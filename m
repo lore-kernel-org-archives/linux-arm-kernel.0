@@ -1,39 +1,22 @@
-From: colin.tuckley@arm.com (Colin Tuckley)
-Date: Thu, 13 Oct 2011 10:09:16 +0100
-Subject: [PATCH 1/5 v4] ARM Realview PCIX map include file changes
-In-Reply-To: <20111012172007.GA21648@n2100.arm.linux.org.uk>
-References: <20111007142310.19554.17204.stgit@e102602-lin.cambridge.arm.com>
-	<20111007142723.19554.88566.stgit@e102602-lin.cambridge.arm.com>
-	<20111007192224.GB25689@n2100.arm.linux.org.uk>
-	<000001cc872e$d1aaf870$7500e950$@tuckley@arm.com>
-	<20111012172007.GA21648@n2100.arm.linux.org.uk>
-Message-ID: <000001cc8987$c9079790$5b16c6b0$@tuckley@arm.com>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Thu, 13 Oct 2011 11:15:39 +0200
+Subject: [RFC 1/5] ARM: dev_archdata: add private iommu extension
+In-Reply-To: <CAK=Wgba6xxD2DBJhM--AcTPBoNRiOZ_6f8+j3bfaCqZMO8A4+w@mail.gmail.com>
+References: <1316948337-7924-1-git-send-email-ohad@wizery.com>
+	<1316948337-7924-2-git-send-email-ohad@wizery.com>
+	<CAK=Wgba6xxD2DBJhM--AcTPBoNRiOZ_6f8+j3bfaCqZMO8A4+w@mail.gmail.com>
+Message-ID: <CAK=Wgbau+XZ-c21FCT8DT0NYfm2uD6WZv3=cU2R23pV7LUkxEA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
-> Subject: Re: [PATCH 1/5 v4] ARM Realview PCIX map include file changes
+On Wed, Oct 5, 2011 at 11:26 AM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
+> Hi Russell,
+>
+> On Sun, Sep 25, 2011 at 1:58 PM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
+>> Add a private iommu pointer to the ARM-specific arch data in the
+>> device struct, which will be used to attach iommu-specific data
+>> to devices which require iommu support.
+>
+> Can you please take a look and ack/nack ?
 
-> On Mon, Oct 10, 2011 at 10:27:08AM +0100, Colin Tuckley wrote:
-> > Ah, I wasn't aware of that. However when I include asm/io.h and
-> remove the
-> 
-> The general rule is that linux/io.h includes asm/io.h, which in turn
-> includes mach/io.h includes and nothing should include either asm/io.h
-> nor mach/io.h directly - if it does, things probably break - which is
-> desirable behaviour because that indicates that the include is wrong.
-
-Right sounds very sensible :)
-
-> > A quick check shows that the piece of code you quote above does not
-> exist in
-> > my (3.1.0-rc9) source tree.
-> 
-> It's not in -rc9, but will be during the next merge window - and is in
-> linux-next.
-
-Ah, understood. Do you have any other concerns about this patch? If not then
-I'll submit it to your patch system with the IO_SPACE_LIMIT stuff fixed.
-
-Colin
+gentle reminder
