@@ -1,42 +1,78 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 13 Oct 2011 11:06:09 +0200
-Subject: [PATCH 1/2] [ARM] mach-types: Re-add apf9328
-In-Reply-To: <20111008220722.GG25689@n2100.arm.linux.org.uk>
-References: <1318087189-22977-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
-	<20111008192621.GA28049@pengutronix.de>
-	<20111008220722.GG25689@n2100.arm.linux.org.uk>
-Message-ID: <20111013090609.GT577@pengutronix.de>
+From: tixy@yxit.co.uk (Tixy)
+Date: Thu, 13 Oct 2011 10:07:32 +0100
+Subject: [PATCH] ARM: kprobes: only patch instructions on one CPU
+In-Reply-To: <1318492515.2265.51.camel@computer2>
+References: <1318435944-21855-1-git-send-email-rabin@rab.in>
+	<1318492515.2265.51.camel@computer2>
+Message-ID: <1318496852.2213.39.camel@computer2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 08, 2011 at 11:07:22PM +0100, Russell King - ARM Linux wrote:
-> On Sat, Oct 08, 2011 at 09:26:21PM +0200, Wolfram Sang wrote:
-> > On Sat, Oct 08, 2011 at 05:19:48PM +0200, Gwenhael Goavec-Merou wrote:
-> > > 
-> > > Signed-off-by: Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>
-> > 
-> > I think this file is maintained by Russell, yet I want to ack that the entry
-> > below is missing for building mx1_defconfig. Found that, too.
+On Thu, 2011-10-13 at 08:55 +0100, Tixy wrote:
+> On Wed, 2011-10-12 at 21:42 +0530, Rabin Vincent wrote:
+> > The text patching needs to be done only once, instead of once on
+> each
+> > CPU.  The other CPUs will busy wait inside the stop machine code
+> until
+> > the patching is done.
 > 
-> The thing is - read the comments at the top of the file.  There's hints
-> there as to what will happen if you patch the file.  The hint is
-> 'automatically generated'.  So when I next update the file, any patches
-> done to the file will be wiped out.
-Currently the id is still missing in your for-next branch and it is
-marked as "mainlined" on http://www.arm.linux.org.uk/developer/machines/
-(906).
+> Where in the stop machine code do the other CPU's busy wait?
+> 
+> How I read the code is that __stop_cpus() calls queue_stop_cpus_work()
+> which queues the work on each of the specified CPU's work list and
+> wakes
+> that CPU's stopper thread to process it. __stop_cpus() then calls
+> wait_for_completion() to wait for these CPUs to finish the work.
+> 
+> I don't see how the execution path of CPUs not specified in cpumask is
+> interrupted in any way.
+> 
 
-That means that the next update should include the id, right? Maybe it's
-worth to add it already earlier with the patch Gwenhael proposed as
-without it mx1_defconfig is broken. After f32609c5a035 it even breaks
-imx_v4_v5_defconfig.
-
-BTW is there a way to see the mach-types file as it would land in
-linux.git if it were updated now?
-
-Best regards
-Uwe
+As I said in my reply to the other mail, I had missed the fact that it
+is stop_machine_cpu_stop() which is used to call our function, and this
+synchronises all cores. Therefore, this patch is correct, assuming that
+a flush_icache_range executed on one core also flushes I-caches on other
+cores. (I'm a bit doubtfull of this as I beleive that at least
+ARM11MPCore requires this to be managed in software and I can't find any
+code that handles this.)
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Tixy
+
+> 
+> > 
+> > Cc: Jon Medhurst <tixy@yxit.co.uk>
+> > Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
+> > Signed-off-by: Rabin Vincent <rabin@rab.in>
+> > ---
+> >  arch/arm/kernel/kprobes.c |    4 ++--
+> >  1 files changed, 2 insertions(+), 2 deletions(-)
+> > 
+> > diff --git a/arch/arm/kernel/kprobes.c b/arch/arm/kernel/kprobes.c
+> > index 129c116..e9f95300 100644
+> > --- a/arch/arm/kernel/kprobes.c
+> > +++ b/arch/arm/kernel/kprobes.c
+> > @@ -127,7 +127,7 @@ void __kprobes arch_arm_kprobe(struct kprobe *p)
+> >               flush_insns(addr, sizeof(u16));
+> >       } else if (addr & 2) {
+> >               /* A 32-bit instruction spanning two words needs
+> special care */
+> > -             stop_machine(set_t32_breakpoint, (void *)addr,
+> &cpu_online_map);
+> > +             stop_machine(set_t32_breakpoint, (void *)addr, NULL);
+> >       } else {
+> >               /* Word aligned 32-bit instruction can be written
+> atomically */
+> >               u32 bkp = KPROBE_THUMB32_BREAKPOINT_INSTRUCTION;
+> > @@ -190,7 +190,7 @@ int __kprobes __arch_disarm_kprobe(void *p)
+> >  
+> >  void __kprobes arch_disarm_kprobe(struct kprobe *p)
+> >  {
+> > -     stop_machine(__arch_disarm_kprobe, p, &cpu_online_map);
+> > +     stop_machine(__arch_disarm_kprobe, p, NULL);
+> >  }
+> >  
+> >  void __kprobes arch_remove_kprobe(struct kprobe *p)
+> 
+> 
+> 
