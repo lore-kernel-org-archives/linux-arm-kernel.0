@@ -1,252 +1,53 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 13 Oct 2011 12:46:07 -0600
-Subject: [PATCH v2 5/5] regulator: map consumer regulator based on device
-	tree
-In-Reply-To: <CACYZBRFmLEY_f1UwJa5U9uj8+NVA-WfUVkiuW1yKrpwnrA_00A@mail.gmail.com>
-References: <1318263578-7407-1-git-send-email-rnayak@ti.com>
-	<1318263578-7407-6-git-send-email-rnayak@ti.com>
-	<20111010173506.GH3607@opensource.wolfsonmicro.com>
-	<CACYZBRFmLEY_f1UwJa5U9uj8+NVA-WfUVkiuW1yKrpwnrA_00A@mail.gmail.com>
-Message-ID: <20111013184607.GQ18574@ponder.secretlab.ca>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Thu, 13 Oct 2011 14:46:44 -0400 (EDT)
+Subject: [GIT PULL] DEBUG_LL platform updates for 3.2
+In-Reply-To: <20111013082345.GF21648@n2100.arm.linux.org.uk>
+References: <20110928103815.GA8344@e102144-lin.cambridge.arm.com>
+	<20111011150915.GE23188@mudshark.cambridge.arm.com>
+	<20111011184821.GA11839@mudshark.cambridge.arm.com>
+	<2414781.rlNqTThJUN@wuerfel>
+	<alpine.LFD.2.02.1110111950290.17040@xanadu.home>
+	<20111013082345.GF21648@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.02.1110131437040.17040@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 11, 2011 at 12:38:53PM +0530, Nayak, Rajendra wrote:
-> >
-> >> + ? ? if (supply) {
-> >> + ? ? ? ? ? ? struct regulator_dev *r;
-> >> + ? ? ? ? ? ? struct device_node *node;
-> >> +
-> >> + ? ? ? ? ? ? /* first do a dt based lookup */
-> >> + ? ? ? ? ? ? if (dev) {
-> >> + ? ? ? ? ? ? ? ? ? ? node = of_get_regulator(dev, supply);
-> >> + ? ? ? ? ? ? ? ? ? ? if (node)
-> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? list_for_each_entry(r, &regulator_list, list)
-> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? if (node == r->dev.parent->of_node)
-> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? goto found;
-> >> ? ? ? ? ? ? ? }
-> >>
-> >> - ? ? ? ? ? ? if (!found) {
-> >> - ? ? ? ? ? ? ? ? ? ? dev_err(dev, "Failed to find supply %s\n",
-> >> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? init_data->supply_regulator);
-> >> - ? ? ? ? ? ? ? ? ? ? ret = -ENODEV;
-> >> - ? ? ? ? ? ? ? ? ? ? goto scrub;
-> >> - ? ? ? ? ? ? }
-> >> + ? ? ? ? ? ? /* next try doing it non-dt way */
-> >> + ? ? ? ? ? ? list_for_each_entry(r, &regulator_list, list)
-> >> + ? ? ? ? ? ? ? ? ? ? if (strcmp(rdev_get_name(r), supply) == 0)
-> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? goto found;
-> >>
-> >> + ? ? ? ? ? ? dev_err(dev, "Failed to find supply %s\n", supply);
-> >> + ? ? ? ? ? ? ret = -ENODEV;
-> >> + ? ? ? ? ? ? goto scrub;
-> >> +
-> >> +found:
-> >
-> > This is all getting *really* complicated and illegible. ?I'm not sure
-> > what the best way to structure is but erroring out early looks useful.
-> >
-> 
-> How about this updated patch?
-> 
-> From f4c7d2b283740382c272c7971665375067d26dbe Mon Sep 17 00:00:00 2001
-> From: Rajendra Nayak <rnayak@ti.com>
-> Date: Thu, 22 Sep 2011 17:51:10 +0530
-> Subject: [PATCH 5/5] regulator: map consumer regulator based on device tree
-> 
-> Device nodes in DT can associate themselves with one or more
-> regulators/supply by providing a list of phandles (to regulator nodes)
-> and corresponding supply names.
-> 
-> For Example:
-> 	devicenode: node at 0x0 {
-> 		...
-> 		...
-> 		vmmc-supply = <&regulator1>;
-> 		vpll-supply = <&regulator1>;
-> 	};
-> 
-> The driver would then do a regulator_get(dev, "vmmc"); to get
-> regulator1 and do a regulator_get(dev, "vpll"); to get
-> regulator2.
-> 
-> of_get_regulator() extracts the regulator node for a given
-> device, based on the supply name.
-> 
-> Use it to look up the regulator for a given consumer from device tree, during
-> a regulator_get(). If not found fallback and lookup through
-> the regulator_map_list instead.
-> 
-> Also, since the regulator dt nodes can use the same binding to
-> associate with a parent regulator/supply, allow the drivers to
-> specify a supply_name, which can then be used to lookup dt
-> to find the parent phandle.
-> 
-> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+On Thu, 13 Oct 2011, Russell King - ARM Linux wrote:
 
-Acked-by: Grant Likely <grant.likely@secretlab.ca>
+> On Tue, Oct 11, 2011 at 08:03:38PM -0400, Nicolas Pitre wrote:
+> > On Tue, 11 Oct 2011, Arnd Bergmann wrote:
+> > 
+> > > I've stuck them into the arm-soc tree for now, so we get linux-next
+> > > coverage, but I won't send them to Linus this way because then we
+> > > would get the same commits twice in the history.
+> > 
+> > Could you please do the same with the following:
+> > 
+> >   git://git.linaro.org/people/nico/linux.git mach_memory_h
+> > 
+> > Russell pulled it at some point, and dropped it due to concerns about 
+> > repeated conflict resolutions (or so I presume).  I just did a test 
+> > merge between your for-next branch and the above and that looked trivial 
+> > enough.
+> 
+> _and_ the breakage of the ZBOOT_ROM stuff.
 
-> ---
->  drivers/regulator/core.c         |   91 +++++++++++++++++++++++++++++++------
->  include/linux/regulator/driver.h |    2 +
->  2 files changed, 78 insertions(+), 15 deletions(-)
-> 
-> Index: linux/drivers/regulator/core.c
-> ===================================================================
-> --- linux.orig/drivers/regulator/core.c	2011-10-11 11:43:27.944140106 +0530
-> +++ linux/drivers/regulator/core.c	2011-10-11 12:25:53.540418748 +0530
-> @@ -25,9 +25,11 @@
->  #include <linux/mutex.h>
->  #include <linux/suspend.h>
->  #include <linux/delay.h>
-> +#include <linux/of.h>
->  #include <linux/regulator/consumer.h>
->  #include <linux/regulator/driver.h>
->  #include <linux/regulator/machine.h>
-> +#include <linux/regulator/of_regulator.h>
-> 
->  #define CREATE_TRACE_POINTS
->  #include <trace/events/regulator.h>
-> @@ -131,6 +133,33 @@
->  	return NULL;
->  }
-> 
-> +/**
-> + * of_get_regulator - get a regulator device node based on supply name
-> + * @dev: Device pointer for the consumer (of regulator) device
-> + * @supply: regulator supply name
-> + *
-> + * Extract the regulator device node corresponding to the supply name.
-> + * retruns the device node corresponding to the regulator if found, else
-> + * returns NULL.
-> + */
-> +static struct device_node *of_get_regulator(struct device *dev, const
-> char *supply)
-> +{
-> +	struct device_node *regnode = NULL;
-> +	char prop_name[32]; /* 32 is max size of property name */
-> +
-> +	dev_dbg(dev, "Looking up %s-supply from device tree\n", supply);
-> +
-> +	snprintf(prop_name, 32, "%s-supply", supply);
-> +	regnode = of_parse_phandle(dev->of_node, prop_name, 0);
-> +
-> +	if (!regnode) {
-> +		pr_warn("%s: %s property in node %s references invalid phandle",
-> +			__func__, prop_name, dev->of_node->full_name);
-> +		return NULL;
-> +	}
-> +	return regnode;
-> +}
-> +
->  /* Platform voltage constraint check */
->  static int regulator_check_voltage(struct regulator_dev *rdev,
->  				   int *min_uV, int *max_uV)
-> @@ -1147,6 +1176,28 @@
->  	return rdev->desc->ops->enable_time(rdev);
->  }
-> 
-> +static struct regulator_dev *regulator_dev_lookup(struct device *dev,
-> +							 const char *supply)
-> +{
-> +	struct regulator_dev *r;
-> +	struct device_node *node;
-> +
-> +	/* first do a dt based lookup */
-> +	if (dev && dev->of_node)
-> +		node = of_get_regulator(dev, supply);
-> +		if (node)
-> +			list_for_each_entry(r, &regulator_list, list)
-> +				if (node == r->dev.parent->of_node)
-> +					return r;
-> +
-> +	/* if not found, try doing it non-dt way */
-> +	list_for_each_entry(r, &regulator_list, list)
-> +		if (strcmp(rdev_get_name(r), supply) == 0)
-> +			return r;
-> +
-> +	return NULL;
-> +}
-> +
->  /* Internal regulator request function */
->  static struct regulator *_regulator_get(struct device *dev, const char *id,
->  					int exclusive)
-> @@ -1155,6 +1206,7 @@
->  	struct regulator_map *map;
->  	struct regulator *regulator = ERR_PTR(-ENODEV);
->  	const char *devname = NULL;
-> +	struct device_node *node;
->  	int ret;
-> 
->  	if (id == NULL) {
-> @@ -1167,6 +1219,10 @@
-> 
->  	mutex_lock(&regulator_list_mutex);
-> 
-> +	rdev = regulator_dev_lookup(dev, id);
-> +	if (rdev)
-> +		goto found;
-> +
->  	list_for_each_entry(map, &regulator_map_list, list) {
->  		/* If the mapping has a device set up it must match */
->  		if (map->dev_name &&
-> @@ -2579,6 +2635,7 @@
->  	static atomic_t regulator_no = ATOMIC_INIT(0);
->  	struct regulator_dev *rdev;
->  	int ret, i;
-> +	const char *supply;
-> 
->  	if (regulator_desc == NULL)
->  		return ERR_PTR(-EINVAL);
-> @@ -2653,21 +2710,18 @@
->  	if (ret < 0)
->  		goto scrub;
-> 
-> -	if (init_data->supply_regulator) {
-> +	if (init_data->supply_regulator)
-> +		supply = init_data->supply_regulator;
-> +	else if (regulator_desc->supply_name);
-> +		supply = regulator_desc->supply_name;
-> +
-> +	if (supply) {
->  		struct regulator_dev *r;
-> -		int found = 0;
-> 
-> -		list_for_each_entry(r, &regulator_list, list) {
-> -			if (strcmp(rdev_get_name(r),
-> -				   init_data->supply_regulator) == 0) {
-> -				found = 1;
-> -				break;
-> -			}
-> -		}
-> +		r = regulator_dev_lookup(dev, supply);
-> 
-> -		if (!found) {
-> -			dev_err(dev, "Failed to find supply %s\n",
-> -				init_data->supply_regulator);
-> +		if (!r) {
-> +			dev_err(dev, "Failed to find supply %s\n", supply);
->  			ret = -ENODEV;
->  			goto scrub;
->  		}
-> Index: linux/include/linux/regulator/driver.h
-> ===================================================================
-> --- linux.orig/include/linux/regulator/driver.h	2011-10-11
-> 11:43:27.936139476 +0530
-> +++ linux/include/linux/regulator/driver.h	2011-10-11 11:43:43.485351850 +0530
-> @@ -153,6 +153,7 @@
->   * this type.
->   *
->   * @name: Identifying name for the regulator.
-> + * @supply_name: Identifying the regulator supply
->   * @id: Numerical identifier for the regulator.
->   * @n_voltages: Number of selectors available for ops.list_voltage().
->   * @ops: Regulator operations table.
-> @@ -162,6 +163,7 @@
->   */
->  struct regulator_desc {
->  	const char *name;
-> +	const char *supply_name;
->  	int id;
->  	unsigned n_voltages;
->  	struct regulator_ops *ops;
+In order to resolve this impass, I simply dropped the ep93xx patch from 
+the series.  This could be revisited later, just like for the 
+StrongARM/XScale cache mapping patches.  Pretty please, tell me if there 
+is still something which is not to your satisfaction.
+
+> So I'm now interpreting your request to Arnd to pull it as an attempt to
+> bypass me.  That's not what arm-soc is supposed to be about, and that's
+> certainly not what Linaro is supposed to be doing.
+
+Not at all.  I asked Arnd to pull it not so this could go to Linus via 
+the arm-soc tree, but rather that this could get increased exposure in 
+both the arm-soc tree and linux-next, and get a feel for the magnitude 
+of the merge conflicts and possible build errors.
+
+I'm therefore officially asking you again to pull this series, given 
+that I've removed from it the last offending piece I know about.
+
+
+Nicolas
