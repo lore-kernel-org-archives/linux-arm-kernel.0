@@ -1,21 +1,31 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Thu, 13 Oct 2011 22:12:40 +0200 (CEST)
-Subject: [PATCH v2] irq: support domains with non-zero hwirq base
-In-Reply-To: <20111013193347.GB18574@ponder.secretlab.ca>
-References: <20111004233953.GE3009@ponder.secretlab.ca>
-	<1317783380-773-1-git-send-email-robherring2@gmail.com>
-	<4E944242.10606@gmail.com>
-	<20111013193347.GB18574@ponder.secretlab.ca>
-Message-ID: <alpine.LFD.2.02.1110132212120.3240@ionos>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Thu, 13 Oct 2011 13:52:34 -0700
+Subject: [PATCH v3.1-rc9] ARM: populate processor tag in proc-cpuinfo
+	for Uni-processor.
+In-Reply-To: <20111013164822.GJ21648@n2100.arm.linux.org.uk>
+References: <1318520590-24372-1-git-send-email-srinivas.kandagatla@st.com>
+	<20111013164822.GJ21648@n2100.arm.linux.org.uk>
+Message-ID: <20111013135234.49f2d400.akpm@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 13 Oct 2011, Grant Likely wrote:
+On Thu, 13 Oct 2011 17:48:22 +0100
+Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
 
-> Thomas, any objection to this patch?  It's entirely contained within
-> the irq_domain stuff, so it is pretty well isolated.
+> On Thu, Oct 13, 2011 at 04:43:10PM +0100, Srinivas KANDAGATLA wrote:
+> > We recently encountered issue while running cyclesoak on ARM-uniprocessor
+> > system, What we have noticed it that /proc/cpuinfo does not have
+> > "processor" tag when its uniprocessor, which looked incorrect.
+> > All the processors code in kernel do populate this tag for both uni and
+> > multi processor systems.
+> > 
+> > This patch just add processor tag for cpuinfo for ARM uni-processor systems.
 > 
-> It can be merged via arm-soc since it is depended on by some of the
-> irq work.
- 
-Acked-by-me
+> I wonder why cyclesoak doesn't use the sysconf(_SC_NPROCESSORS_ONLN)
+> rather than implementing this functionality itself.
+> 
+> akpm?
+
+eep, cyclesoak will soon be celebrating its eleventh birthday. 
+sysconf(_SC_NPROCESSORS_ONLN) might have existed back in those days,
+but I sure didn't know about it!
