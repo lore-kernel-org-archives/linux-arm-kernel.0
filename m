@@ -1,30 +1,39 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 13 Oct 2011 15:29:14 +0100
-Subject: [PATCH] mmc: mmci: Do not release spinlock in request_end
-In-Reply-To: <1318342001-26955-1-git-send-email-ulf.hansson@stericsson.com>
-References: <1318342001-26955-1-git-send-email-ulf.hansson@stericsson.com>
-Message-ID: <20111013142914.GZ21648@n2100.arm.linux.org.uk>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Thu, 13 Oct 2011 10:31:45 -0400 (EDT)
+Subject: [PATCH 2/5] drivercore: Add driver probe deferral mechanism
+In-Reply-To: <CACVXFVNXyzzJw7UK+OFuDe23voQvyywoP9AvUsV=iPDFPO4fPw@mail.gmail.com>
+Message-ID: <Pine.LNX.4.44L0.1110131029510.2026-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 11, 2011 at 04:06:41PM +0200, Ulf Hansson wrote:
-> The patch "mmc: core: move ->request() call from atomic context",
-> is the reason to why this change is possible. This simplifies the
-> error handling code execution path quite a lot and potentially also
-> fixes some error handling hang problems.
+On Thu, 13 Oct 2011, Ming Lei wrote:
+
+> >> Inside device_add(), device_pm_add is called before bus_probe_device,
+> >> so the patch can't change the device order in pm list, and just change
+> >> the driver probe order.
+> >
+> > That's the way it works now, but can it be reworked? ?It would be
 > 
-> Signed-off-by: Ulf Hansson <ulf.hansson@stericsson.com>
+> IMO, it depends on what shape you plan to rework.  Currently, the
+> deferred probe may found a resource dependency, but I am not sure
+> that pm dependency is same with the resource dependency found
+> during probe.
+> 
+> > possible to adjust the list order after successful probe. ?However,
+> > I'm not clear on the ordering rules for the dpm_list. ?Right now it is
+> > explicitly ordered to have parents before children, but as already
+> > expressed, that doesn't accurately represent ordering constraints for
+> > multiple device dependancies.
+> 
+> Maybe we should understand the correct model of the ordering constraints
+> for the multiple device dependancies first, could you give a description or
+> some examples about it?
 
-This doesn't look right:
+The requirement is that devices must be capable of resuming in the 
+order given by dpm_list, and they must be capable of suspending in 
+the reverse order.
 
-void mmc_request_done(struct mmc_host *host, struct mmc_request *mrq)
-{
-        if (err && cmd->retries) {
-                host->ops->request(host, mrq);
+Therefore if device A can't work unless device B is functional, then B 
+must come before A in dpm_list.
 
-So, not dropping the spinlock results in calling the request function
-with the spinlock held - and as the request function then goes on to
-lock the spinlock, we will deadlock.
-
-I don't see anything in current mainline which addresses this, so I'm
-not able to queue this patch.
+Alan Stern
