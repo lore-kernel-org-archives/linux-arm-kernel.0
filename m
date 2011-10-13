@@ -1,66 +1,57 @@
-From: jacmet@sunsite.dk (Peter Korsgaard)
-Date: Thu, 13 Oct 2011 16:45:52 +0200
-Subject: [PATCHv2] atmel_lcdfb: support new-style palette format
-Message-ID: <1318517152-27578-1-git-send-email-jacmet@sunsite.dk>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 13 Oct 2011 15:49:23 +0100
+Subject: [RFC/PATCH 5/7] ARM: Move get_thread_info macro definition to
+	<asm/assembler.h>
+In-Reply-To: <20111013143420.GB21648@n2100.arm.linux.org.uk>
+References: <1317877714-11355-1-git-send-email-gdavis@mvista.com>
+	<1317955121-28047-1-git-send-email-gdavis@mvista.com>
+	<1317955121-28047-6-git-send-email-gdavis@mvista.com>
+	<20111011095639.GB23848@arm.com> <20111012060433.GE188@mvista.com>
+	<20111013143420.GB21648@n2100.arm.linux.org.uk>
+Message-ID: <20111013144923.GE6300@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The newer Atmel SoCs use normal 16bit 565 BGR/RGB for the palette data,
-rather than the special intensity + 555 format.
+On Thu, Oct 13, 2011 at 03:34:20PM +0100, Russell King - ARM Linux wrote:
+> On Wed, Oct 12, 2011 at 02:04:33AM -0400, gdavis at mvista.com wrote:
+> > diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
+> > index 78397d0..eaf4939 100644
+> > --- a/arch/arm/include/asm/assembler.h
+> > +++ b/arch/arm/include/asm/assembler.h
+> > @@ -36,6 +36,20 @@
+> >  	.endm
+> >  #endif  /* !CONFIG_THUMB2_KERNEL */
+> >  
+> > +	.macro	preempt_disable, tsk, cnt
+> > +	get_thread_info \tsk
+> > +	ldr	\cnt, [\tsk, #TI_PREEMPT]
+> > +	add	\cnt, \cnt, #1
+> > +	str	\cnt, [\tsk, #TI_PREEMPT]
+> > +	.endm
+> > +
+> > +	.macro	preempt_enable, tsk, cnt
+> > +	get_thread_info \tsk
+> > +	ldr	\cnt, [\tsk, #TI_PREEMPT]
+> > +	sub	\cnt, \cnt, #1
+> > +	str	\cnt, [\tsk, #TI_PREEMPT]
+> > +	.endm
+> > +
+> >  /*
+> >   * Endian independent macros for shifting bytes within registers.
+> >   */
+> > 
+> > 
+> > Not as efficient as it could be but I imagine the macros could
+> > be written to support optional load of \tsk and/or optional \tmp
+> > parameters to cover other common cases.
+> 
+> It's actually not that simple either: if you disable preemption, then you
+> need to check for a preempt event after re-enabling preemption.
 
-Fill out palette data correctly on these devices, and at the same time
-respect the RGB/BGR wiring mode.
+That's not easily possible in assembly as calling a function would
+corrupt some registers. Is there any disadvantage with just doing the
+equivalent of preempt_enable_no_resched() for a few asm cases where this
+is needed?
 
-Signed-off-by: Peter Korsgaard <jacmet@sunsite.dk>
----
-Changes since v1:
- - ATMEL_LCDC_WIRING_RGB/BGR was swapped
-
- drivers/video/atmel_lcdfb.c |   32 ++++++++++++++++++++++++--------
- 1 files changed, 24 insertions(+), 8 deletions(-)
-
-diff --git a/drivers/video/atmel_lcdfb.c b/drivers/video/atmel_lcdfb.c
-index 63409c1..7ca3eaf 100644
---- a/drivers/video/atmel_lcdfb.c
-+++ b/drivers/video/atmel_lcdfb.c
-@@ -682,14 +682,30 @@ static int atmel_lcdfb_setcolreg(unsigned int regno, unsigned int red,
- 
- 	case FB_VISUAL_PSEUDOCOLOR:
- 		if (regno < 256) {
--			val  = ((red   >> 11) & 0x001f);
--			val |= ((green >>  6) & 0x03e0);
--			val |= ((blue  >>  1) & 0x7c00);
--
--			/*
--			 * TODO: intensity bit. Maybe something like
--			 *   ~(red[10] ^ green[10] ^ blue[10]) & 1
--			 */
-+			if (cpu_is_at91sam9261() || cpu_is_at91sam9263()
-+			    || cpu_is_at91sam9rl()) {
-+				/* old style I+BGR:555 */
-+				val  = ((red   >> 11) & 0x001f);
-+				val |= ((green >>  6) & 0x03e0);
-+				val |= ((blue  >>  1) & 0x7c00);
-+
-+				/*
-+				 * TODO: intensity bit. Maybe something like
-+				 *   ~(red[10] ^ green[10] ^ blue[10]) & 1
-+				 */
-+			} else {
-+				/* new style BGR:565 / RGB:565 */
-+				if (sinfo->lcd_wiring_mode ==
-+				    ATMEL_LCDC_WIRING_RGB) {
-+					val  = ((blue >> 11) & 0x001f);
-+					val |= ((red  >>  0) & 0xf800);
-+				} else {
-+					val  = ((red  >> 11) & 0x001f);
-+					val |= ((blue >>  0) & 0xf800);
-+				}
-+
-+				val |= ((green >>  5) & 0x07e0);
-+			}
- 
- 			lcdc_writel(sinfo, ATMEL_LCDC_LUT(regno), val);
- 			ret = 0;
 -- 
-1.7.6.3
+Catalin
