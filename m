@@ -1,49 +1,122 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 12 Oct 2011 21:29:31 -0600
-Subject: [PATCH 2/3] ARM: Exynos4: Add ioremap interceptor for statically
-	remapped regions
-In-Reply-To: <CAJuYYwTpUX+zdRr5PO9SW+nUFW-BwsSwWkWXNRjw_TKy+vdEgw@mail.gmail.com>
-References: <1318234289-22041-1-git-send-email-thomas.abraham@linaro.org>
-	<1318234289-22041-3-git-send-email-thomas.abraham@linaro.org>
-	<4E95BC8E.8010105@gmail.com>
-	<CAJuYYwSQgiZMEuzyqFvijy+sTLWqi=TqvM8cGe=W3bPOSBe0Hg@mail.gmail.com>
-	<CAJuYYwTpUX+zdRr5PO9SW+nUFW-BwsSwWkWXNRjw_TKy+vdEgw@mail.gmail.com>
-Message-ID: <CACxGe6uDCxC_2fQQm6pYSXSfrvoK0NVoFC5EH0EsZWagPLPr3Q@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 12 Oct 2011 20:56:59 -0700
+Subject: [PATCH] ARM: tegra: update defconfig
+Message-ID: <1318478219-9462-1-git-send-email-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 12, 2011 at 9:28 PM, Thomas Abraham
-<thomas.abraham@linaro.org> wrote:
-> On 12 October 2011 22:00, Thomas Abraham <thomas.abraham@linaro.org> wrote:
->> On 12 October 2011 21:43, Rob Herring <robherring2@gmail.com> wrote:
->>> On 10/10/2011 03:11 AM, Thomas Abraham wrote:
->>>> ioremap() request for statically remapped regions are intercepted and the
->>>> statically assigned virtual address is returned. For requests for which
->>>> there are no statically remapped regions, the requests are let through.
->>>>
->>>> Cc: Kukjin Kim <kgene.kim@samsung.com>
->>>> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
->>>> ---
->>>> ?arch/arm/mach-exynos4/cpu.c ? ? ? ? ? ? | ? 16 ++++++++++++++++
->>>> ?arch/arm/mach-exynos4/include/mach/io.h | ? ?4 ++++
->>>> ?2 files changed, 20 insertions(+), 0 deletions(-)
->>>>
->>>
->>> You won't need this with Nico's vmalloc.h clean-up series. It does
->>> exactly this but generically for all platforms.
->>
->> Ok. Thanks for your suggestion. I will move to using Nico's patches.
->
-> From Nico's reply to his pull request of vmalloc cleanup series, it
-> looks like that pull request has been withdrawn (hope I am not missing
-> anything here). Without Nico's series, and gic dt support for exynos4
-> support requiring this patch, all other workarounds to replace this
-> patch does not seem be correct.
->
-> So is it acceptable to retain this patch and later rework/drop the
-> exynos4 specific ioremap along with Nico's vmalloc patch series when
-> it is merged.
+Refresh tegra_defconfig:
 
-I would say yes, but I don't get to make the decision here.
+New options enabled: RTC, SPI, USB and USB_STORAGE together with
+corresponding tegra drivers. Also enable some of the common usb ethernet
+adapters.
 
-g.
+Finally, enable new merged boards (Ventana) and the generic devicetree board.
+
+Signed-off-by: Olof Johansson <olof@lixom.net>
+---
+ arch/arm/configs/tegra_defconfig |   29 +++++++++++++++++++++--------
+ 1 files changed, 21 insertions(+), 8 deletions(-)
+
+diff --git a/arch/arm/configs/tegra_defconfig b/arch/arm/configs/tegra_defconfig
+index 8845f1c..953aefe 100644
+--- a/arch/arm/configs/tegra_defconfig
++++ b/arch/arm/configs/tegra_defconfig
+@@ -25,6 +25,7 @@ CONFIG_MACH_KAEN=y
+ CONFIG_MACH_PAZ00=y
+ CONFIG_MACH_TRIMSLICE=y
+ CONFIG_MACH_WARIO=y
++CONFIG_MACH_VENTANA=y
+ CONFIG_TEGRA_DEBUG_UARTD=y
+ CONFIG_ARM_ERRATA_742230=y
+ CONFIG_NO_HZ=y
+@@ -38,7 +39,6 @@ CONFIG_HIGHMEM=y
+ CONFIG_ZBOOT_ROM_TEXT=0x0
+ CONFIG_ZBOOT_ROM_BSS=0x0
+ CONFIG_VFP=y
+-CONFIG_PM=y
+ CONFIG_NET=y
+ CONFIG_PACKET=y
+ CONFIG_UNIX=y
+@@ -65,6 +65,7 @@ CONFIG_IPV6_TUNNEL=y
+ CONFIG_IPV6_MULTIPLE_TABLES=y
+ # CONFIG_WIRELESS is not set
+ # CONFIG_FIRMWARE_IN_KERNEL is not set
++CONFIG_PROC_DEVICETREE=y
+ CONFIG_BLK_DEV_LOOP=y
+ CONFIG_MISC_DEVICES=y
+ CONFIG_AD525X_DPOT=y
+@@ -72,34 +73,49 @@ CONFIG_AD525X_DPOT_I2C=y
+ CONFIG_ICS932S401=y
+ CONFIG_APDS9802ALS=y
+ CONFIG_ISL29003=y
++CONFIG_SCSI=y
++CONFIG_BLK_DEV_SD=y
++# CONFIG_SCSI_LOWLEVEL is not set
+ CONFIG_NETDEVICES=y
+ CONFIG_DUMMY=y
++CONFIG_NET_ETHERNET=y
+ CONFIG_R8169=y
+ # CONFIG_NETDEV_10000 is not set
+ # CONFIG_WLAN is not set
++CONFIG_USB_PEGASUS=y
++CONFIG_USB_USBNET=y
++CONFIG_USB_NET_SMSC75XX=y
++CONFIG_USB_NET_SMSC95XX=y
+ # CONFIG_INPUT is not set
+ # CONFIG_SERIO is not set
+ # CONFIG_VT is not set
++# CONFIG_LEGACY_PTYS is not set
+ # CONFIG_DEVKMEM is not set
+ CONFIG_SERIAL_8250=y
+ CONFIG_SERIAL_8250_CONSOLE=y
+-# CONFIG_LEGACY_PTYS is not set
++CONFIG_SERIAL_OF_PLATFORM=y
+ # CONFIG_HW_RANDOM is not set
+ CONFIG_I2C=y
+ # CONFIG_I2C_COMPAT is not set
+ # CONFIG_I2C_HELPER_AUTO is not set
+ CONFIG_I2C_TEGRA=y
++CONFIG_SPI=y
++CONFIG_SPI_TEGRA=y
+ CONFIG_SENSORS_LM90=y
+ CONFIG_MFD_TPS6586X=y
+ CONFIG_REGULATOR=y
+ CONFIG_REGULATOR_TPS6586X=y
+-# CONFIG_USB_SUPPORT is not set
++CONFIG_USB=y
++CONFIG_USB_EHCI_HCD=y
++CONFIG_USB_EHCI_TEGRA=y
++CONFIG_USB_STORAGE=y
+ CONFIG_MMC=y
+ CONFIG_MMC_SDHCI=y
+ CONFIG_MMC_SDHCI_PLTFM=y
+ CONFIG_MMC_SDHCI_TEGRA=y
++CONFIG_RTC_CLASS=y
++CONFIG_RTC_DRV_TEGRA=y
+ CONFIG_STAGING=y
+-# CONFIG_STAGING_EXCLUDE_BUILD is not set
+ CONFIG_IIO=y
+ CONFIG_SENSORS_ISL29018=y
+ CONFIG_SENSORS_AK8975=y
+@@ -123,18 +139,15 @@ CONFIG_NLS_ISO8859_1=y
+ CONFIG_PRINTK_TIME=y
+ CONFIG_MAGIC_SYSRQ=y
+ CONFIG_DEBUG_FS=y
+-CONFIG_DEBUG_KERNEL=y
+ CONFIG_DETECT_HUNG_TASK=y
+ CONFIG_SCHEDSTATS=y
+ CONFIG_TIMER_STATS=y
+ CONFIG_DEBUG_SLAB=y
+ # CONFIG_DEBUG_PREEMPT is not set
+ CONFIG_DEBUG_MUTEXES=y
+-CONFIG_DEBUG_SPINLOCK_SLEEP=y
+ CONFIG_DEBUG_INFO=y
+ CONFIG_DEBUG_VM=y
+ CONFIG_DEBUG_SG=y
+-# CONFIG_RCU_CPU_STALL_DETECTOR is not set
+ CONFIG_DEBUG_LL=y
+ CONFIG_EARLY_PRINTK=y
+ CONFIG_CRYPTO_ECB=y
+-- 
+1.7.4.1
