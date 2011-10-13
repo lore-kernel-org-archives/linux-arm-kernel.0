@@ -1,40 +1,95 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 12 Oct 2011 18:03:21 -0700
-Subject: [PATCH] [RESEND]  ARM: tegra: devices.c should include devices.h
-Message-ID: <1318467801-12184-1-git-send-email-olof@lixom.net>
+From: govindraj.ti@gmail.com (Govindraj)
+Date: Thu, 13 Oct 2011 06:39:18 +0530
+Subject: [PATCH v6 10/16] OMAP2+: UART: Modify omap_uart_can_sleep function
+In-Reply-To: <87wrcangkq.fsf@ti.com>
+References: <1317380561-661-1-git-send-email-govindraj.raja@ti.com>
+	<87vcrv2xox.fsf@ti.com>
+	<CAAL8m4xTmz+-ureDiGPoKUu634q1Wy=h01kpfRWCk9LFCV0+Dg@mail.gmail.com>
+	<87wrcangkq.fsf@ti.com>
+Message-ID: <CAAL8m4zAOw9=qFCYV6-FxqGxQKwNZf71McCUtXSxoFMdOqz5PA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Resolves lots of sparse warnings:
+On Thu, Oct 13, 2011 at 1:11 AM, Kevin Hilman <khilman@ti.com> wrote:
+> Govindraj <govindraj.ti@gmail.com> writes:
+>
+>> On Tue, Oct 11, 2011 at 11:54 PM, Kevin Hilman <khilman@ti.com> wrote:
+>>> "Govindraj.R" <govindraj.raja@ti.com> writes:
+>>>
+>>>> Modify the omap_uart_can_sleep function to check uart is active
+>>>> or not to be used by pm code to enter low power states.
+>>>
+>>> Doesn't the driver now control when the UART clocks are gated (using
+>>> runtime PM autosuspend)?
+>>>
+>>> IMO, this check should be completely removed and the driver should
+>>> be managing this with the autosuspend timeout.
+>>>
+>>>> Removing this check can cause console response little sluggish.
+>>>
+>>> Sluggish in what way?
+>>>
+>>
+>> response is slower like when we type something or cat debugfs/pm_count
+>> see things little slower on console, there is no character loss.
+>>
+>> Happens even though we have not set the autosuspend timeout and uart
+>> clocks are active, which basically means allowing mpu to enter
+>> retention keeping uart active.
+>
+> OK, I see now.
+>
+>> this delay in response or sluggishness is not there on my 3430SDP or
+>> 3630zoom board but I was able to see this behavior on a beagle
+>> board(xm rev c).
+>
+> Here's why:
+>
+> The difference is the powerdomain that the console UART is on for these
+> boards. ?UART1,2 are in CORE, UART2/3 are in PER. ? SDP uses UART1 (CORE),
+> Zoom3 doesn't use OMAP UARTs at all, and Beagle uses UART3 (PER).
+>
+> Due to a HW sleepdep between MPU and CORE, MPU will not transition until
+> CORE does, which means MPU will not transition until UART 1 & 2 are
+> idle.
+>
+> On Beagle, the console is ttyO2 (UART3) which is in PER, and since the
+> MPU is free to transition independently of PER, that is what is
+> happening, resulting in slower response time on for any boards that have
+> PER-UART consoles.
+>
+>> retaining this uart_can_sleep check in omap3_can_sleep ensures a better
+>> console user experience. (not allowing mpu to enter retention
+>> until uart clocks are cut)
+>
+> Yes, but obviously comes at the expense of power savings. ?IOW, This is
+> a hard-coded power vs. performance trade off that we are trying to get
+> away from.
+>
+> So, the root of the problem is that the MPU wakeup latency is causing a
+> "sluggish" console. ?The solution? ?request an MPU wakeup latency
+> constraint.
+>
 
-arch/arm/mach-tegra/devices.c:102:24: warning: symbol 'tegra_i2c_device1' was not declared. Should it be static?
-arch/arm/mach-tegra/devices.c:112:24: warning: symbol 'tegra_i2c_device2' was not declared. Should it be static?
-arch/arm/mach-tegra/devices.c:122:24: warning: symbol 'tegra_i2c_device3' was not declared. Should it be static?
-arch/arm/mach-tegra/devices.c:132:24: warning: symbol 'tegra_i2c_device4' was not declared. Should it be static?
-[...]
+Okay, Will explore this.
 
-Signed-off-by: Olof Johansson <olof@lixom.net>
----
+> This is a classic use-case for such a constraint, and the serial driver
+> should have the option of requesting a constraint to prevent the sluggish
+> console. ?The constraint only needs to be held until the auto-suspend
+> delay expires, so should be relased in the ->runtime_suspend() method of
+> the driver.
+>
+> This constraint needs to be configurable, probably from the board file,
+> so that it is optional, and so users who don't care about sluggish
+> consoles (or non-console UART users who don't care about response time)
+> have the option of preferring power savings over UART responsiveness.
+>
+> As a reference, the i2c driver is currently doing something similar
+> in that it request an MPU constraint to prevent the MPU from going into
+> retention/off while waiting for an i2c interrupt to arrive.
+>
 
-One of these days I will learn to not typo on the mailing list addresses
-for git send-email. Sigh.
+Thanks, will check and try to use the mpu constraints
 
- arch/arm/mach-tegra/devices.c |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/mach-tegra/devices.c b/arch/arm/mach-tegra/devices.c
-index 240d5dc..7a2a02d 100644
---- a/arch/arm/mach-tegra/devices.c
-+++ b/arch/arm/mach-tegra/devices.c
-@@ -29,7 +29,9 @@
- #include <mach/iomap.h>
- #include <mach/dma.h>
- #include <mach/usb_phy.h>
-+
- #include "gpio-names.h"
-+#include "devices.h"
- 
- static struct resource gpio_resource[] = {
- 	[0] = {
--- 
-1.7.4.1
+--
+Govindraj.R.
