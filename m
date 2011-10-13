@@ -1,63 +1,34 @@
-From: jacmet@sunsite.dk (Peter Korsgaard)
-Date: Thu, 13 Oct 2011 14:03:14 +0200
-Subject: [PATCH] atmel_lcdfb: support new-style palette format
-Message-ID: <1318507395-23143-1-git-send-email-jacmet@sunsite.dk>
+From: msalter@redhat.com (Mark Salter)
+Date: Thu, 13 Oct 2011 08:17:47 -0400
+Subject: [PATCH] arm: fix handling of nr_cpus
+In-Reply-To: <20111012172628.GC21648@n2100.arm.linux.org.uk>
+References: <1318339864-32396-1-git-send-email-msalter@redhat.com>
+	<20111012172628.GC21648@n2100.arm.linux.org.uk>
+Message-ID: <1318508268.2300.67.camel@deneb.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The newer Atmel SoCs use normal 16bit 565 BGR/RGB for the palette data,
-rather than the special intensity + 555 format.
+On Wed, 2011-10-12 at 18:26 +0100, Russell King - ARM Linux wrote:
+> On Tue, Oct 11, 2011 at 09:31:04AM -0400, Mark Salter wrote:
+> > The current code duplicates the setup of the cpu_possible bitmap in the
+> > platform smp_init_cpus() function. Unfortunately, all of those places
+> > have the same bug where the nr_cpus kernel parameter is ignored. This patch
+> > consolidates the duplicated code in one place and fixes it to honor the
+> > nr_cpus parameter. This is accomplished by having smp_init_cpus() return
+> > the platform specific number of cores so that the caller (setup_arch) can
+> > set up the cpu_possible bitmap correctly for all platforms.
+> 
+> Who says every platform we're going to see will always have CPUs 0..N ?
+> It's entirely possible that someone might want to have CPUs 0, 2, 3 as
+> possible CPUs but omit CPU1 for platform reasons.
 
-Fill out palette data correctly on these devices, and at the same time
-respect the RGB/BGR wiring mode.
+Good point. We could do that by not setting the cpu_present bit for the
+CPU we want to omit. Or we could leave the current platform cpu_possible
+setup as-is and add something like:
 
-Signed-off-by: Peter Korsgaard <jacmet@sunsite.dk>
----
- drivers/video/atmel_lcdfb.c |   32 ++++++++++++++++++++++++--------
- 1 files changed, 24 insertions(+), 8 deletions(-)
+   for (i = nr_cpu_ids; i < NR_CPUS; i++)
+       set_cpu_possible(i, false);
 
-diff --git a/drivers/video/atmel_lcdfb.c b/drivers/video/atmel_lcdfb.c
-index 63409c1..0e8c38e 100644
---- a/drivers/video/atmel_lcdfb.c
-+++ b/drivers/video/atmel_lcdfb.c
-@@ -682,14 +682,30 @@ static int atmel_lcdfb_setcolreg(unsigned int regno, unsigned int red,
- 
- 	case FB_VISUAL_PSEUDOCOLOR:
- 		if (regno < 256) {
--			val  = ((red   >> 11) & 0x001f);
--			val |= ((green >>  6) & 0x03e0);
--			val |= ((blue  >>  1) & 0x7c00);
--
--			/*
--			 * TODO: intensity bit. Maybe something like
--			 *   ~(red[10] ^ green[10] ^ blue[10]) & 1
--			 */
-+			if (cpu_is_at91sam9261() || cpu_is_at91sam9263()
-+			    || cpu_is_at91sam9rl()) {
-+				/* old style I+BGR:555 */
-+				val  = ((red   >> 11) & 0x001f);
-+				val |= ((green >>  6) & 0x03e0);
-+				val |= ((blue  >>  1) & 0x7c00);
-+
-+				/*
-+				 * TODO: intensity bit. Maybe something like
-+				 *   ~(red[10] ^ green[10] ^ blue[10]) & 1
-+				 */
-+			} else {
-+				/* new style BGR:565 / RGB:565 */
-+				if (sinfo->lcd_wiring_mode ==
-+				    ATMEL_LCDC_WIRING_RGB) {
-+					val  = ((red  >> 11) & 0x001f);
-+					val |= ((blue >>  0) & 0xf800);
-+				} else {
-+					val  = ((blue >> 11) & 0x001f);
-+					val |= ((red  >>  0) & 0xf800);
-+				}
-+
-+				val |= ((green >>  5) & 0x07e0);
-+			}
- 
- 			lcdc_writel(sinfo, ATMEL_LCDC_LUT(regno), val);
- 			ret = 0;
--- 
-1.7.6.3
+to setup_arch after the call to smp_init_cpus.
+
+--Mark
