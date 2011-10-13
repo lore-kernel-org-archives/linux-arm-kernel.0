@@ -1,126 +1,70 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 12 Oct 2011 18:34:22 -0600
-Subject: [PATCH v3 2/4] dmaengine: at_hdmac: add device tree support
-In-Reply-To: <6a7ec87c53609bbb517b199a9b48a5322a625aa1.1318438197.git.nicolas.ferre@atmel.com>
-References: <f91f267b82ac0f0459c11a7bdf3ab0ea8758656a.1318438197.git.nicolas.ferre@atmel.com>
-	<6a7ec87c53609bbb517b199a9b48a5322a625aa1.1318438197.git.nicolas.ferre@atmel.com>
-Message-ID: <20111013003422.GE14042@ponder.secretlab.ca>
+Date: Wed, 12 Oct 2011 19:01:34 -0600
+Subject: [PATCH v2 2/5] tty/serial: atmel_serial: change platform_data
+	variable name
+In-Reply-To: <58d65421a85737b7a25b967da09c3f564fc49be7.1318433947.git.nicolas.ferre@atmel.com>
+References: <37a19e194d02144aecd24f284f5e43979643a3c3.1318433947.git.nicolas.ferre@atmel.com>
+	<58d65421a85737b7a25b967da09c3f564fc49be7.1318433947.git.nicolas.ferre@atmel.com>
+Message-ID: <20111013010134.GL14042@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 12, 2011 at 06:57:12PM +0200, Nicolas Ferre wrote:
-> Add device tree probe support for atmel at_hdmac DMA driver.
-> Bindings are added to specify DMA controller configuration.
+On Wed, Oct 12, 2011 at 06:06:57PM +0200, Nicolas Ferre wrote:
+> Easier to follow if platform_data name is pdata.
 > 
 > Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> ---
->  .../devicetree/bindings/dma/atmel-dma.txt          |   14 +++++++++
->  drivers/dma/at_hdmac.c                             |   30 +++++++++++++++++++-
->  2 files changed, 43 insertions(+), 1 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/dma/atmel-dma.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/dma/atmel-dma.txt b/Documentation/devicetree/bindings/dma/atmel-dma.txt
-> new file mode 100644
-> index 0000000..3c046ee
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/dma/atmel-dma.txt
-> @@ -0,0 +1,14 @@
-> +* Atmel Direct Memory Access Controller (DMA)
-> +
-> +Required properties:
-> +- compatible: Should be "atmel,<chip>-dma"
-> +- reg: Should contain DMA registers location and length
-> +- interrupts: Should contain DMA interrupt
-> +
-> +Examples:
-> +
-> +dma at ffffec00 {
-> +	compatible = "atmel,at91sam9g45-dma";
-> +	reg = <0xffffec00 0x200>;
-> +	interrupts = <21>;
-> +};
-> diff --git a/drivers/dma/at_hdmac.c b/drivers/dma/at_hdmac.c
-> index d1869c5..42bd64c 100644
-> --- a/drivers/dma/at_hdmac.c
-> +++ b/drivers/dma/at_hdmac.c
-> @@ -23,6 +23,8 @@
->  #include <linux/module.h>
->  #include <linux/platform_device.h>
->  #include <linux/slab.h>
-> +#include <linux/of.h>
-> +#include <linux/of_device.h>
->  
->  #include "at_hdmac_regs.h"
->  
-> @@ -1175,6 +1177,20 @@ static void atc_free_chan_resources(struct dma_chan *chan)
->  
->  /*--  Module Management  -----------------------------------------------*/
->  
-> +#if defined(CONFIG_OF)
-> +static const struct of_device_id atmel_dma_dt_ids[] = {
-> +	{
-> +		.compatible = "atmel,at91sam9rl-dma",
-> +		.data = (void *)ATDMA_DEVTYPE_SAM9RL
-> +	}, {
-> +		.compatible = "atmel,at91sam9g45-dma",
-> +		.data = (void *)ATDMA_DEVTYPE_SAM9G45
-> +	}, { /* sentinel */ }
-> +};
-> +
-> +MODULE_DEVICE_TABLE(of, atmel_dma_dt_ids);
-> +#endif
-> +
->  static struct platform_device_id atdma_devtypes[] = {
->  	{
->  		.name = "at91sam9rl_dma",
-> @@ -1187,6 +1203,17 @@ static struct platform_device_id atdma_devtypes[] = {
->  	}
->  };
->  
-> +static inline enum atdma_devtype __init at_dma_get_driver_data(
-> +					struct platform_device *pdev)
-> +{
-> +	if (pdev->dev.of_node) {
-> +		const struct of_device_id *match;
-> +		match = of_match_node(atmel_dma_dt_ids, pdev->dev.of_node);
-
-You'll need to check the return value.  It is possible (though
-unlikely) to have a device with an of_node but still happens to get
-bound via the platform_driver id_table.  In which case match would be
-NULL here.
-
-Otherwise, you can add my a-b after fixing that bug.
 
 Acked-by: Grant Likely <grant.likely@secretlab.ca>
 
-g.
-
-
-> +		return (enum atdma_devtype)match->data;
-> +	}
-> +	return platform_get_device_id(pdev)->driver_data;
-> +}
-> +
->  /**
->   * at_dma_off - disable DMA controller
->   * @atdma: the Atmel HDAMC device
-> @@ -1218,7 +1245,7 @@ static int __init at_dma_probe(struct platform_device *pdev)
->  	dma_cap_set(DMA_MEMCPY, cap_mask);
+> ---
+>  drivers/tty/serial/atmel_serial.c |   14 +++++++-------
+>  1 files changed, 7 insertions(+), 7 deletions(-)
+> 
+> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+> index c7232a9..a507daa 100644
+> --- a/drivers/tty/serial/atmel_serial.c
+> +++ b/drivers/tty/serial/atmel_serial.c
+> @@ -1417,13 +1417,13 @@ static void __devinit atmel_init_port(struct atmel_uart_port *atmel_port,
+>  				      struct platform_device *pdev)
+>  {
+>  	struct uart_port *port = &atmel_port->uart;
+> -	struct atmel_uart_data *data = pdev->dev.platform_data;
+> +	struct atmel_uart_data *pdata = pdev->dev.platform_data;
 >  
->  	/* get DMA parameters from controller type */
-> -	atdmatype = platform_get_device_id(pdev)->driver_data;
-> +	atdmatype = at_dma_get_driver_data(pdev);
+>  	port->iotype		= UPIO_MEM;
+>  	port->flags		= UPF_BOOT_AUTOCONF;
+>  	port->ops		= &atmel_pops;
+>  	port->fifosize		= 1;
+> -	port->line		= data->num;
+> +	port->line		= pdata->num;
+>  	port->dev		= &pdev->dev;
+>  	port->mapbase	= pdev->resource[0].start;
+>  	port->irq	= pdev->resource[1].start;
+> @@ -1433,9 +1433,9 @@ static void __devinit atmel_init_port(struct atmel_uart_port *atmel_port,
 >  
->  	switch (atdmatype) {
->  	case ATDMA_DEVTYPE_SAM9RL:
-> @@ -1526,6 +1553,7 @@ static struct platform_driver at_dma_driver = {
->  	.driver = {
->  		.name	= "at_hdmac",
->  		.pm	= &at_dma_dev_pm_ops,
-> +		.of_match_table	= of_match_ptr(atmel_dma_dt_ids),
->  	},
->  };
+>  	memset(&atmel_port->rx_ring, 0, sizeof(atmel_port->rx_ring));
 >  
+> -	if (data->regs)
+> +	if (pdata->regs)
+>  		/* Already mapped by setup code */
+> -		port->membase = data->regs;
+> +		port->membase = pdata->regs;
+>  	else {
+>  		port->flags	|= UPF_IOREMAP;
+>  		port->membase	= NULL;
+> @@ -1450,9 +1450,9 @@ static void __devinit atmel_init_port(struct atmel_uart_port *atmel_port,
+>  		/* only enable clock when USART is in use */
+>  	}
+>  
+> -	atmel_port->use_dma_rx = data->use_dma_rx;
+> -	atmel_port->use_dma_tx = data->use_dma_tx;
+> -	atmel_port->rs485	= data->rs485;
+> +	atmel_port->use_dma_rx = pdata->use_dma_rx;
+> +	atmel_port->use_dma_tx = pdata->use_dma_tx;
+> +	atmel_port->rs485	= pdata->rs485;
+>  	/* Use TXEMPTY for interrupt when rs485 else TXRDY or ENDTX|TXBUFE */
+>  	if (atmel_port->rs485.flags & SER_RS485_ENABLED)
+>  		atmel_port->tx_done_mask = ATMEL_US_TXEMPTY;
 > -- 
 > 1.7.5.4
 > 
