@@ -1,48 +1,75 @@
-From: tixy@yxit.co.uk (Tixy)
-Date: Thu, 13 Oct 2011 08:40:42 +0100
-Subject: [PATCH] [RFC PATCH] ARM: kprobes: Make breakpoint
-	setting/clearing SMP safe
-In-Reply-To: <CAH+eYFDSG=npBEjEgObqg+vPk8QuJBnnnGyULk9s-C9Bq3iH8Q@mail.gmail.com>
-References: <1310474402-5398-1-git-send-email-tixy@yxit.co.uk>
-	<CAH+eYFDSG=npBEjEgObqg+vPk8QuJBnnnGyULk9s-C9Bq3iH8Q@mail.gmail.com>
-Message-ID: <1318491642.2265.36.camel@computer2>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Thu, 13 Oct 2011 09:55:04 +0200
+Subject: [PATCH V4 3/3] ARM: SAMSUNG: Add lookup of sdhci-s3c clocks using
+	generic names
+In-Reply-To: <CAPs=JDeFyoCYnR-Xa_fdmBVHxfNGuVNfdHd-MZgYcPytprsmFg@mail.gmail.com>
+References: <1318412587-29987-1-git-send-email-rajeshwari.s@samsung.com>
+	<1318412587-29987-4-git-send-email-rajeshwari.s@samsung.com>
+	<4E956ADB.3060604@samsung.com>
+	<CAPs=JDf2N1kh4BO9nPBb-J6k51e-ytntrNOvw_UOKtw-ktdycA@mail.gmail.com>
+	<4E95BDF8.2080406@samsung.com>
+	<CAPs=JDeFyoCYnR-Xa_fdmBVHxfNGuVNfdHd-MZgYcPytprsmFg@mail.gmail.com>
+Message-ID: <4E969958.9020200@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2011-10-12 at 22:03 +0530, Rabin Vincent wrote:
-> On Tue, Jul 12, 2011 at 18:10, Tixy <tixy@yxit.co.uk> wrote:
-> > Both these issues are known and the kprobe implementation uses
-> > stop_machine() to avoid them, however, this is not sufficient.
-> > stop_machine() does not perform any kind on synchronisation between CPUs
-> > so it it still possible for one CPU to call the breakpoint changing
-> > function before another CPU has been interrupted to do likewise.
-> >
-> > To fix this problem, this patch creates a new function
-> > sync_stop_machine() which ensures that all online CPUs execute the
-> > specified function at the same time.
+On 10/13/2011 09:16 AM, Rajeshwari Birje wrote:
+> On Wed, Oct 12, 2011 at 9:49 PM, Sylwester Nawrocki
+> <s.nawrocki@samsung.com> wrote:
+>> On 10/12/2011 02:36 PM, Rajeshwari Birje wrote:
+>>> On Wed, Oct 12, 2011 at 3:54 PM, Sylwester Nawrocki
+>>> <s.nawrocki@samsung.com> wrote:
+>>>> Hi Rajeshwari,
+>>>>
+>>>> On 10/12/2011 11:43 AM, Rajeshwari Shinde wrote:
+>>>>> Add support for lookup of sdhci-s3c controller clocks using generic names
+>>>>> for s3c2416, s3c64xx, s5pc100, s5pv210 and exynos4 SoC's.
+>>>>>
+>>>>> Signed-off-by: Rajeshwari Shinde <rajeshwari.s@samsung.com>
+>>>>> ---
+>>>>>  arch/arm/mach-exynos4/clock.c         |   88 ++++++++++-------
+>>>>>  arch/arm/mach-s3c2416/clock.c         |   68 +++++++------
+>>>>>  arch/arm/mach-s3c64xx/clock.c         |  126 +++++++++++++++----------
+>>>>>  arch/arm/mach-s5pc100/clock.c         |  130 ++++++++++++++++----------
+>>>>>  arch/arm/mach-s5pv210/clock.c         |  167 ++++++++++++++++++++-------------
+>>>>>  arch/arm/plat-s3c24xx/s3c2443-clock.c |   15 ++-
+>>>>>  6 files changed, 359 insertions(+), 235 deletions(-)
+>>>>>
+>>>>> diff --git a/arch/arm/mach-exynos4/clock.c b/arch/arm/mach-exynos4/clock.c
+>>>>> index 9f50e33..c6383b9 100644
+>>>>> --- a/arch/arm/mach-exynos4/clock.c
+>>>>> +++ b/arch/arm/mach-exynos4/clock.c
+>>>>> @@ -1157,42 +1157,6 @@ static struct clksrc_clk clksrcs[] = {
+>>>>>               .reg_div = { .reg = S5P_CLKDIV_MFC, .shift = 0, .size = 4 },
+>> ...
+>>>>> +static struct clksrc_clk clk_sclk_mmc0 = {
+>>>>> +     .clk            = {
+>>>>> +             .name           = "sclk_mmc",
+>>>>> +             .devname        = "s3c-sdhci.0",
+>>>>
+>>>> Would it make sense to drop this 'devname' field here and others
+>>>> until sclk_mmc3 ....
+>>>
+>>> *** The devname here distinguishes these clocks. So it should be okay
+>>> to have a devname for these clocks.
+>>
+>> I'm not sure what's Mr Kukjin's opinion on that, but I personally would really
+>> like to see all the devname fields disappear from samsung clk data structures.
+>> Possibly if all involved people would keep that in mind we could achieve this
+>> over time.
 > 
-> AFAICS stop_machine() already does what you want.  When you use
-> stop_machine(), the actual call to your function is done (on each
-> CPU's stopper thread) using the stop_machine_cpu_stop() function,
-> which already has the synchronization between CPUs which you're
-> trying to do here.
+> 
+> **** Devname field is still required for clocks like hsmmc for driver
+> to work fine. Hence it would be tough to remove the devname
+> completely.
 
-The only serialisation I can see is the wait_for_completion() in
-__stop_cpus() which waits for the all CPUs to have executed the
-requested function. I don't see anything which prevents one CPU from
-starting (and finishing) the requested function before other CPU's are
-ready for it. If this synchronisation existed it would have to be in
-cpu_stopper_thread() as it pulls tasks off the work list.
+Yes, it allowed to add clkdev support with minimal changes required.
 
-In queue_stop_cpus_work() we have
+But let's see what happens when the works on common struct clk for all
+architectures are more or less completed and we convert Samsung platforms
+to use it;)
 
-	for_each_cpu(cpu, cpumask)
-		cpu_stop_queue_work(&per_cpu(cpu_stopper, cpu),
-				    &per_cpu(stop_cpus_work, cpu));
-
-If the CPU executing this gets delayed by an ISR on each iteration of
-the for_each_cpu loop then the work it queues for one CPU could have
-completed before it gets around to queuing it for the next CPU.
-
+Regards,
 -- 
-Tixy
+Sylwester Nawrocki
+Samsung Poland R&D Center
