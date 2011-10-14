@@ -1,48 +1,33 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Fri, 14 Oct 2011 11:04:49 +0100
-Subject: [PATCH 0/2] ARM: amba: Enable module alias autogeneration for AMBA
-	drivers
-Message-ID: <1318586691-3833-1-git-send-email-dave.martin@linaro.org>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Fri, 14 Oct 2011 11:05:04 +0100
+Subject: [PATCH v2 1/7] clk: Add a generic clock infrastructure
+In-Reply-To: <20111014081024.GA9485@b20223-02.ap.freescale.net>
+References: <1316730422-20027-1-git-send-email-mturquette@ti.com>
+	<1316730422-20027-2-git-send-email-mturquette@ti.com>
+	<20111014081024.GA9485@b20223-02.ap.freescale.net>
+Message-ID: <20111014100504.GC2966@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[This is a partial repost of a series previously posted to alkml.
+On Fri, Oct 14, 2011 at 04:10:26PM +0800, Richard Zhao wrote:
+> On Thu, Sep 22, 2011 at 03:26:56PM -0700, Mike Turquette wrote:
 
-This post contains the core changes.  The driver-specific changes
-can be found on alkml.]
+snip essentially Mike's entire mail - *please* delete irrelevant quotes
+from your replies, it makes it very much easier to find the new text in
+your mail and is much more friendly to people reading mail on mobile
+devices.
 
- --
+> > +static int __clk_enable(struct clk *clk)
+> > +{
 
-There's no special reason why AMBA device drivers should not be
-auto-loadable via udev, but udev currently has no way to map AMBA
-device IDs to drivers.
+> Could you expose __clk_enable/__clk_disable? I find it hard to implement
+> clk group. clk group means, when a major clk enable/disable, it want a set
+> of other clks enable/disable accordingly.
 
-As part of the effort to help enable the building of multiple
-ARM platforms into a single kernel image in the future, it's desirable
-to be able to build any non-critical platform-specific drivers as
-modules.
-
-A straightforward solution is to use modaliases to allow udev to
-identify the correct driver module to load.
-
-This series enables the general infrastructure for modalias generation
-to work for AMBA devices, and enables it in the affected drivers.
-
-Briefly tested on Versatile Express, including aaci, mmci and amba-clcd
-(which appears to have the most interesting modalias match pattern).
-For me, the appropiate modules now get loaded at udev trigger time.
-
-Any comments and feedback are welcome.
-
-Dave Martin (2):
-  ARM: amba: Move definition of struct amba_id to mod_devicetable.h
-  ARM: amba: Auto-generate AMBA driver module aliases during modpost
-
- drivers/amba/bus.c              |    9 ++++-
- include/linux/amba/bus.h        |    7 +---
- include/linux/mod_devicetable.h |   18 ++++++++++
- scripts/mod/file2alias.c        |   72 +++++++++++++++++++++++++++++++++++++++
- 4 files changed, 99 insertions(+), 7 deletions(-)
-
--- 
-1.7.4.1
+Shouldn't this be something the core is implementing?  I'd strongly
+expect that the clock drivers are relatively dumb and delegate all the
+decision making to the core API.  Otherwise it's going to be hard for
+the core to implement any logic that involves working with more than one
+clock like rate change notification, or guarantee that driver requests
+made through the API are satisfied, as the state of the clocks will be
+changing underneath it.
