@@ -1,67 +1,77 @@
-From: ddaney.cavm@gmail.com (David Daney)
-Date: Fri, 14 Oct 2011 11:56:15 -0700
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Fri, 14 Oct 2011 13:03:27 -0600
 Subject: [PATCH 2/5] drivercore: Add driver probe deferral mechanism
-In-Reply-To: <CACxGe6t2Xu5B0AKZJe-6HEpxK6GfuNm0Y2Kb_bs8ZwaTz5XnRg@mail.gmail.com>
+In-Reply-To: <4E9885CF.1000301@gmail.com>
 References: <CACxGe6vF6em0-PnJ7UuH0CQ0_StJTfmFKBsktvb9O+ccCx6E8A@mail.gmail.com>
 	<Pine.LNX.4.44L0.1110141229450.2036-100000@iolanthe.rowland.org>
 	<CACxGe6t2Xu5B0AKZJe-6HEpxK6GfuNm0Y2Kb_bs8ZwaTz5XnRg@mail.gmail.com>
-Message-ID: <4E9885CF.1000301@gmail.com>
+	<4E9885CF.1000301@gmail.com>
+Message-ID: <CACxGe6v=NuxX3b=7wG6hMZjO22_zEg3Q4LtjT3UPtv2bKFtjWQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/14/2011 10:20 AM, Grant Likely wrote:
-> On Fri, Oct 14, 2011 at 10:33 AM, Alan Stern<stern@rowland.harvard.edu>  wrote:
->> On Fri, 14 Oct 2011, Grant Likely wrote:
+On Fri, Oct 14, 2011 at 12:56 PM, David Daney <ddaney.cavm@gmail.com> wrote:
+> On 10/14/2011 10:20 AM, Grant Likely wrote:
 >>
->>>> How can a device acquire children before it has a driver?
+>> On Fri, Oct 14, 2011 at 10:33 AM, Alan Stern<stern@rowland.harvard.edu>
+>> ?wrote:
 >>>
->>> There are a few potential situations in embedded systems (or at least
->>> nothing currently prevents it) where platform setup code constructs a
->>> device hierarchy without the aid of device drivers, and it is still
->>> possible for a parent device to be attached to a driver.  IIUC, SPARC
->>> creates an entire hierarchy of platform_devices from all the nodes in
->>> the OpenFirmware device tree, and any of those devices can be bound to
->>> a driver.  I don't like that approach, but at the very least it needs
->>> to be guarded against.
+>>> On Fri, 14 Oct 2011, Grant Likely wrote:
+>>>
+>>>>> How can a device acquire children before it has a driver?
+>>>>
+>>>> There are a few potential situations in embedded systems (or at least
+>>>> nothing currently prevents it) where platform setup code constructs a
+>>>> device hierarchy without the aid of device drivers, and it is still
+>>>> possible for a parent device to be attached to a driver. ?IIUC, SPARC
+>>>> creates an entire hierarchy of platform_devices from all the nodes in
+>>>> the OpenFirmware device tree, and any of those devices can be bound to
+>>>> a driver. ?I don't like that approach, but at the very least it needs
+>>>> to be guarded against.
+>>>
+>>> Do these devices ever require deferred probes?
 >>
->> Do these devices ever require deferred probes?
+>> Yes, they very well might. ?However, I'm happy with the limitation
+>> that only leaf devices can take advantage of probe deferral.
+>>
 >
-> Yes, they very well might.  However, I'm happy with the limitation
-> that only leaf devices can take advantage of probe deferral.
 >
+> I have:
+>
+> I2C-Bus-A
+> ?+--Mux-I2C (controlled by parent I2C-Bus-A)
+> ? ? ?+---I2C-Bus-1
+> ? ? ?| ? ? ?+--GPIO-Expander-A
+> ? ? ?|
+> ? ? ?+---I2C-Bus-2
+> ? ? ? ? ? ? +--GPIO-Expander-B
+>
+> These all have a parent/child relationship so no deferral is needed, so far
+> so good.
+>
+>
+> Then this:
+>
+> MDIO-Bus-A
+> ? +---Mux-MDIO (controlled by GPIO-Expander-A)
+> ? ? ? ? +---MDIO-Bus-1
+> ? ? ? ? |
+> ? ? ? ? +---MDIO-Bus-2
+> ? ? ? ? ? ? ? +---PHY-1
+> ? ? ? ? ? ? ? |
+> ? ? ? ? ? ? ? +---PHY-2
+>
+> In this case the driver for Mux-MDIO needs to be deferred until *both*
+> MDIO-Bus-A's driver *and* GPIO-Expander-B's driver are loaded. ?A perfect
+> use case for the patch.
+>
+> Would you consider Mux-MDIO to be a 'leaf device'? ?If not, then I have real
+> problems with 'the limitation that only leaf devices can take advantage of
+> probe deferral'
 
+leaf device **at the time of its driver probe**.  :-)  After the
+device has all of its dependencies met, it can freely add child
+devices.  In your case, the child devices will get added by the
+Mux-MDIO device driver, so all is good.
 
-I have:
-
-I2C-Bus-A
-   +--Mux-I2C (controlled by parent I2C-Bus-A)
-       +---I2C-Bus-1
-       |      +--GPIO-Expander-A
-       |
-       +---I2C-Bus-2
-              +--GPIO-Expander-B
-
-These all have a parent/child relationship so no deferral is needed, so 
-far so good.
-
-
-Then this:
-
-MDIO-Bus-A
-    +---Mux-MDIO (controlled by GPIO-Expander-A)
-          +---MDIO-Bus-1
-          |
-          +---MDIO-Bus-2
-                +---PHY-1
-                |
-                +---PHY-2
-
-In this case the driver for Mux-MDIO needs to be deferred until *both* 
-MDIO-Bus-A's driver *and* GPIO-Expander-B's driver are loaded.  A 
-perfect use case for the patch.
-
-Would you consider Mux-MDIO to be a 'leaf device'?  If not, then I have 
-real problems with 'the limitation that only leaf devices can take 
-advantage of probe deferral'
-
-David Daney
+g.
