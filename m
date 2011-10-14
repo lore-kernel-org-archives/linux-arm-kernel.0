@@ -1,33 +1,78 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 14 Oct 2011 11:05:04 +0100
-Subject: [PATCH v2 1/7] clk: Add a generic clock infrastructure
-In-Reply-To: <20111014081024.GA9485@b20223-02.ap.freescale.net>
-References: <1316730422-20027-1-git-send-email-mturquette@ti.com>
-	<1316730422-20027-2-git-send-email-mturquette@ti.com>
-	<20111014081024.GA9485@b20223-02.ap.freescale.net>
-Message-ID: <20111014100504.GC2966@opensource.wolfsonmicro.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Fri, 14 Oct 2011 11:04:50 +0100
+Subject: [PATCH 1/2] ARM: amba: Move definition of struct amba_id to
+	mod_devicetable.h
+In-Reply-To: <1318586691-3833-1-git-send-email-dave.martin@linaro.org>
+References: <1318586691-3833-1-git-send-email-dave.martin@linaro.org>
+Message-ID: <1318586691-3833-2-git-send-email-dave.martin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 14, 2011 at 04:10:26PM +0800, Richard Zhao wrote:
-> On Thu, Sep 22, 2011 at 03:26:56PM -0700, Mike Turquette wrote:
+The general kernel infrastructure for adding module alises during
+module post processing expects the affected device type
+identification structures in a common header
+<linux/mod_devicetable.h>.
 
-snip essentially Mike's entire mail - *please* delete irrelevant quotes
-from your replies, it makes it very much easier to find the new text in
-your mail and is much more friendly to people reading mail on mobile
-devices.
+This patch simple moves struct amba_id to the common header, and
+adds the appropriate include in <linux/amba/bus.h>.
 
-> > +static int __clk_enable(struct clk *clk)
-> > +{
+Signed-off-by: Dave Martin <dave.martin@linaro.org>
+---
+ include/linux/amba/bus.h        |    7 +------
+ include/linux/mod_devicetable.h |   18 ++++++++++++++++++
+ 2 files changed, 19 insertions(+), 6 deletions(-)
 
-> Could you expose __clk_enable/__clk_disable? I find it hard to implement
-> clk group. clk group means, when a major clk enable/disable, it want a set
-> of other clks enable/disable accordingly.
-
-Shouldn't this be something the core is implementing?  I'd strongly
-expect that the clock drivers are relatively dumb and delegate all the
-decision making to the core API.  Otherwise it's going to be hard for
-the core to implement any logic that involves working with more than one
-clock like rate change notification, or guarantee that driver requests
-made through the API are satisfied, as the state of the clocks will be
-changing underneath it.
+diff --git a/include/linux/amba/bus.h b/include/linux/amba/bus.h
+index fcbbe71..724c69c 100644
+--- a/include/linux/amba/bus.h
++++ b/include/linux/amba/bus.h
+@@ -16,6 +16,7 @@
+ 
+ #include <linux/clk.h>
+ #include <linux/device.h>
++#include <linux/mod_devicetable.h>
+ #include <linux/err.h>
+ #include <linux/resource.h>
+ #include <linux/regulator/consumer.h>
+@@ -35,12 +36,6 @@ struct amba_device {
+ 	unsigned int		irq[AMBA_NR_IRQS];
+ };
+ 
+-struct amba_id {
+-	unsigned int		id;
+-	unsigned int		mask;
+-	void			*data;
+-};
+-
+ struct amba_driver {
+ 	struct device_driver	drv;
+ 	int			(*probe)(struct amba_device *, const struct amba_id *);
+diff --git a/include/linux/mod_devicetable.h b/include/linux/mod_devicetable.h
+index 468819c..83ac071 100644
+--- a/include/linux/mod_devicetable.h
++++ b/include/linux/mod_devicetable.h
+@@ -542,4 +542,22 @@ struct isapnp_device_id {
+ 	kernel_ulong_t driver_data;	/* data private to the driver */
+ };
+ 
++/**
++ * struct amba_id - identifies a device on an AMBA bus
++ * @id: The significant bits if the hardware device ID
++ * @mask: Bitmask specifying which bits of the id field are significant when
++ *	matching.  A driver binds to a device when ((hardware device ID) & mask)
++ *	== id.
++ * @data: Private data used by the driver.
++ */
++struct amba_id {
++	unsigned int		id;
++	unsigned int		mask;
++#ifndef __KERNEL__
++	kernel_ulong_t		data;
++#else
++	void			*data;
++#endif
++};
++
+ #endif /* LINUX_MOD_DEVICETABLE_H */
+-- 
+1.7.4.1
