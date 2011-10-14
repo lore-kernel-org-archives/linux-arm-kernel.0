@@ -1,49 +1,53 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 14 Oct 2011 17:29:41 +0200
-Subject: [PATCH] arm/tegra: select AUTO_ZRELADDR by default
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF173BE1A260@HQMAIL01.nvidia.com>
-References: <1317172068-14872-1-git-send-email-pdeschrijver@nvidia.com>
-	<20111014071500.GP21648@n2100.arm.linux.org.uk>
-	<74CDBE0F657A3D45AFBB94109FB122FF173BE1A260@HQMAIL01.nvidia.com>
-Message-ID: <201110141729.41515.arnd@arndb.de>
+Date: Fri, 14 Oct 2011 17:34:21 +0200
+Subject: [PATCH v4 8/8] ARM: pxa: move macros into gpio-pxa.c
+In-Reply-To: <CAMPhdO9ig99=w0TOEEw1gnp7x-WRy1N4Fsu3A3_YiEjX+_BbhQ@mail.gmail.com>
+References: <1318478825-17187-1-git-send-email-haojian.zhuang@marvell.com>
+	<CAN1soZxCnZjDw14WZ7vprkTQWjki5Zd47pQf2zzoJQ1O9qSKog@mail.gmail.com>
+	<CAMPhdO9ig99=w0TOEEw1gnp7x-WRy1N4Fsu3A3_YiEjX+_BbhQ@mail.gmail.com>
+Message-ID: <201110141734.22115.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 14 October 2011, Stephen Warren wrote:
-> Russell King wrote at Friday, October 14, 2011 1:15 AM:
-> > On Thu, Oct 13, 2011 at 04:38:46PM -0700, Olof Johansson wrote:
-> > 
-> > I'll point out that this makes Tegra incompatible with ZBOOT_ROM, which
-> > can still be enabled.  ZBOOT_ROM=y AUTO_ZRELADDR=y is an invalid
-> > configuration at runtime.
-> 
-> I see that at least one machine solves that by doing:
-> 
-> config ARCH_EP93XX
-> ...
->         select AUTO_ZRELADDR if !ZBOOT_ROM
-> 
-> That said, given the way Tegra works, ZBOOT_ROM isn't useful; typically,
-> systems don't use NOR flash for storage of the kernel, so I don't think
-> ZBOOT_ROM is likely to be used. Perhaps we should just depend on !ZBOOT_ROM?
+On Friday 14 October 2011, Eric Miao wrote:
+> On Fri, Oct 14, 2011 at 5:13 PM, Haojian Zhuang
+> <haojian.zhuang@gmail.com> wrote:
+> > On Fri, Oct 14, 2011 at 2:17 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
+> >>>
+> >>>> +enum pxa_gpios {
+> >>>> +     PXA_GPLR = 0x00,        /* GPIO Pin Level Registers */
+> >>>> +     PXA_GPDR = 0x0C,        /* GPIO Pin Direction Registers */
+> >>>> +     PXA_GPSR = 0x18,        /* GPIO Pin Output Set Registers */
+> >>>> +     PXA_GPCR = 0x24,        /* GPIO Pin Output Clear Registers */
+> >>>> +     PXA_GRER = 0x30,        /* GPIO Rising Edge Detect Registers */
+> >>>> +     PXA_GFER = 0x3C,        /* GPIO Falling Edge Detect Registers */
+> >>>> +     PXA_GEDR = 0x48,        /* GPIO Edge Detect Status Registers */
+> >>>> +     PXA_GAFR = 0x54,        /* GPIO Alternate Function Select Registers */
+> >>>> +     PXA_ED_MASK = 0x9C,     /* GPIO edge detection for AP side */
+> >>>> +};
+> >>
+> >> And Haojian,
+> >>
+> >> Is this is completely for the GPIO driver's internal use, I'd prefer to
+> >> use GPxR names directly, instead of prefixing it with PXA_, that's a
+> >> bit ugly from my picky point of view.
 
-That sounds like a correct fix, but also confusing because the top-level
-subarchitecture selection should not depend on too many things that are
-not obvious to someone configuring the kernel. From the perspective
-of least suprise I would think that instead ZBOOTROM should depend on
-!ARCH_TEGRA, but there is no precedent for this in the current Kconfig.
+It's not entirely internal to the driver, but internal to pxa specific code
+including a few of the board files.
 
-You mention that tegra30 will require AUTO_ZRELADDR. Does that mean that
-with tegra30 merged you would no longer be able to build any tegra
-kernel? If not, the best solution for now would probably be to
-put AUTO_ZRELADDR into the defconfig for now (provided that tegra20 can
-still boot without it) and make tegra30 depend on AUTO_ZRELADDR within
-the tegra Kconfig.
+> > OK, I'll GPxR directly. And I'll keep PXA_GPIO_bit() to avoid
+> > potential name issue.
+> >
+> 
+> I think GPIO_bit() is just fine if it's only used in gpio-pxa.c. I do
+> prefer to have PXA_* prefixes as less as possible unless absolutely
+> necessary.
 
-This is only a temporary solution I think, because it is one of the
-areas that we will have to revisit once we make it possible to combine
-multiple subarchitectures into a single kernel. I have some ideas how
-I would express that in Kconfig but I'm sure that we will have a lot
-of debate over it before we coem to a solution that works for everyone.
+I think I would prefer the PXA_* prefix (or even PXA_GPIO_*) as long as
+the constants are used outside of the driver implementation, as a
+reminder that these uses should eventually disappear, at least after
+all the pxa board files have been converted into device tree descriptions
+and the pxa_gpio driver itself knows how to set up the gpio lines for
+a given board.
 
 	Arnd
