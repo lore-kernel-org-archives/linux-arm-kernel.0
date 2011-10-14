@@ -1,206 +1,381 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 14 Oct 2011 09:02:09 -0700
-Subject: [GIT PULL] initial omap DT support for v3.2 merge window (Re:
-	[PATCH 26/30] ARM: omap: add board autoselection)
-In-Reply-To: <20111005010550.GX6324@atomide.com>
-References: <1317566760-25681-1-git-send-email-arnd@arndb.de>
-	<201110040944.13205.arnd@arndb.de>
-	<20111004155752.GT6324@atomide.com> <2340307.S2RzXdHlIz@wuerfel>
-	<20111005010550.GX6324@atomide.com>
-Message-ID: <20111014160209.GA27515@atomide.com>
+From: jm@lentin.co.uk (Jamie Lentin)
+Date: Fri, 14 Oct 2011 17:08:09 +0100
+Subject: [PATCH] mach-kirkwood: Add support for D-Link DNS-325
+Message-ID: <op.v3cm3vmp4cuzmg@gonzo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd,
+This patch adds support for the D-Link DNS-325 NAS. A kirkwood-based successor
+to the DNS-323.
 
-* Tony Lindgren <tony@atomide.com> [111004 17:32]:
-> * Arnd Bergmann <arnd@arndb.de> [111004 11:55]:
-> > On Tuesday 04 October 2011 08:57:52 Tony Lindgren wrote:
-> > > * Arnd Bergmann <arnd@arndb.de> [111004 00:10]:
-> > > > On Monday 03 October 2011, Tony Lindgren wrote:
-> > > >
-> > > > > Yes please leave out the list so we don't need to constantly update it.
-> > > > > Let's just always build in MACH_OMAP_GENERIC.
-> > > > 
-> > > > That's what I had initially, but now that board file has become
-> > > > omap2-specific and no longer works on omap3-only or omap4-only
-> > > > configurations.
-> > > 
-> > > Will send a pull request for basic DT bootstrap support from Benoit
-> > > that fixes that. So maybe let's sort that out first, then always
-> > > select it?
-> > 
-> > Yes, sounds good. That is certainly the better solution in the long run.
-> 
-> Here you are. We had to rebase it earlier today because of the
-> SOB update in fixes branch for the musb related fix that's needed
-> here to avoid a merge conflict.
-> 
-> This series pretty much depends and conflicts with all the ealier
-> branches, so I created a new dt-base branch to deal with the merge
-> conflicts. If you prefer some other base, please let me know.
-> 
-> If you prefer to build some other merge base yourself, see the
-> attached patch that's needed to avoid two build warnings after
-> merging the various base branches together.
-> 
-> The dt-base I did is a merge of cleanup-part3, voltage, dmtimer
-> and l3 into fixes. You may not yet have l3 and fixes pulled in,
-> I sent pull requests for those yesterday. The others you have
-> already pulled I believe.
-> 
-> Despite using the merge base this will cause a minor merge conflict
-> in board-generic.c with Nicolas Pitre's earlier patch titled
-> "ARM: mach-omap2: convert boot_params to atag_offset". The 
-> atag_offset can be just left out, as the default will work.
+Signed-off-by: Jamie Lentin <jm@lentin.co.uk>
+---
+The code is largely based on either other kirkwood devices or the DNS-323, so
+there shouldn't be anything too weird. A few points though:-
 
-Ping, any news on merging these? It would be nice to get these out of
-the way so we have something to base other branches on without having
-constant merge conflicts.
- 
-> Regards,
-> 
-> Tony
-> 
-> 
-> The following changes since commit c541c15fb5ab48c47bc9b90121538fd30d152f23:
->   Tony Lindgren (1):
->         Merge branches 'cleanup-part3', 'voltage', 'dmtimer' and 'l3' into dt-base
-> 
-> are available in the git repository at:
-> 
->   git://github.com/tmlind/linux.git dt
-> 
-> Benoit Cousson (18):
->       ARM: OMAP3: beagle-board: Use the omap_hwmod_name_get_dev API
->       ARM: OMAP2+: pm: Use hwmod name instead of dev pointer
->       ARM: OMAP2+: pm: Remove static devices variable for mpu, dsp, iva and l3 PM
->       ARM: OMAP: omap_device: Create a default omap_device_pm_latency
->       ARM: OMAP2+: devices: Remove all omap_device_pm_latency structures
->       of: Add helpers to get one string in multiple strings property
->       ARM: OMAP: omap_device: Add omap_device_[alloc|delete] for DT integration
->       ARM: OMAP: omap_device: Add a method to build an omap_device from a DT node
->       arm/dts: Add initial device tree support for OMAP4 SoC
->       arm/dts: Add support for OMAP4 PandaBoard
->       arm/dts: Add support for OMAP4 SDP board
->       arm/dts: Add initial device tree support for OMAP3 SoC
->       arm/dts: Add support for OMAP3 Beagle board
->       ARM: OMAP2+: board-generic: Add DT support to generic board
->       ARM: OMAP2+: board-generic: Add i2c static init
->       ARM: OMAP2+: l3-noc: Add support for device-tree
->       arm/dts: OMAP4: Add a main ocp entry bound to l3-noc driver
->       arm/dts: OMAP3+: Add mpu, dsp and iva nodes
-> 
-> Nishanth Menon (1):
->       ARM: OMAP: omap_device: Add omap_device_get_by_hwmod_name
-> 
-> Tony Lindgren (1):
->       Merge branch 'for_3.2/3_omap_devicetree' of git://gitorious.org/omap-pm/linux into dt
-> 
->  Documentation/devicetree/bindings/arm/omap/dsp.txt |   14 +
->  Documentation/devicetree/bindings/arm/omap/iva.txt |   19 ++
->  .../devicetree/bindings/arm/omap/l3-noc.txt        |   19 ++
->  Documentation/devicetree/bindings/arm/omap/mpu.txt |   27 ++
->  .../devicetree/bindings/arm/omap/omap.txt          |   43 +++
->  arch/arm/boot/dts/omap3-beagle.dts                 |   29 ++
->  arch/arm/boot/dts/omap3.dtsi                       |   63 ++++
->  arch/arm/boot/dts/omap4-panda.dts                  |   29 ++
->  arch/arm/boot/dts/omap4-sdp.dts                    |   29 ++
->  arch/arm/boot/dts/omap4.dtsi                       |  103 +++++++
->  arch/arm/mach-omap2/Kconfig                        |    8 +-
->  arch/arm/mach-omap2/board-generic.c                |  156 ++++++++---
->  arch/arm/mach-omap2/board-omap3beagle.c            |    4 +-
->  arch/arm/mach-omap2/devices.c                      |   51 +---
->  arch/arm/mach-omap2/display.c                      |   11 +-
->  arch/arm/mach-omap2/dma.c                          |   11 +-
->  arch/arm/mach-omap2/gpio.c                         |   12 +-
->  arch/arm/mach-omap2/hsmmc.c                        |   18 +-
->  arch/arm/mach-omap2/hwspinlock.c                   |   12 +-
->  arch/arm/mach-omap2/mcbsp.c                        |   11 +-
->  arch/arm/mach-omap2/omap_l3_noc.c                  |   25 ++-
->  arch/arm/mach-omap2/pm.c                           |   72 ++---
->  arch/arm/mach-omap2/serial.c                       |   25 +--
->  arch/arm/mach-omap2/sr_device.c                    |   11 +-
->  arch/arm/mach-omap2/usb-musb.c                     |   11 +-
->  arch/arm/plat-omap/i2c.c                           |   10 +-
->  arch/arm/plat-omap/include/plat/omap_device.h      |    1 +
->  arch/arm/plat-omap/omap_device.c                   |  313 +++++++++++++++++---
->  drivers/of/base.c                                  |   84 ++++++
->  include/linux/of.h                                 |   18 ++
->  30 files changed, 929 insertions(+), 310 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/arm/omap/dsp.txt
->  create mode 100644 Documentation/devicetree/bindings/arm/omap/iva.txt
->  create mode 100644 Documentation/devicetree/bindings/arm/omap/l3-noc.txt
->  create mode 100644 Documentation/devicetree/bindings/arm/omap/mpu.txt
->  create mode 100644 Documentation/devicetree/bindings/arm/omap/omap.txt
->  create mode 100644 arch/arm/boot/dts/omap3-beagle.dts
->  create mode 100644 arch/arm/boot/dts/omap3.dtsi
->  create mode 100644 arch/arm/boot/dts/omap4-panda.dts
->  create mode 100644 arch/arm/boot/dts/omap4-sdp.dts
->  create mode 100644 arch/arm/boot/dts/omap4.dtsi
+* There are still unexplored sections of the hardware, a reset button and D-link
+have an option to for "power-off recovery". Will continue to search the D-Link
+code for them, but the NAS is pretty functional without for now.
 
-> --- a/arch/arm/mach-omap2/timer.c
-> +++ b/arch/arm/mach-omap2/timer.c
-> @@ -434,7 +434,7 @@ static int __init omap_timer_init(struct omap_hwmod *oh, void *unused)
->  	int ret = 0;
->  	char *name = "omap_timer";
->  	struct dmtimer_platform_data *pdata;
-> -	struct omap_device *od;
-> +	struct platform_device *pdev;
->  	struct omap_timer_capability_dev_attr *timer_dev_attr;
->  	struct powerdomain *pwrdm;
->  
-> @@ -476,12 +476,12 @@ static int __init omap_timer_init(struct omap_hwmod *oh, void *unused)
->  #ifdef CONFIG_PM
->  	pdata->get_context_loss_count = omap_pm_get_dev_context_loss_count;
->  #endif
-> -	od = omap_device_build(name, id, oh, pdata, sizeof(*pdata),
-> +	pdev = omap_device_build(name, id, oh, pdata, sizeof(*pdata),
->  			omap2_dmtimer_latency,
->  			ARRAY_SIZE(omap2_dmtimer_latency),
->  			0);
->  
-> -	if (IS_ERR(od)) {
-> +	if (IS_ERR(pdev)) {
->  		pr_err("%s: Can't build omap_device for %s: %s.\n",
->  			__func__, name, oh->name);
->  		ret = -EINVAL;
-> --- a/arch/arm/mach-omap2/usb-musb.c
-> +++ b/arch/arm/mach-omap2/usb-musb.c
-> @@ -115,7 +115,6 @@ static struct omap_musb_board_data musb_default_board_data = {
->  void __init usb_musb_init(struct omap_musb_board_data *musb_board_data)
->  {
->  	struct omap_hwmod		*oh;
-> -	struct omap_device		*od;
->  	struct platform_device		*pdev;
->  	struct device			*dev;
->  	int				bus_id = -1;
-> @@ -145,22 +144,20 @@ void __init usb_musb_init(struct omap_musb_board_data *musb_board_data)
->  		name = "musb-omap2430";
->  	}
->  
-> -	oh = omap_hwmod_lookup(oh_name);
-> -	if (!oh) {
-> -		pr_err("Could not look up %s\n", oh_name);
-> -		return;
-> -	}
-> +        oh = omap_hwmod_lookup(oh_name);
-> +        if (WARN(!oh, "%s: could not find omap_hwmod for %s\n",
-> +                 __func__, oh_name))
-> +                return;
->  
-> -	od = omap_device_build(name, bus_id, oh, &musb_plat,
-> +	pdev = omap_device_build(name, bus_id, oh, &musb_plat,
->  			       sizeof(musb_plat), omap_musb_latency,
->  			       ARRAY_SIZE(omap_musb_latency), false);
-> -	if (IS_ERR(od)) {
-> +	if (IS_ERR(pdev)) {
->  		pr_err("Could not build omap_device for %s %s\n",
->  						name, oh_name);
->  		return;
->  	}
->  
-> -	pdev = &od->pdev;
->  	dev = &pdev->dev;
->  	get_device(dev);
->  	dev->dma_mask = &musb_dmamask;
+* I'm not entirely convinced by permanently stealing the SATA power GPIOs,
+however it seems safer than them possibly getting switched off accidentally.
+
+* There's a high chance that the DNS-320 (a cheaper device released at the same
+time, with ~identical specs) could be supported by the same setup file. This is
+just speculation though, I've not got one of these.
+
+* It'd be nice to expose the SATA activity LEDs as LEDs, and allow the mapping
+to happen in software, but there doesn't seem to be a LED trigger for that yet
+(unless I've missed something).
+
+Cheers,
+
+diff --git a/arch/arm/mach-kirkwood/Kconfig b/arch/arm/mach-kirkwood/Kconfig
+index 7fc603b..9759cae 100644
+--- a/arch/arm/mach-kirkwood/Kconfig
++++ b/arch/arm/mach-kirkwood/Kconfig
+@@ -130,6 +130,12 @@ config MACH_T5325
+   	  Say 'Y' here if you want your kernel to support the
+   	  HP t5325 Thin Client.
+
++config MACH_DNS325
++	bool "D-Link DNS-325"
++	help
++	  Say 'Y' here if you want your kernel to support the
++	  D-Link DNS-325 NAS.
++
+   endmenu
+
+   endif
+diff --git a/arch/arm/mach-kirkwood/Makefile b/arch/arm/mach-kirkwood/Makefile
+index 5dcaa81..9b5d4ac 100644
+--- a/arch/arm/mach-kirkwood/Makefile
++++ b/arch/arm/mach-kirkwood/Makefile
+@@ -18,5 +18,6 @@ obj-$(CONFIG_MACH_D2NET_V2)		+= d2net_v2-setup.o lacie_v2-common.o
+   obj-$(CONFIG_MACH_NET2BIG_V2)		+= netxbig_v2-setup.o lacie_v2-common.o
+   obj-$(CONFIG_MACH_NET5BIG_V2)		+= netxbig_v2-setup.o lacie_v2-common.o
+   obj-$(CONFIG_MACH_T5325)		+= t5325-setup.o
++obj-$(CONFIG_MACH_DNS325)		+= dns325-setup.o
+
+   obj-$(CONFIG_CPU_IDLE)			+= cpuidle.o
+diff --git a/arch/arm/mach-kirkwood/dns325-setup.c b/arch/arm/mach-kirkwood/dns325-setup.c
+new file mode 100644
+index 0000000..4e7d16a
+--- /dev/null
++++ b/arch/arm/mach-kirkwood/dns325-setup.c
+@@ -0,0 +1,315 @@
++/*
++ * arch/arm/mach-kirkwood/dns325-setup.c
++ *
++ * D-Link DNS-325 Setup
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#include <linux/kernel.h>
++#include <linux/init.h>
++#include <linux/platform_device.h>
++#include <linux/ata_platform.h>
++#include <linux/mtd/nand.h>
++#include <linux/mtd/partitions.h>
++#include <linux/i2c.h>
++#include <linux/mv643xx_eth.h>
++#include <linux/gpio.h>
++#include <linux/gpio_keys.h>
++#include <linux/gpio-fan.h>
++#include <linux/input.h>
++#include <linux/leds.h>
++#include <asm/mach-types.h>
++#include <asm/mach/arch.h>
++#include <mach/kirkwood.h>
++#include "common.h"
++#include "mpp.h"
++
++static struct mtd_partition dns325_nand_parts[] = {
++	{
++		.name = "u-boot",
++		.offset = 0,
++		.size = SZ_1M,
++		.mask_flags = MTD_WRITEABLE
++	}, {
++		.name = "uImage",
++		.offset = MTDPART_OFS_NXTBLK,
++		.size = 5 * SZ_1M
++	}, {
++		.name = "ramdisk",
++		.offset = MTDPART_OFS_NXTBLK,
++		.size = 5 * SZ_1M
++	}, {
++		.name = "image",
++		.offset = MTDPART_OFS_NXTBLK,
++		.size = 102 * SZ_1M
++	}, {
++		.name = "mini firmware",
++		.offset = MTDPART_OFS_NXTBLK,
++		.size = 10 * SZ_1M
++	}, {
++		.name = "config",
++		.offset = MTDPART_OFS_NXTBLK,
++		.size = 5 * SZ_1M
++	},
++};
++
++static struct mv643xx_eth_platform_data dns325_ge00_data = {
++	.phy_addr	= MV643XX_ETH_PHY_ADDR(8),
++};
++
++static struct mv_sata_platform_data dns325_sata_data = {
++	.n_ports	= 2,
++};
++
++/*
++ *  I2C-based devices
++ *
++ *  i2c addr | chip        | description
++ *  0x48     | GMT G751-2f | temp. sensor and therm. watchdog (LM75 compatible)
++ *  0x0c     | ?
++ *  0x64     | ?
++ */
++
++static struct i2c_board_info i2c_board_info[] __initdata = {
++	{
++		I2C_BOARD_INFO("lm75", 0x48),
++	},
++};
++
++
++/*
++ * GPIO-based devices
++ */
++
++static unsigned int dns325_mpp_config[] __initdata = {
++	MPP20_SATA1_ACTn,	/* LED: White Right HDD */
++	MPP21_SATA0_ACTn,	/* LED: White Left HDD */
++	MPP24_GPIO,
++	MPP25_GPIO,
++	MPP26_GPIO,	/* LED: Power */
++	MPP27_GPIO,	/* LED: Red Right HDD */
++	MPP28_GPIO,	/* LED: Red Left HDD */
++	MPP29_GPIO,	/* LED: Red USB */
++	MPP30_GPIO,
++	MPP31_GPIO,
++	MPP32_GPIO,
++	MPP33_GPO,
++	MPP34_GPIO,	/* Button: Front power */
++	MPP35_GPIO,
++	MPP36_GPIO,	/* Power: MV88F6281_DEV_ID Board */
++	MPP37_GPIO,
++	MPP38_GPIO,
++	MPP39_GPIO,	/* Power: SATA0 */
++	MPP40_GPIO,	/* Power: SATA1 */
++	MPP41_GPIO,
++	MPP42_GPIO,
++	MPP43_GPIO,	/* LED: White USB */
++	MPP44_GPIO,	/* Fan: Alarm */
++	MPP45_GPIO,	/* Fan: high speed */
++	MPP46_GPIO,	/* Fan: low speed */
++	MPP47_GPIO,	/* Button: Back unmount */
++	MPP48_GPIO,
++	MPP49_GPIO,
++	0
++};
++
++#define DNS325_GPIO_LED_POWER	26
++#define DNS325_GPIO_LED_RED_R	27
++#define DNS325_GPIO_LED_RED_L	28
++#define DNS325_GPIO_LED_RED_USB	29
++#define DNS325_GPIO_LED_WHITE_R	20
++#define DNS325_GPIO_LED_WHITE_L	21
++#define DNS325_GPIO_LED_WHITE_USB	43
++#define DNS325_GPIO_FAN_ALARM	44
++#define DNS325_GPIO_FAN_HIGH	45
++#define DNS325_GPIO_FAN_LOW	46
++#define DNS325_GPIO_BTN_POWER	34
++#define DNS325_GPIO_BTN_UNMOUNT	47
++#define DNS325_GPIO_POWER_6281	36
++#define DNS325_GPIO_POWER_SATA0	39
++#define DNS325_GPIO_POWER_SATA1	40
++
++static void dns325_6281_power_off(void)
++{
++	gpio_set_value(DNS325_GPIO_POWER_6281, 1);
++}
++
++/* Buttons */
++
++static struct gpio_keys_button dns325_button_pins[] = {
++	{
++		.code		= KEY_POWER,
++		.gpio		= DNS325_GPIO_BTN_POWER,
++		.desc		= "Power button",
++		.active_low	= 1,
++	},
++	{
++		.code		= KEY_EJECTCD,
++		.gpio		= DNS325_GPIO_BTN_UNMOUNT,
++		.desc		= "USB unmount button",
++		.active_low	= 1,
++	},
++};
++
++static struct gpio_keys_platform_data dns325_button_data = {
++	.buttons	= dns325_button_pins,
++	.nbuttons	= ARRAY_SIZE(dns325_button_pins),
++};
++
++static struct platform_device dns325_button_device = {
++	.name		= "gpio-keys",
++	.id		= -1,
++	.num_resources	= 0,
++	.dev		= {
++		.platform_data	= &dns325_button_data,
++	}
++};
++
++/*
++ * LEDs
++ *
++ * In theory these can blink in hardware too, but it's really annoying.
++ */
++
++static struct gpio_led dns325_led_pins[] = {
++	{
++		.name	= "dns325:white:power",
++		.gpio	= DNS325_GPIO_LED_POWER,
++		.active_low = 1,
++		.default_trigger = "default-on",
++	},
++	{
++		.name	= "dns325:white:usb",
++		.gpio	= DNS325_GPIO_LED_WHITE_USB,
++		.active_low = 1,
++	},
++	{
++		.name	= "dns325:red:l_hdd",
++		.gpio	= DNS325_GPIO_LED_RED_L,
++		.active_low = 1,
++	},
++	{
++		.name	= "dns325:red:r_hdd",
++		.gpio	= DNS325_GPIO_LED_RED_R,
++		.active_low = 1,
++	},
++	{
++		.name	= "dns325:red:usb",
++		.gpio	= DNS325_GPIO_LED_RED_USB,
++		.active_low = 1,
++	},
++};
++
++static struct gpio_led_platform_data dns325_led_data = {
++	.num_leds	= ARRAY_SIZE(dns325_led_pins),
++	.leds		= dns325_led_pins,
++};
++
++static struct platform_device dns325_led_device = {
++	.name		= "leds-gpio",
++	.id		= -1,
++	.dev		= {
++		.platform_data	= &dns325_led_data,
++	},
++};
++
++/* Fan */
++
++/* DNS-325 Fan: ADDA AD045HB-G73 40mm 6000rpm at 5v */
++static struct gpio_fan_speed dns325_fan_speed[] = {
++	{    0,  0 },
++	{ 3000,	 1 },
++	{ 6000,	 2 },
++};
++
++static unsigned dns325_fan_pins[] = {
++	DNS325_GPIO_FAN_LOW,
++	DNS325_GPIO_FAN_HIGH,
++};
++
++static struct gpio_fan_alarm dns325_fan_alarm = {
++	.gpio       = DNS325_GPIO_FAN_ALARM,
++	.active_low = 1,
++};
++
++static struct gpio_fan_platform_data dns325_fan_data = {
++	.num_ctrl	= ARRAY_SIZE(dns325_fan_pins),
++	.ctrl		= dns325_fan_pins,
++	.num_speed	= ARRAY_SIZE(dns325_fan_speed),
++	.speed		= dns325_fan_speed,
++	.alarm		= &dns325_fan_alarm,
++};
++
++static struct platform_device dns325_fan_device = {
++	.name	= "gpio-fan",
++	.id	= -1,
++	.dev	= {
++		.platform_data	= &dns325_fan_data,
++	},
++};
++
++
++static void __init dns325_init(void)
++{
++	u32 dev, rev;
++
++	/*
++	 * Basic setup. Needs to be called early.
++	 */
++	kirkwood_init();
++	kirkwood_mpp_conf(dns325_mpp_config);
++
++	kirkwood_uart0_init();
++	kirkwood_nand_init(ARRAY_AND_SIZE(dns325_nand_parts), 25);
++	kirkwood_ehci_init();
++	kirkwood_i2c_init();
++	kirkwood_ge00_init(&dns325_ge00_data);
++
++	/* Turn on power to harddrives, then enable SATA */
++	if (gpio_request(DNS325_GPIO_POWER_SATA0, "sata0-power") == 0
++	  && gpio_direction_output(DNS325_GPIO_POWER_SATA0, 0) == 0)
++		gpio_set_value(DNS325_GPIO_POWER_SATA0, 1);
++	else
++		pr_err("dns325: Failed to turn on SATA port 0\n");
++	if (gpio_request(DNS325_GPIO_POWER_SATA1, "sata1-power") == 0
++	  && gpio_direction_output(DNS325_GPIO_POWER_SATA1, 0) == 0)
++		gpio_set_value(DNS325_GPIO_POWER_SATA1, 1);
++	else
++		pr_err("dns325: Failed to turn on SATA port 1\n");
++	kirkwood_sata_init(&dns325_sata_data);
++
++	platform_device_register(&dns325_led_device);
++	platform_device_register(&dns325_button_device);
++	platform_device_register(&dns325_fan_device);
++	i2c_register_board_info(0, i2c_board_info, ARRAY_SIZE(i2c_board_info));
++
++	kirkwood_pcie_id(&dev, &rev);
++	if (dev == MV88F6281_DEV_ID) {
++		pr_info("PCI-E Device ID: MV88F6281, configuring power-off");
++		if (gpio_request(DNS325_GPIO_POWER_6281, "power-off") == 0 &&
++		    gpio_direction_output(DNS325_GPIO_POWER_6281, 0) == 0)
++			pm_power_off = dns325_6281_power_off;
++		else
++			pr_err("dns325: failed to configure power-off GPIO\n");
++	} else {
++		/*
++		 * Dlink code also defines 0x6192, and sets LOW_BASE +
++		 * 0x01000000 high. Either cargo-culted code or another model,
++		 * e.g. the cheaper DNS-320.
++		 */
++		pr_err("Unknown PCI-E Device ID %x, no power-off", dev);
++	}
++}
++
++MACHINE_START(DNS325, "D-Link DNS-325")
++	/* Maintainer: Jamie Lentin <jm@lentin.co.uk> */
++	.boot_params	= 0x00000100,
++	.init_machine	= dns325_init,
++	.map_io		= kirkwood_map_io,
++	.init_early	= kirkwood_init_early,
++	.init_irq	= kirkwood_init_irq,
++	.timer		= &kirkwood_timer,
++MACHINE_END
