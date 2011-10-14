@@ -1,7 +1,7 @@
 From: nico@fluxnic.net (Nicolas Pitre)
-Date: Fri, 14 Oct 2011 16:26:46 -0400 (EDT)
+Date: Fri, 14 Oct 2011 17:28:55 -0400 (EDT)
 Subject: [PATCH] arm/tegra: select AUTO_ZRELADDR by default
-In-Reply-To: <20111014201223.GV21648@n2100.arm.linux.org.uk>
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF173BE1A3A6@HQMAIL01.nvidia.com>
 References: <1317172068-14872-1-git-send-email-pdeschrijver@nvidia.com>
 	<201110141729.41515.arnd@arndb.de>
 	<74CDBE0F657A3D45AFBB94109FB122FF173BE1A283@HQMAIL01.nvidia.com>
@@ -9,56 +9,72 @@ References: <1317172068-14872-1-git-send-email-pdeschrijver@nvidia.com>
 	<CAOesGMgDwMeVmwo1WJ3tU+ZdjCSJ6F8mY42e_KwTmzAkGQsqmg@mail.gmail.com>
 	<20111014192011.GS21648@n2100.arm.linux.org.uk>
 	<alpine.LFD.2.02.1110141549160.17040@xanadu.home>
-	<20111014201223.GV21648@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.02.1110141617380.17040@xanadu.home>
+	<74CDBE0F657A3D45AFBB94109FB122FF173BE1A362@HQMAIL01.nvidia.com>
+	<alpine.LFD.2.02.1110141631530.17040@xanadu.home>
+	<74CDBE0F657A3D45AFBB94109FB122FF173BE1A3A6@HQMAIL01.nvidia.com>
+Message-ID: <alpine.LFD.2.02.1110141718160.17040@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 14 Oct 2011, Russell King - ARM Linux wrote:
+On Fri, 14 Oct 2011, Stephen Warren wrote:
 
-> On Fri, Oct 14, 2011 at 04:06:21PM -0400, Nicolas Pitre wrote:
-> > Currently, U-Boot insists on having a uImage with a fixed absolute load 
-> > address.  This is currently provided by the zreladdr value, whether or 
-> > not AUTO_ZRELADDR is set.  I consider this as a persisting uImage 
-> > limitation.
+> Nicolas Pitre wrote at Friday, October 14, 2011 2:45 PM:
+> > On Fri, 14 Oct 2011, Stephen Warren wrote:
+> ...
+> > > I did originally briefly look into getting U-Boot to boot a zImage, but
+> > > that looked like a far more invasive patch. There were rumours of some
+> > > chip's custom U-Boot already having such support, but I couldn't find
+> > > it, nor any evidence of such support in mainline U-Boot.
 > > 
-> > Either u-Boot gets fixed so it can work with plain zImage (and this 
-> > certainly will happen once the pressure from people wanting a single 
-> > kernel to work on targets with different load addresses increase.  
-> > Tegra is one such example.
+> > FRom my clone of the u-Boot repo:
 > > 
-> > Or we create a u-Boot specific Kconfig menu for uImage options that 
-> > would be common to all architectures and kick it out from the ARM 
-> > specific makefile.  This is not solving the u-Boot limitation though.
+> > $ git grep -l zImage
+> > README
+> > arch/sh/lib/zimageboot.c
+> > arch/x86/lib/zimage.c
+> > ...
 > > 
-> > In either cases this is a u-Boot problem that needs fixing on the u-Boot 
-> > side in the end.
+> > Even the name of some of those files clearly hints zImage support.
+> > 
+> > In any case, loading zImage should be even simpler than loading uImage.
+> > It is the same as loading uImage except that you just have to skip the
+> > checking and relocating steps.
 > 
-> I don't think that's so with the various flavours of platform specific
-> uboot which float around.  For instance, on the OMAP4430 SDP, the
-> following commands were used as supplied to load a uImage off the SD
-> card into RAM at a different address to which it was built for, and
-> execute it at that address:
+> Just by way of background in case anyone is wondering why I wrote the
+> patch I did:
 > 
-> mmcinit 0
-> fatload mmc 0 0x80300000 uImage
-> bootm 80300000
+> Those files both implement custom commands "zimageboot" and "zboot". I
+> was looking for integration with the existing "bootm" command.
 > 
-> Whether the 'bootm' command then copied the image and called it there,
-> or whether it executed it at 0x80300000 I've no idea - but why then
-> load the image at a different address in the first place?
+> The advantage of re-using "bootm" for this is that it already supports
+> all the stuff like setting up kernel command-lines, initrds, knowing how
+> to pass the FDT to the kernel, and whatever other OS-specific setup might
+> be required.
 
-Maybe because the lower memory is already in use by other u-Boot related 
-things, or more likely for no specific reasons at all.  But u-Boot 
-_will_ relocate the image if it is not lot loaded at the address being 
-recorded in its header as specified by the -a argument of mkimage.  And 
-currently we use zreladdr for that when "make uImage" is used, meaning 
-that by default no one is currently benefiting from the kernel 
-decompressor relocation avoidance optimization on u-Boot.
+Absolutely.  And that is a must-have.
 
-Of course the u-Boot people are also claiming that u-Boot should take 
-care of the kernel decompression not zImage, which I personally disagree 
-with.
+> The disadvantage of adding zImage support to bootm is that I'd have to
+> teach a bunch of U-Boot image handling code about a new image format; it
+> already knows about "legacy uImage", "FIT" images, and I'd have to add a
+> third "zImage" format. Doing so would at least require adding a lot of
+> "case IMAGE_FORMAT_ZIMAGE" everywhere, but it'd probably be best to add
+> some kind of vtable for image formats to move all the image-format
+> knowledge into format-specific files, leaving the users of the images
+> with much smaller code.
+> 
+> I didn't feel like making such a large change. Hence, I chose to make a
+> small change to the existing uImage support.
+
+And that change is certainly valuable.  Some people do want the extra 
+feature from the uImage format.  REmoving its absolute address 
+limitation is a good thing.
+
+However, also supporting zImage directly on ARM doesn't have to be that 
+hard.  Instead of adding "case IMAGE_FORMAT_ZIMAGE" everywhere, all you 
+would have to do is to load zImage in memory according to the load 
+address provided as an argument to the command, and then fake a uImage 
+load by artificially creating the uImage header at run time with the 
+data that u-Boot needs later on.
 
 
 Nicolas
