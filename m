@@ -1,84 +1,78 @@
-From: govindraj.ti@gmail.com (Govindraj)
-Date: Fri, 14 Oct 2011 18:02:19 +0530
-Subject: [PATCH v6 09/16] OMAP2+: UART: Add runtime pm support for
-	omap-serial driver
-In-Reply-To: <87obxkio3e.fsf@ti.com>
-References: <1317380495-584-1-git-send-email-govindraj.raja@ti.com>
-	<1317380495-584-9-git-send-email-govindraj.raja@ti.com>
-	<878voplppo.fsf@ti.com>
-	<CAAL8m4yrXo4KRYxXxWECU99B6--FCMBDFUbNk+vsBV0Jnt0bcg@mail.gmail.com>
-	<87obxkio3e.fsf@ti.com>
-Message-ID: <CAAL8m4zbdA9rtwLhft8UGQTtvroNbYYoBoq4BG2Eu2nCToX5+w@mail.gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 14 Oct 2011 14:33:57 +0200
+Subject: [PATCH 11/21] ARM: drop unused Kconfig symbols
+In-Reply-To: <1318595356.6132.69.camel@x61.thuisdomein>
+References: <1318595356.6132.69.camel@x61.thuisdomein>
+Message-ID: <4E982C35.2020206@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 14, 2011 at 2:52 AM, Kevin Hilman <khilman@ti.com> wrote:
-> Govindraj <govindraj.ti@gmail.com> writes:
->
->> On Thu, Oct 13, 2011 at 5:36 AM, Kevin Hilman <khilman@ti.com> wrote:
->>> "Govindraj.R" <govindraj.raja@ti.com> writes:
->>>
->>> [...]
->>>
->>>> Use device_may_wakeup to check whether uart has wakeup capabilities
->>>> and then enable uart runtime usage for the uart.
->>>
->>> Curious about what happens when device_may_wakeup() is not set during
->>> device init.
->>>
->>> [...]
->>>
->>>> @@ -1305,6 +1363,16 @@ static int serial_omap_probe(struct platform_device *pdev)
->>>> ? ? ? ? ? ? ? up->uart_dma.rx_dma_channel = OMAP_UART_DMA_CH_FREE;
->>>> ? ? ? }
->>>>
->>>> + ? ? pm_runtime_use_autosuspend(&pdev->dev);
->>>> + ? ? pm_runtime_set_autosuspend_delay(&pdev->dev,
->>>> + ? ? ? ? ? ? ? ? ? ? OMAP_UART_AUTOSUSPEND_DELAY);
->>>> +
->>>> + ? ? pm_runtime_irq_safe(&pdev->dev);
->>>> + ? ? if (device_may_wakeup(&pdev->dev)) {
->>>> + ? ? ? ? ? ? pm_runtime_enable(&pdev->dev);
->>>
->>> So if device_may_wakeup() is false, runtime PM is not enabled, then...
->>>
->>>> + ? ? ? ? ? ? pm_runtime_get_sync(&pdev->dev);
->>>
->>> ...this get doesn't happen, and the first register access causes a crash.
->>
->> Actually no crash, clocks will left enabled from boot up (hwmod_no_reset/idle)
->> that are idled and enabled back here.
->>
->> Since hwmod_idle is binded here later ([PATCH v6 15/16]),
->
-> IMO, That's not a very maintainable solution.
->
-> What happens when when someone fixes serial.c to only set
-> HWMOD_INIT_NO_IDLE on the console UART? ?or if we fix things so we don't
-> need INIT_NO_IDLE anymore? ?Then this will crash.
->
-> Driver code should not make assumptions like this about what device init
-> code is or isn't doing.
->
+On 10/14/2011 02:29 PM, Paul Bolle :
+> ARCH_AT91SAM9260_SAM9XE is simply unused.
+> 
+> MACH_TRIZEPS_UCONXS doesn't offfer anything MACH_TRIZEPS_ANY doesn't
+> already offer (ie, providing a way to not select MACH_TRIZEPS_CONXS,
+> which actually suggest the "choice" they are part of should be
+> "optional").
+> 
+> Add a comment that CPU_IXP46X and CPU_IXP43X could be merged. What
+> would be a nice new name?
+> 
+> Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
 
-Okay, How about doing as below ensuring get_sync always
-and forbid runtime to avoid clock_gating if wakeup is not set.
+For at91:
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-static int serial_omap_probe(struct platform_device *pdev) {
-[..]
-        pm_runtime_enable(&pdev->dev);
-        pm_runtime_get_sync(&pdev->dev);
+> ---
+>  arch/arm/mach-at91/Kconfig   |    6 ------
+>  arch/arm/mach-ixp4xx/Kconfig |    1 +
+>  arch/arm/mach-pxa/Kconfig    |    3 ---
+>  3 files changed, 1 insertions(+), 9 deletions(-)
+> 
+> diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
+> index 2248467..db23f3d 100644
+> --- a/arch/arm/mach-at91/Kconfig
+> +++ b/arch/arm/mach-at91/Kconfig
+> @@ -190,12 +190,6 @@ if ARCH_AT91SAM9260
+>  
+>  comment "AT91SAM9260 Variants"
+>  
+> -config ARCH_AT91SAM9260_SAM9XE
+> -	bool "AT91SAM9XE"
+> -	help
+> -	  Select this if you are using Atmel's AT91SAM9XE System-on-Chip.
+> -	  They are basically AT91SAM9260s with various sizes of embedded Flash.
+> -
+>  comment "AT91SAM9260 / AT91SAM9XE Board Type"
+>  
+>  config MACH_AT91SAM9260EK
+> diff --git a/arch/arm/mach-ixp4xx/Kconfig b/arch/arm/mach-ixp4xx/Kconfig
+> index 6f991c5..56f867c 100644
+> --- a/arch/arm/mach-ixp4xx/Kconfig
+> +++ b/arch/arm/mach-ixp4xx/Kconfig
+> @@ -151,6 +151,7 @@ config MACH_ARCOM_VULCAN
+>  #
+>  # Certain registers and IRQs are only enabled if supporting IXP465 CPUs
+>  #
+> +# XXX These two options can be merged. What is a nice name?
+>  config CPU_IXP46X
+>  	bool
+>  	depends on MACH_IXDP465
+> diff --git a/arch/arm/mach-pxa/Kconfig b/arch/arm/mach-pxa/Kconfig
+> index cd19309..4a03fda 100644
+> --- a/arch/arm/mach-pxa/Kconfig
+> +++ b/arch/arm/mach-pxa/Kconfig
+> @@ -184,9 +184,6 @@ choice
+>  config MACH_TRIZEPS_CONXS
+>  	bool "ConXS Eval Board"
+>  
+> -config MACH_TRIZEPS_UCONXS
+> -	bool "uConXS Eval Board"
+> -
+>  config MACH_TRIZEPS_ANY
+>  	bool "another Board"
+>  
 
-        if (!device_may_wakeup(&pdev->dev))
-                pm_runtime_forbid(&pdev->dev);
 
-[..]
-
-        pm_runtime_put(&pdev->dev);
-[..]
-}
-
-
---
-Thanks,
-Govindraj.R
+-- 
+Nicolas Ferre
