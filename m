@@ -1,83 +1,39 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 14 Oct 2011 22:13:11 +0100
-Subject: [PATCH] arm/tegra: select AUTO_ZRELADDR by default
-In-Reply-To: <alpine.LFD.2.02.1110141628230.17040@xanadu.home>
-References: <1317172068-14872-1-git-send-email-pdeschrijver@nvidia.com>
-	<201110141729.41515.arnd@arndb.de>
-	<74CDBE0F657A3D45AFBB94109FB122FF173BE1A283@HQMAIL01.nvidia.com>
-	<201110141827.53906.arnd@arndb.de>
-	<alpine.LFD.2.02.1110141353390.17040@xanadu.home>
-	<20111014192057.GT21648@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.02.1110141609510.17040@xanadu.home>
-	<20111014201737.GW21648@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.02.1110141628230.17040@xanadu.home>
-Message-ID: <20111014211311.GY21648@n2100.arm.linux.org.uk>
+From: matt@grid-net.com (Matt Burtch)
+Date: Fri, 14 Oct 2011 14:19:40 -0700
+Subject: [PATCH 1/1] ARM: i.MX28: shift frac value in _CLK_SET_RATE
+Message-ID: <1318627180-29865-1-git-send-email-matt@grid-net.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 14, 2011 at 04:31:12PM -0400, Nicolas Pitre wrote:
-> On Fri, 14 Oct 2011, Russell King - ARM Linux wrote:
-> 
-> > On Fri, Oct 14, 2011 at 04:14:12PM -0400, Nicolas Pitre wrote:
-> > > On Fri, 14 Oct 2011, Russell King - ARM Linux wrote:
-> > > 
-> > > > On Fri, Oct 14, 2011 at 02:01:07PM -0400, Nicolas Pitre wrote:
-> > > > > The way I'm restructuring things around this is that AUTO_ZRELADDR will 
-> > > > > always be active by default, just like ARM_PATCH_PHYS_VIRT now.  This 
-> > > > > platform specific exclusion thinking is a step backward so I'd prefer if 
-> > > > > people would refrain from going there for the moment.
-> > > > 
-> > > > Are you expecting everyone to change the way they load the zImage
-> > > > overnight then?
-> > > 
-> > > No, of course.  But adding restrictions in the kernel build because 
-> > > u-Boot's own image format dictates such restrictions doesn't make sense.  
-> > > Those restrictions must be pushed towards the uImage encapsulation step, 
-> > > not higher the kernel config hierarchy.
-> > 
-> > You're not understanding again.
-> > 
-> > I'm talking about people who _explicitly_ load the zImage at a different
-> > address to which the decompressed image ends up.  With AUTO_ZRELADDR=y
-> > their setup will break unless they stop that behaviour, which takes
-> > away one of the advantages of using the zImage format.
-> 
-> Would you care to explain where you got this from?  Because I really do 
-> not understand what you're saying indeed.
+Noticed when setting SSP0 in clk_set_rate, _CLK_SET_RATE attempts to
+reset the clock divider for the SSP0 parent clock, in this case IO0FRAC.
+Bits 24-29 of HW_CLKCTRL_FRAC0 are cleared correctly, but when the new
+frac value is written the value isn't shifted up to write the correct
+bit-field.  This results in IO0FRAC being set to 0 and CPUFRAC being
+corrupted.
 
-My I point out that it's you who decided that I was talking about u-boot
-when I said no such thing in my message.  I merely pointed out about
-those people who may be loading the zImage elsewhere in memory and using
-that facility to cut down on the boot time.  u-boot can't load zImages
-directly.
+This should occur when writing IO1FRAC, EMIFRAC in HW_CLKCTRL_FRAC0 and
+GPMIFRAC, HSADCFRAC in HW_CLKCTRL_FRAC1.
 
-Yet you started nattering on about uboot - which we know is a pile of
-crap for dealing with this stuff.
+Tested on custom i.MX28 board with SSP0 SPI driver.
 
-But ultimately, how people achieve the loading of the zImage is beyond
-the scope of what I stated: whether that's not using u-boot but some
-other boot loader, or maybe using mkimage outside of the kernel build,
-or whatever.
+Signed-off-by: Matt Burtch <matt@grid-net.com>
+---
+ arch/arm/mach-mxs/clock-mx28.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-> With AUTO_ZRELADDR=y you _still_ can load zImage to a different location 
-> from where the decompressed kernel ends up.
-
-You are correct for some values of 'different location' but not all -
-and how can we know _what_ people are doing?  We don't.
-
-#ifdef CONFIG_AUTO_ZRELADDR
-                @ determine final kernel image address
-                mov     r4, pc
-                and     r4, r4, #0xf8000000
-                add     r4, r4, #TEXT_OFFSET
-#else
-                ldr     r4, =zreladdr
-#endif
-
-So this means the decompressor _must_ run within the first 128MB chunk
-of memory for the resulting kernel to be correctly placed at expected
-place - at the beginning of system memory + TEXT_OFFSET.
-
-Can we know that this is always the case?  I don't think so.
-Can we expect there to be regressions if we force AUTO_ZRELADDR=y?  We'd
-be stupid not to expect them.
+diff --git a/arch/arm/mach-mxs/clock-mx28.c b/arch/arm/mach-mxs/clock-mx28.c
+index 5dcc59d..b4ea439 100644
+--- a/arch/arm/mach-mxs/clock-mx28.c
++++ b/arch/arm/mach-mxs/clock-mx28.c
+@@ -349,7 +349,7 @@ static int name##_set_rate(struct clk *clk, unsigned long rate)		\
+ 									\
+ 		reg = __raw_readl(CLKCTRL_BASE_ADDR + HW_CLKCTRL_##fr);	\
+ 		reg &= ~BM_CLKCTRL_##fr##_##fs##FRAC;			\
+-		reg |= frac;						\
++		reg |= frac<<BP_CLKCTRL_##fr##_##fs##FRAC;		\
+ 		__raw_writel(reg, CLKCTRL_BASE_ADDR + HW_CLKCTRL_##fr);	\
+ 	}								\
+ 									\
+-- 
+1.7.1
