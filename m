@@ -1,55 +1,27 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 14 Oct 2011 08:15:00 +0100
-Subject: [PATCH] arm/tegra: select AUTO_ZRELADDR by default
-In-Reply-To: <CAOesGMiuzF47kdmaaFny9Fg1ieox6a75tMFfLRAptvDxz_QPMg@mail.gmail.com>
-References: <1317172068-14872-1-git-send-email-pdeschrijver@nvidia.com>
-	<74CDBE0F657A3D45AFBB94109FB122FF173955580F@HQMAIL01.nvidia.com>
-	<CAOesGMiuzF47kdmaaFny9Fg1ieox6a75tMFfLRAptvDxz_QPMg@mail.gmail.com>
-Message-ID: <20111014071500.GP21648@n2100.arm.linux.org.uk>
+From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
+Date: Fri, 14 Oct 2011 09:27:17 +0200
+Subject: [PATCH 0/8] S3C2416: Enable armdiv and armclk
+In-Reply-To: <085f01cc8a40$df7af8a0$9e70e9e0$%kim@samsung.com>
+References: <201109281217.33813.heiko@sntech.de>
+	<085f01cc8a40$df7af8a0$9e70e9e0$%kim@samsung.com>
+Message-ID: <201110140927.18860.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 13, 2011 at 04:38:46PM -0700, Olof Johansson wrote:
-> Hi,
-> 
-> On Wed, Sep 28, 2011 at 10:50 AM, Stephen Warren <swarren@nvidia.com> wrote:
-> > Peter De Schrijver wrote at Tuesday, September 27, 2011 7:08 PM:
-> >> This patch causes the kernel uncompressor to determine the physical address
-> >> of the SDRAM at runtime. This allows the kernel to boot on both tegra20 and
-> >> tegra30 even though SDRAM is at different physical addresses on both SoCs.
-> >>
-> >> Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
-> >
-> > An alternative would be to simply add that config option to the relevant
-> > defconfig/.config file. I see both cases in use in the kernel. Still, the
-> > code change this enables looks fine to just turn on all the time, and will
-> > be needed for Tegra30 support, so I'm fine just selecting it as you have.
-> >
-> > Acked-by: Stephen Warren <swarren@nvidia.com>
-> >
-> >> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> >> index 472a7f8..474737b 100644
-> >> --- a/arch/arm/Kconfig
-> >> +++ b/arch/arm/Kconfig
-> >> @@ -596,6 +596,7 @@ config ARCH_TEGRA
-> >> ? ? ? select HAVE_CLK
-> >> ? ? ? select HAVE_SCHED_CLOCK
-> >> ? ? ? select ARCH_HAS_CPUFREQ
-> >> + ? ? select AUTO_ZRELADDR
-> >> ? ? ? help
-> >> ? ? ? ? This enables support for NVIDIA Tegra based systems (Tegra APX,
-> >> ? ? ? ? Tegra 6xx and Tegra 2 series).
-> >
-> > P.S. Since this patch relates to Tegra, you should CC the Tegra maintainers
-> > and list; I've done so on this message. I also added Arnd; he might take
-> > this through the arm-soc tree.
-> 
-> While it does touch a file outside of arch/arm/mach-tegra, it's for
-> the tegra options and is not likely to cause conflicts upstream. I'll
-> apply it with the rest of tegra patches for 3.2 here.
-> 
-> So: Applied, thanks.
+Hi Kgene,
 
-I'll point out that this makes Tegra incompatible with ZBOOT_ROM, which
-can still be enabled.  ZBOOT_ROM=y AUTO_ZRELADDR=y is an invalid
-configuration at runtime.
+Am Freitag, 14. Oktober 2011, 09:14:11 schrieb Kukjin Kim:
+> Heiko St?bner wrote:
+[...]
+> > Heiko Stuebner (8):
+> >   S3C2416: Add armdiv_mask constant.
+[...]
+> As a note, if required, 1st patch which is fixing will be sent to stable.
+
+I don't think this is really necessary.
+
+The original code was essentially correct but hard to read.
+The constant makes sense in the rework, as the armdiv_mask is is used in more 
+places now and not contained in a single static function.
+
+Heiko
