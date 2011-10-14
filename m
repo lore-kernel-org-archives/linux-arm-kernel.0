@@ -1,34 +1,66 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 14 Oct 2011 18:29:48 +0200
-Subject: [PATCH] ARM: mutually exclude ZBOOT_ROM and AUTO_ZRELADDR
-In-Reply-To: <1318607945-6807-1-git-send-email-olof@lixom.net>
-References: <20111014071500.GP21648@n2100.arm.linux.org.uk>
-	<1318607945-6807-1-git-send-email-olof@lixom.net>
-Message-ID: <201110141829.48634.arnd@arndb.de>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Fri, 14 Oct 2011 12:33:31 -0400 (EDT)
+Subject: [PATCH 2/5] drivercore: Add driver probe deferral mechanism
+In-Reply-To: <CACxGe6vF6em0-PnJ7UuH0CQ0_StJTfmFKBsktvb9O+ccCx6E8A@mail.gmail.com>
+Message-ID: <Pine.LNX.4.44L0.1110141229450.2036-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 14 October 2011, Olof Johansson wrote:
-> This way platforms that want it can select AUTO_ZRELADDR without issues caused by
-> someone manually also enabling ZBOOT_ROM.
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 82973b2..2ad58e8 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -1814,6 +1814,7 @@ config ZBOOT_ROM_BSS
->  config ZBOOT_ROM
->  	bool "Compressed boot loader in ROM/flash"
->  	depends on ZBOOT_ROM_TEXT != ZBOOT_ROM_BSS
-> +	depends on !AUTO_ZRELADDR
->  	help
->  	  Say Y here if you intend to execute your compressed kernel image
->  	  (zImage) directly from ROM or flash.  If unsure, say N.
+On Fri, 14 Oct 2011, Grant Likely wrote:
 
-Unfortunately, you cannot have it both ways:
+> > How can a device acquire children before it has a driver?
+> 
+> There are a few potential situations in embedded systems (or at least
+> nothing currently prevents it) where platform setup code constructs a
+> device hierarchy without the aid of device drivers, and it is still
+> possible for a parent device to be attached to a driver.  IIUC, SPARC
+> creates an entire hierarchy of platform_devices from all the nodes in
+> the OpenFirmware device tree, and any of those devices can be bound to
+> a driver.  I don't like that approach, but at the very least it needs
+> to be guarded against.
 
-arnd at ocdc-kvm:~/linux-arm$ make O=obj-tmp CROSS_COMPILE=arm-linux-gnueabi- ARCH=arm  -sj20  menuconfig
-arch/arm/Kconfig:1761:error: recursive dependency detected!
-arch/arm/Kconfig:1761:  symbol ZBOOT_ROM depends on AUTO_ZRELADDR
-arch/arm/Kconfig:1899:  symbol AUTO_ZRELADDR depends on ZBOOT_ROM
+Do these devices ever require deferred probes?
 
-	Arnd
+> On Fri, Oct 14, 2011 at 9:39 AM, Alan Stern <stern@rowland.harvard.edu> wrote:
+> > On Thu, 13 Oct 2011, Grant Likely wrote:
+> >> I saw those. ?I also notice that they are only used by device_move()
+> >> when reparenting a device (which is another wrinkle I hadn't though
+> >> about). ?Reparenting a device becomes problematic if the probe order
+> >> is also represented in the list. ?If device_move() gets called, then
+> >> any implicit probe-order sorting for that device would be lost.
+> >>
+> >> I also notice that device_move disregards any children when moving a
+> >> device, which could also be a problem.
+> >>
+> >> Although it looks like the only users of device_move are:
+> >>
+> >> drivers/media/video/pvrusb2/pvrusb2-v4l2.c
+> >> drivers/s390/cio/device.c
+> >> net/bluetooth/hci_sysfs.c
+> >> net/bluetooth/rfcomm/tty.c
+> >>
+> >> So it may not be significant to adapt.
+> >
+> > I trust that very little will be needed. ?I haven't checked the
+> > existing callers, but it's reasonable to require that a device being
+> > moved not have any children.
+> 
+> Yes, that does indeed simplify the issue considerably.  Let's do that.
+>  So, for this patch, there will be two bits added.  First, don't allow
+> deferral on devices with children, and second a successful probe
+> (deferred or otherwise) should always move a device to the end of the
+> dap_list if it doesn't have children to guarantee that the list order
+> satisfies both the hierarchical and probe order.  Manjunath, do you
+> think you can prototype this?
+
+I don't think the second part needs to be quite so invasive.  
+Certainly drivers that never defer probes shouldn't require anything to
+be moved.
+
+A deferred probe _should_ move the device to the end of the list.  But
+this needs to happen in the probe routine itself (after it has verified
+that all the other required devices are present and before it has
+registered any children) to prevent races.  It can't be done in a
+central location.
+
+Alan Stern
