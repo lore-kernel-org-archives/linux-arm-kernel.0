@@ -1,38 +1,35 @@
-From: stefan.xk.nilsson@stericsson.com (Stefan Nilsson XK)
-Date: Fri, 14 Oct 2011 09:38:05 +0200
-Subject: [PATCH 1/4] mmc: mmci: Bugfix in pio read for small packets
-In-Reply-To: <20111007191128.GA25689@n2100.arm.linux.org.uk>
-References: <1317109568-17905-1-git-send-email-ulf.hansson@stericsson.com>
-	<20111001160937.GF11710@n2100.arm.linux.org.uk>
-	<4E895F6A.9070203@stericsson.com> <4E8F00E4.5010702@stericsson.com>
-	<20111007191128.GA25689@n2100.arm.linux.org.uk>
-Message-ID: <4E97E6DD.4030605@stericsson.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 14 Oct 2011 08:42:24 +0100
+Subject: [PATCH] mmc: mmci: Do not release spinlock in request_end
+In-Reply-To: <4E97E6CF.1000601@stericsson.com>
+References: <1318342001-26955-1-git-send-email-ulf.hansson@stericsson.com>
+	<20111013142914.GZ21648@n2100.arm.linux.org.uk>
+	<1318521592.2090.16.camel@linaro1>
+	<4E97E6CF.1000601@stericsson.com>
+Message-ID: <20111014074224.GQ21648@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/07/2011 09:11 PM, Russell King - ARM Linux wrote:
-> But first, you need to fix your code so you're only reading 32-bit
-> quantities from the FIFO register.
+On Fri, Oct 14, 2011 at 09:37:51AM +0200, Ulf Hansson wrote:
+> Jon Medhurst (Tixy) wrote:
+>> On Thu, 2011-10-13 at 15:29 +0100, Russell King - ARM Linux wrote:
+>>> On Tue, Oct 11, 2011 at 04:06:41PM +0200, Ulf Hansson wrote:
+>>>> The patch "mmc: core: move ->request() call from atomic context",
+>>>> is the reason to why this change is possible. This simplifies the
+>>>> error handling code execution path quite a lot and potentially also
+>>>> fixes some error handling hang problems.
+>>>>
+>>>> Signed-off-by: Ulf Hansson <ulf.hansson@stericsson.com>
+>>> This doesn't look right:
+>>>
+>>> void mmc_request_done(struct mmc_host *host, struct mmc_request *mrq)
+>>> {
+>>>         if (err && cmd->retries) {
+>>>                 host->ops->request(host, mrq);
+>>>
+>
+> This is NOT how it looks at mmc-next. You need to test with Adrian  
+> Hunters patch which the commit refers two.
 
-Hi Russel, what to you think of doing it this way instead:
-
-		/*
-		 * SDIO especially may want to send something that is
-		 * not divisible by 4 (as opposed to card sectors
-		 * etc), and the FIFO only accept full 32-bit reads.
-		 */
-		if (count < 4) {
-			unsigned char buf[4];
-			readsl(base + MMCIFIFO, buf, 1);
-			memcpy(ptr, buf, count);
-		}
-		else
-			readsl(base + MMCIFIFO, ptr, count >> 2);
-
-This makes sure we only access the FIFO in a 32 bit way, and the only 
-overhead for the "standard" case (count >= 4) is the "if" clause. I have 
-verified this to work with our WLAN driver.
-
-Best Regards
-
-Stefan Nilsson
+In that case, how can I take the patch to mmci if it depends on something
+in another tree?
