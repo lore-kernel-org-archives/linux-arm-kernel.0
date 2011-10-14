@@ -1,21 +1,37 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 14 Oct 2011 20:20:57 +0100
-Subject: [PATCH] arm/tegra: select AUTO_ZRELADDR by default
-In-Reply-To: <alpine.LFD.2.02.1110141353390.17040@xanadu.home>
-References: <1317172068-14872-1-git-send-email-pdeschrijver@nvidia.com>
-	<201110141729.41515.arnd@arndb.de>
-	<74CDBE0F657A3D45AFBB94109FB122FF173BE1A283@HQMAIL01.nvidia.com>
-	<201110141827.53906.arnd@arndb.de>
-	<alpine.LFD.2.02.1110141353390.17040@xanadu.home>
-Message-ID: <20111014192057.GT21648@n2100.arm.linux.org.uk>
+Date: Fri, 14 Oct 2011 20:42:36 +0100
+Subject: [PATCH v4 5/8] ARM: pxa: change gpio driver to platform driver
+In-Reply-To: <20111013192222.GW18574@ponder.secretlab.ca>
+References: <1318478825-17187-1-git-send-email-haojian.zhuang@marvell.com>
+	<1318478825-17187-6-git-send-email-haojian.zhuang@marvell.com>
+	<20111013192222.GW18574@ponder.secretlab.ca>
+Message-ID: <20111014194235.GU21648@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 14, 2011 at 02:01:07PM -0400, Nicolas Pitre wrote:
-> The way I'm restructuring things around this is that AUTO_ZRELADDR will 
-> always be active by default, just like ARM_PATCH_PHYS_VIRT now.  This 
-> platform specific exclusion thinking is a step backward so I'd prefer if 
-> people would refrain from going there for the moment.
+On Thu, Oct 13, 2011 at 01:22:22PM -0600, Grant Likely wrote:
+> On Thu, Oct 13, 2011 at 12:07:02PM +0800, Haojian Zhuang wrote:
+> > +struct resource mmp2_resources_gpio[] = {
+> > +	{
+> > +		.start  = 0xd4019000,
+> > +		.end    = 0xd4019fff,
+> > +		.name   = "gpio_phys_base",
+> > +		.flags  = IORESOURCE_MEM,
+> > +	}, {
+> > +		.start  = APB_VIRT_BASE + 0x19000,
+> > +		.end    = APB_VIRT_BASE + 0x19fff,
+> > +		.name   = "gpio_virtual_base",
+> > +		.flags  = IORESOURCE_MEM,
+> 
+> This shouldn't be needed.  The driver should ioremap its registers.
+> Only the physical address should be passed in via a IORESOURCE_MEM
+> resource.
 
-Are you expecting everyone to change the way they load the zImage
-overnight then?
+Definitely - the thing to point out to people who do this kind of thing
+is that resources are part of an ordered tree occupying a single space,
+and nasty things happen when resources overlap other resources within
+that space (sometimes they can refuse to be requested - which causes
+device registration to fail.)
+
+Therefore, abusing MEM resources to pass non-physical addresses is a
+potential cause for trouble.
