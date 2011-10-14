@@ -1,57 +1,43 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 14 Oct 2011 16:14:18 +0900
-Subject: [PATCH] ARM: S3C2443: Remove redundant s3c_register_clocks call
-	for init_clocks
-In-Reply-To: <1313463881.16359.2.camel@phoenix>
-References: <1313463881.16359.2.camel@phoenix>
-Message-ID: <086001cc8a40$e3940350$aabc09f0$%kim@samsung.com>
+Date: Fri, 14 Oct 2011 16:14:25 +0900
+Subject: [PATCH] S3C2443: Add devname for hsmmc1 pclk
+In-Reply-To: <201109282159.35240.heiko@sntech.de>
+References: <201109282159.35240.heiko@sntech.de>
+Message-ID: <086101cc8a40$e79edd30$b6dc9790$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Axel Lin wrote:
+Heiko St?bner wrote:
 > 
-> Since commit af337f3e633a198034a99450416257ddf2307497
-> "ARM: S3C2443: Move parts of the clock code to common clock file",
-> the init_clocks array is moved to arch/arm/plat-s3c24xx/s3c2443-clock.c.
-> Now we call s3c_register_clocks for init_clocks in s3c2443_common_init_clocks.
+> S3C2443 uses hsmmc1 as its only hsmmc device and for S3C2416/2450 it's
+> the second hsmmc channel with the same PCLKCON bit.
+> The hsmmc-if clocks on both systems already got a devname, as did the
+> hsmmc pclk for hsmmc0 on the S3C2416.
+> So to make it possible to identify the hsmmc1 pclk on S3C2416 add the
+> correct devname for it. The sclk name on S3C2443 also is s3c-sdhci.1.
 > 
-> Thus we can remove the empty init_clocks array here and remove the
-> redundant s3c_register_clocks call for init_clocks in s3c2443_init_clocks.
-> 
-> Signed-off-by: Axel Lin <axel.lin@gmail.com>
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 > ---
->  arch/arm/mach-s3c2443/clock.c |    7 -------
->  1 files changed, 0 insertions(+), 7 deletions(-)
+>  arch/arm/plat-s3c24xx/s3c2443-clock.c |    1 +
+>  1 files changed, 1 insertions(+), 0 deletions(-)
 > 
-> diff --git a/arch/arm/mach-s3c2443/clock.c b/arch/arm/mach-s3c2443/clock.c
-> index a1a7176..4018dbe 100644
-> --- a/arch/arm/mach-s3c2443/clock.c
-> +++ b/arch/arm/mach-s3c2443/clock.c
-> @@ -305,9 +305,6 @@ static struct clk init_clocks_off[] = {
->  	}
->  };
-> 
-> -static struct clk init_clocks[] = {
-> -};
-> -
->  /* clocks to add straight away */
-> 
->  static struct clksrc_clk *clksrcs[] __initdata = {
-> @@ -345,10 +342,6 @@ void __init s3c2443_init_clocks(int xtal)
->  	for (ptr = 0; ptr < ARRAY_SIZE(clksrcs); ptr++)
->  		s3c_register_clksrc(clksrcs[ptr], 1);
-> 
-> -	/* register clocks from clock array */
-> -
-> -	s3c_register_clocks(init_clocks, ARRAY_SIZE(init_clocks));
-> -
->  	/* We must be careful disabling the clocks we are not intending to
->  	 * be using at boot time, as subsystems such as the LCD which do
->  	 * their own DMA requests to the bus can cause the system to lockup
+> diff --git a/arch/arm/plat-s3c24xx/s3c2443-clock.c b/arch/arm/plat-
+> s3c24xx/s3c2443-clock.c
+> index b4b2fa1..6408650 100644
+> --- a/arch/arm/plat-s3c24xx/s3c2443-clock.c
+> +++ b/arch/arm/plat-s3c24xx/s3c2443-clock.c
+> @@ -416,6 +416,7 @@ static struct clk init_clocks[] = {
+>  		.ctrlbit	= S3C2443_HCLKCON_DMA5,
+>  	}, {
+>  		.name		= "hsmmc",
+> +		.devname	= "s3c-sdhci.1",
+>  		.parent		= &clk_h,
+>  		.enable		= s3c2443_clkcon_enable_h,
+>  		.ctrlbit	= S3C2443_HCLKCON_HSMMC,
 > --
-> 1.7.4.1
+> 1.7.2.3
 
-Looks ok, applied.
+Applied.
 Thanks.
 
 Best regards,
