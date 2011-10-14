@@ -1,96 +1,60 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Fri, 14 Oct 2011 15:54:02 -0700
-Subject: [GIT PULL] OMAP4 MPU sub-system PM for v3.2
-Message-ID: <878vonchh1.fsf@ti.com>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Fri, 14 Oct 2011 16:19:51 -0700
+Subject: [PATCHv16 0/9] Contiguous Memory Allocator
+In-Reply-To: <201110111552.04615.arnd@arndb.de>
+References: <1317909290-29832-1-git-send-email-m.szyprowski@samsung.com>
+	<201110071827.06366.arnd@arndb.de>
+	<20111010155642.38df59af.akpm@linux-foundation.org>
+	<201110111552.04615.arnd@arndb.de>
+Message-ID: <20111014161951.5b4bb327.akpm@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony,
+On Tue, 11 Oct 2011 15:52:04 +0200
+Arnd Bergmann <arnd@arndb.de> wrote:
 
-Please pull the OMAP4 PM support for the MPU sub-system.
+> On Tuesday 11 October 2011, Andrew Morton wrote:
+> > Russell's going to hate me, but...
+> > 
+> > I do know that he had substantial objections to at least earlier
+> > versions of this, and he is a guy who knows of what he speaks.
+> > 
+> > So I would want to get a nod from rmk on this work before proceeding. 
+> > If that nod isn't available then let's please identify the issues and
+> > see what we can do about them.
+> 
+> I'm pretty sure that Russell's concerns were almost entirely about the
+> ARM specific parts, which were extremely hard to figure out. The
+> most important technical concern back in July was that the patch
+> series at the time did not address the problem of conflicting pte
+> flags when we remap memory as uncached on ARMv6. He had a patch
+> to address this problem that was supposed to get merged in 3.1
+> and would have conflicted with the CMA patch set.
+> 
+> Things have changed a lot since then. Russell had to revert his
+> own patch because he found regressions using it on older machines.
+> However, the current CMA on ARM patch AFAICT reliably fixes this
+> problem now and does not cause the same regression on older machines.
+> The solution used now is the one we agreed on after sitting together
+> for a few hours with Russell, Marek, Paul McKenney and myself.
+> 
+> If there are still concerns over the ARM specific portion of
+> the patch series, I'm very confident that we can resolve these
+> now (I was much less so before that meeting).
+> 
+> What I would really want to hear from you is your opinion on
+> the architecture independent stuff. Obviously, ARM is the
+> most important consumer of the patch set, but I think the
+> code has its merit on other architectures as well and most of
+> them (maybe not parisc) should be about as simple as the x86
+> one that Marek posted now with v16.
 
-This branch is built on top of my for_3.2/omap4-pm-base branch which is
-simply a merge of Russell's devel-stable and Thomas' irq/core branch
-(both already part of Arnd's arm-soc/for-next branch.)
+Having an x86 implementation is good.  It would also be good to get
+some x86 drivers using CMA asap, so the thing gets some runtime testing
+from the masses.  Can we think of anything we can do here?
 
-Special thanks to Santosh for this series and also the quick response on
-a few last minute build/test issues I came across so we can hopefully
-still get this in for v3.2.
-
-Kevin
-
-The following changes since commit fe7f69ad79056043413aeb7e5ce27841fe3eb20e:
-
-  Merge branch 'irq/core' of git://tesla.tglx.de/git/linux-2.6-tip into for_3.2/omap4-mpuss-pm (2011-10-07 11:29:32 -0700)
-
-are available in the git repository at:
-
-  git://github.com/khilman/linux-omap-pm.git for_3.2/omap4-pm
-
-Kevin Hilman (1):
-      Merge branch 'for_3.2/omap4-mpuss-pm' into for_3.2/omap4-pm
-
-Santosh Shilimkar (24):
-      ARM: OMAP4: Use WARN_ON() instead of BUG_ON() with graceful exit
-      ARM: OMAP4: Export omap4_get_base*() rather than global address pointers
-      ARM: OMAP4: PM: Add SAR RAM support
-      ARM: OMAP4: PM: Keep static dep between MPUSS-EMIF and MPUSS-L3/L4 and DUCATI-L3
-      ARM: OMAP4: PM: Avoid omap4_pm_init() on OMAP4430 ES1.0
-      ARM: OMAP4: PM: Initialise all the clockdomains to supported states
-      ARM: OMAP: Add Secure HAL and monitor mode API infrastructure.
-      ARM: OMAP: PM: Add support to allocate the memory for secure RAM
-      ARM: OMAP4: PM: Add WakeupGen module as OMAP gic_arch_extn
-      ARM: OMAP4: PM: Add CPUX OFF mode support
-      ARM: OMAP4: Remove __INIT from omap_secondary_startup() to re-use it for hotplug.
-      ARM: OMAP4: PM: Program CPU1 to hit OFF when off-lined
-      ARM: OMAP4: PM: CPU1 wakeup workaround from Low power modes
-      ARM: OMAP4: PM: Use custom omap_do_wfi() for default idle.
-      ARM: OMAP4: suspend: Add MPUSS power domain RETENTION support
-      ARM: OMAP4: Remove un-used do_wfi() macro.
-      ARM: OMAP4: PM: Add WakeupGen and secure GIC low power support
-      ARM: OMAP4: PM: Add L2X0 cache lowpower support
-      ARM: OMAP4: PM: Add MPUSS power domain OSWR support
-      ARM: OMAP4: PM: Add power domain statistics support
-      ARM: OMAP4: PM: Add CPUidle support
-      ARM: OMAP4: cpuidle: Switch to gptimer from twd in deeper C-states.
-      ARM: OMAP3: CPUidle: Make use of CPU PM notifiers
-      ARM: OMAP4: Fix errata i688 with MPU interconnect barriers.
-
- arch/arm/mach-omap2/Kconfig                        |   21 +
- arch/arm/mach-omap2/Makefile                       |   16 +-
- arch/arm/mach-omap2/cpuidle34xx.c                  |   15 +
- arch/arm/mach-omap2/cpuidle44xx.c                  |  218 +++++++++++
- arch/arm/mach-omap2/include/mach/barriers.h        |   31 ++
- arch/arm/mach-omap2/include/mach/omap-secure.h     |   57 +++
- arch/arm/mach-omap2/include/mach/omap-wakeupgen.h  |   39 ++
- arch/arm/mach-omap2/include/mach/omap4-common.h    |   67 +++-
- arch/arm/mach-omap2/io.c                           |    9 +
- arch/arm/mach-omap2/omap-headsmp.S                 |    5 -
- arch/arm/mach-omap2/omap-hotplug.c                 |   14 +-
- arch/arm/mach-omap2/omap-mpuss-lowpower.c          |  398 ++++++++++++++++++++
- arch/arm/mach-omap2/omap-secure.c                  |   81 ++++
- arch/arm/mach-omap2/{omap44xx-smc.S => omap-smc.S} |   23 ++
- arch/arm/mach-omap2/omap-smp.c                     |   45 +++
- arch/arm/mach-omap2/omap-wakeupgen.c               |  389 +++++++++++++++++++
- arch/arm/mach-omap2/omap4-common.c                 |   94 +++++-
- arch/arm/mach-omap2/omap4-sar-layout.h             |   50 +++
- arch/arm/mach-omap2/pm.h                           |    1 +
- arch/arm/mach-omap2/pm44xx.c                       |  156 ++++++++-
- arch/arm/mach-omap2/sleep44xx.S                    |  378 +++++++++++++++++++
- arch/arm/plat-omap/common.c                        |    3 +
- arch/arm/plat-omap/include/plat/omap-secure.h      |   13 +
- arch/arm/plat-omap/include/plat/omap44xx.h         |    1 +
- arch/arm/plat-omap/include/plat/sram.h             |    5 +
- arch/arm/plat-omap/sram.c                          |   11 +-
- 26 files changed, 2104 insertions(+), 36 deletions(-)
- create mode 100644 arch/arm/mach-omap2/cpuidle44xx.c
- create mode 100644 arch/arm/mach-omap2/include/mach/barriers.h
- create mode 100644 arch/arm/mach-omap2/include/mach/omap-secure.h
- create mode 100644 arch/arm/mach-omap2/include/mach/omap-wakeupgen.h
- create mode 100644 arch/arm/mach-omap2/omap-mpuss-lowpower.c
- create mode 100644 arch/arm/mach-omap2/omap-secure.c
- rename arch/arm/mach-omap2/{omap44xx-smc.S => omap-smc.S} (70%)
- create mode 100644 arch/arm/mach-omap2/omap-wakeupgen.c
- create mode 100644 arch/arm/mach-omap2/omap4-sar-layout.h
- create mode 100644 arch/arm/mach-omap2/sleep44xx.S
- create mode 100644 arch/arm/plat-omap/include/plat/omap-secure.h
+Regarding the core MM changes: Mel's the man for migration and
+compaction.  I wouldn't want to proceed until he (and perferably
+Johannes) have spent some quality time with the code.  I'm not seeing
+their reviewed-by's of acked-by's and I don't have a good recollection
+of their involvement?
