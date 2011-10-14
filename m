@@ -1,41 +1,69 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 14 Oct 2011 07:22:15 -0500
-Subject: [PATCH 1/2] ARM: Samsung: Add Exynos4 device tree enabled board
-	file
-In-Reply-To: <000201cc8a64$6775ae30$36610a90$%kim@samsung.com>
-References: <1318342396-26178-1-git-send-email-thomas.abraham@linaro.org>
-	<1318342396-26178-2-git-send-email-thomas.abraham@linaro.org>
-	<20111013175110.GJ18574@ponder.secretlab.ca>
-	<000201cc8a64$6775ae30$36610a90$%kim@samsung.com>
-Message-ID: <4E982977.7000305@gmail.com>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Fri, 14 Oct 2011 14:29:16 +0200
+Subject: [PATCH 11/21] ARM: drop unused Kconfig symbols
+Message-ID: <1318595356.6132.69.camel@x61.thuisdomein>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/14/2011 06:28 AM, Kukjin Kim wrote:
+ARCH_AT91SAM9260_SAM9XE is simply unused.
 
+MACH_TRIZEPS_UCONXS doesn't offfer anything MACH_TRIZEPS_ANY doesn't
+already offer (ie, providing a way to not select MACH_TRIZEPS_CONXS,
+which actually suggest the "choice" they are part of should be
+"optional").
 
->>> diff --git a/arch/arm/mach-exynos4/Kconfig
-> b/arch/arm/mach-exynos4/Kconfig
->>> index 0c5888a..39dc135 100644
->>> --- a/arch/arm/mach-exynos4/Kconfig
->>> +++ b/arch/arm/mach-exynos4/Kconfig
->>> @@ -304,6 +304,20 @@ config MACH_SMDK4412
->>>  	help
->>>  	  Machine support for Samsung SMDK4412
->>>
->>> +comment "Flattened Device Tree based board for Exynos4 based SoC"
->>> +
->>> +config MACH_EXYNOS4_DT
-> 
-> I'm not sure we can use 'MACH_EXYNOS4_DT' here because there are other
-> EXYNOS4 SoCs such as EXYNOS4212 and EXYNOS4412. So if this cannot support
-> other SoCs' boards, SMDK4212 and SMDK4412, we need to change the name.
-> 
-> And I wonder whether there is no problem with selecting this and other
-> boards.
+Add a comment that CPU_IXP46X and CPU_IXP43X could be merged. What
+would be a nice new name?
 
-I think this should be fine assuming most things are common. Generally,
-the differences can be handled by different DT's. The board compatible
-string can be used to handle differences.
+Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
+---
+ arch/arm/mach-at91/Kconfig   |    6 ------
+ arch/arm/mach-ixp4xx/Kconfig |    1 +
+ arch/arm/mach-pxa/Kconfig    |    3 ---
+ 3 files changed, 1 insertions(+), 9 deletions(-)
 
-Rob
+diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
+index 2248467..db23f3d 100644
+--- a/arch/arm/mach-at91/Kconfig
++++ b/arch/arm/mach-at91/Kconfig
+@@ -190,12 +190,6 @@ if ARCH_AT91SAM9260
+ 
+ comment "AT91SAM9260 Variants"
+ 
+-config ARCH_AT91SAM9260_SAM9XE
+-	bool "AT91SAM9XE"
+-	help
+-	  Select this if you are using Atmel's AT91SAM9XE System-on-Chip.
+-	  They are basically AT91SAM9260s with various sizes of embedded Flash.
+-
+ comment "AT91SAM9260 / AT91SAM9XE Board Type"
+ 
+ config MACH_AT91SAM9260EK
+diff --git a/arch/arm/mach-ixp4xx/Kconfig b/arch/arm/mach-ixp4xx/Kconfig
+index 6f991c5..56f867c 100644
+--- a/arch/arm/mach-ixp4xx/Kconfig
++++ b/arch/arm/mach-ixp4xx/Kconfig
+@@ -151,6 +151,7 @@ config MACH_ARCOM_VULCAN
+ #
+ # Certain registers and IRQs are only enabled if supporting IXP465 CPUs
+ #
++# XXX These two options can be merged. What is a nice name?
+ config CPU_IXP46X
+ 	bool
+ 	depends on MACH_IXDP465
+diff --git a/arch/arm/mach-pxa/Kconfig b/arch/arm/mach-pxa/Kconfig
+index cd19309..4a03fda 100644
+--- a/arch/arm/mach-pxa/Kconfig
++++ b/arch/arm/mach-pxa/Kconfig
+@@ -184,9 +184,6 @@ choice
+ config MACH_TRIZEPS_CONXS
+ 	bool "ConXS Eval Board"
+ 
+-config MACH_TRIZEPS_UCONXS
+-	bool "uConXS Eval Board"
+-
+ config MACH_TRIZEPS_ANY
+ 	bool "another Board"
+ 
+-- 
+1.7.4.4
