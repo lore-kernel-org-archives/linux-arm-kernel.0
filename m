@@ -1,46 +1,44 @@
-From: ulf.hansson@stericsson.com (Ulf Hansson)
-Date: Fri, 14 Oct 2011 09:51:44 +0200
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 14 Oct 2011 09:03:18 +0100
 Subject: [PATCH] mmc: mmci: Do not release spinlock in request_end
-In-Reply-To: <20111014074224.GQ21648@n2100.arm.linux.org.uk>
+In-Reply-To: <4E97EA10.6040800@stericsson.com>
 References: <1318342001-26955-1-git-send-email-ulf.hansson@stericsson.com>
 	<20111013142914.GZ21648@n2100.arm.linux.org.uk>
 	<1318521592.2090.16.camel@linaro1>
 	<4E97E6CF.1000601@stericsson.com>
 	<20111014074224.GQ21648@n2100.arm.linux.org.uk>
-Message-ID: <4E97EA10.6040800@stericsson.com>
+	<4E97EA10.6040800@stericsson.com>
+Message-ID: <20111014080318.GR21648@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux wrote:
-> On Fri, Oct 14, 2011 at 09:37:51AM +0200, Ulf Hansson wrote:
->> Jon Medhurst (Tixy) wrote:
->>> On Thu, 2011-10-13 at 15:29 +0100, Russell King - ARM Linux wrote:
->>>> On Tue, Oct 11, 2011 at 04:06:41PM +0200, Ulf Hansson wrote:
->>>>> The patch "mmc: core: move ->request() call from atomic context",
->>>>> is the reason to why this change is possible. This simplifies the
->>>>> error handling code execution path quite a lot and potentially also
->>>>> fixes some error handling hang problems.
->>>>>
->>>>> Signed-off-by: Ulf Hansson <ulf.hansson@stericsson.com>
->>>> This doesn't look right:
->>>>
->>>> void mmc_request_done(struct mmc_host *host, struct mmc_request *mrq)
->>>> {
->>>>         if (err && cmd->retries) {
->>>>                 host->ops->request(host, mrq);
->>>>
->> This is NOT how it looks at mmc-next. You need to test with Adrian  
->> Hunters patch which the commit refers two.
-> 
-> In that case, how can I take the patch to mmci if it depends on something
-> in another tree?
-> 
+On Fri, Oct 14, 2011 at 09:51:44AM +0200, Ulf Hansson wrote:
+> Russell King - ARM Linux wrote:
+>> In that case, how can I take the patch to mmci if it depends on something
+>> in another tree?
+>>
+>
+> I don't know. But how do you update your tree from next normally?
 
-I don't know. But how do you update your tree from next normally? I 
-believe the problem is more related to that the mmc-next tree is now on 
-a temporary git. If you do not update your tree how shall we be able to 
-continue with integration of new patches that depends on mmc patches 
-from "next"?
+I don't - no one in their right mind does.  linux-next is not a tree
+which should ever be pulled into any other git tree to base work upon
+- it's completely unstable and you can't rely on any commit in there
+remaining.  The merge commits between each tree are also specific to
+linux-next only.
 
-BR
-Uffe
+Linus will also refuse to pull any tree which has linux-next merged
+into it.
+
+> I believe the problem is more related to that the mmc-next tree is now on  
+> a temporary git.
+
+Where a tree is hosted has no influence on whether its 'temporary' or
+not.
+
+> If you do not update your tree how shall we be able to  
+> continue with integration of new patches that depends on mmc patches  
+> from "next"?
+
+That's what I'm saying - I can't take the patch as it introduces bugs
+if I do.  It's better to either wait until after the next merge window,
+or we have to sort out merging it via the mmc tree instead.
