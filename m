@@ -1,53 +1,119 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 14 Oct 2011 17:34:21 +0200
-Subject: [PATCH v4 8/8] ARM: pxa: move macros into gpio-pxa.c
-In-Reply-To: <CAMPhdO9ig99=w0TOEEw1gnp7x-WRy1N4Fsu3A3_YiEjX+_BbhQ@mail.gmail.com>
-References: <1318478825-17187-1-git-send-email-haojian.zhuang@marvell.com>
-	<CAN1soZxCnZjDw14WZ7vprkTQWjki5Zd47pQf2zzoJQ1O9qSKog@mail.gmail.com>
-	<CAMPhdO9ig99=w0TOEEw1gnp7x-WRy1N4Fsu3A3_YiEjX+_BbhQ@mail.gmail.com>
-Message-ID: <201110141734.22115.arnd@arndb.de>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Fri, 14 Oct 2011 17:35:17 +0200
+Subject: [RFC 1/2] dma-buf: Introduce dma buffer sharing mechanism
+In-Reply-To: <4E98085A.8080803@samsung.com>
+References: <1318325033-32688-1-git-send-email-sumit.semwal@ti.com>
+	<1318325033-32688-2-git-send-email-sumit.semwal@ti.com>
+	<4E98085A.8080803@samsung.com>
+Message-ID: <20111014152139.GA2908@phenom.ffwll.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 14 October 2011, Eric Miao wrote:
-> On Fri, Oct 14, 2011 at 5:13 PM, Haojian Zhuang
-> <haojian.zhuang@gmail.com> wrote:
-> > On Fri, Oct 14, 2011 at 2:17 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
-> >>>
-> >>>> +enum pxa_gpios {
-> >>>> +     PXA_GPLR = 0x00,        /* GPIO Pin Level Registers */
-> >>>> +     PXA_GPDR = 0x0C,        /* GPIO Pin Direction Registers */
-> >>>> +     PXA_GPSR = 0x18,        /* GPIO Pin Output Set Registers */
-> >>>> +     PXA_GPCR = 0x24,        /* GPIO Pin Output Clear Registers */
-> >>>> +     PXA_GRER = 0x30,        /* GPIO Rising Edge Detect Registers */
-> >>>> +     PXA_GFER = 0x3C,        /* GPIO Falling Edge Detect Registers */
-> >>>> +     PXA_GEDR = 0x48,        /* GPIO Edge Detect Status Registers */
-> >>>> +     PXA_GAFR = 0x54,        /* GPIO Alternate Function Select Registers */
-> >>>> +     PXA_ED_MASK = 0x9C,     /* GPIO edge detection for AP side */
-> >>>> +};
-> >>
-> >> And Haojian,
-> >>
-> >> Is this is completely for the GPIO driver's internal use, I'd prefer to
-> >> use GPxR names directly, instead of prefixing it with PXA_, that's a
-> >> bit ugly from my picky point of view.
-
-It's not entirely internal to the driver, but internal to pxa specific code
-including a few of the board files.
-
-> > OK, I'll GPxR directly. And I'll keep PXA_GPIO_bit() to avoid
-> > potential name issue.
-> >
+On Fri, Oct 14, 2011 at 12:00:58PM +0200, Tomasz Stanislawski wrote:
+> >+/**
+> >+ * struct dma_buf_ops - operations possible on struct dma_buf
+> >+ * @create: creates a struct dma_buf of a fixed size. Actual allocation
+> >+ *	    does not happen here.
 > 
-> I think GPIO_bit() is just fine if it's only used in gpio-pxa.c. I do
-> prefer to have PXA_* prefixes as less as possible unless absolutely
-> necessary.
+> The 'create' ops is not present in dma_buf_ops.
+> 
+> >+ * @attach: allows different devices to 'attach' themselves to the given
+> >+ *	    buffer. It might return -EBUSY to signal that backing storage
+> >+ *	    is already allocated and incompatible with the requirements
+> >+ *	    of requesting device. [optional]
+> >+ * @detach: detach a given device from this buffer. [optional]
+> >+ * @get_scatterlist: returns list of scatter pages allocated, increases
+> >+ *		     usecount of the buffer. Requires atleast one attach to be
+> >+ *		     called before. Returned sg list should already be mapped
+> >+ *		     into _device_ address space.
+> 
+> You must add a comment that this call 'may sleep'.
+> 
+> I like the get_scatterlist idea. It allows the exported to create a
+> valid scatterlist for a client in a elegant way.
+> 
+> I do not like this whole attachment idea. The problem is that
+> currently there is no support in DMA framework for allocation for
+> multiple devices. As long as no such a support exists, there is no
+> generic way to handle attribute negotiations and buffer allocations
+> that involve multiple devices. So the exporter drivers would have to
+> implement more or less hacky solutions to handle memory requirements
+> and choosing the device that allocated memory.
+> 
+> Currently, AFAIK there is even no generic way for a driver to
+> acquire its own DMA memory requirements.
+> 
+> Therefore all logic hidden beneath 'attachment' is pointless. I
+> think that support for attach/detach (and related stuff) should be
+> postponed until support for multi-device allocation is added to DMA
+> framework.
 
-I think I would prefer the PXA_* prefix (or even PXA_GPIO_*) as long as
-the constants are used outside of the driver implementation, as a
-reminder that these uses should eventually disappear, at least after
-all the pxa board files have been converted into device tree descriptions
-and the pxa_gpio driver itself knows how to set up the gpio lines for
-a given board.
+Imo we clearly need this to make the multi-device-driver with insane dma
+requirements work on arm. And rewriting the buffer handling in
+participating subsystem twice isn't really a great plan. I envision that
+on platforms where we need this madness, the driver must call back to the
+dma subsytem to create a dma_buf. The dma subsytem should be already aware
+of all the requirements and hence should be able to handle them..
 
-	Arnd
+> I don't say the attachment list idea is wrong but adding attachment
+> stuff creates an illusion that problem of multi-device allocations
+> is somehow magically solved. We should not force the developers of
+> exporter drivers to solve the problem that is not solvable yet.
+
+Well, this is why we need to create a decent support infrastructure for
+platforms (= arm madness) that needs this, so that device drivers and
+subsystem don't need to invent that wheel on their own. Which as you point
+out, they actually can't.
+
+> The other problem are the APIs. For example, the V4L2 subsystem
+> assumes that memory is allocated after successful VIDIOC_REQBUFS
+> with V4L2_MEMORY_MMAP memory type. Therefore attach would be
+> automatically followed by get_scatterlist, blocking possibility of
+> any buffer migrations in future.
+
+Well, pardon to break the news, but v4l needs to rework the buffer
+handling. If you want to share buffers with a gpu driver, you _have_ to
+life with the fact that gpus do fully dynamic buffer management, meaning:
+- buffers get allocated and destroyed on the fly, meaning static reqbuf
+  just went out the window (we obviously cache buffer objects and reuse
+  them for performance, as long as the processing pipeline doesn't really
+  change).
+- buffers get moved around in memory, meaning you either need full-blown
+  sync-objects with a callback to drivers to tear-down mappings on-demand,
+  or every driver needs to guarnatee to call put_scatterlist in a
+  reasonable short time. The latter is probably the more natural thing for
+  v4l devices.
+
+> The same situation happens if buffer sharing is added to framebuffer API.
+
+You can fix that by using the gem/ttm infrastructure of drm (or whatever
+the blob gpu drivers are using). Which is why I think fb should just die,
+please.
+
+> The buffer sharing mechanism is dedicated to improve cooperation
+> between multiple APIs. Therefore the common denominator strategy
+> should be applied that is buffer-creation == buffer-allocation.
+
+No.
+
+Really, there's just no way gpu's will be moving back to static buffer
+management. And I know, for many use-cases we could get away with a bunch
+of static buffers (e.g. a video processing pipe). But in drm-land even
+scanout-buffers can get moved around - currently only when they're not
+being used, but strictly speaking nothing prevents us from copying the
+scanout to a new location and issueing a pageflip and so even move the
+buffer around even when it's in use.
+
+But let's look quickly at an OpenCL usecase, moving Gb's of date per
+second around between the cpu and a bunch of add-on gpus (or other special
+purpose processing units). We'd also need to extend dma_buf with sync
+objects to make this work well, but there's simply no way this is gonna
+work with statically allocated objects.
+
+Also, gem buffer objects that are currently unused can be swapped out.
+
+Cheers, Daniel
+-- 
+Daniel Vetter
+Mail: daniel at ffwll.ch
+Mobile: +41 (0)79 365 57 48
