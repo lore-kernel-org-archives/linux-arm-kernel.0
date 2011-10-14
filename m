@@ -1,42 +1,56 @@
-From: tom.leiming@gmail.com (Ming Lei)
-Date: Fri, 14 Oct 2011 08:13:17 +0800
-Subject: [PATCH 2/5] drivercore: Add driver probe deferral mechanism
-In-Reply-To: <Pine.LNX.4.44L0.1110131202350.2026-100000@iolanthe.rowland.org>
-References: <CACVXFVMoac7psbfO6UdDvNux4c8bQYS4YNUdz1C-o+CiJzyuZA@mail.gmail.com>
-	<Pine.LNX.4.44L0.1110131202350.2026-100000@iolanthe.rowland.org>
-Message-ID: <CACVXFVMnm2rLPNsaLtTT2NtVkh5UFO8mEy7E9VWNYdjhvw2-0A@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 13 Oct 2011 17:21:40 -0700
+Subject: [GIT PULL] Please pull tegra feature branch for 3.2
+Message-ID: <CAOesGMipZUkZG8oHSwK-8xw5Y0u6Ymfjmumq7=ijsztUwdGeDA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 14, 2011 at 12:04 AM, Alan Stern <stern@rowland.harvard.edu> wrote:
-> On Thu, 13 Oct 2011, Ming Lei wrote:
->
->> Hi,
->>
->> On Thu, Oct 13, 2011 at 10:31 PM, Alan Stern <stern@rowland.harvard.edu>
->> >> Maybe we should understand the correct model of the ordering constraints
->> >> for the multiple device dependancies first, could you give a description or
->> >> some examples about it?
->> >
->> > The requirement is that devices must be capable of resuming in the
->> > order given by dpm_list, and they must be capable of suspending in
->> > the reverse order.
->> >
->> > Therefore if device A can't work unless device B is functional, then B
->> > must come before A in dpm_list.
->>
->> If all devices can support async suspend and resume correctly, looks like
->> the device order given by dpm_list is not needed any longer, doesn't it?
->
-> It _is_ needed, because the user can disable async suspend/resume via
-> /sys/power/pm_async.
->
-> Also, not all devices do support async suspend/resume.
+Hi Arnd,
 
-Basically, the devices which don't support async suspend/resume
-should have out of tree PM dependency. If out of tree PM dependency
-issue is solved, all devices can support async suspend/resume.
+The following changes since commit 976d167615b64e14bc1491ca51d424e2ba9a5e84:
 
-thanks,
--- 
-Ming Lei
+  Linux 3.1-rc9 (2011-10-04 18:11:50 -0700)
+
+are available in the git repository at:
+  git://git.kernel.org/pub/scm/linux/kernel/git/olof/tegra.git for-3.2/features
+
+Olof Johansson (1):
+      ARM: tegra: update defconfig
+
+Peter De Schrijver (4):
+      arm/tegra: prepare Seaboard pinmux code for derived boards
+      arm/tegra: add support for ventana pinmuxing
+      arm/tegra: device tree support for ventana board
+      arm/tegra: select AUTO_ZRELADDR by default
+
+Stephen Warren (6):
+      arm/tegra: Prep boards for gpio/pinmux conversion to pdevs
+      arm/dt: Tegra: Add pinmux node to tegra20.dtsi
+      arm/tegra: Convert pinmux driver to a platform device
+      gpio/tegra: Convert to a platform device
+      arm/tegra: pinmux: ioremap registers
+      arm/tegra: Harmony: Configure PMC for low-level interrupts
+
+ .../devicetree/bindings/pinmux/pinmux_nvidia.txt   |    5 +
+ arch/arm/Kconfig                                   |    1 +
+ arch/arm/boot/dts/tegra-ventana.dts                |   32 ++++
+ arch/arm/boot/dts/tegra20.dtsi                     |    8 +
+ arch/arm/configs/tegra_defconfig                   |   39 ++++-
+ arch/arm/mach-tegra/Kconfig                        |    6 +
+ arch/arm/mach-tegra/Makefile                       |    1 +
+ arch/arm/mach-tegra/Makefile.boot                  |    1 +
+ arch/arm/mach-tegra/board-dt.c                     |   26 +++-
+ arch/arm/mach-tegra/board-harmony-pinmux.c         |    8 +
+ arch/arm/mach-tegra/board-harmony-power.c          |   13 ++-
+ arch/arm/mach-tegra/board-paz00-pinmux.c           |    8 +
+ arch/arm/mach-tegra/board-seaboard-pinmux.c        |   69 ++++++++-
+ arch/arm/mach-tegra/board-trimslice-pinmux.c       |    7 +
+ arch/arm/mach-tegra/devices.c                      |   84 ++++++++++
+ arch/arm/mach-tegra/devices.h                      |    2 +
+ arch/arm/mach-tegra/include/mach/pinmux.h          |    4 +
+ arch/arm/mach-tegra/pinmux-t2-tables.c             |   76 ++--------
+ arch/arm/mach-tegra/pinmux.c                       |  163 ++++++++++++++++----
+ drivers/gpio/gpio-tegra.c                          |  143 ++++++++++++------
+ 20 files changed, 536 insertions(+), 160 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/pinmux/pinmux_nvidia.txt
+ create mode 100644 arch/arm/boot/dts/tegra-ventana.dts
