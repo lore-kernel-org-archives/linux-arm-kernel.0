@@ -1,47 +1,94 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 13 Oct 2011 22:01:21 -0500
-Subject: [GIT PULL] GIC DT binding support
-Message-ID: <4E97A601.1020005@gmail.com>
+Date: Thu, 13 Oct 2011 22:02:08 -0500
+Subject: [GIT PULL] Calxeda Highbank platform support
+Message-ID: <4E97A630.3070603@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Arnd,
 
-Please pull GIC device tree support. This is the first of 2 pull
-requests. You can ignore this one if there are no other dependencies on
-GIC DT support.
+Please pull initial support for Calxeda highbank platform. This is based
+on my GIC DT binding pull request.
 
-This is based on rmk's for-next branch and v3.1-rc9. rc9 was needed for
-this dependency:
-
-commit eef24afb28561a5a9f4be8f8da97735b7e6a826f
-irq: Fix check for already initialized irq_domain in irq_domain_add
+As it appears vmalloc.h and memory.h clean-ups won't make it for 3.2,
+this includes those headers. I'll post follow-ups to delete them if they
+do in fact go in.
 
 Regards,
 Rob
 
-The following changes since commit dd5e9eb0d051606ee3eda0c30222429c74e23f00:
+The following changes since commit 8322153302d9bb3fdceda9e0df00d3c69d1964bd:
 
-  Merge commit 'v3.1-rc9' into upstream/base (2011-10-13 20:30:42 -0500)
+  ARM: gic: add OF based initialization (2011-10-13 20:40:29 -0500)
 
 are available in the git repository at:
 
-  http://sources.calxeda.com/git/kernel/linux.git gic-dt
+  http://sources.calxeda.com/git/kernel/linux.git hb_for_3.2
 
-Rob Herring (4):
-      of/irq: introduce of_irq_init
-      irq: support domains with non-zero hwirq base
-      ARM: gic: add irq_domain support
-      ARM: gic: add OF based initialization
+Martin Bogomolni (1):
+      ARM: highbank: Add cpu hotplug support
 
- Documentation/devicetree/bindings/arm/gic.txt |   55 ++++++++++
- arch/arm/common/Kconfig                       |    1 +
- arch/arm/common/gic.c                         |  142
-+++++++++++++++++++------
- arch/arm/include/asm/hardware/gic.h           |    5 +-
- drivers/of/irq.c                              |  107 +++++++++++++++++++
- include/linux/irqdomain.h                     |   16 +++-
- include/linux/of_irq.h                        |    3 +
- kernel/irq/irqdomain.c                        |   12 +-
- 8 files changed, 299 insertions(+), 42 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/gic.txt
+Rob Herring (6):
+      ARM: l2x0: add empty l2x0_of_init
+      ARM: highbank: add devicetree source
+      ARM: add Highbank core platform support
+      MAINTAINERS: add Calxeda Highbank ARM platform
+      ARM: highbank: add SMP support
+      ARM: highbank: add suspend support
+
+ Documentation/devicetree/bindings/arm/calxeda.txt |    8 +
+ MAINTAINERS                                       |    6 +
+ arch/arm/Kconfig                                  |   16 ++-
+ arch/arm/Kconfig.debug                            |    7 +
+ arch/arm/Makefile                                 |    1 +
+ arch/arm/boot/dts/highbank.dts                    |  198
++++++++++++++++++++++
+ arch/arm/include/asm/hardware/cache-l2x0.h        |    7 +
+ arch/arm/mach-highbank/Makefile                   |    6 +
+ arch/arm/mach-highbank/Makefile.boot              |    1 +
+ arch/arm/mach-highbank/clock.c                    |   62 +++++++
+ arch/arm/mach-highbank/core.h                     |    9 +
+ arch/arm/mach-highbank/highbank.c                 |  145 +++++++++++++++
+ arch/arm/mach-highbank/hotplug.c                  |   56 ++++++
+ arch/arm/mach-highbank/include/mach/debug-macro.S |   19 ++
+ arch/arm/mach-highbank/include/mach/entry-macro.S |    7 +
+ arch/arm/mach-highbank/include/mach/gpio.h        |    1 +
+ arch/arm/mach-highbank/include/mach/io.h          |    7 +
+ arch/arm/mach-highbank/include/mach/irqs.h        |    6 +
+ arch/arm/mach-highbank/include/mach/memory.h      |    1 +
+ arch/arm/mach-highbank/include/mach/system.h      |   26 +++
+ arch/arm/mach-highbank/include/mach/timex.h       |    6 +
+ arch/arm/mach-highbank/include/mach/uncompress.h  |    9 +
+ arch/arm/mach-highbank/include/mach/vmalloc.h     |    1 +
+ arch/arm/mach-highbank/lluart.c                   |   34 ++++
+ arch/arm/mach-highbank/localtimer.c               |   40 ++++
+ arch/arm/mach-highbank/platsmp.c                  |   78 ++++++++
+ arch/arm/mach-highbank/pm.c                       |   55 ++++++
+ arch/arm/mach-highbank/sysregs.h                  |   52 ++++++
+ arch/arm/mach-highbank/system.c                   |   33 ++++
+ arch/arm/mm/Kconfig                               |    2 +-
+ 30 files changed, 897 insertions(+), 2 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/calxeda.txt
+ create mode 100644 arch/arm/boot/dts/highbank.dts
+ create mode 100644 arch/arm/mach-highbank/Makefile
+ create mode 100644 arch/arm/mach-highbank/Makefile.boot
+ create mode 100644 arch/arm/mach-highbank/clock.c
+ create mode 100644 arch/arm/mach-highbank/core.h
+ create mode 100644 arch/arm/mach-highbank/highbank.c
+ create mode 100644 arch/arm/mach-highbank/hotplug.c
+ create mode 100644 arch/arm/mach-highbank/include/mach/debug-macro.S
+ create mode 100644 arch/arm/mach-highbank/include/mach/entry-macro.S
+ create mode 100644 arch/arm/mach-highbank/include/mach/gpio.h
+ create mode 100644 arch/arm/mach-highbank/include/mach/io.h
+ create mode 100644 arch/arm/mach-highbank/include/mach/irqs.h
+ create mode 100644 arch/arm/mach-highbank/include/mach/memory.h
+ create mode 100644 arch/arm/mach-highbank/include/mach/system.h
+ create mode 100644 arch/arm/mach-highbank/include/mach/timex.h
+ create mode 100644 arch/arm/mach-highbank/include/mach/uncompress.h
+ create mode 100644 arch/arm/mach-highbank/include/mach/vmalloc.h
+ create mode 100644 arch/arm/mach-highbank/lluart.c
+ create mode 100644 arch/arm/mach-highbank/localtimer.c
+ create mode 100644 arch/arm/mach-highbank/platsmp.c
+ create mode 100644 arch/arm/mach-highbank/pm.c
+ create mode 100644 arch/arm/mach-highbank/sysregs.h
+ create mode 100644 arch/arm/mach-highbank/system.c
