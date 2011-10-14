@@ -1,43 +1,42 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 13 Oct 2011 16:42:43 -0700
-Subject: [PATCH v4 3/4] gpio/tegra: Convert to a platform device
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF173BE1A08D@HQMAIL01.nvidia.com>
-References: <1318371375-4083-1-git-send-email-swarren@nvidia.com>
-	<1318371375-4083-3-git-send-email-swarren@nvidia.com>
-	<20111012224131.GD25128@quad.lixom.net>
-	<CACxGe6tf0Ly8AC-6xUeoMrVj3y0KHkrcgj87SerAaCAnNhfNqA@mail.gmail.com>
-	<20111012231910.GA13960@quad.lixom.net>
-	<74CDBE0F657A3D45AFBB94109FB122FF173BE1A08D@HQMAIL01.nvidia.com>
-Message-ID: <CAOesGMhEL7qgUGP_t_rAueqUndhv=rBPG2eeQBffpfrri_nj4A@mail.gmail.com>
+From: tom.leiming@gmail.com (Ming Lei)
+Date: Fri, 14 Oct 2011 08:13:17 +0800
+Subject: [PATCH 2/5] drivercore: Add driver probe deferral mechanism
+In-Reply-To: <Pine.LNX.4.44L0.1110131202350.2026-100000@iolanthe.rowland.org>
+References: <CACVXFVMoac7psbfO6UdDvNux4c8bQYS4YNUdz1C-o+CiJzyuZA@mail.gmail.com>
+	<Pine.LNX.4.44L0.1110131202350.2026-100000@iolanthe.rowland.org>
+Message-ID: <CACVXFVMnm2rLPNsaLtTT2NtVkh5UFO8mEy7E9VWNYdjhvw2-0A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 13, 2011 at 9:36 AM, Stephen Warren <swarren@nvidia.com> wrote:
-> Olof Johansson wrote at Wednesday, October 12, 2011 5:19 PM:
->> On Wed, Oct 12, 2011 at 05:03:24PM -0600, Grant Likely wrote:
->> > On Wed, Oct 12, 2011 at 4:41 PM, Olof Johansson <olof@lixom.net> wrote:
->> > > On Tue, Oct 11, 2011 at 04:16:14PM -0600, Stephen Warren wrote:
-> ...
->> > > Otherwise, patch looks good. Due to dependencies between this, the rest
->> > > of this patch series and the pinmux changes, I'll hold off on it until
->> > > the dependencies land (i.e. target it for 3.3). We're cutting it very close
->> > > to the merge window as it is, I'll start for-3.3 branches shortly.
+On Fri, Oct 14, 2011 at 12:04 AM, Alan Stern <stern@rowland.harvard.edu> wrote:
+> On Thu, 13 Oct 2011, Ming Lei wrote:
+>
+>> Hi,
+>>
+>> On Thu, Oct 13, 2011 at 10:31 PM, Alan Stern <stern@rowland.harvard.edu>
+>> >> Maybe we should understand the correct model of the ordering constraints
+>> >> for the multiple device dependancies first, could you give a description or
+>> >> some examples about it?
 >> >
->> > Actually, see if you can get it in via the same tree as the pinmux
->> > changes. ?Dependencies is not a reason to hold off from getting it
->> > into linux-next.
+>> > The requirement is that devices must be capable of resuming in the
+>> > order given by dpm_list, and they must be capable of suspending in
+>> > the reverse order.
+>> >
+>> > Therefore if device A can't work unless device B is functional, then B
+>> > must come before A in dpm_list.
 >>
->> Ok, the fixup is minimal, should be trivial to spot at git merge time.
->>
->> Stephen, do you want to respin yourself or should I do the __devinit
->> change when I apply?
+>> If all devices can support async suspend and resume correctly, looks like
+>> the device order given by dpm_list is not needed any longer, doesn't it?
 >
-> I'm happy for you to fix that up when you apply if you're happy doing that.
+> It _is_ needed, because the user can disable async suspend/resume via
+> /sys/power/pm_async.
 >
-> The same fixup applies to the pinmux patches too.
+> Also, not all devices do support async suspend/resume.
 
-Thanks, applied (and pinmux patch fixed up). for-3.2/features was
-rebased to roll in the pinmux change.
+Basically, the devices which don't support async suspend/resume
+should have out of tree PM dependency. If out of tree PM dependency
+issue is solved, all devices can support async suspend/resume.
 
-
--Olof
+thanks,
+-- 
+Ming Lei
