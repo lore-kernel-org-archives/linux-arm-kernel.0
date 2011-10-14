@@ -1,39 +1,34 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 14 Oct 2011 18:27:53 +0200
-Subject: [PATCH] arm/tegra: select AUTO_ZRELADDR by default
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF173BE1A283@HQMAIL01.nvidia.com>
-References: <1317172068-14872-1-git-send-email-pdeschrijver@nvidia.com>
-	<201110141729.41515.arnd@arndb.de>
-	<74CDBE0F657A3D45AFBB94109FB122FF173BE1A283@HQMAIL01.nvidia.com>
-Message-ID: <201110141827.53906.arnd@arndb.de>
+Date: Fri, 14 Oct 2011 18:29:48 +0200
+Subject: [PATCH] ARM: mutually exclude ZBOOT_ROM and AUTO_ZRELADDR
+In-Reply-To: <1318607945-6807-1-git-send-email-olof@lixom.net>
+References: <20111014071500.GP21648@n2100.arm.linux.org.uk>
+	<1318607945-6807-1-git-send-email-olof@lixom.net>
+Message-ID: <201110141829.48634.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 14 October 2011, Stephen Warren wrote:
-> Arnd Bergmann wrote at Friday, October 14, 2011 9:30 AM:
-> ...
-> > You mention that tegra30 will require AUTO_ZRELADDR.
-> 
-> Well, just to be clear, here's the situation I think:
-> 
-> Tegra20's SDRAM starts at physical address 0.
-> 
-> Tegra30's SDRAM starts at physical address 2G.
-> 
-> To support that, we could either:
-> 
-> a) Introduce a new Kconfig variable for Tegra30, make T20/T30 mutually
-> exclusive, and update arch/arm/mach-tegra/Makefile.boot to set zreladdr
-> etc. based on the new Tegra30 config variable too. Then, there's no need
-> for AUTO_ZRELADDR anywhere.
-> 
-> b) Have no new config variable, build a unified T20/T30 kernel, leave
-> Makefile.boot untouched, and rely on using AUTO_ZRELADDR for Tegra30 to
-> account for the different SDRAM physical addresses.
+On Friday 14 October 2011, Olof Johansson wrote:
+> This way platforms that want it can select AUTO_ZRELADDR without issues caused by
+> someone manually also enabling ZBOOT_ROM.
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 82973b2..2ad58e8 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -1814,6 +1814,7 @@ config ZBOOT_ROM_BSS
+>  config ZBOOT_ROM
+>  	bool "Compressed boot loader in ROM/flash"
+>  	depends on ZBOOT_ROM_TEXT != ZBOOT_ROM_BSS
+> +	depends on !AUTO_ZRELADDR
+>  	help
+>  	  Say Y here if you intend to execute your compressed kernel image
+>  	  (zImage) directly from ROM or flash.  If unsure, say N.
 
-Ok, thanks for the explanation, that makes it much clearer. For
-completeness, you could also do both of the above and make T20/T30 mutually
-exclusive unless AUTO_ZRELADDR is set. That might be more complex than
-necessary, I don't know.
+Unfortunately, you cannot have it both ways:
+
+arnd at ocdc-kvm:~/linux-arm$ make O=obj-tmp CROSS_COMPILE=arm-linux-gnueabi- ARCH=arm  -sj20  menuconfig
+arch/arm/Kconfig:1761:error: recursive dependency detected!
+arch/arm/Kconfig:1761:  symbol ZBOOT_ROM depends on AUTO_ZRELADDR
+arch/arm/Kconfig:1899:  symbol AUTO_ZRELADDR depends on ZBOOT_ROM
 
 	Arnd
