@@ -1,72 +1,103 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 14 Oct 2011 13:41:29 +0100
-Subject: [PATCH v4 0/4] genirq: handling GIC per-cpu interrupts
-In-Reply-To: <20111013181415.GM21648@n2100.arm.linux.org.uk>
-References: <1317661446-2876-1-git-send-email-marc.zyngier@arm.com>
-	<20111013181415.GM21648@n2100.arm.linux.org.uk>
-Message-ID: <4E982DF9.4090806@arm.com>
+From: gdavis@mvista.com (George G. Davis)
+Date: Fri, 14 Oct 2011 08:56:10 -0400
+Subject: [RFC/PATCH 5/7] ARM: Move get_thread_info macro definition to
+	<asm/assembler.h>
+In-Reply-To: <alpine.LFD.2.02.1110132249290.17040@xanadu.home>
+References: <1317877714-11355-1-git-send-email-gdavis@mvista.com>
+	<1317955121-28047-1-git-send-email-gdavis@mvista.com>
+	<1317955121-28047-6-git-send-email-gdavis@mvista.com>
+	<20111011095639.GB23848@arm.com> <20111012060433.GE188@mvista.com>
+	<20111013143420.GB21648@n2100.arm.linux.org.uk>
+	<D53F6A34-89FF-4DE3-96D2-AE415413AB84@mvista.com>
+	<alpine.LFD.2.02.1110132249290.17040@xanadu.home>
+Message-ID: <BDF2123C-D408-41B4-A10E-C108CEB201AF@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/10/11 19:14, Russell King - ARM Linux wrote:
-> On Mon, Oct 03, 2011 at 06:04:02PM +0100, Marc Zyngier wrote:
->> The current GIC per-cpu interrupts (aka PPIs) suffer from a number of
->> problems:
->>
->> - They use a completely separate scheme to handle the interrupts,
->>   mostly because the PPI concept doesn't really match the kernel view
->>   of an interrupt.
->> - PPIs can only be used by the timer code, unless we add more low-level
->>   assembly code.
->> - The local timer code can only be used by devices generating PPIs,
->>   and not SPIs.
->> - At least one platform (msm) has started implementing its own
->>   alternative scheme.
->> - Some low-level code gets duplicated, as usual...
->>
->> The proposed solution is to handle the PPIs using the same path as
->> SPIs. A new core API is added to deal with per-cpu interrupts in a
->> less awkward way. The local timer code is updated to reflect these
->> changes.
->>
->> The core API changes are based on an initial idea by Thomas Gleixner.
->>
->> Tested on ARM Versatile Express (Cortex A15), ARM RealView PB11MP,
->> OMAP4 (Panda) and Tegra (Harmony). Patch series against next-20110930.
->>
->> The two first patches can also be found in Thomas' tree:
->>
->> 	git://tesla.tglx.de/git/linux-2.6-tip irq/core
+
+On Oct 13, 2011, at 10:54 PM, Nicolas Pitre wrote:
+
+> On Thu, 13 Oct 2011, George G. Davis wrote:
 > 
-> So, how do we deal with merging this without ending up with some
-> problematical inter-tree dependencies?
-
-My view on this is that the whole series should ideally be merged via
-one tree only. I suspect that yours would be the best candidate, as
-there is probably little chance of conflicts on the core code.
-
-Otherwise, we'd have to do a two step merge, adding the ARM bits once
-the core code has been merged.
-
-> It looks like I'll see conflicts with:
-> arch/arm/common/gic.c
-> arch/arm/kernel/smp.c
-> arch/arm/include/asm/localtimer.h
+>> 
+>> On Oct 13, 2011, at 10:34 AM, Russell King - ARM Linux wrote:
+>> 
+>>> On Wed, Oct 12, 2011 at 02:04:33AM -0400, gdavis at mvista.com wrote:
+>>>> diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
+>>>> index 78397d0..eaf4939 100644
+>>>> --- a/arch/arm/include/asm/assembler.h
+>>>> +++ b/arch/arm/include/asm/assembler.h
+>>>> @@ -36,6 +36,20 @@
+>>>> 	.endm
+>>>> #endif  /* !CONFIG_THUMB2_KERNEL */
+>>>> 
+>>>> +	.macro	preempt_disable, tsk, cnt
+>>>> +	get_thread_info \tsk
+>>>> +	ldr	\cnt, [\tsk, #TI_PREEMPT]
+>>>> +	add	\cnt, \cnt, #1
+>>>> +	str	\cnt, [\tsk, #TI_PREEMPT]
+>>>> +	.endm
+>>>> +
+>>>> +	.macro	preempt_enable, tsk, cnt
+>>>> +	get_thread_info \tsk
+>>>> +	ldr	\cnt, [\tsk, #TI_PREEMPT]
+>>>> +	sub	\cnt, \cnt, #1
+>>>> +	str	\cnt, [\tsk, #TI_PREEMPT]
+>>>> +	.endm
+>>>> +
+>>>> /*
+>>>> * Endian independent macros for shifting bytes within registers.
+>>>> */
+>>>> 
+>>>> 
+>>>> Not as efficient as it could be but I imagine the macros could
+>>>> be written to support optional load of \tsk and/or optional \tmp
+>>>> parameters to cover other common cases.
+>>> 
+>>> It's actually not that simple either: if you disable preemption, then you
+>>> need to check for a preempt event after re-enabling preemption.  The
+>>> C level code does this:
+>>> 
+>>> #define preempt_enable_no_resched() \
+>>> do { \
+>>>       barrier(); \
+>>>       dec_preempt_count(); \
+>>> } while (0)
+>>> 
+>>> #define preempt_check_resched() \
+>>> do { \
+>>>       if (unlikely(test_thread_flag(TIF_NEED_RESCHED))) \
+>>>               preempt_schedule(); \
+>>> } while (0)
+>>> 
+>>> #define preempt_enable() \
+>>> do { \
+>>>       preempt_enable_no_resched(); \
+>>>       barrier(); \
+>>>       preempt_check_resched(); \
+>>> } while (0)
+>>> 
+>>> Note that preempt_schedule() will check the preempt count itself and
+>>> return immediately if non-zero or irqs are disabled.
+>> 
+>> It would be easier to just insert preempt_disable/preempt_enable in
+>> the cache and proc function call macros.  I did that in an earlier test
+>> patch but moved it into the cache-v6.S and proc-v6.S files instead
+>> since it only affects ARM11 MPCore as far as I'm aware.
 > 
-> and possibly:
-> arch/arm/include/asm/smp.h
-> arch/arm/kernel/irq.c
+> Alternately, why don't you simply disable IRQs locally?  No preemption 
+> can happen until enabled again, just like preempt_disable() would do, 
+> and the IRQ off period should be short enough not to visibly affect IRQ 
+> latency.  And that is easily done in assembly too, without preventing 
+> rescheduling if needed afterwards.
+
+I didn't want to impact interrupt latency but yes, that would work as well
+and is easier to implement.  : )
+
+--
+Regards,
+George
+
 > 
-> as well.  I've not checked with patch 4, so there may be some more too.
 > 
-> Some of this is probably because of 7123/1 and 7124/1.
-
-Do you have a branch you consider stable enough for me to rebase this
-series on? I've already solved these conflicts against -next, so
-rebasing it should be faily trivial.
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+> Nicolas
