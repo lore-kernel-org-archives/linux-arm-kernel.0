@@ -1,35 +1,29 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Fri, 14 Oct 2011 17:13:27 +0800
-Subject: [PATCH v4 8/8] ARM: pxa: move macros into gpio-pxa.c
-In-Reply-To: <CAMPhdO8R3UTCnoPp=66Sdg1d2vGQ7-dJNYZWMbPq-+d6AyiW+g@mail.gmail.com>
-References: <1318478825-17187-1-git-send-email-haojian.zhuang@marvell.com>
-	<1318478825-17187-9-git-send-email-haojian.zhuang@marvell.com>
-	<201110131742.26870.arnd@arndb.de>
-	<CAMPhdO8R3UTCnoPp=66Sdg1d2vGQ7-dJNYZWMbPq-+d6AyiW+g@mail.gmail.com>
-Message-ID: <CAN1soZxCnZjDw14WZ7vprkTQWjki5Zd47pQf2zzoJQ1O9qSKog@mail.gmail.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Fri, 14 Oct 2011 11:14:25 +0200
+Subject: [Linaro-mm-sig] [PATCH 8/9] ARM: integrate CMA with DMA-mapping
+	subsystem
+In-Reply-To: <4E97BB8E.3060204@gmail.com>
+References: <1317909290-29832-1-git-send-email-m.szyprowski@samsung.com>
+	<1317909290-29832-10-git-send-email-m.szyprowski@samsung.com>
+	<4E97BB8E.3060204@gmail.com>
+Message-ID: <013701cc8a51$ab1a3fb0$014ebf10$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 14, 2011 at 2:17 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
->>
->>> +enum pxa_gpios {
->>> + ? ? PXA_GPLR = 0x00, ? ? ? ?/* GPIO Pin Level Registers */
->>> + ? ? PXA_GPDR = 0x0C, ? ? ? ?/* GPIO Pin Direction Registers */
->>> + ? ? PXA_GPSR = 0x18, ? ? ? ?/* GPIO Pin Output Set Registers */
->>> + ? ? PXA_GPCR = 0x24, ? ? ? ?/* GPIO Pin Output Clear Registers */
->>> + ? ? PXA_GRER = 0x30, ? ? ? ?/* GPIO Rising Edge Detect Registers */
->>> + ? ? PXA_GFER = 0x3C, ? ? ? ?/* GPIO Falling Edge Detect Registers */
->>> + ? ? PXA_GEDR = 0x48, ? ? ? ?/* GPIO Edge Detect Status Registers */
->>> + ? ? PXA_GAFR = 0x54, ? ? ? ?/* GPIO Alternate Function Select Registers */
->>> + ? ? PXA_ED_MASK = 0x9C, ? ? /* GPIO edge detection for AP side */
->>> +};
->
-> And Haojian,
->
-> Is this is completely for the GPIO driver's internal use, I'd prefer to
-> use GPxR names directly, instead of prefixing it with PXA_, that's a
-> bit ugly from my picky point of view.
->
+Hello,
 
-OK, I'll GPxR directly. And I'll keep PXA_GPIO_bit() to avoid
-potential name issue.
+On Friday, October 14, 2011 6:33 AM Subash Patel wrote:
+
+> Hi Marek,
+> 
+> As informed to you in private over IRC, below piece of code broke during
+> booting EXYNOS4:SMDKV310 with ZONE_DMA enabled.
+
+Right, I missed the fact that ZONE_DMA can be enabled but the machine does not
+provide specific zone size. I will fix this in the next version. Thanks for 
+pointing this bug!
+
+Best regards
+-- 
+Marek Szyprowski
+Samsung Poland R&D Center
