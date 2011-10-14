@@ -1,170 +1,70 @@
-From: govindraj.ti@gmail.com (Govindraj)
-Date: Fri, 14 Oct 2011 19:48:51 +0530
-Subject: [PATCH v6 15/16] OMAP2+: UART: Enable back uart clocks with
-	runtime API for early console
-In-Reply-To: <8739ewk3m0.fsf@ti.com>
-References: <1317380561-661-1-git-send-email-govindraj.raja@ti.com>
-	<1317380561-661-6-git-send-email-govindraj.raja@ti.com>
-	<87pqi3z19z.fsf@ti.com>
-	<CAAL8m4xmGQaQZm5Oz8B5e6Mt7VP7c_VwQ=AnfpKotZRci32JiQ@mail.gmail.com>
-	<871uuhn4kw.fsf@ti.com>
-	<CAAL8m4wzT-ecmVeU--EQGF1PxuZuB6WZj54MmVAk-kCtFUcUSg@mail.gmail.com>
-	<8739ewk3m0.fsf@ti.com>
-Message-ID: <CAAL8m4wgLbmm-3eqku1+0oa77_fxVoFzR1ujF9nwAQRavfqLfg@mail.gmail.com>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Fri, 14 Oct 2011 07:45:15 -0700
+Subject: [PATCH] arm/tegra: select AUTO_ZRELADDR by default
+In-Reply-To: <20111014071500.GP21648@n2100.arm.linux.org.uk>
+References: <1317172068-14872-1-git-send-email-pdeschrijver@nvidia.com>
+	<74CDBE0F657A3D45AFBB94109FB122FF173955580F@HQMAIL01.nvidia.com>
+	<CAOesGMiuzF47kdmaaFny9Fg1ieox6a75tMFfLRAptvDxz_QPMg@mail.gmail.com>
+	<20111014071500.GP21648@n2100.arm.linux.org.uk>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF173BE1A260@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 14, 2011 at 2:31 AM, Kevin Hilman <khilman@ti.com> wrote:
-> Govindraj <govindraj.ti@gmail.com> writes:
->
->> On Thu, Oct 13, 2011 at 5:30 AM, Kevin Hilman <khilman@ti.com> wrote:
->>> Govindraj <govindraj.ti@gmail.com> writes:
->>>
->>>> On Wed, Oct 12, 2011 at 2:36 AM, Kevin Hilman <khilman@ti.com> wrote:
->>>>> "Govindraj.R" <govindraj.raja@ti.com> writes:
->>>>>
->>>>>> For the early console probing we had avoided hwmod reset and idling
->>>>>> and uart was idled using hwmod API and enabled back using omap_device API
->>>>>> after omap_device registration.
->>>>>>
->>>>>> Now since we are using runtime API's to enable back uart, move hwmod
->>>>>> idling and use runtime API to enable back UART.
->>>>>>
->>>>>> Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
->>>>>
->>>>> Now that the driver is using runtime PM. ?Why do we still need
->>>>> HWMOD_INIT_NO_IDLE and HWMOD_INIT_NO_RESET?
->>>>>
->>>>> The comment in the code says:
->>>>>
->>>>> ? ? ? ? ? ? ? ?/*
->>>>> ? ? ? ? ? ? ? ? * During UART early init, device need to be probed
->>>>> ? ? ? ? ? ? ? ? * to determine SoC specific init before omap_device
->>>>> ? ? ? ? ? ? ? ? * is ready. ?Therefore, don't allow idle here
->>>>> ? ? ? ? ? ? ? ? */
->>>>>
->>>>> This was true when using the 8250 driver because it was not using
->>>>> runtime PM so could not know how to (re)enable the device.
->>>>>
->>>>> However, since the driver is now runtime PM adapted, any device access
->>>>> should be contained within a runtime PM get/put block, so there should
->>>>> no longer be a reason not allow the IP blocks to be reset during boot.
->>>>>
->>>>
->>>> Forgot to add, this is still needed for
->>>> earlyprintk(CONFIG_EARLY_PRINTK) use case,
->>>
->>> Ah, right. ?I forgot about that. ?Please update the changelog (and
->>> comment in the code) to reflect that.
->>>
->>>> The initial boot prints until a console driver is available is from
->>>> "arch/arm/kernel/early_printk.c" which does a tx on uart console
->>>> and relies on configuration from bootloader.
->>>>
->>>> during bootup earlyprink does a tx on uart console and if ?uart driver
->>>> is not available yet
->>>> uart reset or idle done by hwmod layer can cause boot failures.
->>>>
->>>> --> put_char from earlyprintk.c
->>>> ? ? ?--> reset/idle from hwmod layer
->>>> ? ? ? ? ? --> put_char from earlyprintk.c
->>>>
->>>>
->>>> So console_uart reset or clock gating must be done only after uart
->>>> driver is available or be prevented using these available hwmod_flags.
->>>
->>> So why not leave the driver out of it and solve it like the current code
->>> does?
->>>
->>> The current codes use the hwmod flags, then waits until the UART driver
->>> is available (after omap_device_build) and uses omap_hwmod_idle() to do
->>> an clean idle of the device.
->>>
->>> Notably this is inside a console_lock/console_unlock block so that
->>> prints are buffered.
->>>
->>> The current code then does an omap_device_enable() to re-enable the
->>> device, but you shouldn't need that after the driver is converted to
->>> runtime PM.
->>
->> Yes similar approach here, We are not doing hwmod idle
->> until console driver is available, once omap-serial is available
->> from probe doing hwmod_idle* and then get_sync.
->
->> hwmod idle in serial.c will still cause problems if ealryprintk tries
->> to print until omap-uart console driver is not available,
->
-> It will try, but note that current code takes the console_lock() during
-> that time, so those prints will be buffered.
->
->> as now with rumtime adaptation only driver can enable back clocks.
->
-> I'm not sure why you're calling this "enable back clocks." ?This patch
-> is just trying to decide where to idle the hwmod (that is, disable the
-> clocks.)
->
+Russell King wrote at Friday, October 14, 2011 1:15 AM:
+> On Thu, Oct 13, 2011 at 04:38:46PM -0700, Olof Johansson wrote:
+> > Hi,
+> >
+> > On Wed, Sep 28, 2011 at 10:50 AM, Stephen Warren <swarren@nvidia.com> wrote:
+> > > Peter De Schrijver wrote at Tuesday, September 27, 2011 7:08 PM:
+> > >> This patch causes the kernel uncompressor to determine the physical address
+> > >> of the SDRAM at runtime. This allows the kernel to boot on both tegra20 and
+> > >> tegra30 even though SDRAM is at different physical addresses on both SoCs.
+> > >>
+> > >> Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
+> > >
+> > > An alternative would be to simply add that config option to the relevant
+> > > defconfig/.config file. I see both cases in use in the kernel. Still, the
+> > > code change this enables looks fine to just turn on all the time, and will
+> > > be needed for Tegra30 support, so I'm fine just selecting it as you have.
+> > >
+> > > Acked-by: Stephen Warren <swarren@nvidia.com>
+> > >
+> > >> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> > >> index 472a7f8..474737b 100644
+> > >> --- a/arch/arm/Kconfig
+> > >> +++ b/arch/arm/Kconfig
+> > >> @@ -596,6 +596,7 @@ config ARCH_TEGRA
+> > >> ? ? ? select HAVE_CLK
+> > >> ? ? ? select HAVE_SCHED_CLOCK
+> > >> ? ? ? select ARCH_HAS_CPUFREQ
+> > >> + ? ? select AUTO_ZRELADDR
+> > >> ? ? ? help
+> > >> ? ? ? ? This enables support for NVIDIA Tegra based systems (Tegra APX,
+> > >> ? ? ? ? Tegra 6xx and Tegra 2 series).
+> > >
+> > > P.S. Since this patch relates to Tegra, you should CC the Tegra maintainers
+> > > and list; I've done so on this message. I also added Arnd; he might take
+> > > this through the arm-soc tree.
+> >
+> > While it does touch a file outside of arch/arm/mach-tegra, it's for
+> > the tegra options and is not likely to cause conflicts upstream. I'll
+> > apply it with the rest of tegra patches for 3.2 here.
+> >
+> > So: Applied, thanks.
+> 
+> I'll point out that this makes Tegra incompatible with ZBOOT_ROM, which
+> can still be enabled.  ZBOOT_ROM=y AUTO_ZRELADDR=y is an invalid
+> configuration at runtime.
 
-Yes correct, its about where exactly to do hwmod_idle for
-avoiding hmwod_reset/idle from boot up.
+I see that at least one machine solves that by doing:
 
+config ARCH_EP93XX
+...
+        select AUTO_ZRELADDR if !ZBOOT_ROM
 
-> Re: only the driver can do it, I can think of at least 2 ways to keep
-> this out of the driver.
->
+That said, given the way Tegra works, ZBOOT_ROM isn't useful; typically,
+systems don't use NOR flash for storage of the kernel, so I don't think
+ZBOOT_ROM is likely to be used. Perhaps we should just depend on !ZBOOT_ROM?
 
-I did some study into the approaches you suggested,
-Below are my observation, Please correct me if I missed out
-any thing in my below observation,
-
-
-> 1) Use the a custom activate_func in the omap_device pm_lats struct
-> ? to idle the first time.
->
-
-same activate func gets called for all uarts, how to determine the
-activate func. was called for first time for the given uart.
-
-(use od->pdev->dev.name strcmp with uart name for first name
-and maintain a state machine ? confused)
-
-Then should we have different activate funcs?
-
-
-> 2) Use a bus notifier so the device init can be notified when the
-> ? real driver is available. ?I think you're probably wanting
-> ? the BUS_NOTIFY_BIND_DRIVER event, which would happen right
-> ? before probe. ?There's also BUS_NOTIFY_BOUND_DRIVER which
-> ? happens right after probe. ? You might actually want to use
-> ? both. ?e.g. ? console_lock(); omap_hwmod_idle() in BIND
-> ? and console_unlock() in 'BOUND'.
->
-
-bus_register_notifier is for all drivers within the bus,
-omap-uart is registered as platform bus and there a lot more
-devices that register under platform bus,
-
-So registering the notifier for platform bus will call notifier
-for all probes withing platform bus,
-
-Is there a way to have notifier per device or given device?
-
-Since bus notifier seems to be notify for all devices
-registered within the given bus.
-
---
-Thanks,
-Govindraj.R
-
-
->> So have added a function pointer to pdata which calls hwmod_idle
->> implemented in serial.c calling omap_hwmod_idle.
->
-> Yes, I saw that in the patch, and that's what I don't like.
->
-> Fixing up after earlyprintk is not the responsiblity of the driver, and
-> the driver should not know or care whether earlyprintk was or wasn't
-> used before it was loaded. ?This needs to be handled in device init code
-> as it is today.
->
-> Kevin
->
+-- 
+nvpublic
