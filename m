@@ -1,29 +1,56 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Fri, 14 Oct 2011 14:17:25 +0800
-Subject: [PATCH v4 8/8] ARM: pxa: move macros into gpio-pxa.c
-In-Reply-To: <201110131742.26870.arnd@arndb.de>
-References: <1318478825-17187-1-git-send-email-haojian.zhuang@marvell.com>
-	<1318478825-17187-9-git-send-email-haojian.zhuang@marvell.com>
-	<201110131742.26870.arnd@arndb.de>
-Message-ID: <CAMPhdO8R3UTCnoPp=66Sdg1d2vGQ7-dJNYZWMbPq-+d6AyiW+g@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 14 Oct 2011 16:13:25 +0900
+Subject: [PATCH v3 0/5] S3C2443/S3C2416: Implement support for ADC
+In-Reply-To: <201110102146.51694.heiko@sntech.de>
+References: <201110102146.51694.heiko@sntech.de>
+Message-ID: <085c01cc8a40$c40feda0$4c2fc8e0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->
->> +enum pxa_gpios {
->> + ? ? PXA_GPLR = 0x00, ? ? ? ?/* GPIO Pin Level Registers */
->> + ? ? PXA_GPDR = 0x0C, ? ? ? ?/* GPIO Pin Direction Registers */
->> + ? ? PXA_GPSR = 0x18, ? ? ? ?/* GPIO Pin Output Set Registers */
->> + ? ? PXA_GPCR = 0x24, ? ? ? ?/* GPIO Pin Output Clear Registers */
->> + ? ? PXA_GRER = 0x30, ? ? ? ?/* GPIO Rising Edge Detect Registers */
->> + ? ? PXA_GFER = 0x3C, ? ? ? ?/* GPIO Falling Edge Detect Registers */
->> + ? ? PXA_GEDR = 0x48, ? ? ? ?/* GPIO Edge Detect Status Registers */
->> + ? ? PXA_GAFR = 0x54, ? ? ? ?/* GPIO Alternate Function Select Registers */
->> + ? ? PXA_ED_MASK = 0x9C, ? ? /* GPIO edge detection for AP side */
->> +};
+Heiko St?bner wrote:
+> 
+> The adc blocks of S3C2443 and S3C2416/2450 differ in some regards
+> from previous (S3C2410, etc) and later (S3C64XX, S5P) SoCs.
+> 
+> This patch series adds support for these ADC implementations.
+> 
+> Each patch was compile tested. But as I have only access to S3C2416
+> hardware, real life testing happened only there.
+> 
+> Changes since v2:
+> Drop the quirks and follow the proposal of Kukjin Kim introducing
+> additional cpu types for S3C2443 and S3C2416.
+> S3C2443 becomes TYPE_ADCV11, as it's older than the S3C2416 implementation
+> and S3C2416/2450 becomes TYPE_ADCV12.
+> 
+> Changes since v1:
+> added a wrap for a line over 80 and moved the adc_setname call
+> to the s3c24XX.c files where all the other names are set.
+> 
+> Heiko Stuebner (5):
+>   S3C2443/S3C2416: Add adc registers
+>   s3c-adc: Fix mux bit modification in s3c_adc_select
+>   S3C24XX: Allow overriding of adc device name
+>   s3c-adc: Add support for S3C2443
+>   s3c-adc: Add support for S3C2416/S3C2450
+> 
+>  arch/arm/mach-s3c2416/s3c2416.c               |    3 ++
+>  arch/arm/mach-s3c2443/s3c2443.c               |    3 ++
+>  arch/arm/plat-samsung/adc.c                   |   43
+> ++++++++++++++++++------
+>  arch/arm/plat-samsung/include/plat/adc-core.h |    2 +-
+>  arch/arm/plat-samsung/include/plat/regs-adc.h |    3 ++
+>  5 files changed, 42 insertions(+), 12 deletions(-)
+> 
+> --
+> 1.7.2.3
 
-And Haojian,
+Hi Heiko,
 
-Is this is completely for the GPIO driver's internal use, I'd prefer to
-use GPxR names directly, instead of prefixing it with PXA_, that's a
-bit ugly from my picky point of view.
+Thanks for your re-work and looks ok to me, applied.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
