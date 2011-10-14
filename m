@@ -1,5 +1,5 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Fri, 14 Oct 2011 17:28:55 -0400 (EDT)
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 14 Oct 2011 17:06:02 -0500
 Subject: [PATCH] arm/tegra: select AUTO_ZRELADDR by default
 In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF173BE1A3A6@HQMAIL01.nvidia.com>
 References: <1317172068-14872-1-git-send-email-pdeschrijver@nvidia.com>
@@ -12,33 +12,32 @@ References: <1317172068-14872-1-git-send-email-pdeschrijver@nvidia.com>
 	<74CDBE0F657A3D45AFBB94109FB122FF173BE1A362@HQMAIL01.nvidia.com>
 	<alpine.LFD.2.02.1110141631530.17040@xanadu.home>
 	<74CDBE0F657A3D45AFBB94109FB122FF173BE1A3A6@HQMAIL01.nvidia.com>
-Message-ID: <alpine.LFD.2.02.1110141718160.17040@xanadu.home>
+Message-ID: <4E98B24A.2070408@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 14 Oct 2011, Stephen Warren wrote:
-
+On 10/14/2011 04:01 PM, Stephen Warren wrote:
 > Nicolas Pitre wrote at Friday, October 14, 2011 2:45 PM:
-> > On Fri, 14 Oct 2011, Stephen Warren wrote:
+>> On Fri, 14 Oct 2011, Stephen Warren wrote:
 > ...
-> > > I did originally briefly look into getting U-Boot to boot a zImage, but
-> > > that looked like a far more invasive patch. There were rumours of some
-> > > chip's custom U-Boot already having such support, but I couldn't find
-> > > it, nor any evidence of such support in mainline U-Boot.
-> > 
-> > FRom my clone of the u-Boot repo:
-> > 
-> > $ git grep -l zImage
-> > README
-> > arch/sh/lib/zimageboot.c
-> > arch/x86/lib/zimage.c
-> > ...
-> > 
-> > Even the name of some of those files clearly hints zImage support.
-> > 
-> > In any case, loading zImage should be even simpler than loading uImage.
-> > It is the same as loading uImage except that you just have to skip the
-> > checking and relocating steps.
+>>> I did originally briefly look into getting U-Boot to boot a zImage, but
+>>> that looked like a far more invasive patch. There were rumours of some
+>>> chip's custom U-Boot already having such support, but I couldn't find
+>>> it, nor any evidence of such support in mainline U-Boot.
+>>
+>> FRom my clone of the u-Boot repo:
+>>
+>> $ git grep -l zImage
+>> README
+>> arch/sh/lib/zimageboot.c
+>> arch/x86/lib/zimage.c
+>> ...
+>>
+>> Even the name of some of those files clearly hints zImage support.
+>>
+>> In any case, loading zImage should be even simpler than loading uImage.
+>> It is the same as loading uImage except that you just have to skip the
+>> checking and relocating steps.
 > 
 > Just by way of background in case anyone is wondering why I wrote the
 > patch I did:
@@ -50,9 +49,7 @@ On Fri, 14 Oct 2011, Stephen Warren wrote:
 > all the stuff like setting up kernel command-lines, initrds, knowing how
 > to pass the FDT to the kernel, and whatever other OS-specific setup might
 > be required.
-
-Absolutely.  And that is a must-have.
-
+> 
 > The disadvantage of adding zImage support to bootm is that I'd have to
 > teach a bunch of U-Boot image handling code about a new image format; it
 > already knows about "legacy uImage", "FIT" images, and I'd have to add a
@@ -64,17 +61,17 @@ Absolutely.  And that is a must-have.
 > 
 > I didn't feel like making such a large change. Hence, I chose to make a
 > small change to the existing uImage support.
+> 
+> Now admittedly I did say I didn't find any traces of zImage support, which
+> isn't what I'm saying here; I guess I forgot about the stuff I did find
+> soon after I chose the path of modifying the uImage formats.
+> 
 
-And that change is certainly valuable.  Some people do want the extra 
-feature from the uImage format.  REmoving its absolute address 
-limitation is a good thing.
+FYI, this exact topic has been discussed on the Linaro weekly
+boot-architecture call and list. The discussion has been more general in
+terms of what can be done to make installing and updating kernels
+easier/work for distros.
 
-However, also supporting zImage directly on ARM doesn't have to be that 
-hard.  Instead of adding "case IMAGE_FORMAT_ZIMAGE" everywhere, all you 
-would have to do is to load zImage in memory according to the load 
-address provided as an argument to the command, and then fake a uImage 
-load by artificially creating the uImage header at run time with the 
-data that u-Boot needs later on.
+https://wiki.linaro.org/OfficeofCTO/BootArchitecture
 
-
-Nicolas
+Rob
