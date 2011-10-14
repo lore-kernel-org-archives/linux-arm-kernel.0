@@ -1,57 +1,59 @@
 From: nico@fluxnic.net (Nicolas Pitre)
-Date: Fri, 14 Oct 2011 14:03:21 -0400 (EDT)
-Subject: [PATCH] arm/tegra: select AUTO_ZRELADDR by default
-In-Reply-To: <CAOesGMgDwMeVmwo1WJ3tU+ZdjCSJ6F8mY42e_KwTmzAkGQsqmg@mail.gmail.com>
-References: <1317172068-14872-1-git-send-email-pdeschrijver@nvidia.com>
-	<201110141729.41515.arnd@arndb.de>
-	<74CDBE0F657A3D45AFBB94109FB122FF173BE1A283@HQMAIL01.nvidia.com>
-	<201110141827.53906.arnd@arndb.de>
-	<CAOesGMgDwMeVmwo1WJ3tU+ZdjCSJ6F8mY42e_KwTmzAkGQsqmg@mail.gmail.com>
-Message-ID: <alpine.LFD.2.02.1110141402150.17040@xanadu.home>
+Date: Fri, 14 Oct 2011 14:04:50 -0400 (EDT)
+Subject: [PATCH] ARM: mutually exclude ZBOOT_ROM and AUTO_ZRELADDR
+In-Reply-To: <1318607945-6807-1-git-send-email-olof@lixom.net>
+References: <20111014071500.GP21648@n2100.arm.linux.org.uk>
+	<1318607945-6807-1-git-send-email-olof@lixom.net>
+Message-ID: <alpine.LFD.2.02.1110141404060.17040@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Fri, 14 Oct 2011, Olof Johansson wrote:
 
-> On Fri, Oct 14, 2011 at 9:27 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Friday 14 October 2011, Stephen Warren wrote:
-> >> Arnd Bergmann wrote at Friday, October 14, 2011 9:30 AM:
-> >> ...
-> >> > You mention that tegra30 will require AUTO_ZRELADDR.
-> >>
-> >> Well, just to be clear, here's the situation I think:
-> >>
-> >> Tegra20's SDRAM starts at physical address 0.
-> >>
-> >> Tegra30's SDRAM starts at physical address 2G.
-> >>
-> >> To support that, we could either:
-> >>
-> >> a) Introduce a new Kconfig variable for Tegra30, make T20/T30 mutually
-> >> exclusive, and update arch/arm/mach-tegra/Makefile.boot to set zreladdr
-> >> etc. based on the new Tegra30 config variable too. Then, there's no need
-> >> for AUTO_ZRELADDR anywhere.
-> >>
-> >> b) Have no new config variable, build a unified T20/T30 kernel, leave
-> >> Makefile.boot untouched, and rely on using AUTO_ZRELADDR for Tegra30 to
-> >> account for the different SDRAM physical addresses.
-> >
-> > Ok, thanks for the explanation, that makes it much clearer. For
-> > completeness, you could also do both of the above and make T20/T30 mutually
-> > exclusive unless AUTO_ZRELADDR is set. That might be more complex than
-> > necessary, I don't know.
+> This way platforms that want it can select AUTO_ZRELADDR without issues caused by
+> someone manually also enabling ZBOOT_ROM.
 > 
-> That is likely to get messy.
-> 
-> Seems like there could be some use for a (silent) option for a
-> platform to indicate that it can do XIP kernel (or zImage), and thus
-> not able to use AUTO_ZRELADDR (or other options that require rewriting
-> text segment of zImage or kernel).
-> 
-> Language gets awkard though, since it'd be a negative option (or all
-> platforms would need to add it). MACH_XIP_UNSUPPORTED perhaps?
+> Signed-off-by: Olof Johansson <olof@lixom.net>
 
-Please hold on -- I'm on it.
+Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+
+Certainly harmless for the time being.
 
 
-Nicolas
+
+> ---
+>  arch/arm/Kconfig |    1 +
+>  1 files changed, 1 insertions(+), 0 deletions(-)
+> 
+> 
+> Russell King wrote at Friday, October 14, 2011 1:15 AM:
+> 
+> > I'll point out that this makes Tegra incompatible with ZBOOT_ROM, which
+> > can still be enabled.  ZBOOT_ROM=y AUTO_ZRELADDR=y is an invalid
+> > configuration at runtime.
+> 
+> Ah, looks like the dependency is only one-way. Since they are mutually
+> exclusive, how about the below?
+> 
+> 
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 82973b2..2ad58e8 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -1814,6 +1814,7 @@ config ZBOOT_ROM_BSS
+>  config ZBOOT_ROM
+>  	bool "Compressed boot loader in ROM/flash"
+>  	depends on ZBOOT_ROM_TEXT != ZBOOT_ROM_BSS
+> +	depends on !AUTO_ZRELADDR
+>  	help
+>  	  Say Y here if you intend to execute your compressed kernel image
+>  	  (zImage) directly from ROM or flash.  If unsure, say N.
+> -- 
+> 1.7.4.1
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
+> 
