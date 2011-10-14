@@ -1,53 +1,72 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Fri, 14 Oct 2011 09:37:52 +0800
-Subject: [PATCH 2/2] arm/mx5: add device tree support for imx51 babbage
-In-Reply-To: <4E970D62.9090403@free.fr>
-References: <1317389747-24589-1-git-send-email-shawn.guo@linaro.org>
-	<1317389747-24589-3-git-send-email-shawn.guo@linaro.org>
-	<4E970D62.9090403@free.fr>
-Message-ID: <20111014013751.GD27048@S2100-06.ap.freescale.net>
+From: gdavis@mvista.com (George G. Davis)
+Date: Thu, 13 Oct 2011 21:34:02 -0400
+Subject: [RFC/PATCH 3/7] ARM: ARM11 MPCore: {clean,
+	flush}_pmd_entry are not preempt safe
+In-Reply-To: <20111013143143.GA21648@n2100.arm.linux.org.uk>
+References: <1317877714-11355-1-git-send-email-gdavis@mvista.com>
+	<1317955121-28047-1-git-send-email-gdavis@mvista.com>
+	<1317955121-28047-4-git-send-email-gdavis@mvista.com>
+	<20111011095314.GA23848@arm.com>
+	<6EB957F5-6E89-43F3-BAF3-A9E007BD896F@mvista.com>
+	<20111013143143.GA21648@n2100.arm.linux.org.uk>
+Message-ID: <5952CB89-3095-4926-97AB-F5F46299EC55@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 13, 2011 at 06:10:10PM +0200, Julien Boibessot wrote:
-> On 30/09/2011 15:35, Shawn Guo wrote:
-> > It adds device tree support for imx51 babbage board.
-> >
-> cut
-> > diff --git a/arch/arm/mach-mx5/imx51-dt.c b/arch/arm/mach-mx5/imx51-dt.c
-> > new file mode 100644
-> > index 0000000..0878441
-> > --- /dev/null
-> > +++ b/arch/arm/mach-mx5/imx51-dt.c
-> > @@ -0,0 +1,116 @@
-> cut
-> > +
-> > +static void __init imx51_timer_init(void)
-> > +{
-> > +	mx51_clocks_init(32768, 24000000, 22579200, 0);
-> > +}
-> From my understanding, if put in arch/arm/mach-mx5/imx51-dt.c, this
-> clock initialization will apply to all i.MX51 based platforms.
-> Am I right ?
-> If so, I think clock init shouldn't be done here because it's platform
-> dependant: one might for example choose to use 32k quartz instead of
-> 24Mhz external oscillator as clock reference. i.MX51 supports this.
-> For example on my board I do:
->     mx51_clocks_init(32768, 32768*1024, 0, 0);
+
+On Oct 13, 2011, at 10:31 AM, Russell King - ARM Linux wrote:
+
+> On Tue, Oct 11, 2011 at 10:34:17PM -0400, George G. Davis wrote:
+>> 
+>> On Oct 11, 2011, at 5:53 AM, Catalin Marinas wrote:
+>> 
+>>> On Fri, Oct 07, 2011 at 03:38:37AM +0100, gdavis at mvista.com wrote:
+>>>> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+>>>> index 594d677..3c8253f 100644
+>>>> --- a/arch/arm/mm/mmu.c
+>>>> +++ b/arch/arm/mm/mmu.c
+>>>> @@ -567,12 +567,24 @@ static void __init alloc_init_section(pud_t *pud, unsigned long addr,
+>>>> 		if (addr & SECTION_SIZE)
+>>>> 			pmd++;
+>>>> 
+>>>> +		if (cache_ops_need_broadcast())
+>>>> +			preempt_disable();
+>>>> 		do {
+>>>> 			*pmd = __pmd(phys | type->prot_sect);
+>>>> 			phys += SECTION_SIZE;
+>>>> 		} while (pmd++, addr += SECTION_SIZE, addr != end);
+>>>> 
+>>>> +		/* FIXME: Multiple PMD entries may be written above
+>>>> +		 * but only one cache line, up to 8 PMDs depending
+>>>> +		 * on the alignment of this mapping, is flushed below.
+>>>> +		 * IFF this mapping spans >8MiB, then only the first
+>>>> +		 * 8MiB worth of entries will be flushed.  Entries
+>>>> +		 * above the 8MiB limit will not be flushed if I
+>>>> +		 * read this correctly.
+>>>> +		 */
+>>>> 		flush_pmd_entry(p);
+>>>> +		if (cache_ops_need_broadcast())
+>>>> +			preempt_enable();
+>>> 
+>>> My reading of the create_mapping() code is that alloc_init_pud() and
+>>> alloc_init_section() are called with a 2MB range only (that's 2
+>>> entries) given by pgd_addr_end().
+>> 
+>> You're correct of course.  I initially stuck that FIXME note in there more as
+>> a reminder to review it more carefully.  Alas, in my haste, I submitted as-is
+>> w/o checking parameter bounds passed from callers which do as you
+>> say, so it's never more than 2MiB in size.  Thanks for the feedback.
+>> I'll remove that note.
 > 
-Yes, this is a problem and now it's the time to address it.  For dt
-case, these clock frequencies should come from device tree.  I was
-trying to keep it as it is until we finalize the clock bindings or the
-need of different frequency setup shows up.  Now, the need shows up.
+> Note also that the early bringup of MMU mappings (alloc_init_section
+> etc) are running before SMP bringup, so they're already bound to a
+> single CPU.  So these shouldn't need 'fixing'.
 
-I will add a new function call mx51_clocks_init_dt() with zero parameter
-in clock-mx51-mx53.c parsing the clock frequencies from device tree and
-the calling into mx51_clocks_init(...) with these frequencies as the
-parameters.  The updated patch will come soon.
+Yep, I knew that and just went ahead and used a shot gun anyway.  I'll
+drop cases which are already safe.
 
-Thanks for the input.  Glad to see people are actually planning to move
-their board setup to DT.
+Thanks!
 
--- 
+--
 Regards,
-Shawn
+George
