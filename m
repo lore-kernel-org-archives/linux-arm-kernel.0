@@ -1,27 +1,44 @@
-From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
-Date: Fri, 14 Oct 2011 09:27:17 +0200
-Subject: [PATCH 0/8] S3C2416: Enable armdiv and armclk
-In-Reply-To: <085f01cc8a40$df7af8a0$9e70e9e0$%kim@samsung.com>
-References: <201109281217.33813.heiko@sntech.de>
-	<085f01cc8a40$df7af8a0$9e70e9e0$%kim@samsung.com>
-Message-ID: <201110140927.18860.heiko@sntech.de>
+From: ulf.hansson@stericsson.com (Ulf Hansson)
+Date: Fri, 14 Oct 2011 09:37:51 +0200
+Subject: [PATCH] mmc: mmci: Do not release spinlock in request_end
+In-Reply-To: <1318521592.2090.16.camel@linaro1>
+References: <1318342001-26955-1-git-send-email-ulf.hansson@stericsson.com>	
+	<20111013142914.GZ21648@n2100.arm.linux.org.uk>
+	<1318521592.2090.16.camel@linaro1>
+Message-ID: <4E97E6CF.1000601@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kgene,
+Jon Medhurst (Tixy) wrote:
+> On Thu, 2011-10-13 at 15:29 +0100, Russell King - ARM Linux wrote:
+>> On Tue, Oct 11, 2011 at 04:06:41PM +0200, Ulf Hansson wrote:
+>>> The patch "mmc: core: move ->request() call from atomic context",
+>>> is the reason to why this change is possible. This simplifies the
+>>> error handling code execution path quite a lot and potentially also
+>>> fixes some error handling hang problems.
+>>>
+>>> Signed-off-by: Ulf Hansson <ulf.hansson@stericsson.com>
+>> This doesn't look right:
+>>
+>> void mmc_request_done(struct mmc_host *host, struct mmc_request *mrq)
+>> {
+>>         if (err && cmd->retries) {
+>>                 host->ops->request(host, mrq);
+>>
 
-Am Freitag, 14. Oktober 2011, 09:14:11 schrieb Kukjin Kim:
-> Heiko St?bner wrote:
-[...]
-> > Heiko Stuebner (8):
-> >   S3C2416: Add armdiv_mask constant.
-[...]
-> As a note, if required, 1st patch which is fixing will be sent to stable.
+This is NOT how it looks at mmc-next. You need to test with Adrian 
+Hunters patch which the commit refers two.
 
-I don't think this is really necessary.
+Linux next for mmc is available at:
 
-The original code was essentially correct but hard to read.
-The constant makes sense in the rework, as the armdiv_mask is is used in more 
-places now and not contained in a single static function.
+git://dev.laptop.org/users/cjb/mmc mmc-next
 
-Heiko
+
+
+>> So, not dropping the spinlock results in calling the request function
+>> with the spinlock held - and as the request function then goes on to
+>> lock the spinlock, we will deadlock.
+> 
+> Indeed, deadlock behaviour at this point is what I see with this patch
+> on a Versatile Express board running 3.0-rc9.
+> 
