@@ -1,66 +1,52 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Fri, 14 Oct 2011 12:33:31 -0400 (EDT)
-Subject: [PATCH 2/5] drivercore: Add driver probe deferral mechanism
-In-Reply-To: <CACxGe6vF6em0-PnJ7UuH0CQ0_StJTfmFKBsktvb9O+ccCx6E8A@mail.gmail.com>
-Message-ID: <Pine.LNX.4.44L0.1110141229450.2036-100000@iolanthe.rowland.org>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 14 Oct 2011 09:44:34 -0700
+Subject: [PATCH] arm/tegra: select AUTO_ZRELADDR by default
+In-Reply-To: <201110141827.53906.arnd@arndb.de>
+References: <1317172068-14872-1-git-send-email-pdeschrijver@nvidia.com>
+	<201110141729.41515.arnd@arndb.de>
+	<74CDBE0F657A3D45AFBB94109FB122FF173BE1A283@HQMAIL01.nvidia.com>
+	<201110141827.53906.arnd@arndb.de>
+Message-ID: <CAOesGMgDwMeVmwo1WJ3tU+ZdjCSJ6F8mY42e_KwTmzAkGQsqmg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 14 Oct 2011, Grant Likely wrote:
+On Fri, Oct 14, 2011 at 9:27 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Friday 14 October 2011, Stephen Warren wrote:
+>> Arnd Bergmann wrote at Friday, October 14, 2011 9:30 AM:
+>> ...
+>> > You mention that tegra30 will require AUTO_ZRELADDR.
+>>
+>> Well, just to be clear, here's the situation I think:
+>>
+>> Tegra20's SDRAM starts at physical address 0.
+>>
+>> Tegra30's SDRAM starts at physical address 2G.
+>>
+>> To support that, we could either:
+>>
+>> a) Introduce a new Kconfig variable for Tegra30, make T20/T30 mutually
+>> exclusive, and update arch/arm/mach-tegra/Makefile.boot to set zreladdr
+>> etc. based on the new Tegra30 config variable too. Then, there's no need
+>> for AUTO_ZRELADDR anywhere.
+>>
+>> b) Have no new config variable, build a unified T20/T30 kernel, leave
+>> Makefile.boot untouched, and rely on using AUTO_ZRELADDR for Tegra30 to
+>> account for the different SDRAM physical addresses.
+>
+> Ok, thanks for the explanation, that makes it much clearer. For
+> completeness, you could also do both of the above and make T20/T30 mutually
+> exclusive unless AUTO_ZRELADDR is set. That might be more complex than
+> necessary, I don't know.
 
-> > How can a device acquire children before it has a driver?
-> 
-> There are a few potential situations in embedded systems (or at least
-> nothing currently prevents it) where platform setup code constructs a
-> device hierarchy without the aid of device drivers, and it is still
-> possible for a parent device to be attached to a driver.  IIUC, SPARC
-> creates an entire hierarchy of platform_devices from all the nodes in
-> the OpenFirmware device tree, and any of those devices can be bound to
-> a driver.  I don't like that approach, but at the very least it needs
-> to be guarded against.
+That is likely to get messy.
 
-Do these devices ever require deferred probes?
+Seems like there could be some use for a (silent) option for a
+platform to indicate that it can do XIP kernel (or zImage), and thus
+not able to use AUTO_ZRELADDR (or other options that require rewriting
+text segment of zImage or kernel).
 
-> On Fri, Oct 14, 2011 at 9:39 AM, Alan Stern <stern@rowland.harvard.edu> wrote:
-> > On Thu, 13 Oct 2011, Grant Likely wrote:
-> >> I saw those. ?I also notice that they are only used by device_move()
-> >> when reparenting a device (which is another wrinkle I hadn't though
-> >> about). ?Reparenting a device becomes problematic if the probe order
-> >> is also represented in the list. ?If device_move() gets called, then
-> >> any implicit probe-order sorting for that device would be lost.
-> >>
-> >> I also notice that device_move disregards any children when moving a
-> >> device, which could also be a problem.
-> >>
-> >> Although it looks like the only users of device_move are:
-> >>
-> >> drivers/media/video/pvrusb2/pvrusb2-v4l2.c
-> >> drivers/s390/cio/device.c
-> >> net/bluetooth/hci_sysfs.c
-> >> net/bluetooth/rfcomm/tty.c
-> >>
-> >> So it may not be significant to adapt.
-> >
-> > I trust that very little will be needed. ?I haven't checked the
-> > existing callers, but it's reasonable to require that a device being
-> > moved not have any children.
-> 
-> Yes, that does indeed simplify the issue considerably.  Let's do that.
->  So, for this patch, there will be two bits added.  First, don't allow
-> deferral on devices with children, and second a successful probe
-> (deferred or otherwise) should always move a device to the end of the
-> dap_list if it doesn't have children to guarantee that the list order
-> satisfies both the hierarchical and probe order.  Manjunath, do you
-> think you can prototype this?
+Language gets awkard though, since it'd be a negative option (or all
+platforms would need to add it). MACH_XIP_UNSUPPORTED perhaps?
 
-I don't think the second part needs to be quite so invasive.  
-Certainly drivers that never defer probes shouldn't require anything to
-be moved.
 
-A deferred probe _should_ move the device to the end of the list.  But
-this needs to happen in the probe routine itself (after it has verified
-that all the other required devices are present and before it has
-registered any children) to prevent races.  It can't be done in a
-central location.
-
-Alan Stern
+-Olof
