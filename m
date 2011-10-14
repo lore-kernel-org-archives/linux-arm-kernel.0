@@ -1,61 +1,98 @@
-From: mturquette@ti.com (Turquette, Mike)
-Date: Fri, 14 Oct 2011 11:14:19 -0700
-Subject: [PATCH v2 1/7] clk: Add a generic clock infrastructure
-In-Reply-To: <1316730422-20027-2-git-send-email-mturquette@ti.com>
-References: <1316730422-20027-1-git-send-email-mturquette@ti.com>
-	<1316730422-20027-2-git-send-email-mturquette@ti.com>
-Message-ID: <CAJOA=zM9k7_z_PUoF0tZ_OrgdDTgMjZLftqtW0ra3G9C08Th7g@mail.gmail.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Fri, 14 Oct 2011 12:25:03 -0600
+Subject: [PATCH 2/5] drivercore: Add driver probe deferral mechanism
+In-Reply-To: <Pine.LNX.4.44L0.1110141327170.2036-100000@iolanthe.rowland.org>
+References: <CACxGe6t2Xu5B0AKZJe-6HEpxK6GfuNm0Y2Kb_bs8ZwaTz5XnRg@mail.gmail.com>
+	<Pine.LNX.4.44L0.1110141327170.2036-100000@iolanthe.rowland.org>
+Message-ID: <CACxGe6sc8qOWDvLYSKwUzG8-VEZCXDKQX88qQsFYuP2QtEHvFg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 22, 2011 at 3:26 PM, Mike Turquette <mturquette@ti.com> wrote:
-> From: Jeremy Kerr <jeremy.kerr@canonical.com>
-> ?struct clk_hw_ops {
-> ? ? ? ?int ? ? ? ? ? ? (*prepare)(struct clk_hw *);
-> ? ? ? ?void ? ? ? ? ? ?(*unprepare)(struct clk_hw *);
-> ? ? ? ?int ? ? ? ? ? ? (*enable)(struct clk_hw *);
-> ? ? ? ?void ? ? ? ? ? ?(*disable)(struct clk_hw *);
-> ? ? ? ?unsigned long ? (*recalc_rate)(struct clk_hw *);
+On Fri, Oct 14, 2011 at 11:33 AM, Alan Stern <stern@rowland.harvard.edu> wrote:
+> On Fri, 14 Oct 2011, Grant Likely wrote:
+>
+>> > I don't think the second part needs to be quite so invasive.
+>> > Certainly drivers that never defer probes shouldn't require anything to
+>> > be moved.
+>>
+>> Think about that a minute. ?Consider a dpm_list of devices:
+>> ? ? ? ? abcDefGh
+>>
+>> Now assume that D has an implicit dependency on G. ?If D gets probed
+>> first, then it will be deferred until G gets probed and then D will
+>> get retried and moved to the end of the list resulting in:
+>> ? ? ? ? abcefGhD
+>> Everything is good now for the order that things need to be suspended in.
+>>
+>> Now lets assume that the drivers get linked into the kernel in a
+>> different order (or the modules get loaded in a different order) and G
+>> gets probed first, followed by D. ?No deferral occurred and so no
+>> reordering occurs, resulting in:
+>> ? ? ? ? abcDefGh (unchanged)
+>> But now suspend is broken because D depends on G, but G will be
+>> suspended before D.
+>
+> However D sometimes does defer probes. ?Therefore the device always
+> needs to be moved, even though this particular probe wasn't deferred.
 
-In implementing recalc for divider clocks, I started to wonder, "why
-not just pass struct clk *clk into the clk_hw_ops func ptrs?".
+Yes, that's part of my point.
 
-recalc is an obvious example whereby we need access to parent->rate.
-The code usually ends up looking something like:
+>> ?This looks and smells like a bug to me. ?In fact,
+>> even without using probe deferral it looks like a bug because the
+>> dap_list isn't taking into account the fact that there are very likely
+>> to be implicit dependencies between devices that are not represented
+>> in the device hierarchy (maybe not common in PCs, but certainly is the
+>> case for embedded). ?But, it is also easy to solve by ensuring the
+>> dap_list is also probe-order sorted.
+>>
+>> > A deferred probe _should_ move the device to the end of the list. ?But
+>> > this needs to happen in the probe routine itself (after it has verified
+>> > that all the other required devices are present and before it has
+>> > registered any children) to prevent races. ?It can't be done in a
+>> > central location.
+>>
+>> I'm really concerned about drivers having to implement this and not
+>> getting it correct; particularly when moving a device to the end of
+>> the list is cheap, and it shouldn't be a problem to do the move
+>> unconditionally after a driver has been matches, but before probe() is
+>> called.
+>
+> But that's too early. ?What if D gets moved to the end of the list,
+> then G gets added to the list and probed, and then D's probe succeeds?
 
-unsigned long omap_recalc_rate(struct clk_hw *hw)
-{
-        struct clk *parent;
-        struct clk_hw_omap *oclk;
+So the argument is that if really_probe() called dpm_move_last()
+immediately before the dev->bus->probe()/drv->probe() call then there
+is a race condition that G could get both registered and probed before
+D's probe() starts using G's resources.  And so, the list would still
+have G after D which is in the wrong order.  Do I understand
+correctly?
 
-        parent = hw->clk->parent;
-        oclk = to_clk_omap(hw);
-        ...
-}
+> And after the probe returns is too late, because by then there may well
+> be child devices.
 
-That's a bit of a song and dance to have to do in almost every op, and
-often these ops will need access to stuff like clk->rate also.   Is
-there any opposition to just passing in struct clk?  e.g:
+Agreed, after probe returns is definitely too late.
 
-unsigned long omap_recalc_rate(struct clk *clk)
-{
-        struct clk *parent;
-        struct clk_hw_omap *oclk;
+>> ?We may be able to keep watch to make sure that drivers using
+>> probe deferral are also reordering themselves, but that does nothing
+>> for the cases described above where the link order of the drivers
+>> determines probe order, not the dap_list order.
+>
+> Devices need to be moved whenever they have any external dependencies,
+> regardless of the particular order they get probed in.
 
-        parent = clk->parent;
-        oclk = to_clk_omap(clk->hw);
-        ...
-}
+I suspect this gets messy in a hurry, but perhaps it is worth trying.
+So, any device that makes use of a PHY, GPIO line, codec, etc will
+need to call dpm_move_last() before adding child devices, correct?
+I'd be much happier to find a way to do this in core code though.  And
+there is still a potential race condition here.  For example, if G is
+in the middle of it's probe routine, and D gets probed between G
+registering GPIOs and calling dpm_move_last(), then we're in the same
+boat again.  I think the window for this race can be considered to be
+of the same magnitude as the moved to early race described above.  I
+need to think about this more...
 
-It is a small nitpick, but it affects the API for everybody so best to
-get it right now before folks start migrating over to it.
+g.
 
-Thanks,
-Mike
-
-> ? ? ? ?int ? ? ? ? ? ? (*set_rate)(struct clk_hw *,
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?unsigned long, unsigned long *);
-> ? ? ? ?long ? ? ? ? ? ?(*round_rate)(struct clk_hw *, unsigned long);
-> ? ? ? ?int ? ? ? ? ? ? (*set_parent)(struct clk_hw *, struct clk *);
-> ? ? ? ?struct clk * ? ?(*get_parent)(struct clk_hw *);
-> ?};
+-- 
+Grant Likely, B.Sc., P.Eng.
+Secret Lab Technologies Ltd.
