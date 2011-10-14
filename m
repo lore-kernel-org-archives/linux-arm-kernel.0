@@ -1,33 +1,22 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Fri, 14 Oct 2011 10:27:47 +0100
-Subject: [PATCH 00/16] ARM: amba: Enable module alias autogeneration for
-	AMBA drivers
-In-Reply-To: <20111013172404.GL21648@n2100.arm.linux.org.uk>
-References: <1317830707-17517-1-git-send-email-dave.martin@linaro.org>
-	<20111013165420.GA2422@localhost.localdomain>
-	<20111013172404.GL21648@n2100.arm.linux.org.uk>
-Message-ID: <20111014092733.GA2373@localhost.localdomain>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 14 Oct 2011 10:31:01 +0100
+Subject: Warning in -next w/ "ARM: 7011/1: Add ARM cpu topology definition"
+Message-ID: <20111014093100.GA23994@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 13, 2011 at 06:24:04PM +0100, Russell King - ARM Linux wrote:
-> On Thu, Oct 13, 2011 at 05:54:20PM +0100, Dave Martin wrote:
-> > Russell, did you have a view on this series?
-> > 
-> > Following your suggestion I was able to use the generic modpost
-> > infrastructure instead of reinventing stuff, and it seemes to work out
-> > quite neatly.
-> > 
-> > Hopefully the only possibly-contraversial change change is the
-> > movement of struct amba_id.
-> 
-> I think it looks fine - but I would like to see the first patch getting
-> a wider distribution before accepting the series - I think it needs to
-> go to at least lkml.org just in case someone has an issue with it.
+Hi Vincent,
 
-OK, that makes sense.  I tried to CC the appropriate people, but you're
-right-- posting it to lkml would be a better way to reach the right
-audience.  I'll post and see.
+When compiling next with SCHED_MC enabled I get a warning from sched.c
+because your topology functions (declared in arch/arm/include/asm/topology.h)
+take unsigned int cpu rather than int cpu:
 
-Thanks
----Dave
+kernel/sched.c:7354:2: warning: initialization from incompatible pointer type
+
+7353 #ifdef CONFIG_SCHED_MC
+7354         { sd_init_MC, cpu_coregroup_mask, },
+7355 #endif
+
+Apologies if you've already got a fix queued for this,
+
+Will
