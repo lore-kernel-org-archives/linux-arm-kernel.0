@@ -1,35 +1,41 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 14 Oct 2011 08:42:24 +0100
-Subject: [PATCH] mmc: mmci: Do not release spinlock in request_end
-In-Reply-To: <4E97E6CF.1000601@stericsson.com>
-References: <1318342001-26955-1-git-send-email-ulf.hansson@stericsson.com>
-	<20111013142914.GZ21648@n2100.arm.linux.org.uk>
-	<1318521592.2090.16.camel@linaro1>
-	<4E97E6CF.1000601@stericsson.com>
-Message-ID: <20111014074224.GQ21648@n2100.arm.linux.org.uk>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 14 Oct 2011 16:44:03 +0900
+Subject: [PATCH 0/8] S3C2416: Enable armdiv and armclk
+In-Reply-To: <201110140927.18860.heiko@sntech.de>
+References: <201109281217.33813.heiko@sntech.de>
+	<085f01cc8a40$df7af8a0$9e70e9e0$%kim@samsung.com>
+	<201110140927.18860.heiko@sntech.de>
+Message-ID: <087201cc8a45$0b901430$22b03c90$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 14, 2011 at 09:37:51AM +0200, Ulf Hansson wrote:
-> Jon Medhurst (Tixy) wrote:
->> On Thu, 2011-10-13 at 15:29 +0100, Russell King - ARM Linux wrote:
->>> On Tue, Oct 11, 2011 at 04:06:41PM +0200, Ulf Hansson wrote:
->>>> The patch "mmc: core: move ->request() call from atomic context",
->>>> is the reason to why this change is possible. This simplifies the
->>>> error handling code execution path quite a lot and potentially also
->>>> fixes some error handling hang problems.
->>>>
->>>> Signed-off-by: Ulf Hansson <ulf.hansson@stericsson.com>
->>> This doesn't look right:
->>>
->>> void mmc_request_done(struct mmc_host *host, struct mmc_request *mrq)
->>> {
->>>         if (err && cmd->retries) {
->>>                 host->ops->request(host, mrq);
->>>
->
-> This is NOT how it looks at mmc-next. You need to test with Adrian  
-> Hunters patch which the commit refers two.
+Heiko St?bner wrote:
+> 
+> Hi Kgene,
+> 
+> Am Freitag, 14. Oktober 2011, 09:14:11 schrieb Kukjin Kim:
+> > Heiko St?bner wrote:
+> [...]
+> > > Heiko Stuebner (8):
+> > >   S3C2416: Add armdiv_mask constant.
+> [...]
+> > As a note, if required, 1st patch which is fixing will be sent to
+stable.
+> 
+> I don't think this is really necessary.
+> 
+> The original code was essentially correct but hard to read.
+> The constant makes sense in the rework, as the armdiv_mask is is used in
+more
+> places now and not contained in a single static function.
+> 
 
-In that case, how can I take the patch to mmci if it depends on something
-in another tree?
+OK.
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
