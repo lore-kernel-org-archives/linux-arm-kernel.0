@@ -1,58 +1,78 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Fri, 14 Oct 2011 19:03:39 +0200
-Subject: [PATCH v3 1/6] iommu/core: split mapping to page sizes as
-	supported by the hardware
-In-Reply-To: <20111014133510.GC2198@amd.com>
-References: <20110927131222.GL2138@amd.com>
-	<CAK=WgbYG2tpMJ2SikZhm=R9j5kQ6Hm8CGg=q1bko3idzF53Q3Q@mail.gmail.com>
-	<20110927181438.GM2138@amd.com>
-	<CAK=WgbbNs5fWHDEputZ=jzU5YN0sn0tf6AETkcsoq_Jbvc2XgQ@mail.gmail.com>
-	<20111010094738.GW2138@amd.com>
-	<CAK=WgbZ7Wyax1yfS1jSXw9OdwMtxxidwLO8PTsNUXX9CWzmVrw@mail.gmail.com>
-	<20111010153609.GB2138@amd.com>
-	<CAK=WgbbnuO67X46sqS87q2vw2TWq3Ekvw5p1PmXvXinQXMyowg@mail.gmail.com>
-	<20111011103820.GF2138@amd.com>
-	<CAK=WgbYOUZNX0OmRwZNO1mMG+3DZXwff+S60ESWixf04HOcbtw@mail.gmail.com>
-	<20111014133510.GC2198@amd.com>
-Message-ID: <CAK=Wgbar+z_Nm1cDM4bJgrP5yWbjCsVBW=orfYwsZsT7uET8ng@mail.gmail.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Fri, 14 Oct 2011 10:04:38 -0700
+Subject: [PATCH v6 09/16] OMAP2+: UART: Add runtime pm support for
+	omap-serial driver
+In-Reply-To: <CAAL8m4zbdA9rtwLhft8UGQTtvroNbYYoBoq4BG2Eu2nCToX5+w@mail.gmail.com>
+	(Govindraj's message of "Fri, 14 Oct 2011 18:02:19 +0530")
+References: <1317380495-584-1-git-send-email-govindraj.raja@ti.com>
+	<1317380495-584-9-git-send-email-govindraj.raja@ti.com>
+	<878voplppo.fsf@ti.com>
+	<CAAL8m4yrXo4KRYxXxWECU99B6--FCMBDFUbNk+vsBV0Jnt0bcg@mail.gmail.com>
+	<87obxkio3e.fsf@ti.com>
+	<CAAL8m4zbdA9rtwLhft8UGQTtvroNbYYoBoq4BG2Eu2nCToX5+w@mail.gmail.com>
+Message-ID: <87ehyfec7t.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 14, 2011 at 3:35 PM, Roedel, Joerg <Joerg.Roedel@amd.com> wrote:
-> This patch looks good. Please include it in the page-size patch-set.
+Govindraj <govindraj.ti@gmail.com> writes:
 
-will do.
+> On Fri, Oct 14, 2011 at 2:52 AM, Kevin Hilman <khilman@ti.com> wrote:
+>> Govindraj <govindraj.ti@gmail.com> writes:
+>>
+>>> On Thu, Oct 13, 2011 at 5:36 AM, Kevin Hilman <khilman@ti.com> wrote:
+>>>> "Govindraj.R" <govindraj.raja@ti.com> writes:
+>>>>
+>>>> [...]
+>>>>
+>>>>> Use device_may_wakeup to check whether uart has wakeup capabilities
+>>>>> and then enable uart runtime usage for the uart.
+>>>>
+>>>> Curious about what happens when device_may_wakeup() is not set during
+>>>> device init.
+>>>>
+>>>> [...]
+>>>>
+>>>>> @@ -1305,6 +1363,16 @@ static int serial_omap_probe(struct platform_device *pdev)
+>>>>> ? ? ? ? ? ? ? up->uart_dma.rx_dma_channel = OMAP_UART_DMA_CH_FREE;
+>>>>> ? ? ? }
+>>>>>
+>>>>> + ? ? pm_runtime_use_autosuspend(&pdev->dev);
+>>>>> + ? ? pm_runtime_set_autosuspend_delay(&pdev->dev,
+>>>>> + ? ? ? ? ? ? ? ? ? ? OMAP_UART_AUTOSUSPEND_DELAY);
+>>>>> +
+>>>>> + ? ? pm_runtime_irq_safe(&pdev->dev);
+>>>>> + ? ? if (device_may_wakeup(&pdev->dev)) {
+>>>>> + ? ? ? ? ? ? pm_runtime_enable(&pdev->dev);
+>>>>
+>>>> So if device_may_wakeup() is false, runtime PM is not enabled, then...
+>>>>
+>>>>> + ? ? ? ? ? ? pm_runtime_get_sync(&pdev->dev);
+>>>>
+>>>> ...this get doesn't happen, and the first register access causes a crash.
+>>>
+>>> Actually no crash, clocks will left enabled from boot up (hwmod_no_reset/idle)
+>>> that are idled and enabled back here.
+>>>
+>>> Since hwmod_idle is binded here later ([PATCH v6 15/16]),
+>>
+>> IMO, That's not a very maintainable solution.
+>>
+>> What happens when when someone fixes serial.c to only set
+>> HWMOD_INIT_NO_IDLE on the console UART? ?or if we fix things so we don't
+>> need INIT_NO_IDLE anymore? ?Then this will crash.
+>>
+>> Driver code should not make assumptions like this about what device init
+>> code is or isn't doing.
+>>
+>
+> Okay, How about doing as below ensuring get_sync always
+> and forbid runtime to avoid clock_gating if wakeup is not set.
+>
 
-> Hmm, I'd like to constify the iommu_ops structures in the future. This
-> wouldn't work then anymore. How about renaming it to io_page_size
-> (because it is the base page-size of the iommu) and let the driver set
-> it?
+This is better, I'm not crazy about that either.
 
-Sure, that'd work. Though asking the driver to provide this feels a
-bit redundant, as it already provided this info in the supported page
-sizes.
+Consider a platform that doesn't have wakeups, but the UARTs are not
+used (at least initially.)   That means on power up, all the UARTs are
+left enabled to consume power even when they're not used.
 
-I guess a cleaner solution might be allocating a 'struct iommu' in
-which drivers will set a 'const struct iommu_ops *' member. That new
-struct would then contain the base page-size and any other state the
-iommu core would ever need.
-
-This whole thing is quite marginal though and also very easy to change
-later, so we can start with the "driver-provided io_page_size"
-approach for now.
-
-> This needs to be (left > 0). The drivers are allowed to unmap more then
-> requested, so this value may turn negative.
-
-Good point. 'left' is size_t though, so i'll fix this a bit differently.
-
-> Btw, how have you tested this code?
-
-Of course. Every patch I send is always tested on both OMAP3 (with
-omap3isp) and OMAP4 (with rpmsg/remoteproc). In addition, everyone who
-uses my wip rpmsg tree (there are several developers who do) is always
-testing this without even knowing, as I'm always rebasing that tree on
-the latest iommu patches (my wip branches are not linear).
-
-Thanks,
-Ohad.
+Kevin
