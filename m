@@ -1,39 +1,64 @@
-From: matt@grid-net.com (Matt Burtch)
-Date: Fri, 14 Oct 2011 14:19:40 -0700
-Subject: [PATCH 1/1] ARM: i.MX28: shift frac value in _CLK_SET_RATE
-Message-ID: <1318627180-29865-1-git-send-email-matt@grid-net.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Fri, 14 Oct 2011 16:26:46 -0400 (EDT)
+Subject: [PATCH] arm/tegra: select AUTO_ZRELADDR by default
+In-Reply-To: <20111014201223.GV21648@n2100.arm.linux.org.uk>
+References: <1317172068-14872-1-git-send-email-pdeschrijver@nvidia.com>
+	<201110141729.41515.arnd@arndb.de>
+	<74CDBE0F657A3D45AFBB94109FB122FF173BE1A283@HQMAIL01.nvidia.com>
+	<201110141827.53906.arnd@arndb.de>
+	<CAOesGMgDwMeVmwo1WJ3tU+ZdjCSJ6F8mY42e_KwTmzAkGQsqmg@mail.gmail.com>
+	<20111014192011.GS21648@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.02.1110141549160.17040@xanadu.home>
+	<20111014201223.GV21648@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.02.1110141617380.17040@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Noticed when setting SSP0 in clk_set_rate, _CLK_SET_RATE attempts to
-reset the clock divider for the SSP0 parent clock, in this case IO0FRAC.
-Bits 24-29 of HW_CLKCTRL_FRAC0 are cleared correctly, but when the new
-frac value is written the value isn't shifted up to write the correct
-bit-field.  This results in IO0FRAC being set to 0 and CPUFRAC being
-corrupted.
+On Fri, 14 Oct 2011, Russell King - ARM Linux wrote:
 
-This should occur when writing IO1FRAC, EMIFRAC in HW_CLKCTRL_FRAC0 and
-GPMIFRAC, HSADCFRAC in HW_CLKCTRL_FRAC1.
+> On Fri, Oct 14, 2011 at 04:06:21PM -0400, Nicolas Pitre wrote:
+> > Currently, U-Boot insists on having a uImage with a fixed absolute load 
+> > address.  This is currently provided by the zreladdr value, whether or 
+> > not AUTO_ZRELADDR is set.  I consider this as a persisting uImage 
+> > limitation.
+> > 
+> > Either u-Boot gets fixed so it can work with plain zImage (and this 
+> > certainly will happen once the pressure from people wanting a single 
+> > kernel to work on targets with different load addresses increase.  
+> > Tegra is one such example.
+> > 
+> > Or we create a u-Boot specific Kconfig menu for uImage options that 
+> > would be common to all architectures and kick it out from the ARM 
+> > specific makefile.  This is not solving the u-Boot limitation though.
+> > 
+> > In either cases this is a u-Boot problem that needs fixing on the u-Boot 
+> > side in the end.
+> 
+> I don't think that's so with the various flavours of platform specific
+> uboot which float around.  For instance, on the OMAP4430 SDP, the
+> following commands were used as supplied to load a uImage off the SD
+> card into RAM at a different address to which it was built for, and
+> execute it at that address:
+> 
+> mmcinit 0
+> fatload mmc 0 0x80300000 uImage
+> bootm 80300000
+> 
+> Whether the 'bootm' command then copied the image and called it there,
+> or whether it executed it at 0x80300000 I've no idea - but why then
+> load the image at a different address in the first place?
 
-Tested on custom i.MX28 board with SSP0 SPI driver.
+Maybe because the lower memory is already in use by other u-Boot related 
+things, or more likely for no specific reasons at all.  But u-Boot 
+_will_ relocate the image if it is not lot loaded at the address being 
+recorded in its header as specified by the -a argument of mkimage.  And 
+currently we use zreladdr for that when "make uImage" is used, meaning 
+that by default no one is currently benefiting from the kernel 
+decompressor relocation avoidance optimization on u-Boot.
 
-Signed-off-by: Matt Burtch <matt@grid-net.com>
----
- arch/arm/mach-mxs/clock-mx28.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+Of course the u-Boot people are also claiming that u-Boot should take 
+care of the kernel decompression not zImage, which I personally disagree 
+with.
 
-diff --git a/arch/arm/mach-mxs/clock-mx28.c b/arch/arm/mach-mxs/clock-mx28.c
-index 5dcc59d..b4ea439 100644
---- a/arch/arm/mach-mxs/clock-mx28.c
-+++ b/arch/arm/mach-mxs/clock-mx28.c
-@@ -349,7 +349,7 @@ static int name##_set_rate(struct clk *clk, unsigned long rate)		\
- 									\
- 		reg = __raw_readl(CLKCTRL_BASE_ADDR + HW_CLKCTRL_##fr);	\
- 		reg &= ~BM_CLKCTRL_##fr##_##fs##FRAC;			\
--		reg |= frac;						\
-+		reg |= frac<<BP_CLKCTRL_##fr##_##fs##FRAC;		\
- 		__raw_writel(reg, CLKCTRL_BASE_ADDR + HW_CLKCTRL_##fr);	\
- 	}								\
- 									\
--- 
-1.7.1
+
+Nicolas
