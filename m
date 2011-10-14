@@ -1,43 +1,33 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Fri, 14 Oct 2011 17:15:28 +0800
-Subject: [PATCH v4 8/8] ARM: pxa: move macros into gpio-pxa.c
-In-Reply-To: <CAN1soZxCnZjDw14WZ7vprkTQWjki5Zd47pQf2zzoJQ1O9qSKog@mail.gmail.com>
-References: <1318478825-17187-1-git-send-email-haojian.zhuang@marvell.com>
-	<1318478825-17187-9-git-send-email-haojian.zhuang@marvell.com>
-	<201110131742.26870.arnd@arndb.de>
-	<CAMPhdO8R3UTCnoPp=66Sdg1d2vGQ7-dJNYZWMbPq-+d6AyiW+g@mail.gmail.com>
-	<CAN1soZxCnZjDw14WZ7vprkTQWjki5Zd47pQf2zzoJQ1O9qSKog@mail.gmail.com>
-Message-ID: <CAMPhdO9ig99=w0TOEEw1gnp7x-WRy1N4Fsu3A3_YiEjX+_BbhQ@mail.gmail.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Fri, 14 Oct 2011 10:27:47 +0100
+Subject: [PATCH 00/16] ARM: amba: Enable module alias autogeneration for
+	AMBA drivers
+In-Reply-To: <20111013172404.GL21648@n2100.arm.linux.org.uk>
+References: <1317830707-17517-1-git-send-email-dave.martin@linaro.org>
+	<20111013165420.GA2422@localhost.localdomain>
+	<20111013172404.GL21648@n2100.arm.linux.org.uk>
+Message-ID: <20111014092733.GA2373@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 14, 2011 at 5:13 PM, Haojian Zhuang
-<haojian.zhuang@gmail.com> wrote:
-> On Fri, Oct 14, 2011 at 2:17 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
->>>
->>>> +enum pxa_gpios {
->>>> + ? ? PXA_GPLR = 0x00, ? ? ? ?/* GPIO Pin Level Registers */
->>>> + ? ? PXA_GPDR = 0x0C, ? ? ? ?/* GPIO Pin Direction Registers */
->>>> + ? ? PXA_GPSR = 0x18, ? ? ? ?/* GPIO Pin Output Set Registers */
->>>> + ? ? PXA_GPCR = 0x24, ? ? ? ?/* GPIO Pin Output Clear Registers */
->>>> + ? ? PXA_GRER = 0x30, ? ? ? ?/* GPIO Rising Edge Detect Registers */
->>>> + ? ? PXA_GFER = 0x3C, ? ? ? ?/* GPIO Falling Edge Detect Registers */
->>>> + ? ? PXA_GEDR = 0x48, ? ? ? ?/* GPIO Edge Detect Status Registers */
->>>> + ? ? PXA_GAFR = 0x54, ? ? ? ?/* GPIO Alternate Function Select Registers */
->>>> + ? ? PXA_ED_MASK = 0x9C, ? ? /* GPIO edge detection for AP side */
->>>> +};
->>
->> And Haojian,
->>
->> Is this is completely for the GPIO driver's internal use, I'd prefer to
->> use GPxR names directly, instead of prefixing it with PXA_, that's a
->> bit ugly from my picky point of view.
->>
->
-> OK, I'll GPxR directly. And I'll keep PXA_GPIO_bit() to avoid
-> potential name issue.
->
+On Thu, Oct 13, 2011 at 06:24:04PM +0100, Russell King - ARM Linux wrote:
+> On Thu, Oct 13, 2011 at 05:54:20PM +0100, Dave Martin wrote:
+> > Russell, did you have a view on this series?
+> > 
+> > Following your suggestion I was able to use the generic modpost
+> > infrastructure instead of reinventing stuff, and it seemes to work out
+> > quite neatly.
+> > 
+> > Hopefully the only possibly-contraversial change change is the
+> > movement of struct amba_id.
+> 
+> I think it looks fine - but I would like to see the first patch getting
+> a wider distribution before accepting the series - I think it needs to
+> go to at least lkml.org just in case someone has an issue with it.
 
-I think GPIO_bit() is just fine if it's only used in gpio-pxa.c. I do
-prefer to have PXA_* prefixes as less as possible unless absolutely
-necessary.
+OK, that makes sense.  I tried to CC the appropriate people, but you're
+right-- posting it to lkml would be a better way to reach the right
+audience.  I'll post and see.
+
+Thanks
+---Dave
