@@ -1,27 +1,32 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 14 Oct 2011 21:14:03 +0100
-Subject: [PATCH] MANITAINERS: Add Cragganmore reference platform to Wolfson
-	support
-Message-ID: <1318623243-20894-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Fri, 14 Oct 2011 16:14:12 -0400 (EDT)
+Subject: [PATCH] arm/tegra: select AUTO_ZRELADDR by default
+In-Reply-To: <20111014192057.GT21648@n2100.arm.linux.org.uk>
+References: <1317172068-14872-1-git-send-email-pdeschrijver@nvidia.com>
+	<201110141729.41515.arnd@arndb.de>
+	<74CDBE0F657A3D45AFBB94109FB122FF173BE1A283@HQMAIL01.nvidia.com>
+	<201110141827.53906.arnd@arndb.de>
+	<alpine.LFD.2.02.1110141353390.17040@xanadu.home>
+	<20111014192057.GT21648@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.02.1110141609510.17040@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
----
- MAINTAINERS |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+On Fri, 14 Oct 2011, Russell King - ARM Linux wrote:
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index a85a9b7..f1b438a 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -7325,6 +7325,7 @@ T:	git git://opensource.wolfsonmicro.com/linux-2.6-audioplus
- W:	http://opensource.wolfsonmicro.com/content/linux-drivers-wolfson-devices
- S:	Supported
- F:	Documentation/hwmon/wm83??
-+F:	arch/arm/mach-s3c64xx/mach-crag6410*
- F:	drivers/leds/leds-wm83*.c
- F:	drivers/input/misc/wm831x-on.c
- F:	drivers/input/touchscreen/wm831x-ts.c
--- 
-1.7.6.3
+> On Fri, Oct 14, 2011 at 02:01:07PM -0400, Nicolas Pitre wrote:
+> > The way I'm restructuring things around this is that AUTO_ZRELADDR will 
+> > always be active by default, just like ARM_PATCH_PHYS_VIRT now.  This 
+> > platform specific exclusion thinking is a step backward so I'd prefer if 
+> > people would refrain from going there for the moment.
+> 
+> Are you expecting everyone to change the way they load the zImage
+> overnight then?
+
+No, of course.  But adding restrictions in the kernel build because 
+u-Boot's own image format dictates such restrictions doesn't make sense.  
+Those restrictions must be pushed towards the uImage encapsulation step, 
+not higher the kernel config hierarchy.
+
+
+Nicolas
