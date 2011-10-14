@@ -1,52 +1,67 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 14 Oct 2011 09:44:34 -0700
-Subject: [PATCH] arm/tegra: select AUTO_ZRELADDR by default
-In-Reply-To: <201110141827.53906.arnd@arndb.de>
-References: <1317172068-14872-1-git-send-email-pdeschrijver@nvidia.com>
-	<201110141729.41515.arnd@arndb.de>
-	<74CDBE0F657A3D45AFBB94109FB122FF173BE1A283@HQMAIL01.nvidia.com>
-	<201110141827.53906.arnd@arndb.de>
-Message-ID: <CAOesGMgDwMeVmwo1WJ3tU+ZdjCSJ6F8mY42e_KwTmzAkGQsqmg@mail.gmail.com>
+Date: Fri, 14 Oct 2011 09:46:38 -0700
+Subject: [GIT PULL] Please pull tegra feature branch for 3.2
+In-Reply-To: <CAOesGMipZUkZG8oHSwK-8xw5Y0u6Ymfjmumq7=ijsztUwdGeDA@mail.gmail.com>
+References: <CAOesGMipZUkZG8oHSwK-8xw5Y0u6Ymfjmumq7=ijsztUwdGeDA@mail.gmail.com>
+Message-ID: <CAOesGMgZFSYq02CMM0m7aijT1kXmiPfiHURYWXGcPdi514A6Aw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 14, 2011 at 9:27 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Friday 14 October 2011, Stephen Warren wrote:
->> Arnd Bergmann wrote at Friday, October 14, 2011 9:30 AM:
->> ...
->> > You mention that tegra30 will require AUTO_ZRELADDR.
->>
->> Well, just to be clear, here's the situation I think:
->>
->> Tegra20's SDRAM starts at physical address 0.
->>
->> Tegra30's SDRAM starts at physical address 2G.
->>
->> To support that, we could either:
->>
->> a) Introduce a new Kconfig variable for Tegra30, make T20/T30 mutually
->> exclusive, and update arch/arm/mach-tegra/Makefile.boot to set zreladdr
->> etc. based on the new Tegra30 config variable too. Then, there's no need
->> for AUTO_ZRELADDR anywhere.
->>
->> b) Have no new config variable, build a unified T20/T30 kernel, leave
->> Makefile.boot untouched, and rely on using AUTO_ZRELADDR for Tegra30 to
->> account for the different SDRAM physical addresses.
->
-> Ok, thanks for the explanation, that makes it much clearer. For
-> completeness, you could also do both of the above and make T20/T30 mutually
-> exclusive unless AUTO_ZRELADDR is set. That might be more complex than
-> necessary, I don't know.
-
-That is likely to get messy.
-
-Seems like there could be some use for a (silent) option for a
-platform to indicate that it can do XIP kernel (or zImage), and thus
-not able to use AUTO_ZRELADDR (or other options that require rewriting
-text segment of zImage or kernel).
-
-Language gets awkard though, since it'd be a negative option (or all
-platforms would need to add it). MACH_XIP_UNSUPPORTED perhaps?
+Dropped the AUTO_ZRELADDR patch due to discussions related to
+dependency issues. New pull request:
 
 
--Olof
+The following changes since commit ecb7b0e33e048e63d1169e6fee277430c70ddf0b:
+
+  ARM: tegra: update defconfig (2011-10-13 15:07:40 -0700)
+
+are available in the git repository at:
+  git://git.kernel.org/pub/scm/linux/kernel/git/olof/tegra.git for-3.2/features
+
+olof at quad:~/work/tegra (for-3.2/features) $ git request-pull v3.1-rc9
+git://git.kernel.org/pub/scm/linux/kernel/git/olof/tegra.git
+The following changes since commit 976d167615b64e14bc1491ca51d424e2ba9a5e84:
+
+  Linux 3.1-rc9 (2011-10-04 18:11:50 -0700)
+
+are available in the git repository at:
+  git://git.kernel.org/pub/scm/linux/kernel/git/olof/tegra.git for-3.2/features
+
+Olof Johansson (1):
+      ARM: tegra: update defconfig
+
+Peter De Schrijver (3):
+      arm/tegra: prepare Seaboard pinmux code for derived boards
+      arm/tegra: add support for ventana pinmuxing
+      arm/tegra: device tree support for ventana board
+
+Stephen Warren (6):
+      arm/tegra: Prep boards for gpio/pinmux conversion to pdevs
+      arm/dt: Tegra: Add pinmux node to tegra20.dtsi
+      arm/tegra: Convert pinmux driver to a platform device
+      gpio/tegra: Convert to a platform device
+      arm/tegra: pinmux: ioremap registers
+      arm/tegra: Harmony: Configure PMC for low-level interrupts
+
+ .../devicetree/bindings/pinmux/pinmux_nvidia.txt   |    5 +
+ arch/arm/boot/dts/tegra-ventana.dts                |   32 ++++
+ arch/arm/boot/dts/tegra20.dtsi                     |    8 +
+ arch/arm/configs/tegra_defconfig                   |   39 ++++-
+ arch/arm/mach-tegra/Kconfig                        |    6 +
+ arch/arm/mach-tegra/Makefile                       |    1 +
+ arch/arm/mach-tegra/Makefile.boot                  |    1 +
+ arch/arm/mach-tegra/board-dt.c                     |   26 +++-
+ arch/arm/mach-tegra/board-harmony-pinmux.c         |    8 +
+ arch/arm/mach-tegra/board-harmony-power.c          |   13 ++-
+ arch/arm/mach-tegra/board-paz00-pinmux.c           |    8 +
+ arch/arm/mach-tegra/board-seaboard-pinmux.c        |   69 ++++++++-
+ arch/arm/mach-tegra/board-trimslice-pinmux.c       |    7 +
+ arch/arm/mach-tegra/devices.c                      |   84 ++++++++++
+ arch/arm/mach-tegra/devices.h                      |    2 +
+ arch/arm/mach-tegra/include/mach/pinmux.h          |    4 +
+ arch/arm/mach-tegra/pinmux-t2-tables.c             |   76 ++--------
+ arch/arm/mach-tegra/pinmux.c                       |  163 ++++++++++++++++----
+ drivers/gpio/gpio-tegra.c                          |  143 ++++++++++++------
+ 19 files changed, 535 insertions(+), 160 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/pinmux/pinmux_nvidia.txt
+ create mode 100644 arch/arm/boot/dts/tegra-ventana.dts
