@@ -1,46 +1,87 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Fri, 14 Oct 2011 19:14:30 +0200
-Subject: [PATCH] ARM: cpu topology: fix warning
-Message-ID: <1318612470-2151-1-git-send-email-vincent.guittot@linaro.org>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Fri, 14 Oct 2011 11:20:30 -0600
+Subject: [PATCH 2/5] drivercore: Add driver probe deferral mechanism
+In-Reply-To: <Pine.LNX.4.44L0.1110141229450.2036-100000@iolanthe.rowland.org>
+References: <CACxGe6vF6em0-PnJ7UuH0CQ0_StJTfmFKBsktvb9O+ccCx6E8A@mail.gmail.com>
+	<Pine.LNX.4.44L0.1110141229450.2036-100000@iolanthe.rowland.org>
+Message-ID: <CACxGe6t2Xu5B0AKZJe-6HEpxK6GfuNm0Y2Kb_bs8ZwaTz5XnRg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-kernel/sched.c:7354:2: warning: initialization from incompatible pointer type
+On Fri, Oct 14, 2011 at 10:33 AM, Alan Stern <stern@rowland.harvard.edu> wrote:
+> On Fri, 14 Oct 2011, Grant Likely wrote:
+>
+>> > How can a device acquire children before it has a driver?
+>>
+>> There are a few potential situations in embedded systems (or at least
+>> nothing currently prevents it) where platform setup code constructs a
+>> device hierarchy without the aid of device drivers, and it is still
+>> possible for a parent device to be attached to a driver. ?IIUC, SPARC
+>> creates an entire hierarchy of platform_devices from all the nodes in
+>> the OpenFirmware device tree, and any of those devices can be bound to
+>> a driver. ?I don't like that approach, but at the very least it needs
+>> to be guarded against.
+>
+> Do these devices ever require deferred probes?
 
-Align cpu_coregroup_mask prototype interface with sched_domain_mask_f typedef
-use int cpu instead of unsigned int cpu
+Yes, they very well might.  However, I'm happy with the limitation
+that only leaf devices can take advantage of probe deferral.
 
-Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
----
- arch/arm/include/asm/topology.h |    2 +-
- arch/arm/kernel/topology.c      |    2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+>> On Fri, Oct 14, 2011 at 9:39 AM, Alan Stern <stern@rowland.harvard.edu> wrote:
+>> > On Thu, 13 Oct 2011, Grant Likely wrote:
+>> Yes, that does indeed simplify the issue considerably. ?Let's do that.
+>> ?So, for this patch, there will be two bits added. ?First, don't allow
+>> deferral on devices with children, and second a successful probe
+>> (deferred or otherwise) should always move a device to the end of the
+>> dap_list if it doesn't have children to guarantee that the list order
+>> satisfies both the hierarchical and probe order. ?Manjunath, do you
+>> think you can prototype this?
+>
+> I don't think the second part needs to be quite so invasive.
+> Certainly drivers that never defer probes shouldn't require anything to
+> be moved.
 
-diff --git a/arch/arm/include/asm/topology.h b/arch/arm/include/asm/topology.h
-index a7e457e..58b8b84 100644
---- a/arch/arm/include/asm/topology.h
-+++ b/arch/arm/include/asm/topology.h
-@@ -25,7 +25,7 @@ extern struct cputopo_arm cpu_topology[NR_CPUS];
- 
- void init_cpu_topology(void);
- void store_cpu_topology(unsigned int cpuid);
--const struct cpumask *cpu_coregroup_mask(unsigned int cpu);
-+const struct cpumask *cpu_coregroup_mask(int cpu);
- 
- #else
- 
-diff --git a/arch/arm/kernel/topology.c b/arch/arm/kernel/topology.c
-index 1040c00..8200dea 100644
---- a/arch/arm/kernel/topology.c
-+++ b/arch/arm/kernel/topology.c
-@@ -43,7 +43,7 @@
- 
- struct cputopo_arm cpu_topology[NR_CPUS];
- 
--const struct cpumask *cpu_coregroup_mask(unsigned int cpu)
-+const struct cpumask *cpu_coregroup_mask(int cpu)
- {
- 	return &cpu_topology[cpu].core_sibling;
- }
+Think about that a minute.  Consider a dpm_list of devices:
+        abcDefGh
+
+Now assume that D has an implicit dependency on G.  If D gets probed
+first, then it will be deferred until G gets probed and then D will
+get retried and moved to the end of the list resulting in:
+        abcefGhD
+Everything is good now for the order that things need to be suspended in.
+
+Now lets assume that the drivers get linked into the kernel in a
+different order (or the modules get loaded in a different order) and G
+gets probed first, followed by D.  No deferral occurred and so no
+reordering occurs, resulting in:
+        abcDefGh (unchanged)
+But now suspend is broken because D depends on G, but G will be
+suspended before D.  This looks and smells like a bug to me.  In fact,
+even without using probe deferral it looks like a bug because the
+dap_list isn't taking into account the fact that there are very likely
+to be implicit dependencies between devices that are not represented
+in the device hierarchy (maybe not common in PCs, but certainly is the
+case for embedded).  But, it is also easy to solve by ensuring the
+dap_list is also probe-order sorted.
+
+> A deferred probe _should_ move the device to the end of the list. ?But
+> this needs to happen in the probe routine itself (after it has verified
+> that all the other required devices are present and before it has
+> registered any children) to prevent races. ?It can't be done in a
+> central location.
+
+I'm really concerned about drivers having to implement this and not
+getting it correct; particularly when moving a device to the end of
+the list is cheap, and it shouldn't be a problem to do the move
+unconditionally after a driver has been matches, but before probe() is
+called.  We may be able to keep watch to make sure that drivers using
+probe deferral are also reordering themselves, but that does nothing
+for the cases described above where the link order of the drivers
+determines probe order, not the dap_list order.
+
+g.
+
+
 -- 
-1.7.4.1
+Grant Likely, B.Sc., P.Eng.
+Secret Lab Technologies Ltd.
