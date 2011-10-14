@@ -1,75 +1,91 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 13 Oct 2011 22:32:26 -0400 (EDT)
-Subject: [GIT PULL] DEBUG_LL platform updates for 3.2
-In-Reply-To: <4E976F9A.80203@gmail.com>
-References: <20110928103815.GA8344@e102144-lin.cambridge.arm.com>
-	<2414781.rlNqTThJUN@wuerfel>
-	<alpine.LFD.2.02.1110111950290.17040@xanadu.home>
-	<1837446.fiK2eIOO53@wuerfel>
-	<20111013082836.GG21648@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.02.1110130932350.17040@xanadu.home>
-	<4E976F9A.80203@gmail.com>
-Message-ID: <alpine.LFD.2.02.1110132158090.17040@xanadu.home>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Thu, 13 Oct 2011 22:54:42 -0400 (EDT)
+Subject: [RFC/PATCH 5/7] ARM: Move get_thread_info macro definition to
+	<asm/assembler.h>
+In-Reply-To: <D53F6A34-89FF-4DE3-96D2-AE415413AB84@mvista.com>
+References: <1317877714-11355-1-git-send-email-gdavis@mvista.com>
+	<1317955121-28047-1-git-send-email-gdavis@mvista.com>
+	<1317955121-28047-6-git-send-email-gdavis@mvista.com>
+	<20111011095639.GB23848@arm.com> <20111012060433.GE188@mvista.com>
+	<20111013143420.GB21648@n2100.arm.linux.org.uk>
+	<D53F6A34-89FF-4DE3-96D2-AE415413AB84@mvista.com>
+Message-ID: <alpine.LFD.2.02.1110132249290.17040@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 14 Oct 2011, Ryan Mallon wrote:
+On Thu, 13 Oct 2011, George G. Davis wrote:
 
-> On 14/10/11 00:39, Nicolas Pitre wrote:
 > 
-> > On Thu, 13 Oct 2011, Russell King - ARM Linux wrote:
-> > 
-> >> On Wed, Oct 12, 2011 at 10:30:11AM +0200, Arnd Bergmann wrote:
-> >>> On Tuesday 11 October 2011 20:03:38 Nicolas Pitre wrote:
-> >>>> On Tue, 11 Oct 2011, Arnd Bergmann wrote:
-> >>>>
-> >>>>> I've stuck them into the arm-soc tree for now, so we get linux-next
-> >>>>> coverage, but I won't send them to Linus this way because then we
-> >>>>> would get the same commits twice in the history.
-> >>>>
-> >>>> Could you please do the same with the following:
-> >>>>
-> >>>>   git://git.linaro.org/people/nico/linux.git mach_memory_h
-> >>>>
-> >>>> Russell pulled it at some point, and dropped it due to concerns about 
-> >>>> repeated conflict resolutions (or so I presume).  I just did a test 
-> >>>> merge between your for-next branch and the above and that looked trivial 
-> >>>> enough.
-> >>>
-> >>> Ok, done.
-> >>
-> >> Bypassing maintainers stinks - especially when there are unaddressed
-> >> comments outstanding.  Nicolas has "simplified" my objections in this
-> >> request for you to pull - and has completely ignored the problem that
-> >> it breaks ZBOOT_ROM by deleting the zreladdr definitions on EP93xx
-> >> with no way for that to be provided.
-> > 
-> > I also told you that EP93xx doesn't use ZBOOT_ROM anywhere, and that 
-> > this was approved by the EP93xx maintainers.
+> On Oct 13, 2011, at 10:34 AM, Russell King - ARM Linux wrote:
 > 
-> As the less active of the two EP93xx maintainers I didn't agree to this.
-> I don't know if Hartley did, but I can't find anything from him in a
-> quick search of the list. I have Cc'ed him.
+> > On Wed, Oct 12, 2011 at 02:04:33AM -0400, gdavis at mvista.com wrote:
+> >> diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
+> >> index 78397d0..eaf4939 100644
+> >> --- a/arch/arm/include/asm/assembler.h
+> >> +++ b/arch/arm/include/asm/assembler.h
+> >> @@ -36,6 +36,20 @@
+> >> 	.endm
+> >> #endif  /* !CONFIG_THUMB2_KERNEL */
+> >> 
+> >> +	.macro	preempt_disable, tsk, cnt
+> >> +	get_thread_info \tsk
+> >> +	ldr	\cnt, [\tsk, #TI_PREEMPT]
+> >> +	add	\cnt, \cnt, #1
+> >> +	str	\cnt, [\tsk, #TI_PREEMPT]
+> >> +	.endm
+> >> +
+> >> +	.macro	preempt_enable, tsk, cnt
+> >> +	get_thread_info \tsk
+> >> +	ldr	\cnt, [\tsk, #TI_PREEMPT]
+> >> +	sub	\cnt, \cnt, #1
+> >> +	str	\cnt, [\tsk, #TI_PREEMPT]
+> >> +	.endm
+> >> +
+> >> /*
+> >>  * Endian independent macros for shifting bytes within registers.
+> >>  */
+> >> 
+> >> 
+> >> Not as efficient as it could be but I imagine the macros could
+> >> be written to support optional load of \tsk and/or optional \tmp
+> >> parameters to cover other common cases.
+> > 
+> > It's actually not that simple either: if you disable preemption, then you
+> > need to check for a preempt event after re-enabling preemption.  The
+> > C level code does this:
+> > 
+> > #define preempt_enable_no_resched() \
+> > do { \
+> >        barrier(); \
+> >        dec_preempt_count(); \
+> > } while (0)
+> > 
+> > #define preempt_check_resched() \
+> > do { \
+> >        if (unlikely(test_thread_flag(TIF_NEED_RESCHED))) \
+> >                preempt_schedule(); \
+> > } while (0)
+> > 
+> > #define preempt_enable() \
+> > do { \
+> >        preempt_enable_no_resched(); \
+> >        barrier(); \
+> >        preempt_check_resched(); \
+> > } while (0)
+> > 
+> > Note that preempt_schedule() will check the preempt count itself and
+> > return immediately if non-zero or irqs are disabled.
+> 
+> It would be easier to just insert preempt_disable/preempt_enable in
+> the cache and proc function call macros.  I did that in an earlier test
+> patch but moved it into the cache-v6.S and proc-v6.S files instead
+> since it only affects ARM11 MPCore as far as I'm aware.
 
-See http://article.gmane.org/gmane.linux.ports.arm.kernel/124151 
-Granted, while he agreed to the removal of the zreladdr definitions, 
-reading this again he didn't _explicitly_ agree to the disabling of 
-ZBOOT_ROM.  I didn't mention it either, so let's put that on a 
-miscommunication on my part.
-
-> I don't have time to follow this issue in depth, but from my vague
-> understanding ZBOOT_ROM is unlikely to be used on EP93xx, but still
-> _possible_ to use. Therefore we should not be removing support for
-> ZBOOT_ROM on EP93xx in case there are some users out there.
-
-No worry, I've now excluded EP93xx from my series.
-
-My intention never was to permanently remove ZBOOT_ROM support.  But 
-because of the EP93xx memory peculiarities, it will have to wait until 
-the ZBOOT_ROM config is moved away from zreladdr.
-
-That means you won't be able to have a single zImage for all the EP93xx 
-boards with different memory banks just yet.
+Alternately, why don't you simply disable IRQs locally?  No preemption 
+can happen until enabled again, just like preempt_disable() would do, 
+and the IRQ off period should be short enough not to visibly affect IRQ 
+latency.  And that is easily done in assembly too, without preventing 
+rescheduling if needed afterwards.
 
 
 Nicolas
