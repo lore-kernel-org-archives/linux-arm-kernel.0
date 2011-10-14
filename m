@@ -1,32 +1,69 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 14 Oct 2011 18:23:52 +0100
-Subject: [PATCH] ARM: cpu topology: fix warning
-In-Reply-To: <1318612470-2151-1-git-send-email-vincent.guittot@linaro.org>
-References: <1318612470-2151-1-git-send-email-vincent.guittot@linaro.org>
-Message-ID: <20111014172351.GC19009@mudshark.cambridge.arm.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Fri, 14 Oct 2011 13:33:26 -0400 (EDT)
+Subject: [PATCH 2/5] drivercore: Add driver probe deferral mechanism
+In-Reply-To: <CACxGe6t2Xu5B0AKZJe-6HEpxK6GfuNm0Y2Kb_bs8ZwaTz5XnRg@mail.gmail.com>
+Message-ID: <Pine.LNX.4.44L0.1110141327170.2036-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vincent,
+On Fri, 14 Oct 2011, Grant Likely wrote:
 
-On Fri, Oct 14, 2011 at 06:14:30PM +0100, Vincent Guittot wrote:
-> kernel/sched.c:7354:2: warning: initialization from incompatible pointer type
+> > I don't think the second part needs to be quite so invasive.
+> > Certainly drivers that never defer probes shouldn't require anything to
+> > be moved.
 > 
-> Align cpu_coregroup_mask prototype interface with sched_domain_mask_f typedef
-> use int cpu instead of unsigned int cpu
+> Think about that a minute.  Consider a dpm_list of devices:
+>         abcDefGh
+> 
+> Now assume that D has an implicit dependency on G.  If D gets probed
+> first, then it will be deferred until G gets probed and then D will
+> get retried and moved to the end of the list resulting in:
+>         abcefGhD
+> Everything is good now for the order that things need to be suspended in.
+> 
+> Now lets assume that the drivers get linked into the kernel in a
+> different order (or the modules get loaded in a different order) and G
+> gets probed first, followed by D.  No deferral occurred and so no
+> reordering occurs, resulting in:
+>         abcDefGh (unchanged)
+> But now suspend is broken because D depends on G, but G will be
+> suspended before D.
 
-Not sure I parse the commit message...
+However D sometimes does defer probes.  Therefore the device always
+needs to be moved, even though this particular probe wasn't deferred.
 
-> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
-> ---
->  arch/arm/include/asm/topology.h |    2 +-
->  arch/arm/kernel/topology.c      |    2 +-
->  2 files changed, 2 insertions(+), 2 deletions(-)
+>  This looks and smells like a bug to me.  In fact,
+> even without using probe deferral it looks like a bug because the
+> dap_list isn't taking into account the fact that there are very likely
+> to be implicit dependencies between devices that are not represented
+> in the device hierarchy (maybe not common in PCs, but certainly is the
+> case for embedded).  But, it is also easy to solve by ensuring the
+> dap_list is also probe-order sorted.
+> 
+> > A deferred probe _should_ move the device to the end of the list. ?But
+> > this needs to happen in the probe routine itself (after it has verified
+> > that all the other required devices are present and before it has
+> > registered any children) to prevent races. ?It can't be done in a
+> > central location.
+> 
+> I'm really concerned about drivers having to implement this and not
+> getting it correct; particularly when moving a device to the end of
+> the list is cheap, and it shouldn't be a problem to do the move
+> unconditionally after a driver has been matches, but before probe() is
+> called.
 
-... but this fixes the warning for me:
+But that's too early.  What if D gets moved to the end of the list, 
+then G gets added to the list and probed, and then D's probe succeeds?
 
-Reported-and-tested-by: Will Deacon <will.deacon@arm.com>
+And after the probe returns is too late, because by then there may well 
+be child devices.
 
-Thanks,
+>  We may be able to keep watch to make sure that drivers using
+> probe deferral are also reordering themselves, but that does nothing
+> for the cases described above where the link order of the drivers
+> determines probe order, not the dap_list order.
 
-Will
+Devices need to be moved whenever they have any external dependencies,
+regardless of the particular order they get probed in.
+
+Alan Stern
