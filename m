@@ -1,64 +1,46 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 14 Oct 2011 09:47:47 +0200
-Subject: [GIT PULL] i.MX features
-Message-ID: <20111014074747.GD13898@pengutronix.de>
+From: ulf.hansson@stericsson.com (Ulf Hansson)
+Date: Fri, 14 Oct 2011 09:51:44 +0200
+Subject: [PATCH] mmc: mmci: Do not release spinlock in request_end
+In-Reply-To: <20111014074224.GQ21648@n2100.arm.linux.org.uk>
+References: <1318342001-26955-1-git-send-email-ulf.hansson@stericsson.com>
+	<20111013142914.GZ21648@n2100.arm.linux.org.uk>
+	<1318521592.2090.16.camel@linaro1>
+	<4E97E6CF.1000601@stericsson.com>
+	<20111014074224.GQ21648@n2100.arm.linux.org.uk>
+Message-ID: <4E97EA10.6040800@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Russell King - ARM Linux wrote:
+> On Fri, Oct 14, 2011 at 09:37:51AM +0200, Ulf Hansson wrote:
+>> Jon Medhurst (Tixy) wrote:
+>>> On Thu, 2011-10-13 at 15:29 +0100, Russell King - ARM Linux wrote:
+>>>> On Tue, Oct 11, 2011 at 04:06:41PM +0200, Ulf Hansson wrote:
+>>>>> The patch "mmc: core: move ->request() call from atomic context",
+>>>>> is the reason to why this change is possible. This simplifies the
+>>>>> error handling code execution path quite a lot and potentially also
+>>>>> fixes some error handling hang problems.
+>>>>>
+>>>>> Signed-off-by: Ulf Hansson <ulf.hansson@stericsson.com>
+>>>> This doesn't look right:
+>>>>
+>>>> void mmc_request_done(struct mmc_host *host, struct mmc_request *mrq)
+>>>> {
+>>>>         if (err && cmd->retries) {
+>>>>                 host->ops->request(host, mrq);
+>>>>
+>> This is NOT how it looks at mmc-next. You need to test with Adrian  
+>> Hunters patch which the commit refers two.
+> 
+> In that case, how can I take the patch to mmci if it depends on something
+> in another tree?
+> 
 
-Please pull the following feature branch for i.MX.
+I don't know. But how do you update your tree from next normally? I 
+believe the problem is more related to that the mmc-next tree is now on 
+a temporary git. If you do not update your tree how shall we be able to 
+continue with integration of new patches that depends on mmc patches 
+from "next"?
 
-Only trivial merge conflicts to your for-next branch, you won't need
-a merge hint for this, I created a branch for you anyway just to
-see if that's what you want for the next non trivial merge conflicts:
-
-git://git.pengutronix.de/git/imx/linux-2.6.git hint
-
-Sascha
-
-
-The following changes since commit 976d167615b64e14bc1491ca51d424e2ba9a5e84:
-
-  Linux 3.1-rc9 (2011-10-04 18:11:50 -0700)
-
-are available in the git repository at:
-  git://git.pengutronix.de/git/imx/linux-2.6.git imx-features-for-arnd
-
-Richard Zhu (4):
-      AHCI Add the AHCI SATA feature on the MX53 platforms
-      MX53 Enable the AHCI SATA on MX53 ARD board
-      MX53 Enable the AHCI SATA on MX53 LOCO board
-      MX53 Enable the AHCI SATA on MX53 SMD board
-
-Sascha Hauer (2):
-      Merge branch 'features/ahci' into for-arnd-features
-      Merge branch 'features/denx-mx28' into for-arnd-features
-
-Stefano Babic (1):
-      ARM: mxs: Add initial support for DENX MX28
-
- arch/arm/configs/mxs_defconfig                  |    1 +
- arch/arm/mach-mx5/board-mx53_ard.c              |    1 +
- arch/arm/mach-mx5/board-mx53_loco.c             |    1 +
- arch/arm/mach-mx5/board-mx53_smd.c              |   16 +
- arch/arm/mach-mx5/clock-mx51-mx53.c             |   19 ++
- arch/arm/mach-mx5/devices-imx53.h               |    2 +
- arch/arm/mach-mxs/Kconfig                       |   17 +
- arch/arm/mach-mxs/Makefile                      |    1 +
- arch/arm/mach-mxs/clock-mx28.c                  |   16 +-
- arch/arm/mach-mxs/include/mach/mxs.h            |    1 +
- arch/arm/mach-mxs/include/mach/uncompress.h     |    1 +
- arch/arm/mach-mxs/mach-m28evk.c                 |  366 +++++++++++++++++++++++
- arch/arm/plat-mxc/devices/Kconfig               |    4 +
- arch/arm/plat-mxc/devices/Makefile              |    1 +
- arch/arm/plat-mxc/devices/platform-ahci-imx.c   |  156 ++++++++++
- arch/arm/plat-mxc/include/mach/devices-common.h |   10 +
- 16 files changed, 608 insertions(+), 5 deletions(-)
- create mode 100644 arch/arm/mach-mxs/mach-m28evk.c
- create mode 100644 arch/arm/plat-mxc/devices/platform-ahci-imx.c
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+BR
+Uffe
