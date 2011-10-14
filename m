@@ -1,41 +1,64 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 14 Oct 2011 16:44:03 +0900
-Subject: [PATCH 0/8] S3C2416: Enable armdiv and armclk
-In-Reply-To: <201110140927.18860.heiko@sntech.de>
-References: <201109281217.33813.heiko@sntech.de>
-	<085f01cc8a40$df7af8a0$9e70e9e0$%kim@samsung.com>
-	<201110140927.18860.heiko@sntech.de>
-Message-ID: <087201cc8a45$0b901430$22b03c90$%kim@samsung.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 14 Oct 2011 09:47:47 +0200
+Subject: [GIT PULL] i.MX features
+Message-ID: <20111014074747.GD13898@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Heiko St?bner wrote:
-> 
-> Hi Kgene,
-> 
-> Am Freitag, 14. Oktober 2011, 09:14:11 schrieb Kukjin Kim:
-> > Heiko St?bner wrote:
-> [...]
-> > > Heiko Stuebner (8):
-> > >   S3C2416: Add armdiv_mask constant.
-> [...]
-> > As a note, if required, 1st patch which is fixing will be sent to
-stable.
-> 
-> I don't think this is really necessary.
-> 
-> The original code was essentially correct but hard to read.
-> The constant makes sense in the rework, as the armdiv_mask is is used in
-more
-> places now and not contained in a single static function.
-> 
+Hi Arnd,
 
-OK.
+Please pull the following feature branch for i.MX.
 
-Thanks.
+Only trivial merge conflicts to your for-next branch, you won't need
+a merge hint for this, I created a branch for you anyway just to
+see if that's what you want for the next non trivial merge conflicts:
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+git://git.pengutronix.de/git/imx/linux-2.6.git hint
+
+Sascha
+
+
+The following changes since commit 976d167615b64e14bc1491ca51d424e2ba9a5e84:
+
+  Linux 3.1-rc9 (2011-10-04 18:11:50 -0700)
+
+are available in the git repository at:
+  git://git.pengutronix.de/git/imx/linux-2.6.git imx-features-for-arnd
+
+Richard Zhu (4):
+      AHCI Add the AHCI SATA feature on the MX53 platforms
+      MX53 Enable the AHCI SATA on MX53 ARD board
+      MX53 Enable the AHCI SATA on MX53 LOCO board
+      MX53 Enable the AHCI SATA on MX53 SMD board
+
+Sascha Hauer (2):
+      Merge branch 'features/ahci' into for-arnd-features
+      Merge branch 'features/denx-mx28' into for-arnd-features
+
+Stefano Babic (1):
+      ARM: mxs: Add initial support for DENX MX28
+
+ arch/arm/configs/mxs_defconfig                  |    1 +
+ arch/arm/mach-mx5/board-mx53_ard.c              |    1 +
+ arch/arm/mach-mx5/board-mx53_loco.c             |    1 +
+ arch/arm/mach-mx5/board-mx53_smd.c              |   16 +
+ arch/arm/mach-mx5/clock-mx51-mx53.c             |   19 ++
+ arch/arm/mach-mx5/devices-imx53.h               |    2 +
+ arch/arm/mach-mxs/Kconfig                       |   17 +
+ arch/arm/mach-mxs/Makefile                      |    1 +
+ arch/arm/mach-mxs/clock-mx28.c                  |   16 +-
+ arch/arm/mach-mxs/include/mach/mxs.h            |    1 +
+ arch/arm/mach-mxs/include/mach/uncompress.h     |    1 +
+ arch/arm/mach-mxs/mach-m28evk.c                 |  366 +++++++++++++++++++++++
+ arch/arm/plat-mxc/devices/Kconfig               |    4 +
+ arch/arm/plat-mxc/devices/Makefile              |    1 +
+ arch/arm/plat-mxc/devices/platform-ahci-imx.c   |  156 ++++++++++
+ arch/arm/plat-mxc/include/mach/devices-common.h |   10 +
+ 16 files changed, 608 insertions(+), 5 deletions(-)
+ create mode 100644 arch/arm/mach-mxs/mach-m28evk.c
+ create mode 100644 arch/arm/plat-mxc/devices/platform-ahci-imx.c
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
