@@ -1,59 +1,57 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 14 Oct 2011 16:14:11 +0900
-Subject: [PATCH 0/8] S3C2416: Enable armdiv and armclk
-In-Reply-To: <201109281217.33813.heiko@sntech.de>
-References: <201109281217.33813.heiko@sntech.de>
-Message-ID: <085f01cc8a40$df7af8a0$9e70e9e0$%kim@samsung.com>
+Date: Fri, 14 Oct 2011 16:14:18 +0900
+Subject: [PATCH] ARM: S3C2443: Remove redundant s3c_register_clocks call
+	for init_clocks
+In-Reply-To: <1313463881.16359.2.camel@phoenix>
+References: <1313463881.16359.2.camel@phoenix>
+Message-ID: <086001cc8a40$e3940350$aabc09f0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Heiko St?bner wrote:
+Axel Lin wrote:
 > 
-> To enable cpu frequency scaling on the S3C2416/2450 it is necessary
-> to define the arm-divider and armclock.
+> Since commit af337f3e633a198034a99450416257ddf2307497
+> "ARM: S3C2443: Move parts of the clock code to common clock file",
+> the init_clocks array is moved to arch/arm/plat-s3c24xx/s3c2443-clock.c.
+> Now we call s3c_register_clocks for init_clocks in s3c2443_common_init_clocks.
 > 
-> The layout of the clocks (i.e. msysclk -> armdiv -> armclk) is the
-> same on all three architectures (S3C2443/2416/2450) and only the
-> possible dividers for armdiv differ.
-> Therefore it is possible to move the armdiv and armclk to common
-> code with only the divider table definition remaining in the respective
-> clock.c-files.
-> The s3c2443_common_init_clocks method is modified to make it possible
-> to transmit the divider table to the common code.
+> Thus we can remove the empty init_clocks array here and remove the
+> redundant s3c_register_clocks call for init_clocks in s3c2443_init_clocks.
 > 
-> As the armdiv is available in common code now, the fdiv function
-> pointer passed to s3c2443_common_init_clocks becomes obsolete and is
-> therefore removed as the fclk rate can be set by a clk_get_rate call.
+> Signed-off-by: Axel Lin <axel.lin@gmail.com>
+> ---
+>  arch/arm/mach-s3c2443/clock.c |    7 -------
+>  1 files changed, 0 insertions(+), 7 deletions(-)
 > 
-> It works as expected on S3C2416, is compile-tested on S3C2443
-> and checkpatch was happy.
+> diff --git a/arch/arm/mach-s3c2443/clock.c b/arch/arm/mach-s3c2443/clock.c
+> index a1a7176..4018dbe 100644
+> --- a/arch/arm/mach-s3c2443/clock.c
+> +++ b/arch/arm/mach-s3c2443/clock.c
+> @@ -305,9 +305,6 @@ static struct clk init_clocks_off[] = {
+>  	}
+>  };
 > 
+> -static struct clk init_clocks[] = {
+> -};
+> -
+>  /* clocks to add straight away */
 > 
-> Heiko Stuebner (8):
->   S3C2416: Add armdiv_mask constant.
->   S3C2443: Add infrastructure to transmit armdiv to common code
->   S3C2443: Move clk_arm and clk_armdiv to common code.
->   S3C2416: Add comment describing the armdiv/armclk.
->   S3C2443: Add get_rate operation for clk_armdiv
->   S3C2443: handle unset armdiv values gracefully.
->   S3C2443: Accommodate cpufreq frequency scheme in armdiv
->   S3C2443: use clk_get_rate to init fclk in common_setup_clocks
+>  static struct clksrc_clk *clksrcs[] __initdata = {
+> @@ -345,10 +342,6 @@ void __init s3c2443_init_clocks(int xtal)
+>  	for (ptr = 0; ptr < ARRAY_SIZE(clksrcs); ptr++)
+>  		s3c_register_clksrc(clksrcs[ptr], 1);
 > 
->  .../mach-s3c2410/include/mach/regs-s3c2443-clock.h |    1 +
->  arch/arm/mach-s3c2416/clock.c                      |   21 ++--
->  arch/arm/mach-s3c2443/clock.c                      |   98 +--------------
->  arch/arm/plat-s3c24xx/include/plat/s3c2443.h       |    7 +-
->  arch/arm/plat-s3c24xx/s3c2443-clock.c              |  134
-> +++++++++++++++++++-
->  5 files changed, 152 insertions(+), 109 deletions(-)
-> 
+> -	/* register clocks from clock array */
+> -
+> -	s3c_register_clocks(init_clocks, ARRAY_SIZE(init_clocks));
+> -
+>  	/* We must be careful disabling the clocks we are not intending to
+>  	 * be using at boot time, as subsystems such as the LCD which do
+>  	 * their own DMA requests to the bus can cause the system to lockup
 > --
-> 1.7.5.4
+> 1.7.4.1
 
-Looks ok to me, applied.
-
-As a note, if required, 1st patch which is fixing will be sent to stable.
-
+Looks ok, applied.
 Thanks.
 
 Best regards,
