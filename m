@@ -1,53 +1,41 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 14 Oct 2011 14:18:12 +0200
-Subject: [PATCH 2/2] arm/mx5: add device tree support for imx51 babbage
-In-Reply-To: <20111014090043.GA28416@S2100-06.ap.freescale.net>
-References: <1317389747-24589-1-git-send-email-shawn.guo@linaro.org>
-	<1317389747-24589-3-git-send-email-shawn.guo@linaro.org>
-	<CACxGe6v-3D=QS8EfFXyZc84Gr2C+gSv+PCi-Z7rRpXQcZcb8SQ@mail.gmail.com>
-	<20111014083853.GE13898@pengutronix.de>
-	<20111014090043.GA28416@S2100-06.ap.freescale.net>
-Message-ID: <20111014121812.GH13898@pengutronix.de>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 14 Oct 2011 07:22:15 -0500
+Subject: [PATCH 1/2] ARM: Samsung: Add Exynos4 device tree enabled board
+	file
+In-Reply-To: <000201cc8a64$6775ae30$36610a90$%kim@samsung.com>
+References: <1318342396-26178-1-git-send-email-thomas.abraham@linaro.org>
+	<1318342396-26178-2-git-send-email-thomas.abraham@linaro.org>
+	<20111013175110.GJ18574@ponder.secretlab.ca>
+	<000201cc8a64$6775ae30$36610a90$%kim@samsung.com>
+Message-ID: <4E982977.7000305@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 14, 2011 at 05:00:44PM +0800, Shawn Guo wrote:
-> On Fri, Oct 14, 2011 at 10:38:53AM +0200, Sascha Hauer wrote:
-> > On Thu, Oct 13, 2011 at 08:20:04PM -0600, Grant Likely wrote:
-> > > On Fri, Sep 30, 2011 at 7:35 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> > > > It adds device tree support for imx51 babbage board.
-> > > >
-> > > > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> > > > Cc: Grant Likely <grant.likely@secretlab.ca>
-> > > > Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> > > > Acked-by: Grant Likely <grant.likely@secretlab.ca>
-> > > 
-> > > looks good to me.
-> > 
-> > to me aswell.
+On 10/14/2011 06:28 AM, Kukjin Kim wrote:
+
+
+>>> diff --git a/arch/arm/mach-exynos4/Kconfig
+> b/arch/arm/mach-exynos4/Kconfig
+>>> index 0c5888a..39dc135 100644
+>>> --- a/arch/arm/mach-exynos4/Kconfig
+>>> +++ b/arch/arm/mach-exynos4/Kconfig
+>>> @@ -304,6 +304,20 @@ config MACH_SMDK4412
+>>>  	help
+>>>  	  Machine support for Samsung SMDK4412
+>>>
+>>> +comment "Flattened Device Tree based board for Exynos4 based SoC"
+>>> +
+>>> +config MACH_EXYNOS4_DT
 > 
-> I take this as your ack tag.  Otherwise, please let me know.
-
-Yes, Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
-
+> I'm not sure we can use 'MACH_EXYNOS4_DT' here because there are other
+> EXYNOS4 SoCs such as EXYNOS4212 and EXYNOS4412. So if this cannot support
+> other SoCs' boards, SMDK4212 and SMDK4412, we need to change the name.
 > 
-> > To merge it a patch from Rob Herring is missing:
-> > 
-> > of/irq: introduce of_irq_init
-> > 
-> > It currently does not show up in next.
-> > 
-> Rob just sent a pull request to Arnd with this patch included.  If you
-> do not mind, I will send this series to Arnd based on proper branch in
-> arm-soc.
+> And I wonder whether there is no problem with selecting this and other
+> boards.
 
-ok.
+I think this should be fine assuming most things are common. Generally,
+the differences can be handled by different DT's. The board compatible
+string can be used to handle differences.
 
-Sascha
-
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Rob
