@@ -1,39 +1,36 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Sat, 15 Oct 2011 00:32:32 -0600 (MDT)
-Subject: [GIT PULL] ARM: OMAP: Runtime PM/hwmod conversion for HS USBHOST
-Message-ID: <alpine.DEB.2.00.1110150030410.19504@utopia.booyaka.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 15 Oct 2011 16:24:45 +0200
+Subject: [PATCHv16 0/9] Contiguous Memory Allocator
+In-Reply-To: <20111014161951.5b4bb327.akpm@linux-foundation.org>
+References: <1317909290-29832-1-git-send-email-m.szyprowski@samsung.com>
+	<201110111552.04615.arnd@arndb.de>
+	<20111014161951.5b4bb327.akpm@linux-foundation.org>
+Message-ID: <201110151624.47336.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+On Saturday 15 October 2011, Andrew Morton wrote:
+> 
+> On Tue, 11 Oct 2011 15:52:04 +0200
+> Arnd Bergmann <arnd@arndb.de> wrote:
+> > What I would really want to hear from you is your opinion on
+> > the architecture independent stuff. Obviously, ARM is the
+> > most important consumer of the patch set, but I think the
+> > code has its merit on other architectures as well and most of
+> > them (maybe not parisc) should be about as simple as the x86
+> > one that Marek posted now with v16.
+> 
+> Having an x86 implementation is good.  It would also be good to get
+> some x86 drivers using CMA asap, so the thing gets some runtime testing
+> from the masses.  Can we think of anything we can do here?
 
-The following changes since commit be73246058737beec52ae232bcab7776332a9e06:
+With the current implementation, all drivers that use dma_alloc_coherent
+automatically use CMA, there is no need to modify any driver. On
+the other hand, nothing on x86 currently actually requires this feature
+(otherwise it would be broken already), making it hard to test the
+actual migration path.
 
-  ARM: OMAP2+: Remove custom init_irq for remaining boards (2011-09-26 17:50:37 -0700)
+The best test I can think of would be a network benchmark under memory
+pressure, preferrably one that use large jumbo frames (64KB).
 
-are available in the git repository at:
-  git://git.pwsan.com/linux-2.6 usbhost_runtime_pm_14_devel_3.2
-
-Benoit Cousson (1):
-      ARM: OMAP: USB: EHCI and OHCI hwmod structures for OMAP4
-
-Keshava Munegowda (5):
-      ARM: OMAP: USB: EHCI and OHCI hwmod structures for OMAP3
-      ARM: OMAP: USB: register hwmods of usbhs
-      ARM: OMAP: USB: device name change for the clk names of usbhs
-      ARM: OMAP: USBHOST: Replace usbhs core driver APIs by Runtime pm APIs
-      MFD: OMAP: USB: Runtime PM support
-
- arch/arm/mach-omap2/clock3xxx_data.c       |   26 +-
- arch/arm/mach-omap2/clock44xx_data.c       |   10 +-
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |  221 ++++++++
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c |  208 ++++++++-
- arch/arm/mach-omap2/usb-host.c             |  100 ++---
- arch/arm/plat-omap/include/plat/usb.h      |    3 -
- drivers/mfd/omap-usb-host.c                |  755 +++++++++++-----------------
- drivers/usb/host/ehci-omap.c               |   17 +-
- drivers/usb/host/ohci-omap3.c              |   18 +-
- 9 files changed, 797 insertions(+), 561 deletions(-)
-
-
-- Paul
+	Arnd
