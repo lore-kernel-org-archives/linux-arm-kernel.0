@@ -1,36 +1,65 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 15 Oct 2011 16:24:45 +0200
-Subject: [PATCHv16 0/9] Contiguous Memory Allocator
-In-Reply-To: <20111014161951.5b4bb327.akpm@linux-foundation.org>
-References: <1317909290-29832-1-git-send-email-m.szyprowski@samsung.com>
-	<201110111552.04615.arnd@arndb.de>
-	<20111014161951.5b4bb327.akpm@linux-foundation.org>
-Message-ID: <201110151624.47336.arnd@arndb.de>
+From: tixy@yxit.co.uk (Tixy)
+Date: Sat, 15 Oct 2011 16:29:12 +0100
+Subject: [PATCH] arm/tegra: select AUTO_ZRELADDR by default
+In-Reply-To: <20111014201953.GX21648@n2100.arm.linux.org.uk>
+References: <1317172068-14872-1-git-send-email-pdeschrijver@nvidia.com>
+	<201110141729.41515.arnd@arndb.de>
+	<74CDBE0F657A3D45AFBB94109FB122FF173BE1A283@HQMAIL01.nvidia.com>
+	<201110141827.53906.arnd@arndb.de>
+	<CAOesGMgDwMeVmwo1WJ3tU+ZdjCSJ6F8mY42e_KwTmzAkGQsqmg@mail.gmail.com>
+	<20111014192011.GS21648@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.02.1110141549160.17040@xanadu.home>
+	<20111014201223.GV21648@n2100.arm.linux.org.uk>
+	<74CDBE0F657A3D45AFBB94109FB122FF173BE1A365@HQMAIL01.nvidia.com>
+	<20111014201953.GX21648@n2100.arm.linux.org.uk>
+Message-ID: <1318692552.2241.47.camel@computer2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 15 October 2011, Andrew Morton wrote:
+On Fri, 2011-10-14 at 21:19 +0100, Russell King - ARM Linux wrote:
+> On Fri, Oct 14, 2011 at 01:16:27PM -0700, Stephen Warren wrote:
+> > Russell King wrote at Friday, October 14, 2011 2:12 PM:
+> > > I don't think that's so with the various flavours of platform specific
+> > > uboot which float around.  For instance, on the OMAP4430 SDP, the
+> > > following commands were used as supplied to load a uImage off the SD
+> > > card into RAM at a different address to which it was built for, and
+> > > execute it at that address:
+> > > 
+> > > mmcinit 0
+> > > fatload mmc 0 0x80300000 uImage
+> > > bootm 80300000
+> > > 
+> > > Whether the 'bootm' command then copied the image and called it there,
+> > > or whether it executed it at 0x80300000 I've no idea - but why then
+> > > load the image at a different address in the first place?
+> > 
+> > Yes, U-Boot's image handling looks at the image at 80300000, extracts the
+> > "load address" from the image header, memcpy()'s the image to that address,
+> > then jumps to the "entry address" in the image header.
 > 
-> On Tue, 11 Oct 2011 15:52:04 +0200
-> Arnd Bergmann <arnd@arndb.de> wrote:
-> > What I would really want to hear from you is your opinion on
-> > the architecture independent stuff. Obviously, ARM is the
-> > most important consumer of the patch set, but I think the
-> > code has its merit on other architectures as well and most of
-> > them (maybe not parisc) should be about as simple as the x86
-> > one that Marek posted now with v16.
+> Ah, so specifying that address is just a total waste of space then,
+> because you might as well specify an address which results in the
+> copy not being necessary.
 > 
-> Having an x86 implementation is good.  It would also be good to get
-> some x86 drivers using CMA asap, so the thing gets some runtime testing
-> from the masses.  Can we think of anything we can do here?
+> However, I'd expect that uboot is dumb enough to still do the copy
+> irrespective of whether its already in the right place.
 
-With the current implementation, all drivers that use dma_alloc_coherent
-automatically use CMA, there is no need to modify any driver. On
-the other hand, nothing on x86 currently actually requires this feature
-(otherwise it would be broken already), making it hard to test the
-actual migration path.
+U-Boot doesn't do an unnecessary copy if the body of the image is
+already at the load address specified in the image header.
 
-The best test I can think of would be a network benchmark under memory
-pressure, preferrably one that use large jumbo frames (64KB).
+Unfortunately, it also doesn't do a copy if the header of the image is
+at the load address, (I guess to support images constructed with an
+embedded header). This means that
 
-	Arnd
+  fatload mmc 0 0x80300000 uImage
+  bootm 0x80300000
+
+will crash as it will attempt to boot Linux by executing the image
+header. To successfully boot without requiring a relocation we would
+need:
+
+  fatload mmc 0 0x80300000-sizeof(header) uImage
+  bootm 0x80300000
+
+-- 
+Tixy
