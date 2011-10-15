@@ -1,110 +1,54 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Fri, 14 Oct 2011 17:03:54 -0700
-Subject: [PATCH 7/7] ARM: integrate CMA with DMA-mapping subsystem
-In-Reply-To: <1317909290-29832-8-git-send-email-m.szyprowski@samsung.com>
-References: <1317909290-29832-1-git-send-email-m.szyprowski@samsung.com>
-	<1317909290-29832-8-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <20111014170354.ebd604a6.akpm@linux-foundation.org>
+From: sshaiju@mvista.com (shaiju)
+Date: Sat, 15 Oct 2011 01:25:22 +0000 (UTC)
+Subject: Oops #817 on ARM MPCore with 2.6.22-rc3
+References: <46656DE4.2040406@ccrl-nece.de>	<20070605144122.GD26519@flint.arm.linux.org.uk>
+	<tnx7iqixxfy.fsf@arm.com> <466690C0.7060500@ccrl-nece.de>
+Message-ID: <loom.20111015T032223-30@post.gmane.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 06 Oct 2011 15:54:47 +0200
-Marek Szyprowski <m.szyprowski@samsung.com> wrote:
 
-> This patch adds support for CMA to dma-mapping subsystem for ARM
-> architecture. By default a global CMA area is used, but specific devices
-> are allowed to have their private memory areas if required (they can be
-> created with dma_declare_contiguous() function during board
-> initialization).
+
+
+Joerg Wagner <wagner <at> ccrl-nece.de> writes:
+
 > 
-> Contiguous memory areas reserved for DMA are remapped with 2-level page
-> tables on boot. Once a buffer is requested, a low memory kernel mapping
-> is updated to to match requested memory access type.
+> > One more patch worth testing is:
+> > 
+> > http://www.linux-arm.org/git?p=linux-
+2.6.git;a=commitdiff_plain;h=3fe656e0dece808ae1de97f98a2e917c46573beb
 > 
-> GFP_ATOMIC allocations are performed from special pool which is created
-> early during boot. This way remapping page attributes is not needed on
-> allocation time.
+> That one looks very interesting indeed.
+> However I cannot find any information about the mentioned errata.
+> Sadly enough the workaround presented here uses privileged access to CP15 
+which might fix the kernel but
+> userspace programs are left out.
 > 
-> CMA has been enabled unconditionally for ARMv6+ systems.
+> If someone can put more light into this I would be glad to hear about it.
+> At the first glance it seems to add artificial idle cycles to all operations 
+based on ldrex/strex
+> combination, but why are they coupled to the processor id ? Isn't there a 
+chance that a process/threads
+> gets moved to another processor when running code in kernel space (when 
+running the idle loop), given a
+> preemptive kernel.
 > 
->
-> ...
->
-> --- /dev/null
-> +++ b/arch/arm/include/asm/dma-contiguous.h
-> @@ -0,0 +1,33 @@
-> +#ifndef ASMARM_DMA_CONTIGUOUS_H
-> +#define ASMARM_DMA_CONTIGUOUS_H
-> +
-> +#ifdef __KERNEL__
-> +
-> +#include <linux/device.h>
-> +#include <linux/dma-contiguous.h>
-> +
-> +#ifdef CONFIG_CMA
-> +
-> +#define MAX_CMA_AREAS	(8)
+> Regards !
+> 
+> Joerg
+> 
 
-This was already defined in include/linux/dma-contiguous.h.  The
-compiler didn't warn because it was defined to the same value.  Sort it
-out, please?
+Hi  wanger,
 
->
-> ...
->
-> +static int __init early_coherent_pool(char *p)
-> +{
-> +	coherent_pool_size = memparse(p, &p);
-> +	return 0;
-> +}
-> +early_param("coherent_pool", early_coherent_pool);
+Did  this  problem  got  solved .  What  was  the  solution .  I  am  getting 
+similar  Error  .
 
-Is there user documentation for the new parameter?
+regards,
+shaiju
 
->
-> ...
->
-> +struct dma_contiguous_early_reserve {
-> +	phys_addr_t base;
-> +	unsigned long size;
-> +};
-> +
-> +static struct dma_contiguous_early_reserve
-> +dma_mmu_remap[MAX_CMA_AREAS] __initdata;
-
-Tab the continuation line to the right a bit.
-
-> +
-> +static int dma_mmu_remap_num __initdata;
->
-> ...
->
-> +static void *__alloc_from_pool(struct device *dev, size_t size,
-> +			       struct page **ret_page)
-> +{
-> +	struct arm_vmregion *c;
-> +	size_t align;
-> +
-> +	if (!coherent_head.vm_start) {
-> +		printk(KERN_ERR "%s: coherent pool not initialised!\n",
-> +		       __func__);
-> +		dump_stack();
-> +		return NULL;
-> +	}
-> +
-> +	align = 1 << fls(size - 1);
-
-Is there a roundup_pow_of_two() hiding in there?
-
-> +	c = arm_vmregion_alloc(&coherent_head, align, size, 0);
-> +	if (c) {
-> +		void *ptr = (void *)c->vm_start;
-> +		struct page *page = virt_to_page(ptr);
-> +		*ret_page = page;
-> +		return ptr;
-> +	}
-> +	return NULL;
-> +}
->
-> ...
->
+> -------------------------------------------------------------------
+> List admin: http://lists.arm.linux.org.uk/mailman/listinfo/linux-arm-kernel
+> FAQ:        http://www.arm.linux.org.uk/mailinglists/faq.php
+> Etiquette:  http://www.arm.linux.org.uk/mailinglists/etiquette.php
+> 
+> 
