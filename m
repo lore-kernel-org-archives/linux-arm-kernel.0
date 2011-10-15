@@ -1,54 +1,39 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Sat, 15 Oct 2011 11:24:05 +0800
-Subject: [PATCH 1/1] ARM: i.MX28: shift frac value in _CLK_SET_RATE
-In-Reply-To: <1318627180-29865-1-git-send-email-matt@grid-net.com>
-References: <1318627180-29865-1-git-send-email-matt@grid-net.com>
-Message-ID: <20111015032405.GB29039@S2100-06.ap.freescale.net>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Sat, 15 Oct 2011 00:32:32 -0600 (MDT)
+Subject: [GIT PULL] ARM: OMAP: Runtime PM/hwmod conversion for HS USBHOST
+Message-ID: <alpine.DEB.2.00.1110150030410.19504@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 14, 2011 at 02:19:40PM -0700, Matt Burtch wrote:
-> Noticed when setting SSP0 in clk_set_rate, _CLK_SET_RATE attempts to
-> reset the clock divider for the SSP0 parent clock, in this case IO0FRAC.
-> Bits 24-29 of HW_CLKCTRL_FRAC0 are cleared correctly, but when the new
-> frac value is written the value isn't shifted up to write the correct
-> bit-field.  This results in IO0FRAC being set to 0 and CPUFRAC being
-> corrupted.
-> 
-> This should occur when writing IO1FRAC, EMIFRAC in HW_CLKCTRL_FRAC0 and
-> GPMIFRAC, HSADCFRAC in HW_CLKCTRL_FRAC1.
-> 
-> Tested on custom i.MX28 board with SSP0 SPI driver.
-> 
-> Signed-off-by: Matt Burtch <matt@grid-net.com>
+Hi Tony,
 
-Maybe 'Cc: stable at kernel.org'?
+The following changes since commit be73246058737beec52ae232bcab7776332a9e06:
 
-> ---
->  arch/arm/mach-mxs/clock-mx28.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/mach-mxs/clock-mx28.c b/arch/arm/mach-mxs/clock-mx28.c
-> index 5dcc59d..b4ea439 100644
-> --- a/arch/arm/mach-mxs/clock-mx28.c
-> +++ b/arch/arm/mach-mxs/clock-mx28.c
-> @@ -349,7 +349,7 @@ static int name##_set_rate(struct clk *clk, unsigned long rate)		\
->  									\
->  		reg = __raw_readl(CLKCTRL_BASE_ADDR + HW_CLKCTRL_##fr);	\
->  		reg &= ~BM_CLKCTRL_##fr##_##fs##FRAC;			\
-> -		reg |= frac;						\
-> +		reg |= frac<<BP_CLKCTRL_##fr##_##fs##FRAC;		\
+  ARM: OMAP2+: Remove custom init_irq for remaining boards (2011-09-26 17:50:37 -0700)
 
-Add space before and after "<<"?
+are available in the git repository at:
+  git://git.pwsan.com/linux-2.6 usbhost_runtime_pm_14_devel_3.2
 
->  		__raw_writel(reg, CLKCTRL_BASE_ADDR + HW_CLKCTRL_##fr);	\
->  	}								\
->  									\
-> -- 
-Otherwise,
+Benoit Cousson (1):
+      ARM: OMAP: USB: EHCI and OHCI hwmod structures for OMAP4
 
-Acked-by: Shawn Guo <shawn.guo@linaro.org>
+Keshava Munegowda (5):
+      ARM: OMAP: USB: EHCI and OHCI hwmod structures for OMAP3
+      ARM: OMAP: USB: register hwmods of usbhs
+      ARM: OMAP: USB: device name change for the clk names of usbhs
+      ARM: OMAP: USBHOST: Replace usbhs core driver APIs by Runtime pm APIs
+      MFD: OMAP: USB: Runtime PM support
 
--- 
-Regards,
-Shawn
+ arch/arm/mach-omap2/clock3xxx_data.c       |   26 +-
+ arch/arm/mach-omap2/clock44xx_data.c       |   10 +-
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |  221 ++++++++
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c |  208 ++++++++-
+ arch/arm/mach-omap2/usb-host.c             |  100 ++---
+ arch/arm/plat-omap/include/plat/usb.h      |    3 -
+ drivers/mfd/omap-usb-host.c                |  755 +++++++++++-----------------
+ drivers/usb/host/ehci-omap.c               |   17 +-
+ drivers/usb/host/ohci-omap3.c              |   18 +-
+ 9 files changed, 797 insertions(+), 561 deletions(-)
+
+
+- Paul
