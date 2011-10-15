@@ -1,26 +1,30 @@
-From: mika.westerberg@iki.fi (Mika Westerberg)
-Date: Sat, 15 Oct 2011 21:18:08 +0300
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 15 Oct 2011 21:41:30 +0100
 Subject: [PATCH v2] mach-ep93xx: break out GPIO driver specifics
-In-Reply-To: <1316508132-20020-1-git-send-email-linus.walleij@stericsson.com>
+In-Reply-To: <20111015181808.GA3128@mwesterb-mobl.ger.corp.intel.com>
 References: <1316508132-20020-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <20111015181808.GA3128@mwesterb-mobl.ger.corp.intel.com>
+	<20111015181808.GA3128@mwesterb-mobl.ger.corp.intel.com>
+Message-ID: <20111015204129.GZ21648@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 20, 2011 at 10:42:12AM +0200, Linus Walleij wrote:
->  arch/arm/mach-ep93xx/core.c                     |    1 +
->  arch/arm/mach-ep93xx/edb93xx.c                  |    1 +
->  arch/arm/mach-ep93xx/include/mach/gpio-ep93xx.h |  100 +++++++++++++++++++++
->  arch/arm/mach-ep93xx/include/mach/gpio.h        |  105 -----------------------
+On Sat, Oct 15, 2011 at 09:18:08PM +0300, Mika Westerberg wrote:
+> I just tried to compile latest linux-next and due to missing <mach/gpio.h> I
+> get:
+> 
+> In file included from include/linux/gpio.h:18:0,
+>                  from drivers/gpio/gpiolib.c:10:
+> /home/westeri/devel/kernel/linux/arch/arm/include/asm/gpio.h:5:23: fatal error: mach/gpio.h: No such file or directory
+> compilation terminated.
+> make[2]: *** [drivers/gpio/gpiolib.o] Error 1
+> 
+> It looks like arch/arm/include/asm/gpio.h wants to have <mach/gpio.h>. Any idea
+> how to fix this?
 
-I just tried to compile latest linux-next and due to missing <mach/gpio.h> I
-get:
+Hmm.  It shouldn't have been deleted - Linus' patch leaves the file
+empty rather than deleting it.
 
-In file included from include/linux/gpio.h:18:0,
-                 from drivers/gpio/gpiolib.c:10:
-/home/westeri/devel/kernel/linux/arch/arm/include/asm/gpio.h:5:23: fatal error: mach/gpio.h: No such file or directory
-compilation terminated.
-make[2]: *** [drivers/gpio/gpiolib.o] Error 1
-
-It looks like arch/arm/include/asm/gpio.h wants to have <mach/gpio.h>. Any idea
-how to fix this?
+However, as I had to use GNU patch to apply Linus' patch (as git apply
+wouldn't because of fuzz), it doesn't understand that, so it removed it.
+This is where having an /* empty */ comment avoids that kind of thing,
+just like I've done for all the other mach/gpio.h which became empty.
