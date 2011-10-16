@@ -1,37 +1,37 @@
-From: mina86@mina86.com (Michal Nazarewicz)
-Date: Sun, 16 Oct 2011 10:01:36 +0200
-Subject: [PATCH 2/9] mm: alloc_contig_freed_pages() added
-In-Reply-To: <20111014162933.d8fead58.akpm@linux-foundation.org>
-References: <1317909290-29832-1-git-send-email-m.szyprowski@samsung.com>
-	<1317909290-29832-3-git-send-email-m.szyprowski@samsung.com>
-	<20111014162933.d8fead58.akpm@linux-foundation.org>
-Message-ID: <op.v3fpwyxc3l0zgt@mpn-glaptop>
+From: mika.westerberg@iki.fi (Mika Westerberg)
+Date: Sun, 16 Oct 2011 11:08:06 +0300
+Subject: [PATCH] ARM: ep93xx: bring back missing <mach/gpio.h>
+Message-ID: <1318752486-970-1-git-send-email-mika.westerberg@iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 15 Oct 2011 01:29:33 +0200, Andrew Morton <akpm@linux-foundation.org> wrote:
+Change bd5f12a2476 (ARM: 7042/3: mach-ep93xx: break out GPIO driver specifics)
+accidentally removed the ep93xx <mach/gpio.h> instead of making it an empty
+file. This causes compilation to fail:
 
-> On Thu, 06 Oct 2011 15:54:42 +0200
-> Marek Szyprowski <m.szyprowski@samsung.com> wrote:
->
->> From: KAMEZAWA Hiroyuki <kamezawa.hiroyu@jp.fujitsu.com>
->>
->> This commit introduces alloc_contig_freed_pages() function
->
-> The "freed" seems redundant to me.  Wouldn't "alloc_contig_pages" be a
-> better name?
+In file included from include/linux/gpio.h:18:0,
+                  from drivers/gpio/gpiolib.c:10:
+linux/arch/arm/include/asm/gpio.h:5:23: fatal error: mach/gpio.h: No such file or directory
+compilation terminated.
+make[2]: *** [drivers/gpio/gpiolib.o] Error 1
 
-The ?freed? is there because the function operates on pages that are in
-buddy system, ie. it is given a range of PFNs that are to be removed
- from buddy system.
+Fix this by adding the file back.
 
-There's also a alloc_contig_range() function (added by next patch)
-which frees pages in given range and then calls
-alloc_contig_free_pages() to allocate them.
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: Hartley Sweeten <hsweeten@visionengravers.com>
+Cc: Ryan Mallon <rmallon@gmail.com>
+Signed-off-by: Mika Westerberg <mika.westerberg@iki.fi>
+---
+ arch/arm/mach-ep93xx/include/mach/gpio.h |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-ep93xx/include/mach/gpio.h
 
-IMO, if there was an alloc_contig_pages() function, it would have to
-be one level up (ie. it would figure out where to allocate memory and
-then call alloc_contig_range()).  (That's really what CMA is doing).
-
-Still, as I think of it now, maybe alloc_contig_free_range() would be
-better?
+diff --git a/arch/arm/mach-ep93xx/include/mach/gpio.h b/arch/arm/mach-ep93xx/include/mach/gpio.h
+new file mode 100644
+index 0000000..40a8c17
+--- /dev/null
++++ b/arch/arm/mach-ep93xx/include/mach/gpio.h
+@@ -0,0 +1 @@
++/* empty */
+-- 
+1.7.6.3
