@@ -1,40 +1,23 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sun, 16 Oct 2011 12:56:22 +0200
-Subject: [PATCH] ARM: ep93xx: bring back missing <mach/gpio.h>
-In-Reply-To: <1318752486-970-1-git-send-email-mika.westerberg@iki.fi>
-References: <1318752486-970-1-git-send-email-mika.westerberg@iki.fi>
-Message-ID: <CAKnu2Mr74c9G79Dopq62agv5F2OUD7zT+1TgeEyjn=AjJv5bpg@mail.gmail.com>
+Date: Sun, 16 Oct 2011 12:57:46 +0200
+Subject: [PATCH v2] mach-ep93xx: break out GPIO driver specifics
+In-Reply-To: <20111015204129.GZ21648@n2100.arm.linux.org.uk>
+References: <1316508132-20020-1-git-send-email-linus.walleij@stericsson.com>
+	<20111015181808.GA3128@mwesterb-mobl.ger.corp.intel.com>
+	<20111015204129.GZ21648@n2100.arm.linux.org.uk>
+Message-ID: <CAKnu2MqHvKLs3eER8Qvof5a3F95ooabXBUAjNgsdd0xXXajhqA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/10/16 Mika Westerberg <mika.westerberg@iki.fi>:
+2011/10/15 Russell King - ARM Linux <linux@arm.linux.org.uk>:
 
-> Change bd5f12a2476 (ARM: 7042/3: mach-ep93xx: break out GPIO driver specifics)
-> accidentally removed the ep93xx <mach/gpio.h> instead of making it an empty
-> file. This causes compilation to fail:
+> However, as I had to use GNU patch to apply Linus' patch (as git apply
+> wouldn't because of fuzz), it doesn't understand that, so it removed it.
+> This is where having an /* empty */ comment avoids that kind of thing,
+> just like I've done for all the other mach/gpio.h which became empty.
 
-OMG git is too smart on me I suspect :-/
+OK now I understand what happened, I'll have the /* empty */ comment
+in them from now on...
 
-The original patch here:
-http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7042/3
-
-Does not delete it AFAICT:
-diff --git a/arch/arm/mach-ep93xx/include/mach/gpio.h
-b/arch/arm/mach-ep93xx/include/mach/gpio.h
-index 76c68fa..e69de29 100644
---- a/arch/arm/mach-ep93xx/include/mach/gpio.h
-+++ b/arch/arm/mach-ep93xx/include/mach/gpio.h
-
-If it was deleting it, second line should say /dev/null should it not?
-
-Is this because git won't create files with zero content during checkout
-or so :-/
-
-Or because git am takes zero length as deletion?
-
-Help, I need to figure out how not to do the same stupid mistake again...
-
-Acked-by.
-
-Yours,
+Thanks,
 Linus Walleij
