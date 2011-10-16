@@ -1,57 +1,80 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Sun, 16 Oct 2011 21:09:16 +0200
-Subject: [PATCH 07/11] ARM: at92/nand: use gpio_is_valid to check the gpio
+Date: Sun, 16 Oct 2011 21:09:17 +0200
+Subject: [PATCH 08/11] ARM: at92/udc: use gpio_is_valid to check the gpio
 In-Reply-To: <20111016190528.GI1459@game.jcrosoft.org>
 References: <20111016190528.GI1459@game.jcrosoft.org>
-Message-ID: <1318792160-23279-7-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <1318792160-23279-8-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Acked-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 ---
- drivers/mtd/nand/atmel_nand.c |    8 ++++----
- 1 files changed, 4 insertions(+), 4 deletions(-)
+ drivers/usb/gadget/at91_udc.c |   14 +++++++-------
+ 1 files changed, 7 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
-index 55da20c..e20ac1f 100644
---- a/drivers/mtd/nand/atmel_nand.c
-+++ b/drivers/mtd/nand/atmel_nand.c
-@@ -113,7 +113,7 @@ static int cpu_has_dma(void)
-  */
- static void atmel_nand_enable(struct atmel_nand_host *host)
- {
--	if (host->board->enable_pin)
-+	if (gpio_is_valid(host->board->enable_pin))
- 		gpio_set_value(host->board->enable_pin, 0);
+diff --git a/drivers/usb/gadget/at91_udc.c b/drivers/usb/gadget/at91_udc.c
+index ddb118a..205498d 100644
+--- a/drivers/usb/gadget/at91_udc.c
++++ b/drivers/usb/gadget/at91_udc.c
+@@ -1758,7 +1758,7 @@ static int __init at91udc_probe(struct platform_device *pdev)
+ 
+ 	/* rm9200 needs manual D+ pullup; off by default */
+ 	if (cpu_is_at91rm9200()) {
+-		if (udc->board.pullup_pin <= 0) {
++		if (gpio_is_valid(udc->board.pullup_pin)) {
+ 			DBG("no D+ pullup?\n");
+ 			retval = -ENODEV;
+ 			goto fail0;
+@@ -1825,7 +1825,7 @@ static int __init at91udc_probe(struct platform_device *pdev)
+ 		DBG("request irq %d failed\n", udc->udp_irq);
+ 		goto fail1;
+ 	}
+-	if (udc->board.vbus_pin > 0) {
++	if (gpio_is_valid(udc->board.vbus_pin)) {
+ 		retval = gpio_request(udc->board.vbus_pin, "udc_vbus");
+ 		if (retval < 0) {
+ 			DBG("request vbus pin failed\n");
+@@ -1869,10 +1869,10 @@ static int __init at91udc_probe(struct platform_device *pdev)
+ 	INFO("%s version %s\n", driver_name, DRIVER_VERSION);
+ 	return 0;
+ fail4:
+-	if (udc->board.vbus_pin > 0 && !udc->board.vbus_polled)
++	if (gpio_is_valid(udc->board.vbus_pin) && !udc->board.vbus_polled)
+ 		free_irq(udc->board.vbus_pin, udc);
+ fail3:
+-	if (udc->board.vbus_pin > 0)
++	if (gpio_is_valid(udc->board.vbus_pin))
+ 		gpio_free(udc->board.vbus_pin);
+ fail2:
+ 	free_irq(udc->udp_irq, udc);
+@@ -1907,7 +1907,7 @@ static int __exit at91udc_remove(struct platform_device *pdev)
+ 
+ 	device_init_wakeup(&pdev->dev, 0);
+ 	remove_debug_file(udc);
+-	if (udc->board.vbus_pin > 0) {
++	if (gpio_is_valid(udc->board.vbus_pin)) {
+ 		free_irq(udc->board.vbus_pin, udc);
+ 		gpio_free(udc->board.vbus_pin);
+ 	}
+@@ -1951,7 +1951,7 @@ static int at91udc_suspend(struct platform_device *pdev, pm_message_t mesg)
+ 		enable_irq_wake(udc->udp_irq);
+ 
+ 	udc->active_suspend = wake;
+-	if (udc->board.vbus_pin > 0 && !udc->board.vbus_polled && wake)
++	if (gpio_is_valid(udc->board.vbus_pin) && !udc->board.vbus_polled && wake)
+ 		enable_irq_wake(udc->board.vbus_pin);
+ 	return 0;
  }
+@@ -1961,7 +1961,7 @@ static int at91udc_resume(struct platform_device *pdev)
+ 	struct at91_udc *udc = platform_get_drvdata(pdev);
+ 	unsigned long	flags;
  
-@@ -122,7 +122,7 @@ static void atmel_nand_enable(struct atmel_nand_host *host)
-  */
- static void atmel_nand_disable(struct atmel_nand_host *host)
- {
--	if (host->board->enable_pin)
-+	if (gpio_is_valid(host->board->enable_pin))
- 		gpio_set_value(host->board->enable_pin, 1);
- }
+-	if (udc->board.vbus_pin > 0 && !udc->board.vbus_polled &&
++	if (gpio_is_valid(udc->board.vbus_pin) && !udc->board.vbus_polled &&
+ 	    udc->active_suspend)
+ 		disable_irq_wake(udc->board.vbus_pin);
  
-@@ -535,7 +535,7 @@ static int __init atmel_nand_probe(struct platform_device *pdev)
- 	nand_chip->IO_ADDR_W = host->io_base;
- 	nand_chip->cmd_ctrl = atmel_nand_cmd_ctrl;
- 
--	if (host->board->rdy_pin)
-+	if (gpio_is_valid(host->board->rdy_pin))
- 		nand_chip->dev_ready = atmel_nand_device_ready;
- 
- 	regs = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-@@ -573,7 +573,7 @@ static int __init atmel_nand_probe(struct platform_device *pdev)
- 	platform_set_drvdata(pdev, host);
- 	atmel_nand_enable(host);
- 
--	if (host->board->det_pin) {
-+	if (gpio_is_valid(host->board->det_pin)) {
- 		if (gpio_get_value(host->board->det_pin)) {
- 			printk(KERN_INFO "No SmartMedia card inserted.\n");
- 			res = -ENXIO;
 -- 
 1.7.7
