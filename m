@@ -1,30 +1,220 @@
-From: zdevai@gmail.com (Zoltan Devai)
-Date: Sun, 16 Oct 2011 16:16:45 +0200
-Subject: [PATCH 3/9] ARM: SPMP8000: Add clk support
-In-Reply-To: <20111013093836.GK21648@n2100.arm.linux.org.uk>
-References: <1318178172-7965-1-git-send-email-zoss@devai.org>
-	<1318178172-7965-4-git-send-email-zoss@devai.org>
-	<20111013093836.GK21648@n2100.arm.linux.org.uk>
-Message-ID: <CAGVye5Oy8M3+PBZN2KXMmnstBtxngb0feYELgbnu5ZWxZBHLEw@mail.gmail.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Sun, 16 Oct 2011 22:55:37 +0800
+Subject: [PATCH v2 3/5] regulator: helper routine to extract
+	regulator_init_data
+In-Reply-To: <1318263578-7407-4-git-send-email-rnayak@ti.com>
+References: <1318263578-7407-1-git-send-email-rnayak@ti.com>
+	<1318263578-7407-4-git-send-email-rnayak@ti.com>
+Message-ID: <20111016145536.GA29885@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/10/13 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> On Sun, Oct 09, 2011 at 06:36:06PM +0200, Zoltan Devai wrote:
->> --- /dev/null
->> +++ b/arch/arm/mach-spmp8000/clkdev.c
-...
->> +#include <mach/scu.h>
->
-> I find the use of 'scu' for something which isn't the SMP Coherence Unit
-> rather confusing - and I suspect you will too if/when spmp8000 has SMP
-> support.
-Well, Sunplus decided to name these devices 'SCU', which are a collection
-of reset, clock, debug, pinmux and gpio stuff.
-The datasheet doesn't even tell what SCU stands for, but I'd prefer to keep
-the naming to be in sync with the documentation.
+On Mon, Oct 10, 2011 at 09:49:36PM +0530, Rajendra Nayak wrote:
+> The helper routine is meant to be used by regulator drivers
+> to extract the regulator_init_data structure from the data
+> that is passed from device tree.
+> 'consumer_supplies' which is part of regulator_init_data is not extracted
+> as the regulator consumer mappings are passed through DT differently,
+> implemented in subsequent patches.
+> Similarly the regulator<-->parent/supply mapping is handled in
+> subsequent patches.
+> 
+> Also add documentation for regulator bindings to be used to pass
+> regulator_init_data struct information from device tree.
+> 
+> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+> ---
+>  .../devicetree/bindings/regulator/regulator.txt    |   44 +++++++++
+>  drivers/regulator/Kconfig                          |    8 ++
+>  drivers/regulator/Makefile                         |    1 +
+>  drivers/regulator/of_regulator.c                   |   93 ++++++++++++++++++++
+>  include/linux/regulator/of_regulator.h             |   21 +++++
+>  5 files changed, 167 insertions(+), 0 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/regulator/regulator.txt
+>  create mode 100644 drivers/regulator/of_regulator.c
+>  create mode 100644 include/linux/regulator/of_regulator.h
+> 
+> diff --git a/Documentation/devicetree/bindings/regulator/regulator.txt b/Documentation/devicetree/bindings/regulator/regulator.txt
+> new file mode 100644
+> index 0000000..a623fdd
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/regulator/regulator.txt
+> @@ -0,0 +1,44 @@
+> +Voltage/Current Regulators
+> +
+> +Optional properties:
+> +- regulator-min-uV: smallest voltage consumers may set
+> +- regulator-max-uV: largest voltage consumers may set
+> +- regulator-uV-offset: Offset applied to voltages to compensate for voltage drops
+> +- regulator-min-uA: smallest current consumers may set
+> +- regulator-max-uA: largest current consumers may set
+> +- regulator-change-voltage: boolean, Output voltage can be changed by software
+> +- regulator-change-current: boolean, Output current can be chnaged by software
+> +- regulator-change-mode: boolean, Operating mode can be changed by software
+> +- regulator-change-status: boolean, Enable/Disable control for regulator exists
+> +- regulator-change-drms: boolean, Dynamic regulator mode switching is enabled
+> +- regulator-mode-fast: boolean, allow/set fast mode for the regulator
+> +- regulator-mode-normal: boolean, allow/set normal mode for the regulator
+> +- regulator-mode-idle: boolean, allow/set idle mode for the regulator
+> +- regulator-mode-standby: boolean, allow/set standby mode for the regulator
+> +- regulator-input-uV: Input voltage for regulator when supplied by another regulator
+> +- regulator-always-on: boolean, regulator should never be disabled
+> +- regulator-boot-on: bootloader/firmware enabled regulator
+> +- <name>-supply: phandle to the parent supply/regulator node
+> +
+> +Example:
+> +
+> +	xyzreg: regulator at 0 {
+> +		regulator-min-uV = <1000000>;
+> +		regulator-max-uV = <2500000>;
+> +		regulator-mode-fast;
+> +		regulator-change-voltage;
+> +		regulator-always-on;
+> +		vin-supply = <&vin>;
+> +	};
+> +
+> +The same binding used by a regulator to reference its
+> +supply can be used by any consumer to reference its
+> +regulator/supply
+> +
+> +Example of a device node referencing a regulator node,
+> +
+> +	devicenode: node at 0x0 {
+> +		...
+> +		...
+> +		<name>-supply = <&xyzreg>;
+> +	};
+> diff --git a/drivers/regulator/Kconfig b/drivers/regulator/Kconfig
+> index c7fd2c0..981c92e 100644
+> --- a/drivers/regulator/Kconfig
+> +++ b/drivers/regulator/Kconfig
+> @@ -64,6 +64,14 @@ config REGULATOR_USERSPACE_CONSUMER
+>  
+>            If unsure, say no.
+>  
+> +config OF_REGULATOR
+> +	tristate "OF regulator helpers"
+> +	depends on OF
+> +	default y if OF
+> +	help
+> +	  OpenFirmware regulator framework helper routines that can
+> +	  used by regulator drivers to extract data from device tree.
+> +
+>  config REGULATOR_BQ24022
+>  	tristate "TI bq24022 Dual Input 1-Cell Li-Ion Charger IC"
+>  	help
+> diff --git a/drivers/regulator/Makefile b/drivers/regulator/Makefile
+> index 040d5aa..e6bc009 100644
+> --- a/drivers/regulator/Makefile
+> +++ b/drivers/regulator/Makefile
+> @@ -7,6 +7,7 @@ obj-$(CONFIG_REGULATOR) += core.o dummy.o
+>  obj-$(CONFIG_REGULATOR_FIXED_VOLTAGE) += fixed.o
+>  obj-$(CONFIG_REGULATOR_VIRTUAL_CONSUMER) += virtual.o
+>  obj-$(CONFIG_REGULATOR_USERSPACE_CONSUMER) += userspace-consumer.o
+> +obj-$(CONFIG_OF_REGULATOR) += of_regulator.o
+>  
+>  obj-$(CONFIG_REGULATOR_AD5398) += ad5398.o
+>  obj-$(CONFIG_REGULATOR_BQ24022) += bq24022.o
+> diff --git a/drivers/regulator/of_regulator.c b/drivers/regulator/of_regulator.c
+> new file mode 100644
+> index 0000000..9262d06
+> --- /dev/null
+> +++ b/drivers/regulator/of_regulator.c
+> @@ -0,0 +1,93 @@
+> +/*
+> + * OF helpers for regulator framework
+> + *
+> + * Copyright (C) 2011 Texas Instruments, Inc.
+> + * Rajendra Nayak <rnayak@ti.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + */
+> +
+> +#include <linux/slab.h>
+> +#include <linux/of.h>
+> +#include <linux/regulator/machine.h>
+> +
+> +static void of_get_regulation_constraints(struct device_node *np,
+> +					struct regulator_init_data **init_data)
+> +{
+> +	const __be32 *min_uV, *max_uV, *uV_offset;
+> +	const __be32 *min_uA, *max_uA, *input_uV;
+> +	unsigned int valid_modes_mask = 0, valid_ops_mask = 0;
+> +
+> +	min_uV = of_get_property(np, "regulator-min-uV", NULL);
+> +	if (min_uV)
+> +		(*init_data)->constraints.min_uV = be32_to_cpu(*min_uV);
+> +	max_uV = of_get_property(np, "regulator-max-uV", NULL);
+> +	if (max_uV)
+> +		(*init_data)->constraints.max_uV = be32_to_cpu(*max_uV);
+> +	uV_offset = of_get_property(np, "regulator-uV-offset", NULL);
+> +	if (uV_offset)
+> +		(*init_data)->constraints.uV_offset = be32_to_cpu(*uV_offset);
+> +	min_uA = of_get_property(np, "regulator-min-uA", NULL);
+> +	if (min_uA)
+> +		(*init_data)->constraints.min_uA = be32_to_cpu(*min_uA);
+> +	max_uA = of_get_property(np, "regulator-max-uA", NULL);
+> +	if (max_uA)
+> +		(*init_data)->constraints.max_uA = be32_to_cpu(*max_uA);
+> +	input_uV = of_get_property(np, "regulator-input-uV", NULL);
+> +	if (input_uV)
+> +		(*init_data)->constraints.input_uV = be32_to_cpu(*input_uV);
+> +
+> +	/* valid modes mask */
+> +	if (of_find_property(np, "regulator-mode-fast", NULL))
+> +				valid_modes_mask |= REGULATOR_MODE_FAST;
+> +	if (of_find_property(np, "regulator-mode-normal", NULL))
+> +				valid_modes_mask |= REGULATOR_MODE_NORMAL;
+> +	if (of_find_property(np, "regulator-mode-idle", NULL))
+> +				valid_modes_mask |= REGULATOR_MODE_IDLE;
+> +	if (of_find_property(np, "regulator-mode-standby", NULL))
+> +				valid_modes_mask |= REGULATOR_MODE_STANDBY;
+> +
+> +	/* valid ops mask */
+> +	if (of_find_property(np, "regulator-change-voltage", NULL))
+> +				valid_ops_mask |= REGULATOR_CHANGE_VOLTAGE;
+> +	if (of_find_property(np, "regulator-change-current", NULL))
+> +				valid_ops_mask |= REGULATOR_CHANGE_CURRENT;
+> +	if (of_find_property(np, "regulator-change-mode", NULL))
+> +				valid_ops_mask |= REGULATOR_CHANGE_MODE;
+> +	if (of_find_property(np, "regulator-change-status", NULL))
+> +				valid_ops_mask |= REGULATOR_CHANGE_STATUS;
+> +
+> +	(*init_data)->constraints.valid_modes_mask = valid_modes_mask;
+> +	(*init_data)->constraints.valid_ops_mask = valid_ops_mask;
+> +
+> +	if (of_find_property(np, "regulator-always-on", NULL))
+> +				(*init_data)->constraints.always_on = true;
+> +	if (of_find_property(np, "regulator-boot-on", NULL))
+> +				(*init_data)->constraints.boot_on = true;
+> +}
+> +
+I do not see that of_get_regulation_constraints() covers the following
+fields.  We do not support them for DT probe?
 
-I'll fix the issues pointed out by your other comments in the next version.
+struct regulation_constraints {
 
-Thanks,
-Zoltan
+        char *name;
+
+	...
+
+        /* regulator suspend states for global PMIC STANDBY/HIBERNATE */
+        struct regulator_state state_disk;
+        struct regulator_state state_mem;
+        struct regulator_state state_standby;
+        suspend_state_t initial_state; /* suspend state to set at init */
+
+        /* mode to set on startup */
+        unsigned int initial_mode;
+
+        /* constraint flags */
+	...
+        unsigned apply_uV:1;    /* apply uV constraint if min == max */
+};
+
+-- 
+Regards,
+Shawn
