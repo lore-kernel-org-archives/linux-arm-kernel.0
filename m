@@ -1,52 +1,73 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Sun, 16 Oct 2011 19:55:21 +0200
-Subject: [PATCH v2 1/7] clk: Add a generic clock infrastructure
-In-Reply-To: <20111014103233.GB9485@b20223-02.ap.freescale.net>
+Date: Sun, 16 Oct 2011 20:26:49 +0200
+Subject: [PATCH v2 4/7] clk: Add simple gated clock
+In-Reply-To: <CAJOA=zPw7BF1iNFaG9js2k6++qPnXz5S3dq4rsPmUWOcUztL0g@mail.gmail.com>
 References: <1316730422-20027-1-git-send-email-mturquette@ti.com>
-	<1316730422-20027-2-git-send-email-mturquette@ti.com>
-	<20111014081024.GA9485@b20223-02.ap.freescale.net>
-	<20111014100504.GC2966@opensource.wolfsonmicro.com>
-	<20111014103233.GB9485@b20223-02.ap.freescale.net>
-Message-ID: <20111016175521.GA13565@pengutronix.de>
+	<1316730422-20027-5-git-send-email-mturquette@ti.com>
+	<20111012064646.GA31037@b20223-02.ap.freescale.net>
+	<CAJOA=zPw7BF1iNFaG9js2k6++qPnXz5S3dq4rsPmUWOcUztL0g@mail.gmail.com>
+Message-ID: <20111016182649.GB13565@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 14, 2011 at 06:32:33PM +0800, Richard Zhao wrote:
-> On Fri, Oct 14, 2011 at 11:05:04AM +0100, Mark Brown wrote:
-> > On Fri, Oct 14, 2011 at 04:10:26PM +0800, Richard Zhao wrote:
-> > > On Thu, Sep 22, 2011 at 03:26:56PM -0700, Mike Turquette wrote:
-> > 
-> > snip essentially Mike's entire mail - *please* delete irrelevant quotes
-> > from your replies, it makes it very much easier to find the new text in
-> > your mail and is much more friendly to people reading mail on mobile
-> > devices.
-> I snip not enough? sorry for that. I'll be carefull.
-> > 
-> > > > +static int __clk_enable(struct clk *clk)
-> > > > +{
-> > 
-> > > Could you expose __clk_enable/__clk_disable? I find it hard to implement
-> > > clk group. clk group means, when a major clk enable/disable, it want a set
-> > > of other clks enable/disable accordingly.
-> > 
-> > Shouldn't this be something the core is implementing?  I'd strongly
-> > expect that the clock drivers are relatively dumb and delegate all the
-> > decision making to the core API.  Otherwise it's going to be hard for
-> > the core to implement any logic that involves working with more than one
-> > clock like rate change notification, or guarantee that driver requests
-> > made through the API are satisfied, as the state of the clocks will be
-> > changing underneath it.
-> From my point of view, the first step of generic clk can be, easy to adopt
-> features of clocks in current mainline git.
-> Back to the clk group, I have a patch based on Sascha's work. 
-> http://git.linaro.org/gitweb?p=people/riczhao/linux-2.6.git;a=shortlog;h=refs/heads/imx-clk
+On Wed, Oct 12, 2011 at 07:59:19AM -0700, Turquette, Mike wrote:
+> On Tue, Oct 11, 2011 at 11:46 PM, Richard Zhao
+> <richard.zhao@freescale.com> wrote:
+> > On Thu, Sep 22, 2011 at 03:26:59PM -0700, Mike Turquette wrote:
+> >> From: Jeremy Kerr <jeremy.kerr@canonical.com>
+> >>
+> >> Signed-off-by: Jeremy Kerr <jeremy.kerr@canonical.com>
+> >> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> >> Signed-off-by: Jamie Iles <jamie@jamieiles.com>
+> >> Signed-off-by: Mike Turquette <mturquette@ti.com>
+> >> ---
+> >> Changes since v1:
+> >> Add copyright header
+> >> Fold in Jamie's patch for set-to-disable clks
+> >> Use BIT macro instead of shift
+> >>
+> >> ?drivers/clk/Kconfig ? ?| ? ?4 ++
+> >> ?drivers/clk/Makefile ? | ? ?1 +
+> >> ?drivers/clk/clk-gate.c | ? 78 ++++++++++++++++++++++++++++++++++++++++++++++++
+> >> ?include/linux/clk.h ? ?| ? 13 ++++++++
+> >> ?4 files changed, 96 insertions(+), 0 deletions(-)
+> >> ?create mode 100644 drivers/clk/clk-gate.c
+> >
+> > I feel hard to tell the tree the clk parent, at register/init time. For the
+> > simple gate clk, the only way is to set .get_parent. But normally, for clk
+> > without any divider we set .get_parent to NULL. Maybe we can put .parent to
+> > struct clk_hw?
+> 
+> For non-mux clocks, whose parent is *always* going to be the same, you
+> should create a duplicate .parent in the clk_hw_* structure and then
+> have .get_parent return clk_hw_*->parent.
 
-I thought further about this and a clock group is not something we want
-to have at all. Clocks are supposed to be arranged in a tree and
-grouping clocks together violates this which leads to problems.
-This grouping should be done at driver level, so when a driver needs
-more than one clock it should request them all, maybe with a clk_get_all
-helper function.
+Maybe I do not understand what you mean here, but I think there is
+something missing in the gate.
+
+> 
+> This is analogous to the way clk_hw_fixed returns clk_hw_fixed->rate
+> when .recalc is called on it.
+> 
+> >> +
+> >> +static unsigned long clk_gate_get_rate(struct clk_hw *clk)
+> >> +{
+> >> + ? ? return clk_get_rate(clk_get_parent(clk->clk));
+> >> +}
+
+clk_get_parent goes down to clk_gate_set_enable_ops.get_parent below...
+
+> >> +
+> >> +
+> >> +struct clk_hw_ops clk_gate_set_enable_ops = {
+> >> + ? ? .recalc_rate = clk_gate_get_rate,
+> >> + ? ? .enable = clk_gate_enable_set,
+> >> + ? ? .disable = clk_gate_disable_clear,
+> >> +};
+
+...but this does not have a get_parent pointer, so clk_get_parent()
+for a gate always returns NULL which means that a gate never has
+a valid rate.
 
 Sascha
 
