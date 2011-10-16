@@ -1,37 +1,32 @@
-From: mika.westerberg@iki.fi (Mika Westerberg)
-Date: Sun, 16 Oct 2011 11:08:06 +0300
-Subject: [PATCH] ARM: ep93xx: bring back missing <mach/gpio.h>
-Message-ID: <1318752486-970-1-git-send-email-mika.westerberg@iki.fi>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Sun, 16 Oct 2011 01:31:16 -0700
+Subject: [PATCH 2/9] mm: alloc_contig_freed_pages() added
+In-Reply-To: <op.v3fpwyxc3l0zgt@mpn-glaptop>
+References: <1317909290-29832-1-git-send-email-m.szyprowski@samsung.com>
+	<1317909290-29832-3-git-send-email-m.szyprowski@samsung.com>
+	<20111014162933.d8fead58.akpm@linux-foundation.org>
+	<op.v3fpwyxc3l0zgt@mpn-glaptop>
+Message-ID: <20111016013116.53032449.akpm@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Change bd5f12a2476 (ARM: 7042/3: mach-ep93xx: break out GPIO driver specifics)
-accidentally removed the ep93xx <mach/gpio.h> instead of making it an empty
-file. This causes compilation to fail:
+On Sun, 16 Oct 2011 10:01:36 +0200 "Michal Nazarewicz" <mina86@mina86.com> wrote:
 
-In file included from include/linux/gpio.h:18:0,
-                  from drivers/gpio/gpiolib.c:10:
-linux/arch/arm/include/asm/gpio.h:5:23: fatal error: mach/gpio.h: No such file or directory
-compilation terminated.
-make[2]: *** [drivers/gpio/gpiolib.o] Error 1
+> Still, as I think of it now, maybe alloc_contig_free_range() would be
+> better?
 
-Fix this by adding the file back.
+Nope.  Of *course* the pages were free.  Otherwise we couldn't
+(re)allocate them.  I still think the "free" part is redundant.
 
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Cc: Hartley Sweeten <hsweeten@visionengravers.com>
-Cc: Ryan Mallon <rmallon@gmail.com>
-Signed-off-by: Mika Westerberg <mika.westerberg@iki.fi>
----
- arch/arm/mach-ep93xx/include/mach/gpio.h |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-ep93xx/include/mach/gpio.h
+What could be improved is the "alloc" part.  This really isn't an
+allocation operation.  The pages are being removed from buddy then
+moved into the free arena of a different memory manager from where they
+will _later_ be "allocated".
 
-diff --git a/arch/arm/mach-ep93xx/include/mach/gpio.h b/arch/arm/mach-ep93xx/include/mach/gpio.h
-new file mode 100644
-index 0000000..40a8c17
---- /dev/null
-+++ b/arch/arm/mach-ep93xx/include/mach/gpio.h
-@@ -0,0 +1 @@
-+/* empty */
--- 
-1.7.6.3
+So we should move away from the alloc/free naming altogether for this
+operation and think up new terms.  How about "claim" and "release"? 
+claim_contig_pages, claim_contig_range, release_contig_pages, etc?
+Or we could use take/return.
+
+Also, if we have no expectation that anything apart from CMA will use
+these interfaces (?), the names could/should be prefixed with "cma_".
