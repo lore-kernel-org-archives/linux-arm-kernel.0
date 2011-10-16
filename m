@@ -1,208 +1,144 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Sun, 16 Oct 2011 23:18:14 +0200
-Subject: [PATCH 3/4] ARM: at91/smc: add DT support
+Date: Sun, 16 Oct 2011 23:18:15 +0200
+Subject: [PATCH 4/4] ARM: at91/pit: add DT support
 In-Reply-To: <20111016210819.GM1459@game.jcrosoft.org>
 References: <20111016210819.GM1459@game.jcrosoft.org>
-Message-ID: <1318799895-5121-3-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <1318799895-5121-4-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
 ---
- arch/arm/boot/dts/at91sam9m10g45ek.dts |   16 ++++++
- arch/arm/boot/dts/usb_a9g20.dts        |   16 ++++++
- arch/arm/mach-at91/board-dt.c          |   28 ----------
- arch/arm/mach-at91/sam9_smc.c          |   85 ++++++++++++++++++++++++++++++++
- 4 files changed, 117 insertions(+), 28 deletions(-)
+ arch/arm/boot/dts/at91sam9g20.dtsi    |    6 +++++
+ arch/arm/boot/dts/at91sam9g45.dtsi    |    6 +++++
+ arch/arm/mach-at91/at91sam926x_time.c |   37 +++++++++++++++++++++++++++++++-
+ arch/arm/mach-at91/setup.c            |    2 +
+ 4 files changed, 49 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/at91sam9m10g45ek.dts b/arch/arm/boot/dts/at91sam9m10g45ek.dts
-index fb0042d..d98d115 100644
---- a/arch/arm/boot/dts/at91sam9m10g45ek.dts
-+++ b/arch/arm/boot/dts/at91sam9m10g45ek.dts
-@@ -32,6 +32,22 @@
- 			usart3: serial at fff98000 {
- 				status = "disabled";
+diff --git a/arch/arm/boot/dts/at91sam9g20.dtsi b/arch/arm/boot/dts/at91sam9g20.dtsi
+index d6afa5f..de5fbb3 100644
+--- a/arch/arm/boot/dts/at91sam9g20.dtsi
++++ b/arch/arm/boot/dts/at91sam9g20.dtsi
+@@ -54,6 +54,12 @@
+ 				reg = <0xfffff000 0x200>;
  			};
-+			smc03: smc at ffffec30 {
-+				compatible = "atmel,at91sam9260-smc";
-+				reg = <0xffffec30 0x10>;
-+				ncs_read_setup = <0>;
-+				nrd_setup = <2>;
-+				ncs_write_setup = <0>;
-+				nwe_setup = <2>;
-+				ncs_read_pulse = <4>;
-+				nrd_pulse = <4>;
-+				ncs_write_pulse = <4>;
-+				nwe_pulse = <4>;
-+				read_cycle = <7>;
-+				write_cycle = <7>;
-+				mode = <3>;
-+				tdf_cycles = <3>;
-+			};
- 		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/usb_a9g20.dts b/arch/arm/boot/dts/usb_a9g20.dts
-index 4432a29..89a3620 100644
---- a/arch/arm/boot/dts/usb_a9g20.dts
-+++ b/arch/arm/boot/dts/usb_a9g20.dts
-@@ -40,6 +40,22 @@
- 			usart5: serial at fffd8000 {
- 				status = "disabled";
- 			};
-+			smc03: smc at ffffec30 {
-+				compatible = "atmel,at91sam9260-smc";
-+				reg = <0xffffec30 0x10>;
-+				ncs_read_setup = <0>;
-+				nrd_setup = <2>;
-+				ncs_write_setup = <0>;
-+				nwe_setup = <2>;
-+				ncs_read_pulse = <4>;
-+				nrd_pulse = <4>;
-+				ncs_write_pulse = <4>;
-+				nwe_pulse = <4>;
-+				read_cycle = <7>;
-+				write_cycle = <7>;
-+				mode = <3>;
-+				tdf_cycles = <3>;
-+			};
- 		};
- 	};
- };
-diff --git a/arch/arm/mach-at91/board-dt.c b/arch/arm/mach-at91/board-dt.c
-index fdcbf72..f0a8e09 100644
---- a/arch/arm/mach-at91/board-dt.c
-+++ b/arch/arm/mach-at91/board-dt.c
-@@ -54,36 +54,8 @@ static struct atmel_nand_data __initdata ek_nand_data = {
- 	.enable_pin	= AT91_PIN_PC14,
- };
  
--static struct sam9_smc_config __initdata ek_nand_smc_config = {
--	.ncs_read_setup		= 0,
--	.nrd_setup		= 2,
--	.ncs_write_setup	= 0,
--	.nwe_setup		= 2,
--
--	.ncs_read_pulse		= 4,
--	.nrd_pulse		= 4,
--	.ncs_write_pulse	= 4,
--	.nwe_pulse		= 4,
--
--	.read_cycle		= 7,
--	.write_cycle		= 7,
--
--	.mode			= AT91_SMC_READMODE | AT91_SMC_WRITEMODE | AT91_SMC_EXNWMODE_DISABLE,
--	.tdf_cycles		= 3,
--};
--
- static void __init ek_add_device_nand(void)
- {
--	ek_nand_data.bus_width_16 = board_have_nand_16bit();
--	/* setup bus-width (8 or 16) */
--	if (ek_nand_data.bus_width_16)
--		ek_nand_smc_config.mode |= AT91_SMC_DBW_16;
--	else
--		ek_nand_smc_config.mode |= AT91_SMC_DBW_8;
--
--	/* configure chip-select 3 (NAND) */
--	sam9_smc_configure(0, 3, &ek_nand_smc_config);
--
- 	at91_add_device_nand(&ek_nand_data);
- }
- 
-diff --git a/arch/arm/mach-at91/sam9_smc.c b/arch/arm/mach-at91/sam9_smc.c
-index 86d7d9e..0e6dcf6 100644
---- a/arch/arm/mach-at91/sam9_smc.c
-+++ b/arch/arm/mach-at91/sam9_smc.c
-@@ -61,3 +61,88 @@ void __init sam9_smc_init(int id, u32 addr)
- 		return;
- 	smc_base_addr[id] = ioremap(addr, 512);
- }
++			pit: timer at fffffd30 {
++				compatible = "atmel,at91sam9260-pit";
++				reg = <0xfffffd30 0xf>;
++				interrupts = <1>;
++			};
 +
+ 			dbgu: serial at fffff200 {
+ 				compatible = "atmel,at91sam9260-usart";
+ 				reg = <0xfffff200 0x200>;
+diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
+index e092666..c1d0ab5 100644
+--- a/arch/arm/boot/dts/at91sam9g45.dtsi
++++ b/arch/arm/boot/dts/at91sam9g45.dtsi
+@@ -53,6 +53,12 @@
+ 				reg = <0xfffff000 0x200>;
+ 			};
+ 
++			pit: timer at fffffd30 {
++				compatible = "atmel,at91sam9260-pit";
++				reg = <0xfffffd30 0xf>;
++				interrupts = <1>;
++			};
++
+ 			dma: dma-controller at ffffec00 {
+ 				compatible = "atmel,at91sam9g45-dma";
+ 				reg = <0xffffec00 0x200>;
+diff --git a/arch/arm/mach-at91/at91sam926x_time.c b/arch/arm/mach-at91/at91sam926x_time.c
+index 20d0801..e5f8c38 100644
+--- a/arch/arm/mach-at91/at91sam926x_time.c
++++ b/arch/arm/mach-at91/at91sam926x_time.c
+@@ -14,6 +14,8 @@
+ #include <linux/kernel.h>
+ #include <linux/clk.h>
+ #include <linux/clockchips.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
+ 
+ #include <asm/mach/time.h>
+ 
+@@ -133,7 +135,8 @@ static irqreturn_t at91sam926x_pit_interrupt(int irq, void *dev_id)
+ static struct irqaction at91sam926x_pit_irq = {
+ 	.name		= "at91_tick",
+ 	.flags		= IRQF_SHARED | IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
+-	.handler	= at91sam926x_pit_interrupt
++	.handler	= at91sam926x_pit_interrupt,
++	.irq		= AT91_ID_SYS,
+ };
+ 
+ static void at91sam926x_pit_reset(void)
+@@ -149,6 +152,34 @@ static void at91sam926x_pit_reset(void)
+ 	pit_write(AT91_PIT_MR, (pit_cycle - 1) | AT91_PIT_PITEN);
+ }
+ 
 +#ifdef CONFIG_OF
-+static struct of_device_id smc_ids[]  = {
-+	{ .compatible = "atmel,at91sam9260-smc" },
++static struct of_device_id timer_ids[] = {
++	{ .compatible = "atmel,at91sam9260-pit" },
 +};
 +
-+int __init sam9_smc_of_config(struct device_node *np)
-+{
-+	struct sam9_smc_config config;
-+	const unsigned int *prop;
-+	void __iomem *base;
-+
-+	if (!np)
-+		return -EIO;
-+
-+	prop = of_get_property(np, "ncs_read_setup", NULL);
-+	if (prop)
-+		config.ncs_read_setup = be32_to_cpup(prop);
-+
-+	prop = of_get_property(np, "nrd_setup", NULL);
-+	if (prop)
-+		config.nrd_setup = be32_to_cpup(prop);
-+
-+	prop = of_get_property(np, "ncs_write_setup", NULL);
-+	if (prop)
-+		config.ncs_write_setup = be32_to_cpup(prop);
-+
-+	prop = of_get_property(np, "nwe_setup", NULL);
-+	if (prop)
-+		config.nwe_setup = be32_to_cpup(prop);
-+
-+	prop = of_get_property(np, "ncs_read_pulse", NULL);
-+	if (prop)
-+		config.ncs_read_pulse = be32_to_cpup(prop);
-+
-+	prop = of_get_property(np, "nrd_pulse", NULL);
-+	if (prop)
-+		config.nrd_pulse = be32_to_cpup(prop);
-+
-+	prop = of_get_property(np, "ncs_write_pulse", NULL);
-+	if (prop)
-+		config.ncs_write_pulse = be32_to_cpup(prop);
-+
-+	prop = of_get_property(np, "nwe_pulse", NULL);
-+	if (prop)
-+		config.nwe_pulse = be32_to_cpup(prop);
-+
-+	prop = of_get_property(np, "read_cycle", NULL);
-+	if (prop)
-+		config.read_cycle = be32_to_cpup(prop);
-+
-+	prop = of_get_property(np, "write_cycle", NULL);
-+	if (prop)
-+		config.write_cycle = be32_to_cpup(prop);
-+
-+	prop = of_get_property(np, "mode", NULL);
-+	if (prop)
-+		config.mode = be32_to_cpup(prop);
-+
-+	prop = of_get_property(np, "tdf_cycles", NULL);
-+	if (prop)
-+		config.tdf_cycles = be32_to_cpup(prop);
-+
-+	base = of_iomap(np, 0);
-+	if (!base) {
-+		panic("unable to map smc registers\n");
-+		return -EIO;
-+	}
-+
-+	sam9_smc_cs_configure(base, &config);
-+
-+	return 0;
-+}
-+
-+static int __init sam9_smc_of_init(void)
++void __init of_at91sam926x_pit_init(void)
 +{
 +	struct device_node *np;
++	const unsigned int *intspec;
 +
-+	for_each_matching_node(np, smc_ids)
-+		sam9_smc_of_config(np);
++	np = of_find_matching_node(NULL, timer_ids);
++	if (!np)
++		panic("unable to find compatible timer node in dtb\n");
++	pit_base_addr = of_iomap(np, 0);
++	if (!pit_base_addr)
++		panic("unable to map timer cpu registers\n");
 +
-+	return 0;
++	/* Get the interrupts property */
++	intspec = of_get_property(np, "interrupts", NULL);
++	BUG_ON(!intspec);
++	at91sam926x_pit_irq.irq = be32_to_cpup(intspec);
++
++	of_node_put(np);
 +}
-+early_initcall(sam9_smc_of_init);
++#else
++static void __init of_at91sam926x_pit_init(void) {}
 +#endif
++
+ /*
+  * Set up both clocksource and clockevent support.
+  */
+@@ -157,6 +188,8 @@ static void __init at91sam926x_pit_init(void)
+ 	unsigned long	pit_rate;
+ 	unsigned	bits;
+ 
++	of_at91sam926x_pit_init();
++
+ 	/*
+ 	 * Use our actual MCK to figure out how many MCK/16 ticks per
+ 	 * 1/HZ period (instead of a compile-time constant LATCH).
+@@ -177,7 +210,7 @@ static void __init at91sam926x_pit_init(void)
+ 	clocksource_register_hz(&pit_clk, pit_rate);
+ 
+ 	/* Set up irq handler */
+-	setup_irq(AT91_ID_SYS, &at91sam926x_pit_irq);
++	setup_irq(at91sam926x_pit_irq.irq, &at91sam926x_pit_irq);
+ 
+ 	/* Set up and register clockevents */
+ 	pit_clkevt.mult = div_sc(pit_rate, NSEC_PER_SEC, pit_clkevt.shift);
+diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
+index 007fd95..674b64c 100644
+--- a/arch/arm/mach-at91/setup.c
++++ b/arch/arm/mach-at91/setup.c
+@@ -287,7 +287,9 @@ void __init at91_map_io(void)
+ 
+ void __init at91_initialize(unsigned long main_clock)
+ {
++#ifndef CONFIG_OF
+ 	at91_boot_soc.map_register();
++#endif
+ 
+ 	/* Init clock subsystem */
+ 	at91_clock_init(main_clock);
 -- 
 1.7.7
