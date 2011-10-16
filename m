@@ -1,139 +1,214 @@
-From: mturquette@ti.com (Turquette, Mike)
-Date: Sun, 16 Oct 2011 14:17:29 -0700
-Subject: [PATCH v2 1/7] clk: Add a generic clock infrastructure
-In-Reply-To: <20111015022448.GA17872@b20223-02.ap.freescale.net>
-References: <1316730422-20027-1-git-send-email-mturquette@ti.com>
-	<1316730422-20027-2-git-send-email-mturquette@ti.com>
-	<CAJOA=zM9k7_z_PUoF0tZ_OrgdDTgMjZLftqtW0ra3G9C08Th7g@mail.gmail.com>
-	<20111015022448.GA17872@b20223-02.ap.freescale.net>
-Message-ID: <CAJOA=zOvAV1f+rXP1jYNPOXAchyJPEEAvCdrNfGVg=iZn3Q3Ag@mail.gmail.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Sun, 16 Oct 2011 22:57:10 +0200
+Subject: [PATCH 5/8] ARM: at91: add map_register entry point to soc setup
+In-Reply-To: <20111016194504.GK1459@game.jcrosoft.org>
+References: <20111016194504.GK1459@game.jcrosoft.org>
+Message-ID: <1318798633-2542-1-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 14, 2011 at 7:24 PM, Richard Zhao <richard.zhao@linaro.org> wrote:
-> On Fri, Oct 14, 2011 at 11:14:19AM -0700, Turquette, Mike wrote:
->> On Thu, Sep 22, 2011 at 3:26 PM, Mike Turquette <mturquette@ti.com> wrote:
->> unsigned long omap_recalc_rate(struct clk_hw *hw)
->> {
->> ? ? ? ? struct clk *parent;
->> ? ? ? ? struct clk_hw_omap *oclk;
->>
->> ? ? ? ? parent = hw->clk->parent;
-> clk drivers can not see struct clk details. I use clk_get_parent.
+this will allow to ioremap the register of the PIT, PMC and others
+and make the code soc independant
 
-clk_get_parent should query the hardware to see what the parent is.
-This can have undesireable overhead.  It is quite acceptable to
-reference a clock's parent through clk->parent, just as it is
-acceptable to get a clock rate through clk->rate.
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ arch/arm/mach-at91/at91cap9.c    |    5 +++++
+ arch/arm/mach-at91/at91rm9200.c  |    5 +++++
+ arch/arm/mach-at91/at91sam9260.c |    5 +++++
+ arch/arm/mach-at91/at91sam9261.c |    5 +++++
+ arch/arm/mach-at91/at91sam9263.c |    5 +++++
+ arch/arm/mach-at91/at91sam9g45.c |    5 +++++
+ arch/arm/mach-at91/at91sam9rl.c  |    5 +++++
+ arch/arm/mach-at91/setup.c       |    2 ++
+ arch/arm/mach-at91/soc.h         |    1 +
+ 9 files changed, 38 insertions(+), 0 deletions(-)
 
-An analogous situation is a clk_get_rate call which uses a clk's
-.recalc.  There is undesirable overhead involved in .recalc for clocks
-whose rates won't change behind our backs, so best to just treat the
-data in struct clk as cache and reference it directly.
-
->> ? ? ? ? oclk = to_clk_omap(hw);
->> ? ? ? ? ...
->> }
->>
-...
->>
->> unsigned long omap_recalc_rate(struct clk *clk)
->> {
->> ? ? ? ? struct clk *parent;
->> ? ? ? ? struct clk_hw_omap *oclk;
->>
->> ? ? ? ? parent = clk->parent;
->> ? ? ? ? oclk = to_clk_omap(clk->hw);
->> ? ? ? ? ...
->> }
-> In my understanding, struct clk stores things specific to clk core,
-> struct clk_hw stores common things needed by clk drivers. For static clk driver
-> there' some problems:
-> ?- For clocks without mux, I need duplicate a ?.parent and set .get_parent.
-> ? Even when we adopt DT and dynamicly create clk, it's still a problem.
-> ? Moving .parent to clk_hw can fix it.
-
-For clocks with a fixed parent we should just pass it in at
-register-time.  We should definitely not move .parent out of struct
-clk, since struct clk should be the platform agnostic bit that lets us
-do tree walks, build topology, etc etc.
-
-If you really want a .parent outside of struct clk then duplicate it
-in your struct clk_hw_imx and teach your .ops about it (analogous to
-struct clk_hw_fixed->rate).
-
-> ?- When I define a clk array, I don't need to find another place to store .ops.
-> ? It's not problem for dynamic creating clock.
-
-Something like the following?
-
-static struct clk aess_fclk;
-
-static const clk_hw_ops aess_fclk_ops = {
-        .recalc = &omap2_clksel_recalc,
-        .round_rate = &omap2_clksel_round_rate,
-        .set_rate = &omap2_clksel_set_rate,
-};
-
-static struct clk_hw_omap aess_fclk_hw = {
-        .hw = {
-                .clk = &aess_fclk,
-        },
-        .clksel = &aess_fclk_div,
-        .clksel_reg = OMAP4430_CM1_ABE_AESS_CLKCTRL,
-        .clksel_mask = OMAP4430_CLKSEL_AESS_FCLK_MASK,
-};
-
-static struct clk aess_fclk = {
-        .name = "aess_fclk",
-        .ops = &aess_fclk_ops,
-        .hw = &aess_fclk_hw.hw,
-        .parent = &abe_clk,
-};
-
-> ?- As I mentioned in another mail, clk group need no lock version prepare/unprepare
-> ? and enable/disable functions
-
-Clock groups are out of scope for this first series.  We should
-discuss more what the needs are for your clock groups.  If it boils
-down to just enabling all of the clocks for a given device then you
-might want to abstract that away with pm_runtime_* calls, and maybe a
-supplementary layer like OMAP's hwmod.  But I might be way off base, I
-really don't understand your use case for clock groups.
-
-> ? Another way is, add a "{struct clk_hw *clks; int count}" in clk_hw, let clk
-> ? core handle it.
-> ? I prefer the second way, but I'm not sure whether it's common enough. It's
-> ? still a problem for dynamic creating clock.
-
-struct clk_hw is just a pointer for navigating from struct clk ->
-struct your_custom_clk and vice versa.  Again can you elaborate on
-your needs for managing multiple clocks with a single struct clk_hw?
-
-Thanks,
-Mike
-
->
-> Thanks
-> Richard
->>
->> It is a small nitpick, but it affects the API for everybody so best to
->> get it right now before folks start migrating over to it.
->>
->> Thanks,
->> Mike
->>
->> > ? ? ? ?int ? ? ? ? ? ? (*set_rate)(struct clk_hw *,
->> > ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?unsigned long, unsigned long *);
->> > ? ? ? ?long ? ? ? ? ? ?(*round_rate)(struct clk_hw *, unsigned long);
->> > ? ? ? ?int ? ? ? ? ? ? (*set_parent)(struct clk_hw *, struct clk *);
->> > ? ? ? ?struct clk * ? ?(*get_parent)(struct clk_hw *);
->> > ?};
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>
->
->
+diff --git a/arch/arm/mach-at91/at91cap9.c b/arch/arm/mach-at91/at91cap9.c
+index fe00dce..af00d03 100644
+--- a/arch/arm/mach-at91/at91cap9.c
++++ b/arch/arm/mach-at91/at91cap9.c
+@@ -333,6 +333,10 @@ static void __init at91cap9_map_io(void)
+ 	at91_init_sram(0, AT91CAP9_SRAM_BASE, AT91CAP9_SRAM_SIZE);
+ }
+ 
++static void __init at91cap9_map_register(void)
++{
++}
++
+ static void __init at91cap9_initialize(void)
+ {
+ 	at91_arch_reset = at91cap9_reset;
+@@ -394,6 +398,7 @@ static unsigned int at91cap9_default_irq_priority[NR_AIC_IRQS] __initdata = {
+ struct at91_init_soc __initdata at91cap9_soc = {
+ 	.map_io = at91cap9_map_io,
+ 	.default_irq_priority = at91cap9_default_irq_priority,
++	.map_register = at91cap9_map_register,
+ 	.register_clocks = at91cap9_register_clocks,
+ 	.init = at91cap9_initialize,
+ };
+diff --git a/arch/arm/mach-at91/at91rm9200.c b/arch/arm/mach-at91/at91rm9200.c
+index 8ce8675..6608019 100644
+--- a/arch/arm/mach-at91/at91rm9200.c
++++ b/arch/arm/mach-at91/at91rm9200.c
+@@ -307,6 +307,10 @@ static void __init at91rm9200_map_io(void)
+ 	iotable_init(at91rm9200_io_desc, ARRAY_SIZE(at91rm9200_io_desc));
+ }
+ 
++static void __init at91rm9200_map_register(void)
++{
++}
++
+ static void __init at91rm9200_initialize(void)
+ {
+ 	at91_arch_reset = at91rm9200_reset;
+@@ -366,6 +370,7 @@ static unsigned int at91rm9200_default_irq_priority[NR_AIC_IRQS] __initdata = {
+ struct at91_init_soc __initdata at91rm9200_soc = {
+ 	.map_io = at91rm9200_map_io,
+ 	.default_irq_priority = at91rm9200_default_irq_priority,
++	.map_register = at91rm9200_map_register,
+ 	.register_clocks = at91rm9200_register_clocks,
+ 	.init = at91rm9200_initialize,
+ };
+diff --git a/arch/arm/mach-at91/at91sam9260.c b/arch/arm/mach-at91/at91sam9260.c
+index d7ad3e0..9d51673 100644
+--- a/arch/arm/mach-at91/at91sam9260.c
++++ b/arch/arm/mach-at91/at91sam9260.c
+@@ -317,6 +317,10 @@ static void __init at91sam9260_map_io(void)
+ 	}
+ }
+ 
++static void __init at91sam9260_map_register(void)
++{
++}
++
+ static void __init at91sam9260_initialize(void)
+ {
+ 	at91_arch_reset = at91sam9_alt_reset;
+@@ -373,6 +377,7 @@ static unsigned int at91sam9260_default_irq_priority[NR_AIC_IRQS] __initdata = {
+ struct at91_init_soc __initdata at91sam9260_soc = {
+ 	.map_io = at91sam9260_map_io,
+ 	.default_irq_priority = at91sam9260_default_irq_priority,
++	.map_register = at91sam9260_map_register,
+ 	.register_clocks = at91sam9260_register_clocks,
+ 	.init = at91sam9260_initialize,
+ };
+diff --git a/arch/arm/mach-at91/at91sam9261.c b/arch/arm/mach-at91/at91sam9261.c
+index 574aa6b..b468906 100644
+--- a/arch/arm/mach-at91/at91sam9261.c
++++ b/arch/arm/mach-at91/at91sam9261.c
+@@ -285,6 +285,10 @@ static void __init at91sam9261_map_io(void)
+ 		at91_init_sram(0, AT91SAM9261_SRAM_BASE, AT91SAM9261_SRAM_SIZE);
+ }
+ 
++static void __init at91sam9261_map_register(void)
++{
++}
++
+ static void __init at91sam9261_initialize(void)
+ {
+ 	at91_arch_reset = at91sam9_alt_reset;
+@@ -341,6 +345,7 @@ static unsigned int at91sam9261_default_irq_priority[NR_AIC_IRQS] __initdata = {
+ struct at91_init_soc __initdata at91sam9261_soc = {
+ 	.map_io = at91sam9261_map_io,
+ 	.default_irq_priority = at91sam9261_default_irq_priority,
++	.map_register = at91sam9261_map_register,
+ 	.register_clocks = at91sam9261_register_clocks,
+ 	.init = at91sam9261_initialize,
+ };
+diff --git a/arch/arm/mach-at91/at91sam9263.c b/arch/arm/mach-at91/at91sam9263.c
+index dee0ed7..104a500 100644
+--- a/arch/arm/mach-at91/at91sam9263.c
++++ b/arch/arm/mach-at91/at91sam9263.c
+@@ -303,6 +303,10 @@ static void __init at91sam9263_map_io(void)
+ 	at91_init_sram(1, AT91SAM9263_SRAM1_BASE, AT91SAM9263_SRAM1_SIZE);
+ }
+ 
++static void __init at91sam9263_map_register(void)
++{
++}
++
+ static void __init at91sam9263_initialize(void)
+ {
+ 	at91_arch_reset = at91sam9_alt_reset;
+@@ -358,6 +362,7 @@ static unsigned int at91sam9263_default_irq_priority[NR_AIC_IRQS] __initdata = {
+ struct at91_init_soc __initdata at91sam9263_soc = {
+ 	.map_io = at91sam9263_map_io,
+ 	.default_irq_priority = at91sam9263_default_irq_priority,
++	.map_register = at91sam9263_map_register,
+ 	.register_clocks = at91sam9263_register_clocks,
+ 	.init = at91sam9263_initialize,
+ };
+diff --git a/arch/arm/mach-at91/at91sam9g45.c b/arch/arm/mach-at91/at91sam9g45.c
+index e47570f..6411577 100644
+--- a/arch/arm/mach-at91/at91sam9g45.c
++++ b/arch/arm/mach-at91/at91sam9g45.c
+@@ -330,6 +330,10 @@ static void __init at91sam9g45_map_io(void)
+ 	at91_init_sram(0, AT91SAM9G45_SRAM_BASE, AT91SAM9G45_SRAM_SIZE);
+ }
+ 
++static void __init at91sam9g45_map_register(void)
++{
++}
++
+ static void __init at91sam9g45_initialize(void)
+ {
+ 	at91_arch_reset = at91sam9g45_reset;
+@@ -385,6 +389,7 @@ static unsigned int at91sam9g45_default_irq_priority[NR_AIC_IRQS] __initdata = {
+ struct at91_init_soc __initdata at91sam9g45_soc = {
+ 	.map_io = at91sam9g45_map_io,
+ 	.default_irq_priority = at91sam9g45_default_irq_priority,
++	.map_register = at91sam9g45_map_register,
+ 	.register_clocks = at91sam9g45_register_clocks,
+ 	.init = at91sam9g45_initialize,
+ };
+diff --git a/arch/arm/mach-at91/at91sam9rl.c b/arch/arm/mach-at91/at91sam9rl.c
+index c4004e2..c362113 100644
+--- a/arch/arm/mach-at91/at91sam9rl.c
++++ b/arch/arm/mach-at91/at91sam9rl.c
+@@ -290,6 +290,10 @@ static void __init at91sam9rl_map_io(void)
+ 	at91_init_sram(0, AT91SAM9RL_SRAM_BASE, sram_size);
+ }
+ 
++static void __init at91sam9rl_map_register(void)
++{
++}
++
+ static void __init at91sam9rl_initialize(void)
+ {
+ 	at91_arch_reset = at91sam9_alt_reset;
+@@ -345,6 +349,7 @@ static unsigned int at91sam9rl_default_irq_priority[NR_AIC_IRQS] __initdata = {
+ struct at91_init_soc __initdata at91sam9rl_soc = {
+ 	.map_io = at91sam9rl_map_io,
+ 	.default_irq_priority = at91sam9rl_default_irq_priority,
++	.map_register = at91sam9rl_map_register,
+ 	.register_clocks = at91sam9rl_register_clocks,
+ 	.init = at91sam9rl_initialize,
+ };
+diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
+index aa64294..007fd95 100644
+--- a/arch/arm/mach-at91/setup.c
++++ b/arch/arm/mach-at91/setup.c
+@@ -287,6 +287,8 @@ void __init at91_map_io(void)
+ 
+ void __init at91_initialize(unsigned long main_clock)
+ {
++	at91_boot_soc.map_register();
++
+ 	/* Init clock subsystem */
+ 	at91_clock_init(main_clock);
+ 
+diff --git a/arch/arm/mach-at91/soc.h b/arch/arm/mach-at91/soc.h
+index 21ed881..050eda7 100644
+--- a/arch/arm/mach-at91/soc.h
++++ b/arch/arm/mach-at91/soc.h
+@@ -7,6 +7,7 @@
+ struct at91_init_soc {
+ 	unsigned int *default_irq_priority;
+ 	void (*map_io)(void);
++	void (*map_register)(void);
+ 	void (*register_clocks)(void);
+ 	void (*init)(void);
+ };
+-- 
+1.7.7
