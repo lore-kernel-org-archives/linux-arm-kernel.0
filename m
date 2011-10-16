@@ -1,80 +1,39 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Sun, 16 Oct 2011 21:09:17 +0200
-Subject: [PATCH 08/11] ARM: at92/udc: use gpio_is_valid to check the gpio
+Date: Sun, 16 Oct 2011 21:09:18 +0200
+Subject: [PATCH 09/11] ARM: at92/ohci: use gpio_is_valid to check the gpio
 In-Reply-To: <20111016190528.GI1459@game.jcrosoft.org>
 References: <20111016190528.GI1459@game.jcrosoft.org>
-Message-ID: <1318792160-23279-8-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <1318792160-23279-9-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-Acked-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 ---
- drivers/usb/gadget/at91_udc.c |   14 +++++++-------
- 1 files changed, 7 insertions(+), 7 deletions(-)
+ drivers/usb/host/ohci-at91.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/usb/gadget/at91_udc.c b/drivers/usb/gadget/at91_udc.c
-index ddb118a..205498d 100644
---- a/drivers/usb/gadget/at91_udc.c
-+++ b/drivers/usb/gadget/at91_udc.c
-@@ -1758,7 +1758,7 @@ static int __init at91udc_probe(struct platform_device *pdev)
+diff --git a/drivers/usb/host/ohci-at91.c b/drivers/usb/host/ohci-at91.c
+index ba3a46b..4b9ac13 100644
+--- a/drivers/usb/host/ohci-at91.c
++++ b/drivers/usb/host/ohci-at91.c
+@@ -459,7 +459,7 @@ static int ohci_hcd_at91_drv_probe(struct platform_device *pdev)
  
- 	/* rm9200 needs manual D+ pullup; off by default */
- 	if (cpu_is_at91rm9200()) {
--		if (udc->board.pullup_pin <= 0) {
-+		if (gpio_is_valid(udc->board.pullup_pin)) {
- 			DBG("no D+ pullup?\n");
- 			retval = -ENODEV;
- 			goto fail0;
-@@ -1825,7 +1825,7 @@ static int __init at91udc_probe(struct platform_device *pdev)
- 		DBG("request irq %d failed\n", udc->udp_irq);
- 		goto fail1;
- 	}
--	if (udc->board.vbus_pin > 0) {
-+	if (gpio_is_valid(udc->board.vbus_pin)) {
- 		retval = gpio_request(udc->board.vbus_pin, "udc_vbus");
- 		if (retval < 0) {
- 			DBG("request vbus pin failed\n");
-@@ -1869,10 +1869,10 @@ static int __init at91udc_probe(struct platform_device *pdev)
- 	INFO("%s version %s\n", driver_name, DRIVER_VERSION);
- 	return 0;
- fail4:
--	if (udc->board.vbus_pin > 0 && !udc->board.vbus_polled)
-+	if (gpio_is_valid(udc->board.vbus_pin) && !udc->board.vbus_polled)
- 		free_irq(udc->board.vbus_pin, udc);
- fail3:
--	if (udc->board.vbus_pin > 0)
-+	if (gpio_is_valid(udc->board.vbus_pin))
- 		gpio_free(udc->board.vbus_pin);
- fail2:
- 	free_irq(udc->udp_irq, udc);
-@@ -1907,7 +1907,7 @@ static int __exit at91udc_remove(struct platform_device *pdev)
+ 	if (pdata) {
+ 		for (i = 0; i < ARRAY_SIZE(pdata->vbus_pin); i++) {
+-			if (pdata->vbus_pin[i] <= 0)
++			if (!gpio_is_valid(pdata->vbus_pin[i]))
+ 				continue;
+ 			gpio_request(pdata->vbus_pin[i], "ohci_vbus");
+ 			ohci_at91_usb_set_power(pdata, i, 1);
+@@ -493,7 +493,7 @@ static int ohci_hcd_at91_drv_remove(struct platform_device *pdev)
  
- 	device_init_wakeup(&pdev->dev, 0);
- 	remove_debug_file(udc);
--	if (udc->board.vbus_pin > 0) {
-+	if (gpio_is_valid(udc->board.vbus_pin)) {
- 		free_irq(udc->board.vbus_pin, udc);
- 		gpio_free(udc->board.vbus_pin);
- 	}
-@@ -1951,7 +1951,7 @@ static int at91udc_suspend(struct platform_device *pdev, pm_message_t mesg)
- 		enable_irq_wake(udc->udp_irq);
- 
- 	udc->active_suspend = wake;
--	if (udc->board.vbus_pin > 0 && !udc->board.vbus_polled && wake)
-+	if (gpio_is_valid(udc->board.vbus_pin) && !udc->board.vbus_polled && wake)
- 		enable_irq_wake(udc->board.vbus_pin);
- 	return 0;
- }
-@@ -1961,7 +1961,7 @@ static int at91udc_resume(struct platform_device *pdev)
- 	struct at91_udc *udc = platform_get_drvdata(pdev);
- 	unsigned long	flags;
- 
--	if (udc->board.vbus_pin > 0 && !udc->board.vbus_polled &&
-+	if (gpio_is_valid(udc->board.vbus_pin) && !udc->board.vbus_polled &&
- 	    udc->active_suspend)
- 		disable_irq_wake(udc->board.vbus_pin);
- 
+ 	if (pdata) {
+ 		for (i = 0; i < ARRAY_SIZE(pdata->vbus_pin); i++) {
+-			if (pdata->vbus_pin[i] <= 0)
++			if (!gpio_is_valid(pdata->vbus_pin[i]))
+ 				continue;
+ 			ohci_at91_usb_set_power(pdata, i, 0);
+ 			gpio_free(pdata->vbus_pin[i]);
 -- 
 1.7.7
