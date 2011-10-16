@@ -1,94 +1,139 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Sun, 16 Oct 2011 22:52:21 +0200
-Subject: [PATCH 2/9] ARM: SPMP8000: Add machine base files
-In-Reply-To: <201110162259.19960.arnd@arndb.de>
-References: <1318178172-7965-1-git-send-email-zoss@devai.org>
-	<201110111644.56505.arnd@arndb.de>
-	<CAGVye5PjCZRgdmP+VCXifw_MnW1rAN41BPWfJvk9CAuXBt4ggw@mail.gmail.com>
-	<201110162259.19960.arnd@arndb.de>
-Message-ID: <20111016205221.GL1459@game.jcrosoft.org>
+From: mturquette@ti.com (Turquette, Mike)
+Date: Sun, 16 Oct 2011 14:17:29 -0700
+Subject: [PATCH v2 1/7] clk: Add a generic clock infrastructure
+In-Reply-To: <20111015022448.GA17872@b20223-02.ap.freescale.net>
+References: <1316730422-20027-1-git-send-email-mturquette@ti.com>
+	<1316730422-20027-2-git-send-email-mturquette@ti.com>
+	<CAJOA=zM9k7_z_PUoF0tZ_OrgdDTgMjZLftqtW0ra3G9C08Th7g@mail.gmail.com>
+	<20111015022448.GA17872@b20223-02.ap.freescale.net>
+Message-ID: <CAJOA=zOvAV1f+rXP1jYNPOXAchyJPEEAvCdrNfGVg=iZn3Q3Ag@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22:59 Sun 16 Oct     , Arnd Bergmann wrote:
-> On Sunday 16 October 2011, Zoltan Devai wrote:
-> > 2011/10/11 Arnd Bergmann <arnd@arndb.de>:
-> > > On Sunday 09 October 2011, Zoltan Devai wrote:
-> > >> +
-> > >> +/* Static mappings:
-> > >> + * SCU: timer needs clk support which is inited in init_early
-> > >> + * UART: needed for earlyprintk
-> > >> + */
-> > >> +static struct map_desc io_desc[] __initdata = {
-> > >> +     {
-> > >> +             .virtual        = IO_ADDRESS(SPMP8000_SCU_A_BASE),
-> > >> +             .pfn            = __phys_to_pfn(SPMP8000_SCU_A_BASE),
-> > >> +             .length         = SPMP8000_SCU_A_SIZE,
-> > >> +             .type           = MT_DEVICE,
-> > >> +     }, {
-> > >> +             .virtual        = IO_ADDRESS(SPMP8000_SCU_B_BASE),
-> > >> +             .pfn            = __phys_to_pfn(SPMP8000_SCU_B_BASE),
-> > >> +             .length         = SPMP8000_SCU_B_SIZE,
-> > >> +             .type           = MT_DEVICE,
-> > >> +     }, {
-> > >> +             .virtual        = IO_ADDRESS(SPMP8000_SCU_C_BASE),
-> > >> +             .pfn            = __phys_to_pfn(SPMP8000_SCU_C_BASE),
-> > >> +             .length         = SPMP8000_SCU_C_SIZE,
-> > >> +             .type           = MT_DEVICE,
-> > >> +     },
-> > >
-> > > With Nicolas Pitre's rework of the MMIO space handling, I think it
-> > > would be nice to just use a single area that spans all of the devices
-> > > so you can do an optimized ioremap and huge TLBs. Unfortunately
-> > > that series won't make it into 3.2, but if you just set up a large
-> > > area now, it will automatically work.
-> > What do you mean by 'all of the devices' ?
-> > These three, or all MMIO peripherals ?
-> > These are at addresses 0x90005000, 0x92005000 and 0x93007000.
-> > So either a 50 or 256 MB area, but both seem like a waste of
-> > virtual memory space.
-> 
-> I was thinking of mapping everything that your IO_ADDRESS macro covers,
-> which should be something like 240 MB starting at 0x90000000/0xf0000000.
-> On most ARM9 platforms, virtual memory is not really contraint at all
-> because there is not all that much physical memory. Also, you currently
-> reserve the entire 0xf0000000 segment for MMIO ranges, so I would
-> expect that you can keep doing that after the cleanup.
-> 
-> > >> +#ifdef CONFIG_DEBUG_LL
-> > >> +     {
-> > >> +             .virtual        = IO_ADDRESS(SPMP8000_UARTC0_BASE),
-> > >> +             .pfn            = __phys_to_pfn(SPMP8000_UARTC0_BASE),
-> > >> +             .length         = SPMP8000_UARTC0_SIZE,
-> > >> +             .type           = MT_DEVICE,
-> > >> +     },
-> > >> +#endif
-> > >> +};
-> > >>
-> > > And it would be nice to move this into a separate file that handles the
-> > > early debug code, as prima2 does.
-> > Prima2 doesn't have other static mappings. In my case, that would
-> > mean a separate map_desc table in lluart.c and an
-> > #ifdef CONFIG_DEBUG_LL in the map_io call.
-> > Is it worth it ?
-> 
-> Yes, it's worth it. Don't do the #ifdef in the map_io call though, do
-> it in the header file that declares the function prototype.
-> 
-> > BTW, the static mappings are only needed to be able to set up the
-> > clk stuff in init_early. That in turn is only needed for the timer code to
-> > determinate its input clock.
-> > If I would hard-code the timer clock rate in its driver (the bootloader is
-> > very unlikely to change), then I could init the clk driver from
-> > machine_init and get rid of these mappings.
-> > How about that ?
-> 
-> Maybe you can just pass the clock rate in the device tree then. If the boot
-> loader changes it, it can still pass the correct rate and you don't
-> need the early mappings for functional reasons any more.
-please don't update the DT from the bootloader, I'll recommand you to limit
-your bootloader to just update the strict minimun (same as ATAG) and touch
-noting else
+On Fri, Oct 14, 2011 at 7:24 PM, Richard Zhao <richard.zhao@linaro.org> wrote:
+> On Fri, Oct 14, 2011 at 11:14:19AM -0700, Turquette, Mike wrote:
+>> On Thu, Sep 22, 2011 at 3:26 PM, Mike Turquette <mturquette@ti.com> wrote:
+>> unsigned long omap_recalc_rate(struct clk_hw *hw)
+>> {
+>> ? ? ? ? struct clk *parent;
+>> ? ? ? ? struct clk_hw_omap *oclk;
+>>
+>> ? ? ? ? parent = hw->clk->parent;
+> clk drivers can not see struct clk details. I use clk_get_parent.
 
-Best Regards,
-J.
+clk_get_parent should query the hardware to see what the parent is.
+This can have undesireable overhead.  It is quite acceptable to
+reference a clock's parent through clk->parent, just as it is
+acceptable to get a clock rate through clk->rate.
+
+An analogous situation is a clk_get_rate call which uses a clk's
+.recalc.  There is undesirable overhead involved in .recalc for clocks
+whose rates won't change behind our backs, so best to just treat the
+data in struct clk as cache and reference it directly.
+
+>> ? ? ? ? oclk = to_clk_omap(hw);
+>> ? ? ? ? ...
+>> }
+>>
+...
+>>
+>> unsigned long omap_recalc_rate(struct clk *clk)
+>> {
+>> ? ? ? ? struct clk *parent;
+>> ? ? ? ? struct clk_hw_omap *oclk;
+>>
+>> ? ? ? ? parent = clk->parent;
+>> ? ? ? ? oclk = to_clk_omap(clk->hw);
+>> ? ? ? ? ...
+>> }
+> In my understanding, struct clk stores things specific to clk core,
+> struct clk_hw stores common things needed by clk drivers. For static clk driver
+> there' some problems:
+> ?- For clocks without mux, I need duplicate a ?.parent and set .get_parent.
+> ? Even when we adopt DT and dynamicly create clk, it's still a problem.
+> ? Moving .parent to clk_hw can fix it.
+
+For clocks with a fixed parent we should just pass it in at
+register-time.  We should definitely not move .parent out of struct
+clk, since struct clk should be the platform agnostic bit that lets us
+do tree walks, build topology, etc etc.
+
+If you really want a .parent outside of struct clk then duplicate it
+in your struct clk_hw_imx and teach your .ops about it (analogous to
+struct clk_hw_fixed->rate).
+
+> ?- When I define a clk array, I don't need to find another place to store .ops.
+> ? It's not problem for dynamic creating clock.
+
+Something like the following?
+
+static struct clk aess_fclk;
+
+static const clk_hw_ops aess_fclk_ops = {
+        .recalc = &omap2_clksel_recalc,
+        .round_rate = &omap2_clksel_round_rate,
+        .set_rate = &omap2_clksel_set_rate,
+};
+
+static struct clk_hw_omap aess_fclk_hw = {
+        .hw = {
+                .clk = &aess_fclk,
+        },
+        .clksel = &aess_fclk_div,
+        .clksel_reg = OMAP4430_CM1_ABE_AESS_CLKCTRL,
+        .clksel_mask = OMAP4430_CLKSEL_AESS_FCLK_MASK,
+};
+
+static struct clk aess_fclk = {
+        .name = "aess_fclk",
+        .ops = &aess_fclk_ops,
+        .hw = &aess_fclk_hw.hw,
+        .parent = &abe_clk,
+};
+
+> ?- As I mentioned in another mail, clk group need no lock version prepare/unprepare
+> ? and enable/disable functions
+
+Clock groups are out of scope for this first series.  We should
+discuss more what the needs are for your clock groups.  If it boils
+down to just enabling all of the clocks for a given device then you
+might want to abstract that away with pm_runtime_* calls, and maybe a
+supplementary layer like OMAP's hwmod.  But I might be way off base, I
+really don't understand your use case for clock groups.
+
+> ? Another way is, add a "{struct clk_hw *clks; int count}" in clk_hw, let clk
+> ? core handle it.
+> ? I prefer the second way, but I'm not sure whether it's common enough. It's
+> ? still a problem for dynamic creating clock.
+
+struct clk_hw is just a pointer for navigating from struct clk ->
+struct your_custom_clk and vice versa.  Again can you elaborate on
+your needs for managing multiple clocks with a single struct clk_hw?
+
+Thanks,
+Mike
+
+>
+> Thanks
+> Richard
+>>
+>> It is a small nitpick, but it affects the API for everybody so best to
+>> get it right now before folks start migrating over to it.
+>>
+>> Thanks,
+>> Mike
+>>
+>> > ? ? ? ?int ? ? ? ? ? ? (*set_rate)(struct clk_hw *,
+>> > ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?unsigned long, unsigned long *);
+>> > ? ? ? ?long ? ? ? ? ? ?(*round_rate)(struct clk_hw *, unsigned long);
+>> > ? ? ? ?int ? ? ? ? ? ? (*set_parent)(struct clk_hw *, struct clk *);
+>> > ? ? ? ?struct clk * ? ?(*get_parent)(struct clk_hw *);
+>> > ?};
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>
+>
+>
