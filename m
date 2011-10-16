@@ -1,639 +1,1120 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Sun, 16 Oct 2011 21:09:19 +0200
-Subject: [PATCH 10/11] ARM: at91/gpio: drop PIN_BASE
+Date: Sun, 16 Oct 2011 21:09:11 +0200
+Subject: [PATCH 02/11] ARM: at91/boards: use -EINVAL for invalid gpio
 In-Reply-To: <20111016190528.GI1459@game.jcrosoft.org>
 References: <20111016190528.GI1459@game.jcrosoft.org>
-Message-ID: <1318792160-23279-10-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <1318792160-23279-2-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-Reviewed-by: Ryan Mallon <rmallon@gmail.com>
----
- arch/arm/mach-at91/gpio.c              |   54 ++--
- arch/arm/mach-at91/include/mach/gpio.h |  454 ++++++++++++++++----------------
- 2 files changed, 254 insertions(+), 254 deletions(-)
- rewrite arch/arm/mach-at91/include/mach/gpio.h (78%)
+this will allow to use gpio_is_valid
 
-diff --git a/arch/arm/mach-at91/gpio.c b/arch/arm/mach-at91/gpio.c
-index 04beff1..e709406 100644
---- a/arch/arm/mach-at91/gpio.c
-+++ b/arch/arm/mach-at91/gpio.c
-@@ -60,18 +60,17 @@ static int at91_gpiolib_direction_input(struct gpio_chip *chip,
- 	}
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Signed-off-by: Peter Korsgaard <jacmet@sunsite.dk>
+[Peter Korsgaard: Fixed typo on sam9g20ek/9m10g45ek/stam9g20]
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ arch/arm/mach-at91/board-1arm.c         |    1 +
+ arch/arm/mach-at91/board-afeb-9260v1.c  |    7 ++++++-
+ arch/arm/mach-at91/board-cam60.c        |    3 ++-
+ arch/arm/mach-at91/board-cap9adk.c      |   14 ++++++++------
+ arch/arm/mach-at91/board-carmeva.c      |    6 ++++--
+ arch/arm/mach-at91/board-cpu9krea.c     |    7 ++++++-
+ arch/arm/mach-at91/board-cpuat91.c      |    4 ++++
+ arch/arm/mach-at91/board-csb337.c       |    4 +++-
+ arch/arm/mach-at91/board-csb637.c       |    1 +
+ arch/arm/mach-at91/board-eb9200.c       |    8 ++++++--
+ arch/arm/mach-at91/board-ecbat91.c      |    4 ++++
+ arch/arm/mach-at91/board-eco920.c       |    4 ++++
+ arch/arm/mach-at91/board-flexibity.c    |    4 +++-
+ arch/arm/mach-at91/board-foxg20.c       |    6 +++++-
+ arch/arm/mach-at91/board-gsia18s.c      |    4 +++-
+ arch/arm/mach-at91/board-kafa.c         |    1 +
+ arch/arm/mach-at91/board-kb9202.c       |    5 ++++-
+ arch/arm/mach-at91/board-neocore926.c   |    4 +++-
+ arch/arm/mach-at91/board-pcontrol-g20.c |    1 +
+ arch/arm/mach-at91/board-picotux200.c   |    2 ++
+ arch/arm/mach-at91/board-qil-a9260.c    |   11 ++++++-----
+ arch/arm/mach-at91/board-rm9200dk.c     |   10 +++++++---
+ arch/arm/mach-at91/board-rm9200ek.c     |    2 ++
+ arch/arm/mach-at91/board-sam9-l9260.c   |    7 ++++---
+ arch/arm/mach-at91/board-sam9260ek.c    |   11 ++++++-----
+ arch/arm/mach-at91/board-sam9261ek.c    |    8 ++++++--
+ arch/arm/mach-at91/board-sam9263ek.c    |    7 ++++---
+ arch/arm/mach-at91/board-sam9g20ek.c    |    8 +++++++-
+ arch/arm/mach-at91/board-sam9m10g45ek.c |    3 +++
+ arch/arm/mach-at91/board-sam9rlek.c     |    7 ++++---
+ arch/arm/mach-at91/board-snapper9260.c  |    5 +++++
+ arch/arm/mach-at91/board-stamp9g20.c    |   11 +++++++++--
+ arch/arm/mach-at91/board-usb-a926x.c    |    5 +++--
+ arch/arm/mach-at91/board-yl-9200.c      |    6 ++++--
+ 34 files changed, 141 insertions(+), 50 deletions(-)
+
+diff --git a/arch/arm/mach-at91/board-1arm.c b/arch/arm/mach-at91/board-1arm.c
+index 5aa5885..ebd47bf 100644
+--- a/arch/arm/mach-at91/board-1arm.c
++++ b/arch/arm/mach-at91/board-1arm.c
+@@ -70,6 +70,7 @@ static struct at91_eth_data __initdata onearm_eth_data = {
  
- static struct at91_gpio_chip gpio_chip[] = {
--	AT91_GPIO_CHIP("A", 0x00 + PIN_BASE, 32),
--	AT91_GPIO_CHIP("B", 0x20 + PIN_BASE, 32),
--	AT91_GPIO_CHIP("C", 0x40 + PIN_BASE, 32),
--	AT91_GPIO_CHIP("D", 0x60 + PIN_BASE, 32),
--	AT91_GPIO_CHIP("E", 0x80 + PIN_BASE, 32),
-+	AT91_GPIO_CHIP("A", 0x00, 32),
-+	AT91_GPIO_CHIP("B", 0x20, 32),
-+	AT91_GPIO_CHIP("C", 0x40, 32),
-+	AT91_GPIO_CHIP("D", 0x60, 32),
-+	AT91_GPIO_CHIP("E", 0x80, 32),
+ static struct at91_usbh_data __initdata onearm_usbh_data = {
+ 	.ports		= 1,
++	.vbus_pin	= {-EINVAL, -EINVAL},
  };
  
- static int gpio_banks;
- 
- static inline void __iomem *pin_to_controller(unsigned pin)
- {
--	pin -= PIN_BASE;
- 	pin /= 32;
- 	if (likely(pin < gpio_banks))
- 		return gpio_chip[pin].regbase;
-@@ -81,7 +80,6 @@ static inline void __iomem *pin_to_controller(unsigned pin)
- 
- static inline unsigned pin_to_mask(unsigned pin)
- {
--	pin -= PIN_BASE;
- 	return 1 << (pin % 32);
- }
- 
-@@ -276,8 +274,9 @@ static u32 backups[MAX_GPIO_BANKS];
- 
- static int gpio_irq_set_wake(struct irq_data *d, unsigned state)
- {
--	unsigned	mask = pin_to_mask(d->irq);
--	unsigned	bank = (d->irq - PIN_BASE) / 32;
-+	unsigned	pin = irq_to_gpio(d->irq);
-+	unsigned	mask = pin_to_mask(pin);
-+	unsigned	bank = pin / 32;
- 
- 	if (unlikely(bank >= MAX_GPIO_BANKS))
- 		return -EINVAL;
-@@ -346,8 +345,9 @@ void at91_gpio_resume(void)
- 
- static void gpio_irq_mask(struct irq_data *d)
- {
--	void __iomem	*pio = pin_to_controller(d->irq);
--	unsigned	mask = pin_to_mask(d->irq);
-+	unsigned	pin = irq_to_gpio(d->irq);
-+	void __iomem	*pio = pin_to_controller(pin);
-+	unsigned	mask = pin_to_mask(pin);
- 
- 	if (pio)
- 		__raw_writel(mask, pio + PIO_IDR);
-@@ -355,8 +355,9 @@ static void gpio_irq_mask(struct irq_data *d)
- 
- static void gpio_irq_unmask(struct irq_data *d)
- {
--	void __iomem	*pio = pin_to_controller(d->irq);
--	unsigned	mask = pin_to_mask(d->irq);
-+	unsigned	pin = irq_to_gpio(d->irq);
-+	void __iomem	*pio = pin_to_controller(pin);
-+	unsigned	mask = pin_to_mask(pin);
- 
- 	if (pio)
- 		__raw_writel(mask, pio + PIO_IER);
-@@ -384,7 +385,7 @@ static struct irq_chip gpio_irqchip = {
- 
- static void gpio_irq_handler(unsigned irq, struct irq_desc *desc)
- {
--	unsigned	pin;
-+	unsigned	irq_pin;
- 	struct irq_data *idata = irq_desc_get_irq_data(desc);
- 	struct irq_chip *chip = irq_data_get_irq_chip(idata);
- 	struct at91_gpio_chip *at91_gpio = irq_data_get_irq_chip_data(idata);
-@@ -407,12 +408,12 @@ static void gpio_irq_handler(unsigned irq, struct irq_desc *desc)
- 			continue;
- 		}
- 
--		pin = at91_gpio->chip.base;
-+		irq_pin = gpio_to_irq(at91_gpio->chip.base);
- 
- 		while (isr) {
- 			if (isr & 1)
--				generic_handle_irq(pin);
--			pin++;
-+				generic_handle_irq(irq_pin);
-+			irq_pin++;
- 			isr >>= 1;
- 		}
- 	}
-@@ -440,7 +441,7 @@ static int at91_gpio_show(struct seq_file *s, void *unused)
- 		seq_printf(s, "%i:\t", j);
- 
- 		for (bank = 0; bank < gpio_banks; bank++) {
--			unsigned	pin  = PIN_BASE + (32 * bank) + j;
-+			unsigned	pin  = (32 * bank) + j;
- 			void __iomem	*pio = pin_to_controller(pin);
- 			unsigned	mask = pin_to_mask(pin);
- 
-@@ -493,10 +494,10 @@ static struct lock_class_key gpio_lock_class;
+ static struct at91_udc_data __initdata onearm_udc_data = {
+diff --git a/arch/arm/mach-at91/board-afeb-9260v1.c b/arch/arm/mach-at91/board-afeb-9260v1.c
+index b0c796d..68a3e90 100644
+--- a/arch/arm/mach-at91/board-afeb-9260v1.c
++++ b/arch/arm/mach-at91/board-afeb-9260v1.c
+@@ -75,6 +75,7 @@ static void __init afeb9260_init_early(void)
   */
- void __init at91_gpio_irq_setup(void)
- {
--	unsigned		pioc, pin;
-+	unsigned		pioc, irq = gpio_to_irq(0);
- 	struct at91_gpio_chip	*this, *prev;
+ static struct at91_usbh_data __initdata afeb9260_usbh_data = {
+ 	.ports		= 1,
++	.vbus_pin	= {-EINVAL, -EINVAL},
+ };
  
--	for (pioc = 0, pin = PIN_BASE, this = gpio_chip, prev = NULL;
-+	for (pioc = 0, this = gpio_chip, prev = NULL;
- 			pioc++ < gpio_banks;
- 			prev = this, this++) {
- 		unsigned	id = this->bank->id;
-@@ -504,16 +505,17 @@ void __init at91_gpio_irq_setup(void)
+ /*
+@@ -82,7 +83,7 @@ static struct at91_usbh_data __initdata afeb9260_usbh_data = {
+  */
+ static struct at91_udc_data __initdata afeb9260_udc_data = {
+ 	.vbus_pin	= AT91_PIN_PC5,
+-	.pullup_pin	= 0,		/* pull-up driven by UDC */
++	.pullup_pin	= -EINVAL,		/* pull-up driven by UDC */
+ };
  
- 		__raw_writel(~0, this->regbase + PIO_IDR);
  
--		for (i = 0, pin = this->chip.base; i < 32; i++, pin++) {
--			irq_set_lockdep_class(pin, &gpio_lock_class);
-+		for (i = 0, irq = gpio_to_irq(this->chip.base); i < 32;
-+		     i++, irq++) {
-+			irq_set_lockdep_class(irq, &gpio_lock_class);
+@@ -143,6 +144,7 @@ static struct atmel_nand_data __initdata afeb9260_nand_data = {
+ 	.enable_pin	= AT91_PIN_PC14,
+ 	.partition_info	= nand_partitions,
+ 	.bus_width_16	= 0,
++	.det_pin	= -EINVAL,
+ };
  
- 			/*
- 			 * Can use the "simple" and not "edge" handler since it's
- 			 * shorter, and the AIC handles interrupts sanely.
- 			 */
--			irq_set_chip_and_handler(pin, &gpio_irqchip,
-+			irq_set_chip_and_handler(irq, &gpio_irqchip,
- 						 handle_simple_irq);
--			set_irq_flags(pin, IRQF_VALID);
-+			set_irq_flags(irq, IRQF_VALID);
- 		}
  
- 		/* The toplevel handler handles one bank of GPIOs, except
-@@ -526,7 +528,7 @@ void __init at91_gpio_irq_setup(void)
- 		irq_set_chip_data(id, this);
- 		irq_set_chained_handler(id, gpio_irq_handler);
- 	}
--	pr_info("AT91: %d gpio irqs in %d banks\n", pin - PIN_BASE, gpio_banks);
-+	pr_info("AT91: %d gpio irqs in %d banks\n", irq, gpio_banks);
+@@ -154,6 +156,7 @@ static struct at91_mmc_data __initdata afeb9260_mmc_data = {
+ 	.wp_pin 	= AT91_PIN_PC4,
+ 	.slot_b		= 1,
+ 	.wire4		= 1,
++	.vcc_pin	= -EINVAL,
+ };
+ 
+ 
+@@ -174,6 +177,8 @@ static struct i2c_board_info __initdata afeb9260_i2c_devices[] = {
+ static struct at91_cf_data afeb9260_cf_data = {
+ 	.chipselect = 4,
+ 	.irq_pin    = AT91_PIN_PA6,
++	.det_pin	= -EINVAL,
++	.vcc_pin	= -EINVAL,
+ 	.rst_pin    = AT91_PIN_PA7,
+ 	.flags      = AT91_CF_TRUE_IDE,
+ };
+diff --git a/arch/arm/mach-at91/board-cam60.c b/arch/arm/mach-at91/board-cam60.c
+index d1abd58..73f105b 100644
+--- a/arch/arm/mach-at91/board-cam60.c
++++ b/arch/arm/mach-at91/board-cam60.c
+@@ -62,6 +62,7 @@ static void __init cam60_init_early(void)
+  */
+ static struct at91_usbh_data __initdata cam60_usbh_data = {
+ 	.ports		= 1,
++	.vbus_pin	= {-EINVAL, -EINVAL},
+ };
+ 
+ 
+@@ -141,7 +142,7 @@ static struct mtd_partition * __init nand_partitions(int size, int *num_partitio
+ static struct atmel_nand_data __initdata cam60_nand_data = {
+ 	.ale		= 21,
+ 	.cle		= 22,
+-	// .det_pin	= ... not there
++	.det_pin	= -EINVAL,
+ 	.rdy_pin	= AT91_PIN_PA9,
+ 	.enable_pin	= AT91_PIN_PA7,
+ 	.partition_info	= nand_partitions,
+diff --git a/arch/arm/mach-at91/board-cap9adk.c b/arch/arm/mach-at91/board-cap9adk.c
+index 679b0b7..22b62a4 100644
+--- a/arch/arm/mach-at91/board-cap9adk.c
++++ b/arch/arm/mach-at91/board-cap9adk.c
+@@ -70,6 +70,7 @@ static void __init cap9adk_init_early(void)
+  */
+ static struct at91_usbh_data __initdata cap9adk_usbh_data = {
+ 	.ports		= 2,
++	.vbus_pin	= {-EINVAL, -EINVAL},
+ };
+ 
+ /*
+@@ -144,9 +145,9 @@ static struct spi_board_info cap9adk_spi_devices[] = {
+  */
+ static struct at91_mmc_data __initdata cap9adk_mmc_data = {
+ 	.wire4		= 1,
+-//	.det_pin	= ... not connected
+-//	.wp_pin		= ... not connected
+-//	.vcc_pin	= ... not connected
++	.det_pin	= -EINVAL,
++	.wp_pin		= -EINVAL,
++	.vcc_pin	= -EINVAL,
+ };
+ 
+ 
+@@ -154,6 +155,7 @@ static struct at91_mmc_data __initdata cap9adk_mmc_data = {
+  * MACB Ethernet device
+  */
+ static struct at91_eth_data __initdata cap9adk_macb_data = {
++	.phy_irq_pin	= -EINVAL,
+ 	.is_rmii	= 1,
+ };
+ 
+@@ -178,8 +180,8 @@ static struct mtd_partition * __init nand_partitions(int size, int *num_partitio
+ static struct atmel_nand_data __initdata cap9adk_nand_data = {
+ 	.ale		= 21,
+ 	.cle		= 22,
+-//	.det_pin	= ... not connected
+-//	.rdy_pin	= ... not connected
++	.det_pin	= -EINVAL,
++	.rdy_pin	= -EINVAL,
+ 	.enable_pin	= AT91_PIN_PD15,
+ 	.partition_info	= nand_partitions,
+ };
+@@ -356,7 +358,7 @@ static struct atmel_lcdfb_info __initdata cap9adk_lcdc_data;
+  * AC97
+  */
+ static struct ac97c_platform_data cap9adk_ac97_data = {
+-//	.reset_pin	= ... not connected
++	.reset_pin	= -EINVAL,
+ };
+ 
+ 
+diff --git a/arch/arm/mach-at91/board-carmeva.c b/arch/arm/mach-at91/board-carmeva.c
+index c578c5d..eb875db 100644
+--- a/arch/arm/mach-at91/board-carmeva.c
++++ b/arch/arm/mach-at91/board-carmeva.c
+@@ -64,6 +64,7 @@ static struct at91_eth_data __initdata carmeva_eth_data = {
+ 
+ static struct at91_usbh_data __initdata carmeva_usbh_data = {
+ 	.ports		= 2,
++	.vbus_pin	= {-EINVAL, -EINVAL},
+ };
+ 
+ static struct at91_udc_data __initdata carmeva_udc_data = {
+@@ -75,8 +76,8 @@ static struct at91_udc_data __initdata carmeva_udc_data = {
+ // static struct at91_cf_data __initdata carmeva_cf_data = {
+ //	.det_pin	= AT91_PIN_PB0,
+ //	.rst_pin	= AT91_PIN_PC5,
+-	// .irq_pin	= ... not connected
+-	// .vcc_pin	= ... always powered
++	// .irq_pin	= -EINVAL,
++	// .vcc_pin	= -EINVAL,
+ // };
+ 
+ static struct at91_mmc_data __initdata carmeva_mmc_data = {
+@@ -84,6 +85,7 @@ static struct at91_mmc_data __initdata carmeva_mmc_data = {
+ 	.wire4		= 1,
+ 	.det_pin	= AT91_PIN_PB10,
+ 	.wp_pin		= AT91_PIN_PC14,
++	.vcc_pin	= -EINVAL,
+ };
+ 
+ static struct spi_board_info carmeva_spi_devices[] = {
+diff --git a/arch/arm/mach-at91/board-cpu9krea.c b/arch/arm/mach-at91/board-cpu9krea.c
+index f4da8a1..84e5753 100644
+--- a/arch/arm/mach-at91/board-cpu9krea.c
++++ b/arch/arm/mach-at91/board-cpu9krea.c
+@@ -86,6 +86,7 @@ static void __init cpu9krea_init_early(void)
+  */
+ static struct at91_usbh_data __initdata cpu9krea_usbh_data = {
+ 	.ports		= 2,
++	.vbus_pin	= {-EINVAL, -EINVAL},
+ };
+ 
+ /*
+@@ -93,13 +94,14 @@ static struct at91_usbh_data __initdata cpu9krea_usbh_data = {
+  */
+ static struct at91_udc_data __initdata cpu9krea_udc_data = {
+ 	.vbus_pin	= AT91_PIN_PC8,
+-	.pullup_pin	= 0,		/* pull-up driven by UDC */
++	.pullup_pin	= -EINVAL,		/* pull-up driven by UDC */
+ };
+ 
+ /*
+  * MACB Ethernet device
+  */
+ static struct at91_eth_data __initdata cpu9krea_macb_data = {
++	.phy_irq_pin	= -EINVAL,
+ 	.is_rmii	= 1,
+ };
+ 
+@@ -112,6 +114,7 @@ static struct atmel_nand_data __initdata cpu9krea_nand_data = {
+ 	.rdy_pin	= AT91_PIN_PC13,
+ 	.enable_pin	= AT91_PIN_PC14,
+ 	.bus_width_16	= 0,
++	.det_pin	= -EINVAL,
+ };
+ 
+ #ifdef CONFIG_MACH_CPU9260
+@@ -337,6 +340,8 @@ static struct at91_mmc_data __initdata cpu9krea_mmc_data = {
+ 	.slot_b		= 0,
+ 	.wire4		= 1,
+ 	.det_pin	= AT91_PIN_PA29,
++	.wp_pin		= -EINVAL,
++	.vcc_pin	= -EINVAL,
+ };
+ 
+ static void __init cpu9krea_board_init(void)
+diff --git a/arch/arm/mach-at91/board-cpuat91.c b/arch/arm/mach-at91/board-cpuat91.c
+index 2d919f5..95f4b3d 100644
+--- a/arch/arm/mach-at91/board-cpuat91.c
++++ b/arch/arm/mach-at91/board-cpuat91.c
+@@ -83,11 +83,13 @@ static void __init cpuat91_init_early(void)
  }
  
- /* gpiolib support */
-@@ -615,7 +617,7 @@ void __init at91_gpio_init(struct at91_gpio_bank *data, int nr_banks)
- 		at91_gpio = &gpio_chip[i];
+ static struct at91_eth_data __initdata cpuat91_eth_data = {
++	.phy_irq_pin	= -EINVAL,
+ 	.is_rmii	= 1,
+ };
  
- 		at91_gpio->bank = &data[i];
--		at91_gpio->chip.base = PIN_BASE + i * 32;
-+		at91_gpio->chip.base = i * 32;
+ static struct at91_usbh_data __initdata cpuat91_usbh_data = {
+ 	.ports		= 1,
++	.vbus_pin	= {-EINVAL, -EINVAL},
+ };
  
- 		at91_gpio->regbase = ioremap(at91_gpio->bank->regbase, 512);
- 		if (!at91_gpio->regbase) {
-diff --git a/arch/arm/mach-at91/include/mach/gpio.h b/arch/arm/mach-at91/include/mach/gpio.h
-dissimilarity index 78%
-index 056dc66..5213879 100644
---- a/arch/arm/mach-at91/include/mach/gpio.h
-+++ b/arch/arm/mach-at91/include/mach/gpio.h
-@@ -1,228 +1,226 @@
--/*
-- * arch/arm/mach-at91/include/mach/gpio.h
-- *
-- *  Copyright (C) 2005 HP Labs
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
-- *
-- */
--
--#ifndef __ASM_ARCH_AT91RM9200_GPIO_H
--#define __ASM_ARCH_AT91RM9200_GPIO_H
--
--#include <linux/kernel.h>
--#include <asm/irq.h>
--
--#define PIN_BASE		NR_AIC_IRQS
--
--#define MAX_GPIO_BANKS		5
--#define NR_BUILTIN_GPIO		(PIN_BASE + (MAX_GPIO_BANKS * 32))
--
--/* these pin numbers double as IRQ numbers, like AT91xxx_ID_* values */
--
--#define	AT91_PIN_PA0	(PIN_BASE + 0x00 + 0)
--#define	AT91_PIN_PA1	(PIN_BASE + 0x00 + 1)
--#define	AT91_PIN_PA2	(PIN_BASE + 0x00 + 2)
--#define	AT91_PIN_PA3	(PIN_BASE + 0x00 + 3)
--#define	AT91_PIN_PA4	(PIN_BASE + 0x00 + 4)
--#define	AT91_PIN_PA5	(PIN_BASE + 0x00 + 5)
--#define	AT91_PIN_PA6	(PIN_BASE + 0x00 + 6)
--#define	AT91_PIN_PA7	(PIN_BASE + 0x00 + 7)
--#define	AT91_PIN_PA8	(PIN_BASE + 0x00 + 8)
--#define	AT91_PIN_PA9	(PIN_BASE + 0x00 + 9)
--#define	AT91_PIN_PA10	(PIN_BASE + 0x00 + 10)
--#define	AT91_PIN_PA11	(PIN_BASE + 0x00 + 11)
--#define	AT91_PIN_PA12	(PIN_BASE + 0x00 + 12)
--#define	AT91_PIN_PA13	(PIN_BASE + 0x00 + 13)
--#define	AT91_PIN_PA14	(PIN_BASE + 0x00 + 14)
--#define	AT91_PIN_PA15	(PIN_BASE + 0x00 + 15)
--#define	AT91_PIN_PA16	(PIN_BASE + 0x00 + 16)
--#define	AT91_PIN_PA17	(PIN_BASE + 0x00 + 17)
--#define	AT91_PIN_PA18	(PIN_BASE + 0x00 + 18)
--#define	AT91_PIN_PA19	(PIN_BASE + 0x00 + 19)
--#define	AT91_PIN_PA20	(PIN_BASE + 0x00 + 20)
--#define	AT91_PIN_PA21	(PIN_BASE + 0x00 + 21)
--#define	AT91_PIN_PA22	(PIN_BASE + 0x00 + 22)
--#define	AT91_PIN_PA23	(PIN_BASE + 0x00 + 23)
--#define	AT91_PIN_PA24	(PIN_BASE + 0x00 + 24)
--#define	AT91_PIN_PA25	(PIN_BASE + 0x00 + 25)
--#define	AT91_PIN_PA26	(PIN_BASE + 0x00 + 26)
--#define	AT91_PIN_PA27	(PIN_BASE + 0x00 + 27)
--#define	AT91_PIN_PA28	(PIN_BASE + 0x00 + 28)
--#define	AT91_PIN_PA29	(PIN_BASE + 0x00 + 29)
--#define	AT91_PIN_PA30	(PIN_BASE + 0x00 + 30)
--#define	AT91_PIN_PA31	(PIN_BASE + 0x00 + 31)
--
--#define	AT91_PIN_PB0	(PIN_BASE + 0x20 + 0)
--#define	AT91_PIN_PB1	(PIN_BASE + 0x20 + 1)
--#define	AT91_PIN_PB2	(PIN_BASE + 0x20 + 2)
--#define	AT91_PIN_PB3	(PIN_BASE + 0x20 + 3)
--#define	AT91_PIN_PB4	(PIN_BASE + 0x20 + 4)
--#define	AT91_PIN_PB5	(PIN_BASE + 0x20 + 5)
--#define	AT91_PIN_PB6	(PIN_BASE + 0x20 + 6)
--#define	AT91_PIN_PB7	(PIN_BASE + 0x20 + 7)
--#define	AT91_PIN_PB8	(PIN_BASE + 0x20 + 8)
--#define	AT91_PIN_PB9	(PIN_BASE + 0x20 + 9)
--#define	AT91_PIN_PB10	(PIN_BASE + 0x20 + 10)
--#define	AT91_PIN_PB11	(PIN_BASE + 0x20 + 11)
--#define	AT91_PIN_PB12	(PIN_BASE + 0x20 + 12)
--#define	AT91_PIN_PB13	(PIN_BASE + 0x20 + 13)
--#define	AT91_PIN_PB14	(PIN_BASE + 0x20 + 14)
--#define	AT91_PIN_PB15	(PIN_BASE + 0x20 + 15)
--#define	AT91_PIN_PB16	(PIN_BASE + 0x20 + 16)
--#define	AT91_PIN_PB17	(PIN_BASE + 0x20 + 17)
--#define	AT91_PIN_PB18	(PIN_BASE + 0x20 + 18)
--#define	AT91_PIN_PB19	(PIN_BASE + 0x20 + 19)
--#define	AT91_PIN_PB20	(PIN_BASE + 0x20 + 20)
--#define	AT91_PIN_PB21	(PIN_BASE + 0x20 + 21)
--#define	AT91_PIN_PB22	(PIN_BASE + 0x20 + 22)
--#define	AT91_PIN_PB23	(PIN_BASE + 0x20 + 23)
--#define	AT91_PIN_PB24	(PIN_BASE + 0x20 + 24)
--#define	AT91_PIN_PB25	(PIN_BASE + 0x20 + 25)
--#define	AT91_PIN_PB26	(PIN_BASE + 0x20 + 26)
--#define	AT91_PIN_PB27	(PIN_BASE + 0x20 + 27)
--#define	AT91_PIN_PB28	(PIN_BASE + 0x20 + 28)
--#define	AT91_PIN_PB29	(PIN_BASE + 0x20 + 29)
--#define	AT91_PIN_PB30	(PIN_BASE + 0x20 + 30)
--#define	AT91_PIN_PB31	(PIN_BASE + 0x20 + 31)
--
--#define	AT91_PIN_PC0	(PIN_BASE + 0x40 + 0)
--#define	AT91_PIN_PC1	(PIN_BASE + 0x40 + 1)
--#define	AT91_PIN_PC2	(PIN_BASE + 0x40 + 2)
--#define	AT91_PIN_PC3	(PIN_BASE + 0x40 + 3)
--#define	AT91_PIN_PC4	(PIN_BASE + 0x40 + 4)
--#define	AT91_PIN_PC5	(PIN_BASE + 0x40 + 5)
--#define	AT91_PIN_PC6	(PIN_BASE + 0x40 + 6)
--#define	AT91_PIN_PC7	(PIN_BASE + 0x40 + 7)
--#define	AT91_PIN_PC8	(PIN_BASE + 0x40 + 8)
--#define	AT91_PIN_PC9	(PIN_BASE + 0x40 + 9)
--#define	AT91_PIN_PC10	(PIN_BASE + 0x40 + 10)
--#define	AT91_PIN_PC11	(PIN_BASE + 0x40 + 11)
--#define	AT91_PIN_PC12	(PIN_BASE + 0x40 + 12)
--#define	AT91_PIN_PC13	(PIN_BASE + 0x40 + 13)
--#define	AT91_PIN_PC14	(PIN_BASE + 0x40 + 14)
--#define	AT91_PIN_PC15	(PIN_BASE + 0x40 + 15)
--#define	AT91_PIN_PC16	(PIN_BASE + 0x40 + 16)
--#define	AT91_PIN_PC17	(PIN_BASE + 0x40 + 17)
--#define	AT91_PIN_PC18	(PIN_BASE + 0x40 + 18)
--#define	AT91_PIN_PC19	(PIN_BASE + 0x40 + 19)
--#define	AT91_PIN_PC20	(PIN_BASE + 0x40 + 20)
--#define	AT91_PIN_PC21	(PIN_BASE + 0x40 + 21)
--#define	AT91_PIN_PC22	(PIN_BASE + 0x40 + 22)
--#define	AT91_PIN_PC23	(PIN_BASE + 0x40 + 23)
--#define	AT91_PIN_PC24	(PIN_BASE + 0x40 + 24)
--#define	AT91_PIN_PC25	(PIN_BASE + 0x40 + 25)
--#define	AT91_PIN_PC26	(PIN_BASE + 0x40 + 26)
--#define	AT91_PIN_PC27	(PIN_BASE + 0x40 + 27)
--#define	AT91_PIN_PC28	(PIN_BASE + 0x40 + 28)
--#define	AT91_PIN_PC29	(PIN_BASE + 0x40 + 29)
--#define	AT91_PIN_PC30	(PIN_BASE + 0x40 + 30)
--#define	AT91_PIN_PC31	(PIN_BASE + 0x40 + 31)
--
--#define	AT91_PIN_PD0	(PIN_BASE + 0x60 + 0)
--#define	AT91_PIN_PD1	(PIN_BASE + 0x60 + 1)
--#define	AT91_PIN_PD2	(PIN_BASE + 0x60 + 2)
--#define	AT91_PIN_PD3	(PIN_BASE + 0x60 + 3)
--#define	AT91_PIN_PD4	(PIN_BASE + 0x60 + 4)
--#define	AT91_PIN_PD5	(PIN_BASE + 0x60 + 5)
--#define	AT91_PIN_PD6	(PIN_BASE + 0x60 + 6)
--#define	AT91_PIN_PD7	(PIN_BASE + 0x60 + 7)
--#define	AT91_PIN_PD8	(PIN_BASE + 0x60 + 8)
--#define	AT91_PIN_PD9	(PIN_BASE + 0x60 + 9)
--#define	AT91_PIN_PD10	(PIN_BASE + 0x60 + 10)
--#define	AT91_PIN_PD11	(PIN_BASE + 0x60 + 11)
--#define	AT91_PIN_PD12	(PIN_BASE + 0x60 + 12)
--#define	AT91_PIN_PD13	(PIN_BASE + 0x60 + 13)
--#define	AT91_PIN_PD14	(PIN_BASE + 0x60 + 14)
--#define	AT91_PIN_PD15	(PIN_BASE + 0x60 + 15)
--#define	AT91_PIN_PD16	(PIN_BASE + 0x60 + 16)
--#define	AT91_PIN_PD17	(PIN_BASE + 0x60 + 17)
--#define	AT91_PIN_PD18	(PIN_BASE + 0x60 + 18)
--#define	AT91_PIN_PD19	(PIN_BASE + 0x60 + 19)
--#define	AT91_PIN_PD20	(PIN_BASE + 0x60 + 20)
--#define	AT91_PIN_PD21	(PIN_BASE + 0x60 + 21)
--#define	AT91_PIN_PD22	(PIN_BASE + 0x60 + 22)
--#define	AT91_PIN_PD23	(PIN_BASE + 0x60 + 23)
--#define	AT91_PIN_PD24	(PIN_BASE + 0x60 + 24)
--#define	AT91_PIN_PD25	(PIN_BASE + 0x60 + 25)
--#define	AT91_PIN_PD26	(PIN_BASE + 0x60 + 26)
--#define	AT91_PIN_PD27	(PIN_BASE + 0x60 + 27)
--#define	AT91_PIN_PD28	(PIN_BASE + 0x60 + 28)
--#define	AT91_PIN_PD29	(PIN_BASE + 0x60 + 29)
--#define	AT91_PIN_PD30	(PIN_BASE + 0x60 + 30)
--#define	AT91_PIN_PD31	(PIN_BASE + 0x60 + 31)
--
--#define	AT91_PIN_PE0	(PIN_BASE + 0x80 + 0)
--#define	AT91_PIN_PE1	(PIN_BASE + 0x80 + 1)
--#define	AT91_PIN_PE2	(PIN_BASE + 0x80 + 2)
--#define	AT91_PIN_PE3	(PIN_BASE + 0x80 + 3)
--#define	AT91_PIN_PE4	(PIN_BASE + 0x80 + 4)
--#define	AT91_PIN_PE5	(PIN_BASE + 0x80 + 5)
--#define	AT91_PIN_PE6	(PIN_BASE + 0x80 + 6)
--#define	AT91_PIN_PE7	(PIN_BASE + 0x80 + 7)
--#define	AT91_PIN_PE8	(PIN_BASE + 0x80 + 8)
--#define	AT91_PIN_PE9	(PIN_BASE + 0x80 + 9)
--#define	AT91_PIN_PE10	(PIN_BASE + 0x80 + 10)
--#define	AT91_PIN_PE11	(PIN_BASE + 0x80 + 11)
--#define	AT91_PIN_PE12	(PIN_BASE + 0x80 + 12)
--#define	AT91_PIN_PE13	(PIN_BASE + 0x80 + 13)
--#define	AT91_PIN_PE14	(PIN_BASE + 0x80 + 14)
--#define	AT91_PIN_PE15	(PIN_BASE + 0x80 + 15)
--#define	AT91_PIN_PE16	(PIN_BASE + 0x80 + 16)
--#define	AT91_PIN_PE17	(PIN_BASE + 0x80 + 17)
--#define	AT91_PIN_PE18	(PIN_BASE + 0x80 + 18)
--#define	AT91_PIN_PE19	(PIN_BASE + 0x80 + 19)
--#define	AT91_PIN_PE20	(PIN_BASE + 0x80 + 20)
--#define	AT91_PIN_PE21	(PIN_BASE + 0x80 + 21)
--#define	AT91_PIN_PE22	(PIN_BASE + 0x80 + 22)
--#define	AT91_PIN_PE23	(PIN_BASE + 0x80 + 23)
--#define	AT91_PIN_PE24	(PIN_BASE + 0x80 + 24)
--#define	AT91_PIN_PE25	(PIN_BASE + 0x80 + 25)
--#define	AT91_PIN_PE26	(PIN_BASE + 0x80 + 26)
--#define	AT91_PIN_PE27	(PIN_BASE + 0x80 + 27)
--#define	AT91_PIN_PE28	(PIN_BASE + 0x80 + 28)
--#define	AT91_PIN_PE29	(PIN_BASE + 0x80 + 29)
--#define	AT91_PIN_PE30	(PIN_BASE + 0x80 + 30)
--#define	AT91_PIN_PE31	(PIN_BASE + 0x80 + 31)
--
--#ifndef __ASSEMBLY__
--/* setup setup routines, called from board init or driver probe() */
--extern int __init_or_module at91_set_GPIO_periph(unsigned pin, int use_pullup);
--extern int __init_or_module at91_set_A_periph(unsigned pin, int use_pullup);
--extern int __init_or_module at91_set_B_periph(unsigned pin, int use_pullup);
--extern int __init_or_module at91_set_gpio_input(unsigned pin, int use_pullup);
--extern int __init_or_module at91_set_gpio_output(unsigned pin, int value);
--extern int __init_or_module at91_set_deglitch(unsigned pin, int is_on);
--extern int __init_or_module at91_set_multi_drive(unsigned pin, int is_on);
--
--/* callable at any time */
--extern int at91_set_gpio_value(unsigned pin, int value);
--extern int at91_get_gpio_value(unsigned pin);
--
--/* callable only from core power-management code */
--extern void at91_gpio_suspend(void);
--extern void at91_gpio_resume(void);
--
--/*-------------------------------------------------------------------------*/
--
--/* wrappers for "new style" GPIO calls. the old AT91-specific ones should
-- * eventually be removed (along with this errno.h inclusion), and the
-- * gpio request/free calls should probably be implemented.
-- */
--
--#include <asm/errno.h>
--#include <asm-generic/gpio.h>		/* cansleep wrappers */
--
--#define gpio_get_value	__gpio_get_value
--#define gpio_set_value	__gpio_set_value
--#define gpio_cansleep	__gpio_cansleep
--
--#define gpio_to_irq(gpio) (gpio)
--#define irq_to_gpio(irq)  (irq)
--
--#endif	/* __ASSEMBLY__ */
--
--#endif
-+/*
-+ * arch/arm/mach-at91/include/mach/gpio.h
-+ *
-+ *  Copyright (C) 2005 HP Labs
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ */
-+
-+#ifndef __ASM_ARCH_AT91RM9200_GPIO_H
-+#define __ASM_ARCH_AT91RM9200_GPIO_H
-+
-+#include <linux/kernel.h>
-+#include <asm/irq.h>
-+
-+#define MAX_GPIO_BANKS		5
-+#define NR_BUILTIN_GPIO		(MAX_GPIO_BANKS * 32)
-+
-+/* these pin numbers double as IRQ numbers, like AT91xxx_ID_* values */
-+
-+#define	AT91_PIN_PA0	(0x00 + 0)
-+#define	AT91_PIN_PA1	(0x00 + 1)
-+#define	AT91_PIN_PA2	(0x00 + 2)
-+#define	AT91_PIN_PA3	(0x00 + 3)
-+#define	AT91_PIN_PA4	(0x00 + 4)
-+#define	AT91_PIN_PA5	(0x00 + 5)
-+#define	AT91_PIN_PA6	(0x00 + 6)
-+#define	AT91_PIN_PA7	(0x00 + 7)
-+#define	AT91_PIN_PA8	(0x00 + 8)
-+#define	AT91_PIN_PA9	(0x00 + 9)
-+#define	AT91_PIN_PA10	(0x00 + 10)
-+#define	AT91_PIN_PA11	(0x00 + 11)
-+#define	AT91_PIN_PA12	(0x00 + 12)
-+#define	AT91_PIN_PA13	(0x00 + 13)
-+#define	AT91_PIN_PA14	(0x00 + 14)
-+#define	AT91_PIN_PA15	(0x00 + 15)
-+#define	AT91_PIN_PA16	(0x00 + 16)
-+#define	AT91_PIN_PA17	(0x00 + 17)
-+#define	AT91_PIN_PA18	(0x00 + 18)
-+#define	AT91_PIN_PA19	(0x00 + 19)
-+#define	AT91_PIN_PA20	(0x00 + 20)
-+#define	AT91_PIN_PA21	(0x00 + 21)
-+#define	AT91_PIN_PA22	(0x00 + 22)
-+#define	AT91_PIN_PA23	(0x00 + 23)
-+#define	AT91_PIN_PA24	(0x00 + 24)
-+#define	AT91_PIN_PA25	(0x00 + 25)
-+#define	AT91_PIN_PA26	(0x00 + 26)
-+#define	AT91_PIN_PA27	(0x00 + 27)
-+#define	AT91_PIN_PA28	(0x00 + 28)
-+#define	AT91_PIN_PA29	(0x00 + 29)
-+#define	AT91_PIN_PA30	(0x00 + 30)
-+#define	AT91_PIN_PA31	(0x00 + 31)
-+
-+#define	AT91_PIN_PB0	(0x20 + 0)
-+#define	AT91_PIN_PB1	(0x20 + 1)
-+#define	AT91_PIN_PB2	(0x20 + 2)
-+#define	AT91_PIN_PB3	(0x20 + 3)
-+#define	AT91_PIN_PB4	(0x20 + 4)
-+#define	AT91_PIN_PB5	(0x20 + 5)
-+#define	AT91_PIN_PB6	(0x20 + 6)
-+#define	AT91_PIN_PB7	(0x20 + 7)
-+#define	AT91_PIN_PB8	(0x20 + 8)
-+#define	AT91_PIN_PB9	(0x20 + 9)
-+#define	AT91_PIN_PB10	(0x20 + 10)
-+#define	AT91_PIN_PB11	(0x20 + 11)
-+#define	AT91_PIN_PB12	(0x20 + 12)
-+#define	AT91_PIN_PB13	(0x20 + 13)
-+#define	AT91_PIN_PB14	(0x20 + 14)
-+#define	AT91_PIN_PB15	(0x20 + 15)
-+#define	AT91_PIN_PB16	(0x20 + 16)
-+#define	AT91_PIN_PB17	(0x20 + 17)
-+#define	AT91_PIN_PB18	(0x20 + 18)
-+#define	AT91_PIN_PB19	(0x20 + 19)
-+#define	AT91_PIN_PB20	(0x20 + 20)
-+#define	AT91_PIN_PB21	(0x20 + 21)
-+#define	AT91_PIN_PB22	(0x20 + 22)
-+#define	AT91_PIN_PB23	(0x20 + 23)
-+#define	AT91_PIN_PB24	(0x20 + 24)
-+#define	AT91_PIN_PB25	(0x20 + 25)
-+#define	AT91_PIN_PB26	(0x20 + 26)
-+#define	AT91_PIN_PB27	(0x20 + 27)
-+#define	AT91_PIN_PB28	(0x20 + 28)
-+#define	AT91_PIN_PB29	(0x20 + 29)
-+#define	AT91_PIN_PB30	(0x20 + 30)
-+#define	AT91_PIN_PB31	(0x20 + 31)
-+
-+#define	AT91_PIN_PC0	(0x40 + 0)
-+#define	AT91_PIN_PC1	(0x40 + 1)
-+#define	AT91_PIN_PC2	(0x40 + 2)
-+#define	AT91_PIN_PC3	(0x40 + 3)
-+#define	AT91_PIN_PC4	(0x40 + 4)
-+#define	AT91_PIN_PC5	(0x40 + 5)
-+#define	AT91_PIN_PC6	(0x40 + 6)
-+#define	AT91_PIN_PC7	(0x40 + 7)
-+#define	AT91_PIN_PC8	(0x40 + 8)
-+#define	AT91_PIN_PC9	(0x40 + 9)
-+#define	AT91_PIN_PC10	(0x40 + 10)
-+#define	AT91_PIN_PC11	(0x40 + 11)
-+#define	AT91_PIN_PC12	(0x40 + 12)
-+#define	AT91_PIN_PC13	(0x40 + 13)
-+#define	AT91_PIN_PC14	(0x40 + 14)
-+#define	AT91_PIN_PC15	(0x40 + 15)
-+#define	AT91_PIN_PC16	(0x40 + 16)
-+#define	AT91_PIN_PC17	(0x40 + 17)
-+#define	AT91_PIN_PC18	(0x40 + 18)
-+#define	AT91_PIN_PC19	(0x40 + 19)
-+#define	AT91_PIN_PC20	(0x40 + 20)
-+#define	AT91_PIN_PC21	(0x40 + 21)
-+#define	AT91_PIN_PC22	(0x40 + 22)
-+#define	AT91_PIN_PC23	(0x40 + 23)
-+#define	AT91_PIN_PC24	(0x40 + 24)
-+#define	AT91_PIN_PC25	(0x40 + 25)
-+#define	AT91_PIN_PC26	(0x40 + 26)
-+#define	AT91_PIN_PC27	(0x40 + 27)
-+#define	AT91_PIN_PC28	(0x40 + 28)
-+#define	AT91_PIN_PC29	(0x40 + 29)
-+#define	AT91_PIN_PC30	(0x40 + 30)
-+#define	AT91_PIN_PC31	(0x40 + 31)
-+
-+#define	AT91_PIN_PD0	(0x60 + 0)
-+#define	AT91_PIN_PD1	(0x60 + 1)
-+#define	AT91_PIN_PD2	(0x60 + 2)
-+#define	AT91_PIN_PD3	(0x60 + 3)
-+#define	AT91_PIN_PD4	(0x60 + 4)
-+#define	AT91_PIN_PD5	(0x60 + 5)
-+#define	AT91_PIN_PD6	(0x60 + 6)
-+#define	AT91_PIN_PD7	(0x60 + 7)
-+#define	AT91_PIN_PD8	(0x60 + 8)
-+#define	AT91_PIN_PD9	(0x60 + 9)
-+#define	AT91_PIN_PD10	(0x60 + 10)
-+#define	AT91_PIN_PD11	(0x60 + 11)
-+#define	AT91_PIN_PD12	(0x60 + 12)
-+#define	AT91_PIN_PD13	(0x60 + 13)
-+#define	AT91_PIN_PD14	(0x60 + 14)
-+#define	AT91_PIN_PD15	(0x60 + 15)
-+#define	AT91_PIN_PD16	(0x60 + 16)
-+#define	AT91_PIN_PD17	(0x60 + 17)
-+#define	AT91_PIN_PD18	(0x60 + 18)
-+#define	AT91_PIN_PD19	(0x60 + 19)
-+#define	AT91_PIN_PD20	(0x60 + 20)
-+#define	AT91_PIN_PD21	(0x60 + 21)
-+#define	AT91_PIN_PD22	(0x60 + 22)
-+#define	AT91_PIN_PD23	(0x60 + 23)
-+#define	AT91_PIN_PD24	(0x60 + 24)
-+#define	AT91_PIN_PD25	(0x60 + 25)
-+#define	AT91_PIN_PD26	(0x60 + 26)
-+#define	AT91_PIN_PD27	(0x60 + 27)
-+#define	AT91_PIN_PD28	(0x60 + 28)
-+#define	AT91_PIN_PD29	(0x60 + 29)
-+#define	AT91_PIN_PD30	(0x60 + 30)
-+#define	AT91_PIN_PD31	(0x60 + 31)
-+
-+#define	AT91_PIN_PE0	(0x80 + 0)
-+#define	AT91_PIN_PE1	(0x80 + 1)
-+#define	AT91_PIN_PE2	(0x80 + 2)
-+#define	AT91_PIN_PE3	(0x80 + 3)
-+#define	AT91_PIN_PE4	(0x80 + 4)
-+#define	AT91_PIN_PE5	(0x80 + 5)
-+#define	AT91_PIN_PE6	(0x80 + 6)
-+#define	AT91_PIN_PE7	(0x80 + 7)
-+#define	AT91_PIN_PE8	(0x80 + 8)
-+#define	AT91_PIN_PE9	(0x80 + 9)
-+#define	AT91_PIN_PE10	(0x80 + 10)
-+#define	AT91_PIN_PE11	(0x80 + 11)
-+#define	AT91_PIN_PE12	(0x80 + 12)
-+#define	AT91_PIN_PE13	(0x80 + 13)
-+#define	AT91_PIN_PE14	(0x80 + 14)
-+#define	AT91_PIN_PE15	(0x80 + 15)
-+#define	AT91_PIN_PE16	(0x80 + 16)
-+#define	AT91_PIN_PE17	(0x80 + 17)
-+#define	AT91_PIN_PE18	(0x80 + 18)
-+#define	AT91_PIN_PE19	(0x80 + 19)
-+#define	AT91_PIN_PE20	(0x80 + 20)
-+#define	AT91_PIN_PE21	(0x80 + 21)
-+#define	AT91_PIN_PE22	(0x80 + 22)
-+#define	AT91_PIN_PE23	(0x80 + 23)
-+#define	AT91_PIN_PE24	(0x80 + 24)
-+#define	AT91_PIN_PE25	(0x80 + 25)
-+#define	AT91_PIN_PE26	(0x80 + 26)
-+#define	AT91_PIN_PE27	(0x80 + 27)
-+#define	AT91_PIN_PE28	(0x80 + 28)
-+#define	AT91_PIN_PE29	(0x80 + 29)
-+#define	AT91_PIN_PE30	(0x80 + 30)
-+#define	AT91_PIN_PE31	(0x80 + 31)
-+
-+#ifndef __ASSEMBLY__
-+/* setup setup routines, called from board init or driver probe() */
-+extern int __init_or_module at91_set_GPIO_periph(unsigned pin, int use_pullup);
-+extern int __init_or_module at91_set_A_periph(unsigned pin, int use_pullup);
-+extern int __init_or_module at91_set_B_periph(unsigned pin, int use_pullup);
-+extern int __init_or_module at91_set_gpio_input(unsigned pin, int use_pullup);
-+extern int __init_or_module at91_set_gpio_output(unsigned pin, int value);
-+extern int __init_or_module at91_set_deglitch(unsigned pin, int is_on);
-+extern int __init_or_module at91_set_multi_drive(unsigned pin, int is_on);
-+
-+/* callable at any time */
-+extern int at91_set_gpio_value(unsigned pin, int value);
-+extern int at91_get_gpio_value(unsigned pin);
-+
-+/* callable only from core power-management code */
-+extern void at91_gpio_suspend(void);
-+extern void at91_gpio_resume(void);
-+
-+/*-------------------------------------------------------------------------*/
-+
-+/* wrappers for "new style" GPIO calls. the old AT91-specific ones should
-+ * eventually be removed (along with this errno.h inclusion), and the
-+ * gpio request/free calls should probably be implemented.
-+ */
-+
-+#include <asm/errno.h>
-+#include <asm-generic/gpio.h>		/* cansleep wrappers */
-+
-+#define gpio_get_value	__gpio_get_value
-+#define gpio_set_value	__gpio_set_value
-+#define gpio_cansleep	__gpio_cansleep
-+
-+#define gpio_to_irq(gpio) (gpio + NR_AIC_IRQS)
-+#define irq_to_gpio(irq)  (irq - NR_AIC_IRQS)
-+
-+#endif	/* __ASSEMBLY__ */
-+
-+#endif
+ static struct at91_udc_data __initdata cpuat91_udc_data = {
+@@ -98,6 +100,8 @@ static struct at91_udc_data __initdata cpuat91_udc_data = {
+ static struct at91_mmc_data __initdata cpuat91_mmc_data = {
+ 	.det_pin	= AT91_PIN_PC2,
+ 	.wire4		= 1,
++	.wp_pin		= -EINVAL,
++	.vcc_pin	= -EINVAL,
+ };
+ 
+ static struct physmap_flash_data cpuat91_flash_data = {
+diff --git a/arch/arm/mach-at91/board-csb337.c b/arch/arm/mach-at91/board-csb337.c
+index 17654d5..e3b90cc 100644
+--- a/arch/arm/mach-at91/board-csb337.c
++++ b/arch/arm/mach-at91/board-csb337.c
+@@ -65,11 +65,12 @@ static struct at91_eth_data __initdata csb337_eth_data = {
+ 
+ static struct at91_usbh_data __initdata csb337_usbh_data = {
+ 	.ports		= 2,
++	.vbus_pin	= {-EINVAL, -EINVAL},
+ };
+ 
+ static struct at91_udc_data __initdata csb337_udc_data = {
+-	// this has no VBUS sensing pin
+ 	.pullup_pin	= AT91_PIN_PA24,
++	.vbus_pin	= -EINVAL,
+ };
+ 
+ static struct i2c_board_info __initdata csb337_i2c_devices[] = {
+@@ -98,6 +99,7 @@ static struct at91_mmc_data __initdata csb337_mmc_data = {
+ 	.slot_b		= 0,
+ 	.wire4		= 1,
+ 	.wp_pin		= AT91_PIN_PD6,
++	.vcc_pin	= -EINVAL,
+ };
+ 
+ static struct spi_board_info csb337_spi_devices[] = {
+diff --git a/arch/arm/mach-at91/board-csb637.c b/arch/arm/mach-at91/board-csb637.c
+index 72b5567..a3f717c 100644
+--- a/arch/arm/mach-at91/board-csb637.c
++++ b/arch/arm/mach-at91/board-csb637.c
+@@ -59,6 +59,7 @@ static struct at91_eth_data __initdata csb637_eth_data = {
+ 
+ static struct at91_usbh_data __initdata csb637_usbh_data = {
+ 	.ports		= 2,
++	.vbus_pin	= {-EINVAL, -EINVAL},
+ };
+ 
+ static struct at91_udc_data __initdata csb637_udc_data = {
+diff --git a/arch/arm/mach-at91/board-eb9200.c b/arch/arm/mach-at91/board-eb9200.c
+index 01170a2..a88d1b5 100644
+--- a/arch/arm/mach-at91/board-eb9200.c
++++ b/arch/arm/mach-at91/board-eb9200.c
+@@ -67,6 +67,7 @@ static struct at91_eth_data __initdata eb9200_eth_data = {
+ 
+ static struct at91_usbh_data __initdata eb9200_usbh_data = {
+ 	.ports		= 2,
++	.vbus_pin	= {-EINVAL, -EINVAL},
+ };
+ 
+ static struct at91_udc_data __initdata eb9200_udc_data = {
+@@ -75,15 +76,18 @@ static struct at91_udc_data __initdata eb9200_udc_data = {
+ };
+ 
+ static struct at91_cf_data __initdata eb9200_cf_data = {
++	.irq_pin	= -EINVAL,
+ 	.det_pin	= AT91_PIN_PB0,
++	.vcc_pin	= -EINVAL,
+ 	.rst_pin	= AT91_PIN_PC5,
+-	// .irq_pin	= ... not connected
+-	// .vcc_pin	= ... always powered
+ };
+ 
+ static struct at91_mmc_data __initdata eb9200_mmc_data = {
+ 	.slot_b		= 0,
+ 	.wire4		= 1,
++	.det_pin	= -EINVAL,
++	.wp_pin		= -EINVAL,
++	.vcc_pin	= -EINVAL,
+ };
+ 
+ static struct i2c_board_info __initdata eb9200_i2c_devices[] = {
+diff --git a/arch/arm/mach-at91/board-ecbat91.c b/arch/arm/mach-at91/board-ecbat91.c
+index 7c0313c..5847823 100644
+--- a/arch/arm/mach-at91/board-ecbat91.c
++++ b/arch/arm/mach-at91/board-ecbat91.c
+@@ -71,11 +71,15 @@ static struct at91_eth_data __initdata ecb_at91eth_data = {
+ 
+ static struct at91_usbh_data __initdata ecb_at91usbh_data = {
+ 	.ports		= 1,
++	.vbus_pin	= {-EINVAL, -EINVAL},
+ };
+ 
+ static struct at91_mmc_data __initdata ecb_at91mmc_data = {
+ 	.slot_b		= 0,
+ 	.wire4		= 1,
++	.det_pin	= -EINVAL,
++	.wp_pin		= -EINVAL,
++	.vcc_pin	= -EINVAL,
+ };
+ 
+ 
+diff --git a/arch/arm/mach-at91/board-eco920.c b/arch/arm/mach-at91/board-eco920.c
+index 8252c72..e203ccc 100644
+--- a/arch/arm/mach-at91/board-eco920.c
++++ b/arch/arm/mach-at91/board-eco920.c
+@@ -54,6 +54,7 @@ static struct at91_eth_data __initdata eco920_eth_data = {
+ 
+ static struct at91_usbh_data __initdata eco920_usbh_data = {
+ 	.ports		= 1,
++	.vbus_pin	= {-EINVAL, -EINVAL},
+ };
+ 
+ static struct at91_udc_data __initdata eco920_udc_data = {
+@@ -64,6 +65,9 @@ static struct at91_udc_data __initdata eco920_udc_data = {
+ static struct at91_mmc_data __initdata eco920_mmc_data = {
+ 	.slot_b		= 0,
+ 	.wire4		= 0,
++	.det_pin	= -EINVAL,
++	.wp_pin		= -EINVAL,
++	.vcc_pin	= -EINVAL,
+ };
+ 
+ static struct physmap_flash_data eco920_flash_data = {
+diff --git a/arch/arm/mach-at91/board-flexibity.c b/arch/arm/mach-at91/board-flexibity.c
+index 4c3f65d..40d896a 100644
+--- a/arch/arm/mach-at91/board-flexibity.c
++++ b/arch/arm/mach-at91/board-flexibity.c
+@@ -52,12 +52,13 @@ static void __init flexibity_init_early(void)
+ /* USB Host port */
+ static struct at91_usbh_data __initdata flexibity_usbh_data = {
+ 	.ports		= 2,
++	.vbus_pin	= {-EINVAL, -EINVAL},
+ };
+ 
+ /* USB Device port */
+ static struct at91_udc_data __initdata flexibity_udc_data = {
+ 	.vbus_pin	= AT91_PIN_PC5,
+-	.pullup_pin	= 0,		/* pull-up driven by UDC */
++	.pullup_pin	= -EINVAL,		/* pull-up driven by UDC */
+ };
+ 
+ /* SPI devices */
+@@ -76,6 +77,7 @@ static struct at91_mmc_data __initdata flexibity_mmc_data = {
+ 	.wire4		= 1,
+ 	.det_pin	= AT91_PIN_PC9,
+ 	.wp_pin		= AT91_PIN_PC4,
++	.vcc_pin	= -EINVAL,
+ };
+ 
+ /* LEDs */
+diff --git a/arch/arm/mach-at91/board-foxg20.c b/arch/arm/mach-at91/board-foxg20.c
+index f27d1a7..1f2d55b 100644
+--- a/arch/arm/mach-at91/board-foxg20.c
++++ b/arch/arm/mach-at91/board-foxg20.c
+@@ -106,6 +106,7 @@ static void __init foxg20_init_early(void)
+  */
+ static struct at91_usbh_data __initdata foxg20_usbh_data = {
+ 	.ports		= 2,
++	.vbus_pin	= {-EINVAL, -EINVAL},
+ };
+ 
+ /*
+@@ -113,7 +114,7 @@ static struct at91_usbh_data __initdata foxg20_usbh_data = {
+  */
+ static struct at91_udc_data __initdata foxg20_udc_data = {
+ 	.vbus_pin	= AT91_PIN_PC6,
+-	.pullup_pin	= 0,		/* pull-up driven by UDC */
++	.pullup_pin	= -EINVAL,		/* pull-up driven by UDC */
+ };
+ 
+ 
+@@ -147,6 +148,9 @@ static struct at91_eth_data __initdata foxg20_macb_data = {
+ static struct at91_mmc_data __initdata foxg20_mmc_data = {
+ 	.slot_b		= 1,
+ 	.wire4		= 1,
++	.det_pin	= -EINVAL,
++	.wp_pin		= -EINVAL,
++	.vcc_pin	= -EINVAL,
+ };
+ 
+ 
+diff --git a/arch/arm/mach-at91/board-gsia18s.c b/arch/arm/mach-at91/board-gsia18s.c
+index 2e95949..7eb8eae 100644
+--- a/arch/arm/mach-at91/board-gsia18s.c
++++ b/arch/arm/mach-at91/board-gsia18s.c
+@@ -80,6 +80,7 @@ static void __init gsia18s_init_early(void)
+  */
+ static struct at91_usbh_data __initdata usbh_data = {
+ 	.ports		= 2,
++	.vbus_pin	= {-EINVAL, -EINVAL},
+ };
+ 
+ /*
+@@ -87,7 +88,7 @@ static struct at91_usbh_data __initdata usbh_data = {
+  */
+ static struct at91_udc_data __initdata udc_data = {
+ 	.vbus_pin	= AT91_PIN_PA22,
+-	.pullup_pin	= 0,		/* pull-up driven by UDC */
++	.pullup_pin	= -EINVAL,		/* pull-up driven by UDC */
+ };
+ 
+ /*
+@@ -530,6 +531,7 @@ static struct i2c_board_info __initdata gsia18s_i2c_devices[] = {
+ static struct at91_cf_data __initdata gsia18s_cf1_data = {
+ 	.irq_pin	= AT91_PIN_PA27,
+ 	.det_pin	= AT91_PIN_PB30,
++	.vcc_pin	= -EINVAL,
+ 	.rst_pin	= AT91_PIN_PB31,
+ 	.chipselect	= 5,
+ 	.flags		= AT91_CF_TRUE_IDE,
+diff --git a/arch/arm/mach-at91/board-kafa.c b/arch/arm/mach-at91/board-kafa.c
+index 4a17089..18d46d0 100644
+--- a/arch/arm/mach-at91/board-kafa.c
++++ b/arch/arm/mach-at91/board-kafa.c
+@@ -68,6 +68,7 @@ static struct at91_eth_data __initdata kafa_eth_data = {
+ 
+ static struct at91_usbh_data __initdata kafa_usbh_data = {
+ 	.ports		= 1,
++	.vbus_pin	= {-EINVAL, -EINVAL},
+ };
+ 
+ static struct at91_udc_data __initdata kafa_udc_data = {
+diff --git a/arch/arm/mach-at91/board-kb9202.c b/arch/arm/mach-at91/board-kb9202.c
+index 9dc8d49..e0c4d98 100644
+--- a/arch/arm/mach-at91/board-kb9202.c
++++ b/arch/arm/mach-at91/board-kb9202.c
+@@ -76,6 +76,7 @@ static struct at91_eth_data __initdata kb9202_eth_data = {
+ 
+ static struct at91_usbh_data __initdata kb9202_usbh_data = {
+ 	.ports		= 1,
++	.vbus_pin	= {-EINVAL, -EINVAL},
+ };
+ 
+ static struct at91_udc_data __initdata kb9202_udc_data = {
+@@ -87,6 +88,8 @@ static struct at91_mmc_data __initdata kb9202_mmc_data = {
+ 	.det_pin	= AT91_PIN_PB2,
+ 	.slot_b		= 0,
+ 	.wire4		= 1,
++	.wp_pin		= -EINVAL,
++	.vcc_pin	= -EINVAL,
+ };
+ 
+ static struct mtd_partition __initdata kb9202_nand_partition[] = {
+@@ -106,7 +109,7 @@ static struct mtd_partition * __init nand_partitions(int size, int *num_partitio
+ static struct atmel_nand_data __initdata kb9202_nand_data = {
+ 	.ale		= 22,
+ 	.cle		= 21,
+-	// .det_pin	= ... not there
++	.det_pin	= -EINVAL,
+ 	.rdy_pin	= AT91_PIN_PC29,
+ 	.enable_pin	= AT91_PIN_PC28,
+ 	.partition_info	= nand_partitions,
+diff --git a/arch/arm/mach-at91/board-neocore926.c b/arch/arm/mach-at91/board-neocore926.c
+index 9bc6ab3..2451b98 100644
+--- a/arch/arm/mach-at91/board-neocore926.c
++++ b/arch/arm/mach-at91/board-neocore926.c
+@@ -79,7 +79,7 @@ static struct at91_usbh_data __initdata neocore926_usbh_data = {
+  */
+ static struct at91_udc_data __initdata neocore926_udc_data = {
+ 	.vbus_pin	= AT91_PIN_PA25,
+-	.pullup_pin	= 0,		/* pull-up driven by UDC */
++	.pullup_pin	= -EINVAL,		/* pull-up driven by UDC */
+ };
+ 
+ 
+@@ -149,6 +149,7 @@ static struct at91_mmc_data __initdata neocore926_mmc_data = {
+ 	.wire4		= 1,
+ 	.det_pin	= AT91_PIN_PE18,
+ 	.wp_pin		= AT91_PIN_PE19,
++	.vcc_pin	= -EINVAL,
+ };
+ 
+ 
+@@ -195,6 +196,7 @@ static struct atmel_nand_data __initdata neocore926_nand_data = {
+ 	.rdy_pin_active_low	= 1,
+ 	.enable_pin		= AT91_PIN_PD15,
+ 	.partition_info		= nand_partitions,
++	.det_pin		= -EINVAL,
+ };
+ 
+ static struct sam9_smc_config __initdata neocore926_nand_smc_config = {
+diff --git a/arch/arm/mach-at91/board-pcontrol-g20.c b/arch/arm/mach-at91/board-pcontrol-g20.c
+index 49e3f69..4724595 100644
+--- a/arch/arm/mach-at91/board-pcontrol-g20.c
++++ b/arch/arm/mach-at91/board-pcontrol-g20.c
+@@ -107,6 +107,7 @@ static void __init add_device_pcontrol(void)
+  */
+ static struct at91_usbh_data __initdata usbh_data = {
+ 	.ports		= 2,
++	.vbus_pin	= {-EINVAL, -EINVAL},
+ };
+ 
+ 
+diff --git a/arch/arm/mach-at91/board-picotux200.c b/arch/arm/mach-at91/board-picotux200.c
+index b7b8390..8155208 100644
+--- a/arch/arm/mach-at91/board-picotux200.c
++++ b/arch/arm/mach-at91/board-picotux200.c
+@@ -67,6 +67,7 @@ static struct at91_eth_data __initdata picotux200_eth_data = {
+ 
+ static struct at91_usbh_data __initdata picotux200_usbh_data = {
+ 	.ports		= 1,
++	.vbus_pin	= {-EINVAL, -EINVAL},
+ };
+ 
+ static struct at91_mmc_data __initdata picotux200_mmc_data = {
+@@ -74,6 +75,7 @@ static struct at91_mmc_data __initdata picotux200_mmc_data = {
+ 	.slot_b		= 0,
+ 	.wire4		= 1,
+ 	.wp_pin		= AT91_PIN_PA17,
++	.vcc_pin	= -EINVAL,
+ };
+ 
+ #define PICOTUX200_FLASH_BASE	AT91_CHIPSELECT_0
+diff --git a/arch/arm/mach-at91/board-qil-a9260.c b/arch/arm/mach-at91/board-qil-a9260.c
+index 81f9110..4299421 100644
+--- a/arch/arm/mach-at91/board-qil-a9260.c
++++ b/arch/arm/mach-at91/board-qil-a9260.c
+@@ -77,6 +77,7 @@ static void __init ek_init_early(void)
+  */
+ static struct at91_usbh_data __initdata ek_usbh_data = {
+ 	.ports		= 2,
++	.vbus_pin	= {-EINVAL, -EINVAL},
+ };
+ 
+ /*
+@@ -84,7 +85,7 @@ static struct at91_usbh_data __initdata ek_usbh_data = {
+  */
+ static struct at91_udc_data __initdata ek_udc_data = {
+ 	.vbus_pin	= AT91_PIN_PC5,
+-	.pullup_pin	= 0,		/* pull-up driven by UDC */
++	.pullup_pin	= -EINVAL,		/* pull-up driven by UDC */
+ };
+ 
+ /*
+@@ -139,7 +140,7 @@ static struct mtd_partition * __init nand_partitions(int size, int *num_partitio
+ static struct atmel_nand_data __initdata ek_nand_data = {
+ 	.ale		= 21,
+ 	.cle		= 22,
+-//	.det_pin	= ... not connected
++	.det_pin	= -EINVAL,
+ 	.rdy_pin	= AT91_PIN_PC13,
+ 	.enable_pin	= AT91_PIN_PC14,
+ 	.partition_info	= nand_partitions,
+@@ -177,9 +178,9 @@ static void __init ek_add_device_nand(void)
+ static struct at91_mmc_data __initdata ek_mmc_data = {
+ 	.slot_b		= 0,
+ 	.wire4		= 1,
+-//	.det_pin	= ... not connected
+-//	.wp_pin		= ... not connected
+-//	.vcc_pin	= ... not connected
++	.det_pin	= -EINVAL,
++	.wp_pin		= -EINVAL,
++	.vcc_pin	= -EINVAL,
+ };
+ 
+ /*
+diff --git a/arch/arm/mach-at91/board-rm9200dk.c b/arch/arm/mach-at91/board-rm9200dk.c
+index 6f08faa..d791683 100644
+--- a/arch/arm/mach-at91/board-rm9200dk.c
++++ b/arch/arm/mach-at91/board-rm9200dk.c
+@@ -72,6 +72,7 @@ static struct at91_eth_data __initdata dk_eth_data = {
+ 
+ static struct at91_usbh_data __initdata dk_usbh_data = {
+ 	.ports		= 2,
++	.vbus_pin	= {-EINVAL, -EINVAL},
+ };
+ 
+ static struct at91_udc_data __initdata dk_udc_data = {
+@@ -80,16 +81,19 @@ static struct at91_udc_data __initdata dk_udc_data = {
+ };
+ 
+ static struct at91_cf_data __initdata dk_cf_data = {
++	.irq_pin	= -EINVAL,
+ 	.det_pin	= AT91_PIN_PB0,
++	.vcc_pin	= -EINVAL,
+ 	.rst_pin	= AT91_PIN_PC5,
+-	// .irq_pin	= ... not connected
+-	// .vcc_pin	= ... always powered
+ };
+ 
+ #ifndef CONFIG_MTD_AT91_DATAFLASH_CARD
+ static struct at91_mmc_data __initdata dk_mmc_data = {
+ 	.slot_b		= 0,
+ 	.wire4		= 1,
++	.det_pin	= -EINVAL,
++	.wp_pin		= -EINVAL,
++	.vcc_pin	= -EINVAL,
+ };
+ #endif
+ 
+@@ -149,7 +153,7 @@ static struct atmel_nand_data __initdata dk_nand_data = {
+ 	.cle		= 21,
+ 	.det_pin	= AT91_PIN_PB1,
+ 	.rdy_pin	= AT91_PIN_PC2,
+-	// .enable_pin	= ... not there
++	.enable_pin	= -EINVAL,
+ 	.partition_info	= nand_partitions,
+ };
+ 
+diff --git a/arch/arm/mach-at91/board-rm9200ek.c b/arch/arm/mach-at91/board-rm9200ek.c
+index 85bcccd..242ed49 100644
+--- a/arch/arm/mach-at91/board-rm9200ek.c
++++ b/arch/arm/mach-at91/board-rm9200ek.c
+@@ -72,6 +72,7 @@ static struct at91_eth_data __initdata ek_eth_data = {
+ 
+ static struct at91_usbh_data __initdata ek_usbh_data = {
+ 	.ports		= 2,
++	.vbus_pin	= {-EINVAL, -EINVAL},
+ };
+ 
+ static struct at91_udc_data __initdata ek_udc_data = {
+@@ -85,6 +86,7 @@ static struct at91_mmc_data __initdata ek_mmc_data = {
+ 	.slot_b		= 0,
+ 	.wire4		= 1,
+ 	.wp_pin		= AT91_PIN_PA17,
++	.vcc_pin	= -EINVAL,
+ };
+ #endif
+ 
+diff --git a/arch/arm/mach-at91/board-sam9-l9260.c b/arch/arm/mach-at91/board-sam9-l9260.c
+index 4d3a02f..00cf076 100644
+--- a/arch/arm/mach-at91/board-sam9-l9260.c
++++ b/arch/arm/mach-at91/board-sam9-l9260.c
+@@ -72,6 +72,7 @@ static void __init ek_init_early(void)
+  */
+ static struct at91_usbh_data __initdata ek_usbh_data = {
+ 	.ports		= 2,
++	.vbus_pin	= {-EINVAL, -EINVAL},
+ };
+ 
+ /*
+@@ -79,7 +80,7 @@ static struct at91_usbh_data __initdata ek_usbh_data = {
+  */
+ static struct at91_udc_data __initdata ek_udc_data = {
+ 	.vbus_pin	= AT91_PIN_PC5,
+-	.pullup_pin	= 0,		/* pull-up driven by UDC */
++	.pullup_pin	= -EINVAL,		/* pull-up driven by UDC */
+ };
+ 
+ 
+@@ -140,7 +141,7 @@ static struct mtd_partition * __init nand_partitions(int size, int *num_partitio
+ static struct atmel_nand_data __initdata ek_nand_data = {
+ 	.ale		= 21,
+ 	.cle		= 22,
+-//	.det_pin	= ... not connected
++	.det_pin	= -EINVAL,
+ 	.rdy_pin	= AT91_PIN_PC13,
+ 	.enable_pin	= AT91_PIN_PC14,
+ 	.partition_info	= nand_partitions,
+@@ -181,7 +182,7 @@ static struct at91_mmc_data __initdata ek_mmc_data = {
+ 	.wire4		= 1,
+ 	.det_pin	= AT91_PIN_PC8,
+ 	.wp_pin		= AT91_PIN_PC4,
+-//	.vcc_pin	= ... not connected
++	.vcc_pin	= -EINVAL,
+ };
+ 
+ static void __init ek_board_init(void)
+diff --git a/arch/arm/mach-at91/board-sam9260ek.c b/arch/arm/mach-at91/board-sam9260ek.c
+index 8a50c3e..8f89951 100644
+--- a/arch/arm/mach-at91/board-sam9260ek.c
++++ b/arch/arm/mach-at91/board-sam9260ek.c
+@@ -75,6 +75,7 @@ static void __init ek_init_early(void)
+  */
+ static struct at91_usbh_data __initdata ek_usbh_data = {
+ 	.ports		= 2,
++	.vbus_pin	= {-EINVAL, -EINVAL},
+ };
+ 
+ /*
+@@ -82,7 +83,7 @@ static struct at91_usbh_data __initdata ek_usbh_data = {
+  */
+ static struct at91_udc_data __initdata ek_udc_data = {
+ 	.vbus_pin	= AT91_PIN_PC5,
+-	.pullup_pin	= 0,		/* pull-up driven by UDC */
++	.pullup_pin	= -EINVAL,		/* pull-up driven by UDC */
+ };
+ 
+ 
+@@ -182,7 +183,7 @@ static struct mtd_partition * __init nand_partitions(int size, int *num_partitio
+ static struct atmel_nand_data __initdata ek_nand_data = {
+ 	.ale		= 21,
+ 	.cle		= 22,
+-//	.det_pin	= ... not connected
++	.det_pin	= -EINVAL,
+ 	.rdy_pin	= AT91_PIN_PC13,
+ 	.enable_pin	= AT91_PIN_PC14,
+ 	.partition_info	= nand_partitions,
+@@ -228,9 +229,9 @@ static void __init ek_add_device_nand(void)
+ static struct at91_mmc_data __initdata ek_mmc_data = {
+ 	.slot_b		= 1,
+ 	.wire4		= 1,
+-//	.det_pin	= ... not connected
+-//	.wp_pin		= ... not connected
+-//	.vcc_pin	= ... not connected
++	.det_pin	= -EINVAL,
++	.wp_pin		= -EINVAL,
++	.vcc_pin	= -EINVAL,
+ };
+ 
+ 
+diff --git a/arch/arm/mach-at91/board-sam9261ek.c b/arch/arm/mach-at91/board-sam9261ek.c
+index 5096a0e..e778d2c 100644
+--- a/arch/arm/mach-at91/board-sam9261ek.c
++++ b/arch/arm/mach-at91/board-sam9261ek.c
+@@ -151,6 +151,7 @@ static void __init ek_add_device_dm9000(void) {}
+  */
+ static struct at91_usbh_data __initdata ek_usbh_data = {
+ 	.ports		= 2,
++	.vbus_pin	= {-EINVAL, -EINVAL},
+ };
+ 
+ 
+@@ -159,7 +160,7 @@ static struct at91_usbh_data __initdata ek_usbh_data = {
+  */
+ static struct at91_udc_data __initdata ek_udc_data = {
+ 	.vbus_pin	= AT91_PIN_PB29,
+-	.pullup_pin	= 0,		/* pull-up driven by UDC */
++	.pullup_pin	= -EINVAL,		/* pull-up driven by UDC */
+ };
+ 
+ 
+@@ -188,7 +189,7 @@ static struct mtd_partition * __init nand_partitions(int size, int *num_partitio
+ static struct atmel_nand_data __initdata ek_nand_data = {
+ 	.ale		= 22,
+ 	.cle		= 21,
+-//	.det_pin	= ... not connected
++	.det_pin	= -EINVAL,
+ 	.rdy_pin	= AT91_PIN_PC15,
+ 	.enable_pin	= AT91_PIN_PC14,
+ 	.partition_info	= nand_partitions,
+@@ -350,6 +351,9 @@ static struct spi_board_info ek_spi_devices[] = {
+  */
+ static struct at91_mmc_data __initdata ek_mmc_data = {
+ 	.wire4		= 1,
++	.det_pin	= -EINVAL,
++	.wp_pin		= -EINVAL,
++	.vcc_pin	= -EINVAL,
+ };
+ 
+ #endif /* CONFIG_SPI_ATMEL_* */
+diff --git a/arch/arm/mach-at91/board-sam9263ek.c b/arch/arm/mach-at91/board-sam9263ek.c
+index ea8f185..814381a 100644
+--- a/arch/arm/mach-at91/board-sam9263ek.c
++++ b/arch/arm/mach-at91/board-sam9263ek.c
+@@ -81,7 +81,7 @@ static struct at91_usbh_data __initdata ek_usbh_data = {
+  */
+ static struct at91_udc_data __initdata ek_udc_data = {
+ 	.vbus_pin	= AT91_PIN_PA25,
+-	.pullup_pin	= 0,		/* pull-up driven by UDC */
++	.pullup_pin	= -EINVAL,		/* pull-up driven by UDC */
+ };
+ 
+ 
+@@ -151,7 +151,7 @@ static struct at91_mmc_data __initdata ek_mmc_data = {
+ 	.wire4		= 1,
+ 	.det_pin	= AT91_PIN_PE18,
+ 	.wp_pin		= AT91_PIN_PE19,
+-//	.vcc_pin	= ... not connected
++	.vcc_pin	= -EINVAL,
+ };
+ 
+ 
+@@ -189,7 +189,7 @@ static struct mtd_partition * __init nand_partitions(int size, int *num_partitio
+ static struct atmel_nand_data __initdata ek_nand_data = {
+ 	.ale		= 21,
+ 	.cle		= 22,
+-//	.det_pin	= ... not connected
++	.det_pin	= -EINVAL,
+ 	.rdy_pin	= AT91_PIN_PA22,
+ 	.enable_pin	= AT91_PIN_PD15,
+ 	.partition_info	= nand_partitions,
+@@ -358,6 +358,7 @@ static void __init ek_add_device_buttons(void) {}
+  * reset_pin is not connected: NRST
+  */
+ static struct ac97c_platform_data ek_ac97_data = {
++	.reset_pin	= -EINVAL,
+ };
+ 
+ 
+diff --git a/arch/arm/mach-at91/board-sam9g20ek.c b/arch/arm/mach-at91/board-sam9g20ek.c
+index 817f59d..a27069c 100644
+--- a/arch/arm/mach-at91/board-sam9g20ek.c
++++ b/arch/arm/mach-at91/board-sam9g20ek.c
+@@ -86,6 +86,7 @@ static void __init ek_init_early(void)
+  */
+ static struct at91_usbh_data __initdata ek_usbh_data = {
+ 	.ports		= 2,
++	.vbus_pin	= {-EINVAL, -EINVAL},
+ };
+ 
+ /*
+@@ -93,7 +94,7 @@ static struct at91_usbh_data __initdata ek_usbh_data = {
+  */
+ static struct at91_udc_data __initdata ek_udc_data = {
+ 	.vbus_pin	= AT91_PIN_PC5,
+-	.pullup_pin	= 0,		/* pull-up driven by UDC */
++	.pullup_pin	= -EINVAL,		/* pull-up driven by UDC */
+ };
+ 
+ 
+@@ -170,6 +171,7 @@ static struct atmel_nand_data __initdata ek_nand_data = {
+ 	.rdy_pin	= AT91_PIN_PC13,
+ 	.enable_pin	= AT91_PIN_PC14,
+ 	.partition_info	= nand_partitions,
++	.det_pin	= -EINVAL,
+ };
+ 
+ static struct sam9_smc_config __initdata ek_nand_smc_config = {
+@@ -215,6 +217,7 @@ static struct mci_platform_data __initdata ek_mmc_data = {
+ 	.slot[1] = {
+ 		.bus_width	= 4,
+ 		.detect_pin	= AT91_PIN_PC9,
++		.wp_pin		= -EINVAL,
+ 	},
+ 
+ };
+@@ -223,6 +226,8 @@ static struct at91_mmc_data __initdata ek_mmc_data = {
+ 	.slot_b		= 1,	/* Only one slot so use slot B */
+ 	.wire4		= 1,
+ 	.det_pin	= AT91_PIN_PC9,
++	.wp_pin		= -EINVAL,
++	.vcc_pin	= -EINVAL,
+ };
+ #endif
+ 
+@@ -232,6 +237,7 @@ static void __init ek_add_device_mmc(void)
+ 	if (ek_have_2mmc()) {
+ 		ek_mmc_data.slot[0].bus_width = 4;
+ 		ek_mmc_data.slot[0].detect_pin = AT91_PIN_PC2;
++		ek_mmc_data.slot[0].wp_pin = -EINVAL,
+ 	}
+ 	at91_add_device_mci(0, &ek_mmc_data);
+ #else
+diff --git a/arch/arm/mach-at91/board-sam9m10g45ek.c b/arch/arm/mach-at91/board-sam9m10g45ek.c
+index ad234cc..8e7d8ad 100644
+--- a/arch/arm/mach-at91/board-sam9m10g45ek.c
++++ b/arch/arm/mach-at91/board-sam9m10g45ek.c
+@@ -100,6 +100,7 @@ static struct mci_platform_data __initdata mci0_data = {
+ 	.slot[0] = {
+ 		.bus_width	= 4,
+ 		.detect_pin	= AT91_PIN_PD10,
++		.wp_pin		= -EINVAL,
+ 	},
+ };
+ 
+@@ -150,6 +151,7 @@ static struct atmel_nand_data __initdata ek_nand_data = {
+ 	.rdy_pin	= AT91_PIN_PC8,
+ 	.enable_pin	= AT91_PIN_PC14,
+ 	.partition_info	= nand_partitions,
++	.det_pin	= -EINVAL,
+ };
+ 
+ static struct sam9_smc_config __initdata ek_nand_smc_config = {
+@@ -335,6 +337,7 @@ static void __init ek_add_device_buttons(void) {}
+  * reset_pin is not connected: NRST
+  */
+ static struct ac97c_platform_data ek_ac97_data = {
++	.reset_pin	= -EINVAL,
+ };
+ 
+ 
+diff --git a/arch/arm/mach-at91/board-sam9rlek.c b/arch/arm/mach-at91/board-sam9rlek.c
+index 4f14b54..39fc576 100644
+--- a/arch/arm/mach-at91/board-sam9rlek.c
++++ b/arch/arm/mach-at91/board-sam9rlek.c
+@@ -67,8 +67,8 @@ static struct usba_platform_data __initdata ek_usba_udc_data = {
+ static struct at91_mmc_data __initdata ek_mmc_data = {
+ 	.wire4		= 1,
+ 	.det_pin	= AT91_PIN_PA15,
+-//	.wp_pin		= ... not connected
+-//	.vcc_pin	= ... not connected
++	.wp_pin		= -EINVAL,
++	.vcc_pin	= -EINVAL,
+ };
+ 
+ 
+@@ -97,7 +97,7 @@ static struct mtd_partition * __init nand_partitions(int size, int *num_partitio
+ static struct atmel_nand_data __initdata ek_nand_data = {
+ 	.ale		= 21,
+ 	.cle		= 22,
+-//	.det_pin	= ... not connected
++	.det_pin	= -EINVAL,
+ 	.rdy_pin	= AT91_PIN_PD17,
+ 	.enable_pin	= AT91_PIN_PB6,
+ 	.partition_info	= nand_partitions,
+@@ -209,6 +209,7 @@ static struct atmel_lcdfb_info __initdata ek_lcdc_data;
+  * reset_pin is not connected: NRST
+  */
+ static struct ac97c_platform_data ek_ac97_data = {
++	.reset_pin	= -EINVAL,
+ };
+ 
+ 
+diff --git a/arch/arm/mach-at91/board-snapper9260.c b/arch/arm/mach-at91/board-snapper9260.c
+index c73d25e..17dae50 100644
+--- a/arch/arm/mach-at91/board-snapper9260.c
++++ b/arch/arm/mach-at91/board-snapper9260.c
+@@ -57,15 +57,18 @@ static void __init snapper9260_init_early(void)
+ 
+ static struct at91_usbh_data __initdata snapper9260_usbh_data = {
+ 	.ports		= 2,
++	.vbus_pin	= {-EINVAL, -EINVAL},
+ };
+ 
+ static struct at91_udc_data __initdata snapper9260_udc_data = {
+ 	.vbus_pin		= SNAPPER9260_IO_EXP_GPIO(5),
+ 	.vbus_active_low	= 1,
+ 	.vbus_polled		= 1,
++	.pullup_pin		= -EINVAL,
+ };
+ 
+ static struct at91_eth_data snapper9260_macb_data = {
++	.phy_irq_pin	= -EINVAL,
+ 	.is_rmii	= 1,
+ };
+ 
+@@ -110,6 +113,8 @@ static struct atmel_nand_data __initdata snapper9260_nand_data = {
+ 	.rdy_pin	= AT91_PIN_PC13,
+ 	.partition_info	= snapper9260_nand_partition_info,
+ 	.bus_width_16	= 0,
++	.enable_pin	= -EINVAL,
++	.det_pin	= -EINVAL,
+ };
+ 
+ static struct sam9_smc_config __initdata snapper9260_nand_smc_config = {
+diff --git a/arch/arm/mach-at91/board-stamp9g20.c b/arch/arm/mach-at91/board-stamp9g20.c
+index 936e5fd..0bd51ee 100644
+--- a/arch/arm/mach-at91/board-stamp9g20.c
++++ b/arch/arm/mach-at91/board-stamp9g20.c
+@@ -85,6 +85,7 @@ static struct atmel_nand_data __initdata nand_data = {
+ 	.rdy_pin	= AT91_PIN_PC13,
+ 	.enable_pin	= AT91_PIN_PC14,
+ 	.bus_width_16	= 0,
++	.det_pin	= -EINVAL,
+ };
+ 
+ static struct sam9_smc_config __initdata nand_smc_config = {
+@@ -122,12 +123,17 @@ static void __init add_device_nand(void)
+ static struct mci_platform_data __initdata mmc_data = {
+ 	.slot[0] = {
+ 		.bus_width	= 4,
++		.detect_pin	= -EINVAL,
++		.wp_pin		= -EINVAL,
+ 	},
+ };
+ #else
+ static struct at91_mmc_data __initdata mmc_data = {
+ 	.slot_b		= 0,
+ 	.wire4		= 1,
++	.det_pin	= -EINVAL,
++	.wp_pin		= -EINVAL,
++	.vcc_pin	= -EINVAL,
+ };
+ #endif
+ 
+@@ -137,6 +143,7 @@ static struct at91_mmc_data __initdata mmc_data = {
+  */
+ static struct at91_usbh_data __initdata usbh_data = {
+ 	.ports		= 2,
++	.vbus_pin	= {-EINVAL, -EINVAL},
+ };
+ 
+ 
+@@ -145,12 +152,12 @@ static struct at91_usbh_data __initdata usbh_data = {
+  */
+ static struct at91_udc_data __initdata portuxg20_udc_data = {
+ 	.vbus_pin	= AT91_PIN_PC7,
+-	.pullup_pin	= 0,		/* pull-up driven by UDC */
++	.pullup_pin	= -EINVAL,		/* pull-up driven by UDC */
+ };
+ 
+ static struct at91_udc_data __initdata stamp9g20evb_udc_data = {
+ 	.vbus_pin	= AT91_PIN_PA22,
+-	.pullup_pin	= 0,		/* pull-up driven by UDC */
++	.pullup_pin	= -EINVAL,		/* pull-up driven by UDC */
+ };
+ 
+ 
+diff --git a/arch/arm/mach-at91/board-usb-a926x.c b/arch/arm/mach-at91/board-usb-a926x.c
+index 260260b..e5e78dd 100644
+--- a/arch/arm/mach-at91/board-usb-a926x.c
++++ b/arch/arm/mach-at91/board-usb-a926x.c
+@@ -66,6 +66,7 @@ static void __init ek_init_early(void)
+  */
+ static struct at91_usbh_data __initdata ek_usbh_data = {
+ 	.ports		= 2,
++	.vbus_pin	= {-EINVAL, -EINVAL},
+ };
+ 
+ /*
+@@ -73,7 +74,7 @@ static struct at91_usbh_data __initdata ek_usbh_data = {
+  */
+ static struct at91_udc_data __initdata ek_udc_data = {
+ 	.vbus_pin	= AT91_PIN_PB11,
+-	.pullup_pin	= 0,		/* pull-up driven by UDC */
++	.pullup_pin	= -EINVAL,		/* pull-up driven by UDC */
+ };
+ 
+ static void __init ek_add_device_udc(void)
+@@ -199,7 +200,7 @@ static struct mtd_partition * __init nand_partitions(int size, int *num_partitio
+ static struct atmel_nand_data __initdata ek_nand_data = {
+ 	.ale		= 21,
+ 	.cle		= 22,
+-//	.det_pin	= ... not connected
++	.det_pin	= -EINVAL,
+ 	.rdy_pin	= AT91_PIN_PA22,
+ 	.enable_pin	= AT91_PIN_PD15,
+ 	.partition_info	= nand_partitions,
+diff --git a/arch/arm/mach-at91/board-yl-9200.c b/arch/arm/mach-at91/board-yl-9200.c
+index 95edcbd..ecb8378 100644
+--- a/arch/arm/mach-at91/board-yl-9200.c
++++ b/arch/arm/mach-at91/board-yl-9200.c
+@@ -120,6 +120,7 @@ static struct at91_eth_data __initdata yl9200_eth_data = {
+  */
+ static struct at91_usbh_data __initdata yl9200_usbh_data = {
+ 	.ports			= 1,	/* PQFP version of AT91RM9200 */
++	.vbus_pin		= {-EINVAL, -EINVAL},
+ };
+ 
+ /*
+@@ -137,8 +138,9 @@ static struct at91_udc_data __initdata yl9200_udc_data = {
+  */
+ static struct at91_mmc_data __initdata yl9200_mmc_data = {
+ 	.det_pin	= AT91_PIN_PB9,
+-	// .wp_pin	= ... not connected
+ 	.wire4		= 1,
++	.wp_pin		= -EINVAL,
++	.vcc_pin	= -EINVAL,
+ };
+ 
+ /*
+@@ -181,7 +183,7 @@ static struct mtd_partition * __init nand_partitions(int size, int *num_partitio
+ static struct atmel_nand_data __initdata yl9200_nand_data = {
+ 	.ale		= 6,
+ 	.cle		= 7,
+-	// .det_pin	= ... not connected
++	.det_pin	= -EINVAL,
+ 	.rdy_pin	= AT91_PIN_PC14,	/* R/!B (Sheet10) */
+ 	.enable_pin	= AT91_PIN_PC15,	/* !CE  (Sheet10) */
+ 	.partition_info	= nand_partitions,
 -- 
 1.7.7
