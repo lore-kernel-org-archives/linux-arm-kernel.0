@@ -1,23 +1,24 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sun, 16 Oct 2011 12:57:46 +0200
-Subject: [PATCH v2] mach-ep93xx: break out GPIO driver specifics
-In-Reply-To: <20111015204129.GZ21648@n2100.arm.linux.org.uk>
-References: <1316508132-20020-1-git-send-email-linus.walleij@stericsson.com>
-	<20111015181808.GA3128@mwesterb-mobl.ger.corp.intel.com>
-	<20111015204129.GZ21648@n2100.arm.linux.org.uk>
-Message-ID: <CAKnu2MqHvKLs3eER8Qvof5a3F95ooabXBUAjNgsdd0xXXajhqA@mail.gmail.com>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Sun, 16 Oct 2011 14:38:14 +0300
+Subject: [PATCH 14/26] mtd: nand_h1900 never worked
+In-Reply-To: <1317499438-14058-15-git-send-email-arnd@arndb.de>
+References: <1317499438-14058-1-git-send-email-arnd@arndb.de>
+	<1317499438-14058-15-git-send-email-arnd@arndb.de>
+Message-ID: <1318765103.2935.3.camel@sauron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/10/15 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+On Sat, 2011-10-01 at 22:03 +0200, Arnd Bergmann wrote:
+> This driver has been broken through all of git history and
+> cannot even be built. Better mark it as broken. Next stop is
+> removing from the tree.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-> However, as I had to use GNU patch to apply Linus' patch (as git apply
-> wouldn't because of fuzz), it doesn't understand that, so it removed it.
-> This is where having an /* empty */ comment avoids that kind of thing,
-> just like I've done for all the other mach/gpio.h which became empty.
+Pushed to l2-mtd-2.6.git, thanks!
 
-OK now I understand what happened, I'll have the /* empty */ comment
-in them from now on...
+NB: I'd just killed it instead...
 
-Thanks,
-Linus Walleij
+-- 
+Best Regards,
+Artem Bityutskiy
