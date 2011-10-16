@@ -1,30 +1,57 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Sun, 16 Oct 2011 21:09:14 +0200
-Subject: [PATCH 05/11] ARM: at91/ide: use gpio_is_valid to check the gpio
+Date: Sun, 16 Oct 2011 21:09:16 +0200
+Subject: [PATCH 07/11] ARM: at92/nand: use gpio_is_valid to check the gpio
 In-Reply-To: <20111016190528.GI1459@game.jcrosoft.org>
 References: <20111016190528.GI1459@game.jcrosoft.org>
-Message-ID: <1318792160-23279-5-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <1318792160-23279-7-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 ---
- drivers/ide/at91_ide.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ drivers/mtd/nand/atmel_nand.c |    8 ++++----
+ 1 files changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/ide/at91_ide.c b/drivers/ide/at91_ide.c
-index 000a78e..ba2eda3 100644
---- a/drivers/ide/at91_ide.c
-+++ b/drivers/ide/at91_ide.c
-@@ -314,7 +314,7 @@ static int __init at91_ide_probe(struct platform_device *pdev)
- 	apply_timings(board->chipselect, 0, ide_timing_find_mode(XFER_PIO_0), 0);
+diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
+index 55da20c..e20ac1f 100644
+--- a/drivers/mtd/nand/atmel_nand.c
++++ b/drivers/mtd/nand/atmel_nand.c
+@@ -113,7 +113,7 @@ static int cpu_has_dma(void)
+  */
+ static void atmel_nand_enable(struct atmel_nand_host *host)
+ {
+-	if (host->board->enable_pin)
++	if (gpio_is_valid(host->board->enable_pin))
+ 		gpio_set_value(host->board->enable_pin, 0);
+ }
  
- 	/* with GPIO interrupt we have to do quirks in handler */
--	if (board->irq_pin >= PIN_BASE)
-+	if (gpio_is_valid(board->irq_pin))
- 		host->irq_handler = at91_irq_handler;
+@@ -122,7 +122,7 @@ static void atmel_nand_enable(struct atmel_nand_host *host)
+  */
+ static void atmel_nand_disable(struct atmel_nand_host *host)
+ {
+-	if (host->board->enable_pin)
++	if (gpio_is_valid(host->board->enable_pin))
+ 		gpio_set_value(host->board->enable_pin, 1);
+ }
  
- 	host->ports[0]->select_data = board->chipselect;
+@@ -535,7 +535,7 @@ static int __init atmel_nand_probe(struct platform_device *pdev)
+ 	nand_chip->IO_ADDR_W = host->io_base;
+ 	nand_chip->cmd_ctrl = atmel_nand_cmd_ctrl;
+ 
+-	if (host->board->rdy_pin)
++	if (gpio_is_valid(host->board->rdy_pin))
+ 		nand_chip->dev_ready = atmel_nand_device_ready;
+ 
+ 	regs = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+@@ -573,7 +573,7 @@ static int __init atmel_nand_probe(struct platform_device *pdev)
+ 	platform_set_drvdata(pdev, host);
+ 	atmel_nand_enable(host);
+ 
+-	if (host->board->det_pin) {
++	if (gpio_is_valid(host->board->det_pin)) {
+ 		if (gpio_get_value(host->board->det_pin)) {
+ 			printk(KERN_INFO "No SmartMedia card inserted.\n");
+ 			res = -ENXIO;
 -- 
 1.7.7
