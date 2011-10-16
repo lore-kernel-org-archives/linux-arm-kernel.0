@@ -1,45 +1,29 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Sun, 16 Oct 2011 21:50:54 +0200
-Subject: [PATCH 4/8] ARM: rtc/at91sam9: use ioremap and iounmap
-In-Reply-To: <20111016194504.GK1459@game.jcrosoft.org>
-References: <20111016194504.GK1459@game.jcrosoft.org>
-Message-ID: <1318794658-27907-4-git-send-email-plagnioj@jcrosoft.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sun, 16 Oct 2011 22:22:18 +0200
+Subject: [PATCH 1/2] drivers: create a pin control subsystem v9
+In-Reply-To: <CAPTzV15nEaE7kyH9XR36hTdg4xDRDsnnpTdqQ+2HSCEAQX=LvA@mail.gmail.com>
+References: <1317629862-13549-1-git-send-email-linus.walleij@stericsson.com>
+	<CAPTzV16bKaHxoyWEv1H8HGyY_CZhY9orXAuWA-wa0yb2NZ5UcA@mail.gmail.com>
+	<CACRpkdY3scxhAw8dKENq=u0GNpSrkdpe5vKCemG7EWGvmFYxQg@mail.gmail.com>
+	<CAPTzV15nEaE7kyH9XR36hTdg4xDRDsnnpTdqQ+2HSCEAQX=LvA@mail.gmail.com>
+Message-ID: <CAKnu2MqLWmK023ZffczAsiN2cbf32nCjrjTb-inJk79TxmN42w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-Cc: rtc-linux at googlegroups.com
----
- drivers/rtc/rtc-at91sam9.c |    9 +++++++--
- 1 files changed, 7 insertions(+), 2 deletions(-)
+2011/10/14 Chanho Park <parkch98@gmail.com>:
 
-diff --git a/drivers/rtc/rtc-at91sam9.c b/drivers/rtc/rtc-at91sam9.c
-index a3ad957..0c4b183 100644
---- a/drivers/rtc/rtc-at91sam9.c
-+++ b/drivers/rtc/rtc-at91sam9.c
-@@ -307,8 +307,12 @@ static int __init at91_rtc_probe(struct platform_device *pdev)
- 		device_init_wakeup(&pdev->dev, 1);
- 
- 	platform_set_drvdata(pdev, rtc);
--	rtc->rtt = (void __force __iomem *) (AT91_VA_BASE_SYS - AT91_BASE_SYS);
--	rtc->rtt += r->start;
-+	rtc->rtt = ioremap(r->start, resource_size(r));
-+	if (!rtc->rtt) {
-+		dev_err(&pdev->dev, "failed to map registers, aborting.\n");
-+		ret = -ENOMEM;
-+		goto fail;
-+	}
- 
- 	mr = rtt_readl(rtc, MR);
- 
-@@ -371,6 +375,7 @@ static int __exit at91_rtc_remove(struct platform_device *pdev)
- 
- 	rtc_device_unregister(rtc->rtcdev);
- 
-+	iounmap(rtc->rtt);
- 	platform_set_drvdata(pdev, NULL);
- 	kfree(rtc);
- 	return 0;
--- 
-1.7.7
+> A gpio base number of gpio_range0 is 0 and pin base number is also 0.
+> Converting gpio-pin number is no problem about the gpio_range0.
+> A gpio base number of gpio_range1 is 32 but pin base number is 40(not 32).
+
+Aha, I understand now, sorry I'm too slow in the head. :-/
+
+Can you make a patch on top of the stuff that is currently
+in linux-next adding the pin_base that you need?
+
+I don't think there is any hurry of getting this in, but we sure
+need to have it along with the first driver having this problem,
+which I guess could be your driver.
+
+Yours,
+Linus Walleij
