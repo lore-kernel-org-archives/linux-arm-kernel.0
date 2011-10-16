@@ -1,80 +1,111 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Sun, 16 Oct 2011 21:45:04 +0200
-Subject: [PATCH 0/8] ARM: at91: make dma/ecc/pit/smc/rtt register base soc
-	independant
-Message-ID: <20111016194504.GK1459@game.jcrosoft.org>
+Date: Sun, 16 Oct 2011 21:50:52 +0200
+Subject: [PATCH 2/8] ARM: at91/dma: make dma register base soc independant
+In-Reply-To: <20111016194504.GK1459@game.jcrosoft.org>
+References: <20111016194504.GK1459@game.jcrosoft.org>
+Message-ID: <1318794658-27907-2-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-HI,
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ arch/arm/mach-at91/at91sam9g45_devices.c      |    4 ++--
+ arch/arm/mach-at91/at91sam9rl_devices.c       |    4 ++--
+ arch/arm/mach-at91/include/mach/at91cap9.h    |    2 +-
+ arch/arm/mach-at91/include/mach/at91sam9g45.h |    2 +-
+ arch/arm/mach-at91/include/mach/at91sam9rl.h  |    2 +-
+ 5 files changed, 7 insertions(+), 7 deletions(-)
 
-	This patch series start to make all AT91 registers soc independant
-	to allow to have all soc compiled together and simplify the adding of
-	the DT.
-
-The following changes since commit 878aa5c0a050d03e49fdf04bd131286fd8847809:
-
-  at91/yl-9200: Fix section mismatch (2011-10-17 03:57:49 +0800)
-
-are available in the git repository at:
-  git://github.com/at91linux/linux-at91.git ..BRANCH.NOT.VERIFIED..
-
-Jean-Christophe PLAGNIOL-VILLARD (8):
-      ARM: at91/nand: make ecc register base soc independant
-      ARM: at91/dma: make dma register base soc independant
-      ARM: at91/rtt: make rtt register base soc independant
-      ARM: rtc/at91sam9: use ioremap and iounmap
-      ARM: at91: add map_register entry point to soc setup
-      ARM: at91/pit: make register base soc independant
-      ARM: at91: make smc register base soc independant
-      ARM: at91: usart: drop static map regs for dbgu
-
- arch/arm/mach-at91/at91cap9.c                  |    8 +++
- arch/arm/mach-at91/at91cap9_devices.c          |   13 +++---
- arch/arm/mach-at91/at91rm9200.c                |    6 +++
- arch/arm/mach-at91/at91rm9200_devices.c        |    5 +-
- arch/arm/mach-at91/at91sam9260.c               |    8 +++
- arch/arm/mach-at91/at91sam9260_devices.c       |   13 +++---
- arch/arm/mach-at91/at91sam9261.c               |    8 +++
- arch/arm/mach-at91/at91sam9261_devices.c       |    9 ++--
- arch/arm/mach-at91/at91sam9263.c               |    9 ++++
- arch/arm/mach-at91/at91sam9263_devices.c       |   17 +++----
- arch/arm/mach-at91/at91sam926x_time.c          |   35 ++++++++++----
- arch/arm/mach-at91/at91sam9g45.c               |    8 +++
- arch/arm/mach-at91/at91sam9g45_devices.c       |   17 +++----
- arch/arm/mach-at91/at91sam9rl.c                |    8 +++
- arch/arm/mach-at91/at91sam9rl_devices.c        |   17 +++----
- arch/arm/mach-at91/board-cam60.c               |    2 +-
- arch/arm/mach-at91/board-cap9adk.c             |    4 +-
- arch/arm/mach-at91/board-cpu9krea.c            |    4 +-
- arch/arm/mach-at91/board-neocore926.c          |    2 +-
- arch/arm/mach-at91/board-pcontrol-g20.c        |    4 +-
- arch/arm/mach-at91/board-qil-a9260.c           |    2 +-
- arch/arm/mach-at91/board-sam9-l9260.c          |    2 +-
- arch/arm/mach-at91/board-sam9260ek.c           |    2 +-
- arch/arm/mach-at91/board-sam9261ek.c           |    4 +-
- arch/arm/mach-at91/board-sam9263ek.c           |    2 +-
- arch/arm/mach-at91/board-sam9g20ek.c           |    2 +-
- arch/arm/mach-at91/board-sam9m10g45ek.c        |    2 +-
- arch/arm/mach-at91/board-sam9rlek.c            |    2 +-
- arch/arm/mach-at91/board-snapper9260.c         |    2 +-
- arch/arm/mach-at91/board-stamp9g20.c           |    2 +-
- arch/arm/mach-at91/board-usb-a926x.c           |    4 +-
- arch/arm/mach-at91/generic.h                   |    1 +
- arch/arm/mach-at91/include/mach/at91_pit.h     |    8 ++--
- arch/arm/mach-at91/include/mach/at91cap9.h     |   10 ++--
- arch/arm/mach-at91/include/mach/at91sam9260.h  |    8 ++--
- arch/arm/mach-at91/include/mach/at91sam9261.h  |    6 +-
- arch/arm/mach-at91/include/mach/at91sam9263.h  |   14 +++---
- arch/arm/mach-at91/include/mach/at91sam9_smc.h |   17 +++-----
- arch/arm/mach-at91/include/mach/at91sam9g45.h  |   10 ++--
- arch/arm/mach-at91/include/mach/at91sam9rl.h   |   10 ++--
- arch/arm/mach-at91/sam9_smc.c                  |   58 +++++++++++++++---------
- arch/arm/mach-at91/sam9_smc.h                  |    3 +-
- arch/arm/mach-at91/setup.c                     |    2 +
- arch/arm/mach-at91/soc.h                       |    1 +
- drivers/rtc/rtc-at91sam9.c                     |    9 +++-
- 45 files changed, 232 insertions(+), 148 deletions(-)
-
-Best Regards,
-J.
+diff --git a/arch/arm/mach-at91/at91sam9g45_devices.c b/arch/arm/mach-at91/at91sam9g45_devices.c
+index c4afe08..66795a2 100644
+--- a/arch/arm/mach-at91/at91sam9g45_devices.c
++++ b/arch/arm/mach-at91/at91sam9g45_devices.c
+@@ -44,8 +44,8 @@ static struct at_dma_platform_data atdma_pdata = {
+ 
+ static struct resource hdmac_resources[] = {
+ 	[0] = {
+-		.start	= AT91_BASE_SYS + AT91_DMA,
+-		.end	= AT91_BASE_SYS + AT91_DMA + SZ_512 - 1,
++		.start	= AT91SAM9G45_BASE_DMA,
++		.end	= AT91SAM9G45_BASE_DMA + SZ_512 - 1,
+ 		.flags	= IORESOURCE_MEM,
+ 	},
+ 	[1] = {
+diff --git a/arch/arm/mach-at91/at91sam9rl_devices.c b/arch/arm/mach-at91/at91sam9rl_devices.c
+index d8131b5..086243e 100644
+--- a/arch/arm/mach-at91/at91sam9rl_devices.c
++++ b/arch/arm/mach-at91/at91sam9rl_devices.c
+@@ -39,8 +39,8 @@ static struct at_dma_platform_data atdma_pdata = {
+ 
+ static struct resource hdmac_resources[] = {
+ 	[0] = {
+-		.start	= AT91_BASE_SYS + AT91_DMA,
+-		.end	= AT91_BASE_SYS + AT91_DMA + SZ_512 - 1,
++		.start	= AT91SAM9RL_BASE_DMA,
++		.end	= AT91SAM9RL_BASE_DMA + SZ_512 - 1,
+ 		.flags	= IORESOURCE_MEM,
+ 	},
+ 	[2] = {
+diff --git a/arch/arm/mach-at91/include/mach/at91cap9.h b/arch/arm/mach-at91/include/mach/at91cap9.h
+index 5fd105d..a2eccb9 100644
+--- a/arch/arm/mach-at91/include/mach/at91cap9.h
++++ b/arch/arm/mach-at91/include/mach/at91cap9.h
+@@ -84,7 +84,6 @@
+ #define AT91_SMC	(0xffffe800 - AT91_BASE_SYS)
+ #define AT91_MATRIX	(0xffffea00 - AT91_BASE_SYS)
+ #define AT91_CCFG	(0xffffeb10 - AT91_BASE_SYS)
+-#define AT91_DMA	(0xffffec00 - AT91_BASE_SYS)
+ #define AT91_DBGU	(0xffffee00 - AT91_BASE_SYS)
+ #define AT91_AIC	(0xfffff000 - AT91_BASE_SYS)
+ #define AT91_PMC	(0xfffffc00 - AT91_BASE_SYS)
+@@ -98,6 +97,7 @@
+ 			(0xfffffd60 - AT91_BASE_SYS))
+ 
+ #define AT91CAP9_BASE_ECC	0xffffe200
++#define AT91CAP9_BASE_DMA	0xffffec00
+ #define AT91CAP9_BASE_PIOA	0xfffff200
+ #define AT91CAP9_BASE_PIOB	0xfffff400
+ #define AT91CAP9_BASE_PIOC	0xfffff600
+diff --git a/arch/arm/mach-at91/include/mach/at91sam9g45.h b/arch/arm/mach-at91/include/mach/at91sam9g45.h
+index e75c4cc..7cea0eb 100644
+--- a/arch/arm/mach-at91/include/mach/at91sam9g45.h
++++ b/arch/arm/mach-at91/include/mach/at91sam9g45.h
+@@ -90,7 +90,6 @@
+ #define AT91_DDRSDRC0	(0xffffe600 - AT91_BASE_SYS)
+ #define AT91_SMC	(0xffffe800 - AT91_BASE_SYS)
+ #define AT91_MATRIX	(0xffffea00 - AT91_BASE_SYS)
+-#define AT91_DMA	(0xffffec00 - AT91_BASE_SYS)
+ #define AT91_DBGU	(0xffffee00 - AT91_BASE_SYS)
+ #define AT91_AIC	(0xfffff000 - AT91_BASE_SYS)
+ #define AT91_PMC	(0xfffffc00 - AT91_BASE_SYS)
+@@ -103,6 +102,7 @@
+ #define AT91_RTC	(0xfffffdb0 - AT91_BASE_SYS)
+ 
+ #define AT91SAM9G45_BASE_ECC	0xffffe200
++#define AT91SAM9G45_BASE_DMA	0xffffec00
+ #define AT91SAM9G45_BASE_PIOA	0xfffff200
+ #define AT91SAM9G45_BASE_PIOB	0xfffff400
+ #define AT91SAM9G45_BASE_PIOC	0xfffff600
+diff --git a/arch/arm/mach-at91/include/mach/at91sam9rl.h b/arch/arm/mach-at91/include/mach/at91sam9rl.h
+index d9efe5a..e564650 100644
+--- a/arch/arm/mach-at91/include/mach/at91sam9rl.h
++++ b/arch/arm/mach-at91/include/mach/at91sam9rl.h
+@@ -69,7 +69,6 @@
+ /*
+  * System Peripherals (offset from AT91_BASE_SYS)
+  */
+-#define AT91_DMA	(0xffffe600 - AT91_BASE_SYS)
+ #define AT91_SDRAMC0	(0xffffea00 - AT91_BASE_SYS)
+ #define AT91_SMC	(0xffffec00 - AT91_BASE_SYS)
+ #define AT91_MATRIX	(0xffffee00 - AT91_BASE_SYS)
+@@ -86,6 +85,7 @@
+ #define AT91_GPBR	(0xfffffd60 - AT91_BASE_SYS)
+ #define AT91_RTC	(0xfffffe00 - AT91_BASE_SYS)
+ 
++#define AT91SAM9RL_BASE_DMA	0xffffe600
+ #define AT91SAM9RL_BASE_ECC	0xffffe800
+ #define AT91SAM9RL_BASE_PIOA	0xfffff400
+ #define AT91SAM9RL_BASE_PIOB	0xfffff600
+-- 
+1.7.7
