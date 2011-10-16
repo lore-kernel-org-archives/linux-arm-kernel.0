@@ -1,24 +1,37 @@
-From: mika.westerberg@iki.fi (Mika Westerberg)
-Date: Sun, 16 Oct 2011 10:39:29 +0300
-Subject: [PATCH v2] mach-ep93xx: break out GPIO driver specifics
-In-Reply-To: <20111015204129.GZ21648@n2100.arm.linux.org.uk>
-References: <1316508132-20020-1-git-send-email-linus.walleij@stericsson.com>
-	<20111015181808.GA3128@mwesterb-mobl.ger.corp.intel.com>
-	<20111015204129.GZ21648@n2100.arm.linux.org.uk>
-Message-ID: <20111016073928.GB2642@mwesterb-mobl.ger.corp.intel.com>
+From: mina86@mina86.com (Michal Nazarewicz)
+Date: Sun, 16 Oct 2011 10:01:36 +0200
+Subject: [PATCH 2/9] mm: alloc_contig_freed_pages() added
+In-Reply-To: <20111014162933.d8fead58.akpm@linux-foundation.org>
+References: <1317909290-29832-1-git-send-email-m.szyprowski@samsung.com>
+	<1317909290-29832-3-git-send-email-m.szyprowski@samsung.com>
+	<20111014162933.d8fead58.akpm@linux-foundation.org>
+Message-ID: <op.v3fpwyxc3l0zgt@mpn-glaptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 15, 2011 at 09:41:30PM +0100, Russell King - ARM Linux wrote:
-> 
-> Hmm.  It shouldn't have been deleted - Linus' patch leaves the file
-> empty rather than deleting it.
-> 
-> However, as I had to use GNU patch to apply Linus' patch (as git apply
-> wouldn't because of fuzz), it doesn't understand that, so it removed it.
-> This is where having an /* empty */ comment avoids that kind of thing,
-> just like I've done for all the other mach/gpio.h which became empty.
+On Sat, 15 Oct 2011 01:29:33 +0200, Andrew Morton <akpm@linux-foundation.org> wrote:
 
-Ok, thanks for the explanation.
+> On Thu, 06 Oct 2011 15:54:42 +0200
+> Marek Szyprowski <m.szyprowski@samsung.com> wrote:
+>
+>> From: KAMEZAWA Hiroyuki <kamezawa.hiroyu@jp.fujitsu.com>
+>>
+>> This commit introduces alloc_contig_freed_pages() function
+>
+> The "freed" seems redundant to me.  Wouldn't "alloc_contig_pages" be a
+> better name?
 
-I'll send a patch which fixes this later today.
+The ?freed? is there because the function operates on pages that are in
+buddy system, ie. it is given a range of PFNs that are to be removed
+ from buddy system.
+
+There's also a alloc_contig_range() function (added by next patch)
+which frees pages in given range and then calls
+alloc_contig_free_pages() to allocate them.
+
+IMO, if there was an alloc_contig_pages() function, it would have to
+be one level up (ie. it would figure out where to allocate memory and
+then call alloc_contig_range()).  (That's really what CMA is doing).
+
+Still, as I think of it now, maybe alloc_contig_free_range() would be
+better?
