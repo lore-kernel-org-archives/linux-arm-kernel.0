@@ -1,78 +1,131 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Sun, 16 Oct 2011 20:26:49 +0200
-Subject: [PATCH v2 4/7] clk: Add simple gated clock
-In-Reply-To: <CAJOA=zPw7BF1iNFaG9js2k6++qPnXz5S3dq4rsPmUWOcUztL0g@mail.gmail.com>
-References: <1316730422-20027-1-git-send-email-mturquette@ti.com>
-	<1316730422-20027-5-git-send-email-mturquette@ti.com>
-	<20111012064646.GA31037@b20223-02.ap.freescale.net>
-	<CAJOA=zPw7BF1iNFaG9js2k6++qPnXz5S3dq4rsPmUWOcUztL0g@mail.gmail.com>
-Message-ID: <20111016182649.GB13565@pengutronix.de>
+From: subramaniam.ca@ti.com (C.A, Subramaniam)
+Date: Sun, 16 Oct 2011 13:32:05 -0500
+Subject: [PATCH] OMAP: iommu flush page table entries from L1 and L2 cache
+In-Reply-To: <CADysL2Z9XfQNgY3spOaC9yK-gb1dL+87j14R85izF0dY29ah0A@mail.gmail.com>
+References: <1302817968-28516-1-git-send-email-fernando.lugo@ti.com>
+	<20110414223036.GA7335@n2100.arm.linux.org.uk>
+	<BANLkTin8gugnVoai6VHC7qMgK4eKRXRtHg@mail.gmail.com>
+	<20110428134055.GA19709@n2100.arm.linux.org.uk>
+	<BANLkTikKnE-9WncNCADKfZVqkP1LFPYeXA@mail.gmail.com>
+	<CADysL2bp08WP798_MvUJthGi9ACySDE=Dc_BM9Vd0A=YcKpm+Q@mail.gmail.com>
+	<20110811222940.GA26209@n2100.arm.linux.org.uk>
+	<CADysL2Z9XfQNgY3spOaC9yK-gb1dL+87j14R85izF0dY29ah0A@mail.gmail.com>
+Message-ID: <CAPCu-pThH6K10MExTZH0jhZC3VnWsj7c-QN=8iy5xV+OaiThbQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 12, 2011 at 07:59:19AM -0700, Turquette, Mike wrote:
-> On Tue, Oct 11, 2011 at 11:46 PM, Richard Zhao
-> <richard.zhao@freescale.com> wrote:
-> > On Thu, Sep 22, 2011 at 03:26:59PM -0700, Mike Turquette wrote:
-> >> From: Jeremy Kerr <jeremy.kerr@canonical.com>
-> >>
-> >> Signed-off-by: Jeremy Kerr <jeremy.kerr@canonical.com>
-> >> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
-> >> Signed-off-by: Jamie Iles <jamie@jamieiles.com>
-> >> Signed-off-by: Mike Turquette <mturquette@ti.com>
-> >> ---
-> >> Changes since v1:
-> >> Add copyright header
-> >> Fold in Jamie's patch for set-to-disable clks
-> >> Use BIT macro instead of shift
-> >>
-> >> ?drivers/clk/Kconfig ? ?| ? ?4 ++
-> >> ?drivers/clk/Makefile ? | ? ?1 +
-> >> ?drivers/clk/clk-gate.c | ? 78 ++++++++++++++++++++++++++++++++++++++++++++++++
-> >> ?include/linux/clk.h ? ?| ? 13 ++++++++
-> >> ?4 files changed, 96 insertions(+), 0 deletions(-)
-> >> ?create mode 100644 drivers/clk/clk-gate.c
+Hi Russell,
+
+On Fri, Aug 12, 2011 at 11:05 AM, Gupta, Ramesh <grgupta@ti.com> wrote:
+>
+> On Thu, Aug 11, 2011 at 5:29 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > On Thu, Aug 11, 2011 at 02:28:39PM -0500, Gupta, Ramesh wrote:
+> >> Hi Russel,
 > >
-> > I feel hard to tell the tree the clk parent, at register/init time. For the
-> > simple gate clk, the only way is to set .get_parent. But normally, for clk
-> > without any divider we set .get_parent to NULL. Maybe we can put .parent to
-> > struct clk_hw?
-> 
-> For non-mux clocks, whose parent is *always* going to be the same, you
-> should create a duplicate .parent in the clk_hw_* structure and then
-> have .get_parent return clk_hw_*->parent.
+> > grr.
+>
+> Sorry, typo.
+>
+> >
+> >> On Thu, Apr 28, 2011 at 11:48 AM, Gupta, Ramesh <grgupta@ti.com> wrote:
+> >> > Hi Russel,
+> >> >
+> >> > On Thu, Apr 28, 2011 at 8:40 AM, Russell King - ARM Linux
+> >> > <linux@arm.linux.org.uk> wrote:
+> >> >> We _could_ invent a new API to deal with this, which is probably going
+> >> >> to be far better in the longer term for page table based iommus. ?That's
+> >> >> going to need some thought - eg, do we need to pass a struct device
+> >> >> argument for the iommu cache flushing so we know whether we need to flush
+> >> >> or not (eg, if we have cache coherent iommus)...
+> >>
+> >> my apologies for a late mail on this topic.
+> >>
+> >> do you think of any other requirements for this new API?
+> >>
+> >> Could we use the existing dmac_flush_range(), outer_flush_range()
+> >> for this purpose instead of a new API?
+> >>
+> >> I see a comment in the arch/arm/include/asm/cacheflush.h
+> >> for ?_not_ to use these APIs directly, but I am not really understand
+> >> the reason for that.
+> >
+> > When I create APIs, I create them to solve a _purpose_ to code which wants
+> > to do something. ?They're not created to provide some facility which can
+> > be re-used for unrelated stuff.
+> >
+> > This has been proven many times to be the correct approach. ?Over time,
+> > things change.
+> >
+>
+> I agree.
+>
+> > Let's say for arguments sake that you decide to use the DMA API stuff
+> > to achieve your goals. ?Then, lets say that ARM DMA becomes fully
+> > cache coherent, but your IOMMU tables still need to be flushed from
+> > the L1 caches.
+> >
+> > Suddenly, dmac_flush_range() starts doing absolutely nothing. ?Your
+> > driver breaks. ?I get whinged at because a previously working driver
+> > stops working. ?In effect, that usage _prevents_ me making the changes
+> > necessary to keep the core architecture support moving forward as
+> > things develop. ?Or, alternatively I just ignore your driver, make the
+> > changes anyway and leave it to rot.
+> >
+> > So, APIs get created to provide a purpose. ?Like - handling the DMA
+> > issues when mapping a buffer to DMA. ?Like handling the DMA issues
+> > when unmapping a buffer from DMA. ?If you start using those _because_
+> > they happen to clean or invalidate the cache for you, you're really
+> > asking for your driver to be broken at some point in the future.
+> >
+> > What is far better to do is to ensure that we have the right APIs in
+> > place for the purposes for which they are to be used. ?So, if we need
+> > an API to flush out the IOMMU page table entries, then that's what
+> > we need, not some bodged lets-reuse-the-dma-flushing-functions thing.
+> > Inside the processors implementation, yes, it may well be the same
+> > thing, but that's a decision for the _processor_ support code to make,
+> > not the IOMMU writer.
+>
+> I completely agree, thank you for explaining the need to use the correct API.
+>
+Following what you suggested, we looked at the cache flush APIs
+available (for v7).
+There is a v7_flush_kern_dcache_area that does the same job (from what
+I  understand), as
+the dma_inv_range. I have a patch that I have validated for OMAP4, to
+use this API to flush
+iommu pte/pgd entries. I would like to know your opinion before I send
+out the patch.
 
-Maybe I do not understand what you mean here, but I think there is
-something missing in the gate.
+>
+> > As to what shape a new API should be - as I said above, maybe it should
+> > take a struct device argument, virtual base address and size. ?Or maybe
+> > if we don't have any coherent IOMMUs then just ignore the device
+> > argument for the time being, and just pass the virtual base address and
+> > size.
+> >
+> > The next issue is whether it should require the virtual base address to
+> > be in the kernel direct mapped region. ?If you're touching L2, then
+> > that's a yes, because we need to use virt_to_phys on it to get at the
+> > phys address for the L2 operations.
+> >
+> > So, I think: extend the cpu cache operations structure to have a method
+> > for dealing with IOMMUs. ?Add an inline function to deal with calling
+> > that, and the L2 ops if that's what's required.
+>
+> Once again thanks for the API requirements, I will work on this and send
+> the patches for review.
+>
+> Regards
+> Ramesh Gupta G
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
 
-> 
-> This is analogous to the way clk_hw_fixed returns clk_hw_fixed->rate
-> when .recalc is called on it.
-> 
-> >> +
-> >> +static unsigned long clk_gate_get_rate(struct clk_hw *clk)
-> >> +{
-> >> + ? ? return clk_get_rate(clk_get_parent(clk->clk));
-> >> +}
 
-clk_get_parent goes down to clk_gate_set_enable_ops.get_parent below...
 
-> >> +
-> >> +
-> >> +struct clk_hw_ops clk_gate_set_enable_ops = {
-> >> + ? ? .recalc_rate = clk_gate_get_rate,
-> >> + ? ? .enable = clk_gate_enable_set,
-> >> + ? ? .disable = clk_gate_disable_clear,
-> >> +};
+--
 
-...but this does not have a get_parent pointer, so clk_get_parent()
-for a gate always returns NULL which means that a gate never has
-a valid rate.
-
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Thank you and Regards
+Subbu
