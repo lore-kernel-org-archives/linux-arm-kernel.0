@@ -1,43 +1,40 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 16 Oct 2011 11:08:21 +0100
-Subject: [PATCH 6/9] drivers: add Contiguous Memory Allocator
-In-Reply-To: <20111014165730.e98aee8a.akpm@linux-foundation.org>
-References: <1317909290-29832-1-git-send-email-m.szyprowski@samsung.com>
-	<1317909290-29832-7-git-send-email-m.szyprowski@samsung.com>
-	<20111014165730.e98aee8a.akpm@linux-foundation.org>
-Message-ID: <20111016100821.GA21648@n2100.arm.linux.org.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sun, 16 Oct 2011 12:56:22 +0200
+Subject: [PATCH] ARM: ep93xx: bring back missing <mach/gpio.h>
+In-Reply-To: <1318752486-970-1-git-send-email-mika.westerberg@iki.fi>
+References: <1318752486-970-1-git-send-email-mika.westerberg@iki.fi>
+Message-ID: <CAKnu2Mr74c9G79Dopq62agv5F2OUD7zT+1TgeEyjn=AjJv5bpg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 14, 2011 at 04:57:30PM -0700, Andrew Morton wrote:
-> On Thu, 06 Oct 2011 15:54:46 +0200
-> Marek Szyprowski <m.szyprowski@samsung.com> wrote:
-> > +#ifdef phys_to_pfn
-> > +/* nothing to do */
-> > +#elif defined __phys_to_pfn
-> > +#  define phys_to_pfn __phys_to_pfn
-> > +#elif defined __va
-> > +#  define phys_to_pfn(x) page_to_pfn(virt_to_page(__va(x)))
-> > +#else
-> > +#  error phys_to_pfn implementation needed
-> > +#endif
-> 
-> Yikes!
-> 
-> This hackery should not be here, please.  If we need a phys_to_pfn()
-> then let's write a proper one which lives in core MM and arch, then get
-> it suitably reviewed and integrated and then maintained.
+2011/10/16 Mika Westerberg <mika.westerberg@iki.fi>:
 
-Another question is whether we have any arch where PFN != PHYS >> PAGE_SHIFT?
-We've used __phys_to_pfn() to implement that on ARM (with a corresponding
-__pfn_to_phys()).  Catalin recently added a cast to __phys_to_pfn() for
-LPAE, which I don't think is required:
+> Change bd5f12a2476 (ARM: 7042/3: mach-ep93xx: break out GPIO driver specifics)
+> accidentally removed the ep93xx <mach/gpio.h> instead of making it an empty
+> file. This causes compilation to fail:
 
--#define        __phys_to_pfn(paddr)    ((paddr) >> PAGE_SHIFT)
-+#define        __phys_to_pfn(paddr)    ((unsigned long)((paddr) >> PAGE_SHIFT))
+OMG git is too smart on me I suspect :-/
 
-since a phys_addr_t >> PAGE_SHIFT will be silently truncated if the passed
-in physical address was 64-bit anyway.  (Note: we don't support > 32-bit
-PFNs).
+The original patch here:
+http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7042/3
 
-So, I'd suggest CMA should just use PFN_DOWN() and be done with it.
+Does not delete it AFAICT:
+diff --git a/arch/arm/mach-ep93xx/include/mach/gpio.h
+b/arch/arm/mach-ep93xx/include/mach/gpio.h
+index 76c68fa..e69de29 100644
+--- a/arch/arm/mach-ep93xx/include/mach/gpio.h
++++ b/arch/arm/mach-ep93xx/include/mach/gpio.h
+
+If it was deleting it, second line should say /dev/null should it not?
+
+Is this because git won't create files with zero content during checkout
+or so :-/
+
+Or because git am takes zero length as deletion?
+
+Help, I need to figure out how not to do the same stupid mistake again...
+
+Acked-by.
+
+Yours,
+Linus Walleij
