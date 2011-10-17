@@ -1,768 +1,335 @@
-From: Barry.Song@csr.com (Barry Song)
-Date: Mon, 17 Oct 2011 02:36:39 -0700
-Subject: [PATCH v3] dmaengine: add CSR SiRFprimaII DMAC driver
-Message-ID: <1318844199-19303-1-git-send-email-Barry.Song@csr.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 17 Oct 2011 11:44:34 +0200
+Subject: [PATCH] ARM: mxs: Add initial support for Bluegiga APX4
+	Development Kit
+In-Reply-To: <1318838916-8529-1-git-send-email-lauri.hintsala@bluegiga.com>
+References: <1318838916-8529-1-git-send-email-lauri.hintsala@bluegiga.com>
+Message-ID: <20111017094434.GA21504@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rongjun Ying <Rongjun.Ying@csr.com>
+Hello,
 
-Cc: Jassi Brar <jaswinder.singh@linaro.org>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Signed-off-by: Rongjun Ying <rongjun.ying@csr.com>
-Signed-off-by: Barry Song <Barry.Song@csr.com>
----
- -v3:
- use new dma_transfer_direction API from Jassi and Vinod;
- use new dma_interleaved_template API from Jassi Brar;
- fix comment minor issues from Arnd and Vinod in v2;
- add prima2 loop DMA mode support.
+On Mon, Oct 17, 2011 at 11:08:36AM +0300, Lauri Hintsala wrote:
+> Added initial support for Bluegiga APX4 module and Development Kit.
+> Patches are based on Linux v3.1-rc9.
+Specifying the base isn't helpful in the commit log. You can better
+write things like these after the tripple dash below.
 
- MAINTAINERS            |    1 +
- drivers/dma/Kconfig    |    7 +
- drivers/dma/Makefile   |    1 +
- drivers/dma/sirf-dma.c |  685 ++++++++++++++++++++++++++++++++++++++++++++++++
- 4 files changed, 694 insertions(+), 0 deletions(-)
- create mode 100644 drivers/dma/sirf-dma.c
+> 
+> Signed-off-by: Lauri Hintsala <lauri.hintsala@bluegiga.com>
+> Signed-off-by: Veli-Pekka Peltola <veli-pekka.peltola@bluegiga.com>
+> ---
+>  arch/arm/configs/mxs_defconfig              |    1 +
+>  arch/arm/mach-mxs/Kconfig                   |   15 ++
+>  arch/arm/mach-mxs/Makefile                  |    1 +
+>  arch/arm/mach-mxs/include/mach/mxs.h        |    1 +
+>  arch/arm/mach-mxs/include/mach/uncompress.h |    1 +
+>  arch/arm/mach-mxs/mach-apx4devkit.c         |  201 +++++++++++++++++++++++++++
+>  6 files changed, 220 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/mach-mxs/mach-apx4devkit.c
+> 
+> diff --git a/arch/arm/configs/mxs_defconfig b/arch/arm/configs/mxs_defconfig
+> index db2cb7d..6a6268d 100644
+> --- a/arch/arm/configs/mxs_defconfig
+> +++ b/arch/arm/configs/mxs_defconfig
+> @@ -26,6 +26,7 @@ CONFIG_MACH_MX23EVK=y
+>  CONFIG_MACH_MX28EVK=y
+>  CONFIG_MACH_STMP378X_DEVB=y
+>  CONFIG_MACH_TX28=y
+> +CONFIG_MACH_APX4DEVKIT=y
+>  # CONFIG_ARM_THUMB is not set
+>  CONFIG_NO_HZ=y
+>  CONFIG_HIGH_RES_TIMERS=y
+> diff --git a/arch/arm/mach-mxs/Kconfig b/arch/arm/mach-mxs/Kconfig
+> index 4cd0231..b73ec11 100644
+> --- a/arch/arm/mach-mxs/Kconfig
+> +++ b/arch/arm/mach-mxs/Kconfig
+> @@ -64,8 +64,23 @@ config MODULE_TX28
+>  	select MXS_HAVE_PLATFORM_MXS_MMC
+>  	select MXS_HAVE_PLATFORM_MXS_PWM
+>  
+> +config MODULE_APX4
+> +	bool
+> +	select SOC_IMX28
+> +	select LEDS_GPIO_REGISTER
+> +	select MXS_HAVE_AMBA_DUART
+> +	select MXS_HAVE_PLATFORM_AUART
+> +	select MXS_HAVE_PLATFORM_FEC
+> +    select MXS_HAVE_PLATFORM_MXS_I2C
+broken indention
+> +	select MXS_HAVE_PLATFORM_MXS_MMC
+> +	select MXS_OCOTP
+> +
+MODULE_APX4 is unused, do you plan to use it later?
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 5483e0c..adcb6ce 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -739,6 +739,7 @@ M:	Barry Song <baohua.song@csr.com>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- S:	Maintained
- F:	arch/arm/mach-prima2/
-+F:	drivers/dma/sirf-dma*
- 
- ARM/EBSA110 MACHINE SUPPORT
- M:	Russell King <linux@arm.linux.org.uk>
-diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
-index 2e3b3d3..1341bcd 100644
---- a/drivers/dma/Kconfig
-+++ b/drivers/dma/Kconfig
-@@ -187,6 +187,13 @@ config TIMB_DMA
- 	help
- 	  Enable support for the Timberdale FPGA DMA engine.
- 
-+config SIRF_DMA
-+	tristate "CSR SiRFprimaII DMA support"
-+	depends on ARCH_PRIMA2
-+	select DMA_ENGINE
-+	help
-+	  Enable support for the CSR SiRFprimaII DMA engine.
-+
- config ARCH_HAS_ASYNC_TX_FIND_CHANNEL
- 	bool
- 
-diff --git a/drivers/dma/Makefile b/drivers/dma/Makefile
-index 30cf3b1..009a222 100644
---- a/drivers/dma/Makefile
-+++ b/drivers/dma/Makefile
-@@ -21,6 +21,7 @@ obj-$(CONFIG_IMX_SDMA) += imx-sdma.o
- obj-$(CONFIG_IMX_DMA) += imx-dma.o
- obj-$(CONFIG_MXS_DMA) += mxs-dma.o
- obj-$(CONFIG_TIMB_DMA) += timb_dma.o
-+obj-$(CONFIG_SIRF_DMA) += sirf-dma.o
- obj-$(CONFIG_STE_DMA40) += ste_dma40.o ste_dma40_ll.o
- obj-$(CONFIG_PL330_DMA) += pl330.o
- obj-$(CONFIG_PCH_DMA) += pch_dma.o
-diff --git a/drivers/dma/sirf-dma.c b/drivers/dma/sirf-dma.c
-new file mode 100644
-index 0000000..2e938b5
---- /dev/null
-+++ b/drivers/dma/sirf-dma.c
-@@ -0,0 +1,685 @@
-+/*
-+ * DMA controller driver for CSR SiRFprimaII
-+ *
-+ * Copyright (c) 2011 Cambridge Silicon Radio Limited, a CSR plc group company.
-+ *
-+ * Licensed under GPLv2 or later.
-+ */
-+
-+#include <linux/module.h>
-+#include <linux/dmaengine.h>
-+#include <linux/dma-mapping.h>
-+#include <linux/interrupt.h>
-+#include <linux/io.h>
-+#include <linux/slab.h>
-+#include <linux/of_irq.h>
-+#include <linux/of_address.h>
-+#include <linux/of_device.h>
-+#include <linux/of_platform.h>
-+
-+#define SIRFSOC_DMA_DESCRIPTORS                 16
-+#define SIRFSOC_DMA_CHANNELS                    16
-+
-+#define SIRFSOC_DMA_CH_ADDR                     0x00
-+#define SIRFSOC_DMA_CH_XLEN                     0x04
-+#define SIRFSOC_DMA_CH_YLEN                     0x08
-+#define SIRFSOC_DMA_CH_CTRL                     0x0C
-+
-+#define SIRFSOC_DMA_WIDTH_0                     0x100
-+#define SIRFSOC_DMA_CH_VALID                    0x140
-+#define SIRFSOC_DMA_CH_INT                      0x144
-+#define SIRFSOC_DMA_INT_EN                      0x148
-+#define SIRFSOC_DMA_CH_LOOP_CTRL                0x150
-+
-+#define SIRFSOC_DMA_MODE_CTRL_BIT               4
-+#define SIRFSOC_DMA_DIR_CTRL_BIT                5
-+
-+struct sirfsoc_dma_desc {
-+	struct dma_async_tx_descriptor	desc;
-+	struct list_head		node;
-+
-+	/* SiRFprimaII 2D-DMA parameters */
-+
-+	int             xlen;           /* DMA xlen */
-+	int             ylen;           /* DMA ylen */
-+	int             width;          /* DMA width */
-+	int             dir;
-+	bool            cyclic;         /* is loop DMA? */
-+	u32             addr;		/* DMA buffer address */
-+};
-+
-+struct sirfsoc_dma_chan {
-+	struct dma_chan			chan;
-+	struct list_head		free;
-+	struct list_head		prepared;
-+	struct list_head		queued;
-+	struct list_head		active;
-+	struct list_head		completed;
-+	dma_cookie_t			completed_cookie;
-+	unsigned long			happened_cyclic;
-+	unsigned long			completed_cyclic;
-+
-+	/* Lock for this structure */
-+	spinlock_t			lock;
-+
-+	int             mode;
-+};
-+
-+struct sirfsoc_dma {
-+	struct dma_device		dma;
-+	struct tasklet_struct		tasklet;
-+	struct sirfsoc_dma_chan		channels[SIRFSOC_DMA_CHANNELS];
-+	void __iomem			*base;
-+	int				irq;
-+};
-+
-+#define DRV_NAME	"sirfsoc_dma"
-+
-+/* Convert struct dma_chan to struct sirfsoc_dma_chan */
-+static inline struct sirfsoc_dma_chan *dma_chan_to_sirfsoc_dma_chan(struct dma_chan *c)
-+{
-+	return container_of(c, struct sirfsoc_dma_chan, chan);
-+}
-+
-+/* Convert struct dma_chan to struct sirfsoc_dma */
-+static inline struct sirfsoc_dma *dma_chan_to_sirfsoc_dma(struct dma_chan *c)
-+{
-+	struct sirfsoc_dma_chan *schan = dma_chan_to_sirfsoc_dma_chan(c);
-+	return container_of(schan, struct sirfsoc_dma, channels[c->chan_id]);
-+}
-+
-+/* Execute all queued DMA descriptors */
-+static void sirfsoc_dma_execute(struct sirfsoc_dma_chan *schan)
-+{
-+	struct sirfsoc_dma *sdma = dma_chan_to_sirfsoc_dma(&schan->chan);
-+	int cid = schan->chan.chan_id;
-+	struct sirfsoc_dma_desc *sdesc = NULL;
-+
-+	sdesc = list_first_entry(&schan->queued, struct sirfsoc_dma_desc,
-+		node);
-+	/* Move the first queued descriptor to active list */
-+	list_move_tail(&schan->queued, &schan->active);
-+
-+	/* Start the DMA transfer */
-+	writel_relaxed(sdesc->width, sdma->base + SIRFSOC_DMA_WIDTH_0 + cid * 4);
-+	writel_relaxed(cid | (schan->mode << SIRFSOC_DMA_MODE_CTRL_BIT) |
-+		(sdesc->dir << SIRFSOC_DMA_DIR_CTRL_BIT),
-+		sdma->base + cid * 0x10 + SIRFSOC_DMA_CH_CTRL);
-+	writel_relaxed(sdesc->xlen, sdma->base + cid * 0x10 + SIRFSOC_DMA_CH_XLEN);
-+	writel_relaxed(sdesc->ylen, sdma->base + cid * 0x10 + SIRFSOC_DMA_CH_YLEN);
-+	writel_relaxed(readl_relaxed(sdma->base + SIRFSOC_DMA_INT_EN) | (1 << cid),
-+		sdma->base + SIRFSOC_DMA_INT_EN);
-+	writel(sdesc->addr >> 2, sdma->base + cid * 0x10 + SIRFSOC_DMA_CH_ADDR);
-+
-+	if (sdesc->cyclic) {
-+		writel((1 << cid) | 1 << (cid + 16) |
-+			readl_relaxed(sdma->base + SIRFSOC_DMA_CH_LOOP_CTRL),
-+			sdma->base + SIRFSOC_DMA_CH_LOOP_CTRL);
-+		schan->happened_cyclic = schan->completed_cyclic = 0;
-+	}
-+}
-+
-+/* Interrupt handler */
-+static irqreturn_t sirfsoc_dma_irq(int irq, void *data)
-+{
-+	struct sirfsoc_dma *sdma = data;
-+	struct sirfsoc_dma_chan *schan;
-+	struct sirfsoc_dma_desc *sdesc = NULL;
-+	unsigned long iflags;
-+	u32 is;
-+	int ch;
-+
-+	is = readl(sdma->base + SIRFSOC_DMA_CH_INT);
-+	while ((ch = fls(is) - 1) >= 0) {
-+		is &= ~(1 << ch);
-+		writel_relaxed(1 << ch, sdma->base + SIRFSOC_DMA_CH_INT);
-+		schan = &sdma->channels[ch];
-+
-+		spin_lock(&schan->lock);
-+
-+		/* Get free descriptor */
-+		spin_lock_irqsave(&schan->lock, iflags);
-+		sdesc = list_first_entry(&schan->active, struct sirfsoc_dma_desc,
-+			node);
-+		if (!sdesc->cyclic) {
-+			/* Execute queued descriptors */
-+			list_splice_tail_init(&schan->active, &schan->completed);
-+			if (!list_empty(&schan->queued))
-+				sirfsoc_dma_execute(schan);
-+		} else
-+			schan->happened_cyclic++;
-+
-+		spin_unlock(&schan->lock);
-+	}
-+
-+	/* Schedule tasklet */
-+	tasklet_schedule(&sdma->tasklet);
-+
-+	return IRQ_HANDLED;
-+}
-+
-+/* process completed descriptors */
-+static void sirfsoc_dma_process_completed(struct sirfsoc_dma *sdma)
-+{
-+	dma_cookie_t last_cookie = 0;
-+	struct sirfsoc_dma_chan *schan;
-+	struct sirfsoc_dma_desc *sdesc;
-+	struct dma_async_tx_descriptor *desc;
-+	unsigned long flags;
-+	unsigned long happened_cyclic;
-+	LIST_HEAD(list);
-+	int i;
-+
-+	for (i = 0; i < sdma->dma.chancnt; i++) {
-+		schan = &sdma->channels[i];
-+
-+		/* Get all completed descriptors */
-+		spin_lock_irqsave(&schan->lock, flags);
-+		if (!list_empty(&schan->completed)) {
-+			list_splice_tail_init(&schan->completed, &list);
-+			spin_unlock_irqrestore(&schan->lock, flags);
-+
-+			/* Execute callbacks and run dependencies */
-+			list_for_each_entry(sdesc, &list, node) {
-+				desc = &sdesc->desc;
-+
-+				if (desc->callback)
-+					desc->callback(desc->callback_param);
-+
-+				last_cookie = desc->cookie;
-+				dma_run_dependencies(desc);
-+			}
-+
-+			/* Free descriptors */
-+			spin_lock_irqsave(&schan->lock, flags);
-+			list_splice_tail_init(&list, &schan->free);
-+			schan->completed_cookie = last_cookie;
-+			spin_unlock_irqrestore(&schan->lock, flags);
-+		} else {
-+			/* for cyclic channel, desc is always in active list */
-+			sdesc = list_first_entry(&schan->active, struct sirfsoc_dma_desc,
-+				node);
-+
-+			if (!sdesc || (sdesc && !sdesc->cyclic)) { /* without active cyclic DMA */
-+				spin_unlock_irqrestore(&schan->lock, flags);
-+				continue;
-+			}
-+
-+			/* cyclic DMA */
-+			happened_cyclic = schan->happened_cyclic;
-+			spin_unlock_irqrestore(&schan->lock, flags);
-+
-+			desc = &sdesc->desc;
-+			while (happened_cyclic != schan->completed_cyclic) {
-+				spin_unlock_irqrestore(&schan->lock, flags);
-+				if (desc->callback)
-+					desc->callback(desc->callback_param);
-+				schan->completed_cyclic++;
-+			}
-+		}
-+	}
-+}
-+
-+/* DMA Tasklet */
-+static void sirfsoc_dma_tasklet(unsigned long data)
-+{
-+	struct sirfsoc_dma *sdma = (void *)data;
-+
-+	sirfsoc_dma_process_completed(sdma);
-+}
-+
-+/* Submit descriptor to hardware */
-+static dma_cookie_t sirfsoc_dma_tx_submit(struct dma_async_tx_descriptor *txd)
-+{
-+	struct sirfsoc_dma_chan *schan = dma_chan_to_sirfsoc_dma_chan(txd->chan);
-+	struct sirfsoc_dma_desc *sdesc;
-+	unsigned long flags;
-+	dma_cookie_t cookie;
-+
-+	sdesc = container_of(txd, struct sirfsoc_dma_desc, desc);
-+
-+	spin_lock_irqsave(&schan->lock, flags);
-+
-+	/* Move descriptor to queue */
-+	list_move_tail(&sdesc->node, &schan->queued);
-+
-+	/* Update cookie */
-+	cookie = schan->chan.cookie + 1;
-+	if (cookie <= 0)
-+		cookie = 1;
-+
-+	schan->chan.cookie = cookie;
-+	sdesc->desc.cookie = cookie;
-+
-+	spin_unlock_irqrestore(&schan->lock, flags);
-+
-+	return cookie;
-+}
-+
-+static int sirfsoc_dma_slave_config(struct sirfsoc_dma_chan *schan,
-+	struct dma_slave_config *config)
-+{
-+	unsigned long flags;
-+
-+	if ((config->src_addr_width != DMA_SLAVE_BUSWIDTH_4_BYTES) ||
-+		(config->dst_addr_width != DMA_SLAVE_BUSWIDTH_4_BYTES))
-+		return -EINVAL;
-+
-+	spin_lock_irqsave(&schan->lock, flags);
-+	schan->mode = (config->src_maxburst == 4 ? 1 : 0);
-+	spin_unlock_irqrestore(&schan->lock, flags);
-+
-+	return 0;
-+}
-+
-+static int sirfsoc_dma_terminate_all(struct sirfsoc_dma_chan *schan)
-+{
-+	struct sirfsoc_dma *sdma = dma_chan_to_sirfsoc_dma(&schan->chan);
-+	int cid = schan->chan.chan_id;
-+	unsigned long flags;
-+
-+	writel_relaxed(readl_relaxed(sdma->base + SIRFSOC_DMA_INT_EN) & ~(1 << cid),
-+		sdma->base + SIRFSOC_DMA_INT_EN);
-+	writel_relaxed(1 << cid, sdma->base + SIRFSOC_DMA_CH_VALID);
-+
-+	writel_relaxed(readl_relaxed(sdma->base + SIRFSOC_DMA_CH_LOOP_CTRL)
-+		& ~((1 << cid) | 1 << (cid + 16)),
-+			sdma->base + SIRFSOC_DMA_CH_LOOP_CTRL);
-+
-+	spin_lock_irqsave(&schan->lock, flags);
-+	list_splice_tail_init(&schan->active, &schan->free);
-+	list_splice_tail_init(&schan->queued, &schan->free);
-+	spin_unlock_irqrestore(&schan->lock, flags);
-+
-+	return 0;
-+}
-+
-+static int sirfsoc_dma_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
-+	unsigned long arg)
-+{
-+	struct dma_slave_config *config;
-+	struct sirfsoc_dma_chan *schan = dma_chan_to_sirfsoc_dma_chan(chan);
-+
-+	switch (cmd) {
-+	case DMA_TERMINATE_ALL:
-+		return sirfsoc_dma_terminate_all(schan);
-+	case DMA_SLAVE_CONFIG:
-+		config = (struct dma_slave_config *)arg;
-+		return sirfsoc_dma_slave_config(schan, config);
-+
-+	default:
-+		break;
-+	}
-+
-+	return -ENOSYS;
-+}
-+
-+/* Alloc channel resources */
-+static int sirfsoc_dma_alloc_chan_resources(struct dma_chan *chan)
-+{
-+	struct sirfsoc_dma *sdma = dma_chan_to_sirfsoc_dma(chan);
-+	struct sirfsoc_dma_chan *schan = dma_chan_to_sirfsoc_dma_chan(chan);
-+	struct sirfsoc_dma_desc *sdesc;
-+	unsigned long flags;
-+	LIST_HEAD(descs);
-+	int i;
-+
-+	/* Alloc descriptors for this channel */
-+	for (i = 0; i < SIRFSOC_DMA_DESCRIPTORS; i++) {
-+		sdesc = kzalloc(sizeof(*sdesc), GFP_KERNEL);
-+		if (!sdesc) {
-+			dev_notice(sdma->dma.dev, "Memory allocation error. "
-+				"Allocated only %u descriptors\n", i);
-+			break;
-+		}
-+
-+		dma_async_tx_descriptor_init(&sdesc->desc, chan);
-+		sdesc->desc.flags = DMA_CTRL_ACK;
-+		sdesc->desc.tx_submit = sirfsoc_dma_tx_submit;
-+
-+		list_add_tail(&sdesc->node, &descs);
-+	}
-+
-+	/* Return error only if no descriptors were allocated */
-+	if (i == 0)
-+		return -ENOMEM;
-+
-+	spin_lock_irqsave(&schan->lock, flags);
-+
-+	list_splice_tail_init(&descs, &schan->free);
-+	spin_unlock_irqrestore(&schan->lock, flags);
-+
-+	return i;
-+}
-+
-+/* Free channel resources */
-+static void sirfsoc_dma_free_chan_resources(struct dma_chan *chan)
-+{
-+	struct sirfsoc_dma_chan *schan = dma_chan_to_sirfsoc_dma_chan(chan);
-+	struct sirfsoc_dma_desc *sdesc, *tmp;
-+	unsigned long flags;
-+	LIST_HEAD(descs);
-+
-+	spin_lock_irqsave(&schan->lock, flags);
-+
-+	/* Channel must be idle */
-+	BUG_ON(!list_empty(&schan->prepared));
-+	BUG_ON(!list_empty(&schan->queued));
-+	BUG_ON(!list_empty(&schan->active));
-+	BUG_ON(!list_empty(&schan->completed));
-+
-+	/* Move data */
-+	list_splice_tail_init(&schan->free, &descs);
-+
-+	spin_unlock_irqrestore(&schan->lock, flags);
-+
-+	/* Free descriptors */
-+	list_for_each_entry_safe(sdesc, tmp, &descs, node)
-+		kfree(sdesc);
-+}
-+
-+/* Send pending descriptor to hardware */
-+static void sirfsoc_dma_issue_pending(struct dma_chan *chan)
-+{
-+	struct sirfsoc_dma_chan *schan = dma_chan_to_sirfsoc_dma_chan(chan);
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&schan->lock, flags);
-+
-+	if (list_empty(&schan->active) && !list_empty(&schan->queued))
-+		sirfsoc_dma_execute(schan);
-+
-+	spin_unlock_irqrestore(&schan->lock, flags);
-+}
-+
-+/* Check request completion status */
-+static enum dma_status
-+sirfsoc_dma_tx_status(struct dma_chan *chan, dma_cookie_t cookie,
-+	struct dma_tx_state *txstate)
-+{
-+	struct sirfsoc_dma_chan *schan = dma_chan_to_sirfsoc_dma_chan(chan);
-+	unsigned long flags;
-+	dma_cookie_t last_used;
-+	dma_cookie_t last_complete;
-+
-+	spin_lock_irqsave(&schan->lock, flags);
-+	last_used = schan->chan.cookie;
-+	last_complete = schan->completed_cookie;
-+	spin_unlock_irqrestore(&schan->lock, flags);
-+
-+	dma_set_tx_state(txstate, last_complete, last_used, 0);
-+	return dma_async_is_complete(cookie, last_complete, last_used);
-+}
-+
-+static struct dma_async_tx_descriptor *sirfsoc_dma_prep_interleaved(
-+	struct dma_chan *chan, struct dma_interleaved_template *xt)
-+{
-+	struct sirfsoc_dma *sdma = dma_chan_to_sirfsoc_dma(chan);
-+	struct sirfsoc_dma_chan *schan = dma_chan_to_sirfsoc_dma_chan(chan);
-+	struct sirfsoc_dma_desc *sdesc = NULL;
-+	unsigned long iflags;
-+	int ret;
-+
-+	if ((xt->dir != MEM_TO_DEV) || (xt->dir != DEV_TO_MEM)) {
-+		ret = -EINVAL;
-+		goto err_dir;
-+	}
-+
-+	/* Get free descriptor */
-+	spin_lock_irqsave(&schan->lock, iflags);
-+	if (!list_empty(&schan->free)) {
-+		sdesc = list_first_entry(&schan->free, struct sirfsoc_dma_desc,
-+			node);
-+		list_del(&sdesc->node);
-+	}
-+	spin_unlock_irqrestore(&schan->lock, iflags);
-+
-+	if (!sdesc) {
-+		/* try to free completed descriptors */
-+		sirfsoc_dma_process_completed(sdma);
-+		ret = 0;
-+		goto no_desc;
-+	}
-+
-+	/* Place descriptor in prepared list */
-+	spin_lock_irqsave(&schan->lock, iflags);
-+	if ((xt->frame_size == 1) && (xt->numf > 0)) {
-+		sdesc->cyclic = 0;
-+		sdesc->xlen = xt->sgl[0].size / 4;
-+		sdesc->width = (xt->sgl[0].size + xt->sgl[0].icg) / 4;
-+		sdesc->ylen = xt->numf - 1;
-+		if (xt->dir == MEM_TO_DEV) {
-+			sdesc->addr = xt->src_start;
-+			sdesc->dir = 1;
-+		} else {
-+			sdesc->addr = xt->dst_start;
-+			sdesc->dir = 0;
-+		}
-+
-+		list_add_tail(&sdesc->node, &schan->prepared);
-+	} else {
-+		pr_err("sirfsoc DMA Invalid xfer\n");
-+		ret = -EINVAL;
-+		goto err_xfer;
-+	}
-+	spin_unlock_irqrestore(&schan->lock, iflags);
-+
-+	return &sdesc->desc;
-+err_xfer:
-+	spin_unlock_irqrestore(&schan->lock, iflags);
-+no_desc:
-+err_dir:
-+	return ERR_PTR(ret);
-+}
-+
-+static struct dma_async_tx_descriptor *
-+sirfsoc_dma_prep_cyclic(struct dma_chan *chan, dma_addr_t addr,
-+	size_t buf_len, size_t period_len,
-+	enum dma_transfer_direction direction)
-+{
-+	struct sirfsoc_dma_chan *schan = dma_chan_to_sirfsoc_dma_chan(chan);
-+	struct sirfsoc_dma_desc *sdesc = NULL;
-+	unsigned long iflags;
-+
-+	/*
-+	 * we only support cycle transfer with 2 period
-+	 * If the X-length is set to 0, it would be the loop mode.
-+	 * The DMA address keeps increasing until reaching the end of a loop
-+	 * area whose size is defined by (DMA_WIDTH x (Y_LENGTH + 1)). Then
-+	 * the DMA address goes back to the beginning of this area.
-+	 * In loop mode, the DMA data region is divided into two parts, BUFA
-+	 * and BUFB. DMA controller generates interrupts twice in each loop:
-+	 * when the DMA address reaches the end of BUFA or the end of the
-+	 * BUFB
-+	 */
-+	if (buf_len !=  2 * period_len)
-+		return ERR_PTR(-EINVAL);
-+
-+	/* Get free descriptor */
-+	spin_lock_irqsave(&schan->lock, iflags);
-+	if (!list_empty(&schan->free)) {
-+		sdesc = list_first_entry(&schan->free, struct sirfsoc_dma_desc,
-+			node);
-+		list_del(&sdesc->node);
-+	}
-+	spin_unlock_irqrestore(&schan->lock, iflags);
-+
-+	if (!sdesc)
-+		return 0;
-+
-+	/* Place descriptor in prepared list */
-+	spin_lock_irqsave(&schan->lock, iflags);
-+	sdesc->addr = addr;
-+	sdesc->cyclic = 1;
-+	sdesc->xlen = 0;
-+	sdesc->ylen = buf_len / 4 - 1;
-+	sdesc->width = 1;
-+	list_add_tail(&sdesc->node, &schan->prepared);
-+	spin_unlock_irqrestore(&schan->lock, iflags);
-+
-+	return &sdesc->desc;
-+}
-+
-+/*
-+ * The DMA controller consists of 16 independent DMA channels.
-+ * Each channel is allocated to a different function
-+ */
-+bool sirfsoc_dma_filter_id(struct dma_chan *chan, void *chan_id)
-+{
-+	unsigned int ch_nr = (unsigned int) chan_id;
-+
-+	if (ch_nr == chan->chan_id +
-+		chan->device->dev_id * SIRFSOC_DMA_CHANNELS)
-+		return true;
-+
-+	return false;
-+}
-+EXPORT_SYMBOL(sirfsoc_dma_filter_id);
-+
-+static int __devinit sirfsoc_dma_probe(struct platform_device *op)
-+{
-+	struct device_node *dn = op->dev.of_node;
-+	struct device *dev = &op->dev;
-+	struct dma_device *dma;
-+	struct sirfsoc_dma *sdma;
-+	struct sirfsoc_dma_chan *schan;
-+	struct resource res;
-+	ulong regs_start, regs_size;
-+	u32 id;
-+	int retval, i;
-+
-+	sdma = devm_kzalloc(dev, sizeof(*sdma), GFP_KERNEL);
-+	if (!sdma) {
-+		dev_err(dev, "Memory exhausted!\n");
-+		return -ENOMEM;
-+	}
-+
-+	if (of_property_read_u32(dn, "cell-index", &id)) {
-+		dev_err(dev, "Fail to get DMAC index\n");
-+		return -ENODEV;
-+	}
-+
-+	sdma->irq = irq_of_parse_and_map(dn, 0);
-+	if (sdma->irq == NO_IRQ) {
-+		dev_err(dev, "Error mapping IRQ!\n");
-+		return -EINVAL;
-+	}
-+
-+	retval = of_address_to_resource(dn, 0, &res);
-+	if (retval) {
-+		dev_err(dev, "Error parsing memory region!\n");
-+		return retval;
-+	}
-+
-+	regs_start = res.start;
-+	regs_size = resource_size(&res);
-+
-+	if (!devm_request_mem_region(dev, regs_start, regs_size, DRV_NAME)) {
-+		dev_err(dev, "Error requesting memory region!\n");
-+		return -EBUSY;
-+	}
-+
-+	sdma->base = devm_ioremap(dev, regs_start, regs_size);
-+	if (!sdma->base) {
-+		dev_err(dev, "Error mapping memory region!\n");
-+		return -ENOMEM;
-+	}
-+
-+	retval = devm_request_irq(dev, sdma->irq, &sirfsoc_dma_irq, 0, DRV_NAME,
-+		sdma);
-+	if (retval) {
-+		dev_err(dev, "Error requesting IRQ!\n");
-+		return -EINVAL;
-+	}
-+
-+	dma = &sdma->dma;
-+	dma->dev = dev;
-+	dma->chancnt = SIRFSOC_DMA_CHANNELS;
-+
-+	dma->device_alloc_chan_resources = sirfsoc_dma_alloc_chan_resources;
-+	dma->device_free_chan_resources = sirfsoc_dma_free_chan_resources;
-+	dma->device_issue_pending = sirfsoc_dma_issue_pending;
-+	dma->device_control = sirfsoc_dma_control;
-+	dma->device_tx_status = sirfsoc_dma_tx_status;
-+	dma->device_prep_interleaved_dma = sirfsoc_dma_prep_interleaved;
-+	dma->device_prep_dma_cyclic = sirfsoc_dma_prep_cyclic;
-+
-+	INIT_LIST_HEAD(&dma->channels);
-+	dma_cap_set(DMA_SLAVE, dma->cap_mask);
-+	dma_cap_set(DMA_CYCLIC, dma->cap_mask);
-+	dma_cap_set(DMA_INTERLEAVE, dma->cap_mask);
-+	dma_cap_set(DMA_PRIVATE, dma->cap_mask);
-+
-+	for (i = 0; i < dma->chancnt; i++) {
-+		schan = &sdma->channels[i];
-+
-+		schan->chan.device = dma;
-+		schan->chan.cookie = 1;
-+		schan->completed_cookie = schan->chan.cookie;
-+
-+		INIT_LIST_HEAD(&schan->free);
-+		INIT_LIST_HEAD(&schan->prepared);
-+		INIT_LIST_HEAD(&schan->queued);
-+		INIT_LIST_HEAD(&schan->active);
-+		INIT_LIST_HEAD(&schan->completed);
-+
-+		spin_lock_init(&schan->lock);
-+		list_add_tail(&schan->chan.device_node, &dma->channels);
-+	}
-+
-+	tasklet_init(&sdma->tasklet, sirfsoc_dma_tasklet, (unsigned long)sdma);
-+
-+	/* Register DMA engine */
-+	dev_set_drvdata(dev, sdma);
-+	retval = dma_async_device_register(dma);
-+	if (retval) {
-+		devm_free_irq(dev, sdma->irq, sdma);
-+		irq_dispose_mapping(sdma->irq);
-+	}
-+
-+	return retval;
-+}
-+
-+static int __devexit sirfsoc_dma_remove(struct platform_device *op)
-+{
-+	struct device *dev = &op->dev;
-+	struct sirfsoc_dma *sdma = dev_get_drvdata(dev);
-+
-+	dma_async_device_unregister(&sdma->dma);
-+	devm_free_irq(dev, sdma->irq, sdma);
-+	irq_dispose_mapping(sdma->irq);
-+
-+	return 0;
-+}
-+
-+static struct of_device_id sirfsoc_dma_match[] = {
-+	{ .compatible = "sirf,prima2-dmac", },
-+	{},
-+};
-+
-+static struct platform_driver sirfsoc_dma_driver = {
-+	.probe		= sirfsoc_dma_probe,
-+	.remove		= __devexit_p(sirfsoc_dma_remove),
-+	.driver = {
-+		.name = DRV_NAME,
-+		.owner = THIS_MODULE,
-+		.of_match_table	= sirfsoc_dma_match,
-+	},
-+};
-+
-+static int __init sirfsoc_dma_init(void)
-+{
-+	return platform_driver_register(&sirfsoc_dma_driver);
-+}
-+module_init(sirfsoc_dma_init);
-+
-+static void __exit sirfsoc_dma_exit(void)
-+{
-+	platform_driver_unregister(&sirfsoc_dma_driver);
-+}
-+module_exit(sirfsoc_dma_exit);
-+
-+MODULE_AUTHOR("Rongjun Ying <rongjun.ying@csr.com>, "
-+	"Barry Song <baohua.song@csr.com>");
-+MODULE_DESCRIPTION("SIRFSOC DMA control driver");
-+MODULE_LICENSE("GPL");
+>  config MACH_TX28
+>  	bool "Ka-Ro TX28 module"
+>  	select MODULE_TX28
+>  
+> +config MACH_APX4DEVKIT
+> +	bool "Support Bluegiga APX4 Development Kit"
+> +	select MODULE_APX4
+> +
+>  endif
+> diff --git a/arch/arm/mach-mxs/Makefile b/arch/arm/mach-mxs/Makefile
+> index 6c38262..1838466 100644
+> --- a/arch/arm/mach-mxs/Makefile
+> +++ b/arch/arm/mach-mxs/Makefile
+> @@ -10,6 +10,7 @@ obj-$(CONFIG_SOC_IMX28) += clock-mx28.o mm-mx28.o
+>  obj-$(CONFIG_MACH_STMP378X_DEVB) += mach-stmp378x_devb.o
+>  obj-$(CONFIG_MACH_MX23EVK) += mach-mx23evk.o
+>  obj-$(CONFIG_MACH_MX28EVK) += mach-mx28evk.o
+> +obj-$(CONFIG_MACH_APX4DEVKIT) += mach-apx4devkit.o
+>  obj-$(CONFIG_MODULE_TX28) += module-tx28.o
+>  obj-$(CONFIG_MACH_TX28)    += mach-tx28.o
+>  
+> diff --git a/arch/arm/mach-mxs/include/mach/mxs.h b/arch/arm/mach-mxs/include/mach/mxs.h
+> index 35a89dd..209698c 100644
+> --- a/arch/arm/mach-mxs/include/mach/mxs.h
+> +++ b/arch/arm/mach-mxs/include/mach/mxs.h
+> @@ -33,6 +33,7 @@
+>  		0)
+>  #define cpu_is_mx28()		(					\
+>  		machine_is_mx28evk() ||					\
+> +		machine_is_apx4devkit() ||				\
+>  		machine_is_tx28() ||					\
+please keep this list sorted alphabetically.
+
+>  		0)
+>  
+> diff --git a/arch/arm/mach-mxs/include/mach/uncompress.h b/arch/arm/mach-mxs/include/mach/uncompress.h
+> index 7f8bf65..d13ebc1 100644
+> --- a/arch/arm/mach-mxs/include/mach/uncompress.h
+> +++ b/arch/arm/mach-mxs/include/mach/uncompress.h
+> @@ -63,6 +63,7 @@ static inline void __arch_decomp_setup(unsigned long arch_id)
+>  		mxs_duart_base = MX23_DUART_BASE_ADDR;
+>  		break;
+>  	case MACH_TYPE_MX28EVK:
+> +	case MACH_TYPE_APX4DEVKIT:
+>  	case MACH_TYPE_TX28:
+>  		mxs_duart_base = MX28_DUART_BASE_ADDR;
+>  		break;
+> diff --git a/arch/arm/mach-mxs/mach-apx4devkit.c b/arch/arm/mach-mxs/mach-apx4devkit.c
+> new file mode 100644
+> index 0000000..02b7545
+> --- /dev/null
+> +++ b/arch/arm/mach-mxs/mach-apx4devkit.c
+> @@ -0,0 +1,201 @@
+> +/*
+> + * Copyright (C) 2011
+> + * Lauri Hintsala, Bluegiga, <lauri.hintsala@bluegiga.com>
+> + *
+> + * based on: mach-mx28evk.c
+> + * Copyright 2010 Freescale Semiconductor, Inc. All Rights Reserved.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include <linux/delay.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/gpio.h>
+> +#include <linux/leds.h>
+> +#include <linux/irq.h>
+> +#include <linux/clk.h>
+> +#include <linux/i2c.h>
+> +#include <linux/i2c/at24.h>
+> +
+> +#include <asm/mach-types.h>
+> +#include <asm/mach/arch.h>
+> +#include <asm/mach/time.h>
+> +
+> +#include <mach/common.h>
+> +#include <mach/iomux-mx28.h>
+> +
+> +#include "devices-mx28.h"
+> +
+> +#define APX4DEVKIT_GPIO_USERLED	MXS_GPIO_NR(3, 28)
+> +
+> +static const iomux_cfg_t apx4devkit_pads[] __initconst = {
+> +	/* duart */
+> +	MX28_PAD_PWM0__DUART_RX | MXS_PAD_CTRL,
+> +	MX28_PAD_PWM1__DUART_TX | MXS_PAD_CTRL,
+> +
+> +	/* auart0 */
+> +	MX28_PAD_AUART0_RX__AUART0_RX | MXS_PAD_CTRL,
+> +	MX28_PAD_AUART0_TX__AUART0_TX | MXS_PAD_CTRL,
+> +	MX28_PAD_AUART0_CTS__AUART0_CTS | MXS_PAD_CTRL,
+> +	MX28_PAD_AUART0_RTS__AUART0_RTS | MXS_PAD_CTRL,
+> +
+> +	/* auart1 */
+> +	MX28_PAD_AUART1_RX__AUART1_RX | MXS_PAD_CTRL,
+> +	MX28_PAD_AUART1_TX__AUART1_TX | MXS_PAD_CTRL,
+> +
+> +	/* auart2 */
+> +	MX28_PAD_SSP2_SCK__AUART2_RX | MXS_PAD_CTRL,
+> +	MX28_PAD_SSP2_MOSI__AUART2_TX | MXS_PAD_CTRL,
+> +
+> +	/* auart3 */
+> +	MX28_PAD_SSP2_MISO__AUART3_RX | MXS_PAD_CTRL,
+> +	MX28_PAD_SSP2_SS0__AUART3_TX | MXS_PAD_CTRL,
+> +
+> +#define MXS_PAD_FEC	(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP)
+> +	/* fec0 */
+> +	MX28_PAD_ENET0_MDC__ENET0_MDC | MXS_PAD_FEC,
+> +	MX28_PAD_ENET0_MDIO__ENET0_MDIO | MXS_PAD_FEC,
+> +	MX28_PAD_ENET0_RX_EN__ENET0_RX_EN | MXS_PAD_FEC,
+> +	MX28_PAD_ENET0_RXD0__ENET0_RXD0 | MXS_PAD_FEC,
+> +	MX28_PAD_ENET0_RXD1__ENET0_RXD1 | MXS_PAD_FEC,
+> +	MX28_PAD_ENET0_TX_EN__ENET0_TX_EN | MXS_PAD_FEC,
+> +	MX28_PAD_ENET0_TXD0__ENET0_TXD0 | MXS_PAD_FEC,
+> +	MX28_PAD_ENET0_TXD1__ENET0_TXD1 | MXS_PAD_FEC,
+> +	MX28_PAD_ENET_CLK__CLKCTRL_ENET | MXS_PAD_FEC,
+> +
+> +	/* I2C */
+> +	MX28_PAD_I2C0_SCL__I2C0_SCL,
+> +	MX28_PAD_I2C0_SDA__I2C0_SDA,
+> +
+> +	/* mmc0 */
+> +	MX28_PAD_SSP0_DATA0__SSP0_D0 |
+> +		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+> +	MX28_PAD_SSP0_DATA1__SSP0_D1 |
+> +		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+> +	MX28_PAD_SSP0_DATA2__SSP0_D2 |
+> +		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+> +	MX28_PAD_SSP0_DATA3__SSP0_D3 |
+> +		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+> +	MX28_PAD_SSP0_DATA4__SSP0_D4 |
+> +		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+> +	MX28_PAD_SSP0_DATA5__SSP0_D5 |
+> +		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+> +	MX28_PAD_SSP0_DATA6__SSP0_D6 |
+> +		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+> +	MX28_PAD_SSP0_DATA7__SSP0_D7 |
+> +		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+> +	MX28_PAD_SSP0_CMD__SSP0_CMD |
+> +		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+> +	MX28_PAD_SSP0_DETECT__SSP0_CARD_DETECT |
+> +		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
+> +	MX28_PAD_SSP0_SCK__SSP0_SCK |
+> +		(MXS_PAD_12MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
+> +
+> +	/* led */
+> +	MX28_PAD_PWM3__GPIO_3_28 | MXS_PAD_CTRL,
+> +};
+> +
+> +/* led */
+> +static const struct gpio_led apx4devkit_leds[] __initconst = {
+> +	{
+> +		.name = "user-led",
+> +		.default_trigger = "heartbeat",
+> +		.gpio = APX4DEVKIT_GPIO_USERLED,
+> +	},
+> +};
+> +
+> +static const struct gpio_led_platform_data apx4devkit_led_data __initconst = {
+> +	.leds = apx4devkit_leds,
+> +	.num_leds = ARRAY_SIZE(apx4devkit_leds),
+> +};
+> +
+> +static struct fec_platform_data mx28_fec_pdata __initdata = {
+> +	.phy = PHY_INTERFACE_MODE_RMII,
+> +};
+> +
+> +static int __init apx4devkit_fec_get_mac(char *macstr)
+> +{
+> +	int i, h, l;
+> +
+> +	macstr++;
+> +
+> +	for (i = 0; i < 6; i++) {
+> +		if (i != 5 && *(macstr + 2) != ':')
+> +			goto error;
+> +
+> +		h = hex_to_bin(*macstr++);
+> +		if (h == -1)
+> +			goto error;
+> +
+> +		l = hex_to_bin(*macstr++);
+> +		if (l == -1)
+> +			goto error;
+> +
+> +		macstr++;
+> +		mx28_fec_pdata.mac[i] = (h << 4) + l;
+> +	}
+> +	return 0;
+I wonder if there isn't a more generic way to parse a mac address.
+
+Other machines put the mac into the otp.
+
+> +error:
+> +	pr_err("%s: invalid mac address\n", __func__);
+> +	return -EINVAL;
+> +}
+> +
+> +__setup("ethaddr", apx4devkit_fec_get_mac);
+the name is IMHO too generic for a board specific parameter. Think about
+a kernel that runs on all mxs based machines. ethaddr=... only affects
+your machine type. And it's not possible to add the same parameter to a
+different board.
+
+> +
+> +static struct mxs_mmc_platform_data apx4devkit_mmc_pdata __initdata = {
+> +	.wp_gpio = -EINVAL,
+> +	.flags = SLOTF_8_BIT_CAPABLE,
+> +};
+> +
+> +static struct i2c_board_info apx4devkit_i2c_boardinfo[] __initdata = {
+> +	{ I2C_BOARD_INFO("sgtl5000", 0x0a) }, /* ASoC */
+> +	{ I2C_BOARD_INFO("pcf8563", 0x51) }, /* RTC */
+> +};
+> +
+> +static void __init apx4devkit_init(void)
+> +{
+> +	mxs_iomux_setup_multiple_pads(apx4devkit_pads,
+> +			ARRAY_SIZE(apx4devkit_pads));
+> +
+> +	mx28_add_duart();
+> +	mx28_add_auart0();
+> +	mx28_add_auart1();
+> +	mx28_add_auart2();
+> +	mx28_add_auart3();
+> +
+> +	mx28_add_fec(0, &mx28_fec_pdata);
+> +
+> +	mx28_add_mxs_mmc(0, &apx4devkit_mmc_pdata);
+> +
+> +	gpio_led_register_device(0, &apx4devkit_led_data);
+> +
+> +	/* I2C */
+> +	mx28_add_mxs_i2c(0);
+> +	i2c_register_board_info(0, apx4devkit_i2c_boardinfo,
+> +			ARRAY_SIZE(apx4devkit_i2c_boardinfo));
+> +}
+> +
+> +static void __init apx4devkit_timer_init(void)
+> +{
+> +	mx28_clocks_init();
+> +}
+> +
+> +static struct sys_timer apx4devkit_timer = {
+> +	.init	= apx4devkit_timer_init,
+> +};
+> +
+> +MACHINE_START(APX4DEVKIT, "Bluegiga APX4 Development Kit")
+> +	.map_io		= mx28_map_io,
+> +	.init_irq	= mx28_init_irq,
+> +	.init_machine	= apx4devkit_init,
+> +	.timer		= &apx4devkit_timer,
+> +MACHINE_END
+please read http://article.gmane.org/gmane.linux.ports.arm.omap/50721
+
+Best regards
+Uwe
+
 -- 
-1.7.1
-
-
-
-Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
-More information can be found at www.csr.com. Follow CSR on Twitter at http://twitter.com/CSR_PLC and read our blog at www.csr.com/blog
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
