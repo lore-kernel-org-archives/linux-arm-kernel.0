@@ -1,38 +1,39 @@
 From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Mon, 17 Oct 2011 15:12:34 +0200
-Subject: [PATCH 2/3] spi/pl022: disable the PL022 block when unused
-Message-ID: <1318857154-32160-1-git-send-email-linus.walleij@stericsson.com>
+Date: Mon, 17 Oct 2011 15:12:43 +0200
+Subject: [PATCH 3/3] spi/pl022: skip default configuration before suspending
+Message-ID: <1318857163-32193-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Virupax Sadashivpetimath <virupax.sadashivpetimath@stericsson.com>
 
-Make sure we clear the enable bit when the block is not used.
-This will save some energy in certain hardware versions.
+The loading of the default configuration before suspending has
+been in the driver since its inception, but it is not really
+needed. Especially so since we take to all the trouble of
+enabling and disabling power and clock just to do this. Let's
+scrap this now.
 
 Signed-off-by: Virupax Sadashivpetimath <virupax.sadashivpetimath@stericsson.com>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- drivers/spi/spi-pl022.c |    7 ++++++-
- 1 files changed, 6 insertions(+), 1 deletions(-)
+ drivers/spi/spi-pl022.c |    5 -----
+ 1 files changed, 0 insertions(+), 5 deletions(-)
 
 diff --git a/drivers/spi/spi-pl022.c b/drivers/spi/spi-pl022.c
-index 91700bb..0a1d8ed 100644
+index 0a1d8ed..29dc70f 100644
 --- a/drivers/spi/spi-pl022.c
 +++ b/drivers/spi/spi-pl022.c
-@@ -513,7 +513,12 @@ static void giveback(struct pl022 *pl022)
- 	msg->state = NULL;
- 	if (msg->complete)
- 		msg->complete(msg->context);
--	/* This message is completed, so let's turn off the clocks & power */
-+
-+	/* disable the SPI/SSP operation */
-+	writew((readw(SSP_CR1(pl022->virtbase)) &
-+		(~SSP_CR1_MASK_SSE)), SSP_CR1(pl022->virtbase));
-+
-+	/* This message is completed, so let's turn off the clock! */
- 	clk_disable(pl022->clk);
- 	amba_pclk_disable(pl022->adev);
- 	amba_vcore_disable(pl022->adev);
+@@ -2342,11 +2342,6 @@ static int pl022_suspend(struct amba_device *adev, pm_message_t state)
+ 		return status;
+ 	}
+ 
+-	amba_vcore_enable(adev);
+-	amba_pclk_enable(adev);
+-	load_ssp_default_config(pl022);
+-	amba_pclk_disable(adev);
+-	amba_vcore_disable(adev);
+ 	dev_dbg(&adev->dev, "suspended\n");
+ 	return 0;
+ }
 -- 
 1.7.3.2
