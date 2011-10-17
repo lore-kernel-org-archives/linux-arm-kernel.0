@@ -1,244 +1,362 @@
-From: haojian.zhuang@marvell.com (Haojian Zhuang)
-Date: Mon, 17 Oct 2011 21:35:17 +0800
-Subject: [PATCH v5 11/11] ARM: pxa: add clk support in gpio driver
-In-Reply-To: <1318858517-22494-1-git-send-email-haojian.zhuang@marvell.com>
-References: <1318858517-22494-1-git-send-email-haojian.zhuang@marvell.com>
-Message-ID: <1318858517-22494-12-git-send-email-haojian.zhuang@marvell.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Mon, 17 Oct 2011 19:27:41 +0530
+Subject: [PATCH v3] dmaengine: add CSR SiRFprimaII DMAC driver
+In-Reply-To: <1318844199-19303-1-git-send-email-Barry.Song@csr.com>
+References: <1318844199-19303-1-git-send-email-Barry.Song@csr.com>
+Message-ID: <1318859861.23438.137.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Support clk in gpio driver. There's no gpio clock in PXA25x and PXA27x.
-So use dummy clk instead. And move the gpio edge initialization into
-gpio driver for arch-mmp.
+On Mon, 2011-10-17 at 02:36 -0700, Barry Song wrote:
+> From: Rongjun Ying <Rongjun.Ying@csr.com>
+> 
+> Cc: Jassi Brar <jaswinder.singh@linaro.org>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Signed-off-by: Rongjun Ying <rongjun.ying@csr.com>
+> Signed-off-by: Barry Song <Barry.Song@csr.com>
+> ---
+>  -v3:
+>  use new dma_transfer_direction API from Jassi and Vinod;
+>  use new dma_interleaved_template API from Jassi Brar;
+>  fix comment minor issues from Arnd and Vinod in v2;
+>  add prima2 loop DMA mode support.
+> 
+>  MAINTAINERS            |    1 +
+>  drivers/dma/Kconfig    |    7 +
+>  drivers/dma/Makefile   |    1 +
+>  drivers/dma/sirf-dma.c |  685 ++++++++++++++++++++++++++++++++++++++++++++++++
+>  4 files changed, 694 insertions(+), 0 deletions(-)
+>  create mode 100644 drivers/dma/sirf-dma.c
+> 
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index 5483e0c..adcb6ce 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -739,6 +739,7 @@ M:	Barry Song <baohua.song@csr.com>
+>  L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+>  S:	Maintained
+>  F:	arch/arm/mach-prima2/
+> +F:	drivers/dma/sirf-dma*
+>  
+>  ARM/EBSA110 MACHINE SUPPORT
+>  M:	Russell King <linux@arm.linux.org.uk>
+> +++ b/drivers/dma/sirf-dma.c
+> @@ -0,0 +1,685 @@
+> +/*
+> + * DMA controller driver for CSR SiRFprimaII
+> + *
+> + * Copyright (c) 2011 Cambridge Silicon Radio Limited, a CSR plc group company.
+> + *
+> + * Licensed under GPLv2 or later.
+There is a mismatch between this and MODULE_LICENSE()
+> + 
+> +
+> +struct sirfsoc_dma_chan {
+> +	struct dma_chan			chan;
+> +	struct list_head		free;
+> +	struct list_head		prepared;
+> +	struct list_head		queued;
+> +	struct list_head		active;
+> +	struct list_head		completed;
+> +	dma_cookie_t			completed_cookie;
+> +	unsigned long			happened_cyclic;
+> +	unsigned long			completed_cyclic;
+> +
+> +	/* Lock for this structure */
+> +	spinlock_t			lock;
+> +
+> +	int             mode;
+alignment pls...
 
-Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
----
- arch/arm/mach-mmp/mmp2.c   |   11 ++---------
- arch/arm/mach-mmp/pxa168.c |   11 ++---------
- arch/arm/mach-mmp/pxa910.c |   11 ++---------
- arch/arm/mach-pxa/pxa25x.c |    1 +
- arch/arm/mach-pxa/pxa27x.c |    1 +
- arch/arm/mach-pxa/pxa3xx.c |    2 ++
- arch/arm/mach-pxa/pxa95x.c |    2 ++
- drivers/gpio/gpio-pxa.c    |   11 +++++++++++
- 8 files changed, 23 insertions(+), 27 deletions(-)
+> +
+> +/* Execute all queued DMA descriptors */
+> +static void sirfsoc_dma_execute(struct sirfsoc_dma_chan *schan)
+> +{
+> +	struct sirfsoc_dma *sdma = dma_chan_to_sirfsoc_dma(&schan->chan);
+> +	int cid = schan->chan.chan_id;
+> +	struct sirfsoc_dma_desc *sdesc = NULL;
+> +
+> +	sdesc = list_first_entry(&schan->queued, struct sirfsoc_dma_desc,
+> +		node);
+> +	/* Move the first queued descriptor to active list */
+> +	list_move_tail(&schan->queued, &schan->active);
+shouldn't lock be held before this, and if this function is called with
+lock held, would help to mention that explicitly
+> +
+> +	/* Start the DMA transfer */
+> +	writel_relaxed(sdesc->width, sdma->base + SIRFSOC_DMA_WIDTH_0 + cid * 4);
+> +	writel_relaxed(cid | (schan->mode << SIRFSOC_DMA_MODE_CTRL_BIT) |
+> +		(sdesc->dir << SIRFSOC_DMA_DIR_CTRL_BIT),
+> +		sdma->base + cid * 0x10 + SIRFSOC_DMA_CH_CTRL);
+> +	writel_relaxed(sdesc->xlen, sdma->base + cid * 0x10 + SIRFSOC_DMA_CH_XLEN);
+> +	writel_relaxed(sdesc->ylen, sdma->base + cid * 0x10 + SIRFSOC_DMA_CH_YLEN);
+> +	writel_relaxed(readl_relaxed(sdma->base + SIRFSOC_DMA_INT_EN) | (1 << cid),
+> +		sdma->base + SIRFSOC_DMA_INT_EN);
+> +	writel(sdesc->addr >> 2, sdma->base + cid * 0x10 + SIRFSOC_DMA_CH_ADDR);
+> +
+> +	if (sdesc->cyclic) {
+> +		writel((1 << cid) | 1 << (cid + 16) |
+> +			readl_relaxed(sdma->base + SIRFSOC_DMA_CH_LOOP_CTRL),
+> +			sdma->base + SIRFSOC_DMA_CH_LOOP_CTRL);
+> +		schan->happened_cyclic = schan->completed_cyclic = 0;
+> +	}
+any reason why we have mixed use of writel_relaxes and writel?
+Shouldn't all the DMA register writes be done only using writel?
 
-diff --git a/arch/arm/mach-mmp/mmp2.c b/arch/arm/mach-mmp/mmp2.c
-index debde08..07a63eb 100644
---- a/arch/arm/mach-mmp/mmp2.c
-+++ b/arch/arm/mach-mmp/mmp2.c
-@@ -92,18 +92,9 @@ void mmp2_clear_pmic_int(void)
- 	__raw_writel(data, mfpr_pmic);
- }
- 
--static void __init mmp2_init_gpio(void)
--{
--	int i;
--
--	/* enable GPIO clock */
--	__raw_writel(APBC_APBCLK | APBC_FNCLK, APBC_MMP2_GPIO);
--}
--
- void __init mmp2_init_irq(void)
- {
- 	mmp2_init_icu();
--	mmp2_init_gpio();
- }
- 
- static void sdhc_clk_enable(struct clk *clk)
-@@ -140,6 +131,7 @@ static APBC_CLK(twsi3, MMP2_TWSI3, 0, 26000000);
- static APBC_CLK(twsi4, MMP2_TWSI4, 0, 26000000);
- static APBC_CLK(twsi5, MMP2_TWSI5, 0, 26000000);
- static APBC_CLK(twsi6, MMP2_TWSI6, 0, 26000000);
-+static APBC_CLK(gpio, MMP2_GPIO, 0, 26000000);
- 
- static APMU_CLK(nand, NAND, 0xbf, 100000000);
- static APMU_CLK_OPS(sdh0, SDH0, 0x1b, 200000000, &sdhc_clk_ops);
-@@ -159,6 +151,7 @@ static struct clk_lookup mmp2_clkregs[] = {
- 	INIT_CLKREG(&clk_twsi5, "pxa2xx-i2c.4", NULL),
- 	INIT_CLKREG(&clk_twsi6, "pxa2xx-i2c.5", NULL),
- 	INIT_CLKREG(&clk_nand, "pxa3xx-nand", NULL),
-+	INIT_CLKREG(&clk_gpio, "pxa-gpio", NULL),
- 	INIT_CLKREG(&clk_sdh0, "sdhci-pxav3.0", "PXA-SDHCLK"),
- 	INIT_CLKREG(&clk_sdh1, "sdhci-pxav3.1", "PXA-SDHCLK"),
- 	INIT_CLKREG(&clk_sdh2, "sdhci-pxav3.2", "PXA-SDHCLK"),
-diff --git a/arch/arm/mach-mmp/pxa168.c b/arch/arm/mach-mmp/pxa168.c
-index 602ec0a..54c92a9 100644
---- a/arch/arm/mach-mmp/pxa168.c
-+++ b/arch/arm/mach-mmp/pxa168.c
-@@ -40,18 +40,9 @@ static struct mfp_addr_map pxa168_mfp_addr_map[] __initdata =
- 	MFP_ADDR_END,
- };
- 
--static void __init pxa168_init_gpio(void)
--{
--	int i;
--
--	/* enable GPIO clock */
--	__raw_writel(APBC_APBCLK | APBC_FNCLK, APBC_PXA168_GPIO);
--}
--
- void __init pxa168_init_irq(void)
- {
- 	icu_init_irq();
--	pxa168_init_gpio();
- }
- 
- /* APB peripheral clocks */
-@@ -69,6 +60,7 @@ static APBC_CLK(ssp2, PXA168_SSP2, 4, 0);
- static APBC_CLK(ssp3, PXA168_SSP3, 4, 0);
- static APBC_CLK(ssp4, PXA168_SSP4, 4, 0);
- static APBC_CLK(ssp5, PXA168_SSP5, 4, 0);
-+static APBC_CLK(gpio, PXA168_GPIO, 0, 13000000);
- static APBC_CLK(keypad, PXA168_KPC, 0, 32000);
- 
- static APMU_CLK(nand, NAND, 0x19b, 156000000);
-@@ -93,6 +85,7 @@ static struct clk_lookup pxa168_clkregs[] = {
- 	INIT_CLKREG(&clk_ssp5, "pxa168-ssp.4", NULL),
- 	INIT_CLKREG(&clk_nand, "pxa3xx-nand", NULL),
- 	INIT_CLKREG(&clk_lcd, "pxa168-fb", NULL),
-+	INIT_CLKREG(&clk_gpio, "pxa-gpio", NULL),
- 	INIT_CLKREG(&clk_keypad, "pxa27x-keypad", NULL),
- 	INIT_CLKREG(&clk_eth, "pxa168-eth", "MFUCLK"),
- };
-diff --git a/arch/arm/mach-mmp/pxa910.c b/arch/arm/mach-mmp/pxa910.c
-index 7b992ce..3241a25 100644
---- a/arch/arm/mach-mmp/pxa910.c
-+++ b/arch/arm/mach-mmp/pxa910.c
-@@ -77,18 +77,9 @@ static struct mfp_addr_map pxa910_mfp_addr_map[] __initdata =
- 	MFP_ADDR_END,
- };
- 
--static void __init pxa910_init_gpio(void)
--{
--	int i;
--
--	/* enable GPIO clock */
--	__raw_writel(APBC_APBCLK | APBC_FNCLK, APBC_PXA910_GPIO);
--}
--
- void __init pxa910_init_irq(void)
- {
- 	icu_init_irq();
--	pxa910_init_gpio();
- }
- 
- /* APB peripheral clocks */
-@@ -100,6 +91,7 @@ static APBC_CLK(pwm1, PXA910_PWM1, 1, 13000000);
- static APBC_CLK(pwm2, PXA910_PWM2, 1, 13000000);
- static APBC_CLK(pwm3, PXA910_PWM3, 1, 13000000);
- static APBC_CLK(pwm4, PXA910_PWM4, 1, 13000000);
-+static APBC_CLK(gpio, PXA910_GPIO, 0, 13000000);
- 
- static APMU_CLK(nand, NAND, 0x19b, 156000000);
- static APMU_CLK(u2o, USB, 0x1b, 480000000);
-@@ -115,6 +107,7 @@ static struct clk_lookup pxa910_clkregs[] = {
- 	INIT_CLKREG(&clk_pwm3, "pxa910-pwm.2", NULL),
- 	INIT_CLKREG(&clk_pwm4, "pxa910-pwm.3", NULL),
- 	INIT_CLKREG(&clk_nand, "pxa3xx-nand", NULL),
-+	INIT_CLKREG(&clk_gpio, "pxa-gpio", NULL),
- 	INIT_CLKREG(&clk_u2o, "pxa-u2o", "U2OCLK"),
- };
- 
-diff --git a/arch/arm/mach-pxa/pxa25x.c b/arch/arm/mach-pxa/pxa25x.c
-index 4718adf..cb319a7 100644
---- a/arch/arm/mach-pxa/pxa25x.c
-+++ b/arch/arm/mach-pxa/pxa25x.c
-@@ -209,6 +209,7 @@ static struct clk_lookup pxa25x_clkregs[] = {
- 	INIT_CLKREG(&clk_pxa25x_gpio11, NULL, "GPIO11_CLK"),
- 	INIT_CLKREG(&clk_pxa25x_gpio12, NULL, "GPIO12_CLK"),
- 	INIT_CLKREG(&clk_pxa25x_mem, "pxa2xx-pcmcia", NULL),
-+	INIT_CLKREG(&clk_dummy, "pxa-gpio", NULL),
- };
- 
- static struct clk_lookup pxa25x_hwuart_clkreg =
-diff --git a/arch/arm/mach-pxa/pxa27x.c b/arch/arm/mach-pxa/pxa27x.c
-index 80abe4c..d3e42f8 100644
---- a/arch/arm/mach-pxa/pxa27x.c
-+++ b/arch/arm/mach-pxa/pxa27x.c
-@@ -230,6 +230,7 @@ static struct clk_lookup pxa27x_clkregs[] = {
- 	INIT_CLKREG(&clk_pxa27x_im, NULL, "IMCLK"),
- 	INIT_CLKREG(&clk_pxa27x_memc, NULL, "MEMCLK"),
- 	INIT_CLKREG(&clk_pxa27x_mem, "pxa2xx-pcmcia", NULL),
-+	INIT_CLKREG(&clk_dummy, "pxa-gpio", NULL),
- };
- 
- #ifdef CONFIG_PM
-diff --git a/arch/arm/mach-pxa/pxa3xx.c b/arch/arm/mach-pxa/pxa3xx.c
-index 4446d56..d241354 100644
---- a/arch/arm/mach-pxa/pxa3xx.c
-+++ b/arch/arm/mach-pxa/pxa3xx.c
-@@ -55,6 +55,7 @@ static DEFINE_PXA3_CKEN(pxa3xx_pwm0, PWM0, 13000000, 0);
- static DEFINE_PXA3_CKEN(pxa3xx_pwm1, PWM1, 13000000, 0);
- static DEFINE_PXA3_CKEN(pxa3xx_mmc1, MMC1, 19500000, 0);
- static DEFINE_PXA3_CKEN(pxa3xx_mmc2, MMC2, 19500000, 0);
-+static DEFINE_PXA3_CKEN(pxa3xx_gpio, GPIO, 13000000, 0);
- 
- static DEFINE_CK(pxa3xx_lcd, LCD, &clk_pxa3xx_hsio_ops);
- static DEFINE_CK(pxa3xx_smemc, SMC, &clk_pxa3xx_smemc_ops);
-@@ -87,6 +88,7 @@ static struct clk_lookup pxa3xx_clkregs[] = {
- 	INIT_CLKREG(&clk_pxa3xx_mmc1, "pxa2xx-mci.0", NULL),
- 	INIT_CLKREG(&clk_pxa3xx_mmc2, "pxa2xx-mci.1", NULL),
- 	INIT_CLKREG(&clk_pxa3xx_smemc, "pxa2xx-pcmcia", NULL),
-+	INIT_CLKREG(&clk_pxa3xx_gpio, "pxa-gpio", NULL),
- };
- 
- #ifdef CONFIG_PM
-diff --git a/arch/arm/mach-pxa/pxa95x.c b/arch/arm/mach-pxa/pxa95x.c
-index 0961093..d082a58 100644
---- a/arch/arm/mach-pxa/pxa95x.c
-+++ b/arch/arm/mach-pxa/pxa95x.c
-@@ -211,6 +211,7 @@ static DEFINE_PXA3_CKEN(pxa95x_ssp3, SSP3, 13000000, 0);
- static DEFINE_PXA3_CKEN(pxa95x_ssp4, SSP4, 13000000, 0);
- static DEFINE_PXA3_CKEN(pxa95x_pwm0, PWM0, 13000000, 0);
- static DEFINE_PXA3_CKEN(pxa95x_pwm1, PWM1, 13000000, 0);
-+static DEFINE_PXA3_CKEN(pxa95x_gpio, GPIO, 13000000, 0);
- 
- static struct clk_lookup pxa95x_clkregs[] = {
- 	INIT_CLKREG(&clk_pxa95x_pout, NULL, "CLK_POUT"),
-@@ -229,6 +230,7 @@ static struct clk_lookup pxa95x_clkregs[] = {
- 	INIT_CLKREG(&clk_pxa95x_ssp4, "pxa27x-ssp.3", NULL),
- 	INIT_CLKREG(&clk_pxa95x_pwm0, "pxa27x-pwm.0", NULL),
- 	INIT_CLKREG(&clk_pxa95x_pwm1, "pxa27x-pwm.1", NULL),
-+	INIT_CLKREG(&clk_pxa95x_gpio, "pxa-gpio", NULL),
- };
- 
- void __init pxa95x_init_irq(void)
-diff --git a/drivers/gpio/gpio-pxa.c b/drivers/gpio/gpio-pxa.c
-index 2d20118..d278925 100644
---- a/drivers/gpio/gpio-pxa.c
-+++ b/drivers/gpio/gpio-pxa.c
-@@ -11,6 +11,8 @@
-  *  it under the terms of the GNU General Public License version 2 as
-  *  published by the Free Software Foundation.
-  */
-+#include <linux/clk.h>
-+#include <linux/err.h>
- #include <linux/gpio.h>
- #include <linux/gpio-pxa.h>
- #include <linux/init.h>
-@@ -466,6 +468,7 @@ static int __devinit pxa_gpio_probe(struct platform_device *pdev)
- {
- 	struct pxa_gpio_chip *c;
- 	struct resource *res;
-+	struct clk *clk;
- 	int gpio, irq;
- 	int irq0 = 0, irq1 = 0, irq_mux, gpio_offset = 0;
- 
-@@ -489,6 +492,14 @@ static int __devinit pxa_gpio_probe(struct platform_device *pdev)
- 	if (irq0 > 0)
- 		gpio_offset = 2;
- 
-+	clk = clk_get(&pdev->dev, NULL);
-+	if (IS_ERR(clk)) {
-+		printk(KERN_ERR "Error %ld to get gpio clock\n", PTR_ERR(clk));
-+		iounmap(gpio_reg_base);
-+		return PTR_ERR(clk);
-+	}
-+	clk_enable(clk);
-+
- 	/* Initialize GPIO chips */
- 	pxa_init_gpio_chip(pxa_last_gpio);
- 
+> +}
+> +
+> +
+> +static struct dma_async_tx_descriptor *sirfsoc_dma_prep_interleaved(
+> +	struct dma_chan *chan, struct dma_interleaved_template *xt)
+> +{
+> +	struct sirfsoc_dma *sdma = dma_chan_to_sirfsoc_dma(chan);
+> +	struct sirfsoc_dma_chan *schan = dma_chan_to_sirfsoc_dma_chan(chan);
+> +	struct sirfsoc_dma_desc *sdesc = NULL;
+> +	unsigned long iflags;
+> +	int ret;
+> +
+> +	if ((xt->dir != MEM_TO_DEV) || (xt->dir != DEV_TO_MEM)) {
+> +		ret = -EINVAL;
+> +		goto err_dir;
+> +	}
+> +
+> +	/* Get free descriptor */
+> +	spin_lock_irqsave(&schan->lock, iflags);
+> +	if (!list_empty(&schan->free)) {
+> +		sdesc = list_first_entry(&schan->free, struct sirfsoc_dma_desc,
+> +			node);
+> +		list_del(&sdesc->node);
+> +	}
+> +	spin_unlock_irqrestore(&schan->lock, iflags);
+> +
+> +	if (!sdesc) {
+> +		/* try to free completed descriptors */
+> +		sirfsoc_dma_process_completed(sdma);
+> +		ret = 0;
+> +		goto no_desc;
+> +	}
+> +
+> +	/* Place descriptor in prepared list */
+> +	spin_lock_irqsave(&schan->lock, iflags);
+> +	if ((xt->frame_size == 1) && (xt->numf > 0)) {
+what does this mean?
+> +		sdesc->cyclic = 0;
+> +		sdesc->xlen = xt->sgl[0].size / 4;
+> +		sdesc->width = (xt->sgl[0].size + xt->sgl[0].icg) / 4;
+whats so magical about 4?
+> +		sdesc->ylen = xt->numf - 1;
+> +		if (xt->dir == MEM_TO_DEV) {
+> +			sdesc->addr = xt->src_start;
+> +			sdesc->dir = 1;
+> +		} else {
+> +			sdesc->addr = xt->dst_start;
+> +			sdesc->dir = 0;
+> +		}
+> +
+> +		list_add_tail(&sdesc->node, &schan->prepared);
+> +	} else {
+> +		pr_err("sirfsoc DMA Invalid xfer\n");
+> +		ret = -EINVAL;
+> +		goto err_xfer;
+> +	}
+> +	spin_unlock_irqrestore(&schan->lock, iflags);
+> +
+> +	return &sdesc->desc;
+> +err_xfer:
+> +	spin_unlock_irqrestore(&schan->lock, iflags);
+> +no_desc:
+> +err_dir:
+> +	return ERR_PTR(ret);
+> +}
+> +
+> +static struct dma_async_tx_descriptor *
+> +sirfsoc_dma_prep_cyclic(struct dma_chan *chan, dma_addr_t addr,
+> +	size_t buf_len, size_t period_len,
+> +	enum dma_transfer_direction direction)
+> +{
+> +	struct sirfsoc_dma_chan *schan = dma_chan_to_sirfsoc_dma_chan(chan);
+> +	struct sirfsoc_dma_desc *sdesc = NULL;
+> +	unsigned long iflags;
+> +
+> +	/*
+> +	 * we only support cycle transfer with 2 period
+> +	 * If the X-length is set to 0, it would be the loop mode.
+> +	 * The DMA address keeps increasing until reaching the end of a loop
+> +	 * area whose size is defined by (DMA_WIDTH x (Y_LENGTH + 1)). Then
+> +	 * the DMA address goes back to the beginning of this area.
+> +	 * In loop mode, the DMA data region is divided into two parts, BUFA
+> +	 * and BUFB. DMA controller generates interrupts twice in each loop:
+> +	 * when the DMA address reaches the end of BUFA or the end of the
+> +	 * BUFB
+> +	 */
+> +	if (buf_len !=  2 * period_len)
+> +		return ERR_PTR(-EINVAL);
+> +
+> +	/* Get free descriptor */
+> +	spin_lock_irqsave(&schan->lock, iflags);
+> +	if (!list_empty(&schan->free)) {
+> +		sdesc = list_first_entry(&schan->free, struct sirfsoc_dma_desc,
+> +			node);
+> +		list_del(&sdesc->node);
+> +	}
+> +	spin_unlock_irqrestore(&schan->lock, iflags);
+> +
+> +	if (!sdesc)
+> +		return 0;
+> +
+> +	/* Place descriptor in prepared list */
+> +	spin_lock_irqsave(&schan->lock, iflags);
+> +	sdesc->addr = addr;
+> +	sdesc->cyclic = 1;
+> +	sdesc->xlen = 0;
+> +	sdesc->ylen = buf_len / 4 - 1;
+> +	sdesc->width = 1;
+> +	list_add_tail(&sdesc->node, &schan->prepared);
+> +	spin_unlock_irqrestore(&schan->lock, iflags);
+> +
+> +	return &sdesc->desc;
+> +}
+is this interleave cyclic dma or plain sg?
+> +
+> +/*
+> + * The DMA controller consists of 16 independent DMA channels.
+> + * Each channel is allocated to a different function
+> + */
+> +bool sirfsoc_dma_filter_id(struct dma_chan *chan, void *chan_id)
+> +{
+> +	unsigned int ch_nr = (unsigned int) chan_id;
+> +
+> +	if (ch_nr == chan->chan_id +
+> +		chan->device->dev_id * SIRFSOC_DMA_CHANNELS)
+> +		return true;
+pls fix indent here
+> +
+> +	return false;
+> +}
+> +EXPORT_SYMBOL(sirfsoc_dma_filter_id);
+> +
+> +static int __devinit sirfsoc_dma_probe(struct platform_device *op)
+> +{
+> +	struct device_node *dn = op->dev.of_node;
+> +	struct device *dev = &op->dev;
+> +	struct dma_device *dma;
+> +	struct sirfsoc_dma *sdma;
+> +	struct sirfsoc_dma_chan *schan;
+> +	struct resource res;
+> +	ulong regs_start, regs_size;
+> +	u32 id;
+> +	int retval, i;
+> +
+> +	sdma = devm_kzalloc(dev, sizeof(*sdma), GFP_KERNEL);
+> +	if (!sdma) {
+> +		dev_err(dev, "Memory exhausted!\n");
+> +		return -ENOMEM;
+> +	}
+> +
+> +	if (of_property_read_u32(dn, "cell-index", &id)) {
+> +		dev_err(dev, "Fail to get DMAC index\n");
+and you leak memory!!
+> +		return -ENODEV;
+> +	}
+> +
+> +	sdma->irq = irq_of_parse_and_map(dn, 0);
+> +	if (sdma->irq == NO_IRQ) {
+> +		dev_err(dev, "Error mapping IRQ!\n");
+and again...
+> +		return -EINVAL;
+> +	}
+> +
+> +	retval = of_address_to_resource(dn, 0, &res);
+> +	if (retval) {
+> +		dev_err(dev, "Error parsing memory region!\n");
+and again...
+> +		return retval;
+> +	}
+> +
+> +	regs_start = res.start;
+> +	regs_size = resource_size(&res);
+> +
+> +	if (!devm_request_mem_region(dev, regs_start, regs_size, DRV_NAME)) {
+> +		dev_err(dev, "Error requesting memory region!\n");
+> +		return -EBUSY;
+> +	}
+> +
+> +	sdma->base = devm_ioremap(dev, regs_start, regs_size);
+> +	if (!sdma->base) {
+> +		dev_err(dev, "Error mapping memory region!\n");
+> +		return -ENOMEM;
+> +	}
+> +
+> +	retval = devm_request_irq(dev, sdma->irq, &sirfsoc_dma_irq, 0, DRV_NAME,
+> +		sdma);
+> +	if (retval) {
+> +		dev_err(dev, "Error requesting IRQ!\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	dma = &sdma->dma;
+> +	dma->dev = dev;
+> +	dma->chancnt = SIRFSOC_DMA_CHANNELS;
+> +
+> +	dma->device_alloc_chan_resources = sirfsoc_dma_alloc_chan_resources;
+> +	dma->device_free_chan_resources = sirfsoc_dma_free_chan_resources;
+> +	dma->device_issue_pending = sirfsoc_dma_issue_pending;
+> +	dma->device_control = sirfsoc_dma_control;
+> +	dma->device_tx_status = sirfsoc_dma_tx_status;
+> +	dma->device_prep_interleaved_dma = sirfsoc_dma_prep_interleaved;
+> +	dma->device_prep_dma_cyclic = sirfsoc_dma_prep_cyclic;
+> +
+> +	INIT_LIST_HEAD(&dma->channels);
+> +	dma_cap_set(DMA_SLAVE, dma->cap_mask);
+> +	dma_cap_set(DMA_CYCLIC, dma->cap_mask);
+> +	dma_cap_set(DMA_INTERLEAVE, dma->cap_mask);
+> +	dma_cap_set(DMA_PRIVATE, dma->cap_mask);
+> +
+> +	for (i = 0; i < dma->chancnt; i++) {
+> +		schan = &sdma->channels[i];
+> +
+> +		schan->chan.device = dma;
+> +		schan->chan.cookie = 1;
+> +		schan->completed_cookie = schan->chan.cookie;
+> +
+> +		INIT_LIST_HEAD(&schan->free);
+> +		INIT_LIST_HEAD(&schan->prepared);
+> +		INIT_LIST_HEAD(&schan->queued);
+> +		INIT_LIST_HEAD(&schan->active);
+> +		INIT_LIST_HEAD(&schan->completed);
+> +
+> +		spin_lock_init(&schan->lock);
+> +		list_add_tail(&schan->chan.device_node, &dma->channels);
+> +	}
+> +
+> +	tasklet_init(&sdma->tasklet, sirfsoc_dma_tasklet, (unsigned long)sdma);
+> +
+> +	/* Register DMA engine */
+> +	dev_set_drvdata(dev, sdma);
+> +	retval = dma_async_device_register(dma);
+> +	if (retval) {
+> +		devm_free_irq(dev, sdma->irq, sdma);
+> +		irq_dispose_mapping(sdma->irq);
+> +	}
+> +
+> +	return retval;
+> +}
+the error path handling in this function is totally non existent!!
+
+> +
+> +static int __devexit sirfsoc_dma_remove(struct platform_device *op)
+> +{
+> +	struct device *dev = &op->dev;
+> +	struct sirfsoc_dma *sdma = dev_get_drvdata(dev);
+> +
+> +	dma_async_device_unregister(&sdma->dma);
+> +	devm_free_irq(dev, sdma->irq, sdma);
+> +	irq_dispose_mapping(sdma->irq);
+who will free mem allocated in probe?
+> +
+> +	return 0;
+> +}
+> +
 -- 
-1.7.2.5
+~Vinod
