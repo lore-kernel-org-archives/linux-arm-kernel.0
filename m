@@ -1,47 +1,62 @@
 From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Mon, 17 Oct 2011 13:27:23 +0200
-Subject: [PATCH v4 4/7] iommu/msm: announce supported page sizes
+Date: Mon, 17 Oct 2011 13:27:24 +0200
+Subject: [PATCH v4 5/7] iommu/amd: announce supported page sizes
 In-Reply-To: <1318850846-16066-1-git-send-email-ohad@wizery.com>
 References: <1318850846-16066-1-git-send-email-ohad@wizery.com>
-Message-ID: <1318850846-16066-5-git-send-email-ohad@wizery.com>
+Message-ID: <1318850846-16066-6-git-send-email-ohad@wizery.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Let the IOMMU core know we support 4KiB, 64KiB, 1MiB and 16MiB page sizes.
+Let the IOMMU core know we support arbitrary page sizes (as long as
+they're an order of 4KiB).
 
-This way the IOMMU core can split any arbitrary-sized physically
-contiguous regions (that it needs to map) as needed.
+This way the IOMMU core will retain the existing behavior we're used to;
+it will let us map regions that:
+- their size is an order of 4KiB
+- they are naturally aligned
 
 Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
-Acked-by: David Brown <davidb@codeaurora.org>
-Cc: Stepan Moskovchenko <stepanm@codeaurora.org>
+Cc: Joerg Roedel <Joerg.Roedel@amd.com>
 ---
- drivers/iommu/msm_iommu.c |    6 +++++-
- 1 files changed, 5 insertions(+), 1 deletions(-)
+ drivers/iommu/amd_iommu.c |   19 +++++++++++++++++++
+ 1 files changed, 19 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/iommu/msm_iommu.c b/drivers/iommu/msm_iommu.c
-index 13718d9..08a90b8 100644
---- a/drivers/iommu/msm_iommu.c
-+++ b/drivers/iommu/msm_iommu.c
-@@ -42,6 +42,9 @@ __asm__ __volatile__ (							\
- #define RCP15_PRRR(reg)		MRC(reg, p15, 0, c10, c2, 0)
- #define RCP15_NMRR(reg)		MRC(reg, p15, 0, c10, c2, 1)
+diff --git a/drivers/iommu/amd_iommu.c b/drivers/iommu/amd_iommu.c
+index 32d502e..d654b59 100644
+--- a/drivers/iommu/amd_iommu.c
++++ b/drivers/iommu/amd_iommu.c
+@@ -41,6 +41,24 @@
  
-+/* bitmap of the page sizes currently supported */
-+#define MSM_IOMMU_PGSIZES	(SZ_4K | SZ_64K | SZ_1M | SZ_16M)
+ #define LOOP_TIMEOUT	100000
+ 
++/*
++ * This bitmap is used to advertise the page sizes our hardware support
++ * to the IOMMU core, which will then use this information to split
++ * physically contiguous memory regions it is mapping into page sizes
++ * that we support.
++ *
++ * Traditionally the IOMMU core just handed us the mappings directly,
++ * after making sure the size is an order of a 4KiB page and that the
++ * mapping has natural alignment.
++ *
++ * To retain this behavior, we currently advertise that we support
++ * all page sizes that are an order of 4KiB.
++ *
++ * If at some point we'd like to utilize the IOMMU core's new behavior,
++ * we could change this to advertise the real page sizes we support.
++ */
++#define AMD_IOMMU_PGSIZES	(~0xFFFUL)
 +
- static int msm_iommu_tex_class[4];
+ static DEFINE_RWLOCK(amd_iommu_devtable_lock);
  
- DEFINE_SPINLOCK(msm_iommu_lock);
-@@ -679,7 +682,8 @@ static struct iommu_ops msm_iommu_ops = {
- 	.map = msm_iommu_map,
- 	.unmap = msm_iommu_unmap,
- 	.iova_to_phys = msm_iommu_iova_to_phys,
--	.domain_has_cap = msm_iommu_domain_has_cap
-+	.domain_has_cap = msm_iommu_domain_has_cap,
-+	.pgsize_bitmap = MSM_IOMMU_PGSIZES,
+ /* A list of preallocated protection domains */
+@@ -2779,6 +2797,7 @@ static struct iommu_ops amd_iommu_ops = {
+ 	.unmap = amd_iommu_unmap,
+ 	.iova_to_phys = amd_iommu_iova_to_phys,
+ 	.domain_has_cap = amd_iommu_domain_has_cap,
++	.pgsize_bitmap	= AMD_IOMMU_PGSIZES,
  };
  
- static int __init get_tex_class(int icp, int ocp, int mt, int nos)
+ /*****************************************************************************
 -- 
 1.7.4.1
