@@ -1,101 +1,171 @@
-From: mturquette@ti.com (Turquette, Mike)
-Date: Mon, 17 Oct 2011 10:46:45 -0700
-Subject: [PATCH v2 4/7] clk: Add simple gated clock
-In-Reply-To: <20111017064217.GA20184@b20223-02.ap.freescale.net>
-References: <1316730422-20027-1-git-send-email-mturquette@ti.com>
-	<1316730422-20027-5-git-send-email-mturquette@ti.com>
-	<20111012064646.GA31037@b20223-02.ap.freescale.net>
-	<CAJOA=zPw7BF1iNFaG9js2k6++qPnXz5S3dq4rsPmUWOcUztL0g@mail.gmail.com>
-	<20111016182649.GB13565@pengutronix.de>
-	<20111017064217.GA20184@b20223-02.ap.freescale.net>
-Message-ID: <CAJOA=zPqBCZekAyPBAberrOdGcfhrgdtLWnBD=iirDZpacNCtw@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 17 Oct 2011 10:52:56 -0700
+Subject: [RFC] [PATCH] ARM: tegra: emc: device tree bindings
+Message-ID: <1318873976-25335-1-git-send-email-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 16, 2011 at 11:42 PM, Richard Zhao <richard.zhao@linaro.org> wrote:
-> On Sun, Oct 16, 2011 at 08:26:49PM +0200, Sascha Hauer wrote:
->> On Wed, Oct 12, 2011 at 07:59:19AM -0700, Turquette, Mike wrote:
->> > On Tue, Oct 11, 2011 at 11:46 PM, Richard Zhao
->> > <richard.zhao@freescale.com> wrote:
->> > > On Thu, Sep 22, 2011 at 03:26:59PM -0700, Mike Turquette wrote:
->> > >> From: Jeremy Kerr <jeremy.kerr@canonical.com>
->> > >>
->> > >> Signed-off-by: Jeremy Kerr <jeremy.kerr@canonical.com>
->> > >> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
->> > >> Signed-off-by: Jamie Iles <jamie@jamieiles.com>
->> > >> Signed-off-by: Mike Turquette <mturquette@ti.com>
->> > >> ---
->> > >> Changes since v1:
->> > >> Add copyright header
->> > >> Fold in Jamie's patch for set-to-disable clks
->> > >> Use BIT macro instead of shift
->> > >>
->> > >> ?drivers/clk/Kconfig ? ?| ? ?4 ++
->> > >> ?drivers/clk/Makefile ? | ? ?1 +
->> > >> ?drivers/clk/clk-gate.c | ? 78 ++++++++++++++++++++++++++++++++++++++++++++++++
->> > >> ?include/linux/clk.h ? ?| ? 13 ++++++++
->> > >> ?4 files changed, 96 insertions(+), 0 deletions(-)
->> > >> ?create mode 100644 drivers/clk/clk-gate.c
->> > >
->> > > I feel hard to tell the tree the clk parent, at register/init time. For the
->> > > simple gate clk, the only way is to set .get_parent. But normally, for clk
->> > > without any divider we set .get_parent to NULL. Maybe we can put .parent to
->> > > struct clk_hw?
->> >
->> > For non-mux clocks, whose parent is *always* going to be the same, you
->> > should create a duplicate .parent in the clk_hw_* structure and then
->> > have .get_parent return clk_hw_*->parent.
->>
->> Maybe I do not understand what you mean here, but I think there is
->> something missing in the gate.
-> yes, clk_gate can not set fixed parent in v2 patch. Mike means add .parent int clk_gate
-> and set .get_parent in the ops.
+First cut at device tree bindings for the EMC tables on tegra.
 
-Yes, it seems I was unclear.  I mean to say that a .parent can be
-added to any clk hw implementation (clk_hw_imx or whatever) and the
-paired .ops (in this case, .get_parent) will know about it's
-existence.
+Note that I have a prerequisite patch that changes the tegra2_emc code
+to be a platform driver; but I wanted to do a sanity-check of my device
+tree usage here before posting the whole series.
 
-Regards,
-Mike
+Signed-off-by: Olof Johansson <olof@lixom.net>
+---
+ .../devicetree/bindings/arm/tegra/emc.txt          |   77 ++++++++++++++++++++
+ arch/arm/boot/dts/tegra-seaboard.dts               |   36 +++++++++
+ arch/arm/boot/dts/tegra20.dtsi                     |    7 ++
+ 3 files changed, 120 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/tegra/emc.txt
 
->>
->> >
->> > This is analogous to the way clk_hw_fixed returns clk_hw_fixed->rate
->> > when .recalc is called on it.
->> >
->> > >> +
->> > >> +static unsigned long clk_gate_get_rate(struct clk_hw *clk)
->> > >> +{
->> > >> + ? ? return clk_get_rate(clk_get_parent(clk->clk));
->> > >> +}
->>
->> clk_get_parent goes down to clk_gate_set_enable_ops.get_parent below...
->>
->> > >> +
->> > >> +
->> > >> +struct clk_hw_ops clk_gate_set_enable_ops = {
->> > >> + ? ? .recalc_rate = clk_gate_get_rate,
->> > >> + ? ? .enable = clk_gate_enable_set,
->> > >> + ? ? .disable = clk_gate_disable_clear,
->> > >> +};
->>
->> ...but this does not have a get_parent pointer, so clk_get_parent()
->> for a gate always returns NULL which means that a gate never has
->> a valid rate.
->>
->> Sascha
->>
->> --
->> Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? | ? ? ? ? ? ? ? ? ? ? ? ? ? ? |
->> Industrial Linux Solutions ? ? ? ? ? ? ? ? | http://www.pengutronix.de/ ?|
->> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0 ? ?|
->> Amtsgericht Hildesheim, HRA 2686 ? ? ? ? ? | Fax: ? +49-5121-206917-5555 |
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>
->
->
+diff --git a/Documentation/devicetree/bindings/arm/tegra/emc.txt b/Documentation/devicetree/bindings/arm/tegra/emc.txt
+new file mode 100644
+index 0000000..dd7f845
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/tegra/emc.txt
+@@ -0,0 +1,77 @@
++Embedded Memory Controller
++
++Properties:
++- name : Should be emc
++- #address-cells : Should be 1
++- #size-cells : Should be 0
++- compatible : should contain "nvidia,tegra20-emc".
++- reg : Offset and length of the register set for the device
++- nvidia,use-ram-code : If present, the sub-nodes will be addressed
++  and chosen using the ramcode board selector. If omitted, only one
++  set of tables can be present and said tables will be used
++  irrespective of ram-code configuration.
++
++Child device nodes describe the memory settings for different configurations and clock rates.
++
++Example:
++
++	emc at 7000f400 {
++		#address-cells = < 1 >;
++		#size-cells = < 0 >;
++		compatible = "nvidia,tegra20-emc";
++		reg = <0x7000f4000 0x200>;
++	}
++
++
++Embedded Memory Controller configuration table
++
++This is a table containing the EMC register settings for the various
++operating speeds of the memory controller. They are always located as
++subnodes of the emc controller node.
++
++There are two ways of specifying which tables to use:
++
++* The simplest is if there is just one set of tables in the device tree,
++  and they will always be used (based on which frequency is used).
++  This is the preferred method, especially when firmware can fill in
++  this information based on the specific system information and just
++  pass it on to the kernel.
++
++* The slightly more complex one is when more than one memory configuration
++  might exist on the system.  The Tegra20 platform handles this during
++  early boot by selecting one out of possible 4 memory settings based
++  on a 2-pin "ram code" bootstrap setting on the board. The values of
++  these strappings can be read through a register in the SoC, and thus
++  used to select which tables to use.
++
++Properties:
++- name : Should start with emc-table
++- compatible : should contain "nvidia,tegra20-emc-table".
++- reg : only needed if nvidia,use-ram-code is present in the
++  parent. If so, the numerical representation of the selected ram code
++  as reported by the strap option APB misc register.
++- clock-frequency : the clock frequency for the EMC at which this
++  table should be used (in kHz).
++- nvidia,emc-registers : a 46 word array of EMC registers to be programmed
++  for operation at the 'clock-frequency' setting.
++  The order and contents of the registers are defined in the Tegra TRM.
++
++		emc-table-333mhz at 0 {
++			reg = <0>;
++			compatible = "nvidia,tegra20-emc-table";
++			clock-frequency = < 333000 >;
++			nvidia,emc-registers = < 0 0 0 0 0 0 0 0 0 0 0 0 0 0
++						 0 0 0 0 0 0 0 0 0 0 0 0 0 0
++						 0 0 0 0 0 0 0 0 0 0 0 0 0 0
++						 0 0 0 0 >;
++		};
++
++		emc-table-666mhz at 0 {
++			reg = <0>;
++			compatible = "nvidia,tegra20-emc-table";
++			clock-frequency = < 666000 >;
++			nvidia,emc-registers = < 0 0 0 0 0 0 0 0 0 0 0 0 0 0
++						 0 0 0 0 0 0 0 0 0 0 0 0 0 0
++						 0 0 0 0 0 0 0 0 0 0 0 0 0 0
++						 0 0 0 0 >;
++		};
+diff --git a/arch/arm/boot/dts/tegra-seaboard.dts b/arch/arm/boot/dts/tegra-seaboard.dts
+index a72299b..2d60b5ff 100644
+--- a/arch/arm/boot/dts/tegra-seaboard.dts
++++ b/arch/arm/boot/dts/tegra-seaboard.dts
+@@ -20,6 +20,42 @@
+ 		clock-frequency = < 216000000 >;
+ 	};
+ 
++	emc {
++		emc-table-166 {
++			compatible = "nvidia,tegra20-emc-table";
++			clock-frequency = < 166500 >;
++			nvidia,emc-registers = < 0x0000000a 0x00000021
++				0x00000008 0x00000003 0x00000004 0x00000004
++				0x00000002 0x0000000c 0x00000003 0x00000003
++				0x00000002 0x00000001 0x00000004 0x00000005
++				0x00000004 0x00000009 0x0000000d 0x000004df
++				0x00000000 0x00000003 0x00000003 0x00000003
++				0x00000003 0x00000001 0x0000000a 0x000000c8
++				0x00000003 0x00000006 0x00000004 0x0000000f
++				0x00000002 0x00000000 0x00000000 0x00000002
++				0x00000000 0x00000000 0x00000083 0xa04004ae
++				0x007fd010 0x00000000 0x00000000 0x00000000
++				0x00000000 0x00000000 0x00000000 0x00000000 >;
++		};
++
++		emc-table-333 {
++			compatible = "nvidia,tegra20-emc-table";
++			clock-frequency = < 333000 >;
++			nvidia,emc-registers = < 0x00000014 0x00000041
++				0x0000000f 0x00000005 0x00000004 0x00000005
++				0x00000003 0x0000000c 0x00000005 0x00000005
++				0x00000003 0x00000001 0x00000004 0x00000005
++				0x00000004 0x00000009 0x0000000d 0x000009ff
++				0x00000000 0x00000003 0x00000003 0x00000005
++				0x00000005 0x00000001 0x0000000f 0x000000c8
++				0x00000003 0x0000000c 0x00000006 0x0000000f
++				0x00000002 0x00000000 0x00000000 0x00000002
++				0x00000000 0x00000000 0x00000083 0xe034048b
++				0x007e8010 0x00000000 0x00000000 0x00000000
++				0x00000000 0x00000000 0x00000000 0x00000000 >;
++		};
++	};
++
+ 	sdhci at c8000400 {
+ 		cd-gpios = <&gpio 69 0>; /* gpio PI5 */
+ 		wp-gpios = <&gpio 57 0>; /* gpio PH1 */
+diff --git a/arch/arm/boot/dts/tegra20.dtsi b/arch/arm/boot/dts/tegra20.dtsi
+index 65d7e6a..f4dc8d3 100644
+--- a/arch/arm/boot/dts/tegra20.dtsi
++++ b/arch/arm/boot/dts/tegra20.dtsi
+@@ -120,6 +120,13 @@
+ 		interrupts = < 123 >;
+ 	};
+ 
++	emc at 7000f400 {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		compatible = "nvidia,tegra20-emc";
++		reg = <0x7000f400 0x200>;
++	};
++
+ 	sdhci at c8000000 {
+ 		compatible = "nvidia,tegra20-sdhci";
+ 		reg = <0xc8000000 0x200>;
+-- 
+1.7.4.1
