@@ -1,65 +1,24 @@
-From: afzal@ti.com (Afzal Mohammed)
-Date: Mon, 17 Oct 2011 18:45:13 +0530
-Subject: DEBUG LL: Build error while adding support for new board
-Message-ID: <1318857313-2762-1-git-send-email-afzal@ti.com>
+From: haojian.zhuang@marvell.com (Haojian Zhuang)
+Date: Mon, 17 Oct 2011 21:35:06 +0800
+Subject: [PATCH v5 00/11] change gpio as platform driver
+Message-ID: <1318858517-22494-1-git-send-email-haojian.zhuang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Russell,
+Changelog
+v5:
+      1. use generic gpio driver. So clean gpio-pxa.h and gpio-pxa.c again.
+v4:
+      1. append one patch for clean gpio macros and use function instead.
+v3:
+      1. Rebase on Russell's for-next branch.
+      2. Add clock support.
+      3. Move gpio edge detection initiliaztion of arch-mmp into gpio driver.
 
-While adding low level debug support for new board in OMAP2+ family, we
-came across following error,
-
-arch/arm/kernel/debug.S: Assembler messages:
-arch/arm/kernel/debug.S:138: Error: invalid constant (428) after fixup
-
-Following patch fixes it, I am not sure whether this is the right fix,
-please let us know your comments.
-
-(Subject has to be tweaked so that message will reach the list)
-
-Regards
-Afzal
-
-From: Afzal Mohammed <afzal@ti.com>
-Date: Fri, 14 Oct 2011 12:56:16 +0530
-Subject: [PATCH] ARM: Fix error upon adding LL debug
-
-Upon adding new board LL debug support, if the resultant code
-addition would not cause PC relative offset of "hexbuf" from
-"adr r2, hexbuf" (+2) instruction to be representable in a
-shifted 8-bit value (hence indirectly putting higher aligment
-requirement on larger offsets), following error occurs,
-
-arch/arm/kernel/debug.S: Assembler messages:
-arch/arm/kernel/debug.S:138: Error: invalid constant (428) after fixup
-
-Fix it by bringing "hexbuf" closer so that "adr"
-can have the offset.
-
-Signed-off-by: Afzal Mohammed <afzal@ti.com>
----
- arch/arm/kernel/debug.S |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/kernel/debug.S b/arch/arm/kernel/debug.S
-index bcd66e0..0f852d0 100644
---- a/arch/arm/kernel/debug.S
-+++ b/arch/arm/kernel/debug.S
-@@ -151,6 +151,8 @@ printhex:   adr     r2, hexbuf
-                b       printascii
- ENDPROC(printhex2)
-
-+hexbuf:                .space 16
-+
-                .ltorg
-
- ENTRY(printascii)
-@@ -175,5 +177,3 @@ ENTRY(printch)
-                mov     r0, #0
-                b       1b
- ENDPROC(printch)
--
--hexbuf:                .space 16
---
-1.6.2.4
+v2:
+     1. Remove gpio.c from mach-pxa & mach-mmp that is introduced from v1.
+     2. Remove init function in gpio.c. Move the platfrom_device_register()
+        into platform driver.
+     3. Initialize pxa_gpio_regs in gpio-pxa.c
+     4. Simplify code of identifing pxa gpio series or mmp gpio series.
+     5. Use linux/io.h instead of asm/io.h.
