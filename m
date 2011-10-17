@@ -1,90 +1,104 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 17 Oct 2011 12:30:50 +0100
-Subject: [PATCH v2 1/7] clk: Add a generic clock infrastructure
-In-Reply-To: <20111017110539.GB18141@pengutronix.de>
-References: <1316730422-20027-1-git-send-email-mturquette@ti.com>
-	<1316730422-20027-2-git-send-email-mturquette@ti.com>
-	<20111014081024.GA9485@b20223-02.ap.freescale.net>
-	<20111014100504.GC2966@opensource.wolfsonmicro.com>
-	<20111014103233.GB9485@b20223-02.ap.freescale.net>
-	<20111016175521.GA13565@pengutronix.de>
-	<20111017084851.GB20184@b20223-02.ap.freescale.net>
-	<20111017092028.GA3042@opensource.wolfsonmicro.com>
-	<20111017105302.GC20184@b20223-02.ap.freescale.net>
-	<20111017110539.GB18141@pengutronix.de>
-Message-ID: <20111017113050.GI21648@n2100.arm.linux.org.uk>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Mon, 17 Oct 2011 13:41:02 +0200
+Subject: [PATCH] ARM: OMAP: omap_device: Expose omap_device_{alloc, delete,
+	register}
+Message-ID: <1318851662-637-1-git-send-email-ohad@wizery.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 17, 2011 at 01:05:39PM +0200, Sascha Hauer wrote:
-> It's not a problem to associate multiple clocks to a device, we can do
-> this now already. What a driver can't do now is give-me-all-clocks-I-need(dev),
-> but this problem should not be solved at clock core level but at the
-> clkdev level.
+Expose omap_device_{alloc, delete, register} so we can use them outside
+of omap_device.c.
 
-I don't think it even needs solving at the clkdev level.
+This approach allows users, which need to manipulate an archdata member
+of a device before it is registered, to do so. This is also useful
+for users who have their devices created very early so they can be used
+at ->reserve() time to reserve CMA memory.
 
-In order to get all clocks for a specific device, we'd need variable
-length arrays to store the individual struct clk pointers, which isn't
-going to be all that nice.  We'd need clk_get_alldev() and
-clk_put_alldev() to deal with these variable length arrays - and as
-far as the driver is concerned that's an opaque object - it can't know
-anything about any particular individual struct clk in the array.
+The immediate use case for this is to set the private iommu archdata
+member, which binds a device to its associated iommu controller.
+This way, generic code will be able to attach omap devices to their
+iommus, without calling any omap-specific API.
 
-Then we'd need operations to operate on the array itself, which means
-much more API baggage.
+With this in hand, we can further clean the existing mainline OMAP iommu
+driver and its mainline users, and focus on generic IOMMU approaches
+for future users (rpmsg/remoteproc and the upcoming generic DMA API).
 
-Also, if it did need to know about one particular struct clk, then
-there's problems with avoiding that struct clk in the alldev() versions
-(or we'll see drivers doing clk_get() followed by clk_disable() to
-work-around any enabling done via the array versions.)
+This patch is still considered an interim solution until DT fully materializes
+for omap; at that point, this functionality will be removed as DT will
+take care of creating the devices and configuring them correctly.
 
-> The fact is that the different clocks for a device are really different
-> clocks. A dumb driver may want to request/enable all relevant clocks at
-> once while a more sophisticated driver may want to enable the clock for
-> accessing registers in the probe function and a baud clock on device
-> open time.
+Tested on OMAP4 with a generic rpmsg/remoteproc that doesn't use any
+omap-specific IOMMU API anymore.
 
-I don't think you can get away from drivers having to know about their
-individual clocks in some form or other - and I don't think a dumb
-driver should be a justification for creating an API.  If a dumb driver
-wants to get the clocks for a device it has to behave as if it were
-a smart driver and request each one (maybe having an array itself)
-such as this:
+Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
+---
+ arch/arm/plat-omap/include/plat/omap_device.h |    7 +++++++
+ arch/arm/plat-omap/omap_device.c              |   13 +++----------
+ 2 files changed, 10 insertions(+), 10 deletions(-)
 
-static const char *con_ids[NR_CLKS] = {
-	"foo",
-	"bar",
-};
-
-struct driver_priv {
-	struct clk *clk[NR_CLKS];
-};
-
-	
-	for (err = i = 0; i < NR_CLKS; i++) {
-		priv->clk[i] = clk_get(dev, con_ids[i];
-		if (IS_ERR(priv->clk[i])) {
-			err = PTR_ERR(priv->clk[i]);
-			break;
-		}
-	}
-
-	if (err) {
-		for (i = 0; i < NR_CLKS && !IS_ERR(priv->clk[i]); i++)
-			clk_put(priv->clk[i]);
-		return err;
-	}
-
-This approach also has the advantage that we know what order the clocks
-will be in the array, and so we can sensibly index the array to obtain
-a particular clock.
-
-However, going back to the bus fabric case, a driver probably doesn't
-have the knowledge - it's a platform topology thing - one which can't
-be represented by a clock tree.
-
-It might help if we represented our busses closer to reality - like PCI
-does - rather than a flattened set of platform devices.  Couple that with
-runtime PM and a driver for the bus fabric, and it should fall out
-fairly naturally from the infrastructure we already have.
+diff --git a/arch/arm/plat-omap/include/plat/omap_device.h b/arch/arm/plat-omap/include/plat/omap_device.h
+index 12c5b0c..28d7a38 100644
+--- a/arch/arm/plat-omap/include/plat/omap_device.h
++++ b/arch/arm/plat-omap/include/plat/omap_device.h
+@@ -100,6 +100,13 @@ struct platform_device *omap_device_build_ss(const char *pdev_name, int pdev_id,
+ 					 struct omap_device_pm_latency *pm_lats,
+ 					 int pm_lats_cnt, int is_early_device);
+ 
++struct omap_device *omap_device_alloc(struct platform_device *pdev,
++				      struct omap_hwmod **ohs, int oh_cnt,
++				      struct omap_device_pm_latency *pm_lats,
++				      int pm_lats_cnt);
++void omap_device_delete(struct omap_device *od);
++int omap_device_register(struct platform_device *pdev);
++
+ void __iomem *omap_device_get_rt_va(struct omap_device *od);
+ struct device *omap_device_get_by_hwmod_name(const char *oh_name);
+ 
+diff --git a/arch/arm/plat-omap/omap_device.c b/arch/arm/plat-omap/omap_device.c
+index cd90bed..913179c 100644
+--- a/arch/arm/plat-omap/omap_device.c
++++ b/arch/arm/plat-omap/omap_device.c
+@@ -96,14 +96,7 @@
+ #define USE_WAKEUP_LAT			0
+ #define IGNORE_WAKEUP_LAT		1
+ 
+-static int omap_device_register(struct platform_device *pdev);
+ static int omap_early_device_register(struct platform_device *pdev);
+-static struct omap_device *omap_device_alloc(struct platform_device *pdev,
+-				      struct omap_hwmod **ohs, int oh_cnt,
+-				      struct omap_device_pm_latency *pm_lats,
+-				      int pm_lats_cnt);
+-static void omap_device_delete(struct omap_device *od);
+-
+ 
+ static struct omap_device_pm_latency omap_default_latency[] = {
+ 	{
+@@ -508,7 +501,7 @@ static int omap_device_fill_resources(struct omap_device *od,
+  *
+  * Returns an struct omap_device pointer or ERR_PTR() on error;
+  */
+-static struct omap_device *omap_device_alloc(struct platform_device *pdev,
++struct omap_device *omap_device_alloc(struct platform_device *pdev,
+ 					struct omap_hwmod **ohs, int oh_cnt,
+ 					struct omap_device_pm_latency *pm_lats,
+ 					int pm_lats_cnt)
+@@ -590,7 +583,7 @@ oda_exit1:
+ 	return ERR_PTR(ret);
+ }
+ 
+-static void omap_device_delete(struct omap_device *od)
++void omap_device_delete(struct omap_device *od)
+ {
+ 	if (!od)
+ 		return;
+@@ -816,7 +809,7 @@ static struct dev_pm_domain omap_device_pm_domain = {
+  * platform_device_register() on the underlying platform_device.
+  * Returns the return value of platform_device_register().
+  */
+-static int omap_device_register(struct platform_device *pdev)
++int omap_device_register(struct platform_device *pdev)
+ {
+ 	pr_debug("omap_device: %s: registering\n", pdev->name);
+ 
+-- 
+1.7.4.1
