@@ -1,223 +1,76 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 17 Oct 2011 12:52:54 +0100
-Subject: [PATCH 2/6] drivers/base: add bus for System-on-Chip devices
+Date: Mon, 17 Oct 2011 12:52:55 +0100
+Subject: [PATCH 3/6] Documentation: add information for new sysfs soc bus
+	functionality
 In-Reply-To: <1318852378-14180-1-git-send-email-lee.jones@linaro.org>
 References: <1318852378-14180-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1318852378-14180-3-git-send-email-lee.jones@linaro.org>
+Message-ID: <1318852378-14180-4-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Traditionally, any System-on-Chip based platform creates a flat list
-of platform_devices directly under /sys/devices/platform.
-
-In order to give these some better structure, this introduces a new
-bus type for soc_devices that are registered with the new
-soc_device_register() function.  All devices that are on the same
-chip should then be registered as child devices of the soc device.
-
-The soc bus also exports a few standardised device attributes which
-allow user space to query the specific type of soc.
+This change applies the required documentation for each new
+attribute recenty added by the new System-On-Chip (SoC)
+information export bus driver.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/base/Kconfig    |    3 +
- drivers/base/Makefile   |    1 +
- drivers/base/soc.c      |  115 +++++++++++++++++++++++++++++++++++++++++++++++
- include/linux/sys_soc.h |   38 +++++++++++++++
- 4 files changed, 157 insertions(+), 0 deletions(-)
- create mode 100644 drivers/base/soc.c
- create mode 100644 include/linux/sys_soc.h
+ Documentation/ABI/testing/sysfs-devices-soc |   48 +++++++++++++++++++++++++++
+ 1 files changed, 48 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/ABI/testing/sysfs-devices-soc
 
-diff --git a/drivers/base/Kconfig b/drivers/base/Kconfig
-index 21cf46f..707aeaf 100644
---- a/drivers/base/Kconfig
-+++ b/drivers/base/Kconfig
-@@ -172,6 +172,9 @@ config SYS_HYPERVISOR
- 	bool
- 	default n
- 
-+config SOC_BUS
-+	bool
-+
- source "drivers/base/regmap/Kconfig"
- 
- endmenu
-diff --git a/drivers/base/Makefile b/drivers/base/Makefile
-index 99a375a..6b84b36 100644
---- a/drivers/base/Makefile
-+++ b/drivers/base/Makefile
-@@ -18,6 +18,7 @@ obj-$(CONFIG_MODULES)	+= module.o
- endif
- obj-$(CONFIG_SYS_HYPERVISOR) += hypervisor.o
- obj-$(CONFIG_REGMAP)	+= regmap/
-+obj-$(CONFIG_SOC_BUS) += soc.o
- 
- ccflags-$(CONFIG_DEBUG_DRIVER) := -DDEBUG
- 
-diff --git a/drivers/base/soc.c b/drivers/base/soc.c
+diff --git a/Documentation/ABI/testing/sysfs-devices-soc b/Documentation/ABI/testing/sysfs-devices-soc
 new file mode 100644
-index 0000000..1578e4e
+index 0000000..549cbda
 --- /dev/null
-+++ b/drivers/base/soc.c
-@@ -0,0 +1,115 @@
-+/*
-+ * Copyright (C) ST-Ericsson SA 2011
-+ *
-+ * Author: Lee Jones <lee.jones@linaro.org> for ST-Ericsson.
-+ * License terms:  GNU General Public License (GPL), version 2
-+ */
++++ b/Documentation/ABI/testing/sysfs-devices-soc
+@@ -0,0 +1,48 @@
++What:		/sys/devices/socX
++Date:		October 2011
++contact:	Lee Jones <lee.jones@linaro.org>
++Description:
++		The /sys/devices/ directory contains a sub-directory for each
++		System-on-Chip (SoC) device on a running platform. Information
++		regarding each SoC can be obtained by reading sysfs files. This
++		functionality is only available if implemented by the platform.
 +
-+#include <linux/sysfs.h>
-+#include <linux/module.h>
-+#include <linux/init.h>
-+#include <linux/stat.h>
-+#include <linux/slab.h>
-+#include <linux/sys_soc.h>
-+#include <linux/err.h>
++		The directory created for each SoC will also house information
++		about devices which are commonly contained in /sys/devices/platform.
++		It has been agreed that if an SoC device exists, its supported
++		devices would be better suited to appear as children of that SoC.
 +
-+static ssize_t soc_info_get(struct device *dev,
-+			    struct device_attribute *attr,
-+			    char *buf);
++What:		/sys/devices/socX/machine
++Date:		October 2011
++contact:	Lee Jones <lee.jones@linaro.org>
++Description:
++		Read-only attribute common to all SoCs. Contains the SoC machine
++		name (e.g. Ux500).
 +
-+static DEVICE_ATTR(machine,  S_IRUGO, soc_info_get,  NULL);
-+static DEVICE_ATTR(family,   S_IRUGO, soc_info_get,  NULL);
-+static DEVICE_ATTR(soc_id,   S_IRUGO, soc_info_get,  NULL);
-+static DEVICE_ATTR(revision, S_IRUGO, soc_info_get,  NULL);
++What:		/sys/devices/socX/family
++Date:		October 2011
++contact:	Lee Jones <lee.jones@linaro.org>
++Description:
++		Read-only attribute common to all SoCs. Contains SoC family name
++		(e.g. DB8500).
 +
-+static ssize_t soc_info_get(struct device *dev,
-+			    struct device_attribute *attr,
-+			    char *buf)
-+{
-+	struct soc_device *soc_dev =
-+		container_of(dev, struct soc_device, dev);
++What:		/sys/devices/socX/soc_id
++Date:		October 2011
++contact:	Lee Jones <lee.jones@linaro.org>
++Description:
++		Read-only attribute supported by most SoCs. In the case of
++		ST-Ericsson's chips this contains the SoC serial number.
 +
-+	if (attr == &dev_attr_machine)
-+		return sprintf(buf, "%s\n", soc_dev->attr->machine);
-+	if (attr == &dev_attr_family)
-+		return sprintf(buf, "%s\n", soc_dev->attr->family);
-+	if (attr == &dev_attr_revision)
-+		return sprintf(buf, "%s\n", soc_dev->attr->revision);
-+	if (attr == &dev_attr_soc_id)
-+		return sprintf(buf, "%s\n", soc_dev->attr->soc_id);
++What:		/sys/devices/socX/revision
++Date:		October 2011
++contact:	Lee Jones <lee.jones@linaro.org>
++Description:
++		Read-only attribute supported by most SoCs. Contains the SoC's
++		manufacturing revision number.
 +
-+	return -EINVAL;
-+
-+}
-+
-+struct bus_type soc_bus_type = {
-+	.name  = "soc",
-+};
-+
-+static int __init soc_bus_register(void)
-+{
-+	return bus_register(&soc_bus_type);
-+}
-+core_initcall(soc_bus_register);
-+
-+struct attribute *soc_attr[] = {
-+	&dev_attr_machine.attr,
-+	&dev_attr_family.attr,
-+	&dev_attr_soc_id.attr,
-+	&dev_attr_revision.attr,
-+	NULL,
-+};
-+
-+struct attribute_group soc_attr_group = {
-+	.attrs = soc_attr,
-+};
-+
-+struct device *soc_device_register(struct soc_device_attribute *soc_dev_attr)
-+{
-+	struct soc_device *soc_dev;
-+	static atomic_t soc_device_num = ATOMIC_INIT(0);
-+	int ret;
-+
-+	soc_dev = kzalloc(sizeof(*soc_dev), GFP_KERNEL);
-+	if (!soc_dev)
-+		return ERR_PTR(-ENOMEM);
-+
-+	soc_dev->attr = soc_dev_attr;
-+	soc_dev->dev.bus = &soc_bus_type;
-+
-+	dev_set_name(&soc_dev->dev, "soc%d",
-+		atomic_inc_return(&soc_device_num) - 1);
-+
-+	ret = device_register(&soc_dev->dev);
-+	if (ret)
-+		goto out1;
-+
-+	ret = sysfs_create_group(&soc_dev->dev.kobj, &soc_attr_group);
-+	if (ret)
-+		goto out2;
-+
-+	return &soc_dev->dev;
-+
-+out2:
-+	device_unregister(&soc_dev->dev);
-+out1:
-+	kfree(soc_dev);
-+	kfree(soc_dev->attr);
-+	return ERR_PTR(ret);
-+}
-+
-+void soc_device_unregister(struct device *dev)
-+{
-+	struct soc_device *soc_dev =
-+		container_of(dev, struct soc_device, dev);
-+
-+	sysfs_remove_group(&dev->kobj, &soc_attr_group);
-+
-+	if (device_is_registered(dev))
-+		device_unregister(dev);
-+
-+	bus_unregister(&soc_bus_type);
-+
-+	kfree(soc_dev->attr);
-+	kfree(soc_dev);
-+}
-diff --git a/include/linux/sys_soc.h b/include/linux/sys_soc.h
-new file mode 100644
-index 0000000..2485a0f2
---- /dev/null
-+++ b/include/linux/sys_soc.h
-@@ -0,0 +1,38 @@
-+/*
-+ * Copyright (C) ST-Ericsson SA 2011
-+ * Author: Lee Jones <lee.jones@linaro.org> for ST-Ericsson.
-+ * License terms:  GNU General Public License (GPL), version 2
-+ */
-+#ifndef __SOC_BUS_H
-+#define __SOC_BUS_H
-+
-+#include <linux/kobject.h>
-+#include <linux/device.h>
-+#include <linux/platform_device.h>
-+
-+struct soc_device_attribute {
-+	const char *machine;
-+	const char *family;
-+	const char *revision;
-+	const char *soc_id;
-+};
-+
-+struct soc_device {
-+	struct device dev;
-+	struct soc_device_attribute *attr;
-+};
-+
-+/**
-+ * soc_device_register - register SoC as a device
-+ * @soc_plat_dev_attr: Attributes passed from platform to be attributed to a SoC
-+ */
-+struct device *soc_device_register(
-+	struct soc_device_attribute *soc_plat_dev_attr);
-+
-+/**
-+ * soc_device_unregister - unregister SoC device
-+ * @dev: SoC device to be unregistered
-+ */
-+void soc_device_unregister(struct device *dev);
-+
-+#endif /* __SOC_BUS_H */
++What:		/sys/devices/socX/process
++Date:		October 2011
++contact:	Lee Jones <lee.jones@linaro.org>
++Description:
++		Read-only attribute supported ST-Ericsson's silicon. Contains the
++		the process by which the silicon chip was manufactured.
 -- 
 1.7.5.4
