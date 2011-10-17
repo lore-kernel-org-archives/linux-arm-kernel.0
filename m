@@ -1,38 +1,37 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 17 Oct 2011 13:44:24 +0200
-Subject: [PATCH 2/9] ARM: SPMP8000: Add machine base files
-In-Reply-To: <20111016205221.GL1459@game.jcrosoft.org>
-References: <1318178172-7965-1-git-send-email-zoss@devai.org>
-	<201110162259.19960.arnd@arndb.de>
-	<20111016205221.GL1459@game.jcrosoft.org>
-Message-ID: <201110171344.24697.arnd@arndb.de>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 17 Oct 2011 12:52:52 +0100
+Subject: [PATCH 0/6] ux500: Export SoC information and some platform clean-up
+Message-ID: <1318852378-14180-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 16 October 2011, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> On 22:59 Sun 16 Oct     , Arnd Bergmann wrote:
-> > On Sunday 16 October 2011, Zoltan Devai wrote:
-> >> BTW, the static mappings are only needed to be able to set up the
-> >> clk stuff in init_early. That in turn is only needed for the timer code to
-> >> determinate its input clock.
-> >> If I would hard-code the timer clock rate in its driver (the bootloader is
-> >> very unlikely to change), then I could init the clk driver from
-> >> machine_init and get rid of these mappings.
-> >> How about that ?
-> > 
-> > Maybe you can just pass the clock rate in the device tree then. If the boot
-> > loader changes it, it can still pass the correct rate and you don't
-> > need the early mappings for functional reasons any more.
->
-> please don't update the DT from the bootloader, I'll recommand you to limit
-> your bootloader to just update the strict minimun (same as ATAG) and touch
-> noting else
+This patch-set satisfies 4 objectives:
+  1. Ensures each platform device can specify a suitable parent
+  2. Provides a bus for SoC devices as a means to export information
+  3. Allows ux500 to make use of the new SoC bus
+  4. Cleans up unnecessary complexity from ux500 code 
 
-Why? Do you think it's better to hardcode it and have no way to update it?
-Note that the more likely scenario even with clock rate in the device tree
-would be that the value is hardcoded in the board's file and would not
-be touched by the boot loader. Only if the boot loader actually changes
-the physical clock rate (which Zoltan described as very unlikely), it
-would also have to go the full length and update the device tree as well.
-
-	Arnd
+ Documentation/ABI/testing/sysfs-devices-soc    |   24 ++++
+ arch/arm/mach-ux500/Kconfig                    |    1 +
+ arch/arm/mach-ux500/board-mop500-sdi.c         |   30 ++--
+ arch/arm/mach-ux500/board-mop500.c             |   74 +++++++----
+ arch/arm/mach-ux500/board-mop500.h             |    6 +-
+ arch/arm/mach-ux500/board-u5500-sdi.c          |    4 +-
+ arch/arm/mach-ux500/board-u5500.c              |   27 +++--
+ arch/arm/mach-ux500/cpu-db5500.c               |   37 ++++-
+ arch/arm/mach-ux500/cpu-db8500.c               |   45 +++++-
+ arch/arm/mach-ux500/cpu.c                      |   67 +++++++++
+ arch/arm/mach-ux500/devices-common.c           |   79 +++---------
+ arch/arm/mach-ux500/devices-common.h           |   71 +++++-----
+ arch/arm/mach-ux500/devices-db5500.h           |  116 +++++++++-------
+ arch/arm/mach-ux500/devices-db8500.h           |  176 ++++++++++++++----------
+ arch/arm/mach-ux500/dma-db5500.c               |    3 +-
+ arch/arm/mach-ux500/include/mach/db8500-regs.h |    3 +
+ arch/arm/mach-ux500/include/mach/setup.h       |   10 +-
+ arch/arm/mach-ux500/include/mach/usb.h         |    4 +-
+ arch/arm/mach-ux500/usb.c                      |    7 +-
+ drivers/base/Kconfig                           |    3 +
+ drivers/base/Makefile                          |    1 +
+ drivers/base/soc.c                             |  115 +++++++++++++++
+ include/linux/sys_soc.h                        |   38 +++++
+ 23 files changed, 639 insertions(+), 302 deletions(-)
