@@ -1,116 +1,35 @@
-From: gregkh@suse.de (Greg KH)
-Date: Mon, 17 Oct 2011 09:16:16 -0700
-Subject: [PATCH 2/6] drivers/base: add bus for System-on-Chip devices
-In-Reply-To: <1318852378-14180-3-git-send-email-lee.jones@linaro.org>
-References: <1318852378-14180-1-git-send-email-lee.jones@linaro.org>
-	<1318852378-14180-3-git-send-email-lee.jones@linaro.org>
-Message-ID: <20111017161616.GA5108@suse.de>
+From: matt@grid-net.com (Matt Burtch)
+Date: Mon, 17 Oct 2011 09:25:45 -0700
+Subject: [ resend PATCH 1/1] ARM: i.MX28: shift frac value in _CLK_SET_RATE
+Message-ID: <1318868745-19732-1-git-send-email-matt@grid-net.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 17, 2011 at 12:52:54PM +0100, Lee Jones wrote:
-> Traditionally, any System-on-Chip based platform creates a flat list
-> of platform_devices directly under /sys/devices/platform.
-> 
-> In order to give these some better structure, this introduces a new
-> bus type for soc_devices that are registered with the new
-> soc_device_register() function.  All devices that are on the same
-> chip should then be registered as child devices of the soc device.
-> 
-> The soc bus also exports a few standardised device attributes which
-> allow user space to query the specific type of soc.
-> 
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+Fixed whitespace formatting per Shawn Guo.
 
-The code is much better, and smaller, but there's still some issues with
-it:
+Noticed when setting SSP0 in clk_set_rate, _CLK_SET_RATE attempts to reset the clock divider for the SSP0 parent clock, in this case IO0FRAC. Bits 24-29 of HW_CLKCTRL_FRAC0 are cleared correctly, but when the new frac value is written the value isn't shifted up to write the correct bit-field.  This results in IO0FRAC being set to 0 and CPUFRAC being corrupted.
 
-> +static ssize_t soc_info_get(struct device *dev,
-> +			    struct device_attribute *attr,
-> +			    char *buf);
-> +
-> +static DEVICE_ATTR(machine,  S_IRUGO, soc_info_get,  NULL);
-> +static DEVICE_ATTR(family,   S_IRUGO, soc_info_get,  NULL);
-> +static DEVICE_ATTR(soc_id,   S_IRUGO, soc_info_get,  NULL);
-> +static DEVICE_ATTR(revision, S_IRUGO, soc_info_get,  NULL);
-> +
-> +static ssize_t soc_info_get(struct device *dev,
-> +			    struct device_attribute *attr,
-> +			    char *buf)
-> +{
-> +	struct soc_device *soc_dev =
-> +		container_of(dev, struct soc_device, dev);
-> +
-> +	if (attr == &dev_attr_machine)
-> +		return sprintf(buf, "%s\n", soc_dev->attr->machine);
-> +	if (attr == &dev_attr_family)
-> +		return sprintf(buf, "%s\n", soc_dev->attr->family);
-> +	if (attr == &dev_attr_revision)
-> +		return sprintf(buf, "%s\n", soc_dev->attr->revision);
-> +	if (attr == &dev_attr_soc_id)
-> +		return sprintf(buf, "%s\n", soc_dev->attr->soc_id);
-> +
-> +	return -EINVAL;
-> +
-> +}
+This should occur when writing IO1FRAC, EMIFRAC in HW_CLKCTRL_FRAC0 and GPMIFRAC, HSADCFRAC in HW_CLKCTRL_FRAC1.
 
-If you move around things a bit here, you can save 4 lines of code,
-please do so.
+Tested on custom i.MX28 board with SSP0 SPI driver.
 
-> +
-> +struct bus_type soc_bus_type = {
-> +	.name  = "soc",
-> +};
-> +
-> +static int __init soc_bus_register(void)
-> +{
-> +	return bus_register(&soc_bus_type);
-> +}
-> +core_initcall(soc_bus_register);
+Signed-off-by: Matt Burtch <matt@grid-net.com>
+---
+ arch/arm/mach-mxs/clock-mx28.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-No unregister?
-
-> +struct attribute *soc_attr[] = {
-> +	&dev_attr_machine.attr,
-> +	&dev_attr_family.attr,
-> +	&dev_attr_soc_id.attr,
-> +	&dev_attr_revision.attr,
-> +	NULL,
-> +};
-> +
-> +struct attribute_group soc_attr_group = {
-> +	.attrs = soc_attr,
-> +};
-> +
-> +struct device *soc_device_register(struct soc_device_attribute *soc_dev_attr)
-> +{
-> +	struct soc_device *soc_dev;
-> +	static atomic_t soc_device_num = ATOMIC_INIT(0);
-
-No, please don't do this, use the proper kernel interface to dynamically
-handle numbering devices (hint, if you unload a SOC device, you will
-never reclaim that device number, which isn't that nice.)
-
-> +struct soc_device_attribute {
-> +	const char *machine;
-> +	const char *family;
-> +	const char *revision;
-> +	const char *soc_id;
-> +};
-
-What happens if one of these attributes is NULL?  Please check for that
-when you create the attributes so that you don't create an attribute you
-don't want to.
-
-> +
-> +struct soc_device {
-> +	struct device dev;
-> +	struct soc_device_attribute *attr;
-> +};
-
-Why is this needed to be defined here?  It should be in the .c file as
-no external code needs to know what it looks like.
-
-thanks,
-
-greg k-h
+diff --git a/arch/arm/mach-mxs/clock-mx28.c b/arch/arm/mach-mxs/clock-mx28.c
+index 5dcc59d..ba53227 100644
+--- a/arch/arm/mach-mxs/clock-mx28.c
++++ b/arch/arm/mach-mxs/clock-mx28.c
+@@ -349,7 +349,7 @@ static int name##_set_rate(struct clk *clk, unsigned long rate)		\
+ 									\
+ 		reg = __raw_readl(CLKCTRL_BASE_ADDR + HW_CLKCTRL_##fr);	\
+ 		reg &= ~BM_CLKCTRL_##fr##_##fs##FRAC;			\
+-		reg |= frac;						\
++		reg |= frac << BP_CLKCTRL_##fr##_##fs##FRAC;		\
+ 		__raw_writel(reg, CLKCTRL_BASE_ADDR + HW_CLKCTRL_##fr);	\
+ 	}								\
+ 									\
+-- 
+1.7.1
