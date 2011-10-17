@@ -1,192 +1,98 @@
 From: haojian.zhuang@marvell.com (Haojian Zhuang)
-Date: Mon, 17 Oct 2011 21:35:13 +0800
-Subject: [PATCH v5 07/11] ARM: pxa: use little endian read write in gpio driver
+Date: Mon, 17 Oct 2011 21:35:14 +0800
+Subject: [PATCH v5 08/11] ARM: pxa: use generic gpio operation instead of gpio
+	register
 In-Reply-To: <1318858517-22494-1-git-send-email-haojian.zhuang@marvell.com>
 References: <1318858517-22494-1-git-send-email-haojian.zhuang@marvell.com>
-Message-ID: <1318858517-22494-8-git-send-email-haojian.zhuang@marvell.com>
+Message-ID: <1318858517-22494-9-git-send-email-haojian.zhuang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove __raw_readl()/__raw_writel(). Use readl_relaxed()/writel_relaxed()
-instead.
+Remove the code of accessing gpio register. Use the generic read
+operation instead.
 
 Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
 ---
- drivers/gpio/gpio-pxa.c |   68 +++++++++++++++++++++++-----------------------
- 1 files changed, 34 insertions(+), 34 deletions(-)
+ arch/arm/mach-pxa/corgi_pm.c |   12 +++++++++---
+ arch/arm/mach-pxa/spitz_pm.c |    9 +++++++--
+ 2 files changed, 16 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/gpio/gpio-pxa.c b/drivers/gpio/gpio-pxa.c
-index c7f35a2..673caf9 100644
---- a/drivers/gpio/gpio-pxa.c
-+++ b/drivers/gpio/gpio-pxa.c
-@@ -143,12 +143,12 @@ static int pxa_gpio_direction_input(struct gpio_chip *chip, unsigned offset)
+diff --git a/arch/arm/mach-pxa/corgi_pm.c b/arch/arm/mach-pxa/corgi_pm.c
+index 2903477..6c3a0a2 100644
+--- a/arch/arm/mach-pxa/corgi_pm.c
++++ b/arch/arm/mach-pxa/corgi_pm.c
+@@ -40,7 +40,9 @@ static struct gpio charger_gpios[] = {
+ 	{ CORGI_GPIO_ADC_TEMP_ON, GPIOF_OUT_INIT_LOW, "ADC Temp On" },
+ 	{ CORGI_GPIO_CHRG_ON,	  GPIOF_OUT_INIT_LOW, "Charger On" },
+ 	{ CORGI_GPIO_CHRG_UKN,	  GPIOF_OUT_INIT_LOW, "Charger Unknown" },
++	{ CORGI_GPIO_AC_IN,	  GPIOF_IN, "Charger Detection" },
+ 	{ CORGI_GPIO_KEY_INT,	  GPIOF_IN, "Key Interrupt" },
++	{ CORGI_GPIO_WAKEUP,	  GPIOF_IN, "System wakeup notification" },
+ };
  
- 	spin_lock_irqsave(&gpio_lock, flags);
- 
--	value = __raw_readl(base + GPDR_OFFSET);
-+	value = readl_relaxed(base + GPDR_OFFSET);
- 	if (__gpio_is_inverted(chip->base + offset))
- 		value |= mask;
- 	else
- 		value &= ~mask;
--	__raw_writel(value, base + GPDR_OFFSET);
-+	writel_relaxed(value, base + GPDR_OFFSET);
- 
- 	spin_unlock_irqrestore(&gpio_lock, flags);
- 	return 0;
-@@ -161,16 +161,16 @@ static int pxa_gpio_direction_output(struct gpio_chip *chip,
- 	uint32_t tmp, mask = 1 << offset;
- 	unsigned long flags;
- 
--	__raw_writel(mask, base + (value ? GPSR_OFFSET : GPCR_OFFSET));
-+	writel_relaxed(mask, base + (value ? GPSR_OFFSET : GPCR_OFFSET));
- 
- 	spin_lock_irqsave(&gpio_lock, flags);
- 
--	tmp = __raw_readl(base + GPDR_OFFSET);
-+	tmp = readl_relaxed(base + GPDR_OFFSET);
- 	if (__gpio_is_inverted(chip->base + offset))
- 		tmp &= ~mask;
- 	else
- 		tmp |= mask;
--	__raw_writel(tmp, base + GPDR_OFFSET);
-+	writel_relaxed(tmp, base + GPDR_OFFSET);
- 
- 	spin_unlock_irqrestore(&gpio_lock, flags);
- 	return 0;
-@@ -178,12 +178,12 @@ static int pxa_gpio_direction_output(struct gpio_chip *chip,
- 
- static int pxa_gpio_get(struct gpio_chip *chip, unsigned offset)
+ static void corgi_charger_init(void)
+@@ -90,7 +92,7 @@ static int corgi_should_wakeup(unsigned int resume_on_alarm)
  {
--	return __raw_readl(gpio_chip_base(chip) + GPLR_OFFSET) & (1 << offset);
-+	return readl_relaxed(gpio_chip_base(chip) + GPLR_OFFSET) & (1 << offset);
- }
+ 	int is_resume = 0;
  
- static void pxa_gpio_set(struct gpio_chip *chip, unsigned offset, int value)
+-	dev_dbg(sharpsl_pm.dev, "GPLR0 = %x,%x\n", GPLR0, PEDR);
++	dev_dbg(sharpsl_pm.dev, "GPLR0 = %x,%x\n", charger_gpios[4].gpio, PEDR);
+ 
+ 	if ((PEDR & GPIO_bit(CORGI_GPIO_AC_IN))) {
+ 		if (sharpsl_pm.machinfo->read_devdata(SHARPSL_STATUS_ACIN)) {
+@@ -124,14 +126,18 @@ static int corgi_should_wakeup(unsigned int resume_on_alarm)
+ 
+ static unsigned long corgi_charger_wakeup(void)
  {
--	__raw_writel(1 << offset, gpio_chip_base(chip) +
-+	writel_relaxed(1 << offset, gpio_chip_base(chip) +
- 				(value ? GPSR_OFFSET : GPCR_OFFSET));
+-	return ~GPLR0 & ( GPIO_bit(CORGI_GPIO_AC_IN) | GPIO_bit(CORGI_GPIO_KEY_INT) | GPIO_bit(CORGI_GPIO_WAKEUP) );
++	unsigned long gplr0;
++	gplr0 = gpio_get_value(charger_gpios[3].gpio);
++	return ~gplr0 & ( GPIO_bit(CORGI_GPIO_AC_IN) | GPIO_bit(CORGI_GPIO_KEY_INT) | GPIO_bit(CORGI_GPIO_WAKEUP) );
  }
  
-@@ -228,12 +228,12 @@ static inline void update_edge_detect(struct pxa_gpio_chip *c)
+ unsigned long corgipm_read_devdata(int type)
  {
- 	uint32_t grer, gfer;
++	unsigned long gplr0 = 0;
+ 	switch(type) {
+ 	case SHARPSL_STATUS_ACIN:
+-		return ((GPLR(CORGI_GPIO_AC_IN) & GPIO_bit(CORGI_GPIO_AC_IN)) != 0);
++		gplr0 = gpio_get_value(charger_gpios[3].gpio);
++		return ((gplr0 & GPIO_bit(CORGI_GPIO_AC_IN)) != 0);
+ 	case SHARPSL_STATUS_LOCK:
+ 		return gpio_get_value(sharpsl_pm.machinfo->gpio_batlock);
+ 	case SHARPSL_STATUS_CHRGFULL:
+diff --git a/arch/arm/mach-pxa/spitz_pm.c b/arch/arm/mach-pxa/spitz_pm.c
+index 094279a..adf87ed 100644
+--- a/arch/arm/mach-pxa/spitz_pm.c
++++ b/arch/arm/mach-pxa/spitz_pm.c
+@@ -41,6 +41,7 @@ static int spitz_last_ac_status;
+ static struct gpio spitz_charger_gpios[] = {
+ 	{ SPITZ_GPIO_KEY_INT,	GPIOF_IN, "Keyboard Interrupt" },
+ 	{ SPITZ_GPIO_SYNC,	GPIOF_IN, "Sync" },
++	{ SPITZ_GPIO_AC_IN,     GPIOF_IN, "Charger Detection" },
+ 	{ SPITZ_GPIO_ADC_TEMP_ON, GPIOF_OUT_INIT_LOW, "ADC Temp On" },
+ 	{ SPITZ_GPIO_JK_B,	  GPIOF_OUT_INIT_LOW, "JK B" },
+ 	{ SPITZ_GPIO_CHRG_ON,	  GPIOF_OUT_INIT_LOW, "Charger On" },
+@@ -169,14 +170,18 @@ static int spitz_should_wakeup(unsigned int resume_on_alarm)
  
--	grer = __raw_readl(c->regbase + GRER_OFFSET) & ~c->irq_mask;
--	gfer = __raw_readl(c->regbase + GFER_OFFSET) & ~c->irq_mask;
-+	grer = readl_relaxed(c->regbase + GRER_OFFSET) & ~c->irq_mask;
-+	gfer = readl_relaxed(c->regbase + GFER_OFFSET) & ~c->irq_mask;
- 	grer |= c->irq_edge_rise & c->irq_mask;
- 	gfer |= c->irq_edge_fall & c->irq_mask;
--	__raw_writel(grer, c->regbase + GRER_OFFSET);
--	__raw_writel(gfer, c->regbase + GFER_OFFSET);
-+	writel_relaxed(grer, c->regbase + GRER_OFFSET);
-+	writel_relaxed(gfer, c->regbase + GFER_OFFSET);
+ static unsigned long spitz_charger_wakeup(void)
+ {
+-	return (~GPLR0 & GPIO_bit(SPITZ_GPIO_KEY_INT)) | (GPLR0 & GPIO_bit(SPITZ_GPIO_SYNC));
++	unsigned long gplr0;
++	gplr0 = gpio_get_value(spitz_charger_gpios[0].gpio);
++	return (~gplr0 & GPIO_bit(SPITZ_GPIO_KEY_INT)) | (gplr0 & GPIO_bit(SPITZ_GPIO_SYNC));
  }
  
- static int pxa_gpio_irq_type(struct irq_data *d, unsigned int type)
-@@ -257,12 +257,12 @@ static int pxa_gpio_irq_type(struct irq_data *d, unsigned int type)
- 		type = IRQ_TYPE_EDGE_RISING | IRQ_TYPE_EDGE_FALLING;
- 	}
- 
--	gpdr = __raw_readl(c->regbase + GPDR_OFFSET);
-+	gpdr = readl_relaxed(c->regbase + GPDR_OFFSET);
- 
- 	if (__gpio_is_inverted(gpio))
--		__raw_writel(gpdr | mask,  c->regbase + GPDR_OFFSET);
-+		writel_relaxed(gpdr | mask,  c->regbase + GPDR_OFFSET);
- 	else
--		__raw_writel(gpdr & ~mask, c->regbase + GPDR_OFFSET);
-+		writel_relaxed(gpdr & ~mask, c->regbase + GPDR_OFFSET);
- 
- 	if (type & IRQ_TYPE_EDGE_RISING)
- 		c->irq_edge_rise |= mask;
-@@ -293,9 +293,9 @@ static void pxa_gpio_demux_handler(unsigned int irq, struct irq_desc *desc)
- 		for_each_gpio_chip(gpio, c) {
- 			gpio_base = c->chip.base;
- 
--			gedr = __raw_readl(c->regbase + GEDR_OFFSET);
-+			gedr = readl_relaxed(c->regbase + GEDR_OFFSET);
- 			gedr = gedr & c->irq_mask;
--			__raw_writel(gedr, c->regbase + GEDR_OFFSET);
-+			writel_relaxed(gedr, c->regbase + GEDR_OFFSET);
- 
- 			n = find_first_bit(&gedr, BITS_PER_LONG);
- 			while (n < BITS_PER_LONG) {
-@@ -313,7 +313,7 @@ static void pxa_ack_muxed_gpio(struct irq_data *d)
- 	int gpio = pxa_irq_to_gpio(d->irq);
- 	struct pxa_gpio_chip *c = gpio_to_pxachip(gpio);
- 
--	__raw_writel(GPIO_bit(gpio), c->regbase + GEDR_OFFSET);
-+	writel_relaxed(GPIO_bit(gpio), c->regbase + GEDR_OFFSET);
- }
- 
- static void pxa_mask_muxed_gpio(struct irq_data *d)
-@@ -324,10 +324,10 @@ static void pxa_mask_muxed_gpio(struct irq_data *d)
- 
- 	c->irq_mask &= ~GPIO_bit(gpio);
- 
--	grer = __raw_readl(c->regbase + GRER_OFFSET) & ~GPIO_bit(gpio);
--	gfer = __raw_readl(c->regbase + GFER_OFFSET) & ~GPIO_bit(gpio);
--	__raw_writel(grer, c->regbase + GRER_OFFSET);
--	__raw_writel(gfer, c->regbase + GFER_OFFSET);
-+	grer = readl_relaxed(c->regbase + GRER_OFFSET) & ~GPIO_bit(gpio);
-+	gfer = readl_relaxed(c->regbase + GFER_OFFSET) & ~GPIO_bit(gpio);
-+	writel_relaxed(grer, c->regbase + GRER_OFFSET);
-+	writel_relaxed(gfer, c->regbase + GFER_OFFSET);
- }
- 
- static void pxa_unmask_muxed_gpio(struct irq_data *d)
-@@ -398,9 +398,9 @@ void __init pxa_init_gpio(int mux_irq, int start, int end, set_wake_t fn)
- 
- 	/* clear all GPIO edge detects */
- 	for_each_gpio_chip(gpio, c) {
--		__raw_writel(0, c->regbase + GFER_OFFSET);
--		__raw_writel(0, c->regbase + GRER_OFFSET);
--		__raw_writel(~0,c->regbase + GEDR_OFFSET);
-+		writel_relaxed(0, c->regbase + GFER_OFFSET);
-+		writel_relaxed(0, c->regbase + GRER_OFFSET);
-+		writel_relaxed(~0,c->regbase + GEDR_OFFSET);
- 	}
- 
- #ifdef CONFIG_ARCH_PXA
-@@ -435,13 +435,13 @@ static int pxa_gpio_suspend(void)
- 	int gpio;
- 
- 	for_each_gpio_chip(gpio, c) {
--		c->saved_gplr = __raw_readl(c->regbase + GPLR_OFFSET);
--		c->saved_gpdr = __raw_readl(c->regbase + GPDR_OFFSET);
--		c->saved_grer = __raw_readl(c->regbase + GRER_OFFSET);
--		c->saved_gfer = __raw_readl(c->regbase + GFER_OFFSET);
-+		c->saved_gplr = readl_relaxed(c->regbase + GPLR_OFFSET);
-+		c->saved_gpdr = readl_relaxed(c->regbase + GPDR_OFFSET);
-+		c->saved_grer = readl_relaxed(c->regbase + GRER_OFFSET);
-+		c->saved_gfer = readl_relaxed(c->regbase + GFER_OFFSET);
- 
- 		/* Clear GPIO transition detect bits */
--		__raw_writel(0xffffffff, c->regbase + GEDR_OFFSET);
-+		writel_relaxed(0xffffffff, c->regbase + GEDR_OFFSET);
- 	}
- 	return 0;
- }
-@@ -453,12 +453,12 @@ static void pxa_gpio_resume(void)
- 
- 	for_each_gpio_chip(gpio, c) {
- 		/* restore level with set/clear */
--		__raw_writel( c->saved_gplr, c->regbase + GPSR_OFFSET);
--		__raw_writel(~c->saved_gplr, c->regbase + GPCR_OFFSET);
-+		writel_relaxed( c->saved_gplr, c->regbase + GPSR_OFFSET);
-+		writel_relaxed(~c->saved_gplr, c->regbase + GPCR_OFFSET);
- 
--		__raw_writel(c->saved_grer, c->regbase + GRER_OFFSET);
--		__raw_writel(c->saved_gfer, c->regbase + GFER_OFFSET);
--		__raw_writel(c->saved_gpdr, c->regbase + GPDR_OFFSET);
-+		writel_relaxed(c->saved_grer, c->regbase + GRER_OFFSET);
-+		writel_relaxed(c->saved_gfer, c->regbase + GFER_OFFSET);
-+		writel_relaxed(c->saved_gpdr, c->regbase + GPDR_OFFSET);
- 	}
- }
- #else
+ unsigned long spitzpm_read_devdata(int type)
+ {
++	unsigned long gplr = 0;
+ 	switch (type) {
+ 	case SHARPSL_STATUS_ACIN:
+-		return (((~GPLR(SPITZ_GPIO_AC_IN)) & GPIO_bit(SPITZ_GPIO_AC_IN)) != 0);
++		gplr = gpio_get_value(spitz_charger_gpios[2].gpio);
++		return ((~gplr & GPIO_bit(SPITZ_GPIO_AC_IN)) != 0);
+ 	case SHARPSL_STATUS_LOCK:
+ 		return gpio_get_value(sharpsl_pm.machinfo->gpio_batlock);
+ 	case SHARPSL_STATUS_CHRGFULL:
 -- 
 1.7.2.5
