@@ -1,63 +1,33 @@
-From: afzal@ti.com (Afzal Mohammed)
-Date: Mon, 17 Oct 2011 18:30:32 +0530
-Subject: Build error while adding debug LL support for new board
-Message-ID: <1318856432-20219-1-git-send-email-afzal@ti.com>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Mon, 17 Oct 2011 15:12:22 +0200
+Subject: [PATCH 1/3] spi/pl022: fix build warnings
+Message-ID: <1318857142-32127-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Russell,
+From: Jonas Aaberg <jonas.aberg@stericsson.com>
 
-While adding low level debug support for new board in OMAP2+ family, we
-came across following error,
+The driver build complains with newer compilers unless you
+initialize this struct properly.
 
-arch/arm/kernel/debug.S: Assembler messages:
-arch/arm/kernel/debug.S:138: Error: invalid constant (428) after fixup
-
-Following patch fixes it, I am not sure whether this is the right fix,
-please let us know your comments.
-
-Regards
-Afzal
-
-From: Afzal Mohammed <afzal@ti.com>
-Date: Fri, 14 Oct 2011 12:56:16 +0530
-Subject: [PATCH] ARM: Fix error upon adding LL debug
-
-Upon adding new board LL debug support, if the resultant code
-addition would not cause PC relative offset of "hexbuf" from
-"adr r2, hexbuf" (+2) instruction to be representable in a
-shifted 8-bit value (hence indirectly putting higher aligment
-requirement on larger offsets), following error occurs,
-
-arch/arm/kernel/debug.S: Assembler messages:
-arch/arm/kernel/debug.S:138: Error: invalid constant (428) after fixup
-
-Fix it by bringing "hexbuf" closer so that "adr"
-can have the offset.
-
-Signed-off-by: Afzal Mohammed <afzal@ti.com>
+Signed-off-by: Jonas Aaberg <jonas.aberg@stericsson.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/kernel/debug.S |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+ drivers/spi/spi-pl022.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/kernel/debug.S b/arch/arm/kernel/debug.S
-index bcd66e0..0f852d0 100644
---- a/arch/arm/kernel/debug.S
-+++ b/arch/arm/kernel/debug.S
-@@ -151,6 +151,8 @@ printhex:   adr     r2, hexbuf
-                b       printascii
- ENDPROC(printhex2)
-
-+hexbuf:                .space 16
-+
-                .ltorg
-
- ENTRY(printascii)
-@@ -175,5 +177,3 @@ ENTRY(printch)
-                mov     r0, #0
-                b       1b
- ENDPROC(printch)
--
--hexbuf:                .space 16
---
-1.6.2.4
+diff --git a/drivers/spi/spi-pl022.c b/drivers/spi/spi-pl022.c
+index debdaeb..91700bb 100644
+--- a/drivers/spi/spi-pl022.c
++++ b/drivers/spi/spi-pl022.c
+@@ -1930,7 +1930,7 @@ static int pl022_setup(struct spi_device *spi)
+ {
+ 	struct pl022_config_chip const *chip_info;
+ 	struct chip_data *chip;
+-	struct ssp_clock_params clk_freq = {0, };
++	struct ssp_clock_params clk_freq = { .cpsdvsr = 0, .scr = 0};
+ 	int status = 0;
+ 	struct pl022 *pl022 = spi_master_get_devdata(spi->master);
+ 	unsigned int bits = spi->bits_per_word;
+-- 
+1.7.3.2
