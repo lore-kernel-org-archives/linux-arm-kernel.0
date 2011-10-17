@@ -1,61 +1,101 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Mon, 17 Oct 2011 19:36:00 +0200
-Subject: Update: ARM Sub-Architecture Maintainers workshop at Kernel	Summit
-	2011
-In-Reply-To: <20111012091900.GA13134@arm.com>
-References: <CACxGe6vMLeHrN7jLB2=JYQON1ykOiWTeGiH8YXkUbguV0D-HEw@mail.gmail.com>	<4E81CEB8.4090908@compulab.co.il>
-	<4E955A59.4090705@compulab.co.il> <20111012091900.GA13134@arm.com>
-Message-ID: <4E9C6780.1070003@compulab.co.il>
+From: mturquette@ti.com (Turquette, Mike)
+Date: Mon, 17 Oct 2011 10:46:45 -0700
+Subject: [PATCH v2 4/7] clk: Add simple gated clock
+In-Reply-To: <20111017064217.GA20184@b20223-02.ap.freescale.net>
+References: <1316730422-20027-1-git-send-email-mturquette@ti.com>
+	<1316730422-20027-5-git-send-email-mturquette@ti.com>
+	<20111012064646.GA31037@b20223-02.ap.freescale.net>
+	<CAJOA=zPw7BF1iNFaG9js2k6++qPnXz5S3dq4rsPmUWOcUztL0g@mail.gmail.com>
+	<20111016182649.GB13565@pengutronix.de>
+	<20111017064217.GA20184@b20223-02.ap.freescale.net>
+Message-ID: <CAJOA=zPqBCZekAyPBAberrOdGcfhrgdtLWnBD=iirDZpacNCtw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Catalin,
-
-On 10/12/11 11:19, Catalin Marinas wrote:
-> On Wed, Oct 12, 2011 at 10:14:01AM +0100, Igor Grinberg wrote:
->>> One of the LPC2011's bottom lines was:
->>> "We need more people involved in ARM maintainership to help
->>> the sub-architecture maintainers do a better job on
->>> review/consolidation/generalization/etc. of the code."
->>>
->>> Despite the major goal of the DT to reduce the SoC and
->>> board specific code to absolute minimum, there will still be cases
->>> (e.g. discrete power management circuitry) when there is no
->>> appropriate DT solution available and the board file
->>> is a necessity. Also there are already many boards that will remain
->>> and will not be converted to DT.
->>>
->>> Bringing all the above together, I'd like to propose a new "job"
->>> for maintaining board specific code on a cross-platform basis.
->>>
->>> Pros:
->>> 1) There might (I have not checked this, but I'm sure there is) be
->>> code in the existing board files (that are not likely to go away
->>> at least in a couple of years) that can be consolidated and
->>> may be even in a cross-platform manner.
->>> 2) Lower the work load from SoC maintainers (that don't have enough
->>> time to care much about the board specific changes).
->>> 3) Some more eyes to review the newly submitted code.
->>>
->>> Cons:
->>> 1) Resulting overhead for the code to go upstream.
->>> 2) Possible addition of merge conflicts.
->>>
->>>
->>> I'd like to hear, what do you think of the above proposal?
+On Sun, Oct 16, 2011 at 11:42 PM, Richard Zhao <richard.zhao@linaro.org> wrote:
+> On Sun, Oct 16, 2011 at 08:26:49PM +0200, Sascha Hauer wrote:
+>> On Wed, Oct 12, 2011 at 07:59:19AM -0700, Turquette, Mike wrote:
+>> > On Tue, Oct 11, 2011 at 11:46 PM, Richard Zhao
+>> > <richard.zhao@freescale.com> wrote:
+>> > > On Thu, Sep 22, 2011 at 03:26:59PM -0700, Mike Turquette wrote:
+>> > >> From: Jeremy Kerr <jeremy.kerr@canonical.com>
+>> > >>
+>> > >> Signed-off-by: Jeremy Kerr <jeremy.kerr@canonical.com>
+>> > >> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+>> > >> Signed-off-by: Jamie Iles <jamie@jamieiles.com>
+>> > >> Signed-off-by: Mike Turquette <mturquette@ti.com>
+>> > >> ---
+>> > >> Changes since v1:
+>> > >> Add copyright header
+>> > >> Fold in Jamie's patch for set-to-disable clks
+>> > >> Use BIT macro instead of shift
+>> > >>
+>> > >> ?drivers/clk/Kconfig ? ?| ? ?4 ++
+>> > >> ?drivers/clk/Makefile ? | ? ?1 +
+>> > >> ?drivers/clk/clk-gate.c | ? 78 ++++++++++++++++++++++++++++++++++++++++++++++++
+>> > >> ?include/linux/clk.h ? ?| ? 13 ++++++++
+>> > >> ?4 files changed, 96 insertions(+), 0 deletions(-)
+>> > >> ?create mode 100644 drivers/clk/clk-gate.c
+>> > >
+>> > > I feel hard to tell the tree the clk parent, at register/init time. For the
+>> > > simple gate clk, the only way is to set .get_parent. But normally, for clk
+>> > > without any divider we set .get_parent to NULL. Maybe we can put .parent to
+>> > > struct clk_hw?
+>> >
+>> > For non-mux clocks, whose parent is *always* going to be the same, you
+>> > should create a duplicate .parent in the clk_hw_* structure and then
+>> > have .get_parent return clk_hw_*->parent.
 >>
->> Any thoughts? Yes? No? Why? WTF?
-> 
-> Isn't this what the sub-architecture group (Arnd etc.) already started
-> doing? Or I missed something in your proposal.
+>> Maybe I do not understand what you mean here, but I think there is
+>> something missing in the gate.
+> yes, clk_gate can not set fixed parent in v2 patch. Mike means add .parent int clk_gate
+> and set .get_parent in the ops.
 
-I think you did miss something, my proposal is for board specific
-stuff, not SoC specific. It is another level of abstraction, which
-is not always seen.
-Anyway, please, see my answer to Nico.
+Yes, it seems I was unclear.  I mean to say that a .parent can be
+added to any clk hw implementation (clk_hw_imx or whatever) and the
+paired .ops (in this case, .get_parent) will know about it's
+existence.
 
-Thanks 
-
--- 
 Regards,
-Igor.
+Mike
+
+>>
+>> >
+>> > This is analogous to the way clk_hw_fixed returns clk_hw_fixed->rate
+>> > when .recalc is called on it.
+>> >
+>> > >> +
+>> > >> +static unsigned long clk_gate_get_rate(struct clk_hw *clk)
+>> > >> +{
+>> > >> + ? ? return clk_get_rate(clk_get_parent(clk->clk));
+>> > >> +}
+>>
+>> clk_get_parent goes down to clk_gate_set_enable_ops.get_parent below...
+>>
+>> > >> +
+>> > >> +
+>> > >> +struct clk_hw_ops clk_gate_set_enable_ops = {
+>> > >> + ? ? .recalc_rate = clk_gate_get_rate,
+>> > >> + ? ? .enable = clk_gate_enable_set,
+>> > >> + ? ? .disable = clk_gate_disable_clear,
+>> > >> +};
+>>
+>> ...but this does not have a get_parent pointer, so clk_get_parent()
+>> for a gate always returns NULL which means that a gate never has
+>> a valid rate.
+>>
+>> Sascha
+>>
+>> --
+>> Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? | ? ? ? ? ? ? ? ? ? ? ? ? ? ? |
+>> Industrial Linux Solutions ? ? ? ? ? ? ? ? | http://www.pengutronix.de/ ?|
+>> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0 ? ?|
+>> Amtsgericht Hildesheim, HRA 2686 ? ? ? ? ? | Fax: ? +49-5121-206917-5555 |
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>
+>
+>
