@@ -1,67 +1,55 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Mon, 17 Oct 2011 12:39:58 +0200
-Subject: [PATCH] ARM: mxs: Add initial support for Bluegiga APX4
-	Development Kit
-In-Reply-To: <20111017094434.GA21504@pengutronix.de>
-References: <1318838916-8529-1-git-send-email-lauri.hintsala@bluegiga.com>
-	<20111017094434.GA21504@pengutronix.de>
-Message-ID: <20111017103958.GD7761@tarshish>
+From: richard.zhao@linaro.org (Richard Zhao)
+Date: Mon, 17 Oct 2011 18:53:03 +0800
+Subject: [PATCH v2 1/7] clk: Add a generic clock infrastructure
+In-Reply-To: <20111017092028.GA3042@opensource.wolfsonmicro.com>
+References: <1316730422-20027-1-git-send-email-mturquette@ti.com>
+	<1316730422-20027-2-git-send-email-mturquette@ti.com>
+	<20111014081024.GA9485@b20223-02.ap.freescale.net>
+	<20111014100504.GC2966@opensource.wolfsonmicro.com>
+	<20111014103233.GB9485@b20223-02.ap.freescale.net>
+	<20111016175521.GA13565@pengutronix.de>
+	<20111017084851.GB20184@b20223-02.ap.freescale.net>
+	<20111017092028.GA3042@opensource.wolfsonmicro.com>
+Message-ID: <20111017105302.GC20184@b20223-02.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe, Lauri,
-On Mon, Oct 17, 2011 at 11:44:34AM +0200, Uwe Kleine-K?nig wrote:
-> Hello,
+On Mon, Oct 17, 2011 at 10:20:28AM +0100, Mark Brown wrote:
+> On Mon, Oct 17, 2011 at 04:48:52PM +0800, Richard Zhao wrote:
 > 
-> On Mon, Oct 17, 2011 at 11:08:36AM +0300, Lauri Hintsala wrote:
-> > Added initial support for Bluegiga APX4 module and Development Kit.
-> > Patches are based on Linux v3.1-rc9.
-
-[snip]
-
-> > +static int __init apx4devkit_fec_get_mac(char *macstr)
-> > +{
-> > +	int i, h, l;
-> > +
-> > +	macstr++;
-> > +
-> > +	for (i = 0; i < 6; i++) {
-> > +		if (i != 5 && *(macstr + 2) != ':')
-> > +			goto error;
-> > +
-> > +		h = hex_to_bin(*macstr++);
-> > +		if (h == -1)
-> > +			goto error;
-> > +
-> > +		l = hex_to_bin(*macstr++);
-> > +		if (l == -1)
-> > +			goto error;
-> > +
-> > +		macstr++;
-> > +		mx28_fec_pdata.mac[i] = (h << 4) + l;
-> > +	}
-> > +	return 0;
-> I wonder if there isn't a more generic way to parse a mac address.
+> > For example, devices that possible access to on-chip RAM, depend on OCRAM clock. 
+> > On imx53, VPU depends on OCRAM clock, even when VPU does not use OCRAM.
 > 
-> Other machines put the mac into the otp.
+> So if the VPU depends on OCRAM the VPU should be enabling the OCRAM
+> clock.  The function of a given clock isn't terribly relevant, and
+> certainly grouping clocks together doesn't seem to be the obvious
+> solution from what you've said
+VPU don't know OCRAM clk, it's SoC specific. I know it's clock function
+replationship. But it's the only better place to refect the dependency 
+in clock tree. Another dependency example, from SoC bus topology, some bus
+clk always depends on bus switch/hub.
+> - if the driver doesn't know about the
+> clock it seems like the core ought to be enabling it transparently
+> rather than gluing it together with some other random clock.
+If you mean clk core here, then we need things like below:
+struct clk_hw {
+	struct clk *clk;
+	struct dependency {
+		struct clk_hw *clks;
+		int count;
+	};
+};
+Though Mike does not like to add things in clk_hw, but it's the only place
+to put common things of clk drivers.
+
+Thanks
+Richard
 > 
-> > +error:
-> > +	pr_err("%s: invalid mac address\n", __func__);
-> > +	return -EINVAL;
-> > +}
-> > +
-> > +__setup("ethaddr", apx4devkit_fec_get_mac);
-> the name is IMHO too generic for a board specific parameter. Think about
-> a kernel that runs on all mxs based machines. ethaddr=... only affects
-> your machine type. And it's not possible to add the same parameter to a
-> different board.
-
-The fec driver already supports the macaddr module parameter. See the comment 
-at the beginning of the fec_get_mac() routine in drivers/net/fec.c.
-
-baruch
-
--- 
-                                                     ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+> Either way the point here is that individual drivers shouldn't be hand
+> coding this stuff, it should be being handled by core code.
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
