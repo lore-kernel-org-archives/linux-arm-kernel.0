@@ -1,114 +1,63 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 17 Oct 2011 14:56:41 +0200
-Subject: [PATCH v4 2/2] dmaengine: at_hdmac: add device tree support
-In-Reply-To: <7cc84d91b280c5dde075c39de4feae5a6e6603a6.1318855784.git.nicolas.ferre@atmel.com>
-References: <4E9C258D.3030509@atmel.com>
-	<7cc84d91b280c5dde075c39de4feae5a6e6603a6.1318855784.git.nicolas.ferre@atmel.com>
-Message-ID: <d6d3e19422b70e4eee6beeebc524bbe45f9803ba.1318855784.git.nicolas.ferre@atmel.com>
+From: afzal@ti.com (Afzal Mohammed)
+Date: Mon, 17 Oct 2011 18:30:32 +0530
+Subject: Build error while adding debug LL support for new board
+Message-ID: <1318856432-20219-1-git-send-email-afzal@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add device tree probe support for atmel at_hdmac DMA driver.
-Bindings are added to specify DMA controller configuration.
+Hi, Russell,
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-Acked-by: Grant Likely <grant.likely@secretlab.ca>
+While adding low level debug support for new board in OMAP2+ family, we
+came across following error,
+
+arch/arm/kernel/debug.S: Assembler messages:
+arch/arm/kernel/debug.S:138: Error: invalid constant (428) after fixup
+
+Following patch fixes it, I am not sure whether this is the right fix,
+please let us know your comments.
+
+Regards
+Afzal
+
+From: Afzal Mohammed <afzal@ti.com>
+Date: Fri, 14 Oct 2011 12:56:16 +0530
+Subject: [PATCH] ARM: Fix error upon adding LL debug
+
+Upon adding new board LL debug support, if the resultant code
+addition would not cause PC relative offset of "hexbuf" from
+"adr r2, hexbuf" (+2) instruction to be representable in a
+shifted 8-bit value (hence indirectly putting higher aligment
+requirement on larger offsets), following error occurs,
+
+arch/arm/kernel/debug.S: Assembler messages:
+arch/arm/kernel/debug.S:138: Error: invalid constant (428) after fixup
+
+Fix it by bringing "hexbuf" closer so that "adr"
+can have the offset.
+
+Signed-off-by: Afzal Mohammed <afzal@ti.com>
 ---
- .../devicetree/bindings/dma/atmel-dma.txt          |   14 ++++++++
- drivers/dma/at_hdmac.c                             |   32 +++++++++++++++++++-
- 2 files changed, 45 insertions(+), 1 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/dma/atmel-dma.txt
+ arch/arm/kernel/debug.S |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/dma/atmel-dma.txt b/Documentation/devicetree/bindings/dma/atmel-dma.txt
-new file mode 100644
-index 0000000..3c046ee
---- /dev/null
-+++ b/Documentation/devicetree/bindings/dma/atmel-dma.txt
-@@ -0,0 +1,14 @@
-+* Atmel Direct Memory Access Controller (DMA)
+diff --git a/arch/arm/kernel/debug.S b/arch/arm/kernel/debug.S
+index bcd66e0..0f852d0 100644
+--- a/arch/arm/kernel/debug.S
++++ b/arch/arm/kernel/debug.S
+@@ -151,6 +151,8 @@ printhex:   adr     r2, hexbuf
+                b       printascii
+ ENDPROC(printhex2)
+
++hexbuf:                .space 16
 +
-+Required properties:
-+- compatible: Should be "atmel,<chip>-dma"
-+- reg: Should contain DMA registers location and length
-+- interrupts: Should contain DMA interrupt
-+
-+Examples:
-+
-+dma at ffffec00 {
-+	compatible = "atmel,at91sam9g45-dma";
-+	reg = <0xffffec00 0x200>;
-+	interrupts = <21>;
-+};
-diff --git a/drivers/dma/at_hdmac.c b/drivers/dma/at_hdmac.c
-index d1869c5..f3cb4a0 100644
---- a/drivers/dma/at_hdmac.c
-+++ b/drivers/dma/at_hdmac.c
-@@ -23,6 +23,8 @@
- #include <linux/module.h>
- #include <linux/platform_device.h>
- #include <linux/slab.h>
-+#include <linux/of.h>
-+#include <linux/of_device.h>
- 
- #include "at_hdmac_regs.h"
- 
-@@ -1175,6 +1177,20 @@ static void atc_free_chan_resources(struct dma_chan *chan)
- 
- /*--  Module Management  -----------------------------------------------*/
- 
-+#if defined(CONFIG_OF)
-+static const struct of_device_id atmel_dma_dt_ids[] = {
-+	{
-+		.compatible = "atmel,at91sam9rl-dma",
-+		.data = (void *)ATDMA_DEVTYPE_SAM9RL
-+	}, {
-+		.compatible = "atmel,at91sam9g45-dma",
-+		.data = (void *)ATDMA_DEVTYPE_SAM9G45
-+	}, { /* sentinel */ }
-+};
-+
-+MODULE_DEVICE_TABLE(of, atmel_dma_dt_ids);
-+#endif
-+
- static struct platform_device_id atdma_devtypes[] = {
- 	{
- 		.name = "at91sam9rl_dma",
-@@ -1187,6 +1203,19 @@ static struct platform_device_id atdma_devtypes[] = {
- 	}
- };
- 
-+static inline enum atdma_devtype __init at_dma_get_driver_data(
-+					struct platform_device *pdev)
-+{
-+	if (pdev->dev.of_node) {
-+		const struct of_device_id *match;
-+		match = of_match_node(atmel_dma_dt_ids, pdev->dev.of_node);
-+		if (match == NULL)
-+			return ATDMA_DEVTYPE_UNDEFINED;
-+		return (enum atdma_devtype)match->data;
-+	}
-+	return platform_get_device_id(pdev)->driver_data;
-+}
-+
- /**
-  * at_dma_off - disable DMA controller
-  * @atdma: the Atmel HDAMC device
-@@ -1218,7 +1247,7 @@ static int __init at_dma_probe(struct platform_device *pdev)
- 	dma_cap_set(DMA_MEMCPY, cap_mask);
- 
- 	/* get DMA parameters from controller type */
--	atdmatype = platform_get_device_id(pdev)->driver_data;
-+	atdmatype = at_dma_get_driver_data(pdev);
- 
- 	switch (atdmatype) {
- 	case ATDMA_DEVTYPE_SAM9RL:
-@@ -1526,6 +1555,7 @@ static struct platform_driver at_dma_driver = {
- 	.driver = {
- 		.name	= "at_hdmac",
- 		.pm	= &at_dma_dev_pm_ops,
-+		.of_match_table	= of_match_ptr(atmel_dma_dt_ids),
- 	},
- };
- 
--- 
-1.7.5.4
+                .ltorg
+
+ ENTRY(printascii)
+@@ -175,5 +177,3 @@ ENTRY(printch)
+                mov     r0, #0
+                b       1b
+ ENDPROC(printch)
+-
+-hexbuf:                .space 16
+--
+1.6.2.4
