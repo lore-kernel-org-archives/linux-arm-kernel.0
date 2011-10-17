@@ -1,29 +1,30 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 17 Oct 2011 10:20:28 +0100
-Subject: [PATCH v2 1/7] clk: Add a generic clock infrastructure
-In-Reply-To: <20111017084851.GB20184@b20223-02.ap.freescale.net>
-References: <1316730422-20027-1-git-send-email-mturquette@ti.com>
-	<1316730422-20027-2-git-send-email-mturquette@ti.com>
-	<20111014081024.GA9485@b20223-02.ap.freescale.net>
-	<20111014100504.GC2966@opensource.wolfsonmicro.com>
-	<20111014103233.GB9485@b20223-02.ap.freescale.net>
-	<20111016175521.GA13565@pengutronix.de>
-	<20111017084851.GB20184@b20223-02.ap.freescale.net>
-Message-ID: <20111017092028.GA3042@opensource.wolfsonmicro.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 17 Oct 2011 10:23:43 +0100
+Subject: [GIT PULL] DEBUG_LL platform updates for 3.2
+In-Reply-To: <20111017082506.GC21648@n2100.arm.linux.org.uk>
+References: <20110928103815.GA8344@e102144-lin.cambridge.arm.com>
+	<20111011150915.GE23188@mudshark.cambridge.arm.com>
+	<20111011184821.GA11839@mudshark.cambridge.arm.com>
+	<2414781.rlNqTThJUN@wuerfel>
+	<20111017082506.GC21648@n2100.arm.linux.org.uk>
+Message-ID: <20111017092342.GB2459@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 17, 2011 at 04:48:52PM +0800, Richard Zhao wrote:
+On Mon, Oct 17, 2011 at 09:25:06AM +0100, Russell King - ARM Linux wrote:
+> The only thing I can do to keep stuff independent is to rebuild the
+> 'misc' branch into a pair of proper topic branches (debug and smp)
+> and push those out (done).
+> 
+> Note that these are based on the same commit as the original 'misc'
+> branch so that I can verify that what we ultimately end up with
+> after the topic merges is identical to what we had before (it is.)
 
-> For example, devices that possible access to on-chip RAM, depend on OCRAM clock. 
-> On imx53, VPU depends on OCRAM clock, even when VPU does not use OCRAM.
+Thanks for doing this Russell. Arnd, I've made two new branches based on the
+above at:
 
-So if the VPU depends on OCRAM the VPU should be enabling the OCRAM
-clock.  The function of a given clock isn't terribly relevant, and
-certainly grouping clocks together doesn't seem to be the obvious
-solution from what you've said - if the driver doesn't know about the
-clock it seems like the core ought to be enabling it transparently
-rather than gluing it together with some other random clock.
+git://github.com/wdeacon/linux-wd.git cpu-mapping-for-arnd
 
-Either way the point here is that individual drivers shouldn't be hand
-coding this stuff, it should be being handled by core code.
+git://github.com/wdeacon/linux-wd.git debug-ll-for-arnd
+
+Will
