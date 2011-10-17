@@ -1,59 +1,29 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 17 Oct 2011 10:17:49 +0100
-Subject: [PATCH 1/2] [ARM] mach-types: Re-add apf9328
-In-Reply-To: <20111017084421.GD21648@n2100.arm.linux.org.uk>
-References: <1318087189-22977-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
-	<20111008192621.GA28049@pengutronix.de>
-	<20111008220722.GG25689@n2100.arm.linux.org.uk>
-	<20111013090609.GT577@pengutronix.de>
-	<20111017084421.GD21648@n2100.arm.linux.org.uk>
-Message-ID: <20111017091749.GF21648@n2100.arm.linux.org.uk>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 17 Oct 2011 10:20:28 +0100
+Subject: [PATCH v2 1/7] clk: Add a generic clock infrastructure
+In-Reply-To: <20111017084851.GB20184@b20223-02.ap.freescale.net>
+References: <1316730422-20027-1-git-send-email-mturquette@ti.com>
+	<1316730422-20027-2-git-send-email-mturquette@ti.com>
+	<20111014081024.GA9485@b20223-02.ap.freescale.net>
+	<20111014100504.GC2966@opensource.wolfsonmicro.com>
+	<20111014103233.GB9485@b20223-02.ap.freescale.net>
+	<20111016175521.GA13565@pengutronix.de>
+	<20111017084851.GB20184@b20223-02.ap.freescale.net>
+Message-ID: <20111017092028.GA3042@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 17, 2011 at 09:44:21AM +0100, Russell King - ARM Linux wrote:
-> http://www.arm.linux.org.uk/developer/machines/download.php?q=1
-> 
-> will be the exact file if I were to update it right now (that's the
-> URL it's retrieved from.)
-> 
-> One of the problems we now have is that I no longer have visibility
-> of platforms going into mainline (I only find out after they've been
-> merged into mainline), so I've no way to update the database with
-> that information before I do an update - my information will be up
-> to three months out of date.  This in turn means that the 12 month
-> grace period can expire and the entries deleted from the merged file
-> _after_ they've been merged and queued up elsewhere.
-> 
-> As I've already said, this has now become one very big unmanagable
-> problem.  It needs someone to spend a lot of time at each update
-> manually verifying every addition and removal (and kicking those
-> people who botch their entries up - which given my interpretation of
-> the data protection act means it can only be me).
-> 
-> I haven't committed an update since August, and at this point in the
-> cycle, I'm not going to before this merge window - the risks of breaking
-> something already merged or queued up are just too great to consider
-> doing so now.
-> 
-> Longer term, I don't have an answer to this problem - I don't think
-> there is a workable answer to a distributed development model with
-> a centralized ID database with a grace period on 'unused' entries.
+On Mon, Oct 17, 2011 at 04:48:52PM +0800, Richard Zhao wrote:
 
-And while we're discussing this issue...
+> For example, devices that possible access to on-chip RAM, depend on OCRAM clock. 
+> On imx53, VPU depends on OCRAM clock, even when VPU does not use OCRAM.
 
-+v7pxa_dt               MACH_V7PXA_DT           V7PXA_DT                3794
-+v7mmp_dt               MACH_V7MMP_DT           V7MMP_DT                3795
+So if the VPU depends on OCRAM the VPU should be enabling the OCRAM
+clock.  The function of a given clock isn't terribly relevant, and
+certainly grouping clocks together doesn't seem to be the obvious
+solution from what you've said - if the driver doesn't know about the
+clock it seems like the core ought to be enabling it transparently
+rather than gluing it together with some other random clock.
 
-Why do we have DT-based IDs being registered?  DT does not use machine
-IDs in any shape or form.  For DT platforms, machine_is_xxx() must not
-be used because it's meaningless.
-
-#define DT_MACHINE_START(_name, _namestr)               \
-static const struct machine_desc __mach_desc_##_name    \
- __used                                                 \
- __attribute__((__section__(".arch.info.init"))) = {    \
-        .nr             = ~0,                           \
-        .name           = _namestr,
-
-Note the .nr = ~0 there.
+Either way the point here is that individual drivers shouldn't be hand
+coding this stuff, it should be being handled by core code.
