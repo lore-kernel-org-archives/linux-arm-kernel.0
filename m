@@ -1,31 +1,49 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 17 Oct 2011 13:22:42 +0200
-Subject: READ THIS: the next mach-types update
-In-Reply-To: <20111017105647.GH21648@n2100.arm.linux.org.uk>
-References: <20110915102528.GI6267@n2100.arm.linux.org.uk>
-	<ADE657CA350FB648AAC2C43247A983F001F39DAED674@AUSP01VMBX24.collaborationhost.net>
-	<20111017105647.GH21648@n2100.arm.linux.org.uk>
-Message-ID: <201110171322.42666.arnd@arndb.de>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Mon, 17 Oct 2011 13:27:19 +0200
+Subject: [PATCH v4 0/7] iommu: split mapping to page sizes as supported by the
+	hardware
+Message-ID: <1318850846-16066-1-git-send-email-ohad@wizery.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 17 October 2011, Russell King - ARM Linux wrote:
-> On Mon, Sep 19, 2011 at 06:13:11PM -0500, H Hartley Sweeten wrote:
-> > Russell,
-> > 
-> > I posted support for MACH_VISION_EP9307 back in March and it's in your
-> > patch tracker as 6851/1.  I assumed it was still there because of the
-> > work to clean up the ARM tree.
-> 
-> It was.
-> 
-> I've forwarded it to Arnd more than a week ago after discussing it with
-> Arnd, but I've heard nothing back as yet.  I'm not sure what's happening
-> with it.
-> 
+v3->v4:
+- simplify splitter logic (Joerg)
+- declare supported page-sizes in the iommu_ops, without extending iommu_register (Joerg)
+- iommu_unmap should now return bytes too (Joerg)
+- don't cache min_pgsize anymore (Joerg)
+- handle cases when ->unmap() actually unmaps more than requested (Joerg)
+- unroll iommu_unmap completely in case it fails (KyongHo)
+- use size_t for size parameters (KyongHo)
+- add a patch to remove the bytes->order->bytes conversion we had
+- rabase to master branch of the iommu tree (Joerg)
 
-Sorry, I missed it in my previous round of merges. I've put it into the
-next/board branch now so it will show up in linux-next and I'll submit
-it together with the other board-specific updates in the merge window.
+v2->v3:
+- s/KB/KiB/ (David W)
 
-	Arnd
+v1->v2:
+- split to patches (by keeping the old code around until all drivers are converted) (Joerg)
+
+Tested with OMAP3 (omap3isp) and OMAP4 (rpmsg/remoteproc).
+Compile tested with X86_64.
+
+Ohad Ben-Cohen (7):
+  iommu/core: stop converting bytes to page order back and forth
+  iommu/core: split mapping to page sizes as supported by the hardware
+  iommu/omap: announce supported page sizes
+  iommu/msm: announce supported page sizes
+  iommu/amd: announce supported page sizes
+  iommu/intel: announce supported page sizes
+  iommu/core: remove the temporary pgsize settings
+
+ drivers/iommu/amd_iommu.c   |   32 +++++++++---
+ drivers/iommu/intel-iommu.c |   30 ++++++++---
+ drivers/iommu/iommu.c       |  119 ++++++++++++++++++++++++++++++++++++++----
+ drivers/iommu/msm_iommu.c   |   25 ++++-----
+ drivers/iommu/omap-iommu.c  |   18 +++---
+ drivers/iommu/omap-iovmm.c  |   17 ++----
+ include/linux/iommu.h       |   26 +++++++--
+ virt/kvm/iommu.c            |    8 ++--
+ 8 files changed, 205 insertions(+), 70 deletions(-)
+
+-- 
+1.7.4.1
