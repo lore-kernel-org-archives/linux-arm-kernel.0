@@ -1,65 +1,71 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 17 Oct 2011 09:44:21 +0100
-Subject: [PATCH 1/2] [ARM] mach-types: Re-add apf9328
-In-Reply-To: <20111013090609.GT577@pengutronix.de>
-References: <1318087189-22977-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
-	<20111008192621.GA28049@pengutronix.de>
-	<20111008220722.GG25689@n2100.arm.linux.org.uk>
-	<20111013090609.GT577@pengutronix.de>
-Message-ID: <20111017084421.GD21648@n2100.arm.linux.org.uk>
+From: richard.zhao@linaro.org (Richard Zhao)
+Date: Mon, 17 Oct 2011 16:48:52 +0800
+Subject: [PATCH v2 1/7] clk: Add a generic clock infrastructure
+In-Reply-To: <20111016175521.GA13565@pengutronix.de>
+References: <1316730422-20027-1-git-send-email-mturquette@ti.com>
+	<1316730422-20027-2-git-send-email-mturquette@ti.com>
+	<20111014081024.GA9485@b20223-02.ap.freescale.net>
+	<20111014100504.GC2966@opensource.wolfsonmicro.com>
+	<20111014103233.GB9485@b20223-02.ap.freescale.net>
+	<20111016175521.GA13565@pengutronix.de>
+Message-ID: <20111017084851.GB20184@b20223-02.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 13, 2011 at 11:06:09AM +0200, Uwe Kleine-K?nig wrote:
-> On Sat, Oct 08, 2011 at 11:07:22PM +0100, Russell King - ARM Linux wrote:
-> > On Sat, Oct 08, 2011 at 09:26:21PM +0200, Wolfram Sang wrote:
-> > > On Sat, Oct 08, 2011 at 05:19:48PM +0200, Gwenhael Goavec-Merou wrote:
-> > > > 
-> > > > Signed-off-by: Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>
+On Sun, Oct 16, 2011 at 07:55:21PM +0200, Sascha Hauer wrote:
+> On Fri, Oct 14, 2011 at 06:32:33PM +0800, Richard Zhao wrote:
+> > On Fri, Oct 14, 2011 at 11:05:04AM +0100, Mark Brown wrote:
+> > > On Fri, Oct 14, 2011 at 04:10:26PM +0800, Richard Zhao wrote:
+> > > > On Thu, Sep 22, 2011 at 03:26:56PM -0700, Mike Turquette wrote:
 > > > 
-> > > I think this file is maintained by Russell, yet I want to ack that the entry
-> > > below is missing for building mx1_defconfig. Found that, too.
-> > 
-> > The thing is - read the comments at the top of the file.  There's hints
-> > there as to what will happen if you patch the file.  The hint is
-> > 'automatically generated'.  So when I next update the file, any patches
-> > done to the file will be wiped out.
-> Currently the id is still missing in your for-next branch and it is
-> marked as "mainlined" on http://www.arm.linux.org.uk/developer/machines/
-> (906).
+> > > snip essentially Mike's entire mail - *please* delete irrelevant quotes
+> > > from your replies, it makes it very much easier to find the new text in
+> > > your mail and is much more friendly to people reading mail on mobile
+> > > devices.
+> > I snip not enough? sorry for that. I'll be carefull.
+> > > 
+> > > > > +static int __clk_enable(struct clk *clk)
+> > > > > +{
+> > > 
+> > > > Could you expose __clk_enable/__clk_disable? I find it hard to implement
+> > > > clk group. clk group means, when a major clk enable/disable, it want a set
+> > > > of other clks enable/disable accordingly.
+> > > 
+> > > Shouldn't this be something the core is implementing?  I'd strongly
+> > > expect that the clock drivers are relatively dumb and delegate all the
+> > > decision making to the core API.  Otherwise it's going to be hard for
+> > > the core to implement any logic that involves working with more than one
+> > > clock like rate change notification, or guarantee that driver requests
+> > > made through the API are satisfied, as the state of the clocks will be
+> > > changing underneath it.
+> > From my point of view, the first step of generic clk can be, easy to adopt
+> > features of clocks in current mainline git.
+> > Back to the clk group, I have a patch based on Sascha's work. 
+> > http://git.linaro.org/gitweb?p=people/riczhao/linux-2.6.git;a=shortlog;h=refs/heads/imx-clk
 > 
-> That means that the next update should include the id, right? Maybe it's
-> worth to add it already earlier with the patch Gwenhael proposed as
-> without it mx1_defconfig is broken. After f32609c5a035 it even breaks
-> imx_v4_v5_defconfig.
+> I thought further about this and a clock group is not something we want
+> to have at all. Clocks are supposed to be arranged in a tree and
+> grouping clocks together violates this which leads to problems.
+> This grouping should be done at driver level, so when a driver needs
+> more than one clock it should request them all, maybe with a clk_get_all
+> helper function.
+clock group is not limited to help driver get clock. It refects clock dependency.
+For example, devices that possible access to on-chip RAM, depend on OCRAM clock. 
+On imx53, VPU depends on OCRAM clock, even when VPU does not use OCRAM.
+
+Thanks
+Richard
 > 
-> BTW is there a way to see the mach-types file as it would land in
-> linux.git if it were updated now?
-
-http://www.arm.linux.org.uk/developer/machines/download.php?q=1
-
-will be the exact file if I were to update it right now (that's the
-URL it's retrieved from.)
-
-One of the problems we now have is that I no longer have visibility
-of platforms going into mainline (I only find out after they've been
-merged into mainline), so I've no way to update the database with
-that information before I do an update - my information will be up
-to three months out of date.  This in turn means that the 12 month
-grace period can expire and the entries deleted from the merged file
-_after_ they've been merged and queued up elsewhere.
-
-As I've already said, this has now become one very big unmanagable
-problem.  It needs someone to spend a lot of time at each update
-manually verifying every addition and removal (and kicking those
-people who botch their entries up - which given my interpretation of
-the data protection act means it can only be me).
-
-I haven't committed an update since August, and at this point in the
-cycle, I'm not going to before this merge window - the risks of breaking
-something already merged or queued up are just too great to consider
-doing so now.
-
-Longer term, I don't have an answer to this problem - I don't think
-there is a workable answer to a distributed development model with
-a centralized ID database with a grace period on 'unused' entries.
+> Sascha
+> 
+> -- 
+> Pengutronix e.K.                           |                             |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
