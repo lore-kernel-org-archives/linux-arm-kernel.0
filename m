@@ -1,43 +1,27 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 17 Oct 2011 16:07:27 +0200
-Subject: [Linaro-mm-sig] [PATCH 1/2] ARM: initial proof-of-concept IOMMU
-	mapper for DMA-mapping
-In-Reply-To: <401E54CE964CD94BAE1EB4A729C7087E3722519EAE@HQMAIL04.nvidia.com>
-References: <1314971786-15140-1-git-send-email-m.szyprowski@samsung.com>
-	<1314971786-15140-2-git-send-email-m.szyprowski@samsung.com>
-	<594816116217195c28de13accaf1f9f2.squirrel@www.codeaurora.org>
-	<001f01cc786d$d55222c0$7ff66840$%szyprowski@samsung.com>
-	<401E54CE964CD94BAE1EB4A729C7087E37225197F8@HQMAIL04.nvidia.com>
-	<00b101cc87ee$8976c410$9c644c30$%szyprowski@samsung.com>
-	<401E54CE964CD94BAE1EB4A729C7087E3722519A1F@HQMAIL04.nvidia.com>
-	<401E54CE964CD94BAE1EB4A729C7087E3722519BF4@HQMAIL04.nvidia.com>
-	<00e501cc88a2$b82fc680$288f5380$%szyprowski@samsung.com>
-	<401E54CE964CD94BAE1EB4A729C7087E3722519C65@HQMAIL04.nvidia.com>
-	<401E54CE964CD94BAE1EB4A729C7087E3722519EAE@HQMAIL04.nvidia.com>
-Message-ID: <01b801cc8cd6$1a6d4340$4f47c9c0$%szyprowski@samsung.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 17 Oct 2011 16:10:22 +0200
+Subject: [PATCH v3] dmaengine: add CSR SiRFprimaII DMAC driver
+In-Reply-To: <1318859861.23438.137.camel@vkoul-udesk3>
+References: <1318844199-19303-1-git-send-email-Barry.Song@csr.com>
+	<1318859861.23438.137.camel@vkoul-udesk3>
+Message-ID: <CACRpkdadRanBUNQZQMEX6En8A-=spqJUojOOrGAmTCJzMfvo7g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Krishna,
+On Mon, Oct 17, 2011 at 3:57 PM, Vinod Koul <vinod.koul@intel.com> wrote:
 
-On Thursday, October 13, 2011 2:18 AM You wrote:
+>> + ? ? if (sdesc->cyclic) {
+>> + ? ? ? ? ? ? writel((1 << cid) | 1 << (cid + 16) |
+>> + ? ? ? ? ? ? ? ? ? ? readl_relaxed(sdma->base + SIRFSOC_DMA_CH_LOOP_CTRL),
+>> + ? ? ? ? ? ? ? ? ? ? sdma->base + SIRFSOC_DMA_CH_LOOP_CTRL);
+>> + ? ? ? ? ? ? schan->happened_cyclic = schan->completed_cyclic = 0;
+>> + ? ? }
+>
+> any reason why we have mixed use of writel_relaxes and writel?
+> Shouldn't all the DMA register writes be done only using writel?
 
-> Here a patch v2 that has updates/fixes to DMA IOMMU code. With these changes, the nvidia
-> device is able to boot with all its platform drivers as DMA IOMMU clients.
-> 
-> Here is the overview of changes.
-> 
-> 1. Converted the mutex to spinlock to handle atomic context calls and used spinlock in
-> necessary places.
-> 2. Implemented arm_iommu_map_page and arm_iommu_unmap_page, which are used by MMC host stack.
-> 3. Separated creation of dma_iommu_mapping from arm_iommu_attach_device in order to share
-> mapping.
-> 4. Fixed various bugs identified in DMA IOMMU code during testing.
+We has a lengthy discussion on the subject here:
+http://marc.info/?l=linux-arm-kernel&m=130588591415130&w=2
 
-The code looks much better now. The only problem is the fact that your mailed has changed
-all tabs into spaces making the patch really hard to apply. Could you resend it correctly?
-
-Best regards
--- 
-Marek Szyprowski
-Samsung Poland R&D Center
+Yours,
+Linus Walleij
