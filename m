@@ -1,97 +1,57 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Mon, 17 Oct 2011 16:22:39 +0200 (CEST)
-Subject: [PATCH v4 2/3] at91: add parameters for at91_add_device_isi
-	function
-In-Reply-To: <1318331020-22031-3-git-send-email-josh.wu@atmel.com>
-References: <1318331020-22031-1-git-send-email-josh.wu@atmel.com>
-	<1318331020-22031-3-git-send-email-josh.wu@atmel.com>
-Message-ID: <Pine.LNX.4.64.1110171616150.18438@axis700.grange>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Mon, 17 Oct 2011 22:45:45 +0800
+Subject: [PATCH v3] dmaengine: add CSR SiRFprimaII DMAC driver
+In-Reply-To: <1318859861.23438.137.camel@vkoul-udesk3>
+References: <1318844199-19303-1-git-send-email-Barry.Song@csr.com>
+	<1318859861.23438.137.camel@vkoul-udesk3>
+Message-ID: <CAGsJ_4x35qp+ELFY0vDX3PKSXhTe-POzqv+EO+jbB3ABxs_yrA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 11 Oct 2011, Josh Wu wrote:
+2011/10/17 Vinod Koul <vinod.koul@intel.com>:
+>> +static struct dma_async_tx_descriptor *sirfsoc_dma_prep_interleaved(
+>> + ? ? struct dma_chan *chan, struct dma_interleaved_template *xt)
+>> +{
+>> + ? ? struct sirfsoc_dma *sdma = dma_chan_to_sirfsoc_dma(chan);
+>> + ? ? struct sirfsoc_dma_chan *schan = dma_chan_to_sirfsoc_dma_chan(chan);
+>> + ? ? struct sirfsoc_dma_desc *sdesc = NULL;
+>> + ? ? unsigned long iflags;
+>> + ? ? int ret;
+>> +
+>> + ? ? if ((xt->dir != MEM_TO_DEV) || (xt->dir != DEV_TO_MEM)) {
+>> + ? ? ? ? ? ? ret = -EINVAL;
+>> + ? ? ? ? ? ? goto err_dir;
+>> + ? ? }
+>> +
+>> + ? ? /* Get free descriptor */
+>> + ? ? spin_lock_irqsave(&schan->lock, iflags);
+>> + ? ? if (!list_empty(&schan->free)) {
+>> + ? ? ? ? ? ? sdesc = list_first_entry(&schan->free, struct sirfsoc_dma_desc,
+>> + ? ? ? ? ? ? ? ? ? ? node);
+>> + ? ? ? ? ? ? list_del(&sdesc->node);
+>> + ? ? }
+>> + ? ? spin_unlock_irqrestore(&schan->lock, iflags);
+>> +
+>> + ? ? if (!sdesc) {
+>> + ? ? ? ? ? ? /* try to free completed descriptors */
+>> + ? ? ? ? ? ? sirfsoc_dma_process_completed(sdma);
+>> + ? ? ? ? ? ? ret = 0;
+>> + ? ? ? ? ? ? goto no_desc;
+>> + ? ? }
+>> +
+>> + ? ? /* Place descriptor in prepared list */
+>> + ? ? spin_lock_irqsave(&schan->lock, iflags);
+>> + ? ? if ((xt->frame_size == 1) && (xt->numf > 0)) {
+> what does this mean?
 
-> This patch add parameters for at91_add_device_isi function
-> 
-> Signed-off-by: Josh Wu <josh.wu@atmel.com>
-> ---
->  arch/arm/mach-at91/at91sam9263_devices.c |   13 ++++++++++---
->  arch/arm/mach-at91/include/mach/board.h  |    4 +++-
->  2 files changed, 13 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm/mach-at91/at91sam9263_devices.c b/arch/arm/mach-at91/at91sam9263_devices.c
-> index a050f41..7990e8e 100644
-> --- a/arch/arm/mach-at91/at91sam9263_devices.c
-> +++ b/arch/arm/mach-at91/at91sam9263_devices.c
-> @@ -885,7 +885,8 @@ static struct platform_device at91sam9263_isi_device = {
->  	.num_resources	= ARRAY_SIZE(isi_resources),
->  };
->  
-> -void __init at91_add_device_isi(void)
-> +void __init at91_add_device_isi(struct isi_platform_data * data,
+@numf: Number of frames in this template.
+@frame_size: Number of chunks in a frame i.e, size of sgl[].
 
-Not sure if anything in CodingStyle prohibits this, but the rest of this 
-file uses
+frame_size==1 means prima2 only support 1 chunk. numf > 0 means
+ylen(line number -1) is at least 0 and frame number is at least 1.
 
-static type fn(struct s *p)
+>> + ? ? ? ? ? ? sdesc->cyclic = 0;
+>> + ? ? ? ? ? ? sdesc->xlen = xt->sgl[0].size / 4;
+>> + ? ? ? ? ? ? sdesc->width = (xt->sgl[0].size + xt->sgl[0].icg) / 4;
 
-i.e., without an extra space after the '*'. Would be better to keep that 
-style.
-
-> +		bool use_pck_as_mck)
->  {
->  	at91_set_A_periph(AT91_PIN_PE0, 0);	/* ISI_D0 */
->  	at91_set_A_periph(AT91_PIN_PE1, 0);	/* ISI_D1 */
-> @@ -898,14 +899,20 @@ void __init at91_add_device_isi(void)
->  	at91_set_A_periph(AT91_PIN_PE8, 0);	/* ISI_PCK */
->  	at91_set_A_periph(AT91_PIN_PE9, 0);	/* ISI_HSYNC */
->  	at91_set_A_periph(AT91_PIN_PE10, 0);	/* ISI_VSYNC */
-> -	at91_set_B_periph(AT91_PIN_PE11, 0);	/* ISI_MCK (PCK3) */
->  	at91_set_B_periph(AT91_PIN_PE12, 0);	/* ISI_PD8 */
->  	at91_set_B_periph(AT91_PIN_PE13, 0);	/* ISI_PD9 */
->  	at91_set_B_periph(AT91_PIN_PE14, 0);	/* ISI_PD10 */
->  	at91_set_B_periph(AT91_PIN_PE15, 0);	/* ISI_PD11 */
-> +
-> +	if (use_pck_as_mck) {
-> +		at91_set_B_periph(AT91_PIN_PE11, 0);	/* ISI_MCK (PCK3) */
-> +
-> +		/* TODO: register the PCK for ISI_MCK and set its parent */
-
-
-
-> +	}
->  }
->  #else
-> -void __init at91_add_device_isi(void) {}
-> +void __init at91_add_device_isi(struct isi_platform_data * data,
-
-same - no extra space.
-
-> +		int use_pck_as_mck) {}
->  #endif
->  
->  
-> diff --git a/arch/arm/mach-at91/include/mach/board.h b/arch/arm/mach-at91/include/mach/board.h
-> index ed544a0..731c449 100644
-> --- a/arch/arm/mach-at91/include/mach/board.h
-> +++ b/arch/arm/mach-at91/include/mach/board.h
-> @@ -183,7 +183,9 @@ extern void __init at91_add_device_lcdc(struct atmel_lcdfb_info *data);
->  extern void __init at91_add_device_ac97(struct ac97c_platform_data *data);
->  
->   /* ISI */
-> -extern void __init at91_add_device_isi(void);
-> +struct isi_platform_data;
-> +extern void __init at91_add_device_isi(struct isi_platform_data *data,
-> +		bool use_pck_as_mck);
->  
->   /* Touchscreen Controller */
->  struct at91_tsadcc_data {
-> -- 
-> 1.6.3.3
-
-Thanks
-Guennadi
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+-barry
