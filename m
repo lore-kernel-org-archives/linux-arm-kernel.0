@@ -1,178 +1,40 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Sun, 16 Oct 2011 23:18:12 +0200
-Subject: [PATCH 1/4] ARM: at91: add at91sam9g20 dtsi
-In-Reply-To: <20111016210819.GM1459@game.jcrosoft.org>
-References: <20111016210819.GM1459@game.jcrosoft.org>
-Message-ID: <1318799895-5121-1-git-send-email-plagnioj@jcrosoft.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 17 Oct 2011 08:42:15 +0800
+Subject: [PATCH v6 0/2] Add device tree support for i.mx51/53 boards
+Message-ID: <1318812137-13991-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- arch/arm/boot/dts/at91sam9g20.dtsi |  154 ++++++++++++++++++++++++++++++++++++
- 1 files changed, 154 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/boot/dts/at91sam9g20.dtsi
+Changes since v5:
+ * Retrieve fixed clock frequency from device tree
 
-diff --git a/arch/arm/boot/dts/at91sam9g20.dtsi b/arch/arm/boot/dts/at91sam9g20.dtsi
-new file mode 100644
-index 0000000..d6afa5f
---- /dev/null
-+++ b/arch/arm/boot/dts/at91sam9g20.dtsi
-@@ -0,0 +1,154 @@
-+/*
-+ * at91sam9g20.dtsi - Device Tree Include file for AT91SAM9G20 family SoC
-+ *
-+ *  Copyright (C) 2011 Atmel,
-+ *                2011 Nicolas Ferre <nicolas.ferre@atmel.com>
-+ *                2011 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-+ *
-+ * Licensed under GPLv2 or later.
-+ */
-+
-+/include/ "skeleton.dtsi"
-+
-+/ {
-+	model = "Atmel AT91SAM9G20 family SoC";
-+	compatible = "atmel,at91sam9g20";
-+	interrupt-parent = <&aic>;
-+
-+	aliases {
-+		serial0 = &dbgu;
-+		serial1 = &usart0;
-+		serial2 = &usart1;
-+		serial3 = &usart2;
-+		serial4 = &usart3;
-+		serial5 = &usart4;
-+		serial6 = &usart5;
-+	};
-+	cpus {
-+		cpu at 0 {
-+			compatible = "arm,arm926ejs";
-+		};
-+	};
-+
-+	memory at 20000000 {
-+		reg = <0x20000000 0x08000000>;
-+	};
-+
-+	ahb {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+
-+		apb {
-+			compatible = "simple-bus";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges;
-+
-+			aic: interrupt-controller at fffff000 {
-+				#interrupt-cells = <1>;
-+				compatible = "atmel,at91rm9200-aic";
-+				interrupt-controller;
-+				interrupt-parent;
-+				reg = <0xfffff000 0x200>;
-+			};
-+
-+			dbgu: serial at fffff200 {
-+				compatible = "atmel,at91sam9260-usart";
-+				reg = <0xfffff200 0x200>;
-+				interrupts = <1>;
-+			};
-+
-+			usart0: serial at fffb0000 {
-+				compatible = "atmel,at91sam9260-usart";
-+				reg = <0xfffb0000 0x200>;
-+				interrupts = <6>;
-+				atmel,use-dma-rx;
-+				atmel,use-dma-tx;
-+			};
-+
-+			usart1: serial at fffb4000 {
-+				compatible = "atmel,at91sam9260-usart";
-+				reg = <0xfffb4000 0x200>;
-+				interrupts = <7>;
-+				atmel,use-dma-rx;
-+				atmel,use-dma-tx;
-+			};
-+
-+			usart2: serial at fffb8000 {
-+				compatible = "atmel,at91sam9260-usart";
-+				reg = <0xfffb8000 0x200>;
-+				interrupts = <8>;
-+				atmel,use-dma-rx;
-+				atmel,use-dma-tx;
-+			};
-+
-+			usart3: serial at fffd0000 {
-+				compatible = "atmel,at91sam9260-usart";
-+				reg = <0xfffd0000 0x200>;
-+				interrupts = <23>;
-+				atmel,use-dma-rx;
-+				atmel,use-dma-tx;
-+			};
-+
-+			usart4: serial at fffd4000 {
-+				compatible = "atmel,at91sam9260-usart";
-+				reg = <0xfffd4000 0x200>;
-+				interrupts = <24>;
-+				atmel,use-dma-rx;
-+				atmel,use-dma-tx;
-+			};
-+
-+			usart5: serial at fffd8000 {
-+				compatible = "atmel,at91sam9260-usart";
-+				reg = <0xfffd8000 0x200>;
-+				interrupts = <25>;
-+				atmel,use-dma-rx;
-+				atmel,use-dma-tx;
-+			};
-+
-+/*
-+			smc0: smc at ffffec00 {
-+				compatible = "atmel,at91sam9260-smc";
-+				reg = <0xffffec00 0x10>;
-+			};
-+
-+			smc1: smc at ffffec10 {
-+				compatible = "atmel,at91sam9260-smc";
-+				reg = <0xffffec00 0x10>;
-+			};
-+
-+			smc2: smc at ffffec20 {
-+				compatible = "atmel,at91sam9260-smc";
-+				reg = <0xffffec00 0x10>;
-+			};
-+
-+			smc3: smc at ffffec30 {
-+				compatible = "atmel,at91sam9260-smc";
-+				reg = <0xffffec00 0x10>;
-+			};
-+
-+			smc4: smc at ffffec40 {
-+				compatible = "atmel,at91sam9260-smc";
-+				reg = <0xffffec00 0x10>;
-+			};
-+
-+			smc5: smc at ffffec50 {
-+				compatible = "atmel,at91sam9260-smc";
-+				reg = <0xffffec00 0x10>;
-+			};
-+
-+			smc6: smc at ffffec60 {
-+				compatible = "atmel,at91sam9260-smc";
-+				reg = <0xffffec00 0x10>;
-+			};
-+
-+			smc7: smc at ffffec70 {
-+				compatible = "atmel,at91sam9260-smc";
-+				reg = <0xffffec00 0x10>;
-+			};
-+*/
-+		};
-+	};
-+};
--- 
-1.7.7
+Changes since v4:
+ * Rebase onto imx-features branch
+ * Have devices in soc dtsi as "disabled" and explicitly enable the
+   ones in board dts as "okay"
+ * Utilize of_irq_init() infrastructure added by Rob Herring recently
+
+Shawn Guo (2):
+      arm/mx5: add device tree support for imx53 boards
+      arm/mx5: add device tree support for imx51 babbage
+
+ Documentation/devicetree/bindings/arm/fsl.txt |   19 ++
+ arch/arm/boot/dts/imx51-babbage.dts           |  135 +++++++++++
+ arch/arm/boot/dts/imx51.dtsi                  |  246 ++++++++++++++++++++
+ arch/arm/boot/dts/imx53-ard.dts               |  113 +++++++++
+ arch/arm/boot/dts/imx53-evk.dts               |  120 ++++++++++
+ arch/arm/boot/dts/imx53-qsb.dts               |  125 ++++++++++
+ arch/arm/boot/dts/imx53-smd.dts               |  169 ++++++++++++++
+ arch/arm/boot/dts/imx53.dtsi                  |  301 +++++++++++++++++++++++++
+ arch/arm/mach-mx5/Kconfig                     |   21 ++
+ arch/arm/mach-mx5/Makefile                    |    3 +
+ arch/arm/mach-mx5/board-mx51_babbage.c        |    9 +-
+ arch/arm/mach-mx5/board-mx53_ard.c            |   12 +-
+ arch/arm/mach-mx5/board-mx53_evk.c            |    9 +-
+ arch/arm/mach-mx5/board-mx53_loco.c           |    9 +-
+ arch/arm/mach-mx5/board-mx53_smd.c            |    9 +-
+ arch/arm/mach-mx5/clock-mx51-mx53.c           |   39 ++++
+ arch/arm/mach-mx5/imx51-dt.c                  |  116 ++++++++++
+ arch/arm/mach-mx5/imx53-dt.c                  |  126 +++++++++++
+ arch/arm/plat-mxc/include/mach/common.h       |    8 +
+ 19 files changed, 1577 insertions(+), 12 deletions(-)
