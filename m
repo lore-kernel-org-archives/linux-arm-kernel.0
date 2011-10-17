@@ -1,27 +1,33 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 17 Oct 2011 22:33:03 +0100
-Subject: [PATCH] gpio/samsung: Complain loudly if we don't know the SoC
-In-Reply-To: <CACxGe6vqUjayFVu1wNUYN_zjngKJcXkzzcxcGn4bwkHG7xv2yg@mail.gmail.com>
-References: <1318885455-905-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-	<CACxGe6vqUjayFVu1wNUYN_zjngKJcXkzzcxcGn4bwkHG7xv2yg@mail.gmail.com>
-Message-ID: <20111017213303.GA3366@opensource.wolfsonmicro.com>
+Date: Mon, 17 Oct 2011 22:36:19 +0100
+Subject: [PATCH v2] gpio/samsung: Complain loudly if we don't know the SoC
+Message-ID: <1318887379-5158-1-git-send-email-broonie@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 17, 2011 at 03:07:47PM -0600, Grant Likely wrote:
-> On Mon, Oct 17, 2011 at 3:04 PM, Mark Brown
+If we don't know the SoC type then we won't add any chips which is rather
+unfortunate as neither GPIO nor pinmux APIs will work, breaking lots of
+different subsystems. Logging at least provides a hint to the user as to
+what's gone wrong.
 
-> > If we don't know the SoC type then we won't add any chips which is rather
-> > unfortunate as neither GPIO nor pinmux APIs will work, breaking lots of
-> > different subsystems. Logging at least provides a hint to the user as to
-> > what's gone wrong.
+Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+---
+ drivers/gpio/gpio-samsung.c |    3 +++
+ 1 files changed, 3 insertions(+), 0 deletions(-)
 
-> > Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
-
-> Be Bolder!  May as well use WARN() and be really obnoxious.  :-)
-
-Actually what's really unfortunate here is that in most configurations
-this will cause a catastrophic failure to boot so we never get far
-enough to see the logging at all.  We really need aSCREAM_THROUGH_DEBUG_LL()
-or whatever.  Or to fix these things to dump via that route if we don't
-have the console up yet, which is going to be more practical.
+diff --git a/drivers/gpio/gpio-samsung.c b/drivers/gpio/gpio-samsung.c
+index 479edc3..8662518 100644
+--- a/drivers/gpio/gpio-samsung.c
++++ b/drivers/gpio/gpio-samsung.c
+@@ -2486,6 +2486,9 @@ static __init int samsung_gpiolib_init(void)
+ 		s5p_register_gpioint_bank(IRQ_GPIO_XA, 0, IRQ_GPIO1_NR_GROUPS);
+ 		s5p_register_gpioint_bank(IRQ_GPIO_XB, IRQ_GPIO1_NR_GROUPS, IRQ_GPIO2_NR_GROUPS);
+ #endif
++	} else {
++		WARN(1, "Unknown SoC in gpio-samsung, no GPIOs added\n");
++		return -ENODEV;
+ 	}
+ 
+ 	return 0;
+-- 
+1.7.6.3
