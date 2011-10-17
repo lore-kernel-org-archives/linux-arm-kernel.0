@@ -1,654 +1,173 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 17 Oct 2011 08:42:17 +0800
-Subject: [PATCH v6 2/2] arm/mx5: add device tree support for imx51 babbage
-In-Reply-To: <1318812137-13991-1-git-send-email-shawn.guo@linaro.org>
-References: <1318812137-13991-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1318812137-13991-3-git-send-email-shawn.guo@linaro.org>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Sun, 16 Oct 2011 20:48:49 -0400 (EDT)
+Subject: Pull request: removal of most instances of mach/memory.h
+In-Reply-To: <alpine.LFD.2.02.1110041452330.9106@xanadu.home>
+References: <alpine.LFD.2.00.1109062158450.20358@xanadu.home>
+	<alpine.LFD.2.00.1109130849590.20358@xanadu.home>
+	<alpine.LFD.2.00.1109201349400.12663@xanadu.home>
+	<20110926131524.GJ22455@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1109260952490.2718@xanadu.home>
+	<alpine.LFD.2.00.1109261023360.2718@xanadu.home>
+	<20110926191055.GP22455@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.02.1110041452330.9106@xanadu.home>
+Message-ID: <alpine.LFD.2.02.1110161956110.17040@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It adds device tree support for imx51 babbage board.
+On Tue, 4 Oct 2011, Nicolas Pitre wrote:
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-Acked-by: Grant Likely <grant.likely@secretlab.ca>
-Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
----
- Documentation/devicetree/bindings/arm/fsl.txt |    4 +
- arch/arm/boot/dts/imx51-babbage.dts           |  135 ++++++++++++++
- arch/arm/boot/dts/imx51.dtsi                  |  246 +++++++++++++++++++++++++
- arch/arm/mach-mx5/Kconfig                     |    9 +
- arch/arm/mach-mx5/Makefile                    |    1 +
- arch/arm/mach-mx5/board-mx51_babbage.c        |    9 +-
- arch/arm/mach-mx5/clock-mx51-mx53.c           |    8 +
- arch/arm/mach-mx5/imx51-dt.c                  |  116 ++++++++++++
- arch/arm/plat-mxc/include/mach/common.h       |    2 +
- 9 files changed, 528 insertions(+), 2 deletions(-)
- create mode 100644 arch/arm/boot/dts/imx51-babbage.dts
- create mode 100644 arch/arm/boot/dts/imx51.dtsi
- create mode 100644 arch/arm/mach-mx5/imx51-dt.c
+> On Mon, 26 Sep 2011, Russell King - ARM Linux wrote:
+> 
+> > This also gives additional merge conflicts elsewhere, and while git
+> > rerere makes some of them easy, the quantity is going to be a right
+> > pain to deal with on a repeated basis.
+> 
+> Does this mean that you will only merge this before asking Linus to 
+> pull?  I would like to know on which leg I should stand with this 
+> series.
 
-diff --git a/Documentation/devicetree/bindings/arm/fsl.txt b/Documentation/devicetree/bindings/arm/fsl.txt
-index d1e8d6f..e2401cd 100644
---- a/Documentation/devicetree/bindings/arm/fsl.txt
-+++ b/Documentation/devicetree/bindings/arm/fsl.txt
-@@ -1,3 +1,7 @@
-+i.MX51 Babbage Board
-+Required root node properties:
-+    - compatible = "fsl,imx51-babbage", "fsl,imx51";
-+
- i.MX53 Automotive Reference Design Board
- Required root node properties:
-     - compatible = "fsl,imx53-ard", "fsl,imx53";
-diff --git a/arch/arm/boot/dts/imx51-babbage.dts b/arch/arm/boot/dts/imx51-babbage.dts
-new file mode 100644
-index 0000000..f8766af
---- /dev/null
-+++ b/arch/arm/boot/dts/imx51-babbage.dts
-@@ -0,0 +1,135 @@
-+/*
-+ * Copyright 2011 Freescale Semiconductor, Inc.
-+ * Copyright 2011 Linaro Ltd.
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+
-+/dts-v1/;
-+/include/ "imx51.dtsi"
-+
-+/ {
-+	model = "Freescale i.MX51 Babbage Board";
-+	compatible = "fsl,imx51-babbage", "fsl,imx51";
-+
-+	chosen {
-+		bootargs = "console=ttymxc0,115200 root=/dev/mmcblk0p3 rootwait";
-+	};
-+
-+	memory {
-+		reg = <0x90000000 0x20000000>;
-+	};
-+
-+	soc {
-+		aips at 70000000 { /* aips-1 */
-+			spba at 70000000 {
-+				esdhc at 70004000 { /* ESDHC1 */
-+					fsl,cd-internal;
-+					fsl,wp-internal;
-+					status = "okay";
-+				};
-+
-+				esdhc at 70008000 { /* ESDHC2 */
-+					cd-gpios = <&gpio0 6 0>; /* GPIO1_6 */
-+					wp-gpios = <&gpio0 5 0>; /* GPIO1_5 */
-+					status = "okay";
-+				};
-+
-+				uart2: uart at 7000c000 { /* UART3 */
-+					fsl,uart-has-rtscts;
-+					status = "okay";
-+				};
-+
-+				ecspi at 70010000 { /* ECSPI1 */
-+					fsl,spi-num-chipselects = <2>;
-+					cs-gpios = <&gpio3 24 0>, /* GPIO4_24 */
-+						   <&gpio3 25 0>; /* GPIO4_25 */
-+					status = "okay";
-+
-+					pmic: mc13892 at 0 {
-+						#address-cells = <1>;
-+						#size-cells = <0>;
-+						compatible = "fsl,mc13892";
-+						spi-max-frequency = <6000000>;
-+						reg = <0>;
-+						mc13xxx-irq-gpios = <&gpio0 8 0>; /* GPIO1_8 */
-+						fsl,mc13xxx-uses-regulator;
-+					};
-+
-+					flash: at45db321d at 1 {
-+						#address-cells = <1>;
-+						#size-cells = <1>;
-+						compatible = "atmel,at45db321d", "atmel,at45", "atmel,dataflash";
-+						spi-max-frequency = <25000000>;
-+						reg = <1>;
-+
-+						partition at 0 {
-+							label = "U-Boot";
-+							reg = <0x0 0x40000>;
-+							read-only;
-+						};
-+
-+						partition at 40000 {
-+							label = "Kernel";
-+							reg = <0x40000 0x3c0000>;
-+						};
-+					};
-+				};
-+			};
-+
-+			wdog at 73f98000 { /* WDOG1 */
-+				status = "okay";
-+			};
-+
-+			iomuxc at 73fa8000 {
-+				compatible = "fsl,imx51-iomuxc-babbage";
-+				reg = <0x73fa8000 0x4000>;
-+			};
-+
-+			uart0: uart at 73fbc000 {
-+				fsl,uart-has-rtscts;
-+				status = "okay";
-+			};
-+
-+			uart1: uart at 73fc0000 {
-+				status = "okay";
-+			};
-+		};
-+
-+		aips at 80000000 {	/* aips-2 */
-+			sdma at 83fb0000 {
-+				fsl,sdma-ram-script-name = "imx/sdma/sdma-imx51.bin";
-+			};
-+
-+			i2c at 83fc4000 { /* I2C2 */
-+				status = "okay";
-+
-+				codec: sgtl5000 at 0a {
-+					compatible = "fsl,sgtl5000";
-+					reg = <0x0a>;
-+				};
-+			};
-+
-+			fec at 83fec000 {
-+				phy-mode = "mii";
-+				status = "okay";
-+			};
-+		};
-+	};
-+
-+	gpio-keys {
-+		compatible = "gpio-keys";
-+
-+		power {
-+			label = "Power Button";
-+			gpios = <&gpio1 21 0>;
-+			linux,code = <116>; /* KEY_POWER */
-+			gpio-key,wakeup;
-+		};
-+	};
-+};
-diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
-new file mode 100644
-index 0000000..327ab8e
---- /dev/null
-+++ b/arch/arm/boot/dts/imx51.dtsi
-@@ -0,0 +1,246 @@
-+/*
-+ * Copyright 2011 Freescale Semiconductor, Inc.
-+ * Copyright 2011 Linaro Ltd.
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+
-+/include/ "skeleton.dtsi"
-+
-+/ {
-+	aliases {
-+		serial0 = &uart0;
-+		serial1 = &uart1;
-+		serial2 = &uart2;
-+	};
-+
-+	tzic: tz-interrupt-controller at e0000000 {
-+		compatible = "fsl,imx51-tzic", "fsl,tzic";
-+		interrupt-controller;
-+		#interrupt-cells = <1>;
-+		reg = <0xe0000000 0x4000>;
-+	};
-+
-+	clocks {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		ckil {
-+			compatible = "fsl,imx-ckil", "fixed-clock";
-+			clock-frequency = <32768>;
-+		};
-+
-+		ckih1 {
-+			compatible = "fsl,imx-ckih1", "fixed-clock";
-+			clock-frequency = <22579200>;
-+		};
-+
-+		ckih2 {
-+			compatible = "fsl,imx-ckih2", "fixed-clock";
-+			clock-frequency = <0>;
-+		};
-+
-+		osc {
-+			compatible = "fsl,imx-osc", "fixed-clock";
-+			clock-frequency = <24000000>;
-+		};
-+	};
-+
-+	soc {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "simple-bus";
-+		interrupt-parent = <&tzic>;
-+		ranges;
-+
-+		aips at 70000000 { /* AIPS1 */
-+			compatible = "fsl,aips-bus", "simple-bus";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			reg = <0x70000000 0x10000000>;
-+			ranges;
-+
-+			spba at 70000000 {
-+				compatible = "fsl,spba-bus", "simple-bus";
-+				#address-cells = <1>;
-+				#size-cells = <1>;
-+				reg = <0x70000000 0x40000>;
-+				ranges;
-+
-+				esdhc at 70004000 { /* ESDHC1 */
-+					compatible = "fsl,imx51-esdhc";
-+					reg = <0x70004000 0x4000>;
-+					interrupts = <1>;
-+					status = "disabled";
-+				};
-+
-+				esdhc at 70008000 { /* ESDHC2 */
-+					compatible = "fsl,imx51-esdhc";
-+					reg = <0x70008000 0x4000>;
-+					interrupts = <2>;
-+					status = "disabled";
-+				};
-+
-+				uart2: uart at 7000c000 { /* UART3 */
-+					compatible = "fsl,imx51-uart", "fsl,imx21-uart";
-+					reg = <0x7000c000 0x4000>;
-+					interrupts = <33>;
-+					status = "disabled";
-+				};
-+
-+				ecspi at 70010000 { /* ECSPI1 */
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					compatible = "fsl,imx51-ecspi";
-+					reg = <0x70010000 0x4000>;
-+					interrupts = <36>;
-+					status = "disabled";
-+				};
-+
-+				esdhc at 70020000 { /* ESDHC3 */
-+					compatible = "fsl,imx51-esdhc";
-+					reg = <0x70020000 0x4000>;
-+					interrupts = <3>;
-+					status = "disabled";
-+				};
-+
-+				esdhc at 70024000 { /* ESDHC4 */
-+					compatible = "fsl,imx51-esdhc";
-+					reg = <0x70024000 0x4000>;
-+					interrupts = <4>;
-+					status = "disabled";
-+				};
-+			};
-+
-+			gpio0: gpio at 73f84000 { /* GPIO1 */
-+				compatible = "fsl,imx51-gpio", "fsl,imx31-gpio";
-+				reg = <0x73f84000 0x4000>;
-+				interrupts = <50 51>;
-+				gpio-controller;
-+				#gpio-cells = <2>;
-+				interrupt-controller;
-+				#interrupt-cells = <1>;
-+			};
-+
-+			gpio1: gpio at 73f88000 { /* GPIO2 */
-+				compatible = "fsl,imx51-gpio", "fsl,imx31-gpio";
-+				reg = <0x73f88000 0x4000>;
-+				interrupts = <52 53>;
-+				gpio-controller;
-+				#gpio-cells = <2>;
-+				interrupt-controller;
-+				#interrupt-cells = <1>;
-+			};
-+
-+			gpio2: gpio at 73f8c000 { /* GPIO3 */
-+				compatible = "fsl,imx51-gpio", "fsl,imx31-gpio";
-+				reg = <0x73f8c000 0x4000>;
-+				interrupts = <54 55>;
-+				gpio-controller;
-+				#gpio-cells = <2>;
-+				interrupt-controller;
-+				#interrupt-cells = <1>;
-+			};
-+
-+			gpio3: gpio at 73f90000 { /* GPIO4 */
-+				compatible = "fsl,imx51-gpio", "fsl,imx31-gpio";
-+				reg = <0x73f90000 0x4000>;
-+				interrupts = <56 57>;
-+				gpio-controller;
-+				#gpio-cells = <2>;
-+				interrupt-controller;
-+				#interrupt-cells = <1>;
-+			};
-+
-+			wdog at 73f98000 { /* WDOG1 */
-+				compatible = "fsl,imx51-wdt", "fsl,imx21-wdt";
-+				reg = <0x73f98000 0x4000>;
-+				interrupts = <58>;
-+				status = "disabled";
-+			};
-+
-+			wdog at 73f9c000 { /* WDOG2 */
-+				compatible = "fsl,imx51-wdt", "fsl,imx21-wdt";
-+				reg = <0x73f9c000 0x4000>;
-+				interrupts = <59>;
-+				status = "disabled";
-+			};
-+
-+			uart0: uart at 73fbc000 {
-+				compatible = "fsl,imx51-uart", "fsl,imx21-uart";
-+				reg = <0x73fbc000 0x4000>;
-+				interrupts = <31>;
-+				status = "disabled";
-+			};
-+
-+			uart1: uart at 73fc0000 {
-+				compatible = "fsl,imx51-uart", "fsl,imx21-uart";
-+				reg = <0x73fc0000 0x4000>;
-+				interrupts = <32>;
-+				status = "disabled";
-+			};
-+		};
-+
-+		aips at 80000000 {	/* AIPS2 */
-+			compatible = "fsl,aips-bus", "simple-bus";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			reg = <0x80000000 0x10000000>;
-+			ranges;
-+
-+			ecspi at 83fac000 { /* ECSPI2 */
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				compatible = "fsl,imx51-ecspi";
-+				reg = <0x83fac000 0x4000>;
-+				interrupts = <37>;
-+				status = "disabled";
-+			};
-+
-+			sdma at 83fb0000 {
-+				compatible = "fsl,imx51-sdma", "fsl,imx35-sdma";
-+				reg = <0x83fb0000 0x4000>;
-+				interrupts = <6>;
-+			};
-+
-+			cspi at 83fc0000 {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				compatible = "fsl,imx51-cspi", "fsl,imx35-cspi";
-+				reg = <0x83fc0000 0x4000>;
-+				interrupts = <38>;
-+				status = "disabled";
-+			};
-+
-+			i2c at 83fc4000 { /* I2C2 */
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				compatible = "fsl,imx51-i2c", "fsl,imx1-i2c";
-+				reg = <0x83fc4000 0x4000>;
-+				interrupts = <63>;
-+				status = "disabled";
-+			};
-+
-+			i2c at 83fc8000 { /* I2C1 */
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				compatible = "fsl,imx51-i2c", "fsl,imx1-i2c";
-+				reg = <0x83fc8000 0x4000>;
-+				interrupts = <62>;
-+				status = "disabled";
-+			};
-+
-+			fec at 83fec000 {
-+				compatible = "fsl,imx51-fec", "fsl,imx27-fec";
-+				reg = <0x83fec000 0x4000>;
-+				interrupts = <87>;
-+				status = "disabled";
-+			};
-+		};
-+	};
-+};
-diff --git a/arch/arm/mach-mx5/Kconfig b/arch/arm/mach-mx5/Kconfig
-index 08c32a4..af0c212 100644
---- a/arch/arm/mach-mx5/Kconfig
-+++ b/arch/arm/mach-mx5/Kconfig
-@@ -56,6 +56,15 @@ config MACH_MX50_RDP
- 
- comment "i.MX51 machines:"
- 
-+config MACH_IMX51_DT
-+	bool "Support i.MX51 platforms from device tree"
-+	select SOC_IMX51
-+	select USE_OF
-+	select MACH_MX51_BABBAGE
-+	help
-+	  Include support for Freescale i.MX51 based platforms
-+	  using the device tree for discovery
-+
- config MACH_MX51_BABBAGE
- 	bool "Support MX51 BABBAGE platforms"
- 	select SOC_IMX51
-diff --git a/arch/arm/mach-mx5/Makefile b/arch/arm/mach-mx5/Makefile
-index cf9d461..0fc6080 100644
---- a/arch/arm/mach-mx5/Makefile
-+++ b/arch/arm/mach-mx5/Makefile
-@@ -22,4 +22,5 @@ obj-$(CONFIG_MACH_MX51_EFIKAMX) += board-mx51_efikamx.o
- obj-$(CONFIG_MACH_MX51_EFIKASB) += board-mx51_efikasb.o
- obj-$(CONFIG_MACH_MX50_RDP) += board-mx50_rdp.o
- 
-+obj-$(CONFIG_MACH_IMX51_DT) += imx51-dt.o
- obj-$(CONFIG_MACH_IMX53_DT) += imx53-dt.o
-diff --git a/arch/arm/mach-mx5/board-mx51_babbage.c b/arch/arm/mach-mx5/board-mx51_babbage.c
-index 5993208..5c83760 100644
---- a/arch/arm/mach-mx5/board-mx51_babbage.c
-+++ b/arch/arm/mach-mx5/board-mx51_babbage.c
-@@ -349,6 +349,12 @@ static const struct esdhc_platform_data mx51_babbage_sd2_data __initconst = {
- 	.wp_type = ESDHC_WP_GPIO,
- };
- 
-+void __init imx51_babbage_common_init(void)
-+{
-+	mxc_iomux_v3_setup_multiple_pads(mx51babbage_pads,
-+					 ARRAY_SIZE(mx51babbage_pads));
-+}
-+
- /*
-  * Board specific initialization.
-  */
-@@ -363,8 +369,7 @@ static void __init mx51_babbage_init(void)
- #if defined(CONFIG_CPU_FREQ_IMX)
- 	get_cpu_op = mx51_get_cpu_op;
- #endif
--	mxc_iomux_v3_setup_multiple_pads(mx51babbage_pads,
--					ARRAY_SIZE(mx51babbage_pads));
-+	imx51_babbage_common_init();
- 
- 	imx51_add_imx_uart(0, &uart_pdata);
- 	imx51_add_imx_uart(1, NULL);
-diff --git a/arch/arm/mach-mx5/clock-mx51-mx53.c b/arch/arm/mach-mx5/clock-mx51-mx53.c
-index 34a6427..3882c2b 100644
---- a/arch/arm/mach-mx5/clock-mx51-mx53.c
-+++ b/arch/arm/mach-mx5/clock-mx51-mx53.c
-@@ -1637,6 +1637,14 @@ static void __init clk_get_freq_dt(unsigned long *ckil, unsigned long *osc,
- 	}
- }
- 
-+int __init mx51_clocks_init_dt(void)
-+{
-+	unsigned long ckil, osc, ckih1, ckih2;
-+
-+	clk_get_freq_dt(&ckil, &osc, &ckih1, &ckih2);
-+	return mx51_clocks_init(ckil, osc, ckih1, ckih2);
-+}
-+
- int __init mx53_clocks_init_dt(void)
- {
- 	unsigned long ckil, osc, ckih1, ckih2;
-diff --git a/arch/arm/mach-mx5/imx51-dt.c b/arch/arm/mach-mx5/imx51-dt.c
-new file mode 100644
-index 0000000..ccc6158
---- /dev/null
-+++ b/arch/arm/mach-mx5/imx51-dt.c
-@@ -0,0 +1,116 @@
-+/*
-+ * Copyright 2011 Freescale Semiconductor, Inc. All Rights Reserved.
-+ * Copyright 2011 Linaro Ltd.
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+
-+#include <linux/irq.h>
-+#include <linux/irqdomain.h>
-+#include <linux/of_irq.h>
-+#include <linux/of_platform.h>
-+#include <asm/mach/arch.h>
-+#include <asm/mach/time.h>
-+#include <mach/common.h>
-+#include <mach/mx51.h>
-+
-+/*
-+ * Lookup table for attaching a specific name and platform_data pointer to
-+ * devices as they get created by of_platform_populate().  Ideally this table
-+ * would not exist, but the current clock implementation depends on some devices
-+ * having a specific name.
-+ */
-+static const struct of_dev_auxdata imx51_auxdata_lookup[] __initconst = {
-+	OF_DEV_AUXDATA("fsl,imx51-uart", MX51_UART1_BASE_ADDR, "imx21-uart.0", NULL),
-+	OF_DEV_AUXDATA("fsl,imx51-uart", MX51_UART2_BASE_ADDR, "imx21-uart.1", NULL),
-+	OF_DEV_AUXDATA("fsl,imx51-uart", MX51_UART3_BASE_ADDR, "imx21-uart.2", NULL),
-+	OF_DEV_AUXDATA("fsl,imx51-fec", MX51_FEC_BASE_ADDR, "imx27-fec.0", NULL),
-+	OF_DEV_AUXDATA("fsl,imx51-esdhc", MX51_ESDHC1_BASE_ADDR, "sdhci-esdhc-imx51.0", NULL),
-+	OF_DEV_AUXDATA("fsl,imx51-esdhc", MX51_ESDHC2_BASE_ADDR, "sdhci-esdhc-imx51.1", NULL),
-+	OF_DEV_AUXDATA("fsl,imx51-esdhc", MX51_ESDHC3_BASE_ADDR, "sdhci-esdhc-imx51.2", NULL),
-+	OF_DEV_AUXDATA("fsl,imx51-esdhc", MX51_ESDHC4_BASE_ADDR, "sdhci-esdhc-imx51.3", NULL),
-+	OF_DEV_AUXDATA("fsl,imx51-ecspi", MX51_ECSPI1_BASE_ADDR, "imx51-ecspi.0", NULL),
-+	OF_DEV_AUXDATA("fsl,imx51-ecspi", MX51_ECSPI2_BASE_ADDR, "imx51-ecspi.1", NULL),
-+	OF_DEV_AUXDATA("fsl,imx51-cspi", MX51_CSPI_BASE_ADDR, "imx35-cspi.0", NULL),
-+	OF_DEV_AUXDATA("fsl,imx51-i2c", MX51_I2C1_BASE_ADDR, "imx-i2c.0", NULL),
-+	OF_DEV_AUXDATA("fsl,imx51-i2c", MX51_I2C2_BASE_ADDR, "imx-i2c.1", NULL),
-+	OF_DEV_AUXDATA("fsl,imx51-sdma", MX51_SDMA_BASE_ADDR, "imx35-sdma", NULL),
-+	OF_DEV_AUXDATA("fsl,imx51-wdt", MX51_WDOG1_BASE_ADDR, "imx2-wdt.0", NULL),
-+	{ /* sentinel */ }
-+};
-+
-+static void __init imx51_tzic_add_irq_domain(struct device_node *np,
-+				struct device_node *interrupt_parent)
-+{
-+	irq_domain_add_simple(np, 0);
-+}
-+
-+static void __init imx51_gpio_add_irq_domain(struct device_node *np,
-+				struct device_node *interrupt_parent)
-+{
-+	static int gpio_irq_base = MXC_GPIO_IRQ_START + ARCH_NR_GPIOS -
-+				   32 * 4; /* imx51 gets 4 gpio ports */
-+
-+	irq_domain_add_simple(np, gpio_irq_base);
-+	gpio_irq_base += 32;
-+}
-+
-+static const struct of_device_id imx51_irq_match[] __initconst = {
-+	{ .compatible = "fsl,imx51-tzic", .data = imx51_tzic_add_irq_domain, },
-+	{ .compatible = "fsl,imx51-gpio", .data = imx51_gpio_add_irq_domain, },
-+	{ /* sentinel */ }
-+};
-+
-+static const struct of_device_id imx51_iomuxc_of_match[] __initconst = {
-+	{ .compatible = "fsl,imx51-iomuxc-babbage", .data = imx51_babbage_common_init, },
-+	{ /* sentinel */ }
-+};
-+
-+static void __init imx51_dt_init(void)
-+{
-+	struct device_node *node;
-+	const struct of_device_id *of_id;
-+	void (*func)(void);
-+
-+	of_irq_init(imx51_irq_match);
-+
-+	node = of_find_matching_node(NULL, imx51_iomuxc_of_match);
-+	if (node) {
-+		of_id = of_match_node(imx51_iomuxc_of_match, node);
-+		func = of_id->data;
-+		func();
-+		of_node_put(node);
-+	}
-+
-+	of_platform_populate(NULL, of_default_bus_match_table,
-+			     imx51_auxdata_lookup, NULL);
-+}
-+
-+static void __init imx51_timer_init(void)
-+{
-+	mx51_clocks_init_dt();
-+}
-+
-+static struct sys_timer imx51_timer = {
-+	.init = imx51_timer_init,
-+};
-+
-+static const char *imx51_dt_board_compat[] __initdata = {
-+	"fsl,imx51-babbage",
-+	NULL
-+};
-+
-+DT_MACHINE_START(IMX51_DT, "Freescale i.MX51 (Device Tree Support)")
-+	.map_io		= mx51_map_io,
-+	.init_early	= imx51_init_early,
-+	.init_irq	= mx51_init_irq,
-+	.handle_irq	= imx51_handle_irq,
-+	.timer		= &imx51_timer,
-+	.init_machine	= imx51_dt_init,
-+	.dt_compat	= imx51_dt_board_compat,
-+MACHINE_END
-diff --git a/arch/arm/plat-mxc/include/mach/common.h b/arch/arm/plat-mxc/include/mach/common.h
-index bd14035..533c622 100644
---- a/arch/arm/plat-mxc/include/mach/common.h
-+++ b/arch/arm/plat-mxc/include/mach/common.h
-@@ -64,6 +64,7 @@ extern int mx51_clocks_init(unsigned long ckil, unsigned long osc,
- 			unsigned long ckih1, unsigned long ckih2);
- extern int mx53_clocks_init(unsigned long ckil, unsigned long osc,
- 			unsigned long ckih1, unsigned long ckih2);
-+extern int mx51_clocks_init_dt(void);
- extern int mx53_clocks_init_dt(void);
- extern struct platform_device *mxc_register_gpio(char *name, int id,
- 	resource_size_t iobase, resource_size_t iosize, int irq, int irq_high);
-@@ -73,6 +74,7 @@ extern void mx51_efikamx_reset(void);
- extern int mx53_revision(void);
- extern int mx53_display_revision(void);
- 
-+extern void imx51_babbage_common_init(void);
- extern void imx53_ard_common_init(void);
- extern void imx53_evk_common_init(void);
- extern void imx53_qsb_common_init(void);
--- 
-1.7.4.1
+Here's where things stand with this series from my end:
+
+1) The SA/XScale cache maintenance mapping patch is still untested on
+   SA110, hence this patch and all those that depended on it have been 
+   dropped for now.
+
+2) The EP93xx patch removed the ability to use ZBOOT_ROM on 
+   corresponding machines, so this patch has been dropped until the 
+   ZBOOT_ROM facility is reworked in a more generic way.
+
+3) Performing a test merge with your for-next branch produces merge
+   conflicts in arch/arm/Kconfig and arch/arm/plat-omap/Kconfig only, 
+   and they are very trivial to fix.
+
+4) During the few days this series was pulled into linux-next via the 
+   arm-soc tree, no issues were reported.
+
+5) I can't recall any further objections to this series, neither from 
+   you nor anyone else.
+
+If I'm missing something, or if I overlooked a previous comment of 
+yours, I'd be glad to address it promptly.
+
+I therefore would appreciate if you could pull the following:
+
+    git://git.linaro.org/people/nico/linux mach_memory_h
+
+The updated diffstat follows:
+
+ arch/arm/Kconfig                                   |   30 +++++
+ arch/arm/include/asm/memory.h                      |    9 ++-
+ arch/arm/kernel/debug.S                            |    4 +-
+ arch/arm/kernel/head.S                             |    4 +-
+ arch/arm/mach-at91/include/mach/debug-macro.S      |    2 +-
+ arch/arm/mach-bcmring/include/mach/hardware.h      |    3 +-
+ arch/arm/mach-bcmring/include/mach/memory.h        |   28 ----
+ arch/arm/mach-clps711x/include/mach/debug-macro.S  |    2 +-
+ arch/arm/mach-cns3xxx/include/mach/debug-macro.S   |    2 +-
+ arch/arm/mach-cns3xxx/include/mach/memory.h        |   26 ----
+ arch/arm/mach-davinci/cpuidle.c                    |    2 +-
+ arch/arm/mach-davinci/include/mach/ddr2.h          |    4 +
+ arch/arm/mach-davinci/include/mach/debug-macro.S   |   52 ++++-----
+ arch/arm/mach-davinci/include/mach/memory.h        |   39 ------
+ arch/arm/mach-davinci/include/mach/serial.h        |    3 +-
+ arch/arm/mach-davinci/include/mach/uncompress.h    |    7 +-
+ arch/arm/mach-davinci/sleep.S                      |    2 +-
+ arch/arm/mach-dove/include/mach/debug-macro.S      |    2 +-
+ arch/arm/mach-dove/include/mach/memory.h           |   10 --
+ arch/arm/mach-ebsa110/include/mach/debug-macro.S   |    2 +-
+ arch/arm/mach-ep93xx/include/mach/debug-macro.S    |    2 +-
+ arch/arm/mach-exynos4/include/mach/debug-macro.S   |    2 +-
+ .../arm/mach-footbridge/include/mach/debug-macro.S |    4 +-
+ arch/arm/mach-gemini/include/mach/debug-macro.S    |    2 +-
+ arch/arm/mach-gemini/include/mach/memory.h         |   19 ---
+ arch/arm/mach-h720x/include/mach/debug-macro.S     |    2 +-
+ arch/arm/mach-h720x/include/mach/memory.h          |   11 --
+ .../arm/mach-integrator/include/mach/debug-macro.S |    2 +-
+ arch/arm/mach-iop13xx/include/mach/debug-macro.S   |    2 +-
+ arch/arm/mach-iop32x/include/mach/debug-macro.S    |    2 +-
+ arch/arm/mach-iop32x/include/mach/memory.h         |   13 --
+ arch/arm/mach-iop33x/include/mach/debug-macro.S    |    2 +-
+ arch/arm/mach-iop33x/include/mach/memory.h         |   13 --
+ arch/arm/mach-ixp2000/include/mach/debug-macro.S   |    2 +-
+ arch/arm/mach-ixp23xx/include/mach/debug-macro.S   |    2 +-
+ arch/arm/mach-ixp4xx/include/mach/debug-macro.S    |    2 +-
+ arch/arm/mach-ixp4xx/include/mach/memory.h         |   17 ---
+ arch/arm/mach-kirkwood/include/mach/debug-macro.S  |    2 +-
+ arch/arm/mach-kirkwood/include/mach/memory.h       |   10 --
+ arch/arm/mach-ks8695/include/mach/debug-macro.S    |    2 +-
+ arch/arm/mach-l7200/include/mach/debug-macro.S     |    2 +-
+ arch/arm/mach-lpc32xx/include/mach/debug-macro.S   |    2 +-
+ arch/arm/mach-lpc32xx/include/mach/memory.h        |   27 ----
+ arch/arm/mach-mmp/include/mach/debug-macro.S       |    2 +-
+ arch/arm/mach-mmp/include/mach/memory.h            |   14 --
+ arch/arm/mach-msm/include/mach/debug-macro.S       |    4 +-
+ arch/arm/mach-msm/include/mach/memory.h            |   35 ------
+ arch/arm/mach-mv78xx0/include/mach/debug-macro.S   |    2 +-
+ arch/arm/mach-mv78xx0/include/mach/memory.h        |   10 --
+ arch/arm/mach-mxs/include/mach/debug-macro.S       |    2 +-
+ arch/arm/mach-mxs/include/mach/memory.h            |   24 ----
+ arch/arm/mach-netx/include/mach/debug-macro.S      |    2 +-
+ arch/arm/mach-netx/include/mach/memory.h           |   26 ----
+ arch/arm/mach-nomadik/include/mach/debug-macro.S   |    2 +-
+ arch/arm/mach-nomadik/include/mach/memory.h        |   28 ----
+ arch/arm/mach-nuc93x/include/mach/memory.h         |   21 ---
+ arch/arm/mach-omap1/include/mach/debug-macro.S     |   48 +++----
+ arch/arm/mach-omap1/include/mach/memory.h          |   53 ++++++++-
+ arch/arm/mach-omap2/include/mach/debug-macro.S     |   81 ++++++-------
+ arch/arm/mach-omap2/include/mach/memory.h          |    5 -
+ arch/arm/mach-orion5x/include/mach/debug-macro.S   |    2 +-
+ arch/arm/mach-orion5x/include/mach/memory.h        |   12 --
+ arch/arm/mach-pnx4008/include/mach/debug-macro.S   |    2 +-
+ arch/arm/mach-pnx4008/include/mach/memory.h        |   21 ---
+ arch/arm/mach-prima2/include/mach/debug-macro.S    |    2 +-
+ arch/arm/mach-prima2/include/mach/memory.h         |   21 ---
+ arch/arm/mach-prima2/l2x0.c                        |    5 +-
+ arch/arm/mach-prima2/prima2.c                      |    1 +
+ arch/arm/mach-pxa/include/mach/debug-macro.S       |    2 +-
+ arch/arm/mach-pxa/include/mach/memory.h            |   20 ---
+ arch/arm/mach-pxa/z2.c                             |    2 +-
+ arch/arm/mach-realview/include/mach/debug-macro.S  |    2 +-
+ arch/arm/mach-rpc/include/mach/debug-macro.S       |    2 +-
+ arch/arm/mach-s3c2400/include/mach/memory.h        |   20 ---
+ arch/arm/mach-s3c2410/include/mach/debug-macro.S   |    2 +-
+ arch/arm/mach-s3c2410/include/mach/memory.h        |   16 ---
+ arch/arm/mach-s3c64xx/include/mach/debug-macro.S   |    2 +-
+ arch/arm/mach-s3c64xx/include/mach/memory.h        |   18 ---
+ arch/arm/mach-s5p64x0/include/mach/debug-macro.S   |    2 +-
+ arch/arm/mach-s5p64x0/include/mach/memory.h        |   18 ---
+ arch/arm/mach-s5pc100/include/mach/debug-macro.S   |    2 +-
+ arch/arm/mach-s5pc100/include/mach/memory.h        |   18 ---
+ arch/arm/mach-s5pv210/include/mach/debug-macro.S   |    2 +-
+ arch/arm/mach-sa1100/include/mach/debug-macro.S    |    2 +-
+ arch/arm/mach-shark/include/mach/debug-macro.S     |    2 +-
+ arch/arm/mach-spear3xx/include/mach/memory.h       |   19 ---
+ arch/arm/mach-spear6xx/include/mach/memory.h       |   19 ---
+ arch/arm/mach-tegra/include/mach/debug-macro.S     |    2 +-
+ arch/arm/mach-tegra/include/mach/memory.h          |   28 ----
+ arch/arm/mach-u300/include/mach/debug-macro.S      |    2 +-
+ arch/arm/mach-ux500/include/mach/debug-macro.S     |    2 +-
+ arch/arm/mach-ux500/include/mach/memory.h          |   18 ---
+ arch/arm/mach-versatile/include/mach/debug-macro.S |    2 +-
+ arch/arm/mach-versatile/include/mach/memory.h      |   28 ----
+ arch/arm/mach-vexpress/include/mach/debug-macro.S  |    2 +-
+ arch/arm/mach-vexpress/include/mach/memory.h       |   25 ----
+ arch/arm/mach-vt8500/include/mach/debug-macro.S    |    2 +-
+ arch/arm/mach-vt8500/include/mach/memory.h         |   28 ----
+ arch/arm/mach-w90x900/include/mach/memory.h        |   23 ----
+ arch/arm/mach-zynq/include/mach/debug-macro.S      |    2 +-
+ arch/arm/mach-zynq/include/mach/memory.h           |   22 ----
+ arch/arm/plat-mxc/include/mach/debug-macro.S       |    2 +-
+ arch/arm/plat-mxc/include/mach/memory.h            |   43 -------
+ arch/arm/plat-omap/Kconfig                         |    1 +
+ arch/arm/plat-omap/include/plat/memory.h           |   89 --------------
+ arch/arm/plat-omap/include/plat/serial.h           |    6 +-
+ arch/arm/plat-omap/include/plat/uncompress.h       |    8 +-
+ arch/arm/plat-spear/include/plat/debug-macro.S     |    2 +-
+ arch/arm/plat-spear/include/plat/memory.h          |   20 ---
+ arch/arm/plat-tcc/include/mach/debug-macro.S       |    2 +-
+ arch/arm/plat-tcc/include/mach/memory.h            |   18 ---
+ drivers/usb/musb/musb_debugfs.c                    |    6 -
+ 112 files changed, 256 insertions(+), 1099 deletions(-)
+
+
+Nicolas
