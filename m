@@ -1,76 +1,56 @@
 From: haojian.zhuang@marvell.com (Haojian Zhuang)
-Date: Mon, 17 Oct 2011 21:35:10 +0800
-Subject: [PATCH v5 04/11] ARM: pxa: recognize gpio number and type
+Date: Mon, 17 Oct 2011 21:35:12 +0800
+Subject: [PATCH v5 06/11] ARM: pxa: remove head file in plat-pxa
 In-Reply-To: <1318858517-22494-1-git-send-email-haojian.zhuang@marvell.com>
 References: <1318858517-22494-1-git-send-email-haojian.zhuang@marvell.com>
-Message-ID: <1318858517-22494-5-git-send-email-haojian.zhuang@marvell.com>
+Message-ID: <1318858517-22494-7-git-send-email-haojian.zhuang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use cpuid to recognize the gpio number and type. CPU_PXA26x is the
-special case since we can't identify it by cpuid.
+Use generic API for gpio read and write. So head file in plat-pxa could
+be removed.
 
 Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
 ---
- drivers/gpio/gpio-pxa.c |   41 ++++++++++++++++++++++++++++++++++++++++-
- 1 files changed, 40 insertions(+), 1 deletions(-)
+ arch/arm/plat-pxa/include/plat/gpio.h |   30 ------------------------------
+ 1 files changed, 0 insertions(+), 30 deletions(-)
+ delete mode 100644 arch/arm/plat-pxa/include/plat/gpio.h
 
-diff --git a/drivers/gpio/gpio-pxa.c b/drivers/gpio/gpio-pxa.c
-index ed23cbb..c7f35a2 100644
---- a/drivers/gpio/gpio-pxa.c
-+++ b/drivers/gpio/gpio-pxa.c
-@@ -347,12 +347,51 @@ static struct irq_chip pxa_muxed_gpio_chip = {
- 	.irq_set_type	= pxa_gpio_irq_type,
- };
- 
-+static int pxa_gpio_nums(void)
-+{
-+	int count = 0;
-+
-+#ifdef CONFIG_ARCH_PXA
-+	if (cpu_is_pxa25x()) {
-+#ifdef CONFIG_CPU_PXA26x
-+		count = 89;
-+		gpio_type = PXA26X_GPIO;
-+#elif defined(CONFIG_PXA25x)
-+		count = 84;
-+		gpio_type = PXA26X_GPIO;
-+#endif /* CONFIG_CPU_PXA26x */
-+	} else if (cpu_is_pxa27x()) {
-+		count = 120;
-+		gpio_type = PXA27X_GPIO;
-+	} else if (cpu_is_pxa93x() || cpu_is_pxa95x()) {
-+		count = 191;
-+		gpio_type = PXA93X_GPIO;
-+	} else if (cpu_is_pxa3xx()) {
-+		count = 127;
-+		gpio_type = PXA3XX_GPIO;
-+	}
-+#endif /* CONFIG_ARCH_PXA */
-+
-+#ifdef CONFIG_ARCH_MMP
-+	if (cpu_is_pxa168() || cpu_is_pxa910()) {
-+		count = 127;
-+		gpio_type = MMP_GPIO;
-+	} else if (cpu_is_mmp2()) {
-+		count = 191;
-+		gpio_type = MMP2_GPIO;
-+	}
-+#endif /* CONFIG_ARCH_MMP */
-+	return count;
-+}
-+
- void __init pxa_init_gpio(int mux_irq, int start, int end, set_wake_t fn)
- {
- 	struct pxa_gpio_chip *c;
- 	int gpio, irq;
- 
--	pxa_last_gpio = end;
-+	pxa_last_gpio = pxa_gpio_nums();
-+	if (!pxa_last_gpio)
-+		return;
- 
- 	/* Initialize GPIO chips */
- 	pxa_init_gpio_chip(end);
+diff --git a/arch/arm/plat-pxa/include/plat/gpio.h b/arch/arm/plat-pxa/include/plat/gpio.h
+deleted file mode 100644
+index 258f772..0000000
+--- a/arch/arm/plat-pxa/include/plat/gpio.h
++++ /dev/null
+@@ -1,30 +0,0 @@
+-#ifndef __PLAT_GPIO_H
+-#define __PLAT_GPIO_H
+-
+-#define __ARM_GPIOLIB_COMPLEX
+-
+-/* The individual machine provides register offsets and NR_BUILTIN_GPIO */
+-#include <mach/gpio-pxa.h>
+-
+-static inline int gpio_get_value(unsigned gpio)
+-{
+-	if (__builtin_constant_p(gpio) && (gpio < NR_BUILTIN_GPIO))
+-		return GPLR(gpio) & GPIO_bit(gpio);
+-	else
+-		return __gpio_get_value(gpio);
+-}
+-
+-static inline void gpio_set_value(unsigned gpio, int value)
+-{
+-	if (__builtin_constant_p(gpio) && (gpio < NR_BUILTIN_GPIO)) {
+-		if (value)
+-			GPSR(gpio) = GPIO_bit(gpio);
+-		else
+-			GPCR(gpio) = GPIO_bit(gpio);
+-	} else
+-		__gpio_set_value(gpio, value);
+-}
+-
+-#define gpio_cansleep		__gpio_cansleep
+-
+-#endif /* __PLAT_GPIO_H */
 -- 
 1.7.2.5
