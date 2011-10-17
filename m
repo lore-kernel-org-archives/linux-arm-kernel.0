@@ -1,39 +1,65 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Mon, 17 Oct 2011 15:12:43 +0200
-Subject: [PATCH 3/3] spi/pl022: skip default configuration before suspending
-Message-ID: <1318857163-32193-1-git-send-email-linus.walleij@stericsson.com>
+From: afzal@ti.com (Afzal Mohammed)
+Date: Mon, 17 Oct 2011 18:45:13 +0530
+Subject: DEBUG LL: Build error while adding support for new board
+Message-ID: <1318857313-2762-1-git-send-email-afzal@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Virupax Sadashivpetimath <virupax.sadashivpetimath@stericsson.com>
+Hi, Russell,
 
-The loading of the default configuration before suspending has
-been in the driver since its inception, but it is not really
-needed. Especially so since we take to all the trouble of
-enabling and disabling power and clock just to do this. Let's
-scrap this now.
+While adding low level debug support for new board in OMAP2+ family, we
+came across following error,
 
-Signed-off-by: Virupax Sadashivpetimath <virupax.sadashivpetimath@stericsson.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+arch/arm/kernel/debug.S: Assembler messages:
+arch/arm/kernel/debug.S:138: Error: invalid constant (428) after fixup
+
+Following patch fixes it, I am not sure whether this is the right fix,
+please let us know your comments.
+
+(Subject has to be tweaked so that message will reach the list)
+
+Regards
+Afzal
+
+From: Afzal Mohammed <afzal@ti.com>
+Date: Fri, 14 Oct 2011 12:56:16 +0530
+Subject: [PATCH] ARM: Fix error upon adding LL debug
+
+Upon adding new board LL debug support, if the resultant code
+addition would not cause PC relative offset of "hexbuf" from
+"adr r2, hexbuf" (+2) instruction to be representable in a
+shifted 8-bit value (hence indirectly putting higher aligment
+requirement on larger offsets), following error occurs,
+
+arch/arm/kernel/debug.S: Assembler messages:
+arch/arm/kernel/debug.S:138: Error: invalid constant (428) after fixup
+
+Fix it by bringing "hexbuf" closer so that "adr"
+can have the offset.
+
+Signed-off-by: Afzal Mohammed <afzal@ti.com>
 ---
- drivers/spi/spi-pl022.c |    5 -----
- 1 files changed, 0 insertions(+), 5 deletions(-)
+ arch/arm/kernel/debug.S |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/spi/spi-pl022.c b/drivers/spi/spi-pl022.c
-index 0a1d8ed..29dc70f 100644
---- a/drivers/spi/spi-pl022.c
-+++ b/drivers/spi/spi-pl022.c
-@@ -2342,11 +2342,6 @@ static int pl022_suspend(struct amba_device *adev, pm_message_t state)
- 		return status;
- 	}
- 
--	amba_vcore_enable(adev);
--	amba_pclk_enable(adev);
--	load_ssp_default_config(pl022);
--	amba_pclk_disable(adev);
--	amba_vcore_disable(adev);
- 	dev_dbg(&adev->dev, "suspended\n");
- 	return 0;
- }
--- 
-1.7.3.2
+diff --git a/arch/arm/kernel/debug.S b/arch/arm/kernel/debug.S
+index bcd66e0..0f852d0 100644
+--- a/arch/arm/kernel/debug.S
++++ b/arch/arm/kernel/debug.S
+@@ -151,6 +151,8 @@ printhex:   adr     r2, hexbuf
+                b       printascii
+ ENDPROC(printhex2)
+
++hexbuf:                .space 16
++
+                .ltorg
+
+ ENTRY(printascii)
+@@ -175,5 +177,3 @@ ENTRY(printch)
+                mov     r0, #0
+                b       1b
+ ENDPROC(printch)
+-
+-hexbuf:                .space 16
+--
+1.6.2.4
