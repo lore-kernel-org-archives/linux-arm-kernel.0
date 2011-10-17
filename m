@@ -1,26 +1,46 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 17 Oct 2011 13:15:48 +0100
-Subject: [PATCH 3/9] ARM: SPMP8000: Add clk support
-In-Reply-To: <CAGVye5Oy8M3+PBZN2KXMmnstBtxngb0feYELgbnu5ZWxZBHLEw@mail.gmail.com>
-References: <1318178172-7965-1-git-send-email-zoss@devai.org>
-	<1318178172-7965-4-git-send-email-zoss@devai.org>
-	<20111013093836.GK21648@n2100.arm.linux.org.uk>
-	<CAGVye5Oy8M3+PBZN2KXMmnstBtxngb0feYELgbnu5ZWxZBHLEw@mail.gmail.com>
-Message-ID: <20111017121548.GH5448@sirena.org.uk>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Mon, 17 Oct 2011 14:21:07 +0200
+Subject: [PATCH 2/9] mm: alloc_contig_freed_pages() added
+In-Reply-To: <20111014162933.d8fead58.akpm@linux-foundation.org>
+References: <1317909290-29832-1-git-send-email-m.szyprowski@samsung.com>
+	<1317909290-29832-3-git-send-email-m.szyprowski@samsung.com>
+	<20111014162933.d8fead58.akpm@linux-foundation.org>
+Message-ID: <01b201cc8cc7$3f6117d0$be234770$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 16, 2011 at 04:16:45PM +0200, Zoltan Devai wrote:
-> 2011/10/13 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+Hello Andrew,
 
-> > I find the use of 'scu' for something which isn't the SMP Coherence Unit
-> > rather confusing - and I suspect you will too if/when spmp8000 has SMP
-> > support.
+Thanks for your comments. I will try to address them in the next round of
+CMA patches.
 
-> Well, Sunplus decided to name these devices 'SCU', which are a collection
-> of reset, clock, debug, pinmux and gpio stuff.
-> The datasheet doesn't even tell what SCU stands for, but I'd prefer to keep
-> the naming to be in sync with the documentation.
+On Saturday, October 15, 2011 1:30 AM Andrew Morton wrote:
 
-System Control Unit.  It's a fairly common name to use for the core
-system glue logic.
+(snipped)
+
+> > +
+> > +void free_contig_pages(unsigned long pfn, unsigned nr_pages)
+> > +{
+> > +	struct page *page = pfn_to_page(pfn);
+> > +
+> > +	while (nr_pages--) {
+> > +		__free_page(page);
+> > +		++pfn;
+> > +		if (likely(zone_pfn_same_memmap(pfn - 1, pfn)))
+> > +			++page;
+> > +		else
+> > +			page = pfn_to_page(pfn);
+> > +	}
+> > +}
+> 
+> You're sure these functions don't need EXPORT_SYMBOL()?  Maybe the
+> design is that only DMA core calls into here (if so, that's good).
+
+Drivers should not call it, it is intended to be used by low-level DMA
+code. Do you think that a comment about missing EXPORT_SYMBOL is 
+required?
+
+Best regards
+-- 
+Marek Szyprowski
+Samsung Poland R&D Center
