@@ -1,35 +1,88 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 17 Oct 2011 14:15:10 +0800
-Subject: [PATCH 5/5] mmc: mxcmmc: explicitly includes mach/hardware.h
-In-Reply-To: <1318832110-29289-1-git-send-email-shawn.guo@linaro.org>
-References: <1318832110-29289-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1318832110-29289-6-git-send-email-shawn.guo@linaro.org>
+From: richard.zhao@linaro.org (Richard Zhao)
+Date: Mon, 17 Oct 2011 14:42:19 +0800
+Subject: [PATCH v2 4/7] clk: Add simple gated clock
+In-Reply-To: <20111016182649.GB13565@pengutronix.de>
+References: <1316730422-20027-1-git-send-email-mturquette@ti.com>
+	<1316730422-20027-5-git-send-email-mturquette@ti.com>
+	<20111012064646.GA31037@b20223-02.ap.freescale.net>
+	<CAJOA=zPw7BF1iNFaG9js2k6++qPnXz5S3dq4rsPmUWOcUztL0g@mail.gmail.com>
+	<20111016182649.GB13565@pengutronix.de>
+Message-ID: <20111017064217.GA20184@b20223-02.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When indirect inclusion to <mach/hardware.h> via <mach/gpio.h> gets
-removed, we will see the following compile error.
-
-  CC      drivers/mmc/host/mxcmmc.o
-drivers/mmc/host/mxcmmc.c: In function ?mxcmci_init_card?:
-drivers/mmc/host/mxcmmc.c:811:2: error: implicit declaration of function ?cpu_is_mx3?
-
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- drivers/mmc/host/mxcmmc.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
-
-diff --git a/drivers/mmc/host/mxcmmc.c b/drivers/mmc/host/mxcmmc.c
-index 14aa213..6632e38 100644
---- a/drivers/mmc/host/mxcmmc.c
-+++ b/drivers/mmc/host/mxcmmc.c
-@@ -40,6 +40,7 @@
- #include <mach/mmc.h>
- 
- #include <mach/dma.h>
-+#include <mach/hardware.h>
- 
- #define DRIVER_NAME "mxc-mmc"
- 
--- 
-1.7.4.1
+On Sun, Oct 16, 2011 at 08:26:49PM +0200, Sascha Hauer wrote:
+> On Wed, Oct 12, 2011 at 07:59:19AM -0700, Turquette, Mike wrote:
+> > On Tue, Oct 11, 2011 at 11:46 PM, Richard Zhao
+> > <richard.zhao@freescale.com> wrote:
+> > > On Thu, Sep 22, 2011 at 03:26:59PM -0700, Mike Turquette wrote:
+> > >> From: Jeremy Kerr <jeremy.kerr@canonical.com>
+> > >>
+> > >> Signed-off-by: Jeremy Kerr <jeremy.kerr@canonical.com>
+> > >> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> > >> Signed-off-by: Jamie Iles <jamie@jamieiles.com>
+> > >> Signed-off-by: Mike Turquette <mturquette@ti.com>
+> > >> ---
+> > >> Changes since v1:
+> > >> Add copyright header
+> > >> Fold in Jamie's patch for set-to-disable clks
+> > >> Use BIT macro instead of shift
+> > >>
+> > >> ?drivers/clk/Kconfig ? ?| ? ?4 ++
+> > >> ?drivers/clk/Makefile ? | ? ?1 +
+> > >> ?drivers/clk/clk-gate.c | ? 78 ++++++++++++++++++++++++++++++++++++++++++++++++
+> > >> ?include/linux/clk.h ? ?| ? 13 ++++++++
+> > >> ?4 files changed, 96 insertions(+), 0 deletions(-)
+> > >> ?create mode 100644 drivers/clk/clk-gate.c
+> > >
+> > > I feel hard to tell the tree the clk parent, at register/init time. For the
+> > > simple gate clk, the only way is to set .get_parent. But normally, for clk
+> > > without any divider we set .get_parent to NULL. Maybe we can put .parent to
+> > > struct clk_hw?
+> > 
+> > For non-mux clocks, whose parent is *always* going to be the same, you
+> > should create a duplicate .parent in the clk_hw_* structure and then
+> > have .get_parent return clk_hw_*->parent.
+> 
+> Maybe I do not understand what you mean here, but I think there is
+> something missing in the gate.
+yes, clk_gate can not set fixed parent in v2 patch. Mike means add .parent int clk_gate
+and set .get_parent in the ops.
+> 
+> > 
+> > This is analogous to the way clk_hw_fixed returns clk_hw_fixed->rate
+> > when .recalc is called on it.
+> > 
+> > >> +
+> > >> +static unsigned long clk_gate_get_rate(struct clk_hw *clk)
+> > >> +{
+> > >> + ? ? return clk_get_rate(clk_get_parent(clk->clk));
+> > >> +}
+> 
+> clk_get_parent goes down to clk_gate_set_enable_ops.get_parent below...
+> 
+> > >> +
+> > >> +
+> > >> +struct clk_hw_ops clk_gate_set_enable_ops = {
+> > >> + ? ? .recalc_rate = clk_gate_get_rate,
+> > >> + ? ? .enable = clk_gate_enable_set,
+> > >> + ? ? .disable = clk_gate_disable_clear,
+> > >> +};
+> 
+> ...but this does not have a get_parent pointer, so clk_get_parent()
+> for a gate always returns NULL which means that a gate never has
+> a valid rate.
+> 
+> Sascha
+> 
+> -- 
+> Pengutronix e.K.                           |                             |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
