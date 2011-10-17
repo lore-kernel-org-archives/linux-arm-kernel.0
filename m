@@ -1,33 +1,35 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 17 Oct 2011 22:36:19 +0100
-Subject: [PATCH v2] gpio/samsung: Complain loudly if we don't know the SoC
-Message-ID: <1318887379-5158-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+From: matt@grid-net.com (Matt Burtch)
+Date: Mon, 17 Oct 2011 14:36:02 -0700
+Subject: [ v2 resend PATCH 1/1] ARM: i.MX28: shift frac value in _CLK_SET_RATE
+Message-ID: <1318887362-11870-1-git-send-email-matt@grid-net.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If we don't know the SoC type then we won't add any chips which is rather
-unfortunate as neither GPIO nor pinmux APIs will work, breaking lots of
-different subsystems. Logging at least provides a hint to the user as to
-what's gone wrong.
+Noticed when setting SSP0 in clk_set_rate, _CLK_SET_RATE attempts to reset the clock divider for the SSP0 parent clock, in this case IO0FRAC. Bits 24-29 of HW_CLKCTRL_FRAC0 are cleared correctly, but when the new frac value is written the value isn't shifted up to write the correct bit-field.  This results in IO0FRAC being set to 0 and CPUFRAC being corrupted.
 
-Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+This should occur when writing IO1FRAC, EMIFRAC in HW_CLKCTRL_FRAC0 and GPMIFRAC, HSADCFRAC in HW_CLKCTRL_FRAC1.
+
+Tested on custom i.MX28 board with SSP0 SPI driver.
+
+Signed-off-by: Matt Burtch <matt@grid-net.com>
 ---
- drivers/gpio/gpio-samsung.c |    3 +++
- 1 files changed, 3 insertions(+), 0 deletions(-)
+ Fixed whitespace formatting per Shawn Guo.
 
-diff --git a/drivers/gpio/gpio-samsung.c b/drivers/gpio/gpio-samsung.c
-index 479edc3..8662518 100644
---- a/drivers/gpio/gpio-samsung.c
-+++ b/drivers/gpio/gpio-samsung.c
-@@ -2486,6 +2486,9 @@ static __init int samsung_gpiolib_init(void)
- 		s5p_register_gpioint_bank(IRQ_GPIO_XA, 0, IRQ_GPIO1_NR_GROUPS);
- 		s5p_register_gpioint_bank(IRQ_GPIO_XB, IRQ_GPIO1_NR_GROUPS, IRQ_GPIO2_NR_GROUPS);
- #endif
-+	} else {
-+		WARN(1, "Unknown SoC in gpio-samsung, no GPIOs added\n");
-+		return -ENODEV;
- 	}
- 
- 	return 0;
+ arch/arm/mach-mxs/clock-mx28.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/mach-mxs/clock-mx28.c b/arch/arm/mach-mxs/clock-mx28.c
+index 5dcc59d..ba53227 100644
+--- a/arch/arm/mach-mxs/clock-mx28.c
++++ b/arch/arm/mach-mxs/clock-mx28.c
+@@ -349,7 +349,7 @@ static int name##_set_rate(struct clk *clk, unsigned long rate)		\
+ 									\
+ 		reg = __raw_readl(CLKCTRL_BASE_ADDR + HW_CLKCTRL_##fr);	\
+ 		reg &= ~BM_CLKCTRL_##fr##_##fs##FRAC;			\
+-		reg |= frac;						\
++		reg |= frac << BP_CLKCTRL_##fr##_##fs##FRAC;		\
+ 		__raw_writel(reg, CLKCTRL_BASE_ADDR + HW_CLKCTRL_##fr);	\
+ 	}								\
+ 									\
 -- 
-1.7.6.3
+1.7.1
