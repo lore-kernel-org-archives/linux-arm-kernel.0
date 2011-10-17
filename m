@@ -1,371 +1,308 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Mon, 10 Oct 2011 23:50:55 +0200
-Subject: [PATCH] iommu/core: split mapping to page sizes as supported
-Message-ID: <mailman.192.1318838731.20020.linux-arm-kernel@lists.infradead.org>
+From: lauri.hintsala@bluegiga.com (Lauri Hintsala)
+Date: Mon, 17 Oct 2011 11:08:36 +0300
+Subject: [PATCH] ARM: mxs: Add initial support for Bluegiga APX4 Development
+	Kit
+Message-ID: <1318838916-8529-1-git-send-email-lauri.hintsala@bluegiga.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-by the hardware
+Added initial support for Bluegiga APX4 module and Development Kit.
+Patches are based on Linux v3.1-rc9.
 
-When mapping a memory region, split it to page sizes as supported
-by the iommu hardware. Always prefer bigger pages, when possible,
-in order to reduce the TLB pressure.
-
-The logic to do that is now added to the IOMMU core, so neither the iommu
-drivers themselves nor users of the IOMMU API have to duplicate it.
-
-This allows a more lenient granularity of mappings; traditionally the
-IOMMU API took 'order' (of a page) as a mapping size, and directly let
-the low level iommu drivers handle the mapping, but now that the IOMMU
-core can split arbitrary memory regions into pages, we can remove this
-limitation, so users don't have to split those regions by themselves.
-
-Currently the supported page sizes are advertised once and they then
-remain static. That works well for OMAP and MSM but it would probably
-not fly well with intel's hardware, where the page size capabilities
-seem to have the potential to be different between several DMA
-remapping devices.
-
-register_iommu() currently sets a default pgsize behavior, so we can convert
-the IOMMU drivers in subsequent patches. After all the drivers
-are converted, the temporary default settings will be removed.
-
-Mainline users of the IOMMU API (kvm and omap-iovmm) are adopted
-to deal with bytes instead of page order.
-
-Many thanks to Joerg Roedel <Joerg.Roedel@amd.com> for significant review!
-
-Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
-Cc: David Brown <davidb@codeaurora.org>
-Cc: David Woodhouse <dwmw2@infradead.org>
-Cc: Joerg Roedel <Joerg.Roedel@amd.com>
-Cc: Stepan Moskovchenko <stepanm@codeaurora.org>
-Cc: KyongHo Cho <pullip.cho@samsung.com>
-Cc: Hiroshi DOYU <hdoyu@nvidia.com>
-Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-Cc: kvm at vger.kernel.org
+Signed-off-by: Lauri Hintsala <lauri.hintsala@bluegiga.com>
+Signed-off-by: Veli-Pekka Peltola <veli-pekka.peltola@bluegiga.com>
 ---
- drivers/iommu/iommu.c      |  124 +++++++++++++++++++++++++++++++++++++++-----
- drivers/iommu/omap-iovmm.c |   17 ++----
- include/linux/iommu.h      |   24 +++++++-
- virt/kvm/iommu.c           |    8 ++--
- 4 files changed, 141 insertions(+), 32 deletions(-)
+ arch/arm/configs/mxs_defconfig              |    1 +
+ arch/arm/mach-mxs/Kconfig                   |   15 ++
+ arch/arm/mach-mxs/Makefile                  |    1 +
+ arch/arm/mach-mxs/include/mach/mxs.h        |    1 +
+ arch/arm/mach-mxs/include/mach/uncompress.h |    1 +
+ arch/arm/mach-mxs/mach-apx4devkit.c         |  201 +++++++++++++++++++++++++++
+ 6 files changed, 220 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-mxs/mach-apx4devkit.c
 
-diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
-index 5d042e8..26309fc 100644
---- a/drivers/iommu/iommu.c
-+++ b/drivers/iommu/iommu.c
-@@ -16,6 +16,8 @@
-  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
-  */
-
-+#define pr_fmt(fmt)    "%s: " fmt, __func__
+diff --git a/arch/arm/configs/mxs_defconfig b/arch/arm/configs/mxs_defconfig
+index db2cb7d..6a6268d 100644
+--- a/arch/arm/configs/mxs_defconfig
++++ b/arch/arm/configs/mxs_defconfig
+@@ -26,6 +26,7 @@ CONFIG_MACH_MX23EVK=y
+ CONFIG_MACH_MX28EVK=y
+ CONFIG_MACH_STMP378X_DEVB=y
+ CONFIG_MACH_TX28=y
++CONFIG_MACH_APX4DEVKIT=y
+ # CONFIG_ARM_THUMB is not set
+ CONFIG_NO_HZ=y
+ CONFIG_HIGH_RES_TIMERS=y
+diff --git a/arch/arm/mach-mxs/Kconfig b/arch/arm/mach-mxs/Kconfig
+index 4cd0231..b73ec11 100644
+--- a/arch/arm/mach-mxs/Kconfig
++++ b/arch/arm/mach-mxs/Kconfig
+@@ -64,8 +64,23 @@ config MODULE_TX28
+ 	select MXS_HAVE_PLATFORM_MXS_MMC
+ 	select MXS_HAVE_PLATFORM_MXS_PWM
+ 
++config MODULE_APX4
++	bool
++	select SOC_IMX28
++	select LEDS_GPIO_REGISTER
++	select MXS_HAVE_AMBA_DUART
++	select MXS_HAVE_PLATFORM_AUART
++	select MXS_HAVE_PLATFORM_FEC
++    select MXS_HAVE_PLATFORM_MXS_I2C
++	select MXS_HAVE_PLATFORM_MXS_MMC
++	select MXS_OCOTP
 +
- #include <linux/device.h>
- #include <linux/kernel.h>
- #include <linux/bug.h>
-@@ -47,6 +49,19 @@ int bus_set_iommu(struct bus_type *bus, struct
-iommu_ops *ops)
- 	if (bus->iommu_ops != NULL)
- 		return -EBUSY;
-
-+	/*
-+	 * Set the default pgsize values, which retain the existing
-+	 * IOMMU API behavior: drivers will be called to map
-+	 * regions that are sized/aligned to order of 4KiB pages.
-+	 *
-+	 * This will be removed once all drivers are migrated.
-+	 */
-+	if (!ops->pgsize_bitmap)
-+		ops->pgsize_bitmap = ~0xFFFUL;
+ config MACH_TX28
+ 	bool "Ka-Ro TX28 module"
+ 	select MODULE_TX28
+ 
++config MACH_APX4DEVKIT
++	bool "Support Bluegiga APX4 Development Kit"
++	select MODULE_APX4
 +
-+	/* find out the minimum page size only once */
-+	ops->min_pagesz = 1 << __ffs(ops->pgsize_bitmap);
-+
- 	bus->iommu_ops = ops;
-
- 	/* Do IOMMU specific setup for this bus-type */
-@@ -157,35 +172,116 @@ int iommu_domain_has_cap(struct iommu_domain *domain,
- EXPORT_SYMBOL_GPL(iommu_domain_has_cap);
-
- int iommu_map(struct iommu_domain *domain, unsigned long iova,
--	      phys_addr_t paddr, int gfp_order, int prot)
-+	      phys_addr_t paddr, size_t size, int prot)
- {
--	size_t size;
-+	unsigned long orig_iova = iova;
-+	size_t orig_size = size;
-+	int ret = 0;
-
- 	if (unlikely(domain->ops->map == NULL))
- 		return -ENODEV;
-
--	size         = PAGE_SIZE << gfp_order;
-+	/*
-+	 * both the virtual address and the physical one, as well as
-+	 * the size of the mapping, must be aligned (at least) to the
-+	 * size of the smallest page supported by the hardware
-+	 */
-+	if (!IS_ALIGNED(iova | paddr | size, domain->ops->min_pagesz)) {
-+		pr_err("unaligned: iova 0x%lx pa 0x%lx size 0x%x min_pagesz "
-+			"0x%x\n", iova, (unsigned long)paddr,
-+			size, domain->ops->min_pagesz);
-+		return -EINVAL;
-+	}
-+
-+	pr_debug("map: iova 0x%lx pa 0x%lx size 0x%x\n", iova,
-+				(unsigned long)paddr, size);
-+
-+	while (size) {
-+		unsigned long pgsize, addr_merge = iova | paddr;
-+		unsigned int pgsize_idx;
-+
-+		/* Max page size that still fits into 'size' */
-+		pgsize_idx = __fls(size);
-+
-+		/* need to consider alignment requirements ? */
-+		if (likely(addr_merge)) {
-+			/* Max page size allowed by both iova and paddr */
-+			unsigned int align_pgsize_idx = __ffs(addr_merge);
-+
-+			pgsize_idx = min(pgsize_idx, align_pgsize_idx);
-+		}
-+
-+		/* build a mask of acceptable page sizes */
-+		pgsize = (1UL << (pgsize_idx + 1)) - 1;
-+
-+		/* throw away page sizes not supported by the hardware */
-+		pgsize &= domain->ops->pgsize_bitmap;
-
--	BUG_ON(!IS_ALIGNED(iova | paddr, size));
-+		/* make sure we're still sane */
-+		BUG_ON(!pgsize);
-
--	return domain->ops->map(domain, iova, paddr, size, prot);
-+		/* pick the biggest page */
-+		pgsize_idx = __fls(pgsize);
-+		pgsize = 1UL << pgsize_idx;
-+
-+		pr_debug("mapping: iova 0x%lx pa 0x%lx pgsize %lu\n", iova,
-+					(unsigned long)paddr, pgsize);
-+
-+		ret = domain->ops->map(domain, iova, paddr, pgsize, prot);
-+		if (ret)
-+			break;
-+
-+		iova += pgsize;
-+		paddr += pgsize;
-+		size -= pgsize;
-+	}
-+
-+	/* unroll mapping in case something went wrong */
-+	if (ret)
-+		iommu_unmap(domain, orig_iova, orig_size - size);
-+
-+	return ret;
- }
- EXPORT_SYMBOL_GPL(iommu_map);
-
--int iommu_unmap(struct iommu_domain *domain, unsigned long iova, int gfp_order)
-+size_t iommu_unmap(struct iommu_domain *domain, unsigned long iova,
-size_t size)
- {
--	size_t size, unmapped;
-+	size_t unmapped_page, unmapped = 0;
-
- 	if (unlikely(domain->ops->unmap == NULL))
- 		return -ENODEV;
-
--	size         = PAGE_SIZE << gfp_order;
--
--	BUG_ON(!IS_ALIGNED(iova, size));
--
--	unmapped = domain->ops->unmap(domain, iova, size);
--
--	return get_order(unmapped);
-+	/*
-+	 * The virtual address, as well as the size of the mapping, must be
-+	 * aligned (at least) to the size of the smallest page supported
-+	 * by the hardware
-+	 */
-+	if (!IS_ALIGNED(iova | size, domain->ops->min_pagesz)) {
-+		pr_err("unaligned: iova 0x%lx size 0x%x min_pagesz 0x%x\n",
-+			iova, size, domain->ops->min_pagesz);
-+		return -EINVAL;
-+	}
-+
-+	pr_debug("unmap this: iova 0x%lx size 0x%x\n", iova, size);
-+
-+	/*
-+	 * Keep iterating until we either unmap 'size' bytes (or more)
-+	 * or we hit an area that isn't mapped.
-+	 */
-+	while (unmapped < size) {
-+		size_t left = size - unmapped;
-+
-+		unmapped_page = domain->ops->unmap(domain, iova, left);
-+		if (!unmapped_page)
-+			break;
-+
-+		pr_debug("unmapped: iova 0x%lx size %u\n", iova, unmapped_page);
-+
-+		iova += unmapped_page;
-+		unmapped += unmapped_page;
-+	}
-+
-+	return unmapped;
- }
- EXPORT_SYMBOL_GPL(iommu_unmap);
-
-diff --git a/drivers/iommu/omap-iovmm.c b/drivers/iommu/omap-iovmm.c
-index e8fdb88..0b7b14c 100644
---- a/drivers/iommu/omap-iovmm.c
-+++ b/drivers/iommu/omap-iovmm.c
-@@ -409,7 +409,6 @@ static int map_iovm_area(struct iommu_domain
-*domain, struct iovm_struct *new,
- 	unsigned int i, j;
- 	struct scatterlist *sg;
- 	u32 da = new->da_start;
--	int order;
-
- 	if (!domain || !sgt)
- 		return -EINVAL;
-@@ -428,12 +427,10 @@ static int map_iovm_area(struct iommu_domain
-*domain, struct iovm_struct *new,
- 		if (bytes_to_iopgsz(bytes) < 0)
- 			goto err_out;
-
--		order = get_order(bytes);
--
- 		pr_debug("%s: [%d] %08x %08x(%x)\n", __func__,
- 			 i, da, pa, bytes);
-
--		err = iommu_map(domain, da, pa, order, flags);
-+		err = iommu_map(domain, da, pa, bytes, flags);
- 		if (err)
- 			goto err_out;
-
-@@ -448,10 +445,9 @@ err_out:
- 		size_t bytes;
-
- 		bytes = sg->length + sg->offset;
--		order = get_order(bytes);
-
- 		/* ignore failures.. we're already handling one */
--		iommu_unmap(domain, da, order);
-+		iommu_unmap(domain, da, bytes);
-
- 		da += bytes;
- 	}
-@@ -466,7 +462,8 @@ static void unmap_iovm_area(struct iommu_domain
-*domain, struct omap_iommu *obj,
- 	size_t total = area->da_end - area->da_start;
- 	const struct sg_table *sgt = area->sgt;
- 	struct scatterlist *sg;
--	int i, err;
-+	int i;
-+	size_t unmapped;
-
- 	BUG_ON(!sgtable_ok(sgt));
- 	BUG_ON((!total) || !IS_ALIGNED(total, PAGE_SIZE));
-@@ -474,13 +471,11 @@ static void unmap_iovm_area(struct iommu_domain
-*domain, struct omap_iommu *obj,
- 	start = area->da_start;
- 	for_each_sg(sgt->sgl, sg, sgt->nents, i) {
- 		size_t bytes;
--		int order;
-
- 		bytes = sg->length + sg->offset;
--		order = get_order(bytes);
-
--		err = iommu_unmap(domain, start, order);
--		if (err < 0)
-+		unmapped = iommu_unmap(domain, start, bytes);
-+		if (unmapped < bytes)
- 			break;
-
- 		dev_dbg(obj->dev, "%s: unmap %08x(%x) %08x\n",
-diff --git a/include/linux/iommu.h b/include/linux/iommu.h
-index 6b6ed21..76d7ce4 100644
---- a/include/linux/iommu.h
-+++ b/include/linux/iommu.h
-@@ -48,6 +48,22 @@ struct iommu_domain {
-
- #ifdef CONFIG_IOMMU_API
-
-+/**
-+ * struct iommu_ops - iommu ops and capabilities
-+ * @domain_init: init iommu domain
-+ * @domain_destroy: destroy iommu domain
-+ * @attach_dev: attach device to an iommu domain
-+ * @detach_dev: detach device from an iommu domain
-+ * @map: map a physically contiguous memory region to an iommu domain
-+ * @unmap: unmap a physically contiguous memory region from an iommu domain
-+ * @iova_to_phys: translate iova to physical address
-+ * @domain_has_cap: domain capabilities query
-+ * @commit: commit iommu domain
-+ * @pgsize_bitmap: bitmap of supported page sizes
-+ * @min_pagesz: smallest page size supported. note: this member is private
-+ *		to the IOMMU core, and maintained only for efficiency sake;
-+ *		drivers don't need to set it.
+ endif
+diff --git a/arch/arm/mach-mxs/Makefile b/arch/arm/mach-mxs/Makefile
+index 6c38262..1838466 100644
+--- a/arch/arm/mach-mxs/Makefile
++++ b/arch/arm/mach-mxs/Makefile
+@@ -10,6 +10,7 @@ obj-$(CONFIG_SOC_IMX28) += clock-mx28.o mm-mx28.o
+ obj-$(CONFIG_MACH_STMP378X_DEVB) += mach-stmp378x_devb.o
+ obj-$(CONFIG_MACH_MX23EVK) += mach-mx23evk.o
+ obj-$(CONFIG_MACH_MX28EVK) += mach-mx28evk.o
++obj-$(CONFIG_MACH_APX4DEVKIT) += mach-apx4devkit.o
+ obj-$(CONFIG_MODULE_TX28) += module-tx28.o
+ obj-$(CONFIG_MACH_TX28)    += mach-tx28.o
+ 
+diff --git a/arch/arm/mach-mxs/include/mach/mxs.h b/arch/arm/mach-mxs/include/mach/mxs.h
+index 35a89dd..209698c 100644
+--- a/arch/arm/mach-mxs/include/mach/mxs.h
++++ b/arch/arm/mach-mxs/include/mach/mxs.h
+@@ -33,6 +33,7 @@
+ 		0)
+ #define cpu_is_mx28()		(					\
+ 		machine_is_mx28evk() ||					\
++		machine_is_apx4devkit() ||				\
+ 		machine_is_tx28() ||					\
+ 		0)
+ 
+diff --git a/arch/arm/mach-mxs/include/mach/uncompress.h b/arch/arm/mach-mxs/include/mach/uncompress.h
+index 7f8bf65..d13ebc1 100644
+--- a/arch/arm/mach-mxs/include/mach/uncompress.h
++++ b/arch/arm/mach-mxs/include/mach/uncompress.h
+@@ -63,6 +63,7 @@ static inline void __arch_decomp_setup(unsigned long arch_id)
+ 		mxs_duart_base = MX23_DUART_BASE_ADDR;
+ 		break;
+ 	case MACH_TYPE_MX28EVK:
++	case MACH_TYPE_APX4DEVKIT:
+ 	case MACH_TYPE_TX28:
+ 		mxs_duart_base = MX28_DUART_BASE_ADDR;
+ 		break;
+diff --git a/arch/arm/mach-mxs/mach-apx4devkit.c b/arch/arm/mach-mxs/mach-apx4devkit.c
+new file mode 100644
+index 0000000..02b7545
+--- /dev/null
++++ b/arch/arm/mach-mxs/mach-apx4devkit.c
+@@ -0,0 +1,201 @@
++/*
++ * Copyright (C) 2011
++ * Lauri Hintsala, Bluegiga, <lauri.hintsala@bluegiga.com>
++ *
++ * based on: mach-mx28evk.c
++ * Copyright 2010 Freescale Semiconductor, Inc. All Rights Reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
 + */
- struct iommu_ops {
- 	int (*domain_init)(struct iommu_domain *domain);
- 	void (*domain_destroy)(struct iommu_domain *domain);
-@@ -62,6 +78,8 @@ struct iommu_ops {
- 	int (*domain_has_cap)(struct iommu_domain *domain,
- 			      unsigned long cap);
- 	void (*commit)(struct iommu_domain *domain);
-+	unsigned long pgsize_bitmap;
-+	unsigned int min_pagesz;
- };
-
- extern int bus_set_iommu(struct bus_type *bus, struct iommu_ops *ops);
-@@ -73,9 +91,9 @@ extern int iommu_attach_device(struct iommu_domain *domain,
- extern void iommu_detach_device(struct iommu_domain *domain,
- 				struct device *dev);
- extern int iommu_map(struct iommu_domain *domain, unsigned long iova,
--		     phys_addr_t paddr, int gfp_order, int prot);
--extern int iommu_unmap(struct iommu_domain *domain, unsigned long iova,
--		       int gfp_order);
-+		     phys_addr_t paddr, size_t size, int prot);
-+extern size_t iommu_unmap(struct iommu_domain *domain, unsigned long iova,
-+		       size_t size);
- extern phys_addr_t iommu_iova_to_phys(struct iommu_domain *domain,
- 				      unsigned long iova);
- extern int iommu_domain_has_cap(struct iommu_domain *domain,
-diff --git a/virt/kvm/iommu.c b/virt/kvm/iommu.c
-index ca409be..35ed096 100644
---- a/virt/kvm/iommu.c
-+++ b/virt/kvm/iommu.c
-@@ -111,7 +111,7 @@ int kvm_iommu_map_pages(struct kvm *kvm, struct
-kvm_memory_slot *slot)
-
- 		/* Map into IO address space */
- 		r = iommu_map(domain, gfn_to_gpa(gfn), pfn_to_hpa(pfn),
--			      get_order(page_size), flags);
-+			      page_size, flags);
- 		if (r) {
- 			printk(KERN_ERR "kvm_iommu_map_address:"
- 			       "iommu failed to map pfn=%llx\n", pfn);
-@@ -292,15 +292,15 @@ static void kvm_iommu_put_pages(struct kvm *kvm,
-
- 	while (gfn < end_gfn) {
- 		unsigned long unmap_pages;
--		int order;
-+		size_t size;
-
- 		/* Get physical address */
- 		phys = iommu_iova_to_phys(domain, gfn_to_gpa(gfn));
- 		pfn  = phys >> PAGE_SHIFT;
-
- 		/* Unmap address from IO address space */
--		order       = iommu_unmap(domain, gfn_to_gpa(gfn), 0);
--		unmap_pages = 1ULL << order;
-+		size       = iommu_unmap(domain, gfn_to_gpa(gfn), PAGE_SIZE);
-+		unmap_pages = 1ULL << get_order(size);
-
- 		/* Unpin all pages we just unmapped to not leak any memory */
- 		kvm_unpin_pages(kvm, pfn, unmap_pages);
++
++#include <linux/delay.h>
++#include <linux/platform_device.h>
++#include <linux/gpio.h>
++#include <linux/leds.h>
++#include <linux/irq.h>
++#include <linux/clk.h>
++#include <linux/i2c.h>
++#include <linux/i2c/at24.h>
++
++#include <asm/mach-types.h>
++#include <asm/mach/arch.h>
++#include <asm/mach/time.h>
++
++#include <mach/common.h>
++#include <mach/iomux-mx28.h>
++
++#include "devices-mx28.h"
++
++#define APX4DEVKIT_GPIO_USERLED	MXS_GPIO_NR(3, 28)
++
++static const iomux_cfg_t apx4devkit_pads[] __initconst = {
++	/* duart */
++	MX28_PAD_PWM0__DUART_RX | MXS_PAD_CTRL,
++	MX28_PAD_PWM1__DUART_TX | MXS_PAD_CTRL,
++
++	/* auart0 */
++	MX28_PAD_AUART0_RX__AUART0_RX | MXS_PAD_CTRL,
++	MX28_PAD_AUART0_TX__AUART0_TX | MXS_PAD_CTRL,
++	MX28_PAD_AUART0_CTS__AUART0_CTS | MXS_PAD_CTRL,
++	MX28_PAD_AUART0_RTS__AUART0_RTS | MXS_PAD_CTRL,
++
++	/* auart1 */
++	MX28_PAD_AUART1_RX__AUART1_RX | MXS_PAD_CTRL,
++	MX28_PAD_AUART1_TX__AUART1_TX | MXS_PAD_CTRL,
++
++	/* auart2 */
++	MX28_PAD_SSP2_SCK__AUART2_RX | MXS_PAD_CTRL,
++	MX28_PAD_SSP2_MOSI__AUART2_TX | MXS_PAD_CTRL,
++
++	/* auart3 */
++	MX28_PAD_SSP2_MISO__AUART3_RX | MXS_PAD_CTRL,
++	MX28_PAD_SSP2_SS0__AUART3_TX | MXS_PAD_CTRL,
++
++#define MXS_PAD_FEC	(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP)
++	/* fec0 */
++	MX28_PAD_ENET0_MDC__ENET0_MDC | MXS_PAD_FEC,
++	MX28_PAD_ENET0_MDIO__ENET0_MDIO | MXS_PAD_FEC,
++	MX28_PAD_ENET0_RX_EN__ENET0_RX_EN | MXS_PAD_FEC,
++	MX28_PAD_ENET0_RXD0__ENET0_RXD0 | MXS_PAD_FEC,
++	MX28_PAD_ENET0_RXD1__ENET0_RXD1 | MXS_PAD_FEC,
++	MX28_PAD_ENET0_TX_EN__ENET0_TX_EN | MXS_PAD_FEC,
++	MX28_PAD_ENET0_TXD0__ENET0_TXD0 | MXS_PAD_FEC,
++	MX28_PAD_ENET0_TXD1__ENET0_TXD1 | MXS_PAD_FEC,
++	MX28_PAD_ENET_CLK__CLKCTRL_ENET | MXS_PAD_FEC,
++
++	/* I2C */
++	MX28_PAD_I2C0_SCL__I2C0_SCL,
++	MX28_PAD_I2C0_SDA__I2C0_SDA,
++
++	/* mmc0 */
++	MX28_PAD_SSP0_DATA0__SSP0_D0 |
++		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
++	MX28_PAD_SSP0_DATA1__SSP0_D1 |
++		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
++	MX28_PAD_SSP0_DATA2__SSP0_D2 |
++		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
++	MX28_PAD_SSP0_DATA3__SSP0_D3 |
++		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
++	MX28_PAD_SSP0_DATA4__SSP0_D4 |
++		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
++	MX28_PAD_SSP0_DATA5__SSP0_D5 |
++		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
++	MX28_PAD_SSP0_DATA6__SSP0_D6 |
++		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
++	MX28_PAD_SSP0_DATA7__SSP0_D7 |
++		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
++	MX28_PAD_SSP0_CMD__SSP0_CMD |
++		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
++	MX28_PAD_SSP0_DETECT__SSP0_CARD_DETECT |
++		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
++	MX28_PAD_SSP0_SCK__SSP0_SCK |
++		(MXS_PAD_12MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
++
++	/* led */
++	MX28_PAD_PWM3__GPIO_3_28 | MXS_PAD_CTRL,
++};
++
++/* led */
++static const struct gpio_led apx4devkit_leds[] __initconst = {
++	{
++		.name = "user-led",
++		.default_trigger = "heartbeat",
++		.gpio = APX4DEVKIT_GPIO_USERLED,
++	},
++};
++
++static const struct gpio_led_platform_data apx4devkit_led_data __initconst = {
++	.leds = apx4devkit_leds,
++	.num_leds = ARRAY_SIZE(apx4devkit_leds),
++};
++
++static struct fec_platform_data mx28_fec_pdata __initdata = {
++	.phy = PHY_INTERFACE_MODE_RMII,
++};
++
++static int __init apx4devkit_fec_get_mac(char *macstr)
++{
++	int i, h, l;
++
++	macstr++;
++
++	for (i = 0; i < 6; i++) {
++		if (i != 5 && *(macstr + 2) != ':')
++			goto error;
++
++		h = hex_to_bin(*macstr++);
++		if (h == -1)
++			goto error;
++
++		l = hex_to_bin(*macstr++);
++		if (l == -1)
++			goto error;
++
++		macstr++;
++		mx28_fec_pdata.mac[i] = (h << 4) + l;
++	}
++	return 0;
++
++error:
++	pr_err("%s: invalid mac address\n", __func__);
++	return -EINVAL;
++}
++
++__setup("ethaddr", apx4devkit_fec_get_mac);
++
++static struct mxs_mmc_platform_data apx4devkit_mmc_pdata __initdata = {
++	.wp_gpio = -EINVAL,
++	.flags = SLOTF_8_BIT_CAPABLE,
++};
++
++static struct i2c_board_info apx4devkit_i2c_boardinfo[] __initdata = {
++	{ I2C_BOARD_INFO("sgtl5000", 0x0a) }, /* ASoC */
++	{ I2C_BOARD_INFO("pcf8563", 0x51) }, /* RTC */
++};
++
++static void __init apx4devkit_init(void)
++{
++	mxs_iomux_setup_multiple_pads(apx4devkit_pads,
++			ARRAY_SIZE(apx4devkit_pads));
++
++	mx28_add_duart();
++	mx28_add_auart0();
++	mx28_add_auart1();
++	mx28_add_auart2();
++	mx28_add_auart3();
++
++	mx28_add_fec(0, &mx28_fec_pdata);
++
++	mx28_add_mxs_mmc(0, &apx4devkit_mmc_pdata);
++
++	gpio_led_register_device(0, &apx4devkit_led_data);
++
++	/* I2C */
++	mx28_add_mxs_i2c(0);
++	i2c_register_board_info(0, apx4devkit_i2c_boardinfo,
++			ARRAY_SIZE(apx4devkit_i2c_boardinfo));
++}
++
++static void __init apx4devkit_timer_init(void)
++{
++	mx28_clocks_init();
++}
++
++static struct sys_timer apx4devkit_timer = {
++	.init	= apx4devkit_timer_init,
++};
++
++MACHINE_START(APX4DEVKIT, "Bluegiga APX4 Development Kit")
++	.map_io		= mx28_map_io,
++	.init_irq	= mx28_init_irq,
++	.init_machine	= apx4devkit_init,
++	.timer		= &apx4devkit_timer,
++MACHINE_END
 -- 
 1.7.4.1
