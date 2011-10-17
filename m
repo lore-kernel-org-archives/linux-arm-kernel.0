@@ -1,55 +1,50 @@
-From: richard.zhao@linaro.org (Richard Zhao)
-Date: Mon, 17 Oct 2011 18:53:03 +0800
-Subject: [PATCH v2 1/7] clk: Add a generic clock infrastructure
-In-Reply-To: <20111017092028.GA3042@opensource.wolfsonmicro.com>
-References: <1316730422-20027-1-git-send-email-mturquette@ti.com>
-	<1316730422-20027-2-git-send-email-mturquette@ti.com>
-	<20111014081024.GA9485@b20223-02.ap.freescale.net>
-	<20111014100504.GC2966@opensource.wolfsonmicro.com>
-	<20111014103233.GB9485@b20223-02.ap.freescale.net>
-	<20111016175521.GA13565@pengutronix.de>
-	<20111017084851.GB20184@b20223-02.ap.freescale.net>
-	<20111017092028.GA3042@opensource.wolfsonmicro.com>
-Message-ID: <20111017105302.GC20184@b20223-02.ap.freescale.net>
+From: sshtylyov@ru.mvista.com (Sergei Shtylyov)
+Date: Mon, 17 Oct 2011 14:54:40 +0400
+Subject: [PATCH 04/11] ARM: at91/pata: use gpio_is_valid to check the gpio
+In-Reply-To: <1318792160-23279-4-git-send-email-plagnioj@jcrosoft.com>
+References: <20111016190528.GI1459@game.jcrosoft.org>
+	<1318792160-23279-4-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <4E9C0970.5000707@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 17, 2011 at 10:20:28AM +0100, Mark Brown wrote:
-> On Mon, Oct 17, 2011 at 04:48:52PM +0800, Richard Zhao wrote:
-> 
-> > For example, devices that possible access to on-chip RAM, depend on OCRAM clock. 
-> > On imx53, VPU depends on OCRAM clock, even when VPU does not use OCRAM.
-> 
-> So if the VPU depends on OCRAM the VPU should be enabling the OCRAM
-> clock.  The function of a given clock isn't terribly relevant, and
-> certainly grouping clocks together doesn't seem to be the obvious
-> solution from what you've said
-VPU don't know OCRAM clk, it's SoC specific. I know it's clock function
-replationship. But it's the only better place to refect the dependency 
-in clock tree. Another dependency example, from SoC bus topology, some bus
-clk always depends on bus switch/hub.
-> - if the driver doesn't know about the
-> clock it seems like the core ought to be enabling it transparently
-> rather than gluing it together with some other random clock.
-If you mean clk core here, then we need things like below:
-struct clk_hw {
-	struct clk *clk;
-	struct dependency {
-		struct clk_hw *clks;
-		int count;
-	};
-};
-Though Mike does not like to add things in clk_hw, but it's the only place
-to put common things of clk drivers.
+Hello.
 
-Thanks
-Richard
-> 
-> Either way the point here is that individual drivers shouldn't be hand
-> coding this stuff, it should be being handled by core code.
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+On 16.10.2011 23:09, Jean-Christophe PLAGNIOL-VILLARD wrote:
+
+> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> ---
+>   drivers/ata/pata_at91.c |    6 +++---
+>   1 files changed, 3 insertions(+), 3 deletions(-)
+
+    You should post this patch to linux-ide at vger.kernel.org...
+
+> diff --git a/drivers/ata/pata_at91.c b/drivers/ata/pata_at91.c
+> index 960c725..3915353 100644
+> --- a/drivers/ata/pata_at91.c
+> +++ b/drivers/ata/pata_at91.c
+> @@ -360,7 +360,7 @@ static int __devinit pata_at91_probe(struct platform_device *pdev)
+>   	ap->flags |= ATA_FLAG_SLAVE_POSS;
+>   	ap->pio_mask = ATA_PIO4;
+>
+> -	if (!irq) {
+> +	if (!gpio_is_valid(irq)) {
+>   		ap->flags |= ATA_FLAG_PIO_POLLING;
+>   		ata_port_desc(ap, "no IRQ, using PIO polling");
+>   	}
+> @@ -414,8 +414,8 @@ static int __devinit pata_at91_probe(struct platform_device *pdev)
+>
+>   	host->private_data = info;
+>
+> -	return ata_host_activate(host, irq ? gpio_to_irq(irq) : 0,
+> -			irq ? ata_sff_interrupt : NULL,
+> +	return ata_host_activate(host, gpio_is_valid(irq) ? gpio_to_irq(irq) : 0,
+> +			gpio_is_valid(irq) ? ata_sff_interrupt : NULL,
+>   			irq_flags,&pata_at91_sht);
+>   err_put:
+
+    BTW, the driver forgets to call clk_put() iff ata_host_activate() fails; 
+I've already posted a patch to fix this -- it conflicts with this one.
+
+WBR, Sergei
