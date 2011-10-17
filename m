@@ -1,335 +1,57 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 17 Oct 2011 11:44:34 +0200
-Subject: [PATCH] ARM: mxs: Add initial support for Bluegiga APX4
-	Development Kit
-In-Reply-To: <1318838916-8529-1-git-send-email-lauri.hintsala@bluegiga.com>
-References: <1318838916-8529-1-git-send-email-lauri.hintsala@bluegiga.com>
-Message-ID: <20111017094434.GA21504@pengutronix.de>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Mon, 17 Oct 2011 11:55:53 +0200
+Subject: [PATCH v3 1/6] iommu/core: split mapping to page sizes as
+	supported by the hardware
+In-Reply-To: <20111017092824.GF2198@amd.com>
+References: <CAK=WgbbNs5fWHDEputZ=jzU5YN0sn0tf6AETkcsoq_Jbvc2XgQ@mail.gmail.com>
+	<20111010094738.GW2138@amd.com>
+	<CAK=WgbZ7Wyax1yfS1jSXw9OdwMtxxidwLO8PTsNUXX9CWzmVrw@mail.gmail.com>
+	<20111010153609.GB2138@amd.com>
+	<CAK=WgbbnuO67X46sqS87q2vw2TWq3Ekvw5p1PmXvXinQXMyowg@mail.gmail.com>
+	<20111011103820.GF2138@amd.com>
+	<CAK=WgbYOUZNX0OmRwZNO1mMG+3DZXwff+S60ESWixf04HOcbtw@mail.gmail.com>
+	<20111014133510.GC2198@amd.com>
+	<CAK=Wgbar+z_Nm1cDM4bJgrP5yWbjCsVBW=orfYwsZsT7uET8ng@mail.gmail.com>
+	<CAK=WgbbQ9RRFmMXGOK2An7f0QkObYigv_OWXALFr+Bchw97j9Q@mail.gmail.com>
+	<20111017092824.GF2198@amd.com>
+Message-ID: <CAK=WgbYnV1Ghtp0Hf71L-FYjKQ-V+vznYLw-_if=HMLbq5pxPQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Mon, Oct 17, 2011 at 11:28 AM, Roedel, Joerg <Joerg.Roedel@amd.com> wrote:
+> The patch looks good now. Please implement option a) and it should be
+> fine.
 
-On Mon, Oct 17, 2011 at 11:08:36AM +0300, Lauri Hintsala wrote:
-> Added initial support for Bluegiga APX4 module and Development Kit.
-> Patches are based on Linux v3.1-rc9.
-Specifying the base isn't helpful in the commit log. You can better
-write things like these after the tripple dash below.
+Ok, will send in a few moments.
 
-> 
-> Signed-off-by: Lauri Hintsala <lauri.hintsala@bluegiga.com>
-> Signed-off-by: Veli-Pekka Peltola <veli-pekka.peltola@bluegiga.com>
-> ---
->  arch/arm/configs/mxs_defconfig              |    1 +
->  arch/arm/mach-mxs/Kconfig                   |   15 ++
->  arch/arm/mach-mxs/Makefile                  |    1 +
->  arch/arm/mach-mxs/include/mach/mxs.h        |    1 +
->  arch/arm/mach-mxs/include/mach/uncompress.h |    1 +
->  arch/arm/mach-mxs/mach-apx4devkit.c         |  201 +++++++++++++++++++++++++++
->  6 files changed, 220 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm/mach-mxs/mach-apx4devkit.c
-> 
-> diff --git a/arch/arm/configs/mxs_defconfig b/arch/arm/configs/mxs_defconfig
-> index db2cb7d..6a6268d 100644
-> --- a/arch/arm/configs/mxs_defconfig
-> +++ b/arch/arm/configs/mxs_defconfig
-> @@ -26,6 +26,7 @@ CONFIG_MACH_MX23EVK=y
->  CONFIG_MACH_MX28EVK=y
->  CONFIG_MACH_STMP378X_DEVB=y
->  CONFIG_MACH_TX28=y
-> +CONFIG_MACH_APX4DEVKIT=y
->  # CONFIG_ARM_THUMB is not set
->  CONFIG_NO_HZ=y
->  CONFIG_HIGH_RES_TIMERS=y
-> diff --git a/arch/arm/mach-mxs/Kconfig b/arch/arm/mach-mxs/Kconfig
-> index 4cd0231..b73ec11 100644
-> --- a/arch/arm/mach-mxs/Kconfig
-> +++ b/arch/arm/mach-mxs/Kconfig
-> @@ -64,8 +64,23 @@ config MODULE_TX28
->  	select MXS_HAVE_PLATFORM_MXS_MMC
->  	select MXS_HAVE_PLATFORM_MXS_PWM
->  
-> +config MODULE_APX4
-> +	bool
-> +	select SOC_IMX28
-> +	select LEDS_GPIO_REGISTER
-> +	select MXS_HAVE_AMBA_DUART
-> +	select MXS_HAVE_PLATFORM_AUART
-> +	select MXS_HAVE_PLATFORM_FEC
-> +    select MXS_HAVE_PLATFORM_MXS_I2C
-broken indention
-> +	select MXS_HAVE_PLATFORM_MXS_MMC
-> +	select MXS_OCOTP
-> +
-MODULE_APX4 is unused, do you plan to use it later?
+> I will test it on an AMD IOMMU platform. We still need someone to
+> test it on VT-d.
 
->  config MACH_TX28
->  	bool "Ka-Ro TX28 module"
->  	select MODULE_TX28
->  
-> +config MACH_APX4DEVKIT
-> +	bool "Support Bluegiga APX4 Development Kit"
-> +	select MODULE_APX4
-> +
->  endif
-> diff --git a/arch/arm/mach-mxs/Makefile b/arch/arm/mach-mxs/Makefile
-> index 6c38262..1838466 100644
-> --- a/arch/arm/mach-mxs/Makefile
-> +++ b/arch/arm/mach-mxs/Makefile
-> @@ -10,6 +10,7 @@ obj-$(CONFIG_SOC_IMX28) += clock-mx28.o mm-mx28.o
->  obj-$(CONFIG_MACH_STMP378X_DEVB) += mach-stmp378x_devb.o
->  obj-$(CONFIG_MACH_MX23EVK) += mach-mx23evk.o
->  obj-$(CONFIG_MACH_MX28EVK) += mach-mx28evk.o
-> +obj-$(CONFIG_MACH_APX4DEVKIT) += mach-apx4devkit.o
->  obj-$(CONFIG_MODULE_TX28) += module-tx28.o
->  obj-$(CONFIG_MACH_TX28)    += mach-tx28.o
->  
-> diff --git a/arch/arm/mach-mxs/include/mach/mxs.h b/arch/arm/mach-mxs/include/mach/mxs.h
-> index 35a89dd..209698c 100644
-> --- a/arch/arm/mach-mxs/include/mach/mxs.h
-> +++ b/arch/arm/mach-mxs/include/mach/mxs.h
-> @@ -33,6 +33,7 @@
->  		0)
->  #define cpu_is_mx28()		(					\
->  		machine_is_mx28evk() ||					\
-> +		machine_is_apx4devkit() ||				\
->  		machine_is_tx28() ||					\
-please keep this list sorted alphabetically.
+That could be great, yeah.
 
->  		0)
->  
-> diff --git a/arch/arm/mach-mxs/include/mach/uncompress.h b/arch/arm/mach-mxs/include/mach/uncompress.h
-> index 7f8bf65..d13ebc1 100644
-> --- a/arch/arm/mach-mxs/include/mach/uncompress.h
-> +++ b/arch/arm/mach-mxs/include/mach/uncompress.h
-> @@ -63,6 +63,7 @@ static inline void __arch_decomp_setup(unsigned long arch_id)
->  		mxs_duart_base = MX23_DUART_BASE_ADDR;
->  		break;
->  	case MACH_TYPE_MX28EVK:
-> +	case MACH_TYPE_APX4DEVKIT:
->  	case MACH_TYPE_TX28:
->  		mxs_duart_base = MX28_DUART_BASE_ADDR;
->  		break;
-> diff --git a/arch/arm/mach-mxs/mach-apx4devkit.c b/arch/arm/mach-mxs/mach-apx4devkit.c
-> new file mode 100644
-> index 0000000..02b7545
-> --- /dev/null
-> +++ b/arch/arm/mach-mxs/mach-apx4devkit.c
-> @@ -0,0 +1,201 @@
-> +/*
-> + * Copyright (C) 2011
-> + * Lauri Hintsala, Bluegiga, <lauri.hintsala@bluegiga.com>
-> + *
-> + * based on: mach-mx28evk.c
-> + * Copyright 2010 Freescale Semiconductor, Inc. All Rights Reserved.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#include <linux/delay.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/gpio.h>
-> +#include <linux/leds.h>
-> +#include <linux/irq.h>
-> +#include <linux/clk.h>
-> +#include <linux/i2c.h>
-> +#include <linux/i2c/at24.h>
-> +
-> +#include <asm/mach-types.h>
-> +#include <asm/mach/arch.h>
-> +#include <asm/mach/time.h>
-> +
-> +#include <mach/common.h>
-> +#include <mach/iomux-mx28.h>
-> +
-> +#include "devices-mx28.h"
-> +
-> +#define APX4DEVKIT_GPIO_USERLED	MXS_GPIO_NR(3, 28)
-> +
-> +static const iomux_cfg_t apx4devkit_pads[] __initconst = {
-> +	/* duart */
-> +	MX28_PAD_PWM0__DUART_RX | MXS_PAD_CTRL,
-> +	MX28_PAD_PWM1__DUART_TX | MXS_PAD_CTRL,
-> +
-> +	/* auart0 */
-> +	MX28_PAD_AUART0_RX__AUART0_RX | MXS_PAD_CTRL,
-> +	MX28_PAD_AUART0_TX__AUART0_TX | MXS_PAD_CTRL,
-> +	MX28_PAD_AUART0_CTS__AUART0_CTS | MXS_PAD_CTRL,
-> +	MX28_PAD_AUART0_RTS__AUART0_RTS | MXS_PAD_CTRL,
-> +
-> +	/* auart1 */
-> +	MX28_PAD_AUART1_RX__AUART1_RX | MXS_PAD_CTRL,
-> +	MX28_PAD_AUART1_TX__AUART1_TX | MXS_PAD_CTRL,
-> +
-> +	/* auart2 */
-> +	MX28_PAD_SSP2_SCK__AUART2_RX | MXS_PAD_CTRL,
-> +	MX28_PAD_SSP2_MOSI__AUART2_TX | MXS_PAD_CTRL,
-> +
-> +	/* auart3 */
-> +	MX28_PAD_SSP2_MISO__AUART3_RX | MXS_PAD_CTRL,
-> +	MX28_PAD_SSP2_SS0__AUART3_TX | MXS_PAD_CTRL,
-> +
-> +#define MXS_PAD_FEC	(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP)
-> +	/* fec0 */
-> +	MX28_PAD_ENET0_MDC__ENET0_MDC | MXS_PAD_FEC,
-> +	MX28_PAD_ENET0_MDIO__ENET0_MDIO | MXS_PAD_FEC,
-> +	MX28_PAD_ENET0_RX_EN__ENET0_RX_EN | MXS_PAD_FEC,
-> +	MX28_PAD_ENET0_RXD0__ENET0_RXD0 | MXS_PAD_FEC,
-> +	MX28_PAD_ENET0_RXD1__ENET0_RXD1 | MXS_PAD_FEC,
-> +	MX28_PAD_ENET0_TX_EN__ENET0_TX_EN | MXS_PAD_FEC,
-> +	MX28_PAD_ENET0_TXD0__ENET0_TXD0 | MXS_PAD_FEC,
-> +	MX28_PAD_ENET0_TXD1__ENET0_TXD1 | MXS_PAD_FEC,
-> +	MX28_PAD_ENET_CLK__CLKCTRL_ENET | MXS_PAD_FEC,
-> +
-> +	/* I2C */
-> +	MX28_PAD_I2C0_SCL__I2C0_SCL,
-> +	MX28_PAD_I2C0_SDA__I2C0_SDA,
-> +
-> +	/* mmc0 */
-> +	MX28_PAD_SSP0_DATA0__SSP0_D0 |
-> +		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
-> +	MX28_PAD_SSP0_DATA1__SSP0_D1 |
-> +		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
-> +	MX28_PAD_SSP0_DATA2__SSP0_D2 |
-> +		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
-> +	MX28_PAD_SSP0_DATA3__SSP0_D3 |
-> +		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
-> +	MX28_PAD_SSP0_DATA4__SSP0_D4 |
-> +		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
-> +	MX28_PAD_SSP0_DATA5__SSP0_D5 |
-> +		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
-> +	MX28_PAD_SSP0_DATA6__SSP0_D6 |
-> +		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
-> +	MX28_PAD_SSP0_DATA7__SSP0_D7 |
-> +		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
-> +	MX28_PAD_SSP0_CMD__SSP0_CMD |
-> +		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
-> +	MX28_PAD_SSP0_DETECT__SSP0_CARD_DETECT |
-> +		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
-> +	MX28_PAD_SSP0_SCK__SSP0_SCK |
-> +		(MXS_PAD_12MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
-> +
-> +	/* led */
-> +	MX28_PAD_PWM3__GPIO_3_28 | MXS_PAD_CTRL,
-> +};
-> +
-> +/* led */
-> +static const struct gpio_led apx4devkit_leds[] __initconst = {
-> +	{
-> +		.name = "user-led",
-> +		.default_trigger = "heartbeat",
-> +		.gpio = APX4DEVKIT_GPIO_USERLED,
-> +	},
-> +};
-> +
-> +static const struct gpio_led_platform_data apx4devkit_led_data __initconst = {
-> +	.leds = apx4devkit_leds,
-> +	.num_leds = ARRAY_SIZE(apx4devkit_leds),
-> +};
-> +
-> +static struct fec_platform_data mx28_fec_pdata __initdata = {
-> +	.phy = PHY_INTERFACE_MODE_RMII,
-> +};
-> +
-> +static int __init apx4devkit_fec_get_mac(char *macstr)
-> +{
-> +	int i, h, l;
-> +
-> +	macstr++;
-> +
-> +	for (i = 0; i < 6; i++) {
-> +		if (i != 5 && *(macstr + 2) != ':')
-> +			goto error;
-> +
-> +		h = hex_to_bin(*macstr++);
-> +		if (h == -1)
-> +			goto error;
-> +
-> +		l = hex_to_bin(*macstr++);
-> +		if (l == -1)
-> +			goto error;
-> +
-> +		macstr++;
-> +		mx28_fec_pdata.mac[i] = (h << 4) + l;
-> +	}
-> +	return 0;
-I wonder if there isn't a more generic way to parse a mac address.
+Though by declaring variable-size page sizes support, we intentionally
+take a very conservative approach which should effectively make this
+whole logic transparent to both of the x86 implementations:
 
-Other machines put the mac into the otp.
+The ->map() handler of both of the AMD driver and the VT-d should be
+invoked in the exact way it was invoked earlier (same order, same
+parameters), because before this patch-set, all IOMMU users only
+mapped page-ordered regions. With this patch-set in hand, the x86
+drivers declare support for all possible page-ordered page sizes, so
+the IOMMU core should just be a pass-through, and call ->map() with
+the exact parameters that were provided to iommu_map().
 
-> +error:
-> +	pr_err("%s: invalid mac address\n", __func__);
-> +	return -EINVAL;
-> +}
-> +
-> +__setup("ethaddr", apx4devkit_fec_get_mac);
-the name is IMHO too generic for a board specific parameter. Think about
-a kernel that runs on all mxs based machines. ethaddr=... only affects
-your machine type. And it's not possible to add the same parameter to a
-different board.
+Similarly, calls to ->unmap() should not change, because current
+mainline x86 users (kvm..) only unmap a single page at a time. With
+this patch set in hand, the iommu core will just trivially pass those
+request through to the driver's ->unmap().
 
-> +
-> +static struct mxs_mmc_platform_data apx4devkit_mmc_pdata __initdata = {
-> +	.wp_gpio = -EINVAL,
-> +	.flags = SLOTF_8_BIT_CAPABLE,
-> +};
-> +
-> +static struct i2c_board_info apx4devkit_i2c_boardinfo[] __initdata = {
-> +	{ I2C_BOARD_INFO("sgtl5000", 0x0a) }, /* ASoC */
-> +	{ I2C_BOARD_INFO("pcf8563", 0x51) }, /* RTC */
-> +};
-> +
-> +static void __init apx4devkit_init(void)
-> +{
-> +	mxs_iomux_setup_multiple_pads(apx4devkit_pads,
-> +			ARRAY_SIZE(apx4devkit_pads));
-> +
-> +	mx28_add_duart();
-> +	mx28_add_auart0();
-> +	mx28_add_auart1();
-> +	mx28_add_auart2();
-> +	mx28_add_auart3();
-> +
-> +	mx28_add_fec(0, &mx28_fec_pdata);
-> +
-> +	mx28_add_mxs_mmc(0, &apx4devkit_mmc_pdata);
-> +
-> +	gpio_led_register_device(0, &apx4devkit_led_data);
-> +
-> +	/* I2C */
-> +	mx28_add_mxs_i2c(0);
-> +	i2c_register_board_info(0, apx4devkit_i2c_boardinfo,
-> +			ARRAY_SIZE(apx4devkit_i2c_boardinfo));
-> +}
-> +
-> +static void __init apx4devkit_timer_init(void)
-> +{
-> +	mx28_clocks_init();
-> +}
-> +
-> +static struct sys_timer apx4devkit_timer = {
-> +	.init	= apx4devkit_timer_init,
-> +};
-> +
-> +MACHINE_START(APX4DEVKIT, "Bluegiga APX4 Development Kit")
-> +	.map_io		= mx28_map_io,
-> +	.init_irq	= mx28_init_irq,
-> +	.init_machine	= apx4devkit_init,
-> +	.timer		= &apx4devkit_timer,
-> +MACHINE_END
-please read http://article.gmane.org/gmane.linux.ports.arm.omap/50721
+So I guess that if we can test this on AMD and see that indeed this
+conservative approach works (the driver gets the same ->map() and
+->unmap() calls it got before) then it should work exactly the same
+with VT-d.
 
-Best regards
-Uwe
+But having someone with a VT-d setup to test this can be great of course.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Thanks,
+Ohad.
