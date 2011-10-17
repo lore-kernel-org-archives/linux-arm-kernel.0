@@ -1,88 +1,70 @@
-From: richard.zhao@linaro.org (Richard Zhao)
-Date: Mon, 17 Oct 2011 14:42:19 +0800
-Subject: [PATCH v2 4/7] clk: Add simple gated clock
-In-Reply-To: <20111016182649.GB13565@pengutronix.de>
-References: <1316730422-20027-1-git-send-email-mturquette@ti.com>
-	<1316730422-20027-5-git-send-email-mturquette@ti.com>
-	<20111012064646.GA31037@b20223-02.ap.freescale.net>
-	<CAJOA=zPw7BF1iNFaG9js2k6++qPnXz5S3dq4rsPmUWOcUztL0g@mail.gmail.com>
-	<20111016182649.GB13565@pengutronix.de>
-Message-ID: <20111017064217.GA20184@b20223-02.ap.freescale.net>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Mon, 17 Oct 2011 10:05:02 +0200
+Subject: [PATCH v3 1/6] iommu/core: split mapping to page sizes as
+	supported by the hardware
+In-Reply-To: <CAK=Wgbar+z_Nm1cDM4bJgrP5yWbjCsVBW=orfYwsZsT7uET8ng@mail.gmail.com>
+References: <20110927131222.GL2138@amd.com>
+	<CAK=WgbYG2tpMJ2SikZhm=R9j5kQ6Hm8CGg=q1bko3idzF53Q3Q@mail.gmail.com>
+	<20110927181438.GM2138@amd.com>
+	<CAK=WgbbNs5fWHDEputZ=jzU5YN0sn0tf6AETkcsoq_Jbvc2XgQ@mail.gmail.com>
+	<20111010094738.GW2138@amd.com>
+	<CAK=WgbZ7Wyax1yfS1jSXw9OdwMtxxidwLO8PTsNUXX9CWzmVrw@mail.gmail.com>
+	<20111010153609.GB2138@amd.com>
+	<CAK=WgbbnuO67X46sqS87q2vw2TWq3Ekvw5p1PmXvXinQXMyowg@mail.gmail.com>
+	<20111011103820.GF2138@amd.com>
+	<CAK=WgbYOUZNX0OmRwZNO1mMG+3DZXwff+S60ESWixf04HOcbtw@mail.gmail.com>
+	<20111014133510.GC2198@amd.com>
+	<CAK=Wgbar+z_Nm1cDM4bJgrP5yWbjCsVBW=orfYwsZsT7uET8ng@mail.gmail.com>
+Message-ID: <CAK=WgbbQ9RRFmMXGOK2An7f0QkObYigv_OWXALFr+Bchw97j9Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 16, 2011 at 08:26:49PM +0200, Sascha Hauer wrote:
-> On Wed, Oct 12, 2011 at 07:59:19AM -0700, Turquette, Mike wrote:
-> > On Tue, Oct 11, 2011 at 11:46 PM, Richard Zhao
-> > <richard.zhao@freescale.com> wrote:
-> > > On Thu, Sep 22, 2011 at 03:26:59PM -0700, Mike Turquette wrote:
-> > >> From: Jeremy Kerr <jeremy.kerr@canonical.com>
-> > >>
-> > >> Signed-off-by: Jeremy Kerr <jeremy.kerr@canonical.com>
-> > >> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
-> > >> Signed-off-by: Jamie Iles <jamie@jamieiles.com>
-> > >> Signed-off-by: Mike Turquette <mturquette@ti.com>
-> > >> ---
-> > >> Changes since v1:
-> > >> Add copyright header
-> > >> Fold in Jamie's patch for set-to-disable clks
-> > >> Use BIT macro instead of shift
-> > >>
-> > >> ?drivers/clk/Kconfig ? ?| ? ?4 ++
-> > >> ?drivers/clk/Makefile ? | ? ?1 +
-> > >> ?drivers/clk/clk-gate.c | ? 78 ++++++++++++++++++++++++++++++++++++++++++++++++
-> > >> ?include/linux/clk.h ? ?| ? 13 ++++++++
-> > >> ?4 files changed, 96 insertions(+), 0 deletions(-)
-> > >> ?create mode 100644 drivers/clk/clk-gate.c
-> > >
-> > > I feel hard to tell the tree the clk parent, at register/init time. For the
-> > > simple gate clk, the only way is to set .get_parent. But normally, for clk
-> > > without any divider we set .get_parent to NULL. Maybe we can put .parent to
-> > > struct clk_hw?
-> > 
-> > For non-mux clocks, whose parent is *always* going to be the same, you
-> > should create a duplicate .parent in the clk_hw_* structure and then
-> > have .get_parent return clk_hw_*->parent.
-> 
-> Maybe I do not understand what you mean here, but I think there is
-> something missing in the gate.
-yes, clk_gate can not set fixed parent in v2 patch. Mike means add .parent int clk_gate
-and set .get_parent in the ops.
-> 
-> > 
-> > This is analogous to the way clk_hw_fixed returns clk_hw_fixed->rate
-> > when .recalc is called on it.
-> > 
-> > >> +
-> > >> +static unsigned long clk_gate_get_rate(struct clk_hw *clk)
-> > >> +{
-> > >> + ? ? return clk_get_rate(clk_get_parent(clk->clk));
-> > >> +}
-> 
-> clk_get_parent goes down to clk_gate_set_enable_ops.get_parent below...
-> 
-> > >> +
-> > >> +
-> > >> +struct clk_hw_ops clk_gate_set_enable_ops = {
-> > >> + ? ? .recalc_rate = clk_gate_get_rate,
-> > >> + ? ? .enable = clk_gate_enable_set,
-> > >> + ? ? .disable = clk_gate_disable_clear,
-> > >> +};
-> 
-> ...but this does not have a get_parent pointer, so clk_get_parent()
-> for a gate always returns NULL which means that a gate never has
-> a valid rate.
-> 
-> Sascha
-> 
-> -- 
-> Pengutronix e.K.                           |                             |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+Hi Joerg,
+
+On Fri, Oct 14, 2011 at 7:03 PM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
+> On Fri, Oct 14, 2011 at 3:35 PM, Roedel, Joerg <Joerg.Roedel@amd.com> wrote:
+>> Hmm, I'd like to constify the iommu_ops structures in the future. This
+>> wouldn't work then anymore. How about renaming it to io_page_size
+>> (because it is the base page-size of the iommu) and let the driver set
+>> it?
+>
+> Sure, that'd work. Though asking the driver to provide this feels a
+> bit redundant, as it already provided this info in the supported page
+> sizes.
+>
+> I guess a cleaner solution might be allocating a 'struct iommu' in
+> which drivers will set a 'const struct iommu_ops *' member. That new
+> struct would then contain the base page-size and any other state the
+> iommu core would ever need.
+>
+> This whole thing is quite marginal though and also very easy to change
+> later, so we can start with the "driver-provided io_page_size"
+> approach for now.
+
+Sorry, I just couldn't get myself to sign-off this as it really feels
+wrong to me.
+
+This min_pagesz member is just cached by the core so it doesn't need to
+look it up every time we're mapping. Drivers shouldn't care about it, as it's
+completely internal to the iommu core. I'm afraid that pushing this to
+the drivers
+feels like redundant duplication of code and might also confuse developers.
+
+Let me please suggest two alternatives:
+a) drop this min_pagesz cache completely. iommu core would then redundantly
+  re-calculate this every time something is mapped, but I hardly believe there
+  is going to be a measurable impact on performance.
+b) keep the current implementation for now, and fix this later (when we constify
+  struct iommu_ops *) by caching min_pagesz in a dynamically allocated iommu
+  context. Since this future "constify" patch will anyway need to change 'struct
+  bus_type', it would be a good opportunity to do this change at the same time.
+
+I don't mind which of those approaches to take, and I also don't mind doing (b)
+myself later, in a separate patch. Your call.
+
+>> This needs to be (left > 0). The drivers are allowed to unmap more then
+>> requested, so this value may turn negative.
+>
+> Good point. 'left' is size_t though, so i'll fix this a bit differently.
+
+Fixed, please take a look:
