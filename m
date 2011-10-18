@@ -1,58 +1,52 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 18 Oct 2011 11:14:54 -0700
-Subject: [PATCH] [3.3] ARM: tegra: emc: max rate based on emc table
-Message-ID: <1318961694-21105-1-git-send-email-olof@lixom.net>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 18 Oct 2011 20:17:49 +0200
+Subject: Warning at kernel/mutex.c
+In-Reply-To: <20111018173744.GQ21648@n2100.arm.linux.org.uk>
+References: <CAOMZO5AR4iiktjmjzUU3AbQmYVk4wE28+KrZckt=VXLBJzXdBA@mail.gmail.com>
+	<20111018173744.GQ21648@n2100.arm.linux.org.uk>
+Message-ID: <20111018181749.GF21504@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update max rate for emc clock based on configured EMC timings,
-but by default leave it at the same rate that firmware configured.
+On Tue, Oct 18, 2011 at 06:37:44PM +0100, Russell King - ARM Linux wrote:
+> On Tue, Oct 18, 2011 at 02:43:27PM -0200, Fabio Estevam wrote:
+> > Hi,
+> > 
+> > I am running 3.1-rc10 kernel built with mxs_defconfig on a MX28EVK
+> > board and I am getting the following:
+> > 
+> > [    0.200000] Switching to clocksource mxs_timer
+> > [    0.220000] Switched to NOHz mode on CPU #0
+> > [    0.220000] ------------[ cut here ]------------
+> > [    0.220000] WARNING: at kernel/mutex.c:198 mutex_lock_nested+0x260/0x29c()
+> > [    0.220000] Modules linked in:
+> > [    0.220000] [<c0014478>] (unwind_backtrace+0x0/0xf4) from
+> > [<c002630c>] (warn_slowpath_common+0x4c/0x64)
+> > [    0.220000] [<c002630c>] (warn_slowpath_common+0x4c/0x64) from
+> > [<c0026340>] (warn_slowpath_null+0x1c/0x24)
+> > [    0.220000] [<c0026340>] (warn_slowpath_null+0x1c/0x24) from
+> > [<c02957cc>] (mutex_lock_nested+0x260/0x29c)
+> > [    0.220000] [<c02957cc>] (mutex_lock_nested+0x260/0x29c) from
+> > [<c0018580>] (clk_enable+0x2c/0x4c)
+> > [    0.220000] [<c0018580>] (clk_enable+0x2c/0x4c) from [<c01cd9e0>]
+> > (pl011_console_write+0x20/0x78)
+> 
+> clk_enable() shouldn't be taking a mutex because drivers can _and_ do
+> call it from non-schedulable contexts.  Unfortunately, some clk_enable
+> implementations do use a mutex.
+> 
+> We have a transition path for this, discussed quite a while ago -
+> introducing clk_prepare() to do the slow bits of enabling a clock,
+> leaving clk_enable() for the fast stuff.
+> 
+And some time ago I posted a work-around with the obvious downside of
+having the clock on longer than necessary. You can find it at
 
-Also update the shared clocks accordingly.
+	http://mid.gmane.org/1293117682-18505-1-git-send-email-u.kleine-koenig at pengutronix.de
 
-This patch was based on work by Danny Huang <dahuang@nvidia.com>.
+Best regards
+Uwe
 
-Signed-off-by: Olof Johansson <olof@lixom.net>
----
- arch/arm/mach-tegra/tegra2_emc.c |   19 +++++++++++++++++++
- 1 files changed, 19 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/mach-tegra/tegra2_emc.c b/arch/arm/mach-tegra/tegra2_emc.c
-index 0f7ae6e..bed7e74 100644
---- a/arch/arm/mach-tegra/tegra2_emc.c
-+++ b/arch/arm/mach-tegra/tegra2_emc.c
-@@ -23,6 +23,7 @@
- 
- #include <mach/iomap.h>
- 
-+#include "clock.h"
- #include "tegra2_emc.h"
- 
- #ifdef CONFIG_TEGRA_EMC_SCALING_ENABLE
-@@ -173,6 +174,24 @@ int tegra_emc_set_rate(unsigned long rate)
- 
- void tegra_init_emc(const struct tegra_emc_table *table, int table_size)
- {
-+	struct clk *c = clk_get_sys("emc", NULL);
-+	struct clk *user;
-+	unsigned long max = 0;
-+	int i;
-+
-+	/* Since default max_rate on emc clock is the same as firmware set
-+	 * it to before booting, raise it up here based on known timings.
-+	 */
-+
-+	for (i = 0; i < table_size; i++)
-+		if (table[i].rate > max)
-+			max = table[i].rate;
-+
- 	tegra_emc_table = table;
- 	tegra_emc_table_size = table_size;
-+
-+	c->max_rate = max * 2 * 1000;
-+
-+	list_for_each_entry(user, &c->shared_bus_list, u.shared_bus_user.node)
-+		user->max_rate = c->max_rate;
- }
 -- 
-1.7.4.1
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
