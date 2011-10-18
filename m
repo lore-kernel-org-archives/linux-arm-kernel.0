@@ -1,184 +1,86 @@
-From: mina86@mina86.com (Michal Nazarewicz)
-Date: Tue, 18 Oct 2011 10:26:37 -0700
-Subject: [PATCH 2/9] mm: alloc_contig_freed_pages() added
-In-Reply-To: <20111018122109.GB6660@csn.ul.ie>
-References: <1317909290-29832-1-git-send-email-m.szyprowski@samsung.com>
-	<1317909290-29832-3-git-send-email-m.szyprowski@samsung.com>
-	<20111018122109.GB6660@csn.ul.ie>
-Message-ID: <op.v3j5ent03l0zgt@mpn-glaptop>
+From: gdavis@mvista.com (George G. Davis)
+Date: Tue, 18 Oct 2011 13:30:17 -0400
+Subject: [RFC/PATCH v4 4/7] ARM: ARM11 MPCore: clean_dcache_area is not
+	preempt safe
+In-Reply-To: <20111018170839.GD27515@atomide.com>
+References: <1318004800-6525-1-git-send-email-gdavis@mvista.com>
+	<1318945654-548-1-git-send-email-gdavis@mvista.com>
+	<1318945654-548-5-git-send-email-gdavis@mvista.com>
+	<20111018170839.GD27515@atomide.com>
+Message-ID: <F772D91A-6D3A-40F4-ABF5-59C42FD2606E@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 18 Oct 2011 05:21:09 -0700, Mel Gorman <mel@csn.ul.ie> wrote:
+Hello Tony/Ohad,
 
-> At this point, I'm going to apologise for not reviewing this a long long
-> time ago.
->
-> On Thu, Oct 06, 2011 at 03:54:42PM +0200, Marek Szyprowski wrote:
->> From: KAMEZAWA Hiroyuki <kamezawa.hiroyu@jp.fujitsu.com>
->>
->> This commit introduces alloc_contig_freed_pages() function
->> which allocates (ie. removes from buddy system) free pages
->> in range. Caller has to guarantee that all pages in range
->> are in buddy system.
->>
->
-> Straight away, I'm wondering why you didn't use
->
-> mm/compaction.c#isolate_freepages()
->
-> It knows how to isolate pages within ranges. All its control information
-> is passed via struct compact_control() which I recognise may be awkward
-> for CMA but compaction.c know how to manage all the isolated pages and
-> pass them to migrate.c appropriately.
+On Oct 18, 2011, at 1:08 PM, Tony Lindgren wrote:
 
-It is something to consider.  At first glance, I see that isolate_freepages
-seem to operate on pageblocks which is not desired for CMA.
+> Hi,
+> 
+> * gdavis at mvista.com <gdavis@mvista.com> [111018 06:13]:
+>> From: George G. Davis <gdavis@mvista.com>
+>> 
+>> If preemption and subsequent task migration occurs during calls to
+>> clean_dcache_area on ARM11 MPCore machines, global memory state
+>> can become inconsistent.  To prevent inconsistent memory state on
+>> these machines, disable preemption in callers of these functions
+>> around memory modifications and subsequent clean_dcache_area calls.
+> 
+> This one needs to be refreshed against what's queued in for-next as
+> Ohad has moved most of the iommu code into drivers. I've added
+> Ohad to Cc as well.
 
-> I haven't read all the patches yet but isolate_freepages() does break
-> everything up into order-0 pages. This may not be to your liking but it
-> would not be possible to change.
+If you do not use ARM11 MPCore with those drivers, then we can drop this altogether.
 
-Splitting everything into order-0 pages is desired behaviour.
+Thanks!
 
->> Along with this function, a free_contig_pages() function is
->> provided which frees all (or a subset of) pages allocated
->> with alloc_contig_free_pages().
-
-> mm/compaction.c#release_freepages()
-
-It sort of does the same thing but release_freepages() assumes that pages
-that are being freed are not-continuous and they need to be on the lru list.
-With free_contig_pages(), we can assume all pages are continuous.
-
->> +#if defined(CONFIG_SPARSEMEM) && !defined(CONFIG_SPARSEMEM_VMEMMAP)
->> +/*
->> + * Both PFNs must be from the same zone!  If this function returns
->> + * true, pfn_to_page(pfn1) + (pfn2 - pfn1) == pfn_to_page(pfn2).
->> + */
->> +static inline bool zone_pfn_same_memmap(unsigned long pfn1, unsigned long pfn2)
->> +{
->> +	return pfn_to_section_nr(pfn1) == pfn_to_section_nr(pfn2);
->> +}
->> +
->
-> Why do you care what section the page is in? The zone is important all
-> right, but not the section. Also, offhand I'm unsure if being in the
-> same section guarantees the same zone. sections are ordinarily fully
-> populated (except on ARM but hey) but I can't remember anything
-> enforcing that zones be section-aligned.
->
-> Later I think I see that the intention was to reduce the use of
-> pfn_to_page().
-
-That is correct.
-
-> You can do this in a more general fashion by checking the
-> zone boundaries and resolving the pfn->page every MAX_ORDER_NR_PAGES.
-> That will not be SPARSEMEM specific.
-
-I've tried doing stuff that way but it ended up with much more code.
-
-Dave suggested the above function to check if pointer arithmetic is valid.
-
-Please see also <https://lkml.org/lkml/2011/9/21/220>.
-
->
->> +#else
->> +
->> +#define zone_pfn_same_memmap(pfn1, pfn2) (true)
->> +
->> +#endif
->> +
->>  #endif /* !__GENERATING_BOUNDS.H */
->>  #endif /* !__ASSEMBLY__ */
->>  #endif /* _LINUX_MMZONE_H */
-
-
->> @@ -5706,6 +5706,73 @@ out:
->>  	spin_unlock_irqrestore(&zone->lock, flags);
->>  }
->>
->> +unsigned long alloc_contig_freed_pages(unsigned long start, unsigned long end,
->> +				       gfp_t flag)
->> +{
->> +	unsigned long pfn = start, count;
->> +	struct page *page;
->> +	struct zone *zone;
->> +	int order;
->> +
->> +	VM_BUG_ON(!pfn_valid(start));
->
-> VM_BUG_ON seems very harsh here. WARN_ON_ONCE and returning 0 to the
-> caller sees reasonable.
->
->> +	page = pfn_to_page(start);
->> +	zone = page_zone(page);
->> +
->> +	spin_lock_irq(&zone->lock);
->> +
->> +	for (;;) {
->> +		VM_BUG_ON(page_count(page) || !PageBuddy(page) ||
->> +			  page_zone(page) != zone);
->> +
->
-> Here you will VM_BUG_ON with the zone lock held leading to system
-> halting very shortly.
->
->> +		list_del(&page->lru);
->> +		order = page_order(page);
->> +		count = 1UL << order;
->> +		zone->free_area[order].nr_free--;
->> +		rmv_page_order(page);
->> +		__mod_zone_page_state(zone, NR_FREE_PAGES, -(long)count);
->> +
->
-> The callers need to check in advance if watermarks are sufficient for
-> this. In compaction, it happens in compaction_suitable() because it only
-> needed to be checked once. Your requirements might be different.
->
->> +		pfn += count;
->> +		if (pfn >= end)
->> +			break;
->> +		VM_BUG_ON(!pfn_valid(pfn));
->> +
->
-> On ARM, it's possible to encounter invalid pages. VM_BUG_ON is serious
-> overkill.
->
->> +		if (zone_pfn_same_memmap(pfn - count, pfn))
->> +			page += count;
->> +		else
->> +			page = pfn_to_page(pfn);
->> +	}
->> +
->> +	spin_unlock_irq(&zone->lock);
->> +
->> +	/* After this, pages in the range can be freed one be one */
->> +	count = pfn - start;
->> +	pfn = start;
->> +	for (page = pfn_to_page(pfn); count; --count) {
->> +		prep_new_page(page, 0, flag);
->> +		++pfn;
->> +		if (likely(zone_pfn_same_memmap(pfn - 1, pfn)))
->> +			++page;
->> +		else
->> +			page = pfn_to_page(pfn);
->> +	}
->> +
->
-> Here it looks like you have implemented something like split_free_page().
-
-split_free_page() takes a single page, removes it from buddy system, and finally
-splits it.  alloc_contig_freed_pages() takes a range of pages, removes them from
-buddy system, and finally splits them.  Because it works on a range, it is
-made into a separate function.
-
->> +	return pfn;
->> +}
-
--- 
-Best regards,                                         _     _
-.o. | Liege of Serenely Enlightened Majesty of      o' \,=./ `o
-..o | Computer Science,  Micha? ?mina86? Nazarewicz    (o o)
-ooo +----<email/xmpp: mpn@google.com>--------------ooO--(_)--Ooo--
+--
+Regards,
+George
+ 
+> 
+> Regards,
+> 
+> Tony
+> 
+>> 
+>> Cc: Tony Lindgren <tony@atomide.com>
+>> Signed-off-by: George G. Davis <gdavis@mvista.com>
+>> ---
+>> arch/arm/plat-omap/iommu.c |   10 ++++++++++
+>> 1 files changed, 10 insertions(+), 0 deletions(-)
+>> 
+>> diff --git a/arch/arm/plat-omap/iommu.c b/arch/arm/plat-omap/iommu.c
+>> index 34fc31e..59836d1 100644
+>> --- a/arch/arm/plat-omap/iommu.c
+>> +++ b/arch/arm/plat-omap/iommu.c
+>> @@ -1014,8 +1014,12 @@ static int __devinit omap_iommu_probe(struct platform_device *pdev)
+>> 		err = -ENOMEM;
+>> 		goto err_pgd;
+>> 	}
+>> +	if (cache_ops_need_broadcast())
+>> +		preempt_disable();
+>> 	memset(p, 0, IOPGD_TABLE_SIZE);
+>> 	clean_dcache_area(p, IOPGD_TABLE_SIZE);
+>> +	if (cache_ops_need_broadcast())
+>> +		preempt_enable();
+>> 	obj->iopgd = p;
+>> 
+>> 	BUG_ON(!IS_ALIGNED((unsigned long)obj->iopgd, IOPGD_TABLE_SIZE));
+>> @@ -1069,7 +1073,13 @@ static struct platform_driver omap_iommu_driver = {
+>> 
+>> static void iopte_cachep_ctor(void *iopte)
+>> {
+>> +	if (cache_ops_need_broadcast())
+>> +		preempt_disable();
+>> +	/* FIXME: This will not work on ARM11 MPCore.
+>> +	 */
+>> 	clean_dcache_area(iopte, IOPTE_TABLE_SIZE);
+>> +	if (cache_ops_need_broadcast())
+>> +		preempt_enable();
+>> }
+>> 
+>> static int __init omap_iommu_init(void)
+>> -- 
+>> 1.7.4.4
+>> 
