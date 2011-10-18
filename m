@@ -1,51 +1,51 @@
 From: govindraj.raja@ti.com (Govindraj.R)
-Date: Tue, 18 Oct 2011 21:05:07 +0530
-Subject: [PATCH v7 16/21] OMAP2+: UART: Remove custom activate funcs and use
-	generic funcs.
+Date: Tue, 18 Oct 2011 21:05:09 +0530
+Subject: [PATCH v7 18/21] OMAP2+: UART: remove temporary variable used to
+	count uart instance
 In-Reply-To: <1318952110-10659-1-git-send-email-govindraj.raja@ti.com>
 References: <1318952110-10659-1-git-send-email-govindraj.raja@ti.com>
-Message-ID: <1318952110-10659-2-git-send-email-govindraj.raja@ti.com>
+Message-ID: <1318952110-10659-4-git-send-email-govindraj.raja@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The custom hwmod activate and deactivate funcs does hwmod_enable
-and idle same can be done with omap_device generic API's.
+Reuse the num_uarts variable itself to count number of uarts.
 
 Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
 ---
- arch/arm/mach-omap2/serial.c |   18 ++----------------
- 1 files changed, 2 insertions(+), 16 deletions(-)
+ arch/arm/mach-omap2/serial.c |    7 ++-----
+ 1 files changed, 2 insertions(+), 5 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/serial.c b/arch/arm/mach-omap2/serial.c
-index 7c65410..7658a03 100644
+index 55ce950..e1eba7f 100644
 --- a/arch/arm/mach-omap2/serial.c
 +++ b/arch/arm/mach-omap2/serial.c
-@@ -78,24 +78,10 @@ static struct omap_uart_port_info omap_serial_default_info[] __initdata = {
- 	},
- };
+@@ -253,15 +253,13 @@ static void omap_serial_fill_default_pads(struct omap_board_data *bdata) {}
  
--static int uart_idle_hwmod(struct omap_device *od)
--{
--	omap_hwmod_idle(od->hwmods[0]);
+ static int __init omap_serial_early_init(void)
+ {
+-	int i = 0;
 -
--	return 0;
--}
--
--static int uart_enable_hwmod(struct omap_device *od)
--{
--	omap_hwmod_enable(od->hwmods[0]);
--
--	return 0;
--}
--
- static struct omap_device_pm_latency omap_uart_latency[] = {
- 	{
--		.deactivate_func = uart_idle_hwmod,
--		.activate_func	 = uart_enable_hwmod,
-+		.activate_func	 = omap_device_enable_hwmods,
-+		.deactivate_func = omap_device_idle_hwmods,
- 		.flags = OMAP_DEVICE_LATENCY_AUTO_ADJUST,
- 	},
- };
+ 	do {
+ 		char oh_name[MAX_UART_HWMOD_NAME_LEN];
+ 		struct omap_hwmod *oh;
+ 		struct omap_uart_state *uart;
+ 
+ 		snprintf(oh_name, MAX_UART_HWMOD_NAME_LEN,
+-			 "uart%d", i + 1);
++			 "uart%d", num_uarts + 1);
+ 		oh = omap_hwmod_lookup(oh_name);
+ 		if (!oh)
+ 			break;
+@@ -271,9 +269,8 @@ static int __init omap_serial_early_init(void)
+ 			return -ENODEV;
+ 
+ 		uart->oh = oh;
+-		uart->num = i++;
++		uart->num = num_uarts++;
+ 		list_add_tail(&uart->node, &uart_list);
+-		num_uarts++;
+ 
+ 		/*
+ 		 * NOTE: omap_hwmod_setup*() has not yet been called,
 -- 
 1.7.4.1
