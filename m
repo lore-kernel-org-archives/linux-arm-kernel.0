@@ -1,87 +1,130 @@
 From: gdavis@mvista.com (gdavis at mvista.com)
-Date: Tue, 18 Oct 2011 09:47:29 -0400
-Subject: [RFC/PATCH v4 2/7] ARM: ARM11 MPCore: pte_alloc_one{,
-	_kernel} are not preempt safe
+Date: Tue, 18 Oct 2011 09:47:30 -0400
+Subject: [RFC/PATCH v4 3/7] ARM: ARM11 MPCore: {clean,
+	flush}_pmd_entry are not preempt safe
 In-Reply-To: <1318945654-548-1-git-send-email-gdavis@mvista.com>
 References: <1318004800-6525-1-git-send-email-gdavis@mvista.com>
 	<1318945654-548-1-git-send-email-gdavis@mvista.com>
-Message-ID: <1318945654-548-3-git-send-email-gdavis@mvista.com>
+Message-ID: <1318945654-548-4-git-send-email-gdavis@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: George G. Davis <gdavis@mvista.com>
 
-If preemption and subsequent task migration occurs during a call to
-pte_alloc_one{,_kernel} on ARM11 MPCore machines, global memory state
+If preemption and subsequent task migration occurs during calls to
+{clean,flush}_pmd_entry on ARM11 MPCore machines, global memory state
 can become inconsistent.  To prevent inconsistent memory state on
-these machines, disable preemption around initialization and flushing
-of new PTEs.
+these machines, disable preemption in callers of these functions around
+PMD modifications and subsequent {clean,flush}_pmd_entry calls.
 
 Signed-off-by: George G. Davis <gdavis@mvista.com>
 ---
- arch/arm/include/asm/pgalloc.h |   24 +++++++++++++++++++-----
- 1 files changed, 19 insertions(+), 5 deletions(-)
+ arch/arm/include/asm/pgalloc.h  |    4 ++++
+ arch/arm/include/asm/pgtable.h  |    9 +++++++++
+ arch/arm/include/asm/smp_plat.h |    2 ++
+ arch/arm/mm/idmap.c             |    5 +++++
+ 4 files changed, 20 insertions(+), 0 deletions(-)
 
 diff --git a/arch/arm/include/asm/pgalloc.h b/arch/arm/include/asm/pgalloc.h
-index 22de005..92d3f27 100644
+index 92d3f27..ba8cf6a 100644
 --- a/arch/arm/include/asm/pgalloc.h
 +++ b/arch/arm/include/asm/pgalloc.h
-@@ -17,6 +17,7 @@
- #include <asm/processor.h>
- #include <asm/cacheflush.h>
- #include <asm/tlbflush.h>
+@@ -122,9 +122,13 @@ static inline void __pmd_populate(pmd_t *pmdp, phys_addr_t pte,
+ 	unsigned long prot)
+ {
+ 	unsigned long pmdval = (pte + PTE_HWTABLE_OFF) | prot;
++	if (cache_ops_need_broadcast())
++		preempt_disable();
+ 	pmdp[0] = __pmd(pmdval);
+ 	pmdp[1] = __pmd(pmdval + 256 * sizeof(pte_t));
+ 	flush_pmd_entry(pmdp);
++	if (cache_ops_need_broadcast())
++		preempt_enable();
+ }
+ 
+ /*
+diff --git a/arch/arm/include/asm/pgtable.h b/arch/arm/include/asm/pgtable.h
+index 5750704..00068dc 100644
+--- a/arch/arm/include/asm/pgtable.h
++++ b/arch/arm/include/asm/pgtable.h
+@@ -13,6 +13,7 @@
+ #include <linux/const.h>
+ #include <asm-generic/4level-fixup.h>
+ #include <asm/proc-fns.h>
 +#include <asm/smp_plat.h>
  
- #define check_pgt_cache()		do { } while (0)
+ #ifndef CONFIG_MMU
  
-@@ -35,7 +36,7 @@
- extern pgd_t *pgd_alloc(struct mm_struct *mm);
- extern void pgd_free(struct mm_struct *mm, pgd_t *pgd);
+@@ -313,16 +314,24 @@ extern pgd_t swapper_pg_dir[PTRS_PER_PGD];
  
--#define PGALLOC_GFP	(GFP_KERNEL | __GFP_NOTRACK | __GFP_REPEAT | __GFP_ZERO)
-+#define PGALLOC_GFP	(GFP_KERNEL | __GFP_NOTRACK | __GFP_REPEAT)
+ #define copy_pmd(pmdpd,pmdps)		\
+ 	do {				\
++		if (cache_ops_need_broadcast())	\
++			preempt_disable();	\
+ 		pmdpd[0] = pmdps[0];	\
+ 		pmdpd[1] = pmdps[1];	\
+ 		flush_pmd_entry(pmdpd);	\
++		if (cache_ops_need_broadcast())	\
++			preempt_enable();	\
+ 	} while (0)
  
- static inline void clean_pte_table(pte_t *pte)
- {
-@@ -64,8 +65,14 @@ pte_alloc_one_kernel(struct mm_struct *mm, unsigned long addr)
- 	pte_t *pte;
+ #define pmd_clear(pmdp)			\
+ 	do {				\
++		if (cache_ops_need_broadcast())	\
++			preempt_disable();	\
+ 		pmdp[0] = __pmd(0);	\
+ 		pmdp[1] = __pmd(0);	\
+ 		clean_pmd_entry(pmdp);	\
++		if (cache_ops_need_broadcast())	\
++			preempt_enable();	\
+ 	} while (0)
  
- 	pte = (pte_t *)__get_free_page(PGALLOC_GFP);
--	if (pte)
-+	if (pte) {
-+		if (cache_ops_need_broadcast())
-+			preempt_disable();
-+		memset(pte, 0, PAGE_SIZE);
- 		clean_pte_table(pte);
-+		if (cache_ops_need_broadcast())
-+			preempt_enable();
-+	}
+ static inline pte_t *pmd_page_vaddr(pmd_t pmd)
+diff --git a/arch/arm/include/asm/smp_plat.h b/arch/arm/include/asm/smp_plat.h
+index f24c1b9..5a8d3df 100644
+--- a/arch/arm/include/asm/smp_plat.h
++++ b/arch/arm/include/asm/smp_plat.h
+@@ -5,6 +5,7 @@
+ #ifndef __ASMARM_SMP_PLAT_H
+ #define __ASMARM_SMP_PLAT_H
  
- 	return pte;
++#ifndef	__ASSEMBLY__
+ #include <asm/cputype.h>
+ 
+ /*
+@@ -42,5 +43,6 @@ static inline int cache_ops_need_broadcast(void)
+ 	return ((read_cpuid_ext(CPUID_EXT_MMFR3) >> 12) & 0xf) < 1;
  }
-@@ -76,13 +83,20 @@ pte_alloc_one(struct mm_struct *mm, unsigned long addr)
- 	struct page *pte;
- 
- #ifdef CONFIG_HIGHPTE
--	pte = alloc_pages(PGALLOC_GFP | __GFP_HIGHMEM, 0);
-+	pte = alloc_pages(PGALLOC_GFP | __GFP_ZERO | __GFP_HIGHMEM, 0);
- #else
- 	pte = alloc_pages(PGALLOC_GFP, 0);
  #endif
- 	if (pte) {
--		if (!PageHighMem(pte))
--			clean_pte_table(page_address(pte));
-+		if (!PageHighMem(pte)) {
-+			void *page = page_address(pte);
-+			if (cache_ops_need_broadcast())
-+				preempt_disable();
-+			memset(page, 0, PAGE_SIZE);
-+			clean_pte_table(page);
-+			if (cache_ops_need_broadcast())
-+				preempt_enable();
-+		}
- 		pgtable_page_ctor(pte);
- 	}
++#endif
  
+ #endif
+diff --git a/arch/arm/mm/idmap.c b/arch/arm/mm/idmap.c
+index 2be9139..c04face 100644
+--- a/arch/arm/mm/idmap.c
++++ b/arch/arm/mm/idmap.c
+@@ -3,17 +3,22 @@
+ #include <asm/cputype.h>
+ #include <asm/pgalloc.h>
+ #include <asm/pgtable.h>
++#include <asm/smp_plat.h>
+ 
+ static void idmap_add_pmd(pud_t *pud, unsigned long addr, unsigned long end,
+ 	unsigned long prot)
+ {
+ 	pmd_t *pmd = pmd_offset(pud, addr);
+ 
++	if (cache_ops_need_broadcast())
++		preempt_disable();
+ 	addr = (addr & PMD_MASK) | prot;
+ 	pmd[0] = __pmd(addr);
+ 	addr += SECTION_SIZE;
+ 	pmd[1] = __pmd(addr);
+ 	flush_pmd_entry(pmd);
++	if (cache_ops_need_broadcast())
++		preempt_enable();
+ }
+ 
+ static void idmap_add_pud(pgd_t *pgd, unsigned long addr, unsigned long end,
 -- 
 1.7.4.4
