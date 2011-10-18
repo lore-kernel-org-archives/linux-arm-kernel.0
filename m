@@ -1,47 +1,42 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 18 Oct 2011 16:14:02 +0200
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Tue, 18 Oct 2011 15:15:20 +0100
 Subject: [PATCH 2/6] drivers/base: add bus for System-on-Chip devices
-In-Reply-To: <4E9D5F29.1070303@linaro.org>
+In-Reply-To: <201110181605.12512.arnd@arndb.de>
 References: <1318852378-14180-1-git-send-email-lee.jones@linaro.org>
-	<20111017161616.GA5108@suse.de> <4E9D5F29.1070303@linaro.org>
-Message-ID: <201110181614.02312.arnd@arndb.de>
+	<20111017161854.GB5108@suse.de> <4E9D5FAB.2080605@linaro.org>
+	<201110181605.12512.arnd@arndb.de>
+Message-ID: <20111018141520.GA10054@totoro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 18 October 2011, Lee Jones wrote:
-> >> +struct device *soc_device_register(struct soc_device_attribute *soc_dev_attr)
-> >> +{
-> >> +    struct soc_device *soc_dev;
-> >> +    static atomic_t soc_device_num = ATOMIC_INIT(0);
+Hi Arnd,
+
+On Tue, Oct 18, 2011 at 04:05:12PM +0200, Arnd Bergmann wrote:
+> On Tuesday 18 October 2011, Lee Jones wrote:
+> > On 17/10/11 17:18, Greg KH wrote:
+> > > On Mon, Oct 17, 2011 at 12:52:54PM +0100, Lee Jones wrote:
+> > >> +
+> > >> +	bus_unregister(&soc_bus_type);
+> > > 
+> > > What happens if you have more than one SOC device?  I think you just
+> > > oopsed.
 > > 
-> > No, please don't do this, use the proper kernel interface to dynamically
-> > handle numbering devices (hint, if you unload a SOC device, you will
-> > never reclaim that device number, which isn't that nice.)
+> > I think you're right.
+> > 
+> > When to you suggest we unregister the bus?
 > 
-> Again, some help would really be appreciated here. I searched the kernel
-> last time you mentioned numbering, but this is all I came up with.
+> Do it in the same way as registering it, as a module_exit() function
+> below the initcall that instantiates it. These interfaces usually come
+> in pairs, so if something does not look symmetric, you should better
+> have another look.
 
-I guess the correct interface to use here would be an "ida", see
-linux/idr.h. However, I'm not convinced that's actually worth the
-extra space for maintaining it here.
+I can't think of a system where it make sense to have this as a loadable 
+module so can't we just register the bus_type and never unregister it 
+like the platform and spi busses for example?
 
-An SoC pretty much has the following properties:
+Also, (and I'm right at the edge of my knowledge here!) wouldn't you 
+also need to add reference counting of the module when 
+creating/destroying a soc device to prevent the module and bus 
+disappearing whilst you had devices with a reference to it?
 
-* gets probed very early at boot time,
-* can never go away, and
-* there is only one of them in the system.
-
-The only reason I even asked for the devices to be enumerated is that
-there is the possibility that some device will need to have more than
-one and we should design every stable user interface in a way that never
-changes in a user visible way.
-
-IMHO, we could also remove the soc_device_unregister() function entirely
-and add a comment along the lines of 
-/*
- * If you really need to add hot-pluggable soc_devices, add a
- * soc_device_unregister function and turn the number generation
- * into an IDA.
- */
-
-	Arnd
+Jamie
