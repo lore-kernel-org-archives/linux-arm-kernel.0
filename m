@@ -1,93 +1,101 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 18 Oct 2011 20:40:08 +0200
-Subject: Warning at kernel/mutex.c
-In-Reply-To: <CAOMZO5BKTzeV0f0=frQT-4uHESh2-cEQtc2UzniFT6dVSi_0EQ@mail.gmail.com>
-References: <CAOMZO5AR4iiktjmjzUU3AbQmYVk4wE28+KrZckt=VXLBJzXdBA@mail.gmail.com>
-	<20111018173744.GQ21648@n2100.arm.linux.org.uk>
-	<CAOMZO5BKTzeV0f0=frQT-4uHESh2-cEQtc2UzniFT6dVSi_0EQ@mail.gmail.com>
-Message-ID: <20111018184008.GI21504@pengutronix.de>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 18 Oct 2011 11:42:41 -0700
+Subject: [RFC] [PATCH] ARM: tegra: emc: device tree bindings
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF173CA2CBFB@HQMAIL01.nvidia.com>
+References: <1318873976-25335-1-git-send-email-olof@lixom.net>
+	<74CDBE0F657A3D45AFBB94109FB122FF173CA2CBFB@HQMAIL01.nvidia.com>
+Message-ID: <CAOesGMh387Oghyd_TobnTOja6tU2uU5kt-86_HwQe7nFiL+svw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Tue, Oct 18, 2011 at 11:30 AM, Stephen Warren <swarren@nvidia.com> wrote:
+> Olof Johansson wrote at Monday, October 17, 2011 11:53 AM:
+>> First cut at device tree bindings for the EMC tables on tegra.
+>>
+>> Note that I have a prerequisite patch that changes the tegra2_emc code
+>> to be a platform driver; but I wanted to do a sanity-check of my device
+>> tree usage here before posting the whole series.
+>
+> ...
+>> +++ b/Documentation/devicetree/bindings/arm/tegra/emc.txt
+> ...
+>> +Embedded Memory Controller
+>> +
+>> +Properties:
+>> +- name : Should be emc
+>> +- #address-cells : Should be 1
+>> +- #size-cells : Should be 0
+>
+> The address/size-cells properties define the require number of cells for
+> child nodes, where the child nodes are addressable objects in a bus. For
+> the EMC table child nodes, they're more configuration than nodes on a
+> bus, so I don't think it's appropriate for the EMC controller to define
+> the address/size-cells properties. Those properties would be appropriate
+> if we ever have child nodes for the individual SDRAM chips, but I suspect
+> we won't ever do that?
 
-On Tue, Oct 18, 2011 at 04:33:07PM -0200, Fabio Estevam wrote:
-> On Tue, Oct 18, 2011 at 3:37 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> 
-> > clk_enable() shouldn't be taking a mutex because drivers can _and_ do
-> > call it from non-schedulable contexts. ?Unfortunately, some clk_enable
-> > implementations do use a mutex.
-> >
-> > We have a transition path for this, discussed quite a while ago -
-> > introducing clk_prepare() to do the slow bits of enabling a clock,
-> > leaving clk_enable() for the fast stuff.
-> >
-> 
-> Thanks for the explanation, Russell.
-> 
-> Sascha,
-> 
-> Would the conversion from mutex to spinlock in clk_enable/disable work
-> in the meantime?
-> 
-> Please see below.
-> 
-> OMAP/PXA/Tegra also use spinlock in clk_enable/disable.
-> 
-> If this is OK then I can submit a proper patch for mxc and mxs.
-> 
-> diff --git a/arch/arm/mach-mxs/clock.c b/arch/arm/mach-mxs/clock.c
-> index a7093c8..1cdc21a 100644
-> --- a/arch/arm/mach-mxs/clock.c
-> +++ b/arch/arm/mach-mxs/clock.c
-> @@ -42,6 +42,7 @@
-> 
->  static LIST_HEAD(clocks);
->  static DEFINE_MUTEX(clocks_mutex);
-> +static DEFINE_SPINLOCK(clock_lock);
-If clocks_mutex is unused now, please remove it. If it's not unused you
-probably introduced a problem with your patch.
+I'm not aware of anyone going down to the granularity of representing
+actual memory chips in the device tree. It's more common to use SPD on
+DIMMs for it.
 
-Uwe
-> 
->  /*-------------------------------------------------------------------------
->   * Standard clock functions defined in include/linux/clk.h
-> @@ -80,13 +81,14 @@ static int __clk_enable(struct clk *clk)
->  int clk_enable(struct clk *clk)
->  {
->  	int ret = 0;
-> +	unsigned long flags;
-> 
->  	if (clk == NULL || IS_ERR(clk))
->  		return -EINVAL;
-> 
-> -	mutex_lock(&clocks_mutex);
-> +	spin_lock_irqsave(&clock_lock, flags);
->  	ret = __clk_enable(clk);
-> -	mutex_unlock(&clocks_mutex);
-> +	spin_unlock_irqrestore(&clock_lock, flags);
-> 
->  	return ret;
->  }
-> @@ -98,12 +100,14 @@ EXPORT_SYMBOL(clk_enable);
->   */
->  void clk_disable(struct clk *clk)
->  {
-> +	unsigned long flags;
-> +
->  	if (clk == NULL || IS_ERR(clk))
->  		return;
-> 
-> -	mutex_lock(&clocks_mutex);
-> +	spin_lock_irqsave(&clock_lock, flags);
->  	__clk_disable(clk);
-> -	mutex_unlock(&clocks_mutex);
-> +	spin_unlock_irqrestore(&clock_lock, flags);
->  }
->  EXPORT_SYMBOL(clk_disable);
-> 
+[Also, see below]
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> ...
+>> +Embedded Memory Controller configuration table
+> ...
+>> +Properties:
+>> +- name : Should start with emc-table
+>
+>> +- compatible : should contain "nvidia,tegra20-emc-table".
+>> +- reg : only needed if nvidia,use-ram-code is present in the
+>> + ?parent. If so, the numerical representation of the selected ram code
+>> + ?as reported by the strap option APB misc register.
+>
+> I don't think the compatible or reg properties are needed; the EMC tables
+> aren't addressable objects on a bus, so no need for reg. I could see an
+> argument that we'd want to version the emc-table format, and so the
+> compatible flag might be useful, yet AIUI, compatible is more for defining
+> HW compatibility (and hence driver instantiation), rather than a property
+> of some configuration node.
+
+I was struggling with a good way to specify the selection of the
+modules. I can definitely use a nvidia,ram-code property instead of
+reg (with a similar definition to how reg was used here).
+
+Compatible is still needed, in my opinion -- otherwise there will be
+no way to tell if the node is there to describe emc timings or if it's
+some new node used to describe something else (such as SDRAM chips as
+mentioned above).
+
+>> +- clock-frequency : the clock frequency for the EMC at which this
+>> + ?table should be used (in kHz).
+>> +- nvidia,emc-registers : a 46 word array of EMC registers to be programmed
+>> + ?for operation at the 'clock-frequency' setting.
+>> + ?The order and contents of the registers are defined in the Tegra TRM.
+>
+> That's not a very semantic representation. Still, I guess there isn't
+> any benefit representing this at a higher level.
+
+Yeah, it's not all that pretty but I don't see much value in
+describing the actual values for which the register values are derived
+from. It's all black magic from start to finish, as far as I am
+concerned (i.e. we've always received a register blob from nvidia for
+various boards with very little information on why and what certain
+values were tweaked like they were).
+
+
+>> +++ b/arch/arm/boot/dts/tegra-seaboard.dts
+>> @@ -20,6 +20,42 @@
+>> ? ? ? ? ? ? ? clock-frequency = < 216000000 >;
+>> ? ? ? };
+>>
+>> + ? ? emc {
+>
+> I think that should be emc at 7000f400, so it matches tegra20.dtsi?
+
+If there is only one entry, unit address should be optional. I thought
+this would match it up with the one from tegra20.dtsi and overlay that
+already. I'll double-check on that dtc behavior and change if needed.
+
+
+-Olof
