@@ -1,36 +1,68 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 18 Oct 2011 11:25:31 +0100
-Subject: [PATCH v6 0/2] Add device tree support for i.mx51/53 boards
-In-Reply-To: <20111018101846.GL18141@pengutronix.de>
-References: <1318812137-13991-1-git-send-email-shawn.guo@linaro.org>
-	<20111018101846.GL18141@pengutronix.de>
-Message-ID: <20111018102531.GN21648@n2100.arm.linux.org.uk>
+From: cavokz@gmail.com (Domenico Andreoli)
+Date: Tue, 18 Oct 2011 12:52:15 +0200
+Subject: [PATCH] Fix s3c24xx build error if !CONFIG_PM
+Message-ID: <20111018105215.GA10230@glitch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 18, 2011 at 12:18:46PM +0200, Sascha Hauer wrote:
-> Shawn,
-> 
-> On Mon, Oct 17, 2011 at 08:42:15AM +0800, Shawn Guo wrote:
-> > Changes since v5:
-> >  * Retrieve fixed clock frequency from device tree
-> > 
-> > Changes since v4:
-> >  * Rebase onto imx-features branch
-> >  * Have devices in soc dtsi as "disabled" and explicitly enable the
-> >    ones in board dts as "okay"
-> >  * Utilize of_irq_init() infrastructure added by Rob Herring recently
-> > 
-> > Shawn Guo (2):
-> >       arm/mx5: add device tree support for imx53 boards
-> >       arm/mx5: add device tree support for imx51 babbage
-> 
-> You sent this patches to Arnd but without saying what he should do with
-> them. Shall I queue them up or does Arnd handle them? Same with the
-> include cleanup series.
+s3c2440.c fails to build if !CONFIG_PM because in such case
+s3c2410_pm_syscore_ops is not defined. Same error should happen also
+in s3c2410.c and s3c2442.c
 
-I think you should - the arm-soc tree is there to act as an integration
-tree for the various SoC maintainers.  Patches for SoCs where there's
-an active maintainer should still be handled by the SoC maintainer (and
-either applied to their git tree or forwarded upstream) unless there is
-agreement to do otherwise.
+This patch fixes all of them.
+
+Signed-off-by: Domenico Andreoli <cavokz@gmail.com>
+
+---
+ arch/arm/mach-s3c2410/s3c2410.c |    2 ++
+ arch/arm/mach-s3c2440/s3c2440.c |    2 ++
+ arch/arm/mach-s3c2440/s3c2442.c |    2 ++
+ 3 files changed, 6 insertions(+)
+
+Index: b/arch/arm/mach-s3c2410/s3c2410.c
+===================================================================
+--- a/arch/arm/mach-s3c2410/s3c2410.c
++++ b/arch/arm/mach-s3c2410/s3c2410.c
+@@ -170,8 +170,10 @@ int __init s3c2410_init(void)
+ {
+ 	printk("S3C2410: Initialising architecture\n");
+ 
++#ifdef CONFIG_PM
+ 	register_syscore_ops(&s3c2410_pm_syscore_ops);
+ 	register_syscore_ops(&s3c24xx_irq_syscore_ops);
++#endif
+ 
+ 	return sysdev_register(&s3c2410_sysdev);
+ }
+Index: b/arch/arm/mach-s3c2440/s3c2440.c
+===================================================================
+--- a/arch/arm/mach-s3c2440/s3c2440.c
++++ b/arch/arm/mach-s3c2440/s3c2440.c
+@@ -55,9 +55,11 @@ int __init s3c2440_init(void)
+ 
+ 	/* register suspend/resume handlers */
+ 
++#ifdef CONFIG_PM
+ 	register_syscore_ops(&s3c2410_pm_syscore_ops);
+ 	register_syscore_ops(&s3c244x_pm_syscore_ops);
+ 	register_syscore_ops(&s3c24xx_irq_syscore_ops);
++#endif
+ 
+ 	/* register our system device for everything else */
+ 
+Index: b/arch/arm/mach-s3c2440/s3c2442.c
+===================================================================
+--- a/arch/arm/mach-s3c2440/s3c2442.c
++++ b/arch/arm/mach-s3c2440/s3c2442.c
+@@ -169,9 +169,11 @@ int __init s3c2442_init(void)
+ {
+ 	printk("S3C2442: Initialising architecture\n");
+ 
++#ifdef CONFIG_PM
+ 	register_syscore_ops(&s3c2410_pm_syscore_ops);
+ 	register_syscore_ops(&s3c244x_pm_syscore_ops);
+ 	register_syscore_ops(&s3c24xx_irq_syscore_ops);
++#endif
+ 
+ 	return sysdev_register(&s3c2442_sysdev);
+ }
