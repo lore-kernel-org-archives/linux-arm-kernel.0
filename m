@@ -1,39 +1,36 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 18 Oct 2011 10:43:19 -0700
-Subject: [RFC/PATCH v4 4/7] ARM: ARM11 MPCore: clean_dcache_area is not
-	preempt safe
-In-Reply-To: <F772D91A-6D3A-40F4-ABF5-59C42FD2606E@mvista.com>
-References: <1318004800-6525-1-git-send-email-gdavis@mvista.com>
-	<1318945654-548-1-git-send-email-gdavis@mvista.com>
-	<1318945654-548-5-git-send-email-gdavis@mvista.com>
-	<20111018170839.GD27515@atomide.com>
-	<F772D91A-6D3A-40F4-ABF5-59C42FD2606E@mvista.com>
-Message-ID: <20111018174319.GE27515@atomide.com>
+From: dave@linux.vnet.ibm.com (Dave Hansen)
+Date: Tue, 18 Oct 2011 10:48:46 -0700
+Subject: [PATCH 2/9] mm: alloc_contig_freed_pages() added
+In-Reply-To: <op.v3j5ent03l0zgt@mpn-glaptop>
+References: <1317909290-29832-1-git-send-email-m.szyprowski@samsung.com>
+	<1317909290-29832-3-git-send-email-m.szyprowski@samsung.com>
+	<20111018122109.GB6660@csn.ul.ie>  <op.v3j5ent03l0zgt@mpn-glaptop>
+Message-ID: <1318960126.4465.249.camel@nimitz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* George G. Davis <gdavis@mvista.com> [111018 09:56]:
-> Hello Tony/Ohad,
+On Tue, 2011-10-18 at 10:26 -0700, Michal Nazarewicz wrote:
+> > You can do this in a more general fashion by checking the
+> > zone boundaries and resolving the pfn->page every MAX_ORDER_NR_PAGES.
+> > That will not be SPARSEMEM specific.
 > 
-> On Oct 18, 2011, at 1:08 PM, Tony Lindgren wrote:
-> 
-> > Hi,
-> > 
-> > * gdavis at mvista.com <gdavis@mvista.com> [111018 06:13]:
-> >> From: George G. Davis <gdavis@mvista.com>
-> >> 
-> >> If preemption and subsequent task migration occurs during calls to
-> >> clean_dcache_area on ARM11 MPCore machines, global memory state
-> >> can become inconsistent.  To prevent inconsistent memory state on
-> >> these machines, disable preemption in callers of these functions
-> >> around memory modifications and subsequent clean_dcache_area calls.
-> > 
-> > This one needs to be refreshed against what's queued in for-next as
-> > Ohad has moved most of the iommu code into drivers. I've added
-> > Ohad to Cc as well.
-> 
-> If you do not use ARM11 MPCore with those drivers, then we can drop this altogether.
+> I've tried doing stuff that way but it ended up with much more code.
 
-No MPCore omaps available AFAIK, so that sounds OK to me.
+I guess instead of:
 
-Tony
+>> +static inline bool zone_pfn_same_memmap(unsigned long pfn1, unsigned long pfn2)
+>> +{
+>> +    return pfn_to_section_nr(pfn1) == pfn_to_section_nr(pfn2);
+>> +}
+
+You could do:
+
+static inline bool zone_pfn_same_maxorder(unsigned long pfn1, unsigned long pfn2)
+{
+	unsigned long mask = MAX_ORDER_NR_PAGES-1;
+	return (pfn1 & mask) == (pfn2 & mask);
+}
+
+I think that works.  Should be the same code you have now, basically.
+
+-- Dave
