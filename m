@@ -1,33 +1,33 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 18 Oct 2011 09:50:22 -0500
-Subject: [GIT PULL] GIC DT binding support
-In-Reply-To: <20111018095331.GA17505@glitch>
-References: <4E97A601.1020005@gmail.com> <20111018095331.GA17505@glitch>
-Message-ID: <4E9D922E.5070103@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 18 Oct 2011 16:53:09 +0200
+Subject: [PATCH 2/6] drivers/base: add bus for System-on-Chip devices
+In-Reply-To: <20111018141520.GA10054@totoro>
+References: <1318852378-14180-1-git-send-email-lee.jones@linaro.org>
+	<201110181605.12512.arnd@arndb.de> <20111018141520.GA10054@totoro>
+Message-ID: <201110181653.09425.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/18/2011 04:53 AM, Domenico Andreoli wrote:
-> On Thu, Oct 13, 2011 at 10:01:21PM -0500, Rob Herring wrote:
->>
->> The following changes since commit dd5e9eb0d051606ee3eda0c30222429c74e23f00:
->>
->>   Merge commit 'v3.1-rc9' into upstream/base (2011-10-13 20:30:42 -0500)
->>
->> are available in the git repository at:
->>
->>   http://sources.calxeda.com/git/kernel/linux.git gic-dt
-> 
-> I got this when I tried to pick you patch.
-> 
-> $ git fetch calxeda
-> fatal: http://sources.calxeda.com/git/kernel/linux.git/info/refs not found: did you run git update-server-info on the server?
-> $
+On Tuesday 18 October 2011, Jamie Iles wrote:
+> I can't think of a system where it make sense to have this as a loadable 
+> module so can't we just register the bus_type and never unregister it 
+> like the platform and spi busses for example?
 
-Strange. I had tested it out and it worked at the time.
+Good point. At least if we disallow unregistering soc_devices as I
+suggested, there is certainly no point making the bus itself modular.
 
-The git protocol is setup now, so use it:
+> Also, (and I'm right at the edge of my knowledge here!) wouldn't you 
+> also need to add reference counting of the module when 
+> creating/destroying a soc device to prevent the module and bus 
+> disappearing whilst you had devices with a reference to it?
 
-git://sources.calxeda.com/kernel/linux.git
+No, that's not necessary in a case like this: The bus module remains
+pinned by the reference of the module calling it on each exported
+symbol that is referenced. The reference counting is only needed
+if driver module provides function pointers to the bus module
+that might be in the middle of getting called while the driver is
+removed. We have this case with the ux500_get_process function
+that may be called through sysfs, so that would be a bug if the
+code calling device_create_file() was in a module.
 
-Rob
+	Arnd
