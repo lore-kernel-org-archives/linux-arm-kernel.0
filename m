@@ -1,105 +1,59 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 18 Oct 2011 12:07:17 +0200
-Subject: [PATCH V2] AT91: dt: at91sam9g45 family and board device tree
-	files
-In-Reply-To: <4E8EF6F4.4030905@atmel.com>
-References: <1317636056-9537-1-git-send-email-nicolas.ferre@atmel.com>
-	<4E8C54DC.6040700@gmail.com> <4E8EF6F4.4030905@atmel.com>
-Message-ID: <4E9D4FD5.8080802@atmel.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 18 Oct 2011 12:18:46 +0200
+Subject: [PATCH v6 0/2] Add device tree support for i.mx51/53 boards
+In-Reply-To: <1318812137-13991-1-git-send-email-shawn.guo@linaro.org>
+References: <1318812137-13991-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20111018101846.GL18141@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/07/2011 02:56 PM, Nicolas Ferre :
-> On 10/05/2011 03:00 PM, Rob Herring :
->> Nicolas,
->>
->> On 10/03/2011 05:00 AM, Nicolas Ferre wrote:
->>> Create a new device tree source file for Atmel at91sam9g45 SoC family.
->>> The Evaluation Kit at91sam9m10g45ek includes it.
->>> This first basic support will be populated as drivers and boards will be
->>> converted to device tree.
->>> Contains serial, dma and interrupt controllers.
->>>
->>> The generic board file still takes advantage of platform data for early serial
->>> init. As we need a storage media and the NAND flash driver is not converted to
->>> DT yet, we keep old initialization for it.
->>>
->>> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Shawn,
 
-[..]
+On Mon, Oct 17, 2011 at 08:42:15AM +0800, Shawn Guo wrote:
+> Changes since v5:
+>  * Retrieve fixed clock frequency from device tree
+> 
+> Changes since v4:
+>  * Rebase onto imx-features branch
+>  * Have devices in soc dtsi as "disabled" and explicitly enable the
+>    ones in board dts as "okay"
+>  * Utilize of_irq_init() infrastructure added by Rob Herring recently
+> 
+> Shawn Guo (2):
+>       arm/mx5: add device tree support for imx53 boards
+>       arm/mx5: add device tree support for imx51 babbage
 
->>> diff --git a/arch/arm/mach-at91/board-dt.c b/arch/arm/mach-at91/board-dt.c
->>> new file mode 100644
->>> index 0000000..7bcb9a9
->>> --- /dev/null
->>> +++ b/arch/arm/mach-at91/board-dt.c
->>> @@ -0,0 +1,122 @@
->>> +/*
->>> + *  Setup code for AT91SAM Evaluation Kits with Device Tree support
->>> + *
->>> + *  Covers: * AT91SAM9G45-EKES  board
->>> + *          * AT91SAM9M10-EKES  board
->>> + *          * AT91SAM9M10G45-EK board
->>> + *
->>> + *  Copyright (C) 2011 Atmel,
->>> + *                2011 Nicolas Ferre <nicolas.ferre@atmel.com>
->>> + *
->>> + * Licensed under GPLv2 or later.
->>> + */
->>> +
->>> +#include <linux/types.h>
->>> +#include <linux/init.h>
->>> +#include <linux/module.h>
->>> +#include <linux/irqdomain.h>
->>> +#include <linux/of_irq.h>
->>> +#include <linux/of_platform.h>
->>> +
->>> +#include <mach/hardware.h>
->>> +#include <mach/board.h>
->>> +#include <mach/gpio.h>
->>> +#include <mach/system_rev.h>
->>> +#include <mach/at91sam9_smc.h>
->>> +
->>> +#include <asm/setup.h>
->>> +#include <asm/irq.h>
->>> +#include <asm/mach/arch.h>
->>> +#include <asm/mach/map.h>
->>> +#include <asm/mach/irq.h>
->>> +
->>> +#include "sam9_smc.h"
->>> +#include "generic.h"
+You sent this patches to Arnd but without saying what he should do with
+them. Shall I queue them up or does Arnd handle them? Same with the
+include cleanup series.
 
-As found by Jean-Christophe, it seems that some clock lookup data are missing here. Something like:
+Sascha
 
-+/*
-+ * Lookup table for attaching a specific name and platform_data pointer to
-+ * devices as they get created by of_platform_populate(). Ideally this table
-+ * would not exist, but the current clock implementation depends on some devices
-+ * having a specific name.
-+ /
-+static const struct of_dev_auxdata at91_auxdata_lookup[] __initconst = {
-+ / at91sam9260/ at91sam9g20 /
-+ OF_DEV_AUXDATA("atmel,at91sam9260-usart", 0xfffff200, "atmel_usart.0", NULL),
-+ OF_DEV_AUXDATA("atmel,at91sam9260-usart", 0xfffb0000, "atmel_usart.1", NULL),
-+ OF_DEV_AUXDATA("atmel,at91sam9260-usart", 0xfffb4000, "atmel_usart.2", NULL),
-+ OF_DEV_AUXDATA("atmel,at91sam9260-usart", 0xfffb8000, "atmel_usart.3", NULL),
-+ OF_DEV_AUXDATA("atmel,at91sam9260-usart", 0xfffd0000, "atmel_usart.4", NULL),
-+ OF_DEV_AUXDATA("atmel,at91sam9260-usart", 0xfffd4000, "atmel_usart.5", NULL),
-+ OF_DEV_AUXDATA("atmel,at91sam9260-usart", 0xfffd8000, "atmel_usart.6", NULL),
-+ / at91sam9g45*/
-+ OF_DEV_AUXDATA("atmel,at91sam9260-usart", 0xffffee00, "atmel_usart.0", NULL),
-+ OF_DEV_AUXDATA("atmel,at91sam9260-usart", 0xfff8c000, "atmel_usart.1", NULL),
-+ OF_DEV_AUXDATA("atmel,at91sam9260-usart", 0xfff90000, "atmel_usart.2", NULL),
-+ OF_DEV_AUXDATA("atmel,at91sam9260-usart", 0xfff94000, "atmel_usart.3", NULL),
-+ OF_DEV_AUXDATA("atmel,at91sam9260-usart", 0xfff98000, "atmel_usart.4", NULL),
-+ { /* sentinel */ }
-+};
+> 
+>  Documentation/devicetree/bindings/arm/fsl.txt |   19 ++
+>  arch/arm/boot/dts/imx51-babbage.dts           |  135 +++++++++++
+>  arch/arm/boot/dts/imx51.dtsi                  |  246 ++++++++++++++++++++
+>  arch/arm/boot/dts/imx53-ard.dts               |  113 +++++++++
+>  arch/arm/boot/dts/imx53-evk.dts               |  120 ++++++++++
+>  arch/arm/boot/dts/imx53-qsb.dts               |  125 ++++++++++
+>  arch/arm/boot/dts/imx53-smd.dts               |  169 ++++++++++++++
+>  arch/arm/boot/dts/imx53.dtsi                  |  301 +++++++++++++++++++++++++
+>  arch/arm/mach-mx5/Kconfig                     |   21 ++
+>  arch/arm/mach-mx5/Makefile                    |    3 +
+>  arch/arm/mach-mx5/board-mx51_babbage.c        |    9 +-
+>  arch/arm/mach-mx5/board-mx53_ard.c            |   12 +-
+>  arch/arm/mach-mx5/board-mx53_evk.c            |    9 +-
+>  arch/arm/mach-mx5/board-mx53_loco.c           |    9 +-
+>  arch/arm/mach-mx5/board-mx53_smd.c            |    9 +-
+>  arch/arm/mach-mx5/clock-mx51-mx53.c           |   39 ++++
+>  arch/arm/mach-mx5/imx51-dt.c                  |  116 ++++++++++
+>  arch/arm/mach-mx5/imx53-dt.c                  |  126 +++++++++++
+>  arch/arm/plat-mxc/include/mach/common.h       |    8 +
+>  19 files changed, 1577 insertions(+), 12 deletions(-)
+> 
 
-With a change here:
-  of_platform_populate(NULL, of_default_bus_match_table, at91_auxdata_lookup, NULL);
-
-I know that it is a temporary usage of auxdata. Does it sound the right thing to do for the moment?
-
-Best regards,
 -- 
-Nicolas Ferre
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
