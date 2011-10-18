@@ -1,59 +1,41 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 18 Oct 2011 12:14:51 +0100
-Subject: [PATCH 2/6] drivers/base: add bus for System-on-Chip devices
-In-Reply-To: <20111017161854.GB5108@suse.de>
-References: <1318852378-14180-1-git-send-email-lee.jones@linaro.org>
-	<1318852378-14180-3-git-send-email-lee.jones@linaro.org>
-	<20111017161854.GB5108@suse.de>
-Message-ID: <4E9D5FAB.2080605@linaro.org>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Tue, 18 Oct 2011 19:32:10 +0800
+Subject: [PATCH v6 0/2] Add device tree support for i.mx51/53 boards
+In-Reply-To: <20111018101846.GL18141@pengutronix.de>
+References: <1318812137-13991-1-git-send-email-shawn.guo@linaro.org>
+	<20111018101846.GL18141@pengutronix.de>
+Message-ID: <20111018113208.GA30703@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/10/11 17:18, Greg KH wrote:
-> On Mon, Oct 17, 2011 at 12:52:54PM +0100, Lee Jones wrote:
->> +void soc_device_unregister(struct device *dev)
+On Tue, Oct 18, 2011 at 12:18:46PM +0200, Sascha Hauer wrote:
+> Shawn,
 > 
-> Ick, no, pass in the struct soc_device, which the register function
-> should return, not a "raw" struct device.
-
-Okay.
-
->> +{
->> +	struct soc_device *soc_dev =
->> +		container_of(dev, struct soc_device, dev);
->> +
->> +	sysfs_remove_group(&dev->kobj, &soc_attr_group);
->> +
->> +	if (device_is_registered(dev))
->> +		device_unregister(dev);
+> On Mon, Oct 17, 2011 at 08:42:15AM +0800, Shawn Guo wrote:
+> > Changes since v5:
+> >  * Retrieve fixed clock frequency from device tree
+> > 
+> > Changes since v4:
+> >  * Rebase onto imx-features branch
+> >  * Have devices in soc dtsi as "disabled" and explicitly enable the
+> >    ones in board dts as "okay"
+> >  * Utilize of_irq_init() infrastructure added by Rob Herring recently
+> > 
+> > Shawn Guo (2):
+> >       arm/mx5: add device tree support for imx53 boards
+> >       arm/mx5: add device tree support for imx51 babbage
 > 
-> Why is this call needed?
-
-To unregister a previously unregistered device?
-
-Is that wrong?
-
->> +
->> +	bus_unregister(&soc_bus_type);
+> You sent this patches to Arnd but without saying what he should do with
+> them. Shall I queue them up or does Arnd handle them? Same with the
+> include cleanup series.
 > 
-> What happens if you have more than one SOC device?  I think you just
-> oopsed.
+I sent them for review and planned to send a pull-request later.  But
+if you want to get them forwarded to Arnd, sure, please do.
 
-I think you're right.
+The reason I sent these series to Arnd is they have some dependencies
+which are easier to resolve based on Arnd's tree than yours.  But 
+I'm fine with either way, send to Arnd directly or forwarded by you.
 
-When to you suggest we unregister the bus?
-
->> +
->> +	kfree(soc_dev->attr);
->> +	kfree(soc_dev);
-> 
-> Nope, you just failed again.  I can tell you never tried this code path,
-> otherwise you would have noticed the HUGE warnings that the kernel spit
-> back at you.  Please fix this.
-
-I'll look into it.
-
-Thanks.
-
-Kind regards,
-Lee
+-- 
+Regards,
+Shawn
