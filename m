@@ -1,162 +1,165 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 18 Oct 2011 10:35:04 -0500
-Subject: [RFC] clocktree representation in the devicetree
-In-Reply-To: <20111018071618.GI18141@pengutronix.de>
-References: <20111017102921.GA18141@pengutronix.de>
-	<4E9C5F71.5070608@gmail.com>
-	<20111017184358.GD18141@pengutronix.de>
-	<4E9CB63C.1000200@gmail.com>
-	<20111018071618.GI18141@pengutronix.de>
-Message-ID: <4E9D9CA8.8060303@gmail.com>
+From: govindraj.raja@ti.com (Govindraj.R)
+Date: Tue, 18 Oct 2011 21:05:06 +0530
+Subject: [PATCH v7 15/21] OMAP2+: UART: Make the RX_TIMEOUT for DMA
+	configurable for each UART
+Message-ID: <1318952110-10659-1-git-send-email-govindraj.raja@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sascha,
+From: Jon Hunter <jon-hunter@ti.com>
 
-On 10/18/2011 02:16 AM, Sascha Hauer wrote:
-> On Mon, Oct 17, 2011 at 06:11:56PM -0500, Rob Herring wrote:
->> On 10/17/2011 01:43 PM, Sascha Hauer wrote:
+When using DMA there are two timeouts defined. The first timeout,
+rx_timeout, is really a polling rate in which software polls the
+DMA status to see if the DMA has finished. This is necessary for
+the RX side because we do not know how much data we will receive.
+The secound timeout, RX_TIMEOUT, is a timeout after which the
+DMA will be stopped if no more data is received. To make this
+clearer, rename rx_timeout as rx_poll_rate and rename the
+function serial_omap_rx_timeout() to serial_omap_rxdma_poll().
 
-snip
+The OMAP-Serial driver defines an RX_TIMEOUT of 3 seconds that is
+used to indicate when the DMA for UART can be stopped if no more
+data is received. The value is a global definition that is applied
+to all instances of the UART.
 
->>
->> Okay. Missed that not going far enough down into the dts...
->>
->> So either a clock can have an explicit parent (or list) or can inherit
->> from the parent node. That aligns pretty well with how interrupts are done.
->>
->> Perhaps it should be "clock-parent" rather than just parent.
-> 
-> Yes. Also we should make the difference clear between the possible
-> parents of a mux and the one the user wants to select. So maybe
-> 
-> 'clock-parent' for the possible parents of a mux
-> 
-> and
-> 
-> 'selected-clock-parent' for the one the user wants to have.
-> 
+Each UART may be used for a different purpose and so the timeout
+required may differ. Make this value configurable for each UART so
+that this value can be optimised for power savings.
 
-Looks good.
+Acked-by: Kevin Hilman <khilman@ti.com>
+Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
+---
+ arch/arm/mach-omap2/serial.c                  |    5 ++++-
+ arch/arm/plat-omap/include/plat/omap-serial.h |    3 ++-
+ drivers/tty/serial/omap-serial.c              |   15 ++++++++-------
+ 3 files changed, 14 insertions(+), 9 deletions(-)
 
->>
->>>
->>> So the entry in imx53-qsb.dts is used to describe what a board wants
->>> and not what the current status is.
->>>
->> I worry that that could result in a lot of combinations of DT's that
->> won't boot. If it's all generic code, how do you ensure things are done
->> in the right order. There's lots of gotchas ensuring clocks stay in the
->> right ranges and ratios when you change them. I don't think the clock
->> hierarchy alone is enough information. As a simple example, what is the
->> maximum frequency of internal bus clocks. That is one of the primary
->> differences between MX51 and MX53 clocks.
-> 
-> If a user selects higher rates than allowed for a SoC he's doomed, just
-> like he's doomed when he screws up the devicetree in other ways
-> nowadays.
-> 
-> I agree that there will be problems when critical bus timings should be
-> changed via the devicetree. This would either need special handling in
-> the kernel or simply should be dissallowed.
-> 
->>
->> Granted this problem exists already, but is it just making it easier to
->> hang yourself?
->>
->>>>
->>>> Will clocks ever become generic enough that it makes sense to describe
->>>> clocks in DT at the level of muxes, dividers, gates, etc.?
->>>
->>> I think yes. On i.MX processors you only need dividers, gates, muxes and
->>> plls. On other SoCs there may be table based dividers, power-of-2
->>> dividers or similar stuff, but overall there should be a quite limited
->>> set of features to be described.
->>>
->>
->> So how do you bind a "fsl,imx51-clk-mux" to yet to be written generic
->> clock mux code?
-> 
-> Well my first thought was to use normal (of-)platform devices, but as
-> mentioned this may have some unwanted overhead. In case of the mux
-> a generic mux could be used, so maybe compatible = "fsl,imx51-clk-mux",
-> "clk-mux" should do it. In case of a gate we'll probably need a i.MX5
-> specific variant as these SoCs use two bits for a single gate.
-> 
-
-You can easily point a specific compatible property to a generic
-implementation. My concern is just that the binding properties be
-presented generically so everyone pays attention (hopefully).
-
->> More importantly, are the properties exposed sufficient?
-> 
-> No :)
-> 
-> At least there should be a propagates flag, but there may be more.
-> 
-
-At least in the FSL BSP, that was always just an optimization to avoid
-walking the tree needlessly. I think it could be determined from parent
-and child information in the DT.
-
->>
->> While we may ultimately want the compatible strings to be SOC specific,
->> it would be good to start by generically defining bindings for dividers,
->> muxes, and gates and ensure we have something that works for all SOCs.
->>
->>>> Perhaps it
->>>> makes more sense to just describe the clock controller to device
->>>> connections and any board level clocks in the DT.
->>>
->>> Describing the clock tree in the device tree also makes it possible for
->>> a board to customize the divider/PLL/mux settings.
->>> Consider a SoC with a PLL where several different devices can derive its
->>> clock from.  One board may want to move all other devices away from this
->>> PLL and use it exclusively for sound to get an exact rate. Another might
->>> use it for the pixel clock and a third one selects a good compromise
->>> between an exact sound clock and the pixel clock. Not describing this in
->>> the device tree means that we need board specific code with
->>> clk_get/clk_get_parent/clk_set_rate orgies. 
->>> I gave up on creating clock code that magically tries to do everything
->>> right based on clk_* functions. With the example above how should the
->>> clock code know how to adjust the mentioned PLL? If you managed to get
->>> it right for one SoC the next totally different SoC will already be in
->>> the pipeline.
->>>
->> Good point. I guess the board specifics can go all the way back up the
->> clock tree.
->>
->> It's good to see a real example. but it would be nice to see some
->> documentation to update this:
->>
->> http://www.devicetree.org/ClockBindings
->>
->> Do you have any code using this? I've updated the OF clock support based
->> on Mike's latest common clk code that I need to send out. But it's based
->> on the above clock binding.
-> 
-> I wasn't aware of this page. As I see it I could rewrite my suggestion
-> so that it extends these clock bindings without really changing them.
-> I have no code working yet, I first wanted to see how the reactions are.
-> 
-
-To be clear, these are just proposed bindings, so they can be changed
-still. In fact, Grant said at LPC that he wants to make some changes.
-Perhaps Grant can chime in.
-
-Honestly, I like your proposal better. I think having a single clock per
-DT node is a good thing. This can simplify parsing the tree and should
-make implementing generic code easier.
-
-Do we need clock name strings on outputs or just phandles? Many
-intermediate clocks don't really need a name other than the phandle name.
-
-IIRC, Grant suggesting aligning with how doing reg names (aka
-resource_byname) was agreed upon at LPC. Something like this:
-
-clocks = <&clk_phandle1, &clk_phandle2>;
-clock-names = <"clk1", "clk2">;
-
-clock-names could then be optional.
-
-Rob
+diff --git a/arch/arm/mach-omap2/serial.c b/arch/arm/mach-omap2/serial.c
+index e70e273..7c65410 100644
+--- a/arch/arm/mach-omap2/serial.c
++++ b/arch/arm/mach-omap2/serial.c
+@@ -64,13 +64,15 @@ struct omap_uart_state {
+ static LIST_HEAD(uart_list);
+ static u8 num_uarts;
+ 
+-#define DEFAULT_RXDMA_TIMEOUT		1	/* RX DMA polling rate (us) */
++#define DEFAULT_RXDMA_POLLRATE		1	/* RX DMA polling rate (us) */
+ #define DEFAULT_RXDMA_BUFSIZE		4096	/* RX DMA buffer size */
++#define DEFAULT_RXDMA_TIMEOUT		(3 * HZ)/* RX DMA timeout (jiffies) */
+ 
+ static struct omap_uart_port_info omap_serial_default_info[] __initdata = {
+ 	{
+ 		.dma_enabled	= false,
+ 		.dma_rx_buf_size = DEFAULT_RXDMA_BUFSIZE,
++		.dma_rx_poll_rate = DEFAULT_RXDMA_POLLRATE,
+ 		.dma_rx_timeout = DEFAULT_RXDMA_TIMEOUT,
+ 		.autosuspend_timeout = DEFAULT_AUTOSUSPEND_DELAY,
+ 	},
+@@ -373,6 +375,7 @@ void __init omap_serial_init_port(struct omap_board_data *bdata,
+ 	omap_up.enable_wakeup = omap_uart_enable_wakeup;
+ 	omap_up.dma_rx_buf_size = info->dma_rx_buf_size;
+ 	omap_up.dma_rx_timeout = info->dma_rx_timeout;
++	omap_up.dma_rx_poll_rate = info->dma_rx_poll_rate;
+ 	omap_up.autosuspend_timeout = info->autosuspend_timeout;
+ 
+ 	/* Enable the MDR1 errata for OMAP3 */
+diff --git a/arch/arm/plat-omap/include/plat/omap-serial.h b/arch/arm/plat-omap/include/plat/omap-serial.h
+index 26f8cbd..9a6879c 100644
+--- a/arch/arm/plat-omap/include/plat/omap-serial.h
++++ b/arch/arm/plat-omap/include/plat/omap-serial.h
+@@ -53,7 +53,6 @@
+ 
+ #define OMAP_UART_DMA_CH_FREE	-1
+ 
+-#define RX_TIMEOUT		(3 * HZ)
+ #define OMAP_MAX_HSUART_PORTS	4
+ 
+ #define MSR_SAVE_FLAGS		UART_MSR_ANY_DELTA
+@@ -68,6 +67,7 @@ struct omap_uart_port_info {
+ 	unsigned int		dma_rx_buf_size;
+ 	unsigned int		dma_rx_timeout;
+ 	unsigned int		autosuspend_timeout;
++	unsigned int		dma_rx_poll_rate;
+ 
+ 	u32 (*get_context_loss_count)(struct device *);
+ 	void (*set_forceidle)(struct platform_device *);
+@@ -97,6 +97,7 @@ struct uart_omap_dma {
+ 	/* timer to poll activity on rx dma */
+ 	struct timer_list	rx_timer;
+ 	unsigned int		rx_buf_size;
++	unsigned int		rx_poll_rate;
+ 	unsigned int		rx_timeout;
+ };
+ 
+diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
+index 10f8a89..1714bd2 100644
+--- a/drivers/tty/serial/omap-serial.c
++++ b/drivers/tty/serial/omap-serial.c
+@@ -47,7 +47,7 @@ static struct uart_omap_port *ui[OMAP_MAX_HSUART_PORTS];
+ 
+ /* Forward declaration of functions */
+ static void uart_tx_dma_callback(int lch, u16 ch_status, void *data);
+-static void serial_omap_rx_timeout(unsigned long uart_no);
++static void serial_omap_rxdma_poll(unsigned long uart_no);
+ static int serial_omap_start_rxdma(struct uart_omap_port *up);
+ static void serial_omap_mdr1_errataset(struct uart_omap_port *up, u8 mdr1);
+ 
+@@ -542,7 +542,7 @@ static int serial_omap_startup(struct uart_port *port)
+ 			(dma_addr_t *)&(up->uart_dma.tx_buf_dma_phys),
+ 			0);
+ 		init_timer(&(up->uart_dma.rx_timer));
+-		up->uart_dma.rx_timer.function = serial_omap_rx_timeout;
++		up->uart_dma.rx_timer.function = serial_omap_rxdma_poll;
+ 		up->uart_dma.rx_timer.data = up->pdev->id;
+ 		/* Currently the buffer size is 4KB. Can increase it */
+ 		up->uart_dma.rx_buf = dma_alloc_coherent(NULL,
+@@ -1159,7 +1159,7 @@ static int serial_omap_resume(struct device *dev)
+ }
+ #endif
+ 
+-static void serial_omap_rx_timeout(unsigned long uart_no)
++static void serial_omap_rxdma_poll(unsigned long uart_no)
+ {
+ 	struct uart_omap_port *up = ui[uart_no];
+ 	unsigned int curr_dma_pos, curr_transmitted_size;
+@@ -1169,9 +1169,9 @@ static void serial_omap_rx_timeout(unsigned long uart_no)
+ 	if ((curr_dma_pos == up->uart_dma.prev_rx_dma_pos) ||
+ 			     (curr_dma_pos == 0)) {
+ 		if (jiffies_to_msecs(jiffies - up->port_activity) <
+-							RX_TIMEOUT) {
++						up->uart_dma.rx_timeout) {
+ 			mod_timer(&up->uart_dma.rx_timer, jiffies +
+-				usecs_to_jiffies(up->uart_dma.rx_timeout));
++				usecs_to_jiffies(up->uart_dma.rx_poll_rate));
+ 		} else {
+ 			serial_omap_stop_rxdma(up);
+ 			up->ier |= (UART_IER_RDI | UART_IER_RLSI);
+@@ -1200,7 +1200,7 @@ static void serial_omap_rx_timeout(unsigned long uart_no)
+ 		}
+ 	} else  {
+ 		mod_timer(&up->uart_dma.rx_timer, jiffies +
+-			usecs_to_jiffies(up->uart_dma.rx_timeout));
++			usecs_to_jiffies(up->uart_dma.rx_poll_rate));
+ 	}
+ 	up->port_activity = jiffies;
+ }
+@@ -1239,7 +1239,7 @@ static int serial_omap_start_rxdma(struct uart_omap_port *up)
+ 	/* FIXME: Cache maintenance needed here? */
+ 	omap_start_dma(up->uart_dma.rx_dma_channel);
+ 	mod_timer(&up->uart_dma.rx_timer, jiffies +
+-				usecs_to_jiffies(up->uart_dma.rx_timeout));
++				usecs_to_jiffies(up->uart_dma.rx_poll_rate));
+ 	up->uart_dma.rx_dma_used = true;
+ 	return ret;
+ }
+@@ -1375,6 +1375,7 @@ static int serial_omap_probe(struct platform_device *pdev)
+ 		up->use_dma = 1;
+ 		up->uart_dma.rx_buf_size = omap_up_info->dma_rx_buf_size;
+ 		up->uart_dma.rx_timeout = omap_up_info->dma_rx_timeout;
++		up->uart_dma.rx_poll_rate = omap_up_info->dma_rx_poll_rate;
+ 		spin_lock_init(&(up->uart_dma.tx_lock));
+ 		spin_lock_init(&(up->uart_dma.rx_lock));
+ 		up->uart_dma.tx_dma_channel = OMAP_UART_DMA_CH_FREE;
+-- 
+1.7.4.1
