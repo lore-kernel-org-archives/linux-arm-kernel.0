@@ -1,32 +1,46 @@
-From: sshtylyov@ru.mvista.com (Sergei Shtylyov)
-Date: Tue, 18 Oct 2011 15:24:43 +0400
-Subject: [PATCH 04/11] ARM: at91/pata: use gpio_is_valid to check the gpio
-In-Reply-To: <4E9D6132.4050006@ru.mvista.com>
-References: <20111016190528.GI1459@game.jcrosoft.org>
-	<1318792160-23279-4-git-send-email-plagnioj@jcrosoft.com>
-	<4E9C0970.5000707@ru.mvista.com>
-	<20111017122410.GV1459@game.jcrosoft.org>
-	<4E9D6132.4050006@ru.mvista.com>
-Message-ID: <4E9D61FB.4090103@ru.mvista.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Tue, 18 Oct 2011 19:37:19 +0800
+Subject: [PATCH v6 0/2] Add device tree support for i.mx51/53 boards
+In-Reply-To: <20111018102531.GN21648@n2100.arm.linux.org.uk>
+References: <1318812137-13991-1-git-send-email-shawn.guo@linaro.org>
+	<20111018101846.GL18141@pengutronix.de>
+	<20111018102531.GN21648@n2100.arm.linux.org.uk>
+Message-ID: <20111018113718.GB30703@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hello.
+On Tue, Oct 18, 2011 at 11:25:31AM +0100, Russell King - ARM Linux wrote:
+> On Tue, Oct 18, 2011 at 12:18:46PM +0200, Sascha Hauer wrote:
+> > Shawn,
+> > 
+> > On Mon, Oct 17, 2011 at 08:42:15AM +0800, Shawn Guo wrote:
+> > > Changes since v5:
+> > >  * Retrieve fixed clock frequency from device tree
+> > > 
+> > > Changes since v4:
+> > >  * Rebase onto imx-features branch
+> > >  * Have devices in soc dtsi as "disabled" and explicitly enable the
+> > >    ones in board dts as "okay"
+> > >  * Utilize of_irq_init() infrastructure added by Rob Herring recently
+> > > 
+> > > Shawn Guo (2):
+> > >       arm/mx5: add device tree support for imx53 boards
+> > >       arm/mx5: add device tree support for imx51 babbage
+> > 
+> > You sent this patches to Arnd but without saying what he should do with
+> > them. Shall I queue them up or does Arnd handle them? Same with the
+> > include cleanup series.
+> 
+> I think you should - the arm-soc tree is there to act as an integration
+> tree for the various SoC maintainers.  Patches for SoCs where there's
+> an active maintainer should still be handled by the SoC maintainer (and
+> either applied to their git tree or forwarded upstream) unless there is
+> agreement to do otherwise.
+> 
+I agree on this point.  But for imx6 support, I expect I can send pull
+request directly to Arnd, as I sent a patch to add myself as imx6
+maintainer a couple of weeks back and have not seen any objection there.
 
-On 18-10-2011 15:21, Sergei Shtylyov wrote:
-
->>>> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD<plagnioj@jcrosoft.com>
->>>> Acked-by: Nicolas Ferre<nicolas.ferre@atmel.com>
->>>> ---
->>>> drivers/ata/pata_at91.c | 6 +++---
->>>> 1 files changed, 3 insertions(+), 3 deletions(-)
-
->>> You should post this patch to linux-ide at vger.kernel.org...
-
->> already done it's just a resend of the same one send weeks ago
-
-> I haven't seen this patch on linux-ide...
-
-    Sorry, actually I have seen it. :-)
-
-WBR, Sergei
+-- 
+Regards,
+Shawn
