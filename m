@@ -1,52 +1,58 @@
-From: gdavis@mvista.com (George G. Davis)
-Date: Tue, 18 Oct 2011 14:13:54 -0400
-Subject: [RFC/PATCH v4 4/7] ARM: ARM11 MPCore: clean_dcache_area is not
-	preempt safe
-In-Reply-To: <20111018174319.GE27515@atomide.com>
-References: <1318004800-6525-1-git-send-email-gdavis@mvista.com>
-	<1318945654-548-1-git-send-email-gdavis@mvista.com>
-	<1318945654-548-5-git-send-email-gdavis@mvista.com>
-	<20111018170839.GD27515@atomide.com>
-	<F772D91A-6D3A-40F4-ABF5-59C42FD2606E@mvista.com>
-	<20111018174319.GE27515@atomide.com>
-Message-ID: <C0570533-A72E-4628-AA23-3D65358ED317@mvista.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 18 Oct 2011 11:14:54 -0700
+Subject: [PATCH] [3.3] ARM: tegra: emc: max rate based on emc table
+Message-ID: <1318961694-21105-1-git-send-email-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Update max rate for emc clock based on configured EMC timings,
+but by default leave it at the same rate that firmware configured.
 
-On Oct 18, 2011, at 1:43 PM, Tony Lindgren wrote:
+Also update the shared clocks accordingly.
 
-> * George G. Davis <gdavis@mvista.com> [111018 09:56]:
->> Hello Tony/Ohad,
->> 
->> On Oct 18, 2011, at 1:08 PM, Tony Lindgren wrote:
->> 
->>> Hi,
->>> 
->>> * gdavis at mvista.com <gdavis@mvista.com> [111018 06:13]:
->>>> From: George G. Davis <gdavis@mvista.com>
->>>> 
->>>> If preemption and subsequent task migration occurs during calls to
->>>> clean_dcache_area on ARM11 MPCore machines, global memory state
->>>> can become inconsistent.  To prevent inconsistent memory state on
->>>> these machines, disable preemption in callers of these functions
->>>> around memory modifications and subsequent clean_dcache_area calls.
->>> 
->>> This one needs to be refreshed against what's queued in for-next as
->>> Ohad has moved most of the iommu code into drivers. I've added
->>> Ohad to Cc as well.
->> 
->> If you do not use ARM11 MPCore with those drivers, then we can drop this altogether.
-> 
-> No MPCore omaps available AFAIK, so that sounds OK to me.
+This patch was based on work by Danny Huang <dahuang@nvidia.com>.
 
-Good, I'll drop it then.
+Signed-off-by: Olof Johansson <olof@lixom.net>
+---
+ arch/arm/mach-tegra/tegra2_emc.c |   19 +++++++++++++++++++
+ 1 files changed, 19 insertions(+), 0 deletions(-)
 
-Thanks!
-
---
-Regards,
-George
-
-> 
-> Tony
+diff --git a/arch/arm/mach-tegra/tegra2_emc.c b/arch/arm/mach-tegra/tegra2_emc.c
+index 0f7ae6e..bed7e74 100644
+--- a/arch/arm/mach-tegra/tegra2_emc.c
++++ b/arch/arm/mach-tegra/tegra2_emc.c
+@@ -23,6 +23,7 @@
+ 
+ #include <mach/iomap.h>
+ 
++#include "clock.h"
+ #include "tegra2_emc.h"
+ 
+ #ifdef CONFIG_TEGRA_EMC_SCALING_ENABLE
+@@ -173,6 +174,24 @@ int tegra_emc_set_rate(unsigned long rate)
+ 
+ void tegra_init_emc(const struct tegra_emc_table *table, int table_size)
+ {
++	struct clk *c = clk_get_sys("emc", NULL);
++	struct clk *user;
++	unsigned long max = 0;
++	int i;
++
++	/* Since default max_rate on emc clock is the same as firmware set
++	 * it to before booting, raise it up here based on known timings.
++	 */
++
++	for (i = 0; i < table_size; i++)
++		if (table[i].rate > max)
++			max = table[i].rate;
++
+ 	tegra_emc_table = table;
+ 	tegra_emc_table_size = table_size;
++
++	c->max_rate = max * 2 * 1000;
++
++	list_for_each_entry(user, &c->shared_bus_list, u.shared_bus_user.node)
++		user->max_rate = c->max_rate;
+ }
+-- 
+1.7.4.1
