@@ -1,41 +1,111 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 18 Oct 2011 13:15:40 -0700
-Subject: [PATCH] [3.3] ARM: tegra: use APB DMA for accessing APB devices
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF173CA2CC41@HQMAIL01.nvidia.com>
-References: <1318961898-21254-1-git-send-email-olof@lixom.net>
-	<74CDBE0F657A3D45AFBB94109FB122FF173CA2CC0C@HQMAIL01.nvidia.com>
-	<CAOesGMh8mFTkOgHwT-1HTA+XMdo36husYzwWOymL1CBz-mGiiA@mail.gmail.com>
-	<74CDBE0F657A3D45AFBB94109FB122FF173CA2CC41@HQMAIL01.nvidia.com>
-Message-ID: <CAOesGMiVSRG+GhgPMKB99OFg7XyWwOxCOpvq0TU-gjRVo+Vgfg@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 18 Oct 2011 15:44:10 -0500
+Subject: [PATCH V2] AT91: dt: at91sam9g45 family and board device tree
+	files
+In-Reply-To: <4E9D4FD5.8080802@atmel.com>
+References: <1317636056-9537-1-git-send-email-nicolas.ferre@atmel.com>
+	<4E8C54DC.6040700@gmail.com> <4E8EF6F4.4030905@atmel.com>
+	<4E9D4FD5.8080802@atmel.com>
+Message-ID: <4E9DE51A.7070900@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 18, 2011 at 12:28 PM, Stephen Warren <swarren@nvidia.com> wrote:
-> Olof Johansson wrote at Tuesday, October 18, 2011 1:12 PM:
->>...
->> Also, I can't imagine a case where CONFIG_TEGRA_SYSTEM_DMA makes sense
->> to keep off. Can you? If so, I'm tempted to just kill it (in a
->> separate patch).
->
-> I wondered about that too when I first saw that config option.
->
-> Still, I don't think it's impossible to have a system where the DMA driver
-> isn't useful; looking across a few kernels, I see it being used for:
->
-> * Audio; I2S and SPDIF, not HD-audio
-> * SPI (master and slave)
-> * The tegra_hsuart driver (not sure what benefit that has over 8250.c...)
+Nicolas,
 
-8250 generally can't handle the baud rates needed for bluetooth, etc.
-The hsuart drivers have dma offload for that purpose (most arm
-platforms tend to have similar setups).
+On 10/18/2011 05:07 AM, Nicolas Ferre wrote:
+> On 10/07/2011 02:56 PM, Nicolas Ferre :
+>> On 10/05/2011 03:00 PM, Rob Herring :
+>>> Nicolas,
+>>>
+>>> On 10/03/2011 05:00 AM, Nicolas Ferre wrote:
+>>>> Create a new device tree source file for Atmel at91sam9g45 SoC family.
+>>>> The Evaluation Kit at91sam9m10g45ek includes it.
+>>>> This first basic support will be populated as drivers and boards will be
+>>>> converted to device tree.
+>>>> Contains serial, dma and interrupt controllers.
+>>>>
+>>>> The generic board file still takes advantage of platform data for early serial
+>>>> init. As we need a storage media and the NAND flash driver is not converted to
+>>>> DT yet, we keep old initialization for it.
+>>>>
+>>>> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> 
+> [..]
+> 
+>>>> diff --git a/arch/arm/mach-at91/board-dt.c b/arch/arm/mach-at91/board-dt.c
+>>>> new file mode 100644
+>>>> index 0000000..7bcb9a9
+>>>> --- /dev/null
+>>>> +++ b/arch/arm/mach-at91/board-dt.c
+>>>> @@ -0,0 +1,122 @@
+>>>> +/*
+>>>> + *  Setup code for AT91SAM Evaluation Kits with Device Tree support
+>>>> + *
+>>>> + *  Covers: * AT91SAM9G45-EKES  board
+>>>> + *          * AT91SAM9M10-EKES  board
+>>>> + *          * AT91SAM9M10G45-EK board
+>>>> + *
+>>>> + *  Copyright (C) 2011 Atmel,
+>>>> + *                2011 Nicolas Ferre <nicolas.ferre@atmel.com>
+>>>> + *
+>>>> + * Licensed under GPLv2 or later.
+>>>> + */
+>>>> +
+>>>> +#include <linux/types.h>
+>>>> +#include <linux/init.h>
+>>>> +#include <linux/module.h>
+>>>> +#include <linux/irqdomain.h>
+>>>> +#include <linux/of_irq.h>
+>>>> +#include <linux/of_platform.h>
+>>>> +
+>>>> +#include <mach/hardware.h>
+>>>> +#include <mach/board.h>
+>>>> +#include <mach/gpio.h>
+>>>> +#include <mach/system_rev.h>
+>>>> +#include <mach/at91sam9_smc.h>
+>>>> +
+>>>> +#include <asm/setup.h>
+>>>> +#include <asm/irq.h>
+>>>> +#include <asm/mach/arch.h>
+>>>> +#include <asm/mach/map.h>
+>>>> +#include <asm/mach/irq.h>
+>>>> +
+>>>> +#include "sam9_smc.h"
+>>>> +#include "generic.h"
+> 
+> As found by Jean-Christophe, it seems that some clock lookup data are missing here. Something like:
+> 
+> +/*
+> + * Lookup table for attaching a specific name and platform_data pointer to
+> + * devices as they get created by of_platform_populate(). Ideally this table
+> + * would not exist, but the current clock implementation depends on some devices
+> + * having a specific name.
+> + /
+> +static const struct of_dev_auxdata at91_auxdata_lookup[] __initconst = {
+> + / at91sam9260/ at91sam9g20 /
+> + OF_DEV_AUXDATA("atmel,at91sam9260-usart", 0xfffff200, "atmel_usart.0", NULL),
+> + OF_DEV_AUXDATA("atmel,at91sam9260-usart", 0xfffb0000, "atmel_usart.1", NULL),
+> + OF_DEV_AUXDATA("atmel,at91sam9260-usart", 0xfffb4000, "atmel_usart.2", NULL),
+> + OF_DEV_AUXDATA("atmel,at91sam9260-usart", 0xfffb8000, "atmel_usart.3", NULL),
+> + OF_DEV_AUXDATA("atmel,at91sam9260-usart", 0xfffd0000, "atmel_usart.4", NULL),
+> + OF_DEV_AUXDATA("atmel,at91sam9260-usart", 0xfffd4000, "atmel_usart.5", NULL),
+> + OF_DEV_AUXDATA("atmel,at91sam9260-usart", 0xfffd8000, "atmel_usart.6", NULL),
+> + / at91sam9g45*/
+> + OF_DEV_AUXDATA("atmel,at91sam9260-usart", 0xffffee00, "atmel_usart.0", NULL),
+> + OF_DEV_AUXDATA("atmel,at91sam9260-usart", 0xfff8c000, "atmel_usart.1", NULL),
+> + OF_DEV_AUXDATA("atmel,at91sam9260-usart", 0xfff90000, "atmel_usart.2", NULL),
+> + OF_DEV_AUXDATA("atmel,at91sam9260-usart", 0xfff94000, "atmel_usart.3", NULL),
+> + OF_DEV_AUXDATA("atmel,at91sam9260-usart", 0xfff98000, "atmel_usart.4", NULL),
+> + { /* sentinel */ }
+> +};
+> 
+> With a change here:
+>   of_platform_populate(NULL, of_default_bus_match_table, at91_auxdata_lookup, NULL);
+> 
+> I know that it is a temporary usage of auxdata. Does it sound the right thing to do for the moment?
+> 
 
-> * This APB/fuse/DMA workaround
->
-> All of which seem optional given the fourth one isn't required if DMA
-> isn't used.
+If clk lookups are the only thing needed, can't you jusst add the
+lookups for DT?
 
-I guess it depends on what kind of granularity is worth it. But let's
-keep it as an option for now.
-
--Olof
+Rob
