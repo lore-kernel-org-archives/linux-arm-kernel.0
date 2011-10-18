@@ -1,34 +1,89 @@
-From: greg@kroah.com (Greg KH)
-Date: Tue, 18 Oct 2011 11:13:19 -0700
-Subject: [PATCH v2] UART: add CSR SiRFprimaII SoC on-chip uart drivers
-In-Reply-To: <CAGsJ_4w6fGH+G9KapHXzCwMhz_NKfPdCxs7rF5hWKw2LGUpwWA@mail.gmail.com>
-References: <1318570799-3785-1-git-send-email-Barry.Song@csr.com>
-	<CAGsJ_4w6fGH+G9KapHXzCwMhz_NKfPdCxs7rF5hWKw2LGUpwWA@mail.gmail.com>
-Message-ID: <20111018181319.GA7015@kroah.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 18 Oct 2011 11:23:26 -0700
+Subject: [PATCH] [3.3] [RESEND] ARM: tegra: fuse: use apbio dma for register
+	access
+Message-ID: <1318962206-21537-1-git-send-email-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 18, 2011 at 11:39:11AM +0800, Barry Song wrote:
-> 2011/10/14 Barry Song <Barry.Song@csr.com>:
-> > From: Rong Wang <Rong.Wang@csr.com>
-> >
-> > SiRFprimaII is the latest generation application processor from CSR?s
-> > multi-function SoC product family.
-> > The SoC support codes are in arch/arm/mach-prima2 from Linux mainline
-> > 3.0.
-> >
-> > There are three dedicated UARTs in system. This patch adds basic driver
-> > support for them.
-> >
-> > It has used the newest pinmux subsystem from Linus Walleij.
-> 
-> Hi Alan, it means this patch doesn't compile until pinmux tree of
-> Linus Walleij is merged into mainline.
-> Now it is a linux next tree.
+Use the apbio dma functions for accessing the fuse registers.
 
-So should it go through the pinmux tree?  Or do you want to wait for the
-3.3 kernel release to get this merged?
+Signed-off-by: Olof Johansson <olof@lixom.net>
+---
 
-thanks,
+Resend due to messed up linux-arm-kernel address.
 
-greg k-h
+This patch depends on "ARM: tegra: use APB DMA for accessing APB devices",
+I forgot to send them as a 2-patch series.
+
+
+ arch/arm/mach-tegra/fuse.c |   20 ++++++++------------
+ 1 files changed, 8 insertions(+), 12 deletions(-)
+
+diff --git a/arch/arm/mach-tegra/fuse.c b/arch/arm/mach-tegra/fuse.c
+index 1fa26d9..daf3f57 100644
+--- a/arch/arm/mach-tegra/fuse.c
++++ b/arch/arm/mach-tegra/fuse.c
+@@ -23,20 +23,16 @@
+ #include <mach/iomap.h>
+ 
+ #include "fuse.h"
++#include "apbio.h"
+ 
+ #define FUSE_UID_LOW		0x108
+ #define FUSE_UID_HIGH		0x10c
+ #define FUSE_SKU_INFO		0x110
+ #define FUSE_SPARE_BIT		0x200
+ 
+-static inline u32 fuse_readl(unsigned long offset)
++static inline u32 tegra_fuse_readl(unsigned long offset)
+ {
+-	return readl(IO_TO_VIRT(TEGRA_FUSE_BASE + offset));
+-}
+-
+-static inline void fuse_writel(u32 value, unsigned long offset)
+-{
+-	writel(value, IO_TO_VIRT(TEGRA_FUSE_BASE + offset));
++	return tegra_apb_readl(TEGRA_FUSE_BASE + offset);
+ }
+ 
+ void tegra_init_fuse(void)
+@@ -54,15 +50,15 @@ unsigned long long tegra_chip_uid(void)
+ {
+ 	unsigned long long lo, hi;
+ 
+-	lo = fuse_readl(FUSE_UID_LOW);
+-	hi = fuse_readl(FUSE_UID_HIGH);
++	lo = tegra_fuse_readl(FUSE_UID_LOW);
++	hi = tegra_fuse_readl(FUSE_UID_HIGH);
+ 	return (hi << 32ull) | lo;
+ }
+ 
+ int tegra_sku_id(void)
+ {
+ 	int sku_id;
+-	u32 reg = fuse_readl(FUSE_SKU_INFO);
++	u32 reg = tegra_fuse_readl(FUSE_SKU_INFO);
+ 	sku_id = reg & 0xFF;
+ 	return sku_id;
+ }
+@@ -70,7 +66,7 @@ int tegra_sku_id(void)
+ int tegra_cpu_process_id(void)
+ {
+ 	int cpu_process_id;
+-	u32 reg = fuse_readl(FUSE_SPARE_BIT);
++	u32 reg = tegra_fuse_readl(FUSE_SPARE_BIT);
+ 	cpu_process_id = (reg >> 6) & 3;
+ 	return cpu_process_id;
+ }
+@@ -78,7 +74,7 @@ int tegra_cpu_process_id(void)
+ int tegra_core_process_id(void)
+ {
+ 	int core_process_id;
+-	u32 reg = fuse_readl(FUSE_SPARE_BIT);
++	u32 reg = tegra_fuse_readl(FUSE_SPARE_BIT);
+ 	core_process_id = (reg >> 12) & 3;
+ 	return core_process_id;
+ }
+-- 
+1.7.4.1
