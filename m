@@ -1,64 +1,41 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 18 Oct 2011 13:39:00 +0100
-Subject: [PATCH v4 0/4] genirq: handling GIC per-cpu interrupts
-In-Reply-To: <20111013181415.GM21648@n2100.arm.linux.org.uk>
-References: <1317661446-2876-1-git-send-email-marc.zyngier@arm.com>
-	<20111013181415.GM21648@n2100.arm.linux.org.uk>
-Message-ID: <4E9D7364.2020209@arm.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Tue, 18 Oct 2011 14:54:47 +0200
+Subject: [PATCH] ARM: mxs: Add initial support for Bluegiga APX4
+	Development Kit
+In-Reply-To: <4E9D481D.2070905@bluegiga.com>
+References: <1318838916-8529-1-git-send-email-lauri.hintsala@bluegiga.com>
+	<20111017094434.GA21504@pengutronix.de>
+	<20111017103958.GD7761@tarshish> <4E9D2E9A.8000600@bluegiga.com>
+	<20111018075843.GG7761@tarshish> <4E9D481D.2070905@bluegiga.com>
+Message-ID: <20111018125447.GA2345@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/10/11 19:14, Russell King - ARM Linux wrote:
-> On Mon, Oct 03, 2011 at 06:04:02PM +0100, Marc Zyngier wrote:
->> The current GIC per-cpu interrupts (aka PPIs) suffer from a number of
->> problems:
->>
->> - They use a completely separate scheme to handle the interrupts,
->>   mostly because the PPI concept doesn't really match the kernel view
->>   of an interrupt.
->> - PPIs can only be used by the timer code, unless we add more low-level
->>   assembly code.
->> - The local timer code can only be used by devices generating PPIs,
->>   and not SPIs.
->> - At least one platform (msm) has started implementing its own
->>   alternative scheme.
->> - Some low-level code gets duplicated, as usual...
->>
->> The proposed solution is to handle the PPIs using the same path as
->> SPIs. A new core API is added to deal with per-cpu interrupts in a
->> less awkward way. The local timer code is updated to reflect these
->> changes.
->>
->> The core API changes are based on an initial idea by Thomas Gleixner.
->>
->> Tested on ARM Versatile Express (Cortex A15), ARM RealView PB11MP,
->> OMAP4 (Panda) and Tegra (Harmony). Patch series against next-20110930.
->>
->> The two first patches can also be found in Thomas' tree:
->>
->> 	git://tesla.tglx.de/git/linux-2.6-tip irq/core
-> 
-> So, how do we deal with merging this without ending up with some
-> problematical inter-tree dependencies?
-> 
-> It looks like I'll see conflicts with:
-> arch/arm/common/gic.c
-> arch/arm/kernel/smp.c
-> arch/arm/include/asm/localtimer.h
-> 
-> and possibly:
-> arch/arm/include/asm/smp.h
-> arch/arm/kernel/irq.c
-> 
-> as well.  I've not checked with patch 4, so there may be some more too.
-> 
-> Some of this is probably because of 7123/1 and 7124/1.
+Hi Lauri,
 
-I've set up a branch based on your "smp" branch, resolving the above
-conflicts:
+On Tue, Oct 18, 2011 at 12:34:21PM +0300, Lauri Hintsala wrote:
+> On 10/18/2011 10:58 AM, Baruch Siach wrote:
+> >u-boot can pass any string you like to the kernel. Just do
+> 
+> Yes I know I can pass any string I like.
+> 
+> 
+> >setenv bootargs "$bootargs fec.macaddr=0x00,0x04,0x9f,0x01,0x30,0xe0"
+> >
+> >at the u-boot prompt, or in a script.
+> 
+> ethaddr variable of uboot is taking mac addr in colon separated form
+> (e.g. "00:04.9f:01:30:e0") and it is not very useful to have mac
+> address in two different form in uboot envs.
 
-git://github.com/mzyngier/arm-platforms.git ppi-for-rmk
+Makes sense. The code doing the array module parameters is in 
+kernel/params.c:param_array(). It seems that teaching this routine to parse 
+the common MAC notation is not very hard. This IMO is a better solution than 
+adding another MAC parser for a new top-level kernel parameter.
 
-	M.
+baruch
+
 -- 
-Jazz is not dead. It just smells funny...
+                                                     ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
