@@ -1,55 +1,44 @@
-From: gdavis@mvista.com (gdavis at mvista.com)
-Date: Tue, 18 Oct 2011 09:47:34 -0400
-Subject: [RFC/PATCH v4 7/7] ARM: ARM11 MPCore: cpu_v6_set_pte_ext is not
-	preempt safe
-In-Reply-To: <1318945654-548-1-git-send-email-gdavis@mvista.com>
-References: <1318004800-6525-1-git-send-email-gdavis@mvista.com>
-	<1318945654-548-1-git-send-email-gdavis@mvista.com>
-Message-ID: <1318945654-548-8-git-send-email-gdavis@mvista.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 18 Oct 2011 16:00:03 +0200
+Subject: [PATCH 2/6] drivers/base: add bus for System-on-Chip devices
+In-Reply-To: <20111017182542.GB14416@suse.de>
+References: <1318852378-14180-1-git-send-email-lee.jones@linaro.org>
+	<2152965.Ns7xt0yLIG@wuerfel> <20111017182542.GB14416@suse.de>
+Message-ID: <201110181600.03834.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: George G. Davis <gdavis@mvista.com>
+On Monday 17 October 2011, Greg KH wrote:
+> > You also commented that the argument to soc_device_unregister should
+> > be a soc_device (as, consequently, the return type of soc_device_register).
+> > Agree with that comment, but it means that the definition of struct
+> > soc_device needs to remain visible in order to be used as the parent
+> > for other devices.
+> 
+> No it doesn't:
+>         struct device * soc_device_to_device(struct soc device *soc);
 
-If preemption and subsequent task migration occurs during calls to
-cpu_v6_set_pte_ext on ARM11 MPCore machines, global memory state
-can become inconsistent.  To prevent inconsistent memory state on
-these machines, disable preemption in cpu_v6_set_pte_ext.
+Right, that works of course. I believe the more common way is to
+expose the derived type to its users, and it also simplifies the
+interface.
 
-This change depends on "ARM: Move get_thread_info macro definition
-to <asm/assembler.h>".
+> Anyway, what are you using this soc device to be the parent of?
 
-Signed-off-by: George G. Davis <gdavis@mvista.com>
----
- arch/arm/mm/proc-v6.S |   15 +++++++++++++++
- 1 files changed, 15 insertions(+), 0 deletions(-)
+Basically everything. The SoC is probably about 90% of the system in
+modern embedded systems. Typically, there are on-chip buses like
+AMBA or PLB that contain dozens of internal devices (interrupt
+controller, serial, dmaengine, rtc, timer, watchdog, ...) as well
+as buses (i2c, spi, mmc, usb, pci, ...) that have off-chip child
+devices. You can think of an soc device as a kind of ?ber-MFD
+that holds all of these together.
 
-diff --git a/arch/arm/mm/proc-v6.S b/arch/arm/mm/proc-v6.S
-index a923aa0..be0ab8d 100644
---- a/arch/arm/mm/proc-v6.S
-+++ b/arch/arm/mm/proc-v6.S
-@@ -122,7 +122,22 @@ ENTRY(cpu_v6_switch_mm)
- 
- ENTRY(cpu_v6_set_pte_ext)
- #ifdef CONFIG_MMU
-+#if	defined(CONFIG_SMP) && defined(CONFIG_PREEMPT)
-+	stmdb	sp!, {r4, r5}
-+	get_thread_info r5
-+	ldr	r4, [r5, #TI_PREEMPT]	@ get preempt count
-+	add	r3, r4, #1		@ increment it
-+	str	r3, [r5, #TI_PREEMPT]	@ disable preempt
-+#endif
- 	armv6_set_pte_ext cpu_v6
-+#if	defined(CONFIG_SMP) && defined(CONFIG_PREEMPT)
-+	str	r4, [r5, #TI_PREEMPT]	@ restore preempt count
-+	teq	r4, #0			@ preempt count == 0?
-+	ldreq	r4, [r5, #TI_FLAGS]	@ load flags if yes
-+	tst	r4, #_TIF_NEED_RESCHED	@ need resched?
-+	ldmia	sp!, {r4, r5}
-+	bne	preempt_schedule	@ ret via preempt_schedule
-+#endif
- #endif
- 	mov	pc, lr
- 
--- 
-1.7.4.4
+If you remember the early discussions about this patch set, I
+specifically asked for making the soc_device be a representation
+of the whole soc with a hierarchical view of its child devices
+under it, as opposed to having an artificial device node that only
+serves to export strings along the lines of /proc/cpuinfo.
+
+See patch 5/6 for the one that moves all platform devices that
+are part of the dbx500 soc below the soc_device.
+
+	Arnd
