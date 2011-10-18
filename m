@@ -1,75 +1,93 @@
-From: ccross@android.com (Colin Cross)
-Date: Tue, 18 Oct 2011 11:37:28 -0700
-Subject: [PATCH] [3.3] ARM: tegra: use APB DMA for accessing APB devices
-In-Reply-To: <1318961898-21254-1-git-send-email-olof@lixom.net>
-References: <1318961898-21254-1-git-send-email-olof@lixom.net>
-Message-ID: <CAMbhsRRPmd7jAMkbB_HBw-UeQi1W2-+n_qkhsfHfP6rSd01naw@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 18 Oct 2011 20:40:08 +0200
+Subject: Warning at kernel/mutex.c
+In-Reply-To: <CAOMZO5BKTzeV0f0=frQT-4uHESh2-cEQtc2UzniFT6dVSi_0EQ@mail.gmail.com>
+References: <CAOMZO5AR4iiktjmjzUU3AbQmYVk4wE28+KrZckt=VXLBJzXdBA@mail.gmail.com>
+	<20111018173744.GQ21648@n2100.arm.linux.org.uk>
+	<CAOMZO5BKTzeV0f0=frQT-4uHESh2-cEQtc2UzniFT6dVSi_0EQ@mail.gmail.com>
+Message-ID: <20111018184008.GI21504@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 18, 2011 at 11:18 AM, Olof Johansson <olof@lixom.net> wrote:
-> From: Jon Mayo <jmayo@nvidia.com>
->
-> Tegra2 hangs if APB registers are accessed from the cpu during an
-> apb dma operation. The workaround is to use apb dma to read/write the
-> registers instead.
->
-> There is a dependency loop between fuses, clocks, and APBDMA. ?If dma
-> is enabled, fuse reads must go through APBDMA to avoid corruption due
-> to a hw bug. ?APBDMA requires a clock to be enabled. ?Clocks must read
-> a fuse to determine allowable cpu frequencies.
->
-> Separate out the fuse DMA initialization, and allow the fuse read
-> and write functions to be called without using DMA before the DMA
-> initialization has been completed. ?Access to the fuses before APBDMA
-> is initialized won't hit the hardware bug because nothing else can be
-> using DMA.
->
-> Original fuse registar access code from Varun Wadekar
-> <vwadekar@nvidia.com>, improved by Colin Cross <ccross@android.com>
-> and later moved to separate driver by Jon Mayo <jmayo@nvidia.com>.
->
-> Signed-off-by: Jon Mayo <jmayo@nvidia.com>
-> [olof: hooked up init calls to dma init, minor cleanups]
-> Signed-off-by: Olof Johansson <olof@lixom.net>
-> ---
-> ?arch/arm/mach-tegra/Makefile | ? ?1 +
-> ?arch/arm/mach-tegra/apbio.c ?| ?149 ++++++++++++++++++++++++++++++++++++++++++
-> ?arch/arm/mach-tegra/apbio.h ?| ? 22 ++++++
-> ?arch/arm/mach-tegra/dma.c ? ?| ? ?4 +
-> ?4 files changed, 176 insertions(+), 0 deletions(-)
-> ?create mode 100644 arch/arm/mach-tegra/apbio.c
-> ?create mode 100644 arch/arm/mach-tegra/apbio.h
->
-<snip>
+Hello,
 
-> diff --git a/arch/arm/mach-tegra/dma.c b/arch/arm/mach-tegra/dma.c
-> index c0cf967..b7b6957 100644
-> --- a/arch/arm/mach-tegra/dma.c
-> +++ b/arch/arm/mach-tegra/dma.c
-> @@ -33,6 +33,8 @@
-> ?#include <mach/iomap.h>
-> ?#include <mach/suspend.h>
->
-> +#include "apbio.h"
-> +
-> ?#define APB_DMA_GEN ? ? ? ? ? ? ? ? ? ? ? ? ? ?0x000
-> ?#define GEN_ENABLE ? ? ? ? ? ? ? ? ? ? ? ? ? ? (1<<31)
->
-> @@ -735,6 +737,8 @@ int __init tegra_dma_init(void)
->
-> ? ? ? ?tegra_dma_initialized = true;
->
-> + ? ? ? tegra_init_apb_dma();
-> +
-It seems wrong for the dma api init to call init on one of the users
-of the dma api.  For explicit ordering dependencies like this, maybe
-postcore_initcall is not the right way to trigger tegra_dma_init.
+On Tue, Oct 18, 2011 at 04:33:07PM -0200, Fabio Estevam wrote:
+> On Tue, Oct 18, 2011 at 3:37 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> 
+> > clk_enable() shouldn't be taking a mutex because drivers can _and_ do
+> > call it from non-schedulable contexts. ?Unfortunately, some clk_enable
+> > implementations do use a mutex.
+> >
+> > We have a transition path for this, discussed quite a while ago -
+> > introducing clk_prepare() to do the slow bits of enabling a clock,
+> > leaving clk_enable() for the fast stuff.
+> >
+> 
+> Thanks for the explanation, Russell.
+> 
+> Sascha,
+> 
+> Would the conversion from mutex to spinlock in clk_enable/disable work
+> in the meantime?
+> 
+> Please see below.
+> 
+> OMAP/PXA/Tegra also use spinlock in clk_enable/disable.
+> 
+> If this is OK then I can submit a proper patch for mxc and mxs.
+> 
+> diff --git a/arch/arm/mach-mxs/clock.c b/arch/arm/mach-mxs/clock.c
+> index a7093c8..1cdc21a 100644
+> --- a/arch/arm/mach-mxs/clock.c
+> +++ b/arch/arm/mach-mxs/clock.c
+> @@ -42,6 +42,7 @@
+> 
+>  static LIST_HEAD(clocks);
+>  static DEFINE_MUTEX(clocks_mutex);
+> +static DEFINE_SPINLOCK(clock_lock);
+If clocks_mutex is unused now, please remove it. If it's not unused you
+probably introduced a problem with your patch.
 
-> ? ? ? ?return 0;
-> ?fail:
-> ? ? ? ?writel(0, addr + APB_DMA_GEN);
-> --
-> 1.7.4.1
->
->
+Uwe
+> 
+>  /*-------------------------------------------------------------------------
+>   * Standard clock functions defined in include/linux/clk.h
+> @@ -80,13 +81,14 @@ static int __clk_enable(struct clk *clk)
+>  int clk_enable(struct clk *clk)
+>  {
+>  	int ret = 0;
+> +	unsigned long flags;
+> 
+>  	if (clk == NULL || IS_ERR(clk))
+>  		return -EINVAL;
+> 
+> -	mutex_lock(&clocks_mutex);
+> +	spin_lock_irqsave(&clock_lock, flags);
+>  	ret = __clk_enable(clk);
+> -	mutex_unlock(&clocks_mutex);
+> +	spin_unlock_irqrestore(&clock_lock, flags);
+> 
+>  	return ret;
+>  }
+> @@ -98,12 +100,14 @@ EXPORT_SYMBOL(clk_enable);
+>   */
+>  void clk_disable(struct clk *clk)
+>  {
+> +	unsigned long flags;
+> +
+>  	if (clk == NULL || IS_ERR(clk))
+>  		return;
+> 
+> -	mutex_lock(&clocks_mutex);
+> +	spin_lock_irqsave(&clock_lock, flags);
+>  	__clk_disable(clk);
+> -	mutex_unlock(&clocks_mutex);
+> +	spin_unlock_irqrestore(&clock_lock, flags);
+>  }
+>  EXPORT_SYMBOL(clk_disable);
+> 
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
