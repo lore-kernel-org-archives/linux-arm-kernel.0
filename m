@@ -1,269 +1,162 @@
-From: govindraj.raja@ti.com (Govindraj.R)
-Date: Tue, 18 Oct 2011 21:04:50 +0530
-Subject: [PATCH v7 14/21] OMAP2+: UART: Allow UART parameters to be configured
-	from board file.
-Message-ID: <1318952090-10626-1-git-send-email-govindraj.raja@ti.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 18 Oct 2011 10:35:04 -0500
+Subject: [RFC] clocktree representation in the devicetree
+In-Reply-To: <20111018071618.GI18141@pengutronix.de>
+References: <20111017102921.GA18141@pengutronix.de>
+	<4E9C5F71.5070608@gmail.com>
+	<20111017184358.GD18141@pengutronix.de>
+	<4E9CB63C.1000200@gmail.com>
+	<20111018071618.GI18141@pengutronix.de>
+Message-ID: <4E9D9CA8.8060303@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Deepak K <deepak.k@ti.com>
+Sascha,
 
-The following UART parameters are defined within the UART driver:
+On 10/18/2011 02:16 AM, Sascha Hauer wrote:
+> On Mon, Oct 17, 2011 at 06:11:56PM -0500, Rob Herring wrote:
+>> On 10/17/2011 01:43 PM, Sascha Hauer wrote:
 
-1). Whether the UART uses DMA (dma_enabled), by default set to 0
-2). The size of dma buffer (set to 4096 bytes)
-3). The time after which the dma should stop if no more data is received.
-4). The auto suspend delay that will be passed for pm_runtime_autosuspend
-    where uart will be disabled after timeout
+snip
 
-Different UARTs may be used for different purpose such as the console,
-for interfacing bluetooth chip, for interfacing to a modem chip, etc.
-Therefore, it is necessary to be able to customize the above settings
-for a given board on a per UART basis.
+>>
+>> Okay. Missed that not going far enough down into the dts...
+>>
+>> So either a clock can have an explicit parent (or list) or can inherit
+>> from the parent node. That aligns pretty well with how interrupts are done.
+>>
+>> Perhaps it should be "clock-parent" rather than just parent.
+> 
+> Yes. Also we should make the difference clear between the possible
+> parents of a mux and the one the user wants to select. So maybe
+> 
+> 'clock-parent' for the possible parents of a mux
+> 
+> and
+> 
+> 'selected-clock-parent' for the one the user wants to have.
+> 
 
-This change allows these parameters to be configured from the board file
-and allows the parameters to be configured for each UART independently.
+Looks good.
 
-If a board does not define its own custom parameters for the UARTs, then
-use the default parameters in the structure "omap_serial_default_info".
-The default parameters are defined to be the same as the current settings
-in the UART driver to avoid breaking the UART for any cuurnelty supported
-boards. By default, make all boards use the default UART parameters.
+>>
+>>>
+>>> So the entry in imx53-qsb.dts is used to describe what a board wants
+>>> and not what the current status is.
+>>>
+>> I worry that that could result in a lot of combinations of DT's that
+>> won't boot. If it's all generic code, how do you ensure things are done
+>> in the right order. There's lots of gotchas ensuring clocks stay in the
+>> right ranges and ratios when you change them. I don't think the clock
+>> hierarchy alone is enough information. As a simple example, what is the
+>> maximum frequency of internal bus clocks. That is one of the primary
+>> differences between MX51 and MX53 clocks.
+> 
+> If a user selects higher rates than allowed for a SoC he's doomed, just
+> like he's doomed when he screws up the devicetree in other ways
+> nowadays.
+> 
+> I agree that there will be problems when critical bus timings should be
+> changed via the devicetree. This would either need special handling in
+> the kernel or simply should be dissallowed.
+> 
+>>
+>> Granted this problem exists already, but is it just making it easier to
+>> hang yourself?
+>>
+>>>>
+>>>> Will clocks ever become generic enough that it makes sense to describe
+>>>> clocks in DT at the level of muxes, dividers, gates, etc.?
+>>>
+>>> I think yes. On i.MX processors you only need dividers, gates, muxes and
+>>> plls. On other SoCs there may be table based dividers, power-of-2
+>>> dividers or similar stuff, but overall there should be a quite limited
+>>> set of features to be described.
+>>>
+>>
+>> So how do you bind a "fsl,imx51-clk-mux" to yet to be written generic
+>> clock mux code?
+> 
+> Well my first thought was to use normal (of-)platform devices, but as
+> mentioned this may have some unwanted overhead. In case of the mux
+> a generic mux could be used, so maybe compatible = "fsl,imx51-clk-mux",
+> "clk-mux" should do it. In case of a gate we'll probably need a i.MX5
+> specific variant as these SoCs use two bits for a single gate.
+> 
 
-Signed-off-by: Deepak K <deepak.k@ti.com>
-Signed-off-by: Jon Hunter <jon-hunter@ti.com>
-Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
----
- arch/arm/mach-omap2/board-n8x0.c              |    6 +-
- arch/arm/mach-omap2/serial.c                  |   56 ++++++++++++++++++++-----
- arch/arm/plat-omap/include/plat/omap-serial.h |    7 ++-
- arch/arm/plat-omap/include/plat/serial.h      |    5 ++-
- drivers/tty/serial/omap-serial.c              |    8 +--
- 5 files changed, 60 insertions(+), 22 deletions(-)
+You can easily point a specific compatible property to a generic
+implementation. My concern is just that the binding properties be
+presented generically so everyone pays attention (hopefully).
 
-diff --git a/arch/arm/mach-omap2/board-n8x0.c b/arch/arm/mach-omap2/board-n8x0.c
-index e11f0c5..3408726 100644
---- a/arch/arm/mach-omap2/board-n8x0.c
-+++ b/arch/arm/mach-omap2/board-n8x0.c
-@@ -656,15 +656,15 @@ static inline void board_serial_init(void)
- 	bdata.pads_cnt = 0;
- 
- 	bdata.id = 0;
--	omap_serial_init_port(&bdata);
-+	omap_serial_init_port(&bdata, NULL);
- 
- 	bdata.id = 1;
--	omap_serial_init_port(&bdata);
-+	omap_serial_init_port(&bdata, NULL);
- 
- 	bdata.id = 2;
- 	bdata.pads = serial2_pads;
- 	bdata.pads_cnt = ARRAY_SIZE(serial2_pads);
--	omap_serial_init_port(&bdata);
-+	omap_serial_init_port(&bdata, NULL);
- }
- 
- #else
-diff --git a/arch/arm/mach-omap2/serial.c b/arch/arm/mach-omap2/serial.c
-index 66c8360..e70e273 100644
---- a/arch/arm/mach-omap2/serial.c
-+++ b/arch/arm/mach-omap2/serial.c
-@@ -43,12 +43,12 @@
- #include "mux.h"
- 
- /*
-- * NOTE: By default the serial timeout is disabled as it causes lost characters
-- * over the serial ports. This means that the UART clocks will stay on until
-- * disabled via sysfs. This also causes that any deeper omap sleep states are
-- * blocked. 
-+ * NOTE: By default the serial auto_suspend timeout is disabled as it causes
-+ * lost characters over the serial ports. This means that the UART clocks will
-+ * stay on until power/autosuspend_delay is set for the uart from sysfs.
-+ * This also causes that any deeper omap sleep states are blocked.
-  */
--#define DEFAULT_TIMEOUT 0
-+#define DEFAULT_AUTOSUSPEND_DELAY	-1
- 
- #define MAX_UART_HWMOD_NAME_LEN		16
- 
-@@ -64,6 +64,18 @@ struct omap_uart_state {
- static LIST_HEAD(uart_list);
- static u8 num_uarts;
- 
-+#define DEFAULT_RXDMA_TIMEOUT		1	/* RX DMA polling rate (us) */
-+#define DEFAULT_RXDMA_BUFSIZE		4096	/* RX DMA buffer size */
-+
-+static struct omap_uart_port_info omap_serial_default_info[] __initdata = {
-+	{
-+		.dma_enabled	= false,
-+		.dma_rx_buf_size = DEFAULT_RXDMA_BUFSIZE,
-+		.dma_rx_timeout = DEFAULT_RXDMA_TIMEOUT,
-+		.autosuspend_timeout = DEFAULT_AUTOSUSPEND_DELAY,
-+	},
-+};
-+
- static int uart_idle_hwmod(struct omap_device *od)
- {
- 	omap_hwmod_idle(od->hwmods[0]);
-@@ -316,6 +328,7 @@ core_initcall(omap_serial_early_init);
- /**
-  * omap_serial_init_port() - initialize single serial port
-  * @bdata: port specific board data pointer
-+ * @info: platform specific data pointer
-  *
-  * This function initialies serial driver for given port only.
-  * Platforms can call this function instead of omap_serial_init()
-@@ -324,7 +337,8 @@ core_initcall(omap_serial_early_init);
-  * Don't mix calls to omap_serial_init_port() and omap_serial_init(),
-  * use only one of the two.
-  */
--void __init omap_serial_init_port(struct omap_board_data *bdata)
-+void __init omap_serial_init_port(struct omap_board_data *bdata,
-+			struct omap_uart_port_info *info)
- {
- 	struct omap_uart_state *uart;
- 	struct omap_hwmod *oh;
-@@ -344,17 +358,22 @@ void __init omap_serial_init_port(struct omap_board_data *bdata)
- 	list_for_each_entry(uart, &uart_list, node)
- 		if (bdata->id == uart->num)
- 			break;
-+	if (!info)
-+		info = omap_serial_default_info;
- 
- 	oh = uart->oh;
- 	name = DRIVER_NAME;
- 
--	omap_up.dma_enabled = uart->dma_enabled;
-+	omap_up.dma_enabled = info->dma_enabled;
- 	omap_up.uartclk = OMAP24XX_BASE_BAUD * 16;
- 	omap_up.flags = UPF_BOOT_AUTOCONF;
- 	omap_up.get_context_loss_count = omap_pm_get_dev_context_loss_count;
- 	omap_up.set_forceidle = omap_uart_set_forceidle;
- 	omap_up.set_noidle = omap_uart_set_noidle;
- 	omap_up.enable_wakeup = omap_uart_enable_wakeup;
-+	omap_up.dma_rx_buf_size = info->dma_rx_buf_size;
-+	omap_up.dma_rx_timeout = info->dma_rx_timeout;
-+	omap_up.autosuspend_timeout = info->autosuspend_timeout;
- 
- 	/* Enable the MDR1 errata for OMAP3 */
- 	if (cpu_is_omap34xx() && !cpu_is_ti816x())
-@@ -398,13 +417,14 @@ void __init omap_serial_init_port(struct omap_board_data *bdata)
- }
- 
- /**
-- * omap_serial_init() - initialize all supported serial ports
-+ * omap_serial_board_init() - initialize all supported serial ports
-+ * @info: platform specific data pointer
-  *
-  * Initializes all available UARTs as serial ports. Platforms
-  * can call this function when they want to have default behaviour
-  * for serial ports (e.g initialize them all as serial ports).
-  */
--void __init omap_serial_init(void)
-+void __init omap_serial_board_init(struct omap_uart_port_info *info)
- {
- 	struct omap_uart_state *uart;
- 	struct omap_board_data bdata;
-@@ -418,7 +438,21 @@ void __init omap_serial_init(void)
- 		if (cpu_is_omap44xx() || cpu_is_omap34xx())
- 			omap_serial_fill_default_pads(&bdata);
- 
--		omap_serial_init_port(&bdata);
--
-+		if (!info)
-+			omap_serial_init_port(&bdata, NULL);
-+		else
-+			omap_serial_init_port(&bdata, &info[uart->num]);
- 	}
- }
-+
-+/**
-+ * omap_serial_init() - initialize all supported serial ports
-+ *
-+ * Initializes all available UARTs.
-+ * Platforms can call this function when they want to have default behaviour
-+ * for serial ports (e.g initialize them all as serial ports).
-+ */
-+void __init omap_serial_init(void)
-+{
-+	omap_serial_board_init(NULL);
-+}
-diff --git a/arch/arm/plat-omap/include/plat/omap-serial.h b/arch/arm/plat-omap/include/plat/omap-serial.h
-index d58f081..26f8cbd 100644
---- a/arch/arm/plat-omap/include/plat/omap-serial.h
-+++ b/arch/arm/plat-omap/include/plat/omap-serial.h
-@@ -65,6 +65,9 @@ struct omap_uart_port_info {
- 	unsigned int		uartclk;	/* UART clock rate */
- 	upf_t			flags;		/* UPF_* flags */
- 	u32			errata;
-+	unsigned int		dma_rx_buf_size;
-+	unsigned int		dma_rx_timeout;
-+	unsigned int		autosuspend_timeout;
- 
- 	u32 (*get_context_loss_count)(struct device *);
- 	void (*set_forceidle)(struct platform_device *);
-@@ -93,8 +96,8 @@ struct uart_omap_dma {
- 	spinlock_t		rx_lock;
- 	/* timer to poll activity on rx dma */
- 	struct timer_list	rx_timer;
--	int			rx_buf_size;
--	int			rx_timeout;
-+	unsigned int		rx_buf_size;
-+	unsigned int		rx_timeout;
- };
- 
- struct uart_omap_port {
-diff --git a/arch/arm/plat-omap/include/plat/serial.h b/arch/arm/plat-omap/include/plat/serial.h
-index a8bc1f1..d71e2c7 100644
---- a/arch/arm/plat-omap/include/plat/serial.h
-+++ b/arch/arm/plat-omap/include/plat/serial.h
-@@ -106,10 +106,13 @@
- #ifndef __ASSEMBLER__
- 
- struct omap_board_data;
-+struct omap_uart_port_info;
- 
- extern void omap_serial_init(void);
--extern void omap_serial_init_port(struct omap_board_data *bdata);
- extern int omap_uart_can_sleep(void);
-+extern void omap_serial_board_init(struct omap_uart_port_info *platform_data);
-+extern void omap_serial_init_port(struct omap_board_data *bdata,
-+		struct omap_uart_port_info *platform_data);
- #endif
- 
- #endif
-diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
-index 3101130..10f8a89 100644
---- a/drivers/tty/serial/omap-serial.c
-+++ b/drivers/tty/serial/omap-serial.c
-@@ -43,8 +43,6 @@
- #include <plat/dmtimer.h>
- #include <plat/omap-serial.h>
- 
--#define OMAP_UART_AUTOSUSPEND_DELAY -1
--
- static struct uart_omap_port *ui[OMAP_MAX_HSUART_PORTS];
- 
- /* Forward declaration of functions */
-@@ -1375,8 +1373,8 @@ static int serial_omap_probe(struct platform_device *pdev)
- 		up->uart_dma.uart_dma_tx = dma_tx->start;
- 		up->uart_dma.uart_dma_rx = dma_rx->start;
- 		up->use_dma = 1;
--		up->uart_dma.rx_buf_size = 4096;
--		up->uart_dma.rx_timeout = 2;
-+		up->uart_dma.rx_buf_size = omap_up_info->dma_rx_buf_size;
-+		up->uart_dma.rx_timeout = omap_up_info->dma_rx_timeout;
- 		spin_lock_init(&(up->uart_dma.tx_lock));
- 		spin_lock_init(&(up->uart_dma.rx_lock));
- 		up->uart_dma.tx_dma_channel = OMAP_UART_DMA_CH_FREE;
-@@ -1385,7 +1383,7 @@ static int serial_omap_probe(struct platform_device *pdev)
- 
- 	pm_runtime_use_autosuspend(&pdev->dev);
- 	pm_runtime_set_autosuspend_delay(&pdev->dev,
--			OMAP_UART_AUTOSUSPEND_DELAY);
-+			omap_up_info->autosuspend_timeout);
- 
- 	pm_runtime_irq_safe(&pdev->dev);
- 	pm_runtime_enable(&pdev->dev);
--- 
-1.7.4.1
+>> More importantly, are the properties exposed sufficient?
+> 
+> No :)
+> 
+> At least there should be a propagates flag, but there may be more.
+> 
+
+At least in the FSL BSP, that was always just an optimization to avoid
+walking the tree needlessly. I think it could be determined from parent
+and child information in the DT.
+
+>>
+>> While we may ultimately want the compatible strings to be SOC specific,
+>> it would be good to start by generically defining bindings for dividers,
+>> muxes, and gates and ensure we have something that works for all SOCs.
+>>
+>>>> Perhaps it
+>>>> makes more sense to just describe the clock controller to device
+>>>> connections and any board level clocks in the DT.
+>>>
+>>> Describing the clock tree in the device tree also makes it possible for
+>>> a board to customize the divider/PLL/mux settings.
+>>> Consider a SoC with a PLL where several different devices can derive its
+>>> clock from.  One board may want to move all other devices away from this
+>>> PLL and use it exclusively for sound to get an exact rate. Another might
+>>> use it for the pixel clock and a third one selects a good compromise
+>>> between an exact sound clock and the pixel clock. Not describing this in
+>>> the device tree means that we need board specific code with
+>>> clk_get/clk_get_parent/clk_set_rate orgies. 
+>>> I gave up on creating clock code that magically tries to do everything
+>>> right based on clk_* functions. With the example above how should the
+>>> clock code know how to adjust the mentioned PLL? If you managed to get
+>>> it right for one SoC the next totally different SoC will already be in
+>>> the pipeline.
+>>>
+>> Good point. I guess the board specifics can go all the way back up the
+>> clock tree.
+>>
+>> It's good to see a real example. but it would be nice to see some
+>> documentation to update this:
+>>
+>> http://www.devicetree.org/ClockBindings
+>>
+>> Do you have any code using this? I've updated the OF clock support based
+>> on Mike's latest common clk code that I need to send out. But it's based
+>> on the above clock binding.
+> 
+> I wasn't aware of this page. As I see it I could rewrite my suggestion
+> so that it extends these clock bindings without really changing them.
+> I have no code working yet, I first wanted to see how the reactions are.
+> 
+
+To be clear, these are just proposed bindings, so they can be changed
+still. In fact, Grant said at LPC that he wants to make some changes.
+Perhaps Grant can chime in.
+
+Honestly, I like your proposal better. I think having a single clock per
+DT node is a good thing. This can simplify parsing the tree and should
+make implementing generic code easier.
+
+Do we need clock name strings on outputs or just phandles? Many
+intermediate clocks don't really need a name other than the phandle name.
+
+IIRC, Grant suggesting aligning with how doing reg names (aka
+resource_byname) was agreed upon at LPC. Something like this:
+
+clocks = <&clk_phandle1, &clk_phandle2>;
+clock-names = <"clk1", "clk2">;
+
+clock-names could then be optional.
+
+Rob
