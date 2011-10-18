@@ -1,96 +1,73 @@
-From: tim.bird@am.sony.com (Tim Bird)
-Date: Tue, 18 Oct 2011 16:29:10 -0700
-Subject: [PATCH 1/3] ARM 4Kstacks: Add support for 4K kernel stacks to ARM
-In-Reply-To: <4E9E0B71.9020708@am.sony.com>
-References: <4E9E0B71.9020708@am.sony.com>
-Message-ID: <4E9E0BC6.1030505@am.sony.com>
+From: gdavis@mvista.com (George G. Davis)
+Date: Tue, 18 Oct 2011 19:29:37 -0400
+Subject: [RFC/PATCH v4 7/7] ARM: ARM11 MPCore: cpu_v6_set_pte_ext is not
+	preempt safe
+In-Reply-To: <alpine.LFD.2.02.1110181732100.17040@xanadu.home>
+References: <1318004800-6525-1-git-send-email-gdavis@mvista.com>
+	<1318945654-548-1-git-send-email-gdavis@mvista.com>
+	<1318945654-548-8-git-send-email-gdavis@mvista.com>
+	<alpine.LFD.2.02.1110181732100.17040@xanadu.home>
+Message-ID: <20111018232937.GB237@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This saves 4K per kernel thread and user-space process.
-For systems with lots of threads, this can save
-100s of K of memory.
+On Tue, Oct 18, 2011 at 05:52:37PM -0400, Nicolas Pitre wrote:
+> On Tue, 18 Oct 2011, gdavis at mvista.com wrote:
+> 
+> > @@ -122,7 +122,22 @@ ENTRY(cpu_v6_switch_mm)
+> >  
+> >  ENTRY(cpu_v6_set_pte_ext)
+> >  #ifdef CONFIG_MMU
+> > +#if	defined(CONFIG_SMP) && defined(CONFIG_PREEMPT)
+> > +	stmdb	sp!, {r4, r5}
+> > +	get_thread_info r5
+> > +	ldr	r4, [r5, #TI_PREEMPT]	@ get preempt count
+> > +	add	r3, r4, #1		@ increment it
+> > +	str	r3, [r5, #TI_PREEMPT]	@ disable preempt
+> > +#endif
+> >  	armv6_set_pte_ext cpu_v6
+> > +#if	defined(CONFIG_SMP) && defined(CONFIG_PREEMPT)
+> > +	str	r4, [r5, #TI_PREEMPT]	@ restore preempt count
+> > +	teq	r4, #0			@ preempt count == 0?
+> > +	ldreq	r4, [r5, #TI_FLAGS]	@ load flags if yes
+> > +	tst	r4, #_TIF_NEED_RESCHED	@ need resched?
+> > +	ldmia	sp!, {r4, r5}
+> > +	bne	preempt_schedule	@ ret via preempt_schedule
+> > +#endif
+> 
+> Same issue as previous patch.
 
-Signed-off-by: Tim Bird <tim.bird@am.sony.com>
----
- arch/arm/Kconfig                   |   13 +++++++++++++
- arch/arm/include/asm/thread_info.h |    7 ++++++-
- arch/arm/kernel/entry-header.S     |    4 ++--
- arch/arm/mm/proc-macros.S          |    4 ++--
- 4 files changed, 23 insertions(+), 5 deletions(-)
+Same mistake, I second guessed myself and removed the movne r4, #0
+before submitting.  : /
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 3146ed3..321ee11 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1555,6 +1555,19 @@ config OABI_COMPAT
- 	  UNPREDICTABLE (in fact it can be predicted that it won't work
- 	  at all). If in doubt say Y.
+> Wouldn't it be better if you disabled interrupts around the small 
+> critical region within armv6_set_pte_ext instead?  That would certainly 
+> be a lighter solution.  Something like:
+> 
+> diff --git a/arch/arm/mm/proc-macros.S b/arch/arm/mm/proc-macros.S
+> index 307a4def8d..9bc2dbfe4e 100644
+> --- a/arch/arm/mm/proc-macros.S
+> +++ b/arch/arm/mm/proc-macros.S
+> @@ -167,8 +167,11 @@
+>  	tstne	r1, #L_PTE_PRESENT
+>  	moveq	r3, #0
+>  
+> +	mrs	r2, cpsr
+> +	cpsid	i
+>  	str	r3, [r0]
+>  	mcr	p15, 0, r0, c7, c10, 1		@ flush_pte
+> +	msr	cpsr_c, r2
+>  	.endm
 
-+config 4KSTACKS
-+	bool "Use 4K kernel stacks instead of 8K"
-+	default n
-+	help
-+	  This option will use less memory for each kernel stack in the
-+	  system, which can save potentially hundreds of kilobytes of memory.
-+	  It also helps reduce fragmentation in kernel memory.  However,
-+	  it can be dangerous since not all kernel code paths are thrifty
-+	  in their use of the stack.  Unless you have carefully monitored your
-+	  kernel stack usage and verified that your programs and kernel
-+	  usage patterns will not overflow 4K, you should leave this set
-+	  to N.
-+
- config ARCH_HAS_HOLES_MEMORYMODEL
- 	bool
+I do like this better, less overhead than the preempt_{disable,enable}
+case.
 
-diff --git a/arch/arm/include/asm/thread_info.h b/arch/arm/include/asm/thread_info.h
-index 7b5cc8d..3021d06 100644
---- a/arch/arm/include/asm/thread_info.h
-+++ b/arch/arm/include/asm/thread_info.h
-@@ -15,8 +15,13 @@
- #include <linux/compiler.h>
- #include <asm/fpstate.h>
+Thanks!
 
-+#ifndef CONFIG_4KSTACKS
- #define THREAD_SIZE_ORDER	1
--#define THREAD_SIZE		8192
-+#else
-+#define THREAD_SIZE_ORDER	0
-+#endif
-+
-+#define THREAD_SIZE		(4096 << THREAD_SIZE_ORDER)
- #define THREAD_START_SP		(THREAD_SIZE - 8)
+--
+Regards,
+George
 
- #ifndef __ASSEMBLY__
-diff --git a/arch/arm/kernel/entry-header.S b/arch/arm/kernel/entry-header.S
-index 9a8531e..c818505 100644
---- a/arch/arm/kernel/entry-header.S
-+++ b/arch/arm/kernel/entry-header.S
-@@ -109,8 +109,8 @@
- 	.endm
-
- 	.macro	get_thread_info, rd
--	mov	\rd, sp, lsr #13
--	mov	\rd, \rd, lsl #13
-+	mov	\rd, sp, lsr #12 + THREAD_SIZE_ORDER
-+	mov	\rd, \rd, lsl #12 + THREAD_SIZE_ORDER
- 	.endm
-
- 	@
-diff --git a/arch/arm/mm/proc-macros.S b/arch/arm/mm/proc-macros.S
-index 307a4de..27c0907 100644
---- a/arch/arm/mm/proc-macros.S
-+++ b/arch/arm/mm/proc-macros.S
-@@ -30,8 +30,8 @@
-  * act_mm - get current->active_mm
-  */
- 	.macro	act_mm, rd
--	bic	\rd, sp, #8128
--	bic	\rd, \rd, #63
-+	mov	\rd, sp, lsr #12 + THREAD_SIZE_ORDER
-+	mov	\rd, \rd, lsl #12 + THREAD_SIZE_ORDER
- 	ldr	\rd, [\rd, #TI_TASK]
- 	ldr	\rd, [\rd, #TSK_ACTIVE_MM]
- 	.endm
--- 
-1.6.6
+> 
+> 
+> Nicolas
