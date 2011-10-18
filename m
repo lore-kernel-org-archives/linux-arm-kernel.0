@@ -1,59 +1,237 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 18 Oct 2011 21:37:28 +0800
-Subject: [patch 1/1] iMX: Fix module build
-In-Reply-To: <20111018131353.663173305@rtp-net.org>
-References: <20111018131353.663173305@rtp-net.org>
-Message-ID: <20111018133727.GF30703@S2100-06.ap.freescale.net>
+Date: Tue, 18 Oct 2011 21:33:55 +0800
+Subject: [PATCH v2 5/5] regulator: map consumer regulator based on device
+	tree
+In-Reply-To: <1318263578-7407-6-git-send-email-rnayak@ti.com>
+References: <1318263578-7407-1-git-send-email-rnayak@ti.com>
+	<1318263578-7407-6-git-send-email-rnayak@ti.com>
+Message-ID: <20111018133354.GE30703@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-http://patchwork.ozlabs.org/patch/118547/
+On Mon, Oct 10, 2011 at 09:49:38PM +0530, Rajendra Nayak wrote:
+> Device nodes in DT can associate themselves with one or more
+> regulators/supply by providing a list of phandles (to regulator nodes)
+> and corresponding supply names.
+> 
+> For Example:
+> 	devicenode: node at 0x0 {
+> 		...
+> 		...
+> 		vmmc-supply = <&regulator1>;
+> 		vpll-supply = <&regulator1>;
+
+s/regulator1/regulator2
+
+> 	};
+> 
+> The driver would then do a regulator_get(dev, "vmmc"); to get
+> regulator1 and do a regulator_get(dev, "vpll"); to get
+> regulator2.
+> 
+> of_get_regulator() extracts the regulator node for a given
+> device, based on the supply name.
+> 
+> Use it to look up the regulator for a given consumer from device tree, during
+> a regulator_get(). If not found fallback and lookup through
+> the regulator_map_list instead.
+> 
+> Also, since the regulator dt nodes can use the same binding to
+> associate with a parent regulator/supply, allow the drivers to
+> specify a supply_name, which can then be used to lookup dt
+> to find the parent phandle.
+> 
+> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+> ---
+>  drivers/regulator/core.c         |   91 +++++++++++++++++++++++++++++++------
+>  include/linux/regulator/driver.h |    2 +
+>  2 files changed, 78 insertions(+), 15 deletions(-)
+> 
+> diff --git a/drivers/regulator/core.c b/drivers/regulator/core.c
+> index d8e6a42..9a5ebbe 100644
+> --- a/drivers/regulator/core.c
+> +++ b/drivers/regulator/core.c
+> @@ -25,9 +25,11 @@
+>  #include <linux/mutex.h>
+>  #include <linux/suspend.h>
+>  #include <linux/delay.h>
+> +#include <linux/of.h>
+>  #include <linux/regulator/consumer.h>
+>  #include <linux/regulator/driver.h>
+>  #include <linux/regulator/machine.h>
+> +#include <linux/regulator/of_regulator.h>
+>  
+>  #define CREATE_TRACE_POINTS
+>  #include <trace/events/regulator.h>
+> @@ -131,6 +133,33 @@ static struct regulator *get_device_regulator(struct device *dev)
+>  	return NULL;
+>  }
+>  
+> +/**
+> + * of_get_regulator - get a regulator device node based on supply name
+> + * @dev: Device pointer for the consumer (of regulator) device
+> + * @supply: regulator supply name
+> + *
+> + * Extract the regulator device node corresponding to the supply name.
+> + * retruns the device node corresponding to the regulator if found, else
+> + * returns NULL.
+> + */
+> +struct device_node *of_get_regulator(struct device *dev, const char *supply)
+> +{
+> +	struct device_node *regnode = NULL;
+> +	char prop_name[32]; /* 32 is max size of property name */
+> +
+> +	dev_dbg(dev, "Looking up %s-supply from device tree\n", supply);
+> +
+> +	snprintf(prop_name, 32, "%s-supply", supply);
+> +	regnode = of_parse_phandle(dev->of_node, prop_name, 0);
+> +
+> +	if (!regnode) {
+> +		pr_warn("%s: %s property in node %s references invalid phandle",
+> +			__func__, prop_name, dev->of_node->full_name);
+> +		return NULL;
+> +	}
+> +	return regnode;
+> +}
+> +
+>  /* Platform voltage constraint check */
+>  static int regulator_check_voltage(struct regulator_dev *rdev,
+>  				   int *min_uV, int *max_uV)
+> @@ -1155,6 +1184,7 @@ static struct regulator *_regulator_get(struct device *dev, const char *id,
+>  	struct regulator_map *map;
+>  	struct regulator *regulator = ERR_PTR(-ENODEV);
+>  	const char *devname = NULL;
+> +	struct device_node *node;
+>  	int ret;
+>  
+>  	if (id == NULL) {
+> @@ -1167,6 +1197,23 @@ static struct regulator *_regulator_get(struct device *dev, const char *id,
+>  
+>  	mutex_lock(&regulator_list_mutex);
+>  
+> +	/*
+> +	 * Lookup happens in 3 ways
+> +	 * 1. If a dev and dev->of_node exist, look for a
+> +	 * regulator mapping in dt node.
+> +	 * 2. Check if a match can be found in regulator_map_list
+> +	 * if regulator info is still passed in non-dt way
+> +	 * 3. if !dev, then just look for a matching regulator name.
+> +	 * Useful for dt builds using regulator_get() without specifying
+> +	 * a device.
+> +	 */
+> +	if (dev && dev->of_node) {
+> +		node = of_get_regulator(dev, id);
+> +		if (node)
+> +			list_for_each_entry(rdev, &regulator_list, list)
+> +				if (node == rdev->dev.parent->of_node)
+
+If we move DT parsing procedure into regulator core, we will be able to
+find the of_node for given regulator and attach it to rdev->dev when
+regulator_register() gets called by regulator drivers.  Then we will
+have 'if (node == rdev->dev.of_node)' here which makes more sense to me.
 
 Regards,
 Shawn
 
-On Tue, Oct 18, 2011 at 03:13:34PM +0200, Arnaud Patard wrote:
-> When trying to build some modules with the "hint" branch of imx tree,
-> they're now failing to build at modpost with an error like this :
-> 
->   OBJCOPY arch/arm/boot/zImage
->   Kernel: arch/arm/boot/zImage is ready
->   Building modules, stage 2.
->   MODPOST 69 modules
-> ERROR: "imx_ioremap" [sound/soc/imx/snd-soc-imx.ko] undefined!
-> ERROR: "imx_ioremap" [drivers/usb/gadget/fsl_usb2_udc.ko] undefined!
-> make[1]: *** [__modpost] Error 1
-> make: *** [modules] Error 2
-> 
-> It seems to be caused by commit f548897ffc0510885af27e22a11f449fe5e0cbbd,
-> which introduced imx_ioremap without EXPORT_SYMBOL.
-> 
-> Signed-off-by: Arnaud Patard <arnaud.patard@rtp-net.org>
-> Index: linux-2.6-submit/arch/arm/plat-mxc/system.c
-> ===================================================================
-> --- linux-2.6-submit.orig/arch/arm/plat-mxc/system.c	2011-10-18 01:35:32.000000000 +0200
-> +++ linux-2.6-submit/arch/arm/plat-mxc/system.c	2011-10-18 11:56:45.000000000 +0200
-> @@ -21,6 +21,7 @@
->  #include <linux/io.h>
->  #include <linux/err.h>
->  #include <linux/delay.h>
-> +#include <linux/module.h>
+> +					goto found;
+> +	}
+>  	list_for_each_entry(map, &regulator_map_list, list) {
+>  		/* If the mapping has a device set up it must match */
+>  		if (map->dev_name &&
+> @@ -1178,6 +1225,10 @@ static struct regulator *_regulator_get(struct device *dev, const char *id,
+>  			goto found;
+>  		}
+>  	}
+> +	if (!dev)
+> +		list_for_each_entry(rdev, &regulator_list, list)
+> +			if (strcmp(rdev_get_name(rdev), id))
+> +				goto found;
 >  
->  #include <mach/hardware.h>
->  #include <mach/common.h>
-> @@ -30,6 +31,7 @@
+>  	if (board_wants_dummy_regulator) {
+>  		rdev = dummy_regulator_rdev;
+> @@ -2579,6 +2630,7 @@ struct regulator_dev *regulator_register(struct regulator_desc *regulator_desc,
+>  	static atomic_t regulator_no = ATOMIC_INIT(0);
+>  	struct regulator_dev *rdev;
+>  	int ret, i;
+> +	const char *supply;
 >  
->  void (*imx_idle)(void) = NULL;
->  void __iomem *(*imx_ioremap)(unsigned long, size_t, unsigned int) = NULL;
-> +EXPORT_SYMBOL(imx_ioremap);
+>  	if (regulator_desc == NULL)
+>  		return ERR_PTR(-EINVAL);
+> @@ -2653,25 +2705,34 @@ struct regulator_dev *regulator_register(struct regulator_desc *regulator_desc,
+>  	if (ret < 0)
+>  		goto scrub;
 >  
->  static void __iomem *wdog_base;
+> -	if (init_data->supply_regulator) {
+> -		struct regulator_dev *r;
+> -		int found = 0;
+> +	if (init_data->supply_regulator)
+> +		supply = init_data->supply_regulator;
+> +	else if (regulator_desc->supply_name);
+> +		supply = regulator_desc->supply_name;
 >  
-> 
-> 
+> -		list_for_each_entry(r, &regulator_list, list) {
+> -			if (strcmp(rdev_get_name(r),
+> -				   init_data->supply_regulator) == 0) {
+> -				found = 1;
+> -				break;
+> -			}
+> +	if (supply) {
+> +		struct regulator_dev *r;
+> +		struct device_node *node;
+> +
+> +		/* first do a dt based lookup */
+> +		if (dev) {
+> +			node = of_get_regulator(dev, supply);
+> +			if (node)
+> +				list_for_each_entry(r, &regulator_list, list)
+> +					if (node == r->dev.parent->of_node)
+> +						goto found;
+>  		}
+>  
+> -		if (!found) {
+> -			dev_err(dev, "Failed to find supply %s\n",
+> -				init_data->supply_regulator);
+> -			ret = -ENODEV;
+> -			goto scrub;
+> -		}
+> +		/* next try doing it non-dt way */
+> +		list_for_each_entry(r, &regulator_list, list)
+> +			if (strcmp(rdev_get_name(r), supply) == 0)
+> +				goto found;
+>  
+> +		dev_err(dev, "Failed to find supply %s\n", supply);
+> +		ret = -ENODEV;
+> +		goto scrub;
+> +
+> +found:
+>  		ret = set_supply(rdev, r);
+>  		if (ret < 0)
+>  			goto scrub;
+> diff --git a/include/linux/regulator/driver.h b/include/linux/regulator/driver.h
+> index 1a80bc7..65ca5ff 100644
+> --- a/include/linux/regulator/driver.h
+> +++ b/include/linux/regulator/driver.h
+> @@ -153,6 +153,7 @@ enum regulator_type {
+>   * this type.
+>   *
+>   * @name: Identifying name for the regulator.
+> + * @supply_name: Identifying the regulator supply
+>   * @id: Numerical identifier for the regulator.
+>   * @n_voltages: Number of selectors available for ops.list_voltage().
+>   * @ops: Regulator operations table.
+> @@ -162,6 +163,7 @@ enum regulator_type {
+>   */
+>  struct regulator_desc {
+>  	const char *name;
+> +	const char *supply_name;
+>  	int id;
+>  	unsigned n_voltages;
+>  	struct regulator_ops *ops;
+> -- 
+> 1.7.1
 > 
 > _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> devicetree-discuss mailing list
+> devicetree-discuss at lists.ozlabs.org
+> https://lists.ozlabs.org/listinfo/devicetree-discuss
 > 
