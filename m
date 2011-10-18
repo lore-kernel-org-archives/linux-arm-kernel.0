@@ -1,41 +1,64 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 18 Oct 2011 19:32:10 +0800
-Subject: [PATCH v6 0/2] Add device tree support for i.mx51/53 boards
-In-Reply-To: <20111018101846.GL18141@pengutronix.de>
-References: <1318812137-13991-1-git-send-email-shawn.guo@linaro.org>
-	<20111018101846.GL18141@pengutronix.de>
-Message-ID: <20111018113208.GA30703@S2100-06.ap.freescale.net>
+From: sshtylyov@ru.mvista.com (Sergei Shtylyov)
+Date: Tue, 18 Oct 2011 15:21:22 +0400
+Subject: [PATCH 04/11] ARM: at91/pata: use gpio_is_valid to check the gpio
+In-Reply-To: <20111017122410.GV1459@game.jcrosoft.org>
+References: <20111016190528.GI1459@game.jcrosoft.org>
+	<1318792160-23279-4-git-send-email-plagnioj@jcrosoft.com>
+	<4E9C0970.5000707@ru.mvista.com>
+	<20111017122410.GV1459@game.jcrosoft.org>
+Message-ID: <4E9D6132.4050006@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 18, 2011 at 12:18:46PM +0200, Sascha Hauer wrote:
-> Shawn,
-> 
-> On Mon, Oct 17, 2011 at 08:42:15AM +0800, Shawn Guo wrote:
-> > Changes since v5:
-> >  * Retrieve fixed clock frequency from device tree
-> > 
-> > Changes since v4:
-> >  * Rebase onto imx-features branch
-> >  * Have devices in soc dtsi as "disabled" and explicitly enable the
-> >    ones in board dts as "okay"
-> >  * Utilize of_irq_init() infrastructure added by Rob Herring recently
-> > 
-> > Shawn Guo (2):
-> >       arm/mx5: add device tree support for imx53 boards
-> >       arm/mx5: add device tree support for imx51 babbage
-> 
-> You sent this patches to Arnd but without saying what he should do with
-> them. Shall I queue them up or does Arnd handle them? Same with the
-> include cleanup series.
-> 
-I sent them for review and planned to send a pull-request later.  But
-if you want to get them forwarded to Arnd, sure, please do.
+Hello.
 
-The reason I sent these series to Arnd is they have some dependencies
-which are easier to resolve based on Arnd's tree than yours.  But 
-I'm fine with either way, send to Arnd directly or forwarded by you.
+On 17-10-2011 16:24, Jean-Christophe PLAGNIOL-VILLARD wrote:
 
--- 
-Regards,
-Shawn
+>>> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD<plagnioj@jcrosoft.com>
+>>> Acked-by: Nicolas Ferre<nicolas.ferre@atmel.com>
+>>> ---
+>>>   drivers/ata/pata_at91.c |    6 +++---
+>>>   1 files changed, 3 insertions(+), 3 deletions(-)
+
+>>     You should post this patch to linux-ide at vger.kernel.org...
+
+> already done it's just a resend of the same one send weeks ago
+
+    I haven't seen this patch on linux-ide...
+
+>>> diff --git a/drivers/ata/pata_at91.c b/drivers/ata/pata_at91.c
+>>> index 960c725..3915353 100644
+>>> --- a/drivers/ata/pata_at91.c
+>>> +++ b/drivers/ata/pata_at91.c
+>>> @@ -360,7 +360,7 @@ static int __devinit pata_at91_probe(struct platform_device *pdev)
+>>>   	ap->flags |= ATA_FLAG_SLAVE_POSS;
+>>>   	ap->pio_mask = ATA_PIO4;
+>>>
+>>> -	if (!irq) {
+>>> +	if (!gpio_is_valid(irq)) {
+>>>   		ap->flags |= ATA_FLAG_PIO_POLLING;
+>>>   		ata_port_desc(ap, "no IRQ, using PIO polling");
+>>>   	}
+>>> @@ -414,8 +414,8 @@ static int __devinit pata_at91_probe(struct platform_device *pdev)
+>>>
+>>>   	host->private_data = info;
+>>>
+>>> -	return ata_host_activate(host, irq ? gpio_to_irq(irq) : 0,
+>>> -			irq ? ata_sff_interrupt : NULL,
+>>> +	return ata_host_activate(host, gpio_is_valid(irq) ? gpio_to_irq(irq) : 0,
+>>> +			gpio_is_valid(irq) ? ata_sff_interrupt : NULL,
+>>>   			irq_flags,&pata_at91_sht);
+>>>   err_put:
+
+>>     BTW, the driver forgets to call clk_put() iff ata_host_activate()
+>> fails; I've already posted a patch to fix this -- it conflicts with
+>> this one.
+
+> Didn't receive it
+
+http://marc.info/?l=linux-ide&m=131825944706266
+
+> Best Regards,
+> J.
+
+WBR, Sergei
