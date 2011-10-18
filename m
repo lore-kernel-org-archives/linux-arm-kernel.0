@@ -1,68 +1,32 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 18 Oct 2011 12:12:26 -0700
+From: swarren@nvidia.com (Stephen Warren)
+Date: Tue, 18 Oct 2011 12:28:57 -0700
 Subject: [PATCH] [3.3] ARM: tegra: use APB DMA for accessing APB devices
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF173CA2CC0C@HQMAIL01.nvidia.com>
+In-Reply-To: <CAOesGMh8mFTkOgHwT-1HTA+XMdo36husYzwWOymL1CBz-mGiiA@mail.gmail.com>
 References: <1318961898-21254-1-git-send-email-olof@lixom.net>
 	<74CDBE0F657A3D45AFBB94109FB122FF173CA2CC0C@HQMAIL01.nvidia.com>
-Message-ID: <CAOesGMh8mFTkOgHwT-1HTA+XMdo36husYzwWOymL1CBz-mGiiA@mail.gmail.com>
+	<CAOesGMh8mFTkOgHwT-1HTA+XMdo36husYzwWOymL1CBz-mGiiA@mail.gmail.com>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF173CA2CC41@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 18, 2011 at 11:45 AM, Stephen Warren <swarren@nvidia.com> wrote:
-> Olof Johansson wrote at Tuesday, October 18, 2011 12:18 PM:
->> From: Jon Mayo <jmayo@nvidia.com>
->>
->> Tegra2 hangs if APB registers are accessed from the cpu during an
->> apb dma operation. The workaround is to use apb dma to read/write the
->> registers instead.
-> ...
->> +++ b/arch/arm/mach-tegra/apbio.c
-> ...
->> +#ifdef CONFIG_TEGRA_SYSTEM_DMA
-> ...
->> +static inline u32 apb_readl(unsigned long offset)
-> ...
->> +static inline void apb_writel(u32 value, unsigned long offset)
-> ...
->> +#else
->> +static inline u32 apb_readl(unsigned long offset)
-> ...
->> +static inline void apb_writel(u32 value, unsigned long offset)
-> ...
->> +#endif
->> +
->> +u32 tegra_apb_readl(unsigned long offset)
->> +{
->> + ? ? return apb_readl(offset);
->> +}
->> +
->> +void tegra_apb_writel(u32 value, unsigned long offset)
->> +{
->> + ? ? apb_writel(value, offset);
->> +}
->
-> Why not just make the actual implementations use the exported names, and
-> have them not be static inline? That way, you avoid the extra function
-> wrapping them.
+Olof Johansson wrote at Tuesday, October 18, 2011 1:12 PM:
+>...
+> Also, I can't imagine a case where CONFIG_TEGRA_SYSTEM_DMA makes sense
+> to keep off. Can you? If so, I'm tempted to just kill it (in a
+> separate patch).
 
-Yeah, makes perfect sense. Fixed in next revision.
+I wondered about that too when I first saw that config option.
 
-Also, I can't imagine a case where CONFIG_TEGRA_SYSTEM_DMA makes sense
-to keep off. Can you? If so, I'm tempted to just kill it (in a
-separate patch).
+Still, I don't think it's impossible to have a system where the DMA driver
+isn't useful; looking across a few kernels, I see it being used for:
 
->> +void tegra_init_apb_dma(void)
->> +{
->> +#ifdef CONFIG_TEGRA_SYSTEM_DMA
->> + ? ? tegra_apb_dma = tegra_dma_allocate_channel(TEGRA_DMA_MODE_ONESHOT |
->> + ? ? ? ? ? ? TEGRA_DMA_SHARED);
->> + ? ? if (!tegra_apb_dma) {
->> + ? ? ? ? ? ? pr_err("%s: can not allocate dma channel\n", __func__);
->
-> It seems like that should be a lot more noisy if the result is potential
-> HW hangs. Same for the other error below.
+* Audio; I2S and SPDIF, not HD-audio
+* SPI (master and slave)
+* The tegra_hsuart driver (not sure what benefit that has over 8250.c...)
+* This APB/fuse/DMA workaround
 
-Yeah, at least a WARN() seems warranted, I'll revise that too.
+All of which seem optional given the fourth one isn't required if DMA
+isn't used.
 
-
--Olof
+-- 
+nvpublic
