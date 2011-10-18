@@ -1,83 +1,68 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 18 Oct 2011 11:55:04 -0700
+Date: Tue, 18 Oct 2011 12:12:26 -0700
 Subject: [PATCH] [3.3] ARM: tegra: use APB DMA for accessing APB devices
-In-Reply-To: <CAMbhsRRPmd7jAMkbB_HBw-UeQi1W2-+n_qkhsfHfP6rSd01naw@mail.gmail.com>
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF173CA2CC0C@HQMAIL01.nvidia.com>
 References: <1318961898-21254-1-git-send-email-olof@lixom.net>
-	<CAMbhsRRPmd7jAMkbB_HBw-UeQi1W2-+n_qkhsfHfP6rSd01naw@mail.gmail.com>
-Message-ID: <CAOesGMhN-h5P0mmYmCnRWrHw9qsUeSioj6X35r0CL=VnM3TNwQ@mail.gmail.com>
+	<74CDBE0F657A3D45AFBB94109FB122FF173CA2CC0C@HQMAIL01.nvidia.com>
+Message-ID: <CAOesGMh8mFTkOgHwT-1HTA+XMdo36husYzwWOymL1CBz-mGiiA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 18, 2011 at 11:37 AM, Colin Cross <ccross@android.com> wrote:
-> On Tue, Oct 18, 2011 at 11:18 AM, Olof Johansson <olof@lixom.net> wrote:
+On Tue, Oct 18, 2011 at 11:45 AM, Stephen Warren <swarren@nvidia.com> wrote:
+> Olof Johansson wrote at Tuesday, October 18, 2011 12:18 PM:
 >> From: Jon Mayo <jmayo@nvidia.com>
 >>
 >> Tegra2 hangs if APB registers are accessed from the cpu during an
 >> apb dma operation. The workaround is to use apb dma to read/write the
 >> registers instead.
->>
->> There is a dependency loop between fuses, clocks, and APBDMA. ?If dma
->> is enabled, fuse reads must go through APBDMA to avoid corruption due
->> to a hw bug. ?APBDMA requires a clock to be enabled. ?Clocks must read
->> a fuse to determine allowable cpu frequencies.
->>
->> Separate out the fuse DMA initialization, and allow the fuse read
->> and write functions to be called without using DMA before the DMA
->> initialization has been completed. ?Access to the fuses before APBDMA
->> is initialized won't hit the hardware bug because nothing else can be
->> using DMA.
->>
->> Original fuse registar access code from Varun Wadekar
->> <vwadekar@nvidia.com>, improved by Colin Cross <ccross@android.com>
->> and later moved to separate driver by Jon Mayo <jmayo@nvidia.com>.
->>
->> Signed-off-by: Jon Mayo <jmayo@nvidia.com>
->> [olof: hooked up init calls to dma init, minor cleanups]
->> Signed-off-by: Olof Johansson <olof@lixom.net>
->> ---
->> ?arch/arm/mach-tegra/Makefile | ? ?1 +
->> ?arch/arm/mach-tegra/apbio.c ?| ?149 ++++++++++++++++++++++++++++++++++++++++++
->> ?arch/arm/mach-tegra/apbio.h ?| ? 22 ++++++
->> ?arch/arm/mach-tegra/dma.c ? ?| ? ?4 +
->> ?4 files changed, 176 insertions(+), 0 deletions(-)
->> ?create mode 100644 arch/arm/mach-tegra/apbio.c
->> ?create mode 100644 arch/arm/mach-tegra/apbio.h
->>
-> <snip>
+> ...
+>> +++ b/arch/arm/mach-tegra/apbio.c
+> ...
+>> +#ifdef CONFIG_TEGRA_SYSTEM_DMA
+> ...
+>> +static inline u32 apb_readl(unsigned long offset)
+> ...
+>> +static inline void apb_writel(u32 value, unsigned long offset)
+> ...
+>> +#else
+>> +static inline u32 apb_readl(unsigned long offset)
+> ...
+>> +static inline void apb_writel(u32 value, unsigned long offset)
+> ...
+>> +#endif
+>> +
+>> +u32 tegra_apb_readl(unsigned long offset)
+>> +{
+>> + ? ? return apb_readl(offset);
+>> +}
+>> +
+>> +void tegra_apb_writel(u32 value, unsigned long offset)
+>> +{
+>> + ? ? apb_writel(value, offset);
+>> +}
 >
->> diff --git a/arch/arm/mach-tegra/dma.c b/arch/arm/mach-tegra/dma.c
->> index c0cf967..b7b6957 100644
->> --- a/arch/arm/mach-tegra/dma.c
->> +++ b/arch/arm/mach-tegra/dma.c
->> @@ -33,6 +33,8 @@
->> ?#include <mach/iomap.h>
->> ?#include <mach/suspend.h>
->>
->> +#include "apbio.h"
->> +
->> ?#define APB_DMA_GEN ? ? ? ? ? ? ? ? ? ? ? ? ? ?0x000
->> ?#define GEN_ENABLE ? ? ? ? ? ? ? ? ? ? ? ? ? ? (1<<31)
->>
->> @@ -735,6 +737,8 @@ int __init tegra_dma_init(void)
->>
->> ? ? ? ?tegra_dma_initialized = true;
->>
->> + ? ? ? tegra_init_apb_dma();
->> +
-> It seems wrong for the dma api init to call init on one of the users
-> of the dma api. ?For explicit ordering dependencies like this, maybe
-> postcore_initcall is not the right way to trigger tegra_dma_init.
+> Why not just make the actual implementations use the exported names, and
+> have them not be static inline? That way, you avoid the extra function
+> wrapping them.
 
-Yeah, it's not ideal but moving dma init to an explicit call isn't a
-great solution either. Pick your poison. :)
+Yeah, makes perfect sense. Fixed in next revision.
 
-Driver probe deferral should help here since it'll make it possible to
-describe the dependencies.
+Also, I can't imagine a case where CONFIG_TEGRA_SYSTEM_DMA makes sense
+to keep off. Can you? If so, I'm tempted to just kill it (in a
+separate patch).
 
-Until that's merged, how about a big ugly comment saying:
+>> +void tegra_init_apb_dma(void)
+>> +{
+>> +#ifdef CONFIG_TEGRA_SYSTEM_DMA
+>> + ? ? tegra_apb_dma = tegra_dma_allocate_channel(TEGRA_DMA_MODE_ONESHOT |
+>> + ? ? ? ? ? ? TEGRA_DMA_SHARED);
+>> + ? ? if (!tegra_apb_dma) {
+>> + ? ? ? ? ? ? pr_err("%s: can not allocate dma channel\n", __func__);
+>
+> It seems like that should be a lot more noisy if the result is potential
+> HW hangs. Same for the other error below.
 
-/* FIXME: move apb_dma init to deferred driver probe model instead */
-
+Yeah, at least a WARN() seems warranted, I'll revise that too.
 
 
 -Olof
