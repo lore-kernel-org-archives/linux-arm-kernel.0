@@ -1,23 +1,19 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 18 Oct 2011 16:45:51 -0200
-Subject: Warning at kernel/mutex.c
-In-Reply-To: <20111018184008.GI21504@pengutronix.de>
-References: <CAOMZO5AR4iiktjmjzUU3AbQmYVk4wE28+KrZckt=VXLBJzXdBA@mail.gmail.com>
-	<20111018173744.GQ21648@n2100.arm.linux.org.uk>
-	<CAOMZO5BKTzeV0f0=frQT-4uHESh2-cEQtc2UzniFT6dVSi_0EQ@mail.gmail.com>
-	<20111018184008.GI21504@pengutronix.de>
-Message-ID: <CAOMZO5CayjCM7FkdfHxbnyhC9d+7QTODqmNr7_xFPwkLRo8rmw@mail.gmail.com>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Tue, 18 Oct 2011 11:46:54 -0700
+Subject: [PATCH] [3.3] [RESEND] ARM: tegra: fuse: use apbio dma for
+	register access
+In-Reply-To: <1318962206-21537-1-git-send-email-olof@lixom.net>
+References: <1318962206-21537-1-git-send-email-olof@lixom.net>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF173CA2CC11@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/10/18 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+Olof Johansson wrote at Tuesday, October 18, 2011 12:23 PM:
+> Use the apbio dma functions for accessing the fuse registers.
+> 
+> Signed-off-by: Olof Johansson <olof@lixom.net>
 
->> ?static LIST_HEAD(clocks);
->> ?static DEFINE_MUTEX(clocks_mutex);
->> +static DEFINE_SPINLOCK(clock_lock);
-> If clocks_mutex is unused now, please remove it. If it's not unused you
-> probably introduced a problem with your patch.
+Acked-by: Stephen Warren <swarren@nvidia.com>
 
-clocks_mutex is still used in clk_set_rate and clk_set_parent.
-
-Should it be converted to spinlocks too?
+-- 
+nvpublic
