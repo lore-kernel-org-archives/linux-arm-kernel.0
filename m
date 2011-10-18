@@ -1,52 +1,33 @@
-From: gregkh@suse.de (Greg KH)
-Date: Tue, 18 Oct 2011 07:44:16 -0700
-Subject: [PATCH 2/6] drivers/base: add bus for System-on-Chip devices
-In-Reply-To: <201110181600.03834.arnd@arndb.de>
-References: <1318852378-14180-1-git-send-email-lee.jones@linaro.org>
-	<2152965.Ns7xt0yLIG@wuerfel> <20111017182542.GB14416@suse.de>
-	<201110181600.03834.arnd@arndb.de>
-Message-ID: <20111018144416.GD19561@suse.de>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 18 Oct 2011 09:50:22 -0500
+Subject: [GIT PULL] GIC DT binding support
+In-Reply-To: <20111018095331.GA17505@glitch>
+References: <4E97A601.1020005@gmail.com> <20111018095331.GA17505@glitch>
+Message-ID: <4E9D922E.5070103@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 18, 2011 at 04:00:03PM +0200, Arnd Bergmann wrote:
-> On Monday 17 October 2011, Greg KH wrote:
-> > > You also commented that the argument to soc_device_unregister should
-> > > be a soc_device (as, consequently, the return type of soc_device_register).
-> > > Agree with that comment, but it means that the definition of struct
-> > > soc_device needs to remain visible in order to be used as the parent
-> > > for other devices.
-> > 
-> > No it doesn't:
-> >         struct device * soc_device_to_device(struct soc device *soc);
+On 10/18/2011 04:53 AM, Domenico Andreoli wrote:
+> On Thu, Oct 13, 2011 at 10:01:21PM -0500, Rob Herring wrote:
+>>
+>> The following changes since commit dd5e9eb0d051606ee3eda0c30222429c74e23f00:
+>>
+>>   Merge commit 'v3.1-rc9' into upstream/base (2011-10-13 20:30:42 -0500)
+>>
+>> are available in the git repository at:
+>>
+>>   http://sources.calxeda.com/git/kernel/linux.git gic-dt
 > 
-> Right, that works of course. I believe the more common way is to
-> expose the derived type to its users, and it also simplifies the
-> interface.
+> I got this when I tried to pick you patch.
 > 
-> > Anyway, what are you using this soc device to be the parent of?
-> 
-> Basically everything. The SoC is probably about 90% of the system in
-> modern embedded systems. Typically, there are on-chip buses like
-> AMBA or PLB that contain dozens of internal devices (interrupt
-> controller, serial, dmaengine, rtc, timer, watchdog, ...) as well
-> as buses (i2c, spi, mmc, usb, pci, ...) that have off-chip child
-> devices. You can think of an soc device as a kind of ?ber-MFD
-> that holds all of these together.
-> 
-> If you remember the early discussions about this patch set, I
-> specifically asked for making the soc_device be a representation
-> of the whole soc with a hierarchical view of its child devices
-> under it, as opposed to having an artificial device node that only
-> serves to export strings along the lines of /proc/cpuinfo.
-> 
-> See patch 5/6 for the one that moves all platform devices that
-> are part of the dbx500 soc below the soc_device.
+> $ git fetch calxeda
+> fatal: http://sources.calxeda.com/git/kernel/linux.git/info/refs not found: did you run git update-server-info on the server?
+> $
 
-Ah, ok, that's nicer, and makes sense.
+Strange. I had tested it out and it worked at the time.
 
-So yes, you can leave the structure here, or use a helper function, but
-either way, you shouldn't be returning a struct device * from the
-register function, that doesn't make sense.
+The git protocol is setup now, so use it:
 
-greg k-h
+git://sources.calxeda.com/kernel/linux.git
+
+Rob
