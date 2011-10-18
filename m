@@ -1,46 +1,89 @@
-From: viresh.kumar@st.com (Viresh Kumar)
-Date: Tue, 18 Oct 2011 14:43:34 +0530
-Subject: [PATCH 3/3] spi/pl022: skip default configuration before
-	suspending
-In-Reply-To: <1318857163-32193-1-git-send-email-linus.walleij@stericsson.com>
-References: <1318857163-32193-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <4E9D433E.70401@st.com>
+From: lauri.hintsala@bluegiga.com (Lauri Hintsala)
+Date: Tue, 18 Oct 2011 12:34:21 +0300
+Subject: [PATCH] ARM: mxs: Add initial support for Bluegiga APX4
+	Development Kit
+In-Reply-To: <20111018075843.GG7761@tarshish>
+References: <1318838916-8529-1-git-send-email-lauri.hintsala@bluegiga.com>
+	<20111017094434.GA21504@pengutronix.de>
+	<20111017103958.GD7761@tarshish> <4E9D2E9A.8000600@bluegiga.com>
+	<20111018075843.GG7761@tarshish>
+Message-ID: <4E9D481D.2070905@bluegiga.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/17/2011 6:42 PM, Linus WALLEIJ wrote:
-> From: Virupax Sadashivpetimath <virupax.sadashivpetimath@stericsson.com>
-> 
-> The loading of the default configuration before suspending has
-> been in the driver since its inception, but it is not really
-> needed. Especially so since we take to all the trouble of
-> enabling and disabling power and clock just to do this. Let's
-> scrap this now.
-> 
-> Signed-off-by: Virupax Sadashivpetimath <virupax.sadashivpetimath@stericsson.com>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
->  drivers/spi/spi-pl022.c |    5 -----
->  1 files changed, 0 insertions(+), 5 deletions(-)
-> 
-> diff --git a/drivers/spi/spi-pl022.c b/drivers/spi/spi-pl022.c
-> index 0a1d8ed..29dc70f 100644
-> --- a/drivers/spi/spi-pl022.c
-> +++ b/drivers/spi/spi-pl022.c
-> @@ -2342,11 +2342,6 @@ static int pl022_suspend(struct amba_device *adev, pm_message_t state)
->  		return status;
->  	}
->  
-> -	amba_vcore_enable(adev);
-> -	amba_pclk_enable(adev);
-> -	load_ssp_default_config(pl022);
-> -	amba_pclk_disable(adev);
-> -	amba_vcore_disable(adev);
->  	dev_dbg(&adev->dev, "suspended\n");
->  	return 0;
->  }
 
-Reviewed-by: Viresh Kumar <viresh.kumar@st.com>
 
--- 
-viresh
+On 10/18/2011 10:58 AM, Baruch Siach wrote:
+> Hi Lauri,
+>
+> On Tue, Oct 18, 2011 at 10:45:30AM +0300, Lauri Hintsala wrote:
+>> On 10/17/2011 01:39 PM, Baruch Siach wrote:
+>>> Hi Uwe, Lauri,
+>>> On Mon, Oct 17, 2011 at 11:44:34AM +0200, Uwe Kleine-K?nig wrote:
+>>>> Hello,
+>>>>
+>>>> On Mon, Oct 17, 2011 at 11:08:36AM +0300, Lauri Hintsala wrote:
+>>>>> Added initial support for Bluegiga APX4 module and Development Kit.
+>>>>> Patches are based on Linux v3.1-rc9.
+>>>
+>>> [snip]
+>>>
+>>>>> +static int __init apx4devkit_fec_get_mac(char *macstr)
+>>>>> +{
+>>>>> +	int i, h, l;
+>>>>> +
+>>>>> +	macstr++;
+>>>>> +
+>>>>> +	for (i = 0; i<   6; i++) {
+>>>>> +		if (i != 5&&   *(macstr + 2) != ':')
+>>>>> +			goto error;
+>>>>> +
+>>>>> +		h = hex_to_bin(*macstr++);
+>>>>> +		if (h == -1)
+>>>>> +			goto error;
+>>>>> +
+>>>>> +		l = hex_to_bin(*macstr++);
+>>>>> +		if (l == -1)
+>>>>> +			goto error;
+>>>>> +
+>>>>> +		macstr++;
+>>>>> +		mx28_fec_pdata.mac[i] = (h<<   4) + l;
+>>>>> +	}
+>>>>> +	return 0;
+>>>> I wonder if there isn't a more generic way to parse a mac address.
+>>>>
+>>>> Other machines put the mac into the otp.
+>>>>
+>>>>> +error:
+>>>>> +	pr_err("%s: invalid mac address\n", __func__);
+>>>>> +	return -EINVAL;
+>>>>> +}
+>>>>> +
+>>>>> +__setup("ethaddr", apx4devkit_fec_get_mac);
+>>>> the name is IMHO too generic for a board specific parameter. Think about
+>>>> a kernel that runs on all mxs based machines. ethaddr=... only affects
+>>>> your machine type. And it's not possible to add the same parameter to a
+>>>> different board.
+>>>
+>>> The fec driver already supports the macaddr module parameter. See the comment
+>>> at the beginning of the fec_get_mac() routine in drivers/net/fec.c.
+>>
+>> We are passing mac address from uboot. Uboot's format is
+>> "xx:xx:xx:xx:xx:xx" and fec is getting mac address as array
+>> "0x00,0x04,0x9f,0x01,0x30,0xe0". So using fec's routine is not very
+>> useful in our case.
+>
+> u-boot can pass any string you like to the kernel. Just do
+
+Yes I know I can pass any string I like.
+
+
+> setenv bootargs "$bootargs fec.macaddr=0x00,0x04,0x9f,0x01,0x30,0xe0"
+>
+> at the u-boot prompt, or in a script.
+
+ethaddr variable of uboot is taking mac addr in colon separated form 
+(e.g. "00:04.9f:01:30:e0") and it is not very useful to have mac address 
+in two different form in uboot envs.
+
+Lauri
