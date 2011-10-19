@@ -1,61 +1,61 @@
-From: bryan.wu@canonical.com (Bryan Wu)
-Date: Wed, 19 Oct 2011 22:13:17 +0800
-Subject: Question about: linux-linaro-2.6.38.7 booting the ubuntu 10.10
-	filesystem
-In-Reply-To: <CALQsFO+o+zQJZiksb+2fW8b_kdTv6tqhjxYU6owv=hMhbk=92A@mail.gmail.com>
-References: <CALQsFO+o+zQJZiksb+2fW8b_kdTv6tqhjxYU6owv=hMhbk=92A@mail.gmail.com>
-Message-ID: <CAK5ve-LetP_jUyi22T0QhPkHgNqjFBuzuMa5+VnEfWvzFpy3Wg@mail.gmail.com>
+From: afzal@ti.com (Mohammed, Afzal)
+Date: Wed, 19 Oct 2011 19:50:06 +0530
+Subject: [PATCH v7 21/21] OMAP2+: UART: Do not gate uart clocks if used
+	for debug_prints
+In-Reply-To: <CAAL8m4wKu8w2iTBXmtekD09RaD200qFAG6jH=RgdmjJ2uuX8cA@mail.gmail.com>
+References: <1318952141-10697-1-git-send-email-govindraj.raja@ti.com>
+	<1318952141-10697-2-git-send-email-govindraj.raja@ti.com>
+	<B85A65D85D7EB246BE421B3FB0FBB593032869342E@dbde02.ent.ti.com>
+	<CAAL8m4wKu8w2iTBXmtekD09RaD200qFAG6jH=RgdmjJ2uuX8cA@mail.gmail.com>
+Message-ID: <B85A65D85D7EB246BE421B3FB0FBB5930328693855@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-David,
+Hi Govindraj,
 
-Could you please tell us what's kind of hardware are you trying with
-Ubuntu/Linaro?
+On Wed, Oct 19, 2011 at 18:22:58, Govindraj wrote:
+> On Wed, Oct 19, 2011 at 11:05 AM, Mohammed, Afzal <afzal@ti.com> wrote:
+> > Hi Govindraj,
+> >
+> > On Tue, Oct 18, 2011 at 21:05:41, R, Govindraj wrote:
+> >> If OMAP UART is used as console uart and debug is enabled,
+> >> avoid gating of uart clocks to print all debug prints.
+> > :
+> > :
+> >> ? ? ? ? ? ? ? ? ? ? ? console_uart_id = uart->num;
+> >>
+> >> + ? ? ? ? ? ? ? ? ? ? if (cmdline_find_option("debug")) {
+> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? uart_debug = true;
+> >
+> > Shouldn't "loglevel" also be checked?
+> >
+> 
+> Might not be necessary,
+> 
+> loglevel only sets the option in console driver how a printk should be handled
+> from vprintk so any printk should be to sent to console or to syslogd action
+> where it will be buffered to a file(var/log/messages).
+> 
+> Any print's with any log level should be handled and printed to console.
+> 
+> consider below path below path
+> 
+> uart->ops
+>  -> runtime_get_sync
+>       -> omap_device_enable
+>           -> clock_enable
+> 
+> All the prints in given path are dev_dbgs for which we need debug to be set from
+> command line argument.
+> 
+> As stated in change log any dev_dbg prints from these path can be
+> redirect to uart->ops
+> so even before our clock was enabled we got redirected back to uart code.
+> 
+> So for dev_dbg prints from above path we need debug to be set from command-line
+> and we can prevent uart clock gating to this scenario.
 
-Thanks
--Bryan
+Isn't passing bootargs "loglevel=10" same as "debug"? (init/main.c)
 
-On Wed, Oct 19, 2011 at 9:52 PM, David Yang <david.yangshuai@gmail.com> wrote:
-> hi,all
->
-> ? I'm trying booting the ubuntu10.10 using the kernel linux-linaro-2.6.38.7.
-> ? And I use the serial ttyS0 as the Console.
-> ? But the booting always stopped after logging?
->
-> ? ? ? Freeing init memory: 124K
-> ? ? ? init: sreadahead main process (414) terminated with status 1
-> ? ? ? init: procps main process (429) terminated with status 255
-> ? ? ? * Setting preliminary keymap...
->
-> ? And then the ttyS0 doesn't response.
->
-> ? But when I boot the cramfs made using busybox with the same
-> kernel,I can get the login prompt.And then I can login and use it.
->
-> ? I also tried the ubuntu9.10,it has the same problem.
->
-> ? So I don't know why.
->
-> ? Any suggestion is welcome?
->
-> ? Thanks?
->
->
-> Best Regards,
-> David
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
-
-
-
--- 
-Bryan Wu <bryan.wu@canonical.com>
-Kernel Developer ? ?+86.138-1617-6545 Mobile
-Ubuntu Kernel Team
-Canonical Ltd. ? ? ?www.canonical.com
-Ubuntu - Linux for human beings | www.ubuntu.com
+Regards
+Afzal
