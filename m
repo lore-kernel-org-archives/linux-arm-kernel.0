@@ -1,34 +1,55 @@
-From: sshtylyov@ru.mvista.com (Sergei Shtylyov)
-Date: Wed, 19 Oct 2011 16:27:21 +0400
-Subject: [patch 1/1] iMX: Fix module build
-In-Reply-To: <20111018131353.663173305@rtp-net.org>
-References: <20111018131353.663173305@rtp-net.org>
-Message-ID: <4E9EC229.4080704@ru.mvista.com>
+From: govindraj.ti@gmail.com (Govindraj)
+Date: Wed, 19 Oct 2011 18:22:58 +0530
+Subject: [PATCH v7 21/21] OMAP2+: UART: Do not gate uart clocks if used
+	for debug_prints
+In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593032869342E@dbde02.ent.ti.com>
+References: <1318952141-10697-1-git-send-email-govindraj.raja@ti.com>
+	<1318952141-10697-2-git-send-email-govindraj.raja@ti.com>
+	<B85A65D85D7EB246BE421B3FB0FBB593032869342E@dbde02.ent.ti.com>
+Message-ID: <CAAL8m4wKu8w2iTBXmtekD09RaD200qFAG6jH=RgdmjJ2uuX8cA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Wed, Oct 19, 2011 at 11:05 AM, Mohammed, Afzal <afzal@ti.com> wrote:
+> Hi Govindraj,
+>
+> On Tue, Oct 18, 2011 at 21:05:41, R, Govindraj wrote:
+>> If OMAP UART is used as console uart and debug is enabled,
+>> avoid gating of uart clocks to print all debug prints.
+> :
+> :
+>> ? ? ? ? ? ? ? ? ? ? ? console_uart_id = uart->num;
+>>
+>> + ? ? ? ? ? ? ? ? ? ? if (cmdline_find_option("debug")) {
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? uart_debug = true;
+>
+> Shouldn't "loglevel" also be checked?
+>
 
-On 18-10-2011 17:13, Arnaud Patard (Rtp) wrote:
+Might not be necessary,
 
-> When trying to build some modules with the "hint" branch of imx tree,
-> they're now failing to build at modpost with an error like this :
+loglevel only sets the option in console driver how a printk should be handled
+from vprintk so any printk should be to sent to console or to syslogd action
+where it will be buffered to a file(var/log/messages).
 
->   OBJCOPY arch/arm/boot/zImage
->   Kernel: arch/arm/boot/zImage is ready
->   Building modules, stage 2.
->   MODPOST 69 modules
-> ERROR: "imx_ioremap" [sound/soc/imx/snd-soc-imx.ko] undefined!
-> ERROR: "imx_ioremap" [drivers/usb/gadget/fsl_usb2_udc.ko] undefined!
-> make[1]: *** [__modpost] Error 1
-> make: *** [modules] Error 2
+Any print's with any log level should be handled and printed to console.
 
-> It seems to be caused by commit f548897ffc0510885af27e22a11f449fe5e0cbbd,
+consider below path below path
 
-    Please specify that commit's summary in parens.
+uart->ops
+ -> runtime_get_sync
+      -> omap_device_enable
+          -> clock_enable
 
-> which introduced imx_ioremap without EXPORT_SYMBOL.
+All the prints in given path are dev_dbgs for which we need debug to be set from
+command line argument.
 
-> Signed-off-by: Arnaud Patard <arnaud.patard@rtp-net.org>
+As stated in change log any dev_dbg prints from these path can be
+redirect to uart->ops
+so even before our clock was enabled we got redirected back to uart code.
 
-WBR, Sergei
+So for dev_dbg prints from above path we need debug to be set from command-line
+and we can prevent uart clock gating to this scenario.
+
+--
+Govindraj.R
