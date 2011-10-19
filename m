@@ -1,66 +1,125 @@
-From: zdevai@gmail.com (Zoltan Devai)
-Date: Wed, 19 Oct 2011 22:29:01 +0200
-Subject: [PATCH v2 0/5] ARM: Add support for the SPMP8000 SoC and Letcool
-	board v2
-Message-ID: <CAGVye5NitpMGxs2QiPm_YWSMqUTzN+obgcuXSTvCj6nSk=A34g@mail.gmail.com>
+From: dima@android.com (Dima Zavin)
+Date: Wed, 19 Oct 2011 14:16:45 -0700
+Subject: [patch] ARM: smpboot: Enable interrupts after marking CPU
+	online/active
+In-Reply-To: <alpine.LFD.2.02.1110071354310.3240@ionos>
+References: <20110908215314.829452535@linutronix.de>
+	<CADGdYn6V_eQJZ4=irMbSS7XJj4MJVeALxcrWdD7o2bGs1sEJZQ@mail.gmail.com>
+	<20110913133258.GA6267@n2100.arm.linux.org.uk>
+	<CAKfTPtCWuiOM5+sOwdh1FzXZb1EFT__tVEpRPY5suGOxpYTdQQ@mail.gmail.com>
+	<20110913175312.GB6267@n2100.arm.linux.org.uk>
+	<20110923084001.GP17169@n2100.arm.linux.org.uk>
+	<01d501cc84d6$62720890$275619b0$%kim@samsung.com>
+	<alpine.LFD.2.02.1110071354310.3240@ionos>
+Message-ID: <CAPz4a6CkOXp6LHX2hFYVBhXWT4rhCUzLyYTLbO7g8u_jYcHt7Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sorry if you get this multiple times, the original cover letter was held for
-moderation, and I don't know whether I succeeded in canceling it.
+Thomas,
 
-Hi,
+I was seeing something similar, and this patch did address part of it,
+but I still think we have a problem. What I am seeing is the
+following:
 
-This series adds support for the Sunplus SPMP8000 SoC, an ARM926EJ-S based
-MCU, which is most commonly found in handheld game consoles and digital cams.
-Most of the work was done during GSoC 2011, with Greg KH as my mentor.
+We have a SCHED_FIFO kernel thread which tries to do a blocking IPI
+(smp_call_function_single) to all online cpus (for_each_online_cpu).
+This introduces a deadlock where the FIFO thread could be preempting
+the suspend thread which is the one that's trying to set the second
+CPU active after it sees it going online. The second CPU marked itself
+online and is then waiting for the first CPU to mark it active before
+enabling irqs to service the IPI.
 
-The board I'm using for development is the Letcool N350JP handheld.
+It feels to me like we should probably not be sending blocking IPIs
+from a FIFO thread for sanity reasons, but that does mean there's
+still a deadlock present here.
 
-The patches are based on Arnds for-next branch with Jamie Iles' vic-dt patches
-on top and cherry-picks from Russells for-next : trivial GPIOLIB,
-common clk_lookup macro, default IO_SPACE_LIMIT.
-(If anyone has a suggestion on what single branch to base this on, please help)
+Thoughts?
 
-Changes since v1:
-- removed all definitions, headers, dts descriptions for drivers and devices
-  without DT bindings
-- removed Letcool board file
-- removed static mappings of clock controllers
-- removed IO_SPACE_LIMIT, PLAT_PHYS_OFFSET definitions and GPIO accelerators
-- fixed clock clode, removed local-variable-referencing macros, and random bits
-- lluart is now in a separate file
-- timer driver moved to drivers/clocksource
+Thanks in advance.
 
-Thanks to all the reviewers so far!
+--Dima
 
-Cheers,
-Zoltan
-
- Documentation/devicetree/bindings/arm/spmp8000.txt |   25 +
- arch/arm/Kconfig                                   |   16 +
- arch/arm/Makefile                                  |    1 +
- arch/arm/boot/dts/spmp8000-letcool.dts             |   20 +
- arch/arm/boot/dts/spmp8000.dtsi                    |   93 +++
- arch/arm/mach-spmp8000/Makefile                    |    4 +
- arch/arm/mach-spmp8000/Makefile.boot               |    1 +
- arch/arm/mach-spmp8000/clkdev.c                    |  611 ++++++++++++++++++++
- arch/arm/mach-spmp8000/clock.c                     |  149 +++++
- arch/arm/mach-spmp8000/clock.h                     |   32 +
- arch/arm/mach-spmp8000/core.c                      |   79 +++
- arch/arm/mach-spmp8000/core.h                      |   27 +
- arch/arm/mach-spmp8000/include/mach/debug-macro.S  |   19 +
- arch/arm/mach-spmp8000/include/mach/entry-macro.S  |   14 +
- arch/arm/mach-spmp8000/include/mach/gpio.h         |    1 +
- arch/arm/mach-spmp8000/include/mach/hardware.h     |   25 +
- arch/arm/mach-spmp8000/include/mach/io.h           |   17 +
- arch/arm/mach-spmp8000/include/mach/irqs.h         |   21 +
- arch/arm/mach-spmp8000/include/mach/memory.h       |    1 +
- arch/arm/mach-spmp8000/include/mach/system.h       |   43 ++
- arch/arm/mach-spmp8000/include/mach/timex.h        |   17 +
- arch/arm/mach-spmp8000/include/mach/uncompress.h   |   37 ++
- arch/arm/mach-spmp8000/include/mach/vmalloc.h      |   16 +
- arch/arm/mach-spmp8000/lluart.c                    |   24 +
- drivers/clocksource/Makefile                       |    3 +-
- drivers/clocksource/spmp8000_tmrb.c                |  159 +++++
- 26 files changed, 1454 insertions(+), 1 deletions(-)
+On Fri, Oct 7, 2011 at 5:17 AM, Thomas Gleixner <tglx@linutronix.de> wrote:
+> On Fri, 7 Oct 2011, Kukjin Kim wrote:
+>> I think, basically, if SPIs in GIC are used in local timer, the routing
+>> interrupt like calling irq_set_affinity() to offline CPUs should be
+>> available when boot time before calling set_cpu_online() because as you know
+>> the local_timer_setup() which includes setup interrupt is called in
+>> percpu_timer_setup() now...
+>>
+>> Is there any way to get the flags of struct irqaction from struct irq_data
+>> in gic_set_affinity()? Or?
+>
+> No, and you should not even think about it at all.
+>
+> The problem I can see from all this discussion is related to the early
+> enabling of interrupts and the per cpu timer setup before the cpu is
+> marked online. I really do not understand at all why this needs to be
+> done in order to call calibrate_delay().
+>
+> calibrate_delay() monitors jiffies, which are updated from the CPU
+> which is waiting for the new CPU to set the online bit.
+>
+> So you simply can call calibrate_delay() on the new CPU just from the
+> interrupt disabled region and move the local timer setup after you
+> stored the cpu data and before enabling interrupts.
+>
+> This solves both the cpu_online vs. cpu_active problem and the
+> affinity setting of the per cpu timers.
+>
+> Thanks,
+>
+> ? ? ? ?tglx
+> ----
+> Index: linux-2.6/arch/arm/kernel/smp.c
+> ===================================================================
+> --- linux-2.6.orig/arch/arm/kernel/smp.c
+> +++ linux-2.6/arch/arm/kernel/smp.c
+> @@ -301,17 +301,7 @@ asmlinkage void __cpuinit secondary_star
+> ? ? ? ? */
+> ? ? ? ?platform_secondary_init(cpu);
+>
+> - ? ? ? /*
+> - ? ? ? ?* Enable local interrupts.
+> - ? ? ? ?*/
+> ? ? ? ?notify_cpu_starting(cpu);
+> - ? ? ? local_irq_enable();
+> - ? ? ? local_fiq_enable();
+> -
+> - ? ? ? /*
+> - ? ? ? ?* Setup the percpu timer for this CPU.
+> - ? ? ? ?*/
+> - ? ? ? percpu_timer_setup();
+>
+> ? ? ? ?calibrate_delay();
+>
+> @@ -323,10 +313,23 @@ asmlinkage void __cpuinit secondary_star
+> ? ? ? ? * before we continue.
+> ? ? ? ? */
+> ? ? ? ?set_cpu_online(cpu, true);
+> +
+> + ? ? ? /*
+> + ? ? ? ?* Setup the percpu timer for this CPU.
+> + ? ? ? ?*/
+> + ? ? ? percpu_timer_setup();
+> +
+> ? ? ? ?while (!cpu_active(cpu))
+> ? ? ? ? ? ? ? ?cpu_relax();
+>
+> ? ? ? ?/*
+> + ? ? ? ?* cpu_active bit is set, so it's safe to enable interrupts
+> + ? ? ? ?* now.
+> + ? ? ? ?*/
+> + ? ? ? local_irq_enable();
+> + ? ? ? local_fiq_enable();
+> +
+> + ? ? ? /*
+> ? ? ? ? * OK, it's off to the idle thread for us
+> ? ? ? ? */
+> ? ? ? ?cpu_idle();
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
