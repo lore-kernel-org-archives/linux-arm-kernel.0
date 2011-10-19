@@ -1,17 +1,34 @@
-From: alan@linux.intel.com (Alan Cox)
-Date: Wed, 19 Oct 2011 13:13:26 +0100
-Subject: [PATCH v2] UART: add CSR SiRFprimaII SoC on-chip uart drivers
-In-Reply-To: <CAGsJ_4xJzL6dfSmmae8LH6kt2g1PmevgrFWgYLR3Tif8PD0bCQ@mail.gmail.com>
-References: <1318570799-3785-1-git-send-email-Barry.Song@csr.com>
-	<CAGsJ_4w6fGH+G9KapHXzCwMhz_NKfPdCxs7rF5hWKw2LGUpwWA@mail.gmail.com>
-	<20111018181319.GA7015@kroah.com>
-	<CAGsJ_4xJzL6dfSmmae8LH6kt2g1PmevgrFWgYLR3Tif8PD0bCQ@mail.gmail.com>
-Message-ID: <20111019131326.7722222b@bob.linux.org.uk>
+From: sshtylyov@ru.mvista.com (Sergei Shtylyov)
+Date: Wed, 19 Oct 2011 16:27:21 +0400
+Subject: [patch 1/1] iMX: Fix module build
+In-Reply-To: <20111018131353.663173305@rtp-net.org>
+References: <20111018131353.663173305@rtp-net.org>
+Message-ID: <4E9EC229.4080704@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello.
 
-> i think we can go ahead through Linux W's pinmux tree. Linus, would
-> you like to take care once Alan ack this.
+On 18-10-2011 17:13, Arnaud Patard (Rtp) wrote:
 
-Fine by me
+> When trying to build some modules with the "hint" branch of imx tree,
+> they're now failing to build at modpost with an error like this :
+
+>   OBJCOPY arch/arm/boot/zImage
+>   Kernel: arch/arm/boot/zImage is ready
+>   Building modules, stage 2.
+>   MODPOST 69 modules
+> ERROR: "imx_ioremap" [sound/soc/imx/snd-soc-imx.ko] undefined!
+> ERROR: "imx_ioremap" [drivers/usb/gadget/fsl_usb2_udc.ko] undefined!
+> make[1]: *** [__modpost] Error 1
+> make: *** [modules] Error 2
+
+> It seems to be caused by commit f548897ffc0510885af27e22a11f449fe5e0cbbd,
+
+    Please specify that commit's summary in parens.
+
+> which introduced imx_ioremap without EXPORT_SYMBOL.
+
+> Signed-off-by: Arnaud Patard <arnaud.patard@rtp-net.org>
+
+WBR, Sergei
