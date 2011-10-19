@@ -1,36 +1,61 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Wed, 19 Oct 2011 16:01:04 +0200
-Subject: [PATCH 3/4 v2] ARM: OMAP3: cm-t35: fix audio
-In-Reply-To: <4E9EAE69.6010305@ru.mvista.com>
-References: <4E9EAE69.6010305@ru.mvista.com>
-Message-ID: <1319032864-31806-1-git-send-email-grinberg@compulab.co.il>
+From: bryan.wu@canonical.com (Bryan Wu)
+Date: Wed, 19 Oct 2011 22:13:17 +0800
+Subject: Question about: linux-linaro-2.6.38.7 booting the ubuntu 10.10
+	filesystem
+In-Reply-To: <CALQsFO+o+zQJZiksb+2fW8b_kdTv6tqhjxYU6owv=hMhbk=92A@mail.gmail.com>
+References: <CALQsFO+o+zQJZiksb+2fW8b_kdTv6tqhjxYU6owv=hMhbk=92A@mail.gmail.com>
+Message-ID: <CAK5ve-LetP_jUyi22T0QhPkHgNqjFBuzuMa5+VnEfWvzFpy3Wg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-TWL4030 audio codec is not being registered if no platform data is
-supplied. Provide platform data for the TWL4030 audio codec.
+David,
 
-Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
----
+Could you please tell us what's kind of hardware are you trying with
+Ubuntu/Linaro?
 
-v2: fix the commit message (10x to Sergei)
+Thanks
+-Bryan
 
- arch/arm/mach-omap2/board-cm-t35.c |    3 ++-
- 1 files changed, 2 insertions(+), 1 deletions(-)
+On Wed, Oct 19, 2011 at 9:52 PM, David Yang <david.yangshuai@gmail.com> wrote:
+> hi,all
+>
+> ? I'm trying booting the ubuntu10.10 using the kernel linux-linaro-2.6.38.7.
+> ? And I use the serial ttyS0 as the Console.
+> ? But the booting always stopped after logging?
+>
+> ? ? ? Freeing init memory: 124K
+> ? ? ? init: sreadahead main process (414) terminated with status 1
+> ? ? ? init: procps main process (429) terminated with status 255
+> ? ? ? * Setting preliminary keymap...
+>
+> ? And then the ttyS0 doesn't response.
+>
+> ? But when I boot the cramfs made using busybox with the same
+> kernel,I can get the login prompt.And then I can login and use it.
+>
+> ? I also tried the ubuntu9.10,it has the same problem.
+>
+> ? So I don't know why.
+>
+> ? Any suggestion is welcome?
+>
+> ? Thanks?
+>
+>
+> Best Regards,
+> David
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
 
-diff --git a/arch/arm/mach-omap2/board-cm-t35.c b/arch/arm/mach-omap2/board-cm-t35.c
-index 1ee056f5..18cd50c 100644
---- a/arch/arm/mach-omap2/board-cm-t35.c
-+++ b/arch/arm/mach-omap2/board-cm-t35.c
-@@ -477,7 +477,8 @@ static struct twl4030_platform_data cm_t35_twldata = {
- static void __init cm_t35_init_i2c(void)
- {
- 	omap3_pmic_get_config(&cm_t35_twldata, TWL_COMMON_PDATA_USB,
--			TWL_COMMON_REGULATOR_VDAC);
-+			      TWL_COMMON_REGULATOR_VDAC |
-+			      TWL_COMMON_PDATA_AUDIO);
- 
- 	omap3_pmic_init("tps65930", &cm_t35_twldata);
- }
+
+
 -- 
-1.7.3.4
+Bryan Wu <bryan.wu@canonical.com>
+Kernel Developer ? ?+86.138-1617-6545 Mobile
+Ubuntu Kernel Team
+Canonical Ltd. ? ? ?www.canonical.com
+Ubuntu - Linux for human beings | www.ubuntu.com
