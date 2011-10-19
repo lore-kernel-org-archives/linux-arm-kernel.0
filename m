@@ -1,21 +1,42 @@
-From: andi@firstfloor.org (Andi Kleen)
-Date: Wed, 19 Oct 2011 07:02:11 +0200
-Subject: [PATCH 0/3] ARM 4Kstacks: introduction
-In-Reply-To: <20111019045418.GF21338@dastard>
-References: <4E9E0B71.9020708@am.sony.com> <1318983248.7569.5.camel@Joe-Laptop>
-	<4E9E1944.80601@am.sony.com> <20111019045418.GF21338@dastard>
-Message-ID: <20111019050211.GF15908@one.firstfloor.org>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Wed, 19 Oct 2011 13:33:55 +0800
+Subject: [PATCH v2 3/5] regulator: helper routine to extract
+	regulator_init_data
+In-Reply-To: <20111018160046.GD28501@opensource.wolfsonmicro.com>
+References: <1318263578-7407-1-git-send-email-rnayak@ti.com>
+	<1318263578-7407-4-git-send-email-rnayak@ti.com>
+	<20111016145536.GA29885@S2100-06.ap.freescale.net>
+	<4E9BAC4D.3010402@ti.com>
+	<20111018115836.GC30703@S2100-06.ap.freescale.net>
+	<20111018160046.GD28501@opensource.wolfsonmicro.com>
+Message-ID: <20111019053354.GB31162@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> "You can't use block based storage because the storage stack doesn't
-> fit in 4k."
+On Tue, Oct 18, 2011 at 05:00:46PM +0100, Mark Brown wrote:
+> On Tue, Oct 18, 2011 at 07:58:37PM +0800, Shawn Guo wrote:
+> 
+> > I understand that ideally device tree is supposed to describe pure
+> > hardware configurations.  But practically, when migrating a driver
+> > to device tree probe, we are trying to move the configurations
+> > described by platform_data into device tree to save the use of
+> > platform_data for device tree probe.  Then some of the configuration
+> > may not be so purely hardware related.  But I do not see this is a
+> > critical problem.
+> 
+> It's not just Linux-specific stuff, some of this is even specific to
+> what current Linux drivers can do - updating the kernel could mean a
+> different set of constraints.
+> 
+Well, from what I see, the 'struct regulation_constraints' is defined
+in machine.h and meant to be the regulator machine/board interface.
+With the example I'm looking at, mc13892, the regulation_constraints
+configuration is fully passed from machine/board file.  If there is
+something specific to what drivers can do, it probably should be encoded
+in regulator driver rather than staying in regulation_constraints.
 
-Likely far more than that.
+So how do you think we should proceed here?
 
-Perhaps a better way would be to simply put the stack into a virtual
-mapping and allocate more as needed.
-
-I agree it's a bad idea in mainline.
-
--Andi
+-- 
+Regards,
+Shawn
