@@ -1,42 +1,52 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 19 Oct 2011 08:54:16 +0200
-Subject: Warning at kernel/mutex.c
-In-Reply-To: <20111019064603.GP18141@pengutronix.de>
-References: <CAOMZO5AR4iiktjmjzUU3AbQmYVk4wE28+KrZckt=VXLBJzXdBA@mail.gmail.com>
-	<20111018173744.GQ21648@n2100.arm.linux.org.uk>
-	<CAOMZO5BKTzeV0f0=frQT-4uHESh2-cEQtc2UzniFT6dVSi_0EQ@mail.gmail.com>
-	<20111018184008.GI21504@pengutronix.de>
-	<CAOMZO5CayjCM7FkdfHxbnyhC9d+7QTODqmNr7_xFPwkLRo8rmw@mail.gmail.com>
-	<20111019064603.GP18141@pengutronix.de>
-Message-ID: <20111019065416.GL21504@pengutronix.de>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 19 Oct 2011 08:54:28 +0200
+Subject: [ resend PATCH 1/1] ARM: i.MX28: shift frac value in _CLK_SET_RATE
+In-Reply-To: <1318868745-19732-1-git-send-email-matt@grid-net.com>
+References: <1318868745-19732-1-git-send-email-matt@grid-net.com>
+Message-ID: <20111019065428.GQ18141@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 19, 2011 at 08:46:03AM +0200, Sascha Hauer wrote:
-> On Tue, Oct 18, 2011 at 04:45:51PM -0200, Fabio Estevam wrote:
-> > 2011/10/18 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-> > 
-> > >> ?static LIST_HEAD(clocks);
-> > >> ?static DEFINE_MUTEX(clocks_mutex);
-> > >> +static DEFINE_SPINLOCK(clock_lock);
-> > > If clocks_mutex is unused now, please remove it. If it's not unused you
-> > > probably introduced a problem with your patch.
-> > 
-> > clocks_mutex is still used in clk_set_rate and clk_set_parent.
-> > 
-> > Should it be converted to spinlocks too?
-> >
+On Mon, Oct 17, 2011 at 09:25:45AM -0700, Matt Burtch wrote:
+> Fixed whitespace formatting per Shawn Guo.
 > 
-> The mutex currently used protects two things: The clock tree and the
-> clock registers. If we use a mutex for the parent/rate functions and
-> a spinlock for enable/disable we must make sure that both function sets
-> do not access the same registers.
-... and that no strage things happen when there we're in the middle of a
-parent/rate change and a clock is enabled or disabled.
+> Noticed when setting SSP0 in clk_set_rate, _CLK_SET_RATE attempts to reset the clock divider for the SSP0 parent clock, in this case IO0FRAC. Bits 24-29 of HW_CLKCTRL_FRAC0 are cleared correctly, but when the new frac value is written the value isn't shifted up to write the correct bit-field.  This results in IO0FRAC being set to 0 and CPUFRAC being corrupted.
+> 
 
-Best regards
-Uwe
+Please linebreak your commit messages at around 70 characters. Fixed
+this myself this time, but please remember for next time.
+
+Sascha
+
+> This should occur when writing IO1FRAC, EMIFRAC in HW_CLKCTRL_FRAC0 and GPMIFRAC, HSADCFRAC in HW_CLKCTRL_FRAC1.
+> 
+> Tested on custom i.MX28 board with SSP0 SPI driver.
+> 
+> Signed-off-by: Matt Burtch <matt@grid-net.com>
+> ---
+>  arch/arm/mach-mxs/clock-mx28.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/mach-mxs/clock-mx28.c b/arch/arm/mach-mxs/clock-mx28.c
+> index 5dcc59d..ba53227 100644
+> --- a/arch/arm/mach-mxs/clock-mx28.c
+> +++ b/arch/arm/mach-mxs/clock-mx28.c
+> @@ -349,7 +349,7 @@ static int name##_set_rate(struct clk *clk, unsigned long rate)		\
+>  									\
+>  		reg = __raw_readl(CLKCTRL_BASE_ADDR + HW_CLKCTRL_##fr);	\
+>  		reg &= ~BM_CLKCTRL_##fr##_##fs##FRAC;			\
+> -		reg |= frac;						\
+> +		reg |= frac << BP_CLKCTRL_##fr##_##fs##FRAC;		\
+>  		__raw_writel(reg, CLKCTRL_BASE_ADDR + HW_CLKCTRL_##fr);	\
+>  	}								\
+>  									\
+> -- 
+> 1.7.1
+> 
+> 
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Pengutronix e.K.                           |                             |
 Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
