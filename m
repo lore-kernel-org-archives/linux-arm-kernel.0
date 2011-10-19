@@ -1,53 +1,38 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Wed, 19 Oct 2011 15:45:51 +0100
-Subject: [PATCH 6/6] mach-ux500: remove intermediary add_platform_device*
-	functions
-In-Reply-To: <4E9EE1F8.7060207@linaro.org>
-References: <1318852378-14180-1-git-send-email-lee.jones@linaro.org>
-	<1318852378-14180-7-git-send-email-lee.jones@linaro.org>
-	<20111017115908.GE4992@totoro> <4E9EE1F8.7060207@linaro.org>
-Message-ID: <20111019144551.GA4829@totoro>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 19 Oct 2011 15:47:34 +0100
+Subject: [PATCH v2 3/5] regulator: helper routine to extract
+	regulator_init_data
+In-Reply-To: <20111019053354.GB31162@S2100-06.ap.freescale.net>
+References: <1318263578-7407-1-git-send-email-rnayak@ti.com>
+	<1318263578-7407-4-git-send-email-rnayak@ti.com>
+	<20111016145536.GA29885@S2100-06.ap.freescale.net>
+	<4E9BAC4D.3010402@ti.com>
+	<20111018115836.GC30703@S2100-06.ap.freescale.net>
+	<20111018160046.GD28501@opensource.wolfsonmicro.com>
+	<20111019053354.GB31162@S2100-06.ap.freescale.net>
+Message-ID: <20111019144734.GI18713@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 19, 2011 at 03:43:04PM +0100, Lee Jones wrote:
-> On 17/10/11 12:59, Jamie Iles wrote:
-> > Hi Lee,
-> > 
-> > On Mon, Oct 17, 2011 at 12:52:58PM +0100, Lee Jones wrote:
-[...]
-> >> diff --git a/arch/arm/mach-ux500/devices-common.h b/arch/arm/mach-ux500/devices-common.h
-> >> index f8adff8..089371e 100644
-> >> --- a/arch/arm/mach-ux500/devices-common.h
-> >> +++ b/arch/arm/mach-ux500/devices-common.h
-> > [...]
-> >> -static inline struct platform_device *
-> >> -dbx500_add_msp_i2s(int id, resource_size_t base, int irq,
-> >> -		   struct msp_i2s_platform_data *pdata)
-> >> -{
-> >> -	return dbx500_add_platform_device_4k1irq("MSP_I2S", id, base, irq,
-> >> -						 pdata);
-> >> +	struct resource resources[] = {
-> >> +		DEFINE_RES_MEM(base, SZ_4K),
-> >> +		DEFINE_RES_IRQ(irq),
-> >> +	};
-> >> +
-> >> +	return platform_device_register_resndata(parent, "nmk-i2c",
-> >> +						 id, resources,
-> >> +						 ARRAY_SIZE(resources),
-> >> +						 pdata, sizeof(*pdata));
-> >>  }
-> > 
-> > I think you need platform_device_register_full() rather than 
-> > platform_device_register_resndata() here as dbx500_add_platform_device() 
-> > also set a dma mask which platform_device_register_resndata() doesn't 
-> > do.  Otherwise a nice diffstat!
-> 
-> Good spot.
-> 
-> I can't seem to find platform_device_register_full(). Does it exist?
+On Wed, Oct 19, 2011 at 01:33:55PM +0800, Shawn Guo wrote:
+> On Tue, Oct 18, 2011 at 05:00:46PM +0100, Mark Brown wrote:
 
-Yes, but it's in linux-next rather than Linus' tree (new helper to 
-create platform devices with dma mask).
+> > It's not just Linux-specific stuff, some of this is even specific to
+> > what current Linux drivers can do - updating the kernel could mean a
+> > different set of constraints.
 
-Jamie
+> Well, from what I see, the 'struct regulation_constraints' is defined
+> in machine.h and meant to be the regulator machine/board interface.
+
+...which will depend on the system integrator's understanding of what
+their system is capable of right now.
+
+> With the example I'm looking at, mc13892, the regulation_constraints
+> configuration is fully passed from machine/board file.  If there is
+> something specific to what drivers can do, it probably should be encoded
+> in regulator driver rather than staying in regulation_constraints.
+
+I don't think you're quite understanding the issue - it's an integration
+problem with three different variables.  It's a combination of what the
+chips can do, what the drivers can do and if the board design affects
+any of this stuff.  Only the board can come to a final decision.
