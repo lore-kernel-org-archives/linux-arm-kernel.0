@@ -1,56 +1,76 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 19 Oct 2011 09:07:58 +0200
-Subject: [GIT PULL] i.MX cleanup patches
-Message-ID: <20111019070758.GA18759@pengutronix.de>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 19 Oct 2011 09:08:34 +0200
+Subject: [PATCH] ARM: mach-mxs: fix machines' initializers order
+In-Reply-To: <1318931549-16862-1-git-send-email-lauri.hintsala@bluegiga.com>
+References: <1318931549-16862-1-git-send-email-lauri.hintsala@bluegiga.com>
+Message-ID: <20111019070834.GN21504@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Hello Russell,
 
-[again with list on cc]
+would you consider this patch to be churn or a valid cleanup?
 
-Please pull the following i.MX cleanup patches.
+Best regards
+Uwe
 
-Sascha
-
-The following changes since commit 976d167615b64e14bc1491ca51d424e2ba9a5e84:
-
-  Linux 3.1-rc9 (2011-10-04 18:11:50 -0700)
-
-are available in the git repository at:
-  git://git.pengutronix.de/git/imx/linux-2.6.git imx-cleanups-for-arnd
-
-Lauri Hintsala (1):
-      ARM: mach-mxs: fix machines' initializers order
-
-Sascha Hauer (1):
-      Merge branches 'cleanups/mxs', 'cleanups/mx3-defconfig' and 'cleanups/includes' into imx-cleanups-for-arnd
-
-Shawn Guo (5):
-      arm/imx: remove mx31_setup_weimcs() from mx31.h
-      arm/imx: explicitly includes mach/hardware.h in mach-kzm_arm11_01.c
-      arm/imx: remove mx27_setup_weimcs() from mx27.h
-      arm/imx: explicitly includes mach/hardware.h in pm-imx27.c
-      mmc: mxcmmc: explicitly includes mach/hardware.h
-
-Wolfram Sang (1):
-      arm: mx3: update defconfig
-
- arch/arm/configs/mx3_defconfig        |   46 +++++++++++++++++++++++---------
- arch/arm/mach-imx/mach-kzm_arm11_01.c |    1 +
- arch/arm/mach-imx/mach-pcm038.c       |    4 ++-
- arch/arm/mach-imx/mach-qong.c         |    5 +++-
- arch/arm/mach-imx/pm-imx27.c          |    2 +-
- arch/arm/mach-mxs/mach-mx23evk.c      |    2 +-
- arch/arm/mach-mxs/mach-mx28evk.c      |    2 +-
- arch/arm/mach-mxs/mach-tx28.c         |    2 +-
- arch/arm/plat-mxc/include/mach/mx27.h |   14 ----------
- arch/arm/plat-mxc/include/mach/mx31.h |   14 ----------
- drivers/mmc/host/mxcmmc.c             |    1 +
- 11 files changed, 46 insertions(+), 47 deletions(-)
+On Tue, Oct 18, 2011 at 12:52:29PM +0300, Lauri Hintsala wrote:
+> Signed-off-by: Lauri Hintsala <lauri.hintsala@bluegiga.com>
+> ---
+> 
+> reference: http://article.gmane.org/gmane.linux.ports.arm.omap/50721
+> 
+>  arch/arm/mach-mxs/mach-mx23evk.c |    2 +-
+>  arch/arm/mach-mxs/mach-mx28evk.c |    2 +-
+>  arch/arm/mach-mxs/mach-tx28.c    |    2 +-
+>  3 files changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/mach-mxs/mach-mx23evk.c b/arch/arm/mach-mxs/mach-mx23evk.c
+> index 3c2de33..8fa2290 100644
+> --- a/arch/arm/mach-mxs/mach-mx23evk.c
+> +++ b/arch/arm/mach-mxs/mach-mx23evk.c
+> @@ -182,6 +182,6 @@ MACHINE_START(MX23EVK, "Freescale MX23 EVK")
+>  	/* Maintainer: Freescale Semiconductor, Inc. */
+>  	.map_io		= mx23_map_io,
+>  	.init_irq	= mx23_init_irq,
+> -	.init_machine	= mx23evk_init,
+>  	.timer		= &mx23evk_timer,
+> +	.init_machine	= mx23evk_init,
+>  MACHINE_END
+> diff --git a/arch/arm/mach-mxs/mach-mx28evk.c b/arch/arm/mach-mxs/mach-mx28evk.c
+> index eaaf6ff..d0f1ea7 100644
+> --- a/arch/arm/mach-mxs/mach-mx28evk.c
+> +++ b/arch/arm/mach-mxs/mach-mx28evk.c
+> @@ -421,6 +421,6 @@ MACHINE_START(MX28EVK, "Freescale MX28 EVK")
+>  	/* Maintainer: Freescale Semiconductor, Inc. */
+>  	.map_io		= mx28_map_io,
+>  	.init_irq	= mx28_init_irq,
+> -	.init_machine	= mx28evk_init,
+>  	.timer		= &mx28evk_timer,
+> +	.init_machine	= mx28evk_init,
+>  MACHINE_END
+> diff --git a/arch/arm/mach-mxs/mach-tx28.c b/arch/arm/mach-mxs/mach-tx28.c
+> index 515a423..9555938 100644
+> --- a/arch/arm/mach-mxs/mach-tx28.c
+> +++ b/arch/arm/mach-mxs/mach-tx28.c
+> @@ -175,6 +175,6 @@ static struct sys_timer tx28_timer = {
+>  MACHINE_START(TX28, "Ka-Ro electronics TX28 module")
+>  	.map_io = mx28_map_io,
+>  	.init_irq = mx28_init_irq,
+> -	.init_machine = tx28_stk5v3_init,
+>  	.timer = &tx28_timer,
+> +	.init_machine = tx28_stk5v3_init,
+>  MACHINE_END
+> -- 
+> 1.7.4.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
 
 -- 
-Pengutronix e.K.                           |                             |
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
 Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
