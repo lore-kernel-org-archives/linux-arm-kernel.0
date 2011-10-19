@@ -1,14 +1,13 @@
 From: jhbird.choi@samsung.com (jhbird.choi at samsung.com)
-Date: Thu, 20 Oct 2011 08:55:32 +0900
-Subject: [RESEND PATCH] PM / Clocks: Remove redundant NULL checks before
-	kfree()
-Message-ID: <1319068532-21287-1-git-send-email-jhbird.choi@samsung.com>
+Date: Wed, 19 Oct 2011 19:24:29 +0900
+Subject: [PATCH] PM / Clocks: Remove redundant NULL checks before kfree()
+Message-ID: <1319019869-6521-1-git-send-email-jhbird.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jonghwan Choi <jhbird.choi@samsung.com>
+From: Jonghwan Choi <jhbird.choi@gmail.com>
 
-Signed-off-by: Jonghwan Choi <jhbird.choi@samsung.com>
+Signed-off-by: Jonghwan Choi <jhbird.choi@gmail.com>
 ---
  drivers/base/power/clock_ops.c |    4 +---
  1 files changed, 1 insertions(+), 3 deletions(-)
