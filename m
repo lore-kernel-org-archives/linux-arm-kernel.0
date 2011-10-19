@@ -1,35 +1,79 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 18 Oct 2011 20:28:55 -0700
-Subject: [RFC] [PATCH] ARM: tegra: emc: device tree bindings
-In-Reply-To: <4E9E3801.6080707@gmail.com>
-References: <1318873976-25335-1-git-send-email-olof@lixom.net>
-	<74CDBE0F657A3D45AFBB94109FB122FF173CA2CBFB@HQMAIL01.nvidia.com>
-	<CAOesGMh387Oghyd_TobnTOja6tU2uU5kt-86_HwQe7nFiL+svw@mail.gmail.com>
-	<74CDBE0F657A3D45AFBB94109FB122FF173CA2CC18@HQMAIL01.nvidia.com>
-	<CAOesGMghu6Bn3RrFKEUBKkUNS_K8Y0ho3Y2uFZh_LXbfT80hFw@mail.gmail.com>
-	<74CDBE0F657A3D45AFBB94109FB122FF173CA2CCA9@HQMAIL01.nvidia.com>
-	<4E9E3801.6080707@gmail.com>
-Message-ID: <CAOesGMj8TREZ94RFhE3Qy=eaytOuB0YKBWw6--HAERoMB9m7Qg@mail.gmail.com>
+From: compnerd@compnerd.org (Saleem Abdulrasool)
+Date: Tue, 18 Oct 2011 20:52:49 -0700
+Subject: [PATCH] imx: add polled io uart methods
+In-Reply-To: <20111018072733.GC21504@pengutronix.de>
+References: <CAOMZO5CdVqCu8VvaYmxhDW-anG2NQt8Hn3CnM_a48g9V0q9bmA@mail.gmail.com>
+	<1318821721-11965-1-git-send-email-compnerd@compnerd.org>
+	<1318821721-11965-2-git-send-email-compnerd@compnerd.org>
+	<20111018072733.GC21504@pengutronix.de>
+Message-ID: <20111019035249.GA20598@lithium.compnerd.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 18, 2011 at 7:37 PM, Rob Herring <robherring2@gmail.com> wrote:
-> On 10/18/2011 04:01 PM, Stephen Warren wrote:
->> I only suggested the well-known-named sub-nodes in order to eliminate
->> the need for a compatible property.
->>
->> My inclination is that if we use compatible to distinguish the tables
->> from anything else, there's little point having the extra level of nodes;
->> we may as well lay it out as in your original patch, just with an explicit
->> nvidia,ram-code property in each table (or omitted/ignored when not using
->> it) instead of reg?
->
-> Node names should be generic like serial or ethernet. Compatible is used
-> to specify the specific model.
+On Tue, 18 Oct 2011, Uwe Kleine-K?nig wrote:
 
-In cases where unit addresses can be used to separate out identical
-entries, yes. For something like this, there's no logical addressing
-of the tables so something else must be used to distinguish them.
+> On Sun, Oct 16, 2011 at 08:22:01PM -0700, Saleem Abdulrasool wrote:
+> > These methods are invoked if the iMX uart is used in conjuction with kgdb during
+> > early boot.  In order to access the UART without the interrupts, the kernel uses
+> > the basic polling methods for IO with the device.  With these methods
+> > implemented, it is now possible to enable kgdb during early boot over serial.
+> > 
+> > Signed-off-by: Saleem Abdulrasool <compnerd@compnerd.org>
+> > ---
+> >  drivers/tty/serial/imx.c |   77 ++++++++++++++++++++++++++++++++++++++++++++++
+> >  1 files changed, 77 insertions(+), 0 deletions(-)
+> > 
+> > diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
+> > index 7e91b3d..4fcf9ca 100644
+> > --- a/drivers/tty/serial/imx.c
+> > +++ b/drivers/tty/serial/imx.c
+> > @@ -102,6 +102,7 @@
+> >  #define  UCR2_STPB       (1<<6)	 /* Stop */
+> >  #define  UCR2_WS         (1<<5)	 /* Word size */
+> >  #define  UCR2_RTSEN      (1<<4)	 /* Request to send interrupt enable */
+> > +#define  UCR2_ATEN       (1<<3)  /* Aging Timer Enable */
+> >  #define  UCR2_TXEN       (1<<2)	 /* Transmitter enabled */
+> >  #define  UCR2_RXEN       (1<<1)	 /* Receiver enabled */
+> >  #define  UCR2_SRST 	 (1<<0)	 /* SW reset */
+> > @@ -1075,6 +1076,77 @@ imx_verify_port(struct uart_port *port, struct serial_struct *ser)
+> >  	return ret;
+> >  }
+> >  
+> > +
+> needless newline
 
+Removed.
 
--Olof
+> > +#if defined(CONFIG_CONSOLE_POLL)
+> > +static int imx_poll_get_char(struct uart_port *port)
+> > +{
+> > +	volatile unsigned int status;
+> Why is that volatile?
+
+It shouldnt be, removed the volatile attribute.  Im not sure why that was there,
+it really doesnt make any sense since there isnt any inline assembler there to
+confuse the compiler.
+
+> > +	unsigned int cr1, cr2, cr3;
+> > +	unsigned char c;
+> > +
+> > +	/* save control registers */
+> > +	cr1 = readl(port->membase + UCR1);
+> > +	cr2 = readl(port->membase + UCR2);
+> > +	cr3 = readl(port->membase + UCR3);
+> > +
+> 
+> Best regards
+> Uwe
+
+Thanks for the review.  Ive not attached the updated patch since Id like to make
+the changes that Sascha suggested, and I shall post the updated patch
+subsequently.
+
+> -- 
+> Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+
+-- 
+Saleem Abdulrasool
+compnerd (at) compnerd (dot) org
