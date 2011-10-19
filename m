@@ -1,24 +1,56 @@
-From: joe@perches.com (Joe Perches)
-Date: Tue, 18 Oct 2011 17:31:41 -0700
-Subject: [PATCH 0/3] ARM 4Kstacks: introduction
-In-Reply-To: <4E9E1944.80601@am.sony.com>
-References: <4E9E0B71.9020708@am.sony.com>
-	<1318983248.7569.5.camel@Joe-Laptop> <4E9E1944.80601@am.sony.com>
-Message-ID: <1318984301.7569.9.camel@Joe-Laptop>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Tue, 18 Oct 2011 21:09:34 -0400 (EDT)
+Subject: [RFC/PATCH v4 6/7] ARM: ARM11 MPCore: DMA_CACHE_RWFO operations
+	are not preempt safe
+In-Reply-To: <20111018232602.GA237@mvista.com>
+References: <1318004800-6525-1-git-send-email-gdavis@mvista.com>
+	<1318945654-548-1-git-send-email-gdavis@mvista.com>
+	<1318945654-548-7-git-send-email-gdavis@mvista.com>
+	<alpine.LFD.2.02.1110181715120.17040@xanadu.home>
+	<20111018232602.GA237@mvista.com>
+Message-ID: <alpine.LFD.2.02.1110182049010.17040@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2011-10-18 at 17:26 -0700, Tim Bird wrote:
-> On 10/18/2011 05:14 PM, Joe Perches wrote:
-> > On Tue, 2011-10-18 at 16:27 -0700, Tim Bird wrote:
-> >> I'm about to submit a set of patches (really pretty small)
-> >> to add 4K stack support to ARM (defaulted to 'N').
-> > When 4k stacks went away, I thought it safe enough
-> > to submit vsnprintf recursion using %pV.
-> Even inside Sony, usage of 4K stacks is limited
-> to some very special cases, where memory is exceedingly
-> tight (we have one system with 4M of RAM).  And we
-> don't mind lopping off features or coding around
-> problem areas to support our special case.
+On Tue, 18 Oct 2011, George G. Davis wrote:
+> On Tue, Oct 18, 2011 at 05:28:45PM -0400, Nicolas Pitre wrote:
+> > This is buggy.  If the preempt count is _not_ zero, you end up not 
+> > loading the TI_FLAGS bits and testing _TIF_NEED_RESCHED against that 
+> > non-zero preempt count.
+> 
+> Sigh, yep.  FWIW, I had the following before submitting this but dropped
+> it due to brain failure rereading the code - convinced myself that the
+> movne was redundant:
+> 
+> 
+> diff --git a/arch/arm/mm/cache-v6.S b/arch/arm/mm/cache-v6.S
+> index af055dc..5c6ce38 100644
+> --- a/arch/arm/mm/cache-v6.S
+> +++ b/arch/arm/mm/cache-v6.S
+> @@ -285,6 +287,7 @@ v6_dma_inv_range:
+>  	str	r3, [ip, #TI_PREEMPT]		@ restore preempt count
+>  	teq	r3, #0				@ preempt count == 0?
+>  	ldreq	r3, [ip, #TI_FLAGS]		@ load flags if yes
+> +	movne	r3, #0				@ force flags to 0
+>  	tst	r3, #_TIF_NEED_RESCHED		@ need resched?
+>  	bne	preempt_schedule		@ ret via preempt_schedule
+>  #endif
 
-I believe CONFIG_PRINTK=n assures no %pV problem.
+At this point, especially on ARMv6+, I think it is more efficient to
+simply skip over the code:
+
+	teq	r3, #0
+	str	r3, [ip, #TI_PREEMPT]
+	bne	99f
+	ldr	r3, [ip, #TI_FLAGS]
+	tst	r3, #_TIF_NEED_RESCHED
+	bne	preempt_schedule
+99:
+
+> In this case, I think preempt_{disable,enable} is the better option
+> (over interrupt disable/enable) due to variable DMA buffer sizes.
+
+Agreed.
+
+
+Nicolas
