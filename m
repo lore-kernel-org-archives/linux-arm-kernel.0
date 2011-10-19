@@ -1,76 +1,27 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 19 Oct 2011 09:08:34 +0200
-Subject: [PATCH] ARM: mach-mxs: fix machines' initializers order
-In-Reply-To: <1318931549-16862-1-git-send-email-lauri.hintsala@bluegiga.com>
-References: <1318931549-16862-1-git-send-email-lauri.hintsala@bluegiga.com>
-Message-ID: <20111019070834.GN21504@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 19 Oct 2011 08:35:47 +0100
+Subject: [PATCH 0/3] ARM 4Kstacks: introduction
+In-Reply-To: <4E9E0B71.9020708@am.sony.com>
+References: <4E9E0B71.9020708@am.sony.com>
+Message-ID: <20111019073547.GR21648@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Russell,
+On Tue, Oct 18, 2011 at 04:27:45PM -0700, Tim Bird wrote:
+> I'm about to submit a set of patches (really pretty small)
+> to add 4K stack support to ARM (defaulted to 'N').
+> 
+> This has been kicking around in my Sony tree for a few years,
+> and it's about time to mainline it.  The first patch is
+> the actual 4KSTACKS patch.  See subsequent patches
+> for tools to help with stack reduction to avoid the problems
+> that apparently led to the removal of this feature on x86.
 
-would you consider this patch to be churn or a valid cleanup?
+This isn't a good idea - if the feature has been abandoned on x86,
+people aren't going to be soo concerned about the stack usage of
+each function.  They're going to accept that there's more stack
+space available, and we'll see code paths that start expecting that.
 
-Best regards
-Uwe
-
-On Tue, Oct 18, 2011 at 12:52:29PM +0300, Lauri Hintsala wrote:
-> Signed-off-by: Lauri Hintsala <lauri.hintsala@bluegiga.com>
-> ---
-> 
-> reference: http://article.gmane.org/gmane.linux.ports.arm.omap/50721
-> 
->  arch/arm/mach-mxs/mach-mx23evk.c |    2 +-
->  arch/arm/mach-mxs/mach-mx28evk.c |    2 +-
->  arch/arm/mach-mxs/mach-tx28.c    |    2 +-
->  3 files changed, 3 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/mach-mxs/mach-mx23evk.c b/arch/arm/mach-mxs/mach-mx23evk.c
-> index 3c2de33..8fa2290 100644
-> --- a/arch/arm/mach-mxs/mach-mx23evk.c
-> +++ b/arch/arm/mach-mxs/mach-mx23evk.c
-> @@ -182,6 +182,6 @@ MACHINE_START(MX23EVK, "Freescale MX23 EVK")
->  	/* Maintainer: Freescale Semiconductor, Inc. */
->  	.map_io		= mx23_map_io,
->  	.init_irq	= mx23_init_irq,
-> -	.init_machine	= mx23evk_init,
->  	.timer		= &mx23evk_timer,
-> +	.init_machine	= mx23evk_init,
->  MACHINE_END
-> diff --git a/arch/arm/mach-mxs/mach-mx28evk.c b/arch/arm/mach-mxs/mach-mx28evk.c
-> index eaaf6ff..d0f1ea7 100644
-> --- a/arch/arm/mach-mxs/mach-mx28evk.c
-> +++ b/arch/arm/mach-mxs/mach-mx28evk.c
-> @@ -421,6 +421,6 @@ MACHINE_START(MX28EVK, "Freescale MX28 EVK")
->  	/* Maintainer: Freescale Semiconductor, Inc. */
->  	.map_io		= mx28_map_io,
->  	.init_irq	= mx28_init_irq,
-> -	.init_machine	= mx28evk_init,
->  	.timer		= &mx28evk_timer,
-> +	.init_machine	= mx28evk_init,
->  MACHINE_END
-> diff --git a/arch/arm/mach-mxs/mach-tx28.c b/arch/arm/mach-mxs/mach-tx28.c
-> index 515a423..9555938 100644
-> --- a/arch/arm/mach-mxs/mach-tx28.c
-> +++ b/arch/arm/mach-mxs/mach-tx28.c
-> @@ -175,6 +175,6 @@ static struct sys_timer tx28_timer = {
->  MACHINE_START(TX28, "Ka-Ro electronics TX28 module")
->  	.map_io = mx28_map_io,
->  	.init_irq = mx28_init_irq,
-> -	.init_machine = tx28_stk5v3_init,
->  	.timer = &tx28_timer,
-> +	.init_machine = tx28_stk5v3_init,
->  MACHINE_END
-> -- 
-> 1.7.4.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+If we switch to 4K stacks, the problems of stack usage become ours.
+Do we have the capacity to be able to address these issues as they
+crop up?
