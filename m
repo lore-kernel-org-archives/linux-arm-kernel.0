@@ -1,37 +1,20 @@
-From: tim.bird@am.sony.com (Tim Bird)
-Date: Tue, 18 Oct 2011 16:34:02 -0700
-Subject: [PATCH 3/3] ARM 4Kstacks: Decrease poll and select stack usage, when
-	using 4K stacks
+From: joe@perches.com (Joe Perches)
+Date: Tue, 18 Oct 2011 17:14:08 -0700
+Subject: [PATCH 0/3] ARM 4Kstacks: introduction
 In-Reply-To: <4E9E0B71.9020708@am.sony.com>
 References: <4E9E0B71.9020708@am.sony.com>
-Message-ID: <4E9E0CEA.6030102@am.sony.com>
+Message-ID: <1318983248.7569.5.camel@Joe-Laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Reduce the max allowed size for struct poll_wqueue to avoid
-using too much stack space in do_select() and do_sys_poll(),
-when the kernel is using 4K stacks.
+On Tue, 2011-10-18 at 16:27 -0700, Tim Bird wrote:
+> I'm about to submit a set of patches (really pretty small)
+> to add 4K stack support to ARM (defaulted to 'N').
 
-Signed-off-by: Tim Bird <tim.bird@am.sony.com>
----
- include/linux/poll.h |    4 ++++
- 1 files changed, 4 insertions(+), 0 deletions(-)
+When 4k stacks went away, I thought it safe enough
+to submit vsnprintf recursion using %pV.
 
-diff --git a/include/linux/poll.h b/include/linux/poll.h
-index cf40010..b7153a3 100644
---- a/include/linux/poll.h
-+++ b/include/linux/poll.h
-@@ -16,7 +16,11 @@
- extern struct ctl_table epoll_table[]; /* for sysctl */
- /* ~832 bytes of stack space used max in sys_select/sys_poll before allocating
-    additional memory. */
-+#ifndef CONFIG_4KSTACKS
- #define MAX_STACK_ALLOC 832
-+#else
-+#define MAX_STACK_ALLOC 448
-+#endif
- #define FRONTEND_STACK_ALLOC	256
- #define SELECT_STACK_ALLOC	FRONTEND_STACK_ALLOC
- #define POLL_STACK_ALLOC	FRONTEND_STACK_ALLOC
--- 
-1.6.6
+I believe the current vsnprintf max recursion is 3.
+Each recursion uses at least 300 bytes of stack.
+
+That might be some additional issue for 4k stacks.
