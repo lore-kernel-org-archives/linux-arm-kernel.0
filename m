@@ -1,42 +1,48 @@
-From: david.yangshuai@gmail.com (David Yang)
-Date: Thu, 20 Oct 2011 20:36:43 +0800
-Subject: Question about: linux-linaro-2.6.38.7 booting the ubuntu 10.10
-	filesystem
-In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB5930328B2D77E@dbde02.ent.ti.com>
-References: <CALQsFO+o+zQJZiksb+2fW8b_kdTv6tqhjxYU6owv=hMhbk=92A@mail.gmail.com>
-	<CAK5ve-LetP_jUyi22T0QhPkHgNqjFBuzuMa5+VnEfWvzFpy3Wg@mail.gmail.com>
-	<CALQsFO+iuraeVVDZLWL5JUibNE2a-WC3ksGj3PV=tPWfuhJX9A@mail.gmail.com>
-	<CALQsFOJ+kYQ9iJfAPhcHtcWwA9A-5TFbUe+oyiTWrar=ZSN1_g@mail.gmail.com>
-	<B85A65D85D7EB246BE421B3FB0FBB5930328693B98@dbde02.ent.ti.com>
-	<CALQsFOJHiLVskuhGe-OsK8PdUxuR8Lv9idJcmf8vZEumenBUnw@mail.gmail.com>
-	<CALQsFOLs-Jz5-yPGOZkpqumgUUq8V90mCrEJ1EBPvXSwMbVM3A@mail.gmail.com>
-	<B85A65D85D7EB246BE421B3FB0FBB5930328B2D77E@dbde02.ent.ti.com>
-Message-ID: <CALQsFOJw6YRYFL636UYAM0cVATxJ=NKuLsv9iuWVCn0tMGiedg@mail.gmail.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Thu, 20 Oct 2011 20:48:48 +0800
+Subject: [GIT PULL] GIC DT binding support
+In-Reply-To: <4E97A601.1020005@gmail.com>
+References: <4E97A601.1020005@gmail.com>
+Message-ID: <20111020124847.GG32007@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi,Afzal
+On Thu, Oct 13, 2011 at 10:01:21PM -0500, Rob Herring wrote:
+> Arnd,
+> 
+> Please pull GIC device tree support. This is the first of 2 pull
+> requests. You can ignore this one if there are no other dependencies on
+> GIC DT support.
+> 
+> This is based on rmk's for-next branch and v3.1-rc9. rc9 was needed for
+> this dependency:
+> 
+> commit eef24afb28561a5a9f4be8f8da97735b7e6a826f
+> irq: Fix check for already initialized irq_domain in irq_domain_add
+> 
+> Regards,
+> Rob
+> 
+> The following changes since commit dd5e9eb0d051606ee3eda0c30222429c74e23f00:
+> 
+>   Merge commit 'v3.1-rc9' into upstream/base (2011-10-13 20:30:42 -0500)
+> 
+> are available in the git repository at:
+> 
+>   http://sources.calxeda.com/git/kernel/linux.git gic-dt
+> 
+> Rob Herring (4):
+>       of/irq: introduce of_irq_init
+>       irq: support domains with non-zero hwirq base
+>       ARM: gic: add irq_domain support
+>       ARM: gic: add OF based initialization
+> 
+Hi Rob,
 
-  It's not zero.
+Russell is going to take Marc Zyngier's ppi series for v3.2 merge
+window.  I just noticed your patch 'ARM: gic: add irq_domain support'
+gets some conflict with Marc's series on function gic_dist_init(),
+which is not so obvious to resolve.  You may want to take a look. 
 
-
-
-Best Regards,
-Shuai
-
-On 10/20/11, Mohammed, Afzal <afzal@ti.com> wrote:
-> Hi David,
->
-> On Thu, Oct 20, 2011 at 17:32:25, David Yang wrote:
->> another log when booting ubuntu10.10:
->>
->>
->> the PC stopped at futex_wake() again!
->>
->
-> Please pass "printk.time=1" from commandline, and check the
-> Kernel logs whether timing shown are zero.
->
-> Regards
-> Afzal
->
+Regards,
+Shawn
