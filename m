@@ -1,39 +1,94 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 20 Oct 2011 17:50:04 +0100
-Subject: Build error while adding debug LL support for new board
-In-Reply-To: <20111020161251.GL3842@atomide.com>
-References: <1318856432-20219-1-git-send-email-afzal@ti.com>
-	<B85A65D85D7EB246BE421B3FB0FBB5930328B2D71D@dbde02.ent.ti.com>
-	<20111020125721.GD22076@n2100.arm.linux.org.uk>
-	<20111020161251.GL3842@atomide.com>
-Message-ID: <20111020165004.GE22076@n2100.arm.linux.org.uk>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Fri, 21 Oct 2011 01:11:59 +0800
+Subject: [GIT PULL] i.MX6Q support
+Message-ID: <20111020171158.GJ32007@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 20, 2011 at 09:12:52AM -0700, Tony Lindgren wrote:
-> * Russell King - ARM Linux <linux@arm.linux.org.uk> [111020 05:23]:
-> > On Thu, Oct 20, 2011 at 05:09:07PM +0530, Mohammed, Afzal wrote:
-> > > Hi Russell,
-> > > 
-> > > n Mon, Oct 17, 2011 at 18:30:32, Mohammed, Afzal wrote:
-> > > > Hi, Russell,
-> > > > 
-> > > > While adding low level debug support for new board in OMAP2+ family, we
-> > > > came across following error,
-> > > > 
-> > > > arch/arm/kernel/debug.S: Assembler messages:
-> > > > arch/arm/kernel/debug.S:138: Error: invalid constant (428) after fixup
-> > > > 
-> > > > Following patch fixes it, I am not sure whether this is the right fix,
-> > > > please let us know your comments.
-> > > 
-> > > ping
-> > 
-> > The patch looks fine.  Who's merging it?
-> 
-> Can you please take it?
-> 
-> Acked-by: Tony Lindgren <tony@atomide.com>
+Hi Arnd,
 
-If it finds its way into the patch system.  Note that I'm not applying
-patches after end of today until after the kernel summit.
+Please pull imx6q series.  It's based on v3.1-rc10 with the following
+branches merged plus a number of cache-l2x0 patches currently sitting
+on rmk/for-next.
+
+  rmk/devel-stable
+  rmk/smp
+  arnd/cross-platform/debug_ll
+  arnd/next/dt
+  arnd/imx/devel
+
+I will need to send a follow-up patch to update the series if Marc's
+PPI series gets in for for this merge window.
+
+Regards,
+Shawn
+
+The following changes since commit c4a23e643f240875124d56cafd242ca9ba58e045:
+
+  Merge branch 'unstable-tree/rmk/for-next' into imx6q/base (2011-10-21 00:21:32 +0800)
+
+are available in the git repository at:
+
+  git://git.linaro.org/people/shawnguo/linux-2.6.git imx6q/for-arnd
+
+Sascha Hauer (1):
+      arm/imx: merge i.MX3 and i.MX6
+
+Shawn Guo (8):
+      arm/imx6q: add device tree source
+      arm/imx6q: add core definitions and low-level debug uart
+      arm/imx: add gic_handle_irq function
+      arm/imx6q: add core drivers clock, gpc, mmdc and src
+      arm/imx6q: add smp and cpu hotplug support
+      arm/imx6q: add device tree machine support
+      arm/imx6q: add suspend/resume support
+      MAINTAINERS: add ARM/FREESCALE IMX6 entry
+
+ Documentation/devicetree/bindings/arm/fsl.txt |    6 +
+ MAINTAINERS                                   |    7 +
+ arch/arm/Kconfig                              |    2 +-
+ arch/arm/Kconfig.debug                        |    7 +
+ arch/arm/Makefile                             |    2 +-
+ arch/arm/boot/dts/imx6q-sabreauto.dts         |   62 +
+ arch/arm/boot/dts/imx6q.dtsi                  |  575 +++++++
+ arch/arm/mach-imx/Kconfig                     |   30 +-
+ arch/arm/mach-imx/Makefile                    |   11 +
+ arch/arm/mach-imx/Makefile.boot               |   14 +-
+ arch/arm/mach-imx/clock-imx6q.c               | 2012 +++++++++++++++++++++++++
+ arch/arm/mach-imx/gpc.c                       |  113 ++
+ arch/arm/mach-imx/head-v7.S                   |   99 ++
+ arch/arm/mach-imx/hotplug.c                   |   44 +
+ arch/arm/mach-imx/lluart.c                    |   32 +
+ arch/arm/mach-imx/localtimer.c                |   35 +
+ arch/arm/mach-imx/mach-imx6q.c                |   84 +
+ arch/arm/mach-imx/mmdc.c                      |   72 +
+ arch/arm/mach-imx/platsmp.c                   |   85 ++
+ arch/arm/mach-imx/pm-imx6q.c                  |   70 +
+ arch/arm/mach-imx/src.c                       |   49 +
+ arch/arm/mm/Kconfig                           |    2 +-
+ arch/arm/plat-mxc/Kconfig                     |   11 +-
+ arch/arm/plat-mxc/Makefile                    |    2 +-
+ arch/arm/plat-mxc/gic.c                       |   48 +
+ arch/arm/plat-mxc/include/mach/common.h       |   29 +
+ arch/arm/plat-mxc/include/mach/debug-macro.S  |    2 +
+ arch/arm/plat-mxc/include/mach/entry-macro.S  |    6 +
+ arch/arm/plat-mxc/include/mach/hardware.h     |    6 +
+ arch/arm/plat-mxc/include/mach/irqs.h         |   10 +-
+ arch/arm/plat-mxc/include/mach/mx6q.h         |   33 +
+ 31 files changed, 3546 insertions(+), 14 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/fsl.txt
+ create mode 100644 arch/arm/boot/dts/imx6q-sabreauto.dts
+ create mode 100644 arch/arm/boot/dts/imx6q.dtsi
+ create mode 100644 arch/arm/mach-imx/clock-imx6q.c
+ create mode 100644 arch/arm/mach-imx/gpc.c
+ create mode 100644 arch/arm/mach-imx/head-v7.S
+ create mode 100644 arch/arm/mach-imx/hotplug.c
+ create mode 100644 arch/arm/mach-imx/lluart.c
+ create mode 100644 arch/arm/mach-imx/localtimer.c
+ create mode 100644 arch/arm/mach-imx/mach-imx6q.c
+ create mode 100644 arch/arm/mach-imx/mmdc.c
+ create mode 100644 arch/arm/mach-imx/platsmp.c
+ create mode 100644 arch/arm/mach-imx/pm-imx6q.c
+ create mode 100644 arch/arm/mach-imx/src.c
+ create mode 100644 arch/arm/plat-mxc/gic.c
+ create mode 100644 arch/arm/plat-mxc/include/mach/mx6q.h
