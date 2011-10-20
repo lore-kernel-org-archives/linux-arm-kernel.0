@@ -1,56 +1,26 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 20 Oct 2011 09:27:43 -0700
-Subject: [PATCH v2 3/5] regulator: helper routine to extract
-	regulator_init_data
-In-Reply-To: <20111020094140.GK18713@sirena.org.uk>
-References: <20111016145536.GA29885@S2100-06.ap.freescale.net>
-	<4E9BAC4D.3010402@ti.com>
-	<20111018115836.GC30703@S2100-06.ap.freescale.net>
-	<20111018160046.GD28501@opensource.wolfsonmicro.com>
-	<20111019053354.GB31162@S2100-06.ap.freescale.net>
-	<20111019144734.GI18713@sirena.org.uk>
-	<20111019150448.GB32007@S2100-06.ap.freescale.net>
-	<20111019151031.GA4275@opensource.wolfsonmicro.com>
-	<4E9F9892.9070007@ti.com> <20111020094140.GK18713@sirena.org.uk>
-Message-ID: <20111020162743.GB31337@atomide.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 20 Oct 2011 18:31:36 +0200
+Subject: [GIT PULL] at91: driver for Atmel true hardware random number
+	generator
+In-Reply-To: <4E9D92CD.6010008@atmel.com>
+References: <4E92BEE9.5090604@atmel.com> <4E9D92CD.6010008@atmel.com>
+Message-ID: <201110201831.36246.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Mark Brown <broonie@opensource.wolfsonmicro.com> [111020 02:07]:
-> On Thu, Oct 20, 2011 at 09:12:10AM +0530, Rajendra Nayak wrote:
-> > On Wednesday 19 October 2011 08:40 PM, Mark Brown wrote:
+On Tuesday 18 October 2011, Nicolas Ferre wrote:
+> On 10/10/2011 11:46 AM, Nicolas Ferre :
+> > Hi Arnd,
+> > 
+> > Here is a couple of patches for adding the True Random Number Generator
+> > that can be find on some AT91SAM SoCs.
+> > Herbert Xu told me that this material can go through the ARM SoC tree.
 > 
-> > >I don't see any issue with leaving some things out of the DT bindings;
-> > >you were the one raising that as a concern.
-> 
-> > The problem is, that there doesn't seem to be a clean way to embed
-> > *board data* into the kernel with DT, if left out of the DT bindings.
-> > There is the auxdata way of still attaching platform_data, but that I
-> > thought was a stopgap for just handling function pointers.
-> 
-> We can always start off just completely omitting the data and then see
-> how we go from there.  If we only cover 50% of users that's still 50%
-> more than are currently covered with device tree right now and it means
-> we can then spin round and look at the bits that are hard again without
-> review fatigue on the bits that are easy.
+> Ping?
 
-We still need to pass the board configuration somehow, otherwise we can
-never remove all the platform data glue layers. And if we can't do that,
-we'll forever have all the nasty merge conflicts when adding new drivers.
-And there's an unnecessary dependency between adding drivers and the
-core SoC code.
+I'm sorry I missed this at first. I've pulled it into the next/driver
+branch now.
 
-So we really need to remove all the platform data glue layers so driver
-probe can initialize things automagically.
+Thanks,
 
-Kernel cmdline is of course one way to pass options, but probably won't
-scale for all the board wirings.. And the kernel cmdline should really
-be for user configurable options.
-
-So should we just have a cmdline string for each DT entry to pass the
-board specific options from DT to the driver? Something along the
-lines module options?
-
-Regards,
-
-Tony
+	Arnd
