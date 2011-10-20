@@ -1,137 +1,153 @@
-From: dima@android.com (Dima Zavin)
-Date: Wed, 19 Oct 2011 17:32:32 -0700
-Subject: [patch] ARM: smpboot: Enable interrupts after marking CPU
-	online/active
-In-Reply-To: <CAPz4a6CkOXp6LHX2hFYVBhXWT4rhCUzLyYTLbO7g8u_jYcHt7Q@mail.gmail.com>
-References: <20110908215314.829452535@linutronix.de>
-	<CADGdYn6V_eQJZ4=irMbSS7XJj4MJVeALxcrWdD7o2bGs1sEJZQ@mail.gmail.com>
-	<20110913133258.GA6267@n2100.arm.linux.org.uk>
-	<CAKfTPtCWuiOM5+sOwdh1FzXZb1EFT__tVEpRPY5suGOxpYTdQQ@mail.gmail.com>
-	<20110913175312.GB6267@n2100.arm.linux.org.uk>
-	<20110923084001.GP17169@n2100.arm.linux.org.uk>
-	<01d501cc84d6$62720890$275619b0$%kim@samsung.com>
-	<alpine.LFD.2.02.1110071354310.3240@ionos>
-	<CAPz4a6CkOXp6LHX2hFYVBhXWT4rhCUzLyYTLbO7g8u_jYcHt7Q@mail.gmail.com>
-Message-ID: <CAPz4a6C7md+k8pCz6mJtB-v_1h-faGxQZkOqU9vHUtcG-jrYVQ@mail.gmail.com>
+From: tim.bird@am.sony.com (Tim Bird)
+Date: Wed, 19 Oct 2011 18:08:19 -0700
+Subject: [PATCH 0/3] ARM 4Kstacks: introduction
+In-Reply-To: <yw1xvcrkr03h.fsf@unicorn.mansr.com>
+References: <4E9E0B71.9020708@am.sony.com>	<20111019073547.GR21648@n2100.arm.linux.org.uk>	<4E9F5F1B.1020106@am.sony.com>
+	<yw1xvcrkr03h.fsf@unicorn.mansr.com>
+Message-ID: <4E9F7483.9050608@am.sony.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-<go go gadget message retractor>
+On 10/19/2011 05:13 PM, ? wrote:
+> Tim Bird <tim.bird@am.sony.com> writes:
+>> Well, the difference in size is not an order of magnitude.  Current
+>> stacks are only twice as big as what this feature optionally allows.
+>> So people really shouldn't go crazy with their stack usage.
+>>
+>> Granted we're already seeing a bit of stack bloat, but IMHO this should
+>> be nipped in the bud.  If the stack grows a lot more, it will likely
+>> need to shift to 16K, which would REALLY be costly on machines
+>> with lots of threads and low memory.
+> 
+> In binary, 8k is an order of magnitude greater than 4k.
+Touche' ;-)
 
-Looks like the issue ended up being the fact that the caller was
-accessing the cpu_online_mask without calling get_online_cpus anywhere
-in the path and could have picked up the the intermediate state where
-CPU was online but not yet active..
+> Having suffered
+> the consequences of 4k stacks on x86, I have to side with those
+> reluctant to include this.
 
---Dima
+Can you please provide more detail on what consequences
+you suffered?  I think it would help the discussion.
 
-On Wed, Oct 19, 2011 at 2:16 PM, Dima Zavin <dima@android.com> wrote:
-> Thomas,
->
-> I was seeing something similar, and this patch did address part of it,
-> but I still think we have a problem. What I am seeing is the
-> following:
->
-> We have a SCHED_FIFO kernel thread which tries to do a blocking IPI
-> (smp_call_function_single) to all online cpus (for_each_online_cpu).
-> This introduces a deadlock where the FIFO thread could be preempting
-> the suspend thread which is the one that's trying to set the second
-> CPU active after it sees it going online. The second CPU marked itself
-> online and is then waiting for the first CPU to mark it active before
-> enabling irqs to service the IPI.
->
-> It feels to me like we should probably not be sending blocking IPIs
-> from a FIFO thread for sanity reasons, but that does mean there's
-> still a deadlock present here.
->
-> Thoughts?
->
-> Thanks in advance.
->
-> --Dima
->
-> On Fri, Oct 7, 2011 at 5:17 AM, Thomas Gleixner <tglx@linutronix.de> wrote:
->> On Fri, 7 Oct 2011, Kukjin Kim wrote:
->>> I think, basically, if SPIs in GIC are used in local timer, the routing
->>> interrupt like calling irq_set_affinity() to offline CPUs should be
->>> available when boot time before calling set_cpu_online() because as you know
->>> the local_timer_setup() which includes setup interrupt is called in
->>> percpu_timer_setup() now...
->>>
->>> Is there any way to get the flags of struct irqaction from struct irq_data
->>> in gic_set_affinity()? Or?
+If you had some examples where the burden of supporting 4K stacks
+was onerous, that would be useful.  I know that defaulting it to
+'Y' introduced lots of subtle bugs that desktop users had issues
+with.  The situation is completely different in deeply embedded,
+because our user-space is completely constrained and controlled.
+
+Also, there are a now a plethora of stack depth monitoring, guarding,
+and reporting tools already in mainline, some of which weren't
+there during the painful era.
+
+>> I don't want to give up on a small-footprint Linux so easily,
+>> and the discipline for keeping stacks small is probably good
+>> for code hygiene anyway.
+> 
+> I see your point of view, but an optional setting available only on an
+> architecture not used by the majority is probably not going to have much
+> of an impact on code hygiene.
+> 
+> 4k stacks were tried, and the conclusion was that too much of the kernel
+> simply cannot work within so small a space.  Maintaining a list of safe
+> (or unsafe) combinations is probably not feasible either.
+
+That's not what was in the message of the commit that removed them
+on x86.  Instead it was conjecture about high numbers of threads
+being only applicable to x86_64.
+
+Are you basing the conclusion above on conjecture or measurement?  In
+my configuration, the worst code paths are using approximately 2K of
+stack most of the time, and peak out at about 2.5K.
+
+>>> If we switch to 4K stacks, the problems of stack usage become ours.
+>>> Do we have the capacity to be able to address these issues as they
+>>> crop up?
 >>
->> No, and you should not even think about it at all.
+>> Since it's optional, it would become the problem of the people
+>> who actually use the option.  If you think tracking down stack
+>> abusers is going to be a pain, just don't do it.
+> 
+> It will still be one more thing to sanity check in every bug report.
+> The end result will be more crashes going ignored due to lacking
+> information, and I don't think that's a good thing.
+
+I don't think mainline is overwhelmed with bug reports from
+embedded developers.  Most of the time, embedded devs are so far behind
+in kernel version that they can't reasonably (and don't) report many
+bugs found. (I know that this is not helping my case, but I'm trying to be
+honest here.)
+
+If 4K stacks were being turned on for the general population of Linux
+users, then I would agree with you.  But this will likely only be
+turned on by a few people, in controlled situations. If you think
+tainting the kernel would help with the bug reporting, I'd be
+OK with that.  We could introduce a "crazy embedded config - you're
+on your own" taint flag.
+
+> 
+>> If I do it, and get pushback, then I'll make the case to individual
+>> function authors, and we'll see what happens from there.  As it is,
+>> this patch has been useful for me, and continues to be useful
+>> even in the current kernel version, with no other changes
+>> required in mainline.
 >>
->> The problem I can see from all this discussion is related to the early
->> enabling of interrupts and the per cpu timer setup before the cpu is
->> marked online. I really do not understand at all why this needs to be
->> done in order to call calibrate_delay().
+>> Having said this, I've written a tool to rather easily identify
+>> the functions which use the most stack, and so far the routines
+>> I've looked at have had rather simple solutions.  It almost always
+>> boils down to a single big data item on the stack.
+> 
+> Chasing heavy stack consumers is of course always a good thing, whatever
+> the stack size.
+> 
+>> I can understand if people don't want to take patches which
+>> unconditionally limit their stack usage - especially if there's
+>> a performance impact. But I don't see much rationale for not
+>> limiting their stack usage conditionally (that is, do something
+>> slightly different on #ifdef CONFIG_4KSTACKS).  If people
+>> object to even that, then I'll maintain those patches out of
+>> tree, if they're really needed.
+> 
+> Having such a conditional increases the maintenance burden for that
+> function.  Changes will be made without testing the 4k alternative,
+> which sooner or later will break, possibly in subtle ways.
+
+Which will affect no one but those who opt in.  I just don't
+think the maintenance burden will be that big.  (At least,
+no one need be bothered by this, unless contacted by someone
+who cares.)
+
+>> Once again, our products work even without such patches now,
+>> based on the configs we're using and the user-space we're running.
+>> Note that this is defaulted to 'N', so no one should be negatively
+>> affected unless they opt in.
 >>
->> calibrate_delay() monitors jiffies, which are updated from the CPU
->> which is waiting for the new CPU to set the online bit.
->>
->> So you simply can call calibrate_delay() on the new CPU just from the
->> interrupt disabled region and move the local timer setup after you
->> stored the cpu data and before enabling interrupts.
->>
->> This solves both the cpu_online vs. cpu_active problem and the
->> affinity setting of the per cpu timers.
->>
->> Thanks,
->>
->> ? ? ? ?tglx
->> ----
->> Index: linux-2.6/arch/arm/kernel/smp.c
->> ===================================================================
->> --- linux-2.6.orig/arch/arm/kernel/smp.c
->> +++ linux-2.6/arch/arm/kernel/smp.c
->> @@ -301,17 +301,7 @@ asmlinkage void __cpuinit secondary_star
->> ? ? ? ? */
->> ? ? ? ?platform_secondary_init(cpu);
->>
->> - ? ? ? /*
->> - ? ? ? ?* Enable local interrupts.
->> - ? ? ? ?*/
->> ? ? ? ?notify_cpu_starting(cpu);
->> - ? ? ? local_irq_enable();
->> - ? ? ? local_fiq_enable();
->> -
->> - ? ? ? /*
->> - ? ? ? ?* Setup the percpu timer for this CPU.
->> - ? ? ? ?*/
->> - ? ? ? percpu_timer_setup();
->>
->> ? ? ? ?calibrate_delay();
->>
->> @@ -323,10 +313,23 @@ asmlinkage void __cpuinit secondary_star
->> ? ? ? ? * before we continue.
->> ? ? ? ? */
->> ? ? ? ?set_cpu_online(cpu, true);
->> +
->> + ? ? ? /*
->> + ? ? ? ?* Setup the percpu timer for this CPU.
->> + ? ? ? ?*/
->> + ? ? ? percpu_timer_setup();
->> +
->> ? ? ? ?while (!cpu_active(cpu))
->> ? ? ? ? ? ? ? ?cpu_relax();
->>
->> ? ? ? ?/*
->> + ? ? ? ?* cpu_active bit is set, so it's safe to enable interrupts
->> + ? ? ? ?* now.
->> + ? ? ? ?*/
->> + ? ? ? local_irq_enable();
->> + ? ? ? local_fiq_enable();
->> +
->> + ? ? ? /*
->> ? ? ? ? * OK, it's off to the idle thread for us
->> ? ? ? ? */
->> ? ? ? ?cpu_idle();
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>
->
+>> So, I understand your point.  I would, however, like to have
+>> this patch applied, and then deal with any problems as they
+>> come up, rather than preemptively kill the feature on speculative
+>> problems.
+> 
+> An option that will probably, let's be realistic, only be used by you
+> doesn't really belong in mainline.  You are essentially asking everybody
+> else to carry the burden of supporting something only you seem to need.
+
+I'm not so sure that I'm the only one interested in this.
+I'll ask around and see if I can find others.  I'll have
+a good chance at ELC Europe next week.
+
+But in general this attitude is really depressing.  I can
+remember when support for niche use cases was considered good.
+I understand the tradeoff if the maintenance burden is high,
+but I'm not convinced it is.  I don't expect anyone to
+proactively guard against or remedy stack depth issues.  But if
+they'd be open to accepting patches from those who care, that'd
+be nice.
+
+If you're saying that Linux is only for use on general purpose
+platforms, and deeply embedded doesn't matter, I think that's sad.
+ -- Tim
+
+=============================
+Tim Bird
+Architecture Group Chair, CE Workgroup of the Linux Foundation
+Senior Staff Engineer, Sony Network Entertainment
+=============================
