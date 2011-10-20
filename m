@@ -1,61 +1,42 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 20 Oct 2011 14:04:49 +0100
-Subject: [GIT PULL] genirq support for GIC PPIs
-In-Reply-To: <4EA00E7F.8060007@arm.com>
-References: <4E9FF695.10604@arm.com>
-	<20111020112724.GZ21648@n2100.arm.linux.org.uk>
-	<4EA00E7F.8060007@arm.com>
-Message-ID: <20111020130449.GC21648@n2100.arm.linux.org.uk>
+From: david.yangshuai@gmail.com (David Yang)
+Date: Thu, 20 Oct 2011 21:05:45 +0800
+Subject: Question about: linux-linaro-2.6.38.7 booting the ubuntu 10.10
+	filesystem
+In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB5930328B2D77E@dbde02.ent.ti.com>
+References: <CALQsFO+o+zQJZiksb+2fW8b_kdTv6tqhjxYU6owv=hMhbk=92A@mail.gmail.com>
+	<CAK5ve-LetP_jUyi22T0QhPkHgNqjFBuzuMa5+VnEfWvzFpy3Wg@mail.gmail.com>
+	<CALQsFO+iuraeVVDZLWL5JUibNE2a-WC3ksGj3PV=tPWfuhJX9A@mail.gmail.com>
+	<CALQsFOJ+kYQ9iJfAPhcHtcWwA9A-5TFbUe+oyiTWrar=ZSN1_g@mail.gmail.com>
+	<B85A65D85D7EB246BE421B3FB0FBB5930328693B98@dbde02.ent.ti.com>
+	<CALQsFOJHiLVskuhGe-OsK8PdUxuR8Lv9idJcmf8vZEumenBUnw@mail.gmail.com>
+	<CALQsFOLs-Jz5-yPGOZkpqumgUUq8V90mCrEJ1EBPvXSwMbVM3A@mail.gmail.com>
+	<B85A65D85D7EB246BE421B3FB0FBB5930328B2D77E@dbde02.ent.ti.com>
+Message-ID: <CALQsFOKEXCmaHdo7hj25CgjYFijodu6qs1okSwkfNPmuOz6GJg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 20, 2011 at 01:05:19PM +0100, Marc Zyngier wrote:
-> On 20/10/11 12:27, Russell King - ARM Linux wrote:
-> > On Thu, Oct 20, 2011 at 11:23:17AM +0100, Marc Zyngier wrote:
-> >> The following changes since commit 5a567d78c437e3be1c512734cdfe64b4ae6b82d7:
-> >>   Jamie Iles (1):
-> >>         ARM: 7115/4: move __exception and friends to asm/exception.h
-> >>
-> >> are available in the git repository at:
-> >>
-> >>   git://github.com/mzyngier/arm-platforms.git ppi-for-rmk
-> >>
-> >> Marc Zyngier (4):
-> >>       genirq: Add support for per-cpu dev_id interrupts
-> >>       genirq: percpu: allow interrupt type to be set at enable time
-> >>       ARM: gic: consolidate PPI handling
-> >>       ARM: gic, local timers: use the request_percpu_irq() interface
-> >>
-> >> Thomas Gleixner (1):
-> >>       genirq: Fix fatfinered fixup really
-> > 
-> > I thought you said some of these were in Thomas' tree already?
-> 
-> The first three patches are in Thomas' tree indeed. I could drop them
-> from my branch, but the resulting tree would not compile anymore.
-> 
-> What strategy would cause the least merging pain?
+hi,Afzal
 
-The only thing I can think is that you need to start off with a tree
-with 5a567d78c437e3be1c512734cdfe64b4ae6b82d7 as the top commit,
-merge into that the last commit which you need from Thomas' tree
-(iow, "genirq: percpu: allow interrupt type to be set at enable time"
-or maybe "genirq: Fix fatfinered fixup really") and then apply the
-last two GIC patches on top of that merge commit.
+  It's not zero.
 
-However, I guess Thomas already has many other commits queued up for
-mainline before these changes - which would make those commits become
-part of my tree.
 
-That causes problems because if Thomas pushes first, my tree ends up
-with multiple ancestors, which makes it impossible to generate a
-diffstat for my push to Linus.  The flip-side is if I push before
-Thomas, then I'm pushing Thomas' commits into mainline myself (which
-means I then need to explain Thomas' generic changes to Linus and why
-they're part of my tree.)
 
-Cross-tree dependencies like this really suck.
+Best Regards,
+Shuai
 
-I'm really tempted to postpone this to the following merge window to
-'solve' these dependencies (because by that time their dependencies
-should all be merged into mainline, which makes things nice and simple.)
+On 10/20/11, Mohammed, Afzal <afzal@ti.com> wrote:
+> Hi David,
+>
+> On Thu, Oct 20, 2011 at 17:32:25, David Yang wrote:
+>> another log when booting ubuntu10.10:
+>>
+>>
+>> the PC stopped at futex_wake() again!
+>>
+>
+> Please pass "printk.time=1" from commandline, and check the
+> Kernel logs whether timing shown are zero.
+>
+> Regards
+> Afzal
+>
