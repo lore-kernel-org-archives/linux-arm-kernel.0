@@ -1,37 +1,30 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 20 Oct 2011 23:17:08 +0200
-Subject: [GIT PULL] GIC DT binding support
-In-Reply-To: <4EA08DD0.1090706@gmail.com>
-References: <4E97A601.1020005@gmail.com>
-	<20111020185612.GD21648@n2100.arm.linux.org.uk>
-	<4EA08DD0.1090706@gmail.com>
-Message-ID: <4222689.nWCbSCrufR@wuerfel>
+Date: Fri, 21 Oct 2011 00:23:33 +0200
+Subject: [GIT PULL] i.MX6Q support
+In-Reply-To: <20111020211834.GF21648@n2100.arm.linux.org.uk>
+References: <20111020171158.GJ32007@S2100-06.ap.freescale.net>
+	<20111020211834.GF21648@n2100.arm.linux.org.uk>
+Message-ID: <109937284.AlYUSiDe0P@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 20 October 2011 16:08:32 Rob Herring wrote:
-> > unintended dependencies.  That's got to be a good thing.
+On Thursday 20 October 2011 22:18:34 Russell King - ARM Linux wrote:
+> On Fri, Oct 21, 2011 at 01:11:59AM +0800, Shawn Guo wrote:
+> > Please pull imx6q series.  It's based on v3.1-rc10 with the following
+> > branches merged plus a number of cache-l2x0 patches currently sitting
+> > on rmk/for-next.
 > 
-> Understood, but from a git perspective the commit ids have changed.
-> While git can deal with trivial re-commits like this, my understanding
-> is that should be avoided for upstream merges. Otherwise, I could just
-> cherry-pick them and re-commit them in my tree.
-> 
-> Ultimately, the people working off of those branches do need them to be
-> stable to merge their branches. So are you saying your l2x0 branch
-> (91c2ebb90b1890abc648ba9dec5608cbc97e1cb9) is now stable? Can you
-> publish it as a branch. iMX6Q is also dependent on it.
+> Don't do that.  If there's something you need, ask me.  The L2x0
+> patches got shuffled out into their own branch when the SMP and debug
+> patches got split out of the 'misc' branch.
 
-The point is that Russell's 'misc' branch is not stable, which helps a lot
-because it lets him commit stuff early for testing and then take it out
-again when it turns out to be buggy. The for-next branch in Russell's
-tree is not stable and gets recreated by pulling in the other branches.
-This is similar to what I do with the arm-soc for-next branch, which 
-is the sum of the other next/* branches in arm-soc.
+Since I already had the branches at hand for the highbank tree, I
+gave this a go and rebased the imx6q branch on top of the stable branches
+that are there and confirmed that it actually builds.
 
-My understanding is that the other branches in Russell's tree are stable in
-the sense that they are never rebased, though it might happen that the entire
-branch does not get submitted if a problem gets found with the series. That of
-course implies that all other dependent trees cannot get submitted.
+I have pulled the result into the next/soc branch along with highbank
+and picoxcell.
+
+Shawn and Sascha, can you confirm that this is correct?
 
 	Arnd
