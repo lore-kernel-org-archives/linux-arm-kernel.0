@@ -1,32 +1,27 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 20 Oct 2011 19:56:12 +0100
-Subject: [GIT PULL] GIC DT binding support
-In-Reply-To: <4EA055AF.4030207@gmail.com>
-References: <4E97A601.1020005@gmail.com> <201110201507.38722.arnd@arndb.de>
-	<4EA03160.1050304@gmail.com> <201110201812.29202.arnd@arndb.de>
-	<4EA055AF.4030207@gmail.com>
-Message-ID: <20111020185612.GD21648@n2100.arm.linux.org.uk>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 20 Oct 2011 20:56:38 +0100
+Subject: [PATCH v2 3/5] regulator: helper routine to extract
+	regulator_init_data
+In-Reply-To: <20111020170534.GC31337@atomide.com>
+References: <20111018160046.GD28501@opensource.wolfsonmicro.com>
+	<20111019053354.GB31162@S2100-06.ap.freescale.net>
+	<20111019144734.GI18713@sirena.org.uk>
+	<20111019150448.GB32007@S2100-06.ap.freescale.net>
+	<20111019151031.GA4275@opensource.wolfsonmicro.com>
+	<4E9F9892.9070007@ti.com> <20111020094140.GK18713@sirena.org.uk>
+	<20111020162743.GB31337@atomide.com>
+	<20111020164006.GA10155@sirena.org.uk>
+	<20111020170534.GC31337@atomide.com>
+Message-ID: <20111020195638.GA17384@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 20, 2011 at 12:09:03PM -0500, Rob Herring wrote:
-> highbank/soc doesn't build. It needs Russell's l2x0 and io branches.
-> l2x0 has been rebased recently, but the io branch seems to be stable
-> (but not published externally).
+On Thu, Oct 20, 2011 at 10:05:34AM -0700, Tony Lindgren wrote:
 
-Actually, l2x0 _hasn't_.  Let's be clear about what happened.  A load
-of patches were all merged into the 'misc' branch over time, containing
-multiple different subjects.  At the time they were merged there was
-no clear separate line of development of each sub-system, so they
-just ended up in a common branch without any particular ordering or
-grouping.
+> Right, but in addition the board specific integration variables still
+> need to be passed somehow to the driver.
 
-People wanted to base work on a select few of those commits.  Rather
-than having the entire set of commits merged into various peoples trees,
-many of which have nothing to do with what they were working on, I
-split various commits out of the 'misc' branch and created a set of
-more fine-grained topic branches.
-
-That is arguably not rebasing - it is re-committing, in such a way that
-those parts can then be frozen, stabilized and published without
-unintended dependencies.  That's got to be a good thing.
+I'm not sure you're aware of what the regulator bindings that are being
+discussed are - they're entirely board specific.  The discussion was
+about how to handle certain parts of the feature set Linux currently
+has.
