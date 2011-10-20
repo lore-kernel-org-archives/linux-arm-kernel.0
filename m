@@ -1,92 +1,41 @@
-From: david.yangshuai@gmail.com (David Yang)
-Date: Thu, 20 Oct 2011 16:33:49 +0800
-Subject: Question about: linux-linaro-2.6.38.7 booting the ubuntu 10.10
-	filesystem
-In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB5930328693B98@dbde02.ent.ti.com>
-References: <CALQsFO+o+zQJZiksb+2fW8b_kdTv6tqhjxYU6owv=hMhbk=92A@mail.gmail.com>
-	<CAK5ve-LetP_jUyi22T0QhPkHgNqjFBuzuMa5+VnEfWvzFpy3Wg@mail.gmail.com>
-	<CALQsFO+iuraeVVDZLWL5JUibNE2a-WC3ksGj3PV=tPWfuhJX9A@mail.gmail.com>
-	<CALQsFOJ+kYQ9iJfAPhcHtcWwA9A-5TFbUe+oyiTWrar=ZSN1_g@mail.gmail.com>
-	<B85A65D85D7EB246BE421B3FB0FBB5930328693B98@dbde02.ent.ti.com>
-Message-ID: <CALQsFOJHiLVskuhGe-OsK8PdUxuR8Lv9idJcmf8vZEumenBUnw@mail.gmail.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Thu, 20 Oct 2011 16:37:32 +0800
+Subject: [PATCH v2] UART: add CSR SiRFprimaII SoC on-chip uart drivers
+In-Reply-To: <CAKnu2MqUW=6tH0A1Zae0MgMyKiU4X26c0jGCQFKeJrxJA2GyzA@mail.gmail.com>
+References: <1318570799-3785-1-git-send-email-Barry.Song@csr.com>
+	<CAGsJ_4w6fGH+G9KapHXzCwMhz_NKfPdCxs7rF5hWKw2LGUpwWA@mail.gmail.com>
+	<20111018181319.GA7015@kroah.com>
+	<CAGsJ_4xJzL6dfSmmae8LH6kt2g1PmevgrFWgYLR3Tif8PD0bCQ@mail.gmail.com>
+	<CAKnu2MqUW=6tH0A1Zae0MgMyKiU4X26c0jGCQFKeJrxJA2GyzA@mail.gmail.com>
+Message-ID: <CAGsJ_4wLbqRfxVh=kugLnzBYCRLjok6aKgUW-u-qyEqyMTv6=Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi,Afzal
-
-  Thanks for your reply!
-
-  I don't know which CONFIG of kernel affects the timestamps.
-
- AND NOW:
-  when I stop the rsyslogd daemon when booting ubuntu9.10 console
-filesytem.I can get the login prompt now! I will try ubuntu10.10
-Desktop later.
-
-
-
-Best Regards,
-David
-
-
-On 10/20/11, Mohammed, Afzal <afzal@ti.com> wrote:
-> Hi David,
->
-> On Thu, Oct 20, 2011 at 12:46:40, David Yang wrote:
->> After lots of fails,once time I got the failure log from the serial
->> console:
+2011/10/20 Linus Walleij <linus.ml.walleij@gmail.com>:
+> 2011/10/19 Barry Song <21cnbao@gmail.com>:
+>> 2011/10/19 Greg KH <greg@kroah.com>:
+>>> So should it go through the pinmux tree? ?Or do you want to wait for the
+>>> 3.3 kernel release to get this merged?
 >>
->> Unable to handle kernel paging request at virtual address e3500001
->> pgd = d3b4c000
->> [e3500001] *pgd=00000000
->> Internal error: Oops: 5 [#1]
->> last sysfs file:
->> Modules linked in:
->> CPU: 0    Tainted: G        W    (2.6.38.7-gb206aa6-dirty #77)
->> PC is at futex_wake+0xd0/0x104
->> LR is at futex_wake+0x50/0x104
->> pc : [<c00682fc>]    lr : [<c006827c>]    psr: a0000013
->> sp : d3073ea8  ip : d3073e88  fp : 40b9d6a4
->> r10: 00000000  r9 : 00000001  r8 : c0914b88
->> r7 : 00000000  r6 : ffffffff  r5 : 00000001  r4 : e34ffff5
->> r3 : 0005d000  r2 : e594301c  r1 : 0e327082  r0 : c003fc24
->> Flags: NzCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment user
->> Control: 10c53c7d  Table: 93b4c059  DAC: 00000015
->> Process rsyslogd (pid: 587, stack limit = 0xd30722e8)
->> Stack: (0xd3073ea8 to 0xd3074000)
->> 3ea0:                   0005dab8 0005d000 d30a4c00 00000ab8 00000001
->> 00000002
->> 3ec0: 0005dab8 00000000 00000001 c0069854 00000021 40b9cbfc d3b047f0
->> 00000021
->> 3ee0: 00000021 00000000 fffffffa 00000245 00000000 d3b04d2c 00000000
->> 0000002e
->> 3f00: 00000000 d3b04d2c 00000000 00000000 d3802300 000000d0 c0914614
->> d3b04ba0
->> 3f20: 00000002 d3be9a80 d30090c0 00000002 d30090c4 00000001 00000000
->> 00000081
->> 3f40: 0005dab8 c0032844 00000001 00000000 40b9d6a4 c006a0e8 00000002
->> 00000000
->> 3f60: ffffffff d30721b0 00000100 00000000 40b9c778 d3073fb0 40b9c6f8
->> 0005e6a8
->> 3f80: 000000ad 00000002 0005dab8 00000002 000000f0 c0032844 d3072000
->> 00000000
->> 3fa0: 40b9d6a4 c0032680 00000002 0005dab8 0005dab8 00000081 00000001
->> 00000000
->> 3fc0: 00000002 0005dab8 00000002 000000f0 0003d8c0 0004043c 00040418
->> 40b9d6a4
->> 3fe0: 00000000 40b9cab8 4010ae24 4010ae4c 20000010 0005dab8 93ffe821
->> 93ffec21
->> [<c00682fc>] (futex_wake+0xd0/0x104) from [<c0069854>]
->> (do_futex+0xb8/0x804)
->> [<c0069854>] (do_futex+0xb8/0x804) from [<c006a0e8>]
->> (sys_futex+0x148/0x160)
->> [<c006a0e8>] (sys_futex+0x148/0x160) from [<c0032680>]
->> (ret_fast_syscall+0x0/0x30)
->> Code: e2877001 ebffffb4 e1570005 aa000007 (e594300c)
->> ---[ end trace 887204a6d10c91ae ]---
+>> i think we can go ahead through Linux W's pinmux tree. Linus, would
+>> you like to take care once Alan ack this.
 >
-> Is printk time showing "0" timestamps for this Kernel ?
+> It's a bit late, and I don't know if Torvalds will pull my pin control tree
+> yet, that's uncertain since it's an all new subsystem. It's stabilizing
+> for the merge window.
 >
-> Regards
-> Afzal
+> I would suggest that you see if my tree gets pulled in the merge
+> window, and if and when it does, send the patch as a single patch
+> directly to Torvalds with Alan's ACK and explain the situation
+> with cross-dependence and all.
+
+thanks. that is ok to me. i suppose Torvalds will pull your tree in
+this merge window or next.
+
+if this window, i will send that to Torvalds, if next, i'd like to go
+through this tree and get merged in 3.3 together with your pinmux.
+
 >
+> Linus Walleij
+>
+-barry
