@@ -1,21 +1,24 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 20 Oct 2011 15:00:22 +0200
-Subject: [GIT PULL] Please pull tegra cleanups for 3.2
-In-Reply-To: <CAOesGMh9OSKpggk2d4PUwKsQwgYcpiO9rc3ukdp2s4X13djT=Q@mail.gmail.com>
-References: <CAOesGMjVAJK2ArOdpYNmKa11vqCfppi8Ofc0qGn4WxuMxLvd_Q@mail.gmail.com>
-	<201110131716.18358.arnd@arndb.de>
-	<CAOesGMh9OSKpggk2d4PUwKsQwgYcpiO9rc3ukdp2s4X13djT=Q@mail.gmail.com>
-Message-ID: <201110201500.22809.arnd@arndb.de>
+From: msalter@redhat.com (Mark Salter)
+Date: Thu, 20 Oct 2011 09:02:57 -0400
+Subject: [PATCH] arm: fix handling of nr_cpus
+In-Reply-To: <20111020112552.GY21648@n2100.arm.linux.org.uk>
+References: <1318339864-32396-1-git-send-email-msalter@redhat.com>
+	<20111012172628.GC21648@n2100.arm.linux.org.uk>
+	<1318508268.2300.67.camel@deneb.redhat.com>
+	<20111013151004.GF21648@n2100.arm.linux.org.uk>
+	<1318943804.2346.15.camel@deneb.redhat.com>
+	<20111020112552.GY21648@n2100.arm.linux.org.uk>
+Message-ID: <1319115778.14825.17.camel@deneb.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 14 October 2011, Olof Johansson wrote:
-> Based on discussion on IRC, I pulled in the edit into the original
-> commit instead and rebased the branch.
+On Thu, 2011-10-20 at 12:25 +0100, Russell King - ARM Linux wrote:
+> On Tue, Oct 18, 2011 at 09:16:43AM -0400, Mark Salter wrote:
+> > That's fine by me. mach-msm, mach-shmobile, and mach-vexpress also need
+> > patching. They currently don't clip against NR_CPUS.
 > 
-> I also added the devices.c fix that I posted yesterday, so here is a
-> new pull request.
+> So more like this then?
 
-Pulled now, thanks!
+Yes. That works for me.
 
-	Arnd
+--Mark
