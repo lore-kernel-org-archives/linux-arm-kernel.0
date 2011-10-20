@@ -1,188 +1,78 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Thu, 20 Oct 2011 09:09:10 +0200
-Subject: [PATCH 2/3] ARM: AT91: IIO: Add AT91 ADC driver.
-In-Reply-To: <1319041134-19712-3-git-send-email-maxime.ripard@free-electrons.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 20 Oct 2011 09:14:16 +0200
+Subject: [PATCH 3/3] ARM: AT91: Add the ADC to the sam9g20ek board
+In-Reply-To: <1319041134-19712-4-git-send-email-maxime.ripard@free-electrons.com>
 References: <1319041134-19712-1-git-send-email-maxime.ripard@free-electrons.com>
-	<1319041134-19712-3-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <4E9FC916.2070800@metafoo.de>
+	<1319041134-19712-4-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20111020091416.1e90828c@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/19/2011 06:18 PM, Maxime Ripard wrote:
-> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-> Cc: Patrice Vilchez <patrice.vilchez@atmel.com>
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  [...]
-> +
-> +#define at91adc_reg_read(base, reg)        __raw_readl((base) + (reg))
-> +#define at91adc_reg_write(base, reg, val)  __raw_writel((val), (base) + (reg))
+Le Wed, 19 Oct 2011 18:18:54 +0200,
+Maxime Ripard <maxime.ripard@free-electrons.com> a ?crit :
 
-Shouldn't this rather be {readl,writel}_relaxed?
+> +void __init at91_add_device_adc(struct at91_adc_data *data)
+> +{
+> +	if (!data)
+> +		return;
+> +
+> +	at91_set_A_periph(AT91_PIN_PC0, 0);
+> +	at91_set_A_periph(AT91_PIN_PC1, 0);
+> +	at91_set_A_periph(AT91_PIN_PC2, 0);
+> +	at91_set_A_periph(AT91_PIN_PC3, 0);
 
-> +
-> +struct at91adc_state {
-> +	struct clk *clk;
-> +	bool done;
-> +	struct mutex lock;
-> +	struct iio_chan_spec *channels;
-> +	int nb_chan;
-> +	int irq;
-> +	wait_queue_head_t wq_data_avail;
-> +	u16 lcdr;
-> +	void __iomem *reg_base;
-> +
+As suggested, the decision of which ADC channels are used and therefore
+which pins should be muxed to function A is a board-specific decision
+and should not be enforced by SoC code.
+
+> +static struct at91_adc_data ek_adc_data = {
+> +	.channels = 4,
+> +	.adc_clock = 5000000,
+> +	.startup_time = 10,
 > +};
-> +
-> +static irqreturn_t at91adc_eoc_trigger(int irq, void *private)
-> +{
-> +	int chan;
-> +	struct at91adc_state *st = private;
-> +	struct iio_dev *idev = iio_priv_to_dev(st);
-> +	unsigned int status = at91adc_reg_read(st->reg_base, AT91_ADC_SR);
-> +
-> +	if (!(status & AT91_ADC_DRDY))
-> +		return IRQ_HANDLED;
-> +
-> +	for (chan = 0; chan < st->nb_chan; chan++) {
-> +		if (status & AT91_ADC_EOC(chan)) {
-> +			st->done = true;
-> +			st->lcdr = at91adc_reg_read(st->reg_base,
-> +						    AT91_ADC_CHR(chan));
-> +		}
-> +	}
-> +	wake_up_interruptible(&st->wq_data_avail);
-> +
-> +	return IRQ_HANDLED;
-> +}
-> +
-> +static int at91adc_channel_init(struct at91adc_state *st)
-> +{
-> +	int ret = 0, i;
-> +	st->channels = kzalloc(sizeof(struct iio_chan_spec) * st->nb_chan,
-> +			       GFP_KERNEL);
 
-kcalloc
+And on the opposite, those informations are specific to a SoC, not to a
+board. So to avoid duplication in all board files, they should be moved
+to the corresponding SoC file.
 
-> +	if (st->channels == NULL)
-> +		return -ENOMEM;
-> +
-> +	for (i = 0; i < st->nb_chan; i++) {
-> +		struct iio_chan_spec *chan = st->channels + i;
-> +		chan->type = IIO_VOLTAGE;
-> +		chan->indexed = 1;
-> +		chan->channel = i;
+Maybe something like:
 
+#define AT91_ADC_MAX_CHANNELS 8
 
-It probably makes sense to initialize scan_type as well.
+struct at91_adc_data {
+    unsigned int adc_clock;
+    u8 channels_used[AT91_ADC_MAX_CHANNELS];
+    u8 startup_time;
+    u8 channels;
+};
 
-> +		++ret;
-> +	}
-> +
-> +	return ret;
+at91_add_device_adc() {
+	if (data->channels_used[0])
+		at91_set_A_periph(AT91_PIN_PC0, 0);
+	if (data->channels_used[1])
+		at91_set_A_periph(AT91_PIN_PC1, 0);
+	if (data->channels_used[2])
+		at91_set_A_periph(AT91_PIN_PC2, 0);
+	if (data->channels_used[3])
+		at91_set_A_periph(AT91_PIN_PC3, 0);
+	data->startup_time = ...
+	data->channels = ...
+	data->adc_clock = ...
+}
 
-Why do you need ret? Shouldn't this be just st->nb_chan?
+and the board file would do:
 
-> +}
-> +
-> +static int at91adc_read_raw(struct iio_dev *idev,
-> +			    struct iio_chan_spec const *chan,
-> +			    int *val, int *val2, long mask)
-> +{
-> +	struct at91adc_state *st = iio_priv(idev);
-> +
-> +	switch (mask) {
-> +	case 0:
-> +		mutex_lock(&st->lock);
-> +
-> +		at91adc_reg_write(st->reg_base, AT91_ADC_CHER,
-> +				  AT91_ADC_CH(chan->channel));
-> +		at91adc_reg_write(st->reg_base, AT91_ADC_IER,
-> +				  AT91_ADC_EOC(chan->channel));
-> +		at91adc_reg_write(st->reg_base, AT91_ADC_CR, AT91_ADC_START);
-> +
-> +		wait_event_interruptible(st->wq_data_avail, st->done);
+struct at91_adc_data ek_adc_data = {
+	.channels_used = { 1, 0, 1, 1 },;
+};
 
-Its probably a good idea to add a timeout in case there is a problem with
-the hardware.
+Or maybe others have different suggestions ?
 
-> +		*val = st->lcdr;
-> +
-> +		at91adc_reg_write(st->reg_base, AT91_ADC_CHDR,
-> +				  AT91_ADC_CH(chan->channel));
-> +		at91adc_reg_write(st->reg_base, AT91_ADC_IDR,
-> +				  AT91_ADC_EOC(chan->channel));
-> +
-> +		st->lcdr = 0;
-> +		st->done = false;
-> +		mutex_unlock(&st->lock);
-> +		return IIO_VAL_INT;
-> +	default:
-> +		break;
-> +	}
-> +	return -EINVAL;
-> +}
-> +
-> +static const struct iio_info at91adc_info = {
-> +	.driver_module = THIS_MODULE,
-> +	.read_raw = &at91adc_read_raw,
-> +};
-> +
-> +static int __devinit at91adc_probe(struct platform_device *pdev)
-> +{
-> +	unsigned int prsc, mstrclk, ticks;
-> +	int ret;
-> +	struct iio_dev *idev;
-> +	struct at91adc_state *st;
-> +	struct resource *res;
-> +	struct at91_adc_data *pdata = pdev->dev.platform_data;
-> +
-> +	dev_dbg(&pdev->dev, "AT91ADC probed\n");
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	if (!res) {
-> +		dev_err(&pdev->dev, "No resource defined\n");
-> +		ret = -ENXIO;
-> +		goto error_ret;
-> +	}
-> +
-> +	idev = iio_allocate_device(sizeof(*st));
-> +	if (idev == NULL) {
-> +		dev_err(&pdev->dev, "Failed to allocate memory.\n");
-> +		ret = -ENOMEM;
-> +		goto error_ret;
-> +	}
-> +	platform_set_drvdata(pdev, idev);
-> +
-> +	idev->dev.parent = &pdev->dev;
-> +	idev->name = platform_get_device_id(pdev)->name;
+Regards,
 
-You don't use device ids. This should cause a NULL pointer deref? Maybe use
-dev_name(&pdev->dev) instead.
-
-> +	idev->modes = INDIO_DIRECT_MODE;
-> +	idev->info = &at91adc_info;
-> +
-> +[...]
-> +}
-> +
-> +static int __devexit at91adc_remove(struct platform_device *pdev)
-> +{
-> +	struct iio_dev *idev = platform_get_drvdata(pdev);
-> +	struct resource *res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	struct at91adc_state *st = iio_priv(idev);
-> +
-> +	free_irq(st->irq, st);
-> +	iounmap(st->reg_base);
-> +	release_mem_region(res->start, resource_size(res));
-> +	iio_device_unregister(idev);
-> +
-
-The iio API changed a bit recently and uses a two stage unregistration now.
-You should call iio_device_unregister before freeing resources and
-iio_device_free afterwards.
-
-> +	return 0;
-> +}
-> +
-> [...]
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
