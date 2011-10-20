@@ -1,47 +1,32 @@
-From: alexander.stein@systec-electronic.com (Alexander Stein)
-Date: Thu, 20 Oct 2011 08:28:58 +0200
-Subject: [PATCH 3/3] ARM: AT91: Add the ADC to the sam9g20ek board
-In-Reply-To: <1319041134-19712-4-git-send-email-maxime.ripard@free-electrons.com>
-References: <1319041134-19712-1-git-send-email-maxime.ripard@free-electrons.com>
-	<1319041134-19712-4-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <201110200828.59278.alexander.stein@systec-electronic.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 20 Oct 2011 08:01:06 +0100
+Subject: Possible regression in kexec on ARM ARMv6 and ARMv7 cores
+In-Reply-To: <20111020042444.GA20260@verge.net.au>
+References: <20111020042444.GA20260@verge.net.au>
+Message-ID: <20111020070105.GA28548@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 19 October 2011 18:18:54 Maxime Ripard wrote:
-> diff --git a/arch/arm/mach-at91/at91sam9260_devices.c
-> b/arch/arm/mach-at91/at91sam9260_devices.c index 39f81f4..4f5e0f9 100644
-> --- a/arch/arm/mach-at91/at91sam9260_devices.c
-> +++ b/arch/arm/mach-at91/at91sam9260_devices.c
-> [...]
-> +static struct platform_device at91_adc_device = {
-> +	.name		= "at91adc",
-> +	.id		= -1,
-> +	.dev		= {
-> +				.platform_data		= &adc_data,
-> +	},
-> +	.resource	= adc_resources,
-> +	.num_resources	= ARRAY_SIZE(adc_resources),
-> +};
-> +
-> +void __init at91_add_device_adc(struct at91_adc_data *data)
-> +{
-> +	if (!data)
-> +		return;
-> +
-> +	at91_set_A_periph(AT91_PIN_PC0, 0);
-> +	at91_set_A_periph(AT91_PIN_PC1, 0);
-> +	at91_set_A_periph(AT91_PIN_PC2, 0);
-> +	at91_set_A_periph(AT91_PIN_PC3, 0);
-> +
-> +	adc_data = *data;
-> +	platform_device_register(&at91_adc_device);
-> +}
-> +
-> +
+On Thu, Oct 20, 2011 at 05:24:45AM +0100, Simon Horman wrote:
+> Hi Will, Hi All,
 
-This assumes that all 4 channels are used every time.  How about only using an 
-AD channel on PC2 or all but the one on PC1?
+Hi Simon,
 
-Regards,
-Alexander
+> it appears that "ARM: proc: add definition of cpu_reset for
+>  ARMv6 and ARMv7 cores" (f4daf06fc23b99df5ca5b3e892428b91e148cc52),
+> which was introduced for 3.1-rc1, causes a regression and that
+> kexec no longer works on ARM. The board that I am testing
+> on is a Renesas Mackerel which has an SH7372 (ARMv7) processor.
+
+Wow, I'm surprised the old code worked at all on an ARMv7 CPU! It's certainly
+highly unlikely to work by the letter of the architecture, so I guess the
+planets aligned in just the right way for your particular implementation.
+
+Please can you try my kexec/mmu-off patches? They should add the bits and
+pieces you need for kexec to work reliably on a UP system. I plan to finish
+these off next week in Prague so hopefully they'll hit mainline in the near
+future.
+
+https://github.com/wdeacon/linux-wd/commits/kexec/mmu-off
+
+Will
