@@ -1,30 +1,40 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 20 Oct 2011 15:10:43 +0200
-Subject: [GIT PULL] Calxeda Highbank platform support
-In-Reply-To: <4E97A630.3070603@gmail.com>
-References: <4E97A630.3070603@gmail.com>
-Message-ID: <201110201510.43204.arnd@arndb.de>
+Date: Thu, 20 Oct 2011 15:22:56 +0200
+Subject: [GIT PULL] i.MX features
+In-Reply-To: <20111014074747.GD13898@pengutronix.de>
+References: <20111014074747.GD13898@pengutronix.de>
+Message-ID: <201110201522.56223.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 14 October 2011, Rob Herring wrote:
-> Please pull initial support for Calxeda highbank platform. This is based
-> on my GIC DT binding pull request.
+On Friday 14 October 2011, Sascha Hauer wrote:
+> Hi Arnd,
 > 
-> As it appears vmalloc.h and memory.h clean-ups won't make it for 3.2,
-> this includes those headers. I'll post follow-ups to delete them if they
-> do in fact go in.
-
-Ok, sounds good
-
-> The following changes since commit 8322153302d9bb3fdceda9e0df00d3c69d1964bd:
+> Please pull the following feature branch for i.MX.
 > 
->   ARM: gic: add OF based initialization (2011-10-13 20:40:29 -0500)
+> Only trivial merge conflicts to your for-next branch, you won't need
+> a merge hint for this, I created a branch for you anyway just to
+> see if that's what you want for the next non trivial merge conflicts:
+> 
+> git://git.pengutronix.de/git/imx/linux-2.6.git hint
+
+Ok, sounds good.
+ 
+> The following changes since commit 976d167615b64e14bc1491ca51d424e2ba9a5e84:
+> 
+>   Linux 3.1-rc9 (2011-10-04 18:11:50 -0700)
 > 
 > are available in the git repository at:
-> 
->   http://sources.calxeda.com/git/kernel/linux.git hb_for_3.2
+>   git://git.pengutronix.de/git/imx/linux-2.6.git imx-features-for-arnd
 
-I've pulled them into the next/soc branch.
+I've pulled it all into the imx/devel branch now, but I've also pulled
+the two parts of it into separate branches. I already have a next/board
+branch that contains support for new boards and now has the DENX MX28
+commit added to it as well. I've put the AHCI changes into the next/driver
+branch that was suggested before. I still need to decide whether I
+submit that separately before the next/devel branch or if I drop it
+again (most likely if I don't get much stuff for it).
+
+Thanks,
 
 	Arnd
