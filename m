@@ -1,94 +1,57 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Fri, 21 Oct 2011 01:11:59 +0800
-Subject: [GIT PULL] i.MX6Q support
-Message-ID: <20111020171158.GJ32007@S2100-06.ap.freescale.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 20 Oct 2011 10:05:34 -0700
+Subject: [PATCH v2 3/5] regulator: helper routine to extract
+	regulator_init_data
+In-Reply-To: <20111020164006.GA10155@sirena.org.uk>
+References: <20111018115836.GC30703@S2100-06.ap.freescale.net>
+	<20111018160046.GD28501@opensource.wolfsonmicro.com>
+	<20111019053354.GB31162@S2100-06.ap.freescale.net>
+	<20111019144734.GI18713@sirena.org.uk>
+	<20111019150448.GB32007@S2100-06.ap.freescale.net>
+	<20111019151031.GA4275@opensource.wolfsonmicro.com>
+	<4E9F9892.9070007@ti.com> <20111020094140.GK18713@sirena.org.uk>
+	<20111020162743.GB31337@atomide.com>
+	<20111020164006.GA10155@sirena.org.uk>
+Message-ID: <20111020170534.GC31337@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+* Mark Brown <broonie@opensource.wolfsonmicro.com> [111020 09:05]:
+> On Thu, Oct 20, 2011 at 09:27:43AM -0700, Tony Lindgren wrote:
+> > * Mark Brown <broonie@opensource.wolfsonmicro.com> [111020 02:07]:
+> 
+> > > We can always start off just completely omitting the data and then see
+> > > how we go from there.  If we only cover 50% of users that's still 50%
+> > > more than are currently covered with device tree right now and it means
+> > > we can then spin round and look at the bits that are hard again without
+> > > review fatigue on the bits that are easy.
+> 
+> > We still need to pass the board configuration somehow, otherwise we can
+> > never remove all the platform data glue layers. And if we can't do that,
+> > we'll forever have all the nasty merge conflicts when adding new drivers.
+> > And there's an unnecessary dependency between adding drivers and the
+> > core SoC code.
+> 
+> The current patches cover the overwhelming majority of the existing
+> board configuration - the stuff that's Linux specific is also relatively
+> rarely used in actual systems.  For example all the board I work with
+> regularly would be perfectly happy with the generic stuff - the Linux
+> specific stuff is relatively rarely used.
 
-Please pull imx6q series.  It's based on v3.1-rc10 with the following
-branches merged plus a number of cache-l2x0 patches currently sitting
-on rmk/for-next.
+Right, but in addition the board specific integration variables still
+need to be passed somehow to the driver.
 
-  rmk/devel-stable
-  rmk/smp
-  arnd/cross-platform/debug_ll
-  arnd/next/dt
-  arnd/imx/devel
+That's where a DT entry specific configuration string might be the best
+option as it still allows describing the hardware using DT standards,
+while also allowing board specific configuration too.
 
-I will need to send a follow-up patch to update the series if Marc's
-PPI series gets in for for this merge window.
+The issue there is then how do we keep these options from getting out
+of control..
 
-Regards,
-Shawn
+BTW, of course this issue is generic to all drivers, not specific to
+this patchset. With this patchset leaving out the non-standard entries
+is the right way to go to so we can merge it.
 
-The following changes since commit c4a23e643f240875124d56cafd242ca9ba58e045:
+Cheers,
 
-  Merge branch 'unstable-tree/rmk/for-next' into imx6q/base (2011-10-21 00:21:32 +0800)
-
-are available in the git repository at:
-
-  git://git.linaro.org/people/shawnguo/linux-2.6.git imx6q/for-arnd
-
-Sascha Hauer (1):
-      arm/imx: merge i.MX3 and i.MX6
-
-Shawn Guo (8):
-      arm/imx6q: add device tree source
-      arm/imx6q: add core definitions and low-level debug uart
-      arm/imx: add gic_handle_irq function
-      arm/imx6q: add core drivers clock, gpc, mmdc and src
-      arm/imx6q: add smp and cpu hotplug support
-      arm/imx6q: add device tree machine support
-      arm/imx6q: add suspend/resume support
-      MAINTAINERS: add ARM/FREESCALE IMX6 entry
-
- Documentation/devicetree/bindings/arm/fsl.txt |    6 +
- MAINTAINERS                                   |    7 +
- arch/arm/Kconfig                              |    2 +-
- arch/arm/Kconfig.debug                        |    7 +
- arch/arm/Makefile                             |    2 +-
- arch/arm/boot/dts/imx6q-sabreauto.dts         |   62 +
- arch/arm/boot/dts/imx6q.dtsi                  |  575 +++++++
- arch/arm/mach-imx/Kconfig                     |   30 +-
- arch/arm/mach-imx/Makefile                    |   11 +
- arch/arm/mach-imx/Makefile.boot               |   14 +-
- arch/arm/mach-imx/clock-imx6q.c               | 2012 +++++++++++++++++++++++++
- arch/arm/mach-imx/gpc.c                       |  113 ++
- arch/arm/mach-imx/head-v7.S                   |   99 ++
- arch/arm/mach-imx/hotplug.c                   |   44 +
- arch/arm/mach-imx/lluart.c                    |   32 +
- arch/arm/mach-imx/localtimer.c                |   35 +
- arch/arm/mach-imx/mach-imx6q.c                |   84 +
- arch/arm/mach-imx/mmdc.c                      |   72 +
- arch/arm/mach-imx/platsmp.c                   |   85 ++
- arch/arm/mach-imx/pm-imx6q.c                  |   70 +
- arch/arm/mach-imx/src.c                       |   49 +
- arch/arm/mm/Kconfig                           |    2 +-
- arch/arm/plat-mxc/Kconfig                     |   11 +-
- arch/arm/plat-mxc/Makefile                    |    2 +-
- arch/arm/plat-mxc/gic.c                       |   48 +
- arch/arm/plat-mxc/include/mach/common.h       |   29 +
- arch/arm/plat-mxc/include/mach/debug-macro.S  |    2 +
- arch/arm/plat-mxc/include/mach/entry-macro.S  |    6 +
- arch/arm/plat-mxc/include/mach/hardware.h     |    6 +
- arch/arm/plat-mxc/include/mach/irqs.h         |   10 +-
- arch/arm/plat-mxc/include/mach/mx6q.h         |   33 +
- 31 files changed, 3546 insertions(+), 14 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/fsl.txt
- create mode 100644 arch/arm/boot/dts/imx6q-sabreauto.dts
- create mode 100644 arch/arm/boot/dts/imx6q.dtsi
- create mode 100644 arch/arm/mach-imx/clock-imx6q.c
- create mode 100644 arch/arm/mach-imx/gpc.c
- create mode 100644 arch/arm/mach-imx/head-v7.S
- create mode 100644 arch/arm/mach-imx/hotplug.c
- create mode 100644 arch/arm/mach-imx/lluart.c
- create mode 100644 arch/arm/mach-imx/localtimer.c
- create mode 100644 arch/arm/mach-imx/mach-imx6q.c
- create mode 100644 arch/arm/mach-imx/mmdc.c
- create mode 100644 arch/arm/mach-imx/platsmp.c
- create mode 100644 arch/arm/mach-imx/pm-imx6q.c
- create mode 100644 arch/arm/mach-imx/src.c
- create mode 100644 arch/arm/plat-mxc/gic.c
- create mode 100644 arch/arm/plat-mxc/include/mach/mx6q.h
+Tony
