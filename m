@@ -1,49 +1,48 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 20 Oct 2011 15:09:14 -0700
-Subject: [PATCH v2 3/5] regulator: helper routine to extract
-	regulator_init_data
-In-Reply-To: <20111020214225.GB22709@opensource.wolfsonmicro.com>
-References: <20111019151031.GA4275@opensource.wolfsonmicro.com>
-	<4E9F9892.9070007@ti.com> <20111020094140.GK18713@sirena.org.uk>
-	<20111020162743.GB31337@atomide.com>
-	<20111020164006.GA10155@sirena.org.uk>
-	<20111020170534.GC31337@atomide.com>
-	<20111020172218.GE31337@atomide.com>
-	<20111020195734.GB17384@opensource.wolfsonmicro.com>
-	<20111020201054.GN3842@atomide.com>
-	<20111020214225.GB22709@opensource.wolfsonmicro.com>
-Message-ID: <20111020220914.GP3842@atomide.com>
+From: david@fromorbit.com (Dave Chinner)
+Date: Fri, 21 Oct 2011 09:21:09 +1100
+Subject: [PATCH 0/3] ARM 4Kstacks: introduction
+In-Reply-To: <4E9F5F1B.1020106@am.sony.com>
+References: <4E9E0B71.9020708@am.sony.com>
+	<20111019073547.GR21648@n2100.arm.linux.org.uk>
+	<4E9F5F1B.1020106@am.sony.com>
+Message-ID: <20111020222109.GB14993@dastard>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Mark Brown <broonie@opensource.wolfsonmicro.com> [111020 14:08]:
-> On Thu, Oct 20, 2011 at 01:10:55PM -0700, Tony Lindgren wrote:
+On Wed, Oct 19, 2011 at 04:36:59PM -0700, Tim Bird wrote:
+> On 10/19/2011 12:35 AM, Russell King - ARM Linux wrote:
+> > On Tue, Oct 18, 2011 at 04:27:45PM -0700, Tim Bird wrote:
+> >> I'm about to submit a set of patches (really pretty small)
+> >> to add 4K stack support to ARM (defaulted to 'N').
+> >>
+> >> This has been kicking around in my Sony tree for a few years,
+> >> and it's about time to mainline it.  The first patch is
+> >> the actual 4KSTACKS patch.  See subsequent patches
+> >> for tools to help with stack reduction to avoid the problems
+> >> that apparently led to the removal of this feature on x86.
+> > 
+> > This isn't a good idea - if the feature has been abandoned on x86,
+> > people aren't going to be soo concerned about the stack usage of
+> > each function.  They're going to accept that there's more stack
+> > space available, and we'll see code paths that start expecting that.
 > 
-> > We still need to figure out how to get the above board specific
-> > data to the device driver probe in a way where we can avoid having
-> > platform glue code. Any thoughts on that?
+> Well, the difference in size is not an order of magnitude.  Current
+> stacks are only twice as big as what this feature optionally allows.
+> So people really shouldn't go crazy with their stack usage.
 > 
-> I think we should just not bother with most of the above and see if
-> anyone notices, with the exception of always on and status changes it's
-> vanishingly rare for anyone to actually do anything constructive with
-> them.  
+> Granted we're already seeing a bit of stack bloat, but IMHO this should
+> be nipped in the bud.  If the stack grows a lot more, it will likely
+> need to shift to 16K, which would REALLY be costly on machines
+> with lots of threads and low memory.
 
-OK
+FWIW, I was seriously considering bringing up 16k stacks on x86-64
+as a topic for the kernel summit. We've been getting reports of the
+8k stack being blown on different filesystems for the past year or
+so on relatively trivial storage configs....
 
-> Neither of the two I mentioned are Linux specific either, they mean
-> somehing useful for any OS it's just that the decision is policy which
-> is going to depend on the OS version.  Status changes we can probably
-> allow people to enable, it'll just mean that older device trees won't
-> get good power use out of newer kernels and if you move to an older
-> kernel things will start exploding as drivers loose regulator support.
-> Always on we can probably live without, it's a combination of
-> overspecification and interaction with _has_full_constraints() which
-> isn't represented in this binding anyway.
+Cheers,
 
-Yeah, lot of these are "how the regulator using driver is using
-the regulator" or "how the operating system is using the regulator"
-type policies.
-
-Regards,
-
-Tony
+Dave.
+-- 
+Dave Chinner
+david at fromorbit.com
