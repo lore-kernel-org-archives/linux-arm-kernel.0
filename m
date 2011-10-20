@@ -1,26 +1,56 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 20 Oct 2011 18:27:00 +0200
-Subject: [GIT PULL] Samsung devel-3 for v3.2
-In-Reply-To: <000501cc8c87$39960b70$acc22250$%kim@samsung.com>
-References: <000501cc8c87$39960b70$acc22250$%kim@samsung.com>
-Message-ID: <201110201827.00242.arnd@arndb.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 20 Oct 2011 09:27:43 -0700
+Subject: [PATCH v2 3/5] regulator: helper routine to extract
+	regulator_init_data
+In-Reply-To: <20111020094140.GK18713@sirena.org.uk>
+References: <20111016145536.GA29885@S2100-06.ap.freescale.net>
+	<4E9BAC4D.3010402@ti.com>
+	<20111018115836.GC30703@S2100-06.ap.freescale.net>
+	<20111018160046.GD28501@opensource.wolfsonmicro.com>
+	<20111019053354.GB31162@S2100-06.ap.freescale.net>
+	<20111019144734.GI18713@sirena.org.uk>
+	<20111019150448.GB32007@S2100-06.ap.freescale.net>
+	<20111019151031.GA4275@opensource.wolfsonmicro.com>
+	<4E9F9892.9070007@ti.com> <20111020094140.GK18713@sirena.org.uk>
+Message-ID: <20111020162743.GB31337@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 17 October 2011, Kukjin Kim wrote:
-> This is for Samsung devel stuff for v3.2 and based on previous
-> next-samsung-devel-2.
+* Mark Brown <broonie@opensource.wolfsonmicro.com> [111020 02:07]:
+> On Thu, Oct 20, 2011 at 09:12:10AM +0530, Rajendra Nayak wrote:
+> > On Wednesday 19 October 2011 08:40 PM, Mark Brown wrote:
 > 
-> Please pull from:
->  git://github.com/kgene/linux-samsung.git next-samsung-devel-3
+> > >I don't see any issue with leaving some things out of the DT bindings;
+> > >you were the one raising that as a concern.
 > 
-> If any problems, please let me know.
+> > The problem is, that there doesn't seem to be a clean way to embed
+> > *board data* into the kernel with DT, if left out of the DT bindings.
+> > There is the auxdata way of still attaching platform_data, but that I
+> > thought was a stopgap for just handling function pointers.
 > 
-> As a note, I need to sort out DT patches from Thomas and prepare reorganize
-> arch/arm/mach-exynos based on latest arm-soc.
+> We can always start off just completely omitting the data and then see
+> how we go from there.  If we only cover 50% of users that's still 50%
+> more than are currently covered with device tree right now and it means
+> we can then spin round and look at the bits that are hard again without
+> review fatigue on the bits that are easy.
 
-Pulled into next/devel2, as the previous set.
+We still need to pass the board configuration somehow, otherwise we can
+never remove all the platform data glue layers. And if we can't do that,
+we'll forever have all the nasty merge conflicts when adding new drivers.
+And there's an unnecessary dependency between adding drivers and the
+core SoC code.
 
-Thanks,
+So we really need to remove all the platform data glue layers so driver
+probe can initialize things automagically.
 
-	Arnd
+Kernel cmdline is of course one way to pass options, but probably won't
+scale for all the board wirings.. And the kernel cmdline should really
+be for user configurable options.
+
+So should we just have a cmdline string for each DT entry to pass the
+board specific options from DT to the driver? Something along the
+lines module options?
+
+Regards,
+
+Tony
