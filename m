@@ -1,26 +1,24 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 20 Oct 2011 18:31:36 +0200
-Subject: [GIT PULL] at91: driver for Atmel true hardware random number
-	generator
-In-Reply-To: <4E9D92CD.6010008@atmel.com>
-References: <4E92BEE9.5090604@atmel.com> <4E9D92CD.6010008@atmel.com>
-Message-ID: <201110201831.36246.arnd@arndb.de>
+Date: Thu, 20 Oct 2011 18:33:39 +0200
+Subject: [GIT PULL] i.MX cleanup patches
+In-Reply-To: <20111019070758.GA18759@pengutronix.de>
+References: <20111019070758.GA18759@pengutronix.de>
+Message-ID: <201110201833.39916.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 18 October 2011, Nicolas Ferre wrote:
-> On 10/10/2011 11:46 AM, Nicolas Ferre :
-> > Hi Arnd,
-> > 
-> > Here is a couple of patches for adding the True Random Number Generator
-> > that can be find on some AT91SAM SoCs.
-> > Herbert Xu told me that this material can go through the ARM SoC tree.
+On Wednesday 19 October 2011, Sascha Hauer wrote:
+> Sascha
 > 
-> Ping?
+> The following changes since commit 976d167615b64e14bc1491ca51d424e2ba9a5e84:
+> 
+>   Linux 3.1-rc9 (2011-10-04 18:11:50 -0700)
+> 
+> are available in the git repository at:
+>   git://git.pengutronix.de/git/imx/linux-2.6.git imx-cleanups-for-arnd
+> 
 
-I'm sorry I missed this at first. I've pulled it into the next/driver
-branch now.
 
-Thanks,
+Pulled, thanks!
 
 	Arnd
