@@ -1,77 +1,51 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 20 Oct 2011 14:31:33 +0100
-Subject: [GIT PULL] genirq support for GIC PPIs
-In-Reply-To: <20111020130449.GC21648@n2100.arm.linux.org.uk>
-References: <4E9FF695.10604@arm.com>
-	<20111020112724.GZ21648@n2100.arm.linux.org.uk>
-	<4EA00E7F.8060007@arm.com>
-	<20111020130449.GC21648@n2100.arm.linux.org.uk>
-Message-ID: <4EA022B5.1080702@arm.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 20 Oct 2011 15:33:25 +0200
+Subject: [GIT PULL] i.MX features
+In-Reply-To: <201110201522.56223.arnd@arndb.de>
+References: <20111014074747.GD13898@pengutronix.de>
+	<201110201522.56223.arnd@arndb.de>
+Message-ID: <20111020133325.GC23421@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/10/11 14:04, Russell King - ARM Linux wrote:
-> On Thu, Oct 20, 2011 at 01:05:19PM +0100, Marc Zyngier wrote:
->> On 20/10/11 12:27, Russell King - ARM Linux wrote:
->>> On Thu, Oct 20, 2011 at 11:23:17AM +0100, Marc Zyngier wrote:
->>>> The following changes since commit 5a567d78c437e3be1c512734cdfe64b4ae6b82d7:
->>>>   Jamie Iles (1):
->>>>         ARM: 7115/4: move __exception and friends to asm/exception.h
->>>>
->>>> are available in the git repository at:
->>>>
->>>>   git://github.com/mzyngier/arm-platforms.git ppi-for-rmk
->>>>
->>>> Marc Zyngier (4):
->>>>       genirq: Add support for per-cpu dev_id interrupts
->>>>       genirq: percpu: allow interrupt type to be set at enable time
->>>>       ARM: gic: consolidate PPI handling
->>>>       ARM: gic, local timers: use the request_percpu_irq() interface
->>>>
->>>> Thomas Gleixner (1):
->>>>       genirq: Fix fatfinered fixup really
->>>
->>> I thought you said some of these were in Thomas' tree already?
->>
->> The first three patches are in Thomas' tree indeed. I could drop them
->> from my branch, but the resulting tree would not compile anymore.
->>
->> What strategy would cause the least merging pain?
+On Thu, Oct 20, 2011 at 03:22:56PM +0200, Arnd Bergmann wrote:
+> On Friday 14 October 2011, Sascha Hauer wrote:
+> > Hi Arnd,
+> > 
+> > Please pull the following feature branch for i.MX.
+> > 
+> > Only trivial merge conflicts to your for-next branch, you won't need
+> > a merge hint for this, I created a branch for you anyway just to
+> > see if that's what you want for the next non trivial merge conflicts:
+> > 
+> > git://git.pengutronix.de/git/imx/linux-2.6.git hint
 > 
-> The only thing I can think is that you need to start off with a tree
-> with 5a567d78c437e3be1c512734cdfe64b4ae6b82d7 as the top commit,
-> merge into that the last commit which you need from Thomas' tree
-> (iow, "genirq: percpu: allow interrupt type to be set at enable time"
-> or maybe "genirq: Fix fatfinered fixup really") and then apply the
-> last two GIC patches on top of that merge commit.
+> Ok, sounds good.
+>  
+> > The following changes since commit 976d167615b64e14bc1491ca51d424e2ba9a5e84:
+> > 
+> >   Linux 3.1-rc9 (2011-10-04 18:11:50 -0700)
+> > 
+> > are available in the git repository at:
+> >   git://git.pengutronix.de/git/imx/linux-2.6.git imx-features-for-arnd
 > 
-> However, I guess Thomas already has many other commits queued up for
-> mainline before these changes - which would make those commits become
-> part of my tree.
-> 
-> That causes problems because if Thomas pushes first, my tree ends up
-> with multiple ancestors, which makes it impossible to generate a
-> diffstat for my push to Linus.  The flip-side is if I push before
-> Thomas, then I'm pushing Thomas' commits into mainline myself (which
-> means I then need to explain Thomas' generic changes to Linus and why
-> they're part of my tree.)
-> 
-> Cross-tree dependencies like this really suck.
-> 
-> I'm really tempted to postpone this to the following merge window to
-> 'solve' these dependencies (because by that time their dependencies
-> should all be merged into mainline, which makes things nice and simple.)
+> I've pulled it all into the imx/devel branch now, but I've also pulled
+> the two parts of it into separate branches. I already have a next/board
+> branch that contains support for new boards and now has the DENX MX28
+> commit added to it as well. I've put the AHCI changes into the next/driver
+> branch that was suggested before. I still need to decide whether I
+> submit that separately before the next/devel branch or if I drop it
+> again (most likely if I don't get much stuff for it).
 
-Could we just wait until Thomas' branch has reached mainline, and then
-try another pull request with only the last two patches?
+Looks like we need git-pull and git-request-pull for multiple branches
+at once ;)
 
-I understand this is tricky, but waiting another merge window may lead
-to another bunch of conflicts and cross-tree madness (there's some
-MULTI_IRQ_HANDLER stuff coming from a number of parties as well RobH's
-GIC DT work).
+Thanks
+ Sascha
 
-Thanks,
 
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
