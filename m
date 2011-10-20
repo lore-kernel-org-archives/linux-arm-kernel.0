@@ -1,36 +1,53 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Thu, 20 Oct 2011 08:01:12 +0200
-Subject: CMA v16 and DMA-mapping v13 patch series
-Message-ID: <ADF13DA15EB3FE4FBA487CCC7BEFDF3622549EBE58@bssrvexch01>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Thu, 20 Oct 2011 14:14:09 +0800
+Subject: [PATCH v2 3/5] regulator: helper routine to extract
+	regulator_init_data
+In-Reply-To: <4E9FAF42.5060200@ti.com>
+References: <1318263578-7407-1-git-send-email-rnayak@ti.com>
+	<1318263578-7407-4-git-send-email-rnayak@ti.com>
+	<20111018132032.GD30703@S2100-06.ap.freescale.net>
+	<4E9EB61C.1040207@ti.com>
+	<20111019144215.GA32007@S2100-06.ap.freescale.net>
+	<4E9FAF42.5060200@ti.com>
+Message-ID: <20111020061408.GE32007@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello everyone,
+On Thu, Oct 20, 2011 at 10:48:58AM +0530, Rajendra Nayak wrote:
+> >Let's look at mc13892-regulator driver.  There are 23 regulators defined
+> >in array mc13892_regulators.  Needless to say, there is a dev behind
+> >mc13892-regulator driver.  And when getting probed, this driver will
+> >call regulator_register() to register those 23 regulators individually.
+> >That said, for non-dt world, we have 1 + 23 'dev' with that 1 as the
+> >parent of all other 23 'dev' (wrapped by regulator_dev).  But with the
+> >current DT implementation, we will have at least 1 + 23 * 2 'dev'.
+> >These extra 23 'dev' is totally new with DT.
+> >
+> 
+> but thats only because the mc13892-regulator driver is implemeted in
+> such a way that all the regulators on the platform are bundled in as
+> *one* device.
 
-It looks that the last patch series from me was not clearly described in terms
-of their kernel base. Selecting a '-next' kernel as a base was not the best
-idea. I'm really sorry for the confusion. I've rebased again these series and
-prepared 3 new branches. Feel free to download and give them a try.
+I did not look into too many regulator drivers, but I expect this is
+way that most regulator drivers are implemented in.  Having
+mc13892-regulator being probed 23 times to register these 23 regulators
+just makes less sense to me.
 
-Here are the kernel trees with latest version of the patches, ready to use:
+> It would again depend on how you would pass these from
+> the DT, if you indeed stick to the same way of bundling all regulators
+> as one device from DT, the mc13892-regulator probe would just get called
+> once and there would be one device associated, no?
+> 
+Yes, I indeed would stick to the same way of bundling the registration
+of all regulators with mc13892-regulator being probed once.  The problem
+I have with the current regulator core DT implementation is that it
+assumes the device_node of rdev->dev (dev wrapped in regulator_dev) is
+being attached to rdev->dev.parent rather than itself.  Back to
+mc13892-regulator example, that said, it requires the dev of
+mc13892-regulator have the device_node of individual regulator attached
+to.  IOW, the current implementation forces mc13892-regulator to be
+probed 23 times to register those 23 regulators.  This is wrong to me.
 
-Linux v3.1-rc10 with CMA v16 (and a few fixes):
-git://git.infradead.org/users/kmpark/linux-2.6-samsung 3.1-rc10-cma-v16
-
-Linux v3.1-rc10 with DMA mapping v3 (with DMA-IOMMU integration):
-git://git.infradead.org/users/kmpark/linux-2.6-samsung 3.1-rc10-dma-v3
-
-Linux v3.1-rc10 with both CMA v16 and DMA-mapping v3:
-git://git.infradead.org/users/kmpark/linux-2.6-samsung 3.1-rc10-cma-v16-dma-v3
-
-Best regards
---
-Marek Szyprowski
-Samsung Poland R&D Center
-
-
-
-The above message is intended solely for the named addressee and may contain trade secret, industrial technology or privileged and confidential information otherwise protected under applicable law. Any unauthorized dissemination, distribution, copying or use of the information contained in this communication is strictly prohibited. If you have received this communication in error, please notify sender by email and delete this communication immediately.
-
-
-Powy?sza wiadomo?? przeznaczona jest wy??cznie dla adresata niniejszej wiadomo?ci i mo?e zawiera? informacje b?d?ce tajemnic? handlow?, tajemnic? przedsi?biorstwa oraz informacje o charakterze poufnym chronione obowi?zuj?cymi przepisami prawa. Jakiekolwiek nieuprawnione ich rozpowszechnianie, dystrybucja, kopiowanie lub u?ycie informacji zawartych w powy?szej wiadomo?ci jest zabronione. Je?li otrzyma?e? powy?sz? wiadomo?? omy?kowo, uprzejmie prosz? poinformuj o tym fakcie drog? mailow? nadawc? tej wiadomo?ci oraz niezw?ocznie usu? powy?sz? wiadomo?? ze swojego komputera.
+-- 
+Regards,
+Shawn
