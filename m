@@ -1,36 +1,37 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 21 Oct 2011 18:38:32 +0200
-Subject: [PATCH] arm/imx: add missing include of asm/exception.h for avic.c
-In-Reply-To: <20111021072219.GH15299@pengutronix.de>
-References: <1319164380-23517-1-git-send-email-shawn.guo@linaro.org>
-	<20111021072219.GH15299@pengutronix.de>
-Message-ID: <8805141.r6GF1WOsYI@wuerfel>
+Date: Thu, 20 Oct 2011 23:17:08 +0200
+Subject: [GIT PULL] GIC DT binding support
+In-Reply-To: <4EA08DD0.1090706@gmail.com>
+References: <4E97A601.1020005@gmail.com>
+	<20111020185612.GD21648@n2100.arm.linux.org.uk>
+	<4EA08DD0.1090706@gmail.com>
+Message-ID: <4222689.nWCbSCrufR@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 21 October 2011 09:22:19 Uwe Kleine-K?nig wrote:
+On Thursday 20 October 2011 16:08:32 Rob Herring wrote:
+> > unintended dependencies.  That's got to be a good thing.
 > 
-> On Fri, Oct 21, 2011 at 10:33:00AM +0800, Shawn Guo wrote:
-> > It adds missing include of asm/exception.h for avic.c to fix the
-> > compile error below.
-> > 
-> >   arch/arm/plat-mxc/avic.c:154:39: error: expected ?=?, ?,?, ?;?,
-> >   ?asm? or ?__attribute__? before ?avic_handle_irq?
-> > 
-> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> Arnd already posted a patch for that[1], but this one looks better.
+> Understood, but from a git perspective the commit ids have changed.
+> While git can deal with trivial re-commits like this, my understanding
+> is that should be avoided for upstream merges. Otherwise, I could just
+> cherry-pick them and re-commit them in my tree.
 > 
-> Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> Ultimately, the people working off of those branches do need them to be
+> stable to merge their branches. So are you saying your l2x0 branch
+> (91c2ebb90b1890abc648ba9dec5608cbc97e1cb9) is now stable? Can you
+> publish it as a branch. iMX6Q is also dependent on it.
 
-Ok, thanks!
+The point is that Russell's 'misc' branch is not stable, which helps a lot
+because it lets him commit stuff early for testing and then take it out
+again when it turns out to be buggy. The for-next branch in Russell's
+tree is not stable and gets recreated by pulling in the other branches.
+This is similar to what I do with the arm-soc for-next branch, which 
+is the sum of the other next/* branches in arm-soc.
 
-I found the same problem in plat-mxc/tzic.c as well now.
-
-Which branch should we apply the patch to? The header file was
-introduced in rmk's smp branch, but the usage was introduced in
-the imx/multi-irq branch.
-
-Should I merge the smp branch into imx/multi-irq and fix up the
-breakage in the merge commit?
+My understanding is that the other branches in Russell's tree are stable in
+the sense that they are never rebased, though it might happen that the entire
+branch does not get submitted if a problem gets found with the series. That of
+course implies that all other dependent trees cannot get submitted.
 
 	Arnd
