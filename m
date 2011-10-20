@@ -1,199 +1,126 @@
-From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
-Date: Thu, 20 Oct 2011 02:55:19 +0100
-Subject: [PATCH 0/3] ARM 4Kstacks: introduction
-In-Reply-To: <4E9F7483.9050608@am.sony.com> (Tim Bird's message of "Wed, 19
-	Oct 2011 18:08:19 -0700")
-References: <4E9E0B71.9020708@am.sony.com>
-	<20111019073547.GR21648@n2100.arm.linux.org.uk>
-	<4E9F5F1B.1020106@am.sony.com> <yw1xvcrkr03h.fsf@unicorn.mansr.com>
-	<4E9F7483.9050608@am.sony.com>
-Message-ID: <yw1xr528qveg.fsf@unicorn.mansr.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 19 Oct 2011 21:06:30 -0500
+Subject: [PATCH V2] AT91: dt: at91sam9g45 family and board device tree
+	files
+In-Reply-To: <4E9E8444.3070603@atmel.com>
+References: <1317636056-9537-1-git-send-email-nicolas.ferre@atmel.com>
+	<4E8C54DC.6040700@gmail.com> <4E8EF6F4.4030905@atmel.com>
+	<4E9D4FD5.8080802@atmel.com> <4E9DE51A.7070900@gmail.com>
+	<4E9E8444.3070603@atmel.com>
+Message-ID: <4E9F8226.4030503@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tim Bird <tim.bird@am.sony.com> writes:
-
-> On 10/19/2011 05:13 PM, ? wrote:
->> Tim Bird <tim.bird@am.sony.com> writes:
->>> Well, the difference in size is not an order of magnitude.  Current
->>> stacks are only twice as big as what this feature optionally allows.
->>> So people really shouldn't go crazy with their stack usage.
+On 10/19/2011 03:03 AM, Nicolas Ferre wrote:
+> On 10/18/2011 10:44 PM, Rob Herring :
+>> Nicolas,
+>>
+>> On 10/18/2011 05:07 AM, Nicolas Ferre wrote:
+>>> On 10/07/2011 02:56 PM, Nicolas Ferre :
+>>>> On 10/05/2011 03:00 PM, Rob Herring :
+>>>>> Nicolas,
+>>>>>
+>>>>> On 10/03/2011 05:00 AM, Nicolas Ferre wrote:
+>>>>>> Create a new device tree source file for Atmel at91sam9g45 SoC family.
+>>>>>> The Evaluation Kit at91sam9m10g45ek includes it.
+>>>>>> This first basic support will be populated as drivers and boards will be
+>>>>>> converted to device tree.
+>>>>>> Contains serial, dma and interrupt controllers.
+>>>>>>
+>>>>>> The generic board file still takes advantage of platform data for early serial
+>>>>>> init. As we need a storage media and the NAND flash driver is not converted to
+>>>>>> DT yet, we keep old initialization for it.
+>>>>>>
+>>>>>> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 >>>
->>> Granted we're already seeing a bit of stack bloat, but IMHO this should
->>> be nipped in the bud.  If the stack grows a lot more, it will likely
->>> need to shift to 16K, which would REALLY be costly on machines
->>> with lots of threads and low memory.
->> 
->> In binary, 8k is an order of magnitude greater than 4k.
-> Touche' ;-)
->
->> Having suffered
->> the consequences of 4k stacks on x86, I have to side with those
->> reluctant to include this.
->
-> Can you please provide more detail on what consequences
-> you suffered?  I think it would help the discussion.
-
-Random crashes which I eventually figured out were caused by
-xfs + device-mapper + md blowing the 4k stack in certain situations.
-At the time, 4k stacks were enabled default with the option hidden away
-in some obscure place.
-
-> If you had some examples where the burden of supporting 4K stacks
-> was onerous, that would be useful.  I know that defaulting it to
-> 'Y' introduced lots of subtle bugs that desktop users had issues
-> with.  The situation is completely different in deeply embedded,
-> because our user-space is completely constrained and controlled.
->
-> Also, there are a now a plethora of stack depth monitoring, guarding,
-> and reporting tools already in mainline, some of which weren't
-> there during the painful era.
-
-The tools have certainly got better since then, but I they are still not
-able to guard against every possible failure.
-
->>> I don't want to give up on a small-footprint Linux so easily,
->>> and the discipline for keeping stacks small is probably good
->>> for code hygiene anyway.
->> 
->> I see your point of view, but an optional setting available only on an
->> architecture not used by the majority is probably not going to have much
->> of an impact on code hygiene.
->> 
->> 4k stacks were tried, and the conclusion was that too much of the kernel
->> simply cannot work within so small a space.  Maintaining a list of safe
->> (or unsafe) combinations is probably not feasible either.
->
-> That's not what was in the message of the commit that removed them
-> on x86.  Instead it was conjecture about high numbers of threads
-> being only applicable to x86_64.
->
-> Are you basing the conclusion above on conjecture or measurement?  In
-> my configuration, the worst code paths are using approximately 2K of
-> stack most of the time, and peak out at about 2.5K.
-
-Someone else in this thread mentioned several combinations known to
-require more than 4k.  Layered block devices was one of them.
-
->>>> If we switch to 4K stacks, the problems of stack usage become ours.
->>>> Do we have the capacity to be able to address these issues as they
->>>> crop up?
+>>> [..]
 >>>
->>> Since it's optional, it would become the problem of the people
->>> who actually use the option.  If you think tracking down stack
->>> abusers is going to be a pain, just don't do it.
->> 
->> It will still be one more thing to sanity check in every bug report.
->> The end result will be more crashes going ignored due to lacking
->> information, and I don't think that's a good thing.
->
-> I don't think mainline is overwhelmed with bug reports from
-> embedded developers. 
-
-Mainline might not be, but various embedded forums are.  Embedded just
-ain't what it used to be.
-
-> Most of the time, embedded devs are so far behind in kernel version
-> that they can't reasonably (and don't) report many bugs found.
-
-What makes you say that?  Consumer devices available from shops are a
-few versions behind (my Android phone runs 2.6.35), but devices under
-development use quite recent kernels.  A few years ago, being stuck with
-something hopelessly outdated was the norm, but things have thankfully
-improved since then.
-
-> (I know that this is not helping my case, but I'm trying to be honest
-> here.)
->
-> If 4K stacks were being turned on for the general population of Linux
-> users, then I would agree with you.  But this will likely only be
-> turned on by a few people, in controlled situations.
-
-The trouble is figuring out which configurations are safe.
-
-> If you think tainting the kernel would help with the bug reporting,
-> I'd be OK with that.  We could introduce a "crazy embedded config -
-> you're on your own" taint flag.
-
-Taint flags are but a means of automatically ignoring bug reports from
-anyone running such a configuration.  They do not make the bugs go away.
-
->>> I can understand if people don't want to take patches which
->>> unconditionally limit their stack usage - especially if there's
->>> a performance impact. But I don't see much rationale for not
->>> limiting their stack usage conditionally (that is, do something
->>> slightly different on #ifdef CONFIG_4KSTACKS).  If people
->>> object to even that, then I'll maintain those patches out of
->>> tree, if they're really needed.
->> 
->> Having such a conditional increases the maintenance burden for that
->> function.  Changes will be made without testing the 4k alternative,
->> which sooner or later will break, possibly in subtle ways.
->
-> Which will affect no one but those who opt in.  I just don't
-> think the maintenance burden will be that big.  (At least,
-> no one need be bothered by this, unless contacted by someone
-> who cares.)
-
-I would certainly not want to be responsible for any code with such
-conditionals in it.
-
->>> Once again, our products work even without such patches now,
->>> based on the configs we're using and the user-space we're running.
->>> Note that this is defaulted to 'N', so no one should be negatively
->>> affected unless they opt in.
+>>>>>> diff --git a/arch/arm/mach-at91/board-dt.c b/arch/arm/mach-at91/board-dt.c
+>>>>>> new file mode 100644
+>>>>>> index 0000000..7bcb9a9
+>>>>>> --- /dev/null
+>>>>>> +++ b/arch/arm/mach-at91/board-dt.c
+>>>>>> @@ -0,0 +1,122 @@
+>>>>>> +/*
+>>>>>> + *  Setup code for AT91SAM Evaluation Kits with Device Tree support
+>>>>>> + *
+>>>>>> + *  Covers: * AT91SAM9G45-EKES  board
+>>>>>> + *          * AT91SAM9M10-EKES  board
+>>>>>> + *          * AT91SAM9M10G45-EK board
+>>>>>> + *
+>>>>>> + *  Copyright (C) 2011 Atmel,
+>>>>>> + *                2011 Nicolas Ferre <nicolas.ferre@atmel.com>
+>>>>>> + *
+>>>>>> + * Licensed under GPLv2 or later.
+>>>>>> + */
+>>>>>> +
+>>>>>> +#include <linux/types.h>
+>>>>>> +#include <linux/init.h>
+>>>>>> +#include <linux/module.h>
+>>>>>> +#include <linux/irqdomain.h>
+>>>>>> +#include <linux/of_irq.h>
+>>>>>> +#include <linux/of_platform.h>
+>>>>>> +
+>>>>>> +#include <mach/hardware.h>
+>>>>>> +#include <mach/board.h>
+>>>>>> +#include <mach/gpio.h>
+>>>>>> +#include <mach/system_rev.h>
+>>>>>> +#include <mach/at91sam9_smc.h>
+>>>>>> +
+>>>>>> +#include <asm/setup.h>
+>>>>>> +#include <asm/irq.h>
+>>>>>> +#include <asm/mach/arch.h>
+>>>>>> +#include <asm/mach/map.h>
+>>>>>> +#include <asm/mach/irq.h>
+>>>>>> +
+>>>>>> +#include "sam9_smc.h"
+>>>>>> +#include "generic.h"
 >>>
->>> So, I understand your point.  I would, however, like to have
->>> this patch applied, and then deal with any problems as they
->>> come up, rather than preemptively kill the feature on speculative
->>> problems.
->> 
->> An option that will probably, let's be realistic, only be used by you
->> doesn't really belong in mainline.  You are essentially asking everybody
->> else to carry the burden of supporting something only you seem to need.
->
-> I'm not so sure that I'm the only one interested in this.
-> I'll ask around and see if I can find others.  I'll have
-> a good chance at ELC Europe next week.
+>>> As found by Jean-Christophe, it seems that some clock lookup data are missing here. Something like:
+>>>
+>>> +/*
+>>> + * Lookup table for attaching a specific name and platform_data pointer to
+>>> + * devices as they get created by of_platform_populate(). Ideally this table
+>>> + * would not exist, but the current clock implementation depends on some devices
+>>> + * having a specific name.
+>>> + /
+>>> +static const struct of_dev_auxdata at91_auxdata_lookup[] __initconst = {
+>>> + / at91sam9260/ at91sam9g20 /
+>>> + OF_DEV_AUXDATA("atmel,at91sam9260-usart", 0xfffff200, "atmel_usart.0", NULL),
+>>> + OF_DEV_AUXDATA("atmel,at91sam9260-usart", 0xfffb0000, "atmel_usart.1", NULL),
+>>> + OF_DEV_AUXDATA("atmel,at91sam9260-usart", 0xfffb4000, "atmel_usart.2", NULL),
+>>> + OF_DEV_AUXDATA("atmel,at91sam9260-usart", 0xfffb8000, "atmel_usart.3", NULL),
+>>> + OF_DEV_AUXDATA("atmel,at91sam9260-usart", 0xfffd0000, "atmel_usart.4", NULL),
+>>> + OF_DEV_AUXDATA("atmel,at91sam9260-usart", 0xfffd4000, "atmel_usart.5", NULL),
+>>> + OF_DEV_AUXDATA("atmel,at91sam9260-usart", 0xfffd8000, "atmel_usart.6", NULL),
+>>> + / at91sam9g45*/
+>>> + OF_DEV_AUXDATA("atmel,at91sam9260-usart", 0xffffee00, "atmel_usart.0", NULL),
+>>> + OF_DEV_AUXDATA("atmel,at91sam9260-usart", 0xfff8c000, "atmel_usart.1", NULL),
+>>> + OF_DEV_AUXDATA("atmel,at91sam9260-usart", 0xfff90000, "atmel_usart.2", NULL),
+>>> + OF_DEV_AUXDATA("atmel,at91sam9260-usart", 0xfff94000, "atmel_usart.3", NULL),
+>>> + OF_DEV_AUXDATA("atmel,at91sam9260-usart", 0xfff98000, "atmel_usart.4", NULL),
+>>> + { /* sentinel */ }
+>>> +};
+>>>
+>>> With a change here:
+>>>   of_platform_populate(NULL, of_default_bus_match_table, at91_auxdata_lookup, NULL);
+>>>
+>>> I know that it is a temporary usage of auxdata. Does it sound the right thing to do for the moment?
+>>>
+>>
+>> If clk lookups are the only thing needed, can't you jusst add the
+>> lookups for DT?
+> 
+> You mean this code surrounded by #ifdef CONFIG_OF?
+> 
+> This board file is dedicated to device tree support and selects
+> CONFIG_USE_OF in Kconfig... So I thought it was not necessary to add it.
+> 
 
-I'll be there as well.
+No, I mean you already have a clkdev lookup table with atmel_usart.0 for
+example. Can't you just add to that table a clkdev lookup entry for
+atmel_usart.ffffee000. You can ifdef it if you're concerned about size,
+but it doesn't have to be. There shouldn't be any issue having 2 entries
+for 2 different device names.
 
-> But in general this attitude is really depressing.  I can
-> remember when support for niche use cases was considered good.
-
-It's always a tradeoff of utility versus overall impact.  The more
-obscure a feature is, the more confined it will have to be.  A driver
-for some obscure piece of hardware can usually be accommodated without
-touching any other code.  The 4k stack feature, however, has the
-potential to require changes or impose constraints pretty much
-everywhere in the entire kernel.
-
-> I understand the tradeoff if the maintenance burden is high,
-> but I'm not convinced it is.
-
-The removal of the 4k stack option on x86 suggests otherwise.
-
-> I don't expect anyone to proactively guard against or remedy stack
-> depth issues.  But if they'd be open to accepting patches from those
-> who care, that'd be nice.
-
-Of course gratuitous stack bloat should be fixed whenever possible.  I
-would never suggest otherwise.  Expecting support for 4k stacks through
-an alternate (presumably reduced-functionality) path is however pushing
-your luck.  Many maintainers will not even have the hardware necessary
-to test this configuration, and not being able to test code I maintain
-is not a situation I would like to be in (I am not a maintainer of
-anything, so perhaps this carries little weight).
-
-> If you're saying that Linux is only for use on general purpose
-> platforms, and deeply embedded doesn't matter, I think that's sad.
-
-I am saying the line has to be drawn somewhere, and it seems that 4k
-stacks are pushing things a bit too far.  I would probably support (in
-principle, if not with code) an effort to make 4k stacks work
-everywhere (possibly with a few well-defined exceptions).  Were it not
-for the previous failed attempt, I might even believe it could succeed.
-
--- 
-M?ns Rullg?rd
-mans at mansr.com
+Rob
