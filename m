@@ -1,86 +1,43 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Thu, 20 Oct 2011 16:51:14 +0200
-Subject: [PATCHv9 03/18] TEMP: OMAP3xxx: hwmod data: add PRM hwmod
-In-Reply-To: <alpine.DEB.2.00.1110131047110.24155@utopia.booyaka.com>
-References: <1316781986-30642-1-git-send-email-t-kristo@ti.com>
-	<1316781986-30642-4-git-send-email-t-kristo@ti.com>
-	<alpine.DEB.2.00.1110101320180.5205@utopia.booyaka.com>
-	<4E934D79.4080000@ti.com>
-	<alpine.DEB.2.00.1110101416530.5205@utopia.booyaka.com>
-	<4E936F0E.9050203@ti.com>
-	<alpine.DEB.2.00.1110101725140.5205@utopia.booyaka.com>
-	<4E954CDA.10107@ti.com>
-	<alpine.DEB.2.00.1110131033410.24155@utopia.booyaka.com>
-	<alpine.DEB.2.00.1110131047110.24155@utopia.booyaka.com>
-Message-ID: <4EA03562.7000309@ti.com>
+From: jic23@cam.ac.uk (Jonathan Cameron)
+Date: Thu, 20 Oct 2011 15:55:55 +0100
+Subject: Update: ARM Sub-Architecture Maintainers workshop at Kernel Summit
+	2011
+In-Reply-To: <20111020144641.GC6100@sirena.org.uk>
+References: <CACxGe6vMLeHrN7jLB2=JYQON1ykOiWTeGiH8YXkUbguV0D-HEw@mail.gmail.com>
+	<CACRpkdawG9aKAT7PHuYapiHexkteq-_seQGd6iRORyt-LwbmxA@mail.gmail.com>
+	<4EA026C5.1050803@cam.ac.uk>
+	<CAGsJ_4z+DWSXyn6gN9tOAqY3txM22Hk9jNZFPQ_TuYxT3RsRog@mail.gmail.com>
+	<20111020144641.GC6100@sirena.org.uk>
+Message-ID: <4EA0367B.7090300@cam.ac.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/13/2011 6:51 PM, Paul Walmsley wrote:
-> On Thu, 13 Oct 2011, Paul Walmsley wrote:
->
->> On Wed, 12 Oct 2011, Cousson, Benoit wrote:
->>
->>> On 10/11/2011 1:26 AM, Paul Walmsley wrote:
->>>> On Tue, 11 Oct 2011, Cousson, Benoit wrote:
->>>>
->>>>> In fact the device name does not have to match the hwmod name. So we
->>>>> can just create an "omap2_prm" omap_device for OMAP2, "omap3_prm"
->>>>> omap_device for OMAP3... That will allow the relevant PRM driver to
->>>>> be bound to the proper device.
->>>>
->>>> Incidentally, given that we would be using the hwmod name and the version
->>>> number to determine the appropriate omap_device name, what IP version
->>>> numbers should we assign to these PRM IP blocks for different SoCs?
->>>
->>> It can just be 1, 2 and 3... The idea is just to differentiate the IP for each
->>> OMAP.
->>
->> So those are basically arbitrary?  Something is not clear here.
->>
->> In the current hwmod design, IP blocks with different interfaces were
->> intended to be uniquely identified by the hwmod name alone.  That is why
->> omap_hwmod_lookup() only takes a 'name' parameter.
->>
->> If I understand what you want to do, you wish to change this to uniquely
->> identify them by a (name, interface version number) tuple.
->>
->> I don't have a problem with this in theory, but it implies some changes to
->> the existing model.  Specifically:
->>
->> - we'll need to add an interface version number to the struct omap_hwmod
->>
->> - we'll need to modify omap_hwmod_lookup() to take an interface version
->> number
->>
->> - the "ti,hwmod" DT binding that you proposed earlier will need to include
->> an interface version number
->
-> Hmm, reflecting on this further, is your intention to bind drivers to
-> hwmods by the struct omap_hwmod_class instead?
+On 10/20/11 15:46, Mark Brown wrote:
+> On Thu, Oct 20, 2011 at 10:25:15PM +0800, Barry Song wrote:
+> 
+>> as Jonathan knows, i was one of main authors of those drivers in
+>> drivers/staging/iio. one problem for iio is now most people still
+>> write sensor drivers based on input subsystem or others but not iio.
+>> and Android HAL or other frameworks prefer input _event as well.
+>> so to push iio ahead, we might push related app ahead too.
+> 
+> Well, that's not entirely clear - one of the reasons for discussing an
+> in kernel API is so that drivers for these subsystems can make use of
+> IIO channels.  Another big blocker for deployment of IIO right now is
+> that it's in staging, fixing that will probably help enormously.
+That and push in kernel APIs.  Working on that though.  Note however they
+will be dependent on at least the first three sets of patches in
+our original master move out of staging plan.  So lots of other stuff
+to get fixed up first.  Some of which is probably going to be controversial.
 
-Well, somehow, the class was added for that purpose, to allow one timer 
-driver to bind to 2 different hwmods. But in that case the device name 
-was the same.
+Direct user space code will exist for the usecases we were originally
+targeting, but where it makes sense, Mark has convinced me of the need
+to push things out through input / hmwon. Guenter doesn't seem against
+so that's a start.  Dmitry has always pushed for this (though last
+time we talked about it, plan was a userspace bridge).
 
-> If we define that "rev" field as the interface version number, that should
-> probably work.
->
-> So then in C struct format, in a platform_device system, the mapping table
-> would basically become
->
-> struct omap_hwmod_driver_map {
-> 	const char *class_name;
-> 	const u32 class_rev;
-> 	const char *platform_device_name;
-> }
+We'll still want to be very careful to keep any users that go into
+mainline on the straight an narrow wrt to pushing stuff through those
+subsystems that doesn't belong.
 
-This is needed if and only if you want to have a different driver for 
-the same IP.
-
-In the case of the timer, we do have only one device name and one driver:
-class=timer, rev=1, device=omap_timer
-class=timer, rev=2, device=omap_timer
-
-Regards,
-Benoit
+Jonathan
