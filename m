@@ -1,84 +1,36 @@
-From: david.yangshuai@gmail.com (David Yang)
-Date: Thu, 20 Oct 2011 10:43:16 +0800
-Subject: Question about: linux-linaro-2.6.38.7 booting the ubuntu 10.10
-	filesystem
-In-Reply-To: <CAK5ve-LetP_jUyi22T0QhPkHgNqjFBuzuMa5+VnEfWvzFpy3Wg@mail.gmail.com>
-References: <CALQsFO+o+zQJZiksb+2fW8b_kdTv6tqhjxYU6owv=hMhbk=92A@mail.gmail.com>
-	<CAK5ve-LetP_jUyi22T0QhPkHgNqjFBuzuMa5+VnEfWvzFpy3Wg@mail.gmail.com>
-Message-ID: <CALQsFO+iuraeVVDZLWL5JUibNE2a-WC3ksGj3PV=tPWfuhJX9A@mail.gmail.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Thu, 20 Oct 2011 09:12:10 +0530
+Subject: [PATCH v2 3/5] regulator: helper routine to extract
+	regulator_init_data
+In-Reply-To: <20111019151031.GA4275@opensource.wolfsonmicro.com>
+References: <1318263578-7407-1-git-send-email-rnayak@ti.com>
+	<1318263578-7407-4-git-send-email-rnayak@ti.com>
+	<20111016145536.GA29885@S2100-06.ap.freescale.net>
+	<4E9BAC4D.3010402@ti.com>
+	<20111018115836.GC30703@S2100-06.ap.freescale.net>
+	<20111018160046.GD28501@opensource.wolfsonmicro.com>
+	<20111019053354.GB31162@S2100-06.ap.freescale.net>
+	<20111019144734.GI18713@sirena.org.uk>
+	<20111019150448.GB32007@S2100-06.ap.freescale.net>
+	<20111019151031.GA4275@opensource.wolfsonmicro.com>
+Message-ID: <4E9F9892.9070007@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi,Bryan
+On Wednesday 19 October 2011 08:40 PM, Mark Brown wrote:
+> The problem is that the DT is supposed to be separate to the kernel and
+> the decisions can depend on what the kernel is currently capable of.
+> When the data is embedded in the kernel it's not an issue as the data is
+> attached to the rest of the code, when the data becomes detatched from
+> the kernel it becomes an issue.
 
-    It's Cortex-a9 soc  chip made by our company.
+completely agreed.
 
-    We have successfully booted the ubuntu10.10 using the standard
-kernel 2.6.33.
-
-    This is the first time we try the linaro kernel.
-
-    If we should try the standard kernel 2.6.38?
-
-
-   Thanks!
-
-
-Best Regards,
-Shuai
-
-On 10/19/11, Bryan Wu <bryan.wu@canonical.com> wrote:
-> David,
 >
-> Could you please tell us what's kind of hardware are you trying with
-> Ubuntu/Linaro?
->
-> Thanks
-> -Bryan
->
-> On Wed, Oct 19, 2011 at 9:52 PM, David Yang <david.yangshuai@gmail.com>
-> wrote:
->> hi,all
->>
->> ? I'm trying booting the ubuntu10.10 using the kernel
->> linux-linaro-2.6.38.7.
->> ? And I use the serial ttyS0 as the Console.
->> ? But the booting always stopped after logging?
->>
->> ? ? ? Freeing init memory: 124K
->> ? ? ? init: sreadahead main process (414) terminated with status 1
->> ? ? ? init: procps main process (429) terminated with status 255
->> ? ? ? * Setting preliminary keymap...
->>
->> ? And then the ttyS0 doesn't response.
->>
->> ? But when I boot the cramfs made using busybox with the same
->> kernel,I can get the login prompt.And then I can login and use it.
->>
->> ? I also tried the ubuntu9.10,it has the same problem.
->>
->> ? So I don't know why.
->>
->> ? Any suggestion is welcome?
->>
->> ? Thanks?
->>
->>
->> Best Regards,
->> David
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>
->
->
->
-> --
-> Bryan Wu <bryan.wu@canonical.com>
-> Kernel Developer ? ?+86.138-1617-6545 Mobile
-> Ubuntu Kernel Team
-> Canonical Ltd. ? ? ?www.canonical.com
-> Ubuntu - Linux for human beings | www.ubuntu.com
->
+> I don't see any issue with leaving some things out of the DT bindings;
+> you were the one raising that as a concern.
+
+The problem is, that there doesn't seem to be a clean way to embed
+*board data* into the kernel with DT, if left out of the DT bindings.
+There is the auxdata way of still attaching platform_data, but that I
+thought was a stopgap for just handling function pointers.
