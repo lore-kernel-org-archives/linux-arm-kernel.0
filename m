@@ -1,64 +1,183 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 20 Oct 2011 11:23:17 +0100
-Subject: [GIT PULL] genirq support for GIC PPIs
-Message-ID: <4E9FF695.10604@arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 20 Oct 2011 12:25:52 +0100
+Subject: [PATCH] arm: fix handling of nr_cpus
+In-Reply-To: <1318943804.2346.15.camel@deneb.redhat.com>
+References: <1318339864-32396-1-git-send-email-msalter@redhat.com>
+	<20111012172628.GC21648@n2100.arm.linux.org.uk>
+	<1318508268.2300.67.camel@deneb.redhat.com>
+	<20111013151004.GF21648@n2100.arm.linux.org.uk>
+	<1318943804.2346.15.camel@deneb.redhat.com>
+Message-ID: <20111020112552.GY21648@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell,
+On Tue, Oct 18, 2011 at 09:16:43AM -0400, Mark Salter wrote:
+> That's fine by me. mach-msm, mach-shmobile, and mach-vexpress also need
+> patching. They currently don't clip against NR_CPUS.
 
-Please pull the following branch to get the genirq support for the GIC
-PPIs.
+So more like this then?
 
-Thanks,
+ arch/arm/mach-exynos4/platsmp.c   |   10 ++++------
+ arch/arm/mach-msm/platsmp.c       |    6 ++++++
+ arch/arm/mach-omap2/omap-smp.c    |   10 ++++------
+ arch/arm/mach-realview/platsmp.c  |   10 ++++------
+ arch/arm/mach-shmobile/platsmp.c  |    6 ++++++
+ arch/arm/mach-tegra/platsmp.c     |    8 ++++----
+ arch/arm/mach-ux500/platsmp.c     |   10 ++++------
+ arch/arm/mach-vexpress/ct-ca9x4.c |    6 ++++++
+ 8 files changed, 38 insertions(+), 28 deletions(-)
 
-	M.
-
-The following changes since commit 5a567d78c437e3be1c512734cdfe64b4ae6b82d7:
-  Jamie Iles (1):
-        ARM: 7115/4: move __exception and friends to asm/exception.h
-
-are available in the git repository at:
-
-  git://github.com/mzyngier/arm-platforms.git ppi-for-rmk
-
-Marc Zyngier (4):
-      genirq: Add support for per-cpu dev_id interrupts
-      genirq: percpu: allow interrupt type to be set at enable time
-      ARM: gic: consolidate PPI handling
-      ARM: gic, local timers: use the request_percpu_irq() interface
-
-Thomas Gleixner (1):
-      genirq: Fix fatfinered fixup really
-
- arch/arm/common/gic.c                             |   43 +++-
- arch/arm/include/asm/entry-macro-multi.S          |    7 -
- arch/arm/include/asm/hardirq.h                    |    3 -
- arch/arm/include/asm/hardware/entry-macro-gic.S   |   19 +--
- arch/arm/include/asm/hardware/gic.h               |    1 -
- arch/arm/include/asm/localtimer.h                 |   23 +--
- arch/arm/include/asm/smp.h                        |    5 -
- arch/arm/include/asm/smp_twd.h                    |    2 +-
- arch/arm/kernel/irq.c                             |    3 -
- arch/arm/kernel/smp.c                             |   38 +----
- arch/arm/kernel/smp_twd.c                         |   47 +++++-
- arch/arm/mach-exynos4/include/mach/entry-macro.S  |    7 +-
- arch/arm/mach-exynos4/mct.c                       |    7 +-
- arch/arm/mach-msm/board-msm8x60.c                 |   11 -
- arch/arm/mach-msm/include/mach/entry-macro-qgic.S |   73 +-------
- arch/arm/mach-msm/timer.c                         |   69 ++++---
- arch/arm/mach-omap2/include/mach/entry-macro.S    |   14 +--
- arch/arm/mach-shmobile/entry-intc.S               |    3 -
- arch/arm/mach-shmobile/include/mach/entry-macro.S |    3 -
- include/linux/interrupt.h                         |   38 +++-
- include/linux/irq.h                               |   16 ++-
- include/linux/irqdesc.h                           |    1 +
- kernel/irq/chip.c                                 |   64 ++++++-
- kernel/irq/internals.h                            |   19 ++-
- kernel/irq/irqdesc.c                              |   32 +++-
- kernel/irq/manage.c                               |  215 ++++++++++++++++++++-
- kernel/irq/settings.h                             |    7 +
- 27 files changed, 496 insertions(+), 274 deletions(-)
-
--- 
-Jazz is not dead. It just smells funny...
+diff --git a/arch/arm/mach-exynos4/platsmp.c b/arch/arm/mach-exynos4/platsmp.c
+index df6ef1b..7381f56 100644
+--- a/arch/arm/mach-exynos4/platsmp.c
++++ b/arch/arm/mach-exynos4/platsmp.c
+@@ -193,12 +193,10 @@ void __init smp_init_cpus(void)
+ 	ncores = scu_base ? scu_get_core_count(scu_base) : 1;
+ 
+ 	/* sanity check */
+-	if (ncores > NR_CPUS) {
+-		printk(KERN_WARNING
+-		       "EXYNOS4: no. of cores (%d) greater than configured "
+-		       "maximum of %d - clipping\n",
+-		       ncores, NR_CPUS);
+-		ncores = NR_CPUS;
++	if (ncores > nr_cpu_ids) {
++		pr_warn("SMP: %u cores greater than maximum (%u), clipping\n",
++			ncores, nr_cpu_ids);
++		ncores = nr_cpu_ids;
+ 	}
+ 
+ 	for (i = 0; i < ncores; i++)
+diff --git a/arch/arm/mach-msm/platsmp.c b/arch/arm/mach-msm/platsmp.c
+index 1a1af9e..7276595 100644
+--- a/arch/arm/mach-msm/platsmp.c
++++ b/arch/arm/mach-msm/platsmp.c
+@@ -156,6 +156,12 @@ void __init smp_init_cpus(void)
+ {
+ 	unsigned int i, ncores = get_core_count();
+ 
++	if (ncores > nr_cpu_ids) {
++		pr_warn("SMP: %u cores greater than maximum (%u), clipping\n",
++			ncores, nr_cpu_ids);
++		ncores = nr_cpu_ids;
++	}
++
+ 	for (i = 0; i < ncores; i++)
+ 		set_cpu_possible(i, true);
+ 
+diff --git a/arch/arm/mach-omap2/omap-smp.c b/arch/arm/mach-omap2/omap-smp.c
+index ce65e93..ec95516 100644
+--- a/arch/arm/mach-omap2/omap-smp.c
++++ b/arch/arm/mach-omap2/omap-smp.c
+@@ -109,12 +109,10 @@ void __init smp_init_cpus(void)
+ 	ncores = scu_get_core_count(scu_base);
+ 
+ 	/* sanity check */
+-	if (ncores > NR_CPUS) {
+-		printk(KERN_WARNING
+-		       "OMAP4: no. of cores (%d) greater than configured "
+-		       "maximum of %d - clipping\n",
+-		       ncores, NR_CPUS);
+-		ncores = NR_CPUS;
++	if (ncores > nr_cpu_ids) {
++		pr_warn("SMP: %u cores greater than maximum (%u), clipping\n",
++			ncores, nr_cpu_ids);
++		ncores = nr_cpu_ids;
+ 	}
+ 
+ 	for (i = 0; i < ncores; i++)
+diff --git a/arch/arm/mach-realview/platsmp.c b/arch/arm/mach-realview/platsmp.c
+index 4ae943b..4b33a72 100644
+--- a/arch/arm/mach-realview/platsmp.c
++++ b/arch/arm/mach-realview/platsmp.c
+@@ -52,12 +52,10 @@ void __init smp_init_cpus(void)
+ 	ncores = scu_base ? scu_get_core_count(scu_base) : 1;
+ 
+ 	/* sanity check */
+-	if (ncores > NR_CPUS) {
+-		printk(KERN_WARNING
+-		       "Realview: no. of cores (%d) greater than configured "
+-		       "maximum of %d - clipping\n",
+-		       ncores, NR_CPUS);
+-		ncores = NR_CPUS;
++	if (ncores > nr_cpu_ids) {
++		pr_warn("SMP: %u cores greater than maximum (%u), clipping\n",
++			ncores, nr_cpu_ids);
++		ncores = nr_cpu_ids;
+ 	}
+ 
+ 	for (i = 0; i < ncores; i++)
+diff --git a/arch/arm/mach-shmobile/platsmp.c b/arch/arm/mach-shmobile/platsmp.c
+index 66f9806..e4e485f 100644
+--- a/arch/arm/mach-shmobile/platsmp.c
++++ b/arch/arm/mach-shmobile/platsmp.c
+@@ -56,6 +56,12 @@ void __init smp_init_cpus(void)
+ 	unsigned int ncores = shmobile_smp_get_core_count();
+ 	unsigned int i;
+ 
++	if (ncores > nr_cpu_ids) {
++		pr_warn("SMP: %u cores greater than maximum (%u), clipping\n",
++			ncores, nr_cpu_ids);
++		ncores = nr_cpu_ids;
++	}
++
+ 	for (i = 0; i < ncores; i++)
+ 		set_cpu_possible(i, true);
+ 
+diff --git a/arch/arm/mach-tegra/platsmp.c b/arch/arm/mach-tegra/platsmp.c
+index 0886cbc..f779d5e 100644
+--- a/arch/arm/mach-tegra/platsmp.c
++++ b/arch/arm/mach-tegra/platsmp.c
+@@ -114,10 +114,10 @@ void __init smp_init_cpus(void)
+ {
+ 	unsigned int i, ncores = scu_get_core_count(scu_base);
+ 
+-	if (ncores > NR_CPUS) {
+-		printk(KERN_ERR "Tegra: no. of cores (%u) greater than configured (%u), clipping\n",
+-			ncores, NR_CPUS);
+-		ncores = NR_CPUS;
++	if (ncores > nr_cpu_ids) {
++		pr_warn("SMP: %u cores greater than maximum (%u), clipping\n",
++			ncores, nr_cpu_ids);
++		ncores = nr_cpu_ids;
+ 	}
+ 
+ 	for (i = 0; i < ncores; i++)
+diff --git a/arch/arm/mach-ux500/platsmp.c b/arch/arm/mach-ux500/platsmp.c
+index a33df5f..3af3e5c 100644
+--- a/arch/arm/mach-ux500/platsmp.c
++++ b/arch/arm/mach-ux500/platsmp.c
+@@ -156,12 +156,10 @@ void __init smp_init_cpus(void)
+ 	ncores = scu_base ? scu_get_core_count(scu_base) : 1;
+ 
+ 	/* sanity check */
+-	if (ncores > NR_CPUS) {
+-		printk(KERN_WARNING
+-		       "U8500: no. of cores (%d) greater than configured "
+-		       "maximum of %d - clipping\n",
+-		       ncores, NR_CPUS);
+-		ncores = NR_CPUS;
++	if (ncores > nr_cpu_ids) {
++		pr_warn("SMP: %u cores greater than maximum (%u), clipping\n",
++			ncores, nr_cpu_ids);
++		ncores = nr_cpu_ids;
+ 	}
+ 
+ 	for (i = 0; i < ncores; i++)
+diff --git a/arch/arm/mach-vexpress/ct-ca9x4.c b/arch/arm/mach-vexpress/ct-ca9x4.c
+index bfd32f5..2b1e836 100644
+--- a/arch/arm/mach-vexpress/ct-ca9x4.c
++++ b/arch/arm/mach-vexpress/ct-ca9x4.c
+@@ -221,6 +221,12 @@ static void ct_ca9x4_init_cpu_map(void)
+ {
+ 	int i, ncores = scu_get_core_count(MMIO_P2V(A9_MPCORE_SCU));
+ 
++	if (ncores > nr_cpu_ids) {
++		pr_warn("SMP: %u cores greater than maximum (%u), clipping\n",
++			ncores, nr_cpu_ids);
++		ncores = nr_cpu_ids;
++	}
++
+ 	for (i = 0; i < ncores; ++i)
+ 		set_cpu_possible(i, true);
+ 
