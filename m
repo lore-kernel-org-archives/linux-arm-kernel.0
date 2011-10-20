@@ -1,107 +1,193 @@
 From: padma.v@samsung.com (Padmavathi Venna)
-Date: Thu, 20 Oct 2011 17:18:30 +0530
-Subject: [PATCH] ARM: lpc32xx: Use CLKDEV_INIT for creating clk_lookup instance
-Message-ID: <1319111310-27784-1-git-send-email-padma.v@samsung.com>
+Date: Thu, 20 Oct 2011 17:19:51 +0530
+Subject: [PATCH] ARM: mx5: Use CLKDEV_INIT for creating clk_lookup instance
+Message-ID: <1319111391-27820-1-git-send-email-padma.v@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 A common macro CLKDEV_INIT was added for creating clk_lookup
-instance in include/linux/clkdev.h. So replace _REGISTER_CLOCK macro
-with CLKDEV_INIT.
+instance in include/linux/clkdev.h. So replace _REGISTER_CLOCK
+macro with CLKDEV_INIT.
 
 Suggested-by: Russell King <rmk+kernel@arm.linux.org.uk>
-Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+Acked-by: Amit Kucheria <amit.kucheria@canonical.com>
 Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
 ---
- arch/arm/mach-lpc32xx/clock.c |   75 ++++++++++++++++++----------------------
- 1 files changed, 34 insertions(+), 41 deletions(-)
+ arch/arm/mach-mx5/clock-mx51-mx53.c |  149 +++++++++++++++++------------------
+ 1 files changed, 71 insertions(+), 78 deletions(-)
 
-diff --git a/arch/arm/mach-lpc32xx/clock.c b/arch/arm/mach-lpc32xx/clock.c
-index 1e02751..37034c2 100644
---- a/arch/arm/mach-lpc32xx/clock.c
-+++ b/arch/arm/mach-lpc32xx/clock.c
-@@ -1041,48 +1041,41 @@ struct clk *clk_get_parent(struct clk *clk)
- }
- EXPORT_SYMBOL(clk_get_parent);
+diff --git a/arch/arm/mach-mx5/clock-mx51-mx53.c b/arch/arm/mach-mx5/clock-mx51-mx53.c
+index 2b9bd1f..d198515 100644
+--- a/arch/arm/mach-mx5/clock-mx51-mx53.c
++++ b/arch/arm/mach-mx5/clock-mx51-mx53.c
+@@ -1422,97 +1422,90 @@ DEFINE_CLOCK(ipu_di1_clk, 0, MXC_CCM_CCGR6, MXC_CCM_CCGRx_CG6_OFFSET,
+ DEFINE_CLOCK(pata_clk, 0, MXC_CCM_CCGR4, MXC_CCM_CCGRx_CG0_OFFSET,
+ 		NULL, NULL, &ipg_clk, &spba_clk);
  
 -#define _REGISTER_CLOCK(d, n, c) \
--	{ \
--		.dev_id = (d), \
--		.con_id = (n), \
--		.clk = &(c), \
--	},
+-       { \
+-		.dev_id = d, \
+-		.con_id = n, \
+-		.clk = &c,   \
+-       },
 -
- static struct clk_lookup lookups[] = {
--	_REGISTER_CLOCK(NULL, "osc_32KHz", osc_32KHz)
--	_REGISTER_CLOCK(NULL, "osc_pll397", osc_pll397)
--	_REGISTER_CLOCK(NULL, "osc_main", osc_main)
--	_REGISTER_CLOCK(NULL, "sys_ck", clk_sys)
--	_REGISTER_CLOCK(NULL, "arm_pll_ck", clk_armpll)
--	_REGISTER_CLOCK(NULL, "ck_pll5", clk_usbpll)
--	_REGISTER_CLOCK(NULL, "hclk_ck", clk_hclk)
--	_REGISTER_CLOCK(NULL, "pclk_ck", clk_pclk)
--	_REGISTER_CLOCK(NULL, "timer0_ck", clk_timer0)
--	_REGISTER_CLOCK(NULL, "timer1_ck", clk_timer1)
--	_REGISTER_CLOCK(NULL, "timer2_ck", clk_timer2)
--	_REGISTER_CLOCK(NULL, "timer3_ck", clk_timer3)
--	_REGISTER_CLOCK(NULL, "vfp9_ck", clk_vfp9)
--	_REGISTER_CLOCK(NULL, "clk_dmac", clk_dma)
--	_REGISTER_CLOCK("pnx4008-watchdog", NULL, clk_wdt)
--	_REGISTER_CLOCK(NULL, "uart3_ck", clk_uart3)
--	_REGISTER_CLOCK(NULL, "uart4_ck", clk_uart4)
--	_REGISTER_CLOCK(NULL, "uart5_ck", clk_uart5)
--	_REGISTER_CLOCK(NULL, "uart6_ck", clk_uart6)
--	_REGISTER_CLOCK("pnx-i2c.0", NULL, clk_i2c0)
--	_REGISTER_CLOCK("pnx-i2c.1", NULL, clk_i2c1)
--	_REGISTER_CLOCK("pnx-i2c.2", NULL, clk_i2c2)
--	_REGISTER_CLOCK("dev:ssp0", NULL, clk_ssp0)
--	_REGISTER_CLOCK("dev:ssp1", NULL, clk_ssp1)
--	_REGISTER_CLOCK("lpc32xx_keys.0", NULL, clk_kscan)
--	_REGISTER_CLOCK("lpc32xx-nand.0", "nand_ck", clk_nand)
--	_REGISTER_CLOCK("tbd", "i2s0_ck", clk_i2s0)
--	_REGISTER_CLOCK("tbd", "i2s1_ck", clk_i2s1)
--	_REGISTER_CLOCK("ts-lpc32xx", NULL, clk_tsc)
--	_REGISTER_CLOCK("dev:mmc0", "MCLK", clk_mmc)
--	_REGISTER_CLOCK("lpc-net.0", NULL, clk_net)
--	_REGISTER_CLOCK("dev:clcd", NULL, clk_lcd)
--	_REGISTER_CLOCK("lpc32xx_udc", "ck_usbd", clk_usbd)
--	_REGISTER_CLOCK("lpc32xx_rtc", NULL, clk_rtc)
-+	CLKDEV_INIT(NULL, "osc_32KHz", &osc_32KHz),
-+	CLKDEV_INIT(NULL, "osc_pll397", &osc_pll397),
-+	CLKDEV_INIT(NULL, "osc_main", &osc_main),
-+	CLKDEV_INIT(NULL, "sys_ck", &clk_sys),
-+	CLKDEV_INIT(NULL, "arm_pll_ck", &clk_armpll),
-+	CLKDEV_INIT(NULL, "ck_pll5", &clk_usbpll),
-+	CLKDEV_INIT(NULL, "hclk_ck", &clk_hclk),
-+	CLKDEV_INIT(NULL, "pclk_ck", &clk_pclk),
-+	CLKDEV_INIT(NULL, "timer0_ck", &clk_timer0),
-+	CLKDEV_INIT(NULL, "timer1_ck", &clk_timer1),
-+	CLKDEV_INIT(NULL, "timer2_ck", &clk_timer2),
-+	CLKDEV_INIT(NULL, "timer3_ck", &clk_timer3),
-+	CLKDEV_INIT(NULL, "vfp9_ck", &clk_vfp9),
-+	CLKDEV_INIT(NULL, "clk_dmac", &clk_dma),
-+	CLKDEV_INIT("pnx4008-watchdog", NULL, &clk_wdt),
-+	CLKDEV_INIT(NULL, "uart3_ck", &clk_uart3),
-+	CLKDEV_INIT(NULL, "uart4_ck", &clk_uart4),
-+	CLKDEV_INIT(NULL, "uart5_ck", &clk_uart5),
-+	CLKDEV_INIT(NULL, "uart6_ck", &clk_uart6),
-+	CLKDEV_INIT("pnx-i2c.0", NULL, &clk_i2c0),
-+	CLKDEV_INIT("pnx-i2c.1", NULL, &clk_i2c1),
-+	CLKDEV_INIT("pnx-i2c.2", NULL, &clk_i2c2),
-+	CLKDEV_INIT("dev:ssp0", NULL, &clk_ssp0),
-+	CLKDEV_INIT("dev:ssp1", NULL, &clk_ssp1),
-+	CLKDEV_INIT("lpc32xx_keys.0", NULL, &clk_kscan),
-+	CLKDEV_INIT("lpc32xx-nand.0", "nand_ck", &clk_nand),
-+	CLKDEV_INIT("tbd", "i2s0_ck", &clk_i2s0),
-+	CLKDEV_INIT("tbd", "i2s1_ck", &clk_i2s1),
-+	CLKDEV_INIT("ts-lpc32xx", NULL, &clk_tsc),
-+	CLKDEV_INIT("dev:mmc0", "MCLK", &clk_mmc),
-+	CLKDEV_INIT("lpc-net.0", NULL, &clk_net),
-+	CLKDEV_INIT("dev:clcd", NULL, &clk_lcd),
-+	CLKDEV_INIT("lpc32xx_udc", "ck_usbd", &clk_usbd),
-+	CLKDEV_INIT("lpc32xx_rtc", NULL, &clk_rtc),
+ static struct clk_lookup mx51_lookups[] = {
+ 	/* i.mx51 has the i.mx21 type uart */
+-	_REGISTER_CLOCK("imx21-uart.0", NULL, uart1_clk)
+-	_REGISTER_CLOCK("imx21-uart.1", NULL, uart2_clk)
+-	_REGISTER_CLOCK("imx21-uart.2", NULL, uart3_clk)
+-	_REGISTER_CLOCK(NULL, "gpt", gpt_clk)
++	CLKDEV_INIT("imx21-uart.0", NULL, &uart1_clk),
++	CLKDEV_INIT("imx21-uart.1", NULL, &uart2_clk),
++	CLKDEV_INIT("imx21-uart.2", NULL, &uart3_clk),
++	CLKDEV_INIT(NULL, "gpt", &gpt_clk),
+ 	/* i.mx51 has the i.mx27 type fec */
+-	_REGISTER_CLOCK("imx27-fec.0", NULL, fec_clk)
+-	_REGISTER_CLOCK("mxc_pwm.0", "pwm", pwm1_clk)
+-	_REGISTER_CLOCK("mxc_pwm.1", "pwm", pwm2_clk)
+-	_REGISTER_CLOCK("imx-i2c.0", NULL, i2c1_clk)
+-	_REGISTER_CLOCK("imx-i2c.1", NULL, i2c2_clk)
+-	_REGISTER_CLOCK("imx-i2c.2", NULL, hsi2c_clk)
+-	_REGISTER_CLOCK("mxc-ehci.0", "usb", usboh3_clk)
+-	_REGISTER_CLOCK("mxc-ehci.0", "usb_ahb", usb_ahb_clk)
+-	_REGISTER_CLOCK("mxc-ehci.0", "usb_phy1", usb_phy1_clk)
+-	_REGISTER_CLOCK("mxc-ehci.1", "usb", usboh3_clk)
+-	_REGISTER_CLOCK("mxc-ehci.1", "usb_ahb", usb_ahb_clk)
+-	_REGISTER_CLOCK("mxc-ehci.2", "usb", usboh3_clk)
+-	_REGISTER_CLOCK("mxc-ehci.2", "usb_ahb", usb_ahb_clk)
+-	_REGISTER_CLOCK("fsl-usb2-udc", "usb", usboh3_clk)
+-	_REGISTER_CLOCK("fsl-usb2-udc", "usb_ahb", ahb_clk)
+-	_REGISTER_CLOCK("imx-keypad", NULL, dummy_clk)
+-	_REGISTER_CLOCK("mxc_nand", NULL, nfc_clk)
+-	_REGISTER_CLOCK("imx-ssi.0", NULL, ssi1_clk)
+-	_REGISTER_CLOCK("imx-ssi.1", NULL, ssi2_clk)
+-	_REGISTER_CLOCK("imx-ssi.2", NULL, ssi3_clk)
++	CLKDEV_INIT("imx27-fec.0", NULL, &fec_clk),
++	CLKDEV_INIT("mxc_pwm.0", "pwm", &pwm1_clk),
++	CLKDEV_INIT("mxc_pwm.1", "pwm", &pwm2_clk),
++	CLKDEV_INIT("imx-i2c.0", NULL, &i2c1_clk),
++	CLKDEV_INIT("imx-i2c.1", NULL, &i2c2_clk),
++	CLKDEV_INIT("imx-i2c.2", NULL, &hsi2c_clk),
++	CLKDEV_INIT("mxc-ehci.0", "usb", &usboh3_clk),
++	CLKDEV_INIT("mxc-ehci.0", "usb_ahb", &usb_ahb_clk),
++	CLKDEV_INIT("mxc-ehci.0", "usb_phy1", &usb_phy1_clk),
++	CLKDEV_INIT("mxc-ehci.1", "usb", &usboh3_clk),
++	CLKDEV_INIT("mxc-ehci.1", "usb_ahb", &usb_ahb_clk),
++	CLKDEV_INIT("mxc-ehci.2", "usb", &usboh3_clk),
++	CLKDEV_INIT("mxc-ehci.2", "usb_ahb", &usb_ahb_clk),
++	CLKDEV_INIT("fsl-usb2-udc", "usb", &usboh3_clk),
++	CLKDEV_INIT("fsl-usb2-udc", "usb_ahb", &ahb_clk),
++	CLKDEV_INIT("imx-keypad", NULL, &dummy_clk),
++	CLKDEV_INIT("mxc_nand", NULL, &nfc_clk),
++	CLKDEV_INIT("imx-ssi.0", NULL, &ssi1_clk),
++	CLKDEV_INIT("imx-ssi.1", NULL, &ssi2_clk),
++	CLKDEV_INIT("imx-ssi.2", NULL, &ssi3_clk),
+ 	/* i.mx51 has the i.mx35 type sdma */
+-	_REGISTER_CLOCK("imx35-sdma", NULL, sdma_clk)
+-	_REGISTER_CLOCK(NULL, "ckih", ckih_clk)
+-	_REGISTER_CLOCK(NULL, "ckih2", ckih2_clk)
+-	_REGISTER_CLOCK(NULL, "gpt_32k", gpt_32k_clk)
+-	_REGISTER_CLOCK("imx51-ecspi.0", NULL, ecspi1_clk)
+-	_REGISTER_CLOCK("imx51-ecspi.1", NULL, ecspi2_clk)
++	CLKDEV_INIT("imx35-sdma", NULL, &sdma_clk),
++	CLKDEV_INIT(NULL, "ckih", &ckih_clk),
++	CLKDEV_INIT(NULL, "ckih2", &ckih2_clk),
++	CLKDEV_INIT(NULL, "gpt_32k", &gpt_32k_clk),
++	CLKDEV_INIT("imx51-ecspi.0", NULL, &ecspi1_clk),
++	CLKDEV_INIT("imx51-ecspi.1", NULL, &ecspi2_clk),
+ 	/* i.mx51 has the i.mx35 type cspi */
+-	_REGISTER_CLOCK("imx35-cspi.0", NULL, cspi_clk)
+-	_REGISTER_CLOCK("sdhci-esdhc-imx51.0", NULL, esdhc1_clk)
+-	_REGISTER_CLOCK("sdhci-esdhc-imx51.1", NULL, esdhc2_clk)
+-	_REGISTER_CLOCK("sdhci-esdhc-imx51.2", NULL, esdhc3_clk)
+-	_REGISTER_CLOCK("sdhci-esdhc-imx51.3", NULL, esdhc4_clk)
+-	_REGISTER_CLOCK(NULL, "cpu_clk", cpu_clk)
+-	_REGISTER_CLOCK(NULL, "iim_clk", iim_clk)
+-	_REGISTER_CLOCK("imx2-wdt.0", NULL, dummy_clk)
+-	_REGISTER_CLOCK("imx2-wdt.1", NULL, dummy_clk)
+-	_REGISTER_CLOCK(NULL, "mipi_hsp", mipi_hsp_clk)
+-	_REGISTER_CLOCK("imx-ipuv3", NULL, ipu_clk)
+-	_REGISTER_CLOCK("imx-ipuv3", "di0", ipu_di0_clk)
+-	_REGISTER_CLOCK("imx-ipuv3", "di1", ipu_di1_clk)
+-	_REGISTER_CLOCK(NULL, "gpc_dvfs", gpc_dvfs_clk)
+-	_REGISTER_CLOCK("pata_imx", NULL, pata_clk)
++	CLKDEV_INIT("imx35-cspi.0", NULL, &cspi_clk),
++	CLKDEV_INIT("sdhci-esdhc-imx51.0", NULL, &esdhc1_clk),
++	CLKDEV_INIT("sdhci-esdhc-imx51.1", NULL, &esdhc2_clk),
++	CLKDEV_INIT("sdhci-esdhc-imx51.2", NULL, &esdhc3_clk),
++	CLKDEV_INIT("sdhci-esdhc-imx51.3", NULL, &esdhc4_clk),
++	CLKDEV_INIT(NULL, "cpu_clk", &cpu_clk),
++	CLKDEV_INIT(NULL, "iim_clk", &iim_clk),
++	CLKDEV_INIT("imx2-wdt.0", NULL, &dummy_clk),
++	CLKDEV_INIT("imx2-wdt.1", NULL, &dummy_clk),
++	CLKDEV_INIT(NULL, "mipi_hsp", &mipi_hsp_clk),
++	CLKDEV_INIT("imx-ipuv3", NULL, &ipu_clk),
++	CLKDEV_INIT("imx-ipuv3", "di0", &ipu_di0_clk),
++	CLKDEV_INIT("imx-ipuv3", "di1", &ipu_di1_clk),
++	CLKDEV_INIT(NULL, "gpc_dvfs", &gpc_dvfs_clk),
++	CLKDEV_INIT("pata_imx", NULL, &pata_clk),
  };
  
- static int __init clk_init(void)
+ static struct clk_lookup mx53_lookups[] = {
+ 	/* i.mx53 has the i.mx21 type uart */
+-	_REGISTER_CLOCK("imx21-uart.0", NULL, uart1_clk)
+-	_REGISTER_CLOCK("imx21-uart.1", NULL, uart2_clk)
+-	_REGISTER_CLOCK("imx21-uart.2", NULL, uart3_clk)
+-	_REGISTER_CLOCK("imx21-uart.3", NULL, uart4_clk)
+-	_REGISTER_CLOCK("imx21-uart.4", NULL, uart5_clk)
+-	_REGISTER_CLOCK(NULL, "gpt", gpt_clk)
++	CLKDEV_INIT("imx21-uart.0", NULL, &uart1_clk),
++	CLKDEV_INIT("imx21-uart.1", NULL, &uart2_clk),
++	CLKDEV_INIT("imx21-uart.2", NULL, &uart3_clk),
++	CLKDEV_INIT("imx21-uart.3", NULL, &uart4_clk),
++	CLKDEV_INIT("imx21-uart.4", NULL, &uart5_clk),
++	CLKDEV_INIT(NULL, "gpt", &gpt_clk),
+ 	/* i.mx53 has the i.mx25 type fec */
+-	_REGISTER_CLOCK("imx25-fec.0", NULL, fec_clk)
+-	_REGISTER_CLOCK(NULL, "iim_clk", iim_clk)
+-	_REGISTER_CLOCK("imx-i2c.0", NULL, i2c1_clk)
+-	_REGISTER_CLOCK("imx-i2c.1", NULL, i2c2_clk)
+-	_REGISTER_CLOCK("imx-i2c.2", NULL, i2c3_mx53_clk)
++	CLKDEV_INIT("imx25-fec.0", NULL, &fec_clk),
++	CLKDEV_INIT(NULL, "iim_clk", &iim_clk),
++	CLKDEV_INIT("imx-i2c.0", NULL, &i2c1_clk),
++	CLKDEV_INIT("imx-i2c.1", NULL, &i2c2_clk),
++	CLKDEV_INIT("imx-i2c.2", NULL, &i2c3_mx53_clk),
+ 	/* i.mx53 has the i.mx51 type ecspi */
+-	_REGISTER_CLOCK("imx51-ecspi.0", NULL, ecspi1_clk)
+-	_REGISTER_CLOCK("imx51-ecspi.1", NULL, ecspi2_clk)
++	CLKDEV_INIT("imx51-ecspi.0", NULL, &ecspi1_clk),
++	CLKDEV_INIT("imx51-ecspi.1", NULL, &ecspi2_clk),
+ 	/* i.mx53 has the i.mx25 type cspi */
+-	_REGISTER_CLOCK("imx35-cspi.0", NULL, cspi_clk)
+-	_REGISTER_CLOCK("sdhci-esdhc-imx53.0", NULL, esdhc1_clk)
+-	_REGISTER_CLOCK("sdhci-esdhc-imx53.1", NULL, esdhc2_mx53_clk)
+-	_REGISTER_CLOCK("sdhci-esdhc-imx53.2", NULL, esdhc3_mx53_clk)
+-	_REGISTER_CLOCK("sdhci-esdhc-imx53.3", NULL, esdhc4_mx53_clk)
+-	_REGISTER_CLOCK("imx2-wdt.0", NULL, dummy_clk)
+-	_REGISTER_CLOCK("imx2-wdt.1", NULL, dummy_clk)
++	CLKDEV_INIT("imx35-cspi.0", NULL, &cspi_clk),
++	CLKDEV_INIT("sdhci-esdhc-imx53.0", NULL, &esdhc1_clk),
++	CLKDEV_INIT("sdhci-esdhc-imx53.1", NULL, &esdhc2_mx53_clk),
++	CLKDEV_INIT("sdhci-esdhc-imx53.2", NULL, &esdhc3_mx53_clk),
++	CLKDEV_INIT("sdhci-esdhc-imx53.3", NULL, &esdhc4_mx53_clk),
++	CLKDEV_INIT("imx2-wdt.0", NULL, &dummy_clk),
++	CLKDEV_INIT("imx2-wdt.1", NULL, &dummy_clk),
+ 	/* i.mx53 has the i.mx35 type sdma */
+-	_REGISTER_CLOCK("imx35-sdma", NULL, sdma_clk)
+-	_REGISTER_CLOCK("imx-ssi.0", NULL, ssi1_clk)
+-	_REGISTER_CLOCK("imx-ssi.1", NULL, ssi2_clk)
+-	_REGISTER_CLOCK("imx-ssi.2", NULL, ssi3_clk)
+-	_REGISTER_CLOCK("imx-keypad", NULL, dummy_clk)
+-	_REGISTER_CLOCK("pata_imx", NULL, pata_clk)
++	CLKDEV_INIT("imx35-sdma", NULL, &sdma_clk),
++	CLKDEV_INIT("imx-ssi.0", NULL, &ssi1_clk),
++	CLKDEV_INIT("imx-ssi.1", NULL, &ssi2_clk),
++	CLKDEV_INIT("imx-ssi.2", NULL, &ssi3_clk),
++	CLKDEV_INIT("imx-keypad", NULL, &dummy_clk),
++	CLKDEV_INIT("pata_imx", NULL, &pata_clk),
+ };
+ 
+ static void clk_tree_init(void)
 -- 
 1.7.4.4
