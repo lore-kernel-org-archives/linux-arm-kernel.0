@@ -1,57 +1,86 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 20 Oct 2011 10:05:34 -0700
-Subject: [PATCH v2 3/5] regulator: helper routine to extract
-	regulator_init_data
-In-Reply-To: <20111020164006.GA10155@sirena.org.uk>
-References: <20111018115836.GC30703@S2100-06.ap.freescale.net>
-	<20111018160046.GD28501@opensource.wolfsonmicro.com>
-	<20111019053354.GB31162@S2100-06.ap.freescale.net>
-	<20111019144734.GI18713@sirena.org.uk>
-	<20111019150448.GB32007@S2100-06.ap.freescale.net>
-	<20111019151031.GA4275@opensource.wolfsonmicro.com>
-	<4E9F9892.9070007@ti.com> <20111020094140.GK18713@sirena.org.uk>
-	<20111020162743.GB31337@atomide.com>
-	<20111020164006.GA10155@sirena.org.uk>
-Message-ID: <20111020170534.GC31337@atomide.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 20 Oct 2011 12:09:03 -0500
+Subject: [GIT PULL] GIC DT binding support
+In-Reply-To: <201110201812.29202.arnd@arndb.de>
+References: <4E97A601.1020005@gmail.com> <201110201507.38722.arnd@arndb.de>
+	<4EA03160.1050304@gmail.com> <201110201812.29202.arnd@arndb.de>
+Message-ID: <4EA055AF.4030207@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Mark Brown <broonie@opensource.wolfsonmicro.com> [111020 09:05]:
-> On Thu, Oct 20, 2011 at 09:27:43AM -0700, Tony Lindgren wrote:
-> > * Mark Brown <broonie@opensource.wolfsonmicro.com> [111020 02:07]:
+On 10/20/2011 11:12 AM, Arnd Bergmann wrote:
+> On Thursday 20 October 2011, Rob Herring wrote:
+>> Arnd,
+>>
+>> On 10/20/2011 08:07 AM, Arnd Bergmann wrote:
+>>> On Friday 14 October 2011, Rob Herring wrote:
+>>>> Please pull GIC device tree support. This is the first of 2 pull
+>>>> requests. You can ignore this one if there are no other dependencies on
+>>>> GIC DT support.
+>>>>
+>>>> This is based on rmk's for-next branch and v3.1-rc9. rc9 was needed for
+>>>> this dependency:
+>>>
+>>> I don't see the for-next branch in the history. Do you mean it requires
+>>> the for-next branch as well in order to actually build?
+>>
+>> Probably because it is buried by rc9 commits:
+>>
+>> git log v3.1-rc9..gic-dt
 > 
-> > > We can always start off just completely omitting the data and then see
-> > > how we go from there.  If we only cover 50% of users that's still 50%
-> > > more than are currently covered with device tree right now and it means
-> > > we can then spin round and look at the bits that are hard again without
-> > > review fatigue on the bits that are easy.
+> Ah, I see them now. I should make sure I look more closely next time.
+> That definitely explains why I couldn't get this to merge into my
+> for-next branch cleanly.
 > 
-> > We still need to pass the board configuration somehow, otherwise we can
-> > never remove all the platform data glue layers. And if we can't do that,
-> > we'll forever have all the nasty merge conflicts when adding new drivers.
-> > And there's an unnecessary dependency between adding drivers and the
-> > core SoC code.
+>>> Can you be more specific so I can watch for the dependencies to
+>>> get upstream first?
+>>>
+>>
+>> I believe it conflicts with this commit in rmk/for-next:
+>>
+>> commit b166bc3be08b744d2f4b14921a1efee14906b383
+>> Author: Will Deacon <will.deacon@arm.com>
+>> Date:   Tue Aug 23 22:20:03 2011 +0100
+>>
+>>     ARM: 7061/1: gic: convert logical CPU numbers into physical numbers
+>>
+>> And this one in rmk/devel-stable:
+>>
+>> commit 254056f3b12563c11e6dbcfad2fbfce20a4f3302
+>> Author: Colin Cross <ccross@android.com>
+>> Date:   Thu Feb 10 12:54:10 2011 -0800
+>>
+>>     ARM: gic: Use cpu pm notifiers to save gic state
+>>
 > 
-> The current patches cover the overwhelming majority of the existing
-> board configuration - the stuff that's Linux specific is also relatively
-> rarely used in actual systems.  For example all the board I work with
-> regularly would be perfectly happy with the generic stuff - the Linux
-> specific stuff is relatively rarely used.
+> Ok. Conflicts are not the problem though, I can handle them and sfr can
+> handle them for linux-next, too. Real dependencies are the problem,
+> where you rely on a feature that is part of another tree.
+> 
+>> BTW, Russell's for-next branch has been rebased. The conflict with the
+>> 1st commit is trivial, so I could rebase to merge of rmk/devel-stable
+>> and v3.1-rc9.
+>>
+>> I still need things from for-next for highbank. So perhaps I should send
+>> a pull request after Russell's tree goes in?
+> 
+> Yes and no. You simply cannot ask me to merge a branch that is based on
+> top of Russell's for-next branch, since that is getting rebased. It is
+> also bad if the stuff doesn't have any linux-next exposure, so we should
+> try to find another way out.
+> 
+> I've now rebased your tree on top of 3.1-rc9 plus the stable branches
+> from Russell's tree that I already have as dependencies in arm-soc/for-next
+> (devel-stable, smp, debug). This has caused no conflicts for me, but
+> that doesn't mean that it's correct. Please check that what I have
+> in arm-soc/dt/gic and arm-soc/highbank/soc actually works for you
+> and does not contain branches that you don't actually need.
+> 
 
-Right, but in addition the board specific integration variables still
-need to be passed somehow to the driver.
+dt/gic doesn't need Russell's debug branch, but highbank does.
 
-That's where a DT entry specific configuration string might be the best
-option as it still allows describing the hardware using DT standards,
-while also allowing board specific configuration too.
+highbank/soc doesn't build. It needs Russell's l2x0 and io branches.
+l2x0 has been rebased recently, but the io branch seems to be stable
+(but not published externally).
 
-The issue there is then how do we keep these options from getting out
-of control..
-
-BTW, of course this issue is generic to all drivers, not specific to
-this patchset. With this patchset leaving out the non-standard entries
-is the right way to go to so we can merge it.
-
-Cheers,
-
-Tony
+Rob
