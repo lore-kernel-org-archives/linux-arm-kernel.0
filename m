@@ -1,429 +1,143 @@
-From: jm@lentin.co.uk (Jamie Lentin)
-Date: Thu, 20 Oct 2011 12:53:24 +0100
-Subject: [PATCH V2] mach-kirkwood: Add support for D-Link DNS-325
-References: <op.v3cm3vmp4cuzmg@gonzo>
-Message-ID: <op.v3nfbag04cuzmg@gonzo>
+From: david.yangshuai@gmail.com (David Yang)
+Date: Thu, 20 Oct 2011 20:02:25 +0800
+Subject: Question about: linux-linaro-2.6.38.7 booting the ubuntu 10.10
+	filesystem
+In-Reply-To: <CALQsFOJHiLVskuhGe-OsK8PdUxuR8Lv9idJcmf8vZEumenBUnw@mail.gmail.com>
+References: <CALQsFO+o+zQJZiksb+2fW8b_kdTv6tqhjxYU6owv=hMhbk=92A@mail.gmail.com>
+	<CAK5ve-LetP_jUyi22T0QhPkHgNqjFBuzuMa5+VnEfWvzFpy3Wg@mail.gmail.com>
+	<CALQsFO+iuraeVVDZLWL5JUibNE2a-WC3ksGj3PV=tPWfuhJX9A@mail.gmail.com>
+	<CALQsFOJ+kYQ9iJfAPhcHtcWwA9A-5TFbUe+oyiTWrar=ZSN1_g@mail.gmail.com>
+	<B85A65D85D7EB246BE421B3FB0FBB5930328693B98@dbde02.ent.ti.com>
+	<CALQsFOJHiLVskuhGe-OsK8PdUxuR8Lv9idJcmf8vZEumenBUnw@mail.gmail.com>
+Message-ID: <CALQsFOLs-Jz5-yPGOZkpqumgUUq8V90mCrEJ1EBPvXSwMbVM3A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for the D-Link DNS-325 NAS. A kirkwood-based successor
-to the DNS-323.
+another log when booting ubuntu10.10:
 
-Signed-off-by: Jamie Lentin <jm@lentin.co.uk>
----
-This patch supersedes my previous effort, adding in support for the reset button
-and power recovery (ensuring the NAS turns on again when power returns to the
-device).
+Unable to handle kernel NULL pointer dereference at virtual address 00000000
+pgd = ebbf8000
+[00000000] *pgd=abbea831, *pte=00000000, *ppte=00000000
+Internal error: Oops: 17 [#1]
+last sysfs file: /sys/devices/virtual/vc/vcsa7/uevent
+Modules linked in:
+CPU: 0    Tainted: G        W    (2.6.38.7-g23c6b13-dirty #1)
+PC is at futex_wake+0xdc/0x110
+LR is at futex_wake+0x5c/0x110
+pc : [<c0060b74>]    lr : [<c0060af4>]    psr: 80000013
+sp : ebb5de78  ip : ebb5de78  fp : ebb5deac
+r10: 00000001  r9 : ebb5c000  r8 : c0390568
+r7 : 00000000  r6 : ffffffff  r5 : 00000001  r4 : fffffff4
+r3 : 00030000  r2 : 00000000  r1 : 3df9d500  r0 : c0923bd4
+Flags: Nzcv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment user
+Control: 10c53c7d  Table: abbf8059  DAC: 00000015
+Process gconf-sanity-ch (pid: 3255, stack limit = 0xebb5c2e8)
+Stack: (0xebb5de78 to 0xebb5e000)
+de60:                                                       00000000 00030000
+de80: eb999048 00000a18 c009e3e0 00000001 00000002 00030a18 00000000 c002cc88
+dea0: ebb5df44 ebb5deb0 c0062154 c0060aa4 00000000 00000000 00000000 00000000
+dec0: eb844ac0 c009bfd8 00000000 00000000 00000000 00000000 ebb5df04 ebb5dee8
+dee0: 00000001 c009bf04 00000001 00000001 ebb5df70 c02aa980 ea4fc268 ea452410
+df00: 00000000 00000000 00000000 00000000 41651ba0 00000001 ea4fc268 00000001
+df20: 00000000 00000081 000000f0 c002cc88 ebb5c000 00030a18 ebb5dfa4 ebb5df48
+df40: c0062a0c c00620a0 00000002 00000000 ffffffff 00000001 ebb5c000 00000001
+df60: ebb5dfa4 ebb5df70 c009f128 c009f7b8 00000000 00000000 ebb5dfa4 00000002
+df80: 00030a18 00000000 000000f0 c002cc88 ebb5c000 00000000 00000000 ebb5dfa8
+dfa0: c002cac0 c00628c8 00000002 00030a18 00030a18 00000081 00000001 00000000
+dfc0: 00000002 00030a18 00000000 000000f0 00030a10 000002c4 00000000 000002f4
+dfe0: 000000f0 41651b70 4002c477 40031fc6 20000030 00030a18 00000000 00000000
+Backtrace:
+[<c0060a98>] (futex_wake+0x0/0x110) from [<c0062154>] (do_futex+0xc0/0x828)
+ r8:c002cc88 r7:00000000 r6:00030a18 r5:00000002 r4:00000001
+[<c0062094>] (do_futex+0x0/0x828) from [<c0062a0c>] (sys_futex+0x150/0x168)
+[<c00628bc>] (sys_futex+0x0/0x168) from [<c002cac0>] (ret_fast_syscall+0x0/0x30)
+Code: e2877001 ebffffaf e1570005 aa000007 (e594300c)
 
-* There's a high chance that the DNS-320 (a cheaper device released at the same
-time, with ~identical specs) could be supported by the same setup file. This is
-just speculation though, and haven't named it as such.
 
-* It'd be nice to expose the SATA activity LEDs as LEDs, and allow the mapping
-to happen in software, but there doesn't seem to be a LED trigger for that yet
-(unless I've missed something).
 
-Cheers,
+the PC stopped at futex_wake() again!
 
-  arch/arm/mach-kirkwood/Kconfig        |    6 +
-  arch/arm/mach-kirkwood/Makefile       |    1 +
-  arch/arm/mach-kirkwood/dns325-setup.c |  360 +++++++++++++++++++++++++++++++++
-  3 files changed, 367 insertions(+), 0 deletions(-)
-  create mode 100644 arch/arm/mach-kirkwood/dns325-setup.c
 
-diff --git a/arch/arm/mach-kirkwood/Kconfig b/arch/arm/mach-kirkwood/Kconfig
-index 7fc603b..9759cae 100644
---- a/arch/arm/mach-kirkwood/Kconfig
-+++ b/arch/arm/mach-kirkwood/Kconfig
-@@ -130,6 +130,12 @@ config MACH_T5325
-  	  Say 'Y' here if you want your kernel to support the
-  	  HP t5325 Thin Client.
+Best Regards,
+David
 
-+config MACH_DNS325
-+	bool "D-Link DNS-325"
-+	help
-+	  Say 'Y' here if you want your kernel to support the
-+	  D-Link DNS-325 NAS.
-+
-  endmenu
-
-  endif
-diff --git a/arch/arm/mach-kirkwood/Makefile b/arch/arm/mach-kirkwood/Makefile
-index 5dcaa81..9b5d4ac 100644
---- a/arch/arm/mach-kirkwood/Makefile
-+++ b/arch/arm/mach-kirkwood/Makefile
-@@ -18,5 +18,6 @@ obj-$(CONFIG_MACH_D2NET_V2)		+= d2net_v2-setup.o lacie_v2-common.o
-  obj-$(CONFIG_MACH_NET2BIG_V2)		+= netxbig_v2-setup.o lacie_v2-common.o
-  obj-$(CONFIG_MACH_NET5BIG_V2)		+= netxbig_v2-setup.o lacie_v2-common.o
-  obj-$(CONFIG_MACH_T5325)		+= t5325-setup.o
-+obj-$(CONFIG_MACH_DNS325)		+= dns325-setup.o
-
-  obj-$(CONFIG_CPU_IDLE)			+= cpuidle.o
-diff --git a/arch/arm/mach-kirkwood/dns325-setup.c b/arch/arm/mach-kirkwood/dns325-setup.c
-new file mode 100644
-index 0000000..57df16d
---- /dev/null
-+++ b/arch/arm/mach-kirkwood/dns325-setup.c
-@@ -0,0 +1,360 @@
-+/*
-+ * arch/arm/mach-kirkwood/dns325-setup.c
-+ *
-+ * D-Link DNS-325 Setup
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/init.h>
-+#include <linux/sysfs.h>
-+#include <linux/kobject.h>
-+#include <linux/platform_device.h>
-+#include <linux/ata_platform.h>
-+#include <linux/mtd/nand.h>
-+#include <linux/mtd/partitions.h>
-+#include <linux/i2c.h>
-+#include <linux/mv643xx_eth.h>
-+#include <linux/gpio.h>
-+#include <linux/gpio_keys.h>
-+#include <linux/gpio-fan.h>
-+#include <linux/input.h>
-+#include <linux/leds.h>
-+#include <asm/mach-types.h>
-+#include <asm/mach/arch.h>
-+#include <mach/kirkwood.h>
-+#include "common.h"
-+#include "mpp.h"
-+
-+static struct mtd_partition dns325_nand_parts[] = {
-+	{
-+		.name = "u-boot",
-+		.offset = 0,
-+		.size = SZ_1M,
-+		.mask_flags = MTD_WRITEABLE
-+	}, {
-+		.name = "uImage",
-+		.offset = MTDPART_OFS_NXTBLK,
-+		.size = 5 * SZ_1M
-+	}, {
-+		.name = "ramdisk",
-+		.offset = MTDPART_OFS_NXTBLK,
-+		.size = 5 * SZ_1M
-+	}, {
-+		.name = "image",
-+		.offset = MTDPART_OFS_NXTBLK,
-+		.size = 102 * SZ_1M
-+	}, {
-+		.name = "mini firmware",
-+		.offset = MTDPART_OFS_NXTBLK,
-+		.size = 10 * SZ_1M
-+	}, {
-+		.name = "config",
-+		.offset = MTDPART_OFS_NXTBLK,
-+		.size = 5 * SZ_1M
-+	},
-+};
-+
-+static struct mv643xx_eth_platform_data dns325_ge00_data = {
-+	.phy_addr	= MV643XX_ETH_PHY_ADDR(8),
-+};
-+
-+static struct mv_sata_platform_data dns325_sata_data = {
-+	.n_ports	= 2,
-+};
-+
-+/*****************************************************************************
-+ *  I2C-based devices
-+ *
-+ *  i2c addr | chip        | description
-+ *  0x48     | GMT G751-2f | temp. sensor and therm. watchdog (LM75 compatible)
-+ *  0x0c     | ?
-+ *  0x64     | ?
-+ ****************************************************************************/
-+
-+static struct i2c_board_info i2c_board_info[] __initdata = {
-+	{
-+		I2C_BOARD_INFO("lm75", 0x48),
-+	},
-+};
-+
-+
-+/*****************************************************************************
-+ * MPP / GPIO setup
-+ ****************************************************************************/
-+
-+static unsigned int dns325_mpp_config[] __initdata = {
-+	MPP20_SATA1_ACTn,	/* LED: White Right HDD */
-+	MPP21_SATA0_ACTn,	/* LED: White Left HDD */
-+	MPP24_GPIO,
-+	MPP25_GPIO,
-+	MPP26_GPIO,	/* LED: Power */
-+	MPP27_GPIO,	/* LED: Red Right HDD */
-+	MPP28_GPIO,	/* LED: Red Left HDD */
-+	MPP29_GPIO,	/* LED: Red USB */
-+	MPP30_GPIO,
-+	MPP31_GPIO,
-+	MPP32_GPIO,
-+	MPP33_GPO,
-+	MPP34_GPIO,	/* Button: Front power */
-+	MPP35_GPIO,
-+	MPP36_GPIO,	/* Power: MV88F6281_DEV_ID Board */
-+	MPP37_GPIO,	/* Power: Boot when power applied */
-+	MPP38_GPIO,
-+	MPP39_GPIO,	/* Power: SATA0 */
-+	MPP40_GPIO,	/* Power: SATA1 */
-+	MPP41_GPIO,
-+	MPP42_GPIO,
-+	MPP43_GPIO,	/* LED: White USB */
-+	MPP44_GPIO,	/* Fan: Alarm */
-+	MPP45_GPIO,	/* Fan: high speed */
-+	MPP46_GPIO,	/* Fan: low speed */
-+	MPP47_GPIO,	/* Button: Back unmount */
-+	MPP48_GPIO,	/* Button: Back reset */
-+	MPP49_GPIO,
-+	0
-+};
-+
-+#define DNS325_GPIO_LED_POWER		26
-+#define DNS325_GPIO_LED_RED_R		27
-+#define DNS325_GPIO_LED_RED_L		28
-+#define DNS325_GPIO_LED_RED_USB		29
-+#define DNS325_GPIO_LED_WHITE_R		20
-+#define DNS325_GPIO_LED_WHITE_L		21
-+#define DNS325_GPIO_LED_WHITE_USB	43
-+#define DNS325_GPIO_FAN_ALARM		44
-+#define DNS325_GPIO_FAN_HIGH		45
-+#define DNS325_GPIO_FAN_LOW		46
-+#define DNS325_GPIO_BTN_POWER		34
-+#define DNS325_GPIO_BTN_UNMOUNT		47
-+#define DNS325_GPIO_BTN_RESET		48
-+#define DNS325_GPIO_POWER		36
-+#define DNS325_GPIO_POWER_RECOVER	37
-+#define DNS325_GPIO_POWER_SATA0		39
-+#define DNS325_GPIO_POWER_SATA1		40
-+
-+/*****************************************************************************
-+ * Power controls
-+ ****************************************************************************/
-+
-+static void dns325_power_off(void)
-+{
-+	gpio_set_value(DNS325_GPIO_POWER, 1);
-+}
-+
-+static int __initdata power_recover_value = 1;
-+static int __init dns325_power_recover(char *str)
-+{
-+	power_recover_value = 0;
-+	return 1;
-+}
-+__setup("kw_dns325_no_power_recover", dns325_power_recover);
-+
-+static void __init dns325_gpio_register(unsigned gpio, char *name, int def)
-+{
-+	if (gpio_request(gpio, name) == 0 &&
-+	    gpio_direction_output(gpio, 0) == 0) {
-+		gpio_set_value(gpio, def);
-+		if (gpio_export(gpio, 0) != 0)
-+			pr_err("dns325: Failed to export GPIO %s\n", name);
-+	} else
-+		pr_err("dns325: Failed to register %s\n", name);
-+}
-+
-+/*****************************************************************************
-+ * Buttons
-+ ****************************************************************************/
-+
-+static struct gpio_keys_button dns325_button_pins[] = {
-+	{
-+		.code		= KEY_POWER,
-+		.gpio		= DNS325_GPIO_BTN_POWER,
-+		.desc		= "Power button",
-+		.active_low	= 1,
-+	},
-+	{
-+		.code		= KEY_EJECTCD,
-+		.gpio		= DNS325_GPIO_BTN_UNMOUNT,
-+		.desc		= "USB unmount button",
-+		.active_low	= 1,
-+	},
-+	{
-+		.code		= KEY_RESTART,
-+		.gpio		= DNS325_GPIO_BTN_RESET,
-+		.desc		= "Reset button",
-+		.active_low	= 1,
-+	},
-+};
-+
-+static struct gpio_keys_platform_data dns325_button_data = {
-+	.buttons	= dns325_button_pins,
-+	.nbuttons	= ARRAY_SIZE(dns325_button_pins),
-+};
-+
-+static struct platform_device dns325_button_device = {
-+	.name		= "gpio-keys",
-+	.id		= -1,
-+	.num_resources	= 0,
-+	.dev		= {
-+		.platform_data	= &dns325_button_data,
-+	}
-+};
-+
-+/*****************************************************************************
-+ * LEDs
-+ ****************************************************************************/
-+
-+/* In theory these can blink in hardware too, but it's really annoying.*/
-+static struct gpio_led dns325_led_pins[] = {
-+	{
-+		.name	= "dns325:white:power",
-+		.gpio	= DNS325_GPIO_LED_POWER,
-+		.active_low = 1,
-+		.default_trigger = "default-on",
-+	},
-+	{
-+		.name	= "dns325:white:usb",
-+		.gpio	= DNS325_GPIO_LED_WHITE_USB,
-+		.active_low = 1,
-+	},
-+	{
-+		.name	= "dns325:red:l_hdd",
-+		.gpio	= DNS325_GPIO_LED_RED_L,
-+		.active_low = 1,
-+	},
-+	{
-+		.name	= "dns325:red:r_hdd",
-+		.gpio	= DNS325_GPIO_LED_RED_R,
-+		.active_low = 1,
-+	},
-+	{
-+		.name	= "dns325:red:usb",
-+		.gpio	= DNS325_GPIO_LED_RED_USB,
-+		.active_low = 1,
-+	},
-+};
-+
-+static struct gpio_led_platform_data dns325_led_data = {
-+	.num_leds	= ARRAY_SIZE(dns325_led_pins),
-+	.leds		= dns325_led_pins,
-+};
-+
-+static struct platform_device dns325_led_device = {
-+	.name		= "leds-gpio",
-+	.id		= -1,
-+	.dev		= {
-+		.platform_data	= &dns325_led_data,
-+	},
-+};
-+
-+/*****************************************************************************
-+ * Fan
-+ ****************************************************************************/
-+
-+/* DNS-325 Fan: ADDA AD045HB-G73 40mm 6000rpm at 5v */
-+static struct gpio_fan_speed dns325_fan_speed[] = {
-+	{    0,  0 },
-+	{ 3000,	 1 },
-+	{ 6000,	 2 },
-+};
-+
-+static unsigned dns325_fan_pins[] = {
-+	DNS325_GPIO_FAN_LOW,
-+	DNS325_GPIO_FAN_HIGH,
-+};
-+
-+static struct gpio_fan_alarm dns325_fan_alarm = {
-+	.gpio       = DNS325_GPIO_FAN_ALARM,
-+	.active_low = 1,
-+};
-+
-+static struct gpio_fan_platform_data dns325_fan_data = {
-+	.num_ctrl	= ARRAY_SIZE(dns325_fan_pins),
-+	.ctrl		= dns325_fan_pins,
-+	.num_speed	= ARRAY_SIZE(dns325_fan_speed),
-+	.speed		= dns325_fan_speed,
-+	.alarm		= &dns325_fan_alarm,
-+};
-+
-+static struct platform_device dns325_fan_device = {
-+	.name	= "gpio-fan",
-+	.id	= -1,
-+	.dev	= {
-+		.platform_data	= &dns325_fan_data,
-+	},
-+};
-+
-+/*****************************************************************************
-+ * Main init
-+ ****************************************************************************/
-+
-+static void __init dns325_init(void)
-+{
-+	u32 dev, rev;
-+
-+	/*
-+	 * Basic setup. Needs to be called early.
-+	 */
-+	kirkwood_init();
-+	kirkwood_mpp_conf(dns325_mpp_config);
-+
-+	kirkwood_uart0_init();
-+	kirkwood_nand_init(ARRAY_AND_SIZE(dns325_nand_parts), 25);
-+	kirkwood_ehci_init();
-+	kirkwood_i2c_init();
-+	kirkwood_ge00_init(&dns325_ge00_data);
-+
-+	/*
-+	 * Turn on power to harddrives, then enable SATA.
-+	 * NB: Bootloader should have turned sata0 on already, kernel needs
-+	 * to turn on sata1. The idea is to stagger spin-up of HDDs.
-+	 */
-+	dns325_gpio_register(DNS325_GPIO_POWER_SATA0, "dns325:power:sata0", 1);
-+	dns325_gpio_register(DNS325_GPIO_POWER_SATA1, "dns325:power:sata1", 1);
-+	kirkwood_sata_init(&dns325_sata_data);
-+
-+	platform_device_register(&dns325_led_device);
-+	platform_device_register(&dns325_button_device);
-+	platform_device_register(&dns325_fan_device);
-+	i2c_register_board_info(0, i2c_board_info, ARRAY_SIZE(i2c_board_info));
-+
-+	/* Register power off routine */
-+	kirkwood_pcie_id(&dev, &rev);
-+	if (dev == MV88F6281_DEV_ID) {
-+		pr_info("PCI-E Device ID: MV88F6281, configuring power-off");
-+		if (gpio_request(DNS325_GPIO_POWER, "dns325:power:off") == 0 &&
-+		    gpio_direction_output(DNS325_GPIO_POWER, 0) == 0)
-+			pm_power_off = dns325_power_off;
-+		else
-+			pr_err("dns325: failed to configure power-off GPIO\n");
-+	} else {
-+		/*
-+		 * Dlink code also defines 0x6192, and sets LOW_BASE +
-+		 * 0x01000000 high. Either cargo-culted code or another model,
-+		 * e.g. the cheaper DNS-320.
-+		 */
-+		pr_err("Unknown PCI-E Device ID %x, no power-off", dev);
-+	}
-+
-+	/* Set state of power_recover pin */
-+	if (gpio_request(DNS325_GPIO_POWER_RECOVER, "dns325:power:recover") == 0
-+	 && gpio_direction_output(DNS325_GPIO_POWER_RECOVER, 0) == 0) {
-+		pr_info("dns325: Setting power-recover %s\n",
-+			power_recover_value ? "on" : "off");
-+		gpio_set_value(DNS325_GPIO_POWER_RECOVER, power_recover_value);
-+	} else
-+		pr_err("dns325: Failed to register power-recover GPIO\n");
-+}
-+
-+MACHINE_START(DNS325, "D-Link DNS-325")
-+	/* Maintainer: Jamie Lentin <jm@lentin.co.uk> */
-+	.boot_params	= 0x00000100,
-+	.init_machine	= dns325_init,
-+	.map_io		= kirkwood_map_io,
-+	.init_early	= kirkwood_init_early,
-+	.init_irq	= kirkwood_init_irq,
-+	.timer		= &kirkwood_timer,
-+MACHINE_END
--- 
-1.7.5.4
+On 10/20/11, David Yang <david.yangshuai@gmail.com> wrote:
+> hi,Afzal
+>
+>   Thanks for your reply!
+>
+>   I don't know which CONFIG of kernel affects the timestamps.
+>
+>  AND NOW:
+>   when I stop the rsyslogd daemon when booting ubuntu9.10 console
+> filesytem.I can get the login prompt now! I will try ubuntu10.10
+> Desktop later.
+>
+>
+>
+> Best Regards,
+> David
+>
+>
+> On 10/20/11, Mohammed, Afzal <afzal@ti.com> wrote:
+>> Hi David,
+>>
+>> On Thu, Oct 20, 2011 at 12:46:40, David Yang wrote:
+>>> After lots of fails,once time I got the failure log from the serial
+>>> console:
+>>>
+>>> Unable to handle kernel paging request at virtual address e3500001
+>>> pgd = d3b4c000
+>>> [e3500001] *pgd=00000000
+>>> Internal error: Oops: 5 [#1]
+>>> last sysfs file:
+>>> Modules linked in:
+>>> CPU: 0    Tainted: G        W    (2.6.38.7-gb206aa6-dirty #77)
+>>> PC is at futex_wake+0xd0/0x104
+>>> LR is at futex_wake+0x50/0x104
+>>> pc : [<c00682fc>]    lr : [<c006827c>]    psr: a0000013
+>>> sp : d3073ea8  ip : d3073e88  fp : 40b9d6a4
+>>> r10: 00000000  r9 : 00000001  r8 : c0914b88
+>>> r7 : 00000000  r6 : ffffffff  r5 : 00000001  r4 : e34ffff5
+>>> r3 : 0005d000  r2 : e594301c  r1 : 0e327082  r0 : c003fc24
+>>> Flags: NzCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment user
+>>> Control: 10c53c7d  Table: 93b4c059  DAC: 00000015
+>>> Process rsyslogd (pid: 587, stack limit = 0xd30722e8)
+>>> Stack: (0xd3073ea8 to 0xd3074000)
+>>> 3ea0:                   0005dab8 0005d000 d30a4c00 00000ab8 00000001
+>>> 00000002
+>>> 3ec0: 0005dab8 00000000 00000001 c0069854 00000021 40b9cbfc d3b047f0
+>>> 00000021
+>>> 3ee0: 00000021 00000000 fffffffa 00000245 00000000 d3b04d2c 00000000
+>>> 0000002e
+>>> 3f00: 00000000 d3b04d2c 00000000 00000000 d3802300 000000d0 c0914614
+>>> d3b04ba0
+>>> 3f20: 00000002 d3be9a80 d30090c0 00000002 d30090c4 00000001 00000000
+>>> 00000081
+>>> 3f40: 0005dab8 c0032844 00000001 00000000 40b9d6a4 c006a0e8 00000002
+>>> 00000000
+>>> 3f60: ffffffff d30721b0 00000100 00000000 40b9c778 d3073fb0 40b9c6f8
+>>> 0005e6a8
+>>> 3f80: 000000ad 00000002 0005dab8 00000002 000000f0 c0032844 d3072000
+>>> 00000000
+>>> 3fa0: 40b9d6a4 c0032680 00000002 0005dab8 0005dab8 00000081 00000001
+>>> 00000000
+>>> 3fc0: 00000002 0005dab8 00000002 000000f0 0003d8c0 0004043c 00040418
+>>> 40b9d6a4
+>>> 3fe0: 00000000 40b9cab8 4010ae24 4010ae4c 20000010 0005dab8 93ffe821
+>>> 93ffec21
+>>> [<c00682fc>] (futex_wake+0xd0/0x104) from [<c0069854>]
+>>> (do_futex+0xb8/0x804)
+>>> [<c0069854>] (do_futex+0xb8/0x804) from [<c006a0e8>]
+>>> (sys_futex+0x148/0x160)
+>>> [<c006a0e8>] (sys_futex+0x148/0x160) from [<c0032680>]
+>>> (ret_fast_syscall+0x0/0x30)
+>>> Code: e2877001 ebffffb4 e1570005 aa000007 (e594300c)
+>>> ---[ end trace 887204a6d10c91ae ]---
+>>
+>> Is printk time showing "0" timestamps for this Kernel ?
+>>
+>> Regards
+>> Afzal
+>>
+>
