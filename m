@@ -1,47 +1,30 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 20 Oct 2011 10:11:13 -0700
-Subject: Build error while adding debug LL support for new board
-In-Reply-To: <20111020165004.GE22076@n2100.arm.linux.org.uk>
-References: <1318856432-20219-1-git-send-email-afzal@ti.com>
-	<B85A65D85D7EB246BE421B3FB0FBB5930328B2D71D@dbde02.ent.ti.com>
-	<20111020125721.GD22076@n2100.arm.linux.org.uk>
-	<20111020161251.GL3842@atomide.com>
-	<20111020165004.GE22076@n2100.arm.linux.org.uk>
-Message-ID: <20111020171112.GD31337@atomide.com>
+Date: Thu, 20 Oct 2011 10:22:19 -0700
+Subject: [PATCH v2 3/5] regulator: helper routine to extract
+	regulator_init_data
+In-Reply-To: <20111020170534.GC31337@atomide.com>
+References: <20111018160046.GD28501@opensource.wolfsonmicro.com>
+	<20111019053354.GB31162@S2100-06.ap.freescale.net>
+	<20111019144734.GI18713@sirena.org.uk>
+	<20111019150448.GB32007@S2100-06.ap.freescale.net>
+	<20111019151031.GA4275@opensource.wolfsonmicro.com>
+	<4E9F9892.9070007@ti.com> <20111020094140.GK18713@sirena.org.uk>
+	<20111020162743.GB31337@atomide.com>
+	<20111020164006.GA10155@sirena.org.uk>
+	<20111020170534.GC31337@atomide.com>
+Message-ID: <20111020172218.GE31337@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@arm.linux.org.uk> [111020 09:15]:
-> On Thu, Oct 20, 2011 at 09:12:52AM -0700, Tony Lindgren wrote:
-> > * Russell King - ARM Linux <linux@arm.linux.org.uk> [111020 05:23]:
-> > > On Thu, Oct 20, 2011 at 05:09:07PM +0530, Mohammed, Afzal wrote:
-> > > > Hi Russell,
-> > > > 
-> > > > n Mon, Oct 17, 2011 at 18:30:32, Mohammed, Afzal wrote:
-> > > > > Hi, Russell,
-> > > > > 
-> > > > > While adding low level debug support for new board in OMAP2+ family, we
-> > > > > came across following error,
-> > > > > 
-> > > > > arch/arm/kernel/debug.S: Assembler messages:
-> > > > > arch/arm/kernel/debug.S:138: Error: invalid constant (428) after fixup
-> > > > > 
-> > > > > Following patch fixes it, I am not sure whether this is the right fix,
-> > > > > please let us know your comments.
-> > > > 
-> > > > ping
-> > > 
-> > > The patch looks fine.  Who's merging it?
-> > 
-> > Can you please take it?
-> > 
-> > Acked-by: Tony Lindgren <tony@atomide.com>
+* Tony Lindgren <tony@atomide.com> [111020 09:31]:
 > 
-> If it finds its way into the patch system.  Note that I'm not applying
-> patches after end of today until after the kernel summit.
+> That's where a DT entry specific configuration string might be the best
+> option as it still allows describing the hardware using DT standards,
+> while also allowing board specific configuration too.
 
-Afzal, can you please put this into Russell's patch system?
-Sounds like this could be applied after the merge window too.
+Hmm, actually, can't we just pass the board specific configuration in
+the board specific .dts file and then it gets merged in with the
+arch independent DT node?
 
 Regards,
 
