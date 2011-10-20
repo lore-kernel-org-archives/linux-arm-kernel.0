@@ -1,102 +1,92 @@
-From: jic23@cam.ac.uk (Jonathan Cameron)
-Date: Thu, 20 Oct 2011 09:33:29 +0100
-Subject: [PATCH 2/3] ARM: AT91: IIO: Add AT91 ADC driver.
-In-Reply-To: <20111020090532.7df7af70@skate>
-References: <1319041134-19712-1-git-send-email-maxime.ripard@free-electrons.com>
-	<1319041134-19712-3-git-send-email-maxime.ripard@free-electrons.com>
-	<4E9EFE0B.2030205@cam.ac.uk> <4E9F15B6.90506@free-electrons.com>
-	<20111020090532.7df7af70@skate>
-Message-ID: <4E9FDCD9.7030202@cam.ac.uk>
+From: david.yangshuai@gmail.com (David Yang)
+Date: Thu, 20 Oct 2011 16:33:49 +0800
+Subject: Question about: linux-linaro-2.6.38.7 booting the ubuntu 10.10
+	filesystem
+In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB5930328693B98@dbde02.ent.ti.com>
+References: <CALQsFO+o+zQJZiksb+2fW8b_kdTv6tqhjxYU6owv=hMhbk=92A@mail.gmail.com>
+	<CAK5ve-LetP_jUyi22T0QhPkHgNqjFBuzuMa5+VnEfWvzFpy3Wg@mail.gmail.com>
+	<CALQsFO+iuraeVVDZLWL5JUibNE2a-WC3ksGj3PV=tPWfuhJX9A@mail.gmail.com>
+	<CALQsFOJ+kYQ9iJfAPhcHtcWwA9A-5TFbUe+oyiTWrar=ZSN1_g@mail.gmail.com>
+	<B85A65D85D7EB246BE421B3FB0FBB5930328693B98@dbde02.ent.ti.com>
+Message-ID: <CALQsFOJHiLVskuhGe-OsK8PdUxuR8Lv9idJcmf8vZEumenBUnw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Bringing in Mark and Linus as others who have been active in talking about
-similar issues.
-> Hello,
-> 
-> Le Wed, 19 Oct 2011 20:23:50 +0200,
-> Maxime Ripard <maxime.ripard@free-electrons.com> a ?crit :
-> 
->> On 19/10/2011 18:42, Jonathan Cameron wrote:
->>> Afraid I'm out of time for today, but just thought I'd ask one quick question...
->>>
->>> Why isn't this touchscreen ADC in input?
->>
->> Because what I say in the Kconfig is mostly wrong... Sorry about that.
->>
->> Actually, like I was saying, this ADC is present in a lot of AT91 SoC,
->> and while it is always an ADC, sometimes (like on the G45), it can be
->> used as a touchscreen controller, or even as both, with channels for the
->> touchscreen and channels as ADC. On the G20 however, it is just an ADC.
->>
->> For now, the plan is only to support the ADC mode, so I put it in adc.
-> 
-> Just to expand a bit on this: there is already in the kernel an input
-> driver for the AT91 touchscreen which uses some ADC channels (that have
-> additional touchscreen-related features: on the G45, you have 8 ADCs
-> channels, 4 can optionally be used for touchscreen, the 4 other are
-> just raw ADCs).
-> 
-> The ultimate goal is of course to make it possible to use both the IIO
-> AT91 ADC driver and the AT91 touchscreen driver work simultaneously
-> (with of course non-conflicting ADC channels usage). However, as shown
-> by recent discussions on this list, it is not yet entirely clearly how
-> this should be done:
-> 
->  * Should we have some low-level ADC driver in arch/arm/mach-at91/ that
->    allows to request/release/access the ADC channels, this driver
->    providing an internal kernel API used by the IIO ADC driver and the
->    touchscreen driver ?
-That's definitely not going to go down well against moves to move everything
-that looks like a driver out of the arch directories. An equivalent somewhere
-else might work though.
-> 
->            sysfs access                  /dev/input/...
->            to ADC channels               access to touchscreen
->                 ||                              ||
->                 \/                              \/
->         +------------------+            +------------------+
->         |     AT91 IIO     |            | AT91 touchscreen |
->         +------------------+            +------------------+
->                  |                               |
->                  \_______________________________/
->                                  |
->                         +---------------------+
->                         | Some low-level ADC  |
->                         | code to request,    |
->                         | release and access  |
->                         | ADC channels        |
->                         +---------------------+
-> 
->  * Should IIO provide some internal kernel API (as you suggested some
->    time ago) so that kernel drivers can use ADC channels ?
-> 
-> 
->             +-------------------+
->             | AT91 touchscreen  | -> /dev/input/... access to touchscreen
->             +-------------------+
->                      ||
->                      \/
->             +-------------------+
->             |   AT91 IIO        | -> sysfs access to ADC channels
->             +-------------------+
-> 
-> Regards,
-> 
-> Thomas
-Agreed.  This is currently up in the air. The current state of those IIO
-hooks is that they do pull only.  Push based capture is tricky as for IIO
-we want to control the triggering of the push at a far finer scale than
-makes sense for input. I'm not yet clear how these two will play together.
+hi,Afzal
 
-If we sit something underneath the IIO and input drivers (or use the lower
-portions of IIO to do this) then the intent would be to have a fully generic
-input touchscreen driver on top.  I'm not sure that's possible. For
-example are the switches on the G45's adc (from datasheet) something that
-all/many similar touch screen controllers have?
-I suppose we could support these in the chan_spec but only if it helps
-us to write a generic touch screen driver on top.  I have no real
-feeling for whether this would be possible...
-(all my boards are headless ;)
+  Thanks for your reply!
 
-Jonathan
+  I don't know which CONFIG of kernel affects the timestamps.
+
+ AND NOW:
+  when I stop the rsyslogd daemon when booting ubuntu9.10 console
+filesytem.I can get the login prompt now! I will try ubuntu10.10
+Desktop later.
+
+
+
+Best Regards,
+David
+
+
+On 10/20/11, Mohammed, Afzal <afzal@ti.com> wrote:
+> Hi David,
+>
+> On Thu, Oct 20, 2011 at 12:46:40, David Yang wrote:
+>> After lots of fails,once time I got the failure log from the serial
+>> console:
+>>
+>> Unable to handle kernel paging request at virtual address e3500001
+>> pgd = d3b4c000
+>> [e3500001] *pgd=00000000
+>> Internal error: Oops: 5 [#1]
+>> last sysfs file:
+>> Modules linked in:
+>> CPU: 0    Tainted: G        W    (2.6.38.7-gb206aa6-dirty #77)
+>> PC is at futex_wake+0xd0/0x104
+>> LR is at futex_wake+0x50/0x104
+>> pc : [<c00682fc>]    lr : [<c006827c>]    psr: a0000013
+>> sp : d3073ea8  ip : d3073e88  fp : 40b9d6a4
+>> r10: 00000000  r9 : 00000001  r8 : c0914b88
+>> r7 : 00000000  r6 : ffffffff  r5 : 00000001  r4 : e34ffff5
+>> r3 : 0005d000  r2 : e594301c  r1 : 0e327082  r0 : c003fc24
+>> Flags: NzCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment user
+>> Control: 10c53c7d  Table: 93b4c059  DAC: 00000015
+>> Process rsyslogd (pid: 587, stack limit = 0xd30722e8)
+>> Stack: (0xd3073ea8 to 0xd3074000)
+>> 3ea0:                   0005dab8 0005d000 d30a4c00 00000ab8 00000001
+>> 00000002
+>> 3ec0: 0005dab8 00000000 00000001 c0069854 00000021 40b9cbfc d3b047f0
+>> 00000021
+>> 3ee0: 00000021 00000000 fffffffa 00000245 00000000 d3b04d2c 00000000
+>> 0000002e
+>> 3f00: 00000000 d3b04d2c 00000000 00000000 d3802300 000000d0 c0914614
+>> d3b04ba0
+>> 3f20: 00000002 d3be9a80 d30090c0 00000002 d30090c4 00000001 00000000
+>> 00000081
+>> 3f40: 0005dab8 c0032844 00000001 00000000 40b9d6a4 c006a0e8 00000002
+>> 00000000
+>> 3f60: ffffffff d30721b0 00000100 00000000 40b9c778 d3073fb0 40b9c6f8
+>> 0005e6a8
+>> 3f80: 000000ad 00000002 0005dab8 00000002 000000f0 c0032844 d3072000
+>> 00000000
+>> 3fa0: 40b9d6a4 c0032680 00000002 0005dab8 0005dab8 00000081 00000001
+>> 00000000
+>> 3fc0: 00000002 0005dab8 00000002 000000f0 0003d8c0 0004043c 00040418
+>> 40b9d6a4
+>> 3fe0: 00000000 40b9cab8 4010ae24 4010ae4c 20000010 0005dab8 93ffe821
+>> 93ffec21
+>> [<c00682fc>] (futex_wake+0xd0/0x104) from [<c0069854>]
+>> (do_futex+0xb8/0x804)
+>> [<c0069854>] (do_futex+0xb8/0x804) from [<c006a0e8>]
+>> (sys_futex+0x148/0x160)
+>> [<c006a0e8>] (sys_futex+0x148/0x160) from [<c0032680>]
+>> (ret_fast_syscall+0x0/0x30)
+>> Code: e2877001 ebffffb4 e1570005 aa000007 (e594300c)
+>> ---[ end trace 887204a6d10c91ae ]---
+>
+> Is printk time showing "0" timestamps for this Kernel ?
+>
+> Regards
+> Afzal
+>
