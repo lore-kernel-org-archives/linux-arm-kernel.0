@@ -1,86 +1,48 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 20 Oct 2011 12:09:03 -0500
-Subject: [GIT PULL] GIC DT binding support
-In-Reply-To: <201110201812.29202.arnd@arndb.de>
-References: <4E97A601.1020005@gmail.com> <201110201507.38722.arnd@arndb.de>
-	<4EA03160.1050304@gmail.com> <201110201812.29202.arnd@arndb.de>
-Message-ID: <4EA055AF.4030207@gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 20 Oct 2011 10:11:13 -0700
+Subject: Build error while adding debug LL support for new board
+In-Reply-To: <20111020165004.GE22076@n2100.arm.linux.org.uk>
+References: <1318856432-20219-1-git-send-email-afzal@ti.com>
+	<B85A65D85D7EB246BE421B3FB0FBB5930328B2D71D@dbde02.ent.ti.com>
+	<20111020125721.GD22076@n2100.arm.linux.org.uk>
+	<20111020161251.GL3842@atomide.com>
+	<20111020165004.GE22076@n2100.arm.linux.org.uk>
+Message-ID: <20111020171112.GD31337@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/20/2011 11:12 AM, Arnd Bergmann wrote:
-> On Thursday 20 October 2011, Rob Herring wrote:
->> Arnd,
->>
->> On 10/20/2011 08:07 AM, Arnd Bergmann wrote:
->>> On Friday 14 October 2011, Rob Herring wrote:
->>>> Please pull GIC device tree support. This is the first of 2 pull
->>>> requests. You can ignore this one if there are no other dependencies on
->>>> GIC DT support.
->>>>
->>>> This is based on rmk's for-next branch and v3.1-rc9. rc9 was needed for
->>>> this dependency:
->>>
->>> I don't see the for-next branch in the history. Do you mean it requires
->>> the for-next branch as well in order to actually build?
->>
->> Probably because it is buried by rc9 commits:
->>
->> git log v3.1-rc9..gic-dt
+* Russell King - ARM Linux <linux@arm.linux.org.uk> [111020 09:15]:
+> On Thu, Oct 20, 2011 at 09:12:52AM -0700, Tony Lindgren wrote:
+> > * Russell King - ARM Linux <linux@arm.linux.org.uk> [111020 05:23]:
+> > > On Thu, Oct 20, 2011 at 05:09:07PM +0530, Mohammed, Afzal wrote:
+> > > > Hi Russell,
+> > > > 
+> > > > n Mon, Oct 17, 2011 at 18:30:32, Mohammed, Afzal wrote:
+> > > > > Hi, Russell,
+> > > > > 
+> > > > > While adding low level debug support for new board in OMAP2+ family, we
+> > > > > came across following error,
+> > > > > 
+> > > > > arch/arm/kernel/debug.S: Assembler messages:
+> > > > > arch/arm/kernel/debug.S:138: Error: invalid constant (428) after fixup
+> > > > > 
+> > > > > Following patch fixes it, I am not sure whether this is the right fix,
+> > > > > please let us know your comments.
+> > > > 
+> > > > ping
+> > > 
+> > > The patch looks fine.  Who's merging it?
+> > 
+> > Can you please take it?
+> > 
+> > Acked-by: Tony Lindgren <tony@atomide.com>
 > 
-> Ah, I see them now. I should make sure I look more closely next time.
-> That definitely explains why I couldn't get this to merge into my
-> for-next branch cleanly.
-> 
->>> Can you be more specific so I can watch for the dependencies to
->>> get upstream first?
->>>
->>
->> I believe it conflicts with this commit in rmk/for-next:
->>
->> commit b166bc3be08b744d2f4b14921a1efee14906b383
->> Author: Will Deacon <will.deacon@arm.com>
->> Date:   Tue Aug 23 22:20:03 2011 +0100
->>
->>     ARM: 7061/1: gic: convert logical CPU numbers into physical numbers
->>
->> And this one in rmk/devel-stable:
->>
->> commit 254056f3b12563c11e6dbcfad2fbfce20a4f3302
->> Author: Colin Cross <ccross@android.com>
->> Date:   Thu Feb 10 12:54:10 2011 -0800
->>
->>     ARM: gic: Use cpu pm notifiers to save gic state
->>
-> 
-> Ok. Conflicts are not the problem though, I can handle them and sfr can
-> handle them for linux-next, too. Real dependencies are the problem,
-> where you rely on a feature that is part of another tree.
-> 
->> BTW, Russell's for-next branch has been rebased. The conflict with the
->> 1st commit is trivial, so I could rebase to merge of rmk/devel-stable
->> and v3.1-rc9.
->>
->> I still need things from for-next for highbank. So perhaps I should send
->> a pull request after Russell's tree goes in?
-> 
-> Yes and no. You simply cannot ask me to merge a branch that is based on
-> top of Russell's for-next branch, since that is getting rebased. It is
-> also bad if the stuff doesn't have any linux-next exposure, so we should
-> try to find another way out.
-> 
-> I've now rebased your tree on top of 3.1-rc9 plus the stable branches
-> from Russell's tree that I already have as dependencies in arm-soc/for-next
-> (devel-stable, smp, debug). This has caused no conflicts for me, but
-> that doesn't mean that it's correct. Please check that what I have
-> in arm-soc/dt/gic and arm-soc/highbank/soc actually works for you
-> and does not contain branches that you don't actually need.
-> 
+> If it finds its way into the patch system.  Note that I'm not applying
+> patches after end of today until after the kernel summit.
 
-dt/gic doesn't need Russell's debug branch, but highbank does.
+Afzal, can you please put this into Russell's patch system?
+Sounds like this could be applied after the merge window too.
 
-highbank/soc doesn't build. It needs Russell's l2x0 and io branches.
-l2x0 has been rebased recently, but the io branch seems to be stable
-(but not published externally).
+Regards,
 
-Rob
+Tony
