@@ -1,24 +1,28 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 20 Oct 2011 14:57:08 +0200
-Subject: [GIT PULL] Samsung devel-2 for v3.2
-In-Reply-To: <034701cc8704$e86035a0$b920a0e0$%kim@samsung.com>
-References: <002001cc80e5$3e497790$badc66b0$%kim@samsung.com>
-	<20111007191443.GA12004@opensource.wolfsonmicro.com>
-	<034701cc8704$e86035a0$b920a0e0$%kim@samsung.com>
-Message-ID: <201110201457.09228.arnd@arndb.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 20 Oct 2011 13:57:21 +0100
+Subject: Build error while adding debug LL support for new board
+In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB5930328B2D71D@dbde02.ent.ti.com>
+References: <1318856432-20219-1-git-send-email-afzal@ti.com>
+	<B85A65D85D7EB246BE421B3FB0FBB5930328B2D71D@dbde02.ent.ti.com>
+Message-ID: <20111020125721.GD22076@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 10 October 2011, Kukjin Kim wrote:
-
-> Yes I agree with you and I believe we don't need to revert it during next
-> -rc :)
+On Thu, Oct 20, 2011 at 05:09:07PM +0530, Mohammed, Afzal wrote:
+> Hi Russell,
 > 
-> Arnd, could you please pull that for v3.2?
-> If any problems, please let me know.
+> n Mon, Oct 17, 2011 at 18:30:32, Mohammed, Afzal wrote:
+> > Hi, Russell,
+> > 
+> > While adding low level debug support for new board in OMAP2+ family, we
+> > came across following error,
+> > 
+> > arch/arm/kernel/debug.S: Assembler messages:
+> > arch/arm/kernel/debug.S:138: Error: invalid constant (428) after fixup
+> > 
+> > Following patch fixes it, I am not sure whether this is the right fix,
+> > please let us know your comments.
+> 
+> ping
 
-Sorry for the long delay. I've pulled it now and pushed it to the
-next/devel2 branch, so I remember that it comes after the
-next/board branch.
-
-	Arnd
+The patch looks fine.  Who's merging it?
