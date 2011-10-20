@@ -1,102 +1,64 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Thu, 20 Oct 2011 18:25:21 +0300
-Subject: [PATCHv9 03/18] TEMP: OMAP3xxx: hwmod data: add PRM hwmod
-In-Reply-To: <4EA03562.7000309@ti.com>
-References: <1316781986-30642-1-git-send-email-t-kristo@ti.com>
-	<1316781986-30642-4-git-send-email-t-kristo@ti.com>
-	<alpine.DEB.2.00.1110101320180.5205@utopia.booyaka.com>
-	<4E934D79.4080000@ti.com>
-	<alpine.DEB.2.00.1110101416530.5205@utopia.booyaka.com>
-	<4E936F0E.9050203@ti.com>
-	<alpine.DEB.2.00.1110101725140.5205@utopia.booyaka.com>
-	<4E954CDA.10107@ti.com>
-	<alpine.DEB.2.00.1110131033410.24155@utopia.booyaka.com>
-	<alpine.DEB.2.00.1110131047110.24155@utopia.booyaka.com>
-	<4EA03562.7000309@ti.com>
-Message-ID: <1319124321.4979.7.camel@sokoban>
+From: Wernerp@cornelius-consult.de (Werner Cornelius)
+Date: Thu, 20 Oct 2011 18:03:50 +0200
+Subject: select consuming too much cpu time when changing from kernel
+	2.6.29 to 2.6.34
+In-Reply-To: <20111020113701.GA21648@n2100.arm.linux.org.uk>
+References: <201110201332.50407.Wernerp@cornelius-consult.de>
+	<20111020113701.GA21648@n2100.arm.linux.org.uk>
+Message-ID: <201110201804.00090.Wernerp@cornelius-consult.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2011-10-20 at 16:51 +0200, Cousson, Benoit wrote:
-> On 10/13/2011 6:51 PM, Paul Walmsley wrote:
-> > On Thu, 13 Oct 2011, Paul Walmsley wrote:
-> >
-> >> On Wed, 12 Oct 2011, Cousson, Benoit wrote:
-> >>
-> >>> On 10/11/2011 1:26 AM, Paul Walmsley wrote:
-> >>>> On Tue, 11 Oct 2011, Cousson, Benoit wrote:
-> >>>>
-> >>>>> In fact the device name does not have to match the hwmod name. So we
-> >>>>> can just create an "omap2_prm" omap_device for OMAP2, "omap3_prm"
-> >>>>> omap_device for OMAP3... That will allow the relevant PRM driver to
-> >>>>> be bound to the proper device.
-> >>>>
-> >>>> Incidentally, given that we would be using the hwmod name and the version
-> >>>> number to determine the appropriate omap_device name, what IP version
-> >>>> numbers should we assign to these PRM IP blocks for different SoCs?
-> >>>
-> >>> It can just be 1, 2 and 3... The idea is just to differentiate the IP for each
-> >>> OMAP.
-> >>
-> >> So those are basically arbitrary?  Something is not clear here.
-> >>
-> >> In the current hwmod design, IP blocks with different interfaces were
-> >> intended to be uniquely identified by the hwmod name alone.  That is why
-> >> omap_hwmod_lookup() only takes a 'name' parameter.
-> >>
-> >> If I understand what you want to do, you wish to change this to uniquely
-> >> identify them by a (name, interface version number) tuple.
-> >>
-> >> I don't have a problem with this in theory, but it implies some changes to
-> >> the existing model.  Specifically:
-> >>
-> >> - we'll need to add an interface version number to the struct omap_hwmod
-> >>
-> >> - we'll need to modify omap_hwmod_lookup() to take an interface version
-> >> number
-> >>
-> >> - the "ti,hwmod" DT binding that you proposed earlier will need to include
-> >> an interface version number
-> >
-> > Hmm, reflecting on this further, is your intention to bind drivers to
-> > hwmods by the struct omap_hwmod_class instead?
-> 
-> Well, somehow, the class was added for that purpose, to allow one timer 
-> driver to bind to 2 different hwmods. But in that case the device name 
-> was the same.
-> 
-> > If we define that "rev" field as the interface version number, that should
-> > probably work.
-> >
-> > So then in C struct format, in a platform_device system, the mapping table
-> > would basically become
-> >
-> > struct omap_hwmod_driver_map {
-> > 	const char *class_name;
-> > 	const u32 class_rev;
-> > 	const char *platform_device_name;
-> > }
-> 
-> This is needed if and only if you want to have a different driver for 
-> the same IP.
-> 
-> In the case of the timer, we do have only one device name and one driver:
-> class=timer, rev=1, device=omap_timer
-> class=timer, rev=2, device=omap_timer
-> 
-> Regards,
-> Benoit
+Am Donnerstag, 20. Oktober 2011 schrieb Russell King - ARM Linux:
+> On Thu, Oct 20, 2011 at 01:32:45PM +0200, Werner Cornelius wrote:
 
-Currently the delta between the different versions of the driver are so
-minimal that it is easy to cope both omap3 and omap4 PRM with the same
-driver; however it might be beneficial in the future to split it up. The
-detection logic I made into devices.c file can easily be changed to suit
-whatever need. It does not really matter whether there is a different
-name for the hwmod or not, it is probably easier implementation wise if
-the hwmod name is same, but only some field within e.g. class changes.
+With strace some starnge behaviour could be recognized.
+strace tells that the delay of the select syscll is in the corect range, but 
+with the new kernel I get less calls per second than with the old kernel.
 
--Tero
+For example with an 1ms select call the old kernel results in about 400 calls 
+in 4 seconds, the new one 2300 only whch can't be possible.
+Same is true when using nanosleep as an alternative to select.
+
+Except from that verification of the system timer interrupt rate and time of 
+day update don't show any problems regarding this topic.
+
+And the select call on the newer kernel uses much more system time per call 
+than the old one additionally to the non matching number of syscalls.
+
+For a test I changed the systick count HZ from 250 up to 1000, but the 
+behaviour and results keeps the same and so does not have the reason in a too 
+low scheduling resolution.
+
+As far as I remember nanosleep uses the hires timer if available, select does 
+not. But the results are the same for both versions.
+Maybe the hr timer is not correctly implemented or the newer kernel rounds low 
+time values to a higher one.
+
+When I raise the timeout value to 10ms (10 times than before) I am getting a 
+result which matches nearly correctly to the desired one.
+
+When changing kernel tick rate from 250 to 1000Hz results remain unchanged 
+again, so the problem seems not to be resolution related.
 
 
-Texas Instruments Oy, Porkkalankatu 22, 00180 Helsinki, Finland. Business ID: 0115040-6. Domicile: Helsinki
- 
+
+  
+   
+
+> > recently we changed from an older kernel 2.6.29 to a newer one 2.6.34 on
+> > an ARM NXP LPC3250 platform.
+> 
+> strace is a wonderful program to monitor the kernel/user API activity -
+> it would be good if you could strace your test program and confirm
+> whether it's working as you expect.  (Note that it can measure the time
+> spent inside a syscall.)
+> 
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 316 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111020/a907fafb/attachment.sig>
