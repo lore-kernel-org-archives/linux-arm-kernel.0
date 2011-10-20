@@ -1,34 +1,32 @@
-From: afzal@ti.com (Mohammed, Afzal)
-Date: Fri, 21 Oct 2011 00:08:04 +0530
-Subject: Build error while adding debug LL support for new board
-In-Reply-To: <20111020171112.GD31337@atomide.com>
-References: <1318856432-20219-1-git-send-email-afzal@ti.com>
-	<B85A65D85D7EB246BE421B3FB0FBB5930328B2D71D@dbde02.ent.ti.com>
-	<20111020125721.GD22076@n2100.arm.linux.org.uk>
-	<20111020161251.GL3842@atomide.com>
-	<20111020165004.GE22076@n2100.arm.linux.org.uk>
-	<20111020171112.GD31337@atomide.com>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB5930328B2D8AA@dbde02.ent.ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 20 Oct 2011 19:56:12 +0100
+Subject: [GIT PULL] GIC DT binding support
+In-Reply-To: <4EA055AF.4030207@gmail.com>
+References: <4E97A601.1020005@gmail.com> <201110201507.38722.arnd@arndb.de>
+	<4EA03160.1050304@gmail.com> <201110201812.29202.arnd@arndb.de>
+	<4EA055AF.4030207@gmail.com>
+Message-ID: <20111020185612.GD21648@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony, Russell,
+On Thu, Oct 20, 2011 at 12:09:03PM -0500, Rob Herring wrote:
+> highbank/soc doesn't build. It needs Russell's l2x0 and io branches.
+> l2x0 has been rebased recently, but the io branch seems to be stable
+> (but not published externally).
 
-On Thu, Oct 20, 2011 at 22:41:13, Tony Lindgren wrote:
-> * Russell King - ARM Linux <linux@arm.linux.org.uk> [111020 09:15]:
-> >
-:
-:
-> > If it finds its way into the patch system.  Note that I'm not applying
-> > patches after end of today until after the kernel summit.
-> 
-> Afzal, can you please put this into Russell's patch system?
-> Sounds like this could be applied after the merge window too.
-> 
+Actually, l2x0 _hasn't_.  Let's be clear about what happened.  A load
+of patches were all merged into the 'misc' branch over time, containing
+multiple different subjects.  At the time they were merged there was
+no clear separate line of development of each sub-system, so they
+just ended up in a common branch without any particular ordering or
+grouping.
 
-Thanks, this has been put into Russell's patch system,
+People wanted to base work on a select few of those commits.  Rather
+than having the entire set of commits merged into various peoples trees,
+many of which have nothing to do with what they were working on, I
+split various commits out of the 'misc' branch and created a set of
+more fine-grained topic branches.
 
-http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7137/1
-
-Regards
-Afzal
+That is arguably not rebasing - it is re-committing, in such a way that
+those parts can then be frozen, stabilized and published without
+unintended dependencies.  That's got to be a good thing.
