@@ -1,66 +1,102 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 20 Oct 2011 09:21:52 +0100
-Subject: [PATCH v4 0/4] genirq: handling GIC per-cpu interrupts
-In-Reply-To: <4E9D7364.2020209@arm.com>
-References: <1317661446-2876-1-git-send-email-marc.zyngier@arm.com>
-	<20111013181415.GM21648@n2100.arm.linux.org.uk>
-	<4E9D7364.2020209@arm.com>
-Message-ID: <20111020082152.GX21648@n2100.arm.linux.org.uk>
+From: jic23@cam.ac.uk (Jonathan Cameron)
+Date: Thu, 20 Oct 2011 09:33:29 +0100
+Subject: [PATCH 2/3] ARM: AT91: IIO: Add AT91 ADC driver.
+In-Reply-To: <20111020090532.7df7af70@skate>
+References: <1319041134-19712-1-git-send-email-maxime.ripard@free-electrons.com>
+	<1319041134-19712-3-git-send-email-maxime.ripard@free-electrons.com>
+	<4E9EFE0B.2030205@cam.ac.uk> <4E9F15B6.90506@free-electrons.com>
+	<20111020090532.7df7af70@skate>
+Message-ID: <4E9FDCD9.7030202@cam.ac.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 18, 2011 at 01:39:00PM +0100, Marc Zyngier wrote:
-> On 13/10/11 19:14, Russell King - ARM Linux wrote:
-> > On Mon, Oct 03, 2011 at 06:04:02PM +0100, Marc Zyngier wrote:
-> >> The current GIC per-cpu interrupts (aka PPIs) suffer from a number of
-> >> problems:
-> >>
-> >> - They use a completely separate scheme to handle the interrupts,
-> >>   mostly because the PPI concept doesn't really match the kernel view
-> >>   of an interrupt.
-> >> - PPIs can only be used by the timer code, unless we add more low-level
-> >>   assembly code.
-> >> - The local timer code can only be used by devices generating PPIs,
-> >>   and not SPIs.
-> >> - At least one platform (msm) has started implementing its own
-> >>   alternative scheme.
-> >> - Some low-level code gets duplicated, as usual...
-> >>
-> >> The proposed solution is to handle the PPIs using the same path as
-> >> SPIs. A new core API is added to deal with per-cpu interrupts in a
-> >> less awkward way. The local timer code is updated to reflect these
-> >> changes.
-> >>
-> >> The core API changes are based on an initial idea by Thomas Gleixner.
-> >>
-> >> Tested on ARM Versatile Express (Cortex A15), ARM RealView PB11MP,
-> >> OMAP4 (Panda) and Tegra (Harmony). Patch series against next-20110930.
-> >>
-> >> The two first patches can also be found in Thomas' tree:
-> >>
-> >> 	git://tesla.tglx.de/git/linux-2.6-tip irq/core
-> > 
-> > So, how do we deal with merging this without ending up with some
-> > problematical inter-tree dependencies?
-> > 
-> > It looks like I'll see conflicts with:
-> > arch/arm/common/gic.c
-> > arch/arm/kernel/smp.c
-> > arch/arm/include/asm/localtimer.h
-> > 
-> > and possibly:
-> > arch/arm/include/asm/smp.h
-> > arch/arm/kernel/irq.c
-> > 
-> > as well.  I've not checked with patch 4, so there may be some more too.
-> > 
-> > Some of this is probably because of 7123/1 and 7124/1.
+Bringing in Mark and Linus as others who have been active in talking about
+similar issues.
+> Hello,
 > 
-> I've set up a branch based on your "smp" branch, resolving the above
-> conflicts:
+> Le Wed, 19 Oct 2011 20:23:50 +0200,
+> Maxime Ripard <maxime.ripard@free-electrons.com> a ?crit :
 > 
-> git://github.com/mzyngier/arm-platforms.git ppi-for-rmk
+>> On 19/10/2011 18:42, Jonathan Cameron wrote:
+>>> Afraid I'm out of time for today, but just thought I'd ask one quick question...
+>>>
+>>> Why isn't this touchscreen ADC in input?
+>>
+>> Because what I say in the Kconfig is mostly wrong... Sorry about that.
+>>
+>> Actually, like I was saying, this ADC is present in a lot of AT91 SoC,
+>> and while it is always an ADC, sometimes (like on the G45), it can be
+>> used as a touchscreen controller, or even as both, with channels for the
+>> touchscreen and channels as ADC. On the G20 however, it is just an ADC.
+>>
+>> For now, the plan is only to support the ADC mode, so I put it in adc.
+> 
+> Just to expand a bit on this: there is already in the kernel an input
+> driver for the AT91 touchscreen which uses some ADC channels (that have
+> additional touchscreen-related features: on the G45, you have 8 ADCs
+> channels, 4 can optionally be used for touchscreen, the 4 other are
+> just raw ADCs).
+> 
+> The ultimate goal is of course to make it possible to use both the IIO
+> AT91 ADC driver and the AT91 touchscreen driver work simultaneously
+> (with of course non-conflicting ADC channels usage). However, as shown
+> by recent discussions on this list, it is not yet entirely clearly how
+> this should be done:
+> 
+>  * Should we have some low-level ADC driver in arch/arm/mach-at91/ that
+>    allows to request/release/access the ADC channels, this driver
+>    providing an internal kernel API used by the IIO ADC driver and the
+>    touchscreen driver ?
+That's definitely not going to go down well against moves to move everything
+that looks like a driver out of the arch directories. An equivalent somewhere
+else might work though.
+> 
+>            sysfs access                  /dev/input/...
+>            to ADC channels               access to touchscreen
+>                 ||                              ||
+>                 \/                              \/
+>         +------------------+            +------------------+
+>         |     AT91 IIO     |            | AT91 touchscreen |
+>         +------------------+            +------------------+
+>                  |                               |
+>                  \_______________________________/
+>                                  |
+>                         +---------------------+
+>                         | Some low-level ADC  |
+>                         | code to request,    |
+>                         | release and access  |
+>                         | ADC channels        |
+>                         +---------------------+
+> 
+>  * Should IIO provide some internal kernel API (as you suggested some
+>    time ago) so that kernel drivers can use ADC channels ?
+> 
+> 
+>             +-------------------+
+>             | AT91 touchscreen  | -> /dev/input/... access to touchscreen
+>             +-------------------+
+>                      ||
+>                      \/
+>             +-------------------+
+>             |   AT91 IIO        | -> sysfs access to ADC channels
+>             +-------------------+
+> 
+> Regards,
+> 
+> Thomas
+Agreed.  This is currently up in the air. The current state of those IIO
+hooks is that they do pull only.  Push based capture is tricky as for IIO
+we want to control the triggering of the push at a far finer scale than
+makes sense for input. I'm not yet clear how these two will play together.
 
-Please send me a proper pull request - and this almost got lost because it
-doesn't have a PULL tag in the subject line (and would've if Shawn Guo
-hadn't replied to this).
+If we sit something underneath the IIO and input drivers (or use the lower
+portions of IIO to do this) then the intent would be to have a fully generic
+input touchscreen driver on top.  I'm not sure that's possible. For
+example are the switches on the G45's adc (from datasheet) something that
+all/many similar touch screen controllers have?
+I suppose we could support these in the chan_spec but only if it helps
+us to write a generic touch screen driver on top.  I have no real
+feeling for whether this would be possible...
+(all my boards are headless ;)
+
+Jonathan
