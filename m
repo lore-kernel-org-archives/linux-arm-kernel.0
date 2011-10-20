@@ -1,39 +1,65 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 20 Oct 2011 13:05:19 +0100
-Subject: [GIT PULL] genirq support for GIC PPIs
-In-Reply-To: <20111020112724.GZ21648@n2100.arm.linux.org.uk>
-References: <4E9FF695.10604@arm.com>
-	<20111020112724.GZ21648@n2100.arm.linux.org.uk>
-Message-ID: <4EA00E7F.8060007@arm.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Thu, 20 Oct 2011 17:39:32 +0530
+Subject: [PATCH v2 3/5] regulator: helper routine to extract
+	regulator_init_data
+In-Reply-To: <20111020061408.GE32007@S2100-06.ap.freescale.net>
+References: <1318263578-7407-1-git-send-email-rnayak@ti.com>
+	<1318263578-7407-4-git-send-email-rnayak@ti.com>
+	<20111018132032.GD30703@S2100-06.ap.freescale.net>
+	<4E9EB61C.1040207@ti.com>
+	<20111019144215.GA32007@S2100-06.ap.freescale.net>
+	<4E9FAF42.5060200@ti.com>
+	<20111020061408.GE32007@S2100-06.ap.freescale.net>
+Message-ID: <4EA00F7C.1080005@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/10/11 12:27, Russell King - ARM Linux wrote:
-> On Thu, Oct 20, 2011 at 11:23:17AM +0100, Marc Zyngier wrote:
->> The following changes since commit 5a567d78c437e3be1c512734cdfe64b4ae6b82d7:
->>   Jamie Iles (1):
->>         ARM: 7115/4: move __exception and friends to asm/exception.h
+On Thursday 20 October 2011 11:44 AM, Shawn Guo wrote:
+> On Thu, Oct 20, 2011 at 10:48:58AM +0530, Rajendra Nayak wrote:
+>>> Let's look at mc13892-regulator driver.  There are 23 regulators defined
+>>> in array mc13892_regulators.  Needless to say, there is a dev behind
+>>> mc13892-regulator driver.  And when getting probed, this driver will
+>>> call regulator_register() to register those 23 regulators individually.
+>>> That said, for non-dt world, we have 1 + 23 'dev' with that 1 as the
+>>> parent of all other 23 'dev' (wrapped by regulator_dev).  But with the
+>>> current DT implementation, we will have at least 1 + 23 * 2 'dev'.
+>>> These extra 23 'dev' is totally new with DT.
+>>>
 >>
->> are available in the git repository at:
+>> but thats only because the mc13892-regulator driver is implemeted in
+>> such a way that all the regulators on the platform are bundled in as
+>> *one* device.
+>
+> I did not look into too many regulator drivers, but I expect this is
+> way that most regulator drivers are implemented in.  Having
+> mc13892-regulator being probed 23 times to register these 23 regulators
+> just makes less sense to me.
+>
+>> It would again depend on how you would pass these from
+>> the DT, if you indeed stick to the same way of bundling all regulators
+>> as one device from DT, the mc13892-regulator probe would just get called
+>> once and there would be one device associated, no?
 >>
->>   git://github.com/mzyngier/arm-platforms.git ppi-for-rmk
->>
->> Marc Zyngier (4):
->>       genirq: Add support for per-cpu dev_id interrupts
->>       genirq: percpu: allow interrupt type to be set at enable time
->>       ARM: gic: consolidate PPI handling
->>       ARM: gic, local timers: use the request_percpu_irq() interface
->>
->> Thomas Gleixner (1):
->>       genirq: Fix fatfinered fixup really
-> 
-> I thought you said some of these were in Thomas' tree already?
+> Yes, I indeed would stick to the same way of bundling the registration
+> of all regulators with mc13892-regulator being probed once.  The problem
+> I have with the current regulator core DT implementation is that it
+> assumes the device_node of rdev->dev (dev wrapped in regulator_dev) is
+> being attached to rdev->dev.parent rather than itself.  Back to
+> mc13892-regulator example, that said, it requires the dev of
+> mc13892-regulator have the device_node of individual regulator attached
+> to.  IOW, the current implementation forces mc13892-regulator to be
+> probed 23 times to register those 23 regulators.  This is wrong to me.
 
-The first three patches are in Thomas' tree indeed. I could drop them
-from my branch, but the resulting tree would not compile anymore.
+I think I now understand to some extent the problem that you seem to be
+reporting. It is mainly with drivers which bundle all regulators and
+pass them as one device and would want to do so with DT too.
 
-What strategy would cause the least merging pain?
+however I am still not clear on how what you seem to suggest would
+solve this problem. Note that not all drivers do it this way, and
+there are drivers where each regulator is considered as one device
+and I suspect they would remain that way with DT too. And hence we
+need to support both.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Do you have any RFC patch/code which could explain better what you are
+suggesting we do here?
+>
