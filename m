@@ -1,26 +1,27 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 20 Oct 2011 18:18:19 +0200
-Subject: [GIT PULL] Please pull tegra feature branch for 3.2
-In-Reply-To: <CAOesGMgZFSYq02CMM0m7aijT1kXmiPfiHURYWXGcPdi514A6Aw@mail.gmail.com>
-References: <CAOesGMipZUkZG8oHSwK-8xw5Y0u6Ymfjmumq7=ijsztUwdGeDA@mail.gmail.com>
-	<CAOesGMgZFSYq02CMM0m7aijT1kXmiPfiHURYWXGcPdi514A6Aw@mail.gmail.com>
-Message-ID: <201110201818.19830.arnd@arndb.de>
+Date: Thu, 20 Oct 2011 18:24:44 +0200
+Subject: [GIT PULL] Samsung cleanup-3 for v3.2
+In-Reply-To: <000401cc8c87$2ab684e0$80238ea0$%kim@samsung.com>
+References: <000401cc8c87$2ab684e0$80238ea0$%kim@samsung.com>
+Message-ID: <201110201824.44337.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 14 October 2011, Olof Johansson wrote:
-> Dropped the AUTO_ZRELADDR patch due to discussions related to
-> dependency issues. New pull request:
+On Monday 17 October 2011, Kukjin Kim wrote:
+> This is a 3rd cleanup request for v3.2 Samsung stuff which includes cleanup
+> resources and platform devices into one plat-samsung directory. As I said
+> during review in mailing list, this is needed to reduce plat- directories
+> and help to keep easily platform devices.
 > 
+> Please pull from:
+>  git://github.com/kgene/linux-samsung.git next-samsung-cleanup-3
 > 
-> The following changes since commit ecb7b0e33e048e63d1169e6fee277430c70ddf0b:
-> 
->   ARM: tegra: update defconfig (2011-10-13 15:07:40 -0700)
-> 
-> are available in the git repository at:
->   git://git.kernel.org/pub/scm/linux/kernel/git/olof/tegra.git for-3.2/features
-> 
+> Since this moves a lot of files, I think you can pull this into your
+> next/cleanup2 which will be merged late during upcoming merge window.
 
-Pulled, thanks!
+Yes, makes sense. As you suggested, I've pulled into next/cleanup2.
+The code size reduction looks very nice.
+
+Thanks and sorry for the delay.
 
 	Arnd
