@@ -1,43 +1,102 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Fri, 21 Oct 2011 19:58:10 +0800
-Subject: [PATCH v2 3/5] regulator: helper routine to extract
-	regulator_init_data
-In-Reply-To: <4EA13053.7080306@ti.com>
-References: <1318263578-7407-1-git-send-email-rnayak@ti.com>
-	<1318263578-7407-4-git-send-email-rnayak@ti.com>
-	<20111018132032.GD30703@S2100-06.ap.freescale.net>
-	<4E9EB61C.1040207@ti.com>
-	<20111019144215.GA32007@S2100-06.ap.freescale.net>
-	<4E9FAF42.5060200@ti.com>
-	<20111020061408.GE32007@S2100-06.ap.freescale.net>
-	<4EA00F7C.1080005@ti.com>
-	<20111021082309.GA337@S2100-06.ap.freescale.net>
-	<4EA13053.7080306@ti.com>
-Message-ID: <20111021115809.GB337@S2100-06.ap.freescale.net>
+From: cavokz@gmail.com (Domenico Andreoli)
+Date: Fri, 21 Oct 2011 15:50:23 +0200
+Subject: [PATCH v2] Fix s3c24xx build errors if !CONFIG_PM
+In-Reply-To: <016f01cc8fd5$0dbe40c0$293ac240$%kim@samsung.com>
+References: <20111018105215.GA10230@glitch>
+	<016f01cc8fd5$0dbe40c0$293ac240$%kim@samsung.com>
+Message-ID: <20111021135023.GA30167@glitch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 21, 2011 at 02:11:55PM +0530, Rajendra Nayak wrote:
-[...]
-> >+       /* find device_node and attach it */
-> >+       rdev->dev.of_node = of_find_node_by_name(NULL, regulator_desc->name);
-> 
-> so would this do a complete dt search for every regulator?
+From: Domenico Andreoli <cavokz@gmail.com>
 
-Yes, with the first param being NULL, tthe entire device tree will be
-searched.
+v2:
+- register_syscore_ops(&s3c24xx_irq_syscore_ops) does not need to be
+  conditionally compiled out, it is already optimized out on !CONFIG_PM
+- fix also s3c2412 and s3c2416 affected by the same build issue
 
-> we would also need the driver names and dt names to match for this to
-> work, right?
-> 
-Driver name does not matter.  The key for this search to work is having
-regulator's name (regulator_desc->name) match device tree node's name,
-case ignored.
+v1:
+s3c2440.c fails to build if !CONFIG_PM because in such case
+s3c2410_pm_syscore_ops is not defined. Same error should happen also
+in s3c2410.c and s3c2442.c
 
-> The approach otherwise looks fine to me and should work for both cases
-> of one device per regulator and one device for all regulators.
-> 
+Signed-off-by: Domenico Andreoli <cavokz@gmail.com>
 
--- 
-Regards,
-Shawn
+---
+ arch/arm/mach-s3c2410/s3c2410.c |    2 ++
+ arch/arm/mach-s3c2412/s3c2412.c |    2 ++
+ arch/arm/mach-s3c2416/s3c2416.c |    2 ++
+ arch/arm/mach-s3c2440/s3c2440.c |    2 ++
+ arch/arm/mach-s3c2440/s3c2442.c |    2 ++
+ 5 files changed, 10 insertions(+)
+
+Index: b/arch/arm/mach-s3c2410/s3c2410.c
+===================================================================
+--- a/arch/arm/mach-s3c2410/s3c2410.c
++++ b/arch/arm/mach-s3c2410/s3c2410.c
+@@ -170,7 +170,9 @@ int __init s3c2410_init(void)
+ {
+ 	printk("S3C2410: Initialising architecture\n");
+ 
++#ifdef CONFIG_PM
+ 	register_syscore_ops(&s3c2410_pm_syscore_ops);
++#endif
+ 	register_syscore_ops(&s3c24xx_irq_syscore_ops);
+ 
+ 	return sysdev_register(&s3c2410_sysdev);
+Index: b/arch/arm/mach-s3c2412/s3c2412.c
+===================================================================
+--- a/arch/arm/mach-s3c2412/s3c2412.c
++++ b/arch/arm/mach-s3c2412/s3c2412.c
+@@ -245,7 +245,9 @@ int __init s3c2412_init(void)
+ {
+ 	printk("S3C2412: Initialising architecture\n");
+ 
++#ifdef CONFIG_PM
+ 	register_syscore_ops(&s3c2412_pm_syscore_ops);
++#endif
+ 	register_syscore_ops(&s3c24xx_irq_syscore_ops);
+ 
+ 	return sysdev_register(&s3c2412_sysdev);
+Index: b/arch/arm/mach-s3c2416/s3c2416.c
+===================================================================
+--- a/arch/arm/mach-s3c2416/s3c2416.c
++++ b/arch/arm/mach-s3c2416/s3c2416.c
+@@ -97,7 +97,9 @@ int __init s3c2416_init(void)
+ 
+ 	s3c_fb_setname("s3c2443-fb");
+ 
++#ifdef CONFIG_PM
+ 	register_syscore_ops(&s3c2416_pm_syscore_ops);
++#endif
+ 	register_syscore_ops(&s3c24xx_irq_syscore_ops);
+ 
+ 	return sysdev_register(&s3c2416_sysdev);
+Index: b/arch/arm/mach-s3c2440/s3c2440.c
+===================================================================
+--- a/arch/arm/mach-s3c2440/s3c2440.c
++++ b/arch/arm/mach-s3c2440/s3c2440.c
+@@ -55,7 +55,9 @@ int __init s3c2440_init(void)
+ 
+ 	/* register suspend/resume handlers */
+ 
++#ifdef CONFIG_PM
+ 	register_syscore_ops(&s3c2410_pm_syscore_ops);
++#endif
+ 	register_syscore_ops(&s3c244x_pm_syscore_ops);
+ 	register_syscore_ops(&s3c24xx_irq_syscore_ops);
+ 
+Index: b/arch/arm/mach-s3c2440/s3c2442.c
+===================================================================
+--- a/arch/arm/mach-s3c2440/s3c2442.c
++++ b/arch/arm/mach-s3c2440/s3c2442.c
+@@ -169,7 +169,9 @@ int __init s3c2442_init(void)
+ {
+ 	printk("S3C2442: Initialising architecture\n");
+ 
++#ifdef CONFIG_PM
+ 	register_syscore_ops(&s3c2410_pm_syscore_ops);
++#endif
+ 	register_syscore_ops(&s3c244x_pm_syscore_ops);
+ 	register_syscore_ops(&s3c24xx_irq_syscore_ops);
+ 
