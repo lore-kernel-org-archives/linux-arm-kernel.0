@@ -1,44 +1,32 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 21 Oct 2011 11:53:34 +0800
-Subject: [PATCH] MAINTAINERS: add ARM/FREESCALE MXS entry
-Message-ID: <1319169214-8002-1-git-send-email-shawn.guo@linaro.org>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 20 Oct 2011 21:28:30 -0700
+Subject: [PATCHv2 0/2] Update MSM DEBUG_LL support
+Message-ID: <1319171312-21113-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As suggested by Pengutronix, they want to get Sascha relieved from
-the burden of maintaining MXS sub-architecture.  Since I brought the
-most of MXS core code to mainline (with the great help from
-Pengutronix people, thanks!), I would like to step up for maintaining
-MXS.
+This is a reroll of the MSM DEBUG_LL patches. They incorporate
+feedback from Nico and are rebased on top of rmk's debug branch.
+My understanding is the debug branch is a stable branch to build
+up low-level debug on.
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-Cc: Sascha Hauer <s.hauer@pengutronix.de>
----
-Hi Sascha,
+Stephen Boyd (2):
+  msm: Consolidate and move DEBUG_LL to generic ARM Kconfig
+  msm: Support DEBUG_LL on MSM8660 and MSM8960
 
-Please help finish up MXS maintainership for the coming merge window,
-and I can start taking it over after the merge window closes.  Thanks.
+ arch/arm/Kconfig.debug                          |   37 ++++++++++++++++
+ arch/arm/mach-msm/Kconfig                       |   35 +--------------
+ arch/arm/mach-msm/include/mach/debug-macro.S    |   51 ++++++++++++++--------
+ arch/arm/mach-msm/include/mach/msm_iomap-7x00.h |   12 -----
+ arch/arm/mach-msm/include/mach/msm_iomap-7x30.h |   12 -----
+ arch/arm/mach-msm/include/mach/msm_iomap-8960.h |    5 ++
+ arch/arm/mach-msm/include/mach/msm_iomap-8x50.h |   12 -----
+ arch/arm/mach-msm/include/mach/msm_iomap-8x60.h |    5 ++
+ arch/arm/mach-msm/include/mach/msm_iomap.h      |   12 +++++
+ arch/arm/mach-msm/include/mach/uncompress.h     |   31 ++++++++++----
+ arch/arm/mach-msm/io.c                          |   15 +++++-
+ 11 files changed, 129 insertions(+), 98 deletions(-)
 
- MAINTAINERS |    7 +++++++
- 1 files changed, 7 insertions(+), 0 deletions(-)
-
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 5483e0c..7bb20d2 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -787,6 +787,13 @@ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- S:	Maintained
- F:	arch/arm/mach-mx5/
- 
-+ARM/FREESCALE MXS ARM ARCHITECTURE
-+M:	Shawn Guo <shawn.guo@linaro.org>
-+L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-+S:	Maintained
-+T:	git git://git.linaro.org/people/shawnguo/linux-2.6.git
-+F:	arch/arm/mach-mxs/
-+
- ARM/GLOMATION GESBC9312SX MACHINE SUPPORT
- M:	Lennert Buytenhek <kernel@wantstofly.org>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
 -- 
-1.7.4.1
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
