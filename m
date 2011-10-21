@@ -1,56 +1,57 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Fri, 21 Oct 2011 14:04:30 -0200
-Subject: [PATCH] ARM: mx3: Remove duplicate entries in iomux-mx3.h
-Message-ID: <1319213070-15628-1-git-send-email-fabio.estevam@freescale.com>
+From: sales@teliad.com (Frank Dewitt)
+Date: Fri, 21 Oct 2011 18:44:03 +0200
+Subject: Advertising on your site
+Message-ID: <2d07f1e637b486da1f03785132c80998@teliad.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove duplicate entries in iomux-mx3.h.
+Good Afternoon,
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/plat-mxc/include/mach/iomux-mx3.h |   29 ----------------------------
- 1 files changed, 0 insertions(+), 29 deletions(-)
+My name is Frank Dewitt, I am responsible for all English speaking
+markets at teliad, an international service provider in the field of
+Search Engine Optimization (SEO). 
 
-diff --git a/arch/arm/plat-mxc/include/mach/iomux-mx3.h b/arch/arm/plat-mxc/include/mach/iomux-mx3.h
-index c92f0b1..ba8ce55 100644
---- a/arch/arm/plat-mxc/include/mach/iomux-mx3.h
-+++ b/arch/arm/plat-mxc/include/mach/iomux-mx3.h
-@@ -666,35 +666,6 @@ enum iomux_pins {
- #define MX31_PIN_I2C_CLK__I2C1_SCL	IOMUX_MODE(MX31_PIN_I2C_CLK, IOMUX_CONFIG_FUNC)
- #define MX31_PIN_DCD_DTE1__I2C2_SDA	IOMUX_MODE(MX31_PIN_DCD_DTE1, IOMUX_CONFIG_ALT2)
- #define MX31_PIN_RI_DTE1__I2C2_SCL	IOMUX_MODE(MX31_PIN_RI_DTE1, IOMUX_CONFIG_ALT2)
--#define MX31_PIN_ATA_CS0__GPIO3_26	IOMUX_MODE(MX31_PIN_ATA_CS0, IOMUX_CONFIG_GPIO)
--#define MX31_PIN_ATA_CS1__GPIO3_27	IOMUX_MODE(MX31_PIN_ATA_CS1, IOMUX_CONFIG_GPIO)
--#define MX31_PIN_PC_PWRON__SD2_DATA3	IOMUX_MODE(MX31_PIN_PC_PWRON, IOMUX_CONFIG_ALT1)
--#define MX31_PIN_PC_VS1__SD2_DATA2	IOMUX_MODE(MX31_PIN_PC_VS1, IOMUX_CONFIG_ALT1)
--#define MX31_PIN_PC_READY__SD2_DATA1	IOMUX_MODE(MX31_PIN_PC_READY, IOMUX_CONFIG_ALT1)
--#define MX31_PIN_PC_WAIT_B__SD2_DATA0	IOMUX_MODE(MX31_PIN_PC_WAIT_B, IOMUX_CONFIG_ALT1)
--#define MX31_PIN_PC_CD2_B__SD2_CLK	IOMUX_MODE(MX31_PIN_PC_CD2_B, IOMUX_CONFIG_ALT1)
--#define MX31_PIN_PC_CD1_B__SD2_CMD	IOMUX_MODE(MX31_PIN_PC_CD1_B, IOMUX_CONFIG_ALT1)
--#define MX31_PIN_ATA_DIOR__GPIO3_28	IOMUX_MODE(MX31_PIN_ATA_DIOR, IOMUX_CONFIG_GPIO)
--#define MX31_PIN_ATA_DIOW__GPIO3_29	IOMUX_MODE(MX31_PIN_ATA_DIOW, IOMUX_CONFIG_GPIO)
--#define MX31_PIN_CSI_D4__CSI_D4		IOMUX_MODE(MX31_PIN_CSI_D4, IOMUX_CONFIG_FUNC)
--#define MX31_PIN_CSI_D5__CSI_D5		IOMUX_MODE(MX31_PIN_CSI_D5, IOMUX_CONFIG_FUNC)
--#define MX31_PIN_CSI_D6__CSI_D6		IOMUX_MODE(MX31_PIN_CSI_D6, IOMUX_CONFIG_FUNC)
--#define MX31_PIN_CSI_D7__CSI_D7		IOMUX_MODE(MX31_PIN_CSI_D7, IOMUX_CONFIG_FUNC)
--#define MX31_PIN_CSI_D8__CSI_D8		IOMUX_MODE(MX31_PIN_CSI_D8, IOMUX_CONFIG_FUNC)
--#define MX31_PIN_CSI_D9__CSI_D9		IOMUX_MODE(MX31_PIN_CSI_D9, IOMUX_CONFIG_FUNC)
--#define MX31_PIN_CSI_D10__CSI_D10	IOMUX_MODE(MX31_PIN_CSI_D10, IOMUX_CONFIG_FUNC)
--#define MX31_PIN_CSI_D11__CSI_D11	IOMUX_MODE(MX31_PIN_CSI_D11, IOMUX_CONFIG_FUNC)
--#define MX31_PIN_CSI_D12__CSI_D12	IOMUX_MODE(MX31_PIN_CSI_D12, IOMUX_CONFIG_FUNC)
--#define MX31_PIN_CSI_D13__CSI_D13	IOMUX_MODE(MX31_PIN_CSI_D13, IOMUX_CONFIG_FUNC)
--#define MX31_PIN_CSI_D14__CSI_D14	IOMUX_MODE(MX31_PIN_CSI_D14, IOMUX_CONFIG_FUNC)
--#define MX31_PIN_CSI_D15__CSI_D15	IOMUX_MODE(MX31_PIN_CSI_D15, IOMUX_CONFIG_FUNC)
--#define MX31_PIN_CSI_HSYNC__CSI_HSYNC	IOMUX_MODE(MX31_PIN_CSI_HSYNC, IOMUX_CONFIG_FUNC)
--#define MX31_PIN_CSI_MCLK__CSI_MCLK	IOMUX_MODE(MX31_PIN_CSI_MCLK, IOMUX_CONFIG_FUNC)
--#define MX31_PIN_CSI_PIXCLK__CSI_PIXCLK	IOMUX_MODE(MX31_PIN_CSI_PIXCLK, IOMUX_CONFIG_FUNC)
--#define MX31_PIN_CSI_VSYNC__CSI_VSYNC	IOMUX_MODE(MX31_PIN_CSI_VSYNC, IOMUX_CONFIG_FUNC)
--#define MX31_PIN_GPIO3_0__GPIO3_0	IOMUX_MODE(MX31_PIN_GPIO3_0, IOMUX_CONFIG_GPIO)
--#define MX31_PIN_GPIO3_1__GPIO3_1	IOMUX_MODE(MX31_PIN_GPIO3_1, IOMUX_CONFIG_GPIO)
--#define MX31_PIN_TXD2__GPIO1_28		IOMUX_MODE(MX31_PIN_TXD2, IOMUX_CONFIG_GPIO)
- #define MX31_PIN_GPIO1_0__GPIO1_0	IOMUX_MODE(MX31_PIN_GPIO1_0, IOMUX_CONFIG_GPIO)
- #define MX31_PIN_SVEN0__GPIO2_0		IOMUX_MODE(MX31_PIN_SVEN0, IOMUX_CONFIG_GPIO)
- #define MX31_PIN_STX0__GPIO2_1		IOMUX_MODE(MX31_PIN_STX0, IOMUX_CONFIG_GPIO)
--- 
-1.7.1
+I just came across your site lists.infradead.org and found it very
+interesting.
+
+We are constantly looking for new publishers who want to make money
+through their website by selling advertising space for text links. Text
+links (pure html backlinks) are a great way to generate a fixed monthly
+income, independent of page views or click rates. Of course, text links
+are fully compatible with any other forms of advertisement (e.g. Google
+AdSense, affiliate programs, etc.).
+
+Right now we are experiencing a rapidly growing interest in text link
+advertising on sites like yours and I am confident that it would do
+great on our marketplace. You should be able to generate some immediate
+income. Check out our marketplace and register here: www.teliad.com
+(Registration is free, no obligations involved). Afterwards you can
+simply add your blog to our portfolio, sit back and await booking
+requests.
+
+Should this be of interest, I would certainly be happy to explain
+further. Don't hesitate to give me a call or drop me an email!
+
+Thanks & have a great day!
+
+Best regards,
+
+Frank Dewitt
+
+------------------------------------------------------------------------
+teliad Internetmarketing GmbH | 
+Kreuznacher Str. 62           |
+70372 Stuttgart     	      | Tel. +49 (0)711 231 971 26
+Germany                       | http://www.teliad.com
+
+HRB 720138 Stuttgart Court of First Instance
+CEO: Andreas Armbruster
+------------------------------------------------------------------------
+
+DISCLAIMER: The information contained in this e-mail may be
+confidential
+and/or protected by law. If you are not the intended addressee(s) or
+have received this message in error, please notify the sender
+immediately and delete it from your system. Any unauthorized use,
+distribution, copying or modification of this message and its
+attachments is strictly prohibited.
