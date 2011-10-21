@@ -1,55 +1,36 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 21 Oct 2011 10:51:08 +0200
-Subject: [GIT PULL] GIC DT binding support
-In-Reply-To: <201110201812.29202.arnd@arndb.de>
-References: <4E97A601.1020005@gmail.com> <4EA03160.1050304@gmail.com>
-	<201110201812.29202.arnd@arndb.de>
-Message-ID: <4024688.X5RT0XjWMI@wuerfel>
+Date: Fri, 21 Oct 2011 18:38:32 +0200
+Subject: [PATCH] arm/imx: add missing include of asm/exception.h for avic.c
+In-Reply-To: <20111021072219.GH15299@pengutronix.de>
+References: <1319164380-23517-1-git-send-email-shawn.guo@linaro.org>
+	<20111021072219.GH15299@pengutronix.de>
+Message-ID: <8805141.r6GF1WOsYI@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 20 October 2011 18:12:28 Arnd Bergmann wrote:
-> I've now rebased your tree on top of 3.1-rc9 plus the stable branches
-> from Russell's tree that I already have as dependencies in arm-soc/for-next
-> (devel-stable, smp, debug). This has caused no conflicts for me, but
-> that doesn't mean that it's correct. Please check that what I have
-> in arm-soc/dt/gic and arm-soc/highbank/soc actually works for you
-> and does not contain branches that you don't actually need.
+On Friday 21 October 2011 09:22:19 Uwe Kleine-K?nig wrote:
+> 
+> On Fri, Oct 21, 2011 at 10:33:00AM +0800, Shawn Guo wrote:
+> > It adds missing include of asm/exception.h for avic.c to fix the
+> > compile error below.
+> > 
+> >   arch/arm/plat-mxc/avic.c:154:39: error: expected ?=?, ?,?, ?;?,
+> >   ?asm? or ?__attribute__? before ?avic_handle_irq?
+> > 
+> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> Arnd already posted a patch for that[1], but this one looks better.
+> 
+> Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 
-I needed this patch in the end:
+Ok, thanks!
 
-8<-----
-ARM: gic: fix build error with CONFIG_IRQ_DOMAIN disabled
+I found the same problem in plat-mxc/tzic.c as well now.
 
-In file included from arch/arm/mach-msm/timer.c:26:0:
-asm/hardware/gic.h:42:50: warning: 'struct device_node' declared inside parameter list [enabled by default]
-asm/hardware/gic.h:42:50: warning: its scope is only this definition or declaration, which is probably not what you want [enabled by default]
-asm/hardware/gic.h:58:20: error: field 'domain' has incomplete type
+Which branch should we apply the patch to? The header file was
+introduced in rmk's smp branch, but the usage was introduced in
+the imx/multi-irq branch.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
-Ok to apply on top?
+Should I merge the smp branch into imx/multi-irq and fix up the
+breakage in the merge commit?
 
-diff --git a/arch/arm/include/asm/hardware/gic.h b/arch/arm/include/asm/hardware/gic.h
-index 1a776a1..a06c3ac 100644
---- a/arch/arm/include/asm/hardware/gic.h
-+++ b/arch/arm/include/asm/hardware/gic.h
-@@ -35,6 +35,8 @@
- #ifndef __ASSEMBLY__
- #include <linux/irqdomain.h>
- 
-+struct device_node;
-+
- extern void __iomem *gic_cpu_base_addr;
- extern struct irq_chip gic_arch_extn;
- 
-@@ -55,7 +57,9 @@ struct gic_chip_data {
- 	u32 __percpu *saved_ppi_enable;
- 	u32 __percpu *saved_ppi_conf;
- #endif
-+#ifdef CONFIG_IRQ_DOMAIN
- 	struct irq_domain domain;
-+#endif
- 	unsigned int gic_irqs;
- };
- #endif
+	Arnd
