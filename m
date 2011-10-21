@@ -1,36 +1,44 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 21 Oct 2011 10:33:00 +0800
-Subject: [PATCH] arm/imx: add missing include of asm/exception.h for avic.c
-Message-ID: <1319164380-23517-1-git-send-email-shawn.guo@linaro.org>
+Date: Fri, 21 Oct 2011 11:53:34 +0800
+Subject: [PATCH] MAINTAINERS: add ARM/FREESCALE MXS entry
+Message-ID: <1319169214-8002-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It adds missing include of asm/exception.h for avic.c to fix the
-compile error below.
-
-  arch/arm/plat-mxc/avic.c:154:39: error: expected ?=?, ?,?, ?;?,
-  ?asm? or ?__attribute__? before ?avic_handle_irq?
+As suggested by Pengutronix, they want to get Sascha relieved from
+the burden of maintaining MXS sub-architecture.  Since I brought the
+most of MXS core code to mainline (with the great help from
+Pengutronix people, thanks!), I would like to step up for maintaining
+MXS.
 
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+Cc: Sascha Hauer <s.hauer@pengutronix.de>
 ---
-Arnd,
+Hi Sascha,
 
-I hit this error when building imx6q on your for-next branch.
+Please help finish up MXS maintainership for the coming merge window,
+and I can start taking it over after the merge window closes.  Thanks.
 
- arch/arm/plat-mxc/avic.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+ MAINTAINERS |    7 +++++++
+ 1 files changed, 7 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/plat-mxc/avic.c b/arch/arm/plat-mxc/avic.c
-index 8875fb4..3157691 100644
---- a/arch/arm/plat-mxc/avic.c
-+++ b/arch/arm/plat-mxc/avic.c
-@@ -21,6 +21,7 @@
- #include <linux/irq.h>
- #include <linux/io.h>
- #include <mach/common.h>
-+#include <asm/exception.h>
- #include <asm/mach/irq.h>
- #include <mach/hardware.h>
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 5483e0c..7bb20d2 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -787,6 +787,13 @@ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+ S:	Maintained
+ F:	arch/arm/mach-mx5/
  
++ARM/FREESCALE MXS ARM ARCHITECTURE
++M:	Shawn Guo <shawn.guo@linaro.org>
++L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
++S:	Maintained
++T:	git git://git.linaro.org/people/shawnguo/linux-2.6.git
++F:	arch/arm/mach-mxs/
++
+ ARM/GLOMATION GESBC9312SX MACHINE SUPPORT
+ M:	Lennert Buytenhek <kernel@wantstofly.org>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
 -- 
 1.7.4.1
