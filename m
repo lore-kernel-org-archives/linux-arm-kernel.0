@@ -1,191 +1,128 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 21 Oct 2011 18:56:52 +0900
-Subject: [PATCH 1/3] ARM: Samsung: Move timer irq numbers to end of linux
-	irq	space
-In-Reply-To: <001001cc8d6d$5c48fa60$14daef20$%youn@samsung.com>
-References: <1318234289-22041-1-git-send-email-thomas.abraham@linaro.org>
-	<1318234289-22041-2-git-send-email-thomas.abraham@linaro.org>
-	<001001cc8d6d$5c48fa60$14daef20$%youn@samsung.com>
-Message-ID: <017001cc8fd7$c27e4ee0$477aeca0$%kim@samsung.com>
+From: mel@csn.ul.ie (Mel Gorman)
+Date: Fri, 21 Oct 2011 12:06:24 +0200
+Subject: [PATCH 2/9] mm: alloc_contig_freed_pages() added
+In-Reply-To: <op.v3j5ent03l0zgt@mpn-glaptop>
+References: <1317909290-29832-1-git-send-email-m.szyprowski@samsung.com>
+	<1317909290-29832-3-git-send-email-m.szyprowski@samsung.com>
+	<20111018122109.GB6660@csn.ul.ie> <op.v3j5ent03l0zgt@mpn-glaptop>
+Message-ID: <20111021100624.GB4029@csn.ul.ie>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Changhwan Youn wrote:
+On Tue, Oct 18, 2011 at 10:26:37AM -0700, Michal Nazarewicz wrote:
+> On Tue, 18 Oct 2011 05:21:09 -0700, Mel Gorman <mel@csn.ul.ie> wrote:
 > 
-> Hi Thomas,
+> >At this point, I'm going to apologise for not reviewing this a long long
+> >time ago.
+> >
+> >On Thu, Oct 06, 2011 at 03:54:42PM +0200, Marek Szyprowski wrote:
+> >>From: KAMEZAWA Hiroyuki <kamezawa.hiroyu@jp.fujitsu.com>
+> >>
+> >>This commit introduces alloc_contig_freed_pages() function
+> >>which allocates (ie. removes from buddy system) free pages
+> >>in range. Caller has to guarantee that all pages in range
+> >>are in buddy system.
+> >>
+> >
+> >Straight away, I'm wondering why you didn't use
+> >
+> >mm/compaction.c#isolate_freepages()
+> >
+> >It knows how to isolate pages within ranges. All its control information
+> >is passed via struct compact_control() which I recognise may be awkward
+> >for CMA but compaction.c know how to manage all the isolated pages and
+> >pass them to migrate.c appropriately.
 > 
-> All UART_IRQ_RXD, TXD, ERR of Samsung's platforms are also statically
-> mapped to linux irq numbers 16 to 31. These interrupts also need proper
-handling.
-> 
-> Best regards,
-> Changhwan Youn
+> It is something to consider.  At first glance, I see that isolate_freepages
+> seem to operate on pageblocks which is not desired for CMA.
 > 
 
-Hi all,
+isolate_freepages_block operates on a range of pages that happens to be
+hard-coded to be a pageblock because that was the requirements. It calculates
+end_pfn and it is possible to make that a function parameter.
 
-Hmm, I'd like to apply Thomas' device tree series for EXYNOS4 and Samsung
-stuff for upcoming merge window but there are still some comments on some
-stuff and that should be fixed before applying. In addition I need to keep
-the ordering to apply them to avoid conflicts. But as you know, v3.1 is now
-close at hand and we don't have enough time for it now :(
+> >I haven't read all the patches yet but isolate_freepages() does break
+> >everything up into order-0 pages. This may not be to your liking but it
+> >would not be possible to change.
+> 
+> Splitting everything into order-0 pages is desired behaviour.
+> 
 
-I will leave tomorrow morning (KST) for KS. I will talk to Grant Likely
-about this in Prague :)
+Great.
 
-Thanks.
+> >>Along with this function, a free_contig_pages() function is
+> >>provided which frees all (or a subset of) pages allocated
+> >>with alloc_contig_free_pages().
+> 
+> >mm/compaction.c#release_freepages()
+> 
+> It sort of does the same thing but release_freepages() assumes that pages
+> that are being freed are not-continuous and they need to be on the lru list.
+> With free_contig_pages(), we can assume all pages are continuous.
+> 
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Ok, I jumped the gun here. release_freepages() may not be a perfect fit.
+release_freepages() is also used when finishing compaction where as it
+is a real free function that is required here.
 
-> On 10/10/2011 03:11 AM, Thomas Abraham wrote:
-> > All of Samsung's s5p platforms have timer irqs statically mapped from
-linux
-> > irq numbers 11 to 15. These timer irqs are moved to end of the
-statically
-> > mapped linux irq space and the hardware irqs, which were statically
-mapped
-> > starting from 32 is moved to start from 0. The NR_IRQS macro is
-consolidated
-> > for all the s5p platforms in this process.
+> >You can do this in a more general fashion by checking the
+> >zone boundaries and resolving the pfn->page every MAX_ORDER_NR_PAGES.
+> >That will not be SPARSEMEM specific.
+> 
+> I've tried doing stuff that way but it ended up with much more code.
+> 
+> Dave suggested the above function to check if pointer arithmetic is valid.
+> 
+> Please see also <https://lkml.org/lkml/2011/9/21/220>.
+> 
+
+Ok, I'm still not fully convinced but I confess I'm not thinking about this
+particular function too deeply because I am expecting the problem would
+go away if compaction and CMA shared common code for freeing contiguous
+regions via page migration.
+
+> >> <SNIP>
+> >>+		if (zone_pfn_same_memmap(pfn - count, pfn))
+> >>+			page += count;
+> >>+		else
+> >>+			page = pfn_to_page(pfn);
+> >>+	}
+> >>+
+> >>+	spin_unlock_irq(&zone->lock);
+> >>+
+> >>+	/* After this, pages in the range can be freed one be one */
+> >>+	count = pfn - start;
+> >>+	pfn = start;
+> >>+	for (page = pfn_to_page(pfn); count; --count) {
+> >>+		prep_new_page(page, 0, flag);
+> >>+		++pfn;
+> >>+		if (likely(zone_pfn_same_memmap(pfn - 1, pfn)))
+> >>+			++page;
+> >>+		else
+> >>+			page = pfn_to_page(pfn);
+> >>+	}
+> >>+
 > >
-> > Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
-> > ---
-> >  arch/arm/mach-exynos4/include/mach/entry-macro.S |    1 -
-> >  arch/arm/mach-exynos4/include/mach/irqs.h        |    3 +--
-> >  arch/arm/mach-s5p64x0/include/mach/irqs.h        |    4 +---
-> >  arch/arm/mach-s5pc100/include/mach/irqs.h        |    3 +--
-> >  arch/arm/mach-s5pv210/include/mach/irqs.h        |    3 +--
-> >  arch/arm/plat-samsung/include/plat/irqs.h        |    7 +++++--
-> >  6 files changed, 9 insertions(+), 12 deletions(-)
-> >
-> > diff --git a/arch/arm/mach-exynos4/include/mach/entry-macro.S
-b/arch/arm/mach-
-> > exynos4/include/mach/entry-macro.S
-> > index 4c9adbd..5c4fbcc 100644
-> > --- a/arch/arm/mach-exynos4/include/mach/entry-macro.S
-> > +++ b/arch/arm/mach-exynos4/include/mach/entry-macro.S
-> > @@ -72,7 +72,6 @@
-> >  		cmpcc	\irqnr, \irqnr
-> >  		cmpne	\irqnr, \tmp
-> >  		cmpcs	\irqnr, \irqnr
-> > -		addne	\irqnr, \irqnr, #32
-> >
-> >  		.endm
-> >
-> > diff --git a/arch/arm/mach-exynos4/include/mach/irqs.h b/arch/arm/mach-
-> exynos4/include/mach/irqs.h
-> > index dfd4b7e..43087c3 100644
-> > --- a/arch/arm/mach-exynos4/include/mach/irqs.h
-> > +++ b/arch/arm/mach-exynos4/include/mach/irqs.h
-> > @@ -163,7 +163,6 @@
-> >  #define IRQ_GPIO2_NR_GROUPS	9
-> >  #define IRQ_GPIO_END		(S5P_GPIOINT_BASE +
-> S5P_GPIOINT_COUNT)
-> >
-> > -/* Set the default NR_IRQS */
-> > -#define NR_IRQS			(IRQ_GPIO_END + 64)
-> > +#define IRQ_TIMER_BASE		(IRQ_GPIO_END + 64)
-> >
-> >  #endif /* __ASM_ARCH_IRQS_H */
-> > diff --git a/arch/arm/mach-s5p64x0/include/mach/irqs.h b/arch/arm/mach-
-> s5p64x0/include/mach/irqs.h
-> > index 53982db..bea73cc 100644
-> > --- a/arch/arm/mach-s5p64x0/include/mach/irqs.h
-> > +++ b/arch/arm/mach-s5p64x0/include/mach/irqs.h
-> > @@ -141,8 +141,6 @@
-> >
-> >  #define IRQ_EINT_GROUP(grp, x)	(IRQ_EINT_GROUP##grp##_BASE +
-> (x))
-> >
-> > -/* Set the default NR_IRQS */
-> > -
-> > -#define NR_IRQS			(IRQ_EINT_GROUP8_BASE +
-> IRQ_EINT_GROUP8_NR + 1)
-> > +#define IRQ_TIMER_BASE		(IRQ_EINT_GROUP8_BASE +
-> IRQ_EINT_GROUP8_NR + 1)
-> >
-> >  #endif /* __ASM_ARCH_IRQS_H */
-> > diff --git a/arch/arm/mach-s5pc100/include/mach/irqs.h b/arch/arm/mach-
-> s5pc100/include/mach/irqs.h
-> > index d2eb475..3a9d300 100644
-> > --- a/arch/arm/mach-s5pc100/include/mach/irqs.h
-> > +++ b/arch/arm/mach-s5pc100/include/mach/irqs.h
-> > @@ -104,8 +104,7 @@
-> >  #define S5P_GPIOINT_BASE	(IRQ_EINT(31) + 1)
-> >  #define S5P_GPIOINT_GROUP_MAXNR	21
-> >
-> > -/* Set the default NR_IRQS */
-> > -#define NR_IRQS			(IRQ_EINT(31) +
-> S5P_GPIOINT_COUNT + 1)
-> > +#define IRQ_TIMER_BASE		(IRQ_EINT(31) +
-> S5P_GPIOINT_COUNT + 1)
-> >
-> >  /* Compatibility */
-> >  #define IRQ_LCD_FIFO		IRQ_LCD0
-> > diff --git a/arch/arm/mach-s5pv210/include/mach/irqs.h b/arch/arm/mach-
-> s5pv210/include/mach/irqs.h
-> > index 5e0de3a..df3173a 100644
-> > --- a/arch/arm/mach-s5pv210/include/mach/irqs.h
-> > +++ b/arch/arm/mach-s5pv210/include/mach/irqs.h
-> > @@ -125,8 +125,7 @@
-> >  #define S5P_GPIOINT_BASE	(IRQ_EINT(31) + 1)
-> >  #define S5P_GPIOINT_GROUP_MAXNR	22
-> >
-> > -/* Set the default NR_IRQS */
-> > -#define NR_IRQS			(IRQ_EINT(31) +
-> S5P_GPIOINT_COUNT + 1)
-> > +#define IRQ_TIMER_BASE		(IRQ_EINT(31) +
-> S5P_GPIOINT_COUNT + 1)
-> >
-> >  /* Compatibility */
-> >  #define IRQ_LCD_FIFO		IRQ_LCD0
-> > diff --git a/arch/arm/plat-samsung/include/plat/irqs.h b/arch/arm/plat-
-> samsung/include/plat/irqs.h
-> > index 08d1a7e..b8918b3 100644
-> > --- a/arch/arm/plat-samsung/include/plat/irqs.h
-> > +++ b/arch/arm/plat-samsung/include/plat/irqs.h
-> > @@ -22,7 +22,7 @@
-> >   * mulitple of 32 to allow the common code to work
-> >   */
-> >
-> > -#define S5P_IRQ_OFFSET		(32)
-> > +#define S5P_IRQ_OFFSET		(0)
-> >
-> >  #define S5P_IRQ(x)		((x) + S5P_IRQ_OFFSET)
-> >
-> > @@ -44,13 +44,14 @@
-> >  #define S5P_IRQ_VIC2(x)		(S5P_VIC2_BASE + (x))
-> >  #define S5P_IRQ_VIC3(x)		(S5P_VIC3_BASE + (x))
-> >
-> > -#define S5P_TIMER_IRQ(x)	(11 + (x))
-> > +#define S5P_TIMER_IRQ(x)	(IRQ_TIMER_BASE + (x))
-> >
-> >  #define IRQ_TIMER0		S5P_TIMER_IRQ(0)
-> >  #define IRQ_TIMER1		S5P_TIMER_IRQ(1)
-> >  #define IRQ_TIMER2		S5P_TIMER_IRQ(2)
-> >  #define IRQ_TIMER3		S5P_TIMER_IRQ(3)
-> >  #define IRQ_TIMER4		S5P_TIMER_IRQ(4)
-> > +#define IRQ_TIMER_COUNT		(5)
-> >
-> >  #define IRQ_EINT(x)		((x) < 16 ? ((x) + S5P_EINT_BASE1) \
-> >  					: ((x) - 16 + S5P_EINT_BASE2))
-> > @@ -77,4 +78,6 @@
-> >  #define S5P_IRQ_TYPE_EDGE_RISING	(0x03)
-> >  #define S5P_IRQ_TYPE_EDGE_BOTH		(0x04)
-> >
-> > +#define NR_IRQS			(IRQ_TIMER_BASE +
-> IRQ_TIMER_COUNT)
-> > +
-> >  #endif /* __PLAT_SAMSUNG_IRQS_H */
-> > --
-> > 1.6.6.rc2
-> >
-> >
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> >Here it looks like you have implemented something like split_free_page().
+> 
+> split_free_page() takes a single page, removes it from buddy system, and finally
+> splits it. 
+
+I'm referring to just this chunk.
+
+split_free_page takes a page, checks the watermarks and performs similar
+operations to prep_new_page(). There should be no need to introduce a
+new similar function. split_free_page() does affect hte pageblock
+migratetype and that is undesirable but that part could be taken out and
+moved to compaction.c if necessary.
+
+On the watermarks thing, CMA does not pay much attention to them. I have
+a strong feeling that it is easy to deadlock a system by using CMA while
+under memory pressure. Compaction had the same problem early in its
+development FWIW. This is partially why I'd prefer to see CMA and
+compaction sharing as much code as possible because compaction gets
+continual testing.
+
+-- 
+Mel Gorman
+SUSE Labs
