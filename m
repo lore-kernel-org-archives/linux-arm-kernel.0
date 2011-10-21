@@ -1,200 +1,51 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 21 Oct 2011 18:37:30 +0900
-Subject: [PATCH] Fix s3c24xx build error if !CONFIG_PM
-In-Reply-To: <20111018105215.GA10230@glitch>
-References: <20111018105215.GA10230@glitch>
-Message-ID: <016f01cc8fd5$0dbe40c0$293ac240$%kim@samsung.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Fri, 21 Oct 2011 17:39:29 +0800
+Subject: Update: ARM Sub-Architecture Maintainers workshop at Kernel
+	Summit 2011
+In-Reply-To: <4EA0367B.7090300@cam.ac.uk>
+References: <CACxGe6vMLeHrN7jLB2=JYQON1ykOiWTeGiH8YXkUbguV0D-HEw@mail.gmail.com>
+	<CACRpkdawG9aKAT7PHuYapiHexkteq-_seQGd6iRORyt-LwbmxA@mail.gmail.com>
+	<4EA026C5.1050803@cam.ac.uk>
+	<CAGsJ_4z+DWSXyn6gN9tOAqY3txM22Hk9jNZFPQ_TuYxT3RsRog@mail.gmail.com>
+	<20111020144641.GC6100@sirena.org.uk> <4EA0367B.7090300@cam.ac.uk>
+Message-ID: <CAGsJ_4zZHM2dn6XQUBxpymczXk6AP9bU3uc05_7yrUCNqeL8dw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Domenico Andreoli wrote:
-> 
-> s3c2440.c fails to build if !CONFIG_PM because in such case
-> s3c2410_pm_syscore_ops is not defined. Same error should happen also
-> in s3c2410.c and s3c2442.c
-> 
-> This patch fixes all of them.
-> 
-> Signed-off-by: Domenico Andreoli <cavokz@gmail.com>
-> 
-> ---
->  arch/arm/mach-s3c2410/s3c2410.c |    2 ++
->  arch/arm/mach-s3c2440/s3c2440.c |    2 ++
->  arch/arm/mach-s3c2440/s3c2442.c |    2 ++
->  3 files changed, 6 insertions(+)
-> 
-> Index: b/arch/arm/mach-s3c2410/s3c2410.c
-> =============================================================
-> ======
-> --- a/arch/arm/mach-s3c2410/s3c2410.c
-> +++ b/arch/arm/mach-s3c2410/s3c2410.c
-> @@ -170,8 +170,10 @@ int __init s3c2410_init(void)
->  {
->  	printk("S3C2410: Initialising architecture\n");
-> 
-> +#ifdef CONFIG_PM
->  	register_syscore_ops(&s3c2410_pm_syscore_ops);
->  	register_syscore_ops(&s3c24xx_irq_syscore_ops);
+Hi Grant,
+i found i am in the "Nominated, but have not yet responded " at the
+URL http://www.elinux.org/Events/Kernel_Summit_2011_ARM_Subarch_Maintainership_Workshop.
+i am sorry i will not attend.
 
-I think, basically we don't need condition for "s3c24xx_irq_syscore_ops",
-since it will be built without CONFIG_PM.
-
-> +#endif
-> 
->  	return sysdev_register(&s3c2410_sysdev);
->  }
-> Index: b/arch/arm/mach-s3c2440/s3c2440.c
-> =============================================================
-> ======
-> --- a/arch/arm/mach-s3c2440/s3c2440.c
-> +++ b/arch/arm/mach-s3c2440/s3c2440.c
-> @@ -55,9 +55,11 @@ int __init s3c2440_init(void)
-> 
->  	/* register suspend/resume handlers */
-> 
-> +#ifdef CONFIG_PM
->  	register_syscore_ops(&s3c2410_pm_syscore_ops);
->  	register_syscore_ops(&s3c244x_pm_syscore_ops);
-
-Same as above.
-
->  	register_syscore_ops(&s3c24xx_irq_syscore_ops);
-
-Same as above.
-
-> +#endif
-> 
->  	/* register our system device for everything else */
-> 
-> Index: b/arch/arm/mach-s3c2440/s3c2442.c
-> =============================================================
-> ======
-> --- a/arch/arm/mach-s3c2440/s3c2442.c
-> +++ b/arch/arm/mach-s3c2440/s3c2442.c
-> @@ -169,9 +169,11 @@ int __init s3c2442_init(void)
->  {
->  	printk("S3C2442: Initialising architecture\n");
-> 
-> +#ifdef CONFIG_PM
->  	register_syscore_ops(&s3c2410_pm_syscore_ops);
->  	register_syscore_ops(&s3c244x_pm_syscore_ops);
-
-Same as above.
-
->  	register_syscore_ops(&s3c24xx_irq_syscore_ops);
-
-Same as above.
-
-> +#endif
-> 
->  	return sysdev_register(&s3c2442_sysdev);
->  }
-
-Err...happend following build error without CONFIG_PM on 3.1-rc10.
-
-arch/arm/mach-s3c2410/built-in.o: In function `s3c2410_init':
-arch/arm/mach-s3c2410/s3c2410.c:177: undefined reference to
-`s3c2410_pm_syscore_ops'
-arch/arm/mach-s3c2412/built-in.o: In function `s3c2412_init':
-arch/arm/mach-s3c2412/s3c2412.c:252: undefined reference to
-`s3c2412_pm_syscore_ops'
-arch/arm/mach-s3c2416/built-in.o: In function `s3c2416_init':
-arch/arm/mach-s3c2416/s3c2416.c:104: undefined reference to
-`s3c2416_pm_syscore_ops'
-arch/arm/mach-s3c2440/built-in.o: In function `s3c2440_init':
-arch/arm/mach-s3c2440/s3c2440.c:65: undefined reference to
-`s3c2410_pm_syscore_ops'
-arch/arm/mach-s3c2440/built-in.o: In function `s3c2442_init':
-arch/arm/mach-s3c2440/s3c2442.c:177: undefined reference to
-`s3c2410_pm_syscore_ops'
-
-So this should be following?
-
-diff --git a/arch/arm/mach-s3c2410/s3c2410.c
-b/arch/arm/mach-s3c2410/s3c2410.c
-index f1d3bd8..343a540 100644
---- a/arch/arm/mach-s3c2410/s3c2410.c
-+++ b/arch/arm/mach-s3c2410/s3c2410.c
-@@ -170,7 +170,9 @@ int __init s3c2410_init(void)
- {
- 	printk("S3C2410: Initialising architecture\n");
-
-+#ifdef CONFIG_PM
- 	register_syscore_ops(&s3c2410_pm_syscore_ops);
-+#endif
- 	register_syscore_ops(&s3c24xx_irq_syscore_ops);
-
- 	return sysdev_register(&s3c2410_sysdev);
-diff --git a/arch/arm/mach-s3c2412/s3c2412.c
-b/arch/arm/mach-s3c2412/s3c2412.c
-index ef0958d..57a1e01 100644
---- a/arch/arm/mach-s3c2412/s3c2412.c
-+++ b/arch/arm/mach-s3c2412/s3c2412.c
-@@ -245,7 +245,9 @@ int __init s3c2412_init(void)
- {
- 	printk("S3C2412: Initialising architecture\n");
-
-+#ifdef CONFIG_PM
- 	register_syscore_ops(&s3c2412_pm_syscore_ops);
-+#endif
- 	register_syscore_ops(&s3c24xx_irq_syscore_ops);
-
- 	return sysdev_register(&s3c2412_sysdev);
-diff --git a/arch/arm/mach-s3c2416/s3c2416.c
-b/arch/arm/mach-s3c2416/s3c2416.c
-index 494ce91..20b3fdf 100644
---- a/arch/arm/mach-s3c2416/s3c2416.c
-+++ b/arch/arm/mach-s3c2416/s3c2416.c
-@@ -97,7 +97,9 @@ int __init s3c2416_init(void)
-
- 	s3c_fb_setname("s3c2443-fb");
-
-+#ifdef CONFIG_PM
- 	register_syscore_ops(&s3c2416_pm_syscore_ops);
-+#endif
- 	register_syscore_ops(&s3c24xx_irq_syscore_ops);
-
- 	return sysdev_register(&s3c2416_sysdev);
-diff --git a/arch/arm/mach-s3c2440/s3c2440.c
-b/arch/arm/mach-s3c2440/s3c2440.c
-index ce99ff7..2270d33 100644
---- a/arch/arm/mach-s3c2440/s3c2440.c
-+++ b/arch/arm/mach-s3c2440/s3c2440.c
-@@ -55,7 +55,9 @@ int __init s3c2440_init(void)
-
- 	/* register suspend/resume handlers */
-
-+#ifdef CONFIG_PM
- 	register_syscore_ops(&s3c2410_pm_syscore_ops);
-+#endif
- 	register_syscore_ops(&s3c244x_pm_syscore_ops);
- 	register_syscore_ops(&s3c24xx_irq_syscore_ops);
-
-diff --git a/arch/arm/mach-s3c2440/s3c2442.c
-b/arch/arm/mach-s3c2440/s3c2442.c
-index 9ad99f8..6f2b65e 100644
---- a/arch/arm/mach-s3c2440/s3c2442.c
-+++ b/arch/arm/mach-s3c2440/s3c2442.c
-@@ -169,7 +169,9 @@ int __init s3c2442_init(void)
- {
- 	printk("S3C2442: Initialising architecture\n");
-
-+#ifdef CONFIG_PM
- 	register_syscore_ops(&s3c2410_pm_syscore_ops);
-+#endif
- 	register_syscore_ops(&s3c244x_pm_syscore_ops);
- 	register_syscore_ops(&s3c24xx_irq_syscore_ops);
-
-
-However, hmm....I think, we need to sort out regarding s3c24xx PM codes'
-structure.
-
-Anyway, Domenico, if you're ok with above, could you please re-submit?
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+2011/10/20 Jonathan Cameron <jic23@cam.ac.uk>:
+> On 10/20/11 15:46, Mark Brown wrote:
+>> On Thu, Oct 20, 2011 at 10:25:15PM +0800, Barry Song wrote:
+>>
+>>> as Jonathan knows, i was one of main authors of those drivers in
+>>> drivers/staging/iio. one problem for iio is now most people still
+>>> write sensor drivers based on input subsystem or others but not iio.
+>>> and Android HAL or other frameworks prefer input _event as well.
+>>> so to push iio ahead, we might push related app ahead too.
+>>
+>> Well, that's not entirely clear - one of the reasons for discussing an
+>> in kernel API is so that drivers for these subsystems can make use of
+>> IIO channels. ?Another big blocker for deployment of IIO right now is
+>> that it's in staging, fixing that will probably help enormously.
+> That and push in kernel APIs. ?Working on that though. ?Note however they
+> will be dependent on at least the first three sets of patches in
+> our original master move out of staging plan. ?So lots of other stuff
+> to get fixed up first. ?Some of which is probably going to be controversial.
+>
+> Direct user space code will exist for the usecases we were originally
+> targeting, but where it makes sense, Mark has convinced me of the need
+> to push things out through input / hmwon. Guenter doesn't seem against
+> so that's a start. ?Dmitry has always pushed for this (though last
+> time we talked about it, plan was a userspace bridge).
+>
+> We'll still want to be very careful to keep any users that go into
+> mainline on the straight an narrow wrt to pushing stuff through those
+> subsystems that doesn't belong.
+>
+> Jonathan
+>
+-barry
