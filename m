@@ -1,43 +1,43 @@
-From: jarkko.nikula@bitmer.com (Jarkko Nikula)
-Date: Fri, 21 Oct 2011 14:04:03 +0300
-Subject: [PATCH arm-soc.git/for-next] ARM: l2x0: Fix merge typo with "ARM:
-	l2x0: add empty l2x0_of_init"
-Message-ID: <1319195043-20268-1-git-send-email-jarkko.nikula@bitmer.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Fri, 21 Oct 2011 19:58:10 +0800
+Subject: [PATCH v2 3/5] regulator: helper routine to extract
+	regulator_init_data
+In-Reply-To: <4EA13053.7080306@ti.com>
+References: <1318263578-7407-1-git-send-email-rnayak@ti.com>
+	<1318263578-7407-4-git-send-email-rnayak@ti.com>
+	<20111018132032.GD30703@S2100-06.ap.freescale.net>
+	<4E9EB61C.1040207@ti.com>
+	<20111019144215.GA32007@S2100-06.ap.freescale.net>
+	<4E9FAF42.5060200@ti.com>
+	<20111020061408.GE32007@S2100-06.ap.freescale.net>
+	<4EA00F7C.1080005@ti.com>
+	<20111021082309.GA337@S2100-06.ap.freescale.net>
+	<4EA13053.7080306@ti.com>
+Message-ID: <20111021115809.GB337@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix build error "error: implicit declaration of function 'l2x0_init'" if
-CONFIG_OF is not set. This looks like to be caused by some manual typo when
-committing or merging as this is not in the original patch.
+On Fri, Oct 21, 2011 at 02:11:55PM +0530, Rajendra Nayak wrote:
+[...]
+> >+       /* find device_node and attach it */
+> >+       rdev->dev.of_node = of_find_node_by_name(NULL, regulator_desc->name);
+> 
+> so would this do a complete dt search for every regulator?
 
-Signed-off-by: Jarkko Nikula <jarkko.nikula@bitmer.com>
-Cc: Rob Herring <rob.herring@calxeda.com>
----
-See commits 5260f15 and d94527d, tree version and the original patch
-http://lists.infradead.org/pipermail/linux-arm-kernel/2011-August/063478.html
-I'm ok if those commits are dropped and replaced with original one.
----
- arch/arm/include/asm/hardware/cache-l2x0.h |    3 ---
- 1 files changed, 0 insertions(+), 3 deletions(-)
+Yes, with the first param being NULL, tthe entire device tree will be
+searched.
 
-diff --git a/arch/arm/include/asm/hardware/cache-l2x0.h b/arch/arm/include/asm/hardware/cache-l2x0.h
-index e38ac93..662563d 100644
---- a/arch/arm/include/asm/hardware/cache-l2x0.h
-+++ b/arch/arm/include/asm/hardware/cache-l2x0.h
-@@ -101,7 +101,6 @@
- #define L2X0_ADDR_FILTER_EN		1
- 
- #ifndef __ASSEMBLY__
--#if defined(CONFIG_CACHE_L2X0) && defined(CONFIG_OF)
- extern void __init l2x0_init(void __iomem *base, __u32 aux_val, __u32 aux_mask);
- #if defined(CONFIG_CACHE_L2X0) && defined(CONFIG_OF)
- extern int l2x0_of_init(__u32 aux_val, __u32 aux_mask);
-@@ -130,6 +129,4 @@ struct l2x0_regs {
- 
- extern struct l2x0_regs l2x0_saved_regs;
- 
--#endif /* __ASSEMBLY__ */
--
- #endif
+> we would also need the driver names and dt names to match for this to
+> work, right?
+> 
+Driver name does not matter.  The key for this search to work is having
+regulator's name (regulator_desc->name) match device tree node's name,
+case ignored.
+
+> The approach otherwise looks fine to me and should work for both cases
+> of one device per regulator and one device for all regulators.
+> 
+
 -- 
-1.7.6.3
+Regards,
+Shawn
