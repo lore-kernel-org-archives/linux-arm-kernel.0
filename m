@@ -1,38 +1,47 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Fri, 21 Oct 2011 19:55:53 +0200
-Subject: [PATCH 2/3] ARM: AT91: IIO: Add AT91 ADC driver.
-In-Reply-To: <4EA1B1BD.7000908@free-electrons.com>
-References: <1319041134-19712-1-git-send-email-maxime.ripard@free-electrons.com>
-	<1319041134-19712-3-git-send-email-maxime.ripard@free-electrons.com>
-	<4E9FC916.2070800@metafoo.de> <4EA1B1BD.7000908@free-electrons.com>
-Message-ID: <4EA1B229.308@metafoo.de>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Fri, 21 Oct 2011 18:57:24 +0100
+Subject: [PATCH v3] virtio: Add platform bus driver for memory mapped
+	virtio device
+In-Reply-To: <87ty75adtb.fsf@rustcorp.com.au>
+References: <1317841030-17758-1-git-send-email-pawel.moll@arm.com>
+	<1317919843-8343-1-git-send-email-pawel.moll@arm.com>
+	<1317921230.28696.102.camel@hornet.cambridge.arm.com>
+	<87lisjq6tu.fsf@rustcorp.com.au>
+	<1318931075.3146.285.camel@hornet.cambridge.arm.com>
+	<87ty75adtb.fsf@rustcorp.com.au>
+Message-ID: <1319219844.5094.16.camel@hornet.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/21/2011 07:54 PM, Maxime Ripard wrote:
-> [...]
->>> +static int __devexit at91adc_remove(struct platform_device *pdev)
->>> +{
->>> +	struct iio_dev *idev = platform_get_drvdata(pdev);
->>> +	struct resource *res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->>> +	struct at91adc_state *st = iio_priv(idev);
->>> +
->>> +	free_irq(st->irq, st);
->>> +	iounmap(st->reg_base);
->>> +	release_mem_region(res->start, resource_size(res));
->>> +	iio_device_unregister(idev);
->>> +
->>
->> The iio API changed a bit recently and uses a two stage unregistration now.
->> You should call iio_device_unregister before freeing resources and
->> iio_device_free afterwards.
+On Wed, 2011-10-19 at 03:57 +0100, Rusty Russell wrote:
+> > Oh, really? My host-side implementation is just doing that:
+> > 
+> >         addr += align - 1;
+> >         addr &= ~(align - 1);
 > 
-> Hmmm, I don't see the iio_device_free in Jonathan's git. Is it
-> iio_free_device, or should I use another git repo/branch as base ?
-> 
-> Thanks,
-> 
+> OK, so you're assuming power of 2.  Make sure you kill the guest or at
+> least the device if it's not though.
 
-Yes, iio_free_device, sorry.
+Yep, I have assertions all around such places :-) (it's a non-production
+code yet so I can do that)
 
-- Lars
+> > \item The dynamic configuration changes, as described in p. 2.4.3
+> > ``Dealing With Configuration Changes'' are not permitted.
+> 
+> This means some devices simply won't work, at least in theory.  Why
+> don't you support this?
+
+Uh. I simply forgot about it - my Host block device doesn't do that, so
+I ignored that feature initially and then it slipped through cracks. And
+till now I didn't realize that most of the drivers actually use this :-O
+My fault.
+
+Simple to fix anyway - I'll just add InterruptStatus register and use
+second bit (same with InterruptACK) to get this through. Will be done on
+Monday.
+
+Any other final complaints regarding the interface while I'm on it? ;-)
+
+Cheers!
+
+Pawe?
