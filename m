@@ -1,47 +1,36 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Fri, 21 Oct 2011 18:57:24 +0100
-Subject: [PATCH v3] virtio: Add platform bus driver for memory mapped
-	virtio device
-In-Reply-To: <87ty75adtb.fsf@rustcorp.com.au>
-References: <1317841030-17758-1-git-send-email-pawel.moll@arm.com>
-	<1317919843-8343-1-git-send-email-pawel.moll@arm.com>
-	<1317921230.28696.102.camel@hornet.cambridge.arm.com>
-	<87lisjq6tu.fsf@rustcorp.com.au>
-	<1318931075.3146.285.camel@hornet.cambridge.arm.com>
-	<87ty75adtb.fsf@rustcorp.com.au>
-Message-ID: <1319219844.5094.16.camel@hornet.cambridge.arm.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 21 Oct 2011 20:01:58 +0200
+Subject: [GIT PULL] i.MX6Q support
+In-Reply-To: <109937284.AlYUSiDe0P@wuerfel>
+References: <20111020171158.GJ32007@S2100-06.ap.freescale.net>
+	<20111020211834.GF21648@n2100.arm.linux.org.uk>
+	<109937284.AlYUSiDe0P@wuerfel>
+Message-ID: <20111021180158.GI23421@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2011-10-19 at 03:57 +0100, Rusty Russell wrote:
-> > Oh, really? My host-side implementation is just doing that:
+On Fri, Oct 21, 2011 at 12:23:33AM +0200, Arnd Bergmann wrote:
+> On Thursday 20 October 2011 22:18:34 Russell King - ARM Linux wrote:
+> > On Fri, Oct 21, 2011 at 01:11:59AM +0800, Shawn Guo wrote:
+> > > Please pull imx6q series.  It's based on v3.1-rc10 with the following
+> > > branches merged plus a number of cache-l2x0 patches currently sitting
+> > > on rmk/for-next.
 > > 
-> >         addr += align - 1;
-> >         addr &= ~(align - 1);
+> > Don't do that.  If there's something you need, ask me.  The L2x0
+> > patches got shuffled out into their own branch when the SMP and debug
+> > patches got split out of the 'misc' branch.
 > 
-> OK, so you're assuming power of 2.  Make sure you kill the guest or at
-> least the device if it's not though.
-
-Yep, I have assertions all around such places :-) (it's a non-production
-code yet so I can do that)
-
-> > \item The dynamic configuration changes, as described in p. 2.4.3
-> > ``Dealing With Configuration Changes'' are not permitted.
+> Since I already had the branches at hand for the highbank tree, I
+> gave this a go and rebased the imx6q branch on top of the stable branches
+> that are there and confirmed that it actually builds.
 > 
-> This means some devices simply won't work, at least in theory.  Why
-> don't you support this?
+> I have pulled the result into the next/soc branch along with highbank
+> and picoxcell.
+> 
+> Shawn and Sascha, can you confirm that this is correct?
 
-Uh. I simply forgot about it - my Host block device doesn't do that, so
-I ignored that feature initially and then it slipped through cracks. And
-till now I didn't realize that most of the drivers actually use this :-O
-My fault.
+Adding the following at least gives a compilable result. Works on i.MX3,
+I couldn't test on i.MX6 though. BTW your patch exporting imx_ioremap is
+missing in your for-next branch.
 
-Simple to fix anyway - I'll just add InterruptStatus register and use
-second bit (same with InterruptACK) to get this through. Will be done on
-Monday.
-
-Any other final complaints regarding the interface while I'm on it? ;-)
-
-Cheers!
-
-Pawe?
+Sascha
