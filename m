@@ -1,30 +1,41 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 21 Oct 2011 23:25:12 +0100
-Subject: [GIT PULL] GIC DT binding support
-In-Reply-To: <2460374.AAkEFv9LMo@wuerfel>
-References: <4E97A601.1020005@gmail.com> <2901028.94TxBXiCYq@wuerfel>
-	<20111021183352.GI21648@n2100.arm.linux.org.uk>
-	<2460374.AAkEFv9LMo@wuerfel>
-Message-ID: <20111021222512.GJ21648@n2100.arm.linux.org.uk>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Sat, 22 Oct 2011 00:33:28 +0200
+Subject: [RESEND PATCH] PM / Clocks: Remove redundant NULL checks before
+	kfree()
+In-Reply-To: <1319068532-21287-1-git-send-email-jhbird.choi@samsung.com>
+References: <1319068532-21287-1-git-send-email-jhbird.choi@samsung.com>
+Message-ID: <201110220033.29015.rjw@sisk.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 21, 2011 at 09:31:46PM +0200, Arnd Bergmann wrote:
-> Ok, that is a very useful documentation, but the part I still don't
-> understand is how I should get the commit ID of the stable branches.
+On Thursday, October 20, 2011, jhbird.choi at samsung.com wrote:
+> From: Jonghwan Choi <jhbird.choi@samsung.com>
+> 
+> Signed-off-by: Jonghwan Choi <jhbird.choi@samsung.com>
 
-I'll publish the branch itself.
+Applied to linux-pm/linux-next, but I didn't have to resend it.
 
-> I noticed that you are publishing an l2x0 branch now, in addition
-> to the pm and smp branches that were already there the last time
-> I looked, but you don't publish the gpio, io and debug branches
-> that I have pulled into the arm-soc/next-soc branch because imx6 and
-> highbank depend on them.
+Thanks,
+Rafael
 
-debug has been published for a while but not the other two.  gpio can
-be done trivially, but (as I've already said) io has an additional
-commit on top which I'm not publishing yet.  So I'd need to fudge stuff
-in some way to publish that one.
 
-Given the time now, I'm not going to change my tree at this point,
-with very little time available before having to leave.
+> ---
+>  drivers/base/power/clock_ops.c |    4 +---
+>  1 files changed, 1 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/base/power/clock_ops.c b/drivers/base/power/clock_ops.c
+> index b97294e..3ecc303 100644
+> --- a/drivers/base/power/clock_ops.c
+> +++ b/drivers/base/power/clock_ops.c
+> @@ -114,9 +114,7 @@ static void __pm_clk_remove(struct pm_clock_entry *ce)
+>  			clk_put(ce->clk);
+>  	}
+>  
+> -	if (ce->con_id)
+> -		kfree(ce->con_id);
+> -
+> +	kfree(ce->con_id);
+>  	kfree(ce);
+>  }
+>  
+> 
