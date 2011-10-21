@@ -1,31 +1,200 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 21 Oct 2011 10:15:24 +0100
-Subject: Possible regression in kexec on ARM ARMv6 and ARMv7 cores
-In-Reply-To: <20111021085958.GC21850@verge.net.au>
-References: <20111020042444.GA20260@verge.net.au>
-	<20111020070105.GA28548@mudshark.cambridge.arm.com>
-	<20111020080823.GA2716@verge.net.au>
-	<20111021083426.GA16088@verge.net.au>
-	<20111021084641.GA30168@mudshark.cambridge.arm.com>
-	<20111021085958.GC21850@verge.net.au>
-Message-ID: <20111021091524.GB30168@mudshark.cambridge.arm.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 21 Oct 2011 18:37:30 +0900
+Subject: [PATCH] Fix s3c24xx build error if !CONFIG_PM
+In-Reply-To: <20111018105215.GA10230@glitch>
+References: <20111018105215.GA10230@glitch>
+Message-ID: <016f01cc8fd5$0dbe40c0$293ac240$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 21, 2011 at 09:59:58AM +0100, Simon Horman wrote:
-> On Fri, Oct 21, 2011 at 09:46:41AM +0100, Will Deacon wrote:
-> > The more difficult case is when you want to offline the secondary CPUs into
-> > a pen and then boot them in the new kernel. I did get some of this working,
-> > but there are outstanding issues with whether the pen should be at a fixed
-> > location or not. If not, then we need a way to tell the new kernel where it
-> > is, which may involve updating the DT blob...
+Domenico Andreoli wrote:
 > 
-> Is the implication that the (working) callback method does not
-> give the second kernel any secondary CPUs?
+> s3c2440.c fails to build if !CONFIG_PM because in such case
+> s3c2410_pm_syscore_ops is not defined. Same error should happen also
+> in s3c2410.c and s3c2442.c
+> 
+> This patch fixes all of them.
+> 
+> Signed-off-by: Domenico Andreoli <cavokz@gmail.com>
+> 
+> ---
+>  arch/arm/mach-s3c2410/s3c2410.c |    2 ++
+>  arch/arm/mach-s3c2440/s3c2440.c |    2 ++
+>  arch/arm/mach-s3c2440/s3c2442.c |    2 ++
+>  3 files changed, 6 insertions(+)
+> 
+> Index: b/arch/arm/mach-s3c2410/s3c2410.c
+> =============================================================
+> ======
+> --- a/arch/arm/mach-s3c2410/s3c2410.c
+> +++ b/arch/arm/mach-s3c2410/s3c2410.c
+> @@ -170,8 +170,10 @@ int __init s3c2410_init(void)
+>  {
+>  	printk("S3C2410: Initialising architecture\n");
+> 
+> +#ifdef CONFIG_PM
+>  	register_syscore_ops(&s3c2410_pm_syscore_ops);
+>  	register_syscore_ops(&s3c24xx_irq_syscore_ops);
 
-What the callback does it up to you. You just need to make sure that you can
-cope with the kernel disappearing later on, so you'll probably need some
-hardware mechanism for offlining a CPU (for example, placing it in SRAM
-or cutting the power).
+I think, basically we don't need condition for "s3c24xx_irq_syscore_ops",
+since it will be built without CONFIG_PM.
 
-Will
+> +#endif
+> 
+>  	return sysdev_register(&s3c2410_sysdev);
+>  }
+> Index: b/arch/arm/mach-s3c2440/s3c2440.c
+> =============================================================
+> ======
+> --- a/arch/arm/mach-s3c2440/s3c2440.c
+> +++ b/arch/arm/mach-s3c2440/s3c2440.c
+> @@ -55,9 +55,11 @@ int __init s3c2440_init(void)
+> 
+>  	/* register suspend/resume handlers */
+> 
+> +#ifdef CONFIG_PM
+>  	register_syscore_ops(&s3c2410_pm_syscore_ops);
+>  	register_syscore_ops(&s3c244x_pm_syscore_ops);
+
+Same as above.
+
+>  	register_syscore_ops(&s3c24xx_irq_syscore_ops);
+
+Same as above.
+
+> +#endif
+> 
+>  	/* register our system device for everything else */
+> 
+> Index: b/arch/arm/mach-s3c2440/s3c2442.c
+> =============================================================
+> ======
+> --- a/arch/arm/mach-s3c2440/s3c2442.c
+> +++ b/arch/arm/mach-s3c2440/s3c2442.c
+> @@ -169,9 +169,11 @@ int __init s3c2442_init(void)
+>  {
+>  	printk("S3C2442: Initialising architecture\n");
+> 
+> +#ifdef CONFIG_PM
+>  	register_syscore_ops(&s3c2410_pm_syscore_ops);
+>  	register_syscore_ops(&s3c244x_pm_syscore_ops);
+
+Same as above.
+
+>  	register_syscore_ops(&s3c24xx_irq_syscore_ops);
+
+Same as above.
+
+> +#endif
+> 
+>  	return sysdev_register(&s3c2442_sysdev);
+>  }
+
+Err...happend following build error without CONFIG_PM on 3.1-rc10.
+
+arch/arm/mach-s3c2410/built-in.o: In function `s3c2410_init':
+arch/arm/mach-s3c2410/s3c2410.c:177: undefined reference to
+`s3c2410_pm_syscore_ops'
+arch/arm/mach-s3c2412/built-in.o: In function `s3c2412_init':
+arch/arm/mach-s3c2412/s3c2412.c:252: undefined reference to
+`s3c2412_pm_syscore_ops'
+arch/arm/mach-s3c2416/built-in.o: In function `s3c2416_init':
+arch/arm/mach-s3c2416/s3c2416.c:104: undefined reference to
+`s3c2416_pm_syscore_ops'
+arch/arm/mach-s3c2440/built-in.o: In function `s3c2440_init':
+arch/arm/mach-s3c2440/s3c2440.c:65: undefined reference to
+`s3c2410_pm_syscore_ops'
+arch/arm/mach-s3c2440/built-in.o: In function `s3c2442_init':
+arch/arm/mach-s3c2440/s3c2442.c:177: undefined reference to
+`s3c2410_pm_syscore_ops'
+
+So this should be following?
+
+diff --git a/arch/arm/mach-s3c2410/s3c2410.c
+b/arch/arm/mach-s3c2410/s3c2410.c
+index f1d3bd8..343a540 100644
+--- a/arch/arm/mach-s3c2410/s3c2410.c
++++ b/arch/arm/mach-s3c2410/s3c2410.c
+@@ -170,7 +170,9 @@ int __init s3c2410_init(void)
+ {
+ 	printk("S3C2410: Initialising architecture\n");
+
++#ifdef CONFIG_PM
+ 	register_syscore_ops(&s3c2410_pm_syscore_ops);
++#endif
+ 	register_syscore_ops(&s3c24xx_irq_syscore_ops);
+
+ 	return sysdev_register(&s3c2410_sysdev);
+diff --git a/arch/arm/mach-s3c2412/s3c2412.c
+b/arch/arm/mach-s3c2412/s3c2412.c
+index ef0958d..57a1e01 100644
+--- a/arch/arm/mach-s3c2412/s3c2412.c
++++ b/arch/arm/mach-s3c2412/s3c2412.c
+@@ -245,7 +245,9 @@ int __init s3c2412_init(void)
+ {
+ 	printk("S3C2412: Initialising architecture\n");
+
++#ifdef CONFIG_PM
+ 	register_syscore_ops(&s3c2412_pm_syscore_ops);
++#endif
+ 	register_syscore_ops(&s3c24xx_irq_syscore_ops);
+
+ 	return sysdev_register(&s3c2412_sysdev);
+diff --git a/arch/arm/mach-s3c2416/s3c2416.c
+b/arch/arm/mach-s3c2416/s3c2416.c
+index 494ce91..20b3fdf 100644
+--- a/arch/arm/mach-s3c2416/s3c2416.c
++++ b/arch/arm/mach-s3c2416/s3c2416.c
+@@ -97,7 +97,9 @@ int __init s3c2416_init(void)
+
+ 	s3c_fb_setname("s3c2443-fb");
+
++#ifdef CONFIG_PM
+ 	register_syscore_ops(&s3c2416_pm_syscore_ops);
++#endif
+ 	register_syscore_ops(&s3c24xx_irq_syscore_ops);
+
+ 	return sysdev_register(&s3c2416_sysdev);
+diff --git a/arch/arm/mach-s3c2440/s3c2440.c
+b/arch/arm/mach-s3c2440/s3c2440.c
+index ce99ff7..2270d33 100644
+--- a/arch/arm/mach-s3c2440/s3c2440.c
++++ b/arch/arm/mach-s3c2440/s3c2440.c
+@@ -55,7 +55,9 @@ int __init s3c2440_init(void)
+
+ 	/* register suspend/resume handlers */
+
++#ifdef CONFIG_PM
+ 	register_syscore_ops(&s3c2410_pm_syscore_ops);
++#endif
+ 	register_syscore_ops(&s3c244x_pm_syscore_ops);
+ 	register_syscore_ops(&s3c24xx_irq_syscore_ops);
+
+diff --git a/arch/arm/mach-s3c2440/s3c2442.c
+b/arch/arm/mach-s3c2440/s3c2442.c
+index 9ad99f8..6f2b65e 100644
+--- a/arch/arm/mach-s3c2440/s3c2442.c
++++ b/arch/arm/mach-s3c2440/s3c2442.c
+@@ -169,7 +169,9 @@ int __init s3c2442_init(void)
+ {
+ 	printk("S3C2442: Initialising architecture\n");
+
++#ifdef CONFIG_PM
+ 	register_syscore_ops(&s3c2410_pm_syscore_ops);
++#endif
+ 	register_syscore_ops(&s3c244x_pm_syscore_ops);
+ 	register_syscore_ops(&s3c24xx_irq_syscore_ops);
+
+
+However, hmm....I think, we need to sort out regarding s3c24xx PM codes'
+structure.
+
+Anyway, Domenico, if you're ok with above, could you please re-submit?
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
