@@ -1,69 +1,42 @@
-From: ulf.hansson@stericsson.com (Ulf Hansson)
-Date: Fri, 21 Oct 2011 16:08:44 +0200
-Subject: [PATCH] spi/pl022: Enable clock in probe an use runtime_idle
-Message-ID: <1319206124-17549-1-git-send-email-ulf.hansson@stericsson.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 21 Oct 2011 09:48:24 -0500
+Subject: [GIT PULL] DEBUG_LL platform updates for 3.2
+In-Reply-To: <20111021105941.GE30168@mudshark.cambridge.arm.com>
+References: <20110928103815.GA8344@e102144-lin.cambridge.arm.com>
+	<20111017082506.GC21648@n2100.arm.linux.org.uk>
+	<20111017092342.GB2459@mudshark.cambridge.arm.com>
+	<201110201657.51810.arnd@arndb.de>
+	<20111021105941.GE30168@mudshark.cambridge.arm.com>
+Message-ID: <4EA18638.6020809@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since we are always runtime resumed when leaving probe
-the clock must be enabled. To accomplish that we are able
-to be runtime suspended after probe in the case when no
-request is going to be recieved, a runtime_idle function
-has been implemented.
+On 10/21/2011 05:59 AM, Will Deacon wrote:
+> Hi Arnd,
+> 
+> On Thu, Oct 20, 2011 at 03:57:49PM +0100, Arnd Bergmann wrote:
+>> Ok, thanks a lot. I've updated my branches now and recreated
+>> the for-next branch with these. Can you have a look to make sure
+>> that everything looks good there now?
+> 
+> The cpu mapping and debug-ll stuff all looks good to me, thanks. On the
+> downside, I'm seeing a couple of problems with your for-next branch:
+> 
+> 1. I can't compile if !CONFIG_OF, because l2x0_init isn't declared in
+>    cache-l2x0.h. There seems to be some broken ifdeffery because of
+>    what looks like duplicate commits d94527dd and 5260f15b, although
+>    they are slightly different (and actually, both look broken to me
+>    anyway!).
+> 
 
-Change-Id: I6cb86f2cad30ecaab16f512daf4674b039b18213
-Signed-off-by: Ulf Hansson <ulf.hansson@stericsson.com>
-Reviewed-on: http://gerrit.lud.stericsson.com/gerrit/34447
----
- drivers/spi/spi-pl022.c |   18 +++++++++++++++++-
- 1 files changed, 17 insertions(+), 1 deletions(-)
+This was caught in linux-next.
 
-diff --git a/drivers/spi/spi-pl022.c b/drivers/spi/spi-pl022.c
-index f103e47..ad48fba 100644
---- a/drivers/spi/spi-pl022.c
-+++ b/drivers/spi/spi-pl022.c
-@@ -2184,6 +2184,12 @@ pl022_probe(struct amba_device *adev, const struct amba_id *id)
- 		goto  err_clk_prep;
- 	}
- 
-+	status = clk_enable(pl022->clk);
-+	if (status) {
-+		dev_err(&adev->dev, "could not enable SSP/SPI bus clock\n");
-+		goto err_no_clk_en;
-+	}
-+
- 	/* Disable SSP */
- 	writew((readw(SSP_CR1(pl022->virtbase)) & (~SSP_CR1_MASK_SSE)),
- 	       SSP_CR1(pl022->virtbase));
-@@ -2237,6 +2243,8 @@ pl022_probe(struct amba_device *adev, const struct amba_id *id)
- 
- 	free_irq(adev->irq[0], pl022);
-  err_no_irq:
-+	clk_disable(pl022->clk);
-+ err_no_clk_en:
- 	clk_unprepare(pl022->clk);
-  err_clk_prep:
- 	clk_put(pl022->clk);
-@@ -2342,11 +2350,19 @@ static int pl022_runtime_resume(struct device *dev)
- 
- 	return 0;
- }
-+
-+static int pl022_runtime_idle(struct device *dev)
-+{
-+	pm_runtime_suspend(dev);
-+	return 0;
-+}
- #endif
- 
- static const struct dev_pm_ops pl022_dev_pm_ops = {
- 	SET_SYSTEM_SLEEP_PM_OPS(pl022_suspend, pl022_resume)
--	SET_RUNTIME_PM_OPS(pl022_runtime_suspend, pl022_runtime_resume, NULL)
-+	SET_RUNTIME_PM_OPS(pl022_runtime_suspend,
-+			   pl022_runtime_resume,
-+			   pl022_runtime_idle)
- };
- 
- static struct vendor_data vendor_arm = {
--- 
-1.7.5.4
+
+> 2. The GIC is hosed on versatile express. Reverting e3f14d3 ("ARM: gic: add
+>    OF based initialization") and 2071a2a4 ("ARM: gic: add irq_domain support")
+>    allows me to boot again.
+> 
+
+I'll take a look at it today. Do you have more details or a boot log?
+
+Rob
