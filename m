@@ -1,31 +1,32 @@
-From: jhbird.choi@samsung.com (jhbird.choi at samsung.com)
-Date: Wed, 19 Oct 2011 19:24:29 +0900
-Subject: [PATCH] PM / Clocks: Remove redundant NULL checks before kfree()
-Message-ID: <1319019869-6521-1-git-send-email-jhbird.choi@samsung.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 21 Oct 2011 09:22:19 +0200
+Subject: [PATCH] arm/imx: add missing include of asm/exception.h for avic.c
+In-Reply-To: <1319164380-23517-1-git-send-email-shawn.guo@linaro.org>
+References: <1319164380-23517-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20111021072219.GH15299@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jonghwan Choi <jhbird.choi@gmail.com>
+Hello,
 
-Signed-off-by: Jonghwan Choi <jhbird.choi@gmail.com>
----
- drivers/base/power/clock_ops.c |    4 +---
- 1 files changed, 1 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/base/power/clock_ops.c b/drivers/base/power/clock_ops.c
-index b97294e..3ecc303 100644
---- a/drivers/base/power/clock_ops.c
-+++ b/drivers/base/power/clock_ops.c
-@@ -114,9 +114,7 @@ static void __pm_clk_remove(struct pm_clock_entry *ce)
- 			clk_put(ce->clk);
- 	}
- 
--	if (ce->con_id)
--		kfree(ce->con_id);
--
-+	kfree(ce->con_id);
- 	kfree(ce);
- }
- 
+On Fri, Oct 21, 2011 at 10:33:00AM +0800, Shawn Guo wrote:
+> It adds missing include of asm/exception.h for avic.c to fix the
+> compile error below.
+> 
+>   arch/arm/plat-mxc/avic.c:154:39: error: expected ?=?, ?,?, ?;?,
+>   ?asm? or ?__attribute__? before ?avic_handle_irq?
+> 
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+Arnd already posted a patch for that[1], but this one looks better.
+
+Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+
+Best regards
+Uwe
+
+[1] http://mid.gmane.org/1928841.IC5oQhqc6l at wuerfel
+
 -- 
-1.7.1
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
