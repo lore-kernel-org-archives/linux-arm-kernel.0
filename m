@@ -1,102 +1,69 @@
-From: cavokz@gmail.com (Domenico Andreoli)
-Date: Fri, 21 Oct 2011 15:50:23 +0200
-Subject: [PATCH v2] Fix s3c24xx build errors if !CONFIG_PM
-In-Reply-To: <016f01cc8fd5$0dbe40c0$293ac240$%kim@samsung.com>
-References: <20111018105215.GA10230@glitch>
-	<016f01cc8fd5$0dbe40c0$293ac240$%kim@samsung.com>
-Message-ID: <20111021135023.GA30167@glitch>
+From: ulf.hansson@stericsson.com (Ulf Hansson)
+Date: Fri, 21 Oct 2011 16:08:44 +0200
+Subject: [PATCH] spi/pl022: Enable clock in probe an use runtime_idle
+Message-ID: <1319206124-17549-1-git-send-email-ulf.hansson@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Domenico Andreoli <cavokz@gmail.com>
+Since we are always runtime resumed when leaving probe
+the clock must be enabled. To accomplish that we are able
+to be runtime suspended after probe in the case when no
+request is going to be recieved, a runtime_idle function
+has been implemented.
 
-v2:
-- register_syscore_ops(&s3c24xx_irq_syscore_ops) does not need to be
-  conditionally compiled out, it is already optimized out on !CONFIG_PM
-- fix also s3c2412 and s3c2416 affected by the same build issue
-
-v1:
-s3c2440.c fails to build if !CONFIG_PM because in such case
-s3c2410_pm_syscore_ops is not defined. Same error should happen also
-in s3c2410.c and s3c2442.c
-
-Signed-off-by: Domenico Andreoli <cavokz@gmail.com>
-
+Change-Id: I6cb86f2cad30ecaab16f512daf4674b039b18213
+Signed-off-by: Ulf Hansson <ulf.hansson@stericsson.com>
+Reviewed-on: http://gerrit.lud.stericsson.com/gerrit/34447
 ---
- arch/arm/mach-s3c2410/s3c2410.c |    2 ++
- arch/arm/mach-s3c2412/s3c2412.c |    2 ++
- arch/arm/mach-s3c2416/s3c2416.c |    2 ++
- arch/arm/mach-s3c2440/s3c2440.c |    2 ++
- arch/arm/mach-s3c2440/s3c2442.c |    2 ++
- 5 files changed, 10 insertions(+)
+ drivers/spi/spi-pl022.c |   18 +++++++++++++++++-
+ 1 files changed, 17 insertions(+), 1 deletions(-)
 
-Index: b/arch/arm/mach-s3c2410/s3c2410.c
-===================================================================
---- a/arch/arm/mach-s3c2410/s3c2410.c
-+++ b/arch/arm/mach-s3c2410/s3c2410.c
-@@ -170,7 +170,9 @@ int __init s3c2410_init(void)
- {
- 	printk("S3C2410: Initialising architecture\n");
+diff --git a/drivers/spi/spi-pl022.c b/drivers/spi/spi-pl022.c
+index f103e47..ad48fba 100644
+--- a/drivers/spi/spi-pl022.c
++++ b/drivers/spi/spi-pl022.c
+@@ -2184,6 +2184,12 @@ pl022_probe(struct amba_device *adev, const struct amba_id *id)
+ 		goto  err_clk_prep;
+ 	}
  
-+#ifdef CONFIG_PM
- 	register_syscore_ops(&s3c2410_pm_syscore_ops);
-+#endif
- 	register_syscore_ops(&s3c24xx_irq_syscore_ops);
++	status = clk_enable(pl022->clk);
++	if (status) {
++		dev_err(&adev->dev, "could not enable SSP/SPI bus clock\n");
++		goto err_no_clk_en;
++	}
++
+ 	/* Disable SSP */
+ 	writew((readw(SSP_CR1(pl022->virtbase)) & (~SSP_CR1_MASK_SSE)),
+ 	       SSP_CR1(pl022->virtbase));
+@@ -2237,6 +2243,8 @@ pl022_probe(struct amba_device *adev, const struct amba_id *id)
  
- 	return sysdev_register(&s3c2410_sysdev);
-Index: b/arch/arm/mach-s3c2412/s3c2412.c
-===================================================================
---- a/arch/arm/mach-s3c2412/s3c2412.c
-+++ b/arch/arm/mach-s3c2412/s3c2412.c
-@@ -245,7 +245,9 @@ int __init s3c2412_init(void)
- {
- 	printk("S3C2412: Initialising architecture\n");
+ 	free_irq(adev->irq[0], pl022);
+  err_no_irq:
++	clk_disable(pl022->clk);
++ err_no_clk_en:
+ 	clk_unprepare(pl022->clk);
+  err_clk_prep:
+ 	clk_put(pl022->clk);
+@@ -2342,11 +2350,19 @@ static int pl022_runtime_resume(struct device *dev)
  
-+#ifdef CONFIG_PM
- 	register_syscore_ops(&s3c2412_pm_syscore_ops);
-+#endif
- 	register_syscore_ops(&s3c24xx_irq_syscore_ops);
+ 	return 0;
+ }
++
++static int pl022_runtime_idle(struct device *dev)
++{
++	pm_runtime_suspend(dev);
++	return 0;
++}
+ #endif
  
- 	return sysdev_register(&s3c2412_sysdev);
-Index: b/arch/arm/mach-s3c2416/s3c2416.c
-===================================================================
---- a/arch/arm/mach-s3c2416/s3c2416.c
-+++ b/arch/arm/mach-s3c2416/s3c2416.c
-@@ -97,7 +97,9 @@ int __init s3c2416_init(void)
+ static const struct dev_pm_ops pl022_dev_pm_ops = {
+ 	SET_SYSTEM_SLEEP_PM_OPS(pl022_suspend, pl022_resume)
+-	SET_RUNTIME_PM_OPS(pl022_runtime_suspend, pl022_runtime_resume, NULL)
++	SET_RUNTIME_PM_OPS(pl022_runtime_suspend,
++			   pl022_runtime_resume,
++			   pl022_runtime_idle)
+ };
  
- 	s3c_fb_setname("s3c2443-fb");
- 
-+#ifdef CONFIG_PM
- 	register_syscore_ops(&s3c2416_pm_syscore_ops);
-+#endif
- 	register_syscore_ops(&s3c24xx_irq_syscore_ops);
- 
- 	return sysdev_register(&s3c2416_sysdev);
-Index: b/arch/arm/mach-s3c2440/s3c2440.c
-===================================================================
---- a/arch/arm/mach-s3c2440/s3c2440.c
-+++ b/arch/arm/mach-s3c2440/s3c2440.c
-@@ -55,7 +55,9 @@ int __init s3c2440_init(void)
- 
- 	/* register suspend/resume handlers */
- 
-+#ifdef CONFIG_PM
- 	register_syscore_ops(&s3c2410_pm_syscore_ops);
-+#endif
- 	register_syscore_ops(&s3c244x_pm_syscore_ops);
- 	register_syscore_ops(&s3c24xx_irq_syscore_ops);
- 
-Index: b/arch/arm/mach-s3c2440/s3c2442.c
-===================================================================
---- a/arch/arm/mach-s3c2440/s3c2442.c
-+++ b/arch/arm/mach-s3c2440/s3c2442.c
-@@ -169,7 +169,9 @@ int __init s3c2442_init(void)
- {
- 	printk("S3C2442: Initialising architecture\n");
- 
-+#ifdef CONFIG_PM
- 	register_syscore_ops(&s3c2410_pm_syscore_ops);
-+#endif
- 	register_syscore_ops(&s3c244x_pm_syscore_ops);
- 	register_syscore_ops(&s3c24xx_irq_syscore_ops);
- 
+ static struct vendor_data vendor_arm = {
+-- 
+1.7.5.4
