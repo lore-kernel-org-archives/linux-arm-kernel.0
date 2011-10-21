@@ -1,57 +1,55 @@
-From: sales@teliad.com (Frank Dewitt)
-Date: Fri, 21 Oct 2011 18:44:03 +0200
-Subject: Advertising on your site
-Message-ID: <2d07f1e637b486da1f03785132c80998@teliad.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 21 Oct 2011 10:51:08 +0200
+Subject: [GIT PULL] GIC DT binding support
+In-Reply-To: <201110201812.29202.arnd@arndb.de>
+References: <4E97A601.1020005@gmail.com> <4EA03160.1050304@gmail.com>
+	<201110201812.29202.arnd@arndb.de>
+Message-ID: <4024688.X5RT0XjWMI@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Good Afternoon,
+On Thursday 20 October 2011 18:12:28 Arnd Bergmann wrote:
+> I've now rebased your tree on top of 3.1-rc9 plus the stable branches
+> from Russell's tree that I already have as dependencies in arm-soc/for-next
+> (devel-stable, smp, debug). This has caused no conflicts for me, but
+> that doesn't mean that it's correct. Please check that what I have
+> in arm-soc/dt/gic and arm-soc/highbank/soc actually works for you
+> and does not contain branches that you don't actually need.
 
-My name is Frank Dewitt, I am responsible for all English speaking
-markets at teliad, an international service provider in the field of
-Search Engine Optimization (SEO). 
+I needed this patch in the end:
 
-I just came across your site lists.infradead.org and found it very
-interesting.
+8<-----
+ARM: gic: fix build error with CONFIG_IRQ_DOMAIN disabled
 
-We are constantly looking for new publishers who want to make money
-through their website by selling advertising space for text links. Text
-links (pure html backlinks) are a great way to generate a fixed monthly
-income, independent of page views or click rates. Of course, text links
-are fully compatible with any other forms of advertisement (e.g. Google
-AdSense, affiliate programs, etc.).
+In file included from arch/arm/mach-msm/timer.c:26:0:
+asm/hardware/gic.h:42:50: warning: 'struct device_node' declared inside parameter list [enabled by default]
+asm/hardware/gic.h:42:50: warning: its scope is only this definition or declaration, which is probably not what you want [enabled by default]
+asm/hardware/gic.h:58:20: error: field 'domain' has incomplete type
 
-Right now we are experiencing a rapidly growing interest in text link
-advertising on sites like yours and I am confident that it would do
-great on our marketplace. You should be able to generate some immediate
-income. Check out our marketplace and register here: www.teliad.com
-(Registration is free, no obligations involved). Afterwards you can
-simply add your blog to our portfolio, sit back and await booking
-requests.
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+Ok to apply on top?
 
-Should this be of interest, I would certainly be happy to explain
-further. Don't hesitate to give me a call or drop me an email!
-
-Thanks & have a great day!
-
-Best regards,
-
-Frank Dewitt
-
-------------------------------------------------------------------------
-teliad Internetmarketing GmbH | 
-Kreuznacher Str. 62           |
-70372 Stuttgart     	      | Tel. +49 (0)711 231 971 26
-Germany                       | http://www.teliad.com
-
-HRB 720138 Stuttgart Court of First Instance
-CEO: Andreas Armbruster
-------------------------------------------------------------------------
-
-DISCLAIMER: The information contained in this e-mail may be
-confidential
-and/or protected by law. If you are not the intended addressee(s) or
-have received this message in error, please notify the sender
-immediately and delete it from your system. Any unauthorized use,
-distribution, copying or modification of this message and its
-attachments is strictly prohibited.
+diff --git a/arch/arm/include/asm/hardware/gic.h b/arch/arm/include/asm/hardware/gic.h
+index 1a776a1..a06c3ac 100644
+--- a/arch/arm/include/asm/hardware/gic.h
++++ b/arch/arm/include/asm/hardware/gic.h
+@@ -35,6 +35,8 @@
+ #ifndef __ASSEMBLY__
+ #include <linux/irqdomain.h>
+ 
++struct device_node;
++
+ extern void __iomem *gic_cpu_base_addr;
+ extern struct irq_chip gic_arch_extn;
+ 
+@@ -55,7 +57,9 @@ struct gic_chip_data {
+ 	u32 __percpu *saved_ppi_enable;
+ 	u32 __percpu *saved_ppi_conf;
+ #endif
++#ifdef CONFIG_IRQ_DOMAIN
+ 	struct irq_domain domain;
++#endif
+ 	unsigned int gic_irqs;
+ };
+ #endif
