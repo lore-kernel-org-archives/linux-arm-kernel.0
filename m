@@ -1,38 +1,45 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 21 Oct 2011 21:31:46 +0200
-Subject: [GIT PULL] GIC DT binding support
-In-Reply-To: <20111021183352.GI21648@n2100.arm.linux.org.uk>
-References: <4E97A601.1020005@gmail.com> <2901028.94TxBXiCYq@wuerfel>
-	<20111021183352.GI21648@n2100.arm.linux.org.uk>
-Message-ID: <2460374.AAkEFv9LMo@wuerfel>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Sat, 22 Oct 2011 04:45:44 +0900
+Subject: [GIT PULL] Samsung Fixes for v3.1
+Message-ID: <4EA1CBE8.9090500@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 21 October 2011 19:33:52 Russell King - ARM Linux wrote:
-> On Thu, Oct 20, 2011 at 11:04:35PM +0200, Arnd Bergmann wrote:
-> > I'm not sure if I used the intended process to get at those branches.
-> > Since they are not published on ftp.arm.linux.org.uk as separate branches,
-> > I looked at the big merge changeset in the for-next branch and recreated
-> > the branches I needed, which feels like I'm doing something that wasn't
-> > your intention. Is there a better way?
-> 
-> The best way is to say "Hey, my work depends on X, Y, Z" and I'll see
-> what can be done to make them stable and say whether they are ripe
-> for that yet (or, eg, whether they're waiting for peoples acks.)
-> 
-> It's actually what I documented a while ago at
-> http://www.arm.linux.org.uk/developer/git-arm.php
+Hi Linus,
 
-Ok, that is a very useful documentation, but the part I still don't
-understand is how I should get the commit ID of the stable branches.
-I noticed that you are publishing an l2x0 branch now, in addition
-to the pm and smp branches that were already there the last time
-I looked, but you don't publish the gpio, io and debug branches
-that I have pulled into the arm-soc/next-soc branch because imx6 and
-highbank depend on them.
+These things are needed for v3.1 and I believe this is last one for v3.1 
+Samsung stuff.
 
-Does that mean you don't consider the latter three branches stable
-yet, or does it just mean they are stable but you had no reason
-to publish them?
+Please pull from:
+   git://github.com/kgene/linux-samsung.git samsung-fixes-4
 
-	Arnd
+If any problems, please kindly let me know.
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
+
+The following changes since commit 899e3ee404961a90b828ad527573aaaac39f0ab1:
+
+   Linux 3.1-rc10 (2011-10-17 21:06:23 -0700)
+
+are available in the git repository at:
+   git://github.com/kgene/linux-samsung.git samsung-fixes-4
+
+Domenico Andreoli (1):
+       ARM: S3C24XX: Fix s3c24xx build errors if !CONFIG_PM
+
+Marek Szyprowski (1):
+       ARM: S5P: fix offset calculation on gpio-interrupt
+
+  arch/arm/mach-s3c2410/s3c2410.c |    2 ++
+  arch/arm/mach-s3c2412/s3c2412.c |    2 ++
+  arch/arm/mach-s3c2416/s3c2416.c |    2 ++
+  arch/arm/mach-s3c2440/s3c2440.c |    2 ++
+  arch/arm/mach-s3c2440/s3c2442.c |    2 ++
+  arch/arm/plat-s5p/irq-gpioint.c |    6 +++---
+  6 files changed, 13 insertions(+), 3 deletions(-)
