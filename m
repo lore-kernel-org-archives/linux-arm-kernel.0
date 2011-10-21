@@ -1,50 +1,35 @@
-From: vaibhav.bedia@ti.com (Bedia, Vaibhav)
-Date: Fri, 21 Oct 2011 15:40:21 +0530
-Subject: [PATCH 1/2] [ARM] mach-types: Re-add apf9328
-In-Reply-To: <20111017084421.GD21648@n2100.arm.linux.org.uk>
-References: <1318087189-22977-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
-	<20111008192621.GA28049@pengutronix.de>
-	<20111008220722.GG25689@n2100.arm.linux.org.uk>
-	<20111013090609.GT577@pengutronix.de>
-	<20111017084421.GD21648@n2100.arm.linux.org.uk>
-Message-ID: <FCCFB4CDC6E5564B9182F639FC35608711EF9769EC@dbde02.ent.ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 21 Oct 2011 11:59:41 +0100
+Subject: [GIT PULL] DEBUG_LL platform updates for 3.2
+In-Reply-To: <201110201657.51810.arnd@arndb.de>
+References: <20110928103815.GA8344@e102144-lin.cambridge.arm.com>
+	<20111017082506.GC21648@n2100.arm.linux.org.uk>
+	<20111017092342.GB2459@mudshark.cambridge.arm.com>
+	<201110201657.51810.arnd@arndb.de>
+Message-ID: <20111021105941.GE30168@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+Hi Arnd,
 
-> -----Original Message-----
-> From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-
-> arm-kernel-bounces at lists.infradead.org] On Behalf Of Russell King -
-> ARM Linux
-> Sent: Monday, October 17, 2011 2:14 PM
-> To: Uwe Kleine-K?nig
-> Cc: Sascha Hauer; Wolfram Sang; linux-arm-
-> kernel at lists.infradead.org; Gwenhael Goavec-Merou
-> Subject: Re: [PATCH 1/2] [ARM] mach-types: Re-add apf9328
-> 
-[...] 
-> >
-> > BTW is there a way to see the mach-types file as it would land in
-> > linux.git if it were updated now?
-> 
-> http://www.arm.linux.org.uk/developer/machines/download.php?q=1
-> 
-> will be the exact file if I were to update it right now (that's the
-> URL it's retrieved from.)
-> 
+On Thu, Oct 20, 2011 at 03:57:49PM +0100, Arnd Bergmann wrote:
+> Ok, thanks a lot. I've updated my branches now and recreated
+> the for-next branch with these. Can you have a look to make sure
+> that everything looks good there now?
 
-I had registered a new mach-id for Texas Instruments' AM335X processor
-http://www.arm.linux.org.uk/developer/machines/list.php?id=3589
+The cpu mapping and debug-ll stuff all looks good to me, thanks. On the
+downside, I'm seeing a couple of problems with your for-next branch:
 
-I had given the machine name as " TI AM335 EVM", the machine type as "am335xevm" 
-and the directory suffix as "omap".
+1. I can't compile if !CONFIG_OF, because l2x0_init isn't declared in
+   cache-l2x0.h. There seems to be some broken ifdeffery because of
+   what looks like duplicate commits d94527dd and 5260f15b, although
+   they are slightly different (and actually, both look broken to me
+   anyway!).
 
-The type macro (machine_is_am335xevm()) and the Kconfig macro (CONFIG_MACH_AM335XEVM) are correct. 
-But the machine type variable for this is showing up as incorrect. 
-Instead of MACH_TYPE_AM335XEVM it is shown as MACH_TYPE_AM355XEVM.
-                        ^^                                 ^^
-Since the machine type variable is auto-generated can you please tell me what could have gone wrong and how to fix it?
+2. The GIC is hosed on versatile express. Reverting e3f14d3 ("ARM: gic: add
+   OF based initialization") and 2071a2a4 ("ARM: gic: add irq_domain support")
+   allows me to boot again.
 
-Regards,
-Vaibhav
+Cheers,
+
+Will
