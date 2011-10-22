@@ -1,39 +1,72 @@
-From: Josh.wu@atmel.com (Wu, Josh)
-Date: Sat, 22 Oct 2011 14:41:08 +0800
-Subject: [PATCH v4 1/3] [media] at91: add code to enable/disable ISI_MCK
-	clock
-In-Reply-To: <Pine.LNX.4.64.1110171702370.18438@axis700.grange>
-References: <1318331020-22031-1-git-send-email-josh.wu@atmel.com>
-	<1318331020-22031-2-git-send-email-josh.wu@atmel.com>
-	<Pine.LNX.4.64.1110171702370.18438@axis700.grange>
-Message-ID: <4C79549CB6F772498162A641D92D5328031B11E0@penmb01.corp.atmel.com>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Sat, 22 Oct 2011 15:17:39 +0800
+Subject: [RESEND][PATCH v4 2/3] at91: add parameters for at91_add_device_isi
+	function
+Message-ID: <1319267860-32367-1-git-send-email-josh.wu@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Guennadi
+Signed-off-by: Josh Wu <josh.wu@atmel.com>
+---
+fix codeing style
+using bool instead of int for boolean type
 
-On Monday, October 17, 2011 11:04 PM, Guennadi Liakhovetski wrote:
 
-> From: Josh Wu <josh.wu@atmel.com>
->
-> This patch
-> - add ISI_MCK clock enable/disable code.
-> - change field name in isi_platform_data structure
->
-> Signed-off-by: Josh Wu <josh.wu@atmel.com>
-> [g.liakhovetski at gmx.de: fix label names]
-> Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
-> ---
+ arch/arm/mach-at91/at91sam9263_devices.c |   13 ++++++++++---
+ arch/arm/mach-at91/include/mach/board.h  |    4 +++-
+ 2 files changed, 13 insertions(+), 4 deletions(-)
 
-> Josh, I missed a slight hick-up in the previous version of this your 
-> patch, so, I fixed it myself. Please confirm, that this version is ok
-with 
-> you.
-
-> Thanks
-> Guennadi
-
-I confirm that the patch is ok for me. Thank you.
-
-Best Regards,
-Josh Wu
+diff --git a/arch/arm/mach-at91/at91sam9263_devices.c b/arch/arm/mach-at91/at91sam9263_devices.c
+index a050f41..29d5c01 100644
+--- a/arch/arm/mach-at91/at91sam9263_devices.c
++++ b/arch/arm/mach-at91/at91sam9263_devices.c
+@@ -885,7 +885,8 @@ static struct platform_device at91sam9263_isi_device = {
+ 	.num_resources	= ARRAY_SIZE(isi_resources),
+ };
+ 
+-void __init at91_add_device_isi(void)
++void __init at91_add_device_isi(struct isi_platform_data *data,
++		bool use_pck_as_mck)
+ {
+ 	at91_set_A_periph(AT91_PIN_PE0, 0);	/* ISI_D0 */
+ 	at91_set_A_periph(AT91_PIN_PE1, 0);	/* ISI_D1 */
+@@ -898,14 +899,20 @@ void __init at91_add_device_isi(void)
+ 	at91_set_A_periph(AT91_PIN_PE8, 0);	/* ISI_PCK */
+ 	at91_set_A_periph(AT91_PIN_PE9, 0);	/* ISI_HSYNC */
+ 	at91_set_A_periph(AT91_PIN_PE10, 0);	/* ISI_VSYNC */
+-	at91_set_B_periph(AT91_PIN_PE11, 0);	/* ISI_MCK (PCK3) */
+ 	at91_set_B_periph(AT91_PIN_PE12, 0);	/* ISI_PD8 */
+ 	at91_set_B_periph(AT91_PIN_PE13, 0);	/* ISI_PD9 */
+ 	at91_set_B_periph(AT91_PIN_PE14, 0);	/* ISI_PD10 */
+ 	at91_set_B_periph(AT91_PIN_PE15, 0);	/* ISI_PD11 */
++
++	if (use_pck_as_mck) {
++		at91_set_B_periph(AT91_PIN_PE11, 0);	/* ISI_MCK (PCK3) */
++
++		/* TODO: register the PCK for ISI_MCK and set its parent */
++	}
+ }
+ #else
+-void __init at91_add_device_isi(void) {}
++void __init at91_add_device_isi(struct isi_platform_data *data,
++		bool use_pck_as_mck) {}
+ #endif
+ 
+ 
+diff --git a/arch/arm/mach-at91/include/mach/board.h b/arch/arm/mach-at91/include/mach/board.h
+index ed544a0..731c449 100644
+--- a/arch/arm/mach-at91/include/mach/board.h
++++ b/arch/arm/mach-at91/include/mach/board.h
+@@ -183,7 +183,9 @@ extern void __init at91_add_device_lcdc(struct atmel_lcdfb_info *data);
+ extern void __init at91_add_device_ac97(struct ac97c_platform_data *data);
+ 
+  /* ISI */
+-extern void __init at91_add_device_isi(void);
++struct isi_platform_data;
++extern void __init at91_add_device_isi(struct isi_platform_data *data,
++		bool use_pck_as_mck);
+ 
+  /* Touchscreen Controller */
+ struct at91_tsadcc_data {
+-- 
+1.6.3.3
