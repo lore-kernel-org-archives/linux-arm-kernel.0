@@ -1,44 +1,34 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Sat, 22 Oct 2011 08:58:01 +0800
-Subject: [GIT PULL] i.MX6Q support
-In-Reply-To: <20111021180158.GI23421@pengutronix.de>
-References: <20111020171158.GJ32007@S2100-06.ap.freescale.net>
-	<20111020211834.GF21648@n2100.arm.linux.org.uk>
-	<109937284.AlYUSiDe0P@wuerfel>
-	<20111021180158.GI23421@pengutronix.de>
-Message-ID: <20111022005800.GC337@S2100-06.ap.freescale.net>
+From: horms@verge.net.au (Simon Horman)
+Date: Sat, 22 Oct 2011 11:20:16 +0900
+Subject: Possible regression in kexec on ARM ARMv6 and ARMv7 cores
+In-Reply-To: <20111021091524.GB30168@mudshark.cambridge.arm.com>
+References: <20111020042444.GA20260@verge.net.au>
+	<20111020070105.GA28548@mudshark.cambridge.arm.com>
+	<20111020080823.GA2716@verge.net.au>
+	<20111021083426.GA16088@verge.net.au>
+	<20111021084641.GA30168@mudshark.cambridge.arm.com>
+	<20111021085958.GC21850@verge.net.au>
+	<20111021091524.GB30168@mudshark.cambridge.arm.com>
+Message-ID: <20111022022016.GA9208@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 21, 2011 at 08:01:58PM +0200, Sascha Hauer wrote:
-> On Fri, Oct 21, 2011 at 12:23:33AM +0200, Arnd Bergmann wrote:
-> > On Thursday 20 October 2011 22:18:34 Russell King - ARM Linux wrote:
-> > > On Fri, Oct 21, 2011 at 01:11:59AM +0800, Shawn Guo wrote:
-> > > > Please pull imx6q series.  It's based on v3.1-rc10 with the following
-> > > > branches merged plus a number of cache-l2x0 patches currently sitting
-> > > > on rmk/for-next.
-> > > 
-> > > Don't do that.  If there's something you need, ask me.  The L2x0
-> > > patches got shuffled out into their own branch when the SMP and debug
-> > > patches got split out of the 'misc' branch.
+On Fri, Oct 21, 2011 at 10:15:24AM +0100, Will Deacon wrote:
+> On Fri, Oct 21, 2011 at 09:59:58AM +0100, Simon Horman wrote:
+> > On Fri, Oct 21, 2011 at 09:46:41AM +0100, Will Deacon wrote:
+> > > The more difficult case is when you want to offline the secondary CPUs into
+> > > a pen and then boot them in the new kernel. I did get some of this working,
+> > > but there are outstanding issues with whether the pen should be at a fixed
+> > > location or not. If not, then we need a way to tell the new kernel where it
+> > > is, which may involve updating the DT blob...
 > > 
-> > Since I already had the branches at hand for the highbank tree, I
-> > gave this a go and rebased the imx6q branch on top of the stable branches
-> > that are there and confirmed that it actually builds.
-> > 
-> > I have pulled the result into the next/soc branch along with highbank
-> > and picoxcell.
-> > 
-> > Shawn and Sascha, can you confirm that this is correct?
+> > Is the implication that the (working) callback method does not
+> > give the second kernel any secondary CPUs?
 > 
-> Adding the following at least gives a compilable result. Works on i.MX3,
-> I couldn't test on i.MX6 though.
+> What the callback does it up to you. You just need to make sure that you can
+> cope with the kernel disappearing later on, so you'll probably need some
+> hardware mechanism for offlining a CPU (for example, placing it in SRAM
+> or cutting the power).
 
-It works for imx6q.
-
--- 
-Regards,
-Shawn
-
-> BTW your patch exporting imx_ioremap is
-> missing in your for-next branch.
+Thanks, it seems that I now have a bit of work to do implementing
+a callback.
