@@ -1,9 +1,9 @@
 From: yong.zhang0@gmail.com (Yong Zhang)
-Date: Sat, 22 Oct 2011 17:56:44 +0800
-Subject: [PATCH 32/49] media: irq: Remove IRQF_DISABLED
+Date: Sat, 22 Oct 2011 17:56:54 +0800
+Subject: [PATCH 42/49] rtc: irq: Remove IRQF_DISABLED
 In-Reply-To: <1319277421-9203-1-git-send-email-yong.zhang0@gmail.com>
 References: <1319277421-9203-1-git-send-email-yong.zhang0@gmail.com>
-Message-ID: <1319277421-9203-33-git-send-email-yong.zhang0@gmail.com>
+Message-ID: <1319277421-9203-43-git-send-email-yong.zhang0@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -16,328 +16,404 @@ genirq: Warn when handler enables interrupts]).
 So now this flag is a NOOP and can be removed.
 
 Signed-off-by: Yong Zhang <yong.zhang0@gmail.com>
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Acked-by: Wan ZongShun <mcuos.com@gmail.com>
 Acked-by: Wolfram Sang <w.sang@pengutronix.de>
-Acked-by: Mauro Carvalho Chehab <mchehab@redhat.com>
 ---
- drivers/media/common/saa7146_core.c        |    2 +-
- drivers/media/dvb/bt8xx/bt878.c            |    2 +-
- drivers/media/radio/si4713-i2c.c           |    2 +-
- drivers/media/rc/winbond-cir.c             |    2 +-
- drivers/media/video/bt8xx/bttv-driver.c    |    2 +-
- drivers/media/video/cx18/cx18-driver.c     |    2 +-
- drivers/media/video/cx23885/cx23885-core.c |    2 +-
- drivers/media/video/cx88/cx88-alsa.c       |    2 +-
- drivers/media/video/cx88/cx88-mpeg.c       |    2 +-
- drivers/media/video/cx88/cx88-video.c      |    2 +-
- drivers/media/video/davinci/vpbe_display.c |    2 +-
- drivers/media/video/davinci/vpfe_capture.c |    4 ++--
- drivers/media/video/davinci/vpif_capture.c |    2 +-
- drivers/media/video/davinci/vpif_display.c |    2 +-
- drivers/media/video/ivtv/ivtv-driver.c     |    2 +-
- drivers/media/video/meye.c                 |    2 +-
- drivers/media/video/s5p-mfc/s5p_mfc.c      |    3 +--
- drivers/media/video/saa7134/saa7134-alsa.c |    2 +-
- drivers/media/video/saa7134/saa7134-core.c |    2 +-
- drivers/media/video/saa7164/saa7164-core.c |    2 +-
- drivers/media/video/sh_mobile_ceu_camera.c |    2 +-
- drivers/media/video/zoran/zoran_card.c     |    2 +-
- 22 files changed, 23 insertions(+), 24 deletions(-)
+ drivers/rtc/rtc-at91sam9.c  |    2 +-
+ drivers/rtc/rtc-cmos.c      |    2 +-
+ drivers/rtc/rtc-coh901331.c |    2 +-
+ drivers/rtc/rtc-davinci.c   |    2 +-
+ drivers/rtc/rtc-ds1511.c    |    2 +-
+ drivers/rtc/rtc-ds1553.c    |    2 +-
+ drivers/rtc/rtc-lpc32xx.c   |    2 +-
+ drivers/rtc/rtc-mpc5121.c   |    4 ++--
+ drivers/rtc/rtc-mrst.c      |    2 +-
+ drivers/rtc/rtc-mv.c        |    2 +-
+ drivers/rtc/rtc-nuc900.c    |    2 +-
+ drivers/rtc/rtc-omap.c      |    4 ++--
+ drivers/rtc/rtc-pl030.c     |    2 +-
+ drivers/rtc/rtc-pl031.c     |    2 +-
+ drivers/rtc/rtc-puv3.c      |    4 ++--
+ drivers/rtc/rtc-pxa.c       |    4 ++--
+ drivers/rtc/rtc-s3c.c       |    4 ++--
+ drivers/rtc/rtc-sa1100.c    |    4 ++--
+ drivers/rtc/rtc-sh.c        |    8 ++++----
+ drivers/rtc/rtc-stk17ta8.c  |    2 +-
+ drivers/rtc/rtc-tx4939.c    |    2 +-
+ drivers/rtc/rtc-vr41xx.c    |    4 ++--
+ 22 files changed, 32 insertions(+), 32 deletions(-)
 
-diff --git a/drivers/media/common/saa7146_core.c b/drivers/media/common/saa7146_core.c
-index d6b1cf6..dc8bf5e 100644
---- a/drivers/media/common/saa7146_core.c
-+++ b/drivers/media/common/saa7146_core.c
-@@ -414,7 +414,7 @@ static int saa7146_init_one(struct pci_dev *pci, const struct pci_device_id *ent
- 	saa7146_write(dev, MC2, 0xf8000000);
+diff --git a/drivers/rtc/rtc-at91sam9.c b/drivers/rtc/rtc-at91sam9.c
+index a3ad957..0c09e8f 100644
+--- a/drivers/rtc/rtc-at91sam9.c
++++ b/drivers/rtc/rtc-at91sam9.c
+@@ -331,7 +331,7 @@ static int __init at91_rtc_probe(struct platform_device *pdev)
  
- 	/* request an interrupt for the saa7146 */
--	err = request_irq(pci->irq, interrupt_hw, IRQF_SHARED | IRQF_DISABLED,
-+	err = request_irq(pci->irq, interrupt_hw, IRQF_SHARED,
- 			  dev->name, dev);
- 	if (err < 0) {
- 		ERR("request_irq() failed\n");
-diff --git a/drivers/media/dvb/bt8xx/bt878.c b/drivers/media/dvb/bt8xx/bt878.c
-index b34fa95..d6d78df 100644
---- a/drivers/media/dvb/bt8xx/bt878.c
-+++ b/drivers/media/dvb/bt8xx/bt878.c
-@@ -489,7 +489,7 @@ static int __devinit bt878_probe(struct pci_dev *dev,
- 	btwrite(0, BT848_INT_MASK);
- 
- 	result = request_irq(bt->irq, bt878_irq,
--			     IRQF_SHARED | IRQF_DISABLED, "bt878",
-+			     IRQF_SHARED, "bt878",
- 			     (void *) bt);
- 	if (result == -EINVAL) {
- 		printk(KERN_ERR "bt878(%d): Bad irq number or handler\n",
-diff --git a/drivers/media/radio/si4713-i2c.c b/drivers/media/radio/si4713-i2c.c
-index 27aba93..5d48210 100644
---- a/drivers/media/radio/si4713-i2c.c
-+++ b/drivers/media/radio/si4713-i2c.c
-@@ -2036,7 +2036,7 @@ static int si4713_probe(struct i2c_client *client,
- 
- 	if (client->irq) {
- 		rval = request_irq(client->irq,
--			si4713_handler, IRQF_TRIGGER_FALLING | IRQF_DISABLED,
-+			si4713_handler, IRQF_TRIGGER_FALLING,
- 			client->name, sdev);
- 		if (rval < 0) {
- 			v4l2_err(&sdev->sd, "Could not request IRQ\n");
-diff --git a/drivers/media/rc/winbond-cir.c b/drivers/media/rc/winbond-cir.c
-index 13f54b5..2a33b8e 100644
---- a/drivers/media/rc/winbond-cir.c
-+++ b/drivers/media/rc/winbond-cir.c
-@@ -1013,7 +1013,7 @@ wbcir_probe(struct pnp_dev *device, const struct pnp_device_id *dev_id)
- 	}
- 
- 	err = request_irq(data->irq, wbcir_irq_handler,
--			  IRQF_DISABLED, DRVNAME, device);
-+			  0, DRVNAME, device);
- 	if (err) {
- 		dev_err(dev, "Failed to claim IRQ %u\n", data->irq);
- 		err = -EBUSY;
-diff --git a/drivers/media/video/bt8xx/bttv-driver.c b/drivers/media/video/bt8xx/bttv-driver.c
-index 3dd0660..966d57f 100644
---- a/drivers/media/video/bt8xx/bttv-driver.c
-+++ b/drivers/media/video/bt8xx/bttv-driver.c
-@@ -4336,7 +4336,7 @@ static int __devinit bttv_probe(struct pci_dev *dev,
- 	/* disable irqs, register irq handler */
- 	btwrite(0, BT848_INT_MASK);
- 	result = request_irq(btv->c.pci->irq, bttv_irq,
--	    IRQF_SHARED | IRQF_DISABLED, btv->c.v4l2_dev.name, (void *)btv);
-+	    IRQF_SHARED, btv->c.v4l2_dev.name, (void *)btv);
- 	if (result < 0) {
- 		pr_err("%d: can't get IRQ %d\n",
- 		       bttv_num, btv->c.pci->irq);
-diff --git a/drivers/media/video/cx18/cx18-driver.c b/drivers/media/video/cx18/cx18-driver.c
-index 9e2f870..185221a 100644
---- a/drivers/media/video/cx18/cx18-driver.c
-+++ b/drivers/media/video/cx18/cx18-driver.c
-@@ -1031,7 +1031,7 @@ static int __devinit cx18_probe(struct pci_dev *pci_dev,
- 
- 	/* Register IRQ */
- 	retval = request_irq(cx->pci_dev->irq, cx18_irq_handler,
--			     IRQF_SHARED | IRQF_DISABLED,
-+			     IRQF_SHARED,
- 			     cx->v4l2_dev.name, (void *)cx);
- 	if (retval) {
- 		CX18_ERR("Failed to register irq %d\n", retval);
-diff --git a/drivers/media/video/cx23885/cx23885-core.c b/drivers/media/video/cx23885/cx23885-core.c
-index ee41a88..84464f5 100644
---- a/drivers/media/video/cx23885/cx23885-core.c
-+++ b/drivers/media/video/cx23885/cx23885-core.c
-@@ -2062,7 +2062,7 @@ static int __devinit cx23885_initdev(struct pci_dev *pci_dev,
- 	}
- 
- 	err = request_irq(pci_dev->irq, cx23885_irq,
--			  IRQF_SHARED | IRQF_DISABLED, dev->name, dev);
-+			  IRQF_SHARED, dev->name, dev);
- 	if (err < 0) {
- 		printk(KERN_ERR "%s: can't get IRQ %d\n",
- 		       dev->name, pci_dev->irq);
-diff --git a/drivers/media/video/cx88/cx88-alsa.c b/drivers/media/video/cx88/cx88-alsa.c
-index 68d1240..fd0c6b3 100644
---- a/drivers/media/video/cx88/cx88-alsa.c
-+++ b/drivers/media/video/cx88/cx88-alsa.c
-@@ -849,7 +849,7 @@ static int __devinit snd_cx88_create(struct snd_card *card,
- 
- 	/* get irq */
- 	err = request_irq(chip->pci->irq, cx8801_irq,
--			  IRQF_SHARED | IRQF_DISABLED, chip->core->name, chip);
-+			  IRQF_SHARED, chip->core->name, chip);
- 	if (err < 0) {
- 		dprintk(0, "%s: can't get IRQ %d\n",
- 		       chip->core->name, chip->pci->irq);
-diff --git a/drivers/media/video/cx88/cx88-mpeg.c b/drivers/media/video/cx88/cx88-mpeg.c
-index cd5386e..3488efc 100644
---- a/drivers/media/video/cx88/cx88-mpeg.c
-+++ b/drivers/media/video/cx88/cx88-mpeg.c
-@@ -497,7 +497,7 @@ static int cx8802_init_common(struct cx8802_dev *dev)
- 
- 	/* get irq */
- 	err = request_irq(dev->pci->irq, cx8802_irq,
--			  IRQF_SHARED | IRQF_DISABLED, dev->core->name, dev);
-+			  IRQF_SHARED, dev->core->name, dev);
- 	if (err < 0) {
- 		printk(KERN_ERR "%s: can't get IRQ %d\n",
- 		       dev->core->name, dev->pci->irq);
-diff --git a/drivers/media/video/cx88/cx88-video.c b/drivers/media/video/cx88/cx88-video.c
-index 921c56d..1f5d12c 100644
---- a/drivers/media/video/cx88/cx88-video.c
-+++ b/drivers/media/video/cx88/cx88-video.c
-@@ -1917,7 +1917,7 @@ static int __devinit cx8800_initdev(struct pci_dev *pci_dev,
- 
- 	/* get irq */
- 	err = request_irq(pci_dev->irq, cx8800_irq,
--			  IRQF_SHARED | IRQF_DISABLED, core->name, dev);
-+			  IRQF_SHARED, core->name, dev);
- 	if (err < 0) {
- 		printk(KERN_ERR "%s/0: can't get IRQ %d\n",
- 		       core->name,pci_dev->irq);
-diff --git a/drivers/media/video/davinci/vpbe_display.c b/drivers/media/video/davinci/vpbe_display.c
-index 8588a86..32ea582 100644
---- a/drivers/media/video/davinci/vpbe_display.c
-+++ b/drivers/media/video/davinci/vpbe_display.c
-@@ -1735,7 +1735,7 @@ static __devinit int vpbe_display_probe(struct platform_device *pdev)
- 	}
- 
- 	irq = res->start;
--	if (request_irq(irq, venc_isr,  IRQF_DISABLED, VPBE_DISPLAY_DRIVER,
-+	if (request_irq(irq, venc_isr,  0, VPBE_DISPLAY_DRIVER,
- 		disp_dev)) {
- 		v4l2_err(&disp_dev->vpbe_dev->v4l2_dev,
- 				"Unable to request interrupt\n");
-diff --git a/drivers/media/video/davinci/vpfe_capture.c b/drivers/media/video/davinci/vpfe_capture.c
-index 5b38fc9..adb7c5c 100644
---- a/drivers/media/video/davinci/vpfe_capture.c
-+++ b/drivers/media/video/davinci/vpfe_capture.c
-@@ -691,7 +691,7 @@ static int vpfe_attach_irq(struct vpfe_device *vpfe_dev)
- 	frame_format = ccdc_dev->hw_ops.get_frame_format();
- 	if (frame_format == CCDC_FRMFMT_PROGRESSIVE) {
- 		return request_irq(vpfe_dev->ccdc_irq1, vdint1_isr,
--				    IRQF_DISABLED, "vpfe_capture1",
-+				    0, "vpfe_capture1",
- 				    vpfe_dev);
- 	}
- 	return 0;
-@@ -1898,7 +1898,7 @@ static __init int vpfe_probe(struct platform_device *pdev)
- 	}
- 	vpfe_dev->ccdc_irq1 = res1->start;
- 
--	ret = request_irq(vpfe_dev->ccdc_irq0, vpfe_isr, IRQF_DISABLED,
-+	ret = request_irq(vpfe_dev->ccdc_irq0, vpfe_isr, 0,
- 			  "vpfe_capture0", vpfe_dev);
- 
- 	if (0 != ret) {
-diff --git a/drivers/media/video/davinci/vpif_capture.c b/drivers/media/video/davinci/vpif_capture.c
-index 49e4deb..f2785aa 100644
---- a/drivers/media/video/davinci/vpif_capture.c
-+++ b/drivers/media/video/davinci/vpif_capture.c
-@@ -2180,7 +2180,7 @@ static __init int vpif_probe(struct platform_device *pdev)
- 	k = 0;
- 	while ((res = platform_get_resource(pdev, IORESOURCE_IRQ, k))) {
- 		for (i = res->start; i <= res->end; i++) {
--			if (request_irq(i, vpif_channel_isr, IRQF_DISABLED,
-+			if (request_irq(i, vpif_channel_isr, 0,
- 					"DM646x_Capture",
- 				(void *)(&vpif_obj.dev[k]->channel_id))) {
- 				err = -EBUSY;
-diff --git a/drivers/media/video/davinci/vpif_display.c b/drivers/media/video/davinci/vpif_display.c
-index 286f029..7cd4fe8 100644
---- a/drivers/media/video/davinci/vpif_display.c
-+++ b/drivers/media/video/davinci/vpif_display.c
-@@ -1708,7 +1708,7 @@ static __init int vpif_probe(struct platform_device *pdev)
- 	k = 0;
- 	while ((res = platform_get_resource(pdev, IORESOURCE_IRQ, k))) {
- 		for (i = res->start; i <= res->end; i++) {
--			if (request_irq(i, vpif_channel_isr, IRQF_DISABLED,
-+			if (request_irq(i, vpif_channel_isr, 0,
- 					"DM646x_Display",
- 				(void *)(&vpif_obj.dev[k]->channel_id))) {
- 				err = -EBUSY;
-diff --git a/drivers/media/video/ivtv/ivtv-driver.c b/drivers/media/video/ivtv/ivtv-driver.c
-index 0fb7552..a787082 100644
---- a/drivers/media/video/ivtv/ivtv-driver.c
-+++ b/drivers/media/video/ivtv/ivtv-driver.c
-@@ -1213,7 +1213,7 @@ static int __devinit ivtv_probe(struct pci_dev *pdev,
- 
- 	/* Register IRQ */
- 	retval = request_irq(itv->pdev->irq, ivtv_irq_handler,
--	     IRQF_SHARED | IRQF_DISABLED, itv->v4l2_dev.name, (void *)itv);
-+	     IRQF_SHARED, itv->v4l2_dev.name, (void *)itv);
- 	if (retval) {
- 		IVTV_ERR("Failed to register irq %d\n", retval);
- 		goto free_i2c;
-diff --git a/drivers/media/video/meye.c b/drivers/media/video/meye.c
-index b09a3c8..d4d8db2 100644
---- a/drivers/media/video/meye.c
-+++ b/drivers/media/video/meye.c
-@@ -1807,7 +1807,7 @@ static int __devinit meye_probe(struct pci_dev *pcidev,
- 
- 	meye.mchip_irq = pcidev->irq;
- 	if (request_irq(meye.mchip_irq, meye_irq,
--			IRQF_DISABLED | IRQF_SHARED, "meye", meye_irq)) {
-+			IRQF_SHARED, "meye", meye_irq)) {
- 		v4l2_err(v4l2_dev, "request_irq failed\n");
- 		goto outreqirq;
- 	}
-diff --git a/drivers/media/video/s5p-mfc/s5p_mfc.c b/drivers/media/video/s5p-mfc/s5p_mfc.c
-index 8be8b54..db6f34d 100644
---- a/drivers/media/video/s5p-mfc/s5p_mfc.c
-+++ b/drivers/media/video/s5p-mfc/s5p_mfc.c
-@@ -998,8 +998,7 @@ static int s5p_mfc_probe(struct platform_device *pdev)
- 		goto err_get_res;
- 	}
- 	dev->irq = res->start;
--	ret = request_irq(dev->irq, s5p_mfc_irq, IRQF_DISABLED, pdev->name,
--									dev);
-+	ret = request_irq(dev->irq, s5p_mfc_irq, 0, pdev->name, dev);
+ 	/* register irq handler after we know what name we'll use */
+ 	ret = request_irq(AT91_ID_SYS, at91_rtc_interrupt,
+-				IRQF_DISABLED | IRQF_SHARED,
++				IRQF_SHARED,
+ 				dev_name(&rtc->rtcdev->dev), rtc);
  	if (ret) {
- 		dev_err(&pdev->dev, "Failed to install irq (%d)\n", ret);
- 		goto err_req_irq;
-diff --git a/drivers/media/video/saa7134/saa7134-alsa.c b/drivers/media/video/saa7134/saa7134-alsa.c
-index 10460fd..95df27e 100644
---- a/drivers/media/video/saa7134/saa7134-alsa.c
-+++ b/drivers/media/video/saa7134/saa7134-alsa.c
-@@ -1094,7 +1094,7 @@ static int alsa_card_saa7134_create(struct saa7134_dev *dev, int devnum)
+ 		dev_dbg(&pdev->dev, "can't share IRQ %d?\n", AT91_ID_SYS);
+diff --git a/drivers/rtc/rtc-cmos.c b/drivers/rtc/rtc-cmos.c
+index 05beb6c..66d3b14 100644
+--- a/drivers/rtc/rtc-cmos.c
++++ b/drivers/rtc/rtc-cmos.c
+@@ -714,7 +714,7 @@ cmos_do_probe(struct device *dev, struct resource *ports, int rtc_irq)
+ 			rtc_cmos_int_handler = cmos_interrupt;
  
- 
- 	err = request_irq(dev->pci->irq, saa7134_alsa_irq,
--				IRQF_SHARED | IRQF_DISABLED, dev->name,
-+				IRQF_SHARED, dev->name,
- 				(void*) &dev->dmasound);
- 
- 	if (err < 0) {
-diff --git a/drivers/media/video/saa7134/saa7134-core.c b/drivers/media/video/saa7134/saa7134-core.c
-index ca65cda..259eced 100644
---- a/drivers/media/video/saa7134/saa7134-core.c
-+++ b/drivers/media/video/saa7134/saa7134-core.c
-@@ -992,7 +992,7 @@ static int __devinit saa7134_initdev(struct pci_dev *pci_dev,
- 
- 	/* get irq */
- 	err = request_irq(pci_dev->irq, saa7134_irq,
--			  IRQF_SHARED | IRQF_DISABLED, dev->name, dev);
-+			  IRQF_SHARED, dev->name, dev);
- 	if (err < 0) {
- 		printk(KERN_ERR "%s: can't get IRQ %d\n",
- 		       dev->name,pci_dev->irq);
-diff --git a/drivers/media/video/saa7164/saa7164-core.c b/drivers/media/video/saa7164/saa7164-core.c
-index 3b7d7b4..db224fb 100644
---- a/drivers/media/video/saa7164/saa7164-core.c
-+++ b/drivers/media/video/saa7164/saa7164-core.c
-@@ -1264,7 +1264,7 @@ static int __devinit saa7164_initdev(struct pci_dev *pci_dev,
+ 		retval = request_irq(rtc_irq, rtc_cmos_int_handler,
+-				IRQF_DISABLED, dev_name(&cmos_rtc.rtc->dev),
++				0, dev_name(&cmos_rtc.rtc->dev),
+ 				cmos_rtc.rtc);
+ 		if (retval < 0) {
+ 			dev_dbg(dev, "IRQ %d is already in use\n", rtc_irq);
+diff --git a/drivers/rtc/rtc-coh901331.c b/drivers/rtc/rtc-coh901331.c
+index 80f9c88..a5b8a0c 100644
+--- a/drivers/rtc/rtc-coh901331.c
++++ b/drivers/rtc/rtc-coh901331.c
+@@ -199,7 +199,7 @@ static int __init coh901331_probe(struct platform_device *pdev)
  	}
  
- 	err = request_irq(pci_dev->irq, saa7164_irq,
--		IRQF_SHARED | IRQF_DISABLED, dev->name, dev);
-+		IRQF_SHARED, dev->name, dev);
- 	if (err < 0) {
- 		printk(KERN_ERR "%s: can't get IRQ %d\n", dev->name,
- 			pci_dev->irq);
-diff --git a/drivers/media/video/sh_mobile_ceu_camera.c b/drivers/media/video/sh_mobile_ceu_camera.c
-index 8615fb8..98bb590 100644
---- a/drivers/media/video/sh_mobile_ceu_camera.c
-+++ b/drivers/media/video/sh_mobile_ceu_camera.c
-@@ -2030,7 +2030,7 @@ static int __devinit sh_mobile_ceu_probe(struct platform_device *pdev)
- 	}
+ 	rtap->irq = platform_get_irq(pdev, 0);
+-	if (request_irq(rtap->irq, coh901331_interrupt, IRQF_DISABLED,
++	if (request_irq(rtap->irq, coh901331_interrupt, 0,
+ 			"RTC COH 901 331 Alarm", rtap)) {
+ 		ret = -EIO;
+ 		goto out_no_irq;
+diff --git a/drivers/rtc/rtc-davinci.c b/drivers/rtc/rtc-davinci.c
+index 755e1fe..14c2109 100644
+--- a/drivers/rtc/rtc-davinci.c
++++ b/drivers/rtc/rtc-davinci.c
+@@ -542,7 +542,7 @@ static int __init davinci_rtc_probe(struct platform_device *pdev)
+ 	rtcss_write(davinci_rtc, 0, PRTCSS_RTC_CCTRL);
  
- 	/* request irq */
--	err = request_irq(pcdev->irq, sh_mobile_ceu_irq, IRQF_DISABLED,
-+	err = request_irq(pcdev->irq, sh_mobile_ceu_irq, 0,
- 			  dev_name(&pdev->dev), pcdev);
+ 	ret = request_irq(davinci_rtc->irq, davinci_rtc_interrupt,
+-			  IRQF_DISABLED, "davinci_rtc", davinci_rtc);
++			  0, "davinci_rtc", davinci_rtc);
+ 	if (ret < 0) {
+ 		dev_err(dev, "unable to register davinci RTC interrupt\n");
+ 		goto fail4;
+diff --git a/drivers/rtc/rtc-ds1511.c b/drivers/rtc/rtc-ds1511.c
+index 586c244..bbc7c86 100644
+--- a/drivers/rtc/rtc-ds1511.c
++++ b/drivers/rtc/rtc-ds1511.c
+@@ -532,7 +532,7 @@ ds1511_rtc_probe(struct platform_device *pdev)
+ 	if (pdata->irq > 0) {
+ 		rtc_read(RTC_CMD1);
+ 		if (devm_request_irq(&pdev->dev, pdata->irq, ds1511_interrupt,
+-			IRQF_DISABLED | IRQF_SHARED, pdev->name, pdev) < 0) {
++			IRQF_SHARED, pdev->name, pdev) < 0) {
+ 
+ 			dev_warn(&pdev->dev, "interrupt not available.\n");
+ 			pdata->irq = 0;
+diff --git a/drivers/rtc/rtc-ds1553.c b/drivers/rtc/rtc-ds1553.c
+index 1350029..1ef2718 100644
+--- a/drivers/rtc/rtc-ds1553.c
++++ b/drivers/rtc/rtc-ds1553.c
+@@ -320,7 +320,7 @@ static int __devinit ds1553_rtc_probe(struct platform_device *pdev)
+ 		writeb(0, ioaddr + RTC_INTERRUPTS);
+ 		if (devm_request_irq(&pdev->dev, pdata->irq,
+ 				ds1553_rtc_interrupt,
+-				IRQF_DISABLED, pdev->name, pdev) < 0) {
++				0, pdev->name, pdev) < 0) {
+ 			dev_warn(&pdev->dev, "interrupt not available.\n");
+ 			pdata->irq = 0;
+ 		}
+diff --git a/drivers/rtc/rtc-lpc32xx.c b/drivers/rtc/rtc-lpc32xx.c
+index ae16250..ba11a19 100644
+--- a/drivers/rtc/rtc-lpc32xx.c
++++ b/drivers/rtc/rtc-lpc32xx.c
+@@ -287,7 +287,7 @@ static int __devinit lpc32xx_rtc_probe(struct platform_device *pdev)
+ 	if (rtc->irq >= 0) {
+ 		if (devm_request_irq(&pdev->dev, rtc->irq,
+ 				     lpc32xx_rtc_alarm_interrupt,
+-				     IRQF_DISABLED, pdev->name, rtc) < 0) {
++				     0, pdev->name, rtc) < 0) {
+ 			dev_warn(&pdev->dev, "Can't request interrupt.\n");
+ 			rtc->irq = -1;
+ 		} else {
+diff --git a/drivers/rtc/rtc-mpc5121.c b/drivers/rtc/rtc-mpc5121.c
+index da60915..3a683fd 100644
+--- a/drivers/rtc/rtc-mpc5121.c
++++ b/drivers/rtc/rtc-mpc5121.c
+@@ -327,7 +327,7 @@ static int __devinit mpc5121_rtc_probe(struct platform_device *op)
+ 	dev_set_drvdata(&op->dev, rtc);
+ 
+ 	rtc->irq = irq_of_parse_and_map(op->dev.of_node, 1);
+-	err = request_irq(rtc->irq, mpc5121_rtc_handler, IRQF_DISABLED,
++	err = request_irq(rtc->irq, mpc5121_rtc_handler, 0,
+ 						"mpc5121-rtc", &op->dev);
  	if (err) {
- 		dev_err(&pdev->dev, "Unable to register CEU interrupt.\n");
-diff --git a/drivers/media/video/zoran/zoran_card.c b/drivers/media/video/zoran/zoran_card.c
-index c3602d6..23b4023 100644
---- a/drivers/media/video/zoran/zoran_card.c
-+++ b/drivers/media/video/zoran/zoran_card.c
-@@ -1294,7 +1294,7 @@ static int __devinit zoran_probe(struct pci_dev *pdev,
+ 		dev_err(&op->dev, "%s: could not request irq: %i\n",
+@@ -337,7 +337,7 @@ static int __devinit mpc5121_rtc_probe(struct platform_device *op)
+ 
+ 	rtc->irq_periodic = irq_of_parse_and_map(op->dev.of_node, 0);
+ 	err = request_irq(rtc->irq_periodic, mpc5121_rtc_handler_upd,
+-				IRQF_DISABLED, "mpc5121-rtc_upd", &op->dev);
++				0, "mpc5121-rtc_upd", &op->dev);
+ 	if (err) {
+ 		dev_err(&op->dev, "%s: could not request irq: %i\n",
+ 						__func__, rtc->irq_periodic);
+diff --git a/drivers/rtc/rtc-mrst.c b/drivers/rtc/rtc-mrst.c
+index bb21f44..498eee9 100644
+--- a/drivers/rtc/rtc-mrst.c
++++ b/drivers/rtc/rtc-mrst.c
+@@ -366,7 +366,7 @@ vrtc_mrst_do_probe(struct device *dev, struct resource *iomem, int rtc_irq)
+ 
+ 	if (rtc_irq) {
+ 		retval = request_irq(rtc_irq, mrst_rtc_irq,
+-				IRQF_DISABLED, dev_name(&mrst_rtc.rtc->dev),
++				0, dev_name(&mrst_rtc.rtc->dev),
+ 				mrst_rtc.rtc);
+ 		if (retval < 0) {
+ 			dev_dbg(dev, "IRQ %d is already in use, err %d\n",
+diff --git a/drivers/rtc/rtc-mv.c b/drivers/rtc/rtc-mv.c
+index 768e2ed..1300962 100644
+--- a/drivers/rtc/rtc-mv.c
++++ b/drivers/rtc/rtc-mv.c
+@@ -273,7 +273,7 @@ static int __devinit mv_rtc_probe(struct platform_device *pdev)
+ 	if (pdata->irq >= 0) {
+ 		writel(0, pdata->ioaddr + RTC_ALARM_INTERRUPT_MASK_REG_OFFS);
+ 		if (devm_request_irq(&pdev->dev, pdata->irq, mv_rtc_interrupt,
+-				     IRQF_DISABLED | IRQF_SHARED,
++				     IRQF_SHARED,
+ 				     pdev->name, pdata) < 0) {
+ 			dev_warn(&pdev->dev, "interrupt not available.\n");
+ 			pdata->irq = -1;
+diff --git a/drivers/rtc/rtc-nuc900.c b/drivers/rtc/rtc-nuc900.c
+index 781068d..b790109 100644
+--- a/drivers/rtc/rtc-nuc900.c
++++ b/drivers/rtc/rtc-nuc900.c
+@@ -269,7 +269,7 @@ static int __devinit nuc900_rtc_probe(struct platform_device *pdev)
+ 
+ 	nuc900_rtc->irq_num = platform_get_irq(pdev, 0);
+ 	if (request_irq(nuc900_rtc->irq_num, nuc900_rtc_interrupt,
+-				IRQF_DISABLED, "nuc900rtc", nuc900_rtc)) {
++				0, "nuc900rtc", nuc900_rtc)) {
+ 		dev_err(&pdev->dev, "NUC900 RTC request irq failed\n");
+ 		err = -EBUSY;
+ 		goto fail4;
+diff --git a/drivers/rtc/rtc-omap.c b/drivers/rtc/rtc-omap.c
+index 7789002..0b614e3 100644
+--- a/drivers/rtc/rtc-omap.c
++++ b/drivers/rtc/rtc-omap.c
+@@ -348,14 +348,14 @@ static int __init omap_rtc_probe(struct platform_device *pdev)
+ 		rtc_write(OMAP_RTC_STATUS_ALARM, OMAP_RTC_STATUS_REG);
+ 
+ 	/* handle periodic and alarm irqs */
+-	if (request_irq(omap_rtc_timer, rtc_irq, IRQF_DISABLED,
++	if (request_irq(omap_rtc_timer, rtc_irq, 0,
+ 			dev_name(&rtc->dev), rtc)) {
+ 		pr_debug("%s: RTC timer interrupt IRQ%d already claimed\n",
+ 			pdev->name, omap_rtc_timer);
+ 		goto fail1;
+ 	}
+ 	if ((omap_rtc_timer != omap_rtc_alarm) &&
+-		(request_irq(omap_rtc_alarm, rtc_irq, IRQF_DISABLED,
++		(request_irq(omap_rtc_alarm, rtc_irq, 0,
+ 			dev_name(&rtc->dev), rtc))) {
+ 		pr_debug("%s: RTC alarm interrupt IRQ%d already claimed\n",
+ 			pdev->name, omap_rtc_alarm);
+diff --git a/drivers/rtc/rtc-pl030.c b/drivers/rtc/rtc-pl030.c
+index 1d28d44..c5afd6f 100644
+--- a/drivers/rtc/rtc-pl030.c
++++ b/drivers/rtc/rtc-pl030.c
+@@ -123,7 +123,7 @@ static int pl030_probe(struct amba_device *dev, const struct amba_id *id)
+ 
+ 	amba_set_drvdata(dev, rtc);
+ 
+-	ret = request_irq(dev->irq[0], pl030_interrupt, IRQF_DISABLED,
++	ret = request_irq(dev->irq[0], pl030_interrupt, 0,
+ 			  "rtc-pl030", rtc);
+ 	if (ret)
+ 		goto err_irq;
+diff --git a/drivers/rtc/rtc-pl031.c b/drivers/rtc/rtc-pl031.c
+index ff1b84b..d2df59d 100644
+--- a/drivers/rtc/rtc-pl031.c
++++ b/drivers/rtc/rtc-pl031.c
+@@ -352,7 +352,7 @@ static int pl031_probe(struct amba_device *adev, const struct amba_id *id)
  	}
  
- 	result = request_irq(zr->pci_dev->irq, zoran_irq,
--			     IRQF_SHARED | IRQF_DISABLED, ZR_DEVNAME(zr), zr);
-+			     IRQF_SHARED, ZR_DEVNAME(zr), zr);
- 	if (result < 0) {
- 		if (result == -EINVAL) {
- 			dprintk(1,
+ 	if (request_irq(adev->irq[0], pl031_interrupt,
+-			IRQF_DISABLED, "rtc-pl031", ldata)) {
++			0, "rtc-pl031", ldata)) {
+ 		ret = -EIO;
+ 		goto out_no_irq;
+ 	}
+diff --git a/drivers/rtc/rtc-puv3.c b/drivers/rtc/rtc-puv3.c
+index b3eba3c..378fe4b 100644
+--- a/drivers/rtc/rtc-puv3.c
++++ b/drivers/rtc/rtc-puv3.c
+@@ -164,7 +164,7 @@ static int puv3_rtc_open(struct device *dev)
+ 	int ret;
+ 
+ 	ret = request_irq(puv3_rtc_alarmno, puv3_rtc_alarmirq,
+-			  IRQF_DISABLED,  "pkunity-rtc alarm", rtc_dev);
++			  0,  "pkunity-rtc alarm", rtc_dev);
+ 
+ 	if (ret) {
+ 		dev_err(dev, "IRQ%d error %d\n", puv3_rtc_alarmno, ret);
+@@ -172,7 +172,7 @@ static int puv3_rtc_open(struct device *dev)
+ 	}
+ 
+ 	ret = request_irq(puv3_rtc_tickno, puv3_rtc_tickirq,
+-			  IRQF_DISABLED,  "pkunity-rtc tick", rtc_dev);
++			  0,  "pkunity-rtc tick", rtc_dev);
+ 
+ 	if (ret) {
+ 		dev_err(dev, "IRQ%d error %d\n", puv3_rtc_tickno, ret);
+diff --git a/drivers/rtc/rtc-pxa.c b/drivers/rtc/rtc-pxa.c
+index fc9f499..0075c8f 100644
+--- a/drivers/rtc/rtc-pxa.c
++++ b/drivers/rtc/rtc-pxa.c
+@@ -174,14 +174,14 @@ static int pxa_rtc_open(struct device *dev)
+ 	struct pxa_rtc *pxa_rtc = dev_get_drvdata(dev);
+ 	int ret;
+ 
+-	ret = request_irq(pxa_rtc->irq_1Hz, pxa_rtc_irq, IRQF_DISABLED,
++	ret = request_irq(pxa_rtc->irq_1Hz, pxa_rtc_irq, 0,
+ 			  "rtc 1Hz", dev);
+ 	if (ret < 0) {
+ 		dev_err(dev, "can't get irq %i, err %d\n", pxa_rtc->irq_1Hz,
+ 			ret);
+ 		goto err_irq_1Hz;
+ 	}
+-	ret = request_irq(pxa_rtc->irq_Alrm, pxa_rtc_irq, IRQF_DISABLED,
++	ret = request_irq(pxa_rtc->irq_Alrm, pxa_rtc_irq, 0,
+ 			  "rtc Alrm", dev);
+ 	if (ret < 0) {
+ 		dev_err(dev, "can't get irq %i, err %d\n", pxa_rtc->irq_Alrm,
+diff --git a/drivers/rtc/rtc-s3c.c b/drivers/rtc/rtc-s3c.c
+index 7639ab9..9a073aa 100644
+--- a/drivers/rtc/rtc-s3c.c
++++ b/drivers/rtc/rtc-s3c.c
+@@ -536,14 +536,14 @@ static int __devinit s3c_rtc_probe(struct platform_device *pdev)
+ 	s3c_rtc_setfreq(&pdev->dev, 1);
+ 
+ 	ret = request_irq(s3c_rtc_alarmno, s3c_rtc_alarmirq,
+-			  IRQF_DISABLED,  "s3c2410-rtc alarm", rtc);
++			  0,  "s3c2410-rtc alarm", rtc);
+ 	if (ret) {
+ 		dev_err(&pdev->dev, "IRQ%d error %d\n", s3c_rtc_alarmno, ret);
+ 		goto err_alarm_irq;
+ 	}
+ 
+ 	ret = request_irq(s3c_rtc_tickno, s3c_rtc_tickirq,
+-			  IRQF_DISABLED,  "s3c2410-rtc tick", rtc);
++			  0,  "s3c2410-rtc tick", rtc);
+ 	if (ret) {
+ 		dev_err(&pdev->dev, "IRQ%d error %d\n", s3c_rtc_tickno, ret);
+ 		free_irq(s3c_rtc_alarmno, rtc);
+diff --git a/drivers/rtc/rtc-sa1100.c b/drivers/rtc/rtc-sa1100.c
+index 0b40bb8..7ca247e 100644
+--- a/drivers/rtc/rtc-sa1100.c
++++ b/drivers/rtc/rtc-sa1100.c
+@@ -161,13 +161,13 @@ static int sa1100_rtc_open(struct device *dev)
+ 	struct platform_device *plat_dev = to_platform_device(dev);
+ 	struct rtc_device *rtc = platform_get_drvdata(plat_dev);
+ 
+-	ret = request_irq(IRQ_RTC1Hz, sa1100_rtc_interrupt, IRQF_DISABLED,
++	ret = request_irq(IRQ_RTC1Hz, sa1100_rtc_interrupt, 0,
+ 		"rtc 1Hz", dev);
+ 	if (ret) {
+ 		dev_err(dev, "IRQ %d already in use.\n", IRQ_RTC1Hz);
+ 		goto fail_ui;
+ 	}
+-	ret = request_irq(IRQ_RTCAlrm, sa1100_rtc_interrupt, IRQF_DISABLED,
++	ret = request_irq(IRQ_RTCAlrm, sa1100_rtc_interrupt, 0,
+ 		"rtc Alrm", dev);
+ 	if (ret) {
+ 		dev_err(dev, "IRQ %d already in use.\n", IRQ_RTCAlrm);
+diff --git a/drivers/rtc/rtc-sh.c b/drivers/rtc/rtc-sh.c
+index 6ac55fd..e55a763 100644
+--- a/drivers/rtc/rtc-sh.c
++++ b/drivers/rtc/rtc-sh.c
+@@ -666,7 +666,7 @@ static int __init sh_rtc_probe(struct platform_device *pdev)
+ 	if (rtc->carry_irq <= 0) {
+ 		/* register shared periodic/carry/alarm irq */
+ 		ret = request_irq(rtc->periodic_irq, sh_rtc_shared,
+-				  IRQF_DISABLED, "sh-rtc", rtc);
++				  0, "sh-rtc", rtc);
+ 		if (unlikely(ret)) {
+ 			dev_err(&pdev->dev,
+ 				"request IRQ failed with %d, IRQ %d\n", ret,
+@@ -676,7 +676,7 @@ static int __init sh_rtc_probe(struct platform_device *pdev)
+ 	} else {
+ 		/* register periodic/carry/alarm irqs */
+ 		ret = request_irq(rtc->periodic_irq, sh_rtc_periodic,
+-				  IRQF_DISABLED, "sh-rtc period", rtc);
++				  0, "sh-rtc period", rtc);
+ 		if (unlikely(ret)) {
+ 			dev_err(&pdev->dev,
+ 				"request period IRQ failed with %d, IRQ %d\n",
+@@ -685,7 +685,7 @@ static int __init sh_rtc_probe(struct platform_device *pdev)
+ 		}
+ 
+ 		ret = request_irq(rtc->carry_irq, sh_rtc_interrupt,
+-				  IRQF_DISABLED, "sh-rtc carry", rtc);
++				  0, "sh-rtc carry", rtc);
+ 		if (unlikely(ret)) {
+ 			dev_err(&pdev->dev,
+ 				"request carry IRQ failed with %d, IRQ %d\n",
+@@ -695,7 +695,7 @@ static int __init sh_rtc_probe(struct platform_device *pdev)
+ 		}
+ 
+ 		ret = request_irq(rtc->alarm_irq, sh_rtc_alarm,
+-				  IRQF_DISABLED, "sh-rtc alarm", rtc);
++				  0, "sh-rtc alarm", rtc);
+ 		if (unlikely(ret)) {
+ 			dev_err(&pdev->dev,
+ 				"request alarm IRQ failed with %d, IRQ %d\n",
+diff --git a/drivers/rtc/rtc-stk17ta8.c b/drivers/rtc/rtc-stk17ta8.c
+index ed3e9b5..5e9adec 100644
+--- a/drivers/rtc/rtc-stk17ta8.c
++++ b/drivers/rtc/rtc-stk17ta8.c
+@@ -329,7 +329,7 @@ static int __devinit stk17ta8_rtc_probe(struct platform_device *pdev)
+ 		writeb(0, ioaddr + RTC_INTERRUPTS);
+ 		if (devm_request_irq(&pdev->dev, pdata->irq,
+ 				stk17ta8_rtc_interrupt,
+-				IRQF_DISABLED | IRQF_SHARED,
++				IRQF_SHARED,
+ 				pdev->name, pdev) < 0) {
+ 			dev_warn(&pdev->dev, "interrupt not available.\n");
+ 			pdata->irq = 0;
+diff --git a/drivers/rtc/rtc-tx4939.c b/drivers/rtc/rtc-tx4939.c
+index aac0ffe..a12bfac 100644
+--- a/drivers/rtc/rtc-tx4939.c
++++ b/drivers/rtc/rtc-tx4939.c
+@@ -266,7 +266,7 @@ static int __init tx4939_rtc_probe(struct platform_device *pdev)
+ 	spin_lock_init(&pdata->lock);
+ 	tx4939_rtc_cmd(pdata->rtcreg, TX4939_RTCCTL_COMMAND_NOP);
+ 	if (devm_request_irq(&pdev->dev, irq, tx4939_rtc_interrupt,
+-			     IRQF_DISABLED, pdev->name, &pdev->dev) < 0)
++			     0, pdev->name, &pdev->dev) < 0)
+ 		return -EBUSY;
+ 	rtc = rtc_device_register(pdev->name, &pdev->dev,
+ 				  &tx4939_rtc_ops, THIS_MODULE);
+diff --git a/drivers/rtc/rtc-vr41xx.c b/drivers/rtc/rtc-vr41xx.c
+index c5698cd..6aef17d 100644
+--- a/drivers/rtc/rtc-vr41xx.c
++++ b/drivers/rtc/rtc-vr41xx.c
+@@ -333,7 +333,7 @@ static int __devinit rtc_probe(struct platform_device *pdev)
+ 		goto err_device_unregister;
+ 	}
+ 
+-	retval = request_irq(aie_irq, elapsedtime_interrupt, IRQF_DISABLED,
++	retval = request_irq(aie_irq, elapsedtime_interrupt, 0,
+ 	                     "elapsed_time", pdev);
+ 	if (retval < 0)
+ 		goto err_device_unregister;
+@@ -342,7 +342,7 @@ static int __devinit rtc_probe(struct platform_device *pdev)
+ 	if (pie_irq <= 0)
+ 		goto err_free_irq;
+ 
+-	retval = request_irq(pie_irq, rtclong1_interrupt, IRQF_DISABLED,
++	retval = request_irq(pie_irq, rtclong1_interrupt, 0,
+ 		             "rtclong1", pdev);
+ 	if (retval < 0)
+ 		goto err_free_irq;
 -- 
 1.7.1
