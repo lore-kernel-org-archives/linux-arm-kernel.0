@@ -1,34 +1,57 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Sat, 22 Oct 2011 11:20:16 +0900
-Subject: Possible regression in kexec on ARM ARMv6 and ARMv7 cores
-In-Reply-To: <20111021091524.GB30168@mudshark.cambridge.arm.com>
-References: <20111020042444.GA20260@verge.net.au>
-	<20111020070105.GA28548@mudshark.cambridge.arm.com>
-	<20111020080823.GA2716@verge.net.au>
-	<20111021083426.GA16088@verge.net.au>
-	<20111021084641.GA30168@mudshark.cambridge.arm.com>
-	<20111021085958.GC21850@verge.net.au>
-	<20111021091524.GB30168@mudshark.cambridge.arm.com>
-Message-ID: <20111022022016.GA9208@verge.net.au>
+From: david.yangshuai@gmail.com (David Yang)
+Date: Sat, 22 Oct 2011 10:35:05 +0800
+Subject: Question about: linux-linaro-2.6.38.7 booting the ubuntu 10.10
+	filesystem
+In-Reply-To: <CALQsFOKEXCmaHdo7hj25CgjYFijodu6qs1okSwkfNPmuOz6GJg@mail.gmail.com>
+References: <CALQsFO+o+zQJZiksb+2fW8b_kdTv6tqhjxYU6owv=hMhbk=92A@mail.gmail.com>
+	<CAK5ve-LetP_jUyi22T0QhPkHgNqjFBuzuMa5+VnEfWvzFpy3Wg@mail.gmail.com>
+	<CALQsFO+iuraeVVDZLWL5JUibNE2a-WC3ksGj3PV=tPWfuhJX9A@mail.gmail.com>
+	<CALQsFOJ+kYQ9iJfAPhcHtcWwA9A-5TFbUe+oyiTWrar=ZSN1_g@mail.gmail.com>
+	<B85A65D85D7EB246BE421B3FB0FBB5930328693B98@dbde02.ent.ti.com>
+	<CALQsFOJHiLVskuhGe-OsK8PdUxuR8Lv9idJcmf8vZEumenBUnw@mail.gmail.com>
+	<CALQsFOLs-Jz5-yPGOZkpqumgUUq8V90mCrEJ1EBPvXSwMbVM3A@mail.gmail.com>
+	<B85A65D85D7EB246BE421B3FB0FBB5930328B2D77E@dbde02.ent.ti.com>
+	<CALQsFOKEXCmaHdo7hj25CgjYFijodu6qs1okSwkfNPmuOz6GJg@mail.gmail.com>
+Message-ID: <CALQsFOKjH+k6e6tS4HoNrBvB9BdNYfz3F8P-veZtgk6fyOk-Zw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 21, 2011 at 10:15:24AM +0100, Will Deacon wrote:
-> On Fri, Oct 21, 2011 at 09:59:58AM +0100, Simon Horman wrote:
-> > On Fri, Oct 21, 2011 at 09:46:41AM +0100, Will Deacon wrote:
-> > > The more difficult case is when you want to offline the secondary CPUs into
-> > > a pen and then boot them in the new kernel. I did get some of this working,
-> > > but there are outstanding issues with whether the pen should be at a fixed
-> > > location or not. If not, then we need a way to tell the new kernel where it
-> > > is, which may involve updating the DT blob...
-> > 
-> > Is the implication that the (working) callback method does not
-> > give the second kernel any secondary CPUs?
-> 
-> What the callback does it up to you. You just need to make sure that you can
-> cope with the kernel disappearing later on, so you'll probably need some
-> hardware mechanism for offlining a CPU (for example, placing it in SRAM
-> or cutting the power).
+hi,all
 
-Thanks, it seems that I now have a bit of work to do implementing
-a callback.
+ Does anyone know the issue?
+
+  Thanks!
+
+
+
+Best Regards,
+David
+
+
+On 10/20/11, David Yang <david.yangshuai@gmail.com> wrote:
+> hi,Afzal
+>
+>   It's not zero.
+>
+>
+>
+> Best Regards,
+> Shuai
+>
+> On 10/20/11, Mohammed, Afzal <afzal@ti.com> wrote:
+>> Hi David,
+>>
+>> On Thu, Oct 20, 2011 at 17:32:25, David Yang wrote:
+>>> another log when booting ubuntu10.10:
+>>>
+>>>
+>>> the PC stopped at futex_wake() again!
+>>>
+>>
+>> Please pass "printk.time=1" from commandline, and check the
+>> Kernel logs whether timing shown are zero.
+>>
+>> Regards
+>> Afzal
+>>
+>
