@@ -1,32 +1,39 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sat, 22 Oct 2011 18:41:42 +0200
-Subject: [PATCH] spi/pl022: Enable clock in probe an use runtime_idle
-In-Reply-To: <1319206124-17549-1-git-send-email-ulf.hansson@stericsson.com>
-References: <1319206124-17549-1-git-send-email-ulf.hansson@stericsson.com>
-Message-ID: <CACRpkdY2Csh58QbtnfYikr-VtYR_wDRfC2_X_+wR3OPhgTBE3w@mail.gmail.com>
+From: vapier.adi@gmail.com (Mike Frysinger)
+Date: Sat, 22 Oct 2011 13:44:18 -0400
+Subject: [PATCH] drivers: create a pin control subsystem v8
+In-Reply-To: <20111004203520.GK2870@ponder.secretlab.ca>
+References: <1317211419-18472-1-git-send-email-linus.walleij@stericsson.com>
+	<20110930020754.GK12606@ponder.secretlab.ca>
+	<CACRpkdYyyqB6=5M8reqgwpMxXJz5ttXWyOav6K58dQ0CrxwCNA@mail.gmail.com>
+	<CACxGe6v19pZ0i-+ksYZbG2ZvGT30UkXEHTzpZMBTB4RNUV5bnA@mail.gmail.com>
+	<CAKnu2MpQ8Wvd4TF8Ge=o8ACyEoaEY8TcvOSdT1w6zfYiSKFUiw@mail.gmail.com>
+	<20111004203520.GK2870@ponder.secretlab.ca>
+Message-ID: <CAMjpGUe9abPsdWbum2MRzOV2b5_2FDqXZC-K0KThRA6MNTr4FA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 21, 2011 at 4:08 PM, Ulf Hansson <ulf.hansson@stericsson.com> wrote:
-
-> Since we are always runtime resumed when leaving probe
-> the clock must be enabled. To accomplish that we are able
-> to be runtime suspended after probe in the case when no
-> request is going to be recieved, a runtime_idle function
-> has been implemented.
+On Tue, Oct 4, 2011 at 16:35, Grant Likely wrote:
+> On Sat, Oct 01, 2011 at 12:39:21PM +0200, Linus Walleij wrote:
+>> 2011/9/30 Grant Likely:
+>> >?I'm not convinced that the sysfs approach is
+>> > actually the right interface here (I'm certainly not a fan of the gpio
+>> > sysfs i/f), and I'd rather not be putting in unneeded stuff until the
+>> > userspace i/f is hammered out.
+>>
+>> Actually, thinking about it I cannot see what would be wrong
+>> with /dev/gpio0 & friends in the first place.
+>>
+>> Using sysfs as swiss army knife for custom I/O does not
+>> seem like it would be long-term viable so thanks for this
+>> observation, and I think we need /dev/gpio* put on some
+>> mental roadmap somewhere.
 >
-> Change-Id: I6cb86f2cad30ecaab16f512daf4674b039b18213
-> Signed-off-by: Ulf Hansson <ulf.hansson@stericsson.com>
-> Reviewed-on: http://gerrit.lud.stericsson.com/gerrit/34447
+> Agreed. ?I don't want to be in the situation we are now with GPIO,
+> where every time I look at the sysfs interface I shudder.
 
-Skip the gerrit weirdo stuff.
-
-Notice that this patch cannot be merged until Russell's
-AMBA PM patches are merged, so put this in Russell's
-patch tracker so he can put it on his AMBA PM branch.
-
-But looks correct.
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-
-Yours,
-Linus Walleij
+the problem with that is it doesn't scale.  if i have a device with
+over 150 GPIOs on the SoC itself (obviously GPIO expanders can make
+that much bigger), i don't want to see 150+ device nodes in /dev/.
+that's a pretty big waste.  sysfs only allocates/frees resources when
+userspace actually wants to utilize a GPIO.
+-mike
