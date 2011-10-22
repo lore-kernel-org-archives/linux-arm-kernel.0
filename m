@@ -1,133 +1,40 @@
-From: yong.zhang0@gmail.com (Yong Zhang)
-Date: Sat, 22 Oct 2011 17:56:57 +0800
-Subject: [PATCH 45/49] watchdog: irq: Remove IRQF_DISABLED
-In-Reply-To: <1319277421-9203-1-git-send-email-yong.zhang0@gmail.com>
-References: <1319277421-9203-1-git-send-email-yong.zhang0@gmail.com>
-Message-ID: <1319277421-9203-46-git-send-email-yong.zhang0@gmail.com>
+From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
+Date: Sat, 22 Oct 2011 14:13:55 +0100
+Subject: [PATCH 0/3] ARM 4Kstacks: introduction
+In-Reply-To: <CACVXFVMb9p8PiTYWGTNn-FtQts0sRgmK+BQ6kaJ6-D89CAT=xQ@mail.gmail.com>
+	(Ming Lei's message of "Sat, 22 Oct 2011 16:50:15 +0800")
+References: <4E9E0B71.9020708@am.sony.com>
+	<1318983248.7569.5.camel@Joe-Laptop> <4E9E1944.80601@am.sony.com>
+	<1500345.YeXPhIIHc5@wuerfel>
+	<CACVXFVMb9p8PiTYWGTNn-FtQts0sRgmK+BQ6kaJ6-D89CAT=xQ@mail.gmail.com>
+Message-ID: <yw1x1uu5p3sc.fsf@unicorn.mansr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since commit [e58aa3d2: genirq: Run irq handlers with interrupts disabled],
-We run all interrupt handlers with interrupts disabled
-and we even check and yell when an interrupt handler
-returns with interrupts enabled (see commit [b738a50a:
-genirq: Warn when handler enables interrupts]).
+Ming Lei <tom.leiming@gmail.com> writes:
 
-So now this flag is a NOOP and can be removed.
+> On Wed, Oct 19, 2011 at 6:51 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> On Tuesday 18 October 2011 17:26:44 Tim Bird wrote:
+>>> Even inside Sony, usage of 4K stacks is limited
+>>> to some very special cases, where memory is exceedingly
+>>> tight (we have one system with 4M of RAM). ?And we
+>>> don't mind lopping off features or coding around
+>>> problem areas to support our special case.
+>>
+>> I would imagine that in those cases, you can gain more by reducing the
+>> number of threads in the system. What is the highest number of
+>> concurrent threads that you expect in a limited use case with no
+>> networking or block devices?
+>
+> If system run for some time, sometimes it may be difficult for
+> memory allocator to allocate 2 continuous page frames even  there are
+> many spare page frames in system because of
+> fragment issue, so the patch does make sense. Anyway,
+> it provides one option for user to apply 4k stack to avoid
+> such kind of process creation failure.
 
-Signed-off-by: Yong Zhang <yong.zhang0@gmail.com>
-Acked-by: Wolfram Sang <w.sang@pengutronix.de>
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
----
- drivers/watchdog/coh901327_wdt.c   |    2 +-
- drivers/watchdog/eurotechwdt.c     |    2 +-
- drivers/watchdog/mpcore_wdt.c      |    3 +--
- drivers/watchdog/octeon-wdt-main.c |    2 +-
- drivers/watchdog/sb_wdog.c         |    4 ++--
- drivers/watchdog/wdt.c             |    2 +-
- drivers/watchdog/wdt_pci.c         |    2 +-
- 7 files changed, 8 insertions(+), 9 deletions(-)
+Can't page migration be used in these situations?
 
-diff --git a/drivers/watchdog/coh901327_wdt.c b/drivers/watchdog/coh901327_wdt.c
-index 9291506..03f449a 100644
---- a/drivers/watchdog/coh901327_wdt.c
-+++ b/drivers/watchdog/coh901327_wdt.c
-@@ -429,7 +429,7 @@ static int __init coh901327_probe(struct platform_device *pdev)
- 	writew(U300_WDOG_SR_RESET_STATUS_RESET, virtbase + U300_WDOG_SR);
- 
- 	irq = platform_get_irq(pdev, 0);
--	if (request_irq(irq, coh901327_interrupt, IRQF_DISABLED,
-+	if (request_irq(irq, coh901327_interrupt, 0,
- 			DRV_NAME " Bark", pdev)) {
- 		ret = -EIO;
- 		goto out_no_irq;
-diff --git a/drivers/watchdog/eurotechwdt.c b/drivers/watchdog/eurotechwdt.c
-index f1d1da6..41018d4 100644
---- a/drivers/watchdog/eurotechwdt.c
-+++ b/drivers/watchdog/eurotechwdt.c
-@@ -427,7 +427,7 @@ static int __init eurwdt_init(void)
- {
- 	int ret;
- 
--	ret = request_irq(irq, eurwdt_interrupt, IRQF_DISABLED, "eurwdt", NULL);
-+	ret = request_irq(irq, eurwdt_interrupt, 0, "eurwdt", NULL);
- 	if (ret) {
- 		printk(KERN_ERR "eurwdt: IRQ %d is not free.\n", irq);
- 		goto out;
-diff --git a/drivers/watchdog/mpcore_wdt.c b/drivers/watchdog/mpcore_wdt.c
-index 4dc3102..82ccd36 100644
---- a/drivers/watchdog/mpcore_wdt.c
-+++ b/drivers/watchdog/mpcore_wdt.c
-@@ -367,8 +367,7 @@ static int __devinit mpcore_wdt_probe(struct platform_device *dev)
- 		goto err_misc;
- 	}
- 
--	ret = request_irq(wdt->irq, mpcore_wdt_fire, IRQF_DISABLED,
--							"mpcore_wdt", wdt);
-+	ret = request_irq(wdt->irq, mpcore_wdt_fire, 0, "mpcore_wdt", wdt);
- 	if (ret) {
- 		dev_printk(KERN_ERR, wdt->dev,
- 			"cannot register IRQ%d for watchdog\n", wdt->irq);
-diff --git a/drivers/watchdog/octeon-wdt-main.c b/drivers/watchdog/octeon-wdt-main.c
-index 945ee83..6019087 100644
---- a/drivers/watchdog/octeon-wdt-main.c
-+++ b/drivers/watchdog/octeon-wdt-main.c
-@@ -402,7 +402,7 @@ static void octeon_wdt_setup_interrupt(int cpu)
- 	irq = OCTEON_IRQ_WDOG0 + core;
- 
- 	if (request_irq(irq, octeon_wdt_poke_irq,
--			IRQF_DISABLED, "octeon_wdt", octeon_wdt_poke_irq))
-+			0, "octeon_wdt", octeon_wdt_poke_irq))
- 		panic("octeon_wdt: Couldn't obtain irq %d", irq);
- 
- 	cpumask_set_cpu(cpu, &irq_enabled_cpus);
-diff --git a/drivers/watchdog/sb_wdog.c b/drivers/watchdog/sb_wdog.c
-index f31493e..b01a30e 100644
---- a/drivers/watchdog/sb_wdog.c
-+++ b/drivers/watchdog/sb_wdog.c
-@@ -300,7 +300,7 @@ static int __init sbwdog_init(void)
- 	 * get the resources
- 	 */
- 
--	ret = request_irq(1, sbwdog_interrupt, IRQF_DISABLED | IRQF_SHARED,
-+	ret = request_irq(1, sbwdog_interrupt, IRQF_SHARED,
- 		ident.identity, (void *)user_dog);
- 	if (ret) {
- 		printk(KERN_ERR "%s: failed to request irq 1 - %d\n",
-@@ -350,7 +350,7 @@ void platform_wd_setup(void)
- {
- 	int ret;
- 
--	ret = request_irq(1, sbwdog_interrupt, IRQF_DISABLED | IRQF_SHARED,
-+	ret = request_irq(1, sbwdog_interrupt, IRQF_SHARED,
- 		"Kernel Watchdog", IOADDR(A_SCD_WDOG_CFG_0));
- 	if (ret) {
- 		printk(KERN_CRIT
-diff --git a/drivers/watchdog/wdt.c b/drivers/watchdog/wdt.c
-index bb03e15..d2ef002 100644
---- a/drivers/watchdog/wdt.c
-+++ b/drivers/watchdog/wdt.c
-@@ -612,7 +612,7 @@ static int __init wdt_init(void)
- 		goto out;
- 	}
- 
--	ret = request_irq(irq, wdt_interrupt, IRQF_DISABLED, "wdt501p", NULL);
-+	ret = request_irq(irq, wdt_interrupt, 0, "wdt501p", NULL);
- 	if (ret) {
- 		printk(KERN_ERR "wdt: IRQ %d is not free.\n", irq);
- 		goto outreg;
-diff --git a/drivers/watchdog/wdt_pci.c b/drivers/watchdog/wdt_pci.c
-index 172dad6..e0fc3ba 100644
---- a/drivers/watchdog/wdt_pci.c
-+++ b/drivers/watchdog/wdt_pci.c
-@@ -643,7 +643,7 @@ static int __devinit wdtpci_init_one(struct pci_dev *dev,
- 	irq = dev->irq;
- 	io = pci_resource_start(dev, 2);
- 
--	if (request_irq(irq, wdtpci_interrupt, IRQF_DISABLED | IRQF_SHARED,
-+	if (request_irq(irq, wdtpci_interrupt, IRQF_SHARED,
- 			 "wdt_pci", &wdtpci_miscdev)) {
- 		printk(KERN_ERR PFX "IRQ %d is not free\n", irq);
- 		goto out_reg;
 -- 
-1.7.1
+M?ns Rullg?rd
+mans at mansr.com
