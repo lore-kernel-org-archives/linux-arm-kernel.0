@@ -1,27 +1,32 @@
-From: andi@firstfloor.org (Andi Kleen)
-Date: Sat, 22 Oct 2011 16:27:18 +0200
-Subject: [PATCH 0/3] ARM 4Kstacks: introduction
-In-Reply-To: <yw1x1uu5p3sc.fsf@unicorn.mansr.com>
-References: <4E9E0B71.9020708@am.sony.com>
-	<1318983248.7569.5.camel@Joe-Laptop> <4E9E1944.80601@am.sony.com>
-	<1500345.YeXPhIIHc5@wuerfel>
-	<CACVXFVMb9p8PiTYWGTNn-FtQts0sRgmK+BQ6kaJ6-D89CAT=xQ@mail.gmail.com>
-	<yw1x1uu5p3sc.fsf@unicorn.mansr.com>
-Message-ID: <8d6b949ee16a092a660a7b05fdaf6d6a.squirrel@www.firstfloor.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sat, 22 Oct 2011 18:41:42 +0200
+Subject: [PATCH] spi/pl022: Enable clock in probe an use runtime_idle
+In-Reply-To: <1319206124-17549-1-git-send-email-ulf.hansson@stericsson.com>
+References: <1319206124-17549-1-git-send-email-ulf.hansson@stericsson.com>
+Message-ID: <CACRpkdY2Csh58QbtnfYikr-VtYR_wDRfC2_X_+wR3OPhgTBE3w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Oct 21, 2011 at 4:08 PM, Ulf Hansson <ulf.hansson@stericsson.com> wrote:
 
->> If system run for some time, sometimes it may be difficult for
->> memory allocator to allocate 2 continuous page frames even  there are
->> many spare page frames in system because of
->> fragment issue, so the patch does make sense. Anyway,
->> it provides one option for user to apply 4k stack to avoid
->> such kind of process creation failure.
+> Since we are always runtime resumed when leaving probe
+> the clock must be enabled. To accomplish that we are able
+> to be runtime suspended after probe in the case when no
+> request is going to be recieved, a runtime_idle function
+> has been implemented.
 >
-> Can't page migration be used in these situations?
+> Change-Id: I6cb86f2cad30ecaab16f512daf4674b039b18213
+> Signed-off-by: Ulf Hansson <ulf.hansson@stericsson.com>
+> Reviewed-on: http://gerrit.lud.stericsson.com/gerrit/34447
 
-The kernel already uses it of course, assuming the pages are movable.
-So if you are really worried about this, just define a movable zone.
+Skip the gerrit weirdo stuff.
 
--Andi
+Notice that this patch cannot be merged until Russell's
+AMBA PM patches are merged, so put this in Russell's
+patch tracker so he can put it on his AMBA PM branch.
+
+But looks correct.
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+
+Yours,
+Linus Walleij
