@@ -1,5 +1,5 @@
 From: david.yangshuai@gmail.com (David Yang)
-Date: Sat, 22 Oct 2011 16:53:45 +0800
+Date: Sat, 22 Oct 2011 17:04:55 +0800
 Subject: Question about: linux-linaro-2.6.38.7 booting the ubuntu 10.10
 	filesystem
 In-Reply-To: <CALQsFOKjH+k6e6tS4HoNrBvB9BdNYfz3F8P-veZtgk6fyOk-Zw@mail.gmail.com>
@@ -13,7 +13,7 @@ References: <CALQsFO+o+zQJZiksb+2fW8b_kdTv6tqhjxYU6owv=hMhbk=92A@mail.gmail.com>
 	<B85A65D85D7EB246BE421B3FB0FBB5930328B2D77E@dbde02.ent.ti.com>
 	<CALQsFOKEXCmaHdo7hj25CgjYFijodu6qs1okSwkfNPmuOz6GJg@mail.gmail.com>
 	<CALQsFOKjH+k6e6tS4HoNrBvB9BdNYfz3F8P-veZtgk6fyOk-Zw@mail.gmail.com>
-Message-ID: <CALQsFO+dp5vuFhXrkcvtSOPw5+Zsx-QkRakL13Opd=ghGvhXaw@mail.gmail.com>
+Message-ID: <CALQsFOLjbBmvPC5iU_cY3LrEe03Z8q90mm5UsS2KoqVQsLjivA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
