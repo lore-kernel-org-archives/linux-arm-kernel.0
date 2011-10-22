@@ -1,42 +1,39 @@
-From: paul.s.schilling@gmail.com (Paul Schilling)
-Date: Fri, 21 Oct 2011 23:21:41 -0500
-Subject: [PATCH 06/14] ARM : SAMSUNG : S3C2416 Added io mapping for Static
-	memory controller.
-In-Reply-To: <static_memory>
-References: <static_memory>
-Message-ID: <1319257301-5040-1-git-send-email-paul.s.schilling@gmail.com>
+From: Josh.wu@atmel.com (Wu, Josh)
+Date: Sat, 22 Oct 2011 14:41:08 +0800
+Subject: [PATCH v4 1/3] [media] at91: add code to enable/disable ISI_MCK
+	clock
+In-Reply-To: <Pine.LNX.4.64.1110171702370.18438@axis700.grange>
+References: <1318331020-22031-1-git-send-email-josh.wu@atmel.com>
+	<1318331020-22031-2-git-send-email-josh.wu@atmel.com>
+	<Pine.LNX.4.64.1110171702370.18438@axis700.grange>
+Message-ID: <4C79549CB6F772498162A641D92D5328031B11E0@penmb01.corp.atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Added MMU access to the Static Memory Controller.
+Hi, Guennadi
 
-Signed-off-by: Paul Schilling <paul.s.schilling@gmail.com>
----
- arch/arm/mach-s3c2416/s3c2416.c |   12 ++++++++++++
- 1 files changed, 12 insertions(+), 0 deletions(-)
+On Monday, October 17, 2011 11:04 PM, Guennadi Liakhovetski wrote:
 
-diff --git a/arch/arm/mach-s3c2416/s3c2416.c b/arch/arm/mach-s3c2416/s3c2416.c
-index 494ce91..823a034 100644
---- a/arch/arm/mach-s3c2416/s3c2416.c
-+++ b/arch/arm/mach-s3c2416/s3c2416.c
-@@ -65,6 +65,18 @@ static struct map_desc s3c2416_iodesc[] __initdata = {
- 	IODESC_ENT(WATCHDOG),
- 	IODESC_ENT(CLKPWR),
- 	IODESC_ENT(TIMER),
-+	{
-+		.virtual	= (u32)S3C2412_VA_SSMC,
-+		.pfn		= __phys_to_pfn(S3C2412_PA_SSMC),
-+		.length		= SZ_1M,
-+		.type		= MT_DEVICE,
-+	},
-+	/*{
-+		.virtual	= (u32)S3C2412_VA_EBI,
-+		.pfn		= __phys_to_pfn(S3C2412_PA_EBI),
-+		.length		= SZ_1M,
-+		.type		= MT_DEVICE,
-+	},*/
- };
- 
- struct sysdev_class s3c2416_sysclass = {
--- 
-1.7.6.4
+> From: Josh Wu <josh.wu@atmel.com>
+>
+> This patch
+> - add ISI_MCK clock enable/disable code.
+> - change field name in isi_platform_data structure
+>
+> Signed-off-by: Josh Wu <josh.wu@atmel.com>
+> [g.liakhovetski at gmx.de: fix label names]
+> Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+> ---
+
+> Josh, I missed a slight hick-up in the previous version of this your 
+> patch, so, I fixed it myself. Please confirm, that this version is ok
+with 
+> you.
+
+> Thanks
+> Guennadi
+
+I confirm that the patch is ok for me. Thank you.
+
+Best Regards,
+Josh Wu
