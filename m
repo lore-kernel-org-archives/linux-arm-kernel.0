@@ -1,8 +1,8 @@
 From: david.yangshuai@gmail.com (David Yang)
-Date: Sun, 23 Oct 2011 12:45:27 +0800
+Date: Sun, 23 Oct 2011 13:51:01 +0800
 Subject: Question about: linux-linaro-2.6.38.7 booting the ubuntu 10.10
 	filesystem
-In-Reply-To: <20111022133759.GB21374@n2100.arm.linux.org.uk>
+In-Reply-To: <CALQsFOJt6Z7J=QiS1fsieZYvY+mjv4YFZVJHzp69DEBtAA_bfQ@mail.gmail.com>
 References: <CALQsFO+iuraeVVDZLWL5JUibNE2a-WC3ksGj3PV=tPWfuhJX9A@mail.gmail.com>
 	<CALQsFOJ+kYQ9iJfAPhcHtcWwA9A-5TFbUe+oyiTWrar=ZSN1_g@mail.gmail.com>
 	<B85A65D85D7EB246BE421B3FB0FBB5930328693B98@dbde02.ent.ti.com>
@@ -14,30 +14,39 @@ References: <CALQsFO+iuraeVVDZLWL5JUibNE2a-WC3ksGj3PV=tPWfuhJX9A@mail.gmail.com>
 	<CALQsFOLjbBmvPC5iU_cY3LrEe03Z8q90mm5UsS2KoqVQsLjivA@mail.gmail.com>
 	<CALQsFO+AbEH-LtEYCY7wDZW=7U=wYZrQcMPeoDio_BdkByWTcw@mail.gmail.com>
 	<20111022133759.GB21374@n2100.arm.linux.org.uk>
-Message-ID: <CALQsFOJt6Z7J=QiS1fsieZYvY+mjv4YFZVJHzp69DEBtAA_bfQ@mail.gmail.com>
+	<CALQsFOJt6Z7J=QiS1fsieZYvY+mjv4YFZVJHzp69DEBtAA_bfQ@mail.gmail.com>
+Message-ID: <CALQsFOJ8tcDAUM7AuEvkR6NU5wtq939M9vVUJZDScznGgQFHBQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-No,I just ported the kernel from 2.6.33 to 2.6.38.
+I have selected the HAVE_SCHED_CLOCK and implemnt the init_sched_clock fuction?
 
-So I didn't select the HAVE_SCHED_CLOCK?
+But the problem is the same?
 
-And I have tested it.
+So far ,I can get the login prompt  only when I select the preempiable kernel .
 
-When I select the HAVE_SCHED_CLOCK.
-the kernel will hang after uncompressing the kernel.
-
-
-Best Regards,
-David
-
-
-
-On Sat, Oct 22, 2011 at 9:37 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Sat, Oct 22, 2011 at 05:35:52PM +0800, David Yang wrote:
->> ?I found in my timer driver,I didn't implement the "init_sched_clock"
->> function.
+On 10/23/11, David Yang <david.yangshuai@gmail.com> wrote:
+> No,I just ported the kernel from 2.6.33 to 2.6.38.
 >
-> Have you selected HAVE_SCHED_CLOCK ?
+> So I didn't select the HAVE_SCHED_CLOCK?
+>
+> And I have tested it.
+>
+> When I select the HAVE_SCHED_CLOCK.
+> the kernel will hang after uncompressing the kernel.
+>
+>
+> Best Regards,
+> David
+>
+>
+>
+> On Sat, Oct 22, 2011 at 9:37 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+>> On Sat, Oct 22, 2011 at 05:35:52PM +0800, David Yang wrote:
+>>> ?I found in my timer driver,I didn't implement the "init_sched_clock"
+>>> function.
+>>
+>> Have you selected HAVE_SCHED_CLOCK ?
+>>
 >
