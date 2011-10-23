@@ -1,58 +1,42 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Sun, 23 Oct 2011 20:55:56 +0800
-Subject: [PATCH v2 1/7] clk: Add a generic clock infrastructure
-In-Reply-To: <1316730422-20027-2-git-send-email-mturquette@ti.com>
-References: <1316730422-20027-1-git-send-email-mturquette@ti.com>
-	<1316730422-20027-2-git-send-email-mturquette@ti.com>
-Message-ID: <20111023125555.GD1401@S2100-06.ap.freescale.net>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Sun, 23 Oct 2011 14:49:41 +0200
+Subject: [PATCH v7 08/16] ARM: LPAE: Page table maintenance for the
+	3-level format
+In-Reply-To: <20111023115635.GA17912@n2100.arm.linux.org.uk>
+References: <1312988619-16804-1-git-send-email-catalin.marinas@arm.com>
+	<1312988619-16804-9-git-send-email-catalin.marinas@arm.com>
+	<20111023115635.GA17912@n2100.arm.linux.org.uk>
+Message-ID: <CAHkRjk6kJmc7+MDGvyDqhVTBefPzjm-_XdrC85kpZozuYEb=YA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+On 23 October 2011 13:56, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Wed, Aug 10, 2011 at 04:03:31PM +0100, Catalin Marinas wrote:
+>> This patch modifies the pgd/pmd/pte manipulation functions to support
+>> the 3-level page table format. Since there is no need for an 'ext'
+>> argument to cpu_set_pte_ext(), this patch conditionally defines a
+>> different prototype for this function when CONFIG_ARM_LPAE.
+>
+> This has a really large number of ifdefs. ?You've split the 2 and 3
+> level page table stuff into two different header files already,
+> conditionalized on CONFIG_ARM_LPAE, yet we still end up with lots of
+> junk in the common header file conditionalized on that symbol. ?Can't
+> we find a way to restructure pgtable.h to sort this out more cleanly?
 
-Some random comments/nits ...
+I'll look into this.
 
-On Thu, Sep 22, 2011 at 03:26:56PM -0700, Mike Turquette wrote:
-> +struct clk *clk_register(const struct clk_hw_ops *ops, struct clk_hw *hw,
-> +		const char *name)
-> +{
-> +	struct clk *clk;
-> +
-> +	clk = kzalloc(sizeof(*clk), GFP_KERNEL);
-> +	if (!clk)
-> +		return NULL;
-> +
-> +	INIT_HLIST_HEAD(&clk->children);
-> +	INIT_HLIST_NODE(&clk->child_node);
-> +
-The children and child_node are introduced in patch #2, and should not
-be used in patch #1.
+> Do we really need to change the set_pte_ext() prototype as well - do
+> we _really_ need ifdefs around its declaration, and every usage of it
+> as well? ?Can't we just leave the 3rd argument as zero?
 
-> +	clk->name = name;
-> +	clk->ops = ops;
-> +	clk->hw = hw;
-> +	hw->clk = clk;
-> +
-> +	/* Query the hardware for parent and initial rate */
-> +
-> +	if (clk->ops->get_parent)
-> +		/* We don't to lock against prepare/enable here, as
-> +		 * the clock is not yet accessible from anywhere */
-/*
- * Multiple line comments
- */
+The LPAE variant of cpu_v7_set_pte_ext takes the second argument as a
+64-bit value:
 
-> +		clk->parent = clk->ops->get_parent(clk->hw);
-> +
-> +	if (clk->ops->recalc_rate)
-> +		clk->rate = clk->ops->recalc_rate(clk->hw);
-> +
-> +
-One blank line is good enough.
+r0 - ptep
+r2, r3 - pteval
 
-> +	return clk;
-> +}
+If we pass a third argument, that would go on the stack.
 
 -- 
-Regards,
-Shawn
+Catalin
