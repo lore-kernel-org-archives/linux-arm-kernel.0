@@ -1,48 +1,65 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Sun, 23 Oct 2011 16:30:23 +0200
-Subject: [PATCH v3 0/4] dmaengine: Device Tree support for Atmel DMA
-In-Reply-To: <4E9C258D.3030509@atmel.com>
-References: <1318438634-11826-1-git-send-email-nicolas.ferre@atmel.com>
-	<4E9C258D.3030509@atmel.com>
-Message-ID: <4EA424FF.50103@atmel.com>
+From: alexander.korolkov@gmail.com (Alexander Korolkov)
+Date: Sun, 23 Oct 2011 18:53:02 +0400
+Subject: Race condition in switch_to() / set_fs()
+Message-ID: <1319381582.2233.5.camel@kor2duo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/17/2011 02:54 PM, Nicolas Ferre :
-> On 10/12/2011 06:57 PM, Nicolas Ferre :
->> This series add the device tree support to Atmel DMA controller driver:
->> at_hdmac.
->> The removal of platform data ease the conversion to device tree. It also have
->> the additional benefit of being simpler and cleaner.
->>
->> Nicolas Ferre (4):
->>       dmaengine: at_hdmac: platform data move to use .id_table
->>       dmaengine: at_hdmac: add device tree support
->>       ARM: at91/dma: remove platform data from DMA controller
->>       ARM: at91/dma: DMA controller registering with DT support
->>
->>  .../devicetree/bindings/dma/atmel-dma.txt          |   14 ++++
->>  arch/arm/mach-at91/at91sam9g45_devices.c           |   17 ++---
->>  arch/arm/mach-at91/at91sam9rl_devices.c            |    8 +--
->>  arch/arm/mach-at91/include/mach/at_hdmac.h         |   10 ---
->>  drivers/dma/at_hdmac.c                             |   76 +++++++++++++++++---
->>  drivers/dma/at_hdmac_regs.h                        |    8 ++
->>  6 files changed, 97 insertions(+), 36 deletions(-)
->>  create mode 100644 Documentation/devicetree/bindings/dma/atmel-dma.txt
-> 
-> Vinod,
-> 
-> I have just rebased the dmaengine at_hdmac driver patches on top of your
-> "next" branch as a "v4" series. I send it to you with Grant's "Acked-by"
-> right now.
+Hello!
 
-Vinod,
+Seems like I've found a race condition in the ARM implementation of
+functions switch_to() and set_fs(). These functions modify the domain
+access control (DAC) register and current_thread_info()->cpu_domain
+without proper locking.
 
-Ping?
+I have a device based on LPC3250 microcontroller. Recently I've noticed
+that epoll_wait() system call sometimes returns -EFAULT. After an
+investigation I've found that sometimes __put_user() macro fails, but in
+the next system call with exactly the same arguments it works correctly!
+Then I've found that when __put_user() fails, DAC register contains a
+different value, and it isn't equal to cpu_domain.
 
-Do you want me to provide you a git tree for those two patches?
-Do you think it can make it for 3.2 merge window?
+My test system:
+- one process sending a lot of messages to another process via UNIX
+socket (i.e. a lot of context switches)
+- ethernet driver which sometimes reads unaligned u32 words
 
-Best regards,
--- 
-Nicolas Ferre
+What I observe:
+
+__switch_to():
+DAC = next_thread->cpu_domain
+
+       ethernet controller interrupt
+       access to unaligned u32
+       alignment fixup: do_alignment()
+       fs = get_fs();
+       set_fs(KERNEL_DS);
+       ...
+       set_fs(fs);
+       DAC = current_thread->cpu_domain
+       return from ISR
+
+context switch to next_thread
+return from __switch_to()
+__put_user() returns -EFAULT
+system call returns -EFAULT
+
+My conclusion: all interrupts must be disabled in __switch_to() and
+set_fs(), see attachment.
+
+This test is really hard to set up, so I'll try to make a simpler test.
+Meanwhile, please write me what do you think about this: is this a real
+problem, is my solution correct, is it possible that there are other
+similar problems?
+
+A lot of kernel versions is affected, at least from 2.6.22 to 3.0.
+
+With best regards,
+Alexander Korolkov
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: arm-race-condition-fixup.patch
+Type: text/x-patch
+Size: 1472 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111023/a341cea8/attachment.bin>
