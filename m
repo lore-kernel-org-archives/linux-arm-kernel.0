@@ -1,74 +1,60 @@
-From: nsekhar@ti.com (Nori, Sekhar)
-Date: Sun, 23 Oct 2011 21:48:15 +0530
-Subject: [PATCH] DaVinci: only poll EPCPR on DM644x and DM355
-In-Reply-To: <4EA40BDE.40606@mvista.com>
-References: <201109151829.49256.sshtylyov@ru.mvista.com>
-	<B85A65D85D7EB246BE421B3FB0FBB5930328B2DF68@dbde02.ent.ti.com>
-	<4EA40BDE.40606@mvista.com>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB5930328B2DF8C@dbde02.ent.ti.com>
+From: paul.s.schilling@gmail.com (Paul Schilling)
+Date: Sun, 23 Oct 2011 11:44:57 -0500
+Subject: [PATCH 06/14] ARM : SAMSUNG : S3C2416 Added io mapping for Static
+	memory controller.
+In-Reply-To: <201110222343.24141.heiko@sntech.de>
+References: <1319257301-5040-1-git-send-email-paul.s.schilling@gmail.com>
+	<201110222343.24141.heiko@sntech.de>
+Message-ID: <CAC=G6szC+S2oTSVf-KEXZHxc9cFHOqQeoOLaKhA6QWwSjQ=7Bg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 23, 2011 at 18:13:10, Sergei Shtylyov wrote:
-> On 23-10-2011 15:10, Nori, Sekhar wrote:
+Why did I add disabled code.  I didn't want to enable it if no one is
+using it at the moment.
+But,  I took me long enough to figure out how to enable the Static
+memory Controller in the
+MMU with out any hints to begin with.
 
-[...]
+Also the EBI portion is present in a vendor kernel version 2.6.21.
 
-> > OMAP-L137 and OMAP-L138 have additional power domains for DSP
-> > and Shared RAM, but do not support powering them down.
-> 
->     I haven't found such words in either OMAP-L137 or OMAP-L138 datasheets.
-> What they say is:
-> 
-> <<
-> - On PSC0 PD1/PD_DSP Domain: Controls the sleep state for DSP L1 and L2 Memories
-> - On PSC1 PD1/PD_SHRAM Domain: Controls the sleep state for the 128K Shared RAM
->  >>
-> 
->     Although "OMAP-L137 Application Processor System Reference Guide" indeed 
-> said that powering off domain 1 is not supported.
+The Static Memory Controller peripheral needs to be set when ethernet
+chips like the dm9000 is attached to the
+samsung  ARM S3C2416.  The Boardcon board is a good example.
 
-Right. There is a statement put in for shared ram as well.
-
-"
-Currently powering down the RAMs via the pseudo/RAM power domain is not 
-supported; therefore, these domains and the RAM should be left in their 
-default power on state.
-"
-
-BTW, it looks like a separate "System Reference Guide" doesn't exist
-anymore and all the OMAP-L1x user guides have been consolidated to a
-single "Technical Reference Manual".
-
->     Actually, I was able to power down DSP/shared RAM domains on DA830 (at 
-> least the state transition completed); although the domains were on, at least 
-> after U-Boot. That's how I checked that the code powering up these domains 
-> actually locks up on this SoC.
-
-Okay. Surely there must have been some corner case issues found
-which probably led the chip design team to make this feature
-unsupported.
-
-> > So, looks like the only SoC where PDSTAT might indicate a powered
-> > down domain is DM644x and existing code to looks alright for
-> > that SoC.
-> 
-> > At this time, it would be better to leave the code as-is and
-> > revisit it if/when a new SoC with programmable power domain
-> > support comes along.
-> 
->     At least on DA830 power domains appear to be programmable. So I'd still 
-> like the patch to be applied (I could drop DM355 check though).
-
-The problem would be that power domain state transition procedure isn't
-documented for any SoC other than DM644x. So, we can never be sure
-that just avoiding EPCR poll is sufficient for DA830. Software attempting
-this would be operating out of spec.
-
-So, how about allowing a power domain transition for DM644x and bailing
-out with a warning if a power domain on any other SoC is found to be off?
-
-This way users attempting this will be warned and fix their boot loader.
-
-Thanks,
-Sekhar
+On Sat, Oct 22, 2011 at 4:43 PM, Heiko St?bner <heiko@sntech.de> wrote:
+> Am Samstag 22 Oktober 2011, 06:21:41 schrieb Paul Schilling:
+>> Added MMU access to the Static Memory Controller.
+>>
+>> Signed-off-by: Paul Schilling <paul.s.schilling@gmail.com>
+>> ---
+>> ?arch/arm/mach-s3c2416/s3c2416.c | ? 12 ++++++++++++
+>> ?1 files changed, 12 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-s3c2416/s3c2416.c
+>> b/arch/arm/mach-s3c2416/s3c2416.c index 494ce91..823a034 100644
+>> --- a/arch/arm/mach-s3c2416/s3c2416.c
+>> +++ b/arch/arm/mach-s3c2416/s3c2416.c
+>> @@ -65,6 +65,18 @@ static struct map_desc s3c2416_iodesc[] __initdata = {
+>> ? ? ? IODESC_ENT(WATCHDOG),
+>> ? ? ? IODESC_ENT(CLKPWR),
+>> ? ? ? IODESC_ENT(TIMER),
+>> + ? ? {
+>> + ? ? ? ? ? ? .virtual ? ? ? ?= (u32)S3C2412_VA_SSMC,
+>> + ? ? ? ? ? ? .pfn ? ? ? ? ? ?= __phys_to_pfn(S3C2412_PA_SSMC),
+>> + ? ? ? ? ? ? .length ? ? ? ? = SZ_1M,
+>> + ? ? ? ? ? ? .type ? ? ? ? ? = MT_DEVICE,
+>> + ? ? },
+>> + ? ? /*{
+>> + ? ? ? ? ? ? .virtual ? ? ? ?= (u32)S3C2412_VA_EBI,
+>> + ? ? ? ? ? ? .pfn ? ? ? ? ? ?= __phys_to_pfn(S3C2412_PA_EBI),
+>> + ? ? ? ? ? ? .length ? ? ? ? = SZ_1M,
+>> + ? ? ? ? ? ? .type ? ? ? ? ? = MT_DEVICE,
+>> + ? ? },*/
+>> ?};
+> why are you adding disabled code?
+>
+> Btw. it seems your posts got mangled somehow... only your patches 2,5 and 6 of
+> 14 made it to linux-kernel and linux-arm-kernel.
+>
+> Heiko
+>
