@@ -1,73 +1,30 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 23 Oct 2011 12:59:57 +0100
-Subject: [PATCH v7 15/16] ARM: LPAE: add support for ATAG_MEM64
-In-Reply-To: <1312988619-16804-16-git-send-email-catalin.marinas@arm.com>
+Date: Sun, 23 Oct 2011 13:00:08 +0100
+Subject: [PATCH v7 16/16] ARM: LPAE: Add the Kconfig entries
+In-Reply-To: <1312988619-16804-17-git-send-email-catalin.marinas@arm.com>
 References: <1312988619-16804-1-git-send-email-catalin.marinas@arm.com>
-	<1312988619-16804-16-git-send-email-catalin.marinas@arm.com>
-Message-ID: <20111023115957.GD17912@n2100.arm.linux.org.uk>
+	<1312988619-16804-17-git-send-email-catalin.marinas@arm.com>
+Message-ID: <20111023120008.GE17912@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 10, 2011 at 04:03:38PM +0100, Catalin Marinas wrote:
-> From: Will Deacon <will.deacon@arm.com>
-> 
-> LPAE provides support for memory banks with physical addresses of up
-> to 40 bits.
-> 
-> This patch adds a new atag, ATAG_MEM64, so that the Kernel can be
-> informed about memory that exists above the 4GB boundary.
-> 
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-> ---
->  arch/arm/include/asm/setup.h |    8 ++++++++
->  arch/arm/kernel/setup.c      |   10 ++++++++++
->  2 files changed, 18 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/setup.h b/arch/arm/include/asm/setup.h
-> index 915696d..a3ca303 100644
-> --- a/arch/arm/include/asm/setup.h
-> +++ b/arch/arm/include/asm/setup.h
-> @@ -43,6 +43,13 @@ struct tag_mem32 {
->  	__u32	start;	/* physical start address */
->  };
+On Wed, Aug 10, 2011 at 04:03:39PM +0100, Catalin Marinas wrote:
+> diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+> index 88633fe..2df5504 100644
+> --- a/arch/arm/mm/Kconfig
+> +++ b/arch/arm/mm/Kconfig
+> @@ -629,6 +629,19 @@ config IO_36
 >  
-> +#define ATAG_MEM64	0x54420002
-> +
-> +struct tag_mem64 {
-> +	__u64	size;
-> +	__u64	start;	/* physical start address */
-> +};
-> +
->  /* VGA text type displays */
->  #define ATAG_VIDEOTEXT	0x54410003
+>  comment "Processor Features"
 >  
-> @@ -148,6 +155,7 @@ struct tag {
->  	union {
->  		struct tag_core		core;
->  		struct tag_mem32	mem;
-> +		struct tag_mem64	mem64;
->  		struct tag_videotext	videotext;
->  		struct tag_ramdisk	ramdisk;
->  		struct tag_initrd	initrd;
-> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-> index 70bca64..a126558 100644
-> --- a/arch/arm/kernel/setup.c
-> +++ b/arch/arm/kernel/setup.c
-> @@ -608,6 +608,16 @@ static int __init parse_tag_mem32(const struct tag *tag)
->  
->  __tagtable(ATAG_MEM, parse_tag_mem32);
->  
-> +#ifdef CONFIG_PHYS_ADDR_T_64BIT
-> +static int __init parse_tag_mem64(const struct tag *tag)
-> +{
-> +	/* We only use 32-bits for the size. */
-> +	return arm_add_memory(tag->u.mem64.start, (unsigned long)tag->u.mem64.size);
-> +}
-> +
-> +__tagtable(ATAG_MEM64, parse_tag_mem64);
-> +#endif /* CONFIG_PHYS_ADDR_T_64BIT */
-> +
+> +config ARM_LPAE
+> +	bool "Support for the Large Physical Address Extension"
+> +	depends on MMU && CPU_V7
+> +	help
+> +	  Say Y if you have an ARMv7 processor supporting the LPAE page table
+> +	  format and you would like to access memory beyond the 4GB limit.
 
-We should allow this even on 32-bit only kernels - but avoiding adding
->32-bit memory to the system in that case.
+This help text is entirely insufficient.  It doesn't tell people what the
+implications are for enabling this option on CPUs without LPAE support.
+(It won't boot.)  It doesn't suggest what people should select when they're
+unsure what setting to use.
