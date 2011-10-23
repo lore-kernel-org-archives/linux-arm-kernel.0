@@ -1,42 +1,49 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Sun, 23 Oct 2011 14:49:41 +0200
-Subject: [PATCH v7 08/16] ARM: LPAE: Page table maintenance for the
-	3-level format
-In-Reply-To: <20111023115635.GA17912@n2100.arm.linux.org.uk>
-References: <1312988619-16804-1-git-send-email-catalin.marinas@arm.com>
-	<1312988619-16804-9-git-send-email-catalin.marinas@arm.com>
-	<20111023115635.GA17912@n2100.arm.linux.org.uk>
-Message-ID: <CAHkRjk6kJmc7+MDGvyDqhVTBefPzjm-_XdrC85kpZozuYEb=YA@mail.gmail.com>
+From: bernd@petrovitsch.priv.at (Bernd Petrovitsch)
+Date: Sun, 23 Oct 2011 16:06:27 +0200
+Subject: [PATCH 0/3] ARM 4Kstacks: introduction
+In-Reply-To: <1500345.YeXPhIIHc5@wuerfel>
+References: <4E9E0B71.9020708@am.sony.com>
+	<1318983248.7569.5.camel@Joe-Laptop> <4E9E1944.80601@am.sony.com>
+	<1500345.YeXPhIIHc5@wuerfel>
+Message-ID: <1319378792.20227.105.camel@thorin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23 October 2011 13:56, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Wed, Aug 10, 2011 at 04:03:31PM +0100, Catalin Marinas wrote:
->> This patch modifies the pgd/pmd/pte manipulation functions to support
->> the 3-level page table format. Since there is no need for an 'ext'
->> argument to cpu_set_pte_ext(), this patch conditionally defines a
->> different prototype for this function when CONFIG_ARM_LPAE.
->
-> This has a really large number of ifdefs. ?You've split the 2 and 3
-> level page table stuff into two different header files already,
-> conditionalized on CONFIG_ARM_LPAE, yet we still end up with lots of
-> junk in the common header file conditionalized on that symbol. ?Can't
-> we find a way to restructure pgtable.h to sort this out more cleanly?
+On Mit, 2011-10-19 at 12:51 +0200, Arnd Bergmann wrote:
+> On Tuesday 18 October 2011 17:26:44 Tim Bird wrote:
+> > Even inside Sony, usage of 4K stacks is limited
+> > to some very special cases, where memory is exceedingly
+> > tight (we have one system with 4M of RAM).  And we
+> > don't mind lopping off features or coding around
+> > problem areas to support our special case.
 
-I'll look into this.
+Yes, for low memory situations (as in up to 8M) it is usually necessary
+anyways to write every "./configure" line yourself for packages to make
+sure everything possible is disabled unless it is absolutely necessary.
+And a minimal custom kernel config is also unavoidable.
 
-> Do we really need to change the set_pte_ext() prototype as well - do
-> we _really_ need ifdefs around its declaration, and every usage of it
-> as well? ?Can't we just leave the 3rd argument as zero?
+And then you don't have any fancy filesystems (like ext2 or some FAT
+variant), loopback devices, stacking block devices or other "recursive"
+parts - just a flash file system (and not necessarily that if you run
+the system from the initrd which is loaded and decompressed by the boot
+loader).
 
-The LPAE variant of cpu_v7_set_pte_ext takes the second argument as a
-64-bit value:
+So all the points with "stack overflow with stacked $WHATEVER" can't
+happen anyways. And in this situation one controls the user-space too,
+so there won't be any obscure "root can do" issues anyways.
 
-r0 - ptep
-r2, r3 - pteval
+[ and there are more potential savings in the kernel - and user-space -
+for these devices/systems. ]
 
-If we pass a third argument, that would go on the stack.
+> I would imagine that in those cases, you can gain more by reducing the
+> number of threads in the system. What is the highest number of
 
+If you are very limited on memory, you do this anyways: minimizing the
+number of processes and threads - or better just do not use threads at
+all because it also saves space.
+
+	Bernd
 -- 
-Catalin
+Bernd Petrovitsch                  Email : bernd at petrovitsch.priv.at
+                     LUGA : http://www.luga.at
+ 
