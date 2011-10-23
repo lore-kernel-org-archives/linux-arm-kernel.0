@@ -1,214 +1,45 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 23 Oct 2011 12:57:56 +0100
-Subject: [PATCH v7 11/16] ARM: LPAE: Add fault handling support
-In-Reply-To: <1312988619-16804-12-git-send-email-catalin.marinas@arm.com>
+Date: Sun, 23 Oct 2011 12:59:38 +0100
+Subject: [PATCH v7 13/16] ARM: LPAE: Add identity mapping support for
+	the 3-level page table format
+In-Reply-To: <1312988619-16804-14-git-send-email-catalin.marinas@arm.com>
 References: <1312988619-16804-1-git-send-email-catalin.marinas@arm.com>
-	<1312988619-16804-12-git-send-email-catalin.marinas@arm.com>
-Message-ID: <20111023115756.GB17912@n2100.arm.linux.org.uk>
+	<1312988619-16804-14-git-send-email-catalin.marinas@arm.com>
+Message-ID: <20111023115938.GC17912@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 10, 2011 at 04:03:34PM +0100, Catalin Marinas wrote:
-> diff --git a/arch/arm/mm/alignment.c b/arch/arm/mm/alignment.c
-> index be7c638..f0bf61a 100644
-> --- a/arch/arm/mm/alignment.c
-> +++ b/arch/arm/mm/alignment.c
-> @@ -909,6 +909,12 @@ do_alignment(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
->  	return 0;
->  }
->  
-> +#ifdef CONFIG_ARM_LPAE
-> +#define ALIGNMENT_FAULT		33
-> +#else
-> +#define ALIGNMENT_FAULT		1
-> +#endif
+On Wed, Aug 10, 2011 at 04:03:36PM +0100, Catalin Marinas wrote:
+> The pmd_addr_end() definition has been removed and the
+> generic one used instead.
 
-Probably makes sense to move this into a header, along with the other
-fault codes, other FSR bits and fsr_fs().
+NAK - it helps to read code comments.
 
-> +
->  /*
->   * This needs to be done after sysctl_init, otherwise sys/ will be
->   * overwritten.  Actually, this shouldn't be in sys/ at all since
-> @@ -942,7 +948,7 @@ static int __init alignment_init(void)
->  		ai_usermode = UM_FIXUP;
->  	}
->  
-> -	hook_fault_code(1, do_alignment, SIGBUS, BUS_ADRALN,
-> +	hook_fault_code(ALIGNMENT_FAULT, do_alignment, SIGBUS, BUS_ADRALN,
->  			"alignment exception");
->  
->  	/*
-> diff --git a/arch/arm/mm/fault.c b/arch/arm/mm/fault.c
-> index 3b5ea68..91d1768 100644
-> --- a/arch/arm/mm/fault.c
-> +++ b/arch/arm/mm/fault.c
-> @@ -33,10 +33,15 @@
->  #define FSR_WRITE		(1 << 11)
->  #define FSR_FS4			(1 << 10)
->  #define FSR_FS3_0		(15)
-> +#define FSR_FS5_0		(0x3f)
->  
->  static inline int fsr_fs(unsigned int fsr)
->  {
-> +#ifdef CONFIG_ARM_LPAE
-> +	return fsr & FSR_FS5_0;
-> +#else
->  	return (fsr & FSR_FS3_0) | (fsr & FSR_FS4) >> 6;
-> +#endif
->  }
->  
->  #ifdef CONFIG_MMU
-> @@ -122,8 +127,10 @@ void show_pte(struct mm_struct *mm, unsigned long addr)
->  
->  		pte = pte_offset_map(pmd, addr);
->  		printk(", *pte=%08llx", (long long)pte_val(*pte));
-> +#ifndef CONFIG_ARM_LPAE
->  		printk(", *ppte=%08llx",
->  		       (long long)pte_val(pte[PTE_HWTABLE_PTRS]));
-> +#endif
->  		pte_unmap(pte);
->  	} while(0);
->  
-> @@ -440,6 +447,12 @@ do_translation_fault(unsigned long addr, unsigned int fsr,
->  	pmd = pmd_offset(pud, addr);
->  	pmd_k = pmd_offset(pud_k, addr);
->  
-> +#ifdef CONFIG_ARM_LPAE
-> +	/*
-> +	 * Only one hardware entry per PMD with LPAE.
-> +	 */
-> +	index = 0;
-> +#else
->  	/*
->  	 * On ARM one Linux PGD entry contains two hardware entries (see page
->  	 * tables layout in pgtable.h). We normally guarantee that we always
-> @@ -449,6 +462,7 @@ do_translation_fault(unsigned long addr, unsigned int fsr,
->  	 * for the first of pair.
->  	 */
->  	index = (addr >> SECTION_SHIFT) & 1;
-> +#endif
->  	if (pmd_none(pmd_k[index]))
->  		goto bad_area;
->  
-> @@ -494,6 +508,72 @@ static struct fsr_info {
->  	int	code;
->  	const char *name;
->  } fsr_info[] = {
-> +#ifdef CONFIG_ARM_LPAE
-> +	{ do_bad,		SIGBUS,  0,		"unknown 0"			},
-> +	{ do_bad,		SIGBUS,  0,		"unknown 1"			},
-> +	{ do_bad,		SIGBUS,  0,		"unknown 2"			},
-> +	{ do_bad,		SIGBUS,  0,		"unknown 3"			},
-> +	{ do_bad,		SIGBUS,  0,		"reserved translation fault"	},
-> +	{ do_translation_fault,	SIGSEGV, SEGV_MAPERR,	"level 1 translation fault"	},
-> +	{ do_translation_fault,	SIGSEGV, SEGV_MAPERR,	"level 2 translation fault"	},
-> +	{ do_page_fault,	SIGSEGV, SEGV_MAPERR,	"level 3 translation fault"	},
-> +	{ do_bad,		SIGBUS,  0,		"reserved access flag fault"	},
-> +	{ do_bad,		SIGSEGV, SEGV_ACCERR,	"level 1 access flag fault"	},
-> +	{ do_bad,		SIGSEGV, SEGV_ACCERR,	"level 2 access flag fault"	},
-> +	{ do_page_fault,	SIGSEGV, SEGV_ACCERR,	"level 3 access flag fault"	},
-> +	{ do_bad,		SIGBUS,  0,		"reserved permission fault"	},
-> +	{ do_bad,		SIGSEGV, SEGV_ACCERR,	"level 1 permission fault"	},
-> +	{ do_sect_fault,	SIGSEGV, SEGV_ACCERR,	"level 2 permission fault"	},
-> +	{ do_page_fault,	SIGSEGV, SEGV_ACCERR,	"level 3 permission fault"	},
-> +	{ do_bad,		SIGBUS,  0,		"synchronous external abort"	},
-> +	{ do_bad,		SIGBUS,  0,		"asynchronous external abort"	},
-> +	{ do_bad,		SIGBUS,  0,		"unknown 18"			},
-> +	{ do_bad,		SIGBUS,  0,		"unknown 19"			},
-> +	{ do_bad,		SIGBUS,  0,		"synchronous abort (translation table walk)" },
-> +	{ do_bad,		SIGBUS,  0,		"synchronous abort (translation table walk)" },
-> +	{ do_bad,		SIGBUS,  0,		"synchronous abort (translation table walk)" },
-> +	{ do_bad,		SIGBUS,  0,		"synchronous abort (translation table walk)" },
-> +	{ do_bad,		SIGBUS,  0,		"synchronous parity error"	},
-> +	{ do_bad,		SIGBUS,  0,		"asynchronous parity error"	},
-> +	{ do_bad,		SIGBUS,  0,		"unknown 26"			},
-> +	{ do_bad,		SIGBUS,  0,		"unknown 27"			},
-> +	{ do_bad,		SIGBUS,  0,		"synchronous parity error (translation table walk" },
-> +	{ do_bad,		SIGBUS,  0,		"synchronous parity error (translation table walk" },
-> +	{ do_bad,		SIGBUS,  0,		"synchronous parity error (translation table walk" },
-> +	{ do_bad,		SIGBUS,  0,		"synchronous parity error (translation table walk" },
-> +	{ do_bad,		SIGBUS,  0,		"unknown 32"			},
-> +	{ do_bad,		SIGBUS,  BUS_ADRALN,	"alignment fault"		},
-> +	{ do_bad,		SIGBUS,  0,		"debug event"			},
-> +	{ do_bad,		SIGBUS,  0,		"unknown 35"			},
-> +	{ do_bad,		SIGBUS,  0,		"unknown 36"			},
-> +	{ do_bad,		SIGBUS,  0,		"unknown 37"			},
-> +	{ do_bad,		SIGBUS,  0,		"unknown 38"			},
-> +	{ do_bad,		SIGBUS,  0,		"unknown 39"			},
-> +	{ do_bad,		SIGBUS,  0,		"unknown 40"			},
-> +	{ do_bad,		SIGBUS,  0,		"unknown 41"			},
-> +	{ do_bad,		SIGBUS,  0,		"unknown 42"			},
-> +	{ do_bad,		SIGBUS,  0,		"unknown 43"			},
-> +	{ do_bad,		SIGBUS,  0,		"unknown 44"			},
-> +	{ do_bad,		SIGBUS,  0,		"unknown 45"			},
-> +	{ do_bad,		SIGBUS,  0,		"unknown 46"			},
-> +	{ do_bad,		SIGBUS,  0,		"unknown 47"			},
-> +	{ do_bad,		SIGBUS,  0,		"unknown 48"			},
-> +	{ do_bad,		SIGBUS,  0,		"unknown 49"			},
-> +	{ do_bad,		SIGBUS,  0,		"unknown 50"			},
-> +	{ do_bad,		SIGBUS,  0,		"unknown 51"			},
-> +	{ do_bad,		SIGBUS,  0,		"implementation fault (lockdown abort)" },
-> +	{ do_bad,		SIGBUS,  0,		"unknown 53"			},
-> +	{ do_bad,		SIGBUS,  0,		"unknown 54"			},
-> +	{ do_bad,		SIGBUS,  0,		"unknown 55"			},
-> +	{ do_bad,		SIGBUS,  0,		"unknown 56"			},
-> +	{ do_bad,		SIGBUS,  0,		"unknown 57"			},
-> +	{ do_bad,		SIGBUS,  0,		"implementation fault (coprocessor abort)" },
-> +	{ do_bad,		SIGBUS,  0,		"unknown 59"			},
-> +	{ do_bad,		SIGBUS,  0,		"unknown 60"			},
-> +	{ do_bad,		SIGBUS,  0,		"unknown 61"			},
-> +	{ do_bad,		SIGBUS,  0,		"unknown 62"			},
-> +	{ do_bad,		SIGBUS,  0,		"unknown 63"			},
-> +#else	/* !CONFIG_ARM_LPAE */
->  	/*
->  	 * The following are the standard ARMv3 and ARMv4 aborts.  ARMv5
->  	 * defines these to be "precise" aborts.
-> @@ -535,6 +615,7 @@ static struct fsr_info {
->  	{ do_bad,		SIGBUS,  0,		"unknown 29"			   },
->  	{ do_bad,		SIGBUS,  0,		"unknown 30"			   },
->  	{ do_bad,		SIGBUS,  0,		"unknown 31"			   }
-> +#endif	/* CONFIG_ARM_LPAE */
+commit c0ba10b512eb2e2a3888b6e6cc0e089f5e7a191b
+Author: Russell King <rmk+kernel@arm.linux.org.uk>
+Date:   Sun Nov 21 14:42:47 2010 +0000
 
-Can't we do better than this?
+    ARM: improve compiler's ability to optimize page tables
+    
+    Allow the compiler to better optimize the page table walking code
+    by avoiding over-complex pmd_addr_end() calculations.  These
+    calculations prevent the compiler spotting that we'll never iterate
+    over the PMD table, causing it to create double nested loops where
+    a single loop will do.
+    
+    Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
->  };
->  
->  void __init
-> @@ -573,6 +654,9 @@ do_DataAbort(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
->  }
->  
->  
-> +#ifdef CONFIG_ARM_LPAE
-> +#define ifsr_info	fsr_info
-> +#else	/* !CONFIG_ARM_LPAE */
->  static struct fsr_info ifsr_info[] = {
->  	{ do_bad,		SIGBUS,  0,		"unknown 0"			   },
->  	{ do_bad,		SIGBUS,  0,		"unknown 1"			   },
-> @@ -607,6 +691,7 @@ static struct fsr_info ifsr_info[] = {
->  	{ do_bad,		SIGBUS,  0,		"unknown 30"			   },
->  	{ do_bad,		SIGBUS,  0,		"unknown 31"			   },
->  };
-> +#endif	/* CONFIG_ARM_LPAE */
->  
->  void __init
->  hook_ifault_code(int nr, int (*fn)(unsigned long, unsigned int, struct pt_regs *),
-> @@ -642,6 +727,7 @@ do_PrefetchAbort(unsigned long addr, unsigned int ifsr, struct pt_regs *regs)
->  
->  static int __init exceptions_init(void)
->  {
-> +#ifndef CONFIG_ARM_LPAE
->  	if (cpu_architecture() >= CPU_ARCH_ARMv6) {
->  		hook_fault_code(4, do_translation_fault, SIGSEGV, SEGV_MAPERR,
->  				"I-cache maintenance fault");
-> @@ -657,6 +743,7 @@ static int __init exceptions_init(void)
->  		hook_fault_code(6, do_bad, SIGSEGV, SEGV_MAPERR,
->  				"section access flag fault");
->  	}
-> +#endif
->  
->  	return 0;
->  }
-
-Do we even need exceptions_init() at all for LPAE?  If not, can't we
-avoid the whole of this including the useless init call.
+diff --git a/arch/arm/include/asm/pgtable.h b/arch/arm/include/asm/pgtable.h
+index b155414..53d1d5d 100644
+--- a/arch/arm/include/asm/pgtable.h
++++ b/arch/arm/include/asm/pgtable.h
+@@ -374,6 +374,9 @@ static inline pte_t *pmd_page_vaddr(pmd_t pmd)
+ 
+ #define pmd_page(pmd)          pfn_to_page(__phys_to_pfn(pmd_val(pmd)))
+ 
++/* we don't need complex calculations here as the pmd is folded into the pgd */
++#define pmd_addr_end(addr,end) (end)
++
+ /*
+  * Conversion functions: convert a page and protection to a page entry,
+  * and a page entry and page directory to the page they refer to.
