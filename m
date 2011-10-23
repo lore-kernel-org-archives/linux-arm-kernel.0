@@ -1,65 +1,74 @@
-From: alexander.korolkov@gmail.com (Alexander Korolkov)
-Date: Sun, 23 Oct 2011 18:53:02 +0400
-Subject: Race condition in switch_to() / set_fs()
-Message-ID: <1319381582.2233.5.camel@kor2duo>
+From: nsekhar@ti.com (Nori, Sekhar)
+Date: Sun, 23 Oct 2011 21:48:15 +0530
+Subject: [PATCH] DaVinci: only poll EPCPR on DM644x and DM355
+In-Reply-To: <4EA40BDE.40606@mvista.com>
+References: <201109151829.49256.sshtylyov@ru.mvista.com>
+	<B85A65D85D7EB246BE421B3FB0FBB5930328B2DF68@dbde02.ent.ti.com>
+	<4EA40BDE.40606@mvista.com>
+Message-ID: <B85A65D85D7EB246BE421B3FB0FBB5930328B2DF8C@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello!
+On Sun, Oct 23, 2011 at 18:13:10, Sergei Shtylyov wrote:
+> On 23-10-2011 15:10, Nori, Sekhar wrote:
 
-Seems like I've found a race condition in the ARM implementation of
-functions switch_to() and set_fs(). These functions modify the domain
-access control (DAC) register and current_thread_info()->cpu_domain
-without proper locking.
+[...]
 
-I have a device based on LPC3250 microcontroller. Recently I've noticed
-that epoll_wait() system call sometimes returns -EFAULT. After an
-investigation I've found that sometimes __put_user() macro fails, but in
-the next system call with exactly the same arguments it works correctly!
-Then I've found that when __put_user() fails, DAC register contains a
-different value, and it isn't equal to cpu_domain.
+> > OMAP-L137 and OMAP-L138 have additional power domains for DSP
+> > and Shared RAM, but do not support powering them down.
+> 
+>     I haven't found such words in either OMAP-L137 or OMAP-L138 datasheets.
+> What they say is:
+> 
+> <<
+> - On PSC0 PD1/PD_DSP Domain: Controls the sleep state for DSP L1 and L2 Memories
+> - On PSC1 PD1/PD_SHRAM Domain: Controls the sleep state for the 128K Shared RAM
+>  >>
+> 
+>     Although "OMAP-L137 Application Processor System Reference Guide" indeed 
+> said that powering off domain 1 is not supported.
 
-My test system:
-- one process sending a lot of messages to another process via UNIX
-socket (i.e. a lot of context switches)
-- ethernet driver which sometimes reads unaligned u32 words
+Right. There is a statement put in for shared ram as well.
 
-What I observe:
+"
+Currently powering down the RAMs via the pseudo/RAM power domain is not 
+supported; therefore, these domains and the RAM should be left in their 
+default power on state.
+"
 
-__switch_to():
-DAC = next_thread->cpu_domain
+BTW, it looks like a separate "System Reference Guide" doesn't exist
+anymore and all the OMAP-L1x user guides have been consolidated to a
+single "Technical Reference Manual".
 
-       ethernet controller interrupt
-       access to unaligned u32
-       alignment fixup: do_alignment()
-       fs = get_fs();
-       set_fs(KERNEL_DS);
-       ...
-       set_fs(fs);
-       DAC = current_thread->cpu_domain
-       return from ISR
+>     Actually, I was able to power down DSP/shared RAM domains on DA830 (at 
+> least the state transition completed); although the domains were on, at least 
+> after U-Boot. That's how I checked that the code powering up these domains 
+> actually locks up on this SoC.
 
-context switch to next_thread
-return from __switch_to()
-__put_user() returns -EFAULT
-system call returns -EFAULT
+Okay. Surely there must have been some corner case issues found
+which probably led the chip design team to make this feature
+unsupported.
 
-My conclusion: all interrupts must be disabled in __switch_to() and
-set_fs(), see attachment.
+> > So, looks like the only SoC where PDSTAT might indicate a powered
+> > down domain is DM644x and existing code to looks alright for
+> > that SoC.
+> 
+> > At this time, it would be better to leave the code as-is and
+> > revisit it if/when a new SoC with programmable power domain
+> > support comes along.
+> 
+>     At least on DA830 power domains appear to be programmable. So I'd still 
+> like the patch to be applied (I could drop DM355 check though).
 
-This test is really hard to set up, so I'll try to make a simpler test.
-Meanwhile, please write me what do you think about this: is this a real
-problem, is my solution correct, is it possible that there are other
-similar problems?
+The problem would be that power domain state transition procedure isn't
+documented for any SoC other than DM644x. So, we can never be sure
+that just avoiding EPCR poll is sufficient for DA830. Software attempting
+this would be operating out of spec.
 
-A lot of kernel versions is affected, at least from 2.6.22 to 3.0.
+So, how about allowing a power domain transition for DM644x and bailing
+out with a warning if a power domain on any other SoC is found to be off?
 
-With best regards,
-Alexander Korolkov
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: arm-race-condition-fixup.patch
-Type: text/x-patch
-Size: 1472 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111023/a341cea8/attachment.bin>
+This way users attempting this will be warned and fix their boot loader.
+
+Thanks,
+Sekhar
