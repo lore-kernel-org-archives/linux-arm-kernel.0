@@ -1,63 +1,43 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Sat, 22 Oct 2011 22:43:19 -0500
-Subject: [PATCH] ARM: gic: fix irq_alloc_descs handling for sparse irq
-In-Reply-To: <20111022203635.GA30950@n2100.arm.linux.org.uk>
-References: <1319314808-27007-1-git-send-email-robherring2@gmail.com>
-	<20111022203635.GA30950@n2100.arm.linux.org.uk>
-Message-ID: <4EA38D57.8050007@gmail.com>
+From: david.yangshuai@gmail.com (David Yang)
+Date: Sun, 23 Oct 2011 12:45:27 +0800
+Subject: Question about: linux-linaro-2.6.38.7 booting the ubuntu 10.10
+	filesystem
+In-Reply-To: <20111022133759.GB21374@n2100.arm.linux.org.uk>
+References: <CALQsFO+iuraeVVDZLWL5JUibNE2a-WC3ksGj3PV=tPWfuhJX9A@mail.gmail.com>
+	<CALQsFOJ+kYQ9iJfAPhcHtcWwA9A-5TFbUe+oyiTWrar=ZSN1_g@mail.gmail.com>
+	<B85A65D85D7EB246BE421B3FB0FBB5930328693B98@dbde02.ent.ti.com>
+	<CALQsFOJHiLVskuhGe-OsK8PdUxuR8Lv9idJcmf8vZEumenBUnw@mail.gmail.com>
+	<CALQsFOLs-Jz5-yPGOZkpqumgUUq8V90mCrEJ1EBPvXSwMbVM3A@mail.gmail.com>
+	<B85A65D85D7EB246BE421B3FB0FBB5930328B2D77E@dbde02.ent.ti.com>
+	<CALQsFOKEXCmaHdo7hj25CgjYFijodu6qs1okSwkfNPmuOz6GJg@mail.gmail.com>
+	<CALQsFOKjH+k6e6tS4HoNrBvB9BdNYfz3F8P-veZtgk6fyOk-Zw@mail.gmail.com>
+	<CALQsFOLjbBmvPC5iU_cY3LrEe03Z8q90mm5UsS2KoqVQsLjivA@mail.gmail.com>
+	<CALQsFO+AbEH-LtEYCY7wDZW=7U=wYZrQcMPeoDio_BdkByWTcw@mail.gmail.com>
+	<20111022133759.GB21374@n2100.arm.linux.org.uk>
+Message-ID: <CALQsFOJt6Z7J=QiS1fsieZYvY+mjv4YFZVJHzp69DEBtAA_bfQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell,
+No,I just ported the kernel from 2.6.33 to 2.6.38.
 
-On 10/22/2011 03:36 PM, Russell King - ARM Linux wrote:
-> On Sat, Oct 22, 2011 at 03:20:08PM -0500, Rob Herring wrote:
->> @@ -657,7 +664,7 @@ int __init gic_of_init(struct device_node *node, struct device_node *parent)
->>  
->>  	domain->of_node = of_node_get(node);
->>  
->> -	gic_init(gic_cnt, 16, dist_base, cpu_base);
->> +	gic_init(gic_cnt, -1, dist_base, cpu_base);
->>  
->>  	if (parent) {
->>  		irq = irq_of_parse_and_map(node, 0);
-> 
-> You don't explain this change - '16' is used here to skip the SGI
-> interrupts which will never be passed to the generic IRQ subsystem
-> from the GIC.
+So I didn't select the HAVE_SCHED_CLOCK?
 
-This makes irq_alloc_descs do dynamic IRQ# assignment rather than
-allocating at the specified IRQ#.
+And I have tested it.
 
-> 
-> Moreover, the second parameter is an unsigned integer, not a signed
-> integer.
-> 
-> And not only that, but:
-> 
->         gic->irq_offset = (irq_start - 1) & ~31;
-> 
-> means that irq_offset ends up being -2 & ~31, or -32.  Do you really
-> want the PPIs to generate IRQ numbers from -16 to -1 ?  It doesn't stop
-> there:
-> 
->         for (i = irq_start; i < irq_limit; i++) {
->                 irq_set_chip_and_handler(i, &gic_chip, handle_fasteoi_irq);
->                 irq_set_chip_data(i, gic);
->                 set_irq_flags(i, IRQF_VALID | IRQF_PROBE);
->         }
-> 
-> This will start from -1 to irq_limit (-1 + number of GIC IRQs).
-> 
-> Basically, -1 is not legal here - 1 is the minimum valid value that
-> this function takes for proper operation - but that's just wasteful, so
-> 16 is the realistic minimum value.
+When I select the HAVE_SCHED_CLOCK.
+the kernel will hang after uncompressing the kernel.
 
-You're not looking at the right version of gic code. This is the basis
-of this patch which has changes to the lines you reference:
 
-http://lists.infradead.org/pipermail/linux-arm-kernel/2011-September/067588.html
+Best Regards,
+David
 
-You are right about irq_start needing to be signed.
 
-Rob
+
+On Sat, Oct 22, 2011 at 9:37 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Sat, Oct 22, 2011 at 05:35:52PM +0800, David Yang wrote:
+>> ?I found in my timer driver,I didn't implement the "init_sched_clock"
+>> function.
+>
+> Have you selected HAVE_SCHED_CLOCK ?
+>
