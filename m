@@ -1,49 +1,47 @@
-From: bernd@petrovitsch.priv.at (Bernd Petrovitsch)
-Date: Sun, 23 Oct 2011 16:06:27 +0200
-Subject: [PATCH 0/3] ARM 4Kstacks: introduction
-In-Reply-To: <1500345.YeXPhIIHc5@wuerfel>
-References: <4E9E0B71.9020708@am.sony.com>
-	<1318983248.7569.5.camel@Joe-Laptop> <4E9E1944.80601@am.sony.com>
-	<1500345.YeXPhIIHc5@wuerfel>
-Message-ID: <1319378792.20227.105.camel@thorin>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Sun, 23 Oct 2011 22:24:59 +0800
+Subject: [PATCH v2 2/7] clk: Implement clk_set_rate
+In-Reply-To: <1316730422-20027-3-git-send-email-mturquette@ti.com>
+References: <1316730422-20027-1-git-send-email-mturquette@ti.com>
+	<1316730422-20027-3-git-send-email-mturquette@ti.com>
+Message-ID: <20111023142458.GE1401@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mit, 2011-10-19 at 12:51 +0200, Arnd Bergmann wrote:
-> On Tuesday 18 October 2011 17:26:44 Tim Bird wrote:
-> > Even inside Sony, usage of 4K stacks is limited
-> > to some very special cases, where memory is exceedingly
-> > tight (we have one system with 4M of RAM).  And we
-> > don't mind lopping off features or coding around
-> > problem areas to support our special case.
+On Thu, Sep 22, 2011 at 03:26:57PM -0700, Mike Turquette wrote:
+> From: Jeremy Kerr <jeremy.kerr@canonical.com>
+> 
+> Implement clk_set_rate by adding a set_rate callback to clk_hw_ops.
+> Rates are propagated down the clock tree and recalculated.  Also adds a
+> flag for signaling that parents must change rates to achieve the desired
+> frequency (upstream propagation).
+> 
+> TODO:
+> Upstream propagation is not yet implemented.
+> Device pre-change and post-change notifications are not implemented, but
+> are marked up as FIXME comments.
+> 
+> Signed-off-by: Jeremy Kerr <jeremy.kerr@canonical.com>
+> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> Signed-off-by: Mike Turquette <mturquette@ti.com>
+> ---
+> Changes since v1:
+> Remove upstream propagation (for now)
+> Rename CLK_SET_RATE_PROPAGATE to CLK_PARENT_RATE_CHANGE
 
-Yes, for low memory situations (as in up to 8M) it is usually necessary
-anyways to write every "./configure" line yourself for packages to make
-sure everything possible is disabled unless it is absolutely necessary.
-And a minimal custom kernel config is also unavoidable.
+[...]
 
-And then you don't have any fancy filesystems (like ext2 or some FAT
-variant), loopback devices, stacking block devices or other "recursive"
-parts - just a flash file system (and not necessarily that if you run
-the system from the initrd which is loaded and decompressed by the boot
-loader).
+> + * @set_rate	Change the rate of this clock. If this callback returns
+> + *		CLK_SET_RATE_PROPAGATE, the rate change will be propagated to
 
-So all the points with "stack overflow with stacked $WHATEVER" can't
-happen anyways. And in this situation one controls the user-space too,
-so there won't be any obscure "root can do" issues anyways.
+s/CLK_SET_RATE_PROPAGATE/CLK_PARENT_RATE_CHANGE, as suggested by your
+change log above?
 
-[ and there are more potential savings in the kernel - and user-space -
-for these devices/systems. ]
+> + *		the parent clock (which may propagate again). The requested
+> + *		rate of the parent is passed back from the callback in the
+> + *		second 'unsigned long *' argument.
+> + *
 
-> I would imagine that in those cases, you can gain more by reducing the
-> number of threads in the system. What is the highest number of
-
-If you are very limited on memory, you do this anyways: minimizing the
-number of processes and threads - or better just do not use threads at
-all because it also saves space.
-
-	Bernd
 -- 
-Bernd Petrovitsch                  Email : bernd at petrovitsch.priv.at
-                     LUGA : http://www.luga.at
- 
+Regards,
+Shawn
