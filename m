@@ -1,44 +1,49 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 23 Oct 2011 10:47:23 +0100
-Subject: [RFC][PATCH] uncompress.h cleanup and DT support
-In-Reply-To: <20111023094309.GM15299@pengutronix.de>
-References: <CAGVye5MSqdxh0DzCMt79sKk+Z0Trfro0RNDr-4zccMh7O7vGiA@mail.gmail.com>
-	<20111023084132.GA12814@n2100.arm.linux.org.uk>
-	<CAGVye5NQa857oNPEgQBWE0twQHL6U3BTeSOaR2aTiJzUxMvFSg@mail.gmail.com>
-	<20111023092059.GB12814@n2100.arm.linux.org.uk>
-	<20111023094309.GM15299@pengutronix.de>
-Message-ID: <20111023094723.GC12814@n2100.arm.linux.org.uk>
+From: nsekhar@ti.com (Nori, Sekhar)
+Date: Sun, 23 Oct 2011 16:40:51 +0530
+Subject: [PATCH] DaVinci: only poll EPCPR on DM644x and DM355
+In-Reply-To: <201109151829.49256.sshtylyov@ru.mvista.com>
+References: <201109151829.49256.sshtylyov@ru.mvista.com>
+Message-ID: <B85A65D85D7EB246BE421B3FB0FBB5930328B2DF68@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 23, 2011 at 11:43:09AM +0200, Uwe Kleine-K?nig wrote:
-> On Sun, Oct 23, 2011 at 10:20:59AM +0100, Russell King - ARM Linux wrote:
-> > On Sun, Oct 23, 2011 at 11:12:50AM +0200, Zoltan Devai wrote:
-> > > 2011/10/23 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> > > > On Sun, Oct 23, 2011 at 10:18:29AM +0200, Zoltan Devai wrote:
-> > > >> Plase consider all this as RFC, it's mostly not even compile-tested.
-> > > >> If you think it's worth to follow-up, I'm happy to do it.
-> > > >
-> > > > Is the patch available?
-> > > git://github.com/zdevai/linux.git uncompress-h
-> > 
-> > I'd rather not pull your tree just to look at the patch.  Is it
-> > available somewhere else?
-> It's not hard to look at it and no need to pull, just do:
+Hi Sergei,
+
+On Thu, Sep 15, 2011 at 19:59:48, Sergei Shtylyov wrote:
+> EPCPR register and PDCTL.EPCGOOD bit exist only on DaVinci DM644x and DM35x,
+> so do not try to poll EPCPR and set PDCTL.EPCGOOD on the other SoCs -- it would
+> lead to lock up if some power domain hasn't been powered up by this time (which
+> hasn't happened yet on any board, it seems).
 > 
-> 	git fetch git://github.com/zdevai/linux.git uncompress-h
-> 	git log -p ..FETCH_HEAD
+> Signed-off-by: Sergei Shtylyov <sshtylyov@ru.mvista.com>
 
-.1 We do reviews in patch form on mailing lists, not from commits inside
-   git trees.
+Firstly, sorry about feedback this late. I was involved in
+the bring-up of a new TI SoC which took much more of my
+time than I anticipated.
 
-.2 I don't even want to pull the objects into my tree - that's a waste of
-   bandwidth just to _read_ the patch, and risks pulling in a lot more
-   depending on the parents of the commit.
+So, I looked at power domain support for each of the 6
+DaVinci SoCs we support (don't have the specifications
+for tnetv107x; and code does not have evidence of a separate
+DSP power domain).
 
-So, please stick to patch form.  If it's too large for the mailing list,
-please split the patch up into a logical sequence of steps as individual
-patches.  Only then provide a gitweb URL if that's not possible.
+It looks like none of the SoCs except DM6446 actually support
+powering down the DSP power domain.
 
-If the diffstat at the start of this thread reflects a single patch then
-it's doing too much as one change.
+DM6467, DM355, DM365 all have a single "Always ON" power
+domain. DM355 specification actually talks about EPCPR
+and EPCGOOD but that's probably due to copy paste from
+DM644x specification than anything else.
+
+OMAP-L137 and OMAP-L138 have additional power domains for DSP
+and Shared RAM, but do not support powering them down.
+
+So, looks like the only SoC where PDSTAT might indicate a powered
+down domain is DM644x and existing code to looks alright for
+that SoC.
+
+At this time, it would be better to leave the code as-is and
+revisit it if/when a new SoC with programmable power domain
+support comes along.
+
+Thanks,
+Sekhar
