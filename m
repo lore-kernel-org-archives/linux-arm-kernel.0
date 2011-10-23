@@ -1,47 +1,33 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 23 Oct 2011 21:20:08 +0100
-Subject: [PATCH 02/14] ARM : SAMSUNG : Add RS485 support.
-In-Reply-To: <CAC=G6syuf-J4am1mHRg-5gzqy661yOT9pUK2vQyToLPtv4tvEg@mail.gmail.com>
-References: <1319255194-4799-1-git-send-email-paul.s.schilling@gmail.com>
-	<20111022134726.GD21374@n2100.arm.linux.org.uk>
-	<CAC=G6syuf-J4am1mHRg-5gzqy661yOT9pUK2vQyToLPtv4tvEg@mail.gmail.com>
-Message-ID: <20111023202008.GB27802@n2100.arm.linux.org.uk>
+From: zoss@devai.org (Zoltan Devai)
+Date: Sun, 23 Oct 2011 23:10:32 +0200
+Subject: [RFC PATCH 02/15] ARM: uncompress: Remove unused definition of
+	ARCH_HAS_DECOMP_WATCHDOG
+In-Reply-To: <1319404245-12740-1-git-send-email-zoss@devai.org>
+References: <1319404245-12740-1-git-send-email-zoss@devai.org>
+Message-ID: <1319404245-12740-2-git-send-email-zoss@devai.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 23, 2011 at 12:12:13PM -0500, Paul Schilling wrote:
-> On Sat, Oct 22, 2011 at 8:47 AM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> >> + ? ? ? ? ? ? } else {
-> >> + ? ? ? ? ? ? ? ? ? ? /* Set a short timer to toggle RTS */
-> >> + ? ? ? ? ? ? ? ? ? ? mod_timer(
-> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? &(ourport->rs485_tx_timer),
-> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? jiffies + usecs_to_jiffies(
-> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ourport->char_time_usec
-> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? / 10));
-> >
-> > This could do with being better formatted. ?Also, & doesn't need following
-> > parens.
-> 
-> when I ran checkpatch it complained that it exceeded 80 characters.  I
-> had trouble keeping this line
-> under 80 characters.
+This was only used by the old inflate code, which isn't used
+anymore by ARM.
 
-		} else {
-			mod_timer(&our_port->rs485_tx_timer, jiffies +
-				  usecs_to_jiffies(ourport->char_time_usec
-						   / 10));
+Signed-off-by: Zoltan Devai <zoss@devai.org>
+---
+ arch/arm/boot/compressed/decompress.c |    2 --
+ 1 files changed, 0 insertions(+), 2 deletions(-)
 
-is probably a better way to format it.
-
-> >> - ? ? ? ? ? ? if (port->flags & UPF_CONS_FLOW)
-> >> + ? ? ? ? ? ? if (port->flags & UPF_CONS_FLOW) {
-> >> ? ? ? ? ? ? ? ? ? ? ? s3c24xx_serial_rx_enable(port);
-> >> + ? ? ? ? ? ? }
-> >
-> > Why are you reformatting code?
-> 
-> I will remove the reformatting of the code.
-
-If you wish to reformat the code to clean up checkpatch warnings, then that
-needs to be a separate patch from any other changes.
+diff --git a/arch/arm/boot/compressed/decompress.c b/arch/arm/boot/compressed/decompress.c
+index 07be5a2..75b1605 100644
+--- a/arch/arm/boot/compressed/decompress.c
++++ b/arch/arm/boot/compressed/decompress.c
+@@ -13,8 +13,6 @@ extern void error(char *);
+ #define STATIC static
+ #define STATIC_RW_DATA	/* non-static please */
+ 
+-#define ARCH_HAS_DECOMP_WDOG
+-
+ /* Diagnostic functions */
+ #ifdef DEBUG
+ #  define Assert(cond,msg) {if(!(cond)) error(msg);}
+-- 
+1.7.4.1
