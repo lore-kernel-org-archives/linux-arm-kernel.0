@@ -1,39 +1,30 @@
 From: zdevai@gmail.com (Zoltan Devai)
-Date: Sun, 23 Oct 2011 23:28:10 +0200
-Subject: [RFC][PATCH] uncompress.h cleanup and DT support
-In-Reply-To: <20111023092059.GB12814@n2100.arm.linux.org.uk>
-References: <CAGVye5MSqdxh0DzCMt79sKk+Z0Trfro0RNDr-4zccMh7O7vGiA@mail.gmail.com>
-	<20111023084132.GA12814@n2100.arm.linux.org.uk>
-	<CAGVye5NQa857oNPEgQBWE0twQHL6U3BTeSOaR2aTiJzUxMvFSg@mail.gmail.com>
-	<20111023092059.GB12814@n2100.arm.linux.org.uk>
-Message-ID: <CAGVye5PBam17mcJbsiks8oiTmeRa7qZ2s99fY3iy81Le-3EcQw@mail.gmail.com>
+Date: Sun, 23 Oct 2011 23:37:08 +0200
+Subject: [PATCH v2 1/5] ARM: SPMP8000: Add machine base files
+In-Reply-To: <1409922.Ostx0EbfK3@wuerfel>
+References: <1318178172-7965-1-git-send-email-zoss@devai.org>
+	<1319040118-29773-1-git-send-email-zoss@devai.org>
+	<1319040118-29773-2-git-send-email-zoss@devai.org>
+	<1409922.Ostx0EbfK3@wuerfel>
+Message-ID: <CAGVye5PR3rDbGOf48sPtnZHJXPCa_eY1JqeUZKyeLGk4s_LNHA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/10/23 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> On Sun, Oct 23, 2011 at 11:12:50AM +0200, Zoltan Devai wrote:
->> 2011/10/23 Russell King - ARM Linux <linux@arm.linux.org.uk>:
->> > On Sun, Oct 23, 2011 at 10:18:29AM +0200, Zoltan Devai wrote:
->> >> Plase consider all this as RFC, it's mostly not even compile-tested.
->> >> If you think it's worth to follow-up, I'm happy to do it.
->> >
->> > Is the patch available?
->> git://github.com/zdevai/linux.git uncompress-h
+2011/10/19 Arnd Bergmann <arnd@arndb.de>:
+> On Wednesday 19 October 2011 18:01:54 Zoltan Devai wrote:
+>> Files needed for the basic machine support of SPMP8000
+>>
+>> Signed-off-by: Zoltan Devai <zoss@devai.org>
 >
-> I'd rather not pull your tree just to look at the patch. ?Is it
-> available somewhere else?
-Submitted as patches.
-I tried to make the whole series bisectable, which is why it contains
-some extra steps, and didn't want to spam everybody's inbox
-with this noise.
+> Hi Zoltan,
+>
+> This version looks very nice, only a few small things remain that I noticed
+> reading through it again:
+OK, will correct these.
 
->> > Has this been tested with ZBOOT_ROM?
->> Not yet, but I don't see a reason why this would break it.
-> Please try building it with ZBOOT_ROM enabled.
-I did build it, which worked.
-Problem is, I don't have a machine which could actually do
-ZBOOT_ROM, so I can't test it that way.
-(I could execute the image from RAM, but I assume that's
-not a good test scenario)
+What's next then ?
+I assume I'd need some more review on at least the dts file.
+Also, can the timer code go through your tree into drivers/clocksource ?
 
-Z
+Thanks,
+Zoltan
