@@ -1,138 +1,142 @@
 From: zoss@devai.org (Zoltan Devai)
-Date: Sun, 23 Oct 2011 23:10:41 +0200
-Subject: [RFC PATCH 11/15] ARM: uncompress: Call arch_decomp_setup by default
+Date: Sun, 23 Oct 2011 23:10:44 +0200
+Subject: [RFC PATCH 14/15] ARM: uncompress: Get decompress UART info from DT
 In-Reply-To: <1319404245-12740-1-git-send-email-zoss@devai.org>
 References: <1319404245-12740-1-git-send-email-zoss@devai.org>
-Message-ID: <1319404245-12740-11-git-send-email-zoss@devai.org>
+Message-ID: <1319404245-12740-14-git-send-email-zoss@devai.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the initialization of the ucuart uses arch_decomp_setup,
-almost all machines use it, so make this the default behaviour.
+Allow the static decompress UART setup in uncompress.h
+files to be overridden with an ucuart description in DT.
+
+At a later stage, this may also allow to skip the
+inclusion of uncompress.h files on arches which are DT-only,
+to get rid of these files completely.
 
 Signed-off-by: Zoltan Devai <zoss@devai.org>
 ---
- arch/arm/boot/compressed/print.c                  |    8 --------
- arch/arm/mach-mmp/include/mach/uncompress.h       |    2 --
- arch/arm/mach-picoxcell/include/mach/uncompress.h |    1 +
- arch/arm/mach-rpc/include/mach/uncompress.h       |    2 --
- arch/arm/mach-s5p64x0/include/mach/uncompress.h   |    2 --
- arch/arm/mach-shmobile/include/mach/uncompress.h  |    2 ++
- arch/arm/mach-ux500/include/mach/uncompress.h     |    2 --
- arch/arm/plat-samsung/include/plat/uncompress.h   |    2 --
- 8 files changed, 3 insertions(+), 18 deletions(-)
+ arch/arm/Kconfig                  |    9 +++++++
+ arch/arm/boot/compressed/Makefile |    7 +++++
+ arch/arm/boot/compressed/head.S   |    8 ++++++
+ arch/arm/boot/compressed/print.c  |   45 +++++++++++++++++++++++++++++++++++++
+ 4 files changed, 69 insertions(+), 0 deletions(-)
 
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 7a011f4..edfd4b7 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1866,6 +1866,15 @@ config ZBOOT_ROM_SH_MOBILE_SDHI
+ 
+ endchoice
+ 
++config UCUART_DT
++	bool "Configure the decompress UART port from DT"
++	depends on OF
++	help
++	  With this option, the decompressor will use the UART port set up
++	  via the device tree.
++	  This configuration will override the hardcoded settings in any
++	  uncompress.h files.
++
+ config ARM_APPENDED_DTB
+ 	bool "Use appended device tree blob to zImage (EXPERIMENTAL)"
+ 	depends on OF && !ZBOOT_ROM && EXPERIMENTAL
+diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
+index d955d4f..a4a1b8b 100644
+--- a/arch/arm/boot/compressed/Makefile
++++ b/arch/arm/boot/compressed/Makefile
+@@ -110,6 +110,13 @@ ifeq ($(CONFIG_ARM_ATAG_DTB_COMPAT),y)
+ OBJS	+= $(libfdt_objs) atags_to_fdt.o
+ endif
+ 
++$(addprefix $(obj)/,$(libfdt_objs) print.o): \
++	$(addprefix $(obj)/,$(libfdt_hdrs))
++
++ifeq ($(CONFIG_UCUART_DT),y)
++OBJS	+= $(libfdt_objs)
++endif
++
+ targets       := vmlinux vmlinux.lds \
+ 		 piggy.$(suffix_y) piggy.$(suffix_y).o \
+ 		 lib1funcs.o lib1funcs.S font.o font.c head.o misc.o $(OBJS)
+diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
+index 9f5ac11..b80e5df 100644
+--- a/arch/arm/boot/compressed/head.S
++++ b/arch/arm/boot/compressed/head.S
+@@ -443,6 +443,14 @@ not_relocated:	mov	r0, #0
+ 		cmp	r2, r3
+ 		blo	1b
+ 
++#ifdef CONFIG_UCUART_DT
++/* Set up the uncompress UART port from DT data */
++		stmfd	sp!, {r0-r3, ip, lr}
++		mov	r0, r6			@ ATAG / DT pointer
++		bl	ucuart_init_dt
++		ldmfd	sp!, {r0-r3, ip, lr}
++#endif /* CONFIG_UCUART_DT */
++
+ /*
+  * The C runtime environment should now be setup sufficiently.
+  * Set up some pointers, and start decompressing.
 diff --git a/arch/arm/boot/compressed/print.c b/arch/arm/boot/compressed/print.c
-index fbffc99..24a08d4 100644
+index 1529d15..cbb0dbf 100644
 --- a/arch/arm/boot/compressed/print.c
 +++ b/arch/arm/boot/compressed/print.c
-@@ -56,8 +56,6 @@ struct uncompress_uart ucuart;
+@@ -49,9 +49,54 @@ void ucuart_init(int base, int regshift, enum ucuart_iotypes iotype,
+ 		 int flush_val);
  
- #ifdef ARCH_HAVE_UCUART_GENERIC
+ void ucuart_init_8250(int base, int regshift, enum ucuart_iotypes iotype);
++void ucuart_init_amba01x(int base);
  
--#define ARCH_HAVE_DECOMP_SETUP
--
- #include <linux/io.h>
- #include <linux/serial_reg.h>
- #include <linux/amba/serial.h>
-@@ -224,13 +222,7 @@ void error(char *x)
- 	while(1);	/* Halt */
- }
+ struct uncompress_uart ucuart;
  
--#ifdef ARCH_HAVE_DECOMP_SETUP
- void inline decomp_setup(void)
- {
- 	arch_decomp_setup();
- }
--#else /* ARCH_HAVE_DECOMP_SETUP */
--void inline decomp_setup(void)
--{
--}
--#endif /* ARCH_HAVE_DECOMP_SETUP */
-diff --git a/arch/arm/mach-mmp/include/mach/uncompress.h b/arch/arm/mach-mmp/include/mach/uncompress.h
-index 4cafe10..e9bf8bf 100644
---- a/arch/arm/mach-mmp/include/mach/uncompress.h
-+++ b/arch/arm/mach-mmp/include/mach/uncompress.h
-@@ -12,8 +12,6 @@
- #define UART2_BASE	(APB_PHYS_BASE + 0x17000)
- #define UART3_BASE	(APB_PHYS_BASE + 0x18000)
- 
--#define ARCH_HAVE_DECOMP_SETUP
--
- static inline void arch_decomp_setup(void)
- {
- 	if (machine_is_avengers_lite())
-diff --git a/arch/arm/mach-picoxcell/include/mach/uncompress.h b/arch/arm/mach-picoxcell/include/mach/uncompress.h
-index f04f368..db46249 100644
---- a/arch/arm/mach-picoxcell/include/mach/uncompress.h
-+++ b/arch/arm/mach-picoxcell/include/mach/uncompress.h
-@@ -17,3 +17,4 @@
-  */
- #define putc(c)
- #define flush()
-+#define arch_decomp_setup()
-diff --git a/arch/arm/mach-rpc/include/mach/uncompress.h b/arch/arm/mach-rpc/include/mach/uncompress.h
-index 5ea3974..0fd4b0b 100644
---- a/arch/arm/mach-rpc/include/mach/uncompress.h
-+++ b/arch/arm/mach-rpc/include/mach/uncompress.h
-@@ -109,8 +109,6 @@ static inline void flush(void)
- {
- }
- 
--#define ARCH_HAVE_DECOMP_SETUP
--
- /*
-  * Setup for decompression
-  */
-diff --git a/arch/arm/mach-s5p64x0/include/mach/uncompress.h b/arch/arm/mach-s5p64x0/include/mach/uncompress.h
-index 8d537eb..00b70b8 100644
---- a/arch/arm/mach-s5p64x0/include/mach/uncompress.h
-+++ b/arch/arm/mach-s5p64x0/include/mach/uncompress.h
-@@ -151,8 +151,6 @@ static inline void arch_enable_uart_fifo(void)
- #define arch_enable_uart_fifo() do { } while(0)
- #endif
- 
--#define ARCH_HAVE_DECOMP_SETUP
--
- static void arch_decomp_setup(void)
- {
- 	/*
-diff --git a/arch/arm/mach-shmobile/include/mach/uncompress.h b/arch/arm/mach-shmobile/include/mach/uncompress.h
-index b2b2860..462e84e 100644
---- a/arch/arm/mach-shmobile/include/mach/uncompress.h
-+++ b/arch/arm/mach-shmobile/include/mach/uncompress.h
-@@ -12,4 +12,6 @@ static inline void flush(void)
- {
- }
- 
-+#define arch_decomp_setup()
++#ifdef CONFIG_UCUART_DT
++#include <libfdt.h>
 +
- #endif /* __ASM_MACH_UNCOMPRESS_H */
-diff --git a/arch/arm/mach-ux500/include/mach/uncompress.h b/arch/arm/mach-ux500/include/mach/uncompress.h
-index 7e3b48a..eb30110 100644
---- a/arch/arm/mach-ux500/include/mach/uncompress.h
-+++ b/arch/arm/mach-ux500/include/mach/uncompress.h
-@@ -21,8 +21,6 @@
- #include <asm/mach-types.h>
- #include <mach/hardware.h>
++/* Just a concept sketch... */
++void ucuart_init_dt(void *fdt)
++{
++	int ret, offset;
++	const void *prop;
++	const int *uart_base, *uart_regshift;
++	enum ucuart_iotypes iotype = UCUART_IO_MEM8;
++
++	ret = fdt_check_header(fdt);
++	if (ret < 0)
++		return;
++
++	offset = fdt_path_offset(fdt, "/chosen");
++	if (offset == -FDT_ERR_NOTFOUND)
++		return;
++
++	prop = fdt_getprop(fdt, offset, "linux,ucuart-8250", NULL);
++	if (!prop) {
++		putstr("non-8250 uart\n");
++		return;
++	}
++
++	prop = fdt_getprop(fdt, offset, "linux,ucuart-io-32", NULL);
++	if (prop)
++		iotype = UCUART_IO_MEM32;
++
++	uart_base = fdt_getprop(fdt, offset, "linux,ucuart-base", NULL);
++	uart_regshift = fdt_getprop(fdt, offset, "linux,ucuart-regshift", NULL);
++
++	prop = fdt_getprop(fdt, offset, "linux,ucuart-8250", NULL);
++	if (prop)
++		ucuart_init_8250(*uart_base, *uart_regshift, iotype);
++
++	prop = fdt_getprop(fdt, offset, "linux,ucuart-amba01x", NULL);
++	if (prop)
++		ucuart_init_amba01x(*uart_base);
++
++	fdt_pack(fdt);
++}
++#endif
++
+ #include <mach/uncompress.h>
  
--#define ARCH_HAVE_DECOMP_SETUP
--
- static inline void arch_decomp_setup(void)
- {
- 	/* Check in run time if we run on an U8500 or U5500 */
-diff --git a/arch/arm/plat-samsung/include/plat/uncompress.h b/arch/arm/plat-samsung/include/plat/uncompress.h
-index b10e0be..94fecf9 100644
---- a/arch/arm/plat-samsung/include/plat/uncompress.h
-+++ b/arch/arm/plat-samsung/include/plat/uncompress.h
-@@ -130,8 +130,6 @@ static inline void arch_enable_uart_fifo(void)
- #define arch_enable_uart_fifo() do { } while(0)
- #endif
- 
--#define ARCH_HAVE_DECOMP_SETUP
--
- static void
- arch_decomp_setup(void)
- {
+ #ifndef ARCH_UCUART_NONGENERIC
 -- 
 1.7.4.1
