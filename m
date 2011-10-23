@@ -1,61 +1,45 @@
-From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
-Date: Sun, 23 Oct 2011 00:12:14 +0200
-Subject: [RFC][PATCH] Consolidate Samsung MAINTAINERS
-Message-ID: <201110230012.15273.heiko@sntech.de>
+From: sebras@gmail.com (Sebastian Rasmussen)
+Date: Sun, 23 Oct 2011 02:31:39 +0200
+Subject: [PATCH] mmc: mmci: Improve runtime PM support
+In-Reply-To: <CAKnu2MrOriMzJH9NcwUivWa0cinASa6wrRf4a69si4WUs-aTrQ@mail.gmail.com>
+References: <1319210754-22775-1-git-send-email-ulf.hansson@stericsson.com>
+	<20111021173637.GG21648@n2100.arm.linux.org.uk>
+	<CAKnu2MrOriMzJH9NcwUivWa0cinASa6wrRf4a69si4WUs-aTrQ@mail.gmail.com>
+Message-ID: <CAAgDR1OT=+xgQTNwmTz=9XwzpbhjeZ6F-mxnVGhOAPSAR3JiFQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These days most Samsung stuff gets in the kernel through Kukjin Kim.
-This patch changes MAINTAINERS to reflect this.
+Hi!
 
-By adding Kukjin Kim to the maintainers for S3C2410, S3C244x and
-S3C64xx alongside Ben Dooks the extra entries become identical to the
-base ARM/SAMSUNG entry and can move into it.
+> Err, no.  You're not allowed to power down the card between commands
+> unless the card has been removed or been has finished with.
+>
+> If you power down the card (which you _are_ doing by writing zero to
+> the MMCIPOWER register), then you have to do a full setup of the card
+> when you resume.
 
-Also the S3C2416 gets a maintainer through the s3c24* wildcard - as it
-did not have one until now.
+MCIPower is according to ARM PL180 TRM signalling to an external power
+supply to turn on/off (MCIPWR), whether to use open-drain (MCIROD),
+what voltage to use (MCIVDD) and whether the card is clocked (MCICLK).
 
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
----
- MAINTAINERS |   25 +++----------------------
- 1 files changed, 3 insertions(+), 22 deletions(-)
+According ST-Ericsson's public PL180 derivative spec[1] it seems to work
+roughly in same way (but renaming the register SDI_PWR and the signals
+SDIPWR & SDICLK). However, there is no SDIVDD as the derivative can not
+signal desired voltage level externally (there are no bits in SDI_PWR for this).
+This makes it plausible that SDIPWR may not be routed externally either.
+Can you verify this as there are no signal routing diagrams in the spec..?
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 3d9b9d5..6646316 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1032,30 +1032,10 @@ S:	Maintained
- F:	arch/arm/plat-samsung/
- F:	arch/arm/plat-s3c24xx/
- F:	arch/arm/plat-s5p/
-+F:	arch/arm/mach-s3c24*/
-+F:	arch/arm/mach-s3c64xx/
- F:	drivers/*/*s3c2410*
- F:	drivers/*/*/*s3c2410*
--
--ARM/S3C2410 ARM ARCHITECTURE
--M:	Ben Dooks <ben-linux@fluff.org>
--L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
--W:	http://www.fluff.org/ben/linux/
--S:	Maintained
--F:	arch/arm/mach-s3c2410/
--
--ARM/S3C244x ARM ARCHITECTURE
--M:	Ben Dooks <ben-linux@fluff.org>
--L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
--W:	http://www.fluff.org/ben/linux/
--S:	Maintained
--F:	arch/arm/mach-s3c2440/
--F:	arch/arm/mach-s3c2443/
--
--ARM/S3C64xx ARM ARCHITECTURE
--M:	Ben Dooks <ben-linux@fluff.org>
--L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
--W:	http://www.fluff.org/ben/linux/
--S:	Maintained
--F:	arch/arm/mach-s3c64xx/
- 
- ARM/S5P EXYNOS ARM ARCHITECTURES
- M:	Kukjin Kim <kgene.kim@samsung.com>
--- 
-1.7.2.3
+This leads me to believe that writing 0 to SDI_PWR/MMC in actual practice
+doesn't really do much but disabling the clock to the card (and for
+ST-Ericsson's PL180, disable direction signalling to the external level
+shifter). Clearing bit 8 of MCIClock/SDI_CLKCR also disables the clock.
+
+I guess the patch would appeal more to Russell if mmci_runtime_suspend()
+only cleared MCIMask0/SDI_MASK0 and MCIClock/SDI_CLKCR and left
+MCIPower/SDI_PWR unchanged. It may be the case that the signal direction
+bits need to be cleared for the ST-Ericsson PL180, but I haven't yet verified
+this on my Snowball dev board yet.
+
+ / Sebastian
+
+[1] http://www.stericsson.com/developers/DM00030004_AP9500_reference_manual_rev1.pdf
