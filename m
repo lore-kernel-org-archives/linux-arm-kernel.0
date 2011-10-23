@@ -1,27 +1,22 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 23 Oct 2011 10:20:59 +0100
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Sun, 23 Oct 2011 11:02:47 +0200
 Subject: [RFC][PATCH] uncompress.h cleanup and DT support
-In-Reply-To: <CAGVye5NQa857oNPEgQBWE0twQHL6U3BTeSOaR2aTiJzUxMvFSg@mail.gmail.com>
+In-Reply-To: <CAGVye5MSqdxh0DzCMt79sKk+Z0Trfro0RNDr-4zccMh7O7vGiA@mail.gmail.com>
 References: <CAGVye5MSqdxh0DzCMt79sKk+Z0Trfro0RNDr-4zccMh7O7vGiA@mail.gmail.com>
-	<20111023084132.GA12814@n2100.arm.linux.org.uk>
-	<CAGVye5NQa857oNPEgQBWE0twQHL6U3BTeSOaR2aTiJzUxMvFSg@mail.gmail.com>
-Message-ID: <20111023092059.GB12814@n2100.arm.linux.org.uk>
+Message-ID: <20111023090247.GH2638@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 23, 2011 at 11:12:50AM +0200, Zoltan Devai wrote:
-> 2011/10/23 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> > On Sun, Oct 23, 2011 at 10:18:29AM +0200, Zoltan Devai wrote:
-> >> Plase consider all this as RFC, it's mostly not even compile-tested.
-> >> If you think it's worth to follow-up, I'm happy to do it.
-> >
-> > Is the patch available?
-> git://github.com/zdevai/linux.git uncompress-h
+On 10:18 Sun 23 Oct     , Zoltan Devai wrote:
+> Hi,
+> 
+> Originally, I just wanted to get rid of arch_decomp_* in all the uncompress.h
+> files, that were mostly empty. But then, I couldn't stop. Which may also mean
+> I have gone too far.
+on small SoC arm926 the kernel may more time that the watchdog refreshing so
+the kernel will never have enough time to decompress
 
-I'd rather not pull your tree just to look at the patch.  Is it
-available somewhere else?
+and on some platform the watchdog can be configured only one (AT91 as example)
 
-> > Has this been tested with ZBOOT_ROM?
-> Not yet, but I don't see a reason why this would break it.
-
-Please try building it with ZBOOT_ROM enabled.
+Best Regards,
+J.
