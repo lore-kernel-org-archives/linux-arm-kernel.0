@@ -1,45 +1,63 @@
-From: sebras@gmail.com (Sebastian Rasmussen)
-Date: Sun, 23 Oct 2011 02:31:39 +0200
-Subject: [PATCH] mmc: mmci: Improve runtime PM support
-In-Reply-To: <CAKnu2MrOriMzJH9NcwUivWa0cinASa6wrRf4a69si4WUs-aTrQ@mail.gmail.com>
-References: <1319210754-22775-1-git-send-email-ulf.hansson@stericsson.com>
-	<20111021173637.GG21648@n2100.arm.linux.org.uk>
-	<CAKnu2MrOriMzJH9NcwUivWa0cinASa6wrRf4a69si4WUs-aTrQ@mail.gmail.com>
-Message-ID: <CAAgDR1OT=+xgQTNwmTz=9XwzpbhjeZ6F-mxnVGhOAPSAR3JiFQ@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Sat, 22 Oct 2011 22:43:19 -0500
+Subject: [PATCH] ARM: gic: fix irq_alloc_descs handling for sparse irq
+In-Reply-To: <20111022203635.GA30950@n2100.arm.linux.org.uk>
+References: <1319314808-27007-1-git-send-email-robherring2@gmail.com>
+	<20111022203635.GA30950@n2100.arm.linux.org.uk>
+Message-ID: <4EA38D57.8050007@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Russell,
 
-> Err, no.  You're not allowed to power down the card between commands
-> unless the card has been removed or been has finished with.
->
-> If you power down the card (which you _are_ doing by writing zero to
-> the MMCIPOWER register), then you have to do a full setup of the card
-> when you resume.
+On 10/22/2011 03:36 PM, Russell King - ARM Linux wrote:
+> On Sat, Oct 22, 2011 at 03:20:08PM -0500, Rob Herring wrote:
+>> @@ -657,7 +664,7 @@ int __init gic_of_init(struct device_node *node, struct device_node *parent)
+>>  
+>>  	domain->of_node = of_node_get(node);
+>>  
+>> -	gic_init(gic_cnt, 16, dist_base, cpu_base);
+>> +	gic_init(gic_cnt, -1, dist_base, cpu_base);
+>>  
+>>  	if (parent) {
+>>  		irq = irq_of_parse_and_map(node, 0);
+> 
+> You don't explain this change - '16' is used here to skip the SGI
+> interrupts which will never be passed to the generic IRQ subsystem
+> from the GIC.
 
-MCIPower is according to ARM PL180 TRM signalling to an external power
-supply to turn on/off (MCIPWR), whether to use open-drain (MCIROD),
-what voltage to use (MCIVDD) and whether the card is clocked (MCICLK).
+This makes irq_alloc_descs do dynamic IRQ# assignment rather than
+allocating at the specified IRQ#.
 
-According ST-Ericsson's public PL180 derivative spec[1] it seems to work
-roughly in same way (but renaming the register SDI_PWR and the signals
-SDIPWR & SDICLK). However, there is no SDIVDD as the derivative can not
-signal desired voltage level externally (there are no bits in SDI_PWR for this).
-This makes it plausible that SDIPWR may not be routed externally either.
-Can you verify this as there are no signal routing diagrams in the spec..?
+> 
+> Moreover, the second parameter is an unsigned integer, not a signed
+> integer.
+> 
+> And not only that, but:
+> 
+>         gic->irq_offset = (irq_start - 1) & ~31;
+> 
+> means that irq_offset ends up being -2 & ~31, or -32.  Do you really
+> want the PPIs to generate IRQ numbers from -16 to -1 ?  It doesn't stop
+> there:
+> 
+>         for (i = irq_start; i < irq_limit; i++) {
+>                 irq_set_chip_and_handler(i, &gic_chip, handle_fasteoi_irq);
+>                 irq_set_chip_data(i, gic);
+>                 set_irq_flags(i, IRQF_VALID | IRQF_PROBE);
+>         }
+> 
+> This will start from -1 to irq_limit (-1 + number of GIC IRQs).
+> 
+> Basically, -1 is not legal here - 1 is the minimum valid value that
+> this function takes for proper operation - but that's just wasteful, so
+> 16 is the realistic minimum value.
 
-This leads me to believe that writing 0 to SDI_PWR/MMC in actual practice
-doesn't really do much but disabling the clock to the card (and for
-ST-Ericsson's PL180, disable direction signalling to the external level
-shifter). Clearing bit 8 of MCIClock/SDI_CLKCR also disables the clock.
+You're not looking at the right version of gic code. This is the basis
+of this patch which has changes to the lines you reference:
 
-I guess the patch would appeal more to Russell if mmci_runtime_suspend()
-only cleared MCIMask0/SDI_MASK0 and MCIClock/SDI_CLKCR and left
-MCIPower/SDI_PWR unchanged. It may be the case that the signal direction
-bits need to be cleared for the ST-Ericsson PL180, but I haven't yet verified
-this on my Snowball dev board yet.
+http://lists.infradead.org/pipermail/linux-arm-kernel/2011-September/067588.html
 
- / Sebastian
+You are right about irq_start needing to be signed.
 
-[1] http://www.stericsson.com/developers/DM00030004_AP9500_reference_manual_rev1.pdf
+Rob
