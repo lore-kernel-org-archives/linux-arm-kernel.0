@@ -1,206 +1,83 @@
-From: paul.s.schilling@gmail.com (Paul Schilling)
-Date: Sun, 23 Oct 2011 12:12:13 -0500
-Subject: [PATCH 02/14] ARM : SAMSUNG : Add RS485 support.
-In-Reply-To: <20111022134726.GD21374@n2100.arm.linux.org.uk>
-References: <1319255194-4799-1-git-send-email-paul.s.schilling@gmail.com>
-	<20111022134726.GD21374@n2100.arm.linux.org.uk>
-Message-ID: <CAC=G6syuf-J4am1mHRg-5gzqy661yOT9pUK2vQyToLPtv4tvEg@mail.gmail.com>
+From: tim.bird@am.sony.com (Tim Bird)
+Date: Sun, 23 Oct 2011 12:25:10 -0700
+Subject: [PATCH 0/3] ARM 4Kstacks: introduction
+In-Reply-To: <20111022133648.GA21374@n2100.arm.linux.org.uk>
+References: <4E9E0B71.9020708@am.sony.com> <1318983248.7569.5.camel@Joe-Laptop>
+	<4E9E1944.80601@am.sony.com> <1500345.YeXPhIIHc5@wuerfel>
+	<CACVXFVMb9p8PiTYWGTNn-FtQts0sRgmK+BQ6kaJ6-D89CAT=xQ@mail.gmail.com>
+	<20111022133648.GA21374@n2100.arm.linux.org.uk>
+Message-ID: <4EA46A16.5080005@am.sony.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-See Comments inline.
+On 10/22/2011 6:36 AM, Russell King - ARM Linux wrote:
+> On Sat, Oct 22, 2011 at 04:50:15PM +0800, Ming Lei wrote:
+>> On Wed, Oct 19, 2011 at 6:51 PM, Arnd Bergmann<arnd@arndb.de>  wrote:
+>>> On Tuesday 18 October 2011 17:26:44 Tim Bird wrote:
+>>>> Even inside Sony, usage of 4K stacks is limited
+>>>> to some very special cases, where memory is exceedingly
+>>>> tight (we have one system with 4M of RAM).  And we
+>>>> don't mind lopping off features or coding around
+>>>> problem areas to support our special case.
+>>> I would imagine that in those cases, you can gain more by reducing the
+>>> number of threads in the system. What is the highest number of
+>>> concurrent threads that you expect in a limited use case with no
+>>> networking or block devices?
+We have about 50 hard real-time threads, that are part of a
+software stack for digital cameras that was ported over from
+micro-itron.  It has taken a _LONG_ time (on the order of a
+few years) to tune the Linux system using RT-preempt to run
+these threads as is.  It would be very painful to re-architect this
+part of the system.
 
-On Sat, Oct 22, 2011 at 8:47 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Fri, Oct 21, 2011 at 10:46:34PM -0500, Paul Schilling wrote:
->> +config SAMSUNG_HAS_RS485
->> + ? ? bool "Enable RS485 support for Samsung"
->> + ? ? depends on SERIAL_SAMSUNG && (MACH_CONDOR2440 || MACH_CONDOR2416 || MACH_MINI2440)
->> + ? ? default y if (MACH_CONDOR2440 || MACH_CONDOR2416)
->> + ? ? default n if (MACH_MINI2440)
->> +
->> +config SAMSUNG_485_LOW_RES_TIMER
->> + ? ?bool "Samsung RS-485 use low res timer during transmit"
->> + ? ?depends on SERIAL_SAMSUNG && SAMSUNG_HAS_RS485
->> + ? ?default n
->
-> n is the default, so this doesn't need to be specified.
+Note that these threads don't have any of the issues that
+people have raised about filesystem stack depth or printk
+recursion, since they avoid a whole range of Linux syscalls
+to avoid real-time issues (and stack size issues).
 
-Sorry I can fix that.
+I'm looking at possibly implementing a mixed stack
+size system, but I don't know if that will work, or whether
+it would be acceptable upstream.
 
+>>> If system run for some time, sometimes it may be difficult for
+>>> memory allocator to allocate 2 continuous page frames even  there are
+>>> many spare page frames in system because of
+>>> fragment issue, so the patch does make sense.
+> If memory fragmentation is an issue for this, it probably means that we
+> need to switch to a software page size of 8K (or maybe 16K) rather than
+> stick with the hardware 4K size.  That would be a much more reliable
+> solution, especially as the L1 page table is 16K (if you're suffering
+> from memory fragmentation, the first thing which'd get you is the L1
+> page table allocation, not the kernel stack allocation.)
 >
->> +static void s3c24xx_serial_rx_fifo_enable(
->> + ? ? ? ? ? ? struct uart_port *port,
->> + ? ? ? ? ? ? unsigned int en)
->> +{
->> + ? ? unsigned long flags;
->> + ? ? unsigned int ucon;
->> + ? ? static unsigned int last_state = 1;
->> +/* FIXME */
->> + ? ? #if 0
->> + ? ? if (last_state != en) {
->> +
->> + ? ? ? ? ? ? struct s3c2410_uartcfg *cfg = s3c24xx_port_to_cfg(port);
->> +
->> + ? ? ? ? ? ? spin_lock_irqsave(&port->lock, flags);
->> +
->> + ? ? ? ? ? ? ucon = rd_regl(port, S3C2410_UCON);
->> +
->> + ? ? ? ? ? ? ucon &= ~(S3C2440_UFCON_RXTRIG32 | S3C2410_UCON_RXILEVEL);
->> +
->> + ? ? ? ? ? ? if (en) {
->> + ? ? ? ? ? ? ? ? ? ? ucon |= cfg->ucon;
->> + ? ? ? ? ? ? }
->> +
->> + ? ? ? ? ? ? wr_regl(port, S3C2410_UCON, ucon);
->> +
->> + ? ? ? ? ? ? spin_unlock_irqrestore(&port->lock, flags);
->> + ? ? }
->> +#endif
+>> Anyway, it provides one option for user to apply 4k stack to avoid
+>> such kind of process creation failure.
+> I refer you to the comments made by people who've tried running with 4K
+> stacks on x86, and their _vast_ experience of doing this.  If they say
+> that it causes stack overflows, then it's a problem.
 >
-> This looks like dead code.
+I really don't think anyone on x86 has any experience whatsoever
+with anything like this.  This is on a digital camera, with a flash
+filesystem, with a 10M memory budget, with just about every
+in and out-of-tree patch from Linux-tiny applied and configured.
+Many of the things that bloat up the kernel just aren't there at
+all.
 
-It is broken dead code.  Performance of the RS485 code could be
-increased if this code could be made to work.
-right now I am forced to leave it in one character per interrupt so
-that each character that's received is checked
-against the token.  This code was supposed leave it in multi-byte FIFO
-mode until the token byte is sent then switch to receiving
-one byte at a time until the token is received.
+> The possibility of a kernel stack overflow is not something that should
+> be taken lightly
+Agreed.
 
->
->> + ? ? ? ? ? ? } else {
->> + ? ? ? ? ? ? ? ? ? ? /* Set a short timer to toggle RTS */
->> + ? ? ? ? ? ? ? ? ? ? mod_timer(
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? &(ourport->rs485_tx_timer),
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? jiffies + usecs_to_jiffies(
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ourport->char_time_usec
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? / 10));
->
-> This could do with being better formatted. ?Also, & doesn't need following
-> parens.
+This kind of development is done with extensive in-house testing,
+and an absolutely fixed users space. This may sound like an
+isolated case, but I know Sony is not alone and that lots of
+embedded products are developed like this.  I'm pretty sure
+others would benefit from this patch.
 
-when I ran checkpatch it complained that it exceeded 80 characters.  I
-had trouble keeping this line
-under 80 characters.
+We've already shipped tens of thousands of cameras
+with this, with no problems, so it's certainly possible to get it
+right.
 
->
->> + ? ? /* Read UART transmit status register */
->> + ? ? utrstat = rd_regl(&(ourport->port), S3C2410_UTRSTAT);
->
-> Doesn't need the parens.
-
-I can remove the extra parentheses.
-
->
->> +/* Callback array*/
->> +enum hrtimer_restart (*callback_list[CONFIG_SERIAL_SAMSUNG_UARTS])(struct hrtimer *) = {
->> + ? ? ? ? ? ? &rs485_hr_timer_callback_uart0,
->> + ? ? ? ? ? ? &rs485_hr_timer_callback_uart1,
->> +
->> +#if CONFIG_SERIAL_SAMSUNG_UARTS > 2
->> + ? ? ? ? ? ? &rs485_hr_timer_callback_uart2,
->> +#endif
->> +
->> +#if CONFIG_SERIAL_SAMSUNG_UARTS > 3
->> + ? ? ? ? ? ? &rs485_hr_timer_callback_uart3,
->> +#endif
->
-> Silly indentation - this doesn't need two tabs.
->
->> +};
->> +
->> +#endif
->> +#endif /* CONFIG_SAMSUNG_HAS_RS485 */
->> +
->> +
->> ?static void s3c24xx_serial_stop_tx(struct uart_port *port)
->> ?{
->> ? ? ? struct s3c24xx_uart_port *ourport = to_ourport(port);
->>
->> ? ? ? if (tx_enabled(port)) {
->> +#ifdef CONFIG_SAMSUNG_HAS_RS485
->> + ? ? ? ? ? ? if (ourport->rs485.flags & SER_RS485_ENABLED) {
->> +#ifdef CONFIG_SAMSUNG_485_LOW_RES_TIMER
->> + ? ? ? ? ? ? ? ? ? ? /* Set a short timer to toggle RTS */
->> + ? ? ? ? ? ? ? ? ? ? mod_timer(&(ourport->rs485_tx_timer),
->
-> Doesn't need parens.
->
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? jiffies + usecs_to_jiffies(ourport->char_time_usec * s3c24xx_serial_tx_getfifocnt(ourport)));
->> +#else
->> + ? ? ? ? ? ? ? ? ? ? ktime_t kt;
->> +
->> + ? ? ? ? ? ? ? ? ? ? /* Set time struct to one char time. */
->> + ? ? ? ? ? ? ? ? ? ? kt = ktime_set(0, ourport->char_time_nanosec);
->> +
->> + ? ? ? ? ? ? ? ? ? ? /* Start the high res timer. */
->> + ? ? ? ? ? ? ? ? ? ? hrtimer_start(&(ourport->hr_rs485_tx_timer), kt, HRTIMER_MODE_REL);
->
-> Doesn't need parens.
->
->> +#endif /* CONFIG_SAMSUNG_485_LOW_RES_TIMER */
->> +
->> + ? ? ? ? ? ? ? ? ? ? s3c24xx_serial_rx_fifo_enable(port, 0);
->> +
->> + ? ? ? ? ? ? }
->> +#endif /* CONFIG_SAMSUNG_HAS_RS485 */
->> +
->> ? ? ? ? ? ? ? disable_irq_nosync(ourport->tx_irq);
->> ? ? ? ? ? ? ? tx_enabled(port) = 0;
->> - ? ? ? ? ? ? if (port->flags & UPF_CONS_FLOW)
->> + ? ? ? ? ? ? if (port->flags & UPF_CONS_FLOW) {
->> ? ? ? ? ? ? ? ? ? ? ? s3c24xx_serial_rx_enable(port);
->> + ? ? ? ? ? ? }
->
-> Why are you reformatting code?
-
-I will remove the reformatting of the code.
-
->
->> @@ -785,7 +1177,7 @@ static void s3c24xx_serial_set_termios(struct uart_port *port,
->> ? ? ? port->ignore_status_mask = 0;
->> ? ? ? if (termios->c_iflag & IGNPAR)
->> ? ? ? ? ? ? ? port->ignore_status_mask |= S3C2410_UERSTAT_OVERRUN;
->> - ? ? if (termios->c_iflag & IGNBRK && termios->c_iflag & IGNPAR)
->> + ? ? if ((termios->c_iflag & IGNBRK) && (termios->c_iflag & IGNPAR))
->
-> More code reformatting.
->
->> @@ -830,7 +1228,7 @@ static void s3c24xx_serial_config_port(struct uart_port *port, int flags)
->> ?{
->> ? ? ? struct s3c24xx_uart_info *info = s3c24xx_port_to_info(port);
->>
->> - ? ? if (flags & UART_CONFIG_TYPE &&
->> + ? ? if ((flags & UART_CONFIG_TYPE) &&
->
-> And some more.
->
->> +#if 0
->> + ? ? dev_info(port., "rts: on send = %i, after = %i, enabled = %i",
->
-> That can't be correct - and as its #if 0'd out, either remove this or
-> fix it to be correct (and use dev_dbg if you want it to be debugging.)
->
->> +static ssize_t s3c24xx_serial_set_485_mode(struct device *dev,
->> + ? ? ? ? ? ? struct device_attribute *attr,
->> + ? ? ? ? ? ? const char *buf, size_t count)
->> +
->> +{
->> + ? ? struct uart_port *port = s3c24xx_dev_to_port(dev);
->> + ? ? struct s3c24xx_uart_port *ourport = to_ourport(port);
->> +
->> + ? ? if (!strncmp(buf, "Enabled", 7)) {
->> + ? ? ? ? ? ? ourport->rs485.flags |= SER_RS485_ENABLED;
->> + ? ? } else if (!strncmp(buf, "Disabled", 8)) {
->
-> Do you really require the first character to be capitalized?
->
->> +#ifdef CONFIG_SAMSUNG_HAS_RS485
->> +
->> + ? ? ret = device_create_file(&dev->dev, &dev_attr_485_status);
->> + ? ? if (ret < 0)
->> + ? ? ? ? ? ? printk(KERN_ERR "%s: failed to add 485 status attr.\n", __func__);
->
-> pr_err() ? ?dev_err() ?
->
+Whether to include this comes down to a question of whether
+the ability of someone to get it wrong should preclude
+allowing the *option* into the kernel.
+   -- Tim
