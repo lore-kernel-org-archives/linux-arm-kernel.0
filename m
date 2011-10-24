@@ -1,20 +1,29 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 24 Oct 2011 10:17:56 +0100
-Subject: [RFC PATCH 07/15] ARM: uncompress: Move decompressing related
-	stuff to decompress.c
-In-Reply-To: <1319404245-12740-7-git-send-email-zoss@devai.org>
-References: <1319404245-12740-1-git-send-email-zoss@devai.org>
-	<1319404245-12740-7-git-send-email-zoss@devai.org>
-Message-ID: <20111024091756.GC9893@n2100.arm.linux.org.uk>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 24 Oct 2011 11:19:25 +0200
+Subject: [PATCH v2 3/5] regulator: helper routine to extract
+	regulator_init_data
+In-Reply-To: <4EA5279E.3000505@ti.com>
+References: <20111019144215.GA32007@S2100-06.ap.freescale.net>
+	<4E9FAF42.5060200@ti.com>
+	<20111020061408.GE32007@S2100-06.ap.freescale.net>
+	<4EA00F7C.1080005@ti.com>
+	<20111021082309.GA337@S2100-06.ap.freescale.net>
+	<4EA13053.7080306@ti.com>
+	<20111021115809.GB337@S2100-06.ap.freescale.net>
+	<4EA4FF6B.2080906@ti.com>
+	<20111024081706.GC8708@ponder.secretlab.ca>
+	<4EA5279E.3000505@ti.com>
+Message-ID: <20111024091924.GA6148@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 23, 2011 at 11:10:37PM +0200, Zoltan Devai wrote:
-> +void putstr(const char *ptr);
-> +void error(char *x);
-> +extern unsigned int __machine_arch_type;
-> +#define arch_id __machine_arch_type
+On Mon, Oct 24, 2011 at 02:23:50PM +0530, Rajendra Nayak wrote:
 
-Why do we need this new define?  arch_id in this file has only been a
-local parameter to a function, and with your changes it looks like all
-references have been removed.
+> How about the driver passing the of_node to be associated with the
+> regulator, as part of regulator_desc, to the regulator core,
+> instead of this complete DT search and the restriction of having
+> to match DT node names with names in regulator_desc.
+
+regulator_desc should be const so that we handle multiple instances of
+the same device nicely.  We could pass the information in as an argument
+I guess.
