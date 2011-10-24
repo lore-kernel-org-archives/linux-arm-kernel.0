@@ -1,76 +1,48 @@
-From: ulf.hansson@stericsson.com (Ulf Hansson)
-Date: Mon, 24 Oct 2011 16:33:19 +0200
-Subject: [PATCH 1/2] mmc: mmci: Support non-power-of-two block sizes for
-	ux500v2 variant
-In-Reply-To: <1319466800-19884-1-git-send-email-ulf.hansson@stericsson.com>
-References: <1319466800-19884-1-git-send-email-ulf.hansson@stericsson.com>
-Message-ID: <1319466800-19884-2-git-send-email-ulf.hansson@stericsson.com>
+From: tim.bird@am.sony.com (Tim Bird)
+Date: Mon, 24 Oct 2011 07:33:15 -0700
+Subject: [PATCH] Shrink thread_info a bit
+In-Reply-To: <20111024124818.GA17693@n2100.arm.linux.org.uk>
+References: <20111024124818.GA17693@n2100.arm.linux.org.uk>
+Message-ID: <4EA5772B.1060205@am.sony.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stefan Nilsson XK <stefan.xk.nilsson@stericsson.com>
+On 10/24/2011 5:48 AM, Russell King - ARM Linux wrote:
+> Thread info comes in on Versatile Express at 752 bytes in size, which
+> is quite large.  Of this, the crunch state is 184 bytes, which is only
+> used on Cirrus Logic devices.
+>
+> It is wasteful to have this in every kernel when Cirrus Logic CPUs
+> are not that widely used.  So make this conditional.
+>
+> Signed-off-by: Russell King<rmk+kernel@arm.linux.org.uk>
+> ---
+>   arch/arm/include/asm/thread_info.h |    2 ++
+>   arch/arm/kernel/asm-offsets.c      |    2 ++
+>   2 files changed, 4 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/include/asm/thread_info.h b/arch/arm/include/asm/thread_info.h
+> index 7b5cc8d..a030be7 100644
+> --- a/arch/arm/include/asm/thread_info.h
+> +++ b/arch/arm/include/asm/thread_info.h
+> @@ -59,7 +59,9 @@ struct thread_info {
+>   	__u32			syscall;	/* syscall number */
+>   	__u8			used_cp[16];	/* thread used copro */
+>   	unsigned long		tp_value;
+> +#ifdef CONFIG_CRUNCH
+>   	struct crunch_state	crunchstate;
+> +#endif
+>   	union fp_state		fpstate __attribute__((aligned(8)));
+>   	union vfp_state		vfpstate;
+>   #ifdef CONFIG_ARM_THUMBEE
+>
+>
+Since the asm-offsets.h code already has the offset definitions under
+#ifdef CONFIG_CRUNCH, this qualifies as a code consistency cleanup,
+as well as a memory savings.
 
-For the ux500v2 variant of the PL18x block, non power of two block
-sizes are supported. This will make it possible to decrease data
-overhead for SDIO transfers.
+I looked at this, and can find no code outside of #ifdef CONFIG_CRUNCH
+that references this - so FWIW
+Reviewed-by Tim Bird <tim.bird@am.sony.com>
 
-Signed-off-by: Stefan Nilsson XK <stefan.xk.nilsson@stericsson.com>
-Signed-off-by: Ulf Hansson <ulf.hansson@stericsson.com>
----
- drivers/mmc/host/mmci.c |    9 +++++++--
- 1 files changed, 7 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-index 50b5f99..a6387b5 100644
---- a/drivers/mmc/host/mmci.c
-+++ b/drivers/mmc/host/mmci.c
-@@ -53,6 +53,7 @@ static unsigned int fmax = 515633;
-  * @sdio: variant supports SDIO
-  * @st_clkdiv: true if using a ST-specific clock divider algorithm
-  * @blksz_datactrl16: true if Block size is at b16..b30 position in datactrl register
-+ * @non_power_of_2_blksize: true if block sizes can be other than power of two
-  */
- struct variant_data {
- 	unsigned int		clkreg;
-@@ -63,6 +64,7 @@ struct variant_data {
- 	bool			sdio;
- 	bool			st_clkdiv;
- 	bool			blksz_datactrl16;
-+	bool			non_power_of_2_blksize;
- };
- 
- static struct variant_data variant_arm = {
-@@ -104,6 +106,7 @@ static struct variant_data variant_ux500v2 = {
- 	.sdio			= true,
- 	.st_clkdiv		= true,
- 	.blksz_datactrl16	= true,
-+	.non_power_of_2_blksize	= true,
- };
- 
- /*
-@@ -594,7 +597,6 @@ static void mmci_start_data(struct mmci_host *host, struct mmc_data *data)
- 	writel(host->size, base + MMCIDATALENGTH);
- 
- 	blksz_bits = ffs(data->blksz) - 1;
--	BUG_ON(1 << blksz_bits != data->blksz);
- 
- 	if (variant->blksz_datactrl16)
- 		datactrl = MCI_DPSM_ENABLE | (data->blksz << 16);
-@@ -974,11 +976,14 @@ static irqreturn_t mmci_irq(int irq, void *dev_id)
- static void mmci_request(struct mmc_host *mmc, struct mmc_request *mrq)
- {
- 	struct mmci_host *host = mmc_priv(mmc);
-+	struct variant_data *variant = host->variant;
- 	unsigned long flags;
- 
- 	WARN_ON(host->mrq != NULL);
- 
--	if (mrq->data && !is_power_of_2(mrq->data->blksz)) {
-+	if (mrq->data &&
-+	    !variant->non_power_of_2_blksize &&
-+	    !is_power_of_2(mrq->data->blksz)) {
- 		dev_err(mmc_dev(mmc), "unsupported block size (%d bytes)\n",
- 			mrq->data->blksz);
- 		mrq->cmd->error = -EINVAL;
--- 
-1.7.5.4
+  -- Tim
