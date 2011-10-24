@@ -1,63 +1,44 @@
 From: nico@fluxnic.net (Nicolas Pitre)
-Date: Mon, 24 Oct 2011 05:49:55 -0400
-Subject: [PATCH 06/12] ARM: mach-h720x: move special idle code to a out-of-line
-	pm_idle hook
+Date: Mon, 24 Oct 2011 05:49:56 -0400
+Subject: [PATCH 07/12] ARM: mach-ixp23xx: properly disable CPU idle call
 In-Reply-To: <1319449801-12367-1-git-send-email-nico@fluxnic.net>
 References: <1319449801-12367-1-git-send-email-nico@fluxnic.net>
-Message-ID: <1319449801-12367-7-git-send-email-nico@fluxnic.net>
+Message-ID: <1319449801-12367-8-git-send-email-nico@fluxnic.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
 ---
- arch/arm/mach-h720x/common.c              |   20 ++++++++++++++++++++
- arch/arm/mach-h720x/include/mach/system.h |    6 ------
- 2 files changed, 20 insertions(+), 6 deletions(-)
+ arch/arm/mach-ixp23xx/core.c                |    3 +++
+ arch/arm/mach-ixp23xx/include/mach/system.h |    4 ----
+ 2 files changed, 3 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-h720x/common.c b/arch/arm/mach-h720x/common.c
-index 51d4e44ab9..f3bf3572a3 100644
---- a/arch/arm/mach-h720x/common.c
-+++ b/arch/arm/mach-h720x/common.c
-@@ -242,3 +242,23 @@ void __init h720x_map_io(void)
+diff --git a/arch/arm/mach-ixp23xx/core.c b/arch/arm/mach-ixp23xx/core.c
+index a1bee33d18..3fd8da956b 100644
+--- a/arch/arm/mach-ixp23xx/core.c
++++ b/arch/arm/mach-ixp23xx/core.c
+@@ -443,4 +443,7 @@ void __init ixp23xx_sys_init(void)
  {
- 	iotable_init(h720x_io_desc,ARRAY_SIZE(h720x_io_desc));
+ 	*IXP23XX_EXP_UNIT_FUSE |= 0xf;
+ 	platform_add_devices(ixp23xx_devices, ARRAY_SIZE(ixp23xx_devices));
++
++	/* by default, the idle code is disabled */
++	disable_hlt();
  }
-+
-+static void h720x__idle(void)
-+{
-+	CPU_REG (PMU_BASE, PMU_MODE) = PMU_MODE_IDLE;
-+	nop();
-+	nop();
-+	CPU_REG (PMU_BASE, PMU_MODE) = PMU_MODE_RUN;
-+	nop();
-+	nop();
-+	local_irq_enable();
-+}
-+
-+static int __init h720x__idle_init(void)
-+{
-+	pm_idle = h720x__idle;
-+	return 0;
-+}
-+
-+arch_initcall(h720x_idle_init);
-+
-diff --git a/arch/arm/mach-h720x/include/mach/system.h b/arch/arm/mach-h720x/include/mach/system.h
-index a708d24ee4..65032f5c24 100644
---- a/arch/arm/mach-h720x/include/mach/system.h
-+++ b/arch/arm/mach-h720x/include/mach/system.h
-@@ -16,12 +16,6 @@
+diff --git a/arch/arm/mach-ixp23xx/include/mach/system.h b/arch/arm/mach-ixp23xx/include/mach/system.h
+index 8920ff2dff..0d239f2a1c 100644
+--- a/arch/arm/mach-ixp23xx/include/mach/system.h
++++ b/arch/arm/mach-ixp23xx/include/mach/system.h
+@@ -13,10 +13,6 @@
  
- static void arch_idle(void)
+ static inline void arch_idle(void)
  {
--	CPU_REG (PMU_BASE, PMU_MODE) = PMU_MODE_IDLE;
--	nop();
--	nop();
--	CPU_REG (PMU_BASE, PMU_MODE) = PMU_MODE_RUN;
--	nop();
--	nop();
+-#if 0
+-	if (!hlt_counter)
+-		cpu_do_idle();
+-#endif
  }
  
- 
+ static inline void arch_reset(char mode, const char *cmd)
 -- 
 1.7.7.1.431.g10b2a
