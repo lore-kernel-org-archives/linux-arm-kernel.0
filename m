@@ -1,46 +1,30 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Mon, 24 Oct 2011 10:17:06 +0200
-Subject: [PATCH v2 3/5] regulator: helper routine to extract
-	regulator_init_data
-In-Reply-To: <4EA4FF6B.2080906@ti.com>
-References: <20111018132032.GD30703@S2100-06.ap.freescale.net>
-	<4E9EB61C.1040207@ti.com>
-	<20111019144215.GA32007@S2100-06.ap.freescale.net>
-	<4E9FAF42.5060200@ti.com>
-	<20111020061408.GE32007@S2100-06.ap.freescale.net>
-	<4EA00F7C.1080005@ti.com>
-	<20111021082309.GA337@S2100-06.ap.freescale.net>
-	<4EA13053.7080306@ti.com>
-	<20111021115809.GB337@S2100-06.ap.freescale.net>
-	<4EA4FF6B.2080906@ti.com>
-Message-ID: <20111024081706.GC8708@ponder.secretlab.ca>
+From: vaibhav.bedia@ti.com (Bedia, Vaibhav)
+Date: Mon, 24 Oct 2011 13:49:01 +0530
+Subject: [PATCH 1/2] [ARM] mach-types: Re-add apf9328
+In-Reply-To: <20111021180347.GH21648@n2100.arm.linux.org.uk>
+References: <1318087189-22977-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
+	<20111008192621.GA28049@pengutronix.de>
+	<20111008220722.GG25689@n2100.arm.linux.org.uk>
+	<20111013090609.GT577@pengutronix.de>
+	<20111017084421.GD21648@n2100.arm.linux.org.uk>
+	<FCCFB4CDC6E5564B9182F639FC35608711EF9769EC@dbde02.ent.ti.com>
+	<20111021180347.GH21648@n2100.arm.linux.org.uk>
+Message-ID: <FCCFB4CDC6E5564B9182F639FC35608711EF976EA1@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 24, 2011 at 11:32:19AM +0530, Rajendra Nayak wrote:
-> On Friday 21 October 2011 05:28 PM, Shawn Guo wrote:
-> >On Fri, Oct 21, 2011 at 02:11:55PM +0530, Rajendra Nayak wrote:
-> >[...]
-> >>>+       /* find device_node and attach it */
-> >>>+       rdev->dev.of_node = of_find_node_by_name(NULL, regulator_desc->name);
-> >>
-> >>so would this do a complete dt search for every regulator?
-> >
-> >Yes, with the first param being NULL, tthe entire device tree will be
-> >searched.
-> >
-> >>we would also need the driver names and dt names to match for this to
-> >>work, right?
-> >>
-> >Driver name does not matter.  The key for this search to work is having
-> >regulator's name (regulator_desc->name) match device tree node's name,
-> >case ignored.
+> -----Original Message-----
+> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
+> Sent: Friday, October 21, 2011 11:34 PM
+> To: Bedia, Vaibhav
+> Cc: linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH 1/2] [ARM] mach-types: Re-add apf9328
 > 
-> Mark, whats your take on this? I am somehow not quite sure if we should
-> have this limitation put in to match DT node names with whats in the
-> driver structs (regulator_desc).
+> 
+> I've just fixed it.
 
-This looks wrong to me.  Matching based on node /name/, particularly
-when searching the entire tree, will cause problems.
+Thanks Russell.
 
-g.
+Regards,
+Vaibhav
+ 
