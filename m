@@ -1,170 +1,73 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 24 Oct 2011 10:27:47 +0200
-Subject: [PATCH v2 0/9] serial: samsung: rework clock lookup and add device
-	tree support
-In-Reply-To: <1318241285-23568-1-git-send-email-thomas.abraham@linaro.org>
-References: <1318241285-23568-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <4EA52183.3040206@samsung.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Mon, 24 Oct 2011 10:42:05 +0200
+Subject: [RFC 0/4] simplify remapping a resource for drivers
+Message-ID: <1319445729-14841-1-git-send-email-w.sang@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/10/11 12:07, Thomas Abraham wrote:
-> Changes since v1:
-> - Included the missing dt bindings documentation in the last patch.
-> - Rebased and tested with linux 3.1-rc9 on linux-samsung-soc tree.
-> - Commit messages are modified to be elaborate.
-> - No changes in code.
->
->
-> This patchset reworks the lookup of parent clocks for baud rate generator in
-> the uart controller and adds support for device tree based discovery for the
-> uart controller.
->
-> The Samsung uart driver was dependent on the clock names supplied in the
-> platform data. This dependency had to be first removed to add device tree based
-> discovery support for Samsung uart driver. In the process of reworking the clock
-> lookup logic, several changes had to be made which in turn made parts of the
-> driver redundant and such portions of the driver have been removed in this
-> patchset. As a result, all the SoC specific extensions have been deleted.
->
-> Patch 1 modifies the driver to keep a copy of the location of the platform data
-> in the driver's private data. This makes device tree support addition
-> non-intrusive.
->
-> Patch 2 moves the complicated clock divider handling for fclk source clock for
-> s3c2440 SoC into platform code. The fclk clock can be easily managed by
-> representing it as a clock in the platform code. fclk clock handling was
-> specific to s3c2440 and moving this out of the driver makes the rest of the
-> clock handling in the driver almost identical for all SoC's supported by the
-> driver.
->
-> Patch 3 modifies the driver to lookup source clocks for baud rate generator
-> by using generic clock names. The generic clock name used by the driver is
-> 'clk_uart_baud' appended with the parent number of the clock. For instance,
-> the second parent clock source option for baud rate generator is named as
-> 'clk_uart_baud2'.
->
-> The driver stops depending on the set_clock and get_clock callbacks in the
-> SoC specific extensions. Instead, the driver is modified to lookup parent
-> clock rates and decide/calculate the best parent clock source for the baud
-> rate generator (best clock would have the least delta when compared to buad
-> rate requested).
->
-> In this process, four new members are added in the driver's private data
-> structure. The 'def_clk_sel' member is a platform set bit-value that specifies
-> the possible parents that the driver is allowed to use for baud rate clock.
-> A bit set at a particular bit position selects that parent clock source.
-> Example: If bit number 2 is set in 'def_clk_sel', then parent clock source '2'
-> can be a possible parent clock for baud rate generator. The 'num_clks'
-> is the number of possible parent clocks that the SoC supports. The
-> 'clksel_mask' and 'clksel_shift' members are used to operate on the parent clock
-> selection bit field int the uart controller's contol register.
->
-> Patch 4 removes all uses and instances of 'struct s3c24xx_uart_clksrc'. This
-> structure was used to pass source clock 'names' between platform code, driver
-> and SoC specific extensions. By moving away from using platform specified clock
-> names in the driver, all uses and instances of 'struct s3c24xx_uart_clksrc'
-> is removed.
->
-> Patch 5 removes all the SoC specific get_clksrc and set_clksrc callbacks. These
-> callbacks were using SoC specific clock names to communicate the clock to be
-> set or retrieved. These callbacks are removed as they are no longer required.
->
-> Patch 6 reworks the uart clocks in platform code of all Samsung SoC's. The
-> driver would use generic clock names and this patch creates aliases to uart
-> clocks with generic clock names as the alias name.
->
-> Patch 7 merges all the SoC specific port reset functions into one common port
-> reset function and moves the common function into the common Samsung uart
-> driver. All the SoC specific port reset functions perform the same operation
-> allowing all of them to be converged.
->
-> Patch 8 collapses all the SoC specific probe functions and associated driver
-> private data into the Samsung common uart driver. With get_clksrc, set_clksrc
-> and reset_port functions removed from SoC specific extensions, all the remains
-> in those extensions is the probe function along with SoC specific driver data.
-> These are merged into the common Samsung uart driver and all the SoC specific
-> extensions are deleted.
->
-> Patch 9 adds device tree based discovery support for the uart driver.
->
->
-> This patchset is based on the following tree
-> https://github.com/kgene/linux-samsung.git  branch: for-next
->
-> with the following two patches applied
-> [PATCH] serial: samsung: Add unified interrupt handler for s3c64xx and later SoC's
-> [PATCH] ARM: SAMSUNG: Remove uart irq handling from plaform code
->
-> and tested on the following boards.
-> SMDK2440, SMDK2416, SMDK6410, SMDK6440, SMDK6450, SMDKC100, SMDKV210, SMDKV310.
->
-> This patchset has dependency on the following patchset:
-> [PATCH V2 0/2] Add a common macro for creating struct clk_lookup entries
->
->
-> Thomas Abraham (9):
->    serial: samsung: Keep a copy of the location of platform data in driver's private data
->    serial: samsung: move handling of fclk/n clock to platform code
->    serial: samsung: switch to clkdev based clock lookup
->    serial: samsung: remove struct 's3c24xx_uart_clksrc' and all uses of it
->    serial: samsung: remove all uses of get_clksrc and set_clksrc
->    arm: samsung: register uart clocks to clock lookup list
->    serial: samsung: merge all SoC specific port reset functions
->    serial: samsung: merge probe() function from all SoC specific extensions
->    serial: samsung: add device tree support
->
->   .../devicetree/bindings/serial/samsung_uart.txt    |   14 +
->   arch/arm/mach-exynos4/clock.c                      |  106 ++--
->   arch/arm/mach-exynos4/init.c                       |   21 +-
->   arch/arm/mach-s3c2410/mach-bast.c                  |   22 -
->   arch/arm/mach-s3c2410/mach-vr1000.c                |   24 -
->   arch/arm/mach-s3c2410/s3c2410.c                    |    6 +
->   arch/arm/mach-s3c2412/clock.c                      |    7 +
->   arch/arm/mach-s3c2440/clock.c                      |   44 ++
->   arch/arm/mach-s3c2440/mach-anubis.c                |   22 +-
->   arch/arm/mach-s3c2440/mach-at2440evb.c             |   22 +-
->   arch/arm/mach-s3c2440/mach-osiris.c                |   24 +-
->   arch/arm/mach-s3c2440/mach-rx1950.c                |   18 +-
->   arch/arm/mach-s3c2440/mach-rx3715.c                |   19 +-
->   arch/arm/mach-s3c64xx/clock.c                      |   37 +-
->   arch/arm/mach-s5p64x0/clock-s5p6440.c              |   32 +-
->   arch/arm/mach-s5p64x0/clock-s5p6450.c              |   32 +-
->   arch/arm/mach-s5p64x0/init.c                       |   31 -
->   arch/arm/mach-s5pc100/clock.c                      |   33 +-
->   arch/arm/mach-s5pv210/clock.c                      |  107 ++--
->   arch/arm/mach-s5pv210/init.c                       |   19 -
->   arch/arm/plat-s3c24xx/s3c2443-clock.c              |   23 +-
->   arch/arm/plat-samsung/include/plat/regs-serial.h   |   45 +-
->   drivers/tty/serial/Kconfig                         |   45 +--
->   drivers/tty/serial/Makefile                        |    5 -
->   drivers/tty/serial/s3c2410.c                       |  115 ----
->   drivers/tty/serial/s3c2412.c                       |  149 -----
->   drivers/tty/serial/s3c2440.c                       |  178 ------
->   drivers/tty/serial/s3c6400.c                       |  149 -----
->   drivers/tty/serial/s5pv210.c                       |  158 -----
->   drivers/tty/serial/samsung.c                       |  639 ++++++++++++--------
->   drivers/tty/serial/samsung.h                       |   32 +-
->   31 files changed, 752 insertions(+), 1426 deletions(-)
->   create mode 100644 Documentation/devicetree/bindings/serial/samsung_uart.txt
->   delete mode 100644 drivers/tty/serial/s3c2410.c
->   delete mode 100644 drivers/tty/serial/s3c2412.c
->   delete mode 100644 drivers/tty/serial/s3c2440.c
->   delete mode 100644 drivers/tty/serial/s3c6400.c
->   delete mode 100644 drivers/tty/serial/s5pv210.c
+Mostly all platform drivers need to do something like this to get a ioremapped
+pointer from a resource (and some have multiple resources to be remapped):
 
-(Cc'ed Greg KH)
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+	if (!res) {
+		dev_err(&pdev->dev, "can't get device resources\n");
+		return -ENOENT;
+	}
 
-Looks good for me, and I need to get the ack from Greg before applying.
+	res_size = resource_size(res);
+	if (!devm_request_mem_region(&pdev->dev, res->start, res_size, res->name)) {
+		dev_err(&pdev->dev, "can't allocate %d bytes at %d address\n",
+				res_size, res->start);
+		return -EBUSY;
+	}
 
-Greg, if you're ok, I'd like to send this series to upstream via Samsung 
-tree for supporting device tree because this touches a lot of arch/arm/ 
-Samsung stuff. If any problems, please let me know.
+	priv->base = devm_ioremap_nocache(&pdev->dev, res->start, res_size);
+	if (priv->base) {
+		dev_err(&pdev->dev, "ioremap failed\n");
+		return -ENOMEM;
+	}
 
-Thanks.
+In case of not using managed devices, there is also code for cleaning up when
+hitting an error. After this series, the same can be done with:
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+	err = devm_resource_to_mapped_ptr(&pdev->dev, res, &priv->base);
+	if (err)
+		return err;
+
+The new function will perform all necessary checks and return with consistent
+error codes and messages on failures. It also prevents common mistakes like
+using a wrong type for res_size or not calling the _nocache-variant of ioremap
+if the resource is not marked otherwise. Because the new functions works with
+the struct device (plus a resource), it will probably be useful even if
+platform drivers run out of fashion.
+
+The first two patches are minor cleanups on devres found while working on the code.
+The third patch adds the new function. The fourth patch is an example, so we have a
+simple use-case for the proposed functionality.
+
+The series can also be fetched from:
+
+	git://git.pengutronix.de/git/wsa/linux-2.6.git resource_to_ptr
+
+Looking forward to reviews and comments.
+
+Thanks,
+
+   Wolfram
+
+
+Wolfram Sang (4):
+  Documentation: devres: add allocation functions to list of supported calls
+  lib: devres: add annotations for #endif
+  lib: devres: add function which remaps a given resource
+  watchdog: imx2: simplify resource allocation
+
+ Documentation/driver-model/devres.txt |    5 +++
+ drivers/watchdog/imx2_wdt.c           |   22 ++-----------
+ include/linux/device.h                |    3 ++
+ lib/devres.c                          |   56 +++++++++++++++++++++++++++++++-
+ 4 files changed, 65 insertions(+), 21 deletions(-)
+
+-- 
+1.7.6.3
