@@ -1,87 +1,20 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 24 Oct 2011 02:17:04 -0700
-Subject: [GIT PULL] pending DT patches and cleanup for map_io for v3.2
-	merge window
-Message-ID: <20111024091704.GF31337@atomide.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 24 Oct 2011 10:17:56 +0100
+Subject: [RFC PATCH 07/15] ARM: uncompress: Move decompressing related
+	stuff to decompress.c
+In-Reply-To: <1319404245-12740-7-git-send-email-zoss@devai.org>
+References: <1319404245-12740-1-git-send-email-zoss@devai.org>
+	<1319404245-12740-7-git-send-email-zoss@devai.org>
+Message-ID: <20111024091756.GC9893@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd,
+On Sun, Oct 23, 2011 at 11:10:37PM +0200, Zoltan Devai wrote:
+> +void putstr(const char *ptr);
+> +void error(char *x);
+> +extern unsigned int __machine_arch_type;
+> +#define arch_id __machine_arch_type
 
-As discussed in the ARM kernel meeting yesterday, here's are
-the pending omap things to pull for v3.2 merge window.
-
-These would be nice to get still in as other people's work
-such as Nico's map_io changes need #2 below.
-
-1. Initial DT support posted few weeks ago
-
-   Please see the earlier pull request at:
-
-   http://lkml.org/lkml/2011/10/4/441
-
-2. Cleanup for map_io posted few weeks ago
-
-   This depends on the #1 above, and also requires
-   the ioremap_exec patch. Russell said he has applied
-   into devel-stable (But not pushed out yet?).
-
-   When you have the ioremap_exec patch from Russell,
-   please pull this from:
-
-   git://github.com/tmlind/linux.git sram-map-io
-
-   Pull request against #1 attached below.
-
-Regards,
-
-Tony
-
-
-The following changes since commit 3ae3e253db7385238dd9d6c67c085afa3e770a56:
-  Tony Lindgren (1):
-        Merge branch 'for_3.2/3_omap_devicetree' of git://gitorious.org/omap-pm/linux into dt
-
-are available in the git repository at:
-
-  git://github.com/tmlind/linux.git sram-map-io
-
-Tony Lindgren (6):
-      ARM: OMAP1: Use generic map_io, init_early and init_irq
-      ARM: OMAP: Avoid cpu_is_omapxxxx usage until map_io is done
-      ARM: OMAP: Remove calls to SRAM allocations for framebuffer
-      ARM: OMAP: Map SRAM later on with ioremap_exec()
-      ARM: OMAP: Move set_globals initialization to happen in init_early
-      ARM: OMAP: Warn if omap_ioremap is called before SoC detection
-
- arch/arm/mach-omap1/board-ams-delta.c    |   16 +---
- arch/arm/mach-omap1/board-fsample.c      |   76 +++++++++---------
- arch/arm/mach-omap1/board-generic.c      |   16 +---
- arch/arm/mach-omap1/board-h2.c           |   16 +---
- arch/arm/mach-omap1/board-h3.c           |   16 +---
- arch/arm/mach-omap1/board-htcherald.c    |   12 +--
- arch/arm/mach-omap1/board-innovator.c    |   36 ++++-----
- arch/arm/mach-omap1/board-nokia770.c     |   34 +++-----
- arch/arm/mach-omap1/board-osk.c          |   16 +---
- arch/arm/mach-omap1/board-palmte.c       |   16 +---
- arch/arm/mach-omap1/board-palmtt.c       |   16 +---
- arch/arm/mach-omap1/board-palmz71.c      |   18 +----
- arch/arm/mach-omap1/board-perseus2.c     |   75 +++++++++---------
- arch/arm/mach-omap1/board-sx1.c          |   17 +---
- arch/arm/mach-omap1/board-voiceblue.c    |   16 +---
- arch/arm/mach-omap1/devices.c            |    3 +
- arch/arm/mach-omap1/io.c                 |   57 ++++++--------
- arch/arm/mach-omap2/board-omap3beagle.c  |    7 +--
- arch/arm/mach-omap2/board-ti8168evm.c    |    1 -
- arch/arm/mach-omap2/common.c             |   50 ++++++------
- arch/arm/mach-omap2/control.c            |   16 +---
- arch/arm/mach-omap2/io.c                 |  127 +++++++++++++++---------------
- arch/arm/mach-omap2/io.h                 |    7 --
- arch/arm/mach-omap2/omap-smp.c           |    7 +-
- arch/arm/mach-omap2/prcm.c               |   19 ++---
- arch/arm/mach-omap2/sdrc.c               |   13 +--
- arch/arm/plat-omap/include/plat/common.h |   17 +++--
- arch/arm/plat-omap/include/plat/io.h     |   29 ++++++-
- arch/arm/plat-omap/io.c                  |   10 +++
- arch/arm/plat-omap/sram.c                |   85 +++++---------------
- 30 files changed, 335 insertions(+), 509 deletions(-)
+Why do we need this new define?  arch_id in this file has only been a
+local parameter to a function, and with your changes it looks like all
+references have been removed.
