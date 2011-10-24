@@ -1,55 +1,63 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 24 Oct 2011 15:02:44 +0200
-Subject: [PATCH 0/2] ARM: Samsung: Add basic device tree support for
-	Exynos4 boards
-In-Reply-To: <1318342396-26178-1-git-send-email-thomas.abraham@linaro.org>
-References: <1318342396-26178-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <4EA561F4.5010606@samsung.com>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Mon, 24 Oct 2011 14:06:00 +0100
+Subject: [PATCH v3] virtio: Add platform bus driver for memory mapped
+	virtio device
+In-Reply-To: <87wrbv15lp.fsf@rustcorp.com.au>
+References: <1317841030-17758-1-git-send-email-pawel.moll@arm.com>
+	<1317919843-8343-1-git-send-email-pawel.moll@arm.com>
+	<1317921230.28696.102.camel@hornet.cambridge.arm.com>
+	<87lisjq6tu.fsf@rustcorp.com.au>
+	<1318931075.3146.285.camel@hornet.cambridge.arm.com>
+	<87ty75adtb.fsf@rustcorp.com.au>
+	<1319219844.5094.16.camel@hornet.cambridge.arm.com>
+	<87wrbv15lp.fsf@rustcorp.com.au>
+Message-ID: <1319461560.3668.16.camel@hornet.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/11/11 16:13, Thomas Abraham wrote:
-> This patchset adds a new basic device tree enabled machine/board file which is
-> based on the Samsung's Exynos4 family of SoC's. Also included in this patchset is the
-> dts file for Exynos4210 SoC, Samsung's SMDKV310 board and Insignal's Origen board.
->
-> The Exynos4210 dts file includes support for IRQ, GPIO, WDT, RTC, UART, SDHCI, Keypad,
-> DMA and I2C controllers. As device tree coverage for Exynos4210 increases, additional
-> device nodes to represent the controllers should be added.
->
-> The device tree enabled machine file enables boot on two boards based on the
-> Exynos4210 SoC. This provides a starting point to add additional device tree support
-> on these boards, migrate other existing Exynos4 based boards to use device tree
-> and enable device tree based boot on new upcoming boards.
->
-> This patchset has been tested on the following tree:
->    https://github.com/kgene/linux-samsung.git   branch: for-next
->
-> Thomas Abraham (2):
->    ARM: Samsung: Add Exynos4 device tree enabled board file
->    ARM: dts: Add intial dts file for Exynos4210 SoC, SMDKV310 and Origen board
->
->   .../devicetree/bindings/arm/insignal-boards.txt    |    8 +
->   .../devicetree/bindings/arm/samsung-boards.txt     |    8 +
->   arch/arm/boot/dts/exynos4210-origen.dts            |  137 +++++++
->   arch/arm/boot/dts/exynos4210-smdkv310.dts          |  182 +++++++++
->   arch/arm/boot/dts/exynos4210.dtsi                  |  403 ++++++++++++++++++++
->   arch/arm/mach-exynos4/Kconfig                      |   14 +
->   arch/arm/mach-exynos4/Makefile                     |    2 +
->   arch/arm/mach-exynos4/mach-exynos4-dt.c            |   85 ++++
->   8 files changed, 839 insertions(+), 0 deletions(-)
->   create mode 100644 Documentation/devicetree/bindings/arm/insignal-boards.txt
->   create mode 100644 Documentation/devicetree/bindings/arm/samsung-boards.txt
->   create mode 100644 arch/arm/boot/dts/exynos4210-origen.dts
->   create mode 100644 arch/arm/boot/dts/exynos4210-smdkv310.dts
->   create mode 100644 arch/arm/boot/dts/exynos4210.dtsi
->   create mode 100644 arch/arm/mach-exynos4/mach-exynos4-dt.c
+On Mon, 2011-10-24 at 03:33 +0100, Rusty Russell wrote:
+> No, that's it I think.  Please send a diff for the documentation, since
+> I'm updating the LyX master and I've already applied your previous
+> version.
 
-Applied.
-Thanks.
+Here it goes (below). Also do you think you would be able to merge the
+driver (corresponding v4 patch follows) in the 3.2 merge window that
+seems to have just opened? ;-)
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Cheers!
+
+Pawel
+
+--- virtio-mmio.orig	2011-10-24 11:17:08.263907000 +0100
++++ virtio-mmio.tex	2011-10-24 13:58:29.752757000 +0100
+@@ -59,9 +59,18 @@
+ \item 0x050 | W | QueueNotify \\
+ Queue notifier.\\
+ Writing a queue index to this register notifies the Host that there are new buffers to process in the queue.
+-\item 0x060 | W | InterruptACK \\
++\item 0x060 | R | InterruptStatus \\
++Interrupt status. \\
++Reading from this register returns a bit mask of interrupts asserted by the device. An interrupt is asserted if the corresponding bit is set, ie. equals one (1). \\
++\begin{itemize}
++\item Bit 0 | Used Ring update \\
++This interrupt is asserted when the Host has updated the Used Ring in at least one of the active virtual queues.
++\item Bit 1 | Configuration change \\
++This interrupt is asserted when configuration of the device has changed.
++\end{itemize}
++\item 0x064 | W | InterruptACK \\
+ Interrupt acknowledge. \\
+-Writing to this register notifies the Host that the Guest finished receiving used buffers from the device and therefore serviced an asserted interrupt. Values written to this register are currently not used, but for future extensions it must be set to one (0x1).
++Writing to this register notifies the Host that the Guest finished handling interrupts. Every bit of the value clears corresponding bit of the InterruptStatus register. \\
+ \item 0x070 | RW | Status \\
+ Device status. \\
+ Reading from this register returns the current device status flags. \\
+@@ -100,8 +109,7 @@
+ The memory mapped virtio device behaves in the same way as described in p. 2.4 ``Device Operation'', with the following exceptions:
+ \begin{enumerate}
+ \item The device is notified about new buffers available in a queue by writing the queue index to register QueueNum instead of the virtio header in PCI I/O space (p. 2.4.1.4 ``Notifying The Device'').
+-\item As the memory mapped virtio device is using single, dedicated interrupt signal, its handling is much simpler than in the PCI (MSI-X) case (p.  2.4.2 ``Receiving Used Buffer From The Device''). Therefore all the Guest interrupt handler should do after receiving used buffers is acknowledging the interrupt by writing a value to the InterruptACK register. Currently this value does not carry any meaning, but for future extensions it must be set to one (0x1).
+-\item The dynamic configuration changes, as described in p. 2.4.3 ``Dealing With Configuration Changes'' are not permitted.
++\item The memory mapped virtio device is using single, dedicated interrupt signal. After receiving an interrupt, the driver must read the InterruptStatus register to check what caused the interrupt (see the register description). After the interrupt is handled, the driver must acknowledge it by writing a bit mask corresponding to the serviced interrupt to the InterruptACK register.
+ \end{enumerate}
+ 
+ \end{document}
