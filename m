@@ -1,134 +1,102 @@
-From: mina86@mina86.com (Michal Nazarewicz)
-Date: Mon, 24 Oct 2011 12:39:29 -0700
-Subject: [PATCH 6/9] drivers: add Contiguous Memory Allocator
-In-Reply-To: <20111018134321.GE6660@csn.ul.ie>
-References: <1317909290-29832-1-git-send-email-m.szyprowski@samsung.com>
-	<1317909290-29832-7-git-send-email-m.szyprowski@samsung.com>
-	<20111018134321.GE6660@csn.ul.ie>
-Message-ID: <op.v3vfj30d3l0zgt@mpn-glaptop>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Mon, 24 Oct 2011 22:09:33 +0200
+Subject: [RFC 3/4] lib: devres: add convenience function to remap a
+	resource
+In-Reply-To: <20111024154307.GB24914@google.com>
+References: <1319445729-14841-1-git-send-email-w.sang@pengutronix.de>
+	<1319445729-14841-4-git-send-email-w.sang@pengutronix.de>
+	<20111024154307.GB24914@google.com>
+Message-ID: <20111024200933.GB6326@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On Thu, Oct 06, 2011 at 03:54:46PM +0200, Marek Szyprowski wrote:
->> +static unsigned long __init __cma_early_get_total_pages(void)
->> +{
->> +	struct memblock_region *reg;
->> +	unsigned long total_pages = 0;
->> +
->> +	/*
->> +	 * We cannot use memblock_phys_mem_size() here, because
->> +	 * memblock_analyze() has not been called yet.
->> +	 */
->> +	for_each_memblock(memory, reg)
->> +		total_pages += memblock_region_memory_end_pfn(reg) -
->> +			       memblock_region_memory_base_pfn(reg);
->> +	return total_pages;
->> +}
->> +
+Hi,
 
-On Tue, 18 Oct 2011 06:43:21 -0700, Mel Gorman <mel@csn.ul.ie> wrote:
-> Is this being called too early yet? What prevents you seeing up the CMA
-> regions after the page allocator is brought up for example? I understand
-> that there is a need for the memory to be coherent so maybe that is the
-> obstacle.
+> On Mon, Oct 24, 2011 at 10:42:08AM +0200, Wolfram Sang wrote:
+> > * the new function is not named 'devm_ioremap_resource' because it does more than
+> >   just ioremap, namely request_mem_region. I didn't want to create implicit
+> >   knowledge here.
+> 
+> Maybe devm_request_and_ioremap_resource()?  Maybe it's a bit long but
+> A_to_B names are usually used for trivial conversions.
 
-Another reason is that we want to be sure that we can get given range of pages.
-After page allocator is set-up, someone could allocate a non-movable page from
-the range that interests us and that wouldn't be nice for us.
+I had this name in mind, too. Yet, it implies that the function requests a
+resource but in fact it requests a mem_region. Requesting a resource (e.g.
+platform_get_resource) is THE thing the function does not do. So I scrapped
+this name. But will do some more brainstorming for a better name in V2.
 
->> +struct page *dma_alloc_from_contiguous(struct device *dev, int count,
->> +				       unsigned int align)
->> +{
->> +	struct cma *cma = get_dev_cma_area(dev);
->> +	unsigned long pfn, pageno;
->> +	int ret;
->> +
->> +	if (!cma)
->> +		return NULL;
->> +
->> +	if (align > CONFIG_CMA_ALIGNMENT)
->> +		align = CONFIG_CMA_ALIGNMENT;
->> +
->> +	pr_debug("%s(cma %p, count %d, align %d)\n", __func__, (void *)cma,
->> +		 count, align);
->> +
->> +	if (!count)
->> +		return NULL;
->> +
->> +	mutex_lock(&cma_mutex);
->> +
->> +	pageno = bitmap_find_next_zero_area(cma->bitmap, cma->count, 0, count,
->> +					    (1 << align) - 1);
->> +	if (pageno >= cma->count) {
->> +		ret = -ENOMEM;
->> +		goto error;
->> +	}
->> +	bitmap_set(cma->bitmap, pageno, count);
->> +
->> +	pfn = cma->base_pfn + pageno;
->> +	ret = alloc_contig_range(pfn, pfn + count, 0, MIGRATE_CMA);
->> +	if (ret)
->> +		goto free;
->> +
+> 
+> > +int __must_check devm_resource_to_mapped_ptr(struct device *dev,
+> > +			struct resource *res, void __iomem **dest)
+> 
+> If we're already printing out dev_err(), I think we can live with
+> %NULL return on error.
 
-> If alloc_contig_range returns failure, the bitmap is still set. It will
-> never be freed so now the area cannot be used for CMA allocations any
-> more.
+Yes, already fixed this way.
 
-bitmap is cleared at the ?free:? label.
+> > +{
+> > +	resource_size_t size;
+> > +	const char *name;
+> > +
+> > +	BUG_ON(!dev || !dest);
+> > +
+> > +	*dest = NULL;
+> > +
+> > +	if (!res || resource_type(res) != IORESOURCE_MEM) {
+> > +		dev_err(dev, "invalid resource\n");
+> > +		return -ENOENT;
+> > +	}
+> > +
+> > +	size = resource_size(res);
+> > +	name = res->name ?: dev_name(dev);
+> > +
+> > +	if (!devm_request_mem_region(dev, res->start, size, name)) {
+> > +		dev_err(dev, "can't request region for resource %pR\n", res);
+> > +		return -EBUSY;
+> > +	}
+> > +
+> > +	if (res->flags & IORESOURCE_CACHEABLE)
+> > +		*dest = devm_ioremap(dev, res->start, size);
+> > +	else
+> > +		*dest = devm_ioremap_nocache(dev, res->start, size);
+> > +
+> > +	if (!*dest) {
+> > +		dev_err(dev, "ioremap failed for resource %pR\n", res);
+> > +		return -ENOMEM;
+> > +	}
+> 
+> So, for library functions, it's nice if the function doesn't hold any
+> extra resource on error return.  devres has grouping to support this.
+> You just need to wrap allocations inside a group and remove it on
+> success and release on error.  ie.
+> 
+> 	if (!devres_open_group(dev, NULL, GFP_KERNEL))
+> 		return NULL;
+> 	if (alloc_resource(0) < 0)
+> 		goto fail;
+> 	if (alloc_resource(1) < 0)
+> 		goto fail;
+> 	devres_remove_group(dev, NULL);
+> 	return 0;
+> fail:
+> 	devres_release_group(dev, NULL);
+> 	return 0;
 
->> +	mutex_unlock(&cma_mutex);
->> +
->> +	pr_debug("%s(): returned %p\n", __func__, pfn_to_page(pfn));
->> +	return pfn_to_page(pfn);
->> +free:
->> +	bitmap_clear(cma->bitmap, pageno, count);
->> +error:
->> +	mutex_unlock(&cma_mutex);
->> +	return NULL;
->> +}
+I am not sure I got what you mean here, but wouldn't it be easier to simply
+call devm_release_mem_region() when devm_ioremap comes back with a NULL
+pointer?
 
+Thanks,
 
->> +int dma_release_from_contiguous(struct device *dev, struct page *pages,
->> +				int count)
->> +{
->> +	struct cma *cma = get_dev_cma_area(dev);
->> +	unsigned long pfn;
->> +
->> +	if (!cma || !pages)
->> +		return 0;
->> +
->> +	pr_debug("%s(page %p)\n", __func__, (void *)pages);
->> +
->> +	pfn = page_to_pfn(pages);
->> +
->> +	if (pfn < cma->base_pfn || pfn >= cma->base_pfn + cma->count)
->> +		return 0;
->> +
->> +	mutex_lock(&cma_mutex);
->> +
->> +	bitmap_clear(cma->bitmap, pfn - cma->base_pfn, count);
->> +	free_contig_pages(pfn, count);
->> +
->> +	mutex_unlock(&cma_mutex);
->
-> It feels like the mutex could be a lot lighter here. If the bitmap is
-> protected by a spinlock, it would only need to be held while the bitmap
-> was being cleared. free the contig pages outside the spinlock and clear
-> the bitmap afterwards.
->
-> It's not particularly important as the scalability of CMA is not
-> something to be concerned with at this point.
-
-Mutex is used also to protect the core operations, ie. isolating pages
-and such.  This is because two CMA calls may want to work on the same
-pageblock and we have to prevent that from happening.
-
-We could add the spinlock for protecting the bitmap but we will still
-need mutex for other uses.
+   Wolfram
 
 -- 
-Best regards,                                         _     _
-.o. | Liege of Serenely Enlightened Majesty of      o' \,=./ `o
-..o | Computer Science,  Micha? ?mina86? Nazarewicz    (o o)
-ooo +----<email/xmpp: mpn@google.com>--------------ooO--(_)--Ooo--
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111024/01ff8aba/attachment-0001.sig>
