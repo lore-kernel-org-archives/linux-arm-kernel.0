@@ -1,58 +1,87 @@
-From: vapier.adi@gmail.com (Mike Frysinger)
-Date: Mon, 24 Oct 2011 05:14:30 -0400
-Subject: [PATCH] drivers: create a pin control subsystem v8
-In-Reply-To: <CACRpkdatiBathcoo2VjKs9jHJiKC5trDCJ0bePX1q6KbrYRN-g@mail.gmail.com>
-References: <1317211419-18472-1-git-send-email-linus.walleij@stericsson.com>
-	<20110930020754.GK12606@ponder.secretlab.ca>
-	<CACRpkdYyyqB6=5M8reqgwpMxXJz5ttXWyOav6K58dQ0CrxwCNA@mail.gmail.com>
-	<CACxGe6v19pZ0i-+ksYZbG2ZvGT30UkXEHTzpZMBTB4RNUV5bnA@mail.gmail.com>
-	<CAKnu2MpQ8Wvd4TF8Ge=o8ACyEoaEY8TcvOSdT1w6zfYiSKFUiw@mail.gmail.com>
-	<20111004203520.GK2870@ponder.secretlab.ca>
-	<CAMjpGUe9abPsdWbum2MRzOV2b5_2FDqXZC-K0KThRA6MNTr4FA@mail.gmail.com>
-	<CACRpkdatiBathcoo2VjKs9jHJiKC5trDCJ0bePX1q6KbrYRN-g@mail.gmail.com>
-Message-ID: <CAMjpGUc0TqqEFNXcg7m6K6Zc8GCYe1BgOHvZt4Cb35GHJ5=1fQ@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 24 Oct 2011 02:17:04 -0700
+Subject: [GIT PULL] pending DT patches and cleanup for map_io for v3.2
+	merge window
+Message-ID: <20111024091704.GF31337@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 24, 2011 at 03:26, Linus Walleij wrote:
-> On Sat, Oct 22, 2011 at 7:44 PM, Mike Frysinger wrote:
->> On Tue, Oct 4, 2011 at 16:35, Grant Likely wrote:
->>> On Sat, Oct 01, 2011 at 12:39:21PM +0200, Linus Walleij wrote:
->>>> 2011/9/30 Grant Likely:
->>>> >?I'm not convinced that the sysfs approach is
->>>> > actually the right interface here (I'm certainly not a fan of the gpio
->>>> > sysfs i/f), and I'd rather not be putting in unneeded stuff until the
->>>> > userspace i/f is hammered out.
->>>>
->>>> Actually, thinking about it I cannot see what would be wrong
->>>> with /dev/gpio0 & friends in the first place.
->>>>
->>>> Using sysfs as swiss army knife for custom I/O does not
->>>> seem like it would be long-term viable so thanks for this
->>>> observation, and I think we need /dev/gpio* put on some
->>>> mental roadmap somewhere.
->>>
->>> Agreed. ?I don't want to be in the situation we are now with GPIO,
->>> where every time I look at the sysfs interface I shudder.
->>
->> the problem with that is it doesn't scale. ?if i have a device with
->> over 150 GPIOs on the SoC itself (obviously GPIO expanders can make
->> that much bigger), i don't want to see 150+ device nodes in /dev/.
->> that's a pretty big waste. ?sysfs only allocates/frees resources when
->> userspace actually wants to utilize a GPIO.
->
-> I was more thinking along the lines of one device per GPIO controller,
-> then you ioctl() to ask /dev/gpio0 how many pins it has or so.
+Arnd,
 
-that brings its own set of trade offs.  this might be OK from a
-debugging point of view, but it means security wise we have to grant
-access on a per-gpiochip basis instead of a per-gpio basis.  i think
-the sysfs interface has this granularity of support already as the
-root user can chmod/chown the files after exporting them.
+As discussed in the ARM kernel meeting yesterday, here's are
+the pending omap things to pull for v3.2 merge window.
 
-Grant suggested we extend UIO to export GPIOs.  this would be a good
-trade off i think -- sysfs is a good on-the-fly debugging/scripting
-interface, but UIO gets us the performance.  sysfs overhead can be
-mitigated by using pwrite/pread, but without pwritev/preadv, we're
-stuck with 1-transition-per-syscall.
--mike
+These would be nice to get still in as other people's work
+such as Nico's map_io changes need #2 below.
+
+1. Initial DT support posted few weeks ago
+
+   Please see the earlier pull request at:
+
+   http://lkml.org/lkml/2011/10/4/441
+
+2. Cleanup for map_io posted few weeks ago
+
+   This depends on the #1 above, and also requires
+   the ioremap_exec patch. Russell said he has applied
+   into devel-stable (But not pushed out yet?).
+
+   When you have the ioremap_exec patch from Russell,
+   please pull this from:
+
+   git://github.com/tmlind/linux.git sram-map-io
+
+   Pull request against #1 attached below.
+
+Regards,
+
+Tony
+
+
+The following changes since commit 3ae3e253db7385238dd9d6c67c085afa3e770a56:
+  Tony Lindgren (1):
+        Merge branch 'for_3.2/3_omap_devicetree' of git://gitorious.org/omap-pm/linux into dt
+
+are available in the git repository at:
+
+  git://github.com/tmlind/linux.git sram-map-io
+
+Tony Lindgren (6):
+      ARM: OMAP1: Use generic map_io, init_early and init_irq
+      ARM: OMAP: Avoid cpu_is_omapxxxx usage until map_io is done
+      ARM: OMAP: Remove calls to SRAM allocations for framebuffer
+      ARM: OMAP: Map SRAM later on with ioremap_exec()
+      ARM: OMAP: Move set_globals initialization to happen in init_early
+      ARM: OMAP: Warn if omap_ioremap is called before SoC detection
+
+ arch/arm/mach-omap1/board-ams-delta.c    |   16 +---
+ arch/arm/mach-omap1/board-fsample.c      |   76 +++++++++---------
+ arch/arm/mach-omap1/board-generic.c      |   16 +---
+ arch/arm/mach-omap1/board-h2.c           |   16 +---
+ arch/arm/mach-omap1/board-h3.c           |   16 +---
+ arch/arm/mach-omap1/board-htcherald.c    |   12 +--
+ arch/arm/mach-omap1/board-innovator.c    |   36 ++++-----
+ arch/arm/mach-omap1/board-nokia770.c     |   34 +++-----
+ arch/arm/mach-omap1/board-osk.c          |   16 +---
+ arch/arm/mach-omap1/board-palmte.c       |   16 +---
+ arch/arm/mach-omap1/board-palmtt.c       |   16 +---
+ arch/arm/mach-omap1/board-palmz71.c      |   18 +----
+ arch/arm/mach-omap1/board-perseus2.c     |   75 +++++++++---------
+ arch/arm/mach-omap1/board-sx1.c          |   17 +---
+ arch/arm/mach-omap1/board-voiceblue.c    |   16 +---
+ arch/arm/mach-omap1/devices.c            |    3 +
+ arch/arm/mach-omap1/io.c                 |   57 ++++++--------
+ arch/arm/mach-omap2/board-omap3beagle.c  |    7 +--
+ arch/arm/mach-omap2/board-ti8168evm.c    |    1 -
+ arch/arm/mach-omap2/common.c             |   50 ++++++------
+ arch/arm/mach-omap2/control.c            |   16 +---
+ arch/arm/mach-omap2/io.c                 |  127 +++++++++++++++---------------
+ arch/arm/mach-omap2/io.h                 |    7 --
+ arch/arm/mach-omap2/omap-smp.c           |    7 +-
+ arch/arm/mach-omap2/prcm.c               |   19 ++---
+ arch/arm/mach-omap2/sdrc.c               |   13 +--
+ arch/arm/plat-omap/include/plat/common.h |   17 +++--
+ arch/arm/plat-omap/include/plat/io.h     |   29 ++++++-
+ arch/arm/plat-omap/io.c                  |   10 +++
+ arch/arm/plat-omap/sram.c                |   85 +++++---------------
+ 30 files changed, 335 insertions(+), 509 deletions(-)
