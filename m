@@ -1,80 +1,69 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Mon, 24 Oct 2011 14:43:58 +0530
-Subject: [PATCH v2 3/5] regulator: helper routine to extract
-	regulator_init_data
-In-Reply-To: <20111024091158.GB1755@S2100-06.ap.freescale.net>
-References: <4E9FAF42.5060200@ti.com>
-	<20111020061408.GE32007@S2100-06.ap.freescale.net>
-	<4EA00F7C.1080005@ti.com>
-	<20111021082309.GA337@S2100-06.ap.freescale.net>
-	<4EA13053.7080306@ti.com>
-	<20111021115809.GB337@S2100-06.ap.freescale.net>
-	<4EA4FF6B.2080906@ti.com>
-	<20111024081706.GC8708@ponder.secretlab.ca>
-	<20111024090228.GA1755@S2100-06.ap.freescale.net>
-	<4EA52851.8000203@ti.com>
-	<20111024091158.GB1755@S2100-06.ap.freescale.net>
-Message-ID: <4EA52C56.3080908@ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 24 Oct 2011 11:14:21 +0200
+Subject: [PATCH] mmc: mmci: Improve runtime PM support
+In-Reply-To: <4EA51C4A.7040802@stericsson.com>
+References: <1319210754-22775-1-git-send-email-ulf.hansson@stericsson.com>
+	<20111021173637.GG21648@n2100.arm.linux.org.uk>
+	<CAKnu2MrOriMzJH9NcwUivWa0cinASa6wrRf4a69si4WUs-aTrQ@mail.gmail.com>
+	<CAAgDR1OT=+xgQTNwmTz=9XwzpbhjeZ6F-mxnVGhOAPSAR3JiFQ@mail.gmail.com>
+	<4EA51C4A.7040802@stericsson.com>
+Message-ID: <CACRpkdaz7OGeTsvMkNtK_t6t3Wcog=U9Oq9dkumW52H8R+ws0Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 24 October 2011 02:41 PM, Shawn Guo wrote:
-> On Mon, Oct 24, 2011 at 02:26:49PM +0530, Rajendra Nayak wrote:
->> On Monday 24 October 2011 02:32 PM, Shawn Guo wrote:
->>> Okay, it's wrong then since so many people say it's wrong :)  I guess
->>> a quick fix would be adding one property in device tree node for
->>> matching some unique field in regulator_desc, id, maybe?  Mark, any
->>> suggestion?
->>
->> Thats basically what the DT compatible property is for :)
+On Mon, Oct 24, 2011 at 10:05 AM, Ulf Hansson
+<ulf.hansson@stericsson.com> wrote:
+
+> The hole idea with this PM patch is to make sure the vcore regulator and the
+> clock are disabled in runtime_suspend to be able to save a huge amount of
+> current in "idle" mode.
 >
-> But adding compatible property will get DT core create 'struct dev'
-> for each regulator node, while we are trying to avoid that since
-> regulator core has been doing this.
->
-No it won't.
+> Disabling the vcore regulator will sooner or later (depending on your
+> regulator tree) mean that that power to the controller is actually cut,
+> which then means that all registers will be "cleared" including the MCIPWR.
 
-So here's what I am suggesting.
+I guess since this means writing power-off to bits 1 and 0 of
+of MCIPower meaning "power off"  it should not be done unless the MMC
+core has first issued mmci_set_ios() with MMC_POWER_OFF set in
+ios->power_mode. Which means mmc_power_off() must have
+been called.
 
-Case 1:
-One device per regulator:
+That in turn is called by mmc_power_save_host() or
+mmc_suspend_host().
 
-DT nodes look something like this
+mmc_power_save_host() is in turn called by
+mmc_runtime_suspend() in drivers/mmc/bus.c!
 
-reg1: reg at 1 {
-		...
-		...
-};
+So if that is called *before* the driver-local runtime suspend
+calls, you're actually on the safe side, and you can
+proceed to cut the power.
 
-reg2: reg at 2 {
-		...
-		...
-};
+So these need to be zero before we enter runtime suspend.
+This could then be assured by:
 
-The regulator driver probes 2 devices and each time the
-dev passed has a of_node associated which the regulator
-driver can then pass to the core.
+if (readl(host->base + MMCIPOWER) & 3)
+  return -EBUSY;
 
-Case 2:
-One device for all regulators:
+If this has already been done we are on the green and can
+runtime suspend the controller I guess?
 
-DT nodes look something like this
+So what this code
 
-regulators {
-	reg1: reg at 1 {
-			...
-			...
-	};
+> +             /* Save registers for POWER, CLOCK and IRQMASK0 */
+> +             host->irqmask0_reg = readl(host->base + MMCIMASK0);
+> +             host->pwr_reg = readl(host->base + MMCIPOWER);
+> +             host->clk_reg = readl(host->base + MMCICLOCK);
 
-	reg2: reg at 2 {
-			...
-			...
-	};
-};
+In the end does is save the contents of the other 30 bits.
+(MCI_OD, MCI_ROD, and the ST-specific bits)
 
-The regulator driver probes only one device and the dev->of_node
-points to the "regulators" node above.
-The regulator driver then based on compatible property extracts
-and registers all the child nodes of "regulators" (for ex: reg1, reg2
-above) with each call to regulator_register and passes the child nodes
-as of_node to be associated with the regulator device.
+So can we first:
+
+- Assure that mmc_power_save_host() has already been
+  done (MMCI_POWER_OFF)
+
+- Make this variable a prerequiste for cutting the power in
+  runtime_pm?
+
+Yours,
+Linus Walleij
