@@ -1,41 +1,54 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 24 Oct 2011 09:44:55 -0500
-Subject: [PATCH V3 1/2] ARM: at91: dt: at91sam9g45 family and board device
-	tree files
-In-Reply-To: <15ab652499e7f6f8a26724bfd90643a8f3f96ad9.1319464310.git.nicolas.ferre@atmel.com>
-References: <4E9F8226.4030503@gmail.com>
-	<15ab652499e7f6f8a26724bfd90643a8f3f96ad9.1319464310.git.nicolas.ferre@atmel.com>
-Message-ID: <4EA579E7.7000002@gmail.com>
+From: ming.lei@canonical.com (ming.lei at canonical.com)
+Date: Mon, 24 Oct 2011 22:45:52 +0800
+Subject: [PATCH v5 0/7] arm: pmu: support pmu/perf on OMAP4
+Message-ID: <1319467559-5518-1-git-send-email-ming.lei@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/24/2011 09:05 AM, Nicolas Ferre wrote:
-> Create a new device tree source file for Atmel at91sam9g45 SoC family.
-> The Evaluation Kit at91sam9m10g45ek includes it.
-> This first basic support will be populated as drivers and boards will be
-> converted to device tree.
-> Contains serial, dma and interrupt controllers.
-> 
-> The generic board file still takes advantage of platform data for early serial
-> init. As we need a storage media and the NAND flash driver is not converted to
-> DT yet, we keep old initialization for it.
-> 
+Hi,
 
-This comment is out of date for serial.
+This patches support pmu irq routed from CTI, such as implemented
+on OMAP4:
 
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> ---
-> V3:
-> - additional clock lookup for device tree handling
-> - devices disabled in dtsi file so that only useful devices are
->   enabled in dts files
-> 
-> V2: foundation for AT91SAM generic support
-> - device tree focused board file
-> - inclusion of USART DT support
-> - early USART and NAND still using platform data
-> 
+	- introduce some CTI helpers and registers' definition
+	- introduce .enable_irq and .disable_irq into platform_data,
+	so perf irq handler can handle irq correctly if it is routed
+	from CTI on OMAP4
+	- configure CTI on OMAP4 so that perf can work on OMAP4
 
-Reviewed-by: Rob Herring <rob.herring@calxeda.com>
+The patches have been tested Ok on Pandaboard, and 'perf' does work
+after applying them.
 
-Rob
+v5:
+	- build pmu device from hwmod
+	- support runtime pm
+
+v4:
+	- some minor fix(add __iomem, comments, checkpatch warning...)
+
+v3:
+	- fix typo of patch 2/3 title, pointed by Will
+	- move cti addresses to plat/omap44xx.h, suggested by
+	Santosh Shilimkar
+
+v2:
+	- move cti related code out of perf_event.c
+	- introduce .enable_irq and .disable_irq into platform_data
+	as suggested by Will.
+
+v1:
+	- rebase the patch set against 2.6.38-rc6-next-20110301, fix
+	conflicts, which is pointed out by Will Deacon
+
+ arch/arm/include/asm/cti.h                 |  179 ++++++++++++++++++++++++++++
+ arch/arm/include/asm/pmu.h                 |   15 ++-
+ arch/arm/kernel/perf_event.c               |   20 +++-
+ arch/arm/kernel/pmu.c                      |   12 ++-
+ arch/arm/mach-omap2/devices.c              |  126 +++++++++++++++++++-
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c |   26 ++++
+ arch/arm/plat-omap/include/plat/omap44xx.h |    3 +
+ 7 files changed, 367 insertions(+), 14 deletions(-)
+
+thanks,
+--
+Lei Ming
