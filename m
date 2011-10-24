@@ -1,55 +1,36 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Mon, 24 Oct 2011 16:56:31 +0200
-Subject: [PATCH v2 3/5] regulator: helper routine to extract
-	regulator_init_data
-In-Reply-To: <20111024145139.GH1755@S2100-06.ap.freescale.net>
-References: <4E9FAF42.5060200@ti.com>
-	<20111020061408.GE32007@S2100-06.ap.freescale.net>
-	<4EA00F7C.1080005@ti.com>
-	<20111021082309.GA337@S2100-06.ap.freescale.net>
-	<20111024092411.GE8708@ponder.secretlab.ca>
-	<20111024130429.GD1755@S2100-06.ap.freescale.net>
-	<20111024130636.GB26033@opensource.wolfsonmicro.com>
-	<20111024134025.GE1755@S2100-06.ap.freescale.net>
-	<20111024135950.GV8708@ponder.secretlab.ca>
-	<20111024145139.GH1755@S2100-06.ap.freescale.net>
-Message-ID: <20111024145631.GB8708@ponder.secretlab.ca>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 24 Oct 2011 16:58:07 +0200
+Subject: [PATCH] spi/pl022: Enable clock in probe an use runtime_idle
+In-Reply-To: <20111024125030.GB17693@n2100.arm.linux.org.uk>
+References: <1319206124-17549-1-git-send-email-ulf.hansson@stericsson.com>
+	<20111024120342.GQ8708@ponder.secretlab.ca>
+	<20111024125030.GB17693@n2100.arm.linux.org.uk>
+Message-ID: <CAKnu2Mov-ORJ=KD0g0Wd-gr5pHmCMccWmZ74+8mhDzPJzUqr7g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 24, 2011 at 10:51:40PM +0800, Shawn Guo wrote:
-> On Mon, Oct 24, 2011 at 03:59:50PM +0200, Grant Likely wrote:
-> > On Mon, Oct 24, 2011 at 09:40:26PM +0800, Shawn Guo wrote:
-> > > diff --git a/drivers/regulator/core.c b/drivers/regulator/core.c
-> > > index 8fe132d..29dcf90 100644
-> > > --- a/drivers/regulator/core.c
-> > > +++ b/drivers/regulator/core.c
-> > > @@ -2673,7 +2673,8 @@ struct regulator_dev *regulator_register(struct regulator_desc *regulator_desc,
-> > >         BLOCKING_INIT_NOTIFIER_HEAD(&rdev->notifier);
-> > > 
-> > >         /* find device_node and attach it */
-> > > -       rdev->dev.of_node = of_find_node_by_name(NULL, regulator_desc->name);
-> > > +       rdev->dev.of_node = of_find_node_by_name(dev->parent->of_node,
-> > > +                                                regulator_desc->name);
-> > 
-> > of_find_node_by_name() doesn't work that way.  The first argument is a
-> > starting point, but it doesn't restrict the search to children of a
-> > node.
-> > 
-> > for_each_child_of_node() is what you want to use when iterating over
-> > the children which unfortunately changes the structure of this
-> > function.
-> > 
-> The dev->parent->of_node is meant to point to node 'pmic: mc13892 at 0'.
-> And the intention here is not to iterate over the children, but to
-> start a search from a reasonable point rather than the top root node.
+2011/10/24 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> On Mon, Oct 24, 2011 at 02:03:42PM +0200, Grant Likely wrote:
+>> On Fri, Oct 21, 2011 at 04:08:44PM +0200, Ulf Hansson wrote:
+>> > Since we are always runtime resumed when leaving probe
+>> > the clock must be enabled. To accomplish that we are able
+>> > to be runtime suspended after probe in the case when no
+>> > request is going to be recieved, a runtime_idle function
+>> > has been implemented.
+>> >
+>> > Change-Id: I6cb86f2cad30ecaab16f512daf4674b039b18213
+>> > Signed-off-by: Ulf Hansson <ulf.hansson@stericsson.com>
+>> > Reviewed-on: http://gerrit.lud.stericsson.com/gerrit/34447
+>>
+>> Acked-by: Grant Likely <grant.likely@secretlab.ca>
+>>
+>> Since it depends on Russell's tree, I'm okay with it going in that way.
+>
+> I've received this patch in the patch system, but I'm not planning to
+> apply it yet because it depends on two branches in my tree (amba and clk).
 
-It is always better to attach the of_node at struct device
-registration time instead of searching the tree in common code.  The
-of_node should already be assigned by the time regulator_register() is
-called.  The caller should already have access to all that information
-before the call anyway, especially since it is not strictly manditory
-for all regulators to use the common binding.  It is entirely
-conceivable that the proposed binding won't work for some regulators.
+We can fixup that in the aftermath of the merge window, no
+hurries.
 
-g.
+Yours,
+Linus Walleij
