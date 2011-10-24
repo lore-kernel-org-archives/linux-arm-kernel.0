@@ -1,24 +1,31 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 24 Oct 2011 10:36:32 +0100
-Subject: [PATCH] mmc: mmci: Improve runtime PM support
-In-Reply-To: <CAAgDR1OT=+xgQTNwmTz=9XwzpbhjeZ6F-mxnVGhOAPSAR3JiFQ@mail.gmail.com>
-References: <1319210754-22775-1-git-send-email-ulf.hansson@stericsson.com>
-	<20111021173637.GG21648@n2100.arm.linux.org.uk>
-	<CAKnu2MrOriMzJH9NcwUivWa0cinASa6wrRf4a69si4WUs-aTrQ@mail.gmail.com>
-	<CAAgDR1OT=+xgQTNwmTz=9XwzpbhjeZ6F-mxnVGhOAPSAR3JiFQ@mail.gmail.com>
-Message-ID: <20111024093632.GH9893@n2100.arm.linux.org.uk>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 24 Oct 2011 11:39:27 +0200
+Subject: [PATCH v2 3/5] regulator: helper routine to extract
+	regulator_init_data
+In-Reply-To: <20111024092411.GE8708@ponder.secretlab.ca>
+References: <1318263578-7407-1-git-send-email-rnayak@ti.com>
+	<1318263578-7407-4-git-send-email-rnayak@ti.com>
+	<20111018132032.GD30703@S2100-06.ap.freescale.net>
+	<4E9EB61C.1040207@ti.com>
+	<20111019144215.GA32007@S2100-06.ap.freescale.net>
+	<4E9FAF42.5060200@ti.com>
+	<20111020061408.GE32007@S2100-06.ap.freescale.net>
+	<4EA00F7C.1080005@ti.com>
+	<20111021082309.GA337@S2100-06.ap.freescale.net>
+	<20111024092411.GE8708@ponder.secretlab.ca>
+Message-ID: <20111024093925.GB6148@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 23, 2011 at 02:31:39AM +0200, Sebastian Rasmussen wrote:
-> I guess the patch would appeal more to Russell if mmci_runtime_suspend()
-> only cleared MCIMask0/SDI_MASK0 and MCIClock/SDI_CLKCR and left
-> MCIPower/SDI_PWR unchanged. It may be the case that the signal direction
-> bits need to be cleared for the ST-Ericsson PL180, but I haven't yet verified
-> this on my Snowball dev board yet.
+On Mon, Oct 24, 2011 at 11:24:11AM +0200, Grant Likely wrote:
 
-There's also the issue that the specs call for the clock to run after
-a command has completed for a certain number of cycles, and that the
-clock must continue to run until the card reports not-busy after a
-programming or erase cycle has completed - that can be long after the
-previous command has 'completed'.
+> To follow up from my earlier comment, this .dts structure looks fine
+> and reasonable to me, and it would also be fine for the mc13892 driver
+> to use for_each_child_of_node() to find all the children of the
+> regulators node.  Even finding the 'regulators' node by name from the
+> mc13892 driver is perfectly fine provided for_each_child_of_node is
+> used to find it.  All of this is okay because it is under the umbrella
+> of the "fsl,mc13892" binding.
+
+Yes, a search of children of the device node that the driver is probing
+off seems like a sensible approach.
