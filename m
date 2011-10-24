@@ -1,56 +1,44 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 24 Oct 2011 14:18:51 +0200
-Subject: [PATCH] mmc: mmci: Improve runtime PM support
-In-Reply-To: <4EA55076.2010701@stericsson.com>
-References: <1319210754-22775-1-git-send-email-ulf.hansson@stericsson.com>
-	<20111021173637.GG21648@n2100.arm.linux.org.uk>
-	<CAKnu2MrOriMzJH9NcwUivWa0cinASa6wrRf4a69si4WUs-aTrQ@mail.gmail.com>
-	<CAAgDR1OT=+xgQTNwmTz=9XwzpbhjeZ6F-mxnVGhOAPSAR3JiFQ@mail.gmail.com>
-	<4EA51C4A.7040802@stericsson.com>
-	<20111024090432.GA9893@n2100.arm.linux.org.uk>
-	<4EA53181.2050700@stericsson.com>
-	<20111024094203.GI9893@n2100.arm.linux.org.uk>
-	<4EA538A3.9070501@stericsson.com>
-	<20111024101416.GK9893@n2100.arm.linux.org.uk>
-	<4EA55076.2010701@stericsson.com>
-Message-ID: <CACRpkdb7FwW=Qa2MiJkbezkBO3F+Y0j6-RWSiL8dfJXkbd4pHw@mail.gmail.com>
+Date: Mon, 24 Oct 2011 14:28:26 +0200
+Subject: [PATCH] drivers: create a pin control subsystem v8
+In-Reply-To: <CAMjpGUcWUp05SkBi1JWL+NFBCcZV5=EaidtYkEbONPheVwhjgw@mail.gmail.com>
+References: <1317211419-18472-1-git-send-email-linus.walleij@stericsson.com>
+	<20110930020754.GK12606@ponder.secretlab.ca>
+	<CACRpkdYyyqB6=5M8reqgwpMxXJz5ttXWyOav6K58dQ0CrxwCNA@mail.gmail.com>
+	<CACxGe6v19pZ0i-+ksYZbG2ZvGT30UkXEHTzpZMBTB4RNUV5bnA@mail.gmail.com>
+	<CAKnu2MpQ8Wvd4TF8Ge=o8ACyEoaEY8TcvOSdT1w6zfYiSKFUiw@mail.gmail.com>
+	<20111004203520.GK2870@ponder.secretlab.ca>
+	<CAMjpGUe9abPsdWbum2MRzOV2b5_2FDqXZC-K0KThRA6MNTr4FA@mail.gmail.com>
+	<CACRpkdatiBathcoo2VjKs9jHJiKC5trDCJ0bePX1q6KbrYRN-g@mail.gmail.com>
+	<20111024073604.GA8708@ponder.secretlab.ca>
+	<CACRpkdZ6DCeELLhiXF=oOMKB-DxeMuvbd_c6n4H1UDMhpHKZbA@mail.gmail.com>
+	<CAMjpGUcWUp05SkBi1JWL+NFBCcZV5=EaidtYkEbONPheVwhjgw@mail.gmail.com>
+Message-ID: <CACRpkdbbNTGd3opbeAiY2uMpPzD+G_vj=jq_fiArhjosPXyMRQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 24, 2011 at 1:48 PM, Ulf Hansson <ulf.hansson@stericsson.com> wrote:
-> [Russell]
->> The MCIPWR signal controls the external power switch. ?This is the only
->> signal for it. ?This is the only connection for it. ?There is no other
->> control form for this power switch.
->>
+On Mon, Oct 24, 2011 at 11:20 AM, Mike Frysinger <vapier.adi@gmail.com> wrote:
+
+> but the question here is about pinctrl. ?does userspace really need to
+> manipulate the pinmapping ? ?if we agree on that, then the question is
+> on the userspace interface.
 >
-> Then we are only left to use the variant struct I believe. In principle, a
-> flag in the variant struct, could indicate whether it is OK to disable the
-> vcore regulator and thus clear the MCIPWR when doing runtime_suspend.
+> assuming we want this, i can't see the performance argument being made
+> here for pinctrl. ?which means doing a sysfs interface here like we
+> already have with GPIO makes the most sense. ?GPIO deals in "binary"
+> data for the most part (reading/writing 0/1 ints) so the string-based
+> sysfs parsing is a bit weird, but pinctrl deals with strings
+> everywhere for selecting mapping groups, so sysfs is the natural
+> answer.
 
-Yep I think the best could be to add some variant named
-bool external_card_power; and then document in the kerneldoc that this
-means the driver can clear MMCIPWR without risk of cutting the power
-to the card.
+Hm now I feel I start to agree with you and come back to my
+original proposition to do pinctrl in sysfs after all.
 
-This should be true for Ux500, U300 and Nomadik (just checked the designs -
-they all have external regulators).
+I wonder how soon we have a practical use case for this.
+We do have this hacked-up driver in ux500:
+http://git.linaro.org/gitweb?p=bsp/st-ericsson/linux-3.0-ux500.git;a=tree;f=drivers/staging/ab5500_sim;hb=HEAD
 
-So the state save/restore and amba_vcore_disable(adev); should be done
-only for those variants.
-
-However this:
-
-clk_disable(host->clk);
-
-We ought to be able to do for *all* variants, provided we can create
-pm_runtime_get/put and delay properly to cover all bus traffic
-(looks like the patch already does that), plus all the time the card is
-signalling busy. The best I can think of is to just return -EBUSY to runtime
-PM like this:
-
-if ((readl(base + MMCISTATUS) & (MCI_CMDACTIVE | MCI_TXACTIVE| MCI_RXACTIVE))
-  return -EBUSY;
+This controls a lot of SIM card pins from userspace...
 
 Yours,
 Linus Walleij
