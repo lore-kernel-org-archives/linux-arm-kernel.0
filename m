@@ -1,41 +1,46 @@
-From: ulf.hansson@stericsson.com (Ulf Hansson)
-Date: Mon, 24 Oct 2011 09:38:08 +0200
-Subject: [PATCH] spi/pl022: Enable clock in probe an use runtime_idle
-In-Reply-To: <CACRpkdY2Csh58QbtnfYikr-VtYR_wDRfC2_X_+wR3OPhgTBE3w@mail.gmail.com>
-References: <1319206124-17549-1-git-send-email-ulf.hansson@stericsson.com>
-	<CACRpkdY2Csh58QbtnfYikr-VtYR_wDRfC2_X_+wR3OPhgTBE3w@mail.gmail.com>
-Message-ID: <4EA515E0.9060509@stericsson.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 24 Oct 2011 09:48:19 +0200
+Subject: [PATCH] drivers: create a pin control subsystem v8
+In-Reply-To: <20111024073604.GA8708@ponder.secretlab.ca>
+References: <1317211419-18472-1-git-send-email-linus.walleij@stericsson.com>
+	<20110930020754.GK12606@ponder.secretlab.ca>
+	<CACRpkdYyyqB6=5M8reqgwpMxXJz5ttXWyOav6K58dQ0CrxwCNA@mail.gmail.com>
+	<CACxGe6v19pZ0i-+ksYZbG2ZvGT30UkXEHTzpZMBTB4RNUV5bnA@mail.gmail.com>
+	<CAKnu2MpQ8Wvd4TF8Ge=o8ACyEoaEY8TcvOSdT1w6zfYiSKFUiw@mail.gmail.com>
+	<20111004203520.GK2870@ponder.secretlab.ca>
+	<CAMjpGUe9abPsdWbum2MRzOV2b5_2FDqXZC-K0KThRA6MNTr4FA@mail.gmail.com>
+	<CACRpkdatiBathcoo2VjKs9jHJiKC5trDCJ0bePX1q6KbrYRN-g@mail.gmail.com>
+	<20111024073604.GA8708@ponder.secretlab.ca>
+Message-ID: <CACRpkdZ6DCeELLhiXF=oOMKB-DxeMuvbd_c6n4H1UDMhpHKZbA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus Walleij wrote:
-> On Fri, Oct 21, 2011 at 4:08 PM, Ulf Hansson <ulf.hansson@stericsson.com> wrote:
-> 
->> Since we are always runtime resumed when leaving probe
->> the clock must be enabled. To accomplish that we are able
->> to be runtime suspended after probe in the case when no
->> request is going to be recieved, a runtime_idle function
->> has been implemented.
->>
->> Change-Id: I6cb86f2cad30ecaab16f512daf4674b039b18213
->> Signed-off-by: Ulf Hansson <ulf.hansson@stericsson.com>
->> Reviewed-on: http://gerrit.lud.stericsson.com/gerrit/34447
-> 
-> Skip the gerrit weirdo stuff.
-
-Sorry, for not cleaning up the commit msg, my bad. I fix.
-
-> 
-> Notice that this patch cannot be merged until Russell's
-> AMBA PM patches are merged, so put this in Russell's
-> patch tracker so he can put it on his AMBA PM branch.
+On Mon, Oct 24, 2011 at 9:36 AM, Grant Likely <grant.likely@secretlab.ca> wrote:
+> On Mon, Oct 24, 2011 at 09:26:38AM +0200, Linus Walleij wrote:
+(...)
+>> I was more thinking along the lines of one device per GPIO controller,
+>> then you ioctl() to ask /dev/gpio0 how many pins it has or so.
 >
+> And there is also the question of whether it is even a good idea to
+> export pinctrl manipulation to userspace.
 
-I will do!
+The application I've seen is in automatic control.
 
-> But looks correct.
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> 
-> Yours,
-> Linus Walleij
-> 
+I think people do things like connect they GPIO pins to electrical
+relays, plus on top of that they use all the stuff in drivers/staging/iio.
+
+All that from userspace. Controlling entire factories and industrial
+robots, weapon systems too, I'm afraid.
+
+The control of these dangerous things runs on a realtime-patched
+kernel, in a single userspace app with a few threads and they have
+done some realtime-tetris scheduling the beast more or less
+manually with SCHED_FIFO. Basically that app is all that runs on
+the board, and its threads take precedence over everything else
+on the system.
+
+That is the typical beast that is poking around on the GPIO sysfs
+interfaces...
+
+Yours,
+Linus Walleij
