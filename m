@@ -1,24 +1,49 @@
 From: ulf.hansson@stericsson.com (Ulf Hansson)
-Date: Mon, 24 Oct 2011 15:50:41 +0200
-Subject: [PATCH 0/2] mmc: mmci: Bugfixes for SDIO
-Message-ID: <1319464243-16638-1-git-send-email-ulf.hansson@stericsson.com>
+Date: Mon, 24 Oct 2011 15:50:42 +0200
+Subject: [PATCH 1/2] mmc: mmci: Prepare for SDIO before setting up DMA job
+In-Reply-To: <1319464243-16638-1-git-send-email-ulf.hansson@stericsson.com>
+References: <1319464243-16638-1-git-send-email-ulf.hansson@stericsson.com>
+Message-ID: <1319464243-16638-2-git-send-email-ulf.hansson@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchserie fixes some SDIO related issues for the mmci host driver.
+Move the SDIO preparation to be done before the DMA job is setup.
+This makes it possible to do DMA for SDIO transfers as well as the
+earlier supported pio mode.
 
-Previously these patches were included in the patch serie called
-"mmc: mmci: Improvements and bugfixes for SDIO", which now has been
-split up.
+Signed-off-by: Ulf Hansson <ulf.hansson@stericsson.com>
+Signed-off-by: Stefan Nilsson XK <stefan.xk.nilsson@stericsson.com>
+---
+ drivers/mmc/host/mmci.c |   10 +++++-----
+ 1 files changed, 5 insertions(+), 5 deletions(-)
 
-Stefan Nilsson XK (1):
-  mmc: mmci: Fix incorrect handling of HW flow control for SDIO
-
-Ulf Hansson (1):
-  mmc: mmci: Prepare for SDIO before setting up DMA job
-
- drivers/mmc/host/mmci.c |   50 ++++++++++++++++++++++++++--------------------
- 1 files changed, 28 insertions(+), 22 deletions(-)
-
+diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+index 50b5f99..1b73177 100644
+--- a/drivers/mmc/host/mmci.c
++++ b/drivers/mmc/host/mmci.c
+@@ -604,6 +604,11 @@ static void mmci_start_data(struct mmci_host *host, struct mmc_data *data)
+ 	if (data->flags & MMC_DATA_READ)
+ 		datactrl |= MCI_DPSM_DIRECTION;
+ 
++	/* The ST Micro variants has a special bit to enable SDIO */
++	if (variant->sdio && host->mmc->card)
++		if (mmc_card_sdio(host->mmc->card))
++			datactrl |= MCI_ST_DPSM_SDIOEN;
++
+ 	/*
+ 	 * Attempt to use DMA operation mode, if this
+ 	 * should fail, fall back to PIO mode
+@@ -632,11 +637,6 @@ static void mmci_start_data(struct mmci_host *host, struct mmc_data *data)
+ 		irqmask = MCI_TXFIFOHALFEMPTYMASK;
+ 	}
+ 
+-	/* The ST Micro variants has a special bit to enable SDIO */
+-	if (variant->sdio && host->mmc->card)
+-		if (mmc_card_sdio(host->mmc->card))
+-			datactrl |= MCI_ST_DPSM_SDIOEN;
+-
+ 	writel(datactrl, base + MMCIDATACTRL);
+ 	writel(readl(base + MMCIMASK0) & ~MCI_DATAENDMASK, base + MMCIMASK0);
+ 	mmci_set_mask1(host, irqmask);
 -- 
 1.7.5.4
