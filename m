@@ -1,129 +1,91 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Tue, 25 Oct 2011 00:24:08 +0200
-Subject: [PATCH v2] gpio: pl061: add DT binding support
-In-Reply-To: <1313011906-24161-1-git-send-email-robherring2@gmail.com>
+Date: Tue, 25 Oct 2011 00:26:18 +0200
+Subject: [PATCH] gpio: pl061: add DT binding support
+In-Reply-To: <4E39D755.2030700@gmail.com>
 References: <1312397661-3328-1-git-send-email-robherring2@gmail.com>
-	<1313011906-24161-1-git-send-email-robherring2@gmail.com>
-Message-ID: <20111024222408.GH4394@ponder.secretlab.ca>
+	<CACxGe6u1g_XZCvWB=7Z=0hGhZKfcQaiRm1WaQfJMrkkHTTqn8Q@mail.gmail.com>
+	<4E39D755.2030700@gmail.com>
+Message-ID: <20111024222618.GI4394@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 10, 2011 at 04:31:46PM -0500, Rob Herring wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
+On Wed, Aug 03, 2011 at 06:18:45PM -0500, Rob Herring wrote:
+> Grant,
 > 
-> This adds devicetree binding support to the ARM pl061 driver removing the
-> platform_data dependency. When DT binding is used, the gpio numbering is
-> assigned dynamically. For now, interrupts are not supported with DT until
-> irqdomains learn dynamic irq assignment.
+> On 08/03/2011 05:22 PM, Grant Likely wrote:
+> > On Wed, Aug 3, 2011 at 7:54 PM, Rob Herring <robherring2@gmail.com> wrote:
+> >> From: Rob Herring <rob.herring@calxeda.com>
+> >>
+> >> This adds devicetree binding support to the ARM pl061 driver removing the
+> >> platform_data dependency. When DT binding is used, the gpio numbering is
+> >> assigned dynamically. The interrupt assignment is converted to use the
+> >> irq_domain infrastructure.
+> >>
+> >> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> >> Cc: Grant Likely <grant.likely@secretlab.ca>
+> >> ---
+> >>  drivers/gpio/gpio-pl061.c |   32 +++++++++++++++++++++++---------
+> >>  1 files changed, 23 insertions(+), 9 deletions(-)
+> >>
+> >> diff --git a/drivers/gpio/gpio-pl061.c b/drivers/gpio/gpio-pl061.c
+> >> index 2c5a18f..7ea74ff 100644
+> >> --- a/drivers/gpio/gpio-pl061.c
+> >> +++ b/drivers/gpio/gpio-pl061.c
+> >> @@ -23,6 +23,7 @@
+> >>  #include <linux/amba/bus.h>
+> >>  #include <linux/amba/pl061.h>
+> >>  #include <linux/slab.h>
+> >> +#include <linux/of_irq.h>
+> >>
+> >>  #define GPIODIR 0x400
+> >>  #define GPIOIS  0x404
+> >> @@ -246,6 +247,20 @@ static int pl061_probe(struct amba_device *dev, const struct amba_id *id)
+> >>        if (chip == NULL)
+> >>                return -ENOMEM;
+> >>
+> >> +       pdata = dev->dev.platform_data;
+> >> +       if (pdata) {
+> >> +               chip->gc.base = pdata->gpio_base;
+> >> +               chip->irq_base = pdata->irq_base;
+> >> +       } else if (dev->dev.of_node) {
+> >> +               u32 intspec = 0;
+> >> +               chip->gc.base = -1;
+> >> +               chip->irq_base = irq_create_of_mapping(dev->dev.of_node,
+> >> +                                                      &intspec, 1);
+> > 
+> > This looks wrong.  intspec is always 0 here, when I would assume you
+> > would want the value of the interrupts property from this device's
+> > node.  Is this the cascade irq number?  Or is it supposed to be the
+> > starting interrupt number for the gpios?  If it is starting interrupt
+> > number, then it should actually be dynamically assigned.  If it is the
+> > cascade, then platform_get_irq() should work.
+> > 
+> It's the latter case that I need to retrieve. I have this platform code
+> assigning the linux irq numbers:
 > 
-> Rather than add another case of -1, updating the driver to use NO_IRQ.
+>         struct device_node *node;
+>         int n = 0;
 > 
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> Cc: Grant Likely <grant.likely@secretlab.ca>
+>         node = of_find_compatible_node(NULL, NULL, "arm,cortex-a9-gic");
+>         if (!node)
+>                 panic("missing gic devicetree node\n");
+>         irq_domain_add_simple(node, 0);
+> 
+>         for_each_compatible_node(node, NULL, "arm,pl061") {
+>                 irq_domain_add_simple(node, 160 + (8 * n));
+>                 n++;
+>         }
+> 
+> In this case with simple translation, intspec is really a don't care.
+> irq_create_of_mapping just finds the domain that matches the gpio
+> ctrlr's node and returns the domain's irq_base (+ 0) as the translate
+> function will just return the intspec value for the hw_irq.
+> 
+> Have I missed something? There is not yet any dynamic assignment of
+> linux irq numbers?
 
-Applied, thanks.
+Yes, the kernel does support dynamic irq number assignment, but the
+interrupt controller still needs to manage it.  I've not yet decided
+what the best way to integrate it into irq_domain is.
 
 g.
-
-> ---
-> 
-> v2:
-> - Add other -1 to NO_IRQ conversions
-> - Drop DT irq support for now
-> 
->  drivers/gpio/gpio-pl061.c  |   31 +++++++++++++++++++++----------
->  include/linux/amba/pl061.h |    3 +--
->  2 files changed, 22 insertions(+), 12 deletions(-)
-> 
-> diff --git a/drivers/gpio/gpio-pl061.c b/drivers/gpio/gpio-pl061.c
-> index 2c5a18f..093c90b 100644
-> --- a/drivers/gpio/gpio-pl061.c
-> +++ b/drivers/gpio/gpio-pl061.c
-> @@ -118,7 +118,7 @@ static int pl061_to_irq(struct gpio_chip *gc, unsigned offset)
->  {
->  	struct pl061_gpio *chip = container_of(gc, struct pl061_gpio, gc);
->  
-> -	if (chip->irq_base == (unsigned) -1)
-> +	if (chip->irq_base == NO_IRQ)
->  		return -EINVAL;
->  
->  	return chip->irq_base + offset;
-> @@ -246,6 +246,18 @@ static int pl061_probe(struct amba_device *dev, const struct amba_id *id)
->  	if (chip == NULL)
->  		return -ENOMEM;
->  
-> +	pdata = dev->dev.platform_data;
-> +	if (pdata) {
-> +		chip->gc.base = pdata->gpio_base;
-> +		chip->irq_base = pdata->irq_base;
-> +	} else if (dev->dev.of_node) {
-> +		chip->gc.base = -1;
-> +		chip->irq_base = NO_IRQ;
-> +	} else {
-> +		ret = -ENODEV;
-> +		goto free_mem;
-> +	}
-> +
->  	if (!request_mem_region(dev->res.start,
->  				resource_size(&dev->res), "pl061")) {
->  		ret = -EBUSY;
-> @@ -267,14 +279,11 @@ static int pl061_probe(struct amba_device *dev, const struct amba_id *id)
->  	chip->gc.get = pl061_get_value;
->  	chip->gc.set = pl061_set_value;
->  	chip->gc.to_irq = pl061_to_irq;
-> -	chip->gc.base = pdata->gpio_base;
->  	chip->gc.ngpio = PL061_GPIO_NR;
->  	chip->gc.label = dev_name(&dev->dev);
->  	chip->gc.dev = &dev->dev;
->  	chip->gc.owner = THIS_MODULE;
->  
-> -	chip->irq_base = pdata->irq_base;
-> -
->  	ret = gpiochip_add(&chip->gc);
->  	if (ret)
->  		goto iounmap;
-> @@ -283,7 +292,7 @@ static int pl061_probe(struct amba_device *dev, const struct amba_id *id)
->  	 * irq_chip support
->  	 */
->  
-> -	if (chip->irq_base == (unsigned) -1)
-> +	if (chip->irq_base == NO_IRQ)
->  		return 0;
->  
->  	writeb(0, chip->base + GPIOIE); /* disable irqs */
-> @@ -307,11 +316,13 @@ static int pl061_probe(struct amba_device *dev, const struct amba_id *id)
->  	list_add(&chip->list, chip_list);
->  
->  	for (i = 0; i < PL061_GPIO_NR; i++) {
-> -		if (pdata->directions & (1 << i))
-> -			pl061_direction_output(&chip->gc, i,
-> -					pdata->values & (1 << i));
-> -		else
-> -			pl061_direction_input(&chip->gc, i);
-> +		if (pdata) {
-> +			if (pdata->directions & (1 << i))
-> +				pl061_direction_output(&chip->gc, i,
-> +						pdata->values & (1 << i));
-> +			else
-> +				pl061_direction_input(&chip->gc, i);
-> +		}
->  
->  		irq_set_chip_and_handler(i + chip->irq_base, &pl061_irqchip,
->  					 handle_simple_irq);
-> diff --git a/include/linux/amba/pl061.h b/include/linux/amba/pl061.h
-> index 5ddd9ad..2412af9 100644
-> --- a/include/linux/amba/pl061.h
-> +++ b/include/linux/amba/pl061.h
-> @@ -7,8 +7,7 @@ struct pl061_platform_data {
->  	unsigned	gpio_base;
->  
->  	/* number of the first IRQ.
-> -	 * If the IRQ functionality in not desired this must be set to
-> -	 * (unsigned) -1.
-> +	 * If the IRQ functionality in not desired this must be set to NO_IRQ.
->  	 */
->  	unsigned	irq_base;
->  
-> -- 
-> 1.7.4.1
-> 
