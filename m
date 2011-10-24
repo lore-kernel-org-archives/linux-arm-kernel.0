@@ -1,98 +1,74 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 24 Oct 2011 17:48:05 -0500
-Subject: [PATCH] gpio: pl061: add DT binding support
-In-Reply-To: <20111024222618.GI4394@ponder.secretlab.ca>
-References: <1312397661-3328-1-git-send-email-robherring2@gmail.com>
-	<CACxGe6u1g_XZCvWB=7Z=0hGhZKfcQaiRm1WaQfJMrkkHTTqn8Q@mail.gmail.com>
-	<4E39D755.2030700@gmail.com>
-	<20111024222618.GI4394@ponder.secretlab.ca>
-Message-ID: <4EA5EB25.8080003@gmail.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Tue, 25 Oct 2011 00:56:53 +0200
+Subject: [PATCH] of: Add a reg-names property to name reg entries
+In-Reply-To: <20111024221916.GF4394@ponder.secretlab.ca>
+References: <1319471697-8970-1-git-send-email-b-cousson@ti.com>
+	<20111024221916.GF4394@ponder.secretlab.ca>
+Message-ID: <4EA5ED35.7000806@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/24/2011 05:26 PM, Grant Likely wrote:
-> On Wed, Aug 03, 2011 at 06:18:45PM -0500, Rob Herring wrote:
->> Grant,
->>
->> On 08/03/2011 05:22 PM, Grant Likely wrote:
->>> On Wed, Aug 3, 2011 at 7:54 PM, Rob Herring <robherring2@gmail.com> wrote:
->>>> From: Rob Herring <rob.herring@calxeda.com>
->>>>
->>>> This adds devicetree binding support to the ARM pl061 driver removing the
->>>> platform_data dependency. When DT binding is used, the gpio numbering is
->>>> assigned dynamically. The interrupt assignment is converted to use the
->>>> irq_domain infrastructure.
->>>>
->>>> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
->>>> Cc: Grant Likely <grant.likely@secretlab.ca>
->>>> ---
->>>>  drivers/gpio/gpio-pl061.c |   32 +++++++++++++++++++++++---------
->>>>  1 files changed, 23 insertions(+), 9 deletions(-)
->>>>
->>>> diff --git a/drivers/gpio/gpio-pl061.c b/drivers/gpio/gpio-pl061.c
->>>> index 2c5a18f..7ea74ff 100644
->>>> --- a/drivers/gpio/gpio-pl061.c
->>>> +++ b/drivers/gpio/gpio-pl061.c
->>>> @@ -23,6 +23,7 @@
->>>>  #include <linux/amba/bus.h>
->>>>  #include <linux/amba/pl061.h>
->>>>  #include <linux/slab.h>
->>>> +#include <linux/of_irq.h>
->>>>
->>>>  #define GPIODIR 0x400
->>>>  #define GPIOIS  0x404
->>>> @@ -246,6 +247,20 @@ static int pl061_probe(struct amba_device *dev, const struct amba_id *id)
->>>>        if (chip == NULL)
->>>>                return -ENOMEM;
->>>>
->>>> +       pdata = dev->dev.platform_data;
->>>> +       if (pdata) {
->>>> +               chip->gc.base = pdata->gpio_base;
->>>> +               chip->irq_base = pdata->irq_base;
->>>> +       } else if (dev->dev.of_node) {
->>>> +               u32 intspec = 0;
->>>> +               chip->gc.base = -1;
->>>> +               chip->irq_base = irq_create_of_mapping(dev->dev.of_node,
->>>> +                                                      &intspec, 1);
->>>
->>> This looks wrong.  intspec is always 0 here, when I would assume you
->>> would want the value of the interrupts property from this device's
->>> node.  Is this the cascade irq number?  Or is it supposed to be the
->>> starting interrupt number for the gpios?  If it is starting interrupt
->>> number, then it should actually be dynamically assigned.  If it is the
->>> cascade, then platform_get_irq() should work.
->>>
->> It's the latter case that I need to retrieve. I have this platform code
->> assigning the linux irq numbers:
->>
->>         struct device_node *node;
->>         int n = 0;
->>
->>         node = of_find_compatible_node(NULL, NULL, "arm,cortex-a9-gic");
->>         if (!node)
->>                 panic("missing gic devicetree node\n");
->>         irq_domain_add_simple(node, 0);
->>
->>         for_each_compatible_node(node, NULL, "arm,pl061") {
->>                 irq_domain_add_simple(node, 160 + (8 * n));
->>                 n++;
->>         }
->>
->> In this case with simple translation, intspec is really a don't care.
->> irq_create_of_mapping just finds the domain that matches the gpio
->> ctrlr's node and returns the domain's irq_base (+ 0) as the translate
->> function will just return the intspec value for the hw_irq.
->>
->> Have I missed something? There is not yet any dynamic assignment of
->> linux irq numbers?
-> 
-> Yes, the kernel does support dynamic irq number assignment, but the
-> interrupt controller still needs to manage it.  I've not yet decided
-> what the best way to integrate it into irq_domain is.
-> 
+On 10/25/2011 12:19 AM, Grant Likely wrote:
+> On Mon, Oct 24, 2011 at 05:54:57PM +0200, Benoit Cousson wrote:
 
-I had since figured that out with the GIC series. We should discuss at
-Connect. My plan here is to make generic-irq-chip use domains and
-irq_alloc_descs, then convert pl061 to use generic-irq-chip.
+[...]
 
-Rob
+>> @@ -551,7 +551,11 @@ static int __of_address_to_resource(struct device_node *dev,
+>>   		r->end = taddr + size - 1;
+>>   	}
+>>   	r->flags = flags;
+>> -	r->name = dev->full_name;
+>> +	if (name)
+>> +		r->name = name;
+>> +	else
+>> +		r->name = dev->full_name;
+>
+> This form please:
+> 	r->name = name ? name : dev->full_name;
+
+Much better, indeed.
+
+> In general, I'm inclined to accept this patch as we talked about at
+> plumbers.  However, this particular hunk gives me pause as there is
+> still the objection that Russell raised about the (ab)use of r->name
+> for insert the resource name.
+>
+> So, no I won't reject this patch, but I first what to have some idea
+> of what the plan is to migrate away from using r->name.  Perhaps we
+> can talk about this tomorrow.
+
+OK, sure, let's discuss about that.
+But I still think that Russell's concern is not related at all with this 
+patch. That means that it should be fixed separately if needed. It can 
+be done before or after, but this is somehow orthogonal to the DT 
+reg-names support problem.
+
+>>   	return 0;
+>>   }
+>>
+>> @@ -569,11 +573,19 @@ int of_address_to_resource(struct device_node *dev, int index,
+>>   	const __be32	*addrp;
+>>   	u64		size;
+>>   	unsigned int	flags;
+>> +	const char	*name = NULL;
+>> +	int		name_cnt;
+>>
+>>   	addrp = of_get_address(dev, index,&size,&flags);
+>>   	if (addrp == NULL)
+>>   		return -EINVAL;
+>> -	return __of_address_to_resource(dev, addrp, size, flags, r);
+>> +
+>> +	/* Get "reg-names" property to add a name to a resource */
+>> +	name_cnt = of_property_count_strings(dev, "reg-names");
+>> +	if (name_cnt>  0)
+>> +		of_property_read_string_index(dev, "reg-names",	index,&name);
+>
+> Why not simply:
+> 	of_property_read_string_index(dev, "reg-names", index,&name);
+>
+> If it fails, then name remains NULL and everything works.
+
+Good point, that API is already taking care of that.
+
+Thanks,
+Benoit
