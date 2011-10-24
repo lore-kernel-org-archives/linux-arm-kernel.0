@@ -1,34 +1,37 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Mon, 24 Oct 2011 15:35:50 +0530
-Subject: [PATCH v2 3/5] regulator: helper routine to extract
-	regulator_init_data
-In-Reply-To: <20111024091924.GA6148@opensource.wolfsonmicro.com>
-References: <20111019144215.GA32007@S2100-06.ap.freescale.net>
-	<4E9FAF42.5060200@ti.com>
-	<20111020061408.GE32007@S2100-06.ap.freescale.net>
-	<4EA00F7C.1080005@ti.com>
-	<20111021082309.GA337@S2100-06.ap.freescale.net>
-	<4EA13053.7080306@ti.com>
-	<20111021115809.GB337@S2100-06.ap.freescale.net>
-	<4EA4FF6B.2080906@ti.com>
-	<20111024081706.GC8708@ponder.secretlab.ca>
-	<4EA5279E.3000505@ti.com>
-	<20111024091924.GA6148@opensource.wolfsonmicro.com>
-Message-ID: <4EA5387E.8090500@ti.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Mon, 24 Oct 2011 12:06:05 +0200
+Subject: [PATCH] dt: Add empty of_match_node() macro
+In-Reply-To: <1319450012-13033-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1319450012-13033-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <CACxGe6txWcZYvym411Xat0S8UJX=3MWwSLq-GPQn=ERwV00KjA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 24 October 2011 02:49 PM, Mark Brown wrote:
-> On Mon, Oct 24, 2011 at 02:23:50PM +0530, Rajendra Nayak wrote:
+On Mon, Oct 24, 2011 at 11:53 AM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
+> Add an empty macro for of_match_node() that will save
+> some '#ifdef CONFIG_OF' for non-dt builds.
 >
->> How about the driver passing the of_node to be associated with the
->> regulator, as part of regulator_desc, to the regulator core,
->> instead of this complete DT search and the restriction of having
->> to match DT node names with names in regulator_desc.
+> I have chosen to use a macro instead of a function to
+> be able to avoid defining the first parameter.
+> In fact, this "struct of_device_id *" first parameter
+> is usualy not defined as well on non-dt builds.
 >
-> regulator_desc should be const so that we handle multiple instances of
-> the same device nicely.  We could pass the information in as an argument
-> I guess.
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> ---
+> ?include/linux/of.h | ? ?1 +
+> ?1 files changed, 1 insertions(+), 0 deletions(-)
+>
+> diff --git a/include/linux/of.h b/include/linux/of.h
+> index 736b747..92c40a1 100644
+> --- a/include/linux/of.h
+> +++ b/include/linux/of.h
+> @@ -303,6 +303,7 @@ static inline struct device_node *of_parse_phandle(struct device_node *np,
+> ?}
+>
+> ?#define of_match_ptr(_ptr) ? ? NULL
+> +#define of_match_node(_matches, _node) NULL
 
-Ok, will do. The only downside being that all existing users would
-need to be changed.
+Where possible, I prefer to code to be written in C, not PP.  :-)
+static inline please.
+
+g.
