@@ -1,64 +1,80 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Mon, 24 Oct 2011 13:56:49 +0200
-Subject: [RFC 4/4] watchdog: imx2: simplify resource allocation
-In-Reply-To: <1319445729-14841-5-git-send-email-w.sang@pengutronix.de>
-References: <1319445729-14841-1-git-send-email-w.sang@pengutronix.de>
-	<1319445729-14841-5-git-send-email-w.sang@pengutronix.de>
-Message-ID: <20111024115649.GM8708@ponder.secretlab.ca>
+Date: Mon, 24 Oct 2011 14:03:42 +0200
+Subject: [PATCH] spi/pl022: Enable clock in probe an use runtime_idle
+In-Reply-To: <1319206124-17549-1-git-send-email-ulf.hansson@stericsson.com>
+References: <1319206124-17549-1-git-send-email-ulf.hansson@stericsson.com>
+Message-ID: <20111024120342.GQ8708@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 24, 2011 at 10:42:09AM +0200, Wolfram Sang wrote:
-> Use the new devm_resource_to_mapped_ptr function to simplify the code
-> and standardize the error-handling. Silently fixes a wrong type for the
-> resource_size variable as well.
+On Fri, Oct 21, 2011 at 04:08:44PM +0200, Ulf Hansson wrote:
+> Since we are always runtime resumed when leaving probe
+> the clock must be enabled. To accomplish that we are able
+> to be runtime suspended after probe in the case when no
+> request is going to be recieved, a runtime_idle function
+> has been implemented.
 > 
-> Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
-> ---
->  drivers/watchdog/imx2_wdt.c |   22 +++-------------------
->  1 files changed, 3 insertions(+), 19 deletions(-)
+> Change-Id: I6cb86f2cad30ecaab16f512daf4674b039b18213
+> Signed-off-by: Ulf Hansson <ulf.hansson@stericsson.com>
+> Reviewed-on: http://gerrit.lud.stericsson.com/gerrit/34447
 
-w00t!  I can see a lot of drivers simplified by using this.
+Acked-by: Grant Likely <grant.likely@secretlab.ca>
+
+Since it depends on Russell's tree, I'm okay with it going in that way.
 
 g.
 
+> ---
+>  drivers/spi/spi-pl022.c |   18 +++++++++++++++++-
+>  1 files changed, 17 insertions(+), 1 deletions(-)
 > 
-> diff --git a/drivers/watchdog/imx2_wdt.c b/drivers/watchdog/imx2_wdt.c
-> index b8ef2c6..1fc6714 100644
-> --- a/drivers/watchdog/imx2_wdt.c
-> +++ b/drivers/watchdog/imx2_wdt.c
-> @@ -247,28 +247,12 @@ static struct miscdevice imx2_wdt_miscdev = {
->  static int __init imx2_wdt_probe(struct platform_device *pdev)
->  {
->  	int ret;
-> -	int res_size;
->  	struct resource *res;
+> diff --git a/drivers/spi/spi-pl022.c b/drivers/spi/spi-pl022.c
+> index f103e47..ad48fba 100644
+> --- a/drivers/spi/spi-pl022.c
+> +++ b/drivers/spi/spi-pl022.c
+> @@ -2184,6 +2184,12 @@ pl022_probe(struct amba_device *adev, const struct amba_id *id)
+>  		goto  err_clk_prep;
+>  	}
 >  
->  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> -	if (!res) {
-> -		dev_err(&pdev->dev, "can't get device resources\n");
-> -		return -ENODEV;
-> -	}
-> -
-> -	res_size = resource_size(res);
-> -	if (!devm_request_mem_region(&pdev->dev, res->start, res_size,
-> -		res->name)) {
-> -		dev_err(&pdev->dev, "can't allocate %d bytes at %d address\n",
-> -			res_size, res->start);
-> -		return -ENOMEM;
-> -	}
-> -
-> -	imx2_wdt.base = devm_ioremap_nocache(&pdev->dev, res->start, res_size);
-> -	if (!imx2_wdt.base) {
-> -		dev_err(&pdev->dev, "ioremap failed\n");
-> -		return -ENOMEM;
-> -	}
-> +	ret = devm_resource_to_mapped_ptr(&pdev->dev, res, &imx2_wdt.base);
-> +	if (ret)
-> +		return ret;
+> +	status = clk_enable(pl022->clk);
+> +	if (status) {
+> +		dev_err(&adev->dev, "could not enable SSP/SPI bus clock\n");
+> +		goto err_no_clk_en;
+> +	}
+> +
+>  	/* Disable SSP */
+>  	writew((readw(SSP_CR1(pl022->virtbase)) & (~SSP_CR1_MASK_SSE)),
+>  	       SSP_CR1(pl022->virtbase));
+> @@ -2237,6 +2243,8 @@ pl022_probe(struct amba_device *adev, const struct amba_id *id)
 >  
->  	imx2_wdt.clk = clk_get(&pdev->dev, NULL);
->  	if (IS_ERR(imx2_wdt.clk)) {
+>  	free_irq(adev->irq[0], pl022);
+>   err_no_irq:
+> +	clk_disable(pl022->clk);
+> + err_no_clk_en:
+>  	clk_unprepare(pl022->clk);
+>   err_clk_prep:
+>  	clk_put(pl022->clk);
+> @@ -2342,11 +2350,19 @@ static int pl022_runtime_resume(struct device *dev)
+>  
+>  	return 0;
+>  }
+> +
+> +static int pl022_runtime_idle(struct device *dev)
+> +{
+> +	pm_runtime_suspend(dev);
+> +	return 0;
+> +}
+>  #endif
+>  
+>  static const struct dev_pm_ops pl022_dev_pm_ops = {
+>  	SET_SYSTEM_SLEEP_PM_OPS(pl022_suspend, pl022_resume)
+> -	SET_RUNTIME_PM_OPS(pl022_runtime_suspend, pl022_runtime_resume, NULL)
+> +	SET_RUNTIME_PM_OPS(pl022_runtime_suspend,
+> +			   pl022_runtime_resume,
+> +			   pl022_runtime_idle)
+>  };
+>  
+>  static struct vendor_data vendor_arm = {
 > -- 
-> 1.7.6.3
+> 1.7.5.4
 > 
