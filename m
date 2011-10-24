@@ -1,73 +1,54 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Mon, 24 Oct 2011 10:42:05 +0200
-Subject: [RFC 0/4] simplify remapping a resource for drivers
-Message-ID: <1319445729-14841-1-git-send-email-w.sang@pengutronix.de>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Mon, 24 Oct 2011 17:02:29 +0800
+Subject: [PATCH v2 3/5] regulator: helper routine to extract
+	regulator_init_data
+In-Reply-To: <20111024081706.GC8708@ponder.secretlab.ca>
+References: <4E9EB61C.1040207@ti.com>
+	<20111019144215.GA32007@S2100-06.ap.freescale.net>
+	<4E9FAF42.5060200@ti.com>
+	<20111020061408.GE32007@S2100-06.ap.freescale.net>
+	<4EA00F7C.1080005@ti.com>
+	<20111021082309.GA337@S2100-06.ap.freescale.net>
+	<4EA13053.7080306@ti.com>
+	<20111021115809.GB337@S2100-06.ap.freescale.net>
+	<4EA4FF6B.2080906@ti.com>
+	<20111024081706.GC8708@ponder.secretlab.ca>
+Message-ID: <20111024090228.GA1755@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mostly all platform drivers need to do something like this to get a ioremapped
-pointer from a resource (and some have multiple resources to be remapped):
-
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-	if (!res) {
-		dev_err(&pdev->dev, "can't get device resources\n");
-		return -ENOENT;
-	}
-
-	res_size = resource_size(res);
-	if (!devm_request_mem_region(&pdev->dev, res->start, res_size, res->name)) {
-		dev_err(&pdev->dev, "can't allocate %d bytes at %d address\n",
-				res_size, res->start);
-		return -EBUSY;
-	}
-
-	priv->base = devm_ioremap_nocache(&pdev->dev, res->start, res_size);
-	if (priv->base) {
-		dev_err(&pdev->dev, "ioremap failed\n");
-		return -ENOMEM;
-	}
-
-In case of not using managed devices, there is also code for cleaning up when
-hitting an error. After this series, the same can be done with:
-
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-	err = devm_resource_to_mapped_ptr(&pdev->dev, res, &priv->base);
-	if (err)
-		return err;
-
-The new function will perform all necessary checks and return with consistent
-error codes and messages on failures. It also prevents common mistakes like
-using a wrong type for res_size or not calling the _nocache-variant of ioremap
-if the resource is not marked otherwise. Because the new functions works with
-the struct device (plus a resource), it will probably be useful even if
-platform drivers run out of fashion.
-
-The first two patches are minor cleanups on devres found while working on the code.
-The third patch adds the new function. The fourth patch is an example, so we have a
-simple use-case for the proposed functionality.
-
-The series can also be fetched from:
-
-	git://git.pengutronix.de/git/wsa/linux-2.6.git resource_to_ptr
-
-Looking forward to reviews and comments.
-
-Thanks,
-
-   Wolfram
-
-
-Wolfram Sang (4):
-  Documentation: devres: add allocation functions to list of supported calls
-  lib: devres: add annotations for #endif
-  lib: devres: add function which remaps a given resource
-  watchdog: imx2: simplify resource allocation
-
- Documentation/driver-model/devres.txt |    5 +++
- drivers/watchdog/imx2_wdt.c           |   22 ++-----------
- include/linux/device.h                |    3 ++
- lib/devres.c                          |   56 +++++++++++++++++++++++++++++++-
- 4 files changed, 65 insertions(+), 21 deletions(-)
+On Mon, Oct 24, 2011 at 10:17:06AM +0200, Grant Likely wrote:
+> On Mon, Oct 24, 2011 at 11:32:19AM +0530, Rajendra Nayak wrote:
+> > On Friday 21 October 2011 05:28 PM, Shawn Guo wrote:
+> > >On Fri, Oct 21, 2011 at 02:11:55PM +0530, Rajendra Nayak wrote:
+> > >[...]
+> > >>>+       /* find device_node and attach it */
+> > >>>+       rdev->dev.of_node = of_find_node_by_name(NULL, regulator_desc->name);
+> > >>
+> > >>so would this do a complete dt search for every regulator?
+> > >
+> > >Yes, with the first param being NULL, tthe entire device tree will be
+> > >searched.
+> > >
+> > >>we would also need the driver names and dt names to match for this to
+> > >>work, right?
+> > >>
+> > >Driver name does not matter.  The key for this search to work is having
+> > >regulator's name (regulator_desc->name) match device tree node's name,
+> > >case ignored.
+> > 
+> > Mark, whats your take on this? I am somehow not quite sure if we should
+> > have this limitation put in to match DT node names with whats in the
+> > driver structs (regulator_desc).
+> 
+> This looks wrong to me.  Matching based on node /name/, particularly
+> when searching the entire tree, will cause problems.
+> 
+Okay, it's wrong then since so many people say it's wrong :)  I guess
+a quick fix would be adding one property in device tree node for
+matching some unique field in regulator_desc, id, maybe?  Mark, any
+suggestion?
 
 -- 
-1.7.6.3
+Regards,
+Shawn
