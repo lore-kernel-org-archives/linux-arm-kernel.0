@@ -1,178 +1,107 @@
-From: ulf.hansson@stericsson.com (Ulf Hansson)
-Date: Mon, 24 Oct 2011 16:33:20 +0200
-Subject: [PATCH 2/2] mmc: mmci: add constraints on alignment for SDIO
-In-Reply-To: <1319466800-19884-1-git-send-email-ulf.hansson@stericsson.com>
-References: <1319466800-19884-1-git-send-email-ulf.hansson@stericsson.com>
-Message-ID: <1319466800-19884-3-git-send-email-ulf.hansson@stericsson.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Mon, 24 Oct 2011 16:34:51 +0200
+Subject: [PATCH V2] AT91: dt: at91sam9g45 family and board device tree
+	files
+In-Reply-To: <4E9D4FD5.8080802@atmel.com>
+References: <1317636056-9537-1-git-send-email-nicolas.ferre@atmel.com>
+	<4E8C54DC.6040700@gmail.com> <4E8EF6F4.4030905@atmel.com>
+	<4E9D4FD5.8080802@atmel.com>
+Message-ID: <20111024143451.GA8708@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Per Forlin <per.forlin@stericsson.com>
+On Tue, Oct 18, 2011 at 12:07:17PM +0200, Nicolas Ferre wrote:
+> On 10/07/2011 02:56 PM, Nicolas Ferre :
+> > On 10/05/2011 03:00 PM, Rob Herring :
+> >> Nicolas,
+> >>
+> >> On 10/03/2011 05:00 AM, Nicolas Ferre wrote:
+> >>> Create a new device tree source file for Atmel at91sam9g45 SoC family.
+> >>> The Evaluation Kit at91sam9m10g45ek includes it.
+> >>> This first basic support will be populated as drivers and boards will be
+> >>> converted to device tree.
+> >>> Contains serial, dma and interrupt controllers.
+> >>>
+> >>> The generic board file still takes advantage of platform data for early serial
+> >>> init. As we need a storage media and the NAND flash driver is not converted to
+> >>> DT yet, we keep old initialization for it.
+> >>>
+> >>> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> 
+> [..]
+> 
+> >>> diff --git a/arch/arm/mach-at91/board-dt.c b/arch/arm/mach-at91/board-dt.c
+> >>> new file mode 100644
+> >>> index 0000000..7bcb9a9
+> >>> --- /dev/null
+> >>> +++ b/arch/arm/mach-at91/board-dt.c
+> >>> @@ -0,0 +1,122 @@
+> >>> +/*
+> >>> + *  Setup code for AT91SAM Evaluation Kits with Device Tree support
+> >>> + *
+> >>> + *  Covers: * AT91SAM9G45-EKES  board
+> >>> + *          * AT91SAM9M10-EKES  board
+> >>> + *          * AT91SAM9M10G45-EK board
+> >>> + *
+> >>> + *  Copyright (C) 2011 Atmel,
+> >>> + *                2011 Nicolas Ferre <nicolas.ferre@atmel.com>
+> >>> + *
+> >>> + * Licensed under GPLv2 or later.
+> >>> + */
+> >>> +
+> >>> +#include <linux/types.h>
+> >>> +#include <linux/init.h>
+> >>> +#include <linux/module.h>
+> >>> +#include <linux/irqdomain.h>
+> >>> +#include <linux/of_irq.h>
+> >>> +#include <linux/of_platform.h>
+> >>> +
+> >>> +#include <mach/hardware.h>
+> >>> +#include <mach/board.h>
+> >>> +#include <mach/gpio.h>
+> >>> +#include <mach/system_rev.h>
+> >>> +#include <mach/at91sam9_smc.h>
+> >>> +
+> >>> +#include <asm/setup.h>
+> >>> +#include <asm/irq.h>
+> >>> +#include <asm/mach/arch.h>
+> >>> +#include <asm/mach/map.h>
+> >>> +#include <asm/mach/irq.h>
+> >>> +
+> >>> +#include "sam9_smc.h"
+> >>> +#include "generic.h"
+> 
+> As found by Jean-Christophe, it seems that some clock lookup data are missing here. Something like:
+> 
+> +/*
+> + * Lookup table for attaching a specific name and platform_data pointer to
+> + * devices as they get created by of_platform_populate(). Ideally this table
+> + * would not exist, but the current clock implementation depends on some devices
+> + * having a specific name.
+> + /
+> +static const struct of_dev_auxdata at91_auxdata_lookup[] __initconst = {
+> + / at91sam9260/ at91sam9g20 /
+> + OF_DEV_AUXDATA("atmel,at91sam9260-usart", 0xfffff200, "atmel_usart.0", NULL),
+> + OF_DEV_AUXDATA("atmel,at91sam9260-usart", 0xfffb0000, "atmel_usart.1", NULL),
+> + OF_DEV_AUXDATA("atmel,at91sam9260-usart", 0xfffb4000, "atmel_usart.2", NULL),
+> + OF_DEV_AUXDATA("atmel,at91sam9260-usart", 0xfffb8000, "atmel_usart.3", NULL),
+> + OF_DEV_AUXDATA("atmel,at91sam9260-usart", 0xfffd0000, "atmel_usart.4", NULL),
+> + OF_DEV_AUXDATA("atmel,at91sam9260-usart", 0xfffd4000, "atmel_usart.5", NULL),
+> + OF_DEV_AUXDATA("atmel,at91sam9260-usart", 0xfffd8000, "atmel_usart.6", NULL),
+> + / at91sam9g45*/
+> + OF_DEV_AUXDATA("atmel,at91sam9260-usart", 0xffffee00, "atmel_usart.0", NULL),
+> + OF_DEV_AUXDATA("atmel,at91sam9260-usart", 0xfff8c000, "atmel_usart.1", NULL),
+> + OF_DEV_AUXDATA("atmel,at91sam9260-usart", 0xfff90000, "atmel_usart.2", NULL),
+> + OF_DEV_AUXDATA("atmel,at91sam9260-usart", 0xfff94000, "atmel_usart.3", NULL),
+> + OF_DEV_AUXDATA("atmel,at91sam9260-usart", 0xfff98000, "atmel_usart.4", NULL),
+> + { /* sentinel */ }
+> +};
+> 
+> With a change here:
+>   of_platform_populate(NULL, of_default_bus_match_table, at91_auxdata_lookup, NULL);
+> 
+> I know that it is a temporary usage of auxdata. Does it sound the right thing to do for the moment?
 
-Buffers must be 4 bytes aligned due to restrictions that
-the PL18x FIFO accesses must be done in a 4-byte aligned manner.
-Enable DMA_REQCTL for SDIO to support write of not 32 bytes aligned
-sg element lengths. In PIO mode any buffer length can be handled
-as long as the buffer address is 4 byte aligned.
+yes.
 
-Signed-off-by: Ulf Hansson <ulf.hansson@stericsson.com>
-Signed-off-by: Per Forlin <per.forlin@stericsson.com>
-Signed-off-by: Stefan Nilsson XK <stefan.xk.nilsson@stericsson.com>
----
- drivers/mmc/host/mmci.c |   55 +++++++++++++++++++++++++++++++++++++++-------
- drivers/mmc/host/mmci.h |    7 ++++++
- 2 files changed, 53 insertions(+), 9 deletions(-)
-
-diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-index a6387b5..1a46084 100644
---- a/drivers/mmc/host/mmci.c
-+++ b/drivers/mmc/host/mmci.c
-@@ -45,6 +45,7 @@ static unsigned int fmax = 515633;
-  * struct variant_data - MMCI variant-specific quirks
-  * @clkreg: default value for MCICLOCK register
-  * @clkreg_enable: enable value for MMCICLOCK register
-+ * @dma_sdio_req_ctrl: enable value for DMAREQCTL register for SDIO write
-  * @datalength_bits: number of bits in the MMCIDATALENGTH register
-  * @fifosize: number of bytes that can be written when MMCI_TXFIFOEMPTY
-  *	      is asserted (likewise for RX)
-@@ -58,6 +59,7 @@ static unsigned int fmax = 515633;
- struct variant_data {
- 	unsigned int		clkreg;
- 	unsigned int		clkreg_enable;
-+	unsigned int		dma_sdio_req_ctrl;
- 	unsigned int		datalength_bits;
- 	unsigned int		fifosize;
- 	unsigned int		fifohalfsize;
-@@ -92,6 +94,7 @@ static struct variant_data variant_ux500 = {
- 	.fifohalfsize		= 8 * 4,
- 	.clkreg			= MCI_CLK_ENABLE,
- 	.clkreg_enable		= MCI_ST_UX500_HWFCEN,
-+	.dma_sdio_req_ctrl	= MCI_ST_DPSM_DMAREQCTL,
- 	.datalength_bits	= 24,
- 	.sdio			= true,
- 	.st_clkdiv		= true,
-@@ -102,6 +105,7 @@ static struct variant_data variant_ux500v2 = {
- 	.fifohalfsize		= 8 * 4,
- 	.clkreg			= MCI_CLK_ENABLE,
- 	.clkreg_enable		= MCI_ST_UX500_HWFCEN,
-+	.dma_sdio_req_ctrl	= MCI_ST_DPSM_DMAREQCTL,
- 	.datalength_bits	= 24,
- 	.sdio			= true,
- 	.st_clkdiv		= true,
-@@ -110,6 +114,31 @@ static struct variant_data variant_ux500v2 = {
- };
- 
- /*
-+ * Validate mmc prerequisites
-+ */
-+static int mmci_validate_data(struct mmci_host *host,
-+			      struct mmc_data *data)
-+{
-+	if (!data)
-+		return 0;
-+
-+	if (!host->variant->non_power_of_2_blksize &&
-+	    !is_power_of_2(data->blksz)) {
-+		dev_err(mmc_dev(host->mmc),
-+			"unsupported block size (%d bytes)\n", data->blksz);
-+		return -EINVAL;
-+	}
-+
-+	if (data->sg->offset & 3) {
-+		dev_err(mmc_dev(host->mmc),
-+			"unsupported alginment (0x%x)\n", data->sg->offset);
-+		return -EINVAL;
-+	}
-+
-+	return 0;
-+}
-+
-+/*
-  * This must be called with host->lock held
-  */
- static void mmci_set_clkreg(struct mmci_host *host, unsigned int desired)
-@@ -401,8 +430,12 @@ static int mmci_dma_prep_data(struct mmci_host *host, struct mmc_data *data,
- 	if (!chan)
- 		return -EINVAL;
- 
--	/* If less than or equal to the fifo size, don't bother with DMA */
--	if (data->blksz * data->blocks <= variant->fifosize)
-+	/*
-+	 * If less than or equal to the fifo size, don't bother with DMA
-+	 * SDIO transfers may not be 4 bytes aligned, fall back to PIO
-+	 */
-+	if (data->blksz * data->blocks <= variant->fifosize ||
-+	    (data->blksz * data->blocks) & 3)
- 		return -EINVAL;
- 
- 	device = chan->device;
-@@ -437,6 +470,7 @@ static int mmci_dma_start_data(struct mmci_host *host, unsigned int datactrl)
- {
- 	int ret;
- 	struct mmc_data *data = host->data;
-+	struct variant_data *variant = host->variant;
- 
- 	ret = mmci_dma_prep_data(host, host->data, NULL);
- 	if (ret)
-@@ -451,6 +485,11 @@ static int mmci_dma_start_data(struct mmci_host *host, unsigned int datactrl)
- 
- 	datactrl |= MCI_DPSM_DMAENABLE;
- 
-+	/* Some hardware versions need special flags for SDIO DMA write */
-+	if (variant->sdio && host->mmc->card && mmc_card_sdio(host->mmc->card)
-+	    && (data->flags & MMC_DATA_WRITE))
-+		datactrl |= variant->dma_sdio_req_ctrl;
-+
- 	/* Trigger the DMA transfer */
- 	writel(datactrl, host->base + MMCIDATACTRL);
- 
-@@ -495,6 +534,9 @@ static void mmci_pre_request(struct mmc_host *mmc, struct mmc_request *mrq,
- 	if (!data)
- 		return;
- 
-+	if (mmci_validate_data(host, mrq->data))
-+		return;
-+
- 	if (data->host_cookie) {
- 		data->host_cookie = 0;
- 		return;
-@@ -976,17 +1018,12 @@ static irqreturn_t mmci_irq(int irq, void *dev_id)
- static void mmci_request(struct mmc_host *mmc, struct mmc_request *mrq)
- {
- 	struct mmci_host *host = mmc_priv(mmc);
--	struct variant_data *variant = host->variant;
- 	unsigned long flags;
- 
- 	WARN_ON(host->mrq != NULL);
- 
--	if (mrq->data &&
--	    !variant->non_power_of_2_blksize &&
--	    !is_power_of_2(mrq->data->blksz)) {
--		dev_err(mmc_dev(mmc), "unsupported block size (%d bytes)\n",
--			mrq->data->blksz);
--		mrq->cmd->error = -EINVAL;
-+	mrq->cmd->error = mmci_validate_data(host, mrq->data);
-+	if (mrq->cmd->error) {
- 		mmc_request_done(mmc, mrq);
- 		return;
- 	}
-diff --git a/drivers/mmc/host/mmci.h b/drivers/mmc/host/mmci.h
-index 79e4143..d2737f0 100644
---- a/drivers/mmc/host/mmci.h
-+++ b/drivers/mmc/host/mmci.h
-@@ -70,6 +70,13 @@
- #define MCI_ST_DPSM_RWMOD	(1 << 10)
- #define MCI_ST_DPSM_SDIOEN	(1 << 11)
- /* Control register extensions in the ST Micro Ux500 versions */
-+/*
-+ * DMA request control is required for write
-+ * if transfer size is not 32 byte aligned.
-+ * DMA request control is also needed if the total
-+ * transfer size is 32 byte aligned but any of the
-+ * sg element lengths are not aligned with 32 byte.
-+ */
- #define MCI_ST_DPSM_DMAREQCTL	(1 << 12)
- #define MCI_ST_DPSM_DBOOTMODEEN	(1 << 13)
- #define MCI_ST_DPSM_BUSYMODE	(1 << 14)
--- 
-1.7.5.4
+g.
