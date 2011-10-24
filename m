@@ -1,107 +1,104 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Mon, 24 Oct 2011 16:34:51 +0200
-Subject: [PATCH V2] AT91: dt: at91sam9g45 family and board device tree
-	files
-In-Reply-To: <4E9D4FD5.8080802@atmel.com>
-References: <1317636056-9537-1-git-send-email-nicolas.ferre@atmel.com>
-	<4E8C54DC.6040700@gmail.com> <4E8EF6F4.4030905@atmel.com>
-	<4E9D4FD5.8080802@atmel.com>
-Message-ID: <20111024143451.GA8708@ponder.secretlab.ca>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 24 Oct 2011 09:36:09 -0500
+Subject: [PATCH v2] ARM: gic: fix irq_alloc_descs handling for sparse irq
+In-Reply-To: <1319314808-27007-1-git-send-email-robherring2@gmail.com>
+References: <1319314808-27007-1-git-send-email-robherring2@gmail.com>
+Message-ID: <1319466969-5034-1-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 18, 2011 at 12:07:17PM +0200, Nicolas Ferre wrote:
-> On 10/07/2011 02:56 PM, Nicolas Ferre :
-> > On 10/05/2011 03:00 PM, Rob Herring :
-> >> Nicolas,
-> >>
-> >> On 10/03/2011 05:00 AM, Nicolas Ferre wrote:
-> >>> Create a new device tree source file for Atmel at91sam9g45 SoC family.
-> >>> The Evaluation Kit at91sam9m10g45ek includes it.
-> >>> This first basic support will be populated as drivers and boards will be
-> >>> converted to device tree.
-> >>> Contains serial, dma and interrupt controllers.
-> >>>
-> >>> The generic board file still takes advantage of platform data for early serial
-> >>> init. As we need a storage media and the NAND flash driver is not converted to
-> >>> DT yet, we keep old initialization for it.
-> >>>
-> >>> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> 
-> [..]
-> 
-> >>> diff --git a/arch/arm/mach-at91/board-dt.c b/arch/arm/mach-at91/board-dt.c
-> >>> new file mode 100644
-> >>> index 0000000..7bcb9a9
-> >>> --- /dev/null
-> >>> +++ b/arch/arm/mach-at91/board-dt.c
-> >>> @@ -0,0 +1,122 @@
-> >>> +/*
-> >>> + *  Setup code for AT91SAM Evaluation Kits with Device Tree support
-> >>> + *
-> >>> + *  Covers: * AT91SAM9G45-EKES  board
-> >>> + *          * AT91SAM9M10-EKES  board
-> >>> + *          * AT91SAM9M10G45-EK board
-> >>> + *
-> >>> + *  Copyright (C) 2011 Atmel,
-> >>> + *                2011 Nicolas Ferre <nicolas.ferre@atmel.com>
-> >>> + *
-> >>> + * Licensed under GPLv2 or later.
-> >>> + */
-> >>> +
-> >>> +#include <linux/types.h>
-> >>> +#include <linux/init.h>
-> >>> +#include <linux/module.h>
-> >>> +#include <linux/irqdomain.h>
-> >>> +#include <linux/of_irq.h>
-> >>> +#include <linux/of_platform.h>
-> >>> +
-> >>> +#include <mach/hardware.h>
-> >>> +#include <mach/board.h>
-> >>> +#include <mach/gpio.h>
-> >>> +#include <mach/system_rev.h>
-> >>> +#include <mach/at91sam9_smc.h>
-> >>> +
-> >>> +#include <asm/setup.h>
-> >>> +#include <asm/irq.h>
-> >>> +#include <asm/mach/arch.h>
-> >>> +#include <asm/mach/map.h>
-> >>> +#include <asm/mach/irq.h>
-> >>> +
-> >>> +#include "sam9_smc.h"
-> >>> +#include "generic.h"
-> 
-> As found by Jean-Christophe, it seems that some clock lookup data are missing here. Something like:
-> 
-> +/*
-> + * Lookup table for attaching a specific name and platform_data pointer to
-> + * devices as they get created by of_platform_populate(). Ideally this table
-> + * would not exist, but the current clock implementation depends on some devices
-> + * having a specific name.
-> + /
-> +static const struct of_dev_auxdata at91_auxdata_lookup[] __initconst = {
-> + / at91sam9260/ at91sam9g20 /
-> + OF_DEV_AUXDATA("atmel,at91sam9260-usart", 0xfffff200, "atmel_usart.0", NULL),
-> + OF_DEV_AUXDATA("atmel,at91sam9260-usart", 0xfffb0000, "atmel_usart.1", NULL),
-> + OF_DEV_AUXDATA("atmel,at91sam9260-usart", 0xfffb4000, "atmel_usart.2", NULL),
-> + OF_DEV_AUXDATA("atmel,at91sam9260-usart", 0xfffb8000, "atmel_usart.3", NULL),
-> + OF_DEV_AUXDATA("atmel,at91sam9260-usart", 0xfffd0000, "atmel_usart.4", NULL),
-> + OF_DEV_AUXDATA("atmel,at91sam9260-usart", 0xfffd4000, "atmel_usart.5", NULL),
-> + OF_DEV_AUXDATA("atmel,at91sam9260-usart", 0xfffd8000, "atmel_usart.6", NULL),
-> + / at91sam9g45*/
-> + OF_DEV_AUXDATA("atmel,at91sam9260-usart", 0xffffee00, "atmel_usart.0", NULL),
-> + OF_DEV_AUXDATA("atmel,at91sam9260-usart", 0xfff8c000, "atmel_usart.1", NULL),
-> + OF_DEV_AUXDATA("atmel,at91sam9260-usart", 0xfff90000, "atmel_usart.2", NULL),
-> + OF_DEV_AUXDATA("atmel,at91sam9260-usart", 0xfff94000, "atmel_usart.3", NULL),
-> + OF_DEV_AUXDATA("atmel,at91sam9260-usart", 0xfff98000, "atmel_usart.4", NULL),
-> + { /* sentinel */ }
-> +};
-> 
-> With a change here:
->   of_platform_populate(NULL, of_default_bus_match_table, at91_auxdata_lookup, NULL);
-> 
-> I know that it is a temporary usage of auxdata. Does it sound the right thing to do for the moment?
+From: Rob Herring <rob.herring@calxeda.com>
 
-yes.
+Commit "ARM: gic: add irq_domain support" (2071a2a4b8ed5292) broke SPARSE_IRQ
+on platforms with GIC. When SPARSE_IRQ is enabled, all NR_IRQS or
+mach_desc->nr_irqs will be allocated by arch_probe_nr_irqs(). This caused
+irq_alloc_descs to allocate irq_descs after the pre-allocated space.
 
-g.
+Make irq_alloc_descs search for an exact irq range and assume it has
+been pre-allocated on failure. For DT probing dynamic allocation is used.
+DT enabled platforms should set their nr_irqs to NR_IRQ_LEGACY and have all
+irq_chips allocate their irq_descs with irq_alloc_descs if SPARSE_IRQ is
+enabled.
+
+gic_init irq_start param is changed to be signed with negative meaning do
+dynamic Linux irq assigment.
+
+Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+---
+v2:
+ - make irq_start signed
+
+ arch/arm/common/gic.c               |   15 +++++++++++----
+ arch/arm/include/asm/hardware/gic.h |    2 +-
+ 2 files changed, 12 insertions(+), 5 deletions(-)
+
+diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
+index 65cf39d..e9debd4 100644
+--- a/arch/arm/common/gic.c
++++ b/arch/arm/common/gic.c
+@@ -24,6 +24,7 @@
+  */
+ #include <linux/init.h>
+ #include <linux/kernel.h>
++#include <linux/err.h>
+ #include <linux/list.h>
+ #include <linux/smp.h>
+ #include <linux/cpu_pm.h>
+@@ -550,7 +551,7 @@ const struct irq_domain_ops gic_irq_domain_ops = {
+ #endif
+ };
+ 
+-void __init gic_init(unsigned int gic_nr, unsigned int irq_start,
++void __init gic_init(unsigned int gic_nr, int irq_start,
+ 	void __iomem *dist_base, void __iomem *cpu_base)
+ {
+ 	struct gic_chip_data *gic;
+@@ -571,7 +572,8 @@ void __init gic_init(unsigned int gic_nr, unsigned int irq_start,
+ 	if (gic_nr == 0) {
+ 		gic_cpu_base_addr = cpu_base;
+ 		domain->hwirq_base = 16;
+-		irq_start = (irq_start & ~31) + 16;
++		if (irq_start > 0)
++			irq_start = (irq_start & ~31) + 16;
+ 	} else
+ 		domain->hwirq_base = 32;
+ 
+@@ -586,8 +588,13 @@ void __init gic_init(unsigned int gic_nr, unsigned int irq_start,
+ 	gic->gic_irqs = gic_irqs;
+ 
+ 	domain->nr_irq = gic_irqs - domain->hwirq_base;
+-	domain->irq_base = irq_alloc_descs(-1, irq_start, domain->nr_irq,
++	domain->irq_base = irq_alloc_descs(irq_start, 16, domain->nr_irq,
+ 					   numa_node_id());
++	if (IS_ERR_VALUE(domain->irq_base)) {
++		WARN(1, "Cannot allocate irq_descs @ IRQ%d, assuming pre-allocated\n",
++		     irq_start);
++		domain->irq_base = irq_start;
++	}
+ 	domain->priv = gic;
+ 	domain->ops = &gic_irq_domain_ops;
+ 	irq_domain_add(domain);
+@@ -657,7 +664,7 @@ int __init gic_of_init(struct device_node *node, struct device_node *parent)
+ 
+ 	domain->of_node = of_node_get(node);
+ 
+-	gic_init(gic_cnt, 16, dist_base, cpu_base);
++	gic_init(gic_cnt, -1, dist_base, cpu_base);
+ 
+ 	if (parent) {
+ 		irq = irq_of_parse_and_map(node, 0);
+diff --git a/arch/arm/include/asm/hardware/gic.h b/arch/arm/include/asm/hardware/gic.h
+index 1a776a1..0ea4122 100644
+--- a/arch/arm/include/asm/hardware/gic.h
++++ b/arch/arm/include/asm/hardware/gic.h
+@@ -38,7 +38,7 @@
+ extern void __iomem *gic_cpu_base_addr;
+ extern struct irq_chip gic_arch_extn;
+ 
+-void gic_init(unsigned int, unsigned int, void __iomem *, void __iomem *);
++void gic_init(unsigned int, int, void __iomem *, void __iomem *);
+ int gic_of_init(struct device_node *node, struct device_node *parent);
+ void gic_secondary_init(unsigned int);
+ void gic_cascade_irq(unsigned int gic_nr, unsigned int irq);
+-- 
+1.7.5.4
