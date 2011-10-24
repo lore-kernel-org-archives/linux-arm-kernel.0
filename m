@@ -1,149 +1,131 @@
 From: mina86@mina86.com (Michal Nazarewicz)
-Date: Mon, 24 Oct 2011 12:32:45 -0700
-Subject: [PATCH 4/9] mm: MIGRATE_CMA migration type added
-In-Reply-To: <20111018130826.GD6660@csn.ul.ie>
+Date: Mon, 24 Oct 2011 12:39:29 -0700
+Subject: [PATCH 6/9] drivers: add Contiguous Memory Allocator
+In-Reply-To: <20111018134321.GE6660@csn.ul.ie>
 References: <1317909290-29832-1-git-send-email-m.szyprowski@samsung.com>
-	<1317909290-29832-5-git-send-email-m.szyprowski@samsung.com>
-	<20111018130826.GD6660@csn.ul.ie>
-Message-ID: <op.v3ve8vbl3l0zgt@mpn-glaptop>
+	<1317909290-29832-7-git-send-email-m.szyprowski@samsung.com>
+	<20111018134321.GE6660@csn.ul.ie>
+Message-ID: <op.v3vfj30d3l0zgt@mpn-glaptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On Thu, Oct 06, 2011 at 03:54:44PM +0200, Marek Szyprowski wrote:
->> The MIGRATE_CMA migration type has two main characteristics:
->> (i) only movable pages can be allocated from MIGRATE_CMA
->> pageblocks and (ii) page allocator will never change migration
->> type of MIGRATE_CMA pageblocks.
->>
->> This guarantees that page in a MIGRATE_CMA page block can
->> always be migrated somewhere else (unless there's no memory left
->> in the system).
-
-On Tue, 18 Oct 2011 06:08:26 -0700, Mel Gorman <mel@csn.ul.ie> wrote:
-> Or the count is premanently elevated by a device driver for some reason or if
-> the page is backed by a filesystem with a broken or unusable migrate_page()
-> function. This is unavoidable, I'm just pointing out that you can stil have
-> migration failures, particularly if GFP_MOVABLE has been improperly used.
-
-CMA does not handle that well right now.  I guess it's something to think about
-once the rest is nice and working.
-
->> It is designed to be used with Contiguous Memory Allocator
->> (CMA) for allocating big chunks (eg. 10MiB) of physically
->> contiguous memory.  Once driver requests contiguous memory,
->> CMA will migrate pages from MIGRATE_CMA pageblocks.
->>
->> To minimise number of migrations, MIGRATE_CMA migration type
->> is the last type tried when page allocator falls back to other
->> migration types then requested.
-
-> It would be preferable if you could figure out how to reuse the
-> MIGRATE_RESERVE type for just the bitmap.
-
-I'm not entirely sure of what you mean here.
-
-> Like MIGRATE_CMA, it does not
-> change type except when min_free_kbytes changes. However, it is
-> something that could be done in the future to keep the size of the
-> pageblock bitmap where it is now.
-
-
->> +enum {
->> +	MIGRATE_UNMOVABLE,
->> +	MIGRATE_RECLAIMABLE,
->> +	MIGRATE_MOVABLE,
->> +	MIGRATE_PCPTYPES,	/* the number of types on the pcp lists */
->> +	MIGRATE_RESERVE = MIGRATE_PCPTYPES,
->> +	/*
->> +	 * MIGRATE_CMA migration type is designed to mimic the way
->> +	 * ZONE_MOVABLE works.  Only movable pages can be allocated
->> +	 * from MIGRATE_CMA pageblocks and page allocator never
->> +	 * implicitly change migration type of MIGRATE_CMA pageblock.
->> +	 *
->> +	 * The way to use it is to change migratetype of a range of
->> +	 * pageblocks to MIGRATE_CMA which can be done by
->> +	 * __free_pageblock_cma() function.  What is important though
->> +	 * is that a range of pageblocks must be aligned to
->> +	 * MAX_ORDER_NR_PAGES should biggest page be bigger then
->> +	 * a single pageblock.
->> +	 */
->> +	MIGRATE_CMA,
-
-> This does mean that MIGRATE_CMA also does not have a per-cpu list.
-> I don't know if that matters to you but all allocations using
-> MIGRATE_CMA will take the zone lock.
-
-This is sort of an artefact of my misunderstanding of pcp lists in the
-past.  I'll have to re-evaluate the decision not to include CMA on pcp
-list.
-
-Still, I think that CMA not being on pcp lists should not be a problem
-for us.  At least we can try and get CMA running and then consider adding
-CMA to pcp lists.
-
-> I'm not sure this can be easily avoided because
-> if there is a per-CPU list for MIGRATE_CMA, it might use a new cache
-> line for it and incur a different set of performance problems.
-
->> +	MIGRATE_ISOLATE,	/* can't allocate from here */
->> +	MIGRATE_TYPES
->> +};
-
->> diff --git a/mm/compaction.c b/mm/compaction.c
->> index 97254e4..9cf6b2b 100644
->> --- a/mm/compaction.c
->> +++ b/mm/compaction.c
->> @@ -115,6 +115,16 @@ static bool suitable_migration_target(struct page *page)
->>  	if (migratetype == MIGRATE_ISOLATE || migratetype == MIGRATE_RESERVE)
->>  		return false;
->>
->> +	/* Keep MIGRATE_CMA alone as well. */
->> +	/*
->> +	 * XXX Revisit.  We currently cannot let compaction touch CMA
->> +	 * pages since compaction insists on changing their migration
->> +	 * type to MIGRATE_MOVABLE (see split_free_page() called from
->> +	 * isolate_freepages_block() above).
->> +	 */
->> +	if (is_migrate_cma(migratetype))
->> +		return false;
+> On Thu, Oct 06, 2011 at 03:54:46PM +0200, Marek Szyprowski wrote:
+>> +static unsigned long __init __cma_early_get_total_pages(void)
+>> +{
+>> +	struct memblock_region *reg;
+>> +	unsigned long total_pages = 0;
 >> +
+>> +	/*
+>> +	 * We cannot use memblock_phys_mem_size() here, because
+>> +	 * memblock_analyze() has not been called yet.
+>> +	 */
+>> +	for_each_memblock(memory, reg)
+>> +		total_pages += memblock_region_memory_end_pfn(reg) -
+>> +			       memblock_region_memory_base_pfn(reg);
+>> +	return total_pages;
+>> +}
+>> +
+
+On Tue, 18 Oct 2011 06:43:21 -0700, Mel Gorman <mel@csn.ul.ie> wrote:
+> Is this being called too early yet? What prevents you seeing up the CMA
+> regions after the page allocator is brought up for example? I understand
+> that there is a need for the memory to be coherent so maybe that is the
+> obstacle.
+
+Another reason is that we want to be sure that we can get given range of pages.
+After page allocator is set-up, someone could allocate a non-movable page from
+the range that interests us and that wouldn't be nice for us.
+
+>> +struct page *dma_alloc_from_contiguous(struct device *dev, int count,
+>> +				       unsigned int align)
+>> +{
+>> +	struct cma *cma = get_dev_cma_area(dev);
+>> +	unsigned long pfn, pageno;
+>> +	int ret;
+>> +
+>> +	if (!cma)
+>> +		return NULL;
+>> +
+>> +	if (align > CONFIG_CMA_ALIGNMENT)
+>> +		align = CONFIG_CMA_ALIGNMENT;
+>> +
+>> +	pr_debug("%s(cma %p, count %d, align %d)\n", __func__, (void *)cma,
+>> +		 count, align);
+>> +
+>> +	if (!count)
+>> +		return NULL;
+>> +
+>> +	mutex_lock(&cma_mutex);
+>> +
+>> +	pageno = bitmap_find_next_zero_area(cma->bitmap, cma->count, 0, count,
+>> +					    (1 << align) - 1);
+>> +	if (pageno >= cma->count) {
+>> +		ret = -ENOMEM;
+>> +		goto error;
+>> +	}
+>> +	bitmap_set(cma->bitmap, pageno, count);
+>> +
+>> +	pfn = cma->base_pfn + pageno;
+>> +	ret = alloc_contig_range(pfn, pfn + count, 0, MIGRATE_CMA);
+>> +	if (ret)
+>> +		goto free;
+>> +
+
+> If alloc_contig_range returns failure, the bitmap is still set. It will
+> never be freed so now the area cannot be used for CMA allocations any
+> more.
+
+bitmap is cleared at the ?free:? label.
+
+>> +	mutex_unlock(&cma_mutex);
+>> +
+>> +	pr_debug("%s(): returned %p\n", __func__, pfn_to_page(pfn));
+>> +	return pfn_to_page(pfn);
+>> +free:
+>> +	bitmap_clear(cma->bitmap, pageno, count);
+>> +error:
+>> +	mutex_unlock(&cma_mutex);
+>> +	return NULL;
+>> +}
+
+
+>> +int dma_release_from_contiguous(struct device *dev, struct page *pages,
+>> +				int count)
+>> +{
+>> +	struct cma *cma = get_dev_cma_area(dev);
+>> +	unsigned long pfn;
+>> +
+>> +	if (!cma || !pages)
+>> +		return 0;
+>> +
+>> +	pr_debug("%s(page %p)\n", __func__, (void *)pages);
+>> +
+>> +	pfn = page_to_pfn(pages);
+>> +
+>> +	if (pfn < cma->base_pfn || pfn >= cma->base_pfn + cma->count)
+>> +		return 0;
+>> +
+>> +	mutex_lock(&cma_mutex);
+>> +
+>> +	bitmap_clear(cma->bitmap, pfn - cma->base_pfn, count);
+>> +	free_contig_pages(pfn, count);
+>> +
+>> +	mutex_unlock(&cma_mutex);
 >
-> This is another reason why CMA and compaction should be using almost
-> identical code. It does mean that the compact_control may need to be
-> renamed and get flags to control things like the setting of pageblock
-> flags but it would be preferable to having two almost identical pieces
-> of code.
-
-I've addressed it in my other mail where I've changed the split_free_page()
-to not touch CMA and ISOLATE pageblocks.  I think that this change should
-make the above comment no longer accurate and the check unnecessary.
-
->>  	/* If the page is a large free page, then allow migration */
->>  	if (PageBuddy(page) && page_order(page) >= pageblock_order)
->>  		return true;
-
->> @@ -940,12 +963,12 @@ __rmqueue_fallback(struct zone *zone, int order, int start_migratetype)
->>  	/* Find the largest possible block of pages in the other list */
->>  	for (current_order = MAX_ORDER-1; current_order >= order;
->>  						--current_order) {
->> -		for (i = 0; i < MIGRATE_TYPES - 1; i++) {
->> +		for (i = 0; i < ARRAY_SIZE(fallbacks[0]); i++) {
+> It feels like the mutex could be a lot lighter here. If the bitmap is
+> protected by a spinlock, it would only need to be held while the bitmap
+> was being cleared. free the contig pages outside the spinlock and clear
+> the bitmap afterwards.
 >
-> I don't see why this change is necessary.
+> It's not particularly important as the scalability of CMA is not
+> something to be concerned with at this point.
 
-It changes a sort of a magic number into a value that is calculated
- from the array.  This makes it resistant to changes in the definition
-of the fallbacks array.  I think this is a reasonable change.
+Mutex is used also to protect the core operations, ie. isolating pages
+and such.  This is because two CMA calls may want to work on the same
+pageblock and we have to prevent that from happening.
 
->>  			migratetype = fallbacks[start_migratetype][i];
->>
->>  			/* MIGRATE_RESERVE handled later if necessary */
->>  			if (migratetype == MIGRATE_RESERVE)
->> -				continue;
->> +				break;
->>
->>  			area = &(zone->free_area[current_order]);
->>  			if (list_empty(&area->free_list[migratetype]))
+We could add the spinlock for protecting the bitmap but we will still
+need mutex for other uses.
 
 -- 
 Best regards,                                         _     _
