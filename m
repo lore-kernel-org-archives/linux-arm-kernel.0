@@ -1,38 +1,47 @@
-From: sebras@gmail.com (Sebastian Rasmussen)
-Date: Mon, 24 Oct 2011 11:11:28 +0200
-Subject: [PATCH] mmc: mmci: Improve runtime PM support
-In-Reply-To: <4EA51C4A.7040802@stericsson.com>
-References: <1319210754-22775-1-git-send-email-ulf.hansson@stericsson.com>
-	<20111021173637.GG21648@n2100.arm.linux.org.uk>
-	<CAKnu2MrOriMzJH9NcwUivWa0cinASa6wrRf4a69si4WUs-aTrQ@mail.gmail.com>
-	<CAAgDR1OT=+xgQTNwmTz=9XwzpbhjeZ6F-mxnVGhOAPSAR3JiFQ@mail.gmail.com>
-	<4EA51C4A.7040802@stericsson.com>
-Message-ID: <CAAgDR1MxvhXKwDoBMZF44gJXTigWNDQCkZXsueAqUxw4Rf5fkw@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 24 Oct 2011 10:11:19 +0100
+Subject: [GIT PULL] i.MX6Q support
+In-Reply-To: <CAGsJ_4z7AUQmfH47kmjBvGTtwoKWitOH6WWx5cRRmz51-+hYFQ@mail.gmail.com>
+References: <20111020171158.GJ32007@S2100-06.ap.freescale.net>
+	<20111020211834.GF21648@n2100.arm.linux.org.uk>
+	<CAGsJ_4z7AUQmfH47kmjBvGTtwoKWitOH6WWx5cRRmz51-+hYFQ@mail.gmail.com>
+Message-ID: <20111024091119.GB9893@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+On Mon, Oct 24, 2011 at 09:15:38AM +0800, Barry Song wrote:
+> 2011/10/21 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> > On Fri, Oct 21, 2011 at 01:11:59AM +0800, Shawn Guo wrote:
+> >> Please pull imx6q series. ?It's based on v3.1-rc10 with the following
+> >> branches merged plus a number of cache-l2x0 patches currently sitting
+> >> on rmk/for-next.
+> >
+> > Don't do that. ?If there's something you need, _ask_ me. ?The L2x0
+> > patches got shuffled out into their own branch when the SMP and debug
+> > patches got split out of the 'misc' branch.
+> 
+> does it mean i can rebase the prima2 l2 patch based on the rmk/l2
+> branch with the two commits i need:
+> ARM: 7090/1: CACHE-L2X0: filter start address can be 0 and is often 0;
+> ARM: 7114/1: cache-l2x0: add resume entry for l2 in secure mode
 
-> If the ARM PL180 TRM prevent us from from doing this kind of operations in
-> runtime_suspend, we must think of an alternative solution which just apply
-> for ST-Ericssons derivative of PL180. THIS IS VERY IMPORTANT to be able to
-> implement a proper power management solution.
+The l2x0 branch contains these commits, so you can use that as a basis
+for your work.  If you have other dependencies, you may have to merge
+this with other branches.
 
-I believe that what it boils down to is how the power regulators are controlled.
+Note - an issue which came up with the GIC PPI pull request - if
+you're merging by commit ID, please go back and edit the commit
+message using git commit --amend and make it _more_ informative.  This
+is far from a useful commit message:
 
-In ST-Ericssons PL180 derivative there must be two independent regulators,
-controlled by something outside the PL180 itself, one for the controller and
-one for the external card. So if you know what you are doing you can power
-down the controller while still keeping the card powered.
+	Merge commit '32cffdd' into ppi-irq-core-for-rmk
 
-In the case of ARM PL180 it seems to me as if there is one power regulator,
-controlled by something outside the PL180, that supplies power to the
-controller, and one power regulator, controlled by the PL180, that supplies
-power to the card. Therefore it is simply not possible to clear the ARM
-PL180s MCIPower register (because that means that the card will loose
-power since the control signals to the card's power regulator are now asking
-it to cut power to the card). In addition I believe that it may not be
-possible to
-power the controller down...
+What this is actually doing is merging Thomas' IRQ tree, but that message
+gives no clue that's what happened.  On the other hand, a real pull gives
+this kind of message:
 
- / Sebastian
+	Merge branch 'ppi-irq-core-for-rmk' of git://github.com/mzyngier/arm-platforms into devel-stable
+
+And this says exactly what tree is being merged from where - and such
+a line explains why the other commits (which come from someone elses
+tree) are there.
