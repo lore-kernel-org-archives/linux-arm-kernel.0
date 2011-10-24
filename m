@@ -1,27 +1,55 @@
-From: ulf.hansson@stericsson.com (Ulf Hansson)
-Date: Mon, 24 Oct 2011 16:33:18 +0200
-Subject: [PATCH 0/2] mmc: mmci: Improvements for SDIO
-Message-ID: <1319466800-19884-1-git-send-email-ulf.hansson@stericsson.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Mon, 24 Oct 2011 16:56:31 +0200
+Subject: [PATCH v2 3/5] regulator: helper routine to extract
+	regulator_init_data
+In-Reply-To: <20111024145139.GH1755@S2100-06.ap.freescale.net>
+References: <4E9FAF42.5060200@ti.com>
+	<20111020061408.GE32007@S2100-06.ap.freescale.net>
+	<4EA00F7C.1080005@ti.com>
+	<20111021082309.GA337@S2100-06.ap.freescale.net>
+	<20111024092411.GE8708@ponder.secretlab.ca>
+	<20111024130429.GD1755@S2100-06.ap.freescale.net>
+	<20111024130636.GB26033@opensource.wolfsonmicro.com>
+	<20111024134025.GE1755@S2100-06.ap.freescale.net>
+	<20111024135950.GV8708@ponder.secretlab.ca>
+	<20111024145139.GH1755@S2100-06.ap.freescale.net>
+Message-ID: <20111024145631.GB8708@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For the ux500v2 variant of the PL18x block, non power of two block
-sizes are now supported.
+On Mon, Oct 24, 2011 at 10:51:40PM +0800, Shawn Guo wrote:
+> On Mon, Oct 24, 2011 at 03:59:50PM +0200, Grant Likely wrote:
+> > On Mon, Oct 24, 2011 at 09:40:26PM +0800, Shawn Guo wrote:
+> > > diff --git a/drivers/regulator/core.c b/drivers/regulator/core.c
+> > > index 8fe132d..29dcf90 100644
+> > > --- a/drivers/regulator/core.c
+> > > +++ b/drivers/regulator/core.c
+> > > @@ -2673,7 +2673,8 @@ struct regulator_dev *regulator_register(struct regulator_desc *regulator_desc,
+> > >         BLOCKING_INIT_NOTIFIER_HEAD(&rdev->notifier);
+> > > 
+> > >         /* find device_node and attach it */
+> > > -       rdev->dev.of_node = of_find_node_by_name(NULL, regulator_desc->name);
+> > > +       rdev->dev.of_node = of_find_node_by_name(dev->parent->of_node,
+> > > +                                                regulator_desc->name);
+> > 
+> > of_find_node_by_name() doesn't work that way.  The first argument is a
+> > starting point, but it doesn't restrict the search to children of a
+> > node.
+> > 
+> > for_each_child_of_node() is what you want to use when iterating over
+> > the children which unfortunately changes the structure of this
+> > function.
+> > 
+> The dev->parent->of_node is meant to point to node 'pmic: mc13892 at 0'.
+> And the intention here is not to iterate over the children, but to
+> start a search from a reasonable point rather than the top root node.
 
-In addition constraints on buffer alignments is needed since access to the
-PL18x FIFO must be done on a 4-byte aligned manner. Moreover to be able to
-use DMA for buffers with not 32 bytes aligned sg element lengths, DMAREQCTL
-must enabled.
+It is always better to attach the of_node at struct device
+registration time instead of searching the tree in common code.  The
+of_node should already be assigned by the time regulator_register() is
+called.  The caller should already have access to all that information
+before the call anyway, especially since it is not strictly manditory
+for all regulators to use the common binding.  It is entirely
+conceivable that the proposed binding won't work for some regulators.
 
-Per Forlin (1):
-  mmc: mmci: add constraints on alignment for SDIO
-
-Stefan Nilsson XK (1):
-  mmc: mmci: Support non-power-of-two block sizes for ux500v2 variant
-
- drivers/mmc/host/mmci.c |   56 +++++++++++++++++++++++++++++++++++++++++------
- drivers/mmc/host/mmci.h |    7 ++++++
- 2 files changed, 56 insertions(+), 7 deletions(-)
-
--- 
-1.7.5.4
+g.
