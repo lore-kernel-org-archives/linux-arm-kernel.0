@@ -1,84 +1,65 @@
 From: ming.lei@canonical.com (ming.lei at canonical.com)
-Date: Mon, 24 Oct 2011 22:45:55 +0800
-Subject: [PATCH v5 3/7] arm: perf: support device with other non-irq resources
+Date: Mon, 24 Oct 2011 22:45:56 +0800
+Subject: [PATCH v5 4/7] arm: omap4: hwmod: introduce emu hwmod
 In-Reply-To: <1319467559-5518-1-git-send-email-ming.lei@canonical.com>
 References: <1319467559-5518-1-git-send-email-ming.lei@canonical.com>
-Message-ID: <1319467559-5518-4-git-send-email-ming.lei@canonical.com>
+Message-ID: <1319467559-5518-5-git-send-email-ming.lei@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ming Lei <ming.lei@canonical.com>
 
-omap4 may create device via hwmod, which can create resources
-automatically, so may include some non-irq resources.
-
-This patch supports device with other non-irq resources.
+So that access to cross trigger interface can be allowed, which
+will be introduce in later patches.
 
 Signed-off-by: Ming Lei <ming.lei@canonical.com>
 ---
- arch/arm/kernel/perf_event.c |    5 +++--
- arch/arm/kernel/pmu.c        |   12 ++++++++++--
- 2 files changed, 13 insertions(+), 4 deletions(-)
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c |   26 ++++++++++++++++++++++++++
+ 1 files changed, 26 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
-index f367780..d91dba2 100644
---- a/arch/arm/kernel/perf_event.c
-+++ b/arch/arm/kernel/perf_event.c
-@@ -19,6 +19,7 @@
- #include <linux/platform_device.h>
- #include <linux/spinlock.h>
- #include <linux/uaccess.h>
-+#include <linux/cpumask.h>
+diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+index 393afac..c7289a8 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+@@ -5276,6 +5276,30 @@ static struct omap_hwmod omap44xx_wd_timer3_hwmod = {
+ 	.slaves_cnt	= ARRAY_SIZE(omap44xx_wd_timer3_slaves),
+ };
  
- #include <asm/cputype.h>
- #include <asm/irq.h>
-@@ -414,7 +415,7 @@ armpmu_reserve_hardware(void)
- 		return -ENODEV;
- 	}
- 
--	for (i = 0; i < pmu_device->num_resources; ++i) {
-+	for (i = 0; i < nr_cpu_ids; ++i) {
- 		irq = platform_get_irq(pmu_device, i);
- 		if (irq < 0)
- 			continue;
-@@ -453,7 +454,7 @@ armpmu_release_hardware(void)
- 	struct arm_pmu_platdata *plat =
- 		dev_get_platdata(&pmu_device->dev);
- 
--	for (i = pmu_device->num_resources - 1; i >= 0; --i) {
-+	for (i = nr_cpu_ids - 1; i >= 0; --i) {
- 		irq = platform_get_irq(pmu_device, i);
- 		if (irq >= 0) {
- 			if (plat && plat->disable_irq)
-diff --git a/arch/arm/kernel/pmu.c b/arch/arm/kernel/pmu.c
-index c53474f..0e9c908 100644
---- a/arch/arm/kernel/pmu.c
-+++ b/arch/arm/kernel/pmu.c
-@@ -19,6 +19,7 @@
- #include <linux/module.h>
- #include <linux/of_device.h>
- #include <linux/platform_device.h>
-+#include <linux/cpumask.h>
- 
- #include <asm/pmu.h>
- 
-@@ -172,8 +173,15 @@ init_cpu_pmu(void)
- 	if (irqs == 1 && !irq_can_set_affinity(platform_get_irq(pdev, 0)))
- 		return 0;
- 
--	for (i = 0; i < irqs; ++i) {
--		err = set_irq_affinity(platform_get_irq(pdev, i), i);
-+	for (i = 0; i < nr_cpu_ids; ++i) {
-+		int irq;
++static struct omap_hwmod_class omap44xx_emu_hwmod_class = {
++	.name	= "emu",
++};
 +
-+		irq = platform_get_irq(pdev, i);
++static struct omap_hwmod_irq_info omap44xx_emu_irqs[] = {
++	{ .name = "cti0", .irq = 1 + OMAP44XX_IRQ_GIC_START },
++	{ .name = "cti1", .irq = 2 + OMAP44XX_IRQ_GIC_START },
++	{ .irq = -1 }
++};
 +
-+		if (irq < 0)
-+			continue;
++/*emu hwmod*/
++static struct omap_hwmod omap44xx_emu_hwmod = {
++	.name		= "emu",
++	.class		= &omap44xx_emu_hwmod_class,
++	.clkdm_name	= "emu_sys_clkdm",
++	.prcm = {
++		.omap4 = {
++			.clkctrl_offs = OMAP4_CM_EMU_CLKSTCTRL_OFFSET,
++			.modulemode   = MODULEMODE_HWCTRL,
++		},
++	},
++	.mpu_irqs	= omap44xx_emu_irqs,
++};
 +
-+		err = set_irq_affinity(irq, i);
- 		if (err)
- 			break;
- 	}
+ static __initdata struct omap_hwmod *omap44xx_hwmods[] = {
+ 
+ 	/* dmm class */
+@@ -5422,6 +5446,8 @@ static __initdata struct omap_hwmod *omap44xx_hwmods[] = {
+ 	&omap44xx_wd_timer2_hwmod,
+ 	&omap44xx_wd_timer3_hwmod,
+ 
++	/*emu class*/
++	&omap44xx_emu_hwmod,
+ 	NULL,
+ };
+ 
 -- 
 1.7.5.4
