@@ -1,93 +1,63 @@
 From: nico@fluxnic.net (Nicolas Pitre)
-Date: Mon, 24 Oct 2011 05:49:53 -0400
-Subject: [PATCH 04/12] ARM: mach-ebsa110: move special idle code to a
-	out-of-line pm_idle hook
+Date: Mon, 24 Oct 2011 05:49:55 -0400
+Subject: [PATCH 06/12] ARM: mach-h720x: move special idle code to a out-of-line
+	pm_idle hook
 In-Reply-To: <1319449801-12367-1-git-send-email-nico@fluxnic.net>
 References: <1319449801-12367-1-git-send-email-nico@fluxnic.net>
-Message-ID: <1319449801-12367-5-git-send-email-nico@fluxnic.net>
+Message-ID: <1319449801-12367-7-git-send-email-nico@fluxnic.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
 ---
- arch/arm/mach-ebsa110/core.c                |   28 +++++++++++++++++++++++++++
- arch/arm/mach-ebsa110/include/mach/system.h |   21 +-------------------
- 2 files changed, 29 insertions(+), 20 deletions(-)
+ arch/arm/mach-h720x/common.c              |   20 ++++++++++++++++++++
+ arch/arm/mach-h720x/include/mach/system.h |    6 ------
+ 2 files changed, 20 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/mach-ebsa110/core.c b/arch/arm/mach-ebsa110/core.c
-index d0ce8abdd4..53c6f51015 100644
---- a/arch/arm/mach-ebsa110/core.c
-+++ b/arch/arm/mach-ebsa110/core.c
-@@ -271,8 +271,36 @@ static struct platform_device *ebsa110_devices[] = {
- 	&am79c961_device,
- };
- 
-+/*
-+ * EBSA110 idling methodology:
-+ *
-+ * We can not execute the "wait for interrupt" instruction since that
-+ * will stop our MCLK signal (which provides the clock for the glue
-+ * logic, and therefore the timer interrupt).
-+ *
-+ * Instead, we spin, polling the IRQ_STAT register for the occurrence
-+ * of any interrupt with core clock down to the memory clock.
-+ */
-+static void ebsa110_idle(void)
+diff --git a/arch/arm/mach-h720x/common.c b/arch/arm/mach-h720x/common.c
+index 51d4e44ab9..f3bf3572a3 100644
+--- a/arch/arm/mach-h720x/common.c
++++ b/arch/arm/mach-h720x/common.c
+@@ -242,3 +242,23 @@ void __init h720x_map_io(void)
+ {
+ 	iotable_init(h720x_io_desc,ARRAY_SIZE(h720x_io_desc));
+ }
++
++static void h720x__idle(void)
 +{
-+	const char *irq_stat = (char *)0xff000000;
-+
-+	/* disable clock switching */
-+	asm volatile ("mcr p15, 0, ip, c15, c2, 2" : : : "cc");
-+
-+	/* wait for an interrupt to occur */
-+	while (!*irq_stat);
-+
-+	/* enable clock switching */
-+	asm volatile ("mcr p15, 0, ip, c15, c1, 2" : : : "cc");
-+
-+	/* return with IRQ enabled */
++	CPU_REG (PMU_BASE, PMU_MODE) = PMU_MODE_IDLE;
++	nop();
++	nop();
++	CPU_REG (PMU_BASE, PMU_MODE) = PMU_MODE_RUN;
++	nop();
++	nop();
 +	local_irq_enable();
 +}
 +
- static int __init ebsa110_init(void)
++static int __init h720x__idle_init(void)
++{
++	pm_idle = h720x__idle;
++	return 0;
++}
++
++arch_initcall(h720x_idle_init);
++
+diff --git a/arch/arm/mach-h720x/include/mach/system.h b/arch/arm/mach-h720x/include/mach/system.h
+index a708d24ee4..65032f5c24 100644
+--- a/arch/arm/mach-h720x/include/mach/system.h
++++ b/arch/arm/mach-h720x/include/mach/system.h
+@@ -16,12 +16,6 @@
+ 
+ static void arch_idle(void)
  {
-+	pm_idle = ebsa110_idle;
- 	return platform_add_devices(ebsa110_devices, ARRAY_SIZE(ebsa110_devices));
+-	CPU_REG (PMU_BASE, PMU_MODE) = PMU_MODE_IDLE;
+-	nop();
+-	nop();
+-	CPU_REG (PMU_BASE, PMU_MODE) = PMU_MODE_RUN;
+-	nop();
+-	nop();
  }
  
-diff --git a/arch/arm/mach-ebsa110/include/mach/system.h b/arch/arm/mach-ebsa110/include/mach/system.h
-index 9a26245bf1..ac7bd8a74e 100644
---- a/arch/arm/mach-ebsa110/include/mach/system.h
-+++ b/arch/arm/mach-ebsa110/include/mach/system.h
-@@ -10,28 +10,9 @@
- #ifndef __ASM_ARCH_SYSTEM_H
- #define __ASM_ARCH_SYSTEM_H
  
--/*
-- * EBSA110 idling methodology:
-- *
-- * We can not execute the "wait for interrupt" instruction since that
-- * will stop our MCLK signal (which provides the clock for the glue
-- * logic, and therefore the timer interrupt).
-- *
-- * Instead, we spin, polling the IRQ_STAT register for the occurrence
-- * of any interrupt with core clock down to the memory clock.
-- */
- static inline void arch_idle(void)
- {
--	const char *irq_stat = (char *)0xff000000;
--
--	/* disable clock switching */
--	asm volatile ("mcr p15, 0, ip, c15, c2, 2" : : : "cc");
--
--	/* wait for an interrupt to occur */
--	while (!*irq_stat);
--
--	/* enable clock switching */
--	asm volatile ("mcr p15, 0, ip, c15, c1, 2" : : : "cc");
-+	cpu_do_idle();
- }
- 
- #define arch_reset(mode, cmd)	cpu_reset(0x80000000)
 -- 
 1.7.7.1.431.g10b2a
