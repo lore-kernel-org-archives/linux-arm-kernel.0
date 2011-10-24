@@ -1,117 +1,87 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 24 Oct 2011 14:58:07 +0200
-Subject: [PATCH 12/12] ARM: imx: move special idle code to proper
-	out-of-line pm_idle hooks
-In-Reply-To: <1319449801-12367-13-git-send-email-nico@fluxnic.net>
-References: <1319449801-12367-1-git-send-email-nico@fluxnic.net>
-	<1319449801-12367-13-git-send-email-nico@fluxnic.net>
-Message-ID: <20111024125807.GA2263@pengutronix.de>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 24 Oct 2011 15:00:40 +0200
+Subject: [PATCH v5 0/2] Add device tree support for Samsung's keypad
+	controller driver
+In-Reply-To: <057501cc880e$af0a28a0$0d1e79e0$%kim@samsung.com>
+References: <1318264197-6698-1-git-send-email-thomas.abraham@linaro.org>
+	<057501cc880e$af0a28a0$0d1e79e0$%kim@samsung.com>
+Message-ID: <4EA56178.60301@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nico,
+On 10/11/11 14:09, Kukjin Kim wrote:
+> Thomas Abraham wrote:
+>>
+>> Changes since v4:
+>> - Tested with linux 3.1-rc9. No changes in code.
+>>
+>> Changes since v3:
+>> - Addressed comments from Grant Likely.
+>>    - Set num_rows and num_cols to zero in samsung_keypad_parse_dt function.
+>>    - Fixed the wierd looking if-else block in samsung_keypad_probe
+> function.
+>>
+>> Changes since v2:
+>> - Addressed comments from Grant Likely.
+>>    - Renamed 'keypad,key-code' property name to 'linux,code'.
+>>    - Fixed incorrect data types for all instances of of_property+read_u32.
+>>    - linux,input-type binding was not added as suggested since the driver
+>>      supports only EV_KEY event type.
+>>
+>> Changes since v1:
+>> - Addressed comments from Dmitry Torokhov.
+>>    - Type of controller is cached in driver's private data and the function
+>>      that determines the type of the controller for each keypad scan is
+>>      removed.
+>>    - pdata allocated during probe is explicitly freed after probe completes
+>>      without any error. In case of exit from probe due a error, no explicit
+>>      deallocation of pdata memory is performed and it is left to devres to
+>>      handle that.
+>>    - The generic code to translate KEY(x,y,code) is retained in the driver
+>>      itself. I am unsure of a right common place for it.
+>>    - Driver continues with the probe even if one or more gpio configuration
+>>      fails.
+>>    - Patch 1 that adds a new config option is still retained in this
+> patchset.
+>>
+>>
+>> This patchset adds device tree support for samsung's keypad controller
+> driver.
+>> First patch adds a new config option to be used by device tree enabled
+> platforms
+>> for selecting the samsung's keypad controller driver. The second patch
+> adds
+>> device
+>> tree support for the keypad driver.
+>>
+>>
+>> Thomas Abraham (2):
+>>    input: samsung-keypad: Add HAVE_SAMSUNG_KEYPAD config option
+>>    input: samsung-keypad: Add device tree support
+>>
+>>   .../devicetree/bindings/input/samsung-keypad.txt   |   88 ++++++++++
+>>   drivers/input/keyboard/Kconfig                     |    9 +-
+>>   drivers/input/keyboard/samsung-keypad.c            |  174
+>> ++++++++++++++++++--
+>>   3 files changed, 258 insertions(+), 13 deletions(-)
+>>   create mode 100644 Documentation/devicetree/bindings/input/samsung-
+>> keypad.txt
+>
+> Looks ok to me,
+> Acked-by: Kukjin Kim<kgene.kim@samsung.com>
+>
+> Hi Dmitry,
+> If you're ok on this, please adding this in your tree for upcoming merge
+> window.
+>
+Dmitry,
 
-On Mon, Oct 24, 2011 at 05:50:01AM -0400, Nicolas Pitre wrote:
-> Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
-> ---
->  arch/arm/mach-imx/Makefile              |    4 +-
->  arch/arm/mach-imx/idle-mx3.c            |   31 +++++++++++++++++++++++++++++
->  arch/arm/mach-imx/mm-imx31.c            |    1 +
->  arch/arm/mach-imx/mm-imx35.c            |    1 +
->  arch/arm/mach-mx5/clock-mx51-mx53.c     |    7 ++++++
->  arch/arm/plat-mxc/include/mach/system.h |   33 +------------------------------
->  6 files changed, 43 insertions(+), 34 deletions(-)
->  create mode 100644 arch/arm/mach-imx/idle-mx3.c
+Any problem on this?
 
-Please fold the following in this patch. It fixes the compile errors
-in mx3_defconfig and mx51_defconfig. Also, we implemented
-arch_idle and now with your patch pm_idle, thus we have to call
-local_irq_enable().
+Thanks.
 
-With this:
-
-Tested-by: Sascha Hauer <s.hauer@pengutronix.de>
-
-on i.MX35, i.MX51 and i.MX27
-
-
-commit 380c365d85af17d7c4bac5f0db961986fbb7f40d
-Author: Sascha Hauer <s.hauer@pengutronix.de>
-Date:   Mon Oct 24 14:26:20 2011 +0200
-
-    Fix compile and runtime errors introduced with last commit
-    
-    Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-
-diff --git a/arch/arm/mach-imx/idle-mx3.c b/arch/arm/mach-imx/idle-mx3.c
-index 580b407..ac0d655 100644
---- a/arch/arm/mach-imx/idle-mx3.c
-+++ b/arch/arm/mach-imx/idle-mx3.c
-@@ -28,4 +28,6 @@ void mx3_idle(void)
- 	"orr %0, %0, #0x00000004\n"
- 	"mcr p15, 0, %0, c1, c0, 0\n"
- 	: "=r" (reg));
-+
-+	local_irq_enable();
- }
-diff --git a/arch/arm/mach-mx5/clock-mx51-mx53.c b/arch/arm/mach-mx5/clock-mx51-mx53.c
-index c57bd92..63dc037 100644
---- a/arch/arm/mach-mx5/clock-mx51-mx53.c
-+++ b/arch/arm/mach-mx5/clock-mx51-mx53.c
-@@ -15,12 +15,14 @@
- #include <linux/clk.h>
- #include <linux/io.h>
- #include <linux/clkdev.h>
-+#include <linux/pm.h>
- 
- #include <asm/div64.h>
- 
- #include <mach/hardware.h>
- #include <mach/common.h>
- #include <mach/clock.h>
-+#include <mach/system.h>
- 
- #include "crm_regs.h"
- 
-@@ -1532,6 +1534,8 @@ static void clk_tree_init(void)
- static void mx51_idle(void)
- {
- 	mx5_cpu_lp_set(WAIT_UNCLOCKED_POWER_OFF);
-+
-+	local_irq_enable();
- }
- 
- int __init mx51_clocks_init(unsigned long ckil, unsigned long osc,
-diff --git a/arch/arm/plat-mxc/include/mach/mx3x.h b/arch/arm/plat-mxc/include/mach/mx3x.h
-index 388a407..24e61e4 100644
---- a/arch/arm/plat-mxc/include/mach/mx3x.h
-+++ b/arch/arm/plat-mxc/include/mach/mx3x.h
-@@ -203,6 +203,9 @@ static inline int mx35_revision(void)
- {
- 	return mx35_cpu_rev;
- }
-+
-+void mx3_idle(void);
-+
- #endif
- 
- #endif /* ifndef __MACH_MX3x_H__ */
-diff --git a/arch/arm/plat-mxc/include/mach/system.h b/arch/arm/plat-mxc/include/mach/system.h
-index 89d08c5..9875cc0 100644
---- a/arch/arm/plat-mxc/include/mach/system.h
-+++ b/arch/arm/plat-mxc/include/mach/system.h
-@@ -20,6 +20,8 @@
- #include <mach/hardware.h>
- #include <mach/common.h>
- 
-+extern void mx5_cpu_lp_set(enum mxc_cpu_pwr_mode mode);
-+
- static inline void arch_idle(void)
- {
- 	cpu_do_idle();
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
