@@ -1,43 +1,175 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 24 Oct 2011 16:38:36 -0500
-Subject: [GIT PULL] GIC DT binding support
-Message-ID: <4EA5DADC.7030805@gmail.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Tue, 25 Oct 2011 00:19:16 +0200
+Subject: [PATCH] of: Add a reg-names property to name reg entries
+In-Reply-To: <1319471697-8970-1-git-send-email-b-cousson@ti.com>
+References: <1319471697-8970-1-git-send-email-b-cousson@ti.com>
+Message-ID: <20111024221916.GF4394@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd,
+On Mon, Oct 24, 2011 at 05:54:57PM +0200, Benoit Cousson wrote:
+> In a HW system, resources in general have name to identify them.
+> The is the case as well for DT "reg" entries.
+> The current DT mechanism is relying on the "reg" order to identify
+> the proper resource.
+> Add a reg-names property to allow the possiblity to provide a name
+> to any reg entries.
+> If the name is available, use it to name the resource, otherwise
+> keep the legacy device name.
+> 
+> Signed-off-by: Benoit Cousson <b-cousson@ti.com>
+> Cc: Grant Likely <grant.likely@secretlab.ca>
+> Cc: Rob Herring <rob.herring@calxeda.com>
+> ---
+> 
+>  Documentation/devicetree/bindings/reg-names.txt |   48 +++++++++++++++++++++++
+>  drivers/of/address.c                            |   22 ++++++++--
+>  2 files changed, 65 insertions(+), 5 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/reg-names.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/reg-names.txt b/Documentation/devicetree/bindings/reg-names.txt
+> new file mode 100644
+> index 0000000..5554065
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/reg-names.txt
+> @@ -0,0 +1,48 @@
+> +reg-names property
+> +
+> +In a HW system, resources in general have name to identify them.
+> +The is the case as well for register entries.
+> +The current DT mechanism is relying on the "reg" order to identify
+> +the proper resource. The reg-names is adding the possiblity to
+> +provide a name to reg entries.
+> +
+> +Usage:
+> +
+> +This attribute must be used along with a regular reg entry. If not
+> +it will be simply ignored.
+> +The number of entry must match otherwise the default device name will
+> +be used to as the resource name.
+> +
+> +
+> +Example:
+> +
+> +
+> +l4-abe {
+> +	compatible = "simple-bus";
+> +	#address-cells = <2>;
+> +	#size-cells = <1>;
+> +	ranges = <0 0 0x48000000 0x00001000>, /* MPU path */
+> +		 <1 0 0x49000000 0x00001000>; /* L3 path */
+> +	mcasp {
+> +		compatible = "ti,mcasp";
+> +		reg = <0 0x10 0x10>, <0 0x20 0x10>,
+> +		      <1 0x10 0x10>, <1 0x20 0x10>;
+> +		reg-names = "mpu", "dat",
+> +			    "dma", "dma_dat";
+> +	};
+> +
+> +	timer {
+> +		compatible = "ti,timer";
+> +		reg = <0 0x40 0x10>, <1 0x40 0x10>;
+> +		reg-names = "mpu", "dma";
+> +	};
+> +};
+> +
+> +
+> +usb {
+> +	compatible = "ti,usb-host";
+> +	reg = <0x4a064000 0x800>, <0x4a064800 0x200>,
+> +	      <0x4a064c00 0x200>;
+> +	reg-names = "config", "ohci", "ehci";
+> +};
+> +
+> diff --git a/drivers/of/address.c b/drivers/of/address.c
+> index 72c33fb..1f9f8cb 100644
+> --- a/drivers/of/address.c
+> +++ b/drivers/of/address.c
+> @@ -14,7 +14,7 @@
+>  static struct of_bus *of_match_bus(struct device_node *np);
+>  static int __of_address_to_resource(struct device_node *dev,
+>  		const __be32 *addrp, u64 size, unsigned int flags,
+> -				    struct resource *r);
+> +		const char *name, struct resource *r);
+>  
+>  /* Debug utility */
+>  #ifdef DEBUG
+> @@ -215,7 +215,7 @@ int of_pci_address_to_resource(struct device_node *dev, int bar,
+>  	addrp = of_get_pci_address(dev, bar, &size, &flags);
+>  	if (addrp == NULL)
+>  		return -EINVAL;
+> -	return __of_address_to_resource(dev, addrp, size, flags, r);
+> +	return __of_address_to_resource(dev, addrp, size, flags, NULL, r);
+>  }
+>  EXPORT_SYMBOL_GPL(of_pci_address_to_resource);
+>  #endif /* CONFIG_PCI */
+> @@ -529,7 +529,7 @@ EXPORT_SYMBOL(of_get_address);
+>  
+>  static int __of_address_to_resource(struct device_node *dev,
+>  		const __be32 *addrp, u64 size, unsigned int flags,
+> -				    struct resource *r)
+> +		const char *name, struct resource *r)
+>  {
+>  	u64 taddr;
+>  
+> @@ -551,7 +551,11 @@ static int __of_address_to_resource(struct device_node *dev,
+>  		r->end = taddr + size - 1;
+>  	}
+>  	r->flags = flags;
+> -	r->name = dev->full_name;
+> +	if (name)
+> +		r->name = name;
+> +	else
+> +		r->name = dev->full_name;
 
-I'm not sure if you want a rebased branch to fix merge conflicts or not.
-If that's okay, please pull. I've also fixed the msm compile failure.
+This form please:
+	r->name = name ? name : dev->full_name;
 
-The dependencies are v3.1-rc9 and rmk's devel-stable.
+In general, I'm inclined to accept this patch as we talked about at
+plumbers.  However, this particular hunk gives me pause as there is
+still the objection that Russell raised about the (ab)use of r->name
+for insert the resource name.
 
-The following changes since commit 3a8254364277fabe01bc0e12b9691722939f5ef3:
+So, no I won't reject this patch, but I first what to have some idea
+of what the plan is to migrate away from using r->name.  Perhaps we
+can talk about this tomorrow.
 
-  Merge remote-tracking branch 'rmk/devel-stable' into HEAD (2011-10-24
-14:02:37 -0500)
+>  	return 0;
+>  }
+>  
+> @@ -569,11 +573,19 @@ int of_address_to_resource(struct device_node *dev, int index,
+>  	const __be32	*addrp;
+>  	u64		size;
+>  	unsigned int	flags;
+> +	const char	*name = NULL;
+> +	int		name_cnt;
+>  
+>  	addrp = of_get_address(dev, index, &size, &flags);
+>  	if (addrp == NULL)
+>  		return -EINVAL;
+> -	return __of_address_to_resource(dev, addrp, size, flags, r);
+> +
+> +	/* Get "reg-names" property to add a name to a resource */
+> +	name_cnt = of_property_count_strings(dev, "reg-names");
+> +	if (name_cnt > 0)
+> +		of_property_read_string_index(dev, "reg-names",	index, &name);
 
-are available in the git repository at:
+Why not simply:
+	of_property_read_string_index(dev, "reg-names", index, &name);
 
-  git://sources.calxeda.com/kernel/linux.git gic-dt
+If it fails, then name remains NULL and everything works.
 
-Rob Herring (5):
-      of/irq: introduce of_irq_init
-      irq: support domains with non-zero hwirq base
-      ARM: gic: add irq_domain support
-      ARM: gic: add OF based initialization
-      ARM: gic: fix irq_alloc_descs handling for sparse irq
 
- Documentation/devicetree/bindings/arm/gic.txt |   55 +++++++
- arch/arm/common/Kconfig                       |    1 +
- arch/arm/common/gic.c                         |  187
-++++++++++++++++---------
- arch/arm/include/asm/hardware/gic.h           |   10 +-
- drivers/of/irq.c                              |  107 ++++++++++++++
- include/linux/irqdomain.h                     |   16 ++-
- include/linux/of_irq.h                        |    3 +
- kernel/irq/irqdomain.c                        |   12 +-
- 8 files changed, 319 insertions(+), 72 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/gic.txt
-
-Rob
+> +
+> +	return __of_address_to_resource(dev, addrp, size, flags, name, r);
+>  }
+>  EXPORT_SYMBOL_GPL(of_address_to_resource);
+>  
+> -- 
+> 1.7.5.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
