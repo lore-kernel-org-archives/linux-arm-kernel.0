@@ -1,25 +1,74 @@
-From: maz@misterjones.org (Marc Zyngier)
-Date: Mon, 24 Oct 2011 16:26:12 +0100
-Subject: GIC MULTI_IRQ_HANDLER branches
-Message-ID: <20111024162612.728acd58@taxman.wild-wind.fr.eu.org>
+From: ulf.hansson@stericsson.com (Ulf Hansson)
+Date: Mon, 24 Oct 2011 17:34:53 +0200
+Subject: [PATCH] mmc: mmci: Improve runtime PM support
+In-Reply-To: <4EA58368.6050704@stericsson.com>
+References: <1319210754-22775-1-git-send-email-ulf.hansson@stericsson.com>	<20111021173637.GG21648@n2100.arm.linux.org.uk>	<CAKnu2MrOriMzJH9NcwUivWa0cinASa6wrRf4a69si4WUs-aTrQ@mail.gmail.com>	<CAAgDR1OT=+xgQTNwmTz=9XwzpbhjeZ6F-mxnVGhOAPSAR3JiFQ@mail.gmail.com>	<4EA51C4A.7040802@stericsson.com>	<20111024090432.GA9893@n2100.arm.linux.org.uk>	<4EA53181.2050700@stericsson.com>	<20111024094203.GI9893@n2100.arm.linux.org.uk>	<4EA538A3.9070501@stericsson.com>	<20111024101416.GK9893@n2100.arm.linux.org.uk>	<4EA55076.2010701@stericsson.com>
+	<CACRpkdb7FwW=Qa2MiJkbezkBO3F+Y0j6-RWSiL8dfJXkbd4pHw@mail.gmail.com>
+	<4EA58368.6050704@stericsson.com>
+Message-ID: <4EA5859D.80602@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I've stashed my patches for MULTI_IRQ_HANDLER on the following branches:
-git://github.com/mzyngier/arm-platforms.git gic-multi-irq
-git://github.com/mzyngier/arm-platforms.git gic-multi-irq-asm
+Ulf Hansson wrote:
+> Linus Walleij wrote:
+>> On Mon, Oct 24, 2011 at 1:48 PM, Ulf Hansson <ulf.hansson@stericsson.com> wrote:
+>>> [Russell]
+>>>> The MCIPWR signal controls the external power switch.  This is the only
+>>>> signal for it.  This is the only connection for it.  There is no other
+>>>> control form for this power switch.
+>>>>
+>>> Then we are only left to use the variant struct I believe. In principle, a
+>>> flag in the variant struct, could indicate whether it is OK to disable the
+>>> vcore regulator and thus clear the MCIPWR when doing runtime_suspend.
+>> Yep I think the best could be to add some variant named
+>> bool external_card_power; and then document in the kerneldoc that this
+>> means the driver can clear MMCIPWR without risk of cutting the power
+>> to the card.
+>>
+>> This should be true for Ux500, U300 and Nomadik (just checked the designs -
+>> they all have external regulators).
+>>
+> 
+> Could we assume that all boards which utilizes the ARM PL180 are using 
+> the MMCIPWR register to control power the card? Or should we add a new 
+> amba mmci platform member so this is configurable for each board?
+> 
+> An option could also be if we might want to simplify code to just skip 
+> the entire runtime_suspend|idle|resume function (ie stubb it or 
+> something) for these kind of boards?
+> 
+> What do you prefer?
 
-This is based on Russell's smp branch, plus my PPI patches that Russell
-has already pulled for the upcoming merge window.
+By the way, there is also another option. In the runtime_suspend 
+function for ARM PL180 block we can use mmc_power_save_host (and then 
+also disable vcore etc) and vice verse in runtime_resume with 
+mmc_power_restore_host.
 
-The difference between the two branches is that the second is keeping
-the ASM version of the GIC handler instead of a C version.
+Of course, these kind of operations takes quite some time to execute and 
+therefore we use a much bigger timeout than 50 ms (for example 10 s 
+instead) for ARM PL180.
 
-The C version has been tested on VE, Realview, Tegra, and OMAP2/3/4.
-The ASM version has only been tested on OMAP4.
+Just an idea...
 
-Cheers,
-
-	M.
--- 
-I'm the slime oozin' out from your TV set...
+> 
+>> So the state save/restore and amba_vcore_disable(adev); should be done
+>> only for those variants.
+>>
+>> However this:
+>>
+>> clk_disable(host->clk);
+>>
+>> We ought to be able to do for *all* variants, provided we can create
+>> pm_runtime_get/put and delay properly to cover all bus traffic
+>> (looks like the patch already does that), plus all the time the card is
+>> signalling busy. The best I can think of is to just return -EBUSY to runtime
+>> PM like this:
+>>
+>> if ((readl(base + MMCISTATUS) & (MCI_CMDACTIVE | MCI_TXACTIVE| MCI_RXACTIVE))
+>>   return -EBUSY;
+>>
+>> Yours,
+>> Linus Walleij
+>>
+> 
+> 
