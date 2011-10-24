@@ -1,48 +1,57 @@
-From: zdevai@gmail.com (Zoltan Devai)
-Date: Sun, 23 Oct 2011 23:47:18 +0200
-Subject: [PATCH v2 1/5] ARM: SPMP8000: Add machine base files
-In-Reply-To: <20111021225405.GK21648@n2100.arm.linux.org.uk>
-References: <1318178172-7965-1-git-send-email-zoss@devai.org>
-	<1319040118-29773-1-git-send-email-zoss@devai.org>
-	<1319040118-29773-2-git-send-email-zoss@devai.org>
-	<1409922.Ostx0EbfK3@wuerfel>
-	<20111021225405.GK21648@n2100.arm.linux.org.uk>
-Message-ID: <CAGVye5OR=ngW5Dv4HEuxWOAxTU9-u1-8RBb+wg+DqKNfmCfF9Q@mail.gmail.com>
+From: mina86@mina86.com (Michal Nazarewicz)
+Date: Sun, 23 Oct 2011 18:00:30 -0700
+Subject: [PATCH 2/9] mm: alloc_contig_freed_pages() added
+In-Reply-To: <20111021100624.GB4029@csn.ul.ie>
+References: <1317909290-29832-1-git-send-email-m.szyprowski@samsung.com>
+	<1317909290-29832-3-git-send-email-m.szyprowski@samsung.com>
+	<20111018122109.GB6660@csn.ul.ie> <op.v3j5ent03l0zgt@mpn-glaptop>
+	<20111021100624.GB4029@csn.ul.ie>
+Message-ID: <op.v3tzq4q53l0zgt@mpn-glaptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/10/22 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> On Wed, Oct 19, 2011 at 09:15:35PM +0200, Arnd Bergmann wrote:
->> > +#define SERIAL_BASE ? ? ? ?((volatile unsigned char *)SPMP8000_UARTC0_BASE)
->>
->> drop this, then
->>
->> > +static void putc(const char c)
->> > +{
->> > + ? volatile unsigned char *base = SERIAL_BASE;
->>
->> make this a "unsigned char __iomem *".
->>
->> > + ? int i;
->> > +
->> > + ? for (i = 0; i < 0x1000; i++) {
->> > + ? ? ? ? ? if (base[UART_LSR << 2] & UART_LSR_THRE)
->> > + ? ? ? ? ? ? ? ? ? break;
->> > + ? ? ? ? ? barrier();
->> > + ? }
->> > +
->> > + ? base[UART_TX << 2] = c;
->> > +}
->>
->> and use readb_relaxed/writeb_relaxed to do the access. You should
->> never just dereference volatile pointers to do an MMIO access.
->
-> Note that uncompress.h isn't part of the kernel proper, and so the
-> MMIO accessors may not work (depends whether the arch out-of-lines
-> them.) ?Moreover, as the MMU is setup with 1:1 mappings, arguably
-> it's not IOMEM anyway.
-What's the preferred method then ?
-The current uncompress.h files use all possible methods.
-This is certainly also a question for the uncompress.h cleanup series.
+On Fri, 21 Oct 2011 03:06:24 -0700, Mel Gorman <mel@csn.ul.ie> wrote:
 
-Z
+> On Tue, Oct 18, 2011 at 10:26:37AM -0700, Michal Nazarewicz wrote:
+>> On Tue, 18 Oct 2011 05:21:09 -0700, Mel Gorman <mel@csn.ul.ie> wrote:
+>>
+>> >At this point, I'm going to apologise for not reviewing this a long long
+>> >time ago.
+>> >
+>> >On Thu, Oct 06, 2011 at 03:54:42PM +0200, Marek Szyprowski wrote:
+>> >>From: KAMEZAWA Hiroyuki <kamezawa.hiroyu@jp.fujitsu.com>
+>> >>
+>> >>This commit introduces alloc_contig_freed_pages() function
+>> >>which allocates (ie. removes from buddy system) free pages
+>> >>in range. Caller has to guarantee that all pages in range
+>> >>are in buddy system.
+>> >>
+>> >
+>> >Straight away, I'm wondering why you didn't use
+>> >
+>> >mm/compaction.c#isolate_freepages()
+>> >
+>> >It knows how to isolate pages within ranges. All its control information
+>> >is passed via struct compact_control() which I recognise may be awkward
+>> >for CMA but compaction.c know how to manage all the isolated pages and
+>> >pass them to migrate.c appropriately.
+>>
+>> It is something to consider.  At first glance, I see that isolate_freepages
+>> seem to operate on pageblocks which is not desired for CMA.
+>>
+>
+> isolate_freepages_block operates on a range of pages that happens to be
+> hard-coded to be a pageblock because that was the requirements. It calculates
+> end_pfn and it is possible to make that a function parameter.
+
+Yes, this seems doable.  I'll try and rewrite the patches to use it.
+
+The biggest difference is in how CMA and compaction treat pages which are not
+free.  CMA treat it as an error and compaction just skips those.  This is
+solvable by an argument though.
+
+-- 
+Best regards,                                         _     _
+.o. | Liege of Serenely Enlightened Majesty of      o' \,=./ `o
+..o | Computer Science,  Micha? ?mina86? Nazarewicz    (o o)
+ooo +----<email/xmpp: mpn@google.com>--------------ooO--(_)--Ooo--
