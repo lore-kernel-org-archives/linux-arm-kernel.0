@@ -1,31 +1,42 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 24 Oct 2011 11:39:27 +0200
-Subject: [PATCH v2 3/5] regulator: helper routine to extract
-	regulator_init_data
-In-Reply-To: <20111024092411.GE8708@ponder.secretlab.ca>
-References: <1318263578-7407-1-git-send-email-rnayak@ti.com>
-	<1318263578-7407-4-git-send-email-rnayak@ti.com>
-	<20111018132032.GD30703@S2100-06.ap.freescale.net>
-	<4E9EB61C.1040207@ti.com>
-	<20111019144215.GA32007@S2100-06.ap.freescale.net>
-	<4E9FAF42.5060200@ti.com>
-	<20111020061408.GE32007@S2100-06.ap.freescale.net>
-	<4EA00F7C.1080005@ti.com>
-	<20111021082309.GA337@S2100-06.ap.freescale.net>
-	<20111024092411.GE8708@ponder.secretlab.ca>
-Message-ID: <20111024093925.GB6148@opensource.wolfsonmicro.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 24 Oct 2011 10:42:03 +0100
+Subject: [PATCH] mmc: mmci: Improve runtime PM support
+In-Reply-To: <4EA53181.2050700@stericsson.com>
+References: <1319210754-22775-1-git-send-email-ulf.hansson@stericsson.com>
+	<20111021173637.GG21648@n2100.arm.linux.org.uk>
+	<CAKnu2MrOriMzJH9NcwUivWa0cinASa6wrRf4a69si4WUs-aTrQ@mail.gmail.com>
+	<CAAgDR1OT=+xgQTNwmTz=9XwzpbhjeZ6F-mxnVGhOAPSAR3JiFQ@mail.gmail.com>
+	<4EA51C4A.7040802@stericsson.com>
+	<20111024090432.GA9893@n2100.arm.linux.org.uk>
+	<4EA53181.2050700@stericsson.com>
+Message-ID: <20111024094203.GI9893@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 24, 2011 at 11:24:11AM +0200, Grant Likely wrote:
+On Mon, Oct 24, 2011 at 11:36:01AM +0200, Ulf Hansson wrote:
+> Russell King - ARM Linux wrote:
+>> I repeat: if you cut power to the card, you have to re-initialize it.
+>> Re-initialization takes quite a bit of time to re-detect and setup
+>> the card.  You'd also need to re-configure things like the transfer
+>> mode and so forth.
+>
+> Right now host->vcc (vmmc) regulator is controlling the power to card.  
+> Not the MCIPWR register!
 
-> To follow up from my earlier comment, this .dts structure looks fine
-> and reasonable to me, and it would also be fine for the mc13892 driver
-> to use for_each_child_of_node() to find all the children of the
-> regulators node.  Even finding the 'regulators' node by name from the
-> mc13892 driver is perfectly fine provided for_each_child_of_node is
-> used to find it.  All of this is okay because it is under the umbrella
-> of the "fsl,mc13892" binding.
+Maybe for you, but that's not the case on all platforms.
 
-Yes, a search of children of the device node that the driver is probing
-off seems like a sensible approach.
+You *really* need to get out of the idea that just because your
+implementation works one way that everything works that way.  You're
+working on a cross-SoC cross-platform driver, and you need to take
+account of how other platforms work.
+
+In that case, there *are* platforms which the MCIPWR register does
+indeed control power to the card - and setting this to zero _will_
+power down the card.
+
+> I would be very surprised if any hardware has this kind of setup, that  
+> the PL180 itself controls a regulator.
+
+ARM dev boards all use the MCIPWR bits to control an external power
+switch - there's no adjustment of the voltage except via soldered
+links on the board.
