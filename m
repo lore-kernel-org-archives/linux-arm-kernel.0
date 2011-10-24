@@ -1,45 +1,67 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 24 Oct 2011 14:08:31 +0100
-Subject: [PATCH] Shrink thread_info a bit
-In-Reply-To: <20111024130619.GE26649@sapphire.tkos.co.il>
-References: <20111024124818.GA17693@n2100.arm.linux.org.uk>
-	<20111024130619.GE26649@sapphire.tkos.co.il>
-Message-ID: <20111024130831.GA18426@n2100.arm.linux.org.uk>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Mon, 24 Oct 2011 21:13:20 +0800
+Subject: [RFC] ARM: at91: gpio add mux check
+Message-ID: <1319462000-32642-1-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 24, 2011 at 03:06:19PM +0200, Baruch Siach wrote:
-> Hi Russell,
-> 
-> On Mon, Oct 24, 2011 at 01:48:18PM +0100, Russell King - ARM Linux wrote:
-> > Thread info comes in on Versatile Express at 752 bytes in size, which
-> > is quite large.  Of this, the crunch state is 184 bytes, which is only
-> > used on Cirrus Logic devices.
-> > 
-> > It is wasteful to have this in every kernel when Cirrus Logic CPUs
-> > are not that widely used.  So make this conditional.
-> > 
-> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> > ---
-> >  arch/arm/include/asm/thread_info.h |    2 ++
-> >  arch/arm/kernel/asm-offsets.c      |    2 ++
-> >  2 files changed, 4 insertions(+), 0 deletions(-)
-> > 
-> > diff --git a/arch/arm/include/asm/thread_info.h b/arch/arm/include/asm/thread_info.h
-> > index 7b5cc8d..a030be7 100644
-> > --- a/arch/arm/include/asm/thread_info.h
-> > +++ b/arch/arm/include/asm/thread_info.h
-> > @@ -59,7 +59,9 @@ struct thread_info {
-> >  	__u32			syscall;	/* syscall number */
-> >  	__u8			used_cp[16];	/* thread used copro */
-> >  	unsigned long		tp_value;
-> > +#ifdef CONFIG_CRUNCH
-> >  	struct crunch_state	crunchstate;
-> > +#endif
-> >  	union fp_state		fpstate __attribute__((aligned(8)));
-> >  	union vfp_state		vfpstate;
-> >  #ifdef CONFIG_ARM_THUMBEE
-> 
-> Where is the arch/arm/kernel/asm-offsets.c hunk?
+this will check if the pio is not configured as mux first
 
-Have you looked there?
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Cc: Linus Walleij <linus.walleij@stericsson.com>
+Cc: swarren at nvidia.com
+---
+Hi,
+
+	one of the the issue is what happened it the bootloader miss
+	configured a pin a periph A or B?
+
+	do we need to keep the tracking of it in the pinmux?
+
+Best Regards,
+J.
+ arch/arm/mach-at91/gpio.c |   15 +++++++++++++++
+ 1 files changed, 15 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/mach-at91/gpio.c b/arch/arm/mach-at91/gpio.c
+index 743f668..89761d0 100644
+--- a/arch/arm/mach-at91/gpio.c
++++ b/arch/arm/mach-at91/gpio.c
+@@ -38,6 +38,7 @@ struct at91_gpio_chip {
+ #define to_at91_gpio_chip(c) container_of(c, struct at91_gpio_chip, chip)
+ 
+ static void at91_gpiolib_dbg_show(struct seq_file *s, struct gpio_chip *chip);
++static int at91_gpiolib_request(struct gpio_chip *chip, unsigned offset);
+ static void at91_gpiolib_set(struct gpio_chip *chip, unsigned offset, int val);
+ static int at91_gpiolib_get(struct gpio_chip *chip, unsigned offset);
+ static int at91_gpiolib_direction_output(struct gpio_chip *chip,
+@@ -49,6 +50,7 @@ static int at91_gpiolib_direction_input(struct gpio_chip *chip,
+ 	{								\
+ 		.chip = {						\
+ 			.label		  = name,			\
++			.request	  = at91_gpiolib_request,	\
+ 			.direction_input  = at91_gpiolib_direction_input, \
+ 			.direction_output = at91_gpiolib_direction_output, \
+ 			.get		  = at91_gpiolib_get,		\
+@@ -532,6 +534,19 @@ void __init at91_gpio_irq_setup(void)
+ }
+ 
+ /* gpiolib support */
++
++static int at91_gpiolib_request(struct gpio_chip *chip, unsigned offset)
++{
++	struct at91_gpio_chip *at91_gpio = to_at91_gpio_chip(chip);
++	void __iomem *pio = at91_gpio->regbase;
++	unsigned mask = 1 << offset;
++
++	if (__raw_readl(pio + PIO_PSR) & mask)
++		return 0;
++
++	return -EBUSY;
++}
++
+ static int at91_gpiolib_direction_input(struct gpio_chip *chip,
+ 					unsigned offset)
+ {
+-- 
+1.7.7
