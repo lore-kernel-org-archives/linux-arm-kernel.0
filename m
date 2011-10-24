@@ -1,36 +1,74 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 24 Oct 2011 16:58:07 +0200
-Subject: [PATCH] spi/pl022: Enable clock in probe an use runtime_idle
-In-Reply-To: <20111024125030.GB17693@n2100.arm.linux.org.uk>
-References: <1319206124-17549-1-git-send-email-ulf.hansson@stericsson.com>
-	<20111024120342.GQ8708@ponder.secretlab.ca>
-	<20111024125030.GB17693@n2100.arm.linux.org.uk>
-Message-ID: <CAKnu2Mov-ORJ=KD0g0Wd-gr5pHmCMccWmZ74+8mhDzPJzUqr7g@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 24 Oct 2011 16:08:14 +0100
+Subject: [PATCH v5 3/7] arm: perf: support device with other non-irq
+	resources
+In-Reply-To: <1319467559-5518-4-git-send-email-ming.lei@canonical.com>
+References: <1319467559-5518-1-git-send-email-ming.lei@canonical.com>
+	<1319467559-5518-4-git-send-email-ming.lei@canonical.com>
+Message-ID: <20111024150814.GA4771@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/10/24 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> On Mon, Oct 24, 2011 at 02:03:42PM +0200, Grant Likely wrote:
->> On Fri, Oct 21, 2011 at 04:08:44PM +0200, Ulf Hansson wrote:
->> > Since we are always runtime resumed when leaving probe
->> > the clock must be enabled. To accomplish that we are able
->> > to be runtime suspended after probe in the case when no
->> > request is going to be recieved, a runtime_idle function
->> > has been implemented.
->> >
->> > Change-Id: I6cb86f2cad30ecaab16f512daf4674b039b18213
->> > Signed-off-by: Ulf Hansson <ulf.hansson@stericsson.com>
->> > Reviewed-on: http://gerrit.lud.stericsson.com/gerrit/34447
->>
->> Acked-by: Grant Likely <grant.likely@secretlab.ca>
->>
->> Since it depends on Russell's tree, I'm okay with it going in that way.
->
-> I've received this patch in the patch system, but I'm not planning to
-> apply it yet because it depends on two branches in my tree (amba and clk).
+Hi Ming Lei,
 
-We can fixup that in the aftermath of the merge window, no
-hurries.
+On Mon, Oct 24, 2011 at 03:45:55PM +0100, ming.lei at canonical.com wrote:
+> From: Ming Lei <ming.lei@canonical.com>
+> 
+> omap4 may create device via hwmod, which can create resources
+> automatically, so may include some non-irq resources.
+> 
+> This patch supports device with other non-irq resources.
 
-Yours,
-Linus Walleij
+I'd rather not do this in the Perf code since we're essentially dealing with
+an artifact of the hwmod -> platform_device conversion.
+
+> Signed-off-by: Ming Lei <ming.lei@canonical.com>
+> ---
+>  arch/arm/kernel/perf_event.c |    5 +++--
+>  arch/arm/kernel/pmu.c        |   12 ++++++++++--
+>  2 files changed, 13 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
+> index f367780..d91dba2 100644
+> --- a/arch/arm/kernel/perf_event.c
+> +++ b/arch/arm/kernel/perf_event.c
+> @@ -19,6 +19,7 @@
+>  #include <linux/platform_device.h>
+>  #include <linux/spinlock.h>
+>  #include <linux/uaccess.h>
+> +#include <linux/cpumask.h>
+>  
+>  #include <asm/cputype.h>
+>  #include <asm/irq.h>
+> @@ -414,7 +415,7 @@ armpmu_reserve_hardware(void)
+>  		return -ENODEV;
+>  	}
+>  
+> -	for (i = 0; i < pmu_device->num_resources; ++i) {
+> +	for (i = 0; i < nr_cpu_ids; ++i) {
+>  		irq = platform_get_irq(pmu_device, i);
+>  		if (irq < 0)
+>  			continue;
+
+Hmm, I actually changed this code recently. Take a look:
+
+https://github.com/wdeacon/linux-wd/blob/perf/system-pmus/arch/arm/kernel/perf_event.c
+
+This should all be in for 3.2-rc1, so you can rebase then. If you still have
+hwmod issues, please solve them outside of perf_event.c
+
+> diff --git a/arch/arm/kernel/pmu.c b/arch/arm/kernel/pmu.c
+> index c53474f..0e9c908 100644
+> --- a/arch/arm/kernel/pmu.c
+> +++ b/arch/arm/kernel/pmu.c
+> @@ -19,6 +19,7 @@
+>  #include <linux/module.h>
+>  #include <linux/of_device.h>
+>  #include <linux/platform_device.h>
+> +#include <linux/cpumask.h>
+
+'fraid I've changed this file too!
+
+https://github.com/wdeacon/linux-wd/blob/perf/system-pmus/arch/arm/kernel/pmu.c
+
+Will
