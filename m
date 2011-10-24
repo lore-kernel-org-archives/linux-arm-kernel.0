@@ -1,29 +1,52 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Mon, 24 Oct 2011 09:15:38 +0800
-Subject: [GIT PULL] i.MX6Q support
-In-Reply-To: <20111020211834.GF21648@n2100.arm.linux.org.uk>
-References: <20111020171158.GJ32007@S2100-06.ap.freescale.net>
-	<20111020211834.GF21648@n2100.arm.linux.org.uk>
-Message-ID: <CAGsJ_4z7AUQmfH47kmjBvGTtwoKWitOH6WWx5cRRmz51-+hYFQ@mail.gmail.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Mon, 24 Oct 2011 08:34:02 +0530
+Subject: [PATCH v3 0/4] dmaengine: Device Tree support for Atmel DMA
+In-Reply-To: <4EA424FF.50103@atmel.com>
+References: <1318438634-11826-1-git-send-email-nicolas.ferre@atmel.com>
+	<4E9C258D.3030509@atmel.com>  <4EA424FF.50103@atmel.com>
+Message-ID: <1319425442.9355.27.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/10/21 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> On Fri, Oct 21, 2011 at 01:11:59AM +0800, Shawn Guo wrote:
->> Please pull imx6q series. ?It's based on v3.1-rc10 with the following
->> branches merged plus a number of cache-l2x0 patches currently sitting
->> on rmk/for-next.
->
-> Don't do that. ?If there's something you need, _ask_ me. ?The L2x0
-> patches got shuffled out into their own branch when the SMP and debug
-> patches got split out of the 'misc' branch.
+On Sun, 2011-10-23 at 16:30 +0200, Nicolas Ferre wrote:
+> On 10/17/2011 02:54 PM, Nicolas Ferre :
+> > On 10/12/2011 06:57 PM, Nicolas Ferre :
+> >> This series add the device tree support to Atmel DMA controller driver:
+> >> at_hdmac.
+> >> The removal of platform data ease the conversion to device tree. It also have
+> >> the additional benefit of being simpler and cleaner.
+> >>
+> >> Nicolas Ferre (4):
+> >>       dmaengine: at_hdmac: platform data move to use .id_table
+> >>       dmaengine: at_hdmac: add device tree support
+> >>       ARM: at91/dma: remove platform data from DMA controller
+> >>       ARM: at91/dma: DMA controller registering with DT support
+> >>
+> >>  .../devicetree/bindings/dma/atmel-dma.txt          |   14 ++++
+> >>  arch/arm/mach-at91/at91sam9g45_devices.c           |   17 ++---
+> >>  arch/arm/mach-at91/at91sam9rl_devices.c            |    8 +--
+> >>  arch/arm/mach-at91/include/mach/at_hdmac.h         |   10 ---
+> >>  drivers/dma/at_hdmac.c                             |   76 +++++++++++++++++---
+> >>  drivers/dma/at_hdmac_regs.h                        |    8 ++
+> >>  6 files changed, 97 insertions(+), 36 deletions(-)
+> >>  create mode 100644 Documentation/devicetree/bindings/dma/atmel-dma.txt
+> > 
+> > Vinod,
+> > 
+> > I have just rebased the dmaengine at_hdmac driver patches on top of your
+> > "next" branch as a "v4" series. I send it to you with Grant's "Acked-by"
+> > right now.
+> 
+> Vinod,
+> 
+> Ping?
+> 
+> Do you want me to provide you a git tree for those two patches?
+> Do you think it can make it for 3.2 merge window?
+> 
+Sorry lokks like this indeed got missed :(
 
-does it mean i can rebase the prima2 l2 patch based on the rmk/l2
-branch with the two commits i need:
-ARM: 7090/1: CACHE-L2X0: filter start address can be 0 and is often 0;
-ARM: 7114/1: cache-l2x0: add resume entry for l2 in secure mode
+I will review this right away and if good will apply :)
 
-and let Arnd pull my prima2 l2 patches?
->
-Thanks
-barry
+-- 
+~Vinod
