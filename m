@@ -1,54 +1,117 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 24 Oct 2011 14:54:34 +0200
-Subject: [PATCH] rtc: rtc-s3c: Add device tree support
-In-Reply-To: <20111013193455.GC18574@ponder.secretlab.ca>
-References: <1315064959-16930-1-git-send-email-thomas.abraham@linaro.org>
-	<CAJuYYwQdeD=DEFSBqTTJM_EQcc517LPDy4w-N+mbHdH8Eqh=Dg@mail.gmail.com>
-	<053801cc8803$43676230$ca362690$%kim@samsung.com>
-	<20111013193455.GC18574@ponder.secretlab.ca>
-Message-ID: <4EA5600A.3050801@samsung.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 24 Oct 2011 14:58:07 +0200
+Subject: [PATCH 12/12] ARM: imx: move special idle code to proper
+	out-of-line pm_idle hooks
+In-Reply-To: <1319449801-12367-13-git-send-email-nico@fluxnic.net>
+References: <1319449801-12367-1-git-send-email-nico@fluxnic.net>
+	<1319449801-12367-13-git-send-email-nico@fluxnic.net>
+Message-ID: <20111024125807.GA2263@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/13/11 21:34, Grant Likely wrote:
-> On Tue, Oct 11, 2011 at 07:48:07PM +0900, Kukjin Kim wrote:
->> Thomas Abraham wrote:
->>>
->>> On 3 September 2011 21:19, Thomas Abraham<thomas.abraham@linaro.org>
->>> wrote:
->>>> Add device tree based discovery support for Samsung's rtc controller.
->>>>
->>>> Cc: Ben Dooks<ben-linux@fluff.org>
->>>> Signed-off-by: Thomas Abraham<thomas.abraham@linaro.org>
->>>> ---
->>>>   Documentation/devicetree/bindings/rtc/s3c-rtc.txt |   20
->>> ++++++++++++++++++++
->>>>   drivers/rtc/rtc-s3c.c                             |   21
->>> ++++++++++++++++++++-
->>>>   2 files changed, 40 insertions(+), 1 deletions(-)
->>>>   create mode 100644 Documentation/devicetree/bindings/rtc/s3c-rtc.txt
->>>
->>> Ping. Any comments for this patch? If this looks fine, can this be
->>> considered for 3.2 merge via the Samsung kernel tree.
->>>
->> (Cc'ed Alessandro Zummo who is RTC Subsystem maintainer)
->>
->> I'm ok with this, so if this can be got the ack from Grant and Alessandro,
->> will take this.
->
-> Acked-by: Grant Likely<grant.likely@secretlab.ca>
+Nico,
 
-Hi Alessandro,
+On Mon, Oct 24, 2011 at 05:50:01AM -0400, Nicolas Pitre wrote:
+> Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+> ---
+>  arch/arm/mach-imx/Makefile              |    4 +-
+>  arch/arm/mach-imx/idle-mx3.c            |   31 +++++++++++++++++++++++++++++
+>  arch/arm/mach-imx/mm-imx31.c            |    1 +
+>  arch/arm/mach-imx/mm-imx35.c            |    1 +
+>  arch/arm/mach-mx5/clock-mx51-mx53.c     |    7 ++++++
+>  arch/arm/plat-mxc/include/mach/system.h |   33 +------------------------------
+>  6 files changed, 43 insertions(+), 34 deletions(-)
+>  create mode 100644 arch/arm/mach-imx/idle-mx3.c
 
-Applied this in Samsung tree for supporting device tree for upcoming 3.2 
-merge window.
+Please fold the following in this patch. It fixes the compile errors
+in mx3_defconfig and mx51_defconfig. Also, we implemented
+arch_idle and now with your patch pm_idle, thus we have to call
+local_irq_enable().
 
-If any problems, please let me know before sending to upstream.
+With this:
 
-Thanks.
+Tested-by: Sascha Hauer <s.hauer@pengutronix.de>
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+on i.MX35, i.MX51 and i.MX27
+
+
+commit 380c365d85af17d7c4bac5f0db961986fbb7f40d
+Author: Sascha Hauer <s.hauer@pengutronix.de>
+Date:   Mon Oct 24 14:26:20 2011 +0200
+
+    Fix compile and runtime errors introduced with last commit
+    
+    Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+
+diff --git a/arch/arm/mach-imx/idle-mx3.c b/arch/arm/mach-imx/idle-mx3.c
+index 580b407..ac0d655 100644
+--- a/arch/arm/mach-imx/idle-mx3.c
++++ b/arch/arm/mach-imx/idle-mx3.c
+@@ -28,4 +28,6 @@ void mx3_idle(void)
+ 	"orr %0, %0, #0x00000004\n"
+ 	"mcr p15, 0, %0, c1, c0, 0\n"
+ 	: "=r" (reg));
++
++	local_irq_enable();
+ }
+diff --git a/arch/arm/mach-mx5/clock-mx51-mx53.c b/arch/arm/mach-mx5/clock-mx51-mx53.c
+index c57bd92..63dc037 100644
+--- a/arch/arm/mach-mx5/clock-mx51-mx53.c
++++ b/arch/arm/mach-mx5/clock-mx51-mx53.c
+@@ -15,12 +15,14 @@
+ #include <linux/clk.h>
+ #include <linux/io.h>
+ #include <linux/clkdev.h>
++#include <linux/pm.h>
+ 
+ #include <asm/div64.h>
+ 
+ #include <mach/hardware.h>
+ #include <mach/common.h>
+ #include <mach/clock.h>
++#include <mach/system.h>
+ 
+ #include "crm_regs.h"
+ 
+@@ -1532,6 +1534,8 @@ static void clk_tree_init(void)
+ static void mx51_idle(void)
+ {
+ 	mx5_cpu_lp_set(WAIT_UNCLOCKED_POWER_OFF);
++
++	local_irq_enable();
+ }
+ 
+ int __init mx51_clocks_init(unsigned long ckil, unsigned long osc,
+diff --git a/arch/arm/plat-mxc/include/mach/mx3x.h b/arch/arm/plat-mxc/include/mach/mx3x.h
+index 388a407..24e61e4 100644
+--- a/arch/arm/plat-mxc/include/mach/mx3x.h
++++ b/arch/arm/plat-mxc/include/mach/mx3x.h
+@@ -203,6 +203,9 @@ static inline int mx35_revision(void)
+ {
+ 	return mx35_cpu_rev;
+ }
++
++void mx3_idle(void);
++
+ #endif
+ 
+ #endif /* ifndef __MACH_MX3x_H__ */
+diff --git a/arch/arm/plat-mxc/include/mach/system.h b/arch/arm/plat-mxc/include/mach/system.h
+index 89d08c5..9875cc0 100644
+--- a/arch/arm/plat-mxc/include/mach/system.h
++++ b/arch/arm/plat-mxc/include/mach/system.h
+@@ -20,6 +20,8 @@
+ #include <mach/hardware.h>
+ #include <mach/common.h>
+ 
++extern void mx5_cpu_lp_set(enum mxc_cpu_pwr_mode mode);
++
+ static inline void arch_idle(void)
+ {
+ 	cpu_do_idle();
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
