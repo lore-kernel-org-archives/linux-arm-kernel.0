@@ -1,103 +1,34 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Mon, 24 Oct 2011 12:01:07 +0200
-Subject: [PATCH] arm/tegra: Add device-tree support for TrimSlice board
-Message-ID: <1319450467-11819-1-git-send-email-swarren@nvidia.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Mon, 24 Oct 2011 15:35:50 +0530
+Subject: [PATCH v2 3/5] regulator: helper routine to extract
+	regulator_init_data
+In-Reply-To: <20111024091924.GA6148@opensource.wolfsonmicro.com>
+References: <20111019144215.GA32007@S2100-06.ap.freescale.net>
+	<4E9FAF42.5060200@ti.com>
+	<20111020061408.GE32007@S2100-06.ap.freescale.net>
+	<4EA00F7C.1080005@ti.com>
+	<20111021082309.GA337@S2100-06.ap.freescale.net>
+	<4EA13053.7080306@ti.com>
+	<20111021115809.GB337@S2100-06.ap.freescale.net>
+	<4EA4FF6B.2080906@ti.com>
+	<20111024081706.GC8708@ponder.secretlab.ca>
+	<4EA5279E.3000505@ti.com>
+	<20111024091924.GA6148@opensource.wolfsonmicro.com>
+Message-ID: <4EA5387E.8090500@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Add device-tree file for TrimSlice
-* Add that to the list of .dts files to build
-* Update board-dt.c to recognize TrimSlice board name
+On Monday 24 October 2011 02:49 PM, Mark Brown wrote:
+> On Mon, Oct 24, 2011 at 02:23:50PM +0530, Rajendra Nayak wrote:
+>
+>> How about the driver passing the of_node to be associated with the
+>> regulator, as part of regulator_desc, to the regulator core,
+>> instead of this complete DT search and the restriction of having
+>> to match DT node names with names in regulator_desc.
+>
+> regulator_desc should be const so that we handle multiple instances of
+> the same device nicely.  We could pass the information in as an argument
+> I guess.
 
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
----
- arch/arm/boot/dts/tegra-trimslice.dts |   38 +++++++++++++++++++++++++++++++++
- arch/arm/mach-tegra/Makefile.boot     |    1 +
- arch/arm/mach-tegra/board-dt.c        |    3 ++
- 3 files changed, 42 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/boot/dts/tegra-trimslice.dts
-
-diff --git a/arch/arm/boot/dts/tegra-trimslice.dts b/arch/arm/boot/dts/tegra-trimslice.dts
-new file mode 100644
-index 0000000..d3d0d20
---- /dev/null
-+++ b/arch/arm/boot/dts/tegra-trimslice.dts
-@@ -0,0 +1,38 @@
-+/dts-v1/;
-+
-+/memreserve/ 0x1c000000 0x04000000;
-+/include/ "tegra20.dtsi"
-+
-+/ {
-+	model = "Compulab TrimSlice board";
-+	compatible = "compulab,trimslice", "nvidia,tegra20";
-+
-+	chosen {
-+		bootargs = "vmalloc=192M video=tegrafb console=ttyS0,115200n8 root=/dev/mmcblk0p1 rw rootwait";
-+	};
-+
-+	memory at 0 {
-+		reg = < 0x00000000 0x40000000 >;
-+	};
-+
-+	i2c at 7000c000 {
-+		clock-frequency = <400000>;
-+	};
-+
-+	i2c at 7000c400 {
-+		clock-frequency = <400000>;
-+	};
-+
-+	i2c at 7000c500 {
-+		clock-frequency = <400000>;
-+	};
-+
-+	serial at 70006000 {
-+		clock-frequency = < 216000000 >;
-+	};
-+
-+	sdhci at c8000600 {
-+		cd-gpios = <&gpio 121 0>;
-+		wp-gpios = <&gpio 122 0>;
-+	};
-+};
-diff --git a/arch/arm/mach-tegra/Makefile.boot b/arch/arm/mach-tegra/Makefile.boot
-index bd12c9f..9f177a4 100644
---- a/arch/arm/mach-tegra/Makefile.boot
-+++ b/arch/arm/mach-tegra/Makefile.boot
-@@ -4,4 +4,5 @@ initrd_phys-$(CONFIG_ARCH_TEGRA_2x_SOC)	:= 0x00800000
- 
- dtb-$(CONFIG_MACH_HARMONY) += tegra-harmony.dtb
- dtb-$(CONFIG_MACH_SEABOARD) += tegra-seaboard.dtb
-+dtb-$(CONFIG_MACH_TRIMSLICE) += tegra-trimslice.dtb
- dtb-$(CONFIG_MACH_VENTANA) += tegra-ventana.dtb
-diff --git a/arch/arm/mach-tegra/board-dt.c b/arch/arm/mach-tegra/board-dt.c
-index 0d22212..9ac4ed7 100644
---- a/arch/arm/mach-tegra/board-dt.c
-+++ b/arch/arm/mach-tegra/board-dt.c
-@@ -47,6 +47,7 @@
- 
- void harmony_pinmux_init(int is_dt);
- void seaboard_pinmux_init(int is_dt);
-+void trimslice_pinmux_init(int is_dt);
- void ventana_pinmux_init(int is_dt);
- 
- struct of_dev_auxdata tegra20_auxdata_lookup[] __initdata = {
-@@ -84,6 +85,7 @@ static struct {
- 	char *machine;
- 	void (*init)(int is_dt);
- } pinmux_configs[] = {
-+	{ "compulab,trimslice", trimslice_pinmux_init },
- 	{ "nvidia,harmony", harmony_pinmux_init },
- 	{ "nvidia,seaboard", seaboard_pinmux_init },
- 	{ "nvidia,ventana", ventana_pinmux_init },
-@@ -120,6 +122,7 @@ static void __init tegra_dt_init(void)
- }
- 
- static const char * tegra_dt_board_compat[] = {
-+	"compulab,trimslice",
- 	"nvidia,harmony",
- 	"nvidia,seaboard",
- 	"nvidia,ventana",
--- 
-1.7.4.1
+Ok, will do. The only downside being that all existing users would
+need to be changed.
