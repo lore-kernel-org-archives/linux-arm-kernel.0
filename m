@@ -1,34 +1,28 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 24 Oct 2011 13:48:18 +0100
-Subject: [PATCH] Shrink thread_info a bit
-Message-ID: <20111024124818.GA17693@n2100.arm.linux.org.uk>
+Date: Mon, 24 Oct 2011 13:50:30 +0100
+Subject: [PATCH] spi/pl022: Enable clock in probe an use runtime_idle
+In-Reply-To: <20111024120342.GQ8708@ponder.secretlab.ca>
+References: <1319206124-17549-1-git-send-email-ulf.hansson@stericsson.com>
+	<20111024120342.GQ8708@ponder.secretlab.ca>
+Message-ID: <20111024125030.GB17693@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thread info comes in on Versatile Express at 752 bytes in size, which
-is quite large.  Of this, the crunch state is 184 bytes, which is only
-used on Cirrus Logic devices.
+On Mon, Oct 24, 2011 at 02:03:42PM +0200, Grant Likely wrote:
+> On Fri, Oct 21, 2011 at 04:08:44PM +0200, Ulf Hansson wrote:
+> > Since we are always runtime resumed when leaving probe
+> > the clock must be enabled. To accomplish that we are able
+> > to be runtime suspended after probe in the case when no
+> > request is going to be recieved, a runtime_idle function
+> > has been implemented.
+> > 
+> > Change-Id: I6cb86f2cad30ecaab16f512daf4674b039b18213
+> > Signed-off-by: Ulf Hansson <ulf.hansson@stericsson.com>
+> > Reviewed-on: http://gerrit.lud.stericsson.com/gerrit/34447
+> 
+> Acked-by: Grant Likely <grant.likely@secretlab.ca>
+> 
+> Since it depends on Russell's tree, I'm okay with it going in that way.
 
-It is wasteful to have this in every kernel when Cirrus Logic CPUs
-are not that widely used.  So make this conditional.
-
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- arch/arm/include/asm/thread_info.h |    2 ++
- arch/arm/kernel/asm-offsets.c      |    2 ++
- 2 files changed, 4 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/include/asm/thread_info.h b/arch/arm/include/asm/thread_info.h
-index 7b5cc8d..a030be7 100644
---- a/arch/arm/include/asm/thread_info.h
-+++ b/arch/arm/include/asm/thread_info.h
-@@ -59,7 +59,9 @@ struct thread_info {
- 	__u32			syscall;	/* syscall number */
- 	__u8			used_cp[16];	/* thread used copro */
- 	unsigned long		tp_value;
-+#ifdef CONFIG_CRUNCH
- 	struct crunch_state	crunchstate;
-+#endif
- 	union fp_state		fpstate __attribute__((aligned(8)));
- 	union vfp_state		vfpstate;
- #ifdef CONFIG_ARM_THUMBEE
+I've received this patch in the patch system, but I'm not planning to
+apply it yet because it depends on two branches in my tree (amba and clk).
