@@ -1,30 +1,181 @@
-From: vaibhav.bedia@ti.com (Bedia, Vaibhav)
-Date: Mon, 24 Oct 2011 13:49:01 +0530
-Subject: [PATCH 1/2] [ARM] mach-types: Re-add apf9328
-In-Reply-To: <20111021180347.GH21648@n2100.arm.linux.org.uk>
-References: <1318087189-22977-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
-	<20111008192621.GA28049@pengutronix.de>
-	<20111008220722.GG25689@n2100.arm.linux.org.uk>
-	<20111013090609.GT577@pengutronix.de>
-	<20111017084421.GD21648@n2100.arm.linux.org.uk>
-	<FCCFB4CDC6E5564B9182F639FC35608711EF9769EC@dbde02.ent.ti.com>
-	<20111021180347.GH21648@n2100.arm.linux.org.uk>
-Message-ID: <FCCFB4CDC6E5564B9182F639FC35608711EF976EA1@dbde02.ent.ti.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 24 Oct 2011 10:21:25 +0200
+Subject: [PATCH 2/3] ARM: AT91: IIO: Add AT91 ADC driver.
+In-Reply-To: <20111023090813.GI2638@game.jcrosoft.org>
+References: <1319041134-19712-1-git-send-email-maxime.ripard@free-electrons.com>
+	<1319041134-19712-3-git-send-email-maxime.ripard@free-electrons.com>
+	<20111023090813.GI2638@game.jcrosoft.org>
+Message-ID: <4EA52005.1010208@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
-> Sent: Friday, October 21, 2011 11:34 PM
-> To: Bedia, Vaibhav
-> Cc: linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH 1/2] [ARM] mach-types: Re-add apf9328
-> 
-> 
-> I've just fixed it.
+Hi,
 
-Thanks Russell.
+On 23/10/2011 11:08, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> On 18:18 Wed 19 Oct     , Maxime Ripard wrote:
+>> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+>> Cc: Patrice Vilchez <patrice.vilchez@atmel.com>
+>> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> please keep me in CC
+ACK.
+
+>> +
+>> +static int at91adc_channel_init(struct at91adc_state *st)
+>> +{
+>> +	int ret = 0, i;
+>> +	st->channels = kzalloc(sizeof(struct iio_chan_spec) * st->nb_chan,
+>> +			       GFP_KERNEL);
+>> +	if (st->channels == NULL)
+>> +		return -ENOMEM;
+>> +
+>> +	for (i = 0; i < st->nb_chan; i++) {
+>> +		struct iio_chan_spec *chan = st->channels + i;
+>> +		chan->type = IIO_VOLTAGE;
+>> +		chan->indexed = 1;
+>> +		chan->channel = i;
+>> +		++ret;
+>> +	}
+>> +
+>> +	return ret;
+>> +}
+>> +
+>> +static int at91adc_read_raw(struct iio_dev *idev,
+>> +			    struct iio_chan_spec const *chan,
+>> +			    int *val, int *val2, long mask)
+>> +{
+>> +	struct at91adc_state *st = iio_priv(idev);
+>> +
+>> +	switch (mask) {
+>> +	case 0:
+>> +		mutex_lock(&st->lock);
+>> +
+>> +		at91adc_reg_write(st->reg_base, AT91_ADC_CHER,
+>> +				  AT91_ADC_CH(chan->channel));
+>> +		at91adc_reg_write(st->reg_base, AT91_ADC_IER,
+>> +				  AT91_ADC_EOC(chan->channel));
+>> +		at91adc_reg_write(st->reg_base, AT91_ADC_CR, AT91_ADC_START);
+>> +
+>> +		wait_event_interruptible(st->wq_data_avail, st->done);
+>> +		*val = st->lcdr;
+>> +
+>> +		at91adc_reg_write(st->reg_base, AT91_ADC_CHDR,
+>> +				  AT91_ADC_CH(chan->channel));
+>> +		at91adc_reg_write(st->reg_base, AT91_ADC_IDR,
+>> +				  AT91_ADC_EOC(chan->channel));
+>> +
+>> +		st->lcdr = 0;
+>> +		st->done = false;
+>> +		mutex_unlock(&st->lock);
+>> +		return IIO_VAL_INT;
+>> +	default:
+>> +		break;
+>> +	}
+>> +	return -EINVAL;
+>> +}
+>> +
+>> +static const struct iio_info at91adc_info = {
+>> +	.driver_module = THIS_MODULE,
+>> +	.read_raw = &at91adc_read_raw,
+>> +};
+>> +
+>> +static int __devinit at91adc_probe(struct platform_device *pdev)
+>> +{
+>> +	unsigned int prsc, mstrclk, ticks;
+>> +	int ret;
+>> +	struct iio_dev *idev;
+>> +	struct at91adc_state *st;
+>> +	struct resource *res;
+>> +	struct at91_adc_data *pdata = pdev->dev.platform_data;
+> 	do not refence it copy need for the DT
+
+Ok
+
+>> +
+>> +	dev_dbg(&pdev->dev, "AT91ADC probed\n");
+>> +
+>> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>> +	if (!res) {
+>> +		dev_err(&pdev->dev, "No resource defined\n");
+>> +		ret = -ENXIO;
+>> +		goto error_ret;
+>> +	}
+>> +
+>> +	idev = iio_allocate_device(sizeof(*st));
+>> +	if (idev == NULL) {
+>> +		dev_err(&pdev->dev, "Failed to allocate memory.\n");
+>> +		ret = -ENOMEM;
+>> +		goto error_ret;
+>> +	}
+>> +	platform_set_drvdata(pdev, idev);
+>> +
+>> +	idev->dev.parent = &pdev->dev;
+>> +	idev->name = platform_get_device_id(pdev)->name;
+>> +	idev->modes = INDIO_DIRECT_MODE;
+>> +	idev->info = &at91adc_info;
+>> +
+>> +	st = iio_priv(idev);
+>> +	st->irq = platform_get_irq(pdev, 0);
+>> +	if (st->irq < 0) {
+>> +		dev_err(&pdev->dev, "No IRQ ID is designated\n");
+>> +		ret = -ENODEV;
+>> +		goto error_free_device;
+>> +	}
+>> +
+>> +	if (!request_mem_region(res->start, resource_size(res),
+>> +				"AT91 adc registers")) {
+>> +		dev_err(&pdev->dev, "Resources are unavailable.\n");
+>> +		ret = -EBUSY;
+>> +		goto error_free_device;
+>> +	}
+>> +
+>> +	st->reg_base = ioremap(res->start, resource_size(res));
+>> +	if (!st->reg_base) {
+>> +		dev_err(&pdev->dev, "Failed to map registers.\n");
+>> +		ret = -ENOMEM;
+>> +		goto error_release_mem;
+>> +	}
+>> +
+>> +	/*
+>> +	 * Disable all IRQs before setting up the handler
+>> +	 */
+>> +	at91adc_reg_write(st->reg_base, AT91_ADC_CR, AT91_ADC_SWRST);
+>> +	at91adc_reg_write(st->reg_base, AT91_ADC_IDR, 0xFFFFFFFF);
+>> +	ret = request_irq(st->irq,
+>> +			  at91adc_eoc_trigger, 0, pdev->dev.driver->name, st);
+>> +	if (ret) {
+>> +		dev_err(&pdev->dev, "Failed to allocate IRQ.\n");
+>> +		goto error_unmap_reg;
+>> +	}
+>> +
+>> +	st->clk = clk_get(&pdev->dev, "adc_clk");
+>> +	if (IS_ERR(st->clk)) {
+>> +		dev_err(&pdev->dev, "Failed to get the clock.\n");
+>> +		ret = PTR_ERR(st->clk);
+>> +		goto error_free_irq;
+>> +	}
+>> +
+>> +	clk_enable(st->clk);
+>> +	mstrclk = clk_get_rate(st->clk);
+>> +
+>> +	if (!pdata) {
+>> +		dev_err(&pdev->dev, "No platform data available.\n");
+>> +		ret = -EINVAL;
+>> +		goto error_free_clk;
+>> +	}
+>> +
+>> +	if (!pdata->adc_clock) {
+>> +		dev_err(&pdev->dev, "No ADCClock available.\n");
+>> +		ret = -EINVAL;
+>> +		goto error_free_clk;
+>> +	}
+> where is the platform data struct?
+
+In the first patch.
 
 Regards,
-Vaibhav
- 
+
+-- 
+Maxime Ripard, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
