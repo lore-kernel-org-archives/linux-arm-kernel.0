@@ -1,127 +1,42 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Mon, 24 Oct 2011 13:38:16 +0200
-Subject: [PATCH v2 9/9] serial: samsung: add device tree support
-In-Reply-To: <1318241285-23568-10-git-send-email-thomas.abraham@linaro.org>
-References: <1318241285-23568-1-git-send-email-thomas.abraham@linaro.org>
-	<1318241285-23568-10-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <20111024113816.GJ8708@ponder.secretlab.ca>
+From: ulf.hansson@stericsson.com (Ulf Hansson)
+Date: Mon, 24 Oct 2011 13:48:06 +0200
+Subject: [PATCH] mmc: mmci: Improve runtime PM support
+In-Reply-To: <20111024101416.GK9893@n2100.arm.linux.org.uk>
+References: <1319210754-22775-1-git-send-email-ulf.hansson@stericsson.com>
+	<20111021173637.GG21648@n2100.arm.linux.org.uk>
+	<CAKnu2MrOriMzJH9NcwUivWa0cinASa6wrRf4a69si4WUs-aTrQ@mail.gmail.com>
+	<CAAgDR1OT=+xgQTNwmTz=9XwzpbhjeZ6F-mxnVGhOAPSAR3JiFQ@mail.gmail.com>
+	<4EA51C4A.7040802@stericsson.com>
+	<20111024090432.GA9893@n2100.arm.linux.org.uk>
+	<4EA53181.2050700@stericsson.com>
+	<20111024094203.GI9893@n2100.arm.linux.org.uk>
+	<4EA538A3.9070501@stericsson.com>
+	<20111024101416.GK9893@n2100.arm.linux.org.uk>
+Message-ID: <4EA55076.2010701@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 10, 2011 at 03:38:05PM +0530, Thomas Abraham wrote:
-> Add device tree based discovery support for Samsung's uart controller.
+>> Could you maybe elaborate a bit of how the power is controlled in the  
+>> ARM dev boards? Would it be possible to control such a switch in "GPIO"  
+>> manner instead? For example via the vdd_handler or similar?
+>>
+>> I will also think if and see if is feasible to re-design and see if this  
+>> hole feature can be controlled by the variant struct instead. My feeling  
+>> is although it can be kind of messy. But let's see...
 > 
-> Cc: Ben Dooks <ben-linux@fluff.org>
-> Cc: Grant Likely <grant.likely@secretlab.ca>
-> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+> The MCIPWR register contains two bits to control _the_ _power_ _state_.
+> See Table A-4: the MCIPWR signal.  See section 2.2.2.  See section 3.3.1.
+> 
+> The MCIPWR signal controls the external power switch.  This is the only
+> signal for it.  This is the only connection for it.  There is no other
+> control form for this power switch.
+> 
 
-Acked-by: Grant Likely <grant.likely@secretlab.ca>
+Then we are only left to use the variant struct I believe. In principle, 
+a flag in the variant struct, could indicate whether it is OK to disable 
+the vcore regulator and thus clear the MCIPWR when doing runtime_suspend.
 
-> ---
->  .../devicetree/bindings/serial/samsung_uart.txt    |   14 ++++++++
->  drivers/tty/serial/samsung.c                       |   36 ++++++++++++++++++-
->  2 files changed, 48 insertions(+), 2 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/serial/samsung_uart.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/serial/samsung_uart.txt b/Documentation/devicetree/bindings/serial/samsung_uart.txt
-> new file mode 100644
-> index 0000000..2c8a17c
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/serial/samsung_uart.txt
-> @@ -0,0 +1,14 @@
-> +* Samsung's UART Controller
-> +
-> +The Samsung's UART controller is used for interfacing SoC with serial communicaion
-> +devices.
-> +
-> +Required properties:
-> +- compatible: should be
-> +  - "samsung,exynos4210-uart", for UART's compatible with Exynos4210 uart ports.
-> +
-> +- reg: base physical address of the controller and length of memory mapped
-> +  region.
-> +
-> +- interrupts: interrupt number to the cpu. The interrupt specifier format depends
-> +  on the interrupt controller parent.
-> diff --git a/drivers/tty/serial/samsung.c b/drivers/tty/serial/samsung.c
-> index c89987b..efe3756 100644
-> --- a/drivers/tty/serial/samsung.c
-> +++ b/drivers/tty/serial/samsung.c
-> @@ -42,6 +42,7 @@
->  #include <linux/delay.h>
->  #include <linux/clk.h>
->  #include <linux/cpufreq.h>
-> +#include <linux/of.h>
->  
->  #include <asm/irq.h>
->  
-> @@ -1163,10 +1164,26 @@ static ssize_t s3c24xx_serial_show_clksrc(struct device *dev,
->  
->  static DEVICE_ATTR(clock_source, S_IRUGO, s3c24xx_serial_show_clksrc, NULL);
->  
-> +
->  /* Device driver serial port probe */
->  
-> +static const struct of_device_id s3c24xx_uart_dt_match[];
->  static int probe_index;
->  
-> +static inline struct s3c24xx_serial_drv_data *s3c24xx_get_driver_data(
-> +			struct platform_device *pdev)
-> +{
-> +#ifdef CONFIG_OF
-> +	if (pdev->dev.of_node) {
-> +		const struct of_device_id *match;
-> +		match = of_match_node(s3c24xx_uart_dt_match, pdev->dev.of_node);
-> +		return (struct s3c24xx_serial_drv_data *)match->data;
-> +	}
-> +#endif
-> +	return (struct s3c24xx_serial_drv_data *)
-> +			platform_get_device_id(pdev)->driver_data;
-> +}
-> +
->  static int s3c24xx_serial_probe(struct platform_device *pdev)
->  {
->  	struct s3c24xx_uart_port *ourport;
-> @@ -1176,8 +1193,11 @@ static int s3c24xx_serial_probe(struct platform_device *pdev)
->  
->  	ourport = &s3c24xx_serial_ports[probe_index];
->  
-> -	ourport->drv_data = (struct s3c24xx_serial_drv_data *)
-> -			platform_get_device_id(pdev)->driver_data;
-> +	ourport->drv_data = s3c24xx_get_driver_data(pdev);
-> +	if (!ourport->drv_data) {
-> +		dev_err(&pdev->dev, "could not find driver data\n");
-> +		return -ENODEV;
-> +	}
->  
->  	ourport->info = ourport->drv_data->info;
->  	ourport->cfg = (pdev->dev.platform_data) ?
-> @@ -1626,6 +1646,17 @@ static struct platform_device_id s3c24xx_serial_driver_ids[] = {
->  };
->  MODULE_DEVICE_TABLE(platform, s3c24xx_serial_driver_ids);
->  
-> +#ifdef CONFIG_OF
-> +static const struct of_device_id s3c24xx_uart_dt_match[] = {
-> +	{ .compatible = "samsung,exynos4210-uart",
-> +		.data = &exynos4210_serial_drv_data },
-> +	{},
-> +};
-> +MODULE_DEVICE_TABLE(of, s3c24xx_uart_dt_match);
-> +#else
-> +#define s3c24xx_uart_dt_match NULL
-> +#endif
-> +
->  static struct platform_driver samsung_serial_driver = {
->  	.probe		= s3c24xx_serial_probe,
->  	.remove		= __devexit_p(s3c24xx_serial_remove),
-> @@ -1634,6 +1665,7 @@ static struct platform_driver samsung_serial_driver = {
->  		.name	= "samsung-uart",
->  		.owner	= THIS_MODULE,
->  		.pm	= SERIAL_SAMSUNG_PM_OPS,
-> +		.of_match_table	= s3c24xx_uart_dt_match,
->  	},
->  };
->  
-> -- 
-> 1.6.6.rc2
-> 
+How do you feel about this kind of approach to find a solution?
+
+BR
+Ulf Hansson
