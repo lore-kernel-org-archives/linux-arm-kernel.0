@@ -1,65 +1,129 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Tue, 25 Oct 2011 00:21:13 +0200
-Subject: [PATCH v2 3/5] regulator: helper routine to extract
-	regulator_init_data
-In-Reply-To: <20111024155132.GI1755@S2100-06.ap.freescale.net>
-References: <4EA00F7C.1080005@ti.com>
-	<20111021082309.GA337@S2100-06.ap.freescale.net>
-	<20111024092411.GE8708@ponder.secretlab.ca>
-	<20111024130429.GD1755@S2100-06.ap.freescale.net>
-	<20111024130636.GB26033@opensource.wolfsonmicro.com>
-	<20111024134025.GE1755@S2100-06.ap.freescale.net>
-	<20111024135950.GV8708@ponder.secretlab.ca>
-	<20111024145139.GH1755@S2100-06.ap.freescale.net>
-	<20111024145631.GB8708@ponder.secretlab.ca>
-	<20111024155132.GI1755@S2100-06.ap.freescale.net>
-Message-ID: <20111024222113.GG4394@ponder.secretlab.ca>
+Date: Tue, 25 Oct 2011 00:24:08 +0200
+Subject: [PATCH v2] gpio: pl061: add DT binding support
+In-Reply-To: <1313011906-24161-1-git-send-email-robherring2@gmail.com>
+References: <1312397661-3328-1-git-send-email-robherring2@gmail.com>
+	<1313011906-24161-1-git-send-email-robherring2@gmail.com>
+Message-ID: <20111024222408.GH4394@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 24, 2011 at 11:51:33PM +0800, Shawn Guo wrote:
-> On Mon, Oct 24, 2011 at 04:56:31PM +0200, Grant Likely wrote:
-> > On Mon, Oct 24, 2011 at 10:51:40PM +0800, Shawn Guo wrote:
-> > > On Mon, Oct 24, 2011 at 03:59:50PM +0200, Grant Likely wrote:
-> > > > On Mon, Oct 24, 2011 at 09:40:26PM +0800, Shawn Guo wrote:
-> > > > > diff --git a/drivers/regulator/core.c b/drivers/regulator/core.c
-> > > > > index 8fe132d..29dcf90 100644
-> > > > > --- a/drivers/regulator/core.c
-> > > > > +++ b/drivers/regulator/core.c
-> > > > > @@ -2673,7 +2673,8 @@ struct regulator_dev *regulator_register(struct regulator_desc *regulator_desc,
-> > > > >         BLOCKING_INIT_NOTIFIER_HEAD(&rdev->notifier);
-> > > > > 
-> > > > >         /* find device_node and attach it */
-> > > > > -       rdev->dev.of_node = of_find_node_by_name(NULL, regulator_desc->name);
-> > > > > +       rdev->dev.of_node = of_find_node_by_name(dev->parent->of_node,
-> > > > > +                                                regulator_desc->name);
-> > > > 
-> > > > of_find_node_by_name() doesn't work that way.  The first argument is a
-> > > > starting point, but it doesn't restrict the search to children of a
-> > > > node.
-> > > > 
-> > > > for_each_child_of_node() is what you want to use when iterating over
-> > > > the children which unfortunately changes the structure of this
-> > > > function.
-> > > > 
-> > > The dev->parent->of_node is meant to point to node 'pmic: mc13892 at 0'.
-> > > And the intention here is not to iterate over the children, but to
-> > > start a search from a reasonable point rather than the top root node.
-> > 
-> > It is always better to attach the of_node at struct device
-> > registration time instead of searching the tree in common code.  The
-> > of_node should already be assigned by the time regulator_register() is
-> > called.
+On Wed, Aug 10, 2011 at 04:31:46PM -0500, Rob Herring wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
 > 
-> That's the problem we have.  There is no 'struct dev' to attach of_node
-> for each regulator by the time regulator_register() is called, because
-> the 'struct dev' for each regulator is created inside
-> regulator_register() as wrapped by 'struct regulator_dev'.
+> This adds devicetree binding support to the ARM pl061 driver removing the
+> platform_data dependency. When DT binding is used, the gpio numbering is
+> assigned dynamically. For now, interrupts are not supported with DT until
+> irqdomains learn dynamic irq assignment.
+> 
+> Rather than add another case of -1, updating the driver to use NO_IRQ.
+> 
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> Cc: Grant Likely <grant.likely@secretlab.ca>
 
-Then regulator_register must be split in half.  This is a common use
-case, and other libraries have had to do the same.  One half to
-allocate the structure, and then a second half for registration, and
-regulator_register() becomes a simpler helper that calls both.  That
-way a caller can insert extra initialization between the two steps.
+Applied, thanks.
 
 g.
+
+> ---
+> 
+> v2:
+> - Add other -1 to NO_IRQ conversions
+> - Drop DT irq support for now
+> 
+>  drivers/gpio/gpio-pl061.c  |   31 +++++++++++++++++++++----------
+>  include/linux/amba/pl061.h |    3 +--
+>  2 files changed, 22 insertions(+), 12 deletions(-)
+> 
+> diff --git a/drivers/gpio/gpio-pl061.c b/drivers/gpio/gpio-pl061.c
+> index 2c5a18f..093c90b 100644
+> --- a/drivers/gpio/gpio-pl061.c
+> +++ b/drivers/gpio/gpio-pl061.c
+> @@ -118,7 +118,7 @@ static int pl061_to_irq(struct gpio_chip *gc, unsigned offset)
+>  {
+>  	struct pl061_gpio *chip = container_of(gc, struct pl061_gpio, gc);
+>  
+> -	if (chip->irq_base == (unsigned) -1)
+> +	if (chip->irq_base == NO_IRQ)
+>  		return -EINVAL;
+>  
+>  	return chip->irq_base + offset;
+> @@ -246,6 +246,18 @@ static int pl061_probe(struct amba_device *dev, const struct amba_id *id)
+>  	if (chip == NULL)
+>  		return -ENOMEM;
+>  
+> +	pdata = dev->dev.platform_data;
+> +	if (pdata) {
+> +		chip->gc.base = pdata->gpio_base;
+> +		chip->irq_base = pdata->irq_base;
+> +	} else if (dev->dev.of_node) {
+> +		chip->gc.base = -1;
+> +		chip->irq_base = NO_IRQ;
+> +	} else {
+> +		ret = -ENODEV;
+> +		goto free_mem;
+> +	}
+> +
+>  	if (!request_mem_region(dev->res.start,
+>  				resource_size(&dev->res), "pl061")) {
+>  		ret = -EBUSY;
+> @@ -267,14 +279,11 @@ static int pl061_probe(struct amba_device *dev, const struct amba_id *id)
+>  	chip->gc.get = pl061_get_value;
+>  	chip->gc.set = pl061_set_value;
+>  	chip->gc.to_irq = pl061_to_irq;
+> -	chip->gc.base = pdata->gpio_base;
+>  	chip->gc.ngpio = PL061_GPIO_NR;
+>  	chip->gc.label = dev_name(&dev->dev);
+>  	chip->gc.dev = &dev->dev;
+>  	chip->gc.owner = THIS_MODULE;
+>  
+> -	chip->irq_base = pdata->irq_base;
+> -
+>  	ret = gpiochip_add(&chip->gc);
+>  	if (ret)
+>  		goto iounmap;
+> @@ -283,7 +292,7 @@ static int pl061_probe(struct amba_device *dev, const struct amba_id *id)
+>  	 * irq_chip support
+>  	 */
+>  
+> -	if (chip->irq_base == (unsigned) -1)
+> +	if (chip->irq_base == NO_IRQ)
+>  		return 0;
+>  
+>  	writeb(0, chip->base + GPIOIE); /* disable irqs */
+> @@ -307,11 +316,13 @@ static int pl061_probe(struct amba_device *dev, const struct amba_id *id)
+>  	list_add(&chip->list, chip_list);
+>  
+>  	for (i = 0; i < PL061_GPIO_NR; i++) {
+> -		if (pdata->directions & (1 << i))
+> -			pl061_direction_output(&chip->gc, i,
+> -					pdata->values & (1 << i));
+> -		else
+> -			pl061_direction_input(&chip->gc, i);
+> +		if (pdata) {
+> +			if (pdata->directions & (1 << i))
+> +				pl061_direction_output(&chip->gc, i,
+> +						pdata->values & (1 << i));
+> +			else
+> +				pl061_direction_input(&chip->gc, i);
+> +		}
+>  
+>  		irq_set_chip_and_handler(i + chip->irq_base, &pl061_irqchip,
+>  					 handle_simple_irq);
+> diff --git a/include/linux/amba/pl061.h b/include/linux/amba/pl061.h
+> index 5ddd9ad..2412af9 100644
+> --- a/include/linux/amba/pl061.h
+> +++ b/include/linux/amba/pl061.h
+> @@ -7,8 +7,7 @@ struct pl061_platform_data {
+>  	unsigned	gpio_base;
+>  
+>  	/* number of the first IRQ.
+> -	 * If the IRQ functionality in not desired this must be set to
+> -	 * (unsigned) -1.
+> +	 * If the IRQ functionality in not desired this must be set to NO_IRQ.
+>  	 */
+>  	unsigned	irq_base;
+>  
+> -- 
+> 1.7.4.1
+> 
