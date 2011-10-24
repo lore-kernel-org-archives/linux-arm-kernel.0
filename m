@@ -1,24 +1,27 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 24 Oct 2011 09:49:01 -0500
-Subject: [PATCH V3 2/2] ARM: at91: add at91sam9g20 and Calao USB A9G20
-	DT support
-In-Reply-To: <d139db89b4e9830e813abf1329ce1ac499653f2c.1319464310.git.nicolas.ferre@atmel.com>
-References: <4E9F8226.4030503@gmail.com>
-	<15ab652499e7f6f8a26724bfd90643a8f3f96ad9.1319464310.git.nicolas.ferre@atmel.com>
-	<d139db89b4e9830e813abf1329ce1ac499653f2c.1319464310.git.nicolas.ferre@atmel.com>
-Message-ID: <4EA57ADD.6000608@gmail.com>
+From: ulf.hansson@stericsson.com (Ulf Hansson)
+Date: Mon, 24 Oct 2011 16:33:18 +0200
+Subject: [PATCH 0/2] mmc: mmci: Improvements for SDIO
+Message-ID: <1319466800-19884-1-git-send-email-ulf.hansson@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/24/2011 09:05 AM, Nicolas Ferre wrote:
-> From: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> 
-> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> ---
+For the ux500v2 variant of the PL18x block, non power of two block
+sizes are now supported.
 
-Looks good.
+In addition constraints on buffer alignments is needed since access to the
+PL18x FIFO must be done on a 4-byte aligned manner. Moreover to be able to
+use DMA for buffers with not 32 bytes aligned sg element lengths, DMAREQCTL
+must enabled.
 
-Reviewed-by: Rob Herring <rob.herring@calxeda.com>
+Per Forlin (1):
+  mmc: mmci: add constraints on alignment for SDIO
 
-Rob
+Stefan Nilsson XK (1):
+  mmc: mmci: Support non-power-of-two block sizes for ux500v2 variant
+
+ drivers/mmc/host/mmci.c |   56 +++++++++++++++++++++++++++++++++++++++++------
+ drivers/mmc/host/mmci.h |    7 ++++++
+ 2 files changed, 56 insertions(+), 7 deletions(-)
+
+-- 
+1.7.5.4
