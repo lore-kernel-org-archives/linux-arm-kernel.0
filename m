@@ -1,38 +1,48 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 24 Oct 2011 15:06:37 +0200
-Subject: [PATCH v2 3/5] regulator: helper routine to extract
-	regulator_init_data
-In-Reply-To: <20111024130429.GD1755@S2100-06.ap.freescale.net>
-References: <1318263578-7407-4-git-send-email-rnayak@ti.com>
-	<20111018132032.GD30703@S2100-06.ap.freescale.net>
-	<4E9EB61C.1040207@ti.com>
-	<20111019144215.GA32007@S2100-06.ap.freescale.net>
-	<4E9FAF42.5060200@ti.com>
-	<20111020061408.GE32007@S2100-06.ap.freescale.net>
-	<4EA00F7C.1080005@ti.com>
-	<20111021082309.GA337@S2100-06.ap.freescale.net>
-	<20111024092411.GE8708@ponder.secretlab.ca>
-	<20111024130429.GD1755@S2100-06.ap.freescale.net>
-Message-ID: <20111024130636.GB26033@opensource.wolfsonmicro.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Mon, 24 Oct 2011 15:06:19 +0200
+Subject: [PATCH] Shrink thread_info a bit
+In-Reply-To: <20111024124818.GA17693@n2100.arm.linux.org.uk>
+References: <20111024124818.GA17693@n2100.arm.linux.org.uk>
+Message-ID: <20111024130619.GE26649@sapphire.tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 24, 2011 at 09:04:31PM +0800, Shawn Guo wrote:
+Hi Russell,
 
-> If we can attach the device_node of 'regulators' node to dev->of_node
-> when calling regulator_register(regulator_desc, dev, ...) from
-> regulator driver, the regulator core will be able to find all nodes under
-> 'regulators' using for_each_child_of_node(dev->of_node, child).
+On Mon, Oct 24, 2011 at 01:48:18PM +0100, Russell King - ARM Linux wrote:
+> Thread info comes in on Versatile Express at 752 bytes in size, which
+> is quite large.  Of this, the crunch state is 184 bytes, which is only
+> used on Cirrus Logic devices.
+> 
+> It is wasteful to have this in every kernel when Cirrus Logic CPUs
+> are not that widely used.  So make this conditional.
+> 
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+>  arch/arm/include/asm/thread_info.h |    2 ++
+>  arch/arm/kernel/asm-offsets.c      |    2 ++
+>  2 files changed, 4 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/thread_info.h b/arch/arm/include/asm/thread_info.h
+> index 7b5cc8d..a030be7 100644
+> --- a/arch/arm/include/asm/thread_info.h
+> +++ b/arch/arm/include/asm/thread_info.h
+> @@ -59,7 +59,9 @@ struct thread_info {
+>  	__u32			syscall;	/* syscall number */
+>  	__u8			used_cp[16];	/* thread used copro */
+>  	unsigned long		tp_value;
+> +#ifdef CONFIG_CRUNCH
+>  	struct crunch_state	crunchstate;
+> +#endif
+>  	union fp_state		fpstate __attribute__((aligned(8)));
+>  	union vfp_state		vfpstate;
+>  #ifdef CONFIG_ARM_THUMBEE
 
-Please provide concrete examples of the bindings you're talking about,
-the really important thing here is how sane the bindings look and I've
-really got no idea what any of what you're talking about will look like
-or if they make sense.
+Where is the arch/arm/kernel/asm-offsets.c hunk?
 
-> hesitate to hack this into mfd_add_devices(), so I would like to add
-> compatible string "fsl,mc13892-regulators" to node 'regulators' and
-> find the node using of_find_compatible_node(dev->parent, NULL,
-> "fsl,mc13892-regulators").
+baruch
 
-It's not immediately obvious to me that having a binding for the
-regulators separately makes sense, it's not a usefully distinct device.
+-- 
+                                                     ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
