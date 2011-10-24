@@ -1,33 +1,55 @@
-From: christian.hitz@aizo.com (Christian Hitz)
-Date: Mon, 24 Oct 2011 08:57:32 +0200
-Subject: [PATCH Resend] arm: at91: fix NAND bus width decoding from system_rev
-Message-ID: <4EA50C5C.2040701@aizo.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 24 Oct 2011 08:58:53 +0200
+Subject: [RFC PATCH 08/15] ARM: uncompress: Rename misc.c to print.c
+In-Reply-To: <1319404245-12740-8-git-send-email-zoss@devai.org>
+References: <1319404245-12740-1-git-send-email-zoss@devai.org>
+	<1319404245-12740-8-git-send-email-zoss@devai.org>
+Message-ID: <20111024065853.GO15299@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make it safe to assign the return value of this function
-to u8/u16 variables.
+On Sun, Oct 23, 2011 at 11:10:38PM +0200, Zoltan Devai wrote:
+> Now that misc.c only holds functions related to printout
+> during decompression, rename it accordingly.
+> 
+> Signed-off-by: Zoltan Devai <zoss@devai.org>
+> ---
+>  arch/arm/boot/compressed/Makefile |    2 +-
+>  arch/arm/boot/compressed/misc.c   |  122 -------------------------------------
+>  arch/arm/boot/compressed/print.c  |  122 +++++++++++++++++++++++++++++++++++++
+If you add -M to git-format-patch this gets much easier to review.
 
-Signed-off-by: Christian Hitz <christian.hitz@aizo.com>
-Cc: Andrew Victor <linux@maxim.org.za>
-Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
----
-  arch/arm/mach-at91/include/mach/system_rev.h |    2 +-
-  1 files changed, 1 insertions(+), 1 deletions(-)
+>  3 files changed, 123 insertions(+), 123 deletions(-)
+>  delete mode 100644 arch/arm/boot/compressed/misc.c
+>  create mode 100644 arch/arm/boot/compressed/print.c
+> 
+> diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
+> index e4f32a8..d955d4f 100644
+> --- a/arch/arm/boot/compressed/Makefile
+> +++ b/arch/arm/boot/compressed/Makefile
+> @@ -23,7 +23,7 @@ endif
+>  
+>  AFLAGS_head.o += -DTEXT_OFFSET=$(TEXT_OFFSET)
+>  HEAD	= head.o
+> -OBJS	+= misc.o decompress.o
+> +OBJS	+= print.o decompress.o
+>  FONTC	= $(srctree)/drivers/video/console/font_acorn_8x8.c
+>  
+>  # string library code (-Os is enforced to keep it much smaller)
+> [...]
+> diff --git a/arch/arm/boot/compressed/print.c b/arch/arm/boot/compressed/print.c
+> new file mode 100644
+> index 0000000..25f0fb2
+> --- /dev/null
+> +++ b/arch/arm/boot/compressed/print.c
+> @@ -0,0 +1,122 @@
+> +/*
+> + * misc.c
+This is wrong.
 
-diff --git a/arch/arm/mach-at91/include/mach/system_rev.h 
-b/arch/arm/mach-at91/include/mach/system_rev.h
-index 8f48660..ec164a4 100644
---- a/arch/arm/mach-at91/include/mach/system_rev.h
-+++ b/arch/arm/mach-at91/include/mach/system_rev.h
-@@ -19,7 +19,7 @@
-  #define BOARD_HAVE_NAND_16BIT	(1 << 31)
-  static inline int board_have_nand_16bit(void)
-  {
--	return system_rev & BOARD_HAVE_NAND_16BIT;
-+	return (system_rev & BOARD_HAVE_NAND_16BIT) ? 1 : 0;
-  }
-   #endif /* __ARCH_SYSTEM_REV_H__ */
+Best regards
+Uwe
+
 -- 
-1.7.4.1
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
