@@ -1,119 +1,229 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Mon, 24 Oct 2011 15:59:50 +0200
-Subject: [PATCH v2 3/5] regulator: helper routine to extract
-	regulator_init_data
-In-Reply-To: <20111024134025.GE1755@S2100-06.ap.freescale.net>
-References: <4E9EB61C.1040207@ti.com>
-	<20111019144215.GA32007@S2100-06.ap.freescale.net>
-	<4E9FAF42.5060200@ti.com>
-	<20111020061408.GE32007@S2100-06.ap.freescale.net>
-	<4EA00F7C.1080005@ti.com>
-	<20111021082309.GA337@S2100-06.ap.freescale.net>
-	<20111024092411.GE8708@ponder.secretlab.ca>
-	<20111024130429.GD1755@S2100-06.ap.freescale.net>
-	<20111024130636.GB26033@opensource.wolfsonmicro.com>
-	<20111024134025.GE1755@S2100-06.ap.freescale.net>
-Message-ID: <20111024135950.GV8708@ponder.secretlab.ca>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 24 Oct 2011 16:05:01 +0200
+Subject: [PATCH V3 2/2] ARM: at91: add at91sam9g20 and Calao USB A9G20 DT
+	support
+In-Reply-To: <15ab652499e7f6f8a26724bfd90643a8f3f96ad9.1319464310.git.nicolas.ferre@atmel.com>
+References: <4E9F8226.4030503@gmail.com>
+	<15ab652499e7f6f8a26724bfd90643a8f3f96ad9.1319464310.git.nicolas.ferre@atmel.com>
+Message-ID: <d139db89b4e9830e813abf1329ce1ac499653f2c.1319464310.git.nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 24, 2011 at 09:40:26PM +0800, Shawn Guo wrote:
-> On Mon, Oct 24, 2011 at 03:06:37PM +0200, Mark Brown wrote:
-> > On Mon, Oct 24, 2011 at 09:04:31PM +0800, Shawn Guo wrote:
-> > 
-> > > If we can attach the device_node of 'regulators' node to dev->of_node
-> > > when calling regulator_register(regulator_desc, dev, ...) from
-> > > regulator driver, the regulator core will be able to find all nodes under
-> > > 'regulators' using for_each_child_of_node(dev->of_node, child).
-> > 
-> > Please provide concrete examples of the bindings you're talking about,
-> > the really important thing here is how sane the bindings look and I've
-> > really got no idea what any of what you're talking about will look like
-> > or if they make sense.
-> > 
-> The only thing different from what I attached last time is the
-> compatible string added to 'regulators' node.
-> 
->         ecspi at 70010000 { /* ECSPI1 */
->                 fsl,spi-num-chipselects = <2>;
->                 cs-gpios = <&gpio3 24 0>, /* GPIO4_24 */
->                            <&gpio3 25 0>; /* GPIO4_25 */
->                 status = "okay";
-> 
->                 pmic: mc13892 at 0 {
->                         #address-cells = <1>;
->                         #size-cells = <0>;
->                         compatible = "fsl,mc13892";
->                         spi-max-frequency = <6000000>;
->                         reg = <0>;
->                         mc13xxx-irq-gpios = <&gpio0 8 0>; /* GPIO1_8 */
-> 
->                         regulators {
->                         	compatible = "fsl,mc13892-regulator";
-> 
->                                 sw1reg: mc13892_sw1 {
->                                         regulator-min-uV = <600000>;
->                                         regulator-max-uV = <1375000>;
->                                         regulator-change-voltage;
->                                         regulator-boot-on;
->                                         regulator-always-on;
->                                 };
-> 
->                                 sw2reg: mc13892_sw2 {
->                                         regulator-min-uV = <900000>;
->                                         regulator-max-uV = <1850000>;
->                                         regulator-change-voltage;
->                                         regulator-boot-on;
->                                         regulator-always-on;
->                                 };
-> 
->                                 ......
->                         };
-> 
->                         leds {
->                                 ......
->                         };
-> 
->                         buttons {
->                                 ......
->                         };
->                 };
-> 
->                 flash: at45db321d at 1 {
->                         ......
->                 };
->         };
-> 
-> > > hesitate to hack this into mfd_add_devices(), so I would like to add
-> > > compatible string "fsl,mc13892-regulators" to node 'regulators' and
-> > > find the node using of_find_compatible_node(dev->parent, NULL,
-> > > "fsl,mc13892-regulators").
-> > 
-> > It's not immediately obvious to me that having a binding for the
-> > regulators separately makes sense, it's not a usefully distinct device.
-> > 
-> Fair point.  Actually, I also hate to have the finding of node
-> 'regulators' plugged into regulator driver.  What about following
-> change to address Grant's concern on global device tree search?
->  
-> diff --git a/drivers/regulator/core.c b/drivers/regulator/core.c
-> index 8fe132d..29dcf90 100644
-> --- a/drivers/regulator/core.c
-> +++ b/drivers/regulator/core.c
-> @@ -2673,7 +2673,8 @@ struct regulator_dev *regulator_register(struct regulator_desc *regulator_desc,
->         BLOCKING_INIT_NOTIFIER_HEAD(&rdev->notifier);
-> 
->         /* find device_node and attach it */
-> -       rdev->dev.of_node = of_find_node_by_name(NULL, regulator_desc->name);
-> +       rdev->dev.of_node = of_find_node_by_name(dev->parent->of_node,
-> +                                                regulator_desc->name);
+From: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 
-of_find_node_by_name() doesn't work that way.  The first argument is a
-starting point, but it doesn't restrict the search to children of a
-node.
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ arch/arm/boot/dts/at91sam9g20.dtsi |  119 ++++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/usb_a9g20.dts    |   30 +++++++++
+ arch/arm/mach-at91/Makefile.boot   |    2 +-
+ arch/arm/mach-at91/at91sam9260.c   |    8 +++
+ arch/arm/mach-at91/board-dt.c      |    1 +
+ 5 files changed, 159 insertions(+), 1 deletions(-)
+ create mode 100644 arch/arm/boot/dts/at91sam9g20.dtsi
+ create mode 100644 arch/arm/boot/dts/usb_a9g20.dts
 
-for_each_child_of_node() is what you want to use when iterating over
-the children which unfortunately changes the structure of this
-function.
-
-g.
+diff --git a/arch/arm/boot/dts/at91sam9g20.dtsi b/arch/arm/boot/dts/at91sam9g20.dtsi
+new file mode 100644
+index 0000000..aeef042
+--- /dev/null
++++ b/arch/arm/boot/dts/at91sam9g20.dtsi
+@@ -0,0 +1,119 @@
++/*
++ * at91sam9g20.dtsi - Device Tree Include file for AT91SAM9G20 family SoC
++ *
++ *  Copyright (C) 2011 Atmel,
++ *                2011 Nicolas Ferre <nicolas.ferre@atmel.com>,
++ *                2011 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
++ *
++ * Licensed under GPLv2 or later.
++ */
++
++/include/ "skeleton.dtsi"
++
++/ {
++	model = "Atmel AT91SAM9G20 family SoC";
++	compatible = "atmel,at91sam9g20";
++	interrupt-parent = <&aic>;
++
++	aliases {
++		serial0 = &dbgu;
++		serial1 = &usart0;
++		serial2 = &usart1;
++		serial3 = &usart2;
++		serial4 = &usart3;
++		serial5 = &usart4;
++		serial6 = &usart5;
++	};
++	cpus {
++		cpu at 0 {
++			compatible = "arm,arm926ejs";
++		};
++	};
++
++	memory at 20000000 {
++		reg = <0x20000000 0x08000000>;
++	};
++
++	ahb {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
++
++		apb {
++			compatible = "simple-bus";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges;
++
++			aic: interrupt-controller at fffff000 {
++				#interrupt-cells = <1>;
++				compatible = "atmel,at91rm9200-aic";
++				interrupt-controller;
++				interrupt-parent;
++				reg = <0xfffff000 0x200>;
++			};
++
++			dbgu: serial at fffff200 {
++				compatible = "atmel,at91sam9260-usart";
++				reg = <0xfffff200 0x200>;
++				interrupts = <1>;
++				status = "disabled";
++			};
++
++			usart0: serial at fffb0000 {
++				compatible = "atmel,at91sam9260-usart";
++				reg = <0xfffb0000 0x200>;
++				interrupts = <6>;
++				atmel,use-dma-rx;
++				atmel,use-dma-tx;
++				status = "disabled";
++			};
++
++			usart1: serial at fffb4000 {
++				compatible = "atmel,at91sam9260-usart";
++				reg = <0xfffb4000 0x200>;
++				interrupts = <7>;
++				atmel,use-dma-rx;
++				atmel,use-dma-tx;
++				status = "disabled";
++			};
++
++			usart2: serial at fffb8000 {
++				compatible = "atmel,at91sam9260-usart";
++				reg = <0xfffb8000 0x200>;
++				interrupts = <8>;
++				atmel,use-dma-rx;
++				atmel,use-dma-tx;
++				status = "disabled";
++			};
++
++			usart3: serial at fffd0000 {
++				compatible = "atmel,at91sam9260-usart";
++				reg = <0xfffd0000 0x200>;
++				interrupts = <23>;
++				atmel,use-dma-rx;
++				atmel,use-dma-tx;
++				status = "disabled";
++			};
++
++			usart4: serial at fffd4000 {
++				compatible = "atmel,at91sam9260-usart";
++				reg = <0xfffd4000 0x200>;
++				interrupts = <24>;
++				atmel,use-dma-rx;
++				atmel,use-dma-tx;
++				status = "disabled";
++			};
++
++			usart5: serial at fffd8000 {
++				compatible = "atmel,at91sam9260-usart";
++				reg = <0xfffd8000 0x200>;
++				interrupts = <25>;
++				atmel,use-dma-rx;
++				atmel,use-dma-tx;
++				status = "disabled";
++			};
++		};
++	};
++};
+diff --git a/arch/arm/boot/dts/usb_a9g20.dts b/arch/arm/boot/dts/usb_a9g20.dts
+new file mode 100644
+index 0000000..a060f6c
+--- /dev/null
++++ b/arch/arm/boot/dts/usb_a9g20.dts
+@@ -0,0 +1,30 @@
++/*
++ * usb_a9g20.dts - Device Tree file for Caloa USB A9G20 board
++ *
++ *  Copyright (C) 2011 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
++ *
++ * Licensed under GPLv2 or later.
++ */
++/dts-v1/;
++/include/ "at91sam9g20.dtsi"
++
++/ {
++	model = "Calao USB A9G20";
++	compatible = "calao,usb-a9g20", "atmel,at91sam9g20", "atmel,at91sam9";
++
++	chosen {
++		bootargs = "mem=64M console=ttyS0,115200 mtdparts=atmel_nand:128k(at91bootstrap),256k(barebox)ro,128k(bareboxenv),128k(bareboxenv2),4M(kernel),120M(rootfs),-(data) root=/dev/mtdblock5 rw rootfstype=ubifs";
++	};
++
++	memory at 70000000 {
++		reg = <0x20000000 0x4000000>;
++	};
++
++	ahb {
++		apb {
++			dbgu: serial at fffff200 {
++				status = "okay";
++			};
++		};
++	};
++};
+diff --git a/arch/arm/mach-at91/Makefile.boot b/arch/arm/mach-at91/Makefile.boot
+index d278863..08c665a 100644
+--- a/arch/arm/mach-at91/Makefile.boot
++++ b/arch/arm/mach-at91/Makefile.boot
+@@ -17,4 +17,4 @@ params_phys-y	:= 0x20000100
+ initrd_phys-y	:= 0x20410000
+ endif
+ 
+-dtb-$(CONFIG_MACH_AT91SAM_DT) += at91sam9m10g45ek.dtb
++dtb-$(CONFIG_MACH_AT91SAM_DT) += at91sam9m10g45ek.dtb usb_a9g20.dtb
+diff --git a/arch/arm/mach-at91/at91sam9260.c b/arch/arm/mach-at91/at91sam9260.c
+index cb397be..f4518b4 100644
+--- a/arch/arm/mach-at91/at91sam9260.c
++++ b/arch/arm/mach-at91/at91sam9260.c
+@@ -199,6 +199,14 @@ static struct clk_lookup periph_clocks_lookups[] = {
+ 	CLKDEV_CON_DEV_ID("t4_clk", "atmel_tcb.1", &tc4_clk),
+ 	CLKDEV_CON_DEV_ID("t5_clk", "atmel_tcb.1", &tc5_clk),
+ 	CLKDEV_CON_DEV_ID("pclk", "ssc.0", &ssc_clk),
++	/* more usart lookup table for DT entries */
++	CLKDEV_CON_DEV_ID("usart", "fffff200.serial", &mck),
++	CLKDEV_CON_DEV_ID("usart", "fffb0000.serial", &usart0_clk),
++	CLKDEV_CON_DEV_ID("usart", "fffb4000.serial", &usart1_clk),
++	CLKDEV_CON_DEV_ID("usart", "fffb8000.serial", &usart2_clk),
++	CLKDEV_CON_DEV_ID("usart", "fffd0000.serial", &usart3_clk),
++	CLKDEV_CON_DEV_ID("usart", "fffd4000.serial", &usart4_clk),
++	CLKDEV_CON_DEV_ID("usart", "fffd8000.serial", &usart5_clk),
+ };
+ 
+ static struct clk_lookup usart_clocks_lookups[] = {
+diff --git a/arch/arm/mach-at91/board-dt.c b/arch/arm/mach-at91/board-dt.c
+index 77fe466..a3d22f8 100644
+--- a/arch/arm/mach-at91/board-dt.c
++++ b/arch/arm/mach-at91/board-dt.c
+@@ -108,6 +108,7 @@ static void __init at91_dt_device_init(void)
+ 
+ static const char *at91_dt_board_compat[] __initdata = {
+ 	"atmel,at91sam9m10g45ek",
++	"calao,usb-a9g20",
+ 	NULL
+ };
+ 
+-- 
+1.7.5.4
