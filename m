@@ -1,52 +1,47 @@
-From: rusty@rustcorp.com.au (Rusty Russell)
-Date: Mon, 24 Oct 2011 13:03:06 +1030
-Subject: [PATCH v3] virtio: Add platform bus driver for memory mapped
-	virtio device
-In-Reply-To: <1319219844.5094.16.camel@hornet.cambridge.arm.com>
-References: <1317841030-17758-1-git-send-email-pawel.moll@arm.com>
-	<1317919843-8343-1-git-send-email-pawel.moll@arm.com>
-	<1317921230.28696.102.camel@hornet.cambridge.arm.com>
-	<87lisjq6tu.fsf@rustcorp.com.au>
-	<1318931075.3146.285.camel@hornet.cambridge.arm.com>
-	<87ty75adtb.fsf@rustcorp.com.au>
-	<1319219844.5094.16.camel@hornet.cambridge.arm.com>
-Message-ID: <87wrbv15lp.fsf@rustcorp.com.au>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Mon, 24 Oct 2011 11:32:19 +0530
+Subject: [PATCH v2 3/5] regulator: helper routine to extract
+	regulator_init_data
+In-Reply-To: <20111021115809.GB337@S2100-06.ap.freescale.net>
+References: <1318263578-7407-1-git-send-email-rnayak@ti.com>
+	<1318263578-7407-4-git-send-email-rnayak@ti.com>
+	<20111018132032.GD30703@S2100-06.ap.freescale.net>
+	<4E9EB61C.1040207@ti.com>
+	<20111019144215.GA32007@S2100-06.ap.freescale.net>
+	<4E9FAF42.5060200@ti.com>
+	<20111020061408.GE32007@S2100-06.ap.freescale.net>
+	<4EA00F7C.1080005@ti.com>
+	<20111021082309.GA337@S2100-06.ap.freescale.net>
+	<4EA13053.7080306@ti.com>
+	<20111021115809.GB337@S2100-06.ap.freescale.net>
+Message-ID: <4EA4FF6B.2080906@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 21 Oct 2011 18:57:24 +0100, Pawel Moll <pawel.moll@arm.com> wrote:
-> On Wed, 2011-10-19 at 03:57 +0100, Rusty Russell wrote:
-> > > Oh, really? My host-side implementation is just doing that:
-> > > 
-> > >         addr += align - 1;
-> > >         addr &= ~(align - 1);
-> > 
-> > OK, so you're assuming power of 2.  Make sure you kill the guest or at
-> > least the device if it's not though.
-> 
-> Yep, I have assertions all around such places :-) (it's a non-production
-> code yet so I can do that)
-> 
-> > > \item The dynamic configuration changes, as described in p. 2.4.3
-> > > ``Dealing With Configuration Changes'' are not permitted.
-> > 
-> > This means some devices simply won't work, at least in theory.  Why
-> > don't you support this?
-> 
-> Uh. I simply forgot about it - my Host block device doesn't do that, so
-> I ignored that feature initially and then it slipped through cracks. And
-> till now I didn't realize that most of the drivers actually use this :-O
-> My fault.
-> 
-> Simple to fix anyway - I'll just add InterruptStatus register and use
-> second bit (same with InterruptACK) to get this through. Will be done on
-> Monday.
-> 
-> Any other final complaints regarding the interface while I'm on it? ;-)
+On Friday 21 October 2011 05:28 PM, Shawn Guo wrote:
+> On Fri, Oct 21, 2011 at 02:11:55PM +0530, Rajendra Nayak wrote:
+> [...]
+>>> +       /* find device_node and attach it */
+>>> +       rdev->dev.of_node = of_find_node_by_name(NULL, regulator_desc->name);
+>>
+>> so would this do a complete dt search for every regulator?
+>
+> Yes, with the first param being NULL, tthe entire device tree will be
+> searched.
+>
+>> we would also need the driver names and dt names to match for this to
+>> work, right?
+>>
+> Driver name does not matter.  The key for this search to work is having
+> regulator's name (regulator_desc->name) match device tree node's name,
+> case ignored.
 
-No, that's it I think.  Please send a diff for the documentation, since
-I'm updating the LyX master and I've already applied your previous
-version.
+Mark, whats your take on this? I am somehow not quite sure if we should
+have this limitation put in to match DT node names with whats in the
+driver structs (regulator_desc).
 
-Thanks!
-Rusty.
+>
+>> The approach otherwise looks fine to me and should work for both cases
+>> of one device per regulator and one device for all regulators.
+>>
+>
