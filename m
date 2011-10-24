@@ -1,162 +1,170 @@
 From: nico@fluxnic.net (Nicolas Pitre)
-Date: Mon, 24 Oct 2011 05:49:58 -0400
-Subject: [PATCH 09/12] ARM: s3c24xx: move special idle code to a proper
-	out-of-line pm_idle hooks
+Date: Mon, 24 Oct 2011 05:50:01 -0400
+Subject: [PATCH 12/12] ARM: imx: move special idle code to proper out-of-line
+	pm_idle hooks
 In-Reply-To: <1319449801-12367-1-git-send-email-nico@fluxnic.net>
 References: <1319449801-12367-1-git-send-email-nico@fluxnic.net>
-Message-ID: <1319449801-12367-10-git-send-email-nico@fluxnic.net>
+Message-ID: <1319449801-12367-13-git-send-email-nico@fluxnic.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
 ---
- arch/arm/mach-s3c2410/include/mach/system.h |   30 ---------------------------
- arch/arm/mach-s3c2412/s3c2412.c             |    4 +-
- arch/arm/mach-s3c2416/s3c2416.c             |    2 -
- arch/arm/plat-s3c24xx/cpu.c                 |   30 +++++++++++++++++++++++++++
- 4 files changed, 32 insertions(+), 34 deletions(-)
+ arch/arm/mach-imx/Makefile              |    4 +-
+ arch/arm/mach-imx/idle-mx3.c            |   31 +++++++++++++++++++++++++++++
+ arch/arm/mach-imx/mm-imx31.c            |    1 +
+ arch/arm/mach-imx/mm-imx35.c            |    1 +
+ arch/arm/mach-mx5/clock-mx51-mx53.c     |    7 ++++++
+ arch/arm/plat-mxc/include/mach/system.h |   33 +------------------------------
+ 6 files changed, 43 insertions(+), 34 deletions(-)
+ create mode 100644 arch/arm/mach-imx/idle-mx3.c
 
-diff --git a/arch/arm/mach-s3c2410/include/mach/system.h b/arch/arm/mach-s3c2410/include/mach/system.h
-index a8cbca6701..0c394dd671 100644
---- a/arch/arm/mach-s3c2410/include/mach/system.h
-+++ b/arch/arm/mach-s3c2410/include/mach/system.h
-@@ -19,40 +19,10 @@
+diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
+index e9eb36dad8..8caa83be15 100644
+--- a/arch/arm/mach-imx/Makefile
++++ b/arch/arm/mach-imx/Makefile
+@@ -8,8 +8,8 @@ obj-$(CONFIG_ARCH_MX25) += clock-imx25.o mm-imx25.o ehci-imx25.o
+ obj-$(CONFIG_MACH_MX27) += cpu-imx27.o pm-imx27.o
+ obj-$(CONFIG_MACH_MX27) += clock-imx27.o mm-imx27.o ehci-imx27.o
  
- #include <mach/regs-clock.h>
+-obj-$(CONFIG_SOC_IMX31) += mm-imx31.o cpu-imx31.o clock-imx31.o iomux-imx31.o ehci-imx31.o
+-obj-$(CONFIG_SOC_IMX35) += mm-imx35.o cpu-imx35.o clock-imx35.o ehci-imx35.o
++obj-$(CONFIG_SOC_IMX31) += mm-imx31.o cpu-imx31.o clock-imx31.o iomux-imx31.o ehci-imx31.o idle-mx3.o
++obj-$(CONFIG_SOC_IMX35) += mm-imx35.o cpu-imx35.o clock-imx35.o ehci-imx35.o idle-mx3.o
+ obj-$(CONFIG_CACHE_L2X0) += cache-l2x0.o
  
--void (*s3c24xx_idle)(void);
- void (*s3c24xx_reset_hook)(void);
- 
--void s3c24xx_default_idle(void)
--{
--	unsigned long tmp;
--	int i;
--
--	/* idle the system by using the idle mode which will wait for an
--	 * interrupt to happen before restarting the system.
--	 */
--
--	/* Warning: going into idle state upsets jtag scanning */
--
--	__raw_writel(__raw_readl(S3C2410_CLKCON) | S3C2410_CLKCON_IDLE,
--		     S3C2410_CLKCON);
--
--	/* the samsung port seems to do a loop and then unset idle.. */
--	for (i = 0; i < 50; i++) {
--		tmp += __raw_readl(S3C2410_CLKCON); /* ensure loop not optimised out */
--	}
--
--	/* this bit is not cleared on re-start... */
--
--	__raw_writel(__raw_readl(S3C2410_CLKCON) & ~S3C2410_CLKCON_IDLE,
--		     S3C2410_CLKCON);
--}
--
- static void arch_idle(void)
- {
--	if (s3c24xx_idle != NULL)
--		(s3c24xx_idle)();
--	else
--		s3c24xx_default_idle();
- }
- 
- #include <mach/system-reset.h>
-diff --git a/arch/arm/mach-s3c2412/s3c2412.c b/arch/arm/mach-s3c2412/s3c2412.c
-index ef0958d3e5..c9018fbf67 100644
---- a/arch/arm/mach-s3c2412/s3c2412.c
-+++ b/arch/arm/mach-s3c2412/s3c2412.c
-@@ -33,7 +33,6 @@
- #include <asm/irq.h>
- 
- #include <mach/reset.h>
--#include <mach/idle.h>
- 
- #include <plat/cpu-freq.h>
- 
-@@ -129,6 +128,7 @@ static void s3c2412_idle(void)
- 	__raw_writel(tmp, S3C2412_PWRCFG);
- 
- 	cpu_do_idle();
-+	local_irq_enable();
- }
- 
- static void s3c2412_hard_reset(void)
-@@ -162,7 +162,7 @@ void __init s3c2412_map_io(void)
- 
- 	/* set our idle function */
- 
--	s3c24xx_idle = s3c2412_idle;
-+	pm_idle = s3c2412_idle;
- 
- 	/* set custom reset hook */
- 
-diff --git a/arch/arm/mach-s3c2416/s3c2416.c b/arch/arm/mach-s3c2416/s3c2416.c
-index 494ce913dc..5b0ab08d5a 100644
---- a/arch/arm/mach-s3c2416/s3c2416.c
-+++ b/arch/arm/mach-s3c2416/s3c2416.c
-@@ -45,7 +45,6 @@
- #include <asm/irq.h>
- 
- #include <mach/reset.h>
--#include <mach/idle.h>
- #include <mach/regs-s3c2443-clock.h>
- 
- #include <plat/gpio-core.h>
-@@ -85,7 +84,6 @@ int __init s3c2416_init(void)
- 	printk(KERN_INFO "S3C2416: Initializing architecture\n");
- 
- 	s3c24xx_reset_hook = s3c2416_hard_reset;
--	/* s3c24xx_idle = s3c2416_idle;	*/
- 
- 	/* change WDT IRQ number */
- 	s3c_device_wdt.resource[1].start = IRQ_S3C2443_WDT;
-diff --git a/arch/arm/plat-s3c24xx/cpu.c b/arch/arm/plat-s3c24xx/cpu.c
-index c1fc6c6fac..21ac7de906 100644
---- a/arch/arm/plat-s3c24xx/cpu.c
-+++ b/arch/arm/plat-s3c24xx/cpu.c
-@@ -192,6 +192,35 @@ static unsigned long s3c24xx_read_idcode_v4(void)
- 	return __raw_readl(S3C2410_GSTATUS1);
- }
- 
-+static void s3c24xx_default_idle(void)
+ # Support for CMOS sensor interface
+diff --git a/arch/arm/mach-imx/idle-mx3.c b/arch/arm/mach-imx/idle-mx3.c
+new file mode 100644
+index 0000000000..580b4075fd
+--- /dev/null
++++ b/arch/arm/mach-imx/idle-mx3.c
+@@ -0,0 +1,31 @@
++#include <mach/hardware.h>
++#include <mach/common.h>
++
++void mx3_idle(void)
 +{
-+	unsigned long tmp;
-+	int i;
-+
-+	/* idle the system by using the idle mode which will wait for an
-+	 * interrupt to happen before restarting the system.
-+	 */
-+
-+	/* Warning: going into idle state upsets jtag scanning */
-+
-+	__raw_writel(__raw_readl(S3C2410_CLKCON) | S3C2410_CLKCON_IDLE,
-+		     S3C2410_CLKCON);
-+
-+	/* the samsung port seems to do a loop and then unset idle.. */
-+	for (i = 0; i < 50; i++) {
-+		tmp += __raw_readl(S3C2410_CLKCON); /* ensure loop not optimised out */
-+	}
-+
-+	/* this bit is not cleared on re-start... */
-+
-+	__raw_writel(__raw_readl(S3C2410_CLKCON) & ~S3C2410_CLKCON_IDLE,
-+		     S3C2410_CLKCON);
-+
-+	/* return with IRQs enabled */
-+	local_irq_enable();
++	/* fix i.MX31 errata TLSbo65953 and i.MX35 errata ENGcm09472 */
++	unsigned long reg = 0;
++	__asm__ __volatile__(
++	/* disable I and D cache */
++	"mrc p15, 0, %0, c1, c0, 0\n"
++	"bic %0, %0, #0x00001000\n"
++	"bic %0, %0, #0x00000004\n"
++	"mcr p15, 0, %0, c1, c0, 0\n"
++	/* invalidate I cache */
++	"mov %0, #0\n"
++	"mcr p15, 0, %0, c7, c5, 0\n"
++	/* clear and invalidate D cache */
++	"mov %0, #0\n"
++	"mcr p15, 0, %0, c7, c14, 0\n"
++	/* WFI */
++	"mov %0, #0\n"
++	"mcr p15, 0, %0, c7, c0, 4\n"
++	"nop\n" "nop\n" "nop\n" "nop\n"
++	"nop\n" "nop\n" "nop\n"
++	/* enable I and D cache */
++	"mrc p15, 0, %0, c1, c0, 0\n"
++	"orr %0, %0, #0x00001000\n"
++	"orr %0, %0, #0x00000004\n"
++	"mcr p15, 0, %0, c1, c0, 0\n"
++	: "=r" (reg));
++}
+diff --git a/arch/arm/mach-imx/mm-imx31.c b/arch/arm/mach-imx/mm-imx31.c
+index b7c55e7db0..4855e99b2c 100644
+--- a/arch/arm/mach-imx/mm-imx31.c
++++ b/arch/arm/mach-imx/mm-imx31.c
+@@ -51,6 +51,7 @@ void __init imx31_init_early(void)
+ {
+ 	mxc_set_cpu_type(MXC_CPU_MX31);
+ 	mxc_arch_reset_init(MX31_IO_ADDRESS(MX31_WDOG_BASE_ADDR));
++	pm_idle = mx3_idle;
+ }
+ 
+ void __init mx31_init_irq(void)
+diff --git a/arch/arm/mach-imx/mm-imx35.c b/arch/arm/mach-imx/mm-imx35.c
+index f49bac7a1e..f20fed6954 100644
+--- a/arch/arm/mach-imx/mm-imx35.c
++++ b/arch/arm/mach-imx/mm-imx35.c
+@@ -48,6 +48,7 @@ void __init imx35_init_early(void)
+ 	mxc_set_cpu_type(MXC_CPU_MX35);
+ 	mxc_iomux_v3_init(MX35_IO_ADDRESS(MX35_IOMUXC_BASE_ADDR));
+ 	mxc_arch_reset_init(MX35_IO_ADDRESS(MX35_WDOG_BASE_ADDR));
++	pm_idle = mx3_idle;
+ }
+ 
+ void __init mx35_init_irq(void)
+diff --git a/arch/arm/mach-mx5/clock-mx51-mx53.c b/arch/arm/mach-mx5/clock-mx51-mx53.c
+index f7bf996f46..c57bd92764 100644
+--- a/arch/arm/mach-mx5/clock-mx51-mx53.c
++++ b/arch/arm/mach-mx5/clock-mx51-mx53.c
+@@ -1529,6 +1529,11 @@ static void clk_tree_init(void)
+ 	__raw_writel(reg, MXC_CCM_CBCDR);
+ }
+ 
++static void mx51_idle(void)
++{
++	mx5_cpu_lp_set(WAIT_UNCLOCKED_POWER_OFF);
 +}
 +
+ int __init mx51_clocks_init(unsigned long ckil, unsigned long osc,
+ 			unsigned long ckih1, unsigned long ckih2)
+ {
+@@ -1569,6 +1574,8 @@ int __init mx51_clocks_init(unsigned long ckil, unsigned long osc,
+ 	/* System timer */
+ 	mxc_timer_init(&gpt_clk, MX51_IO_ADDRESS(MX51_GPT1_BASE_ADDR),
+ 		MX51_MXC_INT_GPT);
 +
- /* Hook for arm_pm_restart to ensure we execute the reset code
-  * with the caches enabled. It seems@least the S3C2440 has a problem
-  * resetting if there is bus activity interrupted by the reset.
-@@ -227,6 +256,7 @@ void __init s3c24xx_init_io(struct map_desc *mach_desc, int size)
- 		idcode = s3c24xx_read_idcode_v4();
- 	}
++	pm_idle = mx51_idle;
+ 	return 0;
+ }
  
-+	pm_idle = s3c24xx_default_idle;
- 	arm_pm_restart = s3c24xx_pm_restart;
+diff --git a/arch/arm/plat-mxc/include/mach/system.h b/arch/arm/plat-mxc/include/mach/system.h
+index 51f02a9d41..89d08c51ca 100644
+--- a/arch/arm/plat-mxc/include/mach/system.h
++++ b/arch/arm/plat-mxc/include/mach/system.h
+@@ -20,40 +20,9 @@
+ #include <mach/hardware.h>
+ #include <mach/common.h>
  
- 	s3c_init_cpu(idcode, cpu_ids, ARRAY_SIZE(cpu_ids));
+-extern void mx5_cpu_lp_set(enum mxc_cpu_pwr_mode mode);
+-
+ static inline void arch_idle(void)
+ {
+-	/* fix i.MX31 errata TLSbo65953 and i.MX35 errata ENGcm09472 */
+-	if (cpu_is_mx31() || cpu_is_mx35()) {
+-		unsigned long reg = 0;
+-		__asm__ __volatile__(
+-			/* disable I and D cache */
+-			"mrc p15, 0, %0, c1, c0, 0\n"
+-			"bic %0, %0, #0x00001000\n"
+-			"bic %0, %0, #0x00000004\n"
+-			"mcr p15, 0, %0, c1, c0, 0\n"
+-			/* invalidate I cache */
+-			"mov %0, #0\n"
+-			"mcr p15, 0, %0, c7, c5, 0\n"
+-			/* clear and invalidate D cache */
+-			"mov %0, #0\n"
+-			"mcr p15, 0, %0, c7, c14, 0\n"
+-			/* WFI */
+-			"mov %0, #0\n"
+-			"mcr p15, 0, %0, c7, c0, 4\n"
+-			"nop\n" "nop\n" "nop\n" "nop\n"
+-			"nop\n" "nop\n" "nop\n"
+-			/* enable I and D cache */
+-			"mrc p15, 0, %0, c1, c0, 0\n"
+-			"orr %0, %0, #0x00001000\n"
+-			"orr %0, %0, #0x00000004\n"
+-			"mcr p15, 0, %0, c1, c0, 0\n"
+-			: "=r" (reg));
+-	} else if (cpu_is_mx51())
+-		mx5_cpu_lp_set(WAIT_UNCLOCKED_POWER_OFF);
+-	else
+-		cpu_do_idle();
++	cpu_do_idle();
+ }
+ 
+ void arch_reset(char mode, const char *cmd);
 -- 
 1.7.7.1.431.g10b2a
