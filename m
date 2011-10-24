@@ -1,74 +1,56 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 24 Oct 2011 16:08:14 +0100
-Subject: [PATCH v5 3/7] arm: perf: support device with other non-irq
-	resources
-In-Reply-To: <1319467559-5518-4-git-send-email-ming.lei@canonical.com>
-References: <1319467559-5518-1-git-send-email-ming.lei@canonical.com>
-	<1319467559-5518-4-git-send-email-ming.lei@canonical.com>
-Message-ID: <20111024150814.GA4771@mudshark.cambridge.arm.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 24 Oct 2011 17:16:49 +0200
+Subject: [PATCH V5 1/3] SDHCI: S3C: Use generic clock names for sdhci
+	bus clock options
+In-Reply-To: <1318588126-19167-2-git-send-email-rajeshwari.s@samsung.com>
+References: <1318588126-19167-1-git-send-email-rajeshwari.s@samsung.com>
+	<1318588126-19167-2-git-send-email-rajeshwari.s@samsung.com>
+Message-ID: <4EA58161.30603@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ming Lei,
-
-On Mon, Oct 24, 2011 at 03:45:55PM +0100, ming.lei at canonical.com wrote:
-> From: Ming Lei <ming.lei@canonical.com>
-> 
-> omap4 may create device via hwmod, which can create resources
-> automatically, so may include some non-irq resources.
-> 
-> This patch supports device with other non-irq resources.
-
-I'd rather not do this in the Perf code since we're essentially dealing with
-an artifact of the hwmod -> platform_device conversion.
-
-> Signed-off-by: Ming Lei <ming.lei@canonical.com>
+On 10/14/11 12:28, Rajeshwari Shinde wrote:
+> This patch modifies the driver to stop depending on the clock names
+> being passed from the platform and switch over to bus clock lookup
+> using generic clock names.
+>
+> Signed-off-by: Rajeshwari Shinde<rajeshwari.s@samsung.com>
 > ---
->  arch/arm/kernel/perf_event.c |    5 +++--
->  arch/arm/kernel/pmu.c        |   12 ++++++++++--
->  2 files changed, 13 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
-> index f367780..d91dba2 100644
-> --- a/arch/arm/kernel/perf_event.c
-> +++ b/arch/arm/kernel/perf_event.c
-> @@ -19,6 +19,7 @@
->  #include <linux/platform_device.h>
->  #include <linux/spinlock.h>
->  #include <linux/uaccess.h>
-> +#include <linux/cpumask.h>
->  
->  #include <asm/cputype.h>
->  #include <asm/irq.h>
-> @@ -414,7 +415,7 @@ armpmu_reserve_hardware(void)
->  		return -ENODEV;
->  	}
->  
-> -	for (i = 0; i < pmu_device->num_resources; ++i) {
-> +	for (i = 0; i < nr_cpu_ids; ++i) {
->  		irq = platform_get_irq(pmu_device, i);
->  		if (irq < 0)
->  			continue;
+>   drivers/mmc/host/sdhci-s3c.c |    6 ++----
+>   1 files changed, 2 insertions(+), 4 deletions(-)
+>
+> diff --git a/drivers/mmc/host/sdhci-s3c.c b/drivers/mmc/host/sdhci-s3c.c
+> index 82709b6..a5fde87 100644
+> --- a/drivers/mmc/host/sdhci-s3c.c
+> +++ b/drivers/mmc/host/sdhci-s3c.c
+> @@ -435,14 +435,12 @@ static int __devinit sdhci_s3c_probe(struct platform_device *pdev)
+>
+>   	for (clks = 0, ptr = 0; ptr<  MAX_BUS_CLK; ptr++) {
+>   		struct clk *clk;
+> -		char *name = pdata->clocks[ptr];
+> +		char name[14];
+>
+> -		if (name == NULL)
+> -			continue;
+> +		sprintf(name, "mmc_busclk.%d", ptr);
+>
+>   		clk = clk_get(dev, name);
+>   		if (IS_ERR(clk)) {
+> -			dev_err(dev, "failed to get clock %s\n", name);
+>   			continue;
+>   		}
+>
 
-Hmm, I actually changed this code recently. Take a look:
+Looks ok for me.
 
-https://github.com/wdeacon/linux-wd/blob/perf/system-pmus/arch/arm/kernel/perf_event.c
+Chris, if you're ok on this, could you please add this in your tree for 
+this merge window? or if you want, I will apply this to Samsung tree 
+with other Rajeshwari's patches. I'm ok either...
 
-This should all be in for 3.2-rc1, so you can rebase then. If you still have
-hwmod issues, please solve them outside of perf_event.c
+Thanks.
 
-> diff --git a/arch/arm/kernel/pmu.c b/arch/arm/kernel/pmu.c
-> index c53474f..0e9c908 100644
-> --- a/arch/arm/kernel/pmu.c
-> +++ b/arch/arm/kernel/pmu.c
-> @@ -19,6 +19,7 @@
->  #include <linux/module.h>
->  #include <linux/of_device.h>
->  #include <linux/platform_device.h>
-> +#include <linux/cpumask.h>
-
-'fraid I've changed this file too!
-
-https://github.com/wdeacon/linux-wd/blob/perf/system-pmus/arch/arm/kernel/pmu.c
-
-Will
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
