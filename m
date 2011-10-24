@@ -1,55 +1,46 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 24 Oct 2011 08:58:53 +0200
-Subject: [RFC PATCH 08/15] ARM: uncompress: Rename misc.c to print.c
-In-Reply-To: <1319404245-12740-8-git-send-email-zoss@devai.org>
-References: <1319404245-12740-1-git-send-email-zoss@devai.org>
-	<1319404245-12740-8-git-send-email-zoss@devai.org>
-Message-ID: <20111024065853.GO15299@pengutronix.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 24 Oct 2011 09:26:38 +0200
+Subject: [PATCH] drivers: create a pin control subsystem v8
+In-Reply-To: <CAMjpGUe9abPsdWbum2MRzOV2b5_2FDqXZC-K0KThRA6MNTr4FA@mail.gmail.com>
+References: <1317211419-18472-1-git-send-email-linus.walleij@stericsson.com>
+	<20110930020754.GK12606@ponder.secretlab.ca>
+	<CACRpkdYyyqB6=5M8reqgwpMxXJz5ttXWyOav6K58dQ0CrxwCNA@mail.gmail.com>
+	<CACxGe6v19pZ0i-+ksYZbG2ZvGT30UkXEHTzpZMBTB4RNUV5bnA@mail.gmail.com>
+	<CAKnu2MpQ8Wvd4TF8Ge=o8ACyEoaEY8TcvOSdT1w6zfYiSKFUiw@mail.gmail.com>
+	<20111004203520.GK2870@ponder.secretlab.ca>
+	<CAMjpGUe9abPsdWbum2MRzOV2b5_2FDqXZC-K0KThRA6MNTr4FA@mail.gmail.com>
+Message-ID: <CACRpkdatiBathcoo2VjKs9jHJiKC5trDCJ0bePX1q6KbrYRN-g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 23, 2011 at 11:10:38PM +0200, Zoltan Devai wrote:
-> Now that misc.c only holds functions related to printout
-> during decompression, rename it accordingly.
-> 
-> Signed-off-by: Zoltan Devai <zoss@devai.org>
-> ---
->  arch/arm/boot/compressed/Makefile |    2 +-
->  arch/arm/boot/compressed/misc.c   |  122 -------------------------------------
->  arch/arm/boot/compressed/print.c  |  122 +++++++++++++++++++++++++++++++++++++
-If you add -M to git-format-patch this gets much easier to review.
+On Sat, Oct 22, 2011 at 7:44 PM, Mike Frysinger <vapier.adi@gmail.com> wrote:
+> On Tue, Oct 4, 2011 at 16:35, Grant Likely wrote:
+>> On Sat, Oct 01, 2011 at 12:39:21PM +0200, Linus Walleij wrote:
+>>> 2011/9/30 Grant Likely:
+>>> >?I'm not convinced that the sysfs approach is
+>>> > actually the right interface here (I'm certainly not a fan of the gpio
+>>> > sysfs i/f), and I'd rather not be putting in unneeded stuff until the
+>>> > userspace i/f is hammered out.
+>>>
+>>> Actually, thinking about it I cannot see what would be wrong
+>>> with /dev/gpio0 & friends in the first place.
+>>>
+>>> Using sysfs as swiss army knife for custom I/O does not
+>>> seem like it would be long-term viable so thanks for this
+>>> observation, and I think we need /dev/gpio* put on some
+>>> mental roadmap somewhere.
+>>
+>> Agreed. ?I don't want to be in the situation we are now with GPIO,
+>> where every time I look at the sysfs interface I shudder.
+>
+> the problem with that is it doesn't scale. ?if i have a device with
+> over 150 GPIOs on the SoC itself (obviously GPIO expanders can make
+> that much bigger), i don't want to see 150+ device nodes in /dev/.
+> that's a pretty big waste. ?sysfs only allocates/frees resources when
+> userspace actually wants to utilize a GPIO.
 
->  3 files changed, 123 insertions(+), 123 deletions(-)
->  delete mode 100644 arch/arm/boot/compressed/misc.c
->  create mode 100644 arch/arm/boot/compressed/print.c
-> 
-> diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
-> index e4f32a8..d955d4f 100644
-> --- a/arch/arm/boot/compressed/Makefile
-> +++ b/arch/arm/boot/compressed/Makefile
-> @@ -23,7 +23,7 @@ endif
->  
->  AFLAGS_head.o += -DTEXT_OFFSET=$(TEXT_OFFSET)
->  HEAD	= head.o
-> -OBJS	+= misc.o decompress.o
-> +OBJS	+= print.o decompress.o
->  FONTC	= $(srctree)/drivers/video/console/font_acorn_8x8.c
->  
->  # string library code (-Os is enforced to keep it much smaller)
-> [...]
-> diff --git a/arch/arm/boot/compressed/print.c b/arch/arm/boot/compressed/print.c
-> new file mode 100644
-> index 0000000..25f0fb2
-> --- /dev/null
-> +++ b/arch/arm/boot/compressed/print.c
-> @@ -0,0 +1,122 @@
-> +/*
-> + * misc.c
-This is wrong.
+I was more thinking along the lines of one device per GPIO controller,
+then you ioctl() to ask /dev/gpio0 how many pins it has or so.
 
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Yours,
+Linus Walleij
