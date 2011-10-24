@@ -1,47 +1,50 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Mon, 24 Oct 2011 11:32:19 +0530
-Subject: [PATCH v2 3/5] regulator: helper routine to extract
-	regulator_init_data
-In-Reply-To: <20111021115809.GB337@S2100-06.ap.freescale.net>
-References: <1318263578-7407-1-git-send-email-rnayak@ti.com>
-	<1318263578-7407-4-git-send-email-rnayak@ti.com>
-	<20111018132032.GD30703@S2100-06.ap.freescale.net>
-	<4E9EB61C.1040207@ti.com>
-	<20111019144215.GA32007@S2100-06.ap.freescale.net>
-	<4E9FAF42.5060200@ti.com>
-	<20111020061408.GE32007@S2100-06.ap.freescale.net>
-	<4EA00F7C.1080005@ti.com>
-	<20111021082309.GA337@S2100-06.ap.freescale.net>
-	<4EA13053.7080306@ti.com>
-	<20111021115809.GB337@S2100-06.ap.freescale.net>
-Message-ID: <4EA4FF6B.2080906@ti.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 24 Oct 2011 08:55:09 +0200
+Subject: [RFC PATCH 04/15] ARM: uncompress: Only call arch_decomp_setup
+	when needed
+In-Reply-To: <1319404245-12740-4-git-send-email-zoss@devai.org>
+References: <1319404245-12740-1-git-send-email-zoss@devai.org>
+	<1319404245-12740-4-git-send-email-zoss@devai.org>
+Message-ID: <20111024065508.GN15299@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 21 October 2011 05:28 PM, Shawn Guo wrote:
-> On Fri, Oct 21, 2011 at 02:11:55PM +0530, Rajendra Nayak wrote:
-> [...]
->>> +       /* find device_node and attach it */
->>> +       rdev->dev.of_node = of_find_node_by_name(NULL, regulator_desc->name);
->>
->> so would this do a complete dt search for every regulator?
->
-> Yes, with the first param being NULL, tthe entire device tree will be
-> searched.
->
->> we would also need the driver names and dt names to match for this to
->> work, right?
->>
-> Driver name does not matter.  The key for this search to work is having
-> regulator's name (regulator_desc->name) match device tree node's name,
-> case ignored.
+On Sun, Oct 23, 2011 at 11:10:34PM +0200, Zoltan Devai wrote:
+> As only the minority of the machines uses arch_decomp_setup,
+> ifdef it out when not needed, to avoid needless defines in
+> all uncompress.h files.
+> 
+> Machines using this feature should add
+	#define ARCH_HAVE_DECOMP_SETUP
+> in their uncompress.h headers.
 
-Mark, whats your take on this? I am somehow not quite sure if we should
-have this limitation put in to match DT node names with whats in the
-driver structs (regulator_desc).
+I guess this was removed by git-commit.
 
->
->> The approach otherwise looks fine to me and should work for both cases
->> of one device per regulator and one device for all regulators.
->>
->
+> 
+> Signed-off-by: Zoltan Devai <zoss@devai.org>
+> ---
+>  arch/arm/boot/compressed/misc.c |    2 ++
+>  1 files changed, 2 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/boot/compressed/misc.c b/arch/arm/boot/compressed/misc.c
+> index 8e2a8fc..a4b8df2 100644
+> --- a/arch/arm/boot/compressed/misc.c
+> +++ b/arch/arm/boot/compressed/misc.c
+> @@ -142,7 +142,9 @@ decompress_kernel(unsigned long output_start, unsigned long free_mem_ptr_p,
+>  	free_mem_end_ptr	= free_mem_ptr_end_p;
+>  	__machine_arch_type	= arch_id;
+>  
+> +#ifdef ARCH_HAVE_DECOMP_SETUP
+>  	arch_decomp_setup();
+> +#endif /* ARCH_HAVE_DECOMP_SETUP */
+This is a place that needs some care for multi-SoC. I don't know if
+there are any ideas how to handle it, but using a cpp symbol won't work
+I guess. So I think it's not worth to touch arch_decomp_setup without
+solving the multi-SoC case.
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
