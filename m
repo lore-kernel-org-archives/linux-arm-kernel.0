@@ -1,36 +1,103 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 24 Oct 2011 10:56:38 +0100
-Subject: [PATCH] mmc: mmci: Improve runtime PM support
-In-Reply-To: <CACRpkdY6rzYsYQW+GACL6Ux8o=Eo-3wn62O0YZxJZ=F2WbE4DQ@mail.gmail.com>
-References: <1319210754-22775-1-git-send-email-ulf.hansson@stericsson.com>
-	<20111021173637.GG21648@n2100.arm.linux.org.uk>
-	<CAKnu2MrOriMzJH9NcwUivWa0cinASa6wrRf4a69si4WUs-aTrQ@mail.gmail.com>
-	<CAAgDR1OT=+xgQTNwmTz=9XwzpbhjeZ6F-mxnVGhOAPSAR3JiFQ@mail.gmail.com>
-	<20111024093632.GH9893@n2100.arm.linux.org.uk>
-	<CACRpkdY6rzYsYQW+GACL6Ux8o=Eo-3wn62O0YZxJZ=F2WbE4DQ@mail.gmail.com>
-Message-ID: <20111024095638.GJ9893@n2100.arm.linux.org.uk>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Mon, 24 Oct 2011 12:01:07 +0200
+Subject: [PATCH] arm/tegra: Add device-tree support for TrimSlice board
+Message-ID: <1319450467-11819-1-git-send-email-swarren@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 24, 2011 at 11:54:00AM +0200, Linus Walleij wrote:
-> On Mon, Oct 24, 2011 at 11:36 AM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > On Sun, Oct 23, 2011 at 02:31:39AM +0200, Sebastian Rasmussen wrote:
-> >> I guess the patch would appeal more to Russell if mmci_runtime_suspend()
-> >> only cleared MCIMask0/SDI_MASK0 and MCIClock/SDI_CLKCR and left
-> >> MCIPower/SDI_PWR unchanged. It may be the case that the signal direction
-> >> bits need to be cleared for the ST-Ericsson PL180, but I haven't yet verified
-> >> this on my Snowball dev board yet.
-> >
-> > There's also the issue that the specs call for the clock to run after
-> > a command has completed for a certain number of cycles, and that the
-> > clock must continue to run until the card reports not-busy after a
-> > programming or erase cycle has completed - that can be long after the
-> > previous command has 'completed'.
-> 
-> It's 8 cycles on MCLK required.
+* Add device-tree file for TrimSlice
+* Add that to the list of .dts files to build
+* Update board-dt.c to recognize TrimSlice board name
 
-_Plus_ keeping the clock running while the card is signalling busy.
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+ arch/arm/boot/dts/tegra-trimslice.dts |   38 +++++++++++++++++++++++++++++++++
+ arch/arm/mach-tegra/Makefile.boot     |    1 +
+ arch/arm/mach-tegra/board-dt.c        |    3 ++
+ 3 files changed, 42 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/boot/dts/tegra-trimslice.dts
 
-If you don't clock the card while its signalling busy, it will never
-go non-busy (the data line becomes frozen.)
+diff --git a/arch/arm/boot/dts/tegra-trimslice.dts b/arch/arm/boot/dts/tegra-trimslice.dts
+new file mode 100644
+index 0000000..d3d0d20
+--- /dev/null
++++ b/arch/arm/boot/dts/tegra-trimslice.dts
+@@ -0,0 +1,38 @@
++/dts-v1/;
++
++/memreserve/ 0x1c000000 0x04000000;
++/include/ "tegra20.dtsi"
++
++/ {
++	model = "Compulab TrimSlice board";
++	compatible = "compulab,trimslice", "nvidia,tegra20";
++
++	chosen {
++		bootargs = "vmalloc=192M video=tegrafb console=ttyS0,115200n8 root=/dev/mmcblk0p1 rw rootwait";
++	};
++
++	memory at 0 {
++		reg = < 0x00000000 0x40000000 >;
++	};
++
++	i2c at 7000c000 {
++		clock-frequency = <400000>;
++	};
++
++	i2c at 7000c400 {
++		clock-frequency = <400000>;
++	};
++
++	i2c at 7000c500 {
++		clock-frequency = <400000>;
++	};
++
++	serial at 70006000 {
++		clock-frequency = < 216000000 >;
++	};
++
++	sdhci at c8000600 {
++		cd-gpios = <&gpio 121 0>;
++		wp-gpios = <&gpio 122 0>;
++	};
++};
+diff --git a/arch/arm/mach-tegra/Makefile.boot b/arch/arm/mach-tegra/Makefile.boot
+index bd12c9f..9f177a4 100644
+--- a/arch/arm/mach-tegra/Makefile.boot
++++ b/arch/arm/mach-tegra/Makefile.boot
+@@ -4,4 +4,5 @@ initrd_phys-$(CONFIG_ARCH_TEGRA_2x_SOC)	:= 0x00800000
+ 
+ dtb-$(CONFIG_MACH_HARMONY) += tegra-harmony.dtb
+ dtb-$(CONFIG_MACH_SEABOARD) += tegra-seaboard.dtb
++dtb-$(CONFIG_MACH_TRIMSLICE) += tegra-trimslice.dtb
+ dtb-$(CONFIG_MACH_VENTANA) += tegra-ventana.dtb
+diff --git a/arch/arm/mach-tegra/board-dt.c b/arch/arm/mach-tegra/board-dt.c
+index 0d22212..9ac4ed7 100644
+--- a/arch/arm/mach-tegra/board-dt.c
++++ b/arch/arm/mach-tegra/board-dt.c
+@@ -47,6 +47,7 @@
+ 
+ void harmony_pinmux_init(int is_dt);
+ void seaboard_pinmux_init(int is_dt);
++void trimslice_pinmux_init(int is_dt);
+ void ventana_pinmux_init(int is_dt);
+ 
+ struct of_dev_auxdata tegra20_auxdata_lookup[] __initdata = {
+@@ -84,6 +85,7 @@ static struct {
+ 	char *machine;
+ 	void (*init)(int is_dt);
+ } pinmux_configs[] = {
++	{ "compulab,trimslice", trimslice_pinmux_init },
+ 	{ "nvidia,harmony", harmony_pinmux_init },
+ 	{ "nvidia,seaboard", seaboard_pinmux_init },
+ 	{ "nvidia,ventana", ventana_pinmux_init },
+@@ -120,6 +122,7 @@ static void __init tegra_dt_init(void)
+ }
+ 
+ static const char * tegra_dt_board_compat[] = {
++	"compulab,trimslice",
+ 	"nvidia,harmony",
+ 	"nvidia,seaboard",
+ 	"nvidia,ventana",
+-- 
+1.7.4.1
