@@ -1,80 +1,56 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Mon, 24 Oct 2011 14:03:42 +0200
-Subject: [PATCH] spi/pl022: Enable clock in probe an use runtime_idle
-In-Reply-To: <1319206124-17549-1-git-send-email-ulf.hansson@stericsson.com>
-References: <1319206124-17549-1-git-send-email-ulf.hansson@stericsson.com>
-Message-ID: <20111024120342.GQ8708@ponder.secretlab.ca>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 24 Oct 2011 14:18:51 +0200
+Subject: [PATCH] mmc: mmci: Improve runtime PM support
+In-Reply-To: <4EA55076.2010701@stericsson.com>
+References: <1319210754-22775-1-git-send-email-ulf.hansson@stericsson.com>
+	<20111021173637.GG21648@n2100.arm.linux.org.uk>
+	<CAKnu2MrOriMzJH9NcwUivWa0cinASa6wrRf4a69si4WUs-aTrQ@mail.gmail.com>
+	<CAAgDR1OT=+xgQTNwmTz=9XwzpbhjeZ6F-mxnVGhOAPSAR3JiFQ@mail.gmail.com>
+	<4EA51C4A.7040802@stericsson.com>
+	<20111024090432.GA9893@n2100.arm.linux.org.uk>
+	<4EA53181.2050700@stericsson.com>
+	<20111024094203.GI9893@n2100.arm.linux.org.uk>
+	<4EA538A3.9070501@stericsson.com>
+	<20111024101416.GK9893@n2100.arm.linux.org.uk>
+	<4EA55076.2010701@stericsson.com>
+Message-ID: <CACRpkdb7FwW=Qa2MiJkbezkBO3F+Y0j6-RWSiL8dfJXkbd4pHw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 21, 2011 at 04:08:44PM +0200, Ulf Hansson wrote:
-> Since we are always runtime resumed when leaving probe
-> the clock must be enabled. To accomplish that we are able
-> to be runtime suspended after probe in the case when no
-> request is going to be recieved, a runtime_idle function
-> has been implemented.
-> 
-> Change-Id: I6cb86f2cad30ecaab16f512daf4674b039b18213
-> Signed-off-by: Ulf Hansson <ulf.hansson@stericsson.com>
-> Reviewed-on: http://gerrit.lud.stericsson.com/gerrit/34447
+On Mon, Oct 24, 2011 at 1:48 PM, Ulf Hansson <ulf.hansson@stericsson.com> wrote:
+> [Russell]
+>> The MCIPWR signal controls the external power switch. ?This is the only
+>> signal for it. ?This is the only connection for it. ?There is no other
+>> control form for this power switch.
+>>
+>
+> Then we are only left to use the variant struct I believe. In principle, a
+> flag in the variant struct, could indicate whether it is OK to disable the
+> vcore regulator and thus clear the MCIPWR when doing runtime_suspend.
 
-Acked-by: Grant Likely <grant.likely@secretlab.ca>
+Yep I think the best could be to add some variant named
+bool external_card_power; and then document in the kerneldoc that this
+means the driver can clear MMCIPWR without risk of cutting the power
+to the card.
 
-Since it depends on Russell's tree, I'm okay with it going in that way.
+This should be true for Ux500, U300 and Nomadik (just checked the designs -
+they all have external regulators).
 
-g.
+So the state save/restore and amba_vcore_disable(adev); should be done
+only for those variants.
 
-> ---
->  drivers/spi/spi-pl022.c |   18 +++++++++++++++++-
->  1 files changed, 17 insertions(+), 1 deletions(-)
-> 
-> diff --git a/drivers/spi/spi-pl022.c b/drivers/spi/spi-pl022.c
-> index f103e47..ad48fba 100644
-> --- a/drivers/spi/spi-pl022.c
-> +++ b/drivers/spi/spi-pl022.c
-> @@ -2184,6 +2184,12 @@ pl022_probe(struct amba_device *adev, const struct amba_id *id)
->  		goto  err_clk_prep;
->  	}
->  
-> +	status = clk_enable(pl022->clk);
-> +	if (status) {
-> +		dev_err(&adev->dev, "could not enable SSP/SPI bus clock\n");
-> +		goto err_no_clk_en;
-> +	}
-> +
->  	/* Disable SSP */
->  	writew((readw(SSP_CR1(pl022->virtbase)) & (~SSP_CR1_MASK_SSE)),
->  	       SSP_CR1(pl022->virtbase));
-> @@ -2237,6 +2243,8 @@ pl022_probe(struct amba_device *adev, const struct amba_id *id)
->  
->  	free_irq(adev->irq[0], pl022);
->   err_no_irq:
-> +	clk_disable(pl022->clk);
-> + err_no_clk_en:
->  	clk_unprepare(pl022->clk);
->   err_clk_prep:
->  	clk_put(pl022->clk);
-> @@ -2342,11 +2350,19 @@ static int pl022_runtime_resume(struct device *dev)
->  
->  	return 0;
->  }
-> +
-> +static int pl022_runtime_idle(struct device *dev)
-> +{
-> +	pm_runtime_suspend(dev);
-> +	return 0;
-> +}
->  #endif
->  
->  static const struct dev_pm_ops pl022_dev_pm_ops = {
->  	SET_SYSTEM_SLEEP_PM_OPS(pl022_suspend, pl022_resume)
-> -	SET_RUNTIME_PM_OPS(pl022_runtime_suspend, pl022_runtime_resume, NULL)
-> +	SET_RUNTIME_PM_OPS(pl022_runtime_suspend,
-> +			   pl022_runtime_resume,
-> +			   pl022_runtime_idle)
->  };
->  
->  static struct vendor_data vendor_arm = {
-> -- 
-> 1.7.5.4
-> 
+However this:
+
+clk_disable(host->clk);
+
+We ought to be able to do for *all* variants, provided we can create
+pm_runtime_get/put and delay properly to cover all bus traffic
+(looks like the patch already does that), plus all the time the card is
+signalling busy. The best I can think of is to just return -EBUSY to runtime
+PM like this:
+
+if ((readl(base + MMCISTATUS) & (MCI_CMDACTIVE | MCI_TXACTIVE| MCI_RXACTIVE))
+  return -EBUSY;
+
+Yours,
+Linus Walleij
