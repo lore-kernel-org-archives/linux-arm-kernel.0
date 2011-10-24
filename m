@@ -1,80 +1,60 @@
-From: ulf.hansson@stericsson.com (Ulf Hansson)
-Date: Mon, 24 Oct 2011 10:05:30 +0200
-Subject: [PATCH] mmc: mmci: Improve runtime PM support
-In-Reply-To: <CAAgDR1OT=+xgQTNwmTz=9XwzpbhjeZ6F-mxnVGhOAPSAR3JiFQ@mail.gmail.com>
-References: <1319210754-22775-1-git-send-email-ulf.hansson@stericsson.com>	<20111021173637.GG21648@n2100.arm.linux.org.uk>	<CAKnu2MrOriMzJH9NcwUivWa0cinASa6wrRf4a69si4WUs-aTrQ@mail.gmail.com>
-	<CAAgDR1OT=+xgQTNwmTz=9XwzpbhjeZ6F-mxnVGhOAPSAR3JiFQ@mail.gmail.com>
-Message-ID: <4EA51C4A.7040802@stericsson.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 24 Oct 2011 10:09:09 +0200
+Subject: [PATCH 1/3] ARM: Samsung: Move timer irq numbers to end of linux
+	irq	space
+In-Reply-To: <20111021194517.GA3722@ponder.secretlab.ca>
+References: <1318234289-22041-1-git-send-email-thomas.abraham@linaro.org>
+	<1318234289-22041-2-git-send-email-thomas.abraham@linaro.org>
+	<001001cc8d6d$5c48fa60$14daef20$%youn@samsung.com>
+	<017001cc8fd7$c27e4ee0$477aeca0$%kim@samsung.com>
+	<20111021194517.GA3722@ponder.secretlab.ca>
+Message-ID: <4EA51D25.9060802@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sebastian Rasmussen wrote:
-> Hi!
-> 
->> Err, no.  You're not allowed to power down the card between commands
->> unless the card has been removed or been has finished with.
+
+On 10/21/11 21:45, Grant Likely wrote:
+> On Fri, Oct 21, 2011 at 06:56:52PM +0900, Kukjin Kim wrote:
+>> Changhwan Youn wrote:
+>>>
+>>> Hi Thomas,
+>>>
+>>> All UART_IRQ_RXD, TXD, ERR of Samsung's platforms are also statically
+>>> mapped to linux irq numbers 16 to 31. These interrupts also need proper
+>> handling.
+>>>
+>>> Best regards,
+>>> Changhwan Youn
+>>>
 >>
->> If you power down the card (which you _are_ doing by writing zero to
->> the MMCIPOWER register), then you have to do a full setup of the card
->> when you resume.
-> 
-> MCIPower is according to ARM PL180 TRM signalling to an external power
-> supply to turn on/off (MCIPWR), whether to use open-drain (MCIROD),
-> what voltage to use (MCIVDD) and whether the card is clocked (MCICLK).
-> 
-> According ST-Ericsson's public PL180 derivative spec[1] it seems to work
-> roughly in same way (but renaming the register SDI_PWR and the signals
-> SDIPWR & SDICLK). However, there is no SDIVDD as the derivative can not
-> signal desired voltage level externally (there are no bits in SDI_PWR for this).
-> This makes it plausible that SDIPWR may not be routed externally either.
-> Can you verify this as there are no signal routing diagrams in the spec..?
-> 
+>> Hi all,
+>>
+>> Hmm, I'd like to apply Thomas' device tree series for EXYNOS4 and Samsung
+>> stuff for upcoming merge window but there are still some comments on some
+>> stuff and that should be fixed before applying. In addition I need to keep
+>> the ordering to apply them to avoid conflicts. But as you know, v3.1 is now
+>> close at hand and we don't have enough time for it now :(
+>>
+>> I will leave tomorrow morning (KST) for KS. I will talk to Grant Likely
+>> about this in Prague :)
+>
+> One of the goals I have for the hacking summit is to get as much of
+> the outstanding DT patches queued up and into linux-next.
+>
+OK.
 
-The hole idea with this PM patch is to make sure the vcore regulator and 
-the clock are disabled in runtime_suspend to be able to save a huge 
-amount of current in "idle" mode.
+I talked to Grant at ARM Subarch Workshop.
 
-Disabling the vcore regulator will sooner or later (depending on your 
-regulator tree) mean that that power to the controller is actually cut, 
-which then means that all registers will be "cleared" including the 
-MCIPWR. So the actual reason for clearing the registers in the 
-runtime_suspend function is because of two reasons.
+I will apply Thomas' DT patches into Samsung tree and it will be sent to 
+upstream via arm-soc for upcoming merge window v3.2 and if any fixing is 
+required, we will do it during -rc.
 
-1. Set the controller in a known state so no "magic" things happens when 
-we are runtime suspended, for example getting an IRQ.
+Thomas, if any problems during apply, let you know.
 
-2. Save power by disabling the clock etc. The actual power to the 
-controller does not have to be cut just because we have disabled the 
-vore regulator.
+Thanks.
 
-If the ARM PL180 TRM prevent us from from doing this kind of operations 
-in runtime_suspend, we must think of an alternative solution which just 
-apply for ST-Ericssons derivative of PL180. THIS IS VERY IMPORTANT to be 
-able to implement a proper power management solution.
-
-Please check this Russell, this is VERY IMPORTANT!
-
-
-> This leads me to believe that writing 0 to SDI_PWR/MMC in actual practice
-> doesn't really do much but disabling the clock to the card (and for
-> ST-Ericsson's PL180, disable direction signalling to the external level
-> shifter). Clearing bit 8 of MCIClock/SDI_CLKCR also disables the clock.
-> 
-> I guess the patch would appeal more to Russell if mmci_runtime_suspend()
-> only cleared MCIMask0/SDI_MASK0 and MCIClock/SDI_CLKCR and left
-> MCIPower/SDI_PWR unchanged. It may be the case that the signal direction
-> bits need to be cleared for the ST-Ericsson PL180, but I haven't yet verified
-> this on my Snowball dev board yet.
-
-This is according the comment above not feasible, since the vcore 
-regulator to the controller is disabled all registers will be "cleared" 
-anyway.
-
-> 
->  / Sebastian
-> 
-> [1] http://www.stericsson.com/developers/DM00030004_AP9500_reference_manual_rev1.pdf
-> 
-
-BR
-Ulf Hansson
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
