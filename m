@@ -1,37 +1,64 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Mon, 24 Oct 2011 12:06:05 +0200
-Subject: [PATCH] dt: Add empty of_match_node() macro
-In-Reply-To: <1319450012-13033-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1319450012-13033-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <CACxGe6txWcZYvym411Xat0S8UJX=3MWwSLq-GPQn=ERwV00KjA@mail.gmail.com>
+From: ulf.hansson@stericsson.com (Ulf Hansson)
+Date: Mon, 24 Oct 2011 12:06:27 +0200
+Subject: [PATCH] mmc: mmci: Improve runtime PM support
+In-Reply-To: <20111024094203.GI9893@n2100.arm.linux.org.uk>
+References: <1319210754-22775-1-git-send-email-ulf.hansson@stericsson.com>
+	<20111021173637.GG21648@n2100.arm.linux.org.uk>
+	<CAKnu2MrOriMzJH9NcwUivWa0cinASa6wrRf4a69si4WUs-aTrQ@mail.gmail.com>
+	<CAAgDR1OT=+xgQTNwmTz=9XwzpbhjeZ6F-mxnVGhOAPSAR3JiFQ@mail.gmail.com>
+	<4EA51C4A.7040802@stericsson.com>
+	<20111024090432.GA9893@n2100.arm.linux.org.uk>
+	<4EA53181.2050700@stericsson.com>
+	<20111024094203.GI9893@n2100.arm.linux.org.uk>
+Message-ID: <4EA538A3.9070501@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 24, 2011 at 11:53 AM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
-> Add an empty macro for of_match_node() that will save
-> some '#ifdef CONFIG_OF' for non-dt builds.
->
-> I have chosen to use a macro instead of a function to
-> be able to avoid defining the first parameter.
-> In fact, this "struct of_device_id *" first parameter
-> is usualy not defined as well on non-dt builds.
->
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> ---
-> ?include/linux/of.h | ? ?1 +
-> ?1 files changed, 1 insertions(+), 0 deletions(-)
->
-> diff --git a/include/linux/of.h b/include/linux/of.h
-> index 736b747..92c40a1 100644
-> --- a/include/linux/of.h
-> +++ b/include/linux/of.h
-> @@ -303,6 +303,7 @@ static inline struct device_node *of_parse_phandle(struct device_node *np,
-> ?}
->
-> ?#define of_match_ptr(_ptr) ? ? NULL
-> +#define of_match_node(_matches, _node) NULL
+Russell King - ARM Linux wrote:
+> On Mon, Oct 24, 2011 at 11:36:01AM +0200, Ulf Hansson wrote:
+>> Russell King - ARM Linux wrote:
+>>> I repeat: if you cut power to the card, you have to re-initialize it.
+>>> Re-initialization takes quite a bit of time to re-detect and setup
+>>> the card.  You'd also need to re-configure things like the transfer
+>>> mode and so forth.
+>> Right now host->vcc (vmmc) regulator is controlling the power to card.  
+>> Not the MCIPWR register!
+> 
+> Maybe for you, but that's not the case on all platforms.
+> 
+> You *really* need to get out of the idea that just because your
+> implementation works one way that everything works that way.  You're
+> working on a cross-SoC cross-platform driver, and you need to take
+> account of how other platforms work.
 
-Where possible, I prefer to code to be written in C, not PP.  :-)
-static inline please.
+Sorry for being a pain in the ass. :-) I am thinking of the above, even 
+if it not seems like that.
 
-g.
+> 
+> In that case, there *are* platforms which the MCIPWR register does
+> indeed control power to the card - and setting this to zero _will_
+> power down the card.
+> 
+>> I would be very surprised if any hardware has this kind of setup, that  
+>> the PL180 itself controls a regulator.
+> 
+> ARM dev boards all use the MCIPWR bits to control an external power
+> switch - there's no adjustment of the voltage except via soldered
+> links on the board.
+
+That explains it!
+
+My believe was that since the bits for controlling the voltage levels 
+etc was not used (which is replaced with directions bits for 
+ST-version), this functionality was not used either.
+
+Could you maybe elaborate a bit of how the power is controlled in the 
+ARM dev boards? Would it be possible to control such a switch in "GPIO" 
+manner instead? For example via the vdd_handler or similar?
+
+I will also think if and see if is feasible to re-design and see if this 
+hole feature can be controlled by the variant struct instead. My feeling 
+is although it can be kind of messy. But let's see...
+
+BR
+Ulf Hansson
