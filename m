@@ -1,69 +1,58 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 24 Oct 2011 11:14:21 +0200
-Subject: [PATCH] mmc: mmci: Improve runtime PM support
-In-Reply-To: <4EA51C4A.7040802@stericsson.com>
-References: <1319210754-22775-1-git-send-email-ulf.hansson@stericsson.com>
-	<20111021173637.GG21648@n2100.arm.linux.org.uk>
-	<CAKnu2MrOriMzJH9NcwUivWa0cinASa6wrRf4a69si4WUs-aTrQ@mail.gmail.com>
-	<CAAgDR1OT=+xgQTNwmTz=9XwzpbhjeZ6F-mxnVGhOAPSAR3JiFQ@mail.gmail.com>
-	<4EA51C4A.7040802@stericsson.com>
-Message-ID: <CACRpkdaz7OGeTsvMkNtK_t6t3Wcog=U9Oq9dkumW52H8R+ws0Q@mail.gmail.com>
+From: vapier.adi@gmail.com (Mike Frysinger)
+Date: Mon, 24 Oct 2011 05:14:30 -0400
+Subject: [PATCH] drivers: create a pin control subsystem v8
+In-Reply-To: <CACRpkdatiBathcoo2VjKs9jHJiKC5trDCJ0bePX1q6KbrYRN-g@mail.gmail.com>
+References: <1317211419-18472-1-git-send-email-linus.walleij@stericsson.com>
+	<20110930020754.GK12606@ponder.secretlab.ca>
+	<CACRpkdYyyqB6=5M8reqgwpMxXJz5ttXWyOav6K58dQ0CrxwCNA@mail.gmail.com>
+	<CACxGe6v19pZ0i-+ksYZbG2ZvGT30UkXEHTzpZMBTB4RNUV5bnA@mail.gmail.com>
+	<CAKnu2MpQ8Wvd4TF8Ge=o8ACyEoaEY8TcvOSdT1w6zfYiSKFUiw@mail.gmail.com>
+	<20111004203520.GK2870@ponder.secretlab.ca>
+	<CAMjpGUe9abPsdWbum2MRzOV2b5_2FDqXZC-K0KThRA6MNTr4FA@mail.gmail.com>
+	<CACRpkdatiBathcoo2VjKs9jHJiKC5trDCJ0bePX1q6KbrYRN-g@mail.gmail.com>
+Message-ID: <CAMjpGUc0TqqEFNXcg7m6K6Zc8GCYe1BgOHvZt4Cb35GHJ5=1fQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 24, 2011 at 10:05 AM, Ulf Hansson
-<ulf.hansson@stericsson.com> wrote:
-
-> The hole idea with this PM patch is to make sure the vcore regulator and the
-> clock are disabled in runtime_suspend to be able to save a huge amount of
-> current in "idle" mode.
+On Mon, Oct 24, 2011 at 03:26, Linus Walleij wrote:
+> On Sat, Oct 22, 2011 at 7:44 PM, Mike Frysinger wrote:
+>> On Tue, Oct 4, 2011 at 16:35, Grant Likely wrote:
+>>> On Sat, Oct 01, 2011 at 12:39:21PM +0200, Linus Walleij wrote:
+>>>> 2011/9/30 Grant Likely:
+>>>> >?I'm not convinced that the sysfs approach is
+>>>> > actually the right interface here (I'm certainly not a fan of the gpio
+>>>> > sysfs i/f), and I'd rather not be putting in unneeded stuff until the
+>>>> > userspace i/f is hammered out.
+>>>>
+>>>> Actually, thinking about it I cannot see what would be wrong
+>>>> with /dev/gpio0 & friends in the first place.
+>>>>
+>>>> Using sysfs as swiss army knife for custom I/O does not
+>>>> seem like it would be long-term viable so thanks for this
+>>>> observation, and I think we need /dev/gpio* put on some
+>>>> mental roadmap somewhere.
+>>>
+>>> Agreed. ?I don't want to be in the situation we are now with GPIO,
+>>> where every time I look at the sysfs interface I shudder.
+>>
+>> the problem with that is it doesn't scale. ?if i have a device with
+>> over 150 GPIOs on the SoC itself (obviously GPIO expanders can make
+>> that much bigger), i don't want to see 150+ device nodes in /dev/.
+>> that's a pretty big waste. ?sysfs only allocates/frees resources when
+>> userspace actually wants to utilize a GPIO.
 >
-> Disabling the vcore regulator will sooner or later (depending on your
-> regulator tree) mean that that power to the controller is actually cut,
-> which then means that all registers will be "cleared" including the MCIPWR.
+> I was more thinking along the lines of one device per GPIO controller,
+> then you ioctl() to ask /dev/gpio0 how many pins it has or so.
 
-I guess since this means writing power-off to bits 1 and 0 of
-of MCIPower meaning "power off"  it should not be done unless the MMC
-core has first issued mmci_set_ios() with MMC_POWER_OFF set in
-ios->power_mode. Which means mmc_power_off() must have
-been called.
+that brings its own set of trade offs.  this might be OK from a
+debugging point of view, but it means security wise we have to grant
+access on a per-gpiochip basis instead of a per-gpio basis.  i think
+the sysfs interface has this granularity of support already as the
+root user can chmod/chown the files after exporting them.
 
-That in turn is called by mmc_power_save_host() or
-mmc_suspend_host().
-
-mmc_power_save_host() is in turn called by
-mmc_runtime_suspend() in drivers/mmc/bus.c!
-
-So if that is called *before* the driver-local runtime suspend
-calls, you're actually on the safe side, and you can
-proceed to cut the power.
-
-So these need to be zero before we enter runtime suspend.
-This could then be assured by:
-
-if (readl(host->base + MMCIPOWER) & 3)
-  return -EBUSY;
-
-If this has already been done we are on the green and can
-runtime suspend the controller I guess?
-
-So what this code
-
-> +             /* Save registers for POWER, CLOCK and IRQMASK0 */
-> +             host->irqmask0_reg = readl(host->base + MMCIMASK0);
-> +             host->pwr_reg = readl(host->base + MMCIPOWER);
-> +             host->clk_reg = readl(host->base + MMCICLOCK);
-
-In the end does is save the contents of the other 30 bits.
-(MCI_OD, MCI_ROD, and the ST-specific bits)
-
-So can we first:
-
-- Assure that mmc_power_save_host() has already been
-  done (MMCI_POWER_OFF)
-
-- Make this variable a prerequiste for cutting the power in
-  runtime_pm?
-
-Yours,
-Linus Walleij
+Grant suggested we extend UIO to export GPIOs.  this would be a good
+trade off i think -- sysfs is a good on-the-fly debugging/scripting
+interface, but UIO gets us the performance.  sysfs overhead can be
+mitigated by using pwrite/pread, but without pwritev/preadv, we're
+stuck with 1-transition-per-syscall.
+-mike
