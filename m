@@ -1,37 +1,34 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Tue, 25 Oct 2011 13:50:53 -0700
-Subject: [PATCHv2] msm: boards: Fix fallout from removal of machine_desc
-	in fixup
-In-Reply-To: <1319560519-18899-1-git-send-email-sboyd@codeaurora.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 25 Oct 2011 22:06:10 +0100
+Subject: [PATCHv2] msm: boards: Fix fallout from removal of
+	machine_desc in fixup
+In-Reply-To: <20111025205053.GA15649@huya.qualcomm.com>
 References: <1319560519-18899-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20111025205053.GA15649@huya.qualcomm.com>
+	<20111025205053.GA15649@huya.qualcomm.com>
+Message-ID: <20111025210610.GA26579@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 25, 2011 at 09:35:19AM -0700, Stephen Boyd wrote:
-> After 0744a3ee (ARM: platform fixups: remove mdesc argument to
-> fixup function, 2010-12-20) the fixup functions introduced in
-> 9e775ad (ARM: 7012/1: Set proper TEXT_OFFSET for newer MSMs,
-> 2011-08-12) cause warnings like:
+On Tue, Oct 25, 2011 at 01:50:53PM -0700, David Brown wrote:
+> On Tue, Oct 25, 2011 at 09:35:19AM -0700, Stephen Boyd wrote:
+> > After 0744a3ee (ARM: platform fixups: remove mdesc argument to
+> > fixup function, 2010-12-20) the fixup functions introduced in
+> > 9e775ad (ARM: 7012/1: Set proper TEXT_OFFSET for newer MSMs,
+> > 2011-08-12) cause warnings like:
+> > 
+> > arch/arm/mach-msm/board-msm8x60.c:85: warning: initialization
+> > from incompatible pointer type
+> > 
+> > Fix them by removing the machine_desc argument from the fixup
+> > functions.
+> > 
+> > Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 > 
-> arch/arm/mach-msm/board-msm8x60.c:85: warning: initialization
-> from incompatible pointer type
+> Yes, these got missed among the merges.
 > 
-> Fix them by removing the machine_desc argument from the fixup
-> functions.
+> Acked-by: David Brown <davidb@codeaurora.org>
 > 
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> Russell, would you prefer this to go through your tracker, or for me
+> to push this to Arnd?
 
-Yes, these got missed among the merges.
-
-Acked-by: David Brown <davidb@codeaurora.org>
-
-Russell, would you prefer this to go through your tracker, or for me
-to push this to Arnd?
-
-Thanks,
-David
-
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Either is fine.
