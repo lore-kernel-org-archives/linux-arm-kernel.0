@@ -1,395 +1,326 @@
 From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Tue, 25 Oct 2011 19:35:27 +0900
-Subject: [PATCH 1/3 v3] ARM: EXYNOS4: Support for generic I/O power domains on
+Date: Tue, 25 Oct 2011 19:35:30 +0900
+Subject: [PATCH 2/3 v3] ARM: EXYNOS4: Use generic power domain on
 	EXYNOS4210/4212
-Message-ID: <4EA690EF.4000703@samsung.com>
+Message-ID: <4EA690F2.8010309@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch support the generic power domains to control power domain
-of EXYNOS4.
+This patch use the generic power domain framework instead of
+specific code depend on samsung SoC.
 
 Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- arch/arm/mach-exynos4/Kconfig                   |    2 +
- arch/arm/mach-exynos4/Makefile                  |    1 +
- arch/arm/mach-exynos4/include/mach/pm-exynos4.h |   50 +++++
- arch/arm/mach-exynos4/include/mach/regs-clock.h |    9 +
- arch/arm/mach-exynos4/include/mach/regs-pmu.h   |    2 +
- arch/arm/mach-exynos4/pm-exynos4.c              |  237 +++++++++++++++++++++++
- 6 files changed, 301 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-exynos4/include/mach/pm-exynos4.h
- create mode 100644 arch/arm/mach-exynos4/pm-exynos4.c
+ arch/arm/mach-exynos4/mach-armlex4210.c     |    3 +++
+ arch/arm/mach-exynos4/mach-nuri.c           |   24 ++++++++++++------------
+ arch/arm/mach-exynos4/mach-origen.c         |   19 +++++++------------
+ arch/arm/mach-exynos4/mach-smdk4x12.c       |    3 +++
+ arch/arm/mach-exynos4/mach-smdkv310.c       |   17 ++++++-----------
+ arch/arm/mach-exynos4/mach-universal_c210.c |   26 ++++++++++++--------------
+ 6 files changed, 43 insertions(+), 49 deletions(-)
 
-diff --git a/arch/arm/mach-exynos4/Kconfig b/arch/arm/mach-exynos4/Kconfig
-index 4924838..d042e53 100644
---- a/arch/arm/mach-exynos4/Kconfig
-+++ b/arch/arm/mach-exynos4/Kconfig
-@@ -14,6 +14,7 @@ config CPU_EXYNOS4210
- 	select SAMSUNG_DMADEV
- 	select S5P_PM if PM
- 	select S5P_SLEEP if PM
-+	select PM_GENERIC_DOMAINS if PM
- 	help
- 	  Enable EXYNOS4210 CPU support
+diff --git a/arch/arm/mach-exynos4/mach-armlex4210.c b/arch/arm/mach-exynos4/mach-armlex4210.c
+index b482c62..a077305 100644
+--- a/arch/arm/mach-exynos4/mach-armlex4210.c
++++ b/arch/arm/mach-exynos4/mach-armlex4210.c
+@@ -27,6 +27,7 @@
+ #include <plat/sdhci.h>
  
-@@ -21,6 +22,7 @@ config SOC_EXYNOS4212
- 	bool
- 	select S5P_PM if PM
- 	select S5P_SLEEP if PM
-+	select PM_GENERIC_DOMAINS if PM
- 	help
- 	  Enable EXYNOS4212 SoC support
- 
-diff --git a/arch/arm/mach-exynos4/Makefile b/arch/arm/mach-exynos4/Makefile
-index 2bb18f4..d73a4e7 100644
---- a/arch/arm/mach-exynos4/Makefile
-+++ b/arch/arm/mach-exynos4/Makefile
-@@ -14,6 +14,7 @@ obj-				:=
- 
- obj-$(CONFIG_ARCH_EXYNOS4)	+= cpu.o init.o clock.o irq-combiner.o
- obj-$(CONFIG_ARCH_EXYNOS4)	+= setup-i2c0.o irq-eint.o dma.o pmu.o
-+obj-$(CONFIG_ARCH_EXYNOS4)	+= pm-exynos4.o
- obj-$(CONFIG_CPU_EXYNOS4210)	+= clock-exynos4210.o
- obj-$(CONFIG_SOC_EXYNOS4212)	+= clock-exynos4212.o
- obj-$(CONFIG_PM)		+= pm.o
-diff --git a/arch/arm/mach-exynos4/include/mach/pm-exynos4.h b/arch/arm/mach-exynos4/include/mach/pm-exynos4.h
-new file mode 100644
-index 0000000..31f6b75
---- /dev/null
-+++ b/arch/arm/mach-exynos4/include/mach/pm-exynos4.h
-@@ -0,0 +1,50 @@
-+/* linux/arch/arm/mach-exynos4/include/mach/pm-exynos4.h
-+ *
-+ * EXYNOS4 series Power management support
-+ *
-+ * Copyright (c) 2011 Samsung Electronics Co., Ltd.
-+ *		http://www.samsung.com
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#ifndef PM_EXYNOS4_H
-+#define PM_EXYNOS4_H
-+
-+#include <linux/pm_domain.h>
-+
-+#ifdef CONFIG_PM
-+struct exynos4_pm_domain {
-+	struct generic_pm_domain genpd;
-+	const char *name;
-+	void __iomem *base;
-+	u32 clkgate_mask;
-+};
-+
-+extern int exynos4_add_device_to_domain(struct exynos4_pm_domain *exynos4_pd,
-+				struct platform_device *pdev);
-+extern void exynos4210_init_pm_domains(void);
-+extern void exynos4x12_init_pm_domains(void);
-+
-+/* Common power domain for EXYNOS4 series */
-+extern struct exynos4_pm_domain exynos4_pd_mfc;
-+extern struct exynos4_pm_domain exynos4_pd_g3d;
-+extern struct exynos4_pm_domain exynos4_pd_lcd0;
-+extern struct exynos4_pm_domain exynos4_pd_tv;
-+extern struct exynos4_pm_domain exynos4_pd_cam;
-+extern struct exynos4_pm_domain exynos4_pd_gps;
-+
-+/* Only for EXYNOS4210 */
-+extern struct exynos4_pm_domain exynos4_pd_lcd1;
-+
-+/* Only for EXYNOS4x12 */
-+extern struct exynos4_pm_domain exynos4_pd_isp;
-+
-+#else
-+#define exynos4_add_device_to_domain(exynos4_pd, pdev) { }
-+#define exynos4210_init_pm_domains() { }
-+#define exynos4x12_init_pm_domains() { }
-+#endif	/* CONFIG_PM */
-+#endif	/* PM_EXYNOS4_H */
-diff --git a/arch/arm/mach-exynos4/include/mach/regs-clock.h b/arch/arm/mach-exynos4/include/mach/regs-clock.h
-index 6c37ebe..c519ade 100644
---- a/arch/arm/mach-exynos4/include/mach/regs-clock.h
-+++ b/arch/arm/mach-exynos4/include/mach/regs-clock.h
-@@ -194,6 +194,13 @@
- #define S5P_CLKDIV_BUS_GPLR_SHIFT	(4)
- #define S5P_CLKDIV_BUS_GPLR_MASK	(0x7 << S5P_CLKDIV_BUS_GPLR_SHIFT)
- 
-+#define S5P_CLKGATE_BLOCK_CAM		(1 << 0)
-+#define S5P_CLKGATE_BLOCK_TV		(1 << 1)
-+#define S5P_CLKGATE_BLOCK_MFC		(1 << 2)
-+#define S5P_CLKGATE_BLOCK_G3D		(1 << 3)
-+#define S5P_CLKGATE_BLOCK_LCD0		(1 << 4)
-+#define S5P_CLKGATE_BLOCK_GPS		(1 << 7)
-+
- /* Only for EXYNOS4210 */
- 
- #define S5P_CLKSRC_LCD1			S5P_CLKREG(0x0C238)
-@@ -201,6 +208,8 @@
- #define S5P_CLKDIV_LCD1			S5P_CLKREG(0x0C538)
- #define S5P_CLKGATE_IP_LCD1		S5P_CLKREG(0x0C938)
- 
-+#define S5P_CLKGATE_BLOCK_LCD1		(1 << 5)
-+
- /* Compatibility defines and inclusion */
- 
- #include <mach/regs-pmu.h>
-diff --git a/arch/arm/mach-exynos4/include/mach/regs-pmu.h b/arch/arm/mach-exynos4/include/mach/regs-pmu.h
-index 4fff8e9..da397d5 100644
---- a/arch/arm/mach-exynos4/include/mach/regs-pmu.h
-+++ b/arch/arm/mach-exynos4/include/mach/regs-pmu.h
-@@ -217,4 +217,6 @@
- #define S5P_SECSS_MEM_OPTION			S5P_PMUREG(0x2EC8)
- #define S5P_ROTATOR_MEM_OPTION			S5P_PMUREG(0x2F48)
- 
-+#define S5P_PMU_ISP_CONF			S5P_PMUREG(0x3CA0)
-+
- #endif /* __ASM_ARCH_REGS_PMU_H */
-diff --git a/arch/arm/mach-exynos4/pm-exynos4.c b/arch/arm/mach-exynos4/pm-exynos4.c
-new file mode 100644
-index 0000000..c35952b
---- /dev/null
-+++ b/arch/arm/mach-exynos4/pm-exynos4.c
-@@ -0,0 +1,237 @@
-+/* linux/arch/arm/mach-exynos4/pm-exynos4.c
-+ *
-+ * EXYNOS4 series Power management support
-+ *
-+ * Copyright (c) 2011 Samsung Electronics Co., Ltd.
-+ *		http://www.samsung.com
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+#include <linux/delay.h>
-+#include <linux/err.h>
-+#include <linux/pm_runtime.h>
-+#include <linux/platform_device.h>
-+#include <linux/pm_domain.h>
-+#include <linux/io.h>
-+
-+#include <mach/regs-clock.h>
+ #include <mach/map.h>
 +#include <mach/pm-exynos4.h>
+ 
+ /* Following are default values for UCON, ULCON and UFCON UART registers */
+ #define ARMLEX4210_UCON_DEFAULT	(S3C2410_UCON_TXILEVEL |	\
+@@ -195,6 +196,8 @@ static void __init armlex4210_map_io(void)
+ 
+ static void __init armlex4210_machine_init(void)
+ {
++	exynos4210_init_pm_domains();
 +
-+#ifdef CONFIG_PM
-+/*
-+ * Define function to support generic power domain
-+ */
+ 	armlex4210_smsc911x_init();
+ 
+ 	armlex4210_sdhci_init();
+diff --git a/arch/arm/mach-exynos4/mach-nuri.c b/arch/arm/mach-exynos4/mach-nuri.c
+index 816a502..ef10fa0 100644
+--- a/arch/arm/mach-exynos4/mach-nuri.c
++++ b/arch/arm/mach-exynos4/mach-nuri.c
+@@ -47,12 +47,12 @@
+ #include <plat/gpio-cfg.h>
+ #include <plat/iic.h>
+ #include <plat/mfc.h>
+-#include <plat/pd.h>
+ #include <plat/fimc-core.h>
+ #include <plat/camport.h>
+ #include <plat/mipi_csis.h>
+ 
+ #include <mach/map.h>
++#include <mach/pm-exynos4.h>
+ 
+ /* Following are default values for UCON, ULCON and UFCON UART registers */
+ #define NURI_UCON_DEFAULT	(S3C2410_UCON_TXILEVEL |	\
+@@ -1266,9 +1266,6 @@ static struct platform_device *nuri_devices[] __initdata = {
+ 	&s5p_device_mfc,
+ 	&s5p_device_mfc_l,
+ 	&s5p_device_mfc_r,
+-	&exynos4_device_pd[PD_MFC],
+-	&exynos4_device_pd[PD_LCD0],
+-	&exynos4_device_pd[PD_CAM],
+ 	&s5p_device_fimc_md,
+ 
+ 	/* NURI Devices */
+@@ -1295,6 +1292,8 @@ static void __init nuri_reserve(void)
+ 
+ static void __init nuri_machine_init(void)
+ {
++	exynos4210_init_pm_domains();
 +
-+static DEFINE_SPINLOCK(clkgate_block_lock);
+ 	nuri_sdhci_init();
+ 	nuri_tsp_init();
+ 	nuri_power_init();
+@@ -1318,14 +1317,15 @@ static void __init nuri_machine_init(void)
+ 
+ 	/* Last */
+ 	platform_add_devices(nuri_devices, ARRAY_SIZE(nuri_devices));
+-	s5p_device_mfc.dev.parent = &exynos4_device_pd[PD_MFC].dev;
+-	s5p_device_fimd0.dev.parent = &exynos4_device_pd[PD_LCD0].dev;
+-
+-	s5p_device_fimc0.dev.parent = &exynos4_device_pd[PD_CAM].dev;
+-	s5p_device_fimc1.dev.parent = &exynos4_device_pd[PD_CAM].dev;
+-	s5p_device_fimc2.dev.parent = &exynos4_device_pd[PD_CAM].dev;
+-	s5p_device_fimc3.dev.parent = &exynos4_device_pd[PD_CAM].dev;
+-	s5p_device_mipi_csis0.dev.parent = &exynos4_device_pd[PD_CAM].dev;
 +
-+static struct exynos4_pm_domain *to_exynos4_pd(struct generic_pm_domain *pd)
-+{
-+	return container_of(pd, struct exynos4_pm_domain, genpd);
-+}
++	exynos4_add_device_to_domain(&exynos4_pd_mfc, &s5p_device_mfc);
++	exynos4_add_device_to_domain(&exynos4_pd_lcd0, &s5p_device_fimd0);
 +
-+static int __exynos4_pd_power_down(struct generic_pm_domain *genpd)
-+{
-+	struct exynos4_pm_domain *exynos4_pd = to_exynos4_pd(genpd);
-+	u32 timeout;
++	exynos4_add_device_to_domain(&exynos4_pd_cam, &s5p_device_fimc0);
++	exynos4_add_device_to_domain(&exynos4_pd_cam, &s5p_device_fimc1);
++	exynos4_add_device_to_domain(&exynos4_pd_cam, &s5p_device_fimc2);
++	exynos4_add_device_to_domain(&exynos4_pd_cam, &s5p_device_fimc3);
++	exynos4_add_device_to_domain(&exynos4_pd_cam, &s5p_device_mipi_csis0);
+ }
+ 
+ MACHINE_START(NURI, "NURI")
+diff --git a/arch/arm/mach-exynos4/mach-origen.c b/arch/arm/mach-exynos4/mach-origen.c
+index f80b563..dc4237e 100644
+--- a/arch/arm/mach-exynos4/mach-origen.c
++++ b/arch/arm/mach-exynos4/mach-origen.c
+@@ -37,11 +37,11 @@
+ #include <plat/clock.h>
+ #include <plat/gpio-cfg.h>
+ #include <plat/backlight.h>
+-#include <plat/pd.h>
+ #include <plat/fb.h>
+ #include <plat/mfc.h>
+ 
+ #include <mach/map.h>
++#include <mach/pm-exynos4.h>
+ 
+ /* Following are default values for UCON, ULCON and UFCON UART registers */
+ #define ORIGEN_UCON_DEFAULT	(S3C2410_UCON_TXILEVEL |	\
+@@ -606,13 +606,6 @@ static struct platform_device *origen_devices[] __initdata = {
+ 	&s5p_device_mfc_l,
+ 	&s5p_device_mfc_r,
+ 	&s5p_device_mixer,
+-	&exynos4_device_pd[PD_LCD0],
+-	&exynos4_device_pd[PD_TV],
+-	&exynos4_device_pd[PD_G3D],
+-	&exynos4_device_pd[PD_LCD1],
+-	&exynos4_device_pd[PD_CAM],
+-	&exynos4_device_pd[PD_GPS],
+-	&exynos4_device_pd[PD_MFC],
+ 	&origen_device_gpiokeys,
+ 	&origen_lcd_hv070wsa,
+ };
+@@ -657,6 +650,8 @@ static void __init origen_reserve(void)
+ 
+ static void __init origen_machine_init(void)
+ {
++	exynos4210_init_pm_domains();
 +
-+	/* Disable the power of power-domain */
-+	__raw_writel(0, exynos4_pd->base);
+ 	origen_power_init();
+ 
+ 	s3c_i2c0_set_platdata(NULL);
+@@ -679,12 +674,12 @@ static void __init origen_machine_init(void)
+ 
+ 	platform_add_devices(origen_devices, ARRAY_SIZE(origen_devices));
+ 
+-	s5p_device_fimd0.dev.parent = &exynos4_device_pd[PD_LCD0].dev;
++	exynos4_add_device_to_domain(&exynos4_pd_lcd0, &s5p_device_fimd0);
+ 
+-	s5p_device_hdmi.dev.parent = &exynos4_device_pd[PD_TV].dev;
+-	s5p_device_mixer.dev.parent = &exynos4_device_pd[PD_TV].dev;
++	exynos4_add_device_to_domain(&exynos4_pd_tv, &s5p_device_hdmi);
++	exynos4_add_device_to_domain(&exynos4_pd_tv, &s5p_device_mixer);
+ 
+-	s5p_device_mfc.dev.parent = &exynos4_device_pd[PD_MFC].dev;
++	exynos4_add_device_to_domain(&exynos4_pd_mfc, &s5p_device_mfc);
+ 
+ 	samsung_bl_set(&origen_bl_gpio_info, &origen_bl_data);
+ }
+diff --git a/arch/arm/mach-exynos4/mach-smdk4x12.c b/arch/arm/mach-exynos4/mach-smdk4x12.c
+index fcf2e0e..a6f2d1c 100644
+--- a/arch/arm/mach-exynos4/mach-smdk4x12.c
++++ b/arch/arm/mach-exynos4/mach-smdk4x12.c
+@@ -35,6 +35,7 @@
+ #include <plat/sdhci.h>
+ 
+ #include <mach/map.h>
++#include <mach/pm-exynos4.h>
+ 
+ /* Following are default values for UCON, ULCON and UFCON UART registers */
+ #define SMDK4X12_UCON_DEFAULT	(S3C2410_UCON_TXILEVEL |	\
+@@ -256,6 +257,8 @@ static void __init smdk4x12_map_io(void)
+ 
+ static void __init smdk4x12_machine_init(void)
+ {
++	exynos4x12_init_pm_domains();
 +
-+	/* Wait max 1ms */
-+	timeout = 10;
-+	while (__raw_readl(exynos4_pd->base + 0x4) & S5P_INT_LOCAL_PWR_EN) {
-+		if (timeout == 0) {
-+			pr_err("Power domain %s disable failed.\n", exynos4_pd->name);
-+			return -ETIMEDOUT;
-+		}
-+		timeout--;
-+		usleep_range(90, 110);
-+	}
+ 	s3c_i2c0_set_platdata(NULL);
+ 	i2c_register_board_info(0, smdk4x12_i2c_devs0,
+ 				ARRAY_SIZE(smdk4x12_i2c_devs0));
+diff --git a/arch/arm/mach-exynos4/mach-smdkv310.c b/arch/arm/mach-exynos4/mach-smdkv310.c
+index cec2afa..b35effe 100644
+--- a/arch/arm/mach-exynos4/mach-smdkv310.c
++++ b/arch/arm/mach-exynos4/mach-smdkv310.c
+@@ -34,7 +34,6 @@
+ #include <plat/keypad.h>
+ #include <plat/sdhci.h>
+ #include <plat/iic.h>
+-#include <plat/pd.h>
+ #include <plat/gpio-cfg.h>
+ #include <plat/backlight.h>
+ #include <plat/mfc.h>
+@@ -42,6 +41,7 @@
+ #include <plat/clock.h>
+ 
+ #include <mach/map.h>
++#include <mach/pm-exynos4.h>
+ 
+ /* Following are default values for UCON, ULCON and UFCON UART registers */
+ #define SMDKV310_UCON_DEFAULT	(S3C2410_UCON_TXILEVEL |	\
+@@ -265,13 +265,6 @@ static struct platform_device *smdkv310_devices[] __initdata = {
+ 	&s5p_device_mfc,
+ 	&s5p_device_mfc_l,
+ 	&s5p_device_mfc_r,
+-	&exynos4_device_pd[PD_MFC],
+-	&exynos4_device_pd[PD_G3D],
+-	&exynos4_device_pd[PD_LCD0],
+-	&exynos4_device_pd[PD_LCD1],
+-	&exynos4_device_pd[PD_CAM],
+-	&exynos4_device_pd[PD_TV],
+-	&exynos4_device_pd[PD_GPS],
+ 	&exynos4_device_spdif,
+ 	&exynos4_device_sysmmu,
+ 	&samsung_asoc_dma,
+@@ -326,8 +319,8 @@ static void s5p_tv_setup(void)
+ 	s3c_gpio_setpull(EXYNOS4_GPX3(7), S3C_GPIO_PULL_NONE);
+ 
+ 	/* setup dependencies between TV devices */
+-	s5p_device_hdmi.dev.parent = &exynos4_device_pd[PD_TV].dev;
+-	s5p_device_mixer.dev.parent = &exynos4_device_pd[PD_TV].dev;
++	exynos4_add_device_to_domain(&exynos4_pd_tv, &s5p_device_hdmi);
++	exynos4_add_device_to_domain(&exynos4_pd_tv, &s5p_device_mixer);
+ }
+ 
+ static void __init smdkv310_map_io(void)
+@@ -344,6 +337,8 @@ static void __init smdkv310_reserve(void)
+ 
+ static void __init smdkv310_machine_init(void)
+ {
++	exynos4210_init_pm_domains();
 +
-+	/* Configure the clock-gating control register for block to turn off */
-+	if (exynos4_pd->clkgate_mask) {
-+		unsigned long flags;
-+		u32 reg;
+ 	s3c_i2c1_set_platdata(NULL);
+ 	i2c_register_board_info(1, i2c_devs1, ARRAY_SIZE(i2c_devs1));
+ 
+@@ -366,7 +361,7 @@ static void __init smdkv310_machine_init(void)
+ 	clk_xusbxti.rate = 24000000;
+ 
+ 	platform_add_devices(smdkv310_devices, ARRAY_SIZE(smdkv310_devices));
+-	s5p_device_mfc.dev.parent = &exynos4_device_pd[PD_MFC].dev;
++	exynos4_add_device_to_domain(&exynos4_pd_mfc, &s5p_device_mfc);
+ }
+ 
+ MACHINE_START(SMDKV310, "SMDKV310")
+diff --git a/arch/arm/mach-exynos4/mach-universal_c210.c b/arch/arm/mach-exynos4/mach-universal_c210.c
+index 2096c8b..6235c40 100644
+--- a/arch/arm/mach-exynos4/mach-universal_c210.c
++++ b/arch/arm/mach-exynos4/mach-universal_c210.c
+@@ -35,13 +35,13 @@
+ #include <plat/fb.h>
+ #include <plat/mfc.h>
+ #include <plat/sdhci.h>
+-#include <plat/pd.h>
+ #include <plat/regs-fb-v4.h>
+ #include <plat/fimc-core.h>
+ #include <plat/camport.h>
+ #include <plat/mipi_csis.h>
+ 
+ #include <mach/map.h>
++#include <mach/pm-exynos4.h>
+ 
+ #include <media/v4l2-mediabus.h>
+ #include <media/s5p_fimc.h>
+@@ -969,7 +969,6 @@ static struct platform_device *universal_devices[] __initdata = {
+ 	&s3c_device_i2c5,
+ 	&s5p_device_i2c_hdmiphy,
+ 	&hdmi_fixed_voltage,
+-	&exynos4_device_pd[PD_TV],
+ 	&s5p_device_hdmi,
+ 	&s5p_device_sdo,
+ 	&s5p_device_mixer,
+@@ -982,9 +981,6 @@ static struct platform_device *universal_devices[] __initdata = {
+ 	&s5p_device_mfc,
+ 	&s5p_device_mfc_l,
+ 	&s5p_device_mfc_r,
+-	&exynos4_device_pd[PD_MFC],
+-	&exynos4_device_pd[PD_LCD0],
+-	&exynos4_device_pd[PD_CAM],
+ 	&cam_i_core_fixed_reg_dev,
+ 	&cam_s_if_fixed_reg_dev,
+ 	&s5p_device_fimc_md,
+@@ -1007,8 +1003,8 @@ void s5p_tv_setup(void)
+ 	s3c_gpio_setpull(EXYNOS4_GPX3(7), S3C_GPIO_PULL_NONE);
+ 
+ 	/* setup dependencies between TV devices */
+-	s5p_device_hdmi.dev.parent = &exynos4_device_pd[PD_TV].dev;
+-	s5p_device_mixer.dev.parent = &exynos4_device_pd[PD_TV].dev;
++	exynos4_add_device_to_domain(&exynos4_pd_tv, &s5p_device_hdmi);
++	exynos4_add_device_to_domain(&exynos4_pd_tv, &s5p_device_mixer);
+ }
+ 
+ static void __init universal_reserve(void)
+@@ -1018,6 +1014,8 @@ static void __init universal_reserve(void)
+ 
+ static void __init universal_machine_init(void)
+ {
++	exynos4210_init_pm_domains();
 +
-+		spin_lock_irqsave(&clkgate_block_lock, flags);
-+		reg = __raw_readl(S5P_CLKGATE_BLOCK);
-+		reg &= ~exynos4_pd->clkgate_mask;
-+		__raw_writel(reg, S5P_CLKGATE_BLOCK);
-+		spin_unlock_irqrestore(&clkgate_block_lock, flags);
-+	}
-+
-+	return 0;
-+}
-+
-+static int __exynos4_pd_power_up(struct generic_pm_domain *genpd)
-+{
-+	struct exynos4_pm_domain *exynos4_pd = to_exynos4_pd(genpd);
-+	u32 timeout;
-+
-+	/* Enable power domain */
-+	__raw_writel(S5P_INT_LOCAL_PWR_EN, exynos4_pd->base);
-+
-+	/* Wait max 1ms */
-+	timeout = 10;
-+	while ((__raw_readl(exynos4_pd->base + 0x4) & S5P_INT_LOCAL_PWR_EN)
-+		!= S5P_INT_LOCAL_PWR_EN) {
-+		if (timeout == 0) {
-+			pr_err("Power domain %s enable failed.\n",
-+				exynos4_pd->name);
-+			return -ETIMEDOUT;
-+		}
-+		timeout--;
-+		usleep_range(90, 110);
-+	}
-+
-+	/* Configure the clock-gating control register for block to turn on */
-+	if (exynos4_pd->clkgate_mask) {
-+		unsigned long flags;
-+		u32 reg;
-+
-+		spin_lock_irqsave(&clkgate_block_lock, flags);
-+		reg = __raw_readl(S5P_CLKGATE_BLOCK);
-+		reg |= exynos4_pd->clkgate_mask;
-+		__raw_writel(reg, S5P_CLKGATE_BLOCK);
-+		spin_unlock_irqrestore(&clkgate_block_lock, flags);
-+	}
-+
-+	return 0;
-+}
-+
-+static bool __exynos4_pd_active_wakeup(struct device *dev)
-+{
-+	return true;
-+}
-+
-+static void __exynos4_init_pm_domain(struct exynos4_pm_domain *exynos4_pd)
-+{
-+	struct generic_pm_domain *genpd;
-+
-+	if (!exynos4_pd) {
-+		pr_err("Failed to initialize Power domain(%s)\n", exynos4_pd->name);
-+		return;
-+	}
-+
-+	genpd = &exynos4_pd->genpd;
-+
-+	pm_genpd_init(genpd, NULL, false);
-+	genpd->active_wakeup = __exynos4_pd_active_wakeup;
-+	genpd->power_off = __exynos4_pd_power_down;
-+	genpd->power_on = __exynos4_pd_power_up;
-+}
-+
-+/*
-+ * Define power domain of EXYNOS4 series
-+ * - EXYNOS4210
-+ * - EXYNOS4212
-+ */
-+/* Common power domain on EXYNOS4 series */
-+struct exynos4_pm_domain exynos4_pd_mfc = {
-+	.name		= "PD_MFC",
-+	.base		= S5P_PMU_MFC_CONF,
-+	.clkgate_mask	= S5P_CLKGATE_BLOCK_MFC,
-+};
-+
-+struct exynos4_pm_domain exynos4_pd_g3d = {
-+	.name		= "PD_G3D",
-+	.base		= S5P_PMU_G3D_CONF,
-+	.clkgate_mask	= S5P_CLKGATE_BLOCK_G3D,
-+};
-+
-+struct exynos4_pm_domain exynos4_pd_lcd0 = {
-+	.name		= "PD_LCD0",
-+	.base		= S5P_PMU_LCD0_CONF,
-+	.clkgate_mask	= S5P_CLKGATE_BLOCK_LCD0,
-+};
-+
-+struct exynos4_pm_domain exynos4_pd_tv = {
-+	.name		= "PD_TV",
-+	.base		= S5P_PMU_TV_CONF,
-+	.clkgate_mask	= S5P_CLKGATE_BLOCK_TV,
-+};
-+
-+struct exynos4_pm_domain exynos4_pd_cam = {
-+	.name		= "PD_CAM",
-+	.base		= S5P_PMU_CAM_CONF,
-+	.clkgate_mask	= S5P_CLKGATE_BLOCK_CAM,
-+};
-+
-+struct exynos4_pm_domain exynos4_pd_gps = {
-+	.name		= "PD_GPS",
-+	.base		= S5P_PMU_GPS_CONF,
-+	.clkgate_mask	= S5P_CLKGATE_BLOCK_GPS,
-+};
-+
-+/* Only for EXYNOS4210 */
-+struct exynos4_pm_domain exynos4_pd_lcd1 = {
-+	.name		= "PD_LCD1",
-+	.base		= S5P_PMU_LCD1_CONF,
-+	.clkgate_mask	= S5P_CLKGATE_BLOCK_LCD1,
-+};
-+
-+/* Only for EXYNOS4212 */
-+struct exynos4_pm_domain exynos4_pd_isp = {
-+	.name		= "PD_ISP",
-+	.base		= S5P_PMU_ISP_CONF,
-+};
-+
-+/*
-+ * Define function which initalize power domain and add device to it
-+ */
-+int exynos4_add_device_to_domain(struct exynos4_pm_domain *exynos4_pd,
-+				struct platform_device *pdev)
-+{
-+	struct device *dev = &pdev->dev;
-+	int ret;
-+
-+	if (!exynos4_pd || !pdev)
-+		return -EINVAL;
-+
-+	ret = pm_genpd_add_device(&exynos4_pd->genpd, dev);
-+	if (ret < 0) {
-+		pr_err("Failed to add %s device to power domain(%s)\n",
-+			dev_name(&pdev->dev), exynos4_pd->name);
-+		return ret;
-+	}
-+
-+	pr_info("Add %s device to power domain(%s)\n",
-+			dev_name(&pdev->dev), exynos4_pd->name);
-+	return 0;
-+}
-+
-+void exynos4_init_pm_domains(void)
-+{
-+	__exynos4_init_pm_domain(&exynos4_pd_mfc);
-+	__exynos4_init_pm_domain(&exynos4_pd_g3d);
-+	__exynos4_init_pm_domain(&exynos4_pd_lcd0);
-+	__exynos4_init_pm_domain(&exynos4_pd_tv);
-+	__exynos4_init_pm_domain(&exynos4_pd_cam);
-+	__exynos4_init_pm_domain(&exynos4_pd_gps);
-+
-+}
-+
-+/* Initialize EXYNOS4210 power domain */
-+void exynos4210_init_pm_domains(void)
-+{
-+	exynos4_init_pm_domains();
-+
-+	__exynos4_init_pm_domain(&exynos4_pd_lcd1);
-+
-+	/* Enabled the power domain of LCD0 */
-+	__exynos4_pd_power_up(&exynos4_pd_lcd0.genpd);
-+}
-+
-+/* Initialize EXYNOS4x12 power domain */
-+void exynos4x12_init_pm_domains(void)
-+{
-+	exynos4_init_pm_domains();
-+
-+	__exynos4_init_pm_domain(&exynos4_pd_isp);
-+
-+	/* Enabled the power domain of LCD0 */
-+	__exynos4_pd_power_up(&exynos4_pd_lcd0.genpd);
-+}
-+#endif	/* CONFIG_PM */
+ 	universal_sdhci_init();
+ 	s5p_tv_setup();
+ 
+@@ -1043,14 +1041,14 @@ static void __init universal_machine_init(void)
+ 	/* Last */
+ 	platform_add_devices(universal_devices, ARRAY_SIZE(universal_devices));
+ 
+-	s5p_device_mfc.dev.parent = &exynos4_device_pd[PD_MFC].dev;
+-	s5p_device_fimd0.dev.parent = &exynos4_device_pd[PD_LCD0].dev;
++	exynos4_add_device_to_domain(&exynos4_pd_mfc, &s5p_device_mfc);
++	exynos4_add_device_to_domain(&exynos4_pd_lcd0, &s5p_device_fimd0);
+ 
+-	s5p_device_fimc0.dev.parent = &exynos4_device_pd[PD_CAM].dev;
+-	s5p_device_fimc1.dev.parent = &exynos4_device_pd[PD_CAM].dev;
+-	s5p_device_fimc2.dev.parent = &exynos4_device_pd[PD_CAM].dev;
+-	s5p_device_fimc3.dev.parent = &exynos4_device_pd[PD_CAM].dev;
+-	s5p_device_mipi_csis0.dev.parent = &exynos4_device_pd[PD_CAM].dev;
++	exynos4_add_device_to_domain(&exynos4_pd_cam, &s5p_device_fimc0);
++	exynos4_add_device_to_domain(&exynos4_pd_cam, &s5p_device_fimc1);
++	exynos4_add_device_to_domain(&exynos4_pd_cam, &s5p_device_fimc2);
++	exynos4_add_device_to_domain(&exynos4_pd_cam, &s5p_device_fimc3);
++	exynos4_add_device_to_domain(&exynos4_pd_cam, &s5p_device_mipi_csis0);
+ }
+ 
+ MACHINE_START(UNIVERSAL_C210, "UNIVERSAL_C210")
 -- 
 1.7.0.4
