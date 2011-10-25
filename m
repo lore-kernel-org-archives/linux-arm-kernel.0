@@ -1,34 +1,34 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Tue, 25 Oct 2011 15:36:10 +0200
-Subject: [PATCH] ARM: remove NR_IRQS dependency for ARM-specific
-	HARDIRQ_BITS definition
-In-Reply-To: <alpine.LFD.2.02.1110251343580.31312@xanadu.home> (Nicolas
-	Pitre's message of "Tue, 25 Oct 2011 13:45:27 +0200 (CEST)")
-References: <1319541948-10035-1-git-send-email-khilman@ti.com>
-	<alpine.LFD.2.02.1110251343580.31312@xanadu.home>
-Message-ID: <87wrbtnqgl.fsf@ti.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Tue, 25 Oct 2011 15:40:36 +0200
+Subject: [PATCH] of: Add a reg-names property to name reg entries
+In-Reply-To: <440786C5-FA1C-4750-9990-0BA5AABC2190@kernel.crashing.org>
+References: <1319471697-8970-1-git-send-email-b-cousson@ti.com>
+	<20111025082632.GJ4429@atomide.com>
+	<440786C5-FA1C-4750-9990-0BA5AABC2190@kernel.crashing.org>
+Message-ID: <4EA6BC54.7030007@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nicolas Pitre <nico@fluxnic.net> writes:
-
-> On Tue, 25 Oct 2011, Kevin Hilman wrote:
+On 10/25/2011 12:29 PM, Segher Boessenkool wrote:
+>>> +		compatible = "ti,mcasp";
+>>> +		reg =<0 0x10 0x10>,<0 0x20 0x10>,
+>>> +		<1 0x10 0x10>,<1 0x20 0x10>;
+>>> +		reg-names = "mpu", "dat",
+>>> +			    "dma", "dma_dat";
+>>
+>> Hmm for some systems looks like this can also solve how to pass the
+>> mux signal names cleanly from DT.
 >
->> As a first step towards removing NR_IRQS, remove the ARM customization
->> of HARDIRQ_BITS based on NR_IRQS.
->> 
->> The generic code in <linux/hardirq.h> already has a default value of
->> 10 for HARDIRQ_BITS which is the max used on ARM, so let's just remove
->> the NR_IRQS based customization and use the generic default.
->> 
->> Signed-off-by: Kevin Hilman <khilman@ti.com>
->
-> Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+> What problem does any of this solve?  The device binding for the
+> "mcasp" device will have to describe the possible "reg-names", and
+> what those mean; but the binding already has to describe its "reg"
+> property anyway.
 
-Thanks.
+What this solve is the ability to use the platform_get_resource_byname 
+directly to retrieve the proper register base address. The binding is 
+just a text description that the driver will not be able to use 
+directly. It will have to get the resource using an abstract index.
+It thus removes a level of indirection that is error prone and useless 
+most of the time.
 
-FYI, this is now in Russell's patch system as 7140/1:
-
-http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7140/1
-
-Kevin
+Benoit
