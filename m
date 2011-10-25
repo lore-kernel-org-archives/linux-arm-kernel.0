@@ -1,65 +1,35 @@
 From: rnayak@ti.com (Rajendra Nayak)
-Date: Tue, 25 Oct 2011 11:40:34 +0530
+Date: Tue, 25 Oct 2011 11:56:40 +0530
 Subject: [PATCH v2 3/5] regulator: helper routine to extract
 	regulator_init_data
-In-Reply-To: <20111024155132.GI1755@S2100-06.ap.freescale.net>
-References: <20111020061408.GE32007@S2100-06.ap.freescale.net>
-	<4EA00F7C.1080005@ti.com>
+In-Reply-To: <4EA65073.7050205@ti.com>
+References: <4EA00F7C.1080005@ti.com>
 	<20111021082309.GA337@S2100-06.ap.freescale.net>
-	<20111024092411.GE8708@ponder.secretlab.ca>
-	<20111024130429.GD1755@S2100-06.ap.freescale.net>
-	<20111024130636.GB26033@opensource.wolfsonmicro.com>
-	<20111024134025.GE1755@S2100-06.ap.freescale.net>
-	<20111024135950.GV8708@ponder.secretlab.ca>
-	<20111024145139.GH1755@S2100-06.ap.freescale.net>
-	<20111024145631.GB8708@ponder.secretlab.ca>
-	<20111024155132.GI1755@S2100-06.ap.freescale.net>
-Message-ID: <4EA652DA.5050901@ti.com>
+	<4EA13053.7080306@ti.com>
+	<20111021115809.GB337@S2100-06.ap.freescale.net>
+	<4EA4FF6B.2080906@ti.com>
+	<20111024081706.GC8708@ponder.secretlab.ca>
+	<20111024090228.GA1755@S2100-06.ap.freescale.net>
+	<4EA52851.8000203@ti.com>
+	<20111024091158.GB1755@S2100-06.ap.freescale.net>
+	<4EA52C56.3080908@ti.com>
+	<20111024134727.GF1755@S2100-06.ap.freescale.net>
+	<4EA65073.7050205@ti.com>
+Message-ID: <4EA656A0.4010102@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 24 October 2011 09:21 PM, Shawn Guo wrote:
-> On Mon, Oct 24, 2011 at 04:56:31PM +0200, Grant Likely wrote:
->> On Mon, Oct 24, 2011 at 10:51:40PM +0800, Shawn Guo wrote:
->>> On Mon, Oct 24, 2011 at 03:59:50PM +0200, Grant Likely wrote:
->>>> On Mon, Oct 24, 2011 at 09:40:26PM +0800, Shawn Guo wrote:
->>>>> diff --git a/drivers/regulator/core.c b/drivers/regulator/core.c
->>>>> index 8fe132d..29dcf90 100644
->>>>> --- a/drivers/regulator/core.c
->>>>> +++ b/drivers/regulator/core.c
->>>>> @@ -2673,7 +2673,8 @@ struct regulator_dev *regulator_register(struct regulator_desc *regulator_desc,
->>>>>          BLOCKING_INIT_NOTIFIER_HEAD(&rdev->notifier);
->>>>>
->>>>>          /* find device_node and attach it */
->>>>> -       rdev->dev.of_node = of_find_node_by_name(NULL, regulator_desc->name);
->>>>> +       rdev->dev.of_node = of_find_node_by_name(dev->parent->of_node,
->>>>> +                                                regulator_desc->name);
->>>>
->>>> of_find_node_by_name() doesn't work that way.  The first argument is a
->>>> starting point, but it doesn't restrict the search to children of a
->>>> node.
->>>>
->>>> for_each_child_of_node() is what you want to use when iterating over
->>>> the children which unfortunately changes the structure of this
->>>> function.
->>>>
->>> The dev->parent->of_node is meant to point to node 'pmic: mc13892 at 0'.
->>> And the intention here is not to iterate over the children, but to
->>> start a search from a reasonable point rather than the top root node.
->>
->> It is always better to attach the of_node at struct device
->> registration time instead of searching the tree in common code.  The
->> of_node should already be assigned by the time regulator_register() is
->> called.
+On Tuesday 25 October 2011 11:30 AM, Rajendra Nayak wrote:
 >
-> That's the problem we have.  There is no 'struct dev' to attach of_node
-> for each regulator by the time regulator_register() is called, because
-> the 'struct dev' for each regulator is created inside
-> regulator_register() as wrapped by 'struct regulator_dev'.
+> In that case should you not be first converting the mfd driver to
+> register regulator devices using DT?
+> Thats what we did for OMAP, and hence we always have the of_node
+> populated when the regulator devices are probed.
+> See this patch from Benoit on how thats done for twl devices..
+> http://marc.info/?l=linux-omap&m=131489864814428&w=2
 
-The root of your problem seems to be that your pmic driver isn't
-registering regulator devices from DT, and if it did, you wouldn't
-need to do a search in dev->parent->of_node and instead the driver
-would have the right dev->of_node populated.
+Sorry, that was a link to an older version of the patch.
+Here's the latest one from Benoit which he did based
+on Arnd's suggestion of using of_platform_populate() directly.
 
->
+http://marc.info/?l=linux-omap&m=131705623822369&w=2
