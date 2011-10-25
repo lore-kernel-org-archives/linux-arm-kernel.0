@@ -1,50 +1,49 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Mon, 24 Oct 2011 22:16:15 -0700
-Subject: [PATCH 3/3] arm/dt: tegra: add dts file for paz00
-In-Reply-To: <90ee88bcde84141e0280ffa4ccbd288462489eba.1319313020.git.marvin24@gmx.de>
-References: <cover.1319313019.git.marvin24@gmx.de>
-	<90ee88bcde84141e0280ffa4ccbd288462489eba.1319313020.git.marvin24@gmx.de>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF173E1B4189@HQMAIL01.nvidia.com>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Tue, 25 Oct 2011 07:52:39 +0200
+Subject: [PATCH] arm/tegra: Add device-tree support for TrimSlice board
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF173E1B4171@HQMAIL01.nvidia.com>
+References: <1319450467-11819-1-git-send-email-swarren@nvidia.com>
+	<5320972.AGvAdFqRz5@ax5200p>
+	<74CDBE0F657A3D45AFBB94109FB122FF173E1B4171@HQMAIL01.nvidia.com>
+Message-ID: <20111025055238.GA30358@avionic-0098.mockup.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marc Dietrich wrote at Saturday, October 22, 2011 2:17 PM:
-> * NOT FOR COMMIT *
+* Stephen Warren wrote:
+> Marc Dietrich wrote at Monday, October 24, 2011 3:28 PM:
+> > On Monday 24 October 2011 12:01:07 Stephen Warren wrote:
+> > > * Add device-tree file for TrimSlice
+> > > * Add that to the list of .dts files to build
+> > > * Update board-dt.c to recognize TrimSlice board name
+> > >
+> > > Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> > > ---
+> > >  arch/arm/boot/dts/tegra-trimslice.dts |   38
+> > > +++++++++++++++++++++++++++++++++ arch/arm/mach-tegra/Makefile.boot     |
+> > >  1 +
+> > >  arch/arm/mach-tegra/board-dt.c        |    3 ++
+> > >  3 files changed, 42 insertions(+), 0 deletions(-)
+> > >  create mode 100644 arch/arm/boot/dts/tegra-trimslice.dts
+> > 
+> > doesn't this also require to add something like
+> > 
+> > obj-${CONFIG_MACH_TEGRA_DT} += board-trimslice-pinmux.o
+> > 
+> > to the Makefile?
 > 
-> This just adds the dts for paz00. I like to add it to board-dt as
-> well as soon as I find out which tree to base it on.
-...
-> +++ b/arch/arm/boot/dts/tegra-paz00.dts
+> Yes, definitely. I've fixed this up locally; I hope to repost soon.
 
-One thing that cross my mind when writing the TrimSlice support and I
-forgot to mention: Should these files be named ${soc}-${board}.dts or
-${vendor}-${board}.dts (tegra-paz00.dts or toshiba-paz00.dts or
-compal-paz00.dts). I'm OK either way; just want to follow any outside
-expectations.
+Can it please be obj-$(CONFIG_MACH_TEGRA_DT) instead? I think both Russell
+and Olof agreed[0] to use parens instead of braces, even though the current
+practice is to copy what previous boards did.
 
-> @@ -0,0 +1,51 @@
-> +/dts-v1/;
-> +
-> +/memreserve/ 0x1c000000 0x04000000;
-> +/include/ "tegra20.dtsi"
-> +
-> +/ {
-> +	model = "Toshiba AC100 / Dynabook AZ";
-> +	compatible = "compal,paz00", "nvidia,tegra20";
-> +
-> +	chosen {
-> +		bootargs = "console=ttyS0,115200n8 root=/dev/mmcblk1p1";
-> +	};
-> +
-> +	memory at 0 {
+Thierry
 
-The other boards just have "memory" here; which is wrong?
-
-...
-> +	i2c at 7000c500 {
-> +		clock-frequency = <80000>;
-
-That's a pretty odd I2C frequency...
-
--- 
-nvpublic
+[0]: http://article.gmane.org/gmane.linux.ports.tegra/1670
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111025/e6ad7097/attachment-0001.sig>
