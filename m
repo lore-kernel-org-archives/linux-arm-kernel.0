@@ -1,49 +1,62 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Tue, 25 Oct 2011 07:52:39 +0200
-Subject: [PATCH] arm/tegra: Add device-tree support for TrimSlice board
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF173E1B4171@HQMAIL01.nvidia.com>
-References: <1319450467-11819-1-git-send-email-swarren@nvidia.com>
-	<5320972.AGvAdFqRz5@ax5200p>
-	<74CDBE0F657A3D45AFBB94109FB122FF173E1B4171@HQMAIL01.nvidia.com>
-Message-ID: <20111025055238.GA30358@avionic-0098.mockup.avionic-design.de>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Tue, 25 Oct 2011 11:30:19 +0530
+Subject: [PATCH v2 3/5] regulator: helper routine to extract
+	regulator_init_data
+In-Reply-To: <20111024134727.GF1755@S2100-06.ap.freescale.net>
+References: <4EA00F7C.1080005@ti.com>
+	<20111021082309.GA337@S2100-06.ap.freescale.net>
+	<4EA13053.7080306@ti.com>
+	<20111021115809.GB337@S2100-06.ap.freescale.net>
+	<4EA4FF6B.2080906@ti.com>
+	<20111024081706.GC8708@ponder.secretlab.ca>
+	<20111024090228.GA1755@S2100-06.ap.freescale.net>
+	<4EA52851.8000203@ti.com>
+	<20111024091158.GB1755@S2100-06.ap.freescale.net>
+	<4EA52C56.3080908@ti.com>
+	<20111024134727.GF1755@S2100-06.ap.freescale.net>
+Message-ID: <4EA65073.7050205@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Stephen Warren wrote:
-> Marc Dietrich wrote at Monday, October 24, 2011 3:28 PM:
-> > On Monday 24 October 2011 12:01:07 Stephen Warren wrote:
-> > > * Add device-tree file for TrimSlice
-> > > * Add that to the list of .dts files to build
-> > > * Update board-dt.c to recognize TrimSlice board name
-> > >
-> > > Signed-off-by: Stephen Warren <swarren@nvidia.com>
-> > > ---
-> > >  arch/arm/boot/dts/tegra-trimslice.dts |   38
-> > > +++++++++++++++++++++++++++++++++ arch/arm/mach-tegra/Makefile.boot     |
-> > >  1 +
-> > >  arch/arm/mach-tegra/board-dt.c        |    3 ++
-> > >  3 files changed, 42 insertions(+), 0 deletions(-)
-> > >  create mode 100644 arch/arm/boot/dts/tegra-trimslice.dts
-> > 
-> > doesn't this also require to add something like
-> > 
-> > obj-${CONFIG_MACH_TEGRA_DT} += board-trimslice-pinmux.o
-> > 
-> > to the Makefile?
-> 
-> Yes, definitely. I've fixed this up locally; I hope to repost soon.
+On Monday 24 October 2011 07:17 PM, Shawn Guo wrote:
+> On Mon, Oct 24, 2011 at 02:43:58PM +0530, Rajendra Nayak wrote:
+>> Case 2:
+>> One device for all regulators:
+>>
+>> DT nodes look something like this
+>>
+>> regulators {
+>> 	reg1: reg at 1 {
+>> 			...
+>> 			...
+>> 	};
+>>
+>> 	reg2: reg at 2 {
+>> 			...
+>> 			...
+>> 	};
+>> };
+>>
+>> The regulator driver probes only one device and the dev->of_node
+>> points to the "regulators" node above.
+>
+> The mc13892 example I put in the reply to Grant demonstrates that
+> for some case, dev->of_node is NULL (devices are created by mfd core).
 
-Can it please be obj-$(CONFIG_MACH_TEGRA_DT) instead? I think both Russell
-and Olof agreed[0] to use parens instead of braces, even though the current
-practice is to copy what previous boards did.
+In that case should you not be first converting the mfd driver to
+register regulator devices using DT?
+Thats what we did for OMAP, and hence we always have the of_node
+populated when the regulator devices are probed.
+See this patch from Benoit on how thats done for twl devices..
+http://marc.info/?l=linux-omap&m=131489864814428&w=2
 
-Thierry
-
-[0]: http://article.gmane.org/gmane.linux.ports.tegra/1670
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111025/e6ad7097/attachment-0001.sig>
+>
+>> The regulator driver then based on compatible property extracts
+>> and registers all the child nodes of "regulators" (for ex: reg1, reg2
+>> above) with each call to regulator_register and passes the child nodes
+>> as of_node to be associated with the regulator device.
+>>
+> I still think the discovery of all the child nodes of "regulators" does
+> not necessarily need to be done in regulator driver.  Instead, it can
+> be done in regulator core.
+>
