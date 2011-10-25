@@ -1,33 +1,50 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Tue, 25 Oct 2011 06:49:27 +0200
-Subject: [PATCH] of: Add a reg-names property to name reg entries
-In-Reply-To: <4EA5ED35.7000806@ti.com>
-References: <1319471697-8970-1-git-send-email-b-cousson@ti.com>
-	<20111024221916.GF4394@ponder.secretlab.ca>
-	<4EA5ED35.7000806@ti.com>
-Message-ID: <20111025044927.GA798@ponder.secretlab.ca>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Mon, 24 Oct 2011 22:16:15 -0700
+Subject: [PATCH 3/3] arm/dt: tegra: add dts file for paz00
+In-Reply-To: <90ee88bcde84141e0280ffa4ccbd288462489eba.1319313020.git.marvin24@gmx.de>
+References: <cover.1319313019.git.marvin24@gmx.de>
+	<90ee88bcde84141e0280ffa4ccbd288462489eba.1319313020.git.marvin24@gmx.de>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF173E1B4189@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 25, 2011 at 12:56:53AM +0200, Cousson, Benoit wrote:
-> On 10/25/2011 12:19 AM, Grant Likely wrote:
-> >In general, I'm inclined to accept this patch as we talked about at
-> >plumbers.  However, this particular hunk gives me pause as there is
-> >still the objection that Russell raised about the (ab)use of r->name
-> >for insert the resource name.
-> >
-> >So, no I won't reject this patch, but I first what to have some idea
-> >of what the plan is to migrate away from using r->name.  Perhaps we
-> >can talk about this tomorrow.
+Marc Dietrich wrote at Saturday, October 22, 2011 2:17 PM:
+> * NOT FOR COMMIT *
 > 
-> OK, sure, let's discuss about that.
-> But I still think that Russell's concern is not related at all with
-> this patch. That means that it should be fixed separately if needed.
-> It can be done before or after, but this is somehow orthogonal to
-> the DT reg-names support problem.
+> This just adds the dts for paz00. I like to add it to board-dt as
+> well as soon as I find out which tree to base it on.
+...
+> +++ b/arch/arm/boot/dts/tegra-paz00.dts
 
-Right, but this patch does add more infrastructure code manuipulating
-that field, so I'd like to have a plan for fixing the problem before
-committing this.
+One thing that cross my mind when writing the TrimSlice support and I
+forgot to mention: Should these files be named ${soc}-${board}.dts or
+${vendor}-${board}.dts (tegra-paz00.dts or toshiba-paz00.dts or
+compal-paz00.dts). I'm OK either way; just want to follow any outside
+expectations.
 
-g.
+> @@ -0,0 +1,51 @@
+> +/dts-v1/;
+> +
+> +/memreserve/ 0x1c000000 0x04000000;
+> +/include/ "tegra20.dtsi"
+> +
+> +/ {
+> +	model = "Toshiba AC100 / Dynabook AZ";
+> +	compatible = "compal,paz00", "nvidia,tegra20";
+> +
+> +	chosen {
+> +		bootargs = "console=ttyS0,115200n8 root=/dev/mmcblk1p1";
+> +	};
+> +
+> +	memory at 0 {
+
+The other boards just have "memory" here; which is wrong?
+
+...
+> +	i2c at 7000c500 {
+> +		clock-frequency = <80000>;
+
+That's a pretty odd I2C frequency...
+
+-- 
+nvpublic
