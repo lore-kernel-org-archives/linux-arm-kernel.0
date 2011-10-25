@@ -1,46 +1,79 @@
-From: joe@perches.com (Joe Perches)
-Date: Tue, 25 Oct 2011 09:26:08 -0700
-Subject: [PATCH] arm/tegra: clk_get should not be fatal
-In-Reply-To: <1319559329-324-1-git-send-email-pdeschrijver@nvidia.com>
-References: <1319559329-324-1-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <1319559968.14932.5.camel@Joe-Laptop>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 25 Oct 2011 09:35:19 -0700
+Subject: [PATCHv2] msm: boards: Fix fallout from removal of machine_desc in
+	fixup
+Message-ID: <1319560519-18899-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2011-10-25 at 19:15 +0300, pdeschrijver at nvidia.com wrote:
-> The timer and rtc-timer clocks aren't gated by default, so there is no reason
-> to crash the system if the dummy enable call failed.
-[]
-> diff --git a/arch/arm/mach-tegra/timer.c b/arch/arm/mach-tegra/timer.c
-[]
-> @@ -186,16 +186,20 @@ static void __init tegra_init_timer(void)
->  	int ret;
->  
->  	clk = clk_get_sys("timer", NULL);
-> -	BUG_ON(IS_ERR(clk));
-> -	clk_enable(clk);
-> +	if (IS_ERR(clk))
-> +		pr_warning("Unable to get timer clock");
-> +	else
-> +		clk_enable(clk);
->  
->  	/*
->  	 * rtc registers are used by read_persistent_clock, keep the rtc clock
->  	 * enabled
->  	 */
->  	clk = clk_get_sys("rtc-tegra", NULL);
-> -	BUG_ON(IS_ERR(clk));
-> -	clk_enable(clk);
-> +	if (IS_ERR(clk))
-> +		pr_warning("Unable to get rtc-tegra clock");
-> +	else
-> +		clk_enable(clk);
+After 0744a3ee (ARM: platform fixups: remove mdesc argument to
+fixup function, 2010-12-20) the fixup functions introduced in
+9e775ad (ARM: 7012/1: Set proper TEXT_OFFSET for newer MSMs,
+2011-08-12) cause warnings like:
 
-Are these messages are really necessary?
-Maybe just:
-	if (!IS_ERR(clk))
-		clk_enable(clk)
+arch/arm/mach-msm/board-msm8x60.c:85: warning: initialization
+from incompatible pointer type
 
-If these are really necessary, please use
-	pr_warn("Unable to get <foo>\n");
-pr_warn and with a terminating newline.
+Fix them by removing the machine_desc argument from the fixup
+functions.
+
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+
+I sent this a few weeks back. Looks like it was dropped though and
+now the merge window is open and Linus' tree fails to boot on these
+boards.
+
+ arch/arm/mach-msm/board-msm7x30.c |    4 ++--
+ arch/arm/mach-msm/board-msm8960.c |    4 ++--
+ arch/arm/mach-msm/board-msm8x60.c |    4 ++--
+ 3 files changed, 6 insertions(+), 6 deletions(-)
+
+diff --git a/arch/arm/mach-msm/board-msm7x30.c b/arch/arm/mach-msm/board-msm7x30.c
+index d1e4cc8..7a0af9f 100644
+--- a/arch/arm/mach-msm/board-msm7x30.c
++++ b/arch/arm/mach-msm/board-msm7x30.c
+@@ -43,8 +43,8 @@
+ 
+ extern struct sys_timer msm_timer;
+ 
+-static void __init msm7x30_fixup(struct machine_desc *desc, struct tag *tag,
+-			 char **cmdline, struct meminfo *mi)
++static void __init msm7x30_fixup(struct tag *tag, char **cmdline,
++		struct meminfo *mi)
+ {
+ 	for (; tag->hdr.size; tag = tag_next(tag))
+ 		if (tag->hdr.tag == ATAG_MEM && tag->u.mem.start == 0x200000) {
+diff --git a/arch/arm/mach-msm/board-msm8960.c b/arch/arm/mach-msm/board-msm8960.c
+index b04468e..6dc1cbd 100644
+--- a/arch/arm/mach-msm/board-msm8960.c
++++ b/arch/arm/mach-msm/board-msm8960.c
+@@ -32,8 +32,8 @@
+ 
+ #include "devices.h"
+ 
+-static void __init msm8960_fixup(struct machine_desc *desc, struct tag *tag,
+-			 char **cmdline, struct meminfo *mi)
++static void __init msm8960_fixup(struct tag *tag, char **cmdline,
++		struct meminfo *mi)
+ {
+ 	for (; tag->hdr.size; tag = tag_next(tag))
+ 		if (tag->hdr.tag == ATAG_MEM &&
+diff --git a/arch/arm/mach-msm/board-msm8x60.c b/arch/arm/mach-msm/board-msm8x60.c
+index 9221f54..056d9d7 100644
+--- a/arch/arm/mach-msm/board-msm8x60.c
++++ b/arch/arm/mach-msm/board-msm8x60.c
+@@ -30,8 +30,8 @@
+ #include <mach/board.h>
+ #include <mach/msm_iomap.h>
+ 
+-static void __init msm8x60_fixup(struct machine_desc *desc, struct tag *tag,
+-			 char **cmdline, struct meminfo *mi)
++static void __init msm8x60_fixup(struct tag *tag, char **cmdline,
++		struct meminfo *mi)
+ {
+ 	for (; tag->hdr.size; tag = tag_next(tag))
+ 		if (tag->hdr.tag == ATAG_MEM &&
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
