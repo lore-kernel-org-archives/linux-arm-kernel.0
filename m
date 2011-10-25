@@ -1,83 +1,45 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 25 Oct 2011 23:08:45 +0200
-Subject: [PATCH] ARM: at91: Fix USBA gadget registration
-In-Reply-To: <1319568666-10745-1-git-send-email-jochen@scram.de>
-References: <1319568666-10745-1-git-send-email-jochen@scram.de>
-Message-ID: <4EA7255D.6020102@atmel.com>
+From: davidb@codeaurora.org (David Brown)
+Date: Tue, 25 Oct 2011 14:34:48 -0700
+Subject: [PATCHv2] msm: boards: Fix fallout from removal of machine_desc
+	in fixup
+In-Reply-To: <20111025210610.GA26579@n2100.arm.linux.org.uk>
+References: <1319560519-18899-1-git-send-email-sboyd@codeaurora.org>
+	<20111025205053.GA15649@huya.qualcomm.com>
+	<20111025210610.GA26579@n2100.arm.linux.org.uk>
+Message-ID: <20111025213448.GA16295@huya.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/25/2011 08:51 PM, Jochen Friedrich :
-> Since 193ab2a6070039e7ee2b9b9bebea754a7c52fd1b, various AT91 boards don't
-> register USBA adapters anymore due to depending on a now non-existing
-> symbol. Fix the symbol name.
-
-Friedrich,
-
-Thanks a lot for this patch... and moreover I have just retrieved it in
-my backlog: sorry for not having taken care of it earlier.
-
-But actually, it is too bad that this patch has broken those tree boards.
-
-> Signed-off-by: Jochen Friedrich <jochen@scram.de>
-
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-
-I queue it in my at91-fixes branch and send it to Arnd soon.
-
-Best regards,
-
-> CC: stable at kernel.org
-
-^^^^
-Yes, for sure!
-
-> ---
->  arch/arm/mach-at91/at91cap9_devices.c    |    2 +-
->  arch/arm/mach-at91/at91sam9g45_devices.c |    2 +-
->  arch/arm/mach-at91/at91sam9rl_devices.c  |    2 +-
->  3 files changed, 3 insertions(+), 3 deletions(-)
+On Tue, Oct 25, 2011 at 10:06:10PM +0100, Russell King - ARM Linux wrote:
+> On Tue, Oct 25, 2011 at 01:50:53PM -0700, David Brown wrote:
+> > On Tue, Oct 25, 2011 at 09:35:19AM -0700, Stephen Boyd wrote:
+> > > After 0744a3ee (ARM: platform fixups: remove mdesc argument to
+> > > fixup function, 2010-12-20) the fixup functions introduced in
+> > > 9e775ad (ARM: 7012/1: Set proper TEXT_OFFSET for newer MSMs,
+> > > 2011-08-12) cause warnings like:
+> > > 
+> > > arch/arm/mach-msm/board-msm8x60.c:85: warning: initialization
+> > > from incompatible pointer type
+> > > 
+> > > Fix them by removing the machine_desc argument from the fixup
+> > > functions.
+> > > 
+> > > Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> > 
+> > Yes, these got missed among the merges.
+> > 
+> > Acked-by: David Brown <davidb@codeaurora.org>
+> > 
+> > Russell, would you prefer this to go through your tracker, or for me
+> > to push this to Arnd?
 > 
-> diff --git a/arch/arm/mach-at91/at91cap9_devices.c b/arch/arm/mach-at91/at91cap9_devices.c
-> index dba0d8d..0512baf 100644
-> --- a/arch/arm/mach-at91/at91cap9_devices.c
-> +++ b/arch/arm/mach-at91/at91cap9_devices.c
-> @@ -92,7 +92,7 @@ void __init at91_add_device_usbh(struct at91_usbh_data *data) {}
->   *  USB HS Device (Gadget)
->   * -------------------------------------------------------------------- */
->  
-> -#if defined(CONFIG_USB_GADGET_ATMEL_USBA) || defined(CONFIG_USB_GADGET_ATMEL_USBA_MODULE)
-> +#if defined(CONFIG_USB_ATMEL_USBA) || defined(CONFIG_USB_ATMEL_USBA_MODULE)
->  
->  static struct resource usba_udc_resources[] = {
->  	[0] = {
-> diff --git a/arch/arm/mach-at91/at91sam9g45_devices.c b/arch/arm/mach-at91/at91sam9g45_devices.c
-> index 600bffb..371bb0e 100644
-> --- a/arch/arm/mach-at91/at91sam9g45_devices.c
-> +++ b/arch/arm/mach-at91/at91sam9g45_devices.c
-> @@ -191,7 +191,7 @@ void __init at91_add_device_usbh_ehci(struct at91_usbh_data *data) {}
->   *  USB HS Device (Gadget)
->   * -------------------------------------------------------------------- */
->  
-> -#if defined(CONFIG_USB_GADGET_ATMEL_USBA) || defined(CONFIG_USB_GADGET_ATMEL_USBA_MODULE)
-> +#if defined(CONFIG_USB_ATMEL_USBA) || defined(CONFIG_USB_ATMEL_USBA_MODULE)
->  static struct resource usba_udc_resources[] = {
->  	[0] = {
->  		.start	= AT91SAM9G45_UDPHS_FIFO,
-> diff --git a/arch/arm/mach-at91/at91sam9rl_devices.c b/arch/arm/mach-at91/at91sam9rl_devices.c
-> index aacb19d..c884d59 100644
-> --- a/arch/arm/mach-at91/at91sam9rl_devices.c
-> +++ b/arch/arm/mach-at91/at91sam9rl_devices.c
-> @@ -75,7 +75,7 @@ void __init at91_add_device_hdmac(void) {}
->   *  USB HS Device (Gadget)
->   * -------------------------------------------------------------------- */
->  
-> -#if defined(CONFIG_USB_GADGET_ATMEL_USBA) || defined(CONFIG_USB_GADGET_ATMEL_USBA_MODULE)
-> +#if defined(CONFIG_USB_ATMEL_USBA) || defined(CONFIG_USB_ATMEL_USBA_MODULE)
->  
->  static struct resource usba_udc_resources[] = {
->  	[0] = {
+> Either is fine.
 
+I can pull it, then, since it is entirely inside of MSM.
+
+Thanks,
+David
 
 -- 
-Nicolas Ferre
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
