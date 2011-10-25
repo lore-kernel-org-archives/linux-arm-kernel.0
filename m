@@ -1,180 +1,121 @@
 From: swarren@nvidia.com (Stephen Warren)
-Date: Tue, 25 Oct 2011 14:01:27 +0200
-Subject: [PATCH v3 2/3] arm/tegra: Don't create duplicate gpio and pinmux
-	devices
+Date: Tue, 25 Oct 2011 14:01:28 +0200
+Subject: [PATCH v3 3/3] arm/tegra: Add device-tree support for TrimSlice board
 In-Reply-To: <1319544088-25946-1-git-send-email-swarren@nvidia.com>
 References: <1319544088-25946-1-git-send-email-swarren@nvidia.com>
-Message-ID: <1319544088-25946-2-git-send-email-swarren@nvidia.com>
+Message-ID: <1319544088-25946-3-git-send-email-swarren@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-*_pinmux_init() register the GPIO and pinmux devices so that they're ready
-before any other device needs them.
+* Add device-tree file for TrimSlice
+* Add that to the list of .dts files to build
+* Update board-dt.c to recognize TrimSlice board name
 
-*_pinmux_init() are also called by board-dt.c in order to set up the GPIO
-and pinmux configurations. In this case, if we register the devices, they
-end up being probed once due to this registration, and a second time due
-to a device-tree node (or vice-versa). The second probe fails since the
-memory regions are already requested. Besides, we don't actually want the
-duplicated devices.
-
-To avoid this duplicate registration, modify *_pinmux_init() to check
-whether it's running on a DT machine. If not, register the pinmux devices.
-If so, don't register them.
-
-Finally, modify board-dt.c to call the *_pinmux_init() after all devices have
-been instantiated from device-tree. This allows the GPIO and pinmux devices
-to be instantiated and initialized before calling functions to configure the
-hardware.
-
-This has one disadvantage: The pinmux and GPIO initialization now happens
-after /all/ devices are instantiated, rather than after just gpio and
-pinmux but before anything else. So the correct HW configuration is not
-in place when e.g. the SD/MMC device is probed. Long-term, this should be
-solved by doing both:
-
-a) Initializing the HW state from DT nodes during GPIO and pinmux device
-   probe.
-b) Using the deferred driver probe mechanism, so that drivers can defer
-   their probe until after the gpio and pinmux drivers have probed.
-
-v2: s/int is_dt/bool is_dt/
-v3: Use of_machine_is_compatible inside *_pinmux_init() rather than passing
-an explicit parameter into the function from outside.
+v2: Makefile: Add board-trimslice-pinmux.c to obj-$(CONFIG_MACH_TEGRA_DT).
+v3: Makefile: Use brackets not braces around var names
 
 Signed-off-by: Stephen Warren <swarren@nvidia.com>
 ---
- arch/arm/mach-tegra/board-dt.c               |   13 +++++++------
- arch/arm/mach-tegra/board-harmony-pinmux.c   |    6 +++++-
- arch/arm/mach-tegra/board-paz00-pinmux.c     |    6 +++++-
- arch/arm/mach-tegra/board-seaboard-pinmux.c  |    5 ++++-
- arch/arm/mach-tegra/board-trimslice-pinmux.c |    5 ++++-
- 5 files changed, 25 insertions(+), 10 deletions(-)
+ arch/arm/boot/dts/tegra-trimslice.dts |   38 +++++++++++++++++++++++++++++++++
+ arch/arm/mach-tegra/Makefile          |    1 +
+ arch/arm/mach-tegra/Makefile.boot     |    1 +
+ arch/arm/mach-tegra/board-dt.c        |    3 ++
+ 4 files changed, 43 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/boot/dts/tegra-trimslice.dts
 
+diff --git a/arch/arm/boot/dts/tegra-trimslice.dts b/arch/arm/boot/dts/tegra-trimslice.dts
+new file mode 100644
+index 0000000..d3d0d20
+--- /dev/null
++++ b/arch/arm/boot/dts/tegra-trimslice.dts
+@@ -0,0 +1,38 @@
++/dts-v1/;
++
++/memreserve/ 0x1c000000 0x04000000;
++/include/ "tegra20.dtsi"
++
++/ {
++	model = "Compulab TrimSlice board";
++	compatible = "compulab,trimslice", "nvidia,tegra20";
++
++	chosen {
++		bootargs = "vmalloc=192M video=tegrafb console=ttyS0,115200n8 root=/dev/mmcblk0p1 rw rootwait";
++	};
++
++	memory at 0 {
++		reg = < 0x00000000 0x40000000 >;
++	};
++
++	i2c at 7000c000 {
++		clock-frequency = <400000>;
++	};
++
++	i2c at 7000c400 {
++		clock-frequency = <400000>;
++	};
++
++	i2c at 7000c500 {
++		clock-frequency = <400000>;
++	};
++
++	serial at 70006000 {
++		clock-frequency = < 216000000 >;
++	};
++
++	sdhci at c8000600 {
++		cd-gpios = <&gpio 121 0>;
++		wp-gpios = <&gpio 122 0>;
++	};
++};
+diff --git a/arch/arm/mach-tegra/Makefile b/arch/arm/mach-tegra/Makefile
+index 91a07e1..3034d84 100644
+--- a/arch/arm/mach-tegra/Makefile
++++ b/arch/arm/mach-tegra/Makefile
+@@ -32,6 +32,7 @@ obj-${CONFIG_MACH_SEABOARD}             += board-seaboard-pinmux.o
+ obj-${CONFIG_MACH_TEGRA_DT}             += board-dt.o
+ obj-${CONFIG_MACH_TEGRA_DT}             += board-harmony-pinmux.o
+ obj-${CONFIG_MACH_TEGRA_DT}             += board-seaboard-pinmux.o
++obj-$(CONFIG_MACH_TEGRA_DT)             += board-trimslice-pinmux.o
+ 
+ obj-${CONFIG_MACH_TRIMSLICE}            += board-trimslice.o
+ obj-${CONFIG_MACH_TRIMSLICE}            += board-trimslice-pinmux.o
+diff --git a/arch/arm/mach-tegra/Makefile.boot b/arch/arm/mach-tegra/Makefile.boot
+index bd12c9f..9f177a4 100644
+--- a/arch/arm/mach-tegra/Makefile.boot
++++ b/arch/arm/mach-tegra/Makefile.boot
+@@ -4,4 +4,5 @@ initrd_phys-$(CONFIG_ARCH_TEGRA_2x_SOC)	:= 0x00800000
+ 
+ dtb-$(CONFIG_MACH_HARMONY) += tegra-harmony.dtb
+ dtb-$(CONFIG_MACH_SEABOARD) += tegra-seaboard.dtb
++dtb-$(CONFIG_MACH_TRIMSLICE) += tegra-trimslice.dtb
+ dtb-$(CONFIG_MACH_VENTANA) += tegra-ventana.dtb
 diff --git a/arch/arm/mach-tegra/board-dt.c b/arch/arm/mach-tegra/board-dt.c
-index d368f8d..74743ad 100644
+index 74743ad..79817b6 100644
 --- a/arch/arm/mach-tegra/board-dt.c
 +++ b/arch/arm/mach-tegra/board-dt.c
-@@ -101,6 +101,13 @@ static void __init tegra_dt_init(void)
+@@ -47,6 +47,7 @@
  
- 	tegra_clk_init_from_table(tegra_dt_clk_init_table);
+ void harmony_pinmux_init(void);
+ void seaboard_pinmux_init(void);
++void trimslice_pinmux_init(void);
+ void ventana_pinmux_init(void);
  
-+	/*
-+	 * Finished with the static registrations now; fill in the missing
-+	 * devices
-+	 */
-+	of_platform_populate(NULL, tegra_dt_match_table,
-+				tegra20_auxdata_lookup, NULL);
-+
- 	for (i = 0; i < ARRAY_SIZE(pinmux_configs); i++) {
- 		if (of_machine_is_compatible(pinmux_configs[i].machine)) {
- 			pinmux_configs[i].init();
-@@ -110,12 +117,6 @@ static void __init tegra_dt_init(void)
- 
- 	WARN(i == ARRAY_SIZE(pinmux_configs),
- 		"Unknown platform! Pinmuxing not initialized\n");
--
--	/*
--	 * Finished with the static registrations now; fill in the missing
--	 * devices
--	 */
--	of_platform_populate(NULL, tegra_dt_match_table, tegra20_auxdata_lookup, NULL);
+ struct of_dev_auxdata tegra20_auxdata_lookup[] __initdata = {
+@@ -84,6 +85,7 @@ static struct {
+ 	char *machine;
+ 	void (*init)(void);
+ } pinmux_configs[] = {
++	{ "compulab,trimslice", trimslice_pinmux_init },
+ 	{ "nvidia,harmony", harmony_pinmux_init },
+ 	{ "nvidia,seaboard", seaboard_pinmux_init },
+ 	{ "nvidia,ventana", ventana_pinmux_init },
+@@ -120,6 +122,7 @@ static void __init tegra_dt_init(void)
  }
  
  static const char * tegra_dt_board_compat[] = {
-diff --git a/arch/arm/mach-tegra/board-harmony-pinmux.c b/arch/arm/mach-tegra/board-harmony-pinmux.c
-index e99b456..7a4a26d 100644
---- a/arch/arm/mach-tegra/board-harmony-pinmux.c
-+++ b/arch/arm/mach-tegra/board-harmony-pinmux.c
-@@ -16,6 +16,8 @@
- 
- #include <linux/kernel.h>
- #include <linux/gpio.h>
-+#include <linux/of.h>
-+
- #include <mach/pinmux.h>
- 
- #include "gpio-names.h"
-@@ -161,7 +163,9 @@ static struct tegra_gpio_table gpio_table[] = {
- 
- void harmony_pinmux_init(void)
- {
--	platform_add_devices(pinmux_devices, ARRAY_SIZE(pinmux_devices));
-+	if (!of_machine_is_compatible("nvidia,tegra20"))
-+		platform_add_devices(pinmux_devices,
-+					ARRAY_SIZE(pinmux_devices));
- 
- 	tegra_pinmux_config_table(harmony_pinmux, ARRAY_SIZE(harmony_pinmux));
- 
-diff --git a/arch/arm/mach-tegra/board-paz00-pinmux.c b/arch/arm/mach-tegra/board-paz00-pinmux.c
-index fb20894..be30e21 100644
---- a/arch/arm/mach-tegra/board-paz00-pinmux.c
-+++ b/arch/arm/mach-tegra/board-paz00-pinmux.c
-@@ -16,6 +16,8 @@
- 
- #include <linux/kernel.h>
- #include <linux/gpio.h>
-+#include <linux/of.h>
-+
- #include <mach/pinmux.h>
- 
- #include "gpio-names.h"
-@@ -158,7 +160,9 @@ static struct tegra_gpio_table gpio_table[] = {
- 
- void paz00_pinmux_init(void)
- {
--	platform_add_devices(pinmux_devices, ARRAY_SIZE(pinmux_devices));
-+	if (!of_machine_is_compatible("nvidia,tegra20"))
-+		platform_add_devices(pinmux_devices,
-+					ARRAY_SIZE(pinmux_devices));
- 
- 	tegra_pinmux_config_table(paz00_pinmux, ARRAY_SIZE(paz00_pinmux));
- 
-diff --git a/arch/arm/mach-tegra/board-seaboard-pinmux.c b/arch/arm/mach-tegra/board-seaboard-pinmux.c
-index fbce31d..eb5991d 100644
---- a/arch/arm/mach-tegra/board-seaboard-pinmux.c
-+++ b/arch/arm/mach-tegra/board-seaboard-pinmux.c
-@@ -16,6 +16,7 @@
- #include <linux/kernel.h>
- #include <linux/init.h>
- #include <linux/gpio.h>
-+#include <linux/of.h>
- 
- #include <mach/pinmux.h>
- #include <mach/pinmux-t2.h>
-@@ -218,7 +219,9 @@ static void __init update_pinmux(struct tegra_pingroup_config *newtbl, int size)
- 
- void __init seaboard_common_pinmux_init(void)
- {
--	platform_add_devices(pinmux_devices, ARRAY_SIZE(pinmux_devices));
-+	if (!of_machine_is_compatible("nvidia,tegra20"))
-+		platform_add_devices(pinmux_devices,
-+					ARRAY_SIZE(pinmux_devices));
- 
- 	tegra_pinmux_config_table(seaboard_pinmux, ARRAY_SIZE(seaboard_pinmux));
- 
-diff --git a/arch/arm/mach-tegra/board-trimslice-pinmux.c b/arch/arm/mach-tegra/board-trimslice-pinmux.c
-index 4969dd2..7ab719d 100644
---- a/arch/arm/mach-tegra/board-trimslice-pinmux.c
-+++ b/arch/arm/mach-tegra/board-trimslice-pinmux.c
-@@ -16,6 +16,7 @@
- #include <linux/gpio.h>
- #include <linux/kernel.h>
- #include <linux/init.h>
-+#include <linux/of.h>
- 
- #include <mach/pinmux.h>
- 
-@@ -157,7 +158,9 @@ static struct tegra_gpio_table gpio_table[] = {
- 
- void __init trimslice_pinmux_init(void)
- {
--	platform_add_devices(pinmux_devices, ARRAY_SIZE(pinmux_devices));
-+	if (!of_machine_is_compatible("nvidia,tegra20"))
-+		platform_add_devices(pinmux_devices,
-+					ARRAY_SIZE(pinmux_devices));
- 	tegra_pinmux_config_table(trimslice_pinmux, ARRAY_SIZE(trimslice_pinmux));
- 	tegra_gpio_config(gpio_table, ARRAY_SIZE(gpio_table));
- }
++	"compulab,trimslice",
+ 	"nvidia,harmony",
+ 	"nvidia,seaboard",
+ 	"nvidia,ventana",
 -- 
 1.7.4.1
