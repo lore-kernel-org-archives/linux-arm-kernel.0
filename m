@@ -1,42 +1,33 @@
 From: swarren@nvidia.com (Stephen Warren)
-Date: Mon, 24 Oct 2011 20:45:01 -0700
-Subject: [PATCH] arm/tegra: Don't create duplicate gpio and pinmux devices
-In-Reply-To: <1319218550-26002-1-git-send-email-swarren@nvidia.com>
-References: <1319218550-26002-1-git-send-email-swarren@nvidia.com>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF173E1B416D@HQMAIL01.nvidia.com>
+Date: Mon, 24 Oct 2011 21:07:33 -0700
+Subject: [PATCH 1/1] pinctrl/sirf: fix sirfsoc_get_group_pins prototype
+	introduce in 7e570f97
+In-Reply-To: <1319472717-20159-1-git-send-email-plagnioj@jcrosoft.com>
+References: <1319472717-20159-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF173E1B4170@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stephen Warren wrote at Friday, October 21, 2011 11:36 AM:
+Jean-Christophe PLAGNIOL-VILLARD wrote at Monday, October 24, 2011 10:12 AM:
 ...
-> To avoid this duplicate registration, pass a parameter into *_pinmux_init()
-> indicating whether they should register the device or not. Set this true
-> for non-DT boards, and false otherwise.
+> diff --git a/drivers/pinctrl/pinmux-sirf.c b/drivers/pinctrl/pinmux-sirf.c
+> index ba73523..d76cae6 100644
+> --- a/drivers/pinctrl/pinmux-sirf.c
+> +++ b/drivers/pinctrl/pinmux-sirf.c
+> @@ -870,7 +870,7 @@ static const char *sirfsoc_get_group_name(struct pinctrl_dev *pctldev,
+> 
+>  static int sirfsoc_get_group_pins(struct pinctrl_dev *pctldev, unsigned selector,
+>  			       const unsigned **pins,
+> -			       const unsigned *num_pins)
+> +			       unsigned *num_pins)
+>  {
+>  	if (selector >= ARRAY_SIZE(sirfsoc_pin_groups))
+>  		return -EINVAL;
 
-Olof,
+Acked-by: Stephen Warren <swarren@nvidia.com>
 
-You'd asked if the same effect could be achieved simply setting up AUXDATA
-entries so the DT and non-DT devices end up getting named the same, and
-thus avoiding the duplicate registrations.
-
-The answer is: this sort-of works, but apparently only by accident:
-
-The static registration/probe through board-*-pinmux.c works as expected.
-
-Then, when instantiating devs from DT, the AUXDATA /only/ sets the dev
-name of the devs (and pdata if AUXDATA specificed it), but doesn't do
-anything more; an attempt to register the dev from DT is still made, even
-though a dev was already registered with that name. The first check that
-catches this is a failure to create a sysfs entry for the dev, since the
-name is the same. This is a WARN, or something with a very noisy backtrace.
-
-That doesn't seem ideal; I think on balance I'd rather go with the original
-patch. Hacking the DT code to check for already-existing names might be
-an option, but since it's a temporary measure, I think hiding this in Tegra
-code is better? Finally, for the upcoming T30 support, we really do want to
-probe the pinmux from DT rather than ignoring the instantiation from DT, so
-that the dev's OF node is available, and the driver can use a of_device_id
-table to know which SoC version's data tables to use.
+That'll teach me to only test-compile for U300 and not Sirf... I thought
+I'd made the same change to each, but I screwed up Sirf.
 
 -- 
 nvpublic
