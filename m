@@ -1,57 +1,193 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Tue, 25 Oct 2011 15:41:11 +0100
-Subject: [PATCH] Shrink thread_info a bit
-In-Reply-To: <20111024131853.GA4250@mudshark.cambridge.arm.com>
-References: <20111024124818.GA17693@n2100.arm.linux.org.uk>
-	<20111024131853.GA4250@mudshark.cambridge.arm.com>
-Message-ID: <20111025144110.GA2043@localhost.localdomain>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Tue, 25 Oct 2011 23:03:35 +0800
+Subject: [GIT PULL] pxa: fixes for next
+In-Reply-To: <4EA6C8A9.5000305@compulab.co.il>
+References: <CAMPhdO8hOZ6=RHrF4evR+2A0R5v7v1QRfYPBtH274NkfA6fV5g@mail.gmail.com>
+	<4EA6C8A9.5000305@compulab.co.il>
+Message-ID: <CAMPhdO-SM88yeaQMG27MODCHCxDM3U=7=JDP0uphb_w-nfWAkQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 24, 2011 at 02:18:53PM +0100, Will Deacon wrote:
-> Hi Russell,
-> 
-> On Mon, Oct 24, 2011 at 01:48:18PM +0100, Russell King - ARM Linux wrote:
-> > diff --git a/arch/arm/include/asm/thread_info.h b/arch/arm/include/asm/thread_info.h
-> > index 7b5cc8d..a030be7 100644
-> > --- a/arch/arm/include/asm/thread_info.h
-> > +++ b/arch/arm/include/asm/thread_info.h
-> > @@ -59,7 +59,9 @@ struct thread_info {
-> >  	__u32			syscall;	/* syscall number */
-> >  	__u8			used_cp[16];	/* thread used copro */
-> >  	unsigned long		tp_value;
-> > +#ifdef CONFIG_CRUNCH
-> >  	struct crunch_state	crunchstate;
-> > +#endif
-> >  	union fp_state		fpstate __attribute__((aligned(8)));
-> 
-> Can we also shrink the contents of fp_state when AEABI && !OABI_COMPAT?
+Sorry Igor, now merged.
 
-Is this the right config combination to indicate that the FPA ABI will
-not be supported?  I'm assuming so, since that's the condition which
-currently disallows CONFIG_NWFPE.
+Anrd,
 
-I'm not saying it's not ... I'm just unsure.
+With that specific patch queued, see the updated request as below:
 
-Note that the FPA state (35 words) is not that much smaller than the
-iwmmxt state (38 words), so not much space would be saved by shrinking
-that union.
+The following changes since commit c3b92c8787367a8bb53d57d9789b558f1295cc96:
 
-I wonder whether fpstate can go away completely on platforms which have
-neither fpa nor iwmmxt however.  That would be a more significant saving.
-Is it used for anything else?
+  Linux 3.1 (2011-10-24 09:10:05 +0200)
 
-> It's slightly more involved as ptrace and core-dumping would need some
-> similar treatment. We probably need to keep the union kicking around
-> though, since the iwmmxt state is held in there.
+are available in the git repository at:
+  git://github.com/ycmiao/pxa-linux.git fix
 
-We would need some sensible error return from the ptrace calls to access
-the FPA registers.  PTRACE_GETREGSET (not currently working on ARM since
-the relevant generic code is #ifdef'd on CONFIG_HAVE_ARCH_TRACEHOOK for
-some reason) returns -EINVAL when requesting a regset that isn't there.
+Arnd Bergmann (9):
+      ARM: pxa: make zylonite_pxa*_init declaration match code
+      ARM: pxa: export symbols from pxa3xx-ulpi
+      ARM: pxa: allow selecting just one of TREO680/CENTRO
+      ARM: pxa: CPU_FREQ_TABLE is needed for CPU_FREQ
+      ARM: pxa: pxa95x is incompatible with earlier pxa
+      ARM: pxa: select POWER_SUPPLY on raumfeld
+      ARM: pxa: centro and treo680 need palm27x
+      ARM: pxa: sharpsl pm needs SPI
+      ARM: pxa: use correct __iomem annotations
 
-Fixing coredumps should be relatively easy -- I think we just need to
-change arm_regsets[] in arch/arm/kernel/ptrace.c appropriately.
+Axel Lin (1):
+      ARM: pxa/cm-x300: properly set bt_reset pin
 
-Cheers
----Dave
+Eric Miao (5):
+      ARM: pxa: fix building error by palm27x_lcd_init() when FB_PXA not defined
+      ARM: pxa/z2: fix building error of pxa27x_cpu_suspend() no
+longer available
+      ARM: pxa: pxa95x/saarb depends on pxa3xx code
+      ARM: pxa: make pxafb_smart_*() empty when not enabled
+      ARM: mmp: rename SHEEVAD to GPLUGD
+
+ arch/arm/Kconfig                          |    1 +
+ arch/arm/include/asm/hardware/it8152.h    |    2 +-
+ arch/arm/mach-mmp/Kconfig                 |    2 +-
+ arch/arm/mach-mmp/Makefile                |    2 +-
+ arch/arm/mach-mmp/clock.h                 |    8 +++---
+ arch/arm/mach-mmp/common.c                |    4 +-
+ arch/arm/mach-mmp/gplugd.c                |    2 +-
+ arch/arm/mach-mmp/include/mach/addr-map.h |   10 ++++++-
+ arch/arm/mach-mmp/mmp2.c                  |    3 +-
+ arch/arm/mach-pxa/Kconfig                 |   38 ++++++++++++++++++++++-------
+ arch/arm/mach-pxa/Makefile                |    2 +-
+ arch/arm/mach-pxa/balloon3.c              |   10 ++++----
+ arch/arm/mach-pxa/cm-x2xx-pci.c           |    2 +-
+ arch/arm/mach-pxa/cm-x2xx.c               |    4 +-
+ arch/arm/mach-pxa/cm-x300.c               |    8 ++----
+ arch/arm/mach-pxa/include/mach/addr-map.h |    8 +++---
+ arch/arm/mach-pxa/include/mach/balloon3.h |    2 +-
+ arch/arm/mach-pxa/include/mach/hardware.h |    9 ++++---
+ arch/arm/mach-pxa/include/mach/lpd270.h   |    4 +-
+ arch/arm/mach-pxa/include/mach/mtd-xip.h  |    1 -
+ arch/arm/mach-pxa/include/mach/palm27x.h  |    2 +-
+ arch/arm/mach-pxa/include/mach/palmtx.h   |    6 ++--
+ arch/arm/mach-pxa/include/mach/pxa27x.h   |    2 +
+ arch/arm/mach-pxa/include/mach/pxa95x.h   |    7 +++++
+ arch/arm/mach-pxa/include/mach/pxafb.h    |   13 ++++++++++
+ arch/arm/mach-pxa/include/mach/smemc.h    |    2 +-
+ arch/arm/mach-pxa/include/mach/zeus.h     |    4 +-
+ arch/arm/mach-pxa/include/mach/zylonite.h |    4 +-
+ arch/arm/mach-pxa/irq.c                   |    4 +-
+ arch/arm/mach-pxa/lpd270.c                |    2 +-
+ arch/arm/mach-pxa/palmtreo.c              |    8 ++++++
+ arch/arm/mach-pxa/palmtx.c                |    8 +++---
+ arch/arm/mach-pxa/pxa25x.c                |    2 +-
+ arch/arm/mach-pxa/pxa27x.c                |    2 +-
+ arch/arm/mach-pxa/pxa3xx-ulpi.c           |    2 +
+ arch/arm/mach-pxa/pxa3xx.c                |    2 +-
+ arch/arm/mach-pxa/saarb.c                 |    3 +-
+ arch/arm/mach-pxa/z2.c                    |    3 +-
+ arch/arm/mach-pxa/zeus.c                  |    8 +++---
+ arch/arm/plat-pxa/gpio.c                  |    2 +-
+ arch/arm/plat-pxa/include/plat/mfp.h      |    2 +-
+ arch/arm/plat-pxa/mfp.c                   |    4 +-
+ drivers/pcmcia/pxa2xx_balloon3.c          |    2 +-
+ drivers/video/mbx/mbxfb.c                 |    6 ++--
+ drivers/video/pxafb.c                     |   10 -------
+ 45 files changed, 140 insertions(+), 92 deletions(-)
+ create mode 100644 arch/arm/mach-pxa/include/mach/pxa95x.h
+
+
+On Tue, Oct 25, 2011 at 10:33 PM, Igor Grinberg <grinberg@compulab.co.il> wrote:
+> Hi Eric,
+>
+> Can you please include the below patch [1] in your pull request?
+>
+> [1] https://lkml.org/lkml/2011/9/17/38
+>
+> It has been quit a long time on the list and it fixes a regression.
+>
+> Thanks
+> Igor
+>
+> On 10/25/2011 03:04 PM, Eric Miao wrote:
+>> Arnd,
+>>
+>> The fixes are mostly your randconfig fixes which are acked, we'll go
+>> through the remaining issues next cycle.
+>>
+>> The following changes since commit c3b92c8787367a8bb53d57d9789b558f1295cc96:
+>>
+>> ? Linux 3.1 (2011-10-24 09:10:05 +0200)
+>>
+>> are available in the git repository at:
+>> ? git://github.com/ycmiao/pxa-linux.git fix
+>>
+>> Arnd Bergmann (9):
+>> ? ? ? ARM: pxa: make zylonite_pxa*_init declaration match code
+>> ? ? ? ARM: pxa: export symbols from pxa3xx-ulpi
+>> ? ? ? ARM: pxa: allow selecting just one of TREO680/CENTRO
+>> ? ? ? ARM: pxa: CPU_FREQ_TABLE is needed for CPU_FREQ
+>> ? ? ? ARM: pxa: pxa95x is incompatible with earlier pxa
+>> ? ? ? ARM: pxa: select POWER_SUPPLY on raumfeld
+>> ? ? ? ARM: pxa: centro and treo680 need palm27x
+>> ? ? ? ARM: pxa: sharpsl pm needs SPI
+>> ? ? ? ARM: pxa: use correct __iomem annotations
+>>
+>> Eric Miao (5):
+>> ? ? ? ARM: pxa: fix building error by palm27x_lcd_init() when FB_PXA not defined
+>> ? ? ? ARM: pxa/z2: fix building error of pxa27x_cpu_suspend() no
+>> longer available
+>> ? ? ? ARM: pxa: pxa95x/saarb depends on pxa3xx code
+>> ? ? ? ARM: pxa: make pxafb_smart_*() empty when not enabled
+>> ? ? ? ARM: mmp: rename SHEEVAD to GPLUGD
+>>
+>> ?arch/arm/Kconfig ? ? ? ? ? ? ? ? ? ? ? ? ?| ? ?1 +
+>> ?arch/arm/include/asm/hardware/it8152.h ? ?| ? ?2 +-
+>> ?arch/arm/mach-mmp/Kconfig ? ? ? ? ? ? ? ? | ? ?2 +-
+>> ?arch/arm/mach-mmp/Makefile ? ? ? ? ? ? ? ?| ? ?2 +-
+>> ?arch/arm/mach-mmp/clock.h ? ? ? ? ? ? ? ? | ? ?8 +++---
+>> ?arch/arm/mach-mmp/common.c ? ? ? ? ? ? ? ?| ? ?4 +-
+>> ?arch/arm/mach-mmp/gplugd.c ? ? ? ? ? ? ? ?| ? ?2 +-
+>> ?arch/arm/mach-mmp/include/mach/addr-map.h | ? 10 ++++++-
+>> ?arch/arm/mach-mmp/mmp2.c ? ? ? ? ? ? ? ? ?| ? ?3 +-
+>> ?arch/arm/mach-pxa/Kconfig ? ? ? ? ? ? ? ? | ? 38 ++++++++++++++++++++++-------
+>> ?arch/arm/mach-pxa/Makefile ? ? ? ? ? ? ? ?| ? ?2 +-
+>> ?arch/arm/mach-pxa/balloon3.c ? ? ? ? ? ? ?| ? 10 ++++----
+>> ?arch/arm/mach-pxa/cm-x2xx-pci.c ? ? ? ? ? | ? ?2 +-
+>> ?arch/arm/mach-pxa/cm-x2xx.c ? ? ? ? ? ? ? | ? ?4 +-
+>> ?arch/arm/mach-pxa/include/mach/addr-map.h | ? ?8 +++---
+>> ?arch/arm/mach-pxa/include/mach/balloon3.h | ? ?2 +-
+>> ?arch/arm/mach-pxa/include/mach/hardware.h | ? ?9 ++++---
+>> ?arch/arm/mach-pxa/include/mach/lpd270.h ? | ? ?4 +-
+>> ?arch/arm/mach-pxa/include/mach/mtd-xip.h ?| ? ?1 -
+>> ?arch/arm/mach-pxa/include/mach/palm27x.h ?| ? ?2 +-
+>> ?arch/arm/mach-pxa/include/mach/palmtx.h ? | ? ?6 ++--
+>> ?arch/arm/mach-pxa/include/mach/pxa27x.h ? | ? ?2 +
+>> ?arch/arm/mach-pxa/include/mach/pxa95x.h ? | ? ?7 +++++
+>> ?arch/arm/mach-pxa/include/mach/pxafb.h ? ?| ? 13 ++++++++++
+>> ?arch/arm/mach-pxa/include/mach/smemc.h ? ?| ? ?2 +-
+>> ?arch/arm/mach-pxa/include/mach/zeus.h ? ? | ? ?4 +-
+>> ?arch/arm/mach-pxa/include/mach/zylonite.h | ? ?4 +-
+>> ?arch/arm/mach-pxa/irq.c ? ? ? ? ? ? ? ? ? | ? ?4 +-
+>> ?arch/arm/mach-pxa/lpd270.c ? ? ? ? ? ? ? ?| ? ?2 +-
+>> ?arch/arm/mach-pxa/palmtreo.c ? ? ? ? ? ? ?| ? ?8 ++++++
+>> ?arch/arm/mach-pxa/palmtx.c ? ? ? ? ? ? ? ?| ? ?8 +++---
+>> ?arch/arm/mach-pxa/pxa25x.c ? ? ? ? ? ? ? ?| ? ?2 +-
+>> ?arch/arm/mach-pxa/pxa27x.c ? ? ? ? ? ? ? ?| ? ?2 +-
+>> ?arch/arm/mach-pxa/pxa3xx-ulpi.c ? ? ? ? ? | ? ?2 +
+>> ?arch/arm/mach-pxa/pxa3xx.c ? ? ? ? ? ? ? ?| ? ?2 +-
+>> ?arch/arm/mach-pxa/saarb.c ? ? ? ? ? ? ? ? | ? ?3 +-
+>> ?arch/arm/mach-pxa/z2.c ? ? ? ? ? ? ? ? ? ?| ? ?3 +-
+>> ?arch/arm/mach-pxa/zeus.c ? ? ? ? ? ? ? ? ?| ? ?8 +++---
+>> ?arch/arm/plat-pxa/gpio.c ? ? ? ? ? ? ? ? ?| ? ?2 +-
+>> ?arch/arm/plat-pxa/include/plat/mfp.h ? ? ?| ? ?2 +-
+>> ?arch/arm/plat-pxa/mfp.c ? ? ? ? ? ? ? ? ? | ? ?4 +-
+>> ?drivers/pcmcia/pxa2xx_balloon3.c ? ? ? ? ?| ? ?2 +-
+>> ?drivers/video/mbx/mbxfb.c ? ? ? ? ? ? ? ? | ? ?6 ++--
+>> ?drivers/video/pxafb.c ? ? ? ? ? ? ? ? ? ? | ? 10 -------
+>> ?44 files changed, 137 insertions(+), 87 deletions(-)
+>> ?create mode 100644 arch/arm/mach-pxa/include/mach/pxa95x.h
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
+>
+>
+>
