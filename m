@@ -1,367 +1,42 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Tue, 25 Oct 2011 19:35:32 +0900
-Subject: [PATCH 3/3 v3] ARM: EXYNOS4: Delete the power domain code depend on
-	samsung SoC
-Message-ID: <4EA690F4.6040608@samsung.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 25 Oct 2011 05:00:34 -0600 (MDT)
+Subject: [PATCH v5 3/7] arm: perf: support device with other non-irq
+	resources
+In-Reply-To: <CACVXFVOVeuWpVGSUP-sDDbiWb=W8XVB+PDYns4ttK9+ty0GMmA@mail.gmail.com>
+References: <1319467559-5518-1-git-send-email-ming.lei@canonical.com>
+	<1319467559-5518-4-git-send-email-ming.lei@canonical.com>
+	<20111024150814.GA4771@mudshark.cambridge.arm.com>
+	<CACVXFVOzQ0QEnaAb=mLFdr7AU3H3TsT=wXcNgtqeUGVLXahd4Q@mail.gmail.com>
+	<20111025083420.GA6184@mudshark.cambridge.arm.com>
+	<alpine.DEB.2.00.1110250242130.27118@utopia.booyaka.com>
+	<CACVXFVOVeuWpVGSUP-sDDbiWb=W8XVB+PDYns4ttK9+ty0GMmA@mail.gmail.com>
+Message-ID: <alpine.DEB.2.00.1110250459160.12667@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
----
- arch/arm/mach-exynos4/Kconfig           |    5 -
- arch/arm/mach-exynos4/Makefile          |    1 -
- arch/arm/mach-exynos4/dev-pd.c          |  139 -------------------------------
- arch/arm/plat-samsung/Kconfig           |    8 --
- arch/arm/plat-samsung/Makefile          |    4 -
- arch/arm/plat-samsung/include/plat/pd.h |   30 -------
- arch/arm/plat-samsung/pd.c              |   95 ---------------------
- 7 files changed, 0 insertions(+), 282 deletions(-)
- delete mode 100644 arch/arm/mach-exynos4/dev-pd.c
- delete mode 100644 arch/arm/plat-samsung/include/plat/pd.h
- delete mode 100644 arch/arm/plat-samsung/pd.c
++ Beno?t
 
-diff --git a/arch/arm/mach-exynos4/Kconfig b/arch/arm/mach-exynos4/Kconfig
-index d042e53..3c16ab0 100644
---- a/arch/arm/mach-exynos4/Kconfig
-+++ b/arch/arm/mach-exynos4/Kconfig
-@@ -47,11 +47,6 @@ config EXYNOS4_SETUP_FIMD0
- 	help
- 	  Common setup code for FIMD0.
- 
--config EXYNOS4_DEV_PD
--	bool
--	help
--	  Compile in platform device definitions for Power Domain
--
- config EXYNOS4_DEV_SYSMMU
- 	bool
- 	help
-diff --git a/arch/arm/mach-exynos4/Makefile b/arch/arm/mach-exynos4/Makefile
-index d73a4e7..2cad115 100644
---- a/arch/arm/mach-exynos4/Makefile
-+++ b/arch/arm/mach-exynos4/Makefile
-@@ -42,7 +42,6 @@ obj-$(CONFIG_MACH_SMDK4412)		+= mach-smdk4x12.o
- 
- obj-y					+= dev-audio.o
- obj-$(CONFIG_EXYNOS4_DEV_AHCI)		+= dev-ahci.o
--obj-$(CONFIG_EXYNOS4_DEV_PD)		+= dev-pd.o
- obj-$(CONFIG_EXYNOS4_DEV_SYSMMU)	+= dev-sysmmu.o
- obj-$(CONFIG_EXYNOS4_DEV_DWMCI)	+= dev-dwmci.o
- 
-diff --git a/arch/arm/mach-exynos4/dev-pd.c b/arch/arm/mach-exynos4/dev-pd.c
-deleted file mode 100644
-index 3273f25..0000000
---- a/arch/arm/mach-exynos4/dev-pd.c
-+++ /dev/null
-@@ -1,139 +0,0 @@
--/* linux/arch/arm/mach-exynos4/dev-pd.c
-- *
-- * Copyright (c) 2010-2011 Samsung Electronics Co., Ltd.
-- *		http://www.samsung.com
-- *
-- * EXYNOS4 - Power Domain support
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
--*/
--
--#include <linux/io.h>
--#include <linux/kernel.h>
--#include <linux/platform_device.h>
--#include <linux/delay.h>
--
--#include <mach/regs-pmu.h>
--
--#include <plat/pd.h>
--
--static int exynos4_pd_enable(struct device *dev)
--{
--	struct samsung_pd_info *pdata =  dev->platform_data;
--	u32 timeout;
--
--	__raw_writel(S5P_INT_LOCAL_PWR_EN, pdata->base);
--
--	/* Wait max 1ms */
--	timeout = 10;
--	while ((__raw_readl(pdata->base + 0x4) & S5P_INT_LOCAL_PWR_EN)
--		!= S5P_INT_LOCAL_PWR_EN) {
--		if (timeout == 0) {
--			printk(KERN_ERR "Power domain %s enable failed.\n",
--				dev_name(dev));
--			return -ETIMEDOUT;
--		}
--		timeout--;
--		udelay(100);
--	}
--
--	return 0;
--}
--
--static int exynos4_pd_disable(struct device *dev)
--{
--	struct samsung_pd_info *pdata =  dev->platform_data;
--	u32 timeout;
--
--	__raw_writel(0, pdata->base);
--
--	/* Wait max 1ms */
--	timeout = 10;
--	while (__raw_readl(pdata->base + 0x4) & S5P_INT_LOCAL_PWR_EN) {
--		if (timeout == 0) {
--			printk(KERN_ERR "Power domain %s disable failed.\n",
--				dev_name(dev));
--			return -ETIMEDOUT;
--		}
--		timeout--;
--		udelay(100);
--	}
--
--	return 0;
--}
--
--struct platform_device exynos4_device_pd[] = {
--	{
--		.name		= "samsung-pd",
--		.id		= 0,
--		.dev = {
--			.platform_data = &(struct samsung_pd_info) {
--				.enable		= exynos4_pd_enable,
--				.disable	= exynos4_pd_disable,
--				.base		= S5P_PMU_MFC_CONF,
--			},
--		},
--	}, {
--		.name		= "samsung-pd",
--		.id		= 1,
--		.dev = {
--			.platform_data = &(struct samsung_pd_info) {
--				.enable		= exynos4_pd_enable,
--				.disable	= exynos4_pd_disable,
--				.base		= S5P_PMU_G3D_CONF,
--			},
--		},
--	}, {
--		.name		= "samsung-pd",
--		.id		= 2,
--		.dev = {
--			.platform_data = &(struct samsung_pd_info) {
--				.enable		= exynos4_pd_enable,
--				.disable	= exynos4_pd_disable,
--				.base		= S5P_PMU_LCD0_CONF,
--			},
--		},
--	}, {
--		.name		= "samsung-pd",
--		.id		= 3,
--		.dev = {
--			.platform_data = &(struct samsung_pd_info) {
--				.enable		= exynos4_pd_enable,
--				.disable	= exynos4_pd_disable,
--				.base		= S5P_PMU_LCD1_CONF,
--			},
--		},
--	}, {
--		.name		= "samsung-pd",
--		.id		= 4,
--		.dev = {
--			.platform_data = &(struct samsung_pd_info) {
--				.enable		= exynos4_pd_enable,
--				.disable	= exynos4_pd_disable,
--				.base		= S5P_PMU_TV_CONF,
--			},
--		},
--	}, {
--		.name		= "samsung-pd",
--		.id		= 5,
--		.dev = {
--			.platform_data = &(struct samsung_pd_info) {
--				.enable		= exynos4_pd_enable,
--				.disable	= exynos4_pd_disable,
--				.base		= S5P_PMU_CAM_CONF,
--			},
--		},
--	}, {
--		.name		= "samsung-pd",
--		.id		= 6,
--		.dev = {
--			.platform_data = &(struct samsung_pd_info) {
--				.enable		= exynos4_pd_enable,
--				.disable	= exynos4_pd_disable,
--				.base		= S5P_PMU_GPS_CONF,
--			},
--		},
--	},
--};
-diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-samsung/Kconfig
-index 74714c1..f29c443 100644
---- a/arch/arm/plat-samsung/Kconfig
-+++ b/arch/arm/plat-samsung/Kconfig
-@@ -335,12 +335,4 @@ config SAMSUNG_WAKEMASK
- 	  and above. This code allows a set of interrupt to wakeup-mask
- 	  mappings. See <plat/wakeup-mask.h>
- 
--comment "Power Domain"
--
--config SAMSUNG_PD
--	bool "Samsung Power Domain"
--	depends on PM_RUNTIME
--	help
--	  Say Y here if you want to control Power Domain by Runtime PM.
--
- endif
-diff --git a/arch/arm/plat-samsung/Makefile b/arch/arm/plat-samsung/Makefile
-index a524fab..bd60e56 100644
---- a/arch/arm/plat-samsung/Makefile
-+++ b/arch/arm/plat-samsung/Makefile
-@@ -48,10 +48,6 @@ obj-$(CONFIG_SAMSUNG_PM_CHECK)	+= pm-check.o
- 
- obj-$(CONFIG_SAMSUNG_WAKEMASK)	+= wakeup-mask.o
- 
--# PD support
--
--obj-$(CONFIG_SAMSUNG_PD)	+= pd.o
--
- # PWM support
- 
- obj-$(CONFIG_HAVE_PWM)		+= pwm.o
-diff --git a/arch/arm/plat-samsung/include/plat/pd.h b/arch/arm/plat-samsung/include/plat/pd.h
-deleted file mode 100644
-index abb4bc3..0000000
---- a/arch/arm/plat-samsung/include/plat/pd.h
-+++ /dev/null
-@@ -1,30 +0,0 @@
--/* linux/arch/arm/plat-samsung/include/plat/pd.h
-- *
-- * Copyright (c) 2010-2011 Samsung Electronics Co., Ltd.
-- *		http://www.samsung.com
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
--*/
--
--#ifndef __ASM_PLAT_SAMSUNG_PD_H
--#define __ASM_PLAT_SAMSUNG_PD_H __FILE__
--
--struct samsung_pd_info {
--	int (*enable)(struct device *dev);
--	int (*disable)(struct device *dev);
--	void __iomem *base;
--};
--
--enum exynos4_pd_block {
--	PD_MFC,
--	PD_G3D,
--	PD_LCD0,
--	PD_LCD1,
--	PD_TV,
--	PD_CAM,
--	PD_GPS
--};
--
--#endif /* __ASM_PLAT_SAMSUNG_PD_H */
-diff --git a/arch/arm/plat-samsung/pd.c b/arch/arm/plat-samsung/pd.c
-deleted file mode 100644
-index efe1d56..0000000
---- a/arch/arm/plat-samsung/pd.c
-+++ /dev/null
-@@ -1,95 +0,0 @@
--/* linux/arch/arm/plat-samsung/pd.c
-- *
-- * Copyright (c) 2010 Samsung Electronics Co., Ltd.
-- *		http://www.samsung.com
-- *
-- * Samsung Power domain support
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
--*/
--
--#include <linux/init.h>
--#include <linux/module.h>
--#include <linux/platform_device.h>
--#include <linux/err.h>
--#include <linux/pm_runtime.h>
--
--#include <plat/pd.h>
--
--static int samsung_pd_probe(struct platform_device *pdev)
--{
--	struct samsung_pd_info *pdata = pdev->dev.platform_data;
--	struct device *dev = &pdev->dev;
--
--	if (!pdata) {
--		dev_err(dev, "no device data specified\n");
--		return -ENOENT;
--	}
--
--	pm_runtime_set_active(dev);
--	pm_runtime_enable(dev);
--
--	dev_info(dev, "power domain registered\n");
--	return 0;
--}
--
--static int __devexit samsung_pd_remove(struct platform_device *pdev)
--{
--	struct device *dev = &pdev->dev;
--
--	pm_runtime_disable(dev);
--	return 0;
--}
--
--static int samsung_pd_runtime_suspend(struct device *dev)
--{
--	struct samsung_pd_info *pdata = dev->platform_data;
--	int ret = 0;
--
--	if (pdata->disable)
--		ret = pdata->disable(dev);
--
--	dev_dbg(dev, "suspended\n");
--	return ret;
--}
--
--static int samsung_pd_runtime_resume(struct device *dev)
--{
--	struct samsung_pd_info *pdata = dev->platform_data;
--	int ret = 0;
--
--	if (pdata->enable)
--		ret = pdata->enable(dev);
--
--	dev_dbg(dev, "resumed\n");
--	return ret;
--}
--
--static const struct dev_pm_ops samsung_pd_pm_ops = {
--	.runtime_suspend	= samsung_pd_runtime_suspend,
--	.runtime_resume		= samsung_pd_runtime_resume,
--};
--
--static struct platform_driver samsung_pd_driver = {
--	.driver		= {
--		.name		= "samsung-pd",
--		.owner		= THIS_MODULE,
--		.pm		= &samsung_pd_pm_ops,
--	},
--	.probe		= samsung_pd_probe,
--	.remove		= __devexit_p(samsung_pd_remove),
--};
--
--static int __init samsung_pd_init(void)
--{
--	int ret;
--
--	ret = platform_driver_register(&samsung_pd_driver);
--	if (ret)
--		printk(KERN_ERR "%s: failed to add PD driver\n", __func__);
--
--	return ret;
--}
--arch_initcall(samsung_pd_init);
--- 
-1.7.0.4
+Hi
+
+On Tue, 25 Oct 2011, Ming Lei wrote:
+
+> On Tue, Oct 25, 2011 at 4:44 PM, Paul Walmsley <paul@pwsan.com> wrote:
+> > On Tue, 25 Oct 2011, Will Deacon wrote:
+> >
+> >> Hurrah! If you can get the OMAP / hwmod bits acked by the OMAP guys then I'm
+> >> happy to take the perf and PMU changes into my tree.
+> >
+> > I'd suggest that you take the perf/PMU stuff yourself if you are happy
+> > with it, and then we'll deal with the OMAP bits ourselves, since it looks
+> > like they aren't dependent on each other, and the OMAP parts will need
+> > changes.
+> 
+> One omap4 patch(struct arm_pmu_platdata related) depends on 2/7, which
+> need to be rebased. But I still suggest that arm perf/PMU stuff may be
+> merged first.
+> 
+> Paul, expect your comments on OMAP4 parts.
+
+Beno?t is the right person to review OMAP4 hwmod data.
+
+- Paul
