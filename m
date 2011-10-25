@@ -1,8 +1,8 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 25 Oct 2011 15:08:39 +0800
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Tue, 25 Oct 2011 12:31:51 +0530
 Subject: [PATCH v2 3/5] regulator: helper routine to extract
 	regulator_init_data
-In-Reply-To: <4EA652DA.5050901@ti.com>
+In-Reply-To: <20111025070837.GE2119@S2100-06.ap.freescale.net>
 References: <20111021082309.GA337@S2100-06.ap.freescale.net>
 	<20111024092411.GE8708@ponder.secretlab.ca>
 	<20111024130429.GD1755@S2100-06.ap.freescale.net>
@@ -13,37 +13,41 @@ References: <20111021082309.GA337@S2100-06.ap.freescale.net>
 	<20111024145631.GB8708@ponder.secretlab.ca>
 	<20111024155132.GI1755@S2100-06.ap.freescale.net>
 	<4EA652DA.5050901@ti.com>
-Message-ID: <20111025070837.GE2119@S2100-06.ap.freescale.net>
+	<20111025070837.GE2119@S2100-06.ap.freescale.net>
+Message-ID: <4EA65EDF.2070803@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 25, 2011 at 11:40:34AM +0530, Rajendra Nayak wrote:
-> On Monday 24 October 2011 09:21 PM, Shawn Guo wrote:
-> >On Mon, Oct 24, 2011 at 04:56:31PM +0200, Grant Likely wrote:
-[...]
-> >>It is always better to attach the of_node at struct device
-> >>registration time instead of searching the tree in common code.  The
-> >>of_node should already be assigned by the time regulator_register() is
-> >>called.
-> >
-> >That's the problem we have.  There is no 'struct dev' to attach of_node
-> >for each regulator by the time regulator_register() is called, because
-> >the 'struct dev' for each regulator is created inside
-> >regulator_register() as wrapped by 'struct regulator_dev'.
-> 
-> The root of your problem seems to be that your pmic driver isn't
-> registering regulator devices from DT, and if it did, you wouldn't
-> need to do a search in dev->parent->of_node and instead the driver
-> would have the right dev->of_node populated.
-> 
-No, it's not the root of my problem.  Again, we are talking about
-'Case 2', where multiple regulator devices are registered to
-regulator core with regulator driver being probed once, where each
-regulator node is taken as the child of 'regulators' node.  Having
-device_node of 'regulators' attached to dev->of_node does not help
-at all.  What we need is to have each child node attached to
-regulator_dev->dev.of_node.
+On Tuesday 25 October 2011 12:38 PM, Shawn Guo wrote:
+> On Tue, Oct 25, 2011 at 11:40:34AM +0530, Rajendra Nayak wrote:
+>> On Monday 24 October 2011 09:21 PM, Shawn Guo wrote:
+>>> On Mon, Oct 24, 2011 at 04:56:31PM +0200, Grant Likely wrote:
+> [...]
+>>>> It is always better to attach the of_node at struct device
+>>>> registration time instead of searching the tree in common code.  The
+>>>> of_node should already be assigned by the time regulator_register() is
+>>>> called.
+>>>
+>>> That's the problem we have.  There is no 'struct dev' to attach of_node
+>>> for each regulator by the time regulator_register() is called, because
+>>> the 'struct dev' for each regulator is created inside
+>>> regulator_register() as wrapped by 'struct regulator_dev'.
+>>
+>> The root of your problem seems to be that your pmic driver isn't
+>> registering regulator devices from DT, and if it did, you wouldn't
+>> need to do a search in dev->parent->of_node and instead the driver
+>> would have the right dev->of_node populated.
+>>
+> No, it's not the root of my problem.  Again, we are talking about
+> 'Case 2', where multiple regulator devices are registered to
+> regulator core with regulator driver being probed once, where each
+> regulator node is taken as the child of 'regulators' node.  Having
+> device_node of 'regulators' attached to dev->of_node does not help
+> at all.  What we need is to have each child node attached to
+> regulator_dev->dev.of_node.
 
--- 
-Regards,
-Shawn
+It certainly helps if dev->of_node has the 'regulators' node attached.
+The driver can very easily then do a for_each_child_of_node() to extract
+and register individual regulators passing an additional of_node param.
+
+>
