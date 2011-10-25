@@ -1,30 +1,29 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Tue, 25 Oct 2011 08:35:38 -0700
-Subject: [PATCH] lib: devres: add convenience function to remap a resource
-In-Reply-To: <1319548607-28427-1-git-send-email-w.sang@pengutronix.de>
-References: <1319548607-28427-1-git-send-email-w.sang@pengutronix.de>
-Message-ID: <20111025153538.GA13012@google.com>
+From: rabin@rab.in (Rabin Vincent)
+Date: Tue, 25 Oct 2011 21:06:52 +0530
+Subject: [PATCH] ARM: kprobes: only patch instructions on one CPU
+In-Reply-To: <1318496852.2213.39.camel@computer2>
+References: <1318435944-21855-1-git-send-email-rabin@rab.in>
+	<1318492515.2265.51.camel@computer2>
+	<1318496852.2213.39.camel@computer2>
+Message-ID: <20111025153652.GA11649@debian>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 25, 2011 at 03:16:47PM +0200, Wolfram Sang wrote:
-> Almost every platform_driver does the three steps get_resource,
-> request_mem_region, ioremap. This does not only lead to a lot of code
-> duplication, but also a huge number of similar error strings and
-> inconsistent error codes on failure. So, introduce a helper function
-> which simplifies remapping a resource and make it hard to do something
-> wrong and add documentation for it.
-> 
-> Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
-> Cc: Grant Likely <grant.likely@secretlab.ca>
-> Cc: Tejun Heo <tj@kernel.org>
-> Cc: Greg KH <gregkh@suse.de>
+On Thu, Oct 13, 2011 at 10:07:32AM +0100, Tixy wrote:
+> As I said in my reply to the other mail, I had missed the fact that it
+> is stop_machine_cpu_stop() which is used to call our function, and this
+> synchronises all cores. Therefore, this patch is correct, assuming that
+> a flush_icache_range executed on one core also flushes I-caches on other
+> cores. (I'm a bit doubtfull of this as I beleive that at least
+> ARM11MPCore requires this to be managed in software and I can't find any
+> code that handles this.)
 
- Acked-by: Tejun Heo <tj@kernel.org>
+If we want kprobes to work correctly on ARM11MPCore, shouldn't we need
+to broadcast the invalidate in arch_prepare_kprobe() and the
+non-stop-machine-using parts of arch_arm_kprobe() too?
 
-Greg, can you please take this one?
-
-Thank you.
-
--- 
-tejun
+Also, it seems odd to perform the instruction write and
+flush_icache_range() on every CPU from stop_machine().  Perhaps it would
+be better if there were a way in stop_machine() to call an I-cache
+invalidation function on all CPUs, after the arm/disarm function is
+called on only one of them.
