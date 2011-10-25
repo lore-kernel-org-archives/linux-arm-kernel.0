@@ -1,80 +1,32 @@
-From: ulf.hansson@stericsson.com (Ulf Hansson)
-Date: Tue, 25 Oct 2011 09:39:12 +0200
-Subject: [PATCH] mmc: mmci: Improve runtime PM support
-In-Reply-To: <CAKnu2MppySzpE5SxtqW_yV7KNEWw+tQ658i0pyfoUiwQCL2CGA@mail.gmail.com>
-References: <1319210754-22775-1-git-send-email-ulf.hansson@stericsson.com>	<20111021173637.GG21648@n2100.arm.linux.org.uk>	<CAKnu2MrOriMzJH9NcwUivWa0cinASa6wrRf4a69si4WUs-aTrQ@mail.gmail.com>	<CAAgDR1OT=+xgQTNwmTz=9XwzpbhjeZ6F-mxnVGhOAPSAR3JiFQ@mail.gmail.com>	<4EA51C4A.7040802@stericsson.com>	<20111024090432.GA9893@n2100.arm.linux.org.uk>	<4EA53181.2050700@stericsson.com>	<20111024094203.GI9893@n2100.arm.linux.org.uk>	<4EA538A3.9070501@stericsson.com>	<20111024101416.GK9893@n2100.arm.linux.org.uk>	<4EA55076.2010701@stericsson.com>	<CACRpkdb7FwW=Qa2MiJkbezkBO3F+Y0j6-RWSiL8dfJXkbd4pHw@mail.gmail.com>	<4EA58368.6050704@stericsson.com>
-	<CAKnu2MppySzpE5SxtqW_yV7KNEWw+tQ658i0pyfoUiwQCL2CGA@mail.gmail.com>
-Message-ID: <4EA667A0.9070808@stericsson.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 25 Oct 2011 09:48:16 +0200
+Subject: GIC MULTI_IRQ_HANDLER branches
+In-Reply-To: <20111024162612.728acd58@taxman.wild-wind.fr.eu.org>
+References: <20111024162612.728acd58@taxman.wild-wind.fr.eu.org>
+Message-ID: <20111025074815.GG4429@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus Walleij wrote:
-> 2011/10/24 Ulf Hansson <ulf.hansson@stericsson.com>:
+* Marc Zyngier <maz@misterjones.org> [111024 16:59]:
+> I've stashed my patches for MULTI_IRQ_HANDLER on the following branches:
+> git://github.com/mzyngier/arm-platforms.git gic-multi-irq
+> git://github.com/mzyngier/arm-platforms.git gic-multi-irq-asm
 > 
->> Could we assume that all boards which utilizes the ARM PL180 are using the
->> MMCIPWR register to control power the card? Or should we add a new amba mmci
->> platform member so this is configurable for each board?
+> This is based on Russell's smp branch, plus my PPI patches that Russell
+> has already pulled for the upcoming merge window.
 > 
-> I think we should take entire variants, like currently U300 and Ux500.
-> In those designs the MMCIPWR signal is left dangling on the chip,
-> so no-one electronics designer can use that signal for anything even
-> if s/he would have wanted to.
+> The difference between the two branches is that the second is keeping
+> the ASM version of the GIC handler instead of a C version.
 > 
->> An option could also be if we might want to simplify code to just skip the
->> entire runtime_suspend|idle|resume function (ie stubb it or something) for
->> these kind of boards?
-> 
-> I think the clk_disable()/clk_enable() pair in runtime suspend/resume
-> is still valuable for all other variants too. That has nothing to do with
-> MMCIPWR.
-> 
->> By the way, there is also another option. In the runtime_suspend function
->> for ARM PL180 block we can use mmc_power_save_host (and then also
->> disable vcore etc) and vice verse in runtime_resume with
->> mmc_power_restore_host.
-> 
-> This is what the OMAP driver does right?
+> The C version has been tested on VE, Realview, Tegra, and OMAP2/3/4.
+> The ASM version has only been tested on OMAP4.
 
-Nope.
+For the record, boots fine on omap1/2/3/4 like I replied earlier
+with my Tested-by.
 
-Right now I think it is only SDIO function drivers through pm_runtime 
-that can trigger the use of these functions though the bus registered 
-runtime functions.
+Can people please test this series on all subarchs so Marc can
+then remove the remaining assembly code too.
 
-> 
->> Of course, these kind of operations takes quite some time to execute and
->> therefore we use a much bigger timeout than 50 ms (for example 10 s
->> instead) for ARM PL180.
-> 
-> Can we do both?
+Regards,
 
-That is possible! But I think we need confirmation from Russell first.
-
-Using mmc_power_save_host/mmc_power_restore_host could be a way forward 
-for ARM PL180, but you should note that initializing a card after it has 
-been fully powered down, can for really crappy SD-cards take up to 1 s. 
-Normally this time is 100-400 ms.
-
-This initialization time will then be the latency for the first 
-read/write after the runtime timeout has expired. There is always a cost 
-in "performance" when doing power save it seems. :-)
-
-> 
-> 1) Break out mmci_state_save_restore() from the runtime PM hooks.
-> 
-> 2) I.e. have a short time-out that will runtime-suspend the external
->   regulator variants quickly with finer granularity.
-> 
-> 3) Have a long time-out that will runtime-suspend the MMCIPWR
->   variants using mmc_power_save_host() with a longer delay?
->   Since mmc_power_save_host() calls .set_ios() to really shut
->   down the power to the card we should be on the safe side.
-> 
-> Looks like a nice silver bullet to me :-)
-> 
-> I volunteer to test the long time-out code path on the Integrator
-> PB1176 to verify this works.
-> 
-> Yours,
-> Linus Walleij
-> 
+Tony
