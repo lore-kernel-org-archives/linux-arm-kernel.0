@@ -1,59 +1,34 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 25 Oct 2011 15:28:21 +0800
-Subject: [PATCH v2 3/5] regulator: helper routine to extract
-	regulator_init_data
-In-Reply-To: <4EA65EDF.2070803@ti.com>
-References: <20111024130429.GD1755@S2100-06.ap.freescale.net>
-	<20111024130636.GB26033@opensource.wolfsonmicro.com>
-	<20111024134025.GE1755@S2100-06.ap.freescale.net>
-	<20111024135950.GV8708@ponder.secretlab.ca>
-	<20111024145139.GH1755@S2100-06.ap.freescale.net>
-	<20111024145631.GB8708@ponder.secretlab.ca>
-	<20111024155132.GI1755@S2100-06.ap.freescale.net>
-	<4EA652DA.5050901@ti.com>
-	<20111025070837.GE2119@S2100-06.ap.freescale.net>
-	<4EA65EDF.2070803@ti.com>
-Message-ID: <20111025072820.GG2119@S2100-06.ap.freescale.net>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 25 Oct 2011 09:20:34 +0200
+Subject: [PATCH] ARM: mx31pdk: Add MC13783 RTC support
+In-Reply-To: <1319482929-28262-1-git-send-email-fabio.estevam@freescale.com>
+References: <1319482929-28262-1-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <20111025072034.GR15299@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 25, 2011 at 12:31:51PM +0530, Rajendra Nayak wrote:
-> On Tuesday 25 October 2011 12:38 PM, Shawn Guo wrote:
-> >On Tue, Oct 25, 2011 at 11:40:34AM +0530, Rajendra Nayak wrote:
-> >>On Monday 24 October 2011 09:21 PM, Shawn Guo wrote:
-> >>>On Mon, Oct 24, 2011 at 04:56:31PM +0200, Grant Likely wrote:
-> >[...]
-> >>>>It is always better to attach the of_node at struct device
-> >>>>registration time instead of searching the tree in common code.  The
-> >>>>of_node should already be assigned by the time regulator_register() is
-> >>>>called.
-> >>>
-> >>>That's the problem we have.  There is no 'struct dev' to attach of_node
-> >>>for each regulator by the time regulator_register() is called, because
-> >>>the 'struct dev' for each regulator is created inside
-> >>>regulator_register() as wrapped by 'struct regulator_dev'.
-> >>
-> >>The root of your problem seems to be that your pmic driver isn't
-> >>registering regulator devices from DT, and if it did, you wouldn't
-> >>need to do a search in dev->parent->of_node and instead the driver
-> >>would have the right dev->of_node populated.
-> >>
-> >No, it's not the root of my problem.  Again, we are talking about
-> >'Case 2', where multiple regulator devices are registered to
-> >regulator core with regulator driver being probed once, where each
-> >regulator node is taken as the child of 'regulators' node.  Having
-> >device_node of 'regulators' attached to dev->of_node does not help
-> >at all.  What we need is to have each child node attached to
-> >regulator_dev->dev.of_node.
-> 
-> It certainly helps if dev->of_node has the 'regulators' node attached.
-> The driver can very easily then do a for_each_child_of_node() to extract
-> and register individual regulators passing an additional of_node param.
-> 
-Well, let's look at what Grant is asking for.  He is asking for that
-each child node should be attached to regulator_dev->dev.of_node by
-the time regulator_register() is called.  How can this be helping that?
+Hello Fabio,
+
+On Mon, Oct 24, 2011 at 05:02:09PM -0200, Fabio Estevam wrote:
+> diff --git a/arch/arm/mach-imx/mach-mx31_3ds.c b/arch/arm/mach-imx/mach-mx31_3ds.c
+> index c20be75..e82778c 100644
+> --- a/arch/arm/mach-imx/mach-mx31_3ds.c
+> +++ b/arch/arm/mach-imx/mach-mx31_3ds.c
+> @@ -494,7 +494,8 @@ static struct mc13xxx_platform_data mc13783_pdata = {
+>  		.regulators = mx31_3ds_regulators,
+>  		.num_regulators = ARRAY_SIZE(mx31_3ds_regulators),
+>  	},
+> -	.flags  = MC13783_USE_REGULATOR | MC13783_USE_TOUCHSCREEN,
+> +	.flags  = MC13XXX_USE_REGULATOR | MC13XXX_USE_TOUCHSCREEN |
+> +							MC13XXX_USE_RTC,
+ok in principle but (I think mfd in) next touches this already:
+
+	$ git show next/master:arch/arm/mach-imx/mach-mx31_3ds.c | grep USE_TOUCH
+		.flags  = MC13XXX_USE_TOUCHSCREEN,
+
+Best regards
+Uwe
 
 -- 
-Regards,
-Shawn
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
