@@ -1,9 +1,8 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 25 Oct 2011 10:05:32 +0200
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Tue, 25 Oct 2011 10:17:19 +0200
 Subject: [PATCH] drivers: create a pin control subsystem v8
-In-Reply-To: <20111024110518.GG8708@ponder.secretlab.ca>
-References: <20110930020754.GK12606@ponder.secretlab.ca>
-	<CACRpkdYyyqB6=5M8reqgwpMxXJz5ttXWyOav6K58dQ0CrxwCNA@mail.gmail.com>
+In-Reply-To: <20111025080532.GI4429@atomide.com>
+References: <CACRpkdYyyqB6=5M8reqgwpMxXJz5ttXWyOav6K58dQ0CrxwCNA@mail.gmail.com>
 	<CACxGe6v19pZ0i-+ksYZbG2ZvGT30UkXEHTzpZMBTB4RNUV5bnA@mail.gmail.com>
 	<CAKnu2MpQ8Wvd4TF8Ge=o8ACyEoaEY8TcvOSdT1w6zfYiSKFUiw@mail.gmail.com>
 	<20111004203520.GK2870@ponder.secretlab.ca>
@@ -12,48 +11,60 @@ References: <20110930020754.GK12606@ponder.secretlab.ca>
 	<20111024073604.GA8708@ponder.secretlab.ca>
 	<CACRpkdZ6DCeELLhiXF=oOMKB-DxeMuvbd_c6n4H1UDMhpHKZbA@mail.gmail.com>
 	<20111024110518.GG8708@ponder.secretlab.ca>
-Message-ID: <20111025080532.GI4429@atomide.com>
+	<20111025080532.GI4429@atomide.com>
+Message-ID: <20111025081719.GA4605@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Grant Likely <grant.likely@secretlab.ca> [111024 12:31]:
-> On Mon, Oct 24, 2011 at 09:48:19AM +0200, Linus Walleij wrote:
-> > On Mon, Oct 24, 2011 at 9:36 AM, Grant Likely <grant.likely@secretlab.ca> wrote:
-> > > On Mon, Oct 24, 2011 at 09:26:38AM +0200, Linus Walleij wrote:
-> > (...)
-> > >> I was more thinking along the lines of one device per GPIO controller,
-> > >> then you ioctl() to ask /dev/gpio0 how many pins it has or so.
-> > >
-> > > And there is also the question of whether it is even a good idea to
-> > > export pinctrl manipulation to userspace.
+On Tue, Oct 25, 2011 at 10:05:32AM +0200, Tony Lindgren wrote:
+> * Grant Likely <grant.likely@secretlab.ca> [111024 12:31]:
+> > On Mon, Oct 24, 2011 at 09:48:19AM +0200, Linus Walleij wrote:
+> > > On Mon, Oct 24, 2011 at 9:36 AM, Grant Likely <grant.likely@secretlab.ca> wrote:
+> > > > On Mon, Oct 24, 2011 at 09:26:38AM +0200, Linus Walleij wrote:
+> > > (...)
+> > > >> I was more thinking along the lines of one device per GPIO controller,
+> > > >> then you ioctl() to ask /dev/gpio0 how many pins it has or so.
+> > > >
+> > > > And there is also the question of whether it is even a good idea to
+> > > > export pinctrl manipulation to userspace.
+> > > 
+> > > The application I've seen is in automatic control.
+> > > 
+> > > I think people do things like connect they GPIO pins to electrical
+> > > relays, plus on top of that they use all the stuff in drivers/staging/iio.
+> > > 
+> > > All that from userspace. Controlling entire factories and industrial
+> > > robots, weapon systems too, I'm afraid.
+> > > 
+> > > The control of these dangerous things runs on a realtime-patched
+> > > kernel, in a single userspace app with a few threads and they have
+> > > done some realtime-tetris scheduling the beast more or less
+> > > manually with SCHED_FIFO. Basically that app is all that runs on
+> > > the board, and its threads take precedence over everything else
+> > > on the system.
+> > > 
+> > > That is the typical beast that is poking around on the GPIO sysfs
+> > > interfaces...
 > > 
-> > The application I've seen is in automatic control.
-> > 
-> > I think people do things like connect they GPIO pins to electrical
-> > relays, plus on top of that they use all the stuff in drivers/staging/iio.
-> > 
-> > All that from userspace. Controlling entire factories and industrial
-> > robots, weapon systems too, I'm afraid.
-> > 
-> > The control of these dangerous things runs on a realtime-patched
-> > kernel, in a single userspace app with a few threads and they have
-> > done some realtime-tetris scheduling the beast more or less
-> > manually with SCHED_FIFO. Basically that app is all that runs on
-> > the board, and its threads take precedence over everything else
-> > on the system.
-> > 
-> > That is the typical beast that is poking around on the GPIO sysfs
-> > interfaces...
+> > ... which maybe should be encouraged to use some form of uio driver.  :-)
 > 
-> ... which maybe should be encouraged to use some form of uio driver.  :-)
+> Changing pins from userspace is extremely handy for debugging drivers
+> and PM. For normal use case there should not be any need except to
+> view the values.
+> 
+> But for debugging we should have some interface for changing
+> the values either via debugfs or some user space program.
 
-Changing pins from userspace is extremely handy for debugging drivers
-and PM. For normal use case there should not be any need except to
-view the values.
+I've got no issue with a debugfs interface, although it would probably
+a good idea to put a big scary warning into klog when userspace starts
+manipulating pinctrl setting.  Maybe should taint the kernel too.
+Anything manipulating pinctrl, even more than gpio, *really* needs to
+know what it is doing.  I'm not worried about hacking around when
+doing board bringup and debug, but I'm all for barriers to actual
+applications using it.
 
-But for debugging we should have some interface for changing
-the values either via debugfs or some user space program.
+.... of course this also assumes that users have an easy to use
+alternative that isn't as scary as exposing all of pinctl to
+userspace.
 
-Regards,
-
-Tony
+g.
