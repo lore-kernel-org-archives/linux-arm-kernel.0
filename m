@@ -1,48 +1,37 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 25 Oct 2011 14:51:40 -0500
-Subject: [PATCH 3/3] arm/dt: tegra: add dts file for paz00
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF173E1B4189@HQMAIL01.nvidia.com>
-References: <cover.1319313019.git.marvin24@gmx.de>
-	<90ee88bcde84141e0280ffa4ccbd288462489eba.1319313020.git.marvin24@gmx.de>
-	<74CDBE0F657A3D45AFBB94109FB122FF173E1B4189@HQMAIL01.nvidia.com>
-Message-ID: <4EA7134C.3050102@gmail.com>
+From: davidb@codeaurora.org (David Brown)
+Date: Tue, 25 Oct 2011 13:50:53 -0700
+Subject: [PATCHv2] msm: boards: Fix fallout from removal of machine_desc
+	in fixup
+In-Reply-To: <1319560519-18899-1-git-send-email-sboyd@codeaurora.org>
+References: <1319560519-18899-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20111025205053.GA15649@huya.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/25/2011 12:16 AM, Stephen Warren wrote:
-> Marc Dietrich wrote at Saturday, October 22, 2011 2:17 PM:
->> * NOT FOR COMMIT *
->>
->> This just adds the dts for paz00. I like to add it to board-dt as
->> well as soon as I find out which tree to base it on.
-> ...
->> +++ b/arch/arm/boot/dts/tegra-paz00.dts
+On Tue, Oct 25, 2011 at 09:35:19AM -0700, Stephen Boyd wrote:
+> After 0744a3ee (ARM: platform fixups: remove mdesc argument to
+> fixup function, 2010-12-20) the fixup functions introduced in
+> 9e775ad (ARM: 7012/1: Set proper TEXT_OFFSET for newer MSMs,
+> 2011-08-12) cause warnings like:
 > 
-> One thing that cross my mind when writing the TrimSlice support and I
-> forgot to mention: Should these files be named ${soc}-${board}.dts or
-> ${vendor}-${board}.dts (tegra-paz00.dts or toshiba-paz00.dts or
-> compal-paz00.dts). I'm OK either way; just want to follow any outside
-> expectations.
+> arch/arm/mach-msm/board-msm8x60.c:85: warning: initialization
+> from incompatible pointer type
 > 
->> @@ -0,0 +1,51 @@
->> +/dts-v1/;
->> +
->> +/memreserve/ 0x1c000000 0x04000000;
->> +/include/ "tegra20.dtsi"
->> +
->> +/ {
->> +	model = "Toshiba AC100 / Dynabook AZ";
->> +	compatible = "compal,paz00", "nvidia,tegra20";
->> +
->> +	chosen {
->> +		bootargs = "console=ttyS0,115200n8 root=/dev/mmcblk1p1";
->> +	};
->> +
->> +	memory at 0 {
+> Fix them by removing the machine_desc argument from the fixup
+> functions.
 > 
-> The other boards just have "memory" here; which is wrong?
-> 
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 
-Both... I believe it should be "memory@<base address>".
+Yes, these got missed among the merges.
 
-Rob
+Acked-by: David Brown <davidb@codeaurora.org>
+
+Russell, would you prefer this to go through your tracker, or for me
+to push this to Arnd?
+
+Thanks,
+David
+
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
