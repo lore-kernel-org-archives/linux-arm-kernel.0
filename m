@@ -1,74 +1,92 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Tue, 25 Oct 2011 00:56:53 +0200
-Subject: [PATCH] of: Add a reg-names property to name reg entries
-In-Reply-To: <20111024221916.GF4394@ponder.secretlab.ca>
-References: <1319471697-8970-1-git-send-email-b-cousson@ti.com>
-	<20111024221916.GF4394@ponder.secretlab.ca>
-Message-ID: <4EA5ED35.7000806@ti.com>
+From: ming.lei@canonical.com (Ming Lei)
+Date: Tue, 25 Oct 2011 09:09:22 +0800
+Subject: [PATCH v5 3/7] arm: perf: support device with other non-irq
+	resources
+In-Reply-To: <20111024150814.GA4771@mudshark.cambridge.arm.com>
+References: <1319467559-5518-1-git-send-email-ming.lei@canonical.com>
+	<1319467559-5518-4-git-send-email-ming.lei@canonical.com>
+	<20111024150814.GA4771@mudshark.cambridge.arm.com>
+Message-ID: <CACVXFVOzQ0QEnaAb=mLFdr7AU3H3TsT=wXcNgtqeUGVLXahd4Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/25/2011 12:19 AM, Grant Likely wrote:
-> On Mon, Oct 24, 2011 at 05:54:57PM +0200, Benoit Cousson wrote:
+Hi,
 
-[...]
-
->> @@ -551,7 +551,11 @@ static int __of_address_to_resource(struct device_node *dev,
->>   		r->end = taddr + size - 1;
->>   	}
->>   	r->flags = flags;
->> -	r->name = dev->full_name;
->> +	if (name)
->> +		r->name = name;
->> +	else
->> +		r->name = dev->full_name;
+On Mon, Oct 24, 2011 at 11:08 PM, Will Deacon <will.deacon@arm.com> wrote:
+> Hi Ming Lei,
 >
-> This form please:
-> 	r->name = name ? name : dev->full_name;
-
-Much better, indeed.
-
-> In general, I'm inclined to accept this patch as we talked about at
-> plumbers.  However, this particular hunk gives me pause as there is
-> still the objection that Russell raised about the (ab)use of r->name
-> for insert the resource name.
->
-> So, no I won't reject this patch, but I first what to have some idea
-> of what the plan is to migrate away from using r->name.  Perhaps we
-> can talk about this tomorrow.
-
-OK, sure, let's discuss about that.
-But I still think that Russell's concern is not related at all with this 
-patch. That means that it should be fixed separately if needed. It can 
-be done before or after, but this is somehow orthogonal to the DT 
-reg-names support problem.
-
->>   	return 0;
->>   }
+> On Mon, Oct 24, 2011 at 03:45:55PM +0100, ming.lei at canonical.com wrote:
+>> From: Ming Lei <ming.lei@canonical.com>
 >>
->> @@ -569,11 +573,19 @@ int of_address_to_resource(struct device_node *dev, int index,
->>   	const __be32	*addrp;
->>   	u64		size;
->>   	unsigned int	flags;
->> +	const char	*name = NULL;
->> +	int		name_cnt;
+>> omap4 may create device via hwmod, which can create resources
+>> automatically, so may include some non-irq resources.
 >>
->>   	addrp = of_get_address(dev, index,&size,&flags);
->>   	if (addrp == NULL)
->>   		return -EINVAL;
->> -	return __of_address_to_resource(dev, addrp, size, flags, r);
->> +
->> +	/* Get "reg-names" property to add a name to a resource */
->> +	name_cnt = of_property_count_strings(dev, "reg-names");
->> +	if (name_cnt>  0)
->> +		of_property_read_string_index(dev, "reg-names",	index,&name);
+>> This patch supports device with other non-irq resources.
 >
-> Why not simply:
-> 	of_property_read_string_index(dev, "reg-names", index,&name);
+> I'd rather not do this in the Perf code since we're essentially dealing with
+> an artifact of the hwmod -> platform_device conversion.
 >
-> If it fails, then name remains NULL and everything works.
+>> Signed-off-by: Ming Lei <ming.lei@canonical.com>
+>> ---
+>> ?arch/arm/kernel/perf_event.c | ? ?5 +++--
+>> ?arch/arm/kernel/pmu.c ? ? ? ?| ? 12 ++++++++++--
+>> ?2 files changed, 13 insertions(+), 4 deletions(-)
+>>
+>> diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
+>> index f367780..d91dba2 100644
+>> --- a/arch/arm/kernel/perf_event.c
+>> +++ b/arch/arm/kernel/perf_event.c
+>> @@ -19,6 +19,7 @@
+>> ?#include <linux/platform_device.h>
+>> ?#include <linux/spinlock.h>
+>> ?#include <linux/uaccess.h>
+>> +#include <linux/cpumask.h>
+>>
+>> ?#include <asm/cputype.h>
+>> ?#include <asm/irq.h>
+>> @@ -414,7 +415,7 @@ armpmu_reserve_hardware(void)
+>> ? ? ? ? ? ? ? return -ENODEV;
+>> ? ? ? }
+>>
+>> - ? ? for (i = 0; i < pmu_device->num_resources; ++i) {
+>> + ? ? for (i = 0; i < nr_cpu_ids; ++i) {
+>> ? ? ? ? ? ? ? irq = platform_get_irq(pmu_device, i);
+>> ? ? ? ? ? ? ? if (irq < 0)
+>> ? ? ? ? ? ? ? ? ? ? ? continue;
+>
+> Hmm, I actually changed this code recently. Take a look:
+>
+> https://github.com/wdeacon/linux-wd/blob/perf/system-pmus/arch/arm/kernel/perf_event.c
+>
+> This should all be in for 3.2-rc1, so you can rebase then. If you still have
+> hwmod issues, please solve them outside of perf_event.c
 
-Good point, that API is already taking care of that.
+Looks your patch has solved the problem, so the patch is not needed
+any more.
 
-Thanks,
-Benoit
+I will try to rebase the patchset on your tree first.
+
+>> diff --git a/arch/arm/kernel/pmu.c b/arch/arm/kernel/pmu.c
+>> index c53474f..0e9c908 100644
+>> --- a/arch/arm/kernel/pmu.c
+>> +++ b/arch/arm/kernel/pmu.c
+>> @@ -19,6 +19,7 @@
+>> ?#include <linux/module.h>
+>> ?#include <linux/of_device.h>
+>> ?#include <linux/platform_device.h>
+>> +#include <linux/cpumask.h>
+>
+> 'fraid I've changed this file too!
+>
+> https://github.com/wdeacon/linux-wd/blob/perf/system-pmus/arch/arm/kernel/pmu.c
+>
+> Will
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+>
+
+thanks,
+--
+Ming Lei
