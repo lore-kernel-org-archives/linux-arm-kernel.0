@@ -1,26 +1,26 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 25 Oct 2011 10:39:35 +0200
-Subject: [RFC] ARM: at91: gpio add mux check
-In-Reply-To: <1319462000-32642-1-git-send-email-plagnioj@jcrosoft.com>
-References: <1319462000-32642-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <CACRpkdbDLSy+87Obw2LnuBmrUn_v6WSFjN5PuD_UXSTRq66aWA@mail.gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 25 Oct 2011 02:44:41 -0600 (MDT)
+Subject: [PATCH v5 3/7] arm: perf: support device with other non-irq
+	resources
+In-Reply-To: <20111025083420.GA6184@mudshark.cambridge.arm.com>
+References: <1319467559-5518-1-git-send-email-ming.lei@canonical.com>
+	<1319467559-5518-4-git-send-email-ming.lei@canonical.com>
+	<20111024150814.GA4771@mudshark.cambridge.arm.com>
+	<CACVXFVOzQ0QEnaAb=mLFdr7AU3H3TsT=wXcNgtqeUGVLXahd4Q@mail.gmail.com>
+	<20111025083420.GA6184@mudshark.cambridge.arm.com>
+Message-ID: <alpine.DEB.2.00.1110250242130.27118@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 24, 2011 at 3:13 PM, Jean-Christophe PLAGNIOL-VILLARD
-<plagnioj@jcrosoft.com> wrote:
+On Tue, 25 Oct 2011, Will Deacon wrote:
 
-> Hi,
->
-> ? ? ? ?one of the the issue is what happened it the bootloader miss
-> ? ? ? ?configured a pin a periph A or B?
->
-> ? ? ? ?do we need to keep the tracking of it in the pinmux?
+> Hurrah! If you can get the OMAP / hwmod bits acked by the OMAP guys then I'm
+> happy to take the perf and PMU changes into my tree.
 
-Is there an AT91 pinmux driver? If yes, I guess it's something custom and I
-have only looked briefly at these. Generally I would recommend modeling
-any muxing using the pinctrl subsystem but if and only if Torvalds decide to
-pull it in.
+I'd suggest that you take the perf/PMU stuff yourself if you are happy 
+with it, and then we'll deal with the OMAP bits ourselves, since it looks 
+like they aren't dependent on each other, and the OMAP parts will need 
+changes.
 
-Yours.
-Linus Walleij
+
+- Paul
