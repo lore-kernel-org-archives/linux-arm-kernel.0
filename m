@@ -1,26 +1,34 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 25 Oct 2011 02:44:41 -0600 (MDT)
-Subject: [PATCH v5 3/7] arm: perf: support device with other non-irq
-	resources
-In-Reply-To: <20111025083420.GA6184@mudshark.cambridge.arm.com>
-References: <1319467559-5518-1-git-send-email-ming.lei@canonical.com>
-	<1319467559-5518-4-git-send-email-ming.lei@canonical.com>
-	<20111024150814.GA4771@mudshark.cambridge.arm.com>
-	<CACVXFVOzQ0QEnaAb=mLFdr7AU3H3TsT=wXcNgtqeUGVLXahd4Q@mail.gmail.com>
-	<20111025083420.GA6184@mudshark.cambridge.arm.com>
-Message-ID: <alpine.DEB.2.00.1110250242130.27118@utopia.booyaka.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 25 Oct 2011 10:45:43 +0200
+Subject: [PATCH 1/1] pinctrl/sirf: fix sirfsoc_get_group_pins prototype
+	introduce in 7e570f97
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF173E1B4170@HQMAIL01.nvidia.com>
+References: <1319472717-20159-1-git-send-email-plagnioj@jcrosoft.com>
+	<74CDBE0F657A3D45AFBB94109FB122FF173E1B4170@HQMAIL01.nvidia.com>
+Message-ID: <CACRpkdY5JJBB-nRODBMN55NcN3BYYF9MDiFNc2PiB=r1Y+uF2A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 25 Oct 2011, Will Deacon wrote:
+On Tue, Oct 25, 2011 at 6:07 AM, Stephen Warren <swarren@nvidia.com> wrote:
+> Jean-Christophe PLAGNIOL-VILLARD wrote at Monday, October 24, 2011 10:12 AM:
+> ...
+>> diff --git a/drivers/pinctrl/pinmux-sirf.c b/drivers/pinctrl/pinmux-sirf.c
+>> index ba73523..d76cae6 100644
+>> --- a/drivers/pinctrl/pinmux-sirf.c
+>> +++ b/drivers/pinctrl/pinmux-sirf.c
+>> @@ -870,7 +870,7 @@ static const char *sirfsoc_get_group_name(struct pinctrl_dev *pctldev,
+>>
+>> ?static int sirfsoc_get_group_pins(struct pinctrl_dev *pctldev, unsigned selector,
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?const unsigned **pins,
+>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ?const unsigned *num_pins)
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ?unsigned *num_pins)
+>> ?{
+>> ? ? ? if (selector >= ARRAY_SIZE(sirfsoc_pin_groups))
+>> ? ? ? ? ? ? ? return -EINVAL;
+>
+> Acked-by: Stephen Warren <swarren@nvidia.com>
 
-> Hurrah! If you can get the OMAP / hwmod bits acked by the OMAP guys then I'm
-> happy to take the perf and PMU changes into my tree.
+Applied.
 
-I'd suggest that you take the perf/PMU stuff yourself if you are happy 
-with it, and then we'll deal with the OMAP bits ourselves, since it looks 
-like they aren't dependent on each other, and the OMAP parts will need 
-changes.
-
-
-- Paul
+Thanks,
+Linus Walleij
