@@ -1,26 +1,38 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 25 Oct 2011 12:47:22 +0100
-Subject: [PATCH 2/2] [ARM] MX1:apf9328: Add i2c support
-In-Reply-To: <20111025113604.13238b41@trabucayre.com>
-References: <1318087189-22977-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
-	<1318087189-22977-2-git-send-email-gwenhael.goavec-merou@armadeus.com>
-	<20111025113604.13238b41@trabucayre.com>
-Message-ID: <20111025114722.GC14840@n2100.arm.linux.org.uk>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Tue, 25 Oct 2011 14:01:26 +0200
+Subject: [PATCH v3 1/3] dt: add empty of_machine_is_compatible
+Message-ID: <1319544088-25946-1-git-send-email-swarren@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 25, 2011 at 11:36:04AM +0200, gwenhael.goavec wrote:
-> ping
+The patch adds an empty function for non-dt build, so that
+drivers migrating to dt can save some '#ifdef CONFIG_OF'.
 
-This is what your email headers are saying:
+v3: New patch
 
-From: "gwenhael.goavec" <gwenhael.goavec-merou@armadeus.com>
-Cc: "gwenhael.goavec" <gwenhael.goavec-merou@armadeus.com>,
-        linux-arm-kernel at lists.infradead.org,
-        Sascha Hauer <s.hauer@pengutronix.de>,
-        Uwe Kleine-K_nig <u.kleine-koenig@pengutronix.de>,
-        Russell King - ARM Linux <linux@arm.linux.org.uk>
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+Patch 2 relies on this patch, but this patch would typically be merged via
+Grant's OF/DT tree.
 
-There is no to: header, so I've no idea _who_ you're expecting to respond
-in a meaningful way to your ping.  As this is an imx patch, I assume
-Sascha.
+ include/linux/of.h |    5 +++++
+ 1 files changed, 5 insertions(+), 0 deletions(-)
+
+diff --git a/include/linux/of.h b/include/linux/of.h
+index 736b747..47303c7 100644
+--- a/include/linux/of.h
++++ b/include/linux/of.h
+@@ -302,6 +302,11 @@ static inline struct device_node *of_parse_phandle(struct device_node *np,
+ 	return NULL;
+ }
+ 
++static inline int of_machine_is_compatible(const char *compat)
++{
++	return 0;
++}
++
+ #define of_match_ptr(_ptr)	NULL
+ #endif /* CONFIG_OF */
+ 
+-- 
+1.7.4.1
