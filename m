@@ -1,70 +1,37 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 25 Oct 2011 09:12:25 +0200
-Subject: [PATCH] mmc: mmci: Improve runtime PM support
-In-Reply-To: <4EA58368.6050704@stericsson.com>
-References: <1319210754-22775-1-git-send-email-ulf.hansson@stericsson.com>
-	<20111021173637.GG21648@n2100.arm.linux.org.uk>
-	<CAKnu2MrOriMzJH9NcwUivWa0cinASa6wrRf4a69si4WUs-aTrQ@mail.gmail.com>
-	<CAAgDR1OT=+xgQTNwmTz=9XwzpbhjeZ6F-mxnVGhOAPSAR3JiFQ@mail.gmail.com>
-	<4EA51C4A.7040802@stericsson.com>
-	<20111024090432.GA9893@n2100.arm.linux.org.uk>
-	<4EA53181.2050700@stericsson.com>
-	<20111024094203.GI9893@n2100.arm.linux.org.uk>
-	<4EA538A3.9070501@stericsson.com>
-	<20111024101416.GK9893@n2100.arm.linux.org.uk>
-	<4EA55076.2010701@stericsson.com>
-	<CACRpkdb7FwW=Qa2MiJkbezkBO3F+Y0j6-RWSiL8dfJXkbd4pHw@mail.gmail.com>
-	<4EA58368.6050704@stericsson.com>
-Message-ID: <CAKnu2MppySzpE5SxtqW_yV7KNEWw+tQ658i0pyfoUiwQCL2CGA@mail.gmail.com>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Tue, 25 Oct 2011 15:13:14 +0800
+Subject: [PATCH v5 00/11] change gpio as platform driver
+In-Reply-To: <1318858517-22494-1-git-send-email-haojian.zhuang@marvell.com>
+References: <1318858517-22494-1-git-send-email-haojian.zhuang@marvell.com>
+Message-ID: <CAN1soZzVxYgG2pnd=Eafa__P7axvo19OMN3TbV14ULVkt+treA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/10/24 Ulf Hansson <ulf.hansson@stericsson.com>:
+On Mon, Oct 17, 2011 at 9:35 PM, Haojian Zhuang
+<haojian.zhuang@marvell.com> wrote:
+> Changelog
+> v5:
+> ? ? ?1. use generic gpio driver. So clean gpio-pxa.h and gpio-pxa.c again.
+> v4:
+> ? ? ?1. append one patch for clean gpio macros and use function instead.
+> v3:
+> ? ? ?1. Rebase on Russell's for-next branch.
+> ? ? ?2. Add clock support.
+> ? ? ?3. Move gpio edge detection initiliaztion of arch-mmp into gpio driver.
+>
+> v2:
+> ? ? 1. Remove gpio.c from mach-pxa & mach-mmp that is introduced from v1.
+> ? ? 2. Remove init function in gpio.c. Move the platfrom_device_register()
+> ? ? ? ?into platform driver.
+> ? ? 3. Initialize pxa_gpio_regs in gpio-pxa.c
+> ? ? 4. Simplify code of identifing pxa gpio series or mmp gpio series.
+> ? ? 5. Use linux/io.h instead of asm/io.h.
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
 
-> Could we assume that all boards which utilizes the ARM PL180 are using the
-> MMCIPWR register to control power the card? Or should we add a new amba mmci
-> platform member so this is configurable for each board?
-
-I think we should take entire variants, like currently U300 and Ux500.
-In those designs the MMCIPWR signal is left dangling on the chip,
-so no-one electronics designer can use that signal for anything even
-if s/he would have wanted to.
-
-> An option could also be if we might want to simplify code to just skip the
-> entire runtime_suspend|idle|resume function (ie stubb it or something) for
-> these kind of boards?
-
-I think the clk_disable()/clk_enable() pair in runtime suspend/resume
-is still valuable for all other variants too. That has nothing to do with
-MMCIPWR.
-
-> By the way, there is also another option. In the runtime_suspend function
-> for ARM PL180 block we can use mmc_power_save_host (and then also
-> disable vcore etc) and vice verse in runtime_resume with
-> mmc_power_restore_host.
-
-This is what the OMAP driver does right?
-
-> Of course, these kind of operations takes quite some time to execute and
-> therefore we use a much bigger timeout than 50 ms (for example 10 s
-> instead) for ARM PL180.
-
-Can we do both?
-
-1) Break out mmci_state_save_restore() from the runtime PM hooks.
-
-2) I.e. have a short time-out that will runtime-suspend the external
-  regulator variants quickly with finer granularity.
-
-3) Have a long time-out that will runtime-suspend the MMCIPWR
-  variants using mmc_power_save_host() with a longer delay?
-  Since mmc_power_save_host() calls .set_ios() to really shut
-  down the power to the card we should be on the safe side.
-
-Looks like a nice silver bullet to me :-)
-
-I volunteer to test the long time-out code path on the Integrator
-PB1176 to verify this works.
-
-Yours,
-Linus Walleij
+Any comments?
