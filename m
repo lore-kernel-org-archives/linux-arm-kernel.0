@@ -1,50 +1,33 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Tue, 25 Oct 2011 13:25:48 +0200
-Subject: [PATCH] ARM: remove NR_IRQS dependency for ARM-specific HARDIRQ_BITS
-	definition
-Message-ID: <1319541948-10035-1-git-send-email-khilman@ti.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Tue, 25 Oct 2011 13:09:36 +0200
+Subject: [RFC] ARM: at91: gpio add mux check
+In-Reply-To: <CACRpkdbDLSy+87Obw2LnuBmrUn_v6WSFjN5PuD_UXSTRq66aWA@mail.gmail.com>
+References: <1319462000-32642-1-git-send-email-plagnioj@jcrosoft.com>
+	<CACRpkdbDLSy+87Obw2LnuBmrUn_v6WSFjN5PuD_UXSTRq66aWA@mail.gmail.com>
+Message-ID: <20111025110936.GO2638@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As a first step towards removing NR_IRQS, remove the ARM customization
-of HARDIRQ_BITS based on NR_IRQS.
+On 10:39 Tue 25 Oct     , Linus Walleij wrote:
+> On Mon, Oct 24, 2011 at 3:13 PM, Jean-Christophe PLAGNIOL-VILLARD
+> <plagnioj@jcrosoft.com> wrote:
+> 
+> > Hi,
+> >
+> > ? ? ? ?one of the the issue is what happened it the bootloader miss
+> > ? ? ? ?configured a pin a periph A or B?
+> >
+> > ? ? ? ?do we need to keep the tracking of it in the pinmux?
+> 
+> Is there an AT91 pinmux driver? If yes, I guess it's something custom and I
+> have only looked briefly at these. Generally I would recommend modeling
+> any muxing using the pinctrl subsystem but if and only if Torvalds decide to
+> pull it in.
+Yes I start to implement one
 
-The generic code in <linux/hardirq.h> already has a default value of
-10 for HARDIRQ_BITS which is the max used on ARM, so let's just remove
-the NR_IRQS based customization and use the generic default.
+but I've need to hardcode in the driver the pull, multidrive per function
 
-Signed-off-by: Kevin Hilman <khilman@ti.com>
----
- arch/arm/include/asm/hardirq.h |   17 -----------------
- 1 files changed, 0 insertions(+), 17 deletions(-)
+I'll send it soon
 
-diff --git a/arch/arm/include/asm/hardirq.h b/arch/arm/include/asm/hardirq.h
-index 89ad180..96cb097 100644
---- a/arch/arm/include/asm/hardirq.h
-+++ b/arch/arm/include/asm/hardirq.h
-@@ -30,23 +30,6 @@ u64 smp_irq_stat_cpu(unsigned int cpu);
- 
- #define arch_irq_stat_cpu	smp_irq_stat_cpu
- 
--#if NR_IRQS > 512
--#define HARDIRQ_BITS	10
--#elif NR_IRQS > 256
--#define HARDIRQ_BITS	9
--#else
--#define HARDIRQ_BITS	8
--#endif
--
--/*
-- * The hardirq mask has to be large enough to have space
-- * for potentially all IRQ sources in the system nesting
-- * on a single CPU:
-- */
--#if (1 << HARDIRQ_BITS) < NR_IRQS
--# error HARDIRQ_BITS is too low!
--#endif
--
- #define __ARCH_IRQ_EXIT_IRQS_DISABLED	1
- 
- #endif /* __ASM_HARDIRQ_H */
--- 
-1.7.3.4
+Best Regards,
+J.
