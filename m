@@ -1,63 +1,676 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 25 Oct 2011 15:42:46 +0800
-Subject: [PATCH v2 3/5] regulator: helper routine to extract
-	regulator_init_data
-In-Reply-To: <4EA661B3.6010006@ti.com>
-References: <20111024090228.GA1755@S2100-06.ap.freescale.net>
-	<4EA52851.8000203@ti.com>
-	<20111024091158.GB1755@S2100-06.ap.freescale.net>
-	<4EA52C56.3080908@ti.com>
-	<20111024134727.GF1755@S2100-06.ap.freescale.net>
-	<4EA65073.7050205@ti.com>
-	<20111025065216.GD2119@S2100-06.ap.freescale.net>
-	<4EA65D81.6030109@ti.com>
-	<20111025072003.GF2119@S2100-06.ap.freescale.net>
-	<4EA661B3.6010006@ti.com>
-Message-ID: <20111025074245.GH2119@S2100-06.ap.freescale.net>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 25 Oct 2011 09:33:32 +0200
+Subject: [PATCH] gpiolib/arches: Centralise bolierplate asm/gpio.h
+Message-ID: <1319528012-19006-1-git-send-email-broonie@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 25, 2011 at 12:43:55PM +0530, Rajendra Nayak wrote:
-> On Tuesday 25 October 2011 12:50 PM, Shawn Guo wrote:
-> >On Tue, Oct 25, 2011 at 12:26:01PM +0530, Rajendra Nayak wrote:
-> >>On Tuesday 25 October 2011 12:22 PM, Shawn Guo wrote:
-> >>>On Tue, Oct 25, 2011 at 11:30:19AM +0530, Rajendra Nayak wrote:
-> >[...]
-> >>>>Thats what we did for OMAP, and hence we always have the of_node
-> >>>>populated when the regulator devices are probed.
-> >>>>See this patch from Benoit on how thats done for twl devices..
-> >>>>http://marc.info/?l=linux-omap&m=131489864814428&w=2
-> >>>>
-> >>>OMAP is "Case 1", and we are talking about "Case 2".
-> >>
-> >>I don't see why it wouldn't work for "Case 2".
-> >
-> >I did not say it wouldn't work for "Case 2".  I meant they work in
-> >different way.
-> >
-> >>The only difference
-> >>is in case of "Case 1", the dev->of_node would already point to
-> >>the right regulator node, like 'reg1', 'reg2' above.
-> >>In case of "Case 2", the dev->of_node would point to the 'regulators'
-> >>node instead, and the driver could then do a for_each_child_of_node()
-> >>to iterate over all its children to get 'reg1', 'reg2' etc.
-> >>
-> >Yes, that's the difference.  So you will need to distinguish these
-> >two cases in regulator_register()?  How?
-> 
-> You don't need to distinguish these cases in regulator_register().
-> The driver knows if its handling "Case 1" devices or "Case 2" devices
-> and it needs to handle things accordingly and pass the right of_node
-> which regulator_register() can then attach to regulator_dev->dev.
-> 
-Ah, you are thinking about (for Case 2) calling for_each_child_of_node()
-in regulator driver and passing the of_node found for each regulator to
-regulator core as a new parameter of regulator_register().  Yes, that
-would work, though my thought is to put the device_node discovery in
-regulator core and hide it from regulator driver.
+Rather than requiring architectures that use gpiolib but don't have any
+need to define anything custom to copy an asm/gpio.h provide a Kconfig
+symbol which architectures must select in order to include gpio.h and
+for other architectures just provide the trivial implementation directly.
 
-Okay, I'm good with this solution.  Grant, Mark, what about you?
+This makes it much easier to do gpiolib updates and is also a step towards
+making gpiolib APIs available on every architecture.
 
+Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+---
+ arch/alpha/include/asm/gpio.h      |   55 ------------------------------
+ arch/arm/Kconfig                   |    1 +
+ arch/avr32/Kconfig                 |    1 +
+ arch/blackfin/Kconfig              |    1 +
+ arch/ia64/include/asm/gpio.h       |   55 ------------------------------
+ arch/m68k/Kconfig.cpu              |    1 +
+ arch/microblaze/include/asm/gpio.h |   53 -----------------------------
+ arch/mips/Kconfig                  |    1 +
+ arch/openrisc/include/asm/gpio.h   |   65 ------------------------------------
+ arch/powerpc/include/asm/gpio.h    |   53 -----------------------------
+ arch/sh/Kconfig                    |    1 +
+ arch/sparc/include/asm/gpio.h      |   36 --------------------
+ arch/unicore32/Kconfig             |    1 +
+ arch/x86/include/asm/gpio.h        |   53 -----------------------------
+ arch/xtensa/include/asm/gpio.h     |   56 -------------------------------
+ drivers/gpio/Kconfig               |    8 ++++
+ include/linux/gpio.h               |   34 +++++++++++++++++++
+ 17 files changed, 49 insertions(+), 426 deletions(-)
+ delete mode 100644 arch/alpha/include/asm/gpio.h
+ delete mode 100644 arch/ia64/include/asm/gpio.h
+ delete mode 100644 arch/microblaze/include/asm/gpio.h
+ delete mode 100644 arch/openrisc/include/asm/gpio.h
+ delete mode 100644 arch/powerpc/include/asm/gpio.h
+ delete mode 100644 arch/sparc/include/asm/gpio.h
+ delete mode 100644 arch/x86/include/asm/gpio.h
+ delete mode 100644 arch/xtensa/include/asm/gpio.h
+
+diff --git a/arch/alpha/include/asm/gpio.h b/arch/alpha/include/asm/gpio.h
+deleted file mode 100644
+index 7dc6a63..0000000
+--- a/arch/alpha/include/asm/gpio.h
++++ /dev/null
+@@ -1,55 +0,0 @@
+-/*
+- * Generic GPIO API implementation for Alpha.
+- *
+- * A stright copy of that for PowerPC which was:
+- *
+- * Copyright (c) 2007-2008  MontaVista Software, Inc.
+- *
+- * Author: Anton Vorontsov <avorontsov@ru.mvista.com>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- */
+-
+-#ifndef _ASM_ALPHA_GPIO_H
+-#define _ASM_ALPHA_GPIO_H
+-
+-#include <linux/errno.h>
+-#include <asm-generic/gpio.h>
+-
+-#ifdef CONFIG_GPIOLIB
+-
+-/*
+- * We don't (yet) implement inlined/rapid versions for on-chip gpios.
+- * Just call gpiolib.
+- */
+-static inline int gpio_get_value(unsigned int gpio)
+-{
+-	return __gpio_get_value(gpio);
+-}
+-
+-static inline void gpio_set_value(unsigned int gpio, int value)
+-{
+-	__gpio_set_value(gpio, value);
+-}
+-
+-static inline int gpio_cansleep(unsigned int gpio)
+-{
+-	return __gpio_cansleep(gpio);
+-}
+-
+-static inline int gpio_to_irq(unsigned int gpio)
+-{
+-	return __gpio_to_irq(gpio);
+-}
+-
+-static inline int irq_to_gpio(unsigned int irq)
+-{
+-	return -EINVAL;
+-}
+-
+-#endif /* CONFIG_GPIOLIB */
+-
+-#endif /* _ASM_ALPHA_GPIO_H */
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 7e8ffe7..5e0446c 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1,6 +1,7 @@
+ config ARM
+ 	bool
+ 	default y
++	select ARCH_HAVE_CUSTOM_GPIO_H
+ 	select HAVE_AOUT
+ 	select HAVE_DMA_API_DEBUG
+ 	select HAVE_IDE if PCI || ISA || PCMCIA
+diff --git a/arch/avr32/Kconfig b/arch/avr32/Kconfig
+index 197e96f..b2e3e58 100644
+--- a/arch/avr32/Kconfig
++++ b/arch/avr32/Kconfig
+@@ -10,6 +10,7 @@ config AVR32
+ 	select GENERIC_IRQ_PROBE
+ 	select HARDIRQS_SW_RESEND
+ 	select GENERIC_IRQ_SHOW
++	select ARCH_HAVE_CUSTOM_GPIO_H
+ 	select ARCH_HAVE_NMI_SAFE_CMPXCHG
+ 	help
+ 	  AVR32 is a high-performance 32-bit RISC microprocessor core,
+diff --git a/arch/blackfin/Kconfig b/arch/blackfin/Kconfig
+index c747629..2c13eef 100644
+--- a/arch/blackfin/Kconfig
++++ b/arch/blackfin/Kconfig
+@@ -31,6 +31,7 @@ config BLACKFIN
+ 	select HAVE_KERNEL_LZO if RAMKERNEL
+ 	select HAVE_OPROFILE
+ 	select HAVE_PERF_EVENTS
++	select ARCH_HAVE_CUSTOM_GPIO_H
+ 	select ARCH_WANT_OPTIONAL_GPIOLIB
+ 	select HAVE_GENERIC_HARDIRQS
+ 	select GENERIC_ATOMIC64
+diff --git a/arch/ia64/include/asm/gpio.h b/arch/ia64/include/asm/gpio.h
+deleted file mode 100644
+index 590a20d..0000000
+--- a/arch/ia64/include/asm/gpio.h
++++ /dev/null
+@@ -1,55 +0,0 @@
+-/*
+- * Generic GPIO API implementation for IA-64.
+- *
+- * A stright copy of that for PowerPC which was:
+- *
+- * Copyright (c) 2007-2008  MontaVista Software, Inc.
+- *
+- * Author: Anton Vorontsov <avorontsov@ru.mvista.com>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- */
+-
+-#ifndef _ASM_IA64_GPIO_H
+-#define _ASM_IA64_GPIO_H
+-
+-#include <linux/errno.h>
+-#include <asm-generic/gpio.h>
+-
+-#ifdef CONFIG_GPIOLIB
+-
+-/*
+- * We don't (yet) implement inlined/rapid versions for on-chip gpios.
+- * Just call gpiolib.
+- */
+-static inline int gpio_get_value(unsigned int gpio)
+-{
+-	return __gpio_get_value(gpio);
+-}
+-
+-static inline void gpio_set_value(unsigned int gpio, int value)
+-{
+-	__gpio_set_value(gpio, value);
+-}
+-
+-static inline int gpio_cansleep(unsigned int gpio)
+-{
+-	return __gpio_cansleep(gpio);
+-}
+-
+-static inline int gpio_to_irq(unsigned int gpio)
+-{
+-	return __gpio_to_irq(gpio);
+-}
+-
+-static inline int irq_to_gpio(unsigned int irq)
+-{
+-	return -EINVAL;
+-}
+-
+-#endif /* CONFIG_GPIOLIB */
+-
+-#endif /* _ASM_IA64_GPIO_H */
+diff --git a/arch/m68k/Kconfig.cpu b/arch/m68k/Kconfig.cpu
+index e632b2d..d4a818b 100644
+--- a/arch/m68k/Kconfig.cpu
++++ b/arch/m68k/Kconfig.cpu
+@@ -21,6 +21,7 @@ config MCPU32
+ config COLDFIRE
+ 	bool
+ 	select GENERIC_GPIO
++	select ARCH_HAVE_CUSTOM_GPIO_H
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select CPU_HAS_NO_BITFIELDS
+ 	help
+diff --git a/arch/microblaze/include/asm/gpio.h b/arch/microblaze/include/asm/gpio.h
+deleted file mode 100644
+index 2b2c18b..0000000
+--- a/arch/microblaze/include/asm/gpio.h
++++ /dev/null
+@@ -1,53 +0,0 @@
+-/*
+- * Generic GPIO API implementation for PowerPC.
+- *
+- * Copyright (c) 2007-2008  MontaVista Software, Inc.
+- *
+- * Author: Anton Vorontsov <avorontsov@ru.mvista.com>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- */
+-
+-#ifndef _ASM_MICROBLAZE_GPIO_H
+-#define _ASM_MICROBLAZE_GPIO_H
+-
+-#include <linux/errno.h>
+-#include <asm-generic/gpio.h>
+-
+-#ifdef CONFIG_GPIOLIB
+-
+-/*
+- * We don't (yet) implement inlined/rapid versions for on-chip gpios.
+- * Just call gpiolib.
+- */
+-static inline int gpio_get_value(unsigned int gpio)
+-{
+-	return __gpio_get_value(gpio);
+-}
+-
+-static inline void gpio_set_value(unsigned int gpio, int value)
+-{
+-	__gpio_set_value(gpio, value);
+-}
+-
+-static inline int gpio_cansleep(unsigned int gpio)
+-{
+-	return __gpio_cansleep(gpio);
+-}
+-
+-static inline int gpio_to_irq(unsigned int gpio)
+-{
+-	return __gpio_to_irq(gpio);
+-}
+-
+-static inline int irq_to_gpio(unsigned int irq)
+-{
+-	return -EINVAL;
+-}
+-
+-#endif /* CONFIG_GPIOLIB */
+-
+-#endif /* _ASM_MICROBLAZE_GPIO_H */
+diff --git a/arch/mips/Kconfig b/arch/mips/Kconfig
+index 62b9677..567290c 100644
+--- a/arch/mips/Kconfig
++++ b/arch/mips/Kconfig
+@@ -8,6 +8,7 @@ config MIPS
+ 	select HAVE_PERF_EVENTS
+ 	select PERF_USE_VMALLOC
+ 	select HAVE_ARCH_KGDB
++	select ARCH_HAVE_CUSTOM_GPIO_H
+ 	select HAVE_FUNCTION_TRACER
+ 	select HAVE_FUNCTION_TRACE_MCOUNT_TEST
+ 	select HAVE_DYNAMIC_FTRACE
+diff --git a/arch/openrisc/include/asm/gpio.h b/arch/openrisc/include/asm/gpio.h
+deleted file mode 100644
+index 0b0d174..0000000
+--- a/arch/openrisc/include/asm/gpio.h
++++ /dev/null
+@@ -1,65 +0,0 @@
+-/*
+- * OpenRISC Linux
+- *
+- * Linux architectural port borrowing liberally from similar works of
+- * others.  All original copyrights apply as per the original source
+- * declaration.
+- *
+- * OpenRISC implementation:
+- * Copyright (C) 2003 Matjaz Breskvar <phoenix@bsemi.com>
+- * Copyright (C) 2010-2011 Jonas Bonn <jonas@southpole.se>
+- * et al.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- */
+-
+-#ifndef __ASM_OPENRISC_GPIO_H
+-#define __ASM_OPENRISC_GPIO_H
+-
+-#include <linux/errno.h>
+-#include <asm-generic/gpio.h>
+-
+-#ifdef CONFIG_GPIOLIB
+-
+-/*
+- * OpenRISC (or1k) does not have on-chip GPIO's so there is not really
+- * any standardized implementation that makes sense here.  If passing
+- * through gpiolib becomes a bottleneck then it may make sense, on a
+- * case-by-case basis, to implement these inlined/rapid versions.
+- *
+- * Just call gpiolib.
+- */
+-static inline int gpio_get_value(unsigned int gpio)
+-{
+-	return __gpio_get_value(gpio);
+-}
+-
+-static inline void gpio_set_value(unsigned int gpio, int value)
+-{
+-	__gpio_set_value(gpio, value);
+-}
+-
+-static inline int gpio_cansleep(unsigned int gpio)
+-{
+-	return __gpio_cansleep(gpio);
+-}
+-
+-/*
+- * Not implemented, yet.
+- */
+-static inline int gpio_to_irq(unsigned int gpio)
+-{
+-	return -ENOSYS;
+-}
+-
+-static inline int irq_to_gpio(unsigned int irq)
+-{
+-	return -EINVAL;
+-}
+-
+-#endif /* CONFIG_GPIOLIB */
+-
+-#endif /* __ASM_OPENRISC_GPIO_H */
+diff --git a/arch/powerpc/include/asm/gpio.h b/arch/powerpc/include/asm/gpio.h
+deleted file mode 100644
+index 38762ed..0000000
+--- a/arch/powerpc/include/asm/gpio.h
++++ /dev/null
+@@ -1,53 +0,0 @@
+-/*
+- * Generic GPIO API implementation for PowerPC.
+- *
+- * Copyright (c) 2007-2008  MontaVista Software, Inc.
+- *
+- * Author: Anton Vorontsov <avorontsov@ru.mvista.com>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- */
+-
+-#ifndef __ASM_POWERPC_GPIO_H
+-#define __ASM_POWERPC_GPIO_H
+-
+-#include <linux/errno.h>
+-#include <asm-generic/gpio.h>
+-
+-#ifdef CONFIG_GPIOLIB
+-
+-/*
+- * We don't (yet) implement inlined/rapid versions for on-chip gpios.
+- * Just call gpiolib.
+- */
+-static inline int gpio_get_value(unsigned int gpio)
+-{
+-	return __gpio_get_value(gpio);
+-}
+-
+-static inline void gpio_set_value(unsigned int gpio, int value)
+-{
+-	__gpio_set_value(gpio, value);
+-}
+-
+-static inline int gpio_cansleep(unsigned int gpio)
+-{
+-	return __gpio_cansleep(gpio);
+-}
+-
+-static inline int gpio_to_irq(unsigned int gpio)
+-{
+-	return __gpio_to_irq(gpio);
+-}
+-
+-static inline int irq_to_gpio(unsigned int irq)
+-{
+-	return -EINVAL;
+-}
+-
+-#endif /* CONFIG_GPIOLIB */
+-
+-#endif /* __ASM_POWERPC_GPIO_H */
+diff --git a/arch/sh/Kconfig b/arch/sh/Kconfig
+index ff9177c..d00e11a 100644
+--- a/arch/sh/Kconfig
++++ b/arch/sh/Kconfig
+@@ -11,6 +11,7 @@ config SUPERH
+ 	select HAVE_DMA_ATTRS
+ 	select HAVE_IRQ_WORK
+ 	select HAVE_PERF_EVENTS
++	select ARCH_HAVE_CUSTOM_GPIO_H
+ 	select ARCH_HAVE_NMI_SAFE_CMPXCHG if (GUSA_RB || CPU_SH4A)
+ 	select PERF_USE_VMALLOC
+ 	select HAVE_KERNEL_GZIP
+diff --git a/arch/sparc/include/asm/gpio.h b/arch/sparc/include/asm/gpio.h
+deleted file mode 100644
+index a0e3ac0..0000000
+--- a/arch/sparc/include/asm/gpio.h
++++ /dev/null
+@@ -1,36 +0,0 @@
+-#ifndef __ASM_SPARC_GPIO_H
+-#define __ASM_SPARC_GPIO_H
+-
+-#include <linux/errno.h>
+-#include <asm-generic/gpio.h>
+-
+-#ifdef CONFIG_GPIOLIB
+-
+-static inline int gpio_get_value(unsigned int gpio)
+-{
+-	return __gpio_get_value(gpio);
+-}
+-
+-static inline void gpio_set_value(unsigned int gpio, int value)
+-{
+-	__gpio_set_value(gpio, value);
+-}
+-
+-static inline int gpio_cansleep(unsigned int gpio)
+-{
+-	return __gpio_cansleep(gpio);
+-}
+-
+-static inline int gpio_to_irq(unsigned int gpio)
+-{
+-	return -ENOSYS;
+-}
+-
+-static inline int irq_to_gpio(unsigned int irq)
+-{
+-	return -EINVAL;
+-}
+-
+-#endif /* CONFIG_GPIOLIB */
+-
+-#endif /* __ASM_SPARC_GPIO_H */
+diff --git a/arch/unicore32/Kconfig b/arch/unicore32/Kconfig
+index e57dcce..7bdc7c6 100644
+--- a/arch/unicore32/Kconfig
++++ b/arch/unicore32/Kconfig
+@@ -8,6 +8,7 @@ config UNICORE32
+ 	select HAVE_KERNEL_BZIP2
+ 	select HAVE_KERNEL_LZO
+ 	select HAVE_KERNEL_LZMA
++	select ARCH_HAVE_CUSTOM_GPIO_H
+ 	select GENERIC_FIND_FIRST_BIT
+ 	select GENERIC_IRQ_PROBE
+ 	select GENERIC_IRQ_SHOW
+diff --git a/arch/x86/include/asm/gpio.h b/arch/x86/include/asm/gpio.h
+deleted file mode 100644
+index 91d915a..0000000
+--- a/arch/x86/include/asm/gpio.h
++++ /dev/null
+@@ -1,53 +0,0 @@
+-/*
+- * Generic GPIO API implementation for x86.
+- *
+- * Derived from the generic GPIO API for powerpc:
+- *
+- * Copyright (c) 2007-2008  MontaVista Software, Inc.
+- *
+- * Author: Anton Vorontsov <avorontsov@ru.mvista.com>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- */
+-
+-#ifndef _ASM_X86_GPIO_H
+-#define _ASM_X86_GPIO_H
+-
+-#include <asm-generic/gpio.h>
+-
+-#ifdef CONFIG_GPIOLIB
+-
+-/*
+- * Just call gpiolib.
+- */
+-static inline int gpio_get_value(unsigned int gpio)
+-{
+-	return __gpio_get_value(gpio);
+-}
+-
+-static inline void gpio_set_value(unsigned int gpio, int value)
+-{
+-	__gpio_set_value(gpio, value);
+-}
+-
+-static inline int gpio_cansleep(unsigned int gpio)
+-{
+-	return __gpio_cansleep(gpio);
+-}
+-
+-static inline int gpio_to_irq(unsigned int gpio)
+-{
+-	return __gpio_to_irq(gpio);
+-}
+-
+-static inline int irq_to_gpio(unsigned int irq)
+-{
+-	return -EINVAL;
+-}
+-
+-#endif /* CONFIG_GPIOLIB */
+-
+-#endif /* _ASM_X86_GPIO_H */
+diff --git a/arch/xtensa/include/asm/gpio.h b/arch/xtensa/include/asm/gpio.h
+deleted file mode 100644
+index a8c9fc4..0000000
+--- a/arch/xtensa/include/asm/gpio.h
++++ /dev/null
+@@ -1,56 +0,0 @@
+-/*
+- * Generic GPIO API implementation for xtensa.
+- *
+- * Stolen from x86, which is derived from the generic GPIO API for powerpc:
+- *
+- * Copyright (c) 2007-2008  MontaVista Software, Inc.
+- *
+- * Author: Anton Vorontsov <avorontsov@ru.mvista.com>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- */
+-
+-#ifndef _ASM_XTENSA_GPIO_H
+-#define _ASM_XTENSA_GPIO_H
+-
+-#include <asm-generic/gpio.h>
+-
+-#ifdef CONFIG_GPIOLIB
+-
+-/*
+- * Just call gpiolib.
+- */
+-static inline int gpio_get_value(unsigned int gpio)
+-{
+-	return __gpio_get_value(gpio);
+-}
+-
+-static inline void gpio_set_value(unsigned int gpio, int value)
+-{
+-	__gpio_set_value(gpio, value);
+-}
+-
+-static inline int gpio_cansleep(unsigned int gpio)
+-{
+-	return __gpio_cansleep(gpio);
+-}
+-
+-static inline int gpio_to_irq(unsigned int gpio)
+-{
+-	return __gpio_to_irq(gpio);
+-}
+-
+-/*
+- * Not implemented, yet.
+- */
+-static inline int irq_to_gpio(unsigned int irq)
+-{
+-	return -EINVAL;
+-}
+-
+-#endif /* CONFIG_GPIOLIB */
+-
+-#endif /* _ASM_XTENSA_GPIO_H */
+diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
+index a107d44..ef920a2 100644
+--- a/drivers/gpio/Kconfig
++++ b/drivers/gpio/Kconfig
+@@ -2,6 +2,14 @@
+ # GPIO infrastructure and drivers
+ #
+ 
++config ARCH_HAVE_CUSTOM_GPIO_H
++	bool
++	help
++	  Selecting this config option from the architecture Kconfig allows
++	  the architecture to provide a custom asm/gpio.h implementation
++	  overriding the default implementations.  New uses of this are
++	  strongly discouraged.
++
+ config ARCH_WANT_OPTIONAL_GPIOLIB
+ 	bool
+ 	help
+diff --git a/include/linux/gpio.h b/include/linux/gpio.h
+index 38ac48b..3149f68 100644
+--- a/include/linux/gpio.h
++++ b/include/linux/gpio.h
+@@ -1,6 +1,8 @@
+ #ifndef __LINUX_GPIO_H
+ #define __LINUX_GPIO_H
+ 
++#include <linux/errno.h>
++
+ /* see Documentation/gpio.txt */
+ 
+ /* make these flag values available regardless of GPIO kconfig options */
+@@ -27,7 +29,39 @@ struct gpio {
+ };
+ 
+ #ifdef CONFIG_GENERIC_GPIO
++
++#ifdef CONFIG_ARCH_HAVE_CUSTOM_GPIO_H
+ #include <asm/gpio.h>
++#else
++
++#include <asm-generic/gpio.h>
++
++static inline int gpio_get_value(unsigned int gpio)
++{
++	return __gpio_get_value(gpio);
++}
++
++static inline void gpio_set_value(unsigned int gpio, int value)
++{
++	__gpio_set_value(gpio, value);
++}
++
++static inline int gpio_cansleep(unsigned int gpio)
++{
++	return __gpio_cansleep(gpio);
++}
++
++static inline int gpio_to_irq(unsigned int gpio)
++{
++	return __gpio_to_irq(gpio);
++}
++
++static inline int irq_to_gpio(unsigned int irq)
++{
++	return -EINVAL;
++}
++
++#endif
+ 
+ #else
+ 
 -- 
-Regards,
-Shawn
+1.7.6.3
