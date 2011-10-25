@@ -1,42 +1,49 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 25 Oct 2011 05:00:34 -0600 (MDT)
-Subject: [PATCH v5 3/7] arm: perf: support device with other non-irq
-	resources
-In-Reply-To: <CACVXFVOVeuWpVGSUP-sDDbiWb=W8XVB+PDYns4ttK9+ty0GMmA@mail.gmail.com>
-References: <1319467559-5518-1-git-send-email-ming.lei@canonical.com>
-	<1319467559-5518-4-git-send-email-ming.lei@canonical.com>
-	<20111024150814.GA4771@mudshark.cambridge.arm.com>
-	<CACVXFVOzQ0QEnaAb=mLFdr7AU3H3TsT=wXcNgtqeUGVLXahd4Q@mail.gmail.com>
-	<20111025083420.GA6184@mudshark.cambridge.arm.com>
-	<alpine.DEB.2.00.1110250242130.27118@utopia.booyaka.com>
-	<CACVXFVOVeuWpVGSUP-sDDbiWb=W8XVB+PDYns4ttK9+ty0GMmA@mail.gmail.com>
-Message-ID: <alpine.DEB.2.00.1110250459160.12667@utopia.booyaka.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 25 Oct 2011 13:06:36 +0200
+Subject: [PATCH V3 1/2] ARM: at91: dt: at91sam9g45 family and board device
+	tree files
+In-Reply-To: <4EA579E7.7000002@gmail.com>
+References: <4E9F8226.4030503@gmail.com>
+	<15ab652499e7f6f8a26724bfd90643a8f3f96ad9.1319464310.git.nicolas.ferre@atmel.com>
+	<4EA579E7.7000002@gmail.com>
+Message-ID: <4EA6983C.5080303@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ Beno?t
-
-Hi
-
-On Tue, 25 Oct 2011, Ming Lei wrote:
-
-> On Tue, Oct 25, 2011 at 4:44 PM, Paul Walmsley <paul@pwsan.com> wrote:
-> > On Tue, 25 Oct 2011, Will Deacon wrote:
-> >
-> >> Hurrah! If you can get the OMAP / hwmod bits acked by the OMAP guys then I'm
-> >> happy to take the perf and PMU changes into my tree.
-> >
-> > I'd suggest that you take the perf/PMU stuff yourself if you are happy
-> > with it, and then we'll deal with the OMAP bits ourselves, since it looks
-> > like they aren't dependent on each other, and the OMAP parts will need
-> > changes.
+On 10/24/2011 04:44 PM, Rob Herring :
+> On 10/24/2011 09:05 AM, Nicolas Ferre wrote:
+>> Create a new device tree source file for Atmel at91sam9g45 SoC family.
+>> The Evaluation Kit at91sam9m10g45ek includes it.
+>> This first basic support will be populated as drivers and boards will be
+>> converted to device tree.
+>> Contains serial, dma and interrupt controllers.
+>>
+>> The generic board file still takes advantage of platform data for early serial
+>> init. As we need a storage media and the NAND flash driver is not converted to
+>> DT yet, we keep old initialization for it.
+>>
 > 
-> One omap4 patch(struct arm_pmu_platdata related) depends on 2/7, which
-> need to be rebased. But I still suggest that arm perf/PMU stuff may be
-> merged first.
+> This comment is out of date for serial.
+
+Well, not for early serial actually.
+
+>> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+>> ---
+>> V3:
+>> - additional clock lookup for device tree handling
+>> - devices disabled in dtsi file so that only useful devices are
+>>   enabled in dts files
+>>
+>> V2: foundation for AT91SAM generic support
+>> - device tree focused board file
+>> - inclusion of USART DT support
+>> - early USART and NAND still using platform data
+>>
 > 
-> Paul, expect your comments on OMAP4 parts.
+> Reviewed-by: Rob Herring <rob.herring@calxeda.com>
 
-Beno?t is the right person to review OMAP4 hwmod data.
+Thanks Rob for your review. I send a pull request to Arnd on this material.
 
-- Paul
+Best regards,
+-- 
+Nicolas Ferre
