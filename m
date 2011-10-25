@@ -1,49 +1,47 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 25 Oct 2011 13:06:36 +0200
-Subject: [PATCH V3 1/2] ARM: at91: dt: at91sam9g45 family and board device
-	tree files
-In-Reply-To: <4EA579E7.7000002@gmail.com>
-References: <4E9F8226.4030503@gmail.com>
-	<15ab652499e7f6f8a26724bfd90643a8f3f96ad9.1319464310.git.nicolas.ferre@atmel.com>
-	<4EA579E7.7000002@gmail.com>
-Message-ID: <4EA6983C.5080303@atmel.com>
+Date: Tue, 25 Oct 2011 13:21:45 +0200
+Subject: [GIT PULL] at91 device tree basics
+Message-ID: <4EA69BC9.8040402@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/24/2011 04:44 PM, Rob Herring :
-> On 10/24/2011 09:05 AM, Nicolas Ferre wrote:
->> Create a new device tree source file for Atmel at91sam9g45 SoC family.
->> The Evaluation Kit at91sam9m10g45ek includes it.
->> This first basic support will be populated as drivers and boards will be
->> converted to device tree.
->> Contains serial, dma and interrupt controllers.
->>
->> The generic board file still takes advantage of platform data for early serial
->> init. As we need a storage media and the NAND flash driver is not converted to
->> DT yet, we keep old initialization for it.
->>
-> 
-> This comment is out of date for serial.
+Hi Arnd,
 
-Well, not for early serial actually.
+The following changes since commit c3b92c8787367a8bb53d57d9789b558f1295cc96:
 
->> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
->> ---
->> V3:
->> - additional clock lookup for device tree handling
->> - devices disabled in dtsi file so that only useful devices are
->>   enabled in dts files
->>
->> V2: foundation for AT91SAM generic support
->> - device tree focused board file
->> - inclusion of USART DT support
->> - early USART and NAND still using platform data
->>
-> 
-> Reviewed-by: Rob Herring <rob.herring@calxeda.com>
+  Linux 3.1 (2011-10-24 09:10:05 +0200)
 
-Thanks Rob for your review. I send a pull request to Arnd on this material.
+are available in the git repository at:
+  git://github.com/at91linux/linux-at91.git for-arnd/at91-dt
 
-Best regards,
+They cover the basic device tree work done during the last moths around both 
+at91sam9g45 and at91sam9g20 based board. They have been review by Grant and
+Rob. More device tree related stuff is comming ;-)
+
+
+Jean-Christophe PLAGNIOL-VILLARD (1):
+      ARM: at91: add at91sam9g20 and Calao USB A9G20 DT support
+
+Nicolas Ferre (1):
+      ARM: at91: dt: at91sam9g45 family and board device tree files
+
+ arch/arm/boot/dts/at91sam9g20.dtsi     |  119 ++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/at91sam9g45.dtsi     |  106 +++++++++++++++++++++++++++
+ arch/arm/boot/dts/at91sam9m10g45ek.dts |   35 +++++++++
+ arch/arm/boot/dts/usb_a9g20.dts        |   30 ++++++++
+ arch/arm/mach-at91/Kconfig             |   11 +++
+ arch/arm/mach-at91/Makefile            |    3 +
+ arch/arm/mach-at91/Makefile.boot       |    2 +
+ arch/arm/mach-at91/at91sam9260.c       |    8 ++
+ arch/arm/mach-at91/at91sam9g45.c       |    6 ++
+ arch/arm/mach-at91/board-dt.c          |  123 ++++++++++++++++++++++++++++++++
+ 10 files changed, 443 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/boot/dts/at91sam9g20.dtsi
+ create mode 100644 arch/arm/boot/dts/at91sam9g45.dtsi
+ create mode 100644 arch/arm/boot/dts/at91sam9m10g45ek.dts
+ create mode 100644 arch/arm/boot/dts/usb_a9g20.dts
+ create mode 100644 arch/arm/mach-at91/board-dt.c
+
+Thanks, best regards,
 -- 
 Nicolas Ferre
