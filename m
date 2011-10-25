@@ -1,47 +1,50 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 25 Oct 2011 13:21:45 +0200
-Subject: [GIT PULL] at91 device tree basics
-Message-ID: <4EA69BC9.8040402@atmel.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Tue, 25 Oct 2011 13:25:48 +0200
+Subject: [PATCH] ARM: remove NR_IRQS dependency for ARM-specific HARDIRQ_BITS
+	definition
+Message-ID: <1319541948-10035-1-git-send-email-khilman@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+As a first step towards removing NR_IRQS, remove the ARM customization
+of HARDIRQ_BITS based on NR_IRQS.
 
-The following changes since commit c3b92c8787367a8bb53d57d9789b558f1295cc96:
+The generic code in <linux/hardirq.h> already has a default value of
+10 for HARDIRQ_BITS which is the max used on ARM, so let's just remove
+the NR_IRQS based customization and use the generic default.
 
-  Linux 3.1 (2011-10-24 09:10:05 +0200)
+Signed-off-by: Kevin Hilman <khilman@ti.com>
+---
+ arch/arm/include/asm/hardirq.h |   17 -----------------
+ 1 files changed, 0 insertions(+), 17 deletions(-)
 
-are available in the git repository at:
-  git://github.com/at91linux/linux-at91.git for-arnd/at91-dt
-
-They cover the basic device tree work done during the last moths around both 
-at91sam9g45 and at91sam9g20 based board. They have been review by Grant and
-Rob. More device tree related stuff is comming ;-)
-
-
-Jean-Christophe PLAGNIOL-VILLARD (1):
-      ARM: at91: add at91sam9g20 and Calao USB A9G20 DT support
-
-Nicolas Ferre (1):
-      ARM: at91: dt: at91sam9g45 family and board device tree files
-
- arch/arm/boot/dts/at91sam9g20.dtsi     |  119 ++++++++++++++++++++++++++++++
- arch/arm/boot/dts/at91sam9g45.dtsi     |  106 +++++++++++++++++++++++++++
- arch/arm/boot/dts/at91sam9m10g45ek.dts |   35 +++++++++
- arch/arm/boot/dts/usb_a9g20.dts        |   30 ++++++++
- arch/arm/mach-at91/Kconfig             |   11 +++
- arch/arm/mach-at91/Makefile            |    3 +
- arch/arm/mach-at91/Makefile.boot       |    2 +
- arch/arm/mach-at91/at91sam9260.c       |    8 ++
- arch/arm/mach-at91/at91sam9g45.c       |    6 ++
- arch/arm/mach-at91/board-dt.c          |  123 ++++++++++++++++++++++++++++++++
- 10 files changed, 443 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/boot/dts/at91sam9g20.dtsi
- create mode 100644 arch/arm/boot/dts/at91sam9g45.dtsi
- create mode 100644 arch/arm/boot/dts/at91sam9m10g45ek.dts
- create mode 100644 arch/arm/boot/dts/usb_a9g20.dts
- create mode 100644 arch/arm/mach-at91/board-dt.c
-
-Thanks, best regards,
+diff --git a/arch/arm/include/asm/hardirq.h b/arch/arm/include/asm/hardirq.h
+index 89ad180..96cb097 100644
+--- a/arch/arm/include/asm/hardirq.h
++++ b/arch/arm/include/asm/hardirq.h
+@@ -30,23 +30,6 @@ u64 smp_irq_stat_cpu(unsigned int cpu);
+ 
+ #define arch_irq_stat_cpu	smp_irq_stat_cpu
+ 
+-#if NR_IRQS > 512
+-#define HARDIRQ_BITS	10
+-#elif NR_IRQS > 256
+-#define HARDIRQ_BITS	9
+-#else
+-#define HARDIRQ_BITS	8
+-#endif
+-
+-/*
+- * The hardirq mask has to be large enough to have space
+- * for potentially all IRQ sources in the system nesting
+- * on a single CPU:
+- */
+-#if (1 << HARDIRQ_BITS) < NR_IRQS
+-# error HARDIRQ_BITS is too low!
+-#endif
+-
+ #define __ARCH_IRQ_EXIT_IRQS_DISABLED	1
+ 
+ #endif /* __ASM_HARDIRQ_H */
 -- 
-Nicolas Ferre
+1.7.3.4
