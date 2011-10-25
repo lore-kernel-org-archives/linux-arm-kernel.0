@@ -1,48 +1,24 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 25 Oct 2011 09:26:02 +0100
-Subject: [PATCH 01/12] ARM: clean up idle handlers
-In-Reply-To: <20111025075620.GH4429@atomide.com>
-References: <1319449801-12367-1-git-send-email-nico@fluxnic.net>
-	<1319449801-12367-2-git-send-email-nico@fluxnic.net>
-	<20111025075620.GH4429@atomide.com>
-Message-ID: <20111025082602.GA9290@n2100.arm.linux.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 25 Oct 2011 10:26:33 +0200
+Subject: [PATCH] of: Add a reg-names property to name reg entries
+In-Reply-To: <1319471697-8970-1-git-send-email-b-cousson@ti.com>
+References: <1319471697-8970-1-git-send-email-b-cousson@ti.com>
+Message-ID: <20111025082632.GJ4429@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 25, 2011 at 09:56:20AM +0200, Tony Lindgren wrote:
-> * Nicolas Pitre <nico@fluxnic.net> [111024 12:16]:
-> > Let's factor out the need_resched() check instead of having it duplicated
-> > in every pm_idle implementations to avoid inconsistencies (omap2_pm_idle
-> > was missing it already).
-> > 
-> > The forceful re-enablement of IRQs after pm_idle has returned can go.
-> > The warning certainly doesn't trigger for existing users.  Similar for
-> > the redundant  local_irq_disable() call in the OMAP implementations.
-> 
-> Looks good to me.
->  
-> > And finally move the comment explaining the reason for the turning off
-> > of IRQs to a more proper location.
-> 
-> One minor comment on that comment below.
->  
-> > --- a/arch/arm/kernel/process.c
-> > +++ b/arch/arm/kernel/process.c
-> ...
-> 
-> > -				 * This will eventually be removed - pm_idle
-> > -				 * functions should always return with IRQs
-> > -				 * enabled.
-> > +				 * pm_idle functions should always
-> > +				 * return with IRQs enabled.
-> >  				 */
-> >  				WARN_ON(irqs_disabled());
-> > +			} else
-> >  				local_irq_enable();
-> > -			}
-> 
-> Any reason to use "should always return" instead of "must always return
-> with IRQs enabled"?
+* Benoit Cousson <b-cousson@ti.com> [111024 17:20]:
+> +		compatible = "ti,mcasp";
+> +		reg = <0 0x10 0x10>, <0 0x20 0x10>,
+> +		      <1 0x10 0x10>, <1 0x20 0x10>;
+> +		reg-names = "mpu", "dat",
+> +			    "dma", "dma_dat";
 
-I think it's now a 'must' rather than a 'should'.  I'm not aware of any
-cases recently where IRQs were disabled at this point.
+Hmm for some systems looks like this can also solve how to pass the
+mux signal names cleanly from DT.
+
+For some systems we may also need reg-bits in addition to reg-names
+to describe the signal names. Or do we already have something for
+that?
+
+Tony
