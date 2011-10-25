@@ -1,37 +1,29 @@
-From: ming.lei@canonical.com (Ming Lei)
-Date: Tue, 25 Oct 2011 18:23:03 +0800
-Subject: [PATCH v5 3/7] arm: perf: support device with other non-irq
-	resources
-In-Reply-To: <alpine.DEB.2.00.1110250242130.27118@utopia.booyaka.com>
-References: <1319467559-5518-1-git-send-email-ming.lei@canonical.com>
-	<1319467559-5518-4-git-send-email-ming.lei@canonical.com>
-	<20111024150814.GA4771@mudshark.cambridge.arm.com>
-	<CACVXFVOzQ0QEnaAb=mLFdr7AU3H3TsT=wXcNgtqeUGVLXahd4Q@mail.gmail.com>
-	<20111025083420.GA6184@mudshark.cambridge.arm.com>
-	<alpine.DEB.2.00.1110250242130.27118@utopia.booyaka.com>
-Message-ID: <CACVXFVOVeuWpVGSUP-sDDbiWb=W8XVB+PDYns4ttK9+ty0GMmA@mail.gmail.com>
+From: segher@kernel.crashing.org (Segher Boessenkool)
+Date: Tue, 25 Oct 2011 12:29:45 +0200
+Subject: [PATCH] of: Add a reg-names property to name reg entries
+In-Reply-To: <20111025082632.GJ4429@atomide.com>
+References: <1319471697-8970-1-git-send-email-b-cousson@ti.com>
+	<20111025082632.GJ4429@atomide.com>
+Message-ID: <440786C5-FA1C-4750-9990-0BA5AABC2190@kernel.crashing.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Tue, Oct 25, 2011 at 4:44 PM, Paul Walmsley <paul@pwsan.com> wrote:
-> On Tue, 25 Oct 2011, Will Deacon wrote:
+>> +		compatible = "ti,mcasp";
+>> +		reg = <0 0x10 0x10>, <0 0x20 0x10>,
+>> +		      <1 0x10 0x10>, <1 0x20 0x10>;
+>> +		reg-names = "mpu", "dat",
+>> +			    "dma", "dma_dat";
 >
->> Hurrah! If you can get the OMAP / hwmod bits acked by the OMAP guys then I'm
->> happy to take the perf and PMU changes into my tree.
->
-> I'd suggest that you take the perf/PMU stuff yourself if you are happy
-> with it, and then we'll deal with the OMAP bits ourselves, since it looks
-> like they aren't dependent on each other, and the OMAP parts will need
-> changes.
+> Hmm for some systems looks like this can also solve how to pass the
+> mux signal names cleanly from DT.
 
-One omap4 patch(struct arm_pmu_platdata related) depends on 2/7, which
-need to be rebased. But I still suggest that arm perf/PMU stuff may be
-merged first.
+What problem does any of this solve?  The device binding for the
+"mcasp" device will have to describe the possible "reg-names", and
+what those mean; but the binding already has to describe its "reg"
+property anyway.
 
-Paul, expect your comments on OMAP4 parts.
+The example looks like something that should be more properly done
+with subdevices, not sure.
 
-thanks,
---
-Ming Lei
+
+Segher
