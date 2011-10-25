@@ -1,61 +1,45 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 25 Oct 2011 11:10:32 +0200
-Subject: [GIT PULL] i.MX5 devicetree support
-Message-ID: <20111025091032.GT23421@pengutronix.de>
+Date: Tue, 25 Oct 2011 11:23:44 +0200
+Subject: [GIT PULL] assorted i.MX fixes
+Message-ID: <20111025092344.GU23421@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Arnd,
 
-Please pull the following. It contains devicetree support for i.MX5
-based systems. You can use the following to resolve the merge conflicts
-against your for-next branch:
-
-git://git.pengutronix.de/git/imx/linux-2.6.git imx-dt-merge
+Please pull the following assorted i.MX fixes. Should have send this
+earlier, I promise to do this next time.
 
 Sascha
 
-The following changes since commit 976d167615b64e14bc1491ca51d424e2ba9a5e84:
+The following changes since commit fcb8ce5cfe30ca9ca5c9a79cdfe26d1993e65e0c:
 
-  Linux 3.1-rc9 (2011-10-04 18:11:50 -0700)
+  Linux 3.1-rc3 (2011-08-22 11:42:53 -0700)
 
 are available in the git repository at:
-  git://git.pengutronix.de/git/imx/linux-2.6.git imx-features-for-arnd
+  git://git.pengutronix.de/git/imx/linux-2.6.git imx-fixes-for-arnd
 
-Shawn Guo (2):
-      arm/mx5: add device tree support for imx53 boards
-      arm/mx5: add device tree support for imx51 babbage
+Arnaud Patard (1):
+      MX5: fix clock usage
 
- Documentation/devicetree/bindings/arm/fsl.txt |   19 ++
- arch/arm/boot/dts/imx51-babbage.dts           |  135 +++++++++++
- arch/arm/boot/dts/imx51.dtsi                  |  246 ++++++++++++++++++++
- arch/arm/boot/dts/imx53-ard.dts               |  113 +++++++++
- arch/arm/boot/dts/imx53-evk.dts               |  120 ++++++++++
- arch/arm/boot/dts/imx53-qsb.dts               |  125 ++++++++++
- arch/arm/boot/dts/imx53-smd.dts               |  169 ++++++++++++++
- arch/arm/boot/dts/imx53.dtsi                  |  301 +++++++++++++++++++++++++
- arch/arm/mach-mx5/Kconfig                     |   21 ++
- arch/arm/mach-mx5/Makefile                    |    3 +
- arch/arm/mach-mx5/board-mx51_babbage.c        |    9 +-
- arch/arm/mach-mx5/board-mx53_ard.c            |   12 +-
- arch/arm/mach-mx5/board-mx53_evk.c            |    9 +-
- arch/arm/mach-mx5/board-mx53_loco.c           |    9 +-
- arch/arm/mach-mx5/board-mx53_smd.c            |    9 +-
- arch/arm/mach-mx5/clock-mx51-mx53.c           |   39 ++++
- arch/arm/mach-mx5/imx51-dt.c                  |  116 ++++++++++
- arch/arm/mach-mx5/imx53-dt.c                  |  126 +++++++++++
- arch/arm/plat-mxc/include/mach/common.h       |    8 +
- 19 files changed, 1577 insertions(+), 12 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/fsl.txt
- create mode 100644 arch/arm/boot/dts/imx51-babbage.dts
- create mode 100644 arch/arm/boot/dts/imx51.dtsi
- create mode 100644 arch/arm/boot/dts/imx53-ard.dts
- create mode 100644 arch/arm/boot/dts/imx53-evk.dts
- create mode 100644 arch/arm/boot/dts/imx53-qsb.dts
- create mode 100644 arch/arm/boot/dts/imx53-smd.dts
- create mode 100644 arch/arm/boot/dts/imx53.dtsi
- create mode 100644 arch/arm/mach-mx5/imx51-dt.c
- create mode 100644 arch/arm/mach-mx5/imx53-dt.c
+Fabio Estevam (1):
+      ARM: mx31pdk: Fix build by passing IMX_HAVE_PLATFORM_MXC_MMC
+
+Matt Burtch (1):
+      ARM: i.MX28: shift frac value in _CLK_SET_RATE
+
+Paul Bolle (1):
+      ARM: imx: Fix typo 'MACH_MX31_3DS_MXC_NAND_USE_BBT'
+
+Paul Fertser (1):
+      plat-mxc: iomux-v3.h: implicitly enable pull-up/down when that's desired
+
+ arch/arm/mach-imx/Kconfig                 |    1 +
+ arch/arm/mach-imx/mach-mx31_3ds.c         |    2 +-
+ arch/arm/mach-mx5/pm-imx5.c               |   15 ++++++++++++---
+ arch/arm/mach-mxs/clock-mx28.c            |    2 +-
+ arch/arm/plat-mxc/include/mach/iomux-v3.h |   10 +++++-----
+ 5 files changed, 20 insertions(+), 10 deletions(-)
 -- 
 Pengutronix e.K.                           |                             |
 Industrial Linux Solutions                 | http://www.pengutronix.de/  |
