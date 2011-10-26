@@ -1,23 +1,35 @@
 From: rusty@rustcorp.com.au (Rusty Russell)
-Date: Wed, 26 Oct 2011 14:30:50 +1030
-Subject: [PATCH 0/7] Introducing a generic AMP framework
-In-Reply-To: <1319536106-25802-1-git-send-email-ohad@wizery.com>
-References: <1319536106-25802-1-git-send-email-ohad@wizery.com>
-Message-ID: <874nywpfkd.fsf@rustcorp.com.au>
+Date: Wed, 26 Oct 2011 14:36:47 +1030
+Subject: [PATCH v3] virtio: Add platform bus driver for memory mapped
+	virtio device
+In-Reply-To: <1319461560.3668.16.camel@hornet.cambridge.arm.com>
+References: <1317841030-17758-1-git-send-email-pawel.moll@arm.com>
+	<1317919843-8343-1-git-send-email-pawel.moll@arm.com>
+	<1317921230.28696.102.camel@hornet.cambridge.arm.com>
+	<87lisjq6tu.fsf@rustcorp.com.au>
+	<1318931075.3146.285.camel@hornet.cambridge.arm.com>
+	<87ty75adtb.fsf@rustcorp.com.au>
+	<1319219844.5094.16.camel@hornet.cambridge.arm.com>
+	<87wrbv15lp.fsf@rustcorp.com.au>
+	<1319461560.3668.16.camel@hornet.cambridge.arm.com>
+Message-ID: <871uu0pfag.fsf@rustcorp.com.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 25 Oct 2011 11:48:19 +0200, Ohad Ben-Cohen <ohad@wizery.com> wrote:
-> Modern SoCs typically employ a central symmetric multiprocessing (SMP)
-> application processor running Linux, with several other asymmetric
-> multiprocessing (AMP) heterogeneous processors running different instances
-> of operating system, whether Linux or any other flavor of real-time OS.
+On Mon, 24 Oct 2011 14:06:00 +0100, Pawel Moll <pawel.moll@arm.com> wrote:
+> On Mon, 2011-10-24 at 03:33 +0100, Rusty Russell wrote:
+> > No, that's it I think.  Please send a diff for the documentation, since
+> > I'm updating the LyX master and I've already applied your previous
+> > version.
+> 
+> Here it goes (below).
 
-OK, I'm not even sure who this should go through, but no objections here
-but one:
+I've applied the corresponding changes to the latest version of the
+virtio pci draft spec (0.9.2).  Please check it's accurate...
 
-virtio-spec.txt is a derived document, so I'd prefer that patch to go
-through me so I can patch the (LyX) master copy.
+Direct link to version with change tracking:
+
+http://ozlabs.org/~rusty/virtio-spec/virtio-0.9.2-vs-0.9.1.pdf
 
 Thanks!
 Rusty.
