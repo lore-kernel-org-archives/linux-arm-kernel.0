@@ -1,102 +1,28 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Wed, 26 Oct 2011 19:40:45 +0200
-Subject: [PATCH] of: Add a reg-names property to name reg entries
-In-Reply-To: <FD4B90D7-4B26-42C2-8CF9-7AA9971BCBEB@kernel.crashing.org>
-References: <1319471697-8970-1-git-send-email-b-cousson@ti.com>
-	<20111025082632.GJ4429@atomide.com>
-	<440786C5-FA1C-4750-9990-0BA5AABC2190@kernel.crashing.org>
-	<4EA6BC54.7030007@ti.com>
-	<BC60AF8F-C329-44B9-BEC9-EA5821725E1B@kernel.crashing.org>
-	<4EA6DF88.2080704@ti.com>
-	<FD4B90D7-4B26-42C2-8CF9-7AA9971BCBEB@kernel.crashing.org>
-Message-ID: <4EA8461D.6070600@ti.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 26 Oct 2011 17:10:55 -0200
+Subject: [PATCH] ARM: mx31pdk: Add MC13783 RTC support
+In-Reply-To: <20111025072034.GR15299@pengutronix.de>
+References: <1319482929-28262-1-git-send-email-fabio.estevam@freescale.com>
+	<20111025072034.GR15299@pengutronix.de>
+Message-ID: <CAOMZO5AN=R6pa11-3JS2XJ_D6tsrSbO-=54J4+FFy4UL32t3hw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/26/2011 5:57 AM, Segher Boessenkool wrote:
->>>>> What problem does any of this solve?  The device binding for the
->>>>> "mcasp" device will have to describe the possible "reg-names", and
->>>>> what those mean; but the binding already has to describe its "reg"
->>>>> property anyway.
->>>>
->>>> What this solve is the ability to use the
->>>> platform_get_resource_byname directly to retrieve the proper
->>>> register base address.
->>>
->>> You do not have to put it in the device tree for that, the device
->>> driver can implement this itself if it cares.
->>
->> ???
->>
->> The driver is the user of that name, so it has to be populated
->> before into the resource during device creation.
+Hi Uwe,
+
+2011/10/25 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+
+>> - ? ? .flags ?= MC13783_USE_REGULATOR | MC13783_USE_TOUCHSCREEN,
+>> + ? ? .flags ?= MC13XXX_USE_REGULATOR | MC13XXX_USE_TOUCHSCREEN |
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? MC13XXX_USE_RTC,
+> ok in principle but (I think mfd in) next touches this already:
 >
-> It can be as simple as
->
-> #define FOO_REG_INDEX 0
-> #define BAR_REG_INDEX 1
->
-> but you can use C strings if you want to.
+> ? ? ? ?$ git show next/master:arch/arm/mach-imx/mach-mx31_3ds.c | grep USE_TOUCH
+> ? ? ? ? ? ? ? ?.flags ?= MC13XXX_USE_TOUCHSCREEN,
 
-But that will add an extra level of indirection...
+Ok, I will wait for this change to reach Sascha's tree first and then
+I will repost this patch.
 
-The idea is to avoid that and use directly:
+Regards,
 
-platform_get_resource_byname(pdev, IORESOURCE_MEM, "smem");
-platform_get_resource_byname(pdev, IORESOURCE_MEM, "cmem");
-....
-
->>>> The binding is just a text description that the driver will not be
->>>> able to use directly. It will have to get the resource using an
->>>> abstract index.
->>>
->>> Your reg-names are abstract identifiers just as well.
->>
->> This is the name used in the HW documentation.
->
-> So?  The device binding will still have to list them, for exact spelling
-> and register block size etc.
-
-The binding is *just* a text... so instead of having to read a text file 
-and then getting an index, we can just use the text that represent the 
-memory entry.
-
->> Ordering them to get a number is purely arbitrary.
->
-> Ordering them is required, "reg" is an array.  It also matters which
-> entry is the first entry (for the unit address).
->
->> That's why using the name will allow the driver to get the resource
->> the way it is represented in the documentation and thus avoid some
->> intermediate number.
->
-> You use an intermediate string instead, and add code and binding to
-> translate that to that same number.
-
-Nope. We use a string to get the resource directly. There is no 
-intermediate index.
-
->>>> It thus removes a level of indirection that is error prone and
->>>> useless most of the time.
->>>
->>> It *adds* a level of indirection.  I doubt it helps prevent errors
->>> either, but who knows.
->>
->> Well, if that does not bring anything to you, you can just not use it.
->
-> I could, if you did this for your device binding only, but it seems
-> you are adding this as a generic thing.  I am very much against that.
-> The device tree should describe the hardware; it shouldn't describe
-> the description of the hardware, that's what bindings are for.
-
-Not really, it is still a representation of the HW using a more readable 
-way. I kept the original "reg" for legacy only.
-
-This idea is to extend that to any kind of resources attached to a 
-device: irq, dma_req, clock, regulator...
-FWIW, using a name is already the natural way to get a clock and a 
-regulator.
-The point here is to extend legacy binding and thus improve the 
-consistency in the device resource representation.
-
-Benoit
+Fabio Estevam
