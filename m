@@ -1,37 +1,74 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 26 Oct 2011 14:35:47 +0200
-Subject: [PATCH] lib: devres: add convenience function to remap a resource
-In-Reply-To: <20111026121706.GC23457@suse.de>
-References: <1319548607-28427-1-git-send-email-w.sang@pengutronix.de>
-	<20111025153538.GA13012@google.com> <20111026121706.GC23457@suse.de>
-Message-ID: <CACxGe6st52znT6EPWDoUFE0Pvmr+CodqHCp-D7egZNy2eQL+0g@mail.gmail.com>
+From: paul.gortmaker@windriver.com (Paul Gortmaker)
+Date: Wed, 26 Oct 2011 10:27:57 -0400
+Subject: linux-next failure on tegra due to conflicts between PPI and
+	irq domain patches and irq.h->module.h include removal
+In-Reply-To: <CAOesGMiCvFypQ6MbkTARxH3i3YTgYqSVcUwXe=2tdqSqufXtzg@mail.gmail.com>
+References: <CAOesGMhqRg29tq5Cw03UQMzGs_6nc3YA9UE6Cvps_0q7h5OeZw@mail.gmail.com>	<4EA73171.5020207@gmail.com>
+	<CAOesGMiCvFypQ6MbkTARxH3i3YTgYqSVcUwXe=2tdqSqufXtzg@mail.gmail.com>
+Message-ID: <4EA818ED.9000006@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 26, 2011 at 2:17 PM, Greg KH <gregkh@suse.de> wrote:
-> On Tue, Oct 25, 2011 at 08:35:38AM -0700, Tejun Heo wrote:
->> On Tue, Oct 25, 2011 at 03:16:47PM +0200, Wolfram Sang wrote:
->> > Almost every platform_driver does the three steps get_resource,
->> > request_mem_region, ioremap. This does not only lead to a lot of code
->> > duplication, but also a huge number of similar error strings and
->> > inconsistent error codes on failure. So, introduce a helper function
->> > which simplifies remapping a resource and make it hard to do something
->> > wrong and add documentation for it.
->> >
->> > Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
->> > Cc: Grant Likely <grant.likely@secretlab.ca>
->> > Cc: Tejun Heo <tj@kernel.org>
->> > Cc: Greg KH <gregkh@suse.de>
+On 11-10-25 06:01 PM, Olof Johansson wrote:
+> On Tue, Oct 25, 2011 at 3:00 PM, Rob Herring <robherring2@gmail.com> wrote:
+>> Olof,
 >>
->> ?Acked-by: Tejun Heo <tj@kernel.org>
+>> On 10/25/2011 04:48 PM, Olof Johansson wrote:
+>>> Hi,
+>>>
+>>> Looks like Marc added new references to irq_start in his PPI patch,
+>>> and Rob removed it in parallel. Also, irq_offset is no longer
+>>> available. Looks like you need to respin your patch, Marc.
+>>>
+>>> arch/arm/common/gic.c: In function 'gic_dist_init':
+>>> arch/arm/common/gic.c:290: error: 'irq_start' undeclared (first use in
+>>> this function)
+>>> arch/arm/common/gic.c:290: error: (Each undeclared identifier is
+>>> reported only once
+>>> arch/arm/common/gic.c:290: error: for each function it appears in.)
+>>> arch/arm/common/gic.c:296: error: 'struct gic_chip_data' has no member
+>>> named 'irq_offset'
 >>
->> Greg, can you please take this one?
->
-> Ok, I'll queue it up after the 3.2 merge window is over, for the 3.3
-> release.
+>> I fixed this and sent a pull request yesterday to Arnd.
+> 
+> Ah, oops, forgot to check for already-posted-patches. :) Excellent.
+> 
+> 
+>>> The second error is because of the change from Paul that removes
+>>> module.h from irq.h:
+>>>
+>>> arch/arm/common/gic.c: In function 'gic_init':
+>>> arch/arm/common/gic.c:620: error: 'THIS_MODULE' undeclared (first use
+>>> in this function)
+>>>
+>>> Looks odd that I should need to include module.h on my own just to use
+>>> irq defines. Paul?
+>>>
+>>
+>> THIS_MODULE is needed by irq.h itself in irq_alloc_descs, so it probably
+>> needs to be added back.
+> 
+> Well, the new export.h that defines THIS_MODULE probably needs to be
+> added to irq.h, yes.
 
-You can add my a-b on this one too.
+No.  The whole point of the commit was to avoid nested includes
+as per the commit log:
 
-Acked-by: Grant Likely <grant.likely@secretlab.ca>
+    Also convert the irq_alloc_descs variants to macros, since all
+    they really do is is call the __irq_alloc_descs primitive.
+    This avoids including export.h and no debug info is lost.
 
-g.
+If your file is relating to modular usage such that it is a modular
+provider of interrupt sources and hence uses "THIS_MODULE", then it
+will need export.h in the future. And that macro has nothing whatsoever
+to do with any irq defines; it is used all over the kernel to tie
+structures back to a (possibly modular) code block, just as per the
+use case here in irq.h is.
+
+Thanks,
+Paul.
+
+
+> 
+> 
+> -Olof
