@@ -1,289 +1,49 @@
-From: lauri.hintsala@bluegiga.com (Lauri Hintsala)
-Date: Wed, 26 Oct 2011 08:28:01 +0300
-Subject: [PATCH v2] ARM: mxs: Add initial support for Bluegiga APX4
-	Development Kit
-In-Reply-To: <1319019366-9666-1-git-send-email-lauri.hintsala@bluegiga.com>
-References: <1319019366-9666-1-git-send-email-lauri.hintsala@bluegiga.com>
-Message-ID: <4EA79A61.9060805@bluegiga.com>
+From: tixy@yxit.co.uk (Tixy)
+Date: Wed, 26 Oct 2011 07:28:47 +0100
+Subject: [PATCH] ARM: kprobes: only patch instructions on one CPU
+In-Reply-To: <20111025153652.GA11649@debian>
+References: <1318435944-21855-1-git-send-email-rabin@rab.in>
+	<1318492515.2265.51.camel@computer2>
+	<1318496852.2213.39.camel@computer2>
+	<20111025153652.GA11649@debian>
+Message-ID: <1319610527.2246.17.camel@computer2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Sascha,
+On Tue, 2011-10-25 at 21:06 +0530, Rabin Vincent wrote:
+> On Thu, Oct 13, 2011 at 10:07:32AM +0100, Tixy wrote:
+> > As I said in my reply to the other mail, I had missed the fact that it
+> > is stop_machine_cpu_stop() which is used to call our function, and this
+> > synchronises all cores. Therefore, this patch is correct, assuming that
+> > a flush_icache_range executed on one core also flushes I-caches on other
+> > cores. (I'm a bit doubtfull of this as I beleive that at least
+> > ARM11MPCore requires this to be managed in software and I can't find any
+> > code that handles this.)
+> 
+> If we want kprobes to work correctly on ARM11MPCore, shouldn't we need
+> to broadcast the invalidate in arch_prepare_kprobe() and the
+> non-stop-machine-using parts of arch_arm_kprobe() too?
 
-Is this board support patch OK for releasing?
+We would, though the effect of not doing so would be safer. I.e. we
+would just miss triggering kprobes, whereas when removing probes the
+effect could be a processes faulting when it executes the 'breakpoint'
+instruction still in the I cache.
 
-BR,
-Lauri Hintsala
+> Also, it seems odd to perform the instruction write and
+> flush_icache_range() on every CPU from stop_machine().  Perhaps it would
+> be better if there were a way in stop_machine() to call an I-cache
+> invalidation function on all CPUs, after the arm/disarm function is
+> called on only one of them.
 
+The arm/disarm functions only writes an instruction to RAM and flushes
+the I-cache for it. It doesn't seem worth the effort of adding code to
+avoid the couple of instruction required to write the instruction,
+especially as stop_machine() is already causing all CPUs to reschedule,
+sync with each other, and reschedule again.
 
-On 10/19/2011 01:16 PM, Lauri Hintsala wrote:
-> Added initial support for Bluegiga APX4 module and Development Kit.
-> Currently DUART, AUARTs, FEC, I2C, MMC0, RTC and user LED are supported.
->
-> Signed-off-by: Lauri Hintsala<lauri.hintsala@bluegiga.com>
-> Signed-off-by: Veli-Pekka Peltola<veli-pekka.peltola@bluegiga.com>
-> ---
-> v2
->   * code cleanups
->   * ethernet mac address parsing removed because fec driver implements parsing already
->
->   arch/arm/configs/mxs_defconfig              |    1 +
->   arch/arm/mach-mxs/Kconfig                   |   15 +++
->   arch/arm/mach-mxs/Makefile                  |    1 +
->   arch/arm/mach-mxs/include/mach/mxs.h        |    1 +
->   arch/arm/mach-mxs/include/mach/uncompress.h |    1 +
->   arch/arm/mach-mxs/mach-apx4devkit.c         |  170 +++++++++++++++++++++++++++
->   6 files changed, 189 insertions(+), 0 deletions(-)
->   create mode 100644 arch/arm/mach-mxs/mach-apx4devkit.c
->
-> diff --git a/arch/arm/configs/mxs_defconfig b/arch/arm/configs/mxs_defconfig
-> index db2cb7d..6a6268d 100644
-> --- a/arch/arm/configs/mxs_defconfig
-> +++ b/arch/arm/configs/mxs_defconfig
-> @@ -26,6 +26,7 @@ CONFIG_MACH_MX23EVK=y
->   CONFIG_MACH_MX28EVK=y
->   CONFIG_MACH_STMP378X_DEVB=y
->   CONFIG_MACH_TX28=y
-> +CONFIG_MACH_APX4DEVKIT=y
->   # CONFIG_ARM_THUMB is not set
->   CONFIG_NO_HZ=y
->   CONFIG_HIGH_RES_TIMERS=y
-> diff --git a/arch/arm/mach-mxs/Kconfig b/arch/arm/mach-mxs/Kconfig
-> index 4cd0231..fecb606 100644
-> --- a/arch/arm/mach-mxs/Kconfig
-> +++ b/arch/arm/mach-mxs/Kconfig
-> @@ -64,8 +64,23 @@ config MODULE_TX28
->   	select MXS_HAVE_PLATFORM_MXS_MMC
->   	select MXS_HAVE_PLATFORM_MXS_PWM
->
-> +config MODULE_APX4
-> +	bool
-> +	select SOC_IMX28
-> +	select LEDS_GPIO_REGISTER
-> +	select MXS_HAVE_AMBA_DUART
-> +	select MXS_HAVE_PLATFORM_AUART
-> +	select MXS_HAVE_PLATFORM_FEC
-> +	select MXS_HAVE_PLATFORM_MXS_I2C
-> +	select MXS_HAVE_PLATFORM_MXS_MMC
-> +	select MXS_OCOTP
-> +
->   config MACH_TX28
->   	bool "Ka-Ro TX28 module"
->   	select MODULE_TX28
->
-> +config MACH_APX4DEVKIT
-> +	bool "Support Bluegiga APX4 Development Kit"
-> +	select MODULE_APX4
-> +
->   endif
-> diff --git a/arch/arm/mach-mxs/Makefile b/arch/arm/mach-mxs/Makefile
-> index 6c38262..3d335a7 100644
-> --- a/arch/arm/mach-mxs/Makefile
-> +++ b/arch/arm/mach-mxs/Makefile
-> @@ -12,5 +12,6 @@ obj-$(CONFIG_MACH_MX23EVK) += mach-mx23evk.o
->   obj-$(CONFIG_MACH_MX28EVK) += mach-mx28evk.o
->   obj-$(CONFIG_MODULE_TX28) += module-tx28.o
->   obj-$(CONFIG_MACH_TX28)    += mach-tx28.o
-> +obj-$(CONFIG_MACH_APX4DEVKIT) += mach-apx4devkit.o
->
->   obj-y += devices/
-> diff --git a/arch/arm/mach-mxs/include/mach/mxs.h b/arch/arm/mach-mxs/include/mach/mxs.h
-> index 35a89dd..59011ef 100644
-> --- a/arch/arm/mach-mxs/include/mach/mxs.h
-> +++ b/arch/arm/mach-mxs/include/mach/mxs.h
-> @@ -32,6 +32,7 @@
->   		machine_is_mx23evk() ||					\
->   		0)
->   #define cpu_is_mx28()		(					\
-> +		machine_is_apx4devkit() ||				\
->   		machine_is_mx28evk() ||					\
->   		machine_is_tx28() ||					\
->   		0)
-> diff --git a/arch/arm/mach-mxs/include/mach/uncompress.h b/arch/arm/mach-mxs/include/mach/uncompress.h
-> index 7f8bf65..b66a29d 100644
-> --- a/arch/arm/mach-mxs/include/mach/uncompress.h
-> +++ b/arch/arm/mach-mxs/include/mach/uncompress.h
-> @@ -62,6 +62,7 @@ static inline void __arch_decomp_setup(unsigned long arch_id)
->   	case MACH_TYPE_MX23EVK:
->   		mxs_duart_base = MX23_DUART_BASE_ADDR;
->   		break;
-> +	case MACH_TYPE_APX4DEVKIT:
->   	case MACH_TYPE_MX28EVK:
->   	case MACH_TYPE_TX28:
->   		mxs_duart_base = MX28_DUART_BASE_ADDR;
-> diff --git a/arch/arm/mach-mxs/mach-apx4devkit.c b/arch/arm/mach-mxs/mach-apx4devkit.c
-> new file mode 100644
-> index 0000000..28d334d
-> --- /dev/null
-> +++ b/arch/arm/mach-mxs/mach-apx4devkit.c
-> @@ -0,0 +1,170 @@
-> +/*
-> + * Copyright (C) 2011
-> + * Lauri Hintsala, Bluegiga,<lauri.hintsala@bluegiga.com>
-> + *
-> + * based on: mach-mx28evk.c
-> + * Copyright 2010 Freescale Semiconductor, Inc. All Rights Reserved.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#include<linux/delay.h>
-> +#include<linux/platform_device.h>
-> +#include<linux/gpio.h>
-> +#include<linux/leds.h>
-> +#include<linux/irq.h>
-> +#include<linux/clk.h>
-> +#include<linux/i2c.h>
-> +
-> +#include<asm/mach-types.h>
-> +#include<asm/mach/arch.h>
-> +#include<asm/mach/time.h>
-> +
-> +#include<mach/common.h>
-> +#include<mach/iomux-mx28.h>
-> +
-> +#include "devices-mx28.h"
-> +
-> +#define APX4DEVKIT_GPIO_USERLED	MXS_GPIO_NR(3, 28)
-> +
-> +static const iomux_cfg_t apx4devkit_pads[] __initconst = {
-> +	/* duart */
-> +	MX28_PAD_PWM0__DUART_RX | MXS_PAD_CTRL,
-> +	MX28_PAD_PWM1__DUART_TX | MXS_PAD_CTRL,
-> +
-> +	/* auart0 */
-> +	MX28_PAD_AUART0_RX__AUART0_RX | MXS_PAD_CTRL,
-> +	MX28_PAD_AUART0_TX__AUART0_TX | MXS_PAD_CTRL,
-> +	MX28_PAD_AUART0_CTS__AUART0_CTS | MXS_PAD_CTRL,
-> +	MX28_PAD_AUART0_RTS__AUART0_RTS | MXS_PAD_CTRL,
-> +
-> +	/* auart1 */
-> +	MX28_PAD_AUART1_RX__AUART1_RX | MXS_PAD_CTRL,
-> +	MX28_PAD_AUART1_TX__AUART1_TX | MXS_PAD_CTRL,
-> +
-> +	/* auart2 */
-> +	MX28_PAD_SSP2_SCK__AUART2_RX | MXS_PAD_CTRL,
-> +	MX28_PAD_SSP2_MOSI__AUART2_TX | MXS_PAD_CTRL,
-> +
-> +	/* auart3 */
-> +	MX28_PAD_SSP2_MISO__AUART3_RX | MXS_PAD_CTRL,
-> +	MX28_PAD_SSP2_SS0__AUART3_TX | MXS_PAD_CTRL,
-> +
-> +#define MXS_PAD_FEC	(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP)
-> +	/* fec0 */
-> +	MX28_PAD_ENET0_MDC__ENET0_MDC | MXS_PAD_FEC,
-> +	MX28_PAD_ENET0_MDIO__ENET0_MDIO | MXS_PAD_FEC,
-> +	MX28_PAD_ENET0_RX_EN__ENET0_RX_EN | MXS_PAD_FEC,
-> +	MX28_PAD_ENET0_RXD0__ENET0_RXD0 | MXS_PAD_FEC,
-> +	MX28_PAD_ENET0_RXD1__ENET0_RXD1 | MXS_PAD_FEC,
-> +	MX28_PAD_ENET0_TX_EN__ENET0_TX_EN | MXS_PAD_FEC,
-> +	MX28_PAD_ENET0_TXD0__ENET0_TXD0 | MXS_PAD_FEC,
-> +	MX28_PAD_ENET0_TXD1__ENET0_TXD1 | MXS_PAD_FEC,
-> +	MX28_PAD_ENET_CLK__CLKCTRL_ENET | MXS_PAD_FEC,
-> +
-> +	/* i2c */
-> +	MX28_PAD_I2C0_SCL__I2C0_SCL,
-> +	MX28_PAD_I2C0_SDA__I2C0_SDA,
-> +
-> +	/* mmc0 */
-> +	MX28_PAD_SSP0_DATA0__SSP0_D0 |
-> +		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
-> +	MX28_PAD_SSP0_DATA1__SSP0_D1 |
-> +		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
-> +	MX28_PAD_SSP0_DATA2__SSP0_D2 |
-> +		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
-> +	MX28_PAD_SSP0_DATA3__SSP0_D3 |
-> +		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
-> +	MX28_PAD_SSP0_DATA4__SSP0_D4 |
-> +		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
-> +	MX28_PAD_SSP0_DATA5__SSP0_D5 |
-> +		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
-> +	MX28_PAD_SSP0_DATA6__SSP0_D6 |
-> +		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
-> +	MX28_PAD_SSP0_DATA7__SSP0_D7 |
-> +		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
-> +	MX28_PAD_SSP0_CMD__SSP0_CMD |
-> +		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
-> +	MX28_PAD_SSP0_DETECT__SSP0_CARD_DETECT |
-> +		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
-> +	MX28_PAD_SSP0_SCK__SSP0_SCK |
-> +		(MXS_PAD_12MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
-> +
-> +	/* led */
-> +	MX28_PAD_PWM3__GPIO_3_28 | MXS_PAD_CTRL,
-> +};
-> +
-> +/* led */
-> +static const struct gpio_led apx4devkit_leds[] __initconst = {
-> +	{
-> +		.name = "user-led",
-> +		.default_trigger = "heartbeat",
-> +		.gpio = APX4DEVKIT_GPIO_USERLED,
-> +	},
-> +};
-> +
-> +static const struct gpio_led_platform_data apx4devkit_led_data __initconst = {
-> +	.leds = apx4devkit_leds,
-> +	.num_leds = ARRAY_SIZE(apx4devkit_leds),
-> +};
-> +
-> +static struct fec_platform_data mx28_fec_pdata __initdata = {
-> +	.phy = PHY_INTERFACE_MODE_RMII,
-> +};
-> +
-> +static struct mxs_mmc_platform_data apx4devkit_mmc_pdata __initdata = {
-> +	.wp_gpio = -EINVAL,
-> +	.flags = SLOTF_8_BIT_CAPABLE,
-> +};
-> +
-> +static struct i2c_board_info apx4devkit_i2c_boardinfo[] __initdata = {
-> +	{ I2C_BOARD_INFO("sgtl5000", 0x0a) }, /* ASoC */
-> +	{ I2C_BOARD_INFO("pcf8563", 0x51) }, /* RTC */
-> +};
-> +
-> +static void __init apx4devkit_init(void)
-> +{
-> +	mxs_iomux_setup_multiple_pads(apx4devkit_pads,
-> +			ARRAY_SIZE(apx4devkit_pads));
-> +
-> +	mx28_add_duart();
-> +	mx28_add_auart0();
-> +	mx28_add_auart1();
-> +	mx28_add_auart2();
-> +	mx28_add_auart3();
-> +
-> +	mx28_add_fec(0,&mx28_fec_pdata);
-> +
-> +	mx28_add_mxs_mmc(0,&apx4devkit_mmc_pdata);
-> +
-> +	gpio_led_register_device(0,&apx4devkit_led_data);
-> +
-> +	/* I2C */
-> +	mx28_add_mxs_i2c(0);
-> +	i2c_register_board_info(0, apx4devkit_i2c_boardinfo,
-> +			ARRAY_SIZE(apx4devkit_i2c_boardinfo));
-> +}
-> +
-> +static void __init apx4devkit_timer_init(void)
-> +{
-> +	mx28_clocks_init();
-> +}
-> +
-> +static struct sys_timer apx4devkit_timer = {
-> +	.init	= apx4devkit_timer_init,
-> +};
-> +
-> +MACHINE_START(APX4DEVKIT, "Bluegiga APX4 Development Kit")
-> +	.map_io		= mx28_map_io,
-> +	.init_irq	= mx28_init_irq,
-> +	.timer		=&apx4devkit_timer,
-> +	.init_machine	= apx4devkit_init,
-> +MACHINE_END
+As you say though, it should be possible and looks nicer if the disarm
+code was only called on one CPU. I'm just trying to point out that there
+may be risks and there is little performance benefit.
+
+-- 
+Tixy
