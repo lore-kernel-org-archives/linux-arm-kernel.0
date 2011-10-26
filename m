@@ -1,88 +1,226 @@
-From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Wed, 26 Oct 2011 10:58:29 -0400
-Subject: linux-next failure on tegra due to conflicts between PPI and
-	irq domain patches and irq.h->module.h include removal
-In-Reply-To: <CAOesGMgB0nVqaxAvuEa2auJ0rBBYQ4fDbG82MwXApYHtt8=Y+g@mail.gmail.com>
-References: <CAOesGMhqRg29tq5Cw03UQMzGs_6nc3YA9UE6Cvps_0q7h5OeZw@mail.gmail.com>	<4EA73171.5020207@gmail.com>	<CAOesGMiCvFypQ6MbkTARxH3i3YTgYqSVcUwXe=2tdqSqufXtzg@mail.gmail.com>	<4EA818ED.9000006@windriver.com>
-	<CAOesGMgB0nVqaxAvuEa2auJ0rBBYQ4fDbG82MwXApYHtt8=Y+g@mail.gmail.com>
-Message-ID: <4EA82015.4020600@windriver.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Wed, 26 Oct 2011 18:57:12 +0200
+Subject: [PATCH] regulator: Use regmap_read/write(), regmap_update_bits
+	functions directly
+In-Reply-To: <1319617556-29021-1-git-send-email-jhbird.choi@samsung.com>
+References: <1319617556-29021-1-git-send-email-jhbird.choi@samsung.com>
+Message-ID: <CACxGe6uJCt3ytmJhffJGnkPb6Agc1X9gP2Li-Yjj=8ckgMxwPw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11-10-26 10:35 AM, Olof Johansson wrote:
-> On Wed, Oct 26, 2011 at 7:27 AM, Paul Gortmaker
-> <paul.gortmaker@windriver.com> wrote:
->> On 11-10-25 06:01 PM, Olof Johansson wrote:
->>> On Tue, Oct 25, 2011 at 3:00 PM, Rob Herring <robherring2@gmail.com> wrote:
->>>> Olof,
->>>>
->>>> On 10/25/2011 04:48 PM, Olof Johansson wrote:
->>>>> Hi,
->>>>>
->>>>> Looks like Marc added new references to irq_start in his PPI patch,
->>>>> and Rob removed it in parallel. Also, irq_offset is no longer
->>>>> available. Looks like you need to respin your patch, Marc.
->>>>>
->>>>> arch/arm/common/gic.c: In function 'gic_dist_init':
->>>>> arch/arm/common/gic.c:290: error: 'irq_start' undeclared (first use in
->>>>> this function)
->>>>> arch/arm/common/gic.c:290: error: (Each undeclared identifier is
->>>>> reported only once
->>>>> arch/arm/common/gic.c:290: error: for each function it appears in.)
->>>>> arch/arm/common/gic.c:296: error: 'struct gic_chip_data' has no member
->>>>> named 'irq_offset'
->>>>
->>>> I fixed this and sent a pull request yesterday to Arnd.
->>>
->>> Ah, oops, forgot to check for already-posted-patches. :) Excellent.
->>>
->>>
->>>>> The second error is because of the change from Paul that removes
->>>>> module.h from irq.h:
->>>>>
->>>>> arch/arm/common/gic.c: In function 'gic_init':
->>>>> arch/arm/common/gic.c:620: error: 'THIS_MODULE' undeclared (first use
->>>>> in this function)
->>>>>
->>>>> Looks odd that I should need to include module.h on my own just to use
->>>>> irq defines. Paul?
->>>>>
->>>>
->>>> THIS_MODULE is needed by irq.h itself in irq_alloc_descs, so it probably
->>>> needs to be added back.
->>>
->>> Well, the new export.h that defines THIS_MODULE probably needs to be
->>> added to irq.h, yes.
->>
->> No.  The whole point of the commit was to avoid nested includes
->> as per the commit log:
->>
->>    Also convert the irq_alloc_descs variants to macros, since all
->>    they really do is is call the __irq_alloc_descs primitive.
->>    This avoids including export.h and no debug info is lost.
->>
->> If your file is relating to modular usage such that it is a modular
->> provider of interrupt sources and hence uses "THIS_MODULE", then it
->> will need export.h in the future. And that macro has nothing whatsoever
->> to do with any irq defines; it is used all over the kernel to tie
->> structures back to a (possibly modular) code block, just as per the
->> use case here in irq.h is.
-> 
-> I strongly disagree.
-> 
-> Why should I have to include export.h to a file that is not ever going
-> to be built as a module just because I need to include irq.h? That's
+On Wed, Oct 26, 2011 at 10:25 AM,  <jhbird.choi@samsung.com> wrote:
+> From: Jonghwan Choi <jhbird.choi@samsung.com>
+>
+> Signed-off-by: Jonghwan Choi <jhbird.choi@samsung.com>
 
-You won't.  Unless you use irq_alloc_descs.  Also export.h isn't just
-for modules.  It is for code that in some way is exporting infrastructure
-to allow modular infrastructure to exist.  So there is lots of files that
-will include export.h that in turn are not modules themselves.  That was
-largely the point.
+Nitpick:  All patches should include justification about why the
+change is being made.  It may be obvious to you, but take into account
+the people looking at the commit after it hits Linus' tree.  Very few
+patches are trivial and obvious enough that the summary line is enough
+justification.
 
-Thanks,
-Paul.
+g.
 
-> nonsense. If irq.h needs it, it should include it on its own.
-> 
-> 
-> -Olof
+> ---
+> ?drivers/regulator/tps65023-regulator.c | ? 74 +++++++++++--------------------
+> ?1 files changed, 26 insertions(+), 48 deletions(-)
+>
+> diff --git a/drivers/regulator/tps65023-regulator.c b/drivers/regulator/tps65023-regulator.c
+> index 701a590..39f57b9 100644
+> --- a/drivers/regulator/tps65023-regulator.c
+> +++ b/drivers/regulator/tps65023-regulator.c
+> @@ -129,48 +129,22 @@ struct tps_pmic {
+> ? ? ? ?struct regmap *regmap;
+> ?};
+>
+> -static int tps_65023_set_bits(struct tps_pmic *tps, u8 reg, u8 mask)
+> -{
+> - ? ? ? return regmap_update_bits(tps->regmap, reg, mask, mask);
+> -}
+> -
+> -static int tps_65023_clear_bits(struct tps_pmic *tps, u8 reg, u8 mask)
+> -{
+> - ? ? ? return regmap_update_bits(tps->regmap, reg, mask, 0);
+> -}
+> -
+> -static int tps_65023_reg_read(struct tps_pmic *tps, u8 reg)
+> -{
+> - ? ? ? unsigned int val;
+> - ? ? ? int ret;
+> -
+> - ? ? ? ret = regmap_read(tps->regmap, reg, &val);
+> -
+> - ? ? ? if (ret != 0)
+> - ? ? ? ? ? ? ? return ret;
+> - ? ? ? else
+> - ? ? ? ? ? ? ? return val;
+> -}
+> -
+> -static int tps_65023_reg_write(struct tps_pmic *tps, u8 reg, u8 val)
+> -{
+> - ? ? ? return regmap_write(tps->regmap, reg, val);
+> -}
+>
+> ?static int tps65023_dcdc_is_enabled(struct regulator_dev *dev)
+> ?{
+> ? ? ? ?struct tps_pmic *tps = rdev_get_drvdata(dev);
+> ? ? ? ?int data, dcdc = rdev_get_id(dev);
+> + ? ? ? int ret;
+> ? ? ? ?u8 shift;
+>
+> ? ? ? ?if (dcdc < TPS65023_DCDC_1 || dcdc > TPS65023_DCDC_3)
+> ? ? ? ? ? ? ? ?return -EINVAL;
+>
+> ? ? ? ?shift = TPS65023_NUM_REGULATOR - dcdc;
+> - ? ? ? data = tps_65023_reg_read(tps, TPS65023_REG_REG_CTRL);
+> + ? ? ? ret = regmap_read(tps->regmap, TPS65023_REG_REG_CTRL, &data);
+>
+> - ? ? ? if (data < 0)
+> - ? ? ? ? ? ? ? return data;
+> + ? ? ? if (ret != 0)
+> + ? ? ? ? ? ? ? return ret;
+> ? ? ? ?else
+> ? ? ? ? ? ? ? ?return (data & 1<<shift) ? 1 : 0;
+> ?}
+> @@ -179,16 +153,17 @@ static int tps65023_ldo_is_enabled(struct regulator_dev *dev)
+> ?{
+> ? ? ? ?struct tps_pmic *tps = rdev_get_drvdata(dev);
+> ? ? ? ?int data, ldo = rdev_get_id(dev);
+> + ? ? ? int ret;
+> ? ? ? ?u8 shift;
+>
+> ? ? ? ?if (ldo < TPS65023_LDO_1 || ldo > TPS65023_LDO_2)
+> ? ? ? ? ? ? ? ?return -EINVAL;
+>
+> ? ? ? ?shift = (ldo == TPS65023_LDO_1 ? 1 : 2);
+> - ? ? ? data = tps_65023_reg_read(tps, TPS65023_REG_REG_CTRL);
+> + ? ? ? ret = regmap_read(tps->regmap, TPS65023_REG_REG_CTRL, &data);
+>
+> - ? ? ? if (data < 0)
+> - ? ? ? ? ? ? ? return data;
+> + ? ? ? if (ret != 0)
+> + ? ? ? ? ? ? ? return ret;
+> ? ? ? ?else
+> ? ? ? ? ? ? ? ?return (data & 1<<shift) ? 1 : 0;
+> ?}
+> @@ -203,7 +178,7 @@ static int tps65023_dcdc_enable(struct regulator_dev *dev)
+> ? ? ? ? ? ? ? ?return -EINVAL;
+>
+> ? ? ? ?shift = TPS65023_NUM_REGULATOR - dcdc;
+> - ? ? ? return tps_65023_set_bits(tps, TPS65023_REG_REG_CTRL, 1 << shift);
+> + ? ? ? return regmap_update_bits(tps->regmap, TPS65023_REG_REG_CTRL, 1 << shift, 1 << shift);
+> ?}
+>
+> ?static int tps65023_dcdc_disable(struct regulator_dev *dev)
+> @@ -216,7 +191,7 @@ static int tps65023_dcdc_disable(struct regulator_dev *dev)
+> ? ? ? ? ? ? ? ?return -EINVAL;
+>
+> ? ? ? ?shift = TPS65023_NUM_REGULATOR - dcdc;
+> - ? ? ? return tps_65023_clear_bits(tps, TPS65023_REG_REG_CTRL, 1 << shift);
+> + ? ? ? return regmap_update_bits(tps->regmap, TPS65023_REG_REG_CTRL, 1 << shift, 0);
+> ?}
+>
+> ?static int tps65023_ldo_enable(struct regulator_dev *dev)
+> @@ -229,7 +204,7 @@ static int tps65023_ldo_enable(struct regulator_dev *dev)
+> ? ? ? ? ? ? ? ?return -EINVAL;
+>
+> ? ? ? ?shift = (ldo == TPS65023_LDO_1 ? 1 : 2);
+> - ? ? ? return tps_65023_set_bits(tps, TPS65023_REG_REG_CTRL, 1 << shift);
+> + ? ? ? return regmap_update_bits(tps->regmap, TPS65023_REG_REG_CTRL, 1 << shift, 1 << shift);
+> ?}
+>
+> ?static int tps65023_ldo_disable(struct regulator_dev *dev)
+> @@ -242,21 +217,22 @@ static int tps65023_ldo_disable(struct regulator_dev *dev)
+> ? ? ? ? ? ? ? ?return -EINVAL;
+>
+> ? ? ? ?shift = (ldo == TPS65023_LDO_1 ? 1 : 2);
+> - ? ? ? return tps_65023_clear_bits(tps, TPS65023_REG_REG_CTRL, 1 << shift);
+> + ? ? ? return regmap_update_bits(tps->regmap, TPS65023_REG_REG_CTRL, 1 << shift, 0);
+> ?}
+>
+> ?static int tps65023_dcdc_get_voltage(struct regulator_dev *dev)
+> ?{
+> ? ? ? ?struct tps_pmic *tps = rdev_get_drvdata(dev);
+> + ? ? ? int ret;
+> ? ? ? ?int data, dcdc = rdev_get_id(dev);
+>
+> ? ? ? ?if (dcdc < TPS65023_DCDC_1 || dcdc > TPS65023_DCDC_3)
+> ? ? ? ? ? ? ? ?return -EINVAL;
+>
+> ? ? ? ?if (dcdc == TPS65023_DCDC_1) {
+> - ? ? ? ? ? ? ? data = tps_65023_reg_read(tps, TPS65023_REG_DEF_CORE);
+> - ? ? ? ? ? ? ? if (data < 0)
+> - ? ? ? ? ? ? ? ? ? ? ? return data;
+> + ? ? ? ? ? ? ? ret = regmap_read(tps->regmap, TPS65023_REG_DEF_CORE, &data);
+> + ? ? ? ? ? ? ? if (ret != 0)
+> + ? ? ? ? ? ? ? ? ? ? ? return ret;
+> ? ? ? ? ? ? ? ?data &= (tps->info[dcdc]->table_len - 1);
+> ? ? ? ? ? ? ? ?return tps->info[dcdc]->table[data] * 1000;
+> ? ? ? ?} else
+> @@ -296,20 +272,21 @@ static int tps65023_dcdc_set_voltage(struct regulator_dev *dev,
+> ? ? ? ?if (vsel == tps->info[dcdc]->table_len)
+> ? ? ? ? ? ? ? ?return -EINVAL;
+> ? ? ? ?else
+> - ? ? ? ? ? ? ? return tps_65023_reg_write(tps, TPS65023_REG_DEF_CORE, vsel);
+> + ? ? ? ? ? ? ? return regmap_write(tps->regmap, TPS65023_REG_DEF_CORE, vsel);
+> ?}
+>
+> ?static int tps65023_ldo_get_voltage(struct regulator_dev *dev)
+> ?{
+> ? ? ? ?struct tps_pmic *tps = rdev_get_drvdata(dev);
+> ? ? ? ?int data, ldo = rdev_get_id(dev);
+> + ? ? ? int ret;
+>
+> ? ? ? ?if (ldo < TPS65023_LDO_1 || ldo > TPS65023_LDO_2)
+> ? ? ? ? ? ? ? ?return -EINVAL;
+>
+> - ? ? ? data = tps_65023_reg_read(tps, TPS65023_REG_LDO_CTRL);
+> - ? ? ? if (data < 0)
+> - ? ? ? ? ? ? ? return data;
+> + ? ? ? ret = regmap_read(tps->regmap, TPS65023_REG_LDO_CTRL, &data);
+> + ? ? ? if (ret != 0)
+> + ? ? ? ? ? ? ? return ret;
+>
+> ? ? ? ?data >>= (TPS65023_LDO_CTRL_LDOx_SHIFT(ldo - TPS65023_LDO_1));
+> ? ? ? ?data &= (tps->info[ldo]->table_len - 1);
+> @@ -321,6 +298,7 @@ static int tps65023_ldo_set_voltage(struct regulator_dev *dev,
+> ?{
+> ? ? ? ?struct tps_pmic *tps = rdev_get_drvdata(dev);
+> ? ? ? ?int data, vsel, ldo = rdev_get_id(dev);
+> + ? ? ? int ret;
+>
+> ? ? ? ?if (ldo < TPS65023_LDO_1 || ldo > TPS65023_LDO_2)
+> ? ? ? ? ? ? ? ?return -EINVAL;
+> @@ -344,13 +322,13 @@ static int tps65023_ldo_set_voltage(struct regulator_dev *dev,
+>
+> ? ? ? ?*selector = vsel;
+>
+> - ? ? ? data = tps_65023_reg_read(tps, TPS65023_REG_LDO_CTRL);
+> - ? ? ? if (data < 0)
+> - ? ? ? ? ? ? ? return data;
+> + ? ? ? ret = regmap_read(tps->regmap, TPS65023_REG_LDO_CTRL, &data);
+> + ? ? ? if (ret != 0)
+> + ? ? ? ? ? ? ? return ret;
+>
+> ? ? ? ?data &= TPS65023_LDO_CTRL_LDOx_MASK(ldo - TPS65023_LDO_1);
+> ? ? ? ?data |= (vsel << (TPS65023_LDO_CTRL_LDOx_SHIFT(ldo - TPS65023_LDO_1)));
+> - ? ? ? return tps_65023_reg_write(tps, TPS65023_REG_LDO_CTRL, data);
+> + ? ? ? return regmap_write(tps->regmap, TPS65023_REG_LDO_CTRL, data);
+> ?}
+>
+> ?static int tps65023_dcdc_list_voltage(struct regulator_dev *dev,
+> --
+> 1.7.1
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at ?http://www.tux.org/lkml/
+>
+
+
+
+-- 
+Grant Likely, B.Sc., P.Eng.
+Secret Lab Technologies Ltd.
