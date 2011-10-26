@@ -1,48 +1,201 @@
-From: pdeschrijver@nvidia.com (pdeschrijver at nvidia.com)
-Date: Wed, 26 Oct 2011 11:41:41 +0300
-Subject: [PATCHv2] arm/tegra: clk_get should not be fatal
-Message-ID: <1319618501-15020-1-git-send-email-pdeschrijver@nvidia.com>
+From: jhbird.choi@samsung.com (jhbird.choi at samsung.com)
+Date: Wed, 26 Oct 2011 17:25:56 +0900
+Subject: [PATCH] regulator: Use regmap_read/write(),
+	regmap_update_bits functions directly
+Message-ID: <1319617556-29021-1-git-send-email-jhbird.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Peter De Schrijver <pdeschrijver@nvidia.com>
+From: Jonghwan Choi <jhbird.choi@samsung.com>
 
-The timer and rtc-timer clocks aren't gated by default, so there is no reason
-to crash the system if the dummy enable call failed.
-
-Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
+Signed-off-by: Jonghwan Choi <jhbird.choi@samsung.com>
 ---
- arch/arm/mach-tegra/timer.c |   12 ++++++++----
- 1 files changed, 8 insertions(+), 4 deletions(-)
+ drivers/regulator/tps65023-regulator.c |   74 +++++++++++--------------------
+ 1 files changed, 26 insertions(+), 48 deletions(-)
 
-diff --git a/arch/arm/mach-tegra/timer.c b/arch/arm/mach-tegra/timer.c
-index e2272d2..2f1df47 100644
---- a/arch/arm/mach-tegra/timer.c
-+++ b/arch/arm/mach-tegra/timer.c
-@@ -186,16 +186,20 @@ static void __init tegra_init_timer(void)
- 	int ret;
+diff --git a/drivers/regulator/tps65023-regulator.c b/drivers/regulator/tps65023-regulator.c
+index 701a590..39f57b9 100644
+--- a/drivers/regulator/tps65023-regulator.c
++++ b/drivers/regulator/tps65023-regulator.c
+@@ -129,48 +129,22 @@ struct tps_pmic {
+ 	struct regmap *regmap;
+ };
  
- 	clk = clk_get_sys("timer", NULL);
--	BUG_ON(IS_ERR(clk));
--	clk_enable(clk);
-+	if (IS_ERR(clk))
-+		pr_warn("Unable to get timer clock\n");
-+	else
-+		clk_enable(clk);
+-static int tps_65023_set_bits(struct tps_pmic *tps, u8 reg, u8 mask)
+-{
+-	return regmap_update_bits(tps->regmap, reg, mask, mask);
+-}
+-
+-static int tps_65023_clear_bits(struct tps_pmic *tps, u8 reg, u8 mask)
+-{
+-	return regmap_update_bits(tps->regmap, reg, mask, 0);
+-}
+-
+-static int tps_65023_reg_read(struct tps_pmic *tps, u8 reg)
+-{
+-	unsigned int val;
+-	int ret;
+-
+-	ret = regmap_read(tps->regmap, reg, &val);
+-
+-	if (ret != 0)
+-		return ret;
+-	else
+-		return val;
+-}
+-
+-static int tps_65023_reg_write(struct tps_pmic *tps, u8 reg, u8 val)
+-{
+-	return regmap_write(tps->regmap, reg, val);
+-}
  
- 	/*
- 	 * rtc registers are used by read_persistent_clock, keep the rtc clock
- 	 * enabled
- 	 */
- 	clk = clk_get_sys("rtc-tegra", NULL);
--	BUG_ON(IS_ERR(clk));
--	clk_enable(clk);
-+	if (IS_ERR(clk))
-+		pr_warn("Unable to get rtc-tegra clock\n");
-+	else
-+		clk_enable(clk);
+ static int tps65023_dcdc_is_enabled(struct regulator_dev *dev)
+ {
+ 	struct tps_pmic *tps = rdev_get_drvdata(dev);
+ 	int data, dcdc = rdev_get_id(dev);
++	int ret;
+ 	u8 shift;
  
- #ifdef CONFIG_HAVE_ARM_TWD
- 	twd_base = IO_ADDRESS(TEGRA_ARM_PERIF_BASE + 0x600);
+ 	if (dcdc < TPS65023_DCDC_1 || dcdc > TPS65023_DCDC_3)
+ 		return -EINVAL;
+ 
+ 	shift = TPS65023_NUM_REGULATOR - dcdc;
+-	data = tps_65023_reg_read(tps, TPS65023_REG_REG_CTRL);
++	ret = regmap_read(tps->regmap, TPS65023_REG_REG_CTRL, &data);
+ 
+-	if (data < 0)
+-		return data;
++	if (ret != 0)
++		return ret;
+ 	else
+ 		return (data & 1<<shift) ? 1 : 0;
+ }
+@@ -179,16 +153,17 @@ static int tps65023_ldo_is_enabled(struct regulator_dev *dev)
+ {
+ 	struct tps_pmic *tps = rdev_get_drvdata(dev);
+ 	int data, ldo = rdev_get_id(dev);
++	int ret;
+ 	u8 shift;
+ 
+ 	if (ldo < TPS65023_LDO_1 || ldo > TPS65023_LDO_2)
+ 		return -EINVAL;
+ 
+ 	shift = (ldo == TPS65023_LDO_1 ? 1 : 2);
+-	data = tps_65023_reg_read(tps, TPS65023_REG_REG_CTRL);
++	ret = regmap_read(tps->regmap, TPS65023_REG_REG_CTRL, &data);
+ 
+-	if (data < 0)
+-		return data;
++	if (ret != 0)
++		return ret;
+ 	else
+ 		return (data & 1<<shift) ? 1 : 0;
+ }
+@@ -203,7 +178,7 @@ static int tps65023_dcdc_enable(struct regulator_dev *dev)
+ 		return -EINVAL;
+ 
+ 	shift = TPS65023_NUM_REGULATOR - dcdc;
+-	return tps_65023_set_bits(tps, TPS65023_REG_REG_CTRL, 1 << shift);
++	return regmap_update_bits(tps->regmap, TPS65023_REG_REG_CTRL, 1 << shift, 1 << shift);
+ }
+ 
+ static int tps65023_dcdc_disable(struct regulator_dev *dev)
+@@ -216,7 +191,7 @@ static int tps65023_dcdc_disable(struct regulator_dev *dev)
+ 		return -EINVAL;
+ 
+ 	shift = TPS65023_NUM_REGULATOR - dcdc;
+-	return tps_65023_clear_bits(tps, TPS65023_REG_REG_CTRL, 1 << shift);
++	return regmap_update_bits(tps->regmap, TPS65023_REG_REG_CTRL, 1 << shift, 0);
+ }
+ 
+ static int tps65023_ldo_enable(struct regulator_dev *dev)
+@@ -229,7 +204,7 @@ static int tps65023_ldo_enable(struct regulator_dev *dev)
+ 		return -EINVAL;
+ 
+ 	shift = (ldo == TPS65023_LDO_1 ? 1 : 2);
+-	return tps_65023_set_bits(tps, TPS65023_REG_REG_CTRL, 1 << shift);
++	return regmap_update_bits(tps->regmap, TPS65023_REG_REG_CTRL, 1 << shift, 1 << shift);
+ }
+ 
+ static int tps65023_ldo_disable(struct regulator_dev *dev)
+@@ -242,21 +217,22 @@ static int tps65023_ldo_disable(struct regulator_dev *dev)
+ 		return -EINVAL;
+ 
+ 	shift = (ldo == TPS65023_LDO_1 ? 1 : 2);
+-	return tps_65023_clear_bits(tps, TPS65023_REG_REG_CTRL, 1 << shift);
++	return regmap_update_bits(tps->regmap, TPS65023_REG_REG_CTRL, 1 << shift, 0);
+ }
+ 
+ static int tps65023_dcdc_get_voltage(struct regulator_dev *dev)
+ {
+ 	struct tps_pmic *tps = rdev_get_drvdata(dev);
++	int ret;
+ 	int data, dcdc = rdev_get_id(dev);
+ 
+ 	if (dcdc < TPS65023_DCDC_1 || dcdc > TPS65023_DCDC_3)
+ 		return -EINVAL;
+ 
+ 	if (dcdc == TPS65023_DCDC_1) {
+-		data = tps_65023_reg_read(tps, TPS65023_REG_DEF_CORE);
+-		if (data < 0)
+-			return data;
++		ret = regmap_read(tps->regmap, TPS65023_REG_DEF_CORE, &data);
++		if (ret != 0)
++			return ret;
+ 		data &= (tps->info[dcdc]->table_len - 1);
+ 		return tps->info[dcdc]->table[data] * 1000;
+ 	} else
+@@ -296,20 +272,21 @@ static int tps65023_dcdc_set_voltage(struct regulator_dev *dev,
+ 	if (vsel == tps->info[dcdc]->table_len)
+ 		return -EINVAL;
+ 	else
+-		return tps_65023_reg_write(tps, TPS65023_REG_DEF_CORE, vsel);
++		return regmap_write(tps->regmap, TPS65023_REG_DEF_CORE, vsel);
+ }
+ 
+ static int tps65023_ldo_get_voltage(struct regulator_dev *dev)
+ {
+ 	struct tps_pmic *tps = rdev_get_drvdata(dev);
+ 	int data, ldo = rdev_get_id(dev);
++	int ret;
+ 
+ 	if (ldo < TPS65023_LDO_1 || ldo > TPS65023_LDO_2)
+ 		return -EINVAL;
+ 
+-	data = tps_65023_reg_read(tps, TPS65023_REG_LDO_CTRL);
+-	if (data < 0)
+-		return data;
++	ret = regmap_read(tps->regmap, TPS65023_REG_LDO_CTRL, &data);
++	if (ret != 0)
++		return ret;
+ 
+ 	data >>= (TPS65023_LDO_CTRL_LDOx_SHIFT(ldo - TPS65023_LDO_1));
+ 	data &= (tps->info[ldo]->table_len - 1);
+@@ -321,6 +298,7 @@ static int tps65023_ldo_set_voltage(struct regulator_dev *dev,
+ {
+ 	struct tps_pmic *tps = rdev_get_drvdata(dev);
+ 	int data, vsel, ldo = rdev_get_id(dev);
++	int ret;
+ 
+ 	if (ldo < TPS65023_LDO_1 || ldo > TPS65023_LDO_2)
+ 		return -EINVAL;
+@@ -344,13 +322,13 @@ static int tps65023_ldo_set_voltage(struct regulator_dev *dev,
+ 
+ 	*selector = vsel;
+ 
+-	data = tps_65023_reg_read(tps, TPS65023_REG_LDO_CTRL);
+-	if (data < 0)
+-		return data;
++	ret = regmap_read(tps->regmap, TPS65023_REG_LDO_CTRL, &data);
++	if (ret != 0)
++		return ret;
+ 
+ 	data &= TPS65023_LDO_CTRL_LDOx_MASK(ldo - TPS65023_LDO_1);
+ 	data |= (vsel << (TPS65023_LDO_CTRL_LDOx_SHIFT(ldo - TPS65023_LDO_1)));
+-	return tps_65023_reg_write(tps, TPS65023_REG_LDO_CTRL, data);
++	return regmap_write(tps->regmap, TPS65023_REG_LDO_CTRL, data);
+ }
+ 
+ static int tps65023_dcdc_list_voltage(struct regulator_dev *dev,
 -- 
-1.7.7.rc0.72.g4b5ea.dirty
+1.7.1
