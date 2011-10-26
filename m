@@ -1,59 +1,33 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 26 Oct 2011 08:11:59 +0100
-Subject: [PATCH] Shrink thread_info a bit
-In-Reply-To: <20111025144110.GA2043@localhost.localdomain>
-References: <20111024124818.GA17693@n2100.arm.linux.org.uk>
-	<20111024131853.GA4250@mudshark.cambridge.arm.com>
-	<20111025144110.GA2043@localhost.localdomain>
-Message-ID: <20111026071159.GA9165@mudshark.cambridge.arm.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 26 Oct 2011 09:33:50 +0200
+Subject: [PATCH] gpiolib/arches: Centralise bolierplate asm/gpio.h
+In-Reply-To: <CAJaTeTp2w85UHnmH-PPMZsQGQMNa-93kw-tjmDxA_wjJXkYQcQ@mail.gmail.com>
+References: <1319528012-19006-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+	<CAJaTeTp2w85UHnmH-PPMZsQGQMNa-93kw-tjmDxA_wjJXkYQcQ@mail.gmail.com>
+Message-ID: <20111026073348.GB2915@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dave,
+On Tue, Oct 25, 2011 at 07:44:14PM -0400, Mike Frysinger wrote:
 
-On Tue, Oct 25, 2011 at 03:41:11PM +0100, Dave Martin wrote:
-> On Mon, Oct 24, 2011 at 02:18:53PM +0100, Will Deacon wrote:
-> > 
-> > Can we also shrink the contents of fp_state when AEABI && !OABI_COMPAT?
-> 
-> Is this the right config combination to indicate that the FPA ABI will
-> not be supported?  I'm assuming so, since that's the condition which
-> currently disallows CONFIG_NWFPE.
-> 
-> I'm not saying it's not ... I'm just unsure.
+> i don't think this is generally how asm-generic is handled.  instead, how about:
+>  - move the duplicate code to asm-generic/gpio.h
+>  - have the arches which merely need asm-generic/gpio.h add "generic-y
+> += gpio.h" to their include/asm/Kbuild
+>  - for arches which need to override these common funcs in some way,
+> add #ifdef protection to the asm-generic/gpio.h
 
-Well, we basically just want to check whether or not we might have OABI
-executables in userspace so I think this is the right way of doing that.
-I toyed with doing something like !CONFIG_VFP but that doesn't help with the
-compat stuff.
+> and it seems like with slightly more work, this path allow you to
+> merge most of arch/sh/include/asm/gpio.h.  and it has the advantage of
+> not needing new Kconfig symbols.
 
-> Note that the FPA state (35 words) is not that much smaller than the
-> iwmmxt state (38 words), so not much space would be saved by shrinking
-> that union.
+That's really not how gpiolib is currently handled, unfortunately -
+trying to transition over to that model in one patch would be way too
+much.  
 
-Right, but the IWMMXT part of the union is already predicated on
-CONFIG_IWMMXT so the goal is to have an empty union for the common case
-(EABI and no IWMMXT).
-
-> I wonder whether fpstate can go away completely on platforms which have
-> neither fpa nor iwmmxt however.  That would be a more significant saving.
-> Is it used for anything else?
-
-That's kind of the idea, but I was just going to leave it empty.
-
-> > It's slightly more involved as ptrace and core-dumping would need some
-> > similar treatment. We probably need to keep the union kicking around
-> > though, since the iwmmxt state is held in there.
-> 
-> We would need some sensible error return from the ptrace calls to access
-> the FPA registers.  PTRACE_GETREGSET (not currently working on ARM since
-> the relevant generic code is #ifdef'd on CONFIG_HAVE_ARCH_TRACEHOOK for
-> some reason) returns -EINVAL when requesting a regset that isn't there.
-> 
-> Fixing coredumps should be relatively easy -- I think we just need to
-> change arm_regsets[] in arch/arm/kernel/ptrace.c appropriately.
-
-Russell also pointed out that we need to hack some assembly code for this to
-work, but I can't say I've looked into it yet.
-
-Will
+The goal here from that point of view is to make transitioning to
+something more sensible easier by getting rid of the boilerplate code,
+it makes doing the more invasive changes like you're suggesting much
+easier as we're only dealing with the architectures that are actually
+doing something.  It also means that we're able to immediately work on
+turning on gpiolib on random architectures which is a definite win.
