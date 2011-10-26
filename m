@@ -1,215 +1,312 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 26 Oct 2011 09:47:05 +0200
-Subject: [PATCH] ARM: mx5: Use CLKDEV_INIT for creating clk_lookup instance
-In-Reply-To: <1319111391-27820-1-git-send-email-padma.v@samsung.com>
-References: <1319111391-27820-1-git-send-email-padma.v@samsung.com>
-Message-ID: <20111026074705.GD2263@pengutronix.de>
+From: lauri.hintsala@bluegiga.com (Lauri Hintsala)
+Date: Wed, 26 Oct 2011 11:19:37 +0300
+Subject: [PATCH v2] ARM: mxs: Add initial support for Bluegiga
+	APX4	Development Kit
+In-Reply-To: <20111026074346.GC2263@pengutronix.de>
+References: <1319019366-9666-1-git-send-email-lauri.hintsala@bluegiga.com>	<4EA79A61.9060805@bluegiga.com>
+	<20111026074346.GC2263@pengutronix.de>
+Message-ID: <4EA7C299.4090309@bluegiga.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 20, 2011 at 05:19:51PM +0530, Padmavathi Venna wrote:
-> A common macro CLKDEV_INIT was added for creating clk_lookup
-> instance in include/linux/clkdev.h. So replace _REGISTER_CLOCK
-> macro with CLKDEV_INIT.
+On 10/26/2011 10:43 AM, Sascha Hauer wrote:
+> On Wed, Oct 26, 2011 at 08:28:01AM +0300, Lauri Hintsala wrote:
+>> Hello Sascha,
+>>
+>> Is this board support patch OK for releasing?
+>
+> Yes, it's ok. I can't garantuee that it makes it in this merge window
+> though.
 
-The patches are fine this way. Let's wait until the trees from next are
-merged. It's not necessary to risk merge conflicts for this cleanup.
+Could I help you somehow to get patches this merge window? I would like 
+to have our board to be support by next kernel.
 
-Sascha
+Lauri
 
-> 
-> Suggested-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> Acked-by: Amit Kucheria <amit.kucheria@canonical.com>
-> Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
-> ---
->  arch/arm/mach-mx5/clock-mx51-mx53.c |  149 +++++++++++++++++------------------
->  1 files changed, 71 insertions(+), 78 deletions(-)
-> 
-> diff --git a/arch/arm/mach-mx5/clock-mx51-mx53.c b/arch/arm/mach-mx5/clock-mx51-mx53.c
-> index 2b9bd1f..d198515 100644
-> --- a/arch/arm/mach-mx5/clock-mx51-mx53.c
-> +++ b/arch/arm/mach-mx5/clock-mx51-mx53.c
-> @@ -1422,97 +1422,90 @@ DEFINE_CLOCK(ipu_di1_clk, 0, MXC_CCM_CCGR6, MXC_CCM_CCGRx_CG6_OFFSET,
->  DEFINE_CLOCK(pata_clk, 0, MXC_CCM_CCGR4, MXC_CCM_CCGRx_CG0_OFFSET,
->  		NULL, NULL, &ipg_clk, &spba_clk);
->  
-> -#define _REGISTER_CLOCK(d, n, c) \
-> -       { \
-> -		.dev_id = d, \
-> -		.con_id = n, \
-> -		.clk = &c,   \
-> -       },
-> -
->  static struct clk_lookup mx51_lookups[] = {
->  	/* i.mx51 has the i.mx21 type uart */
-> -	_REGISTER_CLOCK("imx21-uart.0", NULL, uart1_clk)
-> -	_REGISTER_CLOCK("imx21-uart.1", NULL, uart2_clk)
-> -	_REGISTER_CLOCK("imx21-uart.2", NULL, uart3_clk)
-> -	_REGISTER_CLOCK(NULL, "gpt", gpt_clk)
-> +	CLKDEV_INIT("imx21-uart.0", NULL, &uart1_clk),
-> +	CLKDEV_INIT("imx21-uart.1", NULL, &uart2_clk),
-> +	CLKDEV_INIT("imx21-uart.2", NULL, &uart3_clk),
-> +	CLKDEV_INIT(NULL, "gpt", &gpt_clk),
->  	/* i.mx51 has the i.mx27 type fec */
-> -	_REGISTER_CLOCK("imx27-fec.0", NULL, fec_clk)
-> -	_REGISTER_CLOCK("mxc_pwm.0", "pwm", pwm1_clk)
-> -	_REGISTER_CLOCK("mxc_pwm.1", "pwm", pwm2_clk)
-> -	_REGISTER_CLOCK("imx-i2c.0", NULL, i2c1_clk)
-> -	_REGISTER_CLOCK("imx-i2c.1", NULL, i2c2_clk)
-> -	_REGISTER_CLOCK("imx-i2c.2", NULL, hsi2c_clk)
-> -	_REGISTER_CLOCK("mxc-ehci.0", "usb", usboh3_clk)
-> -	_REGISTER_CLOCK("mxc-ehci.0", "usb_ahb", usb_ahb_clk)
-> -	_REGISTER_CLOCK("mxc-ehci.0", "usb_phy1", usb_phy1_clk)
-> -	_REGISTER_CLOCK("mxc-ehci.1", "usb", usboh3_clk)
-> -	_REGISTER_CLOCK("mxc-ehci.1", "usb_ahb", usb_ahb_clk)
-> -	_REGISTER_CLOCK("mxc-ehci.2", "usb", usboh3_clk)
-> -	_REGISTER_CLOCK("mxc-ehci.2", "usb_ahb", usb_ahb_clk)
-> -	_REGISTER_CLOCK("fsl-usb2-udc", "usb", usboh3_clk)
-> -	_REGISTER_CLOCK("fsl-usb2-udc", "usb_ahb", ahb_clk)
-> -	_REGISTER_CLOCK("imx-keypad", NULL, dummy_clk)
-> -	_REGISTER_CLOCK("mxc_nand", NULL, nfc_clk)
-> -	_REGISTER_CLOCK("imx-ssi.0", NULL, ssi1_clk)
-> -	_REGISTER_CLOCK("imx-ssi.1", NULL, ssi2_clk)
-> -	_REGISTER_CLOCK("imx-ssi.2", NULL, ssi3_clk)
-> +	CLKDEV_INIT("imx27-fec.0", NULL, &fec_clk),
-> +	CLKDEV_INIT("mxc_pwm.0", "pwm", &pwm1_clk),
-> +	CLKDEV_INIT("mxc_pwm.1", "pwm", &pwm2_clk),
-> +	CLKDEV_INIT("imx-i2c.0", NULL, &i2c1_clk),
-> +	CLKDEV_INIT("imx-i2c.1", NULL, &i2c2_clk),
-> +	CLKDEV_INIT("imx-i2c.2", NULL, &hsi2c_clk),
-> +	CLKDEV_INIT("mxc-ehci.0", "usb", &usboh3_clk),
-> +	CLKDEV_INIT("mxc-ehci.0", "usb_ahb", &usb_ahb_clk),
-> +	CLKDEV_INIT("mxc-ehci.0", "usb_phy1", &usb_phy1_clk),
-> +	CLKDEV_INIT("mxc-ehci.1", "usb", &usboh3_clk),
-> +	CLKDEV_INIT("mxc-ehci.1", "usb_ahb", &usb_ahb_clk),
-> +	CLKDEV_INIT("mxc-ehci.2", "usb", &usboh3_clk),
-> +	CLKDEV_INIT("mxc-ehci.2", "usb_ahb", &usb_ahb_clk),
-> +	CLKDEV_INIT("fsl-usb2-udc", "usb", &usboh3_clk),
-> +	CLKDEV_INIT("fsl-usb2-udc", "usb_ahb", &ahb_clk),
-> +	CLKDEV_INIT("imx-keypad", NULL, &dummy_clk),
-> +	CLKDEV_INIT("mxc_nand", NULL, &nfc_clk),
-> +	CLKDEV_INIT("imx-ssi.0", NULL, &ssi1_clk),
-> +	CLKDEV_INIT("imx-ssi.1", NULL, &ssi2_clk),
-> +	CLKDEV_INIT("imx-ssi.2", NULL, &ssi3_clk),
->  	/* i.mx51 has the i.mx35 type sdma */
-> -	_REGISTER_CLOCK("imx35-sdma", NULL, sdma_clk)
-> -	_REGISTER_CLOCK(NULL, "ckih", ckih_clk)
-> -	_REGISTER_CLOCK(NULL, "ckih2", ckih2_clk)
-> -	_REGISTER_CLOCK(NULL, "gpt_32k", gpt_32k_clk)
-> -	_REGISTER_CLOCK("imx51-ecspi.0", NULL, ecspi1_clk)
-> -	_REGISTER_CLOCK("imx51-ecspi.1", NULL, ecspi2_clk)
-> +	CLKDEV_INIT("imx35-sdma", NULL, &sdma_clk),
-> +	CLKDEV_INIT(NULL, "ckih", &ckih_clk),
-> +	CLKDEV_INIT(NULL, "ckih2", &ckih2_clk),
-> +	CLKDEV_INIT(NULL, "gpt_32k", &gpt_32k_clk),
-> +	CLKDEV_INIT("imx51-ecspi.0", NULL, &ecspi1_clk),
-> +	CLKDEV_INIT("imx51-ecspi.1", NULL, &ecspi2_clk),
->  	/* i.mx51 has the i.mx35 type cspi */
-> -	_REGISTER_CLOCK("imx35-cspi.0", NULL, cspi_clk)
-> -	_REGISTER_CLOCK("sdhci-esdhc-imx51.0", NULL, esdhc1_clk)
-> -	_REGISTER_CLOCK("sdhci-esdhc-imx51.1", NULL, esdhc2_clk)
-> -	_REGISTER_CLOCK("sdhci-esdhc-imx51.2", NULL, esdhc3_clk)
-> -	_REGISTER_CLOCK("sdhci-esdhc-imx51.3", NULL, esdhc4_clk)
-> -	_REGISTER_CLOCK(NULL, "cpu_clk", cpu_clk)
-> -	_REGISTER_CLOCK(NULL, "iim_clk", iim_clk)
-> -	_REGISTER_CLOCK("imx2-wdt.0", NULL, dummy_clk)
-> -	_REGISTER_CLOCK("imx2-wdt.1", NULL, dummy_clk)
-> -	_REGISTER_CLOCK(NULL, "mipi_hsp", mipi_hsp_clk)
-> -	_REGISTER_CLOCK("imx-ipuv3", NULL, ipu_clk)
-> -	_REGISTER_CLOCK("imx-ipuv3", "di0", ipu_di0_clk)
-> -	_REGISTER_CLOCK("imx-ipuv3", "di1", ipu_di1_clk)
-> -	_REGISTER_CLOCK(NULL, "gpc_dvfs", gpc_dvfs_clk)
-> -	_REGISTER_CLOCK("pata_imx", NULL, pata_clk)
-> +	CLKDEV_INIT("imx35-cspi.0", NULL, &cspi_clk),
-> +	CLKDEV_INIT("sdhci-esdhc-imx51.0", NULL, &esdhc1_clk),
-> +	CLKDEV_INIT("sdhci-esdhc-imx51.1", NULL, &esdhc2_clk),
-> +	CLKDEV_INIT("sdhci-esdhc-imx51.2", NULL, &esdhc3_clk),
-> +	CLKDEV_INIT("sdhci-esdhc-imx51.3", NULL, &esdhc4_clk),
-> +	CLKDEV_INIT(NULL, "cpu_clk", &cpu_clk),
-> +	CLKDEV_INIT(NULL, "iim_clk", &iim_clk),
-> +	CLKDEV_INIT("imx2-wdt.0", NULL, &dummy_clk),
-> +	CLKDEV_INIT("imx2-wdt.1", NULL, &dummy_clk),
-> +	CLKDEV_INIT(NULL, "mipi_hsp", &mipi_hsp_clk),
-> +	CLKDEV_INIT("imx-ipuv3", NULL, &ipu_clk),
-> +	CLKDEV_INIT("imx-ipuv3", "di0", &ipu_di0_clk),
-> +	CLKDEV_INIT("imx-ipuv3", "di1", &ipu_di1_clk),
-> +	CLKDEV_INIT(NULL, "gpc_dvfs", &gpc_dvfs_clk),
-> +	CLKDEV_INIT("pata_imx", NULL, &pata_clk),
->  };
->  
->  static struct clk_lookup mx53_lookups[] = {
->  	/* i.mx53 has the i.mx21 type uart */
-> -	_REGISTER_CLOCK("imx21-uart.0", NULL, uart1_clk)
-> -	_REGISTER_CLOCK("imx21-uart.1", NULL, uart2_clk)
-> -	_REGISTER_CLOCK("imx21-uart.2", NULL, uart3_clk)
-> -	_REGISTER_CLOCK("imx21-uart.3", NULL, uart4_clk)
-> -	_REGISTER_CLOCK("imx21-uart.4", NULL, uart5_clk)
-> -	_REGISTER_CLOCK(NULL, "gpt", gpt_clk)
-> +	CLKDEV_INIT("imx21-uart.0", NULL, &uart1_clk),
-> +	CLKDEV_INIT("imx21-uart.1", NULL, &uart2_clk),
-> +	CLKDEV_INIT("imx21-uart.2", NULL, &uart3_clk),
-> +	CLKDEV_INIT("imx21-uart.3", NULL, &uart4_clk),
-> +	CLKDEV_INIT("imx21-uart.4", NULL, &uart5_clk),
-> +	CLKDEV_INIT(NULL, "gpt", &gpt_clk),
->  	/* i.mx53 has the i.mx25 type fec */
-> -	_REGISTER_CLOCK("imx25-fec.0", NULL, fec_clk)
-> -	_REGISTER_CLOCK(NULL, "iim_clk", iim_clk)
-> -	_REGISTER_CLOCK("imx-i2c.0", NULL, i2c1_clk)
-> -	_REGISTER_CLOCK("imx-i2c.1", NULL, i2c2_clk)
-> -	_REGISTER_CLOCK("imx-i2c.2", NULL, i2c3_mx53_clk)
-> +	CLKDEV_INIT("imx25-fec.0", NULL, &fec_clk),
-> +	CLKDEV_INIT(NULL, "iim_clk", &iim_clk),
-> +	CLKDEV_INIT("imx-i2c.0", NULL, &i2c1_clk),
-> +	CLKDEV_INIT("imx-i2c.1", NULL, &i2c2_clk),
-> +	CLKDEV_INIT("imx-i2c.2", NULL, &i2c3_mx53_clk),
->  	/* i.mx53 has the i.mx51 type ecspi */
-> -	_REGISTER_CLOCK("imx51-ecspi.0", NULL, ecspi1_clk)
-> -	_REGISTER_CLOCK("imx51-ecspi.1", NULL, ecspi2_clk)
-> +	CLKDEV_INIT("imx51-ecspi.0", NULL, &ecspi1_clk),
-> +	CLKDEV_INIT("imx51-ecspi.1", NULL, &ecspi2_clk),
->  	/* i.mx53 has the i.mx25 type cspi */
-> -	_REGISTER_CLOCK("imx35-cspi.0", NULL, cspi_clk)
-> -	_REGISTER_CLOCK("sdhci-esdhc-imx53.0", NULL, esdhc1_clk)
-> -	_REGISTER_CLOCK("sdhci-esdhc-imx53.1", NULL, esdhc2_mx53_clk)
-> -	_REGISTER_CLOCK("sdhci-esdhc-imx53.2", NULL, esdhc3_mx53_clk)
-> -	_REGISTER_CLOCK("sdhci-esdhc-imx53.3", NULL, esdhc4_mx53_clk)
-> -	_REGISTER_CLOCK("imx2-wdt.0", NULL, dummy_clk)
-> -	_REGISTER_CLOCK("imx2-wdt.1", NULL, dummy_clk)
-> +	CLKDEV_INIT("imx35-cspi.0", NULL, &cspi_clk),
-> +	CLKDEV_INIT("sdhci-esdhc-imx53.0", NULL, &esdhc1_clk),
-> +	CLKDEV_INIT("sdhci-esdhc-imx53.1", NULL, &esdhc2_mx53_clk),
-> +	CLKDEV_INIT("sdhci-esdhc-imx53.2", NULL, &esdhc3_mx53_clk),
-> +	CLKDEV_INIT("sdhci-esdhc-imx53.3", NULL, &esdhc4_mx53_clk),
-> +	CLKDEV_INIT("imx2-wdt.0", NULL, &dummy_clk),
-> +	CLKDEV_INIT("imx2-wdt.1", NULL, &dummy_clk),
->  	/* i.mx53 has the i.mx35 type sdma */
-> -	_REGISTER_CLOCK("imx35-sdma", NULL, sdma_clk)
-> -	_REGISTER_CLOCK("imx-ssi.0", NULL, ssi1_clk)
-> -	_REGISTER_CLOCK("imx-ssi.1", NULL, ssi2_clk)
-> -	_REGISTER_CLOCK("imx-ssi.2", NULL, ssi3_clk)
-> -	_REGISTER_CLOCK("imx-keypad", NULL, dummy_clk)
-> -	_REGISTER_CLOCK("pata_imx", NULL, pata_clk)
-> +	CLKDEV_INIT("imx35-sdma", NULL, &sdma_clk),
-> +	CLKDEV_INIT("imx-ssi.0", NULL, &ssi1_clk),
-> +	CLKDEV_INIT("imx-ssi.1", NULL, &ssi2_clk),
-> +	CLKDEV_INIT("imx-ssi.2", NULL, &ssi3_clk),
-> +	CLKDEV_INIT("imx-keypad", NULL, &dummy_clk),
-> +	CLKDEV_INIT("pata_imx", NULL, &pata_clk),
->  };
->  
->  static void clk_tree_init(void)
-> -- 
-> 1.7.4.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+>
+> Sascha
+>
+>>
+>> BR,
+>> Lauri Hintsala
+>>
+>>
+>> On 10/19/2011 01:16 PM, Lauri Hintsala wrote:
+>>> Added initial support for Bluegiga APX4 module and Development Kit.
+>>> Currently DUART, AUARTs, FEC, I2C, MMC0, RTC and user LED are supported.
+>>>
+>>> Signed-off-by: Lauri Hintsala<lauri.hintsala@bluegiga.com>
+>>> Signed-off-by: Veli-Pekka Peltola<veli-pekka.peltola@bluegiga.com>
+>>> ---
+>>> v2
+>>>   * code cleanups
+>>>   * ethernet mac address parsing removed because fec driver implements parsing already
+>>>
+>>>   arch/arm/configs/mxs_defconfig              |    1 +
+>>>   arch/arm/mach-mxs/Kconfig                   |   15 +++
+>>>   arch/arm/mach-mxs/Makefile                  |    1 +
+>>>   arch/arm/mach-mxs/include/mach/mxs.h        |    1 +
+>>>   arch/arm/mach-mxs/include/mach/uncompress.h |    1 +
+>>>   arch/arm/mach-mxs/mach-apx4devkit.c         |  170 +++++++++++++++++++++++++++
+>>>   6 files changed, 189 insertions(+), 0 deletions(-)
+>>>   create mode 100644 arch/arm/mach-mxs/mach-apx4devkit.c
+>>>
+>>> diff --git a/arch/arm/configs/mxs_defconfig b/arch/arm/configs/mxs_defconfig
+>>> index db2cb7d..6a6268d 100644
+>>> --- a/arch/arm/configs/mxs_defconfig
+>>> +++ b/arch/arm/configs/mxs_defconfig
+>>> @@ -26,6 +26,7 @@ CONFIG_MACH_MX23EVK=y
+>>>   CONFIG_MACH_MX28EVK=y
+>>>   CONFIG_MACH_STMP378X_DEVB=y
+>>>   CONFIG_MACH_TX28=y
+>>> +CONFIG_MACH_APX4DEVKIT=y
+>>>   # CONFIG_ARM_THUMB is not set
+>>>   CONFIG_NO_HZ=y
+>>>   CONFIG_HIGH_RES_TIMERS=y
+>>> diff --git a/arch/arm/mach-mxs/Kconfig b/arch/arm/mach-mxs/Kconfig
+>>> index 4cd0231..fecb606 100644
+>>> --- a/arch/arm/mach-mxs/Kconfig
+>>> +++ b/arch/arm/mach-mxs/Kconfig
+>>> @@ -64,8 +64,23 @@ config MODULE_TX28
+>>>   	select MXS_HAVE_PLATFORM_MXS_MMC
+>>>   	select MXS_HAVE_PLATFORM_MXS_PWM
+>>>
+>>> +config MODULE_APX4
+>>> +	bool
+>>> +	select SOC_IMX28
+>>> +	select LEDS_GPIO_REGISTER
+>>> +	select MXS_HAVE_AMBA_DUART
+>>> +	select MXS_HAVE_PLATFORM_AUART
+>>> +	select MXS_HAVE_PLATFORM_FEC
+>>> +	select MXS_HAVE_PLATFORM_MXS_I2C
+>>> +	select MXS_HAVE_PLATFORM_MXS_MMC
+>>> +	select MXS_OCOTP
+>>> +
+>>>   config MACH_TX28
+>>>   	bool "Ka-Ro TX28 module"
+>>>   	select MODULE_TX28
+>>>
+>>> +config MACH_APX4DEVKIT
+>>> +	bool "Support Bluegiga APX4 Development Kit"
+>>> +	select MODULE_APX4
+>>> +
+>>>   endif
+>>> diff --git a/arch/arm/mach-mxs/Makefile b/arch/arm/mach-mxs/Makefile
+>>> index 6c38262..3d335a7 100644
+>>> --- a/arch/arm/mach-mxs/Makefile
+>>> +++ b/arch/arm/mach-mxs/Makefile
+>>> @@ -12,5 +12,6 @@ obj-$(CONFIG_MACH_MX23EVK) += mach-mx23evk.o
+>>>   obj-$(CONFIG_MACH_MX28EVK) += mach-mx28evk.o
+>>>   obj-$(CONFIG_MODULE_TX28) += module-tx28.o
+>>>   obj-$(CONFIG_MACH_TX28)    += mach-tx28.o
+>>> +obj-$(CONFIG_MACH_APX4DEVKIT) += mach-apx4devkit.o
+>>>
+>>>   obj-y += devices/
+>>> diff --git a/arch/arm/mach-mxs/include/mach/mxs.h b/arch/arm/mach-mxs/include/mach/mxs.h
+>>> index 35a89dd..59011ef 100644
+>>> --- a/arch/arm/mach-mxs/include/mach/mxs.h
+>>> +++ b/arch/arm/mach-mxs/include/mach/mxs.h
+>>> @@ -32,6 +32,7 @@
+>>>   		machine_is_mx23evk() ||					\
+>>>   		0)
+>>>   #define cpu_is_mx28()		(					\
+>>> +		machine_is_apx4devkit() ||				\
+>>>   		machine_is_mx28evk() ||					\
+>>>   		machine_is_tx28() ||					\
+>>>   		0)
+>>> diff --git a/arch/arm/mach-mxs/include/mach/uncompress.h b/arch/arm/mach-mxs/include/mach/uncompress.h
+>>> index 7f8bf65..b66a29d 100644
+>>> --- a/arch/arm/mach-mxs/include/mach/uncompress.h
+>>> +++ b/arch/arm/mach-mxs/include/mach/uncompress.h
+>>> @@ -62,6 +62,7 @@ static inline void __arch_decomp_setup(unsigned long arch_id)
+>>>   	case MACH_TYPE_MX23EVK:
+>>>   		mxs_duart_base = MX23_DUART_BASE_ADDR;
+>>>   		break;
+>>> +	case MACH_TYPE_APX4DEVKIT:
+>>>   	case MACH_TYPE_MX28EVK:
+>>>   	case MACH_TYPE_TX28:
+>>>   		mxs_duart_base = MX28_DUART_BASE_ADDR;
+>>> diff --git a/arch/arm/mach-mxs/mach-apx4devkit.c b/arch/arm/mach-mxs/mach-apx4devkit.c
+>>> new file mode 100644
+>>> index 0000000..28d334d
+>>> --- /dev/null
+>>> +++ b/arch/arm/mach-mxs/mach-apx4devkit.c
+>>> @@ -0,0 +1,170 @@
+>>> +/*
+>>> + * Copyright (C) 2011
+>>> + * Lauri Hintsala, Bluegiga,<lauri.hintsala@bluegiga.com>
+>>> + *
+>>> + * based on: mach-mx28evk.c
+>>> + * Copyright 2010 Freescale Semiconductor, Inc. All Rights Reserved.
+>>> + *
+>>> + * This program is free software; you can redistribute it and/or modify
+>>> + * it under the terms of the GNU General Public License as published by
+>>> + * the Free Software Foundation; either version 2 of the License, or
+>>> + * (at your option) any later version.
+>>> + *
+>>> + * This program is distributed in the hope that it will be useful,
+>>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>>> + * GNU General Public License for more details.
+>>> + */
+>>> +
+>>> +#include<linux/delay.h>
+>>> +#include<linux/platform_device.h>
+>>> +#include<linux/gpio.h>
+>>> +#include<linux/leds.h>
+>>> +#include<linux/irq.h>
+>>> +#include<linux/clk.h>
+>>> +#include<linux/i2c.h>
+>>> +
+>>> +#include<asm/mach-types.h>
+>>> +#include<asm/mach/arch.h>
+>>> +#include<asm/mach/time.h>
+>>> +
+>>> +#include<mach/common.h>
+>>> +#include<mach/iomux-mx28.h>
+>>> +
+>>> +#include "devices-mx28.h"
+>>> +
+>>> +#define APX4DEVKIT_GPIO_USERLED	MXS_GPIO_NR(3, 28)
+>>> +
+>>> +static const iomux_cfg_t apx4devkit_pads[] __initconst = {
+>>> +	/* duart */
+>>> +	MX28_PAD_PWM0__DUART_RX | MXS_PAD_CTRL,
+>>> +	MX28_PAD_PWM1__DUART_TX | MXS_PAD_CTRL,
+>>> +
+>>> +	/* auart0 */
+>>> +	MX28_PAD_AUART0_RX__AUART0_RX | MXS_PAD_CTRL,
+>>> +	MX28_PAD_AUART0_TX__AUART0_TX | MXS_PAD_CTRL,
+>>> +	MX28_PAD_AUART0_CTS__AUART0_CTS | MXS_PAD_CTRL,
+>>> +	MX28_PAD_AUART0_RTS__AUART0_RTS | MXS_PAD_CTRL,
+>>> +
+>>> +	/* auart1 */
+>>> +	MX28_PAD_AUART1_RX__AUART1_RX | MXS_PAD_CTRL,
+>>> +	MX28_PAD_AUART1_TX__AUART1_TX | MXS_PAD_CTRL,
+>>> +
+>>> +	/* auart2 */
+>>> +	MX28_PAD_SSP2_SCK__AUART2_RX | MXS_PAD_CTRL,
+>>> +	MX28_PAD_SSP2_MOSI__AUART2_TX | MXS_PAD_CTRL,
+>>> +
+>>> +	/* auart3 */
+>>> +	MX28_PAD_SSP2_MISO__AUART3_RX | MXS_PAD_CTRL,
+>>> +	MX28_PAD_SSP2_SS0__AUART3_TX | MXS_PAD_CTRL,
+>>> +
+>>> +#define MXS_PAD_FEC	(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP)
+>>> +	/* fec0 */
+>>> +	MX28_PAD_ENET0_MDC__ENET0_MDC | MXS_PAD_FEC,
+>>> +	MX28_PAD_ENET0_MDIO__ENET0_MDIO | MXS_PAD_FEC,
+>>> +	MX28_PAD_ENET0_RX_EN__ENET0_RX_EN | MXS_PAD_FEC,
+>>> +	MX28_PAD_ENET0_RXD0__ENET0_RXD0 | MXS_PAD_FEC,
+>>> +	MX28_PAD_ENET0_RXD1__ENET0_RXD1 | MXS_PAD_FEC,
+>>> +	MX28_PAD_ENET0_TX_EN__ENET0_TX_EN | MXS_PAD_FEC,
+>>> +	MX28_PAD_ENET0_TXD0__ENET0_TXD0 | MXS_PAD_FEC,
+>>> +	MX28_PAD_ENET0_TXD1__ENET0_TXD1 | MXS_PAD_FEC,
+>>> +	MX28_PAD_ENET_CLK__CLKCTRL_ENET | MXS_PAD_FEC,
+>>> +
+>>> +	/* i2c */
+>>> +	MX28_PAD_I2C0_SCL__I2C0_SCL,
+>>> +	MX28_PAD_I2C0_SDA__I2C0_SDA,
+>>> +
+>>> +	/* mmc0 */
+>>> +	MX28_PAD_SSP0_DATA0__SSP0_D0 |
+>>> +		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+>>> +	MX28_PAD_SSP0_DATA1__SSP0_D1 |
+>>> +		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+>>> +	MX28_PAD_SSP0_DATA2__SSP0_D2 |
+>>> +		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+>>> +	MX28_PAD_SSP0_DATA3__SSP0_D3 |
+>>> +		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+>>> +	MX28_PAD_SSP0_DATA4__SSP0_D4 |
+>>> +		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+>>> +	MX28_PAD_SSP0_DATA5__SSP0_D5 |
+>>> +		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+>>> +	MX28_PAD_SSP0_DATA6__SSP0_D6 |
+>>> +		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+>>> +	MX28_PAD_SSP0_DATA7__SSP0_D7 |
+>>> +		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+>>> +	MX28_PAD_SSP0_CMD__SSP0_CMD |
+>>> +		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+>>> +	MX28_PAD_SSP0_DETECT__SSP0_CARD_DETECT |
+>>> +		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
+>>> +	MX28_PAD_SSP0_SCK__SSP0_SCK |
+>>> +		(MXS_PAD_12MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
+>>> +
+>>> +	/* led */
+>>> +	MX28_PAD_PWM3__GPIO_3_28 | MXS_PAD_CTRL,
+>>> +};
+>>> +
+>>> +/* led */
+>>> +static const struct gpio_led apx4devkit_leds[] __initconst = {
+>>> +	{
+>>> +		.name = "user-led",
+>>> +		.default_trigger = "heartbeat",
+>>> +		.gpio = APX4DEVKIT_GPIO_USERLED,
+>>> +	},
+>>> +};
+>>> +
+>>> +static const struct gpio_led_platform_data apx4devkit_led_data __initconst = {
+>>> +	.leds = apx4devkit_leds,
+>>> +	.num_leds = ARRAY_SIZE(apx4devkit_leds),
+>>> +};
+>>> +
+>>> +static struct fec_platform_data mx28_fec_pdata __initdata = {
+>>> +	.phy = PHY_INTERFACE_MODE_RMII,
+>>> +};
+>>> +
+>>> +static struct mxs_mmc_platform_data apx4devkit_mmc_pdata __initdata = {
+>>> +	.wp_gpio = -EINVAL,
+>>> +	.flags = SLOTF_8_BIT_CAPABLE,
+>>> +};
+>>> +
+>>> +static struct i2c_board_info apx4devkit_i2c_boardinfo[] __initdata = {
+>>> +	{ I2C_BOARD_INFO("sgtl5000", 0x0a) }, /* ASoC */
+>>> +	{ I2C_BOARD_INFO("pcf8563", 0x51) }, /* RTC */
+>>> +};
+>>> +
+>>> +static void __init apx4devkit_init(void)
+>>> +{
+>>> +	mxs_iomux_setup_multiple_pads(apx4devkit_pads,
+>>> +			ARRAY_SIZE(apx4devkit_pads));
+>>> +
+>>> +	mx28_add_duart();
+>>> +	mx28_add_auart0();
+>>> +	mx28_add_auart1();
+>>> +	mx28_add_auart2();
+>>> +	mx28_add_auart3();
+>>> +
+>>> +	mx28_add_fec(0,&mx28_fec_pdata);
+>>> +
+>>> +	mx28_add_mxs_mmc(0,&apx4devkit_mmc_pdata);
+>>> +
+>>> +	gpio_led_register_device(0,&apx4devkit_led_data);
+>>> +
+>>> +	/* I2C */
+>>> +	mx28_add_mxs_i2c(0);
+>>> +	i2c_register_board_info(0, apx4devkit_i2c_boardinfo,
+>>> +			ARRAY_SIZE(apx4devkit_i2c_boardinfo));
+>>> +}
+>>> +
+>>> +static void __init apx4devkit_timer_init(void)
+>>> +{
+>>> +	mx28_clocks_init();
+>>> +}
+>>> +
+>>> +static struct sys_timer apx4devkit_timer = {
+>>> +	.init	= apx4devkit_timer_init,
+>>> +};
+>>> +
+>>> +MACHINE_START(APX4DEVKIT, "Bluegiga APX4 Development Kit")
+>>> +	.map_io		= mx28_map_io,
+>>> +	.init_irq	= mx28_init_irq,
+>>> +	.timer		=&apx4devkit_timer,
+>>> +	.init_machine	= apx4devkit_init,
+>>> +MACHINE_END
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>
+>
