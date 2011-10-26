@@ -1,226 +1,102 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 26 Oct 2011 18:57:12 +0200
-Subject: [PATCH] regulator: Use regmap_read/write(), regmap_update_bits
-	functions directly
-In-Reply-To: <1319617556-29021-1-git-send-email-jhbird.choi@samsung.com>
-References: <1319617556-29021-1-git-send-email-jhbird.choi@samsung.com>
-Message-ID: <CACxGe6uJCt3ytmJhffJGnkPb6Agc1X9gP2Li-Yjj=8ckgMxwPw@mail.gmail.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Wed, 26 Oct 2011 19:40:45 +0200
+Subject: [PATCH] of: Add a reg-names property to name reg entries
+In-Reply-To: <FD4B90D7-4B26-42C2-8CF9-7AA9971BCBEB@kernel.crashing.org>
+References: <1319471697-8970-1-git-send-email-b-cousson@ti.com>
+	<20111025082632.GJ4429@atomide.com>
+	<440786C5-FA1C-4750-9990-0BA5AABC2190@kernel.crashing.org>
+	<4EA6BC54.7030007@ti.com>
+	<BC60AF8F-C329-44B9-BEC9-EA5821725E1B@kernel.crashing.org>
+	<4EA6DF88.2080704@ti.com>
+	<FD4B90D7-4B26-42C2-8CF9-7AA9971BCBEB@kernel.crashing.org>
+Message-ID: <4EA8461D.6070600@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 26, 2011 at 10:25 AM,  <jhbird.choi@samsung.com> wrote:
-> From: Jonghwan Choi <jhbird.choi@samsung.com>
+On 10/26/2011 5:57 AM, Segher Boessenkool wrote:
+>>>>> What problem does any of this solve?  The device binding for the
+>>>>> "mcasp" device will have to describe the possible "reg-names", and
+>>>>> what those mean; but the binding already has to describe its "reg"
+>>>>> property anyway.
+>>>>
+>>>> What this solve is the ability to use the
+>>>> platform_get_resource_byname directly to retrieve the proper
+>>>> register base address.
+>>>
+>>> You do not have to put it in the device tree for that, the device
+>>> driver can implement this itself if it cares.
+>>
+>> ???
+>>
+>> The driver is the user of that name, so it has to be populated
+>> before into the resource during device creation.
 >
-> Signed-off-by: Jonghwan Choi <jhbird.choi@samsung.com>
+> It can be as simple as
+>
+> #define FOO_REG_INDEX 0
+> #define BAR_REG_INDEX 1
+>
+> but you can use C strings if you want to.
 
-Nitpick:  All patches should include justification about why the
-change is being made.  It may be obvious to you, but take into account
-the people looking at the commit after it hits Linus' tree.  Very few
-patches are trivial and obvious enough that the summary line is enough
-justification.
+But that will add an extra level of indirection...
 
-g.
+The idea is to avoid that and use directly:
 
-> ---
-> ?drivers/regulator/tps65023-regulator.c | ? 74 +++++++++++--------------------
-> ?1 files changed, 26 insertions(+), 48 deletions(-)
->
-> diff --git a/drivers/regulator/tps65023-regulator.c b/drivers/regulator/tps65023-regulator.c
-> index 701a590..39f57b9 100644
-> --- a/drivers/regulator/tps65023-regulator.c
-> +++ b/drivers/regulator/tps65023-regulator.c
-> @@ -129,48 +129,22 @@ struct tps_pmic {
-> ? ? ? ?struct regmap *regmap;
-> ?};
->
-> -static int tps_65023_set_bits(struct tps_pmic *tps, u8 reg, u8 mask)
-> -{
-> - ? ? ? return regmap_update_bits(tps->regmap, reg, mask, mask);
-> -}
-> -
-> -static int tps_65023_clear_bits(struct tps_pmic *tps, u8 reg, u8 mask)
-> -{
-> - ? ? ? return regmap_update_bits(tps->regmap, reg, mask, 0);
-> -}
-> -
-> -static int tps_65023_reg_read(struct tps_pmic *tps, u8 reg)
-> -{
-> - ? ? ? unsigned int val;
-> - ? ? ? int ret;
-> -
-> - ? ? ? ret = regmap_read(tps->regmap, reg, &val);
-> -
-> - ? ? ? if (ret != 0)
-> - ? ? ? ? ? ? ? return ret;
-> - ? ? ? else
-> - ? ? ? ? ? ? ? return val;
-> -}
-> -
-> -static int tps_65023_reg_write(struct tps_pmic *tps, u8 reg, u8 val)
-> -{
-> - ? ? ? return regmap_write(tps->regmap, reg, val);
-> -}
->
-> ?static int tps65023_dcdc_is_enabled(struct regulator_dev *dev)
-> ?{
-> ? ? ? ?struct tps_pmic *tps = rdev_get_drvdata(dev);
-> ? ? ? ?int data, dcdc = rdev_get_id(dev);
-> + ? ? ? int ret;
-> ? ? ? ?u8 shift;
->
-> ? ? ? ?if (dcdc < TPS65023_DCDC_1 || dcdc > TPS65023_DCDC_3)
-> ? ? ? ? ? ? ? ?return -EINVAL;
->
-> ? ? ? ?shift = TPS65023_NUM_REGULATOR - dcdc;
-> - ? ? ? data = tps_65023_reg_read(tps, TPS65023_REG_REG_CTRL);
-> + ? ? ? ret = regmap_read(tps->regmap, TPS65023_REG_REG_CTRL, &data);
->
-> - ? ? ? if (data < 0)
-> - ? ? ? ? ? ? ? return data;
-> + ? ? ? if (ret != 0)
-> + ? ? ? ? ? ? ? return ret;
-> ? ? ? ?else
-> ? ? ? ? ? ? ? ?return (data & 1<<shift) ? 1 : 0;
-> ?}
-> @@ -179,16 +153,17 @@ static int tps65023_ldo_is_enabled(struct regulator_dev *dev)
-> ?{
-> ? ? ? ?struct tps_pmic *tps = rdev_get_drvdata(dev);
-> ? ? ? ?int data, ldo = rdev_get_id(dev);
-> + ? ? ? int ret;
-> ? ? ? ?u8 shift;
->
-> ? ? ? ?if (ldo < TPS65023_LDO_1 || ldo > TPS65023_LDO_2)
-> ? ? ? ? ? ? ? ?return -EINVAL;
->
-> ? ? ? ?shift = (ldo == TPS65023_LDO_1 ? 1 : 2);
-> - ? ? ? data = tps_65023_reg_read(tps, TPS65023_REG_REG_CTRL);
-> + ? ? ? ret = regmap_read(tps->regmap, TPS65023_REG_REG_CTRL, &data);
->
-> - ? ? ? if (data < 0)
-> - ? ? ? ? ? ? ? return data;
-> + ? ? ? if (ret != 0)
-> + ? ? ? ? ? ? ? return ret;
-> ? ? ? ?else
-> ? ? ? ? ? ? ? ?return (data & 1<<shift) ? 1 : 0;
-> ?}
-> @@ -203,7 +178,7 @@ static int tps65023_dcdc_enable(struct regulator_dev *dev)
-> ? ? ? ? ? ? ? ?return -EINVAL;
->
-> ? ? ? ?shift = TPS65023_NUM_REGULATOR - dcdc;
-> - ? ? ? return tps_65023_set_bits(tps, TPS65023_REG_REG_CTRL, 1 << shift);
-> + ? ? ? return regmap_update_bits(tps->regmap, TPS65023_REG_REG_CTRL, 1 << shift, 1 << shift);
-> ?}
->
-> ?static int tps65023_dcdc_disable(struct regulator_dev *dev)
-> @@ -216,7 +191,7 @@ static int tps65023_dcdc_disable(struct regulator_dev *dev)
-> ? ? ? ? ? ? ? ?return -EINVAL;
->
-> ? ? ? ?shift = TPS65023_NUM_REGULATOR - dcdc;
-> - ? ? ? return tps_65023_clear_bits(tps, TPS65023_REG_REG_CTRL, 1 << shift);
-> + ? ? ? return regmap_update_bits(tps->regmap, TPS65023_REG_REG_CTRL, 1 << shift, 0);
-> ?}
->
-> ?static int tps65023_ldo_enable(struct regulator_dev *dev)
-> @@ -229,7 +204,7 @@ static int tps65023_ldo_enable(struct regulator_dev *dev)
-> ? ? ? ? ? ? ? ?return -EINVAL;
->
-> ? ? ? ?shift = (ldo == TPS65023_LDO_1 ? 1 : 2);
-> - ? ? ? return tps_65023_set_bits(tps, TPS65023_REG_REG_CTRL, 1 << shift);
-> + ? ? ? return regmap_update_bits(tps->regmap, TPS65023_REG_REG_CTRL, 1 << shift, 1 << shift);
-> ?}
->
-> ?static int tps65023_ldo_disable(struct regulator_dev *dev)
-> @@ -242,21 +217,22 @@ static int tps65023_ldo_disable(struct regulator_dev *dev)
-> ? ? ? ? ? ? ? ?return -EINVAL;
->
-> ? ? ? ?shift = (ldo == TPS65023_LDO_1 ? 1 : 2);
-> - ? ? ? return tps_65023_clear_bits(tps, TPS65023_REG_REG_CTRL, 1 << shift);
-> + ? ? ? return regmap_update_bits(tps->regmap, TPS65023_REG_REG_CTRL, 1 << shift, 0);
-> ?}
->
-> ?static int tps65023_dcdc_get_voltage(struct regulator_dev *dev)
-> ?{
-> ? ? ? ?struct tps_pmic *tps = rdev_get_drvdata(dev);
-> + ? ? ? int ret;
-> ? ? ? ?int data, dcdc = rdev_get_id(dev);
->
-> ? ? ? ?if (dcdc < TPS65023_DCDC_1 || dcdc > TPS65023_DCDC_3)
-> ? ? ? ? ? ? ? ?return -EINVAL;
->
-> ? ? ? ?if (dcdc == TPS65023_DCDC_1) {
-> - ? ? ? ? ? ? ? data = tps_65023_reg_read(tps, TPS65023_REG_DEF_CORE);
-> - ? ? ? ? ? ? ? if (data < 0)
-> - ? ? ? ? ? ? ? ? ? ? ? return data;
-> + ? ? ? ? ? ? ? ret = regmap_read(tps->regmap, TPS65023_REG_DEF_CORE, &data);
-> + ? ? ? ? ? ? ? if (ret != 0)
-> + ? ? ? ? ? ? ? ? ? ? ? return ret;
-> ? ? ? ? ? ? ? ?data &= (tps->info[dcdc]->table_len - 1);
-> ? ? ? ? ? ? ? ?return tps->info[dcdc]->table[data] * 1000;
-> ? ? ? ?} else
-> @@ -296,20 +272,21 @@ static int tps65023_dcdc_set_voltage(struct regulator_dev *dev,
-> ? ? ? ?if (vsel == tps->info[dcdc]->table_len)
-> ? ? ? ? ? ? ? ?return -EINVAL;
-> ? ? ? ?else
-> - ? ? ? ? ? ? ? return tps_65023_reg_write(tps, TPS65023_REG_DEF_CORE, vsel);
-> + ? ? ? ? ? ? ? return regmap_write(tps->regmap, TPS65023_REG_DEF_CORE, vsel);
-> ?}
->
-> ?static int tps65023_ldo_get_voltage(struct regulator_dev *dev)
-> ?{
-> ? ? ? ?struct tps_pmic *tps = rdev_get_drvdata(dev);
-> ? ? ? ?int data, ldo = rdev_get_id(dev);
-> + ? ? ? int ret;
->
-> ? ? ? ?if (ldo < TPS65023_LDO_1 || ldo > TPS65023_LDO_2)
-> ? ? ? ? ? ? ? ?return -EINVAL;
->
-> - ? ? ? data = tps_65023_reg_read(tps, TPS65023_REG_LDO_CTRL);
-> - ? ? ? if (data < 0)
-> - ? ? ? ? ? ? ? return data;
-> + ? ? ? ret = regmap_read(tps->regmap, TPS65023_REG_LDO_CTRL, &data);
-> + ? ? ? if (ret != 0)
-> + ? ? ? ? ? ? ? return ret;
->
-> ? ? ? ?data >>= (TPS65023_LDO_CTRL_LDOx_SHIFT(ldo - TPS65023_LDO_1));
-> ? ? ? ?data &= (tps->info[ldo]->table_len - 1);
-> @@ -321,6 +298,7 @@ static int tps65023_ldo_set_voltage(struct regulator_dev *dev,
-> ?{
-> ? ? ? ?struct tps_pmic *tps = rdev_get_drvdata(dev);
-> ? ? ? ?int data, vsel, ldo = rdev_get_id(dev);
-> + ? ? ? int ret;
->
-> ? ? ? ?if (ldo < TPS65023_LDO_1 || ldo > TPS65023_LDO_2)
-> ? ? ? ? ? ? ? ?return -EINVAL;
-> @@ -344,13 +322,13 @@ static int tps65023_ldo_set_voltage(struct regulator_dev *dev,
->
-> ? ? ? ?*selector = vsel;
->
-> - ? ? ? data = tps_65023_reg_read(tps, TPS65023_REG_LDO_CTRL);
-> - ? ? ? if (data < 0)
-> - ? ? ? ? ? ? ? return data;
-> + ? ? ? ret = regmap_read(tps->regmap, TPS65023_REG_LDO_CTRL, &data);
-> + ? ? ? if (ret != 0)
-> + ? ? ? ? ? ? ? return ret;
->
-> ? ? ? ?data &= TPS65023_LDO_CTRL_LDOx_MASK(ldo - TPS65023_LDO_1);
-> ? ? ? ?data |= (vsel << (TPS65023_LDO_CTRL_LDOx_SHIFT(ldo - TPS65023_LDO_1)));
-> - ? ? ? return tps_65023_reg_write(tps, TPS65023_REG_LDO_CTRL, data);
-> + ? ? ? return regmap_write(tps->regmap, TPS65023_REG_LDO_CTRL, data);
-> ?}
->
-> ?static int tps65023_dcdc_list_voltage(struct regulator_dev *dev,
-> --
-> 1.7.1
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at ?http://www.tux.org/lkml/
->
+platform_get_resource_byname(pdev, IORESOURCE_MEM, "smem");
+platform_get_resource_byname(pdev, IORESOURCE_MEM, "cmem");
+....
 
+>>>> The binding is just a text description that the driver will not be
+>>>> able to use directly. It will have to get the resource using an
+>>>> abstract index.
+>>>
+>>> Your reg-names are abstract identifiers just as well.
+>>
+>> This is the name used in the HW documentation.
+>
+> So?  The device binding will still have to list them, for exact spelling
+> and register block size etc.
 
+The binding is *just* a text... so instead of having to read a text file 
+and then getting an index, we can just use the text that represent the 
+memory entry.
 
--- 
-Grant Likely, B.Sc., P.Eng.
-Secret Lab Technologies Ltd.
+>> Ordering them to get a number is purely arbitrary.
+>
+> Ordering them is required, "reg" is an array.  It also matters which
+> entry is the first entry (for the unit address).
+>
+>> That's why using the name will allow the driver to get the resource
+>> the way it is represented in the documentation and thus avoid some
+>> intermediate number.
+>
+> You use an intermediate string instead, and add code and binding to
+> translate that to that same number.
+
+Nope. We use a string to get the resource directly. There is no 
+intermediate index.
+
+>>>> It thus removes a level of indirection that is error prone and
+>>>> useless most of the time.
+>>>
+>>> It *adds* a level of indirection.  I doubt it helps prevent errors
+>>> either, but who knows.
+>>
+>> Well, if that does not bring anything to you, you can just not use it.
+>
+> I could, if you did this for your device binding only, but it seems
+> you are adding this as a generic thing.  I am very much against that.
+> The device tree should describe the hardware; it shouldn't describe
+> the description of the hardware, that's what bindings are for.
+
+Not really, it is still a representation of the HW using a more readable 
+way. I kept the original "reg" for legacy only.
+
+This idea is to extend that to any kind of resources attached to a 
+device: irq, dma_req, clock, regulator...
+FWIW, using a name is already the natural way to get a clock and a 
+regulator.
+The point here is to extend legacy binding and thus improve the 
+consistency in the device resource representation.
+
+Benoit
