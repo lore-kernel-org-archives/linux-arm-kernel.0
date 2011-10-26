@@ -1,34 +1,56 @@
-From: gregkh@suse.de (Greg KH)
-Date: Wed, 26 Oct 2011 14:17:06 +0200
-Subject: [PATCH] lib: devres: add convenience function to remap a resource
-In-Reply-To: <20111025153538.GA13012@google.com>
-References: <1319548607-28427-1-git-send-email-w.sang@pengutronix.de>
-	<20111025153538.GA13012@google.com>
-Message-ID: <20111026121706.GC23457@suse.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 26 Oct 2011 14:23:32 +0200
+Subject: [PATCH] of: Add a reg-names property to name reg entries
+In-Reply-To: <FD4B90D7-4B26-42C2-8CF9-7AA9971BCBEB@kernel.crashing.org>
+References: <1319471697-8970-1-git-send-email-b-cousson@ti.com>
+	<20111025082632.GJ4429@atomide.com>
+	<440786C5-FA1C-4750-9990-0BA5AABC2190@kernel.crashing.org>
+	<4EA6BC54.7030007@ti.com>
+	<BC60AF8F-C329-44B9-BEC9-EA5821725E1B@kernel.crashing.org>
+	<4EA6DF88.2080704@ti.com>
+	<FD4B90D7-4B26-42C2-8CF9-7AA9971BCBEB@kernel.crashing.org>
+Message-ID: <20111026122332.GM4429@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 25, 2011 at 08:35:38AM -0700, Tejun Heo wrote:
-> On Tue, Oct 25, 2011 at 03:16:47PM +0200, Wolfram Sang wrote:
-> > Almost every platform_driver does the three steps get_resource,
-> > request_mem_region, ioremap. This does not only lead to a lot of code
-> > duplication, but also a huge number of similar error strings and
-> > inconsistent error codes on failure. So, introduce a helper function
-> > which simplifies remapping a resource and make it hard to do something
-> > wrong and add documentation for it.
-> > 
-> > Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
-> > Cc: Grant Likely <grant.likely@secretlab.ca>
-> > Cc: Tejun Heo <tj@kernel.org>
-> > Cc: Greg KH <gregkh@suse.de>
+* Segher Boessenkool <segher@kernel.crashing.org> [111026 05:22]:
+> >>>>What problem does any of this solve?  The device binding for the
+> >>>>"mcasp" device will have to describe the possible "reg-names", and
+> >>>>what those mean; but the binding already has to describe its "reg"
+> >>>>property anyway.
+> >>>
+> >>>What this solve is the ability to use the
+> >>>platform_get_resource_byname directly to retrieve the proper
+> >>>register base address.
+> >>
+> >>You do not have to put it in the device tree for that, the device
+> >>driver can implement this itself if it cares.
+> >
+> >???
+> >
+> >The driver is the user of that name, so it has to be populated
+> >before into the resource during device creation.
 > 
->  Acked-by: Tejun Heo <tj@kernel.org>
+> It can be as simple as
 > 
-> Greg, can you please take this one?
+> #define FOO_REG_INDEX 0
+> #define BAR_REG_INDEX 1
+> 
+> but you can use C strings if you want to.
 
-Ok, I'll queue it up after the 3.2 merge window is over, for the 3.3
-release.
+Fox pin muxing, we really want to use the actual signal names in
+the drivers. The define example above would means mapping the defines
+multiple times depending which packaging you're using.
 
-thanks,
+There can be several packages for each SoC, where the pins wired up
+whichever way. For example, for a serial driver to use UART RX pin,
+the driver can just request a signal called "uart_tx", which is the
+actual hardware name for the signal inside the SoC.
 
-greg k-h
+Using the signal names also makes it easier to make drivers to support
+the same device IP blocks across multiple SoC as the signal name most
+likely is the same as what the device IP block is using.
+
+Regards,
+
+Tony 
