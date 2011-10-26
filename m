@@ -1,28 +1,54 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 26 Oct 2011 17:10:55 -0200
-Subject: [PATCH] ARM: mx31pdk: Add MC13783 RTC support
-In-Reply-To: <20111025072034.GR15299@pengutronix.de>
-References: <1319482929-28262-1-git-send-email-fabio.estevam@freescale.com>
-	<20111025072034.GR15299@pengutronix.de>
-Message-ID: <CAOMZO5AN=R6pa11-3JS2XJ_D6tsrSbO-=54J4+FFy4UL32t3hw@mail.gmail.com>
+From: cjb@laptop.org (Chris Ball)
+Date: Wed, 26 Oct 2011 15:59:42 -0400
+Subject: [PATCH V5 1/3] SDHCI: S3C: Use generic clock names for sdhci bus
+	clock options
+In-Reply-To: <1318588126-19167-2-git-send-email-rajeshwari.s@samsung.com>
+	(Rajeshwari Shinde's message of "Fri, 14 Oct 2011 15:58:44 +0530")
+References: <1318588126-19167-1-git-send-email-rajeshwari.s@samsung.com>
+	<1318588126-19167-2-git-send-email-rajeshwari.s@samsung.com>
+Message-ID: <m2obx34j81.fsf@bob.laptop.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
+Hi Rajeshwari, Kukjin,
 
-2011/10/25 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-
->> - ? ? .flags ?= MC13783_USE_REGULATOR | MC13783_USE_TOUCHSCREEN,
->> + ? ? .flags ?= MC13XXX_USE_REGULATOR | MC13XXX_USE_TOUCHSCREEN |
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? MC13XXX_USE_RTC,
-> ok in principle but (I think mfd in) next touches this already:
+On Fri, Oct 14 2011, Rajeshwari Shinde wrote:
+> This patch modifies the driver to stop depending on the clock names
+> being passed from the platform and switch over to bus clock lookup
+> using generic clock names.
 >
-> ? ? ? ?$ git show next/master:arch/arm/mach-imx/mach-mx31_3ds.c | grep USE_TOUCH
-> ? ? ? ? ? ? ? ?.flags ?= MC13XXX_USE_TOUCHSCREEN,
+> Signed-off-by: Rajeshwari Shinde <rajeshwari.s@samsung.com>
+> ---
+>  drivers/mmc/host/sdhci-s3c.c |    6 ++----
+>  1 files changed, 2 insertions(+), 4 deletions(-)
+>
+> diff --git a/drivers/mmc/host/sdhci-s3c.c b/drivers/mmc/host/sdhci-s3c.c
+> index 82709b6..a5fde87 100644
+> --- a/drivers/mmc/host/sdhci-s3c.c
+> +++ b/drivers/mmc/host/sdhci-s3c.c
+> @@ -435,14 +435,12 @@ static int __devinit sdhci_s3c_probe(struct platform_device *pdev)
+>  
+>  	for (clks = 0, ptr = 0; ptr < MAX_BUS_CLK; ptr++) {
+>  		struct clk *clk;
+> -		char *name = pdata->clocks[ptr];
+> +		char name[14];
+>  
+> -		if (name == NULL)
+> -			continue;
+> +		sprintf(name, "mmc_busclk.%d", ptr);
 
-Ok, I will wait for this change to reach Sascha's tree first and then
-I will repost this patch.
+Let's use snprintf() here instead -- it's better to have fewer uses of
+sprintf() to audit.
 
-Regards,
+>  		clk = clk_get(dev, name);
+>  		if (IS_ERR(clk)) {
+> -			dev_err(dev, "failed to get clock %s\n", name);
+>  			continue;
+>  		}
 
-Fabio Estevam
+Thanks,
+
+- Chris.
+-- 
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+One Laptop Per Child
