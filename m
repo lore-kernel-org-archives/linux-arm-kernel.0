@@ -1,312 +1,48 @@
-From: lauri.hintsala@bluegiga.com (Lauri Hintsala)
-Date: Wed, 26 Oct 2011 11:19:37 +0300
-Subject: [PATCH v2] ARM: mxs: Add initial support for Bluegiga
-	APX4	Development Kit
-In-Reply-To: <20111026074346.GC2263@pengutronix.de>
-References: <1319019366-9666-1-git-send-email-lauri.hintsala@bluegiga.com>	<4EA79A61.9060805@bluegiga.com>
-	<20111026074346.GC2263@pengutronix.de>
-Message-ID: <4EA7C299.4090309@bluegiga.com>
+From: pdeschrijver@nvidia.com (pdeschrijver at nvidia.com)
+Date: Wed, 26 Oct 2011 11:41:41 +0300
+Subject: [PATCHv2] arm/tegra: clk_get should not be fatal
+Message-ID: <1319618501-15020-1-git-send-email-pdeschrijver@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/26/2011 10:43 AM, Sascha Hauer wrote:
-> On Wed, Oct 26, 2011 at 08:28:01AM +0300, Lauri Hintsala wrote:
->> Hello Sascha,
->>
->> Is this board support patch OK for releasing?
->
-> Yes, it's ok. I can't garantuee that it makes it in this merge window
-> though.
+From: Peter De Schrijver <pdeschrijver@nvidia.com>
 
-Could I help you somehow to get patches this merge window? I would like 
-to have our board to be support by next kernel.
+The timer and rtc-timer clocks aren't gated by default, so there is no reason
+to crash the system if the dummy enable call failed.
 
-Lauri
+Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
+---
+ arch/arm/mach-tegra/timer.c |   12 ++++++++----
+ 1 files changed, 8 insertions(+), 4 deletions(-)
 
-
->
-> Sascha
->
->>
->> BR,
->> Lauri Hintsala
->>
->>
->> On 10/19/2011 01:16 PM, Lauri Hintsala wrote:
->>> Added initial support for Bluegiga APX4 module and Development Kit.
->>> Currently DUART, AUARTs, FEC, I2C, MMC0, RTC and user LED are supported.
->>>
->>> Signed-off-by: Lauri Hintsala<lauri.hintsala@bluegiga.com>
->>> Signed-off-by: Veli-Pekka Peltola<veli-pekka.peltola@bluegiga.com>
->>> ---
->>> v2
->>>   * code cleanups
->>>   * ethernet mac address parsing removed because fec driver implements parsing already
->>>
->>>   arch/arm/configs/mxs_defconfig              |    1 +
->>>   arch/arm/mach-mxs/Kconfig                   |   15 +++
->>>   arch/arm/mach-mxs/Makefile                  |    1 +
->>>   arch/arm/mach-mxs/include/mach/mxs.h        |    1 +
->>>   arch/arm/mach-mxs/include/mach/uncompress.h |    1 +
->>>   arch/arm/mach-mxs/mach-apx4devkit.c         |  170 +++++++++++++++++++++++++++
->>>   6 files changed, 189 insertions(+), 0 deletions(-)
->>>   create mode 100644 arch/arm/mach-mxs/mach-apx4devkit.c
->>>
->>> diff --git a/arch/arm/configs/mxs_defconfig b/arch/arm/configs/mxs_defconfig
->>> index db2cb7d..6a6268d 100644
->>> --- a/arch/arm/configs/mxs_defconfig
->>> +++ b/arch/arm/configs/mxs_defconfig
->>> @@ -26,6 +26,7 @@ CONFIG_MACH_MX23EVK=y
->>>   CONFIG_MACH_MX28EVK=y
->>>   CONFIG_MACH_STMP378X_DEVB=y
->>>   CONFIG_MACH_TX28=y
->>> +CONFIG_MACH_APX4DEVKIT=y
->>>   # CONFIG_ARM_THUMB is not set
->>>   CONFIG_NO_HZ=y
->>>   CONFIG_HIGH_RES_TIMERS=y
->>> diff --git a/arch/arm/mach-mxs/Kconfig b/arch/arm/mach-mxs/Kconfig
->>> index 4cd0231..fecb606 100644
->>> --- a/arch/arm/mach-mxs/Kconfig
->>> +++ b/arch/arm/mach-mxs/Kconfig
->>> @@ -64,8 +64,23 @@ config MODULE_TX28
->>>   	select MXS_HAVE_PLATFORM_MXS_MMC
->>>   	select MXS_HAVE_PLATFORM_MXS_PWM
->>>
->>> +config MODULE_APX4
->>> +	bool
->>> +	select SOC_IMX28
->>> +	select LEDS_GPIO_REGISTER
->>> +	select MXS_HAVE_AMBA_DUART
->>> +	select MXS_HAVE_PLATFORM_AUART
->>> +	select MXS_HAVE_PLATFORM_FEC
->>> +	select MXS_HAVE_PLATFORM_MXS_I2C
->>> +	select MXS_HAVE_PLATFORM_MXS_MMC
->>> +	select MXS_OCOTP
->>> +
->>>   config MACH_TX28
->>>   	bool "Ka-Ro TX28 module"
->>>   	select MODULE_TX28
->>>
->>> +config MACH_APX4DEVKIT
->>> +	bool "Support Bluegiga APX4 Development Kit"
->>> +	select MODULE_APX4
->>> +
->>>   endif
->>> diff --git a/arch/arm/mach-mxs/Makefile b/arch/arm/mach-mxs/Makefile
->>> index 6c38262..3d335a7 100644
->>> --- a/arch/arm/mach-mxs/Makefile
->>> +++ b/arch/arm/mach-mxs/Makefile
->>> @@ -12,5 +12,6 @@ obj-$(CONFIG_MACH_MX23EVK) += mach-mx23evk.o
->>>   obj-$(CONFIG_MACH_MX28EVK) += mach-mx28evk.o
->>>   obj-$(CONFIG_MODULE_TX28) += module-tx28.o
->>>   obj-$(CONFIG_MACH_TX28)    += mach-tx28.o
->>> +obj-$(CONFIG_MACH_APX4DEVKIT) += mach-apx4devkit.o
->>>
->>>   obj-y += devices/
->>> diff --git a/arch/arm/mach-mxs/include/mach/mxs.h b/arch/arm/mach-mxs/include/mach/mxs.h
->>> index 35a89dd..59011ef 100644
->>> --- a/arch/arm/mach-mxs/include/mach/mxs.h
->>> +++ b/arch/arm/mach-mxs/include/mach/mxs.h
->>> @@ -32,6 +32,7 @@
->>>   		machine_is_mx23evk() ||					\
->>>   		0)
->>>   #define cpu_is_mx28()		(					\
->>> +		machine_is_apx4devkit() ||				\
->>>   		machine_is_mx28evk() ||					\
->>>   		machine_is_tx28() ||					\
->>>   		0)
->>> diff --git a/arch/arm/mach-mxs/include/mach/uncompress.h b/arch/arm/mach-mxs/include/mach/uncompress.h
->>> index 7f8bf65..b66a29d 100644
->>> --- a/arch/arm/mach-mxs/include/mach/uncompress.h
->>> +++ b/arch/arm/mach-mxs/include/mach/uncompress.h
->>> @@ -62,6 +62,7 @@ static inline void __arch_decomp_setup(unsigned long arch_id)
->>>   	case MACH_TYPE_MX23EVK:
->>>   		mxs_duart_base = MX23_DUART_BASE_ADDR;
->>>   		break;
->>> +	case MACH_TYPE_APX4DEVKIT:
->>>   	case MACH_TYPE_MX28EVK:
->>>   	case MACH_TYPE_TX28:
->>>   		mxs_duart_base = MX28_DUART_BASE_ADDR;
->>> diff --git a/arch/arm/mach-mxs/mach-apx4devkit.c b/arch/arm/mach-mxs/mach-apx4devkit.c
->>> new file mode 100644
->>> index 0000000..28d334d
->>> --- /dev/null
->>> +++ b/arch/arm/mach-mxs/mach-apx4devkit.c
->>> @@ -0,0 +1,170 @@
->>> +/*
->>> + * Copyright (C) 2011
->>> + * Lauri Hintsala, Bluegiga,<lauri.hintsala@bluegiga.com>
->>> + *
->>> + * based on: mach-mx28evk.c
->>> + * Copyright 2010 Freescale Semiconductor, Inc. All Rights Reserved.
->>> + *
->>> + * This program is free software; you can redistribute it and/or modify
->>> + * it under the terms of the GNU General Public License as published by
->>> + * the Free Software Foundation; either version 2 of the License, or
->>> + * (at your option) any later version.
->>> + *
->>> + * This program is distributed in the hope that it will be useful,
->>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->>> + * GNU General Public License for more details.
->>> + */
->>> +
->>> +#include<linux/delay.h>
->>> +#include<linux/platform_device.h>
->>> +#include<linux/gpio.h>
->>> +#include<linux/leds.h>
->>> +#include<linux/irq.h>
->>> +#include<linux/clk.h>
->>> +#include<linux/i2c.h>
->>> +
->>> +#include<asm/mach-types.h>
->>> +#include<asm/mach/arch.h>
->>> +#include<asm/mach/time.h>
->>> +
->>> +#include<mach/common.h>
->>> +#include<mach/iomux-mx28.h>
->>> +
->>> +#include "devices-mx28.h"
->>> +
->>> +#define APX4DEVKIT_GPIO_USERLED	MXS_GPIO_NR(3, 28)
->>> +
->>> +static const iomux_cfg_t apx4devkit_pads[] __initconst = {
->>> +	/* duart */
->>> +	MX28_PAD_PWM0__DUART_RX | MXS_PAD_CTRL,
->>> +	MX28_PAD_PWM1__DUART_TX | MXS_PAD_CTRL,
->>> +
->>> +	/* auart0 */
->>> +	MX28_PAD_AUART0_RX__AUART0_RX | MXS_PAD_CTRL,
->>> +	MX28_PAD_AUART0_TX__AUART0_TX | MXS_PAD_CTRL,
->>> +	MX28_PAD_AUART0_CTS__AUART0_CTS | MXS_PAD_CTRL,
->>> +	MX28_PAD_AUART0_RTS__AUART0_RTS | MXS_PAD_CTRL,
->>> +
->>> +	/* auart1 */
->>> +	MX28_PAD_AUART1_RX__AUART1_RX | MXS_PAD_CTRL,
->>> +	MX28_PAD_AUART1_TX__AUART1_TX | MXS_PAD_CTRL,
->>> +
->>> +	/* auart2 */
->>> +	MX28_PAD_SSP2_SCK__AUART2_RX | MXS_PAD_CTRL,
->>> +	MX28_PAD_SSP2_MOSI__AUART2_TX | MXS_PAD_CTRL,
->>> +
->>> +	/* auart3 */
->>> +	MX28_PAD_SSP2_MISO__AUART3_RX | MXS_PAD_CTRL,
->>> +	MX28_PAD_SSP2_SS0__AUART3_TX | MXS_PAD_CTRL,
->>> +
->>> +#define MXS_PAD_FEC	(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP)
->>> +	/* fec0 */
->>> +	MX28_PAD_ENET0_MDC__ENET0_MDC | MXS_PAD_FEC,
->>> +	MX28_PAD_ENET0_MDIO__ENET0_MDIO | MXS_PAD_FEC,
->>> +	MX28_PAD_ENET0_RX_EN__ENET0_RX_EN | MXS_PAD_FEC,
->>> +	MX28_PAD_ENET0_RXD0__ENET0_RXD0 | MXS_PAD_FEC,
->>> +	MX28_PAD_ENET0_RXD1__ENET0_RXD1 | MXS_PAD_FEC,
->>> +	MX28_PAD_ENET0_TX_EN__ENET0_TX_EN | MXS_PAD_FEC,
->>> +	MX28_PAD_ENET0_TXD0__ENET0_TXD0 | MXS_PAD_FEC,
->>> +	MX28_PAD_ENET0_TXD1__ENET0_TXD1 | MXS_PAD_FEC,
->>> +	MX28_PAD_ENET_CLK__CLKCTRL_ENET | MXS_PAD_FEC,
->>> +
->>> +	/* i2c */
->>> +	MX28_PAD_I2C0_SCL__I2C0_SCL,
->>> +	MX28_PAD_I2C0_SDA__I2C0_SDA,
->>> +
->>> +	/* mmc0 */
->>> +	MX28_PAD_SSP0_DATA0__SSP0_D0 |
->>> +		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
->>> +	MX28_PAD_SSP0_DATA1__SSP0_D1 |
->>> +		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
->>> +	MX28_PAD_SSP0_DATA2__SSP0_D2 |
->>> +		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
->>> +	MX28_PAD_SSP0_DATA3__SSP0_D3 |
->>> +		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
->>> +	MX28_PAD_SSP0_DATA4__SSP0_D4 |
->>> +		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
->>> +	MX28_PAD_SSP0_DATA5__SSP0_D5 |
->>> +		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
->>> +	MX28_PAD_SSP0_DATA6__SSP0_D6 |
->>> +		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
->>> +	MX28_PAD_SSP0_DATA7__SSP0_D7 |
->>> +		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
->>> +	MX28_PAD_SSP0_CMD__SSP0_CMD |
->>> +		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
->>> +	MX28_PAD_SSP0_DETECT__SSP0_CARD_DETECT |
->>> +		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
->>> +	MX28_PAD_SSP0_SCK__SSP0_SCK |
->>> +		(MXS_PAD_12MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
->>> +
->>> +	/* led */
->>> +	MX28_PAD_PWM3__GPIO_3_28 | MXS_PAD_CTRL,
->>> +};
->>> +
->>> +/* led */
->>> +static const struct gpio_led apx4devkit_leds[] __initconst = {
->>> +	{
->>> +		.name = "user-led",
->>> +		.default_trigger = "heartbeat",
->>> +		.gpio = APX4DEVKIT_GPIO_USERLED,
->>> +	},
->>> +};
->>> +
->>> +static const struct gpio_led_platform_data apx4devkit_led_data __initconst = {
->>> +	.leds = apx4devkit_leds,
->>> +	.num_leds = ARRAY_SIZE(apx4devkit_leds),
->>> +};
->>> +
->>> +static struct fec_platform_data mx28_fec_pdata __initdata = {
->>> +	.phy = PHY_INTERFACE_MODE_RMII,
->>> +};
->>> +
->>> +static struct mxs_mmc_platform_data apx4devkit_mmc_pdata __initdata = {
->>> +	.wp_gpio = -EINVAL,
->>> +	.flags = SLOTF_8_BIT_CAPABLE,
->>> +};
->>> +
->>> +static struct i2c_board_info apx4devkit_i2c_boardinfo[] __initdata = {
->>> +	{ I2C_BOARD_INFO("sgtl5000", 0x0a) }, /* ASoC */
->>> +	{ I2C_BOARD_INFO("pcf8563", 0x51) }, /* RTC */
->>> +};
->>> +
->>> +static void __init apx4devkit_init(void)
->>> +{
->>> +	mxs_iomux_setup_multiple_pads(apx4devkit_pads,
->>> +			ARRAY_SIZE(apx4devkit_pads));
->>> +
->>> +	mx28_add_duart();
->>> +	mx28_add_auart0();
->>> +	mx28_add_auart1();
->>> +	mx28_add_auart2();
->>> +	mx28_add_auart3();
->>> +
->>> +	mx28_add_fec(0,&mx28_fec_pdata);
->>> +
->>> +	mx28_add_mxs_mmc(0,&apx4devkit_mmc_pdata);
->>> +
->>> +	gpio_led_register_device(0,&apx4devkit_led_data);
->>> +
->>> +	/* I2C */
->>> +	mx28_add_mxs_i2c(0);
->>> +	i2c_register_board_info(0, apx4devkit_i2c_boardinfo,
->>> +			ARRAY_SIZE(apx4devkit_i2c_boardinfo));
->>> +}
->>> +
->>> +static void __init apx4devkit_timer_init(void)
->>> +{
->>> +	mx28_clocks_init();
->>> +}
->>> +
->>> +static struct sys_timer apx4devkit_timer = {
->>> +	.init	= apx4devkit_timer_init,
->>> +};
->>> +
->>> +MACHINE_START(APX4DEVKIT, "Bluegiga APX4 Development Kit")
->>> +	.map_io		= mx28_map_io,
->>> +	.init_irq	= mx28_init_irq,
->>> +	.timer		=&apx4devkit_timer,
->>> +	.init_machine	= apx4devkit_init,
->>> +MACHINE_END
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>
->
+diff --git a/arch/arm/mach-tegra/timer.c b/arch/arm/mach-tegra/timer.c
+index e2272d2..2f1df47 100644
+--- a/arch/arm/mach-tegra/timer.c
++++ b/arch/arm/mach-tegra/timer.c
+@@ -186,16 +186,20 @@ static void __init tegra_init_timer(void)
+ 	int ret;
+ 
+ 	clk = clk_get_sys("timer", NULL);
+-	BUG_ON(IS_ERR(clk));
+-	clk_enable(clk);
++	if (IS_ERR(clk))
++		pr_warn("Unable to get timer clock\n");
++	else
++		clk_enable(clk);
+ 
+ 	/*
+ 	 * rtc registers are used by read_persistent_clock, keep the rtc clock
+ 	 * enabled
+ 	 */
+ 	clk = clk_get_sys("rtc-tegra", NULL);
+-	BUG_ON(IS_ERR(clk));
+-	clk_enable(clk);
++	if (IS_ERR(clk))
++		pr_warn("Unable to get rtc-tegra clock\n");
++	else
++		clk_enable(clk);
+ 
+ #ifdef CONFIG_HAVE_ARM_TWD
+ 	twd_base = IO_ADDRESS(TEGRA_ARM_PERIF_BASE + 0x600);
+-- 
+1.7.7.rc0.72.g4b5ea.dirty
