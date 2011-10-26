@@ -1,76 +1,23 @@
-From: segher@kernel.crashing.org (Segher Boessenkool)
-Date: Wed, 26 Oct 2011 05:57:34 +0200
-Subject: [PATCH] of: Add a reg-names property to name reg entries
-In-Reply-To: <4EA6DF88.2080704@ti.com>
-References: <1319471697-8970-1-git-send-email-b-cousson@ti.com>
-	<20111025082632.GJ4429@atomide.com>
-	<440786C5-FA1C-4750-9990-0BA5AABC2190@kernel.crashing.org>
-	<4EA6BC54.7030007@ti.com>
-	<BC60AF8F-C329-44B9-BEC9-EA5821725E1B@kernel.crashing.org>
-	<4EA6DF88.2080704@ti.com>
-Message-ID: <FD4B90D7-4B26-42C2-8CF9-7AA9971BCBEB@kernel.crashing.org>
+From: rusty@rustcorp.com.au (Rusty Russell)
+Date: Wed, 26 Oct 2011 14:30:50 +1030
+Subject: [PATCH 0/7] Introducing a generic AMP framework
+In-Reply-To: <1319536106-25802-1-git-send-email-ohad@wizery.com>
+References: <1319536106-25802-1-git-send-email-ohad@wizery.com>
+Message-ID: <874nywpfkd.fsf@rustcorp.com.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>>> What problem does any of this solve?  The device binding for the
->>>> "mcasp" device will have to describe the possible "reg-names", and
->>>> what those mean; but the binding already has to describe its "reg"
->>>> property anyway.
->>>
->>> What this solve is the ability to use the
->>> platform_get_resource_byname directly to retrieve the proper
->>> register base address.
->>
->> You do not have to put it in the device tree for that, the device
->> driver can implement this itself if it cares.
->
-> ???
->
-> The driver is the user of that name, so it has to be populated  
-> before into the resource during device creation.
+On Tue, 25 Oct 2011 11:48:19 +0200, Ohad Ben-Cohen <ohad@wizery.com> wrote:
+> Modern SoCs typically employ a central symmetric multiprocessing (SMP)
+> application processor running Linux, with several other asymmetric
+> multiprocessing (AMP) heterogeneous processors running different instances
+> of operating system, whether Linux or any other flavor of real-time OS.
 
-It can be as simple as
+OK, I'm not even sure who this should go through, but no objections here
+but one:
 
-#define FOO_REG_INDEX 0
-#define BAR_REG_INDEX 1
+virtio-spec.txt is a derived document, so I'd prefer that patch to go
+through me so I can patch the (LyX) master copy.
 
-but you can use C strings if you want to.
-
->>> The binding is just a text description that the driver will not be
->>> able to use directly. It will have to get the resource using an
->>> abstract index.
->>
->> Your reg-names are abstract identifiers just as well.
->
-> This is the name used in the HW documentation.
-
-So?  The device binding will still have to list them, for exact spelling
-and register block size etc.
-
-> Ordering them to get a number is purely arbitrary.
-
-Ordering them is required, "reg" is an array.  It also matters which
-entry is the first entry (for the unit address).
-
-> That's why using the name will allow the driver to get the resource  
-> the way it is represented in the documentation and thus avoid some  
-> intermediate number.
-
-You use an intermediate string instead, and add code and binding to
-translate that to that same number.
-
->>> It thus removes a level of indirection that is error prone and
->>> useless most of the time.
->>
->> It *adds* a level of indirection.  I doubt it helps prevent errors
->> either, but who knows.
->
-> Well, if that does not bring anything to you, you can just not use it.
-
-I could, if you did this for your device binding only, but it seems
-you are adding this as a generic thing.  I am very much against that.
-The device tree should describe the hardware; it shouldn't describe
-the description of the hardware, that's what bindings are for.
-
-
-Segher
+Thanks!
+Rusty.
