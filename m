@@ -1,39 +1,59 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Tue, 25 Oct 2011 23:43:06 -0700
-Subject: [PATCH 3/3] arm/dt: tegra: add dts file for paz00
-In-Reply-To: <2821699.TeokzqUUds@ax5200p>
-References: <cover.1319313019.git.marvin24@gmx.de>
-	<90ee88bcde84141e0280ffa4ccbd288462489eba.1319313020.git.marvin24@gmx.de>
-	<74CDBE0F657A3D45AFBB94109FB122FF173E1B4189@HQMAIL01.nvidia.com>
-	<2821699.TeokzqUUds@ax5200p>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF173E1B4536@HQMAIL01.nvidia.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 26 Oct 2011 08:11:59 +0100
+Subject: [PATCH] Shrink thread_info a bit
+In-Reply-To: <20111025144110.GA2043@localhost.localdomain>
+References: <20111024124818.GA17693@n2100.arm.linux.org.uk>
+	<20111024131853.GA4250@mudshark.cambridge.arm.com>
+	<20111025144110.GA2043@localhost.localdomain>
+Message-ID: <20111026071159.GA9165@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marc Dietrich wrote at Tuesday, October 25, 2011 1:05 PM:
-> On Monday 24 October 2011 22:16:15 Stephen Warren wrote:
-> > Marc Dietrich wrote at Saturday, October 22, 2011 2:17 PM:
-> > > * NOT FOR COMMIT *
-> > >
-> > > This just adds the dts for paz00. I like to add it to board-dt as
-> > > well as soon as I find out which tree to base it on.
-> >
-> > ...
-> >
-> > > +++ b/arch/arm/boot/dts/tegra-paz00.dts
-> >
-> > One thing that cross my mind when writing the TrimSlice support and I
-> > forgot to mention: Should these files be named ${soc}-${board}.dts or
-> > ${vendor}-${board}.dts (tegra-paz00.dts or toshiba-paz00.dts or
-> > compal-paz00.dts). I'm OK either way; just want to follow any outside
-> > expectations.
-> 
-> I also don't know. I prefer compal for paz00 because Toshiba's code name was
-> procyon (I think) and I don't want to change all the naming. Also Toshiba
-> showed no interest in helping us, so I don't see why they should get the fame.
+Hi Dave,
 
-Well, it's more about correctly defining what the HW is than advertising,
-fame, or support!
- 
--- 
-nvpublic
+On Tue, Oct 25, 2011 at 03:41:11PM +0100, Dave Martin wrote:
+> On Mon, Oct 24, 2011 at 02:18:53PM +0100, Will Deacon wrote:
+> > 
+> > Can we also shrink the contents of fp_state when AEABI && !OABI_COMPAT?
+> 
+> Is this the right config combination to indicate that the FPA ABI will
+> not be supported?  I'm assuming so, since that's the condition which
+> currently disallows CONFIG_NWFPE.
+> 
+> I'm not saying it's not ... I'm just unsure.
+
+Well, we basically just want to check whether or not we might have OABI
+executables in userspace so I think this is the right way of doing that.
+I toyed with doing something like !CONFIG_VFP but that doesn't help with the
+compat stuff.
+
+> Note that the FPA state (35 words) is not that much smaller than the
+> iwmmxt state (38 words), so not much space would be saved by shrinking
+> that union.
+
+Right, but the IWMMXT part of the union is already predicated on
+CONFIG_IWMMXT so the goal is to have an empty union for the common case
+(EABI and no IWMMXT).
+
+> I wonder whether fpstate can go away completely on platforms which have
+> neither fpa nor iwmmxt however.  That would be a more significant saving.
+> Is it used for anything else?
+
+That's kind of the idea, but I was just going to leave it empty.
+
+> > It's slightly more involved as ptrace and core-dumping would need some
+> > similar treatment. We probably need to keep the union kicking around
+> > though, since the iwmmxt state is held in there.
+> 
+> We would need some sensible error return from the ptrace calls to access
+> the FPA registers.  PTRACE_GETREGSET (not currently working on ARM since
+> the relevant generic code is #ifdef'd on CONFIG_HAVE_ARCH_TRACEHOOK for
+> some reason) returns -EINVAL when requesting a regset that isn't there.
+> 
+> Fixing coredumps should be relatively easy -- I think we just need to
+> change arm_regsets[] in arch/arm/kernel/ptrace.c appropriately.
+
+Russell also pointed out that we need to hack some assembly code for this to
+work, but I can't say I've looked into it yet.
+
+Will
