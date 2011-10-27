@@ -1,28 +1,32 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 27 Oct 2011 13:49:36 +0200
-Subject: [PATCH v3 1/4] regulator: helper routine to extract
-	regulator_init_data
-In-Reply-To: <CACYZBRG+_mm1O7Qg+ENCcLBX72iEWWyJohD_9EpAaT+Pb54cEA@mail.gmail.com>
-References: <1319702185-16108-1-git-send-email-rnayak@ti.com>
-	<1319702185-16108-2-git-send-email-rnayak@ti.com>
-	<20111027080953.GB18360@opensource.wolfsonmicro.com>
-	<CACYZBRG+_mm1O7Qg+ENCcLBX72iEWWyJohD_9EpAaT+Pb54cEA@mail.gmail.com>
-Message-ID: <20111027114935.GA7384@opensource.wolfsonmicro.com>
+From: cavokz@gmail.com (Domenico Andreoli)
+Date: Thu, 27 Oct 2011 13:54:11 +0200
+Subject: [PATCH v2 1/7] clk: Add a generic clock infrastructure
+In-Reply-To: <4E89C3FA.9020206@gmail.com>
+References: <1316730422-20027-1-git-send-email-mturquette@ti.com>
+	<1316730422-20027-2-git-send-email-mturquette@ti.com>
+	<4E89C3FA.9020206@gmail.com>
+Message-ID: <20111027115411.GA4713@glitch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 27, 2011 at 04:13:08PM +0530, Nayak, Rajendra wrote:
+Hi,
 
-> okay, here's an updated patch which does that. I also added a binding to
-> specify a descriptive name to the regulator outputs as you suggested in
-> the other thread.
+On 09/22/2011 05:26 PM, Mike Turquette wrote:
+> diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
+> index 3530927..c53ed59 100644
+> --- a/drivers/clk/Kconfig
+> +++ b/drivers/clk/Kconfig
+> @@ -5,3 +5,6 @@ config CLKDEV_LOOKUP
+>  
+>  config HAVE_MACH_CLKDEV
+>  	bool
+> +
+> +config GENERIC_CLK
+> +	bool
 
-Looks good!  I guess we may run into issues with the status change thing
-but I think we need to gather some experience to figure that out and
-since it's implicit hopefully that won't have any compatibility issues
-if it does happen.
+Now that Russel's prepare/unprepare patch is mainlined, I think you
+want to select HAVE_CLK_PREPARE here (and remove your prepare/unprepare
+function declarations in clk.h).
 
-Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
-
-I guess it might be useful to resend without this bit at the top to make
-it easier for Liam to apply.
+Regards,
+Domenico
