@@ -1,19 +1,25 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 27 Oct 2011 09:58:36 +0100
-Subject: [PATCH 2/3] omap4: sdp: Pass regulator data from dt
-In-Reply-To: <1319702674-16304-3-git-send-email-rnayak@ti.com>
-References: <1319702674-16304-1-git-send-email-rnayak@ti.com>
-	<1319702674-16304-3-git-send-email-rnayak@ti.com>
-Message-ID: <20111027085835.GB6641@opensource.wolfsonmicro.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Thu, 27 Oct 2011 11:03:48 +0200
+Subject: [RFC] DT boot loader best practice
+Message-ID: <20111027090348.GA4059@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 27, 2011 at 01:34:33PM +0530, Rajendra Nayak wrote:
+Hi,
 
-> Also add documentation for TWL regulator specific bindings.
+	For ARM it's important to use the DT in the bootloader the right way.
+	In oder to do not have to add crapy fixup in the kernel to fix bad practice in
+	bootloader
 
-This should've been in the previous patch.
+	For this is this what is not supposed to done
+	- Hardcode the DTB in the bootloader
+	- Generate the DTB in the bootloader
+	- Update the DTB in the bootloader (except the ATAG equivalent part)
 
-> +For twl6030 regulators/LDO's
+	as all of this will give no control of update the DTB content or
+	format. If some bootloader implementation mess-up with property name
+	as they do it before be review, we will have to do fix up in the
+	kernel. Which we absolutely not want to do.
 
-LDOs.
+Best Regards,
+J.
