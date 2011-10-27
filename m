@@ -1,32 +1,46 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 27 Oct 2011 21:24:49 +0100
-Subject: [PATCH 4/6] arm/tegra: implement support for tegra30
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF173E1B49B6@HQMAIL01.nvidia.com>
-References: <1319561644-6160-1-git-send-email-pdeschrijver@nvidia.com>
-	<1319561644-6160-5-git-send-email-pdeschrijver@nvidia.com>
-	<74CDBE0F657A3D45AFBB94109FB122FF173E1B49B6@HQMAIL01.nvidia.com>
-Message-ID: <20111027202449.GQ19187@n2100.arm.linux.org.uk>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 27 Oct 2011 14:09:01 -0700
+Subject: Tegra T20 / T25 datasheet (Technical Reference Manual)
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF173E1B487B@HQMAIL01.nvidia.com>
+References: <7E91C59574E9954FA075F8D8CCDF78DB38FD04E8C0@HQMAIL04.nvidia.com>
+	<74CDBE0F657A3D45AFBB94109FB122FF173E1B487B@HQMAIL01.nvidia.com>
+Message-ID: <CAOesGMg+hNrmWpKxvRK4=SYL0o3-rB+uSwM-MEErwBQMgVJnNw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 27, 2011 at 01:10:10PM -0700, Stephen Warren wrote:
-> Peter De Schrijver wrote at  Tuesday, October 25, 2011 10:54 AM:
-> > From: Peter De Schrijver <pdeschrijver@nvidia.com>
-> > 
-> > Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
-> 
-> Some description here would be nice.
+Tom,
 
-Definitely - it's something which Andrew Morton commented on during
-the kernel summit.  Commit messages really should sell the patch
-they're attached to, so that people reading the kernel commit log
-(a) have some idea what the patch is doing and (b) why it's being
-added.
+Niice!
 
-So maybe something like:
+I can't count the number of times I've been told "I wish Nvidia had a
+public manual for Tegra" this week, so lots of people should be happy
+now!
 
-Add support for the Tegra T30 SoC, found in x, y and z.  This
-includes a device tree compatible type for this SoC ("nvidia,tegra30")
-and adapts the kernels L2 cache initialization for this new SoC.
 
-(That's my best guess based on the contents of this patch.)
+-Olof
+
+On Thu, Oct 27, 2011 at 8:14 AM, Stephen Warren <swarren@nvidia.com> wrote:
+> (forwarding from U-Boot mailing list)
+>
+> Tom Warren wrote at Wednesday, October 26, 2011 5:49 PM:
+>> The Tegra2 (T20/T25) TRM is now on our web site:
+>> http://developer.nvidia.com/tegra-2-technical-reference-manual
+>>
+>> You'll need to register to download it, but anybody can get access to
+>> the datasheet as long as they don't plan to use the information for
+>> malicious purposes.
+>>
+>> We plan to work on T30 next, and get that out to the community by the
+>> end of the year.
+>>
+>> Tom Warren
+>> twarren at nvidia.com
+>
+> --
+> nvpublic
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-tegra" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+>
