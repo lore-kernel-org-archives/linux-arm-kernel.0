@@ -1,24 +1,29 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 27 Oct 2011 16:54:34 +0100
-Subject: [PATCH] AMBA: Use suspend_noriq to force devices into runtime
-	suspend
-In-Reply-To: <1319730524-29483-1-git-send-email-ulf.hansson@stericsson.com>
-References: <1319730524-29483-1-git-send-email-ulf.hansson@stericsson.com>
-Message-ID: <20111027155434.GN19187@n2100.arm.linux.org.uk>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Thu, 27 Oct 2011 09:03:54 -0700
+Subject: [PATCHv2] arm/tegra: clk_get should not be fatal
+In-Reply-To: <1319618501-15020-1-git-send-email-pdeschrijver@nvidia.com>
+References: <1319618501-15020-1-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF173E1B48B0@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 27, 2011 at 05:48:44PM +0200, Ulf Hansson wrote:
-> To be able to make sure devices are put into runtime suspend
-> after a suspend sequence, the suspend_noirq callback is used.
-> 
-> Previously it was was possible for drivers doing pm_runtime_suspend
-> and pm_runtime_put_sync directly from it's suspend callbacks.
-> This is now not possible due to the following commit, which solve a
-> race issue:
-> 
-> PM: Limit race conditions between runtime PM and system sleep (v2)
+pdeschrijver at nvidia.com wrote at Wednesday, October 26, 2011 2:42 AM:
+> The timer and rtc-timer clocks aren't gated by default, so there is no reason
+> to crash the system if the dummy enable call failed.
+...
+>  	clk = clk_get_sys("timer", NULL);
+> -	BUG_ON(IS_ERR(clk));
+> -	clk_enable(clk);
+> +	if (IS_ERR(clk))
+> +		pr_warn("Unable to get timer clock\n");
+> +	else
+> +		clk_enable(clk);
 
-There's a patch which has been queued for the last 2 months adding
-runtime PM support to the AMBA bus layer which is now merged into
-mainline.  Please check whether this works for you.
+This seems reasonable to me, and is certainly required for Tegra30 support
+until we get a full clock tree set up for Tegra30, which I think we'll
+probably defer until the common clock infra-structure is in place.
+
+Acked-by: Stephen Warren <swarren@nvidia.com>
+
+-- 
+nvpublic
