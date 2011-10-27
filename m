@@ -1,38 +1,22 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Thu, 27 Oct 2011 13:10:10 -0700
-Subject: [PATCH 4/6] arm/tegra: implement support for tegra30
-In-Reply-To: <1319561644-6160-5-git-send-email-pdeschrijver@nvidia.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 27 Oct 2011 21:16:57 +0100
+Subject: [PATCH 3/6] arm/tegra: prepare early init for multiple tegra
+	variants
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF173E1B49B2@HQMAIL01.nvidia.com>
 References: <1319561644-6160-1-git-send-email-pdeschrijver@nvidia.com>
-	<1319561644-6160-5-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF173E1B49B6@HQMAIL01.nvidia.com>
+	<1319561644-6160-4-git-send-email-pdeschrijver@nvidia.com>
+	<74CDBE0F657A3D45AFBB94109FB122FF173E1B49B2@HQMAIL01.nvidia.com>
+Message-ID: <20111027201657.GP19187@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Peter De Schrijver wrote at  Tuesday, October 25, 2011 10:54 AM:
-> From: Peter De Schrijver <pdeschrijver@nvidia.com>
+On Thu, Oct 27, 2011 at 01:06:13PM -0700, Stephen Warren wrote:
+> Peter De Schrijver wrote at Tuesday, October 25, 2011 10:54 AM:
+> > -static __initdata struct tegra_clk_init_table common_clk_init_table[] = {
+> > +void (*arch_reset)(char mode, const char *cmd) = tegra_assert_system_reset;
 > 
-> Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
+> I'm not sure why you moved that, but I suppose it's fine.
 
-Some description here would be nice. And notes re: stuff like lack of
-clock/... support yet, since this just gets stuff booted to a UART with
-no clocks/devices/...
-
-> diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
-
-> +config ARCH_TEGRA_3x_SOC
-> +	bool "Enable support for Tegra30 family"
-> +	select CPU_V7
-> +	select ARM_GIC
-> +	select ARCH_REQUIRE_GPIOLIB
-> +	select USB_ARCH_HAS_EHCI if USB_SUPPORT
-> +	select USB_ULPI if USB_SUPPORT
-> +	select USB_ULPI_VIEWPORT if USB_SUPPORT
-> +	select USE_OF
-> +	help
-> +	  Support for NVIDIA Tegra T30 processorfamily, based on the
-> +	  ARM CortexA9MP CPU and the ARM PL310 L2 cache controller
-
-Either remove "family" or add a space before it to separate the words.
-
--- 
-nvpublic
+Note that Nicolas has a patch set during KS which cleans the arch_reset
+business out of mach/system.h, and effectively gets rid of arch_reset
+entirely, so this probably conflicts with those changes.
