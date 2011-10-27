@@ -1,25 +1,41 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu, 27 Oct 2011 11:03:48 +0200
-Subject: [RFC] DT boot loader best practice
-Message-ID: <20111027090348.GA4059@game.jcrosoft.org>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 27 Oct 2011 11:07:28 +0200
+Subject: [PATCH] dt: add empty of_alias_get_id() for non-dt builds
+Message-ID: <1319706448-1664-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Add function of_alias_get_id() reporting -ENOSYS
+for non-dt builds, so that drivers migrating to dt
+can save some '#ifdef CONFIG_OF'.
 
-	For ARM it's important to use the DT in the bootloader the right way.
-	In oder to do not have to add crapy fixup in the kernel to fix bad practice in
-	bootloader
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+Hi Grant,
 
-	For this is this what is not supposed to done
-	- Hardcode the DTB in the bootloader
-	- Generate the DTB in the bootloader
-	- Update the DTB in the bootloader (except the ATAG equivalent part)
+Another empty function for non-dt builds. Can we consider
+queuing it for 3.1?
 
-	as all of this will give no control of update the DTB content or
-	format. If some bootloader implementation mess-up with property name
-	as they do it before be review, we will have to do fix up in the
-	kernel. Which we absolutely not want to do.
+Best regards,
 
-Best Regards,
-J.
+ include/linux/of.h |    5 +++++
+ 1 files changed, 5 insertions(+), 0 deletions(-)
+
+diff --git a/include/linux/of.h b/include/linux/of.h
+index 92c40a1..34d8338 100644
+--- a/include/linux/of.h
++++ b/include/linux/of.h
+@@ -302,6 +302,11 @@ static inline struct device_node *of_parse_phandle(struct device_node *np,
+ 	return NULL;
+ }
+ 
++static inline int of_alias_get_id(struct device_node *np, const char *stem)
++{
++	return -ENOSYS;
++}
++
+ #define of_match_ptr(_ptr)	NULL
+ #define of_match_node(_matches, _node)	NULL
+ #endif /* CONFIG_OF */
+-- 
+1.7.5.4
