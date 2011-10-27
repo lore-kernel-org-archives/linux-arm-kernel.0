@@ -1,110 +1,78 @@
 From: swarren@nvidia.com (Stephen Warren)
-Date: Thu, 27 Oct 2011 12:59:49 -0700
-Subject: [PATCH 2/6] arm/tegra: prepare pinmux code for multiple tegra
+Date: Thu, 27 Oct 2011 13:06:13 -0700
+Subject: [PATCH 3/6] arm/tegra: prepare early init for multiple tegra
 	variants
-In-Reply-To: <1319561644-6160-3-git-send-email-pdeschrijver@nvidia.com>
+In-Reply-To: <1319561644-6160-4-git-send-email-pdeschrijver@nvidia.com>
 References: <1319561644-6160-1-git-send-email-pdeschrijver@nvidia.com>
-	<1319561644-6160-3-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF173E1B49AA@HQMAIL01.nvidia.com>
+	<1319561644-6160-4-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF173E1B49B2@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Peter De Schrijver wrote at Tuesday, October 25, 2011 10:54 AM:
-> This patch modifies the pinmux code to be useable for multiple tegra variants.
-> Some tegra20 specific constants will be replaced by variables which will be
-> initialized to the appropriate value at runtime.
+> This patch splits the early init code in a common and a tegra20 specific part.
 
-You should probably also mention:
-* Removal of include of pinmux-t2.h from pinmux.h.
-* The file renames you performed and why.
-* The removal of the suspend/resume code and why.
+> diff --git a/arch/arm/mach-tegra/board-dt.c b/arch/arm/mach-tegra/board-dt.c
 
-> diff --git a/arch/arm/mach-tegra/include/mach/pinmux-t2.h b/arch/arm/mach-tegra/include/mach/pinmux-t2.h
-> deleted file mode 100644
-> index 4c26263..0000000
-> --- a/arch/arm/mach-tegra/include/mach/pinmux-t2.h
-> +++ /dev/null
+> +static void __init tegra_init_early(void)
+> +{
+> +
+> +	int i;
+> +
+> +	for (i = 0; i < ARRAY_SIZE(early_init); i++)
+> +		if (of_machine_is_compatible(early_init[i].machine))
+> +			return early_init[i].init();
+> +
+> +	printk(KERN_WARNING "Unknown platform detected\n");
 
-So this file shows up as a delete and an add. Isn't there a way to get
-it to show up as a rename; I've certainly seen git diff tell me that, but
-I'm not sure if the same feature is available for format-patch. In
-particular, IIRC from internal review, there weren't any changes to this
-file besides direct fallout from the rename, but there were quite a few
-symbol name changes in pinmux-t2-tables.c, and also the removal of
-suspend/resume, which it'd be nice if the diff highlighted.
+pr_warn/WARN/WARN_ON?
 
-> diff --git a/arch/arm/mach-tegra/include/mach/pinmux.h b/arch/arm/mach-tegra/include/mach/pinmux.h
-> index bb7dfdb..8f6e9f3 100644
-> --- a/arch/arm/mach-tegra/include/mach/pinmux.h
-> +++ b/arch/arm/mach-tegra/include/mach/pinmux.h
-...
-> @@ -219,13 +213,20 @@ struct tegra_pingroup_desc {
->  	s8 pupd_bit;	/* offset into the PULL_UPDOWN_REG_* register bit */
->  };
+> diff --git a/arch/arm/mach-tegra/common.c b/arch/arm/mach-tegra/common.c
+
+> @@ -31,8 +31,6 @@
+>  #include "clock.h"
+>  #include "fuse.h"
 > 
-> -extern const struct tegra_pingroup_desc tegra_soc_pingroups[];
-> -extern const struct tegra_drive_pingroup_desc tegra_soc_drive_pingroups[];
-> +struct tegra_pinmux_pm {
-> +	void (*suspend)(void);
-> +	void (*resume)(void);
-> +};
-
-Since we elected to strip out suspend/resume (it's currently incomplete
-anyway) to simplify the addition of Tegra30, I don't think you need that
-struct type any more.
-
-I wonder if removal of the suspend/resume functions should have been a
-separate patch before this?
-
-> diff --git a/arch/arm/mach-tegra/pinmux.c b/arch/arm/mach-tegra/pinmux.c
-> index 1d20165..0789122 100644
-> --- a/arch/arm/mach-tegra/pinmux.c
-> +++ b/arch/arm/mach-tegra/pinmux.c
-> @@ -21,6 +21,9 @@
->  #include <linux/spinlock.h>
->  #include <linux/io.h>
->  #include <linux/platform_device.h>
-> +#ifdef CONFIG_OF
-> +#include <linux/of_platform.h>
-> +#endif
-
-I think just include that without any ifdef.
-
-> @@ -668,11 +668,24 @@ void tegra_pinmux_config_pullupdown_table(const struct tegra_pingroup_config *co
->  	}
+> -void (*arch_reset)(char mode, const char *cmd) = tegra_assert_system_reset;
+> -
+>  void tegra_assert_system_reset(char mode, const char *cmd)
+>  {
+>  	void __iomem *reset = IO_ADDRESS(TEGRA_CLK_RESET_BASE + 0x04);
+> @@ -44,7 +42,9 @@ void tegra_assert_system_reset(char mode, const char *cmd)
+>  	writel_relaxed(reg, reset);
 >  }
 > 
-> +static struct of_device_id tegra_pinmux_of_match[] __devinitdata = {
-> +	{ .compatible = "nvidia,tegra20-pinmux", tegra20_pinmux_init },
-> +	{ },
-> +};
+> -static __initdata struct tegra_clk_init_table common_clk_init_table[] = {
+> +void (*arch_reset)(char mode, const char *cmd) = tegra_assert_system_reset;
+
+I'm not sure why you moved that, but I suppose it's fine.
+
 > +
->  static int __devinit tegra_pinmux_probe(struct platform_device *pdev)
+> +static __initdata struct tegra_clk_init_table tegra20_clk_init_table[] = {
+>  	/* name		parent		rate		enabled */
+>  	{ "clk_m",	NULL,		0,		true },
+>  	{ "pll_p",	"clk_m",	216000000,	true },
+> @@ -65,19 +65,25 @@ static void __init tegra_init_cache(void)
 >  {
->  	struct resource *res;
->  	int i;
->  	int config_bad = 0;
-> +	const struct of_device_id *match;
-> +
-> +#ifdef CONFIG_OF
-> +	match = of_match_device(tegra_pinmux_of_match, &pdev->dev);
-
-What if match==NULL? I suppose that "can't" happen with DT, since the
-device wouldn't have been probed unless there was a matching entry...
-
-Does this work when booting without DT; IIRC the internal patches I saw
-fell back to hard-coding a call to tegra20_pinmux_init() when booting
-a static board file (i.e. not booting device-tree)? Perhaps that's in a
-later patch? But either way, it should be here too, so bisectability is
-not lost.
-
-> +
-> +	((pinmux_init)(match->data))(&pingroups, &pingroup_max,
-> +		&drive_pingroups, &drive_max);
-> +#endif
+>  #ifdef CONFIG_CACHE_L2X0
+>  	void __iomem *p = IO_ADDRESS(TEGRA_ARM_PERIF_BASE) + 0x3000;
+> +	u32 aux_ctrl;
 > 
->  	for (i = 0; ; i++) {
->  		res = platform_get_resource(pdev, IORESOURCE_MEM, i);
+>  	writel_relaxed(0x331, p + L2X0_TAG_LATENCY_CTRL);
+>  	writel_relaxed(0x441, p + L2X0_DATA_LATENCY_CTRL);
+> +	writel(2, p + L2X0_PREFETCH_CTRL);
+> +
+> +	aux_ctrl = readl(p + L2X0_CACHE_TYPE);
+> +	aux_ctrl = (aux_ctrl & 0x700) << (17-8);
+> +	aux_ctrl |= 0x6C000001;
+
+This is an unrelated change?
+
+> 
+>  	l2x0_init(p, 0x6C080001, 0x8200c3fe);
+>  #endif
+> 
+>  }
 
 -- 
 nvpublic
