@@ -1,38 +1,70 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Thu, 27 Oct 2011 12:45:56 -0700
-Subject: [PATCH 1/6] arm/tegra: initial device tree for tegra30
-In-Reply-To: <1319561644-6160-2-git-send-email-pdeschrijver@nvidia.com>
-References: <1319561644-6160-1-git-send-email-pdeschrijver@nvidia.com>
-	<1319561644-6160-2-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF173E1B499C@HQMAIL01.nvidia.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 27 Oct 2011 20:48:32 +0100
+Subject: [PATCH] AMBA: Use suspend_noriq to force devices into runtime
+	suspend
+In-Reply-To: <CAKnu2MpGOKFKpO=2mmu4a74gmbCUdO8Ui5+1nEB6GbfitGBLRw@mail.gmail.com>
+References: <1319730524-29483-1-git-send-email-ulf.hansson@stericsson.com>
+	<20111027155434.GN19187@n2100.arm.linux.org.uk>
+	<CAKnu2MpGOKFKpO=2mmu4a74gmbCUdO8Ui5+1nEB6GbfitGBLRw@mail.gmail.com>
+Message-ID: <20111027194832.GO19187@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Peter De Schrijver wrote at Tuesday, October 25, 2011 10:54 AM:
-> From: Peter De Schrijver <pdeschrijver@nvidia.com>
->
-> This patch adds the initial device tree for tegra30
+On Thu, Oct 27, 2011 at 08:27:36PM +0200, Linus Walleij wrote:
+> I think this patch is on top of that one. This moves the
+> runtime_[suspend|resume] so as to put all the runtime PM stuff
+> inside the same #ifdef block, then adds two new _noirq
+> functions to address the problems from the named
+> commit by Rafael.
 
-It'd be nice if you could configure git send-email so it knows your name;
-that way the From email header will include it.
+I don't think it does address any problems mentioned by Rafael - the
+referred to commit is about avoiding races between the system suspend
+method and the runtime PM methods which is an entirely different
+problem to ensuring that the bus clock is shutdown on suspend.
 
-> diff --git a/arch/arm/boot/dts/tegra30.dtsi b/arch/arm/boot/dts/tegra30.dtsi
-> new file mode 100644
-> index 0000000..3550b9a
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/tegra30.dtsi
-> @@ -0,0 +1,128 @@
-> +/include/ "skeleton.dtsi"
-> +
-> +/ {
-> +	model = "NVIDIA Tegra 30";
+Ignoring runtime PM entirely, what this patch is doing is _adding_
+management of the primecell bus clock to the bus layer and taking
+control of that away from drivers.  When I implemented the bus clock
+support, it was based around the bus clock being enabled at probe
+time, and only subsequently disabling it after the driver was
+removed - all other management was left to the driver to manage as
+appropriate.
 
-Separately later, I don't suppose you could send a patch to add a model
-field to tegra20.dtsi too?
+That brings up the question whether there has been any check to
+ensure that there are no drivers already managing the bus clock in
+their suspend methods - if there are, this patch has the potential
+to make the bus clock enable count to negative.
 
-Otherwise, this patch seems fine.
+There's also the related point here that the behaviour that you get
+for the bus clock from a system suspend depends on whether you have
+runtime-PM configured or not - and that's a recipe for drivers being
+scattered with ifdefs to 'undo' this variable semantic.
 
-Acked-by: Stephen Warren <swarren@nvidia.com>
+However, that's not the only problem - let's look closer at what is
+being done in the patch.
 
--- 
-nvpublic
+The ordering on suspend is:
+
+Enter amba_pm_suspend_noirq()
+Call amba_pm_runtime_suspend_noirq()
+	If runtime PM is not suspended
+		Disable pclk
+Call driver suspend_noirq method
+Return
+...
+Enter amba_pm_resume_noirq()
+	If runtime PM is not suspended
+		Enable pclk
+Call driver resume_noirq method
+Call amba_pm_runtime_resume_noirq()
+Return
+
+This _can't_ be correct - we're potentially disabling the bus clock
+and then calling the driver (which may try to access the registers)
+which may cause a bus fault, a data abort and therefore a kernel oops.
+That's really not nice and sane behaviour.
+
+Also throw into the mix whether it's appropriate for the bus clock
+to be turned off while the primecell is acting as a wakeup source -
+can we safely say that it is legal and proper to disable the bus
+clock for every primecell?
