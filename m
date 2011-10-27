@@ -1,31 +1,28 @@
-From: cavokz@gmail.com (Domenico Andreoli)
-Date: Thu, 27 Oct 2011 13:33:49 +0200
-Subject: [PATCH] clk: add definition of HAVE_CLK_PREPARE in Kconfig
-In-Reply-To: <E1R8T0C-0003wI-W2@rmk-PC.arm.linux.org.uk>
-References: <E1R8T0C-0003wI-W2@rmk-PC.arm.linux.org.uk>
-Message-ID: <20111027113349.GA4090@glitch>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 27 Oct 2011 13:49:36 +0200
+Subject: [PATCH v3 1/4] regulator: helper routine to extract
+	regulator_init_data
+In-Reply-To: <CACYZBRG+_mm1O7Qg+ENCcLBX72iEWWyJohD_9EpAaT+Pb54cEA@mail.gmail.com>
+References: <1319702185-16108-1-git-send-email-rnayak@ti.com>
+	<1319702185-16108-2-git-send-email-rnayak@ti.com>
+	<20111027080953.GB18360@opensource.wolfsonmicro.com>
+	<CACYZBRG+_mm1O7Qg+ENCcLBX72iEWWyJohD_9EpAaT+Pb54cEA@mail.gmail.com>
+Message-ID: <20111027114935.GA7384@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Domenico Andreoli <cavokz@gmail.com>
+On Thu, Oct 27, 2011 at 04:13:08PM +0530, Nayak, Rajendra wrote:
 
-Add definition of HAVE_CLK_PREPARE in Kconfig otherwise it is not
-selected when needed.
+> okay, here's an updated patch which does that. I also added a binding to
+> specify a descriptive name to the regulator outputs as you suggested in
+> the other thread.
 
-Signed-off-by: Domenico Andreoli <cavokz@gmail.com>
+Looks good!  I guess we may run into issues with the status change thing
+but I think we need to gather some experience to figure that out and
+since it's implicit hopefully that won't have any compatibility issues
+if it does happen.
 
----
- drivers/clk/Kconfig |    3 +++
- 1 file changed, 3 insertions(+)
+Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
 
-Index: b/drivers/clk/Kconfig
-===================================================================
---- a/drivers/clk/Kconfig
-+++ b/drivers/clk/Kconfig
-@@ -5,3 +5,6 @@ config CLKDEV_LOOKUP
- 
- config HAVE_MACH_CLKDEV
- 	bool
-+
-+config HAVE_CLK_PREPARE
-+	bool
+I guess it might be useful to resend without this bit at the top to make
+it easier for Liam to apply.
