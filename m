@@ -1,77 +1,80 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 28 Oct 2011 15:43:32 +0100
-Subject: [PATCH 04/51] ARM: mach-clps711x: use arm_arch_reset instead of
-	arch_reset
+Date: Fri, 28 Oct 2011 15:43:35 +0100
+Subject: [PATCH 07/51] ARM: mach-dove: use arm_arch_reset instead of arch_reset
 In-Reply-To: <1319813059-8914-1-git-send-email-will.deacon@arm.com>
 References: <1319813059-8914-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1319813059-8914-5-git-send-email-will.deacon@arm.com>
+Message-ID: <1319813059-8914-8-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch updates mach-clps711x to use arm_arch_reset instead of
+This patch updates mach-dove to use arm_arch_reset instead of
 arch_reset.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/mach-clps711x/Makefile              |    2 +-
- arch/arm/mach-clps711x/include/mach/system.h |    1 -
- arch/arm/mach-clps711x/system.c              |   23 +++++++++++++++++++++++
- 3 files changed, 24 insertions(+), 2 deletions(-)
- create mode 100644 arch/arm/mach-clps711x/system.c
+ arch/arm/mach-dove/common.c              |   18 ++++++++++++++++++
+ arch/arm/mach-dove/include/mach/system.h |   13 -------------
+ 2 files changed, 18 insertions(+), 13 deletions(-)
 
-diff --git a/arch/arm/mach-clps711x/Makefile b/arch/arm/mach-clps711x/Makefile
-index 4a19731..c3f224d 100644
---- a/arch/arm/mach-clps711x/Makefile
-+++ b/arch/arm/mach-clps711x/Makefile
-@@ -4,7 +4,7 @@
+diff --git a/arch/arm/mach-dove/common.c b/arch/arm/mach-dove/common.c
+index a9e0dae..975f6f1 100644
+--- a/arch/arm/mach-dove/common.c
++++ b/arch/arm/mach-dove/common.c
+@@ -273,6 +273,22 @@ void __init dove_sdio1_init(void)
+ 	platform_device_register(&dove_sdio1);
+ }
  
- # Object file lists.
++static void dove_arch_reset(char mode, const char *cmd)
++{
++	/*
++	 * Enable soft reset to assert RSTOUTn.
++	 */
++	writel(SOFT_RESET_OUT_EN, RSTOUTn_MASK);
++
++	/*
++	 * Assert soft reset.
++	 */
++	writel(SOFT_RESET, SYSTEM_SOFT_RESET);
++
++	while (1)
++		;
++}
++
+ void __init dove_init(void)
+ {
+ 	int tclk;
+@@ -282,6 +298,8 @@ void __init dove_init(void)
+ 	printk(KERN_INFO "Dove 88AP510 SoC, ");
+ 	printk(KERN_INFO "TCLK = %dMHz\n", (tclk + 499999) / 1000000);
  
--obj-y			:= irq.o mm.o time.o
-+obj-y			:= irq.o mm.o system.o time.o
- obj-m			:=
- obj-n			:=
- obj-			:=
-diff --git a/arch/arm/mach-clps711x/include/mach/system.h b/arch/arm/mach-clps711x/include/mach/system.h
-index f916cd7..9982deb 100644
---- a/arch/arm/mach-clps711x/include/mach/system.h
-+++ b/arch/arm/mach-clps711x/include/mach/system.h
-@@ -34,7 +34,6 @@ static inline void arch_idle(void)
++	arm_arch_reset = dove_arch_reset;
++
+ #ifdef CONFIG_CACHE_TAUROS2
+ 	tauros2_init();
+ #endif
+diff --git a/arch/arm/mach-dove/include/mach/system.h b/arch/arm/mach-dove/include/mach/system.h
+index 356afda..ce3e749 100644
+--- a/arch/arm/mach-dove/include/mach/system.h
++++ b/arch/arm/mach-dove/include/mach/system.h
+@@ -18,19 +18,6 @@ static inline void arch_idle(void)
  
  static inline void arch_reset(char mode, const char *cmd)
  {
--	cpu_reset(0);
+-	/*
+-	 * Enable soft reset to assert RSTOUTn.
+-	 */
+-	writel(SOFT_RESET_OUT_EN, RSTOUTn_MASK);
+-
+-	/*
+-	 * Assert soft reset.
+-	 */
+-	writel(SOFT_RESET, SYSTEM_SOFT_RESET);
+-
+-	while (1)
+-		;
  }
  
+-
  #endif
-diff --git a/arch/arm/mach-clps711x/system.c b/arch/arm/mach-clps711x/system.c
-new file mode 100644
-index 0000000..030d758
---- /dev/null
-+++ b/arch/arm/mach-clps711x/system.c
-@@ -0,0 +1,23 @@
-+/*
-+ * arch/arm/mach-clps711x/system.c
-+ */
-+
-+#include <linux/init.h>
-+#include <linux/io.h>
-+#include <mach/hardware.h>
-+
-+#include <asm/system.h>
-+#include <asm/hardware/clps7111.h>
-+
-+static void clps711x_arch_reset(char mode, const char *cmd)
-+{
-+	cpu_reset(0);
-+}
-+
-+static int __init clps711x_arch_reset_init(void)
-+{
-+	arm_arch_reset = clps711x_arch_reset;
-+	return 0;
-+}
-+
-+arch_initcall(clps711x_arch_reset_init);
 -- 
 1.7.4.1
