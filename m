@@ -1,144 +1,113 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 28 Oct 2011 15:43:45 +0100
-Subject: [PATCH 17/51] ARM: OMAP: convert reset to use arm_arch_reset
+Date: Fri, 28 Oct 2011 15:43:50 +0100
+Subject: [PATCH 22/51] ARM: mach-ks8695: use arm_arch_reset instead of
+	arch_reset
 In-Reply-To: <1319813059-8914-1-git-send-email-will.deacon@arm.com>
 References: <1319813059-8914-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1319813059-8914-18-git-send-email-will.deacon@arm.com>
+Message-ID: <1319813059-8914-23-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Paul Walmsley <paul@pwsan.com>
+This patch updates mach-ks8695 to use arm_arch_reset instead of
+arch_reset.
 
-Align the OMAP reset code with Will Deacon's "ARM: reset: introduce
-arm_arch_reset function pointer" cleanup patch.
-
-Signed-off-by: Paul Walmsley <paul@pwsan.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/mach-omap1/board-voiceblue.c    |    2 +-
- arch/arm/mach-omap1/io.c                 |    4 ++++
- arch/arm/mach-omap1/reset.c              |    2 --
- arch/arm/mach-omap2/io.c                 |    7 ++++++-
- arch/arm/mach-omap2/prcm.c               |    4 +---
- arch/arm/plat-omap/include/plat/system.h |    6 +++++-
- 6 files changed, 17 insertions(+), 8 deletions(-)
+ arch/arm/mach-ks8695/Makefile              |    2 +-
+ arch/arm/mach-ks8695/include/mach/system.h |   19 +---------------
+ arch/arm/mach-ks8695/reset.c               |   33 ++++++++++++++++++++++++++++
+ 3 files changed, 35 insertions(+), 19 deletions(-)
+ create mode 100644 arch/arm/mach-ks8695/reset.c
 
-diff --git a/arch/arm/mach-omap1/board-voiceblue.c b/arch/arm/mach-omap1/board-voiceblue.c
-index 036edc0e..e2a24a0 100644
---- a/arch/arm/mach-omap1/board-voiceblue.c
-+++ b/arch/arm/mach-omap1/board-voiceblue.c
-@@ -296,7 +296,7 @@ static void __init voiceblue_init(void)
- 	omap_writeb(0x00, OMAP_LPG1_LCR);
- 	omap_writeb(0x00, OMAP_LPG1_PMR);	/* Disable clock */
+diff --git a/arch/arm/mach-ks8695/Makefile b/arch/arm/mach-ks8695/Makefile
+index 7e3e816..c2dcdde 100644
+--- a/arch/arm/mach-ks8695/Makefile
++++ b/arch/arm/mach-ks8695/Makefile
+@@ -3,7 +3,7 @@
+ # Makefile for KS8695 architecture support
+ #
  
--	arch_reset = voiceblue_reset;
-+	arm_arch_reset = voiceblue_reset;
- }
+-obj-y				:= cpu.o irq.o time.o gpio.o devices.o
++obj-y				:= cpu.o irq.o time.o gpio.o devices.o reset.o
+ obj-m				:=
+ obj-n				:=
+ obj-				:=
+diff --git a/arch/arm/mach-ks8695/include/mach/system.h b/arch/arm/mach-ks8695/include/mach/system.h
+index fb1dda9..b73ee70 100644
+--- a/arch/arm/mach-ks8695/include/mach/system.h
++++ b/arch/arm/mach-ks8695/include/mach/system.h
+@@ -14,9 +14,6 @@
+ #ifndef __ASM_ARCH_SYSTEM_H
+ #define __ASM_ARCH_SYSTEM_H
  
- MACHINE_START(VOICEBLUE, "VoiceBlue OMAP5910")
-diff --git a/arch/arm/mach-omap1/io.c b/arch/arm/mach-omap1/io.c
-index 870886a..d3b54da 100644
---- a/arch/arm/mach-omap1/io.c
-+++ b/arch/arm/mach-omap1/io.c
-@@ -15,8 +15,10 @@
- 
- #include <asm/tlb.h>
- #include <asm/mach/map.h>
-+#include <asm/system.h>
- #include <plat/mux.h>
- #include <plat/tc.h>
-+#include <plat/system.h>
- 
- #include "clock.h"
- 
-@@ -140,6 +142,8 @@ void __init omap1_init_common_hw(void)
- 	omap1_clk_init();
- 
- 	omap1_mux_init();
-+
-+	arm_arch_reset = omap1_arch_reset;
- }
- 
- /*
-diff --git a/arch/arm/mach-omap1/reset.c b/arch/arm/mach-omap1/reset.c
-index ad951ee..a5ed979 100644
---- a/arch/arm/mach-omap1/reset.c
-+++ b/arch/arm/mach-omap1/reset.c
-@@ -21,5 +21,3 @@ void omap1_arch_reset(char mode, const char *cmd)
- 
- 	omap_writew(1, ARM_RSTCT1);
- }
+-#include <linux/io.h>
+-#include <mach/regs-timer.h>
 -
--void (*arch_reset)(char, const char *) = omap1_arch_reset;
-diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
-index 2ce1ce6..b94e1a2 100644
---- a/arch/arm/mach-omap2/io.c
-+++ b/arch/arm/mach-omap2/io.c
-@@ -31,6 +31,7 @@
- #include <plat/sram.h>
- #include <plat/sdrc.h>
- #include <plat/serial.h>
-+#include <plat/system.h>
- 
- #include "clock2xxx.h"
- #include "clock3xxx.h"
-@@ -44,6 +45,8 @@
- #include <plat/omap_hwmod.h>
- #include <plat/multi.h>
- 
-+#include "prcm-common.h"
-+
- /*
-  * The machine specific code may provide the extra mapping besides the
-  * default mapping provided here.
-@@ -358,7 +361,9 @@ void __init omap2_init_common_infrastructure(void)
- 		omap44xx_hwmod_init();
- 	} else {
- 		pr_err("Could not init hwmod data - unknown SoC\n");
--        }
-+	}
-+
-+	arm_arch_reset = omap_prcm_arch_reset;
- 
- 	/* Set the default postsetup state for all hwmods */
- #ifdef CONFIG_PM_RUNTIME
-diff --git a/arch/arm/mach-omap2/prcm.c b/arch/arm/mach-omap2/prcm.c
-index 2e40a5c..ad3ac5c 100644
---- a/arch/arm/mach-omap2/prcm.c
-+++ b/arch/arm/mach-omap2/prcm.c
-@@ -58,7 +58,7 @@ u32 omap_prcm_get_reset_sources(void)
- EXPORT_SYMBOL(omap_prcm_get_reset_sources);
- 
- /* Resets clock rates and reboots the system. Only called from system.h */
--static void omap_prcm_arch_reset(char mode, const char *cmd)
-+void omap_prcm_arch_reset(char mode, const char *cmd)
+ static void arch_idle(void)
  {
- 	s16 prcm_offs = 0;
+ 	/*
+@@ -27,22 +24,8 @@ static void arch_idle(void)
  
-@@ -109,8 +109,6 @@ static void omap_prcm_arch_reset(char mode, const char *cmd)
- 	omap2_prm_read_mod_reg(prcm_offs, OMAP2_RM_RSTCTRL); /* OCP barrier */
  }
  
--void (*arch_reset)(char, const char *) = omap_prcm_arch_reset;
+-static void arch_reset(char mode, const char *cmd)
++static inline void arch_reset(char mode, const char *cmd)
+ {
+-	unsigned int reg;
 -
- /**
-  * omap2_cm_wait_idlest - wait for IDLEST bit to indicate module readiness
-  * @reg: physical address of module IDLEST register
-diff --git a/arch/arm/plat-omap/include/plat/system.h b/arch/arm/plat-omap/include/plat/system.h
-index c5fa9e9..ac32d88 100644
---- a/arch/arm/plat-omap/include/plat/system.h
-+++ b/arch/arm/plat-omap/include/plat/system.h
-@@ -12,6 +12,10 @@ static inline void arch_idle(void)
- 	cpu_do_idle();
+-	if (mode == 's')
+-		cpu_reset(0);
+-
+-	/* disable timer0 */
+-	reg = __raw_readl(KS8695_TMR_VA + KS8695_TMCON);
+-	__raw_writel(reg & ~TMCON_T0EN, KS8695_TMR_VA + KS8695_TMCON);
+-
+-	/* enable watchdog mode */
+-	__raw_writel((10 << 8) | T0TC_WATCHDOG, KS8695_TMR_VA + KS8695_T0TC);
+-
+-	/* re-enable timer0 */
+-	__raw_writel(reg | TMCON_T0EN, KS8695_TMR_VA + KS8695_TMCON);
  }
- 
--extern void (*arch_reset)(char, const char *);
-+/* To be removed in a future ARM-wide cleanup */
-+static inline void arch_reset(char mode, const char *cmd) {}
-+
-+extern void omap1_arch_reset(char mode, const char *cmd);
-+extern void omap_prcm_arch_reset(char mode, const char *cmd);
  
  #endif
+diff --git a/arch/arm/mach-ks8695/reset.c b/arch/arm/mach-ks8695/reset.c
+new file mode 100644
+index 0000000..911eb95
+--- /dev/null
++++ b/arch/arm/mach-ks8695/reset.c
+@@ -0,0 +1,33 @@
++/*
++ * arch/arm/mach-ks8695/reset.c
++ */
++
++#include <linux/init.h>
++#include <linux/io.h>
++#include <asm/proc-fns.h>
++#include <mach/regs-timer.h>
++
++static void ks8695_arch_reset(char mode, const char *cmd)
++{
++	unsigned int reg;
++
++	if (mode == 's')
++		cpu_reset(0);
++
++	/* disable timer0 */
++	reg = __raw_readl(KS8695_TMR_VA + KS8695_TMCON);
++	__raw_writel(reg & ~TMCON_T0EN, KS8695_TMR_VA + KS8695_TMCON);
++
++	/* enable watchdog mode */
++	__raw_writel((10 << 8) | T0TC_WATCHDOG, KS8695_TMR_VA + KS8695_T0TC);
++
++	/* re-enable timer0 */
++	__raw_writel(reg | TMCON_T0EN, KS8695_TMR_VA + KS8695_TMCON);
++}
++
++static int __init ks8695_arch_reset_init(void)
++{
++	arm_arch_reset = ks8695_arch_reset;
++	return 0;
++}
++arch_initcall(ks8695_arch_reset_init);
 -- 
 1.7.4.1
