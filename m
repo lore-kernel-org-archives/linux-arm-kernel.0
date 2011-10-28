@@ -1,72 +1,65 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 28 Oct 2011 15:43:29 +0100
-Subject: [PATCH 01/51] ARM: reset: introduce arm_arch_reset function pointer
+Date: Fri, 28 Oct 2011 15:43:52 +0100
+Subject: [PATCH 24/51] ARM: mach-mmp: use arm_arch_reset instead of arch_reset
 In-Reply-To: <1319813059-8914-1-git-send-email-will.deacon@arm.com>
 References: <1319813059-8914-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1319813059-8914-2-git-send-email-will.deacon@arm.com>
+Message-ID: <1319813059-8914-25-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-arch_reset is a static inline function defined in mach/system.h and, as
-such, is a blocker for the single zImage work.
-
-This patch introduces an arm_arch_reset function pointer to which
-platforms can assign their reset function rather than define it in the
-header file.
+This patch updates mach-mmp to use arm_arch_reset instead of
+arch_reset.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/include/asm/system.h |    1 +
- arch/arm/kernel/process.c     |   11 ++++++++++-
- 2 files changed, 11 insertions(+), 1 deletions(-)
+ arch/arm/mach-mmp/common.c              |   16 ++++++++++++++++
+ arch/arm/mach-mmp/include/mach/system.h |    4 ----
+ 2 files changed, 16 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/include/asm/system.h b/arch/arm/include/asm/system.h
-index 832888d..6838bd4 100644
---- a/arch/arm/include/asm/system.h
-+++ b/arch/arm/include/asm/system.h
-@@ -108,6 +108,7 @@ extern int cpu_architecture(void);
- extern void cpu_init(void);
+diff --git a/arch/arm/mach-mmp/common.c b/arch/arm/mach-mmp/common.c
+index 0ec0ca8..1d3df64 100644
+--- a/arch/arm/mach-mmp/common.c
++++ b/arch/arm/mach-mmp/common.c
+@@ -13,6 +13,7 @@
+ #include <linux/module.h>
  
- void arm_machine_restart(char mode, const char *cmd);
-+extern void (*arm_arch_reset)(char mode, const char *cmd);
- extern void (*arm_pm_restart)(char str, const char *cmd);
- 
- #define UDBG_UNDEFINED	(1 << 0)
-diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
-index 1a347f4..13e68c5 100644
---- a/arch/arm/kernel/process.c
-+++ b/arch/arm/kernel/process.c
-@@ -117,7 +117,8 @@ void arm_machine_restart(char mode, const char *cmd)
- 	/*
- 	 * Now call the architecture specific reboot code.
- 	 */
--	arch_reset(mode, cmd);
-+	if (arm_arch_reset)
-+		arm_arch_reset(mode, cmd);
- 
- 	/*
- 	 * Whoops - the architecture was unable to reboot.
-@@ -128,6 +129,11 @@ void arm_machine_restart(char mode, const char *cmd)
- 	while (1);
+ #include <asm/page.h>
++#include <asm/proc-fns.h>
+ #include <asm/mach/map.h>
+ #include <mach/addr-map.h>
+ #include <mach/cputype.h>
+@@ -45,3 +46,18 @@ void __init mmp_map_io(void)
+ 	/* this is early, initialize mmp_chip_id here */
+ 	mmp_chip_id = __raw_readl(MMP_CHIPID);
  }
- 
-+static void temporary_arm_arch_reset(char mode, const char *cmd)
++
++static void mmp_arch_reset(char mode, const char *cmd)
 +{
-+	arch_reset(mode, cmd);
++	if (cpu_is_pxa168())
++		cpu_reset(0xffff0000);
++	else
++		cpu_reset(0);
 +}
 +
- /*
-  * Function pointers to optional machine specific functions
-  */
-@@ -137,6 +143,9 @@ EXPORT_SYMBOL(pm_power_off);
- void (*arm_pm_restart)(char str, const char *cmd) = arm_machine_restart;
- EXPORT_SYMBOL_GPL(arm_pm_restart);
++static int __init mmp_arch_reset_init(void)
++{
++	arm_arch_reset = mmp_arch_reset;
++	return 0;
++}
++arch_initcall(mmp_arch_reset_init);
+diff --git a/arch/arm/mach-mmp/include/mach/system.h b/arch/arm/mach-mmp/include/mach/system.h
+index 1a8a25e..b09c19a 100644
+--- a/arch/arm/mach-mmp/include/mach/system.h
++++ b/arch/arm/mach-mmp/include/mach/system.h
+@@ -18,9 +18,5 @@ static inline void arch_idle(void)
  
-+void (*arm_arch_reset)(char mode, const char *cmd) = temporary_arm_arch_reset;
-+EXPORT_SYMBOL_GPL(arm_arch_reset);
-+
- static void do_nothing(void *unused)
+ static inline void arch_reset(char mode, const char *cmd)
  {
+-	if (cpu_is_pxa168())
+-		cpu_reset(0xffff0000);
+-	else
+-		cpu_reset(0);
  }
+ #endif /* __ASM_MACH_SYSTEM_H */
 -- 
 1.7.4.1
