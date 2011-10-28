@@ -1,58 +1,122 @@
-From: ulf.hansson@stericsson.com (Ulf Hansson)
-Date: Fri, 28 Oct 2011 10:12:42 +0200
-Subject: [PATCH] AMBA: Use suspend_noriq to force devices into runtime
-	suspend
-In-Reply-To: <Pine.LNX.4.44L0.1110271206450.2004-100000@iolanthe.rowland.org>
-References: <Pine.LNX.4.44L0.1110271206450.2004-100000@iolanthe.rowland.org>
-Message-ID: <4EAA63FA.8050506@stericsson.com>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Fri, 28 Oct 2011 11:17:38 +0300
+Subject: [PATCH 2/6] arm/tegra: prepare pinmux code for multiple tegra
+	variants
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF173E1B49AA@HQMAIL01.nvidia.com>
+References: <1319561644-6160-1-git-send-email-pdeschrijver@nvidia.com>
+	<1319561644-6160-3-git-send-email-pdeschrijver@nvidia.com>
+	<74CDBE0F657A3D45AFBB94109FB122FF173E1B49AA@HQMAIL01.nvidia.com>
+Message-ID: <20111028081738.GA12383@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Alan Stern wrote:
-> On Thu, 27 Oct 2011, Ulf Hansson wrote:
+On Thu, Oct 27, 2011 at 09:59:49PM +0200, Stephen Warren wrote:
+> Peter De Schrijver wrote at Tuesday, October 25, 2011 10:54 AM:
+> > This patch modifies the pinmux code to be useable for multiple tegra variants.
+> > Some tegra20 specific constants will be replaced by variables which will be
+> > initialized to the appropriate value at runtime.
 > 
->> To be able to make sure devices are put into runtime suspend
->> after a suspend sequence, the suspend_noirq callback is used.
->>
->> Previously it was was possible for drivers doing pm_runtime_suspend
->> and pm_runtime_put_sync directly from it's suspend callbacks.
->> This is now not possible due to the following commit, which solve a
->> race issue:
->>
->> PM: Limit race conditions between runtime PM and system sleep (v2)
+> You should probably also mention:
+> * Removal of include of pinmux-t2.h from pinmux.h.
+> * The file renames you performed and why.
+> * The removal of the suspend/resume code and why.
 > 
-> I have a small request for this patch:
+> > diff --git a/arch/arm/mach-tegra/include/mach/pinmux-t2.h b/arch/arm/mach-tegra/include/mach/pinmux-t2.h
+> > deleted file mode 100644
+> > index 4c26263..0000000
+> > --- a/arch/arm/mach-tegra/include/mach/pinmux-t2.h
+> > +++ /dev/null
 > 
->> +static int amba_pm_runtime_suspend_noirq(struct device *dev)
->> +{
+> So this file shows up as a delete and an add. Isn't there a way to get
+> it to show up as a rename; I've certainly seen git diff tell me that, but
+> I'm not sure if the same feature is available for format-patch. In
+> particular, IIRC from internal review, there weren't any changes to this
+> file besides direct fallout from the rename, but there were quite a few
+> symbol name changes in pinmux-t2-tables.c, and also the removal of
+> suspend/resume, which it'd be nice if the diff highlighted.
+> 
+
+Hmm. Maybe if I split it in 2 patches? 2 rename and 1 modification?
+
+> > diff --git a/arch/arm/mach-tegra/include/mach/pinmux.h b/arch/arm/mach-tegra/include/mach/pinmux.h
+> > index bb7dfdb..8f6e9f3 100644
+> > --- a/arch/arm/mach-tegra/include/mach/pinmux.h
+> > +++ b/arch/arm/mach-tegra/include/mach/pinmux.h
 > ...
->> +}
+> > @@ -219,13 +213,20 @@ struct tegra_pingroup_desc {
+> >  	s8 pupd_bit;	/* offset into the PULL_UPDOWN_REG_* register bit */
+> >  };
+> > 
+> > -extern const struct tegra_pingroup_desc tegra_soc_pingroups[];
+> > -extern const struct tegra_drive_pingroup_desc tegra_soc_drive_pingroups[];
+> > +struct tegra_pinmux_pm {
+> > +	void (*suspend)(void);
+> > +	void (*resume)(void);
+> > +};
 > 
->> +static int amba_pm_runtime_resume_noirq(struct device *dev)
->> +{
-> ...
->> +}
-> 
-> Can the names of these functions be changed?  Since they run during
-> system sleep transitions with IRQs disabled, they aren't really runtime
-> suspend or resume routines.
-
-Sure, we can rename/move the code - do you have a proposal? :-)
-
-The idea with having them as separate functions and something with 
-"runtime" in the name is because it is only when having 
-CONFIG_PM_RUNTIME the functions actually does something.
-
-If I move the the code into amba_pm_suspend|resume_noirq I will need 
-ifdefs around the code. I am fine with that as well...
-
-> 
-> In fact, since each routine is used in only one place, maybe they can 
-> be eliminated entirely and moved into their callers?
-> 
-> Alan Stern
-> 
+> Since we elected to strip out suspend/resume (it's currently incomplete
+> anyway) to simplify the addition of Tegra30, I don't think you need that
+> struct type any more.
 > 
 
-BR
-Ulf Hansson
+True :)
+
+> I wonder if removal of the suspend/resume functions should have been a
+> separate patch before this?
+> 
+
+Good point.
+
+> > diff --git a/arch/arm/mach-tegra/pinmux.c b/arch/arm/mach-tegra/pinmux.c
+> > index 1d20165..0789122 100644
+> > --- a/arch/arm/mach-tegra/pinmux.c
+> > +++ b/arch/arm/mach-tegra/pinmux.c
+> > @@ -21,6 +21,9 @@
+> >  #include <linux/spinlock.h>
+> >  #include <linux/io.h>
+> >  #include <linux/platform_device.h>
+> > +#ifdef CONFIG_OF
+> > +#include <linux/of_platform.h>
+> > +#endif
+> 
+> I think just include that without any ifdef.
+> 
+
+Thinking of it, probably indeed.
+
+> > @@ -668,11 +668,24 @@ void tegra_pinmux_config_pullupdown_table(const struct tegra_pingroup_config *co
+> >  	}
+> >  }
+> > 
+> > +static struct of_device_id tegra_pinmux_of_match[] __devinitdata = {
+> > +	{ .compatible = "nvidia,tegra20-pinmux", tegra20_pinmux_init },
+> > +	{ },
+> > +};
+> > +
+> >  static int __devinit tegra_pinmux_probe(struct platform_device *pdev)
+> >  {
+> >  	struct resource *res;
+> >  	int i;
+> >  	int config_bad = 0;
+> > +	const struct of_device_id *match;
+> > +
+> > +#ifdef CONFIG_OF
+> > +	match = of_match_device(tegra_pinmux_of_match, &pdev->dev);
+> 
+> What if match==NULL? I suppose that "can't" happen with DT, since the
+> device wouldn't have been probed unless there was a matching entry...
+> 
+
+Exactly. That was my reasoning as well. We can't get here unless there is a
+match.
+
+> Does this work when booting without DT; IIRC the internal patches I saw
+> fell back to hard-coding a call to tegra20_pinmux_init() when booting
+> a static board file (i.e. not booting device-tree)? Perhaps that's in a
+
+Unfortunately I don't have a tegra20 board which is supported without
+devicetree.
+
+Cheers,
+
+Peter.
