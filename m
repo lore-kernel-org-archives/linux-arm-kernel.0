@@ -1,34 +1,31 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Sat, 29 Oct 2011 00:50:35 +0200 (CEST)
-Subject: [RFC] Shrink sched_clock some more
-In-Reply-To: <4EAAF5AE.6090300@codeaurora.org>
-References: <20110922153611.GC8072@n2100.arm.linux.org.uk>
-	<4E7C48E2.5040907@arm.com> <4EAAF5AE.6090300@codeaurora.org>
-Message-ID: <alpine.LFD.2.02.1110290049380.30467@xanadu.home>
+From: jhbird.choi@gmail.com (jhbird.choi at gmail.com)
+Date: Sat, 29 Oct 2011 07:56:32 +0900
+Subject: [PATCH] max8997_charger: Fix unsigned value for less than zero
+Message-ID: <1319842592-11334-1-git-send-email-jhbird.choi@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 28 Oct 2011, Stephen Boyd wrote:
+From: Jonghwan Choi <jhbird.choi@gmail.com>
 
-> On 09/23/11 01:52, Marc Zyngier wrote:
-> > On 22/09/11 16:36, Russell King - ARM Linux wrote:
-> >> ... by getting rid of the fixed-constant optimization, and moving the
-> >> update code into arch/arm/kernel/sched_clock.c.
-> >>
-> >> Platforms now only have to supply a function to read the sched_clock
-> >> register, and some basic information such as the number of significant
-> >> bits and the tick rate.
-> > This looks similar to a patch I posted a while ago:
-> > http://patchwork.ozlabs.org/patch/112318/
-> >
-> >
-> 
-> Can we get one of these two patches merged next merge window? I'd like
-> to add sched_clock support to MSM and building on top of this patch is
-> easier than the other way around.
+The 'val' is a 'unsigned char', so it is never less than zero.
 
-Yes, I agree.  Any optimizations I might have suggested may be added 
-later.
+Signed-off-by: Jonghwan Choi <jhbird.choi@gmail.com>
+---
+ drivers/power/max8997_charger.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-
-Nicolas
+diff --git a/drivers/power/max8997_charger.c b/drivers/power/max8997_charger.c
+index ffc5033..a5eb3ed 100644
+--- a/drivers/power/max8997_charger.c
++++ b/drivers/power/max8997_charger.c
+@@ -97,7 +97,7 @@ static __devinit int max8997_battery_probe(struct platform_device *pdev)
+ 		return -EINVAL;
+ 
+ 	if (pdata->eoc_mA) {
+-		u8 val = (pdata->eoc_mA - 50) / 10;
++		int val = (pdata->eoc_mA - 50) / 10;
+ 		if (val < 0)
+ 			val = 0;
+ 		if (val > 0xf)
+-- 
+1.7.0.4
