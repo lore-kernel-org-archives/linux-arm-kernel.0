@@ -1,47 +1,77 @@
-From: arjan@linux.intel.com (Arjan van de Ven)
-Date: Fri, 28 Oct 2011 07:24:07 -0700
-Subject: [PATCH v9 2/4] cpuidle: Remove CPUIDLE_FLAG_IGNORE and
-	dev->prepare()
-In-Reply-To: <20111028105020.7520.68014.stgit@localhost6.localdomain6>
-References: <20111028104945.7520.83828.stgit@localhost6.localdomain6>
-	<20111028105020.7520.68014.stgit@localhost6.localdomain6>
-Message-ID: <4EAABB07.3000305@linux.intel.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 28 Oct 2011 15:43:32 +0100
+Subject: [PATCH 04/51] ARM: mach-clps711x: use arm_arch_reset instead of
+	arch_reset
+In-Reply-To: <1319813059-8914-1-git-send-email-will.deacon@arm.com>
+References: <1319813059-8914-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1319813059-8914-5-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patch updates mach-clps711x to use arm_arch_reset instead of
+arch_reset.
 
------BEGIN PGP SIGNED MESSAGE-----
-Hash: SHA1
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/mach-clps711x/Makefile              |    2 +-
+ arch/arm/mach-clps711x/include/mach/system.h |    1 -
+ arch/arm/mach-clps711x/system.c              |   23 +++++++++++++++++++++++
+ 3 files changed, 24 insertions(+), 2 deletions(-)
+ create mode 100644 arch/arm/mach-clps711x/system.c
+
+diff --git a/arch/arm/mach-clps711x/Makefile b/arch/arm/mach-clps711x/Makefile
+index 4a19731..c3f224d 100644
+--- a/arch/arm/mach-clps711x/Makefile
++++ b/arch/arm/mach-clps711x/Makefile
+@@ -4,7 +4,7 @@
  
-On 10/28/2011 3:50 AM, Deepthi Dharwar wrote:
-> The cpuidle_device->prepare() mechanism causes updates to the
-> cpuidle_state[].flags, setting and clearing CPUIDLE_FLAG_IGNORE
-> to tell the governor not to chose a state on a per-cpu basis at
-> run-time. State demotion is now handled by the driver and it returns
-> the actual state entered. Hence, this mechanism is not required.
-> Also this removes per-cpu flags from cpuidle_state enabling
-> it to be made global.
->
+ # Object file lists.
  
-having worked on some newer platforms....
-this one is really still needed. doing this inside the actual states
-does not work,
-because if the deepest 3 states are invalid, the same (somewhat
-expensive) test would have to be done 3 times,
-and each of the states would have to fail before the 4th one gets chosen.
-that's just not going to work
+-obj-y			:= irq.o mm.o time.o
++obj-y			:= irq.o mm.o system.o time.o
+ obj-m			:=
+ obj-n			:=
+ obj-			:=
+diff --git a/arch/arm/mach-clps711x/include/mach/system.h b/arch/arm/mach-clps711x/include/mach/system.h
+index f916cd7..9982deb 100644
+--- a/arch/arm/mach-clps711x/include/mach/system.h
++++ b/arch/arm/mach-clps711x/include/mach/system.h
+@@ -34,7 +34,6 @@ static inline void arch_idle(void)
  
-(in the state handler you can't know what other state to fall back to,
-and especially not how to enter such a fallback state)
+ static inline void arch_reset(char mode, const char *cmd)
+ {
+-	cpu_reset(0);
+ }
  
------BEGIN PGP SIGNATURE-----
-Version: GnuPG v2.0.17 (MingW32)
- 
-iQEcBAEBAgAGBQJOqrsGAAoJEEHdSxh4DVnEu7EH/i5lEJctBAIubJOcZz/tvBFp
-XYmAe/HqNtSXeHOVsJkTf8y4ppE8487exF7xxMik4GRN0CZNCtkyMezqDVu+eDim
-O/UUbScsAc5cSY6mkjOFXLFup+mi1nkRUnAbxXEyTMhWwcbfr2OvcuO7l7TmATML
-hu87P3PVEafEop3q2+uWMc57fFxnNFfEDqRx6N9V+OJKV5dHrRYL4G4E01fYGFLo
-xTR0IW7nB15L0C29zk9uk/Dqow8SoJZA83c7p7AieP5zdntb6p7noIf03qmdp19f
-fulwMwembCHivo+pLO+jAMhKD1T6VYoCyiYW0LHrQ2E07fayBhFJCxlazgKFcl0=
-=FL6o
------END PGP SIGNATURE-----
+ #endif
+diff --git a/arch/arm/mach-clps711x/system.c b/arch/arm/mach-clps711x/system.c
+new file mode 100644
+index 0000000..030d758
+--- /dev/null
++++ b/arch/arm/mach-clps711x/system.c
+@@ -0,0 +1,23 @@
++/*
++ * arch/arm/mach-clps711x/system.c
++ */
++
++#include <linux/init.h>
++#include <linux/io.h>
++#include <mach/hardware.h>
++
++#include <asm/system.h>
++#include <asm/hardware/clps7111.h>
++
++static void clps711x_arch_reset(char mode, const char *cmd)
++{
++	cpu_reset(0);
++}
++
++static int __init clps711x_arch_reset_init(void)
++{
++	arm_arch_reset = clps711x_arch_reset;
++	return 0;
++}
++
++arch_initcall(clps711x_arch_reset_init);
+-- 
+1.7.4.1
