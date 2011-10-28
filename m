@@ -1,77 +1,56 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Fri, 28 Oct 2011 22:44:59 +0200
-Subject: [PATCH] DaVinci: only poll EPCPR on DM644x and DM355
-In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB5930328B2DF8C@dbde02.ent.ti.com>
-References: <201109151829.49256.sshtylyov@ru.mvista.com>
-	<B85A65D85D7EB246BE421B3FB0FBB5930328B2DF68@dbde02.ent.ti.com>
-	<4EA40BDE.40606@mvista.com>
-	<B85A65D85D7EB246BE421B3FB0FBB5930328B2DF8C@dbde02.ent.ti.com>
-Message-ID: <4EAB144B.4040805@mvista.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 28 Oct 2011 16:17:51 -0500
+Subject: [GIT PULL] GIC DT binding support
+In-Reply-To: <4EA5DADC.7030805@gmail.com>
+References: <4EA5DADC.7030805@gmail.com>
+Message-ID: <4EAB1BFF.3070406@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Arnd,
 
-On 23.10.2011 18:18, Nori, Sekhar wrote:
+On 10/24/2011 04:38 PM, Rob Herring wrote:
+> Arnd,
+> 
+> I'm not sure if you want a rebased branch to fix merge conflicts or not.
+> If that's okay, please pull. I've also fixed the msm compile failure.
+> 
+> The dependencies are v3.1-rc9 and rmk's devel-stable.
+> 
 
->>> OMAP-L137 and OMAP-L138 have additional power domains for DSP
->>> and Shared RAM, but do not support powering them down.
->>      I haven't found such words in either OMAP-L137 or OMAP-L138 datasheets.
->> What they say is:
->>
->> <<
->> - On PSC0 PD1/PD_DSP Domain: Controls the sleep state for DSP L1 and L2 Memories
->> - On PSC1 PD1/PD_SHRAM Domain: Controls the sleep state for the 128K Shared RAM
->>   >>
->>
->>      Although "OMAP-L137 Application Processor System Reference Guide" indeed
->> said that powering off domain 1 is not supported.
-> Right. There is a statement put in for shared ram as well.
+Here's an updated pull request to fix missing export.h include. Now it's
+also dependent on module.h clean-up branch:
 
-    That's domain 1 too, just on PSC1. :-)
+git://openlinux.windriver.com/people/paulg/linux-next for-sfr
 
-> "
-> Currently powering down the RAMs via the pseudo/RAM power domain is not
-> supported; therefore, these domains and the RAM should be left in their
-> default power on state.
-> "
->
-> BTW, it looks like a separate "System Reference Guide" doesn't exist
-> anymore and all the OMAP-L1x user guides have been consolidated to a
-> single "Technical Reference Manual".
 
-     Thanks, didn't know it...
+The following changes since commit fa1d6d372245a160eecf5f57d64d2b21ea248e08:
 
->>      Actually, I was able to power down DSP/shared RAM domains on DA830 (at
->> least the state transition completed); although the domains were on, at least
->> after U-Boot. That's how I checked that the code powering up these domains
->> actually locks up on this SoC.
-> Okay. Surely there must have been some corner case issues found
-> which probably led the chip design team to make this feature
-> unsupported.
->
->>> So, looks like the only SoC where PDSTAT might indicate a powered
->>> down domain is DM644x and existing code to looks alright for
->>> that SoC.
->>> At this time, it would be better to leave the code as-is and
->>> revisit it if/when a new SoC with programmable power domain
->>> support comes along.
->>      At least on DA830 power domains appear to be programmable. So I'd still
->> like the patch to be applied (I could drop DM355 check though).
-> The problem would be that power domain state transition procedure isn't
-> documented for any SoC other than DM644x. So, we can never be sure
-> that just avoiding EPCR poll is sufficient for DA830. Software attempting
-> this would be operating out of spec.
->
-> So, how about allowing a power domain transition for DM644x and bailing
-> out with a warning if a power domain on any other SoC is found to be off?
->
-> This way users attempting this will be warned and fix their boot loader.
+  Merge branch 'for-sfr' of
+git://openlinux.windriver.com/people/paulg/linux-next into HEAD
+(2011-10-28 15:51:07 -0500)
 
-     Good idea. I probably won't be able to recast the patch soon as I'm 
-on vacations and don't have Linux on my laptop (yet).
+are available in the git repository at:
 
-> Thanks,
-> Sekhar
+  git://sources.calxeda.com/kernel/linux.git gic-dt
 
-WBR, Sergei
+Rob Herring (5):
+      of/irq: introduce of_irq_init
+      irq: support domains with non-zero hwirq base
+      ARM: gic: add irq_domain support
+      ARM: gic: add OF based initialization
+      ARM: gic: fix irq_alloc_descs handling for sparse irq
+
+ Documentation/devicetree/bindings/arm/gic.txt |   55 +++++++
+ arch/arm/common/Kconfig                       |    1 +
+ arch/arm/common/gic.c                         |  188
+++++++++++++++++--------
+ arch/arm/include/asm/hardware/gic.h           |   10 +-
+ drivers/of/irq.c                              |  107 ++++++++++++++
+ include/linux/irqdomain.h                     |   16 ++-
+ include/linux/of_irq.h                        |    3 +
+ kernel/irq/irqdomain.c                        |   12 +-
+ 8 files changed, 320 insertions(+), 72 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/gic.txt
+
+Rob
