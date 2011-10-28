@@ -1,73 +1,72 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 28 Oct 2011 15:44:15 +0100
-Subject: [PATCH 47/51] ARM: plat-tcc: use arm_arch_reset instead of arch_reset
+Date: Fri, 28 Oct 2011 15:44:08 +0100
+Subject: [PATCH 40/51] ARM: mach-shmobile: use arm_arch_reset instead of
+	arch_reset
 In-Reply-To: <1319813059-8914-1-git-send-email-will.deacon@arm.com>
 References: <1319813059-8914-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1319813059-8914-48-git-send-email-will.deacon@arm.com>
+Message-ID: <1319813059-8914-41-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch updates plat-tcc to use arm_arch_reset instead of
+This patch updates mach-shmobile to use arm_arch_reset instead of
 arch_reset.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/plat-tcc/include/mach/system.h |    5 -----
- arch/arm/plat-tcc/system.c              |   10 +++++++++-
- 2 files changed, 9 insertions(+), 6 deletions(-)
+ arch/arm/mach-shmobile/Makefile              |    2 +-
+ arch/arm/mach-shmobile/include/mach/system.h |    1 -
+ arch/arm/mach-shmobile/reset.c               |   18 ++++++++++++++++++
+ 3 files changed, 19 insertions(+), 2 deletions(-)
+ create mode 100644 arch/arm/mach-shmobile/reset.c
 
-diff --git a/arch/arm/plat-tcc/include/mach/system.h b/arch/arm/plat-tcc/include/mach/system.h
-index 909e603..e97ae31 100644
---- a/arch/arm/plat-tcc/include/mach/system.h
-+++ b/arch/arm/plat-tcc/include/mach/system.h
-@@ -11,10 +11,6 @@
+diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
+index 612b270..8f12b57 100644
+--- a/arch/arm/mach-shmobile/Makefile
++++ b/arch/arm/mach-shmobile/Makefile
+@@ -3,7 +3,7 @@
+ #
  
- #ifndef __ASM_ARCH_SYSTEM_H
- #define __ASM_ARCH_SYSTEM_H
--#include <linux/clk.h>
--
--#include <asm/mach-types.h>
--#include <mach/hardware.h>
+ # Common objects
+-obj-y				:= timer.o console.o clock.o pm_runtime.o
++obj-y				:= timer.o console.o clock.o pm_runtime.o reset.o
  
- extern void plat_tcc_reboot(void);
- 
-@@ -25,7 +21,6 @@ static inline void arch_idle(void)
+ # CPU objects
+ obj-$(CONFIG_ARCH_SH7367)	+= setup-sh7367.o clock-sh7367.o intc-sh7367.o
+diff --git a/arch/arm/mach-shmobile/include/mach/system.h b/arch/arm/mach-shmobile/include/mach/system.h
+index 76a687e..4f2bea5 100644
+--- a/arch/arm/mach-shmobile/include/mach/system.h
++++ b/arch/arm/mach-shmobile/include/mach/system.h
+@@ -8,7 +8,6 @@ static inline void arch_idle(void)
  
  static inline void arch_reset(char mode, const char *cmd)
  {
--	plat_tcc_reboot();
+-	cpu_reset(0);
  }
  
  #endif
-diff --git a/arch/arm/plat-tcc/system.c b/arch/arm/plat-tcc/system.c
-index cc208fa..c3badd5 100644
---- a/arch/arm/plat-tcc/system.c
-+++ b/arch/arm/plat-tcc/system.c
-@@ -7,12 +7,13 @@
-  *
-  */
- 
-+#include <linux/init.h>
- #include <linux/io.h>
- 
- #include <mach/tcc8k-regs.h>
- 
- /* System reboot */
--void plat_tcc_reboot(void)
-+static void plat_tcc_reboot(char mode, const char *cmd)
- {
- 	/* Make sure clocks are on */
- 	__raw_writel(0xffffffff, CKC_BASE + BCLKCTR0_OFFS);
-@@ -23,3 +24,10 @@ void plat_tcc_reboot(void)
- 	while(1)
- 		;
- }
+diff --git a/arch/arm/mach-shmobile/reset.c b/arch/arm/mach-shmobile/reset.c
+new file mode 100644
+index 0000000..ab53fb9
+--- /dev/null
++++ b/arch/arm/mach-shmobile/reset.c
+@@ -0,0 +1,18 @@
++/*
++ * arch/arm/mach-shmobile/reset.c
++ */
 +
-+static int __init plat_tcc_reboot_init(void)
++#include <linux/init.h>
++#include <asm/proc-fns.h>
++
++static void shmobile_arch_reset(char mode, const char *cmd)
 +{
-+	arm_arch_reset = plat_tcc_reboot;
++	cpu_reset(0);
++}
++
++static int __init shmobile_arch_reset_init(void)
++{
++	arm_arch_reset = shmobile_arch_reset;
 +	return 0;
 +}
-+arch_initcall(plat_tcc_reboot);
++arch_initcall(shmobile_arch_reset_init);
 -- 
 1.7.4.1
