@@ -1,84 +1,96 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 28 Oct 2011 15:43:47 +0100
-Subject: [PATCH 19/51] ARM: mach-ixp23xx: use arm_arch_reset instead of
+Date: Fri, 28 Oct 2011 15:43:48 +0100
+Subject: [PATCH 20/51] ARM: mach-ixp4xx: use arm_arch_reset instead of
 	arch_reset
 In-Reply-To: <1319813059-8914-1-git-send-email-will.deacon@arm.com>
 References: <1319813059-8914-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1319813059-8914-20-git-send-email-will.deacon@arm.com>
+Message-ID: <1319813059-8914-21-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch updates mach-ixp23xx to use arm_arch_reset instead of
+This patch updates mach-ixp4xx to use arm_arch_reset instead of
 arch_reset.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/mach-ixp23xx/core.c                |   15 +++++++++++++++
- arch/arm/mach-ixp23xx/include/mach/system.h |   12 ------------
- 2 files changed, 15 insertions(+), 12 deletions(-)
+ arch/arm/mach-ixp4xx/common.c              |   22 ++++++++++++++++++++++
+ arch/arm/mach-ixp4xx/include/mach/system.h |   19 -------------------
+ 2 files changed, 22 insertions(+), 19 deletions(-)
 
-diff --git a/arch/arm/mach-ixp23xx/core.c b/arch/arm/mach-ixp23xx/core.c
-index a1bee33..e72c089 100644
---- a/arch/arm/mach-ixp23xx/core.c
-+++ b/arch/arm/mach-ixp23xx/core.c
-@@ -32,6 +32,7 @@
- #include <asm/types.h>
- #include <asm/setup.h>
- #include <asm/memory.h>
-+#include <asm/mach-types.h>
- #include <mach/hardware.h>
- #include <asm/irq.h>
- #include <asm/system.h>
-@@ -439,8 +440,22 @@ static struct platform_device *ixp23xx_devices[] __initdata = {
- 	&ixp23xx_uart,
- };
+diff --git a/arch/arm/mach-ixp4xx/common.c b/arch/arm/mach-ixp4xx/common.c
+index 0777257..9e38334 100644
+--- a/arch/arm/mach-ixp4xx/common.c
++++ b/arch/arm/mach-ixp4xx/common.c
+@@ -375,6 +375,26 @@ static struct platform_device *ixp46x_devices[] __initdata = {
+ unsigned long ixp4xx_exp_bus_size;
+ EXPORT_SYMBOL(ixp4xx_exp_bus_size);
  
-+static void ixp23xx_arch_reset(char mode, const char *cmd)
++static void ixp4xx_arch_reset(char mode, const char *cmd)
 +{
-+	/* First try machine specific support */
-+	if (machine_is_ixdp2351()) {
-+		*IXDP2351_CPLD_RESET1_REG = IXDP2351_CPLD_RESET1_MAGIC;
-+		(void) *IXDP2351_CPLD_RESET1_REG;
-+		*IXDP2351_CPLD_RESET1_REG = IXDP2351_CPLD_RESET1_ENABLE;
-+	}
++	if ( 1 && mode == 's') {
++		/* Jump into ROM at address 0 */
++		cpu_reset(0);
++	} else {
++		/* Use on-chip reset capability */
 +
-+	/* Use on-chip reset capability */
-+	*IXP23XX_RESET0 |= IXP23XX_RST_ALL;
++		/* set the "key" register to enable access to
++		 * "timer" and "enable" registers
++		 */
++		*IXP4XX_OSWK = IXP4XX_WDT_KEY;
++
++		/* write 0 to the timer register for an immediate reset */
++		*IXP4XX_OSWT = 0;
++
++		*IXP4XX_OSWE = IXP4XX_WDT_RESET_ENABLE | IXP4XX_WDT_COUNT_ENABLE;
++	}
 +}
 +
- void __init ixp23xx_sys_init(void)
+ void __init ixp4xx_sys_init(void)
  {
- 	*IXP23XX_EXP_UNIT_FUSE |= 0xf;
- 	platform_add_devices(ixp23xx_devices, ARRAY_SIZE(ixp23xx_devices));
-+	arm_arch_reset = ixp23xx_arch_reset;
+ 	ixp4xx_exp_bus_size = SZ_16M;
+@@ -397,6 +417,8 @@ void __init ixp4xx_sys_init(void)
+ 
+ 	printk("IXP4xx: Using %luMiB expansion bus window size\n",
+ 			ixp4xx_exp_bus_size >> 20);
++
++	arm_arch_reset = ixp4xx_arch_reset;
  }
-diff --git a/arch/arm/mach-ixp23xx/include/mach/system.h b/arch/arm/mach-ixp23xx/include/mach/system.h
-index 8920ff2..4569003 100644
---- a/arch/arm/mach-ixp23xx/include/mach/system.h
-+++ b/arch/arm/mach-ixp23xx/include/mach/system.h
-@@ -8,9 +8,6 @@
-  * published by the Free Software Foundation.
+ 
+ /*
+diff --git a/arch/arm/mach-ixp4xx/include/mach/system.h b/arch/arm/mach-ixp4xx/include/mach/system.h
+index 54c0af7..ed5964c 100644
+--- a/arch/arm/mach-ixp4xx/include/mach/system.h
++++ b/arch/arm/mach-ixp4xx/include/mach/system.h
+@@ -9,8 +9,6 @@
+  *
   */
  
 -#include <mach/hardware.h>
--#include <asm/mach-types.h>
 -
  static inline void arch_idle(void)
  {
- #if 0
-@@ -21,13 +18,4 @@ static inline void arch_idle(void)
+ 	/* ixp4xx does not implement the XScale PWRMODE register,
+@@ -24,21 +22,4 @@ static inline void arch_idle(void)
  
  static inline void arch_reset(char mode, const char *cmd)
  {
--	/* First try machine specific support */
--	if (machine_is_ixdp2351()) {
--		*IXDP2351_CPLD_RESET1_REG = IXDP2351_CPLD_RESET1_MAGIC;
--		(void) *IXDP2351_CPLD_RESET1_REG;
--		*IXDP2351_CPLD_RESET1_REG = IXDP2351_CPLD_RESET1_ENABLE;
--	}
+-	if ( 1 && mode == 's') {
+-		/* Jump into ROM at address 0 */
+-		cpu_reset(0);
+-	} else {
+-		/* Use on-chip reset capability */
 -
--	/* Use on-chip reset capability */
--	*IXP23XX_RESET0 |= IXP23XX_RST_ALL;
+-		/* set the "key" register to enable access to
+-		 * "timer" and "enable" registers
+-		 */
+-		*IXP4XX_OSWK = IXP4XX_WDT_KEY;
+-
+-		/* write 0 to the timer register for an immediate reset */
+-		*IXP4XX_OSWT = 0;
+-
+-		*IXP4XX_OSWE = IXP4XX_WDT_RESET_ENABLE | IXP4XX_WDT_COUNT_ENABLE;
+-	}
  }
+-
 -- 
 1.7.4.1
