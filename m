@@ -1,60 +1,64 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 28 Oct 2011 15:43:34 +0100
-Subject: [PATCH 06/51] ARM: mach-davinci: use arm_arch_reset instead of
-	arch_reset
+Date: Fri, 28 Oct 2011 15:44:02 +0100
+Subject: [PATCH 34/51] ARM: mach-pxa: use arm_arch_reset instead of arch_reset
 In-Reply-To: <1319813059-8914-1-git-send-email-will.deacon@arm.com>
 References: <1319813059-8914-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1319813059-8914-7-git-send-email-will.deacon@arm.com>
+Message-ID: <1319813059-8914-35-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch updates mach-davinci to use arm_arch_reset instead of
+This patch updates mach-pxa to use arm_arch_reset instead of
 arch_reset.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/mach-davinci/common.c              |    8 ++++++++
- arch/arm/mach-davinci/include/mach/system.h |    2 --
- 2 files changed, 8 insertions(+), 2 deletions(-)
+ arch/arm/mach-pxa/include/mach/system.h |    6 +++---
+ arch/arm/mach-pxa/reset.c               |    8 +++++++-
+ 2 files changed, 10 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/common.c b/arch/arm/mach-davinci/common.c
-index 1d25573..b0b1560 100644
---- a/arch/arm/mach-davinci/common.c
-+++ b/arch/arm/mach-davinci/common.c
-@@ -71,6 +71,12 @@ static int __init davinci_init_id(struct davinci_soc_info *soc_info)
- 	return -EINVAL;
+diff --git a/arch/arm/mach-pxa/include/mach/system.h b/arch/arm/mach-pxa/include/mach/system.h
+index d1fce8b..0687110 100644
+--- a/arch/arm/mach-pxa/include/mach/system.h
++++ b/arch/arm/mach-pxa/include/mach/system.h
+@@ -11,8 +11,6 @@
+  */
+ 
+ #include <asm/proc-fns.h>
+-#include "hardware.h"
+-#include "pxa2xx-regs.h"
+ 
+ static inline void arch_idle(void)
+ {
+@@ -20,4 +18,6 @@ static inline void arch_idle(void)
  }
  
-+static void davinci_arch_reset(char mode, const char *cmd)
+ 
+-void arch_reset(char mode, const char *cmd);
++static inline void arch_reset(char mode, const char *cmd)
 +{
-+	if (davinci_soc_info.reset)
-+		davinci_soc_info.reset(davinci_soc_info.reset_device);
 +}
-+
- void __init davinci_common_init(struct davinci_soc_info *soc_info)
- {
- 	int ret;
-@@ -97,6 +103,8 @@ void __init davinci_common_init(struct davinci_soc_info *soc_info)
- 	if (!davinci_soc_info.reset)
- 		davinci_soc_info.reset = davinci_watchdog_reset;
- 
-+	arm_arch_reset = davinci_arch_reset;
-+
- 	/*
- 	 * We want to check CPU revision early for cpu_is_xxxx() macros.
- 	 * IO space mapping must be initialized before we can do that.
-diff --git a/arch/arm/mach-davinci/include/mach/system.h b/arch/arm/mach-davinci/include/mach/system.h
-index e65629c..6bd1dc0 100644
---- a/arch/arm/mach-davinci/include/mach/system.h
-+++ b/arch/arm/mach-davinci/include/mach/system.h
-@@ -20,8 +20,6 @@ static inline void arch_idle(void)
- 
- static inline void arch_reset(char mode, const char *cmd)
- {
--	if (davinci_soc_info.reset)
--		davinci_soc_info.reset(davinci_soc_info.reset_device);
+diff --git a/arch/arm/mach-pxa/reset.c b/arch/arm/mach-pxa/reset.c
+index 01e9d64..075598a 100644
+--- a/arch/arm/mach-pxa/reset.c
++++ b/arch/arm/mach-pxa/reset.c
+@@ -81,7 +81,7 @@ static void do_hw_reset(void)
+ 	OSMR3 = OSCR + 368640;	/* ... in 100 ms */
  }
  
- #endif /* __ASM_ARCH_SYSTEM_H */
+-void arch_reset(char mode, const char *cmd)
++static void pxa_arch_reset(char mode, const char *cmd)
+ {
+ 	clear_reset_status(RESET_STATUS_ALL);
+ 
+@@ -100,3 +100,9 @@ void arch_reset(char mode, const char *cmd)
+ 	}
+ }
+ 
++static int __init pxa_arch_reset_init(void)
++{
++	arm_arch_reset = pxa_arch_reset;
++	return 0;
++}
++arch_initcall(pxa_arch_reset_init);
 -- 
 1.7.4.1
