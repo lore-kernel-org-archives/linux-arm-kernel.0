@@ -1,77 +1,64 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 28 Oct 2011 15:43:53 +0100
-Subject: [PATCH 25/51] ARM: mach-mv78xx0: use arm_arch_reset instead of
-	arch_reset
+Date: Fri, 28 Oct 2011 15:43:56 +0100
+Subject: [PATCH 28/51] ARM: mach-netx: use arm_arch_reset instead of arch_reset
 In-Reply-To: <1319813059-8914-1-git-send-email-will.deacon@arm.com>
 References: <1319813059-8914-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1319813059-8914-26-git-send-email-will.deacon@arm.com>
+Message-ID: <1319813059-8914-29-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch updates mach-mv78xx0 to use arm_arch_reset instead of
+This patch updates mach-netx to use arm_arch_reset instead of
 arch_reset.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/mach-mv78xx0/common.c              |   17 +++++++++++++++++
- arch/arm/mach-mv78xx0/include/mach/system.h |   12 ------------
- 2 files changed, 17 insertions(+), 12 deletions(-)
+ arch/arm/mach-netx/generic.c             |    7 +++++++
+ arch/arm/mach-netx/include/mach/system.h |    6 ------
+ 2 files changed, 7 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/mach-mv78xx0/common.c b/arch/arm/mach-mv78xx0/common.c
-index 23d3980..c3d5dd4 100644
---- a/arch/arm/mach-mv78xx0/common.c
-+++ b/arch/arm/mach-mv78xx0/common.c
-@@ -375,6 +375,22 @@ static int __init is_l2_writethrough(void)
- 	return !!(readl(CPU_CONTROL) & L2_WRITETHROUGH);
+diff --git a/arch/arm/mach-netx/generic.c b/arch/arm/mach-netx/generic.c
+index 00023b5..13ed7a3 100644
+--- a/arch/arm/mach-netx/generic.c
++++ b/arch/arm/mach-netx/generic.c
+@@ -180,8 +180,15 @@ void __init netx_init_irq(void)
+ 	irq_set_chained_handler(NETX_IRQ_HIF, netx_hif_demux_handler);
  }
  
-+static void mv78xx0_arch_reset(char mode, const char *cmd)
++static void netx_arch_reset(char mode, const char *cmd)
 +{
-+	/*
-+	 * Enable soft reset to assert RSTOUTn.
-+	 */
-+	writel(SOFT_RESET_OUT_EN, RSTOUTn_MASK);
-+
-+	/*
-+	 * Assert soft reset.
-+	 */
-+	writel(SOFT_RESET, SYSTEM_SOFT_RESET);
-+
-+	while (1)
-+		;
++	writel(NETX_SYSTEM_RES_CR_FIRMW_RES_EN | NETX_SYSTEM_RES_CR_FIRMW_RES,
++	       NETX_SYSTEM_RES_CR);
 +}
 +
- void __init mv78xx0_init(void)
+ static int __init netx_init(void)
  {
- 	int core_index;
-@@ -400,4 +416,5 @@ void __init mv78xx0_init(void)
- #ifdef CONFIG_CACHE_FEROCEON_L2
- 	feroceon_l2_init(is_l2_writethrough());
- #endif
-+	arm_arch_reset = mv78xx0_arch_reset;
++	arm_arch_reset = netx_arch_reset;
+ 	return platform_add_devices(devices, ARRAY_SIZE(devices));
  }
-diff --git a/arch/arm/mach-mv78xx0/include/mach/system.h b/arch/arm/mach-mv78xx0/include/mach/system.h
-index 66e7ce4..1a41dc5 100644
---- a/arch/arm/mach-mv78xx0/include/mach/system.h
-+++ b/arch/arm/mach-mv78xx0/include/mach/system.h
-@@ -18,18 +18,6 @@ static inline void arch_idle(void)
+ 
+diff --git a/arch/arm/mach-netx/include/mach/system.h b/arch/arm/mach-netx/include/mach/system.h
+index dc7b4bc..83ae2b1 100644
+--- a/arch/arm/mach-netx/include/mach/system.h
++++ b/arch/arm/mach-netx/include/mach/system.h
+@@ -19,10 +19,6 @@
+ #ifndef __ASM_ARCH_SYSTEM_H
+ #define __ASM_ARCH_SYSTEM_H
+ 
+-#include <linux/io.h>
+-#include <mach/hardware.h>
+-#include "netx-regs.h"
+-
+ static inline void arch_idle(void)
+ {
+ 	cpu_do_idle();
+@@ -30,8 +26,6 @@ static inline void arch_idle(void)
  
  static inline void arch_reset(char mode, const char *cmd)
  {
--	/*
--	 * Enable soft reset to assert RSTOUTn.
--	 */
--	writel(SOFT_RESET_OUT_EN, RSTOUTn_MASK);
--
--	/*
--	 * Assert soft reset.
--	 */
--	writel(SOFT_RESET, SYSTEM_SOFT_RESET);
--
--	while (1)
--		;
+-	writel(NETX_SYSTEM_RES_CR_FIRMW_RES_EN | NETX_SYSTEM_RES_CR_FIRMW_RES,
+-	       NETX_SYSTEM_RES_CR);
  }
  
- 
+ #endif
 -- 
 1.7.4.1
