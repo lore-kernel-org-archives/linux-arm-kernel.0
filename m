@@ -1,85 +1,106 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 28 Oct 2011 15:43:57 +0100
-Subject: [PATCH 29/51] ARM: mach-nomadik: use arm_arch_reset instead of
+Date: Fri, 28 Oct 2011 15:44:13 +0100
+Subject: [PATCH 45/51] ARM: mach-w90x900: use arm_arch_reset instead of
 	arch_reset
 In-Reply-To: <1319813059-8914-1-git-send-email-will.deacon@arm.com>
 References: <1319813059-8914-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1319813059-8914-30-git-send-email-will.deacon@arm.com>
+Message-ID: <1319813059-8914-46-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch updates mach-nomadik to use arm_arch_reset instead of
+This patch updates mach-w90x900 to use arm_arch_reset instead of
 arch_reset.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/mach-nomadik/cpu-8815.c            |   12 ++++++++++++
- arch/arm/mach-nomadik/include/mach/system.h |    9 ---------
- 2 files changed, 12 insertions(+), 9 deletions(-)
+ arch/arm/mach-w90x900/Makefile              |    2 +-
+ arch/arm/mach-w90x900/include/mach/system.h |   19 +---------------
+ arch/arm/mach-w90x900/reset.c               |   31 +++++++++++++++++++++++++++
+ 3 files changed, 33 insertions(+), 19 deletions(-)
+ create mode 100644 arch/arm/mach-w90x900/reset.c
 
-diff --git a/arch/arm/mach-nomadik/cpu-8815.c b/arch/arm/mach-nomadik/cpu-8815.c
-index ac58e3b..a9c2406 100644
---- a/arch/arm/mach-nomadik/cpu-8815.c
-+++ b/arch/arm/mach-nomadik/cpu-8815.c
-@@ -18,6 +18,7 @@
+diff --git a/arch/arm/mach-w90x900/Makefile b/arch/arm/mach-w90x900/Makefile
+index 828c032..e771d1b 100644
+--- a/arch/arm/mach-w90x900/Makefile
++++ b/arch/arm/mach-w90x900/Makefile
+@@ -5,7 +5,7 @@
+ # Object file lists.
  
- #include <linux/types.h>
- #include <linux/init.h>
-+#include <linux/io.h>
- #include <linux/device.h>
- #include <linux/amba/bus.h>
- #include <linux/platform_device.h>
-@@ -113,6 +114,16 @@ static struct amba_device *amba_devs[] __initdata = {
- 	&cpu8815_amba_rng
- };
+ obj-y				:= irq.o time.o mfp.o gpio.o clock.o
+-obj-y				+= clksel.o dev.o cpu.o
++obj-y				+= clksel.o dev.o cpu.o reset.o
+ # W90X900 CPU support files
  
-+static void nmk_arch_reset(char mode, const char *cmd)
-+{
-+	void __iomem *src_rstsr = io_p2v(NOMADIK_SRC_BASE + 0x18);
-+
-+	/* FIXME: use egpio when implemented */
-+
-+	/* Write anything to Reset status register */
-+	writel(1, src_rstsr);
-+}
-+
- static int __init cpu8815_init(void)
- {
- 	int i;
-@@ -120,6 +131,7 @@ static int __init cpu8815_init(void)
- 	platform_add_devices(platform_devs, ARRAY_SIZE(platform_devs));
- 	for (i = 0; i < ARRAY_SIZE(amba_devs); i++)
- 		amba_device_register(amba_devs[i], &iomem_resource);
-+	arm_arch_reset = nmk_arch_reset;
- 	return 0;
- }
- arch_initcall(cpu8815_init);
-diff --git a/arch/arm/mach-nomadik/include/mach/system.h b/arch/arm/mach-nomadik/include/mach/system.h
-index 7119f68..16f59f6 100644
---- a/arch/arm/mach-nomadik/include/mach/system.h
-+++ b/arch/arm/mach-nomadik/include/mach/system.h
-@@ -20,9 +20,6 @@
- #ifndef __ASM_ARCH_SYSTEM_H
- #define __ASM_ARCH_SYSTEM_H
+ obj-$(CONFIG_CPU_W90P910)	+= nuc910.o
+diff --git a/arch/arm/mach-w90x900/include/mach/system.h b/arch/arm/mach-w90x900/include/mach/system.h
+index ce228bd..ed3478b 100644
+--- a/arch/arm/mach-w90x900/include/mach/system.h
++++ b/arch/arm/mach-w90x900/include/mach/system.h
+@@ -15,27 +15,10 @@
+  *
+  */
  
 -#include <linux/io.h>
--#include <mach/hardware.h>
+-#include <asm/proc-fns.h>
+-#include <mach/map.h>
+-#include <mach/regs-timer.h>
 -
- static inline void arch_idle(void)
+-#define	WTCR	(TMR_BA + 0x1C)
+-#define	WTCLK	(1 << 10)
+-#define	WTE	(1 << 7)
+-#define	WTRE	(1 << 1)
+-
+ static void arch_idle(void)
  {
- 	/*
-@@ -34,12 +31,6 @@ static inline void arch_idle(void)
- 
- static inline void arch_reset(char mode, const char *cmd)
- {
--	void __iomem *src_rstsr = io_p2v(NOMADIK_SRC_BASE + 0x18);
--
--	/* FIXME: use egpio when implemented */
--
--	/* Write anything to Reset status register */
--	writel(1, src_rstsr);
  }
  
- #endif
+-static void arch_reset(char mode, const char *cmd)
++static inline void arch_reset(char mode, const char *cmd)
+ {
+-	if (mode == 's') {
+-		/* Jump into ROM@address 0 */
+-		cpu_reset(0);
+-	} else {
+-		__raw_writel(WTE | WTRE | WTCLK, WTCR);
+-	}
+ }
+-
+diff --git a/arch/arm/mach-w90x900/reset.c b/arch/arm/mach-w90x900/reset.c
+new file mode 100644
+index 0000000..08f1953
+--- /dev/null
++++ b/arch/arm/mach-w90x900/reset.c
+@@ -0,0 +1,31 @@
++/*
++ * arch/arm/mach-w90x900/reset.c
++ */
++
++#include <linux/init.h>
++#include <linux/io.h>
++#include <asm/proc-fns.h>
++#include <mach/map.h>
++#include <mach/regs-timer.h>
++
++#define	WTCR	(TMR_BA + 0x1C)
++#define	WTCLK	(1 << 10)
++#define	WTE	(1 << 7)
++#define	WTRE	(1 << 1)
++
++static void w90x900_arch_reset(char mode, const char *cmd)
++{
++	if (mode == 's') {
++		/* Jump into ROM@address 0 */
++		cpu_reset(0);
++	} else {
++		__raw_writel(WTE | WTRE | WTCLK, WTCR);
++	}
++}
++
++static int __init w90x900_arch_reset_init(void)
++{
++	arm_arch_reset = w90x900_arch_reset;
++	return 0;
++}
++arch_initcall(w90x900_arch_reset_init);
 -- 
 1.7.4.1
