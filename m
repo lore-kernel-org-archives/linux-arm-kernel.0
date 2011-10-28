@@ -1,147 +1,136 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 28 Oct 2011 15:44:18 +0100
-Subject: [PATCH 50/51] ARM: plat-s3c24xx: use arm_arch_reset instead of
-	arch_reset
+Date: Fri, 28 Oct 2011 15:44:16 +0100
+Subject: [PATCH 48/51] ARM: plat-s5p: use arm_arch_reset instead of arch_reset
 In-Reply-To: <1319813059-8914-1-git-send-email-will.deacon@arm.com>
 References: <1319813059-8914-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1319813059-8914-51-git-send-email-will.deacon@arm.com>
+Message-ID: <1319813059-8914-49-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch updates plat-s3c24xx to use arm_arch_reset instead of
+This patch updates plat-s5p to use arm_arch_reset instead of
 arch_reset.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/mach-s3c2410/include/mach/system-reset.h |   32 ---------------------
- arch/arm/mach-s3c2410/include/mach/system.h       |    2 -
- arch/arm/mach-s3c64xx/include/mach/system.h       |    2 +-
- arch/arm/plat-s3c24xx/cpu.c                       |   23 +++++++++++++--
- 4 files changed, 21 insertions(+), 38 deletions(-)
- delete mode 100644 arch/arm/mach-s3c2410/include/mach/system-reset.h
+ arch/arm/mach-exynos4/include/mach/system.h        |    2 --
+ arch/arm/mach-s5p64x0/include/mach/system.h        |    2 --
+ arch/arm/mach-s5pc100/include/mach/system.h        |    2 --
+ arch/arm/mach-s5pv210/include/mach/system.h        |    2 --
+ arch/arm/plat-s5p/Makefile                         |    1 +
+ .../plat/system-reset.h => system-reset.c}         |   17 +++++++++++++----
+ 6 files changed, 14 insertions(+), 12 deletions(-)
+ rename arch/arm/plat-s5p/{include/plat/system-reset.h => system-reset.c} (66%)
 
-diff --git a/arch/arm/mach-s3c2410/include/mach/system-reset.h b/arch/arm/mach-s3c2410/include/mach/system-reset.h
-deleted file mode 100644
-index 6faadce..0000000
---- a/arch/arm/mach-s3c2410/include/mach/system-reset.h
-+++ /dev/null
-@@ -1,32 +0,0 @@
--/* arch/arm/mach-s3c2410/include/mach/system-reset.h
-- *
-- * Copyright (c) 2008 Simtec Electronics
-- *	Ben Dooks <ben@simtec.co.uk>
-- *
-- * S3C2410 - System define for arch_reset() function
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
--*/
+diff --git a/arch/arm/mach-exynos4/include/mach/system.h b/arch/arm/mach-exynos4/include/mach/system.h
+index 5e3220c..0063a6d 100644
+--- a/arch/arm/mach-exynos4/include/mach/system.h
++++ b/arch/arm/mach-exynos4/include/mach/system.h
+@@ -13,8 +13,6 @@
+ #ifndef __ASM_ARCH_SYSTEM_H
+ #define __ASM_ARCH_SYSTEM_H __FILE__
+ 
+-#include <plat/system-reset.h>
 -
--#include <mach/hardware.h>
--#include <plat/watchdog-reset.h>
--
--extern void (*s3c24xx_reset_hook)(void);
--
--static void
--arch_reset(char mode, const char *cmd)
--{
--	if (mode == 's') {
--		cpu_reset(0);
--	}
--
--	if (s3c24xx_reset_hook)
--		s3c24xx_reset_hook();
--
--	arch_wdt_reset();
--
--	/* we'll take a jump through zero as a poor second */
--	cpu_reset(0);
--}
-diff --git a/arch/arm/mach-s3c2410/include/mach/system.h b/arch/arm/mach-s3c2410/include/mach/system.h
-index a8cbca6..a94e7a6 100644
---- a/arch/arm/mach-s3c2410/include/mach/system.h
-+++ b/arch/arm/mach-s3c2410/include/mach/system.h
-@@ -54,5 +54,3 @@ static void arch_idle(void)
- 	else
- 		s3c24xx_default_idle();
- }
--
--#include <mach/system-reset.h>
-diff --git a/arch/arm/mach-s3c64xx/include/mach/system.h b/arch/arm/mach-s3c64xx/include/mach/system.h
-index 51bc8eb..436a8b3 100644
---- a/arch/arm/mach-s3c64xx/include/mach/system.h
-+++ b/arch/arm/mach-s3c64xx/include/mach/system.h
-@@ -16,7 +16,7 @@ static void arch_idle(void)
+ static void arch_idle(void)
+ {
  	/* nothing here yet */
- }
+diff --git a/arch/arm/mach-s5p64x0/include/mach/system.h b/arch/arm/mach-s5p64x0/include/mach/system.h
+index 60f5753..cf26e09 100644
+--- a/arch/arm/mach-s5p64x0/include/mach/system.h
++++ b/arch/arm/mach-s5p64x0/include/mach/system.h
+@@ -13,8 +13,6 @@
+ #ifndef __ASM_ARCH_SYSTEM_H
+ #define __ASM_ARCH_SYSTEM_H __FILE__
+ 
+-#include <plat/system-reset.h>
+-
+ static void arch_idle(void)
+ {
+ 	/* nothing here yet */
+diff --git a/arch/arm/mach-s5pc100/include/mach/system.h b/arch/arm/mach-s5pc100/include/mach/system.h
+index a9ea57c..afc96c2 100644
+--- a/arch/arm/mach-s5pc100/include/mach/system.h
++++ b/arch/arm/mach-s5pc100/include/mach/system.h
+@@ -11,8 +11,6 @@
+ #ifndef __ASM_ARCH_SYSTEM_H
+ #define __ASM_ARCH_SYSTEM_H __FILE__
+ 
+-#include <plat/system-reset.h>
+-
+ static void arch_idle(void)
+ {
+ 	/* nothing here yet */
+diff --git a/arch/arm/mach-s5pv210/include/mach/system.h b/arch/arm/mach-s5pv210/include/mach/system.h
+index af8a200..bf288ce 100644
+--- a/arch/arm/mach-s5pv210/include/mach/system.h
++++ b/arch/arm/mach-s5pv210/include/mach/system.h
+@@ -13,8 +13,6 @@
+ #ifndef __ASM_ARCH_SYSTEM_H
+ #define __ASM_ARCH_SYSTEM_H __FILE__
+ 
+-#include <plat/system-reset.h>
+-
+ static void arch_idle(void)
+ {
+ 	/* nothing here yet */
+diff --git a/arch/arm/plat-s5p/Makefile b/arch/arm/plat-s5p/Makefile
+index 4b53e04..2511d58 100644
+--- a/arch/arm/plat-s5p/Makefile
++++ b/arch/arm/plat-s5p/Makefile
+@@ -16,6 +16,7 @@ obj-y				+= dev-pmu.o
+ obj-y				+= dev-uart.o
+ obj-y				+= cpu.o
+ obj-y				+= clock.o
++obj-y				+= system-reset.o
+ obj-y				+= irq.o
+ obj-$(CONFIG_S5P_EXT_INT)	+= irq-eint.o
+ obj-$(CONFIG_S5P_GPIO_INT)	+= irq-gpioint.o
+diff --git a/arch/arm/plat-s5p/include/plat/system-reset.h b/arch/arm/plat-s5p/system-reset.c
+similarity index 66%
+rename from arch/arm/plat-s5p/include/plat/system-reset.h
+rename to arch/arm/plat-s5p/system-reset.c
+index f307f34..84a38ab 100644
+--- a/arch/arm/plat-s5p/include/plat/system-reset.h
++++ b/arch/arm/plat-s5p/system-reset.c
+@@ -1,22 +1,24 @@
+-/* linux/arch/arm/plat-s5p/include/plat/system-reset.h
++/* linux/arch/arm/plat-s5p/system-reset.c
+  *
+  * Copyright (c) 2010 Samsung Electronics Co., Ltd.
+  *		http://www.samsung.com
+  *
+  * Based on arch/arm/mach-s3c2410/include/mach/system-reset.h
+  *
+- * S5P - System define for arch_reset()
+- *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 as
+  * published by the Free Software Foundation.
+ */
+ 
++#include <linux/init.h>
++#include <linux/delay.h>
++#include <asm/system.h>
++
+ #include <plat/watchdog-reset.h>
+ 
+ void (*s5p_reset_hook)(void);
  
 -static void arch_reset(char mode, const char *cmd)
-+static inline void arch_reset(char mode, const char *cmd)
++static void s5p_arch_reset(char mode, const char *cmd)
  {
+ 	/* SWRESET support in s5p_reset_hook() */
+ 
+@@ -29,3 +31,10 @@ static void arch_reset(char mode, const char *cmd)
+ 
+ 	arch_wdt_reset();
  }
- 
-diff --git a/arch/arm/plat-s3c24xx/cpu.c b/arch/arm/plat-s3c24xx/cpu.c
-index c1fc6c6..b8714db 100644
---- a/arch/arm/plat-s3c24xx/cpu.c
-+++ b/arch/arm/plat-s3c24xx/cpu.c
-@@ -38,8 +38,6 @@
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
- 
--#include <mach/system-reset.h>
--
- #include <mach/regs-gpio.h>
- #include <plat/regs-serial.h>
- 
-@@ -51,6 +49,7 @@
- #include <plat/s3c2416.h>
- #include <plat/s3c244x.h>
- #include <plat/s3c2443.h>
-+#include <plat/watchdog-reset.h>
- 
- /* table of supported CPUs */
- 
-@@ -205,7 +204,7 @@ static void s3c24xx_pm_restart(char mode, const char *cmd)
- 		__cpuc_flush_kern_all();
- 		__cpuc_flush_user_all();
- 
--		arch_reset(mode, cmd);
-+		arm_arch_reset(mode, cmd);
- 		local_irq_restore(flags);
- 	}
- 
-@@ -213,6 +212,23 @@ static void s3c24xx_pm_restart(char mode, const char *cmd)
- 	arm_machine_restart(mode, cmd);
- }
- 
-+extern void (*s3c24xx_reset_hook)(void);
 +
-+static void s3c24xx_arch_reset(char mode, const char *cmd)
++static int __init s5p_arch_reset_init(void)
 +{
-+	if (mode == 's') {
-+		cpu_reset(0);
-+	}
-+
-+	if (s3c24xx_reset_hook)
-+		s3c24xx_reset_hook();
-+
-+	arch_wdt_reset();
-+
-+	/* we'll take a jump through zero as a poor second */
-+	cpu_reset(0);
++	arm_arch_reset = s5p_arch_reset;
++	return 0;
 +}
-+
- void __init s3c24xx_init_io(struct map_desc *mach_desc, int size)
- {
- 	unsigned long idcode = 0x0;
-@@ -227,6 +243,7 @@ void __init s3c24xx_init_io(struct map_desc *mach_desc, int size)
- 		idcode = s3c24xx_read_idcode_v4();
- 	}
- 
-+	arm_arch_reset = s3c24xx_arch_reset;
- 	arm_pm_restart = s3c24xx_pm_restart;
- 
- 	s3c_init_cpu(idcode, cpu_ids, ARRAY_SIZE(cpu_ids));
++arch_initcall(s5p_arch_reset_init);
 -- 
 1.7.4.1
