@@ -1,72 +1,81 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 28 Oct 2011 15:44:11 +0100
-Subject: [PATCH 43/51] ARM: mach-versatile: use arm_arch_reset instead of
+Date: Fri, 28 Oct 2011 15:44:12 +0100
+Subject: [PATCH 44/51] ARM: mach-vt8500: use arm_arch_reset instead of
 	arch_reset
 In-Reply-To: <1319813059-8914-1-git-send-email-will.deacon@arm.com>
 References: <1319813059-8914-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1319813059-8914-44-git-send-email-will.deacon@arm.com>
+Message-ID: <1319813059-8914-45-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch updates mach-versatile to use arm_arch_reset instead of
+This patch updates mach-vt8500 to use arm_arch_reset instead of
 arch_reset.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/mach-versatile/core.c                |   14 ++++++++++++++
- arch/arm/mach-versatile/include/mach/system.h |    8 --------
- 2 files changed, 14 insertions(+), 8 deletions(-)
+ arch/arm/mach-vt8500/Makefile              |    2 +-
+ arch/arm/mach-vt8500/include/mach/system.h |    5 -----
+ arch/arm/mach-vt8500/reset.c               |   21 +++++++++++++++++++++
+ 3 files changed, 22 insertions(+), 6 deletions(-)
+ create mode 100644 arch/arm/mach-vt8500/reset.c
 
-diff --git a/arch/arm/mach-versatile/core.c b/arch/arm/mach-versatile/core.c
-index e340a54..5d97b6e 100644
---- a/arch/arm/mach-versatile/core.c
-+++ b/arch/arm/mach-versatile/core.c
-@@ -756,6 +756,18 @@ void __init versatile_init_early(void)
- 	versatile_sched_clock_init(sys + VERSATILE_SYS_24MHz_OFFSET, 24000000);
- }
+diff --git a/arch/arm/mach-vt8500/Makefile b/arch/arm/mach-vt8500/Makefile
+index 81aedb7..1932b82 100644
+--- a/arch/arm/mach-vt8500/Makefile
++++ b/arch/arm/mach-vt8500/Makefile
+@@ -1,4 +1,4 @@
+-obj-y += devices.o gpio.o irq.o timer.o
++obj-y += devices.o gpio.o irq.o reset.o timer.o
  
-+static void versatile_arch_reset(char mode, const char *cmd)
-+{
-+	u32 val;
-+
-+	val = __raw_readl(IO_ADDRESS(VERSATILE_SYS_RESETCTL)) & ~0x7;
-+	val |= 0x105;
-+
-+	__raw_writel(0xa05f, IO_ADDRESS(VERSATILE_SYS_LOCK));
-+	__raw_writel(val, IO_ADDRESS(VERSATILE_SYS_RESETCTL));
-+	__raw_writel(0, IO_ADDRESS(VERSATILE_SYS_LOCK));
-+}
-+
- void __init versatile_init(void)
+ obj-$(CONFIG_VTWM_VERSION_VT8500) += devices-vt8500.o
+ obj-$(CONFIG_VTWM_VERSION_WM8505) += devices-wm8505.o
+diff --git a/arch/arm/mach-vt8500/include/mach/system.h b/arch/arm/mach-vt8500/include/mach/system.h
+index d6c757e..4bbcce4 100644
+--- a/arch/arm/mach-vt8500/include/mach/system.h
++++ b/arch/arm/mach-vt8500/include/mach/system.h
+@@ -2,10 +2,6 @@
+  * arch/arm/mach-vt8500/include/mach/system.h
+  *
+  */
+-#include <asm/io.h>
+-
+-/* PM Software Reset request register */
+-#define VT8500_PMSR_VIRT	0xf8130060
+ 
+ static inline void arch_idle(void)
  {
- 	int i;
-@@ -773,6 +785,8 @@ void __init versatile_init(void)
- #ifdef CONFIG_LEDS
- 	leds_event = versatile_leds_event;
- #endif
-+
-+	arm_arch_reset = versatile_arch_reset;
- }
- 
- /*
-diff --git a/arch/arm/mach-versatile/include/mach/system.h b/arch/arm/mach-versatile/include/mach/system.h
-index 8ffc12a..ebc6348 100644
---- a/arch/arm/mach-versatile/include/mach/system.h
-+++ b/arch/arm/mach-versatile/include/mach/system.h
-@@ -36,14 +36,6 @@ static inline void arch_idle(void)
+@@ -14,5 +10,4 @@ static inline void arch_idle(void)
  
  static inline void arch_reset(char mode, const char *cmd)
  {
--	u32 val;
--
--	val = __raw_readl(IO_ADDRESS(VERSATILE_SYS_RESETCTL)) & ~0x7;
--	val |= 0x105;
--
--	__raw_writel(0xa05f, IO_ADDRESS(VERSATILE_SYS_LOCK));
--	__raw_writel(val, IO_ADDRESS(VERSATILE_SYS_RESETCTL));
--	__raw_writel(0, IO_ADDRESS(VERSATILE_SYS_LOCK));
+-	writel(1, VT8500_PMSR_VIRT);
  }
- 
- #endif
+diff --git a/arch/arm/mach-vt8500/reset.c b/arch/arm/mach-vt8500/reset.c
+new file mode 100644
+index 0000000..631721a
+--- /dev/null
++++ b/arch/arm/mach-vt8500/reset.c
+@@ -0,0 +1,21 @@
++/*
++ * arch/arm/mach-vt8500/reset.c
++ */
++
++#include <linux/init.h>
++#include <asm/io.h>
++
++/* PM Software Reset request register */
++#define VT8500_PMSR_VIRT	0xf8130060
++
++static void vt8500_arch_reset(char mode, const char *cmd)
++{
++	writel(1, VT8500_PMSR_VIRT);
++}
++
++static int __init vt8500_arch_reset_init(void)
++{
++	arm_arch_reset = vt8500_arch_reset;
++	return 0;
++}
++arch_initcall(vt8500_arch_reset_init);
 -- 
 1.7.4.1
