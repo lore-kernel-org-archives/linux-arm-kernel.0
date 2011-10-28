@@ -1,24 +1,30 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Fri, 28 Oct 2011 10:11:48 -0700
-Subject: [PATCH] arch: arm: tegra: Enable headphone detection gpio
-In-Reply-To: <1319819226-19098-1-git-send-email-thutt@chromium.org>
-References: <1319819226-19098-1-git-send-email-thutt@chromium.org>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF173EDAB4E7@HQMAIL01.nvidia.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 28 Oct 2011 11:34:22 -0700
+Subject: [RFC] Shrink sched_clock some more
+In-Reply-To: <4E7C48E2.5040907@arm.com>
+References: <20110922153611.GC8072@n2100.arm.linux.org.uk>
+	<4E7C48E2.5040907@arm.com>
+Message-ID: <4EAAF5AE.6090300@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Taylor Hutt wrote at Friday, October 28, 2011 10:27 AM:
-> From: Yufeng Shen <miletus@chromium.org>
-> 
-> Enable the headphone detection gpio on tegra platform.
-> 
-> Signed-off-by: Yufeng Shen <miletus@chromium.org>
+On 09/23/11 01:52, Marc Zyngier wrote:
+> On 22/09/11 16:36, Russell King - ARM Linux wrote:
+>> ... by getting rid of the fixed-constant optimization, and moving the
+>> update code into arch/arm/kernel/sched_clock.c.
+>>
+>> Platforms now only have to supply a function to read the sched_clock
+>> register, and some basic information such as the number of significant
+>> bits and the tick rate.
+> This looks similar to a patch I posted a while ago:
+> http://patchwork.ozlabs.org/patch/112318/
+>
+>
 
-Aha, that explains why this seemed to have stopped working when I tried
-it on Seaboard recently; I guess it never did. Harmony already does this
-correctly, and that's where I must have tested the feature initially.
-
-Acked-by: Stephen Warren <swarren@nvidia.com>
+Can we get one of these two patches merged next merge window? I'd like
+to add sched_clock support to MSM and building on top of this patch is
+easier than the other way around.
 
 -- 
-nvpublic
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
