@@ -1,64 +1,53 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 28 Oct 2011 15:44:02 +0100
-Subject: [PATCH 34/51] ARM: mach-pxa: use arm_arch_reset instead of arch_reset
+Date: Fri, 28 Oct 2011 15:43:40 +0100
+Subject: [PATCH 12/51] ARM: mach-h720x: use arm_arch_reset instead of
+	arch_reset
 In-Reply-To: <1319813059-8914-1-git-send-email-will.deacon@arm.com>
 References: <1319813059-8914-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1319813059-8914-35-git-send-email-will.deacon@arm.com>
+Message-ID: <1319813059-8914-13-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch updates mach-pxa to use arm_arch_reset instead of
+This patch updates mach-h720x to use arm_arch_reset instead of
 arch_reset.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/mach-pxa/include/mach/system.h |    6 +++---
- arch/arm/mach-pxa/reset.c               |    8 +++++++-
- 2 files changed, 10 insertions(+), 4 deletions(-)
+ arch/arm/mach-h720x/common.c              |   12 ++++++++++++
+ arch/arm/mach-h720x/include/mach/system.h |    1 -
+ 2 files changed, 12 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-pxa/include/mach/system.h b/arch/arm/mach-pxa/include/mach/system.h
-index d1fce8b..0687110 100644
---- a/arch/arm/mach-pxa/include/mach/system.h
-+++ b/arch/arm/mach-pxa/include/mach/system.h
-@@ -11,8 +11,6 @@
-  */
- 
- #include <asm/proc-fns.h>
--#include "hardware.h"
--#include "pxa2xx-regs.h"
- 
- static inline void arch_idle(void)
+diff --git a/arch/arm/mach-h720x/common.c b/arch/arm/mach-h720x/common.c
+index 51d4e44..1ad66f2 100644
+--- a/arch/arm/mach-h720x/common.c
++++ b/arch/arm/mach-h720x/common.c
+@@ -242,3 +242,15 @@ void __init h720x_map_io(void)
  {
-@@ -20,4 +18,6 @@ static inline void arch_idle(void)
+ 	iotable_init(h720x_io_desc,ARRAY_SIZE(h720x_io_desc));
  }
- 
- 
--void arch_reset(char mode, const char *cmd);
-+static inline void arch_reset(char mode, const char *cmd)
++
++static void h720x_arch_reset(char mode, const char *cmd)
 +{
++	CPU_REG (PMU_BASE, PMU_STAT) |= PMU_WARMRESET;
 +}
-diff --git a/arch/arm/mach-pxa/reset.c b/arch/arm/mach-pxa/reset.c
-index 01e9d64..075598a 100644
---- a/arch/arm/mach-pxa/reset.c
-+++ b/arch/arm/mach-pxa/reset.c
-@@ -81,7 +81,7 @@ static void do_hw_reset(void)
- 	OSMR3 = OSCR + 368640;	/* ... in 100 ms */
- }
- 
--void arch_reset(char mode, const char *cmd)
-+static void pxa_arch_reset(char mode, const char *cmd)
- {
- 	clear_reset_status(RESET_STATUS_ALL);
- 
-@@ -100,3 +100,9 @@ void arch_reset(char mode, const char *cmd)
- 	}
- }
- 
-+static int __init pxa_arch_reset_init(void)
++
++static int __init h720x_arch_reset_init(void)
 +{
-+	arm_arch_reset = pxa_arch_reset;
++	arm_arch_reset = h720x_arch_reset;
 +	return 0;
 +}
-+arch_initcall(pxa_arch_reset_init);
++arch_initcall(h720x_arch_reset_init);
+diff --git a/arch/arm/mach-h720x/include/mach/system.h b/arch/arm/mach-h720x/include/mach/system.h
+index a708d24..4c2fba9 100644
+--- a/arch/arm/mach-h720x/include/mach/system.h
++++ b/arch/arm/mach-h720x/include/mach/system.h
+@@ -27,7 +27,6 @@ static void arch_idle(void)
+ 
+ static __inline__ void arch_reset(char mode, const char *cmd)
+ {
+-	CPU_REG (PMU_BASE, PMU_STAT) |= PMU_WARMRESET;
+ }
+ 
+ #endif
 -- 
 1.7.4.1
