@@ -1,96 +1,69 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 28 Oct 2011 15:43:48 +0100
-Subject: [PATCH 20/51] ARM: mach-ixp4xx: use arm_arch_reset instead of
-	arch_reset
+Date: Fri, 28 Oct 2011 15:43:33 +0100
+Subject: [PATCH 05/51] ARM: cns3xxx: use arm_arch_reset instead of arch_reset
 In-Reply-To: <1319813059-8914-1-git-send-email-will.deacon@arm.com>
 References: <1319813059-8914-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1319813059-8914-21-git-send-email-will.deacon@arm.com>
+Message-ID: <1319813059-8914-6-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch updates mach-ixp4xx to use arm_arch_reset instead of
+This patch updates mach-cns3xxx to use arm_arch_reset instead of
 arch_reset.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/mach-ixp4xx/common.c              |   22 ++++++++++++++++++++++
- arch/arm/mach-ixp4xx/include/mach/system.h |   19 -------------------
- 2 files changed, 22 insertions(+), 19 deletions(-)
+ arch/arm/mach-cns3xxx/cns3420vb.c           |    3 +++
+ arch/arm/mach-cns3xxx/include/mach/system.h |    4 +++-
+ arch/arm/mach-cns3xxx/pm.c                  |    2 +-
+ 3 files changed, 7 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-ixp4xx/common.c b/arch/arm/mach-ixp4xx/common.c
-index 0777257..9e38334 100644
---- a/arch/arm/mach-ixp4xx/common.c
-+++ b/arch/arm/mach-ixp4xx/common.c
-@@ -375,6 +375,26 @@ static struct platform_device *ixp46x_devices[] __initdata = {
- unsigned long ixp4xx_exp_bus_size;
- EXPORT_SYMBOL(ixp4xx_exp_bus_size);
+diff --git a/arch/arm/mach-cns3xxx/cns3420vb.c b/arch/arm/mach-cns3xxx/cns3420vb.c
+index 3e7d149..e19bda7 100644
+--- a/arch/arm/mach-cns3xxx/cns3420vb.c
++++ b/arch/arm/mach-cns3xxx/cns3420vb.c
+@@ -167,6 +167,8 @@ static struct platform_device *cns3420_pdevs[] __initdata = {
+ 	&cns3xxx_usb_ohci_device,
+ };
  
-+static void ixp4xx_arch_reset(char mode, const char *cmd)
++extern void cns3xxx_arch_reset(char mode, const char *cmd);
++
+ static void __init cns3420_init(void)
+ {
+ 	cns3xxx_l2x0_init();
+@@ -176,6 +178,7 @@ static void __init cns3420_init(void)
+ 	cns3xxx_ahci_init();
+ 	cns3xxx_sdhci_init();
+ 
++	arm_arch_reset = cns3xxx_arch_reset;
+ 	pm_power_off = cns3xxx_power_off;
+ }
+ 
+diff --git a/arch/arm/mach-cns3xxx/include/mach/system.h b/arch/arm/mach-cns3xxx/include/mach/system.h
+index 4f16c9b..092d774 100644
+--- a/arch/arm/mach-cns3xxx/include/mach/system.h
++++ b/arch/arm/mach-cns3xxx/include/mach/system.h
+@@ -23,6 +23,8 @@ static inline void arch_idle(void)
+ 	cpu_do_idle();
+ }
+ 
+-void arch_reset(char mode, const char *cmd);
++static inline void arch_reset(char mode, const char *cmd)
 +{
-+	if ( 1 && mode == 's') {
-+		/* Jump into ROM at address 0 */
-+		cpu_reset(0);
-+	} else {
-+		/* Use on-chip reset capability */
-+
-+		/* set the "key" register to enable access to
-+		 * "timer" and "enable" registers
-+		 */
-+		*IXP4XX_OSWK = IXP4XX_WDT_KEY;
-+
-+		/* write 0 to the timer register for an immediate reset */
-+		*IXP4XX_OSWT = 0;
-+
-+		*IXP4XX_OSWE = IXP4XX_WDT_RESET_ENABLE | IXP4XX_WDT_COUNT_ENABLE;
-+	}
 +}
-+
- void __init ixp4xx_sys_init(void)
- {
- 	ixp4xx_exp_bus_size = SZ_16M;
-@@ -397,6 +417,8 @@ void __init ixp4xx_sys_init(void)
  
- 	printk("IXP4xx: Using %luMiB expansion bus window size\n",
- 			ixp4xx_exp_bus_size >> 20);
-+
-+	arm_arch_reset = ixp4xx_arch_reset;
+ #endif
+diff --git a/arch/arm/mach-cns3xxx/pm.c b/arch/arm/mach-cns3xxx/pm.c
+index 0c04678..a3e01f9 100644
+--- a/arch/arm/mach-cns3xxx/pm.c
++++ b/arch/arm/mach-cns3xxx/pm.c
+@@ -89,7 +89,7 @@ void cns3xxx_pwr_soft_rst(unsigned int block)
  }
+ EXPORT_SYMBOL(cns3xxx_pwr_soft_rst);
  
- /*
-diff --git a/arch/arm/mach-ixp4xx/include/mach/system.h b/arch/arm/mach-ixp4xx/include/mach/system.h
-index 54c0af7..ed5964c 100644
---- a/arch/arm/mach-ixp4xx/include/mach/system.h
-+++ b/arch/arm/mach-ixp4xx/include/mach/system.h
-@@ -9,8 +9,6 @@
-  *
-  */
- 
--#include <mach/hardware.h>
--
- static inline void arch_idle(void)
+-void arch_reset(char mode, const char *cmd)
++void cns3xxx_arch_reset(char mode, const char *cmd)
  {
- 	/* ixp4xx does not implement the XScale PWRMODE register,
-@@ -24,21 +22,4 @@ static inline void arch_idle(void)
- 
- static inline void arch_reset(char mode, const char *cmd)
- {
--	if ( 1 && mode == 's') {
--		/* Jump into ROM at address 0 */
--		cpu_reset(0);
--	} else {
--		/* Use on-chip reset capability */
--
--		/* set the "key" register to enable access to
--		 * "timer" and "enable" registers
--		 */
--		*IXP4XX_OSWK = IXP4XX_WDT_KEY;
--
--		/* write 0 to the timer register for an immediate reset */
--		*IXP4XX_OSWT = 0;
--
--		*IXP4XX_OSWE = IXP4XX_WDT_RESET_ENABLE | IXP4XX_WDT_COUNT_ENABLE;
--	}
- }
--
+ 	/*
+ 	 * To reset, we hit the on-board reset register
 -- 
 1.7.4.1
