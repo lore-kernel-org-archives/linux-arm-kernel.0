@@ -1,38 +1,59 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Fri, 28 Oct 2011 11:18:51 -0400 (EDT)
-Subject: [PATCH] AMBA: Use suspend_noriq to force devices into runtime
-	suspend
-In-Reply-To: <4EAA63FA.8050506@stericsson.com>
-Message-ID: <Pine.LNX.4.44L0.1110281051090.2175-100000@iolanthe.rowland.org>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Fri, 28 Oct 2011 09:18:27 -0700
+Subject: [PATCH 2/6] arm/tegra: prepare pinmux code for multiple tegra
+	variants
+In-Reply-To: <20111028081738.GA12383@tbergstrom-lnx.Nvidia.com>
+References: <1319561644-6160-1-git-send-email-pdeschrijver@nvidia.com>
+	<1319561644-6160-3-git-send-email-pdeschrijver@nvidia.com>
+	<74CDBE0F657A3D45AFBB94109FB122FF173E1B49AA@HQMAIL01.nvidia.com>
+	<20111028081738.GA12383@tbergstrom-lnx.Nvidia.com>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF173EDAB4A4@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 28 Oct 2011, Ulf Hansson wrote:
+Peter De Schrijver wrote at Friday, October 28, 2011 2:18 AM:
+> On Thu, Oct 27, 2011 at 09:59:49PM +0200, Stephen Warren wrote:
+> > Peter De Schrijver wrote at Tuesday, October 25, 2011 10:54 AM:
+> > > This patch modifies the pinmux code to be useable for multiple tegra variants.
+> > > Some tegra20 specific constants will be replaced by variables which will be
+> > > initialized to the appropriate value at runtime.
+...
+> > > @@ -668,11 +668,24 @@ void tegra_pinmux_config_pullupdown_table(const struct tegra_pingroup_config *co
+> > >  	}
+> > >  }
+> > >
+> > > +static struct of_device_id tegra_pinmux_of_match[] __devinitdata = {
+> > > +	{ .compatible = "nvidia,tegra20-pinmux", tegra20_pinmux_init },
+> > > +	{ },
+> > > +};
+> > > +
+> > >  static int __devinit tegra_pinmux_probe(struct platform_device *pdev)
+> > >  {
+> > >  	struct resource *res;
+> > >  	int i;
+> > >  	int config_bad = 0;
+> > > +	const struct of_device_id *match;
+> > > +
+> > > +#ifdef CONFIG_OF
+> > > +	match = of_match_device(tegra_pinmux_of_match, &pdev->dev);
+> >
+> > What if match==NULL? I suppose that "can't" happen with DT, since the
+> > device wouldn't have been probed unless there was a matching entry...
+> 
+> Exactly. That was my reasoning as well. We can't get here unless there is a
+> match.
+> 
+> > Does this work when booting without DT; IIRC the internal patches I saw
+> > fell back to hard-coding a call to tegra20_pinmux_init() when booting
+> > a static board file (i.e. not booting device-tree)? Perhaps that's in a
+> 
+> Unfortunately I don't have a tegra20 board which is supported without
+> devicetree.
 
-> The idea with having them as separate functions and something with 
-> "runtime" in the name is because it is only when having 
-> CONFIG_PM_RUNTIME the functions actually does something.
+Oh, that's quite unfortunate. Still, you need to write the code so it's
+expected to work for the non-DT case. Once you've fixed this, if you
+push a complete branch somewhere, I can boot-test it on a few non-DT
+boards. Hopefully I can test on Cardhu too.
 
-No, that's off the main point.
-
-In fact, you're not really using these terms properly.  You shouldn't 
-think of "runtime suspend" as a single verb -- that is, you shouldn't 
-think "Okay, let's runtime-suspend this device now".
-
-The verb is just "suspend", and it means the same thing as "put into a
-low-power state".  The "runtime" part refers to _when_ the low-power 
-transition takes place: while the rest of the system is running (as 
-opposed to while the rest of the system is going to sleep).
-
-Thus, it makes no sense at all for a comment in a suspend_noirq
-callback to say "let's runtime-suspend the device".  That's a 
-contradiction in terms.  The right way to think about it is more like 
-this: "If the device isn't already in a low-power state, let's put it 
-in a low-power state now".
-
-In your case, the device already is (or should be) at low power.  A
-better way to phrase this might be: "If the device's power hasn't
-already been turned off, and the device doesn't need to generate wakeup
-requests, turn off the power now".
-
-Alan Stern
+-- 
+nvpublic
