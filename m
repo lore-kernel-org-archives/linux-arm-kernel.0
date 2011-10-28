@@ -1,26 +1,29 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 28 Oct 2011 21:37:29 +0200
-Subject: [PATCH 42/51] ARM: mach-u300: use arm_arch_reset instead of
-	arch_reset
-In-Reply-To: <1319813059-8914-43-git-send-email-will.deacon@arm.com>
-References: <1319813059-8914-1-git-send-email-will.deacon@arm.com>
-	<1319813059-8914-43-git-send-email-will.deacon@arm.com>
-Message-ID: <CACRpkdZ9iCtb0uy_VGnOsd61PAL4+aOTFNq0RO7psf8XNAbtnw@mail.gmail.com>
+Date: Fri, 28 Oct 2011 22:03:34 +0200
+Subject: [PATCH] pinctrl: Fix "warning: 'struct pinctrl_dev' declared
+	inside parameter list"
+In-Reply-To: <1319773104-3541-1-git-send-email-Barry.Song@csr.com>
+References: <1319773104-3541-1-git-send-email-Barry.Song@csr.com>
+Message-ID: <CACRpkdaG_J1pKhzsfbjAEv6AQ_V0q6w=VTyxf6ur5aQdAnK34A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 28, 2011 at 4:44 PM, Will Deacon <will.deacon@arm.com> wrote:
+On Fri, Oct 28, 2011 at 5:38 AM, Barry Song <Barry.Song@csr.com> wrote:
 
-> This patch updates mach-u300 to use arm_arch_reset instead of
-> arch_reset.
+> From: Barry Song <Baohua.Song@csr.com>
 >
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> when pinctl subsystem is not selected, when compiling drivers including
+> the include/linux/pinctrl/pinctrl.h, we will get the warning as below:
+> In file included from include/linux/pinctrl/pinmux.h:17,
+> ? ? ? ? ? ? ? ? from drivers/tty/serial/sirfsoc_uart.c:25:
+> include/linux/pinctrl/pinctrl.h:126: warning: 'struct pinctrl_dev'
+> ? ? ? ? ? ? ? ?declared inside parameter list
+> include/linux/pinctrl/pinctrl.h:126: warning: its scope is only this
+> ? ? ?definition or declaration, which is probably not what you want
+>
+> Signed-off-by: Barry Song <Baohua.Song@csr.com>
 
-Looks like a good idea so I applied patch 1 and this patch, and it JustWorks,
-compiles, performs reset on the U300.
+OK applied.
 
-Tested-by: Linus Walleij <linus.walleij@linaro.org>
-For patch 1 and 42.
-
-Yours,
+Thanks,
 Linus Walleij
