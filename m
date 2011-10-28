@@ -1,43 +1,37 @@
-From: Barry.Song@csr.com (Barry Song)
-Date: Thu, 27 Oct 2011 20:38:24 -0700
-Subject: [PATCH] pinctrl: Fix "warning: 'struct pinctrl_dev' declared inside
-	parameter list"
-Message-ID: <1319773104-3541-1-git-send-email-Barry.Song@csr.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Fri, 28 Oct 2011 09:39:42 +0530
+Subject: [PATCH v4] dmaengine: add CSR SiRFprimaII DMAC driver
+In-Reply-To: <5EB3BFCD089AD643B9BB63439F5FD5E98419F7FF@SHAASIEXM01.ASIA.ROOT.PRI>
+References: <1318907324-17046-1-git-send-email-Barry.Song@csr.com>
+	<1319703535.20054.30.camel@vkoul-udesk3>
+	<5EB3BFCD089AD643B9BB63439F5FD5E98419F7FF@SHAASIEXM01.ASIA.ROOT.PRI>
+Message-ID: <1319774982.20054.228.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Barry Song <Baohua.Song@csr.com>
+On Fri, 2011-10-28 at 01:49 +0000, Barry Song wrote:
+> > Also, Please ensure you send patches which compile with ZERO warnings:
+> > drivers/dma/sirf-dma.c: In function 'sirfsoc_dma_probe':
+> > drivers/dma/sirf-dma.c:616: warning: assignment from incompatible pointer
+> > type
+> > drivers/dma/sirf-dma.c:617: warning: assignment from incompatible pointer
+> > type
+> > which comes from the fact that your prep_interleaved_dma does not have
+> > last argument of flags.
+> > On the second one you have not rebased to patch from Jassi which I
+> > applied after converting direction stuff.
+> 
+> 
+[pls wrap 80chars within paragraphs, i have reformatted below)
+> I rebased to both yours and Jassi by my merging manually. I remember
+> you have changed the last param of device_prep_dma_cyclic from
+> dma_data_direction to dma_transfer_direction. After checking the tree
+> interleaved_dma @ git://git.infradead.org/users/vkoul/slave-dma.git,
+> it doesn't. then make another compiling warning in
+> sirfsoc_dma_prep_cyclic(). so I'll still use dma_data_direction in
+> sirfsoc_dma_prep_cyclic().
+Yes for cyclic, I have missed to fix that. I will push the fixed version
+now
 
-when pinctl subsystem is not selected, when compiling drivers including
-the include/linux/pinctrl/pinctrl.h, we will get the warning as below:
-In file included from include/linux/pinctrl/pinmux.h:17,
-                 from drivers/tty/serial/sirfsoc_uart.c:25:
-include/linux/pinctrl/pinctrl.h:126: warning: 'struct pinctrl_dev'
-		declared inside parameter list
-include/linux/pinctrl/pinctrl.h:126: warning: its scope is only this
-      definition or declaration, which is probably not what you want
-
-Signed-off-by: Barry Song <Baohua.Song@csr.com>
----
- include/linux/pinctrl/pinctrl.h |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
-
-diff --git a/include/linux/pinctrl/pinctrl.h b/include/linux/pinctrl/pinctrl.h
-index 3605e94..04c0110 100644
---- a/include/linux/pinctrl/pinctrl.h
-+++ b/include/linux/pinctrl/pinctrl.h
-@@ -121,6 +121,7 @@ extern const char *pinctrl_dev_get_name(struct pinctrl_dev *pctldev);
- extern void *pinctrl_dev_get_drvdata(struct pinctrl_dev *pctldev);
- #else
- 
-+struct pinctrl_dev;
- 
- /* Sufficiently stupid default function when pinctrl is not in use */
- static inline bool pin_is_valid(struct pinctrl_dev *pctldev, int pin)
 -- 
-1.7.1
-
-
-
-Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
-More information can be found at www.csr.com. Follow CSR on Twitter at http://twitter.com/CSR_PLC and read our blog at www.csr.com/blog
+~Vinod
