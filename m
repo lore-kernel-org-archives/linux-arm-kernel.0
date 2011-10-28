@@ -1,56 +1,92 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 28 Oct 2011 15:43:55 +0100
-Subject: [PATCH 27/51] ARM: mach-mxs: use arm_arch_reset instead of arch_reset
+Date: Fri, 28 Oct 2011 15:44:05 +0100
+Subject: [PATCH 37/51] ARM: mach-s3c64xx: use arm_arch_reset instead of
+	arch_reset
 In-Reply-To: <1319813059-8914-1-git-send-email-will.deacon@arm.com>
 References: <1319813059-8914-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1319813059-8914-28-git-send-email-will.deacon@arm.com>
+Message-ID: <1319813059-8914-38-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch updates mach-mxs to use arm_arch_reset instead of
+This patch updates mach-s3c64xx to use arm_arch_reset instead of
 arch_reset.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/mach-mxs/include/mach/system.h |    4 +++-
- arch/arm/mach-mxs/system.c              |    4 +++-
- 2 files changed, 6 insertions(+), 2 deletions(-)
+ arch/arm/mach-s3c64xx/Makefile              |    1 +
+ arch/arm/mach-s3c64xx/include/mach/system.h |    7 -------
+ arch/arm/mach-s3c64xx/reset.c               |   26 ++++++++++++++++++++++++++
+ 3 files changed, 27 insertions(+), 7 deletions(-)
+ create mode 100644 arch/arm/mach-s3c64xx/reset.c
 
-diff --git a/arch/arm/mach-mxs/include/mach/system.h b/arch/arm/mach-mxs/include/mach/system.h
-index 0e42823..bcd8989 100644
---- a/arch/arm/mach-mxs/include/mach/system.h
-+++ b/arch/arm/mach-mxs/include/mach/system.h
-@@ -22,6 +22,8 @@ static inline void arch_idle(void)
- 	cpu_do_idle();
- }
+diff --git a/arch/arm/mach-s3c64xx/Makefile b/arch/arm/mach-s3c64xx/Makefile
+index 61b4034..ba2f2ac 100644
+--- a/arch/arm/mach-s3c64xx/Makefile
++++ b/arch/arm/mach-s3c64xx/Makefile
+@@ -14,6 +14,7 @@ obj-				:=
+ obj-y				+= cpu.o
+ obj-y				+= clock.o
+ obj-y				+= gpiolib.o
++obj-y				+= reset.o
  
--void arch_reset(char mode, const char *cmd);
-+static inline void arch_reset(char mode, const char *cmd)
-+{
-+}
+ # Core support for S3C6400 system
  
- #endif /* __MACH_MXS_SYSTEM_H__ */
-diff --git a/arch/arm/mach-mxs/system.c b/arch/arm/mach-mxs/system.c
-index 20ec3bd..add6428 100644
---- a/arch/arm/mach-mxs/system.c
-+++ b/arch/arm/mach-mxs/system.c
-@@ -42,7 +42,7 @@ static void __iomem *mxs_clkctrl_reset_addr;
- /*
-  * Reset the system. It is called by machine_restart().
-  */
--void arch_reset(char mode, const char *cmd)
-+static void mxs_arch_reset(char mode, const char *cmd)
+diff --git a/arch/arm/mach-s3c64xx/include/mach/system.h b/arch/arm/mach-s3c64xx/include/mach/system.h
+index 2e58cb7..51bc8eb 100644
+--- a/arch/arm/mach-s3c64xx/include/mach/system.h
++++ b/arch/arm/mach-s3c64xx/include/mach/system.h
+@@ -11,8 +11,6 @@
+ #ifndef __ASM_ARCH_SYSTEM_H
+ #define __ASM_ARCH_SYSTEM_H __FILE__
+ 
+-#include <plat/watchdog-reset.h>
+-
+ static void arch_idle(void)
  {
- 	/* reset the chip */
- 	__mxs_setl(MXS_CLKCTRL_RESET_CHIP, mxs_clkctrl_reset_addr);
-@@ -68,6 +68,8 @@ static int __init mxs_arch_reset_init(void)
- 	if (!IS_ERR(clk))
- 		clk_enable(clk);
+ 	/* nothing here yet */
+@@ -20,11 +18,6 @@ static void arch_idle(void)
  
-+	arm_arch_reset = mxs_arch_reset;
-+
- 	return 0;
+ static void arch_reset(char mode, const char *cmd)
+ {
+-	if (mode != 's')
+-		arch_wdt_reset();
+-
+-	/* if all else fails, or mode was for soft, jump to 0 */
+-	cpu_reset(0);
  }
- core_initcall(mxs_arch_reset_init);
+ 
+ #endif /* __ASM_ARCH_IRQ_H */
+diff --git a/arch/arm/mach-s3c64xx/reset.c b/arch/arm/mach-s3c64xx/reset.c
+new file mode 100644
+index 0000000..2ea710c
+--- /dev/null
++++ b/arch/arm/mach-s3c64xx/reset.c
+@@ -0,0 +1,26 @@
++/*
++ * arch/arm/mach-s3c64xx/reset.c
++ */
++
++#include <linux/delay.h>
++#include <linux/init.h>
++
++#include <plat/watchdog-reset.h>
++
++#include <asm/proc-fns.h>
++
++static void s3c64xx_arch_reset(char mode, const char *cmd)
++{
++	if (mode != 's')
++		arch_wdt_reset();
++
++	/* if all else fails, or mode was for soft, jump to 0 */
++	cpu_reset(0);
++}
++
++static int __init s3c64xx_arch_reset_init(void)
++{
++	arm_arch_reset = s3c64xx_arch_reset;
++	return 0;
++}
++arch_initcall(s3c64xx_arch_reset_init);
 -- 
 1.7.4.1
