@@ -1,45 +1,52 @@
-From: anup@brainfault.org (Anup Patel)
-Date: Fri, 28 Oct 2011 17:35:16 +0530
-Subject: [ANNOUNCE] [OFFTOPIC] Xvisor: eXtensible Versatile hypervISOR
-Message-ID: <CAAhSdy227WA-+6AGzP1iw1m6Ubs2SUhuz81PMscceWxYuPe5eA@mail.gmail.com>
+From: vapier@gentoo.org (Mike Frysinger)
+Date: Fri, 28 Oct 2011 14:15:00 +0200
+Subject: [PATCH] asm-generic/gpio.h: merge basic gpiolib wrappers
+In-Reply-To: <20111027131124.GK19187@n2100.arm.linux.org.uk>
+References: <1319528012-19006-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+	<1319720503-3183-1-git-send-email-vapier@gentoo.org>
+	<20111027131124.GK19187@n2100.arm.linux.org.uk>
+Message-ID: <CAJaTeTp71t0BYsEpDu07BE5ox2FBAiH7xEQqjhb=6QadrsQGAQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Announcing Xvisor v0.1.0, a new open source bare-metal hypervisor, which aims
-towards providing virtualization solution, which is light-weight, portable,
-and flexible with small memory foot print and less virtualization overhead.
-It is distributed under GNU Public License (GPLv2).
+On Thu, Oct 27, 2011 at 15:11, Russell King - ARM Linux wrote:
+> This is extremely dangerous. ?Consider for example this code
+> (see ARM mach-davinci's gpio.h):
 
-Xvisor has most of the features expected from a modern full fledged hypervisor:
- - Tree based configuration
- - Tickless and high resolution timekeeping
- - Threading framework
- - Device driver framework
- - CPU virtualization
- - Address Space virtualization
- - Device emulation framework
- - Serial port virtualization
- - Managment terminal
+it's interesting you highlight davinci.  if i'm reading things
+correctly, the current davinci code is broken today and my v2 proposed
+patch actually fixes it.
 
-Xvisor is currently being ported for two architectures: ARM and MIPS. The
-development & testing is being done using QEMU (0.14.xx or higher).
+let's see if i have this right:
+arch/arm/include/asm/gpio.h:
+...
+#include <mach/gpio.h>
+#ifndef __ARM_GPIOLIB_COMPLEX
+/* The trivial gpiolib dispatchers */
+#define gpio_get_value  __gpio_get_value
+#define gpio_set_value  __gpio_set_value
+#define gpio_cansleep   __gpio_cansleep
+#endif
+...
 
-Xvisor ARM is able to boot multiple unmodified Linux-2.6.30.10 or Linux-3.0.4
-guest with a fairly interactive and smooth Busybox 0.19.2 console. Currently
-supported host for Xvisor ARM is Realview-PB-A8 Board emulated by QEMU. It is
-also being ported to real hardware, specifically Beagle Board.
+arch/arm/mach-davinci/include/mach/gpio.h:
+...
+#include <asm-generic/gpio.h>
+...
+static inline void gpio_set_value(unsigned gpio, int value)
+{
+    if (__builtin_constant_p(value) && gpio < davinci_soc_info.gpio_num) {
+           ... do some SoC checking ...
+    }
+    __gpio_set_value(gpio, value);
+}
+... same thing for gpio_get_value and gpio_cansleep ...
+...
 
-Please try out our Xivsor ARM demo on QEMU (0.14.xx or higher). To download
-the demo tarball visit the link below:
-https://docs.google.com/a/brainfault.org/leaf?id=0B0ABS_s60oP_OGE2MDA0MWYtNDUxOS00YWZkLTllMmMtN2M5MmE1ZGM0NDky&hl=en_GB
+since the davinci code doesn't define __ARM_GPIOLIB_COMPLEX, the
+common arm gpio.h will rewrite these few gpio calls to the gpiolib
+code all the time, and so all the inline funcs in the davinci header
+always get ignored.
 
-Xvisor MIPS is still a work in progress and will be announced very soon.
-
-Xvisor is currently hosted on Github, to clone or download source code please
-visit following links:
-Mainline: https://github.com/xvisor/xvisor
-ARM Development: https://github.com/avpatel/xvisor-arm
-MIPS Development: https://github.com/hschauhan/xvisor-mips
-
-Our developer mailing list is xvisor-devel[at]googlegroups[dot]com, please feel
-free to post your queries or join our development mailing list.
+i noticed because when comparing the compiled
+-mike
