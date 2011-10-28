@@ -1,166 +1,82 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 28 Oct 2011 15:43:38 +0100
-Subject: [PATCH 10/51] ARM: mach-footbridge: use arm_arch_reset instead of
+Date: Fri, 28 Oct 2011 15:43:59 +0100
+Subject: [PATCH 31/51] ARM: mach-orion5x: use arm_arch_reset instead of
 	arch_reset
 In-Reply-To: <1319813059-8914-1-git-send-email-will.deacon@arm.com>
 References: <1319813059-8914-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1319813059-8914-11-git-send-email-will.deacon@arm.com>
+Message-ID: <1319813059-8914-32-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch updates mach-footbridge to use arm_arch_reset instead of
+This patch updates mach-orion5x to use arm_arch_reset instead of
 arch_reset.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/mach-footbridge/Makefile              |    2 +-
- arch/arm/mach-footbridge/include/mach/system.h |   46 ----------------
- arch/arm/mach-footbridge/reset.c               |   69 ++++++++++++++++++++++++
- 3 files changed, 70 insertions(+), 47 deletions(-)
- create mode 100644 arch/arm/mach-footbridge/reset.c
+ arch/arm/mach-orion5x/common.c              |   17 +++++++++++++++++
+ arch/arm/mach-orion5x/include/mach/system.h |    8 --------
+ 2 files changed, 17 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/mach-footbridge/Makefile b/arch/arm/mach-footbridge/Makefile
-index 3afb1b2..39821ce 100644
---- a/arch/arm/mach-footbridge/Makefile
-+++ b/arch/arm/mach-footbridge/Makefile
-@@ -4,7 +4,7 @@
+diff --git a/arch/arm/mach-orion5x/common.c b/arch/arm/mach-orion5x/common.c
+index 0ab531d..557e4eb 100644
+--- a/arch/arm/mach-orion5x/common.c
++++ b/arch/arm/mach-orion5x/common.c
+@@ -13,6 +13,7 @@
+ #include <linux/kernel.h>
+ #include <linux/init.h>
+ #include <linux/platform_device.h>
++#include <linux/delay.h>
+ #include <linux/dma-mapping.h>
+ #include <linux/serial_8250.h>
+ #include <linux/mbus.h>
+@@ -268,6 +269,17 @@ static void __init orion5x_id(u32 *dev, u32 *rev, char **dev_name)
+ 	}
+ }
  
- # Object file lists.
++static void orion5x_arch_reset(char mode, const char *cmd)
++{
++	/*
++	 * Enable and issue soft reset
++	 */
++	orion5x_setbits(RSTOUTn_MASK, (1 << 2));
++	orion5x_setbits(CPU_SOFT_RESET, 1);
++	mdelay(200);
++	orion5x_clrbits(CPU_SOFT_RESET, 1);
++}
++
+ void __init orion5x_init(void)
+ {
+ 	char *dev_name;
+@@ -302,6 +314,11 @@ void __init orion5x_init(void)
+ 	 * Register watchdog driver
+ 	 */
+ 	orion5x_wdt_init();
++
++	/*
++	 * Assign reset hook.
++	 */
++	arm_arch_reset = orion5x_arch_reset;
+ }
  
--obj-y			:= common.o dc21285.o dma.o isa-irq.o
-+obj-y			:= common.o dc21285.o dma.o isa-irq.o reset.o
- obj-m			:=
- obj-n			:=
- obj-			:=
-diff --git a/arch/arm/mach-footbridge/include/mach/system.h b/arch/arm/mach-footbridge/include/mach/system.h
-index 0b29315..0c19392 100644
---- a/arch/arm/mach-footbridge/include/mach/system.h
-+++ b/arch/arm/mach-footbridge/include/mach/system.h
-@@ -20,50 +20,4 @@ static inline void arch_idle(void)
+ /*
+diff --git a/arch/arm/mach-orion5x/include/mach/system.h b/arch/arm/mach-orion5x/include/mach/system.h
+index a1d6e46..91a933c 100644
+--- a/arch/arm/mach-orion5x/include/mach/system.h
++++ b/arch/arm/mach-orion5x/include/mach/system.h
+@@ -20,14 +20,6 @@ static inline void arch_idle(void)
  
  static inline void arch_reset(char mode, const char *cmd)
  {
--	if (mode == 's') {
--		/*
--		 * Jump into the ROM
--		 */
--		cpu_reset(0x41000000);
--	} else {
--		if (machine_is_netwinder()) {
--			/* open up the SuperIO chip
--			 */
--			outb(0x87, 0x370);
--			outb(0x87, 0x370);
--
--			/* aux function group 1 (logical device 7)
--			 */
--			outb(0x07, 0x370);
--			outb(0x07, 0x371);
--
--			/* set GP16 for WD-TIMER output
--			 */
--			outb(0xe6, 0x370);
--			outb(0x00, 0x371);
--
--			/* set a RED LED and toggle WD_TIMER for rebooting
--			 */
--			outb(0xc4, 0x338);
--		} else {
--			/* 
--			 * Force the watchdog to do a CPU reset.
--			 *
--			 * After making sure that the watchdog is disabled
--			 * (so we can change the timer registers) we first
--			 * enable the timer to autoreload itself.  Next, the
--			 * timer interval is set really short and any
--			 * current interrupt request is cleared (so we can
--			 * see an edge transition).  Finally, TIMER4 is
--			 * enabled as the watchdog.
--			 */
--			*CSR_SA110_CNTL &= ~(1 << 13);
--			*CSR_TIMER4_CNTL = TIMER_CNTL_ENABLE |
--					   TIMER_CNTL_AUTORELOAD |
--					   TIMER_CNTL_DIV16;
--			*CSR_TIMER4_LOAD = 0x2;
--			*CSR_TIMER4_CLR  = 0;
--			*CSR_SA110_CNTL |= (1 << 13);
--		}
--	}
+-	/*
+-	 * Enable and issue soft reset
+-	 */
+-	orion5x_setbits(RSTOUTn_MASK, (1 << 2));
+-	orion5x_setbits(CPU_SOFT_RESET, 1);
+-	mdelay(200);
+-	orion5x_clrbits(CPU_SOFT_RESET, 1);
  }
-diff --git a/arch/arm/mach-footbridge/reset.c b/arch/arm/mach-footbridge/reset.c
-new file mode 100644
-index 0000000..f61e559
---- /dev/null
-+++ b/arch/arm/mach-footbridge/reset.c
-@@ -0,0 +1,69 @@
-+/*
-+ * arch/arm/mach-footbridge/reset.c
-+ */
-+
-+#include <linux/init.h>
-+#include <linux/io.h>
-+#include <linux/spinlock.h>
-+#include <asm/hardware/dec21285.h>
-+#include <mach/hardware.h>
-+#include <asm/leds.h>
-+#include <asm/mach-types.h>
-+#include <asm/proc-fns.h>
-+
-+static void footbridge_arch_reset(char mode, const char *cmd)
-+{
-+	if (mode == 's') {
-+		/*
-+		 * Jump into the ROM
-+		 */
-+		cpu_reset(0x41000000);
-+	} else {
-+		if (machine_is_netwinder()) {
-+			/* open up the SuperIO chip
-+			 */
-+			outb(0x87, 0x370);
-+			outb(0x87, 0x370);
-+
-+			/* aux function group 1 (logical device 7)
-+			 */
-+			outb(0x07, 0x370);
-+			outb(0x07, 0x371);
-+
-+			/* set GP16 for WD-TIMER output
-+			 */
-+			outb(0xe6, 0x370);
-+			outb(0x00, 0x371);
-+
-+			/* set a RED LED and toggle WD_TIMER for rebooting
-+			 */
-+			outb(0xc4, 0x338);
-+		} else {
-+			/*
-+			 * Force the watchdog to do a CPU reset.
-+			 *
-+			 * After making sure that the watchdog is disabled
-+			 * (so we can change the timer registers) we first
-+			 * enable the timer to autoreload itself.  Next, the
-+			 * timer interval is set really short and any
-+			 * current interrupt request is cleared (so we can
-+			 * see an edge transition).  Finally, TIMER4 is
-+			 * enabled as the watchdog.
-+			 */
-+			*CSR_SA110_CNTL &= ~(1 << 13);
-+			*CSR_TIMER4_CNTL = TIMER_CNTL_ENABLE |
-+					   TIMER_CNTL_AUTORELOAD |
-+					   TIMER_CNTL_DIV16;
-+			*CSR_TIMER4_LOAD = 0x2;
-+			*CSR_TIMER4_CLR  = 0;
-+			*CSR_SA110_CNTL |= (1 << 13);
-+		}
-+	}
-+}
-+
-+static int __init footbridge_arch_reset_init(void)
-+{
-+	arm_arch_reset = footbridge_arch_reset;
-+	return 0;
-+}
-+arch_initcall(footbridge_arch_reset_init);
+ 
+-
+ #endif
 -- 
 1.7.4.1
