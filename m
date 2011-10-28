@@ -1,91 +1,83 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 28 Oct 2011 15:43:51 +0100
-Subject: [PATCH 23/51] ARM: mach-lpc32xx: use arm_arch_reset instead of
+Date: Fri, 28 Oct 2011 15:44:06 +0100
+Subject: [PATCH 38/51] ARM: mach-sa1100: use arm_arch_reset instead of
 	arch_reset
 In-Reply-To: <1319813059-8914-1-git-send-email-will.deacon@arm.com>
 References: <1319813059-8914-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1319813059-8914-24-git-send-email-will.deacon@arm.com>
+Message-ID: <1319813059-8914-39-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch updates mach-lpc32xx to use arm_arch_reset instead of
+This patch updates mach-sa1100 to use arm_arch_reset instead of
 arch_reset.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/mach-lpc32xx/common.c              |   30 +++++++++++++++++++++++++++
- arch/arm/mach-lpc32xx/include/mach/system.h |   21 ------------------
- 2 files changed, 30 insertions(+), 21 deletions(-)
+ arch/arm/mach-sa1100/generic.c             |   13 +++++++++++++
+ arch/arm/mach-sa1100/include/mach/system.h |    8 --------
+ 2 files changed, 13 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/mach-lpc32xx/common.c b/arch/arm/mach-lpc32xx/common.c
-index 205b2db..200bd51 100644
---- a/arch/arm/mach-lpc32xx/common.c
-+++ b/arch/arm/mach-lpc32xx/common.c
-@@ -311,3 +311,33 @@ void __init lpc32xx_map_io(void)
- {
- 	iotable_init(lpc32xx_io_desc, ARRAY_SIZE(lpc32xx_io_desc));
+diff --git a/arch/arm/mach-sa1100/generic.c b/arch/arm/mach-sa1100/generic.c
+index e21f347..fb49654 100644
+--- a/arch/arm/mach-sa1100/generic.c
++++ b/arch/arm/mach-sa1100/generic.c
+@@ -25,6 +25,7 @@
+ #include <asm/mach/flash.h>
+ #include <asm/irq.h>
+ #include <asm/gpio.h>
++#include <asm/proc-fns.h>
+ 
+ #include "generic.h"
+ 
+@@ -126,6 +127,17 @@ static void sa1100_power_off(void)
+ 	PMCR = PMCR_SF;
  }
-+
-+static void lpc32xx_arch_reset(char mode, const char *cmd)
+ 
++static void sa1100_arch_reset(char mode, const char *cmd)
 +{
-+	switch (mode) {
-+	case 's':
-+	case 'h':
-+		printk(KERN_CRIT "RESET: Rebooting system\n");
-+
-+		/* Disable interrupts */
-+		local_irq_disable();
-+
-+		lpc32xx_watchdog_reset();
-+		break;
-+
-+	default:
-+		/* Do nothing */
-+		break;
++	if (mode == 's') {
++		/* Jump into ROM at address 0 */
++		cpu_reset(0);
++	} else {
++		/* Use on-chip reset capability */
++		RSRR = RSRR_SWR;
 +	}
-+
-+	/* Wait for watchdog to reset system */
-+	while (1)
-+		;
 +}
 +
-+static int __init lpc32xx_arch_reset_init(void)
-+{
-+	arm_arch_reset = lpc32xx_arch_reset;
-+	return 0;
-+}
-+arch_initcall(lpc32xx_arch_reset_init);
-diff --git a/arch/arm/mach-lpc32xx/include/mach/system.h b/arch/arm/mach-lpc32xx/include/mach/system.h
-index df3b0de..9c6cc0c 100644
---- a/arch/arm/mach-lpc32xx/include/mach/system.h
-+++ b/arch/arm/mach-lpc32xx/include/mach/system.h
-@@ -26,27 +26,6 @@ static void arch_idle(void)
+ static void sa11x0_register_device(struct platform_device *dev, void *data)
+ {
+ 	int err;
+@@ -351,6 +363,7 @@ static struct platform_device *sa11x0_devices[] __initdata = {
+ 
+ static int __init sa1100_init(void)
+ {
++	arm_arch_reset = sa1100_arch_reset;
+ 	pm_power_off = sa1100_power_off;
+ 	return platform_add_devices(sa11x0_devices, ARRAY_SIZE(sa11x0_devices));
+ }
+diff --git a/arch/arm/mach-sa1100/include/mach/system.h b/arch/arm/mach-sa1100/include/mach/system.h
+index ba9da9f..ac3bdb8 100644
+--- a/arch/arm/mach-sa1100/include/mach/system.h
++++ b/arch/arm/mach-sa1100/include/mach/system.h
+@@ -3,7 +3,6 @@
+  *
+  * Copyright (c) 1999 Nicolas Pitre <nico@fluxnic.net>
+  */
+-#include <mach/hardware.h>
+ 
+ static inline void arch_idle(void)
+ {
+@@ -12,11 +11,4 @@ static inline void arch_idle(void)
  
  static inline void arch_reset(char mode, const char *cmd)
  {
--	extern void lpc32xx_watchdog_reset(void);
--
--	switch (mode) {
--	case 's':
--	case 'h':
--		printk(KERN_CRIT "RESET: Rebooting system\n");
--
--		/* Disable interrupts */
--		local_irq_disable();
--
--		lpc32xx_watchdog_reset();
--		break;
--
--	default:
--		/* Do nothing */
--		break;
+-	if (mode == 's') {
+-		/* Jump into ROM at address 0 */
+-		cpu_reset(0);
+-	} else {
+-		/* Use on-chip reset capability */
+-		RSRR = RSRR_SWR;
 -	}
--
--	/* Wait for watchdog to reset system */
--	while (1)
--		;
  }
- 
- #endif
 -- 
 1.7.4.1
