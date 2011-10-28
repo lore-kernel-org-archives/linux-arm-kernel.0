@@ -1,45 +1,33 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 28 Oct 2011 08:19:50 -0500
-Subject: [PATCH] dt: add empty of_alias_get_id() for non-dt builds
-In-Reply-To: <1319706448-1664-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1319706448-1664-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <4EAAABF6.50803@gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 28 Oct 2011 15:51:45 +0200
+Subject: [PATCH] asm-generic/gpio.h: merge basic gpiolib wrappers
+In-Reply-To: <20111028124200.GU19187@n2100.arm.linux.org.uk>
+References: <1319528012-19006-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+	<1319720503-3183-1-git-send-email-vapier@gentoo.org>
+	<20111027131124.GK19187@n2100.arm.linux.org.uk>
+	<CAJaTeTp71t0BYsEpDu07BE5ox2FBAiH7xEQqjhb=6QadrsQGAQ@mail.gmail.com>
+	<20111028124200.GU19187@n2100.arm.linux.org.uk>
+Message-ID: <CACRpkda4NvJeh3X6M57tV_9BbAvY99KQikxB+e0nXtABKU2mQg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/27/2011 04:07 AM, Nicolas Ferre wrote:
-> Add function of_alias_get_id() reporting -ENOSYS
-> for non-dt builds, so that drivers migrating to dt
-> can save some '#ifdef CONFIG_OF'.
-> 
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+On Fri, Oct 28, 2011 at 2:42 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Fri, Oct 28, 2011 at 02:15:00PM +0200, Mike Frysinger wrote:
+>>
+>> it's interesting you highlight davinci. ?if i'm reading things
+>> correctly, the current davinci code is broken today and my v2 proposed
+>> patch actually fixes it.
+>
+> That looks like an error in patch 5f3fcf9649dbb010ccac41259d04147775ec8fc2
+> (ARM: 7040/1: mach-davinci: break out GPIO driver specifics) which does
+> this:
+>
+> -#define __ARM_GPIOLIB_COMPLEX
+>
+> Linus, can you send a fix?
 
-Acked-by: Rob Herring <rob.herring@calxeda.com>
+OK I'm onto it.
 
-> ---
-> Hi Grant,
-> 
-> Another empty function for non-dt builds. Can we consider
-> queuing it for 3.1?
-> 
-> Best regards,
-> 
->  include/linux/of.h |    5 +++++
->  1 files changed, 5 insertions(+), 0 deletions(-)
-> 
-> diff --git a/include/linux/of.h b/include/linux/of.h
-> index 92c40a1..34d8338 100644
-> --- a/include/linux/of.h
-> +++ b/include/linux/of.h
-> @@ -302,6 +302,11 @@ static inline struct device_node *of_parse_phandle(struct device_node *np,
->  	return NULL;
->  }
->  
-> +static inline int of_alias_get_id(struct device_node *np, const char *stem)
-> +{
-> +	return -ENOSYS;
-> +}
-> +
->  #define of_match_ptr(_ptr)	NULL
->  #define of_match_node(_matches, _node)	NULL
->  #endif /* CONFIG_OF */
+Sorry for the mess!
+Linus Walleij
