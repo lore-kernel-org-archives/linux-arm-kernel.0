@@ -1,79 +1,61 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Sat, 29 Oct 2011 13:08:18 +0200
-Subject: [git pull] trivial gpio build failure fixups
-In-Reply-To: <CACxGe6sNC0FseUj2pSL0y4yEJaFg=gNAP=54Ow6n8jXe2mBapA@mail.gmail.com>
-References: <CACxGe6sNC0FseUj2pSL0y4yEJaFg=gNAP=54Ow6n8jXe2mBapA@mail.gmail.com>
-Message-ID: <CACxGe6t+P5DRb0nV6wAD78F=aSt=OtWxiRByOhNAEPhWDkHs6Q@mail.gmail.com>
+From: marco.stornelli@gmail.com (Marco Stornelli)
+Date: Sat, 29 Oct 2011 13:04:30 +0200
+Subject: [PATCH] ramoops appears geared to not support ARM
+In-Reply-To: <20111029093458.GX19187@n2100.arm.linux.org.uk>
+References: <1319844110-23062-1-git-send-email-bfreed@chromium.org>
+	<4EABBBD3.5030700@gmail.com>
+	<20111029093458.GX19187@n2100.arm.linux.org.uk>
+Message-ID: <4EABDDBE.5080407@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Oops, one more...
-
-g.
-
-The following changes since commit ec7ae517537ae5c7b0b2cd7f562dfa3e7a05b954:
-
-  Merge git://git.kernel.org/pub/scm/linux/kernel/git/jejb/scsi-misc-2.6
-(2011-10-28 16:44:18 -0700)
-
-are available in the git repository at:
-
-  git://git.secretlab.ca/git/linux-2.6 devicetree/merge
-
-Grant Likely (1):
-      gpio: Fix ARM versatile-express build failure
-
-Kalle Valo (1):
-      of: include errno.h
-
-Linus Walleij (1):
-      ARM: mark empty gpio.h files empty
-
- arch/arm/mach-lpc32xx/include/mach/gpio.h  |    1 +
- arch/arm/mach-tegra/include/mach/gpio.h    |    1 +
- arch/arm/mach-u300/include/mach/gpio.h     |    1 +
- arch/arm/mach-vexpress/include/mach/gpio.h |    1 +
- include/linux/of.h                         |    1 +
- 5 files changed, 5 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-vexpress/include/mach/gpio.h
 
 
-On Sat, Oct 29, 2011 at 12:57 PM, Grant Likely
-<grant.likely@secretlab.ca> wrote:
-> Hi Linus,
+Il 29/10/2011 11:34, Russell King - ARM Linux ha scritto:
+> On Sat, Oct 29, 2011 at 10:39:47AM +0200, Marco Stornelli wrote:
+>> (Added linux-arm)
+>>
+>> Il 29/10/2011 01:21, Bryan Freed ha scritto:
+>>> I had some difficulty in getting ramoops to work on our ARM systems.
+>>> The driver maps memory with ioremap() which is supposed to map IO memory,
+>>> not physical RAM.  This happens to work on x86 and apparently some other
+>>> architectures, but it does not work on ARM.
+>>> Specifically, I see this comment in __arm_ioremap_pfn_caller():
+>>> 	Don't allow RAM to be mapped - this causes problems with ARMv6+
+>>>
+>>> So here is a patch that hacks around the issue using page_is_ram() to
+>>> differentiate between the two.
+>>>
+>>> Am I missing something here?
+>>> Is ramoops working on any ARM systems yet, and I am just doing something wrong?
+>>>
+>>> My ARM platform reserves a section of RAM for use by ramoops, but it is still
+>>> mapped along with the rest of main memory.  This is so /dev/mem can find it
+>>> with xlate_dev_mem_ptr().
+>>> On x86, I see our BIOS reserves the memory so that it is not counted as main
+>>> memory, and it is not mapped until ramoops ioremaps it.
+>>>
+>>> Bryan Freed (1):
+>>>     ramoops: Add support for ARM systems.
+>>>
+>>>    drivers/char/ramoops.c |   67 +++++++++++++++++++++++++++++++++++++----------
+>>>    1 files changed, 52 insertions(+), 15 deletions(-)
+>>>
+>>
+>> Can some ARM guys give an opinion about that?
 >
-> nothing to say here, subject says it all.
->
-> g.
->
-> The following changes since commit ec7ae517537ae5c7b0b2cd7f562dfa3e7a05b954:
->
-> ?Merge git://git.kernel.org/pub/scm/linux/kernel/git/jejb/scsi-misc-2.6
-> (2011-10-28 16:44:18 -0700)
->
-> are available in the git repository at:
->
-> ?git://git.secretlab.ca/git/linux-2.6 devicetree/merge
->
-> Grant Likely (1):
-> ? ? ?gpio: Fix ARM versatile-express build failure
->
-> Kalle Valo (1):
-> ? ? ?of: include errno.h
->
-> ?arch/arm/mach-vexpress/include/mach/gpio.h | ? ?1 +
-> ?include/linux/of.h ? ? ? ? ? ? ? ? ? ? ? ? | ? ?1 +
-> ?2 files changed, 2 insertions(+), 0 deletions(-)
-> ?create mode 100644 arch/arm/mach-vexpress/include/mach/gpio.h
->
->
-> --
-> Grant Likely, B.Sc., P.Eng.
-> Secret Lab Technologies Ltd.
+> Opinion about the patch which isn't present in this email (so we can't
+> see it) or about the commentry above?
 >
 
+About the ioremap problem. It seems there is a problem on some ARM arch 
+to use ioremap (ramoops driver) to remap a piece of RAM even if it's not 
+used by kernel (reserved at boot with mem option, Bryan can you 
+confirm?). It has been suggested by Bryan to use xlate_dev_mem_ptr(), 
+but I'm not sure if the problem is how to reserve the memory on these 
+ARM archs. I believe ioremap is a general way to do it, of course not 
+using kernel already used by kernel, am I right? Or to be compliant with 
+all archs (in this particular case with ARMv6+) we should use 
+xlate_dev_mem_ptr()?
 
-
--- 
-Grant Likely, B.Sc., P.Eng.
-Secret Lab Technologies Ltd.
+Marco
