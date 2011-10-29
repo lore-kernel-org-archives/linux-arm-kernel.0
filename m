@@ -1,53 +1,44 @@
-From: cesarb@cesarb.net (Cesar Eduardo Barros)
-Date: Sat, 29 Oct 2011 17:32:29 -0200
-Subject: [PATCH] s3c2410: remove __ioaddrc()
-Message-ID: <1319916749-14899-1-git-send-email-cesarb@cesarb.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 29 Oct 2011 21:05:48 +0100
+Subject: [PATCH 01/51] ARM: reset: introduce arm_arch_reset function
+	pointer
+In-Reply-To: <20111029135653.GA25057@mudshark.cambridge.arm.com>
+References: <1319813059-8914-1-git-send-email-will.deacon@arm.com>
+	<1319813059-8914-2-git-send-email-will.deacon@arm.com>
+	<20111029102108.GY19187@n2100.arm.linux.org.uk>
+	<20111029135653.GA25057@mudshark.cambridge.arm.com>
+Message-ID: <20111029200548.GC19187@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-While looking at s3c2410's mach/io.h, I noticed the #define for
-__ioaddr() looked wrong. While the #defines above it called the "c"
-suffixed variant when __builtin_constant_p() was true, the one for
-__ioaddr() called the "c" suffixed variant (__ioaddrc()) when
-__builtin_constant_p() was *false*.
+On Sat, Oct 29, 2011 at 02:56:53PM +0100, Will Deacon wrote:
+> Hi Russell,
+> 
+> On Sat, Oct 29, 2011 at 11:21:08AM +0100, Russell King - ARM Linux wrote:
+> > I think this is slightly the wrong approach.  We already have:
+> > 
+> > void (*arm_pm_restart)(char str, const char *cmd) = arm_machine_restart;
+> > EXPORT_SYMBOL_GPL(arm_pm_restart);
+> > 
+> > so why do we need a new function pointer?  We could convert the bulk of
+> > arm_machine_restart() to a library function (setup_restart()), moving
+> > the failure to reboot into machine_restart().
+> 
+> Funny you should mention this approach. I've been toying with something
+> similar for the kexec reset path but I hadn't managed to join the dots
+> between that and the arch_reset code.
+> 
+> I initially observed this in the idle code, where it looks to me like all
+> the pm_idle overrides could actually be done in the arch_idle hook (the only
+> slightly fiddly one is OMAP). Maybe Nicolas could use the same sort of
+> approach for that?
 
-Looking further, I noticed that __ioaddr() and __ioaddrc() were
-identical, the only difference being that __ioaddr() is an inline
-function and __ioaddrc() is a macro.
+Beware about changing the semantics of pm_idle - it's a cross-arch thing,
+and we really shouldn't change those semantics without changing the other
+architectures as well.
 
-__ioaddrc() is not used anywhere else. There were similar constructs,
-also reversed from what I'd expect, in both mach-clps7500 (removed from
-the kernel in 2.6.29) and mach-rpc. The copy in mach-rpc was removed in
-commit 6de2c31d3dad7384b3efa03674bd6ed479d58cb2 (rpc: remove obsolete IO
-accessors).
+> I'll give this a go for v2, thanks. Once this is sorted out I'll do a second
+> pass to clean up the reboot modes since I've already got some patches for
+> that.
 
-Since __ioaddrc() is both redundant and useless, has no other uses, and
-has already been removed in mach-rpc, remove it also in mach-s3c2410.
-
-Signed-off-by: Cesar Eduardo Barros <cesarb@cesarb.net>
----
- arch/arm/mach-s3c2410/include/mach/io.h |    3 ---
- 1 files changed, 0 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/mach-s3c2410/include/mach/io.h b/arch/arm/mach-s3c2410/include/mach/io.h
-index 118749f..5843974 100644
---- a/arch/arm/mach-s3c2410/include/mach/io.h
-+++ b/arch/arm/mach-s3c2410/include/mach/io.h
-@@ -190,15 +190,12 @@ DECLARE_IO(int,l,"")
- 	result;								\
- })
- 
--#define __ioaddrc(port)	((__PORT_PCIO(port) ? PCIO_BASE + (port) : (void __iomem *)(port)))
--
- #define inb(p)		(__builtin_constant_p((p)) ? __inbc(p)	   : __inb(p))
- #define inw(p)		(__builtin_constant_p((p)) ? __inwc(p)	   : __inw(p))
- #define inl(p)		(__builtin_constant_p((p)) ? __inlc(p)	   : __inl(p))
- #define outb(v,p)	(__builtin_constant_p((p)) ? __outbc(v,p) : __outb(v,p))
- #define outw(v,p)	(__builtin_constant_p((p)) ? __outwc(v,p) : __outw(v,p))
- #define outl(v,p)	(__builtin_constant_p((p)) ? __outlc(v,p) : __outl(v,p))
--#define __ioaddr(p)	(__builtin_constant_p((p)) ? __ioaddr(p)  : __ioaddrc(p))
- 
- #define insb(p,d,l)	__raw_readsb(__ioaddr(p),d,l)
- #define insw(p,d,l)	__raw_readsw(__ioaddr(p),d,l)
--- 
-1.7.6.4
+Great.
