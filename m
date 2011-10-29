@@ -1,37 +1,44 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Sat, 29 Oct 2011 12:57:54 +0200
-Subject: [git pull] trivial gpio build failure fixups
-Message-ID: <CACxGe6sNC0FseUj2pSL0y4yEJaFg=gNAP=54Ow6n8jXe2mBapA@mail.gmail.com>
+Date: Sat, 29 Oct 2011 13:03:20 +0200
+Subject: [PATCH v2 2/3] arm/dt: tegra: add dts file for paz00
+In-Reply-To: <20111029084330.GW19187@n2100.arm.linux.org.uk>
+References: <cover.1319658296.git.marvin24@gmx.de>
+	<e528a8eb783ace4729e0c76ca72d500d5281c9af.1319658296.git.marvin24@gmx.de>
+	<74CDBE0F657A3D45AFBB94109FB122FF173E1B48D7@HQMAIL01.nvidia.com>
+	<3520326.MNh26pzpGT@fb07-iapwap2>
+	<74CDBE0F657A3D45AFBB94109FB122FF173EDAB4C7@HQMAIL01.nvidia.com>
+	<20111029084330.GW19187@n2100.arm.linux.org.uk>
+Message-ID: <20111029110320.GD20132@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Sat, Oct 29, 2011 at 09:43:30AM +0100, Russell King - ARM Linux wrote:
+> On Fri, Oct 28, 2011 at 09:49:49AM -0700, Stephen Warren wrote:
+> > When boards boot from DT, there is no fixup function to override the
+> > bootloader's ATAGs. I also see a bunch of code to set up the memory
+> > information from DT e.g. setup_machine_fdt()'s call to:
+> > 
+> > 	of_scan_flat_dt(early_init_dt_scan_memory, NULL);
+> > 
+> > ... but I assume that happens before the ATAGs are processed, and the
+> > buggy ATAGs end up overriding the information in the DT file.
+> 
+> As far as the uncompressed kernel is concerned, there is either ATAG
+> or DT information, never both.  If the boot loader provides ATAGs and
+> the zImage has a DT appended to it, the zImage decompressor merges the
+> ATAGs into the appended DT and passes the DT to the kernel.
+> 
+> So anyone who currently 'fixes' their broken boot loader via the fixup
+> function by directly manipulating the ATAGS is going to hit the DT
+> image instead.
 
-nothing to say here, subject says it all.
+Ugh.  Not pretty.  A platform could still have board specific fixup
+code that matches on the compatible string that deals with broken
+firmware ATAGs, but I don't think that is what we want to do.
+
+We could handle it by filling the .dts file with an empty 'reg'
+property for memory, and only push in the legacy ATAG data if reg is
+indeed empty.  That gives the option of overriding ATAGs if the DT
+already specifies memory.  Need to think about this more.
 
 g.
-
-The following changes since commit ec7ae517537ae5c7b0b2cd7f562dfa3e7a05b954:
-
-  Merge git://git.kernel.org/pub/scm/linux/kernel/git/jejb/scsi-misc-2.6
-(2011-10-28 16:44:18 -0700)
-
-are available in the git repository at:
-
-  git://git.secretlab.ca/git/linux-2.6 devicetree/merge
-
-Grant Likely (1):
-      gpio: Fix ARM versatile-express build failure
-
-Kalle Valo (1):
-      of: include errno.h
-
- arch/arm/mach-vexpress/include/mach/gpio.h |    1 +
- include/linux/of.h                         |    1 +
- 2 files changed, 2 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-vexpress/include/mach/gpio.h
-
-
--- 
-Grant Likely, B.Sc., P.Eng.
-Secret Lab Technologies Ltd.
