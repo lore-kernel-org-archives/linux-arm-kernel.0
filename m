@@ -1,44 +1,43 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 29 Oct 2011 09:43:30 +0100
-Subject: [PATCH v2 2/3] arm/dt: tegra: add dts file for paz00
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF173EDAB4C7@HQMAIL01.nvidia.com>
-References: <cover.1319658296.git.marvin24@gmx.de>
-	<e528a8eb783ace4729e0c76ca72d500d5281c9af.1319658296.git.marvin24@gmx.de>
-	<74CDBE0F657A3D45AFBB94109FB122FF173E1B48D7@HQMAIL01.nvidia.com>
-	<3520326.MNh26pzpGT@fb07-iapwap2>
-	<74CDBE0F657A3D45AFBB94109FB122FF173EDAB4C7@HQMAIL01.nvidia.com>
-Message-ID: <20111029084330.GW19187@n2100.arm.linux.org.uk>
+From: marco.stornelli@gmail.com (Marco Stornelli)
+Date: Sat, 29 Oct 2011 10:39:47 +0200
+Subject: [PATCH] ramoops appears geared to not support ARM
+In-Reply-To: <1319844110-23062-1-git-send-email-bfreed@chromium.org>
+References: <1319844110-23062-1-git-send-email-bfreed@chromium.org>
+Message-ID: <4EABBBD3.5030700@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 28, 2011 at 09:49:49AM -0700, Stephen Warren wrote:
-> When boards boot from DT, there is no fixup function to override the
-> bootloader's ATAGs. I also see a bunch of code to set up the memory
-> information from DT e.g. setup_machine_fdt()'s call to:
-> 
-> 	of_scan_flat_dt(early_init_dt_scan_memory, NULL);
-> 
-> ... but I assume that happens before the ATAGs are processed, and the
-> buggy ATAGs end up overriding the information in the DT file.
+(Added linux-arm)
 
-As far as the uncompressed kernel is concerned, there is either ATAG
-or DT information, never both.  If the boot loader provides ATAGs and
-the zImage has a DT appended to it, the zImage decompressor merges the
-ATAGs into the appended DT and passes the DT to the kernel.
+Il 29/10/2011 01:21, Bryan Freed ha scritto:
+> I had some difficulty in getting ramoops to work on our ARM systems.
+> The driver maps memory with ioremap() which is supposed to map IO memory,
+> not physical RAM.  This happens to work on x86 and apparently some other
+> architectures, but it does not work on ARM.
+> Specifically, I see this comment in __arm_ioremap_pfn_caller():
+> 	Don't allow RAM to be mapped - this causes problems with ARMv6+
+>
+> So here is a patch that hacks around the issue using page_is_ram() to
+> differentiate between the two.
+>
+> Am I missing something here?
+> Is ramoops working on any ARM systems yet, and I am just doing something wrong?
+>
+> My ARM platform reserves a section of RAM for use by ramoops, but it is still
+> mapped along with the rest of main memory.  This is so /dev/mem can find it
+> with xlate_dev_mem_ptr().
+> On x86, I see our BIOS reserves the memory so that it is not counted as main
+> memory, and it is not mapped until ramoops ioremaps it.
+>
+> Bryan Freed (1):
+>    ramoops: Add support for ARM systems.
+>
+>   drivers/char/ramoops.c |   67 +++++++++++++++++++++++++++++++++++++----------
+>   1 files changed, 52 insertions(+), 15 deletions(-)
+>
 
-So anyone who currently 'fixes' their broken boot loader via the fixup
-function by directly manipulating the ATAGS is going to hit the DT
-image instead.
+Can some ARM guys give an opinion about that?
 
-> > I've seen patches on the chromeos tree which try to reserve the gpu
-> > memory on demand. While we are at it, what is the vmalloc=192M used
-> > by most other boards for?
-> 
-> I'm not sure what vmalloc= does exactly. I somewhat doubt it's necessary
-> until we have code that uses the GPU in mainline.
+Thanks.
 
-It defines the size of the vmalloc and ioremap area - and limits the
-maximum amount of low memory (non-highmem) available to the kernel to
-achieve the specified size of the vmalloc area.  Any additional memory
-will be discarded, or in the presence of a highmem enabled kernel, will
-be turned into highmem.
+Marco
