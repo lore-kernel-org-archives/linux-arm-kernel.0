@@ -1,67 +1,28 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Sat, 29 Oct 2011 14:56:53 +0100
-Subject: [PATCH 01/51] ARM: reset: introduce arm_arch_reset function
-	pointer
-In-Reply-To: <20111029102108.GY19187@n2100.arm.linux.org.uk>
+Date: Sat, 29 Oct 2011 14:58:28 +0100
+Subject: [PATCH 33/51] ARM: mach-prima2: use arm_arch_reset instead of
+	arch_reset
+In-Reply-To: <CAGsJ_4xvOTKwd-A83arN7anNNrdN9NQoaur76izUsa0GCmd=xQ@mail.gmail.com>
 References: <1319813059-8914-1-git-send-email-will.deacon@arm.com>
-	<1319813059-8914-2-git-send-email-will.deacon@arm.com>
-	<20111029102108.GY19187@n2100.arm.linux.org.uk>
-Message-ID: <20111029135653.GA25057@mudshark.cambridge.arm.com>
+	<1319813059-8914-34-git-send-email-will.deacon@arm.com>
+	<CAGsJ_4xvOTKwd-A83arN7anNNrdN9NQoaur76izUsa0GCmd=xQ@mail.gmail.com>
+Message-ID: <20111029135827.GB25057@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
-
-On Sat, Oct 29, 2011 at 11:21:08AM +0100, Russell King - ARM Linux wrote:
-> On Fri, Oct 28, 2011 at 03:43:29PM +0100, Will Deacon wrote:
-> > arch_reset is a static inline function defined in mach/system.h and, as
-> > such, is a blocker for the single zImage work.
-> > 
-> > This patch introduces an arm_arch_reset function pointer to which
-> > platforms can assign their reset function rather than define it in the
-> > header file.
+On Sat, Oct 29, 2011 at 10:41:09AM +0100, Barry Song wrote:
+> 2011/10/28 Will Deacon <will.deacon@arm.com>:
+> > This patch updates mach-prima2 to use arm_arch_reset instead of
+> > arch_reset.
+> >
+> > Signed-off-by: Will Deacon <will.deacon@arm.com>
 > 
-> I think this is slightly the wrong approach.  We already have:
-> 
-> void (*arm_pm_restart)(char str, const char *cmd) = arm_machine_restart;
-> EXPORT_SYMBOL_GPL(arm_pm_restart);
-> 
-> so why do we need a new function pointer?  We could convert the bulk of
-> arm_machine_restart() to a library function (setup_restart()), moving
-> the failure to reboot into machine_restart().
+> Hi Will, i guess you can move the arch reset of prima2 to
+> arch/arm/mach-prima2/rstc.c instead of creating a new file. rstc is
+> the reset controller driver in prima2. so that is the right file to
+> place your codes. and you will not need to include system.h as well.
 
-Funny you should mention this approach. I've been toying with something
-similar for the kexec reset path but I hadn't managed to join the dots
-between that and the arch_reset code.
-
-I initially observed this in the idle code, where it looks to me like all
-the pm_idle overrides could actually be done in the arch_idle hook (the only
-slightly fiddly one is OMAP). Maybe Nicolas could use the same sort of
-approach for that?
-
-> This would then allow everyone to hook into the restart via the same
-> method irrespective of what they want, and if they want the old
-> 'arch_reset' way, call setup_restart() themselves.
-
-Yup, it's a fantastic idea because it allows us to put all of the identity
-mapping bits into setup_restart as well. So then platforms make the choice
-about the mapping they want, rather than being told via the reboot mode.
-
-The only downside is that I have to go over all of the platforms again
-unless I can polish up my Coccinelle-fu. Ho-hum.
-
-> IOW, something like this:
-> 
->  arch/arm/include/asm/system.h |    2 +-
->  arch/arm/kernel/process.c     |   30 +++++++++++++++++-------------
->  2 files changed, 18 insertions(+), 14 deletions(-)
-
-[...]
-
-I'll give this a go for v2, thanks. Once this is sorted out I'll do a second
-pass to clean up the reboot modes since I've already got some patches for
-that.
-
-Cheers,
+Aha! rstc is a reset controller rather than a dyslexic realtime clock. Thanks,
+I'll used that file for v2 if needed.
 
 Will
