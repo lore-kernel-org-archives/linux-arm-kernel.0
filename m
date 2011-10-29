@@ -1,28 +1,24 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Sat, 29 Oct 2011 14:59:27 +0100
-Subject: [PATCH 01/51] ARM: reset: introduce arm_arch_reset function
-	pointer
-In-Reply-To: <20111028213850.GB7961@game.jcrosoft.org>
-References: <1319813059-8914-1-git-send-email-will.deacon@arm.com>
-	<1319813059-8914-2-git-send-email-will.deacon@arm.com>
-	<20111028213850.GB7961@game.jcrosoft.org>
-Message-ID: <20111029135927.GC25057@mudshark.cambridge.arm.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Sat, 29 Oct 2011 19:37:30 +0530
+Subject: [PATCH v4] dmaengine: add CSR SiRFprimaII DMAC driver
+In-Reply-To: <5EB3BFCD089AD643B9BB63439F5FD5E98419FAC0@SHAASIEXM01.ASIA.ROOT.PRI>
+References: <1318907324-17046-1-git-send-email-Barry.Song@csr.com>
+	<1319703535.20054.30.camel@vkoul-udesk3>
+	<5EB3BFCD089AD643B9BB63439F5FD5E98419F7FF@SHAASIEXM01.ASIA.ROOT.PRI>
+	<1319774982.20054.228.camel@vkoul-udesk3>
+	<5EB3BFCD089AD643B9BB63439F5FD5E98419FAC0@SHAASIEXM01.ASIA.ROOT.PRI>
+Message-ID: <1319897250.20054.232.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 28, 2011 at 10:38:50PM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> On 15:43 Fri 28 Oct     , Will Deacon wrote:
-> > arch_reset is a static inline function defined in mach/system.h and, as
-> > such, is a blocker for the single zImage work.
-> > 
-> > This patch introduces an arm_arch_reset function pointer to which
-> > platforms can assign their reset function rather than define it in the
-> > header file.
-> this is a great cleanup but I think this should be done in the soc_desc
-> structure as propose before
+On Fri, 2011-10-28 at 08:08 +0000, Barry Song wrote:
+> Vinod, as I have acked interleaved dma API explicitly before, could
+> you pls add: 
+> Acked-by: Barry Song <Baohua.Song@csr.com>
+> in the commit of " DMAEngine: Define interleaved transfer request api"
+> in your tree too. I didn't find it after I fetch your tree :-) 
+Sorry I must have missed that.
+Fixed now :)
 
-Right, but that's not in mainline. Given that it looks like arm_pm_restart
-is the hook we're going to go with then we can always move it into the SoC
-descriptor later on.
-
-Will
+-- 
+~Vinod
