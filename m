@@ -1,31 +1,28 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 30 Oct 2011 21:50:03 +0200
-Subject: [GIT PULL] assorted i.MX fixes
-In-Reply-To: <20111025092344.GU23421@pengutronix.de>
-References: <20111025092344.GU23421@pengutronix.de>
-Message-ID: <201110302050.03379.arnd@arndb.de>
+Date: Sun, 30 Oct 2011 21:57:06 +0200
+Subject: [GIT PULL] at91 device tree basics
+In-Reply-To: <4EA69BC9.8040402@atmel.com>
+References: <4EA69BC9.8040402@atmel.com>
+Message-ID: <201110302057.06620.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 25 October 2011, Sascha Hauer wrote:
-> Please pull the following assorted i.MX fixes. Should have send this
-> earlier, I promise to do this next time.
+On Tuesday 25 October 2011, Nicolas Ferre wrote:
+> The following changes since commit c3b92c8787367a8bb53d57d9789b558f1295cc96:
 > 
-> Sascha
-> 
-> The following changes since commit fcb8ce5cfe30ca9ca5c9a79cdfe26d1993e65e0c:
-> 
->   Linux 3.1-rc3 (2011-08-22 11:42:53 -0700)
+>   Linux 3.1 (2011-10-24 09:10:05 +0200)
 > 
 > are available in the git repository at:
->   git://git.pengutronix.de/git/imx/linux-2.6.git imx-fixes-for-arnd
+>   git://github.com/at91linux/linux-at91.git for-arnd/at91-dt
+> 
+> They cover the basic device tree work done during the last moths around both 
+> at91sam9g45 and at91sam9g20 based board. They have been review by Grant and
+> Rob. More device tree related stuff is comming ;-)
 
+Hi Nicolas,
 
-Pulled, thanks!
-
-Is it intentional that only one of these commits is tagged stable?
-
-The desciptions seem to suggest that they should all apply to 3.1 or possibly earlier
-as well.
+I've pulled it into the next/dt branch, it looks all good but please try to
+send stuff like this before the merge window next time, ideally much before
+the merge window.
 
 	Arnd
