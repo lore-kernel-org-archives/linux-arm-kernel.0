@@ -1,37 +1,32 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Sun, 30 Oct 2011 21:07:36 +0000
-Subject: [PATCH 01/51] ARM: reset: introduce arm_arch_reset function
-	pointer
-In-Reply-To: <20111029200548.GC19187@n2100.arm.linux.org.uk>
-References: <1319813059-8914-1-git-send-email-will.deacon@arm.com>
-	<1319813059-8914-2-git-send-email-will.deacon@arm.com>
-	<20111029102108.GY19187@n2100.arm.linux.org.uk>
-	<20111029135653.GA25057@mudshark.cambridge.arm.com>
-	<20111029200548.GC19187@n2100.arm.linux.org.uk>
-Message-ID: <20111030210736.GB28363@mudshark.cambridge.arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 31 Oct 2011 00:39:41 +0200
+Subject: [GIT PULL] GIC DT binding support
+In-Reply-To: <4EAB1BFF.3070406@gmail.com>
+References: <4EA5DADC.7030805@gmail.com> <4EAB1BFF.3070406@gmail.com>
+Message-ID: <201110302339.42341.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 29, 2011 at 09:05:48PM +0100, Russell King - ARM Linux wrote:
-> On Sat, Oct 29, 2011 at 02:56:53PM +0100, Will Deacon wrote:
-> > I initially observed this in the idle code, where it looks to me like all
-> > the pm_idle overrides could actually be done in the arch_idle hook (the only
-> > slightly fiddly one is OMAP). Maybe Nicolas could use the same sort of
-> > approach for that?
+On Friday 28 October 2011, Rob Herring wrote:
+> Here's an updated pull request to fix missing export.h include. Now it's
+> also dependent on module.h clean-up branch:
 > 
-> Beware about changing the semantics of pm_idle - it's a cross-arch thing,
-> and we really shouldn't change those semantics without changing the other
-> architectures as well.
+> git://openlinux.windriver.com/people/paulg/linux-next for-sfr
+> 
+> 
+> The following changes since commit fa1d6d372245a160eecf5f57d64d2b21ea248e08:
+> 
+>   Merge branch 'for-sfr' of
+> git://openlinux.windriver.com/people/paulg/linux-next into HEAD
+> (2011-10-28 15:51:07 -0500)
+> 
+> are available in the git repository at:
+> 
+>   git://sources.calxeda.com/kernel/linux.git gic-dt
 
-Indeed. I'm not suggesting making any changes to pm_idle, I'm just pointing
-out that all of the pm_idle overrides for ARM can be written as:
+I've pulled it and am now trying to clean up the mess resulting from
+having the previous version in a number of branches already.
 
-	if (!need_resched())
-		do_magic_soc_specific_idle();
-	local_irq_enable();
+Can you check that the highbank/soc branch is ok this time?
 
-so the platform magic may as well just be implemented using arch_idle and we
-can remove the ability to reassign pm_idle, therefore consolidating the
-platform idle code into one function pointer.
-
-Will
+	Arnd
