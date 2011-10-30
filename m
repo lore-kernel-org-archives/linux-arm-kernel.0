@@ -1,33 +1,30 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Sun, 30 Oct 2011 12:56:36 +0100
-Subject: [PATCH] [RESEND] [TRIVIAL] ARM: imx: Fix typo
-	'MACH_MX31_3DS_MXC_NAND_USE_BBT'
-Message-ID: <1319975796.14409.11.camel@x61.thuisdomein>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 30 Oct 2011 18:52:08 +0000
+Subject: [PATCH] mach-ixp4xx: made gpio functions atomic
+In-Reply-To: <1319973693-19063-1-git-send-email-fransmeulenbroeks@gmail.com>
+References: <1319973693-19063-1-git-send-email-fransmeulenbroeks@gmail.com>
+Message-ID: <20111030185208.GD19187@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
----
-This is trivial because this is what apparently was intended. On the
-other hand this should open code paths that were hidden until now. So
-perhaps this needs the maintainer's approval. (I cannot meaningfully
-test this.)
+On Sun, Oct 30, 2011 at 12:21:33PM +0100, Frans Meulenbroeks wrote:
+> gpio_line_set and gpio_line config on ixp4xx were not atomic
+> This patch fixes this by surrounding them with local_irq_save and
+> local_irq_restore calls, similar to the way Lennert Buytenhek
+> implemented this for iop. (see arch/arm/plat-iop/gpio.c)
+> 
+> Signed-off-by: Frans Meulenbroeks <fransmeulenbroeks@gmail.com>
+> ---
+> 
+> Note: an alternative solution would be to use the set_bit and 
+> clear_bit atomic functions, but I felt it better to do things
+> the same way as Lennert did. Also it could be that this is a few
+> bytes smaller. Didn't check that.
 
- arch/arm/mach-imx/mach-mx31_3ds.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+set_bit and clear_bit should not be used on IO memory - on ARMv6 and
+later these use the load exclusive/store exclusive operations which
+are only valid on 'normal memory' mappings and not 'device' mappings.
 
-diff --git a/arch/arm/mach-imx/mach-mx31_3ds.c b/arch/arm/mach-imx/mach-mx31_3ds.c
-index c20be75..5750ca5 100644
---- a/arch/arm/mach-imx/mach-mx31_3ds.c
-+++ b/arch/arm/mach-imx/mach-mx31_3ds.c
-@@ -542,7 +542,7 @@ static const struct mxc_nand_platform_data
- mx31_3ds_nand_board_info __initconst = {
- 	.width		= 1,
- 	.hw_ecc		= 1,
--#ifdef MACH_MX31_3DS_MXC_NAND_USE_BBT
-+#ifdef CONFIG_MACH_MX31_3DS_MXC_NAND_USE_BBT
- 	.flash_bbt	= 1,
- #endif
- };
--- 
-1.7.4.4
+Plus of course, IO memory is supposed to be __iomem and accessed using
+the proper accessors, and using set_bit and clear_bit on such pointers
+will issue sparse warnings.
