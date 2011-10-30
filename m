@@ -1,30 +1,29 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 30 Oct 2011 18:52:08 +0000
-Subject: [PATCH] mach-ixp4xx: made gpio functions atomic
-In-Reply-To: <1319973693-19063-1-git-send-email-fransmeulenbroeks@gmail.com>
-References: <1319973693-19063-1-git-send-email-fransmeulenbroeks@gmail.com>
-Message-ID: <20111030185208.GD19187@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sun, 30 Oct 2011 21:21:25 +0200
+Subject: [GIT PULL] ARM: CSR: l2x0 init cleanup for 3.2
+In-Reply-To: <CAGsJ_4xu_m7umoohrKSdL2v8reHi9ZdkU7RWo+6a_fCA33e9Eg@mail.gmail.com>
+References: <CAGsJ_4xNqgDSWs-WQCamE592NB_p4r4+sY8-XSrzbkei1jeB7Q@mail.gmail.com>
+	<201110072304.48412.arnd@arndb.de>
+	<CAGsJ_4xu_m7umoohrKSdL2v8reHi9ZdkU7RWo+6a_fCA33e9Eg@mail.gmail.com>
+Message-ID: <201110302021.26003.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 30, 2011 at 12:21:33PM +0100, Frans Meulenbroeks wrote:
-> gpio_line_set and gpio_line config on ixp4xx were not atomic
-> This patch fixes this by surrounding them with local_irq_save and
-> local_irq_restore calls, similar to the way Lennert Buytenhek
-> implemented this for iop. (see arch/arm/plat-iop/gpio.c)
-> 
-> Signed-off-by: Frans Meulenbroeks <fransmeulenbroeks@gmail.com>
-> ---
-> 
-> Note: an alternative solution would be to use the set_bit and 
-> clear_bit atomic functions, but I felt it better to do things
-> the same way as Lennert did. Also it could be that this is a few
-> bytes smaller. Didn't check that.
+On Monday 24 October 2011, Barry Song wrote:
 
-set_bit and clear_bit should not be used on IO memory - on ARMv6 and
-later these use the load exclusive/store exclusive operations which
-are only valid on 'normal memory' mappings and not 'device' mappings.
+> The following changes since commit 1e11bec9b09a28f81dd3173fec6b1c6c56b5e299:
+>   Barry Song (1):
+>         Merge branch 'l2x0' of rmk tree into prima2-l2x0
+> 
+> are available in the git repository at:
+> 
+>   git://gitorious.org/sirfprima2-kernel/sirfprima2-kernel.git prima2-l2x0
+> 
 
-Plus of course, IO memory is supposed to be __iomem and accessed using
-the proper accessors, and using set_bit and clear_bit on such pointers
-will issue sparse warnings.
+
+I've now pulled it into the next/pm branch that had your previous pm
+changes.
+
+Thanks,
+
+	Arnd
