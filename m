@@ -1,37 +1,50 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 31 Oct 2011 22:15:13 +0000
-Subject: [PATCH 01/51] ARM: reset: introduce arm_arch_reset function
-	pointer
-In-Reply-To: <20111031143744.GE29349@mudshark.cambridge.arm.com>
-References: <1319813059-8914-1-git-send-email-will.deacon@arm.com>
-	<1319813059-8914-2-git-send-email-will.deacon@arm.com>
-	<20111029102108.GY19187@n2100.arm.linux.org.uk>
-	<20111029135653.GA25057@mudshark.cambridge.arm.com>
-	<20111031141322.GK19187@n2100.arm.linux.org.uk>
-	<20111031143744.GE29349@mudshark.cambridge.arm.com>
-Message-ID: <20111031221513.GB10576@n2100.arm.linux.org.uk>
+From: marvin24@gmx.de (Marc Dietrich)
+Date: Mon, 31 Oct 2011 23:18:19 +0100
+Subject: [PATCH 2/3] staging: nvec: add device tree support
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF173EDAB877@HQMAIL01.nvidia.com>
+References: <cover.1320088857.git.marvin24@gmx.de>
+	<04ffd9770698b7efb119b92fa379eb2e2698e223.1320088857.git.marvin24@gmx.de>
+	<74CDBE0F657A3D45AFBB94109FB122FF173EDAB877@HQMAIL01.nvidia.com>
+Message-ID: <2575094.nz9Q3TTkgX@ax5200p>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 31, 2011 at 02:37:45PM +0000, Will Deacon wrote:
-> On Mon, Oct 31, 2011 at 02:13:22PM +0000, Russell King - ARM Linux wrote:
-> > On Sat, Oct 29, 2011 at 02:56:53PM +0100, Will Deacon wrote:
-> > > The only downside is that I have to go over all of the platforms again
-> > > unless I can polish up my Coccinelle-fu. Ho-hum.
-> > 
-> > Well, I've just given coccinelle a go, and having read all the hype about
-> > it, I'm completely disappointed with it to the extent that I'm going to
-> > uninstall the tool from my system (unless someone can point out what I'm
-> > doing wrong.)
+On Monday 31 October 2011 13:18:13 Stephen Warren wrote:
+> Marc Dietrich wrote at Monday, October 31, 2011 1:59 PM:
+> > This adds device tree support to the nvec driver. By using this method
+> > it is no longer necessary to specify platform data through a board
+> > file.
 > 
-> I'm really new to it, so I'm by no means an expert...
+> ...
+> 
+> > diff --git a/drivers/staging/nvec/nvec.c b/drivers/staging/nvec/nvec.c
+> 
+> ...
+> 
+> > +	if (pdata) {
+> > +		nvec->gpio = pdata->gpio;
+> > +		nvec->i2c_addr = pdata->i2c_addr;
+> > +	} else if (nvec->dev->of_node) {
+> > +		nvec->gpio = of_get_named_gpio(nvec->dev->of_node, "request-gpios",
+> > 0); +		if (nvec->gpio < 0) {
+> > +			dev_err(&pdev->dev, "no gpio specified");
+> > +			goto failed;
+> > +		}
+> > 
+> > +		prop = of_get_property(nvec->dev->of_node, "slave-addr", NULL);
+> > +		if (!prop) {
+> > +			dev_err(&pdev->dev, "no i2c address specified");
+> > +			goto failed;
+> > +		}
+> > +		nvec->i2c_addr = be32_to_cpup(prop);
+> 
+> ----------==========----------==========----------==========----------======
+> ==== Don't you want to use of_property_read_u32() here to simplify the code
+> slightly? You can also get rid of at least one #include that way.
 
-I've spent the rest of today trying to get it to do another trivial task -
-adding setup_reboot(mode) to the start of the arch_reset() functions, and
-failed to get it to place the call after local variable declarations.
-I really don't like the way I seem to have to create a rule for each
-possible perturbation of arch_reset (as a function pointer, as a
-function, with local variables, without local variables.)
+Ok, I somehow didn't found it during my quick search.
 
-So far, my experiments with it have just resulted in frustration with
-virtually zero productivity (just one commit to be precise).
+> > +	} else {
+> > +		dev_err(&pdev->dev, "no platform data\n");
+> > +		goto failed;
+> > +	}
