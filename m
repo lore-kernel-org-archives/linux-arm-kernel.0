@@ -1,25 +1,44 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 31 Oct 2011 11:06:36 +0000
-Subject: [PATCH] mach-ixp4xx: made gpio functions atomic
-In-Reply-To: <CACW_hTY_CCSMWK1tYK_or5g5-2NQUbfLiJxLhKvT=V8BPuODMg@mail.gmail.com>
-References: <1319973693-19063-1-git-send-email-fransmeulenbroeks@gmail.com>
-	<20111030185208.GD19187@n2100.arm.linux.org.uk>
-	<CACW_hTY_CCSMWK1tYK_or5g5-2NQUbfLiJxLhKvT=V8BPuODMg@mail.gmail.com>
-Message-ID: <20111031110635.GH19187@n2100.arm.linux.org.uk>
+From: fercerpav@gmail.com (Paul Fertser)
+Date: Mon, 31 Oct 2011 15:04:26 +0400
+Subject: [PATCH] iomux-mx25: configuration to support CSPI3 on CSI pins
+Message-ID: <201110311123.p9VBNMWY017281@home.pavel.comp>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 31, 2011 at 09:32:55AM +0100, Frans Meulenbroeks wrote:
-> May I consider the patch accepted or is some rework needed?
+This adds necessary defines for the CSPI3 module (activated with
+imx25_add_spi_imx2()) to work on the CSI pins (alternative mode 7).
 
-Neither, I was just commenting on it.  MAINTAINERS says:
+Signed-off-by: Paul Fertser <fercerpav@gmail.com>
+---
+Tested on real hardware
 
-ARM/INTEL IXP4XX ARM ARCHITECTURE
-M:      Imre Kaloz <kaloz@openwrt.org>
-M:      Krzysztof Halasa <khc@pm.waw.pl>
-L:      linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-S:      Maintained
-F:      arch/arm/mach-ixp4xx/
+ arch/arm/plat-mxc/include/mach/iomux-mx25.h |    4 ++++
+ 1 files changed, 4 insertions(+), 0 deletions(-)
 
-It would be a good idea to have acks from Imre and/or Krzysztof, even
-better if they can apply it themselves.
+diff --git a/arch/arm/plat-mxc/include/mach/iomux-mx25.h b/arch/arm/plat-mxc/include/mach/iomux-mx25.h
+index bf64e1e..f0726d4 100644
+--- a/arch/arm/plat-mxc/include/mach/iomux-mx25.h
++++ b/arch/arm/plat-mxc/include/mach/iomux-mx25.h
+@@ -265,16 +265,20 @@
+ #define MX25_PAD_CSI_D2__CSI_D2		IOMUX_PAD(0x318, 0x120, 0x10, 0, 0, NO_PAD_CTRL)
+ #define MX25_PAD_CSI_D2__UART5_RXD_MUX	IOMUX_PAD(0x318, 0x120, 0x11, 0x578, 1, NO_PAD_CTRL)
+ #define MX25_PAD_CSI_D2__GPIO_1_27	IOMUX_PAD(0x318, 0x120, 0x15, 0, 0, NO_PAD_CTRL)
++#define MX25_PAD_CSI_D2__CSPI3_MOSI	IOMUX_PAD(0x318, 0x120, 0x17, 0, 0, NO_PAD_CTRL)
+ 
+ #define MX25_PAD_CSI_D3__CSI_D3		IOMUX_PAD(0x31c, 0x124, 0x10, 0, 0, NO_PAD_CTRL)
+ #define MX25_PAD_CSI_D3__GPIO_1_28	IOMUX_PAD(0x31c, 0x124, 0x15, 0, 0, NO_PAD_CTRL)
++#define MX25_PAD_CSI_D3__CSPI3_MISO	IOMUX_PAD(0x31c, 0x124, 0x17, 0x4b4, 1, NO_PAD_CTRL)
+ 
+ #define MX25_PAD_CSI_D4__CSI_D4		IOMUX_PAD(0x320, 0x128, 0x10, 0, 0, NO_PAD_CTRL)
+ #define MX25_PAD_CSI_D4__UART5_RTS	IOMUX_PAD(0x320, 0x128, 0x11, 0x574, 1, NO_PAD_CTRL)
+ #define MX25_PAD_CSI_D4__GPIO_1_29	IOMUX_PAD(0x320, 0x128, 0x15, 0, 0, NO_PAD_CTRL)
++#define MX25_PAD_CSI_D4__CSPI3_SCLK	IOMUX_PAD(0x320, 0x128, 0x17, 0, 0, NO_PAD_CTRL)
+ 
+ #define MX25_PAD_CSI_D5__CSI_D5		IOMUX_PAD(0x324, 0x12c, 0x10, 0, 0, NO_PAD_CTRL)
+ #define MX25_PAD_CSI_D5__GPIO_1_30	IOMUX_PAD(0x324, 0x12c, 0x15, 0, 0, NO_PAD_CTRL)
++#define MX25_PAD_CSI_D5__CSPI3_RDY	IOMUX_PAD(0x324, 0x12c, 0x17, 0, 0, NO_PAD_CTRL)
+ 
+ #define MX25_PAD_CSI_D6__CSI_D6		IOMUX_PAD(0x328, 0x130, 0x10, 0, 0, NO_PAD_CTRL)
+ #define MX25_PAD_CSI_D6__GPIO_1_31	IOMUX_PAD(0x328, 0x130, 0x15, 0, 0, NO_PAD_CTRL)
+-- 
+1.7.2.3
