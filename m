@@ -1,45 +1,23 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Mon, 31 Oct 2011 13:18:13 -0700
-Subject: [PATCH 2/3] staging: nvec: add device tree support
-In-Reply-To: <04ffd9770698b7efb119b92fa379eb2e2698e223.1320088857.git.marvin24@gmx.de>
-References: <cover.1320088857.git.marvin24@gmx.de>
-	<04ffd9770698b7efb119b92fa379eb2e2698e223.1320088857.git.marvin24@gmx.de>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF173EDAB877@HQMAIL01.nvidia.com>
+From: hskinnemoen@gmail.com (=?ISO-8859-1?Q?H=E5vard_Skinnemoen?=)
+Date: Mon, 31 Oct 2011 14:21:56 -0700
+Subject: [PATCH] i2c-gpio.c: correct logic of pdata->scl_is_open_drain
+In-Reply-To: <EF2E73589CA71846A15D0B2CDF79505D087B34BE51@wm021.weinmann.com>
+References: <EF2E73589CA71846A15D0B2CDF79505D087B34BE51@wm021.weinmann.com>
+Message-ID: <CAF8ieYXPMgUzekth7PGxC3AgYNKac-HQ21D3vvB5J3SLOatmfQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marc Dietrich wrote at Monday, October 31, 2011 1:59 PM:
-> This adds device tree support to the nvec driver. By using this method
-> it is no longer necessary to specify platform data through a board
-> file.
-...
-> diff --git a/drivers/staging/nvec/nvec.c b/drivers/staging/nvec/nvec.c
-...
-> +	if (pdata) {
-> +		nvec->gpio = pdata->gpio;
-> +		nvec->i2c_addr = pdata->i2c_addr;
-> +	} else if (nvec->dev->of_node) {
-> +		nvec->gpio = of_get_named_gpio(nvec->dev->of_node, "request-gpios", 0);
-> +		if (nvec->gpio < 0) {
-> +			dev_err(&pdev->dev, "no gpio specified");
-> +			goto failed;
-> +		}
+On Mon, Oct 31, 2011 at 9:14 AM, Voss, Nikolaus <N.Voss@weinmann.de> wrote:
+> If pdata->scl_is_open_drain was set, the driver used push-pull output
+> for SCL, not open-drain output.
+>
+> Signed-off-by: Nikolaus Voss <n.voss@weinmann.de>
 
-> +		prop = of_get_property(nvec->dev->of_node, "slave-addr", NULL);
-> +		if (!prop) {
-> +			dev_err(&pdev->dev, "no i2c address specified");
-> +			goto failed;
-> +		}
-> +		nvec->i2c_addr = be32_to_cpup(prop);
+{sda,scl}_is_open_drain indicates that the GPIO hardware is set up to
+do open drain so the software doesn't have to, i.e.
+gpio_set_value(pin, 1) will turn off the output driver rather than
+drive the pin high, so the _val functions will do the right thing.
 
-----------==========----------==========----------==========----------==========
-Don't you want to use of_property_read_u32() here to simplify the code
-slightly? You can also get rid of at least one #include that way.
+In other words, the existing code is correct.
 
-> +	} else {
-> +		dev_err(&pdev->dev, "no platform data\n");
-> +		goto failed;
-> +	}
-
--- 
-nvpublic
+Havard
