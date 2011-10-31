@@ -1,48 +1,22 @@
-From: jkosina@suse.cz (Jiri Kosina)
-Date: Mon, 31 Oct 2011 11:12:30 +0100 (CET)
-Subject: [PATCH] [TRIVIAL] ARM: imx: Fix typo
-	'MACH_MX31_3DS_MXC_NAND_USE_BBT'
-In-Reply-To: <1318421062.2336.4.camel@x61.thuisdomein>
-References: <1318421062.2336.4.camel@x61.thuisdomein>
-Message-ID: <alpine.LNX.2.00.1110311110370.3541@pobox.suse.cz>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 31 Oct 2011 10:15:19 +0000
+Subject: Serious question:  How long does it take to get 64bit into ARM?
+In-Reply-To: <20111030001654.GX4267@michelle1>
+References: <20111030001654.GX4267@michelle1>
+Message-ID: <20111031101519.GF19187@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 12 Oct 2011, Paul Bolle wrote:
+On Sun, Oct 30, 2011 at 02:16:54AM +0200, Michelle Konzack wrote:
+> Hello Arm Developers,
+> 
+> Applied Micro Circuits (AMCC) has now presented its new 64bit ARM ?C:
+> 
+>     <http://www.pcmag.com/article2/0,2817,2395449,00.asp>
+> 
+> and I like to know, how long it take, to  get  64bit  support  into  the
+> Kernel.
 
-> Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
-> ---
-> This is trivial because this is what apparently was intended. On the
-> other hand this should open code paths that were hidden until now. So
-> perhaps this needs the maintainer's approval. (I cannot meaningfully
-> test this.)
-
-I'd like to have this tested by some relevant people before taking it 
-myself (added some CCs).
-
-> 
->  arch/arm/mach-imx/mach-mx31_3ds.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/mach-imx/mach-mx31_3ds.c b/arch/arm/mach-imx/mach-mx31_3ds.c
-> index c20be75..5750ca5 100644
-> --- a/arch/arm/mach-imx/mach-mx31_3ds.c
-> +++ b/arch/arm/mach-imx/mach-mx31_3ds.c
-> @@ -542,7 +542,7 @@ static const struct mxc_nand_platform_data
->  mx31_3ds_nand_board_info __initconst = {
->  	.width		= 1,
->  	.hw_ecc		= 1,
-> -#ifdef MACH_MX31_3DS_MXC_NAND_USE_BBT
-> +#ifdef CONFIG_MACH_MX31_3DS_MXC_NAND_USE_BBT
->  	.flash_bbt	= 1,
->  #endif
->  };
-> -- 
-> 1.7.4.4
-> 
-> 
-> 
-
--- 
-Jiri Kosina
-SUSE Labs
+It won't happen until there's some concrete technical documentation or
+example implementation publically released, so at the moment it really
+depends on the marketing schedule.
