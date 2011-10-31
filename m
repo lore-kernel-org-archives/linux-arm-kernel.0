@@ -1,22 +1,44 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 31 Oct 2011 10:15:19 +0000
-Subject: Serious question:  How long does it take to get 64bit into ARM?
-In-Reply-To: <20111030001654.GX4267@michelle1>
-References: <20111030001654.GX4267@michelle1>
-Message-ID: <20111031101519.GF19187@n2100.arm.linux.org.uk>
+Date: Mon, 31 Oct 2011 10:36:10 +0000
+Subject: [RFC PATCH] arm: dma: Drop GFP_COMP for DMA memory allocations
+In-Reply-To: <1319836732-31687-1-git-send-email-swarren@nvidia.com>
+References: <1319836732-31687-1-git-send-email-swarren@nvidia.com>
+Message-ID: <20111031103610.GG19187@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 30, 2011 at 02:16:54AM +0200, Michelle Konzack wrote:
-> Hello Arm Developers,
-> 
-> Applied Micro Circuits (AMCC) has now presented its new 64bit ARM ?C:
-> 
->     <http://www.pcmag.com/article2/0,2817,2395449,00.asp>
-> 
-> and I like to know, how long it take, to  get  64bit  support  into  the
-> Kernel.
+On Fri, Oct 28, 2011 at 03:18:52PM -0600, Stephen Warren wrote:
+> I believe the patch below was once posted to solve this for ARM, but never
+> got picked up. Evidently, AVR32 did pick it up. I'm wondering if we should
+> pick this up for ARM now, or if there's some other solution?
 
-It won't happen until there's some concrete technical documentation or
-example implementation publically released, so at the moment it really
-depends on the marketing schedule.
+Well, Nick did talk about a solution using GFP_USERMAP in one of those
+threads, which doesn't seem to have gone anywhere.  So I guess we need
+this patch.
+
+> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+> index 82a093c..93b86e6 100644
+> --- a/arch/arm/mm/dma-mapping.c
+> +++ b/arch/arm/mm/dma-mapping.c
+> @@ -308,6 +308,13 @@ __dma_alloc(struct device *dev, size_t size, dma_addr_t *handle, gfp_t gfp,
+>  	struct page *page;
+>  	void *addr;
+>  
+> +	/* Following is a work-around (a.k.a. hack) to prevent pages
+> +	 * with __GFP_COMP being passed to split_page() which cannot
+> +	 * handle them.  The real problem is that this flag probably
+> +	 * should be 0 on ARM as it is not supported on this
+> +	 * platform--see CONFIG_HUGETLB_PAGE. */
+
+I don't think this comment makes sense anymore - HUGETLB_PAGE doesn't
+have any help text.
+
+> +	gfp &= ~(__GFP_COMP);
+> +
+>  	*handle = ~0;
+>  	size = PAGE_ALIGN(size);
+>  
+> -- 
+> 1.7.0.4
+> 
+> 
