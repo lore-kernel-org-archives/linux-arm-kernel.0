@@ -1,48 +1,35 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Mon, 31 Oct 2011 14:16:11 +0100
-Subject: config ARCH_AT91SAM9X5
-In-Reply-To: <1320062362.14409.58.camel@x61.thuisdomein>
-References: <1320062362.14409.58.camel@x61.thuisdomein>
-Message-ID: <4EAE9F9B.4040201@pengutronix.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 31 Oct 2011 13:53:14 +0000
+Subject: [PATCH 01/51] ARM: reset: introduce arm_arch_reset function
+	pointer
+In-Reply-To: <20111031120603.GJ19187@n2100.arm.linux.org.uk>
+References: <1319813059-8914-1-git-send-email-will.deacon@arm.com>
+	<1319813059-8914-2-git-send-email-will.deacon@arm.com>
+	<20111029102108.GY19187@n2100.arm.linux.org.uk>
+	<20111029135653.GA25057@mudshark.cambridge.arm.com>
+	<20111031120603.GJ19187@n2100.arm.linux.org.uk>
+Message-ID: <20111031135314.GD29349@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/31/2011 12:59 PM, Paul Bolle wrote:
-> 0) Since the commits
->     9baeb7e4 ("at91: Add ARCH_ID and basic cpu macros [...]"),
->     b9e379bc ("net/can: allow CAN_AT91 on AT91SAM9X5"), and
->     8c3583b6 ("at91: use structure to store the current soc")
+On Mon, Oct 31, 2011 at 12:06:03PM +0000, Russell King - ARM Linux wrote:
+> On Sat, Oct 29, 2011 at 02:56:53PM +0100, Will Deacon wrote:
+> > Hi Russell,
+> > 
+> > On Sat, Oct 29, 2011 at 11:21:08AM +0100, Russell King - ARM Linux wrote:
+> > > This would then allow everyone to hook into the restart via the same
+> > > method irrespective of what they want, and if they want the old
+> > > 'arch_reset' way, call setup_restart() themselves.
+> > 
+> > Yup, it's a fantastic idea because it allows us to put all of the identity
+> > mapping bits into setup_restart as well. So then platforms make the choice
+> > about the mapping they want, rather than being told via the reboot mode.
 > 
-> the mainline kernel tree uses the Kconfig symbol ARCH_AT91SAM9X5 and the
-> preprocessor macro CONFIG_ARCH_AT91SAM9X5.
-> 
-> 1) But there's currently no Kconfig entry ARCH_AT91SAM9X5. (Neither is
-> there a direct definition of the macro CONFIG_ARCH_AT91SAM9X5.)
-> Shouldn't a Kconfig entry for ARCH_AT91SAM9X5 be added (to
-> arch/arm/mach-at91/Kconfig)?
+> I've now committed my patch, so if you'd like to give it an acked by,
+> and preferably a tested-by, I'll publish it out in a stable branch.
 
-Talking for the at91_can driver (which has been done by me):
-The driver and Kconfig have been prepared for the upcoming 5series AT91
-SOCs.
+I gave it a spin on my Versatile Express and it reboots as expected.
 
-Basically the same applies to the commit 9baeb7e4 ("at91: Add ARCH_ID
-and basic cpu macros [...]").
+Acked-and-tested-by: Will Deacon <will.deacon@arm.com>
 
-But the 5series hasn't bee merged yet. Nicolas and Jean-Christophe can
-probably tell you more.
-
-regards, Marc
-
--- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 262 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111031/7e70a2cc/attachment.sig>
+Will
