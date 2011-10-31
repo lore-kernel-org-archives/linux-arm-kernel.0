@@ -1,43 +1,65 @@
-From: rajeshwari.s@samsung.com (Rajeshwari Shinde)
-Date: Mon, 31 Oct 2011 11:14:36 +0530
-Subject: [PATCH V6] SDHCI: S3C: Use generic clock names for sdhci bus clock
-	options
-Message-ID: <1320039876-21148-1-git-send-email-rajeshwari.s@samsung.com>
+From: vikram.pandita@ti.com (Pandita, Vikram)
+Date: Sun, 30 Oct 2011 23:49:58 -0700
+Subject: [PATCH] usb: ehci: make HC see up-to-date qh/qtd descriptor ASAP
+In-Reply-To: <1315521779.2313.29.camel@deneb.redhat.com>
+References: <20110830172642.GE3464@e102144-lin.cambridge.arm.com>
+	<20110830174859.GA23098@kroah.com>
+	<20110830175432.GG3464@e102144-lin.cambridge.arm.com>
+	<5484D075-A7DA-41B7-B8FA-9B6D72A23723@freescale.com>
+	<20110831084922.GA8777@e102144-lin.cambridge.arm.com>
+	<1314798215.2344.76.camel@deneb.redhat.com>
+	<20110831152137.GG8777@e102144-lin.cambridge.arm.com>
+	<alpine.LFD.2.00.1108311332410.20358@xanadu.home>
+	<20110831175147.GI8777@e102144-lin.cambridge.arm.com>
+	<4E5E7B35.9080008@gmail.com>
+	<20110831193525.GA27476@e102144-lin.cambridge.arm.com>
+	<1315521779.2313.29.camel@deneb.redhat.com>
+Message-ID: <CAFm5wm21mck_cKA0K+9JUy1XtON8=T9Ar29BscDN0sMKPT2m3w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch modifies the driver to stop depending on the clock names
-being passed from the platform and switch over to bus clock lookup
-using generic clock names.
+On Thu, Sep 8, 2011 at 3:41 PM, Mark Salter <msalter@redhat.com> wrote:
+> On Wed, 2011-08-31 at 20:35 +0100, Will Deacon wrote:
+>> On Wed, Aug 31, 2011 at 07:19:33PM +0100, Rob Herring wrote:
+>> > On 08/31/2011 12:51 PM, Will Deacon wrote:
+>> > > Another thing that Marc and I tried on OMAP4 was not bringing up the secondary
+>> > > CPU during boot (by commenting out most of smp_init). In this case, I/O
+>> > > performance was good until we tried to online the secondary CPU. The online
+>> > > failed but after that the I/O performance was certainly degraded.
+>> > >
+>> >
+>> > Was the SCU enabled at that point? One diff between nosmp boot and
+>> > offlining the 2nd core would be that the SCU remains enabled in the
+>> > latter case. I think the SCU does not get enabled for nosmp.
+>>
+>> Our rudimentary test (printing out the SCU control register during boot)
+>> showed that it *was* enabled for nosmp. I think this is due to the secure
+>> world having to do that on OMAP so it's probably not true for other
+>> platforms.
+>
+> I've done a little test and found that turning on the MMU of the second
+> core causes the problem to show up. I patched head.S so I stopped the
+> second core in an infinite loop just before turning on the MMU. The
+> system continues booting on core#0 and I see ~20MB/s with hdparm -t to
+> an attached usb disk. Same setup but with second core being stopped with
+> infinite loop just after MMU is enabled shows ~5MB/s. So whatever is
+> going wrong, its not because of anything the second core is doing beyond
+> turning on its MMU and doing an empty loop.
 
-V6 Changes:
-Changed sprintf to snprintf as suggested by Chris Ball.
+what was the final take on the optimization?
+Excuse if i could not follow the whole thread - could someone
+summarize for the benefit of many.
 
-Signed-off-by: Rajeshwari Shinde <rajeshwari.s@samsung.com>
----
- drivers/mmc/host/sdhci-s3c.c |    7 ++-----
- 1 files changed, 2 insertions(+), 5 deletions(-)
+Thanks
 
-diff --git a/drivers/mmc/host/sdhci-s3c.c b/drivers/mmc/host/sdhci-s3c.c
-index 82709b6..488223c 100644
---- a/drivers/mmc/host/sdhci-s3c.c
-+++ b/drivers/mmc/host/sdhci-s3c.c
-@@ -435,14 +435,11 @@ static int __devinit sdhci_s3c_probe(struct platform_device *pdev)
- 
- 	for (clks = 0, ptr = 0; ptr < MAX_BUS_CLK; ptr++) {
- 		struct clk *clk;
--		char *name = pdata->clocks[ptr];
--
--		if (name == NULL)
--			continue;
-+		char name[14];
- 
-+		snprintf(name, 14, "mmc_busclk.%d", ptr);
- 		clk = clk_get(dev, name);
- 		if (IS_ERR(clk)) {
--			dev_err(dev, "failed to get clock %s\n", name);
- 			continue;
- 		}
- 
--- 
-1.7.4.4
+>
+> --Mark
+>
+>
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
