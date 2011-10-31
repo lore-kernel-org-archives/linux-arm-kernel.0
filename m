@@ -1,54 +1,29 @@
-From: rabin@rab.in (Rabin Vincent)
-Date: Mon, 31 Oct 2011 20:14:14 +0530
-Subject: [PATCH 01/51] ARM: reset: introduce arm_arch_reset function
-	pointer
-In-Reply-To: <20111031143904.GM19187@n2100.arm.linux.org.uk>
-References: <1319813059-8914-1-git-send-email-will.deacon@arm.com>
-	<1319813059-8914-2-git-send-email-will.deacon@arm.com>
-	<20111029102108.GY19187@n2100.arm.linux.org.uk>
-	<20111029135653.GA25057@mudshark.cambridge.arm.com>
-	<20111031141322.GK19187@n2100.arm.linux.org.uk>
-	<CAH+eYFDM_spE8jg4K5awBPZvPyEmdhSnQ9Zt=v2U4PmFQeRLOw@mail.gmail.com>
-	<20111031143904.GM19187@n2100.arm.linux.org.uk>
-Message-ID: <CAH+eYFD_XPgbvp828q7508TOPNdP4TK7wiej2aBhPb18WbQ+Eg@mail.gmail.com>
+From: npavel@mini-box.com (Nicu Pavel)
+Date: Mon, 31 Oct 2011 16:56:50 +0200
+Subject: [PATCH 3/3] Add picosam9g45 board to Makefile
+In-Reply-To: <1320073010-19549-1-git-send-email-npavel@mini-box.com>
+References: <1320073010-19549-1-git-send-email-npavel@mini-box.com>
+Message-ID: <1320073010-19549-3-git-send-email-npavel@mini-box.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 31, 2011 at 20:09, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Mon, Oct 31, 2011 at 08:03:26PM +0530, Rabin Vincent wrote:
->> The above patch will apply with gnu patch if you use -p0.
->
-> $ patch -p0 -i arch_reset-1.diff --dry-run
-> patch: **** rejecting absolute target file name: /tmp/cocci-output-380-f841cc-system.h
 
-Works for me, maybe a version difference?
+Signed-off-by: Nicu Pavel <npavel@mini-box.com>
+---
+ arch/arm/mach-at91/Makefile |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-~/kernel/arm$ cat arch_reset-1.diff  | head
---- arch/arm/mach-ep93xx/include/mach/system.h	2011-10-31
-20:11:04.496237799 +0530
-+++ /tmp/cocci-output-3559-9e5748-system.h	2011-10-31 20:12:08.120235486 +0530
-@@ -11,8 +11,6 @@ static inline void arch_idle(void)
-
- static inline void arch_reset(char mode, const char *cmd)
- {
--	local_irq_disable();
--
- 	/*
- 	 * Set then clear the SWRST bit to initiate a software reset
-~/kernel/arm$ patch -p0 -i arch_reset-1.diff --dry-run
-patching file arch/arm/mach-ep93xx/include/mach/system.h
-patching file arch/arm/mach-iop32x/include/mach/system.h
-patching file arch/arm/mach-ixp2000/include/mach/system.h
-~/kernel/arm$ patch --version
-patch 2.6.1
-Copyright (C) 1988 Larry Wall
-Copyright (C) 2003, 2009 Free Software Foundation, Inc.
-
-This program comes with NO WARRANTY, to the extent permitted by law.
-You may redistribute copies of this program
-under the terms of the GNU General Public License.
-For more information about these matters, see the file named COPYING.
-
-written by Larry Wall and Paul Eggert
-~/kernel/arm$
+diff --git a/arch/arm/mach-at91/Makefile b/arch/arm/mach-at91/Makefile
+index bf57e8b..ad1950d 100644
+--- a/arch/arm/mach-at91/Makefile
++++ b/arch/arm/mach-at91/Makefile
+@@ -72,6 +72,7 @@ obj-$(CONFIG_MACH_GSIA18S)	+= board-gsia18s.o board-stamp9g20.o
+ obj-$(CONFIG_MACH_SNAPPER_9260)	+= board-snapper9260.o
+ 
+ # AT91SAM9G45 board-specific support
++obj-$(CONFIG_MACH_MINIBOXPICOSAM9G45) += board-picosam9g45.o
+ obj-$(CONFIG_MACH_AT91SAM9M10G45EK) += board-sam9m10g45ek.o
+ 
+ # AT91CAP9 board-specific support
+-- 
+1.7.1
