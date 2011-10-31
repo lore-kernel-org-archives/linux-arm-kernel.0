@@ -1,23 +1,36 @@
 From: swarren@nvidia.com (Stephen Warren)
-Date: Mon, 31 Oct 2011 13:13:15 -0700
-Subject: [PATCH 1/3] ARM: tegra: paz00: add support for wakeup gpio key
-In-Reply-To: <36b0283d86591d2bc64fe454676ae214732cdb54.1320088857.git.marvin24@gmx.de>
+Date: Mon, 31 Oct 2011 13:14:17 -0700
+Subject: [PATCH 3/3] arm/dt: tegra: add dts file for paz00
+In-Reply-To: <855f09f77c03a9f081818a03effdbd3bf7a30c91.1320088857.git.marvin24@gmx.de>
 References: <cover.1320088857.git.marvin24@gmx.de>
-	<36b0283d86591d2bc64fe454676ae214732cdb54.1320088857.git.marvin24@gmx.de>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF173EDAB86D@HQMAIL01.nvidia.com>
+	<855f09f77c03a9f081818a03effdbd3bf7a30c91.1320088857.git.marvin24@gmx.de>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF173EDAB86E@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Marc Dietrich wrote at Monday, October 31, 2011 1:59 PM:
-> This adds support for a wakeup gpio which is connected to the
-> embedded controller. This will be used later on for wakeup from suspend.
-> 
-> Signed-off-by: Marc Dietrich <marvin24@gmx.de>
+> This adds a dts file for paz00. As a side effect, this also enables
+> the embedded controller which controls the keyboard, touchpad, power,
+> leds, and some other functions.
+...
+> +	serial at 70006000 {
+> +		clock-frequency = <216000000>;
+> +	};
+> +
+> +	serial at 70006040 {
+> +		status = "disable";
+> +	};
+> +
+> +	serial at 70006200 {
+> +		status = "disable";
+> +	};
+> +
+> +	serial at 70006300 {
+> +		clock-frequency = <216000000>;
+> +	};
 
-Acked-by: Stephen Warren <swarren@nvidia.com>
-
-(Feel free to include that tag in any future postings unless there are
-significant changes that would merit my reviewing it again)
+Don't you also want to disable serial at 70006400, or set a clock rate for
+it?
 
 -- 
 nvpublic
