@@ -1,44 +1,25 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 31 Oct 2011 10:36:10 +0000
-Subject: [RFC PATCH] arm: dma: Drop GFP_COMP for DMA memory allocations
-In-Reply-To: <1319836732-31687-1-git-send-email-swarren@nvidia.com>
-References: <1319836732-31687-1-git-send-email-swarren@nvidia.com>
-Message-ID: <20111031103610.GG19187@n2100.arm.linux.org.uk>
+Date: Mon, 31 Oct 2011 11:06:36 +0000
+Subject: [PATCH] mach-ixp4xx: made gpio functions atomic
+In-Reply-To: <CACW_hTY_CCSMWK1tYK_or5g5-2NQUbfLiJxLhKvT=V8BPuODMg@mail.gmail.com>
+References: <1319973693-19063-1-git-send-email-fransmeulenbroeks@gmail.com>
+	<20111030185208.GD19187@n2100.arm.linux.org.uk>
+	<CACW_hTY_CCSMWK1tYK_or5g5-2NQUbfLiJxLhKvT=V8BPuODMg@mail.gmail.com>
+Message-ID: <20111031110635.GH19187@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 28, 2011 at 03:18:52PM -0600, Stephen Warren wrote:
-> I believe the patch below was once posted to solve this for ARM, but never
-> got picked up. Evidently, AVR32 did pick it up. I'm wondering if we should
-> pick this up for ARM now, or if there's some other solution?
+On Mon, Oct 31, 2011 at 09:32:55AM +0100, Frans Meulenbroeks wrote:
+> May I consider the patch accepted or is some rework needed?
 
-Well, Nick did talk about a solution using GFP_USERMAP in one of those
-threads, which doesn't seem to have gone anywhere.  So I guess we need
-this patch.
+Neither, I was just commenting on it.  MAINTAINERS says:
 
-> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-> index 82a093c..93b86e6 100644
-> --- a/arch/arm/mm/dma-mapping.c
-> +++ b/arch/arm/mm/dma-mapping.c
-> @@ -308,6 +308,13 @@ __dma_alloc(struct device *dev, size_t size, dma_addr_t *handle, gfp_t gfp,
->  	struct page *page;
->  	void *addr;
->  
-> +	/* Following is a work-around (a.k.a. hack) to prevent pages
-> +	 * with __GFP_COMP being passed to split_page() which cannot
-> +	 * handle them.  The real problem is that this flag probably
-> +	 * should be 0 on ARM as it is not supported on this
-> +	 * platform--see CONFIG_HUGETLB_PAGE. */
+ARM/INTEL IXP4XX ARM ARCHITECTURE
+M:      Imre Kaloz <kaloz@openwrt.org>
+M:      Krzysztof Halasa <khc@pm.waw.pl>
+L:      linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+S:      Maintained
+F:      arch/arm/mach-ixp4xx/
 
-I don't think this comment makes sense anymore - HUGETLB_PAGE doesn't
-have any help text.
-
-> +	gfp &= ~(__GFP_COMP);
-> +
->  	*handle = ~0;
->  	size = PAGE_ALIGN(size);
->  
-> -- 
-> 1.7.0.4
-> 
-> 
+It would be a good idea to have acks from Imre and/or Krzysztof, even
+better if they can apply it themselves.
