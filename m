@@ -1,29 +1,25 @@
 From: linux4michelle@tamay-dogan.net (Michelle Konzack)
-Date: Mon, 31 Oct 2011 18:46:43 +0100
-Subject: Serious question: How long does it take to get 64bit into ARM?
-In-Reply-To: <CAHkRjk47P4BpEWCRAyU_cJ=nA1s+-Xbe2+WAwJ9LMx5-wJ6KkQ@mail.gmail.com>
+Date: Mon, 31 Oct 2011 18:49:10 +0100
+Subject: Serious question:  How long does it take to get 64bit into ARM?
+In-Reply-To: <20111031101519.GF19187@n2100.arm.linux.org.uk>
 References: <20111030001654.GX4267@michelle1>
-	<CAHkRjk47P4BpEWCRAyU_cJ=nA1s+-Xbe2+WAwJ9LMx5-wJ6KkQ@mail.gmail.com>
-Message-ID: <20111031174643.GB4267@michelle1>
+	<20111031101519.GF19187@n2100.arm.linux.org.uk>
+Message-ID: <20111031174910.GC4267@michelle1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Catalin Marinas,
+Hello Russell King - ARM Linux,
 
-Am 2011-10-31 08:48:33, hacktest Du folgendes herunter:
-> We are working on this already and will follow the Linux community
-> review process to get the ARMv8 support in the mainline kernel. I
-> can't mention a timeline at this point as it depends on detailed
-> documentation being available and at least some early hardware (FPGA)
-> to test on but hopefully we'll complete the process before you can get
-> platforms with ARMv8 (even if mainline would not fully support ARMv8,
-> I'll make patches available on some Git tree).
+Am 2011-10-31 10:15:19, hacktest Du folgendes herunter:
+> It won't happen until there's some concrete technical documentation or
+> example implementation publically released, so at the moment it really
+> depends on the marketing schedule.
 
-Thanks, this ais a great Information.
+I hope, I can get a Development Kit and some CPUs as fast a possibel and
+I hope, I get it very fast running.
 
-I am already in contact with APM and like to build a series of new  Low-
-Energy Servers.  I have already requested the NDA to get the FPGA  based
-versions and waiting for the validation.
+The Marvel Discovery MV78100/MV78200  had  cost  me  around  1  year  to
+complete.
 
 Thanks, Greetings and nice Day/Evening
     Michelle Konzack
@@ -50,4 +46,4 @@ Name: not available
 Type: application/pgp-signature
 Size: 189 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111031/b256a6d2/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111031/450333b6/attachment.sig>
