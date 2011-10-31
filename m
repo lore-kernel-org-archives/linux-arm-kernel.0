@@ -1,80 +1,61 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 31 Oct 2011 18:42:52 +0000
-Subject: [PATCH 2/3 v3.1] ARM: SAMSUNG: Fix GPIO space reservation for S3C64xx
-	platforms
-In-Reply-To: <1320086573-21184-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-References: <1320086573-21184-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-Message-ID: <1320086573-21184-2-git-send-email-broonie@opensource.wolfsonmicro.com>
+From: marvin24@gmx.de (Marc Dietrich)
+Date: Mon, 31 Oct 2011 20:58:52 +0100
+Subject: [PATCH v3 0/3] paz00 updates for 3.3
+Message-ID: <cover.1320088857.git.marvin24@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The conversion to use SAMSUNG_GPIO_EXTRA rather than S3C24XX_GPIO_EXTRA
-broke a number of S3C64xx boards which had been using the symbols provided
-to reserve a range of GPIOs for board specific use. Fix this by adding
-equivalent symbols for the new shared driver and updating the relevant
-boards to use the new symbols.
+Hi,
 
-Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
----
- arch/arm/mach-s3c64xx/Kconfig |    6 +++---
- arch/arm/plat-samsung/Kconfig |    8 ++++++++
- 2 files changed, 11 insertions(+), 3 deletions(-)
+the following three patches are intended for the 3.3 merge window and are based
+on linux-next.
 
-diff --git a/arch/arm/mach-s3c64xx/Kconfig b/arch/arm/mach-s3c64xx/Kconfig
-index 5552e04..4d8c489 100644
---- a/arch/arm/mach-s3c64xx/Kconfig
-+++ b/arch/arm/mach-s3c64xx/Kconfig
-@@ -188,7 +188,7 @@ config SMDK6410_WM1190_EV1
- 	depends on MACH_SMDK6410
- 	select REGULATOR
- 	select REGULATOR_WM8350
--	select S3C24XX_GPIO_EXTRA64
-+	select SAMSUNG_GPIO_EXTRA64
- 	select MFD_WM8350_I2C
- 	select MFD_WM8350_CONFIG_MODE_0
- 	select MFD_WM8350_CONFIG_MODE_3
-@@ -206,7 +206,7 @@ config SMDK6410_WM1192_EV1
- 	depends on MACH_SMDK6410
- 	select REGULATOR
- 	select REGULATOR_WM831X
--	select S3C24XX_GPIO_EXTRA64
-+	select SAMSUNG_GPIO_EXTRA64
- 	select MFD_WM831X
- 	select MFD_WM831X_I2C
- 	help
-@@ -287,7 +287,7 @@ config MACH_WLF_CRAGG_6410
- 	select S3C_DEV_WDT
- 	select S3C_DEV_RTC
- 	select S3C64XX_DEV_SPI
--	select S3C24XX_GPIO_EXTRA128
-+	select SAMSUNG_GPIO_EXTRA128
- 	select I2C
- 	help
- 	  Machine support for the Wolfson Cragganmore S3C6410 variant.
-diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-samsung/Kconfig
-index 313eb26..bb0af66 100644
---- a/arch/arm/plat-samsung/Kconfig
-+++ b/arch/arm/plat-samsung/Kconfig
-@@ -88,12 +88,20 @@ config S5P_GPIO_DRVSTR
- 
- config SAMSUNG_GPIO_EXTRA
- 	int "Number of additional GPIO pins"
-+	default 128 if SAMSUNG_GPIO_EXTRA128
-+	default 64 if SAMSUNG_GPIO_EXTRA64
- 	default 0
- 	help
- 	  Use additional GPIO space in addition to the GPIO's the SOC
- 	  provides. This allows expanding the GPIO space for use with
- 	  GPIO expanders.
- 
-+config SAMSUNG_GPIO_EXTRA64
-+	bool
-+
-+config SAMSUNG_GPIO_EXTRA128
-+	bool
-+
- config S3C_GPIO_SPACE
- 	int "Space between gpio banks"
- 	default 0
+The first one adds wakeup support similar to seaboard, but with the difference
+that the wakeup gpio is connected to the embedded controller instead of a real
+gpio key.
+
+The second patch adds device tree support for the nvec driver. This way we can
+make use of it without adding more platform devices to the board files (and it
+is also modern to do so).
+
+The final one adds device tree support for paz00. The way the nvec it is
+initialized will probably change in the future, but we like to include it for
+now as it makes debugging easier.
+
+The patches are against linux-next from Oct 25th.
+
+Thanks
+
+Marc
+
+Changes since v2
+    - remove the mem= from the bootargs, this is handled by the memory property
+      already
+    - change the root device until the sdhci init order can be changed
+    - do not init unused serial ports
+    - add dt documentation for nvec
+    - remove CONFIG_OF #ifdefs from nvec.c
+    - exchange the order of patch 2 and 3
+Changes since v1
+    - replace addition of the embedded controller to the board file by a device-tree
+      based implementation.
+
+Marc Dietrich (3):
+  ARM: tegra: paz00: add support for wakeup gpio key
+  staging: nvec: add device tree support
+  arm/dt: tegra: add dts file for paz00
+
+ .../devicetree/bindings/nvec/nvec_nvidia.txt       |    9 ++
+ arch/arm/boot/dts/tegra-paz00.dts                  |   78 ++++++++++++++++++++
+ arch/arm/mach-tegra/Makefile                       |    1 +
+ arch/arm/mach-tegra/Makefile.boot                  |    1 +
+ arch/arm/mach-tegra/board-dt.c                     |    3 +
+ arch/arm/mach-tegra/board-paz00.c                  |   27 +++++++
+ arch/arm/mach-tegra/board-paz00.h                  |    3 +
+ drivers/staging/nvec/nvec.c                        |   35 ++++++++-
+ 8 files changed, 155 insertions(+), 2 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/nvec/nvec_nvidia.txt
+ create mode 100644 arch/arm/boot/dts/tegra-paz00.dts
+
 -- 
-1.7.7.1
+1.7.5.4
