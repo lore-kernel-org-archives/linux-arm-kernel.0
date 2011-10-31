@@ -1,44 +1,22 @@
-From: fercerpav@gmail.com (Paul Fertser)
-Date: Mon, 31 Oct 2011 15:04:26 +0400
-Subject: [PATCH] iomux-mx25: configuration to support CSPI3 on CSI pins
-Message-ID: <201110311123.p9VBNMWY017281@home.pavel.comp>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Mon, 31 Oct 2011 12:59:22 +0100
+Subject: config ARCH_AT91SAM9X5
+Message-ID: <1320062362.14409.58.camel@x61.thuisdomein>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds necessary defines for the CSPI3 module (activated with
-imx25_add_spi_imx2()) to work on the CSI pins (alternative mode 7).
+0) Since the commits
+    9baeb7e4 ("at91: Add ARCH_ID and basic cpu macros [...]"),
+    b9e379bc ("net/can: allow CAN_AT91 on AT91SAM9X5"), and
+    8c3583b6 ("at91: use structure to store the current soc")
 
-Signed-off-by: Paul Fertser <fercerpav@gmail.com>
----
-Tested on real hardware
+the mainline kernel tree uses the Kconfig symbol ARCH_AT91SAM9X5 and the
+preprocessor macro CONFIG_ARCH_AT91SAM9X5.
 
- arch/arm/plat-mxc/include/mach/iomux-mx25.h |    4 ++++
- 1 files changed, 4 insertions(+), 0 deletions(-)
+1) But there's currently no Kconfig entry ARCH_AT91SAM9X5. (Neither is
+there a direct definition of the macro CONFIG_ARCH_AT91SAM9X5.)
+Shouldn't a Kconfig entry for ARCH_AT91SAM9X5 be added (to
+arch/arm/mach-at91/Kconfig)?
 
-diff --git a/arch/arm/plat-mxc/include/mach/iomux-mx25.h b/arch/arm/plat-mxc/include/mach/iomux-mx25.h
-index bf64e1e..f0726d4 100644
---- a/arch/arm/plat-mxc/include/mach/iomux-mx25.h
-+++ b/arch/arm/plat-mxc/include/mach/iomux-mx25.h
-@@ -265,16 +265,20 @@
- #define MX25_PAD_CSI_D2__CSI_D2		IOMUX_PAD(0x318, 0x120, 0x10, 0, 0, NO_PAD_CTRL)
- #define MX25_PAD_CSI_D2__UART5_RXD_MUX	IOMUX_PAD(0x318, 0x120, 0x11, 0x578, 1, NO_PAD_CTRL)
- #define MX25_PAD_CSI_D2__GPIO_1_27	IOMUX_PAD(0x318, 0x120, 0x15, 0, 0, NO_PAD_CTRL)
-+#define MX25_PAD_CSI_D2__CSPI3_MOSI	IOMUX_PAD(0x318, 0x120, 0x17, 0, 0, NO_PAD_CTRL)
- 
- #define MX25_PAD_CSI_D3__CSI_D3		IOMUX_PAD(0x31c, 0x124, 0x10, 0, 0, NO_PAD_CTRL)
- #define MX25_PAD_CSI_D3__GPIO_1_28	IOMUX_PAD(0x31c, 0x124, 0x15, 0, 0, NO_PAD_CTRL)
-+#define MX25_PAD_CSI_D3__CSPI3_MISO	IOMUX_PAD(0x31c, 0x124, 0x17, 0x4b4, 1, NO_PAD_CTRL)
- 
- #define MX25_PAD_CSI_D4__CSI_D4		IOMUX_PAD(0x320, 0x128, 0x10, 0, 0, NO_PAD_CTRL)
- #define MX25_PAD_CSI_D4__UART5_RTS	IOMUX_PAD(0x320, 0x128, 0x11, 0x574, 1, NO_PAD_CTRL)
- #define MX25_PAD_CSI_D4__GPIO_1_29	IOMUX_PAD(0x320, 0x128, 0x15, 0, 0, NO_PAD_CTRL)
-+#define MX25_PAD_CSI_D4__CSPI3_SCLK	IOMUX_PAD(0x320, 0x128, 0x17, 0, 0, NO_PAD_CTRL)
- 
- #define MX25_PAD_CSI_D5__CSI_D5		IOMUX_PAD(0x324, 0x12c, 0x10, 0, 0, NO_PAD_CTRL)
- #define MX25_PAD_CSI_D5__GPIO_1_30	IOMUX_PAD(0x324, 0x12c, 0x15, 0, 0, NO_PAD_CTRL)
-+#define MX25_PAD_CSI_D5__CSPI3_RDY	IOMUX_PAD(0x324, 0x12c, 0x17, 0, 0, NO_PAD_CTRL)
- 
- #define MX25_PAD_CSI_D6__CSI_D6		IOMUX_PAD(0x328, 0x130, 0x10, 0, 0, NO_PAD_CTRL)
- #define MX25_PAD_CSI_D6__GPIO_1_31	IOMUX_PAD(0x328, 0x130, 0x15, 0, 0, NO_PAD_CTRL)
--- 
-1.7.2.3
+
+Paul Bolle
