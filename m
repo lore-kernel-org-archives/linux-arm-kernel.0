@@ -1,19 +1,15 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 31 Oct 2011 21:38:59 +0000
-Subject: [PATCH] regulator: Use regmap_read/write(), regmap_update_bits
-	functions directly
-In-Reply-To: <1319617556-29021-1-git-send-email-jhbird.choi@samsung.com>
-References: <1319617556-29021-1-git-send-email-jhbird.choi@samsung.com>
-Message-ID: <20111031213859.GA22025@sirena.org.uk>
+Date: Mon, 31 Oct 2011 21:44:20 +0000
+Subject: [PATCH v2] regulator: max8649 Convert max8649 to use regmap api
+In-Reply-To: <1319462786-2602-1-git-send-email-jhbird.choi@gmail.com>
+References: <1319462786-2602-1-git-send-email-jhbird.choi@gmail.com>
+Message-ID: <20111031214420.GB22025@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 26, 2011 at 05:25:56PM +0900, jhbird.choi at samsung.com wrote:
-> From: Jonghwan Choi <jhbird.choi@samsung.com>
+On Mon, Oct 24, 2011 at 10:26:26PM +0900, jhbird.choi at gmail.com wrote:
+> From: Jonghwan Choi <jhbird.choi@gmail.com>
 > 
-> Signed-off-by: Jonghwan Choi <jhbird.choi@samsung.com>
+> Signed-off-by: Jonghwan Choi <jhbird.choi@gmail.com>
 
-Please make sure you CC Liam on all regulator API patches - you should
-CC all the maintainers for the subsystem.  This needs to be refreshed
-against current -next, it won't apply as-is (I suspect the patch is for
-3.0 rather than current code).
+Applied, thanks (but for 3.3 rather than 3.2).
