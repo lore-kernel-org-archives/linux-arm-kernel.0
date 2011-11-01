@@ -1,56 +1,91 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 1 Nov 2011 16:07:31 +0000
-Subject: [RFC 0/5] restart cleanups
-Message-ID: <20111101160731.GQ19187@n2100.arm.linux.org.uk>
+Date: Tue, 01 Nov 2011 16:08:28 +0000
+Subject: [PATCH 1/5] ARM: restart: remove argument to setup_mm_for_reboot()
+In-Reply-To: <20111101160731.GQ19187@n2100.arm.linux.org.uk>
+References: <20111101160731.GQ19187@n2100.arm.linux.org.uk>
+Message-ID: <E1RLGt2-0005IN-A0@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series cleans up some of the restart code for ARM.  It doesn't go
-as far as Will's patch set (or even anywhere close to it) mainly because
-of the poor state of the various implementations in various platforms.
+setup_mm_for_reboot() doesn't make use of its argument, so remove it.
 
-Effectively, the various platforms themselves stand in the way of optimal
-cleanup of this code.
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ arch/arm/kernel/machine_kexec.c |    4 ++--
+ arch/arm/kernel/process.c       |    4 ++--
+ arch/arm/mm/idmap.c             |    2 +-
+ arch/arm/mm/nommu.c             |    2 +-
+ 4 files changed, 6 insertions(+), 6 deletions(-)
 
-We already have a function pointer to allow the restart to be hooked at
-runtime - it's called arm_pm_restart().
-
-What a lot of platforms use this for is to intercept the restart call,
-do something, and then continue on by calling arm_machine_restart().
-
-One platform (mioa701) in particular thinks its a good idea to call
-functions like gpio_free() and free_irq() from here.  This is soo far
-from reality its untrue; the restart paths can be called from _any_
-context including IRQ context.  This alone effectively stands in the
-way of moving the IRQ disables before the call to arm_pm_restart().
-
-Other platforms use arm_pm_restart() to intercept the restart, and
-force the mode to 'g', 'h' or 's'.  As the mode already defaults to
-'h' I don't understand why people felt forcing it in that case was
-necessary.  As for the 's' case, this can be done by merely specifying
-".soft_reboot = 1" in the machine record.  We can solve the 'g' case
-by changing .soft_reboot to be a char "restart_mode" argument which
-sets the default restart mode.
-
-Although I have a patch (not published as part of this series) which
-makes that change, I've found it less than useful for getting rid of
-some of the intercept crap because of other games platforms play in
-there (like writing magic values to registers.)
-
-Essentially, we want to move to a state where arm_pm_restart() is _the_
-hook for platforms to insert their restart code into, with the default
-function being a no-op.  All platforms which want to have working
-restart support then have to insert their restart code into this hook.
-
-So, this patch set takes us a little way there by cleaning up some of
-the restart code:
-
-1. remove the useless argument to setup_mm_for_reboot()
-2. remove the silly indirection in AT91 code and do this like other
-   platforms do.
-3. remove any local_irq_disable() calls inside arch_reset() because
-   this is already the case.
-4. factor out the code which fiddles with the MMU tables.
-5. provide (and use) a function for soft rebooting which includes the
-   setup of the MMU tables and call cpu_reset() - and remove the MMU
-   setup from the code paths before arch_reset() is called.
+diff --git a/arch/arm/kernel/machine_kexec.c b/arch/arm/kernel/machine_kexec.c
+index c1b4463..6fcdfc4 100644
+--- a/arch/arm/kernel/machine_kexec.c
++++ b/arch/arm/kernel/machine_kexec.c
+@@ -16,7 +16,7 @@
+ extern const unsigned char relocate_new_kernel[];
+ extern const unsigned int relocate_new_kernel_size;
+ 
+-extern void setup_mm_for_reboot(char mode);
++extern void setup_mm_for_reboot(void);
+ 
+ extern unsigned long kexec_start_address;
+ extern unsigned long kexec_indirection_page;
+@@ -114,7 +114,7 @@ void machine_kexec(struct kimage *image)
+ 		kexec_reinit();
+ 	local_irq_disable();
+ 	local_fiq_disable();
+-	setup_mm_for_reboot(0); /* mode is not used, so just pass 0*/
++	setup_mm_for_reboot(); /* mode is not used, so just pass 0*/
+ 	flush_cache_all();
+ 	outer_flush_all();
+ 	outer_disable();
+diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+index fd08140..62946c0 100644
+--- a/arch/arm/kernel/process.c
++++ b/arch/arm/kernel/process.c
+@@ -57,7 +57,7 @@ static const char *isa_modes[] = {
+   "ARM" , "Thumb" , "Jazelle", "ThumbEE"
+ };
+ 
+-extern void setup_mm_for_reboot(char mode);
++extern void setup_mm_for_reboot(void);
+ 
+ static volatile int hlt_counter;
+ 
+@@ -103,7 +103,7 @@ void arm_machine_restart(char mode, const char *cmd)
+ 	 * we may need it to insert some 1:1 mappings so that
+ 	 * soft boot works.
+ 	 */
+-	setup_mm_for_reboot(mode);
++	setup_mm_for_reboot();
+ 
+ 	/* Clean and invalidate caches */
+ 	flush_cache_all();
+diff --git a/arch/arm/mm/idmap.c b/arch/arm/mm/idmap.c
+index 2be9139..296ad2e 100644
+--- a/arch/arm/mm/idmap.c
++++ b/arch/arm/mm/idmap.c
+@@ -78,7 +78,7 @@ void identity_mapping_del(pgd_t *pgd, unsigned long addr, unsigned long end)
+  * the user-mode pages.  This will then ensure that we have predictable
+  * results when turning the mmu off
+  */
+-void setup_mm_for_reboot(char mode)
++void setup_mm_for_reboot(void)
+ {
+ 	/*
+ 	 * We need to access to user-mode page tables here. For kernel threads
+diff --git a/arch/arm/mm/nommu.c b/arch/arm/mm/nommu.c
+index 941a98c..8841751 100644
+--- a/arch/arm/mm/nommu.c
++++ b/arch/arm/mm/nommu.c
+@@ -43,7 +43,7 @@ void __init paging_init(struct machine_desc *mdesc)
+ /*
+  * We don't need to do anything here for nommu machines.
+  */
+-void setup_mm_for_reboot(char mode)
++void setup_mm_for_reboot(void)
+ {
+ }
+ 
+-- 
+1.7.4.4
