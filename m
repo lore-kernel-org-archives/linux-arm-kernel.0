@@ -1,43 +1,36 @@
-From: alan@linux.intel.com (Alan Cox)
-Date: Tue, 1 Nov 2011 12:18:51 +0000
-Subject: [PATCH 02/14] ARM : SAMSUNG : Add RS485 support.
-In-Reply-To: <1319255194-4799-1-git-send-email-paul.s.schilling@gmail.com>
-References: <samsung_rs485>
-	<1319255194-4799-1-git-send-email-paul.s.schilling@gmail.com>
-Message-ID: <20111101121851.7d393277@bob.linux.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 1 Nov 2011 12:40:13 +0000
+Subject: [PATCH 01/51] ARM: reset: introduce arm_arch_reset function
+	pointer
+In-Reply-To: <20111031221513.GB10576@n2100.arm.linux.org.uk>
+References: <1319813059-8914-1-git-send-email-will.deacon@arm.com>
+	<1319813059-8914-2-git-send-email-will.deacon@arm.com>
+	<20111029102108.GY19187@n2100.arm.linux.org.uk>
+	<20111029135653.GA25057@mudshark.cambridge.arm.com>
+	<20111031141322.GK19187@n2100.arm.linux.org.uk>
+	<20111031143744.GE29349@mudshark.cambridge.arm.com>
+	<20111031221513.GB10576@n2100.arm.linux.org.uk>
+Message-ID: <20111101124013.GA15232@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> +config SAMSUNG_HAS_RS485
-> +	bool "Enable RS485 support for Samsung"
-> +	depends on SERIAL_SAMSUNG && (MACH_CONDOR2440 ||
-> MACH_CONDOR2416 || MACH_MINI2440)
-> +	default y if (MACH_CONDOR2440 || MACH_CONDOR2416)
-> +	default n if (MACH_MINI2440)
+On Mon, Oct 31, 2011 at 10:15:13PM +0000, Russell King - ARM Linux wrote:
+> I've spent the rest of today trying to get it to do another trivial task -
+> adding setup_reboot(mode) to the start of the arch_reset() functions, and
+> failed to get it to place the call after local variable declarations.
 
-There really needs to be more ARM thinking about doing this sort of
-stuff at runtime. If you can detect the board type at runtime then you
-need to be moving towards kicking board specifics out of the depends,
-and treating it as an "include support for this, if the board has it"
-so you can move towards less build time only configuration.
+That sounds difficult. What pattern did you use to skip the declarations?
 
-> +/* FIXME */
-> +	#if 0
-> +	if (last_state != en) {
-> +
+> I really don't like the way I seem to have to create a rule for each
+> possible perturbation of arch_reset (as a function pointer, as a
+> function, with local variables, without local variables.)
 
-So this doesn't look ready to submit either...
+I was wondering if there was a way to avoid it, but I can't figure it out.
 
+> So far, my experiments with it have just resulted in frustration with
+> virtually zero productivity (just one commit to be precise).
 
-> +		if ((utrstat & S3C2410_UTRSTAT_TXE) ? 1 : 0) {
-> +			if (cfg->gpio_transmit_en > -1) {
-> +
-> gpio_set_value(cfg->gpio_transmit_en, 0);
-> +			}
+I guess the tool is good in cases where you're performing a mindless rename,
+but as you pointed out, grep and sed are good for that as well.
 
-Lots of excess brackets (see CodingStyle) - removing a few of the
-excess ones would make it easier to read later.
-
-The later bits become a real mess of ifdefs - much not your fault, the
-combination of your ifdefs and existing lack of design push it beyond
-ugly and really want addressing.
+Will
