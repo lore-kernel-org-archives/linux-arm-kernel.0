@@ -1,42 +1,82 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Tue, 1 Nov 2011 21:28:39 +0800
-Subject: [PATCH] UART: add CSR SiRFprimaII SoC on-chip uart drivers
-In-Reply-To: <20111101131021.GA9109@kroah.com>
-References: <1319772453-1275-1-git-send-email-Barry.Song@csr.com>
-	<20111028071129.GA2362@tarshish>
-	<CAGsJ_4z=VtU+RJ4c0Y2ruttWU6mTVtHMxzvCYWGz=5w6i7QJMQ@mail.gmail.com>
-	<20111101114242.7c90f958@bob.linux.org.uk>
-	<CAGsJ_4wGRv9=fbWtK-0jkmXDcd=y2r6qxae99tNgim4=BmxJ+w@mail.gmail.com>
-	<20111101131021.GA9109@kroah.com>
-Message-ID: <CAGsJ_4ySO=ACfAeeHMvw_sOUdaD9KYD09f4LYrWdUkA2PwuLvA@mail.gmail.com>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Tue, 1 Nov 2011 15:37:15 +0200
+Subject: [PATCH 3/6] arm/tegra: prepare early init for multiple tegra
+	variants
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF173E1B49B2@HQMAIL01.nvidia.com>
+References: <1319561644-6160-1-git-send-email-pdeschrijver@nvidia.com>
+	<1319561644-6160-4-git-send-email-pdeschrijver@nvidia.com>
+	<74CDBE0F657A3D45AFBB94109FB122FF173E1B49B2@HQMAIL01.nvidia.com>
+Message-ID: <20111101133715.GE13358@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/11/1 Greg KH <greg@kroah.com>:
-> On Tue, Nov 01, 2011 at 08:48:29PM +0800, Barry Song wrote:
->> 2011/11/1 Alan Cox <alan@linux.intel.com>:
->> >> i am not sure whether i will make Linus confused if i send a new
->> >> version at this moment. how about i send a seperate patch to fix this
->> >> after the driver is applied?
->> >
->> > That would be the best idea - its a trivial typo so doesn't really
->> > matter much.
->> ok, Alan.
->>
->> Linus, have you gotten it? and can you apply it?
->> or do you want this to go through tty tree and merge it until next merge window?
->
-> That's probably the easiest thing to do, right? ?Send it to me and I can
-> handle it.
+On Thu, Oct 27, 2011 at 10:06:13PM +0200, Stephen Warren wrote:
+> Peter De Schrijver wrote at Tuesday, October 25, 2011 10:54 AM:
+> > This patch splits the early init code in a common and a tegra20 specific part.
+> 
+> > diff --git a/arch/arm/mach-tegra/board-dt.c b/arch/arm/mach-tegra/board-dt.c
+> 
+> > +static void __init tegra_init_early(void)
+> > +{
+> > +
+> > +	int i;
+> > +
+> > +	for (i = 0; i < ARRAY_SIZE(early_init); i++)
+> > +		if (of_machine_is_compatible(early_init[i].machine))
+> > +			return early_init[i].init();
+> > +
+> > +	printk(KERN_WARNING "Unknown platform detected\n");
+> 
+> pr_warn/WARN/WARN_ON?
+> 
+> > diff --git a/arch/arm/mach-tegra/common.c b/arch/arm/mach-tegra/common.c
+> 
+> > @@ -31,8 +31,6 @@
+> >  #include "clock.h"
+> >  #include "fuse.h"
+> > 
+> > -void (*arch_reset)(char mode, const char *cmd) = tegra_assert_system_reset;
+> > -
+> >  void tegra_assert_system_reset(char mode, const char *cmd)
+> >  {
+> >  	void __iomem *reset = IO_ADDRESS(TEGRA_CLK_RESET_BASE + 0x04);
+> > @@ -44,7 +42,9 @@ void tegra_assert_system_reset(char mode, const char *cmd)
+> >  	writel_relaxed(reg, reset);
+> >  }
+> > 
+> > -static __initdata struct tegra_clk_init_table common_clk_init_table[] = {
+> > +void (*arch_reset)(char mode, const char *cmd) = tegra_assert_system_reset;
+> 
+> I'm not sure why you moved that, but I suppose it's fine.
+> 
+> > +
+> > +static __initdata struct tegra_clk_init_table tegra20_clk_init_table[] = {
+> >  	/* name		parent		rate		enabled */
+> >  	{ "clk_m",	NULL,		0,		true },
+> >  	{ "pll_p",	"clk_m",	216000000,	true },
+> > @@ -65,19 +65,25 @@ static void __init tegra_init_cache(void)
+> >  {
+> >  #ifdef CONFIG_CACHE_L2X0
+> >  	void __iomem *p = IO_ADDRESS(TEGRA_ARM_PERIF_BASE) + 0x3000;
+> > +	u32 aux_ctrl;
+> > 
+> >  	writel_relaxed(0x331, p + L2X0_TAG_LATENCY_CTRL);
+> >  	writel_relaxed(0x441, p + L2X0_DATA_LATENCY_CTRL);
+> > +	writel(2, p + L2X0_PREFETCH_CTRL);
 
-Hi Greg, thanks! as i checked your tree, this patch should be able to
-apply on your tree since you already have pinmux subsystem.
-do i need to git send-email to you again for this?
+This is actually wrong :)
 
->
-> thanks,
->
-> greg k-h
->
+> > +
+> > +	aux_ctrl = readl(p + L2X0_CACHE_TYPE);
+> > +	aux_ctrl = (aux_ctrl & 0x700) << (17-8);
+> > +	aux_ctrl |= 0x6C000001;
+> 
+> This is an unrelated change?
+> 
 
--barry
+This is needed to deal with potential differences in L2 associativity between
+SoCs.
+
+Cheers,
+
+Peter.
