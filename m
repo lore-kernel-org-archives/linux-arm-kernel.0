@@ -1,44 +1,60 @@
 From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Tue, 1 Nov 2011 11:29:32 -0500
-Subject: [PATCH] i2c-gpio.c: correct logic of pdata->scl_is_open_drain
-In-Reply-To: <EF2E73589CA71846A15D0B2CDF79505D087B34BEE2@wm021.weinmann.com>
-References: <EF2E73589CA71846A15D0B2CDF79505D087B34BE51@wm021.weinmann.com>
-	<CAF8ieYXPMgUzekth7PGxC3AgYNKac-HQ21D3vvB5J3SLOatmfQ@mail.gmail.com>
-	<EF2E73589CA71846A15D0B2CDF79505D087B34BE8B@wm021.weinmann.com>
-	<CAF8ieYWY2RwkgPERgagvw2bby8Y+UFgrYr3zPOb27e=bfOH-vg@mail.gmail.com>
-	<EF2E73589CA71846A15D0B2CDF79505D087B34BEE2@wm021.weinmann.com>
-Message-ID: <ADE657CA350FB648AAC2C43247A983F001F39DF77673@AUSP01VMBX24.collaborationhost.net>
+Date: Tue, 1 Nov 2011 11:36:14 -0500
+Subject: [PATCH 3/5] ARM: restart: remove local_irq_disable() from
+	within	arch_reset()
+In-Reply-To: <E1RLGtg-0005IV-TG@rmk-PC.arm.linux.org.uk>
+References: <20111101160731.GQ19187@n2100.arm.linux.org.uk>
+	<E1RLGtg-0005IV-TG@rmk-PC.arm.linux.org.uk>
+Message-ID: <ADE657CA350FB648AAC2C43247A983F001F39DF7767A@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, November 01, 2011 1:02 AM, Voss, Nikolaus wrote:
->> It is never correct to use push-pull I/O for i2c, so the flag does not
->> specify the desired behavior of the driver, it specifies what the
->> hardware has been configured to do so that the driver can choose the
->> cheapest way to do open-drain I/O.
+On Tuesday, November 01, 2011 9:09 AM, Russell King wrote:
 >
-> Ok, seems rather logical after all.
+> IRQs are already disabled by the time arch_reset() is called, so these
+> calls to local_irq_disable() instead arch_reset() are redundant.  Remove
+> them.
 >
->> 
->> And even if you could argue that the flag should be inverted, it has
->> had the same meaning since the driver was introduced several years
->> ago, so changing it now will break every single platform which
->> currently uses i2c-gpio.
+> The following spatch was used:
+> @ rule1 @ identifier fn; @@
+> arch_reset = fn;
 >
-> I completely agree.
+> @@ identifier rule1.fn, m, c; @@
+> void fn(char m, const char *c)
+> {
+> <... when != local_irq_enable
+> -local_irq_disable();
+> ...>
+> }
 >
+> @@ identifier m, c; @@
+> arch_reset(char m, const char *c)
+> {
+> <... when != local_irq_enable
+> -local_irq_disable();
+> ...>
+> }
+>
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+>  arch/arm/mach-ep93xx/include/mach/system.h  |    2 --
 
-Just for the record...
+[...]
 
-The GPIO pins used for I2C on the ep93xx platform can be configured as
-open-drain I/O pins.  When they are, and external pull-ups are applied
-to the signals, the I2C bus works correctly when the "is_open_drain"
-flags are set.  If the pull-ups are missing the bus does not work.
-If the "is_open_drain" flags are not set, the I2C bus works correctly
-regardless of the existence of the pull-ups.
+> diff --git a/arch/arm/mach-ep93xx/include/mach/system.h b/arch/arm/mach-ep93xx/include/mach/system.h
+> index 6d661fe..bdf6c4f 100644
+> --- a/arch/arm/mach-ep93xx/include/mach/system.h
+> +++ b/arch/arm/mach-ep93xx/include/mach/system.h
+> @@ -11,8 +11,6 @@ static inline void arch_idle(void)
+>  
+>  static inline void arch_reset(char mode, const char *cmd)
+>  {
+> -	local_irq_disable();
+> -
+>  	/*
+>  	 * Set then clear the SWRST bit to initiate a software reset
+>  	 */
 
-Based on that I think the i2c-gpio driver's use of the "is_open_drain"
-flags is correct.
+For ep93xx.
 
-Regards,
-Hartley
+Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
