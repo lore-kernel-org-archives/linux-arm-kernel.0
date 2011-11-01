@@ -1,28 +1,105 @@
-From: mel@csn.ul.ie (Mel Gorman)
-Date: Tue, 1 Nov 2011 18:47:59 +0000
-Subject: [PATCH 2/9] mm: alloc_contig_freed_pages() added
-In-Reply-To: <op.v394luhl3l0zgt@mpn-glaptop>
-References: <20111018122109.GB6660@csn.ul.ie>
-	<809d0a2afe624c06505e0df51e7657f66aaf9007.1319428526.git.mina86@mina86.com>
-	<20111101150448.GD14998@csn.ul.ie> <op.v394luhl3l0zgt@mpn-glaptop>
-Message-ID: <20111101184759.GE14998@csn.ul.ie>
+From: paul.s.schilling@gmail.com (Paul Schilling)
+Date: Tue, 1 Nov 2011 14:12:45 -0500
+Subject: [PATCH 02/14] ARM : SAMSUNG : Add RS485 support.
+In-Reply-To: <CAC=G6swE7WCqTFkJkOm_GXpVncjXrc+-jvaKHiwc9KTb6Re8hQ@mail.gmail.com>
+References: <1319255194-4799-1-git-send-email-paul.s.schilling@gmail.com>
+	<20111101121851.7d393277@bob.linux.org.uk>
+	<CAC=G6swE7WCqTFkJkOm_GXpVncjXrc+-jvaKHiwc9KTb6Re8hQ@mail.gmail.com>
+Message-ID: <CAC=G6szKRbyJXTXOCyDaF3rEfaiVCktTU6y0Fwohh6qf2VD-_A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 01, 2011 at 07:06:56PM +0100, Michal Nazarewicz wrote:
-> >page_isolation.c may also be a better fit than page_alloc.c
-> 
-> Since isolate_freepages_block() is the only user of split_free_page(),
-> would it make sense to move split_free_page() to page_isolation.c as
-> well?  I sort of like the idea of making it static and removing from
-> header file.
-> 
+I need an opinion on two issues before I resubmit the Samsung RS-485 driver.
 
-I see no problem with that. It'll be separate from split_page() but that
-is not earth shattering.
+First of all the driver works.  I have tested it on a logic analyser
+and I found that it
+switches from transmit to receive in token mode exactly after 1 bit of
+idle time as long
+as interrupts are kept enabled and nothing tries to wait or sleep
+inside of an interrupt.
+I found 2 maybe 3 places where this occurs up to 22 milliseconds.
 
-Thanks.
+The opinion part...  I needed a timer to switch from transmit to
+receive after the FIFO
+was empty.  I started by using the low resolution timer using jiffies
+first.  I found that
+wasn't high enough resolution, so I switched to the Linux HRT.
+Currently I have both
+versions that can be selected by conditional compile.  Should I just
+remove the low
+resolution timer completely or leave it in.
 
--- 
-Mel Gorman
-SUSE Labs
+Second, I have a chunk of code that if it could be made to work could
+off load the
+receiving to DMA up to the last couple of bytes then switch back to
+interrupts for
+the token byte.  Should I leave that code in a #if 0 statement or
+should I just delete
+it.
+
+Thanks,
+Paul Schilling
+
+On Tue, Nov 1, 2011 at 9:57 AM, Paul Schilling
+<paul.s.schilling@gmail.com> wrote:
+> I am working on resubmitting this stuff right now. ?I have 14 patches
+> that should be
+> broken into more like 20 patches. ?Most of them are ARM S3C and
+> specifically S3C2416 patches.
+> I am working on a patch right now to fix a Atomic wait in the DMA
+> code. ?That causes
+> 20 milliseconds of no interrupts whenever a sound is played on the samsung S3C
+> platform.
+>
+> The code below wasn't supposed to go out and I have patch that removes
+> that chunk
+> of code almost ready that just needs testing before I send it.
+>
+> On Tue, Nov 1, 2011 at 7:18 AM, Alan Cox <alan@linux.intel.com> wrote:
+>>> +config SAMSUNG_HAS_RS485
+>>> + ? ? bool "Enable RS485 support for Samsung"
+>>> + ? ? depends on SERIAL_SAMSUNG && (MACH_CONDOR2440 ||
+>>> MACH_CONDOR2416 || MACH_MINI2440)
+>>> + ? ? default y if (MACH_CONDOR2440 || MACH_CONDOR2416)
+>>> + ? ? default n if (MACH_MINI2440)
+>>
+>> There really needs to be more ARM thinking about doing this sort of
+>> stuff at runtime. If you can detect the board type at runtime then you
+>> need to be moving towards kicking board specifics out of the depends,
+>> and treating it as an "include support for this, if the board has it"
+>> so you can move towards less build time only configuration.
+>>
+>
+> The chunk of code that says FIXME is an optimization that could be
+> implemented to
+> decrease interrupts by using DMA until the last byte is ready to be
+> sent. ?I have a new
+> patch that explains in a comment what the code is for.
+>
+>>> +/* FIXME */
+>>> + ? ? #if 0
+>>> + ? ? if (last_state != en) {
+>>> +
+>>
+>> So this doesn't look ready to submit either...
+>>
+>
+> I have a patch that I haven't sent yet that fixes the code formating
+> issues. ?I need to compile and test it before I send it out.
+>
+>>
+>>> + ? ? ? ? ? ? if ((utrstat & S3C2410_UTRSTAT_TXE) ? 1 : 0) {
+>>> + ? ? ? ? ? ? ? ? ? ? if (cfg->gpio_transmit_en > -1) {
+>>> +
+>>> gpio_set_value(cfg->gpio_transmit_en, 0);
+>>> + ? ? ? ? ? ? ? ? ? ? }
+>>
+>> Lots of excess brackets (see CodingStyle) - removing a few of the
+>> excess ones would make it easier to read later.
+>>
+>> The later bits become a real mess of ifdefs - much not your fault, the
+>> combination of your ifdefs and existing lack of design push it beyond
+>> ugly and really want addressing.
+>>
+>>
+>
