@@ -1,70 +1,76 @@
-From: paul.s.schilling@gmail.com (Paul Schilling)
-Date: Tue, 1 Nov 2011 09:57:56 -0500
-Subject: [PATCH 02/14] ARM : SAMSUNG : Add RS485 support.
-In-Reply-To: <20111101121851.7d393277@bob.linux.org.uk>
-References: <1319255194-4799-1-git-send-email-paul.s.schilling@gmail.com>
-	<20111101121851.7d393277@bob.linux.org.uk>
-Message-ID: <CAC=G6swE7WCqTFkJkOm_GXpVncjXrc+-jvaKHiwc9KTb6Re8hQ@mail.gmail.com>
+From: mel@csn.ul.ie (Mel Gorman)
+Date: Tue, 1 Nov 2011 15:04:48 +0000
+Subject: [PATCH 2/9] mm: alloc_contig_freed_pages() added
+In-Reply-To: <809d0a2afe624c06505e0df51e7657f66aaf9007.1319428526.git.mina86@mina86.com>
+References: <20111018122109.GB6660@csn.ul.ie>
+	<809d0a2afe624c06505e0df51e7657f66aaf9007.1319428526.git.mina86@mina86.com>
+Message-ID: <20111101150448.GD14998@csn.ul.ie>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I am working on resubmitting this stuff right now.  I have 14 patches
-that should be
-broken into more like 20 patches.  Most of them are ARM S3C and
-specifically S3C2416 patches.
-I am working on a patch right now to fix a Atomic wait in the DMA
-code.  That causes
-20 milliseconds of no interrupts whenever a sound is played on the samsung S3C
-platform.
+On Sun, Oct 23, 2011 at 09:05:05PM -0700, Michal Nazarewicz wrote:
+> > On Thu, Oct 06, 2011 at 03:54:42PM +0200, Marek Szyprowski wrote:
+> >> This commit introduces alloc_contig_freed_pages() function
+> >> which allocates (ie. removes from buddy system) free pages
+> >> in range. Caller has to guarantee that all pages in range
+> >> are in buddy system.
+> 
+> On Tue, 18 Oct 2011 05:21:09 -0700, Mel Gorman <mel@csn.ul.ie> wrote:
+> > Straight away, I'm wondering why you didn't use
+> > mm/compaction.c#isolate_freepages()
+> 
+> Does the below look like a step in the right direction?
+> 
+> It basically moves isolate_freepages_block() to page_alloc.c (changing
 
-The code below wasn't supposed to go out and I have patch that removes
-that chunk
-of code almost ready that just needs testing before I send it.
+For the purposes of review, have a separate patch for moving
+isolate_freepages_block to another file that does not alter the
+function in any way. When the function is updated in a follow-on patch,
+it'll be far easier to see what has changed.
 
-On Tue, Nov 1, 2011 at 7:18 AM, Alan Cox <alan@linux.intel.com> wrote:
->> +config SAMSUNG_HAS_RS485
->> + ? ? bool "Enable RS485 support for Samsung"
->> + ? ? depends on SERIAL_SAMSUNG && (MACH_CONDOR2440 ||
->> MACH_CONDOR2416 || MACH_MINI2440)
->> + ? ? default y if (MACH_CONDOR2440 || MACH_CONDOR2416)
->> + ? ? default n if (MACH_MINI2440)
->
-> There really needs to be more ARM thinking about doing this sort of
-> stuff at runtime. If you can detect the board type at runtime then you
-> need to be moving towards kicking board specifics out of the depends,
-> and treating it as an "include support for this, if the board has it"
-> so you can move towards less build time only configuration.
->
+page_isolation.c may also be a better fit than page_alloc.c
 
-The chunk of code that says FIXME is an optimization that could be
-implemented to
-decrease interrupts by using DMA until the last byte is ready to be
-sent.  I have a new
-patch that explains in a comment what the code is for.
+As it is, the patch for isolate_freepages_block is almost impossible
+to read because it's getting munged with existing code that is already
+in page_alloc.c . About all I caught from it is that scannedp does
+not have a type. It defaults to unsigned int but it's unnecessarily
+obscure.
 
->> +/* FIXME */
->> + ? ? #if 0
->> + ? ? if (last_state != en) {
->> +
->
-> So this doesn't look ready to submit either...
->
+> it name to isolate_freepages_range()) and changes it so that depending
+> on arguments it treats holes (either invalid PFN or non-free page) as
+> errors so that CMA can use it.
+> 
 
-I have a patch that I haven't sent yet that fixes the code formating
-issues.  I need to compile and test it before I send it out.
+I haven't actually read the function because it's too badly mixed with
+page_alloc.c code but this description fits what I'm looking for.
 
->
->> + ? ? ? ? ? ? if ((utrstat & S3C2410_UTRSTAT_TXE) ? 1 : 0) {
->> + ? ? ? ? ? ? ? ? ? ? if (cfg->gpio_transmit_en > -1) {
->> +
->> gpio_set_value(cfg->gpio_transmit_en, 0);
->> + ? ? ? ? ? ? ? ? ? ? }
->
-> Lots of excess brackets (see CodingStyle) - removing a few of the
-> excess ones would make it easier to read later.
->
-> The later bits become a real mess of ifdefs - much not your fault, the
-> combination of your ifdefs and existing lack of design push it beyond
-> ugly and really want addressing.
->
->
+> It also accepts a range rather then just assuming a single pageblock
+> thus the change moves range calculation in compaction.c from
+> isolate_freepages_block() up to isolate_freepages().
+> 
+> The change also modifies spilt_free_page() so that it does not try to
+> change pageblock's migrate type if current migrate type is ISOLATE or
+> CMA.
+> 
+
+This is fine. Later, the flags that determine what happens to pageblocks
+may be placed in compact_control.
+
+> ---
+>  include/linux/mm.h             |    1 -
+>  include/linux/page-isolation.h |    4 +-
+>  mm/compaction.c                |   73 +++--------------------
+>  mm/internal.h                  |    5 ++
+>  mm/page_alloc.c                |  128 +++++++++++++++++++++++++---------------
+>  5 files changed, 95 insertions(+), 116 deletions(-)
+> 
+
+I confess I didn't read closely because of the mess in page_alloc.c but
+the intent seems fine. Hopefully there will be a new version of CMA
+posted that will be easier to review.
+
+Thanks
+
+-- 
+Mel Gorman
+SUSE Labs
