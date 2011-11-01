@@ -1,61 +1,48 @@
 From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Tue,  1 Nov 2011 06:31:29 +0530
-Subject: [PATCH v2 3/3] ARM: Exynos4: Enable conversion of GIC dt irq
-	specifier to linux virq
-In-Reply-To: <1320109289-2730-1-git-send-email-thomas.abraham@linaro.org>
-References: <1320109289-2730-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <1320109289-2730-4-git-send-email-thomas.abraham@linaro.org>
+Date: Tue,  1 Nov 2011 06:36:51 +0530
+Subject: [PATCH v2 0/2] ARM: Samsung: Add basic device tree support for
+	Exynos4 boards
+Message-ID: <1320109613-2811-1-git-send-email-thomas.abraham@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable conversion of device tree interrupt specifier to linux virq domain
-for GIC controller.
+Changes since v1:
+- Removed unique per-controller compatible string value from gpio controller nodes
+  to align with the updated device tree support for exynos4 gpio controller.
+- Removed the interrupt combiner controller node.
 
-Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
----
- arch/arm/mach-exynos4/cpu.c |   17 ++++++++++++++++-
- 1 files changed, 16 insertions(+), 1 deletions(-)
+This patchset adds a new basic device tree enabled machine/board file which is
+based on the Samsung's Exynos4 family of SoC's. Also included in this patchset is the
+dts file for Exynos4210 SoC, Samsung's SMDKV310 board and Insignal's Origen board.
 
-diff --git a/arch/arm/mach-exynos4/cpu.c b/arch/arm/mach-exynos4/cpu.c
-index 358624d..c06dd03 100644
---- a/arch/arm/mach-exynos4/cpu.c
-+++ b/arch/arm/mach-exynos4/cpu.c
-@@ -10,6 +10,8 @@
- 
- #include <linux/sched.h>
- #include <linux/sysdev.h>
-+#include <linux/of.h>
-+#include <linux/of_irq.h>
- 
- #include <asm/mach/map.h>
- #include <asm/mach/irq.h>
-@@ -229,13 +231,26 @@ static void exynos4_gic_irq_fix_base(struct irq_data *d)
- 			    (gic_bank_offset * smp_processor_id());
- }
- 
-+#ifdef CONFIG_OF
-+static const struct of_device_id exynos4_dt_irq_match[] = {
-+	{ .compatible = "arm,cortex-a9-gic", .data = gic_of_init, },
-+	{},
-+};
-+#endif
-+
- void __init exynos4_init_irq(void)
- {
- 	int irq;
- 
- 	gic_bank_offset = soc_is_exynos4412() ? 0x4000 : 0x8000;
- 
--	gic_init(0, IRQ_PPI(0), S5P_VA_GIC_DIST, S5P_VA_GIC_CPU);
-+	if (!of_have_populated_dt())
-+		gic_init(0, IRQ_PPI(0), S5P_VA_GIC_DIST, S5P_VA_GIC_CPU);
-+#ifdef CONFIG_OF
-+	else	
-+		of_irq_init(exynos4_dt_irq_match);
-+#endif
-+
- 	gic_arch_extn.irq_eoi = exynos4_gic_irq_fix_base;
- 	gic_arch_extn.irq_unmask = exynos4_gic_irq_fix_base;
- 	gic_arch_extn.irq_mask = exynos4_gic_irq_fix_base;
--- 
-1.7.4.4
+The Exynos4210 dts file includes support for IRQ, GPIO, WDT, RTC, UART, SDHCI, Keypad,
+DMA and I2C controllers. As device tree coverage for Exynos4210 increases, additional
+device nodes to represent the controllers should be added.
+
+The device tree enabled machine file enables boot on two boards based on the
+Exynos4210 SoC. This provides a starting point to add additional device tree support
+on these boards, migrate other existing Exynos4 based boards to use device tree
+and enable device tree based boot on new upcoming boards.
+
+This patchset has been tested on the following tree:
+git://git.linaro.org/git/people/arnd/arm-soc.git  branch: for-next
+
+Thomas Abraham (2):
+  ARM: Samsung: Add Exynos4 device tree enabled board file
+  ARM: dts: Add intial dts file for Exynos4210 SoC, SMDKV310 and Origen board
+
+ .../devicetree/bindings/arm/insignal-boards.txt    |    8 +
+ .../devicetree/bindings/arm/samsung-boards.txt     |    8 +
+ arch/arm/boot/dts/exynos4210-origen.dts            |  137 +++++++
+ arch/arm/boot/dts/exynos4210-smdkv310.dts          |  182 +++++++++
+ arch/arm/boot/dts/exynos4210.dtsi                  |  397 ++++++++++++++++++++
+ arch/arm/mach-exynos4/Kconfig                      |   14 +
+ arch/arm/mach-exynos4/Makefile                     |    2 +
+ arch/arm/mach-exynos4/mach-exynos4-dt.c            |   85 +++++
+ 8 files changed, 833 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/insignal-boards.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/samsung-boards.txt
+ create mode 100644 arch/arm/boot/dts/exynos4210-origen.dts
+ create mode 100644 arch/arm/boot/dts/exynos4210-smdkv310.dts
+ create mode 100644 arch/arm/boot/dts/exynos4210.dtsi
+ create mode 100644 arch/arm/mach-exynos4/mach-exynos4-dt.c
