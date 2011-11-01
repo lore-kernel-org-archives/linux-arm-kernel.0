@@ -1,42 +1,38 @@
-From: greg@kroah.com (Greg KH)
-Date: Tue, 1 Nov 2011 06:40:06 -0700
-Subject: [PATCH] UART: add CSR SiRFprimaII SoC on-chip uart drivers
-In-Reply-To: <CAGsJ_4ySO=ACfAeeHMvw_sOUdaD9KYD09f4LYrWdUkA2PwuLvA@mail.gmail.com>
-References: <1319772453-1275-1-git-send-email-Barry.Song@csr.com>
-	<20111028071129.GA2362@tarshish>
-	<CAGsJ_4z=VtU+RJ4c0Y2ruttWU6mTVtHMxzvCYWGz=5w6i7QJMQ@mail.gmail.com>
-	<20111101114242.7c90f958@bob.linux.org.uk>
-	<CAGsJ_4wGRv9=fbWtK-0jkmXDcd=y2r6qxae99tNgim4=BmxJ+w@mail.gmail.com>
-	<20111101131021.GA9109@kroah.com>
-	<CAGsJ_4ySO=ACfAeeHMvw_sOUdaD9KYD09f4LYrWdUkA2PwuLvA@mail.gmail.com>
-Message-ID: <20111101134006.GA9959@kroah.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 01 Nov 2011 14:29:00 +0000
+Subject: [RFC] Shrink sched_clock some more
+In-Reply-To: <4EAAF5AE.6090300@codeaurora.org>
+References: <20110922153611.GC8072@n2100.arm.linux.org.uk>
+	<4E7C48E2.5040907@arm.com> <4EAAF5AE.6090300@codeaurora.org>
+Message-ID: <4EB0022C.7080109@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 01, 2011 at 09:28:39PM +0800, Barry Song wrote:
-> 2011/11/1 Greg KH <greg@kroah.com>:
-> > On Tue, Nov 01, 2011 at 08:48:29PM +0800, Barry Song wrote:
-> >> 2011/11/1 Alan Cox <alan@linux.intel.com>:
-> >> >> i am not sure whether i will make Linus confused if i send a new
-> >> >> version at this moment. how about i send a seperate patch to fix this
-> >> >> after the driver is applied?
-> >> >
-> >> > That would be the best idea - its a trivial typo so doesn't really
-> >> > matter much.
-> >> ok, Alan.
-> >>
-> >> Linus, have you gotten it? and can you apply it?
-> >> or do you want this to go through tty tree and merge it until next merge window?
-> >
-> > That's probably the easiest thing to do, right? ?Send it to me and I can
-> > handle it.
+On 28/10/11 19:34, Stephen Boyd wrote:
+> On 09/23/11 01:52, Marc Zyngier wrote:
+>> On 22/09/11 16:36, Russell King - ARM Linux wrote:
+>>> ... by getting rid of the fixed-constant optimization, and moving the
+>>> update code into arch/arm/kernel/sched_clock.c.
+>>>
+>>> Platforms now only have to supply a function to read the sched_clock
+>>> register, and some basic information such as the number of significant
+>>> bits and the tick rate.
+>> This looks similar to a patch I posted a while ago:
+>> http://patchwork.ozlabs.org/patch/112318/
+>>
+>>
 > 
-> Hi Greg, thanks! as i checked your tree, this patch should be able to
-> apply on your tree since you already have pinmux subsystem.
-> do i need to git send-email to you again for this?
+> Can we get one of these two patches merged next merge window? I'd like
+> to add sched_clock support to MSM and building on top of this patch is
+> easier than the other way around.
 
-Yes, please do.
+I'm happy either way. The only problem I can see with Russell's patch is
+the lack of support for platforms that do not actually implement a
+sched_clock_read() function.
 
-thanks,
+I've worked around this by having a default jiffy based read function,
+but there is probably other, better solutions.
 
-greg k-h
+	M.
+-- 
+Jazz is not dead. It just smells funny...
