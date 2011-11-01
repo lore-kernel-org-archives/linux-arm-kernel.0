@@ -1,103 +1,164 @@
 From: marvin24@gmx.de (Marc Dietrich)
-Date: Tue,  1 Nov 2011 21:37:04 +0100
-Subject: [PATCH 2/3] staging: nvec: add device tree support
+Date: Tue,  1 Nov 2011 21:37:05 +0100
+Subject: [PATCH 3/3] arm/dt: tegra: add dts file for paz00
 In-Reply-To: <cover.1320173572.git.marvin24@gmx.de>
 References: <cover.1320173572.git.marvin24@gmx.de>
-Message-ID: <95b67a12e2b6ea6a9c7e17b0069ec7c9fc6f719c.1320173573.git.marvin24@gmx.de>
+Message-ID: <f3590ac48475e25c1a583124095809b42570db98.1320173573.git.marvin24@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds device tree support to the nvec driver. By using this method
-it is no longer necessary to specify platform data through a board
-file.
+This adds a dts file for paz00. As a side effect, this also enables
+the embedded controller which controls the keyboard, touchpad, power,
+leds, and some other functions.
 
-Cc: devel at driverdev.osuosl.org
-Cc: Greg KH <gregkh@suse.de>
-Cc: Julian Andres Klode <jak@jak-linux.org>
 Cc: Grant Likely <grant.likely@secretlab.ca>
 Signed-off-by: Marc Dietrich <marvin24@gmx.de>
 ---
- .../devicetree/bindings/nvec/nvec_nvidia.txt       |    9 ++++++
- drivers/staging/nvec/nvec.c                        |   30 ++++++++++++++++++-
- 2 files changed, 37 insertions(+), 2 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/nvec/nvec_nvidia.txt
+ arch/arm/boot/dts/tegra-paz00.dts |   82 +++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-tegra/Makefile      |    1 +
+ arch/arm/mach-tegra/Makefile.boot |    1 +
+ arch/arm/mach-tegra/board-dt.c    |    3 +
+ 4 files changed, 87 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/boot/dts/tegra-paz00.dts
 
-diff --git a/Documentation/devicetree/bindings/nvec/nvec_nvidia.txt b/Documentation/devicetree/bindings/nvec/nvec_nvidia.txt
+diff --git a/arch/arm/boot/dts/tegra-paz00.dts b/arch/arm/boot/dts/tegra-paz00.dts
 new file mode 100644
-index 0000000..5aeee53
+index 0000000..15a949f
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/nvec/nvec_nvidia.txt
-@@ -0,0 +1,9 @@
-+NVIDIA compliant embedded controller
++++ b/arch/arm/boot/dts/tegra-paz00.dts
+@@ -0,0 +1,82 @@
++/dts-v1/;
 +
-+Required properties:
-+- compatible : should be "nvidia,nvec".
-+- reg : the iomem of the i2c slave controller
-+- interrupts : the interrupt line of the i2c slave controller
-+- clock-frequency : the frequency of the i2c bus
-+- gpios : the gpio used for ec request
-+- slave-addr: the i2c address of the slave controller
-diff --git a/drivers/staging/nvec/nvec.c b/drivers/staging/nvec/nvec.c
-index e06b867..fafdfa2 100644
---- a/drivers/staging/nvec/nvec.c
-+++ b/drivers/staging/nvec/nvec.c
-@@ -27,6 +27,8 @@
- #include <linux/interrupt.h>
- #include <linux/io.h>
- #include <linux/irq.h>
-+#include <linux/of.h>
-+#include <linux/of_gpio.h>
- #include <linux/list.h>
- #include <linux/mfd/core.h>
- #include <linux/mutex.h>
-@@ -727,8 +729,24 @@ static int __devinit tegra_nvec_probe(struct platform_device *pdev)
- 	}
- 	platform_set_drvdata(pdev, nvec);
- 	nvec->dev = &pdev->dev;
--	nvec->gpio = pdata->gpio;
--	nvec->i2c_addr = pdata->i2c_addr;
++/memreserve/ 0x1c000000 0x04000000;
++/include/ "tegra20.dtsi"
 +
-+	if (pdata) {
-+		nvec->gpio = pdata->gpio;
-+		nvec->i2c_addr = pdata->i2c_addr;
-+	} else if (nvec->dev->of_node) {
-+		nvec->gpio = of_get_named_gpio(nvec->dev->of_node, "request-gpios", 0);
-+		if (nvec->gpio < 0) {
-+			dev_err(&pdev->dev, "no gpio specified");
-+			goto failed;
-+		}
-+		if (of_property_read_u32(nvec->dev->of_node, "slave-addr", &nvec->i2c_addr)) {
-+			dev_err(&pdev->dev, "no i2c address specified");
-+			goto failed;
-+		}
-+	} else {
-+		dev_err(&pdev->dev, "no platform data\n");
-+		goto failed;
-+	}
- 
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	if (!res) {
-@@ -893,6 +911,13 @@ static int tegra_nvec_resume(struct platform_device *pdev)
- #define tegra_nvec_resume NULL
- #endif
- 
-+/* Match table for of_platform binding */
-+static const struct of_device_id nvidia_nvec_of_match[] __devinitconst = {
-+	{ .compatible = "nvidia,nvec", },
-+	{},
++/ {
++	model = "Toshiba AC100 / Dynabook AZ";
++	compatible = "compal,paz00", "nvidia,tegra20";
++
++	chosen {
++		bootargs = "console=ttyS0,115200n8 root=/dev/mmcblk0p1";
++	};
++
++	memory at 0 {
++		reg = <0x00000000 0x20000000>;
++	};
++
++	i2c at 7000c000 {
++		clock-frequency = <400000>;
++	};
++
++	i2c at 7000c400 {
++		clock-frequency = <400000>;
++	};
++
++	i2c at 7000c500 {
++		status = "disable";
++	};
++
++	nvec at 7000c500 {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		compatible = "nvidia,nvec";
++		reg = <0x7000C500 0x100>;
++		interrupts = <124>;
++		clock-frequency = <80000>;
++		request-gpios = <&gpio 170 0>;
++		slave-addr = <138>;
++	};
++
++	i2c at 7000d000 {
++		clock-frequency = <400000>;
++	};
++
++	serial at 70006000 {
++		clock-frequency = <216000000>;
++	};
++
++	serial at 70006040 {
++		status = "disable";
++	};
++
++	serial at 70006200 {
++		status = "disable";
++	};
++
++	serial at 70006300 {
++		clock-frequency = <216000000>;
++	};
++
++	serial at 70006400 {
++		status = "disable";
++	};
++
++	sdhci at c8000000 {
++		cd-gpios = <&gpio 173 0>; /* gpio PV5 */
++		wp-gpios = <&gpio 57 0>;  /* gpio PH1 */
++		power-gpios = <&gpio 155 0>; /* gpio PT3 */
++	};
++
++	sdhci at c8000200 {
++		status = "disable";
++	};
++
++	sdhci at c8000400 {
++		status = "disable";
++	};
++
++	sdhci at c8000600 {
++		support-8bit;
++	};
 +};
-+MODULE_DEVICE_TABLE(of, nvidia_nvec_of_match);
-+
- static struct platform_driver nvec_device_driver = {
- 	.probe   = tegra_nvec_probe,
- 	.remove  = __devexit_p(tegra_nvec_remove),
-@@ -901,6 +926,7 @@ static struct platform_driver nvec_device_driver = {
- 	.driver  = {
- 		.name = "nvec",
- 		.owner = THIS_MODULE,
-+		.of_match_table = nvidia_nvec_of_match,
- 	}
- };
+diff --git a/arch/arm/mach-tegra/Makefile b/arch/arm/mach-tegra/Makefile
+index 91a07e1..b04ebfe6 100644
+--- a/arch/arm/mach-tegra/Makefile
++++ b/arch/arm/mach-tegra/Makefile
+@@ -31,6 +31,7 @@ obj-${CONFIG_MACH_SEABOARD}             += board-seaboard-pinmux.o
  
+ obj-${CONFIG_MACH_TEGRA_DT}             += board-dt.o
+ obj-${CONFIG_MACH_TEGRA_DT}             += board-harmony-pinmux.o
++obj-${CONFIG_MACH_TEGRA_DT}             += board-paz00-pinmux.o
+ obj-${CONFIG_MACH_TEGRA_DT}             += board-seaboard-pinmux.o
+ 
+ obj-${CONFIG_MACH_TRIMSLICE}            += board-trimslice.o
+diff --git a/arch/arm/mach-tegra/Makefile.boot b/arch/arm/mach-tegra/Makefile.boot
+index bd12c9f..152f9fb 100644
+--- a/arch/arm/mach-tegra/Makefile.boot
++++ b/arch/arm/mach-tegra/Makefile.boot
+@@ -3,5 +3,6 @@ params_phys-$(CONFIG_ARCH_TEGRA_2x_SOC)	:= 0x00000100
+ initrd_phys-$(CONFIG_ARCH_TEGRA_2x_SOC)	:= 0x00800000
+ 
+ dtb-$(CONFIG_MACH_HARMONY) += tegra-harmony.dtb
++dtb-$(CONFIG_MACH_PAZ00) += tegra-paz00.dtb
+ dtb-$(CONFIG_MACH_SEABOARD) += tegra-seaboard.dtb
+ dtb-$(CONFIG_MACH_VENTANA) += tegra-ventana.dtb
+diff --git a/arch/arm/mach-tegra/board-dt.c b/arch/arm/mach-tegra/board-dt.c
+index d368f8d..379660e 100644
+--- a/arch/arm/mach-tegra/board-dt.c
++++ b/arch/arm/mach-tegra/board-dt.c
+@@ -46,6 +46,7 @@
+ #include "devices.h"
+ 
+ void harmony_pinmux_init(void);
++void paz00_pinmux_init(void);
+ void seaboard_pinmux_init(void);
+ void ventana_pinmux_init(void);
+ 
+@@ -85,6 +86,7 @@ static struct {
+ 	void (*init)(void);
+ } pinmux_configs[] = {
+ 	{ "nvidia,harmony", harmony_pinmux_init },
++	{ "compal,paz00", paz00_pinmux_init },
+ 	{ "nvidia,seaboard", seaboard_pinmux_init },
+ 	{ "nvidia,ventana", ventana_pinmux_init },
+ };
+@@ -120,6 +122,7 @@ static void __init tegra_dt_init(void)
+ 
+ static const char * tegra_dt_board_compat[] = {
+ 	"nvidia,harmony",
++	"compal,paz00",
+ 	"nvidia,seaboard",
+ 	"nvidia,ventana",
+ 	NULL
 -- 
 1.7.5.4
