@@ -1,65 +1,61 @@
 From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Tue,  1 Nov 2011 06:31:28 +0530
-Subject: [PATCH v2 2/3] ARM: Exynos4: Add ioremap interceptor for statically
-	remapped regions
+Date: Tue,  1 Nov 2011 06:31:29 +0530
+Subject: [PATCH v2 3/3] ARM: Exynos4: Enable conversion of GIC dt irq
+	specifier to linux virq
 In-Reply-To: <1320109289-2730-1-git-send-email-thomas.abraham@linaro.org>
 References: <1320109289-2730-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <1320109289-2730-3-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <1320109289-2730-4-git-send-email-thomas.abraham@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ioremap() request for statically remapped regions are intercepted and the
-statically assigned virtual address is returned. For requests for which
-there are no statically remapped regions, the requests are let through.
+Enable conversion of device tree interrupt specifier to linux virq domain
+for GIC controller.
 
-Cc: Kukjin Kim <kgene.kim@samsung.com>
 Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
 ---
- arch/arm/mach-exynos4/cpu.c             |   16 ++++++++++++++++
- arch/arm/mach-exynos4/include/mach/io.h |    5 +++++
- 2 files changed, 21 insertions(+), 0 deletions(-)
+ arch/arm/mach-exynos4/cpu.c |   17 ++++++++++++++++-
+ 1 files changed, 16 insertions(+), 1 deletions(-)
 
 diff --git a/arch/arm/mach-exynos4/cpu.c b/arch/arm/mach-exynos4/cpu.c
-index 5b1765b..358624d 100644
+index 358624d..c06dd03 100644
 --- a/arch/arm/mach-exynos4/cpu.c
 +++ b/arch/arm/mach-exynos4/cpu.c
-@@ -137,6 +137,22 @@ static struct map_desc exynos4_iodesc1[] __initdata = {
- 	},
- };
+@@ -10,6 +10,8 @@
  
-+/*
-+ * For all ioremap requests of statically mapped regions, intercept ioremap and
-+ * return virtual address from the iodesc table.
-+ */
-+void __iomem *exynos4_ioremap(unsigned long phy, size_t size, unsigned int type)
-+{
-+	struct map_desc *desc = exynos4_iodesc;
-+	unsigned int idx;
+ #include <linux/sched.h>
+ #include <linux/sysdev.h>
++#include <linux/of.h>
++#include <linux/of_irq.h>
+ 
+ #include <asm/mach/map.h>
+ #include <asm/mach/irq.h>
+@@ -229,13 +231,26 @@ static void exynos4_gic_irq_fix_base(struct irq_data *d)
+ 			    (gic_bank_offset * smp_processor_id());
+ }
+ 
++#ifdef CONFIG_OF
++static const struct of_device_id exynos4_dt_irq_match[] = {
++	{ .compatible = "arm,cortex-a9-gic", .data = gic_of_init, },
++	{},
++};
++#endif
 +
-+	for (idx = 0; idx < ARRAY_SIZE(exynos4_iodesc); idx++, desc++)
-+		if (desc->pfn == __phys_to_pfn(phy) && desc->type == type)
-+			return (void __iomem *)desc->virtual;
-+
-+	return __arm_ioremap(phy, size, type);
-+}
-+
- static void exynos4_idle(void)
+ void __init exynos4_init_irq(void)
  {
- 	if (!need_resched())
-diff --git a/arch/arm/mach-exynos4/include/mach/io.h b/arch/arm/mach-exynos4/include/mach/io.h
-index d5478d2..c1b21d5 100644
---- a/arch/arm/mach-exynos4/include/mach/io.h
-+++ b/arch/arm/mach-exynos4/include/mach/io.h
-@@ -22,5 +22,10 @@
- #define __mem_pci(a)	(a)
+ 	int irq;
  
- #define IO_SPACE_LIMIT (0xFFFFFFFF)
-+#define __arch_ioremap	exynos4_ioremap
-+#define __arch_iounmap	__iounmap
+ 	gic_bank_offset = soc_is_exynos4412() ? 0x4000 : 0x8000;
+ 
+-	gic_init(0, IRQ_PPI(0), S5P_VA_GIC_DIST, S5P_VA_GIC_CPU);
++	if (!of_have_populated_dt())
++		gic_init(0, IRQ_PPI(0), S5P_VA_GIC_DIST, S5P_VA_GIC_CPU);
++#ifdef CONFIG_OF
++	else	
++		of_irq_init(exynos4_dt_irq_match);
++#endif
 +
-+void __iomem *exynos4_ioremap(unsigned long phy, size_t size,
-+					unsigned int type);
- 
- #endif /* __ASM_ARM_ARCH_IO_H */
+ 	gic_arch_extn.irq_eoi = exynos4_gic_irq_fix_base;
+ 	gic_arch_extn.irq_unmask = exynos4_gic_irq_fix_base;
+ 	gic_arch_extn.irq_mask = exynos4_gic_irq_fix_base;
 -- 
 1.7.4.4
