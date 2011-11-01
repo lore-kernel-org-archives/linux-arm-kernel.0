@@ -1,143 +1,28 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Tue,  1 Nov 2011 19:32:34 +0100
-Subject: [PATCH 3/3] ARM: pxa: Add basic DTS files for PXA/Vpac270 testing
-	machine
-In-Reply-To: <1320172354-3795-1-git-send-email-marek.vasut@gmail.com>
-References: <1320172354-3795-1-git-send-email-marek.vasut@gmail.com>
-Message-ID: <1320172354-3795-4-git-send-email-marek.vasut@gmail.com>
+From: mel@csn.ul.ie (Mel Gorman)
+Date: Tue, 1 Nov 2011 18:47:59 +0000
+Subject: [PATCH 2/9] mm: alloc_contig_freed_pages() added
+In-Reply-To: <op.v394luhl3l0zgt@mpn-glaptop>
+References: <20111018122109.GB6660@csn.ul.ie>
+	<809d0a2afe624c06505e0df51e7657f66aaf9007.1319428526.git.mina86@mina86.com>
+	<20111101150448.GD14998@csn.ul.ie> <op.v394luhl3l0zgt@mpn-glaptop>
+Message-ID: <20111101184759.GE14998@csn.ul.ie>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Grant Likely <grant.likely@secretlab.ca>
----
- arch/arm/boot/dts/pxa-vpac270.dts |   37 +++++++++++++++++++
- arch/arm/boot/dts/pxa.dtsi        |   72 +++++++++++++++++++++++++++++++++++++
- 2 files changed, 109 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/boot/dts/pxa-vpac270.dts
- create mode 100644 arch/arm/boot/dts/pxa.dtsi
+On Tue, Nov 01, 2011 at 07:06:56PM +0100, Michal Nazarewicz wrote:
+> >page_isolation.c may also be a better fit than page_alloc.c
+> 
+> Since isolate_freepages_block() is the only user of split_free_page(),
+> would it make sense to move split_free_page() to page_isolation.c as
+> well?  I sort of like the idea of making it static and removing from
+> header file.
+> 
 
-diff --git a/arch/arm/boot/dts/pxa-vpac270.dts b/arch/arm/boot/dts/pxa-vpac270.dts
-new file mode 100644
-index 0000000..48dd9e5
---- /dev/null
-+++ b/arch/arm/boot/dts/pxa-vpac270.dts
-@@ -0,0 +1,37 @@
-+/*
-+ * pxa-vpac270.dts - Device Tree file for Voipac PXA270 board
-+ *
-+ * Copyright (C) 2011 Marek Vasut <marek.vasut@gmail.com>
-+ *
-+ * Licensed under GPLv2 or later.
-+ */
-+/dts-v1/;
-+/include/ "pxa.dtsi"
-+
-+/ {
-+	model = "Voipac VPAC270";
-+	compatible = "voipac,vpac270";
-+
-+	chosen {
-+		bootargs = "console=ttyS0,115200 mem=128M at 0xa0000000";
-+		linux,stdout-path = &ffuart;
-+	};
-+
-+	memory at a0000000 {
-+		reg = <0xa0000000 0x8000000>;
-+	};
-+
-+	pxabus {
-+		ffuart: uart at 40100000 {
-+			status = "okay";
-+		};
-+
-+		btuart: uart at 40200000 {
-+			status = "okay";
-+		};
-+
-+		stuart: uart at 40700000 {
-+			status = "okay";
-+		};
-+	};
-+};
-diff --git a/arch/arm/boot/dts/pxa.dtsi b/arch/arm/boot/dts/pxa.dtsi
-new file mode 100644
-index 0000000..2d2f5b97
---- /dev/null
-+++ b/arch/arm/boot/dts/pxa.dtsi
-@@ -0,0 +1,72 @@
-+/*
-+ * pxa.dtsi - Device Tree Include file for Marvell PXA2xx/PXA3xx family SoC
-+ *
-+ * Copyright (C) 2011 Marek Vasut <marek.vasut@gmail.com>
-+ *
-+ * Licensed under GPLv2 or later.
-+ */
-+
-+/include/ "skeleton.dtsi"
-+
-+/ {
-+	model = "Marvell PXA2xx/PXA3xx family SoC";
-+	compatible = "marvell,pxa";
-+	interrupt-parent = <&pxairq>;
-+
-+	alias {
-+		serial0 = &ffuart;
-+		serial1 = &btuart;
-+		serial2 = &stuart;
-+		serial3 = &hwuart;
-+	};
-+
-+	cpus {
-+		cpu at 0 {
-+			compatible = "arm,xscale";
-+		};
-+	};
-+
-+	pxabus {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+
-+		pxairq: interrupt-controller at 40d00000 {
-+			#interrupt-cells = <1>;
-+			compatible = "marvell,pxa-irq";
-+			interrupt-controller;
-+			interrupt-parent;
-+			reg = <0x40d00000 0xd0>;
-+		};
-+
-+		ffuart: uart at 40100000 {
-+			compatible = "marvell,pxa2xx-uart";
-+			reg = <0x40100000 0x30>;
-+			interrupts = <22>;
-+			status = "disabled";
-+		};
-+
-+		btuart: uart at 40200000 {
-+			compatible = "marvell,pxa2xx-uart";
-+			reg = <0x40200000 0x30>;
-+			interrupts = <21>;
-+			status = "disabled";
-+		};
-+
-+		stuart: uart at 40700000 {
-+			compatible = "marvell,pxa2xx-uart";
-+			reg = <0x40700000 0x30>;
-+			interrupts = <20>;
-+			status = "disabled";
-+		};
-+
-+		hwuart: uart at 41100000 {
-+			compatible = "marvell,pxa2xx-uart";
-+			reg = <0x41100000 0x30>;
-+			interrupts = <7>;
-+			marvell,pxa250 = <1>;
-+			status = "disabled";
-+		};
-+	};
-+};
+I see no problem with that. It'll be separate from split_page() but that
+is not earth shattering.
+
+Thanks.
+
 -- 
-1.7.6.3
+Mel Gorman
+SUSE Labs
