@@ -1,36 +1,42 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Tue, 1 Nov 2011 15:37:47 +0200
-Subject: [PATCH 3/6] arm/tegra: prepare early init for multiple tegra
-	variants
-In-Reply-To: <20111028161933.GK23539@mudshark.cambridge.arm.com>
-References: <1319561644-6160-1-git-send-email-pdeschrijver@nvidia.com>
-	<1319561644-6160-4-git-send-email-pdeschrijver@nvidia.com>
-	<74CDBE0F657A3D45AFBB94109FB122FF173E1B49B2@HQMAIL01.nvidia.com>
-	<20111027201657.GP19187@n2100.arm.linux.org.uk>
-	<20111028161933.GK23539@mudshark.cambridge.arm.com>
-Message-ID: <20111101133747.GF13358@tbergstrom-lnx.Nvidia.com>
+From: greg@kroah.com (Greg KH)
+Date: Tue, 1 Nov 2011 06:40:06 -0700
+Subject: [PATCH] UART: add CSR SiRFprimaII SoC on-chip uart drivers
+In-Reply-To: <CAGsJ_4ySO=ACfAeeHMvw_sOUdaD9KYD09f4LYrWdUkA2PwuLvA@mail.gmail.com>
+References: <1319772453-1275-1-git-send-email-Barry.Song@csr.com>
+	<20111028071129.GA2362@tarshish>
+	<CAGsJ_4z=VtU+RJ4c0Y2ruttWU6mTVtHMxzvCYWGz=5w6i7QJMQ@mail.gmail.com>
+	<20111101114242.7c90f958@bob.linux.org.uk>
+	<CAGsJ_4wGRv9=fbWtK-0jkmXDcd=y2r6qxae99tNgim4=BmxJ+w@mail.gmail.com>
+	<20111101131021.GA9109@kroah.com>
+	<CAGsJ_4ySO=ACfAeeHMvw_sOUdaD9KYD09f4LYrWdUkA2PwuLvA@mail.gmail.com>
+Message-ID: <20111101134006.GA9959@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 28, 2011 at 06:19:34PM +0200, Will Deacon wrote:
-> On Thu, Oct 27, 2011 at 09:16:57PM +0100, Russell King - ARM Linux wrote:
-> > On Thu, Oct 27, 2011 at 01:06:13PM -0700, Stephen Warren wrote:
-> > > Peter De Schrijver wrote at Tuesday, October 25, 2011 10:54 AM:
-> > > > -static __initdata struct tegra_clk_init_table common_clk_init_table[] = {
-> > > > +void (*arch_reset)(char mode, const char *cmd) = tegra_assert_system_reset;
-> > > 
-> > > I'm not sure why you moved that, but I suppose it's fine.
-> > 
-> > Note that Nicolas has a patch set during KS which cleans the arch_reset
-> > business out of mach/system.h, and effectively gets rid of arch_reset
-> > entirely, so this probably conflicts with those changes.
+On Tue, Nov 01, 2011 at 09:28:39PM +0800, Barry Song wrote:
+> 2011/11/1 Greg KH <greg@kroah.com>:
+> > On Tue, Nov 01, 2011 at 08:48:29PM +0800, Barry Song wrote:
+> >> 2011/11/1 Alan Cox <alan@linux.intel.com>:
+> >> >> i am not sure whether i will make Linus confused if i send a new
+> >> >> version at this moment. how about i send a seperate patch to fix this
+> >> >> after the driver is applied?
+> >> >
+> >> > That would be the best idea - its a trivial typo so doesn't really
+> >> > matter much.
+> >> ok, Alan.
+> >>
+> >> Linus, have you gotten it? and can you apply it?
+> >> or do you want this to go through tty tree and merge it until next merge window?
+> >
+> > That's probably the easiest thing to do, right? ?Send it to me and I can
+> > handle it.
 > 
-> I've spammed the ARM list with this patch series now, so the state of the
-> conflicts should be evident.
-> 
+> Hi Greg, thanks! as i checked your tree, this patch should be able to
+> apply on your tree since you already have pinmux subsystem.
+> do i need to git send-email to you again for this?
 
-Will be taken into account in the next version.
+Yes, please do.
 
-Chers,
+thanks,
 
-Peter.
+greg k-h
