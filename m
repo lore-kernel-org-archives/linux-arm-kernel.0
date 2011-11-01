@@ -1,164 +1,60 @@
-From: marvin24@gmx.de (Marc Dietrich)
-Date: Tue,  1 Nov 2011 21:37:05 +0100
-Subject: [PATCH 3/3] arm/dt: tegra: add dts file for paz00
-In-Reply-To: <cover.1320173572.git.marvin24@gmx.de>
-References: <cover.1320173572.git.marvin24@gmx.de>
-Message-ID: <f3590ac48475e25c1a583124095809b42570db98.1320173573.git.marvin24@gmx.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 1 Nov 2011 21:19:33 +0000
+Subject: [RFC 0/5] restart cleanups
+In-Reply-To: <20111101194154.GU19187@n2100.arm.linux.org.uk>
+References: <20111101160731.GQ19187@n2100.arm.linux.org.uk>
+	<20111101192343.GA32003@mudshark.cambridge.arm.com>
+	<20111101194154.GU19187@n2100.arm.linux.org.uk>
+Message-ID: <20111101211933.GA32442@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds a dts file for paz00. As a side effect, this also enables
-the embedded controller which controls the keyboard, touchpad, power,
-leds, and some other functions.
+On Tue, Nov 01, 2011 at 07:41:54PM +0000, Russell King - ARM Linux wrote:
+> The other thing is that the generic code shouldn't care what value 'mode'
+> actually is - we just pass it through to the platform handler (via
+> arm_pm_restart()) and if the platform handler wants to ignore it and
+> just do the software reboot thing, it uses soft_restart(addr) which
+> does all the necessary setup for that.
 
-Cc: Grant Likely <grant.likely@secretlab.ca>
-Signed-off-by: Marc Dietrich <marvin24@gmx.de>
----
- arch/arm/boot/dts/tegra-paz00.dts |   82 +++++++++++++++++++++++++++++++++++++
- arch/arm/mach-tegra/Makefile      |    1 +
- arch/arm/mach-tegra/Makefile.boot |    1 +
- arch/arm/mach-tegra/board-dt.c    |    3 +
- 4 files changed, 87 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/boot/dts/tegra-paz00.dts
+Ah yes, you're right. I think it might be worth defining 'h' as REBOOT_MODE_HARD
+and 's' as REBOOT_MODE_SOFT, but there's no reason to disallow other
+combinations giving that the core code no longer has to do anything with
+these.
 
-diff --git a/arch/arm/boot/dts/tegra-paz00.dts b/arch/arm/boot/dts/tegra-paz00.dts
-new file mode 100644
-index 0000000..15a949f
---- /dev/null
-+++ b/arch/arm/boot/dts/tegra-paz00.dts
-@@ -0,0 +1,82 @@
-+/dts-v1/;
-+
-+/memreserve/ 0x1c000000 0x04000000;
-+/include/ "tegra20.dtsi"
-+
-+/ {
-+	model = "Toshiba AC100 / Dynabook AZ";
-+	compatible = "compal,paz00", "nvidia,tegra20";
-+
-+	chosen {
-+		bootargs = "console=ttyS0,115200n8 root=/dev/mmcblk0p1";
-+	};
-+
-+	memory at 0 {
-+		reg = <0x00000000 0x20000000>;
-+	};
-+
-+	i2c at 7000c000 {
-+		clock-frequency = <400000>;
-+	};
-+
-+	i2c at 7000c400 {
-+		clock-frequency = <400000>;
-+	};
-+
-+	i2c at 7000c500 {
-+		status = "disable";
-+	};
-+
-+	nvec at 7000c500 {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		compatible = "nvidia,nvec";
-+		reg = <0x7000C500 0x100>;
-+		interrupts = <124>;
-+		clock-frequency = <80000>;
-+		request-gpios = <&gpio 170 0>;
-+		slave-addr = <138>;
-+	};
-+
-+	i2c at 7000d000 {
-+		clock-frequency = <400000>;
-+	};
-+
-+	serial at 70006000 {
-+		clock-frequency = <216000000>;
-+	};
-+
-+	serial at 70006040 {
-+		status = "disable";
-+	};
-+
-+	serial at 70006200 {
-+		status = "disable";
-+	};
-+
-+	serial at 70006300 {
-+		clock-frequency = <216000000>;
-+	};
-+
-+	serial at 70006400 {
-+		status = "disable";
-+	};
-+
-+	sdhci at c8000000 {
-+		cd-gpios = <&gpio 173 0>; /* gpio PV5 */
-+		wp-gpios = <&gpio 57 0>;  /* gpio PH1 */
-+		power-gpios = <&gpio 155 0>; /* gpio PT3 */
-+	};
-+
-+	sdhci at c8000200 {
-+		status = "disable";
-+	};
-+
-+	sdhci at c8000400 {
-+		status = "disable";
-+	};
-+
-+	sdhci at c8000600 {
-+		support-8bit;
-+	};
-+};
-diff --git a/arch/arm/mach-tegra/Makefile b/arch/arm/mach-tegra/Makefile
-index 91a07e1..b04ebfe6 100644
---- a/arch/arm/mach-tegra/Makefile
-+++ b/arch/arm/mach-tegra/Makefile
-@@ -31,6 +31,7 @@ obj-${CONFIG_MACH_SEABOARD}             += board-seaboard-pinmux.o
- 
- obj-${CONFIG_MACH_TEGRA_DT}             += board-dt.o
- obj-${CONFIG_MACH_TEGRA_DT}             += board-harmony-pinmux.o
-+obj-${CONFIG_MACH_TEGRA_DT}             += board-paz00-pinmux.o
- obj-${CONFIG_MACH_TEGRA_DT}             += board-seaboard-pinmux.o
- 
- obj-${CONFIG_MACH_TRIMSLICE}            += board-trimslice.o
-diff --git a/arch/arm/mach-tegra/Makefile.boot b/arch/arm/mach-tegra/Makefile.boot
-index bd12c9f..152f9fb 100644
---- a/arch/arm/mach-tegra/Makefile.boot
-+++ b/arch/arm/mach-tegra/Makefile.boot
-@@ -3,5 +3,6 @@ params_phys-$(CONFIG_ARCH_TEGRA_2x_SOC)	:= 0x00000100
- initrd_phys-$(CONFIG_ARCH_TEGRA_2x_SOC)	:= 0x00800000
- 
- dtb-$(CONFIG_MACH_HARMONY) += tegra-harmony.dtb
-+dtb-$(CONFIG_MACH_PAZ00) += tegra-paz00.dtb
- dtb-$(CONFIG_MACH_SEABOARD) += tegra-seaboard.dtb
- dtb-$(CONFIG_MACH_VENTANA) += tegra-ventana.dtb
-diff --git a/arch/arm/mach-tegra/board-dt.c b/arch/arm/mach-tegra/board-dt.c
-index d368f8d..379660e 100644
---- a/arch/arm/mach-tegra/board-dt.c
-+++ b/arch/arm/mach-tegra/board-dt.c
-@@ -46,6 +46,7 @@
- #include "devices.h"
- 
- void harmony_pinmux_init(void);
-+void paz00_pinmux_init(void);
- void seaboard_pinmux_init(void);
- void ventana_pinmux_init(void);
- 
-@@ -85,6 +86,7 @@ static struct {
- 	void (*init)(void);
- } pinmux_configs[] = {
- 	{ "nvidia,harmony", harmony_pinmux_init },
-+	{ "compal,paz00", paz00_pinmux_init },
- 	{ "nvidia,seaboard", seaboard_pinmux_init },
- 	{ "nvidia,ventana", ventana_pinmux_init },
- };
-@@ -120,6 +122,7 @@ static void __init tegra_dt_init(void)
- 
- static const char * tegra_dt_board_compat[] = {
- 	"nvidia,harmony",
-+	"compal,paz00",
- 	"nvidia,seaboard",
- 	"nvidia,ventana",
- 	NULL
--- 
-1.7.5.4
+> The nice thing about that is we no longer have to worry about calling
+> arm_pm_restart() with 'h' and a platform doing a soft-reboot instead.
+
+Yes, that's truly horrific. It's a miracle soft reboot worked at all from v6
+onwards.
+
+> > I'm definitely in favour of this change, but be aware that I plan to modify
+> > setup_mm_for_reboot in the future to:
+> > 
+> >   (a) Use a static identity mapping so we don't have to pgd_alloc explicitly
+> >       [I can't see this affecting anything]
+> > 
+> >   (b) Extend the identity mapping into kernel space, leaving some room for
+> >       the kernel image. If this is all called from soft_reboot, which just
+> >       does the cpu_reset(addr) afterwards, then we're fine. I have code to
+> >       take care of changing stack and switching to the new mapping.
+> 
+> Well, bear in mind that (1) + (5) produce something really self-contained.
+> We no longer fiddle with MMU tables for anything but the 'soft reboot'
+> path.  That means things like hardware based reset (eg, using watchdogs,
+> asserting GPIOs, etc) are all dealt with without fiddling with the MMU
+> and caches.
+
+Yup, so we should be able to add the scary MMU and cache stuff into
+soft_reboot. We can even call this function from the kexec code.
+
+> arm_machine_restart() has become almost empty - I want to move the
+> IRQ disables out into machine_restart() and kill off arm_machine_restart()
+> entirely (at the moment its the 'default' action, which is to call the
+> old arch_reset() thing.)
+> 
+> Eventually, when we have everyone hooking into arm_pm_restart() instead,
+> arm_machine_restart() will be unused and meaningless to keep around.
+
+That's where our friend Coccinelle comes in at the end of my patch series.
+
+Will
