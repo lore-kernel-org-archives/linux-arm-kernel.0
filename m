@@ -1,25 +1,24 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Tue, 1 Nov 2011 20:48:29 +0800
-Subject: [PATCH] UART: add CSR SiRFprimaII SoC on-chip uart drivers
-In-Reply-To: <20111101114242.7c90f958@bob.linux.org.uk>
-References: <1319772453-1275-1-git-send-email-Barry.Song@csr.com>
-	<20111028071129.GA2362@tarshish>
-	<CAGsJ_4z=VtU+RJ4c0Y2ruttWU6mTVtHMxzvCYWGz=5w6i7QJMQ@mail.gmail.com>
-	<20111101114242.7c90f958@bob.linux.org.uk>
-Message-ID: <CAGsJ_4wGRv9=fbWtK-0jkmXDcd=y2r6qxae99tNgim4=BmxJ+w@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 1 Nov 2011 12:52:12 +0000
+Subject: [PATCH v5 2/7] arm: pmu: allow platform specific irq
+	enable/disable handling
+In-Reply-To: <20111101112646.75fba9db@tom-ThinkPad-T410>
+References: <1319467559-5518-1-git-send-email-ming.lei@canonical.com>
+	<1319467559-5518-3-git-send-email-ming.lei@canonical.com>
+	<20111101112646.75fba9db@tom-ThinkPad-T410>
+Message-ID: <20111101125212.GB15232@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/11/1 Alan Cox <alan@linux.intel.com>:
->> i am not sure whether i will make Linus confused if i send a new
->> version at this moment. how about i send a seperate patch to fix this
->> after the driver is applied?
->
-> That would be the best idea - its a trivial typo so doesn't really
-> matter much.
-ok, Alan.
+On Tue, Nov 01, 2011 at 03:26:46AM +0000, Ming Lei wrote:
+> Attach the patch [PATCH v5 2/7] which is rebased on 3.1 -next.
 
-Linus, have you gotten it? and can you apply it?
-or do you want this to go through tty tree and merge it until next merge window?
+Great, thanks for that.
 
--barry
+> BTW: The [PATCH v5 3/7] should be dropped as commented before, other patches
+> are OK against 3.1 -next.
+
+Ok, I'll pick up patches 1 and 2. The OMAP guys can take the rest as and
+when they're happy with them.
+
+Will
