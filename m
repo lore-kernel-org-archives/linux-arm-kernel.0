@@ -1,36 +1,65 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 1 Nov 2011 16:38:17 +0000
-Subject: [RFC 0/5] restart cleanups
-In-Reply-To: <20111101160731.GQ19187@n2100.arm.linux.org.uk>
-References: <20111101160731.GQ19187@n2100.arm.linux.org.uk>
-Message-ID: <20111101163817.GR19187@n2100.arm.linux.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 1 Nov 2011 10:00:37 -0700
+Subject: [GIT PULL] pending DT patches and cleanup for map_io for v3.2
+	merge window
+In-Reply-To: <201110310039.34717.arnd@arndb.de>
+References: <20111024091704.GF31337@atomide.com>
+	<201110310039.34717.arnd@arndb.de>
+Message-ID: <20111101170037.GG31337@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Can someone please check whether this code:
+* Arnd Bergmann <arnd@arndb.de> [111030 16:05]:
+> On Monday 24 October 2011, Tony Lindgren wrote:
+> > As discussed in the ARM kernel meeting yesterday, here's are
+> > the pending omap things to pull for v3.2 merge window.
+> 
+> Hi Tony,
+> 
+> I finally got to pull these.
 
-/* Hook for arm_pm_restart to ensure we execute the reset code
- * with the caches enabled. It seems at least the S3C2440 has a problem
- * resetting if there is bus activity interrupted by the reset.
- */
-static void s3c24xx_pm_restart(char mode, const char *cmd)
-{
-        if (mode != 's') {
-                unsigned long flags;
+Great, thanks.
+ 
+> > These would be nice to get still in as other people's work
+> > such as Nico's map_io changes need #2 below.
+> > 
+> > 1. Initial DT support posted few weeks ago
+> > 
+> >    Please see the earlier pull request at:
+> > 
+> >    http://lkml.org/lkml/2011/10/4/441
+> 
+> Looks good. I've missed this initially because I had not yet managed
+> to go through that mail thread (randconfig patches) again and pick
+> up the patches that got an Ack. The pull request was right in the
+> middle of 100 other unread emails...
 
-                local_irq_save(flags);
-                __cpuc_flush_kern_all();
-                __cpuc_flush_user_all();
+I guess it's not a good idea to reply with a pull request, have to
+remember to keep them separate..
+ 
+> > 2. Cleanup for map_io posted few weeks ago
+> > 
+> >    This depends on the #1 above, and also requires
+> >    the ioremap_exec patch. Russell said he has applied
+> >    into devel-stable (But not pushed out yet?).
+> > 
+> >    When you have the ioremap_exec patch from Russell,
+> >    please pull this from:
+> > 
+> >    git://github.com/tmlind/linux.git sram-map-io
+> > 
+> >    Pull request against #1 attached below.
+> 
+> This had systematic but trivial conflicts against the memory.h
+> series, which I fixed up. There was also a conflict with 009426a0e
+> "ARM: omap: Setup consistent dma size at boot time" from Tixy.
+> That patch added a call to omap_init_consistent_dma_size in a function
+> that you removed. I have resolved the conflict by adding that call to
+> omap1_init_early and omap_common_init_early, but I have no idea if that
+> is a correct resolution. Please check.
 
-                arch_reset(mode, cmd);
-                local_irq_restore(flags);
-        }
+Thanks, looks good and still boots on the machines I tested.
 
-        /* fallback, or unhandled */
-        arm_machine_restart(mode, cmd);
-}
+Regards,
 
-will be broken by any of these patches - and more importantly whether
-this code can simply be deleted with these five patches applied.
-
-Thanks.
+Tony
