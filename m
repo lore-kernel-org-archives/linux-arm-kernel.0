@@ -1,65 +1,88 @@
 From: marvin24@gmx.de (Marc Dietrich)
-Date: Tue,  1 Nov 2011 21:37:02 +0100
-Subject: [PATCH v4 0/3] paz00 updates for 3.3
-Message-ID: <cover.1320173572.git.marvin24@gmx.de>
+Date: Tue,  1 Nov 2011 21:37:03 +0100
+Subject: [PATCH 1/3] ARM: tegra: paz00: add support for wakeup gpio key
+In-Reply-To: <cover.1320173572.git.marvin24@gmx.de>
+References: <cover.1320173572.git.marvin24@gmx.de>
+Message-ID: <7fcf184d14b73ebb1f648ed517989126cc4a583c.1320173573.git.marvin24@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This adds support for a wakeup gpio which is connected to the
+embedded controller. This will be used later on for wakeup from suspend.
 
-the following three patches are intended for the 3.3 merge window and are based
-on linux-next.
+Acked-by: Stephen Warren <swarren@nvidia.com>
+Signed-off-by: Marc Dietrich <marvin24@gmx.de>
+---
+ arch/arm/mach-tegra/board-paz00.c |   27 +++++++++++++++++++++++++++
+ arch/arm/mach-tegra/board-paz00.h |    3 +++
+ 2 files changed, 30 insertions(+), 0 deletions(-)
 
-The first one adds wakeup support similar to seaboard, but with the difference
-that the wakeup gpio is connected to the embedded controller instead of a real
-gpio key.
-
-The second patch adds device tree support for the nvec driver. This way we can
-make use of it without adding more platform devices to the board files (and it
-is also modern to do so).
-
-The final one adds device tree support for paz00. The way the nvec it is
-initialized will probably change in the future, but we like to include it for
-now as it makes debugging easier.
-
-The patches are against linux-next from Nov 1st.
-
-Thanks
-
-Marc
-
-Changes since v3
-    - use of_property_read_u32 in nvec
-    - also disable uart-e in the device tree
-
-Changes since v2
-    - remove the mem= from the bootargs, this is handled by the memory property
-      already
-    - change the root device until the sdhci init order can be changed
-    - do not init unused serial ports
-    - add dt documentation for nvec
-    - remove CONFIG_OF #ifdefs from nvec.c
-    - exchange the order of patch 2 and 3
-Changes since v1
-    - replace addition of the embedded controller to the board file by a device-tree
-      based implementation.
-
-Marc Dietrich (3):
-  ARM: tegra: paz00: add support for wakeup gpio key
-  staging: nvec: add device tree support
-  arm/dt: tegra: add dts file for paz00
-
- .../devicetree/bindings/nvec/nvec_nvidia.txt       |    9 ++
- arch/arm/boot/dts/tegra-paz00.dts                  |   82 ++++++++++++++++++++
- arch/arm/mach-tegra/Makefile                       |    1 +
- arch/arm/mach-tegra/Makefile.boot                  |    1 +
- arch/arm/mach-tegra/board-dt.c                     |    3 +
- arch/arm/mach-tegra/board-paz00.c                  |   27 +++++++
- arch/arm/mach-tegra/board-paz00.h                  |    3 +
- drivers/staging/nvec/nvec.c                        |   30 +++++++-
- 8 files changed, 154 insertions(+), 2 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/nvec/nvec_nvidia.txt
- create mode 100644 arch/arm/boot/dts/tegra-paz00.dts
-
+diff --git a/arch/arm/mach-tegra/board-paz00.c b/arch/arm/mach-tegra/board-paz00.c
+index 55c55ba..799e420 100644
+--- a/arch/arm/mach-tegra/board-paz00.c
++++ b/arch/arm/mach-tegra/board-paz00.c
+@@ -23,8 +23,10 @@
+ #include <linux/serial_8250.h>
+ #include <linux/clk.h>
+ #include <linux/dma-mapping.h>
++#include <linux/gpio_keys.h>
+ #include <linux/pda_power.h>
+ #include <linux/io.h>
++#include <linux/input.h>
+ #include <linux/i2c.h>
+ #include <linux/gpio.h>
+ #include <linux/rfkill-gpio.h>
+@@ -114,12 +116,37 @@ static struct platform_device leds_gpio = {
+         },
+ };
+ 
++static struct gpio_keys_button paz00_gpio_keys_buttons[] = {
++	{
++		.code		= KEY_POWER,
++		.gpio		= TEGRA_GPIO_POWERKEY,
++		.active_low	= 1,
++		.desc		= "Power",
++		.type		= EV_KEY,
++		.wakeup		= 1,
++	},
++};
++
++static struct gpio_keys_platform_data paz00_gpio_keys = {
++	.buttons	= paz00_gpio_keys_buttons,
++	.nbuttons	= ARRAY_SIZE(paz00_gpio_keys_buttons),
++};
++
++static struct platform_device gpio_keys_device = {
++	.name	= "gpio-keys",
++	.id	= -1,
++	.dev	= {
++		.platform_data = &paz00_gpio_keys,
++	},
++};
++
+ static struct platform_device *paz00_devices[] __initdata = {
+ 	&debug_uart,
+ 	&tegra_sdhci_device4,
+ 	&tegra_sdhci_device1,
+ 	&wifi_rfkill_device,
+ 	&leds_gpio,
++	&gpio_keys_device,
+ };
+ 
+ static void paz00_i2c_init(void)
+diff --git a/arch/arm/mach-tegra/board-paz00.h b/arch/arm/mach-tegra/board-paz00.h
+index 8aff06e..ffa83f5 100644
+--- a/arch/arm/mach-tegra/board-paz00.h
++++ b/arch/arm/mach-tegra/board-paz00.h
+@@ -32,6 +32,9 @@
+ #define TEGRA_WIFI_RST			TEGRA_GPIO_PD1
+ #define TEGRA_WIFI_LED			TEGRA_GPIO_PD0
+ 
++/* WakeUp */
++#define TEGRA_GPIO_POWERKEY	TEGRA_GPIO_PJ7
++
+ void paz00_pinmux_init(void);
+ 
+ #endif
 -- 
 1.7.5.4
