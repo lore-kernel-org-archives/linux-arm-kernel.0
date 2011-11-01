@@ -1,123 +1,91 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 01 Nov 2011 16:09:08 +0000
-Subject: [PATCH 3/5] ARM: restart: remove local_irq_disable() from within
-	arch_reset()
+Date: Tue, 01 Nov 2011 16:09:29 +0000
+Subject: [PATCH 4/5] ARM: restart: turn reboot setup code into a library
+	function
 In-Reply-To: <20111101160731.GQ19187@n2100.arm.linux.org.uk>
 References: <20111101160731.GQ19187@n2100.arm.linux.org.uk>
-Message-ID: <E1RLGtg-0005IV-TG@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1RLGu1-0005Ib-E4@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-IRQs are already disabled by the time arch_reset() is called, so these
-calls to local_irq_disable() instead arch_reset() are redundant.  Remove
-them.
+Move the failure to reboot into machine_restart() to always catch
+this condition, and turn the bulk of arm_machine_restart() which is
+required for soft-reboot modes into a library call.
 
-The following spatch was used:
-@ rule1 @ identifier fn; @@
-arch_reset = fn;
+This allows everyone to hook into the restart via the same method
+via arm_pm_restart() irrespective of what they want, and if they
+want the old 'arch_reset' way, call setup_restart() themselves.
 
-@@ identifier rule1.fn, m, c; @@
-void fn(char m, const char *c)
-{
-<... when != local_irq_enable
--local_irq_disable();
-...>
-}
-
-@@ identifier m, c; @@
-arch_reset(char m, const char *c)
-{
-<... when != local_irq_enable
--local_irq_disable();
-...>
-}
-
+Acked-by: Will Deacon <will.deacon@arm.com>
+Tested-by: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mach-ep93xx/include/mach/system.h  |    2 --
- arch/arm/mach-iop32x/include/mach/system.h  |    2 --
- arch/arm/mach-ixp2000/include/mach/system.h |    2 --
- arch/arm/mach-lpc32xx/include/mach/system.h |    3 ---
- arch/arm/mach-shark/core.c                  |    1 -
- arch/arm/mach-u300/include/mach/system.h    |    1 -
- 6 files changed, 0 insertions(+), 11 deletions(-)
+ arch/arm/kernel/process.c |   35 +++++++++++++++++++----------------
+ 1 files changed, 19 insertions(+), 16 deletions(-)
 
-diff --git a/arch/arm/mach-ep93xx/include/mach/system.h b/arch/arm/mach-ep93xx/include/mach/system.h
-index 6d661fe..bdf6c4f 100644
---- a/arch/arm/mach-ep93xx/include/mach/system.h
-+++ b/arch/arm/mach-ep93xx/include/mach/system.h
-@@ -11,8 +11,6 @@ static inline void arch_idle(void)
+diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+index 62946c0..db8d836 100644
+--- a/arch/arm/kernel/process.c
++++ b/arch/arm/kernel/process.c
+@@ -92,12 +92,8 @@ static int __init hlt_setup(char *__unused)
+ __setup("nohlt", nohlt_setup);
+ __setup("hlt", hlt_setup);
  
- static inline void arch_reset(char mode, const char *cmd)
+-void arm_machine_restart(char mode, const char *cmd)
++static void setup_restart(void)
  {
+-	/* Disable interrupts first */
 -	local_irq_disable();
+-	local_fiq_disable();
 -
  	/*
- 	 * Set then clear the SWRST bit to initiate a software reset
- 	 */
-diff --git a/arch/arm/mach-iop32x/include/mach/system.h b/arch/arm/mach-iop32x/include/mach/system.h
-index a4b808f..5987196 100644
---- a/arch/arm/mach-iop32x/include/mach/system.h
-+++ b/arch/arm/mach-iop32x/include/mach/system.h
-@@ -18,8 +18,6 @@ static inline void arch_idle(void)
+ 	 * Tell the mm system that we are going to reboot -
+ 	 * we may need it to insert some 1:1 mappings so that
+@@ -113,19 +109,18 @@ void arm_machine_restart(char mode, const char *cmd)
  
- static inline void arch_reset(char mode, const char *cmd)
+ 	/* Push out any further dirty data, and ensure cache is empty */
+ 	flush_cache_all();
++}
+ 
+-	/*
+-	 * Now call the architecture specific reboot code.
+-	 */
+-	arch_reset(mode, cmd);
++void arm_machine_restart(char mode, const char *cmd)
++{
++	/* Disable interrupts first */
++	local_irq_disable();
++	local_fiq_disable();
+ 
+-	/*
+-	 * Whoops - the architecture was unable to reboot.
+-	 * Tell the user!
+-	 */
+-	mdelay(1000);
+-	printk("Reboot failed -- System halted\n");
+-	while (1);
++	setup_restart();
++
++	/* Now call the architecture specific reboot code. */
++	arch_reset(mode, cmd);
+ }
+ 
+ /*
+@@ -250,7 +245,15 @@ void machine_power_off(void)
+ void machine_restart(char *cmd)
  {
--	local_irq_disable();
--
- 	if (machine_is_n2100()) {
- 		gpio_line_set(N2100_HARDWARE_RESET, GPIO_LOW);
- 		gpio_line_config(N2100_HARDWARE_RESET, GPIO_OUT);
-diff --git a/arch/arm/mach-ixp2000/include/mach/system.h b/arch/arm/mach-ixp2000/include/mach/system.h
-index de37099..810df7b 100644
---- a/arch/arm/mach-ixp2000/include/mach/system.h
-+++ b/arch/arm/mach-ixp2000/include/mach/system.h
-@@ -19,8 +19,6 @@ static inline void arch_idle(void)
+ 	machine_shutdown();
++
+ 	arm_pm_restart(reboot_mode, cmd);
++
++	/* Give a grace period for failure to restart of 1s */
++	mdelay(1000);
++
++	/* Whoops - the platform was unable to reboot. Tell the user! */
++	printk("Reboot failed -- System halted\n");
++	while (1);
+ }
  
- static inline void arch_reset(char mode, const char *cmd)
- {
--	local_irq_disable();
--
- 	/*
- 	 * Reset flash banking register so that we are pointing at
- 	 * RedBoot bank.
-diff --git a/arch/arm/mach-lpc32xx/include/mach/system.h b/arch/arm/mach-lpc32xx/include/mach/system.h
-index df3b0de..d47f3b1 100644
---- a/arch/arm/mach-lpc32xx/include/mach/system.h
-+++ b/arch/arm/mach-lpc32xx/include/mach/system.h
-@@ -33,9 +33,6 @@ static inline void arch_reset(char mode, const char *cmd)
- 	case 'h':
- 		printk(KERN_CRIT "RESET: Rebooting system\n");
- 
--		/* Disable interrupts */
--		local_irq_disable();
--
- 		lpc32xx_watchdog_reset();
- 		break;
- 
-diff --git a/arch/arm/mach-shark/core.c b/arch/arm/mach-shark/core.c
-index ac2873c..be82b2a 100644
---- a/arch/arm/mach-shark/core.c
-+++ b/arch/arm/mach-shark/core.c
-@@ -29,7 +29,6 @@
- void arch_reset(char mode, const char *cmd)
- {
-         short temp;
--        local_irq_disable();
-         /* Reset the Machine via pc[3] of the sequoia chipset */
-         outw(0x09,0x24);
-         temp=inw(0x26);
-diff --git a/arch/arm/mach-u300/include/mach/system.h b/arch/arm/mach-u300/include/mach/system.h
-index 8daf136..a000c04 100644
---- a/arch/arm/mach-u300/include/mach/system.h
-+++ b/arch/arm/mach-u300/include/mach/system.h
-@@ -28,7 +28,6 @@ static void arch_reset(char mode, const char *cmd)
- 	case 'h':
- 		printk(KERN_CRIT "RESET: shutting down/rebooting system\n");
- 		/* Disable interrupts */
--		local_irq_disable();
- #ifdef CONFIG_COH901327_WATCHDOG
- 		coh901327_watchdog_reset();
- #endif
+ void __show_regs(struct pt_regs *regs)
 -- 
 1.7.4.4
