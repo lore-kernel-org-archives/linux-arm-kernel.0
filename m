@@ -1,192 +1,133 @@
 From: padma.v@samsung.com (Padmavathi Venna)
-Date: Wed, 02 Nov 2011 17:06:43 -0400
-Subject: [PATCH V4 3/4] ARM: S5P64X0: Add SPI clkdev support
-In-Reply-To: <1320268004-4545-1-git-send-email-padma.v@samsung.com>
-References: <1320268004-4545-1-git-send-email-padma.v@samsung.com>
-Message-ID: <1320268004-4545-4-git-send-email-padma.v@samsung.com>
+Date: Wed, 02 Nov 2011 17:09:33 -0400
+Subject: [RESEND][PATCH 6/6] ARM: SAMSUNG: Remove SPI bus clocks from platform
+	data
+Message-ID: <1320268173-4756-1-git-send-email-padma.v@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Registered the SPI bus clocks with clkdev using generic
-connection id.
+SPI bus clocks can be avoided passing through platform
+data as spi driver is getting the bus clock using the
+generic clock connection id registered via clkdev.
 
 Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
 ---
- arch/arm/mach-s5p64x0/clock-s5p6440.c |   61 +++++++++++++++-----------------
- arch/arm/mach-s5p64x0/clock-s5p6450.c |   49 +++++++++++++++-----------
- 2 files changed, 58 insertions(+), 52 deletions(-)
+ arch/arm/mach-s3c64xx/dev-spi.c                  |    7 -------
+ arch/arm/mach-s5p64x0/dev-spi.c                  |    6 ------
+ arch/arm/mach-s5pc100/dev-spi.c                  |    7 -------
+ arch/arm/mach-s5pv210/dev-spi.c                  |    6 ------
+ arch/arm/plat-samsung/include/plat/s3c64xx-spi.h |    2 --
+ 5 files changed, 0 insertions(+), 28 deletions(-)
 
-diff --git a/arch/arm/mach-s5p64x0/clock-s5p6440.c b/arch/arm/mach-s5p64x0/clock-s5p6440.c
-index bfb1917..73c7cc9 100644
---- a/arch/arm/mach-s5p64x0/clock-s5p6440.c
-+++ b/arch/arm/mach-s5p64x0/clock-s5p6440.c
-@@ -268,18 +268,6 @@ static struct clk init_clocks_off[] = {
- 		.enable		= s5p64x0_pclk_ctrl,
- 		.ctrlbit	= (1 << 31),
- 	}, {
--		.name		= "sclk_spi_48",
--		.devname	= "s3c64xx-spi.0",
--		.parent		= &clk_48m,
--		.enable		= s5p64x0_sclk_ctrl,
--		.ctrlbit	= (1 << 22),
--	}, {
--		.name		= "sclk_spi_48",
--		.devname	= "s3c64xx-spi.1",
--		.parent		= &clk_48m,
--		.enable		= s5p64x0_sclk_ctrl,
--		.ctrlbit	= (1 << 23),
--	}, {
- 		.name		= "mmc_48m",
- 		.devname	= "s3c-sdhci.0",
- 		.parent		= &clk_48m,
-@@ -421,26 +409,6 @@ static struct clksrc_clk clksrcs[] = {
- 		.reg_div = { .reg = S5P64X0_CLK_DIV1, .shift = 8, .size = 4 },
- 	}, {
- 		.clk	= {
--			.name		= "sclk_spi",
--			.devname	= "s3c64xx-spi.0",
--			.ctrlbit	= (1 << 20),
--			.enable		= s5p64x0_sclk_ctrl,
--		},
--		.sources = &clkset_group1,
--		.reg_src = { .reg = S5P64X0_CLK_SRC0, .shift = 14, .size = 2 },
--		.reg_div = { .reg = S5P64X0_CLK_DIV2, .shift = 0, .size = 4 },
--	}, {
--		.clk	= {
--			.name		= "sclk_spi",
--			.devname	= "s3c64xx-spi.1",
--			.ctrlbit	= (1 << 21),
--			.enable		= s5p64x0_sclk_ctrl,
--		},
--		.sources = &clkset_group1,
--		.reg_src = { .reg = S5P64X0_CLK_SRC0, .shift = 16, .size = 2 },
--		.reg_div = { .reg = S5P64X0_CLK_DIV2, .shift = 4, .size = 4 },
--	}, {
--		.clk	= {
- 			.name		= "sclk_post",
- 			.ctrlbit	= (1 << 10),
- 			.enable		= s5p64x0_sclk_ctrl,
-@@ -489,6 +457,30 @@ static struct clksrc_clk clk_sclk_uclk = {
- 	.reg_div = { .reg = S5P64X0_CLK_DIV2, .shift = 16, .size = 4 },
- };
+diff --git a/arch/arm/mach-s3c64xx/dev-spi.c b/arch/arm/mach-s3c64xx/dev-spi.c
+index 5e6b420..86fb130 100644
+--- a/arch/arm/mach-s3c64xx/dev-spi.c
++++ b/arch/arm/mach-s3c64xx/dev-spi.c
+@@ -23,12 +23,6 @@
+ #include <plat/gpio-cfg.h>
+ #include <plat/devs.h>
  
-+static struct clksrc_clk clk_sclk_spi0 = {
-+	.clk	= {
-+		.name		= "sclk_spi",
-+		.devname	= "s3c64xx-spi.0",
-+		.ctrlbit	= (1 << 20),
-+		.enable		= s5p64x0_sclk_ctrl,
-+	},
-+	.sources = &clkset_group1,
-+	.reg_src = { .reg = S5P64X0_CLK_SRC0, .shift = 14, .size = 2 },
-+	.reg_div = { .reg = S5P64X0_CLK_DIV2, .shift = 0, .size = 4 },
-+};
-+
-+static struct clksrc_clk clk_sclk_spi1 = {
-+	.clk	= {
-+		.name		= "sclk_spi",
-+		.devname	= "s3c64xx-spi.1",
-+		.ctrlbit	= (1 << 21),
-+		.enable		= s5p64x0_sclk_ctrl,
-+	},
-+	.sources = &clkset_group1,
-+	.reg_src = { .reg = S5P64X0_CLK_SRC0, .shift = 16, .size = 2 },
-+	.reg_div = { .reg = S5P64X0_CLK_DIV2, .shift = 4, .size = 4 },
-+};
-+
- /* Clock initialization code */
- static struct clksrc_clk *sysclks[] = {
- 	&clk_mout_apll,
-@@ -509,11 +501,16 @@ static struct clk dummy_apb_pclk = {
+-static char *spi_src_clks[] = {
+-	[S3C64XX_SPI_SRCCLK_PCLK] = "pclk",
+-	[S3C64XX_SPI_SRCCLK_SPIBUS] = "spi-bus",
+-	[S3C64XX_SPI_SRCCLK_48M] = "spi_48m",
+-};
+-
+ /* SPI Controller platform_devices */
  
- static struct clksrc_clk *clksrc_cdev[] = {
- 	&clk_sclk_uclk,
-+	&clk_sclk_spi0,
-+	&clk_sclk_spi1,
- };
+ /* Since we emulate multi-cs capability, we do not touch the GPC-3,7.
+@@ -175,5 +169,4 @@ void __init s3c64xx_spi_set_info(int cntrlr, int src_clk_nr, int num_cs)
  
- static struct clk_lookup s5p6440_clk_lookup[] = {
- 	CLKDEV_INIT(NULL, "clk_uart_baud2", &clk_pclk_low.clk),
- 	CLKDEV_INIT(NULL, "clk_uart_baud3", &clk_sclk_uclk.clk),
-+	CLKDEV_INIT(NULL, "spi_busclk0", &clk_p),
-+	CLKDEV_INIT("s3c64xx-spi.0", "spi_busclk1", &clk_sclk_spi0.clk),
-+	CLKDEV_INIT("s3c64xx-spi.1", "spi_busclk1", &clk_sclk_spi1.clk),
- };
+ 	pd->num_cs = num_cs;
+ 	pd->src_clk_nr = src_clk_nr;
+-	pd->src_clk_name = spi_src_clks[src_clk_nr];
+ }
+diff --git a/arch/arm/mach-s5p64x0/dev-spi.c b/arch/arm/mach-s5p64x0/dev-spi.c
+index 1fd9c79..5b5d3c0 100644
+--- a/arch/arm/mach-s5p64x0/dev-spi.c
++++ b/arch/arm/mach-s5p64x0/dev-spi.c
+@@ -25,11 +25,6 @@
+ #include <plat/s3c64xx-spi.h>
+ #include <plat/gpio-cfg.h>
  
- void __init_or_cpufreq s5p6440_setup_clocks(void)
-diff --git a/arch/arm/mach-s5p64x0/clock-s5p6450.c b/arch/arm/mach-s5p64x0/clock-s5p6450.c
-index d132638..50f90cb 100644
---- a/arch/arm/mach-s5p64x0/clock-s5p6450.c
-+++ b/arch/arm/mach-s5p64x0/clock-s5p6450.c
-@@ -443,26 +443,6 @@ static struct clksrc_clk clksrcs[] = {
- 		.reg_div = { .reg = S5P64X0_CLK_DIV1, .shift = 8, .size = 4 },
- 	}, {
- 		.clk	= {
--			.name		= "sclk_spi",
--			.devname	= "s3c64xx-spi.0",
--			.ctrlbit	= (1 << 20),
--			.enable		= s5p64x0_sclk_ctrl,
--		},
--		.sources = &clkset_group2,
--		.reg_src = { .reg = S5P64X0_CLK_SRC0, .shift = 14, .size = 2 },
--		.reg_div = { .reg = S5P64X0_CLK_DIV2, .shift = 0, .size = 4 },
--	}, {
--		.clk	= {
--			.name		= "sclk_spi",
--			.devname	= "s3c64xx-spi.1",
--			.ctrlbit	= (1 << 21),
--			.enable		= s5p64x0_sclk_ctrl,
--		},
--		.sources = &clkset_group2,
--		.reg_src = { .reg = S5P64X0_CLK_SRC0, .shift = 16, .size = 2 },
--		.reg_div = { .reg = S5P64X0_CLK_DIV2, .shift = 4, .size = 4 },
--	}, {
--		.clk	= {
- 			.name		= "sclk_fimc",
- 			.ctrlbit	= (1 << 10),
- 			.enable		= s5p64x0_sclk_ctrl,
-@@ -538,13 +518,42 @@ static struct clksrc_clk clk_sclk_uclk = {
- 	.reg_div = { .reg = S5P64X0_CLK_DIV2, .shift = 16, .size = 4 },
- };
+-static char *s5p64x0_spi_src_clks[] = {
+-	[S5P64X0_SPI_SRCCLK_PCLK] = "pclk",
+-	[S5P64X0_SPI_SRCCLK_SCLK] = "sclk_spi",
+-};
+-
+ /* SPI Controller platform_devices */
  
-+static struct clksrc_clk clk_sclk_spi0 = {
-+	.clk	= {
-+		.name		= "sclk_spi",
-+		.devname	= "s3c64xx-spi.0",
-+		.ctrlbit	= (1 << 20),
-+		.enable		= s5p64x0_sclk_ctrl,
-+	},
-+	.sources = &clkset_group2,
-+	.reg_src = { .reg = S5P64X0_CLK_SRC0, .shift = 14, .size = 2 },
-+	.reg_div = { .reg = S5P64X0_CLK_DIV2, .shift = 0, .size = 4 },
-+};
-+
-+static struct clksrc_clk clk_sclk_spi1 = {
-+	.clk	= {
-+		.name		= "sclk_spi",
-+		.devname	= "s3c64xx-spi.1",
-+		.ctrlbit	= (1 << 21),
-+		.enable		= s5p64x0_sclk_ctrl,
-+	},
-+	.sources = &clkset_group2,
-+	.reg_src = { .reg = S5P64X0_CLK_SRC0, .shift = 16, .size = 2 },
-+	.reg_div = { .reg = S5P64X0_CLK_DIV2, .shift = 4, .size = 4 },
-+};
-+
- static struct clksrc_clk *clksrc_cdev[] = {
- 	&clk_sclk_uclk,
-+	&clk_sclk_spi0,
-+	&clk_sclk_spi1,
- };
+ /* Since we emulate multi-cs capability, we do not touch the CS.
+@@ -220,5 +215,4 @@ void __init s5p64x0_spi_set_info(int cntrlr, int src_clk_nr, int num_cs)
  
- static struct clk_lookup s5p6450_clk_lookup[] = {
- 	CLKDEV_INIT(NULL, "clk_uart_baud2", &clk_pclk_low.clk),
- 	CLKDEV_INIT(NULL, "clk_uart_baud3", &clk_sclk_uclk.clk),
-+	CLKDEV_INIT(NULL, "spi_busclk0", &clk_p),
-+	CLKDEV_INIT("s3c64xx-spi.0", "spi_busclk1", &clk_sclk_spi0.clk),
-+	CLKDEV_INIT("s3c64xx-spi.1", "spi_busclk1", &clk_sclk_spi1.clk),
- };
+ 	pd->num_cs = num_cs;
+ 	pd->src_clk_nr = src_clk_nr;
+-	pd->src_clk_name = s5p64x0_spi_src_clks[src_clk_nr];
+ }
+diff --git a/arch/arm/mach-s5pc100/dev-spi.c b/arch/arm/mach-s5pc100/dev-spi.c
+index e5d6c4d..155f50d 100644
+--- a/arch/arm/mach-s5pc100/dev-spi.c
++++ b/arch/arm/mach-s5pc100/dev-spi.c
+@@ -21,12 +21,6 @@
+ #include <plat/gpio-cfg.h>
+ #include <plat/irqs.h>
  
- /* Clock initialization code */
+-static char *spi_src_clks[] = {
+-	[S5PC100_SPI_SRCCLK_PCLK] = "pclk",
+-	[S5PC100_SPI_SRCCLK_48M] = "spi_48m",
+-	[S5PC100_SPI_SRCCLK_SPIBUS] = "spi_bus",
+-};
+-
+ /* SPI Controller platform_devices */
+ 
+ /* Since we emulate multi-cs capability, we do not touch the CS.
+@@ -223,5 +217,4 @@ void __init s5pc100_spi_set_info(int cntrlr, int src_clk_nr, int num_cs)
+ 
+ 	pd->num_cs = num_cs;
+ 	pd->src_clk_nr = src_clk_nr;
+-	pd->src_clk_name = spi_src_clks[src_clk_nr];
+ }
+diff --git a/arch/arm/mach-s5pv210/dev-spi.c b/arch/arm/mach-s5pv210/dev-spi.c
+index eaf9a7b..39bef19 100644
+--- a/arch/arm/mach-s5pv210/dev-spi.c
++++ b/arch/arm/mach-s5pv210/dev-spi.c
+@@ -20,11 +20,6 @@
+ #include <plat/s3c64xx-spi.h>
+ #include <plat/gpio-cfg.h>
+ 
+-static char *spi_src_clks[] = {
+-	[S5PV210_SPI_SRCCLK_PCLK] = "pclk",
+-	[S5PV210_SPI_SRCCLK_SCLK] = "sclk_spi",
+-};
+-
+ /* SPI Controller platform_devices */
+ 
+ /* Since we emulate multi-cs capability, we do not touch the CS.
+@@ -171,5 +166,4 @@ void __init s5pv210_spi_set_info(int cntrlr, int src_clk_nr, int num_cs)
+ 
+ 	pd->num_cs = num_cs;
+ 	pd->src_clk_nr = src_clk_nr;
+-	pd->src_clk_name = spi_src_clks[src_clk_nr];
+ }
+diff --git a/arch/arm/plat-samsung/include/plat/s3c64xx-spi.h b/arch/arm/plat-samsung/include/plat/s3c64xx-spi.h
+index 4c16fa3..c3d82a5 100644
+--- a/arch/arm/plat-samsung/include/plat/s3c64xx-spi.h
++++ b/arch/arm/plat-samsung/include/plat/s3c64xx-spi.h
+@@ -31,7 +31,6 @@ struct s3c64xx_spi_csinfo {
+ /**
+  * struct s3c64xx_spi_info - SPI Controller defining structure
+  * @src_clk_nr: Clock source index for the CLK_CFG[SPI_CLKSEL] field.
+- * @src_clk_name: Platform name of the corresponding clock.
+  * @clk_from_cmu: If the SPI clock/prescalar control block is present
+  *     by the platform's clock-management-unit and not in SPI controller.
+  * @num_cs: Number of CS this controller emulates.
+@@ -43,7 +42,6 @@ struct s3c64xx_spi_csinfo {
+  */
+ struct s3c64xx_spi_info {
+ 	int src_clk_nr;
+-	char *src_clk_name;
+ 	bool clk_from_cmu;
+ 
+ 	int num_cs;
 -- 
-1.7.0.4
+1.7.4.4
