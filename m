@@ -1,100 +1,46 @@
-From: ccross@android.com (Colin Cross)
-Date: Wed, 2 Nov 2011 11:30:43 -0700
-Subject: [PATCH v2 2/8] arm/tegra: prepare early init for multiple tegra
-	variants
-In-Reply-To: <1320242948-21061-3-git-send-email-pdeschrijver@nvidia.com>
-References: <1320242948-21061-1-git-send-email-pdeschrijver@nvidia.com>
-	<1320242948-21061-3-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <CAMbhsRSTcR8qgYESmM6OxkXeVeg6vS49woCe_OX6CY4pAj2g_A@mail.gmail.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Wed, 2 Nov 2011 19:30:51 +0100
+Subject: [PATCH v2 1/3] Add support for mini-box.com picoSAM9G45 board
+In-Reply-To: <20111102160603.GA12913@n2100.arm.linux.org.uk>
+References: <1320076396-6233-1-git-send-email-npavel@mini-box.com>
+	<20111102142817.GH19187@n2100.arm.linux.org.uk>
+	<20111102154935.GC7136@game.jcrosoft.org>
+	<20111102160603.GA12913@n2100.arm.linux.org.uk>
+Message-ID: <20111102183051.GF7136@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 2, 2011 at 7:09 AM, Peter De Schrijver
-<pdeschrijver@nvidia.com> wrote:
-> This patch splits the early init code in a common and a tegra20 specific part.
-> L2 cache initialization is generalized and discovers the cache associativity
-> at runtime.
->
-> Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
-> ---
-<snip>
+On 16:06 Wed 02 Nov     , Russell King - ARM Linux wrote:
+> On Wed, Nov 02, 2011 at 04:49:35PM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > On 14:28 Wed 02 Nov     , Russell King - ARM Linux wrote:
+> > > Before Nicu puts these into the patch system (which is being attempted
+> > > right now)...
+> > As announce at the kernel summit no new board for 9gx series will be merged
+> > except pending one. The new board will have to go via DT.
+> 
+> Well, we now have patches for this board in the patch system:
+> 
+>    7148/1? Add picosam9g45 board to         3.1?                 14:25:18?
+>            Makefile
+>    7147/1? Add kernel configuration option  3.1?                 14:25:17?
+>            for picosam9g45 board
+>    7146/1? Add support for mini-box.com     3.1?                 14:25:16?
+>            picoSAM9G45 board
+> 
+> along with these old ones:
+> 
+>    6862/1? Add Board Support for Siemens L1 2.6.39-rc1?          04 Apr 2011?
+>            Board
+>    6861/1? Add Board Support for Siemens L0 2.6.39-rc1?          04 Apr 2011?
+>            Board
+> 
+> So, it sounds like I should just discard the three new ones - what about
+> the old ones?  Those too?  I've not seen/heard anything further on them.
 
-> -static __initdata struct tegra_clk_init_table common_clk_init_table[] = {
-> +void (*arch_reset)(char mode, const char *cmd) = tegra_assert_system_reset;
-> +
-This is unrelated to the patch description?
+For the Siemens I take care about it later this week
 
-> +static __initdata struct tegra_clk_init_table tegra20_clk_init_table[] = {
-> ? ? ? ?/* name ? ? ? ? parent ? ? ? ? ?rate ? ? ? ? ? ?enabled */
-> ? ? ? ?{ "clk_m", ? ? ?NULL, ? ? ? ? ? 0, ? ? ? ? ? ? ?true },
-> ? ? ? ?{ "pll_p", ? ? ?"clk_m", ? ? ? ?216000000, ? ? ?true },
-> @@ -59,25 +61,34 @@ static __initdata struct tegra_clk_init_table common_clk_init_table[] = {
-> ? ? ? ?{ NULL, ? ? ? ? NULL, ? ? ? ? ? 0, ? ? ? ? ? ? ?0},
-> ?};
->
-> -static void __init tegra_init_cache(void)
-> +static void __init tegra_init_cache(u32 tag_latency, u32 data_latency)
-> ?{
-> ?#ifdef CONFIG_CACHE_L2X0
-> ? ? ? ?void __iomem *p = IO_ADDRESS(TEGRA_ARM_PERIF_BASE) + 0x3000;
-> + ? ? ? u32 aux_ctrl;
-> +
-> + ? ? ? writel_relaxed(tag_latency, p + L2X0_TAG_LATENCY_CTRL);
-> + ? ? ? writel_relaxed(data_latency, p + L2X0_DATA_LATENCY_CTRL);
->
-> - ? ? ? writel_relaxed(0x331, p + L2X0_TAG_LATENCY_CTRL);
-> - ? ? ? writel_relaxed(0x441, p + L2X0_DATA_LATENCY_CTRL);
-> + ? ? ? aux_ctrl = readl(p + L2X0_CACHE_TYPE);
-> + ? ? ? aux_ctrl = (aux_ctrl & 0x700) << (17-8);
+for the 9g45 yes please discard this is a smple card we will able to support
+it soon via DT, and the patch is for 3.3 anyway
 
-If I'm interpreting the PL310 TRM correctly, the cache associativity
-value in the L2X0_CACHE_TYPE register is read from the aux control
-register, so this is just leaving the existing value in place.  If the
-value is not being modified, just take it out of the aux_ctrl mask
-passed to l2x0_init.
-
-> + ? ? ? aux_ctrl |= 0x7C000001;
-
-This adds the BRESP bit to the aux control register.  Considering the
-problems I've seen with random bits in the L2 cache causing all sorts
-of instabilities, this should be split out into a separate change so
-that it's obvious in a bisect.
-
->
-> - ? ? ? l2x0_init(p, 0x6C080001, 0x8200c3fe);
-> + ? ? ? l2x0_init(p, aux_ctrl, 0x8200c3fe);
-> ?#endif
->
-> ?}
->
-> -void __init tegra_init_early(void)
-> +static void __init tegra_setup_system_reset(void)
-> +{
-> + ? ? ? arm_arch_reset = tegra_assert_system_reset;
-> +}
-> +
-> +void __init tegra20_init_early(void)
-> ?{
-> ? ? ? ?tegra_init_fuse();
-> ? ? ? ?tegra_init_clock();
-> - ? ? ? tegra_clk_init_from_table(common_clk_init_table);
-> - ? ? ? tegra_init_cache();
-> -
-> - ? ? ? arm_arch_reset = tegra_assert_system_reset;
-> + ? ? ? tegra_clk_init_from_table(tegra20_clk_init_table);
-> + ? ? ? tegra_init_cache(0x331, 0x441);
-> + ? ? ? tegra_setup_system_reset();
-
-It seems likely that there will be multiple init functions that need
-to be called from init_early on both tegra20 and tegra30.  Maybe add a
-common function that only calls tegra_setup_system_reset() for now?
-
-> ?}
-> --
-> 1.7.7.rc0.72.g4b5ea.dirty
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-tegra" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
->
+Best Regards,
+J.
