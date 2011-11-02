@@ -1,154 +1,58 @@
-From: myungjoo.ham@gmail.com (MyungJoo Ham)
-Date: Wed, 2 Nov 2011 19:33:03 +0900
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 2 Nov 2011 10:49:50 +0000
 Subject: [PATCH V3] AMBA: Put devices into low-power state in suspend_noirq
-In-Reply-To: <1320142497-16750-1-git-send-email-ulf.hansson@stericsson.com>
+In-Reply-To: <CAJ0PZbTjoEbiaLpQ7DiVWT1FT3asWUYWp3voFQPXrAq_AjEDog@mail.gmail.com>
 References: <1320142497-16750-1-git-send-email-ulf.hansson@stericsson.com>
-Message-ID: <CAJ0PZbTjoEbiaLpQ7DiVWT1FT3asWUYWp3voFQPXrAq_AjEDog@mail.gmail.com>
+	<CAJ0PZbTjoEbiaLpQ7DiVWT1FT3asWUYWp3voFQPXrAq_AjEDog@mail.gmail.com>
+Message-ID: <20111102104950.GY19187@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 1, 2011 at 7:14 PM, Ulf Hansson <ulf.hansson@stericsson.com> wrote:
-> Previously it was possible for device drivers doing
-> pm_runtime_suspend and pm_runtime_put_sync from their suspend
-> callbacks. From the following commit, which solved a race issue,
-> this is not possible anymore.
->
-> PM: Limit race conditions between runtime PM and system sleep (v2)
->
-> Therefore some devices might not be in full low-power state after
-> device's suspend callbacks has been executed. To make sure this is
-> done the suspend_noirq callback is used.
->
-> In the resume_noirq the power is restored to the device if it were
-> previously cut in suspend_noirq. This to make sure the device is
-> put back into the same state as the device driver left it in from
-> it's suspend callback.
->
-> If a device is configured as wakeup device this will prevent the
-> bus from putting it into low-power state during suspend_noirq.
->
-> Signed-off-by: Ulf Hansson <ulf.hansson@stericsson.com>
-> ---
->
-> Changes in v3:
-> ? ? ? ?- Fixup comments and commit message (including the header).
->
-> Changes in v2:
-> ? ? ? ?- Integrated code directly into suspend|resume_noirq and get rid
-> ? ? ? ?of not needed ifdefs.
-> ? ? ? ?- Prevent runtime suspend if device is configured as wakeup.
->
-> ---
-> ?drivers/amba/bus.c | ? 20 ++++++++++++++++++++
-> ?1 files changed, 20 insertions(+), 0 deletions(-)
->
-> diff --git a/drivers/amba/bus.c b/drivers/amba/bus.c
-> index bd230e8..e3ecf66 100644
-> --- a/drivers/amba/bus.c
-> +++ b/drivers/amba/bus.c
-> @@ -14,6 +14,7 @@
-> ?#include <linux/slab.h>
-> ?#include <linux/io.h>
-> ?#include <linux/pm.h>
-> +#include <linux/pm_wakeup.h>
-> ?#include <linux/pm_runtime.h>
-> ?#include <linux/amba/bus.h>
->
-> @@ -158,6 +159,7 @@ static int amba_pm_suspend(struct device *dev)
-> ?static int amba_pm_suspend_noirq(struct device *dev)
-> ?{
-> ? ? ? ?struct device_driver *drv = dev->driver;
-> + ? ? ? bool is_suspended = pm_runtime_status_suspended(dev);
-> ? ? ? ?int ret = 0;
->
-> ? ? ? ?if (!drv)
-> @@ -168,6 +170,15 @@ static int amba_pm_suspend_noirq(struct device *dev)
-> ? ? ? ? ? ? ? ? ? ? ? ?ret = drv->pm->suspend_noirq(dev);
-> ? ? ? ?}
->
-> + ? ? ? /*
-> + ? ? ? ?* If the device's power hasn't already been cut and the
-> + ? ? ? ?* device doesn't need to generate wakeup requests, cut
-> + ? ? ? ?* the power now.
-> + ? ? ? ?*/
-> + ? ? ? if (!ret && !is_suspended && !device_may_wakeup(dev))
-> + ? ? ? ? ? ? ? if (dev->bus && dev->bus->pm && dev->bus->pm->runtime_suspend)
-> + ? ? ? ? ? ? ? ? ? ? ? ret = dev->bus->pm->runtime_suspend(dev);
-> +
-> ? ? ? ?return ret;
-> ?}
+On Wed, Nov 02, 2011 at 07:33:03PM +0900, MyungJoo Ham wrote:
+> If the reason of this patch is for device_may_wakeup condition where
+> AMBA needs to keep something up if any of its devices may wakeup, I
+> guess you need another approach. For example, checking
+> devices_may_wakeup conditions of all devices at ABMA suspend callback,
+> save the information at AMBA's data, use the saved information, set
+> the ABMA bus device with AMBA's suspend_noirq callback based on the
+> saved information or at syscore.
 
-If a device of AMBA bus is still in "running" state, the bus will
-simply need to call pm->suspend() / pm->suspend_noirq(). And the
-suspend/resume callbacks of the devices should be able to handle the
-situation. In other words, the device driver's suspend() and
-suspend_noirq() callbacks should be able to handle the transition from
-running to suspended regardless whether it is already in "suspended"
-(by runtime-pm) or in "running".
+I think this patch is trying to address the variability in the state of
+the bus clock when a device is suspended.
 
-Yes, even if we cannot call pm_runtime_get/put in pm's suspend/resume
-callbacks, that is same.
+Originally, we didn't do any bus clock management, so all the calls into
+the driver were assured that the bus clock would always be running.
 
-If the contents of runtime_pm_suspend() and suspend() callbacks are
-the same, we only need to make another static function and use it at
-the both callbacks at the device driver.
+Then, when bus clock management was added, we ensured that it was enabled
+before the driver was probed, and disabled after the driver has been
+removed.  A driver wishing to manage the bus clock for its device must
+then manage it appropriately given those pre-conditions (which means if
+it turns off the bus clock before probe returns, it has to be prepared
+to turn the bus clock back on when the suspend or remove callbacks are
+made.)
 
-Things could be a bit different for devices whether it is being
-suspended in runtime or in system-wide suspend, and the devices should
-be able to distinguish them. (so, call suspend callback if it is
-suspend, call runtime_pm_suspend callback if it is being suspended in
-runtime.)
+When runtime-PM was added to the bus layer, this took control of the
+bus clock management, but we've kept the same guarantees - although
+runtime PM will be enabled, it is up to the driver to drop the use
+count to make it runtime-suspend the device - and if that is done it is
+up to the driver to make whatever runtime PM calls are necessary to
+bring the bus clock back on when required.
 
+I don't see any reason drivers can't continue to use pm_runtime_get_sync()
+in their suspend callback if they're doing runtime-PM - the runtime PM
+stuff hasn't been disabled at this point and so the runtime resume should
+still happen.
 
+What won't happen is that you won't be able to use runtime PM to turn the
+bus clock off - but that's also the case for a non-runtime PM driver as
+well.  The solution to this is to -at the end- of the suspend callback
+to call amba_pclk_disable(), and -at the beginning- of the resume callback
+to call amba_pclk_enable(), both provided that the device can cope with it.
+At the end of the resume callback, call pm_runtime_put() to balance the
+pm_runtime_get_sync() in the suspend callback.
 
-If the reason of this patch is for device_may_wakeup condition where
-AMBA needs to keep something up if any of its devices may wakeup, I
-guess you need another approach. For example, checking
-devices_may_wakeup conditions of all devices at ABMA suspend callback,
-save the information at AMBA's data, use the saved information, set
-the ABMA bus device with AMBA's suspend_noirq callback based on the
-saved information or at syscore.
-
-
-Cheers!
-MyungJoo
-
->
-> @@ -192,6 +203,7 @@ static int amba_pm_resume(struct device *dev)
-> ?static int amba_pm_resume_noirq(struct device *dev)
-> ?{
-> ? ? ? ?struct device_driver *drv = dev->driver;
-> + ? ? ? bool is_suspended = pm_runtime_status_suspended(dev);
-> ? ? ? ?int ret = 0;
->
-> ? ? ? ?if (!drv)
-> @@ -202,6 +214,14 @@ static int amba_pm_resume_noirq(struct device *dev)
-> ? ? ? ? ? ? ? ? ? ? ? ?ret = drv->pm->resume_noirq(dev);
-> ? ? ? ?}
->
-> + ? ? ? /*
-> + ? ? ? ?* If the device's power were cut during suspend_noirq
-> + ? ? ? ?* restore the power to the device now.
-> + ? ? ? ?*/
-> + ? ? ? if (!ret && !is_suspended && !device_may_wakeup(dev))
-> + ? ? ? ? ? ? ? if (dev->bus && dev->bus->pm && dev->bus->pm->runtime_resume)
-> + ? ? ? ? ? ? ? ? ? ? ? ret = dev->bus->pm->runtime_resume(dev);
-> +
-> ? ? ? ?return ret;
-> ?}
->
-> --
-> 1.7.5.4
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
-
-
-
--- 
-MyungJoo Ham, Ph.D.
-Mobile Software Platform Lab, DMC Business, Samsung Electronics
+So, I don't see any bus-layer patches are necessary or desirable.  Trying
+to fix this at the bus layer changes the entry conditions for the suspend
+and resume callbacks, and makes it _much_ harder for drivers to work out
+what state things are in at that point - which means we're creating a
+recipe for bugs.
