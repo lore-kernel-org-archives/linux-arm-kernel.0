@@ -1,33 +1,33 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Thu, 3 Nov 2011 02:11:56 +0530
-Subject: [PATCH V6] SDHCI: S3C: Use generic clock names for sdhci bus
-	clock options
-In-Reply-To: <1320039876-21148-1-git-send-email-rajeshwari.s@samsung.com>
-References: <1320039876-21148-1-git-send-email-rajeshwari.s@samsung.com>
-Message-ID: <CAJuYYwSav=zEWLpkSsCLF4RafZHsXimayd2APqBrKe6DiQZKwQ@mail.gmail.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Wed, 02 Nov 2011 22:33:00 +0100
+Subject: [RFC 0/5] restart cleanups
+In-Reply-To: <20111101230905.GV19187@n2100.arm.linux.org.uk> (Russell King's
+	message of "Tue, 1 Nov 2011 23:09:05 +0000")
+References: <20111101160731.GQ19187@n2100.arm.linux.org.uk>
+	<20111101192343.GA32003@mudshark.cambridge.arm.com>
+	<20111101194154.GU19187@n2100.arm.linux.org.uk>
+	<20111101211933.GA32442@mudshark.cambridge.arm.com>
+	<20111101230905.GV19187@n2100.arm.linux.org.uk>
+Message-ID: <87vcr2w6pf.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31 October 2011 11:14, Rajeshwari Shinde <rajeshwari.s@samsung.com> wrote:
-> This patch modifies the driver to stop depending on the clock names
-> being passed from the platform and switch over to bus clock lookup
-> using generic clock names.
->
-> V6 Changes:
-> Changed sprintf to snprintf as suggested by Chris Ball.
+Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
+> However, we don't know whether removing the code will then prevent it
+> rebooting even for a userspace-invoked reboot.  We need feedback from
+> the platform maintainer for that (added Philipp and Robert in the
+> hope one of them can answer this - and maybe send a patch to fix it.)
 
-The above two lines can be removed from the commit message.
+OK, I tested the serie on mioa701 board, and everything works as before. I
+tested it with mioa701.c amended so that no more halt/reboot hooks are used
+anymore. The resources freeing is gone as well.
 
->
-> Signed-off-by: Rajeshwari Shinde <rajeshwari.s@samsung.com>
-> ---
-> ?drivers/mmc/host/sdhci-s3c.c | ? ?7 ++-----
-> ?1 files changed, 2 insertions(+), 5 deletions(-)
->
-> diff --git a/drivers/mmc/host/sdhci-s3c.c b/drivers/mmc/host/sdhci-s3c.c
-> index 82709b6..488223c 100644
-> --- a/drivers/mmc/host/sdhci-s3c.c
-> +++ b/drivers/mmc/host/sdhci-s3c.c
-> @@ -435,14 +435,11 @@ static int __devinit sdhci_s3c_probe(struct platform_device *pdev)
+I will submit the following patch [1] to get rid of the hooks to Eric, unless
+you want it in your tree.
 
-[...]
+Cheers.
+
+-- 
+Robert
+
+[1]
