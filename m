@@ -1,130 +1,57 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 02 Nov 2011 08:52:37 -0500
-Subject: [PATCH 1/3] ARM: pxa: Add DT support to pxa2xx-uart
-In-Reply-To: <201111012115.35417.marek.vasut@gmail.com>
-References: <1320172354-3795-1-git-send-email-marek.vasut@gmail.com>
-	<1320172354-3795-2-git-send-email-marek.vasut@gmail.com>
-	<4EB04FDF.1030600@gmail.com>
-	<201111012115.35417.marek.vasut@gmail.com>
-Message-ID: <4EB14B25.5050606@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 2 Nov 2011 14:04:53 +0000
+Subject: [PATCH V3] AMBA: Put devices into low-power state in suspend_noirq
+In-Reply-To: <4EB14ABB.6020103@stericsson.com>
+References: <1320142497-16750-1-git-send-email-ulf.hansson@stericsson.com>
+	<CAJ0PZbTjoEbiaLpQ7DiVWT1FT3asWUYWp3voFQPXrAq_AjEDog@mail.gmail.com>
+	<20111102104950.GY19187@n2100.arm.linux.org.uk>
+	<4EB14ABB.6020103@stericsson.com>
+Message-ID: <20111102140453.GF19187@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/01/2011 03:15 PM, Marek Vasut wrote:
->> On 11/01/2011 01:32 PM, Marek Vasut wrote:
->>> Add device tree binding for PXA2xx UARTs. Tested on Vpac270 board.
->>>
->>> Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
->>> Cc: Arnd Bergmann <arnd@arndb.de>
->>> Cc: Grant Likely <grant.likely@secretlab.ca>
->>> ---
->>>
->>>  drivers/tty/serial/pxa.c |   50
->>>  +++++++++++++++++++++++++++++++++++++++++++-- 1 files changed, 47
->>>  insertions(+), 3 deletions(-)
->>>
->>> diff --git a/drivers/tty/serial/pxa.c b/drivers/tty/serial/pxa.c
->>> index 531931c..836cbb4 100644
->>> --- a/drivers/tty/serial/pxa.c
->>> +++ b/drivers/tty/serial/pxa.c
->>> @@ -43,6 +43,8 @@
->>>
->>>  #include <linux/clk.h>
->>>  #include <linux/io.h>
->>>  #include <linux/slab.h>
->>>
->>> +#include <linux/of.h>
->>> +#include <linux/of_device.h>
->>>
->>>  struct uart_pxa_port {
->>>  
->>>  	struct uart_port        port;
->>>
->>> @@ -761,11 +763,50 @@ static const struct dev_pm_ops serial_pxa_pm_ops =
->>> {
->>>
->>>  };
->>>  #endif
->>>
->>> +#ifdef CONFIG_OF
->>> +static struct of_device_id serial_pxa_dt_ids[] = {
->>> +	{ .compatible = "marvell,pxa2xx-uart" },
->>> +	{ /* sentinel */ }
->>> +};
->>> +MODULE_DEVICE_TABLE(of, serial_pxa_dt_ids);
->>> +
->>> +static int serial_pxa_probe_dt(struct platform_device *pdev, int
->>> *portid) +{
->>> +	struct device_node *np = pdev->dev.of_node;
->>> +	static int portnum;
->>> +
->>> +	if (!np)
->>> +		return -ENODEV;
->>> +
->>> +	/* PXA has up to four UART ports */
->>> +	*portid = portnum++;
->>
->> You have no guarantee of the probe ordering yet are dependent on the
->> number later on to set the name.
-> 
-> The probe order should be the one according to the order of ports in DT, right ?
+On Wed, Nov 02, 2011 at 02:50:51PM +0100, Ulf Hansson wrote:
+> Just some thinking, you may comment if you like....
+>
+> When using a power_domain this will then mean that the power domain  
+> callbacks for suspend|resume should take similar actions as they do in  
+> their runtime_suspend|resume callbacks to put the devices into low power  
+> state. This should be in line of what you prefer?
 
-Maybe so, but there is no guarantee of that. If you can avoid it that
-would be best, but I think most serial drivers end up with some sort of
-index. Look at the recent DT support for i.MX uart and the alias support.
+If it is appropriate to cut the vcore for the device when in runtime
+suspend state, then a driver itself has to explicitly do that.  vcore
+handling is different from pclk handling because loss of vcore requires
+the device to be reinitialized, whereas pclk does not.
 
->>
->>> +	if (*portid >= 4)
->>> +		return -ENODEV;
->>> +
->>> +	/* Check if we're probing compatible ports only! */
->>> +	if (of_get_property(np, "marvell,pxa250", NULL))
->>> +		if (!cpu_is_pxa25x())
->>> +			return -EINVAL;
->>
->> if dev->of_node is set, then you already know you matched against
->> marvell,pxa2xx-uart,
-> 
-> Yes, I'm checking if the port has an additional parameter "marvell,pxa250" set, 
-> which means it should check if the CPU is pxa250.
+> This will mean some duplicated code but at the same time give the device  
+> driver full control and responsibility of putting its device in  
+> low-power state.
 
-If you have differences between pxa250 uart and other pxa2xx uart
-versions, then the compatible string should reflect this (i.e.
-marvell,pxa250-uart). Generally, you want to be specific with compatible
-strings. To do it generically, use the oldest chip name and newer chips
-can be compatible. For example, a pxa250 uart can use
-marvell,pxa250-uart and every other chip can use marvell,pxa210-uart.
+It should not mean any duplicated code - if a driver itself wishes to call
+its runtime suspend and resume handlers from its normal suspend/resume
+handlers, that's a choice it can make (and it alone can make).  Again,
+take a moment to think a little more about your original proposal of
+pushing that into the bus layer.
 
-> 
->>
->>> +
->>> +	return 0;
->>> +}
->>> +#else
->>> +static inline int serial_pxa_probe_dt(struct platform_device *pdev, int
->>> *portid) +{
->>> +	return 0;
->>> +}
->>> +#endif
->>> +
->>>
->>>  static int serial_pxa_probe(struct platform_device *dev)
->>>  {
->>>  
->>>  	struct uart_pxa_port *sport;
->>>  	struct resource *mmres, *irqres;
->>>  	int ret;
->>>
->>> +	int portid = dev->id;
->>> +
->>> +	ret = serial_pxa_probe_dt(dev, &portid);
->>> +	if (ret == -EINVAL)
->>> +		return 0;
->>
->> What about non-DT probing when CONFIG_OF is enabled?
-> 
-> Then ret isn't -EINVAL and it should be ok ?
+And consider the case of a non-runtime PM system (where the runtime PM
+callbacks are NULL) yet you have system suspend enabled, and you trigger
+a system suspend.  Do you really want the suspend of the devices to be
+skipped because the runtime PM callbacks were NULL because of system
+configuration?
 
-Ahh, yes you're right.
+With them being explicit calls in the driver, this doesn't happen because
+if you omit those functions for non-runtime PM, you'll get a link error.
 
-Rob
+> In parallel it would then also make sense to remove the pm_runtime  
+> handling completely from the amba bus and let the pclk be fully runtime  
+> handled from the device driver instead. Since it must handle it from  
+> suspend anyway...
+
+We know that it's safe to handle the pclk at the bus layer for normal
+runtime PM as it causes no state loss.  We also know that throwing the
+vcore handling in there is the wrong thing to do because it does cause
+state loss and therefore needs proper handling at the driver level.
+
+Hence, the bus code can take care of the pclk but not for vcore.
+
+So, I don't see any reason to change the bus code.
