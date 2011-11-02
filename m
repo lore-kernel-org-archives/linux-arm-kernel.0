@@ -1,39 +1,48 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 2 Nov 2011 09:20:11 -0400
-Subject: [PATCH] dt: add empty of_alias_get_id() for non-dt builds
-In-Reply-To: <20111102070042.GA7136@game.jcrosoft.org>
-References: <1319706448-1664-1-git-send-email-nicolas.ferre@atmel.com>
-	<4EAAABF6.50803@gmail.com> <20111029114905.GA22592@ponder.secretlab.ca>
-	<20111102070042.GA7136@game.jcrosoft.org>
-Message-ID: <CACxGe6vepsvk=7DK0-4O=TD3g4qKT_TGZV_iUGLEBX6XV8Y6fw@mail.gmail.com>
+From: zdevai@gmail.com (Zoltan Devai)
+Date: Wed, 2 Nov 2011 14:29:22 +0100
+Subject: [PATCH v2 1/5] ARM: SPMP8000: Add machine base files
+In-Reply-To: <20111024110015.GA5212@totoro>
+References: <1318178172-7965-1-git-send-email-zoss@devai.org>
+	<1409922.Ostx0EbfK3@wuerfel>
+	<CAGVye5PR3rDbGOf48sPtnZHJXPCa_eY1JqeUZKyeLGk4s_LNHA@mail.gmail.com>
+	<201110241113.21837.arnd@arndb.de> <20111024110015.GA5212@totoro>
+Message-ID: <CAGVye5OD3uBuBSKVEYMWNABo7ofuYzCmMP3NcDJR8gAAxxAYXQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 2, 2011 at 3:00 AM, Jean-Christophe PLAGNIOL-VILLARD
-<plagnioj@jcrosoft.com> wrote:
-> On 13:49 Sat 29 Oct ? ? , Grant Likely wrote:
->> On Fri, Oct 28, 2011 at 08:19:50AM -0500, Rob Herring wrote:
->> > On 10/27/2011 04:07 AM, Nicolas Ferre wrote:
->> > > Add function of_alias_get_id() reporting -ENOSYS
->> > > for non-dt builds, so that drivers migrating to dt
->> > > can save some '#ifdef CONFIG_OF'.
+2011/10/24 Jamie Iles <jamie@jamieiles.com>:
+> On Mon, Oct 24, 2011 at 11:13:21AM +0200, Arnd Bergmann wrote:
+>> On Sunday 23 October 2011, Zoltan Devai wrote:
+>> > 2011/10/19 Arnd Bergmann <arnd@arndb.de>:
+>> > > On Wednesday 19 October 2011 18:01:54 Zoltan Devai wrote:
+>> > >> Files needed for the basic machine support of SPMP8000
+>> > >>
+>> > >> Signed-off-by: Zoltan Devai <zoss@devai.org>
 >> > >
->> > > Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+>> > > Hi Zoltan,
+>> > >
+>> > > This version looks very nice, only a few small things remain that I noticed
+>> > > reading through it again:
+>> > OK, will correct these.
 >> >
->> > Acked-by: Rob Herring <rob.herring@calxeda.com>
+>> > What's next then ?
 >>
->> Merged, thanks
->>
->> Rob, for stuff like this, please do pick it up into your git tree and
->> reply saying that you've done so. ?Then I know I can ignore it because
->> I'll be receiving a pull req from you in short order.
->>
->> Similarly, I reply whenever I pick up a patch, so you'll know if I've
->> already delt with it.
-> this is still missing in the mainline kernel
+>> We talked about it at the ARM subarchitecture maintainer summit, and I think
+>> I'll just merge your platform code for 3.2 if you send the fixed version
+>> in time. I'm not going to merge your clk support patch (2/5) though, since
 >
-> the at91 ends broken can one of you send a pull with it to Linus
+> Zoltan uses my device tree bindings and multi IRQ handler for the VIC
+> which hasn't yet been merged (and I haven't had any
+> Tested-by/Acked-by's) from anyone other than Zoltan yet.
+>
+> I suppose the device tree binding and multi IRQ handler patches /could/
+> go in without the other platform conversions though they haven't had any
+> time in -next.
+Arnd, Russell,
 
-The pull req will be going out soon.
+What about Jamie's VIC patches ?
+Should I wait for those to get in somehow, or rebase SPMP8000
+to not depend on those ?
 
-g.
+Thanks,
+Zoltan
