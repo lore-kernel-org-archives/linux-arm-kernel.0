@@ -1,104 +1,51 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Wed, 2 Nov 2011 22:19:26 +0100
-Subject: [PATCH] pxa/mioa701: remove machine restart and halt code
-Message-ID: <mailman.202.1320269595.20020.linux-arm-kernel@lists.infradead.org>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 02 Nov 2011 14:34:03 -0700
+Subject: [RFC PATCH 02/34] msm: clock: Always use an array to iterate
+	over clocks
+In-Reply-To: <20111102194555.GE12913@n2100.arm.linux.org.uk>
+References: <1320258991-22325-1-git-send-email-davidb@codeaurora.org>
+	<1320258991-22325-3-git-send-email-davidb@codeaurora.org>
+	<20111102194555.GE12913@n2100.arm.linux.org.uk>
+Message-ID: <4EB1B74B.8060006@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove all machine stop function which freed irq and gpio,
-as this code is not necessary as the reboot are terminal
-events, and won't suffer from a missing free.
+On 11/02/11 12:45, Russell King - ARM Linux wrote:
+> On Wed, Nov 02, 2011 at 11:35:59AM -0700, David Brown wrote:
+>> If the array of clk_lookups contains aliases for the same struct
+>> clk, msm_clock_init() will add the clock to the clocks list
+>> twice.  This would cause list corruption so let's just remove the
+>> clocks list and any associated code and iterate over the array
+>> instead.
+> Hmm...
+>
+>> @@ -158,13 +152,13 @@ void __init msm_clock_init(struct clk_lookup *clock_tbl, unsigned num_clocks)
+>>   */
+>>  static int __init clock_late_init(void)
+>>  {
+>> +	unsigned i, count = 0;
+>>  	unsigned long flags;
+>> -	struct clk *clk;
+>> -	unsigned count = 0;
+>>  
+>>  	clock_debug_init();
+>> -	mutex_lock(&clocks_mutex);
+>> -	list_for_each_entry(clk, &clocks, list) {
+>> +	for (i = 0; i < msm_num_clocks; i++) {
+>> +		struct clk *clk = msm_clocks[i].clk;
+>> +
+>>  		clock_debug_add(clk);
+> This means you'll end up calling clock_debug_add() twice for the same
+> struct clk - this sounds like a bad idea in itself.  It looks like
+> there's no protection within that function against it being called
+> twice with the same struct clk.
+>
+> Are you sure this is safe?
 
-Use the newly available machine descriptor soft_reboot field
-to kill arm_pm_* hooks. This still ensures RTC clock is not
-reset upon reboot.
+This hasn't proven to be a problem so far because debugfs returns an
+error when you create a directory with the same name twice. If we ever
+do something more in clock_debug_add() we would have a problem.
 
-Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
----
- arch/arm/mach-pxa/mioa701.c |   38 +-------------------------------------
- 1 files changed, 1 insertions(+), 37 deletions(-)
-
-diff --git a/arch/arm/mach-pxa/mioa701.c b/arch/arm/mach-pxa/mioa701.c
-index 4bb1c2b..5068439 100644
---- a/arch/arm/mach-pxa/mioa701.c
-+++ b/arch/arm/mach-pxa/mioa701.c
-@@ -332,12 +332,6 @@ err_gpio:
- 	return rc;
- }
- 
--static void gsm_exit(void)
--{
--	free_irq(gpio_to_irq(GPIO25_GSM_MOD_ON_STATE), NULL);
--	gpio_free_array(ARRAY_AND_SIZE(gsm_gpios));
--}
--
- /*
-  * Bluetooth BRF6150 chip
-  *
-@@ -501,15 +495,6 @@ static int __init bootstrap_init(void)
- 	return 0;
- }
- 
--static void bootstrap_exit(void)
--{
--	kfree(save_buffer);
--	unregister_syscore_ops(&mioa701_syscore_ops);
--
--	printk(KERN_CRIT "Unregistering mioa701 suspend will hang next"
--	       "resume !!!\n");
--}
--
- /*
-  * Power Supply
-  */
-@@ -688,20 +673,6 @@ static struct platform_device *devices[] __initdata = {
- 	&mioa701_board,
- };
- 
--static void mioa701_machine_exit(void);
--
--static void mioa701_poweroff(void)
--{
--	mioa701_machine_exit();
--	arm_machine_restart('s', NULL);
--}
--
--static void mioa701_restart(char c, const char *cmd)
--{
--	mioa701_machine_exit();
--	arm_machine_restart('s', cmd);
--}
--
- static struct gpio global_gpios[] = {
- 	{ GPIO9_CHARGE_EN, GPIOF_OUT_INIT_HIGH, "Charger enable" },
- 	{ GPIO18_POWEROFF, GPIOF_OUT_INIT_LOW, "Power Off" },
-@@ -739,8 +710,6 @@ static void __init mioa701_machine_init(void)
- 	pxa_set_keypad_info(&mioa701_keypad_info);
- 	pxa_set_udc_info(&mioa701_udc_info);
- 	pxa_set_ac97_info(&mioa701_ac97_info);
--	pm_power_off = mioa701_poweroff;
--	arm_pm_restart = mioa701_restart;
- 	platform_add_devices(devices, ARRAY_SIZE(devices));
- 	gsm_init();
- 
-@@ -750,12 +719,6 @@ static void __init mioa701_machine_init(void)
- 	pxa_set_camera_info(&mioa701_pxacamera_platform_data);
- }
- 
--static void mioa701_machine_exit(void)
--{
--	bootstrap_exit();
--	gsm_exit();
--}
--
- MACHINE_START(MIOA701, "MIO A701")
- 	.boot_params	= 0xa0000100,
- 	.map_io		= &pxa27x_map_io,
-@@ -763,4 +726,5 @@ MACHINE_START(MIOA701, "MIO A701")
- 	.handle_irq	= &pxa27x_handle_irq,
- 	.init_machine	= mioa701_machine_init,
- 	.timer		= &pxa_timer,
-+	.soft_reboot	= 1,
- MACHINE_END
 -- 
-1.7.5.4
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
