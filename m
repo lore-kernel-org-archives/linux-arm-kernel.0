@@ -1,27 +1,169 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 2 Nov 2011 13:03:01 +0000
-Subject: [PATCH] slub: doc: update the slabinfo.c file path
-In-Reply-To: <1320231836-9555-4-git-send-email-jason.hui@linaro.org>
-References: <1320231836-9555-1-git-send-email-jason.hui@linaro.org>
-	<1320231836-9555-4-git-send-email-jason.hui@linaro.org>
-Message-ID: <20111102130301.GD19187@n2100.arm.linux.org.uk>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Wed, 2 Nov 2011 18:35:05 +0530
+Subject: [PATCH v2] gpio/samsung: Add device tree support for Exynos4
+In-Reply-To: <4EAFAC42.5080607@gmail.com>
+References: <1320108227-2693-1-git-send-email-thomas.abraham@linaro.org>
+	<4EAFAC42.5080607@gmail.com>
+Message-ID: <CAJuYYwSfjg04gaJUgNkUzFNgs5d_7PL9nio-1RwrPizyShTxGQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 02, 2011 at 07:03:54PM +0800, Jason Liu wrote:
-> slabinfo.c has been moved from Documentaion/vm/ to
-> tools/slub/ by commit:0d24db337e6d81c0c620ab65cc6947bd6553f742
-> 
-> Update the slub.txt doc to reflect this change too.
-> 
-> Signed-off-by: Jason Liu <jason.hui@linaro.org>
-> Cc: Christoph Lameter <cl@linux-foundation.org>
+Hi Sylwester,
 
-This patch shouldn't be part of this patch set; there is nothing IMX
-specific with it.  It is purely a stand-alone bug fix and, therefore,
-it should stand completely alone as its own patch.
+On 1 November 2011 13:52, Sylwester Nawrocki <snjw23@gmail.com> wrote:
+> Hi Thomas,
+>
+> thanks for your work on this.
+>
+> On 11/01/2011 01:43 AM, Thomas Abraham wrote:
+>> As gpio chips get registered, a device tree node which represents the
+>> gpio chip is searched and attached to it. A translate function is also
+>> provided to convert the gpio specifier into actual platform settings
+>> for pin function selection, pull up/down and driver strength settings.
+>>
+>> Signed-off-by: Thomas Abraham<thomas.abraham@linaro.org>
+>> Acked-by: Grant Likely<grant.likely@secretlab.ca>
+>> ---
+>> Changes since v1:
+>> - As suggested by Rob and Grant, the gpio controller node lookup is based
+>> ? ?on the base address of the gpio controller instead of the unique
+>> ? ?per-controller compatible property value.
+>>
+>> This patch is based on the following tree and branch.
+>> git://git.linaro.org/git/people/arnd/arm-soc.git ?branch: for-next
+>>
+>> ? .../devicetree/bindings/gpio/gpio-samsung.txt ? ? ?| ? 40 ++++++++++++
+>> ? drivers/gpio/gpio-samsung.c ? ? ? ? ? ? ? ? ? ? ? ?| ? 66 ++++++++++++++++++++
+>> ? 2 files changed, 106 insertions(+), 0 deletions(-)
+>> ? create mode 100644 Documentation/devicetree/bindings/gpio/gpio-samsung.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/gpio/gpio-samsung.txt b/Documentation/devicetree/bindings/gpio/gpio-samsung.txt
+>> new file mode 100644
+>> index 0000000..c143058
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/gpio/gpio-samsung.txt
+>> @@ -0,0 +1,40 @@
+>> +Samsung Exynos4 GPIO Controller
+>> +
+>> +Required properties:
+>> +- compatible: Compatible property value should be "samsung,exynos4-gpio>".
+>> +
+>> +- reg: Physical base address of the controller and length of memory mapped
+>> + ?region.
+>> +
+>> +- #gpio-cells: Should be 4. The syntax of the gpio specifier used by client nodes
+>> + ?should be the following with values derived from the SoC user manual.
+>> +<[phandle of the gpio controller node]
+>> + ? ? ?[pin number within the gpio controller]
+>> + ? ? ?[mux function]
+>> + ? ? ?[pull up/down]
+>> + ? ? ?[drive strength]>
+>> +
+>> + ?Values for gpio specifier:
+>> + ?- Pin number: is a value between 0 to 7.
+>> + ?- Pull Up/Down: 0 - Pull Up/Down Disabled.
+>> + ? ? ? ? ? ? ? ? ?1 - Pull Down Enabled.
+>> + ? ? ? ? ? ? ? ? ?3 - Pull Up Enabled.
+>> + ?- Drive Strength: 0 - 1x,
+>> + ? ? ? ? ? ? ? ? ? ?1 - 3x,
+>> + ? ? ? ? ? ? ? ? ? ?2 - 2x,
+>> + ? ? ? ? ? ? ? ? ? ?3 - 4x
+>
+> I wonder whether it's worth to have more regular mapping, i.e.
+> *) ? ? ?0 - 1x,
+> ? ? ? ?1 - 2x,
+> ? ? ? ?2 - 3x,
+> ? ? ? ?3 - 4x
+>
+> It doesn't give as much advantage, and introduces an overhead of doing
+> an additional remapping. However I find current mapping of the DT specifier
+> values to real driver strength slightly confusing.
+> Perhaps unlikely, the future SoCs could have different meaning of the
+> register values.
 
-You're not even copying it to those who you claim to be doing so in the
-commit log above.
+The dts file describes the hardware and the drive strength values
+listed above are as per the Exynos4 SoC user manual. I would prefer to
+do it the way you suggested, but that would mean dts is not exactly
+matching the hardware manual.
 
-It should be copied to the appropriate people and mailing lists.
+[...]
+
+>> + ? ? };
+>> diff --git a/drivers/gpio/gpio-samsung.c b/drivers/gpio/gpio-samsung.c
+>> index 8662518..0140756 100644
+>> --- a/drivers/gpio/gpio-samsung.c
+>> +++ b/drivers/gpio/gpio-samsung.c
+
+[...]
+
+>> + ? ? if (gc->of_gpio_n_cells< ?4) {
+>> + ? ? ? ? ? ? WARN_ON(1);
+>> + ? ? ? ? ? ? return -EINVAL;
+>> + ? ? }
+>
+> nit: Could be simplified to:
+>
+> ? ? ? ?if (WARN_ON(gc->of_gpio_n_cells < 4))
+> ? ? ? ? ? ? ? ?return -EINVAL;
+
+Ok.
+
+>
+>> +
+>> + ? ? if (n> ?gc->ngpio)
+>> + ? ? ? ? ? ? return -EINVAL;
+>> +
+>> + ? ? s3c_gpio_cfgpin(pin, S3C_GPIO_SFN(be32_to_cpu(gpio[1])));
+>> + ? ? s3c_gpio_setpull(pin, be32_to_cpu(gpio[2]));
+>> + ? ? s5p_gpio_set_drvstr(pin, be32_to_cpu(gpio[3]));
+>
+> The above functions can fail and IMHO ignoring the return value here
+> makes the system harder to debug.
+
+Ok.
+
+>
+> Assuming GPIO drive strength specifier mapping *) the following code could
+> do the remapping (not tested):
+>
+> ? ? ? ?unsigned int tmp = be32_to_cpu(gpio[3]);
+> ? ? ? ?u32 drvstr = ((tmp >> 1) ^ tmp) & 1 ? ~tmp & 3 : tmp;
+>
+> ? ? ? ?s5p_gpio_set_drvstr(pin, drvstr);
+>
+>> + ? ? return n;
+>> +}
+>> +
+>> +static const struct of_device_id exynos4_gpio_dt_match[] __initdata = {
+>> + ? ? { .compatible = "samsung,exynos4-gpio", },
+>> + ? ? {}
+>> +};
+>> +
+>> +static __init void exynos4_gpiolib_attach_ofnode(struct samsung_gpio_chip *chip,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? u64 base, u64 offset)
+>> +{
+>> + ? ? struct gpio_chip *gc =&chip->chip;
+>> + ? ? u64 address;
+>> +
+>> + ? ? if (!of_have_populated_dt())
+>> + ? ? ? ? ? ? return;
+>> +
+>> + ? ? address = (chip->base) ? (base + ((u32)chip->base& ?0xfff)) :
+>> + ? ? ? ? ? ? ? ? ? ? (base + offset);
+>
+> Could the extra parentheses be dropped ?
+
+Can I postpone these changes for now so that this patch gets merged in
+next-samsung-dt branch. I believe these are required changes but could
+be done a little later.
+
+Thanks for your review and comments on this patch.
+
+Regards,
+Thomas.
+
+>
+> --
+> Regards,
+> Sylwester
+>
