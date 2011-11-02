@@ -1,56 +1,36 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Wed,  2 Nov 2011 13:50:43 -0600
-Subject: [PATCH] arm/tegra: Remove code that's ifndef CONFIG_ARM_GIC
-Message-ID: <1320263443-32548-1-git-send-email-swarren@nvidia.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 2 Nov 2011 19:54:04 +0000
+Subject: [PATCH] arm/tegra: add support for tegra30 interrupts
+In-Reply-To: <20111102194827.GF14372@legolas.emea.dhcp.ti.com>
+References: <1320248292-22736-1-git-send-email-pdeschrijver@nvidia.com>
+	<74CDBE0F657A3D45AFBB94109FB122FF173F9A46E5@HQMAIL01.nvidia.com>
+	<74CDBE0F657A3D45AFBB94109FB122FF173F9A4758@HQMAIL01.nvidia.com>
+	<74CDBE0F657A3D45AFBB94109FB122FF173F9A47A7@HQMAIL01.nvidia.com>
+	<20111102192112.GC12913@n2100.arm.linux.org.uk>
+	<20111102192625.GD14372@legolas.emea.dhcp.ti.com>
+	<20111102193947.GD12913@n2100.arm.linux.org.uk>
+	<20111102194827.GF14372@legolas.emea.dhcp.ti.com>
+Message-ID: <20111102195404.GF12913@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-entry-macro.S contains some stale code for chips before Tegra20 that
-apparently didn't use an ARM GIC. All chips supported by mainline use
-an ARM GIC, so rip out the stale code.
+On Wed, Nov 02, 2011 at 09:48:28PM +0200, Felipe Balbi wrote:
+> Hi,
+> 
+> you forgot to comment on the fact that gpio_desc shouldn't be held in an
+> array. Any comments ?
 
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
----
- arch/arm/mach-tegra/include/mach/entry-macro.S |   23 -----------------------
- 1 files changed, 0 insertions(+), 23 deletions(-)
+I did not comment on that because that's someone elses problem.
 
-diff --git a/arch/arm/mach-tegra/include/mach/entry-macro.S b/arch/arm/mach-tegra/include/mach/entry-macro.S
-index dd165c5..485a11e 100644
---- a/arch/arm/mach-tegra/include/mach/entry-macro.S
-+++ b/arch/arm/mach-tegra/include/mach/entry-macro.S
-@@ -15,7 +15,6 @@
- #include <mach/iomap.h>
- #include <mach/io.h>
- 
--#if defined(CONFIG_ARM_GIC)
- #define HAVE_GET_IRQNR_PREAMBLE
- #include <asm/hardware/entry-macro-gic.S>
- 
-@@ -32,25 +31,3 @@
- 
- 	.macro  arch_ret_to_user, tmp1, tmp2
- 	.endm
--#else
--	/* legacy interrupt controller for AP16 */
--	.macro	disable_fiq
--	.endm
--
--	.macro	get_irqnr_preamble, base, tmp
--	@ enable imprecise aborts
--	cpsie	a
--	@ EVP base at 0xf010f000
--	mov \base, #0xf0000000
--	orr \base, #0x00100000
--	orr \base, #0x0000f000
--	.endm
--
--	.macro	arch_ret_to_user, tmp1, tmp2
--	.endm
--
--	.macro	get_irqnr_and_base, irqnr, irqstat, base, tmp
--	ldr \irqnr, [\base, #0x20]	@ EVT_IRQ_STS
--	cmp \irqnr, #0x80
--	.endm
--#endif
--- 
-1.7.0.4
+> What I mean is that, just like irq_descs, we should be able to allocate
+> them dynamically. Maybe, just like irq_descs, hold them in a radix tree
+> and maybe even have a matching API "gpio_alloc_descs()".
+
+Probably - I expect Grant would really like to see some patches along
+those lines.  As I say, someone elses problem.
+
+But what is _our_ problem is what to do with all the ARCH_NR_GPIOs
+that we have now, and stop them increasing.  There is a trivial solution
+to that which I outlined which can be used until GPIO gets something
+along your idea - and which doesn't involve me having to argue with
+those who think that the kernel should remain as small as possible.
