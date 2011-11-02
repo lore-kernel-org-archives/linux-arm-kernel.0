@@ -1,63 +1,96 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 2 Nov 2011 12:37:30 +0000
-Subject: [PATCH 5/5] ARM: restart: only perform setup for restart when
-	soft-restarting
-In-Reply-To: <20111102121159.GF645@mudshark.cambridge.arm.com>
-References: <20111101160731.GQ19187@n2100.arm.linux.org.uk>
-	<E1RLGuL-0005If-Od@rmk-PC.arm.linux.org.uk>
-	<20111102121159.GF645@mudshark.cambridge.arm.com>
-Message-ID: <20111102123730.GA19187@n2100.arm.linux.org.uk>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 02 Nov 2011 21:44:54 +0900
+Subject: Exynos4: Enable device tree support for GIC controller
+In-Reply-To: <1320109289-2730-1-git-send-email-thomas.abraham@linaro.org>
+References: <1320109289-2730-1-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <005901cc995d$38ca44d0$aa5ece70$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 02, 2011 at 12:12:00PM +0000, Will Deacon wrote:
-> Hi Russell,
+Thomas Abraham wrote:
 > 
-> On Tue, Nov 01, 2011 at 04:09:49PM +0000, Russell King - ARM Linux wrote:
-> > We only need to set the system up for a soft-restart if we're going to
-> > be doing a soft-restart.  Provide a new function (soft_restart()) which
-> > does the setup and final call for this, and make platforms use it.
-> > Eliminate the call to setup_restart() from the default handler.
-> > 
-> > This means that platforms arch_reset() function is no longer called with
-> > the page tables prepared for a soft-restart, and caches will still be
-> > enabled.
-> > 
-> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> > ---
-> >  arch/arm/include/asm/system.h                     |    1 +
-> >  arch/arm/kernel/process.c                         |   10 +++++++---
-> >  arch/arm/mach-clps711x/include/mach/system.h      |    2 +-
-> >  arch/arm/mach-ebsa110/include/mach/system.h       |    2 +-
-> >  arch/arm/mach-footbridge/include/mach/system.h    |    2 +-
-> >  arch/arm/mach-iop32x/include/mach/system.h        |    2 +-
-> >  arch/arm/mach-iop33x/include/mach/system.h        |    2 +-
-> >  arch/arm/mach-ixp4xx/include/mach/system.h        |    2 +-
-> >  arch/arm/mach-ks8695/include/mach/system.h        |    2 +-
-> >  arch/arm/mach-mmp/include/mach/system.h           |    4 ++--
-> >  arch/arm/mach-mxs/system.c                        |    2 +-
-> >  arch/arm/mach-nuc93x/include/mach/system.h        |    2 +-
-> >  arch/arm/mach-pnx4008/include/mach/system.h       |    2 +-
-> >  arch/arm/mach-pxa/reset.c                         |    2 +-
-> >  arch/arm/mach-rpc/include/mach/system.h           |    2 +-
-> >  arch/arm/mach-s3c2410/include/mach/system-reset.h |    4 ++--
-> >  arch/arm/mach-s3c64xx/include/mach/system.h       |    2 +-
-> >  arch/arm/mach-sa1100/include/mach/system.h        |    2 +-
-> >  arch/arm/mach-shmobile/include/mach/system.h      |    2 +-
-> >  arch/arm/mach-w90x900/include/mach/system.h       |    2 +-
-> >  arch/arm/plat-mxc/system.c                        |    2 +-
-> >  arch/arm/plat-spear/include/plat/system.h         |    2 +-
-> >  22 files changed, 30 insertions(+), 25 deletions(-)
+> Changes since v1:
+> - Dropped device tree support for interrupt combiner controller from this
+patchset.
+>   Some rework in the interrupt combiner controller code is required to
+address
+>   the irq domain related comments from Grant Likely and hence those
+changes will
+>   be in another patchset.
+> - As suggested by Grant Likely, linux virq number 0 is left unused.
 > 
-> Which branch is this patch taken against? I'm getting conflicts if I try to
-> apply it against mainline, next, 3.1 or your devel branch.
+> This patchset adds device tree support for GIC controller in Exynos4 SoC.
+> 
+> Patch 1 moves the statically mapped timer irqs 11 to 15 to the end of the
+> statically mapped linux irq space for Exynos4 platforms.
+> 
+> For Exynos4 platforms, the five hardware timer irqs are connected to GIC
+> at some hardware irq number (in exynos it is GIC_ID 69 to 73 for five
+timers).
+> When any of these hardware interrupt occurs, its interrupt handler calls
+> generic_handle_irq() with linux irq number 11/12/13/14/15 for timer
+0/1/2/3/4
+> as the parameter. The code that needs to be notified about the timer
+interrupts
+> would have already registered its handler for either of the interrupts 11
+to 15.
+> 
+> Instead of using linux irq number 11 to 15 to which consumers of timer
+interrupt
+> attach their handler, this interrupt range is moved to the end of linux
+irq
+> space used. So there will be no interrupts statically mapped between 0 to
+31.
+> 
+> The GIC hardware interrupts, which were previously statically mapped to
+> start from linux irq 32 are now moved to start from linux irq 0. In case
+of
+> exynos, GIC_ID[0] (which is SGI[0]) which was previously at linux irq 32,
+will
+> not be at linux irq 0. This was required to use Rob Herring's GIC OF
+bindings
+> patches for Exynos4.
+> 
+> Patch 2 adds a interceptor for all ioremap calls targeted towards any of
+the
+> statically remapped memory region. This was required because the GIC OF
+> binding's patchset ioremaps the GIC memory-mapped regions in the
+gic_of_init()
+> function. Without this patch, there would be two separate remap for GIC
+> controller, one statically remapped and the other dynamically remapped by
+the
+> gic_of_init() function. The patch will eventually be superseded by Nicolas
+> Pitre's vmalloc patch series.
+> 
+> Patch 3 adds device tree support for GIC controllers on Exynos4. For GIC
+> controller, this patch is based on Rob Herring's,
+> "[PATCH 0/3] GIC OF bindings" patchset.
+> 
+> This patchset is based on the following tree:
+> git://git.linaro.org/git/people/arnd/arm-soc.git   branch: for-next
+> 
+> Thomas Abraham (3):
+>   ARM: Exynos4: Move timer irq numbers to end of linux irq space
+>   ARM: Exynos4: Add ioremap interceptor for statically remapped regions
+>   ARM: Exynos4: Enable conversion of GIC dt irq specifier to linux virq
+> 
+>  arch/arm/mach-exynos4/cpu.c                      |   33
+> +++++++++++++++++++++-
+>  arch/arm/mach-exynos4/include/mach/entry-macro.S |    1 -
+>  arch/arm/mach-exynos4/include/mach/io.h          |    5 +++
+>  arch/arm/mach-exynos4/include/mach/irqs.h        |    8 +++--
+>  arch/arm/mach-s5p64x0/include/mach/irqs.h        |    2 +
+>  arch/arm/mach-s5pc100/include/mach/irqs.h        |    2 +
+>  arch/arm/mach-s5pv210/include/mach/irqs.h        |    2 +
+>  arch/arm/plat-samsung/include/plat/irqs.h        |    3 +-
+>  8 files changed, 50 insertions(+), 6 deletions(-)
 
-It's at some random point during the merge window at the moment.
+Looks ok to me, I replaced previous patches with this series.
 
-It's probably going to be a good idea to wait until after the merge window
-closes before tackling this stuff seriously, because things are still
-changing quite quickly - eg, we have new platforms merged last night which
-wouldn't have been updated with these patches.
+Thanks.
 
-I'd suggest not rushing this; we'll have a full 2-3 months before they
-can be merged into mainline.
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
