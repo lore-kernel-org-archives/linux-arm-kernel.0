@@ -1,91 +1,76 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 02 Nov 2011 21:44:54 +0900
-Subject: Exynos4: Enable device tree support for GIC controller
-In-Reply-To: <1320109289-2730-1-git-send-email-thomas.abraham@linaro.org>
-References: <1320109289-2730-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <005901cc995d$38ca44d0$aa5ece70$%kim@samsung.com>
+Date: Wed, 02 Nov 2011 21:45:06 +0900
+Subject: [PATCH v2 0/2] ARM: Samsung: Add basic device tree support for
+	Exynos4 boards
+In-Reply-To: <1320109613-2811-1-git-send-email-thomas.abraham@linaro.org>
+References: <1320109613-2811-1-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <005a01cc995d$3fe56bf0$bfb043d0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Thomas Abraham wrote:
 > 
 > Changes since v1:
-> - Dropped device tree support for interrupt combiner controller from this
-patchset.
->   Some rework in the interrupt combiner controller code is required to
-address
->   the irq domain related comments from Grant Likely and hence those
-changes will
->   be in another patchset.
-> - As suggested by Grant Likely, linux virq number 0 is left unused.
+> - Removed unique per-controller compatible string value from gpio
+controller
+> nodes
+>   to align with the updated device tree support for exynos4 gpio
+controller.
+> - Removed the interrupt combiner controller node.
 > 
-> This patchset adds device tree support for GIC controller in Exynos4 SoC.
+> This patchset adds a new basic device tree enabled machine/board file
+which is
+> based on the Samsung's Exynos4 family of SoC's. Also included in this
+patchset
+> is the
+> dts file for Exynos4210 SoC, Samsung's SMDKV310 board and Insignal's
+Origen
+> board.
 > 
-> Patch 1 moves the statically mapped timer irqs 11 to 15 to the end of the
-> statically mapped linux irq space for Exynos4 platforms.
+> The Exynos4210 dts file includes support for IRQ, GPIO, WDT, RTC, UART,
+SDHCI,
+> Keypad,
+> DMA and I2C controllers. As device tree coverage for Exynos4210 increases,
+> additional
+> device nodes to represent the controllers should be added.
 > 
-> For Exynos4 platforms, the five hardware timer irqs are connected to GIC
-> at some hardware irq number (in exynos it is GIC_ID 69 to 73 for five
-timers).
-> When any of these hardware interrupt occurs, its interrupt handler calls
-> generic_handle_irq() with linux irq number 11/12/13/14/15 for timer
-0/1/2/3/4
-> as the parameter. The code that needs to be notified about the timer
-interrupts
-> would have already registered its handler for either of the interrupts 11
-to 15.
-> 
-> Instead of using linux irq number 11 to 15 to which consumers of timer
-interrupt
-> attach their handler, this interrupt range is moved to the end of linux
-irq
-> space used. So there will be no interrupts statically mapped between 0 to
-31.
-> 
-> The GIC hardware interrupts, which were previously statically mapped to
-> start from linux irq 32 are now moved to start from linux irq 0. In case
-of
-> exynos, GIC_ID[0] (which is SGI[0]) which was previously at linux irq 32,
-will
-> not be at linux irq 0. This was required to use Rob Herring's GIC OF
-bindings
-> patches for Exynos4.
-> 
-> Patch 2 adds a interceptor for all ioremap calls targeted towards any of
+> The device tree enabled machine file enables boot on two boards based on
 the
-> statically remapped memory region. This was required because the GIC OF
-> binding's patchset ioremaps the GIC memory-mapped regions in the
-gic_of_init()
-> function. Without this patch, there would be two separate remap for GIC
-> controller, one statically remapped and the other dynamically remapped by
-the
-> gic_of_init() function. The patch will eventually be superseded by Nicolas
-> Pitre's vmalloc patch series.
+> Exynos4210 SoC. This provides a starting point to add additional device
+tree
+> support
+> on these boards, migrate other existing Exynos4 based boards to use device
+tree
+> and enable device tree based boot on new upcoming boards.
 > 
-> Patch 3 adds device tree support for GIC controllers on Exynos4. For GIC
-> controller, this patch is based on Rob Herring's,
-> "[PATCH 0/3] GIC OF bindings" patchset.
+> This patchset has been tested on the following tree:
+> git://git.linaro.org/git/people/arnd/arm-soc.git  branch: for-next
 > 
-> This patchset is based on the following tree:
-> git://git.linaro.org/git/people/arnd/arm-soc.git   branch: for-next
+> Thomas Abraham (2):
+>   ARM: Samsung: Add Exynos4 device tree enabled board file
+>   ARM: dts: Add intial dts file for Exynos4210 SoC, SMDKV310 and Origen
+board
 > 
-> Thomas Abraham (3):
->   ARM: Exynos4: Move timer irq numbers to end of linux irq space
->   ARM: Exynos4: Add ioremap interceptor for statically remapped regions
->   ARM: Exynos4: Enable conversion of GIC dt irq specifier to linux virq
-> 
->  arch/arm/mach-exynos4/cpu.c                      |   33
-> +++++++++++++++++++++-
->  arch/arm/mach-exynos4/include/mach/entry-macro.S |    1 -
->  arch/arm/mach-exynos4/include/mach/io.h          |    5 +++
->  arch/arm/mach-exynos4/include/mach/irqs.h        |    8 +++--
->  arch/arm/mach-s5p64x0/include/mach/irqs.h        |    2 +
->  arch/arm/mach-s5pc100/include/mach/irqs.h        |    2 +
->  arch/arm/mach-s5pv210/include/mach/irqs.h        |    2 +
->  arch/arm/plat-samsung/include/plat/irqs.h        |    3 +-
->  8 files changed, 50 insertions(+), 6 deletions(-)
+>  .../devicetree/bindings/arm/insignal-boards.txt    |    8 +
+>  .../devicetree/bindings/arm/samsung-boards.txt     |    8 +
+>  arch/arm/boot/dts/exynos4210-origen.dts            |  137 +++++++
+>  arch/arm/boot/dts/exynos4210-smdkv310.dts          |  182 +++++++++
+>  arch/arm/boot/dts/exynos4210.dtsi                  |  397
+> ++++++++++++++++++++
+>  arch/arm/mach-exynos4/Kconfig                      |   14 +
+>  arch/arm/mach-exynos4/Makefile                     |    2 +
+>  arch/arm/mach-exynos4/mach-exynos4-dt.c            |   85 +++++
+>  8 files changed, 833 insertions(+), 0 deletions(-)
+>  create mode 100644
+Documentation/devicetree/bindings/arm/insignal-boards.txt
+>  create mode 100644
+Documentation/devicetree/bindings/arm/samsung-boards.txt
+>  create mode 100644 arch/arm/boot/dts/exynos4210-origen.dts
+>  create mode 100644 arch/arm/boot/dts/exynos4210-smdkv310.dts
+>  create mode 100644 arch/arm/boot/dts/exynos4210.dtsi
+>  create mode 100644 arch/arm/mach-exynos4/mach-exynos4-dt.c
 
-Looks ok to me, I replaced previous patches with this series.
+OK. replaced with this in next-samsung-dt branch.
 
 Thanks.
 
