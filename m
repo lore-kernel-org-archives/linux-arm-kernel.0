@@ -1,67 +1,33 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Wed, 2 Nov 2011 09:45:11 +0200
-Subject: [GIT PULL] hwspinlock changes for 3.2
-In-Reply-To: <CAK=WgbZso1qk5XUTjB1bLXYbezv80SbgyEXJ3Q32U28+cQMfZA@mail.gmail.com>
-References: <CAK=WgbZso1qk5XUTjB1bLXYbezv80SbgyEXJ3Q32U28+cQMfZA@mail.gmail.com>
-Message-ID: <CAK=Wgbb9yfFeubc8jfTe5urMz4WoCpOL=LwP9=Lr7mYaWrt1Vw@mail.gmail.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Wed, 2 Nov 2011 08:46:06 +0100 (CET)
+Subject: [RFC 0/5] restart cleanups
+In-Reply-To: <1676495226.4381981320219764753.JavaMail.root@zimbra20-e3.priv.proxad.net>
+Message-ID: <2088587985.4382541320219966553.JavaMail.root@zimbra20-e3.priv.proxad.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 30, 2011 at 10:06 PM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
-> Please pull from
->
-> git://git.kernel.org/pub/scm/linux/kernel/git/ohad/hwspinlock.git for-linus
-...
-> All of the patches have been tested in linux-next and currently there
-> are no merge conflicts, though I expect one to happen with the arm-sco
-> tree, as reported (and fixed) by Stephen earlier this month (see
-> http://www.spinics.net/lists/linux-next/msg16931.html).
+----- Mail Original -----
+De: "Russell King - ARM Linux" <linux@arm.linux.org.uk>
+> We do have this problem - mioa701 - which insists on doing things like
+> kfree, free_irq, gpio_free in this path, which is a bad idea as it can
+True. You mean gsm_exit() and bootstrap_exit() I think.
+These were added to free resources in a shutdown. If freeing is pointless,
+in a reboot case, and stale resources don't matter, well, we can kill these
+2 functions.
 
-Now that arm-soc is merged, I fixed the conflict with the hwspinlock
-tree and pushed it (just for reference) at:
+> However, we don't know whether removing the code will then prevent it
+> rebooting even for a userspace-invoked reboot.  We need feedback from
+> the platform maintainer for that (added Philipp and Robert in the
+> hope one of them can answer this - and maybe send a patch to fix it.)
+I'll try to test the patch serie this evening after my daywork,
+and give feedback.
 
-git://git.kernel.org/pub/scm/linux/kernel/git/ohad/hwspinlock.git
-for-linus-merged
+The main facts of mioa701 board regarding halting/rebooting:
+ - watchdog reset kills RTC time
+ - there is no GPIO reset (which would preserve time, sic ...)
+ - mioa701 is based on PXA272 (arm v5)
 
-There also seems to be a (trivial) omap_hsmmc build issue which I've
-fixed and pushed to that branch (Chris I'm also attaching it below in
-case you prefer to take it through the mmc tree).
+Cheers.
 
-> the hwspinlock
-> tree and its upstream path have only materialized quite late in the
-> cycle (see https://lkml.org/lkml/2011/9/21/249)
-
-Linus, in the aforementioned thread, Arnd, Tony and Linus W preferred
-that I send you direct pull requests for hwspinlock changes, but were
-also ok with other upstream paths (e.g. through the arm-soc or the
-omap trees), so please express your preference :) I don't expect much
-hwspinlock activity anytime soon (at least not until we'll get either
-c6x support or additional u8500 functionality).
-
-Thanks,
-Ohad.
-
-commit f6e49189a11622f8675bd386db560309a05e581a
-Author: Ohad Ben-Cohen <ohad@wizery.com>
-Date:   Wed Nov 2 08:57:23 2011 +0200
-
-    mmc: omap_hsmmc: fix build
-
-    Fix omap_hsmmc build issue that was introduced by commit a3c76eb
-    "mmc: replace printk with appropriate display macro".
-
-    Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
-
-diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
-index e8ff123..101cd31 100644
---- a/drivers/mmc/host/omap_hsmmc.c
-+++ b/drivers/mmc/host/omap_hsmmc.c
-@@ -1270,7 +1270,7 @@ static void omap_hsmmc_protect_card(struct omap_hsmmc_host
-                }
-        } else {
-                if (!host->protect_card) {
--                       pr_info"%s: cover is open, "
-+                       pr_info("%s: cover is open, "
-                                         "card is now inaccessible\n",
-                                         mmc_hostname(host->mmc));
-                        host->protect_card = 1;
+--
+Robert
