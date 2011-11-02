@@ -1,55 +1,63 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 2 Nov 2011 12:12:00 +0000
-Subject: [PATCH 5/5] ARM: restart: only perform setup for restart when
-	soft-restarting
-In-Reply-To: <E1RLGuL-0005If-Od@rmk-PC.arm.linux.org.uk>
-References: <20111101160731.GQ19187@n2100.arm.linux.org.uk>
-	<E1RLGuL-0005If-Od@rmk-PC.arm.linux.org.uk>
-Message-ID: <20111102121159.GF645@mudshark.cambridge.arm.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 02 Nov 2011 21:12:49 +0900
+Subject: [PATCH V6] SDHCI: S3C: Use generic clock names for sdhci bus clock
+	options
+In-Reply-To: <1320039876-21148-1-git-send-email-rajeshwari.s@samsung.com>
+References: <1320039876-21148-1-git-send-email-rajeshwari.s@samsung.com>
+Message-ID: <005301cc9958$bcf5aa10$36e0fe30$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+Rajeshwari Shinde wrote:
+> 
+> This patch modifies the driver to stop depending on the clock names
+> being passed from the platform and switch over to bus clock lookup
+> using generic clock names.
+> 
+> V6 Changes:
+> Changed sprintf to snprintf as suggested by Chris Ball.
+> 
+> Signed-off-by: Rajeshwari Shinde <rajeshwari.s@samsung.com>
 
-On Tue, Nov 01, 2011 at 04:09:49PM +0000, Russell King - ARM Linux wrote:
-> We only need to set the system up for a soft-restart if we're going to
-> be doing a soft-restart.  Provide a new function (soft_restart()) which
-> does the setup and final call for this, and make platforms use it.
-> Eliminate the call to setup_restart() from the default handler.
-> 
-> This means that platforms arch_reset() function is no longer called with
-> the page tables prepared for a soft-restart, and caches will still be
-> enabled.
-> 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Acked-by: Kukjin Kim <kgene.kim@samsung.com>
+
+Hi Chirs,
+
+Could you please pick this up in your tree for this merge window?
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
+
 > ---
->  arch/arm/include/asm/system.h                     |    1 +
->  arch/arm/kernel/process.c                         |   10 +++++++---
->  arch/arm/mach-clps711x/include/mach/system.h      |    2 +-
->  arch/arm/mach-ebsa110/include/mach/system.h       |    2 +-
->  arch/arm/mach-footbridge/include/mach/system.h    |    2 +-
->  arch/arm/mach-iop32x/include/mach/system.h        |    2 +-
->  arch/arm/mach-iop33x/include/mach/system.h        |    2 +-
->  arch/arm/mach-ixp4xx/include/mach/system.h        |    2 +-
->  arch/arm/mach-ks8695/include/mach/system.h        |    2 +-
->  arch/arm/mach-mmp/include/mach/system.h           |    4 ++--
->  arch/arm/mach-mxs/system.c                        |    2 +-
->  arch/arm/mach-nuc93x/include/mach/system.h        |    2 +-
->  arch/arm/mach-pnx4008/include/mach/system.h       |    2 +-
->  arch/arm/mach-pxa/reset.c                         |    2 +-
->  arch/arm/mach-rpc/include/mach/system.h           |    2 +-
->  arch/arm/mach-s3c2410/include/mach/system-reset.h |    4 ++--
->  arch/arm/mach-s3c64xx/include/mach/system.h       |    2 +-
->  arch/arm/mach-sa1100/include/mach/system.h        |    2 +-
->  arch/arm/mach-shmobile/include/mach/system.h      |    2 +-
->  arch/arm/mach-w90x900/include/mach/system.h       |    2 +-
->  arch/arm/plat-mxc/system.c                        |    2 +-
->  arch/arm/plat-spear/include/plat/system.h         |    2 +-
->  22 files changed, 30 insertions(+), 25 deletions(-)
-
-Which branch is this patch taken against? I'm getting conflicts if I try to
-apply it against mainline, next, 3.1 or your devel branch.
-
-Thanks,
-
-Will
+>  drivers/mmc/host/sdhci-s3c.c |    7 ++-----
+>  1 files changed, 2 insertions(+), 5 deletions(-)
+> 
+> diff --git a/drivers/mmc/host/sdhci-s3c.c b/drivers/mmc/host/sdhci-s3c.c
+> index 82709b6..488223c 100644
+> --- a/drivers/mmc/host/sdhci-s3c.c
+> +++ b/drivers/mmc/host/sdhci-s3c.c
+> @@ -435,14 +435,11 @@ static int __devinit sdhci_s3c_probe(struct
+> platform_device *pdev)
+> 
+>  	for (clks = 0, ptr = 0; ptr < MAX_BUS_CLK; ptr++) {
+>  		struct clk *clk;
+> -		char *name = pdata->clocks[ptr];
+> -
+> -		if (name == NULL)
+> -			continue;
+> +		char name[14];
+> 
+> +		snprintf(name, 14, "mmc_busclk.%d", ptr);
+>  		clk = clk_get(dev, name);
+>  		if (IS_ERR(clk)) {
+> -			dev_err(dev, "failed to get clock %s\n", name);
+>  			continue;
+>  		}
+> 
+> --
+> 1.7.4.4
