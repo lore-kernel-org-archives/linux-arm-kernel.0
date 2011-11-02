@@ -1,66 +1,45 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 2 Nov 2011 18:07:58 +0000
-Subject: [PATCH v7 16/16] ARM: LPAE: Add the Kconfig entries
-In-Reply-To: <20111102172142.GB12913@n2100.arm.linux.org.uk>
-References: <1312988619-16804-1-git-send-email-catalin.marinas@arm.com>
-	<1312988619-16804-17-git-send-email-catalin.marinas@arm.com>
-	<20111102172142.GB12913@n2100.arm.linux.org.uk>
-Message-ID: <20111102180758.GK29782@arm.com>
+From: ccross@android.com (Colin Cross)
+Date: Wed, 2 Nov 2011 11:13:59 -0700
+Subject: [PATCH] arm/tegra: add support for tegra30 interrupts
+In-Reply-To: <1320248292-22736-1-git-send-email-pdeschrijver@nvidia.com>
+References: <1320248292-22736-1-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <CAMbhsRQ7JwzQDmFYf7frwfBvvtkUqdENkmrxtMLRvb-PFbixiw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 02, 2011 at 05:21:42PM +0000, Russell King - ARM Linux wrote:
-> On Wed, Aug 10, 2011 at 04:03:39PM +0100, Catalin Marinas wrote:
-> > +config ARCH_DMA_ADDR_T_64BIT
-> > +	def_bool ARM_LPAE
-> > +
-> 
-> I think this should be selected only when we have a DMA engine supporting
-> 64-bit addresses.  Technically LPAE itself doesn't give us that assurance.
-> 
-> If you have this kind of a setup:
-> 
-> CPU <==++==> RAM
->        ||
->      IOMMU
->        |
->    DMA device
-> 
-> where == and || means >32-bit addressing, and | means 32-bit addressing.
+On Wed, Nov 2, 2011 at 8:38 AM, Peter De Schrijver
+<pdeschrijver@nvidia.com> wrote:
+> Tegra30 has 1 extra legacy interrupt controller. Use the GIC ITLinesNumber
+> field to determine how many interrupt controllers we have and initialize
+> appropriately. Also make room for the extra tegra30 interrupts by moving
+> the GPIO IRQ base. This shouldn't affect existing code as it determines the
+> correct IRQ number for GPIOs using TEGRA_GPIO_TO_IRQ()
+>
+> Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
+> ---
+> ?arch/arm/mach-tegra/include/mach/iomap.h | ? ?3 +++
+> ?arch/arm/mach-tegra/include/mach/irqs.h ?| ? 14 +++++++-------
+> ?arch/arm/mach-tegra/irq.c ? ? ? ? ? ? ? ?| ? 15 ++++++++++-----
+> ?3 files changed, 20 insertions(+), 12 deletions(-)
+>
 
-That's one configuration but there are other configurations with PCI
-devices that can access 64-bit addresses without requiring an IOMMU.
+<snip>
 
-> In such a setup, having dma_addr_t be 64-bit is pointless because it
-> should never see 64-bit addresses (the DMA API should deal with the
-> IOMMU and provide a list of DMA addresses to be placed into RAM for
-> the DMA device which takes account of the mappings setup in the IOMMU.)
-> 
-> So, I think 64-bit dma_addr_t should be a property of the DMA devices
-> present in the system rather than whether the CPUs MMU can deal with
-> >32-bit addresses or not.
+> diff --git a/arch/arm/mach-tegra/irq.c b/arch/arm/mach-tegra/irq.c
+> index 8ad82af..aad335b 100644
+> --- a/arch/arm/mach-tegra/irq.c
+> +++ b/arch/arm/mach-tegra/irq.c
+<snip>
+> @@ -112,8 +114,12 @@ static int tegra_retrigger(struct irq_data *d)
+> ?void __init tegra_init_irq(void)
+> ?{
+> ? ? ? ?int i;
+> + ? ? ? void __iomem *distbase;
+> +
+> + ? ? ? distbase = IO_ADDRESS(TEGRA_ARM_INT_DIST_BASE);
+> + ? ? ? num_ictlrs = readl_relaxed(distbase + GIC_DIST_CTR) & 0x1f;
 
-I agree, that's a property of the device but it doesn't mean that we
-can't have a dma_addr_t as u64.
+Check num_ictlrs against ARRAY_SIZE(ictlr_reg_base)
 
-The current DMA allocator uses pages that can be placed anywhere if the
-mask is 0xffffffff, so just making this type u32 does not change such
-allocation, just ignoring the top bits of the bus address. What I think
-we need for this case is GFP_DMA32, assuming that ZONE_DMA32 is set up:
-
-diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index e4e7f6c..a51026b 100644
---- a/arch/arm/mm/dma-mapping.c
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -81,6 +81,8 @@ static struct page *__dma_alloc_buffer(struct device *dev, size_t size, gfp_t gf
- 
- 	if (mask < 0xffffffffULL)
- 		gfp |= GFP_DMA;
-+	else if (mask == 0xffffffffULL)
-+		gfp |= GFP_DMA32;
- 
- 	page = alloc_pages(gfp, order);
- 	if (!page)
-
--- 
-Catalin
+Other than that:
+Acked-by: Colin Cross <ccross@android.com>
