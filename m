@@ -1,49 +1,34 @@
 From: javi.merino@arm.com (Javi Merino)
-Date: Wed,  2 Nov 2011 14:30:57 +0000
-Subject: [PATCH 2/4] ARM: PL330: Only register usable channels
+Date: Wed,  2 Nov 2011 14:30:58 +0000
+Subject: [PATCH 3/4] ARM: PL330: Fix the size of the dst_cache_ctrl field
 In-Reply-To: <1320244259-10496-1-git-send-email-javi.merino@arm.com>
 References: <1320244259-10496-1-git-send-email-javi.merino@arm.com>
-Message-ID: <1320244259-10496-2-git-send-email-javi.merino@arm.com>
+Message-ID: <1320244259-10496-3-git-send-email-javi.merino@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the manager is running non-secure, the only channels that can
-issue interrupts are the ones that have a 1 in their corresponding bit
-in Configuration Register 3. The other ones will generate an abort
-when trying to signal the end of the transaction so they are useless
-in non-secure mode.
+dst_cache_ctrl affects bits 3, 1 and 0 of AWCACHE but it is a 3-bit
+field in the Channel Control Register (see Table 3-21 of the DMA-330
+Technical Reference Manual) and should be programmed as such.
 
 Signed-off-by: Javi Merino <javi.merino@arm.com>
 Cc: Jassi Brar <jassi.brar@samsung.com>
 ---
- arch/arm/common/pl330.c |    8 +++++++-
- 1 files changed, 7 insertions(+), 1 deletions(-)
+ arch/arm/include/asm/hardware/pl330.h |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/common/pl330.c b/arch/arm/common/pl330.c
-index 842bab0..590fd57 100644
---- a/arch/arm/common/pl330.c
-+++ b/arch/arm/common/pl330.c
-@@ -1623,6 +1623,11 @@ static inline int _alloc_event(struct pl330_thread *thrd)
- 	return -1;
- }
- 
-+static bool is_non_secure_chan(const struct pl330_info *pi, int i)
-+{
-+	return pi->pcfg.irq_ns & (1 << i);
-+}
-+
- /* Upon success, returns IdentityToken for the
-  * allocated channel, NULL otherwise.
-  */
-@@ -1647,7 +1652,8 @@ void *pl330_request_channel(const struct pl330_info *pi)
- 
- 	for (i = 0; i < chans; i++) {
- 		thrd = &pl330->channels[i];
--		if (thrd->free) {
-+		if ((thrd->free) && (!_manager_ns(thrd) ||
-+					is_non_secure_chan(pi, i))) {
- 			thrd->ev = _alloc_event(thrd);
- 			if (thrd->ev >= 0) {
- 				thrd->free = false;
+diff --git a/arch/arm/include/asm/hardware/pl330.h b/arch/arm/include/asm/hardware/pl330.h
+index 575fa81..c182138 100644
+--- a/arch/arm/include/asm/hardware/pl330.h
++++ b/arch/arm/include/asm/hardware/pl330.h
+@@ -41,7 +41,7 @@ enum pl330_dstcachectrl {
+ 	DCCTRL1, /* Bufferable only */
+ 	DCCTRL2, /* Cacheable, but do not allocate */
+ 	DCCTRL3, /* Cacheable and bufferable, but do not allocate */
+-	DINVALID1 = 8,
++	DINVALID1,              /* AWCACHE = 0x1000 */
+ 	DINVALID2,
+ 	DCCTRL6, /* Cacheable write-through, allocate on writes only */
+ 	DCCTRL7, /* Cacheable write-back, allocate on writes only */
 -- 
 1.7.0.4
