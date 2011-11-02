@@ -1,49 +1,42 @@
-From: jason.hui@linaro.org (Jason Liu)
-Date: Wed, 2 Nov 2011 19:03:56 +0800
-Subject: [PATCH v3 3/3] ARM:i.MX: fix the compile warnings in clock-mx51-mx53.c
-In-Reply-To: <1320231836-9555-1-git-send-email-jason.hui@linaro.org>
-References: <1320231836-9555-1-git-send-email-jason.hui@linaro.org>
-Message-ID: <1320231836-9555-6-git-send-email-jason.hui@linaro.org>
+From: padma.v@samsung.com (Padmavathi Venna)
+Date: Wed, 02 Nov 2011 17:06:40 -0400
+Subject: [PATCH V4 0/4] Add SPI clkdev support
+Message-ID: <1320268004-4545-1-git-send-email-padma.v@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-arch/arm/mach-mx5/clock-mx51-mx53.c: In function 'clk_get_freq_dt':
-arch/arm/mach-mx5/clock-mx51-mx53.c:1640: warning: unused variable 'np'
-arch/arm/mach-mx5/clock-mx51-mx53.c: In function 'mx53_clocks_init_dt':
-arch/arm/mach-mx5/clock-mx51-mx53.c:1673: warning: 'ckil' is used uninitialized in this function
-arch/arm/mach-mx5/clock-mx51-mx53.c:1673: warning: 'osc' is used uninitialized in this function
-arch/arm/mach-mx5/clock-mx51-mx53.c:1673: warning: 'ckih1' is used uninitialized in this function
-arch/arm/mach-mx5/clock-mx51-mx53.c:1673: warning: 'ckih2' is used uninitialized in this function
-arch/arm/mach-mx5/clock-mx51-mx53.c: In function 'mx51_clocks_init_dt':
-arch/arm/mach-mx5/clock-mx51-mx53.c:1665: warning: 'ckil' is used uninitialized in this function
-arch/arm/mach-mx5/clock-mx51-mx53.c:1665: warning: 'osc' is used uninitialized in this function
-arch/arm/mach-mx5/clock-mx51-mx53.c:1665: warning: 'ckih1' is used uninitialized in this function
-arch/arm/mach-mx5/clock-mx51-mx53.c:1665: warning: 'ckih2' is used uninitialized in this function
+This patchset modifies the existing clkdev to make SPI driver
+independent of the clock names send from platform data. This
+patches enables the SPI driver to request SPI bus clocks
+using generic connection ID.
 
-Signed-off-by: Jason Liu <jason.hui@linaro.org>
----
- arch/arm/mach-mx5/clock-mx51-mx53.c |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+Link to V1:
+        http://www.spinics.net/lists/arm-kernel/msg141671.html
 
-diff --git a/arch/arm/mach-mx5/clock-mx51-mx53.c b/arch/arm/mach-mx5/clock-mx51-mx53.c
-index 7c373b83..e352a5a 100644
---- a/arch/arm/mach-mx5/clock-mx51-mx53.c
-+++ b/arch/arm/mach-mx5/clock-mx51-mx53.c
-@@ -1662,6 +1662,7 @@ int __init mx51_clocks_init_dt(void)
- {
- 	unsigned long ckil, osc, ckih1, ckih2;
- 
-+	ckil = osc = ckih1 = ckih2 = 0;
- 	clk_get_freq_dt(&ckil, &osc, &ckih1, &ckih2);
- 	return mx51_clocks_init(ckil, osc, ckih1, ckih2);
- }
-@@ -1670,6 +1671,7 @@ int __init mx53_clocks_init_dt(void)
- {
- 	unsigned long ckil, osc, ckih1, ckih2;
- 
-+	ckil = osc = ckih1 = ckih2 = 0;
- 	clk_get_freq_dt(&ckil, &osc, &ckih1, &ckih2);
- 	return mx53_clocks_init(ckil, osc, ckih1, ckih2);
- }
--- 
-1.7.4.1
+V2 Changes:
+        -Add newly introduced CLKDEV_INIT macro for creating clk_lookup
+        structure as suggested by Russell King
+        V2 patches series are:
+        http://www.spinics.net/lists/arm-kernel/msg142733.html
+
+V3 Changes:
+        -Reworked the patches as per the following link. Patch series in
+        the following link removed & and , from the macro declaration and added
+        in the macro defination.
+        http://www.spinics.net/lists/arm-kernel/msg143663.html
+
+V4 Changes:
+	Rebased to next-samsung-dt.
+
+Padmavathi Venna (4):
+  ARM: S3C64XX: Add SPI clkdev support
+  ARM: S5PC100: Add SPI clkdev support
+  ARM: S5P64X0: Add SPI clkdev support
+  ARM: S5PV210: Add SPI clkdev support
+
+ arch/arm/mach-s3c64xx/clock.c         |   80 +++++++++++++--------
+ arch/arm/mach-s5p64x0/clock-s5p6440.c |   61 ++++++++---------
+ arch/arm/mach-s5p64x0/clock-s5p6450.c |   49 ++++++++-----
+ arch/arm/mach-s5pc100/clock.c         |  124 +++++++++++++++++++--------------
+ arch/arm/mach-s5pv210/clock.c         |   50 ++++++++-----
+ 5 files changed, 210 insertions(+), 154 deletions(-)
