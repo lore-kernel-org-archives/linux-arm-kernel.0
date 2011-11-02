@@ -1,107 +1,275 @@
 From: davidb@codeaurora.org (David Brown)
-Date: Wed,  2 Nov 2011 11:36:29 -0700
-Subject: [RFC PATCH 32/34] msm: clock-8x60: Add local control of vpe_axi_clk
-	and vpe_axi_clk
+Date: Wed,  2 Nov 2011 11:36:28 -0700
+Subject: [RFC PATCH 31/34] msm: clock: Remove msm_clk_soc_init()
 In-Reply-To: <1320258991-22325-1-git-send-email-davidb@codeaurora.org>
 References: <1320258991-22325-1-git-send-email-davidb@codeaurora.org>
-Message-ID: <1320258991-22325-33-git-send-email-davidb@codeaurora.org>
+Message-ID: <1320258991-22325-32-git-send-email-davidb@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Matt Wagantall <mattw@codeaurora.org>
+From: Stephen Boyd <sboyd@codeaurora.org>
 
-The MAXI_EN2 register is no longer owned by the RPM. Add local
-control of the VPE and Rotator AXI clocks which are in it.
+Every board file calls msm_clock_init() to initialize the clocks
+and msm_clock_init() in turn calls msm_clk_soc_init() to do any
+SoC specific initialization. Invert the call order so that boards
+that require SoC specific initialization call the SoC specific
+function first which then calls the generic msm_clock_init().
 
-Signed-off-by: Matt Wagantall <mattw@codeaurora.org>
+This removes one more obstacle in the path of multi-arch kernels
+in mach-msm.
+
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 Signed-off-by: David Brown <davidb@codeaurora.org>
 ---
- arch/arm/mach-msm/clock-8x60.c |   19 ++++++++++++++++---
- 1 files changed, 16 insertions(+), 3 deletions(-)
+ arch/arm/mach-msm/board-msm7x30.c      |    2 +-
+ arch/arm/mach-msm/board-msm8960.c      |    2 +-
+ arch/arm/mach-msm/board-msm8x60.c      |    2 +-
+ arch/arm/mach-msm/clock-7x30.c         |    7 ++++---
+ arch/arm/mach-msm/clock-8960.c         |    9 ++++-----
+ arch/arm/mach-msm/clock-8x60.c         |    7 ++++---
+ arch/arm/mach-msm/clock.c              |    3 ---
+ arch/arm/mach-msm/clock.h              |   11 +++++------
+ arch/arm/mach-msm/devices.h            |   10 +---------
+ arch/arm/mach-msm/include/mach/board.h |    2 --
+ 10 files changed, 21 insertions(+), 34 deletions(-)
 
+diff --git a/arch/arm/mach-msm/board-msm7x30.c b/arch/arm/mach-msm/board-msm7x30.c
+index 71de506..c4fdace40 100644
+--- a/arch/arm/mach-msm/board-msm7x30.c
++++ b/arch/arm/mach-msm/board-msm7x30.c
+@@ -117,7 +117,7 @@ static void __init msm7x30_init(void)
+ static void __init msm7x30_map_io(void)
+ {
+ 	msm_map_msm7x30_io();
+-	msm_clock_init(msm_clocks_7x30, msm_num_clocks_7x30);
++	msm7x30_clock_init();
+ }
+ 
+ MACHINE_START(MSM7X30_SURF, "QCT MSM7X30 SURF")
+diff --git a/arch/arm/mach-msm/board-msm8960.c b/arch/arm/mach-msm/board-msm8960.c
+index 28eb287..a363a16 100644
+--- a/arch/arm/mach-msm/board-msm8960.c
++++ b/arch/arm/mach-msm/board-msm8960.c
+@@ -55,7 +55,7 @@ static void __init msm8960_map_io(void)
+ 
+ static void __init msm8960_init_early(void)
+ {
+-	msm_clock_init(msm_clocks_8960, msm_num_clocks_8960);
++	msm8960_clock_init();
+ }
+ 
+ static void __init msm8960_init_irq(void)
+diff --git a/arch/arm/mach-msm/board-msm8x60.c b/arch/arm/mach-msm/board-msm8x60.c
+index f034bf5..fce150e 100644
+--- a/arch/arm/mach-msm/board-msm8x60.c
++++ b/arch/arm/mach-msm/board-msm8x60.c
+@@ -55,7 +55,7 @@ static void __init msm8x60_map_io(void)
+ 
+ static void __init msm8x60_init_early(void)
+ {
+-	msm_clock_init(msm_clocks_8x60, msm_num_clocks_8x60);
++	msm8660_clock_init();
+ }
+ 
+ static void __init msm8x60_init_irq(void)
+diff --git a/arch/arm/mach-msm/clock-7x30.c b/arch/arm/mach-msm/clock-7x30.c
+index 019fdea..de303b4 100644
+--- a/arch/arm/mach-msm/clock-7x30.c
++++ b/arch/arm/mach-msm/clock-7x30.c
+@@ -2862,8 +2862,7 @@ static struct clk_local_ownership {
+ 		O(GLBL), BIT(8) },
+ };
+ 
+-struct clk_lookup msm_clocks_7x30[ARRAY_SIZE(ownership_map)];
+-unsigned msm_num_clocks_7x30 = ARRAY_SIZE(msm_clocks_7x30);
++static struct clk_lookup msm_clocks_7x30[ARRAY_SIZE(ownership_map)];
+ 
+ static void __init set_clock_ownership(void)
+ {
+@@ -2927,7 +2926,7 @@ static const struct reg_init {
+ };
+ 
+ /* Local clock driver initialization. */
+-void __init msm_clk_soc_init(void)
++void __init msm7x30_clock_init(void)
+ {
+ 	int i;
+ 	u32 val;
+@@ -2965,6 +2964,8 @@ void __init msm_clk_soc_init(void)
+ 	clk_set_rate(&lpa_codec_clk.c, 1);
+ 	/* Sync the GRP2D clock to AXI */
+ 	clk_set_rate(&grp_2d_clk.c, 1);
++
++	msm_clock_init(msm_clocks_7x30, ARRAY_SIZE(msm_clocks_7x30));
+ }
+ 
+ /*
+diff --git a/arch/arm/mach-msm/clock-8960.c b/arch/arm/mach-msm/clock-8960.c
+index d885644..4590e7a 100644
+--- a/arch/arm/mach-msm/clock-8960.c
++++ b/arch/arm/mach-msm/clock-8960.c
+@@ -3578,7 +3578,7 @@ static struct clk measure_clk = {
+ 	CLK_INIT(measure_clk),
+ };
+ 
+-struct clk_lookup msm_clocks_8960[] = {
++static struct clk_lookup msm_clocks_8960[] = {
+ 	CLK_LOOKUP("cxo",		cxo_clk.c,		NULL),
+ 	CLK_LOOKUP("pll2",		pll2_clk.c,		NULL),
+ 	CLK_LOOKUP("pll8",		pll8_clk.c,		NULL),
+@@ -3752,8 +3752,6 @@ struct clk_lookup msm_clocks_8960[] = {
+ 	CLK_LOOKUP("iommu_clk",		gfx2d1_clk.c,		"msm_iommu.11"),
+ };
+ 
+-unsigned msm_num_clocks_8960 = ARRAY_SIZE(msm_clocks_8960);
+-
+ /*
+  * Miscellaneous clock register initializations
+  */
+@@ -3892,9 +3890,8 @@ static int wr_pll_clk_enable(struct clk *clk)
+ 	return 0;
+ }
+ 
+-
+ /* Local clock driver initialization. */
+-void __init msm_clk_soc_init(void)
++void __init msm8960_clock_init(void)
+ {
+ 	soc_update_sys_vdd = msm8960_update_sys_vdd;
+ 	local_vote_sys_vdd(HIGH);
+@@ -3922,6 +3919,8 @@ void __init msm_clk_soc_init(void)
+ 	rcg_clk_disable(&pdm_clk.c);
+ 	rcg_clk_enable(&tssc_clk.c);
+ 	rcg_clk_disable(&tssc_clk.c);
++
++	msm_clock_init(msm_clocks_8960, ARRAY_SIZE(msm_clocks_8960));
+ }
+ 
+ static int __init msm_clk_soc_late_init(void)
 diff --git a/arch/arm/mach-msm/clock-8x60.c b/arch/arm/mach-msm/clock-8x60.c
-index 201c478..21c2472 100644
+index 4f999d2..201c478 100644
 --- a/arch/arm/mach-msm/clock-8x60.c
 +++ b/arch/arm/mach-msm/clock-8x60.c
-@@ -122,6 +122,7 @@
- #define JPEGD_CC_REG				REG_MM(0x00A4)
- #define JPEGD_NS_REG				REG_MM(0x00AC)
- #define MAXI_EN_REG				REG_MM(0x0018)
-+#define MAXI_EN2_REG				REG_MM(0x0020)
- #define MAXI_EN3_REG				REG_MM(0x002C)
- #define MDP_CC_REG				REG_MM(0x00C0)
- #define MDP_MD0_REG				REG_MM(0x00C4)
-@@ -603,24 +604,32 @@ static struct branch_clk vfe_axi_clk = {
- 
- static struct branch_clk rot_axi_clk = {
- 	.b = {
-+		.ctl_reg = MAXI_EN2_REG,
-+		.en_mask = BIT(24),
- 		.reset_reg = SW_RESET_AXI_REG,
- 		.reset_mask = BIT(6),
-+		.halt_reg = DBG_BUS_VEC_E_REG,
-+		.halt_bit = 2,
- 	},
- 	.c = {
- 		.dbg_name = "rot_axi_clk",
--		.ops = &clk_ops_reset,
-+		.ops = &clk_ops_branch,
- 		CLK_INIT(rot_axi_clk.c),
- 	},
+@@ -3348,7 +3348,7 @@ static struct measure_clk measure_clk = {
+ 	.multiplier = 1,
  };
  
- static struct branch_clk vpe_axi_clk = {
- 	.b = {
-+		.ctl_reg = MAXI_EN2_REG,
-+		.en_mask = BIT(26),
- 		.reset_reg = SW_RESET_AXI_REG,
- 		.reset_mask = BIT(15),
-+		.halt_reg = DBG_BUS_VEC_E_REG,
-+		.halt_bit = 1,
- 	},
- 	.c = {
- 		.dbg_name = "vpe_axi_clk",
--		.ops = &clk_ops_reset,
-+		.ops = &clk_ops_branch,
- 		CLK_INIT(vpe_axi_clk.c),
- 	},
+-struct clk_lookup msm_clocks_8x60[] = {
++static struct clk_lookup msm_clocks_8x60[] = {
+ 	CLK_LOOKUP("cxo",		cxo_clk.c,	NULL),
+ 	CLK_LOOKUP("pll4",		pll4_clk.c,	NULL),
+ 	CLK_LOOKUP("pll4",		pll4_clk.c,	"peripheral-reset"),
+@@ -3518,7 +3518,6 @@ struct clk_lookup msm_clocks_8x60[] = {
+ 	CLK_LOOKUP("sc1_mclk",		sc1_m_clk, NULL),
+ 	CLK_LOOKUP("l2_mclk",		l2_m_clk,  NULL),
  };
-@@ -2545,6 +2554,7 @@ static struct rcg_clk rot_clk = {
- 	.set_rate = set_rate_div_banked,
- 	.freq_tbl = clk_tbl_rot,
- 	.bank_masks = &bdiv_info_rot,
-+	.depends = &rot_axi_clk.c,
- 	.current_freq = &local_dummy_freq,
- 	.c = {
- 		.dbg_name = "rot_clk",
-@@ -2767,6 +2777,7 @@ static struct rcg_clk vpe_clk = {
- 	.ns_mask = (BM(15, 12) | BM(2, 0)),
- 	.set_rate = set_rate_nop,
- 	.freq_tbl = clk_tbl_vpe,
-+	.depends = &vpe_axi_clk.c,
- 	.current_freq = &local_dummy_freq,
- 	.c = {
- 		.dbg_name = "vpe_clk",
-@@ -3154,8 +3165,10 @@ static struct measure_sel measure_mux[] = {
- 	{ TEST_MM_HS(0x13), &imem_axi_clk.c },
- 	{ TEST_MM_HS(0x14), &jpegd_axi_clk.c },
- 	{ TEST_MM_HS(0x15), &mdp_axi_clk.c },
-+	{ TEST_MM_HS(0x16), &rot_axi_clk.c },
- 	{ TEST_MM_HS(0x17), &vcodec_axi_clk.c },
- 	{ TEST_MM_HS(0x18), &vfe_axi_clk.c },
-+	{ TEST_MM_HS(0x19), &vpe_axi_clk.c },
- 	{ TEST_MM_HS(0x1A), &mdp_clk.c },
- 	{ TEST_MM_HS(0x1B), &rot_clk.c },
- 	{ TEST_MM_HS(0x1C), &vpe_clk.c },
-@@ -3566,7 +3579,7 @@ static void __init reg_init(void)
- 	 * support it. Also set FORCE_CORE_ON bits, and any sleep and wake-up
- 	 * delays to safe values. */
- 	rmwreg(0x000207F9, MAXI_EN_REG,  0x0FFFFFFF);
--	/* MAXI_EN2_REG is owned by the RPM.  Don't touch it. */
-+	writel_relaxed(0x7027FCFF, MAXI_EN2_REG);
- 	writel_relaxed(0x3FE7FCFF, MAXI_EN3_REG);
- 	writel_relaxed(0x000001D8, SAXI_EN_REG);
+-unsigned msm_num_clocks_8x60 = ARRAY_SIZE(msm_clocks_8x60);
  
+ /*
+  * Miscellaneous clock register initializations
+@@ -3620,7 +3619,7 @@ static void __init reg_init(void)
+ }
+ 
+ /* Local clock driver initialization. */
+-void __init msm_clk_soc_init(void)
++void __init msm8660_clock_init(void)
+ {
+ 	soc_update_sys_vdd = msm8660_update_sys_vdd;
+ 	local_vote_sys_vdd(HIGH);
+@@ -3643,6 +3642,8 @@ void __init msm_clk_soc_init(void)
+ 	rcg_clk_disable(&pdm_clk.c);
+ 	rcg_clk_enable(&tssc_clk.c);
+ 	rcg_clk_disable(&tssc_clk.c);
++
++	msm_clock_init(msm_clocks_8x60, ARRAY_SIZE(msm_clocks_8x60));
+ }
+ 
+ static int __init msm_clk_soc_late_init(void)
+diff --git a/arch/arm/mach-msm/clock.c b/arch/arm/mach-msm/clock.c
+index 7daadb1..fbbc973 100644
+--- a/arch/arm/mach-msm/clock.c
++++ b/arch/arm/mach-msm/clock.c
+@@ -186,9 +186,6 @@ void __init msm_clock_init(struct clk_lookup *clock_tbl, size_t num_clocks)
+ {
+ 	unsigned n;
+ 
+-	/* Do SoC-speficic clock init operations. */
+-	msm_clk_soc_init();
+-
+ 	for (n = 0; n < num_clocks; n++) {
+ 		struct clk *clk = clock_tbl[n].clk;
+ 		struct clk *parent = clk_get_parent(clk);
+diff --git a/arch/arm/mach-msm/clock.h b/arch/arm/mach-msm/clock.h
+index a873a19..6c4b332 100644
+--- a/arch/arm/mach-msm/clock.h
++++ b/arch/arm/mach-msm/clock.h
+@@ -20,6 +20,7 @@
+ #include <linux/init.h>
+ #include <linux/list.h>
+ #include <linux/spinlock.h>
++#include <linux/clkdev.h>
+ #include <mach/clk.h>
+ 
+ #define CLKFLAG_INVERT			0x00000001
+@@ -68,12 +69,10 @@ struct clk {
+ 	.children = LIST_HEAD_INIT((name).children), \
+ 	.siblings = LIST_HEAD_INIT((name).siblings)
+ 
+-#if defined(CONFIG_ARCH_MSM7X30) || defined(CONFIG_ARCH_MSM8X60) || \
+-defined(CONFIG_ARCH_MSM8960)
+-void __init msm_clk_soc_init(void);
+-#else
+-static inline void __init msm_clk_soc_init(void) { }
+-#endif
++void msm_clock_init(struct clk_lookup *clock_tbl, size_t num_clocks);
++void msm7x30_clock_init(void);
++void msm8660_clock_init(void);
++void msm8960_clock_init(void);
+ 
+ #ifdef CONFIG_DEBUG_FS
+ int __init clock_debug_init(void);
+diff --git a/arch/arm/mach-msm/devices.h b/arch/arm/mach-msm/devices.h
+index b4d56d5..e4d5abe 100644
+--- a/arch/arm/mach-msm/devices.h
++++ b/arch/arm/mach-msm/devices.h
+@@ -17,6 +17,7 @@
+ #define __ARCH_ARM_MACH_MSM_DEVICES_H
+ 
+ #include <linux/clkdev.h>
++#include <linux/platform_device.h>
+ 
+ #include "clock.h"
+ 
+@@ -49,16 +50,7 @@ extern struct platform_device msm_device_mdp;
+ extern struct clk_lookup msm_clocks_7x01a[];
+ extern unsigned msm_num_clocks_7x01a;
+ 
+-extern struct clk_lookup msm_clocks_7x30[];
+-extern unsigned msm_num_clocks_7x30;
+-
+ extern struct clk_lookup msm_clocks_8x50[];
+ extern unsigned msm_num_clocks_8x50;
+ 
+-extern struct clk_lookup msm_clocks_8x60[];
+-extern unsigned msm_num_clocks_8x60;
+-
+-extern struct clk_lookup msm_clocks_8960[];
+-extern unsigned msm_num_clocks_8960;
+-
+ #endif
+diff --git a/arch/arm/mach-msm/include/mach/board.h b/arch/arm/mach-msm/include/mach/board.h
+index 1e4c50e..699461b 100644
+--- a/arch/arm/mach-msm/include/mach/board.h
++++ b/arch/arm/mach-msm/include/mach/board.h
+@@ -40,8 +40,6 @@ extern struct sys_timer msm_timer;
+ void __init msm_add_devices(void);
+ void __init msm_map_common_io(void);
+ void __init msm_init_irq(void);
+-void __init msm_init_gpio(void);
+-void __init msm_clock_init(struct clk_lookup *clock_tbl, size_t num_clocks);
+ void __init msm_acpu_clock_init(struct msm_acpu_clock_platform_data *);
+ int __init msm_add_sdcc(unsigned int controller,
+ 			struct msm_mmc_platform_data *plat,
 -- 
 Sent by an employee of the Qualcomm Innovation Center, Inc.
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
