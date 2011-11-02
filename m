@@ -1,42 +1,24 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 2 Nov 2011 13:40:24 +0000
-Subject: [PATCHv2 02/10] ARM: vic: MULTI_IRQ_HANDLER handler
-In-Reply-To: <20110929093009.GM17204@pulham.picochip.com>
-References: <1317206507-18867-1-git-send-email-jamie@jamieiles.com>
-	<1317206507-18867-3-git-send-email-jamie@jamieiles.com>
-	<20110928203905.GB2838@ponder.secretlab.ca>
-	<CACRpkdZKns-GraGp-YMD6jzOPETkvEpt9bC8HcYUmf3JUyCV3A@mail.gmail.com>
-	<20110929093009.GM17204@pulham.picochip.com>
-Message-ID: <20111102134024.GE19187@n2100.arm.linux.org.uk>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Wed, 02 Nov 2011 14:43:27 +0100
+Subject: [PATCH] [TRIVIAL] ARM: imx: Fix typo
+	'MACH_MX31_3DS_MXC_NAND_USE_BBT'
+In-Reply-To: <alpine.LNX.2.00.1111021433220.348@pobox.suse.cz>
+References: <1318421062.2336.4.camel@x61.thuisdomein>
+	<alpine.LNX.2.00.1110311110370.3541@pobox.suse.cz>
+	<CAOMZO5DZ6KYa_SLVavorPPyV_Ggspa4Cae+eK7oj1mh=O4J4+w@mail.gmail.com>
+	<alpine.LNX.2.00.1111021433220.348@pobox.suse.cz>
+Message-ID: <1320241407.14409.212.camel@x61.thuisdomein>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 29, 2011 at 10:30:09AM +0100, Jamie Iles wrote:
-> +#ifdef CONFIG_MULTI_IRQ_HANDLER
-> +static void vic_single_handle_irq(struct vic_device *vic, struct pt_regs *regs)
-> +{
-> +	u32 stat, irq;
-> +
-> +	stat = readl_relaxed(vic->base + VIC_IRQ_STATUS);
-> +	while (stat) {
-> +		irq = ffs(stat) - 1;
-> +		handle_IRQ(irq_domain_to_irq(&vic->domain, irq), regs);
-> +		stat &= ~(1 << irq);
-> +	}
-> +}
-> +
-> +asmlinkage void __exception_irq_entry vic_handle_irq(struct pt_regs *regs)
-> +{
-> +	int i;
-> +
-> +	for (i = 0; i < vic_id; ++i)
-> +		vic_single_handle_irq(&vic_devices[i], regs);
-> +}
+On Wed, 2011-11-02 at 14:34 +0100, Jiri Kosina wrote:
+> Thank you, I will be appplying it.
 
-And if we receive another interrupt after the read of the register, we'll
-have to exit all the way back (possibly to userspace) before re-entering
-the IRQ handling paths back to this point to process it.
+By now this is already in mainline (commit 5328ecbb, Signed-off-by:
+Sascha Hauer). This was apparently committed to a tree run by Sascha
+before my resend of a few days ago. I don't recall ever seeing a message
+that Sascha took it, though.
 
-Is there any particular reason folk are destroying the built-in efficiency
-of the IRQ handling which is common-place in the existing assembly
-approach?
+
+
+Paul Bolle
