@@ -1,47 +1,34 @@
 From: davidb@codeaurora.org (David Brown)
-Date: Wed,  2 Nov 2011 11:36:30 -0700
-Subject: [RFC PATCH 33/34] ARM: msm: fix names of UART clocks
+Date: Wed,  2 Nov 2011 11:36:31 -0700
+Subject: [RFC PATCH 34/34] msm_serial: fix clock rate on DMA-based uarts
 In-Reply-To: <1320258991-22325-1-git-send-email-davidb@codeaurora.org>
 References: <1320258991-22325-1-git-send-email-davidb@codeaurora.org>
-Message-ID: <1320258991-22325-34-git-send-email-davidb@codeaurora.org>
+Message-ID: <1320258991-22325-35-git-send-email-davidb@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Earlier code for MSM uarts had three separate drivers, one for the old
-"legacy" hardware, one for the new DMA-based hardware, and a third
-that used the DMA-based hardware in a legacy-compatible mode.
-
-The current msm_serial driver handles both the older hardware and the
-DMA-based hardware in non-DMA mode from the same driver.  Rename the
-clocks for this device to support this usage.
+The driver explicitly requests a clock rate for the UART, but it is
+off by a factor of four from the dividers that it programs into the
+UART.  Fix this by setting the rate to 1/4 of the current value.
 
 Signed-off-by: David Brown <davidb@codeaurora.org>
 ---
- arch/arm/mach-msm/clock-8x60.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+ drivers/tty/serial/msm_serial.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-msm/clock-8x60.c b/arch/arm/mach-msm/clock-8x60.c
-index 21c2472..f398bd7 100644
---- a/arch/arm/mach-msm/clock-8x60.c
-+++ b/arch/arm/mach-msm/clock-8x60.c
-@@ -3378,7 +3378,7 @@ static struct clk_lookup msm_clocks_8x60[] = {
- 	CLK_LOOKUP("gsbi_uart_clk",	gsbi9_uart_clk.c, "msm_serial_hsl.1"),
- 	CLK_LOOKUP("gsbi_uart_clk",	gsbi10_uart_clk.c,	NULL),
- 	CLK_LOOKUP("gsbi_uart_clk",	gsbi11_uart_clk.c,	NULL),
--	CLK_LOOKUP("gsbi_uart_clk",	gsbi12_uart_clk.c, "msm_serial_hsl.0"),
-+	CLK_LOOKUP("gsbi_uart_clk",	gsbi12_uart_clk.c, "msm_serial.0"),
- 	CLK_LOOKUP("spi_clk",		gsbi1_qup_clk.c, "spi_qsd.0"),
- 	CLK_LOOKUP("gsbi_qup_clk",	gsbi2_qup_clk.c,		NULL),
- 	CLK_LOOKUP("gsbi_qup_clk",	gsbi3_qup_clk.c, "qup_i2c.0"),
-@@ -3425,7 +3425,7 @@ static struct clk_lookup msm_clocks_8x60[] = {
- 	CLK_LOOKUP("spi_pclk",		gsbi10_p_clk.c, "spi_qsd.1"),
- 	CLK_LOOKUP("gsbi_pclk",		gsbi11_p_clk.c,		NULL),
- 	CLK_LOOKUP("gsbi_pclk",		gsbi12_p_clk.c, "msm_dsps.0"),
--	CLK_LOOKUP("gsbi_pclk",		gsbi12_p_clk.c, "msm_serial_hsl.0"),
-+	CLK_LOOKUP("gsbi_pclk",		gsbi12_p_clk.c, "msm_serial.0"),
- 	CLK_LOOKUP("gsbi_pclk",		gsbi12_p_clk.c, "qup_i2c.5"),
- 	CLK_LOOKUP("ppss_pclk",		ppss_p_clk.c,		NULL),
- 	CLK_LOOKUP("tsif_pclk",		tsif_p_clk.c,		NULL),
+diff --git a/drivers/tty/serial/msm_serial.c b/drivers/tty/serial/msm_serial.c
+index 29cbfd8..b7baceb 100644
+--- a/drivers/tty/serial/msm_serial.c
++++ b/drivers/tty/serial/msm_serial.c
+@@ -891,7 +891,7 @@ static int __init msm_serial_probe(struct platform_device *pdev)
+ 			return PTR_ERR(msm_port->clk);
+ 
+ 	if (msm_port->is_uartdm)
+-		clk_set_rate(msm_port->clk, 7372800);
++		clk_set_rate(msm_port->clk, 1843200);
+ 
+ 	port->uartclk = clk_get_rate(msm_port->clk);
+ 	printk(KERN_INFO "uartclk = %d\n", port->uartclk);
 -- 
 Sent by an employee of the Qualcomm Innovation Center, Inc.
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
