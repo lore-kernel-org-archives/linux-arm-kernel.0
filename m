@@ -1,33 +1,36 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Tue, 1 Nov 2011 16:14:30 -0700
-Subject: [GIT PULL] msm fix: fixup machine_desc missed in merge
-Message-ID: <20111101231429.GA3446@huya.qualcomm.com>
+From: axel.lin@gmail.com (Axel Lin)
+Date: Wed, 02 Nov 2011 09:40:11 +0800
+Subject: [PATCH] ARM: OMAP2+: l3-noc: Include linux/module.h
+Message-ID: <1320198011.9065.1.camel@phoenix>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit b4beb4bf9934d151bf4581a54ae028927374cb2a:
+Include linux/module.h to fix below build error:
 
-  Merge branch 'for-linus/i2c-3.2' of git://git.fluff.org/bjdooks/linux (2011-11-01 15:07:19 -0700)
+  CC      arch/arm/mach-omap2/omap_l3_noc.o
+arch/arm/mach-omap2/omap_l3_noc.c:240: error: expected ',' or ';' before 'MODULE_DEVICE_TABLE'
+arch/arm/mach-omap2/omap_l3_noc.c:250: error: 'THIS_MODULE' undeclared here (not in a function)
+make[1]: *** [arch/arm/mach-omap2/omap_l3_noc.o] Error 1
+make: *** [arch/arm/mach-omap2] Error 2
 
-are available in the git repository at:
+Signed-off-by: Axel Lin <axel.lin@gmail.com>
+---
+I got the build error by make omap2plus_defconfig on linux-next 20111101.
 
-  git://codeaurora.org/quic/kernel/davidb/linux-msm.git msm-fix
+ arch/arm/mach-omap2/omap_l3_noc.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-Stephen Boyd (1):
-      msm: boards: Fix fallout from removal of machine_desc in fixup
-
- arch/arm/mach-msm/board-msm7x30.c |    4 ++--
- arch/arm/mach-msm/board-msm8960.c |    4 ++--
- arch/arm/mach-msm/board-msm8x60.c |    4 ++--
- 3 files changed, 6 insertions(+), 6 deletions(-)
-
+diff --git a/arch/arm/mach-omap2/omap_l3_noc.c b/arch/arm/mach-omap2/omap_l3_noc.c
+index c8b1bef..6a66aa5 100644
+--- a/arch/arm/mach-omap2/omap_l3_noc.c
++++ b/arch/arm/mach-omap2/omap_l3_noc.c
+@@ -20,6 +20,7 @@
+  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307
+  * USA
+  */
++#include <linux/module.h>
+ #include <linux/init.h>
+ #include <linux/io.h>
+ #include <linux/platform_device.h>
 -- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111101/fbb05118/attachment.sig>
+1.7.5.4
