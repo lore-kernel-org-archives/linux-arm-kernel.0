@@ -1,48 +1,45 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 02 Nov 2011 20:57:20 +0900
-Subject: [PATCH] ARM: SAMSUNG: Fix compile error due to kfree
-In-Reply-To: <1319838312-8205-1-git-send-email-jhbird.choi@gmail.com>
-References: <1319838312-8205-1-git-send-email-jhbird.choi@gmail.com>
-Message-ID: <004e01cc9956$93ad7f40$bb087dc0$%kim@samsung.com>
+Date: Wed, 02 Nov 2011 21:03:38 +0900
+Subject: [PATCH 1/3 v3.1] ARM: S3C64XX: Update for conversion to
+	SAMSUNG_GPIO_EXTRA
+In-Reply-To: <1320086573-21184-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+References: <1320086573-21184-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+Message-ID: <004f01cc9957$74c87340$5e5959c0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-jhbird.choi at gmail.com wrote:
+Mark Brown wrote:
 > 
-> From: Jonghwan Choi <jhbird.choi@gmail.com>
+> The conversion of the S3C64XX GPIOs to the generic Samsung GPIOs mean that
+> rather than using the previous S3C24XX_GPIO_EXTRA configuration the driver
+> now uses SAMSUNG_GPIO_EXTRA.
 > 
-> Fix  implicit declaration of function 'kfree'
+> Since SAMSUNG_GPIO_EXTRA requires the arch to include the extra space in
+> ARCH_NR_GPIOs add it on to BOARD_NR_GPIOs (in case boards are relying on
+> the existing reservation).
 > 
-> Signed-off-by: Jonghwan Choi <jhbird.choi@gmail.com>
+> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
 > ---
->  arch/arm/plat-samsung/dev-backlight.c |    1 +
->  1 files changed, 1 insertions(+), 0 deletions(-)
+>  arch/arm/mach-s3c64xx/include/mach/gpio.h |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
 > 
-> diff --git a/arch/arm/plat-samsung/dev-backlight.c
-b/arch/arm/plat-samsung/dev-
-> backlight.c
-> index 3cedd4c..2adbeae 100644
-> --- a/arch/arm/plat-samsung/dev-backlight.c
-> +++ b/arch/arm/plat-samsung/dev-backlight.c
-> @@ -14,6 +14,7 @@
->  #include <linux/platform_device.h>
->  #include <linux/io.h>
->  #include <linux/pwm_backlight.h>
-> +#include <linux/slab.h>
+> diff --git a/arch/arm/mach-s3c64xx/include/mach/gpio.h b/arch/arm/mach-
+> s3c64xx/include/mach/gpio.h
+> index 6e34c2f..090c497 100644
+> --- a/arch/arm/mach-s3c64xx/include/mach/gpio.h
+> +++ b/arch/arm/mach-s3c64xx/include/mach/gpio.h
+> @@ -88,6 +88,6 @@ enum s3c_gpio_number {
+>  /* define the number of gpios we need to the one after the GPQ() range */
+>  #define GPIO_BOARD_START (S3C64XX_GPQ(S3C64XX_GPIO_Q_NR) + 1)
 > 
->  #include <plat/devs.h>
->  #include <plat/gpio-cfg.h>
+> -#define BOARD_NR_GPIOS 16
+> +#define BOARD_NR_GPIOS (16 + CONFIG_SAMSUNG_GPIO_EXTRA)
+> 
+>  #define ARCH_NR_GPIOS	(GPIO_BOARD_START + BOARD_NR_GPIOS)
 > --
-> 1.7.0.4
+> 1.7.7.1
 
-Yes, applied.
-
-But would be better if you could add description in detail......
-
-Fix following build error.
-    arch/arm/plat-samsung/dev-backlight.c: In function 'samsung_bl_set':
-    arch/arm/plat-samsung/dev-backlight.c:145: error: implicit declaration
-of function 'kfree'
+Yes, agree. BTW, what's the 'v3.1' in title?
 
 Thanks.
 
