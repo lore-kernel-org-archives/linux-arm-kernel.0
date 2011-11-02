@@ -1,46 +1,217 @@
-From: omar.ramirez@ti.com (Ramirez Luna, Omar)
-Date: Wed, 2 Nov 2011 09:56:28 -0500
-Subject: [PATCH v3 0/4] OMAP: iommu: hwmod support and runtime PM
-In-Reply-To: <1320185752-568-1-git-send-email-omar.ramirez@ti.com>
-References: <1320185752-568-1-git-send-email-omar.ramirez@ti.com>
-Message-ID: <CAB-zwWiTA7O4CiP7HmY3hEA3sZ-05FbR0WsA1NVJD4aExE5wow@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 2 Nov 2011 14:59:03 +0000
+Subject: AT91 reboot code
+In-Reply-To: <CAFumwP2m7=QsMTGAafPJs2ekm0R5FqCg8QxbOESBCq5r1PQkrA@mail.gmail.com>
+References: <20111101144058.GP19187@n2100.arm.linux.org.uk>
+	<CAFumwP2m7=QsMTGAafPJs2ekm0R5FqCg8QxbOESBCq5r1PQkrA@mail.gmail.com>
+Message-ID: <20111102145903.GK19187@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ Joerg, iommu-list
+On Wed, Nov 02, 2011 at 07:43:28AM +0200, Andrew Victor wrote:
+> hi Russell,
+> 
+> > Is there any reason this can't just be:
+> >
+> > void (*arch_reset)(char mode, const char *cmd);
+> 
+> I don't see any reason why not, except if arch_reset() can be called
+> early in the setup code (before the platform initialization).
 
-On Tue, Nov 1, 2011 at 5:15 PM, Omar Ramirez Luna <omar.ramirez@ti.com> wrote:
-> Introduced hwmod support for OMAP3 (iva, isp) and OMAP4 (ipu, dsp),
-> along with the corresponding runtime PM routines to deassert reset
-> lines, enable/disable clocks and configure sysc registers.
->
-> v3:
-> - Rebased to 3.1-rc10 lo rebuilt, added structure terminators, and
-> removed .omap_chip field.
->
-> v2:
-> - Added oh reset info to assert/deassert mmu reset lines.
-> - Addressed previous comments on v1
-> http://www.spinics.net/lists/arm-kernel/msg103271.html
->
-> Due to compatibility an ifdef needs to be propagated (previously on
-> iommu resource info) to hwmod data in OMAP3, so users of iommu and
-> tidspbridge can avoid issues of two modules managing mmu data/irqs/resets;
-> this until tidspbridge can be safely migrated to iommu framework.
->
-> Omar Ramirez Luna (4):
-> ?OMAP3: hwmod data: add mmu data for iva and isp
-> ?OMAP4: hwmod data: add mmu hwmod for ipu and dsp
-> ?OMAP3/4: iommu: migrate to hwmod framework
-> ?OMAP3/4: iommu: adapt to runtime pm
->
-> ?arch/arm/mach-omap2/iommu2.c ? ? ? ? ? ? ? ? ? ? ?| ? 36 -----
-> ?arch/arm/mach-omap2/omap-iommu.c ? ? ? ? ? ? ? ? ?| ?162 ++++-----------------
-> ?arch/arm/mach-omap2/omap_hwmod_3xxx_data.c ? ? ? ?| ?131 +++++++++++++++++
-> ?arch/arm/mach-omap2/omap_hwmod_44xx_data.c ? ? ? ?| ?154 ++++++++++++++++++--
-> ?arch/arm/plat-omap/include/plat/iommu.h ? ? ? ? ? | ? 17 ++-
-> ?arch/arm/plat-omap/include/plat/iommu2.h ? ? ? ? ?| ? ?2 -
-> ?drivers/iommu/omap-iommu.c ? ? ? ? ? ? ? ? ? ? ? ?| ? 49 +++----
-> ?drivers/media/video/omap3isp/isp.c ? ? ? ? ? ? ? ?| ? ?2 +-
-> ?drivers/staging/tidspbridge/core/tiomap3430_pwr.c | ? ?2 +-
-> ?9 files changed, 339 insertions(+), 216 deletions(-)
+There is a case where it could happen - that is if you panic and you
+have a non-zero panic timeout.
+
+However, if you don't know how to restart your machine, then you're not
+going to be able to do anything.  I'd therefore suggest this patch:
+
+8<=======
+From: Russell King - ARM Linux <linux@arm.linux.org.uk>
+ARM: restart: get rid of needless at91_arch_reset additional indirection
+
+We don't need an additional level of indirection here, we can just
+turn arch_reset into a function pointer directly and assign the
+appropriate function (with appropriate arguments to it) just like
+other platforms do.
+
+However, ensure that it has a default to ensure that an early panic
+doesn't cause an oops via a NULL pointer here and another panic.
+
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ arch/arm/mach-at91/at91cap9.c            |    4 ++--
+ arch/arm/mach-at91/at91rm9200.c          |    4 ++--
+ arch/arm/mach-at91/at91sam9260.c         |    2 +-
+ arch/arm/mach-at91/at91sam9261.c         |    2 +-
+ arch/arm/mach-at91/at91sam9263.c         |    2 +-
+ arch/arm/mach-at91/at91sam9g45.c         |    4 ++--
+ arch/arm/mach-at91/at91sam9rl.c          |    2 +-
+ arch/arm/mach-at91/generic.h             |    2 +-
+ arch/arm/mach-at91/include/mach/system.h |    9 ++-------
+ arch/arm/mach-at91/setup.c               |    4 ++++
+ 10 files changed, 17 insertions(+), 18 deletions(-)
+
+diff --git a/arch/arm/mach-at91/at91cap9.c b/arch/arm/mach-at91/at91cap9.c
+index bfc6844..d45a877 100644
+--- a/arch/arm/mach-at91/at91cap9.c
++++ b/arch/arm/mach-at91/at91cap9.c
+@@ -311,7 +311,7 @@ static struct at91_gpio_bank at91cap9_gpio[] = {
+ 	}
+ };
+ 
+-static void at91cap9_reset(void)
++static void at91cap9_reset(char mode, const char *cmd)
+ {
+ 	at91_sys_write(AT91_RSTC_CR, AT91_RSTC_KEY | AT91_RSTC_PROCRST | AT91_RSTC_PERRST);
+ }
+@@ -333,7 +333,7 @@ static void __init at91cap9_map_io(void)
+ 
+ static void __init at91cap9_initialize(void)
+ {
+-	at91_arch_reset = at91cap9_reset;
++	arch_reset = at91cap9_reset;
+ 	pm_power_off = at91cap9_poweroff;
+ 	at91_extern_irq = (1 << AT91CAP9_ID_IRQ0) | (1 << AT91CAP9_ID_IRQ1);
+ 
+diff --git a/arch/arm/mach-at91/at91rm9200.c b/arch/arm/mach-at91/at91rm9200.c
+index f73302d..15161a2 100644
+--- a/arch/arm/mach-at91/at91rm9200.c
++++ b/arch/arm/mach-at91/at91rm9200.c
+@@ -286,7 +286,7 @@ static struct at91_gpio_bank at91rm9200_gpio[] = {
+ 	}
+ };
+ 
+-static void at91rm9200_reset(void)
++static void at91rm9200_reset(char mode, const char *cmd)
+ {
+ 	/*
+ 	 * Perform a hardware reset with the use of the Watchdog timer.
+@@ -307,7 +307,7 @@ static void __init at91rm9200_map_io(void)
+ 
+ static void __init at91rm9200_initialize(void)
+ {
+-	at91_arch_reset = at91rm9200_reset;
++	arch_reset = at91rm9200_reset;
+ 	at91_extern_irq = (1 << AT91RM9200_ID_IRQ0) | (1 << AT91RM9200_ID_IRQ1)
+ 			| (1 << AT91RM9200_ID_IRQ2) | (1 << AT91RM9200_ID_IRQ3)
+ 			| (1 << AT91RM9200_ID_IRQ4) | (1 << AT91RM9200_ID_IRQ5)
+diff --git a/arch/arm/mach-at91/at91sam9260.c b/arch/arm/mach-at91/at91sam9260.c
+index cb397be..2301336 100644
+--- a/arch/arm/mach-at91/at91sam9260.c
++++ b/arch/arm/mach-at91/at91sam9260.c
+@@ -317,7 +317,7 @@ static void __init at91sam9260_map_io(void)
+ 
+ static void __init at91sam9260_initialize(void)
+ {
+-	at91_arch_reset = at91sam9_alt_reset;
++	arch_reset = at91sam9_alt_reset;
+ 	pm_power_off = at91sam9260_poweroff;
+ 	at91_extern_irq = (1 << AT91SAM9260_ID_IRQ0) | (1 << AT91SAM9260_ID_IRQ1)
+ 			| (1 << AT91SAM9260_ID_IRQ2);
+diff --git a/arch/arm/mach-at91/at91sam9261.c b/arch/arm/mach-at91/at91sam9261.c
+index 6c8e3b5..771134b 100644
+--- a/arch/arm/mach-at91/at91sam9261.c
++++ b/arch/arm/mach-at91/at91sam9261.c
+@@ -286,7 +286,7 @@ static void __init at91sam9261_map_io(void)
+ 
+ static void __init at91sam9261_initialize(void)
+ {
+-	at91_arch_reset = at91sam9_alt_reset;
++	arch_reset = at91sam9_alt_reset;
+ 	pm_power_off = at91sam9261_poweroff;
+ 	at91_extern_irq = (1 << AT91SAM9261_ID_IRQ0) | (1 << AT91SAM9261_ID_IRQ1)
+ 			| (1 << AT91SAM9261_ID_IRQ2);
+diff --git a/arch/arm/mach-at91/at91sam9263.c b/arch/arm/mach-at91/at91sam9263.c
+index 044f3c9..733abdd 100644
+--- a/arch/arm/mach-at91/at91sam9263.c
++++ b/arch/arm/mach-at91/at91sam9263.c
+@@ -303,7 +303,7 @@ static void __init at91sam9263_map_io(void)
+ 
+ static void __init at91sam9263_initialize(void)
+ {
+-	at91_arch_reset = at91sam9_alt_reset;
++	arch_reset = at91sam9_alt_reset;
+ 	pm_power_off = at91sam9263_poweroff;
+ 	at91_extern_irq = (1 << AT91SAM9263_ID_IRQ0) | (1 << AT91SAM9263_ID_IRQ1);
+ 
+diff --git a/arch/arm/mach-at91/at91sam9g45.c b/arch/arm/mach-at91/at91sam9g45.c
+index e04c5fb..9a02804 100644
+--- a/arch/arm/mach-at91/at91sam9g45.c
++++ b/arch/arm/mach-at91/at91sam9g45.c
+@@ -301,7 +301,7 @@ static struct at91_gpio_bank at91sam9g45_gpio[] = {
+ 	}
+ };
+ 
+-static void at91sam9g45_reset(void)
++static void at91sam9g45_reset(char mode, const char *cmd)
+ {
+ 	at91_sys_write(AT91_RSTC_CR, AT91_RSTC_KEY | AT91_RSTC_PROCRST | AT91_RSTC_PERRST);
+ }
+@@ -323,7 +323,7 @@ static void __init at91sam9g45_map_io(void)
+ 
+ static void __init at91sam9g45_initialize(void)
+ {
+-	at91_arch_reset = at91sam9g45_reset;
++	arch_reset = at91sam9g45_reset;
+ 	pm_power_off = at91sam9g45_poweroff;
+ 	at91_extern_irq = (1 << AT91SAM9G45_ID_IRQ0);
+ 
+diff --git a/arch/arm/mach-at91/at91sam9rl.c b/arch/arm/mach-at91/at91sam9rl.c
+index a238105..043d3ac 100644
+--- a/arch/arm/mach-at91/at91sam9rl.c
++++ b/arch/arm/mach-at91/at91sam9rl.c
+@@ -292,7 +292,7 @@ static void __init at91sam9rl_map_io(void)
+ 
+ static void __init at91sam9rl_initialize(void)
+ {
+-	at91_arch_reset = at91sam9_alt_reset;
++	arch_reset = at91sam9_alt_reset;
+ 	pm_power_off = at91sam9rl_poweroff;
+ 	at91_extern_irq = (1 << AT91SAM9RL_ID_IRQ0);
+ 
+diff --git a/arch/arm/mach-at91/generic.h b/arch/arm/mach-at91/generic.h
+index 938b34f..80bc57f 100644
+--- a/arch/arm/mach-at91/generic.h
++++ b/arch/arm/mach-at91/generic.h
+@@ -57,7 +57,7 @@ extern void at91_irq_suspend(void);
+ extern void at91_irq_resume(void);
+ 
+ /* reset */
+-extern void at91sam9_alt_reset(void);
++extern void at91sam9_alt_reset(char, const char *);
+ 
+  /* GPIO */
+ #define AT91RM9200_PQFP		3	/* AT91RM9200 PQFP package has 3 banks */
+diff --git a/arch/arm/mach-at91/include/mach/system.h b/arch/arm/mach-at91/include/mach/system.h
+index 36af14b..c03f05c 100644
+--- a/arch/arm/mach-at91/include/mach/system.h
++++ b/arch/arm/mach-at91/include/mach/system.h
+@@ -47,13 +47,8 @@ static inline void arch_idle(void)
+ #endif
+ }
+ 
+-void (*at91_arch_reset)(void);
++extern void default_at91_reset(char, const char *);
+ 
+-static inline void arch_reset(char mode, const char *cmd)
+-{
+-	/* call the CPU-specific reset function */
+-	if (at91_arch_reset)
+-		(at91_arch_reset)();
+-}
++void (*arch_reset)(char mode, const char *cmd) = default_at91_reset;
+ 
+ #endif
+diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
+index aa64294..bdb4474 100644
+--- a/arch/arm/mach-at91/setup.c
++++ b/arch/arm/mach-at91/setup.c
+@@ -295,3 +295,7 @@ void __init at91_initialize(unsigned long main_clock)
+ 
+ 	at91_boot_soc.init();
+ }
++
++void default_at91_reset(char mode, const char *cmd)
++{
++}
+-- 
+1.7.4.4
