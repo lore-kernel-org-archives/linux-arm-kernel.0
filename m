@@ -1,85 +1,208 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Wed, 2 Nov 2011 14:08:11 +0000
-Subject: [PATCHv2 02/10] ARM: vic: MULTI_IRQ_HANDLER handler
-In-Reply-To: <20111102134024.GE19187@n2100.arm.linux.org.uk>
-References: <1317206507-18867-1-git-send-email-jamie@jamieiles.com>
-	<1317206507-18867-3-git-send-email-jamie@jamieiles.com>
-	<20110928203905.GB2838@ponder.secretlab.ca>
-	<CACRpkdZKns-GraGp-YMD6jzOPETkvEpt9bC8HcYUmf3JUyCV3A@mail.gmail.com>
-	<20110929093009.GM17204@pulham.picochip.com>
-	<20111102134024.GE19187@n2100.arm.linux.org.uk>
-Message-ID: <20111102140811.GA22491@totoro>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Wed, 2 Nov 2011 16:09:01 +0200
+Subject: [PATCH v2 2/8] arm/tegra: prepare early init for multiple tegra
+	variants
+In-Reply-To: <1320242948-21061-1-git-send-email-pdeschrijver@nvidia.com>
+References: <1320242948-21061-1-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <1320242948-21061-3-git-send-email-pdeschrijver@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 02, 2011 at 01:40:24PM +0000, Russell King - ARM Linux wrote:
-> On Thu, Sep 29, 2011 at 10:30:09AM +0100, Jamie Iles wrote:
-> > +#ifdef CONFIG_MULTI_IRQ_HANDLER
-> > +static void vic_single_handle_irq(struct vic_device *vic, struct pt_regs *regs)
-> > +{
-> > +	u32 stat, irq;
-> > +
-> > +	stat = readl_relaxed(vic->base + VIC_IRQ_STATUS);
-> > +	while (stat) {
-> > +		irq = ffs(stat) - 1;
-> > +		handle_IRQ(irq_domain_to_irq(&vic->domain, irq), regs);
-> > +		stat &= ~(1 << irq);
-> > +	}
-> > +}
-> > +
-> > +asmlinkage void __exception_irq_entry vic_handle_irq(struct pt_regs *regs)
-> > +{
-> > +	int i;
-> > +
-> > +	for (i = 0; i < vic_id; ++i)
-> > +		vic_single_handle_irq(&vic_devices[i], regs);
-> > +}
-> 
-> And if we receive another interrupt after the read of the register, we'll
-> have to exit all the way back (possibly to userspace) before re-entering
-> the IRQ handling paths back to this point to process it.
+This patch splits the early init code in a common and a tegra20 specific part.
+L2 cache initialization is generalized and discovers the cache associativity
+at runtime.
 
-OK, so how about something like this instead:
+Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
+---
+ arch/arm/mach-tegra/board-dt.c        |   19 +++++++++++++++++++
+ arch/arm/mach-tegra/board-harmony.c   |    2 +-
+ arch/arm/mach-tegra/board-paz00.c     |    2 +-
+ arch/arm/mach-tegra/board-seaboard.c  |    6 +++---
+ arch/arm/mach-tegra/board-trimslice.c |    2 +-
+ arch/arm/mach-tegra/board.h           |    4 +---
+ arch/arm/mach-tegra/common.c          |   33 ++++++++++++++++++++++-----------
+ 7 files changed, 48 insertions(+), 20 deletions(-)
 
-static int vic_single_handle_irq(struct vic_device *vic,
-				 struct pt_regs *regs)
-{
-	u32 stat, irq;
-	int handled = 0;
-
-	stat = readl_relaxed(vic->base + VIC_IRQ_STATUS);
-	while (stat) {
-		irq = ffs(stat) - 1;
-		handle_IRQ(irq_domain_to_irq(&vic->domain, irq), regs);
-		stat &= ~(1 << irq);
-		handled = 1;
-	}
-
-	return handled;
-}
-
-asmlinkage void __exception_irq_entry vic_handle_irq(struct pt_regs *regs)
-{
-	int i, handled;
-
-	do {
-		handled = 0;
-		for (i = 0; i < vic_id; ++i)
-			if (vic_single_handle_irq(&vic_devices[i], regs))
-				handled = 1;
-	} while (handled);
-}
-
-which I think should keep handling IRQ's until no VIC has them pending 
-(or as best can be determined).
-
-> Is there any particular reason folk are destroying the built-in efficiency
-> of the IRQ handling which is common-place in the existing assembly
-> approach?
-
-Well this approach makes a single image kernel a bit easier.  The other 
-thing is that it plays a lot nicer with dynamic irq_desc assignment.  
-Grant's IRQ domain patches make this quite easy here, but I can't see an 
-obvious way to do that with the assembly method.
-
-Jamie
+diff --git a/arch/arm/mach-tegra/board-dt.c b/arch/arm/mach-tegra/board-dt.c
+index d368f8d..a7bae50 100644
+--- a/arch/arm/mach-tegra/board-dt.c
++++ b/arch/arm/mach-tegra/board-dt.c
+@@ -118,6 +118,25 @@ static void __init tegra_dt_init(void)
+ 	of_platform_populate(NULL, tegra_dt_match_table, tegra20_auxdata_lookup, NULL);
+ }
+ 
++static struct {
++	const char *machine;
++	void (*init)(void);
++} early_init[] __initdata = {
++	{ "nvidia,tegra20", tegra20_init_early },
++};
++
++static void __init tegra_init_early(void)
++{
++
++	int i;
++
++	for (i = 0; i < ARRAY_SIZE(early_init); i++)
++		if (of_machine_is_compatible(early_init[i].machine))
++			return early_init[i].init();
++
++	pr_warn("Unknown platform detected\n");
++}
++
+ static const char * tegra_dt_board_compat[] = {
+ 	"nvidia,harmony",
+ 	"nvidia,seaboard",
+diff --git a/arch/arm/mach-tegra/board-harmony.c b/arch/arm/mach-tegra/board-harmony.c
+index f0bdc5e..c422aeb 100644
+--- a/arch/arm/mach-tegra/board-harmony.c
++++ b/arch/arm/mach-tegra/board-harmony.c
+@@ -185,7 +185,7 @@ MACHINE_START(HARMONY, "harmony")
+ 	.atag_offset	= 0x100,
+ 	.fixup		= tegra_harmony_fixup,
+ 	.map_io         = tegra_map_common_io,
+-	.init_early	= tegra_init_early,
++	.init_early	= tegra20_init_early,
+ 	.init_irq       = tegra_init_irq,
+ 	.timer          = &tegra_timer,
+ 	.init_machine   = tegra_harmony_init,
+diff --git a/arch/arm/mach-tegra/board-paz00.c b/arch/arm/mach-tegra/board-paz00.c
+index 602f8dd..6997a47 100644
+--- a/arch/arm/mach-tegra/board-paz00.c
++++ b/arch/arm/mach-tegra/board-paz00.c
+@@ -188,7 +188,7 @@ MACHINE_START(PAZ00, "Toshiba AC100 / Dynabook AZ")
+ 	.atag_offset	= 0x100,
+ 	.fixup		= tegra_paz00_fixup,
+ 	.map_io         = tegra_map_common_io,
+-	.init_early	= tegra_init_early,
++	.init_early	= tegra20_init_early,
+ 	.init_irq       = tegra_init_irq,
+ 	.timer          = &tegra_timer,
+ 	.init_machine   = tegra_paz00_init,
+diff --git a/arch/arm/mach-tegra/board-seaboard.c b/arch/arm/mach-tegra/board-seaboard.c
+index bf13ea3..5e42e08 100644
+--- a/arch/arm/mach-tegra/board-seaboard.c
++++ b/arch/arm/mach-tegra/board-seaboard.c
+@@ -282,7 +282,7 @@ static void __init tegra_wario_init(void)
+ MACHINE_START(SEABOARD, "seaboard")
+ 	.atag_offset    = 0x100,
+ 	.map_io         = tegra_map_common_io,
+-	.init_early     = tegra_init_early,
++	.init_early     = tegra20_init_early,
+ 	.init_irq       = tegra_init_irq,
+ 	.timer          = &tegra_timer,
+ 	.init_machine   = tegra_seaboard_init,
+@@ -291,7 +291,7 @@ MACHINE_END
+ MACHINE_START(KAEN, "kaen")
+ 	.atag_offset    = 0x100,
+ 	.map_io         = tegra_map_common_io,
+-	.init_early     = tegra_init_early,
++	.init_early     = tegra20_init_early,
+ 	.init_irq       = tegra_init_irq,
+ 	.timer          = &tegra_timer,
+ 	.init_machine   = tegra_kaen_init,
+@@ -300,7 +300,7 @@ MACHINE_END
+ MACHINE_START(WARIO, "wario")
+ 	.atag_offset    = 0x100,
+ 	.map_io         = tegra_map_common_io,
+-	.init_early     = tegra_init_early,
++	.init_early     = tegra20_init_early,
+ 	.init_irq       = tegra_init_irq,
+ 	.timer          = &tegra_timer,
+ 	.init_machine   = tegra_wario_init,
+diff --git a/arch/arm/mach-tegra/board-trimslice.c b/arch/arm/mach-tegra/board-trimslice.c
+index e008c0e..7117e81 100644
+--- a/arch/arm/mach-tegra/board-trimslice.c
++++ b/arch/arm/mach-tegra/board-trimslice.c
+@@ -175,7 +175,7 @@ MACHINE_START(TRIMSLICE, "trimslice")
+ 	.atag_offset	= 0x100,
+ 	.fixup		= tegra_trimslice_fixup,
+ 	.map_io         = tegra_map_common_io,
+-	.init_early	= tegra_init_early,
++	.init_early	= tegra20_init_early,
+ 	.init_irq       = tegra_init_irq,
+ 	.timer          = &tegra_timer,
+ 	.init_machine   = tegra_trimslice_init,
+diff --git a/arch/arm/mach-tegra/board.h b/arch/arm/mach-tegra/board.h
+index 1d14df7..b86cdab 100644
+--- a/arch/arm/mach-tegra/board.h
++++ b/arch/arm/mach-tegra/board.h
+@@ -23,9 +23,7 @@
+ 
+ #include <linux/types.h>
+ 
+-void tegra_assert_system_reset(char mode, const char *cmd);
+-
+-void __init tegra_init_early(void);
++void __init tegra20_init_early(void);
+ void __init tegra_map_common_io(void);
+ void __init tegra_init_irq(void);
+ void __init tegra_init_clock(void);
+diff --git a/arch/arm/mach-tegra/common.c b/arch/arm/mach-tegra/common.c
+index 03c2bd4..6173fd8 100644
+--- a/arch/arm/mach-tegra/common.c
++++ b/arch/arm/mach-tegra/common.c
+@@ -1,5 +1,5 @@
+ /*
+- * arch/arm/mach-tegra/board-harmony.c
++ * arch/arm/mach-tegra/common.c
+  *
+  * Copyright (C) 2010 Google, Inc.
+  *
+@@ -42,7 +42,9 @@ void tegra_assert_system_reset(char mode, const char *cmd)
+ 	writel_relaxed(reg, reset);
+ }
+ 
+-static __initdata struct tegra_clk_init_table common_clk_init_table[] = {
++void (*arch_reset)(char mode, const char *cmd) = tegra_assert_system_reset;
++
++static __initdata struct tegra_clk_init_table tegra20_clk_init_table[] = {
+ 	/* name		parent		rate		enabled */
+ 	{ "clk_m",	NULL,		0,		true },
+ 	{ "pll_p",	"clk_m",	216000000,	true },
+@@ -59,25 +61,34 @@ static __initdata struct tegra_clk_init_table common_clk_init_table[] = {
+ 	{ NULL,		NULL,		0,		0},
+ };
+ 
+-static void __init tegra_init_cache(void)
++static void __init tegra_init_cache(u32 tag_latency, u32 data_latency)
+ {
+ #ifdef CONFIG_CACHE_L2X0
+ 	void __iomem *p = IO_ADDRESS(TEGRA_ARM_PERIF_BASE) + 0x3000;
++	u32 aux_ctrl;
++
++	writel_relaxed(tag_latency, p + L2X0_TAG_LATENCY_CTRL);
++	writel_relaxed(data_latency, p + L2X0_DATA_LATENCY_CTRL);
+ 
+-	writel_relaxed(0x331, p + L2X0_TAG_LATENCY_CTRL);
+-	writel_relaxed(0x441, p + L2X0_DATA_LATENCY_CTRL);
++	aux_ctrl = readl(p + L2X0_CACHE_TYPE);
++	aux_ctrl = (aux_ctrl & 0x700) << (17-8);
++	aux_ctrl |= 0x7C000001;
+ 
+-	l2x0_init(p, 0x6C080001, 0x8200c3fe);
++	l2x0_init(p, aux_ctrl, 0x8200c3fe);
+ #endif
+ 
+ }
+ 
+-void __init tegra_init_early(void)
++static void __init tegra_setup_system_reset(void)
++{
++	arm_arch_reset = tegra_assert_system_reset;
++}
++
++void __init tegra20_init_early(void)
+ {
+ 	tegra_init_fuse();
+ 	tegra_init_clock();
+-	tegra_clk_init_from_table(common_clk_init_table);
+-	tegra_init_cache();
+-
+-	arm_arch_reset = tegra_assert_system_reset;
++	tegra_clk_init_from_table(tegra20_clk_init_table);
++	tegra_init_cache(0x331, 0x441);
++	tegra_setup_system_reset();
+ }
+-- 
+1.7.7.rc0.72.g4b5ea.dirty
