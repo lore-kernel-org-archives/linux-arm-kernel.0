@@ -1,116 +1,130 @@
 From: davidb@codeaurora.org (David Brown)
-Date: Wed,  2 Nov 2011 11:35:57 -0700
-Subject: [RFC PATCH 00/34] msm: msm8660 and msm8960 clock support
-Message-ID: <1320258991-22325-1-git-send-email-davidb@codeaurora.org>
+Date: Wed,  2 Nov 2011 11:35:59 -0700
+Subject: [RFC PATCH 02/34] msm: clock: Always use an array to iterate over
+	clocks
+In-Reply-To: <1320258991-22325-1-git-send-email-davidb@codeaurora.org>
+References: <1320258991-22325-1-git-send-email-davidb@codeaurora.org>
+Message-ID: <1320258991-22325-3-git-send-email-davidb@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The MSM8660 and MSM8960 have had out-of-tree clock drivers for quite
-some time.  Since people can now order the Dragonboard with the
-MSM8660, I thought it would be good to make sure these get sent out.
-Saravana is actively working on this getting this code into the tree,
-so this RFC is mostly to make the code available for people who get
-the hardware before this work is done.
+From: Stephen Boyd <sboyd@codeaurora.org>
 
-I'll also put these changes on top of a recent version of Linus'
-master branch and make them available at
+If the array of clk_lookups contains aliases for the same struct
+clk, msm_clock_init() will add the clock to the clocks list
+twice.  This would cause list corruption so let's just remove the
+clocks list and any associated code and iterate over the array
+instead.
 
-  git://codeaurora.org/quic/kernel/davidb/linux-msm.git msm-clock-rfc
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+Signed-off-by: David Brown <davidb@codeaurora.org>
+---
+ arch/arm/mach-msm/clock.c              |   27 ++++++++++-----------------
+ arch/arm/mach-msm/clock.h              |    1 -
+ arch/arm/mach-msm/include/mach/board.h |    2 +-
+ 3 files changed, 11 insertions(+), 19 deletions(-)
 
-David
-
-David Brown (2):
-  ARM: msm: fix names of UART clocks
-  msm_serial: fix clock rate on DMA-based uarts
-
-Matt Wagantall (8):
-  msm: clock-local: Add support for 8x60 clock types
-  msm: clock: Add 8x60 clock support
-  msm: clock: Add list_rate debugfs nodes for locally-controlled clocks
-  msm: clock: Add debugfs interface to measure clock rates
-  msm: clock-8x60: Support measurement of CPU and L2 clocks
-  msm: clock: Expand CLK_MIN, CLK_MAX and CLK_MINMAX macros
-  msm: clock: Add EBI1 voter clocks for ADM on SoCs without them
-  msm: clock-8x60: Add local control of vpe_axi_clk and vpe_axi_clk
-
-Saravana Kannan (1):
-  msm: clock: Add 7x30 local clock support
-
-Stepan Moskovchenko (1):
-  msm-8x60: Add serial support
-
-Stephen Boyd (22):
-  msm: clock-pcom: Mark functions static
-  msm: clock: Always use an array to iterate over clocks
-  msm: clock: Pass struct clk to the clk_ops
-  msm: clock: Support one lock per clock
-  msm: clock-pcom: Introduce a struct pcom_clk
-  msm: clock: Support clk_[s|g]et_parent() clk_ops
-  msm: clock-debug: Use clk_enable()/clk_disable() directly
-  msm: clock: Enable/disable parent clocks generically
-  msm: clock: Implement rate voting
-  msm: clock-pcom: Add pbus specific clock ops
-  msm: Migrate to clock rate voting
-  msm: clock: Make most clk_*() operations optional
-  msm: clock-debug: Implement a default is_enabled()
-  msm: proc_comm: Add CLKCTL_RPC_SRC_REQUEST
-  msm: clock: Add local clock control framework
-  msm: clock-pcom: Expose pc_clk_reset
-  msm: Unify iomap for clock regions
-  msm: clock: Support dummy clocks
-  msm: clock: Add 8960 clock support
-  msm: 8660: Add FLUID support
-  msm: clock: Invert CLKFLAG_AUTO_OFF
-  msm: clock: Remove msm_clk_soc_init()
-
- arch/arm/mach-msm/Kconfig                       |    6 +
- arch/arm/mach-msm/Makefile                      |    5 +
- arch/arm/mach-msm/board-msm7x30.c               |    2 +-
- arch/arm/mach-msm/board-msm8960.c               |    9 +-
- arch/arm/mach-msm/board-msm8x60.c               |   69 +
- arch/arm/mach-msm/clock-7x30.c                  | 3001 +++++++++++++++++
- arch/arm/mach-msm/clock-7x30.h                  |  155 -
- arch/arm/mach-msm/clock-8960.c                  | 3930 +++++++++++++++++++++++
- arch/arm/mach-msm/clock-8x60.c                  | 3684 +++++++++++++++++++++
- arch/arm/mach-msm/clock-8x60.h                  |  293 ++
- arch/arm/mach-msm/clock-debug.c                 |   83 +-
- arch/arm/mach-msm/clock-dummy.c                 |   69 +
- arch/arm/mach-msm/clock-local.c                 |  969 ++++++
- arch/arm/mach-msm/clock-local.h                 |  316 ++
- arch/arm/mach-msm/clock-pcom-lookup.c           |  385 +++
- arch/arm/mach-msm/clock-pcom.c                  |   65 +-
- arch/arm/mach-msm/clock-pcom.h                  |   35 +-
- arch/arm/mach-msm/clock-voter.c                 |  187 ++
- arch/arm/mach-msm/clock-voter.h                 |   42 +
- arch/arm/mach-msm/clock.c                       |  150 +-
- arch/arm/mach-msm/clock.h                       |   63 +-
- arch/arm/mach-msm/devices-msm7x00.c             |  124 +-
- arch/arm/mach-msm/devices-msm7x30.c             |   82 -
- arch/arm/mach-msm/devices-qsd8x50.c             |  175 +-
- arch/arm/mach-msm/devices.h                     |    4 +-
- arch/arm/mach-msm/include/mach/board.h          |    2 -
- arch/arm/mach-msm/include/mach/msm_iomap-7x00.h |    5 +-
- arch/arm/mach-msm/include/mach/msm_iomap-7x30.h |    5 +-
- arch/arm/mach-msm/include/mach/msm_iomap-8960.h |    9 +
- arch/arm/mach-msm/include/mach/msm_iomap-8x50.h |    5 +-
- arch/arm/mach-msm/include/mach/msm_iomap-8x60.h |    9 +
- arch/arm/mach-msm/include/mach/msm_iomap.h      |    3 +
- arch/arm/mach-msm/io.c                          |   12 +-
- arch/arm/mach-msm/proc_comm.h                   |    1 +
- drivers/tty/serial/msm_serial.c                 |    2 +-
- 35 files changed, 13506 insertions(+), 450 deletions(-)
- create mode 100644 arch/arm/mach-msm/clock-7x30.c
- delete mode 100644 arch/arm/mach-msm/clock-7x30.h
- create mode 100644 arch/arm/mach-msm/clock-8960.c
- create mode 100644 arch/arm/mach-msm/clock-8x60.c
- create mode 100644 arch/arm/mach-msm/clock-8x60.h
- create mode 100644 arch/arm/mach-msm/clock-dummy.c
- create mode 100644 arch/arm/mach-msm/clock-local.c
- create mode 100644 arch/arm/mach-msm/clock-local.h
- create mode 100644 arch/arm/mach-msm/clock-pcom-lookup.c
- create mode 100644 arch/arm/mach-msm/clock-voter.c
- create mode 100644 arch/arm/mach-msm/clock-voter.h
-
+diff --git a/arch/arm/mach-msm/clock.c b/arch/arm/mach-msm/clock.c
+index d9145df..e23e4c2 100644
+--- a/arch/arm/mach-msm/clock.c
++++ b/arch/arm/mach-msm/clock.c
+@@ -15,7 +15,6 @@
+  */
+ 
+ #include <linux/kernel.h>
+-#include <linux/list.h>
+ #include <linux/err.h>
+ #include <linux/spinlock.h>
+ #include <linux/pm_qos.h>
+@@ -27,9 +26,7 @@
+ 
+ #include "clock.h"
+ 
+-static DEFINE_MUTEX(clocks_mutex);
+ static DEFINE_SPINLOCK(clocks_lock);
+-static LIST_HEAD(clocks);
+ 
+ /*
+  * Standard clock functions defined in include/linux/clk.h
+@@ -135,21 +132,18 @@ EXPORT_SYMBOL(clk_set_flags);
+  * generic to support different clocks.
+  */
+ static struct clk *ebi1_clk;
++static struct clk_lookup *msm_clocks;
++static unsigned msm_num_clocks;
+ 
+-void __init msm_clock_init(struct clk_lookup *clock_tbl, unsigned num_clocks)
++void __init msm_clock_init(struct clk_lookup *clock_tbl, size_t num_clocks)
+ {
+-	unsigned n;
+-
+-	mutex_lock(&clocks_mutex);
+-	for (n = 0; n < num_clocks; n++) {
+-		clkdev_add(&clock_tbl[n]);
+-		list_add_tail(&clock_tbl[n].clk->list, &clocks);
+-	}
+-	mutex_unlock(&clocks_mutex);
++	clkdev_add_table(clock_tbl, num_clocks);
+ 
+ 	ebi1_clk = clk_get(NULL, "ebi1_clk");
+ 	BUG_ON(ebi1_clk == NULL);
+ 
++	msm_clocks = clock_tbl;
++	msm_num_clocks = num_clocks;
+ }
+ 
+ /* The bootloader and/or AMSS may have left various clocks enabled.
+@@ -158,13 +152,13 @@ void __init msm_clock_init(struct clk_lookup *clock_tbl, unsigned num_clocks)
+  */
+ static int __init clock_late_init(void)
+ {
++	unsigned i, count = 0;
+ 	unsigned long flags;
+-	struct clk *clk;
+-	unsigned count = 0;
+ 
+ 	clock_debug_init();
+-	mutex_lock(&clocks_mutex);
+-	list_for_each_entry(clk, &clocks, list) {
++	for (i = 0; i < msm_num_clocks; i++) {
++		struct clk *clk = msm_clocks[i].clk;
++
+ 		clock_debug_add(clk);
+ 		if (clk->flags & CLKFLAG_AUTO_OFF) {
+ 			spin_lock_irqsave(&clocks_lock, flags);
+@@ -175,7 +169,6 @@ static int __init clock_late_init(void)
+ 			spin_unlock_irqrestore(&clocks_lock, flags);
+ 		}
+ 	}
+-	mutex_unlock(&clocks_mutex);
+ 	pr_info("clock_late_init() disabled %d unused clocks\n", count);
+ 	return 0;
+ }
+diff --git a/arch/arm/mach-msm/clock.h b/arch/arm/mach-msm/clock.h
+index 2c007f6..32a43d4 100644
+--- a/arch/arm/mach-msm/clock.h
++++ b/arch/arm/mach-msm/clock.h
+@@ -53,7 +53,6 @@ struct clk {
+ 	uint32_t flags;
+ 	struct clk_ops *ops;
+ 	const char *dbg_name;
+-	struct list_head list;
+ };
+ 
+ #define OFF CLKFLAG_AUTO_OFF
+diff --git a/arch/arm/mach-msm/include/mach/board.h b/arch/arm/mach-msm/include/mach/board.h
+index 2ce8f1f..1e4c50e 100644
+--- a/arch/arm/mach-msm/include/mach/board.h
++++ b/arch/arm/mach-msm/include/mach/board.h
+@@ -41,7 +41,7 @@ void __init msm_add_devices(void);
+ void __init msm_map_common_io(void);
+ void __init msm_init_irq(void);
+ void __init msm_init_gpio(void);
+-void __init msm_clock_init(struct clk_lookup *clock_tbl, unsigned num_clocks);
++void __init msm_clock_init(struct clk_lookup *clock_tbl, size_t num_clocks);
+ void __init msm_acpu_clock_init(struct msm_acpu_clock_platform_data *);
+ int __init msm_add_sdcc(unsigned int controller,
+ 			struct msm_mmc_platform_data *plat,
 -- 
 Sent by an employee of the Qualcomm Innovation Center, Inc.
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
