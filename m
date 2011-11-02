@@ -1,49 +1,39 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed,  2 Nov 2011 17:30:49 +0000
-Subject: [PATCH 2/2] ARM: mcx: fix local timer interrupt handling
-In-Reply-To: <1320255049-12447-1-git-send-email-marc.zyngier@arm.com>
-References: <1320255049-12447-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1320255049-12447-3-git-send-email-marc.zyngier@arm.com>
+From: cjb@laptop.org (Chris Ball)
+Date: Wed, 02 Nov 2011 13:56:32 -0400
+Subject: [PATCH V6] SDHCI: S3C: Use generic clock names for sdhci bus
+	clock options
+In-Reply-To: <005301cc9958$bcf5aa10$36e0fe30$%kim@samsung.com> (Kukjin Kim's
+	message of "Wed, 02 Nov 2011 21:12:49 +0900")
+References: <1320039876-21148-1-git-send-email-rajeshwari.s@samsung.com>
+	<005301cc9958$bcf5aa10$36e0fe30$%kim@samsung.com>
+Message-ID: <m2aa8e9zn3.fsf@bob.laptop.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As local timer interrupts are now handled as normal interrupts,
-remove the special case in the GIC handler.
+Hi Kukjin,
 
-Cc: Shawn Guo <shawn.guo@linaro.org>
-Cc: Sascha Hauer <kernel@pengutronix.de>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm/plat-mxc/gic.c |   11 ++---------
- 1 files changed, 2 insertions(+), 9 deletions(-)
+On Wed, Nov 02 2011, Kukjin Kim wrote:
+>> This patch modifies the driver to stop depending on the clock names
+>> being passed from the platform and switch over to bus clock lookup
+>> using generic clock names.
+>> 
+>> V6 Changes:
+>> Changed sprintf to snprintf as suggested by Chris Ball.
+>> 
+>> Signed-off-by: Rajeshwari Shinde <rajeshwari.s@samsung.com>
+>
+> Acked-by: Kukjin Kim <kgene.kim@samsung.com>
+>
+> Hi Chirs,
+>
+> Could you please pick this up in your tree for this merge window?
 
-diff --git a/arch/arm/plat-mxc/gic.c b/arch/arm/plat-mxc/gic.c
-index b3b8eed..12f8f81 100644
---- a/arch/arm/plat-mxc/gic.c
-+++ b/arch/arm/plat-mxc/gic.c
-@@ -28,21 +28,14 @@ asmlinkage void __exception_irq_entry gic_handle_irq(struct pt_regs *regs)
- 		if (irqnr == 1023)
- 			break;
- 
--		if (irqnr > 29 && irqnr < 1021)
-+		if (irqnr > 15 && irqnr < 1021)
- 			handle_IRQ(irqnr, regs);
- #ifdef CONFIG_SMP
--		else if (irqnr < 16) {
-+		else {
- 			writel_relaxed(irqstat, gic_cpu_base_addr +
- 						GIC_CPU_EOI);
- 			handle_IPI(irqnr, regs);
- 		}
- #endif
--#ifdef CONFIG_LOCAL_TIMERS
--		else if (irqnr == 29) {
--			writel_relaxed(irqstat, gic_cpu_base_addr +
--						GIC_CPU_EOI);
--			handle_local_timer(regs);
--		}
--#endif
- 	} while (1);
- }
+Might be easier to have you send this, if you don't mind, since I'm
+still traveling and have already sent my main pull request.  Thanks!
+
+Acked-by: Chris Ball <cjb@laptop.org>
+
+- Chris.
 -- 
-1.7.0.4
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+One Laptop Per Child
