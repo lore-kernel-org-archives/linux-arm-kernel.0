@@ -1,81 +1,130 @@
-From: ulf.hansson@stericsson.com (Ulf Hansson)
-Date: Wed, 2 Nov 2011 14:50:51 +0100
-Subject: [PATCH V3] AMBA: Put devices into low-power state in	suspend_noirq
-In-Reply-To: <20111102104950.GY19187@n2100.arm.linux.org.uk>
-References: <1320142497-16750-1-git-send-email-ulf.hansson@stericsson.com>
-	<CAJ0PZbTjoEbiaLpQ7DiVWT1FT3asWUYWp3voFQPXrAq_AjEDog@mail.gmail.com>
-	<20111102104950.GY19187@n2100.arm.linux.org.uk>
-Message-ID: <4EB14ABB.6020103@stericsson.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 02 Nov 2011 08:52:37 -0500
+Subject: [PATCH 1/3] ARM: pxa: Add DT support to pxa2xx-uart
+In-Reply-To: <201111012115.35417.marek.vasut@gmail.com>
+References: <1320172354-3795-1-git-send-email-marek.vasut@gmail.com>
+	<1320172354-3795-2-git-send-email-marek.vasut@gmail.com>
+	<4EB04FDF.1030600@gmail.com>
+	<201111012115.35417.marek.vasut@gmail.com>
+Message-ID: <4EB14B25.5050606@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux wrote:
-> On Wed, Nov 02, 2011 at 07:33:03PM +0900, MyungJoo Ham wrote:
->> If the reason of this patch is for device_may_wakeup condition where
->> AMBA needs to keep something up if any of its devices may wakeup, I
->> guess you need another approach. For example, checking
->> devices_may_wakeup conditions of all devices at ABMA suspend callback,
->> save the information at AMBA's data, use the saved information, set
->> the ABMA bus device with AMBA's suspend_noirq callback based on the
->> saved information or at syscore.
+On 11/01/2011 03:15 PM, Marek Vasut wrote:
+>> On 11/01/2011 01:32 PM, Marek Vasut wrote:
+>>> Add device tree binding for PXA2xx UARTs. Tested on Vpac270 board.
+>>>
+>>> Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
+>>> Cc: Arnd Bergmann <arnd@arndb.de>
+>>> Cc: Grant Likely <grant.likely@secretlab.ca>
+>>> ---
+>>>
+>>>  drivers/tty/serial/pxa.c |   50
+>>>  +++++++++++++++++++++++++++++++++++++++++++-- 1 files changed, 47
+>>>  insertions(+), 3 deletions(-)
+>>>
+>>> diff --git a/drivers/tty/serial/pxa.c b/drivers/tty/serial/pxa.c
+>>> index 531931c..836cbb4 100644
+>>> --- a/drivers/tty/serial/pxa.c
+>>> +++ b/drivers/tty/serial/pxa.c
+>>> @@ -43,6 +43,8 @@
+>>>
+>>>  #include <linux/clk.h>
+>>>  #include <linux/io.h>
+>>>  #include <linux/slab.h>
+>>>
+>>> +#include <linux/of.h>
+>>> +#include <linux/of_device.h>
+>>>
+>>>  struct uart_pxa_port {
+>>>  
+>>>  	struct uart_port        port;
+>>>
+>>> @@ -761,11 +763,50 @@ static const struct dev_pm_ops serial_pxa_pm_ops =
+>>> {
+>>>
+>>>  };
+>>>  #endif
+>>>
+>>> +#ifdef CONFIG_OF
+>>> +static struct of_device_id serial_pxa_dt_ids[] = {
+>>> +	{ .compatible = "marvell,pxa2xx-uart" },
+>>> +	{ /* sentinel */ }
+>>> +};
+>>> +MODULE_DEVICE_TABLE(of, serial_pxa_dt_ids);
+>>> +
+>>> +static int serial_pxa_probe_dt(struct platform_device *pdev, int
+>>> *portid) +{
+>>> +	struct device_node *np = pdev->dev.of_node;
+>>> +	static int portnum;
+>>> +
+>>> +	if (!np)
+>>> +		return -ENODEV;
+>>> +
+>>> +	/* PXA has up to four UART ports */
+>>> +	*portid = portnum++;
+>>
+>> You have no guarantee of the probe ordering yet are dependent on the
+>> number later on to set the name.
 > 
-> I think this patch is trying to address the variability in the state of
-> the bus clock when a device is suspended.
-> 
-> Originally, we didn't do any bus clock management, so all the calls into
-> the driver were assured that the bus clock would always be running.
-> 
-> Then, when bus clock management was added, we ensured that it was enabled
-> before the driver was probed, and disabled after the driver has been
-> removed.  A driver wishing to manage the bus clock for its device must
-> then manage it appropriately given those pre-conditions (which means if
-> it turns off the bus clock before probe returns, it has to be prepared
-> to turn the bus clock back on when the suspend or remove callbacks are
-> made.)
-> 
-> When runtime-PM was added to the bus layer, this took control of the
-> bus clock management, but we've kept the same guarantees - although
-> runtime PM will be enabled, it is up to the driver to drop the use
-> count to make it runtime-suspend the device - and if that is done it is
-> up to the driver to make whatever runtime PM calls are necessary to
-> bring the bus clock back on when required.
-> 
-> I don't see any reason drivers can't continue to use pm_runtime_get_sync()
-> in their suspend callback if they're doing runtime-PM - the runtime PM
-> stuff hasn't been disabled at this point and so the runtime resume should
-> still happen.
-> 
-> What won't happen is that you won't be able to use runtime PM to turn the
-> bus clock off - but that's also the case for a non-runtime PM driver as
-> well.  The solution to this is to -at the end- of the suspend callback
-> to call amba_pclk_disable(), and -at the beginning- of the resume callback
-> to call amba_pclk_enable(), both provided that the device can cope with it.
-> At the end of the resume callback, call pm_runtime_put() to balance the
-> pm_runtime_get_sync() in the suspend callback.
+> The probe order should be the one according to the order of ports in DT, right ?
 
-Just some thinking, you may comment if you like....
+Maybe so, but there is no guarantee of that. If you can avoid it that
+would be best, but I think most serial drivers end up with some sort of
+index. Look at the recent DT support for i.MX uart and the alias support.
 
-When using a power_domain this will then mean that the power domain 
-callbacks for suspend|resume should take similar actions as they do in 
-their runtime_suspend|resume callbacks to put the devices into low power 
-state. This should be in line of what you prefer?
+>>
+>>> +	if (*portid >= 4)
+>>> +		return -ENODEV;
+>>> +
+>>> +	/* Check if we're probing compatible ports only! */
+>>> +	if (of_get_property(np, "marvell,pxa250", NULL))
+>>> +		if (!cpu_is_pxa25x())
+>>> +			return -EINVAL;
+>>
+>> if dev->of_node is set, then you already know you matched against
+>> marvell,pxa2xx-uart,
+> 
+> Yes, I'm checking if the port has an additional parameter "marvell,pxa250" set, 
+> which means it should check if the CPU is pxa250.
 
-Alright, let's skip this patch and make sure each device driver handles 
-the things from their suspend|suspend_noirq instead.
-
-This will mean some duplicated code but at the same time give the device 
-driver full control and responsibility of putting its device in 
-low-power state.
-
-In parallel it would then also make sense to remove the pm_runtime 
-handling completely from the amba bus and let the pclk be fully runtime 
-handled from the device driver instead. Since it must handle it from 
-suspend anyway...
+If you have differences between pxa250 uart and other pxa2xx uart
+versions, then the compatible string should reflect this (i.e.
+marvell,pxa250-uart). Generally, you want to be specific with compatible
+strings. To do it generically, use the oldest chip name and newer chips
+can be compatible. For example, a pxa250 uart can use
+marvell,pxa250-uart and every other chip can use marvell,pxa210-uart.
 
 > 
-> So, I don't see any bus-layer patches are necessary or desirable.  Trying
-> to fix this at the bus layer changes the entry conditions for the suspend
-> and resume callbacks, and makes it _much_ harder for drivers to work out
-> what state things are in at that point - which means we're creating a
-> recipe for bugs.
+>>
+>>> +
+>>> +	return 0;
+>>> +}
+>>> +#else
+>>> +static inline int serial_pxa_probe_dt(struct platform_device *pdev, int
+>>> *portid) +{
+>>> +	return 0;
+>>> +}
+>>> +#endif
+>>> +
+>>>
+>>>  static int serial_pxa_probe(struct platform_device *dev)
+>>>  {
+>>>  
+>>>  	struct uart_pxa_port *sport;
+>>>  	struct resource *mmres, *irqres;
+>>>  	int ret;
+>>>
+>>> +	int portid = dev->id;
+>>> +
+>>> +	ret = serial_pxa_probe_dt(dev, &portid);
+>>> +	if (ret == -EINVAL)
+>>> +		return 0;
+>>
+>> What about non-DT probing when CONFIG_OF is enabled?
 > 
+> Then ret isn't -EINVAL and it should be ok ?
+
+Ahh, yes you're right.
+
+Rob
