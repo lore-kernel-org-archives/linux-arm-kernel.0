@@ -1,71 +1,98 @@
 From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Wed, 2 Nov 2011 16:09:04 +0200
-Subject: [PATCH v2 5/8] arm/tegra: add new fields to struct tegra_pingroup_desc
+Date: Wed, 2 Nov 2011 16:09:06 +0200
+Subject: [PATCH v2 7/8] arm/tegra: implement support for tegra30
 In-Reply-To: <1320242948-21061-1-git-send-email-pdeschrijver@nvidia.com>
 References: <1320242948-21061-1-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <1320242948-21061-6-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <1320242948-21061-8-git-send-email-pdeschrijver@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add new fields to struct tegra_pingroup_desc to support new hardware features
-introduced in the tegra30 SoC. The pinmux driver won't use those fields yet,
-but the tegra30 pinmux tables will already provide the necessary data.
+Add support for tegra30 SoC. This includes a device tree compatible type for
+this SoC ("nvidia,tegra30") and adds L2 cache initialization for this new SoC.
+The clock framework is still missing, which prevents most drivers from working.
 
 Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
 ---
- arch/arm/mach-tegra/include/mach/pinmux.h   |   10 ++++++++++
- arch/arm/mach-tegra/pinmux-tegra20-tables.c |    4 ++++
- 2 files changed, 14 insertions(+), 0 deletions(-)
+ arch/arm/mach-tegra/Kconfig    |   18 +++++++++++++-----
+ arch/arm/mach-tegra/board-dt.c |    1 +
+ arch/arm/mach-tegra/board.h    |    1 +
+ arch/arm/mach-tegra/common.c   |    6 ++++++
+ 4 files changed, 21 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/mach-tegra/include/mach/pinmux.h b/arch/arm/mach-tegra/include/mach/pinmux.h
-index fb101f5..1ea2018 100644
---- a/arch/arm/mach-tegra/include/mach/pinmux.h
-+++ b/arch/arm/mach-tegra/include/mach/pinmux.h
-@@ -2,6 +2,7 @@
-  * linux/arch/arm/mach-tegra/include/mach/pinmux.h
-  *
-  * Copyright (C) 2010 Google, Inc.
-+ * Copyright (C) 2010,2011 Nvidia, Inc.
-  *
-  * This software is licensed under the terms of the GNU General Public
-  * License version 2, as published by the Free Software Foundation, and
-@@ -99,6 +100,11 @@ enum tegra_tristate {
- 	TEGRA_TRI_TRISTATE = 1,
+diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
+index 91aff7c..f2eb6d1 100644
+--- a/arch/arm/mach-tegra/Kconfig
++++ b/arch/arm/mach-tegra/Kconfig
+@@ -2,11 +2,8 @@ if ARCH_TEGRA
+ 
+ comment "NVIDIA Tegra options"
+ 
+-choice
+-	prompt "Select Tegra processor family for target system"
+-
+ config ARCH_TEGRA_2x_SOC
+-	bool "Tegra 2 family"
++	bool "Enable support for Tegra20 family"
+ 	select CPU_V7
+ 	select ARM_GIC
+ 	select ARCH_REQUIRE_GPIOLIB
+@@ -17,7 +14,18 @@ config ARCH_TEGRA_2x_SOC
+ 	  Support for NVIDIA Tegra AP20 and T20 processors, based on the
+ 	  ARM CortexA9MP CPU and the ARM PL310 L2 cache controller
+ 
+-endchoice
++config ARCH_TEGRA_3x_SOC
++	bool "Enable support for Tegra30 family"
++	select CPU_V7
++	select ARM_GIC
++	select ARCH_REQUIRE_GPIOLIB
++	select USB_ARCH_HAS_EHCI if USB_SUPPORT
++	select USB_ULPI if USB_SUPPORT
++	select USB_ULPI_VIEWPORT if USB_SUPPORT
++	select USE_OF
++	help
++	  Support for NVIDIA Tegra T30 processor family, based on the
++	  ARM CortexA9MP CPU and the ARM PL310 L2 cache controller
+ 
+ config TEGRA_PCI
+ 	bool "PCI Express support"
+diff --git a/arch/arm/mach-tegra/board-dt.c b/arch/arm/mach-tegra/board-dt.c
+index a7bae50..1680e96 100644
+--- a/arch/arm/mach-tegra/board-dt.c
++++ b/arch/arm/mach-tegra/board-dt.c
+@@ -123,6 +123,7 @@ static struct {
+ 	void (*init)(void);
+ } early_init[] __initdata = {
+ 	{ "nvidia,tegra20", tegra20_init_early },
++	{ "nvidia,tegra30", tegra30_init_early },
  };
  
-+enum tegra_pin_io {
-+	TEGRA_PIN_OUTPUT = 0,
-+	TEGRA_PIN_INPUT = 1,
-+};
+ static void __init tegra_init_early(void)
+diff --git a/arch/arm/mach-tegra/board.h b/arch/arm/mach-tegra/board.h
+index b86cdab..708b330a 100644
+--- a/arch/arm/mach-tegra/board.h
++++ b/arch/arm/mach-tegra/board.h
+@@ -24,6 +24,7 @@
+ #include <linux/types.h>
+ 
+ void __init tegra20_init_early(void);
++void __init tegra30_init_early(void);
+ void __init tegra_map_common_io(void);
+ void __init tegra_init_irq(void);
+ void __init tegra_init_clock(void);
+diff --git a/arch/arm/mach-tegra/common.c b/arch/arm/mach-tegra/common.c
+index 6173fd8..30a6864 100644
+--- a/arch/arm/mach-tegra/common.c
++++ b/arch/arm/mach-tegra/common.c
+@@ -92,3 +92,9 @@ void __init tegra20_init_early(void)
+ 	tegra_init_cache(0x331, 0x441);
+ 	tegra_setup_system_reset();
+ }
 +
- enum tegra_vddio {
- 	TEGRA_VDDIO_BB = 0,
- 	TEGRA_VDDIO_LCD,
-@@ -211,6 +217,10 @@ struct tegra_pingroup_desc {
- 	s8 tri_bit; 	/* offset into the TRISTATE_REG_* register bit */
- 	s8 mux_bit;	/* offset into the PIN_MUX_CTL_* register bit */
- 	s8 pupd_bit;	/* offset into the PULL_UPDOWN_REG_* register bit */
-+	s8 lock_bit;	/* offset of the LOCK bit into mux register bit */
-+	s8 od_bit;	/* offset of the OD bit into mux register bit */
-+	s8 ioreset_bit;	/* offset of the IO_RESET bit into mux register bit */
-+	s8 io_default;
- };
- 
- struct tegra_pinmux_pm {
-diff --git a/arch/arm/mach-tegra/pinmux-tegra20-tables.c b/arch/arm/mach-tegra/pinmux-tegra20-tables.c
-index de9d0df..e469229 100644
---- a/arch/arm/mach-tegra/pinmux-tegra20-tables.c
-+++ b/arch/arm/mach-tegra/pinmux-tegra20-tables.c
-@@ -106,6 +106,10 @@ static const struct tegra_drive_pingroup_desc tegra_soc_drive_pingroups[TEGRA_MA
- 		.pupd_bank = 2,				\
- 		.pupd_reg = ((pupd_r) - PULLUPDOWN_REG_A),	\
- 		.pupd_bit = pupd_b,				\
-+		.lock_bit = -1,					\
-+		.od_bit = -1,					\
-+		.ioreset_bit = -1,				\
-+		.io_default = -1,				\
- 	}
- 
- static const struct tegra_pingroup_desc tegra_soc_pingroups[TEGRA_MAX_PINGROUP] = {
++void __init tegra30_init_early(void)
++{
++	tegra_init_cache(0x441, 0x551);
++	tegra_setup_system_reset();
++}
 -- 
 1.7.7.rc0.72.g4b5ea.dirty
