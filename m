@@ -1,98 +1,99 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Wed, 2 Nov 2011 16:09:06 +0200
-Subject: [PATCH v2 7/8] arm/tegra: implement support for tegra30
-In-Reply-To: <1320242948-21061-1-git-send-email-pdeschrijver@nvidia.com>
-References: <1320242948-21061-1-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <1320242948-21061-8-git-send-email-pdeschrijver@nvidia.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 2 Nov 2011 14:16:28 +0000
+Subject: [PATCH] spi/pl022: Enable clock in probe an use runtime_idle
+In-Reply-To: <1319206124-17549-1-git-send-email-ulf.hansson@stericsson.com>
+References: <1319206124-17549-1-git-send-email-ulf.hansson@stericsson.com>
+Message-ID: <20111102141628.GG19187@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for tegra30 SoC. This includes a device tree compatible type for
-this SoC ("nvidia,tegra30") and adds L2 cache initialization for this new SoC.
-The clock framework is still missing, which prevents most drivers from working.
+On Fri, Oct 21, 2011 at 04:08:44PM +0200, Ulf Hansson wrote:
+> Since we are always runtime resumed when leaving probe
+> the clock must be enabled. To accomplish that we are able
+> to be runtime suspended after probe in the case when no
+> request is going to be recieved, a runtime_idle function
+> has been implemented.
+> 
+> Change-Id: I6cb86f2cad30ecaab16f512daf4674b039b18213
+> Signed-off-by: Ulf Hansson <ulf.hansson@stericsson.com>
+> Reviewed-on: http://gerrit.lud.stericsson.com/gerrit/34447
 
-Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
----
- arch/arm/mach-tegra/Kconfig    |   18 +++++++++++++-----
- arch/arm/mach-tegra/board-dt.c |    1 +
- arch/arm/mach-tegra/board.h    |    1 +
- arch/arm/mach-tegra/common.c   |    6 ++++++
- 4 files changed, 21 insertions(+), 5 deletions(-)
+Sorry Ulf, this patch has issues.
 
-diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
-index 91aff7c..f2eb6d1 100644
---- a/arch/arm/mach-tegra/Kconfig
-+++ b/arch/arm/mach-tegra/Kconfig
-@@ -2,11 +2,8 @@ if ARCH_TEGRA
- 
- comment "NVIDIA Tegra options"
- 
--choice
--	prompt "Select Tegra processor family for target system"
--
- config ARCH_TEGRA_2x_SOC
--	bool "Tegra 2 family"
-+	bool "Enable support for Tegra20 family"
- 	select CPU_V7
- 	select ARM_GIC
- 	select ARCH_REQUIRE_GPIOLIB
-@@ -17,7 +14,18 @@ config ARCH_TEGRA_2x_SOC
- 	  Support for NVIDIA Tegra AP20 and T20 processors, based on the
- 	  ARM CortexA9MP CPU and the ARM PL310 L2 cache controller
- 
--endchoice
-+config ARCH_TEGRA_3x_SOC
-+	bool "Enable support for Tegra30 family"
-+	select CPU_V7
-+	select ARM_GIC
-+	select ARCH_REQUIRE_GPIOLIB
-+	select USB_ARCH_HAS_EHCI if USB_SUPPORT
-+	select USB_ULPI if USB_SUPPORT
-+	select USB_ULPI_VIEWPORT if USB_SUPPORT
-+	select USE_OF
-+	help
-+	  Support for NVIDIA Tegra T30 processor family, based on the
-+	  ARM CortexA9MP CPU and the ARM PL310 L2 cache controller
- 
- config TEGRA_PCI
- 	bool "PCI Express support"
-diff --git a/arch/arm/mach-tegra/board-dt.c b/arch/arm/mach-tegra/board-dt.c
-index a7bae50..1680e96 100644
---- a/arch/arm/mach-tegra/board-dt.c
-+++ b/arch/arm/mach-tegra/board-dt.c
-@@ -123,6 +123,7 @@ static struct {
- 	void (*init)(void);
- } early_init[] __initdata = {
- 	{ "nvidia,tegra20", tegra20_init_early },
-+	{ "nvidia,tegra30", tegra30_init_early },
- };
- 
- static void __init tegra_init_early(void)
-diff --git a/arch/arm/mach-tegra/board.h b/arch/arm/mach-tegra/board.h
-index b86cdab..708b330a 100644
---- a/arch/arm/mach-tegra/board.h
-+++ b/arch/arm/mach-tegra/board.h
-@@ -24,6 +24,7 @@
- #include <linux/types.h>
- 
- void __init tegra20_init_early(void);
-+void __init tegra30_init_early(void);
- void __init tegra_map_common_io(void);
- void __init tegra_init_irq(void);
- void __init tegra_init_clock(void);
-diff --git a/arch/arm/mach-tegra/common.c b/arch/arm/mach-tegra/common.c
-index 6173fd8..30a6864 100644
---- a/arch/arm/mach-tegra/common.c
-+++ b/arch/arm/mach-tegra/common.c
-@@ -92,3 +92,9 @@ void __init tegra20_init_early(void)
- 	tegra_init_cache(0x331, 0x441);
- 	tegra_setup_system_reset();
- }
-+
-+void __init tegra30_init_early(void)
-+{
-+	tegra_init_cache(0x441, 0x551);
-+	tegra_setup_system_reset();
-+}
--- 
-1.7.7.rc0.72.g4b5ea.dirty
+>  drivers/spi/spi-pl022.c |   18 +++++++++++++++++-
+>  1 files changed, 17 insertions(+), 1 deletions(-)
+> 
+> diff --git a/drivers/spi/spi-pl022.c b/drivers/spi/spi-pl022.c
+> index f103e47..ad48fba 100644
+> --- a/drivers/spi/spi-pl022.c
+> +++ b/drivers/spi/spi-pl022.c
+> @@ -2184,6 +2184,12 @@ pl022_probe(struct amba_device *adev, const struct amba_id *id)
+>  		goto  err_clk_prep;
+>  	}
+>  
+> +	status = clk_enable(pl022->clk);
+> +	if (status) {
+> +		dev_err(&adev->dev, "could not enable SSP/SPI bus clock\n");
+> +		goto err_no_clk_en;
+> +	}
+> +
+>  	/* Disable SSP */
+>  	writew((readw(SSP_CR1(pl022->virtbase)) & (~SSP_CR1_MASK_SSE)),
+>  	       SSP_CR1(pl022->virtbase));
+
+Ok - this is a bug fix.
+
+> @@ -2237,6 +2243,8 @@ pl022_probe(struct amba_device *adev, const struct amba_id *id)
+>  
+>  	free_irq(adev->irq[0], pl022);
+>   err_no_irq:
+> +	clk_disable(pl022->clk);
+> + err_no_clk_en:
+>  	clk_unprepare(pl022->clk);
+>   err_clk_prep:
+>  	clk_put(pl022->clk);
+
+As is this.
+
+> @@ -2342,11 +2350,19 @@ static int pl022_runtime_resume(struct device *dev)
+>  
+>  	return 0;
+>  }
+> +
+> +static int pl022_runtime_idle(struct device *dev)
+> +{
+> +	pm_runtime_suspend(dev);
+> +	return 0;
+> +}
+>  #endif
+>  
+>  static const struct dev_pm_ops pl022_dev_pm_ops = {
+>  	SET_SYSTEM_SLEEP_PM_OPS(pl022_suspend, pl022_resume)
+> -	SET_RUNTIME_PM_OPS(pl022_runtime_suspend, pl022_runtime_resume, NULL)
+> +	SET_RUNTIME_PM_OPS(pl022_runtime_suspend,
+> +			   pl022_runtime_resume,
+> +			   pl022_runtime_idle)
+
+This is an unnecessary change.
+
+The bus-level ops runtime PM ops call pm_generic_runtime_idle() when
+its 'runtime_idle' operation is invoked.  Let's look at the code
+there:
+
+int pm_generic_runtime_idle(struct device *dev)
+{
+        const struct dev_pm_ops *pm = dev->driver ? dev->driver->pm : NULL;
+
+        if (pm && pm->runtime_idle) {
+                int ret = pm->runtime_idle(dev);
+                if (ret)
+                        return ret;
+        }
+
+        pm_runtime_suspend(dev);
+        return 0;
+}
+
+If the driver has a NULL runtime idle, then generic code will call
+pm_runtime_suspend() for the device.  So, adding a runtime_idle callback
+to a driver to explicitly call pm_runtime_suspend() is not required.
