@@ -1,36 +1,40 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 2 Nov 2011 16:06:03 +0000
-Subject: [PATCH v2 1/3] Add support for mini-box.com picoSAM9G45 board
-In-Reply-To: <20111102154935.GC7136@game.jcrosoft.org>
-References: <1320076396-6233-1-git-send-email-npavel@mini-box.com>
-	<20111102142817.GH19187@n2100.arm.linux.org.uk>
-	<20111102154935.GC7136@game.jcrosoft.org>
-Message-ID: <20111102160603.GA12913@n2100.arm.linux.org.uk>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Wed, 2 Nov 2011 09:07:52 -0700
+Subject: [PATCH v2 8/8] arm/tegra: add support for tegra30 based board
+	cardhu
+In-Reply-To: <20111102154610.GJ13358@tbergstrom-lnx.Nvidia.com>
+References: <1320242948-21061-1-git-send-email-pdeschrijver@nvidia.com>
+	<1320242948-21061-9-git-send-email-pdeschrijver@nvidia.com>
+	<20111102154610.GJ13358@tbergstrom-lnx.Nvidia.com>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF173F9A46C4@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 02, 2011 at 04:49:35PM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> On 14:28 Wed 02 Nov     , Russell King - ARM Linux wrote:
-> > Before Nicu puts these into the patch system (which is being attempted
-> > right now)...
-> As announce at the kernel summit no new board for 9gx series will be merged
-> except pending one. The new board will have to go via DT.
+Peter De Schrijver wrote at Wednesday, November 02, 2011 9:46 AM:
+> On Wed, Nov 02, 2011 at 03:09:07PM +0100, Peter De Schrijver wrote:
+> > Add support for the tegra30 based cardhu development board. Cardhu is a tablet
+> > formfactor reference design for tegra30. The patch provides a device tree for
+> > the board, updates Makefile.boot to build the dtb, includes the platform in
+> > Kconfig and updates board-dt.c.
+...
+> > diff --git a/arch/arm/boot/dts/tegra-cardhu.dts b/arch/arm/boot/dts/tegra-cardhu.dts
+> > new file mode 100644
+> > index 0000000..70c41fc
+> > --- /dev/null
+> > +++ b/arch/arm/boot/dts/tegra-cardhu.dts
+> > @@ -0,0 +1,36 @@
+> > +/dts-v1/;
+> > +
+> > +/include/ "tegra30.dtsi"
+> > +
+> > +/ {
+> > +	model = "NVIDIA Tegra30 Cardhu evaluation board";
+> 
+> And this should probably be removed.
 
-Well, we now have patches for this board in the patch system:
+I don't follow the reasoning here; it seems correct to identify what this
+.dts file applies to, and having a model property is consistent with other
+.dts files, including non-Tegra boards.
 
-   7148/1? Add picosam9g45 board to         3.1?                 14:25:18?
-           Makefile
-   7147/1? Add kernel configuration option  3.1?                 14:25:17?
-           for picosam9g45 board
-   7146/1? Add support for mini-box.com     3.1?                 14:25:16?
-           picoSAM9G45 board
-
-along with these old ones:
-
-   6862/1? Add Board Support for Siemens L1 2.6.39-rc1?          04 Apr 2011?
-           Board
-   6861/1? Add Board Support for Siemens L0 2.6.39-rc1?          04 Apr 2011?
-           Board
-
-So, it sounds like I should just discard the three new ones - what about
-the old ones?  Those too?  I've not seen/heard anything further on them.
+-- 
+nvpublic
