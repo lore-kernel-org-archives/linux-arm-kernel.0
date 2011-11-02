@@ -1,31 +1,31 @@
-From: omar.ramirez@ti.com (Ramirez Luna, Omar)
-Date: Wed, 2 Nov 2011 10:24:49 -0500
-Subject: [PATCH v3 4/4] OMAP3/4: iommu: adapt to runtime pm
-In-Reply-To: <20111102152116.GB14916@n2100.arm.linux.org.uk>
-References: <1320185752-568-1-git-send-email-omar.ramirez@ti.com>
-	<1320185752-568-5-git-send-email-omar.ramirez@ti.com>
-	<20111102152116.GB14916@n2100.arm.linux.org.uk>
-Message-ID: <CAB-zwWhX5ayyG-Tz7rT4=gG-WZTpHEQskq50MMgPv8bj0VMiGw@mail.gmail.com>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Wed, 2 Nov 2011 17:25:23 +0200
+Subject: [PATCH] arm/tegra: remove unused defines
+Message-ID: <1320247524-22425-1-git-send-email-pdeschrijver@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 2, 2011 at 10:21 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Tue, Nov 01, 2011 at 05:15:52PM -0500, Omar Ramirez Luna wrote:
->> Use runtime PM functionality interfaced with hwmod enable/idle
->> functions, to replace direct clock operations, reset and sysconfig
->> handling.
->>
->> Tidspbridge uses a macro removed with this patch, for now the value
->> is hardcoded to avoid breaking compilation.
->
-> You probably want to include people involved with power management on
-> this, so maybe the linux-pm mailing list, and those involved with
-> runtime-pm stuff (I think Rafael qualifies as the maintainer for this
-> stuff, even if he's not listed in MAINTAINERS.)
+PPI_NR is never used in arch/arm/mach-tegra/irq.c. Remove it.
 
-Will do, I'll submit it again if no other comments are received.
+Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
+---
+ arch/arm/mach-tegra/irq.c |    4 ----
+ 1 files changed, 0 insertions(+), 4 deletions(-)
 
-Regards,
-
-Omar
+diff --git a/arch/arm/mach-tegra/irq.c b/arch/arm/mach-tegra/irq.c
+index 4956c3c..8ad82af 100644
+--- a/arch/arm/mach-tegra/irq.c
++++ b/arch/arm/mach-tegra/irq.c
+@@ -28,10 +28,6 @@
+ 
+ #include "board.h"
+ 
+-#define INT_SYS_NR	(INT_GPIO_BASE - INT_PRI_BASE)
+-#define INT_SYS_SZ	(INT_SEC_BASE - INT_PRI_BASE)
+-#define PPI_NR		((INT_SYS_NR+INT_SYS_SZ-1)/INT_SYS_SZ)
+-
+ #define ICTLR_CPU_IEP_VFIQ	0x08
+ #define ICTLR_CPU_IEP_FIR	0x14
+ #define ICTLR_CPU_IEP_FIR_SET	0x18
+-- 
+1.7.7.rc0.72.g4b5ea.dirty
