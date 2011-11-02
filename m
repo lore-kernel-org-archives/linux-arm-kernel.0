@@ -1,57 +1,85 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 2 Nov 2011 14:04:53 +0000
-Subject: [PATCH V3] AMBA: Put devices into low-power state in suspend_noirq
-In-Reply-To: <4EB14ABB.6020103@stericsson.com>
-References: <1320142497-16750-1-git-send-email-ulf.hansson@stericsson.com>
-	<CAJ0PZbTjoEbiaLpQ7DiVWT1FT3asWUYWp3voFQPXrAq_AjEDog@mail.gmail.com>
-	<20111102104950.GY19187@n2100.arm.linux.org.uk>
-	<4EB14ABB.6020103@stericsson.com>
-Message-ID: <20111102140453.GF19187@n2100.arm.linux.org.uk>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Wed, 2 Nov 2011 14:08:11 +0000
+Subject: [PATCHv2 02/10] ARM: vic: MULTI_IRQ_HANDLER handler
+In-Reply-To: <20111102134024.GE19187@n2100.arm.linux.org.uk>
+References: <1317206507-18867-1-git-send-email-jamie@jamieiles.com>
+	<1317206507-18867-3-git-send-email-jamie@jamieiles.com>
+	<20110928203905.GB2838@ponder.secretlab.ca>
+	<CACRpkdZKns-GraGp-YMD6jzOPETkvEpt9bC8HcYUmf3JUyCV3A@mail.gmail.com>
+	<20110929093009.GM17204@pulham.picochip.com>
+	<20111102134024.GE19187@n2100.arm.linux.org.uk>
+Message-ID: <20111102140811.GA22491@totoro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 02, 2011 at 02:50:51PM +0100, Ulf Hansson wrote:
-> Just some thinking, you may comment if you like....
->
-> When using a power_domain this will then mean that the power domain  
-> callbacks for suspend|resume should take similar actions as they do in  
-> their runtime_suspend|resume callbacks to put the devices into low power  
-> state. This should be in line of what you prefer?
+On Wed, Nov 02, 2011 at 01:40:24PM +0000, Russell King - ARM Linux wrote:
+> On Thu, Sep 29, 2011 at 10:30:09AM +0100, Jamie Iles wrote:
+> > +#ifdef CONFIG_MULTI_IRQ_HANDLER
+> > +static void vic_single_handle_irq(struct vic_device *vic, struct pt_regs *regs)
+> > +{
+> > +	u32 stat, irq;
+> > +
+> > +	stat = readl_relaxed(vic->base + VIC_IRQ_STATUS);
+> > +	while (stat) {
+> > +		irq = ffs(stat) - 1;
+> > +		handle_IRQ(irq_domain_to_irq(&vic->domain, irq), regs);
+> > +		stat &= ~(1 << irq);
+> > +	}
+> > +}
+> > +
+> > +asmlinkage void __exception_irq_entry vic_handle_irq(struct pt_regs *regs)
+> > +{
+> > +	int i;
+> > +
+> > +	for (i = 0; i < vic_id; ++i)
+> > +		vic_single_handle_irq(&vic_devices[i], regs);
+> > +}
+> 
+> And if we receive another interrupt after the read of the register, we'll
+> have to exit all the way back (possibly to userspace) before re-entering
+> the IRQ handling paths back to this point to process it.
 
-If it is appropriate to cut the vcore for the device when in runtime
-suspend state, then a driver itself has to explicitly do that.  vcore
-handling is different from pclk handling because loss of vcore requires
-the device to be reinitialized, whereas pclk does not.
+OK, so how about something like this instead:
 
-> This will mean some duplicated code but at the same time give the device  
-> driver full control and responsibility of putting its device in  
-> low-power state.
+static int vic_single_handle_irq(struct vic_device *vic,
+				 struct pt_regs *regs)
+{
+	u32 stat, irq;
+	int handled = 0;
 
-It should not mean any duplicated code - if a driver itself wishes to call
-its runtime suspend and resume handlers from its normal suspend/resume
-handlers, that's a choice it can make (and it alone can make).  Again,
-take a moment to think a little more about your original proposal of
-pushing that into the bus layer.
+	stat = readl_relaxed(vic->base + VIC_IRQ_STATUS);
+	while (stat) {
+		irq = ffs(stat) - 1;
+		handle_IRQ(irq_domain_to_irq(&vic->domain, irq), regs);
+		stat &= ~(1 << irq);
+		handled = 1;
+	}
 
-And consider the case of a non-runtime PM system (where the runtime PM
-callbacks are NULL) yet you have system suspend enabled, and you trigger
-a system suspend.  Do you really want the suspend of the devices to be
-skipped because the runtime PM callbacks were NULL because of system
-configuration?
+	return handled;
+}
 
-With them being explicit calls in the driver, this doesn't happen because
-if you omit those functions for non-runtime PM, you'll get a link error.
+asmlinkage void __exception_irq_entry vic_handle_irq(struct pt_regs *regs)
+{
+	int i, handled;
 
-> In parallel it would then also make sense to remove the pm_runtime  
-> handling completely from the amba bus and let the pclk be fully runtime  
-> handled from the device driver instead. Since it must handle it from  
-> suspend anyway...
+	do {
+		handled = 0;
+		for (i = 0; i < vic_id; ++i)
+			if (vic_single_handle_irq(&vic_devices[i], regs))
+				handled = 1;
+	} while (handled);
+}
 
-We know that it's safe to handle the pclk at the bus layer for normal
-runtime PM as it causes no state loss.  We also know that throwing the
-vcore handling in there is the wrong thing to do because it does cause
-state loss and therefore needs proper handling at the driver level.
+which I think should keep handling IRQ's until no VIC has them pending 
+(or as best can be determined).
 
-Hence, the bus code can take care of the pclk but not for vcore.
+> Is there any particular reason folk are destroying the built-in efficiency
+> of the IRQ handling which is common-place in the existing assembly
+> approach?
 
-So, I don't see any reason to change the bus code.
+Well this approach makes a single image kernel a bit easier.  The other 
+thing is that it plays a lot nicer with dynamic irq_desc assignment.  
+Grant's IRQ domain patches make this quite easy here, but I can't see an 
+obvious way to do that with the assembly method.
+
+Jamie
