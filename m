@@ -1,51 +1,56 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 02 Nov 2011 14:34:03 -0700
-Subject: [RFC PATCH 02/34] msm: clock: Always use an array to iterate
-	over clocks
-In-Reply-To: <20111102194555.GE12913@n2100.arm.linux.org.uk>
-References: <1320258991-22325-1-git-send-email-davidb@codeaurora.org>
-	<1320258991-22325-3-git-send-email-davidb@codeaurora.org>
-	<20111102194555.GE12913@n2100.arm.linux.org.uk>
-Message-ID: <4EB1B74B.8060006@codeaurora.org>
+From: khilman@ti.com (Kevin Hilman)
+Date: Wed, 02 Nov 2011 15:02:37 -0700
+Subject: [PATCH 00/10] cpufreq: OMAP: move into drivers, cleanups/fixes
+	for v3.2
+In-Reply-To: <1316725648-26710-1-git-send-email-khilman@ti.com>
+References: <1316725648-26710-1-git-send-email-khilman@ti.com>
+Message-ID: <4EB1BDFD.2060403@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/02/11 12:45, Russell King - ARM Linux wrote:
-> On Wed, Nov 02, 2011 at 11:35:59AM -0700, David Brown wrote:
->> If the array of clk_lookups contains aliases for the same struct
->> clk, msm_clock_init() will add the clock to the clocks list
->> twice.  This would cause list corruption so let's just remove the
->> clocks list and any associated code and iterate over the array
->> instead.
-> Hmm...
->
->> @@ -158,13 +152,13 @@ void __init msm_clock_init(struct clk_lookup *clock_tbl, unsigned num_clocks)
->>   */
->>  static int __init clock_late_init(void)
->>  {
->> +	unsigned i, count = 0;
->>  	unsigned long flags;
->> -	struct clk *clk;
->> -	unsigned count = 0;
->>  
->>  	clock_debug_init();
->> -	mutex_lock(&clocks_mutex);
->> -	list_for_each_entry(clk, &clocks, list) {
->> +	for (i = 0; i < msm_num_clocks; i++) {
->> +		struct clk *clk = msm_clocks[i].clk;
->> +
->>  		clock_debug_add(clk);
-> This means you'll end up calling clock_debug_add() twice for the same
-> struct clk - this sounds like a bad idea in itself.  It looks like
-> there's no protection within that function against it being called
-> twice with the same struct clk.
->
-> Are you sure this is safe?
+Hi Dave,
 
-This hasn't proven to be a problem so far because debugfs returns an
-error when you create a directory with the same name twice. If we ever
-do something more in clock_debug_add() we would have a problem.
+On 09/22/2011 02:07 PM, Kevin Hilman wrote:
+> This series moves the OMAP CPUfreq driver into drivers/cpufreq, add
+> support for SMP devices (OMAP4+) and includes several cleanups and
+> fixes from Nishanth Menon.
+> 
+> This series applies to v3.1-rc6, and is available here:
+> 
+>    git://github.com/khilman/linux-omap-pm.git for_3.2/omap-cpufreq
+> 
+> Kevin
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Any chance of this making it in for v3.2?
+
+Kevin
+
+> Colin Cross (1):
+>   cpufreq: OMAP: notify even with bad boot frequency
+> 
+> Nishanth Menon (6):
+>   cpufreq: OMAP: move clk name decision to init
+>   cpufreq: OMAP: deny initialization if no mpudev
+>   cpufreq: OMAP: dont support !freq_table
+>   cpufreq: OMAP: only supports OPP library
+>   cpufreq: OMAP: put clk if cpu_init failed
+>   cpufreq: OMAP: fix freq_table leak
+> 
+> Russell King (1):
+>   cpufreq: OMAP: Add SMP support for OMAP4+
+> 
+> Santosh Shilimkar (1):
+>   cpufreq: OMAP: cleanup for multi-SoC support, move into
+>     drivers/cpufreq
+> 
+> Todd Poynor (1):
+>   cpufreq: OMAP: Enable all CPUs in shared policy mask
+> 
+>  arch/arm/plat-omap/Makefile    |    1 -
+>  arch/arm/plat-omap/cpu-omap.c  |  171 -------------------------
+>  drivers/cpufreq/Makefile       |    1 +
+>  drivers/cpufreq/omap-cpufreq.c |  271 ++++++++++++++++++++++++++++++++++++++++
+>  4 files changed, 272 insertions(+), 172 deletions(-)
+>  delete mode 100644 arch/arm/plat-omap/cpu-omap.c
+>  create mode 100644 drivers/cpufreq/omap-cpufreq.c
+> 
