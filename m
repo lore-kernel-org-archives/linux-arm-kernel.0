@@ -1,99 +1,56 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 2 Nov 2011 14:16:28 +0000
-Subject: [PATCH] spi/pl022: Enable clock in probe an use runtime_idle
-In-Reply-To: <1319206124-17549-1-git-send-email-ulf.hansson@stericsson.com>
-References: <1319206124-17549-1-git-send-email-ulf.hansson@stericsson.com>
-Message-ID: <20111102141628.GG19187@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 2 Nov 2011 15:18:05 +0100
+Subject: [GIT PULL 0/13 (12)] arm-soc updates
+In-Reply-To: <CA+55aFzCyQ1fyTs5ZbcGD_gCVX0oA99NiLEsxMtJ1h9xf_-v9A@mail.gmail.com>
+References: <201111020322.46469.arnd@arndb.de>
+	<CA+55aFzCyQ1fyTs5ZbcGD_gCVX0oA99NiLEsxMtJ1h9xf_-v9A@mail.gmail.com>
+Message-ID: <201111021518.05477.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 21, 2011 at 04:08:44PM +0200, Ulf Hansson wrote:
-> Since we are always runtime resumed when leaving probe
-> the clock must be enabled. To accomplish that we are able
-> to be runtime suspended after probe in the case when no
-> request is going to be recieved, a runtime_idle function
-> has been implemented.
+On Wednesday 02 November 2011, Linus Torvalds wrote:
+> On Tue, Nov 1, 2011 at 7:22 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> >
+> > I have a series of 12 pull requests for the arm-soc tree, a total of 409
+> > non-merge commits. Feel free to pull either the for-linus branch that contains
+> > the lot with all conflicts resolved or the individual pull requests.
 > 
-> Change-Id: I6cb86f2cad30ecaab16f512daf4674b039b18213
-> Signed-off-by: Ulf Hansson <ulf.hansson@stericsson.com>
-> Reviewed-on: http://gerrit.lud.stericsson.com/gerrit/34447
+> Ok, I did the individual merges, because I really want to know what
+> horrible things go on there. Ugh.
+>
+> But I did compare it against your pre-merged thing, and there are some
+> differences. I think my version of the arch/arm/mach-omap2/Makefile
+> thing is better, for example (you seem to have the OMAP4_PANDA and
+> OMAP3517EVM boards duplicated). And the arch/arm/plat-omap/devices.c
+> difference is just a matter of taste.
 
-Sorry Ulf, this patch has issues.
+Right, your version looks better in both cases.
 
->  drivers/spi/spi-pl022.c |   18 +++++++++++++++++-
->  1 files changed, 17 insertions(+), 1 deletions(-)
-> 
-> diff --git a/drivers/spi/spi-pl022.c b/drivers/spi/spi-pl022.c
-> index f103e47..ad48fba 100644
-> --- a/drivers/spi/spi-pl022.c
-> +++ b/drivers/spi/spi-pl022.c
-> @@ -2184,6 +2184,12 @@ pl022_probe(struct amba_device *adev, const struct amba_id *id)
->  		goto  err_clk_prep;
->  	}
->  
-> +	status = clk_enable(pl022->clk);
-> +	if (status) {
-> +		dev_err(&adev->dev, "could not enable SSP/SPI bus clock\n");
-> +		goto err_no_clk_en;
-> +	}
-> +
->  	/* Disable SSP */
->  	writew((readw(SSP_CR1(pl022->virtbase)) & (~SSP_CR1_MASK_SSE)),
->  	       SSP_CR1(pl022->virtbase));
+> But the arch/arm/mach-omap2/board-generic.c difference is real. You
+> left a lot more header file includes in place, while my merge looked
+> at the previous commits and merges that removed a lot of them - and
+> followed suit. Maybe there was some reason you didn't?
 
-Ok - this is a bug fix.
+I've done this merge a few times. I think at one point I got it right,
+but the version I had in my combined branch used an earlier merge
+that got back through rerere. I'll try to watch out for these in the
+future.
 
-> @@ -2237,6 +2243,8 @@ pl022_probe(struct amba_device *adev, const struct amba_id *id)
->  
->  	free_irq(adev->irq[0], pl022);
->   err_no_irq:
-> +	clk_disable(pl022->clk);
-> + err_no_clk_en:
->  	clk_unprepare(pl022->clk);
->   err_clk_prep:
->  	clk_put(pl022->clk);
+> Also, your tree removed the atag_offset lines that weren't even content
+> conflicts, and again, there may have been some reason for that?
 
-As is this.
+This one was intentional, but it's not very important either. The
+conflict was between 5e52b435b "ARM: mach-omap2: convert boot_params
+to atag_offset" and 8d61649 "ARM: OMAP2+: board-generic: Add DT support
+to generic board" and . The first one changed the method how to
+find the traditional "atag" data structure, the second patch moved
+the file over from having one atag (and board number) based entry
+to having three distinct device tree based machine descriptions, which
+obsoletes the atag_offset/boot_params.
 
-> @@ -2342,11 +2350,19 @@ static int pl022_runtime_resume(struct device *dev)
->  
->  	return 0;
->  }
-> +
-> +static int pl022_runtime_idle(struct device *dev)
-> +{
-> +	pm_runtime_suspend(dev);
-> +	return 0;
-> +}
->  #endif
->  
->  static const struct dev_pm_ops pl022_dev_pm_ops = {
->  	SET_SYSTEM_SLEEP_PM_OPS(pl022_suspend, pl022_resume)
-> -	SET_RUNTIME_PM_OPS(pl022_runtime_suspend, pl022_runtime_resume, NULL)
-> +	SET_RUNTIME_PM_OPS(pl022_runtime_suspend,
-> +			   pl022_runtime_resume,
-> +			   pl022_runtime_idle)
+I had originally merged them incorrectly and it seems that this mismerge
+ended up in your tree now. It's harmless because the atag_offset is
+ignored here, but I'll send a cleanup after checking all other files
+that may have the same problem.
 
-This is an unnecessary change.
-
-The bus-level ops runtime PM ops call pm_generic_runtime_idle() when
-its 'runtime_idle' operation is invoked.  Let's look at the code
-there:
-
-int pm_generic_runtime_idle(struct device *dev)
-{
-        const struct dev_pm_ops *pm = dev->driver ? dev->driver->pm : NULL;
-
-        if (pm && pm->runtime_idle) {
-                int ret = pm->runtime_idle(dev);
-                if (ret)
-                        return ret;
-        }
-
-        pm_runtime_suspend(dev);
-        return 0;
-}
-
-If the driver has a NULL runtime idle, then generic code will call
-pm_runtime_suspend() for the device.  So, adding a runtime_idle callback
-to a driver to explicitly call pm_runtime_suspend() is not required.
+	Arnd
