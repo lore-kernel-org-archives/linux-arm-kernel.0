@@ -1,15 +1,21 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 2 Nov 2011 14:48:34 +0000
-Subject: [PATCH 1/5] ARM: restart: remove argument to setup_mm_for_reboot()
-In-Reply-To: <4EB07237.1090001@gmail.com>
+Date: Wed, 2 Nov 2011 14:49:34 +0000
+Subject: [RFC 0/5] restart cleanups
+In-Reply-To: <1320241747.20107.41.camel@ted>
 References: <20111101160731.GQ19187@n2100.arm.linux.org.uk>
-	<E1RLGt2-0005IN-A0@rmk-PC.arm.linux.org.uk>
-	<4EB07237.1090001@gmail.com>
-Message-ID: <20111102144834.GI19187@n2100.arm.linux.org.uk>
+	<20111101170225.GS19187@n2100.arm.linux.org.uk>
+	<1320241747.20107.41.camel@ted>
+Message-ID: <20111102144934.GJ19187@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 02, 2011 at 09:27:03AM +1100, Ryan Mallon wrote:
-> The comment should get removed now also.
+On Wed, Nov 02, 2011 at 01:49:07PM +0000, Richard Purdie wrote:
+> >From what I remember that hardware either always reboots or always
+> halts. I think the option was therefore left hardcoded to make it clear
+> it wasn't expected to work. Later Zaurii models could do either but
+> required some manual poking of registers to make it happen iirc.
+> 
+> Regardless, you can probably clean this up as you suggest now.
 
-Thanks, it'll be gone for the next posting of these patches.
+Thanks, I've now committed a change which removes the indirection
+entirely from poodle.
