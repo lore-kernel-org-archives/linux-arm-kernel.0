@@ -1,65 +1,42 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 2 Nov 2011 09:34:54 -0700
-Subject: [GIT PULL 0/13 (12)] arm-soc updates
-In-Reply-To: <201111021518.05477.arnd@arndb.de>
-References: <201111020322.46469.arnd@arndb.de>
-	<CA+55aFzCyQ1fyTs5ZbcGD_gCVX0oA99NiLEsxMtJ1h9xf_-v9A@mail.gmail.com>
-	<201111021518.05477.arnd@arndb.de>
-Message-ID: <20111102163454.GH31337@atomide.com>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Wed, 2 Nov 2011 09:39:21 -0700
+Subject: [PATCH] arm/tegra: add support for tegra30 interrupts
+In-Reply-To: <1320248292-22736-1-git-send-email-pdeschrijver@nvidia.com>
+References: <1320248292-22736-1-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF173F9A46E5@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Arnd Bergmann <arnd@arndb.de> [111102 06:43]:
-> On Wednesday 02 November 2011, Linus Torvalds wrote:
-> > On Tue, Nov 1, 2011 at 7:22 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > >
-> > > I have a series of 12 pull requests for the arm-soc tree, a total of 409
-> > > non-merge commits. Feel free to pull either the for-linus branch that contains
-> > > the lot with all conflicts resolved or the individual pull requests.
-> > 
-> > Ok, I did the individual merges, because I really want to know what
-> > horrible things go on there. Ugh.
-> >
-> > But I did compare it against your pre-merged thing, and there are some
-> > differences. I think my version of the arch/arm/mach-omap2/Makefile
-> > thing is better, for example (you seem to have the OMAP4_PANDA and
-> > OMAP3517EVM boards duplicated). And the arch/arm/plat-omap/devices.c
-> > difference is just a matter of taste.
+Peter De Schrijver wrote by Wednesday, November 02, 2011 9:38 AM:
+> Tegra30 has 1 extra legacy interrupt controller. Use the GIC ITLinesNumber
+> field to determine how many interrupt controllers we have and initialize
+> appropriately. Also make room for the extra tegra30 interrupts by moving
+> the GPIO IRQ base. This shouldn't affect existing code as it determines the
+> correct IRQ number for GPIOs using TEGRA_GPIO_TO_IRQ()
 > 
-> Right, your version looks better in both cases.
+> Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
 
-Yes thanks Arnd & Linus, what got merged is correct.
- 
-> > But the arch/arm/mach-omap2/board-generic.c difference is real. You
-> > left a lot more header file includes in place, while my merge looked
-> > at the previous commits and merges that removed a lot of them - and
-> > followed suit. Maybe there was some reason you didn't?
-> 
-> I've done this merge a few times. I think at one point I got it right,
-> but the version I had in my combined branch used an earlier merge
-> that got back through rerere. I'll try to watch out for these in the
-> future.
-> 
-> > Also, your tree removed the atag_offset lines that weren't even content
-> > conflicts, and again, there may have been some reason for that?
-> 
-> This one was intentional, but it's not very important either. The
-> conflict was between 5e52b435b "ARM: mach-omap2: convert boot_params
-> to atag_offset" and 8d61649 "ARM: OMAP2+: board-generic: Add DT support
-> to generic board" and . The first one changed the method how to
-> find the traditional "atag" data structure, the second patch moved
-> the file over from having one atag (and board number) based entry
-> to having three distinct device tree based machine descriptions, which
-> obsoletes the atag_offset/boot_params.
-> 
-> I had originally merged them incorrectly and it seems that this mismerge
-> ended up in your tree now. It's harmless because the atag_offset is
-> ignored here, but I'll send a cleanup after checking all other files
-> that may have the same problem.
+After fixing one small issue I comment on below,
+Acked-by: Stephen Warren <swarren@nvidia.com>
 
-This merge too is correct. Looks like there are some driver related
-build errors from other pull requests, will post patches for those.
+I was previously concerned that renumbering the interrupt IDs would cause
+some kind of backwards compatibility problems, but thinking more, I don't
+think there's an issue; for a DT-based system, all the IRQ and GPIO numbers
+are specified relative to the controller, and the relative numbering isn't
+changing here. For a non-DT-based system, any IRQ numbers for any GPIO
+should indeed be generated using TEGRA_GPIO_TO_IRQ (or the run-time
+equivalent) and hence should also work OK after this patch.
 
-Regards,
+> diff --git a/arch/arm/mach-tegra/include/mach/irqs.h b/arch/arm/mach-tegra/include/mach/irqs.h
+...
+>  #define NR_BOARD_IRQS			32
+> -
+> -#define NR_IRQS				(INT_BOARD_BASE + NR_BOARD_IRQS)
+> -#endif
+> +#define NR_IRQS                         (INT_BOARD_BASE + NR_BOARD_IRQS)
 
-Tony
+The indentation change to NR_IRQS seems like a mistake; the existing code
+looks OK.
+
+-- 
+nvpublic
