@@ -1,32 +1,42 @@
-From: davej@redhat.com (Dave Jones)
-Date: Wed, 2 Nov 2011 18:08:14 -0400
-Subject: [PATCH 00/10] cpufreq: OMAP: move into drivers, cleanups/fixes
-	for v3.2
-In-Reply-To: <4EB1BDFD.2060403@ti.com>
-References: <1316725648-26710-1-git-send-email-khilman@ti.com>
-	<4EB1BDFD.2060403@ti.com>
-Message-ID: <20111102220813.GA931@redhat.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Wed, 02 Nov 2011 15:27:25 -0700
+Subject: [GIT PULL] gpio/omap: minor cleanups for v3.2
+In-Reply-To: <8739g91dp5.fsf@ti.com>
+References: <8739g91dp5.fsf@ti.com>
+Message-ID: <4EB1C3CD.4030907@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 02, 2011 at 03:02:37PM -0700, Kevin Hilman wrote:
- > Hi Dave,
- > 
- > On 09/22/2011 02:07 PM, Kevin Hilman wrote:
- > > This series moves the OMAP CPUfreq driver into drivers/cpufreq, add
- > > support for SMP devices (OMAP4+) and includes several cleanups and
- > > fixes from Nishanth Menon.
- > > 
- > > This series applies to v3.1-rc6, and is available here:
- > > 
- > >    git://github.com/khilman/linux-omap-pm.git for_3.2/omap-cpufreq
- > > 
- > > Kevin
- > 
- > Any chance of this making it in for v3.2?
+Hi Grant,
 
-My kernel.org account being created is blocking on Ted uploading my
-signed gpg key.  If you want to ask Linus to pull directly until I get
-that sorted, feel free.  (Though I understand he has a dislike for github trees)
+On 09/06/2011 03:57 PM, Kevin Hilman wrote:
+> Grant,
+> 
+> Please pull the following OMAP GPIO cleanups for v3.2.
+> 
+> Just a heads up: we're also working on another large series of cleanup
+> for this driver that we'll be trying to merge for v3.2.
+> 
+> Kevin
 
-	Dave
+I don't see this in linux-next or your gpio/next branch.  Are you
+planning to pull this for v3.2?
+
+Kevin
+
+> 
+> The following changes since commit fcb8ce5cfe30ca9ca5c9a79cdfe26d1993e65e0c:
+> 
+>   Linux 3.1-rc3 (2011-08-22 11:42:53 -0700)
+> 
+> are available in the git repository at:
+>   git://gitorious.org/khilman/linux-omap-pm.git for_3.2/gpio-cleanup
+> 
+> Kevin Hilman (1):
+>       gpio/omap: replace MOD_REG_BIT macro with static inline
+> 
+> Todd Poynor (1):
+>       gpio/omap: check return value from irq_alloc_generic_chip
+> 
+>  drivers/gpio/gpio-omap.c |   59 ++++++++++++++++++++++++++-------------------
+>  1 files changed, 34 insertions(+), 25 deletions(-)
