@@ -1,254 +1,101 @@
 From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Thu, 03 Nov 2011 02:06:00 +0530
-Subject: [PATCH 3/6] arm: samsung: remove all uses of clk_type member in sdhci
-	platform data
+Date: Thu, 03 Nov 2011 02:06:02 +0530
+Subject: [PATCH 5/6] mmc: Add OF bindings support for mmc host controller
+	capabilities
 In-Reply-To: <1320266163-15292-1-git-send-email-thomas.abraham@linaro.org>
 References: <1320266163-15292-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <1320266163-15292-4-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <1320266163-15292-6-git-send-email-thomas.abraham@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The sdhci driver is modified to be independent of clk_type member in the sdhci
-platform data. Hence, all usage of clk_type in platform code is removed.
+Device nodes representing sd/mmc controllers in a device tree would include
+mmc host controller capabilities. Add support for parsing of mmc host
+controller capabilities included in device nodes.
 
-Cc: Kyungmin Park <kyungmin.park@samsung.com>
-Cc: JeongHyeon Kim <jhkim@insignal.co.kr>
-Cc: Kukjin Kim <kgene.kim@samsung.com>
-Cc: Changhwan Youn <chaos.youn@samsung.com>
-Cc: Alim Akhtar <alim.akhtar@samsung.com>
 Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
 ---
- arch/arm/mach-exynos4/mach-armlex4210.c     |    3 ---
- arch/arm/mach-exynos4/mach-nuri.c           |    3 ---
- arch/arm/mach-exynos4/mach-origen.c         |    2 --
- arch/arm/mach-exynos4/mach-smdk4x12.c       |    2 --
- arch/arm/mach-exynos4/mach-smdkv310.c       |    4 ----
- arch/arm/mach-exynos4/mach-universal_c210.c |    2 --
- arch/arm/plat-samsung/devs.c                |    4 ----
- arch/arm/plat-samsung/include/plat/sdhci.h  |    7 -------
- arch/arm/plat-samsung/platformdata.c        |    2 --
- 9 files changed, 0 insertions(+), 29 deletions(-)
+ .../devicetree/bindings/mmc/linux-mmc-host.txt     |   13 ++++++++
+ drivers/mmc/core/host.c                            |   31 ++++++++++++++++++++
+ include/linux/mmc/host.h                           |    1 +
+ 3 files changed, 45 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mmc/linux-mmc-host.txt
 
-diff --git a/arch/arm/mach-exynos4/mach-armlex4210.c b/arch/arm/mach-exynos4/mach-armlex4210.c
-index f0ca6c1..426b9d2 100644
---- a/arch/arm/mach-exynos4/mach-armlex4210.c
-+++ b/arch/arm/mach-exynos4/mach-armlex4210.c
-@@ -75,7 +75,6 @@ static struct s3c2410_uartcfg armlex4210_uartcfgs[] __initdata = {
+diff --git a/Documentation/devicetree/bindings/mmc/linux-mmc-host.txt b/Documentation/devicetree/bindings/mmc/linux-mmc-host.txt
+new file mode 100644
+index 0000000..714b2b1
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mmc/linux-mmc-host.txt
+@@ -0,0 +1,13 @@
++* Linux MMC Host Controller Capabilities
++
++The following bindings can be used in a device node to specify any board
++specific mmc host controller capabilities.
++
++- linux,mmc_cap_4_bit_data - Host can do 4-bit transfers
++- linux,mmc_cap_mmc_highspeed - Host can do MMC high-speed timing
++- linux,mmc_cap_sd_highspeed - Host can do SD high-speed timing
++- linux,mmc_cap_needs_poll - Host needs polling for card detection
++- linux,mmc_cap_8_bit_data - Host can do 8-bit transfer
++- linux,mmc_cap_disable - Host can be disabled and re-enabled to save power
++- linux,mmc_cap_nonremovable - Host is connected to nonremovable media
++- linux,mmc_cap_erase - Host allows erase/trim commands
+diff --git a/drivers/mmc/core/host.c b/drivers/mmc/core/host.c
+index ca2e4f5..aabf440 100644
+--- a/drivers/mmc/core/host.c
++++ b/drivers/mmc/core/host.c
+@@ -19,6 +19,7 @@
+ #include <linux/leds.h>
+ #include <linux/slab.h>
+ #include <linux/suspend.h>
++#include <linux/of.h>
  
- static struct s3c_sdhci_platdata armlex4210_hsmmc0_pdata __initdata = {
- 	.cd_type		= S3C_SDHCI_CD_PERMANENT,
--	.clk_type		= S3C_SDHCI_CLK_DIV_EXTERNAL,
- #ifdef CONFIG_EXYNOS4_SDHCI_CH0_8BIT
- 	.max_width		= 8,
- 	.host_caps		= MMC_CAP_8_BIT_DATA,
-@@ -86,13 +85,11 @@ static struct s3c_sdhci_platdata armlex4210_hsmmc2_pdata __initdata = {
- 	.cd_type		= S3C_SDHCI_CD_GPIO,
- 	.ext_cd_gpio		= EXYNOS4_GPX2(5),
- 	.ext_cd_gpio_invert	= 1,
--	.clk_type		= S3C_SDHCI_CLK_DIV_EXTERNAL,
- 	.max_width		= 4,
- };
- 
- static struct s3c_sdhci_platdata armlex4210_hsmmc3_pdata __initdata = {
- 	.cd_type		= S3C_SDHCI_CD_PERMANENT,
--	.clk_type		= S3C_SDHCI_CLK_DIV_EXTERNAL,
- 	.max_width		= 4,
- };
- 
-diff --git a/arch/arm/mach-exynos4/mach-nuri.c b/arch/arm/mach-exynos4/mach-nuri.c
-index 236bbe1..4abf4e4 100644
---- a/arch/arm/mach-exynos4/mach-nuri.c
-+++ b/arch/arm/mach-exynos4/mach-nuri.c
-@@ -109,7 +109,6 @@ static struct s3c_sdhci_platdata nuri_hsmmc0_data __initdata = {
- 				MMC_CAP_MMC_HIGHSPEED | MMC_CAP_SD_HIGHSPEED |
- 				MMC_CAP_DISABLE | MMC_CAP_ERASE),
- 	.cd_type		= S3C_SDHCI_CD_PERMANENT,
--	.clk_type		= S3C_SDHCI_CLK_DIV_EXTERNAL,
- };
- 
- static struct regulator_consumer_supply emmc_supplies[] = {
-@@ -151,7 +150,6 @@ static struct s3c_sdhci_platdata nuri_hsmmc2_data __initdata = {
- 	.ext_cd_gpio		= EXYNOS4_GPX3(3),	/* XEINT_27 */
- 	.ext_cd_gpio_invert	= 1,
- 	.cd_type		= S3C_SDHCI_CD_GPIO,
--	.clk_type		= S3C_SDHCI_CLK_DIV_EXTERNAL,
- };
- 
- /* WLAN */
-@@ -160,7 +158,6 @@ static struct s3c_sdhci_platdata nuri_hsmmc3_data __initdata = {
- 	.host_caps		= MMC_CAP_4_BIT_DATA |
- 				MMC_CAP_MMC_HIGHSPEED | MMC_CAP_SD_HIGHSPEED,
- 	.cd_type		= S3C_SDHCI_CD_EXTERNAL,
--	.clk_type		= S3C_SDHCI_CLK_DIV_EXTERNAL,
- };
- 
- static void __init nuri_sdhci_init(void)
-diff --git a/arch/arm/mach-exynos4/mach-origen.c b/arch/arm/mach-exynos4/mach-origen.c
-index f80b563..47efb34 100644
---- a/arch/arm/mach-exynos4/mach-origen.c
-+++ b/arch/arm/mach-exynos4/mach-origen.c
-@@ -465,12 +465,10 @@ static struct i2c_board_info i2c0_devs[] __initdata = {
- 
- static struct s3c_sdhci_platdata origen_hsmmc0_pdata __initdata = {
- 	.cd_type		= S3C_SDHCI_CD_INTERNAL,
--	.clk_type		= S3C_SDHCI_CLK_DIV_EXTERNAL,
- };
- 
- static struct s3c_sdhci_platdata origen_hsmmc2_pdata __initdata = {
- 	.cd_type		= S3C_SDHCI_CD_INTERNAL,
--	.clk_type		= S3C_SDHCI_CLK_DIV_EXTERNAL,
- };
- 
- /* USB EHCI */
-diff --git a/arch/arm/mach-exynos4/mach-smdk4x12.c b/arch/arm/mach-exynos4/mach-smdk4x12.c
-index fcf2e0e..96c60df 100644
---- a/arch/arm/mach-exynos4/mach-smdk4x12.c
-+++ b/arch/arm/mach-exynos4/mach-smdk4x12.c
-@@ -83,7 +83,6 @@ static struct s3c2410_uartcfg smdk4x12_uartcfgs[] __initdata = {
- 
- static struct s3c_sdhci_platdata smdk4x12_hsmmc2_pdata __initdata = {
- 	.cd_type		= S3C_SDHCI_CD_INTERNAL,
--	.clk_type		= S3C_SDHCI_CLK_DIV_EXTERNAL,
- #ifdef CONFIG_EXYNOS4_SDHCI_CH2_8BIT
- 	.max_width		= 8,
- 	.host_caps		= MMC_CAP_8_BIT_DATA,
-@@ -92,7 +91,6 @@ static struct s3c_sdhci_platdata smdk4x12_hsmmc2_pdata __initdata = {
- 
- static struct s3c_sdhci_platdata smdk4x12_hsmmc3_pdata __initdata = {
- 	.cd_type		= S3C_SDHCI_CD_INTERNAL,
--	.clk_type		= S3C_SDHCI_CLK_DIV_EXTERNAL,
- };
- 
- static struct regulator_consumer_supply max8997_buck1 =
-diff --git a/arch/arm/mach-exynos4/mach-smdkv310.c b/arch/arm/mach-exynos4/mach-smdkv310.c
-index cec2afa..f15ae7a 100644
---- a/arch/arm/mach-exynos4/mach-smdkv310.c
-+++ b/arch/arm/mach-exynos4/mach-smdkv310.c
-@@ -90,7 +90,6 @@ static struct s3c2410_uartcfg smdkv310_uartcfgs[] __initdata = {
- 
- static struct s3c_sdhci_platdata smdkv310_hsmmc0_pdata __initdata = {
- 	.cd_type		= S3C_SDHCI_CD_INTERNAL,
--	.clk_type		= S3C_SDHCI_CLK_DIV_EXTERNAL,
- #ifdef CONFIG_EXYNOS4_SDHCI_CH0_8BIT
- 	.max_width		= 8,
- 	.host_caps		= MMC_CAP_8_BIT_DATA,
-@@ -101,12 +100,10 @@ static struct s3c_sdhci_platdata smdkv310_hsmmc1_pdata __initdata = {
- 	.cd_type		= S3C_SDHCI_CD_GPIO,
- 	.ext_cd_gpio		= EXYNOS4_GPK0(2),
- 	.ext_cd_gpio_invert	= 1,
--	.clk_type		= S3C_SDHCI_CLK_DIV_EXTERNAL,
- };
- 
- static struct s3c_sdhci_platdata smdkv310_hsmmc2_pdata __initdata = {
- 	.cd_type		= S3C_SDHCI_CD_INTERNAL,
--	.clk_type		= S3C_SDHCI_CLK_DIV_EXTERNAL,
- #ifdef CONFIG_EXYNOS4_SDHCI_CH2_8BIT
- 	.max_width		= 8,
- 	.host_caps		= MMC_CAP_8_BIT_DATA,
-@@ -117,7 +114,6 @@ static struct s3c_sdhci_platdata smdkv310_hsmmc3_pdata __initdata = {
- 	.cd_type		= S3C_SDHCI_CD_GPIO,
- 	.ext_cd_gpio		= EXYNOS4_GPK2(2),
- 	.ext_cd_gpio_invert	= 1,
--	.clk_type		= S3C_SDHCI_CLK_DIV_EXTERNAL,
- };
- 
- static void lcd_lte480wv_set_power(struct plat_lcd_data *pd,
-diff --git a/arch/arm/mach-exynos4/mach-universal_c210.c b/arch/arm/mach-exynos4/mach-universal_c210.c
-index a2a177f..ab5eeb3 100644
---- a/arch/arm/mach-exynos4/mach-universal_c210.c
-+++ b/arch/arm/mach-exynos4/mach-universal_c210.c
-@@ -737,7 +737,6 @@ static struct s3c_sdhci_platdata universal_hsmmc0_data __initdata = {
- 				MMC_CAP_MMC_HIGHSPEED | MMC_CAP_SD_HIGHSPEED |
- 				MMC_CAP_DISABLE),
- 	.cd_type		= S3C_SDHCI_CD_PERMANENT,
--	.clk_type		= S3C_SDHCI_CLK_DIV_EXTERNAL,
- };
- 
- static struct regulator_consumer_supply mmc0_supplies[] = {
-@@ -778,7 +777,6 @@ static struct s3c_sdhci_platdata universal_hsmmc2_data __initdata = {
- 	.ext_cd_gpio		= EXYNOS4_GPX3(4),      /* XEINT_28 */
- 	.ext_cd_gpio_invert	= 1,
- 	.cd_type		= S3C_SDHCI_CD_GPIO,
--	.clk_type		= S3C_SDHCI_CLK_DIV_EXTERNAL,
- };
- 
- /* WiFi */
-diff --git a/arch/arm/plat-samsung/devs.c b/arch/arm/plat-samsung/devs.c
-index 4ca8b57..d009ad9 100644
---- a/arch/arm/plat-samsung/devs.c
-+++ b/arch/arm/plat-samsung/devs.c
-@@ -321,7 +321,6 @@ struct s3c_sdhci_platdata s3c_hsmmc0_def_platdata = {
- 	.max_width	= 4,
- 	.host_caps	= (MMC_CAP_4_BIT_DATA |
- 			   MMC_CAP_MMC_HIGHSPEED | MMC_CAP_SD_HIGHSPEED),
--	.clk_type	= S3C_SDHCI_CLK_DIV_INTERNAL,
- };
- 
- struct platform_device s3c_device_hsmmc0 = {
-@@ -352,7 +351,6 @@ struct s3c_sdhci_platdata s3c_hsmmc1_def_platdata = {
- 	.max_width	= 4,
- 	.host_caps	= (MMC_CAP_4_BIT_DATA |
- 			   MMC_CAP_MMC_HIGHSPEED | MMC_CAP_SD_HIGHSPEED),
--	.clk_type	= S3C_SDHCI_CLK_DIV_INTERNAL,
- };
- 
- struct platform_device s3c_device_hsmmc1 = {
-@@ -385,7 +383,6 @@ struct s3c_sdhci_platdata s3c_hsmmc2_def_platdata = {
- 	.max_width	= 4,
- 	.host_caps	= (MMC_CAP_4_BIT_DATA |
- 			   MMC_CAP_MMC_HIGHSPEED | MMC_CAP_SD_HIGHSPEED),
--	.clk_type	= S3C_SDHCI_CLK_DIV_INTERNAL,
- };
- 
- struct platform_device s3c_device_hsmmc2 = {
-@@ -416,7 +413,6 @@ struct s3c_sdhci_platdata s3c_hsmmc3_def_platdata = {
- 	.max_width	= 4,
- 	.host_caps	= (MMC_CAP_4_BIT_DATA |
- 			   MMC_CAP_MMC_HIGHSPEED | MMC_CAP_SD_HIGHSPEED),
--	.clk_type	= S3C_SDHCI_CLK_DIV_INTERNAL,
- };
- 
- struct platform_device s3c_device_hsmmc3 = {
-diff --git a/arch/arm/plat-samsung/include/plat/sdhci.h b/arch/arm/plat-samsung/include/plat/sdhci.h
-index 8daaa4d..ae23555 100644
---- a/arch/arm/plat-samsung/include/plat/sdhci.h
-+++ b/arch/arm/plat-samsung/include/plat/sdhci.h
-@@ -33,17 +33,11 @@ enum cd_types {
- 	S3C_SDHCI_CD_PERMANENT,	/* no CD line, card permanently wired to host */
- };
- 
--enum clk_types {
--	S3C_SDHCI_CLK_DIV_INTERNAL,	/* use mmc internal clock divider */
--	S3C_SDHCI_CLK_DIV_EXTERNAL,	/* use external clock divider */
--};
--
- /**
-  * struct s3c_sdhci_platdata() - Platform device data for Samsung SDHCI
-  * @max_width: The maximum number of data bits supported.
-  * @host_caps: Standard MMC host capabilities bit field.
-  * @cd_type: Type of Card Detection method (see cd_types enum above)
-- * @clk_type: Type of clock divider method (see clk_types enum above)
-  * @ext_cd_init: Initialize external card detect subsystem. Called on
-  *		 sdhci-s3c driver probe when cd_type == S3C_SDHCI_CD_EXTERNAL.
-  *		 notify_func argument is a callback to the sdhci-s3c driver
-@@ -66,7 +60,6 @@ struct s3c_sdhci_platdata {
- 	unsigned int	max_width;
- 	unsigned int	host_caps;
- 	enum cd_types	cd_type;
--	enum clk_types	clk_type;
- 
- 	int		ext_cd_gpio;
- 	bool		ext_cd_gpio_invert;
-diff --git a/arch/arm/plat-samsung/platformdata.c b/arch/arm/plat-samsung/platformdata.c
-index 4c9a207..88c5e7c 100644
---- a/arch/arm/plat-samsung/platformdata.c
-+++ b/arch/arm/plat-samsung/platformdata.c
-@@ -52,6 +52,4 @@ void s3c_sdhci_set_platdata(struct s3c_sdhci_platdata *pd,
- 		set->cfg_gpio = pd->cfg_gpio;
- 	if (pd->host_caps)
- 		set->host_caps |= pd->host_caps;
--	if (pd->clk_type)
--		set->clk_type = pd->clk_type;
+ #include <linux/mmc/host.h>
+ #include <linux/mmc/card.h>
+@@ -396,3 +397,33 @@ void mmc_free_host(struct mmc_host *host)
  }
+ 
+ EXPORT_SYMBOL(mmc_free_host);
++
++#ifdef CONFIG_OF
++/**
++ *	mmc_of_parse_host_caps - parse mmc host capabilities from device node
++ *	@np: pointer to device node in device tree
++ *	@caps: pointer to host caps value to be returned
++ *
++ *	Search the device node in device tree for mmc host capabilities.
++ */
++void mmc_of_parse_host_caps(struct device_node *np, unsigned long *caps)
++{
++	if (of_find_property(np, "linux,mmc_cap_4_bit_data", NULL))
++		*caps |= MMC_CAP_4_BIT_DATA;
++	if (of_find_property(np, "linux,mmc_cap_mmc_highspeed", NULL))
++		*caps |= MMC_CAP_MMC_HIGHSPEED;
++	if (of_find_property(np, "linux,mmc_cap_sd_highspeed", NULL))
++		*caps |= MMC_CAP_SD_HIGHSPEED;
++	if (of_find_property(np, "linux,mmc_cap_needs_poll", NULL))
++		*caps |= MMC_CAP_NEEDS_POLL;
++	if (of_find_property(np, "linux,mmc_cap_8_bit_data", NULL))
++		*caps |= MMC_CAP_8_BIT_DATA;
++	if (of_find_property(np, "linux,mmc_cap_disable", NULL))
++		*caps |= MMC_CAP_DISABLE;
++	if (of_find_property(np, "linux,mmc_cap_nonremovable", NULL))
++		*caps |= MMC_CAP_NONREMOVABLE;
++	if (of_find_property(np, "linux,mmc_cap_erase", NULL))
++		*caps |= MMC_CAP_ERASE;
++}
++EXPORT_SYMBOL(mmc_of_parse_host_caps);
++#endif /* CONFIG_OF */
+diff --git a/include/linux/mmc/host.h b/include/linux/mmc/host.h
+index a3ac9c4..c81c6e8 100644
+--- a/include/linux/mmc/host.h
++++ b/include/linux/mmc/host.h
+@@ -330,6 +330,7 @@ extern struct mmc_host *mmc_alloc_host(int extra, struct device *);
+ extern int mmc_add_host(struct mmc_host *);
+ extern void mmc_remove_host(struct mmc_host *);
+ extern void mmc_free_host(struct mmc_host *);
++extern void mmc_of_parse_host_caps(struct device_node *np, unsigned long *caps);
+ 
+ static inline void *mmc_priv(struct mmc_host *host)
+ {
 -- 
 1.6.6.rc2
