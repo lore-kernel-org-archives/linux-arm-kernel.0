@@ -1,42 +1,26 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Wed, 2 Nov 2011 09:39:21 -0700
-Subject: [PATCH] arm/tegra: add support for tegra30 interrupts
-In-Reply-To: <1320248292-22736-1-git-send-email-pdeschrijver@nvidia.com>
-References: <1320248292-22736-1-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF173F9A46E5@HQMAIL01.nvidia.com>
+From: linux_arm@lakedaemon.net (Jason)
+Date: Wed, 2 Nov 2011 12:50:57 -0400
+Subject: orion/kirkwood and device tree
+In-Reply-To: <201110312350.28475.michael@walle.cc>
+References: <20111031105740.GC29402@lunn.ch>
+	<20111031152100.GR32165@titan.lakedaemon.net>
+	<20111031164042.GD29402@lunn.ch>
+	<201110312350.28475.michael@walle.cc>
+Message-ID: <20111102165057.GU32165@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Peter De Schrijver wrote by Wednesday, November 02, 2011 9:38 AM:
-> Tegra30 has 1 extra legacy interrupt controller. Use the GIC ITLinesNumber
-> field to determine how many interrupt controllers we have and initialize
-> appropriately. Also make room for the extra tegra30 interrupts by moving
-> the GPIO IRQ base. This shouldn't affect existing code as it determines the
-> correct IRQ number for GPIOs using TEGRA_GPIO_TO_IRQ()
-> 
-> Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
+Michael,
 
-After fixing one small issue I comment on below,
-Acked-by: Stephen Warren <swarren@nvidia.com>
+On Mon, Oct 31, 2011 at 11:50:28PM +0100, Michael Walle wrote:
+> i've already ported some marvell devices to DT. spi-orion, orion-wdt, rtc-mv 
+> and mv_cesa. Atm i'm struggling with how to pass kirkwood_mbus_dram_info to 
+> the device drivers (the old method is to pass it through platform_data)
 
-I was previously concerned that renumbering the interrupt IDs would cause
-some kind of backwards compatibility problems, but thinking more, I don't
-think there's an issue; for a DT-based system, all the IRQ and GPIO numbers
-are specified relative to the controller, and the relative numbering isn't
-changing here. For a non-DT-based system, any IRQ numbers for any GPIO
-should indeed be generated using TEGRA_GPIO_TO_IRQ (or the run-time
-equivalent) and hence should also work OK after this patch.
+Do you have a public git tree I could pull from, by chance?  I don't
+care about the state, I'd like to learn by example and start pitching
+in.
 
-> diff --git a/arch/arm/mach-tegra/include/mach/irqs.h b/arch/arm/mach-tegra/include/mach/irqs.h
-...
->  #define NR_BOARD_IRQS			32
-> -
-> -#define NR_IRQS				(INT_BOARD_BASE + NR_BOARD_IRQS)
-> -#endif
-> +#define NR_IRQS                         (INT_BOARD_BASE + NR_BOARD_IRQS)
+thx,
 
-The indentation change to NR_IRQS seems like a mistake; the existing code
-looks OK.
-
--- 
-nvpublic
+Jason.
