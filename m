@@ -1,108 +1,111 @@
 From: davidb@codeaurora.org (David Brown)
-Date: Wed,  2 Nov 2011 11:35:58 -0700
-Subject: [RFC PATCH 01/34] msm: clock-pcom: Mark functions static
+Date: Wed,  2 Nov 2011 11:36:01 -0700
+Subject: [RFC PATCH 04/34] msm: clock: Support one lock per clock
 In-Reply-To: <1320258991-22325-1-git-send-email-davidb@codeaurora.org>
 References: <1320258991-22325-1-git-send-email-davidb@codeaurora.org>
-Message-ID: <1320258991-22325-2-git-send-email-davidb@codeaurora.org>
+Message-ID: <1320258991-22325-5-git-send-email-davidb@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Stephen Boyd <sboyd@codeaurora.org>
 
-These functions are only used within clock-pcom.c, therefore mark
-them as static.
-
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 Signed-off-by: David Brown <davidb@codeaurora.org>
 ---
- arch/arm/mach-msm/clock-pcom.c |   18 +++++++++---------
- 1 files changed, 9 insertions(+), 9 deletions(-)
+ arch/arm/mach-msm/clock.c |   19 +++++++++++--------
+ arch/arm/mach-msm/clock.h |    2 ++
+ 2 files changed, 13 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/mach-msm/clock-pcom.c b/arch/arm/mach-msm/clock-pcom.c
-index 63b7113..a52c970 100644
---- a/arch/arm/mach-msm/clock-pcom.c
-+++ b/arch/arm/mach-msm/clock-pcom.c
-@@ -25,7 +25,7 @@
+diff --git a/arch/arm/mach-msm/clock.c b/arch/arm/mach-msm/clock.c
+index a9dabde..aa4a450 100644
+--- a/arch/arm/mach-msm/clock.c
++++ b/arch/arm/mach-msm/clock.c
+@@ -26,19 +26,17 @@
+ 
+ #include "clock.h"
+ 
+-static DEFINE_SPINLOCK(clocks_lock);
+-
  /*
-  * glue for the proc_comm interface
+  * Standard clock functions defined in include/linux/clk.h
   */
--int pc_clk_enable(unsigned id)
-+static int pc_clk_enable(unsigned id)
+ int clk_enable(struct clk *clk)
  {
- 	int rc = msm_proc_comm(PCOM_CLKCTL_RPC_ENABLE, &id, NULL);
- 	if (rc < 0)
-@@ -34,7 +34,7 @@ int pc_clk_enable(unsigned id)
- 		return (int)id < 0 ? -EINVAL : 0;
+ 	unsigned long flags;
+-	spin_lock_irqsave(&clocks_lock, flags);
++	spin_lock_irqsave(&clk->lock, flags);
+ 	clk->count++;
+ 	if (clk->count == 1)
+ 		clk->ops->enable(clk);
+-	spin_unlock_irqrestore(&clocks_lock, flags);
++	spin_unlock_irqrestore(&clk->lock, flags);
+ 	return 0;
  }
- 
--void pc_clk_disable(unsigned id)
-+static void pc_clk_disable(unsigned id)
+ EXPORT_SYMBOL(clk_enable);
+@@ -46,12 +44,12 @@ EXPORT_SYMBOL(clk_enable);
+ void clk_disable(struct clk *clk)
  {
- 	msm_proc_comm(PCOM_CLKCTL_RPC_DISABLE, &id, NULL);
+ 	unsigned long flags;
+-	spin_lock_irqsave(&clocks_lock, flags);
++	spin_lock_irqsave(&clk->lock, flags);
+ 	BUG_ON(clk->count == 0);
+ 	clk->count--;
+ 	if (clk->count == 0)
+ 		clk->ops->disable(clk);
+-	spin_unlock_irqrestore(&clocks_lock, flags);
++	spin_unlock_irqrestore(&clk->lock, flags);
  }
-@@ -54,7 +54,7 @@ int pc_clk_reset(unsigned id, enum clk_reset_action action)
- 		return (int)id < 0 ? -EINVAL : 0;
- }
+ EXPORT_SYMBOL(clk_disable);
  
--int pc_clk_set_rate(unsigned id, unsigned rate)
-+static int pc_clk_set_rate(unsigned id, unsigned rate)
+@@ -137,8 +135,13 @@ static unsigned msm_num_clocks;
+ 
+ void __init msm_clock_init(struct clk_lookup *clock_tbl, size_t num_clocks)
  {
- 	/* The rate _might_ be rounded off to the nearest KHz value by the
- 	 * remote function. So a return value of 0 doesn't necessarily mean
-@@ -67,7 +67,7 @@ int pc_clk_set_rate(unsigned id, unsigned rate)
- 		return (int)id < 0 ? -EINVAL : 0;
- }
++	unsigned n;
++
+ 	clkdev_add_table(clock_tbl, num_clocks);
  
--int pc_clk_set_min_rate(unsigned id, unsigned rate)
-+static int pc_clk_set_min_rate(unsigned id, unsigned rate)
- {
- 	int rc = msm_proc_comm(PCOM_CLKCTL_RPC_MIN_RATE, &id, &rate);
- 	if (rc < 0)
-@@ -76,7 +76,7 @@ int pc_clk_set_min_rate(unsigned id, unsigned rate)
- 		return (int)id < 0 ? -EINVAL : 0;
- }
++	for (n = 0; n < num_clocks; n++)
++		spin_lock_init(&clock_tbl[n].clk->lock);
++
+ 	ebi1_clk = clk_get(NULL, "ebi1_clk");
+ 	BUG_ON(ebi1_clk == NULL);
  
--int pc_clk_set_max_rate(unsigned id, unsigned rate)
-+static int pc_clk_set_max_rate(unsigned id, unsigned rate)
- {
- 	int rc = msm_proc_comm(PCOM_CLKCTL_RPC_MAX_RATE, &id, &rate);
- 	if (rc < 0)
-@@ -85,7 +85,7 @@ int pc_clk_set_max_rate(unsigned id, unsigned rate)
- 		return (int)id < 0 ? -EINVAL : 0;
- }
+@@ -161,12 +164,12 @@ static int __init clock_late_init(void)
  
--int pc_clk_set_flags(unsigned id, unsigned flags)
-+static int pc_clk_set_flags(unsigned id, unsigned flags)
- {
- 	int rc = msm_proc_comm(PCOM_CLKCTL_RPC_SET_FLAGS, &id, &flags);
- 	if (rc < 0)
-@@ -94,7 +94,7 @@ int pc_clk_set_flags(unsigned id, unsigned flags)
- 		return (int)id < 0 ? -EINVAL : 0;
- }
+ 		clock_debug_add(clk);
+ 		if (clk->flags & CLKFLAG_AUTO_OFF) {
+-			spin_lock_irqsave(&clocks_lock, flags);
++			spin_lock_irqsave(&clk->lock, flags);
+ 			if (!clk->count) {
+ 				count++;
+ 				clk->ops->auto_off(clk);
+ 			}
+-			spin_unlock_irqrestore(&clocks_lock, flags);
++			spin_unlock_irqrestore(&clk->lock, flags);
+ 		}
+ 	}
+ 	pr_info("clock_late_init() disabled %d unused clocks\n", count);
+diff --git a/arch/arm/mach-msm/clock.h b/arch/arm/mach-msm/clock.h
+index 7fe1598..89506a8 100644
+--- a/arch/arm/mach-msm/clock.h
++++ b/arch/arm/mach-msm/clock.h
+@@ -19,6 +19,7 @@
  
--unsigned pc_clk_get_rate(unsigned id)
-+static unsigned pc_clk_get_rate(unsigned id)
- {
- 	if (msm_proc_comm(PCOM_CLKCTL_RPC_RATE, &id, NULL))
- 		return 0;
-@@ -102,7 +102,7 @@ unsigned pc_clk_get_rate(unsigned id)
- 		return id;
- }
+ #include <linux/init.h>
+ #include <linux/list.h>
++#include <linux/spinlock.h>
+ #include <mach/clk.h>
  
--unsigned pc_clk_is_enabled(unsigned id)
-+static unsigned pc_clk_is_enabled(unsigned id)
- {
- 	if (msm_proc_comm(PCOM_CLKCTL_RPC_ENABLED, &id, NULL))
- 		return 0;
-@@ -110,7 +110,7 @@ unsigned pc_clk_is_enabled(unsigned id)
- 		return id;
- }
+ #define CLKFLAG_INVERT			0x00000001
+@@ -53,6 +54,7 @@ struct clk {
+ 	uint32_t flags;
+ 	struct clk_ops *ops;
+ 	const char *dbg_name;
++	spinlock_t lock;
+ };
  
--long pc_clk_round_rate(unsigned id, unsigned rate)
-+static long pc_clk_round_rate(unsigned id, unsigned rate)
- {
- 
- 	/* Not really supported; pc_clk_set_rate() does rounding on it's own. */
+ #define OFF CLKFLAG_AUTO_OFF
 -- 
 Sent by an employee of the Qualcomm Innovation Center, Inc.
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
