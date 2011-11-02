@@ -1,21 +1,46 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 2 Nov 2011 14:49:34 +0000
-Subject: [RFC 0/5] restart cleanups
-In-Reply-To: <1320241747.20107.41.camel@ted>
-References: <20111101160731.GQ19187@n2100.arm.linux.org.uk>
-	<20111101170225.GS19187@n2100.arm.linux.org.uk>
-	<1320241747.20107.41.camel@ted>
-Message-ID: <20111102144934.GJ19187@n2100.arm.linux.org.uk>
+From: omar.ramirez@ti.com (Ramirez Luna, Omar)
+Date: Wed, 2 Nov 2011 09:56:28 -0500
+Subject: [PATCH v3 0/4] OMAP: iommu: hwmod support and runtime PM
+In-Reply-To: <1320185752-568-1-git-send-email-omar.ramirez@ti.com>
+References: <1320185752-568-1-git-send-email-omar.ramirez@ti.com>
+Message-ID: <CAB-zwWiTA7O4CiP7HmY3hEA3sZ-05FbR0WsA1NVJD4aExE5wow@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 02, 2011 at 01:49:07PM +0000, Richard Purdie wrote:
-> >From what I remember that hardware either always reboots or always
-> halts. I think the option was therefore left hardcoded to make it clear
-> it wasn't expected to work. Later Zaurii models could do either but
-> required some manual poking of registers to make it happen iirc.
-> 
-> Regardless, you can probably clean this up as you suggest now.
++ Joerg, iommu-list
 
-Thanks, I've now committed a change which removes the indirection
-entirely from poodle.
+On Tue, Nov 1, 2011 at 5:15 PM, Omar Ramirez Luna <omar.ramirez@ti.com> wrote:
+> Introduced hwmod support for OMAP3 (iva, isp) and OMAP4 (ipu, dsp),
+> along with the corresponding runtime PM routines to deassert reset
+> lines, enable/disable clocks and configure sysc registers.
+>
+> v3:
+> - Rebased to 3.1-rc10 lo rebuilt, added structure terminators, and
+> removed .omap_chip field.
+>
+> v2:
+> - Added oh reset info to assert/deassert mmu reset lines.
+> - Addressed previous comments on v1
+> http://www.spinics.net/lists/arm-kernel/msg103271.html
+>
+> Due to compatibility an ifdef needs to be propagated (previously on
+> iommu resource info) to hwmod data in OMAP3, so users of iommu and
+> tidspbridge can avoid issues of two modules managing mmu data/irqs/resets;
+> this until tidspbridge can be safely migrated to iommu framework.
+>
+> Omar Ramirez Luna (4):
+> ?OMAP3: hwmod data: add mmu data for iva and isp
+> ?OMAP4: hwmod data: add mmu hwmod for ipu and dsp
+> ?OMAP3/4: iommu: migrate to hwmod framework
+> ?OMAP3/4: iommu: adapt to runtime pm
+>
+> ?arch/arm/mach-omap2/iommu2.c ? ? ? ? ? ? ? ? ? ? ?| ? 36 -----
+> ?arch/arm/mach-omap2/omap-iommu.c ? ? ? ? ? ? ? ? ?| ?162 ++++-----------------
+> ?arch/arm/mach-omap2/omap_hwmod_3xxx_data.c ? ? ? ?| ?131 +++++++++++++++++
+> ?arch/arm/mach-omap2/omap_hwmod_44xx_data.c ? ? ? ?| ?154 ++++++++++++++++++--
+> ?arch/arm/plat-omap/include/plat/iommu.h ? ? ? ? ? | ? 17 ++-
+> ?arch/arm/plat-omap/include/plat/iommu2.h ? ? ? ? ?| ? ?2 -
+> ?drivers/iommu/omap-iommu.c ? ? ? ? ? ? ? ? ? ? ? ?| ? 49 +++----
+> ?drivers/media/video/omap3isp/isp.c ? ? ? ? ? ? ? ?| ? ?2 +-
+> ?drivers/staging/tidspbridge/core/tiomap3430_pwr.c | ? ?2 +-
+> ?9 files changed, 339 insertions(+), 216 deletions(-)
