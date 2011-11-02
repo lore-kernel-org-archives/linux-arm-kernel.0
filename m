@@ -1,49 +1,40 @@
 From: jason.hui@linaro.org (Jason Liu)
-Date: Wed, 2 Nov 2011 19:03:54 +0800
-Subject: [PATCH] slub: doc: update the slabinfo.c file path
+Date: Wed, 2 Nov 2011 19:03:55 +0800
+Subject: [PATCH v3 2/3] ARM:i.MX: fix the build error in clock-mx51-mx53.c
 In-Reply-To: <1320231836-9555-1-git-send-email-jason.hui@linaro.org>
 References: <1320231836-9555-1-git-send-email-jason.hui@linaro.org>
-Message-ID: <1320231836-9555-4-git-send-email-jason.hui@linaro.org>
+Message-ID: <1320231836-9555-5-git-send-email-jason.hui@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-slabinfo.c has been moved from Documentaion/vm/ to
-tools/slub/ by commit:0d24db337e6d81c0c620ab65cc6947bd6553f742
-
-Update the slub.txt doc to reflect this change too.
+arch/arm/mach-mx5/clock-mx51-mx53.c: In function 'clk_get_freq_dt':
+arch/arm/mach-mx5/clock-mx51-mx53.c:1643: error: implicit declaration of function 'for_each_compatible_node'
+arch/arm/mach-mx5/clock-mx51-mx53.c:1643: error: expected ';' before '{' token
 
 Signed-off-by: Jason Liu <jason.hui@linaro.org>
-Cc: Christoph Lameter <cl@linux-foundation.org>
 ---
- Documentation/vm/00-INDEX |    2 --
- Documentation/vm/slub.txt |    2 +-
- 2 files changed, 1 insertions(+), 3 deletions(-)
+ arch/arm/mach-mx5/clock-mx51-mx53.c |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
 
-diff --git a/Documentation/vm/00-INDEX b/Documentation/vm/00-INDEX
-index dca82d7..5481c8b 100644
---- a/Documentation/vm/00-INDEX
-+++ b/Documentation/vm/00-INDEX
-@@ -30,8 +30,6 @@ page_migration
- 	- description of page migration in NUMA systems.
- pagemap.txt
- 	- pagemap, from the userspace perspective
--slabinfo.c
--	- source code for a tool to get reports about slabs.
- slub.txt
- 	- a short users guide for SLUB.
- unevictable-lru.txt
-diff --git a/Documentation/vm/slub.txt b/Documentation/vm/slub.txt
-index 07375e7..f464f47 100644
---- a/Documentation/vm/slub.txt
-+++ b/Documentation/vm/slub.txt
-@@ -17,7 +17,7 @@ data and perform operation on the slabs. By default slabinfo only lists
- slabs that have data in them. See "slabinfo -h" for more options when
- running the command. slabinfo can be compiled with
+diff --git a/arch/arm/mach-mx5/clock-mx51-mx53.c b/arch/arm/mach-mx5/clock-mx51-mx53.c
+index 2aacf41..7c373b83 100644
+--- a/arch/arm/mach-mx5/clock-mx51-mx53.c
++++ b/arch/arm/mach-mx5/clock-mx51-mx53.c
+@@ -1637,6 +1637,7 @@ int __init mx53_clocks_init(unsigned long ckil, unsigned long osc,
+ static void __init clk_get_freq_dt(unsigned long *ckil, unsigned long *osc,
+ 				   unsigned long *ckih1, unsigned long *ckih2)
+ {
++#ifdef CONFIG_OF
+ 	struct device_node *np;
  
--gcc -o slabinfo Documentation/vm/slabinfo.c
-+gcc -o slabinfo tools/slub/slabinfo.c
+ 	/* retrieve the freqency of fixed clocks from device tree */
+@@ -1654,6 +1655,7 @@ static void __init clk_get_freq_dt(unsigned long *ckil, unsigned long *osc,
+ 		else if (of_device_is_compatible(np, "fsl,imx-ckih2"))
+ 			*ckih2 = rate;
+ 	}
++#endif
+ }
  
- Some of the modes of operation of slabinfo require that slub debugging
- be enabled on the command line. F.e. no tracking information will be
+ int __init mx51_clocks_init_dt(void)
 -- 
 1.7.4.1
