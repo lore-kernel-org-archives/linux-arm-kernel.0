@@ -1,35 +1,15 @@
-From: javi.merino@arm.com (Javi Merino)
-Date: Wed,  2 Nov 2011 14:30:59 +0000
-Subject: [PATCH 4/4] ARM: PL330: Fix typo in _prepare_ccr()
-In-Reply-To: <1320244259-10496-1-git-send-email-javi.merino@arm.com>
-References: <1320244259-10496-1-git-send-email-javi.merino@arm.com>
-Message-ID: <1320244259-10496-4-git-send-email-javi.merino@arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 2 Nov 2011 14:48:34 +0000
+Subject: [PATCH 1/5] ARM: restart: remove argument to setup_mm_for_reboot()
+In-Reply-To: <4EB07237.1090001@gmail.com>
+References: <20111101160731.GQ19187@n2100.arm.linux.org.uk>
+	<E1RLGt2-0005IN-A0@rmk-PC.arm.linux.org.uk>
+	<4EB07237.1090001@gmail.com>
+Message-ID: <20111102144834.GI19187@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-scctl should be shifted by CC_SRCCTRL_SHFT and dcctl by
-CC_DSTCCTRL_SHFT, not the other way round.
+On Wed, Nov 02, 2011 at 09:27:03AM +1100, Ryan Mallon wrote:
+> The comment should get removed now also.
 
-Signed-off-by: Javi Merino <javi.merino@arm.com>
-Cc: Jassi Brar <jassi.brar@samsung.com>
----
- arch/arm/common/pl330.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/common/pl330.c b/arch/arm/common/pl330.c
-index 590fd57..1817963 100644
---- a/arch/arm/common/pl330.c
-+++ b/arch/arm/common/pl330.c
-@@ -1211,8 +1211,8 @@ static inline u32 _prepare_ccr(const struct pl330_reqcfg *rqc)
- 	ccr |= (rqc->brst_size << CC_SRCBRSTSIZE_SHFT);
- 	ccr |= (rqc->brst_size << CC_DSTBRSTSIZE_SHFT);
- 
--	ccr |= (rqc->dcctl << CC_SRCCCTRL_SHFT);
--	ccr |= (rqc->scctl << CC_DSTCCTRL_SHFT);
-+	ccr |= (rqc->scctl << CC_SRCCCTRL_SHFT);
-+	ccr |= (rqc->dcctl << CC_DSTCCTRL_SHFT);
- 
- 	ccr |= (rqc->swap << CC_SWAP_SHFT);
- 
--- 
-1.7.0.4
+Thanks, it'll be gone for the next posting of these patches.
