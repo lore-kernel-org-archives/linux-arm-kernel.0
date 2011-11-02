@@ -1,56 +1,92 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Wed, 2 Nov 2011 16:41:02 +0100
-Subject: AT91 reboot code
-In-Reply-To: <20111102151210.GL19187@n2100.arm.linux.org.uk>
-References: <20111101144058.GP19187@n2100.arm.linux.org.uk>
-	<CAFumwP2m7=QsMTGAafPJs2ekm0R5FqCg8QxbOESBCq5r1PQkrA@mail.gmail.com>
-	<20111102145903.GK19187@n2100.arm.linux.org.uk>
-	<20111102151210.GL19187@n2100.arm.linux.org.uk>
-Message-ID: <20111102154102.GB7136@game.jcrosoft.org>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Wed, 2 Nov 2011 17:46:10 +0200
+Subject: [PATCH v2 8/8] arm/tegra: add support for tegra30 based board
+	cardhu
+In-Reply-To: <1320242948-21061-9-git-send-email-pdeschrijver@nvidia.com>
+References: <1320242948-21061-1-git-send-email-pdeschrijver@nvidia.com>
+	<1320242948-21061-9-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <20111102154610.GJ13358@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15:12 Wed 02 Nov     , Russell King - ARM Linux wrote:
-> On Wed, Nov 02, 2011 at 02:59:03PM +0000, Russell King - ARM Linux wrote:
-> > On Wed, Nov 02, 2011 at 07:43:28AM +0200, Andrew Victor wrote:
-> > > hi Russell,
-> > > 
-> > > > Is there any reason this can't just be:
-> > > >
-> > > > void (*arch_reset)(char mode, const char *cmd);
-> > > 
-> > > I don't see any reason why not, except if arch_reset() can be called
-> > > early in the setup code (before the platform initialization).
-> > 
-> > There is a case where it could happen - that is if you panic and you
-> > have a non-zero panic timeout.
-> > 
-> > However, if you don't know how to restart your machine, then you're not
-> > going to be able to do anything.  I'd therefore suggest this patch:
+On Wed, Nov 02, 2011 at 03:09:07PM +0100, Peter De Schrijver wrote:
+> Add support for the tegra30 based cardhu development board. Cardhu is a tablet
+> formfactor reference design for tegra30. The patch provides a device tree for
+> the board, updates Makefile.boot to build the dtb, includes the platform in
+> Kconfig and updates board-dt.c.
 > 
-> And we can do one better with this given the size of this change.
-> As all the AT91 reset handlers are using a hardware method, we can
-> do without the arm_machine_restart() indirection too.  And we can
-> get rid of the icache enable in the assembly restart code as this
-> will now be the case.  This is a replacement patch for the previous.
+> Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
+> ---
+>  arch/arm/boot/dts/tegra-cardhu.dts |   36 ++++++++++++++++++++++++++++++++++++
+>  arch/arm/mach-tegra/Kconfig        |    7 +++++++
+>  arch/arm/mach-tegra/Makefile.boot  |    1 +
+>  arch/arm/mach-tegra/board-dt.c     |    1 +
+>  4 files changed, 45 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/boot/dts/tegra-cardhu.dts
 > 
-> I've taken the liberty to rename _reset to _restart as well, so we
-> have a common naming for this operation across converted platforms.
-> 
->  arch/arm/mach-at91/at91cap9.c            |    4 ++--
->  arch/arm/mach-at91/at91rm9200.c          |    4 ++--
->  arch/arm/mach-at91/at91sam9260.c         |    2 +-
->  arch/arm/mach-at91/at91sam9261.c         |    2 +-
->  arch/arm/mach-at91/at91sam9263.c         |    2 +-
->  arch/arm/mach-at91/at91sam9_alt_reset.S  |    9 ++-------
->  arch/arm/mach-at91/at91sam9g45.c         |    4 ++--
->  arch/arm/mach-at91/at91sam9rl.c          |    2 +-
->  arch/arm/mach-at91/generic.h             |    3 +--
->  arch/arm/mach-at91/include/mach/system.h |    5 -----
->  10 files changed, 13 insertions(+), 24 deletions(-)
-Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> diff --git a/arch/arm/boot/dts/tegra-cardhu.dts b/arch/arm/boot/dts/tegra-cardhu.dts
+> new file mode 100644
+> index 0000000..70c41fc
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/tegra-cardhu.dts
+> @@ -0,0 +1,36 @@
+> +/dts-v1/;
+> +
+> +/include/ "tegra30.dtsi"
+> +
+> +/ {
+> +	model = "NVIDIA Tegra30 Cardhu evaluation board";
 
-I'll test it later this week
+And this should probably be removed.
 
-Best Regards,
-J.
+> +	compatible = "nvidia,cardhu", "nvidia,tegra30";
+> +
+> +	memory {
+> +		reg = < 0x80000000 0x40000000 >;
+> +	};
+> +
+> +	serial at 70006000 {
+> +		clock-frequency = < 408000000 >;
+> +	};
+> +
+> +	i2c at 7000c000 {
+> +		clock-frequency = <100000>;
+> +	};
+> +
+> +	i2c at 7000c400 {
+> +		clock-frequency = <100000>;
+> +	};
+> +
+> +	i2c at 7000c500 {
+> +		clock-frequency = <100000>;
+> +	};
+> +
+> +	i2c at 7000c700 {
+> +		clock-frequency = <100000>;
+> +	};
+> +
+> +	i2c at 7000d000 {
+> +		clock-frequency = <100000>;
+> +	};
+> +};
+> diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
+> index f2eb6d1..43a6352 100644
+> --- a/arch/arm/mach-tegra/Kconfig
+> +++ b/arch/arm/mach-tegra/Kconfig
+> @@ -83,6 +83,13 @@ config MACH_VENTANA
+>         help
+>           Support for the nVidia Ventana development platform
+>  
+> +config MACH_CARDHU
+> +       bool "Cardhu board"
+> +       depends on ARCH_TEGRA_3x_SOC
+> +       select MACH_TEGRA_DT
+> +       help
+> +         Support for the nVidia Cardhu development platform
+
+This should have been NVIDIA. Will be fixed in the next version. Most other
+nvidia boards use 'nVidia' in their description. What should we do?
+
+Cheers,
+
+Peter.
