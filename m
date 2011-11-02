@@ -1,98 +1,77 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 02 Nov 2011 20:27:52 +0900
-Subject: [PATCH v5 0/2] Add device tree support for Samsung's keypad
-	controller driver
-In-Reply-To: <4EA56178.60301@samsung.com>
-References: <1318264197-6698-1-git-send-email-thomas.abraham@linaro.org>
-	<057501cc880e$af0a28a0$0d1e79e0$%kim@samsung.com>
-	<4EA56178.60301@samsung.com>
-Message-ID: <004b01cc9952$75c87060$61595120$%kim@samsung.com>
+Date: Wed, 02 Nov 2011 20:29:07 +0900
+Subject: [PATCH 5/7] ARM: EXYNOS4: Add support external GIC
+In-Reply-To: <4EB1265B.4090907@arm.com>
+References: <1308555258-4322-1-git-send-email-chaos.youn@samsung.com>
+	<1308555258-4322-6-git-send-email-chaos.youn@samsung.com>
+	<4E8C61C4.9090709@arm.com>
+	<00ec01cc83f1$81f84430$85e8cc90$%kim@samsung.com>
+	<4E8D645D.4020601@arm.com> <4E8ECA1B.5010005@arm.com>
+	<20111007151646.GA2398@mudshark.cambridge.arm.com>
+	<4E92ECD1.2010303@arm.com>
+	<00b901cc8810$8353e730$89fbb590$%youn@samsung.com>
+	<4E944508.4050202@arm.com>
+	<063801cc889e$22a12c20$67e38460$%kim@samsung.com>
+	<4EB1265B.4090907@arm.com>
+Message-ID: <004c01cc9952$a24f5d60$e6ee1820$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kukjin Kim wrote:
+Marc Zyngier wrote:
 > 
-> On 10/11/11 14:09, Kukjin Kim wrote:
-> > Thomas Abraham wrote:
+> On 12/10/11 06:16, Kukjin Kim wrote:
+> > Marc Zyngier wrote:
 > >>
-> >> Changes since v4:
-> >> - Tested with linux 3.1-rc9. No changes in code.
+> >> Hi Changwan,
 > >>
-> >> Changes since v3:
-> >> - Addressed comments from Grant Likely.
-> >>    - Set num_rows and num_cols to zero in samsung_keypad_parse_dt
-> function.
-> >>    - Fixed the wierd looking if-else block in samsung_keypad_probe
-> > function.
+> >> On 11/10/11 13:22, Changhwan Youn wrote:
+> >>>> Kukjin, could you please comment on the presence of a common memory
+> >>>> region for the distributor? This seem quite odd...
+> >>>
+> >>> Some registers in Distributor are banked for PPI and SGI support
+(banked
+> >> interrupts).
+> >>> The register for pending and enable status of these interrupts are
+> >>> banked.
 > >>
-> >> Changes since v2:
-> >> - Addressed comments from Grant Likely.
-> >>    - Renamed 'keypad,key-code' property name to 'linux,code'.
-> >>    - Fixed incorrect data types for all instances of
-of_property+read_u32.
-> >>    - linux,input-type binding was not added as suggested since the
-driver
-> >>      supports only EV_KEY event type.
+> >> Right, that explains it then.
 > >>
-> >> Changes since v1:
-> >> - Addressed comments from Dmitry Torokhov.
-> >>    - Type of controller is cached in driver's private data and the
-function
-> >>      that determines the type of the controller for each keypad scan is
-> >>      removed.
-> >>    - pdata allocated during probe is explicitly freed after probe
-completes
-> >>      without any error. In case of exit from probe due a error, no
-explicit
-> >>      deallocation of pdata memory is performed and it is left to devres
-to
-> >>      handle that.
-> >>    - The generic code to translate KEY(x,y,code) is retained in the
-driver
-> >>      itself. I am unsure of a right common place for it.
-> >>    - Driver continues with the probe even if one or more gpio
-configuration
-> >>      fails.
-> >>    - Patch 1 that adds a new config option is still retained in this
-> > patchset.
+> >>> Marc, I think the approach in your patch is much better than mine if
+it
+> > doesn't hurt
+> >>> the performance of other platforms which use the common gic code.
 > >>
+> >> It probably doesn't hurt the general case too much (I expect a bit more
+> >> pressure on the d-cache because of the per-cpu stuff, but nothing to be
+> >> too worried about).
 > >>
-> >> This patchset adds device tree support for samsung's keypad controller
-> > driver.
-> >> First patch adds a new config option to be used by device tree enabled
-> > platforms
-> >> for selecting the samsung's keypad controller driver. The second patch
-> > adds
-> >> device
-> >> tree support for the keypad driver.
+> >>> I'll re-work the exynos4 interrupt code based on your patch though
+> >>> I'm not sure that it's possible to be merged in merge window.
 > >>
+> >> My main concern at the moment is that mainline is broken as far as
+> >> EXYNOS4 is concerned (there's a race with the EOI hook), so that should
+> >> get fixed first.
 > >>
-> >> Thomas Abraham (2):
-> >>    input: samsung-keypad: Add HAVE_SAMSUNG_KEYPAD config option
-> >>    input: samsung-keypad: Add device tree support
-> >>
-> >>   .../devicetree/bindings/input/samsung-keypad.txt   |   88 ++++++++++
-> >>   drivers/input/keyboard/Kconfig                     |    9 +-
-> >>   drivers/input/keyboard/samsung-keypad.c            |  174
-> >> ++++++++++++++++++--
-> >>   3 files changed, 258 insertions(+), 13 deletions(-)
-> >>   create mode 100644 Documentation/devicetree/bindings/input/samsung-
-> >> keypad.txt
+> > Hi Marc,
 > >
-> > Looks ok to me,
-> > Acked-by: Kukjin Kim<kgene.kim@samsung.com>
-> >
-> > Hi Dmitry,
-> > If you're ok on this, please adding this in your tree for upcoming merge
-> > window.
-> >
-> Dmitry,
+> > OK. I agree with Will and your opinions and I think Changhwan can fix it
+as
+> > per your suggestion, but he needs fixed/updated regarding gic codes to
+avoid
+> > re-work and conflicts with others. So it would be better to us if he
+could
+> > fix it after merging your patches even probably at the end of upcoming
+merge
+> > window. I hope he can do it before v3.2-rc1.
 > 
-> Any problem on this?
+> Right. So this damned thing has made it to mainline in its full glory.
+> Furthermore, the MCT code is also broken, as it uses the old PPI API
+> (doesn't even compile).
 > 
-Hi Dmitry,
+> Can we please fix this as soon as possible? I posted patches for both a
+> while ago, with almost no reaction...
 
-I applied this in Samsung tree, if any problems, please let me know.
+Yeah, should be fixed. Let me check again and if any updates, let you know.
 
 Thanks.
 
