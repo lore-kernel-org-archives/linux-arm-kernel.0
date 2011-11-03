@@ -1,45 +1,28 @@
-From: linux_arm@lakedaemon.net (Jason)
-Date: Thu, 3 Nov 2011 14:47:45 -0400
-Subject: orion/kirkwood and device tree
-In-Reply-To: <201111022303.04957.michael@walle.cc>
-References: <20111031105740.GC29402@lunn.ch>
-	<201110312350.28475.michael@walle.cc>
-	<20111102165057.GU32165@titan.lakedaemon.net>
-	<201111022303.04957.michael@walle.cc>
-Message-ID: <20111103184745.GW32165@titan.lakedaemon.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 3 Nov 2011 11:57:50 -0700
+Subject: mainline tree fails to build with OMAP3-only config
+In-Reply-To: <4EB2D4FF.40408@gmail.com>
+References: <4EB2B7B1.4070804@gmail.com>
+ <4EB2D4FF.40408@gmail.com>
+Message-ID: <20111103185750.GV31337@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Michael,
-
-On Wed, Nov 02, 2011 at 11:03:04PM +0100, Michael Walle wrote:
-> Am Mittwoch 02 November 2011, 17:50:57 schrieb Jason:
-> > Michael,
-> > 
-> > On Mon, Oct 31, 2011 at 11:50:28PM +0100, Michael Walle wrote:
-> > > i've already ported some marvell devices to DT. spi-orion, orion-wdt,
-> > > rtc-mv and mv_cesa. Atm i'm struggling with how to pass
-> > > kirkwood_mbus_dram_info to the device drivers (the old method is to pass
-> > > it through platform_data)
-> > 
-> > Do you have a public git tree I could pull from, by chance?  I don't
-> > care about the state, I'd like to learn by example and start pitching
-> > in.
+* Daniel Mack <zonque@gmail.com> [111103 10:18]:
+> On 11/03/2011 04:48 PM, Daniel Mack wrote:
+> >Hi,
+> >
+> >when trying to build an OMAP3-only config with Linus' current mainline
+> >HEAD, I'm getting the following errors. The same config works fine with
+> >v3.1.
 > 
-> yeah i pushed it to github:
-> https://github.com/mwalle/linux/tree/kirkwood-devtree
+> FWIW, the config in question is available here:
+> 
+>  http://zonque.org/linux-3.1-omap3.config
 
-This is great!  I was having trouble figuring out how to do the
-interrupt controller, and you have that.  I'll look more closely this
-evening.
+Just for reference, here's the patch for this:
 
-My only comment so far is that I think a lot of what you have in
-lschlv2.dts can be in kirkwood.dtsi.  That way other boards don't have
-to copy it (serial, spi, ehci, wdt, rtc, crypto).
+http://marc.info/?l=linux-omap&m=132034503812225&w=2
 
-Oh, also, I think the board-dt.c should be pulling the phys addresses
-from the dt, it looks like you're still relying on the #defines...
-
-Thanks for the effort!
-
-Jason.
+Tony
+ 
