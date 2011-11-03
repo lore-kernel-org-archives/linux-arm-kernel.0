@@ -1,38 +1,62 @@
-From: svenkatr@ti.com (S, Venkatraman)
-Date: Thu, 3 Nov 2011 17:42:36 +0530
-Subject: [PATCH] mmc: omap_hsmmc: fix typo around pr_info() call
-In-Reply-To: <1320319482-9809-1-git-send-email-zonque@gmail.com>
-References: <1320319482-9809-1-git-send-email-zonque@gmail.com>
-Message-ID: <CANfBPZ-Z5PZFwW1uderk5A1FzNKFq=9f-RTOSg0Lre5CX-NDUw@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 3 Nov 2011 13:29:08 +0100
+Subject: [PATCHv2 02/10] ARM: vic: MULTI_IRQ_HANDLER handler
+In-Reply-To: <20111102140811.GA22491@totoro>
+References: <1317206507-18867-1-git-send-email-jamie@jamieiles.com>
+	<1317206507-18867-3-git-send-email-jamie@jamieiles.com>
+	<20110928203905.GB2838@ponder.secretlab.ca>
+	<CACRpkdZKns-GraGp-YMD6jzOPETkvEpt9bC8HcYUmf3JUyCV3A@mail.gmail.com>
+	<20110929093009.GM17204@pulham.picochip.com>
+	<20111102134024.GE19187@n2100.arm.linux.org.uk>
+	<20111102140811.GA22491@totoro>
+Message-ID: <CACRpkdY+EBkHfupO5T4SYKPxzX2L2kr8fLVMJK=JctNeYAzn2g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 3, 2011 at 4:54 PM, Daniel Mack <zonque@gmail.com> wrote:
-> This was introduced by a3c76eb9 ("mmc: replace printk with appropriate
-> display macro").
+On Wed, Nov 2, 2011 at 3:08 PM, Jamie Iles <jamie@jamieiles.com> wrote:
+> On Wed, Nov 02, 2011 at 01:40:24PM +0000, Russell King - ARM Linux wrote:
+>>
+>> And if we receive another interrupt after the read of the register, we'll
+>> have to exit all the way back (possibly to userspace) before re-entering
+>> the IRQ handling paths back to this point to process it.
 >
-> Signed-off-by: Daniel Mack <zonque@gmail.com>
-> Cc: Girish K S <girish.shivananjappa@linaro.org>
-> Cc: Chris Ball <cjb@laptop.org>
-> ---
-> ?drivers/mmc/host/omap_hsmmc.c | ? ?2 +-
-> ?1 files changed, 1 insertions(+), 1 deletions(-)
+> OK, so how about something like this instead:
 >
-> diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
-> index e8ff123..101cd31 100644
-> --- a/drivers/mmc/host/omap_hsmmc.c
-> +++ b/drivers/mmc/host/omap_hsmmc.c
-> @@ -1270,7 +1270,7 @@ static void omap_hsmmc_protect_card(struct omap_hsmmc_host *host)
-> ? ? ? ? ? ? ? ?}
-> ? ? ? ?} else {
-> ? ? ? ? ? ? ? ?if (!host->protect_card) {
-> - ? ? ? ? ? ? ? ? ? ? ? pr_info"%s: cover is open, "
-> + ? ? ? ? ? ? ? ? ? ? ? pr_info("%s: cover is open, "
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? "card is now inaccessible\n",
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? mmc_hostname(host->mmc));
-> ? ? ? ? ? ? ? ? ? ? ? ?host->protect_card = 1;
-> --
-> 1.7.6.4
->
+> static int vic_single_handle_irq(struct vic_device *vic,
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct pt_regs *regs)
 
-Thanks ! But this has been fixed and is available in mmc-next
+Is it single really? This handles all active IRQs on the VIC instance.
+Can it be renamed vic_handle_irq()?
+
+> {
+> ? ? ? ?u32 stat, irq;
+> ? ? ? ?int handled = 0;
+>
+> ? ? ? ?stat = readl_relaxed(vic->base + VIC_IRQ_STATUS);
+> ? ? ? ?while (stat) {
+> ? ? ? ? ? ? ? ?irq = ffs(stat) - 1;
+> ? ? ? ? ? ? ? ?handle_IRQ(irq_domain_to_irq(&vic->domain, irq), regs);
+> ? ? ? ? ? ? ? ?stat &= ~(1 << irq);
+> ? ? ? ? ? ? ? ?handled = 1;
+> ? ? ? ?}
+>
+> ? ? ? ?return handled;
+> }
+
+No, if we receive another IRQ *after* the read of the register was the
+question, right?
+
+Just replace
+
+stat &= ~(1 << irq);
+
+with a second
+
+stat = readl_relaxed(vic->base + VIC_IRQ_STATUS);
+
+It'll work just fine, the IRQ line should be low when you read
+it the second time, else it is probably fully proper to call
+the IRQ handler again anyway.
+
+Just my ?0.01..
+Linus Walleij
