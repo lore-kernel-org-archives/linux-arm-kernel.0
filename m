@@ -1,32 +1,20 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Fri,  4 Nov 2011 01:41:22 +0800
-Subject: [PATCH 2/2] atmel/spi: fix section missmatch
-In-Reply-To: <1320342082-18573-1-git-send-email-plagnioj@jcrosoft.com>
-References: <1320342082-18573-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <1320342082-18573-2-git-send-email-plagnioj@jcrosoft.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 3 Nov 2011 17:43:38 +0000
+Subject: [PATCH v2] atmel/spi: fix missing probe during the switch to
+	module_platform_driver
+In-Reply-To: <20111103165113.GL7136@game.jcrosoft.org>
+References: <1320331706-4946-1-git-send-email-plagnioj@jcrosoft.com>
+	<1320333042-24880-1-git-send-email-plagnioj@jcrosoft.com>
+	<20111103151855.GP12913@n2100.arm.linux.org.uk>
+	<20111103165113.GL7136@game.jcrosoft.org>
+Message-ID: <20111103174338.GQ12913@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-atmel_spi_probe is marked __init where it's supposed to be __devinit
+On Thu, Nov 03, 2011 at 05:51:13PM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> this is an other fix I do not want to fix 2 issue in one commit and I do care
+> of mismatch erros I fix them all the time I send patch for some rm9200 few
+> weeks ago
 
-Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-Cc: Russell King - ARM Linux <linux@arm.linux.org.uk>
----
- drivers/spi/spi-atmel.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
-
-diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
-index 3cd4f49..1525262 100644
---- a/drivers/spi/spi-atmel.c
-+++ b/drivers/spi/spi-atmel.c
-@@ -907,7 +907,7 @@ static void atmel_spi_cleanup(struct spi_device *spi)
- 
- /*-------------------------------------------------------------------------*/
- 
--static int __init atmel_spi_probe(struct platform_device *pdev)
-+static int __devinit atmel_spi_probe(struct platform_device *pdev)
- {
- 	struct resource		*regs;
- 	int			irq;
--- 
-1.7.7
+It should not be a separate patch - it's all to do with fixing the
+original problem.
