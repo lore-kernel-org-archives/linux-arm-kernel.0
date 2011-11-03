@@ -1,47 +1,67 @@
-From: liu.h.jason@gmail.com (Jason Liu)
-Date: Thu, 3 Nov 2011 09:31:05 +0800
-Subject: [PATCH] ARM: mx25: Add the missing IIM base definition
-In-Reply-To: <1320231836-9555-3-git-send-email-jason.hui@linaro.org>
-References: <1320231836-9555-1-git-send-email-jason.hui@linaro.org>
-	<1320231836-9555-3-git-send-email-jason.hui@linaro.org>
-Message-ID: <CAB4PhKfuMZ+jmYk_QQ=WGXRreaaiGPKsjj4PPimR8kMH0Sxaaw@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 03 Nov 2011 10:59:14 +0900
+Subject: [PATCH] ARM: SAMSUNG: Add clk enable/disable of pwm
+In-Reply-To: <1319505701-9784-1-git-send-email-jy0922.shim@samsung.com>
+References: <1319505701-9784-1-git-send-email-jy0922.shim@samsung.com>
+Message-ID: <012701cc99cc$300dca50$90295ef0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Sascha
-
-2011/11/2 Jason Liu <jason.hui@linaro.org>:
-> This fix the mx25 building issue of no IIM base definition
->
-> Signed-off-by: Jason Liu <jason.hui@linaro.org>
-> Cc: Sascha Hauer <s.hauer@pengutronix.de>
+Joonyoung Shim wrote:
+> 
+> PWM timers use pclk("timers" clk) as parent clk. If this pclk is the
+> disabled state when PWM driver is probed, then it causes wrong read and
+> write operation about registers of PWM.
+> 
+> Signed-off-by: Joonyoung Shim <jy0922.shim@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 > ---
-> ?arch/arm/plat-mxc/include/mach/mx25.h | ? ?1 +
-> ?1 files changed, 1 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/plat-mxc/include/mach/mx25.h b/arch/arm/plat-mxc/include/mach/mx25.h
-> index 8dcab80..ccebf5b 100644
-> --- a/arch/arm/plat-mxc/include/mach/mx25.h
-> +++ b/arch/arm/plat-mxc/include/mach/mx25.h
-> @@ -41,6 +41,7 @@
-> ?#define MX25_SSI2_BASE_ADDR ? ? ? ? ? ?0x50014000
-> ?#define MX25_SSI1_BASE_ADDR ? ? ? ? ? ?0x50034000
-> ?#define MX25_NFC_BASE_ADDR ? ? ? ? ? ? 0xbb000000
-> +#define MX25_IIM_BASE_ADDR ? ? ? ? ? ? 0x53ff0000
-> ?#define MX25_DRYICE_BASE_ADDR ? ? ? ? ?0x53ffc000
-> ?#define MX25_ESDHC1_BASE_ADDR ? ? ? ? ?0x53fb4000
-> ?#define MX25_ESDHC2_BASE_ADDR ? ? ? ? ?0x53fb8000
-
-Please ignore this patch, sorry for that.
-
-Jason Liu
+>  arch/arm/plat-samsung/pwm.c |    7 +++++++
+>  1 files changed, 7 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/plat-samsung/pwm.c b/arch/arm/plat-samsung/pwm.c
+> index f37457c..dc1185d 100644
+> --- a/arch/arm/plat-samsung/pwm.c
+> +++ b/arch/arm/plat-samsung/pwm.c
+> @@ -299,6 +299,9 @@ static int s3c_pwm_probe(struct platform_device *pdev)
+>  		goto err_clk_tin;
+>  	}
+> 
+> +	clk_enable(pwm->clk);
+> +	clk_enable(pwm->clk_div);
+> +
+>  	local_irq_save(flags);
+> 
+>  	tcon = __raw_readl(S3C2410_TCON);
+> @@ -326,6 +329,8 @@ static int s3c_pwm_probe(struct platform_device *pdev)
+>  	return 0;
+> 
+>   err_clk_tdiv:
+> +	clk_disable(pwm->clk_div);
+> +	clk_disable(pwm->clk);
+>  	clk_put(pwm->clk_div);
+> 
+>   err_clk_tin:
+> @@ -340,6 +345,8 @@ static int __devexit s3c_pwm_remove(struct
+> platform_device *pdev)
+>  {
+>  	struct pwm_device *pwm = platform_get_drvdata(pdev);
+> 
+> +	clk_disable(pwm->clk_div);
+> +	clk_disable(pwm->clk);
+>  	clk_put(pwm->clk_div);
+>  	clk_put(pwm->clk);
+>  	kfree(pwm);
 > --
-> 1.7.4.1
->
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+> 1.7.5.4
+
+Well, I wonder when this is needed. I think it should be enabled during
+kernel booting...
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
