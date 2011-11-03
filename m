@@ -1,43 +1,37 @@
 From: jason.hui@linaro.org (Jason Liu)
-Date: Thu, 3 Nov 2011 17:31:26 +0800
-Subject: [PATCH v2 1/2] ARM:i.MX: fix build error in tzic/avic.c
+Date: Thu, 3 Nov 2011 17:31:27 +0800
+Subject: [PATCH v2 2/2] ARM:i.MX: fix build error in clock-mx51-mx53.c
 In-Reply-To: <1320312687-20987-1-git-send-email-jason.hui@linaro.org>
 References: <1320312687-20987-1-git-send-email-jason.hui@linaro.org>
-Message-ID: <1320312687-20987-2-git-send-email-jason.hui@linaro.org>
+Message-ID: <1320312687-20987-3-git-send-email-jason.hui@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-arch/arm/plat-mxc/tzic.c:105: error: expected '=', ',', ';', 'asm' or '__attribute__' before 'tzic_handle_irq'
+arch/arm/mach-mx5/clock-mx51-mx53.c: In function 'clk_get_freq_dt':
+arch/arm/mach-mx5/clock-mx51-mx53.c:1643: error: implicit declaration of function 'for_each_compatible_node'
+arch/arm/mach-mx5/clock-mx51-mx53.c:1643: error: expected ';' before '{' token
 
 Signed-off-by: Jason Liu <jason.hui@linaro.org>
 ---
- arch/arm/plat-mxc/avic.c |    1 +
- arch/arm/plat-mxc/tzic.c |    1 +
- 2 files changed, 2 insertions(+), 0 deletions(-)
+ arch/arm/mach-mx5/clock-mx51-mx53.c |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/plat-mxc/avic.c b/arch/arm/plat-mxc/avic.c
-index 8875fb4..55f1569 100644
---- a/arch/arm/plat-mxc/avic.c
-+++ b/arch/arm/plat-mxc/avic.c
-@@ -22,6 +22,7 @@
- #include <linux/io.h>
- #include <mach/common.h>
- #include <asm/mach/irq.h>
-+#include <asm/exception.h>
- #include <mach/hardware.h>
+diff --git a/arch/arm/mach-mx5/clock-mx51-mx53.c b/arch/arm/mach-mx5/clock-mx51-mx53.c
+index 2aacf41..6312425 100644
+--- a/arch/arm/mach-mx5/clock-mx51-mx53.c
++++ b/arch/arm/mach-mx5/clock-mx51-mx53.c
+@@ -1634,6 +1634,7 @@ int __init mx53_clocks_init(unsigned long ckil, unsigned long osc,
+ 	return 0;
+ }
  
- #include "irq-common.h"
-diff --git a/arch/arm/plat-mxc/tzic.c b/arch/arm/plat-mxc/tzic.c
-index e993a18..a3c164c 100644
---- a/arch/arm/plat-mxc/tzic.c
-+++ b/arch/arm/plat-mxc/tzic.c
-@@ -17,6 +17,7 @@
- #include <linux/io.h>
- 
- #include <asm/mach/irq.h>
-+#include <asm/exception.h>
- 
- #include <mach/hardware.h>
- #include <mach/common.h>
++#ifdef CONFIG_OF
+ static void __init clk_get_freq_dt(unsigned long *ckil, unsigned long *osc,
+ 				   unsigned long *ckih1, unsigned long *ckih2)
+ {
+@@ -1671,3 +1672,4 @@ int __init mx53_clocks_init_dt(void)
+ 	clk_get_freq_dt(&ckil, &osc, &ckih1, &ckih2);
+ 	return mx53_clocks_init(ckil, osc, ckih1, ckih2);
+ }
++#endif
 -- 
 1.7.4.1
