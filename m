@@ -1,150 +1,58 @@
-From: ulf.hansson@stericsson.com (Ulf Hansson)
-Date: Thu, 3 Nov 2011 16:47:15 +0100
-Subject: [PATCH] spi/pl022: Enable clock in probe an use runtime_idle
-In-Reply-To: <20111103141336.GN12913@n2100.arm.linux.org.uk>
-References: <1319206124-17549-1-git-send-email-ulf.hansson@stericsson.com>
-	<20111102141628.GG19187@n2100.arm.linux.org.uk>
-	<4EB29E59.4040509@stericsson.com>
-	<20111103141336.GN12913@n2100.arm.linux.org.uk>
-Message-ID: <4EB2B783.7020503@stericsson.com>
+From: zonque@gmail.com (Daniel Mack)
+Date: Thu, 03 Nov 2011 16:48:01 +0100
+Subject: mainline tree fails to build with OMAP3-only config
+Message-ID: <4EB2B7B1.4070804@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux wrote:
-> On Thu, Nov 03, 2011 at 02:59:53PM +0100, Ulf Hansson wrote:
->>>> @@ -2342,11 +2350,19 @@ static int pl022_runtime_resume(struct device *dev)
->>>>   	return 0;
->>>>  }
->>>> +
->>>> +static int pl022_runtime_idle(struct device *dev)
->>>> +{
->>>> +	pm_runtime_suspend(dev);
->>>> +	return 0;
->>>> +}
->>>>  #endif
->>>>   static const struct dev_pm_ops pl022_dev_pm_ops = {
->>>>  	SET_SYSTEM_SLEEP_PM_OPS(pl022_suspend, pl022_resume)
->>>> -	SET_RUNTIME_PM_OPS(pl022_runtime_suspend, pl022_runtime_resume, NULL)
->>>> +	SET_RUNTIME_PM_OPS(pl022_runtime_suspend,
->>>> +			   pl022_runtime_resume,
->>>> +			   pl022_runtime_idle)
->>> This is an unnecessary change.
->>>
->>> The bus-level ops runtime PM ops call pm_generic_runtime_idle() when
->>> its 'runtime_idle' operation is invoked.  Let's look at the code
->>> there:
->>>
->>> int pm_generic_runtime_idle(struct device *dev)
->>> {
->>>         const struct dev_pm_ops *pm = dev->driver ? dev->driver->pm : NULL;
->>>
->>>         if (pm && pm->runtime_idle) {
->>>                 int ret = pm->runtime_idle(dev);
->>>                 if (ret)
->>>                         return ret;
->>>         }
->>>
->>>         pm_runtime_suspend(dev);
->>>         return 0;
->>> }
->>>
->>> If the driver has a NULL runtime idle, then generic code will call
->>> pm_runtime_suspend() for the device.  So, adding a runtime_idle callback
->>> to a driver to explicitly call pm_runtime_suspend() is not required.
->>>
->> You are somewhat correct. But the patch is still needed as is!
-> 
-> No it is not required, by any means shape or form.
-> 
->> Reason is simply that after a probe, driver core is calling  
->> pm_runtime_put_sync. This will not go through the  
->> pm_generic_runtime_idle function, but directly to __pm_runtime_idle.
-> 
-> Let's look at the code:
-> 
-> static inline int pm_runtime_put_sync(struct device *dev)
-> {
->         return __pm_runtime_idle(dev, RPM_GET_PUT);
-> }
-> 
-> int __pm_runtime_idle(struct device *dev, int rpmflags)
-> {
-> ...
->         spin_lock_irqsave(&dev->power.lock, flags);
->         retval = rpm_idle(dev, rpmflags);
->         spin_unlock_irqrestore(&dev->power.lock, flags);
-> ...
-> }
-> 
-> static int rpm_idle(struct device *dev, int rpmflags)
-> {
->         int (*callback)(struct device *);
-> ...
->         if (dev->pm_domain)
->                 callback = dev->pm_domain->ops.runtime_idle;
->         else if (dev->type && dev->type->pm)
->                 callback = dev->type->pm->runtime_idle;
->         else if (dev->class && dev->class->pm)
->                 callback = dev->class->pm->runtime_idle;
->         else if (dev->bus && dev->bus->pm)
->                 callback = dev->bus->pm->runtime_idle;
->         else
->                 callback = NULL;
-> 
->         if (callback)
->                 __rpm_callback(callback, dev);
-> ...
-> }
-> 
-> static int __rpm_callback(int (*cb)(struct device *), struct device *dev)
->         __releases(&dev->power.lock) __acquires(&dev->power.lock)
-> {
-> ...
->         retval = cb(dev);
-> ...
-> }
-> 
-> Nothing in there calls down to the _driver_ level PM ops from the core
-> runtime PM code.  What will happen is that this statement will assign
-> the callback pointer:
-> 
-> 	callback = dev->bus->pm->runtime_idle;
-> 
-> and dev->bus->pm will be &amba_pm.  Its runtime idle function will be
-> pm_generic_runtime_idle.  As I quoted above:
+Hi,
 
-This I totally missed! You are absolutely right!
-Of course the amba bus calls the generic runtime idle function.
+when trying to build an OMAP3-only config with Linus' current mainline 
+HEAD, I'm getting the following errors. The same config works fine with 
+v3.1.
 
-I will re-work the patch and remove the runtime_idle function completely!
+The reasons seems to be that arch/arm/mach-omap2/io.c defines the 
+*_init_early() functions unconditionally for all platforms. Is this 
+already fixed in any tree?
 
-> 
->>> int pm_generic_runtime_idle(struct device *dev)
->>> {
->>>         const struct dev_pm_ops *pm = dev->driver ? dev->driver->pm : NULL;
->>>
->>>         if (pm && pm->runtime_idle) {
->>>                 int ret = pm->runtime_idle(dev);
->>>                 if (ret)
->>>                         return ret;
->>>         }
->>>
->>>         pm_runtime_suspend(dev);
->>>         return 0;
->>> }
-> 
-> This is the only way you get down to the driver-level pm->runtime_idle
-> callback.
-> 
-> Please describe what benefit having *THIS* pm->runtime_idle(dev) pointing
-> at your new function:
-> 
->>>> +static int pl022_runtime_idle(struct device *dev)
->>>> +{
->>>> +	pm_runtime_suspend(dev);
->>>> +	return 0;
->>>> +}
-> 
-> gains us over the case where pm->runtime_idle is NULL inside
-> pm_generic_runtime_idle().
-> 
+
+Thanks,
+Daniel
+
+
+   LD      .tmp_vmlinux1
+arch/arm/mach-omap2/built-in.o: In function `omap4430_init_early':
+twl-common.c:(.init.text+0x4f0): undefined reference to 
+`omap2_set_globals_443x'
+twl-common.c:(.init.text+0x4f8): undefined reference to 
+`omap44xx_voltagedomains_init'
+twl-common.c:(.init.text+0x4fc): undefined reference to 
+`omap44xx_powerdomains_init'
+twl-common.c:(.init.text+0x500): undefined reference to 
+`omap44xx_clockdomains_init'
+twl-common.c:(.init.text+0x504): undefined reference to 
+`omap44xx_hwmod_init'
+twl-common.c:(.init.text+0x510): undefined reference to `omap4xxx_clk_init'
+arch/arm/mach-omap2/built-in.o: In function `omap2430_init_early':
+twl-common.c:(.init.text+0x578): undefined reference to 
+`omap2_set_globals_243x'
+twl-common.c:(.init.text+0x580): undefined reference to 
+`omap2xxx_voltagedomains_init'
+twl-common.c:(.init.text+0x584): undefined reference to 
+`omap243x_powerdomains_init'
+twl-common.c:(.init.text+0x588): undefined reference to 
+`omap243x_clockdomains_init'
+twl-common.c:(.init.text+0x58c): undefined reference to 
+`omap2430_hwmod_init'
+arch/arm/mach-omap2/built-in.o: In function `omap2420_init_early':
+twl-common.c:(.init.text+0x59c): undefined reference to 
+`omap2_set_globals_242x'
+twl-common.c:(.init.text+0x5a4): undefined reference to 
+`omap2xxx_voltagedomains_init'
+twl-common.c:(.init.text+0x5a8): undefined reference to 
+`omap242x_powerdomains_init'
+twl-common.c:(.init.text+0x5ac): undefined reference to 
+`omap242x_clockdomains_init'
+twl-common.c:(.init.text+0x5b0): undefined reference to 
+`omap2420_hwmod_init'
+make: *** [.tmp_vmlinux1] Error 1
