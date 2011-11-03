@@ -1,77 +1,118 @@
-From: jy0922.shim@samsung.com (Joonyoung Shim)
-Date: Thu, 03 Nov 2011 16:53:42 +0900
-Subject: [PATCH] ARM: SAMSUNG: Add clk enable/disable of pwm
-In-Reply-To: <018e01cc99fc$bb4d5ec0$31e81c40$%kim@samsung.com>
-References: <1319505701-9784-1-git-send-email-jy0922.shim@samsung.com>
-	<012701cc99cc$300dca50$90295ef0$%kim@samsung.com>
-	<4EB1FB58.9050503@samsung.com>
-	<018e01cc99fc$bb4d5ec0$31e81c40$%kim@samsung.com>
-Message-ID: <4EB24886.8080002@samsung.com>
+From: B39297@freescale.com (Wu Guoxing-B39297)
+Date: Thu, 3 Nov 2011 08:01:16 +0000
+Subject: [PATCH] ARM : mx35: 3ds-board: add framebuffer device
+In-Reply-To: <20111103071824.GB16886@pengutronix.de>
+References: <1320299797-23167-1-git-send-email-b39297@freescale.com>
+	<20111103071824.GB16886@pengutronix.de>
+Message-ID: <3D55990BDF4852409EA769663F22E54AC04239@039-SN1MPN1-006.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-11/03/2011 04:46 PM, Kukjin Kim ? ?:
-> Joonyoung Shim wrote:
->> 11/03/2011 10:59 AM, Kukjin Kim ? ?:
->>> Joonyoung Shim wrote:
->>>> PWM timers use pclk("timers" clk) as parent clk. If this pclk is the
->>>> disabled state when PWM driver is probed, then it causes wrong read and
->>>> write operation about registers of PWM.
->>>>
->>>> Signed-off-by: Joonyoung Shim<jy0922.shim@samsung.com>
->>>> Signed-off-by: Kyungmin Park<kyungmin.park@samsung.com>
->>>> ---
->>>>    arch/arm/plat-samsung/pwm.c |    7 +++++++
->>>>    1 files changed, 7 insertions(+), 0 deletions(-)
->>>>
->>>> diff --git a/arch/arm/plat-samsung/pwm.c b/arch/arm/plat-samsung/pwm.c
->>>> index f37457c..dc1185d 100644
->>>> --- a/arch/arm/plat-samsung/pwm.c
->>>> +++ b/arch/arm/plat-samsung/pwm.c
->>>> @@ -299,6 +299,9 @@ static int s3c_pwm_probe(struct platform_device *pdev)
->>>>    		goto err_clk_tin;
->>>>    	}
->>>>
->>>> +	clk_enable(pwm->clk);
->>>> +	clk_enable(pwm->clk_div);
->>>> +
->>>>    	local_irq_save(flags);
->>>>
->>>>    	tcon = __raw_readl(S3C2410_TCON);
->>>> @@ -326,6 +329,8 @@ static int s3c_pwm_probe(struct platform_device *pdev)
->>>>    	return 0;
->>>>
->>>>     err_clk_tdiv:
->>>> +	clk_disable(pwm->clk_div);
->>>> +	clk_disable(pwm->clk);
->>>>    	clk_put(pwm->clk_div);
->>>>
->>>>     err_clk_tin:
->>>> @@ -340,6 +345,8 @@ static int __devexit s3c_pwm_remove(struct
->>>> platform_device *pdev)
->>>>    {
->>>>    	struct pwm_device *pwm = platform_get_drvdata(pdev);
->>>>
->>>> +	clk_disable(pwm->clk_div);
->>>> +	clk_disable(pwm->clk);
->>>>    	clk_put(pwm->clk_div);
->>>>    	clk_put(pwm->clk);
->>>>    	kfree(pwm);
->>>> --
->>>> 1.7.5.4
->>> Well, I wonder when this is needed. I think it should be enabled during
->>> kernel booting...
->> The exynos4 machine using just timer turns on "timer" clock in the past,
->> but "timer" clock is disable state when boot since MCT is used. MCT
->> doesn't control "timer" clock.
->>
->> I think pwm driver should control(enable/disable) using clocks
->> regardless of their parents clock.
->>
-> I mean, why that is disabled when kernel boot...
->
+Hi Sascha:
+  The mc9s08dz60 is a MCU, and its function depend on the code flashed in it. so, it is not a common chip.
+it is only for mx35 3ds board, a driver for it will be useless for others, that's why I didn't write a common
+driver for it, as it will never be used in any other freescale board. But, if you insist, I will write a driver for it.
+  For the Blank line, I will remove it.
 
-Please see arch/arm/mach-exynos4/clock.c
-There is "timers' clock in the clk init_clocks_off[].
+-----Original Message-----
+From: Sascha Hauer [mailto:s.hauer at pengutronix.de] 
+Sent: Thursday, November 03, 2011 3:18 PM
+To: Wu Guoxing-B39297
+Cc: linux-arm-kernel at lists.infradead.org; shawn.guo at linaro.org
+Subject: Re: [PATCH] ARM : mx35: 3ds-board: add framebuffer device
 
-Thanks.
+On Thu, Nov 03, 2011 at 01:56:37PM +0800, wu guoxing wrote:
+> This patch adds framebuffer support for freescale mx35 3ds board
+> 
+> Signed-off-by: Wu Guoxing <b39297@freescale.com>
+> ---
+>  arch/arm/mach-imx/mach-mx35_3ds.c |   99 +++++++++++++++++++++++++++++++++++++
+>  1 files changed, 99 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-imx/mach-mx35_3ds.c 
+> b/arch/arm/mach-imx/mach-mx35_3ds.c
+> index 5a5eb3e..e7889ca 100644
+> --- a/arch/arm/mach-imx/mach-mx35_3ds.c
+> +++ b/arch/arm/mach-imx/mach-mx35_3ds.c
+> @@ -40,9 +40,74 @@
+>  #include <mach/iomux-mx35.h>
+>  #include <mach/irqs.h>
+>  #include <mach/3ds_debugboard.h>
+> +#include <video/platform_lcd.h>
+>  
+>  #include "devices-imx35.h"
+>  
+> +static const struct fb_videomode fb_modedb[] = {
+> +	{
+> +	 /* 800x480 @ 55 Hz */
+> +	 .name = "Ceramate-CLAA070VC01",
+> +	 .refresh = 55,
+> +	 .xres = 800,
+> +	 .yres = 480,
+> +	 .pixclock = 40000,
+> +	 .left_margin = 40,
+> +	 .right_margin = 40,
+> +	 .upper_margin = 5,
+> +	 .lower_margin = 5,
+> +	 .hsync_len = 20,
+> +	 .vsync_len = 10,
+> +	 .sync = FB_SYNC_OE_ACT_HIGH,
+> +	 .vmode = FB_VMODE_NONINTERLACED,
+> +	 .flag = 0,
+> +	 },
+> +};
+> +
+> +static const struct ipu_platform_data mx3_ipu_data __initconst = {
+> +	.irq_base = MXC_IPU_IRQ_START,
+> +};
+> +
+> +static struct mx3fb_platform_data mx3fb_pdata __initdata = {
+> +	.name = "Ceramate-CLAA070VC01",
+> +	.mode = fb_modedb,
+> +	.num_modes = ARRAY_SIZE(fb_modedb),
+> +};
+> +
+> +static struct i2c_board_info __initdata mc9s08dz60_i2c_device = {
+> +	I2C_BOARD_INFO("mc9s08dz60", 0x69),
+> +};
+> +
+> +static struct i2c_client *mc9s08dz60_client;
+> +
+> +static void mx35_3ds_lcd_set_power(struct plat_lcd_data *pd, unsigned 
+> +int power) {
+> +	u8 temp;
+> +
+> +	if (!mc9s08dz60_client) {
+> +		mc9s08dz60_client =
+> +		    i2c_new_device(i2c_get_adapter(0), &mc9s08dz60_i2c_device);
+> +	}
+> +	if (mc9s08dz60_client) {
+> +		temp = (u8) i2c_smbus_read_byte_data(mc9s08dz60_client, 0x20);
+> +		if (power)
+> +			temp |= (1 << 6);
+> +		else
+> +			temp &= ~(1 << 6);
+> +
+> +		i2c_smbus_write_byte_data(mc9s08dz60_client, 0x20, temp);
+> +	}
+> +}
+
+The mc9s08dz60 is a RTC/Touchscreen/GPIO chip. You should write a driver for it instead of adding a quick hack in the board code.
+
+>  
+>  static void __init mx35pdk_timer_init(void) @@ -225,3 +323,4 @@ 
+> MACHINE_START(MX35_3DS, "Freescale MX35PDK")
+>  	.timer = &mx35pdk_timer,
+>  	.init_machine = mx35_3ds_init,
+>  MACHINE_END
+> +
+
+Please don't add blank lines to files.
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
