@@ -1,107 +1,50 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Wed, 2 Nov 2011 22:19:26 +0100
-Subject: [PATCH] pxa/mioa701: remove machine restart and halt code
-Message-ID: <mailman.203.1320348867.20020.linux-arm-kernel@lists.infradead.org>
+From: shawn.gsc@gmail.com (Shawn Guo)
+Date: Fri, 4 Nov 2011 05:08:04 +0800
+Subject: [GIT PULL] imx compile fixes
+In-Reply-To: <20111103210444.GA2272@r65073-Latitude-D630>
+References: <20111103210444.GA2272@r65073-Latitude-D630>
+Message-ID: <CAJBJ56+O_vk4F3g41gGjbGhc0RKQ79wKqwNjw_JnNsMWw=YyYw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove all machine stop function which freed irq and gpio,
-as this code is not necessary as the reboot are terminal
-events, and won't suffer from a missing free.
+Forgot cc the list, sorry.
 
-Use the newly available machine descriptor soft_reboot field
-to kill arm_pm_* hooks. This still ensures RTC clock is not
-reset upon reboot.
-
-Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
-
----
-KernelVersion: 3.1
----
- arch/arm/mach-pxa/mioa701.c |   38 +-------------------------------------
- 1 files changed, 1 insertions(+), 37 deletions(-)
-
-diff --git a/arch/arm/mach-pxa/mioa701.c b/arch/arm/mach-pxa/mioa701.c
-index b938fc2..dca3ff6 100644
---- a/arch/arm/mach-pxa/mioa701.c
-+++ b/arch/arm/mach-pxa/mioa701.c
-@@ -331,12 +331,6 @@ err_gpio:
- 	return rc;
- }
- 
--static void gsm_exit(void)
--{
--	free_irq(gpio_to_irq(GPIO25_GSM_MOD_ON_STATE), NULL);
--	gpio_free_array(ARRAY_AND_SIZE(gsm_gpios));
--}
--
- /*
-  * Bluetooth BRF6150 chip
-  *
-@@ -504,15 +498,6 @@ static int __init bootstrap_init(void)
- 	return 0;
- }
- 
--static void bootstrap_exit(void)
--{
--	kfree(save_buffer);
--	unregister_syscore_ops(&mioa701_syscore_ops);
--
--	printk(KERN_CRIT "Unregistering mioa701 suspend will hang next"
--	       "resume !!!\n");
--}
--
- /*
-  * Power Supply
-  */
-@@ -691,20 +676,6 @@ static struct platform_device *devices[] __initdata = {
- 	&mioa701_board,
- };
- 
--static void mioa701_machine_exit(void);
--
--static void mioa701_poweroff(void)
--{
--	mioa701_machine_exit();
--	arm_machine_restart('s', NULL);
--}
--
--static void mioa701_restart(char c, const char *cmd)
--{
--	mioa701_machine_exit();
--	arm_machine_restart('s', cmd);
--}
--
- static struct gpio global_gpios[] = {
- 	{ GPIO9_CHARGE_EN, GPIOF_OUT_INIT_HIGH, "Charger enable" },
- 	{ GPIO18_POWEROFF, GPIOF_OUT_INIT_LOW, "Power Off" },
-@@ -733,8 +704,6 @@ static void __init mioa701_machine_init(void)
- 	pxa_set_keypad_info(&mioa701_keypad_info);
- 	pxa_set_udc_info(&mioa701_udc_info);
- 	pxa_set_ac97_info(&mioa701_ac97_info);
--	pm_power_off = mioa701_poweroff;
--	arm_pm_restart = mioa701_restart;
- 	platform_add_devices(devices, ARRAY_SIZE(devices));
- 	gsm_init();
- 
-@@ -744,12 +713,6 @@ static void __init mioa701_machine_init(void)
- 	pxa_set_camera_info(&mioa701_pxacamera_platform_data);
- }
- 
--static void mioa701_machine_exit(void)
--{
--	bootstrap_exit();
--	gsm_exit();
--}
--
- MACHINE_START(MIOA701, "MIO A701")
- 	.atag_offset	= 0x100,
- 	.map_io		= &pxa27x_map_io,
-@@ -757,4 +720,5 @@ MACHINE_START(MIOA701, "MIO A701")
- 	.handle_irq	= &pxa27x_handle_irq,
- 	.init_machine	= mioa701_machine_init,
- 	.timer		= &pxa_timer,
-+	.soft_reboot	= 1,
- MACHINE_END
--- 
-1.7.5.4
+On Fri, Nov 4, 2011 at 5:04 AM, Shawn Guo <shawn.gsc@gmail.com> wrote:
+> Hi Arnd,
+>
+> If you plan to send the last pull request today, please consider to
+> take these patches, which are to fix imx compile errors seen on
+> mainline. ?If you plan to do that tomorrow, you may probably want to
+> wait for the pull request from Sascha.
+>
+> Hi Sascha,
+>
+> This should really be from you. ?But since today could be the last
+> chance to get the patches to Arnd, I send them out there just in case
+> tomorrow is too late, because I can not stand so many imx platforms
+> having compile error on v3.2-rc1 for another week :)
+>
+> Regards,
+> Shawn
+>
+> The following changes since commit 70c9f18ca8f3652c7dcf715e9f0d41c399fe130d:
+>
+> ?Merge branch 'next' of git://github.com/kernelslacker/cpufreq (2011-11-03 09:59:39 -0700)
+>
+> are available in the git repository at:
+>
+> ?git://git.linaro.org/people/shawnguo/linux-2.6.git imx/compile-fixes
+>
+> Jason Liu (2):
+> ? ? ?ARM:i.MX: fix build error in tzic/avic.c
+> ? ? ?ARM:i.MX: fix build error in clock-mx51-mx53.c
+>
+> Marc Zyngier (1):
+> ? ? ?ARM: mxc: fix local timer interrupt handling
+>
+> ?arch/arm/mach-mx5/clock-mx51-mx53.c | ? ?2 ++
+> ?arch/arm/plat-mxc/avic.c ? ? ? ? ? ?| ? ?1 +
+> ?arch/arm/plat-mxc/gic.c ? ? ? ? ? ? | ? 11 ++---------
+> ?arch/arm/plat-mxc/tzic.c ? ? ? ? ? ?| ? ?1 +
+> ?4 files changed, 6 insertions(+), 9 deletions(-)
+>
