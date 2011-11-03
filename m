@@ -1,42 +1,63 @@
-From: linux_arm@lakedaemon.net (Jason)
-Date: Thu, 3 Nov 2011 14:15:25 -0400
-Subject: memory map in fdt was: Re: orion/kirkwood and device tree
-In-Reply-To: <201111022303.04957.michael@walle.cc>
-References: <20111031105740.GC29402@lunn.ch>
-	<201110312350.28475.michael@walle.cc>
-	<20111102165057.GU32165@titan.lakedaemon.net>
-	<201111022303.04957.michael@walle.cc>
-Message-ID: <20111103181525.GV32165@titan.lakedaemon.net>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Fri,  4 Nov 2011 02:16:06 +0800
+Subject: [PATCH v5] atmel/spi: fix missing probe
+Message-ID: <1320344166-31077-1-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Michael,
+Commit 940ab889 "drivercore: Add helper macro for platform_driver boilerplate"
+converted this driver to use module_platform_driver, but due to the use
+of platform_driver_probe(), this resulted in the call to atmel_spi_probe being
+lost. Place the call to this function into the driver structure.
 
-I've added the devicetree ml to the CC:.  Hopefully someone there can
-provide some insight...
+fix section missmatch
 
-On Wed, Nov 02, 2011 at 11:03:04PM +0100, Michael Walle wrote:
-> Am Dienstag 01 November 2011, 07:25:23 schrieben Andrew:
-> > 
-> > We could maybe put this table into DT?
-> 
-> I don't know if these informations belong to the DT or to generic kirkwood 
-> arch support (eg. mach-kirkwood/board-dt.c).
-> 
-> In both cases there needs to be some functions to retrieve these properties 
-> (instead of passing a pointer to some structure around). But i don't know if 
-> this fits the linux device drivers concept, eg. to be independent from any 
-> architecture.
-> 
-> So if any kernel hacker is reading this, i'm happy for every hint :) The 
-> problem is that most kirkwood/orion SoC devices needs a memory map to set up 
-> its internal memory windows for DMA access. Actually it only uses one window, 
-> which addresses the main memory. The arch-{kirkwood,orion} code stores the 
-> needed informations within a static *_mbus_dram_info variable, which is then 
-> passed as a pointer within platform_data to the device driver.
-> 
-> Is there a best practice for doing such things with device tree aware drivers?
+atmel_spi_probe is marked __init where it's supposed to be __devinit
+atmel_spi_remove is marked __exit where it's supposed to be __devexit
 
-thx,
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Cc: Greg Kroah-Hartman <gregkh@suse.de>
+Cc: Grant Likely <grant.likely@secretlab.ca>
+Cc: Russell King - ARM Linux <linux@arm.linux.org.uk>
+---
+V5:
 
-Jason.
+	do it in in patch
+
+Best Regards,
+J.
+ drivers/spi/spi-atmel.c |    5 +++--
+ 1 files changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
+index 79665e2..16d6a83 100644
+--- a/drivers/spi/spi-atmel.c
++++ b/drivers/spi/spi-atmel.c
+@@ -907,7 +907,7 @@ static void atmel_spi_cleanup(struct spi_device *spi)
+ 
+ /*-------------------------------------------------------------------------*/
+ 
+-static int __init atmel_spi_probe(struct platform_device *pdev)
++static int __devinit atmel_spi_probe(struct platform_device *pdev)
+ {
+ 	struct resource		*regs;
+ 	int			irq;
+@@ -1003,7 +1003,7 @@ out_free:
+ 	return ret;
+ }
+ 
+-static int __exit atmel_spi_remove(struct platform_device *pdev)
++static int __devexit atmel_spi_remove(struct platform_device *pdev)
+ {
+ 	struct spi_master	*master = platform_get_drvdata(pdev);
+ 	struct atmel_spi	*as = spi_master_get_devdata(master);
+@@ -1072,6 +1072,7 @@ static struct platform_driver atmel_spi_driver = {
+ 	},
+ 	.suspend	= atmel_spi_suspend,
+ 	.resume		= atmel_spi_resume,
++	.probe		= atmel_spi_probe,
+ 	.remove		= __exit_p(atmel_spi_remove),
+ };
+ module_platform_driver(atmel_spi_driver);
+-- 
+1.7.7
