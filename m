@@ -1,88 +1,47 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Thu, 3 Nov 2011 15:03:37 +0000
-Subject: [PATCHv2 02/10] ARM: vic: MULTI_IRQ_HANDLER handler
-In-Reply-To: <20111103133102.GM12913@n2100.arm.linux.org.uk>
-References: <1317206507-18867-3-git-send-email-jamie@jamieiles.com>
-	<20110928203905.GB2838@ponder.secretlab.ca>
-	<CACRpkdZKns-GraGp-YMD6jzOPETkvEpt9bC8HcYUmf3JUyCV3A@mail.gmail.com>
-	<20110929093009.GM17204@pulham.picochip.com>
-	<20111102134024.GE19187@n2100.arm.linux.org.uk>
-	<20111102140811.GA22491@totoro>
-	<CACRpkdY+EBkHfupO5T4SYKPxzX2L2kr8fLVMJK=JctNeYAzn2g@mail.gmail.com>
-	<20111103125136.GL12913@n2100.arm.linux.org.uk>
-	<CACRpkdZ1qfVduMAmusNoLjDoqy2kDA4crN__iW9qEeXBgVT4cA@mail.gmail.com>
-	<20111103133102.GM12913@n2100.arm.linux.org.uk>
-Message-ID: <20111103150337.GC5008@totoro>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 3 Nov 2011 16:08:18 +0100
+Subject: [PATCH v2 1/5] ARM: SPMP8000: Add machine base files
+In-Reply-To: <CAGVye5OD3uBuBSKVEYMWNABo7ofuYzCmMP3NcDJR8gAAxxAYXQ@mail.gmail.com>
+References: <1318178172-7965-1-git-send-email-zoss@devai.org>
+	<20111024110015.GA5212@totoro>
+	<CAGVye5OD3uBuBSKVEYMWNABo7ofuYzCmMP3NcDJR8gAAxxAYXQ@mail.gmail.com>
+Message-ID: <201111031608.18371.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 03, 2011 at 01:31:02PM +0000, Russell King - ARM Linux wrote:
-> On Thu, Nov 03, 2011 at 02:00:15PM +0100, Linus Walleij wrote:
-> > On Thu, Nov 3, 2011 at 1:51 PM, Russell King - ARM Linux
-> > <linux@arm.linux.org.uk> wrote:
-> > 
-> > > ? ? ? ?stat = readl_relaxed(vic->base + VIC_IRQ_STATUS);
-> > > ? ? ? ?while (stat) {
-> > > ? ? ? ? ? ? ? ?while (stat) {
-> > > ? ? ? ? ? ? ? ? ? ? ? ?irq = ffs(stat) - 1;
-> > > ? ? ? ? ? ? ? ? ? ? ? ?stat &= ~(1 << irq);
-> > > ? ? ? ? ? ? ? ? ? ? ? ?handle_irq(irq);
-> > > ? ? ? ? ? ? ? ?}
-> > > ? ? ? ? ? ? ? ?stat = readl_relaxed(vic->base + VIC_IRQ_STATUS);
-> > > ? ? ? ?}
-> > >
-> > > This ensures that we process all interrupts found pending before we
-> > > re-check for any new interrupts pending. ?Arguably this is a much
-> > > fairer implementation (and may mean if things get irrevokably stuck,
-> > > things like sysrq via the console uart may still work.)
-> > 
-> > I really like the looks of this, Jamie can you do it like that?
-> > 
-> > Maybe some smallish comment about what's going on can be
-> > good for future generations reading that code...
+On Wednesday 02 November 2011, Zoltan Devai wrote:
+> 2011/10/24 Jamie Iles <jamie@jamieiles.com>:
+> > On Mon, Oct 24, 2011 at 11:13:21AM +0200, Arnd Bergmann wrote:
+> >> On Sunday 23 October 2011, Zoltan Devai wrote:
+> >> > 2011/10/19 Arnd Bergmann <arnd@arndb.de>:
+> >> We talked about it at the ARM subarchitecture maintainer summit, and I think
+> >> I'll just merge your platform code for 3.2 if you send the fixed version
+> >> in time. I'm not going to merge your clk support patch (2/5) though, since
+> >
+> > Zoltan uses my device tree bindings and multi IRQ handler for the VIC
+> > which hasn't yet been merged (and I haven't had any
+> > Tested-by/Acked-by's) from anyone other than Zoltan yet.
+> >
+> > I suppose the device tree binding and multi IRQ handler patches could
+> > go in without the other platform conversions though they haven't had any
+> > time in -next.
+> Arnd, Russell,
 > 
-> Bear in mind that it gets a little more complex when you have more
-> than one VIC, because the outer loop should be across all VICs.
+> What about Jamie's VIC patches ?
+> Should I wait for those to get in somehow, or rebase SPMP8000
+> to not depend on those ?
 
-OK, so I think what I posted yesterday does that (updated for slightly 
-better naming) and with a description.  In the spirit of fairness 
-iterating over the VIC's this way seemed right to me.
+Sorry I didn't get back to you on this any more. As you may have noticed,
+Linus merged a large number of patches through my tree today and yours were
+not a part of that.
 
-/*
- * Handle each interrupt in a single VIC.  Returns non-zero if we've 
- * handled at least one interrupt.  This does a single read of the 
- * status register and handles all interrupts in order from LSB first.
- */
-static int handle_one_vic(struct vic_device *vic,
-			  struct pt_regs *regs)
-{
-	u32 stat, irq;
-	int handled = 0;
+It's too late for 3.2 now, but everything looks good for 3.3. I'll wait for
+Jamie's patches to get stable first and then put your code into the arm-soc
+tree.
 
-	stat = readl_relaxed(vic->base + VIC_IRQ_STATUS);
-	while (stat) {
-		irq = ffs(stat) - 1;
-		handle_IRQ(irq_domain_to_irq(&vic->domain, irq), regs);
-		stat &= ~(1 << irq);
-		handled = 1;
-	}
+There are other problems with the process in your series: you should never
+cherry-pick a kernel from another branch if you depend on them. Instead,
+make sure that the patches are queued up for the next merge window and not
+changing any more (they are now obviously, as Linus merged them).
 
-	return handled;
-}
-
-/*
- * Keep iterating over all registered VIC's until there are no pending 
- * interrupts.
- */
-asmlinkage void __exception_irq_entry vic_handle_irq(struct pt_regs *regs)
-{
-	int i, handled;
-
-	do {
-		for (i = 0, handled = 0; i < vic_id; ++i)
-			handled |= vic_single_handle_irq(&vic_devices[i],
-							 regs))
-	} while (handled);
-}
-
-Jamie
+	Arnd
