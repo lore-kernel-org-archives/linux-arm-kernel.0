@@ -1,28 +1,40 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 3 Nov 2011 09:10:26 +0000
-Subject: [PATCH] ARM: SAMSUNG: Add clk enable/disable of pwm
-In-Reply-To: <019301cc9a08$17c69d50$4753d7f0$%kim@samsung.com>
-References: <1319505701-9784-1-git-send-email-jy0922.shim@samsung.com>
-	<012701cc99cc$300dca50$90295ef0$%kim@samsung.com>
-	<4EB1FB58.9050503@samsung.com>
-	<018e01cc99fc$bb4d5ec0$31e81c40$%kim@samsung.com>
-	<4EB24886.8080002@samsung.com>
-	<CAH9JG2XFALdd_JVSQW4rjCDCgLL9sgf_GVurVDoGJa-SwXmB5Q@mail.gmail.com>
-	<CAH9JG2X9dXe2cG6qvqM6GuTuC6xc0wBYSsvba=zbbmQD7BqYXg@mail.gmail.com>
-	<019301cc9a08$17c69d50$4753d7f0$%kim@samsung.com>
-Message-ID: <20111103091026.GH12913@n2100.arm.linux.org.uk>
+Date: Thu, 3 Nov 2011 09:12:45 +0000
+Subject: [RFC 0/5] restart cleanups
+In-Reply-To: <20111101163817.GR19187@n2100.arm.linux.org.uk>
+References: <20111101160731.GQ19187@n2100.arm.linux.org.uk>
+	<20111101163817.GR19187@n2100.arm.linux.org.uk>
+Message-ID: <20111103091245.GI12913@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 03, 2011 at 06:08:03PM +0900, Kukjin Kim wrote:
-> diff --git a/arch/arm/plat-samsung/pwm-clock.c b/arch/arm/plat-samsung/pwm-clock.c
-> index a35ff3b..37a159b 100644
-> --- a/arch/arm/plat-samsung/pwm-clock.c
-> +++ b/arch/arm/plat-samsung/pwm-clock.c
-> @@ -449,6 +449,8 @@ __init void s3c_pwmclk_init(void)
->  		return;
->  	}
->  
-> +	clk_enable(clk_timers);
+On Tue, Nov 01, 2011 at 04:38:17PM +0000, Russell King - ARM Linux wrote:
+> Can someone please check whether this code:
+> 
+> /* Hook for arm_pm_restart to ensure we execute the reset code
+>  * with the caches enabled. It seems at least the S3C2440 has a problem
+>  * resetting if there is bus activity interrupted by the reset.
+>  */
+> static void s3c24xx_pm_restart(char mode, const char *cmd)
+> {
+>         if (mode != 's') {
+>                 unsigned long flags;
+> 
+>                 local_irq_save(flags);
+>                 __cpuc_flush_kern_all();
+>                 __cpuc_flush_user_all();
+> 
+>                 arch_reset(mode, cmd);
+>                 local_irq_restore(flags);
+>         }
+> 
+>         /* fallback, or unhandled */
+>         arm_machine_restart(mode, cmd);
+> }
+> 
+> will be broken by any of these patches - and more importantly whether
+> this code can simply be deleted with these five patches applied.
 
-Error checking?  clk_prepare() as well?
+Okay, I'm going to delete the above and hope for the best; I'm taking
+the lack of reply as meaning that no one in the Samsung community is
+that interested in this code.
