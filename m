@@ -1,58 +1,47 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Thu, 03 Nov 2011 16:48:01 +0100
-Subject: mainline tree fails to build with OMAP3-only config
-Message-ID: <4EB2B7B1.4070804@gmail.com>
+From: ulf.hansson@stericsson.com (Ulf Hansson)
+Date: Thu, 3 Nov 2011 16:55:41 +0100
+Subject: [PATCH V2] spi/pl022: Enable clock in probe
+Message-ID: <1320335741-5309-1-git-send-email-ulf.hansson@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Make sure we enable the clock before leaving probe.
 
-when trying to build an OMAP3-only config with Linus' current mainline 
-HEAD, I'm getting the following errors. The same config works fine with 
-v3.1.
+Signed-off-by: Ulf Hansson <ulf.hansson@stericsson.com>
+---
 
-The reasons seems to be that arch/arm/mach-omap2/io.c defines the 
-*_init_early() functions unconditionally for all platforms. Is this 
-already fixed in any tree?
+Changes in v2:
+	-Remove runtime_idle
 
+---
+ drivers/spi/spi-pl022.c |    8 ++++++++
+ 1 files changed, 8 insertions(+), 0 deletions(-)
 
-Thanks,
-Daniel
-
-
-   LD      .tmp_vmlinux1
-arch/arm/mach-omap2/built-in.o: In function `omap4430_init_early':
-twl-common.c:(.init.text+0x4f0): undefined reference to 
-`omap2_set_globals_443x'
-twl-common.c:(.init.text+0x4f8): undefined reference to 
-`omap44xx_voltagedomains_init'
-twl-common.c:(.init.text+0x4fc): undefined reference to 
-`omap44xx_powerdomains_init'
-twl-common.c:(.init.text+0x500): undefined reference to 
-`omap44xx_clockdomains_init'
-twl-common.c:(.init.text+0x504): undefined reference to 
-`omap44xx_hwmod_init'
-twl-common.c:(.init.text+0x510): undefined reference to `omap4xxx_clk_init'
-arch/arm/mach-omap2/built-in.o: In function `omap2430_init_early':
-twl-common.c:(.init.text+0x578): undefined reference to 
-`omap2_set_globals_243x'
-twl-common.c:(.init.text+0x580): undefined reference to 
-`omap2xxx_voltagedomains_init'
-twl-common.c:(.init.text+0x584): undefined reference to 
-`omap243x_powerdomains_init'
-twl-common.c:(.init.text+0x588): undefined reference to 
-`omap243x_clockdomains_init'
-twl-common.c:(.init.text+0x58c): undefined reference to 
-`omap2430_hwmod_init'
-arch/arm/mach-omap2/built-in.o: In function `omap2420_init_early':
-twl-common.c:(.init.text+0x59c): undefined reference to 
-`omap2_set_globals_242x'
-twl-common.c:(.init.text+0x5a4): undefined reference to 
-`omap2xxx_voltagedomains_init'
-twl-common.c:(.init.text+0x5a8): undefined reference to 
-`omap242x_powerdomains_init'
-twl-common.c:(.init.text+0x5ac): undefined reference to 
-`omap242x_clockdomains_init'
-twl-common.c:(.init.text+0x5b0): undefined reference to 
-`omap2420_hwmod_init'
-make: *** [.tmp_vmlinux1] Error 1
+diff --git a/drivers/spi/spi-pl022.c b/drivers/spi/spi-pl022.c
+index f103e47..5559b22 100644
+--- a/drivers/spi/spi-pl022.c
++++ b/drivers/spi/spi-pl022.c
+@@ -2184,6 +2184,12 @@ pl022_probe(struct amba_device *adev, const struct amba_id *id)
+ 		goto  err_clk_prep;
+ 	}
+ 
++	status = clk_enable(pl022->clk);
++	if (status) {
++		dev_err(&adev->dev, "could not enable SSP/SPI bus clock\n");
++		goto err_no_clk_en;
++	}
++
+ 	/* Disable SSP */
+ 	writew((readw(SSP_CR1(pl022->virtbase)) & (~SSP_CR1_MASK_SSE)),
+ 	       SSP_CR1(pl022->virtbase));
+@@ -2237,6 +2243,8 @@ pl022_probe(struct amba_device *adev, const struct amba_id *id)
+ 
+ 	free_irq(adev->irq[0], pl022);
+  err_no_irq:
++	clk_disable(pl022->clk);
++ err_no_clk_en:
+ 	clk_unprepare(pl022->clk);
+  err_clk_prep:
+ 	clk_put(pl022->clk);
+-- 
+1.7.5.4
