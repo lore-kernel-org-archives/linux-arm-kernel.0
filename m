@@ -1,45 +1,42 @@
-From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Thu, 3 Nov 2011 20:47:08 +0530
-Subject: [PATCH] OMAP4: I2C: Enable FIFO usage for OMAP4
-Message-ID: <1320333428-23532-1-git-send-email-shubhrajyoti@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 3 Nov 2011 15:18:55 +0000
+Subject: [PATCH v2] atmel/spi: fix missing probe during the switch to
+	module_platform_driver
+In-Reply-To: <1320333042-24880-1-git-send-email-plagnioj@jcrosoft.com>
+References: <1320331706-4946-1-git-send-email-plagnioj@jcrosoft.com>
+	<1320333042-24880-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <20111103151855.GP12913@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently the fifo depth is set to zero for OMAP4 which disables
-the FIFO usage. This patch enables the FIFO usage for I2C transactions
-on OMAP4 also.
+On Thu, Nov 03, 2011 at 11:10:42PM +0800, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> in commit 940ab889
 
-Tested on omap4430 and 3430.
+This kind of commit message is, frankly, utter crap.
 
-Tested-and-Reported-by: Nishanth Menon <nm@ti.com>
-Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
----
- drivers/i2c/busses/i2c-omap.c |   11 ++++++-----
- 1 files changed, 6 insertions(+), 5 deletions(-)
+With all the complaints that have been on this mailing list about raw
+commit IDs without saying what the commit was, it completely astounds
+me that someone in your position (allegedly a co-maintainer of a SoC)
+would make such an error.
 
-diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index a43d002..fa23faa 100644
---- a/drivers/i2c/busses/i2c-omap.c
-+++ b/drivers/i2c/busses/i2c-omap.c
-@@ -1047,13 +1047,14 @@ omap_i2c_probe(struct platform_device *pdev)
- 		 * size. This is to ensure that we can handle the status on int
- 		 * call back latencies.
- 		 */
--		if (dev->rev >= OMAP_I2C_REV_ON_3530_4430) {
--			dev->fifo_size = 0;
-+
-+		dev->fifo_size = (dev->fifo_size / 2);
-+
-+		if (dev->rev >= OMAP_I2C_REV_ON_3530_4430)
- 			dev->b_hw = 0; /* Disable hardware fixes */
--		} else {
--			dev->fifo_size = (dev->fifo_size / 2);
-+		else
- 			dev->b_hw = 1; /* Enable hardware fixes */
--		}
-+
- 		/* calculate wakeup latency constraint for MPU */
- 		if (dev->set_mpu_wkup_lat != NULL)
- 			dev->latency = (1000000 * dev->fifo_size) /
--- 
-1.7.1
+Please generate a much better commit message.  Maybe something like:
+
+----
+Commit 940ab889 (blah blah blah) converted this driver to use
+module_platform_driver, but due to the use of platform_driver_probe(),
+this resulted in the call to atmel_spi_probe being lost.  Place the
+call to this function into the driver structure.
+
+As atmel_spi_probe is marked __init, this will cause a section mismatch
+error, so ... <fill this in for the point below>
+----
+
+And, you're forgetting to fix this properly (maybe you don't care about
+section mismatch errors - are you going to create another patch for that
+as well?)  Did you even build-test this patch and pay attention to any
+warnings issued, or were you just pleased to get a zImage at the end?
+
+static int __init atmel_spi_probe(struct platform_device *pdev)
+
+__init is not compatible with having a pointer in the platform driver
+structure.  It needs to be __devinit.
