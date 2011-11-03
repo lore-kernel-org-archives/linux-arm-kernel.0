@@ -1,43 +1,41 @@
 From: rnayak@ti.com (Rajendra Nayak)
-Date: Thu, 3 Nov 2011 16:24:25 +0530
-Subject: [PATCH 3/3] ARM: OMAP: hwmod: Look for hwmod/module level context
-	lost count if supported
+Date: Thu, 3 Nov 2011 16:24:24 +0530
+Subject: [PATCH 2/3] ARM: OMAP: hwmod: Update/Clear module specific context
+	lost counters
 In-Reply-To: <1320317665-6381-1-git-send-email-rnayak@ti.com>
 References: <1320317665-6381-1-git-send-email-rnayak@ti.com>
-Message-ID: <1320317665-6381-4-git-send-email-rnayak@ti.com>
+Message-ID: <1320317665-6381-3-git-send-email-rnayak@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that OMAP4 has hwmod/module level context lost counters, make
-omap_hwmod_get_context_loss_count() return them on platforms where they
-exist, else fall back on the pwrdm level counters for older platforms.
+Update the module specific context_lost_counter just after
+enabling the module, and clear the context register just
+before disabling the module.
 
 Signed-off-by: Rajendra Nayak <rnayak@ti.com>
 ---
- arch/arm/mach-omap2/omap_hwmod.c |   11 ++++++++---
- 1 files changed, 8 insertions(+), 3 deletions(-)
+ arch/arm/mach-omap2/omap_hwmod.c |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index ac17748..9d140c4 100644
+index d7f9dd1..ac17748 100644
 --- a/arch/arm/mach-omap2/omap_hwmod.c
 +++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -2658,9 +2658,14 @@ u32 omap_hwmod_get_context_loss_count(struct omap_hwmod *oh)
- 	struct powerdomain *pwrdm;
- 	int ret = 0;
+@@ -1510,6 +1510,7 @@ static int _enable(struct omap_hwmod *oh)
  
--	pwrdm = omap_hwmod_get_pwrdm(oh);
--	if (pwrdm)
--		ret = pwrdm_get_context_loss_count(pwrdm);
-+	if (oh->prcm.omap4.context_offs) {
-+		/* Support for per-hwmod context register */
-+		ret = oh->prcm.omap4.context_lost_counter;
-+	} else {
-+		pwrdm = omap_hwmod_get_pwrdm(oh);
-+		if (pwrdm)
-+			ret = pwrdm_get_context_loss_count(pwrdm);
-+	}
+ 	_enable_clocks(oh);
+ 	_enable_module(oh);
++	_update_context_lost(oh);
  
- 	return ret;
- }
+ 	r = _wait_target_ready(oh);
+ 	if (!r) {
+@@ -1563,6 +1564,7 @@ static int _idle(struct omap_hwmod *oh)
+ 	if (oh->class->sysc)
+ 		_idle_sysc(oh);
+ 	_del_initiator_dep(oh, mpu_oh);
++	_clear_context_lost(oh);
+ 	_disable_module(oh);
+ 	ret = _wait_target_disable(oh);
+ 	if (ret)
 -- 
 1.7.1
