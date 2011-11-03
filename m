@@ -1,39 +1,29 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 3 Nov 2011 10:02:35 +0000
-Subject: [PATCH v2 2/8] arm/tegra: prepare early init for multiple
-	tegra variants
-In-Reply-To: <20111103092116.GO13358@tbergstrom-lnx.Nvidia.com>
-References: <1320242948-21061-1-git-send-email-pdeschrijver@nvidia.com>
-	<1320242948-21061-3-git-send-email-pdeschrijver@nvidia.com>
-	<CAMbhsRSTcR8qgYESmM6OxkXeVeg6vS49woCe_OX6CY4pAj2g_A@mail.gmail.com>
-	<20111103092116.GO13358@tbergstrom-lnx.Nvidia.com>
-Message-ID: <20111103100235.GK12913@n2100.arm.linux.org.uk>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu,  3 Nov 2011 11:11:07 +0100
+Subject: [PATCHv2] AT91: Add a driver for the ADC
+In-Reply-To: <1319041134-19712-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1319041134-19712-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1320315070-1700-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 03, 2011 at 11:21:16AM +0200, Peter De Schrijver wrote:
-> On Wed, Nov 02, 2011 at 07:30:43PM +0100, Colin Cross wrote:
-> > On Wed, Nov 2, 2011 at 7:09 AM, Peter De Schrijver
-> > <pdeschrijver@nvidia.com> wrote:
-> > > This patch splits the early init code in a common and a tegra20 specific part.
-> > > L2 cache initialization is generalized and discovers the cache associativity
-> > > at runtime.
-> > >
-> > > Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
-> > > ---
-> > <snip>
-> > 
-> > > -static __initdata struct tegra_clk_init_table common_clk_init_table[] = {
-> > > +void (*arch_reset)(char mode, const char *cmd) = tegra_assert_system_reset;
-> > > +
-> > This is unrelated to the patch description?
-> > 
-> 
-> This is a left over from the past. Will be removed from the next version.
+Hi all,
 
-Please can Tegra move over to hooking the restart via arm_pm_restart()
-rather than via arch_reset()?  That would leave arch_reset() for
-software-based reboot methods - which I suspect Tegra doesn't use.
+This patchset adds the driver for the ADC in the AT91 SoC. It has been tested on
+the at91sam9g20ek and should work on sam9g45 as well.
 
-That would allow Tegra to dovetail into the arch_reset cleanup work much
-better than it would otherwise do.
+For now, it only reads values when asked for by sysfs, but eventually will
+support hardware triggers and more boards.
+
+This patchset is based on the branch master of Jonathan Cameron present at :
+https://github.com/jic23/linux-iio/, commit 85d8ff8
+
+Improvements since v1:
+  - Rebase on top of commit 85d8ff8
+  - Initialise scan_types
+  - Added scale informations in the driver
+  - Allow to use only a subset of adc channels available on the SoC
+  - Various fix according to reviews
+
+Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+Cc: Patrice Vilchez <patrice.vilchez@atmel.com>
