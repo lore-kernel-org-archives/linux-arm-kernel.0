@@ -1,65 +1,36 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 3 Nov 2011 07:55:02 +0100
-Subject: [PATCH 2/2] ARM: mcx: fix local timer interrupt handling
-In-Reply-To: <1320255049-12447-3-git-send-email-marc.zyngier@arm.com>
-References: <1320255049-12447-1-git-send-email-marc.zyngier@arm.com>
-	<1320255049-12447-3-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20111103065502.GO23421@pengutronix.de>
+From: axel.lin@gmail.com (Axel Lin)
+Date: Thu, 03 Nov 2011 15:00:38 +0800
+Subject: [PATCH RESEND] ARM: OMAP: omap_device: Include linux/export.h
+Message-ID: <1320303638.17983.5.camel@phoenix>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 02, 2011 at 05:30:49PM +0000, Marc Zyngier wrote:
-> As local timer interrupts are now handled as normal interrupts,
-> remove the special case in the GIC handler.
-> 
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Include linux/export.h to fix below build warning:
 
-Ok, I'll pick this one up.
+  CC      arch/arm/plat-omap/omap_device.o
+arch/arm/plat-omap/omap_device.c:1055: warning: data definition has no type or storage class
+arch/arm/plat-omap/omap_device.c:1055: warning: type defaults to 'int' in declaration of 'EXPORT_SYMBOL'
+arch/arm/plat-omap/omap_device.c:1055: warning: parameter names (without types) in function declaration
 
-Sascha
+Signed-off-by: Axel Lin <axel.lin@gmail.com>
+---
+This resend also CC linux-omap at vger.kernel.org and linux-arm-kernel at lists.infradead.org.
+This patch is against linux-next 20111103.
 
-> ---
->  arch/arm/plat-mxc/gic.c |   11 ++---------
->  1 files changed, 2 insertions(+), 9 deletions(-)
-> 
-> diff --git a/arch/arm/plat-mxc/gic.c b/arch/arm/plat-mxc/gic.c
-> index b3b8eed..12f8f81 100644
-> --- a/arch/arm/plat-mxc/gic.c
-> +++ b/arch/arm/plat-mxc/gic.c
-> @@ -28,21 +28,14 @@ asmlinkage void __exception_irq_entry gic_handle_irq(struct pt_regs *regs)
->  		if (irqnr == 1023)
->  			break;
->  
-> -		if (irqnr > 29 && irqnr < 1021)
-> +		if (irqnr > 15 && irqnr < 1021)
->  			handle_IRQ(irqnr, regs);
->  #ifdef CONFIG_SMP
-> -		else if (irqnr < 16) {
-> +		else {
->  			writel_relaxed(irqstat, gic_cpu_base_addr +
->  						GIC_CPU_EOI);
->  			handle_IPI(irqnr, regs);
->  		}
->  #endif
-> -#ifdef CONFIG_LOCAL_TIMERS
-> -		else if (irqnr == 29) {
-> -			writel_relaxed(irqstat, gic_cpu_base_addr +
-> -						GIC_CPU_EOI);
-> -			handle_local_timer(regs);
-> -		}
-> -#endif
->  	} while (1);
->  }
-> -- 
-> 1.7.0.4
-> 
-> 
-> 
+ arch/arm/plat-omap/omap_device.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
+diff --git a/arch/arm/plat-omap/omap_device.c b/arch/arm/plat-omap/omap_device.c
+index cd90bed..f839f94 100644
+--- a/arch/arm/plat-omap/omap_device.c
++++ b/arch/arm/plat-omap/omap_device.c
+@@ -78,6 +78,7 @@
+ #undef DEBUG
+ 
+ #include <linux/kernel.h>
++#include <linux/export.h>
+ #include <linux/platform_device.h>
+ #include <linux/slab.h>
+ #include <linux/err.h>
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.7.5.4
