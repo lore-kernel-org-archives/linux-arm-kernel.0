@@ -1,53 +1,34 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu, 3 Nov 2011 19:05:35 +0100
-Subject: [PATCH 1/3] ARM: AT91: Add platform data for the ADCs
-In-Reply-To: <CACRpkdZsNJwgC-7hp2zHNAcZVG-x8JN1CzV5KbYSiokD-9FUBw@mail.gmail.com>
-References: <1319041134-19712-1-git-send-email-maxime.ripard@free-electrons.com>
-	<1320315070-1700-1-git-send-email-maxime.ripard@free-electrons.com>
-	<1320315070-1700-2-git-send-email-maxime.ripard@free-electrons.com>
-	<CAKnu2MqTVPxioKyr-F6JWcdF5SRZjzLSFPt5A-6CkZO7HyeHRw@mail.gmail.com>
-	<4EB2C0F1.1030404@free-electrons.com>
-	<CACRpkdZsNJwgC-7hp2zHNAcZVG-x8JN1CzV5KbYSiokD-9FUBw@mail.gmail.com>
-Message-ID: <20111103180535.GO7136@game.jcrosoft.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 3 Nov 2011 18:08:21 +0000
+Subject: [PATCH v2] atmel/spi: fix missing probe during the switch to
+	module_platform_driver
+In-Reply-To: <20111103180338.GN7136@game.jcrosoft.org>
+References: <1320331706-4946-1-git-send-email-plagnioj@jcrosoft.com>
+	<1320333042-24880-1-git-send-email-plagnioj@jcrosoft.com>
+	<20111103151855.GP12913@n2100.arm.linux.org.uk>
+	<20111103165113.GL7136@game.jcrosoft.org>
+	<20111103174338.GQ12913@n2100.arm.linux.org.uk>
+	<20111103180338.GN7136@game.jcrosoft.org>
+Message-ID: <20111103180821.GR12913@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17:38 Thu 03 Nov     , Linus Walleij wrote:
-> On Thu, Nov 3, 2011 at 5:27 PM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > [Me]
-> >> We're not supposed to have platform data dependent to stuff in
-> >> staging under arch/arm or anyplace else in the main kernel tree.
-> >>
-> >> Please move this to
-> >> drivers/staging/iio/adc/at91adc-board.h
-> >> or so.
-> >
-> > Won't moving this part to staging prevent from using this structure in
-> > board files ? If so, how will I be able to declare a new board that is
-> > using this ADC (or add the support for the ADC to a new one) ?
+On Thu, Nov 03, 2011 at 07:03:38PM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> On 17:43 Thu 03 Nov     , Russell King - ARM Linux wrote:
+> > On Thu, Nov 03, 2011 at 05:51:13PM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > > this is an other fix I do not want to fix 2 issue in one commit and I do care
+> > > of mismatch erros I fix them all the time I send patch for some rm9200 few
+> > > weeks ago
+> > 
+> > It should not be a separate patch - it's all to do with fixing the
+> > original problem.
 > 
-> Put this into a separate board file living under staging/iio/adc
-> 
-> Compare:
-> drivers/staging/ste_rmi4/board-mop500-u8500uib-rmi4.c
-> 
-> >> As for calling the at91_add_device_adc() function (which I guess
-> >> you want to do at some point) the pattern I followed for other
-> >> drivers is to declare a dummy function in arch/arm/mach-*
-> >> with __weak and let the staging driver override that. This way
-> >> the staging driver can go away without any compilation trouble
-> >> happening.
-> >
-> > I don't really see why my changes will break the compilation if the
-> > driver is no longer present in staging. At worst, the structure will be
-> > filled but used by no one, right ?
-> 
-> You're right.
-> 
-> But still, we cannot add that header file for a driver that
-> is in the staging tree. Header files go into the staging dir too.
-agreed
+> yes when we was supposed to swtch to module_platform_driver we use the .probe
+> which is suposed to be __devinit in this case but I was prefering to do it in
+> 2 steps
 
-Best Regards,
-J.
+Then do the __devinit transformation _first_ so you don't introduce a new
+bug in the middle of your 'fix'.
+
+But I personally think you're just creating needless churn by splitting
+this one logical change.
