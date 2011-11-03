@@ -1,125 +1,105 @@
-From: liu.h.jason@gmail.com (Jason Liu)
-Date: Thu, 3 Nov 2011 16:39:04 +0800
-Subject: [PATCH v3 3/3] ARM:i.MX: fix the compile warnings in
-	clock-mx51-mx53.c
-In-Reply-To: <20111103081840.GE16886@pengutronix.de>
-References: <1320231836-9555-1-git-send-email-jason.hui@linaro.org>
-	<1320231836-9555-6-git-send-email-jason.hui@linaro.org>
-	<20111103064426.GN23421@pengutronix.de>
-	<CAB4PhKcU8AQg3Y9MbP8cp6Ji_jZafRtNv-vz83HuECcmg9O7jQ@mail.gmail.com>
-	<20111103081840.GE16886@pengutronix.de>
-Message-ID: <CAB4PhKezarzphrmH3TWCtvc2tSgnAWjXTfSb12hgOFXYSW5Jrw@mail.gmail.com>
+From: ulf.hansson@stericsson.com (Ulf Hansson)
+Date: Thu, 3 Nov 2011 09:44:14 +0100
+Subject: [PATCH V3] AMBA: Put devices into low-power state in suspend_noirq
+In-Reply-To: <201111022357.09759.rjw@sisk.pl>
+References: <1320142497-16750-1-git-send-email-ulf.hansson@stericsson.com>
+	<4EB14ABB.6020103@stericsson.com>
+	<20111102140453.GF19187@n2100.arm.linux.org.uk>
+	<201111022357.09759.rjw@sisk.pl>
+Message-ID: <4EB2545E.2000504@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/11/3 Sascha Hauer <s.hauer@pengutronix.de>:
-> On Thu, Nov 03, 2011 at 03:36:05PM +0800, Jason Liu wrote:
->> 2011/11/3 Sascha Hauer <s.hauer@pengutronix.de>:
->> > On Wed, Nov 02, 2011 at 07:03:56PM +0800, Jason Liu wrote:
->> >> arch/arm/mach-mx5/clock-mx51-mx53.c: In function 'clk_get_freq_dt':
->> >> arch/arm/mach-mx5/clock-mx51-mx53.c: In function 'mx53_clocks_init_dt':
->> >> arch/arm/mach-mx5/clock-mx51-mx53.c:1673: warning: 'ckil' is used uninitialized in this function
->> >> arch/arm/mach-mx5/clock-mx51-mx53.c:1673: warning: 'osc' is used uninitialized in this function
->> >> arch/arm/mach-mx5/clock-mx51-mx53.c:1673: warning: 'ckih1' is used uninitialized in this function
->> >> arch/arm/mach-mx5/clock-mx51-mx53.c:1673: warning: 'ckih2' is used uninitialized in this function
->> >> arch/arm/mach-mx5/clock-mx51-mx53.c: In function 'mx51_clocks_init_dt':
->> >> arch/arm/mach-mx5/clock-mx51-mx53.c:1665: warning: 'ckil' is used uninitialized in this function
->> >> arch/arm/mach-mx5/clock-mx51-mx53.c:1665: warning: 'osc' is used uninitialized in this function
->> >> arch/arm/mach-mx5/clock-mx51-mx53.c:1665: warning: 'ckih1' is used uninitialized in this function
->> >> arch/arm/mach-mx5/clock-mx51-mx53.c:1665: warning: 'ckih2' is used uninitialized in this function
->> >
->> > You only get this warning because you have put the code in
->> > clk_get_freq_dt into #ifdef CONFIG_OF in the last patch. Instead please
->> > put the whole block including clk_get_freq_dt, mx51_clocks_init_dt and
->> > mx53_clocks_init_dt into #ifdef CONFIG_OF.
+Rafael J. Wysocki wrote:
+> On Wednesday, November 02, 2011, Russell King - ARM Linux wrote:
+>> On Wed, Nov 02, 2011 at 02:50:51PM +0100, Ulf Hansson wrote:
+>>> Just some thinking, you may comment if you like....
+>>>
+>>> When using a power_domain this will then mean that the power domain  
+>>> callbacks for suspend|resume should take similar actions as they do in  
+>>> their runtime_suspend|resume callbacks to put the devices into low power  
+>>> state. This should be in line of what you prefer?
+>> If it is appropriate to cut the vcore for the device when in runtime
+>> suspend state, then a driver itself has to explicitly do that.  vcore
+>> handling is different from pclk handling because loss of vcore requires
+>> the device to be reinitialized, whereas pclk does not.
+> 
+> Well, I have a comment here.
+> 
+> There are systems having separate logic for removing power from power
+> domains, so individual drivers obviously can't do that.  What they
+> can do is to indicate that their devices don't need power at the moment,
+> which is done by using the runtime PM reference counting, and the
+> subsystem layer has to take care of the actual power removal.
+> 
+>>> This will mean some duplicated code but at the same time give the device  
+>>> driver full control and responsibility of putting its device in  
+>>> low-power state.
+>> It should not mean any duplicated code - if a driver itself wishes to call
+>> its runtime suspend and resume handlers from its normal suspend/resume
+>> handlers, that's a choice it can make (and it alone can make).  Again,
+>> take a moment to think a little more about your original proposal of
+>> pushing that into the bus layer.
 >>
->> Yes, I can put #ifdef CONFIG_OF to cover the whole block including
->> clk_get_freq_dt/
->> mx51_clocks_init_dt/mx53_clocks_init_dt, but after enable CONFIG_OF,
->> you still will
->> meet these compiling warnings.
->
-> I just tried it and no, I do not get any compiler warnings.
+>> And consider the case of a non-runtime PM system (where the runtime PM
+>> callbacks are NULL) yet you have system suspend enabled, and you trigger
+>> a system suspend.  Do you really want the suspend of the devices to be
+>> skipped because the runtime PM callbacks were NULL because of system
+>> configuration?
 
-OK, thanks.
+This is a fact and is as I see it the main reason to why not this patch 
+should not be accepted.
 
->
-> When passing the address of a variable to a function gcc considers this
-> variable as initialized after that, unless the function is a static
-> inline function and gcc can see that it actually does not get
-> initialized.
-> I hope this hasn't changed with gcc 4.6
-
-you right. After move the #ifdef to cover all the dt related, I did
-not get any compile
-warnings. I will update this patch soon. see v2 for it.
-
-Jason Liu
-
->
 >>
->> But refer to grant before, we don't need place #ifdef CONFIG_OF #endif into
->> the .c file, no-matter enable device_tree support or not. I'm not sure
->> why we still
->> meet compile error, shawn, any comments?
->
-> for_each_compatible_node is inside #ifdef CONFIG_OF in the header file.
-> So unless there are plans to provide some dummy stub for this without
-> CONFIG_OF I see no way around these ifdefs.
->
+>> With them being explicit calls in the driver, this doesn't happen because
+>> if you omit those functions for non-runtime PM, you'll get a link error.
 >>
->> Jason Liu
+>>> In parallel it would then also make sense to remove the pm_runtime  
+>>> handling completely from the amba bus and let the pclk be fully runtime  
+>>> handled from the device driver instead. Since it must handle it from  
+>>> suspend anyway...
+>> We know that it's safe to handle the pclk at the bus layer for normal
+>> runtime PM as it causes no state loss.  We also know that throwing the
+>> vcore handling in there is the wrong thing to do because it does cause
+>> state loss and therefore needs proper handling at the driver level.
+
+The main reason for putting this into the bus was to remove the handling 
+of pclk from the device drivers since it was common for all drivers. Due 
+to the above discussion it will be there anyway, but for 
+suspend|suspend_noirq instead.
+
+In my perfect world :-), either the bus controls the pclk completely or 
+not, to have something in between just does not feel right.
+
+So either I suggest to remove the runtime handling of the pclk and then 
+move the responsibility to the drivers (I think it will be somewhat 
+cleaner code in each device driver if this is done) or add handling of 
+the pclk to the amba normal suspend|resume functions as well, that could 
+be feasible as well.
+
+One additional thought, considering using a power domain with runtime 
+functions. Ideally the power domain will do it's runtime stuff and then 
+would like to call the pm_generic_runtime_* functions which right now is 
+going directly towards the driver and skipping the bus etc. This might 
+be another discussion though, but never the less, it could be a reason 
+to why not have runtime functions at all in the bus.
+
 >>
->> > Sascha
->> >
->> >>
->> >> Signed-off-by: Jason Liu <jason.hui@linaro.org>
->> >> ---
->> >> ?arch/arm/mach-mx5/clock-mx51-mx53.c | ? ?2 ++
->> >> ?1 files changed, 2 insertions(+), 0 deletions(-)
->> >>
->> >> diff --git a/arch/arm/mach-mx5/clock-mx51-mx53.c b/arch/arm/mach-mx5/clock-mx51-mx53.c
->> >> index 7c373b83..e352a5a 100644
->> >> --- a/arch/arm/mach-mx5/clock-mx51-mx53.c
->> >> +++ b/arch/arm/mach-mx5/clock-mx51-mx53.c
->> >> @@ -1662,6 +1662,7 @@ int __init mx51_clocks_init_dt(void)
->> >> ?{
->> >> ? ? ? unsigned long ckil, osc, ckih1, ckih2;
->> >>
->> >> + ? ? ckil = osc = ckih1 = ckih2 = 0;
->> >> ? ? ? clk_get_freq_dt(&ckil, &osc, &ckih1, &ckih2);
->> >> ? ? ? return mx51_clocks_init(ckil, osc, ckih1, ckih2);
->> >> ?}
->> >> @@ -1670,6 +1671,7 @@ int __init mx53_clocks_init_dt(void)
->> >> ?{
->> >> ? ? ? unsigned long ckil, osc, ckih1, ckih2;
->> >>
->> >> + ? ? ckil = osc = ckih1 = ckih2 = 0;
->> >> ? ? ? clk_get_freq_dt(&ckil, &osc, &ckih1, &ckih2);
->> >> ? ? ? return mx53_clocks_init(ckil, osc, ckih1, ckih2);
->> >> ?}
->> >> --
->> >> 1.7.4.1
->> >>
->> >>
->> >>
->> >
->> > --
->> > Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? | ? ? ? ? ? ? ? ? ? ? ? ? ? ? |
->> > Industrial Linux Solutions ? ? ? ? ? ? ? ? | http://www.pengutronix.de/ ?|
->> > Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0 ? ?|
->> > Amtsgericht Hildesheim, HRA 2686 ? ? ? ? ? | Fax: ? +49-5121-206917-5555 |
->> >
->> > _______________________________________________
->> > linux-arm-kernel mailing list
->> > linux-arm-kernel at lists.infradead.org
->> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->> >
+>> Hence, the bus code can take care of the pclk but not for vcore.
 >>
->
-> --
-> Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? | ? ? ? ? ? ? ? ? ? ? ? ? ? ? |
-> Industrial Linux Solutions ? ? ? ? ? ? ? ? | http://www.pengutronix.de/ ?|
-> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0 ? ?|
-> Amtsgericht Hildesheim, HRA 2686 ? ? ? ? ? | Fax: ? +49-5121-206917-5555 |
->
+>> So, I don't see any reason to change the bus code.
+> 
+> I agree.
+> 
+> At least calling a driver's .runtime_resume() callback from the bus type's
+> _resume_noirq() one doesn't seem quite right (and analogously for suspend).
+> It generally is expected that drivers will provide their own .suspend_noirq()
+> and .resume_noirq() callbacks, which may point to the same callback routines
+> as .runtime_suspend() and .runtime_resume(), respectively, in some cases.
+> 
+> It _may_ lead to some code duplication in some cases, but that may be avoided
+> by using the struct dev_pm_domain pointer in struct device.  In some cases.
+> 
+> Thanks,
+> Rafael
+> 
