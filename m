@@ -1,41 +1,32 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Thu, 3 Nov 2011 16:24:24 +0530
-Subject: [PATCH 2/3] ARM: OMAP: hwmod: Update/Clear module specific context
-	lost counters
-In-Reply-To: <1320317665-6381-1-git-send-email-rnayak@ti.com>
-References: <1320317665-6381-1-git-send-email-rnayak@ti.com>
-Message-ID: <1320317665-6381-3-git-send-email-rnayak@ti.com>
+From: zonque@gmail.com (Daniel Mack)
+Date: Thu,  3 Nov 2011 12:24:42 +0100
+Subject: [PATCH] mmc: omap_hsmmc: fix typo around pr_info() call
+Message-ID: <1320319482-9809-1-git-send-email-zonque@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update the module specific context_lost_counter just after
-enabling the module, and clear the context register just
-before disabling the module.
+This was introduced by a3c76eb9 ("mmc: replace printk with appropriate
+display macro").
 
-Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+Signed-off-by: Daniel Mack <zonque@gmail.com>
+Cc: Girish K S <girish.shivananjappa@linaro.org>
+Cc: Chris Ball <cjb@laptop.org>
 ---
- arch/arm/mach-omap2/omap_hwmod.c |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+ drivers/mmc/host/omap_hsmmc.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index d7f9dd1..ac17748 100644
---- a/arch/arm/mach-omap2/omap_hwmod.c
-+++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -1510,6 +1510,7 @@ static int _enable(struct omap_hwmod *oh)
- 
- 	_enable_clocks(oh);
- 	_enable_module(oh);
-+	_update_context_lost(oh);
- 
- 	r = _wait_target_ready(oh);
- 	if (!r) {
-@@ -1563,6 +1564,7 @@ static int _idle(struct omap_hwmod *oh)
- 	if (oh->class->sysc)
- 		_idle_sysc(oh);
- 	_del_initiator_dep(oh, mpu_oh);
-+	_clear_context_lost(oh);
- 	_disable_module(oh);
- 	ret = _wait_target_disable(oh);
- 	if (ret)
+diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
+index e8ff123..101cd31 100644
+--- a/drivers/mmc/host/omap_hsmmc.c
++++ b/drivers/mmc/host/omap_hsmmc.c
+@@ -1270,7 +1270,7 @@ static void omap_hsmmc_protect_card(struct omap_hsmmc_host *host)
+ 		}
+ 	} else {
+ 		if (!host->protect_card) {
+-			pr_info"%s: cover is open, "
++			pr_info("%s: cover is open, "
+ 					 "card is now inaccessible\n",
+ 					 mmc_hostname(host->mmc));
+ 			host->protect_card = 1;
 -- 
-1.7.1
+1.7.6.4
