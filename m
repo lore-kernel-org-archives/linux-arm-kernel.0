@@ -1,28 +1,57 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 3 Nov 2011 12:30:17 +0100
-Subject: [PATCH] ARM : mx35: 3ds-board: add framebuffer device
-In-Reply-To: <3D55990BDF4852409EA769663F22E54AC0424A@039-SN1MPN1-006.039d.mgd.msft.net>
-References: <1320299797-23167-1-git-send-email-b39297@freescale.com>
-	<20111103071824.GB16886@pengutronix.de>
-	<3D55990BDF4852409EA769663F22E54AC0424A@039-SN1MPN1-006.039d.mgd.msft.net>
-Message-ID: <20111103113017.GG16886@pengutronix.de>
+Date: Thu, 3 Nov 2011 12:39:56 +0100
+Subject: [PATCH] MAINTAINERS: add ARM/FREESCALE MXS entry
+In-Reply-To: <1319169214-8002-1-git-send-email-shawn.guo@linaro.org>
+References: <1319169214-8002-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20111103113956.GH16886@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 03, 2011 at 08:02:11AM +0000, Wu Guoxing-B39297 wrote:
-> Hi Sascha:
->   The mc9s08dz60 is a MCU, and its function depend on the code flashed
->   in it. so, it is not a common chip.  it is only for mx35 3ds board,
->   a driver for it will be useless for others, that's why I didn't
->   write a common driver for it, as it will never be used in any other
->   freescale board. But, if you insist, I will write a driver for it.
+On Fri, Oct 21, 2011 at 11:53:34AM +0800, Shawn Guo wrote:
+> As suggested by Pengutronix, they want to get Sascha relieved from
+> the burden of maintaining MXS sub-architecture.  Since I brought the
+> most of MXS core code to mainline (with the great help from
+> Pengutronix people, thanks!), I would like to step up for maintaining
+> MXS.
+> 
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 
-Yes, please write a driver for it. You don't have to write a full
-featured driver, gpio access is enough. Normally you should write a mfd
-driver, but I think for now you can just put the i2c glue into
-drivers/gpio/mc9s08dz60.c
+Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
 
 Sascha
+
+> Cc: Sascha Hauer <s.hauer@pengutronix.de>
+> ---
+> Hi Sascha,
+> 
+> Please help finish up MXS maintainership for the coming merge window,
+> and I can start taking it over after the merge window closes.  Thanks.
+> 
+>  MAINTAINERS |    7 +++++++
+>  1 files changed, 7 insertions(+), 0 deletions(-)
+> 
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index 5483e0c..7bb20d2 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -787,6 +787,13 @@ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+>  S:	Maintained
+>  F:	arch/arm/mach-mx5/
+>  
+> +ARM/FREESCALE MXS ARM ARCHITECTURE
+> +M:	Shawn Guo <shawn.guo@linaro.org>
+> +L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+> +S:	Maintained
+> +T:	git git://git.linaro.org/people/shawnguo/linux-2.6.git
+> +F:	arch/arm/mach-mxs/
+> +
+>  ARM/GLOMATION GESBC9312SX MACHINE SUPPORT
+>  M:	Lennert Buytenhek <kernel@wantstofly.org>
+>  L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+> -- 
+> 1.7.4.1
+> 
+> 
 
 -- 
 Pengutronix e.K.                           |                             |
