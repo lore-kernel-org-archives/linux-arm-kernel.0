@@ -1,33 +1,22 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 3 Nov 2011 11:26:31 -0700
-Subject: [PATCH v2] arm: omap: Fix errors and warnings when building
-	for one board
-In-Reply-To: <E28AAFD00EFAA646AE3DF9B89CD24A8901CD80@DBDE01.ent.ti.com>
-References: <1318522450-18425-1-git-send-email-premi@ti.com>
-	<E28AAFD00EFAA646AE3DF9B89CD24A8901CD80@DBDE01.ent.ti.com>
-Message-ID: <20111103182631.GT31337@atomide.com>
+From: shawn.gsc@gmail.com (Shawn Guo)
+Date: Fri, 4 Nov 2011 02:44:21 +0800
+Subject: Recall: [PATCH] ARM : mx35: 3ds-board: add framebuffer device
+In-Reply-To: <3D55990BDF4852409EA769663F22E54AC04262@039-SN1MPN1-006.039d.mgd.msft.net>
+References: <3D55990BDF4852409EA769663F22E54AC04262@039-SN1MPN1-006.039d.mgd.msft.net>
+Message-ID: <20111103184421.GA6406@r65073-Latitude-D630>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Premi, Sanjeev <premi@ti.com> [111028 06:36]:
-> > -----Original Message-----
-> > From: Premi, Sanjeev 
-> > Sent: Thursday, October 13, 2011 9:44 PM
-> > To: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-> > Cc: Premi, Sanjeev
-> > Subject: [PATCH v2] arm: omap: Fix errors and warnings when 
-> > building for one board
-> > 
-> > When customizing omap2plus_defconfig to build for only
-> > one board (omap3evm), I came across these warnings and
-> > errors (filenames truncated):
+On Thu, Nov 03, 2011 at 08:03:18AM +0000, Wu Guoxing-B39297 wrote:
+> Wu Guoxing-B39297 would like to recall the message, "[PATCH] ARM : mx35: 3ds-board: add framebuffer device".
 > 
-> Just wanted to check the status of this patch.
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-Thanks, now with the DT patches merged, I'll apply this into fixes.
-Also moved around the ifdef a little to avoid a build warning for
-when omap3 is not selected.
+Never recall message sent to mailing list :)
 
+-- 
 Regards,
-
-Tony
+Shawn
