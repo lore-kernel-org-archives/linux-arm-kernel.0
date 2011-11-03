@@ -1,99 +1,125 @@
-From: kyungmin.park@samsung.com (Kyungmin Park)
-Date: Thu, 3 Nov 2011 17:28:09 +0900
-Subject: [PATCH] ARM: SAMSUNG: Add clk enable/disable of pwm
-In-Reply-To: <CAH9JG2XFALdd_JVSQW4rjCDCgLL9sgf_GVurVDoGJa-SwXmB5Q@mail.gmail.com>
-References: <1319505701-9784-1-git-send-email-jy0922.shim@samsung.com>
-	<012701cc99cc$300dca50$90295ef0$%kim@samsung.com>
-	<4EB1FB58.9050503@samsung.com>
-	<018e01cc99fc$bb4d5ec0$31e81c40$%kim@samsung.com>
-	<4EB24886.8080002@samsung.com>
-	<CAH9JG2XFALdd_JVSQW4rjCDCgLL9sgf_GVurVDoGJa-SwXmB5Q@mail.gmail.com>
-Message-ID: <CAH9JG2X9dXe2cG6qvqM6GuTuC6xc0wBYSsvba=zbbmQD7BqYXg@mail.gmail.com>
+From: liu.h.jason@gmail.com (Jason Liu)
+Date: Thu, 3 Nov 2011 16:39:04 +0800
+Subject: [PATCH v3 3/3] ARM:i.MX: fix the compile warnings in
+	clock-mx51-mx53.c
+In-Reply-To: <20111103081840.GE16886@pengutronix.de>
+References: <1320231836-9555-1-git-send-email-jason.hui@linaro.org>
+	<1320231836-9555-6-git-send-email-jason.hui@linaro.org>
+	<20111103064426.GN23421@pengutronix.de>
+	<CAB4PhKcU8AQg3Y9MbP8cp6Ji_jZafRtNv-vz83HuECcmg9O7jQ@mail.gmail.com>
+	<20111103081840.GE16886@pengutronix.de>
+Message-ID: <CAB4PhKezarzphrmH3TWCtvc2tSgnAWjXTfSb12hgOFXYSW5Jrw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/3/11, Kyungmin Park <kyungmin.park@samsung.com> wrote:
-> On 11/3/11, Joonyoung Shim <jy0922.shim@samsung.com> wrote:
->> 11/03/2011 04:46 PM, Kukjin Kim ? ?:
->>> Joonyoung Shim wrote:
->>>> 11/03/2011 10:59 AM, Kukjin Kim ? ?:
->>>>> Joonyoung Shim wrote:
->>>>>> PWM timers use pclk("timers" clk) as parent clk. If this pclk is the
->>>>>> disabled state when PWM driver is probed, then it causes wrong read
->>>>>> and
->>>>>> write operation about registers of PWM.
->>>>>>
->>>>>> Signed-off-by: Joonyoung Shim<jy0922.shim@samsung.com>
->>>>>> Signed-off-by: Kyungmin Park<kyungmin.park@samsung.com>
->>>>>> ---
->>>>>>    arch/arm/plat-samsung/pwm.c |    7 +++++++
->>>>>>    1 files changed, 7 insertions(+), 0 deletions(-)
->>>>>>
->>>>>> diff --git a/arch/arm/plat-samsung/pwm.c
->>>>>> b/arch/arm/plat-samsung/pwm.c
->>>>>> index f37457c..dc1185d 100644
->>>>>> --- a/arch/arm/plat-samsung/pwm.c
->>>>>> +++ b/arch/arm/plat-samsung/pwm.c
->>>>>> @@ -299,6 +299,9 @@ static int s3c_pwm_probe(struct platform_device
->>>>>> *pdev)
->>>>>>    		goto err_clk_tin;
->>>>>>    	}
->>>>>>
->>>>>> +	clk_enable(pwm->clk);
->>>>>> +	clk_enable(pwm->clk_div);
->>>>>> +
->>>>>>    	local_irq_save(flags);
->>>>>>
->>>>>>    	tcon = __raw_readl(S3C2410_TCON);
->>>>>> @@ -326,6 +329,8 @@ static int s3c_pwm_probe(struct platform_device
->>>>>> *pdev)
->>>>>>    	return 0;
->>>>>>
->>>>>>     err_clk_tdiv:
->>>>>> +	clk_disable(pwm->clk_div);
->>>>>> +	clk_disable(pwm->clk);
->>>>>>    	clk_put(pwm->clk_div);
->>>>>>
->>>>>>     err_clk_tin:
->>>>>> @@ -340,6 +345,8 @@ static int __devexit s3c_pwm_remove(struct
->>>>>> platform_device *pdev)
->>>>>>    {
->>>>>>    	struct pwm_device *pwm = platform_get_drvdata(pdev);
->>>>>>
->>>>>> +	clk_disable(pwm->clk_div);
->>>>>> +	clk_disable(pwm->clk);
->>>>>>    	clk_put(pwm->clk_div);
->>>>>>    	clk_put(pwm->clk);
->>>>>>    	kfree(pwm);
->>>>>> --
->>>>>> 1.7.5.4
->>>>> Well, I wonder when this is needed. I think it should be enabled
->>>>> during
->>>>> kernel booting...
->>>> The exynos4 machine using just timer turns on "timer" clock in the
->>>> past,
->>>> but "timer" clock is disable state when boot since MCT is used. MCT
->>>> doesn't control "timer" clock.
->>>>
->>>> I think pwm driver should control(enable/disable) using clocks
->>>> regardless of their parents clock.
->>>>
->>> I mean, why that is disabled when kernel boot...
->>>
+2011/11/3 Sascha Hauer <s.hauer@pengutronix.de>:
+> On Thu, Nov 03, 2011 at 03:36:05PM +0800, Jason Liu wrote:
+>> 2011/11/3 Sascha Hauer <s.hauer@pengutronix.de>:
+>> > On Wed, Nov 02, 2011 at 07:03:56PM +0800, Jason Liu wrote:
+>> >> arch/arm/mach-mx5/clock-mx51-mx53.c: In function 'clk_get_freq_dt':
+>> >> arch/arm/mach-mx5/clock-mx51-mx53.c: In function 'mx53_clocks_init_dt':
+>> >> arch/arm/mach-mx5/clock-mx51-mx53.c:1673: warning: 'ckil' is used uninitialized in this function
+>> >> arch/arm/mach-mx5/clock-mx51-mx53.c:1673: warning: 'osc' is used uninitialized in this function
+>> >> arch/arm/mach-mx5/clock-mx51-mx53.c:1673: warning: 'ckih1' is used uninitialized in this function
+>> >> arch/arm/mach-mx5/clock-mx51-mx53.c:1673: warning: 'ckih2' is used uninitialized in this function
+>> >> arch/arm/mach-mx5/clock-mx51-mx53.c: In function 'mx51_clocks_init_dt':
+>> >> arch/arm/mach-mx5/clock-mx51-mx53.c:1665: warning: 'ckil' is used uninitialized in this function
+>> >> arch/arm/mach-mx5/clock-mx51-mx53.c:1665: warning: 'osc' is used uninitialized in this function
+>> >> arch/arm/mach-mx5/clock-mx51-mx53.c:1665: warning: 'ckih1' is used uninitialized in this function
+>> >> arch/arm/mach-mx5/clock-mx51-mx53.c:1665: warning: 'ckih2' is used uninitialized in this function
+>> >
+>> > You only get this warning because you have put the code in
+>> > clk_get_freq_dt into #ifdef CONFIG_OF in the last patch. Instead please
+>> > put the whole block including clk_get_freq_dt, mx51_clocks_init_dt and
+>> > mx53_clocks_init_dt into #ifdef CONFIG_OF.
 >>
->> Please see arch/arm/mach-exynos4/clock.c
->> There is "timers' clock in the clk init_clocks_off[].
-One more, Don't assume some clocks are enabled at bootloader. user can
-use any bootloader and any configuration.
+>> Yes, I can put #ifdef CONFIG_OF to cover the whole block including
+>> clk_get_freq_dt/
+>> mx51_clocks_init_dt/mx53_clocks_init_dt, but after enable CONFIG_OF,
+>> you still will
+>> meet these compiling warnings.
+>
+> I just tried it and no, I do not get any compiler warnings.
 
-Thanks.
+OK, thanks.
+
+>
+> When passing the address of a variable to a function gcc considers this
+> variable as initialized after that, unless the function is a static
+> inline function and gcc can see that it actually does not get
+> initialized.
+> I hope this hasn't changed with gcc 4.6
+
+you right. After move the #ifdef to cover all the dt related, I did
+not get any compile
+warnings. I will update this patch soon. see v2 for it.
+
+Jason Liu
+
+>
 >>
->> Thanks.
->> --
->> To unsubscribe from this list: send the line "unsubscribe
->> linux-samsung-soc"
->> in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>> But refer to grant before, we don't need place #ifdef CONFIG_OF #endif into
+>> the .c file, no-matter enable device_tree support or not. I'm not sure
+>> why we still
+>> meet compile error, shawn, any comments?
+>
+> for_each_compatible_node is inside #ifdef CONFIG_OF in the header file.
+> So unless there are plans to provide some dummy stub for this without
+> CONFIG_OF I see no way around these ifdefs.
+>
 >>
+>> Jason Liu
+>>
+>> > Sascha
+>> >
+>> >>
+>> >> Signed-off-by: Jason Liu <jason.hui@linaro.org>
+>> >> ---
+>> >> ?arch/arm/mach-mx5/clock-mx51-mx53.c | ? ?2 ++
+>> >> ?1 files changed, 2 insertions(+), 0 deletions(-)
+>> >>
+>> >> diff --git a/arch/arm/mach-mx5/clock-mx51-mx53.c b/arch/arm/mach-mx5/clock-mx51-mx53.c
+>> >> index 7c373b83..e352a5a 100644
+>> >> --- a/arch/arm/mach-mx5/clock-mx51-mx53.c
+>> >> +++ b/arch/arm/mach-mx5/clock-mx51-mx53.c
+>> >> @@ -1662,6 +1662,7 @@ int __init mx51_clocks_init_dt(void)
+>> >> ?{
+>> >> ? ? ? unsigned long ckil, osc, ckih1, ckih2;
+>> >>
+>> >> + ? ? ckil = osc = ckih1 = ckih2 = 0;
+>> >> ? ? ? clk_get_freq_dt(&ckil, &osc, &ckih1, &ckih2);
+>> >> ? ? ? return mx51_clocks_init(ckil, osc, ckih1, ckih2);
+>> >> ?}
+>> >> @@ -1670,6 +1671,7 @@ int __init mx53_clocks_init_dt(void)
+>> >> ?{
+>> >> ? ? ? unsigned long ckil, osc, ckih1, ckih2;
+>> >>
+>> >> + ? ? ckil = osc = ckih1 = ckih2 = 0;
+>> >> ? ? ? clk_get_freq_dt(&ckil, &osc, &ckih1, &ckih2);
+>> >> ? ? ? return mx53_clocks_init(ckil, osc, ckih1, ckih2);
+>> >> ?}
+>> >> --
+>> >> 1.7.4.1
+>> >>
+>> >>
+>> >>
+>> >
+>> > --
+>> > Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? | ? ? ? ? ? ? ? ? ? ? ? ? ? ? |
+>> > Industrial Linux Solutions ? ? ? ? ? ? ? ? | http://www.pengutronix.de/ ?|
+>> > Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0 ? ?|
+>> > Amtsgericht Hildesheim, HRA 2686 ? ? ? ? ? | Fax: ? +49-5121-206917-5555 |
+>> >
+>> > _______________________________________________
+>> > linux-arm-kernel mailing list
+>> > linux-arm-kernel at lists.infradead.org
+>> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>> >
+>>
+>
+> --
+> Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? | ? ? ? ? ? ? ? ? ? ? ? ? ? ? |
+> Industrial Linux Solutions ? ? ? ? ? ? ? ? | http://www.pengutronix.de/ ?|
+> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0 ? ?|
+> Amtsgericht Hildesheim, HRA 2686 ? ? ? ? ? | Fax: ? +49-5121-206917-5555 |
 >
