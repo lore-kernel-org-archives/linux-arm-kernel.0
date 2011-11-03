@@ -1,112 +1,143 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 3 Nov 2011 09:18:40 +0100
-Subject: [PATCH v3 3/3] ARM:i.MX: fix the compile warnings in
-	clock-mx51-mx53.c
-In-Reply-To: <CAB4PhKcU8AQg3Y9MbP8cp6Ji_jZafRtNv-vz83HuECcmg9O7jQ@mail.gmail.com>
-References: <1320231836-9555-1-git-send-email-jason.hui@linaro.org>
-	<1320231836-9555-6-git-send-email-jason.hui@linaro.org>
-	<20111103064426.GN23421@pengutronix.de>
-	<CAB4PhKcU8AQg3Y9MbP8cp6Ji_jZafRtNv-vz83HuECcmg9O7jQ@mail.gmail.com>
-Message-ID: <20111103081840.GE16886@pengutronix.de>
+From: bill4carson@gmail.com (bill4carson)
+Date: Thu, 03 Nov 2011 16:21:28 +0800
+Subject: Query about float point operation on Cortex A9
+Message-ID: <4EB24F08.9050008@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 03, 2011 at 03:36:05PM +0800, Jason Liu wrote:
-> 2011/11/3 Sascha Hauer <s.hauer@pengutronix.de>:
-> > On Wed, Nov 02, 2011 at 07:03:56PM +0800, Jason Liu wrote:
-> >> arch/arm/mach-mx5/clock-mx51-mx53.c: In function 'clk_get_freq_dt':
-> >> arch/arm/mach-mx5/clock-mx51-mx53.c: In function 'mx53_clocks_init_dt':
-> >> arch/arm/mach-mx5/clock-mx51-mx53.c:1673: warning: 'ckil' is used uninitialized in this function
-> >> arch/arm/mach-mx5/clock-mx51-mx53.c:1673: warning: 'osc' is used uninitialized in this function
-> >> arch/arm/mach-mx5/clock-mx51-mx53.c:1673: warning: 'ckih1' is used uninitialized in this function
-> >> arch/arm/mach-mx5/clock-mx51-mx53.c:1673: warning: 'ckih2' is used uninitialized in this function
-> >> arch/arm/mach-mx5/clock-mx51-mx53.c: In function 'mx51_clocks_init_dt':
-> >> arch/arm/mach-mx5/clock-mx51-mx53.c:1665: warning: 'ckil' is used uninitialized in this function
-> >> arch/arm/mach-mx5/clock-mx51-mx53.c:1665: warning: 'osc' is used uninitialized in this function
-> >> arch/arm/mach-mx5/clock-mx51-mx53.c:1665: warning: 'ckih1' is used uninitialized in this function
-> >> arch/arm/mach-mx5/clock-mx51-mx53.c:1665: warning: 'ckih2' is used uninitialized in this function
-> >
-> > You only get this warning because you have put the code in
-> > clk_get_freq_dt into #ifdef CONFIG_OF in the last patch. Instead please
-> > put the whole block including clk_get_freq_dt, mx51_clocks_init_dt and
-> > mx53_clocks_init_dt into #ifdef CONFIG_OF.
-> 
-> Yes, I can put #ifdef CONFIG_OF to cover the whole block including
-> clk_get_freq_dt/
-> mx51_clocks_init_dt/mx53_clocks_init_dt, but after enable CONFIG_OF,
-> you still will
-> meet these compiling warnings.
+Hi, all
 
-I just tried it and no, I do not get any compiler warnings.
+I run STREAM test on ARM Versatile Express Cortex-A9x4 tile with Linux
+version 3.1.0+ by adding hugeptlb support. When using huge page,
+performance improvements surprisingly hit *only* "Copy" function with
+2.7% ~ 10.7%, while "Scale" "Add" "Triadd" functions barely exceed 4k page.
 
-When passing the address of a variable to a function gcc considers this
-variable as initialized after that, unless the function is a static
-inline function and gcc can see that it actually does not get
-initialized.
-I hope this hasn't changed with gcc 4.6
+By analyzing the code with Oprofile, it turn out __adddf3/__muldf3 
+operations
+eating out most of CPU cycles which can be seen from the following log.
+Apparently these two operations destroy the benefit brought by hugetlb,
+To make hugetlb benchmarking more convincing for the community to accept
+I use -mfloat-abi=softfp compile source code, unfortunately I got illegal
+instructions after each run.
 
-> 
-> But refer to grant before, we don't need place #ifdef CONFIG_OF #endif into
-> the .c file, no-matter enable device_tree support or not. I'm not sure
-> why we still
-> meet compile error, shawn, any comments?
+Is there any other thing need to be done to execute instructions such as
+vldr/vmul.f64/vadd.f64 ?
 
-for_each_compatible_node is inside #ifdef CONFIG_OF in the header file.
-So unless there are plans to provide some dummy stub for this without
-CONFIG_OF I see no way around these ifdefs.
 
-> 
-> Jason Liu
-> 
-> > Sascha
-> >
-> >>
-> >> Signed-off-by: Jason Liu <jason.hui@linaro.org>
-> >> ---
-> >> ?arch/arm/mach-mx5/clock-mx51-mx53.c | ? ?2 ++
-> >> ?1 files changed, 2 insertions(+), 0 deletions(-)
-> >>
-> >> diff --git a/arch/arm/mach-mx5/clock-mx51-mx53.c b/arch/arm/mach-mx5/clock-mx51-mx53.c
-> >> index 7c373b83..e352a5a 100644
-> >> --- a/arch/arm/mach-mx5/clock-mx51-mx53.c
-> >> +++ b/arch/arm/mach-mx5/clock-mx51-mx53.c
-> >> @@ -1662,6 +1662,7 @@ int __init mx51_clocks_init_dt(void)
-> >> ?{
-> >> ? ? ? unsigned long ckil, osc, ckih1, ckih2;
-> >>
-> >> + ? ? ckil = osc = ckih1 = ckih2 = 0;
-> >> ? ? ? clk_get_freq_dt(&ckil, &osc, &ckih1, &ckih2);
-> >> ? ? ? return mx51_clocks_init(ckil, osc, ckih1, ckih2);
-> >> ?}
-> >> @@ -1670,6 +1671,7 @@ int __init mx53_clocks_init_dt(void)
-> >> ?{
-> >> ? ? ? unsigned long ckil, osc, ckih1, ckih2;
-> >>
-> >> + ? ? ckil = osc = ckih1 = ckih2 = 0;
-> >> ? ? ? clk_get_freq_dt(&ckil, &osc, &ckih1, &ckih2);
-> >> ? ? ? return mx53_clocks_init(ckil, osc, ckih1, ckih2);
-> >> ?}
-> >> --
-> >> 1.7.4.1
-> >>
-> >>
-> >>
-> >
-> > --
-> > Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? | ? ? ? ? ? ? ? ? ? ? ? ? ? ? |
-> > Industrial Linux Solutions ? ? ? ? ? ? ? ? | http://www.pengutronix.de/ ?|
-> > Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0 ? ?|
-> > Amtsgericht Hildesheim, HRA 2686 ? ? ? ? ? | Fax: ? +49-5121-206917-5555 |
-> >
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> >
-> 
+root at localhost:/root> ./run_huge.sh
+Profiler running.
+hugectl: WARNING: data and bss remapped together in the default hugepage 
+size
+-------------------------------------------------------------
+STREAM version $Revision: 5.9 $
+-------------------------------------------------------------
+This system uses 8 bytes per DOUBLE PRECISION word.
+-------------------------------------------------------------
+Array size = 2097152, Offset = 0
+Total memory required = 48.0 MB.
+Each test is run 10 times, but only
+the *best* time for each is used.
+-------------------------------------------------------------
+Printing one line per active thread....
+-------------------------------------------------------------
+Your clock granularity/precision appears to be 9 microseconds.
+Each test below will take on the order of 267867 microseconds.
+    (= 29763 clock ticks)
+Increase the size of the arrays if this shows that
+you are not getting at least 20 clock ticks per test.
+-------------------------------------------------------------
+WARNING -- The above is only a rough guideline.
+For best results, please be sure you know the
+precision of your system timer.
+-------------------------------------------------------------
+Function      Rate (MB/s)   Avg time     Min time     Max time
+Copy:         209.0475       0.1613       0.1605       0.1624
+Scale:         95.3991       0.3819       0.3517       0.4015
+Add:          125.4612       0.4245       0.4012       0.4696
+Triad:         62.7207       0.8052       0.8025       0.8094
+-------------------------------------------------------------
+Solution Validates
+-------------------------------------------------------------
+Stopping profiling.
+Overflow stats not available
+CPU: ARM Cortex-A9, speed 0 MHz (estimated)
+Counted CPU_CYCLES events (Number of CPU cycles) with a unit mask of 
+0x00 (No unit mask) count 100000
+warning: the last modified time of the binary file does not match that 
+of the sample file for /root/stream_c_2M.exe
+Either this is the wrong binary or the binary has been modified since 
+the sample file was created.
+samples  %        symbol name
+235526   46.7135  __adddf3
+185916   36.8740  __muldf3
+37467     7.4311  tuned_STREAM_Copy
+14374     2.8509  tuned_STREAM_Triad
+11627     2.3061  tuned_STREAM_Add
+10815     2.1450  tuned_STREAM_Scale
+6066      1.2031  main
+2399      0.4758  checkSTREAMresults
+1        2.0e-04  __divdf3
+1        2.0e-04  __floatsidf
+1        2.0e-04  mysecond
+
+
+
+root at localhost:/root> ./run_4k.sh
+Profiler running.
+-------------------------------------------------------------
+STREAM version $Revision: 5.9 $
+-------------------------------------------------------------
+This system uses 8 bytes per DOUBLE PRECISION word.
+-------------------------------------------------------------
+Array size = 2097152, Offset = 0
+Total memory required = 48.0 MB.
+Each test is run 10 times, but only
+the *best* time for each is used.
+-------------------------------------------------------------
+Printing one line per active thread....
+-------------------------------------------------------------
+Your clock granularity/precision appears to be 9 microseconds.
+Each test below will take on the order of 268604 microseconds.
+    (= 29844 clock ticks)
+Increase the size of the arrays if this shows that
+you are not getting at least 20 clock ticks per test.
+-------------------------------------------------------------
+WARNING -- The above is only a rough guideline.
+For best results, please be sure you know the
+precision of your system timer.
+-------------------------------------------------------------
+Function      Rate (MB/s)   Avg time     Min time     Max time
+Copy:         265.7375       0.1269       0.1263       0.1275
+Scale:         99.3782       0.3583       0.3376       0.3796
+Add:          132.0995       0.3940       0.3810       0.4173
+Triad:         71.8116       0.7040       0.7009       0.7082
+-------------------------------------------------------------
+Solution Validates
+-------------------------------------------------------------
+Stopping profiling.
+Overflow stats not available
+CPU: ARM Cortex-A9, speed 0 MHz (estimated)
+Counted CPU_CYCLES events (Number of CPU cycles) with a unit mask of 
+0x00 (No unit mask) count 100000
+warning: the last modified time of the binary file does not match that 
+of the sample file for /root/stream_c_2M.exe
+Either this is the wrong binary or the binary has been modified since 
+the sample file was created.
+samples  %        symbol name
+274767   46.7235  __adddf3
+216873   36.8788  __muldf3
+43709     7.4326  tuned_STREAM_Copy
+16682     2.8367  tuned_STREAM_Triad
+13579     2.3091  tuned_STREAM_Add
+12587     2.1404  tuned_STREAM_Scale
+7079      1.2038  main
+2791      0.4746  checkSTREAMresults
+1        1.7e-04  __divdf3
+1        1.7e-04  __floatsidf
+1        1.7e-04  mysecond
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+I am a slow learner
+but I will keep trying to fight for my dreams!
+
+--bill
