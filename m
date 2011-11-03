@@ -1,70 +1,39 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 3 Nov 2011 09:57:44 +0000
-Subject: [RFC 0/5] restart cleanups
-In-Reply-To: <019401cc9a0a$640e9710$2c2bc530$%kim@samsung.com>
-References: <20111101160731.GQ19187@n2100.arm.linux.org.uk>
-	<20111101163817.GR19187@n2100.arm.linux.org.uk>
-	<20111103091245.GI12913@n2100.arm.linux.org.uk>
-	<019401cc9a0a$640e9710$2c2bc530$%kim@samsung.com>
-Message-ID: <20111103095744.GJ12913@n2100.arm.linux.org.uk>
+Date: Thu, 3 Nov 2011 10:02:35 +0000
+Subject: [PATCH v2 2/8] arm/tegra: prepare early init for multiple
+	tegra variants
+In-Reply-To: <20111103092116.GO13358@tbergstrom-lnx.Nvidia.com>
+References: <1320242948-21061-1-git-send-email-pdeschrijver@nvidia.com>
+	<1320242948-21061-3-git-send-email-pdeschrijver@nvidia.com>
+	<CAMbhsRSTcR8qgYESmM6OxkXeVeg6vS49woCe_OX6CY4pAj2g_A@mail.gmail.com>
+	<20111103092116.GO13358@tbergstrom-lnx.Nvidia.com>
+Message-ID: <20111103100235.GK12913@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 03, 2011 at 06:24:30PM +0900, Kukjin Kim wrote:
-> Russell King - ARM Linux wrote:
+On Thu, Nov 03, 2011 at 11:21:16AM +0200, Peter De Schrijver wrote:
+> On Wed, Nov 02, 2011 at 07:30:43PM +0100, Colin Cross wrote:
+> > On Wed, Nov 2, 2011 at 7:09 AM, Peter De Schrijver
+> > <pdeschrijver@nvidia.com> wrote:
+> > > This patch splits the early init code in a common and a tegra20 specific part.
+> > > L2 cache initialization is generalized and discovers the cache associativity
+> > > at runtime.
+> > >
+> > > Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
+> > > ---
+> > <snip>
 > > 
-> > On Tue, Nov 01, 2011 at 04:38:17PM +0000, Russell King - ARM Linux wrote:
-> > > Can someone please check whether this code:
-> > >
-> > > /* Hook for arm_pm_restart to ensure we execute the reset code
-> > >  * with the caches enabled. It seems at least the S3C2440 has a problem
-> > >  * resetting if there is bus activity interrupted by the reset.
-> > >  */
-> > > static void s3c24xx_pm_restart(char mode, const char *cmd)
-> > > {
-> > >         if (mode != 's') {
-> > >                 unsigned long flags;
-> > >
-> > >                 local_irq_save(flags);
-> > >                 __cpuc_flush_kern_all();
-> > >                 __cpuc_flush_user_all();
-> > >
-> > >                 arch_reset(mode, cmd);
-> > >                 local_irq_restore(flags);
-> > >         }
-> > >
-> > >         /* fallback, or unhandled */
-> > >         arm_machine_restart(mode, cmd);
-> > > }
-> > >
-> > > will be broken by any of these patches - and more importantly whether
-> > > this code can simply be deleted with these five patches applied.
+> > > -static __initdata struct tegra_clk_init_table common_clk_init_table[] = {
+> > > +void (*arch_reset)(char mode, const char *cmd) = tegra_assert_system_reset;
+> > > +
+> > This is unrelated to the patch description?
 > > 
-> > Okay, I'm going to delete the above and hope for the best; I'm taking
-> > the lack of reply as meaning that no one in the Samsung community is
-> > that interested in this code.
 > 
-> Russell,
-> Sorry for late response.
-> 
-> According to its commit message, it is needed...
-> 
-> [ARM] 4987/1: S3C24XX: Ensure watchdog reset initiated from cached code.
-> 
->     There seems to be some problem with at-least the S3C2440 and
->     bus traffic during an reset. It is unlikely, but still possible
->     that the system will hang in such a way that the watchdog cannot
->     get the system out of the state it is in.
-> 
->     Change to making the code that calls the watchdog reset run from
->     cached memory so that instruction fetches have quiesced before the
->     watchdog fires.
-> 
-> But frankly, I'm not sure now and there is no S3C2440 on my desk :(
-> Let me check again, if no response on this, please keep going on.
+> This is a left over from the past. Will be removed from the next version.
 
-And now consider it along side the set of patches that I posted as
-part of this thread, which have the effect that arch_reset() will
-now be called with caches enabled.
+Please can Tegra move over to hooking the restart via arm_pm_restart()
+rather than via arch_reset()?  That would leave arch_reset() for
+software-based reboot methods - which I suspect Tegra doesn't use.
 
-Given that, is it still required?
+That would allow Tegra to dovetail into the arch_reset cleanup work much
+better than it would otherwise do.
