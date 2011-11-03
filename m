@@ -1,40 +1,42 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Wed, 02 Nov 2011 16:37:10 -0700
-Subject: [PATCH 00/10] cpufreq: OMAP: move into drivers,
-	cleanups/fixes for v3.2
-In-Reply-To: <20111102220813.GA931@redhat.com> (Dave Jones's message of "Wed,
-	2 Nov 2011 18:08:14 -0400")
-References: <1316725648-26710-1-git-send-email-khilman@ti.com>
-	<4EB1BDFD.2060403@ti.com> <20111102220813.GA931@redhat.com>
-Message-ID: <8762j2jduh.fsf@ti.com>
+From: liu.h.jason@gmail.com (Jason Liu)
+Date: Thu, 3 Nov 2011 09:28:43 +0800
+Subject: [PATCH] slub: doc: update the slabinfo.c file path
+In-Reply-To: <20111102130301.GD19187@n2100.arm.linux.org.uk>
+References: <1320231836-9555-1-git-send-email-jason.hui@linaro.org>
+	<1320231836-9555-4-git-send-email-jason.hui@linaro.org>
+	<20111102130301.GD19187@n2100.arm.linux.org.uk>
+Message-ID: <CAB4PhKckErLNjQstzRQVhhxqokF0UKkgkut_Whna6ZiGdr1OZQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dave Jones <davej@redhat.com> writes:
-
-> On Wed, Nov 02, 2011 at 03:02:37PM -0700, Kevin Hilman wrote:
->  > Hi Dave,
->  > 
->  > On 09/22/2011 02:07 PM, Kevin Hilman wrote:
->  > > This series moves the OMAP CPUfreq driver into drivers/cpufreq, add
->  > > support for SMP devices (OMAP4+) and includes several cleanups and
->  > > fixes from Nishanth Menon.
->  > > 
->  > > This series applies to v3.1-rc6, and is available here:
->  > > 
->  > >    git://github.com/khilman/linux-omap-pm.git for_3.2/omap-cpufreq
->  > > 
->  > > Kevin
->  > 
->  > Any chance of this making it in for v3.2?
+2011/11/2 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> On Wed, Nov 02, 2011 at 07:03:54PM +0800, Jason Liu wrote:
+>> slabinfo.c has been moved from Documentaion/vm/ to
+>> tools/slub/ by commit:0d24db337e6d81c0c620ab65cc6947bd6553f742
+>>
+>> Update the slub.txt doc to reflect this change too.
+>>
+>> Signed-off-by: Jason Liu <jason.hui@linaro.org>
+>> Cc: Christoph Lameter <cl@linux-foundation.org>
 >
-> My kernel.org account being created is blocking on Ted uploading my
-> signed gpg key.  If you want to ask Linus to pull directly until I get
-> that sorted, feel free.  (Though I understand he has a dislike for github trees)
+> This patch shouldn't be part of this patch set; there is nothing IMX
+> specific with it. ?It is purely a stand-alone bug fix and, therefore,
+> it should stand completely alone as its own patch.
+>
+> You're not even copying it to those who you claim to be doing so in the
+> commit log above.
+>
+> It should be copied to the appropriate people and mailing lists.
 
-Can I take that as an Ack from you for this series?
+Please ignore this patch since this patch has already gone to the next.
+Sorry for that.
 
-With your ack, we can maybe merge this via the OMAP tree, or the arm-soc
-tree (although it's probably too late now for v3.2.)
+Jason Liu
 
-Kevin
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
