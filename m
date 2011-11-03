@@ -1,52 +1,40 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Thu, 3 Nov 2011 13:04:18 +0000
-Subject: [PATCHv2 02/10] ARM: vic: MULTI_IRQ_HANDLER handler
-In-Reply-To: <CACRpkdZ1qfVduMAmusNoLjDoqy2kDA4crN__iW9qEeXBgVT4cA@mail.gmail.com>
-References: <1317206507-18867-1-git-send-email-jamie@jamieiles.com>
-	<1317206507-18867-3-git-send-email-jamie@jamieiles.com>
-	<20110928203905.GB2838@ponder.secretlab.ca>
-	<CACRpkdZKns-GraGp-YMD6jzOPETkvEpt9bC8HcYUmf3JUyCV3A@mail.gmail.com>
-	<20110929093009.GM17204@pulham.picochip.com>
-	<20111102134024.GE19187@n2100.arm.linux.org.uk>
-	<20111102140811.GA22491@totoro>
-	<CACRpkdY+EBkHfupO5T4SYKPxzX2L2kr8fLVMJK=JctNeYAzn2g@mail.gmail.com>
-	<20111103125136.GL12913@n2100.arm.linux.org.uk>
-	<CACRpkdZ1qfVduMAmusNoLjDoqy2kDA4crN__iW9qEeXBgVT4cA@mail.gmail.com>
-Message-ID: <20111103130418.GA5008@totoro>
+From: tbm@cyrius.com (Martin Michlmayr)
+Date: Thu, 3 Nov 2011 12:57:43 +0000
+Subject: [PATCH] kirkwood: Recognize A1 revision of 6282 chip
+Message-ID: <20111103125742.GA29555@jirafa.cyrius.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 03, 2011 at 02:00:15PM +0100, Linus Walleij wrote:
-> On Thu, Nov 3, 2011 at 1:51 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> 
-> > ? ? ? ?stat = readl_relaxed(vic->base + VIC_IRQ_STATUS);
-> > ? ? ? ?while (stat) {
-> > ? ? ? ? ? ? ? ?while (stat) {
-> > ? ? ? ? ? ? ? ? ? ? ? ?irq = ffs(stat) - 1;
-> > ? ? ? ? ? ? ? ? ? ? ? ?stat &= ~(1 << irq);
-> > ? ? ? ? ? ? ? ? ? ? ? ?handle_irq(irq);
-> > ? ? ? ? ? ? ? ?}
-> > ? ? ? ? ? ? ? ?stat = readl_relaxed(vic->base + VIC_IRQ_STATUS);
-> > ? ? ? ?}
-> >
-> > This ensures that we process all interrupts found pending before we
-> > re-check for any new interrupts pending. ?Arguably this is a much
-> > fairer implementation (and may mean if things get irrevokably stuck,
-> > things like sysrq via the console uart may still work.)
-> 
-> I really like the looks of this, Jamie can you do it like that?
+Recognize the Kirkwood 6282 revision A1 chip since products using
+this chip are shipping now, such as the QNAP TS-x19P II devices.
 
-Yup, I'll respin either tonight or tomorrow night and rebase ontop of 
-the asm/exception.h patch.  Do we also want the behaviour so that it 
-keeps looping over all VIC's until there are no pending interrupts?  I 
-think that's probably worth it.
+Signed-off-by: Martin Michlmayr <tbm@cyrius.com>
+Acked-by: Lennert Buytenhek <buytenh@wantstofly.org>
 
-> Maybe some smallish comment about what's going on can be
-> good for future generations reading that code...
+diff --git a/arch/arm/mach-kirkwood/common.c b/arch/arm/mach-kirkwood/common.c
+index f3248cf..b9632ee 100644
+--- a/arch/arm/mach-kirkwood/common.c
++++ b/arch/arm/mach-kirkwood/common.c
+@@ -430,6 +430,8 @@ static char * __init kirkwood_id(void)
+ 	} else if (dev == MV88F6282_DEV_ID) {
+ 		if (rev == MV88F6282_REV_A0)
+ 			return "MV88F6282-Rev-A0";
++		else if (rev == MV88F6282_REV_A1)
++			return "MV88F6282-Rev-A1";
+ 		else
+ 			return "MV88F6282-Rev-Unsupported";
+ 	} else {
+diff --git a/arch/arm/mach-kirkwood/include/mach/kirkwood.h b/arch/arm/mach-kirkwood/include/mach/kirkwood.h
+index 010bdeb..fede3d5 100644
+--- a/arch/arm/mach-kirkwood/include/mach/kirkwood.h
++++ b/arch/arm/mach-kirkwood/include/mach/kirkwood.h
+@@ -135,4 +135,5 @@
+ 
+ #define MV88F6282_DEV_ID	0x6282
+ #define MV88F6282_REV_A0	0
++#define MV88F6282_REV_A1	1
+ #endif
 
-OK, will do.
-
-Thanks Linus and Russell!
-
-Jamie
+-- 
+Martin Michlmayr
+http://www.cyrius.com/
