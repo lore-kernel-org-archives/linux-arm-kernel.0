@@ -1,38 +1,42 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Thu, 03 Nov 2011 10:48:44 -0700
-Subject: [PATCH RESEND] ARM: OMAP: omap_device: Include linux/export.h
-In-Reply-To: <4EB2A987.2040805@windriver.com> (Paul Gortmaker's message of
-	"Thu, 3 Nov 2011 10:47:35 -0400")
-References: <1320303638.17983.5.camel@phoenix> <87d3d9i8ni.fsf@ti.com>
-	<4EB2A987.2040805@windriver.com>
-Message-ID: <877h3hhzb7.fsf@ti.com>
+From: zonque@gmail.com (Daniel Mack)
+Date: Thu, 03 Nov 2011 18:50:31 +0100
+Subject: [PATCH 1/2] atmel/spi: fix missing probe
+In-Reply-To: <1320342082-18573-1-git-send-email-plagnioj@jcrosoft.com>
+References: <1320342082-18573-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <4EB2D467.7050901@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Paul Gortmaker <paul.gortmaker@windriver.com> writes:
-
-> On 11-11-03 10:26 AM, Kevin Hilman wrote:
->> Axel Lin <axel.lin@gmail.com> writes:
->> 
->>> Include linux/export.h to fix below build warning:
->>>
->>>   CC      arch/arm/plat-omap/omap_device.o
->>> arch/arm/plat-omap/omap_device.c:1055: warning: data definition has no type or storage class
->>> arch/arm/plat-omap/omap_device.c:1055: warning: type defaults to 'int' in declaration of 'EXPORT_SYMBOL'
->>> arch/arm/plat-omap/omap_device.c:1055: warning: parameter names (without types) in function declaration
->>>
->>> Signed-off-by: Axel Lin <axel.lin@gmail.com>
->> 
->> Thanks, will queue as a fix for v3.2-rc
+On 11/03/2011 06:41 PM, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> Commit 940ab889 "drivercore: Add helper macro for platform_driver boilerplate"
+> converted this driver to use module_platform_driver, but due to the use
+> of platform_driver_probe(), this resulted in the call to atmel_spi_probe being
+> lost. Place the call to this function into the driver structure.
 >
-> It is probably better if I track this, since export.h won't
-> exist until Linus pulls the module.h-split tree, and I'm
-> guessing that will be closer to the end of the merge window.
+> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD<plagnioj@jcrosoft.com>
+> Cc: Greg Kroah-Hartman<gregkh@suse.de>
+> Cc: Grant Likely<grant.likely@secretlab.ca>
+> Cc: Russell King - ARM Linux<linux@arm.linux.org.uk>
+> ---
+> v3:
+>
+> 	update commit message
+>   drivers/spi/spi-atmel.c |    1 +
+>   1 files changed, 1 insertions(+), 0 deletions(-)
+>
+> diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
+> index 79665e2..3cd4f49 100644
+> --- a/drivers/spi/spi-atmel.c
+> +++ b/drivers/spi/spi-atmel.c
+> @@ -1072,6 +1072,7 @@ static struct platform_driver atmel_spi_driver = {
+>   	},
+>   	.suspend	= atmel_spi_suspend,
+>   	.resume		= atmel_spi_resume,
+> +	.prove		= atmel_spi_probe,
+          ^^^^^
 
-OK, sounds good.  Feel free to add:
+This is certainly a typo. Didn't you even compile-test this?
 
-Acked-by: Kevin Hilman <khilman@ti.com>
 
-Thanks,
 
-Kevin
+Daniel
