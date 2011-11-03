@@ -1,63 +1,33 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Fri,  4 Nov 2011 02:16:06 +0800
-Subject: [PATCH v5] atmel/spi: fix missing probe
-Message-ID: <1320344166-31077-1-git-send-email-plagnioj@jcrosoft.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 3 Nov 2011 11:26:31 -0700
+Subject: [PATCH v2] arm: omap: Fix errors and warnings when building
+	for one board
+In-Reply-To: <E28AAFD00EFAA646AE3DF9B89CD24A8901CD80@DBDE01.ent.ti.com>
+References: <1318522450-18425-1-git-send-email-premi@ti.com>
+	<E28AAFD00EFAA646AE3DF9B89CD24A8901CD80@DBDE01.ent.ti.com>
+Message-ID: <20111103182631.GT31337@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 940ab889 "drivercore: Add helper macro for platform_driver boilerplate"
-converted this driver to use module_platform_driver, but due to the use
-of platform_driver_probe(), this resulted in the call to atmel_spi_probe being
-lost. Place the call to this function into the driver structure.
+* Premi, Sanjeev <premi@ti.com> [111028 06:36]:
+> > -----Original Message-----
+> > From: Premi, Sanjeev 
+> > Sent: Thursday, October 13, 2011 9:44 PM
+> > To: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+> > Cc: Premi, Sanjeev
+> > Subject: [PATCH v2] arm: omap: Fix errors and warnings when 
+> > building for one board
+> > 
+> > When customizing omap2plus_defconfig to build for only
+> > one board (omap3evm), I came across these warnings and
+> > errors (filenames truncated):
+> 
+> Just wanted to check the status of this patch.
 
-fix section missmatch
+Thanks, now with the DT patches merged, I'll apply this into fixes.
+Also moved around the ifdef a little to avoid a build warning for
+when omap3 is not selected.
 
-atmel_spi_probe is marked __init where it's supposed to be __devinit
-atmel_spi_remove is marked __exit where it's supposed to be __devexit
+Regards,
 
-Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-Cc: Greg Kroah-Hartman <gregkh@suse.de>
-Cc: Grant Likely <grant.likely@secretlab.ca>
-Cc: Russell King - ARM Linux <linux@arm.linux.org.uk>
----
-V5:
-
-	do it in in patch
-
-Best Regards,
-J.
- drivers/spi/spi-atmel.c |    5 +++--
- 1 files changed, 3 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
-index 79665e2..16d6a83 100644
---- a/drivers/spi/spi-atmel.c
-+++ b/drivers/spi/spi-atmel.c
-@@ -907,7 +907,7 @@ static void atmel_spi_cleanup(struct spi_device *spi)
- 
- /*-------------------------------------------------------------------------*/
- 
--static int __init atmel_spi_probe(struct platform_device *pdev)
-+static int __devinit atmel_spi_probe(struct platform_device *pdev)
- {
- 	struct resource		*regs;
- 	int			irq;
-@@ -1003,7 +1003,7 @@ out_free:
- 	return ret;
- }
- 
--static int __exit atmel_spi_remove(struct platform_device *pdev)
-+static int __devexit atmel_spi_remove(struct platform_device *pdev)
- {
- 	struct spi_master	*master = platform_get_drvdata(pdev);
- 	struct atmel_spi	*as = spi_master_get_devdata(master);
-@@ -1072,6 +1072,7 @@ static struct platform_driver atmel_spi_driver = {
- 	},
- 	.suspend	= atmel_spi_suspend,
- 	.resume		= atmel_spi_resume,
-+	.probe		= atmel_spi_probe,
- 	.remove		= __exit_p(atmel_spi_remove),
- };
- module_platform_driver(atmel_spi_driver);
--- 
-1.7.7
+Tony
