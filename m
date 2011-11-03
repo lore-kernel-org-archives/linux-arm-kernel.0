@@ -1,32 +1,36 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Thu,  3 Nov 2011 12:24:42 +0100
-Subject: [PATCH] mmc: omap_hsmmc: fix typo around pr_info() call
-Message-ID: <1320319482-9809-1-git-send-email-zonque@gmail.com>
+From: linus.ml.walleij@gmail.com (Linus Walleij)
+Date: Thu, 3 Nov 2011 12:27:28 +0100
+Subject: [PATCH 1/3] ARM: AT91: Add platform data for the ADCs
+In-Reply-To: <1320315070-1700-2-git-send-email-maxime.ripard@free-electrons.com>
+References: <1319041134-19712-1-git-send-email-maxime.ripard@free-electrons.com>
+	<1320315070-1700-1-git-send-email-maxime.ripard@free-electrons.com>
+	<1320315070-1700-2-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <CAKnu2MqTVPxioKyr-F6JWcdF5SRZjzLSFPt5A-6CkZO7HyeHRw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This was introduced by a3c76eb9 ("mmc: replace printk with appropriate
-display macro").
+2011/11/3 Maxime Ripard <maxime.ripard@free-electrons.com>:
 
-Signed-off-by: Daniel Mack <zonque@gmail.com>
-Cc: Girish K S <girish.shivananjappa@linaro.org>
-Cc: Chris Ball <cjb@laptop.org>
----
- drivers/mmc/host/omap_hsmmc.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Cc: Patrice Vilchez <patrice.vilchez@atmel.com>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+> ?arch/arm/mach-at91/include/mach/board.h | ? 22 ++++++++++++++++++++++
+> ?1 files changed, 22 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
-index e8ff123..101cd31 100644
---- a/drivers/mmc/host/omap_hsmmc.c
-+++ b/drivers/mmc/host/omap_hsmmc.c
-@@ -1270,7 +1270,7 @@ static void omap_hsmmc_protect_card(struct omap_hsmmc_host *host)
- 		}
- 	} else {
- 		if (!host->protect_card) {
--			pr_info"%s: cover is open, "
-+			pr_info("%s: cover is open, "
- 					 "card is now inaccessible\n",
- 					 mmc_hostname(host->mmc));
- 			host->protect_card = 1;
--- 
-1.7.6.4
+We're not supposed to have platform data dependent to stuff in
+staging under arch/arm or anyplace else in the main kernel tree.
+
+Please move this to
+drivers/staging/iio/adc/at91adc-board.h
+or so.
+
+As for calling the at91_add_device_adc() function (which I guess
+you want to do at some point) the pattern I followed for other
+drivers is to declare a dummy function in arch/arm/mach-*
+with __weak and let the staging driver override that. This way
+the staging driver can go away without any compilation trouble
+happening.
+
+Yours,
+Linus Walleij
