@@ -1,34 +1,42 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 3 Nov 2011 18:08:21 +0000
-Subject: [PATCH v2] atmel/spi: fix missing probe during the switch to
-	module_platform_driver
-In-Reply-To: <20111103180338.GN7136@game.jcrosoft.org>
-References: <1320331706-4946-1-git-send-email-plagnioj@jcrosoft.com>
-	<1320333042-24880-1-git-send-email-plagnioj@jcrosoft.com>
-	<20111103151855.GP12913@n2100.arm.linux.org.uk>
-	<20111103165113.GL7136@game.jcrosoft.org>
-	<20111103174338.GQ12913@n2100.arm.linux.org.uk>
-	<20111103180338.GN7136@game.jcrosoft.org>
-Message-ID: <20111103180821.GR12913@n2100.arm.linux.org.uk>
+From: linux_arm@lakedaemon.net (Jason)
+Date: Thu, 3 Nov 2011 14:15:25 -0400
+Subject: memory map in fdt was: Re: orion/kirkwood and device tree
+In-Reply-To: <201111022303.04957.michael@walle.cc>
+References: <20111031105740.GC29402@lunn.ch>
+	<201110312350.28475.michael@walle.cc>
+	<20111102165057.GU32165@titan.lakedaemon.net>
+	<201111022303.04957.michael@walle.cc>
+Message-ID: <20111103181525.GV32165@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 03, 2011 at 07:03:38PM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> On 17:43 Thu 03 Nov     , Russell King - ARM Linux wrote:
-> > On Thu, Nov 03, 2011 at 05:51:13PM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > > this is an other fix I do not want to fix 2 issue in one commit and I do care
-> > > of mismatch erros I fix them all the time I send patch for some rm9200 few
-> > > weeks ago
+Michael,
+
+I've added the devicetree ml to the CC:.  Hopefully someone there can
+provide some insight...
+
+On Wed, Nov 02, 2011 at 11:03:04PM +0100, Michael Walle wrote:
+> Am Dienstag 01 November 2011, 07:25:23 schrieben Andrew:
 > > 
-> > It should not be a separate patch - it's all to do with fixing the
-> > original problem.
+> > We could maybe put this table into DT?
 > 
-> yes when we was supposed to swtch to module_platform_driver we use the .probe
-> which is suposed to be __devinit in this case but I was prefering to do it in
-> 2 steps
+> I don't know if these informations belong to the DT or to generic kirkwood 
+> arch support (eg. mach-kirkwood/board-dt.c).
+> 
+> In both cases there needs to be some functions to retrieve these properties 
+> (instead of passing a pointer to some structure around). But i don't know if 
+> this fits the linux device drivers concept, eg. to be independent from any 
+> architecture.
+> 
+> So if any kernel hacker is reading this, i'm happy for every hint :) The 
+> problem is that most kirkwood/orion SoC devices needs a memory map to set up 
+> its internal memory windows for DMA access. Actually it only uses one window, 
+> which addresses the main memory. The arch-{kirkwood,orion} code stores the 
+> needed informations within a static *_mbus_dram_info variable, which is then 
+> passed as a pointer within platform_data to the device driver.
+> 
+> Is there a best practice for doing such things with device tree aware drivers?
 
-Then do the __devinit transformation _first_ so you don't introduce a new
-bug in the middle of your 'fix'.
+thx,
 
-But I personally think you're just creating needless churn by splitting
-this one logical change.
+Jason.
