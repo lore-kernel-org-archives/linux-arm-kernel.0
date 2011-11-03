@@ -1,63 +1,59 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 3 Nov 2011 07:44:26 +0100
-Subject: [PATCH v3 3/3] ARM:i.MX: fix the compile warnings in
-	clock-mx51-mx53.c
-In-Reply-To: <1320231836-9555-6-git-send-email-jason.hui@linaro.org>
-References: <1320231836-9555-1-git-send-email-jason.hui@linaro.org>
-	<1320231836-9555-6-git-send-email-jason.hui@linaro.org>
-Message-ID: <20111103064426.GN23421@pengutronix.de>
+Date: Thu, 3 Nov 2011 07:55:02 +0100
+Subject: [PATCH 2/2] ARM: mcx: fix local timer interrupt handling
+In-Reply-To: <1320255049-12447-3-git-send-email-marc.zyngier@arm.com>
+References: <1320255049-12447-1-git-send-email-marc.zyngier@arm.com>
+	<1320255049-12447-3-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20111103065502.GO23421@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 02, 2011 at 07:03:56PM +0800, Jason Liu wrote:
-> arch/arm/mach-mx5/clock-mx51-mx53.c: In function 'clk_get_freq_dt':
-> arch/arm/mach-mx5/clock-mx51-mx53.c:1640: warning: unused variable 'np'
-> arch/arm/mach-mx5/clock-mx51-mx53.c: In function 'mx53_clocks_init_dt':
-> arch/arm/mach-mx5/clock-mx51-mx53.c:1673: warning: 'ckil' is used uninitialized in this function
-> arch/arm/mach-mx5/clock-mx51-mx53.c:1673: warning: 'osc' is used uninitialized in this function
-> arch/arm/mach-mx5/clock-mx51-mx53.c:1673: warning: 'ckih1' is used uninitialized in this function
-> arch/arm/mach-mx5/clock-mx51-mx53.c:1673: warning: 'ckih2' is used uninitialized in this function
-> arch/arm/mach-mx5/clock-mx51-mx53.c: In function 'mx51_clocks_init_dt':
-> arch/arm/mach-mx5/clock-mx51-mx53.c:1665: warning: 'ckil' is used uninitialized in this function
-> arch/arm/mach-mx5/clock-mx51-mx53.c:1665: warning: 'osc' is used uninitialized in this function
-> arch/arm/mach-mx5/clock-mx51-mx53.c:1665: warning: 'ckih1' is used uninitialized in this function
-> arch/arm/mach-mx5/clock-mx51-mx53.c:1665: warning: 'ckih2' is used uninitialized in this function
+On Wed, Nov 02, 2011 at 05:30:49PM +0000, Marc Zyngier wrote:
+> As local timer interrupts are now handled as normal interrupts,
+> remove the special case in the GIC handler.
+> 
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Sascha Hauer <kernel@pengutronix.de>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 
-You only get this warning because you have put the code in
-clk_get_freq_dt into #ifdef CONFIG_OF in the last patch. Instead please
-put the whole block including clk_get_freq_dt, mx51_clocks_init_dt and
-mx53_clocks_init_dt into #ifdef CONFIG_OF.
+Ok, I'll pick this one up.
 
 Sascha
 
-> 
-> Signed-off-by: Jason Liu <jason.hui@linaro.org>
 > ---
->  arch/arm/mach-mx5/clock-mx51-mx53.c |    2 ++
->  1 files changed, 2 insertions(+), 0 deletions(-)
+>  arch/arm/plat-mxc/gic.c |   11 ++---------
+>  1 files changed, 2 insertions(+), 9 deletions(-)
 > 
-> diff --git a/arch/arm/mach-mx5/clock-mx51-mx53.c b/arch/arm/mach-mx5/clock-mx51-mx53.c
-> index 7c373b83..e352a5a 100644
-> --- a/arch/arm/mach-mx5/clock-mx51-mx53.c
-> +++ b/arch/arm/mach-mx5/clock-mx51-mx53.c
-> @@ -1662,6 +1662,7 @@ int __init mx51_clocks_init_dt(void)
->  {
->  	unsigned long ckil, osc, ckih1, ckih2;
+> diff --git a/arch/arm/plat-mxc/gic.c b/arch/arm/plat-mxc/gic.c
+> index b3b8eed..12f8f81 100644
+> --- a/arch/arm/plat-mxc/gic.c
+> +++ b/arch/arm/plat-mxc/gic.c
+> @@ -28,21 +28,14 @@ asmlinkage void __exception_irq_entry gic_handle_irq(struct pt_regs *regs)
+>  		if (irqnr == 1023)
+>  			break;
 >  
-> +	ckil = osc = ckih1 = ckih2 = 0;
->  	clk_get_freq_dt(&ckil, &osc, &ckih1, &ckih2);
->  	return mx51_clocks_init(ckil, osc, ckih1, ckih2);
->  }
-> @@ -1670,6 +1671,7 @@ int __init mx53_clocks_init_dt(void)
->  {
->  	unsigned long ckil, osc, ckih1, ckih2;
->  
-> +	ckil = osc = ckih1 = ckih2 = 0;
->  	clk_get_freq_dt(&ckil, &osc, &ckih1, &ckih2);
->  	return mx53_clocks_init(ckil, osc, ckih1, ckih2);
+> -		if (irqnr > 29 && irqnr < 1021)
+> +		if (irqnr > 15 && irqnr < 1021)
+>  			handle_IRQ(irqnr, regs);
+>  #ifdef CONFIG_SMP
+> -		else if (irqnr < 16) {
+> +		else {
+>  			writel_relaxed(irqstat, gic_cpu_base_addr +
+>  						GIC_CPU_EOI);
+>  			handle_IPI(irqnr, regs);
+>  		}
+>  #endif
+> -#ifdef CONFIG_LOCAL_TIMERS
+> -		else if (irqnr == 29) {
+> -			writel_relaxed(irqstat, gic_cpu_base_addr +
+> -						GIC_CPU_EOI);
+> -			handle_local_timer(regs);
+> -		}
+> -#endif
+>  	} while (1);
 >  }
 > -- 
-> 1.7.4.1
+> 1.7.0.4
 > 
 > 
 > 
