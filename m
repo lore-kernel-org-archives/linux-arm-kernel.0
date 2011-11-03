@@ -1,38 +1,43 @@
 From: liu.h.jason@gmail.com (Jason Liu)
-Date: Thu, 3 Nov 2011 09:28:43 +0800
-Subject: [PATCH] slub: doc: update the slabinfo.c file path
-In-Reply-To: <20111102130301.GD19187@n2100.arm.linux.org.uk>
+Date: Thu, 3 Nov 2011 09:31:05 +0800
+Subject: [PATCH] ARM: mx25: Add the missing IIM base definition
+In-Reply-To: <1320231836-9555-3-git-send-email-jason.hui@linaro.org>
 References: <1320231836-9555-1-git-send-email-jason.hui@linaro.org>
-	<1320231836-9555-4-git-send-email-jason.hui@linaro.org>
-	<20111102130301.GD19187@n2100.arm.linux.org.uk>
-Message-ID: <CAB4PhKckErLNjQstzRQVhhxqokF0UKkgkut_Whna6ZiGdr1OZQ@mail.gmail.com>
+	<1320231836-9555-3-git-send-email-jason.hui@linaro.org>
+Message-ID: <CAB4PhKfuMZ+jmYk_QQ=WGXRreaaiGPKsjj4PPimR8kMH0Sxaaw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/11/2 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> On Wed, Nov 02, 2011 at 07:03:54PM +0800, Jason Liu wrote:
->> slabinfo.c has been moved from Documentaion/vm/ to
->> tools/slub/ by commit:0d24db337e6d81c0c620ab65cc6947bd6553f742
->>
->> Update the slub.txt doc to reflect this change too.
->>
->> Signed-off-by: Jason Liu <jason.hui@linaro.org>
->> Cc: Christoph Lameter <cl@linux-foundation.org>
->
-> This patch shouldn't be part of this patch set; there is nothing IMX
-> specific with it. ?It is purely a stand-alone bug fix and, therefore,
-> it should stand completely alone as its own patch.
->
-> You're not even copying it to those who you claim to be doing so in the
-> commit log above.
->
-> It should be copied to the appropriate people and mailing lists.
+Hi, Sascha
 
-Please ignore this patch since this patch has already gone to the next.
-Sorry for that.
+2011/11/2 Jason Liu <jason.hui@linaro.org>:
+> This fix the mx25 building issue of no IIM base definition
+>
+> Signed-off-by: Jason Liu <jason.hui@linaro.org>
+> Cc: Sascha Hauer <s.hauer@pengutronix.de>
+> ---
+> ?arch/arm/plat-mxc/include/mach/mx25.h | ? ?1 +
+> ?1 files changed, 1 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/plat-mxc/include/mach/mx25.h b/arch/arm/plat-mxc/include/mach/mx25.h
+> index 8dcab80..ccebf5b 100644
+> --- a/arch/arm/plat-mxc/include/mach/mx25.h
+> +++ b/arch/arm/plat-mxc/include/mach/mx25.h
+> @@ -41,6 +41,7 @@
+> ?#define MX25_SSI2_BASE_ADDR ? ? ? ? ? ?0x50014000
+> ?#define MX25_SSI1_BASE_ADDR ? ? ? ? ? ?0x50034000
+> ?#define MX25_NFC_BASE_ADDR ? ? ? ? ? ? 0xbb000000
+> +#define MX25_IIM_BASE_ADDR ? ? ? ? ? ? 0x53ff0000
+> ?#define MX25_DRYICE_BASE_ADDR ? ? ? ? ?0x53ffc000
+> ?#define MX25_ESDHC1_BASE_ADDR ? ? ? ? ?0x53fb4000
+> ?#define MX25_ESDHC2_BASE_ADDR ? ? ? ? ?0x53fb8000
+
+Please ignore this patch, sorry for that.
 
 Jason Liu
-
+> --
+> 1.7.4.1
+>
 >
 >
 > _______________________________________________
