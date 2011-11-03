@@ -1,50 +1,47 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu, 3 Nov 2011 17:51:13 +0100
-Subject: [PATCH v2] atmel/spi: fix missing probe during the switch to
-	module_platform_driver
-In-Reply-To: <20111103151855.GP12913@n2100.arm.linux.org.uk>
-References: <1320331706-4946-1-git-send-email-plagnioj@jcrosoft.com>
-	<1320333042-24880-1-git-send-email-plagnioj@jcrosoft.com>
-	<20111103151855.GP12913@n2100.arm.linux.org.uk>
-Message-ID: <20111103165113.GL7136@game.jcrosoft.org>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Thu, 3 Nov 2011 19:00:47 +0200
+Subject: [PATCH 3/3] ARM: mach-ux500 Use CONFIG_ARCH_NR_GPIO
+In-Reply-To: <1320339647-30255-1-git-send-email-pdeschrijver@nvidia.com>
+References: <1320339647-30255-1-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <1320339647-30255-4-git-send-email-pdeschrijver@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15:18 Thu 03 Nov     , Russell King - ARM Linux wrote:
-> On Thu, Nov 03, 2011 at 11:10:42PM +0800, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > in commit 940ab889
-> 
-> This kind of commit message is, frankly, utter crap.
-> 
-> With all the complaints that have been on this mailing list about raw
-> commit IDs without saying what the commit was, it completely astounds
-> me that someone in your position (allegedly a co-maintainer of a SoC)
-> would make such an error.
-> 
-> Please generate a much better commit message.  Maybe something like:
-> 
-> ----
-> Commit 940ab889 (blah blah blah) converted this driver to use
-> module_platform_driver, but due to the use of platform_driver_probe(),
-> this resulted in the call to atmel_spi_probe being lost.  Place the
-> call to this function into the driver structure.
-> 
-> As atmel_spi_probe is marked __init, this will cause a section mismatch
-> error, so ... <fill this in for the point below>
-> ----
-> 
-> And, you're forgetting to fix this properly (maybe you don't care about
-> section mismatch errors - are you going to create another patch for that
-> as well?)  Did you even build-test this patch and pay attention to any
-> warnings issued, or were you just pleased to get a zImage at the end?
-> 
-> static int __init atmel_spi_probe(struct platform_device *pdev)
-> 
-> __init is not compatible with having a pointer in the platform driver
-> structure.  It needs to be __devinit.
-this is an other fix I do not want to fix 2 issue in one commit and I do care
-of mismatch erros I fix them all the time I send patch for some rm9200 few
-weeks ago
+Add default value for CONFIG_ARCH_NR_GPIO to Kconfig and remove the definition
+in gpio.h. We can't remove gpio.h yet as asm/gpio.h still includes it.
 
-Best Regards,
-J.
+Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
+---
+ arch/arm/Kconfig                        |    1 +
+ arch/arm/mach-ux500/include/mach/gpio.h |    5 -----
+ 2 files changed, 1 insertions(+), 5 deletions(-)
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index b9cfa99..8da1f5f 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1510,6 +1510,7 @@ config LOCAL_TIMERS
+ config ARCH_NR_GPIO
+ 	int
+ 	default 1024 if ARCH_SHMOBILE || ARCH_TEGRA
++	default 350 if ARCH_U8500
+ 	default 0
+ 	help
+ 	  Maximum number of GPIOs in the system.
+diff --git a/arch/arm/mach-ux500/include/mach/gpio.h b/arch/arm/mach-ux500/include/mach/gpio.h
+index 7389df9..c01ef66 100644
+--- a/arch/arm/mach-ux500/include/mach/gpio.h
++++ b/arch/arm/mach-ux500/include/mach/gpio.h
+@@ -1,10 +1,5 @@
+ #ifndef __ASM_ARCH_GPIO_H
+ #define __ASM_ARCH_GPIO_H
+ 
+-/*
+- * 288 (#267 is the highest one actually hooked up) onchip GPIOs, plus enough
+- * room for a couple of GPIO expanders.
+- */
+-#define ARCH_NR_GPIOS	350
+ 
+ #endif /* __ASM_ARCH_GPIO_H */
+-- 
+1.7.7.rc0.72.g4b5ea.dirty
