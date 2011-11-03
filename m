@@ -1,18 +1,20 @@
 From: B39297@freescale.com (Wu Guoxing-B39297)
-Date: Thu, 3 Nov 2011 08:01:16 +0000
+Date: Thu, 3 Nov 2011 08:02:11 +0000
 Subject: [PATCH] ARM : mx35: 3ds-board: add framebuffer device
 In-Reply-To: <20111103071824.GB16886@pengutronix.de>
 References: <1320299797-23167-1-git-send-email-b39297@freescale.com>
 	<20111103071824.GB16886@pengutronix.de>
-Message-ID: <3D55990BDF4852409EA769663F22E54AC04239@039-SN1MPN1-006.039d.mgd.msft.net>
+Message-ID: <3D55990BDF4852409EA769663F22E54AC0424A@039-SN1MPN1-006.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Sascha:
   The mc9s08dz60 is a MCU, and its function depend on the code flashed in it. so, it is not a common chip.
-it is only for mx35 3ds board, a driver for it will be useless for others, that's why I didn't write a common
-driver for it, as it will never be used in any other freescale board. But, if you insist, I will write a driver for it.
+it is only for mx35 3ds board, a driver for it will be useless for others, that's why I didn't write a common driver for it, as it will never be used in any other freescale board. But, if you insist, I will write a driver for it.
   For the Blank line, I will remove it.
+
+Best Regards
+Wu Guoxing
 
 -----Original Message-----
 From: Sascha Hauer [mailto:s.hauer at pengutronix.de] 
