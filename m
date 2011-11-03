@@ -1,24 +1,32 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Thu, 03 Nov 2011 07:26:57 -0700
+From: paul.gortmaker@windriver.com (Paul Gortmaker)
+Date: Thu, 3 Nov 2011 10:47:35 -0400
 Subject: [PATCH RESEND] ARM: OMAP: omap_device: Include linux/export.h
-In-Reply-To: <1320303638.17983.5.camel@phoenix> (Axel Lin's message of "Thu,
-	03 Nov 2011 15:00:38 +0800")
-References: <1320303638.17983.5.camel@phoenix>
-Message-ID: <87d3d9i8ni.fsf@ti.com>
+In-Reply-To: <87d3d9i8ni.fsf@ti.com>
+References: <1320303638.17983.5.camel@phoenix> <87d3d9i8ni.fsf@ti.com>
+Message-ID: <4EB2A987.2040805@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Axel Lin <axel.lin@gmail.com> writes:
+On 11-11-03 10:26 AM, Kevin Hilman wrote:
+> Axel Lin <axel.lin@gmail.com> writes:
+> 
+>> Include linux/export.h to fix below build warning:
+>>
+>>   CC      arch/arm/plat-omap/omap_device.o
+>> arch/arm/plat-omap/omap_device.c:1055: warning: data definition has no type or storage class
+>> arch/arm/plat-omap/omap_device.c:1055: warning: type defaults to 'int' in declaration of 'EXPORT_SYMBOL'
+>> arch/arm/plat-omap/omap_device.c:1055: warning: parameter names (without types) in function declaration
+>>
+>> Signed-off-by: Axel Lin <axel.lin@gmail.com>
+> 
+> Thanks, will queue as a fix for v3.2-rc
 
-> Include linux/export.h to fix below build warning:
->
->   CC      arch/arm/plat-omap/omap_device.o
-> arch/arm/plat-omap/omap_device.c:1055: warning: data definition has no type or storage class
-> arch/arm/plat-omap/omap_device.c:1055: warning: type defaults to 'int' in declaration of 'EXPORT_SYMBOL'
-> arch/arm/plat-omap/omap_device.c:1055: warning: parameter names (without types) in function declaration
->
-> Signed-off-by: Axel Lin <axel.lin@gmail.com>
+It is probably better if I track this, since export.h won't
+exist until Linus pulls the module.h-split tree, and I'm
+guessing that will be closer to the end of the merge window.
 
-Thanks, will queue as a fix for v3.2-rc
+Thanks,
+Paul.
 
-Kevin
+> 
+> Kevin
