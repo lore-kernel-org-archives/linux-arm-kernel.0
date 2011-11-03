@@ -1,60 +1,32 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 3 Nov 2011 12:39:56 +0100
-Subject: [PATCH] MAINTAINERS: add ARM/FREESCALE MXS entry
-In-Reply-To: <1319169214-8002-1-git-send-email-shawn.guo@linaro.org>
-References: <1319169214-8002-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20111103113956.GH16886@pengutronix.de>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 3 Nov 2011 12:10:14 +0000
+Subject: [PATCH 3/3 v3.1] ARM: S3C64XX: Correct reservation of GPIOs for
+	CPU module on Cragganmore
+In-Reply-To: <018d01cc99fc$8a2ee840$9e8cb8c0$%kim@samsung.com>
+References: <1320086573-21184-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+	<1320086573-21184-3-git-send-email-broonie@opensource.wolfsonmicro.com>
+	<018d01cc99fc$8a2ee840$9e8cb8c0$%kim@samsung.com>
+Message-ID: <20111103121014.GA11851@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 21, 2011 at 11:53:34AM +0800, Shawn Guo wrote:
-> As suggested by Pengutronix, they want to get Sascha relieved from
-> the burden of maintaining MXS sub-architecture.  Since I brought the
-> most of MXS core code to mainline (with the great help from
-> Pengutronix people, thanks!), I would like to step up for maintaining
-> MXS.
-> 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+On Thu, Nov 03, 2011 at 04:45:21PM +0900, Kukjin Kim wrote:
+> Mark Brown wrote:
 
-Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+> >  #define PCA935X_GPIO_BASE		GPIO_BOARD_START
+> >  #define CODEC_GPIO_BASE		(GPIO_BOARD_START + 8)
+> >  #define GLENFARCLAS_PMIC_GPIO_BASE	(GPIO_BOARD_START + 16)
+> > +#define BANFF_PMIC_GPIO_BASE
+> > 	(GLENFARCLAS_PMIC_GPIO_BASE + 16)
 
-Sascha
+> Above definitions are at mach/crag6410.h file not mach-crag6410.c file in my
+> tree.
+> And in my opinion, to use GPIO_BOARD_START is better than to use
+> GLENFARCLAS_PMIC_GPIO_BASE like others for easily reading.
 
-> Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> ---
-> Hi Sascha,
-> 
-> Please help finish up MXS maintainership for the coming merge window,
-> and I can start taking it over after the merge window closes.  Thanks.
-> 
->  MAINTAINERS |    7 +++++++
->  1 files changed, 7 insertions(+), 0 deletions(-)
-> 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index 5483e0c..7bb20d2 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -787,6 +787,13 @@ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
->  S:	Maintained
->  F:	arch/arm/mach-mx5/
->  
-> +ARM/FREESCALE MXS ARM ARCHITECTURE
-> +M:	Shawn Guo <shawn.guo@linaro.org>
-> +L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-> +S:	Maintained
-> +T:	git git://git.linaro.org/people/shawnguo/linux-2.6.git
-> +F:	arch/arm/mach-mxs/
-> +
->  ARM/GLOMATION GESBC9312SX MACHINE SUPPORT
->  M:	Lennert Buytenhek <kernel@wantstofly.org>
->  L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-> -- 
-> 1.7.4.1
-> 
-> 
+I'd prefer it if the were all defined in terms of the preceeding one but
+yes.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> So I think, this should be following...?
+
+Yes.
