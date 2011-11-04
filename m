@@ -1,45 +1,219 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 04 Nov 2011 14:02:16 +0900
-Subject: [PATCH 3/3 v3.1] ARM: S3C64XX: Correct reservation of GPIOs for
-	CPU module on Cragganmore
-In-Reply-To: <20111103121014.GA11851@opensource.wolfsonmicro.com>
-References: <1320086573-21184-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-	<1320086573-21184-3-git-send-email-broonie@opensource.wolfsonmicro.com>
-	<018d01cc99fc$8a2ee840$9e8cb8c0$%kim@samsung.com>
-	<20111103121014.GA11851@opensource.wolfsonmicro.com>
-Message-ID: <026d01cc9aae$ec554520$c4ffcf60$%kim@samsung.com>
+From: b39297@freescale.com (wu guoxing)
+Date: Fri, 4 Nov 2011 12:32:23 +0800
+Subject: [PATCH] ARM/mx35/3ds: gpio: add mc9s08dz60 gpio function
+Message-ID: <1320381143-28621-1-git-send-email-b39297@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark Brown wrote:
-> 
-> On Thu, Nov 03, 2011 at 04:45:21PM +0900, Kukjin Kim wrote:
-> > Mark Brown wrote:
-> 
-> > >  #define PCA935X_GPIO_BASE		GPIO_BOARD_START
-> > >  #define CODEC_GPIO_BASE		(GPIO_BOARD_START + 8)
-> > >  #define GLENFARCLAS_PMIC_GPIO_BASE	(GPIO_BOARD_START + 16)
-> > > +#define BANFF_PMIC_GPIO_BASE
-> > > 	(GLENFARCLAS_PMIC_GPIO_BASE + 16)
-> 
-> > Above definitions are at mach/crag6410.h file not mach-crag6410.c file
-in my
-> > tree.
-> > And in my opinion, to use GPIO_BOARD_START is better than to use
-> > GLENFARCLAS_PMIC_GPIO_BASE like others for easily reading.
-> 
-> I'd prefer it if the were all defined in terms of the preceeding one but
-> yes.
-> 
-> > So I think, this should be following...?
-> 
-> Yes.
+we only use the gpio function of mc9s08dz60 mcu chip, so just
+add the gpio driver, as this mcu will never be used in other board.
 
-OK, applied.
-Thanks.
+Signed-off-by: Wu Guoxing <b39297@freescale.com>
+---
+ drivers/gpio/Kconfig           |    6 ++
+ drivers/gpio/Makefile          |    1 +
+ drivers/gpio/gpio-mc9s08dz60.c |  169 ++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 176 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/gpio/gpio-mc9s08dz60.c
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
+index d539efd..7f6beee 100644
+--- a/drivers/gpio/Kconfig
++++ b/drivers/gpio/Kconfig
+@@ -487,4 +487,10 @@ config GPIO_TPS65910
+ 	help
+ 	  Select this option to enable GPIO driver for the TPS65910
+ 	  chip family.
++
++config GPIO_MC9S08DZ60
++	bool "MX35 3DS BOARD MC9S08DZ60 GPIO functions"
++	depends on I2C && MACH_MX35_3DS
++	help
++	  Select this to enable the MC9S08DZ60 GPIO driver
+ endif
+diff --git a/drivers/gpio/Makefile b/drivers/gpio/Makefile
+index 9588948..85b8799 100644
+--- a/drivers/gpio/Makefile
++++ b/drivers/gpio/Makefile
+@@ -60,3 +60,4 @@ obj-$(CONFIG_GPIO_WM831X)	+= gpio-wm831x.o
+ obj-$(CONFIG_GPIO_WM8350)	+= gpio-wm8350.o
+ obj-$(CONFIG_GPIO_WM8994)	+= gpio-wm8994.o
+ obj-$(CONFIG_GPIO_XILINX)	+= gpio-xilinx.o
++obj-$(CONFIG_GPIO_MC9S08DZ60) += gpio-mc9s08dz60.o
+diff --git a/drivers/gpio/gpio-mc9s08dz60.c b/drivers/gpio/gpio-mc9s08dz60.c
+new file mode 100644
+index 0000000..9c87e06
+--- /dev/null
++++ b/drivers/gpio/gpio-mc9s08dz60.c
+@@ -0,0 +1,169 @@
++/*
++ * Copyright 2009-2011 Freescale Semiconductor, Inc. All Rights Reserved.
++ *
++ * Author: Wu Guoxing <b39297@freescale.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/slab.h>
++#include <linux/i2c.h>
++#include <linux/gpio.h>
++
++#define GPIO_GROUP_NUM 2
++#define GPIO_NUM_PER_GROUP 8
++#define GPIO_NUM (GPIO_GROUP_NUM*GPIO_NUM_PER_GROUP)
++
++static struct i2c_client *mc9s08dz60_client;
++
++static int gpio_to_reg_and_bit(int offset, u8 *reg, u8 *bit)
++{
++	u8 ret = 0;
++	if (offset >= GPIO_NUM)
++		ret = -1;
++	else {
++		*reg = 0x20 + offset / GPIO_NUM_PER_GROUP;
++		*bit = offset % GPIO_NUM_PER_GROUP;
++	}
++
++	return ret;
++}
++
++static int mc9s08dz60_get_value(struct gpio_chip *gc, unsigned offset)
++{
++	int ret = 0;
++	u8 reg, bit;
++	s32 value;
++
++	if (!gpio_to_reg_and_bit(offset, &reg, &bit)) {
++		value = i2c_smbus_read_byte_data(mc9s08dz60_client, reg);
++		if (value >= 0)
++			ret = (value >> bit) & 0x1;
++	}
++
++	return ret;
++}
++
++static void mc9s08dz60_set_value(struct gpio_chip *gc, unsigned offset, int val)
++{
++	u8 reg, bit;
++	s32 value;
++
++	if (!gpio_to_reg_and_bit(offset, &reg, &bit)) {
++		value = i2c_smbus_read_byte_data(mc9s08dz60_client, reg);
++		if (value >= 0) {
++			if (val)
++				value |= 1 << bit;
++			else
++				value &= ~(1 << bit);
++
++			i2c_smbus_write_byte_data(mc9s08dz60_client, reg,
++						  value);
++		}
++	}
++}
++
++static int mc9s08dz60_direction_output(struct gpio_chip *gc,
++				       unsigned offset, int val)
++{
++	mc9s08dz60_set_value(gc, offset, val);
++	return 0;
++}
++
++static int mc9s08dz60_probe(struct i2c_client *client,
++			    const struct i2c_device_id *id)
++{
++	int ret = 0;
++	struct gpio_chip *chip;
++
++	chip = kzalloc(sizeof(*chip), GFP_KERNEL);
++	if (!chip)
++		return -ENOMEM;
++
++	chip->label = client->name;
++	chip->base = -1;
++	chip->dev = &client->dev;
++	chip->owner = THIS_MODULE;
++	chip->ngpio = GPIO_NUM;
++	chip->get = mc9s08dz60_get_value;
++	chip->set = mc9s08dz60_set_value;
++	chip->direction_output = mc9s08dz60_direction_output;
++
++	ret = gpiochip_add(chip);
++	if (ret)
++		goto error;
++
++	i2c_set_clientdata(client, chip);
++	mc9s08dz60_client = client;
++
++	return 0;
++
++error:
++	kfree(chip);
++	return ret;
++}
++
++static int mc9s08dz60_remove(struct i2c_client *client)
++{
++	struct gpio_chip *chip;
++	int ret;
++
++	chip = i2c_get_clientdata(client);
++	if (chip == NULL)
++		return -ENODEV;
++
++	i2c_set_clientdata(client, NULL);
++
++	ret = gpiochip_remove(chip);
++	if (!ret)
++		kfree(chip);
++
++	return ret;
++}
++
++static const struct i2c_device_id mc9s08dz60_id[] = {
++	{"mc9s08dz60", 0},
++	{},
++};
++
++MODULE_DEVICE_TABLE(i2c, mc9s08dz60_id);
++
++static struct i2c_driver mc9s08dz60_i2c_driver = {
++	.driver = {.owner = THIS_MODULE,
++		   .name = "mc9s08dz60",
++		   },
++	.probe = mc9s08dz60_probe,
++	.remove = mc9s08dz60_remove,
++	.id_table = mc9s08dz60_id,
++};
++
++int __init mc9s08dz60_init(void)
++{
++	int err;
++
++	err = i2c_add_driver(&mc9s08dz60_i2c_driver);
++	return err;
++}
++
++void __exit mc9s08dz60_exit(void)
++{
++	i2c_del_driver(&mc9s08dz60_i2c_driver);
++}
++
++module_init(mc9s08dz60_init);
++module_exit(mc9s08dz60_exit);
++
++MODULE_AUTHOR("Freescale Semiconductor, Inc."
++		"Wu Guoxing <b39297@freescale.com>");
++MODULE_DESCRIPTION("mc9s08dz60 gpio function on mx35 3ds board");
++MODULE_LICENSE("GPL v2");
+-- 
+1.7.1
