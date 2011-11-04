@@ -1,8 +1,8 @@
 From: Barry.Song@csr.com (Barry Song)
-Date: Fri, 4 Nov 2011 00:36:16 -0700
+Date: Fri, 4 Nov 2011 00:37:23 -0700
 Subject: [PATCH] PM: HIBERNATION: skip the swap size check if the snapshot
 	image size is anticipative
-Message-ID: <1320392176-3906-1-git-send-email-Barry.Song@csr.com>
+Message-ID: <1320392243-3948-1-git-send-email-Barry.Song@csr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
