@@ -1,97 +1,171 @@
-From: peter.ujfalusi@ti.com (=?ISO-8859-1?Q?P=E9ter?= Ujfalusi)
-Date: Fri, 04 Nov 2011 11:35:26 +0200
-Subject: [PATCH 1/2] OMAP2+: DMA: Workaround for invalid source
-	position
-In-Reply-To: <20111103212756.GZ31337@atomide.com>
-References: <1320070817-9638-1-git-send-email-peter.ujfalusi@ti.com>
-	<1320070817-9638-2-git-send-email-peter.ujfalusi@ti.com>
-	<20111103212756.GZ31337@atomide.com>
-Message-ID: <2603119.amz7RjSE3J@barack>
+From: tanmay.upadhyay@einfochips.com (Tanmay Upadhyay)
+Date: Fri,  4 Nov 2011 15:09:07 +0530
+Subject: [PATCH v2 1/3] ARM: pxa168: Add SDHCI support
+In-Reply-To: <y>
+References: <y>
+Message-ID: <1320399547-2374-1-git-send-email-tanmay.upadhyay@einfochips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 03 November 2011 14:27:56 Tony Lindgren wrote:
-> * Peter Ujfalusi <peter.ujfalusi@ti.com> [111031 06:46]:
-> > If the DMA source position has been asked before the
-> > first actual data transfer has been done, the CSAC
-> > register does not contain valid information.
-> > We can identify this situation by checking the CDAC
-> > register:
-> > CDAC != 0 indicates that the DMA transfer on the channel has
-> > been started already.
-> > When CDAC == 0 we can not trust the CSAC value since it has
-> > not been updated, and can contain random number.
-> > Return the start address in case the DMA has not jet started.
-> > 
-> > Note: The CDAC register has been initialized to 0 at dma_start
-> > time.
-> > 
-> > Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-> > ---
-> > 
-> >  arch/arm/plat-omap/dma.c |   15 +++++++++++++--
-> >  1 files changed, 13 insertions(+), 2 deletions(-)
-> > 
-> > diff --git a/arch/arm/plat-omap/dma.c b/arch/arm/plat-omap/dma.c
-> > index c22217c..38b0d44 100644
-> > --- a/arch/arm/plat-omap/dma.c
-> > +++ b/arch/arm/plat-omap/dma.c
-> > @@ -1024,12 +1024,23 @@ EXPORT_SYMBOL(omap_set_dma_callback);
-> > 
-> >   */
-> >  
-> >  dma_addr_t omap_get_dma_src_pos(int lch)
-> >  {
-> > 
-> > +	u32 cdac;
-> > 
-> >  	dma_addr_t offset = 0;
-> >  	
-> >  	if (cpu_is_omap15xx())
-> >  	
-> >  		offset = p->dma_read(CPC, lch);
-> > 
-> > -	else
-> > -		offset = p->dma_read(CSAC, lch);
-> > +	else {
-> > +		/*
-> > +		 * CDAC == 0 indicates that the DMA transfer on the channel has
-> > +		 * not been started (no data has been transferred so far).
-> > +		 * Return the programmed source start address in this case.
-> > +		 */
-> > +		cdac = p->dma_read(CDAC, lch);
-> > +		if (likely(cdac))
-> > +			offset = p->dma_read(CSAC, lch);
-> > +		else
-> > +			offset = p->dma_read(CSSA, lch);
-> > +	}
-> > 
-> >  	if (IS_DMA_ERRATA(DMA_ERRATA_3_3) && offset == 0)
-> >  	
-> >  		offset = p->dma_read(CSAC, lch);
-> 
-> Should these tests be done only after the errata re-read for both
-> src and dst patches? Otherwise the errata will not be handled?
+v2 - clock register for SDHCI are not common across all MMP SoCs.
+So, move PXA168 implementation to pxa168.c
 
-Yes that might be a good idea.
-I was trying to locate the original errata description for DMA_ERRATA_3_3, but 
-it does not exist, or at least I can not find it. This only been mentioned in 
-the kernel's comment.
-I'm not sure when this DMA_ERRATA_3_3 would have been in force. My guess would 
-be that if someone wants to read the src/dst position right after the channel 
-is disabled, but what would we expect it to return when the channel has been 
-disabled?
-I mean what is the reasonable src/dst for a disabled channel? 0 is as good as 
-any other number, probably the programmed start of the DMA transfer would be 
-my best bet.
-I think the errata description for DMA_ERRATA_3_3 is not correct, and it is in 
-fact to handle the case I'm also handling: Before the first DMA request the 
-CDAC is 0 (since we configured it to be), the CSAC contains _something_ (most 
-of the time 0, but can be random number).
-In some situation re-reading the src/dst position will give enough time to 
-receive the first DMA request, which will update CDAC/CSAC registers.
+Signed-off-by: Tanmay Upadhyay <tanmay.upadhyay@einfochips.com>
+---
+ arch/arm/mach-mmp/clock.c               |    1 +
+ arch/arm/mach-mmp/clock.h               |    1 +
+ arch/arm/mach-mmp/include/mach/pxa168.h |   20 +++++++++++++
+ arch/arm/mach-mmp/pxa168.c              |   46 +++++++++++++++++++++++++++++++
+ 4 files changed, 68 insertions(+), 0 deletions(-)
 
-What do you think?
-
---
-P?ter
+diff --git a/arch/arm/mach-mmp/clock.c b/arch/arm/mach-mmp/clock.c
+index 7c6f95f..eefefea 100644
+--- a/arch/arm/mach-mmp/clock.c
++++ b/arch/arm/mach-mmp/clock.c
+@@ -14,6 +14,7 @@
+ #include <linux/io.h>
+ 
+ #include <mach/regs-apbc.h>
++#include <mach/regs-apmu.h>
+ #include "clock.h"
+ 
+ static void apbc_clk_enable(struct clk *clk)
+diff --git a/arch/arm/mach-mmp/clock.h b/arch/arm/mach-mmp/clock.h
+index 3143e99..1243e4d 100644
+--- a/arch/arm/mach-mmp/clock.h
++++ b/arch/arm/mach-mmp/clock.h
+@@ -27,6 +27,7 @@ struct clk {
+ 
+ extern struct clkops apbc_clk_ops;
+ extern struct clkops apmu_clk_ops;
++extern struct clkops sdh_clk_ops;
+ 
+ #define APBC_CLK(_name, _reg, _fnclksel, _rate)			\
+ struct clk clk_##_name = {					\
+diff --git a/arch/arm/mach-mmp/include/mach/pxa168.h b/arch/arm/mach-mmp/include/mach/pxa168.h
+index 7f00584..390a550 100644
+--- a/arch/arm/mach-mmp/include/mach/pxa168.h
++++ b/arch/arm/mach-mmp/include/mach/pxa168.h
+@@ -15,6 +15,7 @@ extern void pxa168_clear_keypad_wakeup(void);
+ #include <plat/pxa27x_keypad.h>
+ #include <mach/cputype.h>
+ #include <linux/pxa168_eth.h>
++#include <linux/platform_data/pxa_sdhci.h>
+ 
+ extern struct pxa_device_desc pxa168_device_uart1;
+ extern struct pxa_device_desc pxa168_device_uart2;
+@@ -34,6 +35,10 @@ extern struct pxa_device_desc pxa168_device_nand;
+ extern struct pxa_device_desc pxa168_device_fb;
+ extern struct pxa_device_desc pxa168_device_keypad;
+ extern struct pxa_device_desc pxa168_device_eth;
++extern struct pxa_device_desc pxa168_device_sdh0;
++extern struct pxa_device_desc pxa168_device_sdh1;
++extern struct pxa_device_desc pxa168_device_sdh2;
++extern struct pxa_device_desc pxa168_device_sdh3;
+ 
+ static inline int pxa168_add_uart(int id)
+ {
+@@ -125,4 +130,19 @@ static inline int pxa168_add_eth(struct pxa168_eth_platform_data *data)
+ {
+ 	return pxa_register_device(&pxa168_device_eth, data, sizeof(*data));
+ }
++
++static inline int pxa168_add_sdh(int id, struct sdhci_pxa_platdata *data)
++{
++	struct pxa_device_desc *d = NULL;
++
++	switch (id) {
++	case 0: d = &pxa168_device_sdh0; break;
++	case 1: d = &pxa168_device_sdh1; break;
++	case 2: d = &pxa168_device_sdh2; break;
++	case 3: d = &pxa168_device_sdh3; break;
++	default:
++		return -EINVAL;
++	}
++	return pxa_register_device(d, data, sizeof(*data));
++}
+ #endif /* __ASM_MACH_PXA168_H */
+diff --git a/arch/arm/mach-mmp/pxa168.c b/arch/arm/mach-mmp/pxa168.c
+index 0156f53..868605d 100644
+--- a/arch/arm/mach-mmp/pxa168.c
++++ b/arch/arm/mach-mmp/pxa168.c
+@@ -43,6 +43,14 @@ static struct mfp_addr_map pxa168_mfp_addr_map[] __initdata =
+ 
+ #define APMASK(i)	(GPIO_REGS_VIRT + BANK_OFF(i) + 0x09c)
+ 
++/* Offset defined in arch/arm/mach-mmp/include/mach/regs-apmu.h are for MMP2
++ * PXA168 has different offset */
++#undef APMU_SDH2
++#undef APMU_SDH3
++
++#define APMU_SDH2	APMU_REG(0xe0)
++#define APMU_SDH3	APMU_REG(0xe4)
++
+ static void __init pxa168_init_gpio(void)
+ {
+ 	int i;
+@@ -63,6 +71,31 @@ void __init pxa168_init_irq(void)
+ 	pxa168_init_gpio();
+ }
+ 
++static void sdh_clk_enable(struct clk *clk)
++{
++	unsigned long clk_reg_offset = (unsigned long) clk->clk_rst;
++
++	/* Can't see any clean way to do this: Bits 3 & 0 in registers
++	 * for host 0 & 2 should be set for host 1 & 3 also */
++	if (clk_reg_offset == APMU_SDH0 || clk_reg_offset == APMU_SDH1)
++		__raw_writel(__raw_readl(APMU_SDH0) | 0x9, APMU_SDH0);
++	if (clk_reg_offset == APMU_SDH2 || clk_reg_offset == APMU_SDH3)
++		__raw_writel(__raw_readl(APMU_SDH2) | 0x9, APMU_SDH2);
++
++	__raw_writel(__raw_readl(clk->clk_rst) | clk->enable_val, clk->clk_rst);
++}
++
++static void sdh_clk_disable(struct clk *clk)
++{
++	__raw_writel(__raw_readl(clk->clk_rst) & ~(clk->enable_val),
++			clk->clk_rst);
++}
++
++struct clkops sdh_clk_ops = {
++	.enable		= sdh_clk_enable,
++	.disable	= sdh_clk_disable,
++};
++
+ /* APB peripheral clocks */
+ static APBC_CLK(uart1, PXA168_UART1, 1, 14745600);
+ static APBC_CLK(uart2, PXA168_UART2, 1, 14745600);
+@@ -84,6 +117,11 @@ static APMU_CLK(nand, NAND, 0x19b, 156000000);
+ static APMU_CLK(lcd, LCD, 0x7f, 312000000);
+ static APMU_CLK(eth, ETH, 0x09, 0);
+ 
++static APMU_CLK_OPS(sdh0, SDH0, 0x12, 48000000, &sdh_clk_ops);
++static APMU_CLK_OPS(sdh1, SDH1, 0x12, 48000000, &sdh_clk_ops);
++static APMU_CLK_OPS(sdh2, SDH2, 0x12, 48000000, &sdh_clk_ops);
++static APMU_CLK_OPS(sdh3, SDH3, 0x12, 48000000, &sdh_clk_ops);
++
+ /* device and clock bindings */
+ static struct clk_lookup pxa168_clkregs[] = {
+ 	INIT_CLKREG(&clk_uart1, "pxa2xx-uart.0", NULL),
+@@ -104,6 +142,10 @@ static struct clk_lookup pxa168_clkregs[] = {
+ 	INIT_CLKREG(&clk_lcd, "pxa168-fb", NULL),
+ 	INIT_CLKREG(&clk_keypad, "pxa27x-keypad", NULL),
+ 	INIT_CLKREG(&clk_eth, "pxa168-eth", "MFUCLK"),
++	INIT_CLKREG(&clk_sdh0, "sdhci-pxav1.0", "PXA-SDHCLK"),
++	INIT_CLKREG(&clk_sdh1, "sdhci-pxav1.1", "PXA-SDHCLK"),
++	INIT_CLKREG(&clk_sdh2, "sdhci-pxav1.2", "PXA-SDHCLK"),
++	INIT_CLKREG(&clk_sdh3, "sdhci-pxav1.3", "PXA-SDHCLK"),
+ };
+ 
+ static int __init pxa168_init(void)
+@@ -169,3 +211,7 @@ PXA168_DEVICE(ssp5, "pxa168-ssp", 4, SSP5, 0xd4021000, 0x40, 60, 61);
+ PXA168_DEVICE(fb, "pxa168-fb", -1, LCD, 0xd420b000, 0x1c8);
+ PXA168_DEVICE(keypad, "pxa27x-keypad", -1, KEYPAD, 0xd4012000, 0x4c);
+ PXA168_DEVICE(eth, "pxa168-eth", -1, MFU, 0xc0800000, 0x0fff);
++PXA168_DEVICE(sdh0, "sdhci-pxav1", 0, SDH1, 0xd4280000, 0x100);
++PXA168_DEVICE(sdh1, "sdhci-pxav1", 1, SDH1, 0xd4281000, 0x100);
++PXA168_DEVICE(sdh2, "sdhci-pxav1", 2, SDH2, 0xd427e000, 0x100);
++PXA168_DEVICE(sdh3, "sdhci-pxav1", 3, SDH2, 0xd427f000, 0x100);
+-- 
+1.7.0.4
