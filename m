@@ -1,63 +1,399 @@
-From: archive@jic23.retrosnub.co.uk (Jonathan Cameron)
-Date: Fri, 04 Nov 2011 16:28:37 +0000
-Subject: [PATCH 1/3] ARM: AT91: Add platform data for the ADCs
-In-Reply-To: <4EB4031A.4080806@free-electrons.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 04 Nov 2011 17:29:45 +0100
+Subject: [PATCH 2/3] ARM: AT91: IIO: Add AT91 ADC driver.
+In-Reply-To: <4EB3BE00.3080001@jic23.retrosnub.co.uk>
 References: <1319041134-19712-1-git-send-email-maxime.ripard@free-electrons.com>
 	<1320315070-1700-1-git-send-email-maxime.ripard@free-electrons.com>
-	<1320315070-1700-2-git-send-email-maxime.ripard@free-electrons.com>
-	<4EB3BFD2.5080909@jic23.retrosnub.co.uk>
-	<4EB4031A.4080806@free-electrons.com>
-Message-ID: <4EB412B5.2070103@jic23.retrosnub.co.uk>
+	<1320315070-1700-3-git-send-email-maxime.ripard@free-electrons.com>
+	<4EB3BE00.3080001@jic23.retrosnub.co.uk>
+Message-ID: <4EB412F9.8060404@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/04/2011 03:22 PM, Maxime Ripard wrote:
-> Hi Jonathan,
-> 
-> On 04/11/2011 11:34, Jonathan Cameron wrote:
->> On 11/03/2011 10:11 AM, Maxime Ripard wrote:
->>> +/* ADC */
->>> +#define AT91_ADC_MAX_CHANNELS   16
->>> +
->>> +struct at91_adc_data {
->>> +	/* ADC Clock as specified by the datasheet, in Hz. */
->>> +	unsigned int adc_clock;
->>> +	/*
->>> +	 * Global number of channels available (to specify which channels are
->>> +	 * indeed used on the board, see the channels_used array).
->>> +	 */
->>> +	u8 num_channels;
->>> +	/* Channels in use on the board */
->> put it in a unsigned long and use the bitmap functions.
->>> +	u8 channels_used[AT91_ADC_MAX_CHANNELS];
->>> +	/* Number of channels in use */
->> just use bitmap_weight with the long above and
->> length set to num_channels.
->>> +	u8 num_channels_used;
-> 
-> I didn't know bitmap functions before you mentioned it, but if I read it
-> correctly, while I agree with your point, I will lose the ability to
-> define a combination of enabled and disabled channel in a board specific
-> manner.
-> 
-> In the third patch, I defined channels_used as an array of one. But
-> let's say that instead I want all channels except the second one. With
-> what's in the driver for now, I initialise it to {1, 0, 1, 1}. I don't
-> think it's possible to do so with bitmap functions, or am I missing
-> something ?
+On 04/11/2011 11:27, Jonathan Cameron wrote:
+> On 11/03/2011 10:11 AM, Maxime Ripard wrote:
+>> diff --git a/drivers/staging/iio/adc/at91adc.c b/drivers/staging/iio/adc/at91adc.c
+>> new file mode 100644
+>> index 0000000..acf656d
+>> --- /dev/null
+>> +++ b/drivers/staging/iio/adc/at91adc.c
+>> @@ -0,0 +1,310 @@
+>> +/*
+>> + * Driver for the TouchScreen ADC Controller present in the Atmel AT91
+>> + * evaluation boards.
+> I'd add something here to make it clear that it isn't being used for
+> touchscreen input in this driver.
 
-unsigned long bitmask = BIT(0) | BIT(1) | BIT(3);
+Indeed, I forgot to change it here as well.
 
-Bitmaps are just arrays of unsigned longs.  If you 'know' you have
-less than 32 elements, you can just use a single unsigned long and
-this assignment gets easier.
+>> + *
+>> + * Copyright 2011 Free Electrons
+>> + *
+>> + * Licensed under the GPLv2 or later.
+>> + */
+>> +
+>> +#include <linux/clk.h>
+>> +#include <linux/err.h>
+>> +#include <linux/io.h>
+>> +#include <linux/interrupt.h>
+>> +#include <linux/jiffies.h>
+>> +#include <linux/kernel.h>
+>> +#include <linux/module.h>
+>> +#include <linux/platform_device.h>
+>> +#include <linux/slab.h>
+>> +#include <linux/wait.h>
+>> +
+>> +#include "../iio.h"
+>> +
+>> +#include <mach/at91_adc.h>
+>> +#include <mach/board.h>
+>> +
+> I'd marginally prefer to see these as inlines rather than macros.  Far
+> from critical though!
 
-Most of the stuff you want comes from bitops.h anyway (maybe all come
-to think of it?)
+Ok.
+
+>> +#define at91adc_reg_read(base, reg)        readl_relaxed((base) + (reg))
+>> +#define at91adc_reg_write(base, reg, val)  writel_relaxed((val), (base) + (reg))
+>> +
+>> +struct at91adc_state {
+>> +	struct clk *clk;
+>> +	bool done;
+>> +	struct mutex lock;
+> why hold a local pointer?  Just put these
+> directly into iio_dev->channels.
+>> +	struct iio_chan_spec *channels;
+> likewise, we already have iio_dev->num_channels.
+>> +	int nb_chan;
+
+Indeed
+
+>> +	int irq;
+>> +	wait_queue_head_t wq_data_avail;
+> cryptic element.  Nice to have everything documented, but
+> this one is most important as it isn't self explanatory.
+>> +	u16 lcdr;
+>> +	void __iomem *reg_base;
+>> +	unsigned int vref_mv;
+>> +};
+>> +
+>> +static irqreturn_t at91adc_eoc_trigger(int irq, void *private)
+>> +{
+>> +	int chan;
+>> +	struct at91adc_state *st = private;
+>> +	unsigned int status = at91adc_reg_read(st->reg_base, AT91_ADC_SR);
+>> +
+>> +	if (!(status & AT91_ADC_DRDY))
+>> +		return IRQ_HANDLED;
+>> +
+> extra unneeded brackets for the for loop.
+
+I'm confused here. While it makes sense, I find it more readable around
+large blocks of code and checkpatch doesn't complain on that one. But
+coding style is a huge troll, so will change.
+
+>> +	for (chan = 0; chan < st->nb_chan; chan++) {
+>> +		if (status & AT91_ADC_EOC(chan)) {
+>> +			st->done = true;
+>> +			st->lcdr = at91adc_reg_read(st->reg_base,
+>> +						    AT91_ADC_CHR(chan));
+>> +		}
+>> +	}
+>> +	wake_up_interruptible(&st->wq_data_avail);
+>> +
+>> +	return IRQ_HANDLED;
+>> +}
+>> +
+>> +static int at91adc_channel_init(struct at91adc_state *st,
+>> +				struct at91_adc_data *pdata)
+>> +{
+>> +	int i, idx = 0;
+>> +	st->channels = kcalloc(pdata->num_channels_used,
+>> +			       sizeof(struct iio_chan_spec), GFP_KERNEL);
+>> +	if (st->channels == NULL)
+>> +		return -ENOMEM;
+>> +
+> Again, extra brackets.  Also, some wrong spacing for the if.
+> can you run checkpatch.pl over this again and make sure you
+> have fixed everything.
+>> +	for (i = 0; i < st->nb_chan; i++) {
+> as stated for the previous patch, this should be a bitmap rather
+> than array of u8's.   You can then use for_each_bit_set
+> to clean this code up nicely ;)
+>> +		if(pdata->channels_used[i]) {
+>> +			struct iio_chan_spec *chan = st->channels + idx;
+>> +			chan->type = IIO_VOLTAGE;
+>> +			chan->indexed = 1;
+>> +			chan->channel = i;
+>> +			chan->scan_type.sign = 's';
+>> +			chan->scan_type.realbits = 10;
+>> +			chan->scan_type.storagebits = 32;
+> That is pretty inefficient storage!  If we do implement buffering
+> on this, given mass reads don't look to be quicker, we'll just
+> munge it down to 16 bits.
+
+Well, I thought that storage bits was here to represent how the hardware
+stored the values. Since these values are stored on 10 bits alone in a
+32 bits register, I thought that these were the right values, but we can
+definitely lower the storagebits to 16 here.
+
 > 
-> Or put the calls to bitmap_set in the board_init function ?
-Just edit the underlying unsigned long directly.  The fact that the
-bitops.h stuff is supposed to work on a bitmap as well means that
-will always work.
+>> +			chan->scan_type.shift = 0;
+> don't bother initialising this value as it is zero (and that's an
+> obvious default).
+>> +			chan->info_mask = IIO_CHAN_INFO_SCALE_SHARED_BIT;
+>> +			++idx;
+>> +		}
+>> +	}
+>> +
+>> +	return st->nb_chan;
+>> +}
+>> +
+>> +static int at91adc_read_raw(struct iio_dev *idev,
+>> +			    struct iio_chan_spec const *chan,
+>> +			    int *val, int *val2, long mask)
+>> +{
+>> +	struct at91adc_state *st = iio_priv(idev);
+>> +	unsigned int scale_uv;
+>> +
+>> +	switch (mask) {
+>> +	case 0:
+>> +		mutex_lock(&st->lock);
+>> +
+>> +		at91adc_reg_write(st->reg_base, AT91_ADC_CHER,
+>> +				  AT91_ADC_CH(chan->channel));
+>> +		at91adc_reg_write(st->reg_base, AT91_ADC_IER,
+>> +				  AT91_ADC_EOC(chan->channel));
+>> +		at91adc_reg_write(st->reg_base, AT91_ADC_CR, AT91_ADC_START);
+>> +
+>> +		wait_event_interruptible_timeout(st->wq_data_avail, st->done,
+>> +						 msecs_to_jiffies(10 * 1000));
+>> +		*val = st->lcdr;
+>> +
+>> +		at91adc_reg_write(st->reg_base, AT91_ADC_CHDR,
+>> +				  AT91_ADC_CH(chan->channel));
+>> +		at91adc_reg_write(st->reg_base, AT91_ADC_IDR,
+>> +				  AT91_ADC_EOC(chan->channel));
+>> +
+>> +		st->lcdr = 0;
+>> +		st->done = false;
+>> +		mutex_unlock(&st->lock);
+>> +		return IIO_VAL_INT;
+>> +	case IIO_CHAN_INFO_SCALE:
+>> +		scale_uv = (st->vref_mv * 1000) >> chan->scan_type.realbits;
+>> +		*val = scale_uv / 1000;
+>> +		*val2 = (scale_uv % 1000) * 1000;
+>> +		return IIO_VAL_INT_PLUS_MICRO;
+>> +	default:
+>> +		break;
+>> +	}
+>> +	return -EINVAL;
+>> +}
+>> +
+>> +static const struct iio_info at91adc_info = {
+>> +	.driver_module = THIS_MODULE,
+>> +	.read_raw = &at91adc_read_raw,
+>> +};
+>> +
+>> +static int __devinit at91adc_probe(struct platform_device *pdev)
+>> +{
+>> +	unsigned int prsc, mstrclk, ticks;
+>> +	int ret;
+>> +	struct iio_dev *idev;
+>> +	struct at91adc_state *st;
+>> +	struct resource *res;
+>> +	struct at91_adc_data *pdata = pdev->dev.platform_data;
+>> +
+>> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>> +	if (!res) {
+>> +		dev_err(&pdev->dev, "No resource defined\n");
+>> +		ret = -ENXIO;
+>> +		goto error_ret;
+>> +	}
+>> +
+>> +	idev = iio_allocate_device(sizeof(struct at91adc_state));
+> sizeof(*st) is a little neater?
 
-Jonathan
+Well, I find sizeof(struct at91adc_state) clearer, but ok.
+
+>> +	if (idev == NULL) {
+> I'm not sure this message adds anything or is even necessarily
+> correct as that function doesn't just allocate memory!
+
+Right
+
+>> +		dev_err(&pdev->dev, "Failed to allocate memory.\n");
+>> +		ret = -ENOMEM;
+>> +		goto error_ret;
+>> +	}
+>> +	platform_set_drvdata(pdev, idev);
+>> +
+>> +	idev->dev.parent = &pdev->dev;
+>> +	idev->name = dev_name(&pdev->dev);
+>> +	idev->modes = INDIO_DIRECT_MODE;
+>> +	idev->info = &at91adc_info;
+>> +
+>> +	st = iio_priv(idev);
+>> +	st->irq = platform_get_irq(pdev, 0);
+>> +	if (st->irq < 0) {
+>> +		dev_err(&pdev->dev, "No IRQ ID is designated\n");
+>> +		ret = -ENODEV;
+>> +		goto error_free_device;
+>> +	}
+>> +
+>> +	if (!request_mem_region(res->start, resource_size(res),
+>> +				"AT91 adc registers")) {
+>> +		dev_err(&pdev->dev, "Resources are unavailable.\n");
+>> +		ret = -EBUSY;
+>> +		goto error_free_device;
+>> +	}
+>> +
+>> +	st->reg_base = ioremap(res->start, resource_size(res));
+>> +	if (!st->reg_base) {
+>> +		dev_err(&pdev->dev, "Failed to map registers.\n");
+>> +		ret = -ENOMEM;
+>> +		goto error_release_mem;
+>> +	}
+>> +
+>> +	/*
+>> +	 * Disable all IRQs before setting up the handler
+>> +	 */
+>> +	at91adc_reg_write(st->reg_base, AT91_ADC_CR, AT91_ADC_SWRST);
+>> +	at91adc_reg_write(st->reg_base, AT91_ADC_IDR, 0xFFFFFFFF);
+>> +	ret = request_irq(st->irq,
+>> +			  at91adc_eoc_trigger, 0, pdev->dev.driver->name, st);
+>> +	if (ret) {
+>> +		dev_err(&pdev->dev, "Failed to allocate IRQ.\n");
+>> +		goto error_unmap_reg;
+>> +	}
+>> +
+>> +	st->clk = clk_get(&pdev->dev, "adc_clk");
+>> +	if (IS_ERR(st->clk)) {
+>> +		dev_err(&pdev->dev, "Failed to get the clock.\n");
+>> +		ret = PTR_ERR(st->clk);
+>> +		goto error_free_irq;
+>> +	}
+>> +
+>> +	clk_enable(st->clk);
+>> +	mstrclk = clk_get_rate(st->clk);
+>> +
+>> +	if (!pdata) {
+>> +		dev_err(&pdev->dev, "No platform data available.\n");
+>> +		ret = -EINVAL;
+>> +		goto error_free_clk;
+>> +	}
+>> +
+>> +	if (!pdata->adc_clock) {
+>> +		dev_err(&pdev->dev, "No ADCClock available.\n");
+>> +		ret = -EINVAL;
+>> +		goto error_free_clk;
+>> +	}
+>> +
+>> +	prsc = (mstrclk / (2 * pdata->adc_clock)) - 1;
+>> +
+>> +	if (!pdata->startup_time) {
+>> +		dev_err(&pdev->dev, "No startup time available.\n");
+>> +		ret = -EINVAL;
+>> +		goto error_free_clk;
+>> +	}
+>> +
+>> +	ticks = round_up((pdata->startup_time * pdata->adc_clock /
+>> +			  1000000) - 1, 8) / 8;
+>> +	at91adc_reg_write(st->reg_base, AT91_ADC_MR,
+>> +			  (AT91_ADC_PRESCAL_(prsc) & AT91_ADC_PRESCAL) |
+>> +			  (AT91_ADC_STARTUP_(ticks) & AT91_ADC_STARTUP));
+>> +
+>> +	/* Setup the ADC channels available on the board */
+>> +	st->nb_chan = pdata->num_channels;
+>> +	ret = at91adc_channel_init(st, pdata);
+>> +	if (ret < 0) {
+> no brackets please. Again, checkpatch would probably have shouted
+> about this.
+>> +		goto error_free_clk;
+>> +	}
+>> +
+> This is what I meant when I asked why you have two copies of the
+> pointer and count?
+>> +	idev->channels = st->channels;
+>> +	idev->num_channels = pdata->num_channels_used;
+>> +
+>> +	init_waitqueue_head(&st->wq_data_avail);
+>> +	mutex_init(&st->lock);
+>> +
+>> +	st->vref_mv = pdata->vref;
+>> +
+>> +	ret = iio_device_register(idev);
+> again incorrect brackets for the code style.
+>> +	if (ret < 0) {
+> unwind the channel init?
+Oooh, right...
+
+>> +		goto error_free_clk;
+>> +	}
+>> +
+>> +	return 0;
+>> +
+>> +error_free_clk:
+>> +	clk_disable(st->clk);
+>> +	clk_put(st->clk);
+>> +error_free_irq:
+>> +	free_irq(st->irq, st);
+>> +error_unmap_reg:
+>> +	iounmap(st->reg_base);
+>> +error_release_mem:
+>> +	release_mem_region(res->start, resource_size(res));
+>> +error_free_device:
+>> +	iio_free_device(idev);
+>> +error_ret:
+>> +	return ret;
+>> +}
+>> +
+>> +static int __devexit at91adc_remove(struct platform_device *pdev)
+>> +{
+>> +	struct iio_dev *idev = platform_get_drvdata(pdev);
+>> +	struct resource *res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>> +	struct at91adc_state *st = iio_priv(idev);
+>> +
+>> +	iio_device_unregister(idev);
+> Free channels array?
+>> +	free_irq(st->irq, st);
+>> +	iounmap(st->reg_base);
+>> +	release_mem_region(res->start, resource_size(res));
+>> +	iio_free_device(idev);
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +static struct platform_driver at91adc_driver = {
+>> +	.probe = at91adc_probe,
+>> +	.remove = __devexit_p(at91adc_remove),
+>> +	.driver = {
+>> +		   .name = "at91adc",
+>> +		   },
+>> +};
+>> +
+>> +static int __init at91adc_init(void)
+>> +{
+>> +	return platform_driver_register(&at91adc_driver);
+>> +}
+>> +
+>> +static void __exit at91adc_exit(void)
+>> +{
+>> +	platform_driver_unregister(&at91adc_driver);
+>> +}
+>> +
+> 
+> Some neat boiler plate removal stuff was just merged for
+> platform drivers.  See module_platform_driver in include/linux/platform.h
+> 
+> Definitely want to use that!  I'm hoping the spi and i2c versions
+> turn up soon as it will save us a lot of silly cut and paste code.
+Aah, nice :)
+
+Thanks,
+
+-- 
+Maxime Ripard, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
