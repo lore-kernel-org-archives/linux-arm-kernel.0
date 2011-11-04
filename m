@@ -1,634 +1,223 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Fri, 04 Nov 2011 11:41:18 +0100
-Subject: [PATCH 6/9] drivers: add Contiguous Memory Allocator
-In-Reply-To: <20111018134321.GE6660@csn.ul.ie>
-References: <1317909290-29832-1-git-send-email-m.szyprowski@samsung.com>
-	<1317909290-29832-7-git-send-email-m.szyprowski@samsung.com>
-	<20111018134321.GE6660@csn.ul.ie>
-Message-ID: <006b01cc9ade$48f53b30$dadfb190$%szyprowski@samsung.com>
+From: b39297@freescale.com (wu guoxing)
+Date: Fri, 4 Nov 2011 18:12:31 +0800
+Subject: [PATCH v3] ARM/mx35/3ds: gpio: add mc9s08dz60 gpio function
+Message-ID: <1320401551-21377-1-git-send-email-b39297@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+we only use the gpio function of mc9s08dz60 mcu chip, so just
+add the gpio driver, as this mcu will never be used in other board.
 
-On Tuesday, October 18, 2011 3:43 PM Mel Gorman wrote:
+Signed-off-by: Wu Guoxing <b39297@freescale.com>
+---
+Changes since v1:
+	1. add can_sleep = 1
+	2. removed some useless return checks and local variable
+	3. removed the static variable for i2c client.
+	4. make init&exit function static
 
-> On Thu, Oct 06, 2011 at 03:54:46PM +0200, Marek Szyprowski wrote:
-> > The Contiguous Memory Allocator is a set of helper functions for DMA
-> > mapping framework that improves allocations of contiguous memory chunks.
-> >
-> > CMA grabs memory on system boot, marks it with CMA_MIGRATE_TYPE and
-> > gives back to the system. Kernel is allowed to allocate movable pages
-> > within CMA's managed memory so that it can be used for example for page
-> > cache when DMA mapping do not use it. On dma_alloc_from_contiguous()
-> > request such pages are migrated out of CMA area to free required
-> > contiguous block and fulfill the request. This allows to allocate large
-> > contiguous chunks of memory at any time assuming that there is enough
-> > free memory available in the system.
-> >
-> > This code is heavily based on earlier works by Michal Nazarewicz.
-> >
-> > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> > CC: Michal Nazarewicz <mina86@mina86.com>
-> > ---
-> >  arch/Kconfig                         |    3 +
-> >  drivers/base/Kconfig                 |   79 +++++++
-> >  drivers/base/Makefile                |    1 +
-> >  drivers/base/dma-contiguous.c        |  386 ++++++++++++++++++++++++++++++++++
-> >  include/asm-generic/dma-contiguous.h |   27 +++
-> >  include/linux/device.h               |    4 +
-> >  include/linux/dma-contiguous.h       |  106 ++++++++++
-> >  7 files changed, 606 insertions(+), 0 deletions(-)
-> >  create mode 100644 drivers/base/dma-contiguous.c
-> >  create mode 100644 include/asm-generic/dma-contiguous.h
-> >  create mode 100644 include/linux/dma-contiguous.h
-> >
-> > diff --git a/arch/Kconfig b/arch/Kconfig
-> > index 4b0669c..a3b39a2 100644
-> > --- a/arch/Kconfig
-> > +++ b/arch/Kconfig
-> > @@ -124,6 +124,9 @@ config HAVE_ARCH_TRACEHOOK
-> >  config HAVE_DMA_ATTRS
-> >  	bool
-> >
-> > +config HAVE_DMA_CONTIGUOUS
-> > +	bool
-> > +
-> >  config USE_GENERIC_SMP_HELPERS
-> >  	bool
-> >
-> > diff --git a/drivers/base/Kconfig b/drivers/base/Kconfig
-> > index 21cf46f..a5e6d75 100644
-> > --- a/drivers/base/Kconfig
-> > +++ b/drivers/base/Kconfig
-> > @@ -174,4 +174,83 @@ config SYS_HYPERVISOR
-> >
-> >  source "drivers/base/regmap/Kconfig"
-> >
-> > +config CMA
-> > +	bool "Contiguous Memory Allocator (EXPERIMENTAL)"
-> > +	depends on HAVE_DMA_CONTIGUOUS && HAVE_MEMBLOCK && EXPERIMENTAL
-> > +	select MIGRATION
-> > +	select CMA_MIGRATE_TYPE
-> > +	help
-> > +	  This enables the Contiguous Memory Allocator which allows drivers
-> > +	  to allocate big physically-contiguous blocks of memory for use with
-> > +	  hardware components that do not support I/O map nor scatter-gather.
-> > +
-> > +	  For more information see <include/linux/dma-contiguous.h>.
-> > +	  If unsure, say "n".
-> > +
-> > +if CMA
-> > +
-> > +config CMA_DEBUG
-> > +	bool "CMA debug messages (DEVELOPEMENT)"
-> 
-> s/DEVELOPEMENT/DEVELOPMENT/
-> 
-> Should it be under DEBUG_KERNEL?
-> 
-> > +	help
-> > +	  Turns on debug messages in CMA.  This produces KERN_DEBUG
-> > +	  messages for every CMA call as well as various messages while
-> > +	  processing calls such as dma_alloc_from_contiguous().
-> > +	  This option does not affect warning and error messages.
-> > +
-> > +comment "Default contiguous memory area size:"
-> > +
-> > +config CMA_SIZE_ABSOLUTE
-> > +	int "Absolute size (in MiB)"
-> > +	depends on !CMA_SIZE_SEL_PERCENTAGE
-> > +	default 16
-> > +	help
-> > +	  Defines the size (in MiB) of the default memory area for Contiguous
-> > +	  Memory Allocator.
-> > +
-> > +config CMA_SIZE_PERCENTAGE
-> > +	int "Percentage of total memory"
-> > +	depends on !CMA_SIZE_SEL_ABSOLUTE
-> > +	default 10
-> > +	help
-> > +	  Defines the size of the default memory area for Contiguous Memory
-> > +	  Allocator as a percentage of the total memory in the system.
-> > +
-> 
-> Why is this not a kernel parameter rather than a config option?
+ drivers/gpio/Kconfig           |    6 ++
+ drivers/gpio/Makefile          |    1 +
+ drivers/gpio/gpio-mc9s08dz60.c |  167 ++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 174 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/gpio/gpio-mc9s08dz60.c
 
-There is also a kernel parameter for CMA area size which overrides the value
-from .config.
- 
-> Better yet, why do drivers not register how much CMA memory they are
-> interested in and then the drive core figure out if it can allocate that
-> much or not?
-
-CMA area is reserved very early during boot process, even before the buddy 
-allocator gets initialized. That time no device driver has been probed yet.
-Such early reservation is required to be sure that enough contiguous memory
-can be gathered and to perform some MMU related fixups that are required
-on ARM to avoid page aliasing for dma_alloc_coherent() memory.
-
-> > +choice
-> > +	prompt "Selected region size"
-> > +	default CMA_SIZE_SEL_ABSOLUTE
-> > +
-> > +config CMA_SIZE_SEL_ABSOLUTE
-> > +	bool "Use absolute value only"
-> > +
-> > +config CMA_SIZE_SEL_PERCENTAGE
-> > +	bool "Use percentage value only"
-> > +
-> > +config CMA_SIZE_SEL_MIN
-> > +	bool "Use lower value (minimum)"
-> > +
-> > +config CMA_SIZE_SEL_MAX
-> > +	bool "Use higher value (maximum)"
-> > +
-> > +endchoice
-> > +
-> > +config CMA_ALIGNMENT
-> > +	int "Maximum PAGE_SIZE order of alignment for contiguous buffers"
-> > +	range 4 9
-> > +	default 8
-> > +	help
-> > +	  DMA mapping framework by default aligns all buffers to the smallest
-> > +	  PAGE_SIZE order which is greater than or equal to the requested buffer
-> > +	  size. This works well for buffers up to a few hundreds kilobytes, but
-> > +	  for larger buffers it just a memory waste. With this parameter you can
-> > +	  specify the maximum PAGE_SIZE order for contiguous buffers. Larger
-> > +	  buffers will be aligned only to this specified order. The order is
-> > +	  expressed as a power of two multiplied by the PAGE_SIZE.
-> > +
-> > +	  For example, if your system defaults to 4KiB pages, the order value
-> > +	  of 8 means that the buffers will be aligned up to 1MiB only.
-> > +
-> > +	  If unsure, leave the default value "8".
-> > +
-> > +endif
-> > +
-> >  endmenu
-> > diff --git a/drivers/base/Makefile b/drivers/base/Makefile
-> > index 99a375a..794546f 100644
-> > --- a/drivers/base/Makefile
-> > +++ b/drivers/base/Makefile
-> > @@ -5,6 +5,7 @@ obj-y			:= core.o sys.o bus.o dd.o syscore.o \
-> >  			   cpu.o firmware.o init.o map.o devres.o \
-> >  			   attribute_container.o transport_class.o
-> >  obj-$(CONFIG_DEVTMPFS)	+= devtmpfs.o
-> > +obj-$(CONFIG_CMA) += dma-contiguous.o
-> >  obj-y			+= power/
-> >  obj-$(CONFIG_HAS_DMA)	+= dma-mapping.o
-> >  obj-$(CONFIG_HAVE_GENERIC_DMA_COHERENT) += dma-coherent.o
-> > diff --git a/drivers/base/dma-contiguous.c b/drivers/base/dma-contiguous.c
-> > new file mode 100644
-> > index 0000000..e54bb76
-> > --- /dev/null
-> > +++ b/drivers/base/dma-contiguous.c
-> > @@ -0,0 +1,386 @@
-> > +/*
-> > + * Contiguous Memory Allocator for DMA mapping framework
-> > + * Copyright (c) 2010-2011 by Samsung Electronics.
-> > + * Written by:
-> > + *	Marek Szyprowski <m.szyprowski@samsung.com>
-> > + *	Michal Nazarewicz <mina86@mina86.com>
-> > + *
-> > + * This program is free software; you can redistribute it and/or
-> > + * modify it under the terms of the GNU General Public License as
-> > + * published by the Free Software Foundation; either version 2 of the
-> > + * License or (at your optional) any later version of the license.
-> > + */
-> > +
-> > +#define pr_fmt(fmt) "cma: " fmt
-> > +
-> > +#ifdef CONFIG_CMA_DEBUG
-> > +#ifndef DEBUG
-> > +#  define DEBUG
-> > +#endif
-> > +#endif
-> > +
-> > +#include <asm/page.h>
-> > +#include <asm/dma-contiguous.h>
-> > +
-> > +#include <linux/memblock.h>
-> > +#include <linux/err.h>
-> > +#include <linux/mm.h>
-> > +#include <linux/mutex.h>
-> > +#include <linux/page-isolation.h>
-> > +#include <linux/slab.h>
-> > +#include <linux/swap.h>
-> > +#include <linux/mm_types.h>
-> > +#include <linux/dma-contiguous.h>
-> > +
-> > +#ifndef SZ_1M
-> > +#define SZ_1M (1 << 20)
-> > +#endif
-> > +
-> > +#ifdef phys_to_pfn
-> > +/* nothing to do */
-> > +#elif defined __phys_to_pfn
-> > +#  define phys_to_pfn __phys_to_pfn
-> > +#elif defined __va
-> > +#  define phys_to_pfn(x) page_to_pfn(virt_to_page(__va(x)))
-> > +#else
-> > +#  error phys_to_pfn implementation needed
-> > +#endif
-> > +
-> 
-> Parts of this are assuming that there is a linear mapping of virtual to
-> physical memory. I think this is always the case but it looks like
-> something that should be defined in asm-generic with an option for
-> architectures to override.
-> 
-> > +struct cma {
-> > +	unsigned long	base_pfn;
-> > +	unsigned long	count;
-> > +	unsigned long	*bitmap;
-> > +};
-> > +
-> > +struct cma *dma_contiguous_default_area;
-> > +
-> > +#ifndef CONFIG_CMA_SIZE_ABSOLUTE
-> > +#define CONFIG_CMA_SIZE_ABSOLUTE 0
-> > +#endif
-> > +
-> > +#ifndef CONFIG_CMA_SIZE_PERCENTAGE
-> > +#define CONFIG_CMA_SIZE_PERCENTAGE 0
-> > +#endif
-> > +
-> > +static unsigned long size_abs = CONFIG_CMA_SIZE_ABSOLUTE * SZ_1M;
-> 
-> SIZE_ABSOLUTE is an odd name. It can't be a negative size. size_bytes
-> maybe.
-> 
-> > +static unsigned long size_percent = CONFIG_CMA_SIZE_PERCENTAGE;
-> > +static long size_cmdline = -1;
-> > +
-> > +static int __init early_cma(char *p)
-> > +{
-> > +	pr_debug("%s(%s)\n", __func__, p);
-> > +	size_cmdline = memparse(p, &p);
-> > +	return 0;
-> > +}
-> > +early_param("cma", early_cma);
-> > +
-> > +static unsigned long __init __cma_early_get_total_pages(void)
-> > +{
-> > +	struct memblock_region *reg;
-> > +	unsigned long total_pages = 0;
-> > +
-> > +	/*
-> > +	 * We cannot use memblock_phys_mem_size() here, because
-> > +	 * memblock_analyze() has not been called yet.
-> > +	 */
-> > +	for_each_memblock(memory, reg)
-> > +		total_pages += memblock_region_memory_end_pfn(reg) -
-> > +			       memblock_region_memory_base_pfn(reg);
-> > +	return total_pages;
-> > +}
-> > +
-> 
-> Is this being called too early yet? What prevents you seeing up the CMA
-> regions after the page allocator is brought up for example? I understand
-> that there is a need for the memory to be coherent so maybe that is the
-> obstacle.
-
-Right now we assume that CMA areas can be created only during early boot with 
-memblock allocator. The code that converts memory on-fly into CMA region
-can be added later (if required).
- 
-> > +/**
-> > + * dma_contiguous_reserve() - reserve area for contiguous memory handling
-> > + *
-> > + * This funtion reserves memory from early allocator. It should be
-> > + * called by arch specific code once the early allocator (memblock or bootmem)
-> > + * has been activated and all other subsystems have already allocated/reserved
-> > + * memory.
-> > + */
-> > +void __init dma_contiguous_reserve(phys_addr_t limit)
-> > +{
-> > +	unsigned long selected_size = 0;
-> > +	unsigned long total_pages;
-> > +
-> > +	pr_debug("%s(limit %08lx)\n", __func__, (unsigned long)limit);
-> > +
-> > +	total_pages = __cma_early_get_total_pages();
-> > +	size_percent *= (total_pages << PAGE_SHIFT) / 100;
-> > +
-> > +	pr_debug("%s: total available: %ld MiB, size absolute: %ld MiB, size percentage: %ld
-> MiB\n",
-> > +		 __func__, (total_pages << PAGE_SHIFT) / SZ_1M,
-> > +		size_abs / SZ_1M, size_percent / SZ_1M);
-> > +
-> > +#ifdef CONFIG_CMA_SIZE_SEL_ABSOLUTE
-> > +	selected_size = size_abs;
-> > +#elif defined(CONFIG_CMA_SIZE_SEL_PERCENTAGE)
-> > +	selected_size = size_percent;
-> > +#elif defined(CONFIG_CMA_SIZE_SEL_MIN)
-> > +	selected_size = min(size_abs, size_percent);
-> > +#elif defined(CONFIG_CMA_SIZE_SEL_MAX)
-> > +	selected_size = max(size_abs, size_percent);
-> > +#endif
-> > +
-> 
-> It seems very strange to do this at Kconfig time instead of via kernel
-> parameters.
-> 
-> > +	if (size_cmdline != -1)
-> > +		selected_size = size_cmdline;
-> > +
-> > +	if (!selected_size)
-> > +		return;
-> > +
-> > +	pr_debug("%s: reserving %ld MiB for global area\n", __func__,
-> > +		 selected_size / SZ_1M);
-> > +
-> > +	dma_declare_contiguous(NULL, selected_size, 0, limit);
-> > +};
-> > +
-> > +static DEFINE_MUTEX(cma_mutex);
-> > +
-> > +static void __cma_activate_area(unsigned long base_pfn, unsigned long count)
-> > +{
-> > +	unsigned long pfn = base_pfn;
-> > +	unsigned i = count >> pageblock_order;
-> > +	struct zone *zone;
-> > +
-> > +	VM_BUG_ON(!pfn_valid(pfn));
-> 
-> Again, VM_BUG_ON is an extreme reaction. WARN_ON_ONCE, return an error
-> code and fail gracefully.
-> 
-> > +	zone = page_zone(pfn_to_page(pfn));
-> > +
-> > +	do {
-> > +		unsigned j;
-> > +		base_pfn = pfn;
-> > +		for (j = pageblock_nr_pages; j; --j, pfn++) {
-> 
-> This is correct but does not look like any other PFN walker. There are
-> plenty of examples of where we walk PFN ranges. There is no requirement
-> to use the same pattern but it does make reviewing easier.
-> 
-> > +			VM_BUG_ON(!pfn_valid(pfn));
-> > +			VM_BUG_ON(page_zone(pfn_to_page(pfn)) != zone);
-> > +		}
-> 
-> In the field, this is a no-op as I would assume CONFIG_DEBUG_VM is not
-> set. This should be checked unconditionally and fail gracefully if necessary.
-> 
-> > +		init_cma_reserved_pageblock(pfn_to_page(base_pfn));
-> > +	} while (--i);
-> > +}
-> > +
-> > +static struct cma *__cma_create_area(unsigned long base_pfn,
-> > +				     unsigned long count)
-> > +{
-> > +	int bitmap_size = BITS_TO_LONGS(count) * sizeof(long);
-> > +	struct cma *cma;
-> > +
-> > +	pr_debug("%s(base %08lx, count %lx)\n", __func__, base_pfn, count);
-> > +
-> > +	cma = kmalloc(sizeof *cma, GFP_KERNEL);
-> > +	if (!cma)
-> > +		return ERR_PTR(-ENOMEM);
-> > +
-> > +	cma->base_pfn = base_pfn;
-> > +	cma->count = count;
-> > +	cma->bitmap = kzalloc(bitmap_size, GFP_KERNEL);
-> > +
-> > +	if (!cma->bitmap)
-> > +		goto no_mem;
-> > +
-> > +	__cma_activate_area(base_pfn, count);
-> > +
-> > +	pr_debug("%s: returned %p\n", __func__, (void *)cma);
-> > +	return cma;
-> > +
-> > +no_mem:
-> > +	kfree(cma);
-> > +	return ERR_PTR(-ENOMEM);
-> > +}
-> > +
-> > +static struct cma_reserved {
-> > +	phys_addr_t start;
-> > +	unsigned long size;
-> > +	struct device *dev;
-> > +} cma_reserved[MAX_CMA_AREAS] __initdata;
-> > +static unsigned cma_reserved_count __initdata;
-> > +
-> > +static int __init __cma_init_reserved_areas(void)
-> > +{
-> > +	struct cma_reserved *r = cma_reserved;
-> > +	unsigned i = cma_reserved_count;
-> > +
-> > +	pr_debug("%s()\n", __func__);
-> > +
-> > +	for (; i; --i, ++r) {
-> > +		struct cma *cma;
-> > +		cma = __cma_create_area(phys_to_pfn(r->start),
-> > +					r->size >> PAGE_SHIFT);
-> > +		if (!IS_ERR(cma)) {
-> > +			if (r->dev)
-> > +				set_dev_cma_area(r->dev, cma);
-> > +			else
-> > +				dma_contiguous_default_area = cma;
-> > +		}
-> > +	}
-> > +	return 0;
-> > +}
-> > +core_initcall(__cma_init_reserved_areas);
-> > +
-> > +/**
-> > + * dma_declare_contiguous() - reserve area for contiguous memory handling
-> > + *			      for particular device
-> > + * @dev:   Pointer to device structure.
-> > + * @size:  Size of the reserved memory.
-> > + * @start: Start address of the reserved memory (optional, 0 for any).
-> > + * @limit: End address of the reserved memory (optional, 0 for any).
-> > + *
-> > + * This funtion reserves memory for specified device. It should be
-> > + * called by board specific code when early allocator (memblock or bootmem)
-> > + * is still activate.
-> > + */
-> > +int __init dma_declare_contiguous(struct device *dev, unsigned long size,
-> > +				  phys_addr_t base, phys_addr_t limit)
-> > +{
-> > +	struct cma_reserved *r = &cma_reserved[cma_reserved_count];
-> > +	unsigned long alignment;
-> > +
-> > +	pr_debug("%s(size %lx, base %08lx, limit %08lx)\n", __func__,
-> > +		 (unsigned long)size, (unsigned long)base,
-> > +		 (unsigned long)limit);
-> > +
-> > +	/* Sanity checks */
-> > +	if (cma_reserved_count == ARRAY_SIZE(cma_reserved))
-> > +		return -ENOSPC;
-> > +
-> > +	if (!size)
-> > +		return -EINVAL;
-> > +
-> > +	/* Sanitise input arguments */
-> > +	alignment = PAGE_SIZE << max(MAX_ORDER, pageblock_order);
-> > +	base = ALIGN(base, alignment);
-> > +	size = ALIGN(size, alignment);
-> > +	limit = ALIGN(limit, alignment);
-> > +
-> > +	/* Reserve memory */
-> > +	if (base) {
-> > +		if (memblock_is_region_reserved(base, size) ||
-> > +		    memblock_reserve(base, size) < 0) {
-> > +			base = -EBUSY;
-> > +			goto err;
-> > +		}
-> > +	} else {
-> > +		/*
-> > +		 * Use __memblock_alloc_base() since
-> > +		 * memblock_alloc_base() panic()s.
-> > +		 */
-> > +		phys_addr_t addr = __memblock_alloc_base(size, alignment, limit);
-> > +		if (!addr) {
-> > +			base = -ENOMEM;
-> > +			goto err;
-> > +		} else if (addr + size > ~(unsigned long)0) {
-> > +			memblock_free(addr, size);
-> > +			base = -EOVERFLOW;
-> > +			goto err;
-> > +		} else {
-> > +			base = addr;
-> > +		}
-> > +	}
-> > +
-> > +	/*
-> > +	 * Each reserved area must be initialised later, when more kernel
-> > +	 * subsystems (like slab allocator) are available.
-> > +	 */
-> > +	r->start = base;
-> > +	r->size = size;
-> > +	r->dev = dev;
-> > +	cma_reserved_count++;
-> > +	printk(KERN_INFO "CMA: reserved %ld MiB at %08lx\n", size / SZ_1M,
-> > +	       (unsigned long)base);
-> > +
-> > +	/*
-> > +	 * Architecture specific contiguous memory fixup.
-> > +	 */
-> > +	dma_contiguous_early_fixup(base, size);
-> > +	return 0;
-> > +err:
-> > +	printk(KERN_ERR "CMA: failed to reserve %ld MiB\n", size / SZ_1M);
-> > +	return base;
-> > +}
-> > +
-> > +/**
-> > + * dma_alloc_from_contiguous() - allocate pages from contiguous area
-> > + * @dev:   Pointer to device for which the allocation is performed.
-> > + * @count: Requested number of pages.
-> > + * @align: Requested alignment of pages (in PAGE_SIZE order).
-> > + *
-> > + * This funtion allocates memory buffer for specified device. It uses
-> > + * device specific contiguous memory area if available or the default
-> > + * global one. Requires architecture specific get_dev_cma_area() helper
-> > + * function.
-> > + */
-> > +struct page *dma_alloc_from_contiguous(struct device *dev, int count,
-> > +				       unsigned int align)
-> > +{
-> > +	struct cma *cma = get_dev_cma_area(dev);
-> > +	unsigned long pfn, pageno;
-> > +	int ret;
-> > +
-> > +	if (!cma)
-> > +		return NULL;
-> > +
-> > +	if (align > CONFIG_CMA_ALIGNMENT)
-> > +		align = CONFIG_CMA_ALIGNMENT;
-> > +
-> > +	pr_debug("%s(cma %p, count %d, align %d)\n", __func__, (void *)cma,
-> > +		 count, align);
-> > +
-> > +	if (!count)
-> > +		return NULL;
-> > +
-> > +	mutex_lock(&cma_mutex);
-> > +
-> > +	pageno = bitmap_find_next_zero_area(cma->bitmap, cma->count, 0, count,
-> > +					    (1 << align) - 1);
-> > +	if (pageno >= cma->count) {
-> > +		ret = -ENOMEM;
-> > +		goto error;
-> > +	}
-> > +	bitmap_set(cma->bitmap, pageno, count);
-> > +
-> > +	pfn = cma->base_pfn + pageno;
-> > +	ret = alloc_contig_range(pfn, pfn + count, 0, MIGRATE_CMA);
-> > +	if (ret)
-> > +		goto free;
-> > +
-> 
-> If alloc_contig_range returns failure, the bitmap is still set. It will
-> never be freed so now the area cannot be used for CMA allocations any
-> more.
-
-There is bitmap_clear() call just after free: label, so the bitmap is updated
-correctly.
-
-> > +	mutex_unlock(&cma_mutex);
-> > +
-> > +	pr_debug("%s(): returned %p\n", __func__, pfn_to_page(pfn));
-> > +	return pfn_to_page(pfn);
-> > +free:
-> > +	bitmap_clear(cma->bitmap, pageno, count);
-> > +error:
-> > +	mutex_unlock(&cma_mutex);
-> > +	return NULL;
-> > +}
-> > +
-> > +/**
-> > + * dma_release_from_contiguous() - release allocated pages
-> > + * @dev:   Pointer to device for which the pages were allocated.
-> > + * @pages: Allocated pages.
-> > + * @count: Number of allocated pages.
-> > + *
-> > + * This funtion releases memory allocated by dma_alloc_from_contiguous().
-> > + * It return 0 when provided pages doen't belongs to contiguous area and
-> > + * 1 on success.
-> > + */
-> > +int dma_release_from_contiguous(struct device *dev, struct page *pages,
-> > +				int count)
-> > +{
-> > +	struct cma *cma = get_dev_cma_area(dev);
-> > +	unsigned long pfn;
-> > +
-> > +	if (!cma || !pages)
-> > +		return 0;
-> > +
-> > +	pr_debug("%s(page %p)\n", __func__, (void *)pages);
-> > +
-> > +	pfn = page_to_pfn(pages);
-> > +
-> > +	if (pfn < cma->base_pfn || pfn >= cma->base_pfn + cma->count)
-> > +		return 0;
-> > +
-> > +	mutex_lock(&cma_mutex);
-> > +
-> > +	bitmap_clear(cma->bitmap, pfn - cma->base_pfn, count);
-> > +	free_contig_pages(pfn, count);
-> > +
-> > +	mutex_unlock(&cma_mutex);
-> 
-> It feels like the mutex could be a lot lighter here. If the bitmap is
-> protected by a spinlock, it would only need to be held while the bitmap
-> was being cleared. free the contig pages outside the spinlock and clear
-> the bitmap afterwards.
-> 
-> It's not particularly important as the scalability of CMA is not
-> something to be concerned with at this point.
-
-This mutex also serializes cma allocations, so there is only one alloc_contig_range()
-call processed at once. This is done to serialize isolation of page blocks that is
-performed inside alloc_contig_range().
-
-Best regards
+diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
+index d539efd..7f6beee 100644
+--- a/drivers/gpio/Kconfig
++++ b/drivers/gpio/Kconfig
+@@ -487,4 +487,10 @@ config GPIO_TPS65910
+ 	help
+ 	  Select this option to enable GPIO driver for the TPS65910
+ 	  chip family.
++
++config GPIO_MC9S08DZ60
++	bool "MX35 3DS BOARD MC9S08DZ60 GPIO functions"
++	depends on I2C && MACH_MX35_3DS
++	help
++	  Select this to enable the MC9S08DZ60 GPIO driver
+ endif
+diff --git a/drivers/gpio/Makefile b/drivers/gpio/Makefile
+index 9588948..85b8799 100644
+--- a/drivers/gpio/Makefile
++++ b/drivers/gpio/Makefile
+@@ -60,3 +60,4 @@ obj-$(CONFIG_GPIO_WM831X)	+= gpio-wm831x.o
+ obj-$(CONFIG_GPIO_WM8350)	+= gpio-wm8350.o
+ obj-$(CONFIG_GPIO_WM8994)	+= gpio-wm8994.o
+ obj-$(CONFIG_GPIO_XILINX)	+= gpio-xilinx.o
++obj-$(CONFIG_GPIO_MC9S08DZ60) += gpio-mc9s08dz60.o
+diff --git a/drivers/gpio/gpio-mc9s08dz60.c b/drivers/gpio/gpio-mc9s08dz60.c
+new file mode 100644
+index 0000000..c41eb16
+--- /dev/null
++++ b/drivers/gpio/gpio-mc9s08dz60.c
+@@ -0,0 +1,167 @@
++/*
++ * Copyright 2009-2011 Freescale Semiconductor, Inc. All Rights Reserved.
++ *
++ * Author: Wu Guoxing <b39297@freescale.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/slab.h>
++#include <linux/i2c.h>
++#include <linux/gpio.h>
++
++#define GPIO_GROUP_NUM 2
++#define GPIO_NUM_PER_GROUP 8
++#define GPIO_NUM (GPIO_GROUP_NUM*GPIO_NUM_PER_GROUP)
++
++struct mc9s08dz60 {
++	struct i2c_client *client;
++	struct gpio_chip chip;
++};
++
++static struct mc9s08dz60 *to_mc9s08dz60(struct gpio_chip *gc)
++{
++	return container_of(gc, struct mc9s08dz60, chip);
++}
++
++
++static void gpio_to_reg_and_bit(int offset, u8 *reg, u8 *bit)
++{
++	*reg = 0x20 + offset / GPIO_NUM_PER_GROUP;
++	*bit = offset % GPIO_NUM_PER_GROUP;
++}
++
++static int mc9s08dz60_get_value(struct gpio_chip *gc, unsigned offset)
++{
++	int ret = 0;
++	u8 reg, bit;
++	s32 value;
++	struct mc9s08dz60 *mc9s = to_mc9s08dz60(gc);
++
++	gpio_to_reg_and_bit(offset, &reg, &bit);
++	value = i2c_smbus_read_byte_data(mc9s->client, reg);
++	if (value >= 0)
++		ret = (value >> bit) & 0x1;
++
++	return ret;
++}
++
++static void mc9s08dz60_set_value(struct gpio_chip *gc, unsigned offset, int val)
++{
++	u8 reg, bit;
++	s32 value;
++	struct mc9s08dz60 *mc9s = to_mc9s08dz60(gc);
++
++	gpio_to_reg_and_bit(offset, &reg, &bit);
++	value = i2c_smbus_read_byte_data(mc9s->client, reg);
++	if (value >= 0) {
++		if (val)
++			value |= 1 << bit;
++		else
++			value &= ~(1 << bit);
++
++		i2c_smbus_write_byte_data(mc9s->client, reg, value);
++	}
++}
++
++static int mc9s08dz60_direction_output(struct gpio_chip *gc,
++				       unsigned offset, int val)
++{
++	mc9s08dz60_set_value(gc, offset, val);
++	return 0;
++}
++
++static int mc9s08dz60_probe(struct i2c_client *client,
++			    const struct i2c_device_id *id)
++{
++	int ret = 0;
++	struct mc9s08dz60 *mc9s;
++
++	mc9s = kzalloc(sizeof(*mc9s), GFP_KERNEL);
++	if (!mc9s)
++		return -ENOMEM;
++
++	mc9s->chip.label = client->name;
++	mc9s->chip.base = -1;
++	mc9s->chip.dev = &client->dev;
++	mc9s->chip.owner = THIS_MODULE;
++	mc9s->chip.ngpio = GPIO_NUM;
++	mc9s->chip.can_sleep = 1;
++	mc9s->chip.get = mc9s08dz60_get_value;
++	mc9s->chip.set = mc9s08dz60_set_value;
++	mc9s->chip.direction_output = mc9s08dz60_direction_output;
++	mc9s->client = client;
++
++	ret = gpiochip_add(&mc9s->chip);
++	if (ret)
++		goto error;
++
++	i2c_set_clientdata(client, mc9s);
++
++	return 0;
++
++error:
++	kfree(mc9s);
++	return ret;
++}
++
++static int mc9s08dz60_remove(struct i2c_client *client)
++{
++	struct mc9s08dz60 *mc9s;
++	int ret;
++
++	mc9s = i2c_get_clientdata(client);
++
++	i2c_set_clientdata(client, NULL);
++
++	ret = gpiochip_remove(&mc9s->chip);
++	if (!ret)
++		kfree(mc9s);
++
++	return 0;
++
++}
++
++static const struct i2c_device_id mc9s08dz60_id[] = {
++	{"mc9s08dz60", 0},
++	{},
++};
++
++MODULE_DEVICE_TABLE(i2c, mc9s08dz60_id);
++
++static struct i2c_driver mc9s08dz60_i2c_driver = {
++	.driver = {.owner = THIS_MODULE,
++		   .name = "mc9s08dz60",
++		   },
++	.probe = mc9s08dz60_probe,
++	.remove = mc9s08dz60_remove,
++	.id_table = mc9s08dz60_id,
++};
++
++static int __init mc9s08dz60_init(void)
++{
++	return i2c_add_driver(&mc9s08dz60_i2c_driver);
++}
++
++static void __exit mc9s08dz60_exit(void)
++{
++	i2c_del_driver(&mc9s08dz60_i2c_driver);
++}
++
++module_init(mc9s08dz60_init);
++module_exit(mc9s08dz60_exit);
++
++MODULE_AUTHOR("Freescale Semiconductor, Inc."
++		"Wu Guoxing <b39297@freescale.com>");
++MODULE_DESCRIPTION("mc9s08dz60 gpio function on mx35 3ds board");
++MODULE_LICENSE("GPL v2");
 -- 
-Marek Szyprowski
-Samsung Poland R&D Center
+1.7.1
