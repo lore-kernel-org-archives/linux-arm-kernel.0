@@ -1,49 +1,46 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 4 Nov 2011 21:46:50 +0000
-Subject: [PATCH v4 1/4] regulator: helper routine to extract
-	regulator_init_data
-In-Reply-To: <CAOesGMgA7UayF9SJUP0YLnj86GmKBrajsBxv4_kRNNqCsvKTYg@mail.gmail.com>
-References: <1319721864-30067-1-git-send-email-rnayak@ti.com>
-	<20111104202905.GA3918@quad.lixom.net>
-	<20111104211447.GC2541@opensource.wolfsonmicro.com>
-	<20111104212216.GA5756@quad.lixom.net>
-	<20111104212910.GB8266@opensource.wolfsonmicro.com>
-	<CAOesGMgA7UayF9SJUP0YLnj86GmKBrajsBxv4_kRNNqCsvKTYg@mail.gmail.com>
-Message-ID: <20111104214650.GC8266@opensource.wolfsonmicro.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 4 Nov 2011 14:47:05 -0700
+Subject: [PATCH v3 2/4] regulator: adapt fixed regulator driver to dt
+In-Reply-To: <20111104212538.GA8266@opensource.wolfsonmicro.com>
+References: <1319702185-16108-1-git-send-email-rnayak@ti.com>
+	<1319702185-16108-3-git-send-email-rnayak@ti.com>
+	<20111104203422.GB3918@quad.lixom.net>
+	<20111104210151.GA2541@opensource.wolfsonmicro.com>
+	<20111104211824.GA5608@quad.lixom.net>
+	<20111104212538.GA8266@opensource.wolfsonmicro.com>
+Message-ID: <CAOesGMh2_C+yx=_5PjqoKxZmAMvx-puRjq45s+G2kz2EaEEtqw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 04, 2011 at 02:34:35PM -0700, Olof Johansson wrote:
-> On Fri, Nov 4, 2011 at 2:29 PM, Mark Brown
+On Fri, Nov 4, 2011 at 2:25 PM, Mark Brown
+<broonie@opensource.wolfsonmicro.com> wrote:
+> On Fri, Nov 04, 2011 at 02:18:24PM -0700, Olof Johansson wrote:
+>> On Fri, Nov 04, 2011 at 09:01:52PM +0000, Mark Brown wrote:
+>
+>> > No, the fixed voltage regultor is a superset of a general regulator - it
+>> > has additional information like the voltage it supplies and the optional
+>> > enable GPIO.
+>
+>> Still, seems like it could be merged into one regulator binding.
+>
+> I don't see how you can usefully do that, the task of plumbing a
+> regulator into a board is largely orthogonal to the specific feature set
+> of a given regulator. ?The specific bindings for a fixed voltage
+> regulator would be useful or unhelpful for most regultors controlled via
+> I2C.
 
-> > I think it's useful to define how consumers are supposed to do this
-> > somewhere - it is actually part of the core binding how consumers are
-> > supposed to do this.
+I meant more that the fixed regulators should reuse as much as
+possible from the generic regulator bindings, instead of completely
+forking them.
 
-> Yeah, ok, but it shouldn't be part of the description of regulator
-> properties per se. See how gpio does it, defining how a gpio-specifier
-> is crafted. The equivalent should be done for regulators.
+Then, depending on how they are controlled, there will be more
+specific bindings. So the case of a gpio-controlled fixed regulator
+would have a binding where the format of the properties to find the
+gpio, etc, would be described. But things like voltage (without a
+range, obviously) would be using the same bindings as the other
+regulators.
 
-That seems to be pretty much exactly what's being done here, and like
-the GPIO bindings it's specified in the core document.  Though perhaps
-there's some aspect of how the document is written that's missing.
+Does that make more sense?
 
-If you're talking about the specifics of the binding the GPIO bindings
-do suffer from the whole magic indexes into arrays problem that makes a
-lot of the older device tree bindings quite hard to read.
 
-> > There's also a bit of magic here for chained supplies with one regulator
-> > supplying another (eg, using a DCDC to drop the system supply down to a
-> > lower voltage to supply a bunch of LDOs for improved efficiency).
-
-> Describing that in the device tree using regulator-specifiers
-> shouldn't be too bad? The LDO will reference the DCDC as the parent
-> supply (or input or whatever language you prefer). They don't have to
-> be in the same topology, they will instead be under whatever
-> controller/bus they are on for control -- i2c, etc.
-
-That's not great as it means you've got a separate binding for supplies
-that happen to be connected to another regulator from that used for
-other supplies on the device which is particularly confusing in the
-fairly common case where a regulator chip has multiple supplies.  Using
-the same method for binding all supplies seems much neater.
+-Olof
