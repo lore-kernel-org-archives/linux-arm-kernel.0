@@ -1,192 +1,37 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Fri, 04 Nov 2011 16:00:00 -0700
-Subject: [PATCH v7 19/21] OMAP2+: UART: Use custom activate func for
-	console uart.
-In-Reply-To: <1318952110-10659-5-git-send-email-govindraj.raja@ti.com>
-	(Govindraj R.'s message of "Tue, 18 Oct 2011 21:05:10 +0530")
-References: <1318952110-10659-1-git-send-email-govindraj.raja@ti.com>
-	<1318952110-10659-5-git-send-email-govindraj.raja@ti.com>
-Message-ID: <878vnv334f.fsf@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 5 Nov 2011 00:20:54 +0100
+Subject: [GIT PULL] Samsung devel-4 for v3.2
+In-Reply-To: <027f01cc9ab6$2086eae0$6194c0a0$%kim@samsung.com>
+References: <027f01cc9ab6$2086eae0$6194c0a0$%kim@samsung.com>
+Message-ID: <201111050020.55071.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"Govindraj.R" <govindraj.raja@ti.com> writes:
+On Friday 04 November 2011, Kukjin Kim wrote:
+> As we talked in Prague, I'm sending 'pull request for v3.2' Samsung-devel4
+> which includes supporting EXYNOS4 DT, SPI clkdev and reorganization
+> arch/arm/mach-exynos and small things.
+> 
+> Please pull from: 
+>   git://github.com/kgene/linux-samsung.git next-samsung-devel-4
+> 
+> As a note, the branch includes arm-soc/next/cleanup3 and arm-soc/next/devel2
+> based on mainline commit 994c0e99 ("Merge branch 'next/soc' of
+> git://git.linaro.org/people/arnd/arm-soc") because it is needed for this and
+> they include all of Samsung stuff for v3.2.
+> 
+> And I will be back to kernel.org after this merge window.
+> 
+> If any problems, please let me know.
 
-> Omap-uart can be used as console uart to print early boot
-> messages using earlyprintk so for console uart prevent
-> hwmod reset or idling during bootup.
->
-> Identify the console_uart set the id and use the custom
-> pm_latency ops for console uart for the first time
-> to idle console uart left enabled from bootup and then enable
-> them back and reset pm_latency ops to default ops.
->
-> Thanks to Kevin Hilman <khilman@ti.com> for suggesting
-> this approach.
->
-> Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
-> ---
->  arch/arm/mach-omap2/serial.c |   79 ++++++++++++++++++++++++++++-------------
->  1 files changed, 54 insertions(+), 25 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/serial.c b/arch/arm/mach-omap2/serial.c
-> index e1eba7f..55903f0 100644
-> --- a/arch/arm/mach-omap2/serial.c
-> +++ b/arch/arm/mach-omap2/serial.c
-> @@ -63,6 +63,7 @@ struct omap_uart_state {
->  
->  static LIST_HEAD(uart_list);
->  static u8 num_uarts;
-> +static u8 console_uart_id = -1;
->  
->  #define DEFAULT_RXDMA_POLLRATE		1	/* RX DMA polling rate (us) */
->  #define DEFAULT_RXDMA_BUFSIZE		4096	/* RX DMA buffer size */
-> @@ -87,6 +88,29 @@ static struct omap_device_pm_latency omap_uart_latency[] = {
->  	},
->  };
->  
-> +static int console_uart_enable_hwmod(struct omap_device *od)
-> +{
-> +	/* For early console we prevented hwmod reset and idle
-> +	 * So before we enable the uart clocks idle and then
-> +	 */
+I've looked through it, and I think I'll hold off for this merge window,
+especially given that I had enough trouble with the the other commits
+and that the submission is really late. Please realize that I have to
+push back on stuff that comes during the merge window.
 
-minor: fix multi-line comment style (search for multi-line in
-Documentation/CodingStyle).  Another one below.
+Please send the contents split up into separate branches (dt, spi, clkdev,
+rename, devel) for 3.3. I think it's ok if you want to send just the
+rename patch for 3.2 the way we had discussed earlier, because this kind
+of patch really makes sense at the end of the merge window.
 
-Notice that you're moving existing code here, but also changing the
-functionality without a description as to why.    Based on the existing code:
-
-You need a console_lock() here...
-
-> +	omap_hwmod_idle(od->hwmods[0]);
-> +	omap_hwmod_enable(od->hwmods[0]);
-
-...and this should be omap_device_enable().
-
-And  you need a console_unlock() here.
-
-Yes, you're subsequent patches avoid this problem, but we still need a real
-fix other than checking for 'debug/loglevel', and when that happens,
-we'll need a console lock here.
-
-> +	/* restore the default activate/deactivate funcs,
-> +	 * since now we have set the hwmod state machine right
-> +	 * with the idle/enable for console uart
-> +	 */
-> +	od->pm_lats = omap_uart_latency;
-> +
-> +	return 0;
-> +}
-> +
-> +static struct omap_device_pm_latency console_uart_latency[] = {
-> +	{
-> +		.activate_func	 = console_uart_enable_hwmod,
-> +	},
-> +};
-> +
->  #ifdef CONFIG_PM
->  static void omap_uart_enable_wakeup(struct platform_device *pdev, bool enable)
->  {
-> @@ -251,12 +275,20 @@ static void omap_serial_fill_default_pads(struct omap_board_data *bdata)
->  static void omap_serial_fill_default_pads(struct omap_board_data *bdata) {}
->  #endif
->  
-> +char *cmdline_find_option(char *str)
-
-static inline
-
-> +{
-> +	extern char *saved_command_line;
-> +
-> +	return strstr(saved_command_line, str);
-> +}
-> +
->  static int __init omap_serial_early_init(void)
->  {
->  	do {
->  		char oh_name[MAX_UART_HWMOD_NAME_LEN];
->  		struct omap_hwmod *oh;
->  		struct omap_uart_state *uart;
-> +		char uart_name[MAX_UART_HWMOD_NAME_LEN];
->  
->  		snprintf(oh_name, MAX_UART_HWMOD_NAME_LEN,
->  			 "uart%d", num_uarts + 1);
-> @@ -271,18 +303,23 @@ static int __init omap_serial_early_init(void)
->  		uart->oh = oh;
->  		uart->num = num_uarts++;
->  		list_add_tail(&uart->node, &uart_list);
-> +		snprintf(uart_name, MAX_UART_HWMOD_NAME_LEN,
-> +				"%s%d", OMAP_SERIAL_NAME, uart->num);
-> +
-> +		if (cmdline_find_option(uart_name)) {
-> +			console_uart_id = uart->num;
-> +			/*
-> +			 * omap-uart can be used for earlyprintk logs
-> +			 * So if omap-uart is used as console then prevent
-> +			 * uart reset and idle to get logs from omap-uart
-> +			 * until uart console driver is available to take
-> +			 * care for console messages.
-> +			 * Idling or resetting omap-uart while printing logs
-> +			 * early boot logs can stall the boot-up.
-> +			 */
-> +			oh->flags |= HWMOD_INIT_NO_IDLE | HWMOD_INIT_NO_RESET;
-> +		}
->  
-> -		/*
-> -		 * NOTE: omap_hwmod_setup*() has not yet been called,
-> -		 *       so no hwmod functions will work yet.
-> -		 */
-> -
-> -		/*
-> -		 * During UART early init, device need to be probed
-> -		 * to determine SoC specific init before omap_device
-> -		 * is ready.  Therefore, don't allow idle here
-> -		 */
-> -		uart->oh->flags |= HWMOD_INIT_NO_IDLE | HWMOD_INIT_NO_RESET;
->  	} while (1);
->  
->  	return 0;
-> @@ -311,6 +348,7 @@ void __init omap_serial_init_port(struct omap_board_data *bdata,
->  	u32 pdata_size = 0;
->  	char *name;
->  	struct omap_uart_port_info omap_up;
-> +	struct omap_device *od;
->  
->  	if (WARN_ON(!bdata))
->  		return;
-> @@ -357,6 +395,11 @@ void __init omap_serial_init_port(struct omap_board_data *bdata,
->  	WARN(IS_ERR(pdev), "Could not build omap_device for %s: %s.\n",
->  	     name, oh->name);
->  
-> +	if (console_uart_id == bdata->id) {
-> +		od = to_omap_device(pdev);
-> +		od->pm_lats = console_uart_latency;
-> +	}
-> +
->  	omap_device_disable_idle_on_suspend(pdev);
->  	oh->mux = omap_hwmod_mux_init(bdata->pads, bdata->pads_cnt);
->  
-> @@ -364,20 +407,6 @@ void __init omap_serial_init_port(struct omap_board_data *bdata,
->  
->  	oh->dev_attr = uart;
->  
-> -	console_lock(); /* in case the earlycon is on the UART */
-> -
-> -	/*
-> -	 * Because of early UART probing, UART did not get idled
-> -	 * on init.  Now that omap_device is ready, ensure full idle
-> -	 * before doing omap_device_enable().
-> -	 */
-> -	omap_hwmod_idle(uart->oh);
-> -
-> -	omap_device_enable(uart->pdev);
-> -	omap_device_idle(uart->pdev);
-> -
-> -	console_unlock();
-> -
->  	if ((cpu_is_omap34xx() || cpu_is_omap44xx()) && bdata->pads)
->  		device_init_wakeup(&pdev->dev, true);
->  }
-
-Kevin
+	Arnd
