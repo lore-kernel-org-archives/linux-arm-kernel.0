@@ -1,25 +1,63 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 4 Nov 2011 21:02:41 +0000
-Subject: [PATCH v3 0/4] Device tree support for regulators
-In-Reply-To: <CAOesGMii8v3DOCjWpuF3=+EVu+-HYGys=7RRgpk+9U=FxTHwOA@mail.gmail.com>
-References: <1319702185-16108-1-git-send-email-rnayak@ti.com>
-	<20111027090847.GC6641@opensource.wolfsonmicro.com>
-	<CAOesGMii8v3DOCjWpuF3=+EVu+-HYGys=7RRgpk+9U=FxTHwOA@mail.gmail.com>
-Message-ID: <20111104210241.GB2541@opensource.wolfsonmicro.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 4 Nov 2011 14:06:29 -0700
+Subject: [PATCH v2 5/8] arm/tegra: add new fields to struct
+	tegra_pingroup_desc
+In-Reply-To: <1320242948-21061-6-git-send-email-pdeschrijver@nvidia.com>
+References: <1320242948-21061-1-git-send-email-pdeschrijver@nvidia.com>
+	<1320242948-21061-6-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <20111104210629.GA4685@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 04, 2011 at 01:21:26PM -0700, Olof Johansson wrote:
-> On Thu, Oct 27, 2011 at 2:08 AM, Mark Brown
+On Wed, Nov 02, 2011 at 04:09:04PM +0200, Peter De Schrijver wrote:
+> Add new fields to struct tegra_pingroup_desc to support new hardware features
+> introduced in the tegra30 SoC. The pinmux driver won't use those fields yet,
+> but the tegra30 pinmux tables will already provide the necessary data.
+> 
+> Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
 
-> > Looking at the device bindings I notice that these bindings loose the
-> > ability to assign a descriptive name to regulator outputs. ?This is
-> > really useful for making it easy to tie the code and the schematics
-> > together - you can make the runing system use the same name as the
-> > schematic.
+Just a nit below.
 
-> That can easily be added by having a output-name property in the
-> regulator device node.
+> ---
+>  arch/arm/mach-tegra/include/mach/pinmux.h   |   10 ++++++++++
+>  arch/arm/mach-tegra/pinmux-tegra20-tables.c |    4 ++++
+>  2 files changed, 14 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-tegra/include/mach/pinmux.h b/arch/arm/mach-tegra/include/mach/pinmux.h
+> index fb101f5..1ea2018 100644
+> --- a/arch/arm/mach-tegra/include/mach/pinmux.h
+> +++ b/arch/arm/mach-tegra/include/mach/pinmux.h
+> @@ -2,6 +2,7 @@
+>   * linux/arch/arm/mach-tegra/include/mach/pinmux.h
+>   *
+>   * Copyright (C) 2010 Google, Inc.
+> + * Copyright (C) 2010,2011 Nvidia, Inc.
+>   *
+>   * This software is licensed under the terms of the GNU General Public
+>   * License version 2, as published by the Free Software Foundation, and
+> @@ -99,6 +100,11 @@ enum tegra_tristate {
+>  	TEGRA_TRI_TRISTATE = 1,
+>  };
+>  
+> +enum tegra_pin_io {
+> +	TEGRA_PIN_OUTPUT = 0,
+> +	TEGRA_PIN_INPUT = 1,
+> +};
+> +
+>  enum tegra_vddio {
+>  	TEGRA_VDDIO_BB = 0,
+>  	TEGRA_VDDIO_LCD,
+> @@ -211,6 +217,10 @@ struct tegra_pingroup_desc {
+>  	s8 tri_bit; 	/* offset into the TRISTATE_REG_* register bit */
+>  	s8 mux_bit;	/* offset into the PIN_MUX_CTL_* register bit */
+>  	s8 pupd_bit;	/* offset into the PULL_UPDOWN_REG_* register bit */
+> +	s8 lock_bit;	/* offset of the LOCK bit into mux register bit */
+> +	s8 od_bit;	/* offset of the OD bit into mux register bit */
+> +	s8 ioreset_bit;	/* offset of the IO_RESET bit into mux register bit */
+> +	s8 io_default;
 
-Which is pretty much what Rajendra's updated version in response to my
-above comment did FWIW.
+Shouldn't this be an enum tegra_pin_io? Also, feel free to move it up above the
+s16/s8 members.
+
+
+-Olof
