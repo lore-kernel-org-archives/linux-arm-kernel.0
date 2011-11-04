@@ -1,53 +1,25 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 04 Nov 2011 16:22:02 +0100
-Subject: [PATCH 1/3] ARM: AT91: Add platform data for the ADCs
-In-Reply-To: <4EB3BFD2.5080909@jic23.retrosnub.co.uk>
-References: <1319041134-19712-1-git-send-email-maxime.ripard@free-electrons.com>
-	<1320315070-1700-1-git-send-email-maxime.ripard@free-electrons.com>
-	<1320315070-1700-2-git-send-email-maxime.ripard@free-electrons.com>
-	<4EB3BFD2.5080909@jic23.retrosnub.co.uk>
-Message-ID: <4EB4031A.4080806@free-electrons.com>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Fri, 4 Nov 2011 08:27:21 -0700
+Subject: [PATCH 1/2] arm/dt: add basic usb nodes to tegra device trees
+In-Reply-To: <1320377174-28047-1-git-send-email-olof@lixom.net>
+References: <1320377174-28047-1-git-send-email-olof@lixom.net>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF173F9A4CAC@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jonathan,
+Olof Johansson wrote at Thursday, November 03, 2011 9:26 PM:
+> For now they are a minimal binding. It needs to be amended with
+> vendor-specific settings for phy setup and link tuning, etc.
+...
+> diff --git a/arch/arm/boot/dts/tegra-seaboard.dts b/arch/arm/boot/dts/tegra-seaboard.dts
+...
+> +	usb at c5000000 {
+> +		nvidia,vbus-gpio = <&gpio 24 0>; /* PD0 */
+> +	};
 
-On 04/11/2011 11:34, Jonathan Cameron wrote:
-> On 11/03/2011 10:11 AM, Maxime Ripard wrote:
->> +/* ADC */
->> +#define AT91_ADC_MAX_CHANNELS   16
->> +
->> +struct at91_adc_data {
->> +	/* ADC Clock as specified by the datasheet, in Hz. */
->> +	unsigned int adc_clock;
->> +	/*
->> +	 * Global number of channels available (to specify which channels are
->> +	 * indeed used on the board, see the channels_used array).
->> +	 */
->> +	u8 num_channels;
->> +	/* Channels in use on the board */
-> put it in a unsigned long and use the bitmap functions.
->> +	u8 channels_used[AT91_ADC_MAX_CHANNELS];
->> +	/* Number of channels in use */
-> just use bitmap_weight with the long above and
-> length set to num_channels.
->> +	u8 num_channels_used;
-
-I didn't know bitmap functions before you mentioned it, but if I read it
-correctly, while I agree with your point, I will lose the ability to
-define a combination of enabled and disabled channel in a board specific
-manner.
-
-In the third patch, I defined channels_used as an array of one. But
-let's say that instead I want all channels except the second one. With
-what's in the driver for now, I initialise it to {1, 0, 1, 1}. I don't
-think it's possible to do so with bitmap functions, or am I missing
-something ?
-
-Or put the calls to bitmap_set in the board_init function ?
+Given that's a custom property, don't we need bindings documentation in
+Documentation/devictree/bindings/usb/? Even if the binding is pretty self-
+explanatory.
 
 -- 
-Maxime Ripard, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+nvpublic
