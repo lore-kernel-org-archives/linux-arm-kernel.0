@@ -1,51 +1,39 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Fri, 04 Nov 2011 10:01:43 -0400 (EDT)
-Subject: orion/kirkwood and device tree
-In-Reply-To: <201111032250.59528.michael@walle.cc>
-References: <20111031105740.GC29402@lunn.ch>
-	<201111022303.04957.michael@walle.cc>
-	<20111103184745.GW32165@titan.lakedaemon.net>
-	<201111032250.59528.michael@walle.cc>
-Message-ID: <alpine.LFD.2.02.1111041000060.3307@xanadu.home>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 4 Nov 2011 14:01:55 +0000
+Subject: [RFC 0/5] restart cleanups
+In-Reply-To: <CAAQYJAvAfFCwr1KH1CD7fKbD_keZK9iGAD20m110Qd_sX=icoA@mail.gmail.com>
+References: <20111101160731.GQ19187@n2100.arm.linux.org.uk>
+	<20111101170225.GS19187@n2100.arm.linux.org.uk>
+	<1320241747.20107.41.camel@ted>
+	<20111102144934.GJ19187@n2100.arm.linux.org.uk>
+	<CAAQYJAvAfFCwr1KH1CD7fKbD_keZK9iGAD20m110Qd_sX=icoA@mail.gmail.com>
+Message-ID: <20111104140155.GZ12913@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 3 Nov 2011, Michael Walle wrote:
+On Fri, Nov 04, 2011 at 02:58:02PM +0100, Andrea Adami wrote:
+> On Wed, Nov 2, 2011 at 3:49 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> >
+> > On Wed, Nov 02, 2011 at 01:49:07PM +0000, Richard Purdie wrote:
+> > > >From what I remember that hardware either always reboots or always
+> > > halts. I think the option was therefore left hardcoded to make it clear
+> > > it wasn't expected to work. Later Zaurii models could do either but
+> > > required some manual poking of registers to make it happen iirc.
+> > >
+> > > Regardless, you can probably clean this up as you suggest now.
+> >
+> > Thanks, I've now committed a change which removes the indirection
+> > entirely from poodle.
+> >
+> Hi, sorry for the late reply
+> 
+> I'm playing with poodle and I can confirm that poweroff does indeed
+> not work with 2.6.3x kernels.
+> See this thread:
+> http://lists.linuxtogo.org/pipermail/zaurus-devel/2011-May/000501.html
 
-> Am Donnerstag 03 November 2011, 19:47:45 schrieb Jason:
-> > Michael,
-> > 
-> > On Wed, Nov 02, 2011 at 11:03:04PM +0100, Michael Walle wrote:
-> > > Am Mittwoch 02 November 2011, 17:50:57 schrieb Jason:
-> > > > Michael,
-> > > > 
-> > > > On Mon, Oct 31, 2011 at 11:50:28PM +0100, Michael Walle wrote:
-> > > > > i've already ported some marvell devices to DT. spi-orion, orion-wdt,
-> > > > > rtc-mv and mv_cesa. Atm i'm struggling with how to pass
-> > > > > kirkwood_mbus_dram_info to the device drivers (the old method is to
-> > > > > pass it through platform_data)
-> > > > 
-> > > > Do you have a public git tree I could pull from, by chance?  I don't
-> > > > care about the state, I'd like to learn by example and start pitching
-> > > > in.
-> > > 
-> > > yeah i pushed it to github:
-> > > https://github.com/mwalle/linux/tree/kirkwood-devtree
-> > 
-> > This is great!  I was having trouble figuring out how to do the
-> > interrupt controller, and you have that.  I'll look more closely this
-> > evening.
-> > 
-> > My only comment so far is that I think a lot of what you have in
-> > lschlv2.dts can be in kirkwood.dtsi.  That way other boards don't have
-> > to copy it (serial, spi, ehci, wdt, rtc, crypto).
-> yeah i had it there and it should be definitely put back to kirkwood.dtsi. the 
-> reason i've put it into lschv2.dts atm is that there is the clock property for 
-> every device, which may be different for different platforms.
+Okay, at least we know that restart works with that.
 
-The clock property should be a separate entity from the actual devices.  
-In fact, that would be a good idea for Kirkwood and friends to move to 
-the struck clk API.
-
-
-Nicolas
+I'm not offering to try and change the poweroff behaviour for the better,
+as I know absolutely nothing about the Zaurus platforms.
