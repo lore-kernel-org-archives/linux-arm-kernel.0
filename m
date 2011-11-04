@@ -1,32 +1,32 @@
-From: b.van.den.berg.nl@gmail.com (Bas van den Berg)
-Date: Fri, 4 Nov 2011 12:00:07 +0100
-Subject: [PATCH] ARM: mach-davinci: fixed name and parent of pll1 sysclock6
-Message-ID: <20111104110004.GA15331@altenpts-laptop>
+From: jarkko.nikula@bitmer.com (Jarkko Nikula)
+Date: Fri,  4 Nov 2011 13:18:02 +0200
+Subject: [PATCH] MAINTAINERS: Update linux-omap git repository
+Message-ID: <1320405482-25736-1-git-send-email-jarkko.nikula@bitmer.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The name and parent of pll1_sysclk6 should be pll1 and not pll0.
-Checked and tested in debugfs on OmapL138.
+linux-omap is back at git.kernel.org. Path is the same than before except
+-2.6 appendix.
 
-Signed-off-by: Bas van den Berg <b.van.den.berg.nl@gmail.com>
+Signed-off-by: Jarkko Nikula <jarkko.nikula@bitmer.com>
 ---
- arch/arm/mach-davinci/da850.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+http://marc.info/?l=linux-omap&m=132033925209702&w=2
+---
+ MAINTAINERS |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
-index b047f87..0962275 100644
---- a/arch/arm/mach-davinci/da850.c
-+++ b/arch/arm/mach-davinci/da850.c
-@@ -168,8 +168,8 @@ static struct clk pll1_sysclk5 = {
- };
+diff --git a/MAINTAINERS b/MAINTAINERS
+index c406f9b..03067f5 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -4662,7 +4662,7 @@ L:	linux-omap at vger.kernel.org
+ W:	http://www.muru.com/linux/omap/
+ W:	http://linux.omap.com/
+ Q:	http://patchwork.kernel.org/project/linux-omap/list/
+-T:	git git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git
++T:	git git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap.git
+ S:	Maintained
+ F:	arch/arm/*omap*/
  
- static struct clk pll1_sysclk6 = {
--	.name		= "pll0_sysclk6",
--	.parent		= &pll0_clk,
-+	.name		= "pll1_sysclk6",
-+	.parent		= &pll1_clk,
- 	.flags		= CLK_PLL,
- 	.div_reg	= PLLDIV6,
- };
 -- 
-1.7.0.4
+1.7.7
