@@ -1,86 +1,167 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri,  4 Nov 2011 12:12:39 -0700
-Subject: [PATCH v2 1/2] arm/dt: add basic usb nodes to tegra device trees
-Message-ID: <1320433960-18173-1-git-send-email-olof@lixom.net>
+Date: Fri,  4 Nov 2011 12:12:40 -0700
+Subject: [PATCH v2 2/2] USB: ehci-tegra: add probing through device tree
+In-Reply-To: <1320433960-18173-1-git-send-email-olof@lixom.net>
+References: <1320433960-18173-1-git-send-email-olof@lixom.net>
+Message-ID: <1320433960-18173-2-git-send-email-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For now they are a minimal binding. It needs to be amended with
-vendor-specific settings for phy setup and link tuning, etc.
+Rely on platform_data being passed through auxdata for now; more elaborate
+bindings for phy config and tunings to be added.
 
-v2: Added bindings specification and phy_type properties
+v2: moved vbus-gpio check to the helper function, added check for !of_node,
+    added usb2 clock to board-dt table.
 
 Signed-off-by: Olof Johansson <olof@lixom.net>
-Acked-by: Grant Likely <grant.likely@secretlab.ca>
+Cc: Greg Kroah-Hartman <gregkh@suse.de>
 ---
- .../devicetree/bindings/usb/tegra-usb.txt          |   13 ++++++++++++
- arch/arm/boot/dts/tegra-seaboard.dts               |    4 +++
- arch/arm/boot/dts/tegra20.dtsi                     |   21 ++++++++++++++++++++
- 3 files changed, 38 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/usb/tegra-usb.txt
+ arch/arm/mach-tegra/board-dt.c |    9 +++++
+ drivers/usb/host/ehci-tegra.c  |   71 ++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 80 insertions(+), 0 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/usb/tegra-usb.txt b/Documentation/devicetree/bindings/usb/tegra-usb.txt
-new file mode 100644
-index 0000000..035d63d
---- /dev/null
-+++ b/Documentation/devicetree/bindings/usb/tegra-usb.txt
-@@ -0,0 +1,13 @@
-+Tegra SOC USB controllers
-+
-+The device node for a USB controller that is part of a Tegra
-+SOC is as described in the document "Open Firmware Recommended
-+Practice : Universal Serial Bus" with the following modifications
-+and additions :
-+
-+Required properties :
-+ - compatible : Should be "nvidia,tegra20-ehci" for USB controllers
-+   used in host mode.
-+ - phy_type : Should be one of "ulpi" or "utmi".
-+ - nvidia,vbus-gpio : If present, specifies a gpio that needs to be
-+   activated for the bus to be powered.
-diff --git a/arch/arm/boot/dts/tegra-seaboard.dts b/arch/arm/boot/dts/tegra-seaboard.dts
-index a72299b..88c682a 100644
---- a/arch/arm/boot/dts/tegra-seaboard.dts
-+++ b/arch/arm/boot/dts/tegra-seaboard.dts
-@@ -29,4 +29,8 @@
- 	sdhci at c8000600 {
- 		support-8bit;
- 	};
-+
-+	usb at c5000000 {
-+		nvidia,vbus-gpio = <&gpio 24 0>; /* PD0 */
-+	};
- };
-diff --git a/arch/arm/boot/dts/tegra20.dtsi b/arch/arm/boot/dts/tegra20.dtsi
-index 65d7e6a..795b921 100644
---- a/arch/arm/boot/dts/tegra20.dtsi
-+++ b/arch/arm/boot/dts/tegra20.dtsi
-@@ -143,5 +143,26 @@
- 		reg = <0xc8000600 0x200>;
- 		interrupts = < 63 >;
- 	};
-+
-+	usb at c5000000 {
-+		compatible = "nvidia,tegra20-ehci", "usb-ehci";
-+		reg = <0xc5000000 0x4000>;
-+		interrupts = < 52 >;
-+		phy_type = "utmi";
-+	};
-+
-+	usb at c5004000 {
-+		compatible = "nvidia,tegra20-ehci", "usb-ehci";
-+		reg = <0xc5004000 0x4000>;
-+		interrupts = < 53 >;
-+		phy_type = "ulpi";
-+	};
-+
-+	usb at c5008000 {
-+		compatible = "nvidia,tegra20-ehci", "usb-ehci";
-+		reg = <0xc5008000 0x4000>;
-+		interrupts = < 129 >;
-+		phy_type = "utmi";
-+	};
+diff --git a/arch/arm/mach-tegra/board-dt.c b/arch/arm/mach-tegra/board-dt.c
+index 74743ad..7f287a8 100644
+--- a/arch/arm/mach-tegra/board-dt.c
++++ b/arch/arm/mach-tegra/board-dt.c
+@@ -61,12 +61,21 @@ struct of_dev_auxdata tegra20_auxdata_lookup[] __initdata = {
+ 	OF_DEV_AUXDATA("nvidia,tegra20-i2s", TEGRA_I2S1_BASE, "tegra-i2s.0", NULL),
+ 	OF_DEV_AUXDATA("nvidia,tegra20-i2s", TEGRA_I2S1_BASE, "tegra-i2s.1", NULL),
+ 	OF_DEV_AUXDATA("nvidia,tegra20-das", TEGRA_APB_MISC_DAS_BASE, "tegra-das", NULL),
++	OF_DEV_AUXDATA("nvidia,tegra20-ehci", TEGRA_USB_BASE, "tegra-ehci.0",
++		       &tegra_ehci1_device.dev.platform_data),
++	OF_DEV_AUXDATA("nvidia,tegra20-ehci", TEGRA_USB2_BASE, "tegra-ehci.1",
++		       &tegra_ehci2_device.dev.platform_data),
++	OF_DEV_AUXDATA("nvidia,tegra20-ehci", TEGRA_USB3_BASE, "tegra-ehci.2",
++		       &tegra_ehci3_device.dev.platform_data),
+ 	{}
  };
  
+ static __initdata struct tegra_clk_init_table tegra_dt_clk_init_table[] = {
+ 	/* name		parent		rate		enabled */
+ 	{ "uartd",	"pll_p",	216000000,	true },
++	{ "usbd",	"clk_m",	12000000,	false },
++	{ "usb2",	"clk_m",	12000000,	false },
++	{ "usb3",	"clk_m",	12000000,	false },
+ 	{ NULL,		NULL,		0,		0},
+ };
+ 
+diff --git a/drivers/usb/host/ehci-tegra.c b/drivers/usb/host/ehci-tegra.c
+index db9d1b4..dbc7fe8 100644
+--- a/drivers/usb/host/ehci-tegra.c
++++ b/drivers/usb/host/ehci-tegra.c
+@@ -21,7 +21,12 @@
+ #include <linux/platform_data/tegra_usb.h>
+ #include <linux/irq.h>
+ #include <linux/usb/otg.h>
++#include <linux/gpio.h>
++#include <linux/of.h>
++#include <linux/of_gpio.h>
++
+ #include <mach/usb_phy.h>
++#include <mach/iomap.h>
+ 
+ #define TEGRA_USB_DMA_ALIGN 32
+ 
+@@ -574,6 +579,35 @@ static const struct hc_driver tegra_ehci_hc_driver = {
+ 	.port_handed_over	= ehci_port_handed_over,
+ };
+ 
++static int setup_vbus_gpio(struct platform_device *pdev)
++{
++	int err = 0;
++	int gpio;
++
++	if (!pdev->dev.of_node)
++		return 0;
++
++	gpio = of_get_named_gpio(pdev->dev.of_node, "nvidia,vbus-gpio", 0);
++	if (!gpio_is_valid(gpio))
++		return 0;
++
++	err = gpio_request(gpio, "vbus_gpio");
++	if (err) {
++		dev_err(&pdev->dev, "can't request vbus gpio %d", gpio);
++		return err;
++	}
++	err = gpio_direction_output(gpio, 1);
++	if (err) {
++		dev_err(&pdev->dev, "can't enable vbus\n");
++		return err;
++	}
++	gpio_set_value(gpio, 1);
++
++	return err;
++}
++
++static u64 tegra_ehci_dma_mask = DMA_BIT_MASK(32);
++
+ static int tegra_ehci_probe(struct platform_device *pdev)
+ {
+ 	struct resource *res;
+@@ -590,6 +624,15 @@ static int tegra_ehci_probe(struct platform_device *pdev)
+ 		return -EINVAL;
+ 	}
+ 
++	/* Right now device-tree probed devices don't get dma_mask set.
++	 * Since shared usb code relies on it, set it here for now.
++	 * Once we have dma capability bindings this can go away.
++	 */
++	if (!pdev->dev.dma_mask)
++		pdev->dev.dma_mask = &tegra_ehci_dma_mask;
++
++	setup_vbus_gpio(pdev);
++
+ 	tegra = kzalloc(sizeof(struct tegra_ehci_hcd), GFP_KERNEL);
+ 	if (!tegra)
+ 		return -ENOMEM;
+@@ -640,6 +683,28 @@ static int tegra_ehci_probe(struct platform_device *pdev)
+ 		goto fail_io;
+ 	}
+ 
++	/* This is pretty ugly and needs to be fixed when we do only
++	 * device-tree probing. Old code relies on the platform_device
++	 * numbering that we lack for device-tree-instantiated devices.
++	 */
++	if (instance < 0) {
++		switch (res->start) {
++		case TEGRA_USB_BASE:
++			instance = 0;
++			break;
++		case TEGRA_USB2_BASE:
++			instance = 1;
++			break;
++		case TEGRA_USB3_BASE:
++			instance = 2;
++			break;
++		default:
++			err = -ENODEV;
++			dev_err(&pdev->dev, "unknown usb instance\n");
++			goto fail_phy;
++		}
++	}
++
+ 	tegra->phy = tegra_usb_phy_open(instance, hcd->regs, pdata->phy_config,
+ 						TEGRA_USB_PHY_MODE_HOST);
+ 	if (IS_ERR(tegra->phy)) {
+@@ -773,6 +838,11 @@ static void tegra_ehci_hcd_shutdown(struct platform_device *pdev)
+ 		hcd->driver->shutdown(hcd);
+ }
+ 
++static struct of_device_id tegra_ehci_of_match[] __devinitdata = {
++	{ .compatible = "nvidia,tegra20-ehci", },
++	{ },
++};
++
+ static struct platform_driver tegra_ehci_driver = {
+ 	.probe		= tegra_ehci_probe,
+ 	.remove		= tegra_ehci_remove,
+@@ -783,5 +853,6 @@ static struct platform_driver tegra_ehci_driver = {
+ 	.shutdown	= tegra_ehci_hcd_shutdown,
+ 	.driver		= {
+ 		.name	= "tegra-ehci",
++		.of_match_table = tegra_ehci_of_match,
+ 	}
+ };
 -- 
 1.7.4.1
