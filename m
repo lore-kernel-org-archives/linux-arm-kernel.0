@@ -1,31 +1,98 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 4 Nov 2011 22:23:23 +0000
-Subject: [PATCH v3 2/4] regulator: adapt fixed regulator driver to dt
-In-Reply-To: <CAOesGMh-fpUSMvOGkq_b4DVzFUby6pnMmKDXQ=sFJpn+g4FzOw@mail.gmail.com>
-References: <1319702185-16108-1-git-send-email-rnayak@ti.com>
-	<1319702185-16108-3-git-send-email-rnayak@ti.com>
-	<20111104203422.GB3918@quad.lixom.net>
-	<20111104210151.GA2541@opensource.wolfsonmicro.com>
-	<20111104211824.GA5608@quad.lixom.net>
-	<20111104212538.GA8266@opensource.wolfsonmicro.com>
-	<CAOesGMh2_C+yx=_5PjqoKxZmAMvx-puRjq45s+G2kz2EaEEtqw@mail.gmail.com>
-	<20111104215733.GD8266@opensource.wolfsonmicro.com>
-	<CAOesGMh-fpUSMvOGkq_b4DVzFUby6pnMmKDXQ=sFJpn+g4FzOw@mail.gmail.com>
-Message-ID: <20111104222323.GB16978@opensource.wolfsonmicro.com>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Fri, 4 Nov 2011 23:29:45 +0100
+Subject: [PATCH] PM: HIBERNATION: skip the swap size check if the snapshot
+	image size is anticipative
+In-Reply-To: <1320392176-3906-1-git-send-email-Barry.Song@csr.com>
+References: <1320392176-3906-1-git-send-email-Barry.Song@csr.com>
+Message-ID: <201111042329.45405.rjw@sisk.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 04, 2011 at 03:09:32PM -0700, Olof Johansson wrote:
+On Friday, November 04, 2011, Barry Song wrote:
+> From: Barry Song <Baohua.Song@csr.com>
+> 
+> Current swsusp requires swap partitions even larger than real saved pages
+> due to the worst compress ratio:
+> but for an embedded system, which has limited storage space, then it might
+> can't give the big size partition to save snapshot.
+> In the another way, some embedded systems can definitely know the most size
+> needed for snapshot since they run some specific application lists.
+> So this patch provides the possibility for bootloader to tell kernel even
+> the system has a little snapshot partition, but it is still enough.
+> For example, if the system need to save 120MB memory, origin swsusp will require
+> a 130MB partition to save snapshot. but if users know 30MB is enough for them(
+> compressed image will be less than 30MB), they just make a 30MB partition.
+> 
+> Signed-off-by: Barry Song <Baohua.Song@csr.com>
+> Cc: Xiangzhen Ye <Xiangzhen.Ye@csr.com>
 
-> But even things like allowing (optional) attributes such as
-> startup-delay on non-fixed regulators could make sense. Keep in mind
-> that the device tree should focus on describing the hardware, not just
-> what the linux driver needs from it. So maybe instead of
-> startup-delay, specifying ramp-up speed instead of time needed until
-> power is good could be the way to go there.
+I'm considering this as 3.3 material, so I'll take care of it after the current
+merge window closes.
 
-This is in general something that a driver should know as a result of
-knowing which regulator it's dealing with - in many cases these are
-properties which can be varied at runtime on hardware which has register
-control.  Replicating this into the device tree would make things more
-error prone.
+Thanks,
+Rafael
+
+
+> ---
+>  this is another patch after I provide resumewait/resumedelay kernel params
+>  to make swsusp support embedded systems better.
+>  This patch is tested on CSR SiRFprimaII platform.
+> 
+>  Documentation/kernel-parameters.txt |    7 +++++++
+>  kernel/power/swap.c                 |   13 +++++++++++++
+>  2 files changed, 20 insertions(+), 0 deletions(-)
+> 
+> diff --git a/Documentation/kernel-parameters.txt b/Documentation/kernel-parameters.txt
+> index a0c5c5f..2ad2e9c 100644
+> --- a/Documentation/kernel-parameters.txt
+> +++ b/Documentation/kernel-parameters.txt
+> @@ -2277,6 +2277,13 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
+>  			in <PAGE_SIZE> units (needed only for swap files).
+>  			See  Documentation/power/swsusp-and-swap-files.txt
+>  
+> +	swapenough	[SWSUSP]
+> +			Tell kernel the swap partition size is enough and let kernel
+> +			skip checking whether the swap partition has enough size to
+> +			save snapshot.
+> +			It is used for embedded systems, typically using NAND and SD
+> +			card, which have not large space.
+> +
+>  	resumedelay=	[HIBERNATION] Delay (in seconds) to pause before attempting to
+>  			read the resume files
+>  
+> diff --git a/kernel/power/swap.c b/kernel/power/swap.c
+> index 11a594c..97c30b5 100644
+> --- a/kernel/power/swap.c
+> +++ b/kernel/power/swap.c
+> @@ -36,6 +36,8 @@
+>  
+>  #define HIBERNATE_SIG	"S1SUSPEND"
+>  
+> +static int swapenough;
+> +
+>  /*
+>   *	The swap map is a data structure used for keeping track of each page
+>   *	written to a swap partition.  It consists of many swap_map_page
+> @@ -772,6 +774,9 @@ static int enough_swap(unsigned int nr_pages, unsigned int flags)
+>  	unsigned int free_swap = count_swap_pages(root_swap, 1);
+>  	unsigned int required;
+>  
+> +	if (swapenough)
+> +		return 1;
+> +
+>  	pr_debug("PM: Free swap pages: %u\n", free_swap);
+>  
+>  	required = PAGES_FOR_IO + ((flags & SF_NOCOMPRESS_MODE) ?
+> @@ -1449,3 +1454,11 @@ static int swsusp_header_init(void)
+>  }
+>  
+>  core_initcall(swsusp_header_init);
+> +
+> +static int __init swapenough_setup(char *str)
+> +{
+> +	swapenough = 1;
+> +	return 1;
+> +}
+> +
+> +__setup("swapenough", swapenough_setup);
+> 
