@@ -1,62 +1,133 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 04 Nov 2011 11:27:35 +0100
-Subject: config ARCH_AT91SAM9X5
-In-Reply-To: <4EAE9F9B.4040201@pengutronix.de>
-References: <1320062362.14409.58.camel@x61.thuisdomein>
-	<4EAE9F9B.4040201@pengutronix.de>
-Message-ID: <4EB3BE17.2050001@atmel.com>
+From: archive@jic23.retrosnub.co.uk (Jonathan Cameron)
+Date: Fri, 04 Nov 2011 10:33:46 +0000
+Subject: [PATCH 3/3] ARM: AT91: Add the ADC to the sam9g20ek board
+In-Reply-To: <1320315070-1700-4-git-send-email-maxime.ripard@free-electrons.com>
+References: <1319041134-19712-1-git-send-email-maxime.ripard@free-electrons.com>
+	<1320315070-1700-1-git-send-email-maxime.ripard@free-electrons.com>
+	<1320315070-1700-4-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <4EB3BF8A.9080809@jic23.retrosnub.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
------BEGIN PGP SIGNED MESSAGE-----
-Hash: SHA1
+Forgot to put some general comments in the previous patch reviews.
 
-On 10/31/2011 02:16 PM, Marc Kleine-Budde :
-> On 10/31/2011 12:59 PM, Paul Bolle wrote:
->> 0) Since the commits 9baeb7e4 ("at91: Add ARCH_ID and basic cpu 
->> macros [...]"), b9e379bc ("net/can: allow CAN_AT91 on 
->> AT91SAM9X5"), and 8c3583b6 ("at91: use structure to store the 
->> current soc")
->> 
->> the mainline kernel tree uses the Kconfig symbol ARCH_AT91SAM9X5 
->> and the preprocessor macro CONFIG_ARCH_AT91SAM9X5.
->> 
->> 1) But there's currently no Kconfig entry ARCH_AT91SAM9X5. 
->> (Neither is there a direct definition of the macro 
->> CONFIG_ARCH_AT91SAM9X5.) Shouldn't a Kconfig entry for 
->> ARCH_AT91SAM9X5 be added (to arch/arm/mach-at91/Kconfig)?
-> 
-> Talking for the at91_can driver (which has been done by me): The 
-> driver and Kconfig have been prepared for the upcoming 5series AT91
-> SOCs.
-> 
-> Basically the same applies to the commit 9baeb7e4 ("at91: Add 
-> ARCH_ID and basic cpu macros [...]").
-> 
-> But the 5series hasn't bee merged yet. Nicolas and Jean-Christophe 
-> can probably tell you more.
+Please run checkpatch.pl over all patches as it will clean up quite a few
+issues.
 
-Yes, AT91SAM9X5 support is underway to mainline kernel.
-It was posted to the mailing-list a while ago but did not reached
-acceptance due to the move to device tree on ARM platforms.
-We have made progress on this side recently and will add this SoC
-during this effort.
+Mostly looking good.  At the moment it's simple enough that we can
+rapidly move this one out of staging once the core has gone.
 
-So, please keep this symbol for the moment as we may need it during
-our submitting of 9x5 work.
+Then we can build up more interesting stuff as support goes into
+the non staging core.
 
-Best regards,
-- -- 
-Nicolas Ferre
------BEGIN PGP SIGNATURE-----
-Version: GnuPG v1.4.11 (GNU/Linux)
-Comment: Using GnuPG with Mozilla - http://enigmail.mozdev.org/
+Thanks,
 
-iQEcBAEBAgAGBQJOs74LAAoJEAf03oE53VmQ+rIIAM8+rPAB3spWpzueeAcvtS+s
-Hmaf5GqCblBpi4Kl9Q0ej6S8pLNWZJT8+DSAiUFE+a7IMsGULccg11BdgYX2sYMM
-A5zo/50FrbWhWKl78Jmh42cdFqtDv2mSZLsgzNwrjMiNjt6V3V2eQha/xiL/gBsc
-/pQgH1Q+gmvMUWz6WMSY1/4KzBPKzy18YVoxLK0uOot7sNlZIRKxjrxwUO6IXH8+
-rrdNHx87ymbzz5RjUNZM3M3U+SkjU4DXmJBgkYyizh8/fdl5SYsgA+yNjES4B+88
-Y+x+43Q8fvT1GSwTSCILNqRYOWNm8sQnC364nCPR10CBAd47mjsuF8IrbyBFkbM=
-=Uzdk
------END PGP SIGNATURE-----
+Jonathan
+
+On 11/03/2011 10:11 AM, Maxime Ripard wrote:
+> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Cc: Patrice Vilchez <patrice.vilchez@atmel.com>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  arch/arm/mach-at91/at91sam9260_devices.c |   52 ++++++++++++++++++++++++++++++
+>  arch/arm/mach-at91/board-sam9g20ek.c     |   12 +++++++
+>  2 files changed, 64 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/mach-at91/at91sam9260_devices.c b/arch/arm/mach-at91/at91sam9260_devices.c
+> index 39f81f4..bfc50ac 100644
+> --- a/arch/arm/mach-at91/at91sam9260_devices.c
+> +++ b/arch/arm/mach-at91/at91sam9260_devices.c
+> @@ -1312,6 +1312,58 @@ void __init at91_add_device_cf(struct at91_cf_data *data)
+>  void __init at91_add_device_cf(struct at91_cf_data * data) {}
+>  #endif
+>  
+> +/* --------------------------------------------------------------------
+> + *  ADCs
+> + * -------------------------------------------------------------------- */
+> +
+> +static struct at91_adc_data adc_data;
+> +
+> +static struct resource adc_resources[] = {
+> +	[0] = {
+> +		.start	= AT91SAM9260_BASE_ADC,
+> +		.end	= AT91SAM9260_BASE_ADC + SZ_16K - 1,
+> +		.flags	= IORESOURCE_MEM,
+> +	},
+> +	[1] = {
+> +		.start	= AT91SAM9260_ID_ADC,
+> +		.end	= AT91SAM9260_ID_ADC,
+> +		.flags	= IORESOURCE_IRQ,
+> +	},
+> +};
+> +
+> +static struct platform_device at91_adc_device = {
+> +	.name		= "at91adc",
+> +	.id		= -1,
+> +	.dev		= {
+> +				.platform_data		= &adc_data,
+> +	},
+> +	.resource	= adc_resources,
+> +	.num_resources	= ARRAY_SIZE(adc_resources),
+> +};
+> +
+> +void __init at91_add_device_adc(struct at91_adc_data *data)
+> +{
+> +	if (!data)
+> +		return;
+> +
+> +	if(data->channels_used[0])
+> +		at91_set_A_periph(AT91_PIN_PC0, 0);
+> +	if(data->channels_used[1])
+> +		at91_set_A_periph(AT91_PIN_PC1, 0);
+> +	if(data->channels_used[2])
+> +		at91_set_A_periph(AT91_PIN_PC2, 0);
+> +	if(data->channels_used[3])
+> +		at91_set_A_periph(AT91_PIN_PC3, 0);
+formatting issues so another one for checkpatch.
+
+Also define AT91_PIN_PC(n) then make this another
+for_each_bit_set call.  That should get you down from
+8 lines to about 3.
+> +
+> +	data->adc_clock = 5000000;
+> +	data->num_channels = 4;
+> +	data->startup_time = 10;
+> +
+> +	adc_data = *data;
+> +	platform_device_register(&at91_adc_device);
+> +}
+> +
+> +
+>  /* -------------------------------------------------------------------- */
+>  /*
+>   * These devices are always present and don't need any board-specific
+> diff --git a/arch/arm/mach-at91/board-sam9g20ek.c b/arch/arm/mach-at91/board-sam9g20ek.c
+> index 817f59d..6f2542fb 100644
+> --- a/arch/arm/mach-at91/board-sam9g20ek.c
+> +++ b/arch/arm/mach-at91/board-sam9g20ek.c
+> @@ -314,6 +314,16 @@ static void __init ek_add_device_buttons(void)
+>  static void __init ek_add_device_buttons(void) {}
+>  #endif
+>  
+> +/*
+> + * ADCs
+> + */
+> +
+> +static struct at91_adc_data ek_adc_data = {
+> +	.channels_used = { 1, 1, 1, 1} ,
+> +	.num_channels_used = 4,
+> +	.vref = 3300,
+> +};
+> +
+>  #if defined(CONFIG_REGULATOR_FIXED_VOLTAGE) || defined(CONFIG_REGULATOR_FIXED_VOLTAGE_MODULE)
+>  static struct regulator_consumer_supply ek_audio_consumer_supplies[] = {
+>  	REGULATOR_SUPPLY("AVDD", "0-001b"),
+> @@ -389,6 +399,8 @@ static void __init ek_board_init(void)
+>  	ek_add_device_gpio_leds();
+>  	/* Push Buttons */
+>  	ek_add_device_buttons();
+> +	/* ADCs */
+> +	at91_add_device_adc(&ek_adc_data);
+>  	/* PCK0 provides MCLK to the WM8731 */
+>  	at91_set_B_periph(AT91_PIN_PC1, 0);
+>  	/* SSC (for WM8731) */
