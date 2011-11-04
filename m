@@ -1,26 +1,46 @@
-From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
-Date: Fri, 4 Nov 2011 12:50:39 +0100
-Subject: [RFC][PATCH] Consolidate Samsung MAINTAINERS
-In-Reply-To: <201110230012.15273.heiko@sntech.de>
-References: <201110230012.15273.heiko@sntech.de>
-Message-ID: <201111041250.40613.heiko@sntech.de>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Fri, 4 Nov 2011 17:20:37 +0530
+Subject: [PATCH 0/4] omap hsmmc device tree support
+Message-ID: <1320407441-29697-1-git-send-email-rnayak@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Sonntag 23 Oktober 2011, 00:12:14 schrieb Heiko St?bner:
-> These days most Samsung stuff gets in the kernel through Kukjin Kim.
-> This patch changes MAINTAINERS to reflect this.
-> 
-> By adding Kukjin Kim to the maintainers for S3C2410, S3C244x and
-> S3C64xx alongside Ben Dooks the extra entries become identical to the
-> base ARM/SAMSUNG entry and can move into it.
-> 
-> Also the S3C2416 gets a maintainer through the s3c24* wildcard - as it
-> did not have one until now.
-> 
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> ---
-ping?
+This series adds device tree support for omap hsmmc
+driver. The series is currently based on my patch
+series[1] to add dt support for twl-regulators, since
+hsmmc requires regulators to work.
+I have also pulled the patch from Thomas Abraham which
+adds mmc host controller bindings[2]
+'mmc: Add OF bindings support for mmc host controller capabilities'
 
-Thanks
-Heiko
+The series currently adds supports for only omap4-panda and
+omap4-sdp boards and uses auxdata to pass platform specific
+function pointers to the driver.
+
+All the dependent patches along with this series can be found here
+git://gitorious.org/omap-pm/linux.git for-dt/regulator-i2c-twl-mmc
+
+regards,
+Rajendra
+
+[1] http://lists.ozlabs.org/pipermail/devicetree-discuss/2011-October/009185.html
+[2] http://lists.ozlabs.org/pipermail/devicetree-discuss/2011-November/009237.html
+
+Rajendra Nayak (4):
+  mmc: Add additional binding for mmc host controller
+  mmc: omap: adapt the hsmmc driver to device tree
+  omap4: mmc: Pass SoC and board data for omap4 mmc from dt
+  omap4: mmc: use auxdata to pass platform function ptrs
+
+ .../devicetree/bindings/mmc/linux-mmc-host.txt     |    1 +
+ .../devicetree/bindings/mmc/ti-omap-hsmmc.txt      |   50 ++++++++
+ arch/arm/boot/dts/omap4-panda.dts                  |   23 ++++
+ arch/arm/boot/dts/omap4-sdp.dts                    |   33 +++++
+ arch/arm/boot/dts/omap4.dtsi                       |   46 +++++++
+ arch/arm/mach-omap2/board-generic.c                |   19 +++-
+ arch/arm/mach-omap2/hsmmc.c                        |    9 +-
+ arch/arm/mach-omap2/hsmmc.h                        |    5 +
+ drivers/mmc/core/host.c                            |    2 +
+ drivers/mmc/host/omap_hsmmc.c                      |  125 ++++++++++++++++++++
+ 10 files changed, 307 insertions(+), 6 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt
