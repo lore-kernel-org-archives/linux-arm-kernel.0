@@ -1,131 +1,31 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Sat, 5 Nov 2011 04:37:34 +0800
-Subject: [PATCH v3 01/17] ARM: Make global handler and
-	CONFIG_MULTI_IRQ_HANDLER mutually exclusive
-In-Reply-To: <1320425871-30564-2-git-send-email-marc.zyngier@arm.com>
-References: <1320425871-30564-1-git-send-email-marc.zyngier@arm.com>
-	<1320425871-30564-2-git-send-email-marc.zyngier@arm.com>
-Message-ID: <CAMPhdO-34y+NWXdFrhcLO1Cgr+rBmF0yitK_DKssmVecHWJgDw@mail.gmail.com>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Fri, 4 Nov 2011 13:43:57 -0700
+Subject: [PATCH v2 7/8] arm/tegra: implement support for tegra30
+In-Reply-To: <1320242948-21061-8-git-send-email-pdeschrijver@nvidia.com>
+References: <1320242948-21061-1-git-send-email-pdeschrijver@nvidia.com>
+	<1320242948-21061-8-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF173F9A4E4F@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 5, 2011 at 12:57 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> Even when CONFIG_MULTI_IRQ_HANDLER is selected, the core code
-> requires the arch_irq_handler_default macro to be defined as
-> a fallback.
->
-> It turns out nobody is using that particular feature as both PXA
-> and shmobile have all their machine descriptors populated with
-> the interrupt handler, leaving unused code (or empty macros) in
-> their entry-macro.S file just to be able to compile entry-armv.S.
->
-> Make CONFIG_MULTI_IRQ_HANDLER exclusive wrt arch_irq_handler_default,
-> which allows to remove one test from the hot path. Also cleanup both
-> PXA and shmobile entry-macro.S.
->
-> Cc: Eric Miao <eric.y.miao@gmail.com>
-> Cc: Paul Mundt <lethal@linux-sh.org>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Peter De Schrijver wrote at Wednesday, November 02, 2011 8:09 AM:
+> Add support for tegra30 SoC. This includes a device tree compatible type for
+> this SoC ("nvidia,tegra30") and adds L2 cache initialization for this new SoC.
+> The clock framework is still missing, which prevents most drivers from working.
+...
+> diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
+...
+> @@ -17,7 +14,18 @@ config ARCH_TEGRA_2x_SOC
+>  	  Support for NVIDIA Tegra AP20 and T20 processors, based on the
+>  	  ARM CortexA9MP CPU and the ARM PL310 L2 cache controller
+> 
+> -endchoice
+> +config ARCH_TEGRA_3x_SOC
 
-Acked-by: Eric Miao <eric.y.miao@gmail.com>
+Wasn't that config option already used earlier in the series, e.g. in
+[PATCH v2 6/8] arm/tegra: pinmux tables and definitions for tegra30.
+Should this patch be pushed earlier so it isn't used before it's created?
+I'm not sure how much that matters.
 
-> ---
-> ?arch/arm/kernel/entry-armv.S ? ? ? ? ? ? ? ? ? ? ?| ? ?7 ++--
-> ?arch/arm/mach-pxa/include/mach/entry-macro.S ? ? ?| ? 36 ---------------------
-> ?arch/arm/mach-shmobile/include/mach/entry-macro.S | ? ?9 -----
-> ?3 files changed, 3 insertions(+), 49 deletions(-)
->
-> diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
-> index 9ad50c4..bd49a6a 100644
-> --- a/arch/arm/kernel/entry-armv.S
-> +++ b/arch/arm/kernel/entry-armv.S
-> @@ -36,12 +36,11 @@
-> ?#ifdef CONFIG_MULTI_IRQ_HANDLER
-> ? ? ? ?ldr ? ? r1, =handle_arch_irq
-> ? ? ? ?mov ? ? r0, sp
-> - ? ? ? ldr ? ? r1, [r1]
-> ? ? ? ?adr ? ? lr, BSYM(9997f)
-> - ? ? ? teq ? ? r1, #0
-> - ? ? ? movne ? pc, r1
-> -#endif
-> + ? ? ? ldr ? ? pc, [r1]
-> +#else
-> ? ? ? ?arch_irq_handler_default
-> +#endif
-> ?9997:
-> ? ? ? ?.endm
->
-> diff --git a/arch/arm/mach-pxa/include/mach/entry-macro.S b/arch/arm/mach-pxa/include/mach/entry-macro.S
-> index a73bc86..260c0c1 100644
-> --- a/arch/arm/mach-pxa/include/mach/entry-macro.S
-> +++ b/arch/arm/mach-pxa/include/mach/entry-macro.S
-> @@ -7,45 +7,9 @@
-> ?* License version 2. This program is licensed "as is" without any
-> ?* warranty of any kind, whether express or implied.
-> ?*/
-> -#include <mach/hardware.h>
-> -#include <mach/irqs.h>
->
-> ? ? ? ? ? ? ? ?.macro ?disable_fiq
-> ? ? ? ? ? ? ? ?.endm
->
-> - ? ? ? ? ? ? ? .macro ?get_irqnr_preamble, base, tmp
-> - ? ? ? ? ? ? ? .endm
-> -
-> ? ? ? ? ? ? ? ?.macro ?arch_ret_to_user, tmp1, tmp2
-> ? ? ? ? ? ? ? ?.endm
-> -
-> - ? ? ? ? ? ? ? .macro ?get_irqnr_and_base, irqnr, irqstat, base, tmp
-> - ? ? ? ? ? ? ? mrc ? ? p15, 0, \tmp, c0, c0, 0 ? ? ? ? @ CPUID
-> - ? ? ? ? ? ? ? mov ? ? \tmp, \tmp, lsr #13
-> - ? ? ? ? ? ? ? and ? ? \tmp, \tmp, #0x7 ? ? ? ? ? ? ? ?@ Core G
-> - ? ? ? ? ? ? ? cmp ? ? \tmp, #1
-> - ? ? ? ? ? ? ? bhi ? ? 1002f
-> -
-> - ? ? ? ? ? ? ? @ Core Generation 1 (PXA25x)
-> - ? ? ? ? ? ? ? mov ? ? \base, #io_p2v(0x40000000) ? ? ?@ IIR Ctl = 0x40d00000
-> - ? ? ? ? ? ? ? add ? ? \base, \base, #0x00d00000
-> - ? ? ? ? ? ? ? ldr ? ? \irqstat, [\base, #0] ? ? ? ? ? @ ICIP
-> - ? ? ? ? ? ? ? ldr ? ? \irqnr, [\base, #4] ? ? ? ? ? ? @ ICMR
-> -
-> - ? ? ? ? ? ? ? ands ? ?\irqnr, \irqstat, \irqnr
-> - ? ? ? ? ? ? ? beq ? ? 1001f
-> - ? ? ? ? ? ? ? rsb ? ? \irqstat, \irqnr, #0
-> - ? ? ? ? ? ? ? and ? ? \irqstat, \irqstat, \irqnr
-> - ? ? ? ? ? ? ? clz ? ? \irqnr, \irqstat
-> - ? ? ? ? ? ? ? rsb ? ? \irqnr, \irqnr, #(31 + PXA_IRQ(0))
-> - ? ? ? ? ? ? ? b ? ? ? 1001f
-> -1002:
-> - ? ? ? ? ? ? ? @ Core Generation 2 (PXA27x) or Core Generation 3 (PXA3xx)
-> - ? ? ? ? ? ? ? mrc ? ? p6, 0, \irqstat, c5, c0, 0 ? ? ?@ ICHP
-> - ? ? ? ? ? ? ? tst ? ? \irqstat, #0x80000000
-> - ? ? ? ? ? ? ? beq ? ? 1001f
-> - ? ? ? ? ? ? ? bic ? ? \irqstat, \irqstat, #0x80000000
-> - ? ? ? ? ? ? ? mov ? ? \irqnr, \irqstat, lsr #16
-> - ? ? ? ? ? ? ? add ? ? \irqnr, \irqnr, #(PXA_IRQ(0))
-> -1001:
-> - ? ? ? ? ? ? ? .endm
-> diff --git a/arch/arm/mach-shmobile/include/mach/entry-macro.S b/arch/arm/mach-shmobile/include/mach/entry-macro.S
-> index 8d4a416..2a57b29 100644
-> --- a/arch/arm/mach-shmobile/include/mach/entry-macro.S
-> +++ b/arch/arm/mach-shmobile/include/mach/entry-macro.S
-> @@ -18,14 +18,5 @@
-> ? ? ? ?.macro ?disable_fiq
-> ? ? ? ?.endm
->
-> - ? ? ? .macro ?get_irqnr_preamble, base, tmp
-> - ? ? ? .endm
-> -
-> - ? ? ? .macro ?get_irqnr_and_base, irqnr, irqstat, base, tmp
-> - ? ? ? .endm
-> -
-> - ? ? ? .macro ?test_for_ipi, irqnr, irqstat, base, tmp
-> - ? ? ? .endm
-> -
-> ? ? ? ?.macro ?arch_ret_to_user, tmp1, tmp2
-> ? ? ? ?.endm
-> --
-> 1.7.0.4
->
->
->
+-- 
+nvpublic
