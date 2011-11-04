@@ -1,35 +1,48 @@
-From: ulf.hansson@stericsson.com (Ulf Hansson)
-Date: Fri, 4 Nov 2011 15:35:18 +0100
-Subject: [PATCH 0/2] mmc: mmci: Improvements for SDIO
-In-Reply-To: <1319466800-19884-1-git-send-email-ulf.hansson@stericsson.com>
-References: <1319466800-19884-1-git-send-email-ulf.hansson@stericsson.com>
-Message-ID: <4EB3F826.1030001@stericsson.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 4 Nov 2011 08:09:42 -0700
+Subject: [PATCH v2 2/8] arm/tegra: prepare early init for multiple tegra
+	variants
+In-Reply-To: <20111103100235.GK12913@n2100.arm.linux.org.uk>
+References: <1320242948-21061-1-git-send-email-pdeschrijver@nvidia.com>
+	<1320242948-21061-3-git-send-email-pdeschrijver@nvidia.com>
+	<CAMbhsRSTcR8qgYESmM6OxkXeVeg6vS49woCe_OX6CY4pAj2g_A@mail.gmail.com>
+	<20111103092116.GO13358@tbergstrom-lnx.Nvidia.com>
+	<20111103100235.GK12913@n2100.arm.linux.org.uk>
+Message-ID: <CAOesGMh7LqUtBkB5Dffr-bJSkC__V+55yLsp7KAYs-6oRAGMhA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Is this patchserie considered OK?
+On Thu, Nov 3, 2011 at 3:02 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Thu, Nov 03, 2011 at 11:21:16AM +0200, Peter De Schrijver wrote:
+>> On Wed, Nov 02, 2011 at 07:30:43PM +0100, Colin Cross wrote:
+>> > On Wed, Nov 2, 2011 at 7:09 AM, Peter De Schrijver
+>> > <pdeschrijver@nvidia.com> wrote:
+>> > > This patch splits the early init code in a common and a tegra20 specific part.
+>> > > L2 cache initialization is generalized and discovers the cache associativity
+>> > > at runtime.
+>> > >
+>> > > Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
+>> > > ---
+>> > <snip>
+>> >
+>> > > -static __initdata struct tegra_clk_init_table common_clk_init_table[] = {
+>> > > +void (*arch_reset)(char mode, const char *cmd) = tegra_assert_system_reset;
+>> > > +
+>> > This is unrelated to the patch description?
+>> >
+>>
+>> This is a left over from the past. Will be removed from the next version.
+>
+> Please can Tegra move over to hooking the restart via arm_pm_restart()
+> rather than via arch_reset()? ?That would leave arch_reset() for
+> software-based reboot methods - which I suspect Tegra doesn't use.
+>
+> That would allow Tegra to dovetail into the arch_reset cleanup work much
+> better than it would otherwise do.
 
--Russell, patches are available in your patchtracker.
+Sounds reasonable to me. Want a patch to put in your arch_reset
+cleanup branch, I presume? I'll post something later today.
 
-Br
-Ulf Hansson
 
-Ulf HANSSON wrote:
-> For the ux500v2 variant of the PL18x block, non power of two block
-> sizes are now supported.
-> 
-> In addition constraints on buffer alignments is needed since access to the
-> PL18x FIFO must be done on a 4-byte aligned manner. Moreover to be able to
-> use DMA for buffers with not 32 bytes aligned sg element lengths, DMAREQCTL
-> must enabled.
-> 
-> Per Forlin (1):
->   mmc: mmci: add constraints on alignment for SDIO
-> 
-> Stefan Nilsson XK (1):
->   mmc: mmci: Support non-power-of-two block sizes for ux500v2 variant
-> 
->  drivers/mmc/host/mmci.c |   56 +++++++++++++++++++++++++++++++++++++++++------
->  drivers/mmc/host/mmci.h |    7 ++++++
->  2 files changed, 56 insertions(+), 7 deletions(-)
-> 
+-Olof
