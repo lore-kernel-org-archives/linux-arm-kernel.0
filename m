@@ -1,52 +1,31 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 4 Nov 2011 13:08:26 -0700
-Subject: [PATCH 1/2] OMAP2+: DMA: Workaround for invalid source
-	position
-In-Reply-To: <2603119.amz7RjSE3J@barack>
-References: <1320070817-9638-1-git-send-email-peter.ujfalusi@ti.com>
-	<1320070817-9638-2-git-send-email-peter.ujfalusi@ti.com>
-	<20111103212756.GZ31337@atomide.com> <2603119.amz7RjSE3J@barack>
-Message-ID: <20111104200826.GE31337@atomide.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Fri, 4 Nov 2011 22:23:23 +0000
+Subject: [PATCH v3 2/4] regulator: adapt fixed regulator driver to dt
+In-Reply-To: <CAOesGMh-fpUSMvOGkq_b4DVzFUby6pnMmKDXQ=sFJpn+g4FzOw@mail.gmail.com>
+References: <1319702185-16108-1-git-send-email-rnayak@ti.com>
+	<1319702185-16108-3-git-send-email-rnayak@ti.com>
+	<20111104203422.GB3918@quad.lixom.net>
+	<20111104210151.GA2541@opensource.wolfsonmicro.com>
+	<20111104211824.GA5608@quad.lixom.net>
+	<20111104212538.GA8266@opensource.wolfsonmicro.com>
+	<CAOesGMh2_C+yx=_5PjqoKxZmAMvx-puRjq45s+G2kz2EaEEtqw@mail.gmail.com>
+	<20111104215733.GD8266@opensource.wolfsonmicro.com>
+	<CAOesGMh-fpUSMvOGkq_b4DVzFUby6pnMmKDXQ=sFJpn+g4FzOw@mail.gmail.com>
+Message-ID: <20111104222323.GB16978@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* P?ter Ujfalusi <peter.ujfalusi@ti.com> [111104 02:00]:
-> On Thursday 03 November 2011 14:27:56 Tony Lindgren wrote:
-> > 
-> > Should these tests be done only after the errata re-read for both
-> > src and dst patches? Otherwise the errata will not be handled?
-> 
-> Yes that might be a good idea.
-> I was trying to locate the original errata description for DMA_ERRATA_3_3, but 
-> it does not exist, or at least I can not find it. This only been mentioned in 
-> the kernel's comment.
+On Fri, Nov 04, 2011 at 03:09:32PM -0700, Olof Johansson wrote:
 
-Seems it got added with commit d3c9be2f.
+> But even things like allowing (optional) attributes such as
+> startup-delay on non-fixed regulators could make sense. Keep in mind
+> that the device tree should focus on describing the hardware, not just
+> what the linux driver needs from it. So maybe instead of
+> startup-delay, specifying ramp-up speed instead of time needed until
+> power is good could be the way to go there.
 
-> I'm not sure when this DMA_ERRATA_3_3 would have been in force. My guess would 
-> be that if someone wants to read the src/dst position right after the channel 
-> is disabled, but what would we expect it to return when the channel has been 
-> disabled?
-
-No idea.. Or read it after stopping it?
-
-> I mean what is the reasonable src/dst for a disabled channel? 0 is as good as 
-> any other number, probably the programmed start of the DMA transfer would be 
-> my best bet.
-> I think the errata description for DMA_ERRATA_3_3 is not correct, and it is in 
-> fact to handle the case I'm also handling: Before the first DMA request the 
-> CDAC is 0 (since we configured it to be), the CSAC contains _something_ (most 
-> of the time 0, but can be random number).
-> In some situation re-reading the src/dst position will give enough time to 
-> receive the first DMA request, which will update CDAC/CSAC registers.
-
-Yeah could be since the handling is just an immediate re-read of the register..
- 
-> What do you think?
-
-Probably the safest thing to do is move your check after the re-read test
-in case there's more to the ERRATA_3_3.
-
-Regards,
-
-Tony
+This is in general something that a driver should know as a result of
+knowing which regulator it's dealing with - in many cases these are
+properties which can be varied at runtime on hardware which has register
+control.  Replicating this into the device tree would make things more
+error prone.
