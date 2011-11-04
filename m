@@ -1,229 +1,137 @@
 From: rajeshwari.s@samsung.com (Rajeshwari Shinde)
-Date: Fri, 04 Nov 2011 19:26:59 +0530
-Subject: [PATCH 2/3] ARM: S5P64X0: Add lookup of sdhci-s3c clocks using generic
-	names
+Date: Fri, 04 Nov 2011 19:27:00 +0530
+Subject: [PATCH 3/3] ARM: S5P64X0: Enable SDHCI support
 In-Reply-To: <1320415020-7439-1-git-send-email-rajeshwari.s@samsung.com>
 References: <1320415020-7439-1-git-send-email-rajeshwari.s@samsung.com>
-Message-ID: <1320415020-7439-3-git-send-email-rajeshwari.s@samsung.com>
+Message-ID: <1320415020-7439-4-git-send-email-rajeshwari.s@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for lookup of sdhci-s3c controller clocks using generic
-names for s5p64x0
+Enables SDHCI supports for SMDK6440 and SMDK6450.
 
 Signed-off-by: Rajeshwari Shinde <rajeshwari.s@samsung.com>
 ---
- arch/arm/mach-s5p64x0/clock-s5p6440.c |   72 +++++++++++++++++++--------------
- arch/arm/mach-s5p64x0/clock-s5p6450.c |   72 +++++++++++++++++++--------------
- 2 files changed, 84 insertions(+), 60 deletions(-)
+ arch/arm/mach-s5p64x0/mach-smdk6440.c |   25 +++++++++++++++++++++++++
+ arch/arm/mach-s5p64x0/mach-smdk6450.c |   26 +++++++++++++++++++++++++-
+ 2 files changed, 50 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-s5p64x0/clock-s5p6440.c b/arch/arm/mach-s5p64x0/clock-s5p6440.c
-index 73c7cc9..c041ad7 100644
---- a/arch/arm/mach-s5p64x0/clock-s5p6440.c
-+++ b/arch/arm/mach-s5p64x0/clock-s5p6440.c
-@@ -379,36 +379,6 @@ static struct clksrc_sources clkset_audio = {
- static struct clksrc_clk clksrcs[] = {
- 	{
- 		.clk	= {
--			.name		= "sclk_mmc",
--			.devname	= "s3c-sdhci.0",
--			.ctrlbit	= (1 << 24),
--			.enable		= s5p64x0_sclk_ctrl,
--		},
--		.sources = &clkset_group1,
--		.reg_src = { .reg = S5P64X0_CLK_SRC0, .shift = 18, .size = 2 },
--		.reg_div = { .reg = S5P64X0_CLK_DIV1, .shift = 0, .size = 4 },
--	}, {
--		.clk	= {
--			.name		= "sclk_mmc",
--			.devname	= "s3c-sdhci.1",
--			.ctrlbit	= (1 << 25),
--			.enable		= s5p64x0_sclk_ctrl,
--		},
--		.sources = &clkset_group1,
--		.reg_src = { .reg = S5P64X0_CLK_SRC0, .shift = 20, .size = 2 },
--		.reg_div = { .reg = S5P64X0_CLK_DIV1, .shift = 4, .size = 4 },
--	}, {
--		.clk	= {
--			.name		= "sclk_mmc",
--			.devname	= "s3c-sdhci.2",
--			.ctrlbit	= (1 << 26),
--			.enable		= s5p64x0_sclk_ctrl,
--		},
--		.sources = &clkset_group1,
--		.reg_src = { .reg = S5P64X0_CLK_SRC0, .shift = 22, .size = 2 },
--		.reg_div = { .reg = S5P64X0_CLK_DIV1, .shift = 8, .size = 4 },
--	}, {
--		.clk	= {
- 			.name		= "sclk_post",
- 			.ctrlbit	= (1 << 10),
- 			.enable		= s5p64x0_sclk_ctrl,
-@@ -446,6 +416,42 @@ static struct clksrc_clk clksrcs[] = {
- 	},
- };
+diff --git a/arch/arm/mach-s5p64x0/mach-smdk6440.c b/arch/arm/mach-s5p64x0/mach-smdk6440.c
+index d828fd3..79967d1 100644
+--- a/arch/arm/mach-s5p64x0/mach-smdk6440.c
++++ b/arch/arm/mach-s5p64x0/mach-smdk6440.c
+@@ -24,6 +24,7 @@
+ #include <linux/gpio.h>
+ #include <linux/pwm_backlight.h>
+ #include <linux/fb.h>
++#include <linux/mmc/host.h>
  
-+static struct clksrc_clk clk_sclk_mmc0 = {
-+	.clk	= {
-+		.name		= "sclk_mmc",
-+		.devname	= "s3c-sdhci.0",
-+		.ctrlbit	= (1 << 24),
-+		.enable		= s5p64x0_sclk_ctrl,
-+	},
-+	.sources = &clkset_group1,
-+	.reg_src = { .reg = S5P64X0_CLK_SRC0, .shift = 18, .size = 2 },
-+	.reg_div = { .reg = S5P64X0_CLK_DIV1, .shift = 0, .size = 4 },
+ #include <video/platform_lcd.h>
+ 
+@@ -53,6 +54,7 @@
+ #include <plat/fb.h>
+ #include <plat/regs-fb.h>
+ #include <plat/s3c64xx-spi.h>
++#include <plat/sdhci.h>
+ 
+ #define SMDK6440_UCON_DEFAULT	(S3C2410_UCON_TXILEVEL |	\
+ 				S3C2410_UCON_RXILEVEL |		\
+@@ -162,6 +164,25 @@ static struct platform_device *smdk6440_devices[] __initdata = {
+ 	&s5p6440_device_iis,
+ 	&s3c_device_fb,
+ 	&smdk6440_lcd_lte480wv,
++	&s3c_device_hsmmc0,
++	&s3c_device_hsmmc1,
++	&s3c_device_hsmmc2,
 +};
 +
-+static struct clksrc_clk clk_sclk_mmc1 = {
-+	.clk	= {
-+		.name		= "sclk_mmc",
-+		.devname	= "s3c-sdhci.1",
-+		.ctrlbit	= (1 << 25),
-+		.enable		= s5p64x0_sclk_ctrl,
-+	},
-+	.sources = &clkset_group1,
-+	.reg_src = { .reg = S5P64X0_CLK_SRC0, .shift = 20, .size = 2 },
-+	.reg_div = { .reg = S5P64X0_CLK_DIV1, .shift = 4, .size = 4 },
++static struct s3c_sdhci_platdata smdk6440_hsmmc0_pdata __initdata = {
++	.cd_type	= S3C_SDHCI_CD_NONE,
 +};
 +
-+static struct clksrc_clk clk_sclk_mmc2 = {
-+	.clk	= {
-+		.name		= "sclk_mmc",
-+		.devname	= "s3c-sdhci.2",
-+		.ctrlbit	= (1 << 26),
-+		.enable		= s5p64x0_sclk_ctrl,
-+	},
-+	.sources = &clkset_group1,
-+	.reg_src = { .reg = S5P64X0_CLK_SRC0, .shift = 22, .size = 2 },
-+	.reg_div = { .reg = S5P64X0_CLK_DIV1, .shift = 8, .size = 4 },
++static struct s3c_sdhci_platdata smdk6440_hsmmc1_pdata __initdata = {
++	.cd_type	= S3C_SDHCI_CD_INTERNAL,
++#if defined(CONFIG_S5P64X0_SD_CH1_8BIT)
++	.max_width	= 8,
++	.host_caps	= MMC_CAP_8_BIT_DATA,
++#endif
 +};
 +
- static struct clksrc_clk clk_sclk_uclk = {
- 	.clk	= {
- 		.name		= "uclk1",
-@@ -503,6 +509,9 @@ static struct clksrc_clk *clksrc_cdev[] = {
- 	&clk_sclk_uclk,
- 	&clk_sclk_spi0,
- 	&clk_sclk_spi1,
-+	&clk_sclk_mmc0,
-+	&clk_sclk_mmc1,
-+	&clk_sclk_mmc2
++static struct s3c_sdhci_platdata smdk6440_hsmmc2_pdata __initdata = {
++	.cd_type	= S3C_SDHCI_CD_NONE,
  };
  
- static struct clk_lookup s5p6440_clk_lookup[] = {
-@@ -511,6 +520,9 @@ static struct clk_lookup s5p6440_clk_lookup[] = {
- 	CLKDEV_INIT(NULL, "spi_busclk0", &clk_p),
- 	CLKDEV_INIT("s3c64xx-spi.0", "spi_busclk1", &clk_sclk_spi0.clk),
- 	CLKDEV_INIT("s3c64xx-spi.1", "spi_busclk1", &clk_sclk_spi1.clk),
-+	CLKDEV_INIT("s3c-sdhci.0", "mmc_busclk.2", &clk_sclk_mmc0.clk),
-+	CLKDEV_INIT("s3c-sdhci.1", "mmc_busclk.2", &clk_sclk_mmc1.clk),
-+	CLKDEV_INIT("s3c-sdhci.2", "mmc_busclk.2", &clk_sclk_mmc2.clk),
+ static struct s3c2410_platform_i2c s5p6440_i2c0_data __initdata = {
+@@ -253,6 +274,10 @@ static void __init smdk6440_machine_init(void)
+ 	s5p6440_set_lcd_interface();
+ 	s3c_fb_set_platdata(&smdk6440_lcd_pdata);
+ 
++	s3c_sdhci0_set_platdata(&smdk6440_hsmmc0_pdata);
++	s3c_sdhci1_set_platdata(&smdk6440_hsmmc1_pdata);
++	s3c_sdhci2_set_platdata(&smdk6440_hsmmc2_pdata);
++
+ 	platform_add_devices(smdk6440_devices, ARRAY_SIZE(smdk6440_devices));
+ }
+ 
+diff --git a/arch/arm/mach-s5p64x0/mach-smdk6450.c b/arch/arm/mach-s5p64x0/mach-smdk6450.c
+index 73224b2..6a4d41c 100644
+--- a/arch/arm/mach-s5p64x0/mach-smdk6450.c
++++ b/arch/arm/mach-s5p64x0/mach-smdk6450.c
+@@ -24,6 +24,7 @@
+ #include <linux/gpio.h>
+ #include <linux/pwm_backlight.h>
+ #include <linux/fb.h>
++#include <linux/mmc/host.h>
+ 
+ #include <video/platform_lcd.h>
+ 
+@@ -53,6 +54,7 @@
+ #include <plat/fb.h>
+ #include <plat/regs-fb.h>
+ #include <plat/s3c64xx-spi.h>
++#include <plat/sdhci.h>
+ 
+ #define SMDK6450_UCON_DEFAULT	(S3C2410_UCON_TXILEVEL |	\
+ 				S3C2410_UCON_RXILEVEL |		\
+@@ -180,10 +182,28 @@ static struct platform_device *smdk6450_devices[] __initdata = {
+ 	&s5p6450_device_iis0,
+ 	&s3c_device_fb,
+ 	&smdk6450_lcd_lte480wv,
+-
++	&s3c_device_hsmmc0,
++	&s3c_device_hsmmc1,
++	&s3c_device_hsmmc2,
+ 	/* s5p6450_device_spi0 will be added */
  };
  
- void __init_or_cpufreq s5p6440_setup_clocks(void)
-diff --git a/arch/arm/mach-s5p64x0/clock-s5p6450.c b/arch/arm/mach-s5p64x0/clock-s5p6450.c
-index 50f90cb..b5087cb 100644
---- a/arch/arm/mach-s5p64x0/clock-s5p6450.c
-+++ b/arch/arm/mach-s5p64x0/clock-s5p6450.c
-@@ -413,36 +413,6 @@ static struct clksrc_clk clk_sclk_audio0 = {
- static struct clksrc_clk clksrcs[] = {
- 	{
- 		.clk	= {
--			.name		= "sclk_mmc",
--			.devname	= "s3c-sdhci.0",
--			.ctrlbit	= (1 << 24),
--			.enable		= s5p64x0_sclk_ctrl,
--		},
--		.sources = &clkset_group2,
--		.reg_src = { .reg = S5P64X0_CLK_SRC0, .shift = 18, .size = 2 },
--		.reg_div = { .reg = S5P64X0_CLK_DIV1, .shift = 0, .size = 4 },
--	}, {
--		.clk	= {
--			.name		= "sclk_mmc",
--			.devname	= "s3c-sdhci.1",
--			.ctrlbit	= (1 << 25),
--			.enable		= s5p64x0_sclk_ctrl,
--		},
--		.sources = &clkset_group2,
--		.reg_src = { .reg = S5P64X0_CLK_SRC0, .shift = 20, .size = 2 },
--		.reg_div = { .reg = S5P64X0_CLK_DIV1, .shift = 4, .size = 4 },
--	}, {
--		.clk	= {
--			.name		= "sclk_mmc",
--			.devname	= "s3c-sdhci.2",
--			.ctrlbit	= (1 << 26),
--			.enable		= s5p64x0_sclk_ctrl,
--		},
--		.sources = &clkset_group2,
--		.reg_src = { .reg = S5P64X0_CLK_SRC0, .shift = 22, .size = 2 },
--		.reg_div = { .reg = S5P64X0_CLK_DIV1, .shift = 8, .size = 4 },
--	}, {
--		.clk	= {
- 			.name		= "sclk_fimc",
- 			.ctrlbit	= (1 << 10),
- 			.enable		= s5p64x0_sclk_ctrl,
-@@ -507,6 +477,42 @@ static struct clksrc_clk clksrcs[] = {
- 	},
- };
- 
-+static struct clksrc_clk clk_sclk_mmc0 = {
-+	.clk	= {
-+		.name		= "sclk_mmc",
-+		.devname	= "s3c-sdhci.0",
-+		.ctrlbit	= (1 << 24),
-+		.enable		= s5p64x0_sclk_ctrl,
-+	},
-+	.sources = &clkset_group2,
-+	.reg_src = { .reg = S5P64X0_CLK_SRC0, .shift = 18, .size = 2 },
-+	.reg_div = { .reg = S5P64X0_CLK_DIV1, .shift = 0, .size = 4 },
++static struct s3c_sdhci_platdata smdk6450_hsmmc0_pdata __initdata = {
++	.cd_type	= S3C_SDHCI_CD_NONE,
 +};
 +
-+static struct clksrc_clk clk_sclk_mmc1 = {
-+	.clk	= {
-+		.name		= "sclk_mmc",
-+		.devname	= "s3c-sdhci.1",
-+		.ctrlbit	= (1 << 25),
-+		.enable		= s5p64x0_sclk_ctrl,
-+	},
-+	.sources = &clkset_group2,
-+	.reg_src = { .reg = S5P64X0_CLK_SRC0, .shift = 20, .size = 2 },
-+	.reg_div = { .reg = S5P64X0_CLK_DIV1, .shift = 4, .size = 4 },
++static struct s3c_sdhci_platdata smdk6450_hsmmc1_pdata __initdata = {
++	.cd_type	= S3C_SDHCI_CD_NONE,
++#if defined(CONFIG_S5P64X0_SD_CH1_8BIT)
++	.max_width	= 8,
++	.host_caps	= MMC_CAP_8_BIT_DATA,
++#endif
 +};
 +
-+static struct clksrc_clk clk_sclk_mmc2 = {
-+	.clk	= {
-+		.name		= "sclk_mmc",
-+		.devname	= "s3c-sdhci.2",
-+		.ctrlbit	= (1 << 26),
-+		.enable		= s5p64x0_sclk_ctrl,
-+	},
-+	.sources = &clkset_group2,
-+	.reg_src = { .reg = S5P64X0_CLK_SRC0, .shift = 22, .size = 2 },
-+	.reg_div = { .reg = S5P64X0_CLK_DIV1, .shift = 8, .size = 4 },
++static struct s3c_sdhci_platdata smdk6450_hsmmc2_pdata __initdata = {
++	.cd_type	= S3C_SDHCI_CD_NONE,
 +};
 +
- static struct clksrc_clk clk_sclk_uclk = {
- 	.clk	= {
- 		.name		= "uclk1",
-@@ -546,6 +552,9 @@ static struct clksrc_clk *clksrc_cdev[] = {
- 	&clk_sclk_uclk,
- 	&clk_sclk_spi0,
- 	&clk_sclk_spi1,
-+	&clk_sclk_mmc0,
-+	&clk_sclk_mmc1,
-+	&clk_sclk_mmc2,
- };
+ static struct s3c2410_platform_i2c s5p6450_i2c0_data __initdata = {
+ 	.flags		= 0,
+ 	.slave_addr	= 0x10,
+@@ -273,6 +293,10 @@ static void __init smdk6450_machine_init(void)
+ 	s5p6450_set_lcd_interface();
+ 	s3c_fb_set_platdata(&smdk6450_lcd_pdata);
  
- static struct clk_lookup s5p6450_clk_lookup[] = {
-@@ -554,6 +563,9 @@ static struct clk_lookup s5p6450_clk_lookup[] = {
- 	CLKDEV_INIT(NULL, "spi_busclk0", &clk_p),
- 	CLKDEV_INIT("s3c64xx-spi.0", "spi_busclk1", &clk_sclk_spi0.clk),
- 	CLKDEV_INIT("s3c64xx-spi.1", "spi_busclk1", &clk_sclk_spi1.clk),
-+	CLKDEV_INIT("s3c-sdhci.0", "mmc_busclk.2", &clk_sclk_mmc0.clk),
-+	CLKDEV_INIT("s3c-sdhci.1", "mmc_busclk.2", &clk_sclk_mmc1.clk),
-+	CLKDEV_INIT("s3c-sdhci.2", "mmc_busclk.2", &clk_sclk_mmc2.clk),
- };
++	s3c_sdhci0_set_platdata(&smdk6450_hsmmc0_pdata);
++	s3c_sdhci1_set_platdata(&smdk6450_hsmmc1_pdata);
++	s3c_sdhci2_set_platdata(&smdk6450_hsmmc2_pdata);
++
+ 	platform_add_devices(smdk6450_devices, ARRAY_SIZE(smdk6450_devices));
+ }
  
- /* Clock initialization code */
 -- 
 1.7.4.4
