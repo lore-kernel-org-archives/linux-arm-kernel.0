@@ -1,31 +1,26 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Fri,  4 Nov 2011 01:13:20 +0000
-Subject: [PATCH] picoxcell: add extra temp register to addruart
-Message-ID: <1320369200-23868-1-git-send-email-jamie@jamieiles.com>
+From: vapier@gentoo.org (Mike Frysinger)
+Date: Thu, 3 Nov 2011 22:05:52 -0400
+Subject: [PATCH 0/3] Change ARCH_NR_GPIO into a Kconfig variable
+In-Reply-To: <20111103231707.GU12913@n2100.arm.linux.org.uk>
+References: <1320339647-30255-1-git-send-email-pdeschrijver@nvidia.com>
+	<201111031907.46434.vapier@gentoo.org>
+	<20111103231707.GU12913@n2100.arm.linux.org.uk>
+Message-ID: <201111032205.56557.vapier@gentoo.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-639da5ee3 (ARM: add an extra temp register to the low level debugging
-addruart macro) didn't include picoxcell as it hadn't been merged at the
-time.  Fix up the compile breakage by adding the extra temp parameter.
+On Thursday 03 November 2011 19:17:07 Russell King - ARM Linux wrote:
+> (b) that's effectively what it is - if you understand what's going on with
+> the 'default' statements.
+> 
+> For any option, there can be multiple 'default' statements:
 
-Signed-off-by: Jamie Iles <jamie@jamieiles.com>
----
- arch/arm/mach-picoxcell/include/mach/debug-macro.S |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/mach-picoxcell/include/mach/debug-macro.S b/arch/arm/mach-picoxcell/include/mach/debug-macro.S
-index 8f2c234..58d4ee3 100644
---- a/arch/arm/mach-picoxcell/include/mach/debug-macro.S
-+++ b/arch/arm/mach-picoxcell/include/mach/debug-macro.S
-@@ -14,7 +14,7 @@
- 
- #define UART_SHIFT 2
- 
--		.macro	addruart, rp, rv
-+		.macro	addruart, rp, rv, tmp
- 		ldr	\rv, =PHYS_TO_IO(PICOXCELL_UART1_BASE)
- 		ldr	\rp, =PICOXCELL_UART1_BASE
- 		.endm
--- 
-1.7.5.4
+thanks, i wasn't aware of the cascading nature of the default keyword
+-mike
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111103/757fccb9/attachment.sig>
