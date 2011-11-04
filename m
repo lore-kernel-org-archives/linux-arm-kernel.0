@@ -1,57 +1,118 @@
-From: andrea.adami@gmail.com (Andrea Adami)
-Date: Fri, 4 Nov 2011 15:22:32 +0100
-Subject: [RFC 0/5] restart cleanups
-In-Reply-To: <20111104140155.GZ12913@n2100.arm.linux.org.uk>
-References: <20111101160731.GQ19187@n2100.arm.linux.org.uk>
-	<20111101170225.GS19187@n2100.arm.linux.org.uk>
-	<1320241747.20107.41.camel@ted>
-	<20111102144934.GJ19187@n2100.arm.linux.org.uk>
-	<CAAQYJAvAfFCwr1KH1CD7fKbD_keZK9iGAD20m110Qd_sX=icoA@mail.gmail.com>
-	<20111104140155.GZ12913@n2100.arm.linux.org.uk>
-Message-ID: <CAAQYJAsP35Y_a28awBgkVwP0Us8FVX28TxEp-Z7vovx66Zis2Q@mail.gmail.com>
+From: ulf.hansson@stericsson.com (Ulf Hansson)
+Date: Fri, 4 Nov 2011 15:33:05 +0100
+Subject: [PATCH V2 1/3] mmc: mmci: Put power register deviations in variant
+	data
+In-Reply-To: <1319462928-14892-2-git-send-email-ulf.hansson@stericsson.com>
+References: <1319462928-14892-1-git-send-email-ulf.hansson@stericsson.com>
+	<1319462928-14892-2-git-send-email-ulf.hansson@stericsson.com>
+Message-ID: <4EB3F7A1.4090703@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 4, 2011 at 3:01 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Fri, Nov 04, 2011 at 02:58:02PM +0100, Andrea Adami wrote:
->> On Wed, Nov 2, 2011 at 3:49 PM, Russell King - ARM Linux
->> <linux@arm.linux.org.uk> wrote:
->> >
->> > On Wed, Nov 02, 2011 at 01:49:07PM +0000, Richard Purdie wrote:
->> > > >From what I remember that hardware either always reboots or always
->> > > halts. I think the option was therefore left hardcoded to make it clear
->> > > it wasn't expected to work. Later Zaurii models could do either but
->> > > required some manual poking of registers to make it happen iirc.
->> > >
->> > > Regardless, you can probably clean this up as you suggest now.
->> >
->> > Thanks, I've now committed a change which removes the indirection
->> > entirely from poodle.
->> >
->> Hi, sorry for the late reply
->>
->> I'm playing with poodle and I can confirm that poweroff does indeed
->> not work with 2.6.3x kernels.
->> See this thread:
->> http://lists.linuxtogo.org/pipermail/zaurus-devel/2011-May/000501.html
->
-> Okay, at least we know that restart works with that.
-Yes, indeed
+Is this patch and it's patchserie considered OK?
 
->
-> I'm not offering to try and change the poweroff behaviour for the better,
-> as I know absolutely nothing about the Zaurus platforms.
->
-I see, np. I'm just puzzled because after a cold reset (pulling
-battery out) poodle is acting as if powered off and does not restart
-itself.
-Apparently we cannot reach this state again after boot.
+-Russell, patches are available in your patchtracker.
 
-FYI the modern zaurus (corgi and spitz) do
-suspend/resume/poweroff/restart flawlessy so it's only this machine
-failing poweroff (and maybe collie, no idea).
+Br
+Ulf Hansson
 
-Regards
-
-Andrea
+Ulf HANSSON wrote:
+> From: Sebastian Rasmussen <sebastian.rasmussen@stericsson.com>
+> 
+> Use variant data to store hardware controller deviations concerning
+> power registers to improve readability of the code.
+> 
+> Signed-off-by: Sebastian Rasmussen <sebastian.rasmussen@stericsson.com>
+> Signed-off-by: Ulf Hansson <ulf.hansson@stericsson.com>
+> Reviewed-by: Linus Walleij <linus.walleij@stericsson.com>
+> ---
+>  drivers/mmc/host/mmci.c |   22 +++++++++++++++++-----
+>  1 files changed, 17 insertions(+), 5 deletions(-)
+> 
+> diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+> index 50b5f99..1296719 100644
+> --- a/drivers/mmc/host/mmci.c
+> +++ b/drivers/mmc/host/mmci.c
+> @@ -53,6 +53,7 @@ static unsigned int fmax = 515633;
+>   * @sdio: variant supports SDIO
+>   * @st_clkdiv: true if using a ST-specific clock divider algorithm
+>   * @blksz_datactrl16: true if Block size is at b16..b30 position in datactrl register
+> + * @pwrreg_powerup: power up value for MMCIPOWER register
+>   */
+>  struct variant_data {
+>  	unsigned int		clkreg;
+> @@ -63,18 +64,21 @@ struct variant_data {
+>  	bool			sdio;
+>  	bool			st_clkdiv;
+>  	bool			blksz_datactrl16;
+> +	u32			pwrreg_powerup;
+>  };
+>  
+>  static struct variant_data variant_arm = {
+>  	.fifosize		= 16 * 4,
+>  	.fifohalfsize		= 8 * 4,
+>  	.datalength_bits	= 16,
+> +	.pwrreg_powerup		= MCI_PWR_UP,
+>  };
+>  
+>  static struct variant_data variant_arm_extended_fifo = {
+>  	.fifosize		= 128 * 4,
+>  	.fifohalfsize		= 64 * 4,
+>  	.datalength_bits	= 16,
+> +	.pwrreg_powerup		= MCI_PWR_UP,
+>  };
+>  
+>  static struct variant_data variant_u300 = {
+> @@ -83,6 +87,7 @@ static struct variant_data variant_u300 = {
+>  	.clkreg_enable		= MCI_ST_U300_HWFCEN,
+>  	.datalength_bits	= 16,
+>  	.sdio			= true,
+> +	.pwrreg_powerup		= MCI_PWR_ON,
+>  };
+>  
+>  static struct variant_data variant_ux500 = {
+> @@ -93,6 +98,7 @@ static struct variant_data variant_ux500 = {
+>  	.datalength_bits	= 24,
+>  	.sdio			= true,
+>  	.st_clkdiv		= true,
+> +	.pwrreg_powerup		= MCI_PWR_ON,
+>  };
+>  
+>  static struct variant_data variant_ux500v2 = {
+> @@ -104,6 +110,7 @@ static struct variant_data variant_ux500v2 = {
+>  	.sdio			= true,
+>  	.st_clkdiv		= true,
+>  	.blksz_datactrl16	= true,
+> +	.pwrreg_powerup		= MCI_PWR_ON,
+>  };
+>  
+>  /*
+> @@ -1006,6 +1013,7 @@ static void mmci_request(struct mmc_host *mmc, struct mmc_request *mrq)
+>  static void mmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+>  {
+>  	struct mmci_host *host = mmc_priv(mmc);
+> +	struct variant_data *variant = host->variant;
+>  	u32 pwr = 0;
+>  	unsigned long flags;
+>  	int ret;
+> @@ -1032,11 +1040,15 @@ static void mmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+>  		if (host->plat->vdd_handler)
+>  			pwr |= host->plat->vdd_handler(mmc_dev(mmc), ios->vdd,
+>  						       ios->power_mode);
+> -		/* The ST version does not have this, fall through to POWER_ON */
+> -		if (host->hw_designer != AMBA_VENDOR_ST) {
+> -			pwr |= MCI_PWR_UP;
+> -			break;
+> -		}
+> +
+> +		/*
+> +		 * The ST Micro variant doesn't have the PL180s MCI_PWR_UP
+> +		 * and instead uses MCI_PWR_ON so apply whatever value is
+> +		 * configured in the variant data.
+> +		 */
+> +		pwr |= variant->pwrreg_powerup;
+> +
+> +		break;
+>  	case MMC_POWER_ON:
+>  		pwr |= MCI_PWR_ON;
+>  		break;
