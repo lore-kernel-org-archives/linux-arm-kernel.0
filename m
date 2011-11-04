@@ -1,40 +1,51 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 4 Nov 2011 14:18:24 -0700
-Subject: [PATCH v3 2/4] regulator: adapt fixed regulator driver to dt
-In-Reply-To: <20111104210151.GA2541@opensource.wolfsonmicro.com>
-References: <1319702185-16108-1-git-send-email-rnayak@ti.com>
-	<1319702185-16108-3-git-send-email-rnayak@ti.com>
-	<20111104203422.GB3918@quad.lixom.net>
-	<20111104210151.GA2541@opensource.wolfsonmicro.com>
-Message-ID: <20111104211824.GA5608@quad.lixom.net>
+Date: Fri, 4 Nov 2011 14:22:16 -0700
+Subject: [PATCH v4 1/4] regulator: helper routine to extract
+	regulator_init_data
+In-Reply-To: <20111104211447.GC2541@opensource.wolfsonmicro.com>
+References: <1319721864-30067-1-git-send-email-rnayak@ti.com>
+	<20111104202905.GA3918@quad.lixom.net>
+	<20111104211447.GC2541@opensource.wolfsonmicro.com>
+Message-ID: <20111104212216.GA5756@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 04, 2011 at 09:01:52PM +0000, Mark Brown wrote:
-> On Fri, Nov 04, 2011 at 01:34:22PM -0700, Olof Johansson wrote:
+On Fri, Nov 04, 2011 at 09:14:48PM +0000, Mark Brown wrote:
+> On Fri, Nov 04, 2011 at 01:29:05PM -0700, Olof Johansson wrote:
+> > On Thu, Oct 27, 2011 at 06:54:24PM +0530, Rajendra Nayak wrote:
 > 
-> > Shouldn't a fixed regulator just be a subset of a fixed one? If so, should the
-> > binding be merged with that one?
+> > > @@ -0,0 +1,33 @@
+> > > +Voltage/Current Regulators
 > 
-> No, the fixed voltage regultor is a superset of a general regulator - it
-> has additional information like the voltage it supplies and the optional
-> enable GPIO.
+> > There should be a mandatory compatible field here, right? I.e. a topmost
+> > generic one, "regulator" or similar.
+> 
+> It's not really useful for the regulator subsystem to directly bind to
+> the device as something needs to actually control it, the idea is that
+> this binding is included by reference in the bindings for specific
+> devices.
 
-Still, seems like it could be merged into one regulator binding.
+Right, same goes for many other devices. Some use a toplevel compatible field,
+some do not. Either way, not a big deal if you don't want to include one.
 
-> > > +- regulator-fixed-enabled-at-boot: 1 = yes, 0 = no
+> > Also, lower-caps is common instead of V and A.
 > 
-> > Same here, you can drop the prefix. Also, the regular regulators use
-> > "regulator-name" for the supply name, it would make sense to reuse the same
-> > naming here, right?
-> 
-> I'm having a hard time associating your second comment with the property
-> being discussed - could you clarify please?
+> On the other hand the case is pretty important for SI units
 
-It was the first comment I wrote on the whole block and later interspersed
-other comments above, so I don't blame you for not understanding. The
-second comment was related to the "regulator-fixed-supply" property at
-the top of the block.
+Yeah, true. The fixed regulators used microvolt instead, which could be a good
+way to do it.
+
+> > > +- <name>-supply: phandle to the parent supply/regulator node
+> 
+> > Having a fixed name here instead of a free form string would probably be a good
+> > idea?
+> 
+> The name will be fixed by the individual device bindings, this is
+> specifying the general form of a supply property.  Each device binding
+> will define the set of supplies that the device can use.
+
+Ah, ok. It shouldn't be a part of this binding then and instead be added
+to the bindings for the consumers.
 
 
 -Olof
