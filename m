@@ -1,26 +1,53 @@
-From: vapier@gentoo.org (Mike Frysinger)
-Date: Thu, 3 Nov 2011 22:05:52 -0400
-Subject: [PATCH 0/3] Change ARCH_NR_GPIO into a Kconfig variable
-In-Reply-To: <20111103231707.GU12913@n2100.arm.linux.org.uk>
-References: <1320339647-30255-1-git-send-email-pdeschrijver@nvidia.com>
-	<201111031907.46434.vapier@gentoo.org>
-	<20111103231707.GU12913@n2100.arm.linux.org.uk>
-Message-ID: <201111032205.56557.vapier@gentoo.org>
+From: boojin.kim@samsung.com (Boojin Kim)
+Date: Fri,  4 Nov 2011 11:17:36 +0900
+Subject: [PATCH] ARM: EXYNOS4: Enable write full line for zeros mode
+Message-ID: <1320373056-11718-1-git-send-email-boojin.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 03 November 2011 19:17:07 Russell King - ARM Linux wrote:
-> (b) that's effectively what it is - if you understand what's going on with
-> the 'default' statements.
-> 
-> For any option, there can be multiple 'default' statements:
+This patch enables the 'write full line for zeros mode' feature of cortex-A9.
+The performance of memset() with zero is increased about 10% with this patch.
 
-thanks, i wasn't aware of the cascading nature of the default keyword
--mike
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111103/757fccb9/attachment.sig>
+Signed-off-by: Boojin Kim <boojin.kim@samsung.com>
+---
+ arch/arm/mach-exynos4/platsmp.c |   18 ++++++++++++++++++
+ 1 files changed, 18 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/mach-exynos4/platsmp.c b/arch/arm/mach-exynos4/platsmp.c
+index d5f0f29..edf7054 100644
+--- a/arch/arm/mach-exynos4/platsmp.c
++++ b/arch/arm/mach-exynos4/platsmp.c
+@@ -90,6 +90,16 @@ static void __cpuinit exynos4_gic_secondary_init(void)
+ 	__raw_writel(1, cpu_base + GIC_CPU_CTRL);
+ }
+ 
++static void enable_foz(void)
++{
++	u32 val;
++	asm volatile(
++	"mrc   p15, 0, %0, c1, c0, 1\n"
++	"orr   %0, %0, #(1 << 3)\n"
++	"mcr   p15, 0, %0, c1, c0, 1"
++	: "=r" (val));
++}
++
+ void __cpuinit platform_secondary_init(unsigned int cpu)
+ {
+ 	/*
+@@ -106,6 +116,14 @@ void __cpuinit platform_secondary_init(unsigned int cpu)
+ 	write_pen_release(-1);
+ 
+ 	/*
++	* Enable write full line for zeros mode
++	*/
++	if (soc_is_exynos4210() | soc_is_exynos4212() | soc_is_exynos4412()) {
++		enable_foz();
++		smp_call_function((void (*)(void *))enable_foz, NULL, 0);
++	}
++
++	/*
+ 	 * Synchronise with the boot thread.
+ 	 */
+ 	spin_lock(&boot_lock);
+-- 
+1.7.1
