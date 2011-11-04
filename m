@@ -1,12 +1,11 @@
 From: khilman@ti.com (Kevin Hilman)
-Date: Fri, 04 Nov 2011 09:53:30 -0700
-Subject: [PATCH v8 24/24] gpio/omap: handle set_dataout reg capable IP on
-	restore
-In-Reply-To: <1317803593-12259-25-git-send-email-tarun.kanti@ti.com> (Tarun
-	Kanti DebBarma's message of "Wed, 5 Oct 2011 14:03:13 +0530")
-References: <1317803593-12259-1-git-send-email-tarun.kanti@ti.com>
-	<1317803593-12259-25-git-send-email-tarun.kanti@ti.com>
-Message-ID: <87aa8bde2d.fsf@ti.com>
+Date: Fri, 04 Nov 2011 09:57:49 -0700
+Subject: [PATCH v8 REPOST 21/24] gpio/omap: save and restore debounce
+	registers
+In-Reply-To: <1318422730-22282-1-git-send-email-tarun.kanti@ti.com> (Tarun
+	Kanti DebBarma's message of "Wed, 12 Oct 2011 18:02:10 +0530")
+References: <1318422730-22282-1-git-send-email-tarun.kanti@ti.com>
+Message-ID: <87zkgbbzaq.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,55 +13,22 @@ Tarun Kanti DebBarma <tarun.kanti@ti.com> writes:
 
 > From: Nishanth Menon <nm@ti.com>
 >
-> GPIO IP revisions such as those used in OMAP4 have a set_dataout
-> while the previous revisions used a single dataout register.
-> Depending on what is available restore the dataout settings
-> to the right register.
->
-> Signed-off-by: Nishanth Menon <nm@ti.com>
-> Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
-> Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> ---
->  drivers/gpio/gpio-omap.c |    9 +++++++--
->  1 files changed, 7 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-> index 4009446..3df7a98 100644
-> --- a/drivers/gpio/gpio-omap.c
-> +++ b/drivers/gpio/gpio-omap.c
-> @@ -1073,7 +1073,7 @@ static int __devinit omap_gpio_probe(struct platform_device *pdev)
->  	bank->get_context_loss_count = pdata->get_context_loss_count;
->  	bank->regs = pdata->regs;
->  
-> -	if (bank->regs->set_dataout && bank->regs->clr_dataout)
-> +	if (bank->regs->set_dataout)
+> GPIO debounce registers need to be saved and restored for proper functioning
+> of driver. 
 
-This change isn't right.
+OK.
 
-The _set_gpio_dataout_reg function depends on the existence of
-->clr_dataout too.
+> To save the registers, we cannot cut the clock before the save,
+> hence move the clk disable after the save.
 
->  		bank->set_dataout = _set_gpio_dataout_reg;
->  	else
->  		bank->set_dataout = _set_gpio_dataout_mask;
-> @@ -1351,7 +1351,12 @@ static void omap_gpio_restore_context(struct gpio_bank *bank)
->  				bank->base + bank->regs->risingdetect);
->  	__raw_writel(bank->context.fallingdetect,
->  				bank->base + bank->regs->fallingdetect);
-> -	__raw_writel(bank->context.dataout, bank->base + bank->regs->dataout);
-> +	if (bank->regs->set_dataout)
-  
-Why the check again?  The check has already been done in probe.
+This patch doesn't move any clk disable.
 
-Just use bank->set_dataout() here.
+I suspect you made some changes to the original patch from Nishanth.
+Please note that in the changelog.  This is typically done by adding
+something like:
+
+[my at email.addr: describe changes made]
+
+just before your signoff.
 
 Kevin
-
-> +		__raw_writel(bank->context.dataout,
-> +				bank->base + bank->regs->set_dataout);
-> +	else
-> +		__raw_writel(bank->context.dataout,
-> +				bank->base + bank->regs->dataout);
->  	__raw_writel(bank->context.oe, bank->base + bank->regs->direction);
->  
->  	if (bank->dbck_enable_mask) {
