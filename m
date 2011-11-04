@@ -1,161 +1,68 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Fri, 04 Nov 2011 16:32:30 +0000
-Subject: [PATCH 3/3] ARM: AT91: Add the ADC to the sam9g20ek board
-In-Reply-To: <4EB3CB8C.8080008@free-electrons.com>
-References: <1319041134-19712-1-git-send-email-maxime.ripard@free-electrons.com>
-	<1320315070-1700-1-git-send-email-maxime.ripard@free-electrons.com>
-	<1320315070-1700-4-git-send-email-maxime.ripard@free-electrons.com>
-	<4EB3BF8A.9080809@jic23.retrosnub.co.uk>
-	<4EB3CB8C.8080008@free-electrons.com>
-Message-ID: <4EB4139E.2040807@kernel.org>
+From: khilman@ti.com (Kevin Hilman)
+Date: Fri, 04 Nov 2011 09:53:30 -0700
+Subject: [PATCH v8 24/24] gpio/omap: handle set_dataout reg capable IP on
+	restore
+In-Reply-To: <1317803593-12259-25-git-send-email-tarun.kanti@ti.com> (Tarun
+	Kanti DebBarma's message of "Wed, 5 Oct 2011 14:03:13 +0530")
+References: <1317803593-12259-1-git-send-email-tarun.kanti@ti.com>
+	<1317803593-12259-25-git-send-email-tarun.kanti@ti.com>
+Message-ID: <87aa8bde2d.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/04/2011 11:25 AM, Maxime Ripard wrote:
-> Hi Jonathan,
-> 
-> Thanks for your review, I'm working on it and will submit a new version
-> asap.
-> 
-> On 04/11/2011 11:33, Jonathan Cameron wrote:
->> Please run checkpatch.pl over all patches as it will clean up quite a few
->> issues.
-> 
-> Yep, I forgot to run it, my bad.
-> 
->> Mostly looking good.  At the moment it's simple enough that we can
->> rapidly move this one out of staging once the core has gone.
-> 
-> Ok. Rebasing on your outofstaging branch for the next version would be a
-> good idea ?
-> 
-> Or do you want the driver to still go through the staging step ?
-I don't really mind.  I doubt Greg would send it on in this merge window
-anyway.  Going from one to the other is trivial change of about 4
-function names anyway for a simple driver like this.  It probably mostly
-depends on whether you want to mess around with the more complex bits
-that are going to stay in staging for sometime yet (buffering, in kernel
-push interface, events).
+Tarun Kanti DebBarma <tarun.kanti@ti.com> writes:
 
-> 
-> Linus, I guess that if we put the driver directly into the main tree you
-> are ok with the changes made to boards files (code reviews apart) ?
-> 
-> Thanks,
-> Maxime
-> 
->> On 11/03/2011 10:11 AM, Maxime Ripard wrote:
->>> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
->>> Cc: Patrice Vilchez <patrice.vilchez@atmel.com>
->>> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
->>> ---
->>>  arch/arm/mach-at91/at91sam9260_devices.c |   52 ++++++++++++++++++++++++++++++
->>>  arch/arm/mach-at91/board-sam9g20ek.c     |   12 +++++++
->>>  2 files changed, 64 insertions(+), 0 deletions(-)
->>>
->>> diff --git a/arch/arm/mach-at91/at91sam9260_devices.c b/arch/arm/mach-at91/at91sam9260_devices.c
->>> index 39f81f4..bfc50ac 100644
->>> --- a/arch/arm/mach-at91/at91sam9260_devices.c
->>> +++ b/arch/arm/mach-at91/at91sam9260_devices.c
->>> @@ -1312,6 +1312,58 @@ void __init at91_add_device_cf(struct at91_cf_data *data)
->>>  void __init at91_add_device_cf(struct at91_cf_data * data) {}
->>>  #endif
->>>  
->>> +/* --------------------------------------------------------------------
->>> + *  ADCs
->>> + * -------------------------------------------------------------------- */
->>> +
->>> +static struct at91_adc_data adc_data;
->>> +
->>> +static struct resource adc_resources[] = {
->>> +	[0] = {
->>> +		.start	= AT91SAM9260_BASE_ADC,
->>> +		.end	= AT91SAM9260_BASE_ADC + SZ_16K - 1,
->>> +		.flags	= IORESOURCE_MEM,
->>> +	},
->>> +	[1] = {
->>> +		.start	= AT91SAM9260_ID_ADC,
->>> +		.end	= AT91SAM9260_ID_ADC,
->>> +		.flags	= IORESOURCE_IRQ,
->>> +	},
->>> +};
->>> +
->>> +static struct platform_device at91_adc_device = {
->>> +	.name		= "at91adc",
->>> +	.id		= -1,
->>> +	.dev		= {
->>> +				.platform_data		= &adc_data,
->>> +	},
->>> +	.resource	= adc_resources,
->>> +	.num_resources	= ARRAY_SIZE(adc_resources),
->>> +};
->>> +
->>> +void __init at91_add_device_adc(struct at91_adc_data *data)
->>> +{
->>> +	if (!data)
->>> +		return;
->>> +
->>> +	if(data->channels_used[0])
->>> +		at91_set_A_periph(AT91_PIN_PC0, 0);
->>> +	if(data->channels_used[1])
->>> +		at91_set_A_periph(AT91_PIN_PC1, 0);
->>> +	if(data->channels_used[2])
->>> +		at91_set_A_periph(AT91_PIN_PC2, 0);
->>> +	if(data->channels_used[3])
->>> +		at91_set_A_periph(AT91_PIN_PC3, 0);
->> formatting issues so another one for checkpatch.
->>
->> Also define AT91_PIN_PC(n) then make this another
->> for_each_bit_set call.  That should get you down from
->> 8 lines to about 3.
->>> +
->>> +	data->adc_clock = 5000000;
->>> +	data->num_channels = 4;
->>> +	data->startup_time = 10;
->>> +
->>> +	adc_data = *data;
->>> +	platform_device_register(&at91_adc_device);
->>> +}
->>> +
->>> +
->>>  /* -------------------------------------------------------------------- */
->>>  /*
->>>   * These devices are always present and don't need any board-specific
->>> diff --git a/arch/arm/mach-at91/board-sam9g20ek.c b/arch/arm/mach-at91/board-sam9g20ek.c
->>> index 817f59d..6f2542fb 100644
->>> --- a/arch/arm/mach-at91/board-sam9g20ek.c
->>> +++ b/arch/arm/mach-at91/board-sam9g20ek.c
->>> @@ -314,6 +314,16 @@ static void __init ek_add_device_buttons(void)
->>>  static void __init ek_add_device_buttons(void) {}
->>>  #endif
->>>  
->>> +/*
->>> + * ADCs
->>> + */
->>> +
->>> +static struct at91_adc_data ek_adc_data = {
->>> +	.channels_used = { 1, 1, 1, 1} ,
->>> +	.num_channels_used = 4,
->>> +	.vref = 3300,
->>> +};
->>> +
->>>  #if defined(CONFIG_REGULATOR_FIXED_VOLTAGE) || defined(CONFIG_REGULATOR_FIXED_VOLTAGE_MODULE)
->>>  static struct regulator_consumer_supply ek_audio_consumer_supplies[] = {
->>>  	REGULATOR_SUPPLY("AVDD", "0-001b"),
->>> @@ -389,6 +399,8 @@ static void __init ek_board_init(void)
->>>  	ek_add_device_gpio_leds();
->>>  	/* Push Buttons */
->>>  	ek_add_device_buttons();
->>> +	/* ADCs */
->>> +	at91_add_device_adc(&ek_adc_data);
->>>  	/* PCK0 provides MCLK to the WM8731 */
->>>  	at91_set_B_periph(AT91_PIN_PC1, 0);
->>>  	/* SSC (for WM8731) */
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
-> 
+> From: Nishanth Menon <nm@ti.com>
+>
+> GPIO IP revisions such as those used in OMAP4 have a set_dataout
+> while the previous revisions used a single dataout register.
+> Depending on what is available restore the dataout settings
+> to the right register.
+>
+> Signed-off-by: Nishanth Menon <nm@ti.com>
+> Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
+> Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> ---
+>  drivers/gpio/gpio-omap.c |    9 +++++++--
+>  1 files changed, 7 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
+> index 4009446..3df7a98 100644
+> --- a/drivers/gpio/gpio-omap.c
+> +++ b/drivers/gpio/gpio-omap.c
+> @@ -1073,7 +1073,7 @@ static int __devinit omap_gpio_probe(struct platform_device *pdev)
+>  	bank->get_context_loss_count = pdata->get_context_loss_count;
+>  	bank->regs = pdata->regs;
+>  
+> -	if (bank->regs->set_dataout && bank->regs->clr_dataout)
+> +	if (bank->regs->set_dataout)
+
+This change isn't right.
+
+The _set_gpio_dataout_reg function depends on the existence of
+->clr_dataout too.
+
+>  		bank->set_dataout = _set_gpio_dataout_reg;
+>  	else
+>  		bank->set_dataout = _set_gpio_dataout_mask;
+> @@ -1351,7 +1351,12 @@ static void omap_gpio_restore_context(struct gpio_bank *bank)
+>  				bank->base + bank->regs->risingdetect);
+>  	__raw_writel(bank->context.fallingdetect,
+>  				bank->base + bank->regs->fallingdetect);
+> -	__raw_writel(bank->context.dataout, bank->base + bank->regs->dataout);
+> +	if (bank->regs->set_dataout)
+  
+Why the check again?  The check has already been done in probe.
+
+Just use bank->set_dataout() here.
+
+Kevin
+
+> +		__raw_writel(bank->context.dataout,
+> +				bank->base + bank->regs->set_dataout);
+> +	else
+> +		__raw_writel(bank->context.dataout,
+> +				bank->base + bank->regs->dataout);
+>  	__raw_writel(bank->context.oe, bank->base + bank->regs->direction);
+>  
+>  	if (bank->dbck_enable_mask) {
