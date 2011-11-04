@@ -1,54 +1,64 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Sat, 05 Nov 2011 08:32:57 +0900
-Subject: [GIT PULL] Samsung devel-4 for v3.2
-In-Reply-To: <201111050020.55071.arnd@arndb.de>
-References: <027f01cc9ab6$2086eae0$6194c0a0$%kim@samsung.com>
-	<201111050020.55071.arnd@arndb.de>
-Message-ID: <02d901cc9b4a$15a127f0$40e377d0$%kim@samsung.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 4 Nov 2011 16:39:38 -0700
+Subject: [PATCH 1/4] ARM: OMAP3: cm-t35: add regulator supply for ads7846
+In-Reply-To: <1319017160-20391-2-git-send-email-grinberg@compulab.co.il>
+References: <1319017160-20391-1-git-send-email-grinberg@compulab.co.il>
+	<1319017160-20391-2-git-send-email-grinberg@compulab.co.il>
+Message-ID: <20111104233938.GF31337@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann wrote:
+* Igor Grinberg <grinberg@compulab.co.il> [111019 02:05]:
 > 
-> On Friday 04 November 2011, Kukjin Kim wrote:
-> > As we talked in Prague, I'm sending 'pull request for v3.2'
-Samsung-devel4
-> > which includes supporting EXYNOS4 DT, SPI clkdev and reorganization
-> > arch/arm/mach-exynos and small things.
-> >
-> > Please pull from:
-> >   git://github.com/kgene/linux-samsung.git next-samsung-devel-4
-> >
-> > As a note, the branch includes arm-soc/next/cleanup3 and
-arm-soc/next/devel2
-> > based on mainline commit 994c0e99 ("Merge branch 'next/soc' of
-> > git://git.linaro.org/people/arnd/arm-soc") because it is needed for this
-and
-> > they include all of Samsung stuff for v3.2.
-> >
-> > And I will be back to kernel.org after this merge window.
-> >
-> > If any problems, please let me know.
+> Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
+> ---
+>  arch/arm/mach-omap2/board-cm-t35.c |   18 ++++++++++++++++++
+>  1 files changed, 18 insertions(+), 0 deletions(-)
 > 
-> I've looked through it, and I think I'll hold off for this merge window,
-> especially given that I had enough trouble with the the other commits
-> and that the submission is really late. Please realize that I have to
-> push back on stuff that comes during the merge window.
-> 
-> Please send the contents split up into separate branches (dt, spi, clkdev,
-> rename, devel) for 3.3. I think it's ok if you want to send just the
-> rename patch for 3.2 the way we had discussed earlier, because this kind
-> of patch really makes sense at the end of the merge window.
-> 
-Hi Arnd,
+> diff --git a/arch/arm/mach-omap2/board-cm-t35.c b/arch/arm/mach-omap2/board-cm-t35.c
+> index e15d39b..6d93db0 100644
+> --- a/arch/arm/mach-omap2/board-cm-t35.c
+> +++ b/arch/arm/mach-omap2/board-cm-t35.c
+> @@ -343,6 +343,10 @@ static struct regulator_consumer_supply cm_t35_vdvi_supply[] = {
+>  	REGULATOR_SUPPLY("vdvi", "omapdss"),
+>  };
+>  
+> +static struct regulator_consumer_supply cm_t35_vio_supplies[] = {
+> +	REGULATOR_SUPPLY("vcc", "spi1.0"),
+> +};
+> +
+>  /* VMMC1 for MMC1 pins CMD, CLK, DAT0..DAT3 (20 mA, plus card == max 220 mA) */
+>  static struct regulator_init_data cm_t35_vmmc1 = {
+>  	.constraints = {
+> @@ -373,6 +377,19 @@ static struct regulator_init_data cm_t35_vsim = {
+>  	.consumer_supplies	= cm_t35_vsim_supply,
+>  };
+>  
+> +static struct regulator_init_data cm_t35_vio = {
+> +	.constraints = {
+> +		.min_uV			= 1800000,
+> +		.max_uV			= 1800000,
+> +		.apply_uV		= true,
+> +		.valid_modes_mask	= REGULATOR_MODE_NORMAL
+> +					| REGULATOR_MODE_STANDBY,
+> +		.valid_ops_mask		= REGULATOR_CHANGE_MODE,
+> +	},
+> +	.num_consumer_supplies	= ARRAY_SIZE(cm_t35_vio_supplies),
+> +	.consumer_supplies	= cm_t35_vio_supplies,
+> +};
+> +
+>  static uint32_t cm_t35_keymap[] = {
+>  	KEY(0, 0, KEY_A),	KEY(0, 1, KEY_B),	KEY(0, 2, KEY_LEFT),
+>  	KEY(1, 0, KEY_UP),	KEY(1, 1, KEY_ENTER),	KEY(1, 2, KEY_DOWN),
+> @@ -456,6 +473,7 @@ static struct twl4030_platform_data cm_t35_twldata = {
+>  	.gpio		= &cm_t35_gpio_data,
+>  	.vmmc1		= &cm_t35_vmmc1,
+>  	.vsim		= &cm_t35_vsim,
+> +	.vio		= &cm_t35_vio,
+>  };
+>  
+>  static void __init cm_t35_init_i2c(void)
 
-OK, I will send the rename branch in a half an hour and make separate
-branches for others which will be merged next time.
+Applying to board branch for v3.3 merge window.
 
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Tony
