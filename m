@@ -1,98 +1,125 @@
 From: jamie@jamieiles.com (Jamie Iles)
-Date: Fri,  4 Nov 2011 01:09:57 +0000
-Subject: [PATCHv4 00/13] VIC DT binding and MULTI_IRQ_HANDLER
-Message-ID: <1320369010-23428-1-git-send-email-jamie@jamieiles.com>
+Date: Fri,  4 Nov 2011 01:09:58 +0000
+Subject: [PATCHv4 01/13] ARM: Make global handler and CONFIG_MULTI_IRQ_HANDLER
+	mutually exclusive
+In-Reply-To: <1320369010-23428-1-git-send-email-jamie@jamieiles.com>
+References: <1320369010-23428-1-git-send-email-jamie@jamieiles.com>
+Message-ID: <1320369010-23428-2-git-send-email-jamie@jamieiles.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since the last revision I've updated the handling loop as suggested by
-Linus and Russell, added a patch for picoxcell and added a final patch
-to remove the non MULTI_IRQ_HANDLER support for VIC.  The final patch
-assumes that all VIC users will be converted to MULTI_IRQ_HANDLER which
-I would hope would be the case but this could be dropped if not.
+From: Marc Zyngier <marc.zyngier@arm.com>
 
-I've also included Marc's patch for reference as the mach patches are
-dependent on it.
+Even when CONFIG_MULTI_IRQ_HANDLER is selected, the core code
+requires the arch_irq_handler_default macro to be defined as
+a fallback.
 
-Jamie Iles (12):
-  ARM: vic: device tree binding
-  ARM: vic: MULTI_IRQ_HANDLER handler
-  ARM: ep93xx: convert to MULTI_IRQ_HANDLER
-  ARM: netx: convert to MULTI_IRQ_HANDLER
-  ARM: nomadik: convert to MULTI_IRQ_HANDLER
-  ARM: s3c64xx: convert to MULTI_IRQ_HANDLER
-  ARM: spear: convert to MULTI_IRQ_HANDLER
-  ARM: u300: convert to MULTI_IRQ_HANDLER
-  ARM: versatile: convert to MULTI_IRQ_HANDLER
-  ARM: samsung: convert to MULTI_IRQ_HANDLER
-  ARM: picoxcell: convert to MULTI_IRQ_HANDLER
-  ARM: VIC: remove non MULTI_IRQ_HANDLER support
+It turns out nobody is using that particular feature as both PXA
+and shmobile have all their machine descriptors populated with
+the interrupt handler, leaving unused code (or empty macros) in
+their entry-macro.S file just to be able to compile entry-armv.S.
 
-Marc Zyngier (1):
-  ARM: Make global handler and CONFIG_MULTI_IRQ_HANDLER mutually
-    exclusive
+Make CONFIG_MULTI_IRQ_HANDLER exclusive wrt arch_irq_handler_default,
+which allows to remove one test from the hot path. Also cleanup both
+PXA and shmobile entry-macro.S.
 
- Documentation/devicetree/bindings/arm/vic.txt      |   29 ++++
- arch/arm/common/Kconfig                            |    2 +
- arch/arm/common/vic.c                              |  142 ++++++++++++++++----
- arch/arm/include/asm/entry-macro-vic2.S            |   57 --------
- arch/arm/include/asm/hardware/vic.h                |   10 ++-
- arch/arm/kernel/entry-armv.S                       |    7 +-
- arch/arm/mach-ep93xx/adssphere.c                   |    2 +
- arch/arm/mach-ep93xx/edb93xx.c                     |    9 ++
- arch/arm/mach-ep93xx/gesbc9312.c                   |    2 +
- arch/arm/mach-ep93xx/include/mach/entry-macro.S    |   42 ------
- arch/arm/mach-ep93xx/micro9.c                      |    5 +
- arch/arm/mach-ep93xx/simone.c                      |    2 +
- arch/arm/mach-ep93xx/snappercl15.c                 |    2 +
- arch/arm/mach-ep93xx/ts72xx.c                      |    2 +
- arch/arm/mach-netx/include/mach/entry-macro.S      |   13 --
- arch/arm/mach-netx/nxdb500.c                       |    2 +
- arch/arm/mach-netx/nxdkn.c                         |    2 +
- arch/arm/mach-netx/nxeb500hmi.c                    |    2 +
- arch/arm/mach-nomadik/board-nhk8815.c              |    2 +
- arch/arm/mach-nomadik/include/mach/entry-macro.S   |   30 ----
- arch/arm/mach-picoxcell/common.c                   |    9 +-
- arch/arm/mach-picoxcell/include/mach/entry-macro.S |   11 +-
- arch/arm/mach-pxa/include/mach/entry-macro.S       |   36 -----
- arch/arm/mach-s3c64xx/include/mach/entry-macro.S   |    7 +-
- arch/arm/mach-s3c64xx/mach-anw6410.c               |    2 +
- arch/arm/mach-s3c64xx/mach-crag6410.c              |    2 +
- arch/arm/mach-s3c64xx/mach-hmt.c                   |    2 +
- arch/arm/mach-s3c64xx/mach-mini6410.c              |    2 +
- arch/arm/mach-s3c64xx/mach-ncp.c                   |    2 +
- arch/arm/mach-s3c64xx/mach-real6410.c              |    2 +
- arch/arm/mach-s3c64xx/mach-smartq5.c               |    2 +
- arch/arm/mach-s3c64xx/mach-smartq7.c               |    2 +
- arch/arm/mach-s3c64xx/mach-smdk6400.c              |    2 +
- arch/arm/mach-s3c64xx/mach-smdk6410.c              |    2 +
- arch/arm/mach-s5p64x0/include/mach/entry-macro.S   |    7 +-
- arch/arm/mach-s5p64x0/mach-smdk6440.c              |    2 +
- arch/arm/mach-s5p64x0/mach-smdk6450.c              |    2 +
- arch/arm/mach-s5pc100/include/mach/entry-macro.S   |   25 ----
- arch/arm/mach-s5pc100/mach-smdkc100.c              |    2 +
- arch/arm/mach-s5pv210/include/mach/entry-macro.S   |   37 -----
- arch/arm/mach-s5pv210/mach-aquila.c                |    2 +
- arch/arm/mach-s5pv210/mach-goni.c                  |    2 +
- arch/arm/mach-s5pv210/mach-smdkc110.c              |    2 +
- arch/arm/mach-s5pv210/mach-smdkv210.c              |    2 +
- arch/arm/mach-s5pv210/mach-torbreck.c              |    2 +
- arch/arm/mach-shmobile/include/mach/entry-macro.S  |    9 --
- arch/arm/mach-spear3xx/include/mach/entry-macro.S  |   27 ----
- arch/arm/mach-spear3xx/spear300_evb.c              |    2 +
- arch/arm/mach-spear3xx/spear310_evb.c              |    2 +
- arch/arm/mach-spear3xx/spear320_evb.c              |    2 +
- arch/arm/mach-spear6xx/include/mach/entry-macro.S  |   36 -----
- arch/arm/mach-spear6xx/spear600_evb.c              |    2 +
- arch/arm/mach-u300/include/mach/entry-macro.S      |   24 ----
- arch/arm/mach-u300/u300.c                          |    2 +
- arch/arm/mach-versatile/include/mach/entry-macro.S |   30 ----
- arch/arm/mach-versatile/versatile_ab.c             |    2 +
- arch/arm/mach-versatile/versatile_dt.c             |    2 +
- arch/arm/mach-versatile/versatile_pb.c             |    2 +
- 58 files changed, 257 insertions(+), 417 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/vic.txt
- delete mode 100644 arch/arm/include/asm/entry-macro-vic2.S
+Cc: Eric Miao <eric.y.miao@gmail.com>
+Cc: Paul Mundt <lethal@linux-sh.org>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm/kernel/entry-armv.S                      |    7 ++--
+ arch/arm/mach-pxa/include/mach/entry-macro.S      |   36 ---------------------
+ arch/arm/mach-shmobile/include/mach/entry-macro.S |    9 -----
+ 3 files changed, 3 insertions(+), 49 deletions(-)
 
+diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
+index 9ad50c4..bd49a6a 100644
+--- a/arch/arm/kernel/entry-armv.S
++++ b/arch/arm/kernel/entry-armv.S
+@@ -36,12 +36,11 @@
+ #ifdef CONFIG_MULTI_IRQ_HANDLER
+ 	ldr	r1, =handle_arch_irq
+ 	mov	r0, sp
+-	ldr	r1, [r1]
+ 	adr	lr, BSYM(9997f)
+-	teq	r1, #0
+-	movne	pc, r1
+-#endif
++	ldr	pc, [r1]
++#else
+ 	arch_irq_handler_default
++#endif
+ 9997:
+ 	.endm
+ 
+diff --git a/arch/arm/mach-pxa/include/mach/entry-macro.S b/arch/arm/mach-pxa/include/mach/entry-macro.S
+index a73bc86..260c0c1 100644
+--- a/arch/arm/mach-pxa/include/mach/entry-macro.S
++++ b/arch/arm/mach-pxa/include/mach/entry-macro.S
+@@ -7,45 +7,9 @@
+  * License version 2. This program is licensed "as is" without any
+  * warranty of any kind, whether express or implied.
+  */
+-#include <mach/hardware.h>
+-#include <mach/irqs.h>
+ 
+ 		.macro	disable_fiq
+ 		.endm
+ 
+-		.macro  get_irqnr_preamble, base, tmp
+-		.endm
+-
+ 		.macro  arch_ret_to_user, tmp1, tmp2
+ 		.endm
+-
+-		.macro	get_irqnr_and_base, irqnr, irqstat, base, tmp
+-		mrc	p15, 0, \tmp, c0, c0, 0		@ CPUID
+-		mov	\tmp, \tmp, lsr #13
+-		and	\tmp, \tmp, #0x7		@ Core G
+-		cmp	\tmp, #1
+-		bhi	1002f
+-
+-		@ Core Generation 1 (PXA25x)
+-		mov	\base, #io_p2v(0x40000000)	@ IIR Ctl = 0x40d00000
+-		add	\base, \base, #0x00d00000
+-		ldr	\irqstat, [\base, #0]		@ ICIP
+-		ldr	\irqnr, [\base, #4]		@ ICMR
+-
+-		ands	\irqnr, \irqstat, \irqnr
+-		beq	1001f
+-		rsb	\irqstat, \irqnr, #0
+-		and	\irqstat, \irqstat, \irqnr
+-		clz	\irqnr, \irqstat
+-		rsb	\irqnr, \irqnr, #(31 + PXA_IRQ(0))
+-		b	1001f
+-1002:
+-		@ Core Generation 2 (PXA27x) or Core Generation 3 (PXA3xx)
+-		mrc	p6, 0, \irqstat, c5, c0, 0	@ ICHP
+-		tst	\irqstat, #0x80000000
+-		beq	1001f
+-		bic	\irqstat, \irqstat, #0x80000000
+-		mov	\irqnr, \irqstat, lsr #16
+-		add	\irqnr, \irqnr, #(PXA_IRQ(0))
+-1001:
+-		.endm
+diff --git a/arch/arm/mach-shmobile/include/mach/entry-macro.S b/arch/arm/mach-shmobile/include/mach/entry-macro.S
+index 8d4a416..2a57b29 100644
+--- a/arch/arm/mach-shmobile/include/mach/entry-macro.S
++++ b/arch/arm/mach-shmobile/include/mach/entry-macro.S
+@@ -18,14 +18,5 @@
+ 	.macro  disable_fiq
+ 	.endm
+ 
+-	.macro  get_irqnr_preamble, base, tmp
+-	.endm
+-
+-	.macro  get_irqnr_and_base, irqnr, irqstat, base, tmp
+-	.endm
+-
+-	.macro  test_for_ipi, irqnr, irqstat, base, tmp
+-	.endm
+-
+ 	.macro  arch_ret_to_user, tmp1, tmp2
+ 	.endm
 -- 
 1.7.5.4
