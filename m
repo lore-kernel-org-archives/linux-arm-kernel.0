@@ -1,80 +1,66 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 04 Nov 2011 09:55:12 +0100
-Subject: [PATCH v5] atmel/spi: fix missing probe
-In-Reply-To: <1320344166-31077-1-git-send-email-plagnioj@jcrosoft.com>
-References: <1320344166-31077-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <4EB3A870.3050107@atmel.com>
+From: simon@sequanux.org (Simon Guinot)
+Date: Fri, 4 Nov 2011 10:21:59 +0100
+Subject: orion/kirkwood and device tree
+In-Reply-To: <201111032250.59528.michael@walle.cc>
+References: <20111031105740.GC29402@lunn.ch>
+	<201111022303.04957.michael@walle.cc>
+	<20111103184745.GW32165@titan.lakedaemon.net>
+	<201111032250.59528.michael@walle.cc>
+Message-ID: <20111104092159.GG634@kw.sim.vm.gnt>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/03/2011 07:16 PM, Jean-Christophe PLAGNIOL-VILLARD :
-> Commit 940ab889 "drivercore: Add helper macro for platform_driver boilerplate"
-> converted this driver to use module_platform_driver, but due to the use
-> of platform_driver_probe(), this resulted in the call to atmel_spi_probe being
-> lost. Place the call to this function into the driver structure.
+Hi Michael,
+
+On Thu, Nov 03, 2011 at 10:50:59PM +0100, Michael Walle wrote:
+> Am Donnerstag 03 November 2011, 19:47:45 schrieb Jason:
+> > Michael,
+> > 
+> > On Wed, Nov 02, 2011 at 11:03:04PM +0100, Michael Walle wrote:
+> > > Am Mittwoch 02 November 2011, 17:50:57 schrieb Jason:
+> > > > Michael,
+> > > > 
+> > > > On Mon, Oct 31, 2011 at 11:50:28PM +0100, Michael Walle wrote:
+> > > > > i've already ported some marvell devices to DT. spi-orion, orion-wdt,
+> > > > > rtc-mv and mv_cesa. Atm i'm struggling with how to pass
+> > > > > kirkwood_mbus_dram_info to the device drivers (the old method is to
+> > > > > pass it through platform_data)
+> > > > 
+> > > > Do you have a public git tree I could pull from, by chance?  I don't
+> > > > care about the state, I'd like to learn by example and start pitching
+> > > > in.
+> > > 
+> > > yeah i pushed it to github:
+> > > https://github.com/mwalle/linux/tree/kirkwood-devtree
+> > 
+> > This is great!  I was having trouble figuring out how to do the
+> > interrupt controller, and you have that.  I'll look more closely this
+> > evening.
+> > 
+> > My only comment so far is that I think a lot of what you have in
+> > lschlv2.dts can be in kirkwood.dtsi.  That way other boards don't have
+> > to copy it (serial, spi, ehci, wdt, rtc, crypto).
+> yeah i had it there and it should be definitely put back to kirkwood.dtsi. the 
+> reason i've put it into lschv2.dts atm is that there is the clock property for 
+> every device, which may be different for different platforms.
 > 
-> fix section missmatch
-> 
-> atmel_spi_probe is marked __init where it's supposed to be __devinit
-> atmel_spi_remove is marked __exit where it's supposed to be __devexit
-> 
-> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> Cc: Greg Kroah-Hartman <gregkh@suse.de>
-> Cc: Grant Likely <grant.likely@secretlab.ca>
-> Cc: Russell King - ARM Linux <linux@arm.linux.org.uk>
+> > Oh, also, I think the board-dt.c should be pulling the phys addresses
+> > from the dt, it looks like you're still relying on the #defines...
+> i haven't looked at ethernet/mdio yet ;)
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+It is good to see some work to add DT support for Kirkwood SoCs.
 
-J. can you please queue it in:
+What are your plans concerning the MPPs configuration ? Is it possible
+to embed this configuration into a DT ? What kind of node could hold
+a such information ?
 
-git://github.com/at91linux/linux-at91.git   at91-fixes
+Regards,
 
-We may also need to rebase the material already there (one patch) on a
-newer linus' kernel...
-
-Thanks, bye,
-
-> ---
-> V5:
-> 
-> 	do it in in patch
-> 
-> Best Regards,
-> J.
->  drivers/spi/spi-atmel.c |    5 +++--
->  1 files changed, 3 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
-> index 79665e2..16d6a83 100644
-> --- a/drivers/spi/spi-atmel.c
-> +++ b/drivers/spi/spi-atmel.c
-> @@ -907,7 +907,7 @@ static void atmel_spi_cleanup(struct spi_device *spi)
->  
->  /*-------------------------------------------------------------------------*/
->  
-> -static int __init atmel_spi_probe(struct platform_device *pdev)
-> +static int __devinit atmel_spi_probe(struct platform_device *pdev)
->  {
->  	struct resource		*regs;
->  	int			irq;
-> @@ -1003,7 +1003,7 @@ out_free:
->  	return ret;
->  }
->  
-> -static int __exit atmel_spi_remove(struct platform_device *pdev)
-> +static int __devexit atmel_spi_remove(struct platform_device *pdev)
->  {
->  	struct spi_master	*master = platform_get_drvdata(pdev);
->  	struct atmel_spi	*as = spi_master_get_devdata(master);
-> @@ -1072,6 +1072,7 @@ static struct platform_driver atmel_spi_driver = {
->  	},
->  	.suspend	= atmel_spi_suspend,
->  	.resume		= atmel_spi_resume,
-> +	.probe		= atmel_spi_probe,
->  	.remove		= __exit_p(atmel_spi_remove),
->  };
->  module_platform_driver(atmel_spi_driver);
-
-
--- 
-Nicolas Ferre
+Simon
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111104/c9bb7072/attachment.sig>
