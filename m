@@ -1,23 +1,32 @@
-From: b39297@freescale.com (wu guoxing)
-Date: Fri, 4 Nov 2011 13:18:44 +0800
+From: B39297@freescale.com (Wu Guoxing-B39297)
+Date: Fri, 4 Nov 2011 06:01:12 +0000
 Subject: [PATCH v2] ARM/mx35/3ds: gpio: add mc9s08dz60 gpio function
-Message-ID: <1320383924-18762-1-git-send-email-b39297@freescale.com>
+In-Reply-To: <1320383924-18762-1-git-send-email-b39297@freescale.com>
+References: <1320383924-18762-1-git-send-email-b39297@freescale.com>
+Message-ID: <3D55990BDF4852409EA769663F22E54AC04776@039-SN1MPN1-006.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-we only use the gpio function of mc9s08dz60 mcu chip, so just
-add the gpio driver, as this mcu will never be used in other board.
+Changes since v1:
+  Introduce "struct mc9s08dz60" for i2c client, instead of a static variable.
+
+-----Original Message-----
+From: Wu Guoxing-B39297 
+Sent: Friday, November 04, 2011 1:19 PM
+To: linux-arm-kernel at lists.infradead.org
+Cc: s.hauer at pengutronix.de; shawn.guo at linaro.org; Wu Guoxing-B39297
+Subject: [PATCH v2] ARM/mx35/3ds: gpio: add mc9s08dz60 gpio function
+
+we only use the gpio function of mc9s08dz60 mcu chip, so just add the gpio driver, as this mcu will never be used in other board.
 
 Signed-off-by: Wu Guoxing <b39297@freescale.com>
 ---
  drivers/gpio/Kconfig           |    6 ++
  drivers/gpio/Makefile          |    1 +
  drivers/gpio/gpio-mc9s08dz60.c |  180 ++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 187 insertions(+), 0 deletions(-)
- create mode 100644 drivers/gpio/gpio-mc9s08dz60.c
+ 3 files changed, 187 insertions(+), 0 deletions(-)  create mode 100644 drivers/gpio/gpio-mc9s08dz60.c
 
-diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
-index d539efd..7f6beee 100644
+diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig index d539efd..7f6beee 100644
 --- a/drivers/gpio/Kconfig
 +++ b/drivers/gpio/Kconfig
 @@ -487,4 +487,10 @@ config GPIO_TPS65910
@@ -31,8 +40,7 @@ index d539efd..7f6beee 100644
 +	help
 +	  Select this to enable the MC9S08DZ60 GPIO driver
  endif
-diff --git a/drivers/gpio/Makefile b/drivers/gpio/Makefile
-index 9588948..85b8799 100644
+diff --git a/drivers/gpio/Makefile b/drivers/gpio/Makefile index 9588948..85b8799 100644
 --- a/drivers/gpio/Makefile
 +++ b/drivers/gpio/Makefile
 @@ -60,3 +60,4 @@ obj-$(CONFIG_GPIO_WM831X)	+= gpio-wm831x.o
@@ -40,9 +48,7 @@ index 9588948..85b8799 100644
  obj-$(CONFIG_GPIO_WM8994)	+= gpio-wm8994.o
  obj-$(CONFIG_GPIO_XILINX)	+= gpio-xilinx.o
 +obj-$(CONFIG_GPIO_MC9S08DZ60) += gpio-mc9s08dz60.o
-diff --git a/drivers/gpio/gpio-mc9s08dz60.c b/drivers/gpio/gpio-mc9s08dz60.c
-new file mode 100644
-index 0000000..5724317
+diff --git a/drivers/gpio/gpio-mc9s08dz60.c b/drivers/gpio/gpio-mc9s08dz60.c new file mode 100644 index 0000000..5724317
 --- /dev/null
 +++ b/drivers/gpio/gpio-mc9s08dz60.c
 @@ -0,0 +1,180 @@
@@ -77,10 +83,8 @@ index 0000000..5724317
 +	struct gpio_chip chip;
 +};
 +
-+static struct mc9s08dz60 *to_mc9s08dz60(struct gpio_chip *gc)
-+{
-+	return container_of(gc, struct mc9s08dz60, chip);
-+}
++static struct mc9s08dz60 *to_mc9s08dz60(struct gpio_chip *gc) {
++	return container_of(gc, struct mc9s08dz60, chip); }
 +
 +
 +static int gpio_to_reg_and_bit(int offset, u8 *reg, u8 *bit)
