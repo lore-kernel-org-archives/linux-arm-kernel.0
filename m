@@ -1,37 +1,25 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 4 Nov 2011 21:14:48 +0000
-Subject: [PATCH v4 1/4] regulator: helper routine to extract
-	regulator_init_data
-In-Reply-To: <20111104202905.GA3918@quad.lixom.net>
-References: <1319721864-30067-1-git-send-email-rnayak@ti.com>
-	<20111104202905.GA3918@quad.lixom.net>
-Message-ID: <20111104211447.GC2541@opensource.wolfsonmicro.com>
+From: shawn.gsc@gmail.com (Shawn Guo)
+Date: Sat, 5 Nov 2011 05:15:40 +0800
+Subject: [PATCH v3 04/17] ARM: mxc: convert smp platforms to global
+	gic_handle_irq()
+In-Reply-To: <1320425871-30564-5-git-send-email-marc.zyngier@arm.com>
+References: <1320425871-30564-1-git-send-email-marc.zyngier@arm.com>
+	<1320425871-30564-5-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20111104211540.GB3546@r65073-Latitude-D630>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 04, 2011 at 01:29:05PM -0700, Olof Johansson wrote:
-> On Thu, Oct 27, 2011 at 06:54:24PM +0530, Rajendra Nayak wrote:
+On Fri, Nov 04, 2011 at 04:57:38PM +0000, Marc Zyngier wrote:
+> Convert the SMP shmobile platforms to use the global gic_handle_irq()
 
-> > @@ -0,0 +1,33 @@
-> > +Voltage/Current Regulators
+s/shmobile/imx
 
-> There should be a mandatory compatible field here, right? I.e. a topmost
-> generic one, "regulator" or similar.
+Other than the typo there, for patches #2 and #4:
 
-It's not really useful for the regulator subsystem to directly bind to
-the device as something needs to actually control it, the idea is that
-this binding is included by reference in the bindings for specific
-devices.
+Acked-by: Shawn Guo <shawn.guo@linaro.org>
 
-> Also, lower-caps is common instead of V and A.
-
-On the other hand the case is pretty important for SI units
-
-> > +- <name>-supply: phandle to the parent supply/regulator node
-
-> Having a fixed name here instead of a free form string would probably be a good
-> idea?
-
-The name will be fixed by the individual device bindings, this is
-specifying the general form of a supply property.  Each device binding
-will define the set of supplies that the device can use.
+> function instead a private function.
+> 
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Sascha Hauer <kernel@pengutronix.de>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
