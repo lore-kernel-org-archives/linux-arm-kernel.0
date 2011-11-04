@@ -1,37 +1,60 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 5 Nov 2011 00:20:54 +0100
-Subject: [GIT PULL] Samsung devel-4 for v3.2
-In-Reply-To: <027f01cc9ab6$2086eae0$6194c0a0$%kim@samsung.com>
-References: <027f01cc9ab6$2086eae0$6194c0a0$%kim@samsung.com>
-Message-ID: <201111050020.55071.arnd@arndb.de>
+From: khilman@ti.com (Kevin Hilman)
+Date: Fri, 04 Nov 2011 16:23:24 -0700
+Subject: [PATCH v3 2/4] OMAP4: hwmod data: add mmu hwmod for ipu and dsp
+In-Reply-To: <1320185752-568-3-git-send-email-omar.ramirez@ti.com> (Omar
+	Ramirez Luna's message of "Tue, 1 Nov 2011 17:15:50 -0500")
+References: <1320185752-568-1-git-send-email-omar.ramirez@ti.com>
+	<1320185752-568-3-git-send-email-omar.ramirez@ti.com>
+Message-ID: <87sjm31ngz.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 04 November 2011, Kukjin Kim wrote:
-> As we talked in Prague, I'm sending 'pull request for v3.2' Samsung-devel4
-> which includes supporting EXYNOS4 DT, SPI clkdev and reorganization
-> arch/arm/mach-exynos and small things.
-> 
-> Please pull from: 
->   git://github.com/kgene/linux-samsung.git next-samsung-devel-4
-> 
-> As a note, the branch includes arm-soc/next/cleanup3 and arm-soc/next/devel2
-> based on mainline commit 994c0e99 ("Merge branch 'next/soc' of
-> git://git.linaro.org/people/arnd/arm-soc") because it is needed for this and
-> they include all of Samsung stuff for v3.2.
-> 
-> And I will be back to kernel.org after this merge window.
-> 
-> If any problems, please let me know.
+Omar Ramirez Luna <omar.ramirez@ti.com> writes:
 
-I've looked through it, and I think I'll hold off for this merge window,
-especially given that I had enough trouble with the the other commits
-and that the submission is really late. Please realize that I have to
-push back on stuff that comes during the merge window.
+> Add mmu hwmod data for ipu and dsp.
+>
+> Signed-off-by: Omar Ramirez Luna <omar.ramirez@ti.com>
 
-Please send the contents split up into separate branches (dt, spi, clkdev,
-rename, devel) for 3.3. I think it's ok if you want to send just the
-rename patch for 3.2 the way we had discussed earlier, because this kind
-of patch really makes sense at the end of the merge window.
+[...]
 
-	Arnd
+> +static struct omap_hwmod omap44xx_ipu_mmu_hwmod = {
+> +	.name		= "ipu_mmu",
+> +	.class		= &omap44xx_mmu_hwmod_class,
+> +	.mpu_irqs	= omap44xx_ipu_mmu_irqs,
+> +	.rst_lines	= omap44xx_ipu_mmu_resets,
+> +	.rst_lines_cnt	= ARRAY_SIZE(omap44xx_ipu_mmu_resets),
+> +	.main_clk	= "ipu_fck",
+> +	.prcm = {
+> +		.omap4 = {
+> +			.rstctrl_offs = OMAP4_RM_DUCATI_RSTCTRL_OFFSET,
+> +		},
+> +	},
+> +	.dev_attr	= &ipu_mmu_dev_attr,
+> +	.slaves		= omap44xx_ipu_mmu_slaves,
+> +	.slaves_cnt	= ARRAY_SIZE(omap44xx_ipu_mmu_slaves),
+> +	.flags		= HWMOD_INIT_NO_RESET,
+
+Why is this needed?
+
+[...]
+
+> +static struct omap_hwmod omap44xx_dsp_mmu_hwmod = {
+> +	.name		= "dsp_mmu",
+> +	.class		= &omap44xx_mmu_hwmod_class,
+> +	.mpu_irqs	= omap44xx_dsp_mmu_irqs,
+> +	.rst_lines	= omap44xx_dsp_mmu_resets,
+> +	.rst_lines_cnt	= ARRAY_SIZE(omap44xx_dsp_mmu_resets),
+> +	.main_clk	= "dsp_fck",
+> +	.prcm = {
+> +		.omap4 = {
+> +			.rstctrl_offs = OMAP4_RM_TESLA_RSTCTRL_OFFSET,
+> +		},
+> +	},
+> +	.dev_attr	= &dsp_mmu_dev_attr,
+> +	.slaves		= omap44xx_dsp_mmu_slaves,
+> +	.slaves_cnt	= ARRAY_SIZE(omap44xx_dsp_mmu_slaves),
+> +	.flags		= HWMOD_INIT_NO_RESET,
+
+And this?
+
+Kevin
