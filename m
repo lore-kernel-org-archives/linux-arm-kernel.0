@@ -1,86 +1,66 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri,  4 Nov 2011 16:57:46 +0000
-Subject: [PATCH v3 12/17] ARM: shmobile: convert smp platforms to
-	gic_handle_irq()
+Date: Fri,  4 Nov 2011 16:57:47 +0000
+Subject: [PATCH v3 13/17] ARM: cns3xxx: convert to CONFIG_MULTI_IRQ_HANDLER
 In-Reply-To: <1320425871-30564-1-git-send-email-marc.zyngier@arm.com>
 References: <1320425871-30564-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1320425871-30564-13-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1320425871-30564-14-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert the SMP shmobile platforms to use gic_handle_irq() instead
-of the assembly macro.
+Convert the cns3xxx platform to be using the gic_handle_irq
+function as its primary interrupt handler.
 
-Cc: Paul Mundt <lethal@linux-sh.org>
+Acked-by: Anton Vorontsov <cbouatmailru@gmail.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/mach-shmobile/Makefile              |    1 -
- arch/arm/mach-shmobile/board-ag5evm.c        |    2 +-
- arch/arm/mach-shmobile/entry-gic.S           |   18 ------------------
- arch/arm/mach-shmobile/include/mach/common.h |    1 -
- 4 files changed, 1 insertions(+), 21 deletions(-)
- delete mode 100644 arch/arm/mach-shmobile/entry-gic.S
+ arch/arm/Kconfig                                 |    1 +
+ arch/arm/mach-cns3xxx/cns3420vb.c                |    2 ++
+ arch/arm/mach-cns3xxx/include/mach/entry-macro.S |    2 --
+ 3 files changed, 3 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
-index 43754f3..38fdbf2 100644
---- a/arch/arm/mach-shmobile/Makefile
-+++ b/arch/arm/mach-shmobile/Makefile
-@@ -28,7 +28,6 @@ pfc-$(CONFIG_ARCH_SH73A0)	+= pfc-sh73a0.o
- obj-$(CONFIG_ARCH_SH7367)	+= entry-intc.o
- obj-$(CONFIG_ARCH_SH7377)	+= entry-intc.o
- obj-$(CONFIG_ARCH_SH7372)	+= entry-intc.o
--obj-$(CONFIG_ARCH_SH73A0)	+= entry-gic.o
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 605e897..e38be77 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -366,6 +366,7 @@ config ARCH_CNS3XXX
+ 	select ARM_GIC
+ 	select MIGHT_HAVE_PCI
+ 	select PCI_DOMAINS if PCI
++	select MULTI_IRQ_HANDLER
+ 	help
+ 	  Support for Cavium Networks CNS3XXX platform.
  
- # PM objects
- obj-$(CONFIG_SUSPEND)		+= suspend.o
-diff --git a/arch/arm/mach-shmobile/board-ag5evm.c b/arch/arm/mach-shmobile/board-ag5evm.c
-index 448f51a..06483e4 100644
---- a/arch/arm/mach-shmobile/board-ag5evm.c
-+++ b/arch/arm/mach-shmobile/board-ag5evm.c
-@@ -603,7 +603,7 @@ MACHINE_START(AG5EVM, "ag5evm")
- 	.map_io		= ag5evm_map_io,
- 	.soc		= &sh73a0_soc_desc,
- 	.init_irq	= ag5evm_init_irq,
--	.handle_irq	= shmobile_handle_irq_gic,
+diff --git a/arch/arm/mach-cns3xxx/cns3420vb.c b/arch/arm/mach-cns3xxx/cns3420vb.c
+index 55f7b4b..594852f 100644
+--- a/arch/arm/mach-cns3xxx/cns3420vb.c
++++ b/arch/arm/mach-cns3xxx/cns3420vb.c
+@@ -26,6 +26,7 @@
+ #include <linux/mtd/partitions.h>
+ #include <asm/setup.h>
+ #include <asm/mach-types.h>
++#include <asm/hardware/gic.h>
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
+ #include <asm/mach/time.h>
+@@ -201,5 +202,6 @@ MACHINE_START(CNS3420VB, "Cavium Networks CNS3420 Validation Board")
+ 	.map_io		= cns3420_map_io,
+ 	.init_irq	= cns3xxx_init_irq,
+ 	.timer		= &cns3xxx_timer,
 +	.handle_irq	= gic_handle_irq,
- 	.init_machine	= ag5evm_init,
- 	.timer		= &ag5evm_timer,
+ 	.init_machine	= cns3420_init,
  MACHINE_END
-diff --git a/arch/arm/mach-shmobile/entry-gic.S b/arch/arm/mach-shmobile/entry-gic.S
-deleted file mode 100644
-index e20239b..0000000
---- a/arch/arm/mach-shmobile/entry-gic.S
-+++ /dev/null
-@@ -1,18 +0,0 @@
--/*
-- * ARM Interrupt demux handler using GIC
-- *
-- * Copyright (C) 2010 Magnus Damm
-- * Copyright (C) 2011 Paul Mundt
-- * Copyright (C) 2010 - 2011 Renesas Solutions Corp.
-- *
-- * This file is licensed under  the terms of the GNU General Public
-- * License version 2. This program is licensed "as is" without any
-- * warranty of any kind, whether express or implied.
-- */
--
--#include <asm/assembler.h>
--#include <asm/entry-macro-multi.S>
--#include <asm/hardware/gic.h>
+diff --git a/arch/arm/mach-cns3xxx/include/mach/entry-macro.S b/arch/arm/mach-cns3xxx/include/mach/entry-macro.S
+index d87bfc3..01c57df 100644
+--- a/arch/arm/mach-cns3xxx/include/mach/entry-macro.S
++++ b/arch/arm/mach-cns3xxx/include/mach/entry-macro.S
+@@ -8,8 +8,6 @@
+  * published by the Free Software Foundation.
+  */
+ 
 -#include <asm/hardware/entry-macro-gic.S>
 -
--	arch_irq_handler shmobile_handle_irq_gic
-diff --git a/arch/arm/mach-shmobile/include/mach/common.h b/arch/arm/mach-shmobile/include/mach/common.h
-index 2283521..04856a3 100644
---- a/arch/arm/mach-shmobile/include/mach/common.h
-+++ b/arch/arm/mach-shmobile/include/mach/common.h
-@@ -7,7 +7,6 @@ extern void shmobile_secondary_vector(void);
- struct clk;
- extern int clk_init(void);
- extern void shmobile_handle_irq_intc(struct pt_regs *);
--extern void shmobile_handle_irq_gic(struct pt_regs *);
- extern struct platform_suspend_ops shmobile_suspend_ops;
- struct cpuidle_device;
- extern void (*shmobile_cpuidle_modes[])(void);
+ 		.macro	disable_fiq
+ 		.endm
+ 
 -- 
 1.7.0.4
