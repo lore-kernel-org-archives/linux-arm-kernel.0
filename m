@@ -1,223 +1,169 @@
 From: b39297@freescale.com (wu guoxing)
-Date: Fri, 4 Nov 2011 18:12:31 +0800
-Subject: [PATCH v3] ARM/mx35/3ds: gpio: add mc9s08dz60 gpio function
-Message-ID: <1320401551-21377-1-git-send-email-b39297@freescale.com>
+Date: Fri, 4 Nov 2011 18:13:52 +0800
+Subject: [PATCH v3] ARM : mx35: 3ds-board: add framebuffer device
+Message-ID: <1320401632-21444-1-git-send-email-b39297@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-we only use the gpio function of mc9s08dz60 mcu chip, so just
-add the gpio driver, as this mcu will never be used in other board.
+This patch adds framebuffer support for freescale mx35 3ds board
 
 Signed-off-by: Wu Guoxing <b39297@freescale.com>
 ---
+Changes since v2:
+	1. use gpio_set_value_cansleep instead of gpio_set_value
 Changes since v1:
-	1. add can_sleep = 1
-	2. removed some useless return checks and local variable
-	3. removed the static variable for i2c client.
-	4. make init&exit function static
+	1. use gpio driver for mc9s08dz60
 
- drivers/gpio/Kconfig           |    6 ++
- drivers/gpio/Makefile          |    1 +
- drivers/gpio/gpio-mc9s08dz60.c |  167 ++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 174 insertions(+), 0 deletions(-)
- create mode 100644 drivers/gpio/gpio-mc9s08dz60.c
+ arch/arm/mach-imx/mach-mx35_3ds.c |  113 +++++++++++++++++++++++++++++++++++++
+ 1 files changed, 113 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
-index d539efd..7f6beee 100644
---- a/drivers/gpio/Kconfig
-+++ b/drivers/gpio/Kconfig
-@@ -487,4 +487,10 @@ config GPIO_TPS65910
- 	help
- 	  Select this option to enable GPIO driver for the TPS65910
- 	  chip family.
-+
-+config GPIO_MC9S08DZ60
-+	bool "MX35 3DS BOARD MC9S08DZ60 GPIO functions"
-+	depends on I2C && MACH_MX35_3DS
-+	help
-+	  Select this to enable the MC9S08DZ60 GPIO driver
- endif
-diff --git a/drivers/gpio/Makefile b/drivers/gpio/Makefile
-index 9588948..85b8799 100644
---- a/drivers/gpio/Makefile
-+++ b/drivers/gpio/Makefile
-@@ -60,3 +60,4 @@ obj-$(CONFIG_GPIO_WM831X)	+= gpio-wm831x.o
- obj-$(CONFIG_GPIO_WM8350)	+= gpio-wm8350.o
- obj-$(CONFIG_GPIO_WM8994)	+= gpio-wm8994.o
- obj-$(CONFIG_GPIO_XILINX)	+= gpio-xilinx.o
-+obj-$(CONFIG_GPIO_MC9S08DZ60) += gpio-mc9s08dz60.o
-diff --git a/drivers/gpio/gpio-mc9s08dz60.c b/drivers/gpio/gpio-mc9s08dz60.c
-new file mode 100644
-index 0000000..c41eb16
---- /dev/null
-+++ b/drivers/gpio/gpio-mc9s08dz60.c
-@@ -0,0 +1,167 @@
-+/*
-+ * Copyright 2009-2011 Freescale Semiconductor, Inc. All Rights Reserved.
-+ *
-+ * Author: Wu Guoxing <b39297@freescale.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/slab.h>
-+#include <linux/i2c.h>
-+#include <linux/gpio.h>
-+
-+#define GPIO_GROUP_NUM 2
-+#define GPIO_NUM_PER_GROUP 8
-+#define GPIO_NUM (GPIO_GROUP_NUM*GPIO_NUM_PER_GROUP)
-+
-+struct mc9s08dz60 {
-+	struct i2c_client *client;
-+	struct gpio_chip chip;
+diff --git a/arch/arm/mach-imx/mach-mx35_3ds.c b/arch/arm/mach-imx/mach-mx35_3ds.c
+index 5a5eb3e..fa19c0d 100644
+--- a/arch/arm/mach-imx/mach-mx35_3ds.c
++++ b/arch/arm/mach-imx/mach-mx35_3ds.c
+@@ -40,9 +40,86 @@
+ #include <mach/iomux-mx35.h>
+ #include <mach/irqs.h>
+ #include <mach/3ds_debugboard.h>
++#include <video/platform_lcd.h>
+ 
+ #include "devices-imx35.h"
+ 
++static const struct fb_videomode fb_modedb[] = {
++	{
++	 /* 800x480 @ 55 Hz */
++	 .name = "Ceramate-CLAA070VC01",
++	 .refresh = 55,
++	 .xres = 800,
++	 .yres = 480,
++	 .pixclock = 40000,
++	 .left_margin = 40,
++	 .right_margin = 40,
++	 .upper_margin = 5,
++	 .lower_margin = 5,
++	 .hsync_len = 20,
++	 .vsync_len = 10,
++	 .sync = FB_SYNC_OE_ACT_HIGH,
++	 .vmode = FB_VMODE_NONINTERLACED,
++	 .flag = 0,
++	 },
 +};
 +
-+static struct mc9s08dz60 *to_mc9s08dz60(struct gpio_chip *gc)
++static const struct ipu_platform_data mx3_ipu_data __initconst = {
++	.irq_base = MXC_IPU_IRQ_START,
++};
++
++static struct mx3fb_platform_data mx3fb_pdata __initdata = {
++	.name = "Ceramate-CLAA070VC01",
++	.mode = fb_modedb,
++	.num_modes = ARRAY_SIZE(fb_modedb),
++};
++
++static struct i2c_board_info __initdata i2c_devices_3ds[] = {
++	{
++		I2C_BOARD_INFO("mc9s08dz60", 0x69),
++	},
++};
++
++static int mc9s08dz60_gpiochip_match(struct gpio_chip *chip,
++						     void *data)
 +{
-+	return container_of(gc, struct mc9s08dz60, chip);
++	return !strcmp(chip->label, data);
 +}
 +
-+
-+static void gpio_to_reg_and_bit(int offset, u8 *reg, u8 *bit)
++static int mc9s08dz60_lcd_gpio_get(void)
 +{
-+	*reg = 0x20 + offset / GPIO_NUM_PER_GROUP;
-+	*bit = offset % GPIO_NUM_PER_GROUP;
-+}
-+
-+static int mc9s08dz60_get_value(struct gpio_chip *gc, unsigned offset)
-+{
-+	int ret = 0;
-+	u8 reg, bit;
-+	s32 value;
-+	struct mc9s08dz60 *mc9s = to_mc9s08dz60(gc);
-+
-+	gpio_to_reg_and_bit(offset, &reg, &bit);
-+	value = i2c_smbus_read_byte_data(mc9s->client, reg);
-+	if (value >= 0)
-+		ret = (value >> bit) & 0x1;
-+
-+	return ret;
-+}
-+
-+static void mc9s08dz60_set_value(struct gpio_chip *gc, unsigned offset, int val)
-+{
-+	u8 reg, bit;
-+	s32 value;
-+	struct mc9s08dz60 *mc9s = to_mc9s08dz60(gc);
-+
-+	gpio_to_reg_and_bit(offset, &reg, &bit);
-+	value = i2c_smbus_read_byte_data(mc9s->client, reg);
-+	if (value >= 0) {
-+		if (val)
-+			value |= 1 << bit;
-+		else
-+			value &= ~(1 << bit);
-+
-+		i2c_smbus_write_byte_data(mc9s->client, reg, value);
-+	}
-+}
-+
-+static int mc9s08dz60_direction_output(struct gpio_chip *gc,
-+				       unsigned offset, int val)
-+{
-+	mc9s08dz60_set_value(gc, offset, val);
-+	return 0;
-+}
-+
-+static int mc9s08dz60_probe(struct i2c_client *client,
-+			    const struct i2c_device_id *id)
-+{
-+	int ret = 0;
-+	struct mc9s08dz60 *mc9s;
-+
-+	mc9s = kzalloc(sizeof(*mc9s), GFP_KERNEL);
-+	if (!mc9s)
-+		return -ENOMEM;
-+
-+	mc9s->chip.label = client->name;
-+	mc9s->chip.base = -1;
-+	mc9s->chip.dev = &client->dev;
-+	mc9s->chip.owner = THIS_MODULE;
-+	mc9s->chip.ngpio = GPIO_NUM;
-+	mc9s->chip.can_sleep = 1;
-+	mc9s->chip.get = mc9s08dz60_get_value;
-+	mc9s->chip.set = mc9s08dz60_set_value;
-+	mc9s->chip.direction_output = mc9s08dz60_direction_output;
-+	mc9s->client = client;
-+
-+	ret = gpiochip_add(&mc9s->chip);
-+	if (ret)
-+		goto error;
-+
-+	i2c_set_clientdata(client, mc9s);
-+
-+	return 0;
-+
-+error:
-+	kfree(mc9s);
-+	return ret;
-+}
-+
-+static int mc9s08dz60_remove(struct i2c_client *client)
-+{
-+	struct mc9s08dz60 *mc9s;
 +	int ret;
++	struct gpio_chip *chip;
++	chip = gpiochip_find(
++			"mc9s08dz60", mc9s08dz60_gpiochip_match);
++	if (chip)
++		ret = chip->base + 6;
++	else {
++		pr_err("didn't find mc9s08dz60 gpio\n");
++		ret = -1;
++	}
 +
-+	mc9s = i2c_get_clientdata(client);
-+
-+	i2c_set_clientdata(client, NULL);
-+
-+	ret = gpiochip_remove(&mc9s->chip);
-+	if (!ret)
-+		kfree(mc9s);
-+
-+	return 0;
-+
++	return ret;
 +}
 +
-+static const struct i2c_device_id mc9s08dz60_id[] = {
-+	{"mc9s08dz60", 0},
-+	{},
++static void mx35_3ds_lcd_set_power(struct plat_lcd_data *pd, unsigned int power)
++{
++	int gpio;
++
++	gpio = mc9s08dz60_lcd_gpio_get();
++	if (gpio >= 0)
++		gpio_set_value_cansleep(gpio, power);
++}
++
++static struct plat_lcd_data mx35_3ds_lcd_data = {
++	.set_power = mx35_3ds_lcd_set_power,
 +};
 +
-+MODULE_DEVICE_TABLE(i2c, mc9s08dz60_id);
-+
-+static struct i2c_driver mc9s08dz60_i2c_driver = {
-+	.driver = {.owner = THIS_MODULE,
-+		   .name = "mc9s08dz60",
-+		   },
-+	.probe = mc9s08dz60_probe,
-+	.remove = mc9s08dz60_remove,
-+	.id_table = mc9s08dz60_id,
++static struct platform_device mx35_3ds_lcd = {
++	.name = "platform-lcd",
++	.dev.platform_data = &mx35_3ds_lcd_data,
 +};
 +
-+static int __init mc9s08dz60_init(void)
-+{
-+	return i2c_add_driver(&mc9s08dz60_i2c_driver);
-+}
+ #define EXPIO_PARENT_INT	gpio_to_irq(IMX_GPIO_NR(1, 1))
+ 
+ static const struct imxuart_platform_data uart_pdata __initconst = {
+@@ -120,6 +197,32 @@ static iomux_v3_cfg_t mx35pdk_pads[] = {
+ 	/* I2C1 */
+ 	MX35_PAD_I2C1_CLK__I2C1_SCL,
+ 	MX35_PAD_I2C1_DAT__I2C1_SDA,
++	/* Display */
++	MX35_PAD_LD0__IPU_DISPB_DAT_0,
++	MX35_PAD_LD1__IPU_DISPB_DAT_1,
++	MX35_PAD_LD2__IPU_DISPB_DAT_2,
++	MX35_PAD_LD3__IPU_DISPB_DAT_3,
++	MX35_PAD_LD4__IPU_DISPB_DAT_4,
++	MX35_PAD_LD5__IPU_DISPB_DAT_5,
++	MX35_PAD_LD6__IPU_DISPB_DAT_6,
++	MX35_PAD_LD7__IPU_DISPB_DAT_7,
++	MX35_PAD_LD8__IPU_DISPB_DAT_8,
++	MX35_PAD_LD9__IPU_DISPB_DAT_9,
++	MX35_PAD_LD10__IPU_DISPB_DAT_10,
++	MX35_PAD_LD11__IPU_DISPB_DAT_11,
++	MX35_PAD_LD12__IPU_DISPB_DAT_12,
++	MX35_PAD_LD13__IPU_DISPB_DAT_13,
++	MX35_PAD_LD14__IPU_DISPB_DAT_14,
++	MX35_PAD_LD15__IPU_DISPB_DAT_15,
++	MX35_PAD_LD16__IPU_DISPB_DAT_16,
++	MX35_PAD_LD17__IPU_DISPB_DAT_17,
++	MX35_PAD_D3_HSYNC__IPU_DISPB_D3_HSYNC,
++	MX35_PAD_D3_FPSHIFT__IPU_DISPB_D3_CLK,
++	MX35_PAD_D3_DRDY__IPU_DISPB_D3_DRDY,
++	MX35_PAD_CONTRAST__IPU_DISPB_CONTR,
++	MX35_PAD_D3_VSYNC__IPU_DISPB_D3_VSYNC,
++	MX35_PAD_D3_REV__IPU_DISPB_D3_REV,
++	MX35_PAD_D3_CLS__IPU_DISPB_D3_CLS,
+ };
+ 
+ static int mx35_3ds_otg_init(struct platform_device *pdev)
+@@ -179,6 +282,8 @@ static const struct imxi2c_platform_data mx35_3ds_i2c0_data __initconst = {
+  */
+ static void __init mx35_3ds_init(void)
+ {
++	struct platform_device *imx35_fb_pdev;
 +
-+static void __exit mc9s08dz60_exit(void)
-+{
-+	i2c_del_driver(&mc9s08dz60_i2c_driver);
-+}
+ 	imx35_soc_init();
+ 
+ 	mxc_iomux_v3_setup_multiple_pads(mx35pdk_pads, ARRAY_SIZE(mx35pdk_pads));
+@@ -204,6 +309,14 @@ static void __init mx35_3ds_init(void)
+ 		pr_warn("Init of the debugboard failed, all "
+ 				"devices on the debugboard are unusable.\n");
+ 	imx35_add_imx_i2c0(&mx35_3ds_i2c0_data);
 +
-+module_init(mc9s08dz60_init);
-+module_exit(mc9s08dz60_exit);
++	i2c_register_board_info(
++		0, i2c_devices_3ds, ARRAY_SIZE(i2c_devices_3ds));
 +
-+MODULE_AUTHOR("Freescale Semiconductor, Inc."
-+		"Wu Guoxing <b39297@freescale.com>");
-+MODULE_DESCRIPTION("mc9s08dz60 gpio function on mx35 3ds board");
-+MODULE_LICENSE("GPL v2");
++	imx35_add_ipu_core(&mx3_ipu_data);
++	imx35_fb_pdev = imx35_add_mx3_sdc_fb(&mx3fb_pdata);
++	mx35_3ds_lcd.dev.parent = &imx35_fb_pdev->dev;
++	platform_device_register(&mx35_3ds_lcd);
+ }
+ 
+ static void __init mx35pdk_timer_init(void)
 -- 
 1.7.1
