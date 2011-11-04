@@ -1,98 +1,50 @@
-From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Fri, 4 Nov 2011 23:29:45 +0100
-Subject: [PATCH] PM: HIBERNATION: skip the swap size check if the snapshot
-	image size is anticipative
-In-Reply-To: <1320392176-3906-1-git-send-email-Barry.Song@csr.com>
-References: <1320392176-3906-1-git-send-email-Barry.Song@csr.com>
-Message-ID: <201111042329.45405.rjw@sisk.pl>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Fri, 4 Nov 2011 22:35:19 +0000
+Subject: [PATCH v4 1/4] regulator: helper routine to extract
+	regulator_init_data
+In-Reply-To: <CAOesGMjkcExKXhNN1nFGey=wBie0PQGp2XS_r-5Rr3X0p4eNhg@mail.gmail.com>
+References: <1319721864-30067-1-git-send-email-rnayak@ti.com>
+	<20111104202905.GA3918@quad.lixom.net>
+	<20111104211447.GC2541@opensource.wolfsonmicro.com>
+	<20111104212216.GA5756@quad.lixom.net>
+	<20111104212910.GB8266@opensource.wolfsonmicro.com>
+	<CAOesGMgA7UayF9SJUP0YLnj86GmKBrajsBxv4_kRNNqCsvKTYg@mail.gmail.com>
+	<20111104214650.GC8266@opensource.wolfsonmicro.com>
+	<CAOesGMjkcExKXhNN1nFGey=wBie0PQGp2XS_r-5Rr3X0p4eNhg@mail.gmail.com>
+Message-ID: <20111104223518.GC16978@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, November 04, 2011, Barry Song wrote:
-> From: Barry Song <Baohua.Song@csr.com>
-> 
-> Current swsusp requires swap partitions even larger than real saved pages
-> due to the worst compress ratio:
-> but for an embedded system, which has limited storage space, then it might
-> can't give the big size partition to save snapshot.
-> In the another way, some embedded systems can definitely know the most size
-> needed for snapshot since they run some specific application lists.
-> So this patch provides the possibility for bootloader to tell kernel even
-> the system has a little snapshot partition, but it is still enough.
-> For example, if the system need to save 120MB memory, origin swsusp will require
-> a 130MB partition to save snapshot. but if users know 30MB is enough for them(
-> compressed image will be less than 30MB), they just make a 30MB partition.
-> 
-> Signed-off-by: Barry Song <Baohua.Song@csr.com>
-> Cc: Xiangzhen Ye <Xiangzhen.Ye@csr.com>
+On Fri, Nov 04, 2011 at 03:16:12PM -0700, Olof Johansson wrote:
+> On Fri, Nov 4, 2011 at 2:46 PM, Mark Brown
 
-I'm considering this as 3.3 material, so I'll take care of it after the current
-merge window closes.
+> >> Describing that in the device tree using regulator-specifiers
+> >> shouldn't be too bad? The LDO will reference the DCDC as the parent
+> >> supply (or input or whatever language you prefer). They don't have to
+> >> be in the same topology, they will instead be under whatever
+> >> controller/bus they are on for control -- i2c, etc.
 
-Thanks,
-Rafael
+> > That's not great as it means you've got a separate binding for supplies
+> > that happen to be connected to another regulator from that used for
+> > other supplies on the device which is particularly confusing in the
+> > fairly common case where a regulator chip has multiple supplies. ?Using
+> > the same method for binding all supplies seems much neater.
 
+> I'm not following the above 100%, but I think you are saying that you
+> would prefer to describe the regulator / power hierarchy in the
+> functional topology instead of how the various regulators and supplies
+> are organized on i2c busses and other controllers?  And the obvious
+> one that would be less than trivial to find a home for would be the
+> top-level or freestanding fixed regulators that don't sit on a
+> controlling bus.
 
-> ---
->  this is another patch after I provide resumewait/resumedelay kernel params
->  to make swsusp support embedded systems better.
->  This patch is tested on CSR SiRFprimaII platform.
-> 
->  Documentation/kernel-parameters.txt |    7 +++++++
->  kernel/power/swap.c                 |   13 +++++++++++++
->  2 files changed, 20 insertions(+), 0 deletions(-)
-> 
-> diff --git a/Documentation/kernel-parameters.txt b/Documentation/kernel-parameters.txt
-> index a0c5c5f..2ad2e9c 100644
-> --- a/Documentation/kernel-parameters.txt
-> +++ b/Documentation/kernel-parameters.txt
-> @@ -2277,6 +2277,13 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
->  			in <PAGE_SIZE> units (needed only for swap files).
->  			See  Documentation/power/swsusp-and-swap-files.txt
->  
-> +	swapenough	[SWSUSP]
-> +			Tell kernel the swap partition size is enough and let kernel
-> +			skip checking whether the swap partition has enough size to
-> +			save snapshot.
-> +			It is used for embedded systems, typically using NAND and SD
-> +			card, which have not large space.
-> +
->  	resumedelay=	[HIBERNATION] Delay (in seconds) to pause before attempting to
->  			read the resume files
->  
-> diff --git a/kernel/power/swap.c b/kernel/power/swap.c
-> index 11a594c..97c30b5 100644
-> --- a/kernel/power/swap.c
-> +++ b/kernel/power/swap.c
-> @@ -36,6 +36,8 @@
->  
->  #define HIBERNATE_SIG	"S1SUSPEND"
->  
-> +static int swapenough;
-> +
->  /*
->   *	The swap map is a data structure used for keeping track of each page
->   *	written to a swap partition.  It consists of many swap_map_page
-> @@ -772,6 +774,9 @@ static int enough_swap(unsigned int nr_pages, unsigned int flags)
->  	unsigned int free_swap = count_swap_pages(root_swap, 1);
->  	unsigned int required;
->  
-> +	if (swapenough)
-> +		return 1;
-> +
->  	pr_debug("PM: Free swap pages: %u\n", free_swap);
->  
->  	required = PAGES_FOR_IO + ((flags & SF_NOCOMPRESS_MODE) ?
-> @@ -1449,3 +1454,11 @@ static int swsusp_header_init(void)
->  }
->  
->  core_initcall(swsusp_header_init);
-> +
-> +static int __init swapenough_setup(char *str)
-> +{
-> +	swapenough = 1;
-> +	return 1;
-> +}
-> +
-> +__setup("swapenough", swapenough_setup);
-> 
+No, that's not the issue at all.  The issue is that we want a single way
+of describing the supplies a device has regardless of their function
+(which is what the existing stuff does).
+
+Consider the case of a simple regulator with register control.  It is
+going to have a supply used for the regulator itself and almost
+certainly also a separate digital buffer supply used to reference the
+digital I/O.  It seems bad to specify the first supply in a different
+manner to the second, and there are more complex examples where a supply
+can be both a regulator input and also a more general purpose supply.
