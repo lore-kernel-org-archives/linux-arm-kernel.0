@@ -1,63 +1,192 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 4 Nov 2011 15:50:05 -0700
-Subject: [PATCH v4 1/4] regulator: helper routine to extract
-	regulator_init_data
-In-Reply-To: <20111104223518.GC16978@opensource.wolfsonmicro.com>
-References: <1319721864-30067-1-git-send-email-rnayak@ti.com>
-	<20111104202905.GA3918@quad.lixom.net>
-	<20111104211447.GC2541@opensource.wolfsonmicro.com>
-	<20111104212216.GA5756@quad.lixom.net>
-	<20111104212910.GB8266@opensource.wolfsonmicro.com>
-	<CAOesGMgA7UayF9SJUP0YLnj86GmKBrajsBxv4_kRNNqCsvKTYg@mail.gmail.com>
-	<20111104214650.GC8266@opensource.wolfsonmicro.com>
-	<CAOesGMjkcExKXhNN1nFGey=wBie0PQGp2XS_r-5Rr3X0p4eNhg@mail.gmail.com>
-	<20111104223518.GC16978@opensource.wolfsonmicro.com>
-Message-ID: <CAOesGMh028s9mxHYwMq0h_a2km_GL_6O1ce=NN2HVBZ9q_1qAQ@mail.gmail.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Fri, 04 Nov 2011 16:00:00 -0700
+Subject: [PATCH v7 19/21] OMAP2+: UART: Use custom activate func for
+	console uart.
+In-Reply-To: <1318952110-10659-5-git-send-email-govindraj.raja@ti.com>
+	(Govindraj R.'s message of "Tue, 18 Oct 2011 21:05:10 +0530")
+References: <1318952110-10659-1-git-send-email-govindraj.raja@ti.com>
+	<1318952110-10659-5-git-send-email-govindraj.raja@ti.com>
+Message-ID: <878vnv334f.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 4, 2011 at 3:35 PM, Mark Brown
-<broonie@opensource.wolfsonmicro.com> wrote:
-> On Fri, Nov 04, 2011 at 03:16:12PM -0700, Olof Johansson wrote:
->> On Fri, Nov 4, 2011 at 2:46 PM, Mark Brown
->
->> >> Describing that in the device tree using regulator-specifiers
->> >> shouldn't be too bad? The LDO will reference the DCDC as the parent
->> >> supply (or input or whatever language you prefer). They don't have to
->> >> be in the same topology, they will instead be under whatever
->> >> controller/bus they are on for control -- i2c, etc.
->
->> > That's not great as it means you've got a separate binding for supplies
->> > that happen to be connected to another regulator from that used for
->> > other supplies on the device which is particularly confusing in the
->> > fairly common case where a regulator chip has multiple supplies. ?Using
->> > the same method for binding all supplies seems much neater.
->
->> I'm not following the above 100%, but I think you are saying that you
->> would prefer to describe the regulator / power hierarchy in the
->> functional topology instead of how the various regulators and supplies
->> are organized on i2c busses and other controllers? ?And the obvious
->> one that would be less than trivial to find a home for would be the
->> top-level or freestanding fixed regulators that don't sit on a
->> controlling bus.
->
-> No, that's not the issue at all. ?The issue is that we want a single way
-> of describing the supplies a device has regardless of their function
-> (which is what the existing stuff does).
->
-> Consider the case of a simple regulator with register control. ?It is
-> going to have a supply used for the regulator itself and almost
-> certainly also a separate digital buffer supply used to reference the
-> digital I/O. ?It seems bad to specify the first supply in a different
-> manner to the second, and there are more complex examples where a supply
-> can be both a regulator input and also a more general purpose supply.
+"Govindraj.R" <govindraj.raja@ti.com> writes:
 
-Ah, we're misunderstanding each other again (as just discussed on irc
-as well), and we're in agreement here as far as I can tell.
+> Omap-uart can be used as console uart to print early boot
+> messages using earlyprintk so for console uart prevent
+> hwmod reset or idling during bootup.
+>
+> Identify the console_uart set the id and use the custom
+> pm_latency ops for console uart for the first time
+> to idle console uart left enabled from bootup and then enable
+> them back and reset pm_latency ops to default ops.
+>
+> Thanks to Kevin Hilman <khilman@ti.com> for suggesting
+> this approach.
+>
+> Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
+> ---
+>  arch/arm/mach-omap2/serial.c |   79 ++++++++++++++++++++++++++++-------------
+>  1 files changed, 54 insertions(+), 25 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/serial.c b/arch/arm/mach-omap2/serial.c
+> index e1eba7f..55903f0 100644
+> --- a/arch/arm/mach-omap2/serial.c
+> +++ b/arch/arm/mach-omap2/serial.c
+> @@ -63,6 +63,7 @@ struct omap_uart_state {
+>  
+>  static LIST_HEAD(uart_list);
+>  static u8 num_uarts;
+> +static u8 console_uart_id = -1;
+>  
+>  #define DEFAULT_RXDMA_POLLRATE		1	/* RX DMA polling rate (us) */
+>  #define DEFAULT_RXDMA_BUFSIZE		4096	/* RX DMA buffer size */
+> @@ -87,6 +88,29 @@ static struct omap_device_pm_latency omap_uart_latency[] = {
+>  	},
+>  };
+>  
+> +static int console_uart_enable_hwmod(struct omap_device *od)
+> +{
+> +	/* For early console we prevented hwmod reset and idle
+> +	 * So before we enable the uart clocks idle and then
+> +	 */
 
-Named properties using regulator-specifiers to reference upstream
-supplies should work well enough for any use today, and if it needs to
-be reconsidered in the future we can revisit it then.
+minor: fix multi-line comment style (search for multi-line in
+Documentation/CodingStyle).  Another one below.
 
+Notice that you're moving existing code here, but also changing the
+functionality without a description as to why.    Based on the existing code:
 
--Olof
+You need a console_lock() here...
+
+> +	omap_hwmod_idle(od->hwmods[0]);
+> +	omap_hwmod_enable(od->hwmods[0]);
+
+...and this should be omap_device_enable().
+
+And  you need a console_unlock() here.
+
+Yes, you're subsequent patches avoid this problem, but we still need a real
+fix other than checking for 'debug/loglevel', and when that happens,
+we'll need a console lock here.
+
+> +	/* restore the default activate/deactivate funcs,
+> +	 * since now we have set the hwmod state machine right
+> +	 * with the idle/enable for console uart
+> +	 */
+> +	od->pm_lats = omap_uart_latency;
+> +
+> +	return 0;
+> +}
+> +
+> +static struct omap_device_pm_latency console_uart_latency[] = {
+> +	{
+> +		.activate_func	 = console_uart_enable_hwmod,
+> +	},
+> +};
+> +
+>  #ifdef CONFIG_PM
+>  static void omap_uart_enable_wakeup(struct platform_device *pdev, bool enable)
+>  {
+> @@ -251,12 +275,20 @@ static void omap_serial_fill_default_pads(struct omap_board_data *bdata)
+>  static void omap_serial_fill_default_pads(struct omap_board_data *bdata) {}
+>  #endif
+>  
+> +char *cmdline_find_option(char *str)
+
+static inline
+
+> +{
+> +	extern char *saved_command_line;
+> +
+> +	return strstr(saved_command_line, str);
+> +}
+> +
+>  static int __init omap_serial_early_init(void)
+>  {
+>  	do {
+>  		char oh_name[MAX_UART_HWMOD_NAME_LEN];
+>  		struct omap_hwmod *oh;
+>  		struct omap_uart_state *uart;
+> +		char uart_name[MAX_UART_HWMOD_NAME_LEN];
+>  
+>  		snprintf(oh_name, MAX_UART_HWMOD_NAME_LEN,
+>  			 "uart%d", num_uarts + 1);
+> @@ -271,18 +303,23 @@ static int __init omap_serial_early_init(void)
+>  		uart->oh = oh;
+>  		uart->num = num_uarts++;
+>  		list_add_tail(&uart->node, &uart_list);
+> +		snprintf(uart_name, MAX_UART_HWMOD_NAME_LEN,
+> +				"%s%d", OMAP_SERIAL_NAME, uart->num);
+> +
+> +		if (cmdline_find_option(uart_name)) {
+> +			console_uart_id = uart->num;
+> +			/*
+> +			 * omap-uart can be used for earlyprintk logs
+> +			 * So if omap-uart is used as console then prevent
+> +			 * uart reset and idle to get logs from omap-uart
+> +			 * until uart console driver is available to take
+> +			 * care for console messages.
+> +			 * Idling or resetting omap-uart while printing logs
+> +			 * early boot logs can stall the boot-up.
+> +			 */
+> +			oh->flags |= HWMOD_INIT_NO_IDLE | HWMOD_INIT_NO_RESET;
+> +		}
+>  
+> -		/*
+> -		 * NOTE: omap_hwmod_setup*() has not yet been called,
+> -		 *       so no hwmod functions will work yet.
+> -		 */
+> -
+> -		/*
+> -		 * During UART early init, device need to be probed
+> -		 * to determine SoC specific init before omap_device
+> -		 * is ready.  Therefore, don't allow idle here
+> -		 */
+> -		uart->oh->flags |= HWMOD_INIT_NO_IDLE | HWMOD_INIT_NO_RESET;
+>  	} while (1);
+>  
+>  	return 0;
+> @@ -311,6 +348,7 @@ void __init omap_serial_init_port(struct omap_board_data *bdata,
+>  	u32 pdata_size = 0;
+>  	char *name;
+>  	struct omap_uart_port_info omap_up;
+> +	struct omap_device *od;
+>  
+>  	if (WARN_ON(!bdata))
+>  		return;
+> @@ -357,6 +395,11 @@ void __init omap_serial_init_port(struct omap_board_data *bdata,
+>  	WARN(IS_ERR(pdev), "Could not build omap_device for %s: %s.\n",
+>  	     name, oh->name);
+>  
+> +	if (console_uart_id == bdata->id) {
+> +		od = to_omap_device(pdev);
+> +		od->pm_lats = console_uart_latency;
+> +	}
+> +
+>  	omap_device_disable_idle_on_suspend(pdev);
+>  	oh->mux = omap_hwmod_mux_init(bdata->pads, bdata->pads_cnt);
+>  
+> @@ -364,20 +407,6 @@ void __init omap_serial_init_port(struct omap_board_data *bdata,
+>  
+>  	oh->dev_attr = uart;
+>  
+> -	console_lock(); /* in case the earlycon is on the UART */
+> -
+> -	/*
+> -	 * Because of early UART probing, UART did not get idled
+> -	 * on init.  Now that omap_device is ready, ensure full idle
+> -	 * before doing omap_device_enable().
+> -	 */
+> -	omap_hwmod_idle(uart->oh);
+> -
+> -	omap_device_enable(uart->pdev);
+> -	omap_device_idle(uart->pdev);
+> -
+> -	console_unlock();
+> -
+>  	if ((cpu_is_omap34xx() || cpu_is_omap44xx()) && bdata->pads)
+>  		device_init_wakeup(&pdev->dev, true);
+>  }
+
+Kevin
