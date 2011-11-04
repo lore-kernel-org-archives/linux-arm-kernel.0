@@ -1,24 +1,29 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 4 Nov 2011 18:01:33 +0000
-Subject: [PATCH] at91: vmalloc fix missing AT91_VIRT_BASE define
-In-Reply-To: <1320334246-16457-1-git-send-email-plagnioj@jcrosoft.com>
-References: <1320334246-16457-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <20111104180133.GC12913@n2100.arm.linux.org.uk>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Fri, 4 Nov 2011 14:20:05 -0400
+Subject: [PATCH 1/2] arm/dt: add basic usb nodes to tegra device trees
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF173F9A4CAC@HQMAIL01.nvidia.com>
+References: <1320377174-28047-1-git-send-email-olof@lixom.net>
+	<74CDBE0F657A3D45AFBB94109FB122FF173F9A4CAC@HQMAIL01.nvidia.com>
+Message-ID: <CACxGe6u5UJLwE+-iS_GzQxE5wkJ1RH_c9MFdrHfa__Wju-SuHg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 03, 2011 at 11:30:46PM +0800, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> break during the this merge
-> 
-> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+On Fri, Nov 4, 2011 at 11:27 AM, Stephen Warren <swarren@nvidia.com> wrote:
+> Olof Johansson wrote at Thursday, November 03, 2011 9:26 PM:
+>> For now they are a minimal binding. It needs to be amended with
+>> vendor-specific settings for phy setup and link tuning, etc.
+> ...
+>> diff --git a/arch/arm/boot/dts/tegra-seaboard.dts b/arch/arm/boot/dts/tegra-seaboard.dts
+> ...
+>> + ? ? usb at c5000000 {
+>> + ? ? ? ? ? ? nvidia,vbus-gpio = <&gpio 24 0>; /* PD0 */
+>> + ? ? };
+>
+> Given that's a custom property, don't we need bindings documentation in
+> Documentation/devictree/bindings/usb/? Even if the binding is pretty self-
+> explanatory.
 
-Not the only bug:
+Yes, you're right.  Please add a binding, but you can leave my ack in
+place when reposted.
 
-  CC      drivers/tty/serial/atmel_serial.o
-drivers/tty/serial/atmel_serial.c: In function ?atmel_serial_probe?:
-drivers/tty/serial/atmel_serial.c:1788: error: implicit declaration of function ?of_alias_get_id?
-make[4]: *** [drivers/tty/serial/atmel_serial.o] Error 1
-make[3]: *** [drivers/tty/serial] Error 2
-make[2]: *** [drivers/tty] Error 2
-make[1]: *** [drivers] Error 2
+g.
