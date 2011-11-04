@@ -1,140 +1,62 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Fri, 4 Nov 2011 14:30:20 -0400 (EDT)
-Subject: [PATCH v3 01/17] ARM: Make global handler and
-	CONFIG_MULTI_IRQ_HANDLER mutually exclusive
-In-Reply-To: <1320425871-30564-2-git-send-email-marc.zyngier@arm.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 04 Nov 2011 13:30:46 -0500
+Subject: [PATCH v3 05/17] ARM: highbank: convert to
+	CONFIG_MULTI_IRQ_HANDLER
+In-Reply-To: <1320425871-30564-6-git-send-email-marc.zyngier@arm.com>
 References: <1320425871-30564-1-git-send-email-marc.zyngier@arm.com>
-	<1320425871-30564-2-git-send-email-marc.zyngier@arm.com>
-Message-ID: <alpine.LFD.2.02.1111041427340.3307@xanadu.home>
+	<1320425871-30564-6-git-send-email-marc.zyngier@arm.com>
+Message-ID: <4EB42F56.1040402@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 4 Nov 2011, Marc Zyngier wrote:
-
-> Even when CONFIG_MULTI_IRQ_HANDLER is selected, the core code
-> requires the arch_irq_handler_default macro to be defined as
-> a fallback.
+On 11/04/2011 11:57 AM, Marc Zyngier wrote:
+> Convert the highbank platform to be using the gic_handle_irq
+> function as its primary interrupt handler.
 > 
-> It turns out nobody is using that particular feature as both PXA
-> and shmobile have all their machine descriptors populated with
-> the interrupt handler, leaving unused code (or empty macros) in
-> their entry-macro.S file just to be able to compile entry-armv.S.
-> 
-> Make CONFIG_MULTI_IRQ_HANDLER exclusive wrt arch_irq_handler_default,
-> which allows to remove one test from the hot path. Also cleanup both
-> PXA and shmobile entry-macro.S.
-> 
-> Cc: Eric Miao <eric.y.miao@gmail.com>
-> Cc: Paul Mundt <lethal@linux-sh.org>
+> Cc: Rob Herring <rob.herring@calxeda.com>
 > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 
-I like the look of it.
+Acked-by: Rob Herring <rob.herring@calxeda.com>
 
-Acked-by: Nicolas Pitre <nico@linaro.org>
-
+Rob
 
 > ---
->  arch/arm/kernel/entry-armv.S                      |    7 ++--
->  arch/arm/mach-pxa/include/mach/entry-macro.S      |   36 ---------------------
->  arch/arm/mach-shmobile/include/mach/entry-macro.S |    9 -----
->  3 files changed, 3 insertions(+), 49 deletions(-)
+>  arch/arm/Kconfig                                  |    1 +
+>  arch/arm/mach-highbank/highbank.c                 |    1 +
+>  arch/arm/mach-highbank/include/mach/entry-macro.S |    2 --
+>  3 files changed, 2 insertions(+), 2 deletions(-)
 > 
-> diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
-> index 9ad50c4..bd49a6a 100644
-> --- a/arch/arm/kernel/entry-armv.S
-> +++ b/arch/arm/kernel/entry-armv.S
-> @@ -36,12 +36,11 @@
->  #ifdef CONFIG_MULTI_IRQ_HANDLER
->  	ldr	r1, =handle_arch_irq
->  	mov	r0, sp
-> -	ldr	r1, [r1]
->  	adr	lr, BSYM(9997f)
-> -	teq	r1, #0
-> -	movne	pc, r1
-> -#endif
-> +	ldr	pc, [r1]
-> +#else
->  	arch_irq_handler_default
-> +#endif
->  9997:
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index c4f13c3..503daf0 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -345,6 +345,7 @@ config ARCH_HIGHBANK
+>  	select GENERIC_CLOCKEVENTS
+>  	select HAVE_ARM_SCU
+>  	select USE_OF
+> +	select MULTI_IRQ_HANDLER
+>  	help
+>  	  Support for the Calxeda Highbank SoC based boards.
+>  
+> diff --git a/arch/arm/mach-highbank/highbank.c b/arch/arm/mach-highbank/highbank.c
+> index b82dcf0..89bdf00 100644
+> --- a/arch/arm/mach-highbank/highbank.c
+> +++ b/arch/arm/mach-highbank/highbank.c
+> @@ -140,6 +140,7 @@ DT_MACHINE_START(HIGHBANK, "Highbank")
+>  	.map_io		= highbank_map_io,
+>  	.init_irq	= highbank_init_irq,
+>  	.timer		= &highbank_timer,
+> +	.handle_irq	= gic_handle_irq,
+>  	.init_machine	= highbank_init,
+>  	.dt_compat	= highbank_match,
+>  MACHINE_END
+> diff --git a/arch/arm/mach-highbank/include/mach/entry-macro.S b/arch/arm/mach-highbank/include/mach/entry-macro.S
+> index 73c1129..a14f9e6 100644
+> --- a/arch/arm/mach-highbank/include/mach/entry-macro.S
+> +++ b/arch/arm/mach-highbank/include/mach/entry-macro.S
+> @@ -1,5 +1,3 @@
+> -#include <asm/hardware/entry-macro-gic.S>
+> -
+>  	.macro	disable_fiq
 >  	.endm
 >  
-> diff --git a/arch/arm/mach-pxa/include/mach/entry-macro.S b/arch/arm/mach-pxa/include/mach/entry-macro.S
-> index a73bc86..260c0c1 100644
-> --- a/arch/arm/mach-pxa/include/mach/entry-macro.S
-> +++ b/arch/arm/mach-pxa/include/mach/entry-macro.S
-> @@ -7,45 +7,9 @@
->   * License version 2. This program is licensed "as is" without any
->   * warranty of any kind, whether express or implied.
->   */
-> -#include <mach/hardware.h>
-> -#include <mach/irqs.h>
->  
->  		.macro	disable_fiq
->  		.endm
->  
-> -		.macro  get_irqnr_preamble, base, tmp
-> -		.endm
-> -
->  		.macro  arch_ret_to_user, tmp1, tmp2
->  		.endm
-> -
-> -		.macro	get_irqnr_and_base, irqnr, irqstat, base, tmp
-> -		mrc	p15, 0, \tmp, c0, c0, 0		@ CPUID
-> -		mov	\tmp, \tmp, lsr #13
-> -		and	\tmp, \tmp, #0x7		@ Core G
-> -		cmp	\tmp, #1
-> -		bhi	1002f
-> -
-> -		@ Core Generation 1 (PXA25x)
-> -		mov	\base, #io_p2v(0x40000000)	@ IIR Ctl = 0x40d00000
-> -		add	\base, \base, #0x00d00000
-> -		ldr	\irqstat, [\base, #0]		@ ICIP
-> -		ldr	\irqnr, [\base, #4]		@ ICMR
-> -
-> -		ands	\irqnr, \irqstat, \irqnr
-> -		beq	1001f
-> -		rsb	\irqstat, \irqnr, #0
-> -		and	\irqstat, \irqstat, \irqnr
-> -		clz	\irqnr, \irqstat
-> -		rsb	\irqnr, \irqnr, #(31 + PXA_IRQ(0))
-> -		b	1001f
-> -1002:
-> -		@ Core Generation 2 (PXA27x) or Core Generation 3 (PXA3xx)
-> -		mrc	p6, 0, \irqstat, c5, c0, 0	@ ICHP
-> -		tst	\irqstat, #0x80000000
-> -		beq	1001f
-> -		bic	\irqstat, \irqstat, #0x80000000
-> -		mov	\irqnr, \irqstat, lsr #16
-> -		add	\irqnr, \irqnr, #(PXA_IRQ(0))
-> -1001:
-> -		.endm
-> diff --git a/arch/arm/mach-shmobile/include/mach/entry-macro.S b/arch/arm/mach-shmobile/include/mach/entry-macro.S
-> index 8d4a416..2a57b29 100644
-> --- a/arch/arm/mach-shmobile/include/mach/entry-macro.S
-> +++ b/arch/arm/mach-shmobile/include/mach/entry-macro.S
-> @@ -18,14 +18,5 @@
->  	.macro  disable_fiq
->  	.endm
->  
-> -	.macro  get_irqnr_preamble, base, tmp
-> -	.endm
-> -
-> -	.macro  get_irqnr_and_base, irqnr, irqstat, base, tmp
-> -	.endm
-> -
-> -	.macro  test_for_ipi, irqnr, irqstat, base, tmp
-> -	.endm
-> -
->  	.macro  arch_ret_to_user, tmp1, tmp2
->  	.endm
-> -- 
-> 1.7.0.4
-> 
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
