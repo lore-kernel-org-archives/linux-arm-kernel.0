@@ -1,30 +1,26 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 5 Nov 2011 00:56:51 +0100
-Subject: [GIT PULL] Samsung devel-4 for v3.2
-In-Reply-To: <02d901cc9b4a$15a127f0$40e377d0$%kim@samsung.com>
-References: <027f01cc9ab6$2086eae0$6194c0a0$%kim@samsung.com>
-	<201111050020.55071.arnd@arndb.de>
-	<02d901cc9b4a$15a127f0$40e377d0$%kim@samsung.com>
-Message-ID: <201111050056.51554.arnd@arndb.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 4 Nov 2011 16:57:20 -0700
+Subject: [PATCH 1/4] ARM: OMAP3: cm-t35: add regulator supply for ads7846
+In-Reply-To: <20111104233938.GF31337@atomide.com>
+References: <1319017160-20391-1-git-send-email-grinberg@compulab.co.il>
+	<1319017160-20391-2-git-send-email-grinberg@compulab.co.il>
+	<20111104233938.GF31337@atomide.com>
+Message-ID: <20111104235720.GG31337@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 05 November 2011, Kukjin Kim wrote:
-> Arnd Bergmann wrote:
-
-> > Please send the contents split up into separate branches (dt, spi, clkdev,
-> > rename, devel) for 3.3. I think it's ok if you want to send just the
-> > rename patch for 3.2 the way we had discussed earlier, because this kind
-> > of patch really makes sense at the end of the merge window.
-> > 
-> Hi Arnd,
+* Tony Lindgren <tony@atomide.com> [111104 16:05]:
+> * Igor Grinberg <grinberg@compulab.co.il> [111019 02:05]:
 > 
-> OK, I will send the rename branch in a half an hour and make separate
-> branches for others which will be merged next time.
+> Applying to board branch for v3.3 merge window.
 
-Ok, very good. I'm sending the pull requests for the other two branches
-right now, I assume Linus will take them quickly (or not at all if he
-has unexpected objections), so you could base your pull request on top
-of his merge.
+Hmm, actually I suggest you respin patches 2 and 3 so they apply
+on their own to current fixes branch. Then update 1 and 4 to
+apply on top of those.
 
-	Arnd
+This way we can apply 2 and 3 during the -rc cycle, and then
+queue 1 and 4 for the next merge window.
+
+Regards,
+
+Tony
