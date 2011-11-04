@@ -1,157 +1,161 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 04 Nov 2011 12:25:00 +0100
-Subject: [PATCH 3/3] ARM: AT91: Add the ADC to the sam9g20ek board
-In-Reply-To: <4EB3BF8A.9080809@jic23.retrosnub.co.uk>
-References: <1319041134-19712-1-git-send-email-maxime.ripard@free-electrons.com>
-	<1320315070-1700-1-git-send-email-maxime.ripard@free-electrons.com>
-	<1320315070-1700-4-git-send-email-maxime.ripard@free-electrons.com>
-	<4EB3BF8A.9080809@jic23.retrosnub.co.uk>
-Message-ID: <4EB3CB8C.8080008@free-electrons.com>
+From: jarkko.nikula@bitmer.com (Jarkko Nikula)
+Date: Fri,  4 Nov 2011 13:28:04 +0200
+Subject: [PATCH RESEND] omap1: Remove unused omap-alsa.h
+In-Reply-To: <1314187226-30216-1-git-send-email-jarkko.nikula@bitmer.com>
+References: <1314187226-30216-1-git-send-email-jarkko.nikula@bitmer.com>
+Message-ID: <1320406084-26004-1-git-send-email-jarkko.nikula@bitmer.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jonathan,
+There is no use for omap-alsa.h and board-palmz71.c doesn't need it either.
 
-Thanks for your review, I'm working on it and will submit a new version
-asap.
+Signed-off-by: Jarkko Nikula <jarkko.nikula@bitmer.com>
+---
+ arch/arm/mach-omap1/board-palmz71.c         |    1 -
+ arch/arm/plat-omap/include/plat/omap-alsa.h |  123 ---------------------------
+ 2 files changed, 0 insertions(+), 124 deletions(-)
+ delete mode 100644 arch/arm/plat-omap/include/plat/omap-alsa.h
 
-On 04/11/2011 11:33, Jonathan Cameron wrote:
-> Please run checkpatch.pl over all patches as it will clean up quite a few
-> issues.
-
-Yep, I forgot to run it, my bad.
-
-> Mostly looking good.  At the moment it's simple enough that we can
-> rapidly move this one out of staging once the core has gone.
-
-Ok. Rebasing on your outofstaging branch for the next version would be a
-good idea ?
-
-Or do you want the driver to still go through the staging step ?
-
-Linus, I guess that if we put the driver directly into the main tree you
-are ok with the changes made to boards files (code reviews apart) ?
-
-Thanks,
-Maxime
-
-> On 11/03/2011 10:11 AM, Maxime Ripard wrote:
->> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
->> Cc: Patrice Vilchez <patrice.vilchez@atmel.com>
->> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
->> ---
->>  arch/arm/mach-at91/at91sam9260_devices.c |   52 ++++++++++++++++++++++++++++++
->>  arch/arm/mach-at91/board-sam9g20ek.c     |   12 +++++++
->>  2 files changed, 64 insertions(+), 0 deletions(-)
->>
->> diff --git a/arch/arm/mach-at91/at91sam9260_devices.c b/arch/arm/mach-at91/at91sam9260_devices.c
->> index 39f81f4..bfc50ac 100644
->> --- a/arch/arm/mach-at91/at91sam9260_devices.c
->> +++ b/arch/arm/mach-at91/at91sam9260_devices.c
->> @@ -1312,6 +1312,58 @@ void __init at91_add_device_cf(struct at91_cf_data *data)
->>  void __init at91_add_device_cf(struct at91_cf_data * data) {}
->>  #endif
->>  
->> +/* --------------------------------------------------------------------
->> + *  ADCs
->> + * -------------------------------------------------------------------- */
->> +
->> +static struct at91_adc_data adc_data;
->> +
->> +static struct resource adc_resources[] = {
->> +	[0] = {
->> +		.start	= AT91SAM9260_BASE_ADC,
->> +		.end	= AT91SAM9260_BASE_ADC + SZ_16K - 1,
->> +		.flags	= IORESOURCE_MEM,
->> +	},
->> +	[1] = {
->> +		.start	= AT91SAM9260_ID_ADC,
->> +		.end	= AT91SAM9260_ID_ADC,
->> +		.flags	= IORESOURCE_IRQ,
->> +	},
->> +};
->> +
->> +static struct platform_device at91_adc_device = {
->> +	.name		= "at91adc",
->> +	.id		= -1,
->> +	.dev		= {
->> +				.platform_data		= &adc_data,
->> +	},
->> +	.resource	= adc_resources,
->> +	.num_resources	= ARRAY_SIZE(adc_resources),
->> +};
->> +
->> +void __init at91_add_device_adc(struct at91_adc_data *data)
->> +{
->> +	if (!data)
->> +		return;
->> +
->> +	if(data->channels_used[0])
->> +		at91_set_A_periph(AT91_PIN_PC0, 0);
->> +	if(data->channels_used[1])
->> +		at91_set_A_periph(AT91_PIN_PC1, 0);
->> +	if(data->channels_used[2])
->> +		at91_set_A_periph(AT91_PIN_PC2, 0);
->> +	if(data->channels_used[3])
->> +		at91_set_A_periph(AT91_PIN_PC3, 0);
-> formatting issues so another one for checkpatch.
-> 
-> Also define AT91_PIN_PC(n) then make this another
-> for_each_bit_set call.  That should get you down from
-> 8 lines to about 3.
->> +
->> +	data->adc_clock = 5000000;
->> +	data->num_channels = 4;
->> +	data->startup_time = 10;
->> +
->> +	adc_data = *data;
->> +	platform_device_register(&at91_adc_device);
->> +}
->> +
->> +
->>  /* -------------------------------------------------------------------- */
->>  /*
->>   * These devices are always present and don't need any board-specific
->> diff --git a/arch/arm/mach-at91/board-sam9g20ek.c b/arch/arm/mach-at91/board-sam9g20ek.c
->> index 817f59d..6f2542fb 100644
->> --- a/arch/arm/mach-at91/board-sam9g20ek.c
->> +++ b/arch/arm/mach-at91/board-sam9g20ek.c
->> @@ -314,6 +314,16 @@ static void __init ek_add_device_buttons(void)
->>  static void __init ek_add_device_buttons(void) {}
->>  #endif
->>  
->> +/*
->> + * ADCs
->> + */
->> +
->> +static struct at91_adc_data ek_adc_data = {
->> +	.channels_used = { 1, 1, 1, 1} ,
->> +	.num_channels_used = 4,
->> +	.vref = 3300,
->> +};
->> +
->>  #if defined(CONFIG_REGULATOR_FIXED_VOLTAGE) || defined(CONFIG_REGULATOR_FIXED_VOLTAGE_MODULE)
->>  static struct regulator_consumer_supply ek_audio_consumer_supplies[] = {
->>  	REGULATOR_SUPPLY("AVDD", "0-001b"),
->> @@ -389,6 +399,8 @@ static void __init ek_board_init(void)
->>  	ek_add_device_gpio_leds();
->>  	/* Push Buttons */
->>  	ek_add_device_buttons();
->> +	/* ADCs */
->> +	at91_add_device_adc(&ek_adc_data);
->>  	/* PCK0 provides MCLK to the WM8731 */
->>  	at91_set_B_periph(AT91_PIN_PC1, 0);
->>  	/* SSC (for WM8731) */
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
-
+diff --git a/arch/arm/mach-omap1/board-palmz71.c b/arch/arm/mach-omap1/board-palmz71.c
+index c6fe61d..4206157 100644
+--- a/arch/arm/mach-omap1/board-palmz71.c
++++ b/arch/arm/mach-omap1/board-palmz71.c
+@@ -42,7 +42,6 @@
+ #include <plat/irda.h>
+ #include <plat/keypad.h>
+ #include <plat/common.h>
+-#include <plat/omap-alsa.h>
+ 
+ #include <linux/spi/spi.h>
+ #include <linux/spi/ads7846.h>
+diff --git a/arch/arm/plat-omap/include/plat/omap-alsa.h b/arch/arm/plat-omap/include/plat/omap-alsa.h
+deleted file mode 100644
+index b53055b..0000000
+--- a/arch/arm/plat-omap/include/plat/omap-alsa.h
++++ /dev/null
+@@ -1,123 +0,0 @@
+-/*
+- * arch/arm/plat-omap/include/mach/omap-alsa.h
+- *
+- * Alsa Driver for AIC23 and TSC2101 codecs on OMAP platform boards.
+- *
+- * Copyright (C) 2006 Mika Laitio <lamikr@cc.jyu.fi>
+- *
+- * Copyright (C) 2005 Instituto Nokia de Tecnologia - INdT - Manaus Brazil
+- * Written by Daniel Petrini, David Cohen, Anderson Briglia
+- *            {daniel.petrini, david.cohen, anderson.briglia}@indt.org.br
+- *
+- * This program is free software; you can redistribute it and/or modify it
+- * under the terms of the GNU General Public License as published by the
+- * Free Software Foundation; either version 2 of the License, or (at your
+- * option) any later version.
+- *
+- * THIS SOFTWARE IS PROVIDED ``AS IS'' AND ANY EXPRESS OR IMPLIED
+- * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+- * MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN
+- * NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
+- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+- * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF
+- * USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
+- * ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+- * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+- *
+- * You should have received a copy of the  GNU General Public License along
+- * with this program; if not, write  to the Free Software Foundation, Inc.,
+- * 675 Mass Ave, Cambridge, MA 02139, USA.
+- *
+- *  History
+- *  -------
+- *
+- *  2005/07/25 INdT-10LE Kernel Team - 	Alsa driver for omap osk,
+- *  					original version based in sa1100 driver
+- *  					and omap oss driver.
+- */
+-
+-#ifndef __OMAP_ALSA_H
+-#define __OMAP_ALSA_H
+-
+-#include <plat/dma.h>
+-#include <sound/core.h>
+-#include <sound/pcm.h>
+-#include <plat/mcbsp.h>
+-#include <linux/platform_device.h>
+-
+-#define DMA_BUF_SIZE	(1024 * 8)
+-
+-/*
+- * Buffer management for alsa and dma
+- */
+-struct audio_stream {
+-	char *id;		/* identification string */
+-	int stream_id;		/* numeric identification */
+-	int dma_dev;		/* dma number of that device */
+-	int *lch;		/* Chain of channels this stream is linked to */
+-	char started;		/* to store if the chain was started or not */
+-	int dma_q_head;		/* DMA Channel Q Head */
+-	int dma_q_tail;		/* DMA Channel Q Tail */
+-	char dma_q_count;	/* DMA Channel Q Count */
+-	int active:1;		/* we are using this stream for transfer now */
+-	int period;		/* current transfer period */
+-	int periods;		/* current count of periods registerd in the DMA engine */
+-	spinlock_t dma_lock;	/* for locking in DMA operations */
+-	struct snd_pcm_substream *stream;	/* the pcm stream */
+-	unsigned linked:1;	/* dma channels linked */
+-	int offset;		/* store start position of the last period in the alsa buffer */
+-	int (*hw_start)(void);  /* interface to start HW interface, e.g. McBSP */
+-	int (*hw_stop)(void);   /* interface to stop HW interface, e.g. McBSP */
+-};
+-
+-/*
+- * Alsa card structure for aic23
+- */
+-struct snd_card_omap_codec {
+-	struct snd_card *card;
+-	struct snd_pcm *pcm;
+-	long samplerate;
+-	struct audio_stream s[2];	/* playback & capture */
+-};
+-
+-/* Codec specific information and function pointers.
+- * Codec (omap-alsa-aic23.c and omap-alsa-tsc2101.c)
+- * are responsible for defining the function pointers.
+- */
+-struct omap_alsa_codec_config {
+-	char 	*name;
+-	struct	omap_mcbsp_reg_cfg *mcbsp_regs_alsa;
+-	struct	snd_pcm_hw_constraint_list *hw_constraints_rates;
+-	struct	snd_pcm_hardware *snd_omap_alsa_playback;
+-	struct	snd_pcm_hardware *snd_omap_alsa_capture;
+-	void	(*codec_configure_dev)(void);
+-	void	(*codec_set_samplerate)(long);
+-	void	(*codec_clock_setup)(void);
+-	int	(*codec_clock_on)(void);
+-	int 	(*codec_clock_off)(void);
+-	int	(*get_default_samplerate)(void);
+-};
+-
+-/*********** Mixer function prototypes *************************/
+-int snd_omap_mixer(struct snd_card_omap_codec *);
+-void snd_omap_init_mixer(void);
+-
+-#ifdef CONFIG_PM
+-void snd_omap_suspend_mixer(void);
+-void snd_omap_resume_mixer(void);
+-#endif
+-
+-int snd_omap_alsa_post_probe(struct platform_device *pdev, struct omap_alsa_codec_config *config);
+-int snd_omap_alsa_remove(struct platform_device *pdev);
+-#ifdef CONFIG_PM
+-int snd_omap_alsa_suspend(struct platform_device *pdev, pm_message_t state);
+-int snd_omap_alsa_resume(struct platform_device *pdev);
+-#else
+-#define snd_omap_alsa_suspend	NULL
+-#define snd_omap_alsa_resume	NULL
+-#endif
+-
+-void callback_omap_alsa_sound_dma(void *);
+-
+-#endif
 -- 
-Maxime Ripard, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+1.7.7
