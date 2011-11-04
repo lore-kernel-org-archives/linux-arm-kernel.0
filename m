@@ -1,139 +1,145 @@
 From: amit.kachhap@linaro.org (amit.kachhap at linaro.org)
-Date: Fri,  4 Nov 2011 13:03:47 -0400
-Subject: [PATCH 3/4] ARM: exynos4: add L2 early resume code
+Date: Fri,  4 Nov 2011 13:03:48 -0400
+Subject: [PATCH 4/4] ARM: exynos4: remove useless code to save/restore L2 and
+	GIC state
 In-Reply-To: <1320426228-21746-1-git-send-email-amit.kachhap@linaro.org>
 References: <1320426228-21746-1-git-send-email-amit.kachhap@linaro.org>
-Message-ID: <1320426228-21746-4-git-send-email-amit.kachhap@linaro.org>
+Message-ID: <1320426228-21746-5-git-send-email-amit.kachhap@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Amit Daniel Kachhap <amit.kachhap@linaro.org>
 
-This patch adds code to save L2 register configuration at boot, and to
-resume L2 before MMU is enabled in suspend and cpuidle resume paths.
+Following the merge of CPU PM notifiers and L2 resume code, this patch
+removes useless code to save and restore L2 and GIC registers.
+
+This is now automatically covered by suspend calls which integrated
+CPU PM notifiers and new sleep code that allows to resume L2 before MMU
+is turned on.
 
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Signed-off-by: Amit Daniel Kachhap <amit.kachhap@linaro.org>
 ---
- arch/arm/mach-exynos4/cpu.c   |   43 ++++++++++++++++++++++++++++++----------
- arch/arm/mach-exynos4/sleep.S |   26 ++++++++++++++++++++++++
- 2 files changed, 58 insertions(+), 11 deletions(-)
+ arch/arm/mach-exynos4/pm.c |   86 --------------------------------------------
+ 1 files changed, 0 insertions(+), 86 deletions(-)
 
-diff --git a/arch/arm/mach-exynos4/cpu.c b/arch/arm/mach-exynos4/cpu.c
-index a348434..53c6cd3 100644
---- a/arch/arm/mach-exynos4/cpu.c
-+++ b/arch/arm/mach-exynos4/cpu.c
-@@ -11,6 +11,7 @@
- #include <linux/sched.h>
- #include <linux/sysdev.h>
+diff --git a/arch/arm/mach-exynos4/pm.c b/arch/arm/mach-exynos4/pm.c
+index 62e4f43..7499f14 100644
+--- a/arch/arm/mach-exynos4/pm.c
++++ b/arch/arm/mach-exynos4/pm.c
+@@ -63,77 +63,6 @@ static struct sleep_save exynos4_vpll_save[] = {
+ };
  
-+#include <asm/cacheflush.h>
- #include <asm/mach/map.h>
- #include <asm/mach/irq.h>
+ static struct sleep_save exynos4_core_save[] = {
+-	/* GIC side */
+-	SAVE_ITEM(S5P_VA_GIC_CPU + 0x000),
+-	SAVE_ITEM(S5P_VA_GIC_CPU + 0x004),
+-	SAVE_ITEM(S5P_VA_GIC_CPU + 0x008),
+-	SAVE_ITEM(S5P_VA_GIC_CPU + 0x00C),
+-	SAVE_ITEM(S5P_VA_GIC_CPU + 0x014),
+-	SAVE_ITEM(S5P_VA_GIC_CPU + 0x018),
+-	SAVE_ITEM(S5P_VA_GIC_DIST + 0x000),
+-	SAVE_ITEM(S5P_VA_GIC_DIST + 0x004),
+-	SAVE_ITEM(S5P_VA_GIC_DIST + 0x100),
+-	SAVE_ITEM(S5P_VA_GIC_DIST + 0x104),
+-	SAVE_ITEM(S5P_VA_GIC_DIST + 0x108),
+-	SAVE_ITEM(S5P_VA_GIC_DIST + 0x300),
+-	SAVE_ITEM(S5P_VA_GIC_DIST + 0x304),
+-	SAVE_ITEM(S5P_VA_GIC_DIST + 0x308),
+-	SAVE_ITEM(S5P_VA_GIC_DIST + 0x400),
+-	SAVE_ITEM(S5P_VA_GIC_DIST + 0x404),
+-	SAVE_ITEM(S5P_VA_GIC_DIST + 0x408),
+-	SAVE_ITEM(S5P_VA_GIC_DIST + 0x40C),
+-	SAVE_ITEM(S5P_VA_GIC_DIST + 0x410),
+-	SAVE_ITEM(S5P_VA_GIC_DIST + 0x414),
+-	SAVE_ITEM(S5P_VA_GIC_DIST + 0x418),
+-	SAVE_ITEM(S5P_VA_GIC_DIST + 0x41C),
+-	SAVE_ITEM(S5P_VA_GIC_DIST + 0x420),
+-	SAVE_ITEM(S5P_VA_GIC_DIST + 0x424),
+-	SAVE_ITEM(S5P_VA_GIC_DIST + 0x428),
+-	SAVE_ITEM(S5P_VA_GIC_DIST + 0x42C),
+-	SAVE_ITEM(S5P_VA_GIC_DIST + 0x430),
+-	SAVE_ITEM(S5P_VA_GIC_DIST + 0x434),
+-	SAVE_ITEM(S5P_VA_GIC_DIST + 0x438),
+-	SAVE_ITEM(S5P_VA_GIC_DIST + 0x43C),
+-	SAVE_ITEM(S5P_VA_GIC_DIST + 0x440),
+-	SAVE_ITEM(S5P_VA_GIC_DIST + 0x444),
+-	SAVE_ITEM(S5P_VA_GIC_DIST + 0x448),
+-	SAVE_ITEM(S5P_VA_GIC_DIST + 0x44C),
+-	SAVE_ITEM(S5P_VA_GIC_DIST + 0x450),
+-	SAVE_ITEM(S5P_VA_GIC_DIST + 0x454),
+-	SAVE_ITEM(S5P_VA_GIC_DIST + 0x458),
+-	SAVE_ITEM(S5P_VA_GIC_DIST + 0x45C),
+-
+-	SAVE_ITEM(S5P_VA_GIC_DIST + 0x800),
+-	SAVE_ITEM(S5P_VA_GIC_DIST + 0x804),
+-	SAVE_ITEM(S5P_VA_GIC_DIST + 0x808),
+-	SAVE_ITEM(S5P_VA_GIC_DIST + 0x80C),
+-	SAVE_ITEM(S5P_VA_GIC_DIST + 0x810),
+-	SAVE_ITEM(S5P_VA_GIC_DIST + 0x814),
+-	SAVE_ITEM(S5P_VA_GIC_DIST + 0x818),
+-	SAVE_ITEM(S5P_VA_GIC_DIST + 0x81C),
+-	SAVE_ITEM(S5P_VA_GIC_DIST + 0x820),
+-	SAVE_ITEM(S5P_VA_GIC_DIST + 0x824),
+-	SAVE_ITEM(S5P_VA_GIC_DIST + 0x828),
+-	SAVE_ITEM(S5P_VA_GIC_DIST + 0x82C),
+-	SAVE_ITEM(S5P_VA_GIC_DIST + 0x830),
+-	SAVE_ITEM(S5P_VA_GIC_DIST + 0x834),
+-	SAVE_ITEM(S5P_VA_GIC_DIST + 0x838),
+-	SAVE_ITEM(S5P_VA_GIC_DIST + 0x83C),
+-	SAVE_ITEM(S5P_VA_GIC_DIST + 0x840),
+-	SAVE_ITEM(S5P_VA_GIC_DIST + 0x844),
+-	SAVE_ITEM(S5P_VA_GIC_DIST + 0x848),
+-	SAVE_ITEM(S5P_VA_GIC_DIST + 0x84C),
+-	SAVE_ITEM(S5P_VA_GIC_DIST + 0x850),
+-	SAVE_ITEM(S5P_VA_GIC_DIST + 0x854),
+-	SAVE_ITEM(S5P_VA_GIC_DIST + 0x858),
+-	SAVE_ITEM(S5P_VA_GIC_DIST + 0x85C),
+-
+-	SAVE_ITEM(S5P_VA_GIC_DIST + 0xC00),
+-	SAVE_ITEM(S5P_VA_GIC_DIST + 0xC04),
+-	SAVE_ITEM(S5P_VA_GIC_DIST + 0xC08),
+-	SAVE_ITEM(S5P_VA_GIC_DIST + 0xC0C),
+-	SAVE_ITEM(S5P_VA_GIC_DIST + 0xC10),
+-	SAVE_ITEM(S5P_VA_GIC_DIST + 0xC14),
  
-@@ -31,6 +32,7 @@
+ 	SAVE_ITEM(S5P_VA_COMBINER_BASE + 0x000),
+ 	SAVE_ITEM(S5P_VA_COMBINER_BASE + 0x010),
+@@ -154,13 +83,6 @@ static struct sleep_save exynos4_core_save[] = {
+ 	SAVE_ITEM(S5P_SROM_BC3),
+ };
  
- #include <mach/regs-irq.h>
- #include <mach/regs-pmu.h>
-+#include <mach/pmu.h>
+-static struct sleep_save exynos4_l2cc_save[] = {
+-	SAVE_ITEM(S5P_VA_L2CC + L2X0_TAG_LATENCY_CTRL),
+-	SAVE_ITEM(S5P_VA_L2CC + L2X0_DATA_LATENCY_CTRL),
+-	SAVE_ITEM(S5P_VA_L2CC + L2X0_PREFETCH_CTRL),
+-	SAVE_ITEM(S5P_VA_L2CC + L2X0_POWER_CTRL),
+-	SAVE_ITEM(S5P_VA_L2CC + L2X0_AUX_CTRL),
+-};
  
- unsigned int gic_bank_offset __read_mostly;
+ /* For Cortex-A9 Diagnostic and Power control register */
+ static unsigned int save_arm_register[2];
+@@ -181,7 +103,6 @@ static void exynos4_pm_prepare(void)
+ 	u32 tmp;
  
-@@ -254,20 +256,39 @@ core_initcall(exynos4_core_init);
- #ifdef CONFIG_CACHE_L2X0
- static int __init exynos4_l2x0_cache_init(void)
- {
--	/* TAG, Data Latency Control: 2cycle */
--	__raw_writel(0x110, S5P_VA_L2CC + L2X0_TAG_LATENCY_CTRL);
-+	if (!(__raw_readl(S5P_VA_L2CC + L2X0_CTRL) & 0x1)) {
+ 	s3c_pm_do_save(exynos4_core_save, ARRAY_SIZE(exynos4_core_save));
+-	s3c_pm_do_save(exynos4_l2cc_save, ARRAY_SIZE(exynos4_l2cc_save));
+ 	s3c_pm_do_save(exynos4_epll_save, ARRAY_SIZE(exynos4_epll_save));
+ 	s3c_pm_do_save(exynos4_vpll_save, ARRAY_SIZE(exynos4_vpll_save));
  
--	if (soc_is_exynos4210())
--		__raw_writel(0x110, S5P_VA_L2CC + L2X0_DATA_LATENCY_CTRL);
--	else if (soc_is_exynos4212() || soc_is_exynos4412())
--		__raw_writel(0x120, S5P_VA_L2CC + L2X0_DATA_LATENCY_CTRL);
-+		l2x0_saved_regs.phy_base = EXYNOS4_PA_L2CC;
-+		/* TAG, Data Latency Control: 2 cycles */
-+		l2x0_saved_regs.tag_latency = 0x110;
-+
-+		if (soc_is_exynos4212() || soc_is_exynos4412())
-+			l2x0_saved_regs.data_latency = 0x120;
-+		else
-+			l2x0_saved_regs.data_latency = 0x110;
-+
-+		l2x0_saved_regs.prefetch_ctrl = 0x30000007;
-+		l2x0_saved_regs.pwr_ctrl =
-+			(L2X0_DYNAMIC_CLK_GATING_EN | L2X0_STNDBY_MODE_EN);
+@@ -397,13 +318,6 @@ static void exynos4_pm_resume(void)
  
--	/* L2X0 Prefetch Control */
--	__raw_writel(0x30000007, S5P_VA_L2CC + L2X0_PREFETCH_CTRL);
-+		l2x0_regs_phys = virt_to_phys(&l2x0_saved_regs);
+ 	exynos4_scu_enable(S5P_VA_SCU);
  
--	/* L2X0 Power Control */
--	__raw_writel(L2X0_DYNAMIC_CLK_GATING_EN | L2X0_STNDBY_MODE_EN,
--		     S5P_VA_L2CC + L2X0_POWER_CTRL);
-+		__raw_writel(l2x0_saved_regs.tag_latency,
-+				S5P_VA_L2CC + L2X0_TAG_LATENCY_CTRL);
-+		__raw_writel(l2x0_saved_regs.data_latency,
-+				S5P_VA_L2CC + L2X0_DATA_LATENCY_CTRL);
-+
-+		/* L2X0 Prefetch Control */
-+		__raw_writel(l2x0_saved_regs.prefetch_ctrl,
-+				S5P_VA_L2CC + L2X0_PREFETCH_CTRL);
-+
-+		/* L2X0 Power Control */
-+		__raw_writel(l2x0_saved_regs.pwr_ctrl,
-+				S5P_VA_L2CC + L2X0_POWER_CTRL);
-+
-+		clean_dcache_area(&l2x0_regs_phys, sizeof(unsigned long));
-+		clean_dcache_area(&l2x0_saved_regs, sizeof(struct l2x0_regs));
-+	}
- 
- 	l2x0_init(S5P_VA_L2CC, 0x7C470001, 0xC200ffff);
- 
-diff --git a/arch/arm/mach-exynos4/sleep.S b/arch/arm/mach-exynos4/sleep.S
-index c19527b..3284213 100644
---- a/arch/arm/mach-exynos4/sleep.S
-+++ b/arch/arm/mach-exynos4/sleep.S
-@@ -27,6 +27,8 @@
- */
- 
- #include <linux/linkage.h>
-+#include <asm/asm-offsets.h>
-+#include <asm/hardware/cache-l2x0.h>
- 
- 	.text
- 
-@@ -47,7 +49,31 @@
- 	 * other way of restoring the stack pointer after sleep, and we
- 	 * must not write to the code segment (code is read-only)
- 	 */
-+	.align
-+	.data
- 
- ENTRY(s3c_cpu_resume)
-+	adr	r0, l2x0_regs_phys
-+	ldr	r0, [r0]
-+	ldr	r1, [r0, #L2X0_R_PHY_BASE]
-+	ldr	r2, [r1, #L2X0_CTRL]
-+	tst	r2, #0x1
-+	bne	resume_l2on
-+	ldr	r2, [r0, #L2X0_R_AUX_CTRL]
-+	str	r2, [r1, #L2X0_AUX_CTRL]
-+	ldr	r2, [r0, #L2X0_R_TAG_LATENCY]
-+	str	r2, [r1, #L2X0_TAG_LATENCY_CTRL]
-+	ldr	r2, [r0, #L2X0_R_DATA_LATENCY]
-+	str	r2, [r1, #L2X0_DATA_LATENCY_CTRL]
-+	ldr	r2, [r0, #L2X0_R_PREFETCH_CTRL]
-+	str	r2, [r1, #L2X0_PREFETCH_CTRL]
-+	ldr	r2, [r0, #L2X0_R_PWR_CTRL]
-+	str	r2, [r1, #L2X0_POWER_CTRL]
-+	mov	r2, #1
-+	str	r2, [r1, #L2X0_CTRL]
-+resume_l2on:
- 	b	cpu_resume
- ENDPROC(s3c_cpu_resume)
-+	.globl l2x0_regs_phys
-+l2x0_regs_phys:
-+	.long	0
+-#ifdef CONFIG_CACHE_L2X0
+-	s3c_pm_do_restore_core(exynos4_l2cc_save, ARRAY_SIZE(exynos4_l2cc_save));
+-	outer_inv_all();
+-	/* enable L2X0*/
+-	writel_relaxed(1, S5P_VA_L2CC + L2X0_CTRL);
+-#endif
+-
+ early_wakeup:
+ 	return;
+ }
 -- 
 1.7.5.4
