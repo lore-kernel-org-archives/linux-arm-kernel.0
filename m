@@ -1,137 +1,51 @@
-From: rajeshwari.s@samsung.com (Rajeshwari Shinde)
-Date: Fri, 04 Nov 2011 19:27:00 +0530
-Subject: [PATCH 3/3] ARM: S5P64X0: Enable SDHCI support
-In-Reply-To: <1320415020-7439-1-git-send-email-rajeshwari.s@samsung.com>
-References: <1320415020-7439-1-git-send-email-rajeshwari.s@samsung.com>
-Message-ID: <1320415020-7439-4-git-send-email-rajeshwari.s@samsung.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Fri, 04 Nov 2011 10:01:43 -0400 (EDT)
+Subject: orion/kirkwood and device tree
+In-Reply-To: <201111032250.59528.michael@walle.cc>
+References: <20111031105740.GC29402@lunn.ch>
+	<201111022303.04957.michael@walle.cc>
+	<20111103184745.GW32165@titan.lakedaemon.net>
+	<201111032250.59528.michael@walle.cc>
+Message-ID: <alpine.LFD.2.02.1111041000060.3307@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enables SDHCI supports for SMDK6440 and SMDK6450.
+On Thu, 3 Nov 2011, Michael Walle wrote:
 
-Signed-off-by: Rajeshwari Shinde <rajeshwari.s@samsung.com>
----
- arch/arm/mach-s5p64x0/mach-smdk6440.c |   25 +++++++++++++++++++++++++
- arch/arm/mach-s5p64x0/mach-smdk6450.c |   26 +++++++++++++++++++++++++-
- 2 files changed, 50 insertions(+), 1 deletions(-)
+> Am Donnerstag 03 November 2011, 19:47:45 schrieb Jason:
+> > Michael,
+> > 
+> > On Wed, Nov 02, 2011 at 11:03:04PM +0100, Michael Walle wrote:
+> > > Am Mittwoch 02 November 2011, 17:50:57 schrieb Jason:
+> > > > Michael,
+> > > > 
+> > > > On Mon, Oct 31, 2011 at 11:50:28PM +0100, Michael Walle wrote:
+> > > > > i've already ported some marvell devices to DT. spi-orion, orion-wdt,
+> > > > > rtc-mv and mv_cesa. Atm i'm struggling with how to pass
+> > > > > kirkwood_mbus_dram_info to the device drivers (the old method is to
+> > > > > pass it through platform_data)
+> > > > 
+> > > > Do you have a public git tree I could pull from, by chance?  I don't
+> > > > care about the state, I'd like to learn by example and start pitching
+> > > > in.
+> > > 
+> > > yeah i pushed it to github:
+> > > https://github.com/mwalle/linux/tree/kirkwood-devtree
+> > 
+> > This is great!  I was having trouble figuring out how to do the
+> > interrupt controller, and you have that.  I'll look more closely this
+> > evening.
+> > 
+> > My only comment so far is that I think a lot of what you have in
+> > lschlv2.dts can be in kirkwood.dtsi.  That way other boards don't have
+> > to copy it (serial, spi, ehci, wdt, rtc, crypto).
+> yeah i had it there and it should be definitely put back to kirkwood.dtsi. the 
+> reason i've put it into lschv2.dts atm is that there is the clock property for 
+> every device, which may be different for different platforms.
 
-diff --git a/arch/arm/mach-s5p64x0/mach-smdk6440.c b/arch/arm/mach-s5p64x0/mach-smdk6440.c
-index d828fd3..79967d1 100644
---- a/arch/arm/mach-s5p64x0/mach-smdk6440.c
-+++ b/arch/arm/mach-s5p64x0/mach-smdk6440.c
-@@ -24,6 +24,7 @@
- #include <linux/gpio.h>
- #include <linux/pwm_backlight.h>
- #include <linux/fb.h>
-+#include <linux/mmc/host.h>
- 
- #include <video/platform_lcd.h>
- 
-@@ -53,6 +54,7 @@
- #include <plat/fb.h>
- #include <plat/regs-fb.h>
- #include <plat/s3c64xx-spi.h>
-+#include <plat/sdhci.h>
- 
- #define SMDK6440_UCON_DEFAULT	(S3C2410_UCON_TXILEVEL |	\
- 				S3C2410_UCON_RXILEVEL |		\
-@@ -162,6 +164,25 @@ static struct platform_device *smdk6440_devices[] __initdata = {
- 	&s5p6440_device_iis,
- 	&s3c_device_fb,
- 	&smdk6440_lcd_lte480wv,
-+	&s3c_device_hsmmc0,
-+	&s3c_device_hsmmc1,
-+	&s3c_device_hsmmc2,
-+};
-+
-+static struct s3c_sdhci_platdata smdk6440_hsmmc0_pdata __initdata = {
-+	.cd_type	= S3C_SDHCI_CD_NONE,
-+};
-+
-+static struct s3c_sdhci_platdata smdk6440_hsmmc1_pdata __initdata = {
-+	.cd_type	= S3C_SDHCI_CD_INTERNAL,
-+#if defined(CONFIG_S5P64X0_SD_CH1_8BIT)
-+	.max_width	= 8,
-+	.host_caps	= MMC_CAP_8_BIT_DATA,
-+#endif
-+};
-+
-+static struct s3c_sdhci_platdata smdk6440_hsmmc2_pdata __initdata = {
-+	.cd_type	= S3C_SDHCI_CD_NONE,
- };
- 
- static struct s3c2410_platform_i2c s5p6440_i2c0_data __initdata = {
-@@ -253,6 +274,10 @@ static void __init smdk6440_machine_init(void)
- 	s5p6440_set_lcd_interface();
- 	s3c_fb_set_platdata(&smdk6440_lcd_pdata);
- 
-+	s3c_sdhci0_set_platdata(&smdk6440_hsmmc0_pdata);
-+	s3c_sdhci1_set_platdata(&smdk6440_hsmmc1_pdata);
-+	s3c_sdhci2_set_platdata(&smdk6440_hsmmc2_pdata);
-+
- 	platform_add_devices(smdk6440_devices, ARRAY_SIZE(smdk6440_devices));
- }
- 
-diff --git a/arch/arm/mach-s5p64x0/mach-smdk6450.c b/arch/arm/mach-s5p64x0/mach-smdk6450.c
-index 73224b2..6a4d41c 100644
---- a/arch/arm/mach-s5p64x0/mach-smdk6450.c
-+++ b/arch/arm/mach-s5p64x0/mach-smdk6450.c
-@@ -24,6 +24,7 @@
- #include <linux/gpio.h>
- #include <linux/pwm_backlight.h>
- #include <linux/fb.h>
-+#include <linux/mmc/host.h>
- 
- #include <video/platform_lcd.h>
- 
-@@ -53,6 +54,7 @@
- #include <plat/fb.h>
- #include <plat/regs-fb.h>
- #include <plat/s3c64xx-spi.h>
-+#include <plat/sdhci.h>
- 
- #define SMDK6450_UCON_DEFAULT	(S3C2410_UCON_TXILEVEL |	\
- 				S3C2410_UCON_RXILEVEL |		\
-@@ -180,10 +182,28 @@ static struct platform_device *smdk6450_devices[] __initdata = {
- 	&s5p6450_device_iis0,
- 	&s3c_device_fb,
- 	&smdk6450_lcd_lte480wv,
--
-+	&s3c_device_hsmmc0,
-+	&s3c_device_hsmmc1,
-+	&s3c_device_hsmmc2,
- 	/* s5p6450_device_spi0 will be added */
- };
- 
-+static struct s3c_sdhci_platdata smdk6450_hsmmc0_pdata __initdata = {
-+	.cd_type	= S3C_SDHCI_CD_NONE,
-+};
-+
-+static struct s3c_sdhci_platdata smdk6450_hsmmc1_pdata __initdata = {
-+	.cd_type	= S3C_SDHCI_CD_NONE,
-+#if defined(CONFIG_S5P64X0_SD_CH1_8BIT)
-+	.max_width	= 8,
-+	.host_caps	= MMC_CAP_8_BIT_DATA,
-+#endif
-+};
-+
-+static struct s3c_sdhci_platdata smdk6450_hsmmc2_pdata __initdata = {
-+	.cd_type	= S3C_SDHCI_CD_NONE,
-+};
-+
- static struct s3c2410_platform_i2c s5p6450_i2c0_data __initdata = {
- 	.flags		= 0,
- 	.slave_addr	= 0x10,
-@@ -273,6 +293,10 @@ static void __init smdk6450_machine_init(void)
- 	s5p6450_set_lcd_interface();
- 	s3c_fb_set_platdata(&smdk6450_lcd_pdata);
- 
-+	s3c_sdhci0_set_platdata(&smdk6450_hsmmc0_pdata);
-+	s3c_sdhci1_set_platdata(&smdk6450_hsmmc1_pdata);
-+	s3c_sdhci2_set_platdata(&smdk6450_hsmmc2_pdata);
-+
- 	platform_add_devices(smdk6450_devices, ARRAY_SIZE(smdk6450_devices));
- }
- 
--- 
-1.7.4.4
+The clock property should be a separate entity from the actual devices.  
+In fact, that would be a good idea for Kirkwood and friends to move to 
+the struck clk API.
+
+
+Nicolas
