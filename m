@@ -1,63 +1,73 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 4 Nov 2011 14:06:29 -0700
-Subject: [PATCH v2 5/8] arm/tegra: add new fields to struct
-	tegra_pingroup_desc
-In-Reply-To: <1320242948-21061-6-git-send-email-pdeschrijver@nvidia.com>
-References: <1320242948-21061-1-git-send-email-pdeschrijver@nvidia.com>
-	<1320242948-21061-6-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <20111104210629.GA4685@quad.lixom.net>
+From: shawn.gsc@gmail.com (Shawn Guo)
+Date: Sat, 5 Nov 2011 05:09:28 +0800
+Subject: [PATCH v3 02/17] ARM: mxc: rename gic_handle_irq to avoid name
+	clash
+In-Reply-To: <1320425871-30564-3-git-send-email-marc.zyngier@arm.com>
+References: <1320425871-30564-1-git-send-email-marc.zyngier@arm.com>
+	<1320425871-30564-3-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20111104210928.GA3546@r65073-Latitude-D630>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 02, 2011 at 04:09:04PM +0200, Peter De Schrijver wrote:
-> Add new fields to struct tegra_pingroup_desc to support new hardware features
-> introduced in the tegra30 SoC. The pinmux driver won't use those fields yet,
-> but the tegra30 pinmux tables will already provide the necessary data.
+Hi Marc,
+
+Thanks for the patch.  Minor comment below.
+
+On Fri, Nov 04, 2011 at 04:57:36PM +0000, Marc Zyngier wrote:
+> Before introducing a global gic_handle_irq(), rename
+> MXC's version to mcx_gic_handle_irq(). This function will be
+
+s/mcx_gic_handle_irq/mxc_gic_handle_irq
+
+> removed altogether in a later patch.
 > 
-> Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
-
-Just a nit below.
-
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Sascha Hauer <kernel@pengutronix.de>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 > ---
->  arch/arm/mach-tegra/include/mach/pinmux.h   |   10 ++++++++++
->  arch/arm/mach-tegra/pinmux-tegra20-tables.c |    4 ++++
->  2 files changed, 14 insertions(+), 0 deletions(-)
+>  arch/arm/plat-mxc/gic.c                 |    2 +-
+>  arch/arm/plat-mxc/include/mach/common.h |    4 ++--
+>  2 files changed, 3 insertions(+), 3 deletions(-)
 > 
-> diff --git a/arch/arm/mach-tegra/include/mach/pinmux.h b/arch/arm/mach-tegra/include/mach/pinmux.h
-> index fb101f5..1ea2018 100644
-> --- a/arch/arm/mach-tegra/include/mach/pinmux.h
-> +++ b/arch/arm/mach-tegra/include/mach/pinmux.h
-> @@ -2,6 +2,7 @@
->   * linux/arch/arm/mach-tegra/include/mach/pinmux.h
->   *
->   * Copyright (C) 2010 Google, Inc.
-> + * Copyright (C) 2010,2011 Nvidia, Inc.
->   *
->   * This software is licensed under the terms of the GNU General Public
->   * License version 2, as published by the Free Software Foundation, and
-> @@ -99,6 +100,11 @@ enum tegra_tristate {
->  	TEGRA_TRI_TRISTATE = 1,
->  };
+> diff --git a/arch/arm/plat-mxc/gic.c b/arch/arm/plat-mxc/gic.c
+> index 12f8f81..ea51ea4 100644
+> --- a/arch/arm/plat-mxc/gic.c
+> +++ b/arch/arm/plat-mxc/gic.c
+> @@ -18,7 +18,7 @@
+>  #include <asm/smp.h>
+>  #endif
 >  
-> +enum tegra_pin_io {
-> +	TEGRA_PIN_OUTPUT = 0,
-> +	TEGRA_PIN_INPUT = 1,
-> +};
-> +
->  enum tegra_vddio {
->  	TEGRA_VDDIO_BB = 0,
->  	TEGRA_VDDIO_LCD,
-> @@ -211,6 +217,10 @@ struct tegra_pingroup_desc {
->  	s8 tri_bit; 	/* offset into the TRISTATE_REG_* register bit */
->  	s8 mux_bit;	/* offset into the PIN_MUX_CTL_* register bit */
->  	s8 pupd_bit;	/* offset into the PULL_UPDOWN_REG_* register bit */
-> +	s8 lock_bit;	/* offset of the LOCK bit into mux register bit */
-> +	s8 od_bit;	/* offset of the OD bit into mux register bit */
-> +	s8 ioreset_bit;	/* offset of the IO_RESET bit into mux register bit */
-> +	s8 io_default;
+> -asmlinkage void __exception_irq_entry gic_handle_irq(struct pt_regs *regs)
+> +asmlinkage void __exception_irq_entry mxc_gic_handle_irq(struct pt_regs *regs)
+>  {
+>  	u32 irqstat, irqnr;
+>  
+> diff --git a/arch/arm/plat-mxc/include/mach/common.h b/arch/arm/plat-mxc/include/mach/common.h
+> index 83b745a..f6c13ab 100644
+> --- a/arch/arm/plat-mxc/include/mach/common.h
+> +++ b/arch/arm/plat-mxc/include/mach/common.h
+> @@ -90,7 +90,7 @@ extern void imx_print_silicon_rev(const char *cpu, int srev);
+>  
+>  void avic_handle_irq(struct pt_regs *);
+>  void tzic_handle_irq(struct pt_regs *);
+> -void gic_handle_irq(struct pt_regs *);
+> +void mxc_gic_handle_irq(struct pt_regs *);
+>  
+>  #define imx1_handle_irq avic_handle_irq
+>  #define imx21_handle_irq avic_handle_irq
+> @@ -101,7 +101,7 @@ void gic_handle_irq(struct pt_regs *);
+>  #define imx50_handle_irq tzic_handle_irq
+>  #define imx51_handle_irq tzic_handle_irq
+>  #define imx53_handle_irq tzic_handle_irq
+> -#define imx6q_handle_irq gic_handle_irq
+> +#define imx6q_handle_irq mcx_gic_handle_irq
+>  
+s/mcx_gic_handle_irq/mxc_gic_handle_irq
 
-Shouldn't this be an enum tegra_pin_io? Also, feel free to move it up above the
-s16/s8 members.
+Regards,
+Shawn
 
-
--Olof
+>  extern void imx_enable_cpu(int cpu, bool enable);
+>  extern void imx_set_cpu_jump(int cpu, void *jump_addr);
+> -- 
+> 1.7.0.4
