@@ -1,24 +1,30 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Fri, 4 Nov 2011 12:27:42 -0700
-Subject: [PATCH v2 1/2] arm/dt: add basic usb nodes to tegra device trees
-In-Reply-To: <1320433960-18173-1-git-send-email-olof@lixom.net>
-References: <1320433960-18173-1-git-send-email-olof@lixom.net>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF173F9A4E02@HQMAIL01.nvidia.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 4 Nov 2011 12:48:47 -0700
+Subject: [PATCH v3 10/17] ARM: tegra2: convert to CONFIG_MULTI_IRQ_HANDLER
+In-Reply-To: <1320425871-30564-11-git-send-email-marc.zyngier@arm.com>
+References: <1320425871-30564-1-git-send-email-marc.zyngier@arm.com>
+	<1320425871-30564-11-git-send-email-marc.zyngier@arm.com>
+Message-ID: <CAOesGMg7hVL7i=UnW3_fwLasdHvAyi8wb+rLC2pnXvxAw3aSNw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Olof Johansson wrote at Friday, November 04, 2011 1:13 PM:
-> For now they are a minimal binding. It needs to be amended with
-> vendor-specific settings for phy setup and link tuning, etc.
-> 
-> v2: Added bindings specification and phy_type properties
-> 
-> Signed-off-by: Olof Johansson <olof@lixom.net>
-> Acked-by: Grant Likely <grant.likely@secretlab.ca>
+On Fri, Nov 4, 2011 at 9:57 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> Convert the tegra2 platforms to be using the gic_handle_irq
+> function as their primary interrupt handler.
+>
+> Tested on harmony.
+>
+> Cc: Colin Cross <ccross@android.com>
+> Acked-by: Stephen Warren <swarren@nvidia.com>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 
-Both patches:
+Hm, the series did require some manual touch up on top of last night's
+linux-next, mostly due to fuzz and some exynos changes. That being
+said, the tegra parts are still:
 
-Acked-by: Stephen Warren <swarren@nvidia.com>
+Acked-by: Olof Johansson <olof@lixom.net>
 
--- 
-nvpublic
+(I acked 0/x of the last patch set instead of the individual patch)
+
+
+-Olof
