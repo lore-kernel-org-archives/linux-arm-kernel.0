@@ -1,34 +1,117 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 4 Nov 2011 06:11:24 -0200
-Subject: [PATCH v2] ARM/mx35/3ds: gpio: add mc9s08dz60 gpio function
-In-Reply-To: <3D55990BDF4852409EA769663F22E54AC04776@039-SN1MPN1-006.039d.mgd.msft.net>
-References: <1320383924-18762-1-git-send-email-b39297@freescale.com>
-	<3D55990BDF4852409EA769663F22E54AC04776@039-SN1MPN1-006.039d.mgd.msft.net>
-Message-ID: <CAOMZO5BRzQgbi5K2n8bwzyxJpoh_T476iOkwu8uCk_A0nD9eeg@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 4 Nov 2011 08:13:23 +0000
+Subject: [PATCH] GPIO: spear: remove empty plat/gpio.h
+In-Reply-To: <4EB35EE6.2050500@st.com>
+References: <20111103233925.GV12913@n2100.arm.linux.org.uk>
+	<4EB35EE6.2050500@st.com>
+Message-ID: <20111104081323.GW12913@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 4, 2011 at 4:01 AM, Wu Guoxing-B39297 <B39297@freescale.com> wrote:
-> Changes since v1:
-> ?Introduce "struct mc9s08dz60" for i2c client, instead of a static variable.
+On Fri, Nov 04, 2011 at 09:11:26AM +0530, Viresh Kumar wrote:
+> On 11/4/2011 5:09 AM, Russell King - ARM Linux wrote:
+> > Viresh - can you test and provide a tested-by for this please?
+> > 
+> > Grant,
+> > 
+> > You may wish to (eventually) take this through your gpio tree.
+> > 
+> > It's not something I've build-tested, but afaics nothing refers to
+> > plat/gpio.h outside of arch/arm - and nothing spear-wise refers to
+> > that include after this commit so it should be entirely safe.
+> > Nevertheless, waiting for Viresh to confirm...
+> > 
+> > 8<---
+> > From: Russell King <rmk+kernel@arm.linux.org.uk>
+> > GPIO: spear: remove empty plat/gpio.h
+> > 
+> > Spear now has an empty plat/gpio.h, and two mach/gpio.h which include
+> > this file.  Simply this by emptying the mach/gpio.h headers, and
+> > getting rid of plat/gpio.h entirely.
+> > 
+> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> > ---
+> >  arch/arm/mach-spear3xx/include/mach/gpio.h |   20 +-------------------
+> >  arch/arm/mach-spear6xx/include/mach/gpio.h |   20 +-------------------
+> >  arch/arm/plat-spear/include/plat/gpio.h    |    1 -
+> >  3 files changed, 2 insertions(+), 39 deletions(-)
+> >  delete mode 100644 arch/arm/plat-spear/include/plat/gpio.h
+> > 
+> > diff --git a/arch/arm/mach-spear3xx/include/mach/gpio.h b/arch/arm/mach-spear3xx/include/mach/gpio.h
+> > index 451b208..40a8c17 100644
+> > --- a/arch/arm/mach-spear3xx/include/mach/gpio.h
+> > +++ b/arch/arm/mach-spear3xx/include/mach/gpio.h
+> > @@ -1,19 +1 @@
+> > -/*
+> > - * arch/arm/mach-spear3xx/include/mach/gpio.h
+> > - *
+> > - * GPIO macros for SPEAr3xx machine family
+> > - *
+> > - * Copyright (C) 2009 ST Microelectronics
+> > - * Viresh Kumar<viresh.kumar@st.com>
+> > - *
+> > - * This file is licensed under the terms of the GNU General Public
+> > - * License version 2. This program is licensed "as is" without any
+> > - * warranty of any kind, whether express or implied.
+> > - */
+> > -
+> > -#ifndef __MACH_GPIO_H
+> > -#define __MACH_GPIO_H
+> > -
+> > -#include <plat/gpio.h>
+> > -
+> > -#endif /* __MACH_GPIO_H */
+> > +/* empty */
+> > diff --git a/arch/arm/mach-spear6xx/include/mach/gpio.h b/arch/arm/mach-spear6xx/include/mach/gpio.h
+> > index 3a789db..40a8c17 100644
+> > --- a/arch/arm/mach-spear6xx/include/mach/gpio.h
+> > +++ b/arch/arm/mach-spear6xx/include/mach/gpio.h
+> > @@ -1,19 +1 @@
+> > -/*
+> > - * arch/arm/mach-spear6xx/include/mach/gpio.h
+> > - *
+> > - * GPIO macros for SPEAr6xx machine family
+> > - *
+> > - * Copyright (C) 2009 ST Microelectronics
+> > - * Viresh Kumar<viresh.kumar@st.com>
+> > - *
+> > - * This file is licensed under the terms of the GNU General Public
+> > - * License version 2. This program is licensed "as is" without any
+> > - * warranty of any kind, whether express or implied.
+> > - */
+> > -
+> > -#ifndef __MACH_GPIO_H
+> > -#define __MACH_GPIO_H
+> > -
+> > -#include <plat/gpio.h>
+> > -
+> > -#endif /* __MACH_GPIO_H */
+> > +/* empty */
+> > diff --git a/arch/arm/plat-spear/include/plat/gpio.h b/arch/arm/plat-spear/include/plat/gpio.h
+> > deleted file mode 100644
+> > index 40a8c17..0000000
+> > --- a/arch/arm/plat-spear/include/plat/gpio.h
+> > +++ /dev/null
+> > @@ -1 +0,0 @@
+> > -/* empty */
+> > .
+> > 
+> 
+> Hi Russell,
+> 
+> Due to some other priorities in ST we were not able to update our code
+> to Mainline since sometime. We have now reserved time for doing Mainline activities.
+> 
+> We would be required to add this file again once we start pushing our code
+> to mainline.
+> 
+> So i would request to keep this patch on hold till the time we present our
+> patches once again.
 
-Patch history should be below the --- line.
+With the move to gpiolib, and the cleanups which are happening - specifically
+that the simple gpiolib implementation is now contained within asm/gpio.h,
+and we're moving towards having ARCH_NR_GPIO defined outside of mach/gpio.h,
+you should not require any plat/gpio.h.
 
-> -----Original Message-----
-> From: Wu Guoxing-B39297
-> Sent: Friday, November 04, 2011 1:19 PM
-> To: linux-arm-kernel at lists.infradead.org
-> Cc: s.hauer at pengutronix.de; shawn.guo at linaro.org; Wu Guoxing-B39297
-> Subject: [PATCH v2] ARM/mx35/3ds: gpio: add mc9s08dz60 gpio function
->
-> we only use the gpio function of mc9s08dz60 mcu chip, so just add the gpio driver, as this mcu will never be used in other board.
->
-> Signed-off-by: Wu Guoxing <b39297@freescale.com>
-> ---
-> ?drivers/gpio/Kconfig ? ? ? ? ? | ? ?6 ++
-> ?drivers/gpio/Makefile ? ? ? ? ?| ? ?1 +
-> ?drivers/gpio/gpio-mc9s08dz60.c | ?180 ++++++++++++++++++++++++++++++++++++++++
-> ?3 files changed, 187 insertions(+), 0 deletions(-) ?create mode 100644 drivers/gpio/gpio-mc9s08dz60.c
-
-Run ./script/getmaintainer.pl on your patch to get the lists and
-people you should also Cc.
+Platform specific gpio definitions unrelated to gpiolib should be placed
+into a separate header file.
