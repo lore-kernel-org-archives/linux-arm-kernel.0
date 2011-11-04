@@ -1,34 +1,24 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Fri, 04 Nov 2011 09:57:49 -0700
-Subject: [PATCH v8 REPOST 21/24] gpio/omap: save and restore debounce
-	registers
-In-Reply-To: <1318422730-22282-1-git-send-email-tarun.kanti@ti.com> (Tarun
-	Kanti DebBarma's message of "Wed, 12 Oct 2011 18:02:10 +0530")
-References: <1318422730-22282-1-git-send-email-tarun.kanti@ti.com>
-Message-ID: <87zkgbbzaq.fsf@ti.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri,  4 Nov 2011 16:57:34 +0000
+Subject: [PATCH v3 00/17] Switch GIC users (and omap2plus) to
+	CONFIG_MULTI_IRQ_HANDLER
+Message-ID: <1320425871-30564-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tarun Kanti DebBarma <tarun.kanti@ti.com> writes:
+In order to support multiple primary interrupt controllers in the same
+image, it is necessary to use the MULTI_IRQ_HANDLER config option.
 
-> From: Nishanth Menon <nm@ti.com>
->
-> GPIO debounce registers need to be saved and restored for proper functioning
-> of driver. 
+This patch series makes a first step in that direction by:
+- having the GIC code to provides a global handler,
+- make GIC users to provide this handler from their machine descriptor.
 
-OK.
+A side effect of this is that it forces OMAP2/3 platforms to be
+converted too in order to preserve the MULTI_OMAP feature. This leads
+to a certain simplification of the interrupt handling for the
+OMAP2/3/4 platforms.
 
-> To save the registers, we cannot cut the clock before the save,
-> hence move the clk disable after the save.
-
-This patch doesn't move any clk disable.
-
-I suspect you made some changes to the original patch from Nishanth.
-Please note that in the changelog.  This is typically done by adding
-something like:
-
-[my at email.addr: describe changes made]
-
-just before your signoff.
-
-Kevin
+This series has been tested by myself on VE (A9, A5, A15), PB11MP,
+Panda, IGEPv2, Harmony and Origen, as well as on other platforms by
+people who tested it. Patches against next-20111104 plus my "ARM: gic:
+allow GIC to support non-banked setups" patch.
