@@ -1,56 +1,110 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri,  4 Nov 2011 16:57:39 +0000
-Subject: [PATCH v3 05/17] ARM: highbank: convert to CONFIG_MULTI_IRQ_HANDLER
+Date: Fri,  4 Nov 2011 16:57:40 +0000
+Subject: [PATCH v3 06/17] ARM: RealView: convert to CONFIG_MULTI_IRQ_HANDLER
 In-Reply-To: <1320425871-30564-1-git-send-email-marc.zyngier@arm.com>
 References: <1320425871-30564-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1320425871-30564-6-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1320425871-30564-7-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert the highbank platform to be using the gic_handle_irq
-function as its primary interrupt handler.
+Convert the RealView platforms to be using the gic_handle_irq
+function as their primary interrupt handler.
 
-Cc: Rob Herring <rob.herring@calxeda.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
  arch/arm/Kconfig                                  |    1 +
- arch/arm/mach-highbank/highbank.c                 |    1 +
- arch/arm/mach-highbank/include/mach/entry-macro.S |    2 --
- 3 files changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/mach-realview/include/mach/entry-macro.S |    2 --
+ arch/arm/mach-realview/realview_eb.c              |    1 +
+ arch/arm/mach-realview/realview_pb1176.c          |    1 +
+ arch/arm/mach-realview/realview_pb11mp.c          |    1 +
+ arch/arm/mach-realview/realview_pba8.c            |    1 +
+ arch/arm/mach-realview/realview_pbx.c             |    1 +
+ 7 files changed, 6 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index c4f13c3..503daf0 100644
+index 503daf0..918d466 100644
 --- a/arch/arm/Kconfig
 +++ b/arch/arm/Kconfig
-@@ -345,6 +345,7 @@ config ARCH_HIGHBANK
- 	select GENERIC_CLOCKEVENTS
- 	select HAVE_ARM_SCU
- 	select USE_OF
+@@ -278,6 +278,7 @@ config ARCH_REALVIEW
+ 	select ARM_TIMER_SP804
+ 	select GPIO_PL061 if GPIOLIB
+ 	select NEED_MACH_MEMORY_H
 +	select MULTI_IRQ_HANDLER
  	help
- 	  Support for the Calxeda Highbank SoC based boards.
+ 	  This enables support for ARM Ltd RealView boards.
  
-diff --git a/arch/arm/mach-highbank/highbank.c b/arch/arm/mach-highbank/highbank.c
-index b82dcf0..89bdf00 100644
---- a/arch/arm/mach-highbank/highbank.c
-+++ b/arch/arm/mach-highbank/highbank.c
-@@ -140,6 +140,7 @@ DT_MACHINE_START(HIGHBANK, "Highbank")
- 	.map_io		= highbank_map_io,
- 	.init_irq	= highbank_init_irq,
- 	.timer		= &highbank_timer,
-+	.handle_irq	= gic_handle_irq,
- 	.init_machine	= highbank_init,
- 	.dt_compat	= highbank_match,
- MACHINE_END
-diff --git a/arch/arm/mach-highbank/include/mach/entry-macro.S b/arch/arm/mach-highbank/include/mach/entry-macro.S
-index 73c1129..a14f9e6 100644
---- a/arch/arm/mach-highbank/include/mach/entry-macro.S
-+++ b/arch/arm/mach-highbank/include/mach/entry-macro.S
-@@ -1,5 +1,3 @@
+diff --git a/arch/arm/mach-realview/include/mach/entry-macro.S b/arch/arm/mach-realview/include/mach/entry-macro.S
+index 4071164..e8a5179 100644
+--- a/arch/arm/mach-realview/include/mach/entry-macro.S
++++ b/arch/arm/mach-realview/include/mach/entry-macro.S
+@@ -7,8 +7,6 @@
+  * License version 2. This program is licensed "as is" without any
+  * warranty of any kind, whether express or implied.
+  */
+-#include <mach/hardware.h>
 -#include <asm/hardware/entry-macro-gic.S>
--
- 	.macro	disable_fiq
- 	.endm
  
+ 		.macro	disable_fiq
+ 		.endm
+diff --git a/arch/arm/mach-realview/realview_eb.c b/arch/arm/mach-realview/realview_eb.c
+index 427e44e..f01e332 100644
+--- a/arch/arm/mach-realview/realview_eb.c
++++ b/arch/arm/mach-realview/realview_eb.c
+@@ -470,6 +470,7 @@ MACHINE_START(REALVIEW_EB, "ARM-RealView EB")
+ 	.init_early	= realview_init_early,
+ 	.init_irq	= gic_init_irq,
+ 	.timer		= &realview_eb_timer,
++	.handle_irq	= gic_handle_irq,
+ 	.init_machine	= realview_eb_init,
+ #ifdef CONFIG_ZONE_DMA
+ 	.dma_zone_size	= SZ_256M,
+diff --git a/arch/arm/mach-realview/realview_pb1176.c b/arch/arm/mach-realview/realview_pb1176.c
+index ad227c4..d329b37 100644
+--- a/arch/arm/mach-realview/realview_pb1176.c
++++ b/arch/arm/mach-realview/realview_pb1176.c
+@@ -393,6 +393,7 @@ MACHINE_START(REALVIEW_PB1176, "ARM-RealView PB1176")
+ 	.init_early	= realview_init_early,
+ 	.init_irq	= gic_init_irq,
+ 	.timer		= &realview_pb1176_timer,
++	.handle_irq	= gic_handle_irq,
+ 	.init_machine	= realview_pb1176_init,
+ #ifdef CONFIG_ZONE_DMA
+ 	.dma_zone_size	= SZ_256M,
+diff --git a/arch/arm/mach-realview/realview_pb11mp.c b/arch/arm/mach-realview/realview_pb11mp.c
+index 6cb8318..32d18e5 100644
+--- a/arch/arm/mach-realview/realview_pb11mp.c
++++ b/arch/arm/mach-realview/realview_pb11mp.c
+@@ -367,6 +367,7 @@ MACHINE_START(REALVIEW_PB11MP, "ARM-RealView PB11MPCore")
+ 	.init_early	= realview_init_early,
+ 	.init_irq	= gic_init_irq,
+ 	.timer		= &realview_pb11mp_timer,
++	.handle_irq	= gic_handle_irq,
+ 	.init_machine	= realview_pb11mp_init,
+ #ifdef CONFIG_ZONE_DMA
+ 	.dma_zone_size	= SZ_256M,
+diff --git a/arch/arm/mach-realview/realview_pba8.c b/arch/arm/mach-realview/realview_pba8.c
+index 3db72c5..0896cc4 100644
+--- a/arch/arm/mach-realview/realview_pba8.c
++++ b/arch/arm/mach-realview/realview_pba8.c
+@@ -317,6 +317,7 @@ MACHINE_START(REALVIEW_PBA8, "ARM-RealView PB-A8")
+ 	.init_early	= realview_init_early,
+ 	.init_irq	= gic_init_irq,
+ 	.timer		= &realview_pba8_timer,
++	.handle_irq	= gic_handle_irq,
+ 	.init_machine	= realview_pba8_init,
+ #ifdef CONFIG_ZONE_DMA
+ 	.dma_zone_size	= SZ_256M,
+diff --git a/arch/arm/mach-realview/realview_pbx.c b/arch/arm/mach-realview/realview_pbx.c
+index bea4212..cac0b69 100644
+--- a/arch/arm/mach-realview/realview_pbx.c
++++ b/arch/arm/mach-realview/realview_pbx.c
+@@ -400,6 +400,7 @@ MACHINE_START(REALVIEW_PBX, "ARM-RealView PBX")
+ 	.init_early	= realview_init_early,
+ 	.init_irq	= gic_init_irq,
+ 	.timer		= &realview_pbx_timer,
++	.handle_irq	= gic_handle_irq,
+ 	.init_machine	= realview_pbx_init,
+ #ifdef CONFIG_ZONE_DMA
+ 	.dma_zone_size	= SZ_256M,
 -- 
 1.7.0.4
