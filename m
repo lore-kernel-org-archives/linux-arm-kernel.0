@@ -1,140 +1,91 @@
 From: jamie@jamieiles.com (Jamie Iles)
-Date: Fri,  4 Nov 2011 01:10:07 +0000
-Subject: [PATCHv4 10/13] ARM: versatile: convert to MULTI_IRQ_HANDLER
+Date: Fri,  4 Nov 2011 01:10:09 +0000
+Subject: [PATCHv4 12/13] ARM: picoxcell: convert to MULTI_IRQ_HANDLER
 In-Reply-To: <1320369010-23428-1-git-send-email-jamie@jamieiles.com>
 References: <1320369010-23428-1-git-send-email-jamie@jamieiles.com>
-Message-ID: <1320369010-23428-11-git-send-email-jamie@jamieiles.com>
+Message-ID: <1320369010-23428-13-git-send-email-jamie@jamieiles.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Now that there is a generic IRQ handler for multiple VIC devices use it
-for versatile to help building multi platform kernels.
+for picoxcell to help building multi platform kernels.
 
-Cc: Russell King <linux@arm.linux.org.uk>
 Signed-off-by: Jamie Iles <jamie@jamieiles.com>
 ---
  arch/arm/Kconfig                                   |    1 +
- arch/arm/mach-versatile/include/mach/entry-macro.S |   30 --------------------
- arch/arm/mach-versatile/versatile_ab.c             |    2 +
- arch/arm/mach-versatile/versatile_dt.c             |    2 +
- arch/arm/mach-versatile/versatile_pb.c             |    2 +
- 5 files changed, 7 insertions(+), 30 deletions(-)
+ arch/arm/mach-picoxcell/common.c                   |    9 ++++-----
+ arch/arm/mach-picoxcell/include/mach/entry-macro.S |   11 ++++-------
+ 3 files changed, 9 insertions(+), 12 deletions(-)
 
 diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index bb62f38..d1caaba 100644
+index 76a379c..43bb172 100644
 --- a/arch/arm/Kconfig
 +++ b/arch/arm/Kconfig
-@@ -294,6 +294,7 @@ config ARCH_VERSATILE
- 	select PLAT_VERSATILE_CLCD
- 	select PLAT_VERSATILE_FPGA_IRQ
- 	select ARM_TIMER_SP804
+@@ -651,6 +651,7 @@ config ARCH_PICOXCELL
+ 	select GENERIC_GPIO
+ 	select HAVE_SCHED_CLOCK
+ 	select HAVE_TCM
 +	select MULTI_IRQ_HANDLER
+ 	select NO_IOPORT
+ 	select USE_OF
  	help
- 	  This enables support for ARM Ltd Versatile board.
+diff --git a/arch/arm/mach-picoxcell/common.c b/arch/arm/mach-picoxcell/common.c
+index 34d0834..ad871bd 100644
+--- a/arch/arm/mach-picoxcell/common.c
++++ b/arch/arm/mach-picoxcell/common.c
+@@ -11,6 +11,7 @@
+ #include <linux/irqdomain.h>
+ #include <linux/of.h>
+ #include <linux/of_address.h>
++#include <linux/of_irq.h>
+ #include <linux/of_platform.h>
  
-diff --git a/arch/arm/mach-versatile/include/mach/entry-macro.S b/arch/arm/mach-versatile/include/mach/entry-macro.S
-index e6f7c16..b6f0dbf 100644
---- a/arch/arm/mach-versatile/include/mach/entry-macro.S
-+++ b/arch/arm/mach-versatile/include/mach/entry-macro.S
-@@ -7,39 +7,9 @@
+ #include <asm/mach/arch.h>
+@@ -33,22 +34,20 @@ static const char *picoxcell_dt_match[] = {
+ };
+ 
+ static const struct of_device_id vic_of_match[] __initconst = {
+-	{ .compatible = "arm,pl192-vic" },
++	{ .compatible = "arm,pl192-vic", .data = vic_of_init, },
+ 	{ /* Sentinel */ }
+ };
+ 
+ static void __init picoxcell_init_irq(void)
+ {
+-	vic_init(IO_ADDRESS(PICOXCELL_VIC0_BASE), 0, ~0, 0);
+-	vic_init(IO_ADDRESS(PICOXCELL_VIC1_BASE), 32, ~0, 0);
+-	irq_domain_generate_simple(vic_of_match, PICOXCELL_VIC0_BASE, 0);
+-	irq_domain_generate_simple(vic_of_match, PICOXCELL_VIC1_BASE, 32);
++	of_irq_init(vic_of_match);
+ }
+ 
+ DT_MACHINE_START(PICOXCELL, "Picochip picoXcell")
+ 	.map_io		= picoxcell_map_io,
+ 	.nr_irqs	= ARCH_NR_IRQS,
+ 	.init_irq	= picoxcell_init_irq,
++	.handle_irq	= vic_handle_irq,
+ 	.timer		= &picoxcell_timer,
+ 	.init_machine	= picoxcell_init_machine,
+ 	.dt_compat	= picoxcell_dt_match,
+diff --git a/arch/arm/mach-picoxcell/include/mach/entry-macro.S b/arch/arm/mach-picoxcell/include/mach/entry-macro.S
+index a6b09f7..9b505ac 100644
+--- a/arch/arm/mach-picoxcell/include/mach/entry-macro.S
++++ b/arch/arm/mach-picoxcell/include/mach/entry-macro.S
+@@ -9,11 +9,8 @@
   * License version 2. This program is licensed "as is" without any
   * warranty of any kind, whether express or implied.
   */
 -#include <mach/hardware.h>
--#include <mach/platform.h>
--#include <asm/hardware/vic.h>
+-#include <mach/irqs.h>
+-#include <mach/map.h>
++	.macro  disable_fiq
++	.endm
  
- 		.macro	disable_fiq
- 		.endm
- 
--		.macro  get_irqnr_preamble, base, tmp
--		ldr	\base, =IO_ADDRESS(VERSATILE_VIC_BASE)
--		.endm
+-#define VA_VIC0		IO_ADDRESS(PICOXCELL_VIC0_BASE)
+-#define VA_VIC1		IO_ADDRESS(PICOXCELL_VIC1_BASE)
 -
- 		.macro  arch_ret_to_user, tmp1, tmp2
- 		.endm
--
--		.macro	get_irqnr_and_base, irqnr, irqstat, base, tmp
--		ldr	\irqstat, [\base, #VIC_IRQ_STATUS]	@ get masked status
--		mov	\irqnr, #0
--		teq	\irqstat, #0
--		beq	1003f
--
--1001:		tst	\irqstat, #15
--		bne	1002f
--		add	\irqnr, \irqnr, #4
--		movs	\irqstat, \irqstat, lsr #4
--		bne	1001b
--1002:		tst	\irqstat, #1
--		bne	1003f
--		add	\irqnr, \irqnr, #1
--		movs	\irqstat, \irqstat, lsr #1
--		bne	1002b
--1003:		/* EQ will be set if no irqs pending */
--
--@		clz	\irqnr, \irqstat
-- at 1003:		/* EQ will be set if we reach MAXIRQNUM */
--		.endm
--
-diff --git a/arch/arm/mach-versatile/versatile_ab.c b/arch/arm/mach-versatile/versatile_ab.c
-index fda4866..c83a1f3 100644
---- a/arch/arm/mach-versatile/versatile_ab.c
-+++ b/arch/arm/mach-versatile/versatile_ab.c
-@@ -27,6 +27,7 @@
- 
- #include <mach/hardware.h>
- #include <asm/irq.h>
-+#include <asm/hardware/vic.h>
- #include <asm/mach-types.h>
- 
- #include <asm/mach/arch.h>
-@@ -39,6 +40,7 @@ MACHINE_START(VERSATILE_AB, "ARM-Versatile AB")
- 	.map_io		= versatile_map_io,
- 	.init_early	= versatile_init_early,
- 	.init_irq	= versatile_init_irq,
-+	.handle_irq	= vic_handle_irq,
- 	.timer		= &versatile_timer,
- 	.init_machine	= versatile_init,
- MACHINE_END
-diff --git a/arch/arm/mach-versatile/versatile_dt.c b/arch/arm/mach-versatile/versatile_dt.c
-index 54e037c..f4d1e0f 100644
---- a/arch/arm/mach-versatile/versatile_dt.c
-+++ b/arch/arm/mach-versatile/versatile_dt.c
-@@ -24,6 +24,7 @@
- #include <linux/init.h>
- #include <linux/of_irq.h>
- #include <linux/of_platform.h>
-+#include <asm/hardware/vic.h>
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
- 
-@@ -45,6 +46,7 @@ DT_MACHINE_START(VERSATILE_PB, "ARM-Versatile (Device Tree Support)")
- 	.map_io		= versatile_map_io,
- 	.init_early	= versatile_init_early,
- 	.init_irq	= versatile_init_irq,
-+	.handle_irq	= vic_handle_irq,
- 	.timer		= &versatile_timer,
- 	.init_machine	= versatile_dt_init,
- 	.dt_compat	= versatile_dt_match,
-diff --git a/arch/arm/mach-versatile/versatile_pb.c b/arch/arm/mach-versatile/versatile_pb.c
-index feaf9cb..4d31eeb 100644
---- a/arch/arm/mach-versatile/versatile_pb.c
-+++ b/arch/arm/mach-versatile/versatile_pb.c
-@@ -28,6 +28,7 @@
- #include <linux/io.h>
- 
- #include <mach/hardware.h>
-+#include <asm/hardware/vic.h>
- #include <asm/irq.h>
- #include <asm/mach-types.h>
- 
-@@ -107,6 +108,7 @@ MACHINE_START(VERSATILE_PB, "ARM-Versatile PB")
- 	.map_io		= versatile_map_io,
- 	.init_early	= versatile_init_early,
- 	.init_irq	= versatile_init_irq,
-+	.handle_irq	= vic_handle_irq,
- 	.timer		= &versatile_timer,
- 	.init_machine	= versatile_pb_init,
- MACHINE_END
+-#include <asm/entry-macro-vic2.S>
++	.macro  arch_ret_to_user, tmp1, tmp2
++	.endm
 -- 
 1.7.5.4
