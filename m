@@ -1,173 +1,41 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 04 Nov 2011 14:01:33 +0900
-Subject: [PATCH] ARM: SAMSUNG: Add clk enable/disable of pwm
-In-Reply-To: <4EB26AF4.8040601@samsung.com>
-References: <1319505701-9784-1-git-send-email-jy0922.shim@samsung.com>
-	<012701cc99cc$300dca50$90295ef0$%kim@samsung.com>
-	<4EB1FB58.9050503@samsung.com>
-	<018e01cc99fc$bb4d5ec0$31e81c40$%kim@samsung.com>
-	<4EB24886.8080002@samsung.com>
-	<CAH9JG2XFALdd_JVSQW4rjCDCgLL9sgf_GVurVDoGJa-SwXmB5Q@mail.gmail.com>
-	<CAH9JG2X9dXe2cG6qvqM6GuTuC6xc0wBYSsvba=zbbmQD7BqYXg@mail.gmail.com>
-	<019301cc9a08$17c69d50$4753d7f0$%kim@samsung.com>
-	<4EB26AF4.8040601@samsung.com>
-Message-ID: <026c01cc9aae$d2bb0280$78310780$%kim@samsung.com>
+Date: Fri, 04 Nov 2011 14:02:16 +0900
+Subject: [PATCH 3/3 v3.1] ARM: S3C64XX: Correct reservation of GPIOs for
+	CPU module on Cragganmore
+In-Reply-To: <20111103121014.GA11851@opensource.wolfsonmicro.com>
+References: <1320086573-21184-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+	<1320086573-21184-3-git-send-email-broonie@opensource.wolfsonmicro.com>
+	<018d01cc99fc$8a2ee840$9e8cb8c0$%kim@samsung.com>
+	<20111103121014.GA11851@opensource.wolfsonmicro.com>
+Message-ID: <026d01cc9aae$ec554520$c4ffcf60$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Joonyoung Shim wrote:
+Mark Brown wrote:
 > 
-> 11/03/2011 06:08 PM, Kukjin Kim ? ?:
-> > Kyungmin Park wrote:
-> >> On 11/3/11, Kyungmin Park<kyungmin.park@samsung.com>  wrote:
-> >>> On 11/3/11, Joonyoung Shim<jy0922.shim@samsung.com>  wrote:
-> >>>> 11/03/2011 04:46 PM, Kukjin Kim ? ?:
-> >>>>> Joonyoung Shim wrote:
-> >>>>>> 11/03/2011 10:59 AM, Kukjin Kim ? ?:
-> >>>>>>> Joonyoung Shim wrote:
-> >>>>>>>> PWM timers use pclk("timers" clk) as parent clk. If this pclk is the
-> >>>>>>>> disabled state when PWM driver is probed, then it causes wrong read
-> >>>>>>>> and
-> >>>>>>>> write operation about registers of PWM.
-> >>>>>>>>
-> >>>>>>>> Signed-off-by: Joonyoung Shim<jy0922.shim@samsung.com>
-> >>>>>>>> Signed-off-by: Kyungmin Park<kyungmin.park@samsung.com>
-> >>>>>>>> ---
-> >>>>>>>>     arch/arm/plat-samsung/pwm.c |    7 +++++++
-> >>>>>>>>     1 files changed, 7 insertions(+), 0 deletions(-)
-> >>>>>>>>
-> >>>>>>>> diff --git a/arch/arm/plat-samsung/pwm.c
-> >>>>>>>> b/arch/arm/plat-samsung/pwm.c
-> >>>>>>>> index f37457c..dc1185d 100644
-> >>>>>>>> --- a/arch/arm/plat-samsung/pwm.c
-> >>>>>>>> +++ b/arch/arm/plat-samsung/pwm.c
-> >>>>>>>> @@ -299,6 +299,9 @@ static int s3c_pwm_probe(struct
-> platform_device
-> >>>>>>>> *pdev)
-> >>>>>>>>     		goto err_clk_tin;
-> >>>>>>>>     	}
-> >>>>>>>>
-> >>>>>>>> +	clk_enable(pwm->clk);
-> >>>>>>>> +	clk_enable(pwm->clk_div);
-> >>>>>>>> +
-> >>>>>>>>     	local_irq_save(flags);
-> >>>>>>>>
-> >>>>>>>>     	tcon = __raw_readl(S3C2410_TCON);
-> >>>>>>>> @@ -326,6 +329,8 @@ static int s3c_pwm_probe(struct
-> platform_device
-> >>>>>>>> *pdev)
-> >>>>>>>>     	return 0;
-> >>>>>>>>
-> >>>>>>>>      err_clk_tdiv:
-> >>>>>>>> +	clk_disable(pwm->clk_div);
-> >>>>>>>> +	clk_disable(pwm->clk);
-> >>>>>>>>     	clk_put(pwm->clk_div);
-> >>>>>>>>
-> >>>>>>>>      err_clk_tin:
-> >>>>>>>> @@ -340,6 +345,8 @@ static int __devexit s3c_pwm_remove(struct
-> >>>>>>>> platform_device *pdev)
-> >>>>>>>>     {
-> >>>>>>>>     	struct pwm_device *pwm = platform_get_drvdata(pdev);
-> >>>>>>>>
-> >>>>>>>> +	clk_disable(pwm->clk_div);
-> >>>>>>>> +	clk_disable(pwm->clk);
-> >>>>>>>>     	clk_put(pwm->clk_div);
-> >>>>>>>>     	clk_put(pwm->clk);
-> >>>>>>>>     	kfree(pwm);
-> >>>>>>>> --
-> >>>>>>>> 1.7.5.4
-> >>>>>>> Well, I wonder when this is needed. I think it should be enabled
-> >>>>>>> during
-> >>>>>>> kernel booting...
-> >>>>>> The exynos4 machine using just timer turns on "timer" clock in the
-> >>>>>> past,
-> >>>>>> but "timer" clock is disable state when boot since MCT is used. MCT
-> >>>>>> doesn't control "timer" clock.
-> >>>>>>
-> >>>>>> I think pwm driver should control(enable/disable) using clocks
-> >>>>>> regardless of their parents clock.
-> >>>>>>
-> >>>>> I mean, why that is disabled when kernel boot...
-> >>>>>
-> >>>> Please see arch/arm/mach-exynos4/clock.c
-> >>>> There is "timers' clock in the clk init_clocks_off[].
-> >> One more, Don't assume some clocks are enabled at bootloader. user can
-> >> use any bootloader and any configuration.
-> >>
-> > Kyungmin,
-> > NO! I didn't. Just I thought your bootloader disables the clock and why it is
-> needed.
-> >
-> > Anyway, Joonyoung,
-> > How about following? And it seems enough...
-> > --
-> > diff --git a/arch/arm/plat-samsung/pwm-clock.c b/arch/arm/plat-samsung/pwm-
-> clock.c
-> > index a35ff3b..37a159b 100644
-> > --- a/arch/arm/plat-samsung/pwm-clock.c
-> > +++ b/arch/arm/plat-samsung/pwm-clock.c
-> > @@ -449,6 +449,8 @@ __init void s3c_pwmclk_init(void)
-> >   		return;
-> >   	}
-> >
-> > +	clk_enable(clk_timers);
-> > +
-> >   	for (clk = 0; clk<  ARRAY_SIZE(clk_timer_scaler); clk++)
-> >   		clk_timer_scaler[clk].parent = clk_timers;
-> >
+> On Thu, Nov 03, 2011 at 04:45:21PM +0900, Kukjin Kim wrote:
+> > Mark Brown wrote:
 > 
-> No, there is no the reason "timers" clock turns on always.
+> > >  #define PCA935X_GPIO_BASE		GPIO_BOARD_START
+> > >  #define CODEC_GPIO_BASE		(GPIO_BOARD_START + 8)
+> > >  #define GLENFARCLAS_PMIC_GPIO_BASE	(GPIO_BOARD_START + 16)
+> > > +#define BANFF_PMIC_GPIO_BASE
+> > > 	(GLENFARCLAS_PMIC_GPIO_BASE + 16)
 > 
-> > --
-> > Or needs separate clk_enable like following?
-> >
-> > diff --git a/arch/arm/plat-samsung/pwm.c b/arch/arm/plat-samsung/pwm.c
-> > index f37457c..7a77e36 100644
-> > --- a/arch/arm/plat-samsung/pwm.c
-> > +++ b/arch/arm/plat-samsung/pwm.c
-> > @@ -292,6 +292,8 @@ static int s3c_pwm_probe(struct platform_device *pdev)
-> >   		goto err_alloc;
-> >   	}
-> >
-> > +	clk_enable(pwm->clk);
-> > +
-> >   	pwm->clk_div = clk_get(dev, "pwm-tdiv");
-> >   	if (IS_ERR(pwm->clk_div)) {
-> >   		dev_err(dev, "failed to get pwm tdiv clk\n");
-> > @@ -299,6 +301,8 @@ static int s3c_pwm_probe(struct platform_device *pdev)
-> >   		goto err_clk_tin;
-> >   	}
-> >
-> > +	clk_enable(pwm->clk_div);
-> > +
-> >   	local_irq_save(flags);
-> >
-> >   	tcon = __raw_readl(S3C2410_TCON);
-> > @@ -326,9 +330,11 @@ static int s3c_pwm_probe(struct platform_device *pdev)
-> >   	return 0;
-> >
-> >   err_clk_tdiv:
-> > +	clk_disable(pwm->clk_div);
-> >   	clk_put(pwm->clk_div);
-> >
-> >   err_clk_tin:
-> > +	clk_disable(pwm->clk);
-> >   	clk_put(pwm->clk);
-> >
-> >   err_alloc:
-> > --
+> > Above definitions are at mach/crag6410.h file not mach-crag6410.c file
+in my
+> > tree.
+> > And in my opinion, to use GPIO_BOARD_START is better than to use
+> > GLENFARCLAS_PMIC_GPIO_BASE like others for easily reading.
 > 
-> I don't care about this.
+> I'd prefer it if the were all defined in terms of the preceeding one but
+> yes.
 > 
-> >
-> > BTW, I think this is not really needed for this merge window because the pwm.c
-> is used for only s3c24xx and as you know, it doesn't matter because of
-> arch/arm/plat-samsung/time.c. And if required, this can be fixed during -rc.
+> > So I think, this should be following...?
 > 
-> It's the problem to assume that the related clocks turned on by other
-> and the pwm is used for exynos4 also.
-> 
-OK, I agree, applied.
+> Yes.
+
+OK, applied.
 Thanks.
 
 Best regards,
