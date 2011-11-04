@@ -1,91 +1,52 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 4 Nov 2011 15:16:12 -0700
-Subject: [PATCH v4 1/4] regulator: helper routine to extract
-	regulator_init_data
-In-Reply-To: <20111104214650.GC8266@opensource.wolfsonmicro.com>
-References: <1319721864-30067-1-git-send-email-rnayak@ti.com>
-	<20111104202905.GA3918@quad.lixom.net>
-	<20111104211447.GC2541@opensource.wolfsonmicro.com>
-	<20111104212216.GA5756@quad.lixom.net>
-	<20111104212910.GB8266@opensource.wolfsonmicro.com>
-	<CAOesGMgA7UayF9SJUP0YLnj86GmKBrajsBxv4_kRNNqCsvKTYg@mail.gmail.com>
-	<20111104214650.GC8266@opensource.wolfsonmicro.com>
-Message-ID: <CAOesGMjkcExKXhNN1nFGey=wBie0PQGp2XS_r-5Rr3X0p4eNhg@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 4 Nov 2011 13:08:26 -0700
+Subject: [PATCH 1/2] OMAP2+: DMA: Workaround for invalid source
+	position
+In-Reply-To: <2603119.amz7RjSE3J@barack>
+References: <1320070817-9638-1-git-send-email-peter.ujfalusi@ti.com>
+	<1320070817-9638-2-git-send-email-peter.ujfalusi@ti.com>
+	<20111103212756.GZ31337@atomide.com> <2603119.amz7RjSE3J@barack>
+Message-ID: <20111104200826.GE31337@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 4, 2011 at 2:46 PM, Mark Brown
-<broonie@opensource.wolfsonmicro.com> wrote:
-> On Fri, Nov 04, 2011 at 02:34:35PM -0700, Olof Johansson wrote:
->> On Fri, Nov 4, 2011 at 2:29 PM, Mark Brown
->
->> > I think it's useful to define how consumers are supposed to do this
->> > somewhere - it is actually part of the core binding how consumers are
->> > supposed to do this.
->
->> Yeah, ok, but it shouldn't be part of the description of regulator
->> properties per se. See how gpio does it, defining how a gpio-specifier
->> is crafted. The equivalent should be done for regulators.
->
-> That seems to be pretty much exactly what's being done here, and like
-> the GPIO bindings it's specified in the core document. ?Though perhaps
-> there's some aspect of how the document is written that's missing.
+* P?ter Ujfalusi <peter.ujfalusi@ti.com> [111104 02:00]:
+> On Thursday 03 November 2011 14:27:56 Tony Lindgren wrote:
+> > 
+> > Should these tests be done only after the errata re-read for both
+> > src and dst patches? Otherwise the errata will not be handled?
+> 
+> Yes that might be a good idea.
+> I was trying to locate the original errata description for DMA_ERRATA_3_3, but 
+> it does not exist, or at least I can not find it. This only been mentioned in 
+> the kernel's comment.
 
-Yep, sounds good. A slightly more elaborate description of the binding
-inspired by the gpio.txt document would be the way to do that.
+Seems it got added with commit d3c9be2f.
 
-> If you're talking about the specifics of the binding the GPIO bindings
-> do suffer from the whole magic indexes into arrays problem that makes a
-> lot of the older device tree bindings quite hard to read.
+> I'm not sure when this DMA_ERRATA_3_3 would have been in force. My guess would 
+> be that if someone wants to read the src/dst position right after the channel 
+> is disabled, but what would we expect it to return when the channel has been 
+> disabled?
 
-I wasn't talking about that in this case, but that is unfortunate and
-I do agree that the ordered array of gpios is messy and hard to
-follow.
+No idea.. Or read it after stopping it?
 
-I've been trying to catch those as they are introduced -- i.e. we
-moved away from the magic array-of-three-gpios to discrete properties
-on the sdhci binding for tegra, for example. We'll keep an eye on the
-same for regulators.
+> I mean what is the reasonable src/dst for a disabled channel? 0 is as good as 
+> any other number, probably the programmed start of the DMA transfer would be 
+> my best bet.
+> I think the errata description for DMA_ERRATA_3_3 is not correct, and it is in 
+> fact to handle the case I'm also handling: Before the first DMA request the 
+> CDAC is 0 (since we configured it to be), the CSAC contains _something_ (most 
+> of the time 0, but can be random number).
+> In some situation re-reading the src/dst position will give enough time to 
+> receive the first DMA request, which will update CDAC/CSAC registers.
 
->> > There's also a bit of magic here for chained supplies with one regulator
->> > supplying another (eg, using a DCDC to drop the system supply down to a
->> > lower voltage to supply a bunch of LDOs for improved efficiency).
->
->> Describing that in the device tree using regulator-specifiers
->> shouldn't be too bad? The LDO will reference the DCDC as the parent
->> supply (or input or whatever language you prefer). They don't have to
->> be in the same topology, they will instead be under whatever
->> controller/bus they are on for control -- i2c, etc.
->
-> That's not great as it means you've got a separate binding for supplies
-> that happen to be connected to another regulator from that used for
-> other supplies on the device which is particularly confusing in the
-> fairly common case where a regulator chip has multiple supplies. ?Using
-> the same method for binding all supplies seems much neater.
+Yeah could be since the handling is just an immediate re-read of the register..
+ 
+> What do you think?
 
-I'm not following the above 100%, but I think you are saying that you
-would prefer to describe the regulator / power hierarchy in the
-functional topology instead of how the various regulators and supplies
-are organized on i2c busses and other controllers?  And the obvious
-one that would be less than trivial to find a home for would be the
-top-level or freestanding fixed regulators that don't sit on a
-controlling bus.
+Probably the safest thing to do is move your check after the re-read test
+in case there's more to the ERRATA_3_3.
 
-If that is the case then this is yet another case of where we have a
-couple of different structures that are overlaid on each other in the
-device tree. Another is/will be clocking.
+Regards,
 
-That should be OK, since you can have a binding for your PMIC that
-splits up the various rails in separate subnodes, where each can
-specify a reference to the upstream supply for that rail, etc. Would
-that work?
-
-Finding a best-practices location for where to put the fixed
-regulators that don't sit on a controlling bus would be the trickiest
-part, and I suppose we will just have to make up a location for those
-(/power-supplies or something).  But various regulators will need to
-be spread around the device tree a bit, in particular the i2c vs gpio
-controlled ones will need to sit on their controlling busses.
-
-
--Olof
+Tony
