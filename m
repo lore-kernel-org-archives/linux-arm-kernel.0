@@ -1,110 +1,65 @@
-From: viresh.kumar@st.com (Viresh Kumar)
-Date: Fri, 4 Nov 2011 09:11:26 +0530
-Subject: [PATCH] GPIO: spear: remove empty plat/gpio.h
-In-Reply-To: <20111103233925.GV12913@n2100.arm.linux.org.uk>
-References: <20111103233925.GV12913@n2100.arm.linux.org.uk>
-Message-ID: <4EB35EE6.2050500@st.com>
+From: kmpark@infradead.org (Kyungmin Park)
+Date: Fri, 4 Nov 2011 13:45:03 +0900
+Subject: [PATCH] ARM: EXYNOS4: Enable write full line for zeros mode
+In-Reply-To: <1320373056-11718-1-git-send-email-boojin.kim@samsung.com>
+References: <1320373056-11718-1-git-send-email-boojin.kim@samsung.com>
+Message-ID: <CAH9JG2XWPrrWWvnwmbbqixsN72P=Y87KBw3Skgsp_aiYx66XCg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/4/2011 5:09 AM, Russell King - ARM Linux wrote:
-> Viresh - can you test and provide a tested-by for this please?
-> 
-> Grant,
-> 
-> You may wish to (eventually) take this through your gpio tree.
-> 
-> It's not something I've build-tested, but afaics nothing refers to
-> plat/gpio.h outside of arch/arm - and nothing spear-wise refers to
-> that include after this commit so it should be entirely safe.
-> Nevertheless, waiting for Viresh to confirm...
-> 
-> 8<---
-> From: Russell King <rmk+kernel@arm.linux.org.uk>
-> GPIO: spear: remove empty plat/gpio.h
-> 
-> Spear now has an empty plat/gpio.h, and two mach/gpio.h which include
-> this file.  Simply this by emptying the mach/gpio.h headers, and
-> getting rid of plat/gpio.h entirely.
-> 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Hi,
+
+On 11/4/11, Boojin Kim <boojin.kim@samsung.com> wrote:
+> This patch enables the 'write full line for zeros mode' feature of
+> cortex-A9.
+> The performance of memset() with zero is increased about 10% with this
+> patch.
+
+It seems CA9 common parts, does other SoC require same feature?
+>
+> Signed-off-by: Boojin Kim <boojin.kim@samsung.com>
 > ---
->  arch/arm/mach-spear3xx/include/mach/gpio.h |   20 +-------------------
->  arch/arm/mach-spear6xx/include/mach/gpio.h |   20 +-------------------
->  arch/arm/plat-spear/include/plat/gpio.h    |    1 -
->  3 files changed, 2 insertions(+), 39 deletions(-)
->  delete mode 100644 arch/arm/plat-spear/include/plat/gpio.h
-> 
-> diff --git a/arch/arm/mach-spear3xx/include/mach/gpio.h b/arch/arm/mach-spear3xx/include/mach/gpio.h
-> index 451b208..40a8c17 100644
-> --- a/arch/arm/mach-spear3xx/include/mach/gpio.h
-> +++ b/arch/arm/mach-spear3xx/include/mach/gpio.h
-> @@ -1,19 +1 @@
-> -/*
-> - * arch/arm/mach-spear3xx/include/mach/gpio.h
-> - *
-> - * GPIO macros for SPEAr3xx machine family
-> - *
-> - * Copyright (C) 2009 ST Microelectronics
-> - * Viresh Kumar<viresh.kumar@st.com>
-> - *
-> - * This file is licensed under the terms of the GNU General Public
-> - * License version 2. This program is licensed "as is" without any
-> - * warranty of any kind, whether express or implied.
-> - */
-> -
-> -#ifndef __MACH_GPIO_H
-> -#define __MACH_GPIO_H
-> -
-> -#include <plat/gpio.h>
-> -
-> -#endif /* __MACH_GPIO_H */
-> +/* empty */
-> diff --git a/arch/arm/mach-spear6xx/include/mach/gpio.h b/arch/arm/mach-spear6xx/include/mach/gpio.h
-> index 3a789db..40a8c17 100644
-> --- a/arch/arm/mach-spear6xx/include/mach/gpio.h
-> +++ b/arch/arm/mach-spear6xx/include/mach/gpio.h
-> @@ -1,19 +1 @@
-> -/*
-> - * arch/arm/mach-spear6xx/include/mach/gpio.h
-> - *
-> - * GPIO macros for SPEAr6xx machine family
-> - *
-> - * Copyright (C) 2009 ST Microelectronics
-> - * Viresh Kumar<viresh.kumar@st.com>
-> - *
-> - * This file is licensed under the terms of the GNU General Public
-> - * License version 2. This program is licensed "as is" without any
-> - * warranty of any kind, whether express or implied.
-> - */
-> -
-> -#ifndef __MACH_GPIO_H
-> -#define __MACH_GPIO_H
-> -
-> -#include <plat/gpio.h>
-> -
-> -#endif /* __MACH_GPIO_H */
-> +/* empty */
-> diff --git a/arch/arm/plat-spear/include/plat/gpio.h b/arch/arm/plat-spear/include/plat/gpio.h
-> deleted file mode 100644
-> index 40a8c17..0000000
-> --- a/arch/arm/plat-spear/include/plat/gpio.h
-> +++ /dev/null
-> @@ -1 +0,0 @@
-> -/* empty */
-> .
-> 
-
-Hi Russell,
-
-Due to some other priorities in ST we were not able to update our code
-to Mainline since sometime. We have now reserved time for doing Mainline activities.
-
-We would be required to add this file again once we start pushing our code
-to mainline.
-
-So i would request to keep this patch on hold till the time we present our
-patches once again.
-
--- 
-viresh
+>  arch/arm/mach-exynos4/platsmp.c |   18 ++++++++++++++++++
+>  1 files changed, 18 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/mach-exynos4/platsmp.c
+> b/arch/arm/mach-exynos4/platsmp.c
+> index d5f0f29..edf7054 100644
+> --- a/arch/arm/mach-exynos4/platsmp.c
+> +++ b/arch/arm/mach-exynos4/platsmp.c
+> @@ -90,6 +90,16 @@ static void __cpuinit exynos4_gic_secondary_init(void)
+>  	__raw_writel(1, cpu_base + GIC_CPU_CTRL);
+>  }
+>
+> +static void enable_foz(void)
+> +{
+> +	u32 val;
+> +	asm volatile(
+> +	"mrc   p15, 0, %0, c1, c0, 1\n"
+> +	"orr   %0, %0, #(1 << 3)\n"
+> +	"mcr   p15, 0, %0, c1, c0, 1"
+> +	: "=r" (val));
+> +}
+> +
+>  void __cpuinit platform_secondary_init(unsigned int cpu)
+>  {
+>  	/*
+> @@ -106,6 +116,14 @@ void __cpuinit platform_secondary_init(unsigned int
+> cpu)
+>  	write_pen_release(-1);
+>
+>  	/*
+> +	* Enable write full line for zeros mode
+> +	*/
+> +	if (soc_is_exynos4210() | soc_is_exynos4212() | soc_is_exynos4412()) {
+Now CA15 is not ready so this if statement is meaningless.
+> +		enable_foz();
+> +		smp_call_function((void (*)(void *))enable_foz, NULL, 0);
+> +	}
+> +
+> +	/*
+>  	 * Synchronise with the boot thread.
+>  	 */
+>  	spin_lock(&boot_lock);
+Thank you,
+Kyungmin Park
