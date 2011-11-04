@@ -1,28 +1,25 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 4 Nov 2011 21:01:52 +0000
-Subject: [PATCH v3 2/4] regulator: adapt fixed regulator driver to dt
-In-Reply-To: <20111104203422.GB3918@quad.lixom.net>
+Date: Fri, 4 Nov 2011 21:02:41 +0000
+Subject: [PATCH v3 0/4] Device tree support for regulators
+In-Reply-To: <CAOesGMii8v3DOCjWpuF3=+EVu+-HYGys=7RRgpk+9U=FxTHwOA@mail.gmail.com>
 References: <1319702185-16108-1-git-send-email-rnayak@ti.com>
-	<1319702185-16108-3-git-send-email-rnayak@ti.com>
-	<20111104203422.GB3918@quad.lixom.net>
-Message-ID: <20111104210151.GA2541@opensource.wolfsonmicro.com>
+	<20111027090847.GC6641@opensource.wolfsonmicro.com>
+	<CAOesGMii8v3DOCjWpuF3=+EVu+-HYGys=7RRgpk+9U=FxTHwOA@mail.gmail.com>
+Message-ID: <20111104210241.GB2541@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 04, 2011 at 01:34:22PM -0700, Olof Johansson wrote:
+On Fri, Nov 04, 2011 at 01:21:26PM -0700, Olof Johansson wrote:
+> On Thu, Oct 27, 2011 at 2:08 AM, Mark Brown
 
-> Shouldn't a fixed regulator just be a subset of a fixed one? If so, should the
-> binding be merged with that one?
+> > Looking at the device bindings I notice that these bindings loose the
+> > ability to assign a descriptive name to regulator outputs. ?This is
+> > really useful for making it easy to tie the code and the schematics
+> > together - you can make the runing system use the same name as the
+> > schematic.
 
-No, the fixed voltage regultor is a superset of a general regulator - it
-has additional information like the voltage it supplies and the optional
-enable GPIO.
+> That can easily be added by having a output-name property in the
+> regulator device node.
 
-> > +- regulator-fixed-enabled-at-boot: 1 = yes, 0 = no
-
-> Same here, you can drop the prefix. Also, the regular regulators use
-> "regulator-name" for the supply name, it would make sense to reuse the same
-> naming here, right?
-
-I'm having a hard time associating your second comment with the property
-being discussed - could you clarify please?
+Which is pretty much what Rajendra's updated version in response to my
+above comment did FWIW.
