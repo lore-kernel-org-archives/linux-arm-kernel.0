@@ -1,13 +1,13 @@
 From: ulf.hansson@stericsson.com (Ulf Hansson)
-Date: Fri, 4 Nov 2011 15:34:15 +0100
-Subject: [PATCH 0/2] mmc: mmci: Bugfixes for SDIO
-In-Reply-To: <1319464243-16638-1-git-send-email-ulf.hansson@stericsson.com>
-References: <1319464243-16638-1-git-send-email-ulf.hansson@stericsson.com>
-Message-ID: <4EB3F7E7.1070901@stericsson.com>
+Date: Fri, 4 Nov 2011 15:35:18 +0100
+Subject: [PATCH 0/2] mmc: mmci: Improvements for SDIO
+In-Reply-To: <1319466800-19884-1-git-send-email-ulf.hansson@stericsson.com>
+References: <1319466800-19884-1-git-send-email-ulf.hansson@stericsson.com>
+Message-ID: <4EB3F826.1030001@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Is this patch and it's patchserie considered OK?
+Is this patchserie considered OK?
 
 -Russell, patches are available in your patchtracker.
 
@@ -15,18 +15,21 @@ Br
 Ulf Hansson
 
 Ulf HANSSON wrote:
-> This patchserie fixes some SDIO related issues for the mmci host driver.
+> For the ux500v2 variant of the PL18x block, non power of two block
+> sizes are now supported.
 > 
-> Previously these patches were included in the patch serie called
-> "mmc: mmci: Improvements and bugfixes for SDIO", which now has been
-> split up.
+> In addition constraints on buffer alignments is needed since access to the
+> PL18x FIFO must be done on a 4-byte aligned manner. Moreover to be able to
+> use DMA for buffers with not 32 bytes aligned sg element lengths, DMAREQCTL
+> must enabled.
+> 
+> Per Forlin (1):
+>   mmc: mmci: add constraints on alignment for SDIO
 > 
 > Stefan Nilsson XK (1):
->   mmc: mmci: Fix incorrect handling of HW flow control for SDIO
+>   mmc: mmci: Support non-power-of-two block sizes for ux500v2 variant
 > 
-> Ulf Hansson (1):
->   mmc: mmci: Prepare for SDIO before setting up DMA job
-> 
->  drivers/mmc/host/mmci.c |   50 ++++++++++++++++++++++++++--------------------
->  1 files changed, 28 insertions(+), 22 deletions(-)
+>  drivers/mmc/host/mmci.c |   56 +++++++++++++++++++++++++++++++++++++++++------
+>  drivers/mmc/host/mmci.h |    7 ++++++
+>  2 files changed, 56 insertions(+), 7 deletions(-)
 > 
