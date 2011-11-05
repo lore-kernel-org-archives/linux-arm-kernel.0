@@ -1,30 +1,44 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 5 Nov 2011 22:28:32 +0000
-Subject: [PATCH 0/2] Minor PXA fixes
-In-Reply-To: <CAMPhdO-t0mJb2U+1eutKA4YRwCXsr2smLNKDw_a7T+TJXLbmvQ@mail.gmail.com>
-References: <20111104113032.GY12913@n2100.arm.linux.org.uk>
- <CAMPhdO-t0mJb2U+1eutKA4YRwCXsr2smLNKDw_a7T+TJXLbmvQ@mail.gmail.com>
-Message-ID: <20111105222832.GH12913@n2100.arm.linux.org.uk>
+Date: Sat, 05 Nov 2011 22:29:34 +0000
+Subject: [PATCH 1/2] ARM: PXA: fix gpio-pxa.h build errors
+In-Reply-To: <20111105222832.GH12913@n2100.arm.linux.org.uk>
+References: <20111105222832.GH12913@n2100.arm.linux.org.uk>
+Message-ID: <E1RMok2-0000KQ-9j@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 05, 2011 at 10:13:31PM +0800, Eric Miao wrote:
-> On Friday, November 4, 2011, Russell King - ARM Linux <
-> linux at arm.linux.org.uk> wrote:
-> > Eric,
-> >
-> > Here's a couple of fixes I have queued in my tree for some PXA build
-> > problems I found after kernel summit.  Do you want to pick them up,
-> > or shall I send them to Linus in the next couple of days along with
-> > the other fixes I have queued?
-> >
-> 
-> Russell,
-> 
-> Please go ahead and send to Linus directly, really appreciated.
-> 
-> The patches are good, feel free to put my Acked-by.
+A mismerge in 43872fa (Merge branch 'depends/rmk/gpio' into next/fixes)
+causes these build errors:
 
-Thanks.  Two more follow.  First is a build error with the latest kernel,
-the second is one which is caused by touching mach/system.h (as the commit
-log describes why including mach/system.h is wrong.)
+In file included from arch/arm/mach-pxa/include/mach/gpio.h:30,
+                 from arch/arm/include/asm/gpio.h:6,
+                 from include/linux/gpio.h:31,
+                 from arch/arm/mach-pxa/generic.c:20:
+arch/arm/mach-pxa/include/mach/gpio-pxa.h: In function ?__gpio_is_occupied?:
+arch/arm/mach-pxa/include/mach/gpio-pxa.h:121: error: invalid operands to binary >> (have ?void *? and ?unsigned int?)
+arch/arm/mach-pxa/include/mach/gpio-pxa.h:122: error: invalid operands to binary & (have ?void *? and ?int?)
+arch/arm/mach-pxa/include/mach/gpio-pxa.h:129: error: invalid operands to binary & (have ?void *? and ?int?)
+
+So fix them.
+
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ arch/arm/mach-pxa/include/mach/gpio-pxa.h |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/mach-pxa/include/mach/gpio-pxa.h b/arch/arm/mach-pxa/include/mach/gpio-pxa.h
+index 576868f..41b4c93 100644
+--- a/arch/arm/mach-pxa/include/mach/gpio-pxa.h
++++ b/arch/arm/mach-pxa/include/mach/gpio-pxa.h
+@@ -25,7 +25,7 @@
+ #define GPIO_REGS_VIRT	io_p2v(0x40E00000)
+ 
+ #define BANK_OFF(n)	(((n) < 3) ? (n) << 2 : 0x100 + (((n) - 3) << 2))
+-#define GPIO_REG(x)	(GPIO_REGS_VIRT + (x))
++#define GPIO_REG(x)	(*(volatile u32 *)(GPIO_REGS_VIRT + (x)))
+ 
+ /* GPIO Pin Level Registers */
+ #define GPLR0		GPIO_REG(BANK_OFF(0) + 0x00)
+-- 
+1.7.4.4
