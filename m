@@ -1,106 +1,82 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Sat, 5 Nov 2011 09:51:56 +0800
-Subject: [linux-pm] [PATCH] PM: HIBERNATION: skip the swap size check if
-	the snapshot image size is anticipative
-In-Reply-To: <201111042329.45405.rjw@sisk.pl>
-References: <1320392176-3906-1-git-send-email-Barry.Song@csr.com>
-	<201111042329.45405.rjw@sisk.pl>
-Message-ID: <CAGsJ_4yx4+nxBC1P0i6QEPce60EKRouy-AhLKhPyik1T+0MtJA@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Sat, 05 Nov 2011 12:32:10 +0900
+Subject: [PATCH 0/6]  SPI platform device consolidation
+In-Reply-To: <1320410634-10788-1-git-send-email-padma.v@samsung.com>
+References: <1320410634-10788-1-git-send-email-padma.v@samsung.com>
+Message-ID: <02ea01cc9b6b$80990660$81cb1320$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/11/5 Rafael J. Wysocki <rjw@sisk.pl>:
-> On Friday, November 04, 2011, Barry Song wrote:
->> From: Barry Song <Baohua.Song@csr.com>
->>
->> Current swsusp requires swap partitions even larger than real saved pages
->> due to the worst compress ratio:
->> but for an embedded system, which has limited storage space, then it might
->> can't give the big size partition to save snapshot.
->> In the another way, some embedded systems can definitely know the most size
->> needed for snapshot since they run some specific application lists.
->> So this patch provides the possibility for bootloader to tell kernel even
->> the system has a little snapshot partition, but it is still enough.
->> For example, if the system need to save 120MB memory, origin swsusp will require
->> a 130MB partition to save snapshot. but if users know 30MB is enough for them(
->> compressed image will be less than 30MB), they just make a 30MB partition.
->>
->> Signed-off-by: Barry Song <Baohua.Song@csr.com>
->> Cc: Xiangzhen Ye <Xiangzhen.Ye@csr.com>
->
-> I'm considering this as 3.3 material, so I'll take care of it after the current
-> merge window closes.
->
+Padmavathi Venna wrote:
+> 
+> SPI platform devices are defined in respective machine folder of
+> Samsung S3C64XX and S5P series SoCs.This patchset moves S3C64XX
+> and S5P series of SPI platform devices to a common place plat-samsung.
+> This patchset also creates SPI setup files for GPIO configurations and
+> initializes the platform specific data in the corresponding machine file.
+> 
+> Padmavathi Venna (6):
+>   ARM: SAMSUNG: Consolidation of SPI platform devices to
+>     plat-samsung
+>   ARM: S3C64XX: Modified files for SPI consolidation work
+>   ARM: S5PC100: Modified files for SPI consolidation work.
+>   ARM: S5P64X0: Modified files for SPI consolidation work
+>   ARM: S5PV210: Modified files for SPI consolidation work
+> 
+> The following patch make the corresponding SPI changes required for
+> Wolfson Cragganmore S3C6410 variant. This patch is only build tested.
+> 
+>   ARM: S3C64XX: Modified according to SPI consolidation work.
+> 
+>  arch/arm/mach-s3c64xx/Kconfig                    |    8 +-
+>  arch/arm/mach-s3c64xx/Makefile                   |    2 +-
+>  arch/arm/mach-s3c64xx/dev-spi.c                  |  172 -----------------
+>  arch/arm/mach-s3c64xx/include/mach/map.h         |    2 +
+>  arch/arm/mach-s3c64xx/mach-crag6410.c            |    9 +
+>  arch/arm/mach-s3c64xx/mach-smdk6410.c            |   19 ++
+>  arch/arm/mach-s3c64xx/setup-spi.c                |   32 +++
+>  arch/arm/mach-s5p64x0/Kconfig                    |    7 +-
+>  arch/arm/mach-s5p64x0/Makefile                   |    2 +-
+>  arch/arm/mach-s5p64x0/dev-spi.c                  |  218
+---------------------
+>  arch/arm/mach-s5p64x0/include/mach/map.h         |    3 +
+>  arch/arm/mach-s5p64x0/mach-smdk6440.c            |   19 ++
+>  arch/arm/mach-s5p64x0/mach-smdk6450.c            |   19 ++
+>  arch/arm/mach-s5p64x0/setup-spi.c                |   42 ++++
+>  arch/arm/mach-s5pc100/Kconfig                    |    5 +
+>  arch/arm/mach-s5pc100/Makefile                   |    2 +-
+>  arch/arm/mach-s5pc100/dev-spi.c                  |  220
+----------------------
+>  arch/arm/mach-s5pc100/include/mach/map.h         |    3 +
+>  arch/arm/mach-s5pc100/mach-smdkc100.c            |   31 +++
+>  arch/arm/mach-s5pc100/setup-spi.c                |   43 +++++
+>  arch/arm/mach-s5pv210/Kconfig                    |    5 +
+>  arch/arm/mach-s5pv210/Makefile                   |    2 +-
+>  arch/arm/mach-s5pv210/dev-spi.c                  |  169 -----------------
+>  arch/arm/mach-s5pv210/include/mach/map.h         |    2 +
+>  arch/arm/mach-s5pv210/mach-smdkv210.c            |   21 ++
+>  arch/arm/mach-s5pv210/setup-spi.c                |   36 ++++
+>  arch/arm/plat-samsung/Kconfig                    |   14 ++-
+>  arch/arm/plat-samsung/devs.c                     |  112 +++++++++++
+>  arch/arm/plat-samsung/include/plat/devs.h        |    8 +-
+>  arch/arm/plat-samsung/include/plat/s3c64xx-spi.h |   16 +-
+>  30 files changed, 444 insertions(+), 799 deletions(-)
+>  delete mode 100644 arch/arm/mach-s3c64xx/dev-spi.c
+>  create mode 100644 arch/arm/mach-s3c64xx/setup-spi.c
+>  delete mode 100644 arch/arm/mach-s5p64x0/dev-spi.c
+>  create mode 100644 arch/arm/mach-s5p64x0/setup-spi.c
+>  delete mode 100644 arch/arm/mach-s5pc100/dev-spi.c
+>  create mode 100644 arch/arm/mach-s5pc100/setup-spi.c
+>  delete mode 100644 arch/arm/mach-s5pv210/dev-spi.c
+>  create mode 100644 arch/arm/mach-s5pv210/setup-spi.c
 
-ok. thanks. the idea is making swsusp support embedded systems with
-limited resources better.
-we can get into details after the current merge window.
+Looks good to consolidate work, but it's merge window so will be back on
+this after that.
 
-> Thanks,
-> Rafael
->
->
->> ---
->> ?this is another patch after I provide resumewait/resumedelay kernel params
->> ?to make swsusp support embedded systems better.
->> ?This patch is tested on CSR SiRFprimaII platform.
->>
->> ?Documentation/kernel-parameters.txt | ? ?7 +++++++
->> ?kernel/power/swap.c ? ? ? ? ? ? ? ? | ? 13 +++++++++++++
->> ?2 files changed, 20 insertions(+), 0 deletions(-)
->>
->> diff --git a/Documentation/kernel-parameters.txt b/Documentation/kernel-parameters.txt
->> index a0c5c5f..2ad2e9c 100644
->> --- a/Documentation/kernel-parameters.txt
->> +++ b/Documentation/kernel-parameters.txt
->> @@ -2277,6 +2277,13 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
->> ? ? ? ? ? ? ? ? ? ? ? in <PAGE_SIZE> units (needed only for swap files).
->> ? ? ? ? ? ? ? ? ? ? ? See ?Documentation/power/swsusp-and-swap-files.txt
->>
->> + ? ? swapenough ? ? ?[SWSUSP]
->> + ? ? ? ? ? ? ? ? ? ? Tell kernel the swap partition size is enough and let kernel
->> + ? ? ? ? ? ? ? ? ? ? skip checking whether the swap partition has enough size to
->> + ? ? ? ? ? ? ? ? ? ? save snapshot.
->> + ? ? ? ? ? ? ? ? ? ? It is used for embedded systems, typically using NAND and SD
->> + ? ? ? ? ? ? ? ? ? ? card, which have not large space.
->> +
->> ? ? ? resumedelay= ? ?[HIBERNATION] Delay (in seconds) to pause before attempting to
->> ? ? ? ? ? ? ? ? ? ? ? read the resume files
->>
->> diff --git a/kernel/power/swap.c b/kernel/power/swap.c
->> index 11a594c..97c30b5 100644
->> --- a/kernel/power/swap.c
->> +++ b/kernel/power/swap.c
->> @@ -36,6 +36,8 @@
->>
->> ?#define HIBERNATE_SIG ? ? ? ?"S1SUSPEND"
->>
->> +static int swapenough;
->> +
->> ?/*
->> ? * ? The swap map is a data structure used for keeping track of each page
->> ? * ? written to a swap partition. ?It consists of many swap_map_page
->> @@ -772,6 +774,9 @@ static int enough_swap(unsigned int nr_pages, unsigned int flags)
->> ? ? ? unsigned int free_swap = count_swap_pages(root_swap, 1);
->> ? ? ? unsigned int required;
->>
->> + ? ? if (swapenough)
->> + ? ? ? ? ? ? return 1;
->> +
->> ? ? ? pr_debug("PM: Free swap pages: %u\n", free_swap);
->>
->> ? ? ? required = PAGES_FOR_IO + ((flags & SF_NOCOMPRESS_MODE) ?
->> @@ -1449,3 +1454,11 @@ static int swsusp_header_init(void)
->> ?}
->>
->> ?core_initcall(swsusp_header_init);
->> +
->> +static int __init swapenough_setup(char *str)
->> +{
->> + ? ? swapenough = 1;
->> + ? ? return 1;
->> +}
->> +
->> +__setup("swapenough", swapenough_setup);
->>
--barry
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
