@@ -1,38 +1,49 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Sat, 05 Nov 2011 12:37:47 +0900
-Subject: [PATCH] ARM: EXYNOS4: Add SPI support
-In-Reply-To: <1320411606-11518-2-git-send-email-padma.v@samsung.com>
-References: <1320411606-11518-1-git-send-email-padma.v@samsung.com>
-	<1320411606-11518-2-git-send-email-padma.v@samsung.com>
-Message-ID: <02eb01cc9b6c$4937aae0$dba700a0$%kim@samsung.com>
+Date: Sat, 05 Nov 2011 12:39:32 +0900
+Subject: [PATCH 0/3] ARM: S5P64X0: Add SDMMC support
+In-Reply-To: <1320415020-7439-1-git-send-email-rajeshwari.s@samsung.com>
+References: <1320415020-7439-1-git-send-email-rajeshwari.s@samsung.com>
+Message-ID: <02ec01cc9b6c$87f8bb20$97ea3160$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Padmavathi Venna wrote:
+Rajeshwari Shinde wrote:
 > 
-> Add SPI setup files for GPIO configurations.
-> Add SPI clkdev support.
-> Initialize SPI platform specific code in the machine file.
+> This patchset adds support for sdhci controller on S5P6440 and S5P6450.
 > 
-> Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
-> ---
->  arch/arm/mach-exynos4/Kconfig                   |    5 ++
->  arch/arm/mach-exynos4/Makefile                  |    1 +
->  arch/arm/mach-exynos4/clock.c                   |   72 +++++++++++++-----
-> ----
->  arch/arm/mach-exynos4/include/mach/irqs.h       |    3 +
->  arch/arm/mach-exynos4/include/mach/map.h        |    6 ++
->  arch/arm/mach-exynos4/include/mach/spi-clocks.h |   16 +++++
->  arch/arm/mach-exynos4/mach-smdkv310.c           |   35 +++++++++++
->  arch/arm/mach-exynos4/setup-spi.c               |   47 +++++++++++++++
->  8 files changed, 155 insertions(+), 30 deletions(-)
->  create mode 100644 arch/arm/mach-exynos4/include/mach/spi-clocks.h
->  create mode 100644 arch/arm/mach-exynos4/setup-spi.c
+> Since this patchset is based on "mmc: sdhci-s3c: Rework platform data
+> and add device tree support" clk_type member has been removed from
+> platform data.
 > 
-The mach-exynos4 directory will be re-organized in this merge window. So
-maybe you need to wait for v3.2-rc1.
+> This patchset depends on the patchs:
+> ARM: S5P64X0: Modified files for SPI consolidation work.
+> mmc: sdhci-s3c: Rework platform data and add device tree support.
+> 
+> Rajeshwari Shinde (3):
+>   ARM: S5P64X0: Add HSMMC setup for host Controller
+>   ARM: S5P64X0: Add lookup of sdhci-s3c clocks using generic names
+>   ARM: S5P64X0: Enable SDHCI support
+> 
+>  arch/arm/mach-s5p64x0/Kconfig              |   24 +++++++
+>  arch/arm/mach-s5p64x0/Makefile             |    1 +
+>  arch/arm/mach-s5p64x0/clock-s5p6440.c      |   72 +++++++++++--------
+>  arch/arm/mach-s5p64x0/clock-s5p6450.c      |   72 +++++++++++--------
+>  arch/arm/mach-s5p64x0/cpu.c                |    9 +++
+>  arch/arm/mach-s5p64x0/mach-smdk6440.c      |   25 +++++++
+>  arch/arm/mach-s5p64x0/mach-smdk6450.c      |   26 +++++++-
+>  arch/arm/mach-s5p64x0/setup-sdhci-gpio.c   |  104
+> ++++++++++++++++++++++++++++
+>  arch/arm/plat-samsung/include/plat/sdhci.h |   42 +++++++++++
+>  9 files changed, 314 insertions(+), 61 deletions(-)
+>  create mode 100644 arch/arm/mach-s5p64x0/setup-sdhci-gpio.c
+> 
+> --
+> 1.7.4.4
 
-And I will be on this after that :)
+Hi Rajeshwari,
+
+I need to sort out your this patches and Thomas' sdhci dt patches.
+And it's merge window, so will be back on this after that.
 
 Thanks.
 
