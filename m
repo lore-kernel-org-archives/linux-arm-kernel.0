@@ -1,69 +1,30 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Sat, 5 Nov 2011 15:05:32 -0400
-Subject: [PATCH v2] ARM: pl330: Fix a race condition
-In-Reply-To: <1317892206-3600-1-git-send-email-javi.merino@arm.com>
-References: <4E8C5425.80303@arm.com>
-	<1317892206-3600-1-git-send-email-javi.merino@arm.com>
-Message-ID: <CAJuYYwTXf-XU0fdGT0+sggN-MEY3v7UHkfjNkM4+QUW464J9Ew@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 5 Nov 2011 22:28:32 +0000
+Subject: [PATCH 0/2] Minor PXA fixes
+In-Reply-To: <CAMPhdO-t0mJb2U+1eutKA4YRwCXsr2smLNKDw_a7T+TJXLbmvQ@mail.gmail.com>
+References: <20111104113032.GY12913@n2100.arm.linux.org.uk>
+ <CAMPhdO-t0mJb2U+1eutKA4YRwCXsr2smLNKDw_a7T+TJXLbmvQ@mail.gmail.com>
+Message-ID: <20111105222832.GH12913@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Javi,
+On Sat, Nov 05, 2011 at 10:13:31PM +0800, Eric Miao wrote:
+> On Friday, November 4, 2011, Russell King - ARM Linux <
+> linux at arm.linux.org.uk> wrote:
+> > Eric,
+> >
+> > Here's a couple of fixes I have queued in my tree for some PXA build
+> > problems I found after kernel summit.  Do you want to pick them up,
+> > or shall I send them to Linus in the next couple of days along with
+> > the other fixes I have queued?
+> >
+> 
+> Russell,
+> 
+> Please go ahead and send to Linus directly, really appreciated.
+> 
+> The patches are good, feel free to put my Acked-by.
 
-On 6 October 2011 05:10, Javi Merino <javi.merino@arm.com> wrote:
-> If two requests have been submitted and one of them is running, if you
-> call pl330_chan_ctrl(ch_id, PL330_OP_START), there's a window of time
-> between the spin_lock_irqsave() and the _state() check in which the
-> running transaction may finish. ?In that case, we don't receive the
-> interrupt (because they are disabled), but _start() sees that the DMA
-> is stopped, so it starts it. ?The problem is that it sends the
-> transaction that has just finished again, because pl330_update()
-> hasn't mark it as done yet.
->
-> This patch fixes this race condition by not calling _start() if the
-> DMA is already executing transactions. ?When interrupts are reenabled,
-> pl330_update() will call _start().
->
-> Signed-off-by: Javi Merino <javi.merino@arm.com>
-> Acked-by: Jassi Brar <jassi.brar@samsung.com>
-> ---
-> ?arch/arm/common/pl330.c | ? ?2 +-
-> ?1 files changed, 1 insertions(+), 1 deletions(-)
->
-> diff --git a/arch/arm/common/pl330.c b/arch/arm/common/pl330.c
-> index 97912fa..7129cfb 100644
-> --- a/arch/arm/common/pl330.c
-> +++ b/arch/arm/common/pl330.c
-> @@ -1546,7 +1546,7 @@ int pl330_chan_ctrl(void *ch_id, enum pl330_chan_op op)
->
-> ? ? ? ? ? ? ? ?/* Start the next */
-> ? ? ? ?case PL330_OP_START:
-> - ? ? ? ? ? ? ? if (!_start(thrd))
-> + ? ? ? ? ? ? ? if (!_thrd_active(thrd) && !_start(thrd))
-> ? ? ? ? ? ? ? ? ? ? ? ?ret = -EIO;
-> ? ? ? ? ? ? ? ?break;
-
-On Samsung's Exynos4 platform, while testing audio playback with i2s
-interface, the above change causes the playback to freeze. The
-_thrd_active(thrd) call always returns '1' and hence _start(thrd) is
-not getting called.
-
-I have not debugged this much but if there is something that I am
-missing, please let me know. Meanwhile, I will continue checking on
-this.
-
-Thanks,
-Thomas.
-
-
->
-> --
-> 1.7.0.4
->
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+Thanks.  Two more follow.  First is a build error with the latest kernel,
+the second is one which is caused by touching mach/system.h (as the commit
+log describes why including mach/system.h is wrong.)
