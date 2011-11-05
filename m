@@ -1,35 +1,39 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 4 Nov 2011 17:40:24 -0700
-Subject: [GIT PULL] ARM: OMAP: PRCM/SCM/hwmod miscellaneous fixes for 3.2
-In-Reply-To: <alpine.DEB.2.00.1110070318120.4611@utopia.booyaka.com>
-References: <alpine.DEB.2.00.1110070318120.4611@utopia.booyaka.com>
-Message-ID: <20111105004024.GO31337@atomide.com>
+Date: Fri, 4 Nov 2011 17:42:02 -0700
+Subject: [GIT PULL] OMAP: few more PM cleanup/fixes for v3.2
+In-Reply-To: <87sjn4jyzx.fsf@ti.com>
+References: <87sjn4jyzx.fsf@ti.com>
+Message-ID: <20111105004202.GP31337@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Paul Walmsley <paul@pwsan.com> [111007 01:45]:
-> Hi Tony,
+* Kevin Hilman <khilman@ti.com> [111007 13:29]:
+> Tony,
 > 
-> The following changes since commit be73246058737beec52ae232bcab7776332a9e06:
+> Please pull the (hopefully) last few PM fixes/cleanups for v3.2.
 > 
->   ARM: OMAP2+: Remove custom init_irq for remaining boards (2011-09-26 17:50:37 -0700)
+> Kevin
+> 
+> 
+> The following changes since commit 976d167615b64e14bc1491ca51d424e2ba9a5e84:
+> 
+>   Linux 3.1-rc9 (2011-10-04 18:11:50 -0700)
 > 
 > are available in the git repository at:
->   git://git.pwsan.com/linux-2.6 prcm_scm_misc_fixes_3.2
+>   git://github.com/khilman/linux-omap-pm.git for_3.2/pm-cleanup-2
 
-Pulling into fixes.
+Thanks pulling into fixes.
 
 Tony
  
-> Abhilash K V (1):
->       ARM: OMAP: AM35x: remove hwmods that aren't generic
+> Charulatha V (1):
+>       ARM: OMAP3: PM: fix pwrdm_post_transition call sequence
 > 
-> Archit Taneja (1):
->       ARM: OMAP: ctrl: Fix CONTROL_DSIPHY register fields
+> Paul Walmsley (2):
+>       ARM: OMAP3: PM: fix I/O wakeup and I/O chain clock control detection
+>       ARM: OMAP3: PM: restrict erratum i443 handling to OMAP3430 only
 > 
->  .../include/mach/ctrl_module_pad_core_44xx.h       |    8 ++++----
->  arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         |   13 ++++++++-----
->  2 files changed, 12 insertions(+), 9 deletions(-)
-> 
-> 
-> - Paul
+>  arch/arm/mach-omap2/id.c              |    5 ++-
+>  arch/arm/mach-omap2/pm34xx.c          |   70 +++++++++++++++++---------------
+>  arch/arm/plat-omap/include/plat/cpu.h |   17 ++++++--
+>  3 files changed, 53 insertions(+), 39 deletions(-)
