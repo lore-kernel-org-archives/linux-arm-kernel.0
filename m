@@ -1,36 +1,38 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 4 Nov 2011 18:08:24 -0700
-Subject: [PATCH] MAINTAINERS: Update linux-omap git repository
-In-Reply-To: <1320405482-25736-1-git-send-email-jarkko.nikula@bitmer.com>
-References: <1320405482-25736-1-git-send-email-jarkko.nikula@bitmer.com>
-Message-ID: <20111105010824.GR31337@atomide.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Sat, 05 Nov 2011 10:21:48 +0900
+Subject: [RFC][PATCH] Consolidate Samsung MAINTAINERS
+In-Reply-To: <201111041250.40613.heiko@sntech.de>
+References: <201110230012.15273.heiko@sntech.de>
+	<201111041250.40613.heiko@sntech.de>
+Message-ID: <02df01cc9b59$4a50ddb0$def29910$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Jarkko Nikula <jarkko.nikula@bitmer.com> [111104 03:44]:
-> linux-omap is back at git.kernel.org. Path is the same than before except
-> -2.6 appendix.
+Heiko St?bner wrote:
 > 
-> Signed-off-by: Jarkko Nikula <jarkko.nikula@bitmer.com>
-> ---
-> http://marc.info/?l=linux-omap&m=132033925209702&w=2
-> ---
->  MAINTAINERS |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
+> Am Sonntag 23 Oktober 2011, 00:12:14 schrieb Heiko St?bner:
+> > These days most Samsung stuff gets in the kernel through Kukjin Kim.
+> > This patch changes MAINTAINERS to reflect this.
+> >
+> > By adding Kukjin Kim to the maintainers for S3C2410, S3C244x and
+> > S3C64xx alongside Ben Dooks the extra entries become identical to the
+> > base ARM/SAMSUNG entry and can move into it.
+> >
+> > Also the S3C2416 gets a maintainer through the s3c24* wildcard - as it
+> > did not have one until now.
+> >
+> > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> > ---
+> ping?
 > 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index c406f9b..03067f5 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -4662,7 +4662,7 @@ L:	linux-omap at vger.kernel.org
->  W:	http://www.muru.com/linux/omap/
->  W:	http://linux.omap.com/
->  Q:	http://patchwork.kernel.org/project/linux-omap/list/
-> -T:	git git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git
-> +T:	git git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap.git
->  S:	Maintained
->  F:	arch/arm/*omap*/
+Hi Heiko,
 
-Thanks applying into fixes.
+Basically I'm ok on this but need to get the agreement from Ben Dooks.
 
-Tony
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
