@@ -1,58 +1,33 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Sun, 6 Nov 2011 11:42:54 -0700
-Subject: [PATCH] distclean: Remove generated .dtb files
-In-Reply-To: <20111106183802.GB2546@ponder.secretlab.ca>
-References: <1320473955-4500-1-git-send-email-dirk.behme@de.bosch.com>
- <20111106183802.GB2546@ponder.secretlab.ca>
-Message-ID: <CACxGe6vK24j=L_WQWf5eqmdKXf0gCD=waAbJj4eq9d63O8mbvA@mail.gmail.com>
+From: mina86@mina86.com (Michal Nazarewicz)
+Date: Sun, 06 Nov 2011 22:35:16 +0100
+Subject: CMA v16 and DMA-mapping v13 patch series
+In-Reply-To: <ADF13DA15EB3FE4FBA487CCC7BEFDF3622549EBE58@bssrvexch01> (Marek
+ Szyprowski's message of "Thu, 20 Oct 2011 08:01:12 +0200")
+References: <ADF13DA15EB3FE4FBA487CCC7BEFDF3622549EBE58@bssrvexch01>
+Message-ID: <87lirtgciz.fsf@erwin.mina86.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 6, 2011 at 11:38 AM, Grant Likely <grant.likely@secretlab.ca> wrote:
-> On Sat, Nov 05, 2011 at 07:19:15AM +0100, Dirk Behme wrote:
->> The patch 'arm/dt: Add dtb make rule' adds support to
->> create a .dtb file. But this is never removed afterwards.
->> Remove the generated .dtb file if 'distclean' is called.
->>
->> Signed-off-by: Dirk Behme <dirk.behme@de.bosch.com>
->> CC: Rob Herring <rob.herring@calxeda.com>
->> CC: Shawn Guo <shawn.guo@freescale.com>
->> CC: Jason Liu <jason.hui@linaro.org>
->> CC: Grant Likely <grant.likely@secretlab.ca>
->
-> Acked-by: Grant Likely <grant.likely@secretlab.ca>
+Marek Szyprowski <m.szyprowski@samsung.com> writes:
+> Linux v3.1-rc10 with both CMA v16 and DMA-mapping v3:
+> git://git.infradead.org/users/kmpark/linux-2.6-samsung 3.1-rc10-cma-v16-dma-v3
 
-... although why are only the .dtb files needed in the clean list?
-How are the other built files cleaned?  'make clean' does remove the
-other images, but I don't know what the mechanism is.
+I've pushed a new version based on Mel's suggestions to 
 
-g.
+     git://github.com/mina86/linux-2.6.git cma-17
 
->
->> ---
->> ?arch/arm/boot/Makefile | ? ?2 ++
->> ?1 files changed, 2 insertions(+), 0 deletions(-)
->>
->> diff --git a/arch/arm/boot/Makefile b/arch/arm/boot/Makefile
->> index 1cd9b0a..08f0d35 100644
->> --- a/arch/arm/boot/Makefile
->> +++ b/arch/arm/boot/Makefile
->> @@ -71,6 +71,8 @@ $(obj)/%.dtb: $(src)/dts/%.dts
->>
->> ?$(obj)/dtbs: $(addprefix $(obj)/, $(dtb-y))
->>
->> +clean-files := *.dtb
->> +
->> ?quiet_cmd_uimage = UIMAGE ?$@
->> ? ? ? ?cmd_uimage = $(CONFIG_SHELL) $(MKIMAGE) -A arm -O linux -T kernel \
->> ? ? ? ? ? ? ? ? ?-C none -a $(LOADADDR) -e $(STARTADDR) \
->> --
->> 1.7.0.4
->>
->
-
-
+Unfortunately, it took me more time then I anticipated and so I had no
+time to test the code in any way (other then compile it on x86_64).
 
 -- 
-Grant Likely, B.Sc., P.Eng.
-Secret Lab Technologies Ltd.
+Best regards,                                          _     _
+ .o. | Liege of Serenly Enlightened Majesty of       o' \,=./ `o
+ ..o | Computer Science,  Michal "mina86" Nazarewicz    (o o)
+ ooo +-<mina86-mina86.com>-<jid:mina86-jabber.org>--ooO--(_)--Ooo--
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 197 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111106/7ba70861/attachment.sig>
