@@ -1,63 +1,188 @@
-From: per.forlin@stericsson.com (=?ISO-8859-1?Q?Per_F=F6rlin?=)
-Date: Sun, 6 Nov 2011 16:29:54 +0100
-Subject: OMAP CRAP: The Continuing Story Of Brokenness
-In-Reply-To: <20111106121829.GB15294@n2100.arm.linux.org.uk>
-References: <20111106121829.GB15294@n2100.arm.linux.org.uk>
-Message-ID: <4EB6A7F2.1010606@stericsson.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sun, 6 Nov 2011 16:37:14 +0100
+Subject: [GIT PULL] arm-soc: mach-exynos code reorganization
+Message-ID: <201111061637.15412.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/06/2011 01:18 PM, Russell King - ARM Linux wrote:
-> Yet again I find that I'm having to email about crap on OMAP3.
-> 
-> I'm getting really fed up with OMAP stuff which keeps breaking in
-> idiotic ways - and the way there's fatal build errors at EVERY merge
-> window.  The OMAP workflow is totally broken.  Something MUST change
-> in the way the OMAP community works to stop the continual breakage
-> at every single bloody merge window.
-> 
-> One is new:
-> 
-> WARNING: at arch/arm/mach-omap2/usb-musb.c:141 usb_musb_init+0xc0/0x174()
-> usb_musb_init: could not find omap_hwmod for usb_otg_hs
-> Modules linked in:
-> Backtrace:
-> [<c0017920>] (dump_backtrace+0x0/0x10c) from [<c02d9368>] (dump_stack+0x18/0x1c) r7:c181ff20 r6:c03ceb54 r5:c037545b r4:0000008d
-> [<c02d9350>] (dump_stack+0x0/0x1c) from [<c003adfc>] (warn_slowpath_common+0x58/0x70)
-> [<c003ada4>] (warn_slowpath_common+0x0/0x70) from [<c003aeb8>] (warn_slowpath_fmt+0x38/0x40)
->  r8:00000000 r7:00000013 r6:c0374b05 r5:c03f06e4 r4:c0374190
-> [<c003ae80>] (warn_slowpath_fmt+0x0/0x40) from [<c03ceb54>] (usb_musb_init+0xc0/0x174)
->  r3:c02df894 r2:c03707d9
-> [<c03cea94>] (usb_musb_init+0x0/0x174) from [<c03ce02c>] (omap_ldp_init+0xb0/0x100)
->  r6:c003e7d8 r5:c03f06e4 r4:c04053e4
-> [<c03cdf7c>] (omap_ldp_init+0x0/0x100) from [<c03c6788>] (customize_machine+0x24/0x30)
->  r4:c03f03a8
-> [<c03c6764>] (customize_machine+0x0/0x30) from [<c0008710>] (do_one_initcall+0x9c/0x164)
-> [<c0008674>] (do_one_initcall+0x0/0x164) from [<c03c3284>] (kernel_init+0x7c/0x120)
-> [<c03c3208>] (kernel_init+0x0/0x120) from [<c003e7d8>] (do_exit+0x0/0x62c)
->  r5:c03c3208 r4:00000000
-> ---[ end trace 1b75b31a2719ed1c ]---
->  omap_timer.1: alias fck already exists
->  omap_timer.2: alias fck already exists
->  omap_timer.3: alias fck already exists
->  omap_timer.4: alias fck already exists
->  omap_timer.5: alias fck already exists
->  omap_timer.6: alias fck already exists
->  omap_timer.7: alias fck already exists
->  omap_timer.8: alias fck already exists
->  omap_timer.9: alias fck already exists
->  omap_timer.10: alias fck already exists
->  omap_timer.11: alias fck already exists
->  omap_timer.12: alias fck already exists
->  omap-mcbsp.2: alias fck already exists
->  omap-mcbsp.3: alias fck already exists
-> 
-> And this, which I reported on August 26th - so it's now over three months
-> old is still there.  Clearly, no one cares about this driver so shall I
-> delete the omap-hsmmc driver, or is someone going to clean up their crap?
-> Or shall we revert all those patches for adding the asynchronous mapping
-> of MMC requests until the _REGRESSION_ is fixed properly?
-It's possible to disable async mapping in omap_hsmmc.c. Set pre_req and post_req to NULL.
+Hi Linus,
 
-Regards,
-Per
+Thanks for pulling the two previous sets of samsung patches, I've just seen
+them show up and Kukjin Kim has already provided a patch on top of that
+to do the move I mentioned in the previous pull request.
+
+This moves all files from mach-exynos4 to mach-exynos in preparation for
+future exynos socs. The branch also contains three bug fixes that have
+shown up during the merge window.
+
+	Arnd
+
+The following changes since commit c861cd3e92d92ae946e19099f198018fcb4fd887:
+
+  Merge branch 'next/devel2' of git://git.linaro.org/people/arnd/arm-soc (2011-11-05 18:21:21 -0700)
+
+are available in the git repository at:
+
+  git://git.linaro.org/people/arnd/arm-soc.git next/move
+
+Jonghwan Choi (1):
+      ARM: SAMSUNG: Fix compile error due to kfree
+
+Joonyoung Shim (1):
+      ARM: SAMSUNG: Add clk enable/disable of pwm
+
+Kukjin Kim (1):
+      ARM: EXYNOS: Add ARCH_EXYNOS and reorganize arch/arm/mach-exynos
+
+Marc Zyngier (1):
+      ARM: EXYNOS4: convert MCT to percpu interrupt API
+
+ arch/arm/Kconfig                                   |    8 +-
+ arch/arm/Makefile                                  |    2 +-
+ arch/arm/configs/exynos4_defconfig                 |    9 +--
+ arch/arm/{mach-exynos4 => mach-exynos}/Kconfig     |   42 +++++++++---
+ arch/arm/{mach-exynos4 => mach-exynos}/Makefile    |   11 ++--
+ .../{mach-exynos4 => mach-exynos}/Makefile.boot    |    0
+ .../clock-exynos4210.c                             |    0
+ .../clock-exynos4212.c                             |    0
+ arch/arm/{mach-exynos4 => mach-exynos}/clock.c     |    0
+ arch/arm/{mach-exynos4 => mach-exynos}/cpu.c       |   69 +++++++++++---------
+ arch/arm/{mach-exynos4 => mach-exynos}/cpuidle.c   |    0
+ arch/arm/{mach-exynos4 => mach-exynos}/dev-ahci.c  |    0
+ arch/arm/{mach-exynos4 => mach-exynos}/dev-audio.c |    0
+ arch/arm/{mach-exynos4 => mach-exynos}/dev-dwmci.c |    0
+ arch/arm/{mach-exynos4 => mach-exynos}/dev-pd.c    |    0
+ .../arm/{mach-exynos4 => mach-exynos}/dev-sysmmu.c |    0
+ arch/arm/{mach-exynos4 => mach-exynos}/dma.c       |    0
+ arch/arm/{mach-exynos4 => mach-exynos}/headsmp.S   |    0
+ arch/arm/{mach-exynos4 => mach-exynos}/hotplug.c   |    0
+ .../include/mach/debug-macro.S                     |    0
+ .../include/mach/dma.h                             |    0
+ .../include/mach/dwmci.h                           |    0
+ .../include/mach/entry-macro.S                     |    0
+ .../include/mach/exynos4-clock.h                   |    0
+ .../include/mach/gpio.h                            |    0
+ .../include/mach/hardware.h                        |    0
+ .../include/mach/io.h                              |    0
+ .../include/mach/irqs.h                            |    0
+ .../include/mach/map.h                             |   32 ++++++----
+ .../include/mach/memory.h                          |    0
+ .../include/mach/pm-core.h                         |    0
+ .../include/mach/pmu.h                             |    0
+ .../include/mach/regs-audss.h                      |    0
+ .../include/mach/regs-clock.h                      |    0
+ .../include/mach/regs-gpio.h                       |    0
+ .../include/mach/regs-irq.h                        |    0
+ .../include/mach/regs-mct.h                        |    0
+ .../include/mach/regs-mem.h                        |    0
+ .../include/mach/regs-pmu.h                        |    0
+ .../include/mach/regs-sysmmu.h                     |    0
+ .../include/mach/regs-usb-phy.h                    |    0
+ .../include/mach/sysmmu.h                          |    0
+ .../include/mach/system.h                          |    0
+ .../include/mach/timex.h                           |    0
+ .../include/mach/uncompress.h                      |    0
+ .../include/mach/vmalloc.h                         |    0
+ arch/arm/{mach-exynos4 => mach-exynos}/init.c      |    0
+ .../{mach-exynos4 => mach-exynos}/irq-combiner.c   |    0
+ arch/arm/{mach-exynos4 => mach-exynos}/irq-eint.c  |    0
+ .../mach-armlex4210.c                              |    0
+ arch/arm/{mach-exynos4 => mach-exynos}/mach-nuri.c |    0
+ .../{mach-exynos4 => mach-exynos}/mach-origen.c    |    0
+ .../{mach-exynos4 => mach-exynos}/mach-smdk4x12.c  |    0
+ .../{mach-exynos4 => mach-exynos}/mach-smdkv310.c  |    0
+ .../mach-universal_c210.c                          |    0
+ arch/arm/{mach-exynos4 => mach-exynos}/mct.c       |   40 ++++++++----
+ arch/arm/{mach-exynos4 => mach-exynos}/platsmp.c   |    0
+ arch/arm/{mach-exynos4 => mach-exynos}/pm.c        |    0
+ arch/arm/{mach-exynos4 => mach-exynos}/pmu.c       |    0
+ .../arm/{mach-exynos4 => mach-exynos}/setup-fimc.c |    0
+ .../{mach-exynos4 => mach-exynos}/setup-fimd0.c    |    0
+ .../arm/{mach-exynos4 => mach-exynos}/setup-i2c0.c |    0
+ .../arm/{mach-exynos4 => mach-exynos}/setup-i2c1.c |    0
+ .../arm/{mach-exynos4 => mach-exynos}/setup-i2c2.c |    0
+ .../arm/{mach-exynos4 => mach-exynos}/setup-i2c3.c |    0
+ .../arm/{mach-exynos4 => mach-exynos}/setup-i2c4.c |    0
+ .../arm/{mach-exynos4 => mach-exynos}/setup-i2c5.c |    0
+ .../arm/{mach-exynos4 => mach-exynos}/setup-i2c6.c |    0
+ .../arm/{mach-exynos4 => mach-exynos}/setup-i2c7.c |    0
+ .../{mach-exynos4 => mach-exynos}/setup-keypad.c   |    0
+ .../setup-sdhci-gpio.c                             |    0
+ .../{mach-exynos4 => mach-exynos}/setup-sdhci.c    |    0
+ .../{mach-exynos4 => mach-exynos}/setup-usb-phy.c  |    0
+ arch/arm/plat-s5p/Kconfig                          |    2 +-
+ arch/arm/plat-s5p/cpu.c                            |    6 +-
+ arch/arm/plat-samsung/dev-backlight.c              |    1 +
+ arch/arm/plat-samsung/include/plat/exynos4.h       |    6 +-
+ arch/arm/plat-samsung/pwm.c                        |    7 ++
+ 78 files changed, 141 insertions(+), 94 deletions(-)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/Kconfig (92%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/Makefile (90%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/Makefile.boot (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/clock-exynos4210.c (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/clock-exynos4212.c (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/clock.c (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/cpu.c (91%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/cpuidle.c (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/dev-ahci.c (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/dev-audio.c (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/dev-dwmci.c (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/dev-pd.c (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/dev-sysmmu.c (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/dma.c (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/headsmp.S (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/hotplug.c (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/include/mach/debug-macro.S (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/include/mach/dma.h (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/include/mach/dwmci.h (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/include/mach/entry-macro.S (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/include/mach/exynos4-clock.h (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/include/mach/gpio.h (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/include/mach/hardware.h (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/include/mach/io.h (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/include/mach/irqs.h (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/include/mach/map.h (93%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/include/mach/memory.h (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/include/mach/pm-core.h (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/include/mach/pmu.h (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/include/mach/regs-audss.h (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/include/mach/regs-clock.h (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/include/mach/regs-gpio.h (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/include/mach/regs-irq.h (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/include/mach/regs-mct.h (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/include/mach/regs-mem.h (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/include/mach/regs-pmu.h (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/include/mach/regs-sysmmu.h (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/include/mach/regs-usb-phy.h (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/include/mach/sysmmu.h (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/include/mach/system.h (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/include/mach/timex.h (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/include/mach/uncompress.h (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/include/mach/vmalloc.h (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/init.c (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/irq-combiner.c (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/irq-eint.c (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/mach-armlex4210.c (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/mach-nuri.c (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/mach-origen.c (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/mach-smdk4x12.c (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/mach-smdkv310.c (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/mach-universal_c210.c (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/mct.c (91%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/platsmp.c (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/pm.c (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/pmu.c (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/setup-fimc.c (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/setup-fimd0.c (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/setup-i2c0.c (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/setup-i2c1.c (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/setup-i2c2.c (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/setup-i2c3.c (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/setup-i2c4.c (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/setup-i2c5.c (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/setup-i2c6.c (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/setup-i2c7.c (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/setup-keypad.c (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/setup-sdhci-gpio.c (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/setup-sdhci.c (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/setup-usb-phy.c (100%)
