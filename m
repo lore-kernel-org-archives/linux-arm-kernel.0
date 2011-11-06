@@ -1,10 +1,10 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 06 Nov 2011 17:56:08 +0000
-Subject: [PATCH 3/5] ARM: restart: exynos4: use new restart hook XXX WIP XXX
+Date: Sun, 06 Nov 2011 17:56:29 +0000
+Subject: [PATCH 4/5] ARM: restart: s5pv210: use new restart hook XXX WIP XXX
  WHY IS THERE NO LOCAL HEADERS IN arch/arm/mach-exynos4 XXX
 In-Reply-To: <20111106175457.GK12913@n2100.arm.linux.org.uk>
 References: <20111106175457.GK12913@n2100.arm.linux.org.uk>
-Message-ID: <E1RN6wy-0001aV-VK@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1RN6xJ-0001aZ-3e@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,120 +13,93 @@ than using arch_reset().
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mach-exynos4/cpu.c                 |    6 +-----
- arch/arm/mach-exynos4/mach-armlex4210.c     |    1 +
- arch/arm/mach-exynos4/mach-nuri.c           |    1 +
- arch/arm/mach-exynos4/mach-origen.c         |    1 +
- arch/arm/mach-exynos4/mach-smdk4x12.c       |    2 ++
- arch/arm/mach-exynos4/mach-smdkv310.c       |    2 ++
- arch/arm/mach-exynos4/mach-universal_c210.c |    1 +
- 7 files changed, 9 insertions(+), 5 deletions(-)
+ arch/arm/mach-s5pv210/cpu.c           |    6 +-----
+ arch/arm/mach-s5pv210/mach-aquila.c   |    1 +
+ arch/arm/mach-s5pv210/mach-goni.c     |    1 +
+ arch/arm/mach-s5pv210/mach-smdkc110.c |    1 +
+ arch/arm/mach-s5pv210/mach-smdkv210.c |    1 +
+ arch/arm/mach-s5pv210/mach-torbreck.c |    1 +
+ 6 files changed, 6 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/mach-exynos4/cpu.c b/arch/arm/mach-exynos4/cpu.c
-index 5b1765b..5b1ee56 100644
---- a/arch/arm/mach-exynos4/cpu.c
-+++ b/arch/arm/mach-exynos4/cpu.c
-@@ -27,7 +27,6 @@
- #include <plat/fb-core.h>
- #include <plat/fimc-core.h>
+diff --git a/arch/arm/mach-s5pv210/cpu.c b/arch/arm/mach-s5pv210/cpu.c
+index 84ec746..4c7b071 100644
+--- a/arch/arm/mach-s5pv210/cpu.c
++++ b/arch/arm/mach-s5pv210/cpu.c
+@@ -41,7 +41,6 @@
  #include <plat/iic-core.h>
+ #include <plat/keypad-core.h>
+ #include <plat/sdhci.h>
 -#include <plat/reset.h>
  #include <plat/tv-core.h>
  
- #include <mach/regs-irq.h>
-@@ -145,7 +144,7 @@ static void exynos4_idle(void)
+ /* Initial IO mappings */
+@@ -108,7 +107,7 @@ static void s5pv210_idle(void)
  	local_irq_enable();
  }
  
--static void exynos4_sw_reset(void)
-+void exynos4_restart(char mode, const char *cmd)
+-static void s5pv210_sw_reset(void)
++void s5pv210_restart(char mode, const char *cmd)
  {
  	__raw_writel(0x1, S5P_SWRESET);
  }
-@@ -286,8 +285,5 @@ int __init exynos4_init(void)
+@@ -196,8 +195,5 @@ int __init s5pv210_init(void)
  	/* set idle function */
- 	pm_idle = exynos4_idle;
+ 	pm_idle = s5pv210_idle;
  
 -	/* set sw_reset function */
--	s5p_reset_hook = exynos4_sw_reset;
+-	s5p_reset_hook = s5pv210_sw_reset;
 -
- 	return sysdev_register(&exynos4_sysdev);
+ 	return sysdev_register(&s5pv210_sysdev);
  }
-diff --git a/arch/arm/mach-exynos4/mach-armlex4210.c b/arch/arm/mach-exynos4/mach-armlex4210.c
-index f0ca6c1..9bb7e6c 100644
---- a/arch/arm/mach-exynos4/mach-armlex4210.c
-+++ b/arch/arm/mach-exynos4/mach-armlex4210.c
-@@ -212,4 +212,5 @@ MACHINE_START(ARMLEX4210, "ARMLEX4210")
- 	.map_io		= armlex4210_map_io,
- 	.init_machine	= armlex4210_machine_init,
- 	.timer		= &exynos4_timer,
-+	.restart	= exynos4_restart,
+diff --git a/arch/arm/mach-s5pv210/mach-aquila.c b/arch/arm/mach-s5pv210/mach-aquila.c
+index 5811a96..68fd31d 100644
+--- a/arch/arm/mach-s5pv210/mach-aquila.c
++++ b/arch/arm/mach-s5pv210/mach-aquila.c
+@@ -683,4 +683,5 @@ MACHINE_START(AQUILA, "Aquila")
+ 	.map_io		= aquila_map_io,
+ 	.init_machine	= aquila_machine_init,
+ 	.timer		= &s5p_timer,
++	.restart	= s5pv210_restart,
  MACHINE_END
-diff --git a/arch/arm/mach-exynos4/mach-nuri.c b/arch/arm/mach-exynos4/mach-nuri.c
-index 236bbe1..3504f56 100644
---- a/arch/arm/mach-exynos4/mach-nuri.c
-+++ b/arch/arm/mach-exynos4/mach-nuri.c
-@@ -1336,4 +1336,5 @@ MACHINE_START(NURI, "NURI")
- 	.init_machine	= nuri_machine_init,
- 	.timer		= &exynos4_timer,
- 	.reserve        = &nuri_reserve,
-+	.restart	= exynos4_restart,
+diff --git a/arch/arm/mach-s5pv210/mach-goni.c b/arch/arm/mach-s5pv210/mach-goni.c
+index 15edcae..1156a5b 100644
+--- a/arch/arm/mach-s5pv210/mach-goni.c
++++ b/arch/arm/mach-s5pv210/mach-goni.c
+@@ -960,4 +960,5 @@ MACHINE_START(GONI, "GONI")
+ 	.init_machine	= goni_machine_init,
+ 	.timer		= &s5p_timer,
+ 	.reserve	= &goni_reserve,
++	.restart	= s5pv210_restart,
  MACHINE_END
-diff --git a/arch/arm/mach-exynos4/mach-origen.c b/arch/arm/mach-exynos4/mach-origen.c
-index f80b563..161e5ee 100644
---- a/arch/arm/mach-exynos4/mach-origen.c
-+++ b/arch/arm/mach-exynos4/mach-origen.c
-@@ -697,4 +697,5 @@ MACHINE_START(ORIGEN, "ORIGEN")
- 	.init_machine	= origen_machine_init,
- 	.timer		= &exynos4_timer,
- 	.reserve	= &origen_reserve,
-+	.restart	= exynos4_restart,
+diff --git a/arch/arm/mach-s5pv210/mach-smdkc110.c b/arch/arm/mach-s5pv210/mach-smdkc110.c
+index f7266bb..a70fa53 100644
+--- a/arch/arm/mach-s5pv210/mach-smdkc110.c
++++ b/arch/arm/mach-s5pv210/mach-smdkc110.c
+@@ -141,4 +141,5 @@ MACHINE_START(SMDKC110, "SMDKC110")
+ 	.map_io		= smdkc110_map_io,
+ 	.init_machine	= smdkc110_machine_init,
+ 	.timer		= &s5p_timer,
++	.restart	= s5pv210_restart,
  MACHINE_END
-diff --git a/arch/arm/mach-exynos4/mach-smdk4x12.c b/arch/arm/mach-exynos4/mach-smdk4x12.c
-index fcf2e0e..020284c 100644
---- a/arch/arm/mach-exynos4/mach-smdk4x12.c
-+++ b/arch/arm/mach-exynos4/mach-smdk4x12.c
-@@ -289,6 +289,7 @@ MACHINE_START(SMDK4212, "SMDK4212")
- 	.map_io		= smdk4x12_map_io,
- 	.init_machine	= smdk4x12_machine_init,
- 	.timer		= &exynos4_timer,
-+	.restart	= exynos4_restart,
+diff --git a/arch/arm/mach-s5pv210/mach-smdkv210.c b/arch/arm/mach-s5pv210/mach-smdkv210.c
+index a9106c3..5e8a775 100644
+--- a/arch/arm/mach-s5pv210/mach-smdkv210.c
++++ b/arch/arm/mach-s5pv210/mach-smdkv210.c
+@@ -318,4 +318,5 @@ MACHINE_START(SMDKV210, "SMDKV210")
+ 	.map_io		= smdkv210_map_io,
+ 	.init_machine	= smdkv210_machine_init,
+ 	.timer		= &s5p_timer,
++	.restart	= s5pv210_restart,
  MACHINE_END
- 
- MACHINE_START(SMDK4412, "SMDK4412")
-@@ -299,4 +300,5 @@ MACHINE_START(SMDK4412, "SMDK4412")
- 	.map_io		= smdk4x12_map_io,
- 	.init_machine	= smdk4x12_machine_init,
- 	.timer		= &exynos4_timer,
-+	.restart	= exynos4_restart,
- MACHINE_END
-diff --git a/arch/arm/mach-exynos4/mach-smdkv310.c b/arch/arm/mach-exynos4/mach-smdkv310.c
-index cec2afa..fdf5535 100644
---- a/arch/arm/mach-exynos4/mach-smdkv310.c
-+++ b/arch/arm/mach-exynos4/mach-smdkv310.c
-@@ -378,6 +378,7 @@ MACHINE_START(SMDKV310, "SMDKV310")
- 	.init_machine	= smdkv310_machine_init,
- 	.timer		= &exynos4_timer,
- 	.reserve	= &smdkv310_reserve,
-+	.restart	= exynos4_restart,
- MACHINE_END
- 
- MACHINE_START(SMDKC210, "SMDKC210")
-@@ -387,4 +388,5 @@ MACHINE_START(SMDKC210, "SMDKC210")
- 	.map_io		= smdkv310_map_io,
- 	.init_machine	= smdkv310_machine_init,
- 	.timer		= &exynos4_timer,
-+	.restart	= exynos4_restart,
- MACHINE_END
-diff --git a/arch/arm/mach-exynos4/mach-universal_c210.c b/arch/arm/mach-exynos4/mach-universal_c210.c
-index a2a177f..4bdd30c 100644
---- a/arch/arm/mach-exynos4/mach-universal_c210.c
-+++ b/arch/arm/mach-exynos4/mach-universal_c210.c
-@@ -1061,4 +1061,5 @@ MACHINE_START(UNIVERSAL_C210, "UNIVERSAL_C210")
- 	.init_machine	= universal_machine_init,
- 	.timer		= &exynos4_timer,
- 	.reserve        = &universal_reserve,
-+	.restart	= exynos4_restart,
+diff --git a/arch/arm/mach-s5pv210/mach-torbreck.c b/arch/arm/mach-s5pv210/mach-torbreck.c
+index 97cc066..49e9c6d 100644
+--- a/arch/arm/mach-s5pv210/mach-torbreck.c
++++ b/arch/arm/mach-s5pv210/mach-torbreck.c
+@@ -130,4 +130,5 @@ MACHINE_START(TORBRECK, "TORBRECK")
+ 	.map_io		= torbreck_map_io,
+ 	.init_machine	= torbreck_machine_init,
+ 	.timer		= &s5p_timer,
++	.restart	= s5pv210_restart,
  MACHINE_END
 -- 
 1.7.4.4
