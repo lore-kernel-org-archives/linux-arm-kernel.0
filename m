@@ -1,37 +1,129 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 06 Nov 2011 17:52:30 +0000
-Subject: [PATCH 37/41] ARM: restart: Versatile Express: use new restart hook
+Date: Sun, 06 Nov 2011 17:52:50 +0000
+Subject: [PATCH 38/41] ARM: restart: w90x900: use new restart hook
 In-Reply-To: <20111106173113.GI12913@n2100.arm.linux.org.uk>
 References: <20111106173113.GI12913@n2100.arm.linux.org.uk>
-Message-ID: <E1RN6tS-0001Z5-Df@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1RN6tm-0001Z9-Ha@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hook the Versatile Express platform restart code into the new restart
-hook.
+Hook these platforms restart code into the new restart hook rather
+than using arch_reset().
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mach-vexpress/v2m.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ arch/arm/mach-w90x900/cpu.c                 |   15 +++++++++++++++
+ arch/arm/mach-w90x900/cpu.h                 |    1 +
+ arch/arm/mach-w90x900/include/mach/system.h |   17 -----------------
+ arch/arm/mach-w90x900/mach-nuc910evb.c      |    1 +
+ arch/arm/mach-w90x900/mach-nuc950evb.c      |    1 +
+ arch/arm/mach-w90x900/mach-nuc960evb.c      |    1 +
+ 6 files changed, 19 insertions(+), 17 deletions(-)
 
-diff --git a/arch/arm/mach-vexpress/v2m.c b/arch/arm/mach-vexpress/v2m.c
-index 1fafc32..b9a465b 100644
---- a/arch/arm/mach-vexpress/v2m.c
-+++ b/arch/arm/mach-vexpress/v2m.c
-@@ -437,7 +437,6 @@ static void __init v2m_init(void)
- 		amba_device_register(v2m_amba_devs[i], &iomem_resource);
+diff --git a/arch/arm/mach-w90x900/cpu.c b/arch/arm/mach-w90x900/cpu.c
+index 0a235e5..07eddd7 100644
+--- a/arch/arm/mach-w90x900/cpu.c
++++ b/arch/arm/mach-w90x900/cpu.c
+@@ -33,6 +33,7 @@
+ #include <mach/regs-serial.h>
+ #include <mach/regs-clock.h>
+ #include <mach/regs-ebi.h>
++#include <mach/regs-timer.h>
  
- 	pm_power_off = v2m_power_off;
--	arm_pm_restart = v2m_restart;
- 
- 	ct_desc->init_tile();
+ #include "cpu.h"
+ #include "clock.h"
+@@ -222,3 +223,17 @@ void __init nuc900_init_clocks(void)
+ 	clkdev_add_table(nuc900_clkregs, ARRAY_SIZE(nuc900_clkregs));
  }
-@@ -449,4 +448,5 @@ MACHINE_START(VEXPRESS, "ARM-Versatile Express")
- 	.init_irq	= v2m_init_irq,
- 	.timer		= &v2m_timer,
- 	.init_machine	= v2m_init,
-+	.restart	= v2m_restart,
+ 
++#define	WTCR	(TMR_BA + 0x1C)
++#define	WTCLK	(1 << 10)
++#define	WTE	(1 << 7)
++#define	WTRE	(1 << 1)
++
++void nuc900_restart(char mode, const char *cmd)
++{
++	if (mode == 's') {
++		/* Jump into ROM@address 0 */
++		soft_restart(0);
++	} else {
++		__raw_writel(WTE | WTRE | WTCLK, WTCR);
++	}
++}
+diff --git a/arch/arm/mach-w90x900/cpu.h b/arch/arm/mach-w90x900/cpu.h
+index f8730b6..b56799d 100644
+--- a/arch/arm/mach-w90x900/cpu.h
++++ b/arch/arm/mach-w90x900/cpu.h
+@@ -49,6 +49,7 @@ extern void nuc900_clock_source(struct device *dev, unsigned char *src);
+ extern void nuc900_init_clocks(void);
+ extern void nuc900_map_io(struct map_desc *mach_desc, int mach_size);
+ extern void nuc900_board_init(struct platform_device **device, int size);
++extern void nuc900_restart(char, const char *);
+ 
+ /* for either public between 910 and 920, or between 920 and 950 */
+ 
+diff --git a/arch/arm/mach-w90x900/include/mach/system.h b/arch/arm/mach-w90x900/include/mach/system.h
+index 68875a1..001a2f9 100644
+--- a/arch/arm/mach-w90x900/include/mach/system.h
++++ b/arch/arm/mach-w90x900/include/mach/system.h
+@@ -14,28 +14,11 @@
+  * (at your option) any later version.
+  *
+  */
+-
+-#include <linux/io.h>
+-#include <asm/proc-fns.h>
+-#include <mach/map.h>
+-#include <mach/regs-timer.h>
+-
+-#define	WTCR	(TMR_BA + 0x1C)
+-#define	WTCLK	(1 << 10)
+-#define	WTE	(1 << 7)
+-#define	WTRE	(1 << 1)
+-
+ static void arch_idle(void)
+ {
+ }
+ 
+ static void arch_reset(char mode, const char *cmd)
+ {
+-	if (mode == 's') {
+-		/* Jump into ROM@address 0 */
+-		soft_restart(0);
+-	} else {
+-		__raw_writel(WTE | WTRE | WTCLK, WTCR);
+-	}
+ }
+ 
+diff --git a/arch/arm/mach-w90x900/mach-nuc910evb.c b/arch/arm/mach-w90x900/mach-nuc910evb.c
+index 31c1090..10852dc 100644
+--- a/arch/arm/mach-w90x900/mach-nuc910evb.c
++++ b/arch/arm/mach-w90x900/mach-nuc910evb.c
+@@ -38,4 +38,5 @@ MACHINE_START(W90P910EVB, "W90P910EVB")
+ 	.init_irq	= nuc900_init_irq,
+ 	.init_machine	= nuc910evb_init,
+ 	.timer		= &nuc900_timer,
++	.restart	= nuc900_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-w90x900/mach-nuc950evb.c b/arch/arm/mach-w90x900/mach-nuc950evb.c
+index 4062e55..b549967 100644
+--- a/arch/arm/mach-w90x900/mach-nuc950evb.c
++++ b/arch/arm/mach-w90x900/mach-nuc950evb.c
+@@ -41,4 +41,5 @@ MACHINE_START(W90P950EVB, "W90P950EVB")
+ 	.init_irq	= nuc900_init_irq,
+ 	.init_machine	= nuc950evb_init,
+ 	.timer		= &nuc900_timer,
++	.restart	= nuc900_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-w90x900/mach-nuc960evb.c b/arch/arm/mach-w90x900/mach-nuc960evb.c
+index 0ab9995..1ea5acf 100644
+--- a/arch/arm/mach-w90x900/mach-nuc960evb.c
++++ b/arch/arm/mach-w90x900/mach-nuc960evb.c
+@@ -38,4 +38,5 @@ MACHINE_START(W90N960EVB, "W90N960EVB")
+ 	.init_irq	= nuc900_init_irq,
+ 	.init_machine	= nuc960evb_init,
+ 	.timer		= &nuc900_timer,
++	.restart	= nuc900_restart,
  MACHINE_END
 -- 
 1.7.4.4
