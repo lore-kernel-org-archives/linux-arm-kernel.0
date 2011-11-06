@@ -1,249 +1,215 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 06 Nov 2011 17:43:00 +0000
-Subject: [PATCH 09/41] ARM: restart: ep93xx: use new restart hook
+Date: Sun, 06 Nov 2011 17:43:20 +0000
+Subject: [PATCH 10/41] ARM: restart: footbridge: use new restart hook
 In-Reply-To: <20111106173113.GI12913@n2100.arm.linux.org.uk>
 References: <20111106173113.GI12913@n2100.arm.linux.org.uk>
-Message-ID: <E1RN6kG-0001XA-GF@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1RN6ka-0001XF-KR@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hook these platforms restart code into the new restart hook rather than
-using arch_reset().
+Hook these platforms restart code into the new restart hook rather
+than using arch_reset().
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mach-ep93xx/adssphere.c             |    1 +
- arch/arm/mach-ep93xx/core.c                  |   12 ++++++++++++
- arch/arm/mach-ep93xx/edb93xx.c               |    8 ++++++++
- arch/arm/mach-ep93xx/gesbc9312.c             |    1 +
- arch/arm/mach-ep93xx/include/mach/platform.h |    2 ++
- arch/arm/mach-ep93xx/include/mach/system.h   |   11 -----------
- arch/arm/mach-ep93xx/micro9.c                |    4 ++++
- arch/arm/mach-ep93xx/simone.c                |    1 +
- arch/arm/mach-ep93xx/snappercl15.c           |    1 +
- arch/arm/mach-ep93xx/ts72xx.c                |    1 +
- arch/arm/mach-ep93xx/vision_ep9307.c         |    1 +
- 11 files changed, 32 insertions(+), 11 deletions(-)
+ arch/arm/mach-footbridge/cats-hw.c             |    1 +
+ arch/arm/mach-footbridge/common.c              |   27 ++++++++++++
+ arch/arm/mach-footbridge/common.h              |    1 +
+ arch/arm/mach-footbridge/ebsa285.c             |    1 +
+ arch/arm/mach-footbridge/include/mach/system.h |   52 ------------------------
+ arch/arm/mach-footbridge/netwinder-hw.c        |   27 ++++++++++++
+ arch/arm/mach-footbridge/personal.c            |    1 +
+ 7 files changed, 58 insertions(+), 52 deletions(-)
 
-diff --git a/arch/arm/mach-ep93xx/adssphere.c b/arch/arm/mach-ep93xx/adssphere.c
-index 0713448..7b41651 100644
---- a/arch/arm/mach-ep93xx/adssphere.c
-+++ b/arch/arm/mach-ep93xx/adssphere.c
-@@ -38,4 +38,5 @@ MACHINE_START(ADSSPHERE, "ADS Sphere board")
- 	.init_irq	= ep93xx_init_irq,
- 	.timer		= &ep93xx_timer,
- 	.init_machine	= adssphere_init_machine,
-+	.restart	= ep93xx_restart,
+diff --git a/arch/arm/mach-footbridge/cats-hw.c b/arch/arm/mach-footbridge/cats-hw.c
+index 60b6774..25b4536 100644
+--- a/arch/arm/mach-footbridge/cats-hw.c
++++ b/arch/arm/mach-footbridge/cats-hw.c
+@@ -91,4 +91,5 @@ MACHINE_START(CATS, "Chalice-CATS")
+ 	.map_io		= footbridge_map_io,
+ 	.init_irq	= footbridge_init_irq,
+ 	.timer		= &isa_timer,
++	.restart	= footbridge_restart,
  MACHINE_END
-diff --git a/arch/arm/mach-ep93xx/core.c b/arch/arm/mach-ep93xx/core.c
-index 94c78bc..348e13e 100644
---- a/arch/arm/mach-ep93xx/core.c
-+++ b/arch/arm/mach-ep93xx/core.c
-@@ -905,3 +905,15 @@ void __init ep93xx_init_devices(void)
- 	platform_device_register(&ep93xx_ohci_device);
- 	platform_device_register(&ep93xx_leds);
+diff --git a/arch/arm/mach-footbridge/common.c b/arch/arm/mach-footbridge/common.c
+index 38a44f9..41978ee 100644
+--- a/arch/arm/mach-footbridge/common.c
++++ b/arch/arm/mach-footbridge/common.c
+@@ -199,6 +199,33 @@ void __init footbridge_map_io(void)
+ 		iotable_init(ebsa285_host_io_desc, ARRAY_SIZE(ebsa285_host_io_desc));
  }
-+
-+void ep93xx_restart(char mode, const char *cmd)
+ 
++void footbridge_restart(char mode, const char *cmd)
 +{
-+	/*
-+	 * Set then clear the SWRST bit to initiate a software reset
-+	 */
-+	ep93xx_devcfg_set_bits(EP93XX_SYSCON_DEVCFG_SWRST);
-+	ep93xx_devcfg_clear_bits(EP93XX_SYSCON_DEVCFG_SWRST);
-+
-+	while (1)
-+		;
++	if (mode == 's') {
++		/* Jump into the ROM */
++		soft_restart(0x41000000);
++	} else {
++		/*
++		 * Force the watchdog to do a CPU reset.
++		 *
++		 * After making sure that the watchdog is disabled
++		 * (so we can change the timer registers) we first
++		 * enable the timer to autoreload itself.  Next, the
++		 * timer interval is set really short and any
++		 * current interrupt request is cleared (so we can
++		 * see an edge transition).  Finally, TIMER4 is
++		 * enabled as the watchdog.
++		 */
++		*CSR_SA110_CNTL &= ~(1 << 13);
++		*CSR_TIMER4_CNTL = TIMER_CNTL_ENABLE |
++				   TIMER_CNTL_AUTORELOAD |
++				   TIMER_CNTL_DIV16;
++		*CSR_TIMER4_LOAD = 0x2;
++		*CSR_TIMER4_CLR  = 0;
++		*CSR_SA110_CNTL |= (1 << 13);
++	}
 +}
-diff --git a/arch/arm/mach-ep93xx/edb93xx.c b/arch/arm/mach-ep93xx/edb93xx.c
-index 70ef8c5..c5731c6 100644
---- a/arch/arm/mach-ep93xx/edb93xx.c
-+++ b/arch/arm/mach-ep93xx/edb93xx.c
-@@ -252,6 +252,7 @@ MACHINE_START(EDB9301, "Cirrus Logic EDB9301 Evaluation Board")
- 	.init_irq	= ep93xx_init_irq,
- 	.timer		= &ep93xx_timer,
- 	.init_machine	= edb93xx_init_machine,
-+	.restart	= ep93xx_restart,
- MACHINE_END
- #endif
- 
-@@ -263,6 +264,7 @@ MACHINE_START(EDB9302, "Cirrus Logic EDB9302 Evaluation Board")
- 	.init_irq	= ep93xx_init_irq,
- 	.timer		= &ep93xx_timer,
- 	.init_machine	= edb93xx_init_machine,
-+	.restart	= ep93xx_restart,
- MACHINE_END
- #endif
- 
-@@ -274,6 +276,7 @@ MACHINE_START(EDB9302A, "Cirrus Logic EDB9302A Evaluation Board")
- 	.init_irq	= ep93xx_init_irq,
- 	.timer		= &ep93xx_timer,
- 	.init_machine	= edb93xx_init_machine,
-+	.restart	= ep93xx_restart,
- MACHINE_END
- #endif
- 
-@@ -285,6 +288,7 @@ MACHINE_START(EDB9307, "Cirrus Logic EDB9307 Evaluation Board")
- 	.init_irq	= ep93xx_init_irq,
- 	.timer		= &ep93xx_timer,
- 	.init_machine	= edb93xx_init_machine,
-+	.restart	= ep93xx_restart,
- MACHINE_END
- #endif
- 
-@@ -296,6 +300,7 @@ MACHINE_START(EDB9307A, "Cirrus Logic EDB9307A Evaluation Board")
- 	.init_irq	= ep93xx_init_irq,
- 	.timer		= &ep93xx_timer,
- 	.init_machine	= edb93xx_init_machine,
-+	.restart	= ep93xx_restart,
- MACHINE_END
- #endif
- 
-@@ -307,6 +312,7 @@ MACHINE_START(EDB9312, "Cirrus Logic EDB9312 Evaluation Board")
- 	.init_irq	= ep93xx_init_irq,
- 	.timer		= &ep93xx_timer,
- 	.init_machine	= edb93xx_init_machine,
-+	.restart	= ep93xx_restart,
- MACHINE_END
- #endif
- 
-@@ -318,6 +324,7 @@ MACHINE_START(EDB9315, "Cirrus Logic EDB9315 Evaluation Board")
- 	.init_irq	= ep93xx_init_irq,
- 	.timer		= &ep93xx_timer,
- 	.init_machine	= edb93xx_init_machine,
-+	.restart	= ep93xx_restart,
- MACHINE_END
- #endif
- 
-@@ -329,5 +336,6 @@ MACHINE_START(EDB9315A, "Cirrus Logic EDB9315A Evaluation Board")
- 	.init_irq	= ep93xx_init_irq,
- 	.timer		= &ep93xx_timer,
- 	.init_machine	= edb93xx_init_machine,
-+	.restart	= ep93xx_restart,
- MACHINE_END
- #endif
-diff --git a/arch/arm/mach-ep93xx/gesbc9312.c b/arch/arm/mach-ep93xx/gesbc9312.c
-index 45ee205..7b89e8a 100644
---- a/arch/arm/mach-ep93xx/gesbc9312.c
-+++ b/arch/arm/mach-ep93xx/gesbc9312.c
-@@ -38,4 +38,5 @@ MACHINE_START(GESBC9312, "Glomation GESBC-9312-sx")
- 	.init_irq	= ep93xx_init_irq,
- 	.timer		= &ep93xx_timer,
- 	.init_machine	= gesbc9312_init_machine,
-+	.restart	= ep93xx_restart,
- MACHINE_END
-diff --git a/arch/arm/mach-ep93xx/include/mach/platform.h b/arch/arm/mach-ep93xx/include/mach/platform.h
-index 5066045..d4c9349 100644
---- a/arch/arm/mach-ep93xx/include/mach/platform.h
-+++ b/arch/arm/mach-ep93xx/include/mach/platform.h
-@@ -66,4 +66,6 @@ void ep93xx_register_ac97(void);
- void ep93xx_init_devices(void);
- extern struct sys_timer ep93xx_timer;
- 
-+void ep93xx_restart(char, const char *);
 +
- #endif
-diff --git a/arch/arm/mach-ep93xx/include/mach/system.h b/arch/arm/mach-ep93xx/include/mach/system.h
-index bdf6c4f..b27a654 100644
---- a/arch/arm/mach-ep93xx/include/mach/system.h
-+++ b/arch/arm/mach-ep93xx/include/mach/system.h
-@@ -1,9 +1,6 @@
- /*
-  * arch/arm/mach-ep93xx/include/mach/system.h
+ #ifdef CONFIG_FOOTBRIDGE_ADDIN
+ 
+ static inline unsigned long fb_bus_sdram_offset(void)
+diff --git a/arch/arm/mach-footbridge/common.h b/arch/arm/mach-footbridge/common.h
+index b05e662..c9767b8 100644
+--- a/arch/arm/mach-footbridge/common.h
++++ b/arch/arm/mach-footbridge/common.h
+@@ -8,3 +8,4 @@ extern void footbridge_map_io(void);
+ extern void footbridge_init_irq(void);
+ 
+ extern void isa_init_irq(unsigned int irq);
++extern void footbridge_restart(char, const char *);
+diff --git a/arch/arm/mach-footbridge/ebsa285.c b/arch/arm/mach-footbridge/ebsa285.c
+index 012210c..27716a7 100644
+--- a/arch/arm/mach-footbridge/ebsa285.c
++++ b/arch/arm/mach-footbridge/ebsa285.c
+@@ -21,5 +21,6 @@ MACHINE_START(EBSA285, "EBSA285")
+ 	.map_io		= footbridge_map_io,
+ 	.init_irq	= footbridge_init_irq,
+ 	.timer		= &footbridge_timer,
++	.restart	= footbridge_restart,
+ MACHINE_END
+ 
+diff --git a/arch/arm/mach-footbridge/include/mach/system.h b/arch/arm/mach-footbridge/include/mach/system.h
+index 249f895..794a02c 100644
+--- a/arch/arm/mach-footbridge/include/mach/system.h
++++ b/arch/arm/mach-footbridge/include/mach/system.h
+@@ -7,12 +7,6 @@
+  * it under the terms of the GNU General Public License version 2 as
+  * published by the Free Software Foundation.
   */
--
+-#include <linux/io.h>
+-#include <asm/hardware/dec21285.h>
 -#include <mach/hardware.h>
+-#include <asm/leds.h>
+-#include <asm/mach-types.h>
 -
  static inline void arch_idle(void)
  {
  	cpu_do_idle();
-@@ -11,12 +8,4 @@ static inline void arch_idle(void)
+@@ -20,50 +14,4 @@ static inline void arch_idle(void)
  
  static inline void arch_reset(char mode, const char *cmd)
  {
--	/*
--	 * Set then clear the SWRST bit to initiate a software reset
--	 */
--	ep93xx_devcfg_set_bits(EP93XX_SYSCON_DEVCFG_SWRST);
--	ep93xx_devcfg_clear_bits(EP93XX_SYSCON_DEVCFG_SWRST);
+-	if (mode == 's') {
+-		/*
+-		 * Jump into the ROM
+-		 */
+-		soft_restart(0x41000000);
+-	} else {
+-		if (machine_is_netwinder()) {
+-			/* open up the SuperIO chip
+-			 */
+-			outb(0x87, 0x370);
+-			outb(0x87, 0x370);
 -
--	while (1)
--		;
+-			/* aux function group 1 (logical device 7)
+-			 */
+-			outb(0x07, 0x370);
+-			outb(0x07, 0x371);
+-
+-			/* set GP16 for WD-TIMER output
+-			 */
+-			outb(0xe6, 0x370);
+-			outb(0x00, 0x371);
+-
+-			/* set a RED LED and toggle WD_TIMER for rebooting
+-			 */
+-			outb(0xc4, 0x338);
+-		} else {
+-			/* 
+-			 * Force the watchdog to do a CPU reset.
+-			 *
+-			 * After making sure that the watchdog is disabled
+-			 * (so we can change the timer registers) we first
+-			 * enable the timer to autoreload itself.  Next, the
+-			 * timer interval is set really short and any
+-			 * current interrupt request is cleared (so we can
+-			 * see an edge transition).  Finally, TIMER4 is
+-			 * enabled as the watchdog.
+-			 */
+-			*CSR_SA110_CNTL &= ~(1 << 13);
+-			*CSR_TIMER4_CNTL = TIMER_CNTL_ENABLE |
+-					   TIMER_CNTL_AUTORELOAD |
+-					   TIMER_CNTL_DIV16;
+-			*CSR_TIMER4_LOAD = 0x2;
+-			*CSR_TIMER4_CLR  = 0;
+-			*CSR_SA110_CNTL |= (1 << 13);
+-		}
+-	}
  }
-diff --git a/arch/arm/mach-ep93xx/micro9.c b/arch/arm/mach-ep93xx/micro9.c
-index e72f736..050ce92 100644
---- a/arch/arm/mach-ep93xx/micro9.c
-+++ b/arch/arm/mach-ep93xx/micro9.c
-@@ -82,6 +82,7 @@ MACHINE_START(MICRO9, "Contec Micro9-High")
- 	.init_irq	= ep93xx_init_irq,
- 	.timer		= &ep93xx_timer,
- 	.init_machine	= micro9_init_machine,
-+	.restart	= ep93xx_restart,
- MACHINE_END
+diff --git a/arch/arm/mach-footbridge/netwinder-hw.c b/arch/arm/mach-footbridge/netwinder-hw.c
+index 0d3846f..80a1c5c 100644
+--- a/arch/arm/mach-footbridge/netwinder-hw.c
++++ b/arch/arm/mach-footbridge/netwinder-hw.c
+@@ -645,6 +645,32 @@ fixup_netwinder(struct tag *tags, char **cmdline, struct meminfo *mi)
  #endif
+ }
  
-@@ -93,6 +94,7 @@ MACHINE_START(MICRO9M, "Contec Micro9-Mid")
- 	.init_irq	= ep93xx_init_irq,
- 	.timer		= &ep93xx_timer,
- 	.init_machine	= micro9_init_machine,
-+	.restart	= ep93xx_restart,
++static void netwinder_restart(char mode, const char *cmd)
++{
++	if (mode == 's') {
++		/* Jump into the ROM */
++		soft_restart(0x41000000);
++	} else {
++		local_irq_disable();
++		local_fiq_disable();
++
++		/* open up the SuperIO chip */
++		outb(0x87, 0x370);
++		outb(0x87, 0x370);
++
++		/* aux function group 1 (logical device 7) */
++		outb(0x07, 0x370);
++		outb(0x07, 0x371);
++
++		/* set GP16 for WD-TIMER output */
++		outb(0xe6, 0x370);
++		outb(0x00, 0x371);
++
++		/* set a RED LED and toggle WD_TIMER for rebooting */
++		outb(0xc4, 0x338);
++	}
++}
++
+ MACHINE_START(NETWINDER, "Rebel-NetWinder")
+ 	/* Maintainer: Russell King/Rebel.com */
+ 	.atag_offset	= 0x100,
+@@ -656,4 +682,5 @@ MACHINE_START(NETWINDER, "Rebel-NetWinder")
+ 	.map_io		= footbridge_map_io,
+ 	.init_irq	= footbridge_init_irq,
+ 	.timer		= &isa_timer,
++	.restart	= netwinder_restart,
  MACHINE_END
- #endif
+diff --git a/arch/arm/mach-footbridge/personal.c b/arch/arm/mach-footbridge/personal.c
+index f41dba3..e1e9990 100644
+--- a/arch/arm/mach-footbridge/personal.c
++++ b/arch/arm/mach-footbridge/personal.c
+@@ -19,5 +19,6 @@ MACHINE_START(PERSONAL_SERVER, "Compaq-PersonalServer")
+ 	.map_io		= footbridge_map_io,
+ 	.init_irq	= footbridge_init_irq,
+ 	.timer		= &footbridge_timer,
++	.restart	= footbridge_restart,
+ MACHINE_END
  
-@@ -104,6 +106,7 @@ MACHINE_START(MICRO9L, "Contec Micro9-Lite")
- 	.init_irq	= ep93xx_init_irq,
- 	.timer		= &ep93xx_timer,
- 	.init_machine	= micro9_init_machine,
-+	.restart	= ep93xx_restart,
- MACHINE_END
- #endif
- 
-@@ -115,5 +118,6 @@ MACHINE_START(MICRO9S, "Contec Micro9-Slim")
- 	.init_irq	= ep93xx_init_irq,
- 	.timer		= &ep93xx_timer,
- 	.init_machine	= micro9_init_machine,
-+	.restart	= ep93xx_restart,
- MACHINE_END
- #endif
-diff --git a/arch/arm/mach-ep93xx/simone.c b/arch/arm/mach-ep93xx/simone.c
-index 52e090d..188cbdb 100644
---- a/arch/arm/mach-ep93xx/simone.c
-+++ b/arch/arm/mach-ep93xx/simone.c
-@@ -82,4 +82,5 @@ MACHINE_START(SIM_ONE, "Simplemachines Sim.One Board")
- 	.init_irq	= ep93xx_init_irq,
- 	.timer		= &ep93xx_timer,
- 	.init_machine	= simone_init_machine,
-+	.restart	= ep93xx_restart,
- MACHINE_END
-diff --git a/arch/arm/mach-ep93xx/snappercl15.c b/arch/arm/mach-ep93xx/snappercl15.c
-index 8121e3a..797afde 100644
---- a/arch/arm/mach-ep93xx/snappercl15.c
-+++ b/arch/arm/mach-ep93xx/snappercl15.c
-@@ -179,4 +179,5 @@ MACHINE_START(SNAPPER_CL15, "Bluewater Systems Snapper CL15")
- 	.init_irq	= ep93xx_init_irq,
- 	.timer 		= &ep93xx_timer,
- 	.init_machine	= snappercl15_init_machine,
-+	.restart	= ep93xx_restart,
- MACHINE_END
-diff --git a/arch/arm/mach-ep93xx/ts72xx.c b/arch/arm/mach-ep93xx/ts72xx.c
-index 1ade3c3..8fa6169 100644
---- a/arch/arm/mach-ep93xx/ts72xx.c
-+++ b/arch/arm/mach-ep93xx/ts72xx.c
-@@ -262,4 +262,5 @@ MACHINE_START(TS72XX, "Technologic Systems TS-72xx SBC")
- 	.init_irq	= ep93xx_init_irq,
- 	.timer		= &ep93xx_timer,
- 	.init_machine	= ts72xx_init_machine,
-+	.restart	= ep93xx_restart,
- MACHINE_END
-diff --git a/arch/arm/mach-ep93xx/vision_ep9307.c b/arch/arm/mach-ep93xx/vision_ep9307.c
-index d96e4db..03dd401 100644
---- a/arch/arm/mach-ep93xx/vision_ep9307.c
-+++ b/arch/arm/mach-ep93xx/vision_ep9307.c
-@@ -361,4 +361,5 @@ MACHINE_START(VISION_EP9307, "Vision Engraving Systems EP9307")
- 	.init_irq	= ep93xx_init_irq,
- 	.timer		= &ep93xx_timer,
- 	.init_machine	= vision_init_machine,
-+	.restart	= ep93xx_restart,
- MACHINE_END
 -- 
 1.7.4.4
