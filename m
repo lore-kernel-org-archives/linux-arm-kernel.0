@@ -1,382 +1,564 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 6 Nov 2011 17:39:39 +0000
-Subject: [02: PATCH 0/41] Platform arch_reset changes
+Date: Sun, 06 Nov 2011 17:40:16 +0000
+Subject: [PATCH 01/41] ARM: clps711x: consolidate irq/mm/time code into a
+ single file
 In-Reply-To: <20111106173113.GI12913@n2100.arm.linux.org.uk>
 References: <20111106173113.GI12913@n2100.arm.linux.org.uk>
-Message-ID: <20111106173939.GJ12913@n2100.arm.linux.org.uk>
+Message-ID: <E1RN6hc-0001Wd-NK@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Part 2. These are the platform updates, so far.
+The separate files for clps711x which contain maybe one or two data
+structures or functions is an inefficient use of files, and encourages
+further small files as other changes happen.  Collapse down these into
+a single core.c file.
 
-The first patch combines the individual files in mach-clps711x which
-contain one or two functions or data structures before changing the
-arch_reset stuff.
-
-The majority of the remaining patches address each group of platforms
-individually.
-
-The final patch removes the resulting empty arch_reset() functions,
-its call site and associated code.  XXX NOTE XXX This results in
-anything left with an arch_reset() function having non-functional
-restart capability.
-
- arch/arm/include/asm/hardware/iop3xx.h         |    1 +
- arch/arm/include/asm/system.h                  |    1 -
- arch/arm/kernel/process.c                      |   10 +-
- arch/arm/mach-at91/at91cap9.c                  |    4 +-
- arch/arm/mach-at91/at91rm9200.c                |    4 +-
- arch/arm/mach-at91/at91sam9260.c               |    2 +-
- arch/arm/mach-at91/at91sam9261.c               |    2 +-
- arch/arm/mach-at91/at91sam9263.c               |    2 +-
- arch/arm/mach-at91/at91sam9_alt_reset.S        |    9 +-
- arch/arm/mach-at91/at91sam9g45.c               |    4 +-
- arch/arm/mach-at91/at91sam9rl.c                |    2 +-
- arch/arm/mach-at91/generic.h                   |    3 +-
- arch/arm/mach-at91/include/mach/system.h       |    9 -
- arch/arm/mach-clps711x/Makefile                |    2 +-
- arch/arm/mach-clps711x/autcpu12.c              |    1 +
- arch/arm/mach-clps711x/cdb89712.c              |    1 +
- arch/arm/mach-clps711x/ceiva.c                 |    1 +
- arch/arm/mach-clps711x/clep7312.c              |    1 +
- arch/arm/mach-clps711x/common.c                |  227 ++++++++++++++++++++++++
- arch/arm/mach-clps711x/edb7211-arch.c          |    1 +
- arch/arm/mach-clps711x/fortunet.c              |    1 +
- arch/arm/mach-clps711x/include/mach/system.h   |    5 -
- arch/arm/mach-clps711x/irq.c                   |  143 ---------------
- arch/arm/mach-clps711x/mm.c                    |   48 -----
- arch/arm/mach-clps711x/p720t.c                 |    1 +
- arch/arm/mach-clps711x/time.c                  |   84 ---------
- arch/arm/mach-cns3xxx/cns3420vb.c              |    1 +
- arch/arm/mach-cns3xxx/core.h                   |    1 +
- arch/arm/mach-cns3xxx/include/mach/system.h    |    3 -
- arch/arm/mach-cns3xxx/pm.c                     |    2 +-
- arch/arm/mach-dove/cm-a510.c                   |    1 +
- arch/arm/mach-dove/common.c                    |   16 ++
- arch/arm/mach-dove/common.h                    |    1 +
- arch/arm/mach-dove/dove-db-setup.c             |    1 +
- arch/arm/mach-dove/include/mach/system.h       |   19 --
- arch/arm/mach-ebsa110/core.c                   |    6 +
- arch/arm/mach-ebsa110/include/mach/system.h    |    2 -
- arch/arm/mach-ep93xx/adssphere.c               |    1 +
- arch/arm/mach-ep93xx/core.c                    |   12 ++
- arch/arm/mach-ep93xx/edb93xx.c                 |    8 +
- arch/arm/mach-ep93xx/gesbc9312.c               |    1 +
- arch/arm/mach-ep93xx/include/mach/platform.h   |    2 +
- arch/arm/mach-ep93xx/include/mach/system.h     |   15 --
- arch/arm/mach-ep93xx/micro9.c                  |    4 +
- arch/arm/mach-ep93xx/simone.c                  |    1 +
- arch/arm/mach-ep93xx/snappercl15.c             |    1 +
- arch/arm/mach-ep93xx/ts72xx.c                  |    1 +
- arch/arm/mach-ep93xx/vision_ep9307.c           |    1 +
- arch/arm/mach-footbridge/cats-hw.c             |    1 +
- arch/arm/mach-footbridge/common.c              |   27 +++
- arch/arm/mach-footbridge/common.h              |    1 +
- arch/arm/mach-footbridge/ebsa285.c             |    1 +
- arch/arm/mach-footbridge/include/mach/system.h |   56 ------
- arch/arm/mach-footbridge/netwinder-hw.c        |   27 +++
- arch/arm/mach-footbridge/personal.c            |    1 +
- arch/arm/mach-h720x/common.c                   |    5 +
- arch/arm/mach-h720x/common.h                   |    1 +
- arch/arm/mach-h720x/h7201-eval.c               |    1 +
- arch/arm/mach-h720x/h7202-eval.c               |    1 +
- arch/arm/mach-h720x/include/mach/system.h      |    6 -
- arch/arm/mach-highbank/core.h                  |    1 +
- arch/arm/mach-highbank/highbank.c              |    1 +
- arch/arm/mach-highbank/include/mach/system.h   |    2 -
- arch/arm/mach-highbank/system.c                |    2 +-
- arch/arm/mach-imx/mach-apf9328.c               |    1 +
- arch/arm/mach-imx/mach-armadillo5x0.c          |    1 +
- arch/arm/mach-imx/mach-bug.c                   |    1 +
- arch/arm/mach-imx/mach-cpuimx27.c              |    1 +
- arch/arm/mach-imx/mach-cpuimx35.c              |    1 +
- arch/arm/mach-imx/mach-eukrea_cpuimx25.c       |    1 +
- arch/arm/mach-imx/mach-imx27_visstrim_m10.c    |    1 +
- arch/arm/mach-imx/mach-imx27ipcam.c            |    1 +
- arch/arm/mach-imx/mach-imx27lite.c             |    1 +
- arch/arm/mach-imx/mach-imx6q.c                 |    1 +
- arch/arm/mach-imx/mach-kzm_arm11_01.c          |    1 +
- arch/arm/mach-imx/mach-mx1ads.c                |    2 +
- arch/arm/mach-imx/mach-mx21ads.c               |    1 +
- arch/arm/mach-imx/mach-mx25_3ds.c              |    1 +
- arch/arm/mach-imx/mach-mx27_3ds.c              |    1 +
- arch/arm/mach-imx/mach-mx27ads.c               |    1 +
- arch/arm/mach-imx/mach-mx31_3ds.c              |    1 +
- arch/arm/mach-imx/mach-mx31ads.c               |    1 +
- arch/arm/mach-imx/mach-mx31lilly.c             |    1 +
- arch/arm/mach-imx/mach-mx31lite.c              |    1 +
- arch/arm/mach-imx/mach-mx31moboard.c           |    1 +
- arch/arm/mach-imx/mach-mx35_3ds.c              |    1 +
- arch/arm/mach-imx/mach-mxt_td60.c              |    1 +
- arch/arm/mach-imx/mach-pca100.c                |    1 +
- arch/arm/mach-imx/mach-pcm037.c                |    1 +
- arch/arm/mach-imx/mach-pcm038.c                |    1 +
- arch/arm/mach-imx/mach-pcm043.c                |    1 +
- arch/arm/mach-imx/mach-qong.c                  |    1 +
- arch/arm/mach-imx/mach-scb9328.c               |    1 +
- arch/arm/mach-imx/mach-vpr200.c                |    1 +
- arch/arm/mach-integrator/common.h              |    1 +
- arch/arm/mach-integrator/core.c                |    8 +
- arch/arm/mach-integrator/include/mach/system.h |   11 --
- arch/arm/mach-integrator/integrator_ap.c       |    1 +
- arch/arm/mach-integrator/integrator_cp.c       |    1 +
- arch/arm/mach-iop13xx/include/mach/iop13xx.h   |    1 +
- arch/arm/mach-iop13xx/include/mach/system.h    |   14 --
- arch/arm/mach-iop13xx/iq81340mc.c              |    1 +
- arch/arm/mach-iop13xx/iq81340sc.c              |    1 +
- arch/arm/mach-iop13xx/setup.c                  |   11 ++
- arch/arm/mach-iop32x/em7210.c                  |    1 +
- arch/arm/mach-iop32x/glantank.c                |    1 +
- arch/arm/mach-iop32x/include/mach/system.h     |   19 --
- arch/arm/mach-iop32x/iq31244.c                 |    2 +
- arch/arm/mach-iop32x/iq80321.c                 |    1 +
- arch/arm/mach-iop32x/n2100.c                   |    9 +
- arch/arm/mach-iop33x/include/mach/system.h     |   10 -
- arch/arm/mach-iop33x/iq80331.c                 |    1 +
- arch/arm/mach-iop33x/iq80332.c                 |    1 +
- arch/arm/mach-ixp2000/core.c                   |    4 +
- arch/arm/mach-ixp2000/enp2611.c                |    1 +
- arch/arm/mach-ixp2000/include/mach/platform.h  |    1 +
- arch/arm/mach-ixp2000/include/mach/system.h    |   33 ----
- arch/arm/mach-ixp2000/ixdp2400.c               |    1 +
- arch/arm/mach-ixp2000/ixdp2800.c               |    1 +
- arch/arm/mach-ixp2000/ixdp2x01.c               |   32 ++++
- arch/arm/mach-ixp23xx/core.c                   |    6 +
- arch/arm/mach-ixp23xx/espresso.c               |    1 +
- arch/arm/mach-ixp23xx/include/mach/platform.h  |    1 +
- arch/arm/mach-ixp23xx/include/mach/system.h    |   17 --
- arch/arm/mach-ixp23xx/ixdp2351.c               |   12 ++
- arch/arm/mach-ixp23xx/roadrunner.c             |    1 +
- arch/arm/mach-ixp4xx/avila-setup.c             |    2 +
- arch/arm/mach-ixp4xx/common.c                  |   20 ++
- arch/arm/mach-ixp4xx/coyote-setup.c            |    2 +
- arch/arm/mach-ixp4xx/dsmg600-setup.c           |    1 +
- arch/arm/mach-ixp4xx/fsg-setup.c               |    1 +
- arch/arm/mach-ixp4xx/gateway7001-setup.c       |    1 +
- arch/arm/mach-ixp4xx/goramo_mlr.c              |    1 +
- arch/arm/mach-ixp4xx/gtwx5715-setup.c          |    1 +
- arch/arm/mach-ixp4xx/include/mach/platform.h   |    1 +
- arch/arm/mach-ixp4xx/include/mach/system.h     |   25 ---
- arch/arm/mach-ixp4xx/ixdp425-setup.c           |    1 +
- arch/arm/mach-ixp4xx/nas100d-setup.c           |    1 +
- arch/arm/mach-ixp4xx/nslu2-setup.c             |    1 +
- arch/arm/mach-ixp4xx/omixp-setup.c             |    3 +
- arch/arm/mach-ixp4xx/vulcan-setup.c            |    1 +
- arch/arm/mach-ixp4xx/wg302v2-setup.c           |    1 +
- arch/arm/mach-kirkwood/common.c                |   16 ++
- arch/arm/mach-kirkwood/common.h                |    1 +
- arch/arm/mach-kirkwood/d2net_v2-setup.c        |    1 +
- arch/arm/mach-kirkwood/db88f6281-bp-setup.c    |    1 +
- arch/arm/mach-kirkwood/dockstar-setup.c        |    1 +
- arch/arm/mach-kirkwood/guruplug-setup.c        |    1 +
- arch/arm/mach-kirkwood/include/mach/system.h   |   19 --
- arch/arm/mach-kirkwood/mv88f6281gtw_ge-setup.c |    1 +
- arch/arm/mach-kirkwood/netspace_v2-setup.c     |    3 +
- arch/arm/mach-kirkwood/netxbig_v2-setup.c      |    2 +
- arch/arm/mach-kirkwood/openrd-setup.c          |    3 +
- arch/arm/mach-kirkwood/rd88f6192-nas-setup.c   |    1 +
- arch/arm/mach-kirkwood/rd88f6281-setup.c       |    1 +
- arch/arm/mach-kirkwood/sheevaplug-setup.c      |    2 +
- arch/arm/mach-kirkwood/t5325-setup.c           |    1 +
- arch/arm/mach-kirkwood/ts219-setup.c           |    1 +
- arch/arm/mach-kirkwood/ts41x-setup.c           |    1 +
- arch/arm/mach-lpc32xx/common.c                 |   20 ++-
- arch/arm/mach-lpc32xx/common.h                 |    2 +
- arch/arm/mach-lpc32xx/include/mach/system.h    |   22 ---
- arch/arm/mach-lpc32xx/phy3250.c                |    1 +
- arch/arm/mach-mmp/aspenite.c                   |    2 +
- arch/arm/mach-mmp/avengers_lite.c              |    1 +
- arch/arm/mach-mmp/brownstone.c                 |    1 +
- arch/arm/mach-mmp/common.c                     |    5 +
- arch/arm/mach-mmp/common.h                     |    1 +
- arch/arm/mach-mmp/flint.c                      |    1 +
- arch/arm/mach-mmp/gplugd.c                     |    1 +
- arch/arm/mach-mmp/include/mach/pxa168.h        |    1 +
- arch/arm/mach-mmp/include/mach/system.h        |   10 -
- arch/arm/mach-mmp/jasper.c                     |    1 +
- arch/arm/mach-mmp/pxa168.c                     |    5 +
- arch/arm/mach-mmp/tavorevb.c                   |    1 +
- arch/arm/mach-mmp/teton_bga.c                  |    1 +
- arch/arm/mach-mmp/ttc_dkb.c                    |    1 +
- arch/arm/mach-msm/include/mach/system.h        |    8 -
- arch/arm/mach-mv78xx0/buffalo-wxl-setup.c      |    1 +
- arch/arm/mach-mv78xx0/common.c                 |   16 ++
- arch/arm/mach-mv78xx0/common.h                 |    1 +
- arch/arm/mach-mv78xx0/db78x00-bp-setup.c       |    1 +
- arch/arm/mach-mv78xx0/include/mach/system.h    |   19 --
- arch/arm/mach-mv78xx0/rd78x00-masa-setup.c     |    1 +
- arch/arm/mach-mx5/board-cpuimx51.c             |    1 +
- arch/arm/mach-mx5/board-cpuimx51sd.c           |    1 +
- arch/arm/mach-mx5/board-mx50_rdp.c             |    1 +
- arch/arm/mach-mx5/board-mx51_3ds.c             |    1 +
- arch/arm/mach-mx5/board-mx51_babbage.c         |    1 +
- arch/arm/mach-mx5/board-mx51_efikamx.c         |    3 +-
- arch/arm/mach-mx5/board-mx51_efikasb.c         |    1 +
- arch/arm/mach-mx5/board-mx53_ard.c             |    1 +
- arch/arm/mach-mx5/board-mx53_evk.c             |    1 +
- arch/arm/mach-mx5/board-mx53_loco.c            |    1 +
- arch/arm/mach-mx5/board-mx53_smd.c             |    1 +
- arch/arm/mach-mx5/imx51-dt.c                   |    1 +
- arch/arm/mach-mx5/imx53-dt.c                   |    1 +
- arch/arm/mach-mxs/include/mach/common.h        |    1 +
- arch/arm/mach-mxs/include/mach/system.h        |    2 -
- arch/arm/mach-mxs/mach-m28evk.c                |    1 +
- arch/arm/mach-mxs/mach-mx23evk.c               |    1 +
- arch/arm/mach-mxs/mach-mx28evk.c               |    1 +
- arch/arm/mach-mxs/mach-stmp378x_devb.c         |    1 +
- arch/arm/mach-mxs/mach-tx28.c                  |    1 +
- arch/arm/mach-mxs/system.c                     |    2 +-
- arch/arm/mach-orion5x/common.c                 |   12 ++
- arch/arm/mach-orion5x/common.h                 |    1 +
- arch/arm/mach-orion5x/d2net-setup.c            |    2 +
- arch/arm/mach-orion5x/db88f5281-setup.c        |    1 +
- arch/arm/mach-orion5x/dns323-setup.c           |    1 +
- arch/arm/mach-orion5x/edmini_v2-setup.c        |    1 +
- arch/arm/mach-orion5x/include/mach/system.h    |   14 --
- arch/arm/mach-orion5x/kurobox_pro-setup.c      |    2 +
- arch/arm/mach-orion5x/ls-chl-setup.c           |    3 +-
- arch/arm/mach-orion5x/ls_hgl-setup.c           |    3 +-
- arch/arm/mach-orion5x/lsmini-setup.c           |    3 +-
- arch/arm/mach-orion5x/mss2-setup.c             |    3 +-
- arch/arm/mach-orion5x/mv2120-setup.c           |    3 +-
- arch/arm/mach-orion5x/net2big-setup.c          |    1 +
- arch/arm/mach-orion5x/rd88f5181l-fxo-setup.c   |    1 +
- arch/arm/mach-orion5x/rd88f5181l-ge-setup.c    |    1 +
- arch/arm/mach-orion5x/rd88f5182-setup.c        |    1 +
- arch/arm/mach-orion5x/rd88f6183ap-ge-setup.c   |    1 +
- arch/arm/mach-orion5x/terastation_pro2-setup.c |    1 +
- arch/arm/mach-orion5x/ts209-setup.c            |    1 +
- arch/arm/mach-orion5x/ts409-setup.c            |    1 +
- arch/arm/mach-orion5x/ts78xx-setup.c           |    1 +
- arch/arm/mach-orion5x/wnr854t-setup.c          |    1 +
- arch/arm/mach-orion5x/wrt350n-v2-setup.c       |    1 +
- arch/arm/mach-picoxcell/include/mach/system.h  |    5 -
- arch/arm/mach-pnx4008/core.c                   |    6 +
- arch/arm/mach-pnx4008/include/mach/system.h    |    9 -
- arch/arm/mach-prima2/common.h                  |    1 +
- arch/arm/mach-prima2/include/mach/system.h     |   12 --
- arch/arm/mach-prima2/prima2.c                  |    1 +
- arch/arm/mach-prima2/rstc.c                    |    7 +
- arch/arm/mach-pxa/balloon3.c                   |    1 +
- arch/arm/mach-pxa/capc7117.c                   |    3 +-
- arch/arm/mach-pxa/cm-x2xx.c                    |    1 +
- arch/arm/mach-pxa/cm-x300.c                    |    1 +
- arch/arm/mach-pxa/colibri-pxa270.c             |    2 +
- arch/arm/mach-pxa/colibri-pxa300.c             |    1 +
- arch/arm/mach-pxa/colibri-pxa320.c             |    1 +
- arch/arm/mach-pxa/corgi.c                      |    8 +-
- arch/arm/mach-pxa/csb726.c                     |    1 +
- arch/arm/mach-pxa/em-x270.c                    |    2 +
- arch/arm/mach-pxa/eseries.c                    |    6 +
- arch/arm/mach-pxa/ezx.c                        |    6 +
- arch/arm/mach-pxa/generic.h                    |    2 +
- arch/arm/mach-pxa/gumstix.c                    |    1 +
- arch/arm/mach-pxa/h5000.c                      |    1 +
- arch/arm/mach-pxa/himalaya.c                   |    1 +
- arch/arm/mach-pxa/hx4700.c                     |    1 +
- arch/arm/mach-pxa/icontrol.c                   |    3 +-
- arch/arm/mach-pxa/idp.c                        |    1 +
- arch/arm/mach-pxa/include/mach/system.h        |    8 -
- arch/arm/mach-pxa/littleton.c                  |    1 +
- arch/arm/mach-pxa/lpd270.c                     |    1 +
- arch/arm/mach-pxa/lubbock.c                    |    1 +
- arch/arm/mach-pxa/magician.c                   |    1 +
- arch/arm/mach-pxa/mainstone.c                  |    1 +
- arch/arm/mach-pxa/mioa701.c                    |    6 +-
- arch/arm/mach-pxa/mp900.c                      |    1 +
- arch/arm/mach-pxa/palmld.c                     |    3 +-
- arch/arm/mach-pxa/palmt5.c                     |    3 +-
- arch/arm/mach-pxa/palmtc.c                     |    3 +-
- arch/arm/mach-pxa/palmte2.c                    |    3 +-
- arch/arm/mach-pxa/palmtreo.c                   |    2 +
- arch/arm/mach-pxa/palmtx.c                     |    3 +-
- arch/arm/mach-pxa/palmz72.c                    |    3 +-
- arch/arm/mach-pxa/pcm027.c                     |    1 +
- arch/arm/mach-pxa/poodle.c                     |    9 +-
- arch/arm/mach-pxa/raumfeld.c                   |    3 +
- arch/arm/mach-pxa/reset.c                      |    5 +-
- arch/arm/mach-pxa/saar.c                       |    1 +
- arch/arm/mach-pxa/saarb.c                      |    1 +
- arch/arm/mach-pxa/spitz.c                      |    6 +-
- arch/arm/mach-pxa/stargate2.c                  |    2 +
- arch/arm/mach-pxa/tavorevb.c                   |    1 +
- arch/arm/mach-pxa/tavorevb3.c                  |    1 +
- arch/arm/mach-pxa/tosa.c                       |    4 +-
- arch/arm/mach-pxa/trizeps4.c                   |    2 +
- arch/arm/mach-pxa/viper.c                      |    1 +
- arch/arm/mach-pxa/vpac270.c                    |    3 +-
- arch/arm/mach-pxa/xcep.c                       |    1 +
- arch/arm/mach-pxa/z2.c                         |    1 +
- arch/arm/mach-pxa/zeus.c                       |    1 +
- arch/arm/mach-pxa/zylonite.c                   |    1 +
- arch/arm/mach-realview/core.h                  |    1 -
- arch/arm/mach-realview/include/mach/system.h   |   17 --
- arch/arm/mach-realview/realview_eb.c           |    5 +-
- arch/arm/mach-realview/realview_pb1176.c       |    5 +-
- arch/arm/mach-realview/realview_pb11mp.c       |    5 +-
- arch/arm/mach-realview/realview_pba8.c         |    5 +-
- arch/arm/mach-realview/realview_pbx.c          |    5 +-
- arch/arm/mach-rpc/include/mach/system.h        |   14 --
- arch/arm/mach-rpc/riscpc.c                     |   12 ++
- arch/arm/mach-sa1100/assabet.c                 |    1 +
- arch/arm/mach-sa1100/badge4.c                  |    1 +
- arch/arm/mach-sa1100/cerf.c                    |    1 +
- arch/arm/mach-sa1100/collie.c                  |    1 +
- arch/arm/mach-sa1100/generic.c                 |   11 ++
- arch/arm/mach-sa1100/generic.h                 |    1 +
- arch/arm/mach-sa1100/h3100.c                   |    1 +
- arch/arm/mach-sa1100/h3600.c                   |    1 +
- arch/arm/mach-sa1100/hackkit.c                 |    1 +
- arch/arm/mach-sa1100/include/mach/system.h     |   13 --
- arch/arm/mach-sa1100/jornada720.c              |    1 +
- arch/arm/mach-sa1100/lart.c                    |    1 +
- arch/arm/mach-sa1100/nanoengine.c              |    1 +
- arch/arm/mach-sa1100/pleb.c                    |    1 +
- arch/arm/mach-sa1100/shannon.c                 |    1 +
- arch/arm/mach-sa1100/simpad.c                  |    1 +
- arch/arm/mach-shark/core.c                     |    3 +-
- arch/arm/mach-shark/include/mach/system.h      |    3 -
- arch/arm/mach-spear3xx/include/mach/generic.h  |    2 +
- arch/arm/mach-spear3xx/spear300_evb.c          |    1 +
- arch/arm/mach-spear3xx/spear310_evb.c          |    1 +
- arch/arm/mach-spear3xx/spear320_evb.c          |    1 +
- arch/arm/mach-spear6xx/include/mach/generic.h  |    2 +
- arch/arm/mach-spear6xx/spear600_evb.c          |    1 +
- arch/arm/mach-tegra/common.c                   |    5 +-
- arch/arm/mach-tegra/include/mach/system.h      |    4 -
- arch/arm/mach-u300/core.c                      |   20 ++
- arch/arm/mach-u300/include/mach/platform.h     |    1 +
- arch/arm/mach-u300/include/mach/system.h       |   26 ---
- arch/arm/mach-u300/u300.c                      |    1 +
- arch/arm/mach-ux500/include/mach/system.h      |    5 -
- arch/arm/mach-versatile/core.c                 |   13 ++
- arch/arm/mach-versatile/core.h                 |    1 +
- arch/arm/mach-versatile/include/mach/system.h  |   16 --
- arch/arm/mach-versatile/versatile_ab.c         |    1 +
- arch/arm/mach-versatile/versatile_dt.c         |    1 +
- arch/arm/mach-versatile/versatile_pb.c         |    1 +
- arch/arm/mach-vexpress/include/mach/system.h   |    4 -
- arch/arm/mach-vexpress/v2m.c                   |    2 +-
- arch/arm/mach-w90x900/cpu.c                    |   15 ++
- arch/arm/mach-w90x900/cpu.h                    |    1 +
- arch/arm/mach-w90x900/include/mach/system.h    |   22 ---
- arch/arm/mach-w90x900/mach-nuc910evb.c         |    1 +
- arch/arm/mach-w90x900/mach-nuc950evb.c         |    1 +
- arch/arm/mach-w90x900/mach-nuc960evb.c         |    1 +
- arch/arm/mach-zynq/include/mach/system.h       |    5 -
- arch/arm/plat-iop/Makefile                     |    2 +
- arch/arm/plat-iop/restart.c                    |   19 ++
- arch/arm/plat-mxc/include/mach/common.h        |    2 +-
- arch/arm/plat-mxc/include/mach/system.h        |    2 -
- arch/arm/plat-mxc/system.c                     |    9 +-
- arch/arm/plat-s3c24xx/cpu.c                    |   23 ---
- arch/arm/plat-spear/Makefile                   |    2 +-
- arch/arm/plat-spear/include/plat/system.h      |   15 --
- arch/arm/plat-spear/restart.c                  |   27 +++
- 352 files changed, 995 insertions(+), 910 deletions(-)
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ arch/arm/mach-clps711x/Makefile |    2 +-
+ arch/arm/mach-clps711x/common.c |  222 +++++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-clps711x/irq.c    |  143 -------------------------
+ arch/arm/mach-clps711x/mm.c     |   48 ---------
+ arch/arm/mach-clps711x/time.c   |   84 ---------------
+ 5 files changed, 223 insertions(+), 276 deletions(-)
  create mode 100644 arch/arm/mach-clps711x/common.c
  delete mode 100644 arch/arm/mach-clps711x/irq.c
  delete mode 100644 arch/arm/mach-clps711x/mm.c
  delete mode 100644 arch/arm/mach-clps711x/time.c
- create mode 100644 arch/arm/plat-iop/restart.c
- create mode 100644 arch/arm/plat-spear/restart.c
+
+diff --git a/arch/arm/mach-clps711x/Makefile b/arch/arm/mach-clps711x/Makefile
+index 4a19731..f2f0256 100644
+--- a/arch/arm/mach-clps711x/Makefile
++++ b/arch/arm/mach-clps711x/Makefile
+@@ -4,7 +4,7 @@
+ 
+ # Object file lists.
+ 
+-obj-y			:= irq.o mm.o time.o
++obj-y			:= common.o
+ obj-m			:=
+ obj-n			:=
+ obj-			:=
+diff --git a/arch/arm/mach-clps711x/common.c b/arch/arm/mach-clps711x/common.c
+new file mode 100644
+index 0000000..aa273e7
+--- /dev/null
++++ b/arch/arm/mach-clps711x/common.c
+@@ -0,0 +1,222 @@
++/*
++ *  linux/arch/arm/mach-clps711x/core.c
++ *
++ *  Core support for the CLPS711x-based machines.
++ *
++ *  Copyright (C) 2001,2011 Deep Blue Solutions Ltd
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
++ */
++#include <linux/kernel.h>
++#include <linux/mm.h>
++#include <linux/init.h>
++#include <linux/interrupt.h>
++#include <linux/io.h>
++#include <linux/irq.h>
++#include <linux/sched.h>
++#include <linux/timex.h>
++
++#include <asm/sizes.h>
++#include <mach/hardware.h>
++#include <asm/irq.h>
++#include <asm/leds.h>
++#include <asm/pgtable.h>
++#include <asm/page.h>
++#include <asm/mach/map.h>
++#include <asm/mach/time.h>
++#include <asm/hardware/clps7111.h>
++
++/*
++ * This maps the generic CLPS711x registers
++ */
++static struct map_desc clps711x_io_desc[] __initdata = {
++	{
++		.virtual	= CLPS7111_VIRT_BASE,
++		.pfn		= __phys_to_pfn(CLPS7111_PHYS_BASE),
++		.length		= SZ_1M,
++		.type		= MT_DEVICE
++	}
++};
++
++void __init clps711x_map_io(void)
++{
++	iotable_init(clps711x_io_desc, ARRAY_SIZE(clps711x_io_desc));
++}
++
++static void int1_mask(struct irq_data *d)
++{
++	u32 intmr1;
++
++	intmr1 = clps_readl(INTMR1);
++	intmr1 &= ~(1 << d->irq);
++	clps_writel(intmr1, INTMR1);
++}
++
++static void int1_ack(struct irq_data *d)
++{
++	u32 intmr1;
++
++	intmr1 = clps_readl(INTMR1);
++	intmr1 &= ~(1 << d->irq);
++	clps_writel(intmr1, INTMR1);
++
++	switch (d->irq) {
++	case IRQ_CSINT:  clps_writel(0, COEOI);  break;
++	case IRQ_TC1OI:  clps_writel(0, TC1EOI); break;
++	case IRQ_TC2OI:  clps_writel(0, TC2EOI); break;
++	case IRQ_RTCMI:  clps_writel(0, RTCEOI); break;
++	case IRQ_TINT:   clps_writel(0, TEOI);   break;
++	case IRQ_UMSINT: clps_writel(0, UMSEOI); break;
++	}
++}
++
++static void int1_unmask(struct irq_data *d)
++{
++	u32 intmr1;
++
++	intmr1 = clps_readl(INTMR1);
++	intmr1 |= 1 << d->irq;
++	clps_writel(intmr1, INTMR1);
++}
++
++static struct irq_chip int1_chip = {
++	.irq_ack	= int1_ack,
++	.irq_mask	= int1_mask,
++	.irq_unmask	= int1_unmask,
++};
++
++static void int2_mask(struct irq_data *d)
++{
++	u32 intmr2;
++
++	intmr2 = clps_readl(INTMR2);
++	intmr2 &= ~(1 << (d->irq - 16));
++	clps_writel(intmr2, INTMR2);
++}
++
++static void int2_ack(struct irq_data *d)
++{
++	u32 intmr2;
++
++	intmr2 = clps_readl(INTMR2);
++	intmr2 &= ~(1 << (d->irq - 16));
++	clps_writel(intmr2, INTMR2);
++
++	switch (d->irq) {
++	case IRQ_KBDINT: clps_writel(0, KBDEOI); break;
++	}
++}
++
++static void int2_unmask(struct irq_data *d)
++{
++	u32 intmr2;
++
++	intmr2 = clps_readl(INTMR2);
++	intmr2 |= 1 << (d->irq - 16);
++	clps_writel(intmr2, INTMR2);
++}
++
++static struct irq_chip int2_chip = {
++	.irq_ack	= int2_ack,
++	.irq_mask	= int2_mask,
++	.irq_unmask	= int2_unmask,
++};
++
++void __init clps711x_init_irq(void)
++{
++	unsigned int i;
++
++	for (i = 0; i < NR_IRQS; i++) {
++	        if (INT1_IRQS & (1 << i)) {
++	        	irq_set_chip_and_handler(i, &int1_chip,
++						 handle_level_irq);
++	        	set_irq_flags(i, IRQF_VALID | IRQF_PROBE);
++		}
++		if (INT2_IRQS & (1 << i)) {
++			irq_set_chip_and_handler(i, &int2_chip,
++						 handle_level_irq);
++			set_irq_flags(i, IRQF_VALID | IRQF_PROBE);
++		}			
++	}
++
++	/*
++	 * Disable interrupts
++	 */
++	clps_writel(0, INTMR1);
++	clps_writel(0, INTMR2);
++
++	/*
++	 * Clear down any pending interrupts
++	 */
++	clps_writel(0, COEOI);
++	clps_writel(0, TC1EOI);
++	clps_writel(0, TC2EOI);
++	clps_writel(0, RTCEOI);
++	clps_writel(0, TEOI);
++	clps_writel(0, UMSEOI);
++	clps_writel(0, SYNCIO);
++	clps_writel(0, KBDEOI);
++}
++
++/*
++ * gettimeoffset() returns time since last timer tick, in usecs.
++ *
++ * 'LATCH' is hwclock ticks (see CLOCK_TICK_RATE in timex.h) per jiffy.
++ * 'tick' is usecs per jiffy.
++ */
++static unsigned long clps711x_gettimeoffset(void)
++{
++	unsigned long hwticks;
++	hwticks = LATCH - (clps_readl(TC2D) & 0xffff);	/* since last underflow */
++	return (hwticks * (tick_nsec / 1000)) / LATCH;
++}
++
++/*
++ * IRQ handler for the timer
++ */
++static irqreturn_t p720t_timer_interrupt(int irq, void *dev_id)
++{
++	timer_tick();
++	return IRQ_HANDLED;
++}
++
++static struct irqaction clps711x_timer_irq = {
++	.name		= "CLPS711x Timer Tick",
++	.flags		= IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
++	.handler	= p720t_timer_interrupt,
++};
++
++static void __init clps711x_timer_init(void)
++{
++	struct timespec tv;
++	unsigned int syscon;
++
++	syscon = clps_readl(SYSCON1);
++	syscon |= SYSCON1_TC2S | SYSCON1_TC2M;
++	clps_writel(syscon, SYSCON1);
++
++	clps_writel(LATCH-1, TC2D); /* 512kHz / 100Hz - 1 */
++
++	setup_irq(IRQ_TC2OI, &clps711x_timer_irq);
++
++	tv.tv_nsec = 0;
++	tv.tv_sec = clps_readl(RTCDR);
++	do_settimeofday(&tv);
++}
++
++struct sys_timer clps711x_timer = {
++	.init		= clps711x_timer_init,
++	.offset		= clps711x_gettimeoffset,
++};
+diff --git a/arch/arm/mach-clps711x/irq.c b/arch/arm/mach-clps711x/irq.c
+deleted file mode 100644
+index c2eceee..0000000
+--- a/arch/arm/mach-clps711x/irq.c
++++ /dev/null
+@@ -1,143 +0,0 @@
+-/*
+- *  linux/arch/arm/mach-clps711x/irq.c
+- *
+- *  Copyright (C) 2000 Deep Blue Solutions Ltd.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+- */
+-#include <linux/init.h>
+-#include <linux/list.h>
+-#include <linux/io.h>
+-
+-#include <asm/mach/irq.h>
+-#include <mach/hardware.h>
+-#include <asm/irq.h>
+-
+-#include <asm/hardware/clps7111.h>
+-
+-static void int1_mask(struct irq_data *d)
+-{
+-	u32 intmr1;
+-
+-	intmr1 = clps_readl(INTMR1);
+-	intmr1 &= ~(1 << d->irq);
+-	clps_writel(intmr1, INTMR1);
+-}
+-
+-static void int1_ack(struct irq_data *d)
+-{
+-	u32 intmr1;
+-
+-	intmr1 = clps_readl(INTMR1);
+-	intmr1 &= ~(1 << d->irq);
+-	clps_writel(intmr1, INTMR1);
+-
+-	switch (d->irq) {
+-	case IRQ_CSINT:  clps_writel(0, COEOI);  break;
+-	case IRQ_TC1OI:  clps_writel(0, TC1EOI); break;
+-	case IRQ_TC2OI:  clps_writel(0, TC2EOI); break;
+-	case IRQ_RTCMI:  clps_writel(0, RTCEOI); break;
+-	case IRQ_TINT:   clps_writel(0, TEOI);   break;
+-	case IRQ_UMSINT: clps_writel(0, UMSEOI); break;
+-	}
+-}
+-
+-static void int1_unmask(struct irq_data *d)
+-{
+-	u32 intmr1;
+-
+-	intmr1 = clps_readl(INTMR1);
+-	intmr1 |= 1 << d->irq;
+-	clps_writel(intmr1, INTMR1);
+-}
+-
+-static struct irq_chip int1_chip = {
+-	.irq_ack	= int1_ack,
+-	.irq_mask	= int1_mask,
+-	.irq_unmask	= int1_unmask,
+-};
+-
+-static void int2_mask(struct irq_data *d)
+-{
+-	u32 intmr2;
+-
+-	intmr2 = clps_readl(INTMR2);
+-	intmr2 &= ~(1 << (d->irq - 16));
+-	clps_writel(intmr2, INTMR2);
+-}
+-
+-static void int2_ack(struct irq_data *d)
+-{
+-	u32 intmr2;
+-
+-	intmr2 = clps_readl(INTMR2);
+-	intmr2 &= ~(1 << (d->irq - 16));
+-	clps_writel(intmr2, INTMR2);
+-
+-	switch (d->irq) {
+-	case IRQ_KBDINT: clps_writel(0, KBDEOI); break;
+-	}
+-}
+-
+-static void int2_unmask(struct irq_data *d)
+-{
+-	u32 intmr2;
+-
+-	intmr2 = clps_readl(INTMR2);
+-	intmr2 |= 1 << (d->irq - 16);
+-	clps_writel(intmr2, INTMR2);
+-}
+-
+-static struct irq_chip int2_chip = {
+-	.irq_ack	= int2_ack,
+-	.irq_mask	= int2_mask,
+-	.irq_unmask	= int2_unmask,
+-};
+-
+-void __init clps711x_init_irq(void)
+-{
+-	unsigned int i;
+-
+-	for (i = 0; i < NR_IRQS; i++) {
+-	        if (INT1_IRQS & (1 << i)) {
+-	        	irq_set_chip_and_handler(i, &int1_chip,
+-						 handle_level_irq);
+-	        	set_irq_flags(i, IRQF_VALID | IRQF_PROBE);
+-		}
+-		if (INT2_IRQS & (1 << i)) {
+-			irq_set_chip_and_handler(i, &int2_chip,
+-						 handle_level_irq);
+-			set_irq_flags(i, IRQF_VALID | IRQF_PROBE);
+-		}			
+-	}
+-
+-	/*
+-	 * Disable interrupts
+-	 */
+-	clps_writel(0, INTMR1);
+-	clps_writel(0, INTMR2);
+-
+-	/*
+-	 * Clear down any pending interrupts
+-	 */
+-	clps_writel(0, COEOI);
+-	clps_writel(0, TC1EOI);
+-	clps_writel(0, TC2EOI);
+-	clps_writel(0, RTCEOI);
+-	clps_writel(0, TEOI);
+-	clps_writel(0, UMSEOI);
+-	clps_writel(0, SYNCIO);
+-	clps_writel(0, KBDEOI);
+-}
+diff --git a/arch/arm/mach-clps711x/mm.c b/arch/arm/mach-clps711x/mm.c
+deleted file mode 100644
+index 9865921..0000000
+--- a/arch/arm/mach-clps711x/mm.c
++++ /dev/null
+@@ -1,48 +0,0 @@
+-/*
+- *  linux/arch/arm/mach-clps711x/mm.c
+- *
+- *  Generic MM setup for the CLPS711x-based machines.
+- *
+- *  Copyright (C) 2001 Deep Blue Solutions Ltd
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+- */
+-#include <linux/kernel.h>
+-#include <linux/mm.h>
+-#include <linux/init.h>
+-
+-#include <asm/sizes.h>
+-#include <mach/hardware.h>
+-#include <asm/pgtable.h>
+-#include <asm/page.h>
+-#include <asm/mach/map.h>
+-#include <asm/hardware/clps7111.h>
+-
+-/*
+- * This maps the generic CLPS711x registers
+- */
+-static struct map_desc clps711x_io_desc[] __initdata = {
+-	{
+-		.virtual	= CLPS7111_VIRT_BASE,
+-		.pfn		= __phys_to_pfn(CLPS7111_PHYS_BASE),
+-		.length		= SZ_1M,
+-		.type		= MT_DEVICE
+-	}
+-};
+-
+-void __init clps711x_map_io(void)
+-{
+-	iotable_init(clps711x_io_desc, ARRAY_SIZE(clps711x_io_desc));
+-}
+diff --git a/arch/arm/mach-clps711x/time.c b/arch/arm/mach-clps711x/time.c
+deleted file mode 100644
+index d581ef0..0000000
+--- a/arch/arm/mach-clps711x/time.c
++++ /dev/null
+@@ -1,84 +0,0 @@
+-/*
+- *  linux/arch/arm/mach-clps711x/time.c
+- *
+- *  Copyright (C) 2001 Deep Blue Solutions Ltd.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+- */
+-#include <linux/timex.h>
+-#include <linux/init.h>
+-#include <linux/interrupt.h>
+-#include <linux/irq.h>
+-#include <linux/sched.h>
+-#include <linux/io.h>
+-
+-#include <mach/hardware.h>
+-#include <asm/irq.h>
+-#include <asm/leds.h>
+-#include <asm/hardware/clps7111.h>
+-
+-#include <asm/mach/time.h>
+-
+-
+-/*
+- * gettimeoffset() returns time since last timer tick, in usecs.
+- *
+- * 'LATCH' is hwclock ticks (see CLOCK_TICK_RATE in timex.h) per jiffy.
+- * 'tick' is usecs per jiffy.
+- */
+-static unsigned long clps711x_gettimeoffset(void)
+-{
+-	unsigned long hwticks;
+-	hwticks = LATCH - (clps_readl(TC2D) & 0xffff);	/* since last underflow */
+-	return (hwticks * (tick_nsec / 1000)) / LATCH;
+-}
+-
+-/*
+- * IRQ handler for the timer
+- */
+-static irqreturn_t
+-p720t_timer_interrupt(int irq, void *dev_id)
+-{
+-	timer_tick();
+-	return IRQ_HANDLED;
+-}
+-
+-static struct irqaction clps711x_timer_irq = {
+-	.name		= "CLPS711x Timer Tick",
+-	.flags		= IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
+-	.handler	= p720t_timer_interrupt,
+-};
+-
+-static void __init clps711x_timer_init(void)
+-{
+-	struct timespec tv;
+-	unsigned int syscon;
+-
+-	syscon = clps_readl(SYSCON1);
+-	syscon |= SYSCON1_TC2S | SYSCON1_TC2M;
+-	clps_writel(syscon, SYSCON1);
+-
+-	clps_writel(LATCH-1, TC2D); /* 512kHz / 100Hz - 1 */
+-
+-	setup_irq(IRQ_TC2OI, &clps711x_timer_irq);
+-
+-	tv.tv_nsec = 0;
+-	tv.tv_sec = clps_readl(RTCDR);
+-	do_settimeofday(&tv);
+-}
+-
+-struct sys_timer clps711x_timer = {
+-	.init		= clps711x_timer_init,
+-	.offset		= clps711x_gettimeoffset,
+-};
+-- 
+1.7.4.4
