@@ -1,215 +1,126 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 06 Nov 2011 17:41:18 +0000
-Subject: [PATCH 04/41] ARM: restart: at91: use new restart hook
+Date: Sun, 06 Nov 2011 17:41:38 +0000
+Subject: [PATCH 05/41] ARM: restart: clps711x: use new restart hook
 In-Reply-To: <20111106173113.GI12913@n2100.arm.linux.org.uk>
 References: <20111106173113.GI12913@n2100.arm.linux.org.uk>
-Message-ID: <E1RN6ic-0001Wp-7t@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1RN6iw-0001Wt-M3@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rather than using a private function pointer, use the existing
-arm_pm_restart function pointer instead.  We no longer need to enable
-the I-cache in at91sam9_alt_reset() as the caches will now be on when
-this function is called.
-
-Update the function names to use the 'restart' terminology rather than
-the 'reboot' terminology.
+Hook these platforms restart code into the new restart hook rather
+than using arch_reset().
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mach-at91/at91cap9.c            |    4 ++--
- arch/arm/mach-at91/at91rm9200.c          |    4 ++--
- arch/arm/mach-at91/at91sam9260.c         |    2 +-
- arch/arm/mach-at91/at91sam9261.c         |    2 +-
- arch/arm/mach-at91/at91sam9263.c         |    2 +-
- arch/arm/mach-at91/at91sam9_alt_reset.S  |    9 ++-------
- arch/arm/mach-at91/at91sam9g45.c         |    4 ++--
- arch/arm/mach-at91/at91sam9rl.c          |    2 +-
- arch/arm/mach-at91/generic.h             |    3 +--
- arch/arm/mach-at91/include/mach/system.h |    5 -----
- 10 files changed, 13 insertions(+), 24 deletions(-)
+ arch/arm/mach-clps711x/autcpu12.c            |    1 +
+ arch/arm/mach-clps711x/cdb89712.c            |    1 +
+ arch/arm/mach-clps711x/ceiva.c               |    1 +
+ arch/arm/mach-clps711x/clep7312.c            |    1 +
+ arch/arm/mach-clps711x/common.c              |    5 +++++
+ arch/arm/mach-clps711x/edb7211-arch.c        |    1 +
+ arch/arm/mach-clps711x/fortunet.c            |    1 +
+ arch/arm/mach-clps711x/include/mach/system.h |    1 -
+ arch/arm/mach-clps711x/p720t.c               |    1 +
+ 9 files changed, 12 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-at91/at91cap9.c b/arch/arm/mach-at91/at91cap9.c
-index ecdd54d..2937339 100644
---- a/arch/arm/mach-at91/at91cap9.c
-+++ b/arch/arm/mach-at91/at91cap9.c
-@@ -313,7 +313,7 @@ static struct at91_gpio_bank at91cap9_gpio[] = {
- 	}
+diff --git a/arch/arm/mach-clps711x/autcpu12.c b/arch/arm/mach-clps711x/autcpu12.c
+index 0276091..3fb79a1 100644
+--- a/arch/arm/mach-clps711x/autcpu12.c
++++ b/arch/arm/mach-clps711x/autcpu12.c
+@@ -68,5 +68,6 @@ MACHINE_START(AUTCPU12, "autronix autcpu12")
+ 	.map_io		= autcpu12_map_io,
+ 	.init_irq	= clps711x_init_irq,
+ 	.timer		= &clps711x_timer,
++	.restart	= clps711x_restart,
+ MACHINE_END
+ 
+diff --git a/arch/arm/mach-clps711x/cdb89712.c b/arch/arm/mach-clps711x/cdb89712.c
+index 25b3bfd..c314f49 100644
+--- a/arch/arm/mach-clps711x/cdb89712.c
++++ b/arch/arm/mach-clps711x/cdb89712.c
+@@ -59,4 +59,5 @@ MACHINE_START(CDB89712, "Cirrus-CDB89712")
+ 	.map_io		= cdb89712_map_io,
+ 	.init_irq	= clps711x_init_irq,
+ 	.timer		= &clps711x_timer,
++	.restart	= clps711x_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-clps711x/ceiva.c b/arch/arm/mach-clps711x/ceiva.c
+index 1df9ec6..a70147e 100644
+--- a/arch/arm/mach-clps711x/ceiva.c
++++ b/arch/arm/mach-clps711x/ceiva.c
+@@ -60,4 +60,5 @@ MACHINE_START(CEIVA, "CEIVA/Polaroid Photo MAX Digital Picture Frame")
+ 	.map_io		= ceiva_map_io,
+ 	.init_irq	= clps711x_init_irq,
+ 	.timer		= &clps711x_timer,
++	.restart	= clps711x_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-clps711x/clep7312.c b/arch/arm/mach-clps711x/clep7312.c
+index 80496c0..dbc7842 100644
+--- a/arch/arm/mach-clps711x/clep7312.c
++++ b/arch/arm/mach-clps711x/clep7312.c
+@@ -41,5 +41,6 @@ MACHINE_START(CLEP7212, "Cirrus Logic 7212/7312")
+ 	.map_io		= clps711x_map_io,
+ 	.init_irq	= clps711x_init_irq,
+ 	.timer		= &clps711x_timer,
++	.restart	= clps711x_restart,
+ MACHINE_END
+ 
+diff --git a/arch/arm/mach-clps711x/common.c b/arch/arm/mach-clps711x/common.c
+index aa273e7..fedf0e3 100644
+--- a/arch/arm/mach-clps711x/common.c
++++ b/arch/arm/mach-clps711x/common.c
+@@ -220,3 +220,8 @@ struct sys_timer clps711x_timer = {
+ 	.init		= clps711x_timer_init,
+ 	.offset		= clps711x_gettimeoffset,
  };
++
++void clps711x_restart(char mode, const char *cmd)
++{
++	soft_restart(0);
++}
+diff --git a/arch/arm/mach-clps711x/edb7211-arch.c b/arch/arm/mach-clps711x/edb7211-arch.c
+index 9721f61..5fad0b4 100644
+--- a/arch/arm/mach-clps711x/edb7211-arch.c
++++ b/arch/arm/mach-clps711x/edb7211-arch.c
+@@ -62,4 +62,5 @@ MACHINE_START(EDB7211, "CL-EDB7211 (EP7211 eval board)")
+ 	.reserve	= edb7211_reserve,
+ 	.init_irq	= clps711x_init_irq,
+ 	.timer		= &clps711x_timer,
++	.restart	= clps711x_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-clps711x/fortunet.c b/arch/arm/mach-clps711x/fortunet.c
+index d992566..3a3f0b7 100644
+--- a/arch/arm/mach-clps711x/fortunet.c
++++ b/arch/arm/mach-clps711x/fortunet.c
+@@ -78,4 +78,5 @@ MACHINE_START(FORTUNET, "ARM-FortuNet")
+ 	.map_io		= clps711x_map_io,
+ 	.init_irq	= clps711x_init_irq,
+ 	.timer		= &clps711x_timer,
++	.restart	= clps711x_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-clps711x/include/mach/system.h b/arch/arm/mach-clps711x/include/mach/system.h
+index 6c11993..9982deb 100644
+--- a/arch/arm/mach-clps711x/include/mach/system.h
++++ b/arch/arm/mach-clps711x/include/mach/system.h
+@@ -34,7 +34,6 @@ static inline void arch_idle(void)
  
--static void at91cap9_reset(void)
-+static void at91cap9_restart(char mode, const char *cmd)
- {
- 	at91_sys_write(AT91_RSTC_CR, AT91_RSTC_KEY | AT91_RSTC_PROCRST | AT91_RSTC_PERRST);
- }
-@@ -335,7 +335,7 @@ static void __init at91cap9_map_io(void)
- 
- static void __init at91cap9_initialize(void)
- {
--	at91_arch_reset = at91cap9_reset;
-+	arm_pm_restart = at91cap9_restart;
- 	pm_power_off = at91cap9_poweroff;
- 	at91_extern_irq = (1 << AT91CAP9_ID_IRQ0) | (1 << AT91CAP9_ID_IRQ1);
- 
-diff --git a/arch/arm/mach-at91/at91rm9200.c b/arch/arm/mach-at91/at91rm9200.c
-index 713d3bd..430a9fd 100644
---- a/arch/arm/mach-at91/at91rm9200.c
-+++ b/arch/arm/mach-at91/at91rm9200.c
-@@ -288,7 +288,7 @@ static struct at91_gpio_bank at91rm9200_gpio[] = {
- 	}
- };
- 
--static void at91rm9200_reset(void)
-+static void at91rm9200_restart(char mode, const char *cmd)
- {
- 	/*
- 	 * Perform a hardware reset with the use of the Watchdog timer.
-@@ -309,7 +309,7 @@ static void __init at91rm9200_map_io(void)
- 
- static void __init at91rm9200_initialize(void)
- {
--	at91_arch_reset = at91rm9200_reset;
-+	arm_pm_restart = at91rm9200_restart;
- 	at91_extern_irq = (1 << AT91RM9200_ID_IRQ0) | (1 << AT91RM9200_ID_IRQ1)
- 			| (1 << AT91RM9200_ID_IRQ2) | (1 << AT91RM9200_ID_IRQ3)
- 			| (1 << AT91RM9200_ID_IRQ4) | (1 << AT91RM9200_ID_IRQ5)
-diff --git a/arch/arm/mach-at91/at91sam9260.c b/arch/arm/mach-at91/at91sam9260.c
-index b84a9f6..ec9e23d 100644
---- a/arch/arm/mach-at91/at91sam9260.c
-+++ b/arch/arm/mach-at91/at91sam9260.c
-@@ -327,7 +327,7 @@ static void __init at91sam9260_map_io(void)
- 
- static void __init at91sam9260_initialize(void)
- {
--	at91_arch_reset = at91sam9_alt_reset;
-+	arm_pm_restart = at91sam9_alt_restart;
- 	pm_power_off = at91sam9260_poweroff;
- 	at91_extern_irq = (1 << AT91SAM9260_ID_IRQ0) | (1 << AT91SAM9260_ID_IRQ1)
- 			| (1 << AT91SAM9260_ID_IRQ2);
-diff --git a/arch/arm/mach-at91/at91sam9261.c b/arch/arm/mach-at91/at91sam9261.c
-index 658a518..19ac7c0 100644
---- a/arch/arm/mach-at91/at91sam9261.c
-+++ b/arch/arm/mach-at91/at91sam9261.c
-@@ -287,7 +287,7 @@ static void __init at91sam9261_map_io(void)
- 
- static void __init at91sam9261_initialize(void)
- {
--	at91_arch_reset = at91sam9_alt_reset;
-+	arm_pm_restart = at91sam9_alt_restart;
- 	pm_power_off = at91sam9261_poweroff;
- 	at91_extern_irq = (1 << AT91SAM9261_ID_IRQ0) | (1 << AT91SAM9261_ID_IRQ1)
- 			| (1 << AT91SAM9261_ID_IRQ2);
-diff --git a/arch/arm/mach-at91/at91sam9263.c b/arch/arm/mach-at91/at91sam9263.c
-index f83fbb0..50d0163 100644
---- a/arch/arm/mach-at91/at91sam9263.c
-+++ b/arch/arm/mach-at91/at91sam9263.c
-@@ -305,7 +305,7 @@ static void __init at91sam9263_map_io(void)
- 
- static void __init at91sam9263_initialize(void)
- {
--	at91_arch_reset = at91sam9_alt_reset;
-+	arm_pm_restart = at91sam9_alt_restart;
- 	pm_power_off = at91sam9263_poweroff;
- 	at91_extern_irq = (1 << AT91SAM9263_ID_IRQ0) | (1 << AT91SAM9263_ID_IRQ1);
- 
-diff --git a/arch/arm/mach-at91/at91sam9_alt_reset.S b/arch/arm/mach-at91/at91sam9_alt_reset.S
-index e0256de..d3f931c 100644
---- a/arch/arm/mach-at91/at91sam9_alt_reset.S
-+++ b/arch/arm/mach-at91/at91sam9_alt_reset.S
-@@ -14,20 +14,15 @@
-  */
- 
- #include <linux/linkage.h>
--#include <asm/system.h>
- #include <mach/hardware.h>
- #include <mach/at91sam9_sdramc.h>
- #include <mach/at91_rstc.h>
- 
- 			.arm
- 
--			.globl	at91sam9_alt_reset
-+			.globl	at91sam9_alt_restart
- 
--at91sam9_alt_reset:	mrc	p15, 0, r0, c1, c0, 0
--			orr	r0, r0, #CR_I
--			mcr	p15, 0, r0, c1, c0, 0		@ enable I-cache
--
--			ldr	r0, .at91_va_base_sdramc	@ preload constants
-+at91sam9_alt_restart:	ldr	r0, .at91_va_base_sdramc	@ preload constants
- 			ldr	r1, .at91_va_base_rstc_cr
- 
- 			mov	r2, #1
-diff --git a/arch/arm/mach-at91/at91sam9g45.c b/arch/arm/mach-at91/at91sam9g45.c
-index 318b040..ff21f7a 100644
---- a/arch/arm/mach-at91/at91sam9g45.c
-+++ b/arch/arm/mach-at91/at91sam9g45.c
-@@ -317,7 +317,7 @@ static struct at91_gpio_bank at91sam9g45_gpio[] = {
- 	}
- };
- 
--static void at91sam9g45_reset(void)
-+static void at91sam9g45_restart(char mode, const char *cmd)
- {
- 	at91_sys_write(AT91_RSTC_CR, AT91_RSTC_KEY | AT91_RSTC_PROCRST | AT91_RSTC_PERRST);
- }
-@@ -340,7 +340,7 @@ static void __init at91sam9g45_map_io(void)
- 
- static void __init at91sam9g45_initialize(void)
- {
--	at91_arch_reset = at91sam9g45_reset;
-+	arm_pm_restart = at91sam9g45_restart;
- 	pm_power_off = at91sam9g45_poweroff;
- 	at91_extern_irq = (1 << AT91SAM9G45_ID_IRQ0);
- 
-diff --git a/arch/arm/mach-at91/at91sam9rl.c b/arch/arm/mach-at91/at91sam9rl.c
-index a238105..61cbb46 100644
---- a/arch/arm/mach-at91/at91sam9rl.c
-+++ b/arch/arm/mach-at91/at91sam9rl.c
-@@ -292,7 +292,7 @@ static void __init at91sam9rl_map_io(void)
- 
- static void __init at91sam9rl_initialize(void)
- {
--	at91_arch_reset = at91sam9_alt_reset;
-+	arm_pm_restart = at91sam9_alt_restart;
- 	pm_power_off = at91sam9rl_poweroff;
- 	at91_extern_irq = (1 << AT91SAM9RL_ID_IRQ0);
- 
-diff --git a/arch/arm/mach-at91/generic.h b/arch/arm/mach-at91/generic.h
-index 938b34f..7f4503b 100644
---- a/arch/arm/mach-at91/generic.h
-+++ b/arch/arm/mach-at91/generic.h
-@@ -57,7 +57,7 @@ extern void at91_irq_suspend(void);
- extern void at91_irq_resume(void);
- 
- /* reset */
--extern void at91sam9_alt_reset(void);
-+extern void at91sam9_alt_restart(char, const char *);
- 
-  /* GPIO */
- #define AT91RM9200_PQFP		3	/* AT91RM9200 PQFP package has 3 banks */
-@@ -71,5 +71,4 @@ struct at91_gpio_bank {
- extern void __init at91_gpio_init(struct at91_gpio_bank *, int nr_banks);
- extern void __init at91_gpio_irq_setup(void);
- 
--extern void (*at91_arch_reset)(void);
- extern int at91_extern_irq;
-diff --git a/arch/arm/mach-at91/include/mach/system.h b/arch/arm/mach-at91/include/mach/system.h
-index 36af14b..079eb12 100644
---- a/arch/arm/mach-at91/include/mach/system.h
-+++ b/arch/arm/mach-at91/include/mach/system.h
-@@ -47,13 +47,8 @@ static inline void arch_idle(void)
- #endif
- }
- 
--void (*at91_arch_reset)(void);
--
  static inline void arch_reset(char mode, const char *cmd)
  {
--	/* call the CPU-specific reset function */
--	if (at91_arch_reset)
--		(at91_arch_reset)();
+-	soft_restart(0);
  }
  
  #endif
+diff --git a/arch/arm/mach-clps711x/p720t.c b/arch/arm/mach-clps711x/p720t.c
+index 6ecea95..42ee8f3 100644
+--- a/arch/arm/mach-clps711x/p720t.c
++++ b/arch/arm/mach-clps711x/p720t.c
+@@ -93,6 +93,7 @@ MACHINE_START(P720T, "ARM-Prospector720T")
+ 	.map_io		= p720t_map_io,
+ 	.init_irq	= clps711x_init_irq,
+ 	.timer		= &clps711x_timer,
++	.restart	= clps711x_restart,
+ MACHINE_END
+ 
+ static int p720t_hw_init(void)
 -- 
 1.7.4.4
