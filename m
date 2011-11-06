@@ -1,66 +1,36 @@
 From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Sun,  6 Nov 2011 16:16:23 +0200
-Subject: [PATCH v2 1/4] ARM: OMAP3: cm-t35: fix ads7846 touchscreen
+Date: Sun,  6 Nov 2011 16:16:25 +0200
+Subject: [PATCH v2 3/4] ARM: OMAP3: cm-t35: fix audio
 In-Reply-To: <1320588827-9407-1-git-send-email-grinberg@compulab.co.il>
 References: <1320588827-9407-1-git-send-email-grinberg@compulab.co.il>
-Message-ID: <1320588986-9480-1-git-send-email-grinberg@compulab.co.il>
+Message-ID: <1320588986-9480-3-git-send-email-grinberg@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ads7846 driver fails to find the regulator supply and
-as a result the touchscreen is not working.
-Fix this by adding a regulator supply for the ads7846 driver.
+TWL4030 audio codec is not being registered if no platform data is
+supplied. Provide platform data for the TWL4030 audio codec.
 
 Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
 ---
-v2:	- Rebase on top of fixes branch
-	- Elaborate on the problem in the commit message
+v2: - Rebase on top of fixes branch
+    - fix the commit message (10x to Sergei)
 
- arch/arm/mach-omap2/board-cm-t35.c |   18 ++++++++++++++++++
- 1 files changed, 18 insertions(+), 0 deletions(-)
+ arch/arm/mach-omap2/board-cm-t35.c |    3 ++-
+ 1 files changed, 2 insertions(+), 1 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/board-cm-t35.c b/arch/arm/mach-omap2/board-cm-t35.c
-index bd1bcac..7141cb6 100644
+index 724a23c..7b71fe1 100644
 --- a/arch/arm/mach-omap2/board-cm-t35.c
 +++ b/arch/arm/mach-omap2/board-cm-t35.c
-@@ -343,6 +343,10 @@ static struct regulator_consumer_supply cm_t35_vdvi_supply[] = {
- 	REGULATOR_SUPPLY("vdvi", "omapdss"),
- };
- 
-+static struct regulator_consumer_supply cm_t35_vio_supplies[] = {
-+	REGULATOR_SUPPLY("vcc", "spi1.0"),
-+};
-+
- /* VMMC1 for MMC1 pins CMD, CLK, DAT0..DAT3 (20 mA, plus card == max 220 mA) */
- static struct regulator_init_data cm_t35_vmmc1 = {
- 	.constraints = {
-@@ -373,6 +377,19 @@ static struct regulator_init_data cm_t35_vsim = {
- 	.consumer_supplies	= cm_t35_vsim_supply,
- };
- 
-+static struct regulator_init_data cm_t35_vio = {
-+	.constraints = {
-+		.min_uV			= 1800000,
-+		.max_uV			= 1800000,
-+		.apply_uV		= true,
-+		.valid_modes_mask	= REGULATOR_MODE_NORMAL
-+					| REGULATOR_MODE_STANDBY,
-+		.valid_ops_mask		= REGULATOR_CHANGE_MODE,
-+	},
-+	.num_consumer_supplies	= ARRAY_SIZE(cm_t35_vio_supplies),
-+	.consumer_supplies	= cm_t35_vio_supplies,
-+};
-+
- static uint32_t cm_t35_keymap[] = {
- 	KEY(0, 0, KEY_A),	KEY(0, 1, KEY_B),	KEY(0, 2, KEY_LEFT),
- 	KEY(1, 0, KEY_UP),	KEY(1, 1, KEY_ENTER),	KEY(1, 2, KEY_DOWN),
-@@ -456,6 +473,7 @@ static struct twl4030_platform_data cm_t35_twldata = {
- 	.gpio		= &cm_t35_gpio_data,
- 	.vmmc1		= &cm_t35_vmmc1,
- 	.vsim		= &cm_t35_vsim,
-+	.vio		= &cm_t35_vio,
- };
- 
+@@ -477,7 +477,8 @@ static struct twl4030_platform_data cm_t35_twldata = {
  static void __init cm_t35_init_i2c(void)
+ {
+ 	omap3_pmic_get_config(&cm_t35_twldata, TWL_COMMON_PDATA_USB,
+-			TWL_COMMON_REGULATOR_VDAC);
++			      TWL_COMMON_REGULATOR_VDAC |
++			      TWL_COMMON_PDATA_AUDIO);
+ 
+ 	omap3_pmic_init("tps65930", &cm_t35_twldata);
+ }
 -- 
 1.7.3.4
