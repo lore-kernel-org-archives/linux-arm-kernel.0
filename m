@@ -1,287 +1,296 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 06 Nov 2011 17:46:04 +0000
-Subject: [PATCH 18/41] ARM: restart: ixp4xx: use new restart hook
+Date: Sun, 06 Nov 2011 17:46:24 +0000
+Subject: [PATCH 19/41] ARM: restart: kirkwood: use new restart hook
 In-Reply-To: <20111106173113.GI12913@n2100.arm.linux.org.uk>
 References: <20111106173113.GI12913@n2100.arm.linux.org.uk>
-Message-ID: <E1RN6nE-0001Xl-8i@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1RN6nY-0001Xp-PG@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hook these platforms restart code into the new restart hook rather
-than using arch_reset().
+Hook these platforms restart code into the new restart hook rather than
+using arch_reset().
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mach-ixp4xx/avila-setup.c           |    2 ++
- arch/arm/mach-ixp4xx/common.c                |   20 ++++++++++++++++++++
- arch/arm/mach-ixp4xx/coyote-setup.c          |    2 ++
- arch/arm/mach-ixp4xx/dsmg600-setup.c         |    1 +
- arch/arm/mach-ixp4xx/fsg-setup.c             |    1 +
- arch/arm/mach-ixp4xx/gateway7001-setup.c     |    1 +
- arch/arm/mach-ixp4xx/goramo_mlr.c            |    1 +
- arch/arm/mach-ixp4xx/gtwx5715-setup.c        |    1 +
- arch/arm/mach-ixp4xx/include/mach/platform.h |    1 +
- arch/arm/mach-ixp4xx/include/mach/system.h   |   21 ---------------------
- arch/arm/mach-ixp4xx/ixdp425-setup.c         |    1 +
- arch/arm/mach-ixp4xx/nas100d-setup.c         |    1 +
- arch/arm/mach-ixp4xx/nslu2-setup.c           |    1 +
- arch/arm/mach-ixp4xx/omixp-setup.c           |    3 +++
- arch/arm/mach-ixp4xx/vulcan-setup.c          |    1 +
- arch/arm/mach-ixp4xx/wg302v2-setup.c         |    1 +
- 16 files changed, 38 insertions(+), 21 deletions(-)
+ arch/arm/mach-kirkwood/common.c                |   16 ++++++++++++++++
+ arch/arm/mach-kirkwood/common.h                |    1 +
+ arch/arm/mach-kirkwood/d2net_v2-setup.c        |    1 +
+ arch/arm/mach-kirkwood/db88f6281-bp-setup.c    |    1 +
+ arch/arm/mach-kirkwood/dockstar-setup.c        |    1 +
+ arch/arm/mach-kirkwood/guruplug-setup.c        |    1 +
+ arch/arm/mach-kirkwood/include/mach/system.h   |   15 ---------------
+ arch/arm/mach-kirkwood/mv88f6281gtw_ge-setup.c |    1 +
+ arch/arm/mach-kirkwood/netspace_v2-setup.c     |    3 +++
+ arch/arm/mach-kirkwood/netxbig_v2-setup.c      |    2 ++
+ arch/arm/mach-kirkwood/openrd-setup.c          |    3 +++
+ arch/arm/mach-kirkwood/rd88f6192-nas-setup.c   |    1 +
+ arch/arm/mach-kirkwood/rd88f6281-setup.c       |    1 +
+ arch/arm/mach-kirkwood/sheevaplug-setup.c      |    2 ++
+ arch/arm/mach-kirkwood/t5325-setup.c           |    1 +
+ arch/arm/mach-kirkwood/ts219-setup.c           |    1 +
+ arch/arm/mach-kirkwood/ts41x-setup.c           |    1 +
+ 17 files changed, 37 insertions(+), 15 deletions(-)
 
-diff --git a/arch/arm/mach-ixp4xx/avila-setup.c b/arch/arm/mach-ixp4xx/avila-setup.c
-index 37609a2..a7277ad 100644
---- a/arch/arm/mach-ixp4xx/avila-setup.c
-+++ b/arch/arm/mach-ixp4xx/avila-setup.c
-@@ -172,6 +172,7 @@ MACHINE_START(AVILA, "Gateworks Avila Network Platform")
- #if defined(CONFIG_PCI)
- 	.dma_zone_size	= SZ_64M,
- #endif
-+	.restart	= ixp4xx_restart,
- MACHINE_END
- 
-  /*
-@@ -190,6 +191,7 @@ MACHINE_START(LOFT, "Giant Shoulder Inc Loft board")
- #if defined(CONFIG_PCI)
- 	.dma_zone_size	= SZ_64M,
- #endif
-+	.restart	= ixp4xx_restart,
- MACHINE_END
- #endif
- 
-diff --git a/arch/arm/mach-ixp4xx/common.c b/arch/arm/mach-ixp4xx/common.c
-index 0777257..4a02619 100644
---- a/arch/arm/mach-ixp4xx/common.c
-+++ b/arch/arm/mach-ixp4xx/common.c
-@@ -500,3 +500,23 @@ static void __init ixp4xx_clockevent_init(void)
- 
- 	clockevents_register_device(&clockevent_ixp4xx);
+diff --git a/arch/arm/mach-kirkwood/common.c b/arch/arm/mach-kirkwood/common.c
+index f3248cf..0bff4a9 100644
+--- a/arch/arm/mach-kirkwood/common.c
++++ b/arch/arm/mach-kirkwood/common.c
+@@ -534,3 +534,19 @@ static int __init kirkwood_clock_gate(void)
+ 	return 0;
  }
+ late_initcall(kirkwood_clock_gate);
 +
-+void ixp4xx_restart(char mode, const char *cmd)
++void kirkwood_restart(char mode, const char *cmd)
 +{
-+	if ( 1 && mode == 's') {
-+		/* Jump into ROM at address 0 */
-+		soft_restart(0);
-+	} else {
-+		/* Use on-chip reset capability */
++	/*
++	 * Enable soft reset to assert RSTOUTn.
++	 */
++	writel(SOFT_RESET_OUT_EN, RSTOUTn_MASK);
 +
-+		/* set the "key" register to enable access to
-+		 * "timer" and "enable" registers
-+		 */
-+		*IXP4XX_OSWK = IXP4XX_WDT_KEY;
++	/*
++	 * Assert soft reset.
++	 */
++	writel(SOFT_RESET, SYSTEM_SOFT_RESET);
 +
-+		/* write 0 to the timer register for an immediate reset */
-+		*IXP4XX_OSWT = 0;
-+
-+		*IXP4XX_OSWE = IXP4XX_WDT_RESET_ENABLE | IXP4XX_WDT_COUNT_ENABLE;
-+	}
++	while (1)
++		;
 +}
-diff --git a/arch/arm/mach-ixp4xx/coyote-setup.c b/arch/arm/mach-ixp4xx/coyote-setup.c
-index 81dfec3..a74f86c 100644
---- a/arch/arm/mach-ixp4xx/coyote-setup.c
-+++ b/arch/arm/mach-ixp4xx/coyote-setup.c
-@@ -117,6 +117,7 @@ MACHINE_START(ADI_COYOTE, "ADI Engineering Coyote")
- #if defined(CONFIG_PCI)
- 	.dma_zone_size	= SZ_64M,
- #endif
-+	.restart	= ixp4xx_restart,
- MACHINE_END
- #endif
+diff --git a/arch/arm/mach-kirkwood/common.h b/arch/arm/mach-kirkwood/common.h
+index b9b0f09..1529280 100644
+--- a/arch/arm/mach-kirkwood/common.h
++++ b/arch/arm/mach-kirkwood/common.h
+@@ -50,6 +50,7 @@ void kirkwood_uart1_init(void);
+ void kirkwood_nand_init(struct mtd_partition *parts, int nr_parts, int delay);
+ void kirkwood_nand_init_rnb(struct mtd_partition *parts, int nr_parts, int (*dev_ready)(struct mtd_info *));
+ void kirkwood_audio_init(void);
++void kirkwood_restart(char, const char *);
  
-@@ -132,6 +133,7 @@ MACHINE_START(IXDPG425, "Intel IXDPG425")
- 	.timer		= &ixp4xx_timer,
- 	.atag_offset	= 0x100,
- 	.init_machine	= coyote_init,
-+	.restart	= ixp4xx_restart,
+ extern int kirkwood_tclk;
+ extern struct sys_timer kirkwood_timer;
+diff --git a/arch/arm/mach-kirkwood/d2net_v2-setup.c b/arch/arm/mach-kirkwood/d2net_v2-setup.c
+index f457e07..6e1bac9 100644
+--- a/arch/arm/mach-kirkwood/d2net_v2-setup.c
++++ b/arch/arm/mach-kirkwood/d2net_v2-setup.c
+@@ -227,4 +227,5 @@ MACHINE_START(D2NET_V2, "LaCie d2 Network v2")
+ 	.init_early	= kirkwood_init_early,
+ 	.init_irq	= kirkwood_init_irq,
+ 	.timer		= &kirkwood_timer,
++	.restart	= kirkwood_restart,
  MACHINE_END
- #endif
+diff --git a/arch/arm/mach-kirkwood/db88f6281-bp-setup.c b/arch/arm/mach-kirkwood/db88f6281-bp-setup.c
+index ff4c21c..d933593 100644
+--- a/arch/arm/mach-kirkwood/db88f6281-bp-setup.c
++++ b/arch/arm/mach-kirkwood/db88f6281-bp-setup.c
+@@ -103,4 +103,5 @@ MACHINE_START(DB88F6281_BP, "Marvell DB-88F6281-BP Development Board")
+ 	.init_early	= kirkwood_init_early,
+ 	.init_irq	= kirkwood_init_irq,
+ 	.timer		= &kirkwood_timer,
++	.restart	= kirkwood_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-kirkwood/dockstar-setup.c b/arch/arm/mach-kirkwood/dockstar-setup.c
+index e4d199b..61d9a55 100644
+--- a/arch/arm/mach-kirkwood/dockstar-setup.c
++++ b/arch/arm/mach-kirkwood/dockstar-setup.c
+@@ -108,4 +108,5 @@ MACHINE_START(DOCKSTAR, "Seagate FreeAgent DockStar")
+ 	.init_early	= kirkwood_init_early,
+ 	.init_irq	= kirkwood_init_irq,
+ 	.timer		= &kirkwood_timer,
++	.restart	= kirkwood_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-kirkwood/guruplug-setup.c b/arch/arm/mach-kirkwood/guruplug-setup.c
+index 6c40f78..bdaed38 100644
+--- a/arch/arm/mach-kirkwood/guruplug-setup.c
++++ b/arch/arm/mach-kirkwood/guruplug-setup.c
+@@ -127,4 +127,5 @@ MACHINE_START(GURUPLUG, "Marvell GuruPlug Reference Board")
+ 	.init_early	= kirkwood_init_early,
+ 	.init_irq	= kirkwood_init_irq,
+ 	.timer		= &kirkwood_timer,
++	.restart	= kirkwood_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-kirkwood/include/mach/system.h b/arch/arm/mach-kirkwood/include/mach/system.h
+index 7568e95..8a94d97 100644
+--- a/arch/arm/mach-kirkwood/include/mach/system.h
++++ b/arch/arm/mach-kirkwood/include/mach/system.h
+@@ -9,8 +9,6 @@
+ #ifndef __ASM_ARCH_SYSTEM_H
+ #define __ASM_ARCH_SYSTEM_H
  
-diff --git a/arch/arm/mach-ixp4xx/dsmg600-setup.c b/arch/arm/mach-ixp4xx/dsmg600-setup.c
-index 8837fbc..67be177 100644
---- a/arch/arm/mach-ixp4xx/dsmg600-setup.c
-+++ b/arch/arm/mach-ixp4xx/dsmg600-setup.c
-@@ -286,4 +286,5 @@ MACHINE_START(DSMG600, "D-Link DSM-G600 RevA")
- #if defined(CONFIG_PCI)
- 	.dma_zone_size	= SZ_64M,
- #endif
-+	.restart	= ixp4xx_restart,
- MACHINE_END
-diff --git a/arch/arm/mach-ixp4xx/fsg-setup.c b/arch/arm/mach-ixp4xx/fsg-setup.c
-index 2887c35..6d58182 100644
---- a/arch/arm/mach-ixp4xx/fsg-setup.c
-+++ b/arch/arm/mach-ixp4xx/fsg-setup.c
-@@ -277,5 +277,6 @@ MACHINE_START(FSG, "Freecom FSG-3")
- #if defined(CONFIG_PCI)
- 	.dma_zone_size	= SZ_64M,
- #endif
-+	.restart	= ixp4xx_restart,
- MACHINE_END
- 
-diff --git a/arch/arm/mach-ixp4xx/gateway7001-setup.c b/arch/arm/mach-ixp4xx/gateway7001-setup.c
-index d69d1b0..7ecf9b2 100644
---- a/arch/arm/mach-ixp4xx/gateway7001-setup.c
-+++ b/arch/arm/mach-ixp4xx/gateway7001-setup.c
-@@ -104,5 +104,6 @@ MACHINE_START(GATEWAY7001, "Gateway 7001 AP")
- #if defined(CONFIG_PCI)
- 	.dma_zone_size	= SZ_64M,
- #endif
-+	.restart	= ixp4xx_restart,
- MACHINE_END
- #endif
-diff --git a/arch/arm/mach-ixp4xx/goramo_mlr.c b/arch/arm/mach-ixp4xx/goramo_mlr.c
-index bf6678d..c0e3d69 100644
---- a/arch/arm/mach-ixp4xx/goramo_mlr.c
-+++ b/arch/arm/mach-ixp4xx/goramo_mlr.c
-@@ -504,4 +504,5 @@ MACHINE_START(GORAMO_MLR, "MultiLink")
- #if defined(CONFIG_PCI)
- 	.dma_zone_size	= SZ_64M,
- #endif
-+	.restart	= ixp4xx_restart,
- MACHINE_END
-diff --git a/arch/arm/mach-ixp4xx/gtwx5715-setup.c b/arch/arm/mach-ixp4xx/gtwx5715-setup.c
-index aa029fc..a23f893 100644
---- a/arch/arm/mach-ixp4xx/gtwx5715-setup.c
-+++ b/arch/arm/mach-ixp4xx/gtwx5715-setup.c
-@@ -172,6 +172,7 @@ MACHINE_START(GTWX5715, "Gemtek GTWX5715 (Linksys WRV54G)")
- #if defined(CONFIG_PCI)
- 	.dma_zone_size	= SZ_64M,
- #endif
-+	.restart	= ixp4xx_restart,
- MACHINE_END
- 
- 
-diff --git a/arch/arm/mach-ixp4xx/include/mach/platform.h b/arch/arm/mach-ixp4xx/include/mach/platform.h
-index e824c02..df9250b 100644
---- a/arch/arm/mach-ixp4xx/include/mach/platform.h
-+++ b/arch/arm/mach-ixp4xx/include/mach/platform.h
-@@ -125,6 +125,7 @@ extern void ixp4xx_init_irq(void);
- extern void ixp4xx_sys_init(void);
- extern void ixp4xx_timer_init(void);
- extern struct sys_timer ixp4xx_timer;
-+extern void ixp4xx_restart(char, const char *);
- extern void ixp4xx_pci_preinit(void);
- struct pci_sys_data;
- extern int ixp4xx_setup(int nr, struct pci_sys_data *sys);
-diff --git a/arch/arm/mach-ixp4xx/include/mach/system.h b/arch/arm/mach-ixp4xx/include/mach/system.h
-index 24337d9..72db2bb 100644
---- a/arch/arm/mach-ixp4xx/include/mach/system.h
-+++ b/arch/arm/mach-ixp4xx/include/mach/system.h
-@@ -8,9 +8,6 @@
-  * published by the Free Software Foundation.
-  *
-  */
--
--#include <mach/hardware.h>
+-#include <mach/bridge-regs.h>
 -
  static inline void arch_idle(void)
  {
- 	/* ixp4xx does not implement the XScale PWRMODE register,
-@@ -21,24 +18,6 @@ static inline void arch_idle(void)
- #endif
- }
+ 	cpu_do_idle();
+@@ -18,19 +16,6 @@ static inline void arch_idle(void)
  
--
  static inline void arch_reset(char mode, const char *cmd)
  {
--	if ( 1 && mode == 's') {
--		/* Jump into ROM at address 0 */
--		soft_restart(0);
--	} else {
--		/* Use on-chip reset capability */
+-	/*
+-	 * Enable soft reset to assert RSTOUTn.
+-	 */
+-	writel(SOFT_RESET_OUT_EN, RSTOUTn_MASK);
 -
--		/* set the "key" register to enable access to
--		 * "timer" and "enable" registers
--		 */
--		*IXP4XX_OSWK = IXP4XX_WDT_KEY;
+-	/*
+-	 * Assert soft reset.
+-	 */
+-	writel(SOFT_RESET, SYSTEM_SOFT_RESET);
 -
--		/* write 0 to the timer register for an immediate reset */
--		*IXP4XX_OSWT = 0;
--
--		*IXP4XX_OSWE = IXP4XX_WDT_RESET_ENABLE | IXP4XX_WDT_COUNT_ENABLE;
--	}
+-	while (1)
+-		;
  }
+ 
 -
-diff --git a/arch/arm/mach-ixp4xx/ixdp425-setup.c b/arch/arm/mach-ixp4xx/ixdp425-setup.c
-index f235f82..8a38b39 100644
---- a/arch/arm/mach-ixp4xx/ixdp425-setup.c
-+++ b/arch/arm/mach-ixp4xx/ixdp425-setup.c
-@@ -261,6 +261,7 @@ MACHINE_START(IXDP425, "Intel IXDP425 Development Platform")
- #if defined(CONFIG_PCI)
- 	.dma_zone_size	= SZ_64M,
  #endif
-+	.restart	= ixp4xx_restart,
+diff --git a/arch/arm/mach-kirkwood/mv88f6281gtw_ge-setup.c b/arch/arm/mach-kirkwood/mv88f6281gtw_ge-setup.c
+index 9a1e917..85f6169 100644
+--- a/arch/arm/mach-kirkwood/mv88f6281gtw_ge-setup.c
++++ b/arch/arm/mach-kirkwood/mv88f6281gtw_ge-setup.c
+@@ -169,4 +169,5 @@ MACHINE_START(MV88F6281GTW_GE, "Marvell 88F6281 GTW GE Board")
+ 	.init_early	= kirkwood_init_early,
+ 	.init_irq	= kirkwood_init_irq,
+ 	.timer		= &kirkwood_timer,
++	.restart	= kirkwood_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-kirkwood/netspace_v2-setup.c b/arch/arm/mach-kirkwood/netspace_v2-setup.c
+index 8849bcc..e6bba01 100644
+--- a/arch/arm/mach-kirkwood/netspace_v2-setup.c
++++ b/arch/arm/mach-kirkwood/netspace_v2-setup.c
+@@ -264,6 +264,7 @@ MACHINE_START(NETSPACE_V2, "LaCie Network Space v2")
+ 	.init_early	= kirkwood_init_early,
+ 	.init_irq	= kirkwood_init_irq,
+ 	.timer		= &kirkwood_timer,
++	.restart	= kirkwood_restart,
  MACHINE_END
  #endif
  
-diff --git a/arch/arm/mach-ixp4xx/nas100d-setup.c b/arch/arm/mach-ixp4xx/nas100d-setup.c
-index de716fa..1010eb7 100644
---- a/arch/arm/mach-ixp4xx/nas100d-setup.c
-+++ b/arch/arm/mach-ixp4xx/nas100d-setup.c
-@@ -321,4 +321,5 @@ MACHINE_START(NAS100D, "Iomega NAS 100d")
- #if defined(CONFIG_PCI)
- 	.dma_zone_size	= SZ_64M,
- #endif
-+	.restart	= ixp4xx_restart,
- MACHINE_END
-diff --git a/arch/arm/mach-ixp4xx/nslu2-setup.c b/arch/arm/mach-ixp4xx/nslu2-setup.c
-index ac81ccb..aa355c3 100644
---- a/arch/arm/mach-ixp4xx/nslu2-setup.c
-+++ b/arch/arm/mach-ixp4xx/nslu2-setup.c
-@@ -307,4 +307,5 @@ MACHINE_START(NSLU2, "Linksys NSLU2")
- #if defined(CONFIG_PCI)
- 	.dma_zone_size	= SZ_64M,
- #endif
-+	.restart	= ixp4xx_restart,
- MACHINE_END
-diff --git a/arch/arm/mach-ixp4xx/omixp-setup.c b/arch/arm/mach-ixp4xx/omixp-setup.c
-index 3b6a81a..0940869 100644
---- a/arch/arm/mach-ixp4xx/omixp-setup.c
-+++ b/arch/arm/mach-ixp4xx/omixp-setup.c
-@@ -246,6 +246,7 @@ MACHINE_START(DEVIXP, "Omicron DEVIXP")
- 	.init_irq	= ixp4xx_init_irq,
- 	.timer          = &ixp4xx_timer,
- 	.init_machine	= omixp_init,
-+	.restart	= ixp4xx_restart,
+@@ -275,6 +276,7 @@ MACHINE_START(INETSPACE_V2, "LaCie Internet Space v2")
+ 	.init_early	= kirkwood_init_early,
+ 	.init_irq	= kirkwood_init_irq,
+ 	.timer		= &kirkwood_timer,
++	.restart	= kirkwood_restart,
  MACHINE_END
  #endif
  
-@@ -259,6 +260,7 @@ MACHINE_START(MICCPT, "Omicron MICCPT")
- #if defined(CONFIG_PCI)
- 	.dma_zone_size	= SZ_64M,
+@@ -286,5 +288,6 @@ MACHINE_START(NETSPACE_MAX_V2, "LaCie Network Space Max v2")
+ 	.init_early	= kirkwood_init_early,
+ 	.init_irq	= kirkwood_init_irq,
+ 	.timer		= &kirkwood_timer,
++	.restart	= kirkwood_restart,
+ MACHINE_END
  #endif
-+	.restart	= ixp4xx_restart,
+diff --git a/arch/arm/mach-kirkwood/netxbig_v2-setup.c b/arch/arm/mach-kirkwood/netxbig_v2-setup.c
+index 1ba12c4..31ae8de 100644
+--- a/arch/arm/mach-kirkwood/netxbig_v2-setup.c
++++ b/arch/arm/mach-kirkwood/netxbig_v2-setup.c
+@@ -405,6 +405,7 @@ MACHINE_START(NET2BIG_V2, "LaCie 2Big Network v2")
+ 	.init_early	= kirkwood_init_early,
+ 	.init_irq	= kirkwood_init_irq,
+ 	.timer		= &kirkwood_timer,
++	.restart	= kirkwood_restart,
  MACHINE_END
  #endif
  
-@@ -269,5 +271,6 @@ MACHINE_START(MIC256, "Omicron MIC256")
- 	.init_irq	= ixp4xx_init_irq,
- 	.timer          = &ixp4xx_timer,
- 	.init_machine	= omixp_init,
-+	.restart	= ixp4xx_restart,
+@@ -416,5 +417,6 @@ MACHINE_START(NET5BIG_V2, "LaCie 5Big Network v2")
+ 	.init_early	= kirkwood_init_early,
+ 	.init_irq	= kirkwood_init_irq,
+ 	.timer		= &kirkwood_timer,
++	.restart	= kirkwood_restart,
  MACHINE_END
  #endif
-diff --git a/arch/arm/mach-ixp4xx/vulcan-setup.c b/arch/arm/mach-ixp4xx/vulcan-setup.c
-index 27e469e..9dec206 100644
---- a/arch/arm/mach-ixp4xx/vulcan-setup.c
-+++ b/arch/arm/mach-ixp4xx/vulcan-setup.c
-@@ -244,4 +244,5 @@ MACHINE_START(ARCOM_VULCAN, "Arcom/Eurotech Vulcan")
- #if defined(CONFIG_PCI)
- 	.dma_zone_size	= SZ_64M,
- #endif
-+	.restart	= ixp4xx_restart,
- MACHINE_END
-diff --git a/arch/arm/mach-ixp4xx/wg302v2-setup.c b/arch/arm/mach-ixp4xx/wg302v2-setup.c
-index b14144b..5ac0f0a 100644
---- a/arch/arm/mach-ixp4xx/wg302v2-setup.c
-+++ b/arch/arm/mach-ixp4xx/wg302v2-setup.c
-@@ -105,5 +105,6 @@ MACHINE_START(WG302V2, "Netgear WG302 v2 / WAG302 v2")
- #if defined(CONFIG_PCI)
- 	.dma_zone_size	= SZ_64M,
- #endif
-+	.restart	= ixp4xx_restart,
+diff --git a/arch/arm/mach-kirkwood/openrd-setup.c b/arch/arm/mach-kirkwood/openrd-setup.c
+index 5660ca6..01f8c89 100644
+--- a/arch/arm/mach-kirkwood/openrd-setup.c
++++ b/arch/arm/mach-kirkwood/openrd-setup.c
+@@ -220,6 +220,7 @@ MACHINE_START(OPENRD_BASE, "Marvell OpenRD Base Board")
+ 	.init_early	= kirkwood_init_early,
+ 	.init_irq	= kirkwood_init_irq,
+ 	.timer		= &kirkwood_timer,
++	.restart	= kirkwood_restart,
  MACHINE_END
  #endif
+ 
+@@ -232,6 +233,7 @@ MACHINE_START(OPENRD_CLIENT, "Marvell OpenRD Client Board")
+ 	.init_early	= kirkwood_init_early,
+ 	.init_irq	= kirkwood_init_irq,
+ 	.timer		= &kirkwood_timer,
++	.restart	= kirkwood_restart,
+ MACHINE_END
+ #endif
+ 
+@@ -244,5 +246,6 @@ MACHINE_START(OPENRD_ULTIMATE, "Marvell OpenRD Ultimate Board")
+ 	.init_early	= kirkwood_init_early,
+ 	.init_irq	= kirkwood_init_irq,
+ 	.timer		= &kirkwood_timer,
++	.restart	= kirkwood_restart,
+ MACHINE_END
+ #endif
+diff --git a/arch/arm/mach-kirkwood/rd88f6192-nas-setup.c b/arch/arm/mach-kirkwood/rd88f6192-nas-setup.c
+index 6663869..fd2c9c8 100644
+--- a/arch/arm/mach-kirkwood/rd88f6192-nas-setup.c
++++ b/arch/arm/mach-kirkwood/rd88f6192-nas-setup.c
+@@ -85,4 +85,5 @@ MACHINE_START(RD88F6192_NAS, "Marvell RD-88F6192-NAS Development Board")
+ 	.init_early	= kirkwood_init_early,
+ 	.init_irq	= kirkwood_init_irq,
+ 	.timer		= &kirkwood_timer,
++	.restart	= kirkwood_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-kirkwood/rd88f6281-setup.c b/arch/arm/mach-kirkwood/rd88f6281-setup.c
+index 66b3c05..ef92207 100644
+--- a/arch/arm/mach-kirkwood/rd88f6281-setup.c
++++ b/arch/arm/mach-kirkwood/rd88f6281-setup.c
+@@ -121,4 +121,5 @@ MACHINE_START(RD88F6281, "Marvell RD-88F6281 Reference Board")
+ 	.init_early	= kirkwood_init_early,
+ 	.init_irq	= kirkwood_init_irq,
+ 	.timer		= &kirkwood_timer,
++	.restart	= kirkwood_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-kirkwood/sheevaplug-setup.c b/arch/arm/mach-kirkwood/sheevaplug-setup.c
+index 8b102d6..85bff6b 100644
+--- a/arch/arm/mach-kirkwood/sheevaplug-setup.c
++++ b/arch/arm/mach-kirkwood/sheevaplug-setup.c
+@@ -144,6 +144,7 @@ MACHINE_START(SHEEVAPLUG, "Marvell SheevaPlug Reference Board")
+ 	.init_early	= kirkwood_init_early,
+ 	.init_irq	= kirkwood_init_irq,
+ 	.timer		= &kirkwood_timer,
++	.restart	= kirkwood_restart,
+ MACHINE_END
+ #endif
+ 
+@@ -155,5 +156,6 @@ MACHINE_START(ESATA_SHEEVAPLUG, "Marvell eSATA SheevaPlug Reference Board")
+ 	.init_early	= kirkwood_init_early,
+ 	.init_irq	= kirkwood_init_irq,
+ 	.timer		= &kirkwood_timer,
++	.restart	= kirkwood_restart,
+ MACHINE_END
+ #endif
+diff --git a/arch/arm/mach-kirkwood/t5325-setup.c b/arch/arm/mach-kirkwood/t5325-setup.c
+index ea104fb..966b2b3 100644
+--- a/arch/arm/mach-kirkwood/t5325-setup.c
++++ b/arch/arm/mach-kirkwood/t5325-setup.c
+@@ -207,4 +207,5 @@ MACHINE_START(T5325, "HP t5325 Thin Client")
+ 	.init_early	= kirkwood_init_early,
+ 	.init_irq	= kirkwood_init_irq,
+ 	.timer		= &kirkwood_timer,
++	.restart	= kirkwood_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-kirkwood/ts219-setup.c b/arch/arm/mach-kirkwood/ts219-setup.c
+index 262c034..73e2b6c 100644
+--- a/arch/arm/mach-kirkwood/ts219-setup.c
++++ b/arch/arm/mach-kirkwood/ts219-setup.c
+@@ -138,4 +138,5 @@ MACHINE_START(TS219, "QNAP TS-119/TS-219")
+ 	.init_early	= kirkwood_init_early,
+ 	.init_irq	= kirkwood_init_irq,
+ 	.timer		= &kirkwood_timer,
++	.restart	= kirkwood_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-kirkwood/ts41x-setup.c b/arch/arm/mach-kirkwood/ts41x-setup.c
+index b68f5b4..5bbca26 100644
+--- a/arch/arm/mach-kirkwood/ts41x-setup.c
++++ b/arch/arm/mach-kirkwood/ts41x-setup.c
+@@ -182,4 +182,5 @@ MACHINE_START(TS41X, "QNAP TS-41x")
+ 	.init_early	= kirkwood_init_early,
+ 	.init_irq	= kirkwood_init_irq,
+ 	.timer		= &kirkwood_timer,
++	.restart	= kirkwood_restart,
+ MACHINE_END
 -- 
 1.7.4.4
