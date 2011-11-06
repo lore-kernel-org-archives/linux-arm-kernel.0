@@ -1,105 +1,382 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 06 Nov 2011 17:33:56 +0000
-Subject: [PATCH 7/7] ARM: restart: remove local_irq_disable() from within
- arch_reset()
+Date: Sun, 6 Nov 2011 17:39:39 +0000
+Subject: [02: PATCH 0/41] Platform arch_reset changes
 In-Reply-To: <20111106173113.GI12913@n2100.arm.linux.org.uk>
 References: <20111106173113.GI12913@n2100.arm.linux.org.uk>
-Message-ID: <E1RN6bU-0001NK-5Y@rmk-PC.arm.linux.org.uk>
+Message-ID: <20111106173939.GJ12913@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-IRQs are already disabled by the time arch_reset() is called, so these
-calls to local_irq_disable() instead arch_reset() are redundant.  Remove
-them.
+Part 2. These are the platform updates, so far.
 
-Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- arch/arm/mach-ep93xx/include/mach/system.h  |    2 --
- arch/arm/mach-iop32x/include/mach/system.h  |    2 --
- arch/arm/mach-ixp2000/include/mach/system.h |    2 --
- arch/arm/mach-lpc32xx/include/mach/system.h |    3 ---
- arch/arm/mach-shark/core.c                  |    1 -
- arch/arm/mach-u300/include/mach/system.h    |    2 --
- 6 files changed, 0 insertions(+), 12 deletions(-)
+The first patch combines the individual files in mach-clps711x which
+contain one or two functions or data structures before changing the
+arch_reset stuff.
 
-diff --git a/arch/arm/mach-ep93xx/include/mach/system.h b/arch/arm/mach-ep93xx/include/mach/system.h
-index 6d661fe..bdf6c4f 100644
---- a/arch/arm/mach-ep93xx/include/mach/system.h
-+++ b/arch/arm/mach-ep93xx/include/mach/system.h
-@@ -11,8 +11,6 @@ static inline void arch_idle(void)
- 
- static inline void arch_reset(char mode, const char *cmd)
- {
--	local_irq_disable();
--
- 	/*
- 	 * Set then clear the SWRST bit to initiate a software reset
- 	 */
-diff --git a/arch/arm/mach-iop32x/include/mach/system.h b/arch/arm/mach-iop32x/include/mach/system.h
-index 4865a9b..b4f83e5 100644
---- a/arch/arm/mach-iop32x/include/mach/system.h
-+++ b/arch/arm/mach-iop32x/include/mach/system.h
-@@ -18,8 +18,6 @@ static inline void arch_idle(void)
- 
- static inline void arch_reset(char mode, const char *cmd)
- {
--	local_irq_disable();
--
- 	if (machine_is_n2100()) {
- 		gpio_line_set(N2100_HARDWARE_RESET, GPIO_LOW);
- 		gpio_line_config(N2100_HARDWARE_RESET, GPIO_OUT);
-diff --git a/arch/arm/mach-ixp2000/include/mach/system.h b/arch/arm/mach-ixp2000/include/mach/system.h
-index de37099..810df7b 100644
---- a/arch/arm/mach-ixp2000/include/mach/system.h
-+++ b/arch/arm/mach-ixp2000/include/mach/system.h
-@@ -19,8 +19,6 @@ static inline void arch_idle(void)
- 
- static inline void arch_reset(char mode, const char *cmd)
- {
--	local_irq_disable();
--
- 	/*
- 	 * Reset flash banking register so that we are pointing at
- 	 * RedBoot bank.
-diff --git a/arch/arm/mach-lpc32xx/include/mach/system.h b/arch/arm/mach-lpc32xx/include/mach/system.h
-index df3b0de..d47f3b1 100644
---- a/arch/arm/mach-lpc32xx/include/mach/system.h
-+++ b/arch/arm/mach-lpc32xx/include/mach/system.h
-@@ -33,9 +33,6 @@ static inline void arch_reset(char mode, const char *cmd)
- 	case 'h':
- 		printk(KERN_CRIT "RESET: Rebooting system\n");
- 
--		/* Disable interrupts */
--		local_irq_disable();
--
- 		lpc32xx_watchdog_reset();
- 		break;
- 
-diff --git a/arch/arm/mach-shark/core.c b/arch/arm/mach-shark/core.c
-index feda3ca..f4b25d8 100644
---- a/arch/arm/mach-shark/core.c
-+++ b/arch/arm/mach-shark/core.c
-@@ -29,7 +29,6 @@
- void arch_reset(char mode, const char *cmd)
- {
-         short temp;
--        local_irq_disable();
-         /* Reset the Machine via pc[3] of the sequoia chipset */
-         outw(0x09,0x24);
-         temp=inw(0x26);
-diff --git a/arch/arm/mach-u300/include/mach/system.h b/arch/arm/mach-u300/include/mach/system.h
-index 8daf136..6b6fef7 100644
---- a/arch/arm/mach-u300/include/mach/system.h
-+++ b/arch/arm/mach-u300/include/mach/system.h
-@@ -27,8 +27,6 @@ static void arch_reset(char mode, const char *cmd)
- 	case 's':
- 	case 'h':
- 		printk(KERN_CRIT "RESET: shutting down/rebooting system\n");
--		/* Disable interrupts */
--		local_irq_disable();
- #ifdef CONFIG_COH901327_WATCHDOG
- 		coh901327_watchdog_reset();
- #endif
--- 
-1.7.4.4
+The majority of the remaining patches address each group of platforms
+individually.
+
+The final patch removes the resulting empty arch_reset() functions,
+its call site and associated code.  XXX NOTE XXX This results in
+anything left with an arch_reset() function having non-functional
+restart capability.
+
+ arch/arm/include/asm/hardware/iop3xx.h         |    1 +
+ arch/arm/include/asm/system.h                  |    1 -
+ arch/arm/kernel/process.c                      |   10 +-
+ arch/arm/mach-at91/at91cap9.c                  |    4 +-
+ arch/arm/mach-at91/at91rm9200.c                |    4 +-
+ arch/arm/mach-at91/at91sam9260.c               |    2 +-
+ arch/arm/mach-at91/at91sam9261.c               |    2 +-
+ arch/arm/mach-at91/at91sam9263.c               |    2 +-
+ arch/arm/mach-at91/at91sam9_alt_reset.S        |    9 +-
+ arch/arm/mach-at91/at91sam9g45.c               |    4 +-
+ arch/arm/mach-at91/at91sam9rl.c                |    2 +-
+ arch/arm/mach-at91/generic.h                   |    3 +-
+ arch/arm/mach-at91/include/mach/system.h       |    9 -
+ arch/arm/mach-clps711x/Makefile                |    2 +-
+ arch/arm/mach-clps711x/autcpu12.c              |    1 +
+ arch/arm/mach-clps711x/cdb89712.c              |    1 +
+ arch/arm/mach-clps711x/ceiva.c                 |    1 +
+ arch/arm/mach-clps711x/clep7312.c              |    1 +
+ arch/arm/mach-clps711x/common.c                |  227 ++++++++++++++++++++++++
+ arch/arm/mach-clps711x/edb7211-arch.c          |    1 +
+ arch/arm/mach-clps711x/fortunet.c              |    1 +
+ arch/arm/mach-clps711x/include/mach/system.h   |    5 -
+ arch/arm/mach-clps711x/irq.c                   |  143 ---------------
+ arch/arm/mach-clps711x/mm.c                    |   48 -----
+ arch/arm/mach-clps711x/p720t.c                 |    1 +
+ arch/arm/mach-clps711x/time.c                  |   84 ---------
+ arch/arm/mach-cns3xxx/cns3420vb.c              |    1 +
+ arch/arm/mach-cns3xxx/core.h                   |    1 +
+ arch/arm/mach-cns3xxx/include/mach/system.h    |    3 -
+ arch/arm/mach-cns3xxx/pm.c                     |    2 +-
+ arch/arm/mach-dove/cm-a510.c                   |    1 +
+ arch/arm/mach-dove/common.c                    |   16 ++
+ arch/arm/mach-dove/common.h                    |    1 +
+ arch/arm/mach-dove/dove-db-setup.c             |    1 +
+ arch/arm/mach-dove/include/mach/system.h       |   19 --
+ arch/arm/mach-ebsa110/core.c                   |    6 +
+ arch/arm/mach-ebsa110/include/mach/system.h    |    2 -
+ arch/arm/mach-ep93xx/adssphere.c               |    1 +
+ arch/arm/mach-ep93xx/core.c                    |   12 ++
+ arch/arm/mach-ep93xx/edb93xx.c                 |    8 +
+ arch/arm/mach-ep93xx/gesbc9312.c               |    1 +
+ arch/arm/mach-ep93xx/include/mach/platform.h   |    2 +
+ arch/arm/mach-ep93xx/include/mach/system.h     |   15 --
+ arch/arm/mach-ep93xx/micro9.c                  |    4 +
+ arch/arm/mach-ep93xx/simone.c                  |    1 +
+ arch/arm/mach-ep93xx/snappercl15.c             |    1 +
+ arch/arm/mach-ep93xx/ts72xx.c                  |    1 +
+ arch/arm/mach-ep93xx/vision_ep9307.c           |    1 +
+ arch/arm/mach-footbridge/cats-hw.c             |    1 +
+ arch/arm/mach-footbridge/common.c              |   27 +++
+ arch/arm/mach-footbridge/common.h              |    1 +
+ arch/arm/mach-footbridge/ebsa285.c             |    1 +
+ arch/arm/mach-footbridge/include/mach/system.h |   56 ------
+ arch/arm/mach-footbridge/netwinder-hw.c        |   27 +++
+ arch/arm/mach-footbridge/personal.c            |    1 +
+ arch/arm/mach-h720x/common.c                   |    5 +
+ arch/arm/mach-h720x/common.h                   |    1 +
+ arch/arm/mach-h720x/h7201-eval.c               |    1 +
+ arch/arm/mach-h720x/h7202-eval.c               |    1 +
+ arch/arm/mach-h720x/include/mach/system.h      |    6 -
+ arch/arm/mach-highbank/core.h                  |    1 +
+ arch/arm/mach-highbank/highbank.c              |    1 +
+ arch/arm/mach-highbank/include/mach/system.h   |    2 -
+ arch/arm/mach-highbank/system.c                |    2 +-
+ arch/arm/mach-imx/mach-apf9328.c               |    1 +
+ arch/arm/mach-imx/mach-armadillo5x0.c          |    1 +
+ arch/arm/mach-imx/mach-bug.c                   |    1 +
+ arch/arm/mach-imx/mach-cpuimx27.c              |    1 +
+ arch/arm/mach-imx/mach-cpuimx35.c              |    1 +
+ arch/arm/mach-imx/mach-eukrea_cpuimx25.c       |    1 +
+ arch/arm/mach-imx/mach-imx27_visstrim_m10.c    |    1 +
+ arch/arm/mach-imx/mach-imx27ipcam.c            |    1 +
+ arch/arm/mach-imx/mach-imx27lite.c             |    1 +
+ arch/arm/mach-imx/mach-imx6q.c                 |    1 +
+ arch/arm/mach-imx/mach-kzm_arm11_01.c          |    1 +
+ arch/arm/mach-imx/mach-mx1ads.c                |    2 +
+ arch/arm/mach-imx/mach-mx21ads.c               |    1 +
+ arch/arm/mach-imx/mach-mx25_3ds.c              |    1 +
+ arch/arm/mach-imx/mach-mx27_3ds.c              |    1 +
+ arch/arm/mach-imx/mach-mx27ads.c               |    1 +
+ arch/arm/mach-imx/mach-mx31_3ds.c              |    1 +
+ arch/arm/mach-imx/mach-mx31ads.c               |    1 +
+ arch/arm/mach-imx/mach-mx31lilly.c             |    1 +
+ arch/arm/mach-imx/mach-mx31lite.c              |    1 +
+ arch/arm/mach-imx/mach-mx31moboard.c           |    1 +
+ arch/arm/mach-imx/mach-mx35_3ds.c              |    1 +
+ arch/arm/mach-imx/mach-mxt_td60.c              |    1 +
+ arch/arm/mach-imx/mach-pca100.c                |    1 +
+ arch/arm/mach-imx/mach-pcm037.c                |    1 +
+ arch/arm/mach-imx/mach-pcm038.c                |    1 +
+ arch/arm/mach-imx/mach-pcm043.c                |    1 +
+ arch/arm/mach-imx/mach-qong.c                  |    1 +
+ arch/arm/mach-imx/mach-scb9328.c               |    1 +
+ arch/arm/mach-imx/mach-vpr200.c                |    1 +
+ arch/arm/mach-integrator/common.h              |    1 +
+ arch/arm/mach-integrator/core.c                |    8 +
+ arch/arm/mach-integrator/include/mach/system.h |   11 --
+ arch/arm/mach-integrator/integrator_ap.c       |    1 +
+ arch/arm/mach-integrator/integrator_cp.c       |    1 +
+ arch/arm/mach-iop13xx/include/mach/iop13xx.h   |    1 +
+ arch/arm/mach-iop13xx/include/mach/system.h    |   14 --
+ arch/arm/mach-iop13xx/iq81340mc.c              |    1 +
+ arch/arm/mach-iop13xx/iq81340sc.c              |    1 +
+ arch/arm/mach-iop13xx/setup.c                  |   11 ++
+ arch/arm/mach-iop32x/em7210.c                  |    1 +
+ arch/arm/mach-iop32x/glantank.c                |    1 +
+ arch/arm/mach-iop32x/include/mach/system.h     |   19 --
+ arch/arm/mach-iop32x/iq31244.c                 |    2 +
+ arch/arm/mach-iop32x/iq80321.c                 |    1 +
+ arch/arm/mach-iop32x/n2100.c                   |    9 +
+ arch/arm/mach-iop33x/include/mach/system.h     |   10 -
+ arch/arm/mach-iop33x/iq80331.c                 |    1 +
+ arch/arm/mach-iop33x/iq80332.c                 |    1 +
+ arch/arm/mach-ixp2000/core.c                   |    4 +
+ arch/arm/mach-ixp2000/enp2611.c                |    1 +
+ arch/arm/mach-ixp2000/include/mach/platform.h  |    1 +
+ arch/arm/mach-ixp2000/include/mach/system.h    |   33 ----
+ arch/arm/mach-ixp2000/ixdp2400.c               |    1 +
+ arch/arm/mach-ixp2000/ixdp2800.c               |    1 +
+ arch/arm/mach-ixp2000/ixdp2x01.c               |   32 ++++
+ arch/arm/mach-ixp23xx/core.c                   |    6 +
+ arch/arm/mach-ixp23xx/espresso.c               |    1 +
+ arch/arm/mach-ixp23xx/include/mach/platform.h  |    1 +
+ arch/arm/mach-ixp23xx/include/mach/system.h    |   17 --
+ arch/arm/mach-ixp23xx/ixdp2351.c               |   12 ++
+ arch/arm/mach-ixp23xx/roadrunner.c             |    1 +
+ arch/arm/mach-ixp4xx/avila-setup.c             |    2 +
+ arch/arm/mach-ixp4xx/common.c                  |   20 ++
+ arch/arm/mach-ixp4xx/coyote-setup.c            |    2 +
+ arch/arm/mach-ixp4xx/dsmg600-setup.c           |    1 +
+ arch/arm/mach-ixp4xx/fsg-setup.c               |    1 +
+ arch/arm/mach-ixp4xx/gateway7001-setup.c       |    1 +
+ arch/arm/mach-ixp4xx/goramo_mlr.c              |    1 +
+ arch/arm/mach-ixp4xx/gtwx5715-setup.c          |    1 +
+ arch/arm/mach-ixp4xx/include/mach/platform.h   |    1 +
+ arch/arm/mach-ixp4xx/include/mach/system.h     |   25 ---
+ arch/arm/mach-ixp4xx/ixdp425-setup.c           |    1 +
+ arch/arm/mach-ixp4xx/nas100d-setup.c           |    1 +
+ arch/arm/mach-ixp4xx/nslu2-setup.c             |    1 +
+ arch/arm/mach-ixp4xx/omixp-setup.c             |    3 +
+ arch/arm/mach-ixp4xx/vulcan-setup.c            |    1 +
+ arch/arm/mach-ixp4xx/wg302v2-setup.c           |    1 +
+ arch/arm/mach-kirkwood/common.c                |   16 ++
+ arch/arm/mach-kirkwood/common.h                |    1 +
+ arch/arm/mach-kirkwood/d2net_v2-setup.c        |    1 +
+ arch/arm/mach-kirkwood/db88f6281-bp-setup.c    |    1 +
+ arch/arm/mach-kirkwood/dockstar-setup.c        |    1 +
+ arch/arm/mach-kirkwood/guruplug-setup.c        |    1 +
+ arch/arm/mach-kirkwood/include/mach/system.h   |   19 --
+ arch/arm/mach-kirkwood/mv88f6281gtw_ge-setup.c |    1 +
+ arch/arm/mach-kirkwood/netspace_v2-setup.c     |    3 +
+ arch/arm/mach-kirkwood/netxbig_v2-setup.c      |    2 +
+ arch/arm/mach-kirkwood/openrd-setup.c          |    3 +
+ arch/arm/mach-kirkwood/rd88f6192-nas-setup.c   |    1 +
+ arch/arm/mach-kirkwood/rd88f6281-setup.c       |    1 +
+ arch/arm/mach-kirkwood/sheevaplug-setup.c      |    2 +
+ arch/arm/mach-kirkwood/t5325-setup.c           |    1 +
+ arch/arm/mach-kirkwood/ts219-setup.c           |    1 +
+ arch/arm/mach-kirkwood/ts41x-setup.c           |    1 +
+ arch/arm/mach-lpc32xx/common.c                 |   20 ++-
+ arch/arm/mach-lpc32xx/common.h                 |    2 +
+ arch/arm/mach-lpc32xx/include/mach/system.h    |   22 ---
+ arch/arm/mach-lpc32xx/phy3250.c                |    1 +
+ arch/arm/mach-mmp/aspenite.c                   |    2 +
+ arch/arm/mach-mmp/avengers_lite.c              |    1 +
+ arch/arm/mach-mmp/brownstone.c                 |    1 +
+ arch/arm/mach-mmp/common.c                     |    5 +
+ arch/arm/mach-mmp/common.h                     |    1 +
+ arch/arm/mach-mmp/flint.c                      |    1 +
+ arch/arm/mach-mmp/gplugd.c                     |    1 +
+ arch/arm/mach-mmp/include/mach/pxa168.h        |    1 +
+ arch/arm/mach-mmp/include/mach/system.h        |   10 -
+ arch/arm/mach-mmp/jasper.c                     |    1 +
+ arch/arm/mach-mmp/pxa168.c                     |    5 +
+ arch/arm/mach-mmp/tavorevb.c                   |    1 +
+ arch/arm/mach-mmp/teton_bga.c                  |    1 +
+ arch/arm/mach-mmp/ttc_dkb.c                    |    1 +
+ arch/arm/mach-msm/include/mach/system.h        |    8 -
+ arch/arm/mach-mv78xx0/buffalo-wxl-setup.c      |    1 +
+ arch/arm/mach-mv78xx0/common.c                 |   16 ++
+ arch/arm/mach-mv78xx0/common.h                 |    1 +
+ arch/arm/mach-mv78xx0/db78x00-bp-setup.c       |    1 +
+ arch/arm/mach-mv78xx0/include/mach/system.h    |   19 --
+ arch/arm/mach-mv78xx0/rd78x00-masa-setup.c     |    1 +
+ arch/arm/mach-mx5/board-cpuimx51.c             |    1 +
+ arch/arm/mach-mx5/board-cpuimx51sd.c           |    1 +
+ arch/arm/mach-mx5/board-mx50_rdp.c             |    1 +
+ arch/arm/mach-mx5/board-mx51_3ds.c             |    1 +
+ arch/arm/mach-mx5/board-mx51_babbage.c         |    1 +
+ arch/arm/mach-mx5/board-mx51_efikamx.c         |    3 +-
+ arch/arm/mach-mx5/board-mx51_efikasb.c         |    1 +
+ arch/arm/mach-mx5/board-mx53_ard.c             |    1 +
+ arch/arm/mach-mx5/board-mx53_evk.c             |    1 +
+ arch/arm/mach-mx5/board-mx53_loco.c            |    1 +
+ arch/arm/mach-mx5/board-mx53_smd.c             |    1 +
+ arch/arm/mach-mx5/imx51-dt.c                   |    1 +
+ arch/arm/mach-mx5/imx53-dt.c                   |    1 +
+ arch/arm/mach-mxs/include/mach/common.h        |    1 +
+ arch/arm/mach-mxs/include/mach/system.h        |    2 -
+ arch/arm/mach-mxs/mach-m28evk.c                |    1 +
+ arch/arm/mach-mxs/mach-mx23evk.c               |    1 +
+ arch/arm/mach-mxs/mach-mx28evk.c               |    1 +
+ arch/arm/mach-mxs/mach-stmp378x_devb.c         |    1 +
+ arch/arm/mach-mxs/mach-tx28.c                  |    1 +
+ arch/arm/mach-mxs/system.c                     |    2 +-
+ arch/arm/mach-orion5x/common.c                 |   12 ++
+ arch/arm/mach-orion5x/common.h                 |    1 +
+ arch/arm/mach-orion5x/d2net-setup.c            |    2 +
+ arch/arm/mach-orion5x/db88f5281-setup.c        |    1 +
+ arch/arm/mach-orion5x/dns323-setup.c           |    1 +
+ arch/arm/mach-orion5x/edmini_v2-setup.c        |    1 +
+ arch/arm/mach-orion5x/include/mach/system.h    |   14 --
+ arch/arm/mach-orion5x/kurobox_pro-setup.c      |    2 +
+ arch/arm/mach-orion5x/ls-chl-setup.c           |    3 +-
+ arch/arm/mach-orion5x/ls_hgl-setup.c           |    3 +-
+ arch/arm/mach-orion5x/lsmini-setup.c           |    3 +-
+ arch/arm/mach-orion5x/mss2-setup.c             |    3 +-
+ arch/arm/mach-orion5x/mv2120-setup.c           |    3 +-
+ arch/arm/mach-orion5x/net2big-setup.c          |    1 +
+ arch/arm/mach-orion5x/rd88f5181l-fxo-setup.c   |    1 +
+ arch/arm/mach-orion5x/rd88f5181l-ge-setup.c    |    1 +
+ arch/arm/mach-orion5x/rd88f5182-setup.c        |    1 +
+ arch/arm/mach-orion5x/rd88f6183ap-ge-setup.c   |    1 +
+ arch/arm/mach-orion5x/terastation_pro2-setup.c |    1 +
+ arch/arm/mach-orion5x/ts209-setup.c            |    1 +
+ arch/arm/mach-orion5x/ts409-setup.c            |    1 +
+ arch/arm/mach-orion5x/ts78xx-setup.c           |    1 +
+ arch/arm/mach-orion5x/wnr854t-setup.c          |    1 +
+ arch/arm/mach-orion5x/wrt350n-v2-setup.c       |    1 +
+ arch/arm/mach-picoxcell/include/mach/system.h  |    5 -
+ arch/arm/mach-pnx4008/core.c                   |    6 +
+ arch/arm/mach-pnx4008/include/mach/system.h    |    9 -
+ arch/arm/mach-prima2/common.h                  |    1 +
+ arch/arm/mach-prima2/include/mach/system.h     |   12 --
+ arch/arm/mach-prima2/prima2.c                  |    1 +
+ arch/arm/mach-prima2/rstc.c                    |    7 +
+ arch/arm/mach-pxa/balloon3.c                   |    1 +
+ arch/arm/mach-pxa/capc7117.c                   |    3 +-
+ arch/arm/mach-pxa/cm-x2xx.c                    |    1 +
+ arch/arm/mach-pxa/cm-x300.c                    |    1 +
+ arch/arm/mach-pxa/colibri-pxa270.c             |    2 +
+ arch/arm/mach-pxa/colibri-pxa300.c             |    1 +
+ arch/arm/mach-pxa/colibri-pxa320.c             |    1 +
+ arch/arm/mach-pxa/corgi.c                      |    8 +-
+ arch/arm/mach-pxa/csb726.c                     |    1 +
+ arch/arm/mach-pxa/em-x270.c                    |    2 +
+ arch/arm/mach-pxa/eseries.c                    |    6 +
+ arch/arm/mach-pxa/ezx.c                        |    6 +
+ arch/arm/mach-pxa/generic.h                    |    2 +
+ arch/arm/mach-pxa/gumstix.c                    |    1 +
+ arch/arm/mach-pxa/h5000.c                      |    1 +
+ arch/arm/mach-pxa/himalaya.c                   |    1 +
+ arch/arm/mach-pxa/hx4700.c                     |    1 +
+ arch/arm/mach-pxa/icontrol.c                   |    3 +-
+ arch/arm/mach-pxa/idp.c                        |    1 +
+ arch/arm/mach-pxa/include/mach/system.h        |    8 -
+ arch/arm/mach-pxa/littleton.c                  |    1 +
+ arch/arm/mach-pxa/lpd270.c                     |    1 +
+ arch/arm/mach-pxa/lubbock.c                    |    1 +
+ arch/arm/mach-pxa/magician.c                   |    1 +
+ arch/arm/mach-pxa/mainstone.c                  |    1 +
+ arch/arm/mach-pxa/mioa701.c                    |    6 +-
+ arch/arm/mach-pxa/mp900.c                      |    1 +
+ arch/arm/mach-pxa/palmld.c                     |    3 +-
+ arch/arm/mach-pxa/palmt5.c                     |    3 +-
+ arch/arm/mach-pxa/palmtc.c                     |    3 +-
+ arch/arm/mach-pxa/palmte2.c                    |    3 +-
+ arch/arm/mach-pxa/palmtreo.c                   |    2 +
+ arch/arm/mach-pxa/palmtx.c                     |    3 +-
+ arch/arm/mach-pxa/palmz72.c                    |    3 +-
+ arch/arm/mach-pxa/pcm027.c                     |    1 +
+ arch/arm/mach-pxa/poodle.c                     |    9 +-
+ arch/arm/mach-pxa/raumfeld.c                   |    3 +
+ arch/arm/mach-pxa/reset.c                      |    5 +-
+ arch/arm/mach-pxa/saar.c                       |    1 +
+ arch/arm/mach-pxa/saarb.c                      |    1 +
+ arch/arm/mach-pxa/spitz.c                      |    6 +-
+ arch/arm/mach-pxa/stargate2.c                  |    2 +
+ arch/arm/mach-pxa/tavorevb.c                   |    1 +
+ arch/arm/mach-pxa/tavorevb3.c                  |    1 +
+ arch/arm/mach-pxa/tosa.c                       |    4 +-
+ arch/arm/mach-pxa/trizeps4.c                   |    2 +
+ arch/arm/mach-pxa/viper.c                      |    1 +
+ arch/arm/mach-pxa/vpac270.c                    |    3 +-
+ arch/arm/mach-pxa/xcep.c                       |    1 +
+ arch/arm/mach-pxa/z2.c                         |    1 +
+ arch/arm/mach-pxa/zeus.c                       |    1 +
+ arch/arm/mach-pxa/zylonite.c                   |    1 +
+ arch/arm/mach-realview/core.h                  |    1 -
+ arch/arm/mach-realview/include/mach/system.h   |   17 --
+ arch/arm/mach-realview/realview_eb.c           |    5 +-
+ arch/arm/mach-realview/realview_pb1176.c       |    5 +-
+ arch/arm/mach-realview/realview_pb11mp.c       |    5 +-
+ arch/arm/mach-realview/realview_pba8.c         |    5 +-
+ arch/arm/mach-realview/realview_pbx.c          |    5 +-
+ arch/arm/mach-rpc/include/mach/system.h        |   14 --
+ arch/arm/mach-rpc/riscpc.c                     |   12 ++
+ arch/arm/mach-sa1100/assabet.c                 |    1 +
+ arch/arm/mach-sa1100/badge4.c                  |    1 +
+ arch/arm/mach-sa1100/cerf.c                    |    1 +
+ arch/arm/mach-sa1100/collie.c                  |    1 +
+ arch/arm/mach-sa1100/generic.c                 |   11 ++
+ arch/arm/mach-sa1100/generic.h                 |    1 +
+ arch/arm/mach-sa1100/h3100.c                   |    1 +
+ arch/arm/mach-sa1100/h3600.c                   |    1 +
+ arch/arm/mach-sa1100/hackkit.c                 |    1 +
+ arch/arm/mach-sa1100/include/mach/system.h     |   13 --
+ arch/arm/mach-sa1100/jornada720.c              |    1 +
+ arch/arm/mach-sa1100/lart.c                    |    1 +
+ arch/arm/mach-sa1100/nanoengine.c              |    1 +
+ arch/arm/mach-sa1100/pleb.c                    |    1 +
+ arch/arm/mach-sa1100/shannon.c                 |    1 +
+ arch/arm/mach-sa1100/simpad.c                  |    1 +
+ arch/arm/mach-shark/core.c                     |    3 +-
+ arch/arm/mach-shark/include/mach/system.h      |    3 -
+ arch/arm/mach-spear3xx/include/mach/generic.h  |    2 +
+ arch/arm/mach-spear3xx/spear300_evb.c          |    1 +
+ arch/arm/mach-spear3xx/spear310_evb.c          |    1 +
+ arch/arm/mach-spear3xx/spear320_evb.c          |    1 +
+ arch/arm/mach-spear6xx/include/mach/generic.h  |    2 +
+ arch/arm/mach-spear6xx/spear600_evb.c          |    1 +
+ arch/arm/mach-tegra/common.c                   |    5 +-
+ arch/arm/mach-tegra/include/mach/system.h      |    4 -
+ arch/arm/mach-u300/core.c                      |   20 ++
+ arch/arm/mach-u300/include/mach/platform.h     |    1 +
+ arch/arm/mach-u300/include/mach/system.h       |   26 ---
+ arch/arm/mach-u300/u300.c                      |    1 +
+ arch/arm/mach-ux500/include/mach/system.h      |    5 -
+ arch/arm/mach-versatile/core.c                 |   13 ++
+ arch/arm/mach-versatile/core.h                 |    1 +
+ arch/arm/mach-versatile/include/mach/system.h  |   16 --
+ arch/arm/mach-versatile/versatile_ab.c         |    1 +
+ arch/arm/mach-versatile/versatile_dt.c         |    1 +
+ arch/arm/mach-versatile/versatile_pb.c         |    1 +
+ arch/arm/mach-vexpress/include/mach/system.h   |    4 -
+ arch/arm/mach-vexpress/v2m.c                   |    2 +-
+ arch/arm/mach-w90x900/cpu.c                    |   15 ++
+ arch/arm/mach-w90x900/cpu.h                    |    1 +
+ arch/arm/mach-w90x900/include/mach/system.h    |   22 ---
+ arch/arm/mach-w90x900/mach-nuc910evb.c         |    1 +
+ arch/arm/mach-w90x900/mach-nuc950evb.c         |    1 +
+ arch/arm/mach-w90x900/mach-nuc960evb.c         |    1 +
+ arch/arm/mach-zynq/include/mach/system.h       |    5 -
+ arch/arm/plat-iop/Makefile                     |    2 +
+ arch/arm/plat-iop/restart.c                    |   19 ++
+ arch/arm/plat-mxc/include/mach/common.h        |    2 +-
+ arch/arm/plat-mxc/include/mach/system.h        |    2 -
+ arch/arm/plat-mxc/system.c                     |    9 +-
+ arch/arm/plat-s3c24xx/cpu.c                    |   23 ---
+ arch/arm/plat-spear/Makefile                   |    2 +-
+ arch/arm/plat-spear/include/plat/system.h      |   15 --
+ arch/arm/plat-spear/restart.c                  |   27 +++
+ 352 files changed, 995 insertions(+), 910 deletions(-)
+ create mode 100644 arch/arm/mach-clps711x/common.c
+ delete mode 100644 arch/arm/mach-clps711x/irq.c
+ delete mode 100644 arch/arm/mach-clps711x/mm.c
+ delete mode 100644 arch/arm/mach-clps711x/time.c
+ create mode 100644 arch/arm/plat-iop/restart.c
+ create mode 100644 arch/arm/plat-spear/restart.c
