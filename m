@@ -1,67 +1,42 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 06 Nov 2011 17:56:49 +0000
-Subject: [PATCH 5/5] ARM: restart: plat-samsung: remove plat/reset.h and
- s5p_reset_hook
-In-Reply-To: <20111106175457.GK12913@n2100.arm.linux.org.uk>
-References: <20111106175457.GK12913@n2100.arm.linux.org.uk>
-Message-ID: <E1RN6xd-0001ad-7r@rmk-PC.arm.linux.org.uk>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Sun, 6 Nov 2011 11:38:02 -0700
+Subject: [PATCH] distclean: Remove generated .dtb files
+In-Reply-To: <1320473955-4500-1-git-send-email-dirk.behme@de.bosch.com>
+References: <1320473955-4500-1-git-send-email-dirk.behme@de.bosch.com>
+Message-ID: <20111106183802.GB2546@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that s5p_reset_hook is unused, we can get rid of plat/reset.h and
-the s5p_reset_hook code in plat/system-reset.h.
+On Sat, Nov 05, 2011 at 07:19:15AM +0100, Dirk Behme wrote:
+> The patch 'arm/dt: Add dtb make rule' adds support to
+> create a .dtb file. But this is never removed afterwards.
+> Remove the generated .dtb file if 'distclean' is called.
+> 
+> Signed-off-by: Dirk Behme <dirk.behme@de.bosch.com>
+> CC: Rob Herring <rob.herring@calxeda.com>
+> CC: Shawn Guo <shawn.guo@freescale.com>
+> CC: Jason Liu <jason.hui@linaro.org>
+> CC: Grant Likely <grant.likely@secretlab.ca>
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- arch/arm/plat-samsung/include/plat/reset.h        |   16 ----------------
- arch/arm/plat-samsung/include/plat/system-reset.h |   11 -----------
- 2 files changed, 0 insertions(+), 27 deletions(-)
- delete mode 100644 arch/arm/plat-samsung/include/plat/reset.h
+Acked-by: Grant Likely <grant.likely@secretlab.ca>
 
-diff --git a/arch/arm/plat-samsung/include/plat/reset.h b/arch/arm/plat-samsung/include/plat/reset.h
-deleted file mode 100644
-index 32ca517..0000000
---- a/arch/arm/plat-samsung/include/plat/reset.h
-+++ /dev/null
-@@ -1,16 +0,0 @@
--/* linux/arch/arm/plat-samsung/include/plat/reset.h
-- *
-- * Copyright (c) 2010 Samsung Electronics Co., Ltd.
-- *		http://www.samsung.com/
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
--*/
--
--#ifndef __PLAT_SAMSUNG_RESET_H
--#define __PLAT_SAMSUNG_RESET_H __FILE__
--
--extern void (*s5p_reset_hook)(void);
--
--#endif /* __PLAT_SAMSUNG_RESET_H */
-diff --git a/arch/arm/plat-samsung/include/plat/system-reset.h b/arch/arm/plat-samsung/include/plat/system-reset.h
-index a448e99..73d7808 100644
---- a/arch/arm/plat-samsung/include/plat/system-reset.h
-+++ b/arch/arm/plat-samsung/include/plat/system-reset.h
-@@ -14,18 +14,7 @@
- 
- #include <plat/watchdog-reset.h>
- 
--void (*s5p_reset_hook)(void);
--
- static void arch_reset(char mode, const char *cmd)
- {
--	/* SWRESET support in s5p_reset_hook() */
--
--	if (s5p_reset_hook)
--		s5p_reset_hook();
--
--	/* Perform reset using Watchdog reset
--	 * if there is no s5p_reset_hook()
--	 */
--
- 	arch_wdt_reset();
- }
--- 
-1.7.4.4
+> ---
+>  arch/arm/boot/Makefile |    2 ++
+>  1 files changed, 2 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/boot/Makefile b/arch/arm/boot/Makefile
+> index 1cd9b0a..08f0d35 100644
+> --- a/arch/arm/boot/Makefile
+> +++ b/arch/arm/boot/Makefile
+> @@ -71,6 +71,8 @@ $(obj)/%.dtb: $(src)/dts/%.dts
+>  
+>  $(obj)/dtbs: $(addprefix $(obj)/, $(dtb-y))
+>  
+> +clean-files := *.dtb
+> +
+>  quiet_cmd_uimage = UIMAGE  $@
+>        cmd_uimage = $(CONFIG_SHELL) $(MKIMAGE) -A arm -O linux -T kernel \
+>  		   -C none -a $(LOADADDR) -e $(STARTADDR) \
+> -- 
+> 1.7.0.4
+> 
