@@ -1,66 +1,47 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 6 Nov 2011 17:31:13 +0000
-Subject: [01: PATCH 0/7] Preparation for arch_reset changes
-Message-ID: <20111106173113.GI12913@n2100.arm.linux.org.uk>
+Date: Sun, 06 Nov 2011 17:31:53 +0000
+Subject: [PATCH 1/7] ARM: restart: add restart hook to machine_desc record
+In-Reply-To: <20111106173113.GI12913@n2100.arm.linux.org.uk>
+References: <20111106173113.GI12913@n2100.arm.linux.org.uk>
+Message-ID: <E1RN6ZV-0001Mv-LX@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series lays down the ground work for changing the way we handle the
-reset (now called restart) handling on ARM.
+Add a restart hook to the machine_desc record so we don't have to
+populate all platforms with init_early methods to initialize the
+arm_pm_restart function pointer.
 
-As a result of these patches, we provide a new hook in the machine_desc
-record called 'restart' which is pointed at a function to perform the
-appropriate restart actions for the platform.  This is called directly
-from machine_restart() with IRQs and caches on.
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ arch/arm/include/asm/mach/arch.h |    1 +
+ arch/arm/kernel/setup.c          |    3 +++
+ 2 files changed, 4 insertions(+), 0 deletions(-)
 
-The 'soft_reboot' flag is changed to a more generic 'restart_mode'
-character - which is used to initialize the default reboot mode (which
-can be changed via the 'reboot=' command line parameter.)
-
-'soft_restart(addr)' is added which performs a soft restart (iow,
-orderly shutdown of caches and MMU and a jump to the passed address),
-rather than the old way which separated the tear-down of the caches
-and MMU from the code doing the jump.  This will be necessary to
-resolve the ARMv6 and ARMv7 CPU restarting problems.
-
-Finally, appropriate 'restart_mode' values are added to several
-platforms which were hard-coding the restart mode by intercepting
-the restarting via arm_pm_restart.
-
- arch/arm/include/asm/mach/arch.h                  |    9 +++--
- arch/arm/include/asm/system.h                     |    1 +
- arch/arm/kernel/machine_kexec.c                   |    4 +-
- arch/arm/kernel/process.c                         |   35 ++++++++++++--------
- arch/arm/kernel/setup.c                           |    7 +++-
- arch/arm/mach-clps711x/include/mach/system.h      |    2 +-
- arch/arm/mach-ebsa110/core.c                      |    2 +-
- arch/arm/mach-ebsa110/include/mach/system.h       |    2 +-
- arch/arm/mach-ep93xx/include/mach/system.h        |    2 -
- arch/arm/mach-footbridge/cats-hw.c                |    2 +-
- arch/arm/mach-footbridge/include/mach/system.h    |    2 +-
- arch/arm/mach-iop32x/include/mach/system.h        |    4 +--
- arch/arm/mach-iop33x/include/mach/system.h        |    2 +-
- arch/arm/mach-ixp2000/include/mach/system.h       |    2 -
- arch/arm/mach-ixp4xx/include/mach/system.h        |    2 +-
- arch/arm/mach-ks8695/include/mach/system.h        |    2 +-
- arch/arm/mach-lpc32xx/include/mach/system.h       |    3 --
- arch/arm/mach-mmp/include/mach/system.h           |    4 +-
- arch/arm/mach-mxs/system.c                        |    2 +-
- arch/arm/mach-pnx4008/include/mach/system.h       |    2 +-
- arch/arm/mach-pxa/mioa701.c                       |    1 +
- arch/arm/mach-pxa/reset.c                         |    2 +-
- arch/arm/mach-pxa/spitz.c                         |    3 ++
- arch/arm/mach-pxa/tosa.c                          |    1 +
- arch/arm/mach-rpc/include/mach/system.h           |    2 +-
- arch/arm/mach-s3c2410/include/mach/system-reset.h |    4 +-
- arch/arm/mach-s3c64xx/include/mach/system.h       |    2 +-
- arch/arm/mach-sa1100/include/mach/system.h        |    2 +-
- arch/arm/mach-shark/core.c                        |    1 -
- arch/arm/mach-shmobile/include/mach/system.h      |    2 +-
- arch/arm/mach-u300/include/mach/system.h          |    2 -
- arch/arm/mach-w90x900/include/mach/system.h       |    2 +-
- arch/arm/mm/idmap.c                               |    2 +-
- arch/arm/mm/nommu.c                               |    2 +-
- arch/arm/plat-mxc/system.c                        |    2 +-
- arch/arm/plat-spear/include/plat/system.h         |    2 +-
- 36 files changed, 64 insertions(+), 59 deletions(-)
+diff --git a/arch/arm/include/asm/mach/arch.h b/arch/arm/include/asm/mach/arch.h
+index 7d19425..8aa397a 100644
+--- a/arch/arm/include/asm/mach/arch.h
++++ b/arch/arm/include/asm/mach/arch.h
+@@ -45,6 +45,7 @@ struct machine_desc {
+ #ifdef CONFIG_MULTI_IRQ_HANDLER
+ 	void			(*handle_irq)(struct pt_regs *);
+ #endif
++	void			(*restart)(char, const char *);
+ };
+ 
+ /*
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index bda0a21..d187d0a 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -922,6 +922,9 @@ void __init setup_arch(char **cmdline_p)
+ 	paging_init(mdesc);
+ 	request_standard_resources(mdesc);
+ 
++	if (mdesc->restart)
++		arm_pm_restart = mdesc->restart;
++
+ 	unflatten_device_tree();
+ 
+ #ifdef CONFIG_SMP
+-- 
+1.7.4.4
