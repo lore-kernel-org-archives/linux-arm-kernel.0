@@ -1,58 +1,61 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 06 Nov 2011 17:40:37 +0000
-Subject: [PATCH 02/41] ARM: restart: remove poodle restart handler
+Date: Sun, 06 Nov 2011 17:40:57 +0000
+Subject: [PATCH 03/41] ARM: restart: remove s3c24xx restart handler
 In-Reply-To: <20111106173113.GI12913@n2100.arm.linux.org.uk>
 References: <20111106173113.GI12913@n2100.arm.linux.org.uk>
-Message-ID: <E1RN6hx-0001Wh-C9@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1RN6iH-0001Wl-QI@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The poodle restart handler was added in 74617fb6b8 (3593/1: Add reboot
-and shutdown handlers for Zaurus handhelds), and at that time it was
-necessary to deal with the RCSR register.  This commit also forced all
-restarts to use the 'hard' restart method.
-
-In dc38e2ad53 (pxa: Fix RCSR handling), the RCSR handling was removed,
-leaving just the forcing to use a 'hard' restart.  As hard restarts are
-the default (in the absense of a reboot= command line argument), this
-seems pointless.  In any case, Richard Purdie says:
-
-> From what I remember that hardware either always reboots or always
-> halts. I think the option was therefore left hardcoded to make it clear
-> it wasn't expected to work. Later Zaurii models could do either but
-> required some manual poking of registers to make it happen iirc.
->
-> Regardless, you can probably clean this up as you suggest now.
-
-So, lets remove the unnecessary interception and rely on the default
-restart mode.
+Remove the s3c24xx restart handler, which is trying to work around
+a chip bug by keeping caches on but flushed.  As we now only disable
+caches when performing a soft reboot, there doesn't need to be a
+work-around to do that.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mach-pxa/poodle.c |    6 ------
- 1 files changed, 0 insertions(+), 6 deletions(-)
+ arch/arm/plat-s3c24xx/cpu.c |   23 -----------------------
+ 1 files changed, 0 insertions(+), 23 deletions(-)
 
-diff --git a/arch/arm/mach-pxa/poodle.c b/arch/arm/mach-pxa/poodle.c
-index 948ce3e..1c597ad 100644
---- a/arch/arm/mach-pxa/poodle.c
-+++ b/arch/arm/mach-pxa/poodle.c
-@@ -419,17 +419,11 @@ static void poodle_poweroff(void)
- 	arm_machine_restart('h', NULL);
+diff --git a/arch/arm/plat-s3c24xx/cpu.c b/arch/arm/plat-s3c24xx/cpu.c
+index 3c63353..1121df1 100644
+--- a/arch/arm/plat-s3c24xx/cpu.c
++++ b/arch/arm/plat-s3c24xx/cpu.c
+@@ -192,27 +192,6 @@ static unsigned long s3c24xx_read_idcode_v4(void)
+ 	return __raw_readl(S3C2410_GSTATUS1);
  }
  
--static void poodle_restart(char mode, const char *cmd)
+-/* Hook for arm_pm_restart to ensure we execute the reset code
+- * with the caches enabled. It seems at least the S3C2440 has a problem
+- * resetting if there is bus activity interrupted by the reset.
+- */
+-static void s3c24xx_pm_restart(char mode, const char *cmd)
 -{
--	arm_machine_restart('h', cmd);
+-	if (mode != 's') {
+-		unsigned long flags;
+-
+-		local_irq_save(flags);
+-		__cpuc_flush_kern_all();
+-		__cpuc_flush_user_all();
+-
+-		arch_reset(mode, cmd);
+-		local_irq_restore(flags);
+-	}
+-
+-	/* fallback, or unhandled */
+-	arm_machine_restart(mode, cmd);
 -}
 -
- static void __init poodle_init(void)
+ void __init s3c24xx_init_io(struct map_desc *mach_desc, int size)
  {
- 	int ret = 0;
+ 	/* initialise the io descriptors we need for initialisation */
+@@ -226,7 +205,5 @@ void __init s3c24xx_init_io(struct map_desc *mach_desc, int size)
+ 	}
+ 	s3c24xx_init_cpu();
  
- 	pm_power_off = poodle_poweroff;
--	arm_pm_restart = poodle_restart;
- 
- 	PCFR |= PCFR_OPDE;
- 
+-	arm_pm_restart = s3c24xx_pm_restart;
+-
+ 	s3c_init_cpu(samsung_cpu_id, cpu_ids, ARRAY_SIZE(cpu_ids));
+ }
 -- 
 1.7.4.4
