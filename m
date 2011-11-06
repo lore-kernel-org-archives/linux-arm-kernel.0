@@ -1,41 +1,42 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 05 Nov 2011 22:29:54 +0000
-Subject: [PATCH 2/2] ARM: PXA: fix includes in pxa2xx_cm_x2xx PCMCIA driver
-In-Reply-To: <20111105222832.GH12913@n2100.arm.linux.org.uk>
-References: <20111105222832.GH12913@n2100.arm.linux.org.uk>
-Message-ID: <E1RMokM-0000KU-Hr@rmk-PC.arm.linux.org.uk>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Sun, 6 Nov 2011 11:24:15 +0800
+Subject: [linux-pm] [PATCH] PM: HIBERNATION: skip the swap size check if
+ the snapshot image size is anticipative
+In-Reply-To: <20111105182244.GB6772@elf.ucw.cz>
+References: <1320392176-3906-1-git-send-email-Barry.Song@csr.com>
+ <20111105182244.GB6772@elf.ucw.cz>
+Message-ID: <CAGsJ_4xU28APFEcALAzuB2jAACa8FbOR6iSvOaEeGZa=JyjNeA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The includes in the pxa2xx_cm_x2xx PCMCIA driver are rather random;
-the driver doesn't require anything from these headers except the
-cpu_is_xxx() macros which come from another include.
+2011/11/6 Pavel Machek <pavel@ucw.cz>:
+> Hi!
+>
+>> From: Barry Song <Baohua.Song@csr.com>
+>>
+>> Current swsusp requires swap partitions even larger than real saved pages
+>> due to the worst compress ratio:
+>> but for an embedded system, which has limited storage space, then it might
+>> can't give the big size partition to save snapshot.
+>> In the another way, some embedded systems can definitely know the most size
+>> needed for snapshot since they run some specific application lists.
+>> So this patch provides the possibility for bootloader to tell kernel even
+>> the system has a little snapshot partition, but it is still enough.
+>> For example, if the system need to save 120MB memory, origin swsusp will require
+>> a 130MB partition to save snapshot. but if users know 30MB is enough for them(
+>> compressed image will be less than 30MB), they just make a 30MB
+>> partition.
+>
+> Would it be better to have /sys/power/... entry which would allow
+> configuring expected compression ratio at runtime?
 
-The concern is that it's getting these definitions via mach/system.h,
-which is supposed to only be included by arch/arm/kernel/process.c.
-As this header is scheduled for cleanup (and elimination) keeping
-the status quo will cause build errors.  So lets fix properly and
-independent of the future work.
-
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- drivers/pcmcia/pxa2xx_cm_x2xx.c |    3 +--
- 1 files changed, 1 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/pcmcia/pxa2xx_cm_x2xx.c b/drivers/pcmcia/pxa2xx_cm_x2xx.c
-index 4f09506..6e7dcfd 100644
---- a/drivers/pcmcia/pxa2xx_cm_x2xx.c
-+++ b/drivers/pcmcia/pxa2xx_cm_x2xx.c
-@@ -12,9 +12,8 @@
- 
- #include <linux/module.h>
- 
--#include <asm/system.h>
- #include <asm/mach-types.h>
--#include <mach/system.h>
-+#include <mach/hardware.h>
- 
- int cmx255_pcmcia_init(void);
- int cmx270_pcmcia_init(void);
--- 
-1.7.4.4
+i think it is better to have a sys node than add another kernel param.
+but the point is i only care about the final image size but not
+compression ratio. i don't care how well lzo will do for me since i
+only have limited disk space and know how many pages want to be saved.
+there has been a image_size node, will we have a expected_image_size node?
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?Pavel
+>
+> --
+Thanks
+barry
