@@ -1,42 +1,47 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Sun, 6 Nov 2011 11:24:15 +0800
-Subject: [linux-pm] [PATCH] PM: HIBERNATION: skip the swap size check if
- the snapshot image size is anticipative
-In-Reply-To: <20111105182244.GB6772@elf.ucw.cz>
-References: <1320392176-3906-1-git-send-email-Barry.Song@csr.com>
- <20111105182244.GB6772@elf.ucw.cz>
-Message-ID: <CAGsJ_4xU28APFEcALAzuB2jAACa8FbOR6iSvOaEeGZa=JyjNeA@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Sun, 06 Nov 2011 14:04:15 +0900
+Subject: [GIT PULL] Samsung devel-4 for v3.2
+In-Reply-To: <201111050056.51554.arnd@arndb.de>
+References: <027f01cc9ab6$2086eae0$6194c0a0$%kim@samsung.com>
+ <201111050020.55071.arnd@arndb.de>
+ <02d901cc9b4a$15a127f0$40e377d0$%kim@samsung.com>
+ <201111050056.51554.arnd@arndb.de>
+Message-ID: <4EB6154F.2050501@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/11/6 Pavel Machek <pavel@ucw.cz>:
-> Hi!
+On 11/05/11 08:56, Arnd Bergmann wrote:
+> On Saturday 05 November 2011, Kukjin Kim wrote:
+>> Arnd Bergmann wrote:
 >
->> From: Barry Song <Baohua.Song@csr.com>
+>>> Please send the contents split up into separate branches (dt, spi, clkdev,
+>>> rename, devel) for 3.3. I think it's ok if you want to send just the
+>>> rename patch for 3.2 the way we had discussed earlier, because this kind
+>>> of patch really makes sense at the end of the merge window.
+>>>
+>> Hi Arnd,
 >>
->> Current swsusp requires swap partitions even larger than real saved pages
->> due to the worst compress ratio:
->> but for an embedded system, which has limited storage space, then it might
->> can't give the big size partition to save snapshot.
->> In the another way, some embedded systems can definitely know the most size
->> needed for snapshot since they run some specific application lists.
->> So this patch provides the possibility for bootloader to tell kernel even
->> the system has a little snapshot partition, but it is still enough.
->> For example, if the system need to save 120MB memory, origin swsusp will require
->> a 130MB partition to save snapshot. but if users know 30MB is enough for them(
->> compressed image will be less than 30MB), they just make a 30MB
->> partition.
+>> OK, I will send the rename branch in a half an hour and make separate
+>> branches for others which will be merged next time.
 >
-> Would it be better to have /sys/power/... entry which would allow
-> configuring expected compression ratio at runtime?
+> Ok, very good. I'm sending the pull requests for the other two branches
+> right now, I assume Linus will take them quickly (or not at all if he
+> has unexpected objections), so you could base your pull request on top
+> of his merge.
+>
 
-i think it is better to have a sys node than add another kernel param.
-but the point is i only care about the final image size but not
-compression ratio. i don't care how well lzo will do for me since i
-only have limited disk space and know how many pages want to be saved.
-there has been a image_size node, will we have a expected_image_size node?
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?Pavel
->
-> --
-Thanks
-barry
+Hi Arnd,
+
+I remade 'next-samsung-exynos' branch based on latest mainline which 
+includes arm-soc/next/cleanup3 and arm-soc/next/devel2 just now so that 
+you can send it to Linus easily :)
+
+If any problems, please let me know.
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
