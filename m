@@ -1,69 +1,50 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Sun,  6 Nov 2011 16:16:26 +0200
-Subject: [PATCH v2 4/4] ARM: OMAP3: cm-t35: fix USB hub
-In-Reply-To: <1320588827-9407-1-git-send-email-grinberg@compulab.co.il>
-References: <1320588827-9407-1-git-send-email-grinberg@compulab.co.il>
-Message-ID: <1320588986-9480-4-git-send-email-grinberg@compulab.co.il>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sun, 6 Nov 2011 16:19:35 +0100
+Subject: [GIT PULL] Samsung Exynos for v3.2
+In-Reply-To: <4EB61826.4070601@samsung.com>
+References: <02dd01cc9b4e$0cb27c80$26177580$%kim@samsung.com>
+ <4EB61826.4070601@samsung.com>
+Message-ID: <201111061619.36283.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-USB hub is not functional until is reset.
-Reset the USB hub on SB-T35.
+On Sunday 06 November 2011, Kukjin Kim wrote:
+> As I replied, I re-based 'next-samsung-exynos' based on latest mainline.
+> 
+> So changes since previous pull request:
+> 
+> The following changes since commit c861cd3e92d92ae946e19099f198018fcb4fd887:
+> 
+>    Merge branch 'next/devel2' of 
+> git://git.linaro.org/people/arnd/arm-soc (2011-11-05 18:21:21 -0700)
+> 
+> are available in the git repository at:
+> 
+>    git://github.com/kgene/linux-samsung.git next-samsung-exynos
+> 
+> Others same, if any problems, please kindly let me know.
 
-Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
----
-v2:	- Rebase on top of fixes branch
-	- Elaborate on the problem in the commit message
+Ok, looks good. I'll forward the pull request right away.
 
- arch/arm/mach-omap2/board-cm-t35.c |   22 ++++++++++++++++++++--
- 1 files changed, 20 insertions(+), 2 deletions(-)
+One thing that I noticed in your new Kconfig file is this however:
 
-diff --git a/arch/arm/mach-omap2/board-cm-t35.c b/arch/arm/mach-omap2/board-cm-t35.c
-index 7b71fe1..e02c28b 100644
---- a/arch/arm/mach-omap2/board-cm-t35.c
-+++ b/arch/arm/mach-omap2/board-cm-t35.c
-@@ -53,7 +53,8 @@
- #include "hsmmc.h"
- #include "common-board-devices.h"
- 
--#define CM_T35_GPIO_PENDOWN	57
-+#define CM_T35_GPIO_PENDOWN		57
-+#define SB_T35_USB_HUB_RESET_GPIO	167
- 
- #define CM_T35_SMSC911X_CS	5
- #define CM_T35_SMSC911X_GPIO	163
-@@ -436,6 +437,23 @@ static struct usbhs_omap_board_data usbhs_bdata __initdata = {
- 	.reset_gpio_port[2]  = -EINVAL
- };
- 
-+static void cm_t35_init_usbh(void)
-+{
-+	int err;
-+
-+	err = gpio_request_one(SB_T35_USB_HUB_RESET_GPIO,
-+			       GPIOF_OUT_INIT_LOW, "usb hub rst");
-+	if (err) {
-+		pr_err("SB-T35: usb hub rst gpio request failed: %d\n", err);
-+	} else {
-+		udelay(10);
-+		gpio_set_value(SB_T35_USB_HUB_RESET_GPIO, 1);
-+		msleep(1);
-+	}
-+
-+	usbhs_init(&usbhs_bdata);
-+}
-+
- static int cm_t35_twl_gpio_setup(struct device *dev, unsigned gpio,
- 				 unsigned ngpio)
- {
-@@ -624,7 +642,7 @@ static void __init cm_t3x_common_init(void)
- 	cm_t35_init_display();
- 
- 	usb_musb_init(NULL);
--	usbhs_init(&usbhs_bdata);
-+	cm_t35_init_usbh();
- }
- 
- static void __init cm_t35_init(void)
--- 
-1.7.3.4
+| choice
+|         prompt "EXYNOS System Type"
+|         default ARCH_EXYNOS4
+| config ARCH_EXYNOS4
+|         bool "SAMSUNG EXYNOS4"
+|         help
+|           Samsung EXYNOS4 SoCs based systems
+| endchoice
+
+This looks like the idea is to make the future EXYNOS5 and later SoCs a
+separate "choice" that is mutually exclusive with EXYNOS4.
+
+This seems to be a significant limitation considering that we are working
+hard on making all platforms coexist in the same kernel binary.
+
+Are there strong technical reasons why you could not build EXYNOS4 and
+EXYNOS5 into a combined kernel? If this is at all possible, I would
+recommend trying hard to do it when you add EXYNOS5.
+
+	Arnd
