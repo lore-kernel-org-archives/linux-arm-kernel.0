@@ -1,52 +1,32 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 07 Nov 2011 16:38:01 -0600
-Subject: [PATCH 2/3 RESEND] ARM: pxa: Add DT testing machine
-In-Reply-To: <201111072331.58272.marek.vasut@gmail.com>
-References: <1320172354-3795-1-git-send-email-marek.vasut@gmail.com>
- <201111072306.43015.marek.vasut@gmail.com>
- <20111107223005.GF28491@ponder.secretlab.ca>
- <201111072331.58272.marek.vasut@gmail.com>
-Message-ID: <4EB85DC9.30106@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 7 Nov 2011 22:41:29 +0000
+Subject: [PATCH] arm: omap2+: hwmod: fix breakage introduced by d6504acd
+In-Reply-To: <alpine.DEB.2.00.1111071428001.12394@utopia.booyaka.com>
+References: <1320688617-4543-1-git-send-email-balbi@ti.com>
+ <20111107183208.GG15294@n2100.arm.linux.org.uk>
+ <20111107193908.GA5059@legolas.emea.dhcp.ti.com>
+ <20111107212707.GH15294@n2100.arm.linux.org.uk>
+ <alpine.DEB.2.00.1111071428001.12394@utopia.booyaka.com>
+Message-ID: <20111107224129.GJ15294@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/07/2011 04:31 PM, Marek Vasut wrote:
->> On Mon, Nov 07, 2011 at 11:06:42PM +0100, Marek Vasut wrote:
->>>> On 11/07/2011 03:31 PM, Marek Vasut wrote:
->>>>> I use the Voipac PXA270 board for PXA DT conversion. This board is a
->>>>> helper for the conversion to go smoothly and the testing to be easy.
->>>>>
->>>>> Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
->>>>> Cc: Arnd Bergmann <arnd@arndb.de>
->>>>> Cc: Grant Likely <grant.likely@secretlab.ca>
->>>>> Cc: Rob Herring <robherring2@gmail.com>
->>>>> ---
->>>>> +	help
->>>>> +	  PXA Device Tree Machine.
->>>>> +	  This is to be a generic machine which probes all of it's 
-> drivers
->>>>> +	  using the Flattened Device Tree blob. This is work-in-progress
->>>>> +	  so don't expect much yet. We selected the Voipac PXA270 device
->>>>> +	  as a base device to test support along the way.
->>>>> +
->>>>> +	  NOTE: This platform is mutually exclusive with the original!
->>>>
->>>> It shouldn't need to be.
->>>
->>> I want it that way ... eventually, this will be renamed to PXA_DT, but
->>> not now.
->>
->> Nah, do it now.  Aim high.  :-)
->>
->> g.
+On Mon, Nov 07, 2011 at 02:29:35PM -0700, Paul Walmsley wrote:
+> On Mon, 7 Nov 2011, Russell King - ARM Linux wrote:
 > 
-> Hehe, all right then. This patch shall be reworked soon. Also, I'll push the 
-> patchset to k.org git soon.
+> > Again, can never have been tested on OMAP3.
+> > 
+> > Does anyone apart from me bother doing any testing what so ever on OMAP3
+> > platforms?  Am I the only one?
 > 
-> btw. what's the exact git repo and branch I should rebase this on?
+> This was fixed by 
+> 
+> http://www.spinics.net/lists/arm-kernel/msg143549.html
+> 
+> which didn't go upstream as part of the v3.2 merge window.
 
-The minimum -rcX you are dependent on. Clearly document (for Arnd) any
-other branches you are dependent on. That doesn't really matter until
-you are ready to send to Arnd though.
+Ah, that patch.
 
-Rob
+Which version of the patch does Tony have?  The one you point at which
+uses IS_ERR_VALUE() and I complained about, or the version that has that
+fixed?
