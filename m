@@ -1,41 +1,32 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 7 Nov 2011 17:07:23 +0000
-Subject: [PATCH] ARM: Allow kernel unaligned accesses on ARMv6+ processors
-In-Reply-To: <1d0610da-0dc0-4130-9d14-8524820b9846@WA4EHSMHS001.ehs.local>
-References: <1320489687-9642-1-git-send-email-catalin.marinas@arm.com>
- <1d0610da-0dc0-4130-9d14-8524820b9846@WA4EHSMHS001.ehs.local>
-Message-ID: <20111107170723.GD24887@arm.com>
+From: sangwook.lee@linaro.org (Sangwook Lee)
+Date: Mon,  7 Nov 2011 17:05:22 +0000
+Subject: [PATCH 2/2] mmc: sdhci-s3c: Add pm_caps into SD/MMC host
+In-Reply-To: <1320685522-17481-1-git-send-email-sangwook.lee@linaro.org>
+References: <1320685522-17481-1-git-send-email-sangwook.lee@linaro.org>
+Message-ID: <1320685522-17481-3-git-send-email-sangwook.lee@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 07, 2011 at 02:11:24AM +0000, John Linn wrote:
-> > -----Original Message-----
-> > From: Catalin Marinas [mailto:catalin.marinas at gmail.com] On Behalf Of
-> > Catalin Marinas
-> > Sent: Saturday, November 05, 2011 3:41 AM
-> > To: linux-arm-kernel at lists.infradead.org
-> > Cc: John Linn
-> > Subject: [PATCH] ARM: Allow kernel unaligned accesses on ARMv6+
-> > processors
-> > 
-> > Recent gcc versions generate unaligned accesses by default on ARMv6
-> and
-> > later processors. This patch ensures that the SCTLR.A bit is always
-> > cleared on such processors to avoid kernel traping before
-> > alignment_init() is called.
-> > 
-> > Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-> > Cc: John Linn <John.Linn@xilinx.com>
-> 
-> It worked great, thanks Catalin. I'd love to see a solution merged in
-> the mainline and this seems reasonable.
-> I'm being pushed to newer tools which require a solution.
-> 
-> Tested-by: John Linn <john.linn@xilinx.com>
+sdhci-s3c updates pm_caps from platform data for SDIO PM.
 
-Thanks. I pushed it to Russell's patch system as:
+Signed-off-by: Sangwook Lee <sangwook.lee@samsung.com>
+---
+ drivers/mmc/host/sdhci-s3c.c |    3 +++
+ 1 files changed, 3 insertions(+), 0 deletions(-)
 
-http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7150/1
-
+diff --git a/drivers/mmc/host/sdhci-s3c.c b/drivers/mmc/host/sdhci-s3c.c
+index fe886d6..f10dd52 100644
+--- a/drivers/mmc/host/sdhci-s3c.c
++++ b/drivers/mmc/host/sdhci-s3c.c
+@@ -518,6 +518,9 @@ static int __devinit sdhci_s3c_probe(struct platform_device *pdev)
+ 	if (pdata->host_caps)
+ 		host->mmc->caps |= pdata->host_caps;
+ 
++	if (pdata->pm_caps)
++		host->mmc->pm_caps |= pdata->pm_caps;
++
+ 	host->quirks |= (SDHCI_QUIRK_32BIT_DMA_ADDR |
+ 			 SDHCI_QUIRK_32BIT_DMA_SIZE);
+ 
 -- 
-Catalin
+1.7.4.1
