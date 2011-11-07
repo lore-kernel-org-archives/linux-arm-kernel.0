@@ -1,371 +1,124 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon,  7 Nov 2011 17:08:32 +0100
-Subject: [PATCH 2/3] ARM: AT91: IIO: Add AT91 ADC driver.
-In-Reply-To: <1320682113-23655-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1319041134-19712-1-git-send-email-maxime.ripard@free-electrons.com>
- <1320682113-23655-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1320682113-23655-3-git-send-email-maxime.ripard@free-electrons.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon,  7 Nov 2011 16:16:42 +0000
+Subject: [PATCH v8 00/16] ARM: Add support for the Large Physical Address
+ Extensions
+Message-ID: <1320682618-1182-1-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-Cc: Patrice Vilchez <patrice.vilchez@atmel.com>
-Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
-Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- drivers/iio/adc/Kconfig   |    6 +
- drivers/iio/adc/Makefile  |    4 +-
- drivers/iio/adc/at91adc.c |  311 +++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 320 insertions(+), 1 deletions(-)
- create mode 100644 drivers/iio/adc/at91adc.c
+Hi,
 
-diff --git a/drivers/iio/adc/Kconfig b/drivers/iio/adc/Kconfig
-index 3d97b21..74f4d9f 100644
---- a/drivers/iio/adc/Kconfig
-+++ b/drivers/iio/adc/Kconfig
-@@ -14,6 +14,12 @@ config IIO_AD799X
- 	  i2c analog to digital convertors (ADC). Provides direct access
- 	  via sysfs.
- 
-+config IIO_AT91ADC
-+	tristate "Atmel AT91 ADC"
-+	depends on SYSFS && ARCH_AT91
-+	help
-+	  Say yes here to build support for Atmel AT91 ADC.
-+
- config IIO_MAX1363
- 	tristate "Maxim max1363 ADC driver"
- 	depends on I2C
-diff --git a/drivers/iio/adc/Makefile b/drivers/iio/adc/Makefile
-index c197334..776b56f 100644
---- a/drivers/iio/adc/Makefile
-+++ b/drivers/iio/adc/Makefile
-@@ -6,4 +6,6 @@ iio_ad799x-y := ad799x_core.o
- obj-$(CONFIG_IIO_AD799X) += iio_ad799x.o
- 
- iio_max1363-y := max1363_core.o
--obj-$(CONFIG_IIO_MAX1363) += iio_max1363.o
-\ No newline at end of file
-+obj-$(CONFIG_IIO_MAX1363) += iio_max1363.o
-+
-+obj-$(CONFIG_IIO_AT91ADC) += at91adc.o
-diff --git a/drivers/iio/adc/at91adc.c b/drivers/iio/adc/at91adc.c
-new file mode 100644
-index 0000000..3ca2a64
---- /dev/null
-+++ b/drivers/iio/adc/at91adc.c
-@@ -0,0 +1,311 @@
-+/*
-+ * Driver for the ADC present in the Atmel AT91 evaluation boards.
-+ *
-+ * Copyright 2011 Free Electrons
-+ *
-+ * Licensed under the GPLv2 or later.
-+ */
-+
-+#include <linux/bitmap.h>
-+#include <linux/bitops.h>
-+#include <linux/clk.h>
-+#include <linux/err.h>
-+#include <linux/io.h>
-+#include <linux/interrupt.h>
-+#include <linux/jiffies.h>
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/platform_device.h>
-+#include <linux/slab.h>
-+#include <linux/wait.h>
-+
-+#include <linux/iio/iio.h>
-+
-+#include <mach/at91_adc.h>
-+#include <mach/board.h>
-+
-+struct at91adc_state {
-+	struct clk *clk;
-+	bool done;
-+	struct mutex lock;
-+	int irq;
-+	wait_queue_head_t wq_data_avail;
-+	u16 last_value;
-+	void __iomem *reg_base;
-+	unsigned int vref_mv;
-+};
-+
-+static inline u32 at91adc_reg_read(void *base, u8 reg)
-+{
-+	return readl_relaxed(base + reg);
-+}
-+
-+static inline void at91adc_reg_write(void *base, u8 reg, u32 val)
-+{
-+	writel_relaxed(val, base + reg);
-+}
-+
-+static irqreturn_t at91adc_eoc_trigger(int irq, void *private)
-+{
-+	int chan;
-+	struct iio_dev *idev = private;
-+	struct at91adc_state *st = iio_priv(idev);
-+	unsigned int status = at91adc_reg_read(st->reg_base, AT91_ADC_SR);
-+
-+	if (!(status & AT91_ADC_DRDY))
-+		return IRQ_HANDLED;
-+
-+	for (chan = 0; chan < idev->num_channels; chan++)
-+		if (status & AT91_ADC_EOC(chan)) {
-+			st->done = true;
-+			st->last_value = at91adc_reg_read(st->reg_base,
-+							  AT91_ADC_CHR(chan));
-+		}
-+
-+	wake_up_interruptible(&st->wq_data_avail);
-+
-+	return IRQ_HANDLED;
-+}
-+
-+static int at91adc_channel_init(struct iio_dev *idev,
-+				struct at91_adc_data *pdata)
-+{
-+	struct iio_chan_spec *chan_array;
-+	int bit, idx = 0;
-+
-+	idev->num_channels = bitmap_weight(&(pdata->channels_used),
-+					   pdata->num_channels);
-+	chan_array = kcalloc(idev->num_channels, sizeof(struct iio_chan_spec),
-+			     GFP_KERNEL);
-+
-+	if (chan_array == NULL)
-+		return -ENOMEM;
-+
-+	for_each_set_bit(bit, &(pdata->channels_used), pdata->num_channels) {
-+		struct iio_chan_spec *chan = chan_array + idx;
-+		chan->type = IIO_VOLTAGE;
-+		chan->indexed = 1;
-+		chan->channel = bit;
-+		chan->scan_type.sign = 's';
-+		chan->scan_type.realbits = 10;
-+		chan->info_mask = IIO_CHAN_INFO_SCALE_SHARED_BIT;
-+		++idx;
-+	}
-+
-+	idev->channels = chan_array;
-+	return idev->num_channels;
-+}
-+
-+static void at91adc_channel_remove(struct iio_dev *idev)
-+{
-+	if (idev->channels == NULL)
-+		return;
-+
-+	kfree(idev->channels);
-+}
-+
-+static int at91adc_read_raw(struct iio_dev *idev,
-+			    struct iio_chan_spec const *chan,
-+			    int *val, int *val2, long mask)
-+{
-+	struct at91adc_state *st = iio_priv(idev);
-+	unsigned int scale_uv;
-+
-+	switch (mask) {
-+	case 0:
-+		mutex_lock(&st->lock);
-+
-+		at91adc_reg_write(st->reg_base, AT91_ADC_CHER,
-+				  AT91_ADC_CH(chan->channel));
-+		at91adc_reg_write(st->reg_base, AT91_ADC_IER,
-+				  AT91_ADC_EOC(chan->channel));
-+		at91adc_reg_write(st->reg_base, AT91_ADC_CR, AT91_ADC_START);
-+
-+		wait_event_interruptible_timeout(st->wq_data_avail, st->done,
-+						 msecs_to_jiffies(10 * 1000));
-+		*val = st->last_value;
-+
-+		at91adc_reg_write(st->reg_base, AT91_ADC_CHDR,
-+				  AT91_ADC_CH(chan->channel));
-+		at91adc_reg_write(st->reg_base, AT91_ADC_IDR,
-+				  AT91_ADC_EOC(chan->channel));
-+
-+		st->last_value = 0;
-+		st->done = false;
-+		mutex_unlock(&st->lock);
-+		return IIO_VAL_INT;
-+	case IIO_CHAN_INFO_SCALE:
-+		scale_uv = (st->vref_mv * 1000) >> chan->scan_type.realbits;
-+		*val = scale_uv / 1000;
-+		*val2 = (scale_uv % 1000) * 1000;
-+		return IIO_VAL_INT_PLUS_MICRO;
-+	default:
-+		break;
-+	}
-+	return -EINVAL;
-+}
-+
-+static const struct iio_info at91adc_info = {
-+	.driver_module = THIS_MODULE,
-+	.read_raw = &at91adc_read_raw,
-+};
-+
-+static int __devinit at91adc_probe(struct platform_device *pdev)
-+{
-+	unsigned int prsc, mstrclk, ticks;
-+	int ret;
-+	struct iio_dev *idev;
-+	struct at91adc_state *st;
-+	struct resource *res;
-+	struct at91_adc_data *pdata = pdev->dev.platform_data;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	if (!res) {
-+		dev_err(&pdev->dev, "No resource defined\n");
-+		ret = -ENXIO;
-+		goto error_ret;
-+	}
-+
-+	idev = iio_device_allocate(sizeof(struct at91adc_state));
-+	if (idev == NULL) {
-+		ret = -ENOMEM;
-+		goto error_ret;
-+	}
-+	platform_set_drvdata(pdev, idev);
-+
-+	idev->dev.parent = &pdev->dev;
-+	idev->name = dev_name(&pdev->dev);
-+	idev->info = &at91adc_info;
-+
-+	st = iio_priv(idev);
-+	st->irq = platform_get_irq(pdev, 0);
-+	if (st->irq < 0) {
-+		dev_err(&pdev->dev, "No IRQ ID is designated\n");
-+		ret = -ENODEV;
-+		goto error_free_device;
-+	}
-+
-+	if (!request_mem_region(res->start, resource_size(res),
-+				"AT91 adc registers")) {
-+		dev_err(&pdev->dev, "Resources are unavailable.\n");
-+		ret = -EBUSY;
-+		goto error_free_device;
-+	}
-+
-+	st->reg_base = ioremap(res->start, resource_size(res));
-+	if (!st->reg_base) {
-+		dev_err(&pdev->dev, "Failed to map registers.\n");
-+		ret = -ENOMEM;
-+		goto error_release_mem;
-+	}
-+
-+	/*
-+	 * Disable all IRQs before setting up the handler
-+	 */
-+	at91adc_reg_write(st->reg_base, AT91_ADC_CR, AT91_ADC_SWRST);
-+	at91adc_reg_write(st->reg_base, AT91_ADC_IDR, 0xFFFFFFFF);
-+	ret = request_irq(st->irq,
-+			  at91adc_eoc_trigger, 0, pdev->dev.driver->name, idev);
-+	if (ret) {
-+		dev_err(&pdev->dev, "Failed to allocate IRQ.\n");
-+		goto error_unmap_reg;
-+	}
-+
-+	st->clk = clk_get(&pdev->dev, "adc_clk");
-+	if (IS_ERR(st->clk)) {
-+		dev_err(&pdev->dev, "Failed to get the clock.\n");
-+		ret = PTR_ERR(st->clk);
-+		goto error_free_irq;
-+	}
-+
-+	clk_enable(st->clk);
-+	mstrclk = clk_get_rate(st->clk);
-+
-+	if (!pdata) {
-+		dev_err(&pdev->dev, "No platform data available.\n");
-+		ret = -EINVAL;
-+		goto error_free_clk;
-+	}
-+
-+	if (!pdata->adc_clock) {
-+		dev_err(&pdev->dev, "No ADCClock available.\n");
-+		ret = -EINVAL;
-+		goto error_free_clk;
-+	}
-+
-+	prsc = (mstrclk / (2 * pdata->adc_clock)) - 1;
-+
-+	if (!pdata->startup_time) {
-+		dev_err(&pdev->dev, "No startup time available.\n");
-+		ret = -EINVAL;
-+		goto error_free_clk;
-+	}
-+
-+	ticks = round_up((pdata->startup_time * pdata->adc_clock /
-+			  1000000) - 1, 8) / 8;
-+	at91adc_reg_write(st->reg_base, AT91_ADC_MR,
-+			  (AT91_ADC_PRESCAL_(prsc) & AT91_ADC_PRESCAL) |
-+			  (AT91_ADC_STARTUP_(ticks) & AT91_ADC_STARTUP));
-+
-+	/* Setup the ADC channels available on the board */
-+	ret = at91adc_channel_init(idev, pdata);
-+	if (ret < 0)
-+		goto error_free_clk;
-+
-+	init_waitqueue_head(&st->wq_data_avail);
-+	mutex_init(&st->lock);
-+
-+	st->vref_mv = pdata->vref;
-+
-+	ret = iio_device_register(idev);
-+	if (ret < 0)
-+		goto error_free_channels;
-+
-+	return 0;
-+
-+error_free_channels:
-+	at91adc_channel_remove(idev);
-+error_free_clk:
-+	clk_disable(st->clk);
-+	clk_put(st->clk);
-+error_free_irq:
-+	free_irq(st->irq, st);
-+error_unmap_reg:
-+	iounmap(st->reg_base);
-+error_release_mem:
-+	release_mem_region(res->start, resource_size(res));
-+error_free_device:
-+	iio_device_free(idev);
-+error_ret:
-+	return ret;
-+}
-+
-+static int __devexit at91adc_remove(struct platform_device *pdev)
-+{
-+	struct iio_dev *idev = platform_get_drvdata(pdev);
-+	struct resource *res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	struct at91adc_state *st = iio_priv(idev);
-+
-+	at91adc_channel_remove(idev);
-+	iio_device_unregister(idev);
-+	free_irq(st->irq, idev);
-+	iounmap(st->reg_base);
-+	release_mem_region(res->start, resource_size(res));
-+	iio_device_free(idev);
-+
-+	return 0;
-+}
-+
-+static struct platform_driver at91adc_driver = {
-+	.probe = at91adc_probe,
-+	.remove = __devexit_p(at91adc_remove),
-+	.driver = {
-+		   .name = "at91adc",
-+		   },
-+};
-+
-+module_platform_driver(at91adc_driver);
-+
-+MODULE_LICENSE("GPL");
-+MODULE_DESCRIPTION("Atmel AT91 ADC Driver");
-+MODULE_AUTHOR("Maxime Ripard <maxime.ripard@free-electrons.com>");
--- 
-1.7.4.1
+This is version 8 of the set of patches adding support for the Large
+Physical Address Extensions on the ARM architecture (available with the
+Cortex-A15 and Cortex-A7 processors).
+
+This patch set against latest mainline is available on this branch:
+
+git://git.kernel.org/pub/scm/linux/kernel/git/cmarinas/linux.git for-next
+
+The full set of patches against Linux 3.1 (together with other ARM
+architecture developments) is available on this tree (rebased to latest
+mainline regularly):
+
+git://git.kernel.org/pub/scm/linux/kernel/git/cmarinas/linux-arm-arch.git
+
+The patch set also includes Russell's nopud patch with an additional
+fix-up to be reviewed (they are not in mainline yet but LPAE depends on
+them).
+
+My plan is to submit these patches for upstreaming during the upcoming
+merging window (for 3.3-rc1). Please let me know of any comments you may
+have.
+
+
+Changelog (from v7):
+
+- Several patches already merged upstream.
+- #ifdef's ARM_LPAE removed in pgable.h by moving page walking macros to
+  separate 2level.h and 3level.h files (pgalloc.h still has two #ifdef's
+  as it's not worth creating separate files for a few lines).
+- pmd_addr_end() re-introduced for the 2-level page tables as we use
+  pgtable-nopud.h which has a more complex macro that is not eliminated
+  by the compiler (following Russell's feedback).
+- alignment and debug fault codes moved to system.h near the
+  hook_fault_code() function prototype.
+- FSR bits and fsr_fs() moved to header file.
+- exceptions_init() #ifdef'ed out entirely.
+- fsr_info and ifsr_info arrays moved to separate files for 2-level and
+  3-level page table formats.
+- Kconfig ARM_LPAE help improved.
+- proc-v7.S code that differs with LPAE has been factored out into
+  proc-2level.S and proc-3level.S files to avoid lots of #ifdef's but
+  also share the common code. Functions implemented differently are
+  cpu_v7_switch_mm, cpu_v7_set_pte_ext and TTB setting via a new asm
+  macro.
+- suspend/resume code in proc-v7.S has been modified to preserve TTBCR
+  which is non-zero with LPAE.
+- Fix to ignore RAM banks beyond 4G when HIGHMEM is not enabled.
+
+
+Catalin Marinas (12):
+  ARM: pgtable: Fix compiler warning in ioremap.c introduced by nopud
+  ARM: LPAE: Move page table maintenance macros to pgtable-2level.h
+  ARM: LPAE: Move the FSR definitions to separate files
+  ARM: LPAE: Factor out classic-MMU specific code into proc-v7-2level.S
+  ARM: LPAE: Introduce the 3-level page table format definitions
+  ARM: LPAE: Page table maintenance for the 3-level format
+  ARM: LPAE: MMU setup for the 3-level page table format
+  ARM: LPAE: Invalidate the TLB before freeing the PMD
+  ARM: LPAE: Add fault handling support
+  ARM: LPAE: Add context switching support
+  ARM: LPAE: Add identity mapping support for the 3-level page table
+    format
+  ARM: LPAE: Add the Kconfig entries
+
+Russell King (1):
+  ARM: pgtable: switch to use pgtable-nopud.h
+
+Will Deacon (3):
+  ARM: LPAE: add ISBs around MMU enabling code
+  ARM: LPAE: mark memory banks with start > ULONG_MAX as highmem
+  ARM: LPAE: add support for ATAG_MEM64
+
+ arch/arm/Kconfig                            |    2 +-
+ arch/arm/boot/compressed/head.S             |    1 +
+ arch/arm/include/asm/assembler.h            |   11 ++
+ arch/arm/include/asm/page.h                 |    4 +
+ arch/arm/include/asm/pgalloc.h              |   26 ++++-
+ arch/arm/include/asm/pgtable-2level.h       |   41 ++++++
+ arch/arm/include/asm/pgtable-3level-hwdef.h |   82 +++++++++++++
+ arch/arm/include/asm/pgtable-3level-types.h |   70 +++++++++++
+ arch/arm/include/asm/pgtable-3level.h       |  155 ++++++++++++++++++++++++
+ arch/arm/include/asm/pgtable-hwdef.h        |    4 +
+ arch/arm/include/asm/pgtable.h              |   43 +------
+ arch/arm/include/asm/proc-fns.h             |   21 +++
+ arch/arm/include/asm/setup.h                |    8 ++
+ arch/arm/include/asm/system.h               |    8 ++
+ arch/arm/include/asm/tlb.h                  |   12 ++-
+ arch/arm/kernel/head.S                      |   45 +++++++-
+ arch/arm/kernel/hw_breakpoint.c             |    8 +-
+ arch/arm/kernel/setup.c                     |   23 ++++
+ arch/arm/kernel/sleep.S                     |    2 +
+ arch/arm/mm/Kconfig                         |   17 +++
+ arch/arm/mm/alignment.c                     |    2 +-
+ arch/arm/mm/context.c                       |   19 +++-
+ arch/arm/mm/fault.c                         |  111 +++--------------
+ arch/arm/mm/fault.h                         |   27 ++++-
+ arch/arm/mm/fsr-2level.c                    |   78 ++++++++++++
+ arch/arm/mm/fsr-3level.c                    |   68 +++++++++++
+ arch/arm/mm/idmap.c                         |   36 +++++-
+ arch/arm/mm/ioremap.c                       |   39 ++++---
+ arch/arm/mm/mmu.c                           |   46 +++++++-
+ arch/arm/mm/pgd.c                           |   51 +++++++-
+ arch/arm/mm/proc-macros.S                   |    5 +-
+ arch/arm/mm/proc-v7-2level.S                |  171 ++++++++++++++++++++++++++
+ arch/arm/mm/proc-v7-3level.S                |  149 +++++++++++++++++++++++
+ arch/arm/mm/proc-v7.S                       |  175 +++------------------------
+ 34 files changed, 1238 insertions(+), 322 deletions(-)
+ create mode 100644 arch/arm/include/asm/pgtable-3level-hwdef.h
+ create mode 100644 arch/arm/include/asm/pgtable-3level-types.h
+ create mode 100644 arch/arm/include/asm/pgtable-3level.h
+ create mode 100644 arch/arm/mm/fsr-2level.c
+ create mode 100644 arch/arm/mm/fsr-3level.c
+ create mode 100644 arch/arm/mm/proc-v7-2level.S
+ create mode 100644 arch/arm/mm/proc-v7-3level.S
