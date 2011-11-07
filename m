@@ -1,25 +1,106 @@
 From: rnayak@ti.com (Rajendra Nayak)
-Date: Mon, 07 Nov 2011 11:57:27 +0530
-Subject: [PATCH v4 1/4] regulator: helper routine to extract
- regulator_init_data
-In-Reply-To: <CAOesGMjkcExKXhNN1nFGey=wBie0PQGp2XS_r-5Rr3X0p4eNhg@mail.gmail.com>
-References: <1319721864-30067-1-git-send-email-rnayak@ti.com>	<20111104202905.GA3918@quad.lixom.net>	<20111104211447.GC2541@opensource.wolfsonmicro.com>	<20111104212216.GA5756@quad.lixom.net>	<20111104212910.GB8266@opensource.wolfsonmicro.com>	<CAOesGMgA7UayF9SJUP0YLnj86GmKBrajsBxv4_kRNNqCsvKTYg@mail.gmail.com>	<20111104214650.GC8266@opensource.wolfsonmicro.com>
- <CAOesGMjkcExKXhNN1nFGey=wBie0PQGp2XS_r-5Rr3X0p4eNhg@mail.gmail.com>
-Message-ID: <4EB77A4F.5010007@ti.com>
+Date: Mon, 07 Nov 2011 11:57:44 +0530
+Subject: [PATCH v3 2/4] regulator: adapt fixed regulator driver to dt
+In-Reply-To: <20111104203422.GB3918@quad.lixom.net>
+References: <1319702185-16108-1-git-send-email-rnayak@ti.com>
+ <1319702185-16108-3-git-send-email-rnayak@ti.com>
+ <20111104203422.GB3918@quad.lixom.net>
+Message-ID: <4EB77A60.5050704@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 05 November 2011 03:46 AM, Olof Johansson wrote:
->>> Yeah, ok, but it shouldn't be part of the description of regulator
->>> >>  properties per se. See how gpio does it, defining how a gpio-specifier
->>> >>  is crafted. The equivalent should be done for regulators.
->> >
->> >  That seems to be pretty much exactly what's being done here, and like
->> >  the GPIO bindings it's specified in the core document.  Though perhaps
->> >  there's some aspect of how the document is written that's missing.
- >
-> Yep, sounds good. A slightly more elaborate description of the binding
-> inspired by the gpio.txt document would be the way to do that.
 >
-Ok, will add more elaborate documentation for this in the core
-bindings.
+>> +- regulator-fixed-gpio: gpio to use for enable control
+>> +- regulator-fixed-startup-delay: startup time in microseconds
+>
+> startup-delay-ms ?
+
+ok.
+
+>
+>> +- regulator-fixed-enable-high: Polarity of enable GPIO,
+>> +  1 = Active High, 0 = Active low
+>
+> Some gpio specifiers allow you to specify active high or low flags, but either
+> way something like "enable-active-low" as a property (with active high as
+> default if property is missing) is a more devicetreey convention.
+>
+>> +- regulator-fixed-enabled-at-boot: 1 = yes, 0 = no
+>
+> Same here, you can drop the prefix. Also, the regular regulators use
+> "regulator-name" for the supply name, it would make sense to reuse the same
+> naming here, right?
+
+yes, will do these changes.
+
+>
+>> +
+>> +Example:
+>> +
+>> +	abc: fixedregulator at 0 {
+>> +		compatible = "regulator-fixed";
+>> +		regulator-fixed-supply = "fixed-supply";
+>> +		regulator-fixed-microvolts =<1800000>;
+>> +		regulator-fixed-gpio =<43>;
+>
+> This is not a valid gpio specifier.
+
+right. will fix.
+>
+>> +		regulator-fixed-startup-delay =<70000>;
+>> +		regulator-fixed-enable-high;
+>> +		regulator-fixed-enabled-at-boot;
+>> +	};
+>> diff --git a/drivers/regulator/fixed.c b/drivers/regulator/fixed.c
+>> index 2fe9d99..9851b42 100644
+>> --- a/drivers/regulator/fixed.c
+>> +++ b/drivers/regulator/fixed.c
+>> @@ -26,6 +26,9 @@
+>>   #include<linux/gpio.h>
+>>   #include<linux/delay.h>
+>>   #include<linux/slab.h>
+>> +#include<linux/of.h>
+>> +#include<linux/regulator/of_regulator.h>
+>> +#include<linux/regulator/machine.h>
+>>
+>>   struct fixed_voltage_data {
+>>   	struct regulator_desc desc;
+>> @@ -37,6 +40,46 @@ struct fixed_voltage_data {
+>>   	bool is_enabled;
+>>   };
+>>
+>> +
+>> +/**
+>> + * of_get_fixed_voltage_config - extract fixed_voltage_config structure info
+>> + * @dev: device requesting for fixed_voltage_config
+>> + *
+>> + * Populates fixed_voltage_config structure by extracting data from device
+>> + * tree node, returns a pointer to the populated structure of NULL if memory
+>> + * alloc fails.
+>> + */
+>> +struct fixed_voltage_config *of_get_fixed_voltage_config(struct device *dev)
+>> +{
+>> +	struct fixed_voltage_config *config;
+>> +	struct device_node *np = dev->of_node;
+>> +	const __be32 *microvolts, *gpio, *delay;
+>> +
+>> +	config = devm_kzalloc(dev, sizeof(struct fixed_voltage_config), GFP_KERNEL);
+>> +	if (!config)
+>> +		return NULL;
+>> +
+>> +	config->supply_name = of_get_property(np, "regulator-fixed-supply", NULL);
+>> +	microvolts = of_get_property(np, "regulator-fixed-microvolts", NULL);
+>> +	if (microvolts)
+>> +		config->microvolts = be32_to_cpu(*microvolts);
+>> +	gpio = of_get_property(np, "regulator-fixed-gpio", NULL);
+>> +	if (gpio)
+>> +		config->gpio = be32_to_cpu(*gpio);
+>
+> This needs to be fixed to parse a gpio properly instead.
+
+yes, will use of_get_gpio() here.
+
+>
+>
+>
+> -Olof
