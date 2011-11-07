@@ -1,43 +1,67 @@
-From: omar.ramirez@ti.com (Ramirez Luna, Omar)
-Date: Mon, 7 Nov 2011 12:21:41 -0600
-Subject: [PATCH v3 4/4] OMAP3/4: iommu: adapt to runtime pm
-In-Reply-To: <87obwr1n9i.fsf@ti.com>
-References: <1320185752-568-1-git-send-email-omar.ramirez@ti.com>
- <1320185752-568-5-git-send-email-omar.ramirez@ti.com>
- <87obwr1n9i.fsf@ti.com>
-Message-ID: <CAB-zwWhkdv430aD8Osgi7Kyi6ScvhkwZ7BSW1cs3Nyzxc10VYg@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 7 Nov 2011 18:29:39 +0000
+Subject: [PATCH 1/1] mmc: omap_hsmmc: DMA unmap only once in case of
+ MMC error
+In-Reply-To: <1320683111-12577-1-git-send-email-balajitk@ti.com>
+References: <1320683111-12577-1-git-send-email-balajitk@ti.com>
+Message-ID: <20111107182939.GF15294@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, Nov 07, 2011 at 09:55:11PM +0530, Balaji T K wrote:
+> From: Per Forlin <per.forlin@linaro.org>
+> 
+> Reported by Russell King:
+> mmcblk0: error -84 transferring data, sector 149201, nr 64,
+> cmd response 0x900, card status 0xb00
+> mmcblk0: retrying using single block read
+> 
+> WARNING: at lib/dma-debug.c:811 check_unmap
+> omap_hsmmc omap_hsmmc.0: DMA-API: device driver tries to free DMA memory
+> it has not allocated [device address=0x0000000080933000] [size=20480 bytes]
+> 
+> In case of an error dma_unmap() is issued in omap_hsmmc_dma_cleanup()
+> and then again in omap_hsmmc_post_req(). Resolve this by clearing the
+> host_cookie to indicate there is no DMA mapped memory to unmap.
+> 
+> Signed-off-by: Per Forlin <per.forlin@linaro.org>
+> Tested-by: Balaji T K <balajitk@ti.com>
+> ---
+> Repost with my Tested-by
 
-On Fri, Nov 4, 2011 at 6:27 PM, Kevin Hilman <khilman@ti.com> wrote:
->> @@ -821,9 +820,7 @@ static irqreturn_t iommu_fault_handler(int irq, void *data)
->> ? ? ? if (!obj->refcount)
->> ? ? ? ? ? ? ? return IRQ_NONE;
->>
->> - ? ? clk_enable(obj->clk);
->> ? ? ? errs = iommu_report_fault(obj, &da);
->> - ? ? clk_disable(obj->clk);
->> ? ? ? if (errs == 0)
->> ? ? ? ? ? ? ? return IRQ_HANDLED;
->
-> I'm not terribly familiar with this IOMMU code, but this one looks
-> suspiciou because you're removing the clock calls but not replacing them
-> with runtime PM get/put calls.
->
-> I just want to make sure that's intentional. ?If so, you might want to
-> add a comment about that to the changelog.
+Thanks.
 
-Yes it is intentional, reason is that in order to get an interrupt,
-the device should be powered on in advance, right now it is working
-because the modules share a common clock so the users of the
-omap-iommu indirectly give power to it. However I made another change
-to do pm_runtime_get/put on attach/detach so it doesn't rely on others
-to keep the clocks on.
+Tested-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
-I'll add the comment.
-
-Thanks,
-
-Omar
+> 
+>  drivers/mmc/host/omap_hsmmc.c |    7 +++++--
+>  1 files changed, 5 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
+> index 101cd31..d5fe43d 100644
+> --- a/drivers/mmc/host/omap_hsmmc.c
+> +++ b/drivers/mmc/host/omap_hsmmc.c
+> @@ -1010,6 +1010,7 @@ static void omap_hsmmc_dma_cleanup(struct omap_hsmmc_host *host, int errno)
+>  			host->data->sg_len,
+>  			omap_hsmmc_get_dma_dir(host, host->data));
+>  		omap_free_dma(dma_ch);
+> +		host->data->host_cookie = 0;
+>  	}
+>  	host->data = NULL;
+>  }
+> @@ -1575,8 +1576,10 @@ static void omap_hsmmc_post_req(struct mmc_host *mmc, struct mmc_request *mrq,
+>  	struct mmc_data *data = mrq->data;
+>  
+>  	if (host->use_dma) {
+> -		dma_unmap_sg(mmc_dev(host->mmc), data->sg, data->sg_len,
+> -			     omap_hsmmc_get_dma_dir(host, data));
+> +		if (data->host_cookie)
+> +			dma_unmap_sg(mmc_dev(host->mmc), data->sg,
+> +				     data->sg_len,
+> +				     omap_hsmmc_get_dma_dir(host, data));
+>  		data->host_cookie = 0;
+>  	}
+>  }
+> -- 
+> 1.7.0.4
+> 
