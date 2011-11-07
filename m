@@ -1,106 +1,23 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Mon, 07 Nov 2011 11:57:44 +0530
-Subject: [PATCH v3 2/4] regulator: adapt fixed regulator driver to dt
-In-Reply-To: <20111104203422.GB3918@quad.lixom.net>
-References: <1319702185-16108-1-git-send-email-rnayak@ti.com>
- <1319702185-16108-3-git-send-email-rnayak@ti.com>
- <20111104203422.GB3918@quad.lixom.net>
-Message-ID: <4EB77A60.5050704@ti.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 7 Nov 2011 07:28:36 +0100
+Subject: orion/kirkwood and device tree
+In-Reply-To: <alpine.LFD.2.02.1111062046320.3307@xanadu.home>
+References: <20111031105740.GC29402@lunn.ch>
+ <20111031152100.GR32165@titan.lakedaemon.net>
+ <20111031164042.GD29402@lunn.ch>
+ <201110312350.28475.michael@walle.cc>
+ <20111106160538.GD19491@lunn.ch>
+ <alpine.LFD.2.02.1111062046320.3307@xanadu.home>
+Message-ID: <20111107062836.GG19491@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->
->> +- regulator-fixed-gpio: gpio to use for enable control
->> +- regulator-fixed-startup-delay: startup time in microseconds
->
-> startup-delay-ms ?
+> Beware. Moving the DRAM window setup code out of the various drivers is 
+> not necessarily a good idea.  This setup is different from one 
+> peripheral to another, and the associated registers are highly 
+> peripheral specific.
 
-ok.
+Yes, i've noticed this. However, the core of the code is the same in
+every case. So i think it should be possible. We will see.
 
->
->> +- regulator-fixed-enable-high: Polarity of enable GPIO,
->> +  1 = Active High, 0 = Active low
->
-> Some gpio specifiers allow you to specify active high or low flags, but either
-> way something like "enable-active-low" as a property (with active high as
-> default if property is missing) is a more devicetreey convention.
->
->> +- regulator-fixed-enabled-at-boot: 1 = yes, 0 = no
->
-> Same here, you can drop the prefix. Also, the regular regulators use
-> "regulator-name" for the supply name, it would make sense to reuse the same
-> naming here, right?
-
-yes, will do these changes.
-
->
->> +
->> +Example:
->> +
->> +	abc: fixedregulator at 0 {
->> +		compatible = "regulator-fixed";
->> +		regulator-fixed-supply = "fixed-supply";
->> +		regulator-fixed-microvolts =<1800000>;
->> +		regulator-fixed-gpio =<43>;
->
-> This is not a valid gpio specifier.
-
-right. will fix.
->
->> +		regulator-fixed-startup-delay =<70000>;
->> +		regulator-fixed-enable-high;
->> +		regulator-fixed-enabled-at-boot;
->> +	};
->> diff --git a/drivers/regulator/fixed.c b/drivers/regulator/fixed.c
->> index 2fe9d99..9851b42 100644
->> --- a/drivers/regulator/fixed.c
->> +++ b/drivers/regulator/fixed.c
->> @@ -26,6 +26,9 @@
->>   #include<linux/gpio.h>
->>   #include<linux/delay.h>
->>   #include<linux/slab.h>
->> +#include<linux/of.h>
->> +#include<linux/regulator/of_regulator.h>
->> +#include<linux/regulator/machine.h>
->>
->>   struct fixed_voltage_data {
->>   	struct regulator_desc desc;
->> @@ -37,6 +40,46 @@ struct fixed_voltage_data {
->>   	bool is_enabled;
->>   };
->>
->> +
->> +/**
->> + * of_get_fixed_voltage_config - extract fixed_voltage_config structure info
->> + * @dev: device requesting for fixed_voltage_config
->> + *
->> + * Populates fixed_voltage_config structure by extracting data from device
->> + * tree node, returns a pointer to the populated structure of NULL if memory
->> + * alloc fails.
->> + */
->> +struct fixed_voltage_config *of_get_fixed_voltage_config(struct device *dev)
->> +{
->> +	struct fixed_voltage_config *config;
->> +	struct device_node *np = dev->of_node;
->> +	const __be32 *microvolts, *gpio, *delay;
->> +
->> +	config = devm_kzalloc(dev, sizeof(struct fixed_voltage_config), GFP_KERNEL);
->> +	if (!config)
->> +		return NULL;
->> +
->> +	config->supply_name = of_get_property(np, "regulator-fixed-supply", NULL);
->> +	microvolts = of_get_property(np, "regulator-fixed-microvolts", NULL);
->> +	if (microvolts)
->> +		config->microvolts = be32_to_cpu(*microvolts);
->> +	gpio = of_get_property(np, "regulator-fixed-gpio", NULL);
->> +	if (gpio)
->> +		config->gpio = be32_to_cpu(*gpio);
->
-> This needs to be fixed to parse a gpio properly instead.
-
-yes, will use of_get_gpio() here.
-
->
->
->
-> -Olof
+      Andrew
