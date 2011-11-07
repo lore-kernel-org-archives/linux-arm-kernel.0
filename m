@@ -1,37 +1,42 @@
 From: zonque@gmail.com (Daniel Mack)
-Date: Mon,  7 Nov 2011 16:43:28 +0100
-Subject: [PATCH 1/4] mtd: pxa3xx_nand: fix a memory leak
+Date: Mon,  7 Nov 2011 16:43:31 +0100
+Subject: [PATCH 4/4] mtd: pxa3xx_nand: Fix blank page ECC mismatch
 In-Reply-To: <1320680611-29448-1-git-send-email-zonque@gmail.com>
 References: <1320680611-29448-1-git-send-email-zonque@gmail.com>
-Message-ID: <1320680611-29448-2-git-send-email-zonque@gmail.com>
+Message-ID: <1320680611-29448-5-git-send-email-zonque@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Axel Lin <axel.lin@gmail.com>
+This bug was introduced in f8155a40 ("mtd: pxa3xx_nand: rework irq
+logic") and causes the PXA3xx NAND controller fail to operate with NAND
+flash that has empty pages. According to the comment in this block, the
+hardware controller will report a double-bit error for empty pages,
+which can and must be ignored.
 
-In pxa3xx_nand_remove, we should call nand_release instead of
-mtd_device_unregister to properly free bad block table memory
-and bad block descriptor memory.
+This patch restores the original behaviour of the driver.
 
-Signed-off-by: Axel Lin <axel.lin@gmail.com>
+Signed-off-by: Daniel Mack <zonque@gmail.com>
 Acked-by: Lei Wen <leiwen@marvell.com>
+Cc: Haojian Zhuang <haojian.zhuang@marvell.com>
+Cc: David Woodhouse <David.Woodhouse@intel.com>
+Cc: stable at kernel.org [2.6.38+]
 Signed-off-by: Artem Bityutskiy <Artem.Bityutskiy@nokia.com>
 ---
- drivers/mtd/nand/pxa3xx_nand.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ drivers/mtd/nand/pxa3xx_nand.c |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
 
 diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
-index 1fb3b3a..f7040ea 100644
+index f08fae9..063cb19 100644
 --- a/drivers/mtd/nand/pxa3xx_nand.c
 +++ b/drivers/mtd/nand/pxa3xx_nand.c
-@@ -1119,7 +1119,7 @@ static int pxa3xx_nand_remove(struct platform_device *pdev)
- 	clk_put(info->clk);
- 
- 	if (mtd) {
--		mtd_device_unregister(mtd);
-+		nand_release(mtd);
- 		kfree(mtd);
+@@ -685,6 +685,8 @@ static int pxa3xx_nand_read_page_hwecc(struct mtd_info *mtd,
+ 		 * OOB, ignore such double bit errors
+ 		 */
+ 		if (is_buf_blank(buf, mtd->writesize))
++			info->retcode = ERR_NONE;
++		else
+ 			mtd->ecc_stats.failed++;
  	}
- 	return 0;
+ 
 -- 
 1.7.6.4
