@@ -1,53 +1,28 @@
-From: adrian.wenl@gmail.com (Lei Wen)
-Date: Tue, 8 Nov 2011 04:55:43 +0800
-Subject: 2b034922 breaks kexec on ARM
-In-Reply-To: <20111107192043.GT12913@n2100.arm.linux.org.uk>
-References: <20111107185125.GA17464@mudshark.cambridge.arm.com>
- <20111107190314.GS12913@n2100.arm.linux.org.uk>
- <20111107191453.GC17464@mudshark.cambridge.arm.com>
- <20111107192043.GT12913@n2100.arm.linux.org.uk>
-Message-ID: <CALZhoSRZu=fbsToqWQsxJBSQ6huwxtkR=M7iFZyJ576jeJ4FHw@mail.gmail.com>
+From: michael@walle.cc (Michael Walle)
+Date: Mon,  7 Nov 2011 21:54:11 +0100
+Subject: [PATCH] ARM: Add lsxhl machine type to mach-types
+Message-ID: <1320699251-26115-1-git-send-email-michael@walle.cc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 8, 2011 at 3:20 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Mon, Nov 07, 2011 at 07:14:53PM +0000, Will Deacon wrote:
->> On Mon, Nov 07, 2011 at 07:03:15PM +0000, Russell King - ARM Linux wrote:
->> > Hmm, having looked at kernel/kexec.c, this patch is clearly wrong.
->> > There are two kernels which can be loaded into kexec - a crash kernel
->> > and a default kernel. ?These are kept entirely separately (and the
->> > per-kernel context is stored in 'image').
->> >
->> > However, this patch makes machine_kexec_prepare() store into some
->> > _global_ variables, which means if you've loaded a crash kernel
->> > followed by a default kernel, the values for the crash kernel will
->> > be corrupted.
->> >
->> > So yes, I think a revert of this patch is the right thing.
->>
->> Great. Would you like me to submit the revert to the patch system or are you
->> happy just to do it using git?
->
-> I've reverted it myself (see the tip of the fixes branch). ?It's slightly
-> annoying that the branch was only pulled last night.
->
->> > I think the only valid thing its doing is moving the copy of the
->> > reboot code earlier, but I don't see the value of moving just that.
->>
->> Neither can I. It seems to be happy enough with the patch reverted, so if it
->> ain't broke...
->
-> I guess this is where the problems of poor commit descriptions crop up.
-> We don't know _why_ the original author of the patch wanted to make the
-> change - we don't know if they were seeing a problem.
->
+(Re-)add Buffalo Linkstation Pro LS-XHL machine type.
 
-Apologize for messing things up...
-But we have make in-depth testing over that patch already in our local
-code base...
-Does this problem happens for the kernel is running on a SMP soc? Our current
-testing haven't extend to SMP one, but only have test on non-smp.
+Signed-off-by: Michael Walle <michael@walle.cc>
+---
+ arch/arm/tools/mach-types |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-Best regards,
-Lei
+diff --git a/arch/arm/tools/mach-types b/arch/arm/tools/mach-types
+index 5bdeef9..d50917e 100644
+--- a/arch/arm/tools/mach-types
++++ b/arch/arm/tools/mach-types
+@@ -458,6 +458,7 @@ mityomapl138		MACH_MITYOMAPL138	MITYOMAPL138		2650
+ guruplug		MACH_GURUPLUG		GURUPLUG		2659
+ spear310		MACH_SPEAR310		SPEAR310		2660
+ spear320		MACH_SPEAR320		SPEAR320		2661
++lsxhl			MACH_LSXHL		LSXHL			2663
+ aquila			MACH_AQUILA		AQUILA			2676
+ sheeva_esata		MACH_ESATA_SHEEVAPLUG	ESATA_SHEEVAPLUG	2678
+ msm7x30_surf		MACH_MSM7X30_SURF	MSM7X30_SURF		2679
+-- 
+1.7.2.5
