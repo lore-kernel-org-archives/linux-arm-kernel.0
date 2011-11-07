@@ -1,17 +1,21 @@
-From: h.feurstein@gmail.com (Hubert Feurstein)
-Date: Mon, 7 Nov 2011 17:36:39 +0100
-Subject: [PATCH V2] drivers/i2c/busses/i2c-at91.c: fix brokeness
-In-Reply-To: <alpine.DEB.2.00.1111071019560.21431@gatekeeper.vosshq.de>
-References: <alpine.DEB.2.00.1111071019560.21431@gatekeeper.vosshq.de>
-Message-ID: <CAFfN3gXdqb7aKF1MiE8XAbu=seTy+9Giqs5SZcMbF2rfoDmX_Q@mail.gmail.com>
+From: sangwook.lee@linaro.org (Sangwook Lee)
+Date: Mon,  7 Nov 2011 17:05:20 +0000
+Subject: [PATCH 0/2] ARM: SAMSUNG: Add pm_caps 
+Message-ID: <1320685522-17481-1-git-send-email-sangwook.lee@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Add pm_caps into platform data and update it in SD/MMC driver
+This field can be used with SDIO device such as SDIO WLAN.
 
-sorry, but your patch still does not apply. You fixed the tab issue,
-but it seems that there are still some bad whitespaces left which
-corrupt your patch.
+Sangwook Lee (2):
+  ARM: SAMSUNG: Add pm_caps into platform data
+  mmc: sdhci-s3c: Add pm_caps into SD/MMC host
 
-Regards
-Hubert
+ arch/arm/plat-samsung/dev-hsmmc3.c         |    2 ++
+ arch/arm/plat-samsung/include/plat/sdhci.h |    2 ++
+ drivers/mmc/host/sdhci-s3c.c               |    3 +++
+ 3 files changed, 7 insertions(+), 0 deletions(-)
+
+-- 
+1.7.4.1
