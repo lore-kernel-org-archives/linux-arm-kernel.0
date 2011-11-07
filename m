@@ -1,71 +1,41 @@
-From: J.Kilb@phytec.de (Juergen Kilb)
-Date: Mon, 7 Nov 2011 22:30:16 +0100
-Subject: [PATCH 1/2] ARM:OMAP:hwmod: Fix handling of return value in
- omap3xx_hwmod_init.
-In-Reply-To: <1320701417-16818-1-git-send-email-J.Kilb@phytec.de>
-References: <1320701417-16818-1-git-send-email-J.Kilb@phytec.de>
-Message-ID: <1320701417-16818-2-git-send-email-J.Kilb@phytec.de>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Mon,  7 Nov 2011 22:31:42 +0100
+Subject: [PATCH 0/3 V2] Initial PXA DT bindings
+In-Reply-To: <1320172354-3795-1-git-send-email-marek.vasut@gmail.com>
+References: <1320172354-3795-1-git-send-email-marek.vasut@gmail.com>
+Message-ID: <1320701506-26812-1-git-send-email-marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Because omap_hwmod_register() always return '0', checking the
-return value as followed:
+This patchset starts effort to convert PXA machines to DT. I started with PXA
+UART driver and added a stub machine, which I plan to eventually rename to
+board-pxa-dt when ready.
 
-	r = omap_hwmod_register(omap3xxx_hwmods);
-	if (!r)
-		return r;
+The file in patch 0002 contains style errors (line over 80), because they are 1
+character over. To avoid crippling readability, I left that as is.
 
-leads to exiting the omap3xxx_hwmod_init() function right after
-adding the omap3xxx_hwmods which are common to all omap3 variants.
+Marek Vasut (3):
+  ARM: pxa: Add DT support to pxa2xx-uart
+  ARM: pxa: Add DT testing machine
+  ARM: pxa: Add basic DTS files for PXA/Vpac270 testing machine
 
-Therefore hwmods special to other revisions will not be
-registered.
+ arch/arm/boot/dts/pxa-vpac270.dts |   37 +++++++++++++++++
+ arch/arm/boot/dts/pxa.dtsi        |   71 ++++++++++++++++++++++++++++++++
+ arch/arm/mach-pxa/Kconfig         |   15 +++++++
+ arch/arm/mach-pxa/Makefile        |    3 +
+ arch/arm/mach-pxa/vpac270-dt.c    |   82 +++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-pxa/vpac270.c       |    2 +
+ drivers/tty/serial/pxa.c          |   46 +++++++++++++++++++-
+ 7 files changed, 253 insertions(+), 3 deletions(-)
+ create mode 100644 arch/arm/boot/dts/pxa-vpac270.dts
+ create mode 100644 arch/arm/boot/dts/pxa.dtsi
+ create mode 100644 arch/arm/mach-pxa/vpac270-dt.c
 
-Signed-off-by: Juergen Kilb <J.Kilb@phytec.de>
----
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |   13 ++++---------
- 1 files changed, 4 insertions(+), 9 deletions(-)
+V2: Adjust to recent DT changes (see patches for details)
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-index 3008e16..30ec4bd 100644
---- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-@@ -3261,14 +3261,11 @@ static __initdata struct omap_hwmod *am35xx_hwmods[] = {
- 
- int __init omap3xxx_hwmod_init(void)
- {
--	int r;
- 	struct omap_hwmod **h = NULL;
- 	unsigned int rev;
- 
- 	/* Register hwmods common to all OMAP3 */
--	r = omap_hwmod_register(omap3xxx_hwmods);
--	if (!r)
--		return r;
-+	omap_hwmod_register(omap3xxx_hwmods);
- 
- 	rev = omap_rev();
- 
-@@ -3291,9 +3288,7 @@ int __init omap3xxx_hwmod_init(void)
- 		return -EINVAL;
- 	};
- 
--	r = omap_hwmod_register(h);
--	if (!r)
--		return r;
-+	omap_hwmod_register(h);
- 
- 	/*
- 	 * Register hwmods specific to certain ES levels of a
-@@ -3309,7 +3304,7 @@ int __init omap3xxx_hwmod_init(void)
- 	};
- 
- 	if (h)
--		r = omap_hwmod_register(h);
-+		omap_hwmod_register(h);
- 
--	return r;
-+	return 0;
- }
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Grant Likely <grant.likely@secretlab.ca>
+Cc: Rob Herring <robherring2@gmail.com>
+
 -- 
-1.7.0.4
+1.7.7.1
