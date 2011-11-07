@@ -1,29 +1,82 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 7 Nov 2011 13:47:24 -0800
-Subject: [GIT PULL] omap fixes for v3.2 merge window breakage
-In-Reply-To: <20111107212919.GI15294@n2100.arm.linux.org.uk>
-References: <20111107204929.GZ31337@atomide.com>
- <20111107212919.GI15294@n2100.arm.linux.org.uk>
-Message-ID: <20111107214724.GA31337@atomide.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 7 Nov 2011 21:47:55 +0000
+Subject: 2b034922 breaks kexec on ARM
+In-Reply-To: <CALZhoSRZu=fbsToqWQsxJBSQ6huwxtkR=M7iFZyJ576jeJ4FHw@mail.gmail.com>
+References: <20111107185125.GA17464@mudshark.cambridge.arm.com>
+ <20111107190314.GS12913@n2100.arm.linux.org.uk>
+ <20111107191453.GC17464@mudshark.cambridge.arm.com>
+ <20111107192043.GT12913@n2100.arm.linux.org.uk>
+ <CALZhoSRZu=fbsToqWQsxJBSQ6huwxtkR=M7iFZyJ576jeJ4FHw@mail.gmail.com>
+Message-ID: <20111107214755.GA27679@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@arm.linux.org.uk> [111107 12:54]:
-> Arnd,
-> 
-> Don't pull this - there's yet more crap in OMAP to be fixed before
-> these go to mainline.  OMAP3 is severely broken at the moment with,
-> to put it bluntly, totally fucked up OMAP hwmod code, and should be
-> fixed *now* by folk before this pull request.
-> 
-> The fixes are damned trivial I expect even Tony can fix it without
-> reference to Paul.
+On Mon, Nov 07, 2011 at 08:55:43PM +0000, Lei Wen wrote:
+> Apologize for messing things up...
+> But we have make in-depth testing over that patch already in our local
+> code base...
 
-> >       ARM: OMAP3: hwmod: fix variant registration and remove SmartReflex from common list
+Hmm, well even if we put Russell's concerns aside for a moment, the code
+does:
 
-Sounds like the above patch already queued should fix the issues you
-are seeing with hwmod?
+		/* Loading another kernel to reboot into */
+                if ((flags & KEXEC_ON_CRASH) == 0)
+                        result = kimage_normal_alloc(&image, entry,
+                                                        nr_segments, segments);
+                /* Loading another kernel to switch to if this one crashes */
+                else if (flags & KEXEC_ON_CRASH) {
+                        /* Free any current crash dump kernel before
+                         * we corrupt it.
+                         */
+                        kimage_free(xchg(&kexec_crash_image, NULL));
+                        result = kimage_crash_alloc(&image, entry,
+                                                     nr_segments, segments);
+                        crash_map_reserved_pages();
+                }
+                if (result)
+                        goto out;
 
-Or do you still have other issues you're having?
+                if (flags & KEXEC_PRESERVE_CONTEXT)
+                        image->preserve_context = 1;
+                result = machine_kexec_prepare(image);
 
-Tony
+At this point the image may be fresh out of kimage_normal_malloc, which sets
+image->head to 0 (i.e. a NULL indirection page). So when machine_kexec_prepare
+tries to determine the page list, it's NULL and relocate_new_kernel will do:
+
+	/*
+	 * If there is no indirection page (we are doing crashdumps)
+	 * skip any relocation.
+	 */
+	cmp	r0, #0
+	beq	2f
+
+and not actually relocate the kernel sections at all! In fact, looking back at
+kernel/kexec.c, right after calling machine_kexec_prepare it goes and loads
+the segments:
+
+                if (result)
+                        goto out;
+
+                for (i = 0; i < nr_segments; i++) {
+                        result = kimage_load_segment(image, &image->segment[i]);
+                        if (result)
+                                goto out;
+                }
+
+so only at this point is it safe to start setting up the page list (as the
+image entries are now populated).
+
+So why is this passing your in-depth testing? It could be that:
+
+  (1) You're only testing crashdumps, which don't need the indirection page.
+  (2) You don't have the poison_init_mem patches in arch/arm/mm/init.c and
+      actually end up using the old kernel that's still kicking around in
+      memory.
+  (3) Your testing isn't that in-depth after all.
+
+It's probably a combination of all three, but the fact remains that this patch
+is breaking things so you should probably roll another version if you really
+need to move parts of the image setup earlier on.
+
+Will
