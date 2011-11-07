@@ -1,38 +1,110 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Mon, 7 Nov 2011 15:03:55 -0800
-Subject: [PATCH v3 0/8] Add support for tegra30 and cardhu
-In-Reply-To: <1320675617-20751-1-git-send-email-pdeschrijver@nvidia.com>
-References: <1320675617-20751-1-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF173F9A525A@HQMAIL01.nvidia.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 7 Nov 2011 15:07:28 -0800
+Subject: [PATCH] arm: omap2+: hwmod: fix breakage introduced by d6504acd
+In-Reply-To: <20111107225529.GK15294@n2100.arm.linux.org.uk>
+References: <1320688617-4543-1-git-send-email-balbi@ti.com>
+ <20111107183208.GG15294@n2100.arm.linux.org.uk>
+ <20111107193908.GA5059@legolas.emea.dhcp.ti.com>
+ <20111107212707.GH15294@n2100.arm.linux.org.uk>
+ <alpine.DEB.2.00.1111071428001.12394@utopia.booyaka.com>
+ <20111107224129.GJ15294@n2100.arm.linux.org.uk>
+ <20111107225157.GB31337@atomide.com>
+ <20111107225529.GK15294@n2100.arm.linux.org.uk>
+Message-ID: <20111107230728.GC31337@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Peter De Schrijver wrote at Monday, November 07, 2011 7:20 AM:
-> This patchset adds support for the tegra30 SoC and the cardhu development
-> board.
+* Russell King - ARM Linux <linux@arm.linux.org.uk> [111107 14:20]:
+> On Mon, Nov 07, 2011 at 02:51:57PM -0800, Tony Lindgren wrote:
+> > Here's what I got. Looks like the removal of the sr[12]_hwmod
+> > part is no longer needed, so only the r value check part is needed.
 > 
-> Pathset is on top of Will Deacon's ARM reset work.
+> Err.  So do you have anything in your git tree which you're pushing out
+> this evening which removes the sr[12]_hwmod from the omap_3xxx_hwmod
+> list?
+> 
+> If not, how does that bug get fixed in mainline?
 
-Peter, how did you test this on Tegra30/Cardhu?
+Ah sorry, there's also the following commit there that deals
+with other related issues:
 
-I took the branch you send me containing all your patches and built it. I
-tried booting this using both our internal Tegra30 U-boot, and using
-fastboot from an internal Android Honeycomb image. In both cases, as soon
-as the kernel started, it spewed a line or two of binary garbage on the
-serial port, then nothing. Can you fill me in on details like:
+From: Abhilash K V <abhilash.kv@ti.com>
+Date: Fri, 7 Oct 2011 03:08:56 -0600
+Subject: [PATCH] ARM: OMAP: AM35x: remove hwmods that aren't generic
 
-a) What .config you used
-b) What kernel command-line you used
-c) Do you have an A01 or A02 CPU on your Cardhu, and how much RAM?
-d) What bootloader you used (exact git commit ID of U-Boot, or the 
-Android build ID)
-e) Do you have any local changes applied that may help boot work but aren't
-in your patchset, or the branch you sent me?
+Removing modules iva, sr1_hwmod, sr2_hwmod, mailbox from
+the base omap3xxx_hwmods list, so that they can be excluded
+for am35x.  This removes quite a few warnings on boot for AM35x.
 
-Perhaps we should work on this off-list and report back once I've got it
-working.
+Signed-off-by: Abhilash K V <abhilash.kv@ti.com>
+[paul at pwsan.com: dropped 'mailbox class' comments; updated changelog]
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
 
-Thanks.
-
--- 
-nvpublic
+--- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+@@ -3132,7 +3132,6 @@ static __initdata struct omap_hwmod *omap3xxx_hwmods[] = {
+ 	&omap3xxx_mmc2_hwmod,
+ 	&omap3xxx_mmc3_hwmod,
+ 	&omap3xxx_mpu_hwmod,
+-	&omap3xxx_iva_hwmod,
+ 
+ 	&omap3xxx_timer1_hwmod,
+ 	&omap3xxx_timer2_hwmod,
+@@ -3161,8 +3160,6 @@ static __initdata struct omap_hwmod *omap3xxx_hwmods[] = {
+ 	&omap3xxx_i2c1_hwmod,
+ 	&omap3xxx_i2c2_hwmod,
+ 	&omap3xxx_i2c3_hwmod,
+-	&omap34xx_sr1_hwmod,
+-	&omap34xx_sr2_hwmod,
+ 
+ 	/* gpio class */
+ 	&omap3xxx_gpio1_hwmod,
+@@ -3184,8 +3181,6 @@ static __initdata struct omap_hwmod *omap3xxx_hwmods[] = {
+ 	&omap3xxx_mcbsp2_sidetone_hwmod,
+ 	&omap3xxx_mcbsp3_sidetone_hwmod,
+ 
+-	/* mailbox class */
+-	&omap3xxx_mailbox_hwmod,
+ 
+ 	/* mcspi class */
+ 	&omap34xx_mcspi1,
+@@ -3198,31 +3193,39 @@ static __initdata struct omap_hwmod *omap3xxx_hwmods[] = {
+ 
+ /* 3430ES1-only hwmods */
+ static __initdata struct omap_hwmod *omap3430es1_hwmods[] = {
++	&omap3xxx_iva_hwmod,
+ 	&omap3430es1_dss_core_hwmod,
++	&omap3xxx_mailbox_hwmod,
+ 	NULL
+ };
+ 
+ /* 3430ES2+-only hwmods */
+ static __initdata struct omap_hwmod *omap3430es2plus_hwmods[] = {
++	&omap3xxx_iva_hwmod,
+ 	&omap3xxx_dss_core_hwmod,
+ 	&omap3xxx_usbhsotg_hwmod,
++	&omap3xxx_mailbox_hwmod,
+ 	NULL
+ };
+ 
+ /* 34xx-only hwmods (all ES revisions) */
+ static __initdata struct omap_hwmod *omap34xx_hwmods[] = {
++	&omap3xxx_iva_hwmod,
+ 	&omap34xx_sr1_hwmod,
+ 	&omap34xx_sr2_hwmod,
++	&omap3xxx_mailbox_hwmod,
+ 	NULL
+ };
+ 
+ /* 36xx-only hwmods (all ES revisions) */
+ static __initdata struct omap_hwmod *omap36xx_hwmods[] = {
++	&omap3xxx_iva_hwmod,
+ 	&omap3xxx_uart4_hwmod,
+ 	&omap3xxx_dss_core_hwmod,
+ 	&omap36xx_sr1_hwmod,
+ 	&omap36xx_sr2_hwmod,
+ 	&omap3xxx_usbhsotg_hwmod,
++	&omap3xxx_mailbox_hwmod,
+ 	NULL
+ };
+ 
