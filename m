@@ -1,38 +1,69 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Mon, 07 Nov 2011 11:53:36 +0530
-Subject: [PATCH v4 1/4] regulator: helper routine to extract
- regulator_init_data
-In-Reply-To: <20111104202905.GA3918@quad.lixom.net>
-References: <1319721864-30067-1-git-send-email-rnayak@ti.com>
- <20111104202905.GA3918@quad.lixom.net>
-Message-ID: <4EB77968.803@ti.com>
+From: dirk.behme@googlemail.com (Dirk Behme)
+Date: Mon, 07 Nov 2011 07:25:19 +0100
+Subject: [PATCH] distclean: Remove generated .dtb files
+In-Reply-To: <CACxGe6vK24j=L_WQWf5eqmdKXf0gCD=waAbJj4eq9d63O8mbvA@mail.gmail.com>
+References: <1320473955-4500-1-git-send-email-dirk.behme@de.bosch.com>
+ <20111106183802.GB2546@ponder.secretlab.ca>
+ <CACxGe6vK24j=L_WQWf5eqmdKXf0gCD=waAbJj4eq9d63O8mbvA@mail.gmail.com>
+Message-ID: <4EB779CF.4040007@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
+On 06.11.2011 19:42, Grant Likely wrote:
+> On Sun, Nov 6, 2011 at 11:38 AM, Grant Likely<grant.likely@secretlab.ca>  wrote:
+>> On Sat, Nov 05, 2011 at 07:19:15AM +0100, Dirk Behme wrote:
+>>> The patch 'arm/dt: Add dtb make rule' adds support to
+>>> create a .dtb file. But this is never removed afterwards.
+>>> Remove the generated .dtb file if 'distclean' is called.
+>>>
+>>> Signed-off-by: Dirk Behme<dirk.behme@de.bosch.com>
+>>> CC: Rob Herring<rob.herring@calxeda.com>
+>>> CC: Shawn Guo<shawn.guo@freescale.com>
+>>> CC: Jason Liu<jason.hui@linaro.org>
+>>> CC: Grant Likely<grant.likely@secretlab.ca>
+>>
+>> Acked-by: Grant Likely<grant.likely@secretlab.ca>
+>
+> ... although why are only the .dtb files needed in the clean list?
+> How are the other built files cleaned?  'make clean' does remove the
+> other images, but I don't know what the mechanism is.
 
-On Saturday 05 November 2011 01:59 AM, Olof Johansson wrote:
->> +- regulator-min-uV: smallest voltage consumers may set
->> >  +- regulator-max-uV: largest voltage consumers may set
->> >  +- regulator-uV-offset: Offset applied to voltages to compensate for voltage drops
->> >  +- regulator-min-uA: smallest current consumers may set
->> >  +- regulator-max-uA: largest current consumers may set
->> >  +- regulator-always-on: boolean, regulator should never be disabled
->> >  +- regulator-boot-on: bootloader/firmware enabled regulator
- >
-> Once you have a compatible field that can determine what kind of device node,
-> and binding, this is, you can drop the regulator- prefix and save some space in
-> the device tree. Properties are rarely prefixed by their subsystem. Only
-> exception would/could be the regulator-name property where it could make
-> sense to keep the prefix.
+A lot of stuff is removed by the top level Makefile [1]. But as the 
+patch "arm/dt: Add dtb make rule" adds the .dtb generation to 
+arch/arm/boot/Makefile, we thought it would be a good place to add the 
+removal of that file there, too.
 
-given that we decided not to have a compatible field like "regulator"
-for the top-level bindings and instead have a device specific one,
-and based on the discussions with Grant here[1], I hope its OK to keep
-these the way they are.
+Hmm, not sure if this answers your question, though ;)
 
-regards,
-Rajendra
+Best regards
+
+Dirk
 
 [1] 
-http://lists.ozlabs.org/pipermail/devicetree-discuss/2011-September/008196.html
+http://git.kernel.org/?p=linux/kernel/git/torvalds/linux.git;a=blob;f=Makefile;h=ed25c5b35470dc2035f8b024994fa6cb7cecaca6;hb=HEAD#l1188
+
+>>
+>>> ---
+>>>   arch/arm/boot/Makefile |    2 ++
+>>>   1 files changed, 2 insertions(+), 0 deletions(-)
+>>>
+>>> diff --git a/arch/arm/boot/Makefile b/arch/arm/boot/Makefile
+>>> index 1cd9b0a..08f0d35 100644
+>>> --- a/arch/arm/boot/Makefile
+>>> +++ b/arch/arm/boot/Makefile
+>>> @@ -71,6 +71,8 @@ $(obj)/%.dtb: $(src)/dts/%.dts
+>>>
+>>>   $(obj)/dtbs: $(addprefix $(obj)/, $(dtb-y))
+>>>
+>>> +clean-files := *.dtb
+>>> +
+>>>   quiet_cmd_uimage = UIMAGE  $@
+>>>         cmd_uimage = $(CONFIG_SHELL) $(MKIMAGE) -A arm -O linux -T kernel \
+>>>                   -C none -a $(LOADADDR) -e $(STARTADDR) \
+>>> --
+>>> 1.7.0.4
+>>>
+>>
+>
+>
+>
