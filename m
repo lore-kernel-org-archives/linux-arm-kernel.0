@@ -1,57 +1,131 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Mon, 07 Nov 2011 18:15:59 -0500 (EST)
-Subject: [PATCH] ARM: kirkwood: add LaCie Network Space Lite v2 support
-In-Reply-To: <20111107151233.GD18750@kw.sim.vm.gnt>
-References: <1320661790-7066-1-git-send-email-cvubrugier@lacie.com>
- <20111107103506.GN12913@n2100.arm.linux.org.uk>
- <20111107143959.GC18750@kw.sim.vm.gnt>
- <20111107144200.GQ12913@n2100.arm.linux.org.uk>
- <20111107151233.GD18750@kw.sim.vm.gnt>
-Message-ID: <alpine.LFD.2.02.1111071815120.3307@xanadu.home>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 7 Nov 2011 23:16:32 +0000
+Subject: [PATCH] arm: omap2+: hwmod: fix breakage introduced by d6504acd
+In-Reply-To: <20111107230728.GC31337@atomide.com>
+References: <1320688617-4543-1-git-send-email-balbi@ti.com>
+ <20111107183208.GG15294@n2100.arm.linux.org.uk>
+ <20111107193908.GA5059@legolas.emea.dhcp.ti.com>
+ <20111107212707.GH15294@n2100.arm.linux.org.uk>
+ <alpine.DEB.2.00.1111071428001.12394@utopia.booyaka.com>
+ <20111107224129.GJ15294@n2100.arm.linux.org.uk>
+ <20111107225157.GB31337@atomide.com>
+ <20111107225529.GK15294@n2100.arm.linux.org.uk>
+ <20111107230728.GC31337@atomide.com>
+Message-ID: <20111107231632.GL15294@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 7 Nov 2011, Simon Guinot wrote:
-
-> On Mon, Nov 07, 2011 at 02:42:00PM +0000, Russell King - ARM Linux wrote:
-> > On Mon, Nov 07, 2011 at 03:39:59PM +0100, Simon Guinot wrote:
-> > > Hi Russel,
-> > > 
-> > > On Mon, Nov 07, 2011 at 10:35:06AM +0000, Russell King - ARM Linux wrote:
-> > > > On Mon, Nov 07, 2011 at 11:29:50AM +0100, Christophe Vu-Brugier wrote:
-> > > > > +#ifdef CONFIG_MACH_NETSPACE_LITE_V2
-> > > > > +MACHINE_START(NETSPACE_LITE_V2, "LaCie Network Space Lite v2")
-> > > > > +	.atag_offset	= 0x100,
-> > > > > +	.init_machine	= netspace_v2_init,
-> > > > > +	.map_io		= kirkwood_map_io,
-> > > > > +	.init_early	= kirkwood_init_early,
-> > > > > +	.init_irq	= kirkwood_init_irq,
-> > > > > +	.timer		= &kirkwood_timer,
-> > > > 
-> > > > When the restart series is queued, you'll have to add a:
-> > > > 	.restart	= kirkwood_restart,
-> > > > 
-> > > > here.
-> > > > 
-> > > > Please also order these initializers in the same order as they're
-> > > > declared in struct machine_desc - the order there reflects the order in
-> > > > which they're called.  They're done like that to aid peoples
-> > > > understanding of the ordering there.
-> > > > 
-> > > > So you want .init_machine after .timer.
-> > > 
-> > > The Christophe's patch is consistent with the other Kirkwood machines
-> > > declarations. Maybe that all this declarations should be fixed with a
-> > > separate patch ?
+On Mon, Nov 07, 2011 at 03:07:28PM -0800, Tony Lindgren wrote:
+> * Russell King - ARM Linux <linux@arm.linux.org.uk> [111107 14:20]:
+> > On Mon, Nov 07, 2011 at 02:51:57PM -0800, Tony Lindgren wrote:
+> > > Here's what I got. Looks like the removal of the sr[12]_hwmod
+> > > part is no longer needed, so only the r value check part is needed.
 > > 
-> > Why create more work (and churn) by having to fix new introductions up?
-> > Why not make sure new introductions are correct first time around.
+> > Err.  So do you have anything in your git tree which you're pushing out
+> > this evening which removes the sr[12]_hwmod from the omap_3xxx_hwmod
+> > list?
+> > 
+> > If not, how does that bug get fixed in mainline?
 > 
-> Yes, sure. On the other hand, having different field ordering for the
-> machine_desc declarations within a same file could confuse the reader
-> as well.
+> Ah sorry, there's also the following commit there that deals
+> with other related issues:
 
-What about a patch fixing the ordering first?
+Great, so it looks like everything that I've found over the last two days
+should be solved completely by what you have queued for Arnd.
 
+One last issue though...
 
-Nicolas
+We had this patch:
+
+http://lists.arm.linux.org.uk/lurker/message/20111006.232441.227dfcf6.en.html
+
+which is from Paul, post my complaint about IS_ERR_VALUE being used.
+This removed sr1_hwmod and sr2_hwmod, and the commit message explicitly
+talks about doing this.
+
+There's also the patch below.  Somehow, this resulted in that bit of
+Paul's patch being removed (possibly automatically by git) but the commit
+comments are retained, which are now stale and no longer reflect what the
+patch is doing...  That's rather unfortunate, but at this point its
+probably too late to do something about it.
+
+> From: Abhilash K V <abhilash.kv@ti.com>
+> Date: Fri, 7 Oct 2011 03:08:56 -0600
+> Subject: [PATCH] ARM: OMAP: AM35x: remove hwmods that aren't generic
+> 
+> Removing modules iva, sr1_hwmod, sr2_hwmod, mailbox from
+> the base omap3xxx_hwmods list, so that they can be excluded
+> for am35x.  This removes quite a few warnings on boot for AM35x.
+> 
+> Signed-off-by: Abhilash K V <abhilash.kv@ti.com>
+> [paul at pwsan.com: dropped 'mailbox class' comments; updated changelog]
+> Signed-off-by: Paul Walmsley <paul@pwsan.com>
+> 
+> --- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+> @@ -3132,7 +3132,6 @@ static __initdata struct omap_hwmod *omap3xxx_hwmods[] = {
+>  	&omap3xxx_mmc2_hwmod,
+>  	&omap3xxx_mmc3_hwmod,
+>  	&omap3xxx_mpu_hwmod,
+> -	&omap3xxx_iva_hwmod,
+>  
+>  	&omap3xxx_timer1_hwmod,
+>  	&omap3xxx_timer2_hwmod,
+> @@ -3161,8 +3160,6 @@ static __initdata struct omap_hwmod *omap3xxx_hwmods[] = {
+>  	&omap3xxx_i2c1_hwmod,
+>  	&omap3xxx_i2c2_hwmod,
+>  	&omap3xxx_i2c3_hwmod,
+> -	&omap34xx_sr1_hwmod,
+> -	&omap34xx_sr2_hwmod,
+>  
+>  	/* gpio class */
+>  	&omap3xxx_gpio1_hwmod,
+> @@ -3184,8 +3181,6 @@ static __initdata struct omap_hwmod *omap3xxx_hwmods[] = {
+>  	&omap3xxx_mcbsp2_sidetone_hwmod,
+>  	&omap3xxx_mcbsp3_sidetone_hwmod,
+>  
+> -	/* mailbox class */
+> -	&omap3xxx_mailbox_hwmod,
+>  
+>  	/* mcspi class */
+>  	&omap34xx_mcspi1,
+> @@ -3198,31 +3193,39 @@ static __initdata struct omap_hwmod *omap3xxx_hwmods[] = {
+>  
+>  /* 3430ES1-only hwmods */
+>  static __initdata struct omap_hwmod *omap3430es1_hwmods[] = {
+> +	&omap3xxx_iva_hwmod,
+>  	&omap3430es1_dss_core_hwmod,
+> +	&omap3xxx_mailbox_hwmod,
+>  	NULL
+>  };
+>  
+>  /* 3430ES2+-only hwmods */
+>  static __initdata struct omap_hwmod *omap3430es2plus_hwmods[] = {
+> +	&omap3xxx_iva_hwmod,
+>  	&omap3xxx_dss_core_hwmod,
+>  	&omap3xxx_usbhsotg_hwmod,
+> +	&omap3xxx_mailbox_hwmod,
+>  	NULL
+>  };
+>  
+>  /* 34xx-only hwmods (all ES revisions) */
+>  static __initdata struct omap_hwmod *omap34xx_hwmods[] = {
+> +	&omap3xxx_iva_hwmod,
+>  	&omap34xx_sr1_hwmod,
+>  	&omap34xx_sr2_hwmod,
+> +	&omap3xxx_mailbox_hwmod,
+>  	NULL
+>  };
+>  
+>  /* 36xx-only hwmods (all ES revisions) */
+>  static __initdata struct omap_hwmod *omap36xx_hwmods[] = {
+> +	&omap3xxx_iva_hwmod,
+>  	&omap3xxx_uart4_hwmod,
+>  	&omap3xxx_dss_core_hwmod,
+>  	&omap36xx_sr1_hwmod,
+>  	&omap36xx_sr2_hwmod,
+>  	&omap3xxx_usbhsotg_hwmod,
+> +	&omap3xxx_mailbox_hwmod,
+>  	NULL
+>  };
+>  
