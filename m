@@ -1,34 +1,39 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Mon, 7 Nov 2011 14:47:46 +0200
-Subject: [PATCH v2 7/8] arm/tegra: implement support for tegra30
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF173F9A4E4F@HQMAIL01.nvidia.com>
-References: <1320242948-21061-1-git-send-email-pdeschrijver@nvidia.com>
- <1320242948-21061-8-git-send-email-pdeschrijver@nvidia.com>
- <74CDBE0F657A3D45AFBB94109FB122FF173F9A4E4F@HQMAIL01.nvidia.com>
-Message-ID: <20111107124746.GP29978@tbergstrom-lnx.Nvidia.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 07 Nov 2011 13:49:04 +0100
+Subject: [PATCH V2] drivers/i2c/busses/i2c-at91.c: fix brokeness
+In-Reply-To: <20111107130432.3309ffd6@endymion.delvare>
+References: <alpine.DEB.2.00.1111071019560.21431@gatekeeper.vosshq.de>
+ <20111107094701.GF4265@legolas.emea.dhcp.ti.com>
+ <EF2E73589CA71846A15D0B2CDF79505D087B38B21C@wm021.weinmann.com>
+ <20111107100446.GG4265@legolas.emea.dhcp.ti.com>
+ <EF2E73589CA71846A15D0B2CDF79505D087B38B2AB@wm021.weinmann.com>
+ <20111107130432.3309ffd6@endymion.delvare>
+Message-ID: <4EB7D3C0.9070706@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 04, 2011 at 09:43:57PM +0100, Stephen Warren wrote:
-> Peter De Schrijver wrote at Wednesday, November 02, 2011 8:09 AM:
-> > Add support for tegra30 SoC. This includes a device tree compatible type for
-> > this SoC ("nvidia,tegra30") and adds L2 cache initialization for this new SoC.
-> > The clock framework is still missing, which prevents most drivers from working.
-> ...
-> > diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
-> ...
-> > @@ -17,7 +14,18 @@ config ARCH_TEGRA_2x_SOC
-> >  	  Support for NVIDIA Tegra AP20 and T20 processors, based on the
-> >  	  ARM CortexA9MP CPU and the ARM PL310 L2 cache controller
-> > 
-> > -endchoice
-> > +config ARCH_TEGRA_3x_SOC
+On 11/07/2011 01:04 PM, Jean Delvare :
+> On Mon, 7 Nov 2011 12:06:52 +0100, Voss, Nikolaus wrote:
+>>>>> IMHO, you should split this patch into three or more smaller patches.
+>>>>> You're doing lots of different things in one commit and it'll be a
+>>>>> pain to bisect should this cause any issues to anyone.
+>>>>
+>>>> I didn't split the patch because it is virtually a complete rewrite.
+>>>> Due to the severe limitations of the old driver, I think it should
+>>>> replace the old driver.
+>>>
+>>> The final decision is up to Ben and/or Jean but I think we should always have
+>>> incremental patches, not sure if we should allow big patches for the reasons
+>>> above.
 > 
-> Wasn't that config option already used earlier in the series, e.g. in
-> [PATCH v2 6/8] arm/tegra: pinmux tables and definitions for tegra30.
+> The final call is obviously to Ben, not me, as this driver falls under
+> his jurisdiction. But for what it's worth, I consider the small-steps
+> rule void when it comes to fixing a plain broken driver by almost fully
+> rewriting it. The reviewer should really review the resulting code
+> rather than the patch. If it makes everybody happier, then killing the
+> old code completely first is certainly an option.
 
-It is. Is that a problem?
+I agree with this.
 
-Cheers,
-
-Peter.
+-- 
+Nicolas Ferre
