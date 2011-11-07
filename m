@@ -1,35 +1,75 @@
-From: khali@linux-fr.org (Jean Delvare)
-Date: Mon, 7 Nov 2011 13:04:32 +0100
-Subject: [PATCH V2] drivers/i2c/busses/i2c-at91.c: fix brokeness
-In-Reply-To: <EF2E73589CA71846A15D0B2CDF79505D087B38B2AB@wm021.weinmann.com>
-References: <alpine.DEB.2.00.1111071019560.21431@gatekeeper.vosshq.de>
- <20111107094701.GF4265@legolas.emea.dhcp.ti.com>
- <EF2E73589CA71846A15D0B2CDF79505D087B38B21C@wm021.weinmann.com>
- <20111107100446.GG4265@legolas.emea.dhcp.ti.com>
- <EF2E73589CA71846A15D0B2CDF79505D087B38B2AB@wm021.weinmann.com>
-Message-ID: <20111107130432.3309ffd6@endymion.delvare>
+From: tarun.kanti@ti.com (DebBarma, Tarun Kanti)
+Date: Mon, 7 Nov 2011 17:35:37 +0530
+Subject: [PATCH v8 24/24] gpio/omap: handle set_dataout reg capable IP on
+ restore
+In-Reply-To: <87aa8bde2d.fsf@ti.com>
+References: <1317803593-12259-1-git-send-email-tarun.kanti@ti.com>
+ <1317803593-12259-25-git-send-email-tarun.kanti@ti.com>
+ <87aa8bde2d.fsf@ti.com>
+Message-ID: <CAC83Zv+gac_Wd8+V+o6USxv73ia5i8JLjLDHj8VQiRiqZ7DOtQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 7 Nov 2011 12:06:52 +0100, Voss, Nikolaus wrote:
-> > > > IMHO, you should split this patch into three or more smaller patches.
-> > > > You're doing lots of different things in one commit and it'll be a
-> > > > pain to bisect should this cause any issues to anyone.
-> > >
-> > > I didn't split the patch because it is virtually a complete rewrite.
-> > > Due to the severe limitations of the old driver, I think it should
-> > > replace the old driver.
-> > 
-> > The final decision is up to Ben and/or Jean but I think we should always have
-> > incremental patches, not sure if we should allow big patches for the reasons
-> > above.
+On Fri, Nov 4, 2011 at 10:23 PM, Kevin Hilman <khilman@ti.com> wrote:
+> Tarun Kanti DebBarma <tarun.kanti@ti.com> writes:
+>
+>> From: Nishanth Menon <nm@ti.com>
+>>
+>> GPIO IP revisions such as those used in OMAP4 have a set_dataout
+>> while the previous revisions used a single dataout register.
+>> Depending on what is available restore the dataout settings
+>> to the right register.
+>>
+>> Signed-off-by: Nishanth Menon <nm@ti.com>
+>> Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
+>> Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>> ---
+>> ?drivers/gpio/gpio-omap.c | ? ?9 +++++++--
+>> ?1 files changed, 7 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
+>> index 4009446..3df7a98 100644
+>> --- a/drivers/gpio/gpio-omap.c
+>> +++ b/drivers/gpio/gpio-omap.c
+>> @@ -1073,7 +1073,7 @@ static int __devinit omap_gpio_probe(struct platform_device *pdev)
+>> ? ? ? bank->get_context_loss_count = pdata->get_context_loss_count;
+>> ? ? ? bank->regs = pdata->regs;
+>>
+>> - ? ? if (bank->regs->set_dataout && bank->regs->clr_dataout)
+>> + ? ? if (bank->regs->set_dataout)
+>
+> This change isn't right.
+>
+> The _set_gpio_dataout_reg function depends on the existence of
+> ->clr_dataout too.
+Ok, I will add the clr_dataout condtion as well.
 
-The final call is obviously to Ben, not me, as this driver falls under
-his jurisdiction. But for what it's worth, I consider the small-steps
-rule void when it comes to fixing a plain broken driver by almost fully
-rewriting it. The reviewer should really review the resulting code
-rather than the patch. If it makes everybody happier, then killing the
-old code completely first is certainly an option.
-
--- 
-Jean Delvare
+>
+>> ? ? ? ? ? ? ? bank->set_dataout = _set_gpio_dataout_reg;
+>> ? ? ? else
+>> ? ? ? ? ? ? ? bank->set_dataout = _set_gpio_dataout_mask;
+>> @@ -1351,7 +1351,12 @@ static void omap_gpio_restore_context(struct gpio_bank *bank)
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? bank->base + bank->regs->risingdetect);
+>> ? ? ? __raw_writel(bank->context.fallingdetect,
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? bank->base + bank->regs->fallingdetect);
+>> - ? ? __raw_writel(bank->context.dataout, bank->base + bank->regs->dataout);
+>> + ? ? if (bank->regs->set_dataout)
+>
+> Why the check again? ?The check has already been done in probe.
+>
+> Just use bank->set_dataout() here.
+Sure, i will make the change.
+--
+Tarun
+>
+> Kevin
+>
+>> + ? ? ? ? ? ? __raw_writel(bank->context.dataout,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? bank->base + bank->regs->set_dataout);
+>> + ? ? else
+>> + ? ? ? ? ? ? __raw_writel(bank->context.dataout,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? bank->base + bank->regs->dataout);
+>> ? ? ? __raw_writel(bank->context.oe, bank->base + bank->regs->direction);
+>>
+>> ? ? ? if (bank->dbck_enable_mask) {
+>
