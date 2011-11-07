@@ -1,55 +1,39 @@
-From: John.Linn@xilinx.com (John Linn)
-Date: Sun, 6 Nov 2011 19:11:24 -0700
-Subject: [PATCH] ARM: Allow kernel unaligned accesses on ARMv6+ processors
-In-Reply-To: <1320489687-9642-1-git-send-email-catalin.marinas@arm.com>
-References: <1320489687-9642-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <8e74d1d8-0772-4770-8ce6-5d362cb58009@VA3EHSMHS018.ehs.local>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Sun, 06 Nov 2011 21:48:54 -0500 (EST)
+Subject: [01: PATCH 0/7] Preparation for arch_reset changes
+In-Reply-To: <20111106173113.GI12913@n2100.arm.linux.org.uk>
+References: <20111106173113.GI12913@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.02.1111062147070.3307@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Catalin Marinas [mailto:catalin.marinas at gmail.com] On Behalf Of
-> Catalin Marinas
-> Sent: Saturday, November 05, 2011 3:41 AM
-> To: linux-arm-kernel at lists.infradead.org
-> Cc: John Linn
-> Subject: [PATCH] ARM: Allow kernel unaligned accesses on ARMv6+
-> processors
+On Sun, 6 Nov 2011, Russell King - ARM Linux wrote:
+
+> This series lays down the ground work for changing the way we handle the
+> reset (now called restart) handling on ARM.
 > 
-> Recent gcc versions generate unaligned accesses by default on ARMv6
-and
-> later processors. This patch ensures that the SCTLR.A bit is always
-> cleared on such processors to avoid kernel traping before
-> alignment_init() is called.
+> As a result of these patches, we provide a new hook in the machine_desc
+> record called 'restart' which is pointed at a function to perform the
+> appropriate restart actions for the platform.  This is called directly
+> from machine_restart() with IRQs and caches on.
 > 
-> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: John Linn <John.Linn@xilinx.com>
-
-It worked great, thanks Catalin. I'd love to see a solution merged in
-the mainline and this seems reasonable.
-I'm being pushed to newer tools which require a solution.
-
-Tested-by: John Linn <john.linn@xilinx.com>
-
-> ---
->  arch/arm/kernel/head.S |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
+> The 'soft_reboot' flag is changed to a more generic 'restart_mode'
+> character - which is used to initialize the default reboot mode (which
+> can be changed via the 'reboot=' command line parameter.)
 > 
-> diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
-> index a400a4d..1768db2 100644
-> --- a/arch/arm/kernel/head.S
-> +++ b/arch/arm/kernel/head.S
-> @@ -394,7 +394,7 @@ __secondary_data:
->   *  r13 = *virtual* address to jump to upon completion
->   */
->  __enable_mmu:
-> -#ifdef CONFIG_ALIGNMENT_TRAP
-> +#if defined(CONFIG_ALIGNMENT_TRAP) && __LINUX_ARM_ARCH__ < 6
->  	orr	r0, r0, #CR_A
->  #else
->  	bic	r0, r0, #CR_A
+> 'soft_restart(addr)' is added which performs a soft restart (iow,
+> orderly shutdown of caches and MMU and a jump to the passed address),
+> rather than the old way which separated the tear-down of the caches
+> and MMU from the code doing the jump.  This will be necessary to
+> resolve the ARMv6 and ARMv7 CPU restarting problems.
+> 
+> Finally, appropriate 'restart_mode' values are added to several
+> platforms which were hard-coding the restart mode by intercepting
+> the restarting via arm_pm_restart.
 
-**** Please ignore the following footer which I'm still working on
-getting removed, this IS open source information ***
+This series (the 7 patches) looks good to me.
 
-This email and any attachments are intended for the sole use of the named recipient(s) and contain(s) confidential information that may be proprietary, privileged or copyrighted under applicable law. If you are not the intended recipient, do not read, copy, or forward this email message or any attachments. Delete this email message and any attachments immediately.
+Acked-by: Nicolas Pitre <nico@linaro.org>
+
+
+Nicolas
