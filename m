@@ -1,53 +1,41 @@
-From: sangwook.lee@linaro.org (Sangwook Lee)
-Date: Mon,  7 Nov 2011 17:05:21 +0000
-Subject: [PATCH 1/2] ARM: SAMSUNG: Add pm_caps into platform data
-In-Reply-To: <1320685522-17481-1-git-send-email-sangwook.lee@linaro.org>
-References: <1320685522-17481-1-git-send-email-sangwook.lee@linaro.org>
-Message-ID: <1320685522-17481-2-git-send-email-sangwook.lee@linaro.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 7 Nov 2011 17:07:23 +0000
+Subject: [PATCH] ARM: Allow kernel unaligned accesses on ARMv6+ processors
+In-Reply-To: <1d0610da-0dc0-4130-9d14-8524820b9846@WA4EHSMHS001.ehs.local>
+References: <1320489687-9642-1-git-send-email-catalin.marinas@arm.com>
+ <1d0610da-0dc0-4130-9d14-8524820b9846@WA4EHSMHS001.ehs.local>
+Message-ID: <20111107170723.GD24887@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add pm_caps into platform_data. This is power management, usually
-for SDIO device such as SDIO WLAN.
+On Mon, Nov 07, 2011 at 02:11:24AM +0000, John Linn wrote:
+> > -----Original Message-----
+> > From: Catalin Marinas [mailto:catalin.marinas at gmail.com] On Behalf Of
+> > Catalin Marinas
+> > Sent: Saturday, November 05, 2011 3:41 AM
+> > To: linux-arm-kernel at lists.infradead.org
+> > Cc: John Linn
+> > Subject: [PATCH] ARM: Allow kernel unaligned accesses on ARMv6+
+> > processors
+> > 
+> > Recent gcc versions generate unaligned accesses by default on ARMv6
+> and
+> > later processors. This patch ensures that the SCTLR.A bit is always
+> > cleared on such processors to avoid kernel traping before
+> > alignment_init() is called.
+> > 
+> > Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+> > Cc: John Linn <John.Linn@xilinx.com>
+> 
+> It worked great, thanks Catalin. I'd love to see a solution merged in
+> the mainline and this seems reasonable.
+> I'm being pushed to newer tools which require a solution.
+> 
+> Tested-by: John Linn <john.linn@xilinx.com>
 
-Signed-off-by: Sangwook Lee <sangwook.lee@samsung.com>
----
- arch/arm/plat-samsung/dev-hsmmc3.c         |    2 ++
- arch/arm/plat-samsung/include/plat/sdhci.h |    2 ++
- 2 files changed, 4 insertions(+), 0 deletions(-)
+Thanks. I pushed it to Russell's patch system as:
 
-diff --git a/arch/arm/plat-samsung/dev-hsmmc3.c b/arch/arm/plat-samsung/dev-hsmmc3.c
-index ede776f..8f467f2 100644
---- a/arch/arm/plat-samsung/dev-hsmmc3.c
-+++ b/arch/arm/plat-samsung/dev-hsmmc3.c
-@@ -78,6 +78,8 @@ void s3c_sdhci3_set_platdata(struct s3c_sdhci_platdata *pd)
- 		set->cfg_card = pd->cfg_card;
- 	if (pd->host_caps)
- 		set->host_caps |= pd->host_caps;
-+	if (pd->pm_caps)
-+		set->pm_caps |= pd->pm_caps;
- 	if (pd->clk_type)
- 		set->clk_type = pd->clk_type;
- }
-diff --git a/arch/arm/plat-samsung/include/plat/sdhci.h b/arch/arm/plat-samsung/include/plat/sdhci.h
-index 058e096..35646de 100644
---- a/arch/arm/plat-samsung/include/plat/sdhci.h
-+++ b/arch/arm/plat-samsung/include/plat/sdhci.h
-@@ -40,6 +40,7 @@ enum clk_types {
-  * struct s3c_sdhci_platdata() - Platform device data for Samsung SDHCI
-  * @max_width: The maximum number of data bits supported.
-  * @host_caps: Standard MMC host capabilities bit field.
-+ * @pm_caps: SDIO host PM capabilities bit field.
-  * @cd_type: Type of Card Detection method (see cd_types enum above)
-  * @clk_type: Type of clock divider method (see clk_types enum above)
-  * @ext_cd_init: Initialize external card detect subsystem. Called on
-@@ -67,6 +68,7 @@ enum clk_types {
- struct s3c_sdhci_platdata {
- 	unsigned int	max_width;
- 	unsigned int	host_caps;
-+	unsigned int	pm_caps;
- 	enum cd_types	cd_type;
- 	enum clk_types	clk_type;
- 
+http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7150/1
+
 -- 
-1.7.4.1
+Catalin
