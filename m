@@ -1,46 +1,55 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Mon, 7 Nov 2011 09:31:10 +0800
-Subject: [linux-pm] [PATCH] PM: HIBERNATION: skip the swap size check if
- the snapshot image size is anticipative
-In-Reply-To: <CAGsJ_4xU28APFEcALAzuB2jAACa8FbOR6iSvOaEeGZa=JyjNeA@mail.gmail.com>
-References: <1320392176-3906-1-git-send-email-Barry.Song@csr.com>
- <20111105182244.GB6772@elf.ucw.cz>
- <CAGsJ_4xU28APFEcALAzuB2jAACa8FbOR6iSvOaEeGZa=JyjNeA@mail.gmail.com>
-Message-ID: <CAGsJ_4xm05N4UZ94kvUtUGLGkcDnxesojV0fL9hQQnZBOFvohg@mail.gmail.com>
+From: John.Linn@xilinx.com (John Linn)
+Date: Sun, 6 Nov 2011 19:11:24 -0700
+Subject: [PATCH] ARM: Allow kernel unaligned accesses on ARMv6+ processors
+In-Reply-To: <1320489687-9642-1-git-send-email-catalin.marinas@arm.com>
+References: <1320489687-9642-1-git-send-email-catalin.marinas@arm.com>
+Message-ID: <8e74d1d8-0772-4770-8ce6-5d362cb58009@VA3EHSMHS018.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/11/6 Barry Song <21cnbao@gmail.com>:
-> 2011/11/6 Pavel Machek <pavel@ucw.cz>:
->> Hi!
->>
->>> From: Barry Song <Baohua.Song@csr.com>
->>>
->>> Current swsusp requires swap partitions even larger than real saved pages
->>> due to the worst compress ratio:
->>> but for an embedded system, which has limited storage space, then it might
->>> can't give the big size partition to save snapshot.
->>> In the another way, some embedded systems can definitely know the most size
->>> needed for snapshot since they run some specific application lists.
->>> So this patch provides the possibility for bootloader to tell kernel even
->>> the system has a little snapshot partition, but it is still enough.
->>> For example, if the system need to save 120MB memory, origin swsusp will require
->>> a 130MB partition to save snapshot. but if users know 30MB is enough for them(
->>> compressed image will be less than 30MB), they just make a 30MB
->>> partition.
->>
->> Would it be better to have /sys/power/... entry which would allow
->> configuring expected compression ratio at runtime?
->
-> i think it is better to have a sys node than add another kernel param.
-> but the point is i only care about the final image size but not
-> compression ratio. i don't care how well lzo will do for me since i
-> only have limited disk space and know how many pages want to be saved.
-> there has been a image_size node, will we have a expected_image_size node?
+> -----Original Message-----
+> From: Catalin Marinas [mailto:catalin.marinas at gmail.com] On Behalf Of
+> Catalin Marinas
+> Sent: Saturday, November 05, 2011 3:41 AM
+> To: linux-arm-kernel at lists.infradead.org
+> Cc: John Linn
+> Subject: [PATCH] ARM: Allow kernel unaligned accesses on ARMv6+
+> processors
+> 
+> Recent gcc versions generate unaligned accesses by default on ARMv6
+and
+> later processors. This patch ensures that the SCTLR.A bit is always
+> cleared on such processors to avoid kernel traping before
+> alignment_init() is called.
+> 
+> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: John Linn <John.Linn@xilinx.com>
 
-or will we have just a node named /sys/power/check_size, if
-1(default), check, otherwise(0 set by users), skip checking?
+It worked great, thanks Catalin. I'd love to see a solution merged in
+the mainline and this seems reasonable.
+I'm being pushed to newer tools which require a solution.
 
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?Pavel
+Tested-by: John Linn <john.linn@xilinx.com>
 
--barry
+> ---
+>  arch/arm/kernel/head.S |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
+> index a400a4d..1768db2 100644
+> --- a/arch/arm/kernel/head.S
+> +++ b/arch/arm/kernel/head.S
+> @@ -394,7 +394,7 @@ __secondary_data:
+>   *  r13 = *virtual* address to jump to upon completion
+>   */
+>  __enable_mmu:
+> -#ifdef CONFIG_ALIGNMENT_TRAP
+> +#if defined(CONFIG_ALIGNMENT_TRAP) && __LINUX_ARM_ARCH__ < 6
+>  	orr	r0, r0, #CR_A
+>  #else
+>  	bic	r0, r0, #CR_A
+
+**** Please ignore the following footer which I'm still working on
+getting removed, this IS open source information ***
+
+This email and any attachments are intended for the sole use of the named recipient(s) and contain(s) confidential information that may be proprietary, privileged or copyrighted under applicable law. If you are not the intended recipient, do not read, copy, or forward this email message or any attachments. Delete this email message and any attachments immediately.
