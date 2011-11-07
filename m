@@ -1,70 +1,195 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 07 Nov 2011 17:33:44 +0000
-Subject: [PATCH] ARM: Do not call flush_cache_user_range with mmap_sem held
-Message-ID: <20111107172836.5615.64219.stgit@e102109-lin.cambridge.arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 7 Nov 2011 17:46:45 +0000
+Subject: OMAP CRAP: The Continuing Story Of Brokenness
+In-Reply-To: <20111107172600.GS31337@atomide.com>
+References: <20111106121829.GB15294@n2100.arm.linux.org.uk>
+ <20111107172600.GS31337@atomide.com>
+Message-ID: <20111107174645.GE15294@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dima Zavin <dima@android.com>
+On Mon, Nov 07, 2011 at 09:26:00AM -0800, Tony Lindgren wrote:
+> * Russell King - ARM Linux <linux@arm.linux.org.uk> [111106 03:44]:
+> > Yet again I find that I'm having to email about crap on OMAP3.
+> > 
+> > I'm getting really fed up with OMAP stuff which keeps breaking in
+> > idiotic ways - and the way there's fatal build errors at EVERY merge
+> > window.  The OMAP workflow is totally broken.  Something MUST change
+> > in the way the OMAP community works to stop the continual breakage
+> > at every single bloody merge window.
+> 
+> Hmm he following fixes are queued elsewhere and now merged:
+> 
+> omap_hsmmc: fix missing parenthesis in pr_info
+> PM / OPP: Fix build when CONFIG_PM_OPP is not set 
+> net: Add back alignment for size for __alloc_skb
+> 
+> Or have you seen some other build errors?
+> 
+> FYI, now all the compile warnings are finally gone with what
+> I have in fixes branch.
 
-We can't be holding the mmap_sem while calling flush_cache_user_range
-because the flush can fault. If we fault on a user address, the
-page fault handler will try to take mmap_sem again. Since both places
-acquire the read lock, most of the time it succeeds. However, if another
-thread tries to acquire the write lock on the mmap_sem (e.g. mmap) in
-between the call to flush_cache_user_range and the fault, the down_read
-in do_page_fault will deadlock.
+It was the errors in the "ARM: OMAP: Fix build for OMAP3 only builds"
+thread.
 
-Also, since we really can't be holding the mmap_sem while calling
-flush_cache_user_range AND vma is actually unused by the flush itself,
-get rid of vma as an argument.
+However, rebuilding today gives brand new breakage - for my OMAP4430SDP
+config.  This seems to be because more linux/module.h includes have been
+deleted from include/linux/*.h includes.
 
-Signed-off-by: Dima Zavin <dima@android.com>
-Signed-off-by: John Stultz <john.stultz@linaro.org>
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
----
+arch/arm/plat-omap/dmtimer.c:184: warning: data definition has no type or storage class
+arch/arm/plat-omap/dmtimer.c:184: warning: type defaults to 'int' in declaration of 'EXPORT_SYMBOL_GPL'
+arch/arm/plat-omap/dmtimer.c:184: warning: parameter names (without types) in function declaration
+arch/arm/plat-omap/dmtimer.c:215: warning: data definition has no type or storage class
+arch/arm/plat-omap/dmtimer.c:215: warning: type defaults to 'int' in declaration of 'EXPORT_SYMBOL_GPL'
+arch/arm/plat-omap/dmtimer.c:215: warning: parameter names (without types) in function declaration
+arch/arm/plat-omap/dmtimer.c:228: warning: data definition has no type or storage class
+arch/arm/plat-omap/dmtimer.c:228: warning: type defaults to 'int' in declaration of 'EXPORT_SYMBOL_GPL'
+arch/arm/plat-omap/dmtimer.c:228: warning: parameter names (without types) in function declaration
+arch/arm/plat-omap/dmtimer.c:234: warning: data definition has no type or storage class
+arch/arm/plat-omap/dmtimer.c:234: warning: type defaults to 'int' in declaration of 'EXPORT_SYMBOL_GPL'
+arch/arm/plat-omap/dmtimer.c:234: warning: parameter names (without types) in function declaration
+arch/arm/plat-omap/dmtimer.c:240: warning: data definition has no type or storage class
+arch/arm/plat-omap/dmtimer.c:240: warning: type defaults to 'int' in declaration of 'EXPORT_SYMBOL_GPL'
+arch/arm/plat-omap/dmtimer.c:240: warning: parameter names (without types) in function declaration
+arch/arm/plat-omap/dmtimer.c:248: warning: data definition has no type or storage class
+arch/arm/plat-omap/dmtimer.c:248: warning: type defaults to 'int' in declaration of 'EXPORT_SYMBOL_GPL'
+arch/arm/plat-omap/dmtimer.c:248: warning: parameter names (without types) in function declaration
+arch/arm/plat-omap/dmtimer.c:294: warning: data definition has no type or storage class
+arch/arm/plat-omap/dmtimer.c:294: warning: type defaults to 'int' in declaration of 'EXPORT_SYMBOL_GPL'
+arch/arm/plat-omap/dmtimer.c:294: warning: parameter names (without types) in function declaration
+arch/arm/plat-omap/dmtimer.c:302: warning: data definition has no type or storage class
+arch/arm/plat-omap/dmtimer.c:302: warning: type defaults to 'int' in declaration of 'EXPORT_SYMBOL_GPL'
+arch/arm/plat-omap/dmtimer.c:302: warning: parameter names (without types) in function declaration
+arch/arm/plat-omap/dmtimer.c:316: warning: data definition has no type or storage class
+arch/arm/plat-omap/dmtimer.c:316: warning: type defaults to 'int' in declaration of 'EXPORT_SYMBOL_GPL'
+arch/arm/plat-omap/dmtimer.c:316: warning: parameter names (without types) in function declaration
+arch/arm/plat-omap/dmtimer.c:344: warning: data definition has no type or storage class
+arch/arm/plat-omap/dmtimer.c:344: warning: type defaults to 'int' in declaration of 'EXPORT_SYMBOL_GPL'
+arch/arm/plat-omap/dmtimer.c:344: warning: parameter names (without types) in function declaration
+arch/arm/plat-omap/dmtimer.c:361: warning: data definition has no type or storage class
+arch/arm/plat-omap/dmtimer.c:361: warning: type defaults to 'int' in declaration of 'EXPORT_SYMBOL_GPL'
+arch/arm/plat-omap/dmtimer.c:361: warning: parameter names (without types) in function declaration
+arch/arm/plat-omap/dmtimer.c:380: warning: data definition has no type or storage class
+arch/arm/plat-omap/dmtimer.c:380: warning: type defaults to 'int' in declaration of 'EXPORT_SYMBOL_GPL'
+arch/arm/plat-omap/dmtimer.c:380: warning: parameter names (without types) in function declaration
+arch/arm/plat-omap/dmtimer.c:406: warning: data definition has no type or storage class
+arch/arm/plat-omap/dmtimer.c:406: warning: type defaults to 'int' in declaration of 'EXPORT_SYMBOL_GPL'
+arch/arm/plat-omap/dmtimer.c:406: warning: parameter names (without types) in function declaration
+arch/arm/plat-omap/dmtimer.c:443: warning: data definition has no type or storage class
+arch/arm/plat-omap/dmtimer.c:443: warning: type defaults to 'int' in declaration of 'EXPORT_SYMBOL_GPL'
+arch/arm/plat-omap/dmtimer.c:443: warning: parameter names (without types) in function declaration
+arch/arm/plat-omap/dmtimer.c:468: warning: data definition has no type or storage class
+arch/arm/plat-omap/dmtimer.c:468: warning: type defaults to 'int' in declaration of 'EXPORT_SYMBOL_GPL'
+arch/arm/plat-omap/dmtimer.c:468: warning: parameter names (without types) in function declaration
+arch/arm/plat-omap/dmtimer.c:494: warning: data definition has no type or storage class
+arch/arm/plat-omap/dmtimer.c:494: warning: type defaults to 'int' in declaration of 'EXPORT_SYMBOL_GPL'
+arch/arm/plat-omap/dmtimer.c:494: warning: parameter names (without types) in function declaration
+arch/arm/plat-omap/dmtimer.c:517: warning: data definition has no type or storage class
+arch/arm/plat-omap/dmtimer.c:517: warning: type defaults to 'int' in declaration of 'EXPORT_SYMBOL_GPL'
+arch/arm/plat-omap/dmtimer.c:517: warning: parameter names (without types) in function declaration
+arch/arm/plat-omap/dmtimer.c:534: warning: data definition has no type or storage class
+arch/arm/plat-omap/dmtimer.c:534: warning: type defaults to 'int' in declaration of 'EXPORT_SYMBOL_GPL'
+arch/arm/plat-omap/dmtimer.c:534: warning: parameter names (without types) in function declaration
+arch/arm/plat-omap/dmtimer.c:549: warning: data definition has no type or storage class
+arch/arm/plat-omap/dmtimer.c:549: warning: type defaults to 'int' in declaration of 'EXPORT_SYMBOL_GPL'
+arch/arm/plat-omap/dmtimer.c:549: warning: parameter names (without types) in function declaration
+arch/arm/plat-omap/dmtimer.c:561: warning: data definition has no type or storage class
+arch/arm/plat-omap/dmtimer.c:561: warning: type defaults to 'int' in declaration of 'EXPORT_SYMBOL_GPL'
+arch/arm/plat-omap/dmtimer.c:561: warning: parameter names (without types) in function declaration
+arch/arm/plat-omap/dmtimer.c:572: warning: data definition has no type or storage class
+arch/arm/plat-omap/dmtimer.c:572: warning: type defaults to 'int' in declaration of 'EXPORT_SYMBOL_GPL'
+arch/arm/plat-omap/dmtimer.c:572: warning: parameter names (without types) in function declaration
+arch/arm/plat-omap/dmtimer.c:587: warning: data definition has no type or storage class
+arch/arm/plat-omap/dmtimer.c:587: warning: type defaults to 'int' in declaration of 'EXPORT_SYMBOL_GPL'
+arch/arm/plat-omap/dmtimer.c:587: warning: parameter names (without types) in function declaration
+arch/arm/plat-omap/dmtimer.c:604: warning: data definition has no type or storage class
+arch/arm/plat-omap/dmtimer.c:604: warning: type defaults to 'int' in declaration of 'EXPORT_SYMBOL_GPL'
+arch/arm/plat-omap/dmtimer.c:604: warning: parameter names (without types) in function declaration
+arch/arm/plat-omap/dmtimer.c:746: error: expected declaration specifiers or '...' before string constant
+arch/arm/plat-omap/dmtimer.c:746: warning: data definition has no type or storage class
+arch/arm/plat-omap/dmtimer.c:746: warning: type defaults to 'int' in declaration of 'MODULE_DESCRIPTION'
+arch/arm/plat-omap/dmtimer.c:746: warning: function declaration isn't a prototype
+arch/arm/plat-omap/dmtimer.c:747: error: expected declaration specifiers or '...' before string constant
+arch/arm/plat-omap/dmtimer.c:747: warning: data definition has no type or storage class
+arch/arm/plat-omap/dmtimer.c:747: warning: type defaults to 'int' in declaration of 'MODULE_LICENSE'
+arch/arm/plat-omap/dmtimer.c:747: warning: function declaration isn't a prototype
+arch/arm/plat-omap/dmtimer.c:748: error: expected declaration specifiers or '...' before string constant
+arch/arm/plat-omap/dmtimer.c:748: warning: data definition has no type or storage class
+arch/arm/plat-omap/dmtimer.c:748: warning: type defaults to 'int' in declaration of 'MODULE_ALIAS'
+arch/arm/plat-omap/dmtimer.c:748: warning: function declaration isn't a prototype
+arch/arm/plat-omap/dmtimer.c:749: error: expected declaration specifiers or '...' before string constant
+arch/arm/plat-omap/dmtimer.c:749: warning: data definition has no type or storage class
+arch/arm/plat-omap/dmtimer.c:749: warning: type defaults to 'int' in declaration of 'MODULE_AUTHOR'
+arch/arm/plat-omap/dmtimer.c:749: warning: function declaration isn't a prototype
+arch/arm/mach-omap2/omap_l3_noc.c:250: error: 'THIS_MODULE' undeclared here (not in a function)
+arch/arm/mach-omap2/usb-musb.c:64: warning: 'usb_musb_mux_init' defined but not used
 
-Russell, this patch has been around for a while but still no decision
-made, so I'm reposting it. It solves a real bug in the ARM kernels and
-I'd like to be considered for upstream.
+In addition, for OMAP3430 LDP:
 
-If you think there is some cache flushing race that this semaphore is
-protecting against, the ARMv8 allows (some) user-space cache maintenance
-and that's no different from running the cache flush outside the
-mmap_sem.
+arch/arm/plat-omap/omap_device.c:1055: warning: data definition has no type or storage class
+arch/arm/plat-omap/omap_device.c:1055: warning: type defaults to 'int' in declaration of 'EXPORT_SYMBOL'
+arch/arm/plat-omap/omap_device.c:1055: warning: parameter names (without types) in function declaration
+arch/arm/mach-omap2/mailbox.c:417: error: expected declaration specifiers or '...' before string constant
+arch/arm/mach-omap2/mailbox.c:417: warning: data definition has no type or storage class
+arch/arm/mach-omap2/mailbox.c:417: warning: type defaults to 'int' in declaration of 'MODULE_LICENSE'
+arch/arm/mach-omap2/mailbox.c:417: warning: function declaration isn't a prototype
+arch/arm/mach-omap2/mailbox.c:418: error: expected declaration specifiers or '...' before string constant
+arch/arm/mach-omap2/mailbox.c:418: warning: data definition has no type or storage class
+arch/arm/mach-omap2/mailbox.c:418: warning: type defaults to 'int' in declaration of 'MODULE_DESCRIPTION'
+arch/arm/mach-omap2/mailbox.c:418: warning: function declaration isn't a prototype
+arch/arm/mach-omap2/mailbox.c:419: error: expected declaration specifiers or '...' before string constant
+arch/arm/mach-omap2/mailbox.c:419: warning: data definition has no type or storage class
+arch/arm/mach-omap2/mailbox.c:419: warning: type defaults to 'int' in declaration of 'MODULE_AUTHOR'
+arch/arm/mach-omap2/mailbox.c:419: warning: function declaration isn't a prototype
+arch/arm/mach-omap2/mailbox.c:420: error: expected declaration specifiers or '...' before string constant
+arch/arm/mach-omap2/mailbox.c:420: warning: data definition has no type or storage class
+arch/arm/mach-omap2/mailbox.c:420: warning: type defaults to 'int' in declaration of 'MODULE_AUTHOR'
+arch/arm/mach-omap2/mailbox.c:420: warning: function declaration isn't a prototype
+arch/arm/mach-omap2/mailbox.c:421: error: expected declaration specifiers or '...' before string constant
+arch/arm/mach-omap2/mailbox.c:421: warning: data definition has no type or storage class
+arch/arm/mach-omap2/mailbox.c:421: warning: type defaults to 'int' in declaration of 'MODULE_ALIAS'
+arch/arm/mach-omap2/mailbox.c:421: warning: function declaration isn't a prototype
+drivers/video/omap/dispc.c:276: warning: data definition has no type or storage class
+drivers/video/omap/dispc.c:276: warning: type defaults to 'int' in declaration of 'EXPORT_SYMBOL'
+drivers/video/omap/dispc.c:276: warning: parameter names (without types) in function declaration
+drivers/video/omap/dispc.c:286: warning: data definition has no type or storage class
+drivers/video/omap/dispc.c:286: warning: type defaults to 'int' in declaration of 'EXPORT_SYMBOL'
+drivers/video/omap/dispc.c:286: warning: parameter names (without types) in function declaration
+drivers/video/omap/dispc.c:320: warning: data definition has no type or storage class
+drivers/video/omap/dispc.c:320: warning: type defaults to 'int' in declaration of 'EXPORT_SYMBOL'
+drivers/video/omap/dispc.c:320: warning: parameter names (without types) in function declaration
+drivers/video/omap/dispc.c:328: warning: data definition has no type or storage class
+drivers/video/omap/dispc.c:328: warning: type defaults to 'int' in declaration of 'EXPORT_SYMBOL'
+drivers/video/omap/dispc.c:328: warning: parameter names (without types) in function declaration
+drivers/video/omap/dispc.c:863: warning: data definition has no type or storage class
+drivers/video/omap/dispc.c:863: warning: type defaults to 'int' in declaration of 'EXPORT_SYMBOL'
+drivers/video/omap/dispc.c:863: warning: parameter names (without types) in function declaration
+drivers/video/omap/dispc.c:883: warning: data definition has no type or storage class
+drivers/video/omap/dispc.c:883: warning: type defaults to 'int' in declaration of 'EXPORT_SYMBOL'
+drivers/video/omap/dispc.c:883: warning: parameter names (without types) in function declaration
 
-Thanks.
+It might be an idea to do this:
 
+grep -rl EXPORT_SYMBOL arch/arm/*omap* | xargs grep -L linux/export.h
 
- arch/arm/include/asm/cacheflush.h |    2 +-
- arch/arm/kernel/traps.c           |    4 +++-
- 2 files changed, 4 insertions(+), 2 deletions(-)
+and for any OMAP drivers as well.  This gives:
 
-diff --git a/arch/arm/include/asm/cacheflush.h b/arch/arm/include/asm/cacheflush.h
-index d5d8d5c..1252a26 100644
---- a/arch/arm/include/asm/cacheflush.h
-+++ b/arch/arm/include/asm/cacheflush.h
-@@ -249,7 +249,7 @@ extern void flush_cache_page(struct vm_area_struct *vma, unsigned long user_addr
-  * Harvard caches are synchronised for the user space address range.
-  * This is used for the ARM private sys_cacheflush system call.
-  */
--#define flush_cache_user_range(vma,start,end) \
-+#define flush_cache_user_range(start,end) \
- 	__cpuc_coherent_user_range((start) & PAGE_MASK, PAGE_ALIGN(end))
- 
- /*
-diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
-index e8fd69e..d9b59d0 100644
---- a/arch/arm/kernel/traps.c
-+++ b/arch/arm/kernel/traps.c
-@@ -466,7 +466,9 @@ do_cache_op(unsigned long start, unsigned long end, int flags)
- 		if (end > vma->vm_end)
- 			end = vma->vm_end;
- 
--		flush_cache_user_range(vma, start, end);
-+		up_read(&mm->mmap_sem);
-+		flush_cache_user_range(start, end);
-+		return;
- 	}
- 	up_read(&mm->mmap_sem);
- }
+arch/arm/mach-omap1/id.c
+arch/arm/mach-omap1/lcd_dma.c
+arch/arm/mach-omap1/io.c
+arch/arm/mach-omap1/ams-delta-fiq.c
+arch/arm/mach-omap2/gpmc.c
+arch/arm/mach-omap2/id.c
+arch/arm/mach-omap2/io.c
+arch/arm/plat-omap/ocpi.c
+arch/arm/plat-omap/mcbsp.c
+arch/arm/plat-omap/omap_device.c
+arch/arm/plat-omap/mux.c
+arch/arm/plat-omap/devices.c
+arch/arm/plat-omap/io.c
+arch/arm/plat-omap/dma.c
+arch/arm/plat-omap/dmtimer.c
+arch/arm/plat-omap/mailbox.c
+
+which probably should all be fixed before any more of these errors
+spring up.
