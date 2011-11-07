@@ -1,36 +1,46 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Mon, 07 Nov 2011 14:45:50 +0900
-Subject: [PATCH] arm: exynos: Fix compiler error with THIS_MODULE
-Message-ID: <20111107054550.GA1943@july>
+From: liu.h.jason@gmail.com (Jason Liu)
+Date: Mon, 7 Nov 2011 14:07:58 +0800
+Subject: [PATCH 2/2] ARM: mxc: fix tzic build error
+In-Reply-To: <1320634936-7898-2-git-send-email-richard.zhao@linaro.org>
+References: <1320634936-7898-1-git-send-email-richard.zhao@linaro.org>
+ <1320634936-7898-2-git-send-email-richard.zhao@linaro.org>
+Message-ID: <CAB4PhKeyAf+X_v_ABud25+rDud+8ujFUQeV051BXPOtuZN3pcA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kyungmin Park <kyungmin.park@samsung.com>
+Richard,
 
-  CC      arch/arm/mach-exynos/cpuidle.o
-arch/arm/mach-exynos/cpuidle.c:36: error: 'THIS_MODULE' undeclared here (not in a function)
-arch/arm/mach-exynos/cpuidle.c: In function 'exynos4_enter_idle':
-arch/arm/mach-exynos/cpuidle.c:42: error: storage size of 'before' isn't known
-arch/arm/mach-exynos/cpuidle.c:42: error: storage size of 'after' isn't known
-arch/arm/mach-exynos/cpuidle.c:46: error: implicit declaration of function 'do_gettimeofday'
-arch/arm/mach-exynos/cpuidle.c:52: error: 'USEC_PER_SEC' undeclared (first use in this function)
-arch/arm/mach-exynos/cpuidle.c:52: error: (Each undeclared identifier is reported only once
-arch/arm/mach-exynos/cpuidle.c:52: error: for each function it appears in.)
-arch/arm/mach-exynos/cpuidle.c:42: warning: unused variable 'after'
-arch/arm/mach-exynos/cpuidle.c:42: warning: unused variable 'before'
-make[1]: *** [arch/arm/mach-exynos/cpuidle.o] Error 1
+2011/11/7 Richard Zhao <richard.zhao@linaro.org>:
+> Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
+> ---
+> ?arch/arm/plat-mxc/tzic.c | ? ?1 +
+> ?1 files changed, 1 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/plat-mxc/tzic.c b/arch/arm/plat-mxc/tzic.c
+> index e993a18..a3c164c 100644
+> --- a/arch/arm/plat-mxc/tzic.c
+> +++ b/arch/arm/plat-mxc/tzic.c
+> @@ -17,6 +17,7 @@
+> ?#include <linux/io.h>
+>
+> ?#include <asm/mach/irq.h>
+> +#include <asm/exception.h>
+>
+> ?#include <mach/hardware.h>
+> ?#include <mach/common.h>
 
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
----
-diff --git a/arch/arm/mach-exynos/cpuidle.c b/arch/arm/mach-exynos/cpuidle.c
-index bf7e96f..84628a8 100644
---- a/arch/arm/mach-exynos/cpuidle.c
-+++ b/arch/arm/mach-exynos/cpuidle.c
-@@ -9,6 +9,7 @@
- */
- 
- #include <linux/kernel.h>
-+#include <linux/module.h>
- #include <linux/init.h>
- #include <linux/cpuidle.h>
- #include <linux/io.h>
+Patch already here:
+http://patchwork.ozlabs.org/patch/123421/
+
+
+Jason Liu
+> --
+> 1.7.5.4
+>
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
