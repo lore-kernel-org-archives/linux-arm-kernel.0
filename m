@@ -1,39 +1,32 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 07 Nov 2011 11:22:39 +0000
-Subject: [PATCH v3 01/17] ARM: Make global handler and
- CONFIG_MULTI_IRQ_HANDLER mutually exclusive
-In-Reply-To: <20111107111701.GB6939@totoro>
-References: <1320425871-30564-1-git-send-email-marc.zyngier@arm.com>
- <1320425871-30564-2-git-send-email-marc.zyngier@arm.com>
- <20111107094515.GA6939@totoro>
- <CACRpkdYxPmNRwQQ_ykSkSn2vPpMuyYBLFk11-VrCne+Nigp0=Q@mail.gmail.com>
- <4EB7BD09.5010902@arm.com> <20111107111701.GB6939@totoro>
-Message-ID: <4EB7BF7F.8000608@arm.com>
+From: zonque@gmail.com (Daniel Mack)
+Date: Mon, 07 Nov 2011 12:27:00 +0100
+Subject: Missing patches for pxa3xx_nand
+Message-ID: <4EB7C084.4060706@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/11/11 11:17, Jamie Iles wrote:
-> On Mon, Nov 07, 2011 at 11:12:09AM +0000, Marc Zyngier wrote:
->> On 07/11/11 11:02, Linus Walleij wrote:
->>> On Mon, Nov 7, 2011 at 10:45 AM, Jamie Iles <jamie@jamieiles.com> wrote:
->>>
->>>> My VIC patches are using this so if it goes in through the GIC patches
->>>> first then that would be great!
->>>
->>> That sounds like you should create some common irqchip-consolidation
->>> topic branch in ARM SoC or Russell's tree to get this properly stacked up?
->>
->> Sounds like a good idea to me. I'm willing to gather such patches if
->> nobody else steps up.
-> 
-> Great, thanks Marc!  I'm happy to rebase my branch onto any point so you 
-> can easily pull if that makes things easier.
+Hi,
 
-Thanks Jamie. I'll create a branch based on -rc1 as soon as it is tagged
-(shouldn't be long now).
+In June, there have been important patches submitted for the pxa3xx_nand 
+driver after it was broken by Lei's rework series. These patches were 
+discussed in June, and they are present in
 
-Cheers,
+   git://git.infradead.org/mtd-2.6.git linux-fallback
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+but not in the master branch of the same git. Also, they have not been 
+merged to Linus' master tree which renders the pxa3xx_nand driver 
+unusable in 3.0 and 3.1.
+
+A selection of the patches I'm talking about are titled
+
+   mtd: pxa3xx_nand: Fix blank page ECC mismatch
+   mtd: pxa3xx_nand: fix nand detection issue
+   mtd: pxa3xx_nand don't specify default parsing options
+
+and of course they depend on others that aren't merged yet either.
+
+Can anyone explain what went wrong here and how we can get out of this?
+
+
+Thanks,
+Daniel
