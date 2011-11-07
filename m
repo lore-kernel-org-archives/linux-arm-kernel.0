@@ -1,128 +1,133 @@
-From: kaloz@openwrt.org (Imre Kaloz)
-Date: Mon,  7 Nov 2011 21:03:36 +0100
-Subject: [PATCH v3] ARM: support XZ compressed kernels
-Message-ID: <1320696216-5570-1-git-send-email-kaloz@openwrt.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 7 Nov 2011 12:26:20 -0800
+Subject: OMAP CRAP: The Continuing Story Of Brokenness
+In-Reply-To: <20111107174645.GE15294@n2100.arm.linux.org.uk>
+References: <20111106121829.GB15294@n2100.arm.linux.org.uk>
+ <20111107172600.GS31337@atomide.com>
+ <20111107174645.GE15294@n2100.arm.linux.org.uk>
+Message-ID: <20111107202620.GW31337@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Wire up support for the XZ decompressor
+Tomi,
 
-Signed-off-by: Imre Kaloz <kaloz@openwrt.org>
----
-New in v3: refreshed against current git
+* Russell King - ARM Linux <linux@arm.linux.org.uk> [111107 09:12]:
 
-New in v2: added missing .gitignore modification
+> drivers/video/omap/dispc.c:276: warning: data definition has no type or storage class
+> drivers/video/omap/dispc.c:276: warning: type defaults to 'int' in declaration of 'EXPORT_SYMBOL'
+> drivers/video/omap/dispc.c:276: warning: parameter names (without types) in function declaration
+> drivers/video/omap/dispc.c:286: warning: data definition has no type or storage class
+> drivers/video/omap/dispc.c:286: warning: type defaults to 'int' in declaration of 'EXPORT_SYMBOL'
+> drivers/video/omap/dispc.c:286: warning: parameter names (without types) in function declaration
+> drivers/video/omap/dispc.c:320: warning: data definition has no type or storage class
+> drivers/video/omap/dispc.c:320: warning: type defaults to 'int' in declaration of 'EXPORT_SYMBOL'
+> drivers/video/omap/dispc.c:320: warning: parameter names (without types) in function declaration
+> drivers/video/omap/dispc.c:328: warning: data definition has no type or storage class
+> drivers/video/omap/dispc.c:328: warning: type defaults to 'int' in declaration of 'EXPORT_SYMBOL'
+> drivers/video/omap/dispc.c:328: warning: parameter names (without types) in function declaration
+> drivers/video/omap/dispc.c:863: warning: data definition has no type or storage class
+> drivers/video/omap/dispc.c:863: warning: type defaults to 'int' in declaration of 'EXPORT_SYMBOL'
+> drivers/video/omap/dispc.c:863: warning: parameter names (without types) in function declaration
+> drivers/video/omap/dispc.c:883: warning: data definition has no type or storage class
+> drivers/video/omap/dispc.c:883: warning: type defaults to 'int' in declaration of 'EXPORT_SYMBOL'
+> drivers/video/omap/dispc.c:883: warning: parameter names (without types) in function declaration
 
- arch/arm/Kconfig                        |    1 +
- arch/arm/boot/compressed/.gitignore     |    2 ++
- arch/arm/boot/compressed/Makefile       |   15 ++++++++++++---
- arch/arm/boot/compressed/decompress.c   |    4 ++++
- arch/arm/boot/compressed/piggy.xzkern.S |    6 ++++++
- 5 files changed, 25 insertions(+), 3 deletions(-)
- create mode 100644 arch/arm/boot/compressed/piggy.xzkern.S
+Care to queue something for drivers/video/omap warnings above?
+ 
+> It might be an idea to do this:
+> 
+> grep -rl EXPORT_SYMBOL arch/arm/*omap* | xargs grep -L linux/export.h
+> 
+> and for any OMAP drivers as well.  This gives:
+> 
+> arch/arm/mach-omap1/id.c
+> arch/arm/mach-omap1/lcd_dma.c
+> arch/arm/mach-omap1/io.c
+> arch/arm/mach-omap1/ams-delta-fiq.c
+> arch/arm/mach-omap2/gpmc.c
+> arch/arm/mach-omap2/id.c
+> arch/arm/mach-omap2/io.c
+> arch/arm/plat-omap/ocpi.c
+> arch/arm/plat-omap/mcbsp.c
+> arch/arm/plat-omap/omap_device.c
+> arch/arm/plat-omap/mux.c
+> arch/arm/plat-omap/devices.c
+> arch/arm/plat-omap/io.c
+> arch/arm/plat-omap/dma.c
+> arch/arm/plat-omap/dmtimer.c
+> arch/arm/plat-omap/mailbox.c
+> 
+> which probably should all be fixed before any more of these errors
+> spring up.
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 2bda424..866e652 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -20,6 +20,7 @@ config ARM
- 	select HAVE_KERNEL_GZIP
- 	select HAVE_KERNEL_LZO
- 	select HAVE_KERNEL_LZMA
-+	select HAVE_KERNEL_XZ
- 	select HAVE_IRQ_WORK
- 	select HAVE_PERF_EVENTS
- 	select PERF_USE_VMALLOC
-diff --git a/arch/arm/boot/compressed/.gitignore b/arch/arm/boot/compressed/.gitignore
-index e0936a1..d0d441c 100644
---- a/arch/arm/boot/compressed/.gitignore
-+++ b/arch/arm/boot/compressed/.gitignore
-@@ -1,8 +1,10 @@
-+ashldi3.S
- font.c
- lib1funcs.S
- piggy.gzip
- piggy.lzo
- piggy.lzma
-+piggy.xzkern
- vmlinux
- vmlinux.lds
+I'll add the following patch to fix the remaining arch/arm/*omap*/
+warnings in fixes branch.
+
+Tony
+
+
+From: Tony Lindgren <tony@atomide.com>
+Date: Mon, 7 Nov 2011 11:58:55 -0800
+Subject: [PATCH] ARM: OMAP: Fix export.h or module.h includes
+
+Commit 32aaeffbd4a7457bf2f7448b33b5946ff2a960eb (Merge branch
+'modsplit-Oct31_2011'...) caused some build errors. Fix these
+and make sure we always have export.h or module.h included
+for MODULE_ and EXPORT_SYMBOL users:
+
+$ grep -rl ^MODULE_ arch/arm/*omap*/*.c | xargs \
+  grep -L linux/module.h
+arch/arm/mach-omap2/dsp.c
+arch/arm/mach-omap2/mailbox.c
+arch/arm/mach-omap2/omap-iommu.c
+arch/arm/mach-omap2/smartreflex.c
+
+Also check we either have export.h or module.h included
+for the files exporting symbols:
+
+$ grep -rl EXPORT_SYMBOL arch/arm/*omap*/*.c | xargs \
+  grep -L linux/export.h | xargs grep -L linux/module.h
+
+Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+
+--- a/arch/arm/mach-omap2/dsp.c
++++ b/arch/arm/mach-omap2/dsp.c
+@@ -18,6 +18,7 @@
+  * of the OMAP PM core code.
+  */
  
-diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
-index 21f56ff..0b9a6d1 100644
---- a/arch/arm/boot/compressed/Makefile
-+++ b/arch/arm/boot/compressed/Makefile
-@@ -92,6 +92,7 @@ SEDFLAGS	= s/TEXT_START/$(ZTEXTADDR)/;s/BSS_START/$(ZBSSADDR)/
- suffix_$(CONFIG_KERNEL_GZIP) = gzip
- suffix_$(CONFIG_KERNEL_LZO)  = lzo
- suffix_$(CONFIG_KERNEL_LZMA) = lzma
-+suffix_$(CONFIG_KERNEL_XZ)   = xzkern
++#include <linux/module.h>
+ #include <linux/platform_device.h>
+ #include "cm2xxx_3xxx.h"
+ #include "prm2xxx_3xxx.h"
+--- a/arch/arm/mach-omap2/mailbox.c
++++ b/arch/arm/mach-omap2/mailbox.c
+@@ -10,6 +10,7 @@
+  * for more details.
+  */
  
- # Borrowed libfdt files for the ATAG compatibility mode
++#include <linux/module.h>
+ #include <linux/clk.h>
+ #include <linux/err.h>
+ #include <linux/platform_device.h>
+--- a/arch/arm/mach-omap2/omap-iommu.c
++++ b/arch/arm/mach-omap2/omap-iommu.c
+@@ -10,6 +10,7 @@
+  * published by the Free Software Foundation.
+  */
  
-@@ -112,10 +113,12 @@ endif
++#include <linux/module.h>
+ #include <linux/platform_device.h>
  
- targets       := vmlinux vmlinux.lds \
- 		 piggy.$(suffix_y) piggy.$(suffix_y).o \
--		 lib1funcs.o lib1funcs.S font.o font.c head.o misc.o $(OBJS)
-+		 lib1funcs.o lib1funcs.S ashldi3.o ashldi3.S \
-+		 font.o font.c head.o misc.o $(OBJS)
+ #include <plat/iommu.h>
+--- a/arch/arm/mach-omap2/smartreflex.c
++++ b/arch/arm/mach-omap2/smartreflex.c
+@@ -17,6 +17,7 @@
+  * published by the Free Software Foundation.
+  */
  
- # Make sure files are removed during clean
--extra-y       += piggy.gzip piggy.lzo piggy.lzma lib1funcs.S $(libfdt) $(libfdt_hdrs)
-+extra-y       += piggy.gzip piggy.lzo piggy.lzma piggy.xzkern \
-+		 lib1funcs.S ashldi3.S $(libfdt) $(libfdt_hdrs)
- 
- ifeq ($(CONFIG_FUNCTION_TRACER),y)
- ORIG_CFLAGS := $(KBUILD_CFLAGS)
-@@ -150,6 +153,12 @@ lib1funcs = $(obj)/lib1funcs.o
- $(obj)/lib1funcs.S: $(srctree)/arch/$(SRCARCH)/lib/lib1funcs.S
- 	$(call cmd,shipped)
- 
-+# For __aeabi_llsl
-+ashldi3 = $(obj)/ashldi3.o
-+
-+$(obj)/ashldi3.S: $(srctree)/arch/$(SRCARCH)/lib/ashldi3.S
-+	$(call cmd,shipped)
-+
- # We need to prevent any GOTOFF relocs being used with references
- # to symbols in the .bss section since we cannot relocate them
- # independently from the rest at run time.  This can be achieved by
-@@ -171,7 +180,7 @@ if [ $(words $(ZRELADDR)) -gt 1 -a "$(CONFIG_AUTO_ZRELADDR)" = "" ]; then \
- fi
- 
- $(obj)/vmlinux: $(obj)/vmlinux.lds $(obj)/$(HEAD) $(obj)/piggy.$(suffix_y).o \
--	 	$(addprefix $(obj)/, $(OBJS)) $(lib1funcs) FORCE
-+	 	$(addprefix $(obj)/, $(OBJS)) $(lib1funcs) $(ashldi3) FORCE
- 	@$(check_for_multiple_zreladdr)
- 	$(call if_changed,ld)
- 	@$(check_for_bad_syms)
-diff --git a/arch/arm/boot/compressed/decompress.c b/arch/arm/boot/compressed/decompress.c
-index 07be5a2..0ecd8b4 100644
---- a/arch/arm/boot/compressed/decompress.c
-+++ b/arch/arm/boot/compressed/decompress.c
-@@ -44,6 +44,10 @@ extern void error(char *);
- #include "../../../../lib/decompress_unlzma.c"
- #endif
- 
-+#ifdef CONFIG_KERNEL_XZ
-+#include "../../../../lib/decompress_unxz.c"
-+#endif
-+
- int do_decompress(u8 *input, int len, u8 *output, void (*error)(char *x))
- {
- 	return decompress(input, len, NULL, NULL, output, NULL, error);
-diff --git a/arch/arm/boot/compressed/piggy.xzkern.S b/arch/arm/boot/compressed/piggy.xzkern.S
-new file mode 100644
-index 0000000..5703f30
---- /dev/null
-+++ b/arch/arm/boot/compressed/piggy.xzkern.S
-@@ -0,0 +1,6 @@
-+	.section .piggydata,#alloc
-+	.globl	input_data
-+input_data:
-+	.incbin	"arch/arm/boot/compressed/piggy.xzkern"
-+	.globl	input_data_end
-+input_data_end:
--- 
-1.7.1
++#include <linux/module.h>
+ #include <linux/interrupt.h>
+ #include <linux/clk.h>
+ #include <linux/io.h>
