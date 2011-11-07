@@ -1,43 +1,28 @@
-From: tarun.kanti@ti.com (DebBarma, Tarun Kanti)
-Date: Mon, 7 Nov 2011 16:41:37 +0530
-Subject: [PATCH v8 REPOST 21/24] gpio/omap: save and restore debounce
- registers
-In-Reply-To: <87zkgbbzaq.fsf@ti.com>
-References: <1318422730-22282-1-git-send-email-tarun.kanti@ti.com>
- <87zkgbbzaq.fsf@ti.com>
-Message-ID: <CAC83ZvK=8DiiBeHHK+yKkn4UwRkdkd58m+F52L9NjJUqRW9wcw@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 07 Nov 2011 11:12:09 +0000
+Subject: [PATCH v3 01/17] ARM: Make global handler and
+ CONFIG_MULTI_IRQ_HANDLER mutually exclusive
+In-Reply-To: <CACRpkdYxPmNRwQQ_ykSkSn2vPpMuyYBLFk11-VrCne+Nigp0=Q@mail.gmail.com>
+References: <1320425871-30564-1-git-send-email-marc.zyngier@arm.com>
+ <1320425871-30564-2-git-send-email-marc.zyngier@arm.com>
+ <20111107094515.GA6939@totoro>
+ <CACRpkdYxPmNRwQQ_ykSkSn2vPpMuyYBLFk11-VrCne+Nigp0=Q@mail.gmail.com>
+Message-ID: <4EB7BD09.5010902@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 4, 2011 at 10:27 PM, Kevin Hilman <khilman@ti.com> wrote:
-> Tarun Kanti DebBarma <tarun.kanti@ti.com> writes:
->
->> From: Nishanth Menon <nm@ti.com>
->>
->> GPIO debounce registers need to be saved and restored for proper functioning
->> of driver.
->
-> OK.
->
->> To save the registers, we cannot cut the clock before the save,
->> hence move the clk disable after the save.
->
-> This patch doesn't move any clk disable.
->
-> I suspect you made some changes to the original patch from Nishanth.
-> Please note that in the changelog. ?This is typically done by adding
-> something like:
->
-> [my at email.addr: describe changes made]
->
-> just before your signoff.
-Yes, quite a bit of changes happened which not captured in the description.
-The save context has been moved from *_runtime_suspend() to _set_gpio_debounce()
-as part of your comment in v6 to reduce overhead.
-Also, the clock disable is moved to *_prepare_for_idle().
-I will add changelog to capture above changes.
---
-Tarun
->
-> Kevin
->
+On 07/11/11 11:02, Linus Walleij wrote:
+> On Mon, Nov 7, 2011 at 10:45 AM, Jamie Iles <jamie@jamieiles.com> wrote:
+> 
+>> My VIC patches are using this so if it goes in through the GIC patches
+>> first then that would be great!
+> 
+> That sounds like you should create some common irqchip-consolidation
+> topic branch in ARM SoC or Russell's tree to get this properly stacked up?
+
+Sounds like a good idea to me. I'm willing to gather such patches if
+nobody else steps up.
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
