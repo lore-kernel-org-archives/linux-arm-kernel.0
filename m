@@ -1,81 +1,114 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 7 Nov 2011 14:51:57 -0800
-Subject: [PATCH] arm: omap2+: hwmod: fix breakage introduced by d6504acd
-In-Reply-To: <20111107224129.GJ15294@n2100.arm.linux.org.uk>
-References: <1320688617-4543-1-git-send-email-balbi@ti.com>
- <20111107183208.GG15294@n2100.arm.linux.org.uk>
- <20111107193908.GA5059@legolas.emea.dhcp.ti.com>
- <20111107212707.GH15294@n2100.arm.linux.org.uk>
- <alpine.DEB.2.00.1111071428001.12394@utopia.booyaka.com>
- <20111107224129.GJ15294@n2100.arm.linux.org.uk>
-Message-ID: <20111107225157.GB31337@atomide.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 7 Nov 2011 22:52:01 +0000
+Subject: 2b034922 breaks kexec on ARM
+In-Reply-To: <CALZhoSSyUAhriZU0wM3qQV5npN67d-Rvr=DgTyRTTtgiW94V4A@mail.gmail.com>
+References: <20111107185125.GA17464@mudshark.cambridge.arm.com>
+ <20111107190314.GS12913@n2100.arm.linux.org.uk>
+ <20111107191453.GC17464@mudshark.cambridge.arm.com>
+ <20111107192043.GT12913@n2100.arm.linux.org.uk>
+ <CALZhoSRZu=fbsToqWQsxJBSQ6huwxtkR=M7iFZyJ576jeJ4FHw@mail.gmail.com>
+ <20111107210317.GU12913@n2100.arm.linux.org.uk>
+ <CALZhoSSyUAhriZU0wM3qQV5npN67d-Rvr=DgTyRTTtgiW94V4A@mail.gmail.com>
+Message-ID: <20111107225201.GV12913@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@arm.linux.org.uk> [111107 14:06]:
-> On Mon, Nov 07, 2011 at 02:29:35PM -0700, Paul Walmsley wrote:
-> > On Mon, 7 Nov 2011, Russell King - ARM Linux wrote:
-> > 
-> > > Again, can never have been tested on OMAP3.
-> > > 
-> > > Does anyone apart from me bother doing any testing what so ever on OMAP3
-> > > platforms?  Am I the only one?
-> > 
-> > This was fixed by 
-> > 
-> > http://www.spinics.net/lists/arm-kernel/msg143549.html
-> > 
-> > which didn't go upstream as part of the v3.2 merge window.
+On Tue, Nov 08, 2011 at 05:15:13AM +0800, Lei Wen wrote:
+> Hi Russel,
 > 
-> Ah, that patch.
+> On Tue, Nov 8, 2011 at 5:03 AM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > On Tue, Nov 08, 2011 at 04:55:43AM +0800, Lei Wen wrote:
+> >> On Tue, Nov 8, 2011 at 3:20 AM, Russell King - ARM Linux
+> >> <linux@arm.linux.org.uk> wrote:
+> >> > On Mon, Nov 07, 2011 at 07:14:53PM +0000, Will Deacon wrote:
+> >> >> On Mon, Nov 07, 2011 at 07:03:15PM +0000, Russell King - ARM Linux wrote:
+> >> >> > Hmm, having looked at kernel/kexec.c, this patch is clearly wrong.
+> >> >> > There are two kernels which can be loaded into kexec - a crash kernel
+> >> >> > and a default kernel. ?These are kept entirely separately (and the
+> >> >> > per-kernel context is stored in 'image').
+> >> >> >
+> >> >> > However, this patch makes machine_kexec_prepare() store into some
+> >> >> > _global_ variables, which means if you've loaded a crash kernel
+> >> >> > followed by a default kernel, the values for the crash kernel will
+> >> >> > be corrupted.
+> >> >> >
+> >> >> > So yes, I think a revert of this patch is the right thing.
+> >> >>
+> >> >> Great. Would you like me to submit the revert to the patch system or are you
+> >> >> happy just to do it using git?
+> >> >
+> >> > I've reverted it myself (see the tip of the fixes branch). ?It's slightly
+> >> > annoying that the branch was only pulled last night.
+> >> >
+> >> >> > I think the only valid thing its doing is moving the copy of the
+> >> >> > reboot code earlier, but I don't see the value of moving just that.
+> >> >>
+> >> >> Neither can I. It seems to be happy enough with the patch reverted, so if it
+> >> >> ain't broke...
+> >> >
+> >> > I guess this is where the problems of poor commit descriptions crop up.
+> >> > We don't know _why_ the original author of the patch wanted to make the
+> >> > change - we don't know if they were seeing a problem.
+> >> >
+> >>
+> >> Apologize for messing things up...
+> >> But we have make in-depth testing over that patch already in our local
+> >> code base...
+> >> Does this problem happens for the kernel is running on a SMP soc? Our current
+> >> testing haven't extend to SMP one, but only have test on non-smp.
+> >
+> > It doesn't matter - as I've pointed out, the change is _fundamentally_
+> > wrong because you're storing state in global variables which refers to
+> > one of two possible images which may be loaded.
 > 
-> Which version of the patch does Tony have?  The one you point at which
-> uses IS_ERR_VALUE() and I complained about, or the version that has that
-> fixed?
+> I still cannot get understand your point there... Why image->start would refer
+> to the default kernel? You means kexec load two kernel at the same time?
 
-Here's what I got. Looks like the removal of the sr[12]_hwmod
-part is no longer needed, so only the r value check part is needed.
+I've now stated the problem twice.  Let me re-state it again:
 
-From: Paul Walmsley <paul@pwsan.com>
-Date: Thu, 6 Oct 2011 14:39:28 -0600
-Subject: [PATCH] ARM: OMAP3: hwmod: fix variant registration and remove SmartReflex from common list
+You are storing state in global variables which refers to one of two
+possible images which may be loaded.
 
-Commit d6504acd2125984c61dce24727dd3842d0144015 ("OMAP2+: hwmod:
-remove OMAP_CHIP*") tests the inverse condition of what it should be
-testing for the return value from omap_hwmod_register().  This causes
-several IP blocks to not be registered on several OMAP3 family devices.
+Take a moment to _think_ about what effect this sequence of events has:
 
-Fixing that bug also unmasked another bug, originally reported by
-Chase Maupin <chase.maupin@ti.com> and then subsequently by Abhilash K
-V <abhilash.kv@ti.com>, which caused SmartReflex IP blocks to be
-registered on SoCs that don't support them.
+1. loading a crash kernel has with image->type = KEXEC_TYPE_CRASH.
+   This calls machine_kexec_prepare() for this kernel, which with your
+   patch ends up writing to these variables:
+	kexec_start_address
+	kexec_indirection_page
+	kexec_mach_type
+	kexec_boot_atags
 
-Thanks to Russell King - ARM Linux <linux@arm.linux.org.uk> for comments
-on a previous version of the patch.
+   this will be loaded and retained in memory.
 
-Signed-off-by: Paul Walmsley <paul@pwsan.com>
-Cc: Chase Maupin <chase.maupin@ti.com>
-Cc: Abhilash K V <abhilash.kv@ti.com>
-Cc: Russell King - ARM Linux <linux@arm.linux.org.uk>
-Signed-off-by: Tony Lindgren <tony@atomide.com>
+2. loading a normal kexec image.
+   Again, this calls machine_kexec_prepare() for this kernel, which with
+   your patch ends up writing to these variables:
+	kexec_start_address
+	kexec_indirection_page
+	kexec_mach_type
+	kexec_boot_atags
 
---- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-@@ -3270,7 +3270,7 @@ int __init omap3xxx_hwmod_init(void)
- 
- 	/* Register hwmods common to all OMAP3 */
- 	r = omap_hwmod_register(omap3xxx_hwmods);
--	if (!r)
-+	if (r < 0)
- 		return r;
- 
- 	rev = omap_rev();
-@@ -3295,7 +3295,7 @@ int __init omap3xxx_hwmod_init(void)
- 	};
- 
- 	r = omap_hwmod_register(h);
--	if (!r)
-+	if (r < 0)
- 		return r;
- 
- 	/*
+3. you experience a crash at this point, and the kernel which is attempted
+   to be booted is the one with image->type = KEXEC_TYPE_CRASH.  However,
+	kexec_start_address
+	kexec_indirection_page
+	kexec_mach_type
+	kexec_boot_atags
+   are all set for the normal image, not the kexec image.
+
+See - storing this state in global variables does _NOT_ work if it has to
+persist to the point where the kexec actually happens.
+
+> The original intension for this posting is for we want to have a chance to
+> launch the crash kernel, even when default kernel is hanging, which
+> means it has no chance to trigger the panic path that lead to load the
+> crash kernel.
+
+Right.  That's a better explanation.
+
+It doesn't get us away from the fact that the patch is _technically_
+wrong though for the point I make above.  Those variables must stay
+inside machine_kexec() so they are correctly initialized for the
+kernel being booted.
