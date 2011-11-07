@@ -1,39 +1,41 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 07 Nov 2011 13:49:04 +0100
-Subject: [PATCH V2] drivers/i2c/busses/i2c-at91.c: fix brokeness
-In-Reply-To: <20111107130432.3309ffd6@endymion.delvare>
-References: <alpine.DEB.2.00.1111071019560.21431@gatekeeper.vosshq.de>
- <20111107094701.GF4265@legolas.emea.dhcp.ti.com>
- <EF2E73589CA71846A15D0B2CDF79505D087B38B21C@wm021.weinmann.com>
- <20111107100446.GG4265@legolas.emea.dhcp.ti.com>
- <EF2E73589CA71846A15D0B2CDF79505D087B38B2AB@wm021.weinmann.com>
- <20111107130432.3309ffd6@endymion.delvare>
-Message-ID: <4EB7D3C0.9070706@atmel.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 7 Nov 2011 13:31:40 +0000
+Subject: [01: PATCH 0/7] Preparation for arch_reset changes
+In-Reply-To: <20111106173113.GI12913@n2100.arm.linux.org.uk>
+References: <20111106173113.GI12913@n2100.arm.linux.org.uk>
+Message-ID: <20111107133140.GB5454@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/07/2011 01:04 PM, Jean Delvare :
-> On Mon, 7 Nov 2011 12:06:52 +0100, Voss, Nikolaus wrote:
->>>>> IMHO, you should split this patch into three or more smaller patches.
->>>>> You're doing lots of different things in one commit and it'll be a
->>>>> pain to bisect should this cause any issues to anyone.
->>>>
->>>> I didn't split the patch because it is virtually a complete rewrite.
->>>> Due to the severe limitations of the old driver, I think it should
->>>> replace the old driver.
->>>
->>> The final decision is up to Ben and/or Jean but I think we should always have
->>> incremental patches, not sure if we should allow big patches for the reasons
->>> above.
+Hi Russell,
+
+On Sun, Nov 06, 2011 at 05:31:13PM +0000, Russell King - ARM Linux wrote:
+> This series lays down the ground work for changing the way we handle the
+> reset (now called restart) handling on ARM.
 > 
-> The final call is obviously to Ben, not me, as this driver falls under
-> his jurisdiction. But for what it's worth, I consider the small-steps
-> rule void when it comes to fixing a plain broken driver by almost fully
-> rewriting it. The reviewer should really review the resulting code
-> rather than the patch. If it makes everybody happier, then killing the
-> old code completely first is certainly an option.
+> As a result of these patches, we provide a new hook in the machine_desc
+> record called 'restart' which is pointed at a function to perform the
+> appropriate restart actions for the platform.  This is called directly
+> from machine_restart() with IRQs and caches on.
+> 
+> The 'soft_reboot' flag is changed to a more generic 'restart_mode'
+> character - which is used to initialize the default reboot mode (which
+> can be changed via the 'reboot=' command line parameter.)
+> 
+> 'soft_restart(addr)' is added which performs a soft restart (iow,
+> orderly shutdown of caches and MMU and a jump to the passed address),
+> rather than the old way which separated the tear-down of the caches
+> and MMU from the code doing the jump.  This will be necessary to
+> resolve the ARMv6 and ARMv7 CPU restarting problems.
+> 
+> Finally, appropriate 'restart_mode' values are added to several
+> platforms which were hard-coding the restart mode by intercepting
+> the restarting via arm_pm_restart.
 
-I agree with this.
+For the seven patches,
 
--- 
-Nicolas Ferre
+Acked-by: Will Deacon <will.deacon@arm.com>
+
+Thanks,
+
+Will
