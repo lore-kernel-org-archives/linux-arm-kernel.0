@@ -1,39 +1,22 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 7 Nov 2011 07:27:04 +0100
-Subject: orion/kirkwood and device tree
-In-Reply-To: <201111062340.59042.michael@walle.cc>
-References: <20111031105740.GC29402@lunn.ch>
- <201110312350.28475.michael@walle.cc>
- <20111106160538.GD19491@lunn.ch>
- <201111062340.59042.michael@walle.cc>
-Message-ID: <20111107062704.GF19491@lunn.ch>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Mon, 07 Nov 2011 11:57:15 +0530
+Subject: [PATCH v4 1/4] regulator: helper routine to extract
+ regulator_init_data
+In-Reply-To: <20111104212216.GA5756@quad.lixom.net>
+References: <1319721864-30067-1-git-send-email-rnayak@ti.com>
+ <20111104202905.GA3918@quad.lixom.net>
+ <20111104211447.GC2541@opensource.wolfsonmicro.com>
+ <20111104212216.GA5756@quad.lixom.net>
+Message-ID: <4EB77A43.8050206@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 06, 2011 at 11:40:58PM +0100, Michael Walle wrote:
-> Hi Andrew,
-> 
-> thanks for the patch,
-> 
-> Am Sonntag 06 November 2011, 17:05:38 schrieb Andrew Lunn:
-> > Soon to follow is my patch to cleanup the address mapping of orion
-> > based platforms. I think this is one step towards solving your
-> > kirkwood_mbus_dram_info problem. I think the next steps are:
-> > 
-> > Rename all the {kirkwood|dove|orion5x|mv78xx0}_mbus_dram_info to
-> > orion_mbus_dram_info and move this variable into
-> > arch/arm/plat-orion/addr-map.c.
-> > 
-> > Move all the address setup code which is currently in various drives
-> > into arch/arm/plat-orion/addr-map.c. Remove orion_mbus_dram_info from
-> > all the platform_data structures.
-> mh and then use orion_mbus_dram_info directly within the device drivers?
+On Saturday 05 November 2011 02:52 AM, Olof Johansson wrote:
+>>> >  >  Also, lower-caps is common instead of V and A.
+>> >
+>> >  On the other hand the case is pretty important for SI units
+> Yeah, true. The fixed regulators used microvolt instead, which could be a good
+> way to do it.
+>
 
-No. Since all the address setup is now inside
-arch/arm/plat-orion/addr-map.c, the drivers themselves have no need of
-orion_mbus_dram_info.
-
-I'm about 75% through modifying the code. I hope i can find a couple
-of hours to get it finished and tested.
-
-   Andrew
+Ok, will use microvolt and microamp across all bindings.
