@@ -1,37 +1,49 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Mon, 7 Nov 2011 11:10:29 -0800
-Subject: [PATCH v3 0/8] Add support for tegra30 and cardhu
-In-Reply-To: <1320675617-20751-1-git-send-email-pdeschrijver@nvidia.com>
-References: <1320675617-20751-1-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF173F9A50F3@HQMAIL01.nvidia.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 7 Nov 2011 19:14:53 +0000
+Subject: 2b034922 breaks kexec on ARM
+In-Reply-To: <20111107190314.GS12913@n2100.arm.linux.org.uk>
+References: <20111107185125.GA17464@mudshark.cambridge.arm.com>
+ <20111107190314.GS12913@n2100.arm.linux.org.uk>
+Message-ID: <20111107191453.GC17464@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Peter De Schrijver wrote at Monday, November 07, 2011 7:20 AM:
-> This patchset adds support for the tegra30 SoC and the cardhu development
-> board.
+On Mon, Nov 07, 2011 at 07:03:15PM +0000, Russell King - ARM Linux wrote:
+> On Mon, Nov 07, 2011 at 06:51:25PM +0000, Will Deacon wrote:
+> > Hello,
+> > 
+> > I've just finished rebasing and reworking my kexec patches so that they sit
+> > nicely on top of Russell's recent reset work. The only problem is that
+> > commit 2b034922 ("ARM: 7098/1: kdump: copy kernel relocation code at the
+> > kexec prepare stage") is causing kexec to fail.
+> > 
+> > The symptoms are that the .init.text section is not loaded as part of the
+> > new kernel image, so when we try to do the SMP/UP fixups we hit a whole sea
+> > of poison left there by the previous kernel.
+> > 
+> > So my guess is that machine_kexec_prepare *is* too early for preparing the
+> > reboot_code_buffer and, unless anybody has a good reason not to, I'd like to
+> > revert the patch causing these problems.
 > 
-> Pathset is on top of Will Deacon's ARM reset work.
+> Hmm, having looked at kernel/kexec.c, this patch is clearly wrong.
+> There are two kernels which can be loaded into kexec - a crash kernel
+> and a default kernel.  These are kept entirely separately (and the
+> per-kernel context is stored in 'image').
+> 
+> However, this patch makes machine_kexec_prepare() store into some
+> _global_ variables, which means if you've loaded a crash kernel
+> followed by a default kernel, the values for the crash kernel will
+> be corrupted.
+> 
+> So yes, I think a revert of this patch is the right thing.
 
-A few minor issues:
+Great. Would you like me to submit the revert to the patch system or are you
+happy just to do it using git?
 
-1) If I enable just ARCH_TEGRA_3x_SOC, but not ARCH_TEGRA_2x_SOC, the
-kernel fails to build because arch/arm/mach-tegra/include/mach/irqs.h
-only defines NR_IRQS if ARCH_TEGRA_2x_SOC is defined.
+> I think the only valid thing its doing is moving the copy of the
+> reboot code earlier, but I don't see the value of moving just that.
 
-2) All the Tegra20 boards don't depend on ARCH_TEGRA_2x_SOC, so they can
-be enabled even if only Tegra30 support is enabled.
+Neither can I. It seems to be happy enough with the patch reverted, so if it
+ain't broke...
 
-3) I notice that in "arm/tegra: pinmux tables and definitions for tegra30",
-you ifdef'd the two entries in tegra_pinmux_of_match[] based on which SoCs
-were enabled, but in "arm/tegra: implement support for tegra30", you didn't
-do the same for the two entries in early_init[] (board-dt.c). I'm not sure
-how far we want to take only-Tegra20 or only-Tegra30 support, but perhaps
-we should be consistent here?
-
-I've tested this series on Harmony both booting with a board file and booting
-using device-tree and don't see any issues. I'll try to test it on Cardhu
-later today.
-
--- 
-nvpublic
+Will
