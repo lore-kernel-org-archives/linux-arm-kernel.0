@@ -1,123 +1,106 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon,  7 Nov 2011 16:16:44 +0000
-Subject: [PATCH v8 02/16] ARM: pgtable: Fix compiler warning in ioremap.c
- introduced by nopud
+Date: Mon,  7 Nov 2011 16:16:43 +0000
+Subject: [PATCH v8 01/16] ARM: pgtable: switch to use pgtable-nopud.h
 In-Reply-To: <1320682618-1182-1-git-send-email-catalin.marinas@arm.com>
 References: <1320682618-1182-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <1320682618-1182-3-git-send-email-catalin.marinas@arm.com>
+Message-ID: <1320682618-1182-2-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the arch/arm code conversion to pgtable-nopud.h, the section and
-supersection (un|re)map code triggers compiler warnings on UP systems.
-This is caused by pmd_offset() being given a pgd_t argument rather than
-a pud_t one. This patch makes the necessary conversion with the
-assumption that the pud is folded into the pgd. The page table setting
-code only loops over the pmd which is enough with the classic page
-tables. This code is not compiled when LPAE is enabled.
+From: Russell King <rmk+kernel@arm.linux.org.uk>
 
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+Nick Piggin noted upon introducing 4level-fixup.h:
+
+| Add a temporary "fallback" header so architectures can run with
+| the 4level pagetables patch without modification. All architectures
+| should be converted to use the folding headers (include/asm-generic/
+| pgtable-nop?d.h) as soon as possible, and the fallback header removed.
+
+This makes ARM compliant with this statement.
+
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mm/ioremap.c |   31 +++++++++++++++++++------------
- 1 files changed, 19 insertions(+), 12 deletions(-)
+ arch/arm/include/asm/pgalloc.h |    2 +-
+ arch/arm/include/asm/pgtable.h |   23 +++++++++++++----------
+ arch/arm/include/asm/tlb.h     |    1 +
+ 3 files changed, 15 insertions(+), 11 deletions(-)
 
-diff --git a/arch/arm/mm/ioremap.c b/arch/arm/mm/ioremap.c
-index bdb248c..c3fa40d 100644
---- a/arch/arm/mm/ioremap.c
-+++ b/arch/arm/mm/ioremap.c
-@@ -79,13 +79,16 @@ static void unmap_area_sections(unsigned long virt, unsigned long size)
- {
- 	unsigned long addr = virt, end = virt + (size & ~(SZ_1M - 1));
- 	pgd_t *pgd;
-+	pud_t *pud;
-+	pmd_t *pmdp;
+diff --git a/arch/arm/include/asm/pgalloc.h b/arch/arm/include/asm/pgalloc.h
+index 3e08fd3..7418894 100644
+--- a/arch/arm/include/asm/pgalloc.h
++++ b/arch/arm/include/asm/pgalloc.h
+@@ -30,7 +30,7 @@
+  */
+ #define pmd_alloc_one(mm,addr)		({ BUG(); ((pmd_t *)2); })
+ #define pmd_free(mm, pmd)		do { } while (0)
+-#define pgd_populate(mm,pmd,pte)	BUG()
++#define pud_populate(mm,pmd,pte)	BUG()
  
- 	flush_cache_vunmap(addr, end);
- 	pgd = pgd_offset_k(addr);
-+	pud = pud_offset(pgd, addr);
-+	pmdp = pmd_offset(pud, addr);
- 	do {
--		pmd_t pmd, *pmdp = pmd_offset(pgd, addr);
-+		pmd_t pmd = *pmdp;
+ extern pgd_t *pgd_alloc(struct mm_struct *mm);
+ extern void pgd_free(struct mm_struct *mm, pgd_t *pgd);
+diff --git a/arch/arm/include/asm/pgtable.h b/arch/arm/include/asm/pgtable.h
+index 9451dce..a1aca79 100644
+--- a/arch/arm/include/asm/pgtable.h
++++ b/arch/arm/include/asm/pgtable.h
+@@ -11,15 +11,16 @@
+ #define _ASMARM_PGTABLE_H
  
--		pmd = *pmdp;
- 		if (!pmd_none(pmd)) {
- 			/*
- 			 * Clear the PMD from the page table, and
-@@ -104,8 +107,8 @@ static void unmap_area_sections(unsigned long virt, unsigned long size)
- 				pte_free_kernel(&init_mm, pmd_page_vaddr(pmd));
- 		}
+ #include <linux/const.h>
+-#include <asm-generic/4level-fixup.h>
+ #include <asm/proc-fns.h>
  
--		addr += PGDIR_SIZE;
--		pgd++;
-+		addr += PMD_SIZE;
-+		pmdp += 2;
- 	} while (addr < end);
+ #ifndef CONFIG_MMU
  
- 	/*
-@@ -124,6 +127,8 @@ remap_area_sections(unsigned long virt, unsigned long pfn,
- {
- 	unsigned long addr = virt, end = virt + size;
- 	pgd_t *pgd;
-+	pud_t *pud;
-+	pmd_t *pmd;
++#include <asm-generic/4level-fixup.h>
+ #include "pgtable-nommu.h"
  
- 	/*
- 	 * Remove and free any PTE-based mapping, and
-@@ -132,17 +137,17 @@ remap_area_sections(unsigned long virt, unsigned long pfn,
- 	unmap_area_sections(virt, size);
+ #else
  
- 	pgd = pgd_offset_k(addr);
-+	pud = pud_offset(pgd, addr);
-+	pmd = pmd_offset(pud, addr);
- 	do {
--		pmd_t *pmd = pmd_offset(pgd, addr);
--
- 		pmd[0] = __pmd(__pfn_to_phys(pfn) | type->prot_sect);
- 		pfn += SZ_1M >> PAGE_SHIFT;
- 		pmd[1] = __pmd(__pfn_to_phys(pfn) | type->prot_sect);
- 		pfn += SZ_1M >> PAGE_SHIFT;
- 		flush_pmd_entry(pmd);
++#include <asm-generic/pgtable-nopud.h>
+ #include <asm/memory.h>
+ #include <mach/vmalloc.h>
+ #include <asm/pgtable-hwdef.h>
+@@ -164,20 +165,22 @@ extern pgd_t swapper_pg_dir[PTRS_PER_PGD];
+ #define pgd_offset_k(addr)	pgd_offset(&init_mm, addr)
  
--		addr += PGDIR_SIZE;
--		pgd++;
-+		addr += PMD_SIZE;
-+		pmd += 2;
- 	} while (addr < end);
+ /*
+- * The "pgd_xxx()" functions here are trivial for a folded two-level
+- * setup: the pgd is never bad, and a pmd always exists (as it's folded
+- * into the pgd entry)
++ * The "pud_xxx()" functions here are trivial when the pmd is folded into
++ * the pud: the pud entry is never bad, always exists, and can't be set or
++ * cleared.
+  */
+-#define pgd_none(pgd)		(0)
+-#define pgd_bad(pgd)		(0)
+-#define pgd_present(pgd)	(1)
+-#define pgd_clear(pgdp)		do { } while (0)
+-#define set_pgd(pgd,pgdp)	do { } while (0)
++#define pud_none(pud)		(0)
++#define pud_bad(pud)		(0)
++#define pud_present(pud)	(1)
++#define pud_clear(pudp)		do { } while (0)
+ #define set_pud(pud,pudp)	do { } while (0)
  
- 	return 0;
-@@ -154,6 +159,8 @@ remap_area_supersections(unsigned long virt, unsigned long pfn,
- {
- 	unsigned long addr = virt, end = virt + size;
- 	pgd_t *pgd;
-+	pud_t *pud;
-+	pmd_t *pmd;
  
- 	/*
- 	 * Remove and free any PTE-based mapping, and
-@@ -162,6 +169,8 @@ remap_area_supersections(unsigned long virt, unsigned long pfn,
- 	unmap_area_sections(virt, size);
+ /* Find an entry in the second-level page table.. */
+-#define pmd_offset(dir, addr)	((pmd_t *)(dir))
++static inline pmd_t *pmd_offset(pud_t *pud, unsigned long addr)
++{
++	return (pmd_t *)pud;
++}
  
- 	pgd = pgd_offset_k(virt);
-+	pud = pud_offset(pgd, addr);
-+	pmd = pmd_offset(pud, addr);
- 	do {
- 		unsigned long super_pmd_val, i;
+ #define pmd_none(pmd)		(!pmd_val(pmd))
+ #define pmd_present(pmd)	(pmd_val(pmd))
+diff --git a/arch/arm/include/asm/tlb.h b/arch/arm/include/asm/tlb.h
+index 265f908..b509e44 100644
+--- a/arch/arm/include/asm/tlb.h
++++ b/arch/arm/include/asm/tlb.h
+@@ -204,6 +204,7 @@ static inline void __pte_free_tlb(struct mmu_gather *tlb, pgtable_t pte,
  
-@@ -170,14 +179,12 @@ remap_area_supersections(unsigned long virt, unsigned long pfn,
- 		super_pmd_val |= ((pfn >> (32 - PAGE_SHIFT)) & 0xf) << 20;
+ #define pte_free_tlb(tlb, ptep, addr)	__pte_free_tlb(tlb, ptep, addr)
+ #define pmd_free_tlb(tlb, pmdp, addr)	pmd_free((tlb)->mm, pmdp)
++#define pud_free_tlb(tlb, pudp, addr)	pud_free((tlb)->mm, pudp)
  
- 		for (i = 0; i < 8; i++) {
--			pmd_t *pmd = pmd_offset(pgd, addr);
--
- 			pmd[0] = __pmd(super_pmd_val);
- 			pmd[1] = __pmd(super_pmd_val);
- 			flush_pmd_entry(pmd);
+ #define tlb_migrate_finish(mm)		do { } while (0)
  
--			addr += PGDIR_SIZE;
--			pgd++;
-+			addr += PMD_SIZE;
-+			pmd += 2;
- 		}
- 
- 		pfn += SUPERSECTION_SIZE >> PAGE_SHIFT;
