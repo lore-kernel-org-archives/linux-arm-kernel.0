@@ -1,169 +1,120 @@
 From: marek.vasut@gmail.com (Marek Vasut)
-Date: Mon,  7 Nov 2011 22:31:44 +0100
-Subject: [PATCH 2/3 RESEND] ARM: pxa: Add DT testing machine
+Date: Mon,  7 Nov 2011 22:31:43 +0100
+Subject: [PATCH 1/3 V2] ARM: pxa: Add DT support to pxa2xx-uart
 In-Reply-To: <1320701506-26812-1-git-send-email-marek.vasut@gmail.com>
 References: <1320172354-3795-1-git-send-email-marek.vasut@gmail.com>
  <1320701506-26812-1-git-send-email-marek.vasut@gmail.com>
-Message-ID: <1320701506-26812-3-git-send-email-marek.vasut@gmail.com>
+Message-ID: <1320701506-26812-2-git-send-email-marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I use the Voipac PXA270 board for PXA DT conversion. This board is a helper for
-the conversion to go smoothly and the testing to be easy.
+Add device tree binding for PXA2xx UARTs. Tested on Vpac270 board.
 
 Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
 Cc: Arnd Bergmann <arnd@arndb.de>
 Cc: Grant Likely <grant.likely@secretlab.ca>
 Cc: Rob Herring <robherring2@gmail.com>
 ---
- arch/arm/mach-pxa/Kconfig      |   15 +++++++
- arch/arm/mach-pxa/Makefile     |    3 +
- arch/arm/mach-pxa/vpac270-dt.c |   82 ++++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-pxa/vpac270.c    |    2 +
- 4 files changed, 102 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-pxa/vpac270-dt.c
+ drivers/tty/serial/pxa.c |   46 +++++++++++++++++++++++++++++++++++++++++++---
+ 1 files changed, 43 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-pxa/Kconfig b/arch/arm/mach-pxa/Kconfig
-index 61d3c72..a9bba3d 100644
---- a/arch/arm/mach-pxa/Kconfig
-+++ b/arch/arm/mach-pxa/Kconfig
-@@ -616,6 +616,21 @@ config MACH_ZIPIT2
- 	bool "Zipit Z2 Handheld"
- 	select PXA27x
- 	select HAVE_PWM
-+config MACH_VPAC_DT
-+	bool "PXA (Voipac270) FDT Machine"
-+	select PXA27x
-+	select OF
-+	depends on !MACH_VPAC270 && EXPERIMENTAL
-+	help
-+	  PXA Device Tree Machine.
-+	  This is to be a generic machine which probes all of it's drivers
-+	  using the Flattened Device Tree blob. This is work-in-progress
-+	  so don't expect much yet. We selected the Voipac PXA270 device
-+	  as a base device to test support along the way.
-+
-+	  NOTE: This platform is mutually exclusive with the original!
-+	  NOTE: Use only if you know what you're doing!!
-+
- endif
- endmenu
+V2: Use of_alias_get_id() instead of static int portnum
+    Drop checking of CPU type, instead let user handle HWUART on his own (by not
+    registering it in the DT file on new CPUs -- this depends on user's sanity).
+
+diff --git a/drivers/tty/serial/pxa.c b/drivers/tty/serial/pxa.c
+index 5c8e3bb..80bee8e 100644
+--- a/drivers/tty/serial/pxa.c
++++ b/drivers/tty/serial/pxa.c
+@@ -43,6 +43,8 @@
+ #include <linux/clk.h>
+ #include <linux/io.h>
+ #include <linux/slab.h>
++#include <linux/of.h>
++#include <linux/of_device.h>
  
-diff --git a/arch/arm/mach-pxa/Makefile b/arch/arm/mach-pxa/Makefile
-index be0f7df..2b80829 100644
---- a/arch/arm/mach-pxa/Makefile
-+++ b/arch/arm/mach-pxa/Makefile
-@@ -104,3 +104,6 @@ led-$(CONFIG_ARCH_PXA_IDP)	+= leds-idp.o
- obj-$(CONFIG_LEDS)		+= $(led-y)
+ struct uart_pxa_port {
+ 	struct uart_port        port;
+@@ -781,11 +783,48 @@ static const struct dev_pm_ops serial_pxa_pm_ops = {
+ };
+ #endif
  
- obj-$(CONFIG_TOSA_BT)		+= tosa-bt.o
-+
-+# PXA FDT board
-+obj-$(CONFIG_MACH_VPAC_DT)	+= vpac270-dt.o
-diff --git a/arch/arm/mach-pxa/vpac270-dt.c b/arch/arm/mach-pxa/vpac270-dt.c
-new file mode 100644
-index 0000000..dc9a6dd
---- /dev/null
-+++ b/arch/arm/mach-pxa/vpac270-dt.c
-@@ -0,0 +1,82 @@
-+/*
-+ * Hardware definitions for Voipac PXA270 driven by FDT
-+ *
-+ * Copyright (C) 2011 Marek Vasut <marek.vasut@gmail.com>
-+ *
-+ * NOTE: This is an ongoing effort of preparing generic FDT-based board
-+ *       for PXA machines. This particular device allows us to test the
-+ *       support for breakage.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ */
-+
-+#include <linux/of_platform.h>
-+#include <linux/irqdomain.h>
-+#include "vpac270.c"
-+
-+/******************************************************************************
-+ * Machine init
-+ ******************************************************************************/
-+static const struct of_device_id pxairq_of_match[] __initconst = {
-+	{ .compatible = "marvell,pxa-irq", },
-+	{},
++#ifdef CONFIG_OF
++static struct of_device_id serial_pxa_dt_ids[] = {
++	{ .compatible = "marvell,pxa2xx-uart" },
++	{ /* sentinel */ }
 +};
++MODULE_DEVICE_TABLE(of, serial_pxa_dt_ids);
 +
-+static void __init pxa_dt_init_irq(void)
++static int serial_pxa_probe_dt(struct platform_device *pdev, int *portid)
 +{
-+	irq_domain_generate_simple(pxairq_of_match, 0x40d00000, 0);
-+	pxa27x_init_irq();
++	struct device_node *np = pdev->dev.of_node;
++	int ret;
++
++	if (!np)
++		return -ENODEV;
++
++	ret = of_alias_get_id(np, "serial");
++	if (ret < 0) {
++		dev_err(&pdev->dev, "Failed to get alias id, errno %d\n", ret);
++		return -ENODEV;
++	}
++
++	*portid = ret;
++
++	return 0;
 +}
-+
-+static struct of_device_id pxa_dt_match_table[] __initdata = {
-+	{ .compatible = "simple-bus", },
-+	{}
-+};
-+
-+static const struct of_dev_auxdata pxa_dt_auxdata_table[] __initconst = {
-+	OF_DEV_AUXDATA("marvell,pxa2xx-uart", 0x40100000, "pxa2xx-uart.0", NULL),
-+	OF_DEV_AUXDATA("marvell,pxa2xx-uart", 0x40200000, "pxa2xx-uart.1", NULL),
-+	OF_DEV_AUXDATA("marvell,pxa2xx-uart", 0x40700000, "pxa2xx-uart.2", NULL),
-+};
-+
-+static void __init vpac270_dt_init(void)
++#else
++static inline int serial_pxa_probe_dt(struct platform_device *pdev, int *portid)
 +{
-+	pxa2xx_mfp_config(ARRAY_AND_SIZE(vpac270_pin_config));
-+
-+	of_platform_populate(NULL, pxa_dt_match_table,
-+				pxa_dt_auxdata_table, NULL);
-+
-+	pxa_set_i2c_info(NULL);
-+	pxa27x_set_i2c_power_info(NULL);
-+
-+	vpac270_pmic_init();
-+	vpac270_lcd_init();
-+	vpac270_mmc_init();
-+	vpac270_nor_init();
-+	vpac270_onenand_init();
-+	vpac270_leds_init();
-+	vpac270_keys_init();
-+	vpac270_uhc_init();
-+	vpac270_udc_init();
-+	vpac270_eth_init();
-+	vpac270_ts_init();
-+	vpac270_rtc_init();
-+	vpac270_ide_init();
++	return 0;
 +}
-+
-+static const char *vpac270_dt_board_compat[] __initdata = {
-+	"voipac,vpac270",
-+	NULL
-+};
-+
-+DT_MACHINE_START(PXA_DT, "Marvell PXA2xx/PXA3xx (Flattened Device Tree)")
-+	.map_io		= pxa27x_map_io,
-+	.init_irq	= pxa_dt_init_irq,
-+	.handle_irq	= pxa27x_handle_irq,
-+	.timer		= &pxa_timer,
-+	.init_machine	= vpac270_dt_init,
-+	.dt_compat	= vpac270_dt_board_compat,
-+MACHINE_END
-diff --git a/arch/arm/mach-pxa/vpac270.c b/arch/arm/mach-pxa/vpac270.c
-index a7539a6..339ecdf 100644
---- a/arch/arm/mach-pxa/vpac270.c
-+++ b/arch/arm/mach-pxa/vpac270.c
-@@ -715,6 +715,7 @@ static void __init vpac270_init(void)
- 	vpac270_ide_init();
- }
- 
-+#ifndef	CONFIG_MACH_VPAC_DT
- MACHINE_START(VPAC270, "Voipac PXA270")
- 	.atag_offset	= 0x100,
- 	.map_io		= pxa27x_map_io,
-@@ -723,3 +724,4 @@ MACHINE_START(VPAC270, "Voipac PXA270")
- 	.timer		= &pxa_timer,
- 	.init_machine	= vpac270_init
- MACHINE_END
 +#endif
++
+ static int serial_pxa_probe(struct platform_device *dev)
+ {
+ 	struct uart_pxa_port *sport;
+ 	struct resource *mmres, *irqres;
+ 	int ret;
++	int portid = dev->id;
++
++	ret = serial_pxa_probe_dt(dev, &portid);
++	if (ret == -EINVAL)
++		return 0;
+ 
+ 	mmres = platform_get_resource(dev, IORESOURCE_MEM, 0);
+ 	irqres = platform_get_resource(dev, IORESOURCE_IRQ, 0);
+@@ -808,12 +847,12 @@ static int serial_pxa_probe(struct platform_device *dev)
+ 	sport->port.irq = irqres->start;
+ 	sport->port.fifosize = 64;
+ 	sport->port.ops = &serial_pxa_pops;
+-	sport->port.line = dev->id;
++	sport->port.line = portid;
+ 	sport->port.dev = &dev->dev;
+ 	sport->port.flags = UPF_IOREMAP | UPF_BOOT_AUTOCONF;
+ 	sport->port.uartclk = clk_get_rate(sport->clk);
+ 
+-	switch (dev->id) {
++	switch (portid) {
+ 	case 0: sport->name = "FFUART"; break;
+ 	case 1: sport->name = "BTUART"; break;
+ 	case 2: sport->name = "STUART"; break;
+@@ -829,7 +868,7 @@ static int serial_pxa_probe(struct platform_device *dev)
+ 		goto err_clk;
+ 	}
+ 
+-	serial_pxa_ports[dev->id] = sport;
++	serial_pxa_ports[portid] = sport;
+ 
+ 	uart_add_one_port(&serial_pxa_reg, &sport->port);
+ 	platform_set_drvdata(dev, sport);
+@@ -866,6 +905,7 @@ static struct platform_driver serial_pxa_driver = {
+ #ifdef CONFIG_PM
+ 		.pm	= &serial_pxa_pm_ops,
+ #endif
++		.of_match_table = of_match_ptr(serial_pxa_dt_ids),
+ 	},
+ };
+ 
 -- 
 1.7.7.1
