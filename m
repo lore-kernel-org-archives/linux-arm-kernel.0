@@ -1,46 +1,51 @@
-From: liu.h.jason@gmail.com (Jason Liu)
-Date: Mon, 7 Nov 2011 14:07:58 +0800
-Subject: [PATCH 2/2] ARM: mxc: fix tzic build error
-In-Reply-To: <1320634936-7898-2-git-send-email-richard.zhao@linaro.org>
-References: <1320634936-7898-1-git-send-email-richard.zhao@linaro.org>
- <1320634936-7898-2-git-send-email-richard.zhao@linaro.org>
-Message-ID: <CAB4PhKeyAf+X_v_ABud25+rDud+8ujFUQeV051BXPOtuZN3pcA@mail.gmail.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Mon, 07 Nov 2011 11:44:43 +0530
+Subject: [PATCH 2/4] mmc: omap: adapt the hsmmc driver to device tree
+In-Reply-To: <4EB45844.5000603@ti.com>
+References: <1320407441-29697-1-git-send-email-rnayak@ti.com>
+ <1320407441-29697-3-git-send-email-rnayak@ti.com>
+ <20111104200415.GC3045@quad.lixom.net> <4EB45844.5000603@ti.com>
+Message-ID: <4EB77753.8040606@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Richard,
+On Saturday 05 November 2011 02:55 AM, Cousson, Benoit wrote:
+>>> +Required properties:
+>>> +- compatible: Should be "ti,omap-hsmmc<n>", "ti,omap2-hsmmc";
+>>> +n is controller instance starting 0, for OMAP2/3 controllers
+>>
+>> No, no, no. You should not have to specify the unit-address in the
+>> compatible
+>> field. They are all programmed the same way, right?
+>
+> AFAIR, 2 instances contain a DMA engine, but that should anyway be
+> detected using a "ti,had-dma-engine" extra property and not like that.
+>
+> Checking the code in #2, it is used to get the instance of the MMC.
+>
+> +static unsigned int of_get_hsmmc_instance(struct device_node *np)
+> +{
+> +    int i;
+> +    char comp[32];
+> +
+> +    for (; i < OMAP_MMC_DEV_MAX; i++) {
+> +        snprintf(comp, 32, "ti,omap-hsmmc%d", i);
+> +        if (of_device_is_compatible(np, comp))
+> +            break;
+> +    }
+> +    return i;
+> +}
+>
+> Which does not seems to be a good usage of the compatible property anyway.
+> For a similar issue someone on the list suggested using the "cell-index"
+> property. But the definition I found in some binding documentation seems
+> to reserve that to: "enumerate logical devices within an IP core."
+> Ideally the driver should probably get rid of the need for an index.
+> I didn't check the original driver, but that should be needed for some
+> legacy reason.
 
-2011/11/7 Richard Zhao <richard.zhao@linaro.org>:
-> Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
-> ---
-> ?arch/arm/plat-mxc/tzic.c | ? ?1 +
-> ?1 files changed, 1 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/plat-mxc/tzic.c b/arch/arm/plat-mxc/tzic.c
-> index e993a18..a3c164c 100644
-> --- a/arch/arm/plat-mxc/tzic.c
-> +++ b/arch/arm/plat-mxc/tzic.c
-> @@ -17,6 +17,7 @@
-> ?#include <linux/io.h>
->
-> ?#include <asm/mach/irq.h>
-> +#include <asm/exception.h>
->
-> ?#include <mach/hardware.h>
-> ?#include <mach/common.h>
-
-Patch already here:
-http://patchwork.ozlabs.org/patch/123421/
-
-
-Jason Liu
-> --
-> 1.7.5.4
->
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+yes, there are a bunch of things done inside the driver based on the
+instance id which seem wrong, but I agree, encoding the instance
+in the compatible property seems really bad and non-scalable.
+Will look at how some of this legacy code in the driver can be
+removed/cleaned up.
