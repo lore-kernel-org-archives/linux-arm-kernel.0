@@ -1,24 +1,38 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 7 Nov 2011 22:55:29 +0000
-Subject: [PATCH] arm: omap2+: hwmod: fix breakage introduced by d6504acd
-In-Reply-To: <20111107225157.GB31337@atomide.com>
-References: <1320688617-4543-1-git-send-email-balbi@ti.com>
- <20111107183208.GG15294@n2100.arm.linux.org.uk>
- <20111107193908.GA5059@legolas.emea.dhcp.ti.com>
- <20111107212707.GH15294@n2100.arm.linux.org.uk>
- <alpine.DEB.2.00.1111071428001.12394@utopia.booyaka.com>
- <20111107224129.GJ15294@n2100.arm.linux.org.uk>
- <20111107225157.GB31337@atomide.com>
-Message-ID: <20111107225529.GK15294@n2100.arm.linux.org.uk>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Mon, 7 Nov 2011 15:03:55 -0800
+Subject: [PATCH v3 0/8] Add support for tegra30 and cardhu
+In-Reply-To: <1320675617-20751-1-git-send-email-pdeschrijver@nvidia.com>
+References: <1320675617-20751-1-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF173F9A525A@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 07, 2011 at 02:51:57PM -0800, Tony Lindgren wrote:
-> Here's what I got. Looks like the removal of the sr[12]_hwmod
-> part is no longer needed, so only the r value check part is needed.
+Peter De Schrijver wrote at Monday, November 07, 2011 7:20 AM:
+> This patchset adds support for the tegra30 SoC and the cardhu development
+> board.
+> 
+> Pathset is on top of Will Deacon's ARM reset work.
 
-Err.  So do you have anything in your git tree which you're pushing out
-this evening which removes the sr[12]_hwmod from the omap_3xxx_hwmod
-list?
+Peter, how did you test this on Tegra30/Cardhu?
 
-If not, how does that bug get fixed in mainline?
+I took the branch you send me containing all your patches and built it. I
+tried booting this using both our internal Tegra30 U-boot, and using
+fastboot from an internal Android Honeycomb image. In both cases, as soon
+as the kernel started, it spewed a line or two of binary garbage on the
+serial port, then nothing. Can you fill me in on details like:
+
+a) What .config you used
+b) What kernel command-line you used
+c) Do you have an A01 or A02 CPU on your Cardhu, and how much RAM?
+d) What bootloader you used (exact git commit ID of U-Boot, or the 
+Android build ID)
+e) Do you have any local changes applied that may help boot work but aren't
+in your patchset, or the branch you sent me?
+
+Perhaps we should work on this off-list and report back once I've got it
+working.
+
+Thanks.
+
+-- 
+nvpublic
