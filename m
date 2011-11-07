@@ -1,59 +1,57 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon,  7 Nov 2011 16:16:58 +0000
-Subject: [PATCH v8 16/16] ARM: LPAE: Add the Kconfig entries
-In-Reply-To: <1320682618-1182-1-git-send-email-catalin.marinas@arm.com>
-References: <1320682618-1182-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <1320682618-1182-17-git-send-email-catalin.marinas@arm.com>
+From: balajitk@ti.com (Balaji T K)
+Date: Mon, 7 Nov 2011 21:55:11 +0530
+Subject: [PATCH 1/1] mmc: omap_hsmmc: DMA unmap only once in case of MMC error
+Message-ID: <1320683111-12577-1-git-send-email-balajitk@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the ARM_LPAE and ARCH_PHYS_ADDR_T_64BIT Kconfig entries
-allowing LPAE support to be compiled into the kernel.
+From: Per Forlin <per.forlin@linaro.org>
 
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+Reported by Russell King:
+mmcblk0: error -84 transferring data, sector 149201, nr 64,
+cmd response 0x900, card status 0xb00
+mmcblk0: retrying using single block read
+
+WARNING: at lib/dma-debug.c:811 check_unmap
+omap_hsmmc omap_hsmmc.0: DMA-API: device driver tries to free DMA memory
+it has not allocated [device address=0x0000000080933000] [size=20480 bytes]
+
+In case of an error dma_unmap() is issued in omap_hsmmc_dma_cleanup()
+and then again in omap_hsmmc_post_req(). Resolve this by clearing the
+host_cookie to indicate there is no DMA mapped memory to unmap.
+
+Signed-off-by: Per Forlin <per.forlin@linaro.org>
+Tested-by: Balaji T K <balajitk@ti.com>
 ---
- arch/arm/Kconfig    |    2 +-
- arch/arm/mm/Kconfig |   17 +++++++++++++++++
- 2 files changed, 18 insertions(+), 1 deletions(-)
+Repost with my Tested-by
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 44789ef..885c04e 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1959,7 +1959,7 @@ endchoice
+ drivers/mmc/host/omap_hsmmc.c |    7 +++++--
+ 1 files changed, 5 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
+index 101cd31..d5fe43d 100644
+--- a/drivers/mmc/host/omap_hsmmc.c
++++ b/drivers/mmc/host/omap_hsmmc.c
+@@ -1010,6 +1010,7 @@ static void omap_hsmmc_dma_cleanup(struct omap_hsmmc_host *host, int errno)
+ 			host->data->sg_len,
+ 			omap_hsmmc_get_dma_dir(host, host->data));
+ 		omap_free_dma(dma_ch);
++		host->data->host_cookie = 0;
+ 	}
+ 	host->data = NULL;
+ }
+@@ -1575,8 +1576,10 @@ static void omap_hsmmc_post_req(struct mmc_host *mmc, struct mmc_request *mrq,
+ 	struct mmc_data *data = mrq->data;
  
- config XIP_KERNEL
- 	bool "Kernel Execute-In-Place from ROM"
--	depends on !ZBOOT_ROM
-+	depends on !ZBOOT_ROM && !ARM_LPAE
- 	help
- 	  Execute-In-Place allows the kernel to run from non-volatile storage
- 	  directly addressable by the CPU, such as NOR flash. This saves RAM
-diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-index 67f75a0..d289cdb 100644
---- a/arch/arm/mm/Kconfig
-+++ b/arch/arm/mm/Kconfig
-@@ -629,6 +629,23 @@ config IO_36
- 
- comment "Processor Features"
- 
-+config ARM_LPAE
-+	bool "Support for the Large Physical Address Extension"
-+	depends on MMU && CPU_V7
-+	help
-+	  Say Y if you have an ARMv7 processor supporting the LPAE page
-+	  table format and you would like to access memory beyond the
-+	  4GB limit. The resulting kernel image will not run on
-+	  processors without the LPA extension.
-+
-+	  If unsure, say N.
-+
-+config ARCH_PHYS_ADDR_T_64BIT
-+	def_bool ARM_LPAE
-+
-+config ARCH_DMA_ADDR_T_64BIT
-+	def_bool ARM_LPAE
-+
- config ARM_THUMB
- 	bool "Support Thumb user binaries"
- 	depends on CPU_ARM720T || CPU_ARM740T || CPU_ARM920T || CPU_ARM922T || CPU_ARM925T || CPU_ARM926T || CPU_ARM940T || CPU_ARM946E || CPU_ARM1020 || CPU_ARM1020E || CPU_ARM1022 || CPU_ARM1026 || CPU_XSCALE || CPU_XSC3 || CPU_MOHAWK || CPU_V6 || CPU_V6K || CPU_V7 || CPU_FEROCEON
+ 	if (host->use_dma) {
+-		dma_unmap_sg(mmc_dev(host->mmc), data->sg, data->sg_len,
+-			     omap_hsmmc_get_dma_dir(host, data));
++		if (data->host_cookie)
++			dma_unmap_sg(mmc_dev(host->mmc), data->sg,
++				     data->sg_len,
++				     omap_hsmmc_get_dma_dir(host, data));
+ 		data->host_cookie = 0;
+ 	}
+ }
+-- 
+1.7.0.4
