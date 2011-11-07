@@ -1,64 +1,67 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 7 Nov 2011 15:27:13 -0800
-Subject: [PATCH] arm: omap2+: hwmod: fix breakage introduced by d6504acd
-In-Reply-To: <20111107231632.GL15294@n2100.arm.linux.org.uk>
-References: <1320688617-4543-1-git-send-email-balbi@ti.com>
- <20111107183208.GG15294@n2100.arm.linux.org.uk>
- <20111107193908.GA5059@legolas.emea.dhcp.ti.com>
- <20111107212707.GH15294@n2100.arm.linux.org.uk>
- <alpine.DEB.2.00.1111071428001.12394@utopia.booyaka.com>
- <20111107224129.GJ15294@n2100.arm.linux.org.uk>
- <20111107225157.GB31337@atomide.com>
- <20111107225529.GK15294@n2100.arm.linux.org.uk>
- <20111107230728.GC31337@atomide.com>
- <20111107231632.GL15294@n2100.arm.linux.org.uk>
-Message-ID: <20111107232713.GD31337@atomide.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon,  7 Nov 2011 17:43:40 -0600
+Subject: [PATCH 1/2] ARM: use cache type functions for arch_get_unmapped_area
+Message-ID: <1320709421-14469-1-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@arm.linux.org.uk> [111107 14:41]:
-> On Mon, Nov 07, 2011 at 03:07:28PM -0800, Tony Lindgren wrote:
-> > * Russell King - ARM Linux <linux@arm.linux.org.uk> [111107 14:20]:
-> > > On Mon, Nov 07, 2011 at 02:51:57PM -0800, Tony Lindgren wrote:
-> > > > Here's what I got. Looks like the removal of the sr[12]_hwmod
-> > > > part is no longer needed, so only the r value check part is needed.
-> > > 
-> > > Err.  So do you have anything in your git tree which you're pushing out
-> > > this evening which removes the sr[12]_hwmod from the omap_3xxx_hwmod
-> > > list?
-> > > 
-> > > If not, how does that bug get fixed in mainline?
-> > 
-> > Ah sorry, there's also the following commit there that deals
-> > with other related issues:
-> 
-> Great, so it looks like everything that I've found over the last two days
-> should be solved completely by what you have queued for Arnd.
+From: Rob Herring <rob.herring@calxeda.com>
 
-OK good to hear.
+There are already cache type decoding functions, so use those instead
+of custom decode code which only works for ARMv6.
 
-> One last issue though...
-> 
-> We had this patch:
-> 
-> http://lists.arm.linux.org.uk/lurker/message/20111006.232441.227dfcf6.en.html
-> 
-> which is from Paul, post my complaint about IS_ERR_VALUE being used.
-> This removed sr1_hwmod and sr2_hwmod, and the commit message explicitly
-> talks about doing this.
-> 
-> There's also the patch below.  Somehow, this resulted in that bit of
-> Paul's patch being removed (possibly automatically by git) but the commit
-> comments are retained, which are now stale and no longer reflect what the
-> patch is doing...  That's rather unfortunate, but at this point its
-> probably too late to do something about it.
+This change also correctly enables cache colour alignment on Cortex-A9
+whose I-cache is aliasing VIPT.
 
-Yeah that's a bit unfortunate. At least the commit message mentions
-what it fixes, and then mentions the secondary bug related to the
-sr[12]_hwmod entries. Anyways, I'd rather not start messing with commit
-unless people think it's worth rebasing about half of the patches
-in fixes.
+Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+---
+ arch/arm/mm/mmap.c |   23 ++++++-----------------
+ 1 files changed, 6 insertions(+), 17 deletions(-)
 
-Regards,
-
-Tony
+diff --git a/arch/arm/mm/mmap.c b/arch/arm/mm/mmap.c
+index 74be05f..80e70ef 100644
+--- a/arch/arm/mm/mmap.c
++++ b/arch/arm/mm/mmap.c
+@@ -9,8 +9,7 @@
+ #include <linux/io.h>
+ #include <linux/personality.h>
+ #include <linux/random.h>
+-#include <asm/cputype.h>
+-#include <asm/system.h>
++#include <asm/cachetype.h>
+ 
+ #define COLOUR_ALIGN(addr,pgoff)		\
+ 	((((addr)+SHMLBA-1)&~(SHMLBA-1)) +	\
+@@ -32,25 +31,15 @@ arch_get_unmapped_area(struct file *filp, unsigned long addr,
+ 	struct mm_struct *mm = current->mm;
+ 	struct vm_area_struct *vma;
+ 	unsigned long start_addr;
+-#if defined(CONFIG_CPU_V6) || defined(CONFIG_CPU_V6K)
+-	unsigned int cache_type;
+-	int do_align = 0, aliasing = 0;
++	int do_align = 0;
++	int aliasing = cache_is_vipt_aliasing() || icache_is_vipt_aliasing();
+ 
+ 	/*
+ 	 * We only need to do colour alignment if either the I or D
+-	 * caches alias.  This is indicated by bits 9 and 21 of the
+-	 * cache type register.
++	 * caches alias.
+ 	 */
+-	cache_type = read_cpuid_cachetype();
+-	if (cache_type != read_cpuid_id()) {
+-		aliasing = (cache_type | cache_type >> 12) & (1 << 11);
+-		if (aliasing)
+-			do_align = filp || flags & MAP_SHARED;
+-	}
+-#else
+-#define do_align 0
+-#define aliasing 0
+-#endif
++	if (aliasing)
++		do_align = filp || (flags & MAP_SHARED);
+ 
+ 	/*
+ 	 * We enforce the MAP_FIXED case.
+-- 
+1.7.5.4
