@@ -1,25 +1,38 @@
-From: richard.zhao@linaro.org (Richard Zhao)
-Date: Mon, 7 Nov 2011 14:22:23 +0800
-Subject: [PATCH 2/2] ARM: mxc: fix tzic build error
-In-Reply-To: <CAB4PhKeyAf+X_v_ABud25+rDud+8ujFUQeV051BXPOtuZN3pcA@mail.gmail.com>
-References: <1320634936-7898-1-git-send-email-richard.zhao@linaro.org>
- <1320634936-7898-2-git-send-email-richard.zhao@linaro.org>
- <CAB4PhKeyAf+X_v_ABud25+rDud+8ujFUQeV051BXPOtuZN3pcA@mail.gmail.com>
-Message-ID: <20111107062221.GA5898@b20223-02.ap.freescale.net>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Mon, 07 Nov 2011 11:53:36 +0530
+Subject: [PATCH v4 1/4] regulator: helper routine to extract
+ regulator_init_data
+In-Reply-To: <20111104202905.GA3918@quad.lixom.net>
+References: <1319721864-30067-1-git-send-email-rnayak@ti.com>
+ <20111104202905.GA3918@quad.lixom.net>
+Message-ID: <4EB77968.803@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 07, 2011 at 02:07:58PM +0800, Jason Liu wrote:
-> Patch already here:
-> http://patchwork.ozlabs.org/patch/123421/
-ah, I didn't saw it.
+Hi Olof,
 
-Hi Sascha,
+On Saturday 05 November 2011 01:59 AM, Olof Johansson wrote:
+>> +- regulator-min-uV: smallest voltage consumers may set
+>> >  +- regulator-max-uV: largest voltage consumers may set
+>> >  +- regulator-uV-offset: Offset applied to voltages to compensate for voltage drops
+>> >  +- regulator-min-uA: smallest current consumers may set
+>> >  +- regulator-max-uA: largest current consumers may set
+>> >  +- regulator-always-on: boolean, regulator should never be disabled
+>> >  +- regulator-boot-on: bootloader/firmware enabled regulator
+ >
+> Once you have a compatible field that can determine what kind of device node,
+> and binding, this is, you can drop the regulator- prefix and save some space in
+> the device tree. Properties are rarely prefixed by their subsystem. Only
+> exception would/could be the regulator-name property where it could make
+> sense to keep the prefix.
 
-please ignore this patch, take the one Jason sent.
+given that we decided not to have a compatible field like "regulator"
+for the top-level bindings and instead have a device specific one,
+and based on the discussions with Grant here[1], I hope its OK to keep
+these the way they are.
 
-Thanks
-Richard
-> 
-> 
-> Jason Liu
+regards,
+Rajendra
+
+[1] 
+http://lists.ozlabs.org/pipermail/devicetree-discuss/2011-September/008196.html
