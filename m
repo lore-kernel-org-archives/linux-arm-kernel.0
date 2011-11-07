@@ -1,19 +1,166 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 7 Nov 2011 14:31:25 -0700 (MST)
-Subject: Fix handling of return value in omap3xx_hwmod_init and sr warning.
-In-Reply-To: <1320701417-16818-1-git-send-email-J.Kilb@phytec.de>
-References: <1320701417-16818-1-git-send-email-J.Kilb@phytec.de>
-Message-ID: <alpine.DEB.2.00.1111071431070.12394@utopia.booyaka.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 07 Nov 2011 15:45:24 -0600
+Subject: [PATCH 3/3 V2] ARM: pxa: Add basic DTS files for PXA/Vpac270
+ testing machine
+In-Reply-To: <1320701506-26812-4-git-send-email-marek.vasut@gmail.com>
+References: <1320172354-3795-1-git-send-email-marek.vasut@gmail.com>
+ <1320701506-26812-1-git-send-email-marek.vasut@gmail.com>
+ <1320701506-26812-4-git-send-email-marek.vasut@gmail.com>
+Message-ID: <4EB85174.70801@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 7 Nov 2011, Juergen Kilb wrote:
 
-> After this, I got some new warnings during bootup about sr1_hwmod and sr2_hwmod.
-> This is fixed with PATCH2/2.
+On 11/07/2011 03:31 PM, Marek Vasut wrote:
+> Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Grant Likely <grant.likely@secretlab.ca>
+> Cc: Rob Herring <robherring2@gmail.com>
+> ---
 
-Thanks for the patches, but these should be already fixed by 
+Couple of minor things below. With those fixed:
 
-http://www.spinics.net/lists/arm-kernel/msg143549.html
+Acked-by: Rob Herring <rob.herring@calxeda.com>
 
-- Paul
+>  arch/arm/boot/dts/pxa-vpac270.dts |   37 +++++++++++++++++++
+>  arch/arm/boot/dts/pxa.dtsi        |   71 +++++++++++++++++++++++++++++++++++++
+>  2 files changed, 108 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/boot/dts/pxa-vpac270.dts
+>  create mode 100644 arch/arm/boot/dts/pxa.dtsi
+> 
+> V2: Fix typo -- rename alias -> aliases in the pxa270.dtsi
+>     Drop marvell,pxa250 option, instead leave all ports disable and let user
+>     select, which will be registered. This depends on the user not doing
+>     something stupid (like registering HWUART, which is available only on
+>     pxa250) on pxa320.
+
+Should be a safe assumption. Only someone capable of implementing board
+support should create a dts...
+
+> 
+> diff --git a/arch/arm/boot/dts/pxa-vpac270.dts b/arch/arm/boot/dts/pxa-vpac270.dts
+> new file mode 100644
+> index 0000000..48dd9e5
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/pxa-vpac270.dts
+> @@ -0,0 +1,37 @@
+> +/*
+> + * pxa-vpac270.dts - Device Tree file for Voipac PXA270 board
+> + *
+> + * Copyright (C) 2011 Marek Vasut <marek.vasut@gmail.com>
+> + *
+> + * Licensed under GPLv2 or later.
+> + */
+> +/dts-v1/;
+> +/include/ "pxa.dtsi"
+> +
+> +/ {
+> +	model = "Voipac VPAC270";
+> +	compatible = "voipac,vpac270";
+> +
+> +	chosen {
+> +		bootargs = "console=ttyS0,115200 mem=128M at 0xa0000000";
+
+Isn't mem= redundant with the memory node below?
+
+> +		linux,stdout-path = &ffuart;
+> +	};
+> +
+> +	memory at a0000000 {
+> +		reg = <0xa0000000 0x8000000>;
+> +	};
+> +
+> +	pxabus {
+> +		ffuart: uart at 40100000 {
+
+These should be serial at ...
+
+> +			status = "okay";
+> +		};
+> +
+> +		btuart: uart at 40200000 {
+> +			status = "okay";
+> +		};
+> +
+> +		stuart: uart at 40700000 {
+> +			status = "okay";
+> +		};
+> +	};
+> +};
+> diff --git a/arch/arm/boot/dts/pxa.dtsi b/arch/arm/boot/dts/pxa.dtsi
+> new file mode 100644
+> index 0000000..4c9c4c7
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/pxa.dtsi
+> @@ -0,0 +1,71 @@
+> +/*
+> + * pxa.dtsi - Device Tree Include file for Marvell PXA2xx/PXA3xx family SoC
+> + *
+> + * Copyright (C) 2011 Marek Vasut <marek.vasut@gmail.com>
+> + *
+> + * Licensed under GPLv2 or later.
+> + */
+> +
+> +/include/ "skeleton.dtsi"
+> +
+> +/ {
+> +	model = "Marvell PXA2xx/PXA3xx family SoC";
+> +	compatible = "marvell,pxa";
+> +	interrupt-parent = <&pxairq>;
+> +
+> +	aliases {
+> +		serial0 = &ffuart;
+> +		serial1 = &btuart;
+> +		serial2 = &stuart;
+> +		serial3 = &hwuart;
+> +	};
+> +
+> +	cpus {
+> +		cpu at 0 {
+> +			compatible = "arm,xscale";
+> +		};
+> +	};
+> +
+> +	pxabus {
+> +		compatible = "simple-bus";
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		ranges;
+> +
+> +		pxairq: interrupt-controller at 40d00000 {
+> +			#interrupt-cells = <1>;
+> +			compatible = "marvell,pxa-irq";
+> +			interrupt-controller;
+> +			interrupt-parent;
+> +			reg = <0x40d00000 0xd0>;
+> +		};
+> +
+> +		ffuart: uart at 40100000 {
+> +			compatible = "marvell,pxa2xx-uart";
+> +			reg = <0x40100000 0x30>;
+> +			interrupts = <22>;
+> +			status = "disabled";
+> +		};
+> +
+> +		btuart: uart at 40200000 {
+> +			compatible = "marvell,pxa2xx-uart";
+> +			reg = <0x40200000 0x30>;
+> +			interrupts = <21>;
+> +			status = "disabled";
+> +		};
+> +
+> +		stuart: uart at 40700000 {
+> +			compatible = "marvell,pxa2xx-uart";
+> +			reg = <0x40700000 0x30>;
+> +			interrupts = <20>;
+> +			status = "disabled";
+> +		};
+> +
+> +		hwuart: uart at 41100000 {
+> +			compatible = "marvell,pxa2xx-uart";
+> +			reg = <0x41100000 0x30>;
+> +			interrupts = <7>;
+> +			status = "disabled";
+> +		};
+> +	};
+> +};
