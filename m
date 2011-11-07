@@ -1,45 +1,25 @@
-From: cjb@laptop.org (Chris Ball)
-Date: Mon, 07 Nov 2011 13:41:33 -0500
-Subject: [PATCH 1/1] mmc: omap_hsmmc: DMA unmap only once in case of MMC
- error
-In-Reply-To: <20111107182939.GF15294@n2100.arm.linux.org.uk> (Russell King's
- message of "Mon, 7 Nov 2011 18:29:39 +0000")
-References: <1320683111-12577-1-git-send-email-balajitk@ti.com>
- <20111107182939.GF15294@n2100.arm.linux.org.uk>
-Message-ID: <m2pqh3zsf6.fsf@bob.laptop.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 7 Nov 2011 18:51:25 +0000
+Subject: 2b034922 breaks kexec on ARM
+Message-ID: <20111107185125.GA17464@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello,
 
-On Mon, Nov 07 2011, Russell King - ARM Linux wrote:
-> On Mon, Nov 07, 2011 at 09:55:11PM +0530, Balaji T K wrote:
->> From: Per Forlin <per.forlin@linaro.org>
->> 
->> Reported by Russell King:
->> mmcblk0: error -84 transferring data, sector 149201, nr 64,
->> cmd response 0x900, card status 0xb00
->> mmcblk0: retrying using single block read
->> 
->> WARNING: at lib/dma-debug.c:811 check_unmap
->> omap_hsmmc omap_hsmmc.0: DMA-API: device driver tries to free DMA memory
->> it has not allocated [device address=0x0000000080933000] [size=20480 bytes]
->> 
->> In case of an error dma_unmap() is issued in omap_hsmmc_dma_cleanup()
->> and then again in omap_hsmmc_post_req(). Resolve this by clearing the
->> host_cookie to indicate there is no DMA mapped memory to unmap.
->> 
->> Signed-off-by: Per Forlin <per.forlin@linaro.org>
->> Tested-by: Balaji T K <balajitk@ti.com>
->> ---
->> Repost with my Tested-by
->
-> Thanks.
->
-> Tested-by: Russell King <rmk+kernel@arm.linux.org.uk>
+I've just finished rebasing and reworking my kexec patches so that they sit
+nicely on top of Russell's recent reset work. The only problem is that
+commit 2b034922 ("ARM: 7098/1: kdump: copy kernel relocation code at the
+kexec prepare stage") is causing kexec to fail.
 
-Thanks, pushed to mmc-next for 3.2.
+The symptoms are that the .init.text section is not loaded as part of the
+new kernel image, so when we try to do the SMP/UP fixups we hit a whole sea
+of poison left there by the previous kernel.
 
--- 
-Chris Ball   <cjb@laptop.org>   <http://printf.net/>
-One Laptop Per Child
+So my guess is that machine_kexec_prepare *is* too early for preparing the
+reboot_code_buffer and, unless anybody has a good reason not to, I'd like to
+revert the patch causing these problems.
+
+Thanks,
+
+Will
