@@ -1,32 +1,38 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Mon, 07 Nov 2011 12:27:00 +0100
-Subject: Missing patches for pxa3xx_nand
-Message-ID: <4EB7C084.4060706@gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 07 Nov 2011 12:36:44 +0100
+Subject: PLEASE FIX: lack of trailing , on structure initializers
+In-Reply-To: <20111105164855.GG12913@n2100.arm.linux.org.uk>
+References: <20111105164855.GG12913@n2100.arm.linux.org.uk>
+Message-ID: <4EB7C2CC.40106@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 11/05/2011 05:48 PM, Russell King - ARM Linux :
+> The lack of trailing ','s on initializers is causing me quite an amount
+> of grief while trying to prepare the set of patches for arch_reset.
+> It's really annoying to add a new initializer at the end of a structure,
+> not notice the lack of trailing ',' on the last entry, and then end up
+> having to rework the patches because of that.  E.g.:
+> 
+> arch/arm/mach-orion5x/mv2120-setup.c:238: error: request for member ?restart? in something not a structure or union
+> 
+> caused by the lack of trailing comma for the .fixup initializer on the
+> preceding line.
+> 
+> We have around 778 of these in arch/arm, and it's about time that number
+> started to be reduced.  This will cause a lot of conflicts, so the
+> earlier it can be done in the cycle (and merged into each platform tree)
+> the less (hopefully) it'll conflict with other work that goes through
+> the appropriate maintainer tree.
 
-In June, there have been important patches submitted for the pxa3xx_nand 
-driver after it was broken by Lei's rework series. These patches were 
-discussed in June, and they are present in
+Hi Russell,
 
-   git://git.infradead.org/mtd-2.6.git linux-fallback
+We have a dozen of those missing trailing ',' in mach-at91.
+But as you mentioned in your other email, we may need to wait for
+another change in the concerned files to fix this. Am I right?
 
-but not in the master branch of the same git. Also, they have not been 
-merged to Linus' master tree which renders the pxa3xx_nand driver 
-unusable in 3.0 and 3.1.
+So we keep this in mind...
 
-A selection of the patches I'm talking about are titled
-
-   mtd: pxa3xx_nand: Fix blank page ECC mismatch
-   mtd: pxa3xx_nand: fix nand detection issue
-   mtd: pxa3xx_nand don't specify default parsing options
-
-and of course they depend on others that aren't merged yet either.
-
-Can anyone explain what went wrong here and how we can get out of this?
-
-
-Thanks,
-Daniel
+Best regards,
+-- 
+Nicolas Ferre
