@@ -1,40 +1,37 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 7 Nov 2011 19:20:43 +0000
-Subject: 2b034922 breaks kexec on ARM
-In-Reply-To: <20111107191453.GC17464@mudshark.cambridge.arm.com>
-References: <20111107185125.GA17464@mudshark.cambridge.arm.com>
- <20111107190314.GS12913@n2100.arm.linux.org.uk>
- <20111107191453.GC17464@mudshark.cambridge.arm.com>
-Message-ID: <20111107192043.GT12913@n2100.arm.linux.org.uk>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 7 Nov 2011 21:39:09 +0200
+Subject: [PATCH] arm: omap2+: hwmod: fix breakage introduced by d6504acd
+In-Reply-To: <20111107183208.GG15294@n2100.arm.linux.org.uk>
+References: <1320688617-4543-1-git-send-email-balbi@ti.com>
+ <20111107183208.GG15294@n2100.arm.linux.org.uk>
+Message-ID: <20111107193908.GA5059@legolas.emea.dhcp.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 07, 2011 at 07:14:53PM +0000, Will Deacon wrote:
-> On Mon, Nov 07, 2011 at 07:03:15PM +0000, Russell King - ARM Linux wrote:
-> > Hmm, having looked at kernel/kexec.c, this patch is clearly wrong.
-> > There are two kernels which can be loaded into kexec - a crash kernel
-> > and a default kernel.  These are kept entirely separately (and the
-> > per-kernel context is stored in 'image').
+Hi,
+
+On Mon, Nov 07, 2011 at 06:32:08PM +0000, Russell King - ARM Linux wrote:
+> On Mon, Nov 07, 2011 at 07:56:57PM +0200, Felipe Balbi wrote:
+> > commit d6504acd (OMAP2+: hwmod: remove OMAP_CHIP*) has
+> > mistakenly added MUSB as a hwmod available only on ES2.0
+> > of OMAP3430.
 > > 
-> > However, this patch makes machine_kexec_prepare() store into some
-> > _global_ variables, which means if you've loaded a crash kernel
-> > followed by a default kernel, the values for the crash kernel will
-> > be corrupted.
-> > 
-> > So yes, I think a revert of this patch is the right thing.
+> > MUSB hwmod has always be available on all OMAP revisions
+> > since OMAP2430.
 > 
-> Great. Would you like me to submit the revert to the patch system or are you
-> happy just to do it using git?
+> This doesn't seem to solve it:
 
-I've reverted it myself (see the tip of the fixes branch).  It's slightly
-annoying that the branch was only pulled last night.
+then i can't help. From all I know the LDP is based on OMAP3430 so that
+should work. If it doesn't, it's something deeper on hwmod, maybe ?
 
-> > I think the only valid thing its doing is moving the copy of the
-> > reboot code earlier, but I don't see the value of moving just that.
-> 
-> Neither can I. It seems to be happy enough with the patch reverted, so if it
-> ain't broke...
+Paul, it's your call.
 
-I guess this is where the problems of poor commit descriptions crop up.
-We don't know _why_ the original author of the patch wanted to make the
-change - we don't know if they were seeing a problem.
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111107/4eff924f/attachment.sig>
