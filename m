@@ -1,25 +1,39 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 7 Nov 2011 18:51:25 +0000
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 7 Nov 2011 19:03:15 +0000
 Subject: 2b034922 breaks kexec on ARM
-Message-ID: <20111107185125.GA17464@mudshark.cambridge.arm.com>
+In-Reply-To: <20111107185125.GA17464@mudshark.cambridge.arm.com>
+References: <20111107185125.GA17464@mudshark.cambridge.arm.com>
+Message-ID: <20111107190314.GS12913@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Mon, Nov 07, 2011 at 06:51:25PM +0000, Will Deacon wrote:
+> Hello,
+> 
+> I've just finished rebasing and reworking my kexec patches so that they sit
+> nicely on top of Russell's recent reset work. The only problem is that
+> commit 2b034922 ("ARM: 7098/1: kdump: copy kernel relocation code at the
+> kexec prepare stage") is causing kexec to fail.
+> 
+> The symptoms are that the .init.text section is not loaded as part of the
+> new kernel image, so when we try to do the SMP/UP fixups we hit a whole sea
+> of poison left there by the previous kernel.
+> 
+> So my guess is that machine_kexec_prepare *is* too early for preparing the
+> reboot_code_buffer and, unless anybody has a good reason not to, I'd like to
+> revert the patch causing these problems.
 
-I've just finished rebasing and reworking my kexec patches so that they sit
-nicely on top of Russell's recent reset work. The only problem is that
-commit 2b034922 ("ARM: 7098/1: kdump: copy kernel relocation code at the
-kexec prepare stage") is causing kexec to fail.
+Hmm, having looked at kernel/kexec.c, this patch is clearly wrong.
+There are two kernels which can be loaded into kexec - a crash kernel
+and a default kernel.  These are kept entirely separately (and the
+per-kernel context is stored in 'image').
 
-The symptoms are that the .init.text section is not loaded as part of the
-new kernel image, so when we try to do the SMP/UP fixups we hit a whole sea
-of poison left there by the previous kernel.
+However, this patch makes machine_kexec_prepare() store into some
+_global_ variables, which means if you've loaded a crash kernel
+followed by a default kernel, the values for the crash kernel will
+be corrupted.
 
-So my guess is that machine_kexec_prepare *is* too early for preparing the
-reboot_code_buffer and, unless anybody has a good reason not to, I'd like to
-revert the patch causing these problems.
+So yes, I think a revert of this patch is the right thing.
 
-Thanks,
-
-Will
+I think the only valid thing its doing is moving the copy of the
+reboot code earlier, but I don't see the value of moving just that.
