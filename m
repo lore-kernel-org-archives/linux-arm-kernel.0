@@ -1,45 +1,19 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Mon,  7 Nov 2011 11:33:07 +0200
-Subject: [PATCH v2 2/2] OMAP2+: DMA: Workaround for invalid destination
- position
-In-Reply-To: <1320658387-21067-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1320658387-21067-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1320658387-21067-3-git-send-email-peter.ujfalusi@ti.com>
+From: mykofzone@gmail.com (=?GB2312?B?seXA2g==?=)
+Date: Mon, 7 Nov 2011 17:33:31 +0800
+Subject: OMAP3 ISP DMA status
+Message-ID: <CAORxB+CUEi-bykNky9T+nBOiV7mBpXnEv_uzfS=McxUdTeODSg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If the DMA destination position has been asked before the
-first actual data transfer has been done, the CDAC
-register still contains 0 (it is initialized to 0 at
-omsp_dma_start).
-If CDAC == 0, return the programmed start address.
+Hi ALL,
+   I meet a problem when developing scan device (such as a camera)
+driver on OMAP3 platform (my MPU is AM3715). The scan application may
+change the scan hardware settings (such as exposure time), and try to
+find out the best one. But sometimes, after applied the new settings,
+the scan hardware may did not output data, so the application blocked.
+Since i can't modify the application, the driver should notify this
+event to app. So my question is that, can the driver query the ISP DMA
+status such as how many bytes the DMA has transferred?
 
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
----
- arch/arm/plat-omap/dma.c |   10 +++++++++-
- 1 files changed, 9 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/plat-omap/dma.c b/arch/arm/plat-omap/dma.c
-index a9983b6..002fb4d 100644
---- a/arch/arm/plat-omap/dma.c
-+++ b/arch/arm/plat-omap/dma.c
-@@ -1074,8 +1074,16 @@ dma_addr_t omap_get_dma_dst_pos(int lch)
- 	 * omap 3.2/3.3 erratum: sometimes 0 is returned if CSAC/CDAC is
- 	 * read before the DMA controller finished disabling the channel.
- 	 */
--	if (!cpu_is_omap15xx() && offset == 0)
-+	if (!cpu_is_omap15xx() && offset == 0) {
- 		offset = p->dma_read(CDAC, lch);
-+		/*
-+		 * CDAC == 0 indicates that the DMA transfer on the channel has
-+		 * not been started (no data has been transferred so far).
-+		 * Return the programmed destination start address in this case.
-+		 */
-+		if (unlikely(!offset))
-+			offset = p->dma_read(CDSA, lch);
-+	}
- 
- 	if (cpu_class_is_omap1())
- 		offset |= (p->dma_read(CDSA, lch) & 0xFFFF0000);
--- 
-1.7.7.2
+BRs,
+Lei.Bian
