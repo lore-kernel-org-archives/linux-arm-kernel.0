@@ -1,55 +1,56 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Tue, 8 Nov 2011 14:01:12 +0200
-Subject: [PATCH] iMX28 Ethernet driver fix
-In-Reply-To: <20111108111749.GA30638@axolotl.localnet>
-References: <20111108111749.GA30638@axolotl.localnet>
-Message-ID: <20111108120112.GB31518@sapphire.tkos.co.il>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Tue, 8 Nov 2011 13:03:02 +0100 (CET)
+Subject: [PATCH] fix compilation breakage in entry-armv.S
+In-Reply-To: <20111108114050.GC12913@n2100.arm.linux.org.uk>
+References: <Pine.LNX.4.64.1111081232140.10851@axis700.grange>
+ <20111108114050.GC12913@n2100.arm.linux.org.uk>
+Message-ID: <Pine.LNX.4.64.1111081258240.10851@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
+On Tue, 8 Nov 2011, Russell King - ARM Linux wrote:
 
-On Tue, Nov 08, 2011 at 11:17:49AM +0000, Peter Horton wrote:
-> Fix driver to correctly handle cloned SKBs. Currently any clones
-> of the transmit SKBs get endian-swapped by the driver. This breaks
-> the ATA-over-Ethernet driver for example.
-
-Patches for network devices should go to the netdev list.
-
-> Signed-off-by: Peter Horton <phorton@bitbox.co.uk>
-> ---
->  drivers/net/fec.c |    8 +++++++-
-
-The driver has moved to drivers/net/ethernet/freescale/fec.c. You should 
-rebase on v3.2-rc1.
-
->  1 files changed, 7 insertions(+), 1 deletions(-)
+> On Tue, Nov 08, 2011 at 12:36:36PM +0100, Guennadi Liakhovetski wrote:
+> > Compilation of Linus' tree of today without THUMB support for V7 machines 
+> > breaks:
+> > 
+> > linux-2.6/arch/arm/kernel/entry-armv.S: Assembler messages:
+> > linux-2.6/arch/arm/kernel/entry-armv.S:501: Error: backward ref to unknown label "2:"
+> > linux-2.6/arch/arm/kernel/entry-armv.S:502: Error: backward ref to unknown label "3:"
+> > make[2]: *** [arch/arm/kernel/entry-armv.o] Error 1
+> > 
+> > Fix this by adding a check for CONFIG_ARM_THUMB.
 > 
-> diff --git a/drivers/net/fec.c b/drivers/net/fec.c
-> index c46ccb1..6455483 100644
-> --- a/drivers/net/fec.c
-> +++ b/drivers/net/fec.c
-> @@ -302,8 +302,14 @@ fec_enet_start_xmit(struct sk_buff *skb, struct net_device *ndev)
->  	 * On some FEC implementations data must be aligned on
->  	 * 4-byte boundaries. Use bounce buffers to copy data
->  	 * and get it aligned. Ugh.
-> +	 *
-> +	 * We also have to use the bounce buffers if we need
-> +	 * to do the endian swap (see below) on a cloned buffer.
->  	 */
-> -	if (((unsigned long) bufaddr) & FEC_ALIGNMENT) {
-> +	if ((((unsigned long) bufaddr) & FEC_ALIGNMENT) ||
-> +		((id_entry->driver_data & FEC_QUIRK_SWAP_FRAME) &&
-> +		skb_cloned(skb)))
-> +	{
->  		unsigned int index;
->  		index = bdp - fep->tx_bd_base;
->  		memcpy(fep->tx_bounce[index], skb->data, skb->len);
-> -- 
+> This still looks wrong.  The code for '2' and '3' is included when:
+> 
+> #if CONFIG_ARM_THUMB && __LINUX_ARM_ARCH__ >= 6 && CONFIG_CPU_V7
+> 
+> is true - so the condition on including it in the exception tables should
+> be the same as that.
 
-baruch
+Yes, I saw those, but, aren't they superfluous? Let's see:
 
--- 
-                                                     ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+arch/arm/mm/Kconfig:
+
+config CPU_V7
+	...
+	select CPU_32v7
+
+arch/arm/Makefile:
+
+arch-$(CONFIG_CPU_32v7)		:=-D__LINUX_ARM_ARCH__=7 $(call cc-option,-march=armv7-a,-march=armv5t -Wa$(comma)-march=armv7-a)
+
+So, looks like CPU_V7 implies __LINUX_ARM_ARCH__=7? Ok, I picked up the 
+wrong pair, so, should this be enough:
+
+#if CONFIG_ARM_THUMB && CONFIG_CPU_V7
+
+and the original condition, where the labels are defined, that you 
+quoted, can be reduced too?
+
+Thanks
+Guennadi
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
