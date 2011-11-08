@@ -1,48 +1,49 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 8 Nov 2011 06:08:45 -0700 (MST)
-Subject: [GIT PULL] ARM: OMAP: DSS hwmod/reset fixes for 3.2-rc
-Message-ID: <alpine.DEB.2.00.1111080607090.8313@utopia.booyaka.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 8 Nov 2011 14:08:58 +0100
+Subject: [PATCH 1/1] ARM: mx51/53: correct clocks that take ipg_perclk as
+ parent
+In-Reply-To: <20111108004130.GB5898@b20223-02.ap.freescale.net>
+References: <1320399263-14885-1-git-send-email-richard.zhao@linaro.org>
+ <20111107075254.GQ16886@pengutronix.de>
+ <20111108004130.GB5898@b20223-02.ap.freescale.net>
+Message-ID: <20111108130858.GT16886@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Nov 08, 2011 at 08:41:31AM +0800, Richard Zhao wrote:
+> On Mon, Nov 07, 2011 at 08:52:54AM +0100, Sascha Hauer wrote:
+> > On Fri, Nov 04, 2011 at 05:34:23PM +0800, Richard Zhao wrote:
+> > > gpt_clk, pwm1_clk and pwm2_clk parent clock are all ipg_perclk.
+> > > 
+> > > Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
+> > > ---
+> > >  arch/arm/mach-mx5/clock-mx51-mx53.c |    6 +++---
+> > >  1 files changed, 3 insertions(+), 3 deletions(-)
+> > > 
+> > > diff --git a/arch/arm/mach-mx5/clock-mx51-mx53.c b/arch/arm/mach-mx5/clock-mx51-mx53.c
+> > > index 2aacf41..a3ca4ce 100644
+> > > --- a/arch/arm/mach-mx5/clock-mx51-mx53.c
+> > > +++ b/arch/arm/mach-mx5/clock-mx51-mx53.c
+> > > @@ -1278,12 +1278,12 @@ DEFINE_CLOCK(uart5_clk, 4, MXC_CCM_CCGR7, MXC_CCM_CCGRx_CG7_OFFSET,
+> > >  DEFINE_CLOCK(gpt_ipg_clk, 0, MXC_CCM_CCGR2, MXC_CCM_CCGRx_CG10_OFFSET,
+> > >  	NULL,  NULL, &ipg_clk, NULL);
+> > >  DEFINE_CLOCK(gpt_clk, 0, MXC_CCM_CCGR2, MXC_CCM_CCGRx_CG9_OFFSET,
+> > > -	NULL,  NULL, &ipg_clk, &gpt_ipg_clk);
+> > > +	NULL,  NULL, &ipg_perclk, &gpt_ipg_clk);
+> > 
+> > No. The gpt has several parents and the one we are using is the ipg
+> > clock. Try a sleep 10 with your patch applied.
+> You are right. Sounds like gpt_clk can not be defined here. Is it better to pass
+> three clocks (ipg, ipg_per, ckil) to gpt driver and let gpt decide what to use?
+> Anyway, it's beyond this patch. I'll keep this line as it was.
 
-Hi Tony
+Yes, this would be the correct solution.
 
-The following changes since commit 1ea6b8f48918282bdca0b32a34095504ee65bab5:
-
-  Linux 3.2-rc1 (2011-11-07 16:16:02 -0800)
-
-are available in the git repository at:
-  git://git.pwsan.com/linux-2.6 hwmod_dss_fixes_3.2rc
-
-Archit Taneja (1):
-      ARM: OMAP2PLUS: DSS: Ensure DSS works correctly if display is enabled in bootloader
-
-Tomi Valkeinen (9):
-      ARM: OMAP2xxx: HWMOD: Fix DSS reset
-      ARM: OMAP2xxx: HWMOD: fix DSS clock data
-      ARM: OMAP3: HWMOD: Fix DSS reset
-      ARM: OMAP3: HWMOD: fix DSS clock data
-      ARM: OMAP4: HWMOD: remove extra clocks
-      ARM: OMAP4: HWMOD: Add HWMOD_CONTROL_OPT_CLKS_IN_RESET for dss_core
-      ARM: OMAP4: HWMOD: fix DSS clock data
-      ARM: OMAP2/3: HWMOD: Add SYSS_HAS_RESET_STATUS for dss
-      ARM: OMAP: HWMOD: Unify DSS resets for OMAPs
-
- arch/arm/mach-omap2/Makefile                       |    5 +-
- arch/arm/mach-omap2/display.c                      |  159 ++++++++++++++++++++
- arch/arm/mach-omap2/display.h                      |   29 ++++
- arch/arm/mach-omap2/omap_hwmod_2420_data.c         |   17 ++-
- arch/arm/mach-omap2/omap_hwmod_2430_data.c         |   17 ++-
- .../mach-omap2/omap_hwmod_2xxx_3xxx_ipblock_data.c |    5 +-
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         |   37 ++++-
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c         |   24 ++--
- arch/arm/mach-omap2/omap_hwmod_common_data.c       |    4 +
- arch/arm/mach-omap2/omap_hwmod_common_data.h       |    4 +
- arch/arm/plat-omap/include/plat/common.h           |    3 +
- include/video/omapdss.h                            |    7 -
- 12 files changed, 276 insertions(+), 35 deletions(-)
- create mode 100644 arch/arm/mach-omap2/display.h
+Sascha
 
 
-- Paul
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
