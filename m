@@ -1,46 +1,48 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue,  8 Nov 2011 13:07:36 +0000
-Subject: [PATCH] ARM: msm: fix compilation flags for MSM_SCM
-Message-ID: <1320757656-32171-1-git-send-email-marc.zyngier@arm.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 8 Nov 2011 06:08:45 -0700 (MST)
+Subject: [GIT PULL] ARM: OMAP: DSS hwmod/reset fixes for 3.2-rc
+Message-ID: <alpine.DEB.2.00.1111080607090.8313@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CONFIG_MSM_SCM uses the smc instruction, which with some
-toolchains requires a ".arch_extension" directive.
 
-Cc: David Brown <davidb@codeaurora.org>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm/mach-msm/Makefile |    2 ++
- arch/arm/mach-msm/scm.c    |    3 +++
- 2 files changed, 5 insertions(+), 0 deletions(-)
+Hi Tony
 
-diff --git a/arch/arm/mach-msm/Makefile b/arch/arm/mach-msm/Makefile
-index 4285dfd..4ad3969 100644
---- a/arch/arm/mach-msm/Makefile
-+++ b/arch/arm/mach-msm/Makefile
-@@ -15,6 +15,8 @@ obj-$(CONFIG_MSM_SMD) += smd.o smd_debug.o
- obj-$(CONFIG_MSM_SMD) += last_radio_log.o
- obj-$(CONFIG_MSM_SCM) += scm.o scm-boot.o
- 
-+CFLAGS_scm.o :=$(call as-instr,.arch_extension sec,-DREQUIRES_SEC=1)
-+
- obj-$(CONFIG_HOTPLUG_CPU) += hotplug.o
- obj-$(CONFIG_SMP) += headsmp.o platsmp.o
- 
-diff --git a/arch/arm/mach-msm/scm.c b/arch/arm/mach-msm/scm.c
-index 232f97a..bafabb5 100644
---- a/arch/arm/mach-msm/scm.c
-+++ b/arch/arm/mach-msm/scm.c
-@@ -180,6 +180,9 @@ static u32 smc(u32 cmd_addr)
- 			__asmeq("%1", "r0")
- 			__asmeq("%2", "r1")
- 			__asmeq("%3", "r2")
-+#ifdef REQUIRES_SEC
-+			".arch_extension sec\n"
-+#endif
- 			"smc	#0	@ switch to secure world\n"
- 			: "=r" (r0)
- 			: "r" (r0), "r" (r1), "r" (r2)
--- 
-1.7.0.4
+The following changes since commit 1ea6b8f48918282bdca0b32a34095504ee65bab5:
+
+  Linux 3.2-rc1 (2011-11-07 16:16:02 -0800)
+
+are available in the git repository at:
+  git://git.pwsan.com/linux-2.6 hwmod_dss_fixes_3.2rc
+
+Archit Taneja (1):
+      ARM: OMAP2PLUS: DSS: Ensure DSS works correctly if display is enabled in bootloader
+
+Tomi Valkeinen (9):
+      ARM: OMAP2xxx: HWMOD: Fix DSS reset
+      ARM: OMAP2xxx: HWMOD: fix DSS clock data
+      ARM: OMAP3: HWMOD: Fix DSS reset
+      ARM: OMAP3: HWMOD: fix DSS clock data
+      ARM: OMAP4: HWMOD: remove extra clocks
+      ARM: OMAP4: HWMOD: Add HWMOD_CONTROL_OPT_CLKS_IN_RESET for dss_core
+      ARM: OMAP4: HWMOD: fix DSS clock data
+      ARM: OMAP2/3: HWMOD: Add SYSS_HAS_RESET_STATUS for dss
+      ARM: OMAP: HWMOD: Unify DSS resets for OMAPs
+
+ arch/arm/mach-omap2/Makefile                       |    5 +-
+ arch/arm/mach-omap2/display.c                      |  159 ++++++++++++++++++++
+ arch/arm/mach-omap2/display.h                      |   29 ++++
+ arch/arm/mach-omap2/omap_hwmod_2420_data.c         |   17 ++-
+ arch/arm/mach-omap2/omap_hwmod_2430_data.c         |   17 ++-
+ .../mach-omap2/omap_hwmod_2xxx_3xxx_ipblock_data.c |    5 +-
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         |   37 ++++-
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c         |   24 ++--
+ arch/arm/mach-omap2/omap_hwmod_common_data.c       |    4 +
+ arch/arm/mach-omap2/omap_hwmod_common_data.h       |    4 +
+ arch/arm/plat-omap/include/plat/common.h           |    3 +
+ include/video/omapdss.h                            |    7 -
+ 12 files changed, 276 insertions(+), 35 deletions(-)
+ create mode 100644 arch/arm/mach-omap2/display.h
+
+
+- Paul
