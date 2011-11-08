@@ -1,126 +1,69 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 08 Nov 2011 14:23:36 +0900
-Subject: [PATCH 4/5] ARM: restart: s5pv210: use new restart hook XXX WIP
- XXX WHY IS THERE NO LOCAL HEADERS IN arch/arm/mach-exynos4 XXX
-In-Reply-To: <E1RN6xJ-0001aZ-3e@rmk-PC.arm.linux.org.uk>
-References: <20111106175457.GK12913@n2100.arm.linux.org.uk>
- <E1RN6xJ-0001aZ-3e@rmk-PC.arm.linux.org.uk>
-Message-ID: <04f301cc9dd6$9105cb60$b3116220$%kim@samsung.com>
+From: tarun.kanti@ti.com (Tarun Kanti DebBarma)
+Date: Tue, 8 Nov 2011 11:30:26 +0530
+Subject: [PATCH] ARM: OMAP: dmtimer: fix missing content/correction in
+ low-power mode support
+Message-ID: <1320732026-6783-1-git-send-email-tarun.kanti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux wrote:
-> 
-> Hook these platforms restart code into the new restart hook rather
-> than using arch_reset().
-> 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Since omap_dm_timer_write_reg/__omap_dm_timer_write is now modified
+to use timer->func_base OCP_CFG should not use this wrapper anymore.
+Instead use __raw_writel() directly and use timer->io_base instead
+to write to OCP_CFG.
 
-Acked-by: Kukjin Kim <kgene.kim@samsung.com>
+The timer->sys_stat is valid only if timer->revision is 1. In the
+context restore function make this correction.
 
-Thanks.
+Save the contexts and loss count when timer is stopped.
+Also, disable the clock. Else, clock usecount would become imbalanced.
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
+---
+Baseline: git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux-2.6.git
+Branch: master
+Linux 3.2-rc1
 
-> ---
->  arch/arm/mach-s5pv210/cpu.c           |    6 +-----
->  arch/arm/mach-s5pv210/mach-aquila.c   |    1 +
->  arch/arm/mach-s5pv210/mach-goni.c     |    1 +
->  arch/arm/mach-s5pv210/mach-smdkc110.c |    1 +
->  arch/arm/mach-s5pv210/mach-smdkv210.c |    1 +
->  arch/arm/mach-s5pv210/mach-torbreck.c |    1 +
->  6 files changed, 6 insertions(+), 5 deletions(-)
-> 
-> diff --git a/arch/arm/mach-s5pv210/cpu.c b/arch/arm/mach-s5pv210/cpu.c
-> index 84ec746..4c7b071 100644
-> --- a/arch/arm/mach-s5pv210/cpu.c
-> +++ b/arch/arm/mach-s5pv210/cpu.c
-> @@ -41,7 +41,6 @@
->  #include <plat/iic-core.h>
->  #include <plat/keypad-core.h>
->  #include <plat/sdhci.h>
-> -#include <plat/reset.h>
->  #include <plat/tv-core.h>
-> 
->  /* Initial IO mappings */
-> @@ -108,7 +107,7 @@ static void s5pv210_idle(void)
->  	local_irq_enable();
->  }
-> 
-> -static void s5pv210_sw_reset(void)
-> +void s5pv210_restart(char mode, const char *cmd)
->  {
->  	__raw_writel(0x1, S5P_SWRESET);
->  }
-> @@ -196,8 +195,5 @@ int __init s5pv210_init(void)
->  	/* set idle function */
->  	pm_idle = s5pv210_idle;
-> 
-> -	/* set sw_reset function */
-> -	s5p_reset_hook = s5pv210_sw_reset;
-> -
->  	return sysdev_register(&s5pv210_sysdev);
->  }
-> diff --git a/arch/arm/mach-s5pv210/mach-aquila.c
-b/arch/arm/mach-s5pv210/mach-
-> aquila.c
-> index 5811a96..68fd31d 100644
-> --- a/arch/arm/mach-s5pv210/mach-aquila.c
-> +++ b/arch/arm/mach-s5pv210/mach-aquila.c
-> @@ -683,4 +683,5 @@ MACHINE_START(AQUILA, "Aquila")
->  	.map_io		= aquila_map_io,
->  	.init_machine	= aquila_machine_init,
->  	.timer		= &s5p_timer,
-> +	.restart	= s5pv210_restart,
->  MACHINE_END
-> diff --git a/arch/arm/mach-s5pv210/mach-goni.c
-b/arch/arm/mach-s5pv210/mach-
-> goni.c
-> index 15edcae..1156a5b 100644
-> --- a/arch/arm/mach-s5pv210/mach-goni.c
-> +++ b/arch/arm/mach-s5pv210/mach-goni.c
-> @@ -960,4 +960,5 @@ MACHINE_START(GONI, "GONI")
->  	.init_machine	= goni_machine_init,
->  	.timer		= &s5p_timer,
->  	.reserve	= &goni_reserve,
-> +	.restart	= s5pv210_restart,
->  MACHINE_END
-> diff --git a/arch/arm/mach-s5pv210/mach-smdkc110.c b/arch/arm/mach-
-> s5pv210/mach-smdkc110.c
-> index f7266bb..a70fa53 100644
-> --- a/arch/arm/mach-s5pv210/mach-smdkc110.c
-> +++ b/arch/arm/mach-s5pv210/mach-smdkc110.c
-> @@ -141,4 +141,5 @@ MACHINE_START(SMDKC110, "SMDKC110")
->  	.map_io		= smdkc110_map_io,
->  	.init_machine	= smdkc110_machine_init,
->  	.timer		= &s5p_timer,
-> +	.restart	= s5pv210_restart,
->  MACHINE_END
-> diff --git a/arch/arm/mach-s5pv210/mach-smdkv210.c b/arch/arm/mach-
-> s5pv210/mach-smdkv210.c
-> index a9106c3..5e8a775 100644
-> --- a/arch/arm/mach-s5pv210/mach-smdkv210.c
-> +++ b/arch/arm/mach-s5pv210/mach-smdkv210.c
-> @@ -318,4 +318,5 @@ MACHINE_START(SMDKV210, "SMDKV210")
->  	.map_io		= smdkv210_map_io,
->  	.init_machine	= smdkv210_machine_init,
->  	.timer		= &s5p_timer,
-> +	.restart	= s5pv210_restart,
->  MACHINE_END
-> diff --git a/arch/arm/mach-s5pv210/mach-torbreck.c b/arch/arm/mach-
-> s5pv210/mach-torbreck.c
-> index 97cc066..49e9c6d 100644
-> --- a/arch/arm/mach-s5pv210/mach-torbreck.c
-> +++ b/arch/arm/mach-s5pv210/mach-torbreck.c
-> @@ -130,4 +130,5 @@ MACHINE_START(TORBRECK, "TORBRECK")
->  	.map_io		= torbreck_map_io,
->  	.init_machine	= torbreck_machine_init,
->  	.timer		= &s5p_timer,
-> +	.restart	= s5pv210_restart,
->  MACHINE_END
-> --
-> 1.7.4.4
+ arch/arm/plat-omap/dmtimer.c |   21 ++++++++++++++++++---
+ 1 files changed, 18 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/plat-omap/dmtimer.c b/arch/arm/plat-omap/dmtimer.c
+index af3b92b..f042c82 100644
+--- a/arch/arm/plat-omap/dmtimer.c
++++ b/arch/arm/plat-omap/dmtimer.c
+@@ -80,9 +80,9 @@ static void omap_dm_timer_write_reg(struct omap_dm_timer *timer, u32 reg,
+ 
+ static void omap_timer_restore_context(struct omap_dm_timer *timer)
+ {
+-	omap_dm_timer_write_reg(timer, OMAP_TIMER_OCP_CFG_OFFSET,
+-				timer->context.tiocp_cfg);
+-	if (timer->revision > 1)
++	__raw_writel(timer->context.tiocp_cfg,
++			timer->io_base + OMAP_TIMER_OCP_CFG_OFFSET);
++	if (timer->revision == 1)
+ 		__raw_writel(timer->context.tistat, timer->sys_stat);
+ 
+ 	__raw_writel(timer->context.tisr, timer->irq_stat);
+@@ -357,6 +357,21 @@ int omap_dm_timer_stop(struct omap_dm_timer *timer)
+ 
+ 	__omap_dm_timer_stop(timer, timer->posted, rate);
+ 
++	if (timer->loses_context) {
++		if (timer->get_context_loss_count)
++			timer->ctx_loss_count =
++			timer->get_context_loss_count(&timer->pdev->dev);
++	}
++
++	/*
++	 * Since the register values are computed and written within
++	 * __omap_dm_timer_stop, we need to use read to retrieve the
++	 * context.
++	 */
++	timer->context.tclr =
++			omap_dm_timer_read_reg(timer, OMAP_TIMER_CTRL_REG);
++	timer->context.tisr = __raw_readl(timer->irq_stat);
++	omap_dm_timer_disable(timer);
+ 	return 0;
+ }
+ EXPORT_SYMBOL_GPL(omap_dm_timer_stop);
+-- 
+1.7.0.4
