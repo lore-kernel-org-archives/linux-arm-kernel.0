@@ -1,67 +1,29 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Tue, 8 Nov 2011 09:44:45 +0200
-Subject: [GIT PULL] hwspinlock fixes for 3.2
-Message-ID: <CAK=WgbYWeYQf2dRsD2iBf+d7Eo=HiTynifVP3DhES5CwPUzCwQ@mail.gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 8 Nov 2011 00:50:13 -0700 (MST)
+Subject: [GIT PULL] ARM: OMAP: DSS hwmod/reset fixes for 3.2
+In-Reply-To: <20111105003550.GM31337@atomide.com>
+References: <alpine.DEB.2.00.1110061806150.4611@utopia.booyaka.com>
+ <20111105003550.GM31337@atomide.com>
+Message-ID: <alpine.DEB.2.00.1111080049470.12394@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Fri, 4 Nov 2011, Tony Lindgren wrote:
 
-Please pull:
+> * Paul Walmsley <paul@pwsan.com> [111006 16:33]:
+> > Hi Tony,
+> > 
+> > The following changes since commit be73246058737beec52ae232bcab7776332a9e06:
+> > 
+> >   ARM: OMAP2+: Remove custom init_irq for remaining boards (2011-09-26 17:50:37 -0700)
+> > 
+> > are available in the git repository at:
+> >   git://git.pwsan.com/linux-2.6 hwmod_dss_fixes_3.2
+> 
+> Looks like you should take a look at the merge conflicts with
+> this one, maybe rebase it on 994c0e992522c123298b4a91b72f5e67ba2d1123.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/ohad/hwspinlock.git fixes
+Do you want this series for 3.2-rc or 3.3 at this point?
 
-To get two hwspinlock fixes from Axel.
 
-There was a third, "module.h split merge"-related fix from Axel that I
-dropped because I saw Paul picked it up in his pull request.
-
-Thanks,
-Ohad.
-
-The following changes since commit 1ea6b8f48918282bdca0b32a34095504ee65bab5:
-
-  Linux 3.2-rc1 (2011-11-07 16:16:02 -0800)
-
-are available in the git repository at:
-  git://git.kernel.org/pub/scm/linux/kernel/git/ohad/hwspinlock.git fixes
-
-Axel Lin (2):
-      hwspinlock: Don't return a value in __hwspin_unlock
-      hwspinlock/u8500: fix build error due to undefined label
-
- drivers/hwspinlock/u8500_hsem.c |    6 ++----
- include/linux/hwspinlock.h      |    1 -
- 2 files changed, 2 insertions(+), 5 deletions(-)
-
-diff --git a/drivers/hwspinlock/u8500_hsem.c b/drivers/hwspinlock/u8500_hsem.c
-index 143461a..a120f14 100644
---- a/drivers/hwspinlock/u8500_hsem.c
-+++ b/drivers/hwspinlock/u8500_hsem.c
-@@ -108,10 +108,8 @@ static int __devinit u8500_hsem_probe(struct
-platform_device *pdev)
- 		return -ENODEV;
-
- 	io_base = ioremap(res->start, resource_size(res));
--	if (!io_base) {
--		ret = -ENOMEM;
--		goto free_state;
--	}
-+	if (!io_base)
-+		return -ENOMEM;
-
- 	/* make sure protocol 1 is selected */
- 	val = readl(io_base + HSEM_CTRL_REG);
-diff --git a/include/linux/hwspinlock.h b/include/linux/hwspinlock.h
-index 08a2fee..aad6bd4 100644
---- a/include/linux/hwspinlock.h
-+++ b/include/linux/hwspinlock.h
-@@ -118,7 +118,6 @@ int __hwspin_trylock(struct hwspinlock *hwlock,
-int mode, unsigned long *flags)
- static inline
- void __hwspin_unlock(struct hwspinlock *hwlock, int mode, unsigned long *flags)
- {
--	return 0;
- }
-
- static inline int hwspin_lock_get_id(struct hwspinlock *hwlock)
+- Paul
