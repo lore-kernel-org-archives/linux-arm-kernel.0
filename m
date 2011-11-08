@@ -1,30 +1,40 @@
 From: haojian.zhuang@marvell.com (Haojian Zhuang)
-Date: Tue,  8 Nov 2011 18:24:08 +0800
-Subject: [PATCH v6 00/11] change pxa gpio to platform driver
-Message-ID: <1320747859-8366-1-git-send-email-haojian.zhuang@marvell.com>
+Date: Tue,  8 Nov 2011 18:24:09 +0800
+Subject: [PATCH v6 01/11] ARM: mmp: fix build error on gpio
+In-Reply-To: <1320747859-8366-1-git-send-email-haojian.zhuang@marvell.com>
+References: <1320747859-8366-1-git-send-email-haojian.zhuang@marvell.com>
+Message-ID: <1320747859-8366-2-git-send-email-haojian.zhuang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Changelog
-v6:
-     1. fix build issue in pxa910 since building gpio failure is found in
-        mainline.
-     2. merge two dependant patches (original v5 0005 and 0006) together.
-     3. fix gpio bit issue in corgi and spitz.
-     4. replace printk() with dev_err in clk patch.
-v5:
-     1. use generic gpio driver. So clean gpio-pxa.h and gpio-pxa.c again.
-v4:
-     1. append one patch for clean gpio macros and use function instead.
-v3:
-     1. Rebase on Russell's for-next branch.
-     2. Add clock support.
-     3. Move gpio edge detection initiliaztion of arch-mmp into gpio driver.
+Parameters of GPIO_REG() should be assigned as volatile.
 
-v2:
-    1. Remove gpio.c from mach-pxa & mach-mmp that is introduced from v1.
-    2. Remove init function in gpio.c. Move the platfrom_device_register()
-       into platform driver.
-    3. Initialize pxa_gpio_regs in gpio-pxa.c
-    4. Simplify code of identifing pxa gpio series or mmp gpio series.
-    5. Use linux/io.h instead of asm/io.h.
+arch/arm/plat-pxa/include/plat/gpio.h: In function ?gpio_get_value?:
+arch/arm/plat-pxa/include/plat/gpio.h:12:21: error: invalid operands to
+binary & (have ?void *? and ?int?)
+arch/arm/plat-pxa/include/plat/gpio.h: In function ?gpio_set_value?:
+arch/arm/plat-pxa/include/plat/gpio.h:21:4: error: lvalue required as
+left operand of assignment
+arch/arm/plat-pxa/include/plat/gpio.h:23:4: error: lvalue required as
+left operand of assignment
+
+Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+---
+ arch/arm/mach-mmp/include/mach/gpio-pxa.h |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/mach-mmp/include/mach/gpio-pxa.h b/arch/arm/mach-mmp/include/mach/gpio-pxa.h
+index d14eeaf..99b4ce1 100644
+--- a/arch/arm/mach-mmp/include/mach/gpio-pxa.h
++++ b/arch/arm/mach-mmp/include/mach/gpio-pxa.h
+@@ -7,7 +7,7 @@
+ #define GPIO_REGS_VIRT	(APB_VIRT_BASE + 0x19000)
+ 
+ #define BANK_OFF(n)	(((n) < 3) ? (n) << 2 : 0x100 + (((n) - 3) << 2))
+-#define GPIO_REG(x)	(GPIO_REGS_VIRT + (x))
++#define GPIO_REG(x)	(*(volatile u32 *)(GPIO_REGS_VIRT + (x)))
+ 
+ #define NR_BUILTIN_GPIO		IRQ_GPIO_NUM
+ 
+-- 
+1.7.4.1
