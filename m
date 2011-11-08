@@ -1,84 +1,77 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 08 Nov 2011 14:00:36 +0900
-Subject: [01: PATCH 0/7] Preparation for arch_reset changes
-In-Reply-To: <20111106173113.GI12913@n2100.arm.linux.org.uk>
+Date: Tue, 08 Nov 2011 14:00:41 +0900
+Subject: [PATCH 03/41] ARM: restart: remove s3c24xx restart handler
+In-Reply-To: <E1RN6iH-0001Wl-QI@rmk-PC.arm.linux.org.uk>
 References: <20111106173113.GI12913@n2100.arm.linux.org.uk>
-Message-ID: <04eb01cc9dd3$5a6105f0$0f2311d0$%kim@samsung.com>
+ <E1RN6iH-0001Wl-QI@rmk-PC.arm.linux.org.uk>
+Message-ID: <04ec01cc9dd3$5d4d9e90$17e8dbb0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Russell King - ARM Linux wrote:
 > 
-> This series lays down the ground work for changing the way we handle the
-> reset (now called restart) handling on ARM.
+> Remove the s3c24xx restart handler, which is trying to work around
+> a chip bug by keeping caches on but flushed.  As we now only disable
+> caches when performing a soft reboot, there doesn't need to be a
+> work-around to do that.
 > 
-> As a result of these patches, we provide a new hook in the machine_desc
-> record called 'restart' which is pointed at a function to perform the
-> appropriate restart actions for the platform.  This is called directly
-> from machine_restart() with IRQs and caches on.
-> 
-> The 'soft_reboot' flag is changed to a more generic 'restart_mode'
-> character - which is used to initialize the default reboot mode (which
-> can be changed via the 'reboot=' command line parameter.)
-> 
-> 'soft_restart(addr)' is added which performs a soft restart (iow,
-> orderly shutdown of caches and MMU and a jump to the passed address),
-> rather than the old way which separated the tear-down of the caches
-> and MMU from the code doing the jump.  This will be necessary to
-> resolve the ARMv6 and ARMv7 CPU restarting problems.
-> 
-> Finally, appropriate 'restart_mode' values are added to several
-> platforms which were hard-coding the restart mode by intercepting
-> the restarting via arm_pm_restart.
-> 
->  arch/arm/include/asm/mach/arch.h                  |    9 +++--
->  arch/arm/include/asm/system.h                     |    1 +
->  arch/arm/kernel/machine_kexec.c                   |    4 +-
->  arch/arm/kernel/process.c                         |   35
-++++++++++++-----
-> ---
->  arch/arm/kernel/setup.c                           |    7 +++-
->  arch/arm/mach-clps711x/include/mach/system.h      |    2 +-
->  arch/arm/mach-ebsa110/core.c                      |    2 +-
->  arch/arm/mach-ebsa110/include/mach/system.h       |    2 +-
->  arch/arm/mach-ep93xx/include/mach/system.h        |    2 -
->  arch/arm/mach-footbridge/cats-hw.c                |    2 +-
->  arch/arm/mach-footbridge/include/mach/system.h    |    2 +-
->  arch/arm/mach-iop32x/include/mach/system.h        |    4 +--
->  arch/arm/mach-iop33x/include/mach/system.h        |    2 +-
->  arch/arm/mach-ixp2000/include/mach/system.h       |    2 -
->  arch/arm/mach-ixp4xx/include/mach/system.h        |    2 +-
->  arch/arm/mach-ks8695/include/mach/system.h        |    2 +-
->  arch/arm/mach-lpc32xx/include/mach/system.h       |    3 --
->  arch/arm/mach-mmp/include/mach/system.h           |    4 +-
->  arch/arm/mach-mxs/system.c                        |    2 +-
->  arch/arm/mach-pnx4008/include/mach/system.h       |    2 +-
->  arch/arm/mach-pxa/mioa701.c                       |    1 +
->  arch/arm/mach-pxa/reset.c                         |    2 +-
->  arch/arm/mach-pxa/spitz.c                         |    3 ++
->  arch/arm/mach-pxa/tosa.c                          |    1 +
->  arch/arm/mach-rpc/include/mach/system.h           |    2 +-
->  arch/arm/mach-s3c2410/include/mach/system-reset.h |    4 +-
->  arch/arm/mach-s3c64xx/include/mach/system.h       |    2 +-
->  arch/arm/mach-sa1100/include/mach/system.h        |    2 +-
->  arch/arm/mach-shark/core.c                        |    1 -
->  arch/arm/mach-shmobile/include/mach/system.h      |    2 +-
->  arch/arm/mach-u300/include/mach/system.h          |    2 -
->  arch/arm/mach-w90x900/include/mach/system.h       |    2 +-
->  arch/arm/mm/idmap.c                               |    2 +-
->  arch/arm/mm/nommu.c                               |    2 +-
->  arch/arm/plat-mxc/system.c                        |    2 +-
->  arch/arm/plat-spear/include/plat/system.h         |    2 +-
->  36 files changed, 64 insertions(+), 59 deletions(-)
-
-For Samsung stuff,
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
 Acked-by: Kukjin Kim <kgene.kim@samsung.com>
 
-Thanks.
+Thanks for removing some workaround :)
 
 Best regards,
 Kgene.
 --
 Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
 SW Solution Development Team, Samsung Electronics Co., Ltd.
+
+> ---
+>  arch/arm/plat-s3c24xx/cpu.c |   23 -----------------------
+>  1 files changed, 0 insertions(+), 23 deletions(-)
+> 
+> diff --git a/arch/arm/plat-s3c24xx/cpu.c b/arch/arm/plat-s3c24xx/cpu.c
+> index 3c63353..1121df1 100644
+> --- a/arch/arm/plat-s3c24xx/cpu.c
+> +++ b/arch/arm/plat-s3c24xx/cpu.c
+> @@ -192,27 +192,6 @@ static unsigned long s3c24xx_read_idcode_v4(void)
+>  	return __raw_readl(S3C2410_GSTATUS1);
+>  }
+> 
+> -/* Hook for arm_pm_restart to ensure we execute the reset code
+> - * with the caches enabled. It seems at least the S3C2440 has a problem
+> - * resetting if there is bus activity interrupted by the reset.
+> - */
+> -static void s3c24xx_pm_restart(char mode, const char *cmd)
+> -{
+> -	if (mode != 's') {
+> -		unsigned long flags;
+> -
+> -		local_irq_save(flags);
+> -		__cpuc_flush_kern_all();
+> -		__cpuc_flush_user_all();
+> -
+> -		arch_reset(mode, cmd);
+> -		local_irq_restore(flags);
+> -	}
+> -
+> -	/* fallback, or unhandled */
+> -	arm_machine_restart(mode, cmd);
+> -}
+> -
+>  void __init s3c24xx_init_io(struct map_desc *mach_desc, int size)
+>  {
+>  	/* initialise the io descriptors we need for initialisation */
+> @@ -226,7 +205,5 @@ void __init s3c24xx_init_io(struct map_desc
+*mach_desc,
+> int size)
+>  	}
+>  	s3c24xx_init_cpu();
+> 
+> -	arm_pm_restart = s3c24xx_pm_restart;
+> -
+>  	s3c_init_cpu(samsung_cpu_id, cpu_ids, ARRAY_SIZE(cpu_ids));
+>  }
+> --
+> 1.7.4.4
