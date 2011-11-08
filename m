@@ -1,60 +1,32 @@
 From: khilman@ti.com (Kevin Hilman)
-Date: Tue, 08 Nov 2011 11:20:57 -0800
-Subject: [PATCH v7 17/21] OMAP2+: UART: Remove omap_uart_can_sleep and add
- pm_qos
-In-Reply-To: <4EB8F368.5070603@ti.com> (Rajendra Nayak's message of "Tue, 08
- Nov 2011 14:46:24 +0530")
-References: <1318952110-10659-1-git-send-email-govindraj.raja@ti.com>
- <1318952110-10659-3-git-send-email-govindraj.raja@ti.com>
- <87vcqz33y8.fsf@ti.com> <4EB8F368.5070603@ti.com>
-Message-ID: <87r51i1kva.fsf@ti.com>
+Date: Tue, 08 Nov 2011 11:24:11 -0800
+Subject: [PATCH] arm: omap2: fix build failure
+In-Reply-To: <1320726849-11854-1-git-send-email-tom.leiming@gmail.com> (tom
+ leiming's message of "Tue, 8 Nov 2011 12:34:09 +0800")
+References: <1320726849-11854-1-git-send-email-tom.leiming@gmail.com>
+Message-ID: <87mxc61kpw.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rajendra Nayak <rnayak@ti.com> writes:
+tom.leiming at gmail.com writes:
 
-> Hi Kevin,
+> From: Ming Lei <tom.leiming@gmail.com>
 >
-> On Saturday 05 November 2011 04:12 AM, Kevin Hilman wrote:
->> However, as mentioned previously[1], due to a HW sleepdep between MPU
->> and CORE, this constraint isn't actually needed for CORE UARTs, so it's
->> a bit wasteful to go through all the constraint setting for no reason.
+> The patch fixes the compile failure:
 >
-> I had a short chat with Govind on this and was trying to understand
-> this better.
-> Are you referring to the 'autodeps' for omap3 here, because they would
-> prevent any clock domain from idling as long as MPU or IVA are active,
-
-No, I was thinking of HW sleepdeps.  However, I looked back at the
-OMAP3430 TRM and see that MPU does not have a HW sleepdep on CORE like I
-thought.
-
-> but not the other way round. Which means MPU can still idle, while CORE
-> does not.
+>   CC      arch/arm/mach-omap2/cpuidle34xx.o
+> arch/arm/mach-omap2/cpuidle34xx.c:317:12: error: 'THIS_MODULE'
+> undeclared here (not in a function)
+> make[1]: *** [arch/arm/mach-omap2/cpuidle34xx.o] Error 1
+> make: *** [arch/arm/mach-omap2] Error 2
+> make: *** Waiting for unfinished jobs....
 >
-> My guess was, its probably the CORE domain idling itself thats causing
-> the UART sluggishness, (and not MPU idling), due to higher latency,
-> which is prevented with an active UART module in CORE, but not in PER.
+> Signed-off-by: Ming Lei <tom.leiming@gmail.com>
 
-OK, that indeed makes sense.  Thanks for correcting me.
+FYI...
 
-> So Govind did a small experiment to prevent just CORE idling and let MPU
-> idle alone and that did not show any sluggishness.
+Tony has already queued fix for this in his fixes branch.
 
-OK, good.
-
-> Now, putting a pm-qos constraint for a UART in CORE still looks
-> redundant because the latency requirement that UART has is in
-> some way *indirectly* met (because the active UART in CORE prevents
-> CORE transitions in idle).
-> But don't you think the UART driver should express its
-> latency constraints regardless, without thinking of any indirect ways
-> in which the same requirements would have already been met?
-
-Yes, you're right.  The driver should not need to know which powerdomain
-a given UART is in.  It's probably best (and most portable) to have UART
-always express its requirements all the time.
-
-Thanks for digging into this,
+     http://marc.info/?l=linux-arm-kernel&m=132071036621713&w=2
 
 Kevin
