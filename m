@@ -1,84 +1,43 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 8 Nov 2011 20:06:49 +0200
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 8 Nov 2011 18:29:55 +0000
 Subject: [PATCH V3 2/4] drivers/i2c/busses/i2c-at91.c: add new driver
-In-Reply-To: <EF2E73589CA71846A15D0B2CDF79505D087B38B8B5@wm021.weinmann.com>
+In-Reply-To: <20111108152343.GJ20728@legolas.emea.dhcp.ti.com>
 References: <cover.1320753142.git.n.voss@weinmann.de>
  <7bdd6b456b0e055441cb25634c8cb6d483718f6c.1320753142.git.n.voss@weinmann.de>
  <20111108144115.GH20728@legolas.emea.dhcp.ti.com>
- <EF2E73589CA71846A15D0B2CDF79505D087B38B899@wm021.weinmann.com>
- <20111108154004.GK20728@legolas.emea.dhcp.ti.com>
- <EF2E73589CA71846A15D0B2CDF79505D087B38B8B5@wm021.weinmann.com>
-Message-ID: <20111108180648.GA24399@legolas.emea.dhcp.ti.com>
+ <4EB9477E.8070002@atmel.com>
+ <20111108152343.GJ20728@legolas.emea.dhcp.ti.com>
+Message-ID: <20111108182955.GH12913@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Tue, Nov 08, 2011 at 04:49:07PM +0100, Voss, Nikolaus wrote:
-> > > > > +#include <mach/at91_twi.h>
-> > > > > +#include <mach/board.h>
-> > > > > +#include <mach/cpu.h>
-> > > >
-> > > > avoid including <mach/*> on drivers.
-> > >
-> > > Should I move at91_twi.h to include/linux (omap does it like this,
-> > > other use the mach-include)?
+On Tue, Nov 08, 2011 at 05:23:46PM +0200, Felipe Balbi wrote:
+> On Tue, Nov 08, 2011 at 04:15:10PM +0100, Nicolas Ferre wrote:
+> > -----BEGIN PGP SIGNED MESSAGE-----
+> > Hash: SHA1
 > > 
-> > maybe, is at91_twi.h some sort of platform_data ? there's
-> > <linux/platform_data/...> for that.
-> 
-> It contains hardware register definitions, not really platform data.
-> So linux/i2c-at91.h (like linux/i2c-{omap,pxe,...}) would be the right place?
-
-if it's only register definitions, does it need to be in a header ? I
-mean, is anyone outside of this driver trying to access those registers?
-Otherwise they could sit on the C source file itself.
-
-If there's anyone else which needs those register definitions then
-<linux/i2c/at91.h> seems like a good place (??)
-
-> > > > > +	if (irqstatus & AT91_TWI_TXCOMP) {
-> > > > > +		at91_disable_twi_interrupts(dev);
-> > > > > +		dev->transfer_status = status;
-> > > > > +		complete(&dev->cmd_complete);
-> > > > > +	}
-> > > > > +	else if (irqstatus & AT91_TWI_RXRDY) {
-> > > > > +		at91_twi_read_next_byte(dev);
-> > > > > +	}
-> > > > > +	else if (irqstatus & AT91_TWI_TXRDY) {
-> > > > > +		at91_twi_write_next_byte(dev);
-> > > > > +	}
-> > > > > +	else {
-> > > > > +		return IRQ_NONE;
-> > > >
-> > > > coding style is wrong. Also, are those IRQ events really mutually
-> > exclusive ??
-> > >
-> > > These are indeed mutually exclusive (semantically).
+> > On 11/08/2011 03:41 PM, Felipe Balbi :
 > > 
-> > so you couldn't have AT91_TWI_TXCOMP and AT91_TWI_RXRDY set when you read
-> > irqstatus ?
+> > >> +	if (cpu_is_at91rm9200()) {			/* AT91RM9200 Errata #22 */
+> > > 
+> > > I don't think you should be using cpu_is_* on drivers.
+> > 
+> > It is a common pattern in at91 drivers and has worked for ages.
+> > Do you think it is related to the need to be able to compile the
+> > driver for any SoC in the case of multi-SoC zImage support?
 > 
-> Yes, I do have this, but in this constellation only TXCOMP is relevant and
-> all other flags can be ignored (because the transfer is finished).
+> we have drivers compiling on multiple OMAP versions without those hacks.
+> Generally, we check the IP revision for that. Don't you have a Revision
+> register of some sort ?
 
-I asked about different directions exactly because of that. My question
-was if you could have a TX Complete and RX Ready IRQs simultaneously.
+I'm not sure what your objection is - this is no different from what
+happens with OMAP when detecting OMAP1,2,3,4 etc.  E.g.:
 
-The way you coded this IRQ handler is like a priority encoder, meaning
-that you will ignore all other bits once you find the first set bit. I'm
-wondering if you shouldn't drop the "else" as most of the IRQ handlers
-do.
+drivers/mfd/twl-core.c:     if (cpu_is_omap2430())
+drivers/media/video/omap3isp/isp.c: if (cpu_is_omap3630())
+drivers/media/video/omap/omap_vout.c:               if (cpu_is_omap24xx() || cpu_is_omap34xx())
+drivers/media/video/omap/omap_voutlib.c:    if (cpu_is_omap24xx()) {
+drivers/media/video/omap/omap_voutlib.c:    } else if (cpu_is_omap34xx()) {
+drivers/media/video/omap/omap_voutlib.c:    if (cpu_is_omap24xx()) {
 
-But it's your driver anyway, I don't know how this controller behaves.
-Just found it a bit worrying that you ignore all other IRQ status bits.
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111108/49980e10/attachment.sig>
+for a small selection.
