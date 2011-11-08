@@ -1,53 +1,32 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Tue, 08 Nov 2011 14:14:49 +0200
-Subject: [GIT PULL] ARM: OMAP: DSS hwmod/reset fixes for 3.2
-In-Reply-To: <alpine.DEB.2.00.1111080329300.8313@utopia.booyaka.com>
-References: <alpine.DEB.2.00.1110061806150.4611@utopia.booyaka.com>
- <20111105003550.GM31337@atomide.com>
- <alpine.DEB.2.00.1111080049470.12394@utopia.booyaka.com>
- <1320746911.1907.47.camel@deskari>
- <alpine.DEB.2.00.1111080329300.8313@utopia.booyaka.com>
-Message-ID: <1320754489.1907.50.camel@deskari>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 8 Nov 2011 12:17:35 +0000
+Subject: [PATCH v5 3/7] arm: perf: support device with other non-irq
+ resources
+In-Reply-To: <CACVXFVPD90q0euQXXG+3ujyvzxCjAovFSSPKvqf6esU7vkD7Tg@mail.gmail.com>
+References: <1319467559-5518-1-git-send-email-ming.lei@canonical.com>
+ <1319467559-5518-4-git-send-email-ming.lei@canonical.com>
+ <20111024150814.GA4771@mudshark.cambridge.arm.com>
+ <CACVXFVOzQ0QEnaAb=mLFdr7AU3H3TsT=wXcNgtqeUGVLXahd4Q@mail.gmail.com>
+ <20111025083420.GA6184@mudshark.cambridge.arm.com>
+ <alpine.DEB.2.00.1110250242130.27118@utopia.booyaka.com>
+ <CACVXFVOVeuWpVGSUP-sDDbiWb=W8XVB+PDYns4ttK9+ty0GMmA@mail.gmail.com>
+ <alpine.DEB.2.00.1110250459160.12667@utopia.booyaka.com>
+ <CACVXFVPD90q0euQXXG+3ujyvzxCjAovFSSPKvqf6esU7vkD7Tg@mail.gmail.com>
+Message-ID: <20111108121735.GD28350@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2011-11-08 at 03:33 -0700, Paul Walmsley wrote:
-> On Tue, 8 Nov 2011, Tomi Valkeinen wrote:
+On Tue, Nov 08, 2011 at 09:25:52AM +0000, Ming Lei wrote:
+> On Tue, Oct 25, 2011 at 7:00 PM, Paul Walmsley <paul@pwsan.com> wrote:
+> >
+> > Beno?t is the right person to review OMAP4 hwmod data.
 > 
-> > On Tue, 2011-11-08 at 00:50 -0700, Paul Walmsley wrote:
-> > > On Fri, 4 Nov 2011, Tony Lindgren wrote:
-> > > 
-> > > > * Paul Walmsley <paul@pwsan.com> [111006 16:33]:
-> > > > > The following changes since commit be73246058737beec52ae232bcab7776332a9e06:
-> > > > > 
-> > > > >   ARM: OMAP2+: Remove custom init_irq for remaining boards (2011-09-26 17:50:37 -0700)
-> > > > > 
-> > > > > are available in the git repository at:
-> > > > >   git://git.pwsan.com/linux-2.6 hwmod_dss_fixes_3.2
-> > > > 
-> > > > Looks like you should take a look at the merge conflicts with
-> > > > this one, maybe rebase it on 994c0e992522c123298b4a91b72f5e67ba2d1123.
-> > > 
-> > > Do you want this series for 3.2-rc or 3.3 at this point?
-> > 
-> > Seems that at least HDMI output is broken due to this series missing.
-> 
-> OK thanks, 3.2-rc it is.
-> 
-> The merge conflicts have been fixed, they were trivial.  Tomi, care to 
-> do a quick test boot with the updated branch
-> 
-> git://git.pwsan.com/linux-2.6 hwmod_dss_fixes_3.2rc
-> 
+> Beno?t, gentle ping, :-)
 
-Thanks, the patches in your branch look ok and work ok for me.
+Note that I've taken the two perf patches into my perf/omap4 branch now:
 
- Tomi
+http://git.kernel.org/?p=linux/kernel/git/will/linux.git;a=shortlog;h=refs/heads/perf/omap4
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111108/b2cdc7e1/attachment.sig>
+so it would be really good to see the platform parts getting picked up too.
+
+Will
