@@ -1,44 +1,32 @@
-From: liu.h.jason@gmail.com (Jason Liu)
-Date: Tue, 8 Nov 2011 19:19:28 +0800
-Subject: [PATCH v6 01/11] ARM: mmp: fix build error on gpio
-In-Reply-To: <1320747859-8366-2-git-send-email-haojian.zhuang@marvell.com>
-References: <1320747859-8366-1-git-send-email-haojian.zhuang@marvell.com>
- <1320747859-8366-2-git-send-email-haojian.zhuang@marvell.com>
-Message-ID: <CAB4PhKf_LtiWPDm_angtn1KP7u=pXzZt4N_Bbh52tOQ8mKrC0Q@mail.gmail.com>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Tue, 8 Nov 2011 12:36:36 +0100 (CET)
+Subject: [PATCH] fix compilation breakage in entry-armv.S
+Message-ID: <Pine.LNX.4.64.1111081232140.10851@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/11/8 Haojian Zhuang <haojian.zhuang@marvell.com>:
-> Parameters of GPIO_REG() should be assigned as volatile.
->
-> arch/arm/plat-pxa/include/plat/gpio.h: In function ?gpio_get_value?:
-> arch/arm/plat-pxa/include/plat/gpio.h:12:21: error: invalid operands to
-> binary & (have ?void *? and ?int?)
-> arch/arm/plat-pxa/include/plat/gpio.h: In function ?gpio_set_value?:
-> arch/arm/plat-pxa/include/plat/gpio.h:21:4: error: lvalue required as
-> left operand of assignment
-> arch/arm/plat-pxa/include/plat/gpio.h:23:4: error: lvalue required as
-> left operand of assignment
->
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
-> ---
-> ?arch/arm/mach-mmp/include/mach/gpio-pxa.h | ? ?2 +-
-> ?1 files changed, 1 insertions(+), 1 deletions(-)
->
+Compilation of Linus' tree of today without THUMB support for V7 machines 
+breaks:
 
-It seems that this is pxa related fix, why not have pxa keyword in the
-commit log
-which will make the patch filter life easier.
+linux-2.6/arch/arm/kernel/entry-armv.S: Assembler messages:
+linux-2.6/arch/arm/kernel/entry-armv.S:501: Error: backward ref to unknown label "2:"
+linux-2.6/arch/arm/kernel/entry-armv.S:502: Error: backward ref to unknown label "3:"
+make[2]: *** [arch/arm/kernel/entry-armv.o] Error 1
 
-Jason Liu
+Fix this by adding a check for CONFIG_ARM_THUMB.
 
->
-> --
-> 1.7.4.1
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+---
+diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
+index 9ad50c4..6f8fbfe 100644
+--- a/arch/arm/kernel/entry-armv.S
++++ b/arch/arm/kernel/entry-armv.S
+@@ -497,7 +497,7 @@ ENDPROC(__und_usr)
+ 	.popsection
+ 	.pushsection __ex_table,"a"
+ 	.long	1b, 4b
+-#if __LINUX_ARM_ARCH__ >= 7
++#if CONFIG_ARM_THUMB && __LINUX_ARM_ARCH__ >= 7
+ 	.long	2b, 4b
+ 	.long	3b, 4b
+ #endif
