@@ -1,46 +1,20 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue,  8 Nov 2011 22:07:07 +0800
-Subject: [PATCH] arm/mxs: fix mmc device adding for mach-mx28evk
-Message-ID: <1320761227-24476-1-git-send-email-shawn.guo@linaro.org>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Tue, 8 Nov 2011 16:03:09 +0200
+Subject: [PATCH v4 0/7] iommu: split mapping to page sizes as supported by
+ the hardware
+In-Reply-To: <20111108140133.GD2113@amd.com>
+References: <1318850846-16066-1-git-send-email-ohad@wizery.com>
+ <CAK=Wgbb5K+rqPNdM2sC8z+9d4-hdcPwV-vXk6gcAYWaO+dVx3w@mail.gmail.com>
+ <20111108140133.GD2113@amd.com>
+Message-ID: <CAK=WgbYiF04i8XRkn+YQhd=z6uDRwr8JEiWP1CLFLjM7Y+xWKg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The merge commit "526b264 Merge branch 'imx/cleanup' into imx/devel"
-left a duplicated mx28_add_mxs_mmc() call, which causes the problem
-below during boot.
+On Tue, Nov 8, 2011 at 4:01 PM, Joerg Roedel <Joerg.Roedel@amd.com> wrote:
+> On Tue, Nov 08, 2011 at 02:57:02PM +0200, Ohad Ben-Cohen wrote:
+>> Joerg, gentle reminder. thanks.
+>
+> Just wanted to wait until -rc1 is out and I can start merging
+> new stuff :)
 
-  kobject_add_internal failed for mxs-mmc.1 with -EEXIST, don't try
-  to register things with the same name in the same directory.
-
-The patch removes this leftover and also change mmc0 adding to align
-with mmc1.
-
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- arch/arm/mach-mxs/mach-mx28evk.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/mach-mxs/mach-mx28evk.c b/arch/arm/mach-mxs/mach-mx28evk.c
-index ac2316d..064ec5a 100644
---- a/arch/arm/mach-mxs/mach-mx28evk.c
-+++ b/arch/arm/mach-mxs/mach-mx28evk.c
-@@ -471,7 +471,8 @@ static void __init mx28evk_init(void)
- 			       "mmc0-slot-power");
- 	if (ret)
- 		pr_warn("failed to request gpio mmc0-slot-power: %d\n", ret);
--	mx28_add_mxs_mmc(0, &mx28evk_mmc_pdata[0]);
-+	else
-+		mx28_add_mxs_mmc(0, &mx28evk_mmc_pdata[0]);
- 
- 	ret = gpio_request_one(MX28EVK_MMC1_SLOT_POWER, GPIOF_OUT_INIT_LOW,
- 			       "mmc1-slot-power");
-@@ -480,7 +481,6 @@ static void __init mx28evk_init(void)
- 	else
- 		mx28_add_mxs_mmc(1, &mx28evk_mmc_pdata[1]);
- 
--	mx28_add_mxs_mmc(1, &mx28evk_mmc_pdata[1]);
- 	mx28_add_rtc_stmp3xxx();
- 
- 	gpio_led_register_device(0, &mx28evk_led_data);
--- 
-1.7.4.1
+np, thanks :)
