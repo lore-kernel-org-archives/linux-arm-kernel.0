@@ -1,40 +1,74 @@
-From: sbabic@denx.de (Stefano Babic)
-Date: Tue, 08 Nov 2011 07:30:19 +0100
-Subject: Error for machine_is_m28evk
-In-Reply-To: <CAOMZO5C4=ELWef8keoT8u0H8jTPRGQ5BA_8xYyKge++s+wdNqw@mail.gmail.com>
-References: <CAOMZO5C4=ELWef8keoT8u0H8jTPRGQ5BA_8xYyKge++s+wdNqw@mail.gmail.com>
-Message-ID: <4EB8CC7B.5060503@denx.de>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 08 Nov 2011 16:00:16 +0900
+Subject: [03: PATCH 0/5] The remaining stuff
+In-Reply-To: <20111106175457.GK12913@n2100.arm.linux.org.uk>
+References: <20111106173113.GI12913@n2100.arm.linux.org.uk>
+ <20111106173939.GJ12913@n2100.arm.linux.org.uk>
+ <20111106175457.GK12913@n2100.arm.linux.org.uk>
+Message-ID: <04fc01cc9de4$11dc3410$35949c30$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/08/2011 02:49 AM, Fabio Estevam wrote:
-> Hi,
+Russell King - ARM Linux wrote:
 > 
-
-Hi Fabio,
-
-> On a 3.2-rc1 kernel I get the following error when trying to build
-> mxs_defconfig:
+> Part 3 - the remaining stuff
 > 
->   CHK     include/generated/compile.h
->   CC      arch/arm/mach-mxs/clock-mx28.o
-> arch/arm/mach-mxs/clock-mx28.c: In function 'clk_misc_init':
-> arch/arm/mach-mxs/clock-mx28.c:748: error: implicit declaration of
-> function 'machine_is_m28evk'
-> make[1]: *** [arch/arm/mach-mxs/clock-mx28.o] Error 1
-> make: *** [arch/arm/mach-mxs] Error 2
+> These are patches which I've managed to get half way through before
+> getting - to be honest - totally hacked off with the code found in
+> various platforms (as mentioned in previous mails).
+> 
+> These platforms are broken as a result of the final patch in part 2,
+> and these patches move these platforms _towards_ a solution.  They
+> are not a complete solution though, but the start of the solution.
+> 
+> For instance, the Exynos4 and S5PV210 patches both consist of almost
+> a full solution -but- with the new function prototype missing because
+> there is _no_ local header file to put it in, and I'm damned well not
+> putting it in the remote plat-samsung/include/plat headers.
+> 
+Russell,
 
-This is due to the missing mach-id for the M28. The mach-id for this
-board was requested and it is 3613, already set as "mainlined" at
-http://www.arm.linux.org.uk/developer/machines/. We need an update of
-mach-types.
+The new restart prototype for s5pv210 and exynos can be placed in their
+respective<mach/system.h>file. And the board files can include it. Would
+this place be fine for the new prototype?
 
-Regards,
-Stefano Babic
+Thanks.
 
--- 
-=====================================================================
-DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
-HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
-Phone: +49-8142-66989-0 Fax: +49-8142-66989-80  Email: office at denx.de
-=====================================================================
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
+
+> The final set of platforms - touched neither by part 3 nor 4, are
+> broken by the final patch in part 2, and at present I have no plans
+> to fix them.  I would welcome patches to fix these which address the
+> issues raised in the "pet peaves" email (which is why I have no plans
+> to fix them.)
+> 
+>  arch/arm/mach-exynos4/cpu.c                       |    6 +-----
+>  arch/arm/mach-exynos4/mach-armlex4210.c           |    1 +
+>  arch/arm/mach-exynos4/mach-nuri.c                 |    1 +
+>  arch/arm/mach-exynos4/mach-origen.c               |    1 +
+>  arch/arm/mach-exynos4/mach-smdk4x12.c             |    2 ++
+>  arch/arm/mach-exynos4/mach-smdkv310.c             |    2 ++
+>  arch/arm/mach-exynos4/mach-universal_c210.c       |    1 +
+>  arch/arm/mach-omap1/board-voiceblue.c             |    5 ++---
+>  arch/arm/mach-omap1/include/mach/system.h         |    6 ++++++
+>  arch/arm/mach-omap1/reset.c                       |    4 +---
+>  arch/arm/mach-omap2/include/mach/system.h         |    6 ++++++
+>  arch/arm/mach-omap2/prcm.c                        |    4 +---
+>  arch/arm/mach-s5pv210/cpu.c                       |    6 +-----
+>  arch/arm/mach-s5pv210/mach-aquila.c               |    1 +
+>  arch/arm/mach-s5pv210/mach-goni.c                 |    1 +
+>  arch/arm/mach-s5pv210/mach-smdkc110.c             |    1 +
+>  arch/arm/mach-s5pv210/mach-smdkv210.c             |    1 +
+>  arch/arm/mach-s5pv210/mach-torbreck.c             |    1 +
+>  arch/arm/plat-omap/include/plat/system.h          |    2 --
+>  arch/arm/plat-samsung/include/plat/reset.h        |   16 ----------------
+>  arch/arm/plat-samsung/include/plat/system-reset.h |   11 -----------
+>  arch/arm/plat-tcc/include/mach/system.h           |    4 ++--
+>  arch/arm/plat-tcc/system.c                        |    2 +-
+>  23 files changed, 34 insertions(+), 51 deletions(-)
+>  delete mode 100644 arch/arm/plat-samsung/include/plat/reset.h
+> 
