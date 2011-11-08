@@ -1,68 +1,43 @@
-From: richard.zhao@linaro.org (Richard Zhao)
-Date: Tue, 8 Nov 2011 08:41:31 +0800
-Subject: [PATCH 1/1] ARM: mx51/53: correct clocks that take ipg_perclk as
- parent
-In-Reply-To: <20111107075254.GQ16886@pengutronix.de>
-References: <1320399263-14885-1-git-send-email-richard.zhao@linaro.org>
- <20111107075254.GQ16886@pengutronix.de>
-Message-ID: <20111108004130.GB5898@b20223-02.ap.freescale.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 8 Nov 2011 00:42:14 +0000
+Subject: [GIT PULL] omap fixes for v3.2 merge window breakage
+In-Reply-To: <20111108001840.GF31337@atomide.com>
+References: <20111107204929.GZ31337@atomide.com>
+ <20111107212919.GI15294@n2100.arm.linux.org.uk>
+ <20111107214724.GA31337@atomide.com> <20111108001840.GF31337@atomide.com>
+Message-ID: <20111108004214.GN15294@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 07, 2011 at 08:52:54AM +0100, Sascha Hauer wrote:
-> On Fri, Nov 04, 2011 at 05:34:23PM +0800, Richard Zhao wrote:
-> > gpt_clk, pwm1_clk and pwm2_clk parent clock are all ipg_perclk.
+On Mon, Nov 07, 2011 at 04:18:41PM -0800, Tony Lindgren wrote:
+> * Tony Lindgren <tony@atomide.com> [111107 13:12]:
+> > * Russell King - ARM Linux <linux@arm.linux.org.uk> [111107 12:54]:
+> > > Arnd,
+> > > 
+> > > Don't pull this - there's yet more crap in OMAP to be fixed before
+> > > these go to mainline.  OMAP3 is severely broken at the moment with,
+> > > to put it bluntly, totally fucked up OMAP hwmod code, and should be
+> > > fixed *now* by folk before this pull request.
+> > > 
+> > > The fixes are damned trivial I expect even Tony can fix it without
+> > > reference to Paul.
 > > 
-> > Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
-> > ---
-> >  arch/arm/mach-mx5/clock-mx51-mx53.c |    6 +++---
-> >  1 files changed, 3 insertions(+), 3 deletions(-)
+> > > >       ARM: OMAP3: hwmod: fix variant registration and remove SmartReflex from common list
 > > 
-> > diff --git a/arch/arm/mach-mx5/clock-mx51-mx53.c b/arch/arm/mach-mx5/clock-mx51-mx53.c
-> > index 2aacf41..a3ca4ce 100644
-> > --- a/arch/arm/mach-mx5/clock-mx51-mx53.c
-> > +++ b/arch/arm/mach-mx5/clock-mx51-mx53.c
-> > @@ -1278,12 +1278,12 @@ DEFINE_CLOCK(uart5_clk, 4, MXC_CCM_CCGR7, MXC_CCM_CCGRx_CG7_OFFSET,
-> >  DEFINE_CLOCK(gpt_ipg_clk, 0, MXC_CCM_CCGR2, MXC_CCM_CCGRx_CG10_OFFSET,
-> >  	NULL,  NULL, &ipg_clk, NULL);
-> >  DEFINE_CLOCK(gpt_clk, 0, MXC_CCM_CCGR2, MXC_CCM_CCGRx_CG9_OFFSET,
-> > -	NULL,  NULL, &ipg_clk, &gpt_ipg_clk);
-> > +	NULL,  NULL, &ipg_perclk, &gpt_ipg_clk);
+> > Sounds like the above patch already queued should fix the issues you
+> > are seeing with hwmod?
+> > 
+> > Or do you still have other issues you're having?
 > 
-> No. The gpt has several parents and the one we are using is the ipg
-> clock. Try a sleep 10 with your patch applied.
-You are right. Sounds like gpt_clk can not be defined here. Is it better to pass
-three clocks (ipg, ipg_per, ckil) to gpt driver and let gpt decide what to use?
-Anyway, it's beyond this patch. I'll keep this line as it was.
+> Sounds like all Russell's issues are all dealt with:
+> 
+> http://marc.info/?l=linux-arm-kernel&m=132070787220812&w=2
+> 
+> Arnd, if you have not pulled yet, Kevin just posted one more export.h
+> fix for THIS_MODULE for cpuidle. I'll add that patch into fixes,
+> and will post a new pull request.
 
-Richard
-> 
-> Sascha
-> 
-> >  
-> >  DEFINE_CLOCK(pwm1_clk, 0, MXC_CCM_CCGR2, MXC_CCM_CCGRx_CG6_OFFSET,
-> > -	NULL, NULL, &ipg_clk, NULL);
-> > +	NULL, NULL, &ipg_perclk, NULL);
-> >  DEFINE_CLOCK(pwm2_clk, 0, MXC_CCM_CCGR2, MXC_CCM_CCGRx_CG8_OFFSET,
-> > -	NULL, NULL, &ipg_clk, NULL);
-> > +	NULL, NULL, &ipg_perclk, NULL);
-> >  
-> >  /* I2C */
-> >  DEFINE_CLOCK(i2c1_clk, 0, MXC_CCM_CCGR1, MXC_CCM_CCGRx_CG9_OFFSET,
-> > -- 
-> > 1.7.5.4
-> > 
-> > 
-> > 
-> 
-> -- 
-> Pengutronix e.K.                           |                             |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+Arnd isn't around much at the moment.
+
+I've forwarded your request to Linus already, so adding to it may not go
+down too well.
