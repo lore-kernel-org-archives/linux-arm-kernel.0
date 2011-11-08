@@ -1,99 +1,38 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue,  8 Nov 2011 15:52:57 +0000
-Subject: [PATCH v5 2/8] ARM: lib: add call_with_stack function for safely
- changing stack
+Date: Tue,  8 Nov 2011 15:53:01 +0000
+Subject: [PATCH v5 6/8] ARM: soft_restart: disable the outer L2 when the last
+ CPU is going down
 In-Reply-To: <1320767583-21162-1-git-send-email-will.deacon@arm.com>
 References: <1320767583-21162-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1320767583-21162-3-git-send-email-will.deacon@arm.com>
+Message-ID: <1320767583-21162-7-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When disabling the MMU, it is necessary to take out a 1:1 identity map
-of the reset code so that it can safely be executed with and without
-the MMU active. To avoid the situation where the physical address of the
-reset code aliases with the virtual address of the active stack (which
-cannot be included in the 1:1 mapping), it is desirable to change to a
-new stack at a location which is less likely to alias.
+Soft-restarting a system with an outer, shared L2 requires us to disable
+it when no other CPUs are running.
 
-This code adds a new lib function, call_with_stack:
+This patch adds an outer_disable call to soft_restart so that the last
+CPU going down will disable the L2 cache.
 
-	void call_with_stack(void (*fn)(void *), void *arg, void *sp);
-
-which changes the stack to point at the sp parameter, before invoking
-fn(arg) with the new stack selected.
-
-Reviewed-by: Nicolas Pitre <nicolas.pitre@linaro.org>
-Signed-off-by: Dave Martin <dave.martin@linaro.org>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/lib/Makefile          |    3 +-
- arch/arm/lib/call_with_stack.S |   44 ++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 46 insertions(+), 1 deletions(-)
- create mode 100644 arch/arm/lib/call_with_stack.S
+ arch/arm/kernel/process.c |    4 ++++
+ 1 files changed, 4 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/lib/Makefile b/arch/arm/lib/Makefile
-index cf73a7f..0ade0ac 100644
---- a/arch/arm/lib/Makefile
-+++ b/arch/arm/lib/Makefile
-@@ -13,7 +13,8 @@ lib-y		:= backtrace.o changebit.o csumipv6.o csumpartial.o   \
- 		   testchangebit.o testclearbit.o testsetbit.o        \
- 		   ashldi3.o ashrdi3.o lshrdi3.o muldi3.o             \
- 		   ucmpdi2.o lib1funcs.o div64.o                      \
--		   io-readsb.o io-writesb.o io-readsl.o io-writesl.o
-+		   io-readsb.o io-writesb.o io-readsl.o io-writesl.o  \
-+		   call_with_stack.o
+diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+index 577d092..664d351 100644
+--- a/arch/arm/kernel/process.c
++++ b/arch/arm/kernel/process.c
+@@ -137,6 +137,10 @@ void soft_restart(unsigned long addr)
+ 	local_irq_disable();
+ 	local_fiq_disable();
  
- mmu-y	:= clear_user.o copy_page.o getuser.o putuser.o
++	/* Disable the L2 if we're the last man standing. */
++	if (num_online_cpus() == 1)
++		outer_disable();
++
+ 	/* Change to the new stack and continue with the reset. */
+ 	call_with_stack(__soft_restart, (void *)addr, (void *)stack);
  
-diff --git a/arch/arm/lib/call_with_stack.S b/arch/arm/lib/call_with_stack.S
-new file mode 100644
-index 0000000..916c80f
---- /dev/null
-+++ b/arch/arm/lib/call_with_stack.S
-@@ -0,0 +1,44 @@
-+/*
-+ * arch/arm/lib/call_with_stack.S
-+ *
-+ * Copyright (C) 2011 ARM Ltd.
-+ * Written by Will Deacon <will.deacon@arm.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
-+ */
-+
-+#include <linux/linkage.h>
-+#include <asm/assembler.h>
-+
-+/*
-+ * void call_with_stack(void (*fn)(void *), void *arg, void *sp)
-+ *
-+ * Change the stack to that pointed at by sp, then invoke fn(arg) with
-+ * the new stack.
-+ */
-+ENTRY(call_with_stack)
-+	str	sp, [r2, #-4]!
-+	str	lr, [r2, #-4]!
-+
-+	mov	sp, r2
-+	mov	r2, r0
-+	mov	r0, r1
-+
-+	adr	lr, BSYM(1f)
-+	mov	pc, r2
-+
-+1:	ldr	lr, [sp]
-+	ldr	sp, [sp, #4]
-+	mov	pc, lr
-+ENDPROC(call_with_stack)
 -- 
 1.7.4.1
