@@ -1,62 +1,84 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 8 Nov 2011 17:55:17 +0000
-Subject: [RFC 1/2] dma-buf: Introduce dma buffer sharing mechanismch
-In-Reply-To: <20111108174122.GA4754@phenom.ffwll.local>
-References: <1318325033-32688-1-git-send-email-sumit.semwal@ti.com>
- <1318325033-32688-2-git-send-email-sumit.semwal@ti.com>
- <4E98085A.8080803@samsung.com> <20111014152139.GA2908@phenom.ffwll.local>
- <000001cc99ff$47cfe960$d76fbc20$%szyprowski@samsung.com>
- <CAO8GWqnNMGwADVnO4-RfJu0TPzHhANBdyctv2RyhCxbBJ0beXw@mail.gmail.com>
- <20111108174122.GA4754@phenom.ffwll.local>
-Message-ID: <20111108175517.GG12913@n2100.arm.linux.org.uk>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 8 Nov 2011 20:06:49 +0200
+Subject: [PATCH V3 2/4] drivers/i2c/busses/i2c-at91.c: add new driver
+In-Reply-To: <EF2E73589CA71846A15D0B2CDF79505D087B38B8B5@wm021.weinmann.com>
+References: <cover.1320753142.git.n.voss@weinmann.de>
+ <7bdd6b456b0e055441cb25634c8cb6d483718f6c.1320753142.git.n.voss@weinmann.de>
+ <20111108144115.GH20728@legolas.emea.dhcp.ti.com>
+ <EF2E73589CA71846A15D0B2CDF79505D087B38B899@wm021.weinmann.com>
+ <20111108154004.GK20728@legolas.emea.dhcp.ti.com>
+ <EF2E73589CA71846A15D0B2CDF79505D087B38B8B5@wm021.weinmann.com>
+Message-ID: <20111108180648.GA24399@legolas.emea.dhcp.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 08, 2011 at 06:42:27PM +0100, Daniel Vetter wrote:
-> Actually I think the importer should get a _mapped_ scatterlist when it
-> calls get_scatterlist. The simple reason is that for strange stuff like
-> memory remapped into e.g. omaps TILER doesn't have any sensible notion of
-> an address in physical memory. For the USB-example I think the right
-> approach is to attach the usb hci to the dma_buf, after all that is the
-> device that will read the data and move over the usb bus to the udl
-> device. Similar for any other device that sits behind a bus that can't do
-> dma (or it doesn't make sense to do dma).
+Hi,
+
+On Tue, Nov 08, 2011 at 04:49:07PM +0100, Voss, Nikolaus wrote:
+> > > > > +#include <mach/at91_twi.h>
+> > > > > +#include <mach/board.h>
+> > > > > +#include <mach/cpu.h>
+> > > >
+> > > > avoid including <mach/*> on drivers.
+> > >
+> > > Should I move at91_twi.h to include/linux (omap does it like this,
+> > > other use the mach-include)?
+> > 
+> > maybe, is at91_twi.h some sort of platform_data ? there's
+> > <linux/platform_data/...> for that.
 > 
-> Imo if there's a use-case where the client needs to frob the sg_list
-> before calling dma_map_sg, we have an issue with the dma subsystem in
-> general.
+> It contains hardware register definitions, not really platform data.
+> So linux/i2c-at91.h (like linux/i2c-{omap,pxe,...}) would be the right place?
 
-Let's clear something up about the DMA API, which I think is causing some
-misunderstanding here.  For this purpose, I'm going to talk about
-dma_map_single(), but the same applies to the scatterlist and _page
-variants as well.
+if it's only register definitions, does it need to be in a header ? I
+mean, is anyone outside of this driver trying to access those registers?
+Otherwise they could sit on the C source file itself.
 
-	dma = dma_map_single(dev, cpuaddr, size, dir);
+If there's anyone else which needs those register definitions then
+<linux/i2c/at91.h> seems like a good place (??)
 
-dev := the device _performing_ the DMA operation.  You are quite correct
-       that in the case of a USB peripheral device, the device is normally
-       the USB HCI device.
+> > > > > +	if (irqstatus & AT91_TWI_TXCOMP) {
+> > > > > +		at91_disable_twi_interrupts(dev);
+> > > > > +		dev->transfer_status = status;
+> > > > > +		complete(&dev->cmd_complete);
+> > > > > +	}
+> > > > > +	else if (irqstatus & AT91_TWI_RXRDY) {
+> > > > > +		at91_twi_read_next_byte(dev);
+> > > > > +	}
+> > > > > +	else if (irqstatus & AT91_TWI_TXRDY) {
+> > > > > +		at91_twi_write_next_byte(dev);
+> > > > > +	}
+> > > > > +	else {
+> > > > > +		return IRQ_NONE;
+> > > >
+> > > > coding style is wrong. Also, are those IRQ events really mutually
+> > exclusive ??
+> > >
+> > > These are indeed mutually exclusive (semantically).
+> > 
+> > so you couldn't have AT91_TWI_TXCOMP and AT91_TWI_RXRDY set when you read
+> > irqstatus ?
+> 
+> Yes, I do have this, but in this constellation only TXCOMP is relevant and
+> all other flags can be ignored (because the transfer is finished).
 
-dma := dma address to be programmed into 'dev' which corresponds (by some
-       means) with 'cpuaddr'.  This may not be the physical address due
-       to bus offset translations or mappings setup in IOMMUs.
+I asked about different directions exactly because of that. My question
+was if you could have a TX Complete and RX Ready IRQs simultaneously.
 
-Therefore, it is wrong to talk about a 'physical address' when talking
-about the DMA API.
+The way you coded this IRQ handler is like a priority encoder, meaning
+that you will ignore all other bits once you find the first set bit. I'm
+wondering if you shouldn't drop the "else" as most of the IRQ handlers
+do.
 
-We can take this one step further.  Lets say that the USB HCI is not
-capable of performing memory accesses itself, but it is connected to a
-separate DMA engine device:
+But it's your driver anyway, I don't know how this controller behaves.
+Just found it a bit worrying that you ignore all other IRQ status bits.
 
-	mem <---> dma engine <---> usb hci <---> usb peripheral
-
-(such setups do exist, but despite having such implementations I've never
-tried to support it.)
-
-In this case, the dma engine, in response to control signals from the
-USB host controller, will generate the appropriate bus address to access
-memory and transfer the data into the USB HCI device.
-
-So, in this case, the struct device to be used for mapping memory for
-transfers to the usb peripheral is the DMA engine device, not the USB HCI
-device nor the USB peripheral device.
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111108/49980e10/attachment.sig>
