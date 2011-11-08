@@ -1,74 +1,67 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 08 Nov 2011 16:00:16 +0900
-Subject: [03: PATCH 0/5] The remaining stuff
-In-Reply-To: <20111106175457.GK12913@n2100.arm.linux.org.uk>
-References: <20111106173113.GI12913@n2100.arm.linux.org.uk>
- <20111106173939.GJ12913@n2100.arm.linux.org.uk>
- <20111106175457.GK12913@n2100.arm.linux.org.uk>
-Message-ID: <04fc01cc9de4$11dc3410$35949c30$%kim@samsung.com>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Tue, 8 Nov 2011 09:44:45 +0200
+Subject: [GIT PULL] hwspinlock fixes for 3.2
+Message-ID: <CAK=WgbYWeYQf2dRsD2iBf+d7Eo=HiTynifVP3DhES5CwPUzCwQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux wrote:
-> 
-> Part 3 - the remaining stuff
-> 
-> These are patches which I've managed to get half way through before
-> getting - to be honest - totally hacked off with the code found in
-> various platforms (as mentioned in previous mails).
-> 
-> These platforms are broken as a result of the final patch in part 2,
-> and these patches move these platforms _towards_ a solution.  They
-> are not a complete solution though, but the start of the solution.
-> 
-> For instance, the Exynos4 and S5PV210 patches both consist of almost
-> a full solution -but- with the new function prototype missing because
-> there is _no_ local header file to put it in, and I'm damned well not
-> putting it in the remote plat-samsung/include/plat headers.
-> 
-Russell,
+Hi Linus,
 
-The new restart prototype for s5pv210 and exynos can be placed in their
-respective<mach/system.h>file. And the board files can include it. Would
-this place be fine for the new prototype?
+Please pull:
 
-Thanks.
+  git://git.kernel.org/pub/scm/linux/kernel/git/ohad/hwspinlock.git fixes
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+To get two hwspinlock fixes from Axel.
 
-> The final set of platforms - touched neither by part 3 nor 4, are
-> broken by the final patch in part 2, and at present I have no plans
-> to fix them.  I would welcome patches to fix these which address the
-> issues raised in the "pet peaves" email (which is why I have no plans
-> to fix them.)
-> 
->  arch/arm/mach-exynos4/cpu.c                       |    6 +-----
->  arch/arm/mach-exynos4/mach-armlex4210.c           |    1 +
->  arch/arm/mach-exynos4/mach-nuri.c                 |    1 +
->  arch/arm/mach-exynos4/mach-origen.c               |    1 +
->  arch/arm/mach-exynos4/mach-smdk4x12.c             |    2 ++
->  arch/arm/mach-exynos4/mach-smdkv310.c             |    2 ++
->  arch/arm/mach-exynos4/mach-universal_c210.c       |    1 +
->  arch/arm/mach-omap1/board-voiceblue.c             |    5 ++---
->  arch/arm/mach-omap1/include/mach/system.h         |    6 ++++++
->  arch/arm/mach-omap1/reset.c                       |    4 +---
->  arch/arm/mach-omap2/include/mach/system.h         |    6 ++++++
->  arch/arm/mach-omap2/prcm.c                        |    4 +---
->  arch/arm/mach-s5pv210/cpu.c                       |    6 +-----
->  arch/arm/mach-s5pv210/mach-aquila.c               |    1 +
->  arch/arm/mach-s5pv210/mach-goni.c                 |    1 +
->  arch/arm/mach-s5pv210/mach-smdkc110.c             |    1 +
->  arch/arm/mach-s5pv210/mach-smdkv210.c             |    1 +
->  arch/arm/mach-s5pv210/mach-torbreck.c             |    1 +
->  arch/arm/plat-omap/include/plat/system.h          |    2 --
->  arch/arm/plat-samsung/include/plat/reset.h        |   16 ----------------
->  arch/arm/plat-samsung/include/plat/system-reset.h |   11 -----------
->  arch/arm/plat-tcc/include/mach/system.h           |    4 ++--
->  arch/arm/plat-tcc/system.c                        |    2 +-
->  23 files changed, 34 insertions(+), 51 deletions(-)
->  delete mode 100644 arch/arm/plat-samsung/include/plat/reset.h
-> 
+There was a third, "module.h split merge"-related fix from Axel that I
+dropped because I saw Paul picked it up in his pull request.
+
+Thanks,
+Ohad.
+
+The following changes since commit 1ea6b8f48918282bdca0b32a34095504ee65bab5:
+
+  Linux 3.2-rc1 (2011-11-07 16:16:02 -0800)
+
+are available in the git repository at:
+  git://git.kernel.org/pub/scm/linux/kernel/git/ohad/hwspinlock.git fixes
+
+Axel Lin (2):
+      hwspinlock: Don't return a value in __hwspin_unlock
+      hwspinlock/u8500: fix build error due to undefined label
+
+ drivers/hwspinlock/u8500_hsem.c |    6 ++----
+ include/linux/hwspinlock.h      |    1 -
+ 2 files changed, 2 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/hwspinlock/u8500_hsem.c b/drivers/hwspinlock/u8500_hsem.c
+index 143461a..a120f14 100644
+--- a/drivers/hwspinlock/u8500_hsem.c
++++ b/drivers/hwspinlock/u8500_hsem.c
+@@ -108,10 +108,8 @@ static int __devinit u8500_hsem_probe(struct
+platform_device *pdev)
+ 		return -ENODEV;
+
+ 	io_base = ioremap(res->start, resource_size(res));
+-	if (!io_base) {
+-		ret = -ENOMEM;
+-		goto free_state;
+-	}
++	if (!io_base)
++		return -ENOMEM;
+
+ 	/* make sure protocol 1 is selected */
+ 	val = readl(io_base + HSEM_CTRL_REG);
+diff --git a/include/linux/hwspinlock.h b/include/linux/hwspinlock.h
+index 08a2fee..aad6bd4 100644
+--- a/include/linux/hwspinlock.h
++++ b/include/linux/hwspinlock.h
+@@ -118,7 +118,6 @@ int __hwspin_trylock(struct hwspinlock *hwlock,
+int mode, unsigned long *flags)
+ static inline
+ void __hwspin_unlock(struct hwspinlock *hwlock, int mode, unsigned long *flags)
+ {
+-	return 0;
+ }
+
+ static inline int hwspin_lock_get_id(struct hwspinlock *hwlock)
