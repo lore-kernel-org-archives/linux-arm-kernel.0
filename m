@@ -1,36 +1,47 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 8 Nov 2011 14:45:35 +0000
-Subject: Error for machine_is_m28evk
-In-Reply-To: <20111108140557.GC10538@mudshark.cambridge.arm.com>
-References: <CAOMZO5C4=ELWef8keoT8u0H8jTPRGQ5BA_8xYyKge++s+wdNqw@mail.gmail.com>
- <4EB8CC7B.5060503@denx.de> <20111108075349.GK2854@pengutronix.de>
- <CAB4PhKeKdGLa74W-n1DNbUcszWMf3nymqqhuzdZoj_oQG+YNsg@mail.gmail.com>
- <20111108085350.GX12913@n2100.arm.linux.org.uk>
- <20111108125346.GA7563@S2100-06.ap.freescale.net>
- <20111108133744.GE12913@n2100.arm.linux.org.uk>
- <20111108140557.GC10538@mudshark.cambridge.arm.com>
-Message-ID: <20111108144535.GF12913@n2100.arm.linux.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue,  8 Nov 2011 14:46:06 +0000
+Subject: [PATCH] ARM: setup: avoid overflowing {elf,
+ arch}_name from proc_info_list
+Message-ID: <1320763566-12183-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 08, 2011 at 02:05:58PM +0000, Will Deacon wrote:
-> On Tue, Nov 08, 2011 at 01:37:44PM +0000, Russell King - ARM Linux wrote:
-> > (b) with the loss of facilities like kautobuild (no one noticed for six
-> >     months that simtec had shut it down...), we have lost any kind of
-> >     automated detection for these kinds of issues.
-> 
-> Have Simtec /actually/ shut this down, or did it just die when kernel.org
-> was hacked and nobody has poked it since then?
+setup_processor copies the arch_name and elf_name fields out of
+the selected proc_info_list into two fixed size buffers.
 
-I talked to Vince yesterday - it was shut down at the end of May,
-before the kernel.org problem.  Apparantly, it was announced on the
-kautobuild mailing list and there was no reaction to that either.
+Since the proc_info_list structure is defined in a proc_*.S
+assembly file, this can lead to subtle errors if the strings
+defined there are too long (for example, corrupting the machine ID).
 
-As I understand it, it become uneconomic to continue with the effort,
-both on terms of running the backend (Vince used to run that himself)
-or in terms of developing a replacement (a clustered build farm.)
+This patch uses snprintf instead of sprintf to ensure that these
+buffers are not overrun.
 
-Given that no one noticed that it had been shut down, that reinforced
-the point that it wasn't a useful exercise to have running (because,
-if it was, people would've noticed it wasn't updating and would've said
-something.)
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+
+I appreciate this is borderline pedantry, but it doesn't hurt. Plus, if
+you are (for whatever reason) messing around with arch_name and elf_name,
+hitting this bug is seriously painful!
+
+ arch/arm/kernel/setup.c |    6 ++++--
+ 1 files changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index 7e7977a..3448a3f 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -461,8 +461,10 @@ static void __init setup_processor(void)
+ 	       cpu_name, read_cpuid_id(), read_cpuid_id() & 15,
+ 	       proc_arch[cpu_architecture()], cr_alignment);
+ 
+-	sprintf(init_utsname()->machine, "%s%c", list->arch_name, ENDIANNESS);
+-	sprintf(elf_platform, "%s%c", list->elf_name, ENDIANNESS);
++	snprintf(init_utsname()->machine, __NEW_UTS_LEN + 1, "%s%c",
++		 list->arch_name, ENDIANNESS);
++	snprintf(elf_platform, ELF_PLATFORM_SIZE, "%s%c",
++		 list->elf_name, ENDIANNESS);
+ 	elf_hwcap = list->elf_hwcap;
+ #ifndef CONFIG_ARM_THUMB
+ 	elf_hwcap &= ~HWCAP_THUMB;
+-- 
+1.7.4.1
