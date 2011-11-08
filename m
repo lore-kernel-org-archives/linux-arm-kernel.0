@@ -1,59 +1,54 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue,  8 Nov 2011 15:52:59 +0000
-Subject: [PATCH v5 4/8] ARM: reset: allow kernelspace mappings to be flat
- mapped during reset
+Date: Tue,  8 Nov 2011 15:53:02 +0000
+Subject: [PATCH v5 7/8] ARM: stop: execute platform callback from cpu_stop code
 In-Reply-To: <1320767583-21162-1-git-send-email-will.deacon@arm.com>
 References: <1320767583-21162-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1320767583-21162-5-git-send-email-will.deacon@arm.com>
+Message-ID: <1320767583-21162-8-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, switch_mm_for_reboot only takes out a 1:1 mapping from 0x0
-to TASK_SIZE during reboot. For situations where we actually want to
-turn off the MMU (e.g. kexec, hibernate, CPU hotplug) we want to map
-as much memory as possible using the identity mapping so that we
-increase the chance of mapping our reset code.
+Sending IPI_CPU_STOP to a CPU causes it to execute a busy cpu_relax
+loop forever. This makes it impossible to kexec successfully on an SMP
+system since the secondary CPUs do not reset.
 
-This patch modifies setup_mm_for_reboot to change to the static identity
-map page tables that are setup during booting, therefore remapping all
-of memory apart from a small window containing the kernel image.
+This patch adds a callback to platform_cpu_kill, defined when
+CONFIG_HOTPLUG_CPU=y, from the ipi_cpu_stop handling code. This function
+currently just returns 1 on all platforms that define it but allows them
+to do something more sophisticated in the future.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/mm/idmap.c |   19 ++++++++++---------
- 1 files changed, 10 insertions(+), 9 deletions(-)
+ arch/arm/Kconfig      |    2 +-
+ arch/arm/kernel/smp.c |    4 ++++
+ 2 files changed, 5 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mm/idmap.c b/arch/arm/mm/idmap.c
-index 24f6cf3..cdd4d08 100644
---- a/arch/arm/mm/idmap.c
-+++ b/arch/arm/mm/idmap.c
-@@ -92,17 +92,18 @@ static int __init init_static_idmap(void)
- arch_initcall(init_static_idmap);
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 44789ef..796d8cc 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1989,7 +1989,7 @@ config XIP_PHYS_ADDR
  
- /*
-- * In order to soft-boot, we need to insert a 1:1 mapping in place of
-- * the user-mode pages.  This will then ensure that we have predictable
-- * results when turning the mmu off
-+ * In order to soft-boot, we need to insert a 1:1 mapping of memory.
-+ * This will then ensure that we have predictable results when turning
-+ * the mmu off
-  */
- void setup_mm_for_reboot(void)
- {
--	/*
--	 * We need to access to user-mode page tables here. For kernel threads
--	 * we don't have any user-mode mappings so we use the context that we
--	 * "borrowed".
--	 */
--	identity_mapping_add(current->active_mm->pgd, 0, TASK_SIZE);
-+	/* Clean and invalidate L1. */
-+	flush_cache_all();
+ config KEXEC
+ 	bool "Kexec system call (EXPERIMENTAL)"
+-	depends on EXPERIMENTAL
++	depends on EXPERIMENTAL && (!SMP || HOTPLUG_CPU)
+ 	help
+ 	  kexec is a system call that implements the ability to shutdown your
+ 	  current kernel, and to start another kernel.  It is like a reboot
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index ef5640b..9c71665 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -550,6 +550,10 @@ static void ipi_cpu_stop(unsigned int cpu)
+ 	local_fiq_disable();
+ 	local_irq_disable();
+ 
++#ifdef CONFIG_HOTPLUG_CPU
++	platform_cpu_kill(cpu);
++#endif
 +
-+	/* Switch exclusively to kernel mappings. */
-+	cpu_switch_mm(idmap_pgd, &init_mm);
-+
-+	/* Flush the TLB. */
- 	local_flush_tlb_all();
+ 	while (1)
+ 		cpu_relax();
  }
 -- 
 1.7.4.1
