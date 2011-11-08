@@ -1,37 +1,29 @@
-From: jesper.nilsson@axis.com (Jesper Nilsson)
-Date: Tue, 8 Nov 2011 17:34:44 +0100
-Subject: [PATCH] RS485: fix inconsistencies in the meaning of some
- variables
-In-Reply-To: <4EB94EAA.2010603@evidence.eu.com>
-References: <4E492CFF.7040905@pwrnet.de> <20110822211832.GA8023@kroah.com>
- <4EB3A009.10502@evidence.eu.com> <4EB8F6B9.6010008@atmel.com>
- <4EB90902.4030200@evidence.eu.com> <4EB9447C.4050109@atmel.com>
- <4EB94EAA.2010603@evidence.eu.com>
-Message-ID: <20111108163444.GN26898@axis.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 8 Nov 2011 16:36:00 +0000
+Subject: [PATCH] ARM: S3C6410: Use device names for both I2C clocks
+In-Reply-To: <CAJuYYwTM4M-dt6mMgOH2TLEbBx7CgmiNVaB2VqYN-YMLYHqaZg@mail.gmail.com>
+References: <1320768593-21010-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+ <CAJuYYwTM4M-dt6mMgOH2TLEbBx7CgmiNVaB2VqYN-YMLYHqaZg@mail.gmail.com>
+Message-ID: <20111108163600.GF5632@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 08, 2011 at 04:45:46PM +0100, Claudio Scordino wrote:
-> Subject: RS485: fix inconsistencies in the meaning of some variables
-> From: Claudio Scordino <claudio@evidence.eu.com>
-> 
-> The crisv10.c and the atmel_serial.c serial drivers intepret the fields of the
-> serial_rs485 structure in a different way.
-> In particular, crisv10.c uses SER_RS485_RTS_AFTER_SEND and
-> SER_RS485_RTS_ON_SEND for the voltage of the RTS pin; atmel_serial.c, instead,
-> uses these values to know if a delay must be set before and after sending.
-> This patch makes the usage of these variables consistent across all drivers and
-> fixes the Documentation as well.
-> >From now on, SER_RS485_RTS_AFTER_SEND and SER_RS485_RTS_ON_SEND will be used to
-> set the voltage of the RTS pin (as in the crisv10.c driver); the delay will be
-> understood by looking only at the value of delay_rts_before_send and
-> delay_rts_after_send.
-> 
-> Signed-off-by: Claudio Scordino <claudio@evidence.eu.com>
-> Signed-off-by: Darron Black <darron@griffin.net>
+On Tue, Nov 08, 2011 at 09:57:56PM +0530, Thomas Abraham wrote:
+> On 8 November 2011 21:39, Mark Brown
 
-Acked-by: Jesper Nilsson <jesper.nilsson@axis.com>
+> > +#ifdef CONFIG_S3C_DEV_I2C1
+> > + ? ? ? ? ? ? ? .devname ? ? ? ?= "s3c2440-i2c.0",
+> > +#else
+> > + ? ? ? ? ? ? ? .devname ? ? ? ?= "s3c2440-i2c",
+> > +#endif
 
-/^JN - Jesper Nilsson
--- 
-               Jesper Nilsson -- jesper.nilsson at axis.com
+> The #ifdef around the id of the s3c_device_i2c0 structure in
+> arch/arm/plat-samsung/devs.c file can be removed and id can be fixed
+> as 0. And devname "s3c2440-i2c.0" can be assigned above without the
+> #ifdef. Will there be any issues in using .id as 0 even if there is
+> only one instance of i2c?
+
+That would be much nicer from my point of view but it's much more
+invasive as this device is used by a whole raft of other SoCs, not all
+of which have more than one I2C controller and I don't really feel like
+changing the idiom over the entire Samsung SoC family right now.
