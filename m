@@ -1,240 +1,39 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 8 Nov 2011 16:04:23 +0100
-Subject: [PATCH v3] ARM/mx35/3ds: gpio: add mc9s08dz60 gpio function
-In-Reply-To: <1320401551-21377-1-git-send-email-b39297@freescale.com>
-References: <1320401551-21377-1-git-send-email-b39297@freescale.com>
-Message-ID: <20111108150423.GW16886@pengutronix.de>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 08 Nov 2011 16:15:10 +0100
+Subject: [PATCH V3 2/4] drivers/i2c/busses/i2c-at91.c: add new driver
+In-Reply-To: <20111108144115.GH20728@legolas.emea.dhcp.ti.com>
+References: <cover.1320753142.git.n.voss@weinmann.de>
+ <7bdd6b456b0e055441cb25634c8cb6d483718f6c.1320753142.git.n.voss@weinmann.de>
+ <20111108144115.GH20728@legolas.emea.dhcp.ti.com>
+Message-ID: <4EB9477E.8070002@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 04, 2011 at 06:12:31PM +0800, wu guoxing wrote:
-> we only use the gpio function of mc9s08dz60 mcu chip, so just
-> add the gpio driver, as this mcu will never be used in other board.
-> 
-> Signed-off-by: Wu Guoxing <b39297@freescale.com>
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA1
 
-Looks good to me.
+On 11/08/2011 03:41 PM, Felipe Balbi :
 
-Reviewed-by: Sascha Hauer <s.hauer@pengutronix.de>
+>> +	if (cpu_is_at91rm9200()) {			/* AT91RM9200 Errata #22 */
+> 
+> I don't think you should be using cpu_is_* on drivers.
 
-> ---
-> Changes since v1:
-> 	1. add can_sleep = 1
-> 	2. removed some useless return checks and local variable
-> 	3. removed the static variable for i2c client.
-> 	4. make init&exit function static
-> 
->  drivers/gpio/Kconfig           |    6 ++
->  drivers/gpio/Makefile          |    1 +
->  drivers/gpio/gpio-mc9s08dz60.c |  167 ++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 174 insertions(+), 0 deletions(-)
->  create mode 100644 drivers/gpio/gpio-mc9s08dz60.c
-> 
-> diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
-> index d539efd..7f6beee 100644
-> --- a/drivers/gpio/Kconfig
-> +++ b/drivers/gpio/Kconfig
-> @@ -487,4 +487,10 @@ config GPIO_TPS65910
->  	help
->  	  Select this option to enable GPIO driver for the TPS65910
->  	  chip family.
-> +
-> +config GPIO_MC9S08DZ60
-> +	bool "MX35 3DS BOARD MC9S08DZ60 GPIO functions"
-> +	depends on I2C && MACH_MX35_3DS
-> +	help
-> +	  Select this to enable the MC9S08DZ60 GPIO driver
->  endif
-> diff --git a/drivers/gpio/Makefile b/drivers/gpio/Makefile
-> index 9588948..85b8799 100644
-> --- a/drivers/gpio/Makefile
-> +++ b/drivers/gpio/Makefile
-> @@ -60,3 +60,4 @@ obj-$(CONFIG_GPIO_WM831X)	+= gpio-wm831x.o
->  obj-$(CONFIG_GPIO_WM8350)	+= gpio-wm8350.o
->  obj-$(CONFIG_GPIO_WM8994)	+= gpio-wm8994.o
->  obj-$(CONFIG_GPIO_XILINX)	+= gpio-xilinx.o
-> +obj-$(CONFIG_GPIO_MC9S08DZ60) += gpio-mc9s08dz60.o
-> diff --git a/drivers/gpio/gpio-mc9s08dz60.c b/drivers/gpio/gpio-mc9s08dz60.c
-> new file mode 100644
-> index 0000000..c41eb16
-> --- /dev/null
-> +++ b/drivers/gpio/gpio-mc9s08dz60.c
-> @@ -0,0 +1,167 @@
-> +/*
-> + * Copyright 2009-2011 Freescale Semiconductor, Inc. All Rights Reserved.
-> + *
-> + * Author: Wu Guoxing <b39297@freescale.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#include <linux/kernel.h>
-> +#include <linux/module.h>
-> +#include <linux/slab.h>
-> +#include <linux/i2c.h>
-> +#include <linux/gpio.h>
-> +
-> +#define GPIO_GROUP_NUM 2
-> +#define GPIO_NUM_PER_GROUP 8
-> +#define GPIO_NUM (GPIO_GROUP_NUM*GPIO_NUM_PER_GROUP)
-> +
-> +struct mc9s08dz60 {
-> +	struct i2c_client *client;
-> +	struct gpio_chip chip;
-> +};
-> +
-> +static struct mc9s08dz60 *to_mc9s08dz60(struct gpio_chip *gc)
-> +{
-> +	return container_of(gc, struct mc9s08dz60, chip);
-> +}
-> +
-> +
-> +static void gpio_to_reg_and_bit(int offset, u8 *reg, u8 *bit)
-> +{
-> +	*reg = 0x20 + offset / GPIO_NUM_PER_GROUP;
-> +	*bit = offset % GPIO_NUM_PER_GROUP;
-> +}
-> +
-> +static int mc9s08dz60_get_value(struct gpio_chip *gc, unsigned offset)
-> +{
-> +	int ret = 0;
-> +	u8 reg, bit;
-> +	s32 value;
-> +	struct mc9s08dz60 *mc9s = to_mc9s08dz60(gc);
-> +
-> +	gpio_to_reg_and_bit(offset, &reg, &bit);
-> +	value = i2c_smbus_read_byte_data(mc9s->client, reg);
-> +	if (value >= 0)
-> +		ret = (value >> bit) & 0x1;
-> +
-> +	return ret;
-> +}
-> +
-> +static void mc9s08dz60_set_value(struct gpio_chip *gc, unsigned offset, int val)
-> +{
-> +	u8 reg, bit;
-> +	s32 value;
-> +	struct mc9s08dz60 *mc9s = to_mc9s08dz60(gc);
-> +
-> +	gpio_to_reg_and_bit(offset, &reg, &bit);
-> +	value = i2c_smbus_read_byte_data(mc9s->client, reg);
-> +	if (value >= 0) {
-> +		if (val)
-> +			value |= 1 << bit;
-> +		else
-> +			value &= ~(1 << bit);
-> +
-> +		i2c_smbus_write_byte_data(mc9s->client, reg, value);
-> +	}
-> +}
-> +
-> +static int mc9s08dz60_direction_output(struct gpio_chip *gc,
-> +				       unsigned offset, int val)
-> +{
-> +	mc9s08dz60_set_value(gc, offset, val);
-> +	return 0;
-> +}
-> +
-> +static int mc9s08dz60_probe(struct i2c_client *client,
-> +			    const struct i2c_device_id *id)
-> +{
-> +	int ret = 0;
-> +	struct mc9s08dz60 *mc9s;
-> +
-> +	mc9s = kzalloc(sizeof(*mc9s), GFP_KERNEL);
-> +	if (!mc9s)
-> +		return -ENOMEM;
-> +
-> +	mc9s->chip.label = client->name;
-> +	mc9s->chip.base = -1;
-> +	mc9s->chip.dev = &client->dev;
-> +	mc9s->chip.owner = THIS_MODULE;
-> +	mc9s->chip.ngpio = GPIO_NUM;
-> +	mc9s->chip.can_sleep = 1;
-> +	mc9s->chip.get = mc9s08dz60_get_value;
-> +	mc9s->chip.set = mc9s08dz60_set_value;
-> +	mc9s->chip.direction_output = mc9s08dz60_direction_output;
-> +	mc9s->client = client;
-> +
-> +	ret = gpiochip_add(&mc9s->chip);
-> +	if (ret)
-> +		goto error;
-> +
-> +	i2c_set_clientdata(client, mc9s);
-> +
-> +	return 0;
-> +
-> +error:
-> +	kfree(mc9s);
-> +	return ret;
-> +}
-> +
-> +static int mc9s08dz60_remove(struct i2c_client *client)
-> +{
-> +	struct mc9s08dz60 *mc9s;
-> +	int ret;
-> +
-> +	mc9s = i2c_get_clientdata(client);
-> +
-> +	i2c_set_clientdata(client, NULL);
-> +
-> +	ret = gpiochip_remove(&mc9s->chip);
-> +	if (!ret)
-> +		kfree(mc9s);
-> +
-> +	return 0;
-> +
-> +}
-> +
-> +static const struct i2c_device_id mc9s08dz60_id[] = {
-> +	{"mc9s08dz60", 0},
-> +	{},
-> +};
-> +
-> +MODULE_DEVICE_TABLE(i2c, mc9s08dz60_id);
-> +
-> +static struct i2c_driver mc9s08dz60_i2c_driver = {
-> +	.driver = {.owner = THIS_MODULE,
-> +		   .name = "mc9s08dz60",
-> +		   },
-> +	.probe = mc9s08dz60_probe,
-> +	.remove = mc9s08dz60_remove,
-> +	.id_table = mc9s08dz60_id,
-> +};
-> +
-> +static int __init mc9s08dz60_init(void)
-> +{
-> +	return i2c_add_driver(&mc9s08dz60_i2c_driver);
-> +}
-> +
-> +static void __exit mc9s08dz60_exit(void)
-> +{
-> +	i2c_del_driver(&mc9s08dz60_i2c_driver);
-> +}
-> +
-> +module_init(mc9s08dz60_init);
-> +module_exit(mc9s08dz60_exit);
-> +
-> +MODULE_AUTHOR("Freescale Semiconductor, Inc."
-> +		"Wu Guoxing <b39297@freescale.com>");
-> +MODULE_DESCRIPTION("mc9s08dz60 gpio function on mx35 3ds board");
-> +MODULE_LICENSE("GPL v2");
-> -- 
-> 1.7.1
-> 
-> 
-> 
+It is a common pattern in at91 drivers and has worked for ages.
+Do you think it is related to the need to be able to compile the
+driver for any SoC in the case of multi-SoC zImage support?
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Best regards,
+- -- 
+Nicolas Ferre
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v1.4.11 (GNU/Linux)
+Comment: Using GnuPG with Mozilla - http://enigmail.mozdev.org/
+
+iQEcBAEBAgAGBQJOuUd1AAoJEAf03oE53VmQs9UH/i+pKZlIN7lNb+sHvqHJhiUK
+zqvPObtSo2Y78dODM4Qf/WrJP/jBW4FUAx60kBlEBzWAD2aef1D078POAOVhcVdH
+Gj76Z+O5tF9H9YPcn/9HGyA42kL3NZu43ibywsvbUmX1O2LbtmX49bGOjArYSyXQ
+sN4F8+QJnkMQfmMNjYgG0WfhMyWnp15W4QWq+frk2Kq0nXjiuozqr9goq8/LVRZc
+aSToJUUJqsfk/bEGBAF6RmNxRIu2AMNpKQZS9a1gOZA/mAfSZrT9zQE6EZVXJDVr
+VVck4KlhHBR3JU6AEh0CtoRgfZxsZyzS2RNUDyF7dq+8VsNiNpajSL8S2ILanZc=
+=iqlm
+-----END PGP SIGNATURE-----
