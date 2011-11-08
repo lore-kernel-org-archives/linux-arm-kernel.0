@@ -1,159 +1,76 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Tue, 8 Nov 2011 11:43:28 +0800
-Subject: [PATCH] I2C: add CSR SiRFprimaII on-chip I2C controllers driver
-In-Reply-To: <20111102105210.GZ19187@n2100.arm.linux.org.uk>
-References: <1320228610-18129-1-git-send-email-Barry.Song@csr.com>
- <20111102103904.GB4937@totoro> <20111102105210.GZ19187@n2100.arm.linux.org.uk>
-Message-ID: <CAGsJ_4w2zeMQXc_nqZV1FWTXWMa_HM6Q1DdR-PmaR1O57eUcRQ@mail.gmail.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Mon, 07 Nov 2011 23:24:39 -0500 (EST)
+Subject: [02: PATCH 0/41] Platform arch_reset changes
+In-Reply-To: <20111107135216.GP12913@n2100.arm.linux.org.uk>
+References: <20111106173113.GI12913@n2100.arm.linux.org.uk>
+ <20111106173939.GJ12913@n2100.arm.linux.org.uk>
+ <20111107133847.GC5454@mudshark.cambridge.arm.com>
+ <20111107135216.GP12913@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.02.1111072306340.3307@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/11/2 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> On Wed, Nov 02, 2011 at 10:39:04AM +0000, Jamie Iles wrote:
->> > + ? clk = clk_get(&pdev->dev, NULL);
->> > + ? if (IS_ERR(clk)) {
->> > + ? ? ? ? ? err = PTR_ERR(clk);
->> > + ? ? ? ? ? dev_err(&pdev->dev, "Clock get failed\n");
->> > + ? ? ? ? ? goto out;
->> > + ? }
->> > +
->> > + ? clk_enable(clk);
->>
->> The return value of clk_enable() should really be checked.
->
-> Now that the clk_prepare() patch has been enabled, new drivers should be
-> written assuming that clk_prepare() will be necessary before clk_enable().
->
+On Mon, 7 Nov 2011, Russell King - ARM Linux wrote:
 
-done for this as well.
+> The final removal of mach/system.h depends on getting rid of the arch_idle
+> thing.  While going through these headers, I was dismayed to find these:
+> 
+> arch/arm/mach-s3c2410/include/mach/system.h:void (*s3c24xx_idle)(void);
+> arch/arm/plat-mxc/include/mach/system.h:extern void (*imx_idle)(void);
+> 
+> when we have a perfectly good pm_idle hook already in place - so there's
+> no excuse for these especially when other platforms are already using
+> pm_idle to hook their platform specific idle function into.  This is
+> something that better be gone at the next merge window!
 
-diff --git a/drivers/i2c/busses/i2c-sirfsoc.c b/drivers/i2c/busses/i2c-sirfsoc.c
-index 9c11458..cf4f61f 100644
---- a/drivers/i2c/busses/i2c-sirfsoc.c
-+++ b/drivers/i2c/busses/i2c-sirfsoc.c
-@@ -244,17 +244,27 @@ static int __devinit i2c_sirfsoc_probe(struct
-platform_device *pdev)
- 	if (pdata == NULL) {
- 		err = -ENODEV;
- 		dev_err(&pdev->dev, "No platform data!\n");
--		goto out;
-+		goto err_pdata;
- 	}
+I saw those too and intended to get rid of those pointers.
+I was just waiting for your arch_reset work to settle down before
+respinning my arch-idle series.
 
- 	clk = clk_get(&pdev->dev, NULL);
- 	if (IS_ERR(clk)) {
- 		err = PTR_ERR(clk);
- 		dev_err(&pdev->dev, "Clock get failed\n");
--		goto out;
-+		goto err_get_clk;
- 	}
+> > I guess I should also ask whether or not the third series is a blocker for
+> > merging the other two (given that it would leave those platforms broken).
+> 
+> That depends on your point of view.
+> 
+> My original plan was to see about merging the ground-work (part 1) in
+> this merge window to avoid a dependency problem - but I think it grew
+> too large to contemplate that (I might have a discussion with Linus
+> in private over this, because not doing this could be quite hairy for
+> us.)
+> 
+> Part 2 is fine up until the final patch - if we can get part 1 in, then
+> the individual patches can be carried in the various maintainer trees
+> independently.  In any case, patch 41 would have to be scheduled for
+> the end of the merge window.
 
--	clk_enable(clk);
-+	err = clk_prepare(clk);
-+	if (err) {
-+		dev_err(&pdev->dev, "Clock prepare failed\n");
-+		goto  err_clk_prep;
-+	}
-+
-+	err = clk_enable(clk);
-+	if (err) {
-+		dev_err(&pdev->dev, "Clock enable failed\n");
-+		goto  err_clk_en;
-+	}
+I'd recommend publishing all those patches in your tree and pushing them 
+all in the next merge window.  The probability for conflicts with 
+subarch trees is still relatively low. If conflicts are unavoidable then 
+using your branch as a base would be the way to go. Whether platform 
+code is then based on 3.2-rc1 or a particular branch in your tree is not 
+much different at that point.
 
- 	ctrl_speed = clk_get_rate(clk);
+> As for whether patch 41 goes in with or without the remainder fixed 
+> up, that depends what kind of a mood I'm in - over the weekend I was 
+> feeling very pissed off with the state of the remaining platforms that 
+> I was seriously thinking that I'd push it in anyway at the next merge 
+> window and to hell with them.  (Just like the Greece holding the 
+> eurozone to ransom, I don't want a few platforms holding the rest of 
+> the ARM tree to ransom over this change!)
 
-@@ -263,14 +273,14 @@ static int __devinit i2c_sirfsoc_probe(struct
-platform_device *pdev)
- 		dev_err(&pdev->dev,
- 			"Can't allocate new i2c adapter!\n");
- 		err = -ENOMEM;
--		goto clk_out;
-+		goto out;
- 	}
+I agree with that.  However, if you merge those patches (including patch 
+41) in your tree now, that means people have about 5 months before this 
+change will show up in a released kernel, which should give plenty of 
+time for interested parties to fix their problematic code.  The sooner 
+this appears in linux-next the better.
 
- 	siic = devm_kzalloc(&pdev->dev, sizeof(*siic), GFP_KERNEL);
- 	if (!siic) {
- 		dev_err(&pdev->dev, "Can't allocate driver data\n");
- 		err = -ENOMEM;
--		goto clk_out;
-+		goto out;
- 	}
- 	new_adapter->class = I2C_CLASS_HWMON | I2C_CLASS_DDC | I2C_CLASS_SPD;
- 	siic->adapter = new_adapter;
-@@ -279,7 +289,7 @@ static int __devinit i2c_sirfsoc_probe(struct
-platform_device *pdev)
- 	if (mem_res == NULL) {
- 		dev_err(&pdev->dev, "Unable to get MEM resource\n");
- 		err = -EINVAL;
--		goto clk_out;
-+		goto out;
- 	}
+> I've moderated a little bit over that - but only to the extent that
+> there's going to be something like 12 weeks for other platforms to get
+> their act together and if they don't show willing to address the
+> concerns, then I'm really not going to care about breaking them at
+> the next merge window.
 
- 	siic->base =
-@@ -287,18 +297,18 @@ static int __devinit i2c_sirfsoc_probe(struct
-platform_device *pdev)
- 	if (siic->base == NULL) {
- 		dev_err(&pdev->dev, "IO remap failed!\n");
- 		err = -ENOMEM;
--		goto clk_out;
-+		goto out;
- 	}
-
- 	siic->irq = platform_get_irq(pdev, 0);
- 	if (!siic->irq) {
- 		err = -EINVAL;
--		goto clk_out;
-+		goto out;
- 	}
- 	err = devm_request_irq(&pdev->dev, siic->irq, i2c_sirfsoc_irq, 0,
- 		dev_name(&pdev->dev), siic);
- 	if (err)
--		goto clk_out;
-+		goto out;
-
- 	new_adapter->algo = &i2c_sirfsoc_algo;
- 	new_adapter->algo_data = siic;
-@@ -338,7 +348,7 @@ static int __devinit i2c_sirfsoc_probe(struct
-platform_device *pdev)
- 	err = i2c_add_numbered_adapter(new_adapter);
- 	if (err < 0) {
- 		dev_err(&pdev->dev, "Can't add new i2c adapter\n");
--		goto clk_out;
-+		goto out;
- 	}
-
- 	clk_disable(clk);
-@@ -347,10 +357,14 @@ static int __devinit i2c_sirfsoc_probe(struct
-platform_device *pdev)
-
- 	return 0;
-
--clk_out:
-+out:
- 	clk_disable(clk);
-+err_clk_en:
-+	clk_unprepare(clk);
-+err_clk_prep:
- 	clk_put(clk);
--out:
-+err_get_clk:
-+err_pdata:
- 	return err;
- }
-
-@@ -362,6 +376,7 @@ static int __devexit i2c_sirfsoc_remove(struct
-platform_device *pdev)
- 	writel(SIRFSOC_I2C_RESET, siic->base + SIRFSOC_I2C_CTRL);
- 	i2c_del_adapter(adapter);
- 	clk_disable(siic->clk);
-+	clk_unprepare(siic->clk);
- 	clk_put(siic->clk);
- 	return 0;
- }
+Exactly.
 
 
-> And one may query why it's not possible to use clk_enable()...clk_disable()
-> around the transfer itself, so the clock can be turned off while the device
-> is idle. ?Obviously if its expecting to be operated in slave mode as well
-> then you may need to keep the clock enabled.
+Nicolas
