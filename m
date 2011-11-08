@@ -1,33 +1,87 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Mon, 07 Nov 2011 16:58:10 -0800
-Subject: [PATCHv2 0/7]ARM: OMAP3PLUS PM: Add IO DaisyChain support via
- hwmod mux
-In-Reply-To: <1318009671-12813-1-git-send-email-vishwanath.bs@ti.com>
- (Vishwanath BS's message of "Fri, 7 Oct 2011 23:17:44 +0530")
-References: <1318009671-12813-1-git-send-email-vishwanath.bs@ti.com>
-Message-ID: <87pqh3qvkt.fsf@ti.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 8 Nov 2011 09:59:22 +0900
+Subject: 2b034922 breaks kexec on ARM
+In-Reply-To: <20111107214755.GA27679@mudshark.cambridge.arm.com>
+References: <20111107185125.GA17464@mudshark.cambridge.arm.com>
+ <20111107190314.GS12913@n2100.arm.linux.org.uk>
+ <20111107191453.GC17464@mudshark.cambridge.arm.com>
+ <20111107192043.GT12913@n2100.arm.linux.org.uk>
+ <CALZhoSRZu=fbsToqWQsxJBSQ6huwxtkR=M7iFZyJ576jeJ4FHw@mail.gmail.com>
+ <20111107214755.GA27679@mudshark.cambridge.arm.com>
+Message-ID: <20111108005922.GA15689@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vishwa,
+On Mon, Nov 07, 2011 at 09:47:55PM +0000, Will Deacon wrote:
+> On Mon, Nov 07, 2011 at 08:55:43PM +0000, Lei Wen wrote:
+> > Apologize for messing things up...
+> > But we have make in-depth testing over that patch already in our local
+> > code base...
+> 
+> Hmm, well even if we put Russell's concerns aside for a moment, the code
+> does:
+> 
+> 		/* Loading another kernel to reboot into */
+>                 if ((flags & KEXEC_ON_CRASH) == 0)
+>                         result = kimage_normal_alloc(&image, entry,
+>                                                         nr_segments, segments);
+>                 /* Loading another kernel to switch to if this one crashes */
+>                 else if (flags & KEXEC_ON_CRASH) {
+>                         /* Free any current crash dump kernel before
+>                          * we corrupt it.
+>                          */
+>                         kimage_free(xchg(&kexec_crash_image, NULL));
+>                         result = kimage_crash_alloc(&image, entry,
+>                                                      nr_segments, segments);
+>                         crash_map_reserved_pages();
+>                 }
+>                 if (result)
+>                         goto out;
+> 
+>                 if (flags & KEXEC_PRESERVE_CONTEXT)
+>                         image->preserve_context = 1;
+>                 result = machine_kexec_prepare(image);
+> 
+> At this point the image may be fresh out of kimage_normal_malloc, which sets
+> image->head to 0 (i.e. a NULL indirection page). So when machine_kexec_prepare
+> tries to determine the page list, it's NULL and relocate_new_kernel will do:
+> 
+> 	/*
+> 	 * If there is no indirection page (we are doing crashdumps)
+> 	 * skip any relocation.
+> 	 */
+> 	cmp	r0, #0
+> 	beq	2f
+> 
+> and not actually relocate the kernel sections at all! In fact, looking back at
+> kernel/kexec.c, right after calling machine_kexec_prepare it goes and loads
+> the segments:
+> 
+>                 if (result)
+>                         goto out;
+> 
+>                 for (i = 0; i < nr_segments; i++) {
+>                         result = kimage_load_segment(image, &image->segment[i]);
+>                         if (result)
+>                                 goto out;
+>                 }
+> 
+> so only at this point is it safe to start setting up the page list (as the
+> image entries are now populated).
+> 
+> So why is this passing your in-depth testing? It could be that:
+> 
+>   (1) You're only testing crashdumps, which don't need the indirection page.
+>   (2) You don't have the poison_init_mem patches in arch/arm/mm/init.c and
+>       actually end up using the old kernel that's still kicking around in
+>       memory.
+>   (3) Your testing isn't that in-depth after all.
+> 
+> It's probably a combination of all three, but the fact remains that this patch
+> is breaking things so you should probably roll another version if you really
+> need to move parts of the image setup earlier on.
 
-Vishwanath BS <vishwanath.bs@ti.com> writes:
+Hi Will, Hi All,
 
-> The folowing patch series provides IO Daisychain feature via omap hwmod mux
-> framework.
-
-The series looks OK at first glance, but needs a refresh against current
-mainline.
-
-Can you refresh this against Tony's 'fixes' branch and re-test.
-
-I tested this on OMAP3430/n900 and noticed that it no longer hit off
-mode from idle.  
-
-IOW, If I enable UART timeouts and then enable off mode, I don't
-actually ever hit off during idle.  However, if I do a suspend/resume I
-see it hits off mode, then subsequent attempts to hit off during idle work.
-
-Can you investigate this?
-
-Kevin
+FWIW, as I acked this patch in the first place, I think that this patch
+should be reverted and a fresh version considered latter if appropriate.
