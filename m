@@ -1,42 +1,38 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Tue, 8 Nov 2011 13:51:53 +0200
-Subject: [PATCH v3 0/8] Add support for tegra30 and cardhu
-In-Reply-To: <20111108114559.GT29978@tbergstrom-lnx.Nvidia.com>
-References: <1320675617-20751-1-git-send-email-pdeschrijver@nvidia.com>
- <74CDBE0F657A3D45AFBB94109FB122FF173F9A50F3@HQMAIL01.nvidia.com>
- <20111108114559.GT29978@tbergstrom-lnx.Nvidia.com>
-Message-ID: <20111108115153.GU29978@tbergstrom-lnx.Nvidia.com>
+From: phorton@bitbox.co.uk (Peter Horton)
+Date: Tue, 8 Nov 2011 11:17:49 +0000
+Subject: [PATCH] iMX28 Ethernet driver fix
+Message-ID: <20111108111749.GA30638@axolotl.localnet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 08, 2011 at 12:45:59PM +0100, Peter De Schrijver wrote:
-> On Mon, Nov 07, 2011 at 08:10:29PM +0100, Stephen Warren wrote:
-> > Peter De Schrijver wrote at Monday, November 07, 2011 7:20 AM:
-> > > This patchset adds support for the tegra30 SoC and the cardhu development
-> > > board.
-> > > 
-> > > Pathset is on top of Will Deacon's ARM reset work.
-> > 
-> > A few minor issues:
-> > 
-> > 1) If I enable just ARCH_TEGRA_3x_SOC, but not ARCH_TEGRA_2x_SOC, the
-> > kernel fails to build because arch/arm/mach-tegra/include/mach/irqs.h
-> > only defines NR_IRQS if ARCH_TEGRA_2x_SOC is defined.
-> > 
-> > 2) All the Tegra20 boards don't depend on ARCH_TEGRA_2x_SOC, so they can
-> > be enabled even if only Tegra30 support is enabled.
-> > 
-> 
-> Indeed. I also noticed that MACH_VENTANA lacks select MACH_SEABOARD...
+Fix driver to correctly handle cloned SKBs. Currently any clones
+of the transmit SKBs get endian-swapped by the driver. This breaks
+the ATA-over-Ethernet driver for example.
 
-I take that back. It's not needed.
+Signed-off-by: Peter Horton <phorton@bitbox.co.uk>
+---
+ drivers/net/fec.c |    8 +++++++-
+ 1 files changed, 7 insertions(+), 1 deletions(-)
 
-> Maybe I should submit a seperate patch to fix all this?
-> 
-
-I will make a patch to cleanup the ARCH_TEGRA_2x_SOC dependencies. Or do you
-want this as part of the tegra30/cardhu series?
-
-Cheers,
-
-Peter.
+diff --git a/drivers/net/fec.c b/drivers/net/fec.c
+index c46ccb1..6455483 100644
+--- a/drivers/net/fec.c
++++ b/drivers/net/fec.c
+@@ -302,8 +302,14 @@ fec_enet_start_xmit(struct sk_buff *skb, struct net_device *ndev)
+ 	 * On some FEC implementations data must be aligned on
+ 	 * 4-byte boundaries. Use bounce buffers to copy data
+ 	 * and get it aligned. Ugh.
++	 *
++	 * We also have to use the bounce buffers if we need
++	 * to do the endian swap (see below) on a cloned buffer.
+ 	 */
+-	if (((unsigned long) bufaddr) & FEC_ALIGNMENT) {
++	if ((((unsigned long) bufaddr) & FEC_ALIGNMENT) ||
++		((id_entry->driver_data & FEC_QUIRK_SWAP_FRAME) &&
++		skb_cloned(skb)))
++	{
+ 		unsigned int index;
+ 		index = bdp - fep->tx_bd_base;
+ 		memcpy(fep->tx_bounce[index], skb->data, skb->len);
+-- 
+1.7.2.5
