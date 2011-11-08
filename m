@@ -1,88 +1,22 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 08 Nov 2011 14:21:39 +0900
-Subject: [PATCH 3/5] ARM: restart: exynos4: use new restart hook XXX WIP
- XXX WHY IS THERE NO LOCAL HEADERS IN arch/arm/mach-exynos4 XXX
-In-Reply-To: <20111107115223.GO12913@n2100.arm.linux.org.uk>
+Date: Tue, 08 Nov 2011 14:22:33 +0900
+Subject: [PATCH 5/5] ARM: restart: plat-samsung: remove plat/reset.h and
+ s5p_reset_hook
+In-Reply-To: <E1RN6xd-0001ad-7r@rmk-PC.arm.linux.org.uk>
 References: <20111106175457.GK12913@n2100.arm.linux.org.uk>
- <E1RN6wy-0001aV-VK@rmk-PC.arm.linux.org.uk>
- <20111107103048.GM12913@n2100.arm.linux.org.uk>
- <CAH9JG2WO9LHLbLy-8Ly1UrN--L=VNuzV0yZ+5WeDxwHLbJkyOw@mail.gmail.com>
- <20111107115223.GO12913@n2100.arm.linux.org.uk>
-Message-ID: <04f101cc9dd6$4b228f20$e167ad60$%kim@samsung.com>
+ <E1RN6xd-0001ad-7r@rmk-PC.arm.linux.org.uk>
+Message-ID: <04f201cc9dd6$6b5beb10$4213c130$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Russell King - ARM Linux wrote:
 > 
-> On Mon, Nov 07, 2011 at 08:17:58PM +0900, Kyungmin Park wrote:
-> > On 11/7/11, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-> > > On Sun, Nov 06, 2011 at 05:56:08PM +0000, Russell King - ARM Linux
-wrote:
-> > >> Hook these platforms restart code into the new restart hook rather
-> > >> than using arch_reset().
-> > >>
-> > >> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> > >> ---
-> > >>  arch/arm/mach-exynos4/cpu.c                 |    6 +-----
-> > >>  arch/arm/mach-exynos4/mach-armlex4210.c     |    1 +
-> > >>  arch/arm/mach-exynos4/mach-nuri.c           |    1 +
-> > >>  arch/arm/mach-exynos4/mach-origen.c         |    1 +
-> > >>  arch/arm/mach-exynos4/mach-smdk4x12.c       |    2 ++
-> > >>  arch/arm/mach-exynos4/mach-smdkv310.c       |    2 ++
-> > >>  arch/arm/mach-exynos4/mach-universal_c210.c |    1 +
-> > >>  7 files changed, 9 insertions(+), 5 deletions(-)
-> > >>
-> > >> diff --git a/arch/arm/mach-exynos4/cpu.c
-b/arch/arm/mach-exynos4/cpu.c
-> > >> index 5b1765b..5b1ee56 100644
-> > >> --- a/arch/arm/mach-exynos4/cpu.c
-> > >> +++ b/arch/arm/mach-exynos4/cpu.c
-> > >> @@ -27,7 +27,6 @@
-> > >>  #include <plat/fb-core.h>
-> > >>  #include <plat/fimc-core.h>
-> > >>  #include <plat/iic-core.h>
-> > >> -#include <plat/reset.h>
-> > >>  #include <plat/tv-core.h>
-> > >>
-> > >>  #include <mach/regs-irq.h>
-> > >> @@ -145,7 +144,7 @@ static void exynos4_idle(void)
-> > >>  	local_irq_enable();
-> > >>  }
-> > >>
-> > >> -static void exynos4_sw_reset(void)
-> > >> +void exynos4_restart(char mode, const char *cmd)
-> > >>  {
-> > >>  	__raw_writel(0x1, S5P_SWRESET);
-> > >>  }
-> > >> @@ -286,8 +285,5 @@ int __init exynos4_init(void)
-> > >>  	/* set idle function */
-> > >>  	pm_idle = exynos4_idle;
-> > >>
-> > >> -	/* set sw_reset function */
-> > >> -	s5p_reset_hook = exynos4_sw_reset;
-> > >> -
-> > >
-> > > I notice in last nights merge of the Samsung stuff, this has become
-> > > less trivial - it's now:
-> > >         /* set sw_reset function */
-> > >         if (soc_is_exynos4210() || soc_is_exynos4212() ||
-> > > soc_is_exynos4412())
-> > >                 s5p_reset_hook = exynos4_sw_reset;
-> > >
-> > > So which of the boards should be converted and which shouldn't ?
-> > > In other words, which exynos4210, 4212 or 4412 platforms?
-> >
-> > except the arch/arm/mach-exynos4/mach-smdk4x12.c, exynos4210 is used.
-> > currently all exynos4 series has same reset function. it's preparation
-> > for exynos5 series maybe.
-> >
-> > you can use the exynos4_sw_reset for all boards.
+> Now that s5p_reset_hook is unused, we can get rid of plat/reset.h and
+> the s5p_reset_hook code in plat/system-reset.h.
 > 
-Thanks, Kyungmin.
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
-> Thanks, that gets me back to where I was with the patch before the
-> exynos4 move.
-> 
+Acked-by: Kukjin Kim <kgene.kim@samsung.com>
 
 Thanks.
 
@@ -91,3 +25,61 @@ Kgene.
 --
 Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
 SW Solution Development Team, Samsung Electronics Co., Ltd.
+
+
+> ---
+>  arch/arm/plat-samsung/include/plat/reset.h        |   16 ----------------
+>  arch/arm/plat-samsung/include/plat/system-reset.h |   11 -----------
+>  2 files changed, 0 insertions(+), 27 deletions(-)
+>  delete mode 100644 arch/arm/plat-samsung/include/plat/reset.h
+> 
+> diff --git a/arch/arm/plat-samsung/include/plat/reset.h b/arch/arm/plat-
+> samsung/include/plat/reset.h
+> deleted file mode 100644
+> index 32ca517..0000000
+> --- a/arch/arm/plat-samsung/include/plat/reset.h
+> +++ /dev/null
+> @@ -1,16 +0,0 @@
+> -/* linux/arch/arm/plat-samsung/include/plat/reset.h
+> - *
+> - * Copyright (c) 2010 Samsung Electronics Co., Ltd.
+> - *		http://www.samsung.com/
+> - *
+> - * This program is free software; you can redistribute it and/or modify
+> - * it under the terms of the GNU General Public License version 2 as
+> - * published by the Free Software Foundation.
+> -*/
+> -
+> -#ifndef __PLAT_SAMSUNG_RESET_H
+> -#define __PLAT_SAMSUNG_RESET_H __FILE__
+> -
+> -extern void (*s5p_reset_hook)(void);
+> -
+> -#endif /* __PLAT_SAMSUNG_RESET_H */
+> diff --git a/arch/arm/plat-samsung/include/plat/system-reset.h
+b/arch/arm/plat-
+> samsung/include/plat/system-reset.h
+> index a448e99..73d7808 100644
+> --- a/arch/arm/plat-samsung/include/plat/system-reset.h
+> +++ b/arch/arm/plat-samsung/include/plat/system-reset.h
+> @@ -14,18 +14,7 @@
+> 
+>  #include <plat/watchdog-reset.h>
+> 
+> -void (*s5p_reset_hook)(void);
+> -
+>  static void arch_reset(char mode, const char *cmd)
+>  {
+> -	/* SWRESET support in s5p_reset_hook() */
+> -
+> -	if (s5p_reset_hook)
+> -		s5p_reset_hook();
+> -
+> -	/* Perform reset using Watchdog reset
+> -	 * if there is no s5p_reset_hook()
+> -	 */
+> -
+>  	arch_wdt_reset();
+>  }
+> --
+> 1.7.4.4
