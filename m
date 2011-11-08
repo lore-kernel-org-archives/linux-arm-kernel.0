@@ -1,43 +1,46 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Tue,  8 Nov 2011 10:28:39 +0000
-Subject: [PATCH] at91: fix compile breakage with VMALLOC_END
-Message-ID: <1320748119-16270-1-git-send-email-jamie.iles@mathembedded.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 8 Nov 2011 03:33:35 -0700 (MST)
+Subject: [GIT PULL] ARM: OMAP: DSS hwmod/reset fixes for 3.2
+In-Reply-To: <1320746911.1907.47.camel@deskari>
+References: <alpine.DEB.2.00.1110061806150.4611@utopia.booyaka.com>
+ <20111105003550.GM31337@atomide.com>
+ <alpine.DEB.2.00.1111080049470.12394@utopia.booyaka.com>
+ <1320746911.1907.47.camel@deskari>
+Message-ID: <alpine.DEB.2.00.1111080329300.8313@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jamie Iles <jamie@jamieiles.com>
+On Tue, 8 Nov 2011, Tomi Valkeinen wrote:
 
-VMALLOC_END is defined in terms of AT91_VIRT_BASE but this needs
-mach/hardware.h for it's definition.
+> On Tue, 2011-11-08 at 00:50 -0700, Paul Walmsley wrote:
+> > On Fri, 4 Nov 2011, Tony Lindgren wrote:
+> > 
+> > > * Paul Walmsley <paul@pwsan.com> [111006 16:33]:
+> > > > The following changes since commit be73246058737beec52ae232bcab7776332a9e06:
+> > > > 
+> > > >   ARM: OMAP2+: Remove custom init_irq for remaining boards (2011-09-26 17:50:37 -0700)
+> > > > 
+> > > > are available in the git repository at:
+> > > >   git://git.pwsan.com/linux-2.6 hwmod_dss_fixes_3.2
+> > > 
+> > > Looks like you should take a look at the merge conflicts with
+> > > this one, maybe rebase it on 994c0e992522c123298b4a91b72f5e67ba2d1123.
+> > 
+> > Do you want this series for 3.2-rc or 3.3 at this point?
+> 
+> Seems that at least HDMI output is broken due to this series missing.
 
-In file included from arch/arm/mach-at91/board-usb-a926x.c:26:0:
-include/linux/mm.h: In function 'is_vmalloc_addr':
-include/linux/mm.h:305:41: error: 'AT91_VIRT_BASE' undeclared (first use in this function)
-include/linux/mm.h:305:41: note: each undeclared identifier is reported only once for each function it appears in
+OK thanks, 3.2-rc it is.
 
-Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
-Signed-off-by: Jamie Iles <jamie@jamieiles.com>
----
+The merge conflicts have been fixed, they were trivial.  Tomi, care to 
+do a quick test boot with the updated branch
 
-This is a bit more heavyweight than most of the other platforms,
-but it's the simplest fix.
+git://git.pwsan.com/linux-2.6 hwmod_dss_fixes_3.2rc
 
- arch/arm/mach-at91/include/mach/vmalloc.h |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+?
 
-diff --git a/arch/arm/mach-at91/include/mach/vmalloc.h b/arch/arm/mach-at91/include/mach/vmalloc.h
-index 8eb459f..8e4a1bd 100644
---- a/arch/arm/mach-at91/include/mach/vmalloc.h
-+++ b/arch/arm/mach-at91/include/mach/vmalloc.h
-@@ -21,6 +21,8 @@
- #ifndef __ASM_ARCH_VMALLOC_H
- #define __ASM_ARCH_VMALLOC_H
- 
-+#include <mach/hardware.h>
-+
- #define VMALLOC_END		(AT91_VIRT_BASE & PGDIR_MASK)
- 
- #endif
--- 
-1.7.4.1
+My testbed is down at the moment and won't have the chance to deal with it 
+for a few more days.
+
+
+- Paul
