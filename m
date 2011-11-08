@@ -1,32 +1,30 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 8 Nov 2011 21:26:20 +0100
+From: mirqus@gmail.com (=?ISO-8859-2?Q?Micha=B3_Miros=B3aw?=)
+Date: Tue, 8 Nov 2011 21:42:56 +0100
 Subject: [PATCH 2/5] dma i.MX: remove individual SOC dependency
-In-Reply-To: <1320768633.32205.147.camel@vkoul-udesk3>
+In-Reply-To: <1314168072-13822-3-git-send-email-s.hauer@pengutronix.de>
 References: <1314168072-13822-1-git-send-email-s.hauer@pengutronix.de>
  <1314168072-13822-3-git-send-email-s.hauer@pengutronix.de>
- <20111108152239.GA9641@pengutronix.de>
- <1320768633.32205.147.camel@vkoul-udesk3>
-Message-ID: <20111108202620.GB13122@pengutronix.de>
+Message-ID: <CAHXqBFKps1jsaKCr9yqQY72zAQHT6HU78eJ+adbYfnhRhkKQog@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 08, 2011 at 09:40:33PM +0530, Vinod Koul wrote:
-> On Tue, 2011-11-08 at 16:22 +0100, Sascha Hauer wrote:
-> > Vinod,
-> > 
-> > Ping. Can you please queue this one?
-> Sorry Sascha, looks like I have missed this one :(
-> 
-> Nevertheless, this seems to be part of a series, but I couldn't locate
-> the rest.
-> Do you want me to apply only this individual patch, seems little odd if
-> thats the case...
-It was part of a series that removes SOC dependencies in different
-subsystems. So it's right that each patch goes via a different
-maintainer.
+2011/8/24 Sascha Hauer <s.hauer@pengutronix.de>:
+> The individual SoC dependency in Kconfig hardly scales anymore.
+> Instead of having such a fine grained dependency just depend
+> on ARCH_MXC and risk that the uninformed user has to look in
+> the help text to figure out which driver is the correct one.
+[...]
+> ?config MX3_IPU
+> ? ? ? ?bool "MX3x Image Processing Unit support"
+> - ? ? ? depends on ARCH_MX3
+> + ? ? ? depends on ARCH_MXC
+> ? ? ? ?select DMA_ENGINE
+> ? ? ? ?default y
+> ? ? ? ?help
 
-Best regards
-Uwe
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+You could instead make it depend on HAVE_MX3_IPU and select this
+symbol from relevant model config. Leaving it for the users is making
+every one of them redo the work you already did.
+
+Best Regards,
+Micha? Miros?aw
