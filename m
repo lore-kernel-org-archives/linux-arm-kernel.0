@@ -1,78 +1,61 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue,  8 Nov 2011 15:52:56 +0000
-Subject: [PATCH v5 1/8] Revert "ARM: 7098/1: kdump: copy kernel relocation
- code at the kexec prepare stage"
+Date: Tue,  8 Nov 2011 15:52:58 +0000
+Subject: [PATCH v5 3/8] ARM: idmap: populate identity map pgd at init time
 In-Reply-To: <1320767583-21162-1-git-send-email-will.deacon@arm.com>
 References: <1320767583-21162-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1320767583-21162-2-git-send-email-will.deacon@arm.com>
+Message-ID: <1320767583-21162-4-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This reverts commit 2b034922af2caa19df86f0c502e76cb6f6e910f9.
----
- arch/arm/kernel/machine_kexec.c |   35 +++++++++++++++++------------------
- 1 files changed, 17 insertions(+), 18 deletions(-)
+When disabling the MMU, it is necessary to take out an identity mapping
+for as much of the address space as possible so that the reset path can
+be executed using its physical address. This is useful for softbooting
+and entering low power states.
 
-diff --git a/arch/arm/kernel/machine_kexec.c b/arch/arm/kernel/machine_kexec.c
-index cc40b96..29620b6 100644
---- a/arch/arm/kernel/machine_kexec.c
-+++ b/arch/arm/kernel/machine_kexec.c
-@@ -32,24 +32,6 @@ static atomic_t waiting_for_crash_ipi;
+This patch allocates a set of pagetables during boot and populates them
+with an identity mapping for all of memory apart from a small window
+containing the kernel image.
+
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/mm/idmap.c |   18 ++++++++++++++++++
+ 1 files changed, 18 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/mm/idmap.c b/arch/arm/mm/idmap.c
+index 296ad2e..24f6cf3 100644
+--- a/arch/arm/mm/idmap.c
++++ b/arch/arm/mm/idmap.c
+@@ -3,6 +3,9 @@
+ #include <asm/cputype.h>
+ #include <asm/pgalloc.h>
+ #include <asm/pgtable.h>
++#include <asm/sections.h>
++
++static pgd_t *idmap_pgd;
  
- int machine_kexec_prepare(struct kimage *image)
- {
--	unsigned long page_list;
--	void *reboot_code_buffer;
--	page_list = image->head & PAGE_MASK;
--
--	reboot_code_buffer = page_address(image->control_code_page);
--
--	/* Prepare parameters for reboot_code_buffer*/
--	kexec_start_address = image->start;
--	kexec_indirection_page = page_list;
--	kexec_mach_type = machine_arch_type;
--	kexec_boot_atags = image->start - KEXEC_ARM_ZIMAGE_OFFSET + KEXEC_ARM_ATAGS_OFFSET;
--
--	/* copy our kernel relocation code to the control code page */
--	memcpy(reboot_code_buffer,
--	       relocate_new_kernel, relocate_new_kernel_size);
--
--	flush_icache_range((unsigned long) reboot_code_buffer,
--			   (unsigned long) reboot_code_buffer + KEXEC_CONTROL_PAGE_SIZE);
- 	return 0;
+ static void idmap_add_pmd(pud_t *pud, unsigned long addr, unsigned long end,
+ 	unsigned long prot)
+@@ -73,6 +76,21 @@ void identity_mapping_del(pgd_t *pgd, unsigned long addr, unsigned long end)
  }
+ #endif
  
-@@ -100,14 +82,31 @@ void (*kexec_reinit)(void);
- 
- void machine_kexec(struct kimage *image)
- {
-+	unsigned long page_list;
- 	unsigned long reboot_code_buffer_phys;
- 	void *reboot_code_buffer;
- 
++static int __init init_static_idmap(void)
++{
++	unsigned long kernel_end = ALIGN((unsigned long)_end, PMD_SIZE);
 +
-+	page_list = image->head & PAGE_MASK;
++	idmap_pgd = pgd_alloc(&init_mm);
++	if (!idmap_pgd)
++		return -ENOMEM;
 +
- 	/* we need both effective and real address here */
- 	reboot_code_buffer_phys =
- 	    page_to_pfn(image->control_code_page) << PAGE_SHIFT;
- 	reboot_code_buffer = page_address(image->control_code_page);
- 
-+	/* Prepare parameters for reboot_code_buffer*/
-+	kexec_start_address = image->start;
-+	kexec_indirection_page = page_list;
-+	kexec_mach_type = machine_arch_type;
-+	kexec_boot_atags = image->start - KEXEC_ARM_ZIMAGE_OFFSET + KEXEC_ARM_ATAGS_OFFSET;
++	identity_mapping_add(idmap_pgd, 0, TASK_SIZE);
++	identity_mapping_add(idmap_pgd, kernel_end, 0);
 +
-+	/* copy our kernel relocation code to the control code page */
-+	memcpy(reboot_code_buffer,
-+	       relocate_new_kernel, relocate_new_kernel_size);
++	return 0;
++}
++arch_initcall(init_static_idmap);
 +
-+
-+	flush_icache_range((unsigned long) reboot_code_buffer,
-+			   (unsigned long) reboot_code_buffer + KEXEC_CONTROL_PAGE_SIZE);
- 	printk(KERN_INFO "Bye!\n");
- 
- 	if (kexec_reinit)
+ /*
+  * In order to soft-boot, we need to insert a 1:1 mapping in place of
+  * the user-mode pages.  This will then ensure that we have predictable
 -- 
 1.7.4.1
