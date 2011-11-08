@@ -1,40 +1,35 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Tue, 08 Nov 2011 09:41:39 -0800
-Subject: [PATCH v3 2/4] OMAP4: hwmod data: add mmu hwmod for ipu and dsp
-In-Reply-To: <CAB-zwWgd5U+8UNFe_rLY99VpiaHhTqscwYNF+SmuRTyDi+h3+A@mail.gmail.com>
- (Ramirez Luna's message of "Tue, 8 Nov 2011 10:21:08 -0600")
-References: <1320185752-568-1-git-send-email-omar.ramirez@ti.com>
- <1320185752-568-3-git-send-email-omar.ramirez@ti.com>
- <87sjm31ngz.fsf@ti.com>
- <CAB-zwWgd5U+8UNFe_rLY99VpiaHhTqscwYNF+SmuRTyDi+h3+A@mail.gmail.com>
-Message-ID: <8762iuqzos.fsf@ti.com>
+From: joerg.roedel@amd.com (Joerg Roedel)
+Date: Tue, 8 Nov 2011 18:43:08 +0100
+Subject: [PATCH] arm: cpuidle34xx.c: Fix compile error
+In-Reply-To: <87hb2eqzwv.fsf@ti.com>
+References: <1320768665-9759-1-git-send-email-joerg.roedel@amd.com>
+ <87hb2eqzwv.fsf@ti.com>
+Message-ID: <20111108174308.GG5182@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"Ramirez Luna, Omar" <omar.ramirez@ti.com> writes:
+On Tue, Nov 08, 2011 at 09:36:48AM -0800, Kevin Hilman wrote:
+> Joerg Roedel <joerg.roedel@amd.com> writes:
+> 
+> > Add missing module.h include to provide THIS_MODULE.
+> >
+> > Signed-off-by: Joerg Roedel <joerg.roedel@amd.com>
+> 
+> FYI...
+> 
+> Tony has already queued fix for this in his fixes branch.
+> 
+>      http://marc.info/?l=linux-arm-kernel&m=132071036621713&w=2
 
-> Hi,
->
-> On Fri, Nov 4, 2011 at 6:23 PM, Kevin Hilman <khilman@ti.com> wrote:
->>> + ? ? .flags ? ? ? ? ?= HWMOD_INIT_NO_RESET,
->>
->> Why is this needed?
-> ...
->>> + ? ? .flags ? ? ? ? ?= HWMOD_INIT_NO_RESET,
->>
->> And this?
->
-> I have this because the hwmod complains about a failure in hard reset,
-> even though the reset deassert does complete after the clock is
-> enabled. Later on, hwmod will warn again because of a wrong state when
-> enabling, I believe because of the failure on _setup but didn't dig
-> into it yet.
-
-Please dig deeper into the reset failure.
-
-We don't merge HWMOD_INIT_NO_RESET changes without a very good reason
-(that is also well described in the changelog.)
+Great. I stumbled over it while compile-testing the iommu-tree for omap.
 
 Thanks,
 
-Kevin
+	Joerg
+
+-- 
+AMD Operating System Research Center
+
+Advanced Micro Devices GmbH Einsteinring 24 85609 Dornach
+General Managers: Alberto Bozzo, Andrew Bowd
+Registration: Dornach, Landkr. Muenchen; Registerger. Muenchen, HRB Nr. 43632
