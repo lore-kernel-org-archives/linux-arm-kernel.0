@@ -1,45 +1,41 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Tue, 8 Nov 2011 09:13:17 +0900
-Subject: [RFC] Shrink sched_clock some more
-In-Reply-To: <4EB0022C.7080109@arm.com>
-References: <20110922153611.GC8072@n2100.arm.linux.org.uk>
- <4E7C48E2.5040907@arm.com> <4EAAF5AE.6090300@codeaurora.org>
- <4EB0022C.7080109@arm.com>
-Message-ID: <CAH9JG2WEVVEAMsWKQzgxy28UXymise_4niD3Hz+ckY3=NEn6SQ@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 7 Nov 2011 16:18:41 -0800
+Subject: [GIT PULL] omap fixes for v3.2 merge window breakage
+In-Reply-To: <20111107214724.GA31337@atomide.com>
+References: <20111107204929.GZ31337@atomide.com>
+ <20111107212919.GI15294@n2100.arm.linux.org.uk>
+ <20111107214724.GA31337@atomide.com>
+Message-ID: <20111108001840.GF31337@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/1/11, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> On 28/10/11 19:34, Stephen Boyd wrote:
->> On 09/23/11 01:52, Marc Zyngier wrote:
->>> On 22/09/11 16:36, Russell King - ARM Linux wrote:
->>>> ... by getting rid of the fixed-constant optimization, and moving the
->>>> update code into arch/arm/kernel/sched_clock.c.
->>>>
->>>> Platforms now only have to supply a function to read the sched_clock
->>>> register, and some basic information such as the number of significant
->>>> bits and the tick rate.
->>> This looks similar to a patch I posted a while ago:
->>> http://patchwork.ozlabs.org/patch/112318/
->>>
->>>
->>
->> Can we get one of these two patches merged next merge window? I'd like
->> to add sched_clock support to MSM and building on top of this patch is
->> easier than the other way around.
->
-> I'm happy either way. The only problem I can see with Russell's patch is
-> the lack of support for platforms that do not actually implement a
-> sched_clock_read() function.
->
-> I've worked around this by having a default jiffy based read function,
-> but there is probably other, better solutions.
+* Tony Lindgren <tony@atomide.com> [111107 13:12]:
+> * Russell King - ARM Linux <linux@arm.linux.org.uk> [111107 12:54]:
+> > Arnd,
+> > 
+> > Don't pull this - there's yet more crap in OMAP to be fixed before
+> > these go to mainline.  OMAP3 is severely broken at the moment with,
+> > to put it bluntly, totally fucked up OMAP hwmod code, and should be
+> > fixed *now* by folk before this pull request.
+> > 
+> > The fixes are damned trivial I expect even Tony can fix it without
+> > reference to Paul.
+> 
+> > >       ARM: OMAP3: hwmod: fix variant registration and remove SmartReflex from common list
+> 
+> Sounds like the above patch already queued should fix the issues you
+> are seeing with hwmod?
+> 
+> Or do you still have other issues you're having?
 
-Hi Marc, Russell,
+Sounds like all Russell's issues are all dealt with:
 
-Maybe this patch is missing at v3.2 merge windows. Russell said it's
-maybe queue for his devel tree at prague but maybe doesn't.
-Any chance to merge it for v3.2?
+http://marc.info/?l=linux-arm-kernel&m=132070787220812&w=2
 
-Thank you,
-Kyungmin Park
+Arnd, if you have not pulled yet, Kevin just posted one more export.h
+fix for THIS_MODULE for cpuidle. I'll add that patch into fixes,
+and will post a new pull request.
+
+Regards,
+
+Tony
