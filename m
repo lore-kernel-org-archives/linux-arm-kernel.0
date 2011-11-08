@@ -1,74 +1,99 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue,  8 Nov 2011 15:52:55 +0000
-Subject: [PATCH v5 0/8] kexec fixes and soft restart code
-Message-ID: <1320767583-21162-1-git-send-email-will.deacon@arm.com>
+Date: Tue,  8 Nov 2011 15:52:57 +0000
+Subject: [PATCH v5 2/8] ARM: lib: add call_with_stack function for safely
+ changing stack
+In-Reply-To: <1320767583-21162-1-git-send-email-will.deacon@arm.com>
+References: <1320767583-21162-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1320767583-21162-3-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+When disabling the MMU, it is necessary to take out a 1:1 identity map
+of the reset code so that it can safely be executed with and without
+the MMU active. To avoid the situation where the physical address of the
+reset code aliases with the virtual address of the active stack (which
+cannot be included in the 1:1 mapping), it is desirable to change to a
+new stack at a location which is less likely to alias.
 
-This is version 5 of the patches originally posted here:
+This code adds a new lib function, call_with_stack:
 
-v1: http://lists.infradead.org/pipermail/linux-arm-kernel/2011-June/052157.html
-v2: http://lists.infradead.org/pipermail/linux-arm-kernel/2011-June/052559.html
-v3: http://lists.infradead.org/pipermail/linux-arm-kernel/2011-June/053252.html
-v4: http://lists.infradead.org/pipermail/linux-arm-kernel/2011-August/062305.html
+	void call_with_stack(void (*fn)(void *), void *arg, void *sp);
 
-This time around, the patches are based on top of Russell's reset branch,
-where soft restart on ARMv6 onwards is starting to look like a reality.
+which changes the stack to point at the sp parameter, before invoking
+fn(arg) with the new stack selected.
 
-Notable changes from previous versions of this code are:
-	- The identity map pgd is now populated at init time and is
-	  static to idmap.c
-	- The reserved stack page is no more
-	- The temporary restart stack is simply a static array
-
-The reserved stack page disappeared after feedback from Nicolas suggesting
-that using a known physical location for the secondary CPU pen is ripe for
-bootloader abuse. Although I can think of ways around this, having to maintain
-this in future kernels could become tricky so I got rid of the idea.
-Furthermore, talks at the ARM workshop in Prague revealed that most SMP SoCs
-have hardware for controlling SMP boot anyway, so a purely software solution
-is not usually needed (the exception being boards from ARM Ltd.).
-
-The removal of the stack page means that we need to use a static array for
-the stack prior to turning off the MMU. It looks to me like we currently only
-need 6 stack slots [__soft_restart (-4), setup_mm_for_reboot (-2)] so I've
-allocated 32 to be safe. Is there a way GCC can help us here?
-
-The first patch (revert) is present in Russell's fixes branch but I'm
-including it here for completeness. The fourth and fifth patches may
-also need to be combined as it doesn't make sense to apply one without
-the other.
-
-As per usual, all feedback is welcome.
-
-Cheers,
-
-Will
-
-
-Will Deacon (8):
-  Revert "ARM: 7098/1: kdump: copy kernel relocation code at the kexec
-    prepare stage"
-  ARM: lib: add call_with_stack function for safely changing stack
-  ARM: idmap: populate identity map pgd at init time
-  ARM: reset: allow kernelspace mappings to be flat mapped during reset
-  ARM: reset: implement soft_restart for jumping to a physical address
-  ARM: soft_restart: disable the outer L2 when the last CPU is going
-    down
-  ARM: stop: execute platform callback from cpu_stop code
-  ARM: kexec: use soft_restart for branching to the reboot buffer
-
- arch/arm/Kconfig                |    2 +-
- arch/arm/kernel/machine_kexec.c |   50 ++++++++++++++---------------------
- arch/arm/kernel/process.c       |   55 ++++++++++++++++++++++++++++++--------
- arch/arm/kernel/smp.c           |    4 +++
- arch/arm/lib/Makefile           |    3 +-
- arch/arm/lib/call_with_stack.S  |   44 +++++++++++++++++++++++++++++++
- arch/arm/mm/idmap.c             |   37 ++++++++++++++++++++------
- 7 files changed, 142 insertions(+), 53 deletions(-)
+Reviewed-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+Signed-off-by: Dave Martin <dave.martin@linaro.org>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/lib/Makefile          |    3 +-
+ arch/arm/lib/call_with_stack.S |   44 ++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 46 insertions(+), 1 deletions(-)
  create mode 100644 arch/arm/lib/call_with_stack.S
 
+diff --git a/arch/arm/lib/Makefile b/arch/arm/lib/Makefile
+index cf73a7f..0ade0ac 100644
+--- a/arch/arm/lib/Makefile
++++ b/arch/arm/lib/Makefile
+@@ -13,7 +13,8 @@ lib-y		:= backtrace.o changebit.o csumipv6.o csumpartial.o   \
+ 		   testchangebit.o testclearbit.o testsetbit.o        \
+ 		   ashldi3.o ashrdi3.o lshrdi3.o muldi3.o             \
+ 		   ucmpdi2.o lib1funcs.o div64.o                      \
+-		   io-readsb.o io-writesb.o io-readsl.o io-writesl.o
++		   io-readsb.o io-writesb.o io-readsl.o io-writesl.o  \
++		   call_with_stack.o
+ 
+ mmu-y	:= clear_user.o copy_page.o getuser.o putuser.o
+ 
+diff --git a/arch/arm/lib/call_with_stack.S b/arch/arm/lib/call_with_stack.S
+new file mode 100644
+index 0000000..916c80f
+--- /dev/null
++++ b/arch/arm/lib/call_with_stack.S
+@@ -0,0 +1,44 @@
++/*
++ * arch/arm/lib/call_with_stack.S
++ *
++ * Copyright (C) 2011 ARM Ltd.
++ * Written by Will Deacon <will.deacon@arm.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
++ */
++
++#include <linux/linkage.h>
++#include <asm/assembler.h>
++
++/*
++ * void call_with_stack(void (*fn)(void *), void *arg, void *sp)
++ *
++ * Change the stack to that pointed at by sp, then invoke fn(arg) with
++ * the new stack.
++ */
++ENTRY(call_with_stack)
++	str	sp, [r2, #-4]!
++	str	lr, [r2, #-4]!
++
++	mov	sp, r2
++	mov	r2, r0
++	mov	r0, r1
++
++	adr	lr, BSYM(1f)
++	mov	pc, r2
++
++1:	ldr	lr, [sp]
++	ldr	sp, [sp, #4]
++	mov	pc, lr
++ENDPROC(call_with_stack)
 -- 
 1.7.4.1
