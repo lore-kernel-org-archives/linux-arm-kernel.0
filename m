@@ -1,35 +1,62 @@
-From: joerg.roedel@amd.com (Joerg Roedel)
-Date: Tue, 8 Nov 2011 18:43:08 +0100
-Subject: [PATCH] arm: cpuidle34xx.c: Fix compile error
-In-Reply-To: <87hb2eqzwv.fsf@ti.com>
-References: <1320768665-9759-1-git-send-email-joerg.roedel@amd.com>
- <87hb2eqzwv.fsf@ti.com>
-Message-ID: <20111108174308.GG5182@amd.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 8 Nov 2011 17:55:17 +0000
+Subject: [RFC 1/2] dma-buf: Introduce dma buffer sharing mechanismch
+In-Reply-To: <20111108174122.GA4754@phenom.ffwll.local>
+References: <1318325033-32688-1-git-send-email-sumit.semwal@ti.com>
+ <1318325033-32688-2-git-send-email-sumit.semwal@ti.com>
+ <4E98085A.8080803@samsung.com> <20111014152139.GA2908@phenom.ffwll.local>
+ <000001cc99ff$47cfe960$d76fbc20$%szyprowski@samsung.com>
+ <CAO8GWqnNMGwADVnO4-RfJu0TPzHhANBdyctv2RyhCxbBJ0beXw@mail.gmail.com>
+ <20111108174122.GA4754@phenom.ffwll.local>
+Message-ID: <20111108175517.GG12913@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 08, 2011 at 09:36:48AM -0800, Kevin Hilman wrote:
-> Joerg Roedel <joerg.roedel@amd.com> writes:
+On Tue, Nov 08, 2011 at 06:42:27PM +0100, Daniel Vetter wrote:
+> Actually I think the importer should get a _mapped_ scatterlist when it
+> calls get_scatterlist. The simple reason is that for strange stuff like
+> memory remapped into e.g. omaps TILER doesn't have any sensible notion of
+> an address in physical memory. For the USB-example I think the right
+> approach is to attach the usb hci to the dma_buf, after all that is the
+> device that will read the data and move over the usb bus to the udl
+> device. Similar for any other device that sits behind a bus that can't do
+> dma (or it doesn't make sense to do dma).
 > 
-> > Add missing module.h include to provide THIS_MODULE.
-> >
-> > Signed-off-by: Joerg Roedel <joerg.roedel@amd.com>
-> 
-> FYI...
-> 
-> Tony has already queued fix for this in his fixes branch.
-> 
->      http://marc.info/?l=linux-arm-kernel&m=132071036621713&w=2
+> Imo if there's a use-case where the client needs to frob the sg_list
+> before calling dma_map_sg, we have an issue with the dma subsystem in
+> general.
 
-Great. I stumbled over it while compile-testing the iommu-tree for omap.
+Let's clear something up about the DMA API, which I think is causing some
+misunderstanding here.  For this purpose, I'm going to talk about
+dma_map_single(), but the same applies to the scatterlist and _page
+variants as well.
 
-Thanks,
+	dma = dma_map_single(dev, cpuaddr, size, dir);
 
-	Joerg
+dev := the device _performing_ the DMA operation.  You are quite correct
+       that in the case of a USB peripheral device, the device is normally
+       the USB HCI device.
 
--- 
-AMD Operating System Research Center
+dma := dma address to be programmed into 'dev' which corresponds (by some
+       means) with 'cpuaddr'.  This may not be the physical address due
+       to bus offset translations or mappings setup in IOMMUs.
 
-Advanced Micro Devices GmbH Einsteinring 24 85609 Dornach
-General Managers: Alberto Bozzo, Andrew Bowd
-Registration: Dornach, Landkr. Muenchen; Registerger. Muenchen, HRB Nr. 43632
+Therefore, it is wrong to talk about a 'physical address' when talking
+about the DMA API.
+
+We can take this one step further.  Lets say that the USB HCI is not
+capable of performing memory accesses itself, but it is connected to a
+separate DMA engine device:
+
+	mem <---> dma engine <---> usb hci <---> usb peripheral
+
+(such setups do exist, but despite having such implementations I've never
+tried to support it.)
+
+In this case, the dma engine, in response to control signals from the
+USB host controller, will generate the appropriate bus address to access
+memory and transfer the data into the USB HCI device.
+
+So, in this case, the struct device to be used for mapping memory for
+transfers to the usb peripheral is the DMA engine device, not the USB HCI
+device nor the USB peripheral device.
