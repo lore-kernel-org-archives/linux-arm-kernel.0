@@ -1,88 +1,80 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Tue, 8 Nov 2011 19:43:14 +0100
-Subject: [RFC 1/2] dma-buf: Introduce dma buffer sharing mechanismch
-In-Reply-To: <20111108175517.GG12913@n2100.arm.linux.org.uk>
-References: <1318325033-32688-1-git-send-email-sumit.semwal@ti.com>
- <1318325033-32688-2-git-send-email-sumit.semwal@ti.com>
- <4E98085A.8080803@samsung.com>
- <20111014152139.GA2908@phenom.ffwll.local>
- <000001cc99ff$47cfe960$d76fbc20$%szyprowski@samsung.com>
- <CAO8GWqnNMGwADVnO4-RfJu0TPzHhANBdyctv2RyhCxbBJ0beXw@mail.gmail.com>
- <20111108174122.GA4754@phenom.ffwll.local>
- <20111108175517.GG12913@n2100.arm.linux.org.uk>
-Message-ID: <20111108184314.GB4754@phenom.ffwll.local>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 8 Nov 2011 20:44:48 +0200
+Subject: [PATCH V3 2/4] drivers/i2c/busses/i2c-at91.c: add new driver
+In-Reply-To: <20111108182955.GH12913@n2100.arm.linux.org.uk>
+References: <cover.1320753142.git.n.voss@weinmann.de>
+ <7bdd6b456b0e055441cb25634c8cb6d483718f6c.1320753142.git.n.voss@weinmann.de>
+ <20111108144115.GH20728@legolas.emea.dhcp.ti.com>
+ <4EB9477E.8070002@atmel.com>
+ <20111108152343.GJ20728@legolas.emea.dhcp.ti.com>
+ <20111108182955.GH12913@n2100.arm.linux.org.uk>
+Message-ID: <20111108184447.GB24399@legolas.emea.dhcp.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 08, 2011 at 05:55:17PM +0000, Russell King - ARM Linux wrote:
-> On Tue, Nov 08, 2011 at 06:42:27PM +0100, Daniel Vetter wrote:
-> > Actually I think the importer should get a _mapped_ scatterlist when it
-> > calls get_scatterlist. The simple reason is that for strange stuff like
-> > memory remapped into e.g. omaps TILER doesn't have any sensible notion of
-> > an address in physical memory. For the USB-example I think the right
-> > approach is to attach the usb hci to the dma_buf, after all that is the
-> > device that will read the data and move over the usb bus to the udl
-> > device. Similar for any other device that sits behind a bus that can't do
-> > dma (or it doesn't make sense to do dma).
+hi,
+
+On Tue, Nov 08, 2011 at 06:29:55PM +0000, Russell King - ARM Linux wrote:
+> On Tue, Nov 08, 2011 at 05:23:46PM +0200, Felipe Balbi wrote:
+> > On Tue, Nov 08, 2011 at 04:15:10PM +0100, Nicolas Ferre wrote:
+> > > -----BEGIN PGP SIGNED MESSAGE-----
+> > > Hash: SHA1
+> > > 
+> > > On 11/08/2011 03:41 PM, Felipe Balbi :
+> > > 
+> > > >> +	if (cpu_is_at91rm9200()) {			/* AT91RM9200 Errata #22 */
+> > > > 
+> > > > I don't think you should be using cpu_is_* on drivers.
+> > > 
+> > > It is a common pattern in at91 drivers and has worked for ages.
+> > > Do you think it is related to the need to be able to compile the
+> > > driver for any SoC in the case of multi-SoC zImage support?
 > > 
-> > Imo if there's a use-case where the client needs to frob the sg_list
-> > before calling dma_map_sg, we have an issue with the dma subsystem in
-> > general.
+> > we have drivers compiling on multiple OMAP versions without those hacks.
+> > Generally, we check the IP revision for that. Don't you have a Revision
+> > register of some sort ?
 > 
-> Let's clear something up about the DMA API, which I think is causing some
-> misunderstanding here.  For this purpose, I'm going to talk about
-> dma_map_single(), but the same applies to the scatterlist and _page
-> variants as well.
-> 
-> 	dma = dma_map_single(dev, cpuaddr, size, dir);
-> 
-> dev := the device _performing_ the DMA operation.  You are quite correct
->        that in the case of a USB peripheral device, the device is normally
->        the USB HCI device.
-> 
-> dma := dma address to be programmed into 'dev' which corresponds (by some
->        means) with 'cpuaddr'.  This may not be the physical address due
->        to bus offset translations or mappings setup in IOMMUs.
-> 
-> Therefore, it is wrong to talk about a 'physical address' when talking
-> about the DMA API.
-> 
-> We can take this one step further.  Lets say that the USB HCI is not
-> capable of performing memory accesses itself, but it is connected to a
-> separate DMA engine device:
-> 
-> 	mem <---> dma engine <---> usb hci <---> usb peripheral
-> 
-> (such setups do exist, but despite having such implementations I've never
-> tried to support it.)
-> 
-> In this case, the dma engine, in response to control signals from the
-> USB host controller, will generate the appropriate bus address to access
-> memory and transfer the data into the USB HCI device.
-> 
-> So, in this case, the struct device to be used for mapping memory for
-> transfers to the usb peripheral is the DMA engine device, not the USB HCI
-> device nor the USB peripheral device.
+> I'm not sure what your objection is - this is no different from what
+> happens with OMAP when detecting OMAP1,2,3,4 etc.  E.g.:
 
-Thanks for the clarification. I think this is another reason why
-get_scatterlist should return the sg_list already mapped into the device
-address space - it's more consisten with the other dma apis. Another
-reason to completely hide everything but mapped addresses is crazy stuff
-like this
+so ? Instead of saying this to me, you should contact the
+authors/maintainers of those drivers and ask them to clean that up.
 
-	mem <---> tiling iommu <-+-> gpu
-	                         |
-	                         +-> scanout engine
-	                         |
-				 +-> mpeg decoder
+Moreover, just because there are a bunch of drivers with such silly
+mistakes, is it really enough argument to perpetuate the problem ?
 
-where it doesn't really make sense to talk about the memory backing the
-dma buffer because that's smeared all over the place due to tiling. IIRC
-for the case of omap these devices can also access memory through other
-paths and iommut that don't tile (but just remap like a normal iommu)
+You were (actually still is) one of the biggest source of complaints for
+drivers using <mach/*> and <asm/*> includes and now you're changing your
+mind ?
 
--Daniel
+Also, instead of taking bad examples take the ones which are activelly
+improving with regards to those details. I have been fighting against
+those on the USB drivers, at least. And, except for
+drivers/usb/musb/davinci.c you won't find those on MUSB driver or its
+glue layers. Similarly, I have been asking all USB Peripheral Controller
+drivers to make their driver buildable on all arches, which will get rid
+of bad usage of <mach/*> and <asm/*> headers while also allowing for a
+better coverage of compile tests on linux-next.
+
+Now, if you really think those aren't problematic, refrain from
+complaining next time someone adds a machine_is_* or cpu_is_* check on a
+driver.
+
+> drivers/mfd/twl-core.c:     if (cpu_is_omap2430())
+> drivers/media/video/omap3isp/isp.c: if (cpu_is_omap3630())
+> drivers/media/video/omap/omap_vout.c:               if (cpu_is_omap24xx() || cpu_is_omap34xx())
+> drivers/media/video/omap/omap_voutlib.c:    if (cpu_is_omap24xx()) {
+> drivers/media/video/omap/omap_voutlib.c:    } else if (cpu_is_omap34xx()) {
+> drivers/media/video/omap/omap_voutlib.c:    if (cpu_is_omap24xx()) {
+
+at least vout and voutlib haven't been touched since january.
+
 -- 
-Daniel Vetter
-Mail: daniel at ffwll.ch
-Mobile: +41 (0)79 365 57 48
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111108/9676d69d/attachment.sig>
