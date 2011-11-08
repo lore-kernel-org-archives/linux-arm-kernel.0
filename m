@@ -1,43 +1,45 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 7 Nov 2011 16:12:15 -0800
-Subject: [PATCH] ARM: OMAP3: CPUidle: include <linux/export.h>
-In-Reply-To: <1320710320-8279-1-git-send-email-khilman@ti.com>
-References: <1320710320-8279-1-git-send-email-khilman@ti.com>
-Message-ID: <20111108001214.GE31337@atomide.com>
+From: kmpark@infradead.org (Kyungmin Park)
+Date: Tue, 8 Nov 2011 09:13:17 +0900
+Subject: [RFC] Shrink sched_clock some more
+In-Reply-To: <4EB0022C.7080109@arm.com>
+References: <20110922153611.GC8072@n2100.arm.linux.org.uk>
+ <4E7C48E2.5040907@arm.com> <4EAAF5AE.6090300@codeaurora.org>
+ <4EB0022C.7080109@arm.com>
+Message-ID: <CAH9JG2WEVVEAMsWKQzgxy28UXymise_4niD3Hz+ckY3=NEn6SQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Kevin Hilman <khilman@ti.com> [111107 15:23]:
-> The CPUidle use THIS_MODULE, so needs <linux/export.h>
-> 
-> Signed-off-by: Kevin Hilman <khilman@ti.com>
-> ---
-> Tony, one more for omap/fixes.   This one applies to Linus' master branch,
-> but also applies to your current omap/fixes.
+On 11/1/11, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> On 28/10/11 19:34, Stephen Boyd wrote:
+>> On 09/23/11 01:52, Marc Zyngier wrote:
+>>> On 22/09/11 16:36, Russell King - ARM Linux wrote:
+>>>> ... by getting rid of the fixed-constant optimization, and moving the
+>>>> update code into arch/arm/kernel/sched_clock.c.
+>>>>
+>>>> Platforms now only have to supply a function to read the sched_clock
+>>>> register, and some basic information such as the number of significant
+>>>> bits and the tick rate.
+>>> This looks similar to a patch I posted a while ago:
+>>> http://patchwork.ozlabs.org/patch/112318/
+>>>
+>>>
+>>
+>> Can we get one of these two patches merged next merge window? I'd like
+>> to add sched_clock support to MSM and building on top of this patch is
+>> easier than the other way around.
+>
+> I'm happy either way. The only problem I can see with Russell's patch is
+> the lack of support for platforms that do not actually implement a
+> sched_clock_read() function.
+>
+> I've worked around this by having a default jiffy based read function,
+> but there is probably other, better solutions.
 
-Thanks, applying into fixes. Looks like I did not grep for THIS_MODULE..
+Hi Marc, Russell,
 
-Tony
- 
->  arch/arm/mach-omap2/cpuidle34xx.c |    1 +
->  1 files changed, 1 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/cpuidle34xx.c b/arch/arm/mach-omap2/cpuidle34xx.c
-> index 4bf6e6e..2e0fa5a 100644
-> --- a/arch/arm/mach-omap2/cpuidle34xx.c
-> +++ b/arch/arm/mach-omap2/cpuidle34xx.c
-> @@ -24,6 +24,7 @@
->  
->  #include <linux/sched.h>
->  #include <linux/cpuidle.h>
-> +#include <linux/export.h>
->  
->  #include <plat/prcm.h>
->  #include <plat/irqs.h>
-> -- 
-> 1.7.6
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Maybe this patch is missing at v3.2 merge windows. Russell said it's
+maybe queue for his devel tree at prague but maybe doesn't.
+Any chance to merge it for v3.2?
+
+Thank you,
+Kyungmin Park
