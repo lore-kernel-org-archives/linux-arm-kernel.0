@@ -1,32 +1,44 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 08 Nov 2011 11:56:57 +0100
-Subject: [PATCH] at91: vmalloc fix missing AT91_VIRT_BASE define
-In-Reply-To: <20111104180133.GC12913@n2100.arm.linux.org.uk>
-References: <1320334246-16457-1-git-send-email-plagnioj@jcrosoft.com>
- <20111104180133.GC12913@n2100.arm.linux.org.uk>
-Message-ID: <4EB90AF9.8010900@atmel.com>
+From: liu.h.jason@gmail.com (Jason Liu)
+Date: Tue, 8 Nov 2011 19:19:28 +0800
+Subject: [PATCH v6 01/11] ARM: mmp: fix build error on gpio
+In-Reply-To: <1320747859-8366-2-git-send-email-haojian.zhuang@marvell.com>
+References: <1320747859-8366-1-git-send-email-haojian.zhuang@marvell.com>
+ <1320747859-8366-2-git-send-email-haojian.zhuang@marvell.com>
+Message-ID: <CAB4PhKf_LtiWPDm_angtn1KP7u=pXzZt4N_Bbh52tOQ8mKrC0Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/04/2011 07:01 PM, Russell King - ARM Linux :
-> On Thu, Nov 03, 2011 at 11:30:46PM +0800, Jean-Christophe PLAGNIOL-VILLARD wrote:
->> break during the this merge
->>
->> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
->> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-> 
-> Not the only bug:
-> 
->   CC      drivers/tty/serial/atmel_serial.o
-> drivers/tty/serial/atmel_serial.c: In function ?atmel_serial_probe?:
-> drivers/tty/serial/atmel_serial.c:1788: error: implicit declaration of function ?of_alias_get_id?
-> make[4]: *** [drivers/tty/serial/atmel_serial.o] Error 1
-> make[3]: *** [drivers/tty/serial] Error 2
-> make[2]: *** [drivers/tty] Error 2
-> make[1]: *** [drivers] Error 2
+2011/11/8 Haojian Zhuang <haojian.zhuang@marvell.com>:
+> Parameters of GPIO_REG() should be assigned as volatile.
+>
+> arch/arm/plat-pxa/include/plat/gpio.h: In function ?gpio_get_value?:
+> arch/arm/plat-pxa/include/plat/gpio.h:12:21: error: invalid operands to
+> binary & (have ?void *? and ?int?)
+> arch/arm/plat-pxa/include/plat/gpio.h: In function ?gpio_set_value?:
+> arch/arm/plat-pxa/include/plat/gpio.h:21:4: error: lvalue required as
+> left operand of assignment
+> arch/arm/plat-pxa/include/plat/gpio.h:23:4: error: lvalue required as
+> left operand of assignment
+>
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+> ---
+> ?arch/arm/mach-mmp/include/mach/gpio-pxa.h | ? ?2 +-
+> ?1 files changed, 1 insertions(+), 1 deletions(-)
+>
 
-Yes but it is already addressed in ed5f886d163 in Linus' tree.
+It seems that this is pxa related fix, why not have pxa keyword in the
+commit log
+which will make the patch filter life easier.
 
-Best regards,
--- 
-Nicolas Ferre
+Jason Liu
+
+>
+> --
+> 1.7.4.1
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
