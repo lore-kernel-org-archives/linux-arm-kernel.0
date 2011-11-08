@@ -1,182 +1,143 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue,  8 Nov 2011 15:00:14 +0000
-Subject: [PATCH] ARM: mm: update CONTEXTIDR register to contain PID of current
- process
-Message-ID: <1320764414-12599-1-git-send-email-will.deacon@arm.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 08 Nov 2011 16:02:20 +0100
+Subject: [PATCH] RS485: fix inconsistencies in the meaning of some
+ variables
+In-Reply-To: <4EB90902.4030200@evidence.eu.com>
+References: <4E492CFF.7040905@pwrnet.de> <20110822211832.GA8023@kroah.com>
+ <4EB3A009.10502@evidence.eu.com> <4EB8F6B9.6010008@atmel.com>
+ <4EB90902.4030200@evidence.eu.com>
+Message-ID: <4EB9447C.4050109@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch introduces a new Kconfig option which, when enabled, causes
-the kernel to write the PID of the current task into the PROCID field
-of the CONTEXTIDR on context switch. This is useful when analysing
-hardware trace, since writes to this register can be configured to emit
-an event into the trace stream.
+On 11/08/2011 11:48 AM, Claudio Scordino :
+> Il 08/11/2011 10:30, Nicolas Ferre ha scritto:
+>> On 11/04/2011 09:19 AM, Claudio Scordino :
+>>> Hi Alan, Hi Greg,
+>>>
+>>>     it seems that the crisv10.c and the atmel_serial.c serial
+>>> drivers interpret the fields of the serial_rs485 structure in a
+>>> different
+>>> way.
+>>>
+>>> In particular, it seems that crisv10.c uses SER_RS485_RTS_AFTER_SEND and
+>>> SER_RS485_RTS_ON_SEND for the _logic value_ of the RTS pin;
+>>> atmel_serial.c, instead, uses these values to know if a _delay_ must be
+>>> set before and after sending.
+>>
+>> It seems sensible, but, on the other hand, I fear that this is a big
+>> change in the user interface: If people are already relying on this for
+>> their application, this can be difficult to understand the change. Can't
+>> we imagine an smoother migration path?
+>>
+>> It seems from de6f86ce5 that 16C950 may also use rs485 mode (with
+>> another signal that RTS BTW)...
+>>
+>> See comments online...
+>>
+>>> This patch makes the usage of these variables consistent across all
+>>> drivers and fixes the Documentation as well.
+>>> In particular, SER_RS485_RTS_AFTER_SEND and SER_RS485_RTS_ON_SEND will
+>>> be used to set the logic value of the RTS pin (as in the crisv10.c
+>>> driver); the delay is understood by looking only at the value of
+>>> delay_rts_before_send and delay_rts_after_send.
+>>>
+>>> Best regards,
+>>>
+>>>     Claudio
+>>>
+>>>
+>>> Subject: RS485: fix inconsistencies in the meaning of some variables
+>>> From: Claudio Scordino<claudio@evidence.eu.com>
+>>>
+>>> The crisv10.c and the atmel_serial.c serial drivers interpret the fields
+>>> of the serial_rs485 structure in a different way.
+>>> In particular, crisv10.c uses SER_RS485_RTS_AFTER_SEND and
+>>> SER_RS485_RTS_ON_SEND for the voltage of the RTS pin; atmel_serial.c,
+>>> instead,
+>>> uses these values to know if a delay must be set before and after
+>>> sending.
+>>> This patch makes the usage of these variables consistent across all
+>>> drivers and
+>>> fixes the Documentation as well.
+>>> > From now on, SER_RS485_RTS_AFTER_SEND and SER_RS485_RTS_ON_SEND
+>>> will be used to
+>>> set the voltage of the RTS pin (as in the crisv10.c driver); the
+>>> delay will be
+>>> understood by looking only at the value of delay_rts_before_send and
+>>> delay_rts_after_send.
+>>
+>> Ok, but don't you think that the flags names are not so much
+>> self-explanatory for this new meaning?
+>>
+>> What about:
+>> SER_RS485_RTS_LEVEL_DURING_SEND
+>> SER_RS485_RTS_VALUE_DURING_SEND (maybe too vague?)
+>> SER_RS485_RTS_LOGICAL_VALUE_DURING_SEND (maybe too long?)
+>>
+>> Moreover, can't we just use one property for this? I mean, if RTS
+>> logical value is high during the sending of data, can it mean that RTS
+>> will be low before and after? And the other way around: if the signal is
+>> low during data send, will it be high before and after?
+>>
+>> Here again, changing the user interface is not a good idea, so I fear
+>> that it can be a show stopper.
+> 
+> Hi Nicolas,
+> 
+>     I understand, but honestly I do not agree.
+> 
+> The current state is inconsistent, and leaving the status quo can only
+> bring to more issues in the future (because it is not clear if the
+> interface should be used either as in the Cris or in the Atmel driver).
+> That's why I think it should be fixed ASAP (before further drivers start
+> using it).
+> 
+> The modifications that I have proposed are very minimal, and most
+> user-space code should continue to work without any difference. Any Cris
+> user-space code will continue to work, because we didn't change the
+> behavior of the driver. For Atmel user-space code, instead, the behavior
+> of the driver changes only if flags are not set and delay variables
+> contain a value different than 0 (which, hopefully, is not a very common
+> situation).
 
-The thread notifier for writing the PID is deliberately kept separate
-from the ASID code, so that we can easily support newer processors (A15
-onwards) which store the ASID in TTBR0. As such, the switch_mm code is
-updated to perform a read-modify-write sequence to ensure that we don't
-clobber the PID on older CPUs.
+Ok then. I was fearing that, with Atmel driver, someone can set
+SER_RS485_RTS_AFTER_SEND to tell that the delay is needed but not
+necessarily that the signal level is "high".
 
-Cc: Wolfgang Betz <wolfgang.betz@st.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/Kconfig.debug |    9 ++++++
- arch/arm/mm/context.c  |   67 +++++++++++++++++++++++++++++++++++++++++++++---
- arch/arm/mm/proc-v6.S  |    6 ++++
- arch/arm/mm/proc-v7.S  |    6 ++++
- 4 files changed, 84 insertions(+), 4 deletions(-)
+But you are right telling that this inconstancy should be addressed.
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index c5213e7..5b9eca2 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -271,4 +271,13 @@ config ARM_KPROBES_TEST
- 	help
- 	  Perform tests of kprobes API and instruction set simulation.
- 
-+config PID_IN_CONTEXTIDR
-+	bool "Write the current PID to the CONTEXTIDR register"
-+	depends on CPU_COPY_V6
-+	help
-+	  Enabling this option causes the kernel to write the current PID to
-+	  the PROCID field of the CONTEXTIDR register, at the expense of some
-+	  additional instructions during context switch. Say Y here only if you
-+	  are planning to use hardware trace tools with this kernel.
-+
- endmenu
-diff --git a/arch/arm/mm/context.c b/arch/arm/mm/context.c
-index 93aac06..14536f6 100644
---- a/arch/arm/mm/context.c
-+++ b/arch/arm/mm/context.c
-@@ -14,6 +14,7 @@
- #include <linux/percpu.h>
- 
- #include <asm/mmu_context.h>
-+#include <asm/thread_notify.h>
- #include <asm/tlbflush.h>
- 
- static DEFINE_RAW_SPINLOCK(cpu_asid_lock);
-@@ -22,6 +23,66 @@ unsigned int cpu_last_asid = ASID_FIRST_VERSION;
- DEFINE_PER_CPU(struct mm_struct *, current_mm);
- #endif
- 
-+static void write_contextidr(u32 contextidr)
-+{
-+	asm("mcr	p15, 0, %0, c13, c0, 1" : : "r" (contextidr));
-+	isb();
-+}
-+
-+#ifdef CONFIG_PID_IN_CONTEXTIDR
-+static u32 read_contextidr(void)
-+{
-+	u32 contextidr;
-+	asm("mrc	p15, 0, %0, c13, c0, 1" : "=r" (contextidr));
-+	return contextidr;
-+}
-+
-+static int contextidr_notifier(struct notifier_block *unused, unsigned long cmd,
-+			       void *t)
-+{
-+	unsigned long flags;
-+	u32 contextidr;
-+	pid_t pid;
-+	struct thread_info *thread = t;
-+
-+	if (cmd != THREAD_NOTIFY_SWITCH)
-+		return NOTIFY_DONE;
-+
-+	pid = task_pid_nr(thread->task);
-+	local_irq_save(flags);
-+	contextidr = read_contextidr();
-+	contextidr &= ~ASID_MASK;
-+	contextidr |= pid << ASID_BITS;
-+	write_contextidr(contextidr);
-+	local_irq_restore(flags);
-+
-+	return NOTIFY_OK;
-+}
-+
-+static struct notifier_block contextidr_notifier_block = {
-+	.notifier_call = contextidr_notifier,
-+};
-+
-+static int __init contextidr_notifier_init(void)
-+{
-+	return thread_register_notifier(&contextidr_notifier_block);
-+}
-+arch_initcall(contextidr_notifier_init);
-+
-+static void set_asid(unsigned int asid)
-+{
-+	u32 contextidr = read_contextidr();
-+	contextidr &= ASID_MASK;
-+	contextidr |= asid & ~ASID_MASK;
-+	write_contextidr(contextidr);
-+}
-+#else
-+static void set_asid(unsigned int asid)
-+{
-+	write_contextidr(asid);
-+}
-+#endif
-+
- /*
-  * We fork()ed a process, and we need a new context for the child
-  * to run in.  We reserve version 0 for initial tasks so we will
-@@ -37,8 +98,7 @@ void __init_new_context(struct task_struct *tsk, struct mm_struct *mm)
- static void flush_context(void)
- {
- 	/* set the reserved ASID before flushing the TLB */
--	asm("mcr	p15, 0, %0, c13, c0, 1\n" : : "r" (0));
--	isb();
-+	set_asid(0);
- 	local_flush_tlb_all();
- 	if (icache_is_vivt_asid_tagged()) {
- 		__flush_icache_all();
-@@ -99,8 +159,7 @@ static void reset_context(void *info)
- 	set_mm_context(mm, asid);
- 
- 	/* set the new ASID */
--	asm("mcr	p15, 0, %0, c13, c0, 1\n" : : "r" (mm->context.id));
--	isb();
-+	set_asid(mm->context.id);
- }
- 
- #else
-diff --git a/arch/arm/mm/proc-v6.S b/arch/arm/mm/proc-v6.S
-index d061d2f..8614eb3 100644
---- a/arch/arm/mm/proc-v6.S
-+++ b/arch/arm/mm/proc-v6.S
-@@ -104,6 +104,12 @@ ENTRY(cpu_v6_switch_mm)
- 	mcr	p15, 0, r2, c7, c5, 6		@ flush BTAC/BTB
- 	mcr	p15, 0, r2, c7, c10, 4		@ drain write buffer
- 	mcr	p15, 0, r0, c2, c0, 0		@ set TTB 0
-+#ifdef CONFIG_PID_IN_CONTEXTIDR
-+	mrc	p15, 0, r2, c13, c0, 1		@ read current context ID
-+	bic	r2, r2, #0xff			@ extract the PID
-+	and	r1, r1, #0xff
-+	orr	r1, r1, r2			@ insert the PID into r1
-+#endif
- 	mcr	p15, 0, r1, c13, c0, 1		@ set context ID
- #endif
- 	mov	pc, lr
-diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-index 2c559ac..fe1075d 100644
---- a/arch/arm/mm/proc-v7.S
-+++ b/arch/arm/mm/proc-v7.S
-@@ -119,6 +119,12 @@ ENTRY(cpu_v7_switch_mm)
- #ifdef CONFIG_ARM_ERRATA_754322
- 	dsb
- #endif
-+#ifdef CONFIG_PID_IN_CONTEXTIDR
-+	mrc	p15, 0, r2, c13, c0, 1		@ read current context ID
-+	bic	r2, r2, #0xff			@ extract the PID
-+	and	r1, r1, #0xff
-+	orr	r1, r1, r2			@ insert the PID into r1
-+#endif
- 	mcr	p15, 0, r2, c13, c0, 1		@ set reserved context ID
- 	isb
- 1:	mcr	p15, 0, r0, c2, c0, 0		@ set TTB 0
+> That's the reason why I preferred to not change the names of
+> the variables, even if better names would be desirable.
+
+100% agree with this.
+
+> If you want, I can re-format the patch according to you suggestions,
+
+Yes
+
+> remove formatted lines
+
+Yes
+
+> and changing the names of the variables.
+
+Well, this is proved to be not a good option at this stage of RS485
+support in kernel. So as you said: no need to mess with this.
+
+> But unfortunately, I cannot undertake the device tree bindings at the
+moment.
+
+Ah, ok... well we will manage this after your submitting of this patch.
+But can you tell me if the signal wave is always like this:
+__|--|__ and --|__|--
+
+or if it can also be like this:
+__|--|--  or --|--|__
+
+This way, we will see if the hardware property can be addressed with
+only one device tree biding or if tree of them are needed.
+
+Best regards,
 -- 
-1.7.4.1
+Nicolas Ferre
