@@ -1,23 +1,41 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Tue, 08 Nov 2011 09:36:48 -0800
-Subject: [PATCH] arm: cpuidle34xx.c: Fix compile error
-In-Reply-To: <1320768665-9759-1-git-send-email-joerg.roedel@amd.com> (Joerg
- Roedel's message of "Tue, 8 Nov 2011 17:11:05 +0100")
-References: <1320768665-9759-1-git-send-email-joerg.roedel@amd.com>
-Message-ID: <87hb2eqzwv.fsf@ti.com>
+From: davidb@codeaurora.org (David Brown)
+Date: Tue,  8 Nov 2011 09:40:07 -0800
+Subject: [PATCH] ARM: msm: Remove call to missing FPGA init on 8660
+Message-ID: <1320774007-6448-1-git-send-email-davidb@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Joerg Roedel <joerg.roedel@amd.com> writes:
+A previous patch[1] added code to initialize an FPGA register on the
+8660 "SURF" development platform.  Since this development platform is
+not widely available, and there is now a more available device "the
+Dragonboard" based on the same core SOC, this change was dropped.
 
-> Add missing module.h include to provide THIS_MODULE.
->
-> Signed-off-by: Joerg Roedel <joerg.roedel@amd.com>
+However, the DT code kept a lingering call to this FPGA init function.
+Remove it.
 
-FYI...
+[1] https://lkml.org/lkml/2011/8/12/357
 
-Tony has already queued fix for this in his fixes branch.
+Signed-off-by: David Brown <davidb@codeaurora.org>
+---
+ arch/arm/mach-msm/board-msm8x60.c |    5 -----
+ 1 files changed, 0 insertions(+), 5 deletions(-)
 
-     http://marc.info/?l=linux-arm-kernel&m=132071036621713&w=2
-
-Kevin
+diff --git a/arch/arm/mach-msm/board-msm8x60.c b/arch/arm/mach-msm/board-msm8x60.c
+index 44bf716..5876292 100644
+--- a/arch/arm/mach-msm/board-msm8x60.c
++++ b/arch/arm/mach-msm/board-msm8x60.c
+@@ -87,11 +87,6 @@ static void __init msm8x60_dt_init(void)
+ 	if (node)
+ 		irq_domain_add_simple(node, GIC_SPI_START);
+ 
+-	if (of_machine_is_compatible("qcom,msm8660-surf")) {
+-		printk(KERN_INFO "Init surf UART registers\n");
+-		msm8x60_init_uart12dm();
+-	}
+-
+ 	of_platform_populate(NULL, of_default_bus_match_table,
+ 			msm_auxdata_lookup, NULL);
+ }
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
