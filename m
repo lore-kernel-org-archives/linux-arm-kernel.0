@@ -1,40 +1,40 @@
-From: rmallon@gmail.com (Ryan Mallon)
-Date: Wed, 09 Nov 2011 10:58:15 +1100
-Subject: [PATCH V3 2/4] drivers/i2c/busses/i2c-at91.c: add new driver
-In-Reply-To: <7bdd6b456b0e055441cb25634c8cb6d483718f6c.1320753142.git.n.voss@weinmann.de>
-References: <cover.1320753142.git.n.voss@weinmann.de>
- <7bdd6b456b0e055441cb25634c8cb6d483718f6c.1320753142.git.n.voss@weinmann.de>
-Message-ID: <4EB9C217.1010100@gmail.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Wed, 9 Nov 2011 00:59:33 +0100
+Subject: [PATCH v6 00/11] change pxa gpio to platform driver
+In-Reply-To: <1320747859-8366-1-git-send-email-haojian.zhuang@marvell.com>
+References: <1320747859-8366-1-git-send-email-haojian.zhuang@marvell.com>
+Message-ID: <201111090059.34110.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/11/11 21:49, Nikolaus Voss wrote:
-
-> This driver has the following properties compared to the old driver:
-> 1. Support for multiple interfaces.
-> 2. Interrupt driven I/O as opposed to polling/busy waiting.
-> 3. Support for _one_ repeated start (Sr) condition, which is enough
->    for most real-world applications including all SMBus transfer types.
->    (The hardware does not support issuing arbitrary Sr conditions on the
->     bus.)
+> Changelog
+> v6:
+>      1. fix build issue in pxa910 since building gpio failure is found in
+>         mainline.
+>      2. merge two dependant patches (original v5 0005 and 0006) together.
+>      3. fix gpio bit issue in corgi and spitz.
+>      4. replace printk() with dev_err in clk patch.
+> v5:
+>      1. use generic gpio driver. So clean gpio-pxa.h and gpio-pxa.c again.
+> v4:
+>      1. append one patch for clean gpio macros and use function instead.
+> v3:
+>      1. Rebase on Russell's for-next branch.
+>      2. Add clock support.
+>      3. Move gpio edge detection initiliaztion of arch-mmp into gpio
+> driver.
 > 
-> Tested on Atmel G45 with BQ20Z80 battery SMBus client.
+> v2:
+>     1. Remove gpio.c from mach-pxa & mach-mmp that is introduced from v1.
+>     2. Remove init function in gpio.c. Move the platfrom_device_register()
+>        into platform driver.
+>     3. Initialize pxa_gpio_regs in gpio-pxa.c
+>     4. Simplify code of identifing pxa gpio series or mmp gpio series.
+>     5. Use linux/io.h instead of asm/io.h.
 > 
-> Signed-off-by: Nikolaus Voss <n.voss@weinmann.de>
 
-<snip>
+Hi Haojian,
 
-> +	dev->clk = clk_get(&pdev->dev, "twi_clk");
-> +	if (IS_ERR(dev->clk)) {
-> +		dev_err(&pdev->dev, "no clock defined\n");
-> +		rc = -ENODEV;
-> +		goto err_free_mem;
-> +	}
-> +	clk_enable(dev->clk);
+are we also getting pinmux support any soon?
 
-
-There are now dummy clk_prepare/unprepare functions in
-include/linux/clk.h, so you should be using them in this driver to
-future proof it.
-
-~Ryan
+M
