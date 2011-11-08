@@ -1,100 +1,59 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue,  8 Nov 2011 15:53:00 +0000
-Subject: [PATCH v5 5/8] ARM: reset: implement soft_restart for jumping to a
- physical address
+Date: Tue,  8 Nov 2011 15:52:59 +0000
+Subject: [PATCH v5 4/8] ARM: reset: allow kernelspace mappings to be flat
+ mapped during reset
 In-Reply-To: <1320767583-21162-1-git-send-email-will.deacon@arm.com>
 References: <1320767583-21162-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1320767583-21162-6-git-send-email-will.deacon@arm.com>
+Message-ID: <1320767583-21162-5-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tools such as kexec and CPU hotplug require a way to reset the processor
-and branch to some code in physical space. This requires various bits of
-jiggery pokery with the caches and MMU which, when it goes wrong, tends
-to lock up the system.
+Currently, switch_mm_for_reboot only takes out a 1:1 mapping from 0x0
+to TASK_SIZE during reboot. For situations where we actually want to
+turn off the MMU (e.g. kexec, hibernate, CPU hotplug) we want to map
+as much memory as possible using the identity mapping so that we
+increase the chance of mapping our reset code.
 
-This patch fleshes out the soft_restart implementation so that it
-branches to the reset code using the identity mapping. This requires us
-to change to a temporary stack, held within the kernel image as a static
-array, to avoid conflicting with the new view of memory.
+This patch modifies setup_mm_for_reboot to change to the static identity
+map page tables that are setup during booting, therefore remapping all
+of memory apart from a small window containing the kernel image.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/kernel/process.c |   51 ++++++++++++++++++++++++++++++++++----------
- 1 files changed, 39 insertions(+), 12 deletions(-)
+ arch/arm/mm/idmap.c |   19 ++++++++++---------
+ 1 files changed, 10 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
-index a92ca50..577d092 100644
---- a/arch/arm/kernel/process.c
-+++ b/arch/arm/kernel/process.c
-@@ -92,29 +92,56 @@ static int __init hlt_setup(char *__unused)
- __setup("nohlt", nohlt_setup);
- __setup("hlt", hlt_setup);
+diff --git a/arch/arm/mm/idmap.c b/arch/arm/mm/idmap.c
+index 24f6cf3..cdd4d08 100644
+--- a/arch/arm/mm/idmap.c
++++ b/arch/arm/mm/idmap.c
+@@ -92,17 +92,18 @@ static int __init init_static_idmap(void)
+ arch_initcall(init_static_idmap);
  
--void soft_restart(unsigned long addr)
-+extern void call_with_stack(void (*fn)(void *), void *arg, void *sp);
-+typedef void (*phys_reset_t)(unsigned long);
-+
-+/*
-+ * A temporary stack to use for CPU reset. This is static so that we
-+ * don't clobber it with the identity mapping. When running with this
-+ * stack, any references to the current task *will not work* so you
-+ * should really do as little as possible before jumping to your reset
-+ * code.
-+ */
-+#define SOFT_RESTART_STACK_WORDS	32
-+static u32 soft_restart_stack[SOFT_RESTART_STACK_WORDS];
-+
-+static void __soft_restart(void *addr)
+ /*
+- * In order to soft-boot, we need to insert a 1:1 mapping in place of
+- * the user-mode pages.  This will then ensure that we have predictable
+- * results when turning the mmu off
++ * In order to soft-boot, we need to insert a 1:1 mapping of memory.
++ * This will then ensure that we have predictable results when turning
++ * the mmu off
+  */
+ void setup_mm_for_reboot(void)
  {
--	/* Disable interrupts first */
--	local_irq_disable();
--	local_fiq_disable();
-+	phys_reset_t phys_reset;
- 
 -	/*
--	 * Tell the mm system that we are going to reboot -
--	 * we may need it to insert some 1:1 mappings so that
--	 * soft boot works.
+-	 * We need to access to user-mode page tables here. For kernel threads
+-	 * we don't have any user-mode mappings so we use the context that we
+-	 * "borrowed".
 -	 */
-+	/* Take out a flat memory mapping. */
- 	setup_mm_for_reboot();
- 
--	/* Clean and invalidate caches */
-+	/* Clean and invalidate caches. */
- 	flush_cache_all();
- 
--	/* Turn off caching */
-+	/* Turn off caching. */
- 	cpu_proc_fin();
- 
- 	/* Push out any further dirty data, and ensure cache is empty */
- 	flush_cache_all();
- 
--	cpu_reset(addr);
-+	/* Switch to the identity mapping. */
-+	phys_reset = (phys_reset_t)(unsigned long)virt_to_phys(cpu_reset);
-+	phys_reset((unsigned long)addr);
+-	identity_mapping_add(current->active_mm->pgd, 0, TASK_SIZE);
++	/* Clean and invalidate L1. */
++	flush_cache_all();
 +
-+	/* Should never get here. */
-+	BUG();
-+}
++	/* Switch exclusively to kernel mappings. */
++	cpu_switch_mm(idmap_pgd, &init_mm);
 +
-+void soft_restart(unsigned long addr)
-+{
-+	u32 *stack = soft_restart_stack + SOFT_RESTART_STACK_WORDS;
-+
-+	/* Disable interrupts first */
-+	local_irq_disable();
-+	local_fiq_disable();
-+
-+	/* Change to the new stack and continue with the reset. */
-+	call_with_stack(__soft_restart, (void *)addr, (void *)stack);
-+
-+	/* Should never get here. */
-+	BUG();
++	/* Flush the TLB. */
+ 	local_flush_tlb_all();
  }
- 
- static void null_restart(char mode, const char *cmd)
 -- 
 1.7.4.1
