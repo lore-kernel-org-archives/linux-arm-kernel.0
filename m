@@ -1,41 +1,24 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 8 Nov 2011 09:00:36 +0000
-Subject: [03: PATCH 0/5] The remaining stuff
-In-Reply-To: <04fc01cc9de4$11dc3410$35949c30$%kim@samsung.com>
-References: <20111106173113.GI12913@n2100.arm.linux.org.uk>
- <20111106173939.GJ12913@n2100.arm.linux.org.uk>
- <20111106175457.GK12913@n2100.arm.linux.org.uk>
- <04fc01cc9de4$11dc3410$35949c30$%kim@samsung.com>
-Message-ID: <20111108090036.GY12913@n2100.arm.linux.org.uk>
+Date: Tue, 8 Nov 2011 09:01:55 +0000
+Subject: 2b034922 breaks kexec on ARM
+In-Reply-To: <20111108005922.GA15689@verge.net.au>
+References: <20111107185125.GA17464@mudshark.cambridge.arm.com>
+ <20111107190314.GS12913@n2100.arm.linux.org.uk>
+ <20111107191453.GC17464@mudshark.cambridge.arm.com>
+ <20111107192043.GT12913@n2100.arm.linux.org.uk>
+ <CALZhoSRZu=fbsToqWQsxJBSQ6huwxtkR=M7iFZyJ576jeJ4FHw@mail.gmail.com>
+ <20111107214755.GA27679@mudshark.cambridge.arm.com>
+ <20111108005922.GA15689@verge.net.au>
+Message-ID: <20111108090155.GZ12913@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 08, 2011 at 04:00:16PM +0900, Kukjin Kim wrote:
-> Russell King - ARM Linux wrote:
-> > 
-> > Part 3 - the remaining stuff
-> > 
-> > These are patches which I've managed to get half way through before
-> > getting - to be honest - totally hacked off with the code found in
-> > various platforms (as mentioned in previous mails).
-> > 
-> > These platforms are broken as a result of the final patch in part 2,
-> > and these patches move these platforms _towards_ a solution.  They
-> > are not a complete solution though, but the start of the solution.
-> > 
-> > For instance, the Exynos4 and S5PV210 patches both consist of almost
-> > a full solution -but- with the new function prototype missing because
-> > there is _no_ local header file to put it in, and I'm damned well not
-> > putting it in the remote plat-samsung/include/plat headers.
-> > 
-> Russell,
+On Tue, Nov 08, 2011 at 09:59:22AM +0900, Simon Horman wrote:
+> Hi Will, Hi All,
 > 
-> The new restart prototype for s5pv210 and exynos can be placed in their
-> respective<mach/system.h>file.
+> FWIW, as I acked this patch in the first place, I think that this patch
+> should be reverted and a fresh version considered latter if appropriate.
 
-No - mach/system.h will be removed once arch_idle is gone as well.  In
-any case, this should not be in a mach/*.h file.  There should be a
-header in the arch/arm/mach-* directory for functions and data structures
-local _only_ to the files in that directory.
+I've already reverted it - it's in my 'fixes' branch.
 
-Please read my 'pet peaves' email, point 4.
+Thanks.
