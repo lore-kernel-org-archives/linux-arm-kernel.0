@@ -1,28 +1,40 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Tue, 08 Nov 2011 18:38:12 -0500 (EST)
-Subject: [PATCH v8 15/16] ARM: LPAE: add support for ATAG_MEM64
-In-Reply-To: <1320682618-1182-16-git-send-email-catalin.marinas@arm.com>
-References: <1320682618-1182-1-git-send-email-catalin.marinas@arm.com>
- <1320682618-1182-16-git-send-email-catalin.marinas@arm.com>
-Message-ID: <alpine.LFD.2.02.1111081832290.3307@xanadu.home>
+From: rmallon@gmail.com (Ryan Mallon)
+Date: Wed, 09 Nov 2011 10:58:15 +1100
+Subject: [PATCH V3 2/4] drivers/i2c/busses/i2c-at91.c: add new driver
+In-Reply-To: <7bdd6b456b0e055441cb25634c8cb6d483718f6c.1320753142.git.n.voss@weinmann.de>
+References: <cover.1320753142.git.n.voss@weinmann.de>
+ <7bdd6b456b0e055441cb25634c8cb6d483718f6c.1320753142.git.n.voss@weinmann.de>
+Message-ID: <4EB9C217.1010100@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 7 Nov 2011, Catalin Marinas wrote:
+On 08/11/11 21:49, Nikolaus Voss wrote:
 
-> From: Will Deacon <will.deacon@arm.com>
+> This driver has the following properties compared to the old driver:
+> 1. Support for multiple interfaces.
+> 2. Interrupt driven I/O as opposed to polling/busy waiting.
+> 3. Support for _one_ repeated start (Sr) condition, which is enough
+>    for most real-world applications including all SMBus transfer types.
+>    (The hardware does not support issuing arbitrary Sr conditions on the
+>     bus.)
 > 
-> LPAE provides support for memory banks with physical addresses of up
-> to 40 bits.
+> Tested on Atmel G45 with BQ20Z80 battery SMBus client.
 > 
-> This patch adds a new atag, ATAG_MEM64, so that the Kernel can be
-> informed about memory that exists above the 4GB boundary.
-> 
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+> Signed-off-by: Nikolaus Voss <n.voss@weinmann.de>
 
-NAK.  Any LPAE capable platform to come is, by definition, a new 
-platform.  It therefore should be using DT upfront.
+<snip>
+
+> +	dev->clk = clk_get(&pdev->dev, "twi_clk");
+> +	if (IS_ERR(dev->clk)) {
+> +		dev_err(&pdev->dev, "no clock defined\n");
+> +		rc = -ENODEV;
+> +		goto err_free_mem;
+> +	}
+> +	clk_enable(dev->clk);
 
 
-Nicolas
+There are now dummy clk_prepare/unprepare functions in
+include/linux/clk.h, so you should be using them in this driver to
+future proof it.
+
+~Ryan
