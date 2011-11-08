@@ -1,61 +1,79 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 08 Nov 2011 14:00:19 +0900
-Subject: [GIT PULL] Samsung Exynos for v3.2
-In-Reply-To: <201111061619.36283.arnd@arndb.de>
-References: <02dd01cc9b4e$0cb27c80$26177580$%kim@samsung.com>
- <4EB61826.4070601@samsung.com> <201111061619.36283.arnd@arndb.de>
-Message-ID: <04e901cc9dd3$50487d50$f0d977f0$%kim@samsung.com>
+Date: Tue, 08 Nov 2011 14:00:36 +0900
+Subject: [01: PATCH 0/7] Preparation for arch_reset changes
+In-Reply-To: <20111106173113.GI12913@n2100.arm.linux.org.uk>
+References: <20111106173113.GI12913@n2100.arm.linux.org.uk>
+Message-ID: <04eb01cc9dd3$5a6105f0$0f2311d0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann wrote:
+Russell King - ARM Linux wrote:
 > 
-> On Sunday 06 November 2011, Kukjin Kim wrote:
-> > As I replied, I re-based 'next-samsung-exynos' based on latest mainline.
-> >
-> > So changes since previous pull request:
-> >
-> > The following changes since commit
-> c861cd3e92d92ae946e19099f198018fcb4fd887:
-> >
-> >    Merge branch 'next/devel2' of
-> > git://git.linaro.org/people/arnd/arm-soc (2011-11-05 18:21:21 -0700)
-> >
-> > are available in the git repository at:
-> >
-> >    git://github.com/kgene/linux-samsung.git next-samsung-exynos
-> >
-> > Others same, if any problems, please kindly let me know.
+> This series lays down the ground work for changing the way we handle the
+> reset (now called restart) handling on ARM.
 > 
-> Ok, looks good. I'll forward the pull request right away.
+> As a result of these patches, we provide a new hook in the machine_desc
+> record called 'restart' which is pointed at a function to perform the
+> appropriate restart actions for the platform.  This is called directly
+> from machine_restart() with IRQs and caches on.
 > 
-Thanks and I checked they are in mainline now :)
+> The 'soft_reboot' flag is changed to a more generic 'restart_mode'
+> character - which is used to initialize the default reboot mode (which
+> can be changed via the 'reboot=' command line parameter.)
+> 
+> 'soft_restart(addr)' is added which performs a soft restart (iow,
+> orderly shutdown of caches and MMU and a jump to the passed address),
+> rather than the old way which separated the tear-down of the caches
+> and MMU from the code doing the jump.  This will be necessary to
+> resolve the ARMv6 and ARMv7 CPU restarting problems.
+> 
+> Finally, appropriate 'restart_mode' values are added to several
+> platforms which were hard-coding the restart mode by intercepting
+> the restarting via arm_pm_restart.
+> 
+>  arch/arm/include/asm/mach/arch.h                  |    9 +++--
+>  arch/arm/include/asm/system.h                     |    1 +
+>  arch/arm/kernel/machine_kexec.c                   |    4 +-
+>  arch/arm/kernel/process.c                         |   35
+++++++++++++-----
+> ---
+>  arch/arm/kernel/setup.c                           |    7 +++-
+>  arch/arm/mach-clps711x/include/mach/system.h      |    2 +-
+>  arch/arm/mach-ebsa110/core.c                      |    2 +-
+>  arch/arm/mach-ebsa110/include/mach/system.h       |    2 +-
+>  arch/arm/mach-ep93xx/include/mach/system.h        |    2 -
+>  arch/arm/mach-footbridge/cats-hw.c                |    2 +-
+>  arch/arm/mach-footbridge/include/mach/system.h    |    2 +-
+>  arch/arm/mach-iop32x/include/mach/system.h        |    4 +--
+>  arch/arm/mach-iop33x/include/mach/system.h        |    2 +-
+>  arch/arm/mach-ixp2000/include/mach/system.h       |    2 -
+>  arch/arm/mach-ixp4xx/include/mach/system.h        |    2 +-
+>  arch/arm/mach-ks8695/include/mach/system.h        |    2 +-
+>  arch/arm/mach-lpc32xx/include/mach/system.h       |    3 --
+>  arch/arm/mach-mmp/include/mach/system.h           |    4 +-
+>  arch/arm/mach-mxs/system.c                        |    2 +-
+>  arch/arm/mach-pnx4008/include/mach/system.h       |    2 +-
+>  arch/arm/mach-pxa/mioa701.c                       |    1 +
+>  arch/arm/mach-pxa/reset.c                         |    2 +-
+>  arch/arm/mach-pxa/spitz.c                         |    3 ++
+>  arch/arm/mach-pxa/tosa.c                          |    1 +
+>  arch/arm/mach-rpc/include/mach/system.h           |    2 +-
+>  arch/arm/mach-s3c2410/include/mach/system-reset.h |    4 +-
+>  arch/arm/mach-s3c64xx/include/mach/system.h       |    2 +-
+>  arch/arm/mach-sa1100/include/mach/system.h        |    2 +-
+>  arch/arm/mach-shark/core.c                        |    1 -
+>  arch/arm/mach-shmobile/include/mach/system.h      |    2 +-
+>  arch/arm/mach-u300/include/mach/system.h          |    2 -
+>  arch/arm/mach-w90x900/include/mach/system.h       |    2 +-
+>  arch/arm/mm/idmap.c                               |    2 +-
+>  arch/arm/mm/nommu.c                               |    2 +-
+>  arch/arm/plat-mxc/system.c                        |    2 +-
+>  arch/arm/plat-spear/include/plat/system.h         |    2 +-
+>  36 files changed, 64 insertions(+), 59 deletions(-)
 
-> One thing that I noticed in your new Kconfig file is this however:
-> 
-> | choice
-> |         prompt "EXYNOS System Type"
-> |         default ARCH_EXYNOS4
-> | config ARCH_EXYNOS4
-> |         bool "SAMSUNG EXYNOS4"
-> |         help
-> |           Samsung EXYNOS4 SoCs based systems
-> | endchoice
-> 
-> This looks like the idea is to make the future EXYNOS5 and later SoCs a
-> separate "choice" that is mutually exclusive with EXYNOS4.
-> 
-> This seems to be a significant limitation considering that we are working
-> hard on making all platforms coexist in the same kernel binary.
-> 
-> Are there strong technical reasons why you could not build EXYNOS4 and
-> EXYNOS5 into a combined kernel? If this is at all possible, I would
-> recommend trying hard to do it when you add EXYNOS5.
-> 
-Yes, as you pointed out, I need to sort out the physical addresses
-(mach/map.h) and interrupt numbers (mach/irqs.h) for single zImage on exynos
-now. But I think, the 'choice' will be changed to just 'config' for
-multi-selecting when EXYNOS5 is supported.
+For Samsung stuff,
+
+Acked-by: Kukjin Kim <kgene.kim@samsung.com>
 
 Thanks.
 
