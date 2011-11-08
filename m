@@ -1,39 +1,50 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 8 Nov 2011 17:23:46 +0200
-Subject: [PATCH V3 2/4] drivers/i2c/busses/i2c-at91.c: add new driver
-In-Reply-To: <4EB9477E.8070002@atmel.com>
-References: <cover.1320753142.git.n.voss@weinmann.de>
- <7bdd6b456b0e055441cb25634c8cb6d483718f6c.1320753142.git.n.voss@weinmann.de>
- <20111108144115.GH20728@legolas.emea.dhcp.ti.com>
- <4EB9477E.8070002@atmel.com>
-Message-ID: <20111108152343.GJ20728@legolas.emea.dhcp.ti.com>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Tue, 8 Nov 2011 20:53:58 +0530
+Subject: [PATCH 6/6] mmc: sdhci-s3c: Add device tree support
+In-Reply-To: <20111107211726.GC28491@ponder.secretlab.ca>
+References: <1320266163-15292-1-git-send-email-thomas.abraham@linaro.org>
+ <1320266163-15292-7-git-send-email-thomas.abraham@linaro.org>
+ <20111107211726.GC28491@ponder.secretlab.ca>
+Message-ID: <CAJuYYwSfC5t6xs-TDT2wBOj1RbQYSpH0wjo9uBcYf7bGyi0t9g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 08, 2011 at 04:15:10PM +0100, Nicolas Ferre wrote:
-> -----BEGIN PGP SIGNED MESSAGE-----
-> Hash: SHA1
-> 
-> On 11/08/2011 03:41 PM, Felipe Balbi :
-> 
-> >> +	if (cpu_is_at91rm9200()) {			/* AT91RM9200 Errata #22 */
-> > 
-> > I don't think you should be using cpu_is_* on drivers.
-> 
-> It is a common pattern in at91 drivers and has worked for ages.
-> Do you think it is related to the need to be able to compile the
-> driver for any SoC in the case of multi-SoC zImage support?
+Hi Grant,
 
-we have drivers compiling on multiple OMAP versions without those hacks.
-Generally, we check the IP revision for that. Don't you have a Revision
-register of some sort ?
+On 8 November 2011 02:47, Grant Likely <grant.likely@secretlab.ca> wrote:
+> On Thu, Nov 03, 2011 at 02:06:03AM +0530, Thomas Abraham wrote:
+>> Add device tree based discovery support for Samsung's sdhci controller
+>>
+>> Cc: Ben Dooks <ben-linux@fluff.org>
+>> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+>> ---
+>> +Example:
+>> + ? ? sdhci at 12530000 {
+>> + ? ? ? ? ? ? compatible = "samsung,exynos4210-sdhci";
+>> + ? ? ? ? ? ? reg = <0x12530000 0x100>;
+>> + ? ? ? ? ? ? interrupts = <139>;
+>> + ? ? ? ? ? ? samsung,sdhci-bus-width = <4>;
+>> + ? ? ? ? ? ? linux,mmc_cap_4_bit_data;
+>
+> Following on from my reply on patch 5, this is an example of exactly
+> what I'm talking about. ?This node both sets bus-width to '4', and
+> sets the 4_bit_data flag. ?Don't you think that the driver would be
+> smart enough to set the 4_bit_data flag when the bus width was set to
+> 4?
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111108/2d7f082a/attachment.sig>
+Yes, that is true. I will modify the driver based on your comments and
+resubmit this patch.
+
+Thanks for your comments.
+
+Regards,
+Thomas.
+
+>
+> g.
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+>
