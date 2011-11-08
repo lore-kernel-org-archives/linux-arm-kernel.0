@@ -1,71 +1,39 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 8 Nov 2011 16:22:39 +0100
-Subject: [PATCH 2/5] dma i.MX: remove individual SOC dependency
-In-Reply-To: <1314168072-13822-3-git-send-email-s.hauer@pengutronix.de>
-References: <1314168072-13822-1-git-send-email-s.hauer@pengutronix.de>
- <1314168072-13822-3-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20111108152239.GA9641@pengutronix.de>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 8 Nov 2011 17:23:46 +0200
+Subject: [PATCH V3 2/4] drivers/i2c/busses/i2c-at91.c: add new driver
+In-Reply-To: <4EB9477E.8070002@atmel.com>
+References: <cover.1320753142.git.n.voss@weinmann.de>
+ <7bdd6b456b0e055441cb25634c8cb6d483718f6c.1320753142.git.n.voss@weinmann.de>
+ <20111108144115.GH20728@legolas.emea.dhcp.ti.com>
+ <4EB9477E.8070002@atmel.com>
+Message-ID: <20111108152343.GJ20728@legolas.emea.dhcp.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Vinod,
+On Tue, Nov 08, 2011 at 04:15:10PM +0100, Nicolas Ferre wrote:
+> -----BEGIN PGP SIGNED MESSAGE-----
+> Hash: SHA1
+> 
+> On 11/08/2011 03:41 PM, Felipe Balbi :
+> 
+> >> +	if (cpu_is_at91rm9200()) {			/* AT91RM9200 Errata #22 */
+> > 
+> > I don't think you should be using cpu_is_* on drivers.
+> 
+> It is a common pattern in at91 drivers and has worked for ages.
+> Do you think it is related to the need to be able to compile the
+> driver for any SoC in the case of multi-SoC zImage support?
 
-Ping. Can you please queue this one?
-
-Thanks
-  Sascha
-
-On Wed, Aug 24, 2011 at 08:41:09AM +0200, Sascha Hauer wrote:
-> The individual SoC dependency in Kconfig hardly scales anymore.
-> Instead of having such a fine grained dependency just depend
-> on ARCH_MXC and risk that the uninformed user has to look in
-> the help text to figure out which driver is the correct one.
-> 
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> Cc: Vinod Koul <vinod.koul@intel.com>
-> ---
->  drivers/dma/Kconfig |    6 +++---
->  1 files changed, 3 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
-> index 2e3b3d3..eda9e34 100644
-> --- a/drivers/dma/Kconfig
-> +++ b/drivers/dma/Kconfig
-> @@ -124,7 +124,7 @@ config MV_XOR
->  
->  config MX3_IPU
->  	bool "MX3x Image Processing Unit support"
-> -	depends on ARCH_MX3
-> +	depends on ARCH_MXC
->  	select DMA_ENGINE
->  	default y
->  	help
-> @@ -215,11 +215,11 @@ config PCH_DMA
->  
->  config IMX_SDMA
->  	tristate "i.MX SDMA support"
-> -	depends on ARCH_MX25 || ARCH_MX3 || ARCH_MX5
-> +	depends on ARCH_MXC
->  	select DMA_ENGINE
->  	help
->  	  Support the i.MX SDMA engine. This engine is integrated into
-> -	  Freescale i.MX25/31/35/51 chips.
-> +	  Freescale i.MX25/31/35/51/53 chips.
->  
->  config IMX_DMA
->  	tristate "i.MX DMA support"
-> -- 
-> 1.7.5.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+we have drivers compiling on multiple OMAP versions without those hacks.
+Generally, we check the IP revision for that. Don't you have a Revision
+register of some sort ?
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111108/2d7f082a/attachment.sig>
