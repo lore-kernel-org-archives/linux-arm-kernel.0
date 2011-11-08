@@ -1,38 +1,49 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 08 Nov 2011 08:54:35 -0800
-Subject: [PATCH v8 15/16] ARM: LPAE: add support for ATAG_MEM64
-In-Reply-To: <1320682618-1182-16-git-send-email-catalin.marinas@arm.com>
-References: <1320682618-1182-1-git-send-email-catalin.marinas@arm.com>
- <1320682618-1182-16-git-send-email-catalin.marinas@arm.com>
-Message-ID: <4EB95ECB.8060905@codeaurora.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 8 Nov 2011 08:56:18 -0800
+Subject: [GIT PULL v3] ARM: OMAP: Cortex-A9 PERIPHCLK node for 3.2
+In-Reply-To: <CAMQu2gwAezM7WZRyZFijYf0vLGEWRaUOGkyctBp=9A5+7oV=tA@mail.gmail.com>
+References: <alpine.DEB.2.00.1110101342010.5205@utopia.booyaka.com>
+ <alpine.DEB.2.00.1110101415560.5205@utopia.booyaka.com>
+ <alpine.DEB.2.00.1110101840440.5205@utopia.booyaka.com>
+ <20111105005312.GQ31337@atomide.com>
+ <alpine.DEB.2.00.1111080051471.12394@utopia.booyaka.com>
+ <CAMQu2gwAezM7WZRyZFijYf0vLGEWRaUOGkyctBp=9A5+7oV=tA@mail.gmail.com>
+Message-ID: <20111108165618.GK31337@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/7/2011 8:16 AM, Catalin Marinas wrote:
-> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-> index 7e7977a..223af71 100644
-> --- a/arch/arm/kernel/setup.c
-> +++ b/arch/arm/kernel/setup.c
-> @@ -638,6 +638,29 @@ static int __init parse_tag_mem32(const struct tag *tag)
->  
->  __tagtable(ATAG_MEM, parse_tag_mem32);
->  
-> +static int __init parse_tag_mem64(const struct tag *tag)
-> +{
-> +	/* We only use 32-bits for the size. */
-> +	unsigned long size;
-> +	phys_addr_t start, end;
-> +
-> +	start = tag->u.mem64.start;
-> +	size = tag->u.mem64.size;
-> +	end = start + size;
-> +
-> +	/* Ensure that the memory region is in range. */
-> +	if (end & ~PHYS_MASK)
-> +		pr_warning("Ignoring out-of-range mem64 tag (%.8llx-%.8llx)\n",
+* Shilimkar, Santosh <santosh.shilimkar@ti.com> [111107 23:33]:
+> On Tue, Nov 8, 2011 at 1:23 PM, Paul Walmsley <paul@pwsan.com> wrote:
+> > On Fri, 4 Nov 2011, Tony Lindgren wrote:
+> >
+> >> * Paul Walmsley <paul@pwsan.com> [111010 17:09]:
+> >> > The following changes since commit be73246058737beec52ae232bcab7776332a9e06:
+> >> >
+> >> > ? ARM: OMAP2+: Remove custom init_irq for remaining boards (2011-09-26 17:50:37 -0700)
+> >> >
+> >> > are available in the git repository at:
+> >> > ? git://git.pwsan.com/linux-2.6 clock_hwmod_devel_3.2
+> >> >
+> >> > This pull request drops the EHCI/OHCI hwmod data due to some
+> >> > inconsistencies that were just found in the data.
+> >> >
+> >> > Santosh Shilimkar (1):
+> >> > ? ? ? ARM: OMAP4: clock: Add CPU local timer clock node.
+> >> >
+> >> > ?arch/arm/mach-omap2/clock44xx_data.c | ? ?9 +++++++++
+> >> > ?1 files changed, 9 insertions(+), 0 deletions(-)
+> >>
+> >> Should this be pulled into fixes for v3.2 -rc cycle?
+> >
+> > Santosh would be the right person to ask. ?Santosh, is anything broken in
+> > 3.2 if this patch doesn't get merged in -rc? ?Or is it just a feature
+> > which could be added in 3.3?
+> >
+> Nope nothing broken now since OMAP CPUFreq has not
+> got into mainline yet. We need this patch to present once we
+> start supporting MPU frequency scaling which I guess would
+> happen now in 3.3.
 
-Can you add 0x (or #) here so we can see the 0x hex part?
+OK thanks for the update.
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Tony
