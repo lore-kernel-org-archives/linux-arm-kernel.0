@@ -1,56 +1,28 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Tue, 08 Nov 2011 16:11:17 +0000
-Subject: [RFC 6/6] ARM: vexpress: DT-based support for Coretile Express
- A5x2 (V2P-CA5s)
-In-Reply-To: <4EB93E02.9000100@gmail.com>
-References: <1320758169-22668-1-git-send-email-pawel.moll@arm.com>
- <1320758169-22668-7-git-send-email-pawel.moll@arm.com>
- <4EB93E02.9000100@gmail.com>
-Message-ID: <1320768677.3259.115.camel@hornet.cambridge.arm.com>
+From: joerg.roedel@amd.com (Joerg Roedel)
+Date: Tue, 8 Nov 2011 17:11:05 +0100
+Subject: [PATCH] arm: cpuidle34xx.c: Fix compile error
+Message-ID: <1320768665-9759-1-git-send-email-joerg.roedel@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2011-11-08 at 14:34 +0000, Rob Herring wrote:
-> I really think v2p-ca5s.c and v2p-ca9.c should be combined into 1 file.
-> There's a lot of duplication and the parts that are different can go in
-> the DT.
+Add missing module.h include to provide THIS_MODULE.
 
-As I mentioned in the cover letter - that's the goal. My (minor) worry
-is how to treat such file... The A5 and A9 are very similar indeed, but
-A7/A15 are slightly different. So there would be "a5_and_a9.c" and
-"a7_and_a15.c" and "64bit_chip.c"... I'll see how it works.
+Signed-off-by: Joerg Roedel <joerg.roedel@amd.com>
+---
+ arch/arm/mach-omap2/cpuidle34xx.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-> > +                     uart0: uart at 090000 {
-> 
-> Use generic names:
-> 
-> s/uart/serial/
-
-Ok, will do.
-
-> > +     memory {
-> 
-> memory at 80000000
-
-Ok.
-
-> > +#ifdef CONFIG_SMP
-> > +static void v2p_ca5s_init_cpu_map(void)
-> > +{
-> > +     int i, ncores = scu_get_core_count(V2TILE_PERIPH_P2V(A5_MPCORE_SCU));
-> 
-> This works on A9, does it work on A5? 
-> 
->         /* Get SCU base */
->         asm("mrc p15, 4, %0, c15, c0, 0" : "=r" (base));
-
-Cool, didn't know about this :-) And as this is a PERIPHBASE value
-(http://infocenter.arm.com/help/topic/com.arm.doc.ddi0407g/CACCJFCJ.html) it could help with TWD as well. 
-
-> If not, an SCU binding should be created.
-
-I'll do one or the other.
-
-Thanks!
-
-Pawel
+diff --git a/arch/arm/mach-omap2/cpuidle34xx.c b/arch/arm/mach-omap2/cpuidle34xx.c
+index 1fe35c2..158c17e 100644
+--- a/arch/arm/mach-omap2/cpuidle34xx.c
++++ b/arch/arm/mach-omap2/cpuidle34xx.c
+@@ -24,6 +24,7 @@
+ 
+ #include <linux/sched.h>
+ #include <linux/cpuidle.h>
++#include <linux/module.h>
+ 
+ #include <plat/prcm.h>
+ #include <plat/irqs.h>
+-- 
+1.7.5.4
