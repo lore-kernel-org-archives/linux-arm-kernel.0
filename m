@@ -1,21 +1,38 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Tue, 8 Nov 2011 18:43:26 +0200
-Subject: [PATCH v4 0/7] iommu: split mapping to page sizes as supported by
- the hardware
-In-Reply-To: <20111108162311.GB5182@amd.com>
-References: <1318850846-16066-1-git-send-email-ohad@wizery.com>
- <CAK=Wgbb5K+rqPNdM2sC8z+9d4-hdcPwV-vXk6gcAYWaO+dVx3w@mail.gmail.com>
- <20111108140133.GD2113@amd.com>
- <CAK=WgbYiF04i8XRkn+YQhd=z6uDRwr8JEiWP1CLFLjM7Y+xWKg@mail.gmail.com>
- <20111108162311.GB5182@amd.com>
-Message-ID: <CAK=WgbaeB5B5ygB58YeANaVraah7ifRa+=hN3AacYv1qt=jYKA@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 08 Nov 2011 08:54:35 -0800
+Subject: [PATCH v8 15/16] ARM: LPAE: add support for ATAG_MEM64
+In-Reply-To: <1320682618-1182-16-git-send-email-catalin.marinas@arm.com>
+References: <1320682618-1182-1-git-send-email-catalin.marinas@arm.com>
+ <1320682618-1182-16-git-send-email-catalin.marinas@arm.com>
+Message-ID: <4EB95ECB.8060905@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 8, 2011 at 6:23 PM, Joerg Roedel <Joerg.Roedel@amd.com> wrote:
-> Does not apply cleanly. Can you please rebase against v3.2-rc1 and
-> resend?
+On 11/7/2011 8:16 AM, Catalin Marinas wrote:
+> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+> index 7e7977a..223af71 100644
+> --- a/arch/arm/kernel/setup.c
+> +++ b/arch/arm/kernel/setup.c
+> @@ -638,6 +638,29 @@ static int __init parse_tag_mem32(const struct tag *tag)
+>  
+>  __tagtable(ATAG_MEM, parse_tag_mem32);
+>  
+> +static int __init parse_tag_mem64(const struct tag *tag)
+> +{
+> +	/* We only use 32-bits for the size. */
+> +	unsigned long size;
+> +	phys_addr_t start, end;
+> +
+> +	start = tag->u.mem64.start;
+> +	size = tag->u.mem64.size;
+> +	end = start + size;
+> +
+> +	/* Ensure that the memory region is in range. */
+> +	if (end & ~PHYS_MASK)
+> +		pr_warning("Ignoring out-of-range mem64 tag (%.8llx-%.8llx)\n",
 
-sure!
+Can you add 0x (or #) here so we can see the 0x hex part?
 
-will refresh and resend.
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
