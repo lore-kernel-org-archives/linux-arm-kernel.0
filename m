@@ -1,20 +1,27 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Tue, 8 Nov 2011 16:03:09 +0200
-Subject: [PATCH v4 0/7] iommu: split mapping to page sizes as supported by
- the hardware
-In-Reply-To: <20111108140133.GD2113@amd.com>
-References: <1318850846-16066-1-git-send-email-ohad@wizery.com>
- <CAK=Wgbb5K+rqPNdM2sC8z+9d4-hdcPwV-vXk6gcAYWaO+dVx3w@mail.gmail.com>
- <20111108140133.GD2113@amd.com>
-Message-ID: <CAK=WgbYiF04i8XRkn+YQhd=z6uDRwr8JEiWP1CLFLjM7Y+xWKg@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 8 Nov 2011 14:05:58 +0000
+Subject: Error for machine_is_m28evk
+In-Reply-To: <20111108133744.GE12913@n2100.arm.linux.org.uk>
+References: <CAOMZO5C4=ELWef8keoT8u0H8jTPRGQ5BA_8xYyKge++s+wdNqw@mail.gmail.com>
+ <4EB8CC7B.5060503@denx.de> <20111108075349.GK2854@pengutronix.de>
+ <CAB4PhKeKdGLa74W-n1DNbUcszWMf3nymqqhuzdZoj_oQG+YNsg@mail.gmail.com>
+ <20111108085350.GX12913@n2100.arm.linux.org.uk>
+ <20111108125346.GA7563@S2100-06.ap.freescale.net>
+ <20111108133744.GE12913@n2100.arm.linux.org.uk>
+Message-ID: <20111108140557.GC10538@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 8, 2011 at 4:01 PM, Joerg Roedel <Joerg.Roedel@amd.com> wrote:
-> On Tue, Nov 08, 2011 at 02:57:02PM +0200, Ohad Ben-Cohen wrote:
->> Joerg, gentle reminder. thanks.
->
-> Just wanted to wait until -rc1 is out and I can start merging
-> new stuff :)
+On Tue, Nov 08, 2011 at 01:37:44PM +0000, Russell King - ARM Linux wrote:
+> (b) with the loss of facilities like kautobuild (no one noticed for six
+>     months that simtec had shut it down...), we have lost any kind of
+>     automated detection for these kinds of issues.
 
-np, thanks :)
+Have Simtec /actually/ shut this down, or did it just die when kernel.org
+was hacked and nobody has poked it since then?
+
+The website is still up and doesn't seem to mention its demise:
+
+http://armlinux.simtec.co.uk/kautobuild/
+
+Will
