@@ -1,63 +1,66 @@
-From: tom.leiming@gmail.com (tom.leiming at gmail.com)
-Date: Tue,  8 Nov 2011 12:36:14 +0800
-Subject: [PATCH] arm: omap2: select ARM_AMBA if OMAP3_EMU is defined
-Message-ID: <1320726974-11912-1-git-send-email-tom.leiming@gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 08 Nov 2011 14:00:19 +0900
+Subject: [GIT PULL] Samsung Exynos for v3.2
+In-Reply-To: <201111061619.36283.arnd@arndb.de>
+References: <02dd01cc9b4e$0cb27c80$26177580$%kim@samsung.com>
+ <4EB61826.4070601@samsung.com> <201111061619.36283.arnd@arndb.de>
+Message-ID: <04e901cc9dd3$50487d50$f0d977f0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ming Lei <tom.leiming@gmail.com>
+Arnd Bergmann wrote:
+> 
+> On Sunday 06 November 2011, Kukjin Kim wrote:
+> > As I replied, I re-based 'next-samsung-exynos' based on latest mainline.
+> >
+> > So changes since previous pull request:
+> >
+> > The following changes since commit
+> c861cd3e92d92ae946e19099f198018fcb4fd887:
+> >
+> >    Merge branch 'next/devel2' of
+> > git://git.linaro.org/people/arnd/arm-soc (2011-11-05 18:21:21 -0700)
+> >
+> > are available in the git repository at:
+> >
+> >    git://github.com/kgene/linux-samsung.git next-samsung-exynos
+> >
+> > Others same, if any problems, please kindly let me know.
+> 
+> Ok, looks good. I'll forward the pull request right away.
+> 
+Thanks and I checked they are in mainline now :)
 
-This patch selects ARM_AMBA if OMAP3_EMU is defined because
-OC_ETM depends on ARM_AMBA, so fix the link failure[1].
+> One thing that I noticed in your new Kconfig file is this however:
+> 
+> | choice
+> |         prompt "EXYNOS System Type"
+> |         default ARCH_EXYNOS4
+> | config ARCH_EXYNOS4
+> |         bool "SAMSUNG EXYNOS4"
+> |         help
+> |           Samsung EXYNOS4 SoCs based systems
+> | endchoice
+> 
+> This looks like the idea is to make the future EXYNOS5 and later SoCs a
+> separate "choice" that is mutually exclusive with EXYNOS4.
+> 
+> This seems to be a significant limitation considering that we are working
+> hard on making all platforms coexist in the same kernel binary.
+> 
+> Are there strong technical reasons why you could not build EXYNOS4 and
+> EXYNOS5 into a combined kernel? If this is at all possible, I would
+> recommend trying hard to do it when you add EXYNOS5.
+> 
+Yes, as you pointed out, I need to sort out the physical addresses
+(mach/map.h) and interrupt numbers (mach/irqs.h) for single zImage on exynos
+now. But I think, the 'choice' will be changed to just 'config' for
+multi-selecting when EXYNOS5 is supported.
 
-[1],
-arch/arm/kernel/built-in.o: In function `etm_remove':
-/home/tom/git/omap/linux-2.6-omap/arch/arm/kernel/etm.c:609: undefined
-reference to `amba_release_regions'
-arch/arm/kernel/built-in.o: In function `etb_remove':
-/home/tom/git/omap/linux-2.6-omap/arch/arm/kernel/etm.c:409: undefined
-reference to `amba_release_regions'
-arch/arm/kernel/built-in.o: In function `etm_init':
-/home/tom/git/omap/linux-2.6-omap/arch/arm/kernel/etm.c:640: undefined
-reference to `amba_driver_register'
-/home/tom/git/omap/linux-2.6-omap/arch/arm/kernel/etm.c:646: undefined
-reference to `amba_driver_register'
-/home/tom/git/omap/linux-2.6-omap/arch/arm/kernel/etm.c:648: undefined
-reference to `amba_driver_unregister'
-arch/arm/kernel/built-in.o: In function `etm_probe':
-/home/tom/git/omap/linux-2.6-omap/arch/arm/kernel/etm.c:545: undefined
-reference to `amba_request_regions'
-/home/tom/git/omap/linux-2.6-omap/arch/arm/kernel/etm.c:595: undefined
-reference to `amba_release_regions'
-arch/arm/kernel/built-in.o: In function `etb_probe':
-/home/tom/git/omap/linux-2.6-omap/arch/arm/kernel/etm.c:347: undefined
-reference to `amba_request_regions'
-/home/tom/git/omap/linux-2.6-omap/arch/arm/kernel/etm.c:392: undefined
-reference to `amba_release_regions'
-arch/arm/mach-omap2/built-in.o: In function `emu_init':
-/home/tom/git/omap/linux-2.6-omap/arch/arm/mach-omap2/emu.c:62:
-undefined reference to `amba_device_register'
-/home/tom/git/omap/linux-2.6-omap/arch/arm/mach-omap2/emu.c:63:
-undefined reference to `amba_device_register'
-make: *** [.tmp_vmlinux1] Error 1
-making modules
+Thanks.
 
-Signed-off-by: Ming Lei <tom.leiming@gmail.com>
----
- arch/arm/mach-omap2/Kconfig |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-index 5034147..e1293aa 100644
---- a/arch/arm/mach-omap2/Kconfig
-+++ b/arch/arm/mach-omap2/Kconfig
-@@ -334,6 +334,7 @@ config MACH_OMAP4_PANDA
- config OMAP3_EMU
- 	bool "OMAP3 debugging peripherals"
- 	depends on ARCH_OMAP3
-+	select ARM_AMBA
- 	select OC_ETM
- 	help
- 	  Say Y here to enable debugging hardware of omap3
--- 
-1.7.5.4
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
