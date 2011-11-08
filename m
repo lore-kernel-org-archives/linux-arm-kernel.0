@@ -1,56 +1,32 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Tue, 08 Nov 2011 15:22:59 -0500 (EST)
-Subject: [PATCHv3 2/2] msm: Support DEBUG_LL on MSM8660 and MSM8960
-In-Reply-To: <20111108195956.GA13998@huya.qualcomm.com>
-References: <1320777184-22446-1-git-send-email-sboyd@codeaurora.org>
- <1320777184-22446-3-git-send-email-sboyd@codeaurora.org>
- <alpine.LFD.2.02.1111081406220.3307@xanadu.home>
- <4EB97F83.3070509@codeaurora.org> <20111108195956.GA13998@huya.qualcomm.com>
-Message-ID: <alpine.LFD.2.02.1111081521110.3307@xanadu.home>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 8 Nov 2011 21:26:20 +0100
+Subject: [PATCH 2/5] dma i.MX: remove individual SOC dependency
+In-Reply-To: <1320768633.32205.147.camel@vkoul-udesk3>
+References: <1314168072-13822-1-git-send-email-s.hauer@pengutronix.de>
+ <1314168072-13822-3-git-send-email-s.hauer@pengutronix.de>
+ <20111108152239.GA9641@pengutronix.de>
+ <1320768633.32205.147.camel@vkoul-udesk3>
+Message-ID: <20111108202620.GB13122@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 8 Nov 2011, David Brown wrote:
-
-> On Tue, Nov 08, 2011 at 11:14:11AM -0800, Stephen Boyd wrote:
-> > On 11/08/11 11:08, Nicolas Pitre wrote:
-> > > Independently from this patch, I was wondering about this code:
-> > >
-> > >> +	.macro	senduart, rd, rx
-> > >> +#ifdef CONFIG_MSM_HAS_DEBUG_UART_HS
-> > >> +	@ Write the 1 character to UARTDM_TF
-> > >> +	str	\rd, [\rx, #0x70]
-> > >> +#else
-> > >>  	teq	\rx, #0
-> > >>  	strne	\rd, [\rx, #0x0C]
-> > >> +#endif
-> > >>  	.endm
-> > > Why testing for zero in the #else part?  The upper level code should 
-> > > never call this macro with a null byte.
+On Tue, Nov 08, 2011 at 09:40:33PM +0530, Vinod Koul wrote:
+> On Tue, 2011-11-08 at 16:22 +0100, Sascha Hauer wrote:
+> > Vinod,
 > > 
-> > I was wondering the same thing, I don't know why that test for null is
-> > there. I will dust off the old 7201a (literally) and see what I can find
-> > out. It certainly looks unnecessary.
+> > Ping. Can you please queue this one?
+> Sorry Sascha, looks like I have missed this one :(
 > 
-> Perhaps this is a better fix?  Google removed the 7201a code from
-> their tree quite a while back.  I don't have any more working hardware
-> to test things with.
-> 
-> David
-> 
-> >From b4a76f1561d35d043f9266f8fe47725389ea7ba9 Mon Sep 17 00:00:00 2001
-> From: David Brown <davidb@codeaurora.org>
-> Date: Tue, 8 Nov 2011 11:44:05 -0800
-> Subject: [PATCH] ARM: msm: Mark 720x targets as broken
-> 
-> The 720x code is bitrotting.  These have only been compile tested for
-> quite some time.  Mark as broken now so they can be removed after a
-> while.
-> 
-> Signed-off-by: David Brown <davidb@codeaurora.org>
+> Nevertheless, this seems to be part of a series, but I couldn't locate
+> the rest.
+> Do you want me to apply only this individual patch, seems little odd if
+> thats the case...
+It was part of a series that removes SOC dependencies in different
+subsystems. So it's right that each patch goes via a different
+maintainer.
 
-I certainly have no problem with that.  Keeping unused code in the tree 
-just increases maintenance costs for no gain.
-
-
-Nicolas
+Best regards
+Uwe
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
