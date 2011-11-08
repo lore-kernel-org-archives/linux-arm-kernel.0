@@ -1,34 +1,60 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 08 Nov 2011 11:14:11 -0800
-Subject: [PATCHv3 2/2] msm: Support DEBUG_LL on MSM8660 and MSM8960
-In-Reply-To: <alpine.LFD.2.02.1111081406220.3307@xanadu.home>
-References: <1320777184-22446-1-git-send-email-sboyd@codeaurora.org>
- <1320777184-22446-3-git-send-email-sboyd@codeaurora.org>
- <alpine.LFD.2.02.1111081406220.3307@xanadu.home>
-Message-ID: <4EB97F83.3070509@codeaurora.org>
+From: khilman@ti.com (Kevin Hilman)
+Date: Tue, 08 Nov 2011 11:20:57 -0800
+Subject: [PATCH v7 17/21] OMAP2+: UART: Remove omap_uart_can_sleep and add
+ pm_qos
+In-Reply-To: <4EB8F368.5070603@ti.com> (Rajendra Nayak's message of "Tue, 08
+ Nov 2011 14:46:24 +0530")
+References: <1318952110-10659-1-git-send-email-govindraj.raja@ti.com>
+ <1318952110-10659-3-git-send-email-govindraj.raja@ti.com>
+ <87vcqz33y8.fsf@ti.com> <4EB8F368.5070603@ti.com>
+Message-ID: <87r51i1kva.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/08/11 11:08, Nicolas Pitre wrote:
-> Independently from this patch, I was wondering about this code:
->
->> +	.macro	senduart, rd, rx
->> +#ifdef CONFIG_MSM_HAS_DEBUG_UART_HS
->> +	@ Write the 1 character to UARTDM_TF
->> +	str	\rd, [\rx, #0x70]
->> +#else
->>  	teq	\rx, #0
->>  	strne	\rd, [\rx, #0x0C]
->> +#endif
->>  	.endm
-> Why testing for zero in the #else part?  The upper level code should 
-> never call this macro with a null byte.
->
+Rajendra Nayak <rnayak@ti.com> writes:
 
-I was wondering the same thing, I don't know why that test for null is
-there. I will dust off the old 7201a (literally) and see what I can find
-out. It certainly looks unnecessary.
+> Hi Kevin,
+>
+> On Saturday 05 November 2011 04:12 AM, Kevin Hilman wrote:
+>> However, as mentioned previously[1], due to a HW sleepdep between MPU
+>> and CORE, this constraint isn't actually needed for CORE UARTs, so it's
+>> a bit wasteful to go through all the constraint setting for no reason.
+>
+> I had a short chat with Govind on this and was trying to understand
+> this better.
+> Are you referring to the 'autodeps' for omap3 here, because they would
+> prevent any clock domain from idling as long as MPU or IVA are active,
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+No, I was thinking of HW sleepdeps.  However, I looked back at the
+OMAP3430 TRM and see that MPU does not have a HW sleepdep on CORE like I
+thought.
+
+> but not the other way round. Which means MPU can still idle, while CORE
+> does not.
+>
+> My guess was, its probably the CORE domain idling itself thats causing
+> the UART sluggishness, (and not MPU idling), due to higher latency,
+> which is prevented with an active UART module in CORE, but not in PER.
+
+OK, that indeed makes sense.  Thanks for correcting me.
+
+> So Govind did a small experiment to prevent just CORE idling and let MPU
+> idle alone and that did not show any sluggishness.
+
+OK, good.
+
+> Now, putting a pm-qos constraint for a UART in CORE still looks
+> redundant because the latency requirement that UART has is in
+> some way *indirectly* met (because the active UART in CORE prevents
+> CORE transitions in idle).
+> But don't you think the UART driver should express its
+> latency constraints regardless, without thinking of any indirect ways
+> in which the same requirements would have already been met?
+
+Yes, you're right.  The driver should not need to know which powerdomain
+a given UART is in.  It's probably best (and most portable) to have UART
+always express its requirements all the time.
+
+Thanks for digging into this,
+
+Kevin
