@@ -1,44 +1,53 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 8 Nov 2011 16:59:05 +0000
-Subject: [PATCH v8 15/16] ARM: LPAE: add support for ATAG_MEM64
-In-Reply-To: <4EB95ECB.8060905@codeaurora.org>
-References: <1320682618-1182-1-git-send-email-catalin.marinas@arm.com>
- <1320682618-1182-16-git-send-email-catalin.marinas@arm.com>
- <4EB95ECB.8060905@codeaurora.org>
-Message-ID: <20111108165905.GF10506@arm.com>
+From: dirk.behme@googlemail.com (Dirk Behme)
+Date: Tue, 08 Nov 2011 18:20:12 +0100
+Subject: [PATCH] distclean: Remove generated .dtb files
+In-Reply-To: <4EB7E24D.8080804@gmail.com>
+References: <1320473955-4500-1-git-send-email-dirk.behme@de.bosch.com>
+ <4EB7E24D.8080804@gmail.com>
+Message-ID: <4EB964CC.5050004@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 08, 2011 at 04:54:35PM +0000, Stephen Boyd wrote:
-> On 11/7/2011 8:16 AM, Catalin Marinas wrote:
-> > diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-> > index 7e7977a..223af71 100644
-> > --- a/arch/arm/kernel/setup.c
-> > +++ b/arch/arm/kernel/setup.c
-> > @@ -638,6 +638,29 @@ static int __init parse_tag_mem32(const struct tag *tag)
-> >  
-> >  __tagtable(ATAG_MEM, parse_tag_mem32);
-> >  
-> > +static int __init parse_tag_mem64(const struct tag *tag)
-> > +{
-> > +	/* We only use 32-bits for the size. */
-> > +	unsigned long size;
-> > +	phys_addr_t start, end;
-> > +
-> > +	start = tag->u.mem64.start;
-> > +	size = tag->u.mem64.size;
-> > +	end = start + size;
-> > +
-> > +	/* Ensure that the memory region is in range. */
-> > +	if (end & ~PHYS_MASK)
-> > +		pr_warning("Ignoring out-of-range mem64 tag (%.8llx-%.8llx)\n",
-> 
-> Can you add 0x (or #) here so we can see the 0x hex part?
+On 07.11.2011 14:51, Rob Herring wrote:
+> On 11/05/2011 01:19 AM, Dirk Behme wrote:
+>> The patch 'arm/dt: Add dtb make rule' adds support to
+>> create a .dtb file. But this is never removed afterwards.
+>> Remove the generated .dtb file if 'distclean' is called.
+>>
+>> Signed-off-by: Dirk Behme<dirk.behme@de.bosch.com>
+>> CC: Rob Herring<rob.herring@calxeda.com>
+>> CC: Shawn Guo<shawn.guo@freescale.com>
+>> CC: Jason Liu<jason.hui@linaro.org>
+>> CC: Grant Likely<grant.likely@secretlab.ca>
+>> ---
+>
+> Acked-by: Rob Herring<rob.herring@calxeda.com>
+...
+> Acked-by: Grant Likely <grant.likely@secretlab.ca>
 
-There are some inconsistencies across the kernel, we just used the
-printk format found in sanity_check_meminfo(). I don't have a problem
-with changing this, though maybe some separate clean-up patch would be
-better.
+Submitted to Russell King's Patch Tracking System:
 
--- 
-Catalin
+http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7152/1
+
+Thanks
+
+Dirk
+
+>>   arch/arm/boot/Makefile |    2 ++
+>>   1 files changed, 2 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/Makefile b/arch/arm/boot/Makefile
+>> index 1cd9b0a..08f0d35 100644
+>> --- a/arch/arm/boot/Makefile
+>> +++ b/arch/arm/boot/Makefile
+>> @@ -71,6 +71,8 @@ $(obj)/%.dtb: $(src)/dts/%.dts
+>>
+>>   $(obj)/dtbs: $(addprefix $(obj)/, $(dtb-y))
+>>
+>> +clean-files := *.dtb
+>> +
+>>   quiet_cmd_uimage = UIMAGE  $@
+>>         cmd_uimage = $(CONFIG_SHELL) $(MKIMAGE) -A arm -O linux -T kernel \
+>>   		   -C none -a $(LOADADDR) -e $(STARTADDR) \
+>
+>
