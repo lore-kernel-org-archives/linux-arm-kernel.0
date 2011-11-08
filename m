@@ -1,71 +1,42 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 8 Nov 2011 08:26:52 -0700 (MST)
-Subject: [PATCH v5 4/7] arm: omap4: hwmod: introduce emu hwmod
-In-Reply-To: <1319467559-5518-5-git-send-email-ming.lei@canonical.com>
-References: <1319467559-5518-1-git-send-email-ming.lei@canonical.com>
- <1319467559-5518-5-git-send-email-ming.lei@canonical.com>
-Message-ID: <alpine.DEB.2.00.1111080750130.10451@utopia.booyaka.com>
+From: N.Voss@weinmann.de (Voss, Nikolaus)
+Date: Tue, 8 Nov 2011 16:35:21 +0100
+Subject: [PATCH V3 2/4] drivers/i2c/busses/i2c-at91.c: add new driver
+In-Reply-To: <20111108144115.GH20728@legolas.emea.dhcp.ti.com>
+References: <cover.1320753142.git.n.voss@weinmann.de>
+ <7bdd6b456b0e055441cb25634c8cb6d483718f6c.1320753142.git.n.voss@weinmann.de>
+ <20111108144115.GH20728@legolas.emea.dhcp.ti.com>
+Message-ID: <EF2E73589CA71846A15D0B2CDF79505D087B38B899@wm021.weinmann.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+Hi,
 
-some comments
-
-On Mon, 24 Oct 2011, ming.lei at canonical.com wrote:
-
-> From: Ming Lei <ming.lei@canonical.com>
+> > +#include <mach/at91_twi.h>
+> > +#include <mach/board.h>
+> > +#include <mach/cpu.h>
 > 
-> So that access to cross trigger interface can be allowed, which
-> will be introduce in later patches.
+> avoid including <mach/*> on drivers.
+
+Should I move at91_twi.h to include/linux (omap does it like this,
+other use the mach-include)?
+
+
+> > +	if (irqstatus & AT91_TWI_TXCOMP) {
+> > +		at91_disable_twi_interrupts(dev);
+> > +		dev->transfer_status = status;
+> > +		complete(&dev->cmd_complete);
+> > +	}
+> > +	else if (irqstatus & AT91_TWI_RXRDY) {
+> > +		at91_twi_read_next_byte(dev);
+> > +	}
+> > +	else if (irqstatus & AT91_TWI_TXRDY) {
+> > +		at91_twi_write_next_byte(dev);
+> > +	}
+> > +	else {
+> > +		return IRQ_NONE;
 > 
-> Signed-off-by: Ming Lei <ming.lei@canonical.com>
-> ---
->  arch/arm/mach-omap2/omap_hwmod_44xx_data.c |   26 ++++++++++++++++++++++++++
->  1 files changed, 26 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-> index 393afac..c7289a8 100644
-> --- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-> @@ -5276,6 +5276,30 @@ static struct omap_hwmod omap44xx_wd_timer3_hwmod = {
->  	.slaves_cnt	= ARRAY_SIZE(omap44xx_wd_timer3_slaves),
->  };
->  
-> +static struct omap_hwmod_class omap44xx_emu_hwmod_class = {
-> +	.name	= "emu",
-> +};
-> +
-> +static struct omap_hwmod_irq_info omap44xx_emu_irqs[] = {
-> +	{ .name = "cti0", .irq = 1 + OMAP44XX_IRQ_GIC_START },
-> +	{ .name = "cti1", .irq = 2 + OMAP44XX_IRQ_GIC_START },
-> +	{ .irq = -1 }
-> +};
+> coding style is wrong. Also, are those IRQ events really mutually exclusive ??
 
-Are you sure these are part of the emulation IP?  We already have those 
-IRQs in the MPU hwmod, see omap44xx_mpu_irqs[] in the same file.
+These are indeed mutually exclusive (semantically).
 
-> +/*emu hwmod*/
-> +static struct omap_hwmod omap44xx_emu_hwmod = {
-> +	.name		= "emu",
-> +	.class		= &omap44xx_emu_hwmod_class,
-> +	.clkdm_name	= "emu_sys_clkdm",
-> +	.prcm = {
-> +		.omap4 = {
-> +			.clkctrl_offs = OMAP4_CM_EMU_CLKSTCTRL_OFFSET,
-
-This doesn't look right either: EMU is a clockdomain, not an IP block.
-
-> +			.modulemode   = MODULEMODE_HWCTRL,
-> +		},
-> +	},
-> +	.mpu_irqs	= omap44xx_emu_irqs,
-> +};
-> +
->  static __initdata struct omap_hwmod *omap44xx_hwmods[] = {
->  
->  	/* dmm class */
-
-
-
-- Paul
+Niko
