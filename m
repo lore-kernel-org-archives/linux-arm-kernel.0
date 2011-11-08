@@ -1,44 +1,49 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 8 Nov 2011 23:25:42 +0000
-Subject: [PATCH v6 09/11] ARM: pxa: change gpio to platform device
-In-Reply-To: <1320747859-8366-10-git-send-email-haojian.zhuang@marvell.com>
+Date: Tue, 8 Nov 2011 23:28:10 +0000
+Subject: [PATCH v6 11/11] ARM: pxa: add clk support in gpio driver
+In-Reply-To: <1320747859-8366-12-git-send-email-haojian.zhuang@marvell.com>
 References: <1320747859-8366-1-git-send-email-haojian.zhuang@marvell.com>
- <1320747859-8366-10-git-send-email-haojian.zhuang@marvell.com>
-Message-ID: <20111108232542.GL12913@n2100.arm.linux.org.uk>
+ <1320747859-8366-12-git-send-email-haojian.zhuang@marvell.com>
+Message-ID: <20111108232810.GM12913@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 08, 2011 at 06:24:17PM +0800, Haojian Zhuang wrote:
-> diff --git a/arch/arm/mach-mmp/include/mach/gpio.h b/arch/arm/mach-mmp/include/mach/gpio.h
-> index 904466d..13219eb 100644
-> --- a/arch/arm/mach-mmp/include/mach/gpio.h
-> +++ b/arch/arm/mach-mmp/include/mach/gpio.h
-> @@ -3,7 +3,6 @@
+On Tue, Nov 08, 2011 at 06:24:19PM +0800, Haojian Zhuang wrote:
+> diff --git a/drivers/gpio/gpio-pxa.c b/drivers/gpio/gpio-pxa.c
+> index bfd7555..1a6b150 100644
+> --- a/drivers/gpio/gpio-pxa.c
+> +++ b/drivers/gpio/gpio-pxa.c
+> @@ -11,6 +11,8 @@
+>   *  it under the terms of the GNU General Public License version 2 as
+>   *  published by the Free Software Foundation.
+>   */
+> +#include <linux/clk.h>
+> +#include <linux/err.h>
+>  #include <linux/gpio.h>
+>  #include <linux/gpio-pxa.h>
+>  #include <linux/init.h>
+> @@ -466,6 +468,7 @@ static int __devinit pxa_gpio_probe(struct platform_device *pdev)
+>  {
+>  	struct pxa_gpio_chip *c;
+>  	struct resource *res;
+> +	struct clk *clk;
+>  	int gpio, irq;
+>  	int irq0 = 0, irq1 = 0, irq_mux, gpio_offset = 0;
 >  
->  #include <asm-generic/gpio.h>
+> @@ -489,6 +492,15 @@ static int __devinit pxa_gpio_probe(struct platform_device *pdev)
+>  	if (irq0 > 0)
+>  		gpio_offset = 2;
 >  
-> -#define __gpio_is_inverted(gpio)	(0)
-> -#define __gpio_is_occupied(gpio)	(0)
-> +#include <mach/cputype.h>
->  
->  #endif /* __ASM_MACH_GPIO_H */
-> diff --git a/arch/arm/mach-pxa/include/mach/gpio.h b/arch/arm/mach-pxa/include/mach/gpio.h
-> index 561cdbf..0248e43 100644
-> --- a/arch/arm/mach-pxa/include/mach/gpio.h
-> +++ b/arch/arm/mach-pxa/include/mach/gpio.h
-> @@ -25,7 +25,8 @@
->  #define __ASM_ARCH_PXA_GPIO_H
->  
->  #include <asm-generic/gpio.h>
-> -/* The defines for the driver are needed for the accelerated accessors */
-> -#include "gpio-pxa.h"
-> +
-> +#include <mach/irqs.h>
-> +#include <mach/hardware.h>
->  
->  #endif
+> +	clk = clk_get(&pdev->dev, NULL);
+> +	if (IS_ERR(clk)) {
+> +		dev_err(&pdev->dev, "Error %ld to get gpio clock\n",
+> +			PTR_ERR(clk));
+> +		iounmap(gpio_reg_base);
+> +		return PTR_ERR(clk);
+> +	}
+> +	clk_enable(clk);
 
-Could you explain what is going on with the above two files please,
-specifically why those includes are required?
-
-Thanks.
+Please also ensure that you have proper error checking on this.
+Also, extending this to clk_prepare() now would be a good idea so that
+such a change doesn't need to be made separately in the future.  (A
+dummy clk_prepare() is already provided.)  Thanks.
