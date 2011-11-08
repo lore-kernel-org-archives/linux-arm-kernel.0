@@ -1,48 +1,48 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Tue, 8 Nov 2011 07:56:58 -0800
-Subject: [PATCH v3 0/8] Add support for tegra30 and cardhu
-In-Reply-To: <20111108115153.GU29978@tbergstrom-lnx.Nvidia.com>
-References: <1320675617-20751-1-git-send-email-pdeschrijver@nvidia.com>
- <74CDBE0F657A3D45AFBB94109FB122FF173F9A50F3@HQMAIL01.nvidia.com>
- <20111108114559.GT29978@tbergstrom-lnx.Nvidia.com>
- <20111108115153.GU29978@tbergstrom-lnx.Nvidia.com>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF173F9A5394@HQMAIL01.nvidia.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 08 Nov 2011 09:59:17 -0600
+Subject: [PATCH 2/2] ARM: highbank: convert logical CPU numbers to physical
+ numbers
+In-Reply-To: <1320762894-11824-3-git-send-email-will.deacon@arm.com>
+References: <1320762894-11824-1-git-send-email-will.deacon@arm.com>
+ <1320762894-11824-3-git-send-email-will.deacon@arm.com>
+Message-ID: <4EB951D5.9060005@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Peter De Schrijver wrote at Tuesday, November 08, 2011 4:52 AM:
-> On Tue, Nov 08, 2011 at 12:45:59PM +0100, Peter De Schrijver wrote:
-> > On Mon, Nov 07, 2011 at 08:10:29PM +0100, Stephen Warren wrote:
-> > > Peter De Schrijver wrote at Monday, November 07, 2011 7:20 AM:
-> > > > This patchset adds support for the tegra30 SoC and the cardhu development
-> > > > board.
-> > > >
-> > > > Pathset is on top of Will Deacon's ARM reset work.
-> > >
-> > > A few minor issues:
-> > >
-> > > 1) If I enable just ARCH_TEGRA_3x_SOC, but not ARCH_TEGRA_2x_SOC, the
-> > > kernel fails to build because arch/arm/mach-tegra/include/mach/irqs.h
-> > > only defines NR_IRQS if ARCH_TEGRA_2x_SOC is defined.
-> > >
-> > > 2) All the Tegra20 boards don't depend on ARCH_TEGRA_2x_SOC, so they can
-> > > be enabled even if only Tegra30 support is enabled.
-> > >
-> >
-> > Indeed. I also noticed that MACH_VENTANA lacks select MACH_SEABOARD...
+On 11/08/2011 08:34 AM, Will Deacon wrote:
+> This patch uses the new cpu_logical_map() macro for converting logical
+> CPU numbers into physical numbers when releasing CPUs during the SMP
+> boot and CPU hotplug paths.
 > 
-> I take that back. It's not needed.
+> Cc: Rob Herring <rob.herring@calxeda.com>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm/mach-highbank/highbank.c |    2 ++
+>  1 files changed, 2 insertions(+), 0 deletions(-)
 > 
-> > Maybe I should submit a seperate patch to fix all this?
-> >
-> 
-> I will make a patch to cleanup the ARCH_TEGRA_2x_SOC dependencies. Or do you
-> want this as part of the tegra30/cardhu series?
+> diff --git a/arch/arm/mach-highbank/highbank.c b/arch/arm/mach-highbank/highbank.c
+> index b82dcf0..a6cdc27 100644
+> --- a/arch/arm/mach-highbank/highbank.c
+> +++ b/arch/arm/mach-highbank/highbank.c
+> @@ -22,6 +22,7 @@
+>  #include <linux/of_irq.h>
+>  #include <linux/of_platform.h>
+>  #include <linux/of_address.h>
+> +#include <linux/smp.h>
+>  
+>  #include <asm/cacheflush.h>
+>  #include <asm/unified.h>
+> @@ -72,6 +73,7 @@ static void __init highbank_map_io(void)
+>  
+>  void highbank_set_cpu_jump(int cpu, void *jump_addr)
+>  {
+> +	cpu = cpu_logical_map(cpu);
 
-It should be applied before/with the Tegra30/Cardhu series so that when
-Tegra30 support is there, all the correct dependencies are. So, since I
-think you're respinning the Tegra30/Cardhu series, you may as well include
-it in there somewhere, but no big deal if it's posted separately.
+This doesn't build for !CONFIG_SMP. It's possible to want to do this for
+core 0 in the cpuidle case.
 
--- 
-nvpublic
+Rob
+
+>  	writel(BSYM(virt_to_phys(jump_addr)), HB_JUMP_TABLE_VIRT(cpu));
+>  	__cpuc_flush_dcache_area(HB_JUMP_TABLE_VIRT(cpu), 16);
+>  	outer_clean_range(HB_JUMP_TABLE_PHYS(cpu),
