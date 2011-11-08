@@ -1,32 +1,27 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 8 Nov 2011 12:17:35 +0000
-Subject: [PATCH v5 3/7] arm: perf: support device with other non-irq
- resources
-In-Reply-To: <CACVXFVPD90q0euQXXG+3ujyvzxCjAovFSSPKvqf6esU7vkD7Tg@mail.gmail.com>
-References: <1319467559-5518-1-git-send-email-ming.lei@canonical.com>
- <1319467559-5518-4-git-send-email-ming.lei@canonical.com>
- <20111024150814.GA4771@mudshark.cambridge.arm.com>
- <CACVXFVOzQ0QEnaAb=mLFdr7AU3H3TsT=wXcNgtqeUGVLXahd4Q@mail.gmail.com>
- <20111025083420.GA6184@mudshark.cambridge.arm.com>
- <alpine.DEB.2.00.1110250242130.27118@utopia.booyaka.com>
- <CACVXFVOVeuWpVGSUP-sDDbiWb=W8XVB+PDYns4ttK9+ty0GMmA@mail.gmail.com>
- <alpine.DEB.2.00.1110250459160.12667@utopia.booyaka.com>
- <CACVXFVPD90q0euQXXG+3ujyvzxCjAovFSSPKvqf6esU7vkD7Tg@mail.gmail.com>
-Message-ID: <20111108121735.GD28350@mudshark.cambridge.arm.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Tue, 8 Nov 2011 20:53:47 +0800
+Subject: Error for machine_is_m28evk
+In-Reply-To: <20111108085350.GX12913@n2100.arm.linux.org.uk>
+References: <CAOMZO5C4=ELWef8keoT8u0H8jTPRGQ5BA_8xYyKge++s+wdNqw@mail.gmail.com>
+ <4EB8CC7B.5060503@denx.de> <20111108075349.GK2854@pengutronix.de>
+ <CAB4PhKeKdGLa74W-n1DNbUcszWMf3nymqqhuzdZoj_oQG+YNsg@mail.gmail.com>
+ <20111108085350.GX12913@n2100.arm.linux.org.uk>
+Message-ID: <20111108125346.GA7563@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 08, 2011 at 09:25:52AM +0000, Ming Lei wrote:
-> On Tue, Oct 25, 2011 at 7:00 PM, Paul Walmsley <paul@pwsan.com> wrote:
-> >
-> > Beno?t is the right person to review OMAP4 hwmod data.
+On Tue, Nov 08, 2011 at 08:53:50AM +0000, Russell King - ARM Linux wrote:
+[...]
 > 
-> Beno?t, gentle ping, :-)
+> Maybe the answer is to just update the file anyway, and ignore peoples
+> complaints that their entries aren't present until they come to their
+> senses and start COMMUNICATING properly about issues they have with
+> their fscked up entry in the database.
+> 
+So I assume that you will update mach-types for -rc2.  Otherwise,
+please let me know, and I will send a patch to disable m28evk build
+from mxs_defconfig for -rc2.
 
-Note that I've taken the two perf patches into my perf/omap4 branch now:
-
-http://git.kernel.org/?p=linux/kernel/git/will/linux.git;a=shortlog;h=refs/heads/perf/omap4
-
-so it would be really good to see the platform parts getting picked up too.
-
-Will
+-- 
+Regards,
+Shawn
