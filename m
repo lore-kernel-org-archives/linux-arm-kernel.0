@@ -1,49 +1,39 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 8 Nov 2011 14:08:58 +0100
-Subject: [PATCH 1/1] ARM: mx51/53: correct clocks that take ipg_perclk as
- parent
-In-Reply-To: <20111108004130.GB5898@b20223-02.ap.freescale.net>
-References: <1320399263-14885-1-git-send-email-richard.zhao@linaro.org>
- <20111107075254.GQ16886@pengutronix.de>
- <20111108004130.GB5898@b20223-02.ap.freescale.net>
-Message-ID: <20111108130858.GT16886@pengutronix.de>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Tue, 8 Nov 2011 21:09:56 +0800
+Subject: [PATCH v6 01/11] ARM: mmp: fix build error on gpio
+In-Reply-To: <CAB4PhKf_LtiWPDm_angtn1KP7u=pXzZt4N_Bbh52tOQ8mKrC0Q@mail.gmail.com>
+References: <1320747859-8366-1-git-send-email-haojian.zhuang@marvell.com>
+ <1320747859-8366-2-git-send-email-haojian.zhuang@marvell.com>
+ <CAB4PhKf_LtiWPDm_angtn1KP7u=pXzZt4N_Bbh52tOQ8mKrC0Q@mail.gmail.com>
+Message-ID: <CAN1soZzPK_j1OoMPNOGDb-qwPYPYrH1_3VtezKS0VZsGz=m1dA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 08, 2011 at 08:41:31AM +0800, Richard Zhao wrote:
-> On Mon, Nov 07, 2011 at 08:52:54AM +0100, Sascha Hauer wrote:
-> > On Fri, Nov 04, 2011 at 05:34:23PM +0800, Richard Zhao wrote:
-> > > gpt_clk, pwm1_clk and pwm2_clk parent clock are all ipg_perclk.
-> > > 
-> > > Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
-> > > ---
-> > >  arch/arm/mach-mx5/clock-mx51-mx53.c |    6 +++---
-> > >  1 files changed, 3 insertions(+), 3 deletions(-)
-> > > 
-> > > diff --git a/arch/arm/mach-mx5/clock-mx51-mx53.c b/arch/arm/mach-mx5/clock-mx51-mx53.c
-> > > index 2aacf41..a3ca4ce 100644
-> > > --- a/arch/arm/mach-mx5/clock-mx51-mx53.c
-> > > +++ b/arch/arm/mach-mx5/clock-mx51-mx53.c
-> > > @@ -1278,12 +1278,12 @@ DEFINE_CLOCK(uart5_clk, 4, MXC_CCM_CCGR7, MXC_CCM_CCGRx_CG7_OFFSET,
-> > >  DEFINE_CLOCK(gpt_ipg_clk, 0, MXC_CCM_CCGR2, MXC_CCM_CCGRx_CG10_OFFSET,
-> > >  	NULL,  NULL, &ipg_clk, NULL);
-> > >  DEFINE_CLOCK(gpt_clk, 0, MXC_CCM_CCGR2, MXC_CCM_CCGRx_CG9_OFFSET,
-> > > -	NULL,  NULL, &ipg_clk, &gpt_ipg_clk);
-> > > +	NULL,  NULL, &ipg_perclk, &gpt_ipg_clk);
-> > 
-> > No. The gpt has several parents and the one we are using is the ipg
-> > clock. Try a sleep 10 with your patch applied.
-> You are right. Sounds like gpt_clk can not be defined here. Is it better to pass
-> three clocks (ipg, ipg_per, ckil) to gpt driver and let gpt decide what to use?
-> Anyway, it's beyond this patch. I'll keep this line as it was.
+On Tue, Nov 8, 2011 at 7:19 PM, Jason Liu <liu.h.jason@gmail.com> wrote:
+> 2011/11/8 Haojian Zhuang <haojian.zhuang@marvell.com>:
+>> Parameters of GPIO_REG() should be assigned as volatile.
+>>
+>> arch/arm/plat-pxa/include/plat/gpio.h: In function ?gpio_get_value?:
+>> arch/arm/plat-pxa/include/plat/gpio.h:12:21: error: invalid operands to
+>> binary & (have ?void *? and ?int?)
+>> arch/arm/plat-pxa/include/plat/gpio.h: In function ?gpio_set_value?:
+>> arch/arm/plat-pxa/include/plat/gpio.h:21:4: error: lvalue required as
+>> left operand of assignment
+>> arch/arm/plat-pxa/include/plat/gpio.h:23:4: error: lvalue required as
+>> left operand of assignment
+>>
+>> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+>> ---
+>> ?arch/arm/mach-mmp/include/mach/gpio-pxa.h | ? ?2 +-
+>> ?1 files changed, 1 insertions(+), 1 deletions(-)
+>>
+>
+> It seems that this is pxa related fix, why not have pxa keyword in the
+> commit log
+> which will make the patch filter life easier.
+>
+> Jason Liu
+>
 
-Yes, this would be the correct solution.
-
-Sascha
-
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Because this issue is caused by incorrect macro definition in arch-mmp.
+Both arch-pxa and arch-mmp is sharing plat-pxa.
