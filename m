@@ -1,56 +1,46 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Tue, 8 Nov 2011 14:57:02 +0200
-Subject: [PATCH v4 0/7] iommu: split mapping to page sizes as supported by
- the hardware
-In-Reply-To: <1318850846-16066-1-git-send-email-ohad@wizery.com>
-References: <1318850846-16066-1-git-send-email-ohad@wizery.com>
-Message-ID: <CAK=Wgbb5K+rqPNdM2sC8z+9d4-hdcPwV-vXk6gcAYWaO+dVx3w@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue,  8 Nov 2011 13:07:36 +0000
+Subject: [PATCH] ARM: msm: fix compilation flags for MSM_SCM
+Message-ID: <1320757656-32171-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Joerg, gentle reminder. thanks.
+CONFIG_MSM_SCM uses the smc instruction, which with some
+toolchains requires a ".arch_extension" directive.
 
-On Mon, Oct 17, 2011 at 1:27 PM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
-> v3->v4:
-> - simplify splitter logic (Joerg)
-> - declare supported page-sizes in the iommu_ops, without extending iommu_register (Joerg)
-> - iommu_unmap should now return bytes too (Joerg)
-> - don't cache min_pgsize anymore (Joerg)
-> - handle cases when ->unmap() actually unmaps more than requested (Joerg)
-> - unroll iommu_unmap completely in case it fails (KyongHo)
-> - use size_t for size parameters (KyongHo)
-> - add a patch to remove the bytes->order->bytes conversion we had
-> - rabase to master branch of the iommu tree (Joerg)
->
-> v2->v3:
-> - s/KB/KiB/ (David W)
->
-> v1->v2:
-> - split to patches (by keeping the old code around until all drivers are converted) (Joerg)
->
-> Tested with OMAP3 (omap3isp) and OMAP4 (rpmsg/remoteproc).
-> Compile tested with X86_64.
->
-> Ohad Ben-Cohen (7):
-> ?iommu/core: stop converting bytes to page order back and forth
-> ?iommu/core: split mapping to page sizes as supported by the hardware
-> ?iommu/omap: announce supported page sizes
-> ?iommu/msm: announce supported page sizes
-> ?iommu/amd: announce supported page sizes
-> ?iommu/intel: announce supported page sizes
-> ?iommu/core: remove the temporary pgsize settings
->
-> ?drivers/iommu/amd_iommu.c ? | ? 32 +++++++++---
-> ?drivers/iommu/intel-iommu.c | ? 30 ++++++++---
-> ?drivers/iommu/iommu.c ? ? ? | ?119 ++++++++++++++++++++++++++++++++++++++----
-> ?drivers/iommu/msm_iommu.c ? | ? 25 ++++-----
-> ?drivers/iommu/omap-iommu.c ?| ? 18 +++---
-> ?drivers/iommu/omap-iovmm.c ?| ? 17 ++----
-> ?include/linux/iommu.h ? ? ? | ? 26 +++++++--
-> ?virt/kvm/iommu.c ? ? ? ? ? ?| ? ?8 ++--
-> ?8 files changed, 205 insertions(+), 70 deletions(-)
->
-> --
-> 1.7.4.1
->
->
+Cc: David Brown <davidb@codeaurora.org>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm/mach-msm/Makefile |    2 ++
+ arch/arm/mach-msm/scm.c    |    3 +++
+ 2 files changed, 5 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/mach-msm/Makefile b/arch/arm/mach-msm/Makefile
+index 4285dfd..4ad3969 100644
+--- a/arch/arm/mach-msm/Makefile
++++ b/arch/arm/mach-msm/Makefile
+@@ -15,6 +15,8 @@ obj-$(CONFIG_MSM_SMD) += smd.o smd_debug.o
+ obj-$(CONFIG_MSM_SMD) += last_radio_log.o
+ obj-$(CONFIG_MSM_SCM) += scm.o scm-boot.o
+ 
++CFLAGS_scm.o :=$(call as-instr,.arch_extension sec,-DREQUIRES_SEC=1)
++
+ obj-$(CONFIG_HOTPLUG_CPU) += hotplug.o
+ obj-$(CONFIG_SMP) += headsmp.o platsmp.o
+ 
+diff --git a/arch/arm/mach-msm/scm.c b/arch/arm/mach-msm/scm.c
+index 232f97a..bafabb5 100644
+--- a/arch/arm/mach-msm/scm.c
++++ b/arch/arm/mach-msm/scm.c
+@@ -180,6 +180,9 @@ static u32 smc(u32 cmd_addr)
+ 			__asmeq("%1", "r0")
+ 			__asmeq("%2", "r1")
+ 			__asmeq("%3", "r2")
++#ifdef REQUIRES_SEC
++			".arch_extension sec\n"
++#endif
+ 			"smc	#0	@ switch to secure world\n"
+ 			: "=r" (r0)
+ 			: "r" (r0), "r" (r1), "r" (r2)
+-- 
+1.7.0.4
