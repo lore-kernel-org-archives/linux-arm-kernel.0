@@ -1,29 +1,26 @@
-From: alan@lxorguk.ukuu.org.uk (Alan Cox)
-Date: Tue, 8 Nov 2011 13:48:04 +0000
-Subject: [PATCH] RS485: fix inconsistencies in the meaning of some
- variables
-In-Reply-To: <4EB90902.4030200@evidence.eu.com>
-References: <4E492CFF.7040905@pwrnet.de> <20110822211832.GA8023@kroah.com>
- <4EB3A009.10502@evidence.eu.com> <4EB8F6B9.6010008@atmel.com>
- <4EB90902.4030200@evidence.eu.com>
-Message-ID: <20111108134804.07095c5d@lxorguk.ukuu.org.uk>
+From: Joerg.Roedel@amd.com (Joerg Roedel)
+Date: Tue, 8 Nov 2011 15:01:34 +0100
+Subject: [PATCH v4 0/7] iommu: split mapping to page sizes as supported
+ by the hardware
+In-Reply-To: <CAK=Wgbb5K+rqPNdM2sC8z+9d4-hdcPwV-vXk6gcAYWaO+dVx3w@mail.gmail.com>
+References: <1318850846-16066-1-git-send-email-ohad@wizery.com>
+ <CAK=Wgbb5K+rqPNdM2sC8z+9d4-hdcPwV-vXk6gcAYWaO+dVx3w@mail.gmail.com>
+Message-ID: <20111108140133.GD2113@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> The modifications that I have proposed are very minimal, and most 
-> user-space code should continue to work without any difference. Any Cris 
-> user-space code will continue to work, because we didn't change the 
-> behavior of the driver. For Atmel user-space code, instead, the behavior 
-> of the driver changes only if flags are not set and delay variables 
-> contain a value different than 0 (which, hopefully, is not a very common 
-> situation). That's the reason why I preferred to not change the names of 
-> the variables, even if better names would be desirable.
+On Tue, Nov 08, 2011 at 02:57:02PM +0200, Ohad Ben-Cohen wrote:
+> Joerg, gentle reminder. thanks.
 
-We have inconsistency between implementations. We don't have a change in
-implementation. There isn't any way to resolve that except by fixing the
-deviating implementation and doing it promptly.
+Just wanted to wait until -rc1 is out and I can start merging
+new stuff :)
 
-With my tty hat on I'm quite happy with this patch. The sooner it is
-upstream the better.
 
-Alan
+	Joerg
+
+-- 
+AMD Operating System Research Center
+
+Advanced Micro Devices GmbH Einsteinring 24 85609 Dornach
+General Managers: Alberto Bozzo, Andrew Bowd
+Registration: Dornach, Landkr. Muenchen; Registerger. Muenchen, HRB Nr. 43632
