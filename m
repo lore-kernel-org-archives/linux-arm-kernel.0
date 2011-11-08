@@ -1,36 +1,31 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue,  8 Nov 2011 16:18:51 +0000
-Subject: [PATCH] ARM: S3C64XX: Use software initiated powerdown for Cragganmore
-Message-ID: <1320769131-21188-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+From: omar.ramirez@ti.com (Ramirez Luna, Omar)
+Date: Tue, 8 Nov 2011 10:21:08 -0600
+Subject: [PATCH v3 2/4] OMAP4: hwmod data: add mmu hwmod for ipu and dsp
+In-Reply-To: <87sjm31ngz.fsf@ti.com>
+References: <1320185752-568-1-git-send-email-omar.ramirez@ti.com>
+ <1320185752-568-3-git-send-email-omar.ramirez@ti.com>
+ <87sjm31ngz.fsf@ti.com>
+Message-ID: <CAB-zwWgd5U+8UNFe_rLY99VpiaHhTqscwYNF+SmuRTyDi+h3+A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since the two PMICs are independent we initiate a shutdown on each.
+Hi,
 
-Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
----
- arch/arm/mach-s3c64xx/mach-crag6410.c |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+On Fri, Nov 4, 2011 at 6:23 PM, Kevin Hilman <khilman@ti.com> wrote:
+>> + ? ? .flags ? ? ? ? ?= HWMOD_INIT_NO_RESET,
+>
+> Why is this needed?
+...
+>> + ? ? .flags ? ? ? ? ?= HWMOD_INIT_NO_RESET,
+>
+> And this?
 
-diff --git a/arch/arm/mach-s3c64xx/mach-crag6410.c b/arch/arm/mach-s3c64xx/mach-crag6410.c
-index b9a052a..3882c2f 100644
---- a/arch/arm/mach-s3c64xx/mach-crag6410.c
-+++ b/arch/arm/mach-s3c64xx/mach-crag6410.c
-@@ -501,6 +501,7 @@ static struct wm831x_pdata crag_pmic_pdata __initdata = {
- 	.wm831x_num = 1,
- 	.irq_base = BANFF_PMIC_IRQ_BASE,
- 	.gpio_base = GPIO_BOARD_START + 8,
-+	.soft_shutdown = true,
- 
- 	.backup = &banff_backup_pdata,
- 
-@@ -605,6 +606,7 @@ static struct wm831x_pdata glenfarclas_pmic_pdata __initdata = {
- 	.wm831x_num = 2,
- 	.irq_base = GLENFARCLAS_PMIC_IRQ_BASE,
- 	.gpio_base = GLENFARCLAS_PMIC_GPIO_BASE,
-+	.soft_shutdown = true,
- 
- 	.gpio_defaults = {
- 		/* GPIO1-3: IRQ inputs, rising edge triggered, CMOS */
--- 
-1.7.7.1
+I have this because the hwmod complains about a failure in hard reset,
+even though the reset deassert does complete after the clock is
+enabled. Later on, hwmod will warn again because of a wrong state when
+enabling, I believe because of the failure on _setup but didn't dig
+into it yet.
+
+Regards,
+
+Omar
