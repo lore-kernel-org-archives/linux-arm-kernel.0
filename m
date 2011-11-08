@@ -1,143 +1,240 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 08 Nov 2011 16:02:20 +0100
-Subject: [PATCH] RS485: fix inconsistencies in the meaning of some
- variables
-In-Reply-To: <4EB90902.4030200@evidence.eu.com>
-References: <4E492CFF.7040905@pwrnet.de> <20110822211832.GA8023@kroah.com>
- <4EB3A009.10502@evidence.eu.com> <4EB8F6B9.6010008@atmel.com>
- <4EB90902.4030200@evidence.eu.com>
-Message-ID: <4EB9447C.4050109@atmel.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 8 Nov 2011 16:04:23 +0100
+Subject: [PATCH v3] ARM/mx35/3ds: gpio: add mc9s08dz60 gpio function
+In-Reply-To: <1320401551-21377-1-git-send-email-b39297@freescale.com>
+References: <1320401551-21377-1-git-send-email-b39297@freescale.com>
+Message-ID: <20111108150423.GW16886@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/08/2011 11:48 AM, Claudio Scordino :
-> Il 08/11/2011 10:30, Nicolas Ferre ha scritto:
->> On 11/04/2011 09:19 AM, Claudio Scordino :
->>> Hi Alan, Hi Greg,
->>>
->>>     it seems that the crisv10.c and the atmel_serial.c serial
->>> drivers interpret the fields of the serial_rs485 structure in a
->>> different
->>> way.
->>>
->>> In particular, it seems that crisv10.c uses SER_RS485_RTS_AFTER_SEND and
->>> SER_RS485_RTS_ON_SEND for the _logic value_ of the RTS pin;
->>> atmel_serial.c, instead, uses these values to know if a _delay_ must be
->>> set before and after sending.
->>
->> It seems sensible, but, on the other hand, I fear that this is a big
->> change in the user interface: If people are already relying on this for
->> their application, this can be difficult to understand the change. Can't
->> we imagine an smoother migration path?
->>
->> It seems from de6f86ce5 that 16C950 may also use rs485 mode (with
->> another signal that RTS BTW)...
->>
->> See comments online...
->>
->>> This patch makes the usage of these variables consistent across all
->>> drivers and fixes the Documentation as well.
->>> In particular, SER_RS485_RTS_AFTER_SEND and SER_RS485_RTS_ON_SEND will
->>> be used to set the logic value of the RTS pin (as in the crisv10.c
->>> driver); the delay is understood by looking only at the value of
->>> delay_rts_before_send and delay_rts_after_send.
->>>
->>> Best regards,
->>>
->>>     Claudio
->>>
->>>
->>> Subject: RS485: fix inconsistencies in the meaning of some variables
->>> From: Claudio Scordino<claudio@evidence.eu.com>
->>>
->>> The crisv10.c and the atmel_serial.c serial drivers interpret the fields
->>> of the serial_rs485 structure in a different way.
->>> In particular, crisv10.c uses SER_RS485_RTS_AFTER_SEND and
->>> SER_RS485_RTS_ON_SEND for the voltage of the RTS pin; atmel_serial.c,
->>> instead,
->>> uses these values to know if a delay must be set before and after
->>> sending.
->>> This patch makes the usage of these variables consistent across all
->>> drivers and
->>> fixes the Documentation as well.
->>> > From now on, SER_RS485_RTS_AFTER_SEND and SER_RS485_RTS_ON_SEND
->>> will be used to
->>> set the voltage of the RTS pin (as in the crisv10.c driver); the
->>> delay will be
->>> understood by looking only at the value of delay_rts_before_send and
->>> delay_rts_after_send.
->>
->> Ok, but don't you think that the flags names are not so much
->> self-explanatory for this new meaning?
->>
->> What about:
->> SER_RS485_RTS_LEVEL_DURING_SEND
->> SER_RS485_RTS_VALUE_DURING_SEND (maybe too vague?)
->> SER_RS485_RTS_LOGICAL_VALUE_DURING_SEND (maybe too long?)
->>
->> Moreover, can't we just use one property for this? I mean, if RTS
->> logical value is high during the sending of data, can it mean that RTS
->> will be low before and after? And the other way around: if the signal is
->> low during data send, will it be high before and after?
->>
->> Here again, changing the user interface is not a good idea, so I fear
->> that it can be a show stopper.
+On Fri, Nov 04, 2011 at 06:12:31PM +0800, wu guoxing wrote:
+> we only use the gpio function of mc9s08dz60 mcu chip, so just
+> add the gpio driver, as this mcu will never be used in other board.
 > 
-> Hi Nicolas,
+> Signed-off-by: Wu Guoxing <b39297@freescale.com>
+
+Looks good to me.
+
+Reviewed-by: Sascha Hauer <s.hauer@pengutronix.de>
+
+> ---
+> Changes since v1:
+> 	1. add can_sleep = 1
+> 	2. removed some useless return checks and local variable
+> 	3. removed the static variable for i2c client.
+> 	4. make init&exit function static
 > 
->     I understand, but honestly I do not agree.
+>  drivers/gpio/Kconfig           |    6 ++
+>  drivers/gpio/Makefile          |    1 +
+>  drivers/gpio/gpio-mc9s08dz60.c |  167 ++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 174 insertions(+), 0 deletions(-)
+>  create mode 100644 drivers/gpio/gpio-mc9s08dz60.c
 > 
-> The current state is inconsistent, and leaving the status quo can only
-> bring to more issues in the future (because it is not clear if the
-> interface should be used either as in the Cris or in the Atmel driver).
-> That's why I think it should be fixed ASAP (before further drivers start
-> using it).
+> diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
+> index d539efd..7f6beee 100644
+> --- a/drivers/gpio/Kconfig
+> +++ b/drivers/gpio/Kconfig
+> @@ -487,4 +487,10 @@ config GPIO_TPS65910
+>  	help
+>  	  Select this option to enable GPIO driver for the TPS65910
+>  	  chip family.
+> +
+> +config GPIO_MC9S08DZ60
+> +	bool "MX35 3DS BOARD MC9S08DZ60 GPIO functions"
+> +	depends on I2C && MACH_MX35_3DS
+> +	help
+> +	  Select this to enable the MC9S08DZ60 GPIO driver
+>  endif
+> diff --git a/drivers/gpio/Makefile b/drivers/gpio/Makefile
+> index 9588948..85b8799 100644
+> --- a/drivers/gpio/Makefile
+> +++ b/drivers/gpio/Makefile
+> @@ -60,3 +60,4 @@ obj-$(CONFIG_GPIO_WM831X)	+= gpio-wm831x.o
+>  obj-$(CONFIG_GPIO_WM8350)	+= gpio-wm8350.o
+>  obj-$(CONFIG_GPIO_WM8994)	+= gpio-wm8994.o
+>  obj-$(CONFIG_GPIO_XILINX)	+= gpio-xilinx.o
+> +obj-$(CONFIG_GPIO_MC9S08DZ60) += gpio-mc9s08dz60.o
+> diff --git a/drivers/gpio/gpio-mc9s08dz60.c b/drivers/gpio/gpio-mc9s08dz60.c
+> new file mode 100644
+> index 0000000..c41eb16
+> --- /dev/null
+> +++ b/drivers/gpio/gpio-mc9s08dz60.c
+> @@ -0,0 +1,167 @@
+> +/*
+> + * Copyright 2009-2011 Freescale Semiconductor, Inc. All Rights Reserved.
+> + *
+> + * Author: Wu Guoxing <b39297@freescale.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include <linux/kernel.h>
+> +#include <linux/module.h>
+> +#include <linux/slab.h>
+> +#include <linux/i2c.h>
+> +#include <linux/gpio.h>
+> +
+> +#define GPIO_GROUP_NUM 2
+> +#define GPIO_NUM_PER_GROUP 8
+> +#define GPIO_NUM (GPIO_GROUP_NUM*GPIO_NUM_PER_GROUP)
+> +
+> +struct mc9s08dz60 {
+> +	struct i2c_client *client;
+> +	struct gpio_chip chip;
+> +};
+> +
+> +static struct mc9s08dz60 *to_mc9s08dz60(struct gpio_chip *gc)
+> +{
+> +	return container_of(gc, struct mc9s08dz60, chip);
+> +}
+> +
+> +
+> +static void gpio_to_reg_and_bit(int offset, u8 *reg, u8 *bit)
+> +{
+> +	*reg = 0x20 + offset / GPIO_NUM_PER_GROUP;
+> +	*bit = offset % GPIO_NUM_PER_GROUP;
+> +}
+> +
+> +static int mc9s08dz60_get_value(struct gpio_chip *gc, unsigned offset)
+> +{
+> +	int ret = 0;
+> +	u8 reg, bit;
+> +	s32 value;
+> +	struct mc9s08dz60 *mc9s = to_mc9s08dz60(gc);
+> +
+> +	gpio_to_reg_and_bit(offset, &reg, &bit);
+> +	value = i2c_smbus_read_byte_data(mc9s->client, reg);
+> +	if (value >= 0)
+> +		ret = (value >> bit) & 0x1;
+> +
+> +	return ret;
+> +}
+> +
+> +static void mc9s08dz60_set_value(struct gpio_chip *gc, unsigned offset, int val)
+> +{
+> +	u8 reg, bit;
+> +	s32 value;
+> +	struct mc9s08dz60 *mc9s = to_mc9s08dz60(gc);
+> +
+> +	gpio_to_reg_and_bit(offset, &reg, &bit);
+> +	value = i2c_smbus_read_byte_data(mc9s->client, reg);
+> +	if (value >= 0) {
+> +		if (val)
+> +			value |= 1 << bit;
+> +		else
+> +			value &= ~(1 << bit);
+> +
+> +		i2c_smbus_write_byte_data(mc9s->client, reg, value);
+> +	}
+> +}
+> +
+> +static int mc9s08dz60_direction_output(struct gpio_chip *gc,
+> +				       unsigned offset, int val)
+> +{
+> +	mc9s08dz60_set_value(gc, offset, val);
+> +	return 0;
+> +}
+> +
+> +static int mc9s08dz60_probe(struct i2c_client *client,
+> +			    const struct i2c_device_id *id)
+> +{
+> +	int ret = 0;
+> +	struct mc9s08dz60 *mc9s;
+> +
+> +	mc9s = kzalloc(sizeof(*mc9s), GFP_KERNEL);
+> +	if (!mc9s)
+> +		return -ENOMEM;
+> +
+> +	mc9s->chip.label = client->name;
+> +	mc9s->chip.base = -1;
+> +	mc9s->chip.dev = &client->dev;
+> +	mc9s->chip.owner = THIS_MODULE;
+> +	mc9s->chip.ngpio = GPIO_NUM;
+> +	mc9s->chip.can_sleep = 1;
+> +	mc9s->chip.get = mc9s08dz60_get_value;
+> +	mc9s->chip.set = mc9s08dz60_set_value;
+> +	mc9s->chip.direction_output = mc9s08dz60_direction_output;
+> +	mc9s->client = client;
+> +
+> +	ret = gpiochip_add(&mc9s->chip);
+> +	if (ret)
+> +		goto error;
+> +
+> +	i2c_set_clientdata(client, mc9s);
+> +
+> +	return 0;
+> +
+> +error:
+> +	kfree(mc9s);
+> +	return ret;
+> +}
+> +
+> +static int mc9s08dz60_remove(struct i2c_client *client)
+> +{
+> +	struct mc9s08dz60 *mc9s;
+> +	int ret;
+> +
+> +	mc9s = i2c_get_clientdata(client);
+> +
+> +	i2c_set_clientdata(client, NULL);
+> +
+> +	ret = gpiochip_remove(&mc9s->chip);
+> +	if (!ret)
+> +		kfree(mc9s);
+> +
+> +	return 0;
+> +
+> +}
+> +
+> +static const struct i2c_device_id mc9s08dz60_id[] = {
+> +	{"mc9s08dz60", 0},
+> +	{},
+> +};
+> +
+> +MODULE_DEVICE_TABLE(i2c, mc9s08dz60_id);
+> +
+> +static struct i2c_driver mc9s08dz60_i2c_driver = {
+> +	.driver = {.owner = THIS_MODULE,
+> +		   .name = "mc9s08dz60",
+> +		   },
+> +	.probe = mc9s08dz60_probe,
+> +	.remove = mc9s08dz60_remove,
+> +	.id_table = mc9s08dz60_id,
+> +};
+> +
+> +static int __init mc9s08dz60_init(void)
+> +{
+> +	return i2c_add_driver(&mc9s08dz60_i2c_driver);
+> +}
+> +
+> +static void __exit mc9s08dz60_exit(void)
+> +{
+> +	i2c_del_driver(&mc9s08dz60_i2c_driver);
+> +}
+> +
+> +module_init(mc9s08dz60_init);
+> +module_exit(mc9s08dz60_exit);
+> +
+> +MODULE_AUTHOR("Freescale Semiconductor, Inc."
+> +		"Wu Guoxing <b39297@freescale.com>");
+> +MODULE_DESCRIPTION("mc9s08dz60 gpio function on mx35 3ds board");
+> +MODULE_LICENSE("GPL v2");
+> -- 
+> 1.7.1
 > 
-> The modifications that I have proposed are very minimal, and most
-> user-space code should continue to work without any difference. Any Cris
-> user-space code will continue to work, because we didn't change the
-> behavior of the driver. For Atmel user-space code, instead, the behavior
-> of the driver changes only if flags are not set and delay variables
-> contain a value different than 0 (which, hopefully, is not a very common
-> situation).
+> 
+> 
 
-Ok then. I was fearing that, with Atmel driver, someone can set
-SER_RS485_RTS_AFTER_SEND to tell that the delay is needed but not
-necessarily that the signal level is "high".
-
-But you are right telling that this inconstancy should be addressed.
-
-> That's the reason why I preferred to not change the names of
-> the variables, even if better names would be desirable.
-
-100% agree with this.
-
-> If you want, I can re-format the patch according to you suggestions,
-
-Yes
-
-> remove formatted lines
-
-Yes
-
-> and changing the names of the variables.
-
-Well, this is proved to be not a good option at this stage of RS485
-support in kernel. So as you said: no need to mess with this.
-
-> But unfortunately, I cannot undertake the device tree bindings at the
-moment.
-
-Ah, ok... well we will manage this after your submitting of this patch.
-But can you tell me if the signal wave is always like this:
-__|--|__ and --|__|--
-
-or if it can also be like this:
-__|--|--  or --|--|__
-
-This way, we will see if the hardware property can be addressed with
-only one device tree biding or if tree of them are needed.
-
-Best regards,
 -- 
-Nicolas Ferre
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
