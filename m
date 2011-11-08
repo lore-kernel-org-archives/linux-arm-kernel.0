@@ -1,35 +1,73 @@
-From: Joerg.Roedel@amd.com (Joerg Roedel)
-Date: Tue, 8 Nov 2011 17:23:11 +0100
-Subject: [PATCH v4 0/7] iommu: split mapping to page sizes as supported
- by the hardware
-In-Reply-To: <CAK=WgbYiF04i8XRkn+YQhd=z6uDRwr8JEiWP1CLFLjM7Y+xWKg@mail.gmail.com>
-References: <1318850846-16066-1-git-send-email-ohad@wizery.com>
- <CAK=Wgbb5K+rqPNdM2sC8z+9d4-hdcPwV-vXk6gcAYWaO+dVx3w@mail.gmail.com>
- <20111108140133.GD2113@amd.com>
- <CAK=WgbYiF04i8XRkn+YQhd=z6uDRwr8JEiWP1CLFLjM7Y+xWKg@mail.gmail.com>
-Message-ID: <20111108162311.GB5182@amd.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue,  8 Nov 2011 16:20:03 +0000
+Subject: [PATCH] ARM: S3C64xx: Hook up platform data for Kilchomin module on
+ Cragganmore
+Message-ID: <1320769203-21240-1-git-send-email-broonie@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 08, 2011 at 04:03:09PM +0200, Ohad Ben-Cohen wrote:
-> On Tue, Nov 8, 2011 at 4:01 PM, Joerg Roedel <Joerg.Roedel@amd.com> wrote:
-> > On Tue, Nov 08, 2011 at 02:57:02PM +0200, Ohad Ben-Cohen wrote:
-> >> Joerg, gentle reminder. thanks.
-> >
-> > Just wanted to wait until -rc1 is out and I can start merging
-> > new stuff :)
-> 
-> np, thanks :)
+Now that the WM5100 driver is merged add some initial platform data for
+the WM5100 on Kilchomin.
 
-Does not apply cleanly. Can you please rebase against v3.2-rc1 and
-resend?
+Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+---
+ arch/arm/mach-s3c64xx/mach-crag6410-module.c |   30 ++++++++++++++++++++++++++
+ 1 files changed, 30 insertions(+), 0 deletions(-)
 
-
-	Joerg
-
+diff --git a/arch/arm/mach-s3c64xx/mach-crag6410-module.c b/arch/arm/mach-s3c64xx/mach-crag6410-module.c
+index 7c5ddb6..7a12b87 100644
+--- a/arch/arm/mach-s3c64xx/mach-crag6410-module.c
++++ b/arch/arm/mach-s3c64xx/mach-crag6410-module.c
+@@ -18,6 +18,7 @@
+ #include <linux/mfd/wm831x/gpio.h>
+ 
+ #include <sound/wm0010.h>
++#include <sound/wm5100.h>
+ #include <sound/wm8996.h>
+ #include <sound/wm8962.h>
+ #include <sound/wm9081.h>
+@@ -48,6 +49,34 @@ static struct spi_board_info wm1253_devs[] = {
+ 	},
+ };
+ 
++static struct wm5100_pdata wm5100_pdata = {
++	.ldo_ena = S3C64XX_GPN(7),
++	.irq_flags = IRQF_TRIGGER_HIGH,
++	.gpio_base = CODEC_GPIO_BASE,
++
++	.in_mode = {
++		WM5100_IN_DIFF,
++		WM5100_IN_DIFF,
++		WM5100_IN_DIFF,
++		WM5100_IN_SE,
++	},
++
++	.hp_pol = CODEC_GPIO_BASE + 3,
++	.jack_modes = {
++		{ WM5100_MICDET_MICBIAS3, 0, 0 },
++		{ WM5100_MICDET_MICBIAS2, 1, 1 },
++	},
++
++	.gpio_defaults = {
++		0,
++		0,
++		0,
++		0,
++		0x2, /* IRQ: CMOS output */
++		0x3, /* CLKOUT: CMOS output */
++	},
++};
++
+ static struct wm8996_retune_mobile_config wm8996_retune[] = {
+ 	{
+ 		.name = "Sub LPF",
+@@ -119,6 +148,7 @@ static const struct i2c_board_info wm1254_devs[] = {
+ 
+ static const struct i2c_board_info wm1255_devs[] = {
+ 	{ I2C_BOARD_INFO("wm5100", 0x1a),
++	  .platform_data = &wm5100_pdata,
+ 	  .irq = GLENFARCLAS_PMIC_IRQ_BASE + WM831X_IRQ_GPIO_2,
+ 	},
+ 	{ I2C_BOARD_INFO("wm9081", 0x6c),
 -- 
-AMD Operating System Research Center
-
-Advanced Micro Devices GmbH Einsteinring 24 85609 Dornach
-General Managers: Alberto Bozzo, Andrew Bowd
-Registration: Dornach, Landkr. Muenchen; Registerger. Muenchen, HRB Nr. 43632
+1.7.7.1
