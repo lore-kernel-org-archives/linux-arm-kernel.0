@@ -1,147 +1,34 @@
-From: mcuos.com@gmail.com (Wan ZongShun)
-Date: Thu, 10 Nov 2011 00:31:43 +0800
-Subject: [PATCHJ] ARM: NUC900: add new MFP implement
-Message-ID: <4EBAAAEF.4000504@gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 9 Nov 2011 14:51:01 -0200
+Subject: [PATCH v3] ARM/mx35/3ds: gpio: add mc9s08dz60 gpio function
+In-Reply-To: <4EBAA038.6010606@pengutronix.de>
+References: <1320401551-21377-1-git-send-email-b39297@freescale.com>
+ <4EBAA038.6010606@pengutronix.de>
+Message-ID: <CAOMZO5Af9XCB8OGGJo0Hb-Bhhv_R==cS-D3jeC-NKvzbANbMyw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch is to add new MFP implement in mfp.c,since nuc900 mmc driver
-needs this function support, thanks!
+On Wed, Nov 9, 2011 at 1:46 PM, Marc Kleine-Budde <mkl@pengutronix.de> wrote:
+>> +static int mc9s08dz60_remove(struct i2c_client *client)
+>> +{
+>> + ? ? struct mc9s08dz60 *mc9s;
+>> + ? ? int ret;
+>> +
+>> + ? ? mc9s = i2c_get_clientdata(client);
+>> +
+>> + ? ? i2c_set_clientdata(client, NULL);
+>> +
+>> + ? ? ret = gpiochip_remove(&mc9s->chip);
+>> + ? ? if (!ret)
+>> + ? ? ? ? ? ? kfree(mc9s);
+>> +
+>> + ? ? return 0;
+>
+> return 0 if gpiochip_remove() fails?
 
-Signed-off-by: Wan ZongShun <mcuos.com@gmail.com>
+See Russell's comment about returning error on this remove function:
+http://www.spinics.net/lists/arm-kernel/msg146501.html
 
----
- arch/arm/mach-w90x900/include/mach/mfp.h        |    3 +-
- arch/arm/mach-w90x900/include/mach/nuc900_spi.h |    2 +-
- arch/arm/mach-w90x900/mfp.c                     |   49
-++++++++++++++++++++---
- 3 files changed, 46 insertions(+), 8 deletions(-)
+Regards,
 
-diff --git a/arch/arm/mach-w90x900/include/mach/mfp.h
-b/arch/arm/mach-w90x900/include/mach/mfp.h
-index 94c0e71..23ef1f5 100644
---- a/arch/arm/mach-w90x900/include/mach/mfp.h
-+++ b/arch/arm/mach-w90x900/include/mach/mfp.h
-@@ -19,6 +19,7 @@
- extern void mfp_set_groupf(struct device *dev);
- extern void mfp_set_groupc(struct device *dev);
- extern void mfp_set_groupi(struct device *dev);
--extern void mfp_set_groupg(struct device *dev);
-+extern void mfp_set_groupg(struct device *dev, const char *subname);
-+extern void mfp_set_groupd(struct device *dev, const char *subname);
-
- #endif /* __ASM_ARCH_MFP_H */
-diff --git a/arch/arm/mach-w90x900/include/mach/nuc900_spi.h
-b/arch/arm/mach-w90x900/include/mach/nuc900_spi.h
-index bd94819..2c4e0c1 100644
---- a/arch/arm/mach-w90x900/include/mach/nuc900_spi.h
-+++ b/arch/arm/mach-w90x900/include/mach/nuc900_spi.h
-@@ -14,7 +14,7 @@
- #ifndef __ASM_ARCH_SPI_H
- #define __ASM_ARCH_SPI_H
-
--extern void mfp_set_groupg(struct device *dev);
-+extern void mfp_set_groupg(struct device *dev, const char *subname);
-
- struct nuc900_spi_info {
- 	unsigned int num_cs;
-diff --git a/arch/arm/mach-w90x900/mfp.c b/arch/arm/mach-w90x900/mfp.c
-index fb7fb62..435aa8b 100644
---- a/arch/arm/mach-w90x900/mfp.c
-+++ b/arch/arm/mach-w90x900/mfp.c
-@@ -26,10 +26,8 @@
- #define REG_MFSEL	(W90X900_VA_GCR + 0xC)
-
- #define GPSELF		(0x01 << 1)
--
- #define GPSELC		(0x03 << 2)
--#define ENKPI		(0x02 << 2)
--#define ENNAND		(0x01 << 2)
-+#define GPSELD		(0x0f << 4)
-
- #define GPSELEI0	(0x01 << 26)
- #define GPSELEI1	(0x01 << 27)
-@@ -37,11 +35,16 @@
- #define GPIOG0TO1	(0x03 << 14)
- #define GPIOG2TO3	(0x03 << 16)
- #define GPIOG22TO23	(0x03 << 22)
-+#define GPIOG18TO20	(0x07 << 18)
-
- #define ENSPI		(0x0a << 14)
- #define ENI2C0		(0x01 << 14)
- #define ENI2C1		(0x01 << 16)
- #define ENAC97		(0x02 << 22)
-+#define ENSD1		(0x02 << 18)
-+#define ENSD0		(0x0a << 4)
-+#define ENKPI		(0x02 << 2)
-+#define ENNAND		(0x01 << 2)
-
- static DEFINE_MUTEX(mfp_mutex);
-
-@@ -127,16 +130,19 @@ void mfp_set_groupi(struct device *dev)
- }
- EXPORT_SYMBOL(mfp_set_groupi);
-
--void mfp_set_groupg(struct device *dev)
-+void mfp_set_groupg(struct device *dev, const char *subname)
- {
- 	unsigned long mfpen;
- 	const char *dev_id;
-
--	BUG_ON(!dev);
-+	BUG_ON((!dev) && (!subname));
-
- 	mutex_lock(&mfp_mutex);
-
--	dev_id = dev_name(dev);
-+	if (subname != NULL)
-+		dev_id = subname;
-+	else
-+		dev_id = dev_name(dev);
-
- 	mfpen = __raw_readl(REG_MFSEL);
-
-@@ -152,6 +158,9 @@ void mfp_set_groupg(struct device *dev)
- 	} else if (strcmp(dev_id, "nuc900-audio") == 0) {
- 		mfpen &= ~(GPIOG22TO23);
- 		mfpen |= ENAC97;/*enable AC97*/
-+	} else if (strcmp(dev_id, "nuc900-mmc-port1") == 0) {
-+		mfpen &= ~(GPIOG18TO20);
-+		mfpen |= (ENSD1 | 0x01);/*enable sd1*/
- 	} else {
- 		mfpen &= ~(GPIOG0TO1 | GPIOG2TO3);/*GPIOG[3:0]*/
- 	}
-@@ -162,3 +171,31 @@ void mfp_set_groupg(struct device *dev)
- }
- EXPORT_SYMBOL(mfp_set_groupg);
-
-+void mfp_set_groupd(struct device *dev, const char *subname)
-+{
-+	unsigned long mfpen;
-+	const char *dev_id;
-+
-+	BUG_ON((!dev) && (!subname));
-+
-+	mutex_lock(&mfp_mutex);
-+
-+	if (subname != NULL)
-+		dev_id = subname;
-+	else
-+		dev_id = dev_name(dev);
-+
-+	mfpen = __raw_readl(REG_MFSEL);
-+
-+	if (strcmp(dev_id, "nuc900-mmc-port0") == 0) {
-+		mfpen &= ~GPSELD;/*enable sd0*/
-+		mfpen |= ENSD0;
-+	} else
-+		mfpen &= (~GPSELD);
-+
-+	__raw_writel(mfpen, REG_MFSEL);
-+
-+	mutex_unlock(&mfp_mutex);
-+}
-+EXPORT_SYMBOL(mfp_set_groupd);
-+
--- 
-1.7.0.4
+Fabio Estevam
