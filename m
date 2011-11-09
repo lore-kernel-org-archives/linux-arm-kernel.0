@@ -1,37 +1,40 @@
 From: viresh.kumar@st.com (Viresh Kumar)
-Date: Wed, 9 Nov 2011 16:22:31 +0530
-Subject: [PATCH 2/6] spi/pl022: fix build warnings
-In-Reply-To: <1320835139-31235-1-git-send-email-linus.walleij@stericsson.com>
-References: <1320835139-31235-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <4EBA5B6F.3010307@st.com>
+Date: Wed, 9 Nov 2011 16:23:24 +0530
+Subject: [PATCH 3/6] spi/pl022: disable the PL022 block when unused
+In-Reply-To: <1320835146-31268-1-git-send-email-linus.walleij@stericsson.com>
+References: <1320835146-31268-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <4EBA5BA4.8030504@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/9/2011 4:08 PM, Linus WALLEIJ wrote:
-> From: Jonas Aaberg <jonas.aberg@stericsson.com>
+On 11/9/2011 4:09 PM, Linus WALLEIJ wrote:
+> From: Virupax Sadashivpetimath <virupax.sadashivpetimath@stericsson.com>
 > 
-> The driver build complains with newer compilers unless you
-> initialize this struct properly.
+> Make sure we clear the enable bit when the block is not used.
+> This will save some energy in certain hardware versions.
 > 
-> Signed-off-by: Jonas Aaberg <jonas.aberg@stericsson.com>
+> Signed-off-by: Virupax Sadashivpetimath <virupax.sadashivpetimath@stericsson.com>
 > Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 > ---
->  drivers/spi/spi-pl022.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
+>  drivers/spi/spi-pl022.c |    5 +++++
+>  1 files changed, 5 insertions(+), 0 deletions(-)
 > 
 > diff --git a/drivers/spi/spi-pl022.c b/drivers/spi/spi-pl022.c
-> index b251926..305f2ba 100644
+> index 305f2ba..fa3eaae 100644
 > --- a/drivers/spi/spi-pl022.c
 > +++ b/drivers/spi/spi-pl022.c
-> @@ -1885,7 +1885,7 @@ static int pl022_setup(struct spi_device *spi)
->  {
->  	struct pl022_config_chip const *chip_info;
->  	struct chip_data *chip;
-> -	struct ssp_clock_params clk_freq = {0, };
-> +	struct ssp_clock_params clk_freq = { .cpsdvsr = 0, .scr = 0};
->  	int status = 0;
->  	struct pl022 *pl022 = spi_master_get_devdata(spi->master);
->  	unsigned int bits = spi->bits_per_word;
+> @@ -512,6 +512,11 @@ static void giveback(struct pl022 *pl022)
+>  	msg->state = NULL;
+>  	if (msg->complete)
+>  		msg->complete(msg->context);
+> +
+> +	/* disable the SPI/SSP operation */
+> +	writew((readw(SSP_CR1(pl022->virtbase)) &
+> +		(~SSP_CR1_MASK_SSE)), SSP_CR1(pl022->virtbase));
+> +
+>  	/* This message is completed, so let's turn off the clocks & power */
+>  	pm_runtime_put(&pl022->adev->dev);
+>  }
 
 Reviewed-by: Viresh Kumar <viresh.kumar@st.com>
 
