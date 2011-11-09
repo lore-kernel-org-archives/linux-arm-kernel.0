@@ -1,119 +1,71 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Wed, 9 Nov 2011 11:34:13 +0200
-Subject: [PATCH] ARM: OMAP: omap_device: Expose omap_device_{alloc,
- delete, register}
-In-Reply-To: <1318851662-637-1-git-send-email-ohad@wizery.com>
-References: <1318851662-637-1-git-send-email-ohad@wizery.com>
-Message-ID: <CAK=WgbZ=h0OdeqLmNFwz31MN+o52-2ZNisFKgnJgwVLAyTTLCw@mail.gmail.com>
+From: ming.lei@canonical.com (Ming Lei)
+Date: Wed, 9 Nov 2011 17:56:36 +0800
+Subject: [PATCH v5 4/7] arm: omap4: hwmod: introduce emu hwmod
+In-Reply-To: <alpine.DEB.2.00.1111080750130.10451@utopia.booyaka.com>
+References: <1319467559-5518-1-git-send-email-ming.lei@canonical.com>
+ <1319467559-5518-5-git-send-email-ming.lei@canonical.com>
+ <alpine.DEB.2.00.1111080750130.10451@utopia.booyaka.com>
+Message-ID: <CACVXFVMSJUT2Ac+bWetrLpbyOs6PqY+npNHsbvHipEVZ0gWdgQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin,
+Hi,
 
-On Mon, Oct 17, 2011 at 1:41 PM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
-> Expose omap_device_{alloc, delete, register} so we can use them outside
-> of omap_device.c.
+Thanks for your comments.
 
-Can you please take this one ?
+On Tue, Nov 8, 2011 at 11:26 PM, Paul Walmsley <paul@pwsan.com> wrote:
 
-Please tell me if you want a refreshed version against 3.2-rc1.
+>> +static struct omap_hwmod_irq_info omap44xx_emu_irqs[] = {
+>> + ? ? { .name = "cti0", .irq = 1 + OMAP44XX_IRQ_GIC_START },
+>> + ? ? { .name = "cti1", .irq = 2 + OMAP44XX_IRQ_GIC_START },
+>> + ? ? { .irq = -1 }
+>> +};
+>
+> Are you sure these are part of the emulation IP? ?We already have those
 
-Thanks!
-Ohad.
+I am not sure, I just figure out one way to make omap4 pmu work. Since there
+are few descriptions in TRM about it, it is a hacking based on [1], :-)
+
+> IRQs in the MPU hwmod, see omap44xx_mpu_irqs[] in the same file.
+
+I just see it, but looks like the "mpu" hwmod isn't populated as omap_device,
+so the CTI irqs aren't requested now. Also, current arm perf code don't handle
+three IRQs(one pl310 irq and two CTI irq) inside one device correctly.
+
+So any suggestion about CTI IRQs connecting to which hwmod, so that they can
+be found by pmu driver?
+
+>> +/*emu hwmod*/
+>> +static struct omap_hwmod omap44xx_emu_hwmod = {
+>> + ? ? .name ? ? ? ? ? = "emu",
+>> + ? ? .class ? ? ? ? ?= &omap44xx_emu_hwmod_class,
+>> + ? ? .clkdm_name ? ? = "emu_sys_clkdm",
+>> + ? ? .prcm = {
+>> + ? ? ? ? ? ? .omap4 = {
+>> + ? ? ? ? ? ? ? ? ? ? .clkctrl_offs = OMAP4_CM_EMU_CLKSTCTRL_OFFSET,
+>
+> This doesn't look right either: EMU is a clockdomain, not an IP block.
+
+I defined the 'emu' hwmod to control the clock state transition of the EMU
+clock domain by writing to CLKTRCTRL.CM_EMU_CLKSTCTRL with standard
+hwmod interface(_enable / _idle). Is there any other neat way to do it?
 
 >
-> This approach allows users, which need to manipulate an archdata member
-> of a device before it is registered, to do so. This is also useful
-> for users who have their devices created very early so they can be used
-> at ->reserve() time to reserve CMA memory.
->
-> The immediate use case for this is to set the private iommu archdata
-> member, which binds a device to its associated iommu controller.
-> This way, generic code will be able to attach omap devices to their
-> iommus, without calling any omap-specific API.
->
-> With this in hand, we can further clean the existing mainline OMAP iommu
-> driver and its mainline users, and focus on generic IOMMU approaches
-> for future users (rpmsg/remoteproc and the upcoming generic DMA API).
->
-> This patch is still considered an interim solution until DT fully materializes
-> for omap; at that point, this functionality will be removed as DT will
-> take care of creating the devices and configuring them correctly.
->
-> Tested on OMAP4 with a generic rpmsg/remoteproc that doesn't use any
-> omap-specific IOMMU API anymore.
->
-> Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
-> ---
-> ?arch/arm/plat-omap/include/plat/omap_device.h | ? ?7 +++++++
-> ?arch/arm/plat-omap/omap_device.c ? ? ? ? ? ? ?| ? 13 +++----------
-> ?2 files changed, 10 insertions(+), 10 deletions(-)
->
-> diff --git a/arch/arm/plat-omap/include/plat/omap_device.h b/arch/arm/plat-omap/include/plat/omap_device.h
-> index 12c5b0c..28d7a38 100644
-> --- a/arch/arm/plat-omap/include/plat/omap_device.h
-> +++ b/arch/arm/plat-omap/include/plat/omap_device.h
-> @@ -100,6 +100,13 @@ struct platform_device *omap_device_build_ss(const char *pdev_name, int pdev_id,
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct omap_device_pm_latency *pm_lats,
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? int pm_lats_cnt, int is_early_device);
->
-> +struct omap_device *omap_device_alloc(struct platform_device *pdev,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct omap_hwmod **ohs, int oh_cnt,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct omap_device_pm_latency *pm_lats,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? int pm_lats_cnt);
-> +void omap_device_delete(struct omap_device *od);
-> +int omap_device_register(struct platform_device *pdev);
-> +
-> ?void __iomem *omap_device_get_rt_va(struct omap_device *od);
-> ?struct device *omap_device_get_by_hwmod_name(const char *oh_name);
->
-> diff --git a/arch/arm/plat-omap/omap_device.c b/arch/arm/plat-omap/omap_device.c
-> index cd90bed..913179c 100644
-> --- a/arch/arm/plat-omap/omap_device.c
-> +++ b/arch/arm/plat-omap/omap_device.c
-> @@ -96,14 +96,7 @@
-> ?#define USE_WAKEUP_LAT ? ? ? ? ? ? ? ? 0
-> ?#define IGNORE_WAKEUP_LAT ? ? ? ? ? ? ?1
->
-> -static int omap_device_register(struct platform_device *pdev);
-> ?static int omap_early_device_register(struct platform_device *pdev);
-> -static struct omap_device *omap_device_alloc(struct platform_device *pdev,
-> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct omap_hwmod **ohs, int oh_cnt,
-> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct omap_device_pm_latency *pm_lats,
-> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? int pm_lats_cnt);
-> -static void omap_device_delete(struct omap_device *od);
-> -
->
-> ?static struct omap_device_pm_latency omap_default_latency[] = {
-> ? ? ? ?{
-> @@ -508,7 +501,7 @@ static int omap_device_fill_resources(struct omap_device *od,
-> ?*
-> ?* Returns an struct omap_device pointer or ERR_PTR() on error;
-> ?*/
-> -static struct omap_device *omap_device_alloc(struct platform_device *pdev,
-> +struct omap_device *omap_device_alloc(struct platform_device *pdev,
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?struct omap_hwmod **ohs, int oh_cnt,
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?struct omap_device_pm_latency *pm_lats,
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?int pm_lats_cnt)
-> @@ -590,7 +583,7 @@ oda_exit1:
-> ? ? ? ?return ERR_PTR(ret);
-> ?}
->
-> -static void omap_device_delete(struct omap_device *od)
-> +void omap_device_delete(struct omap_device *od)
-> ?{
-> ? ? ? ?if (!od)
-> ? ? ? ? ? ? ? ?return;
-> @@ -816,7 +809,7 @@ static struct dev_pm_domain omap_device_pm_domain = {
-> ?* platform_device_register() on the underlying platform_device.
-> ?* Returns the return value of platform_device_register().
-> ?*/
-> -static int omap_device_register(struct platform_device *pdev)
-> +int omap_device_register(struct platform_device *pdev)
-> ?{
-> ? ? ? ?pr_debug("omap_device: %s: registering\n", pdev->name);
->
-> --
-> 1.7.4.1
+>> + ? ? ? ? ? ? ? ? ? ? .modulemode ? = MODULEMODE_HWCTRL,
+>> + ? ? ? ? ? ? },
+>> + ? ? },
+>> + ? ? .mpu_irqs ? ? ? = omap44xx_emu_irqs,
+>> +};
+>> +
+>> ?static __initdata struct omap_hwmod *omap44xx_hwmods[] = {
+>>
+>> ? ? ? /* dmm class */
+c
 >
 >
+
+[1], http://comments.gmane.org/gmane.comp.embedded.pandaboard/168
+
+thanks,
+--
+Ming Lei
