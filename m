@@ -1,22 +1,20 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 8 Nov 2011 22:27:29 -0200
-Subject: Broken mx5_defconfig on 3.2-rc1
-Message-ID: <CAOMZO5Bth-dKSY9S6o=waYLMrzdx-Tc4E+VshGHvWo5bVC+fKw@mail.gmail.com>
+Date: Tue, 8 Nov 2011 22:32:51 -0200
+Subject: Broken imx_v4_v5_defconfig on 3.2-rc1
+Message-ID: <CAOMZO5BuC5CvY=K=OPVB3pA39u2ASua8OrxMMvoW04wg3V4qng@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+When building  imx_v4_v5_defconfig on 3.2-rc1:
 
-Building mx5_defconfig on 3.2-rc1 I get:
+  CC      arch/arm/plat-mxc/irq-common.o
+  CC      arch/arm/plat-mxc/avic.o
+arch/arm/plat-mxc/avic.c:155: error: expected '=', ',', ';', 'asm' or
+'__attribute__' before 'avic_handle_irq'
+make[1]: *** [arch/arm/plat-mxc/avic.o] Error 1
+make: *** [arch/arm/plat-mxc] Error 2
 
-  CHK     include/generated/compile.h
-  CC      arch/arm/mach-mx5/clock-mx51-mx53.o
-arch/arm/mach-mx5/clock-mx51-mx53.c: In function 'clk_get_freq_dt':
-arch/arm/mach-mx5/clock-mx51-mx53.c:1644: error: implicit declaration
-of function 'for_each_compatible_node'
-arch/arm/mach-mx5/clock-mx51-mx53.c:1644: error: expected ';' before '{' token
-make[1]: *** [arch/arm/mach-mx5/clock-mx51-mx53.o] Error 1
-make: *** [arch/arm/mach-mx5] Error 2
+BTW, too bad that no i.MX can be built on 3.2-rc1
 
 Regards,
 
