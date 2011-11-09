@@ -1,18 +1,23 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Wed, 09 Nov 2011 21:45:00 +0100
-Subject: CONFIG_USB_MUSB_PERIPHERAL
-Message-ID: <1320871500.27598.40.camel@x61.thuisdomein>
+From: davem@davemloft.net (David Miller)
+Date: Wed, 09 Nov 2011 16:11:34 -0500 (EST)
+Subject: [PATCH] iMX28 Ethernet driver fix
+In-Reply-To: <20111109124411.GA31046@axolotl.localnet>
+References: <20111109124411.GA31046@axolotl.localnet>
+Message-ID: <20111109.161134.468360904095628089.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-0) Commit 622859634a663c5e55d0e2a2cdbb55ac058d97b3 ("usb: musb: drop a
-gigantic amount of ifdeferry") dropped config USB_MUSB_PERIPHERAL. But
-currently there are still five references to CONFIG_USB_MUSB_PERIPHERAL
-(all in arch/arm).
+From: Peter Horton <phorton@bitbox.co.uk>
+Date: Wed, 9 Nov 2011 12:44:11 +0000
 
-1) I could try to fix those five references (as they only influence a
-trivial amount of code). But I guess that you people could come up with
-a better solution with less effort. Ie, I choose the easy way out.
+> -	if (((unsigned long) bufaddr) & FEC_ALIGNMENT) {
+> +	if ((((unsigned long) bufaddr) & FEC_ALIGNMENT) ||
+> +		((id_entry->driver_data & FEC_QUIRK_SWAP_FRAME) &&
+> +		skb_cloned(skb)))
+> +	{
 
+Please format this condition properly:
 
-Paul Bolle
+	if (A ||
+	    (B &&
+             C)) {
