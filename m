@@ -1,69 +1,81 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed,  9 Nov 2011 18:36:38 -0200
-Subject: [PATCH v2] ARM: mx28evk: Simplify GPIO requests for mx28evk_fec_reset
-Message-ID: <1320870998-6200-1-git-send-email-festevam@gmail.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Wed, 09 Nov 2011 15:41:13 -0500 (EST)
+Subject: [PATCH v8 14/16] ARM: LPAE: mark memory banks with start >
+ ULONG_MAX as highmem
+In-Reply-To: <1320682618-1182-15-git-send-email-catalin.marinas@arm.com>
+References: <1320682618-1182-1-git-send-email-catalin.marinas@arm.com>
+ <1320682618-1182-15-git-send-email-catalin.marinas@arm.com>
+Message-ID: <alpine.LFD.2.02.1111091540450.3307@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+On Mon, 7 Nov 2011, Catalin Marinas wrote:
 
-Simplify GPIO requests inside mx28evk_fec_reset by using gpio_request_array.
+> From: Will Deacon <will.deacon@arm.com>
+> 
+> Memory banks living outside of the 32-bit physical address
+> space do not have a 1:1 pa <-> va mapping and therefore the
+> __va macro may wrap.
+> 
+> This patch ensures that such banks are marked as highmem so
+> that the Kernel doesn't try to split them up when it sees that
+> the wrapped virtual address overlaps the vmalloc space.
+> 
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
-Changes since v1:
+Acked-by: Nicolas Pitre <nico@linaro.org>
 
-- Make mx28evk_fec_gpios const
- arch/arm/mach-mxs/mach-mx28evk.c |   29 ++++++++---------------------
- 1 files changed, 8 insertions(+), 21 deletions(-)
 
-diff --git a/arch/arm/mach-mxs/mach-mx28evk.c b/arch/arm/mach-mxs/mach-mx28evk.c
-index ac2316d..c565c33 100644
---- a/arch/arm/mach-mxs/mach-mx28evk.c
-+++ b/arch/arm/mach-mxs/mach-mx28evk.c
-@@ -219,6 +219,11 @@ static const struct gpio_led_platform_data mx28evk_led_data __initconst = {
- 	.num_leds = ARRAY_SIZE(mx28evk_leds),
- };
- 
-+static const struct gpio mx28evk_fec_gpios[] __initconst = {
-+	{ MX28EVK_FEC_PHY_POWER, GPIOF_OUT_INIT_LOW, "fec-power" },
-+	{ MX28EVK_FEC_PHY_RESET, GPIOF_OUT_INIT_LOW, "fec-enable" },
-+};
-+
- /* fec */
- static void __init mx28evk_fec_reset(void)
- {
-@@ -231,28 +236,10 @@ static void __init mx28evk_fec_reset(void)
- 		clk_enable(clk);
- 
- 	/* Power up fec phy */
--	ret = gpio_request(MX28EVK_FEC_PHY_POWER, "fec-phy-power");
--	if (ret) {
--		pr_err("Failed to request gpio fec-phy-%s: %d\n", "power", ret);
--		return;
--	}
--
--	ret = gpio_direction_output(MX28EVK_FEC_PHY_POWER, 0);
--	if (ret) {
--		pr_err("Failed to drive gpio fec-phy-%s: %d\n", "power", ret);
--		return;
--	}
--
--	/* Reset fec phy */
--	ret = gpio_request(MX28EVK_FEC_PHY_RESET, "fec-phy-reset");
--	if (ret) {
--		pr_err("Failed to request gpio fec-phy-%s: %d\n", "reset", ret);
--		return;
--	}
--
--	gpio_direction_output(MX28EVK_FEC_PHY_RESET, 0);
-+	ret = gpio_request_array(mx28evk_fec_gpios,
-+				ARRAY_SIZE(mx28evk_fec_gpios));
- 	if (ret) {
--		pr_err("Failed to drive gpio fec-phy-%s: %d\n", "reset", ret);
-+		pr_err("Failed to request FEC gpios: %d\n", ret);
- 		return;
- 	}
- 
--- 
-1.7.1
+> ---
+>  arch/arm/mm/mmu.c |   16 +++++++++++++++-
+>  1 files changed, 15 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+> index 1935311..b836d6b 100644
+> --- a/arch/arm/mm/mmu.c
+> +++ b/arch/arm/mm/mmu.c
+> @@ -799,6 +799,9 @@ void __init sanity_check_meminfo(void)
+>  		struct membank *bank = &meminfo.bank[j];
+>  		*bank = meminfo.bank[i];
+>  
+> +		if (bank->start > ULONG_MAX)
+> +			highmem = 1;
+> +
+>  #ifdef CONFIG_HIGHMEM
+>  		if (__va(bank->start) >= vmalloc_min ||
+>  		    __va(bank->start) < (void *)PAGE_OFFSET)
+> @@ -810,7 +813,7 @@ void __init sanity_check_meminfo(void)
+>  		 * Split those memory banks which are partially overlapping
+>  		 * the vmalloc area greatly simplifying things later.
+>  		 */
+> -		if (__va(bank->start) < vmalloc_min &&
+> +		if (!highmem && __va(bank->start) < vmalloc_min &&
+>  		    bank->size > vmalloc_min - __va(bank->start)) {
+>  			if (meminfo.nr_banks >= NR_BANKS) {
+>  				printk(KERN_CRIT "NR_BANKS too low, "
+> @@ -831,6 +834,17 @@ void __init sanity_check_meminfo(void)
+>  		bank->highmem = highmem;
+>  
+>  		/*
+> +		 * Highmem banks not allowed with !CONFIG_HIGHMEM.
+> +		 */
+> +		if (highmem) {
+> +			printk(KERN_NOTICE "Ignoring RAM at %.8llx-%.8llx "
+> +			       "(!CONFIG_HIGHMEM).\n",
+> +			       (unsigned long long)bank->start,
+> +			       (unsigned long long)bank->start + bank->size - 1);
+> +			continue;
+> +		}
+> +
+> +		/*
+>  		 * Check whether this memory bank would entirely overlap
+>  		 * the vmalloc area.
+>  		 */
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
+> 
