@@ -1,83 +1,60 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 09 Nov 2011 07:31:24 -0600
-Subject: [RFC 6/8] of: add clock providers
-In-Reply-To: <20111109091328.GY16886@pengutronix.de>
-References: <1320801583-12774-1-git-send-email-grant.likely@secretlab.ca>
- <1320801583-12774-7-git-send-email-grant.likely@secretlab.ca>
- <20111109091328.GY16886@pengutronix.de>
-Message-ID: <4EBA80AC.30604@gmail.com>
+From: jon.medhurst@linaro.org (Jon Medhurst (Tixy))
+Date: Wed, 09 Nov 2011 13:38:41 +0000
+Subject: [PATCH] ARM: hw_breakpoint: don't fault when debug is not powered
+In-Reply-To: <1320843602-12278-1-git-send-email-linus.walleij@stericsson.com>
+References: <1320843602-12278-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <1320845921.2427.15.camel@linaro1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/09/2011 03:13 AM, Sascha Hauer wrote:
-> On Tue, Nov 08, 2011 at 06:19:41PM -0700, Grant Likely wrote:
->> Based on work by Ben Herrenschmidt and Jeremy Kerr, this patch adds an
->> of_clk_get function to allow platforms to retrieve clock data from the
->> device tree.
->>
->> Platform register a provider through of_clk_add_provider, which will be
->> called when a device references the provider's OF node for a clock
->> reference.
->>
->> Signed-off-by: Grant Likely <grant.likely@secretlab.ca>
->> ---
->>  .../devicetree/bindings/clock/clock-bindings.txt   |  109 +++++++++++++++++
->>  drivers/of/Kconfig                                 |    6 +
->>  drivers/of/Makefile                                |    1 +
->>  drivers/of/clock.c                                 |  129 ++++++++++++++++++++
->>  include/linux/of_clk.h                             |   37 ++++++
->>  5 files changed, 282 insertions(+), 0 deletions(-)
->>  create mode 100644 Documentation/devicetree/bindings/clock/clock-bindings.txt
->>  create mode 100644 drivers/of/clock.c
->>  create mode 100644 include/linux/of_clk.h
->>
->> diff --git a/Documentation/devicetree/bindings/clock/clock-bindings.txt b/Documentation/devicetree/bindings/clock/clock-bindings.txt
->> new file mode 100644
->> index 0000000..4770c7e
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/clock/clock-bindings.txt
->> @@ -0,0 +1,109 @@
->> +This binding is a work-in-progress, and are based on some experimental
->> +work by benh[1].
->> +
->> +Sources of clock signal can be represented by any node in the device
->> +tree.  Those nodes are designated as clock providers.  Clock consumer
->> +nodes use a phandle and clock specifier pair to connect clock provider
->> +outputs to clock inputs.  Similar to the gpio specifiers, a clock
->> +specifier is an array of one more more cells identifying the clock
->> +output on a device.  The length of a clock specifier is defined by the
->> +value of a #clock-cells property in the clock provider node.
->> +
->> +[1] http://patchwork.ozlabs.org/patch/31551/
->> +
->> +==Clock providers==
->> +
->> +Required properties:
->> +#clock-cells:	   Number of cells in a clock specifier; typically will be
->> +		   set to 1
->> +
->> +Optional properties:
->> +clock-output-name: Recommended to be a list of strings of clock output signal
->> +		   names indexed by the first cell in the clock specifier.
->> +		   However, the meaning of clock-output-names is domain
->> +		   specific to the clock provider, and is only provided to
->> +		   encourage using the same meaning for the majority of clock
->> +		   providers.  This format may not work for clock providers
->> +		   using a complex clock specifier format.  In those cases it
->> +		   is recommended to omit this property and create a binding
->> +		   specific names property.
+On Wed, 2011-11-09 at 14:00 +0100, Linus Walleij wrote:
+> From: Rabin Vincent <rabin.vincent@stericsson.com>
 > 
-> If the clock-output-name property is omitted, does this mean a clock
-> provider only has a single output or does it mean that it's not known
-> how many clock outputs a provider actually has?
+> If the debug logic is not powered, the processor can unfortunately
+> raise an undefined instruction exception on the instruction that
+> we use to check if the debug logic is powered up or not.
+> 
+> Handle this with an undef hook, so that the kernel doesn't crash
+> on boot on such setups.
+> 
+> Cc: Will Deacon <will.deacon@arm.com>
+> Signed-off-by: Rabin Vincent <rabin.vincent@stericsson.com>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+>  arch/arm/kernel/hw_breakpoint.c |   25 +++++++++++++++++++++++++
+>  1 files changed, 25 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/kernel/hw_breakpoint.c b/arch/arm/kernel/hw_breakpoint.c
+> index 814a52a9..f46137c 100644
+> --- a/arch/arm/kernel/hw_breakpoint.c
+> +++ b/arch/arm/kernel/hw_breakpoint.c
+> @@ -854,6 +854,25 @@ static int hw_breakpoint_pending(unsigned long addr, unsigned int fsr,
+>  	return ret;
+>  }
+>  
+> +static int hw_breakpoint_undef(struct pt_regs *regs, unsigned int instr)
+> +{
+> +	int reg = (instr >> 12) & 15;
+> +
+> +	/* Fake sticky power-down cleared */
+> +	regs->uregs[reg] = 0;
+> +	regs->ARM_pc += 4;
+> +
+> +	return 0;
+> +}
+> +
+> +static struct undef_hook hw_breakpoint_hook = {
+> +	.instr_mask	= 0xffff0fff,
+> +	.instr_val	= 0xee110e95,
+> +	.cpsr_mask	= MODE_MASK,
+> +	.cpsr_val	= SVC_MODE,
+> +	.fn		= hw_breakpoint_undef,
+> +};
+> +
 
-Neither. It's similar to how interrupt bindings work. For a clock
-consumer, you have a phandle to the parent and some number of cells to
-describe the connection. Often this is just the index or local interrupt
-number. Obviously, interrupt numbers make more sense than clock numbers,
-so having names is more useful in the clocks case if you have many outputs.
+This should work OK on Thumb2 kernels as the encoding for the MRC
+instruction is the same as on ARM :-) Is it worth a comment to this
+effect?
 
-The name strings are just additional information. Keep in mind that the
-clock node name can also be used if you need to attach a name to a clock.
-
-Rob
+-- 
+Tixy
