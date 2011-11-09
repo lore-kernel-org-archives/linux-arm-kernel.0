@@ -1,73 +1,60 @@
-From: rmallon@gmail.com (Ryan Mallon)
-Date: Thu, 10 Nov 2011 09:22:54 +1100
-Subject: [PATCH v4 2/4] drivers/i2c/busses/i2c-at91.c: add new driver
-In-Reply-To: <20111109195925.GB17406@legolas.emea.dhcp.ti.com>
-References: <cover.1320853921.git.n.voss@weinmann.de>
- <fc7ccca66f0ffea1aa9c0409162b4a66974c46b3.1320853921.git.n.voss@weinmann.de>
- <20111109195925.GB17406@legolas.emea.dhcp.ti.com>
-Message-ID: <4EBAFD3E.5070609@gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 9 Nov 2011 14:27:29 -0800
+Subject: [PATCH 2/5] ARM: restart: omap: use new restart hook XXX WIP XXX
+In-Reply-To: <E1RN6we-0001aR-Qs@rmk-PC.arm.linux.org.uk>
+References: <20111106175457.GK12913@n2100.arm.linux.org.uk>
+ <E1RN6we-0001aR-Qs@rmk-PC.arm.linux.org.uk>
+Message-ID: <20111109222728.GO31337@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/11/11 06:59, Felipe Balbi wrote:
-
-> Hi,
+* Russell King - ARM Linux <linux@arm.linux.org.uk> [111106 09:32]:
+> Hook these platforms restart code into the new restart hook rather
+> than using arch_reset().
 > 
-> On Tue, Nov 08, 2011 at 11:49:46AM +0100, Nikolaus Voss wrote:
->> diff --git a/drivers/i2c/busses/Makefile b/drivers/i2c/busses/Makefile
->> index e8a1852..fba6da6 100644
-
->> +	ckdiv = 0;
->> +	while (cdiv > 255) {
->> +		ckdiv++;
->> +		cdiv = cdiv >> 1;
->> +	}
->> +
->> +	if (cpu_is_at91rm9200() && (ckdiv > 5)) {
->> +		dev_err(dev->dev, "AT91RM9200 Erratum #22: using ckdiv = 5.\n");
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+>  arch/arm/mach-omap1/board-voiceblue.c     |    5 ++---
+>  arch/arm/mach-omap1/include/mach/system.h |    6 ++++++
+>  arch/arm/mach-omap1/reset.c               |    4 +---
+>  arch/arm/mach-omap2/include/mach/system.h |    6 ++++++
+>  arch/arm/mach-omap2/prcm.c                |    4 +---
+>  arch/arm/plat-omap/include/plat/system.h  |    2 --
+>  6 files changed, 16 insertions(+), 11 deletions(-)
 > 
-> is it really an error ? Or would it be enough as dev_dbg() ?
+> diff --git a/arch/arm/mach-omap1/board-voiceblue.c b/arch/arm/mach-omap1/board-voiceblue.c
+> index 2a6545b..b0111b6 100644
+> --- a/arch/arm/mach-omap1/board-voiceblue.c
+> +++ b/arch/arm/mach-omap1/board-voiceblue.c
+> @@ -220,7 +220,7 @@ void voiceblue_wdt_ping(void)
+>  	gpio_set_value(0, wdt_gpio_state);
+>  }
+>  
+> -static void voiceblue_reset(char mode, const char *cmd)
+> +static void voiceblue_restart(char mode, const char *cmd)
+>  {
+>  	/*
+>  	 * Workaround for 5912/1611b bug mentioned in sprz209d.pdf p. 28
+> @@ -284,8 +284,6 @@ static void __init voiceblue_init(void)
+>  	 * (it is connected through invertor) */
+>  	omap_writeb(0x00, OMAP_LPG1_LCR);
+>  	omap_writeb(0x00, OMAP_LPG1_PMR);	/* Disable clock */
+> -
+> -	arch_reset = voiceblue_reset;
+>  }
+>  
+>  MACHINE_START(VOICEBLUE, "VoiceBlue OMAP5910")
+> @@ -297,4 +295,5 @@ MACHINE_START(VOICEBLUE, "VoiceBlue OMAP5910")
+>  	.init_irq	= omap1_init_irq,
+>  	.init_machine	= voiceblue_init,
+>  	.timer		= &omap1_timer,
+> +	.restart	= voiceblue_restart,
+>  MACHINE_END
 
+I guess we want the rest of the board files to set .restart
+to omap1_restart or omap_prcm_restart? Do you already have
+some script doing that or do you need some help there?
 
-dev_warn is probably appropriate.
+Regards,
 
-> 
->> +static int at91_do_twi_transfer(struct at91_twi_dev *dev, bool is_read)
->> +{
->> +	int ret;
->> +
->> +	INIT_COMPLETION(dev->cmd_complete);
->> +	if (is_read) {
->> +		if (!dev->buf_len)
->> +			at91_twi_write(dev, AT91_TWI_CR,
->> +				       AT91_TWI_START | AT91_TWI_STOP);
->> +		else
->> +			at91_twi_write(dev, AT91_TWI_CR, AT91_TWI_START);
->> +		at91_twi_write(dev, AT91_TWI_IER,
->> +			       AT91_TWI_TXCOMP | AT91_TWI_RXRDY);
->> +	} else {
->> +		at91_twi_write_next_byte(dev);
->> +		at91_twi_write(dev, AT91_TWI_IER,
->> +			       AT91_TWI_TXCOMP | AT91_TWI_TXRDY);
->> +	}
->> +
->> +	ret = wait_for_completion_interruptible_timeout(&dev->cmd_complete,
->> +							dev->adapter.timeout);
->> +	if (ret == 0) {
->> +		dev_err(dev->dev, "controller timed out\n");
->> +		at91_init_twi_bus(dev);
->> +		return -ETIMEDOUT;
->> +	}
->> +	if (dev->transfer_status & AT91_TWI_NACK) {
->> +		dev_dbg(dev->dev, "received nack\n");
->> +		return -ENODEV;
-> 
-> not sure error code matches here. If the HW replies with NACK you tell
-> your users there's no I2C adapter ? Sounds a bit weird to me...
-
-
-I think -ENODEV was used because a NACK can mean that there is no device
-at the address you are trying to talk to. Other drivers appear to use
--EIO or -EREMOTEIO. The latter is possibly more correct.
-
-~Ryan
+Tony
