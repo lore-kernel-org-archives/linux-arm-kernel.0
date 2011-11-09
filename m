@@ -1,78 +1,18 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 9 Nov 2011 20:13:38 +0100
-Subject: [PATCH] ARM: mx28evk: Simplify GPIO requests for mx28evk_fec_reset
-In-Reply-To: <1320865742-16768-1-git-send-email-fabio.estevam@freescale.com>
-References: <1320865742-16768-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <20111109191338.GG13122@pengutronix.de>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Wed, 09 Nov 2011 20:17:05 +0100
+Subject: CONFIG_CPU_FREQ_DEBUG
+Message-ID: <1320866225.27598.11.camel@x61.thuisdomein>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+0) Commit 2d06d8c49afdcc9bb35a85039fa50f0fe35bd40e ("[CPUFREQ] use
+dynamic debug instead of custom infrastructure") dropped config
+CPU_FREQ_DEBUG. But currently there are still two references to
+CONFIG_CPU_FREQ_DEBUG (both in arch/arm).
 
-On Wed, Nov 09, 2011 at 05:09:02PM -0200, Fabio Estevam wrote:
-> Simplify GPIO requests inside mx28evk_fec_reset by using gpio_request_array.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
->  arch/arm/mach-mxs/mach-mx28evk.c |   29 ++++++++---------------------
->  1 files changed, 8 insertions(+), 21 deletions(-)
-> 
-> diff --git a/arch/arm/mach-mxs/mach-mx28evk.c b/arch/arm/mach-mxs/mach-mx28evk.c
-> index ac2316d..c565c33 100644
-> --- a/arch/arm/mach-mxs/mach-mx28evk.c
-> +++ b/arch/arm/mach-mxs/mach-mx28evk.c
-> @@ -219,6 +219,11 @@ static const struct gpio_led_platform_data mx28evk_led_data __initconst = {
->  	.num_leds = ARRAY_SIZE(mx28evk_leds),
->  };
->  
-> +static struct gpio mx28evk_fec_gpios[] = {
-const + __initconst please.
+1) I've stared a bit at the (trivial) code still relying on
+CONFIG_CPU_FREQ_DEBUG but wasn't sure how it could be rewritten. Perhaps
+one of you does know how to do that.
 
-> +	{ MX28EVK_FEC_PHY_POWER, GPIOF_OUT_INIT_LOW, "fec-power" },
-> +	{ MX28EVK_FEC_PHY_RESET, GPIOF_OUT_INIT_LOW, "fec-enable" },
-> +};
-> +
->  /* fec */
->  static void __init mx28evk_fec_reset(void)
->  {
-> @@ -231,28 +236,10 @@ static void __init mx28evk_fec_reset(void)
->  		clk_enable(clk);
->  
->  	/* Power up fec phy */
-> -	ret = gpio_request(MX28EVK_FEC_PHY_POWER, "fec-phy-power");
-> -	if (ret) {
-> -		pr_err("Failed to request gpio fec-phy-%s: %d\n", "power", ret);
-> -		return;
-> -	}
-> -
-> -	ret = gpio_direction_output(MX28EVK_FEC_PHY_POWER, 0);
-> -	if (ret) {
-> -		pr_err("Failed to drive gpio fec-phy-%s: %d\n", "power", ret);
-> -		return;
-> -	}
-> -
-> -	/* Reset fec phy */
-> -	ret = gpio_request(MX28EVK_FEC_PHY_RESET, "fec-phy-reset");
-> -	if (ret) {
-> -		pr_err("Failed to request gpio fec-phy-%s: %d\n", "reset", ret);
-> -		return;
-> -	}
-> -
-> -	gpio_direction_output(MX28EVK_FEC_PHY_RESET, 0);
-> +	ret = gpio_request_array(mx28evk_fec_gpios,
-> +				ARRAY_SIZE(mx28evk_fec_gpios));
->  	if (ret) {
-> -		pr_err("Failed to drive gpio fec-phy-%s: %d\n", "reset", ret);
-> +		pr_err("Failed to request FEC gpios: %d\n", ret);
->  		return;
->  	}
->  
-> -- 
-> 1.7.1
-> 
-> 
-> 
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Paul Bolle
