@@ -1,22 +1,35 @@
-From: paul.s.schilling@gmail.com (Paul Schilling)
-Date: Wed, 9 Nov 2011 17:30:59 -0600
-Subject: s3c2440 / s3c2416 broken
-In-Reply-To: <CAC=G6syKMJk+L+-_k+T37qHKzfpNz_TrYi-HTaufczLxJKEtkQ@mail.gmail.com>
-References: <CAC=G6syKMJk+L+-_k+T37qHKzfpNz_TrYi-HTaufczLxJKEtkQ@mail.gmail.com>
-Message-ID: <CAC=G6swbDHZJ7fqu9LoYRiri6bg+M+VDZnG_-=ZfP9r=6YtVeg@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 9 Nov 2011 23:39:00 +0000
+Subject: [PATCH] ARM: OMAP: Fix map_io for Amstrad E3
+In-Reply-To: <20111109232525.GT31337@atomide.com>
+References: <B8A6ED05-78AC-4140-A9B8-8265F1E9C32F@iki.fi>
+ <20111109231900.GS31337@atomide.com> <20111109232525.GT31337@atomide.com>
+Message-ID: <20111109233900.GP15294@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Boot past init slow - stalled when using jffs2 also.
+On Wed, Nov 09, 2011 at 03:25:25PM -0800, Tony Lindgren wrote:
+> Commit 7b88e62f5d219a86d81bdf4388012c97dc42e8f8 (ARM: OMAP1: Use generic
+> map_io, init_early and init_irq) changed omap1 to use generic map_io.
+> 
+> Looks like I missed one board though. Fix this by adding a custom
+> map_io for Amstrad E3.
+> 
+> Reported-by: Aaro Koskinen <aaro.koskinen@iki.fi>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> 
+> ---
+> Untested, does this help?
+> --- a/arch/arm/mach-omap1/board-ams-delta.c
+> +++ b/arch/arm/mach-omap1/board-ams-delta.c
+> @@ -302,8 +302,6 @@ static void __init ams_delta_init(void)
+>  	omap_cfg_reg(J19_1610_CAM_D6);
+>  	omap_cfg_reg(J18_1610_CAM_D7);
+>  
+> -	iotable_init(ams_delta_io_desc, ARRAY_SIZE(ams_delta_io_desc));
+> -
 
-On Wed, Nov 9, 2011 at 4:12 PM, Paul Schilling
-<paul.s.schilling@gmail.com> wrote:
-> Latest kernel 3.2.0-rc1 appears to break the following processors
-> s3c2440 and s3c2416
->
-> both appear to stall when init is executed on NFS. ?Also I ?lost HSMMC on
-> the s3c2416.
->
-> Thanks,
-> Paul
->
+This is definitely wrong.  Using iotable_init() after map_io has returned
+has (and remains) a serious bug - doing so may _appear_ to work but as it
+doesn't obtain its memory from the standard kernel memory allocators, it
+will lead to duplicate usage of that memory.
