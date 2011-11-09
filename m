@@ -1,242 +1,59 @@
-From: deepthi@linux.vnet.ibm.com (Deepthi Dharwar)
-Date: Wed, 09 Nov 2011 16:43:10 +0530
-Subject: [PATCH] CPUIdle: Reevaluate C-states under CPU load to favor
- deeper C-states
-In-Reply-To: <87d3d75zo6.fsf@ti.com>
-References: <1316475315-5905-1-git-send-email-khilman@ti.com>
- <87d3d75zo6.fsf@ti.com>
-Message-ID: <4EBA6046.2060305@linux.vnet.ibm.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Wed, 9 Nov 2011 12:23:25 +0100
+Subject: [RFC 6/8] of: add clock providers
+In-Reply-To: <20111109091328.GY16886@pengutronix.de>
+References: <1320801583-12774-1-git-send-email-grant.likely@secretlab.ca>
+ <1320801583-12774-7-git-send-email-grant.likely@secretlab.ca>
+ <20111109091328.GY16886@pengutronix.de>
+Message-ID: <4EBA62AD.3000407@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 05 November 2011 03:16 AM, Kevin Hilman wrote:
-> ping v2
-> 
-> Kevin Hilman <khilman@ti.com> writes:
-> 
->> From: Nicole Chalhoub <n-chalhoub@ti.com>
->>
->> While there is CPU load, program a C-state specific one-shot timer in
->> order to give CPUidle another opportunity to pick a deeper C-state
->> instead of spending potentially long idle times in a shallow C-state.
->>
->> Long winded version:
->> When going idle with a high load average, CPUidle menu governor will
->> decide to pick a shallow C-state since one of the guiding principles
->> of the menu governor is "The busier the system, the less impact of
->> C-states is acceptable" (taken from cpuidle/governors/menu.c.)
->> That makes perfect sense.
->>
->> However, there are missed power-saving opportunities for bursty
->> workloads with long idle times (e.g. MP3 playback.)  Given such a
->> workload, because of the load average, CPUidle tends to pick a shallow
->> C-state.  Because we also go tickless, this shallow C-state is used
->> for the duration of the idle period. If the idle period is long, a
->> deeper C state would've resulted in better power savings.
->> This patch provides an additional opportuntity for CPUidle to pick a
->> deeper C-state by programming a timer (with a C-state specific timeout)
->> such that the CPUidle governor will have another opportunity to pick a
->> deeper C-state.
->>
->> Adding this timer for C-state reevaluation improved the load estimation
->> on our ARM/OMAP4 platform and increased the time spent in deep C-states
->> (~50% of idle time in C-states deeper than C1).  A power saving of ~10mA
->> at battery level is observed during MP3 playback on OMAP4/Blaze board.
->>
->> Signed-off-by: Nicole Chalhoub <n-chalhoub@ti.com>
->> Signed-off-by: Kevin Hilman <khilman@ti.com>
->> ---
->>  drivers/cpuidle/cpuidle.c        |   28 +++++++++++++++++++++++++-
->>  drivers/cpuidle/governors/menu.c |   39 ++++++++++++++++++++++++++++++++-----
->>  include/linux/cpuidle.h          |    4 +++
->>  3 files changed, 63 insertions(+), 8 deletions(-)
->>
->> diff --git a/drivers/cpuidle/cpuidle.c b/drivers/cpuidle/cpuidle.c
->> index 1994885..4b1ac0c 100644
->> --- a/drivers/cpuidle/cpuidle.c
->> +++ b/drivers/cpuidle/cpuidle.c
->> @@ -92,13 +92,33 @@ static void cpuidle_idle_call(void)
->>  	target_state->time += (unsigned long long)dev->last_residency;
->>  	target_state->usage++;
->>  
->> -	/* give the governor an opportunity to reflect on the outcome */
->> -	if (cpuidle_curr_governor->reflect)
->> +	hrtimer_cancel(&dev->cstate_timer);
->> +
->> +	/*
->> +	 * Give the governor an opportunity to reflect on the outcome
->> +	 * Do not take into account the wakeups due to the hrtimer, they
->> +	 * should not impact the predicted idle time.
->> +	 */
->> +	if ((!dev->hrtimer_expired) && cpuidle_curr_governor->reflect)
->>  		cpuidle_curr_governor->reflect(dev);
->>  	trace_power_end(0);
->>  }
->>  
->>  /**
->> + * cstate_reassessment_timer - interrupt handler of the cstate hrtimer
->> + * @handle:	the expired hrtimer
->> + */
->> +static enum hrtimer_restart cstate_reassessment_timer(struct hrtimer *handle)
->> +{
->> +	struct cpuidle_device *data =
->> +		container_of(handle, struct cpuidle_device, cstate_timer);
->> +
->> +	data->hrtimer_expired = 1;
->> +
->> +	return HRTIMER_NORESTART;
->> +}
->> +
->> +/**
->>   * cpuidle_install_idle_handler - installs the cpuidle idle loop handler
->>   */
->>  void cpuidle_install_idle_handler(void)
->> @@ -185,6 +205,10 @@ int cpuidle_enable_device(struct cpuidle_device *dev)
->>  
->>  	dev->enabled = 1;
->>  
->> +	dev->hrtimer_expired = 0;
->> +	hrtimer_init(&dev->cstate_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
->> +	dev->cstate_timer.function = cstate_reassessment_timer;
->> +
->>  	enabled_devices++;
->>  	return 0;
->>  
->> diff --git a/drivers/cpuidle/governors/menu.c b/drivers/cpuidle/governors/menu.c
->> index 1b12870..fd54584 100644
->> --- a/drivers/cpuidle/governors/menu.c
->> +++ b/drivers/cpuidle/governors/menu.c
->> @@ -125,10 +125,21 @@ struct menu_device {
->>  #define LOAD_INT(x) ((x) >> FSHIFT)
->>  #define LOAD_FRAC(x) LOAD_INT(((x) & (FIXED_1-1)) * 100)
->>  
->> -static int get_loadavg(void)
->> +static int get_loadavg(struct cpuidle_device *dev)
->>  {
->> -	unsigned long this = this_cpu_load();
->> +	unsigned long this;
->>  
->> +	/*
->> +	 * this_cpu_load() returns the value of rq->load.weight
->> +	 * at the previous scheduler tick and not the current value.
->> +	 * If the timer expired, that means we are in idle,there
->> +	 * are no more runnable processes in the current queue
->> +	 * =>return the current value of rq->load.weight which is 0.
->> +	 */
->> +	if (dev->hrtimer_expired == 1)
->> +		return 0;
->> +	else
->> +		this = this_cpu_load();
->>  
->>  	return LOAD_INT(this) * 10 + LOAD_FRAC(this) / 10;
->>  }
->> @@ -166,13 +177,13 @@ static inline int which_bucket(unsigned int duration)
->>   * to be, the higher this multiplier, and thus the higher
->>   * the barrier to go to an expensive C state.
->>   */
->> -static inline int performance_multiplier(void)
->> +static inline int performance_multiplier(struct cpuidle_device *dev)
->>  {
->>  	int mult = 1;
->>  
->>  	/* for higher loadavg, we are more reluctant */
->>  
->> -	mult += 2 * get_loadavg();
->> +	mult += 2 * get_loadavg(dev);
->>  
->>  	/* for IO wait tasks (per cpu!) we add 5x each */
->>  	mult += 10 * nr_iowait_cpu(smp_processor_id());
->> @@ -236,6 +247,7 @@ static int menu_select(struct cpuidle_device *dev)
->>  	int latency_req = pm_qos_request(PM_QOS_CPU_DMA_LATENCY);
->>  	int i;
->>  	int multiplier;
->> +	ktime_t timeout;
->>  
->>  	if (data->needs_update) {
->>  		menu_update(dev);
->> @@ -256,7 +268,7 @@ static int menu_select(struct cpuidle_device *dev)
->>  
->>  	data->bucket = which_bucket(data->expected_us);
->>  
->> -	multiplier = performance_multiplier();
->> +	multiplier = performance_multiplier(dev);
->>  
->>  	/*
->>  	 * if the correction factor is 0 (eg first time init or cpu hotplug
->> @@ -287,12 +299,27 @@ static int menu_select(struct cpuidle_device *dev)
->>  			break;
->>  		if (s->exit_latency > latency_req)
->>  			break;
->> -		if (s->exit_latency * multiplier > data->predicted_us)
->> +		if (s->exit_latency * multiplier > data->predicted_us) {
->> +			/*
->> +			 * Could not enter the next C-state because of a high
->> +			 * load. Set a timer in order to check the load again
->> +			 * after the timeout expires and re-evaluate cstate.
->> +			 */
->> +			if (s->hrtimer_timeout != 0 && get_loadavg(dev)) {
->> +				timeout =
->> +				       ktime_set(0,
->> +					   s->hrtimer_timeout * NSEC_PER_USEC);
->> +				hrtimer_start(&dev->cstate_timer, timeout,
->> +					   HRTIMER_MODE_REL);
->> +			}
->>  			break;
->> +		}
->>  		data->exit_us = s->exit_latency;
->>  		data->last_state_idx = i;
->>  	}
->>  
->> +	/* Reset hrtimer_expired which is set when the hrtimer fires */
->> +	dev->hrtimer_expired = 0;
->>  	return data->last_state_idx;
->>  }
->>  
->> diff --git a/include/linux/cpuidle.h b/include/linux/cpuidle.h
->> index 55215cc..8d11b52 100644
->> --- a/include/linux/cpuidle.h
->> +++ b/include/linux/cpuidle.h
->> @@ -16,6 +16,7 @@
->>  #include <linux/module.h>
->>  #include <linux/kobject.h>
->>  #include <linux/completion.h>
->> +#include <linux/hrtimer.h>
->>  
->>  #define CPUIDLE_STATE_MAX	8
->>  #define CPUIDLE_NAME_LEN	16
->> @@ -37,6 +38,7 @@ struct cpuidle_state {
->>  	unsigned int	exit_latency; /* in US */
->>  	unsigned int	power_usage; /* in mW */
->>  	unsigned int	target_residency; /* in US */
->> +	unsigned int	hrtimer_timeout; /* in US */
->>  
->>  	unsigned long long	usage;
->>  	unsigned long long	time; /* in US */
->> @@ -97,6 +99,8 @@ struct cpuidle_device {
->>  	struct completion	kobj_unregister;
->>  	void			*governor_data;
->>  	struct cpuidle_state	*safe_state;
->> +	struct hrtimer          cstate_timer;
->> +	unsigned int            hrtimer_expired;
->>  };
->>  
->>  DECLARE_PER_CPU(struct cpuidle_device *, cpuidle_devices);
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
-> 
+On 11/9/2011 10:13 AM, Sascha Hauer wrote:
+> On Tue, Nov 08, 2011 at 06:19:41PM -0700, Grant Likely wrote:
 
-By setting timers when we enter non-deepest C-state possible, such that when it fires we
-can re-evaluate and try moving into deeper and deeper C-states enhancing the
-power savings is a good feature to have. 
+[...]
 
-Looking at the current implementation, is it possible to have it as configurable option
-where one can enable/disable this functionality through the backhand driver ?
+>> +Sources of clock signal can be represented by any node in the device
+>> +tree.  Those nodes are designated as clock providers.  Clock consumer
+>> +nodes use a phandle and clock specifier pair to connect clock provider
+>> +outputs to clock inputs.  Similar to the gpio specifiers, a clock
+>> +specifier is an array of one more more cells identifying the clock
+>> +output on a device.  The length of a clock specifier is defined by the
+>> +value of a #clock-cells property in the clock provider node.
+>> +
+>> +[1] http://patchwork.ozlabs.org/patch/31551/
+>> +
+>> +==Clock providers==
+>> +
+>> +Required properties:
+>> +#clock-cells:	   Number of cells in a clock specifier; typically will be
+>> +		   set to 1
+>> +
+>> +Optional properties:
+>> +clock-output-name: Recommended to be a list of strings of clock output signal
+>> +		   names indexed by the first cell in the clock specifier.
+>> +		   However, the meaning of clock-output-names is domain
+>> +		   specific to the clock provider, and is only provided to
+>> +		   encourage using the same meaning for the majority of clock
+>> +		   providers.  This format may not work for clock providers
+>> +		   using a complex clock specifier format.  In those cases it
+>> +		   is recommended to omit this property and create a binding
+>> +		   specific names property.
+>
+> If the clock-output-name property is omitted, does this mean a clock
+> provider only has a single output or does it mean that it's not known
+> how many clock outputs a provider actually has?
 
-Also I am thinking, instead of having them in governor
-wouldnt it be a good idea to have it implemented in 
-the backhand driver itself ? 
+Allowing several outputs for a single clock node might lead to a lot of 
+confusion. What will be the meaning of a clock rate if you have several 
+outputs at different frequency?
+I think it will be better to define a clock node as a single source of 
+clock. If several outputs are needed, then we should define several 
+clock nodes.
+If we let a clock node be any kind of big clock blob, we will never be 
+able to define some generic reusable clock node API. Everybody will 
+define its own custom clock blobs.
 
---Deepthi
+Regards,
+Benoit
