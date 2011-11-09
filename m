@@ -1,34 +1,24 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 9 Nov 2011 14:51:01 -0200
-Subject: [PATCH v3] ARM/mx35/3ds: gpio: add mc9s08dz60 gpio function
-In-Reply-To: <4EBAA038.6010606@pengutronix.de>
-References: <1320401551-21377-1-git-send-email-b39297@freescale.com>
- <4EBAA038.6010606@pengutronix.de>
-Message-ID: <CAOMZO5Af9XCB8OGGJo0Hb-Bhhv_R==cS-D3jeC-NKvzbANbMyw@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 9 Nov 2011 17:56:35 +0000
+Subject: [PATCH v2] ARM: arch.h: Declare 'pt_regs' locally
+In-Reply-To: <1320840648-3197-1-git-send-email-fabio.estevam@freescale.com>
+References: <1320840648-3197-1-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <20111109175635.GO12913@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 9, 2011 at 1:46 PM, Marc Kleine-Budde <mkl@pengutronix.de> wrote:
->> +static int mc9s08dz60_remove(struct i2c_client *client)
->> +{
->> + ? ? struct mc9s08dz60 *mc9s;
->> + ? ? int ret;
->> +
->> + ? ? mc9s = i2c_get_clientdata(client);
->> +
->> + ? ? i2c_set_clientdata(client, NULL);
->> +
->> + ? ? ret = gpiochip_remove(&mc9s->chip);
->> + ? ? if (!ret)
->> + ? ? ? ? ? ? kfree(mc9s);
->> +
->> + ? ? return 0;
->
-> return 0 if gpiochip_remove() fails?
+On Wed, Nov 09, 2011 at 10:10:48AM -0200, Fabio Estevam wrote:
+> Fix the following warning when building imx_v4_v5_defconfig target:
+> 
+>   CC      arch/arm/mach-imx/mach-imx27ipcam.o
+> In file included from arch/arm/mach-imx/mach-imx27ipcam.c:18:
+> /home/fabio/linus/linux-2.6/arch/arm/include/asm/mach/arch.h:47: warning: 'struct pt_regs' declared inside parameter list
+> /home/fabio/linus/linux-2.6/arch/arm/include/asm/mach/arch.h:47: warning: its scope is only this definition or declaration, which is probably not what you want
+> arch/arm/mach-imx/mach-imx27ipcam.c:78: warning: initialization from incompatible pointer type
+> 
+> Declare 'struct pt_regs' locally.
+> 
+> Cc: Eric Miao <eric.miao@canonical.com>
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 
-See Russell's comment about returning error on this remove function:
-http://www.spinics.net/lists/arm-kernel/msg146501.html
-
-Regards,
-
-Fabio Estevam
+Yup.  Can go to the patch system, thanks.
