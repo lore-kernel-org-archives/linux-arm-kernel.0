@@ -1,85 +1,45 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 9 Nov 2011 13:46:52 -0800
-Subject: Pet Peaves about Platform code, and arch_reset
-In-Reply-To: <20111108004550.GH31337@atomide.com>
-References: <20111106135250.GC15294@n2100.arm.linux.org.uk>
- <20111108004550.GH31337@atomide.com>
-Message-ID: <20111109214652.GM31337@atomide.com>
+Date: Wed, 9 Nov 2011 13:49:44 -0800
+Subject: PLEASE FIX: lack of trailing , on structure initializers
+In-Reply-To: <4EB7C2CC.40106@atmel.com>
+References: <20111105164855.GG12913@n2100.arm.linux.org.uk>
+ <4EB7C2CC.40106@atmel.com>
+Message-ID: <20111109214944.GN31337@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [111107 16:11]:
-> * Russell King - ARM Linux <linux@arm.linux.org.uk> [111106 05:18]:
-> > Here's a list of my peaves about current platform code - which are
-> > causing me great issue when trying to clean up the arch_reset() stuff:
+* Nicolas Ferre <nicolas.ferre@atmel.com> [111107 03:06]:
+> On 11/05/2011 05:48 PM, Russell King - ARM Linux :
+> > The lack of trailing ','s on initializers is causing me quite an amount
+> > of grief while trying to prepare the set of patches for arch_reset.
+> > It's really annoying to add a new initializer at the end of a structure,
+> > not notice the lack of trailing ',' on the last entry, and then end up
+> > having to rework the patches because of that.  E.g.:
 > > 
-> > 1. Lack of trailing ',' on structure initializers
-> >    This makes it much harder to add additional initializers at the end
-> >    of existing initializers, and increases the risks of conflicts being
-> >    caused due to more lines having to be modified.
+> > arch/arm/mach-orion5x/mv2120-setup.c:238: error: request for member ?restart? in something not a structure or union
 > > 
-> > (This won't work directly because the tabs have been converted to space.
-> > The empty-looking [] contain a space plus a tab.)
-> > $ grep '[   ][      ]*\.[[:alnum:]_][[:alnum:]_]*[  ]*=[    ]*[[:alnum:]_{][[:alnum:]_|()}]*[^,]$' arch/arm -r|wc -l
-> > 768
-> > $ grep '[   ][      ]*\.[[:alnum:]_][[:alnum:]_]*[  ]*=[    ]*[[:alnum:]_{][[:alnum:]_|()}]*[^,]$' arch/arm/*omap* -r|wc -l
-> > 325
+> > caused by the lack of trailing comma for the .fixup initializer on the
+> > preceding line.
 > > 
-> >    Note that this is _far_ too big a problem - and trivial - to fix in
-> >    a set of silly churn generating patches - it's a problem to be fixed
-> >    as a part of _other_ changes to the files.
-> > 
-> >    But most importantly _stop_ introducing versions of this problem.
+> > We have around 778 of these in arch/arm, and it's about time that number
+> > started to be reduced.  This will cause a lot of conflicts, so the
+> > earlier it can be done in the cycle (and merged into each platform tree)
+> > the less (hopefully) it'll conflict with other work that goes through
+> > the appropriate maintainer tree.
 > 
-> Sounds like we need a spatch for this issue?
+> Hi Russell,
+> 
+> We have a dozen of those missing trailing ',' in mach-at91.
+> But as you mentioned in your other email, we may need to wait for
+> another change in the concerned files to fix this. Am I right?
+> 
+> So we keep this in mind...
 
-I guess spatch would need some patching to deal with this.. I tried
-with something like:
+FYI, I think I got most of them fixed for all ARM subarchs. Please
+feel free to pick these changes as needed and integrate them into
+other patches so we can slowly fix the issue.
 
-@r@
-identifier I, s, fld;
-position p0,p;
-expression E;
-@@
-
-struct I s =@p0 {
-...
--       .fld at p = E,
-+       .fld = E,
-...
-};
-
-That catches them, but adds an extra comma in the beginning :)
-
---- a/ams-delta-fiq.c 2011-11-08 18:03:20.110707512 -0800
-+++ b/ams-delta-fiq.c 2011-11-08 18:04:36.094948038 -0800
-@@ -25,7 +25,7 @@
- #include <mach/ams-delta-fiq.h>
- 
- static struct fiq_handler fh = {
--	.name	= "ams-delta-fiq"
-+	,.name = "ams-delta-fiq",
- };
- 
- /*
-
-And it also messes up the formatting for other structs..
-
-Anyways, I think I got most of these fixed for all ARM subarchitectures
-in a pile of 72 patches, the stats are: 
-
-486 files changed, 2296 insertions(+), 2296 deletions(-)
-
-This is something people can then use as a base to start chipping away at
-the problem. I'm thinking it may be possible to use this as a base for
-search and replacement type work and then hopefully git mergetool will
-pick the relevant changes when rebasing a working branch to the mainline.
-
-I can also post the patches here if people want, but sounds like we're
-not going to merge them as they are, but instead will slowly fix the
-issue in other related patches?
-
-I've pushed the patches into a git branch at:
+I've pushed it into a git branch at:
 
 git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap formatting:
 
