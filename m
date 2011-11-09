@@ -1,41 +1,99 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Wed, 9 Nov 2011 11:29:18 +0200
-Subject: [RFC 4/5] ARM: OMAP3: bind omap3isp_device to its iommu device
-In-Reply-To: <201111091017.18860.laurent.pinchart@ideasonboard.com>
-References: <1316948337-7924-1-git-send-email-ohad@wizery.com>
- <1316948337-7924-5-git-send-email-ohad@wizery.com>
- <201111091017.18860.laurent.pinchart@ideasonboard.com>
-Message-ID: <CAK=WgbbizCd5ZBjyk=sukWtR6j1vVv+1Jc-QRzfppPCaQ+67HQ@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 9 Nov 2011 10:31:47 +0100
+Subject: [RFC 8/8] dt/arm: versatile add clock parsing
+In-Reply-To: <1320801583-12774-9-git-send-email-grant.likely@secretlab.ca>
+References: <1320801583-12774-1-git-send-email-grant.likely@secretlab.ca>
+ <1320801583-12774-9-git-send-email-grant.likely@secretlab.ca>
+Message-ID: <20111109093147.GZ16886@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 9, 2011 at 11:17 AM, Laurent Pinchart
-<laurent.pinchart@ideasonboard.com> wrote:
-> Hi Ohad,
->
-> On Sunday 25 September 2011 12:58:56 Ohad Ben-Cohen wrote:
->> Bind OMAP3's isp device to the isp's dedicated iommu, by setting
->> the device's archdata iommu member.
->>
->> This way omap3isp will be able to use the generic IOMMU API without
->> having to call any omap-specific binding method.
->>
->> Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
->> Cc: Tony Lindgren <tony@atomide.com>
->> Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
->
-> Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+On Tue, Nov 08, 2011 at 06:19:43PM -0700, Grant Likely wrote:
+> Signed-off-by: Grant Likely <grant.likely@secretlab.ca>
+> ---
+>  arch/arm/boot/dts/versatile-ab.dts     |   37 ++++++++++++++++++++++++++++++++
+>  arch/arm/boot/dts/versatile-pb.dts     |    2 +
+>  arch/arm/mach-versatile/core.c         |   37 +------------------------------
+>  arch/arm/mach-versatile/versatile_dt.c |   33 ++++++++++++++++++++++++++++
+>  4 files changed, 74 insertions(+), 35 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/versatile-ab.dts b/arch/arm/boot/dts/versatile-ab.dts
+> index 0b32925..cb8a49e 100644
+> --- a/arch/arm/boot/dts/versatile-ab.dts
+> +++ b/arch/arm/boot/dts/versatile-ab.dts
+> @@ -19,6 +19,35 @@
+>  		reg = <0x0 0x08000000>;
+>  	};
+>  
+> +	clocks {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		ref24_clk: clock0 {
+> +			compatible = "fixed-clock";
+> +			#clock-cells = <1>;
+> +			clock-frequency = <24000000>;
+> +			clock-output-names = "ref";
+> +		};
+> +
+> +		sp804_clk: clock1 {
+> +			compatible = "fixed-clock";
+> +			#clock-cells = <1>;
+> +			clock-frequency = <1000000>;
+> +			clock-output-names = "ref";
+> +		};
+> +
+> +		osc4_clk: clock3 {
+> +			compatible = "ics,icst307";
+> +			#clock-cells = <1>;
+> +			ref = <24000>;
+> +			vco-max = <200000>;
+> +			vd-range = <12 519>;
+> +			rd-range = <3 129>;
+> +			clock-output-names = "osc4";
+> +		};
 
-Thanks, Laurent!
+The registers needed to access osc4 are missing here. This probably
+means that osc4 cannot be specified in the clocks node but has to
+be sorted into the bus structure of the SoC.
 
-Tony, can you please Ack the OMAP parts of this patch set:
+> +
+>  static void __init versatile_dt_init(void)
+>  {
+> +	struct device_node *node;
+> +	struct clk *clk;
+> +	int rc;
+> +
+> +	for_each_compatible_node(node, NULL, "fixed-clock") {
+> +		u32 rate;
+> +		if (of_property_read_u32(node, "clock-frequency", &rate))
+> +			continue;
+> +
+> +		clk = kzalloc(sizeof(*clk), GFP_KERNEL);
+> +		if (!clk)
+> +			panic("out of memory\n");
+> +		clk->rate = rate;
+> +
+> +		rc = of_clk_add_provider(node, versatile_dt_clk_get, clk);
+> +		if (rc) {
+> +			kfree(clk);
+> +			pr_err("error adding fixed clk %s\n", node->name);
+> +		}
+> +	}
+> +
 
-https://lkml.org/lkml/2011/9/25/44 (patch 3/5)
-https://lkml.org/lkml/2011/9/25/46 (patch 4/5)
-https://lkml.org/lkml/2011/9/25/45 (patch 5/5)
+Well this is obviously just a quick hack to get something working. I
+just want to add the note here that Mikes current patches require to
+register the clock tree top-down. This may be hard to archieve as the
+clocks are somewhere in the devicetree (sorted by bus topology and not
+by clock topology). So we either need more thinking in the clock
+framework to overcome the top-down registration or more thinking here
+in the registration of the clocks.
 
-With this in hand, generic iommu users will now work on OMAP platforms
-too (without calling any omap-specific API).
+Sascha
 
-Thanks,
-Ohad.
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
