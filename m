@@ -1,37 +1,33 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 9 Nov 2011 13:34:40 -0800
-Subject: [GIT PULL] arm/tegra fixes for 3.2-rc
-Message-ID: <CAOesGMip77Y7PMiCRginfZDoGe9k3jj33adP1SkJfNO1BBbrig@mail.gmail.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Wed, 9 Nov 2011 22:46:03 +0100
+Subject: [PATCH v2] ARM: mx28evk: Simplify GPIO requests for
+ mx28evk_fec_reset
+In-Reply-To: <1320870998-6200-1-git-send-email-festevam@gmail.com>
+References: <1320870998-6200-1-git-send-email-festevam@gmail.com>
+Message-ID: <20111109214603.GA6316@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Nov 09, 2011 at 06:36:38PM -0200, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
+> 
+> Simplify GPIO requests inside mx28evk_fec_reset by using gpio_request_array.
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 
-A couple of fixes for 3.2-rc below. Nothing controversial.
+Like it: Acked-by: Wolfram Sang <w.sang@pengutronix.de>
 
+Thanks,
 
-Thanks!
+   Wolfram
 
--Olof
-
-The following changes since commit 1ea6b8f48918282bdca0b32a34095504ee65bab5:
-
-  Linux 3.2-rc1 (2011-11-07 16:16:02 -0800)
-
-are available in the git repository at:
-  git://git.kernel.org/pub/scm/linux/kernel/git/olof/tegra.git for-3.2/fixes
-
-Stephen Warren (2):
-      arm/tegra: Don't create duplicate gpio and pinmux devices
-      arm/dt: Fix ventana SDHCI power-gpios
-
-Yufeng Shen (1):
-      arm/tegra: enable headphone detection gpio on seaboard
-
- arch/arm/boot/dts/tegra-ventana.dts          |    3 +--
- arch/arm/mach-tegra/board-dt.c               |   13 +++++++------
- arch/arm/mach-tegra/board-harmony-pinmux.c   |    6 +++++-
- arch/arm/mach-tegra/board-paz00-pinmux.c     |    6 +++++-
- arch/arm/mach-tegra/board-seaboard-pinmux.c  |    6 +++++-
- arch/arm/mach-tegra/board-trimslice-pinmux.c |    5 ++++-
- 6 files changed, 27 insertions(+), 12 deletions(-)
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111109/b4aa0ae2/attachment-0001.sig>
