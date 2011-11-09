@@ -1,140 +1,213 @@
-From: premi@ti.com (Premi, Sanjeev)
-Date: Wed, 9 Nov 2011 10:11:03 +0000
-Subject: [PATCH] ARM: OMAP: PM: only register TWL with voltage layer
- when device is present
-In-Reply-To: <1320797670-21460-1-git-send-email-khilman@ti.com>
-References: <1320797670-21460-1-git-send-email-khilman@ti.com>
-Message-ID: <E28AAFD00EFAA646AE3DF9B89CD24A89036E64@DBDE01.ent.ti.com>
+From: viresh.kumar@st.com (Viresh Kumar)
+Date: Wed, 9 Nov 2011 15:45:49 +0530
+Subject: [PATCHv4 08/13] ARM: spear: convert to MULTI_IRQ_HANDLER
+In-Reply-To: <1320369010-23428-9-git-send-email-jamie@jamieiles.com>
+References: <1320369010-23428-1-git-send-email-jamie@jamieiles.com>
+ <1320369010-23428-9-git-send-email-jamie@jamieiles.com>
+Message-ID: <4EBA52D5.4010801@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: linux-omap-owner at vger.kernel.org 
-> [mailto:linux-omap-owner at vger.kernel.org] On Behalf Of Hilman, Kevin
-> Sent: Wednesday, November 09, 2011 5:45 AM
-> To: linux-omap at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org; Koyamangalath, Abhilash
-> Subject: [PATCH] ARM: OMAP: PM: only register TWL with 
-> voltage layer when device is present
+On 11/4/2011 6:40 AM, Jamie Iles wrote:
+> Now that there is a generic IRQ handler for multiple VIC devices use it
+> for spear to help building multi platform kernels.
 > 
-> Current code registers voltage layer details for TWL PMIC 
-> even when a TWL
-> has not been registered.  Fix this to only register the TWL 
-> with voltage
-> layer when the TWL PMIC is initialized by board-level code.
-> 
-> Signed-off-by: Kevin Hilman <khilman@ti.com>
+> Cc: Viresh Kumar <viresh.kumar@st.com>
+> Cc: Rajeev Kumar <rajeev-dlh.kumar@st.com>
+> Signed-off-by: Jamie Iles <jamie@jamieiles.com>
 > ---
-> Barring any objections, will be queued as a fix for v3.2-rc cycle.
+>  arch/arm/Kconfig                                  |    1 +
+>  arch/arm/mach-spear3xx/include/mach/entry-macro.S |   27 ---------------
+>  arch/arm/mach-spear3xx/spear300_evb.c             |    2 +
+>  arch/arm/mach-spear3xx/spear310_evb.c             |    2 +
+>  arch/arm/mach-spear3xx/spear320_evb.c             |    2 +
+>  arch/arm/mach-spear6xx/include/mach/entry-macro.S |   36 ---------------------
+>  arch/arm/mach-spear6xx/spear600_evb.c             |    2 +
+>  7 files changed, 9 insertions(+), 63 deletions(-)
 > 
-> Originally posted here: 
-> http://marc.info/?l=linux-omap&m=131831996730420&w=2,
-> but posting again since it was buried inside this thread.
-> 
->  arch/arm/mach-omap2/pm.c         |    6 ++----
->  arch/arm/mach-omap2/twl-common.c |   11 +++++++++++
->  arch/arm/mach-omap2/twl-common.h |    3 +++
->  3 files changed, 16 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/pm.c b/arch/arm/mach-omap2/pm.c
-> index 1e79bdf..00bff46 100644
-> --- a/arch/arm/mach-omap2/pm.c
-> +++ b/arch/arm/mach-omap2/pm.c
-> @@ -24,6 +24,7 @@
->  #include "powerdomain.h"
->  #include "clockdomain.h"
->  #include "pm.h"
-> +#include "twl-common.h"
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 32929ef..46d0319 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -956,6 +956,7 @@ config PLAT_SPEAR
+>  	select CLKSRC_MMIO
+>  	select GENERIC_CLOCKEVENTS
+>  	select HAVE_CLK
+> +	select MULTI_IRQ_HANDLER
+>  	help
+>  	  Support for ST's SPEAr platform (SPEAr3xx, SPEAr6xx and SPEAr13xx).
 >  
->  static struct omap_device_pm_latency *pm_lats;
+> diff --git a/arch/arm/mach-spear3xx/include/mach/entry-macro.S b/arch/arm/mach-spear3xx/include/mach/entry-macro.S
+> index 53da422..de3bb41 100644
+> --- a/arch/arm/mach-spear3xx/include/mach/entry-macro.S
+> +++ b/arch/arm/mach-spear3xx/include/mach/entry-macro.S
+> @@ -11,35 +11,8 @@
+>   * warranty of any kind, whether express or implied.
+>   */
 >  
-> @@ -226,11 +227,8 @@ postcore_initcall(omap2_common_pm_init);
->  
->  static int __init omap2_common_pm_late_init(void)
->  {
-> -	/* Init the OMAP TWL parameters */
-> -	omap3_twl_init();
-> -	omap4_twl_init();
+> -#include <asm/hardware/vic.h>
+> -#include <mach/hardware.h>
 > -
->  	/* Init the voltage layer */
-> +	omap_pmic_late_init();
->  	omap_voltage_late_init();
+>  		.macro	disable_fiq
+>  		.endm
 >  
->  	/* Initialize the voltages */
-> diff --git a/arch/arm/mach-omap2/twl-common.c 
-> b/arch/arm/mach-omap2/twl-common.c
-> index 52243577..10b20c6 100644
-> --- a/arch/arm/mach-omap2/twl-common.c
-> +++ b/arch/arm/mach-omap2/twl-common.c
-> @@ -30,6 +30,7 @@
->  #include <plat/usb.h>
+> -		.macro	get_irqnr_preamble, base, tmp
+> -		.endm
+> -
+>  		.macro	arch_ret_to_user, tmp1, tmp2
+>  		.endm
+> -
+> -		.macro	get_irqnr_and_base, irqnr, irqstat, base, tmp
+> -		ldr	\base, =VA_SPEAR3XX_ML1_VIC_BASE
+> -		ldr	\irqstat, [\base, #VIC_IRQ_STATUS]	@ get status
+> -		teq	\irqstat, #0
+> -		beq	1001f				@ this will set/reset
+> -							@ zero register
+> -		/*
+> -		 * Following code will find bit position of least significang
+> -		 * bit set in irqstat, using following equation
+> -		 * least significant bit set in n = (n & ~(n-1))
+> -		 */
+> -		sub	\tmp, \irqstat, #1		@ tmp = irqstat - 1
+> -		mvn	\tmp, \tmp			@ tmp = ~tmp
+> -		and	\irqstat, \irqstat, \tmp	@ irqstat &= tmp
+> -		/* Now, irqstat is = bit no. of 1st bit set in vic irq status */
+> -		clz	\tmp, \irqstat			@ tmp = leading zeros
+> -		rsb	\irqnr, \tmp, #0x1F		@ irqnr = 32 - tmp - 1
+> -
+> -1001:		/* EQ will be set if no irqs pending */
+> -		.endm
+> diff --git a/arch/arm/mach-spear3xx/spear300_evb.c b/arch/arm/mach-spear3xx/spear300_evb.c
+> index a5ff98e..61068ba 100644
+> --- a/arch/arm/mach-spear3xx/spear300_evb.c
+> +++ b/arch/arm/mach-spear3xx/spear300_evb.c
+> @@ -11,6 +11,7 @@
+>   * warranty of any kind, whether express or implied.
+>   */
 >  
->  #include "twl-common.h"
-> +#include "pm.h"
+> +#include <asm/hardware/vic.h>
+>  #include <asm/mach/arch.h>
+>  #include <asm/mach-types.h>
+>  #include <mach/generic.h>
+> @@ -67,6 +68,7 @@ MACHINE_START(SPEAR300, "ST-SPEAR300-EVB")
+>  	.atag_offset	=	0x100,
+>  	.map_io		=	spear3xx_map_io,
+>  	.init_irq	=	spear3xx_init_irq,
+> +	.handle_irq	=	vic_handle_irq,
+>  	.timer		=	&spear3xx_timer,
+>  	.init_machine	=	spear300_evb_init,
+>  MACHINE_END
+> diff --git a/arch/arm/mach-spear3xx/spear310_evb.c b/arch/arm/mach-spear3xx/spear310_evb.c
+> index 45d180d..7903abe 100644
+> --- a/arch/arm/mach-spear3xx/spear310_evb.c
+> +++ b/arch/arm/mach-spear3xx/spear310_evb.c
+> @@ -11,6 +11,7 @@
+>   * warranty of any kind, whether express or implied.
+>   */
 >  
->  static struct i2c_board_info __initdata pmic_i2c_board_info = {
->  	.addr		= 0x48,
-> @@ -48,6 +49,16 @@ void __init omap_pmic_init(int bus, u32 clkrate,
->  	omap_register_i2c_bus(bus, clkrate, &pmic_i2c_board_info, 1);
->  }
+> +#include <asm/hardware/vic.h>
+>  #include <asm/mach/arch.h>
+>  #include <asm/mach-types.h>
+>  #include <mach/generic.h>
+> @@ -73,6 +74,7 @@ MACHINE_START(SPEAR310, "ST-SPEAR310-EVB")
+>  	.atag_offset	=	0x100,
+>  	.map_io		=	spear3xx_map_io,
+>  	.init_irq	=	spear3xx_init_irq,
+> +	.handle_irq	=	vic_handle_irq,
+>  	.timer		=	&spear3xx_timer,
+>  	.init_machine	=	spear310_evb_init,
+>  MACHINE_END
+> diff --git a/arch/arm/mach-spear3xx/spear320_evb.c b/arch/arm/mach-spear3xx/spear320_evb.c
+> index 2287984..e9751f9 100644
+> --- a/arch/arm/mach-spear3xx/spear320_evb.c
+> +++ b/arch/arm/mach-spear3xx/spear320_evb.c
+> @@ -11,6 +11,7 @@
+>   * warranty of any kind, whether express or implied.
+>   */
 >  
-> +void __init omap_pmic_late_init(void)
-> +{
-> +	/* Init the OMAP TWL parameters (if PMIC has been registerd) */
-> +	if (!pmic_i2c_board_info.irq)
-> +		return;
+> +#include <asm/hardware/vic.h>
+>  #include <asm/mach/arch.h>
+>  #include <asm/mach-types.h>
+>  #include <mach/generic.h>
+> @@ -71,6 +72,7 @@ MACHINE_START(SPEAR320, "ST-SPEAR320-EVB")
+>  	.atag_offset	=	0x100,
+>  	.map_io		=	spear3xx_map_io,
+>  	.init_irq	=	spear3xx_init_irq,
+> +	.handle_irq	=	vic_handle_irq,
+>  	.timer		=	&spear3xx_timer,
+>  	.init_machine	=	spear320_evb_init,
+>  MACHINE_END
+> diff --git a/arch/arm/mach-spear6xx/include/mach/entry-macro.S b/arch/arm/mach-spear6xx/include/mach/entry-macro.S
+> index 8a0b0ed..d490a91 100644
+> --- a/arch/arm/mach-spear6xx/include/mach/entry-macro.S
+> +++ b/arch/arm/mach-spear6xx/include/mach/entry-macro.S
+> @@ -11,44 +11,8 @@
+>   * warranty of any kind, whether express or implied.
+>   */
+>  
+> -#include <asm/hardware/vic.h>
+> -#include <mach/hardware.h>
+> -
+>  		.macro	disable_fiq
+>  		.endm
+>  
+> -		.macro	get_irqnr_preamble, base, tmp
+> -		.endm
+> -
+>  		.macro	arch_ret_to_user, tmp1, tmp2
+>  		.endm
+> -
+> -		.macro	get_irqnr_and_base, irqnr, irqstat, base, tmp
+> -		ldr	\base, =VA_SPEAR6XX_CPU_VIC_PRI_BASE
+> -		ldr	\irqstat, [\base, #VIC_IRQ_STATUS]	@ get status
+> -		mov	\irqnr, #0
+> -		teq	\irqstat, #0
+> -		bne	1001f
+> -		ldr	\base, =VA_SPEAR6XX_CPU_VIC_SEC_BASE
+> -		ldr	\irqstat, [\base, #VIC_IRQ_STATUS]	@ get status
+> -		teq	\irqstat, #0
+> -		beq	1002f				@ this will set/reset
+> -							@ zero register
+> -		mov	\irqnr, #32
+> -1001:
+> -		/*
+> -		 * Following code will find bit position of least significang
+> -		 * bit set in irqstat, using following equation
+> -		 * least significant bit set in n = (n & ~(n-1))
+> -		 */
+> -		sub	\tmp, \irqstat, #1		@ tmp = irqstat - 1
+> -		mvn	\tmp, \tmp			@ tmp = ~tmp
+> -		and	\irqstat, \irqstat, \tmp	@ irqstat &= tmp
+> -		/* Now, irqstat is = bit no. of 1st bit set in vic irq status */
+> -		clz	\tmp, \irqstat			@ tmp = leading zeros
+> -
+> -		rsb	\tmp, \tmp, #0x1F		@ tmp = 32 - tmp - 1
+> -		add	\irqnr, \irqnr, \tmp
+> -
+> -1002:		/* EQ will be set if no irqs pending */
+> -		.endm
+> diff --git a/arch/arm/mach-spear6xx/spear600_evb.c b/arch/arm/mach-spear6xx/spear600_evb.c
+> index 8238fe3..ff139ed 100644
+> --- a/arch/arm/mach-spear6xx/spear600_evb.c
+> +++ b/arch/arm/mach-spear6xx/spear600_evb.c
+> @@ -11,6 +11,7 @@
+>   * warranty of any kind, whether express or implied.
+>   */
+>  
+> +#include <asm/hardware/vic.h>
+>  #include <asm/mach/arch.h>
+>  #include <asm/mach-types.h>
+>  #include <mach/generic.h>
+> @@ -46,6 +47,7 @@ MACHINE_START(SPEAR600, "ST-SPEAR600-EVB")
+>  	.atag_offset	=	0x100,
+>  	.map_io		=	spear6xx_map_io,
+>  	.init_irq	=	spear6xx_init_irq,
+> +	.handle_irq	=	vic_handle_irq,
+>  	.timer		=	&spear6xx_timer,
+>  	.init_machine	=	spear600_evb_init,
+>  MACHINE_END
 
-Kevin,
+Acked-by: Viresh Kumar <viresh.kumar@st.com>
 
-I have been out-of-loop from PM for some time. So my query may be
-redundant:
-
-1) What happens when different PMIC (not TWL series) is registered
-   for AM35x? e.g. TPS65023
-   http://www.spinics.net/lists/linux-omap/msg48630.html
-
-2) Wouldn't we still fall back into omap3_twl_init()?
-
-~sanjeev
-
-> +
-> +	omap3_twl_init();
-> +	omap4_twl_init();
-> +}
-> +
->  #if defined(CONFIG_ARCH_OMAP3)
->  static struct twl4030_usb_data omap3_usb_pdata = {
->  	.usb_mode	= T2_USB_MODE_ULPI,
-> diff --git a/arch/arm/mach-omap2/twl-common.h 
-> b/arch/arm/mach-omap2/twl-common.h
-> index 5e83a5b..275dde8 100644
-> --- a/arch/arm/mach-omap2/twl-common.h
-> +++ b/arch/arm/mach-omap2/twl-common.h
-> @@ -1,6 +1,8 @@
->  #ifndef __OMAP_PMIC_COMMON__
->  #define __OMAP_PMIC_COMMON__
->  
-> +#include <plat/irqs.h>
-> +
->  #define TWL_COMMON_PDATA_USB		(1 << 0)
->  #define TWL_COMMON_PDATA_BCI		(1 << 1)
->  #define TWL_COMMON_PDATA_MADC		(1 << 2)
-> @@ -30,6 +32,7 @@ struct twl4030_platform_data;
->  
->  void omap_pmic_init(int bus, u32 clkrate, const char 
-> *pmic_type, int pmic_irq,
->  		    struct twl4030_platform_data *pmic_data);
-> +void omap_pmic_late_init(void);
->  
->  static inline void omap2_pmic_init(const char *pmic_type,
->  				   struct twl4030_platform_data 
-> *pmic_data)
-> -- 
-> 1.7.6
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe 
-> linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+-- 
+viresh
