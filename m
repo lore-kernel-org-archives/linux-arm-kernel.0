@@ -1,58 +1,51 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Wed, 9 Nov 2011 10:34:45 +0800
-Subject: [PATCH v6 11/11] ARM: pxa: add clk support in gpio driver
-In-Reply-To: <20111108232810.GM12913@n2100.arm.linux.org.uk>
-References: <1320747859-8366-1-git-send-email-haojian.zhuang@marvell.com>
- <1320747859-8366-12-git-send-email-haojian.zhuang@marvell.com>
- <20111108232810.GM12913@n2100.arm.linux.org.uk>
-Message-ID: <CAN1soZwJLBvPHs6twSAxSN8_VmAdgMPfeZrot-46g7P++j-hDw@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 08 Nov 2011 20:36:22 -0600
+Subject: [RFC 7/8] arm/clkdev: lookup clocks from OF clock providers
+In-Reply-To: <1320801583-12774-8-git-send-email-grant.likely@secretlab.ca>
+References: <1320801583-12774-1-git-send-email-grant.likely@secretlab.ca>
+ <1320801583-12774-8-git-send-email-grant.likely@secretlab.ca>
+Message-ID: <4EB9E726.2000500@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 9, 2011 at 7:28 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Tue, Nov 08, 2011 at 06:24:19PM +0800, Haojian Zhuang wrote:
->> diff --git a/drivers/gpio/gpio-pxa.c b/drivers/gpio/gpio-pxa.c
->> index bfd7555..1a6b150 100644
->> --- a/drivers/gpio/gpio-pxa.c
->> +++ b/drivers/gpio/gpio-pxa.c
->> @@ -11,6 +11,8 @@
->> ? * ?it under the terms of the GNU General Public License version 2 as
->> ? * ?published by the Free Software Foundation.
->> ? */
->> +#include <linux/clk.h>
->> +#include <linux/err.h>
->> ?#include <linux/gpio.h>
->> ?#include <linux/gpio-pxa.h>
->> ?#include <linux/init.h>
->> @@ -466,6 +468,7 @@ static int __devinit pxa_gpio_probe(struct platform_device *pdev)
->> ?{
->> ? ? ? struct pxa_gpio_chip *c;
->> ? ? ? struct resource *res;
->> + ? ? struct clk *clk;
->> ? ? ? int gpio, irq;
->> ? ? ? int irq0 = 0, irq1 = 0, irq_mux, gpio_offset = 0;
->>
->> @@ -489,6 +492,15 @@ static int __devinit pxa_gpio_probe(struct platform_device *pdev)
->> ? ? ? if (irq0 > 0)
->> ? ? ? ? ? ? ? gpio_offset = 2;
->>
->> + ? ? clk = clk_get(&pdev->dev, NULL);
->> + ? ? if (IS_ERR(clk)) {
->> + ? ? ? ? ? ? dev_err(&pdev->dev, "Error %ld to get gpio clock\n",
->> + ? ? ? ? ? ? ? ? ? ? PTR_ERR(clk));
->> + ? ? ? ? ? ? iounmap(gpio_reg_base);
->> + ? ? ? ? ? ? return PTR_ERR(clk);
->> + ? ? }
->> + ? ? clk_enable(clk);
->
-> Please also ensure that you have proper error checking on this.
-> Also, extending this to clk_prepare() now would be a good idea so that
-> such a change doesn't need to be made separately in the future. ?(A
-> dummy clk_prepare() is already provided.) ?Thanks.
->
-Yes, current error check is enough. I'll submit a new version with
-clk_prepare() support.
+On 11/08/2011 07:19 PM, Grant Likely wrote:
+> From: Jeremy Kerr <jeremy.kerr@canonical.com>
+> 
+> Hook the OF clock provider infrastructure to clk_get.
+> 
+> Signed-off-by: Jeremy Kerr <jeremy.kerr@canonical.com>
+> Signed-off-by: Grant Likely <grant.likely@secretlab.ca>
+> ---
+>  drivers/clk/clkdev.c |    7 +++++++
+>  1 files changed, 7 insertions(+), 0 deletions(-)
+> 
+> diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
+> index 6db161f..63f81c9 100644
+> --- a/drivers/clk/clkdev.c
+> +++ b/drivers/clk/clkdev.c
+> @@ -19,6 +19,8 @@
+>  #include <linux/mutex.h>
+>  #include <linux/clk.h>
+>  #include <linux/clkdev.h>
+> +#include <linux/of.h>
+> +#include <linux/of_clk.h>
+>  
+>  static LIST_HEAD(clocks);
+>  static DEFINE_MUTEX(clocks_mutex);
+> @@ -78,6 +80,11 @@ EXPORT_SYMBOL(clk_get_sys);
+>  struct clk *clk_get(struct device *dev, const char *con_id)
+>  {
+>  	const char *dev_id = dev ? dev_name(dev) : NULL;
+> +	struct clk *clk;
+> +
 
-Thanks
-Haojian
+Need NULL check for dev (and then init clk to NULL):
+
+	if (dev && dev->of_node)
+> +	clk = of_clk_get_by_name(dev->of_node, con_id);
+
+> +	if (clk && __clk_get(clk))
+> +		return clk;
+>  
+>  	return clk_get_sys(dev_id, con_id);
+>  }
