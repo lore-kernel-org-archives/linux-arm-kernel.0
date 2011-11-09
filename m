@@ -1,41 +1,64 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed,  9 Nov 2011 10:53:43 -0800
-Subject: [PATCH] ARM: l2x0: fix compile error on !CONFIG_USE_OF
-Message-ID: <1320864823-5015-1-git-send-email-olof@lixom.net>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Wed, 9 Nov 2011 17:09:02 -0200
+Subject: [PATCH] ARM: mx28evk: Simplify GPIO requests for mx28evk_fec_reset
+Message-ID: <1320865742-16768-1-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-fae2b89ab1 (ARM: l2x0: add empty l2x0_of_init) adds a static inline
-function that returns -ENODEV, but at least on tegra cache-l2x0.h is
-included without errno.h being pulled in first, resulting in compile
-errors if OF isn't enabled:
+Simplify GPIO requests inside mx28evk_fec_reset by using gpio_request_array.
 
-In file included from arch/arm/mach-tegra/common.c:26:
-arch/arm/include/asm/hardware/cache-l2x0.h: In function 'l2x0_of_init':
-arch/arm/include/asm/hardware/cache-l2x0.h:110: error: 'ENODEV' undeclared (first use in this function)
-arch/arm/include/asm/hardware/cache-l2x0.h:110: error: (Each undeclared identifier is reported only once
-arch/arm/include/asm/hardware/cache-l2x0.h:110: error: for each function it appears in.)
-
-Add errno.h to the include file to make it self-contained.
-
-Signed-off-by: Olof Johansson <olof@lixom.net>
-Cc: Rob Herring <rob.herring@calxeda.com>
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 ---
- arch/arm/include/asm/hardware/cache-l2x0.h |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+ arch/arm/mach-mxs/mach-mx28evk.c |   29 ++++++++---------------------
+ 1 files changed, 8 insertions(+), 21 deletions(-)
 
-diff --git a/arch/arm/include/asm/hardware/cache-l2x0.h b/arch/arm/include/asm/hardware/cache-l2x0.h
-index 1db1143..7df239b 100644
---- a/arch/arm/include/asm/hardware/cache-l2x0.h
-+++ b/arch/arm/include/asm/hardware/cache-l2x0.h
-@@ -20,6 +20,8 @@
- #ifndef __ASM_ARM_HARDWARE_L2X0_H
- #define __ASM_ARM_HARDWARE_L2X0_H
+diff --git a/arch/arm/mach-mxs/mach-mx28evk.c b/arch/arm/mach-mxs/mach-mx28evk.c
+index ac2316d..c565c33 100644
+--- a/arch/arm/mach-mxs/mach-mx28evk.c
++++ b/arch/arm/mach-mxs/mach-mx28evk.c
+@@ -219,6 +219,11 @@ static const struct gpio_led_platform_data mx28evk_led_data __initconst = {
+ 	.num_leds = ARRAY_SIZE(mx28evk_leds),
+ };
  
-+#include <linux/errno.h>
++static struct gpio mx28evk_fec_gpios[] = {
++	{ MX28EVK_FEC_PHY_POWER, GPIOF_OUT_INIT_LOW, "fec-power" },
++	{ MX28EVK_FEC_PHY_RESET, GPIOF_OUT_INIT_LOW, "fec-enable" },
++};
 +
- #define L2X0_CACHE_ID			0x000
- #define L2X0_CACHE_TYPE			0x004
- #define L2X0_CTRL			0x100
+ /* fec */
+ static void __init mx28evk_fec_reset(void)
+ {
+@@ -231,28 +236,10 @@ static void __init mx28evk_fec_reset(void)
+ 		clk_enable(clk);
+ 
+ 	/* Power up fec phy */
+-	ret = gpio_request(MX28EVK_FEC_PHY_POWER, "fec-phy-power");
+-	if (ret) {
+-		pr_err("Failed to request gpio fec-phy-%s: %d\n", "power", ret);
+-		return;
+-	}
+-
+-	ret = gpio_direction_output(MX28EVK_FEC_PHY_POWER, 0);
+-	if (ret) {
+-		pr_err("Failed to drive gpio fec-phy-%s: %d\n", "power", ret);
+-		return;
+-	}
+-
+-	/* Reset fec phy */
+-	ret = gpio_request(MX28EVK_FEC_PHY_RESET, "fec-phy-reset");
+-	if (ret) {
+-		pr_err("Failed to request gpio fec-phy-%s: %d\n", "reset", ret);
+-		return;
+-	}
+-
+-	gpio_direction_output(MX28EVK_FEC_PHY_RESET, 0);
++	ret = gpio_request_array(mx28evk_fec_gpios,
++				ARRAY_SIZE(mx28evk_fec_gpios));
+ 	if (ret) {
+-		pr_err("Failed to drive gpio fec-phy-%s: %d\n", "reset", ret);
++		pr_err("Failed to request FEC gpios: %d\n", ret);
+ 		return;
+ 	}
+ 
 -- 
-1.7.5.4
+1.7.1
