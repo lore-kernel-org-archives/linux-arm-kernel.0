@@ -1,91 +1,32 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Wed, 9 Nov 2011 11:39:22 +0100
-Subject: [PATCH 5/6] spi/pl022: move device disable to workqueue thread
-Message-ID: <1320835162-31337-1-git-send-email-linus.walleij@stericsson.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 9 Nov 2011 10:44:01 +0000
+Subject: [PATCH v8 15/16] ARM: LPAE: add support for ATAG_MEM64
+In-Reply-To: <alpine.LFD.2.02.1111081832290.3307@xanadu.home>
+References: <1320682618-1182-1-git-send-email-catalin.marinas@arm.com>
+ <1320682618-1182-16-git-send-email-catalin.marinas@arm.com>
+ <alpine.LFD.2.02.1111081832290.3307@xanadu.home>
+Message-ID: <20111109104401.GB31092@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Chris Blair <chris.blair@stericsson.com>
+On Tue, Nov 08, 2011 at 11:38:12PM +0000, Nicolas Pitre wrote:
+> On Mon, 7 Nov 2011, Catalin Marinas wrote:
+> 
+> > From: Will Deacon <will.deacon@arm.com>
+> > 
+> > LPAE provides support for memory banks with physical addresses of up
+> > to 40 bits.
+> > 
+> > This patch adds a new atag, ATAG_MEM64, so that the Kernel can be
+> > informed about memory that exists above the 4GB boundary.
+> > 
+> > Signed-off-by: Will Deacon <will.deacon@arm.com>
+> > Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+> 
+> NAK.  Any LPAE capable platform to come is, by definition, a new 
+> platform.  It therefore should be using DT upfront.
 
-Moves the disabling of the device and clocks to the same thread in
-which the device and clocks are enabled. This avoids SMP issues where
-the device can be enabled for a transfer by one thread and then
-disabled by the completion of the previous transfer in another thread.
+It's fine by me, one less patch to merge.
 
-Signed-off-by: Chris Blair <chris.blair@stericsson.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- drivers/spi/spi-pl022.c |   33 +++++++++++++++++++--------------
- 1 files changed, 19 insertions(+), 14 deletions(-)
-
-diff --git a/drivers/spi/spi-pl022.c b/drivers/spi/spi-pl022.c
-index bffad2a..2e3522d 100644
---- a/drivers/spi/spi-pl022.c
-+++ b/drivers/spi/spi-pl022.c
-@@ -512,13 +512,6 @@ static void giveback(struct pl022 *pl022)
- 	msg->state = NULL;
- 	if (msg->complete)
- 		msg->complete(msg->context);
--
--	/* disable the SPI/SSP operation */
--	writew((readw(SSP_CR1(pl022->virtbase)) &
--		(~SSP_CR1_MASK_SSE)), SSP_CR1(pl022->virtbase));
--
--	/* This message is completed, so let's turn off the clocks & power */
--	pm_runtime_put(&pl022->adev->dev);
- }
- 
- /**
-@@ -1513,10 +1506,17 @@ static void pump_messages(struct work_struct *work)
- 	struct pl022 *pl022 =
- 		container_of(work, struct pl022, pump_messages);
- 	unsigned long flags;
-+	bool was_busy = false;
- 
- 	/* Lock queue and check for queue work */
- 	spin_lock_irqsave(&pl022->queue_lock, flags);
- 	if (list_empty(&pl022->queue) || !pl022->running) {
-+		if (pl022->busy) {
-+			/* nothing more to do - disable spi/ssp and power off */
-+			writew((readw(SSP_CR1(pl022->virtbase)) &
-+				(~SSP_CR1_MASK_SSE)), SSP_CR1(pl022->virtbase));
-+			pm_runtime_put(&pl022->adev->dev);
-+		}
- 		pl022->busy = false;
- 		spin_unlock_irqrestore(&pl022->queue_lock, flags);
- 		return;
-@@ -1531,7 +1531,10 @@ static void pump_messages(struct work_struct *work)
- 	    list_entry(pl022->queue.next, struct spi_message, queue);
- 
- 	list_del_init(&pl022->cur_msg->queue);
--	pl022->busy = true;
-+	if (pl022->busy)
-+		was_busy = true;
-+	else
-+		pl022->busy = true;
- 	spin_unlock_irqrestore(&pl022->queue_lock, flags);
- 
- 	/* Initial message state */
-@@ -1541,12 +1544,14 @@ static void pump_messages(struct work_struct *work)
- 
- 	/* Setup the SPI using the per chip configuration */
- 	pl022->cur_chip = spi_get_ctldata(pl022->cur_msg->spi);
--	/*
--	 * We enable the core voltage and clocks here, then the clocks
--	 * and core will be disabled when giveback() is called in each method
--	 * (poll/interrupt/DMA)
--	 */
--	pm_runtime_get_sync(&pl022->adev->dev);
-+	if (!was_busy)
-+		/*
-+		 * We enable the core voltage and clocks here, then the clocks
-+		 * and core will be disabled when this workqueue is run again
-+		 * and there is no more work to be done.
-+		 */
-+		pm_runtime_get_sync(&pl022->adev->dev);
-+
- 	restore_state(pl022);
- 	flush(pl022);
- 
 -- 
-1.7.3.2
+Catalin
