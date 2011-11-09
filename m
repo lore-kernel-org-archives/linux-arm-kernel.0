@@ -1,58 +1,66 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 09 Nov 2011 14:06:42 +0900
-Subject: [03: PATCH 0/5] The remaining stuff
-In-Reply-To: <20111108090036.GY12913@n2100.arm.linux.org.uk>
-References: <20111106173113.GI12913@n2100.arm.linux.org.uk>
- <20111106173939.GJ12913@n2100.arm.linux.org.uk>
- <20111106175457.GK12913@n2100.arm.linux.org.uk>
- <04fc01cc9de4$11dc3410$35949c30$%kim@samsung.com>
- <20111108090036.GY12913@n2100.arm.linux.org.uk>
-Message-ID: <001701cc9e9d$5f1a6080$1d4f2180$%kim@samsung.com>
+From: dongas86@gmail.com (Dong Aisheng)
+Date: Wed, 9 Nov 2011 15:28:18 +0800
+Subject: [alsa-devel] [PATCH v3 0/3] ARM: mxs: add recording support for
+ saif
+In-Reply-To: <CAA+hA=Sf=TKeQxLUAuExi9jTmFk=d653FdBjacD3jK7tPG88ew@mail.gmail.com>
+References: <1317052353-6029-1-git-send-email-b29396@freescale.com>
+ <CAA+hA=Sf=TKeQxLUAuExi9jTmFk=d653FdBjacD3jK7tPG88ew@mail.gmail.com>
+Message-ID: <CAA+hA=Qaxy0pOs4k2rxGUiCHJF3ghpr95M=BQBy8cyWeDwdHLA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux wrote:
-> 
-> On Tue, Nov 08, 2011 at 04:00:16PM +0900, Kukjin Kim wrote:
-> > Russell King - ARM Linux wrote:
-> > >
-> > > Part 3 - the remaining stuff
-> > >
-> > > These are patches which I've managed to get half way through before
-> > > getting - to be honest - totally hacked off with the code found in
-> > > various platforms (as mentioned in previous mails).
-> > >
-> > > These platforms are broken as a result of the final patch in part 2,
-> > > and these patches move these platforms _towards_ a solution.  They
-> > > are not a complete solution though, but the start of the solution.
-> > >
-> > > For instance, the Exynos4 and S5PV210 patches both consist of almost
-> > > a full solution -but- with the new function prototype missing because
-> > > there is _no_ local header file to put it in, and I'm damned well not
-> > > putting it in the remote plat-samsung/include/plat headers.
-> > >
-> > Russell,
-> >
-> > The new restart prototype for s5pv210 and exynos can be placed in their
-> > respective<mach/system.h>file.
-> 
-> No - mach/system.h will be removed once arch_idle is gone as well.  In
-> any case, this should not be in a mach/*.h file.  There should be a
-> header in the arch/arm/mach-* directory for functions and data structures
-> local _only_ to the files in that directory.
-> 
-Okay, I agree. So how about mach-xxx/common.h for it?
+2011/10/11 Dong Aisheng <dongas86@gmail.com>:
+> 2011/9/26 Dong Aisheng <b29396@freescale.com>:
+>> Changes since v2:
+>> ?* separate clkmux code into another patch according to Uwe
+>> ?* add lock according to Wolfram
+>> ?* Other minus fixes suggested by Uwe and Wolfram.
+>> ?* remove Wolfram's fix saif clock setting patch which is in v2 series
+>> ? since Wolfram will reform the clock code and send it out himself.
+>> ? For test purpose, user still needs that patch. People can get it
+>> ? from v2 series.
+>> ? The patch is:
+>> ? [PATCH v2 3/3] arm: mxs: disable clock-gates when setting saif-clocks
+>>
+>> The patches are based on imx-features branch since commit:
+>> f4f01e31835f.
+>>
+>> Changes since v1:
+>> The main changes are move mach-specific code(clkmux in DIGCTL) from
+>> saif driver to mach-specific layer based on Wolfram's suggestion.
+>>
+>> Note that the last patch is a RFC patch and sent out for testing
+>> since without that patch the saif may not work.
+>>
+>> Dong Aisheng (3):
+>> ?ARM: mxs: add saif clkmux functions
+>> ?ARM: mx28evk: add platform data for saif
+>> ?ARM: mx28evk: set a initial clock rate for saif
+>
+> Any comments for this?
+>
+This patch is without any comment for a long time.
 
-If required, I will sort out all of Samsung stuff as per your suggestion.
+Sascha, Wolfram, Uwe,
+Could you someone help provide some comments?
 
-> Please read my 'pet peaves' email, point 4.
+Regards
+Dong Aisheng
 
-Okay, I see.
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+>> ?arch/arm/mach-mxs/clock-mx28.c ? ? ? ? ? ? ? ? ?| ? 67 +++++++++++++++++++++++
+>> ?arch/arm/mach-mxs/devices-mx28.h ? ? ? ? ? ? ? ?| ? ?3 +-
+>> ?arch/arm/mach-mxs/devices/platform-mxs-saif.c ? | ? ?5 +-
+>> ?arch/arm/mach-mxs/include/mach/common.h ? ? ? ? | ? ?2 +
+>> ?arch/arm/mach-mxs/include/mach/devices-common.h | ? ?4 +-
+>> ?arch/arm/mach-mxs/include/mach/digctl.h ? ? ? ? | ? 21 +++++++
+>> ?arch/arm/mach-mxs/mach-mx28evk.c ? ? ? ? ? ? ? ?| ? 16 +++++-
+>> ?7 files changed, 112 insertions(+), 6 deletions(-)
+>> ?create mode 100644 arch/arm/mach-mxs/include/mach/digctl.h
+>>
+>>
+>> _______________________________________________
+>> Alsa-devel mailing list
+>> Alsa-devel at alsa-project.org
+>> http://mailman.alsa-project.org/mailman/listinfo/alsa-devel
+>>
+>
