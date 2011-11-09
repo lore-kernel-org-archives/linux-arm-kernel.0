@@ -1,49 +1,41 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 9 Nov 2011 10:17:41 +0100
-Subject: [RFC 5/5] iommu/omap: eliminate the public
- omap_find_iommu_device() method
-In-Reply-To: <CAK=WgbZaZTT=PsrvY8QTypuViknCK=APHogZLg5SjSN3_C=odw@mail.gmail.com>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Wed, 9 Nov 2011 11:29:18 +0200
+Subject: [RFC 4/5] ARM: OMAP3: bind omap3isp_device to its iommu device
+In-Reply-To: <201111091017.18860.laurent.pinchart@ideasonboard.com>
 References: <1316948337-7924-1-git-send-email-ohad@wizery.com>
- <201109271346.13791.laurent.pinchart@ideasonboard.com>
- <CAK=WgbZaZTT=PsrvY8QTypuViknCK=APHogZLg5SjSN3_C=odw@mail.gmail.com>
-Message-ID: <201111091017.41947.laurent.pinchart@ideasonboard.com>
+ <1316948337-7924-5-git-send-email-ohad@wizery.com>
+ <201111091017.18860.laurent.pinchart@ideasonboard.com>
+Message-ID: <CAK=WgbbizCd5ZBjyk=sukWtR6j1vVv+1Jc-QRzfppPCaQ+67HQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ohad,
+On Wed, Nov 9, 2011 at 11:17 AM, Laurent Pinchart
+<laurent.pinchart@ideasonboard.com> wrote:
+> Hi Ohad,
+>
+> On Sunday 25 September 2011 12:58:56 Ohad Ben-Cohen wrote:
+>> Bind OMAP3's isp device to the isp's dedicated iommu, by setting
+>> the device's archdata iommu member.
+>>
+>> This way omap3isp will be able to use the generic IOMMU API without
+>> having to call any omap-specific binding method.
+>>
+>> Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
+>> Cc: Tony Lindgren <tony@atomide.com>
+>> Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+>
+> Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 
-On Wednesday 09 November 2011 09:50:30 Ohad Ben-Cohen wrote:
-> On Tue, Sep 27, 2011 at 2:46 PM, Laurent Pinchart wrote:
-> > On Sunday 25 September 2011 12:58:57 Ohad Ben-Cohen wrote:
-> >> Eliminate the public omap_find_iommu_device() method, and don't
-> >> expect clients to provide the omap_iommu handle anymore.
-> >> 
-> >> Instead, OMAP's iommu driver should now utilize dev_archdata's private
-> >> iommu extension to be able to access the required iommu information.
-> >> 
-> >> Update omap3isp appropriately.
-> >> 
-> >> Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
-> >> Cc: Hiroshi DOYU <Hiroshi.DOYU@nokia.com>
-> >> Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> >> Cc: Tony Lindgren <tony@atomide.com>
-> > 
-> > For the OMAP3 ISP driver,
-> > 
-> > Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> 
-> Thanks !
-> 
-> Can you please also ack the 4th patch in this series (that's the part
-> the makes this fifth patch possible):
-> 
-> https://lkml.org/lkml/2011/9/25/46
+Thanks, Laurent!
 
-Sure. Done.
+Tony, can you please Ack the OMAP parts of this patch set:
 
-> I could then ask Tony to Ack it so we could merge this via the iommu tree.
+https://lkml.org/lkml/2011/9/25/44 (patch 3/5)
+https://lkml.org/lkml/2011/9/25/46 (patch 4/5)
+https://lkml.org/lkml/2011/9/25/45 (patch 5/5)
 
--- 
-Regards,
+With this in hand, generic iommu users will now work on OMAP platforms
+too (without calling any omap-specific API).
 
-Laurent Pinchart
+Thanks,
+Ohad.
