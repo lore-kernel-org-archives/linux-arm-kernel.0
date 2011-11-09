@@ -1,36 +1,37 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 9 Nov 2011 12:29:54 +0100
-Subject: [PATCH 2/5] dma i.MX: remove individual SOC dependency
-In-Reply-To: <1320768633.32205.147.camel@vkoul-udesk3>
-References: <1314168072-13822-1-git-send-email-s.hauer@pengutronix.de>
- <1314168072-13822-3-git-send-email-s.hauer@pengutronix.de>
- <20111108152239.GA9641@pengutronix.de>
- <1320768633.32205.147.camel@vkoul-udesk3>
-Message-ID: <20111109112954.GJ16886@pengutronix.de>
+From: ming.lei@canonical.com (Ming Lei)
+Date: Wed, 9 Nov 2011 19:33:31 +0800
+Subject: [PATCH v5 4/7] arm: omap4: hwmod: introduce emu hwmod
+In-Reply-To: <alpine.DEB.2.00.1111080837250.10451@utopia.booyaka.com>
+References: <1319467559-5518-1-git-send-email-ming.lei@canonical.com>
+ <1319467559-5518-5-git-send-email-ming.lei@canonical.com>
+ <alpine.DEB.2.00.1111080837250.10451@utopia.booyaka.com>
+Message-ID: <CACVXFVO-ay4auvF+=+b7pagcfaYOkEeZb212TiaysJ2A6p14Eg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 08, 2011 at 09:40:33PM +0530, Vinod Koul wrote:
-> On Tue, 2011-11-08 at 16:22 +0100, Sascha Hauer wrote:
-> > Vinod,
-> > 
-> > Ping. Can you please queue this one?
-> Sorry Sascha, looks like I have missed this one :(
-> 
-> Nevertheless, this seems to be part of a series, but I couldn't locate
-> the rest.
-> Do you want me to apply only this individual patch, seems little odd if
-> thats the case...
+Hi,
 
-Yes, only this patch please. Maybe I should send patches for different
-subsystems in individual patches instead as a series, but it's very
-convenient to create a series, add maintainers to the Cc field and just
-send it out.
+On Tue, Nov 8, 2011 at 11:42 PM, Paul Walmsley <paul@pwsan.com> wrote:
+>
+> Hi
+>
+> I just read
+>
+> http://comments.gmane.org/gmane.comp.embedded.pandaboard/168
+>
+> Looks to me that the L3_EMU interconnect and the emulation IP blocks need
 
-Sascha
+You mean the "emu" hwmod in the patch should be kept and a new "l3_emu" hwmod
+need to be added? and make the clkdm_name of 'l3_emu' points to CD_L3_2?
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+But in the link above, looks like the hwmod of "l3_main_3" and "l3_instr" need
+to be enabled for routing IRQs of pmu on omap4.
+
+> to be added to the OMAP4 hwmod data, based on Section 2.2.1 "L3_EMU Memory
+> Space Mapping" in the OMAP4460 TRM Rev. I. ?If the clockdomain &
+> powerdomain are correctly defined then the OMAP framework code will
+> automatically enable these too.
+
+thanks,
+--
+Ming Lei
