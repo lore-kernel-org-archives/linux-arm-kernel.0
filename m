@@ -1,41 +1,58 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 08 Nov 2011 20:11:17 -0800
-Subject: [PATCHv3 2/2] msm: Support DEBUG_LL on MSM8660 and MSM8960
-In-Reply-To: <alpine.LFD.2.02.1111081406220.3307@xanadu.home>
-References: <1320777184-22446-1-git-send-email-sboyd@codeaurora.org>
- <1320777184-22446-3-git-send-email-sboyd@codeaurora.org>
- <alpine.LFD.2.02.1111081406220.3307@xanadu.home>
-Message-ID: <4EB9FD65.3030900@codeaurora.org>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 09 Nov 2011 14:06:42 +0900
+Subject: [03: PATCH 0/5] The remaining stuff
+In-Reply-To: <20111108090036.GY12913@n2100.arm.linux.org.uk>
+References: <20111106173113.GI12913@n2100.arm.linux.org.uk>
+ <20111106173939.GJ12913@n2100.arm.linux.org.uk>
+ <20111106175457.GK12913@n2100.arm.linux.org.uk>
+ <04fc01cc9de4$11dc3410$35949c30$%kim@samsung.com>
+ <20111108090036.GY12913@n2100.arm.linux.org.uk>
+Message-ID: <001701cc9e9d$5f1a6080$1d4f2180$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/08/11 11:08, Nicolas Pitre wrote:
->> +	.macro	senduart, rd, rx
->> +#ifdef CONFIG_MSM_HAS_DEBUG_UART_HS
->> +	@ Write the 1 character to UARTDM_TF
->> +	str	\rd, [\rx, #0x70]
->> +#else
->>  	teq	\rx, #0
->>  	strne	\rd, [\rx, #0x0C]
->> +#endif
->>  	.endm
-> Why testing for zero in the #else part?  The upper level code should 
-> never call this macro with a null byte.
->
+Russell King - ARM Linux wrote:
+> 
+> On Tue, Nov 08, 2011 at 04:00:16PM +0900, Kukjin Kim wrote:
+> > Russell King - ARM Linux wrote:
+> > >
+> > > Part 3 - the remaining stuff
+> > >
+> > > These are patches which I've managed to get half way through before
+> > > getting - to be honest - totally hacked off with the code found in
+> > > various platforms (as mentioned in previous mails).
+> > >
+> > > These platforms are broken as a result of the final patch in part 2,
+> > > and these patches move these platforms _towards_ a solution.  They
+> > > are not a complete solution though, but the start of the solution.
+> > >
+> > > For instance, the Exynos4 and S5PV210 patches both consist of almost
+> > > a full solution -but- with the new function prototype missing because
+> > > there is _no_ local header file to put it in, and I'm damned well not
+> > > putting it in the remote plat-samsung/include/plat headers.
+> > >
+> > Russell,
+> >
+> > The new restart prototype for s5pv210 and exynos can be placed in their
+> > respective<mach/system.h>file.
+> 
+> No - mach/system.h will be removed once arch_idle is gone as well.  In
+> any case, this should not be in a mach/*.h file.  There should be a
+> header in the arch/arm/mach-* directory for functions and data structures
+> local _only_ to the files in that directory.
+> 
+Okay, I agree. So how about mach-xxx/common.h for it?
 
-Ok I poked into the git logs (thanks Bryan). It was first introduced in
-bcc0f6a ([ARM] msm: clean up iomap and devices, 2008-09-10). It seems
-that debug_ll support on MSM at the time had to remove the virtual
-mapping for the uart base. Thus when the MMU was enabled the addruart
-macro returned 0 and the senduart macro would test for 0 so that
-senduart could disable debug_ll when the MMU was enabled. Something
-about "problems with the peripheral window".
+If required, I will sort out all of Samsung stuff as per your suggestion.
 
-Later on, the virtual mapping was added back in 6339f66 (msm: make
-debugging UART (for DEBUG_LL) configurable, 2009-11-02) but the patch
-forgot to remove the teq. So as it stands the teq has been useless for
-two years.
+> Please read my 'pet peaves' email, point 4.
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Okay, I see.
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
