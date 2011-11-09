@@ -1,53 +1,52 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Wed, 9 Nov 2011 10:03:46 -0800
-Subject: [PATCH] arm: dma:  Drop GFP_COMP for DMA memory allocations
-In-Reply-To: <1320442539-7753-1-git-send-email-swarren@nvidia.com>
-References: <1320442539-7753-1-git-send-email-swarren@nvidia.com>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF174080512F@HQMAIL01.nvidia.com>
+From: n-chalhoub@ti.com (Chalhoub, Nicole)
+Date: Wed, 9 Nov 2011 18:06:41 +0000
+Subject: [PATCH] CPUIdle: Reevaluate C-states under CPU load to favor
+ deeper C-states
+In-Reply-To: <4EBA6046.2060305@linux.vnet.ibm.com>
+References: <1316475315-5905-1-git-send-email-khilman@ti.com>
+ <87d3d75zo6.fsf@ti.com> <4EBA6046.2060305@linux.vnet.ibm.com>
+Message-ID: <37CAE120BAE10B42A790DD1418C8021D0136C7@DNCE02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stephen Warren wrote at Friday, November 04, 2011 3:36 PM:
-> dma_alloc_coherent wants to split pages after allocation in order to
-> reduce the memory footprint. This does not work well with GFP_COMP
-> pages, so drop this flag before allocation.
-> 
-> This patch is ported from arch/avr32
-> (commit 3611553ef985ef7c5863c8a94641738addd04cff).
-> 
-> Signed-off-by: Sumit Bhattacharya <sumitb@nvidia.com>
-> Tested-by: Varun Colbert <vcolbert@nvidia.com>
-> [swarren: s/HUGETLB_PAGE/HUGETLBFS/ in comment, minor comment cleanup]
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+Hi Deepthi,
 
-Russell, does this look good to go in the patch system now?
+>
+Texas Instruments France SA, 821 Avenue Jack Kilby, 06270 Villeneuve Loubet. 036 420 040 R.C.S Antibes. Capital de EUR 753.920
 
-> ---
->  arch/arm/mm/dma-mapping.c |    9 +++++++++
->  1 files changed, 9 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-> index e4e7f6c..68d64b4 100644
-> --- a/arch/arm/mm/dma-mapping.c
-> +++ b/arch/arm/mm/dma-mapping.c
-> @@ -332,6 +332,15 @@ __dma_alloc(struct device *dev, size_t size, dma_addr_t *handle, gfp_t gfp,
->  	struct page *page;
->  	void *addr;
-> 
-> +	/*
-> +	 * Following is a work-around (a.k.a. hack) to prevent pages
-> +	 * with __GFP_COMP being passed to split_page() which cannot
-> +	 * handle them.  The real problem is that this flag probably
-> +	 * should be 0 on ARM as it is not supported on this
-> +	 * platform; see CONFIG_HUGETLBFS.
-> +	 */
-> +	gfp &= ~(__GFP_COMP);
-> +
->  	*handle = ~0;
->  	size = PAGE_ALIGN(size);
-> 
-> --
-> 1.7.0.4
+-----Original Message-----
+> From: Deepthi Dharwar [mailto:deepthi at linux.vnet.ibm.com]
+> Sent: Wednesday, November 09, 2011 12:13 PM
+> To: Hilman, Kevin
+> Cc: linux-kernel at vger.kernel.org; Arjan van de Ven; linux-arm-
+> kernel at lists.infradead.org; linux-omap at vger.kernel.org; linux-
+> pm at lists.linux-foundation.org; Chalhoub, Nicole
+> Subject: Re: [PATCH] CPUIdle: Reevaluate C-states under CPU load to favor
+> deeper C-states
 
--- 
-nvpublic
+[...]
+> By setting timers when we enter non-deepest C-state possible, such that
+> when it fires we
+> can re-evaluate and try moving into deeper and deeper C-states enhancing
+> the
+> power savings is a good feature to have.
+>
+> Looking at the current implementation, is it possible to have it as
+> configurable option
+> where one can enable/disable this functionality through the backhand
+> driver ?
+
+The timeout values of the c state timers are set in the backhand driver.
+By setting the timeout to 0 the timers will not fire so you'll not have this functionality enabled
+
+> Also I am thinking, instead of having them in governor
+> wouldnt it be a good idea to have it implemented in
+> the backhand driver itself ?
+> --Deepthi
+
+
+In fact each C-state had its own configurable timer, so it is a parameter characterizing a C-state as it is for the exit_latency and target_residency parameters.
+And we wanted the timer to fire only when we do not go in deep Cstate due to a high load. This decision is made in the CPU idle governor. So the functionality should be seen from the governor..
+
+Thanks and Regards
+Nicole
