@@ -1,38 +1,83 @@
-From: phorton@bitbox.co.uk (Peter Horton)
-Date: Wed, 9 Nov 2011 12:44:11 +0000
-Subject: [PATCH] iMX28 Ethernet driver fix
-Message-ID: <20111109124411.GA31046@axolotl.localnet>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 09 Nov 2011 07:31:24 -0600
+Subject: [RFC 6/8] of: add clock providers
+In-Reply-To: <20111109091328.GY16886@pengutronix.de>
+References: <1320801583-12774-1-git-send-email-grant.likely@secretlab.ca>
+ <1320801583-12774-7-git-send-email-grant.likely@secretlab.ca>
+ <20111109091328.GY16886@pengutronix.de>
+Message-ID: <4EBA80AC.30604@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix driver to correctly handle cloned SKBs. Currently any clones
-of the transmit SKBs get endian-swapped by the driver. This breaks
-the ATA-over-Ethernet driver for example.
+On 11/09/2011 03:13 AM, Sascha Hauer wrote:
+> On Tue, Nov 08, 2011 at 06:19:41PM -0700, Grant Likely wrote:
+>> Based on work by Ben Herrenschmidt and Jeremy Kerr, this patch adds an
+>> of_clk_get function to allow platforms to retrieve clock data from the
+>> device tree.
+>>
+>> Platform register a provider through of_clk_add_provider, which will be
+>> called when a device references the provider's OF node for a clock
+>> reference.
+>>
+>> Signed-off-by: Grant Likely <grant.likely@secretlab.ca>
+>> ---
+>>  .../devicetree/bindings/clock/clock-bindings.txt   |  109 +++++++++++++++++
+>>  drivers/of/Kconfig                                 |    6 +
+>>  drivers/of/Makefile                                |    1 +
+>>  drivers/of/clock.c                                 |  129 ++++++++++++++++++++
+>>  include/linux/of_clk.h                             |   37 ++++++
+>>  5 files changed, 282 insertions(+), 0 deletions(-)
+>>  create mode 100644 Documentation/devicetree/bindings/clock/clock-bindings.txt
+>>  create mode 100644 drivers/of/clock.c
+>>  create mode 100644 include/linux/of_clk.h
+>>
+>> diff --git a/Documentation/devicetree/bindings/clock/clock-bindings.txt b/Documentation/devicetree/bindings/clock/clock-bindings.txt
+>> new file mode 100644
+>> index 0000000..4770c7e
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/clock/clock-bindings.txt
+>> @@ -0,0 +1,109 @@
+>> +This binding is a work-in-progress, and are based on some experimental
+>> +work by benh[1].
+>> +
+>> +Sources of clock signal can be represented by any node in the device
+>> +tree.  Those nodes are designated as clock providers.  Clock consumer
+>> +nodes use a phandle and clock specifier pair to connect clock provider
+>> +outputs to clock inputs.  Similar to the gpio specifiers, a clock
+>> +specifier is an array of one more more cells identifying the clock
+>> +output on a device.  The length of a clock specifier is defined by the
+>> +value of a #clock-cells property in the clock provider node.
+>> +
+>> +[1] http://patchwork.ozlabs.org/patch/31551/
+>> +
+>> +==Clock providers==
+>> +
+>> +Required properties:
+>> +#clock-cells:	   Number of cells in a clock specifier; typically will be
+>> +		   set to 1
+>> +
+>> +Optional properties:
+>> +clock-output-name: Recommended to be a list of strings of clock output signal
+>> +		   names indexed by the first cell in the clock specifier.
+>> +		   However, the meaning of clock-output-names is domain
+>> +		   specific to the clock provider, and is only provided to
+>> +		   encourage using the same meaning for the majority of clock
+>> +		   providers.  This format may not work for clock providers
+>> +		   using a complex clock specifier format.  In those cases it
+>> +		   is recommended to omit this property and create a binding
+>> +		   specific names property.
+> 
+> If the clock-output-name property is omitted, does this mean a clock
+> provider only has a single output or does it mean that it's not known
+> how many clock outputs a provider actually has?
 
-Signed-off-by: Peter Horton <phorton@bitbox.co.uk>
----
- drivers/net/ethernet/freescale/fec.c |    8 +++++++-
- 1 files changed, 7 insertions(+), 1 deletions(-)
+Neither. It's similar to how interrupt bindings work. For a clock
+consumer, you have a phandle to the parent and some number of cells to
+describe the connection. Often this is just the index or local interrupt
+number. Obviously, interrupt numbers make more sense than clock numbers,
+so having names is more useful in the clocks case if you have many outputs.
 
-diff --git a/drivers/net/ethernet/freescale/fec.c b/drivers/net/ethernet/freescale/fec.c
-index 1124ce0..aff1fa9 100644
---- a/drivers/net/ethernet/freescale/fec.c
-+++ b/drivers/net/ethernet/freescale/fec.c
-@@ -312,8 +312,14 @@ fec_enet_start_xmit(struct sk_buff *skb, struct net_device *ndev)
- 	 * On some FEC implementations data must be aligned on
- 	 * 4-byte boundaries. Use bounce buffers to copy data
- 	 * and get it aligned. Ugh.
-+	 *
-+	 * We also have to use the bounce buffers if we need
-+	 * to do the endian swap (see below) on a cloned buffer.
- 	 */
--	if (((unsigned long) bufaddr) & FEC_ALIGNMENT) {
-+	if ((((unsigned long) bufaddr) & FEC_ALIGNMENT) ||
-+		((id_entry->driver_data & FEC_QUIRK_SWAP_FRAME) &&
-+		skb_cloned(skb)))
-+	{
- 		unsigned int index;
- 		index = bdp - fep->tx_bd_base;
- 		memcpy(fep->tx_bounce[index], skb->data, skb->len);
--- 
-1.7.2.5
+The name strings are just additional information. Keep in mind that the
+clock node name can also be used if you need to attach a name to a clock.
+
+Rob
