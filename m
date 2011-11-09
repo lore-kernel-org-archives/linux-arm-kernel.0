@@ -1,155 +1,72 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 9 Nov 2011 12:35:54 +0100
-Subject: [PATCH v3 1/3] ARM: mxs: add saif clkmux functions
-In-Reply-To: <1317052353-6029-2-git-send-email-b29396@freescale.com>
-References: <1317052353-6029-1-git-send-email-b29396@freescale.com>
- <1317052353-6029-2-git-send-email-b29396@freescale.com>
-Message-ID: <20111109113554.GK16886@pengutronix.de>
+Date: Wed, 9 Nov 2011 12:49:36 +0100
+Subject: [RFC 6/8] of: add clock providers
+In-Reply-To: <4EBA62AD.3000407@ti.com>
+References: <1320801583-12774-1-git-send-email-grant.likely@secretlab.ca>
+ <1320801583-12774-7-git-send-email-grant.likely@secretlab.ca>
+ <20111109091328.GY16886@pengutronix.de> <4EBA62AD.3000407@ti.com>
+Message-ID: <20111109114936.GL16886@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 26, 2011 at 11:52:31PM +0800, Dong Aisheng wrote:
-> Signed-off-by: Dong Aisheng <b29396@freescale.com>
-> Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> Cc: Wolfram Sang <w.sang@pengutronix.de>
-> Cc: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
-> Cc: Liam Girdwood <lrg@ti.com>
+On Wed, Nov 09, 2011 at 12:23:25PM +0100, Cousson, Benoit wrote:
+> On 11/9/2011 10:13 AM, Sascha Hauer wrote:
+> >On Tue, Nov 08, 2011 at 06:19:41PM -0700, Grant Likely wrote:
 > 
-> ---
-> changes since v2:
->  * This patch is separated from the following patch based on
->    suggestions from Uwe.
->   [PATCH 2/3] ARM: mx28evk: add platform data for saif
->  * add lock suggested by Wolfram
-> ---
->  arch/arm/mach-mxs/clock-mx28.c          |   58 +++++++++++++++++++++++++++++++
->  arch/arm/mach-mxs/include/mach/digctl.h |   21 +++++++++++
->  2 files changed, 79 insertions(+), 0 deletions(-)
+> [...]
 > 
-> diff --git a/arch/arm/mach-mxs/clock-mx28.c b/arch/arm/mach-mxs/clock-mx28.c
-> index 7954013..9497346 100644
-> --- a/arch/arm/mach-mxs/clock-mx28.c
-> +++ b/arch/arm/mach-mxs/clock-mx28.c
-> @@ -22,6 +22,7 @@
->  #include <linux/io.h>
->  #include <linux/jiffies.h>
->  #include <linux/clkdev.h>
-> +#include <linux/spinlock.h>
->  
->  #include <asm/clkdev.h>
->  #include <asm/div64.h>
-> @@ -29,6 +30,7 @@
->  #include <mach/mx28.h>
->  #include <mach/common.h>
->  #include <mach/clock.h>
-> +#include <mach/digctl.h>
->  
->  #include "regs-clkctrl-mx28.h"
->  
-> @@ -43,6 +45,62 @@ static struct clk emi_clk;
->  static struct clk saif0_clk;
->  static struct clk saif1_clk;
->  static struct clk clk32k_clk;
-> +static DEFINE_SPINLOCK(clkmux_lock);
-> +
-> +/*
-> + * HW_SAIF_CLKMUX_SEL:
-> + *  DIRECT(0x0): SAIF0 clock pins selected for SAIF0 input clocks, and SAIF1
-> + *		clock pins selected for SAIF1 input clocks.
-> + *  CROSSINPUT(0x1): SAIF1 clock inputs selected for SAIF0 input clocks, and
-> + *		SAIF0 clock inputs selected for SAIF1 input clocks.
-> + *  EXTMSTR0(0x2): SAIF0 clock pin selected for both SAIF0 and SAIF1 input
-> + *		clocks.
-> + *  EXTMSTR1(0x3): SAIF1 clock pin selected for both SAIF0 and SAIF1 input
-> + *		clocks.
-> + */
-> +int mxs_saif_clkmux_select(unsigned int clkmux)
+> >>+Sources of clock signal can be represented by any node in the device
+> >>+tree.  Those nodes are designated as clock providers.  Clock consumer
+> >>+nodes use a phandle and clock specifier pair to connect clock provider
+> >>+outputs to clock inputs.  Similar to the gpio specifiers, a clock
+> >>+specifier is an array of one more more cells identifying the clock
+> >>+output on a device.  The length of a clock specifier is defined by the
+> >>+value of a #clock-cells property in the clock provider node.
+> >>+
+> >>+[1] http://patchwork.ozlabs.org/patch/31551/
+> >>+
+> >>+==Clock providers==
+> >>+
+> >>+Required properties:
+> >>+#clock-cells:	   Number of cells in a clock specifier; typically will be
+> >>+		   set to 1
+> >>+
+> >>+Optional properties:
+> >>+clock-output-name: Recommended to be a list of strings of clock output signal
+> >>+		   names indexed by the first cell in the clock specifier.
+> >>+		   However, the meaning of clock-output-names is domain
+> >>+		   specific to the clock provider, and is only provided to
+> >>+		   encourage using the same meaning for the majority of clock
+> >>+		   providers.  This format may not work for clock providers
+> >>+		   using a complex clock specifier format.  In those cases it
+> >>+		   is recommended to omit this property and create a binding
+> >>+		   specific names property.
+> >
+> >If the clock-output-name property is omitted, does this mean a clock
+> >provider only has a single output or does it mean that it's not known
+> >how many clock outputs a provider actually has?
+> 
+> Allowing several outputs for a single clock node might lead to a lot
+> of confusion. What will be the meaning of a clock rate if you have
+> several outputs at different frequency?
+> I think it will be better to define a clock node as a single source
+> of clock. If several outputs are needed, then we should define
+> several clock nodes.
+> If we let a clock node be any kind of big clock blob, we will never
+> be able to define some generic reusable clock node API. Everybody
+> will define its own custom clock blobs.
 
-Ahem, this seems to be a clk_set_parent function which is exported and
-bypasses the clk api. No.
+Generally +1. I asked myself the same question whether it's a good thing
+to allow a node to have multiple clocks. For i.MX I can say that I don't
+need this and that I do not intend to use this feature. Grants concerns
+about this are that the clock part of the device tree might explode when
+we put each and every clock into the devicetree, so he wants to allow
+bigger blobs of multiple clocks.
 
-> +{
-> +	if (clkmux > 0x3)
-> +		return -EINVAL;
-> +
-> +	spin_lock(&clkmux_lock);
-> +	__raw_writel(BM_DIGCTL_CTRL_SAIF_CLKMUX,
-> +			DIGCTRL_BASE_ADDR + HW_DIGCTL_CTRL + MXS_CLR_ADDR);
-> +	__raw_writel(clkmux << BP_DIGCTL_CTRL_SAIF_CLKMUX,
-> +			DIGCTRL_BASE_ADDR + HW_DIGCTL_CTRL + MXS_SET_ADDR);
-> +	spin_unlock(&clkmux_lock);
-> +
-> +	return 0;
-> +}
-> +
-> +int mxs_get_saif_clk_master_id(unsigned int saif_id)
-> +{
-> +	unsigned int saif_clkmux;
-> +	unsigned int master_id;
-> +
-> +	spin_lock(&clkmux_lock);
-> +	saif_clkmux = (__raw_readl(DIGCTRL_BASE_ADDR + HW_DIGCTL_CTRL)
-> +			& BM_DIGCTL_CTRL_SAIF_CLKMUX) >> BP_DIGCTL_CTRL_SAIF_CLKMUX;
-> +	switch (saif_clkmux) {
-> +	case MXS_DIGCTL_SAIF_CLKMUX_DIRECT:
-> +		master_id = saif_id;
-> +		break;
-> +	case MXS_DIGCTL_SAIF_CLKMUX_CROSSINPUT:
-> +		master_id = saif_id ? 0 : 1;
-> +		break;
-> +	case MXS_DIGCTL_SAIF_CLKMUX_EXTMSTR0:
-> +		master_id = 0;
-> +		break;
-> +	case MXS_DIGCTL_SAIF_CLKMUX_EXTMSTR1:
-> +		master_id = 1;
-> +		break;
-> +	default:
-> +		return -EINVAL;
+My impression gets more and more that we either put the clock tree in the
+devicetree or we do not do it, but there's not much room in between.
 
-You return with a spinlock held here. You don't need the spinlock at all
-in this function as the only register access you have is atomic.
-
-> +	}
-> +	spin_unlock(&clkmux_lock);
-> +
-> +	return master_id;
-> +}
->  
->  static int _raw_clk_enable(struct clk *clk)
->  {
-> diff --git a/arch/arm/mach-mxs/include/mach/digctl.h b/arch/arm/mach-mxs/include/mach/digctl.h
-> new file mode 100644
-> index 0000000..9bd0496
-> --- /dev/null
-> +++ b/arch/arm/mach-mxs/include/mach/digctl.h
-> @@ -0,0 +1,21 @@
-> +/*
-> + * Copyright 2011 Freescale Semiconductor, Inc. All Rights Reserved.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#ifndef __MACH_DIGCTL_H__
-> +#define __MACH_DIGCTL_H__
-> +
-> +/* MXS DIGCTL SAIF CLKMUX */
-> +#define MXS_DIGCTL_SAIF_CLKMUX_DIRECT		0x0
-> +#define MXS_DIGCTL_SAIF_CLKMUX_CROSSINPUT	0x1
-> +#define MXS_DIGCTL_SAIF_CLKMUX_EXTMSTR0		0x2
-> +#define MXS_DIGCTL_SAIF_CLKMUX_EXTMSTR1		0x3
-> +
-> +#define HW_DIGCTL_CTRL			0x0
-> +#define  BP_DIGCTL_CTRL_SAIF_CLKMUX	(10)
-> +#define  BM_DIGCTL_CTRL_SAIF_CLKMUX	(0x3 << 10)
-> +#endif
-> -- 
-> 1.7.0.4
-> 
-> 
-> 
+Sascha
 
 -- 
 Pengutronix e.K.                           |                             |
