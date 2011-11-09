@@ -1,29 +1,75 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 9 Nov 2011 13:31:44 +0100
-Subject: [PATCH 4/6] spi/pl022: skip default configuration before
- suspending
-In-Reply-To: <4EBA5C08.1040709@st.com>
-References: <1320835154-31303-1-git-send-email-linus.walleij@stericsson.com>
- <4EBA5C08.1040709@st.com>
-Message-ID: <CACRpkdZLPnM-NqOOz3OjwCzKys9LvEt0Yxej4JMf4GCjfB_kyA@mail.gmail.com>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Wed, 9 Nov 2011 14:00:02 +0100
+Subject: [PATCH] ARM: hw_breakpoint: don't fault when debug is not powered
+Message-ID: <1320843602-12278-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 9, 2011 at 11:55 AM, Viresh Kumar <viresh.kumar@st.com> wrote:
-> On 11/9/2011 4:09 PM, Linus WALLEIJ wrote:
->>
->> - ? ? amba_vcore_enable(pl022->adev);
->> - ? ? amba_pclk_enable(pl022->adev);
->> - ? ? load_ssp_default_config(pl022);
->> - ? ? amba_pclk_disable(pl022->adev);
->> - ? ? amba_vcore_disable(pl022->adev);
->> - ? ? dev_dbg(dev, "suspended\n");
->> + ? ? dev_dbg(&adev->dev, "suspended\n");
->
-> why adev->dev instead of dev?
+From: Rabin Vincent <rabin.vincent@stericsson.com>
 
-Plain bug. It doesn't even compile with -DDEBUG :-/
+If the debug logic is not powered, the processor can unfortunately
+raise an undefined instruction exception on the instruction that
+we use to check if the debug logic is powered up or not.
 
-I'll fix it up..
+Handle this with an undef hook, so that the kernel doesn't crash
+on boot on such setups.
 
-Linus
+Cc: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Rabin Vincent <rabin.vincent@stericsson.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/kernel/hw_breakpoint.c |   25 +++++++++++++++++++++++++
+ 1 files changed, 25 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/kernel/hw_breakpoint.c b/arch/arm/kernel/hw_breakpoint.c
+index 814a52a9..f46137c 100644
+--- a/arch/arm/kernel/hw_breakpoint.c
++++ b/arch/arm/kernel/hw_breakpoint.c
+@@ -854,6 +854,25 @@ static int hw_breakpoint_pending(unsigned long addr, unsigned int fsr,
+ 	return ret;
+ }
+ 
++static int hw_breakpoint_undef(struct pt_regs *regs, unsigned int instr)
++{
++	int reg = (instr >> 12) & 15;
++
++	/* Fake sticky power-down cleared */
++	regs->uregs[reg] = 0;
++	regs->ARM_pc += 4;
++
++	return 0;
++}
++
++static struct undef_hook hw_breakpoint_hook = {
++	.instr_mask	= 0xffff0fff,
++	.instr_val	= 0xee110e95,
++	.cpsr_mask	= MODE_MASK,
++	.cpsr_val	= SVC_MODE,
++	.fn		= hw_breakpoint_undef,
++};
++
+ /*
+  * One-time initialisation.
+  */
+@@ -900,6 +919,10 @@ static void reset_ctrl_regs(void *unused)
+ 		/*
+ 		 * Ensure sticky power-down is clear (i.e. debug logic is
+ 		 * powered up).
++		 *
++		 * This could raise an undefined instruction exception.  If it
++		 * does, it is fixed up with an undef hook which constructs
++		 * a fake value with the sticky power-down bit cleared.
+ 		 */
+ 		asm volatile("mrc p14, 0, %0, c1, c5, 4" : "=r" (dbg_power));
+ 		if ((dbg_power & 0x1) == 0)
+@@ -980,6 +1003,8 @@ static int __init arch_hw_breakpoint_init(void)
+ 	core_num_brps = get_num_brps();
+ 	core_num_wrps = get_num_wrps();
+ 
++	register_undef_hook(&hw_breakpoint_hook);
++
+ 	/*
+ 	 * We need to tread carefully here because DBGSWENABLE may be
+ 	 * driven low on this core and there isn't an architected way to
+-- 
+1.7.3.2
