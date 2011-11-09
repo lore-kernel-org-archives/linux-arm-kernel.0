@@ -1,40 +1,31 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 9 Nov 2011 12:27:34 +0100
+Date: Wed, 9 Nov 2011 12:29:54 +0100
 Subject: [PATCH 2/5] dma i.MX: remove individual SOC dependency
-In-Reply-To: <CAHXqBFKps1jsaKCr9yqQY72zAQHT6HU78eJ+adbYfnhRhkKQog@mail.gmail.com>
+In-Reply-To: <1320768633.32205.147.camel@vkoul-udesk3>
 References: <1314168072-13822-1-git-send-email-s.hauer@pengutronix.de>
  <1314168072-13822-3-git-send-email-s.hauer@pengutronix.de>
- <CAHXqBFKps1jsaKCr9yqQY72zAQHT6HU78eJ+adbYfnhRhkKQog@mail.gmail.com>
-Message-ID: <20111109112734.GI16886@pengutronix.de>
+ <20111108152239.GA9641@pengutronix.de>
+ <1320768633.32205.147.camel@vkoul-udesk3>
+Message-ID: <20111109112954.GJ16886@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 08, 2011 at 09:42:56PM +0100, Micha? Miros?aw wrote:
-> 2011/8/24 Sascha Hauer <s.hauer@pengutronix.de>:
-> > The individual SoC dependency in Kconfig hardly scales anymore.
-> > Instead of having such a fine grained dependency just depend
-> > on ARCH_MXC and risk that the uninformed user has to look in
-> > the help text to figure out which driver is the correct one.
-> [...]
-> > ?config MX3_IPU
-> > ? ? ? ?bool "MX3x Image Processing Unit support"
-> > - ? ? ? depends on ARCH_MX3
-> > + ? ? ? depends on ARCH_MXC
-> > ? ? ? ?select DMA_ENGINE
-> > ? ? ? ?default y
-> > ? ? ? ?help
+On Tue, Nov 08, 2011 at 09:40:33PM +0530, Vinod Koul wrote:
+> On Tue, 2011-11-08 at 16:22 +0100, Sascha Hauer wrote:
+> > Vinod,
+> > 
+> > Ping. Can you please queue this one?
+> Sorry Sascha, looks like I have missed this one :(
 > 
-> You could instead make it depend on HAVE_MX3_IPU and select this
-> symbol from relevant model config. Leaving it for the users is making
-> every one of them redo the work you already did.
+> Nevertheless, this seems to be part of a series, but I couldn't locate
+> the rest.
+> Do you want me to apply only this individual patch, seems little odd if
+> thats the case...
 
-I thought about this. I came to the conclusion that these are quite hard
-to change when they are present in many subsystems (I try to get rid of
-ARCH_MXx macros for some time now). Also with upcoming devicetree
-support the IMX_HAVE_ macros will loose their meaning anyway. Being a
-bit more relaxed with the 'depends on' only means that a user might
-compile in some unused drivers, which is the standard case on other
-architectures like x86 anyway.
+Yes, only this patch please. Maybe I should send patches for different
+subsystems in individual patches instead as a series, but it's very
+convenient to create a series, add maintainers to the Cc field and just
+send it out.
 
 Sascha
 
