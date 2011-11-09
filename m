@@ -1,101 +1,35 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Tue,  8 Nov 2011 16:14:30 -0800
-Subject: [PATCH] ARM: OMAP: PM: only register TWL with voltage layer when
- device is present
-Message-ID: <1320797670-21460-1-git-send-email-khilman@ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 9 Nov 2011 00:24:37 +0000
+Subject: [PATCH v8 15/16] ARM: LPAE: add support for ATAG_MEM64
+In-Reply-To: <alpine.LFD.2.02.1111081832290.3307@xanadu.home>
+References: <1320682618-1182-1-git-send-email-catalin.marinas@arm.com>
+ <1320682618-1182-16-git-send-email-catalin.marinas@arm.com>
+ <alpine.LFD.2.02.1111081832290.3307@xanadu.home>
+Message-ID: <20111109002437.GA5256@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Current code registers voltage layer details for TWL PMIC even when a TWL
-has not been registered.  Fix this to only register the TWL with voltage
-layer when the TWL PMIC is initialized by board-level code.
+Hi Nicolas,
 
-Signed-off-by: Kevin Hilman <khilman@ti.com>
----
-Barring any objections, will be queued as a fix for v3.2-rc cycle.
+On Tue, Nov 08, 2011 at 11:38:12PM +0000, Nicolas Pitre wrote:
+> On Mon, 7 Nov 2011, Catalin Marinas wrote:
+> 
+> > From: Will Deacon <will.deacon@arm.com>
+> > 
+> > LPAE provides support for memory banks with physical addresses of up
+> > to 40 bits.
+> > 
+> > This patch adds a new atag, ATAG_MEM64, so that the Kernel can be
+> > informed about memory that exists above the 4GB boundary.
+> > 
+> > Signed-off-by: Will Deacon <will.deacon@arm.com>
+> > Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+> 
+> NAK.  Any LPAE capable platform to come is, by definition, a new 
+> platform.  It therefore should be using DT upfront.
 
-Originally posted here: http://marc.info/?l=linux-omap&m=131831996730420&w=2,
-but posting again since it was buried inside this thread.
+Ok, well in that case it's a simple matter of defining #address-cells
+correctly in your .dts and we can simply drop this patch. Does that sound
+like the right approach?
 
- arch/arm/mach-omap2/pm.c         |    6 ++----
- arch/arm/mach-omap2/twl-common.c |   11 +++++++++++
- arch/arm/mach-omap2/twl-common.h |    3 +++
- 3 files changed, 16 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/pm.c b/arch/arm/mach-omap2/pm.c
-index 1e79bdf..00bff46 100644
---- a/arch/arm/mach-omap2/pm.c
-+++ b/arch/arm/mach-omap2/pm.c
-@@ -24,6 +24,7 @@
- #include "powerdomain.h"
- #include "clockdomain.h"
- #include "pm.h"
-+#include "twl-common.h"
- 
- static struct omap_device_pm_latency *pm_lats;
- 
-@@ -226,11 +227,8 @@ postcore_initcall(omap2_common_pm_init);
- 
- static int __init omap2_common_pm_late_init(void)
- {
--	/* Init the OMAP TWL parameters */
--	omap3_twl_init();
--	omap4_twl_init();
--
- 	/* Init the voltage layer */
-+	omap_pmic_late_init();
- 	omap_voltage_late_init();
- 
- 	/* Initialize the voltages */
-diff --git a/arch/arm/mach-omap2/twl-common.c b/arch/arm/mach-omap2/twl-common.c
-index 52243577..10b20c6 100644
---- a/arch/arm/mach-omap2/twl-common.c
-+++ b/arch/arm/mach-omap2/twl-common.c
-@@ -30,6 +30,7 @@
- #include <plat/usb.h>
- 
- #include "twl-common.h"
-+#include "pm.h"
- 
- static struct i2c_board_info __initdata pmic_i2c_board_info = {
- 	.addr		= 0x48,
-@@ -48,6 +49,16 @@ void __init omap_pmic_init(int bus, u32 clkrate,
- 	omap_register_i2c_bus(bus, clkrate, &pmic_i2c_board_info, 1);
- }
- 
-+void __init omap_pmic_late_init(void)
-+{
-+	/* Init the OMAP TWL parameters (if PMIC has been registerd) */
-+	if (!pmic_i2c_board_info.irq)
-+		return;
-+
-+	omap3_twl_init();
-+	omap4_twl_init();
-+}
-+
- #if defined(CONFIG_ARCH_OMAP3)
- static struct twl4030_usb_data omap3_usb_pdata = {
- 	.usb_mode	= T2_USB_MODE_ULPI,
-diff --git a/arch/arm/mach-omap2/twl-common.h b/arch/arm/mach-omap2/twl-common.h
-index 5e83a5b..275dde8 100644
---- a/arch/arm/mach-omap2/twl-common.h
-+++ b/arch/arm/mach-omap2/twl-common.h
-@@ -1,6 +1,8 @@
- #ifndef __OMAP_PMIC_COMMON__
- #define __OMAP_PMIC_COMMON__
- 
-+#include <plat/irqs.h>
-+
- #define TWL_COMMON_PDATA_USB		(1 << 0)
- #define TWL_COMMON_PDATA_BCI		(1 << 1)
- #define TWL_COMMON_PDATA_MADC		(1 << 2)
-@@ -30,6 +32,7 @@ struct twl4030_platform_data;
- 
- void omap_pmic_init(int bus, u32 clkrate, const char *pmic_type, int pmic_irq,
- 		    struct twl4030_platform_data *pmic_data);
-+void omap_pmic_late_init(void);
- 
- static inline void omap2_pmic_init(const char *pmic_type,
- 				   struct twl4030_platform_data *pmic_data)
--- 
-1.7.6
+Will
