@@ -1,35 +1,78 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 9 Nov 2011 19:11:36 +0000
-Subject: [PATCH V3 2/4] drivers/i2c/busses/i2c-at91.c: add new driver
-In-Reply-To: <EF2E73589CA71846A15D0B2CDF79505D087B3C9440@wm021.weinmann.com>
-References: <cover.1320753142.git.n.voss@weinmann.de>
- <7bdd6b456b0e055441cb25634c8cb6d483718f6c.1320753142.git.n.voss@weinmann.de>
- <4EB9B24A.5040809@gmail.com>
- <EF2E73589CA71846A15D0B2CDF79505D087B3C9440@wm021.weinmann.com>
-Message-ID: <20111109191136.GP12913@n2100.arm.linux.org.uk>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 9 Nov 2011 20:13:38 +0100
+Subject: [PATCH] ARM: mx28evk: Simplify GPIO requests for mx28evk_fec_reset
+In-Reply-To: <1320865742-16768-1-git-send-email-fabio.estevam@freescale.com>
+References: <1320865742-16768-1-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <20111109191338.GG13122@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 09, 2011 at 05:01:07PM +0100, Voss, Nikolaus wrote:
-> Hi Ryan,
-> > 
-> > > +	dev->irq = irq->start;
-> > > +	platform_set_drvdata(pdev, dev);
-> > > +
-> > > +	dev->clk = clk_get(&pdev->dev, "twi_clk");
-> > 
-> > 
-> > This didn't get answered. Can't you just do:
-> > 
-> > 	dev->clk = clk_get(&pdev->dev, NULL);
-> > 
-> > and clkdev should figure out the correct clock based on the device pointer?
+Hello,
+
+On Wed, Nov 09, 2011 at 05:09:02PM -0200, Fabio Estevam wrote:
+> Simplify GPIO requests inside mx28evk_fec_reset by using gpio_request_array.
 > 
-> No, this doesn't work on at91 since the clocks have no dev_id property
-> but only con_id. I cannot see a reason for this, but that's the way it's
-> done. Multiple hardware interfaces are handled via a lookup table.
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> ---
+>  arch/arm/mach-mxs/mach-mx28evk.c |   29 ++++++++---------------------
+>  1 files changed, 8 insertions(+), 21 deletions(-)
+> 
+> diff --git a/arch/arm/mach-mxs/mach-mx28evk.c b/arch/arm/mach-mxs/mach-mx28evk.c
+> index ac2316d..c565c33 100644
+> --- a/arch/arm/mach-mxs/mach-mx28evk.c
+> +++ b/arch/arm/mach-mxs/mach-mx28evk.c
+> @@ -219,6 +219,11 @@ static const struct gpio_led_platform_data mx28evk_led_data __initconst = {
+>  	.num_leds = ARRAY_SIZE(mx28evk_leds),
+>  };
+>  
+> +static struct gpio mx28evk_fec_gpios[] = {
+const + __initconst please.
 
-If you can, you could move over to doing this via the standard method
-and start switching some of this stuff over to using dev_id.
+> +	{ MX28EVK_FEC_PHY_POWER, GPIOF_OUT_INIT_LOW, "fec-power" },
+> +	{ MX28EVK_FEC_PHY_RESET, GPIOF_OUT_INIT_LOW, "fec-enable" },
+> +};
+> +
+>  /* fec */
+>  static void __init mx28evk_fec_reset(void)
+>  {
+> @@ -231,28 +236,10 @@ static void __init mx28evk_fec_reset(void)
+>  		clk_enable(clk);
+>  
+>  	/* Power up fec phy */
+> -	ret = gpio_request(MX28EVK_FEC_PHY_POWER, "fec-phy-power");
+> -	if (ret) {
+> -		pr_err("Failed to request gpio fec-phy-%s: %d\n", "power", ret);
+> -		return;
+> -	}
+> -
+> -	ret = gpio_direction_output(MX28EVK_FEC_PHY_POWER, 0);
+> -	if (ret) {
+> -		pr_err("Failed to drive gpio fec-phy-%s: %d\n", "power", ret);
+> -		return;
+> -	}
+> -
+> -	/* Reset fec phy */
+> -	ret = gpio_request(MX28EVK_FEC_PHY_RESET, "fec-phy-reset");
+> -	if (ret) {
+> -		pr_err("Failed to request gpio fec-phy-%s: %d\n", "reset", ret);
+> -		return;
+> -	}
+> -
+> -	gpio_direction_output(MX28EVK_FEC_PHY_RESET, 0);
+> +	ret = gpio_request_array(mx28evk_fec_gpios,
+> +				ARRAY_SIZE(mx28evk_fec_gpios));
+>  	if (ret) {
+> -		pr_err("Failed to drive gpio fec-phy-%s: %d\n", "reset", ret);
+> +		pr_err("Failed to request FEC gpios: %d\n", ret);
+>  		return;
+>  	}
+>  
+> -- 
+> 1.7.1
+> 
+> 
+> 
 
-We'll then have another platform starting to use this stuff correctly.
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
