@@ -1,21 +1,26 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Tue,  8 Nov 2011 18:19:35 -0700
-Subject: [RFC 0/8] Initial DT clock bindings
-Message-ID: <1320801583-12774-1-git-send-email-grant.likely@secretlab.ca>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Wed, 9 Nov 2011 09:46:59 +0800
+Subject: [GIT PULL] mxs: fixes for v3.2-rc2
+Message-ID: <20111109014658.GB7579@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey all, here is an initial implementation of the DT clock bindings
-with the versatile platform modified to use them.  I'm fairly happy
-with how this has turned out, although I'll probably roll the clock
-lookup stuff directly into drivers/clk/clkdev.c which will simplify
-things a bit.  Please take a look and comment.
+Hi Arnd,
 
-You'll also notice that I've started adding selftests to the
-devicetree code, which turned out to be pretty useful for debugging.
-I think I want to do this for a lot of the dt infrastructure.
+Please pull the mxs fixes below for v3.2-rc2.
 
-The first 5 patches are probably pretty close to ready to be merged,
-the last 3 I expect to still need work.
+Regards,
+Shawn
 
-g.
+The following changes since commit 1ea6b8f48918282bdca0b32a34095504ee65bab5:
+
+  Linux 3.2-rc1 (2011-11-07 16:16:02 -0800)
+
+are available in the git repository at:
+  git://git.linaro.org/people/shawnguo/linux-2.6.git mxs/fixes
+
+Shawn Guo (1):
+      arm/mxs: fix mmc device adding for mach-mx28evk
+
+ arch/arm/mach-mxs/mach-mx28evk.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
