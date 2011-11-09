@@ -1,99 +1,119 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 9 Nov 2011 10:31:47 +0100
-Subject: [RFC 8/8] dt/arm: versatile add clock parsing
-In-Reply-To: <1320801583-12774-9-git-send-email-grant.likely@secretlab.ca>
-References: <1320801583-12774-1-git-send-email-grant.likely@secretlab.ca>
- <1320801583-12774-9-git-send-email-grant.likely@secretlab.ca>
-Message-ID: <20111109093147.GZ16886@pengutronix.de>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Wed, 9 Nov 2011 11:34:13 +0200
+Subject: [PATCH] ARM: OMAP: omap_device: Expose omap_device_{alloc,
+ delete, register}
+In-Reply-To: <1318851662-637-1-git-send-email-ohad@wizery.com>
+References: <1318851662-637-1-git-send-email-ohad@wizery.com>
+Message-ID: <CAK=WgbZ=h0OdeqLmNFwz31MN+o52-2ZNisFKgnJgwVLAyTTLCw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 08, 2011 at 06:19:43PM -0700, Grant Likely wrote:
-> Signed-off-by: Grant Likely <grant.likely@secretlab.ca>
+Hi Kevin,
+
+On Mon, Oct 17, 2011 at 1:41 PM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
+> Expose omap_device_{alloc, delete, register} so we can use them outside
+> of omap_device.c.
+
+Can you please take this one ?
+
+Please tell me if you want a refreshed version against 3.2-rc1.
+
+Thanks!
+Ohad.
+
+>
+> This approach allows users, which need to manipulate an archdata member
+> of a device before it is registered, to do so. This is also useful
+> for users who have their devices created very early so they can be used
+> at ->reserve() time to reserve CMA memory.
+>
+> The immediate use case for this is to set the private iommu archdata
+> member, which binds a device to its associated iommu controller.
+> This way, generic code will be able to attach omap devices to their
+> iommus, without calling any omap-specific API.
+>
+> With this in hand, we can further clean the existing mainline OMAP iommu
+> driver and its mainline users, and focus on generic IOMMU approaches
+> for future users (rpmsg/remoteproc and the upcoming generic DMA API).
+>
+> This patch is still considered an interim solution until DT fully materializes
+> for omap; at that point, this functionality will be removed as DT will
+> take care of creating the devices and configuring them correctly.
+>
+> Tested on OMAP4 with a generic rpmsg/remoteproc that doesn't use any
+> omap-specific IOMMU API anymore.
+>
+> Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
 > ---
->  arch/arm/boot/dts/versatile-ab.dts     |   37 ++++++++++++++++++++++++++++++++
->  arch/arm/boot/dts/versatile-pb.dts     |    2 +
->  arch/arm/mach-versatile/core.c         |   37 +------------------------------
->  arch/arm/mach-versatile/versatile_dt.c |   33 ++++++++++++++++++++++++++++
->  4 files changed, 74 insertions(+), 35 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/versatile-ab.dts b/arch/arm/boot/dts/versatile-ab.dts
-> index 0b32925..cb8a49e 100644
-> --- a/arch/arm/boot/dts/versatile-ab.dts
-> +++ b/arch/arm/boot/dts/versatile-ab.dts
-> @@ -19,6 +19,35 @@
->  		reg = <0x0 0x08000000>;
->  	};
->  
-> +	clocks {
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
+> ?arch/arm/plat-omap/include/plat/omap_device.h | ? ?7 +++++++
+> ?arch/arm/plat-omap/omap_device.c ? ? ? ? ? ? ?| ? 13 +++----------
+> ?2 files changed, 10 insertions(+), 10 deletions(-)
+>
+> diff --git a/arch/arm/plat-omap/include/plat/omap_device.h b/arch/arm/plat-omap/include/plat/omap_device.h
+> index 12c5b0c..28d7a38 100644
+> --- a/arch/arm/plat-omap/include/plat/omap_device.h
+> +++ b/arch/arm/plat-omap/include/plat/omap_device.h
+> @@ -100,6 +100,13 @@ struct platform_device *omap_device_build_ss(const char *pdev_name, int pdev_id,
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct omap_device_pm_latency *pm_lats,
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? int pm_lats_cnt, int is_early_device);
+>
+> +struct omap_device *omap_device_alloc(struct platform_device *pdev,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct omap_hwmod **ohs, int oh_cnt,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct omap_device_pm_latency *pm_lats,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? int pm_lats_cnt);
+> +void omap_device_delete(struct omap_device *od);
+> +int omap_device_register(struct platform_device *pdev);
 > +
-> +		ref24_clk: clock0 {
-> +			compatible = "fixed-clock";
-> +			#clock-cells = <1>;
-> +			clock-frequency = <24000000>;
-> +			clock-output-names = "ref";
-> +		};
-> +
-> +		sp804_clk: clock1 {
-> +			compatible = "fixed-clock";
-> +			#clock-cells = <1>;
-> +			clock-frequency = <1000000>;
-> +			clock-output-names = "ref";
-> +		};
-> +
-> +		osc4_clk: clock3 {
-> +			compatible = "ics,icst307";
-> +			#clock-cells = <1>;
-> +			ref = <24000>;
-> +			vco-max = <200000>;
-> +			vd-range = <12 519>;
-> +			rd-range = <3 129>;
-> +			clock-output-names = "osc4";
-> +		};
-
-The registers needed to access osc4 are missing here. This probably
-means that osc4 cannot be specified in the clocks node but has to
-be sorted into the bus structure of the SoC.
-
-> +
->  static void __init versatile_dt_init(void)
->  {
-> +	struct device_node *node;
-> +	struct clk *clk;
-> +	int rc;
-> +
-> +	for_each_compatible_node(node, NULL, "fixed-clock") {
-> +		u32 rate;
-> +		if (of_property_read_u32(node, "clock-frequency", &rate))
-> +			continue;
-> +
-> +		clk = kzalloc(sizeof(*clk), GFP_KERNEL);
-> +		if (!clk)
-> +			panic("out of memory\n");
-> +		clk->rate = rate;
-> +
-> +		rc = of_clk_add_provider(node, versatile_dt_clk_get, clk);
-> +		if (rc) {
-> +			kfree(clk);
-> +			pr_err("error adding fixed clk %s\n", node->name);
-> +		}
-> +	}
-> +
-
-Well this is obviously just a quick hack to get something working. I
-just want to add the note here that Mikes current patches require to
-register the clock tree top-down. This may be hard to archieve as the
-clocks are somewhere in the devicetree (sorted by bus topology and not
-by clock topology). So we either need more thinking in the clock
-framework to overcome the top-down registration or more thinking here
-in the registration of the clocks.
-
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> ?void __iomem *omap_device_get_rt_va(struct omap_device *od);
+> ?struct device *omap_device_get_by_hwmod_name(const char *oh_name);
+>
+> diff --git a/arch/arm/plat-omap/omap_device.c b/arch/arm/plat-omap/omap_device.c
+> index cd90bed..913179c 100644
+> --- a/arch/arm/plat-omap/omap_device.c
+> +++ b/arch/arm/plat-omap/omap_device.c
+> @@ -96,14 +96,7 @@
+> ?#define USE_WAKEUP_LAT ? ? ? ? ? ? ? ? 0
+> ?#define IGNORE_WAKEUP_LAT ? ? ? ? ? ? ?1
+>
+> -static int omap_device_register(struct platform_device *pdev);
+> ?static int omap_early_device_register(struct platform_device *pdev);
+> -static struct omap_device *omap_device_alloc(struct platform_device *pdev,
+> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct omap_hwmod **ohs, int oh_cnt,
+> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct omap_device_pm_latency *pm_lats,
+> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? int pm_lats_cnt);
+> -static void omap_device_delete(struct omap_device *od);
+> -
+>
+> ?static struct omap_device_pm_latency omap_default_latency[] = {
+> ? ? ? ?{
+> @@ -508,7 +501,7 @@ static int omap_device_fill_resources(struct omap_device *od,
+> ?*
+> ?* Returns an struct omap_device pointer or ERR_PTR() on error;
+> ?*/
+> -static struct omap_device *omap_device_alloc(struct platform_device *pdev,
+> +struct omap_device *omap_device_alloc(struct platform_device *pdev,
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?struct omap_hwmod **ohs, int oh_cnt,
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?struct omap_device_pm_latency *pm_lats,
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?int pm_lats_cnt)
+> @@ -590,7 +583,7 @@ oda_exit1:
+> ? ? ? ?return ERR_PTR(ret);
+> ?}
+>
+> -static void omap_device_delete(struct omap_device *od)
+> +void omap_device_delete(struct omap_device *od)
+> ?{
+> ? ? ? ?if (!od)
+> ? ? ? ? ? ? ? ?return;
+> @@ -816,7 +809,7 @@ static struct dev_pm_domain omap_device_pm_domain = {
+> ?* platform_device_register() on the underlying platform_device.
+> ?* Returns the return value of platform_device_register().
+> ?*/
+> -static int omap_device_register(struct platform_device *pdev)
+> +int omap_device_register(struct platform_device *pdev)
+> ?{
+> ? ? ? ?pr_debug("omap_device: %s: registering\n", pdev->name);
+>
+> --
+> 1.7.4.1
+>
+>
