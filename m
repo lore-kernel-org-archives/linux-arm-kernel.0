@@ -1,71 +1,41 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 9 Nov 2011 10:39:45 -0800
-Subject: [RFC 6/8] of: add clock providers
-In-Reply-To: <1320801583-12774-7-git-send-email-grant.likely@secretlab.ca>
-References: <1320801583-12774-1-git-send-email-grant.likely@secretlab.ca>
- <1320801583-12774-7-git-send-email-grant.likely@secretlab.ca>
-Message-ID: <20111109183945.GL31337@atomide.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed,  9 Nov 2011 10:53:43 -0800
+Subject: [PATCH] ARM: l2x0: fix compile error on !CONFIG_USE_OF
+Message-ID: <1320864823-5015-1-git-send-email-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Grant Likely <grant.likely@secretlab.ca> [111108 16:51]:
-> +
-> +    /* external oscillator */
-> +    osc: oscillator {
-> +        compatible = "fixed-clock";
-> +        #clock-cells = <1>;
-> +        frequency  = <32678>;
-> +        clock-output-name = "osc";
-> +    };
-> +
-> +    /* phase-locked-loop device, generates a higher frequency clock
-> +     * from the external oscillator reference */
-> +    pll: pll {
-> +        compatible = "some-pll-interface"
-> +        #clock-cells = <1>;
-> +        clock-input = <&osc 0>;
-> +        clock-input-name = "ref";
-> +        reg = <0x4c000 0x1000>;
-> +        clock-output-name = "pll", "pll-switched";
-> +    };
+fae2b89ab1 (ARM: l2x0: add empty l2x0_of_init) adds a static inline
+function that returns -ENODEV, but at least on tegra cache-l2x0.h is
+included without errno.h being pulled in first, resulting in compile
+errors if OF isn't enabled:
 
-I think for the clocks we need something describing which bits
-in the clock register the "pll" and "pll-switched" belong to.
+In file included from arch/arm/mach-tegra/common.c:26:
+arch/arm/include/asm/hardware/cache-l2x0.h: In function 'l2x0_of_init':
+arch/arm/include/asm/hardware/cache-l2x0.h:110: error: 'ENODEV' undeclared (first use in this function)
+arch/arm/include/asm/hardware/cache-l2x0.h:110: error: (Each undeclared identifier is reported only once
+arch/arm/include/asm/hardware/cache-l2x0.h:110: error: for each function it appears in.)
 
-Otherwise we'll end up having to map all that data in the clock
-driver for various SoC variants.
+Add errno.h to the include file to make it self-contained.
 
-> +    /* UART, using the low frequency oscillator for the baud clock,
-> +     * and the high frequency switched PLL output for register
-> +     * clocking */
-> +    uart {
-> +        compatible = "fsl,imx-uart";
-> +        reg = <0xa000 0x1000>;
-> +        interrupts = <33>;
-> +        clock-input = <&osc 0>, <&pll 1>;
-> +        clock-input-name = "baud", "register";
-> +    };
-> +
+Signed-off-by: Olof Johansson <olof@lixom.net>
+Cc: Rob Herring <rob.herring@calxeda.com>
+---
+ arch/arm/include/asm/hardware/cache-l2x0.h |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
 
-Here I think we need a better solution for finding the
-clocks by name. Doing clock-input = <&osc 0>, <&pll 1> means
-that we have redefine the uart for similar SoC many times.
-
-How about using source + option in the name instead:
-
-	   clock-source-name = "osc.osc", "pll.pll-switched";
-
-This same solution would also work for the pinctrl names:
-
-	   pinctrl-source-name = "uart1_rx.uart1_rx", "dss_data7.uart1_tx";
-
-The reason I'm worried here is that just for omap2/3/4 we already
-have 3 options for uart1 clock and 19 options for uart1_rx pin!
-
-Using the signal names for both clocks and pinctrl would
-allow defining the uart entry for for each reg address instead
-of for each clock and pinctrl option.
-
-Regards,
-
-Tony
+diff --git a/arch/arm/include/asm/hardware/cache-l2x0.h b/arch/arm/include/asm/hardware/cache-l2x0.h
+index 1db1143..7df239b 100644
+--- a/arch/arm/include/asm/hardware/cache-l2x0.h
++++ b/arch/arm/include/asm/hardware/cache-l2x0.h
+@@ -20,6 +20,8 @@
+ #ifndef __ASM_ARM_HARDWARE_L2X0_H
+ #define __ASM_ARM_HARDWARE_L2X0_H
+ 
++#include <linux/errno.h>
++
+ #define L2X0_CACHE_ID			0x000
+ #define L2X0_CACHE_TYPE			0x004
+ #define L2X0_CTRL			0x100
+-- 
+1.7.5.4
