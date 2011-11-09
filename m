@@ -1,26 +1,35 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 9 Nov 2011 11:11:44 -0800
-Subject: [PATCH 2/3] staging: nvec: add device tree support
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF173EDABBF6@HQMAIL01.nvidia.com>
-References: <cover.1320173572.git.marvin24@gmx.de>
- <95b67a12e2b6ea6a9c7e17b0069ec7c9fc6f719c.1320173573.git.marvin24@gmx.de>
- <74CDBE0F657A3D45AFBB94109FB122FF173EDABBF6@HQMAIL01.nvidia.com>
-Message-ID: <20111109191144.GB5354@quad.lixom.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 9 Nov 2011 19:11:36 +0000
+Subject: [PATCH V3 2/4] drivers/i2c/busses/i2c-at91.c: add new driver
+In-Reply-To: <EF2E73589CA71846A15D0B2CDF79505D087B3C9440@wm021.weinmann.com>
+References: <cover.1320753142.git.n.voss@weinmann.de>
+ <7bdd6b456b0e055441cb25634c8cb6d483718f6c.1320753142.git.n.voss@weinmann.de>
+ <4EB9B24A.5040809@gmail.com>
+ <EF2E73589CA71846A15D0B2CDF79505D087B3C9440@wm021.weinmann.com>
+Message-ID: <20111109191136.GP12913@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 01, 2011 at 03:36:31PM -0700, Stephen Warren wrote:
-> Marc Dietrich wrote at Tuesday, November 01, 2011 2:37 PM:
-> > This adds device tree support to the nvec driver. By using this method
-> > it is no longer necessary to specify platform data through a board
-> > file.
+On Wed, Nov 09, 2011 at 05:01:07PM +0100, Voss, Nikolaus wrote:
+> Hi Ryan,
+> > 
+> > > +	dev->irq = irq->start;
+> > > +	platform_set_drvdata(pdev, dev);
+> > > +
+> > > +	dev->clk = clk_get(&pdev->dev, "twi_clk");
+> > 
+> > 
+> > This didn't get answered. Can't you just do:
+> > 
+> > 	dev->clk = clk_get(&pdev->dev, NULL);
+> > 
+> > and clkdev should figure out the correct clock based on the device pointer?
 > 
-> Acked-by: Stephen Warren <swarren@nvidia.com>
+> No, this doesn't work on at91 since the clocks have no dev_id property
+> but only con_id. I cannot see a reason for this, but that's the way it's
+> done. Multiple hardware interfaces are handled via a lookup table.
 
-Acked-by: Olof Johansson <olof@lixom.net>
+If you can, you could move over to doing this via the standard method
+and start switching some of this stuff over to using dev_id.
 
-Greg, this one can go through the staging tree. We'll pick up the other pieces
-of the series through the tegra soc tree.
-
-
--Olof
+We'll then have another platform starting to use this stuff correctly.
