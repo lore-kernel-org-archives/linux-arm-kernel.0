@@ -1,105 +1,39 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 9 Nov 2011 18:05:15 -0800
-Subject: [GIT PULL] arm-soc fixes for 3.2-rc
-Message-ID: <CAOesGMj+ppJty2_pQ=nkTQ4OT-8=O+OFL3FUq6nA-uC9tj9kCg@mail.gmail.com>
+From: richard.zhao@linaro.org (Richard Zhao)
+Date: Thu, 10 Nov 2011 10:37:18 +0800
+Subject: [RFC PATCH] Generic clock parent enumeration
+In-Reply-To: <20111104175908.GA9337@glitch>
+References: <20111104175908.GA9337@glitch>
+Message-ID: <20111110023716.GA11045@b20223-02.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Fri, Nov 04, 2011 at 06:59:08PM +0100, Domenico Andreoli wrote:
+> Hi,
+> 
+>   here is my proposal for the enumeration of a clock parents and the
+> first implementation of clk_set_parent() based on it. It depends on
+> the generic-clk-v2 patchset.
+> 
+> The basic idea is that only the clock can provide a way to walk all
+> the parent clocks that it can be attached to. This has multiple purposes:
+> 
+>  1. generic clock framework is able to find the best parent a given
+>     clock can be attached to in order to satisfy an arbitrary requirement
+>     (ie the lowest number of enabled parent clocks, energy constrains,
+>     clock network tuning, etc)
+Is there any use case that you have to let clk core select parent?
+In my opinion, clk parent don't change frequently. most time display
+driver do that, which must has ideas of clk tree topology.
+> 
+>  2. generic clock framework is able to check in an implementation
+>     independent way if a given clock is suitable to be parent of
+>     another one
+Only mux clk driver needs it.
 
-Arnd is offline at the moment so I'm pitching in on collecting patches
-for arm-soc.
-
-See below for a set of fixes, mostly addressing fallout from the merge
-window. Please pull.
-
-
-Thanks!
-
-
--Olof
-
-
-The following changes since commit 19e0bafc36abd84a5b4d7c7745b78a6f4626e944:
-
-  Merge branch 'for-linus' of
-git://git.kernel.org/pub/scm/linux/kernel/git/paulg/linux (2011-11-08
-18:34:16 -0800)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git fixes
-
-Dirk Behme (1):
-      ARM: mxc: Remove test_for_ltirq
-
-Jason Liu (2):
-      ARM:i.MX: fix build error in tzic/avic.c
-      ARM:i.MX: fix build error in clock-mx51-mx53.c
-
-Jean-Christophe PLAGNIOL-VILLARD (4):
-      ARM: at91: usart: drop static map regs for dbgu
-      at91: vmalloc fix missing AT91_VIRT_BASE define
-      at91/yl-9200: Fix section mismatch
-      atmel/spi: fix missing probe
-
-Jochen Friedrich (1):
-      ARM: at91: Fix USBA gadget registration
-
-Marc Zyngier (2):
-      ARM: mxc: fix local timer interrupt handling
-      ARM: msm: fix compilation flags for MSM_SCM
-
-Olof Johansson (5):
-      Merge branch 'mxs/fixes' of
-git://git.linaro.org/people/shawnguo/linux-2.6 into fixes
-      Merge branch 'imx/compile-fixes' of
-git://git.linaro.org/people/shawnguo/linux-2.6 into fixes
-      Merge branch 'at91-fixes' of
-git://github.com/at91linux/linux-at91 into fixes
-      Merge branch 'for-3.2/fixes' of
-git://git.kernel.org/.../olof/tegra into fixes
-      Merge branch 'msm-fix' of
-git://codeaurora.org/quic/kernel/davidb/linux-msm into fixes
-
-Shawn Guo (1):
-      arm/mxs: fix mmc device adding for mach-mx28evk
-
-Stephen Boyd (1):
-      msm: boards: Fix fallout from removal of machine_desc in fixup
-
-Stephen Warren (2):
-      arm/tegra: Don't create duplicate gpio and pinmux devices
-      arm/dt: Fix ventana SDHCI power-gpios
-
-Yufeng Shen (1):
-      arm/tegra: enable headphone detection gpio on seaboard
-
- arch/arm/boot/dts/tegra-ventana.dts          |    3 +--
- arch/arm/mach-at91/at91cap9_devices.c        |    7 +++----
- arch/arm/mach-at91/at91rm9200_devices.c      |    5 ++---
- arch/arm/mach-at91/at91sam9260_devices.c     |    5 ++---
- arch/arm/mach-at91/at91sam9261_devices.c     |    5 ++---
- arch/arm/mach-at91/at91sam9263_devices.c     |    5 ++---
- arch/arm/mach-at91/at91sam9g45_devices.c     |    7 +++----
- arch/arm/mach-at91/at91sam9rl_devices.c      |    7 +++----
- arch/arm/mach-at91/board-yl-9200.c           |    2 +-
- arch/arm/mach-at91/include/mach/vmalloc.h    |    2 ++
- arch/arm/mach-msm/Makefile                   |    2 ++
- arch/arm/mach-msm/board-msm7x30.c            |    4 ++--
- arch/arm/mach-msm/board-msm8960.c            |    4 ++--
- arch/arm/mach-msm/board-msm8x60.c            |    4 ++--
- arch/arm/mach-msm/scm.c                      |    3 +++
- arch/arm/mach-mx5/clock-mx51-mx53.c          |    2 ++
- arch/arm/mach-mxs/mach-mx28evk.c             |    4 ++--
- arch/arm/mach-tegra/board-dt.c               |   13 +++++++------
- arch/arm/mach-tegra/board-harmony-pinmux.c   |    6 +++++-
- arch/arm/mach-tegra/board-paz00-pinmux.c     |    6 +++++-
- arch/arm/mach-tegra/board-seaboard-pinmux.c  |    6 +++++-
- arch/arm/mach-tegra/board-trimslice-pinmux.c |    5 ++++-
- arch/arm/plat-mxc/avic.c                     |    1 +
- arch/arm/plat-mxc/gic.c                      |   11 ++---------
- arch/arm/plat-mxc/include/mach/entry-macro.S |    3 ---
- arch/arm/plat-mxc/tzic.c                     |    1 +
- drivers/spi/spi-atmel.c                      |    5 +++--
- 27 files changed, 69 insertions(+), 59 deletions(-)
+Richard
+> 
+>  3. the proposed implementation of the generic clk_set_parent()
+> 
+> 
+> Signed-off-by: Domenico Andreoli <cavokz@gmail.com>
+> 
