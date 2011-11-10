@@ -1,77 +1,44 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Thu, 10 Nov 2011 16:28:08 +0000
-Subject: [PATCHv4 02/13] ARM: vic: device tree binding
-In-Reply-To: <4EBBEBD3.8090001@arm.com>
-References: <1320369010-23428-1-git-send-email-jamie@jamieiles.com>
- <1320369010-23428-3-git-send-email-jamie@jamieiles.com>
- <20111110144648.GC16018@totoro> <4EBBEBD3.8090001@arm.com>
-Message-ID: <20111110162808.GE16018@totoro>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Thu, 10 Nov 2011 17:59:33 +0100
+Subject: [PATCH 1/3 V2] ARM: pxa: Add DT support to pxa2xx-uart
+In-Reply-To: <20111110120058.GQ12913@n2100.arm.linux.org.uk>
+References: <1320172354-3795-1-git-send-email-marek.vasut@gmail.com>
+ <1320701506-26812-2-git-send-email-marek.vasut@gmail.com>
+ <20111110120058.GQ12913@n2100.arm.linux.org.uk>
+Message-ID: <201111101759.33994.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 10, 2011 at 03:20:51PM +0000, Marc Zyngier wrote:
-> On 10/11/11 14:46, Jamie Iles wrote:
-> > On Fri, Nov 04, 2011 at 01:09:59AM +0000, Jamie Iles wrote:
-> >> This adds a device tree binding for the VIC based on the of_irq_init()
-> >> support.  This adds an irqdomain to the vic and always registers all
-> >> vics in the static vic array rather than for pm only to keep track of
-> >> the irq domain.  struct irq_data::hwirq is used where appropriate rather
-> >> than runtime masking.
-> >>
-> >> v2:	- use irq_domain_simple_ops
-> >> 	- remove stub implementation of vic_of_init for !CONFIG_OF
-> >> 	- Make VIC select IRQ_DOMAIN
-> >>
-> >> Reviewed-by: Rob Herring <robherring2@gmail.com>
-> >> Reviewed-by: Grant Likely <grant.likely@secretlab.ca>
-> >> Signed-off-by: Jamie Iles <jamie@jamieiles.com>
-> >> ---
-> >>  Documentation/devicetree/bindings/arm/vic.txt |   29 +++++++
-> >>  arch/arm/common/Kconfig                       |    1 +
-> >>  arch/arm/common/vic.c                         |  106 ++++++++++++++++++-------
-> >>  arch/arm/include/asm/hardware/vic.h           |    7 ++-
-> >>  4 files changed, 114 insertions(+), 29 deletions(-)
-> >>  create mode 100644 Documentation/devicetree/bindings/arm/vic.txt
-> >>
-> >> diff --git a/arch/arm/common/vic.c b/arch/arm/common/vic.c
-> >> index 01f18a4..e689975 100644
-> >> --- a/arch/arm/common/vic.c
-> >> +++ b/arch/arm/common/vic.c
-> >> @@ -22,6 +22,10 @@
-> > [...]
-> >> +#ifdef CONFIG_OF
-> >> +int __init vic_of_init(struct device_node *node, struct device_node *parent)
-> >> +{
-> >> +	void __iomem *regs;
-> >> +	int irq_base;
-> >> +
-> >> +	if (WARN(parent, "non-root VICs are not supported"))
-> >> +		return -EINVAL;
-> >> +
-> >> +	regs = of_iomap(node, 0);
-> >> +	if (WARN_ON(!regs))
-> >> +		return -EIO;
-> >> +
-> >> +	irq_base = irq_alloc_descs(-1, 0, 32, numa_node_id());
-> >> +	if (WARN_ON(irq_base < 0))
-> >> +		goto out_unmap;
+> On Mon, Nov 07, 2011 at 10:31:43PM +0100, Marek Vasut wrote:
+> > @@ -781,11 +783,48 @@ static const struct dev_pm_ops serial_pxa_pm_ops =
+> > {
 > > 
-> > Hmm, this appears to need linux/export.h for THIS_MODULE now.  
-> > linux/irq.h has a comment saying it uses a macro to avoid needing an 
-> > include of export.h there so I guess it needs to go in here instead.
+> >  };
+> >  #endif
+> > 
+> > +#ifdef CONFIG_OF
+> > +static struct of_device_id serial_pxa_dt_ids[] = {
+> > +	{ .compatible = "marvell,pxa2xx-uart" },
+> > +	{ /* sentinel */ }
+> > +};
+> > +MODULE_DEVICE_TABLE(of, serial_pxa_dt_ids);
+> > +
+> > +static int serial_pxa_probe_dt(struct platform_device *pdev, int
+> > *portid) +{
+> > +	struct device_node *np = pdev->dev.of_node;
+> > +	int ret;
+> > +
+> > +	if (!np)
+> > +		return -ENODEV;
+> > +
+> > +	ret = of_alias_get_id(np, "serial");
+> > +	if (ret < 0) {
+> > +		dev_err(&pdev->dev, "Failed to get alias id, errno %d\n", ret);
 > 
-> Yes, I had to hack it when I tested this series on PB1176 (and of course
-> forgot to send the patch around...).
+> Is this documented somewhere (eg, an example dt snippet for a PXA uart).
+
+Yes it is, in patch 3/3 I'm adding an example DT code for vpac270 machine.
 > 
-> It seems a bit backward to impose including linux/export.h while this
-> file doesn't use any of it directly.
+> There is the requirement that new DT bindings must be documented.
 
-Yeah, but seeing as include/linux/irq.h had a comment saying that they'd 
-explicitly decided to avoid including export.h there I decided it would 
-be simplest to punt it into vic.c and that someone knew better than me!
-
-I'll include it in vic.c when I ask you to pull (probably tomorrow).
-
-Thanks,
-
-Jamie
+Thank you for guiding me, I really fell into deep water here.
