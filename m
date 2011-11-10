@@ -1,30 +1,40 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 10 Nov 2011 08:54:46 +0100
-Subject: [PATCH v2] ARM: mx28evk: Simplify GPIO requests for
- mx28evk_fec_reset
-In-Reply-To: <20111109214603.GA6316@pengutronix.de>
-References: <1320870998-6200-1-git-send-email-festevam@gmail.com>
- <20111109214603.GA6316@pengutronix.de>
-Message-ID: <20111110075446.GR16886@pengutronix.de>
+From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
+Date: Thu, 10 Nov 2011 08:59:01 +0100
+Subject: s3c2440 / s3c2416 broken
+In-Reply-To: <CAJuYYwTQ-eCN1pTkgrthhUEdk5gr9oGGcO6MCKCWQAovsQVqcg@mail.gmail.com>
+References: <CAC=G6syKMJk+L+-_k+T37qHKzfpNz_TrYi-HTaufczLxJKEtkQ@mail.gmail.com>
+ <CAC=G6swbDHZJ7fqu9LoYRiri6bg+M+VDZnG_-=ZfP9r=6YtVeg@mail.gmail.com>
+ <CAJuYYwTQ-eCN1pTkgrthhUEdk5gr9oGGcO6MCKCWQAovsQVqcg@mail.gmail.com>
+Message-ID: <201111100859.02647.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 09, 2011 at 10:46:03PM +0100, Wolfram Sang wrote:
-> On Wed, Nov 09, 2011 at 06:36:38PM -0200, Fabio Estevam wrote:
-> > From: Fabio Estevam <fabio.estevam@freescale.com>
+Hi Paul,
+
+Am Donnerstag, 10. November 2011, 01:14:59 schrieb Thomas Abraham:
+> On 10 November 2011 05:00, Paul Schilling <paul.s.schilling@gmail.com> 
+wrote:
+> > Boot past init slow - stalled when using jffs2 also.
 > > 
-> > Simplify GPIO requests inside mx28evk_fec_reset by using gpio_request_array.
+> > On Wed, Nov 9, 2011 at 4:12 PM, Paul Schilling
 > > 
-> > Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> > <paul.s.schilling@gmail.com> wrote:
+> >> Latest kernel 3.2.0-rc1 appears to break the following processors
+> >> s3c2440 and s3c2416
+> >> 
+> >> both appear to stall when init is executed on NFS.  Also I  lost HSMMC
+> >> on the s3c2416.
 > 
-> Like it: Acked-by: Wolfram Sang <w.sang@pengutronix.de>
+> Could you post a boot log of the kernel on the s3c2440 and s3c2416 boards?
 
-/me not. See my comments to v1.
+Also, is your out-of-tree kernel code available somewhere? [1]
 
-Sascha
+As my S3C2416 based platform didn't show any problems and has working hsmmc 
+with 3.2-rc1 it would be cool to be able to compare both and see if we differ 
+somehow.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+
+Heiko
+
+
+[1] Mine's at https://gitorious.org/oyo-hack/kernel/commits/topic/board/sg060
