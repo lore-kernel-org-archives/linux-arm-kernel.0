@@ -1,29 +1,23 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 10 Nov 2011 07:54:38 +0100
-Subject: [PATCH v2] ARM: mx28evk: Simplify GPIO requests for
- mx28evk_fec_reset
-In-Reply-To: <20111109214603.GA6316@pengutronix.de>
-References: <1320870998-6200-1-git-send-email-festevam@gmail.com>
- <20111109214603.GA6316@pengutronix.de>
-Message-ID: <20111110065438.GI13122@pengutronix.de>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Thu, 10 Nov 2011 09:31:57 +0200
+Subject: [PATCH v4 2/7] iommu/core: split mapping to page sizes as
+ supported by the hardware
+In-Reply-To: <CANqQZNH1YRSgYRVxceicQ3szD=t7zeJjhJKEQ30PeKsxtj5V+A@mail.gmail.com>
+References: <1318850846-16066-1-git-send-email-ohad@wizery.com>
+ <1318850846-16066-3-git-send-email-ohad@wizery.com>
+ <CANqQZNH1YRSgYRVxceicQ3szD=t7zeJjhJKEQ30PeKsxtj5V+A@mail.gmail.com>
+Message-ID: <CAK=WgbZbfCRJqA-wwHN=iLH6rYyoKjJCaL0zMfY93Tg6Jw2uvA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 09, 2011 at 10:46:03PM +0100, Wolfram Sang wrote:
-> On Wed, Nov 09, 2011 at 06:36:38PM -0200, Fabio Estevam wrote:
-> > From: Fabio Estevam <fabio.estevam@freescale.com>
-> > 
-> > Simplify GPIO requests inside mx28evk_fec_reset by using gpio_request_array.
-> > 
-> > Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> 
-> Like it: Acked-by: Wolfram Sang <w.sang@pengutronix.de>
-/me to.
+On Thu, Nov 10, 2011 at 8:17 AM, Kai Huang <mail.kai.huang@gmail.com> wrote:
+> Seems the unmap function don't take phys as parameter, does this mean
+> domain->ops->unmap will walk through the page table to find out the
+> actual page size?
 
-Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+The short answer is yes, and furthermore, we also consider to remove
+the size param from domain->ops->unmap entirely at some point.
 
-Uwe
+We had a long discussion about it, please see:
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+https://lkml.org/lkml/2011/10/10/234
