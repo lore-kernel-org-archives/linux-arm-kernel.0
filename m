@@ -1,52 +1,106 @@
-From: Joerg.Roedel@amd.com (Joerg Roedel)
-Date: Thu, 10 Nov 2011 14:08:01 +0100
-Subject: [PATCH v4 2/7] iommu/core: split mapping to page sizes as
- supported by the hardware
-In-Reply-To: <4EBBC090.4070109@gmail.com>
-References: <1318850846-16066-1-git-send-email-ohad@wizery.com>
- <1318850846-16066-3-git-send-email-ohad@wizery.com>
- <CANqQZNH1YRSgYRVxceicQ3szD=t7zeJjhJKEQ30PeKsxtj5V+A@mail.gmail.com>
- <CAK=WgbZbfCRJqA-wwHN=iLH6rYyoKjJCaL0zMfY93Tg6Jw2uvA@mail.gmail.com>
- <4EBBC090.4070109@gmail.com>
-Message-ID: <20111110130801.GC13213@amd.com>
+From: dirk.behme@de.bosch.com (Dirk Behme)
+Date: Thu, 10 Nov 2011 14:44:17 +0100
+Subject: [PATCH 4/4] arm/imx: fix imx6q mmc error when mounting rootfs
+In-Reply-To: <1320914372-4416-5-git-send-email-shawn.guo@linaro.org>
+References: <1320914372-4416-1-git-send-email-shawn.guo@linaro.org>
+ <1320914372-4416-5-git-send-email-shawn.guo@linaro.org>
+Message-ID: <4EBBD531.4010206@de.bosch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 10, 2011 at 08:16:16PM +0800, cody wrote:
-> On 11/10/2011 03:31 PM, Ohad Ben-Cohen wrote:
-> >On Thu, Nov 10, 2011 at 8:17 AM, Kai Huang<mail.kai.huang@gmail.com>  wrote:
-> >>Seems the unmap function don't take phys as parameter, does this mean
-> >>domain->ops->unmap will walk through the page table to find out the
-> >>actual page size?
-> >The short answer is yes, and furthermore, we also consider to remove
-> >the size param from domain->ops->unmap entirely at some point.
-> >
-> >We had a long discussion about it, please see:
-> >
-> >https://lkml.org/lkml/2011/10/10/234
-> Yes I've seen your discussion, I followed this thread from beginning:)
+On 10.11.2011 09:39, Shawn Guo wrote:
+> The following error is seen in some case when mounting rootfs from
+> SD/MMC cards.
 > 
-> How about the IOTLB flush? As I said I think we need to consider
-> that IOMMU (even does not exist now) may have some limitation on
-> IOTLB flush, and hiding page size from IOTLB flush code may hurt
-> performance, or even worse, trigger undefined behaviors.
+>   Waiting for root device /dev/mmcblk0p1...
+>   mmc1: host does not support reading read-only switch. assuming write-enable.
+>   mmc1: new high speed SDHC card at address b368
+>   mmcblk0: mmc1:b368 SDC   3.74 GiB
+>    mmcblk0: p1
+>   mmc1: Timeout waiting for hardware interrupt.
+>   mmcblk0: error -110 transferring data, sector 3678224, nr 40, cmd response 0x900, card status 0xc00
+>   end_request: I/O error, dev mmcblk0, sector 3678225
+>   Buffer I/O error on device mmcblk0p1, logical block 458754
+>   lost page write due to I/O error on mmcblk0p1
+> 
+> This patch fixes the problem by lowering the usdhc clock and correcting
+> watermark configuration.
+> 
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Chris Ball <cjb@laptop.org>
+> Cc: Sascha Hauer <s.hauer@pengutronix.de>
 
-We can only care about IOMMUs that exist today or ones that will exist
-and we already know of.
-In general for the hardware I know of a page-size is not required for
-implementing unmap operations. Requiring this would imply that any user
-of the IOMMU-API needs to keeps track of the page-sizes used to map a
-given area.
-This would be a huge burden which is not really necessary because the
-IOMMU driver already has this information and can return it to the user.
-So if you want to change that you need a very good reason for it.
+The above errors are gone with this patch.
 
+Tested-by: Dirk Behme <dirk.behme@de.bosch.com>
 
-	Joerg
+Thanks
 
--- 
-AMD Operating System Research Center
+Dirk
 
-Advanced Micro Devices GmbH Einsteinring 24 85609 Dornach
-General Managers: Alberto Bozzo, Andrew Bowd
-Registration: Dornach, Landkr. Muenchen; Registerger. Muenchen, HRB Nr. 43632
+> ---
+>  arch/arm/mach-imx/clock-imx6q.c    |   17 ++++++++++++++++-
+>  drivers/mmc/host/sdhci-esdhc-imx.c |    8 ++++++++
+>  2 files changed, 24 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/mach-imx/clock-imx6q.c b/arch/arm/mach-imx/clock-imx6q.c
+> index e0b926d..613a1b9 100644
+> --- a/arch/arm/mach-imx/clock-imx6q.c
+> +++ b/arch/arm/mach-imx/clock-imx6q.c
+> @@ -1139,7 +1139,7 @@ static int _clk_set_rate(struct clk *clk, unsigned long rate)
+>  		return -EINVAL;
+>  
+>  	max_div = ((d->bm_pred >> d->bp_pred) + 1) *
+> -		  ((d->bm_pred >> d->bp_pred) + 1);
+> +		  ((d->bm_podf >> d->bp_podf) + 1);
+>  
+>  	div = parent_rate / rate;
+>  	if (div == 0)
+> @@ -2002,6 +2002,21 @@ int __init mx6q_clocks_init(void)
+>  	clk_set_rate(&asrc_serial_clk, 1500000);
+>  	clk_set_rate(&enfc_clk, 11000000);
+>  
+> +	/*
+> +	 * Before pinctrl API is available, we have to rely on the pad
+> +	 * configuration set up by bootloader.  For usdhc example here,
+> +	 * u-boot sets up the pads for 49.5 MHz case, and we have to lower
+> +	 * the usdhc clock from 198 to 49.5 MHz to match the pad configuration.
+> +	 *
+> +	 * FIXME: This is should be removed after pinctrl API is available.
+> +	 * At that time, usdhc driver can call pinctrl API to change pad
+> +	 * configuration dynamically per different usdhc clock settings.
+> +	 */
+> +	clk_set_rate(&usdhc1_clk, 49500000);
+> +	clk_set_rate(&usdhc2_clk, 49500000);
+> +	clk_set_rate(&usdhc3_clk, 49500000);
+> +	clk_set_rate(&usdhc4_clk, 49500000);
+> +
+>  	np = of_find_compatible_node(NULL, NULL, "fsl,imx6q-gpt");
+>  	base = of_iomap(np, 0);
+>  	WARN_ON(!base);
+> diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
+> index ae57769..4b976f0 100644
+> --- a/drivers/mmc/host/sdhci-esdhc-imx.c
+> +++ b/drivers/mmc/host/sdhci-esdhc-imx.c
+> @@ -32,6 +32,7 @@
+>  /* VENDOR SPEC register */
+>  #define SDHCI_VENDOR_SPEC		0xC0
+>  #define  SDHCI_VENDOR_SPEC_SDIO_QUIRK	0x00000002
+> +#define SDHCI_WTMK_LVL			0x44
+>  #define SDHCI_MIX_CTRL			0x48
+>  
+>  /*
+> @@ -476,6 +477,13 @@ static int __devinit sdhci_esdhc_imx_probe(struct platform_device *pdev)
+>  	if (is_imx53_esdhc(imx_data))
+>  		imx_data->flags |= ESDHC_FLAG_MULTIBLK_NO_INT;
+>  
+> +	/*
+> +	 * The imx6q ROM code will change the default watermark level setting
+> +	 * to something insane.  Change it back here.
+> +	 */
+> +	if (is_imx6q_usdhc(imx_data))
+> +		writel(0x08100810, host->ioaddr + SDHCI_WTMK_LVL);
+> +
+>  	boarddata = &imx_data->boarddata;
+>  	if (sdhci_esdhc_imx_probe_dt(pdev, boarddata) < 0) {
+>  		if (!host->mmc->parent->platform_data) {
