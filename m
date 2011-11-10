@@ -1,50 +1,35 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 9 Nov 2011 16:53:21 -0800
-Subject: [GIT PULL] arm/tegra fixes for 3.2-rc
-In-Reply-To: <CAOesGMip77Y7PMiCRginfZDoGe9k3jj33adP1SkJfNO1BBbrig@mail.gmail.com>
-References: <CAOesGMip77Y7PMiCRginfZDoGe9k3jj33adP1SkJfNO1BBbrig@mail.gmail.com>
-Message-ID: <CAOesGMjSozfya6fP6o9aqsj7MQfCoi11tgZSHB66p9O87xwv3g@mail.gmail.com>
+From: davidb@codeaurora.org (David Brown)
+Date: Wed, 9 Nov 2011 17:00:03 -0800
+Subject: [GIT PULL] msm fixes for 3.2
+Message-ID: <20111110010003.GA785@huya.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since Arnd is out, I'll collect fixes for 3.2-rc2 in arm-soc, and
-pulled this one in there.
+This contains an additional fix from
+https://lkml.org/lkml/2011/11/1/345
+so that pull request can be ignored.
 
-(I know, silly to send myself a pull request, but I wanted to post the
-contents on the list).
+The following changes since commit b4beb4bf9934d151bf4581a54ae028927374cb2a:
 
+  Merge branch 'for-linus/i2c-3.2' of git://git.fluff.org/bjdooks/linux (2011-11-01 15:07:19 -0700)
 
--Olof
+are available in the git repository at:
 
-On Wed, Nov 9, 2011 at 1:34 PM, Olof Johansson <olof@lixom.net> wrote:
-> Hi,
->
-> A couple of fixes for 3.2-rc below. Nothing controversial.
->
->
-> Thanks!
->
-> -Olof
->
-> The following changes since commit 1ea6b8f48918282bdca0b32a34095504ee65bab5:
->
-> ?Linux 3.2-rc1 (2011-11-07 16:16:02 -0800)
->
-> are available in the git repository at:
-> ?git://git.kernel.org/pub/scm/linux/kernel/git/olof/tegra.git for-3.2/fixes
->
-> Stephen Warren (2):
-> ? ? ?arm/tegra: Don't create duplicate gpio and pinmux devices
-> ? ? ?arm/dt: Fix ventana SDHCI power-gpios
->
-> Yufeng Shen (1):
-> ? ? ?arm/tegra: enable headphone detection gpio on seaboard
->
-> ?arch/arm/boot/dts/tegra-ventana.dts ? ? ? ? ?| ? ?3 +--
-> ?arch/arm/mach-tegra/board-dt.c ? ? ? ? ? ? ? | ? 13 +++++++------
-> ?arch/arm/mach-tegra/board-harmony-pinmux.c ? | ? ?6 +++++-
-> ?arch/arm/mach-tegra/board-paz00-pinmux.c ? ? | ? ?6 +++++-
-> ?arch/arm/mach-tegra/board-seaboard-pinmux.c ?| ? ?6 +++++-
-> ?arch/arm/mach-tegra/board-trimslice-pinmux.c | ? ?5 ++++-
-> ?6 files changed, 27 insertions(+), 12 deletions(-)
->
+  git://codeaurora.org/quic/kernel/davidb/linux-msm.git msm-fix
+
+Marc Zyngier (1):
+      ARM: msm: fix compilation flags for MSM_SCM
+
+Stephen Boyd (1):
+      msm: boards: Fix fallout from removal of machine_desc in fixup
+
+ arch/arm/mach-msm/Makefile        |    2 ++
+ arch/arm/mach-msm/board-msm7x30.c |    4 ++--
+ arch/arm/mach-msm/board-msm8960.c |    4 ++--
+ arch/arm/mach-msm/board-msm8x60.c |    4 ++--
+ arch/arm/mach-msm/scm.c           |    3 +++
+ 5 files changed, 11 insertions(+), 6 deletions(-)
+
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
