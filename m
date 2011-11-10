@@ -1,42 +1,34 @@
 From: richard.zhao@linaro.org (Richard Zhao)
-Date: Thu, 10 Nov 2011 12:59:18 +0800
-Subject: [PATCH 1/1] serial: imx: convert to clk_prepare/clk_unprepare
-Message-ID: <1320901158-13103-1-git-send-email-richard.zhao@linaro.org>
+Date: Thu, 10 Nov 2011 13:04:19 +0800
+Subject: [PATCH 1/1] i2c: imx: convert clk_prepare/clk_unprepare
+Message-ID: <1320901459-13208-1-git-send-email-richard.zhao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
 ---
- drivers/tty/serial/imx.c |    3 +++
- 1 files changed, 3 insertions(+), 0 deletions(-)
+ drivers/i2c/busses/i2c-imx.c |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
-index 163fc90..22fd9c8 100644
---- a/drivers/tty/serial/imx.c
-+++ b/drivers/tty/serial/imx.c
-@@ -1390,6 +1390,7 @@ static int serial_imx_probe(struct platform_device *pdev)
- 		ret = PTR_ERR(sport->clk);
- 		goto unmap;
- 	}
-+	clk_prepare(sport->clk);
- 	clk_enable(sport->clk);
+diff --git a/drivers/i2c/busses/i2c-imx.c b/drivers/i2c/busses/i2c-imx.c
+index 58832e5..aad623b 100644
+--- a/drivers/i2c/busses/i2c-imx.c
++++ b/drivers/i2c/busses/i2c-imx.c
+@@ -196,6 +196,7 @@ static int i2c_imx_start(struct imx_i2c_struct *i2c_imx)
  
- 	sport->port.uartclk = clk_get_rate(sport->clk);
-@@ -1415,6 +1416,7 @@ deinit:
- clkput:
- 	clk_put(sport->clk);
- 	clk_disable(sport->clk);
-+	clk_unprepare(sport->clk);
- unmap:
- 	iounmap(sport->port.membase);
- free:
-@@ -1438,6 +1440,7 @@ static int serial_imx_remove(struct platform_device *pdev)
- 	}
+ 	dev_dbg(&i2c_imx->adapter.dev, "<%s>\n", __func__);
  
- 	clk_disable(sport->clk);
-+	clk_unprepare(sport->clk);
++	clk_prepare(i2c_imx->clk);
+ 	clk_enable(i2c_imx->clk);
+ 	writeb(i2c_imx->ifdr, i2c_imx->base + IMX_I2C_IFDR);
+ 	/* Enable I2C controller */
+@@ -246,6 +247,7 @@ static void i2c_imx_stop(struct imx_i2c_struct *i2c_imx)
+ 	/* Disable I2C controller */
+ 	writeb(0, i2c_imx->base + IMX_I2C_I2CR);
+ 	clk_disable(i2c_imx->clk);
++	clk_unprepare(i2c_imx->clk);
+ }
  
- 	if (pdata && pdata->exit)
- 		pdata->exit(pdev);
+ static void __init i2c_imx_set_clk(struct imx_i2c_struct *i2c_imx,
 -- 
 1.7.5.4
