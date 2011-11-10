@@ -1,50 +1,43 @@
-From: myungjoo.ham@gmail.com (MyungJoo Ham)
-Date: Thu, 10 Nov 2011 14:57:34 +0900
-Subject: [PATCH 1/3] ARM: EXYNOS: Add ASV feature for Exynos4 series
-In-Reply-To: <4EAAF8EF.5010201@gmail.com>
-References: <1319677938-25732-1-git-send-email-boyko.lee@samsung.com>
- <1319677938-25732-2-git-send-email-boyko.lee@samsung.com>
- <4EAAF8EF.5010201@gmail.com>
-Message-ID: <CAJ0PZbR9DEOud8j90n0M4UHQ=HA35NSzO0MHUzAxsOz4ViVCKA@mail.gmail.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 10 Nov 2011 08:02:32 +0200
+Subject: CONFIG_USB_GADGET_PXA27X
+In-Reply-To: <CAN1soZzFMg+d5H2nCb-w_FAjVCQQHF0Fu-prQAbuEQtqwbtDqg@mail.gmail.com>
+References: <1320870640.27598.33.camel@x61.thuisdomein>
+ <20111109220144.GA17605@legolas.emea.dhcp.ti.com>
+ <CAN1soZzFMg+d5H2nCb-w_FAjVCQQHF0Fu-prQAbuEQtqwbtDqg@mail.gmail.com>
+Message-ID: <20111110060231.GB18919@legolas.emea.dhcp.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 29, 2011 at 3:48 AM, Sylwester Nawrocki <snjw23@gmail.com> wrote:
->
-> You're putting whole driver under arch/arm/, I'm wondering whether the functionality
-> it provides could be handled by some generic framework, like cpufreq or devfreq.
-> How this driver is different from cpufreq drivers ?
+Hi,
 
-I think there would be futher usage with ASV if IEM and proper PMICs
-are attaches; however, for now, ASV guides proper vddarm and vddint
-voltages for each freuquency.
+On Thu, Nov 10, 2011 at 07:15:18AM +0800, Haojian Zhuang wrote:
+> From: Haojian Zhuang <haojian.zhuang@hexinfolabs.org>
+> To: haojian.zhuang at gmail.com
+> Cc: Haojian Zhuang <haojian.zhuang@marvell.com>
+> Subject: [PATCH] ARM: pxa: fix inconsistent CONFIG_USB_PXA27X
+> Date: Thu, 10 Nov 2011 07:13:07 +0800
+> Message-Id: <1320880387-13440-1-git-send-email-haojian.zhuang@hexinfolabs.org>
+> X-Mailer: git-send-email 1.7.4.1
+> 
+> From: Haojian Zhuang <haojian.zhuang@marvell.com>
+> 
+> Since CONFIG_USB_GADGET_PXA27X and other macros are renamed to
+> CONFIG_USB_PXA27X. Update them in arch/arm/mach-pxa and arch/arm/configs
+> to keep consistent.
+> 
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
 
-Both drivers in cpufreq(vddarm and arm core freq) and devfreq(vddint
-and memory/bus freq.. and GPU or MMC later?) should use the result
-value of ASV because they both alter voltages according to the ASV
-value.
+FWIW:
 
-Thus, if this is going to be located in drivers/, it'd better be in
-elsewhere (drivers/misc? drivers/hwmon? ..???) and capable of
-providing values to other device drivers, at least to cpufreq and
-devfreq drivers.
-
-
-Cheers!
-MyungJoo
-
->
-> --
-> Thanks,
-> Sylwester
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
->
-
-
+Acked-by: Felipe Balbi <balbi@ti.com>
 
 -- 
-MyungJoo Ham, Ph.D.
-Mobile Software Platform Lab, DMC Business, Samsung Electronics
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111110/833f94fd/attachment.sig>
