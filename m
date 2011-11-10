@@ -1,54 +1,52 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 10 Nov 2011 09:06:41 +0100
-Subject: [PATCH 1/1] serial: imx: convert to clk_prepare/clk_unprepare
-In-Reply-To: <1320901158-13103-1-git-send-email-richard.zhao@linaro.org>
-References: <1320901158-13103-1-git-send-email-richard.zhao@linaro.org>
-Message-ID: <20111110080641.GT16886@pengutronix.de>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 10 Nov 2011 10:08:51 +0200
+Subject: CONFIG_USB_GADGET_PXA27X
+In-Reply-To: <CAMPhdO9wts8MZ0bF3grLyUOTszbfQBqthTgT7MniAc8AL3DuMA@mail.gmail.com>
+References: <1320870640.27598.33.camel@x61.thuisdomein>
+ <20111109220144.GA17605@legolas.emea.dhcp.ti.com>
+ <CAN1soZzFMg+d5H2nCb-w_FAjVCQQHF0Fu-prQAbuEQtqwbtDqg@mail.gmail.com>
+ <20111110060231.GB18919@legolas.emea.dhcp.ti.com>
+ <CAMPhdO9wts8MZ0bF3grLyUOTszbfQBqthTgT7MniAc8AL3DuMA@mail.gmail.com>
+Message-ID: <20111110080850.GC18919@legolas.emea.dhcp.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 10, 2011 at 12:59:18PM +0800, Richard Zhao wrote:
-> Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
-> ---
->  drivers/tty/serial/imx.c |    3 +++
->  1 files changed, 3 insertions(+), 0 deletions(-)
+On Thu, Nov 10, 2011 at 03:34:25PM +0800, Eric Miao wrote:
+> On Thu, Nov 10, 2011 at 2:02 PM, Felipe Balbi <balbi@ti.com> wrote:
+> > Hi,
+> >
+> > On Thu, Nov 10, 2011 at 07:15:18AM +0800, Haojian Zhuang wrote:
+> >> From: Haojian Zhuang <haojian.zhuang@hexinfolabs.org>
+> >> To: haojian.zhuang at gmail.com
+> >> Cc: Haojian Zhuang <haojian.zhuang@marvell.com>
+> >> Subject: [PATCH] ARM: pxa: fix inconsistent CONFIG_USB_PXA27X
+> >> Date: Thu, 10 Nov 2011 07:13:07 +0800
+> >> Message-Id: <1320880387-13440-1-git-send-email-haojian.zhuang@hexinfolabs.org>
+> >> X-Mailer: git-send-email 1.7.4.1
+> >>
+> >> From: Haojian Zhuang <haojian.zhuang@marvell.com>
+> >>
+> >> Since CONFIG_USB_GADGET_PXA27X and other macros are renamed to
+> >> CONFIG_USB_PXA27X. Update them in arch/arm/mach-pxa and arch/arm/configs
+> >> to keep consistent.
+> >>
+> >> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+> >
+> > FWIW:
+> >
+> > Acked-by: Felipe Balbi <balbi@ti.com>
 > 
-> diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
-> index 163fc90..22fd9c8 100644
-> --- a/drivers/tty/serial/imx.c
-> +++ b/drivers/tty/serial/imx.c
-> @@ -1390,6 +1390,7 @@ static int serial_imx_probe(struct platform_device *pdev)
->  		ret = PTR_ERR(sport->clk);
->  		goto unmap;
->  	}
-> +	clk_prepare(sport->clk);
->  	clk_enable(sport->clk);
->  
->  	sport->port.uartclk = clk_get_rate(sport->clk);
-> @@ -1415,6 +1416,7 @@ deinit:
->  clkput:
->  	clk_put(sport->clk);
->  	clk_disable(sport->clk);
-> +	clk_unprepare(sport->clk);
+> Applied, thanks Felipe. And I guess this is also applicable to v3.1,
+> stable@ Cc'ed.
 
-Ouch, clk_put before clk_disable? This is is bug. Care to fix it?
-
->  unmap:
->  	iounmap(sport->port.membase);
->  free:
-> @@ -1438,6 +1440,7 @@ static int serial_imx_remove(struct platform_device *pdev)
->  	}
->  
->  	clk_disable(sport->clk);
-> +	clk_unprepare(sport->clk);
->  
-
-Here clk_put is missing, another bug.
-
-Sascha
+that's correct :-)
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111110/978adf93/attachment.sig>
