@@ -1,86 +1,70 @@
-From: liu.h.jason@gmail.com (Jason Liu)
-Date: Thu, 10 Nov 2011 23:07:12 +0800
-Subject: [PATCH 4/4] arm/imx: fix imx6q mmc error when mounting rootfs
-In-Reply-To: <1320914372-4416-5-git-send-email-shawn.guo@linaro.org>
-References: <1320914372-4416-1-git-send-email-shawn.guo@linaro.org>
- <1320914372-4416-5-git-send-email-shawn.guo@linaro.org>
-Message-ID: <CAB4PhKcegDBxfqtEzA3_qH2q8pdjYAwGS+wKzZEYmK6poQj8EQ@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 10 Nov 2011 15:20:51 +0000
+Subject: [PATCHv4 02/13] ARM: vic: device tree binding
+In-Reply-To: <20111110144648.GC16018@totoro>
+References: <1320369010-23428-1-git-send-email-jamie@jamieiles.com>
+ <1320369010-23428-3-git-send-email-jamie@jamieiles.com>
+ <20111110144648.GC16018@totoro>
+Message-ID: <4EBBEBD3.8090001@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/11/10 Shawn Guo <shawn.guo@linaro.org>:
-> The following error is seen in some case when mounting rootfs from
-> SD/MMC cards.
->
-> ?Waiting for root device /dev/mmcblk0p1...
-> ?mmc1: host does not support reading read-only switch. assuming write-enable.
-> ?mmc1: new high speed SDHC card at address b368
-> ?mmcblk0: mmc1:b368 SDC ? 3.74 GiB
-> ? mmcblk0: p1
-> ?mmc1: Timeout waiting for hardware interrupt.
-> ?mmcblk0: error -110 transferring data, sector 3678224, nr 40, cmd response 0x900, card status 0xc00
-> ?end_request: I/O error, dev mmcblk0, sector 3678225
-> ?Buffer I/O error on device mmcblk0p1, logical block 458754
-> ?lost page write due to I/O error on mmcblk0p1
->
-> This patch fixes the problem by lowering the usdhc clock and correcting
-> watermark configuration.
->
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Chris Ball <cjb@laptop.org>
-> Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> ---
-> ?arch/arm/mach-imx/clock-imx6q.c ? ?| ? 17 ++++++++++++++++-
-> ?drivers/mmc/host/sdhci-esdhc-imx.c | ? ?8 ++++++++
-> ?2 files changed, 24 insertions(+), 1 deletions(-)
->
-> diff --git a/arch/arm/mach-imx/clock-imx6q.c b/arch/arm/mach-imx/clock-imx6q.c
-> index e0b926d..613a1b9 100644
-> --- a/arch/arm/mach-imx/clock-imx6q.c
-> +++ b/arch/arm/mach-imx/clock-imx6q.c
-> @@ -1139,7 +1139,7 @@ static int _clk_set_rate(struct clk *clk, unsigned long rate)
-> ? ? ? ? ? ? ? ?return -EINVAL;
->
-> ? ? ? ?max_div = ((d->bm_pred >> d->bp_pred) + 1) *
-> - ? ? ? ? ? ? ? ? ((d->bm_pred >> d->bp_pred) + 1);
-> + ? ? ? ? ? ? ? ? ((d->bm_podf >> d->bp_podf) + 1);
->
-> ? ? ? ?div = parent_rate / rate;
-> ? ? ? ?if (div == 0)
-> @@ -2002,6 +2002,21 @@ int __init mx6q_clocks_init(void)
-> ? ? ? ?clk_set_rate(&asrc_serial_clk, 1500000);
-> ? ? ? ?clk_set_rate(&enfc_clk, 11000000);
->
-> + ? ? ? /*
-> + ? ? ? ?* Before pinctrl API is available, we have to rely on the pad
-> + ? ? ? ?* configuration set up by bootloader. ?For usdhc example here,
-> + ? ? ? ?* u-boot sets up the pads for 49.5 MHz case, and we have to lower
-> + ? ? ? ?* the usdhc clock from 198 to 49.5 MHz to match the pad configuration.
+On 10/11/11 14:46, Jamie Iles wrote:
+> On Fri, Nov 04, 2011 at 01:09:59AM +0000, Jamie Iles wrote:
+>> This adds a device tree binding for the VIC based on the of_irq_init()
+>> support.  This adds an irqdomain to the vic and always registers all
+>> vics in the static vic array rather than for pm only to keep track of
+>> the irq domain.  struct irq_data::hwirq is used where appropriate rather
+>> than runtime masking.
+>>
+>> v2:	- use irq_domain_simple_ops
+>> 	- remove stub implementation of vic_of_init for !CONFIG_OF
+>> 	- Make VIC select IRQ_DOMAIN
+>>
+>> Reviewed-by: Rob Herring <robherring2@gmail.com>
+>> Reviewed-by: Grant Likely <grant.likely@secretlab.ca>
+>> Signed-off-by: Jamie Iles <jamie@jamieiles.com>
+>> ---
+>>  Documentation/devicetree/bindings/arm/vic.txt |   29 +++++++
+>>  arch/arm/common/Kconfig                       |    1 +
+>>  arch/arm/common/vic.c                         |  106 ++++++++++++++++++-------
+>>  arch/arm/include/asm/hardware/vic.h           |    7 ++-
+>>  4 files changed, 114 insertions(+), 29 deletions(-)
+>>  create mode 100644 Documentation/devicetree/bindings/arm/vic.txt
+>>
+>> diff --git a/arch/arm/common/vic.c b/arch/arm/common/vic.c
+>> index 01f18a4..e689975 100644
+>> --- a/arch/arm/common/vic.c
+>> +++ b/arch/arm/common/vic.c
+>> @@ -22,6 +22,10 @@
+> [...]
+>> +#ifdef CONFIG_OF
+>> +int __init vic_of_init(struct device_node *node, struct device_node *parent)
+>> +{
+>> +	void __iomem *regs;
+>> +	int irq_base;
+>> +
+>> +	if (WARN(parent, "non-root VICs are not supported"))
+>> +		return -EINVAL;
+>> +
+>> +	regs = of_iomap(node, 0);
+>> +	if (WARN_ON(!regs))
+>> +		return -EIO;
+>> +
+>> +	irq_base = irq_alloc_descs(-1, 0, 32, numa_node_id());
+>> +	if (WARN_ON(irq_base < 0))
+>> +		goto out_unmap;
+> 
+> Hmm, this appears to need linux/export.h for THIS_MODULE now.  
+> linux/irq.h has a comment saying it uses a macro to avoid needing an 
+> include of export.h there so I guess it needs to go in here instead.
 
-The comments above is wrong. The pad configuration don't have the relationship
-with the clock freq 49.5MHZ. I'm not sure you mean pinctrl API can
-resolve the clock
-configuration, do you mean common clock API?
+Yes, I had to hack it when I tested this series on PB1176 (and of course
+forgot to send the patch around...).
 
-> + ? ? ? ?*
-> + ? ? ? ?* FIXME: This is should be removed after pinctrl API is available.
-> + ? ? ? ?* At that time, usdhc driver can call pinctrl API to change pad
-> + ? ? ? ?* configuration dynamically per different usdhc clock settings.
-> + ? ? ? ?*/
-> + ? ? ? clk_set_rate(&usdhc1_clk, 49500000);
-> + ? ? ? clk_set_rate(&usdhc2_clk, 49500000);
-> + ? ? ? clk_set_rate(&usdhc3_clk, 49500000);
-> + ? ? ? clk_set_rate(&usdhc4_clk, 49500000);
-> +
-[]
+It seems a bit backward to impose including linux/export.h while this
+file doesn't use any of it directly.
 
-Jason Liu
-> --
-> 1.7.4.1
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+	M.
+-- 
+Jazz is not dead. It just smells funny...
