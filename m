@@ -1,47 +1,58 @@
-From: Joerg.Roedel@amd.com (Joerg Roedel)
-Date: Thu, 10 Nov 2011 15:51:10 +0100
-Subject: [PATCH v4 2/7] iommu/core: split mapping to page sizes as
- supported by the hardware
-In-Reply-To: <4EBBE136.4030404@gmail.com>
-References: <1318850846-16066-1-git-send-email-ohad@wizery.com>
- <1318850846-16066-3-git-send-email-ohad@wizery.com>
- <CANqQZNH1YRSgYRVxceicQ3szD=t7zeJjhJKEQ30PeKsxtj5V+A@mail.gmail.com>
- <CAK=WgbZbfCRJqA-wwHN=iLH6rYyoKjJCaL0zMfY93Tg6Jw2uvA@mail.gmail.com>
- <4EBBC090.4070109@gmail.com> <20111110130801.GC13213@amd.com>
- <4EBBE136.4030404@gmail.com>
-Message-ID: <20111110145110.GD13213@amd.com>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Thu, 10 Nov 2011 14:53:18 +0000
+Subject: [PATCHv4 07/13] ARM: s3c64xx: convert to MULTI_IRQ_HANDLER
+In-Reply-To: <CAJuYYwQK-V0AYcayUdXy+SCAyTYbH6vJrn=+m5LGy6PSxP0Vzg@mail.gmail.com>
+References: <1320369010-23428-1-git-send-email-jamie@jamieiles.com>
+ <1320369010-23428-8-git-send-email-jamie@jamieiles.com>
+ <CAJuYYwRPoFDUhtcVLT_rj4c9whJWVXyQ7tcaK3O_G3X9SYf-cw@mail.gmail.com>
+ <20111109115406.GB4253@totoro>
+ <CAJuYYwQK-V0AYcayUdXy+SCAyTYbH6vJrn=+m5LGy6PSxP0Vzg@mail.gmail.com>
+Message-ID: <20111110145318.GD16018@totoro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 10, 2011 at 10:35:34PM +0800, cody wrote:
-> Yes I totally agree page-size is not required for unmap operations
-> and should not be added as parameter to map/unmap operations. I am
-> not saying the unmap operation, but the IOTLB flush operation. My
-> point is we also may also need to add similar logic in IOTLB flush
-> code (such as in Intel IOMMU dirver) to grantee that when issuing
-> IOTLB flush command for large page, we will still meet the hardware
-> limitation of flushing large page. Seems for Intel IOMMU the only
-> limitation is the mask value (indicating number of 4k-pages) cannot
-> be smaller than the value to cover large page, and seems current
-> Intel IOMMU driver code has covered this case well. I am not
-> familiar with how AMD IOMMU issues IOTLB flush command, it should be
-> able to handle this large page case too. So at this moment, this
-> patch should not have any issues :)
+On Wed, Nov 09, 2011 at 06:00:20PM +0530, Thomas Abraham wrote:
+> On 9 November 2011 17:24, Jamie Iles <jamie@jamieiles.com> wrote:
+> > On Wed, Nov 09, 2011 at 04:55:06PM +0530, Thomas Abraham wrote:
+> >> Hi Jamie,
+> >>
+> >> On 4 November 2011 06:40, Jamie Iles <jamie@jamieiles.com> wrote:
+> >> > Now that there is a generic IRQ handler for multiple VIC devices use it
+> >> > for s3c64xx to help building multi platform kernels.
+> >> >
+> >> > Cc: Ben Dooks <ben-linux@fluff.org>
+> >> > Signed-off-by: Jamie Iles <jamie@jamieiles.com>
+> >> > ---
+> >> > ?arch/arm/Kconfig ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? | ? ?1 +
+> >> > ?arch/arm/mach-s3c64xx/include/mach/entry-macro.S | ? ?7 ++++---
+> >> > ?arch/arm/mach-s3c64xx/mach-anw6410.c ? ? ? ? ? ? | ? ?2 ++
+> >> > ?arch/arm/mach-s3c64xx/mach-crag6410.c ? ? ? ? ? ?| ? ?2 ++
+> >> > ?arch/arm/mach-s3c64xx/mach-hmt.c ? ? ? ? ? ? ? ? | ? ?2 ++
+> >> > ?arch/arm/mach-s3c64xx/mach-mini6410.c ? ? ? ? ? ?| ? ?2 ++
+> >> > ?arch/arm/mach-s3c64xx/mach-ncp.c ? ? ? ? ? ? ? ? | ? ?2 ++
+> >> > ?arch/arm/mach-s3c64xx/mach-real6410.c ? ? ? ? ? ?| ? ?2 ++
+> >> > ?arch/arm/mach-s3c64xx/mach-smartq5.c ? ? ? ? ? ? | ? ?2 ++
+> >> > ?arch/arm/mach-s3c64xx/mach-smartq7.c ? ? ? ? ? ? | ? ?2 ++
+> >> > ?arch/arm/mach-s3c64xx/mach-smdk6400.c ? ? ? ? ? ?| ? ?2 ++
+> >> > ?arch/arm/mach-s3c64xx/mach-smdk6410.c ? ? ? ? ? ?| ? ?2 ++
+> >> > ?12 files changed, 25 insertions(+), 3 deletions(-)
+> >> >
+> >>
+> >> I have tested this patch series on smdk6410 board (s3c64xx) using the
+> >> following repositorty and branch
+> >>
+> >> https://github.com/jamieiles/linux-2.6-ji.git ?branch: vic-dt
+> >>
+> >> There is a crash while booting. Am I using the right tree and branch?
+> >> The following is the boot log. Is there any other config option to be
+> >> enabled?
+> >
+> > Hmm, could you please try with the patch below applied?
+[...]
+> 
+> This patch solves the issue and both smdk6410 and smdkv210 works fine.
 
-The map-operation actually takes a size, as it should. The idea is to
-change this function to a map_page interface which takes a page-size
-parameter, but thats another story.
-The IOTLB flushing is not exposed by the IOMMU-API anyway. To whatever
-is necessary to do that, it is the business of the IOMMU driver. So in
-the unmap-path the driver finds out the page-size to unmap and can
-immediatly flush the IOTLB for that page.
+Brilliant, thanks Thomas.  Mind if I add a Tested-by from you providing 
+the fixup patch is applied first?
 
-
-	Joerg
-
--- 
-AMD Operating System Research Center
-
-Advanced Micro Devices GmbH Einsteinring 24 85609 Dornach
-General Managers: Alberto Bozzo, Andrew Bowd
-Registration: Dornach, Landkr. Muenchen; Registerger. Muenchen, HRB Nr. 43632
+Jamie
