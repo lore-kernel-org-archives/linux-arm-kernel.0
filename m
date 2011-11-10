@@ -1,64 +1,39 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 10 Nov 2011 09:43:08 +0000
-Subject: [PATCH 1/2] ARM: EXYNOS4: convert MCT to percpu interrupt API
-In-Reply-To: <CAJ0PZbQG6Gse8RNfrhqLyQgUemcBDK5-XM7J_wX6jyP28bZ3zQ@mail.gmail.com>
-References: <1320255049-12447-1-git-send-email-marc.zyngier@arm.com>
- <1320255049-12447-2-git-send-email-marc.zyngier@arm.com>
- <CAJ0PZbQG6Gse8RNfrhqLyQgUemcBDK5-XM7J_wX6jyP28bZ3zQ@mail.gmail.com>
-Message-ID: <4EBB9CAC.4030000@arm.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Thu, 10 Nov 2011 15:14:43 +0530
+Subject: [PATCH] DMA: PL330: Fix build warning
+In-Reply-To: <1320302929-4731-1-git-send-email-boojin.kim@samsung.com>
+References: <1320302929-4731-1-git-send-email-boojin.kim@samsung.com>
+Message-ID: <1320918283.32205.1206.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/11/11 02:40, MyungJoo Ham wrote:
-> On Thu, Nov 3, 2011 at 2:30 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->> MCT recently gained per cpu interrupts, and missed the fact that
->> ARM has moved to a genirq based implementation.
->>
->> This patch converts the driver to the new API.
->>
->> Boot tested on Origen.
->>
->> Cc: Kukjin Kim <kgene.kim@samsung.com>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+On Thu, 2011-11-03 at 15:48 +0900, Boojin Kim wrote:
+> This patch adds to fix the build warning as following.
 > 
-> There is one concern regarding the CONFIG_LOCAL_TIMER.
+> drivers/dma/pl330.c: In function 'pl330_probe':
+> drivers/dma/pl330.c:859: warning: comparison of distinct pointer types lacks a cast
 > 
-> []
->>  #endif /* CONFIG_LOCAL_TIMERS */
->>
->>  static void __init exynos4_timer_resources(void)
->> @@ -438,6 +442,16 @@ static void __init exynos4_timer_resources(void)
->>        mct_clk = clk_get(NULL, "xtal");
->>
->>        clk_rate = clk_get_rate(mct_clk);
->> +
->> +       if (mct_int_type == MCT_INT_PPI) {
->> +               int err;
->> +
->> +               err = request_percpu_irq(IRQ_MCT_LOCALTIMER,
->> +                                        exynos4_mct_tick_isr, "MCT",
->> +                                        &percpu_mct_tick);
->> +               WARN(err, "MCT: can't request IRQ %d (%d)\n",
->> +                    IRQ_MCT_LOCALTIMER, err);
->> +       }
->>  }
->>
+> Signed-off-by: Boojin Kim <boojin.kim@samsung.com>
+> ---
+>  drivers/dma/pl330.c |    3 ++-
+>  1 files changed, 2 insertions(+), 1 deletions(-)
 > 
-> You've added exynos4_mct_tick_isr, which is defined in
-> CONFIG_LOCAL_TIMER section, in the place that is compiled without
-> CONFIG_LOCAL_TIMER.
-> I guess we are going to stop supporting LOCAL_TIMER in Exynos later
-> and this could be a problem with it.
+> diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
+> index 621134f..379d928 100644
+> --- a/drivers/dma/pl330.c
+> +++ b/drivers/dma/pl330.c
+> @@ -856,7 +856,8 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
+>  	INIT_LIST_HEAD(&pd->channels);
+>  
+>  	/* Initialize channel parameters */
+> -	num_chan = max(pdat ? pdat->nr_valid_peri : 0, (u8)pi->pcfg.num_chan);
+> +	num_chan = max(pdat ? (int)pdat->nr_valid_peri : 0,
+> +					(int)pi->pcfg.num_chan);
+>  	pdmac->peripherals = kzalloc(num_chan * sizeof(*pch), GFP_KERNEL);
+>  
+>  	for (i = 0; i < num_chan; i++) {
 
-Yup, this is a problem. It probably means we need to #ifdef that chink
-as well. I'm not sure I get your remark about not supporting LOCAL_TIMER
-though. Are you planning to move away from the LOCAL_TIMER infrastructure?
+Applied Thanks
 
-If that's the case, you might as well know that my pet plan is to get
-rid of the LOCAL_TIMER option altogether, and move to a model where each
-timer driver is (sort of) autonomous, instead of being driven by the SMP
-code.
-
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+~Vinod
