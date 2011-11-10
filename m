@@ -1,266 +1,353 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Thu, 10 Nov 2011 12:49:39 +0100
-Subject: [PATCH v6] ARM/mx35/3ds: gpio: add mc9s08dz60 gpio function
-In-Reply-To: <1320922426-26453-1-git-send-email-b39297@freescale.com>
-References: <1320922426-26453-1-git-send-email-b39297@freescale.com>
-Message-ID: <4EBBBA53.8080602@pengutronix.de>
+From: jtzhou@marvell.com (Jett.Zhou)
+Date: Thu, 10 Nov 2011 19:43:26 +0800
+Subject: [V1] mfd: Convert pm860x to use regmap api
+Message-ID: <1320925406-7445-1-git-send-email-jtzhou@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/10/2011 11:53 AM, wu guoxing wrote:
-> we only use the gpio function of mc9s08dz60 mcu chip, so just
-> add the gpio driver, as this mcu will never be used in other board.
-> 
-> Signed-off-by: Wu Guoxing <b39297@freescale.com>
+Convert the register read/write code to use the register map API. We
+still need some pm860x specific code and locking in place to make sure
+test page read/write can not be interrupted by other i2c operation based
+on pm860x chip;
 
-looks good, add my
-Acked-by: Marc Kleine-Budde <mkl@pengutronix.de>
+Change-Id: I4d5c616d021ff62672477b9e08e118985c4d6af0
+Signed-off-by: Jett.Zhou <jtzhou@marvell.com>
+---
+ drivers/mfd/88pm860x-i2c.c   |  162 +++++++++++++++++++++---------------------
+ drivers/mfd/Kconfig          |    1 +
+ include/linux/mfd/88pm860x.h |    2 +
+ 3 files changed, 83 insertions(+), 82 deletions(-)
 
-Is it just me, but my editor says the file has dos lineendings.
-
-Marc
-
-> ---
-> changes since v5:
-> 	1. do not set i2c client data to NULL in probe&remove as i2c core will handle it.
-> 	2. return error code to i2c core in remove function as i2c-core will depend on it to 
-> 	set i2c client data to NULL.
-> 
-> changes since v4:
-> 	1. set i2c client data to NULL only when gpiochip_remove success.
-> 
-> changes since v3:
-> 	1. set i2c client data before gpiochip_add
-> 	2. return error value in mc9s08dz60_direction_output
-> 
-> Changes since v1:
-> 	1. add can_sleep = 1
-> 	2. removed some useless return checks and local variable
-> 	3. removed the static variable for i2c client.
-> 	4. make init&exit function static
-> 
->  drivers/gpio/Kconfig           |    6 ++
->  drivers/gpio/Makefile          |    1 +
->  drivers/gpio/gpio-mc9s08dz60.c |  174 ++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 181 insertions(+), 0 deletions(-)
->  create mode 100644 drivers/gpio/gpio-mc9s08dz60.c
-> 
-> diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
-> index d539efd..7f6beee 100644
-> --- a/drivers/gpio/Kconfig
-> +++ b/drivers/gpio/Kconfig
-> @@ -487,4 +487,10 @@ config GPIO_TPS65910
->  	help
->  	  Select this option to enable GPIO driver for the TPS65910
->  	  chip family.
-> +
-> +config GPIO_MC9S08DZ60
-> +	bool "MX35 3DS BOARD MC9S08DZ60 GPIO functions"
-> +	depends on I2C && MACH_MX35_3DS
-> +	help
-> +	  Select this to enable the MC9S08DZ60 GPIO driver
->  endif
-> diff --git a/drivers/gpio/Makefile b/drivers/gpio/Makefile
-> index 9588948..85b8799 100644
-> --- a/drivers/gpio/Makefile
-> +++ b/drivers/gpio/Makefile
-> @@ -60,3 +60,4 @@ obj-$(CONFIG_GPIO_WM831X)	+= gpio-wm831x.o
->  obj-$(CONFIG_GPIO_WM8350)	+= gpio-wm8350.o
->  obj-$(CONFIG_GPIO_WM8994)	+= gpio-wm8994.o
->  obj-$(CONFIG_GPIO_XILINX)	+= gpio-xilinx.o
-> +obj-$(CONFIG_GPIO_MC9S08DZ60) += gpio-mc9s08dz60.o
-> diff --git a/drivers/gpio/gpio-mc9s08dz60.c b/drivers/gpio/gpio-mc9s08dz60.c
-> new file mode 100644
-> index 0000000..f0bc59a
-> --- /dev/null
-> +++ b/drivers/gpio/gpio-mc9s08dz60.c
-> @@ -0,0 +1,174 @@
-> +/*
-> + * Copyright 2009-2011 Freescale Semiconductor, Inc. All Rights Reserved.
-> + *
-> + * Author: Wu Guoxing <b39297@freescale.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#include <linux/kernel.h>
-> +#include <linux/module.h>
-> +#include <linux/slab.h>
-> +#include <linux/i2c.h>
-> +#include <linux/gpio.h>
-> +
-> +#define GPIO_GROUP_NUM 2
-> +#define GPIO_NUM_PER_GROUP 8
-> +#define GPIO_NUM (GPIO_GROUP_NUM*GPIO_NUM_PER_GROUP)
-> +
-> +struct mc9s08dz60 {
-> +	struct i2c_client *client;
-> +	struct gpio_chip chip;
-> +};
-> +
-> +static struct mc9s08dz60 *to_mc9s08dz60(struct gpio_chip *gc)
-> +{
-> +	return container_of(gc, struct mc9s08dz60, chip);
-> +}
-> +
-> +
-> +static void gpio_to_reg_and_bit(int offset, u8 *reg, u8 *bit)
-> +{
-> +	*reg = 0x20 + offset / GPIO_NUM_PER_GROUP;
-> +	*bit = offset % GPIO_NUM_PER_GROUP;
-> +}
-> +
-> +static int mc9s08dz60_get_value(struct gpio_chip *gc, unsigned offset)
-> +{
-> +	int ret = 0;
-> +	u8 reg, bit;
-> +	s32 value;
-> +	struct mc9s08dz60 *mc9s = to_mc9s08dz60(gc);
-> +
-> +	gpio_to_reg_and_bit(offset, &reg, &bit);
-> +	value = i2c_smbus_read_byte_data(mc9s->client, reg);
-> +	if (value >= 0)
-> +		ret = (value >> bit) & 0x1;
-> +
-> +	return ret;
-> +}
-> +
-> +static int _mc9s08dz60_set(struct mc9s08dz60 *mc9s, unsigned offset, int val)
-> +{
-> +	u8 reg, bit;
-> +	s32 value;
-> +
-> +	gpio_to_reg_and_bit(offset, &reg, &bit);
-> +	value = i2c_smbus_read_byte_data(mc9s->client, reg);
-> +	if (value >= 0) {
-> +		if (val)
-> +			value |= 1 << bit;
-> +		else
-> +			value &= ~(1 << bit);
-> +
-> +		return i2c_smbus_write_byte_data(mc9s->client, reg, value);
-> +	} else
-> +		return value;
-> +
-> +}
-> +
-> +
-> +static void mc9s08dz60_set_value(struct gpio_chip *gc, unsigned offset, int val)
-> +{
-> +	struct mc9s08dz60 *mc9s = to_mc9s08dz60(gc);
-> +
-> +	_mc9s08dz60_set(mc9s, offset, val);
-> +}
-> +
-> +static int mc9s08dz60_direction_output(struct gpio_chip *gc,
-> +				       unsigned offset, int val)
-> +{
-> +	struct mc9s08dz60 *mc9s = to_mc9s08dz60(gc);
-> +
-> +	return _mc9s08dz60_set(mc9s, offset, val);
-> +}
-> +
-> +static int mc9s08dz60_probe(struct i2c_client *client,
-> +			    const struct i2c_device_id *id)
-> +{
-> +	int ret = 0;
-> +	struct mc9s08dz60 *mc9s;
-> +
-> +	mc9s = kzalloc(sizeof(*mc9s), GFP_KERNEL);
-> +	if (!mc9s)
-> +		return -ENOMEM;
-> +
-> +	mc9s->chip.label = client->name;
-> +	mc9s->chip.base = -1;
-> +	mc9s->chip.dev = &client->dev;
-> +	mc9s->chip.owner = THIS_MODULE;
-> +	mc9s->chip.ngpio = GPIO_NUM;
-> +	mc9s->chip.can_sleep = 1;
-> +	mc9s->chip.get = mc9s08dz60_get_value;
-> +	mc9s->chip.set = mc9s08dz60_set_value;
-> +	mc9s->chip.direction_output = mc9s08dz60_direction_output;
-> +	mc9s->client = client;
-> +	i2c_set_clientdata(client, mc9s);
-> +
-> +	ret = gpiochip_add(&mc9s->chip);
-> +	if (ret)
-> +		goto error;
-> +
-> +	return 0;
-> +
-> +error:
-> +	kfree(mc9s);
-> +	return ret;
-> +}
-> +
-> +static int mc9s08dz60_remove(struct i2c_client *client)
-> +{
-> +	struct mc9s08dz60 *mc9s;
-> +	int ret;
-> +
-> +	mc9s = i2c_get_clientdata(client);
-> +
-> +	ret = gpiochip_remove(&mc9s->chip);
-> +	if (!ret)
-> +		kfree(mc9s);
-> +
-> +	return ret;
-> +
-> +}
-> +
-> +static const struct i2c_device_id mc9s08dz60_id[] = {
-> +	{"mc9s08dz60", 0},
-> +	{},
-> +};
-> +
-> +MODULE_DEVICE_TABLE(i2c, mc9s08dz60_id);
-> +
-> +static struct i2c_driver mc9s08dz60_i2c_driver = {
-> +	.driver = {.owner = THIS_MODULE,
-> +		   .name = "mc9s08dz60",
-> +		   },
-> +	.probe = mc9s08dz60_probe,
-> +	.remove = mc9s08dz60_remove,
-> +	.id_table = mc9s08dz60_id,
-> +};
-> +
-> +static int __init mc9s08dz60_init(void)
-> +{
-> +	return i2c_add_driver(&mc9s08dz60_i2c_driver);
-> +}
-> +
-> +static void __exit mc9s08dz60_exit(void)
-> +{
-> +	i2c_del_driver(&mc9s08dz60_i2c_driver);
-> +}
-> +
-> +module_init(mc9s08dz60_init);
-> +module_exit(mc9s08dz60_exit);
-> +
-> +MODULE_AUTHOR("Freescale Semiconductor, Inc."
-> +		"Wu Guoxing <b39297@freescale.com>");
-> +MODULE_DESCRIPTION("mc9s08dz60 gpio function on mx35 3ds board");
-> +MODULE_LICENSE("GPL v2");
-
-
+diff --git a/drivers/mfd/88pm860x-i2c.c b/drivers/mfd/88pm860x-i2c.c
+index e017dc8..fd3e7f7 100644
+--- a/drivers/mfd/88pm860x-i2c.c
++++ b/drivers/mfd/88pm860x-i2c.c
+@@ -12,49 +12,21 @@
+ #include <linux/module.h>
+ #include <linux/platform_device.h>
+ #include <linux/i2c.h>
++#include <linux/err.h>
+ #include <linux/mfd/88pm860x.h>
+ #include <linux/slab.h>
+-
+-static inline int pm860x_read_device(struct i2c_client *i2c,
+-				     int reg, int bytes, void *dest)
+-{
+-	unsigned char data;
+-	int ret;
+-
+-	data = (unsigned char)reg;
+-	ret = i2c_master_send(i2c, &data, 1);
+-	if (ret < 0)
+-		return ret;
+-
+-	ret = i2c_master_recv(i2c, dest, bytes);
+-	if (ret < 0)
+-		return ret;
+-	return 0;
+-}
+-
+-static inline int pm860x_write_device(struct i2c_client *i2c,
+-				      int reg, int bytes, void *src)
+-{
+-	unsigned char buf[bytes + 1];
+-	int ret;
+-
+-	buf[0] = (unsigned char)reg;
+-	memcpy(&buf[1], src, bytes);
+-
+-	ret = i2c_master_send(i2c, buf, bytes + 1);
+-	if (ret < 0)
+-		return ret;
+-	return 0;
+-}
++#include <linux/regmap.h>
+ 
+ int pm860x_reg_read(struct i2c_client *i2c, int reg)
+ {
+ 	struct pm860x_chip *chip = i2c_get_clientdata(i2c);
+-	unsigned char data;
++	struct regmap *map = (i2c == chip->client) ? chip->regmap
++					: chip->regmap_companion;
++	unsigned int data;
+ 	int ret;
+ 
+ 	mutex_lock(&chip->io_lock);
+-	ret = pm860x_read_device(i2c, reg, 1, &data);
++	ret = regmap_read(map, reg, &data);
+ 	mutex_unlock(&chip->io_lock);
+ 
+ 	if (ret < 0)
+@@ -68,10 +40,12 @@ int pm860x_reg_write(struct i2c_client *i2c, int reg,
+ 		     unsigned char data)
+ {
+ 	struct pm860x_chip *chip = i2c_get_clientdata(i2c);
++	struct regmap *map = (i2c == chip->client) ? chip->regmap
++					: chip->regmap_companion;
+ 	int ret;
+ 
+ 	mutex_lock(&chip->io_lock);
+-	ret = pm860x_write_device(i2c, reg, 1, &data);
++	ret = regmap_write(map, reg, data);
+ 	mutex_unlock(&chip->io_lock);
+ 
+ 	return ret;
+@@ -82,10 +56,12 @@ int pm860x_bulk_read(struct i2c_client *i2c, int reg,
+ 		     int count, unsigned char *buf)
+ {
+ 	struct pm860x_chip *chip = i2c_get_clientdata(i2c);
++	struct regmap *map = (i2c == chip->client) ? chip->regmap
++					: chip->regmap_companion;
+ 	int ret;
+ 
+ 	mutex_lock(&chip->io_lock);
+-	ret = pm860x_read_device(i2c, reg, count, buf);
++	ret = regmap_raw_read(map, reg, buf, count);
+ 	mutex_unlock(&chip->io_lock);
+ 
+ 	return ret;
+@@ -96,10 +72,12 @@ int pm860x_bulk_write(struct i2c_client *i2c, int reg,
+ 		      int count, unsigned char *buf)
+ {
+ 	struct pm860x_chip *chip = i2c_get_clientdata(i2c);
++	struct regmap *map = (i2c == chip->client) ? chip->regmap
++					: chip->regmap_companion;
+ 	int ret;
+ 
+ 	mutex_lock(&chip->io_lock);
+-	ret = pm860x_write_device(i2c, reg, count, buf);
++	ret = regmap_raw_write(map, reg, buf, count);
+ 	mutex_unlock(&chip->io_lock);
+ 
+ 	return ret;
+@@ -110,17 +88,12 @@ int pm860x_set_bits(struct i2c_client *i2c, int reg,
+ 		    unsigned char mask, unsigned char data)
+ {
+ 	struct pm860x_chip *chip = i2c_get_clientdata(i2c);
+-	unsigned char value;
++	struct regmap *map = (i2c == chip->client) ? chip->regmap
++					: chip->regmap_companion;
+ 	int ret;
+ 
+ 	mutex_lock(&chip->io_lock);
+-	ret = pm860x_read_device(i2c, reg, 1, &value);
+-	if (ret < 0)
+-		goto out;
+-	value &= ~mask;
+-	value |= data;
+-	ret = pm860x_write_device(i2c, reg, 1, &value);
+-out:
++	ret = regmap_update_bits(map, reg, mask, data);
+ 	mutex_unlock(&chip->io_lock);
+ 	return ret;
+ }
+@@ -129,19 +102,21 @@ EXPORT_SYMBOL(pm860x_set_bits);
+ int pm860x_page_reg_read(struct i2c_client *i2c, int reg)
+ {
+ 	struct pm860x_chip *chip = i2c_get_clientdata(i2c);
++	struct regmap *map = (i2c == chip->client) ? chip->regmap
++					: chip->regmap_companion;
+ 	unsigned char zero = 0;
+ 	unsigned char data;
+ 	int ret;
+ 
+ 	mutex_lock(&chip->io_lock);
+-	pm860x_write_device(i2c, 0xFA, 0, &zero);
+-	pm860x_write_device(i2c, 0xFB, 0, &zero);
+-	pm860x_write_device(i2c, 0xFF, 0, &zero);
+-	ret = pm860x_read_device(i2c, reg, 1, &data);
++	regmap_raw_write(map, 0xFA, &zero, 0);
++	regmap_raw_write(map, 0xFB, &zero, 0);
++	regmap_raw_write(map, 0xFF, &zero, 0);
++	ret = regmap_raw_read(map, reg, &data, 1);
+ 	if (ret >= 0)
+ 		ret = (int)data;
+-	pm860x_write_device(i2c, 0xFE, 0, &zero);
+-	pm860x_write_device(i2c, 0xFC, 0, &zero);
++	regmap_raw_write(map, 0xFE, &zero, 0);
++	regmap_raw_write(map, 0xFC, &zero, 0);
+ 	mutex_unlock(&chip->io_lock);
+ 	return ret;
+ }
+@@ -151,16 +126,18 @@ int pm860x_page_reg_write(struct i2c_client *i2c, int reg,
+ 			  unsigned char data)
+ {
+ 	struct pm860x_chip *chip = i2c_get_clientdata(i2c);
++	struct regmap *map = (i2c == chip->client) ? chip->regmap
++					: chip->regmap_companion;
+ 	unsigned char zero;
+ 	int ret;
+ 
+ 	mutex_lock(&chip->io_lock);
+-	pm860x_write_device(i2c, 0xFA, 0, &zero);
+-	pm860x_write_device(i2c, 0xFB, 0, &zero);
+-	pm860x_write_device(i2c, 0xFF, 0, &zero);
+-	ret = pm860x_write_device(i2c, reg, 1, &data);
+-	pm860x_write_device(i2c, 0xFE, 0, &zero);
+-	pm860x_write_device(i2c, 0xFC, 0, &zero);
++	regmap_raw_write(map, 0xFA, &zero, 0);
++	regmap_raw_write(map, 0xFB, &zero, 0);
++	regmap_raw_write(map, 0xFF, &zero, 0);
++	ret = regmap_raw_write(map, reg, &data, 1);
++	regmap_raw_write(map, 0xFE, &zero, 0);
++	regmap_raw_write(map, 0xFC, &zero, 0);
+ 	mutex_unlock(&chip->io_lock);
+ 	return ret;
+ }
+@@ -170,16 +147,18 @@ int pm860x_page_bulk_read(struct i2c_client *i2c, int reg,
+ 			  int count, unsigned char *buf)
+ {
+ 	struct pm860x_chip *chip = i2c_get_clientdata(i2c);
++	struct regmap *map = (i2c == chip->client) ? chip->regmap
++					: chip->regmap_companion;
+ 	unsigned char zero = 0;
+ 	int ret;
+ 
+ 	mutex_lock(&chip->io_lock);
+-	pm860x_write_device(i2c, 0xFA, 0, &zero);
+-	pm860x_write_device(i2c, 0xFB, 0, &zero);
+-	pm860x_write_device(i2c, 0xFF, 0, &zero);
+-	ret = pm860x_read_device(i2c, reg, count, buf);
+-	pm860x_write_device(i2c, 0xFE, 0, &zero);
+-	pm860x_write_device(i2c, 0xFC, 0, &zero);
++	regmap_raw_write(map, 0xFA, &zero, 0);
++	regmap_raw_write(map, 0xFB, &zero, 0);
++	regmap_raw_write(map, 0xFF, &zero, 0);
++	ret = regmap_raw_read(map, reg, buf, count);
++	regmap_raw_write(map, 0xFE, &zero, 0);
++	regmap_raw_write(map, 0xFC, &zero, 0);
+ 	mutex_unlock(&chip->io_lock);
+ 	return ret;
+ }
+@@ -189,16 +168,18 @@ int pm860x_page_bulk_write(struct i2c_client *i2c, int reg,
+ 			   int count, unsigned char *buf)
+ {
+ 	struct pm860x_chip *chip = i2c_get_clientdata(i2c);
++	struct regmap *map = (i2c == chip->client) ? chip->regmap
++					: chip->regmap_companion;
+ 	unsigned char zero = 0;
+ 	int ret;
+ 
+ 	mutex_lock(&chip->io_lock);
+-	pm860x_write_device(i2c, 0xFA, 0, &zero);
+-	pm860x_write_device(i2c, 0xFB, 0, &zero);
+-	pm860x_write_device(i2c, 0xFF, 0, &zero);
+-	ret = pm860x_write_device(i2c, reg, count, buf);
+-	pm860x_write_device(i2c, 0xFE, 0, &zero);
+-	pm860x_write_device(i2c, 0xFC, 0, &zero);
++	regmap_raw_write(map, 0xFA, &zero, 0);
++	regmap_raw_write(map, 0xFB, &zero, 0);
++	regmap_raw_write(map, 0xFF, &zero, 0);
++	ret = regmap_raw_write(map, reg, buf, count);
++	regmap_raw_write(map, 0xFE, &zero, 0);
++	regmap_raw_write(map, 0xFC, &zero, 0);
+ 	mutex_unlock(&chip->io_lock);
+ 	return ret;
+ }
+@@ -208,23 +189,18 @@ int pm860x_page_set_bits(struct i2c_client *i2c, int reg,
+ 			 unsigned char mask, unsigned char data)
+ {
+ 	struct pm860x_chip *chip = i2c_get_clientdata(i2c);
++	struct regmap *map = (i2c == chip->client) ? chip->regmap
++					: chip->regmap_companion;
+ 	unsigned char zero;
+-	unsigned char value;
+ 	int ret;
+ 
+ 	mutex_lock(&chip->io_lock);
+-	pm860x_write_device(i2c, 0xFA, 0, &zero);
+-	pm860x_write_device(i2c, 0xFB, 0, &zero);
+-	pm860x_write_device(i2c, 0xFF, 0, &zero);
+-	ret = pm860x_read_device(i2c, reg, 1, &value);
+-	if (ret < 0)
+-		goto out;
+-	value &= ~mask;
+-	value |= data;
+-	ret = pm860x_write_device(i2c, reg, 1, &value);
+-out:
+-	pm860x_write_device(i2c, 0xFE, 0, &zero);
+-	pm860x_write_device(i2c, 0xFC, 0, &zero);
++	regmap_raw_write(map, 0xFA, &zero, 0);
++	regmap_raw_write(map, 0xFB, &zero, 0);
++	regmap_raw_write(map, 0xFF, &zero, 0);
++	ret = regmap_update_bits(map, reg, mask, data);
++	regmap_raw_write(map, 0xFE, &zero, 0);
++	regmap_raw_write(map, 0xFC, &zero, 0);
+ 	mutex_unlock(&chip->io_lock);
+ 	return ret;
+ }
+@@ -257,11 +233,17 @@ static int verify_addr(struct i2c_client *i2c)
+ 	return 0;
+ }
+ 
++static struct regmap_config pm860x_regmap_config = {
++	.reg_bits = 8,
++	.val_bits = 8,
++};
++
+ static int __devinit pm860x_probe(struct i2c_client *client,
+ 				  const struct i2c_device_id *id)
+ {
+ 	struct pm860x_platform_data *pdata = client->dev.platform_data;
+ 	struct pm860x_chip *chip;
++	int ret;
+ 
+ 	if (!pdata) {
+ 		pr_info("No platform data in %s!\n", __func__);
+@@ -273,6 +255,14 @@ static int __devinit pm860x_probe(struct i2c_client *client,
+ 		return -ENOMEM;
+ 
+ 	chip->id = verify_addr(client);
++
++	chip->regmap = regmap_init_i2c(client, &pm860x_regmap_config);
++	if (IS_ERR(chip->regmap)) {
++		ret = PTR_ERR(chip->regmap);
++		dev_err(&client->dev, "Failed to allocate register map: %d\n",
++				ret);
++		return ret;
++	}
+ 	chip->client = client;
+ 	i2c_set_clientdata(client, chip);
+ 	chip->dev = &client->dev;
+@@ -290,6 +280,14 @@ static int __devinit pm860x_probe(struct i2c_client *client,
+ 		chip->companion_addr = pdata->companion_addr;
+ 		chip->companion = i2c_new_dummy(chip->client->adapter,
+ 						chip->companion_addr);
++		chip->regmap_companion = regmap_init_i2c(chip->companion,
++							&pm860x_regmap_config);
++		if (IS_ERR(chip->regmap_companion)) {
++			ret = PTR_ERR(chip->regmap_companion);
++			dev_err(&chip->companion->dev,
++				"Failed to allocate register map: %d\n", ret);
++			return ret;
++		}
+ 		i2c_set_clientdata(chip->companion, chip);
+ 	}
+ 
+diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
+index a67adcb..1973b23 100644
+--- a/drivers/mfd/Kconfig
++++ b/drivers/mfd/Kconfig
+@@ -27,6 +27,7 @@ config MFD_CORE
+ config MFD_88PM860X
+ 	bool "Support Marvell 88PM8606/88PM8607"
+ 	depends on I2C=y && GENERIC_HARDIRQS
++	select REGMAP_I2C
+ 	select MFD_CORE
+ 	help
+ 	  This supports for Marvell 88PM8606/88PM8607 Power Management IC.
+diff --git a/include/linux/mfd/88pm860x.h b/include/linux/mfd/88pm860x.h
+index 63b4fb8..f860547 100644
+--- a/include/linux/mfd/88pm860x.h
++++ b/include/linux/mfd/88pm860x.h
+@@ -301,6 +301,8 @@ struct pm860x_chip {
+ 	struct mutex		irq_lock;
+ 	struct i2c_client	*client;
+ 	struct i2c_client	*companion;	/* companion chip client */
++	struct regmap           *regmap;
++	struct regmap           *regmap_companion;
+ 
+ 	int			buck3_double;	/* DVC ramp slope double */
+ 	unsigned short		companion_addr;
 -- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 262 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111110/4e0f04b0/attachment.sig>
+1.7.0.4
