@@ -1,43 +1,49 @@
 From: myungjoo.ham@gmail.com (MyungJoo Ham)
-Date: Thu, 10 Nov 2011 14:52:24 +0900
+Date: Thu, 10 Nov 2011 14:57:34 +0900
 Subject: [PATCH 1/3] ARM: EXYNOS: Add ASV feature for Exynos4 series
-In-Reply-To: <1319677938-25732-2-git-send-email-boyko.lee@samsung.com>
+In-Reply-To: <4EAAF8EF.5010201@gmail.com>
 References: <1319677938-25732-1-git-send-email-boyko.lee@samsung.com>
  <1319677938-25732-2-git-send-email-boyko.lee@samsung.com>
-Message-ID: <CAJ0PZbTHmgAkLuSRJfmkKr_uTCD+YqAj3q10SMg9XkziR6i_ww@mail.gmail.com>
+ <4EAAF8EF.5010201@gmail.com>
+Message-ID: <CAJ0PZbR9DEOud8j90n0M4UHQ=HA35NSzO0MHUzAxsOz4ViVCKA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 27, 2011 at 10:12 AM, Jongpill Lee <boyko.lee@samsung.com> wrote:
-> This patch adds ASV feature for exynos4 seires.
-> Asv(Adoptive support voltage) feature support to get spec of SoC.
-> And we can use to adjust voltage for operation SoC usign by ASV result.
+On Sat, Oct 29, 2011 at 3:48 AM, Sylwester Nawrocki <snjw23@gmail.com> wrote:
 >
-> Signed-off-by: Jongpill Lee <boyko.lee@samsung.com>
-> ---
-> ?arch/arm/mach-exynos4/Makefile ? ? ? ? ? | ? ?2 +-
-> ?arch/arm/mach-exynos4/asv.c ? ? ? ? ? ? ?| ? 78 ++++++++++++++++++++++++++++++
-> ?arch/arm/mach-exynos4/include/mach/asv.h | ? 42 ++++++++++++++++
-> ?3 files changed, 121 insertions(+), 1 deletions(-)
-> ?create mode 100644 arch/arm/mach-exynos4/asv.c
-> ?create mode 100644 arch/arm/mach-exynos4/include/mach/asv.h
->
+> You're putting whole driver under arch/arm/, I'm wondering whether the functionality
+> it provides could be handled by some generic framework, like cpufreq or devfreq.
+> How this driver is different from cpufreq drivers ?
 
-Hello,
+I think there would be futher usage with ASV if IEM and proper PMICs
+are attaches; however, for now, ASV guides proper vddarm and vddint
+voltages for each freuquency.
 
+Both drivers in cpufreq(vddarm and arm core freq) and devfreq(vddint
+and memory/bus freq.. and GPU or MMC later?) should use the result
+value of ASV because they both alter voltages according to the ASV
+value.
 
-As long as we have <mach/asv.h> in our hands, we can have the ASV
-value stored at the common place declared by this asv.h rather than at
-INFORM2 as I've mentioned before at another thread. This location
-<mach/asv.h> seems the perfect location for the purpose. Besides, now,
-with Exynos4x12s, I start to hear cases where all the INFORMx
-registers are fully used; thus, it seems that it's time to remove
-unnecessary usage of the registers.
-
+Thus, if this is going to be located in drivers/, it'd better be in
+elsewhere (drivers/misc? drivers/hwmon? ..???) and capable of
+providing values to other device drivers, at least to cpufreq and
+devfreq drivers.
 
 
 Cheers!
 MyungJoo
+
+>
+> --
+> Thanks,
+> Sylwester
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+>
+
+
 
 -- 
 MyungJoo Ham, Ph.D.
