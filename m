@@ -1,94 +1,80 @@
-From: ddaney.cavm@gmail.com (David Daney)
-Date: Thu, 10 Nov 2011 10:49:49 -0800
-Subject: [PATCH Resend 1/2] fs: binfmt_elf: Create Kconfig variable for PIE
- randomization.
-Message-ID: <1320950990-10827-1-git-send-email-david.daney@cavium.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Thu, 10 Nov 2011 11:02:03 -0800
+Subject: [PATCH v7 17/21] OMAP2+: UART: Remove omap_uart_can_sleep and add
+ pm_qos
+In-Reply-To: <CAAL8m4zLEnQE+BkK4xmLUBkREYOuqjmbBweKS0_qcEYUMo71nQ@mail.gmail.com>
+ (Govindraj's message of "Thu, 10 Nov 2011 17:30:05 +0530")
+References: <1318952110-10659-1-git-send-email-govindraj.raja@ti.com>
+ <1318952110-10659-3-git-send-email-govindraj.raja@ti.com>
+ <87vcqz33y8.fsf@ti.com> <4EB8F368.5070603@ti.com>
+ <87r51i1kva.fsf@ti.com>
+ <CAAL8m4zLEnQE+BkK4xmLUBkREYOuqjmbBweKS0_qcEYUMo71nQ@mail.gmail.com>
+Message-ID: <87aa83er84.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Randomization of PIE load address is hard coded in binfmt_elf.c for
-X86 and ARM.  Create a new Kconfig variable
-(CONFIG_ARCH_BINFMT_ELF_RANDOMIZE_PIE) for this and use it instead.
-Thus architecture specific policy is pushed out of the generic
-binfmt_elf.c and into the architecture Kconfig files.
+Govindraj <govindraj.ti@gmail.com> writes:
 
-X86 and ARM Kconfigs are modified to select the new variable so there
-is no change in behavior.  A follow on patch will select it for MIPS
-too.
+> Hi Kevin,
+>
+> On Wed, Nov 9, 2011 at 12:50 AM, Kevin Hilman <khilman@ti.com> wrote:
+>> Rajendra Nayak <rnayak@ti.com> writes:
+>>
+>>> Hi Kevin,
+>>>
+>>> On Saturday 05 November 2011 04:12 AM, Kevin Hilman wrote:
+>>>> However, as mentioned previously[1], due to a HW sleepdep between MPU
+>>>> and CORE, this constraint isn't actually needed for CORE UARTs, so it's
+>>>> a bit wasteful to go through all the constraint setting for no reason.
+>>>
+>>> I had a short chat with Govind on this and was trying to understand
+>>> this better.
+>>> Are you referring to the 'autodeps' for omap3 here, because they would
+>>> prevent any clock domain from idling as long as MPU or IVA are active,
+>>
+>> No, I was thinking of HW sleepdeps. ?However, I looked back at the
+>> OMAP3430 TRM and see that MPU does not have a HW sleepdep on CORE like I
+>> thought.
+>>
+>>> but not the other way round. Which means MPU can still idle, while CORE
+>>> does not.
+>>>
+>>> My guess was, its probably the CORE domain idling itself thats causing
+>>> the UART sluggishness, (and not MPU idling), due to higher latency,
+>>> which is prevented with an active UART module in CORE, but not in PER.
+>>
+>> OK, that indeed makes sense. ?Thanks for correcting me.
+>>
+>>> So Govind did a small experiment to prevent just CORE idling and let MPU
+>>> idle alone and that did not show any sluggishness.
+>>
+>> OK, good.
+>>
+>>> Now, putting a pm-qos constraint for a UART in CORE still looks
+>>> redundant because the latency requirement that UART has is in
+>>> some way *indirectly* met (because the active UART in CORE prevents
+>>> CORE transitions in idle).
+>>> But don't you think the UART driver should express its
+>>> latency constraints regardless, without thinking of any indirect ways
+>>> in which the same requirements would have already been met?
+>>
+>> Yes, you're right. ?The driver should not need to know which powerdomain
+>> a given UART is in. ?It's probably best (and most portable) to have UART
+>> always express its requirements all the time.
+>>
+>> Thanks for digging into this,
+>>
+>
+> I have fixed this and other uart_v7 comments and have re-based the
+> patch series on top
+> of 3.2-rc1 along with Tero's v9 irq chaining patches and tested the same.
+> Available here [1].
 
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Ingo Molnar <mingo@redhat.com>
-Cc: "H. Peter Anvin" <hpa@zytor.com>
-Cc: x86 at kernel.org
-Cc: Alexander Viro <viro@zeniv.linux.org.uk>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
-Cc: linux-fsdevel at vger.kernel.org
-Signed-off-by: David Daney <david.daney@cavium.com>
-Acked-by: H. Peter Anvin <hpa@zytor.com>
----
+Please repost your updated series.
 
-I am resending with no change other than adding HPAs Acked-by.  The
-first attempt to send was not completly successful due to my MTA being
-fubar.  It should be working now.
+> Can this patches series be added to a test branch for upstreaming or do you
+> think there are still some outstanding comments that needs to be discussed?
 
- arch/arm/Kconfig  |    1 +
- arch/x86/Kconfig  |    1 +
- fs/Kconfig.binfmt |    3 +++
- fs/binfmt_elf.c   |    2 +-
- 4 files changed, 6 insertions(+), 1 deletions(-)
+The PRCM IRQ chaining series is not yet finalized.
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 44789ef..3830439 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -30,6 +30,7 @@ config ARM
- 	select HAVE_SPARSE_IRQ
- 	select GENERIC_IRQ_SHOW
- 	select CPU_PM if (SUSPEND || CPU_IDLE)
-+	select ARCH_BINFMT_ELF_RANDOMIZE_PIE
- 	help
- 	  The ARM series is a line of low-power-consumption RISC chip designs
- 	  licensed by ARM Ltd and targeted at embedded applications and
-diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
-index cb9a104..9c3e447 100644
---- a/arch/x86/Kconfig
-+++ b/arch/x86/Kconfig
-@@ -75,6 +75,7 @@ config X86
- 	select HAVE_BPF_JIT if (X86_64 && NET)
- 	select CLKEVT_I8253
- 	select ARCH_HAVE_NMI_SAFE_CMPXCHG
-+	select ARCH_BINFMT_ELF_RANDOMIZE_PIE
- 
- config INSTRUCTION_DECODER
- 	def_bool (KPROBES || PERF_EVENTS)
-diff --git a/fs/Kconfig.binfmt b/fs/Kconfig.binfmt
-index 79e2ca7..e95d1b6 100644
---- a/fs/Kconfig.binfmt
-+++ b/fs/Kconfig.binfmt
-@@ -27,6 +27,9 @@ config COMPAT_BINFMT_ELF
- 	bool
- 	depends on COMPAT && BINFMT_ELF
- 
-+config ARCH_BINFMT_ELF_RANDOMIZE_PIE
-+	bool
-+
- config BINFMT_ELF_FDPIC
- 	bool "Kernel support for FDPIC ELF binaries"
- 	default y
-diff --git a/fs/binfmt_elf.c b/fs/binfmt_elf.c
-index 21ac5ee..bcb884e 100644
---- a/fs/binfmt_elf.c
-+++ b/fs/binfmt_elf.c
-@@ -794,7 +794,7 @@ static int load_elf_binary(struct linux_binprm *bprm, struct pt_regs *regs)
- 			 * default mmap base, as well as whatever program they
- 			 * might try to exec.  This is because the brk will
- 			 * follow the loader, and is not movable.  */
--#if defined(CONFIG_X86) || defined(CONFIG_ARM)
-+#ifdef CONFIG_ARCH_BINFMT_ELF_RANDOMIZE_PIE
- 			/* Memory randomization might have been switched off
- 			 * in runtime via sysctl.
- 			 * If that is the case, retain the original non-zero
--- 
-1.7.2.3
+Kevin
