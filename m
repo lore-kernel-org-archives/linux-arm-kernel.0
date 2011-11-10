@@ -1,67 +1,60 @@
-From: mail.kai.huang@gmail.com (cody)
-Date: Thu, 10 Nov 2011 22:35:34 +0800
-Subject: [PATCH v4 2/7] iommu/core: split mapping to page sizes as
- supported by the hardware
-In-Reply-To: <20111110130801.GC13213@amd.com>
-References: <1318850846-16066-1-git-send-email-ohad@wizery.com>
- <1318850846-16066-3-git-send-email-ohad@wizery.com>
- <CANqQZNH1YRSgYRVxceicQ3szD=t7zeJjhJKEQ30PeKsxtj5V+A@mail.gmail.com>
- <CAK=WgbZbfCRJqA-wwHN=iLH6rYyoKjJCaL0zMfY93Tg6Jw2uvA@mail.gmail.com>
- <4EBBC090.4070109@gmail.com> <20111110130801.GC13213@amd.com>
-Message-ID: <4EBBE136.4030404@gmail.com>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Thu, 10 Nov 2011 14:46:48 +0000
+Subject: [PATCHv4 02/13] ARM: vic: device tree binding
+In-Reply-To: <1320369010-23428-3-git-send-email-jamie@jamieiles.com>
+References: <1320369010-23428-1-git-send-email-jamie@jamieiles.com>
+ <1320369010-23428-3-git-send-email-jamie@jamieiles.com>
+Message-ID: <20111110144648.GC16018@totoro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/10/2011 09:08 PM, Joerg Roedel wrote:
-> On Thu, Nov 10, 2011 at 08:16:16PM +0800, cody wrote:
->    
->> On 11/10/2011 03:31 PM, Ohad Ben-Cohen wrote:
->>      
->>> On Thu, Nov 10, 2011 at 8:17 AM, Kai Huang<mail.kai.huang@gmail.com>   wrote:
->>>        
->>>> Seems the unmap function don't take phys as parameter, does this mean
->>>> domain->ops->unmap will walk through the page table to find out the
->>>> actual page size?
->>>>          
->>> The short answer is yes, and furthermore, we also consider to remove
->>> the size param from domain->ops->unmap entirely at some point.
->>>
->>> We had a long discussion about it, please see:
->>>
->>> https://lkml.org/lkml/2011/10/10/234
->>>        
->> Yes I've seen your discussion, I followed this thread from beginning:)
->>
->> How about the IOTLB flush? As I said I think we need to consider
->> that IOMMU (even does not exist now) may have some limitation on
->> IOTLB flush, and hiding page size from IOTLB flush code may hurt
->> performance, or even worse, trigger undefined behaviors.
->>      
-> We can only care about IOMMUs that exist today or ones that will exist
-> and we already know of.
-> In general for the hardware I know of a page-size is not required for
-> implementing unmap operations. Requiring this would imply that any user
-> of the IOMMU-API needs to keeps track of the page-sizes used to map a
-> given area.
-> This would be a huge burden which is not really necessary because the
-> IOMMU driver already has this information and can return it to the user.
-> So if you want to change that you need a very good reason for it.
->
->    
-Yes I totally agree page-size is not required for unmap operations and 
-should not be added as parameter to map/unmap operations. I am not 
-saying the unmap operation, but the IOTLB flush operation. My point is 
-we also may also need to add similar logic in IOTLB flush code (such as 
-in Intel IOMMU dirver) to grantee that when issuing IOTLB flush command 
-for large page, we will still meet the hardware limitation of flushing 
-large page. Seems for Intel IOMMU the only limitation is the mask value 
-(indicating number of 4k-pages) cannot be smaller than the value to 
-cover large page, and seems current Intel IOMMU driver code has covered 
-this case well. I am not familiar with how AMD IOMMU issues IOTLB flush 
-command, it should be able to handle this large page case too. So at 
-this moment, this patch should not have any issues :)
+On Fri, Nov 04, 2011 at 01:09:59AM +0000, Jamie Iles wrote:
+> This adds a device tree binding for the VIC based on the of_irq_init()
+> support.  This adds an irqdomain to the vic and always registers all
+> vics in the static vic array rather than for pm only to keep track of
+> the irq domain.  struct irq_data::hwirq is used where appropriate rather
+> than runtime masking.
+> 
+> v2:	- use irq_domain_simple_ops
+> 	- remove stub implementation of vic_of_init for !CONFIG_OF
+> 	- Make VIC select IRQ_DOMAIN
+> 
+> Reviewed-by: Rob Herring <robherring2@gmail.com>
+> Reviewed-by: Grant Likely <grant.likely@secretlab.ca>
+> Signed-off-by: Jamie Iles <jamie@jamieiles.com>
+> ---
+>  Documentation/devicetree/bindings/arm/vic.txt |   29 +++++++
+>  arch/arm/common/Kconfig                       |    1 +
+>  arch/arm/common/vic.c                         |  106 ++++++++++++++++++-------
+>  arch/arm/include/asm/hardware/vic.h           |    7 ++-
+>  4 files changed, 114 insertions(+), 29 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/arm/vic.txt
+> 
+> diff --git a/arch/arm/common/vic.c b/arch/arm/common/vic.c
+> index 01f18a4..e689975 100644
+> --- a/arch/arm/common/vic.c
+> +++ b/arch/arm/common/vic.c
+> @@ -22,6 +22,10 @@
+[...]
+> +#ifdef CONFIG_OF
+> +int __init vic_of_init(struct device_node *node, struct device_node *parent)
+> +{
+> +	void __iomem *regs;
+> +	int irq_base;
+> +
+> +	if (WARN(parent, "non-root VICs are not supported"))
+> +		return -EINVAL;
+> +
+> +	regs = of_iomap(node, 0);
+> +	if (WARN_ON(!regs))
+> +		return -EIO;
+> +
+> +	irq_base = irq_alloc_descs(-1, 0, 32, numa_node_id());
+> +	if (WARN_ON(irq_base < 0))
+> +		goto out_unmap;
 
--cody
-> 	Joerg
->
->    
+Hmm, this appears to need linux/export.h for THIS_MODULE now.  
+linux/irq.h has a comment saying it uses a macro to avoid needing an 
+include of export.h there so I guess it needs to go in here instead.
+
+Jamie
