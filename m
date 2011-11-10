@@ -1,20 +1,21 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 10 Nov 2011 15:38:57 -0800
-Subject: [PATCH 41/41] ARM: restart: remove the now empty arch_reset()
-In-Reply-To: <E1RN6ul-0001ZP-07@rmk-PC.arm.linux.org.uk>
-References: <20111106173113.GI12913@n2100.arm.linux.org.uk>
- <E1RN6ul-0001ZP-07@rmk-PC.arm.linux.org.uk>
-Message-ID: <20111110233857.GB31337@atomide.com>
+Date: Thu, 10 Nov 2011 15:44:12 -0800
+Subject: [PATCH v8 04/16] ARM: LPAE: Move the FSR definitions to
+ separate files
+In-Reply-To: <1320682618-1182-5-git-send-email-catalin.marinas@arm.com>
+References: <1320682618-1182-1-git-send-email-catalin.marinas@arm.com>
+ <1320682618-1182-5-git-send-email-catalin.marinas@arm.com>
+Message-ID: <20111110234411.GC31337@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@arm.linux.org.uk> [111106 09:31]:
-> Remove the now empty arch_reset() from all the mach/system.h includes,
-> and remove its callsite.  Remove arm_machine_restart() as this function
-> no longer does anything useful.
-> 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+* Catalin Marinas <catalin.marinas@arm.com> [111107 07:59]:
+> +	{ do_bad,		SIGBUS,  0,		"unknown 29"			   },
+> +	{ do_bad,		SIGBUS,  0,		"unknown 30"			   },
+> +	{ do_bad,		SIGBUS,  0,		"unknown 31"			   }
 
-Assuming arch_reset can now also be removed for omaps:
+Maybe add the trailing comma here while at it? :)
 
-Acked-by: Tony Lindgren <tony@atomide.com>
+Regards,
+
+Tony
