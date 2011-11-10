@@ -1,86 +1,47 @@
-From: mail.kai.huang@gmail.com (Kai Huang)
-Date: Thu, 10 Nov 2011 14:17:24 +0800
-Subject: [PATCH v4 2/7] iommu/core: split mapping to page sizes as
- supported by the hardware
-In-Reply-To: <1318850846-16066-3-git-send-email-ohad@wizery.com>
-References: <1318850846-16066-1-git-send-email-ohad@wizery.com>
- <1318850846-16066-3-git-send-email-ohad@wizery.com>
-Message-ID: <CANqQZNH1YRSgYRVxceicQ3szD=t7zeJjhJKEQ30PeKsxtj5V+A@mail.gmail.com>
+From: b29396@freescale.com (Dong Aisheng)
+Date: Thu, 10 Nov 2011 14:42:10 +0800
+Subject: [PATCH v4 0/3] ARM: mxs: add recording support for saif
+Message-ID: <1320907333-12696-1-git-send-email-b29396@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->
-> -int iommu_unmap(struct iommu_domain *domain, unsigned long iova, int gfp_order)
-> +size_t iommu_unmap(struct iommu_domain *domain, unsigned long iova, size_t size)
-> ?{
-> - ? ? ? size_t size, unmapped;
-> + ? ? ? size_t unmapped_page, unmapped = 0;
-> + ? ? ? unsigned int min_pagesz;
->
-> ? ? ? ?if (unlikely(domain->ops->unmap == NULL))
-> ? ? ? ? ? ? ? ?return -ENODEV;
->
-> - ? ? ? size ? ? ? ? = PAGE_SIZE << gfp_order;
-> -
-> - ? ? ? BUG_ON(!IS_ALIGNED(iova, size));
-> -
-> - ? ? ? unmapped = domain->ops->unmap(domain, iova, size);
-> -
-> - ? ? ? return get_order(unmapped);
-> + ? ? ? /* find out the minimum page size supported */
-> + ? ? ? min_pagesz = 1 << __ffs(domain->ops->pgsize_bitmap);
-> +
-> + ? ? ? /*
-> + ? ? ? ?* The virtual address, as well as the size of the mapping, must be
-> + ? ? ? ?* aligned (at least) to the size of the smallest page supported
-> + ? ? ? ?* by the hardware
-> + ? ? ? ?*/
-> + ? ? ? if (!IS_ALIGNED(iova | size, min_pagesz)) {
-> + ? ? ? ? ? ? ? pr_err("unaligned: iova 0x%lx size 0x%lx min_pagesz 0x%x\n",
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? iova, (unsigned long)size, min_pagesz);
-> + ? ? ? ? ? ? ? return -EINVAL;
-> + ? ? ? }
-> +
-> + ? ? ? pr_debug("unmap this: iova 0x%lx size 0x%lx\n", iova,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? (unsigned long)size);
-> +
-> + ? ? ? /*
-> + ? ? ? ?* Keep iterating until we either unmap 'size' bytes (or more)
-> + ? ? ? ?* or we hit an area that isn't mapped.
-> + ? ? ? ?*/
-> + ? ? ? while (unmapped < size) {
-> + ? ? ? ? ? ? ? size_t left = size - unmapped;
-> +
-> + ? ? ? ? ? ? ? unmapped_page = domain->ops->unmap(domain, iova, left);
-> + ? ? ? ? ? ? ? if (!unmapped_page)
-> + ? ? ? ? ? ? ? ? ? ? ? break;
-> +
-> + ? ? ? ? ? ? ? pr_debug("unmapped: iova 0x%lx size %lx\n", iova,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? (unsigned long)unmapped_page);
-> +
-> + ? ? ? ? ? ? ? iova += unmapped_page;
-> + ? ? ? ? ? ? ? unmapped += unmapped_page;
-> + ? ? ? }
-> +
-> + ? ? ? return unmapped;
-> ?}
-> ?EXPORT_SYMBOL_GPL(iommu_unmap);
->
+Changes since v3:
+ * remove unneeded locking according to Sascha.
+The patches are based on imx-features branch since commit:
+ca4e419c2.
 
-Seems the unmap function don't take phys as parameter, does this mean
-domain->ops->unmap will walk through the page table to find out the
-actual page size?
+Changes since v2:
+ * separate clkmux code into another patch according to Uwe
+ * add lock according to Wolfram
+ * Other minus fixes suggested by Uwe and Wolfram.
+ * remove Wolfram's fix saif clock setting patch which is in v2 series
+   since Wolfram will reform the clock code and send it out himself.
+   For test purpose, user still needs that patch. People can get it
+   from v2 series.
+   The patch is:
+   [PATCH v2 3/3] arm: mxs: disable clock-gates when setting saif-clocks
 
-And another question: have we considered the IOTLB flush operation? I
-think we need to implement similar logic when flush the DVMA range.
-Intel VT-d's manual says software needs to specify the appropriate
-mask value to flush large pages, but it does not say we need to
-exactly match the page size as it is mapped. I guess it's not
-necessary for Intel IOMMU, but other vendor's IOMMU may have such
-limitation (or some other limitations). In my understanding current
-implementation does not provide page size information for particular
-DVMA ranges that has been mapped, and it's not flexible to implement
-IOTLB flush code (ex, we may need to walk through page table to find
-out actual page size). Maybe we can also add iommu_ops->flush_iotlb ?
+The patches are based on imx-features branch since commit:
+f4f01e31835f.
 
--cody
+Changes since v1:
+The main changes are move mach-specific code(clkmux in DIGCTL) from
+saif driver to mach-specific layer based on Wolfram's suggestion.
+
+Note that the last patch is a RFC patch and sent out for testing
+since without that patch the saif may not work.
+
+Dong Aisheng (3):
+  ARM: mxs: add saif clkmux functions
+  ARM: mx28evk: add platform data for saif
+  ARM: mx28evk: set a initial clock rate for saif
+
+ arch/arm/mach-mxs/clock-mx28.c                  |   65 +++++++++++++++++++++++
+ arch/arm/mach-mxs/devices-mx28.h                |    3 +-
+ arch/arm/mach-mxs/devices/platform-mxs-saif.c   |    5 +-
+ arch/arm/mach-mxs/include/mach/common.h         |    2 +
+ arch/arm/mach-mxs/include/mach/devices-common.h |    4 +-
+ arch/arm/mach-mxs/include/mach/digctl.h         |   21 +++++++
+ arch/arm/mach-mxs/mach-mx28evk.c                |   16 +++++-
+ 7 files changed, 110 insertions(+), 6 deletions(-)
+ create mode 100644 arch/arm/mach-mxs/include/mach/digctl.h
