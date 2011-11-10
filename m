@@ -1,48 +1,40 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 9 Nov 2011 17:35:29 -0800
-Subject: [AT91 PULL] defconfig pullrequest
-In-Reply-To: <20111110012933.GC17366@game.jcrosoft.org>
-References: <20111102155803.GE7136@game.jcrosoft.org>
- <20111109144126.GE31737@game.jcrosoft.org>
- <CAOesGMj_PGsShxUQGmBatiZLHYBGZj-8N+udJEpJv_zRv3pbkA@mail.gmail.com>
- <20111110003747.GB17366@game.jcrosoft.org>
- <20111110012933.GC17366@game.jcrosoft.org>
-Message-ID: <CAOesGMirB+wWB7D93d7Q9V0+Mt-PAbcaYvio9UJ27T-4zODPzQ@mail.gmail.com>
+From: axel.lin@gmail.com (Axel Lin)
+Date: Thu, 10 Nov 2011 09:56:18 +0800
+Subject: [PATCH] mfd: add #ifdef CONFIG_DEBUG_FS guard for
+ ab8500_debug_resources
+Message-ID: <1320890178.13074.1.camel@phoenix>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 9, 2011 at 5:29 PM, Jean-Christophe PLAGNIOL-VILLARD
-<plagnioj@jcrosoft.com> wrote:
-> On 01:37 Thu 10 Nov ? ? , Jean-Christophe PLAGNIOL-VILLARD wrote:
->> On 08:01 Wed 09 Nov ? ? , Olof Johansson wrote:
->> > Hi,
->> >
->> > On Wed, Nov 9, 2011 at 6:41 AM, Jean-Christophe PLAGNIOL-VILLARD
->> > <plagnioj@jcrosoft.com> wrote:
->> >
->> > > ? ? ? ?when do you pull this one?
->> > >
->> > > ? ? ? ?can it go to the 3.2?
->> >
->> > Arnd is offline most of this week, so I'll reply.
->> >
->> > The merge window is closed and only bug fixes should be sent upstream
->> > at this time, so this should go into a 3.3-targeted branch now.
->> >
->> > The pull request was sent halfway through the merge window, which to
->> > be strict means that it was already too late. Next time, please make
->> > sure your branches are staged in the arm-soc tree before the window
->> > opens, ideally around -rc6 or -rc7 time frame.
->> the pull was send first before the release of 3.1 originaly it's a resend of
->> the previous one split in 2 pull
->>
->> so was suposed to be merged before
-> I forget to mention it but there was an agreement with arnd durring the kernel
-> summit to pull the defconfig part and let the gpio go for 3.3
+Fix below build warning if CONFIG_DEBUG_FS is disabled.
 
-Ok. I'll defer to Arnd when he's back next week then!
+  CC      drivers/mfd/ab8500-core.o
+drivers/mfd/ab8500-core.c:623: warning: 'ab8500_debug_resources' defined but not used
 
+Signed-off-by: Axel Lin <axel.lin@gmail.com>
+---
+ drivers/mfd/ab8500-core.c |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
 
-Thanks,
-
--Olof
+diff --git a/drivers/mfd/ab8500-core.c b/drivers/mfd/ab8500-core.c
+index 1e91738..d3d572b 100644
+--- a/drivers/mfd/ab8500-core.c
++++ b/drivers/mfd/ab8500-core.c
+@@ -620,6 +620,7 @@ static struct resource __devinitdata ab8500_fg_resources[] = {
+ 
+ static struct resource __devinitdata ab8500_chargalg_resources[] = {};
+ 
++#ifdef CONFIG_DEBUG_FS
+ static struct resource __devinitdata ab8500_debug_resources[] = {
+ 	{
+ 		.name	= "IRQ_FIRST",
+@@ -634,6 +635,7 @@ static struct resource __devinitdata ab8500_debug_resources[] = {
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+ };
++#endif
+ 
+ static struct resource __devinitdata ab8500_usb_resources[] = {
+ 	{
+-- 
+1.7.5.4
