@@ -1,31 +1,40 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Thu, 10 Nov 2011 10:33:21 -0800
-Subject: [PATCH 0/8] MSM timer fixes and cleanups
-In-Reply-To: <1320777250-23263-1-git-send-email-sboyd@codeaurora.org>
-References: <1320777250-23263-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20111110183321.GA16832@huya.qualcomm.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Thu, 10 Nov 2011 10:33:48 -0800
+Subject: [PATCH] ARM: OMAP: PM: only register TWL with voltage layer when
+ device is present
+In-Reply-To: <E28AAFD00EFAA646AE3DF9B89CD24A89036E64@DBDE01.ent.ti.com>
+ (Sanjeev Premi's message of "Wed, 9 Nov 2011 10:11:03 +0000")
+References: <1320797670-21460-1-git-send-email-khilman@ti.com>
+ <E28AAFD00EFAA646AE3DF9B89CD24A89036E64@DBDE01.ent.ti.com>
+Message-ID: <8762irg73n.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 08, 2011 at 10:34:02AM -0800, Stephen Boyd wrote:
-> Currently the MSM timers use the same physical counter
-> for the clockevent and clocksource. This works as long
-> as the clocksource isn't stopped from ticking during normal
-> operation but unfortunately that isn't the case and the
-> clocksource is stopped when the clockevent is shutdown.
-> Even worse, switching the clocksource via sysfs at runtime will
-> hang the system.
-> 
-> This series reorganizes the MSM timer code so that one counter
-> is only used for either a clocksource or a clockevent, and not 
-> both. In the process we reduce the lines of code and fix
-> a few long-standing bugs.
+"Premi, Sanjeev" <premi@ti.com> writes:
 
-How do you test these on the upstream kernel?  Booting successfully is
-probably a good starting point, though.
+>> Current code registers voltage layer details for TWL PMIC even when a
+>> TWL has not been registered.  Fix this to only register the TWL with
+>> voltage layer when the TWL PMIC is initialized by board-level code.
+>> 
+>> Signed-off-by: Kevin Hilman <khilman@ti.com>
 
-David
+[...]
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+> I have been out-of-loop from PM for some time. So my query may be
+> redundant:
+>
+> 1) What happens when different PMIC (not TWL series) is registered
+>    for AM35x? e.g. TPS65023
+>    http://www.spinics.net/lists/linux-omap/msg48630.html
+>
+> 2) Wouldn't we still fall back into omap3_twl_init()?
+
+I'm not sure I follow the question.
+
+If you're not using a TWL PMIC (or similar derivative) then
+omap*_twl_init() should not be called.
+
+If you are using a TWL PMIC, then no, the omap*_twl_init functions
+should not be called.
+
+Kevin
