@@ -1,35 +1,42 @@
-From: stepanm@codeaurora.org (Stepan Moskovchenko)
-Date: Thu, 10 Nov 2011 13:12:00 -0800
-Subject: [PATCH v4 2/7] iommu/core: split mapping to page sizes as
- supported by the hardware
-In-Reply-To: <20111110170918.GE13213@amd.com>
-References: <1318850846-16066-1-git-send-email-ohad@wizery.com>
- <1318850846-16066-3-git-send-email-ohad@wizery.com>
- <CANqQZNH1YRSgYRVxceicQ3szD=t7zeJjhJKEQ30PeKsxtj5V+A@mail.gmail.com>
- <1320938930.22195.17.camel@i7.infradead.org> <20111110170918.GE13213@amd.com>
-Message-ID: <4EBC3E20.20301@codeaurora.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 10 Nov 2011 13:50:09 -0800
+Subject: [PATCH] ARM: OMAP: Introduce local common.h files
+In-Reply-To: <20111110202356.GQ15294@n2100.arm.linux.org.uk>
+References: <20111106135250.GC15294@n2100.arm.linux.org.uk>
+ <20111108004550.GH31337@atomide.com>
+ <20111110201719.GW31337@atomide.com>
+ <20111110202356.GQ15294@n2100.arm.linux.org.uk>
+Message-ID: <20111110215008.GX31337@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/10/2011 9:09 AM, Joerg Roedel wrote:
-> The plan is to have a single DMA-API implementation for all IOMMU 
-> drivers (X86 and ARM) which just uses the IOMMU-API. But to make this 
-> performing reasonalbly well a few changes to the IOMMU-API are 
-> required. I already have some ideas which we can discuss if you want.
+* Russell King - ARM Linux <linux@arm.linux.org.uk> [111110 11:49]:
+> On Thu, Nov 10, 2011 at 12:17:19PM -0800, Tony Lindgren wrote:
+> > As suggested by Russell King - ARM Linux <linux@arm.linux.org.uk>,
+> > there's no need to keep local prototypes in non-local headers.
+> > 
+> > Add mach-omap1/common.h and mach-omap2/common.h and move the
+> > local prototypes there from plat/common.h and mach/omap4-common.h.
+> > 
+> > Signed-off-by: Tony Lindgren <tony@atomide.com>
+> 
+> Great, looks fine, thanks.  I suspect the chance of conflicts on this are
+> about the same as the chance of conflicts with the rest of the restart
+> series (in that, new platforms will need to be fixed for both these
+> changes.)
+> 
+> So, I suggest that I add it to my series so I can fix the OMAP changes
+> there so stuff still builds - and then I can see about publishing a more
+> stable branch in a couple of weeks for new platforms to base on.
 
-I have been experimenting with an iommu_map_range call, which maps a 
-given scatterlist of discontiguous physical pages into a contiguous 
-virtual region at a given IOVA. This has some performance advantages 
-over just calling iommu_map iteratively. First, it reduces the amount of 
-table walking / calculation needed for mapping each page, given how you 
-know that all the pages will be mapped into a single 
-virtually-contiguous region (so in most cases, the first-level table 
-calculation can be reused). Second, it allows one to defer the TLB (and 
-sometimes cache) maintenance operations until the entire scatterlist has 
-been mapped, rather than doing a TLB invalidate after mapping each page, 
-as would have been the case if iommu_map were just being called from 
-within a loop. Granted, just using iommu_map many times may be 
-acceptable on the slow path, but I have seen significant performance 
-gains when using this approach on the fast path.
+OK, a stable branch is needed badly for this.. If possible please
+publish some minimal stable base branch as soon as you can as pretty
+much all omap patches need to be updated for this one.
+ 
+> If you agree, could you put it in the patch system please?  Thanks.
 
-Steve
+Sounds good to me, it there now as patch 7159/1.
+
+Regards,
+
+Tony
