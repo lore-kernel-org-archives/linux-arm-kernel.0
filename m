@@ -1,43 +1,86 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 10 Nov 2011 08:02:32 +0200
-Subject: CONFIG_USB_GADGET_PXA27X
-In-Reply-To: <CAN1soZzFMg+d5H2nCb-w_FAjVCQQHF0Fu-prQAbuEQtqwbtDqg@mail.gmail.com>
-References: <1320870640.27598.33.camel@x61.thuisdomein>
- <20111109220144.GA17605@legolas.emea.dhcp.ti.com>
- <CAN1soZzFMg+d5H2nCb-w_FAjVCQQHF0Fu-prQAbuEQtqwbtDqg@mail.gmail.com>
-Message-ID: <20111110060231.GB18919@legolas.emea.dhcp.ti.com>
+From: mail.kai.huang@gmail.com (Kai Huang)
+Date: Thu, 10 Nov 2011 14:17:24 +0800
+Subject: [PATCH v4 2/7] iommu/core: split mapping to page sizes as
+ supported by the hardware
+In-Reply-To: <1318850846-16066-3-git-send-email-ohad@wizery.com>
+References: <1318850846-16066-1-git-send-email-ohad@wizery.com>
+ <1318850846-16066-3-git-send-email-ohad@wizery.com>
+Message-ID: <CANqQZNH1YRSgYRVxceicQ3szD=t7zeJjhJKEQ30PeKsxtj5V+A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+>
+> -int iommu_unmap(struct iommu_domain *domain, unsigned long iova, int gfp_order)
+> +size_t iommu_unmap(struct iommu_domain *domain, unsigned long iova, size_t size)
+> ?{
+> - ? ? ? size_t size, unmapped;
+> + ? ? ? size_t unmapped_page, unmapped = 0;
+> + ? ? ? unsigned int min_pagesz;
+>
+> ? ? ? ?if (unlikely(domain->ops->unmap == NULL))
+> ? ? ? ? ? ? ? ?return -ENODEV;
+>
+> - ? ? ? size ? ? ? ? = PAGE_SIZE << gfp_order;
+> -
+> - ? ? ? BUG_ON(!IS_ALIGNED(iova, size));
+> -
+> - ? ? ? unmapped = domain->ops->unmap(domain, iova, size);
+> -
+> - ? ? ? return get_order(unmapped);
+> + ? ? ? /* find out the minimum page size supported */
+> + ? ? ? min_pagesz = 1 << __ffs(domain->ops->pgsize_bitmap);
+> +
+> + ? ? ? /*
+> + ? ? ? ?* The virtual address, as well as the size of the mapping, must be
+> + ? ? ? ?* aligned (at least) to the size of the smallest page supported
+> + ? ? ? ?* by the hardware
+> + ? ? ? ?*/
+> + ? ? ? if (!IS_ALIGNED(iova | size, min_pagesz)) {
+> + ? ? ? ? ? ? ? pr_err("unaligned: iova 0x%lx size 0x%lx min_pagesz 0x%x\n",
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? iova, (unsigned long)size, min_pagesz);
+> + ? ? ? ? ? ? ? return -EINVAL;
+> + ? ? ? }
+> +
+> + ? ? ? pr_debug("unmap this: iova 0x%lx size 0x%lx\n", iova,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? (unsigned long)size);
+> +
+> + ? ? ? /*
+> + ? ? ? ?* Keep iterating until we either unmap 'size' bytes (or more)
+> + ? ? ? ?* or we hit an area that isn't mapped.
+> + ? ? ? ?*/
+> + ? ? ? while (unmapped < size) {
+> + ? ? ? ? ? ? ? size_t left = size - unmapped;
+> +
+> + ? ? ? ? ? ? ? unmapped_page = domain->ops->unmap(domain, iova, left);
+> + ? ? ? ? ? ? ? if (!unmapped_page)
+> + ? ? ? ? ? ? ? ? ? ? ? break;
+> +
+> + ? ? ? ? ? ? ? pr_debug("unmapped: iova 0x%lx size %lx\n", iova,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? (unsigned long)unmapped_page);
+> +
+> + ? ? ? ? ? ? ? iova += unmapped_page;
+> + ? ? ? ? ? ? ? unmapped += unmapped_page;
+> + ? ? ? }
+> +
+> + ? ? ? return unmapped;
+> ?}
+> ?EXPORT_SYMBOL_GPL(iommu_unmap);
+>
 
-On Thu, Nov 10, 2011 at 07:15:18AM +0800, Haojian Zhuang wrote:
-> From: Haojian Zhuang <haojian.zhuang@hexinfolabs.org>
-> To: haojian.zhuang at gmail.com
-> Cc: Haojian Zhuang <haojian.zhuang@marvell.com>
-> Subject: [PATCH] ARM: pxa: fix inconsistent CONFIG_USB_PXA27X
-> Date: Thu, 10 Nov 2011 07:13:07 +0800
-> Message-Id: <1320880387-13440-1-git-send-email-haojian.zhuang@hexinfolabs.org>
-> X-Mailer: git-send-email 1.7.4.1
-> 
-> From: Haojian Zhuang <haojian.zhuang@marvell.com>
-> 
-> Since CONFIG_USB_GADGET_PXA27X and other macros are renamed to
-> CONFIG_USB_PXA27X. Update them in arch/arm/mach-pxa and arch/arm/configs
-> to keep consistent.
-> 
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+Seems the unmap function don't take phys as parameter, does this mean
+domain->ops->unmap will walk through the page table to find out the
+actual page size?
 
-FWIW:
+And another question: have we considered the IOTLB flush operation? I
+think we need to implement similar logic when flush the DVMA range.
+Intel VT-d's manual says software needs to specify the appropriate
+mask value to flush large pages, but it does not say we need to
+exactly match the page size as it is mapped. I guess it's not
+necessary for Intel IOMMU, but other vendor's IOMMU may have such
+limitation (or some other limitations). In my understanding current
+implementation does not provide page size information for particular
+DVMA ranges that has been mapped, and it's not flexible to implement
+IOTLB flush code (ex, we may need to walk through page table to find
+out actual page size). Maybe we can also add iommu_ops->flush_iotlb ?
 
-Acked-by: Felipe Balbi <balbi@ti.com>
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111110/833f94fd/attachment.sig>
+-cody
