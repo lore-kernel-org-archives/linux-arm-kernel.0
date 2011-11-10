@@ -1,47 +1,138 @@
 From: b29396@freescale.com (Dong Aisheng)
-Date: Thu, 10 Nov 2011 14:42:10 +0800
-Subject: [PATCH v4 0/3] ARM: mxs: add recording support for saif
-Message-ID: <1320907333-12696-1-git-send-email-b29396@freescale.com>
+Date: Thu, 10 Nov 2011 14:42:11 +0800
+Subject: [PATCH v4 1/3] ARM: mxs: add saif clkmux functions
+In-Reply-To: <1320907333-12696-1-git-send-email-b29396@freescale.com>
+References: <1320907333-12696-1-git-send-email-b29396@freescale.com>
+Message-ID: <1320907333-12696-2-git-send-email-b29396@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Changes since v3:
- * remove unneeded locking according to Sascha.
-The patches are based on imx-features branch since commit:
-ca4e419c2.
+Signed-off-by: Dong Aisheng <b29396@freescale.com>
+Cc: Sascha Hauer <s.hauer@pengutronix.de>
+Cc: Wolfram Sang <w.sang@pengutronix.de>
+Cc: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
+Cc: Liam Girdwood <lrg@ti.com>
 
-Changes since v2:
- * separate clkmux code into another patch according to Uwe
- * add lock according to Wolfram
- * Other minus fixes suggested by Uwe and Wolfram.
- * remove Wolfram's fix saif clock setting patch which is in v2 series
-   since Wolfram will reform the clock code and send it out himself.
-   For test purpose, user still needs that patch. People can get it
-   from v2 series.
-   The patch is:
-   [PATCH v2 3/3] arm: mxs: disable clock-gates when setting saif-clocks
+---
+changes since v3:
+ * remove the unneeded locking according to Sascha
+changes since v2:
+ * This patch is separated from the following patch based on
+   suggestions from Uwe.
+   [PATCH 2/3] ARM: mx28evk: add platform data for saif
+---
+ arch/arm/mach-mxs/clock-mx28.c          |   56 +++++++++++++++++++++++++++++++
+ arch/arm/mach-mxs/include/mach/digctl.h |   21 +++++++++++
+ 2 files changed, 77 insertions(+), 0 deletions(-)
 
-The patches are based on imx-features branch since commit:
-f4f01e31835f.
-
-Changes since v1:
-The main changes are move mach-specific code(clkmux in DIGCTL) from
-saif driver to mach-specific layer based on Wolfram's suggestion.
-
-Note that the last patch is a RFC patch and sent out for testing
-since without that patch the saif may not work.
-
-Dong Aisheng (3):
-  ARM: mxs: add saif clkmux functions
-  ARM: mx28evk: add platform data for saif
-  ARM: mx28evk: set a initial clock rate for saif
-
- arch/arm/mach-mxs/clock-mx28.c                  |   65 +++++++++++++++++++++++
- arch/arm/mach-mxs/devices-mx28.h                |    3 +-
- arch/arm/mach-mxs/devices/platform-mxs-saif.c   |    5 +-
- arch/arm/mach-mxs/include/mach/common.h         |    2 +
- arch/arm/mach-mxs/include/mach/devices-common.h |    4 +-
- arch/arm/mach-mxs/include/mach/digctl.h         |   21 +++++++
- arch/arm/mach-mxs/mach-mx28evk.c                |   16 +++++-
- 7 files changed, 110 insertions(+), 6 deletions(-)
- create mode 100644 arch/arm/mach-mxs/include/mach/digctl.h
+diff --git a/arch/arm/mach-mxs/clock-mx28.c b/arch/arm/mach-mxs/clock-mx28.c
+index 7954013..6522d5f 100644
+--- a/arch/arm/mach-mxs/clock-mx28.c
++++ b/arch/arm/mach-mxs/clock-mx28.c
+@@ -22,6 +22,7 @@
+ #include <linux/io.h>
+ #include <linux/jiffies.h>
+ #include <linux/clkdev.h>
++#include <linux/spinlock.h>
+ 
+ #include <asm/clkdev.h>
+ #include <asm/div64.h>
+@@ -29,6 +30,7 @@
+ #include <mach/mx28.h>
+ #include <mach/common.h>
+ #include <mach/clock.h>
++#include <mach/digctl.h>
+ 
+ #include "regs-clkctrl-mx28.h"
+ 
+@@ -43,6 +45,60 @@ static struct clk emi_clk;
+ static struct clk saif0_clk;
+ static struct clk saif1_clk;
+ static struct clk clk32k_clk;
++static DEFINE_SPINLOCK(clkmux_lock);
++
++/*
++ * HW_SAIF_CLKMUX_SEL:
++ *  DIRECT(0x0): SAIF0 clock pins selected for SAIF0 input clocks, and SAIF1
++ *		clock pins selected for SAIF1 input clocks.
++ *  CROSSINPUT(0x1): SAIF1 clock inputs selected for SAIF0 input clocks, and
++ *		SAIF0 clock inputs selected for SAIF1 input clocks.
++ *  EXTMSTR0(0x2): SAIF0 clock pin selected for both SAIF0 and SAIF1 input
++ *		clocks.
++ *  EXTMSTR1(0x3): SAIF1 clock pin selected for both SAIF0 and SAIF1 input
++ *		clocks.
++ */
++int mxs_saif_clkmux_select(unsigned int clkmux)
++{
++	if (clkmux > 0x3)
++		return -EINVAL;
++
++	spin_lock(&clkmux_lock);
++	__raw_writel(BM_DIGCTL_CTRL_SAIF_CLKMUX,
++			DIGCTRL_BASE_ADDR + HW_DIGCTL_CTRL + MXS_CLR_ADDR);
++	__raw_writel(clkmux << BP_DIGCTL_CTRL_SAIF_CLKMUX,
++			DIGCTRL_BASE_ADDR + HW_DIGCTL_CTRL + MXS_SET_ADDR);
++	spin_unlock(&clkmux_lock);
++
++	return 0;
++}
++
++int mxs_get_saif_clk_master_id(unsigned int saif_id)
++{
++	unsigned int saif_clkmux;
++	unsigned int master_id;
++
++	saif_clkmux = (__raw_readl(DIGCTRL_BASE_ADDR + HW_DIGCTL_CTRL)
++			&& BM_DIGCTL_CTRL_SAIF_CLKMUX) >> BP_DIGCTL_CTRL_SAIF_CLKMUX;
++	switch (saif_clkmux) {
++	case MXS_DIGCTL_SAIF_CLKMUX_DIRECT:
++		master_id = saif_id;
++		break;
++	case MXS_DIGCTL_SAIF_CLKMUX_CROSSINPUT:
++		master_id = saif_id ? 0 : 1;
++		break;
++	case MXS_DIGCTL_SAIF_CLKMUX_EXTMSTR0:
++		master_id = 0;
++		break;
++	case MXS_DIGCTL_SAIF_CLKMUX_EXTMSTR1:
++		master_id = 1;
++		break;
++	default:
++		return -EINVAL;
++	}
++
++	return master_id;
++}
+ 
+ static int _raw_clk_enable(struct clk *clk)
+ {
+diff --git a/arch/arm/mach-mxs/include/mach/digctl.h b/arch/arm/mach-mxs/include/mach/digctl.h
+new file mode 100644
+index 0000000..9bd0496
+--- /dev/null
++++ b/arch/arm/mach-mxs/include/mach/digctl.h
+@@ -0,0 +1,21 @@
++/*
++ * Copyright 2011 Freescale Semiconductor, Inc. All Rights Reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#ifndef __MACH_DIGCTL_H__
++#define __MACH_DIGCTL_H__
++
++/* MXS DIGCTL SAIF CLKMUX */
++#define MXS_DIGCTL_SAIF_CLKMUX_DIRECT		0x0
++#define MXS_DIGCTL_SAIF_CLKMUX_CROSSINPUT	0x1
++#define MXS_DIGCTL_SAIF_CLKMUX_EXTMSTR0		0x2
++#define MXS_DIGCTL_SAIF_CLKMUX_EXTMSTR1		0x3
++
++#define HW_DIGCTL_CTRL			0x0
++#define  BP_DIGCTL_CTRL_SAIF_CLKMUX	(10)
++#define  BM_DIGCTL_CTRL_SAIF_CLKMUX	(0x3 << 10)
++#endif
+-- 
+1.7.0.4
