@@ -1,35 +1,62 @@
-From: a_bouin@yahoo.fr (Aurelien Bouin)
-Date: Thu, 10 Nov 2011 09:06:38 +0000 (GMT)
-Subject: [PATCH] Proposed patch for USB and RS485 on imx board
-Message-ID: <1320915998.92232.YahooMailNeo@web28513.mail.ukl.yahoo.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 10 Nov 2011 10:11:56 +0100
+Subject: [PATCH 2/3] ARM i.MX: Merge i.MX5 support into mach-imx
+In-Reply-To: <1320915966-8063-3-git-send-email-s.hauer@pengutronix.de>
+References: <1320915966-8063-1-git-send-email-s.hauer@pengutronix.de>
+ <1320915966-8063-3-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <20111110091156.GX16886@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Thu, Nov 10, 2011 at 10:06:05AM +0100, Sascha Hauer wrote:
+> This patch moves the contents of arch/arm/mach-mx5 to arch/arm/mach-imx
+> and adjusts the Makefile/Kconfig entries in a way that it's possible
+> to compile i.MX5 together with i.MX3/6.
+> 
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> ---
+>  arch/arm/Makefile                                  |    1 -
+>  arch/arm/mach-imx/Kconfig                          |  239 +++++++++++++++++++
+>  arch/arm/mach-imx/Makefile                         |   21 ++
+>  arch/arm/{mach-mx5 => mach-imx}/clock-mx51-mx53.c  |    2 +-
+>  arch/arm/{mach-mx5/cpu.c => mach-imx/cpu-imx5.c}   |    0
+>  arch/arm/{mach-mx5 => mach-imx}/cpu_op-mx51.c      |    0
+>  arch/arm/{mach-mx5 => mach-imx}/cpu_op-mx51.h      |    0
+>  .../crm_regs.h => mach-imx/crm-regs-imx5.h}        |    0
+>  arch/arm/{mach-mx5 => mach-imx}/devices-imx50.h    |    0
+>  arch/arm/{mach-mx5 => mach-imx}/devices-imx51.h    |    0
+>  arch/arm/{mach-mx5 => mach-imx}/devices-imx53.h    |    0
+>  arch/arm/{mach-mx5 => mach-imx}/efika.h            |    0
+>  arch/arm/{mach-mx5/ehci.c => mach-imx/ehci-imx5.c} |    0
+>  .../eukrea_mbimx51-baseboard.c                     |    0
+>  .../eukrea_mbimxsd-baseboard.c                     |    0
+>  arch/arm/{mach-mx5 => mach-imx}/imx51-dt.c         |    0
+>  arch/arm/{mach-mx5 => mach-imx}/imx53-dt.c         |    0
+>  .../board-cpuimx51.c => mach-imx/mach-cpuimx51.c}  |    0
+>  .../mach-cpuimx51sd.c}                             |    0
+>  .../board-mx50_rdp.c => mach-imx/mach-mx50_rdp.c}  |    0
+>  .../board-mx51_3ds.c => mach-imx/mach-mx51_3ds.c}  |    0
+>  .../mach-mx51_babbage.c}                           |    0
+>  .../mach-mx51_efikamx.c}                           |    0
+>  .../mach-mx51_efikasb.c}                           |    0
+>  .../board-mx53_ard.c => mach-imx/mach-mx53_ard.c}  |    0
+>  .../board-mx53_evk.c => mach-imx/mach-mx53_evk.c}  |    0
+>  .../mach-mx53_loco.c}                              |    0
+>  .../board-mx53_smd.c => mach-imx/mach-mx53_smd.c}  |    0
+>  arch/arm/{mach-mx5/mm.c => mach-imx/mm-imx5.c}     |    0
+>  arch/arm/{mach-mx5 => mach-imx}/mx51_efika.c       |    0
+>  arch/arm/{mach-mx5/system.c => mach-imx/pm-imx5.c} |   89 +++++++-
+>  arch/arm/mach-mx5/Kconfig                          |  244 --------------------
+>  arch/arm/mach-mx5/Makefile                         |   26 --
+>  arch/arm/mach-mx5/pm-imx5.c                        |   83 -------
+>  arch/arm/plat-mxc/Kconfig                          |   15 +-
 
-Attached are two patches :?
-- imx_rs485_support.patch : Implement the RS485 on imx board... like describe in the kernel documentation : linux/Documentation/serial/serial-rs485.txt
-- imx_solve_compilation_problem_with_mx27.patch : Solve a compilation problem when using host USB port with mx27 boards
+Forgot to handle Makefile.boot. Will update.
 
-Feel free to contact me if you have any problem in merging them,
+Sascha
 
-Thank you,
-
-Aurelien BOUIN
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111110/46bbb5a8/attachment.html>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: imx_solve_compilation_problem_with_mx27.patch
-Type: application/octet-stream
-Size: 330 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111110/46bbb5a8/attachment.obj>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: imx_rs485_support.patch
-Type: application/octet-stream
-Size: 6344 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111110/46bbb5a8/attachment-0001.obj>
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
