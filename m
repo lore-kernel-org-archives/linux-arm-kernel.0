@@ -1,14 +1,19 @@
-From: b39297@freescale.com (wu guoxing)
-Date: Thu, 10 Nov 2011 10:20:03 +0800
+From: y@shlinux1.ap.freescale.net (y at shlinux1.ap.freescale.net)
+Date: Thu, 10 Nov 2011 10:24:10 +0800
 Subject: [PATCH v4] ARM/mx35/3ds: gpio: add mc9s08dz60 gpio function
-Message-ID: <1320891603-15759-1-git-send-email-b39297@freescale.com>
+In-Reply-To: <y>
+References: <y>
+Message-ID: <1320891850-16097-1-git-send-email-y>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+From: wu guoxing <b39297@freescale.com>
 
 we only use the gpio function of mc9s08dz60 mcu chip, so just
 add the gpio driver, as this mcu will never be used in other board.
 
 Signed-off-by: Wu Guoxing <b39297@freescale.com>
+---
 changes since v3:
 	1. set i2c client data before gpiochip_add
 	2. return error value in mc9s08dz60_direction_output
@@ -18,7 +23,6 @@ v3 Changes since v1:
 	3. removed the static variable for i2c client.
 	4. make init&exit function static
 
----
  drivers/gpio/Kconfig           |    6 ++
  drivers/gpio/Makefile          |    1 +
  drivers/gpio/gpio-mc9s08dz60.c |  177 ++++++++++++++++++++++++++++++++++++++++
