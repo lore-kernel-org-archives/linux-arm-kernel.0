@@ -1,40 +1,105 @@
-From: axel.lin@gmail.com (Axel Lin)
-Date: Thu, 10 Nov 2011 09:56:18 +0800
-Subject: [PATCH] mfd: add #ifdef CONFIG_DEBUG_FS guard for
- ab8500_debug_resources
-Message-ID: <1320890178.13074.1.camel@phoenix>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 9 Nov 2011 18:05:15 -0800
+Subject: [GIT PULL] arm-soc fixes for 3.2-rc
+Message-ID: <CAOesGMj+ppJty2_pQ=nkTQ4OT-8=O+OFL3FUq6nA-uC9tj9kCg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix below build warning if CONFIG_DEBUG_FS is disabled.
+Hi Linus,
 
-  CC      drivers/mfd/ab8500-core.o
-drivers/mfd/ab8500-core.c:623: warning: 'ab8500_debug_resources' defined but not used
+Arnd is offline at the moment so I'm pitching in on collecting patches
+for arm-soc.
 
-Signed-off-by: Axel Lin <axel.lin@gmail.com>
----
- drivers/mfd/ab8500-core.c |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+See below for a set of fixes, mostly addressing fallout from the merge
+window. Please pull.
 
-diff --git a/drivers/mfd/ab8500-core.c b/drivers/mfd/ab8500-core.c
-index 1e91738..d3d572b 100644
---- a/drivers/mfd/ab8500-core.c
-+++ b/drivers/mfd/ab8500-core.c
-@@ -620,6 +620,7 @@ static struct resource __devinitdata ab8500_fg_resources[] = {
- 
- static struct resource __devinitdata ab8500_chargalg_resources[] = {};
- 
-+#ifdef CONFIG_DEBUG_FS
- static struct resource __devinitdata ab8500_debug_resources[] = {
- 	{
- 		.name	= "IRQ_FIRST",
-@@ -634,6 +635,7 @@ static struct resource __devinitdata ab8500_debug_resources[] = {
- 		.flags	= IORESOURCE_IRQ,
- 	},
- };
-+#endif
- 
- static struct resource __devinitdata ab8500_usb_resources[] = {
- 	{
--- 
-1.7.5.4
+
+Thanks!
+
+
+-Olof
+
+
+The following changes since commit 19e0bafc36abd84a5b4d7c7745b78a6f4626e944:
+
+  Merge branch 'for-linus' of
+git://git.kernel.org/pub/scm/linux/kernel/git/paulg/linux (2011-11-08
+18:34:16 -0800)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git fixes
+
+Dirk Behme (1):
+      ARM: mxc: Remove test_for_ltirq
+
+Jason Liu (2):
+      ARM:i.MX: fix build error in tzic/avic.c
+      ARM:i.MX: fix build error in clock-mx51-mx53.c
+
+Jean-Christophe PLAGNIOL-VILLARD (4):
+      ARM: at91: usart: drop static map regs for dbgu
+      at91: vmalloc fix missing AT91_VIRT_BASE define
+      at91/yl-9200: Fix section mismatch
+      atmel/spi: fix missing probe
+
+Jochen Friedrich (1):
+      ARM: at91: Fix USBA gadget registration
+
+Marc Zyngier (2):
+      ARM: mxc: fix local timer interrupt handling
+      ARM: msm: fix compilation flags for MSM_SCM
+
+Olof Johansson (5):
+      Merge branch 'mxs/fixes' of
+git://git.linaro.org/people/shawnguo/linux-2.6 into fixes
+      Merge branch 'imx/compile-fixes' of
+git://git.linaro.org/people/shawnguo/linux-2.6 into fixes
+      Merge branch 'at91-fixes' of
+git://github.com/at91linux/linux-at91 into fixes
+      Merge branch 'for-3.2/fixes' of
+git://git.kernel.org/.../olof/tegra into fixes
+      Merge branch 'msm-fix' of
+git://codeaurora.org/quic/kernel/davidb/linux-msm into fixes
+
+Shawn Guo (1):
+      arm/mxs: fix mmc device adding for mach-mx28evk
+
+Stephen Boyd (1):
+      msm: boards: Fix fallout from removal of machine_desc in fixup
+
+Stephen Warren (2):
+      arm/tegra: Don't create duplicate gpio and pinmux devices
+      arm/dt: Fix ventana SDHCI power-gpios
+
+Yufeng Shen (1):
+      arm/tegra: enable headphone detection gpio on seaboard
+
+ arch/arm/boot/dts/tegra-ventana.dts          |    3 +--
+ arch/arm/mach-at91/at91cap9_devices.c        |    7 +++----
+ arch/arm/mach-at91/at91rm9200_devices.c      |    5 ++---
+ arch/arm/mach-at91/at91sam9260_devices.c     |    5 ++---
+ arch/arm/mach-at91/at91sam9261_devices.c     |    5 ++---
+ arch/arm/mach-at91/at91sam9263_devices.c     |    5 ++---
+ arch/arm/mach-at91/at91sam9g45_devices.c     |    7 +++----
+ arch/arm/mach-at91/at91sam9rl_devices.c      |    7 +++----
+ arch/arm/mach-at91/board-yl-9200.c           |    2 +-
+ arch/arm/mach-at91/include/mach/vmalloc.h    |    2 ++
+ arch/arm/mach-msm/Makefile                   |    2 ++
+ arch/arm/mach-msm/board-msm7x30.c            |    4 ++--
+ arch/arm/mach-msm/board-msm8960.c            |    4 ++--
+ arch/arm/mach-msm/board-msm8x60.c            |    4 ++--
+ arch/arm/mach-msm/scm.c                      |    3 +++
+ arch/arm/mach-mx5/clock-mx51-mx53.c          |    2 ++
+ arch/arm/mach-mxs/mach-mx28evk.c             |    4 ++--
+ arch/arm/mach-tegra/board-dt.c               |   13 +++++++------
+ arch/arm/mach-tegra/board-harmony-pinmux.c   |    6 +++++-
+ arch/arm/mach-tegra/board-paz00-pinmux.c     |    6 +++++-
+ arch/arm/mach-tegra/board-seaboard-pinmux.c  |    6 +++++-
+ arch/arm/mach-tegra/board-trimslice-pinmux.c |    5 ++++-
+ arch/arm/plat-mxc/avic.c                     |    1 +
+ arch/arm/plat-mxc/gic.c                      |   11 ++---------
+ arch/arm/plat-mxc/include/mach/entry-macro.S |    3 ---
+ arch/arm/plat-mxc/tzic.c                     |    1 +
+ drivers/spi/spi-atmel.c                      |    5 +++--
+ 27 files changed, 69 insertions(+), 59 deletions(-)
