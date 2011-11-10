@@ -1,23 +1,35 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 10 Nov 2011 22:42:08 +0000
-Subject: [PATCH v8 02/16] ARM: pgtable: Fix compiler warning in
- ioremap.c introduced by nopud
-In-Reply-To: <1320682618-1182-3-git-send-email-catalin.marinas@arm.com>
+Date: Thu, 10 Nov 2011 22:45:45 +0000
+Subject: [PATCH v8 04/16] ARM: LPAE: Move the FSR definitions to
+ separate files
+In-Reply-To: <1320682618-1182-5-git-send-email-catalin.marinas@arm.com>
 References: <1320682618-1182-1-git-send-email-catalin.marinas@arm.com>
- <1320682618-1182-3-git-send-email-catalin.marinas@arm.com>
-Message-ID: <20111110224208.GT12913@n2100.arm.linux.org.uk>
+ <1320682618-1182-5-git-send-email-catalin.marinas@arm.com>
+Message-ID: <20111110224545.GU12913@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 07, 2011 at 04:16:44PM +0000, Catalin Marinas wrote:
-> With the arch/arm code conversion to pgtable-nopud.h, the section and
-> supersection (un|re)map code triggers compiler warnings on UP systems.
-> This is caused by pmd_offset() being given a pgd_t argument rather than
-> a pud_t one. This patch makes the necessary conversion with the
-> assumption that the pud is folded into the pgd. The page table setting
-> code only loops over the pmd which is enough with the classic page
-> tables. This code is not compiled when LPAE is enabled.
+On Mon, Nov 07, 2011 at 04:16:46PM +0000, Catalin Marinas wrote:
+> diff --git a/arch/arm/mm/fault.h b/arch/arm/mm/fault.h
+> index 49e9e38..25b45c1 100644
+> --- a/arch/arm/mm/fault.h
+> +++ b/arch/arm/mm/fault.h
+> @@ -1,3 +1,20 @@
+> -void do_bad_area(unsigned long addr, unsigned int fsr, struct pt_regs *regs);
+> +#ifndef __ARCH_ARM_FAULT_H
+> +#define __ARCH_ARM_FAULT_H
+> +
+> +/*
+> + * Fault status register encodings.  We steal bit 31 for our own purposes.
+> + */
+> +#define FSR_LNX_PF		(1 << 31)
+> +#define FSR_WRITE		(1 << 11)
+> +#define FSR_FS4			(1 << 10)
+> +#define FSR_FS3_0		(15)
+> +
+> +static inline int fsr_fs(unsigned int fsr)
+> +{
+> +	return (fsr & FSR_FS3_0) | (fsr & FSR_FS4) >> 6;
+> +}
 
-This should come before the nopud include, so that we don't introduce the
-warnings in the first place.  The result should compile to the same code
-with just this patch applied.
+Much better.
