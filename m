@@ -1,35 +1,44 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 10 Nov 2011 09:47:06 +0100
-Subject: [PATCH] ARM: mx28evk: Simplify GPIO requests for mx28evk_fec_reset
-In-Reply-To: <65EE16ACC360FA4D99C96DC085B3F7722CB848@039-SN1MPN1-002.039d.mgd.msft.net>
-References: <1320865742-16768-1-git-send-email-fabio.estevam@freescale.com>
- <20111110075324.GQ16886@pengutronix.de>
- <65EE16ACC360FA4D99C96DC085B3F7722CB848@039-SN1MPN1-002.039d.mgd.msft.net>
-Message-ID: <20111110084706.GV16886@pengutronix.de>
+From: richard.zhao@linaro.org (Richard Zhao)
+Date: Thu, 10 Nov 2011 16:49:18 +0800
+Subject: [PATCH 1/4] arm/imx: fix mx3_defconfig to add FEC back
+In-Reply-To: <1320914372-4416-2-git-send-email-shawn.guo@linaro.org>
+References: <1320914372-4416-1-git-send-email-shawn.guo@linaro.org>
+ <1320914372-4416-2-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20111110084917.GB14617@b20223-02.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 10, 2011 at 08:11:10AM +0000, Dong Aisheng-B29396 wrote:
-> > 
-> > I think it makes more sense to create an array per board and not per
-> > board function. In the mx28evk file we use gpios for the fec, we have a
-> > gpio_request_one for the flexcan switch and a gpio_request_array for the
-> > lcd pins. All these could be added to a single mx28evk_gpios array.
-> > Then it would be easy to see which gpios a board uses and it would be
-> > trivial to add additional gpios. The same applies for other boards aswell
-> > of course.
-> > 
-> One question is that if one gpio, assume in one function like fec, request fail
-> will cause the whole gpio array request fail.
+Is it supposed to be generated, like by make menuconfig?
 
-They don't fail. If they do it means we have a duplicate entry in the
-table or otherwise screwed up the kernel. I think a single pr_err("bad
-things may happen, continue and hope for the best") is enough here.
-
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Richard
+On Thu, Nov 10, 2011 at 04:39:29PM +0800, Shawn Guo wrote:
+> The commit 'd880db0 arm: mx3: update defconfig' removes FEC support
+> which is not good, since FEC is useful for both developers and users.
+> 
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Sascha Hauer <s.hauer@pengutronix.de>
+> ---
+>  arch/arm/configs/mx3_defconfig |    1 +
+>  1 files changed, 1 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/configs/mx3_defconfig b/arch/arm/configs/mx3_defconfig
+> index cb0717f..ee50a9e 100644
+> --- a/arch/arm/configs/mx3_defconfig
+> +++ b/arch/arm/configs/mx3_defconfig
+> @@ -67,6 +67,7 @@ CONFIG_SMSC_PHY=y
+>  CONFIG_NET_ETHERNET=y
+>  CONFIG_SMSC911X=y
+>  CONFIG_DNET=y
+> +CONFIG_FEC=y
+>  # CONFIG_NETDEV_1000 is not set
+>  # CONFIG_NETDEV_10000 is not set
+>  # CONFIG_INPUT_MOUSEDEV is not set
+> -- 
+> 1.7.4.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
