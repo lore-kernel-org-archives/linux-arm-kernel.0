@@ -1,39 +1,57 @@
-From: richard.zhao@linaro.org (Richard Zhao)
-Date: Thu, 10 Nov 2011 10:37:18 +0800
-Subject: [RFC PATCH] Generic clock parent enumeration
-In-Reply-To: <20111104175908.GA9337@glitch>
-References: <20111104175908.GA9337@glitch>
-Message-ID: <20111110023716.GA11045@b20223-02.ap.freescale.net>
+From: myungjoo.ham@gmail.com (MyungJoo Ham)
+Date: Thu, 10 Nov 2011 11:40:27 +0900
+Subject: [PATCH 1/2] ARM: EXYNOS4: convert MCT to percpu interrupt API
+In-Reply-To: <1320255049-12447-2-git-send-email-marc.zyngier@arm.com>
+References: <1320255049-12447-1-git-send-email-marc.zyngier@arm.com>
+ <1320255049-12447-2-git-send-email-marc.zyngier@arm.com>
+Message-ID: <CAJ0PZbQG6Gse8RNfrhqLyQgUemcBDK5-XM7J_wX6jyP28bZ3zQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 04, 2011 at 06:59:08PM +0100, Domenico Andreoli wrote:
-> Hi,
-> 
->   here is my proposal for the enumeration of a clock parents and the
-> first implementation of clk_set_parent() based on it. It depends on
-> the generic-clk-v2 patchset.
-> 
-> The basic idea is that only the clock can provide a way to walk all
-> the parent clocks that it can be attached to. This has multiple purposes:
-> 
->  1. generic clock framework is able to find the best parent a given
->     clock can be attached to in order to satisfy an arbitrary requirement
->     (ie the lowest number of enabled parent clocks, energy constrains,
->     clock network tuning, etc)
-Is there any use case that you have to let clk core select parent?
-In my opinion, clk parent don't change frequently. most time display
-driver do that, which must has ideas of clk tree topology.
-> 
->  2. generic clock framework is able to check in an implementation
->     independent way if a given clock is suitable to be parent of
->     another one
-Only mux clk driver needs it.
+On Thu, Nov 3, 2011 at 2:30 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> MCT recently gained per cpu interrupts, and missed the fact that
+> ARM has moved to a genirq based implementation.
+>
+> This patch converts the driver to the new API.
+>
+> Boot tested on Origen.
+>
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 
-Richard
-> 
->  3. the proposed implementation of the generic clk_set_parent()
-> 
-> 
-> Signed-off-by: Domenico Andreoli <cavokz@gmail.com>
-> 
+There is one concern regarding the CONFIG_LOCAL_TIMER.
+
+[]
+> ?#endif /* CONFIG_LOCAL_TIMERS */
+>
+> ?static void __init exynos4_timer_resources(void)
+> @@ -438,6 +442,16 @@ static void __init exynos4_timer_resources(void)
+> ? ? ? ?mct_clk = clk_get(NULL, "xtal");
+>
+> ? ? ? ?clk_rate = clk_get_rate(mct_clk);
+> +
+> + ? ? ? if (mct_int_type == MCT_INT_PPI) {
+> + ? ? ? ? ? ? ? int err;
+> +
+> + ? ? ? ? ? ? ? err = request_percpu_irq(IRQ_MCT_LOCALTIMER,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?exynos4_mct_tick_isr, "MCT",
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?&percpu_mct_tick);
+> + ? ? ? ? ? ? ? WARN(err, "MCT: can't request IRQ %d (%d)\n",
+> + ? ? ? ? ? ? ? ? ? ?IRQ_MCT_LOCALTIMER, err);
+> + ? ? ? }
+> ?}
+>
+
+You've added exynos4_mct_tick_isr, which is defined in
+CONFIG_LOCAL_TIMER section, in the place that is compiled without
+CONFIG_LOCAL_TIMER.
+I guess we are going to stop supporting LOCAL_TIMER in Exynos later
+and this could be a problem with it.
+
+
+Cheers!
+MyungJoo
+
+-- 
+MyungJoo Ham, Ph.D.
+Mobile Software Platform Lab, DMC Business, Samsung Electronics
