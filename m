@@ -1,58 +1,86 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Thu, 10 Nov 2011 14:53:18 +0000
-Subject: [PATCHv4 07/13] ARM: s3c64xx: convert to MULTI_IRQ_HANDLER
-In-Reply-To: <CAJuYYwQK-V0AYcayUdXy+SCAyTYbH6vJrn=+m5LGy6PSxP0Vzg@mail.gmail.com>
-References: <1320369010-23428-1-git-send-email-jamie@jamieiles.com>
- <1320369010-23428-8-git-send-email-jamie@jamieiles.com>
- <CAJuYYwRPoFDUhtcVLT_rj4c9whJWVXyQ7tcaK3O_G3X9SYf-cw@mail.gmail.com>
- <20111109115406.GB4253@totoro>
- <CAJuYYwQK-V0AYcayUdXy+SCAyTYbH6vJrn=+m5LGy6PSxP0Vzg@mail.gmail.com>
-Message-ID: <20111110145318.GD16018@totoro>
+From: liu.h.jason@gmail.com (Jason Liu)
+Date: Thu, 10 Nov 2011 23:07:12 +0800
+Subject: [PATCH 4/4] arm/imx: fix imx6q mmc error when mounting rootfs
+In-Reply-To: <1320914372-4416-5-git-send-email-shawn.guo@linaro.org>
+References: <1320914372-4416-1-git-send-email-shawn.guo@linaro.org>
+ <1320914372-4416-5-git-send-email-shawn.guo@linaro.org>
+Message-ID: <CAB4PhKcegDBxfqtEzA3_qH2q8pdjYAwGS+wKzZEYmK6poQj8EQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 09, 2011 at 06:00:20PM +0530, Thomas Abraham wrote:
-> On 9 November 2011 17:24, Jamie Iles <jamie@jamieiles.com> wrote:
-> > On Wed, Nov 09, 2011 at 04:55:06PM +0530, Thomas Abraham wrote:
-> >> Hi Jamie,
-> >>
-> >> On 4 November 2011 06:40, Jamie Iles <jamie@jamieiles.com> wrote:
-> >> > Now that there is a generic IRQ handler for multiple VIC devices use it
-> >> > for s3c64xx to help building multi platform kernels.
-> >> >
-> >> > Cc: Ben Dooks <ben-linux@fluff.org>
-> >> > Signed-off-by: Jamie Iles <jamie@jamieiles.com>
-> >> > ---
-> >> > ?arch/arm/Kconfig ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? | ? ?1 +
-> >> > ?arch/arm/mach-s3c64xx/include/mach/entry-macro.S | ? ?7 ++++---
-> >> > ?arch/arm/mach-s3c64xx/mach-anw6410.c ? ? ? ? ? ? | ? ?2 ++
-> >> > ?arch/arm/mach-s3c64xx/mach-crag6410.c ? ? ? ? ? ?| ? ?2 ++
-> >> > ?arch/arm/mach-s3c64xx/mach-hmt.c ? ? ? ? ? ? ? ? | ? ?2 ++
-> >> > ?arch/arm/mach-s3c64xx/mach-mini6410.c ? ? ? ? ? ?| ? ?2 ++
-> >> > ?arch/arm/mach-s3c64xx/mach-ncp.c ? ? ? ? ? ? ? ? | ? ?2 ++
-> >> > ?arch/arm/mach-s3c64xx/mach-real6410.c ? ? ? ? ? ?| ? ?2 ++
-> >> > ?arch/arm/mach-s3c64xx/mach-smartq5.c ? ? ? ? ? ? | ? ?2 ++
-> >> > ?arch/arm/mach-s3c64xx/mach-smartq7.c ? ? ? ? ? ? | ? ?2 ++
-> >> > ?arch/arm/mach-s3c64xx/mach-smdk6400.c ? ? ? ? ? ?| ? ?2 ++
-> >> > ?arch/arm/mach-s3c64xx/mach-smdk6410.c ? ? ? ? ? ?| ? ?2 ++
-> >> > ?12 files changed, 25 insertions(+), 3 deletions(-)
-> >> >
-> >>
-> >> I have tested this patch series on smdk6410 board (s3c64xx) using the
-> >> following repositorty and branch
-> >>
-> >> https://github.com/jamieiles/linux-2.6-ji.git ?branch: vic-dt
-> >>
-> >> There is a crash while booting. Am I using the right tree and branch?
-> >> The following is the boot log. Is there any other config option to be
-> >> enabled?
-> >
-> > Hmm, could you please try with the patch below applied?
-[...]
-> 
-> This patch solves the issue and both smdk6410 and smdkv210 works fine.
+2011/11/10 Shawn Guo <shawn.guo@linaro.org>:
+> The following error is seen in some case when mounting rootfs from
+> SD/MMC cards.
+>
+> ?Waiting for root device /dev/mmcblk0p1...
+> ?mmc1: host does not support reading read-only switch. assuming write-enable.
+> ?mmc1: new high speed SDHC card at address b368
+> ?mmcblk0: mmc1:b368 SDC ? 3.74 GiB
+> ? mmcblk0: p1
+> ?mmc1: Timeout waiting for hardware interrupt.
+> ?mmcblk0: error -110 transferring data, sector 3678224, nr 40, cmd response 0x900, card status 0xc00
+> ?end_request: I/O error, dev mmcblk0, sector 3678225
+> ?Buffer I/O error on device mmcblk0p1, logical block 458754
+> ?lost page write due to I/O error on mmcblk0p1
+>
+> This patch fixes the problem by lowering the usdhc clock and correcting
+> watermark configuration.
+>
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Chris Ball <cjb@laptop.org>
+> Cc: Sascha Hauer <s.hauer@pengutronix.de>
+> ---
+> ?arch/arm/mach-imx/clock-imx6q.c ? ?| ? 17 ++++++++++++++++-
+> ?drivers/mmc/host/sdhci-esdhc-imx.c | ? ?8 ++++++++
+> ?2 files changed, 24 insertions(+), 1 deletions(-)
+>
+> diff --git a/arch/arm/mach-imx/clock-imx6q.c b/arch/arm/mach-imx/clock-imx6q.c
+> index e0b926d..613a1b9 100644
+> --- a/arch/arm/mach-imx/clock-imx6q.c
+> +++ b/arch/arm/mach-imx/clock-imx6q.c
+> @@ -1139,7 +1139,7 @@ static int _clk_set_rate(struct clk *clk, unsigned long rate)
+> ? ? ? ? ? ? ? ?return -EINVAL;
+>
+> ? ? ? ?max_div = ((d->bm_pred >> d->bp_pred) + 1) *
+> - ? ? ? ? ? ? ? ? ((d->bm_pred >> d->bp_pred) + 1);
+> + ? ? ? ? ? ? ? ? ((d->bm_podf >> d->bp_podf) + 1);
+>
+> ? ? ? ?div = parent_rate / rate;
+> ? ? ? ?if (div == 0)
+> @@ -2002,6 +2002,21 @@ int __init mx6q_clocks_init(void)
+> ? ? ? ?clk_set_rate(&asrc_serial_clk, 1500000);
+> ? ? ? ?clk_set_rate(&enfc_clk, 11000000);
+>
+> + ? ? ? /*
+> + ? ? ? ?* Before pinctrl API is available, we have to rely on the pad
+> + ? ? ? ?* configuration set up by bootloader. ?For usdhc example here,
+> + ? ? ? ?* u-boot sets up the pads for 49.5 MHz case, and we have to lower
+> + ? ? ? ?* the usdhc clock from 198 to 49.5 MHz to match the pad configuration.
 
-Brilliant, thanks Thomas.  Mind if I add a Tested-by from you providing 
-the fixup patch is applied first?
+The comments above is wrong. The pad configuration don't have the relationship
+with the clock freq 49.5MHZ. I'm not sure you mean pinctrl API can
+resolve the clock
+configuration, do you mean common clock API?
 
-Jamie
+> + ? ? ? ?*
+> + ? ? ? ?* FIXME: This is should be removed after pinctrl API is available.
+> + ? ? ? ?* At that time, usdhc driver can call pinctrl API to change pad
+> + ? ? ? ?* configuration dynamically per different usdhc clock settings.
+> + ? ? ? ?*/
+> + ? ? ? clk_set_rate(&usdhc1_clk, 49500000);
+> + ? ? ? clk_set_rate(&usdhc2_clk, 49500000);
+> + ? ? ? clk_set_rate(&usdhc3_clk, 49500000);
+> + ? ? ? clk_set_rate(&usdhc4_clk, 49500000);
+> +
+[]
+
+Jason Liu
+> --
+> 1.7.4.1
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
