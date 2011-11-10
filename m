@@ -1,24 +1,52 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 10 Nov 2011 13:02:25 +0000
-Subject: [V1] mfd: Convert pm860x to use regmap api
-In-Reply-To: <1320925406-7445-1-git-send-email-jtzhou@marvell.com>
-References: <1320925406-7445-1-git-send-email-jtzhou@marvell.com>
-Message-ID: <20111110130225.GG21630@sirena.org.uk>
+From: Joerg.Roedel@amd.com (Joerg Roedel)
+Date: Thu, 10 Nov 2011 14:08:01 +0100
+Subject: [PATCH v4 2/7] iommu/core: split mapping to page sizes as
+ supported by the hardware
+In-Reply-To: <4EBBC090.4070109@gmail.com>
+References: <1318850846-16066-1-git-send-email-ohad@wizery.com>
+ <1318850846-16066-3-git-send-email-ohad@wizery.com>
+ <CANqQZNH1YRSgYRVxceicQ3szD=t7zeJjhJKEQ30PeKsxtj5V+A@mail.gmail.com>
+ <CAK=WgbZbfCRJqA-wwHN=iLH6rYyoKjJCaL0zMfY93Tg6Jw2uvA@mail.gmail.com>
+ <4EBBC090.4070109@gmail.com>
+Message-ID: <20111110130801.GC13213@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 10, 2011 at 07:43:26PM +0800, Jett.Zhou wrote:
-> Convert the register read/write code to use the register map API. We
-> still need some pm860x specific code and locking in place to make sure
-> test page read/write can not be interrupted by other i2c operation based
-> on pm860x chip;
+On Thu, Nov 10, 2011 at 08:16:16PM +0800, cody wrote:
+> On 11/10/2011 03:31 PM, Ohad Ben-Cohen wrote:
+> >On Thu, Nov 10, 2011 at 8:17 AM, Kai Huang<mail.kai.huang@gmail.com>  wrote:
+> >>Seems the unmap function don't take phys as parameter, does this mean
+> >>domain->ops->unmap will walk through the page table to find out the
+> >>actual page size?
+> >The short answer is yes, and furthermore, we also consider to remove
+> >the size param from domain->ops->unmap entirely at some point.
+> >
+> >We had a long discussion about it, please see:
+> >
+> >https://lkml.org/lkml/2011/10/10/234
+> Yes I've seen your discussion, I followed this thread from beginning:)
+> 
+> How about the IOTLB flush? As I said I think we need to consider
+> that IOMMU (even does not exist now) may have some limitation on
+> IOTLB flush, and hiding page size from IOTLB flush code may hurt
+> performance, or even worse, trigger undefined behaviors.
 
-Reviewed-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+We can only care about IOMMUs that exist today or ones that will exist
+and we already know of.
+In general for the hardware I know of a page-size is not required for
+implementing unmap operations. Requiring this would imply that any user
+of the IOMMU-API needs to keeps track of the page-sizes used to map a
+given area.
+This would be a huge burden which is not really necessary because the
+IOMMU driver already has this information and can return it to the user.
+So if you want to change that you need a very good reason for it.
 
-I'm assuming that the interruptions come from the fact that there's two
-I2C clients?
 
-> Change-Id: I4d5c616d021ff62672477b9e08e118985c4d6af0
+	Joerg
 
-Don't include these in kernel submissions, they're only meaningful
-within your private Gerrit install.
+-- 
+AMD Operating System Research Center
+
+Advanced Micro Devices GmbH Einsteinring 24 85609 Dornach
+General Managers: Alberto Bozzo, Andrew Bowd
+Registration: Dornach, Landkr. Muenchen; Registerger. Muenchen, HRB Nr. 43632
