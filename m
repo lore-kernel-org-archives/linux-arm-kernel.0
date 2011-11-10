@@ -1,21 +1,55 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 10 Nov 2011 15:44:12 -0800
-Subject: [PATCH v8 04/16] ARM: LPAE: Move the FSR definitions to
- separate files
-In-Reply-To: <1320682618-1182-5-git-send-email-catalin.marinas@arm.com>
-References: <1320682618-1182-1-git-send-email-catalin.marinas@arm.com>
- <1320682618-1182-5-git-send-email-catalin.marinas@arm.com>
-Message-ID: <20111110234411.GC31337@atomide.com>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Thu, 10 Nov 2011 17:44:27 -0600
+Subject: [PATCH v7 11/21] OMAP2+: UART: Move errata handling from serial.c
+ to omap-serial
+In-Reply-To: <1318951576-10165-12-git-send-email-govindraj.raja@ti.com>
+References: <1318951576-10165-1-git-send-email-govindraj.raja@ti.com>
+ <1318951576-10165-12-git-send-email-govindraj.raja@ti.com>
+Message-ID: <4EBC61DB.9020402@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Catalin Marinas <catalin.marinas@arm.com> [111107 07:59]:
-> +	{ do_bad,		SIGBUS,  0,		"unknown 29"			   },
-> +	{ do_bad,		SIGBUS,  0,		"unknown 30"			   },
-> +	{ do_bad,		SIGBUS,  0,		"unknown 31"			   }
+Hi Govindraj,
 
-Maybe add the trailing comma here while at it? :)
+On 10/18/2011 10:26, Govindraj.R wrote:
+> Move the errata handling mechanism from serial.c to omap-serial file
+> and utilise the same func in driver file.
+>
+> Errata i202, i291 are moved to be handled with omap-serial
+> Moving the errata macro from serial.c file to driver header file
+> as from on errata will be handled in driver file itself.
+> Corrected errata id from chapter reference 2.15 to errata id i291.
+>
+> Removed errata and dma_enabled feilds from omap_uart_state struct
+> as they are no more needed with errata handling done within omap-serial.
+>
+> Acked-by: Alan Cox<alan@linux.intel.com>
+> Signed-off-by: Govindraj.R<govindraj.raja@ti.com>
+> ---
+>   arch/arm/mach-omap2/serial.c                  |   97 +++++++------------------
+>   arch/arm/plat-omap/include/plat/omap-serial.h |    6 ++
+>   drivers/tty/serial/omap-serial.c              |   66 ++++++++++++++++-
+>   3 files changed, 95 insertions(+), 74 deletions(-)
 
-Regards,
+[snip]
 
-Tony
+> +	/* Enable the MDR1 errata for OMAP3 */
+> +	if (cpu_is_omap34xx()&&  !cpu_is_ti816x())
+> +		omap_up.errata |= UART_ERRATA_i202_MDR1_ACCESS;
+
+This errata (i202) is applicable to all devices from OMAP2430 to 
+OMAP4460 (apparently this one is not getting fixed). So could you make 
+sure this is enabled for 2430, 3430, 3630, 4430 and 4460?
+
+[snip]
+
+> +/*
+> + * Work Around for Errata i202 (3430 - 1.12, 3630 - 1.6)
+
+We should update the comment to be "Work Around for Errata i202 (2430, 
+3430, 3630, 4430 and 4460)". The "1.12" and "1.6" are just the section 
+references in the errata docs, but I think that you can drop these as 
+you can just search for the errata ID which is i202.
+
+Cheers
+Jon
