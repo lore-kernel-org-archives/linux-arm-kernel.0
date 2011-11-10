@@ -1,43 +1,58 @@
 From: richard.zhao@linaro.org (Richard Zhao)
-Date: Thu, 10 Nov 2011 12:54:12 +0800
-Subject: [PATCH 7/9] ARM: pm-imx5: convert to clk_prepare/clk_unprepare
-In-Reply-To: <1320900854-13031-1-git-send-email-richard.zhao@linaro.org>
-References: <1320900854-13031-1-git-send-email-richard.zhao@linaro.org>
-Message-ID: <1320900854-13031-7-git-send-email-richard.zhao@linaro.org>
+Date: Thu, 10 Nov 2011 13:01:44 +0800
+Subject: [PATCH 1/1] net: fec: convert to clk_prepare/clk_unprepare
+Message-ID: <1320901304-13157-1-git-send-email-richard.zhao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
 ---
- arch/arm/mach-mx5/pm-imx5.c |    9 ++++++++-
- 1 files changed, 8 insertions(+), 1 deletions(-)
+ drivers/net/ethernet/freescale/fec.c |    5 +++++
+ 1 files changed, 5 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-mx5/pm-imx5.c b/arch/arm/mach-mx5/pm-imx5.c
-index 98052fc..9e8cfe5 100644
---- a/arch/arm/mach-mx5/pm-imx5.c
-+++ b/arch/arm/mach-mx5/pm-imx5.c
-@@ -22,7 +22,13 @@ static struct clk *gpc_dvfs_clk;
+diff --git a/drivers/net/ethernet/freescale/fec.c b/drivers/net/ethernet/freescale/fec.c
+index 1124ce0..92e3585 100644
+--- a/drivers/net/ethernet/freescale/fec.c
++++ b/drivers/net/ethernet/freescale/fec.c
+@@ -1588,6 +1588,7 @@ fec_probe(struct platform_device *pdev)
+ 		ret = PTR_ERR(fep->clk);
+ 		goto failed_clk;
+ 	}
++	clk_prepare(fep->clk);
+ 	clk_enable(fep->clk);
  
- static int mx5_suspend_prepare(void)
- {
--	return clk_enable(gpc_dvfs_clk);
-+	int ret;
-+	ret = clk_prepare(gpc_dvfs_clk);
-+	if (!ret)
-+		ret = clk_enable(gpc_dvfs_clk);
-+	if (ret)
-+		clk_unprepare(gpc_dvfs_clk);
-+	return ret;
+ 	ret = fec_enet_init(ndev);
+@@ -1612,6 +1613,7 @@ failed_register:
+ failed_mii_init:
+ failed_init:
+ 	clk_disable(fep->clk);
++	clk_unprepare(fep->clk);
+ 	clk_put(fep->clk);
+ failed_clk:
+ 	for (i = 0; i < FEC_IRQ_NUM; i++) {
+@@ -1639,6 +1641,7 @@ fec_drv_remove(struct platform_device *pdev)
+ 	fec_stop(ndev);
+ 	fec_enet_mii_remove(fep);
+ 	clk_disable(fep->clk);
++	clk_unprepare(fep->clk);
+ 	clk_put(fep->clk);
+ 	iounmap(fep->hwp);
+ 	unregister_netdev(ndev);
+@@ -1665,6 +1668,7 @@ fec_suspend(struct device *dev)
+ 		netif_device_detach(ndev);
+ 	}
+ 	clk_disable(fep->clk);
++	clk_unprepare(fep->clk);
+ 
+ 	return 0;
  }
+@@ -1675,6 +1679,7 @@ fec_resume(struct device *dev)
+ 	struct net_device *ndev = dev_get_drvdata(dev);
+ 	struct fec_enet_private *fep = netdev_priv(ndev);
  
- static int mx5_suspend_enter(suspend_state_t state)
-@@ -53,6 +59,7 @@ static int mx5_suspend_enter(suspend_state_t state)
- static void mx5_suspend_finish(void)
- {
- 	clk_disable(gpc_dvfs_clk);
-+	clk_unprepare(gpc_dvfs_clk);
- }
- 
- static int mx5_pm_valid(suspend_state_t state)
++	clk_prepare(fep->clk);
+ 	clk_enable(fep->clk);
+ 	if (netif_running(ndev)) {
+ 		fec_restart(ndev, fep->full_duplex);
 -- 
 1.7.5.4
