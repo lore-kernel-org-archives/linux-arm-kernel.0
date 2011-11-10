@@ -1,32 +1,66 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 10 Nov 2011 16:39:29 +0800
-Subject: [PATCH 1/4] arm/imx: fix mx3_defconfig to add FEC back
+Date: Thu, 10 Nov 2011 16:39:30 +0800
+Subject: [PATCH 2/4] arm/imx: fix the references to ARCH_MX3
 In-Reply-To: <1320914372-4416-1-git-send-email-shawn.guo@linaro.org>
 References: <1320914372-4416-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1320914372-4416-2-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1320914372-4416-3-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The commit 'd880db0 arm: mx3: update defconfig' removes FEC support
-which is not good, since FEC is useful for both developers and users.
+The config symbol ARCH_MX3 has been removed by commit 'a89cf59
+arm/imx: merge i.MX3 and i.MX6', and it should not be referenced
+any more.
 
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+Cc: Vinod Koul <vinod.koul@intel.com>
 Cc: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- arch/arm/configs/mx3_defconfig |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+ arch/arm/mach-imx/Makefile.boot |   10 +++++++---
+ drivers/dma/Kconfig             |    4 ++--
+ 2 files changed, 9 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/configs/mx3_defconfig b/arch/arm/configs/mx3_defconfig
-index cb0717f..ee50a9e 100644
---- a/arch/arm/configs/mx3_defconfig
-+++ b/arch/arm/configs/mx3_defconfig
-@@ -67,6 +67,7 @@ CONFIG_SMSC_PHY=y
- CONFIG_NET_ETHERNET=y
- CONFIG_SMSC911X=y
- CONFIG_DNET=y
-+CONFIG_FEC=y
- # CONFIG_NETDEV_1000 is not set
- # CONFIG_NETDEV_10000 is not set
- # CONFIG_INPUT_MOUSEDEV is not set
+diff --git a/arch/arm/mach-imx/Makefile.boot b/arch/arm/mach-imx/Makefile.boot
+index 22d8588..c349a96 100644
+--- a/arch/arm/mach-imx/Makefile.boot
++++ b/arch/arm/mach-imx/Makefile.boot
+@@ -14,9 +14,13 @@ zreladdr-$(CONFIG_MACH_MX27)	+= 0xA0008000
+ params_phys-$(CONFIG_MACH_MX27)	:= 0xA0000100
+ initrd_phys-$(CONFIG_MACH_MX27)	:= 0xA0800000
+ 
+-zreladdr-$(CONFIG_ARCH_MX3)	+= 0x80008000
+-params_phys-$(CONFIG_ARCH_MX3)	:= 0x80000100
+-initrd_phys-$(CONFIG_ARCH_MX3)	:= 0x80800000
++zreladdr-$(CONFIG_SOC_IMX31)	+= 0x80008000
++params_phys-$(CONFIG_SOC_IMX31)	:= 0x80000100
++initrd_phys-$(CONFIG_SOC_IMX31)	:= 0x80800000
++
++zreladdr-$(CONFIG_SOC_IMX35)	+= 0x80008000
++params_phys-$(CONFIG_SOC_IMX35)	:= 0x80000100
++initrd_phys-$(CONFIG_SOC_IMX35)	:= 0x80800000
+ 
+ zreladdr-$(CONFIG_SOC_IMX6Q)	+= 0x10008000
+ params_phys-$(CONFIG_SOC_IMX6Q)	:= 0x10000100
+diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
+index ab8f469..8f7dce1 100644
+--- a/drivers/dma/Kconfig
++++ b/drivers/dma/Kconfig
+@@ -124,7 +124,7 @@ config MV_XOR
+ 
+ config MX3_IPU
+ 	bool "MX3x Image Processing Unit support"
+-	depends on ARCH_MX3
++	depends on SOC_IMX31 || SOC_IMX35
+ 	select DMA_ENGINE
+ 	default y
+ 	help
+@@ -216,7 +216,7 @@ config PCH_DMA
+ 
+ config IMX_SDMA
+ 	tristate "i.MX SDMA support"
+-	depends on ARCH_MX25 || ARCH_MX3 || ARCH_MX5
++	depends on ARCH_MX25 || SOC_IMX31 || SOC_IMX35 || ARCH_MX5
+ 	select DMA_ENGINE
+ 	help
+ 	  Support the i.MX SDMA engine. This engine is integrated into
 -- 
 1.7.4.1
