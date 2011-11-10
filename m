@@ -1,40 +1,28 @@
-From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
-Date: Thu, 10 Nov 2011 08:59:01 +0100
-Subject: s3c2440 / s3c2416 broken
-In-Reply-To: <CAJuYYwTQ-eCN1pTkgrthhUEdk5gr9oGGcO6MCKCWQAovsQVqcg@mail.gmail.com>
-References: <CAC=G6syKMJk+L+-_k+T37qHKzfpNz_TrYi-HTaufczLxJKEtkQ@mail.gmail.com>
- <CAC=G6swbDHZJ7fqu9LoYRiri6bg+M+VDZnG_-=ZfP9r=6YtVeg@mail.gmail.com>
- <CAJuYYwTQ-eCN1pTkgrthhUEdk5gr9oGGcO6MCKCWQAovsQVqcg@mail.gmail.com>
-Message-ID: <201111100859.02647.heiko@sntech.de>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 10 Nov 2011 09:03:31 +0100
+Subject: [PATCH 1/9] ARM: mxc: time: convert to clk_prepare/clk_unprepare
+In-Reply-To: <1320900854-13031-1-git-send-email-richard.zhao@linaro.org>
+References: <1320900854-13031-1-git-send-email-richard.zhao@linaro.org>
+Message-ID: <20111110080331.GS16886@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
+Hi Richard,
 
-Am Donnerstag, 10. November 2011, 01:14:59 schrieb Thomas Abraham:
-> On 10 November 2011 05:00, Paul Schilling <paul.s.schilling@gmail.com> 
-wrote:
-> > Boot past init slow - stalled when using jffs2 also.
-> > 
-> > On Wed, Nov 9, 2011 at 4:12 PM, Paul Schilling
-> > 
-> > <paul.s.schilling@gmail.com> wrote:
-> >> Latest kernel 3.2.0-rc1 appears to break the following processors
-> >> s3c2440 and s3c2416
-> >> 
-> >> both appear to stall when init is executed on NFS.  Also I  lost HSMMC
-> >> on the s3c2416.
-> 
-> Could you post a boot log of the kernel on the s3c2440 and s3c2416 boards?
+I think we should introduce two new helpers:
 
-Also, is your out-of-tree kernel code available somewhere? [1]
+clk_prepare_enable()
+clk_disable_unprepare()
 
-As my S3C2416 based platform didn't show any problems and has working hsmmc 
-with 3.2-rc1 it would be cool to be able to compare both and see if we differ 
-somehow.
+This series could look much nicer with it.
 
+Minor nitpick: I don't like the subject. 'convert' suggests that you are
+replacing something, instead you are adding something.
 
-Heiko
+Sascha
 
-
-[1] Mine's at https://gitorious.org/oyo-hack/kernel/commits/topic/board/sg060
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
