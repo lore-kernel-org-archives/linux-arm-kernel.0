@@ -1,73 +1,43 @@
-From: dwmw2@infradead.org (David Woodhouse)
-Date: Thu, 10 Nov 2011 15:28:50 +0000
-Subject: [PATCH v4 2/7] iommu/core: split mapping to page sizes as
- supported by the hardware
-In-Reply-To: <CANqQZNH1YRSgYRVxceicQ3szD=t7zeJjhJKEQ30PeKsxtj5V+A@mail.gmail.com>
-References: <1318850846-16066-1-git-send-email-ohad@wizery.com>
- <1318850846-16066-3-git-send-email-ohad@wizery.com>
- <CANqQZNH1YRSgYRVxceicQ3szD=t7zeJjhJKEQ30PeKsxtj5V+A@mail.gmail.com>
-Message-ID: <1320938930.22195.17.camel@i7.infradead.org>
+From: ulf.hansson@stericsson.com (Ulf Hansson)
+Date: Thu, 10 Nov 2011 16:33:19 +0100
+Subject: [PATCH] mmc: mmci: Fixup handling of MCI_STARTBITERR
+Message-ID: <1320939199-30363-1-git-send-email-ulf.hansson@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2011-11-10 at 14:17 +0800, Kai Huang wrote:
-> And another question: have we considered the IOTLB flush operation? I
-> think we need to implement similar logic when flush the DVMA range.
-> Intel VT-d's manual says software needs to specify the appropriate
-> mask value to flush large pages, but it does not say we need to
-> exactly match the page size as it is mapped. I guess it's not
-> necessary for Intel IOMMU, but other vendor's IOMMU may have such
-> limitation (or some other limitations). In my understanding current
-> implementation does not provide page size information for particular
-> DVMA ranges that has been mapped, and it's not flexible to implement
-> IOTLB flush code (ex, we may need to walk through page table to find
-> out actual page size). Maybe we can also add iommu_ops->flush_iotlb ? 
+The interrupt was previously enabled and then correctly cleared.
+Now we also handle it correctly.
 
-Which brings me to another question I have been pondering... do we even
-have a consensus on exactly *when* the IOTLB should be flushed?
+Signed-off-by: Ulf Hansson <ulf.hansson@stericsson.com>
+---
+ drivers/mmc/host/mmci.c |    8 +++++---
+ 1 files changed, 5 insertions(+), 3 deletions(-)
 
-Even just for the Intel IOMMU, we have three different behaviours:
-
-  - For DMA API users by default, we do 'batched unmap', so a mapping
-    may be active for a period of time after the driver has requested
-    that it be unmapped.
-
-  - ... unless booted with 'intel_iommu=strict', in which case we do the
-    unmap and IOTLB flush immediately before returning to the driver.
-
-  - But the IOMMU API for virtualisation is different. In fact that
-    doesn't seem to flush the IOTLB at all. Which is probably a bug.
-
-What is acceptable, though? That batched unmap is quite important for
-performance, because it means that we don't have to bash on the hardware
-and wait for a flush to complete in the fast path of network driver RX,
-for example.
-
-If we move to a model where we have a separate ->flush_iotlb() call, we
-need to be careful that we still allow necessary optimisations to
-happen.
-
-Since I have the right people on Cc and the iommu list is still down,
-and it's vaguely tangentially related...
-
-I'm looking at fixing performance issues in the Intel IOMMU code, with
-its virtual address space allocation (the rbtree-based one in iova.c
-that nobody else uses, which has a single spinlock that *all* CPUs bash
-on when they need to allocate).
-
-The plan is, vaguely, to allocate large chunks of space to each CPU, and
-then for each CPU to allocate from its own region first, thus ensuring
-that the common case doesn't bounce locks between CPUs. It'll be rare
-for one CPU to have to touch a subregion 'belonging' to another CPU, so
-lock contention should be drastically reduced.
-
-Should I be planning to drop the DMA API support from intel-iommu.c
-completely, and have the new allocator just call into the IOMMU API
-functions instead? Other people have been looking at that, haven't they?
-Is there any code? Or special platform-specific requirements for such a
-generic wrapper that I might not have thought of? Details about when to
-flush the IOTLB are one such thing which might need special handling for
-certain hardware...
-
+diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+index 50b5f99..8265981 100644
+--- a/drivers/mmc/host/mmci.c
++++ b/drivers/mmc/host/mmci.c
+@@ -675,7 +675,8 @@ mmci_data_irq(struct mmci_host *host, struct mmc_data *data,
+ 	      unsigned int status)
+ {
+ 	/* First check for errors */
+-	if (status & (MCI_DATACRCFAIL|MCI_DATATIMEOUT|MCI_TXUNDERRUN|MCI_RXOVERRUN)) {
++	if (status & (MCI_DATACRCFAIL|MCI_DATATIMEOUT|MCI_STARTBITERR|
++		      MCI_TXUNDERRUN|MCI_RXOVERRUN)) {
+ 		u32 remain, success;
+ 
+ 		/* Terminate the DMA transfer */
+@@ -955,8 +956,9 @@ static irqreturn_t mmci_irq(int irq, void *dev_id)
+ 		dev_dbg(mmc_dev(host->mmc), "irq0 (data+cmd) %08x\n", status);
+ 
+ 		data = host->data;
+-		if (status & (MCI_DATACRCFAIL|MCI_DATATIMEOUT|MCI_TXUNDERRUN|
+-			      MCI_RXOVERRUN|MCI_DATAEND|MCI_DATABLOCKEND) && data)
++		if (status & (MCI_DATACRCFAIL|MCI_DATATIMEOUT|MCI_STARTBITERR|
++			      MCI_TXUNDERRUN|MCI_RXOVERRUN|MCI_DATAEND|
++			      MCI_DATABLOCKEND) && data)
+ 			mmci_data_irq(host, data, status);
+ 
+ 		cmd = host->cmd;
 -- 
-dwmw2
+1.7.5.4
