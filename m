@@ -1,35 +1,60 @@
-From: mail.kai.huang@gmail.com (cody)
-Date: Thu, 10 Nov 2011 20:16:16 +0800
-Subject: [PATCH v4 2/7] iommu/core: split mapping to page sizes as
- supported by the hardware
-In-Reply-To: <CAK=WgbZbfCRJqA-wwHN=iLH6rYyoKjJCaL0zMfY93Tg6Jw2uvA@mail.gmail.com>
-References: <1318850846-16066-1-git-send-email-ohad@wizery.com>
- <1318850846-16066-3-git-send-email-ohad@wizery.com>
- <CANqQZNH1YRSgYRVxceicQ3szD=t7zeJjhJKEQ30PeKsxtj5V+A@mail.gmail.com>
- <CAK=WgbZbfCRJqA-wwHN=iLH6rYyoKjJCaL0zMfY93Tg6Jw2uvA@mail.gmail.com>
-Message-ID: <4EBBC090.4070109@gmail.com>
+From: jarkko.nikula@bitmer.com (Jarkko Nikula)
+Date: Thu, 10 Nov 2011 14:46:22 +0200
+Subject: [PATCH v2 1/2] OMAP2+: DMA: Workaround for invalid source position
+In-Reply-To: <1320658387-21067-2-git-send-email-peter.ujfalusi@ti.com>
+References: <1320658387-21067-1-git-send-email-peter.ujfalusi@ti.com>
+ <1320658387-21067-2-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <4EBBC79E.30701@bitmer.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/10/2011 03:31 PM, Ohad Ben-Cohen wrote:
-> On Thu, Nov 10, 2011 at 8:17 AM, Kai Huang<mail.kai.huang@gmail.com>  wrote:
->    
->> Seems the unmap function don't take phys as parameter, does this mean
->> domain->ops->unmap will walk through the page table to find out the
->> actual page size?
->>      
-> The short answer is yes, and furthermore, we also consider to remove
-> the size param from domain->ops->unmap entirely at some point.
+On 11/07/2011 11:33 AM, Peter Ujfalusi wrote:
+> If the DMA source position has been asked before the
+> first actual data transfer has been done, the CSAC
+> register does not contain valid information.
+> We can identify this situation by checking the CDAC
+> register:
+> CDAC != 0 indicates that the DMA transfer on the channel has
+> been started already.
+> When CDAC == 0 we can not trust the CSAC value since it has
+> not been updated, and can contain random number.
+> Return the start address in case the DMA has not jet started.
 >
-> We had a long discussion about it, please see:
+> Note: The CDAC register has been initialized to 0 at dma_start
+> time.
 >
-> https://lkml.org/lkml/2011/10/10/234
->    
-Yes I've seen your discussion, I followed this thread from beginning:)
+> Signed-off-by: Peter Ujfalusi<peter.ujfalusi@ti.com>
+> ---
+>   arch/arm/plat-omap/dma.c |   12 ++++++++++++
+>   1 files changed, 12 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/plat-omap/dma.c b/arch/arm/plat-omap/dma.c
+> index c22217c..a9983b6 100644
+> --- a/arch/arm/plat-omap/dma.c
+> +++ b/arch/arm/plat-omap/dma.c
+> @@ -1034,6 +1034,18 @@ dma_addr_t omap_get_dma_src_pos(int lch)
+>   	if (IS_DMA_ERRATA(DMA_ERRATA_3_3)&&  offset == 0)
+>   		offset = p->dma_read(CSAC, lch);
+>
+> +	if (!cpu_is_omap15xx()) {
+> +		/*
+> +		 * CDAC == 0 indicates that the DMA transfer on the channel has
+> +		 * not been started (no data has been transferred so far).
+> +		 * Return the programmed source start address in this case.
+> +		 */
+> +		if (likely(p->dma_read(CDAC, lch)))
+> +			offset = p->dma_read(CSAC, lch);
+> +		else
+> +			offset = p->dma_read(CSSA, lch);
+> +	}
+> +
 
-How about the IOTLB flush? As I said I think we need to consider that 
-IOMMU (even does not exist now) may have some limitation on IOTLB flush, 
-and hiding page size from IOTLB flush code may hurt performance, or even 
-worse, trigger undefined behaviors.
+I think this is enough:
 
--cody
+if (unlikely(p->dma_read(CDAC, lch) == 0))
+	offset = p->dma_read(CSSA, lch);
+
+I suppose offset is ok for normal case as it is already read (twise) above.
+
+-- 
+Jarkko
