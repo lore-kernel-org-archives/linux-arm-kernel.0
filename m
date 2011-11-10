@@ -1,40 +1,32 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Thu, 10 Nov 2011 23:10:14 +0100
-Subject: [PATCH] ARM: mini2440: Fix Kconfig select of LEDS_TRIGGER
-Message-ID: <1320963014.27598.77.camel@x61.thuisdomein>
+From: rmallon@gmail.com (Ryan Mallon)
+Date: Fri, 11 Nov 2011 09:11:51 +1100
+Subject: ioremap on system memory
+In-Reply-To: <CAM8FrKJ8OeavZxTBJBONw76UBBzS_mQYMZuS6Chf8+Po6yqDgA@mail.gmail.com>
+References: <CAM8FrKJ8OeavZxTBJBONw76UBBzS_mQYMZuS6Chf8+Po6yqDgA@mail.gmail.com>
+Message-ID: <4EBC4C27.3070400@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 2e18edf75d ("ARM: mini2440: Fix Kconfig to allow kernel to
-build") added "select LEDS_TRIGGER" to the MACH_MINI2440 entry. That
-Kconfig symbol doesn't exist. What actually should be selected is
-LEDS_TRIGGERS.
+On 10/11/11 19:06, Marcus Folkesson wrote:
 
-(This shouldn't be a problem with the mini2440 defconfig, since it
-contains "CONFIG_MAC80211_LEDS=y" and MAC80211_LEDS selects
-LEDS_TRIGGERS. But it seems that nothing mini2440 related pulls in
-MAC80211_LEDS.)
+> Hi,
+> 
+> I'm working with a custom based platform based on OMAP-L138.
+> A driver we are using is ioremapping system memory. It does this to
+> share data between the GPP and DSP core.
+> This is not allowed in later kernel versions since ARMv6+ does not support this.
+> 
+> Is there any good(and easy) way to get around this or is it so
+> fundamentally wrong that the driver should be written from scratch?
 
-Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
----
-Tested with "yes "" | make ARCH=arm config", using the
-mini2440_defconfig with the CONFIG_MAC80211_LEDS=y line commented out.
 
- arch/arm/mach-s3c2440/Kconfig |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+Cc'ed the ARM kernel list and Marek Szyprowski (CMA developer). The CMA
+patches I think do what you want, but I am not sure if they are merged
+yet. The other solution (again, I'm not an expert on this area) is to
+not pass the region of memory you want to manage as part of Linux's
+normal system memory. See how the OMAP framebuffer driver reserves a
+region of SDRAM (arch/arm/plat-omap/fb.c).
 
-diff --git a/arch/arm/mach-s3c2440/Kconfig b/arch/arm/mach-s3c2440/Kconfig
-index 914e620..e505701 100644
---- a/arch/arm/mach-s3c2440/Kconfig
-+++ b/arch/arm/mach-s3c2440/Kconfig
-@@ -178,7 +178,7 @@ config MACH_MINI2440
- 	select EEPROM_AT24
- 	select NEW_LEDS
- 	select LEDS_CLASS
--	select LEDS_TRIGGER
-+	select LEDS_TRIGGERS
- 	select LEDS_TRIGGER_BACKLIGHT
- 	select S3C_DEV_NAND
- 	select S3C_DEV_USB_HOST
--- 
-1.7.4.4
+Some one else on the ARM list can probably explain in more detail.
+
+~Ryan
