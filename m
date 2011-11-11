@@ -1,73 +1,59 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 11 Nov 2011 09:17:25 -0600
-Subject: [PATCH] mach-ux500: add devicetree compat nodes
-In-Reply-To: <1321023902-18870-1-git-send-email-niklas.hernaeus@linaro.org>
-References: <1321023902-18870-1-git-send-email-niklas.hernaeus@linaro.org>
-Message-ID: <4EBD3C85.1010508@gmail.com>
+From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
+Date: Fri, 11 Nov 2011 16:13:41 +0100
+Subject: [PATCH v2] mmc mxcmmc: fix falling back to PIO
+In-Reply-To: <20111111144815.GW16886@pengutronix.de>
+References: <1314264785-19224-1-git-send-email-s.hauer@pengutronix.de>
+ <20111111144815.GW16886@pengutronix.de>
+Message-ID: <20157.15269.398865.274711@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/11/2011 09:05 AM, Niklas Hernaeus wrote:
-> From: Linus Walleij <linus.walleij@linaro.org>
-> 
-> This adds devicetree compat members to all the U8500 reference
-> boards.
-> 
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
->  arch/arm/mach-ux500/board-mop500.c |   18 ++++++++++++++++++
->  1 files changed, 18 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
-> index cd54aba..7cbefa7 100644
-> --- a/arch/arm/mach-ux500/board-mop500.c
-> +++ b/arch/arm/mach-ux500/board-mop500.c
-> @@ -643,6 +643,21 @@ static void __init mop500_init_machine(void)
->  	regulator_has_full_constraints();
->  }
->  
-> +static const char * mop500_dt_board_compat[] = {
-> +	"stericsson,mop500",
-> +	NULL
-> +};
-> +
-> +static const char * hrefv60_dt_board_compat[] = {
-> +	"stericsson,hrefv60",
-> +	NULL
-> +};
-> +
-> +static const char * snowball_dt_board_compat[] = {
-> +	"stericsson,snowball",
-> +	NULL
-> +};
-> +
->  MACHINE_START(U8500, "ST-Ericsson MOP500 platform")
->  	/* Maintainer: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com> */
->  	.boot_params	= 0x100,
-> @@ -651,6 +666,7 @@ MACHINE_START(U8500, "ST-Ericsson MOP500 platform")
->  	/* we re-use nomadik timer here */
->  	.timer		= &ux500_timer,
->  	.init_machine	= mop500_init_machine,
-> +	.dt_compat	= mop500_dt_board_compat,
->  MACHINE_END
->  
->  MACHINE_START(HREFV60, "ST-Ericsson U8500 Platform HREFv60+")
-> @@ -659,6 +675,7 @@ MACHINE_START(HREFV60, "ST-Ericsson U8500 Platform HREFv60+")
->  	.init_irq	= ux500_init_irq,
->  	.timer		= &ux500_timer,
->  	.init_machine	= mop500_init_machine,
-> +	.dt_compat	= hrefv60_dt_board_compat,
->  MACHINE_END
->  
->  MACHINE_START(SNOWBALL, "Calao Systems Snowball platform")
-> @@ -668,4 +685,5 @@ MACHINE_START(SNOWBALL, "Calao Systems Snowball platform")
->  	/* we re-use nomadik timer here */
->  	.timer		= &ux500_timer,
->  	.init_machine	= mop500_init_machine,
-> +	.dt_compat	= snowball_dt_board_compat,
->  MACHINE_END
+Hi,
 
-These all look very similar and should be combined. Why do you not have
-1 machine for all DT platforms as other SOCs are doing?
+Sascha Hauer writes:
+> Hi Chris,
+> 
+> Can you take this one please?
+> 
+> Sascha
+> 
+> On Thu, Aug 25, 2011 at 11:33:05AM +0200, Sascha Hauer wrote:
+> > When we can't configure the dma channel we want to fall
+> > back to PIO. We do this by setting host->do_dma to zero.
+> > This does not work as do_dma is used to see whether dma
+> > can be used for the current transfer. Instead, we have
+> > to set host->dma to NULL.
+> > 
+> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> > Cc: Chris Ball <cjb@laptop.org>
+> > Cc: linux-mmc at vger.kernel.org
+> > ---
+> >  drivers/mmc/host/mxcmmc.c |    3 ++-
+> >  1 files changed, 2 insertions(+), 1 deletions(-)
+> > 
+> > diff --git a/drivers/mmc/host/mxcmmc.c b/drivers/mmc/host/mxcmmc.c
+> > index 14aa213..4dc9008 100644
+> > --- a/drivers/mmc/host/mxcmmc.c
+> > +++ b/drivers/mmc/host/mxcmmc.c
+> > @@ -730,7 +730,8 @@ static void mxcmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+> >  			dev_err(mmc_dev(host->mmc),
+> >  				"failed to config DMA channel. Falling back to PIO\n");
+> >  			dma_release_channel(host->dma);
+> > -			host->do_dma = 0;
+> > +			host->dma = NULL;
+> > +			host->dma = 0;
+NULL or 0, that is the question? Or both?
+That looks a little bit screwed.
 
-Rob
+
+Lothar Wa?mann
+-- 
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
