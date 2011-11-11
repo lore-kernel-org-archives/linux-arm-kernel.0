@@ -1,73 +1,55 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 11 Nov 2011 15:22:28 +0000
-Subject: [PATCH v5 4/7] arm: omap4: hwmod: introduce emu hwmod
-In-Reply-To: <4EBD3B71.5000801@ti.com>
-References: <1319467559-5518-1-git-send-email-ming.lei@canonical.com>
- <1319467559-5518-5-git-send-email-ming.lei@canonical.com>
- <alpine.DEB.2.00.1111080750130.10451@utopia.booyaka.com>
- <CACVXFVMSJUT2Ac+bWetrLpbyOs6PqY+npNHsbvHipEVZ0gWdgQ@mail.gmail.com>
- <alpine.DEB.2.00.1111100152430.4195@utopia.booyaka.com>
- <20111111114147.GE12410@mudshark.cambridge.arm.com>
- <20111111114735.GC5114@totoro> <4EBD3785.4050102@ti.com>
- <20111111145833.GL12410@mudshark.cambridge.arm.com>
- <4EBD3B71.5000801@ti.com>
-Message-ID: <20111111152228.GM12410@mudshark.cambridge.arm.com>
+From: B29396@freescale.com (Dong Aisheng-B29396)
+Date: Fri, 11 Nov 2011 15:25:01 +0000
+Subject: [PATCH 1/2] ARM: mx28evk: remove flexcan_pdata __initconst
+ attribute
+In-Reply-To: <20111111150609.GD5011@pengutronix.de>
+References: <1321024360-5249-1-git-send-email-b29396@freescale.com>
+ <20111111150609.GD5011@pengutronix.de>
+Message-ID: <65EE16ACC360FA4D99C96DC085B3F7722CECED@039-SN1MPN1-002.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 11, 2011 at 03:12:49PM +0000, Cousson, Benoit wrote:
-> Hi Will,
-
-Hello,
-
-> On 11/11/2011 3:58 PM, Will Deacon wrote:
-> > Actually, I was hoping you could help Ming Lei with the hwmod stuff :)
+> -----Original Message-----
+> From: Uwe Kleine-K?nig [mailto:u.kleine-koenig at pengutronix.de]
+> Sent: Friday, November 11, 2011 11:06 PM
+> To: Dong Aisheng-B29396
+> Cc: linux-arm-kernel at lists.infradead.org; kernel at pengutronix.de;
+> s.hauer at pengutronix.de; w.sang at pengutronix.de; Guo Shawn-R65073
+> Subject: Re: [PATCH 1/2] ARM: mx28evk: remove flexcan_pdata __initconst
+> attribute
 > 
-> And I'll do :-)
-
-Cheers!
-
-> We already started looking at that with Paul a couple of days ago, but 
-> the organization of the debugss IPs inside MPUSS is a little bit messy 
-> in OMAP :-)
-
-Ok, I'm not familiar with it so that's why I've been pestering.
-
-> For the moment the cti IRQs are attached to the MPU subsystem which make 
-> sense for the HW partitioning point of view.
-> Unfortunately, these debug IPs are accessed through an external L3_EMU 
-> configuration bus and not using some internal bus inside the MPUSS.
-> In the memory maps they are thus all located inside the 
-> 0x54000000-0x54164FFF.
+> On Fri, Nov 11, 2011 at 11:12:39PM +0800, Dong Aisheng wrote:
+> > The flexcan driver still uses it after init.
+> As "it" is a copy of flexcan_pdata it's completely OK for the driver to
+> use it.
 > 
-> So for the driver point of view, it might be better to assign these IRQs 
-> to the debugss IP instead of the MPUSS IP.
-> 
-> The MPU will then only have the PL310 IRQ.
-> 
-> static struct omap_hwmod_irq_info omap44xx_mpu_irqs[] = {
-> 	{ .name = "pl310", .irq = 0 + OMAP44XX_IRQ_GIC_START },
-> 	{ .irq = -1 }
-> };
+> What is the exact problem you want to address?
+>
+Sorry, I just checked the code and found platform_device_add_data will
+Add a copy of platform specific data.
+Originally I thought the driver may access the freed pdata after init.
 
-At some point I'd like to add support for the PL310 PMU, which will want to
-use that IRQ. That would need to be passed to the PL310 driver though, which
-will then register it's own PMU device with perf.
+So, does it mean that every pdata of pdevice added
+by mxs_add_platform_device_dmamask can be prefixed by __init*?
 
-> The debugss one will have the cti ones, that will start at 0 and thus 
-> will make them even accessible using the index.
-> 
-> static struct omap_hwmod_irq_info omap44xx_debugss_irqs[] = {
-> 	{ .name = "cti0", .irq = 1 + OMAP44XX_IRQ_GIC_START },
-> 	{ .name = "cti1", .irq = 2 + OMAP44XX_IRQ_GIC_START },
-> 	{ .irq = -1 }
-> };
-> 
-> I need to fix this IRQ mapping and then I'll be able to send a hwmod 
-> version of this debugss virtual IP that should help Ming.
+And, below change seems correct?
+diff --git a/arch/arm/mach-mxs/module-tx28.c b/arch/arm/mach-mxs/module-tx28.c
+index 0fcff47..a096cca 100644
+--- a/arch/arm/mach-mxs/module-tx28.c
++++ b/arch/arm/mach-mxs/module-tx28.c
+@@ -66,11 +66,11 @@ static const iomux_cfg_t tx28_fec1_pads[] __initconst = {
+        MX28_PAD_ENET0_CRS__ENET1_RX_EN,
+ };
 
-That looks cracking and should work out of the box.
+-static struct fec_platform_data tx28_fec0_data = {
++static struct fec_platform_data __initconst tx28_fec0_data = {
+        .phy = PHY_INTERFACE_MODE_RMII,
+ };
 
-Thanks,
+-static struct fec_platform_data tx28_fec1_data = {
++static struct fec_platform_data __initconst tx28_fec1_data = {
+        .phy = PHY_INTERFACE_MODE_RMII,
+ };
 
-Will
+Regards
+Dong Aisheng
