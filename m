@@ -1,44 +1,98 @@
-From: Joerg.Roedel@amd.com (Joerg Roedel)
-Date: Fri, 11 Nov 2011 14:24:11 +0100
+From: dwmw2@infradead.org (David Woodhouse)
+Date: Fri, 11 Nov 2011 13:27:28 +0000
 Subject: [PATCH v4 2/7] iommu/core: split mapping to page sizes as
  supported by the hardware
-In-Reply-To: <4EBC3E20.20301@codeaurora.org>
+In-Reply-To: <20111111125837.GF13213@amd.com>
 References: <1318850846-16066-1-git-send-email-ohad@wizery.com>
  <1318850846-16066-3-git-send-email-ohad@wizery.com>
  <CANqQZNH1YRSgYRVxceicQ3szD=t7zeJjhJKEQ30PeKsxtj5V+A@mail.gmail.com>
  <1320938930.22195.17.camel@i7.infradead.org>
- <20111110170918.GE13213@amd.com> <4EBC3E20.20301@codeaurora.org>
-Message-ID: <20111111132411.GH13213@amd.com>
+ <20111110170918.GE13213@amd.com> <1320953319.535.11.camel@i7.infradead.org>
+ <20111111125837.GF13213@amd.com>
+Message-ID: <1321018048.2027.44.camel@shinybook.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 10, 2011 at 01:12:00PM -0800, Stepan Moskovchenko wrote:
-> I have been experimenting with an iommu_map_range call, which maps a
-> given scatterlist of discontiguous physical pages into a contiguous
-> virtual region at a given IOVA. This has some performance advantages
-> over just calling iommu_map iteratively. First, it reduces the
-> amount of table walking / calculation needed for mapping each page,
-> given how you know that all the pages will be mapped into a single
-> virtually-contiguous region (so in most cases, the first-level table
-> calculation can be reused). Second, it allows one to defer the TLB
-> (and sometimes cache) maintenance operations until the entire
-> scatterlist has been mapped, rather than doing a TLB invalidate
-> after mapping each page, as would have been the case if iommu_map
-> were just being called from within a loop. Granted, just using
-> iommu_map many times may be acceptable on the slow path, but I have
-> seen significant performance gains when using this approach on the
-> fast path.
+On Fri, 2011-11-11 at 13:58 +0100, Joerg Roedel wrote:
+> For AMD IOMMU there is a feature called not-present cache. It says that
+> the IOMMU caches non-present entries as well and needs an IOTLB flush
+> when something is mapped (meant for software implementations of the
+> IOMMU).
+> So it can't be really taken out of the fast-path. But the IOMMU driver
+> can optimize the function so that it only flushes the IOTLB when there
+> was an unmap-call before. 
 
-Yes, from a performance point-of-view that makes sense, as an addition
-to the existing iommu_map interface. Are the pages in the list allowed
-to have different page-sizes?
+We have exactly the same situation with the Intel IOMMU (we call it
+'Caching Mode') for the same reasons.
 
+I'd be wary about making the IOMMU driver *track* whether there was an
+unmap call before ? that seems like hard work and more cache contention,
+especially if the ->commit() call happens on a CPU other than the one
+that just did the unmap.
 
-	Joerg
+I'm also not sure exactly when you'd call the ->commit() function when
+the DMA API is being used, and which 'side' of that API the
+deferred-flush optimisations would live.
+
+Would the optimisation be done on the generic side, only calling
+->commit when it absolutely *has* to happen? (Or periodically after
+unmaps have happened to avoid entries hanging around for ever?)
+
+Or would the optimisation be done in the IOMMU driver, thus turning the
+->commit() function into more of a *hint*? You could add a 'simon_says'
+boolean argument to it, I suppose...?
+
+> It is also an improvement over the current
+> situation where every iommu_unmap call results in a flush implicitly.
+> This pretty much a no-go for using IOMMU-API in DMA mapping at the
+> moment.
+
+Right. That definitely needs to be handled. We just need to work out the
+(above and other) details.
+
+> > But also, it's not *so* much of an issue to divide the space up even
+> > when it's limited. The idea was not to have it *strictly* per-CPU, but
+> > just for a CPU to try allocating from "its own" subrange first?
+> 
+> Yeah, I get the idea. I fear that the memory consumption will get pretty
+> high with that approach. It basically means one round-robin allocator
+> per cpu and device. What does that mean on a 4096 CPU machine :)
+
+Well, if your network device is taking interrupts, and mapping/unmapping
+buffers across all 4096 CPUs, then your performance is screwed anyway :)
+
+Certainly your concerns are valid, but I think we can cope with them
+fairly reasonably. If we *do* have large number of CPUs allocating for a
+given domain, we can move to a per-node rather than per-CPU allocator.
+And we can have dynamically sized allocation regions, so we aren't
+wasting too much space on unused bitmaps if you map just *one* page from
+each of your 4096 CPUs.
+
+> How much lock contention will be lowered also depends on the work-load.
+> If dma-handles are frequently freed from another cpu than they were
+> allocated from the same problem re-appears.
+
+The idea is that dma handles are *infrequently* freed, in batches. So
+we'll bounce the lock's cache line occasionally, but not all the time.
+
+In "strict" or "unmap_flush" mode, you get to go slowly unless you do
+the unmap on the same CPU that you mapped it from. I can live with that.
+
+> But in the end we have to try it out and see what works best :)
+
+Indeed. I'm just trying to work out if I should try to do the allocator
+thing purely inside the Intel code first, and then try to move it out
+and make it generic ? or if I should start with making the DMA API work
+with a wrapper around the IOMMU API, with your ->commit() and other
+necessary changes. I think I'd prefer the latter, if we can work out how
+it should look.
 
 -- 
-AMD Operating System Research Center
-
-Advanced Micro Devices GmbH Einsteinring 24 85609 Dornach
-General Managers: Alberto Bozzo, Andrew Bowd
-Registration: Dornach, Landkr. Muenchen; Registerger. Muenchen, HRB Nr. 43632
+dwmw2
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: smime.p7s
+Type: application/x-pkcs7-signature
+Size: 5818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111111/52150256/attachment-0001.bin>
