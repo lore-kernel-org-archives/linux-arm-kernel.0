@@ -1,82 +1,33 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Fri, 11 Nov 2011 20:57:59 +0100
-Subject: [RFC 6/8] of: add clock providers
-In-Reply-To: <20111109114936.GL16886@pengutronix.de>
-References: <1320801583-12774-1-git-send-email-grant.likely@secretlab.ca>
- <1320801583-12774-7-git-send-email-grant.likely@secretlab.ca>
- <20111109091328.GY16886@pengutronix.de> <4EBA62AD.3000407@ti.com>
- <20111109114936.GL16886@pengutronix.de>
-Message-ID: <4EBD7E47.8010502@ti.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri, 11 Nov 2011 18:48:30 -0200
+Subject: [PATCH v2] ARM: mx28evk: Simplify GPIO requests for
+ mx28evk_fec_reset
+In-Reply-To: <20111110075446.GR16886@pengutronix.de>
+References: <1320870998-6200-1-git-send-email-festevam@gmail.com>
+ <20111109214603.GA6316@pengutronix.de>
+ <20111110075446.GR16886@pengutronix.de>
+Message-ID: <CAOMZO5DOA64OmHEn0FnqtL71FztYC9Vp=3wCDrZY+f7b8dRwzA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/9/2011 12:49 PM, Sascha Hauer wrote:
-> On Wed, Nov 09, 2011 at 12:23:25PM +0100, Cousson, Benoit wrote:
->> On 11/9/2011 10:13 AM, Sascha Hauer wrote:
->>> On Tue, Nov 08, 2011 at 06:19:41PM -0700, Grant Likely wrote:
+On Thu, Nov 10, 2011 at 5:54 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> On Wed, Nov 09, 2011 at 10:46:03PM +0100, Wolfram Sang wrote:
+>> On Wed, Nov 09, 2011 at 06:36:38PM -0200, Fabio Estevam wrote:
+>> > From: Fabio Estevam <fabio.estevam@freescale.com>
+>> >
+>> > Simplify GPIO requests inside mx28evk_fec_reset by using gpio_request_array.
+>> >
+>> > Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 >>
->> [...]
->>
->>>> +Sources of clock signal can be represented by any node in the device
->>>> +tree.  Those nodes are designated as clock providers.  Clock consumer
->>>> +nodes use a phandle and clock specifier pair to connect clock provider
->>>> +outputs to clock inputs.  Similar to the gpio specifiers, a clock
->>>> +specifier is an array of one more more cells identifying the clock
->>>> +output on a device.  The length of a clock specifier is defined by the
->>>> +value of a #clock-cells property in the clock provider node.
->>>> +
->>>> +[1] http://patchwork.ozlabs.org/patch/31551/
->>>> +
->>>> +==Clock providers==
->>>> +
->>>> +Required properties:
->>>> +#clock-cells:	   Number of cells in a clock specifier; typically will be
->>>> +		   set to 1
->>>> +
->>>> +Optional properties:
->>>> +clock-output-name: Recommended to be a list of strings of clock output signal
->>>> +		   names indexed by the first cell in the clock specifier.
->>>> +		   However, the meaning of clock-output-names is domain
->>>> +		   specific to the clock provider, and is only provided to
->>>> +		   encourage using the same meaning for the majority of clock
->>>> +		   providers.  This format may not work for clock providers
->>>> +		   using a complex clock specifier format.  In those cases it
->>>> +		   is recommended to omit this property and create a binding
->>>> +		   specific names property.
->>>
->>> If the clock-output-name property is omitted, does this mean a clock
->>> provider only has a single output or does it mean that it's not known
->>> how many clock outputs a provider actually has?
->>
->> Allowing several outputs for a single clock node might lead to a lot
->> of confusion. What will be the meaning of a clock rate if you have
->> several outputs at different frequency?
->> I think it will be better to define a clock node as a single source
->> of clock. If several outputs are needed, then we should define
->> several clock nodes.
->> If we let a clock node be any kind of big clock blob, we will never
->> be able to define some generic reusable clock node API. Everybody
->> will define its own custom clock blobs.
+>> Like it: Acked-by: Wolfram Sang <w.sang@pengutronix.de>
 >
-> Generally +1. I asked myself the same question whether it's a good thing
-> to allow a node to have multiple clocks. For i.MX I can say that I don't
-> need this and that I do not intend to use this feature. Grants concerns
-> about this are that the clock part of the device tree might explode when
-> we put each and every clock into the devicetree, so he wants to allow
-> bigger blobs of multiple clocks.
+> /me not. See my comments to v1.
 
-I can clearly understand this concern, because in the case of OMAP4, we 
-will have to add ~250 nodes if we want to define the current clock tree.
+Ok, I will implement your suggestion in v3.
 
-> My impression gets more and more that we either put the clock tree in the
-> devicetree or we do not do it, but there's not much room in between.
-
-If we are not ready to accept 4k lines of clock data inside the 
-devicetree, which is indeed huge and mostly useless, then I think we 
-should just expose the leaf clocks. But then they will depend on parent 
-that will not be in DT but in static files, which might be weird.
-
-I'm not sure what the right answer is :-(
+Will wait Shawn?s patch "arm/mxs: fix mmc device adding for
+mach-mx28evk" to reach rc2 first.
 
 Regards,
-Benoit
+
+Fabio Estevam
