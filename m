@@ -1,180 +1,437 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 11 Nov 2011 13:09:18 +0800
-Subject: [PATCH] arm/imx: remove imx_idle hook and use pm_idle instead
-Message-ID: <1320988158-9409-1-git-send-email-shawn.guo@linaro.org>
+From: jtzhou@marvell.com (Jett.Zhou)
+Date: Fri, 11 Nov 2011 13:35:11 +0800
+Subject: [V2] mfd: Convert pm860x to use regmap api
+Message-ID: <1320989711-29179-1-git-send-email-jtzhou@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch removes imx_idle hook and use pm_idle instead to get imx
-arch_idle prepared for the cleanup.  It's suggested by Russel King
-as below.
+There are two banks in 88pm8607. One is the normal bank, and the other
+one is the test bank.
+For normal bank , convert the register read/write code to use the
+register map API;
+For test bank, it needs a special I2C sequence as below,
+    Touching to 0xFA address
+    Touching to 0xFB address
+    Touching to 0xFF address
+    Accessing bank register
+    Touching to 0xFE address
+    Touching to 0xFC address
+This sequence can't be interrupted. It means that we can't use
+i2c_transfef() to implement touching 0xFA address. Otherwise, other i2c
+operation may be inserted into 0xFA and 0xFB operation since the lock of
+i2c_adapter is already released.
+So for test bank we implemented specific i2c read/write operation;
 
-> The final removal of mach/system.h depends on getting rid of the arch_idle
-> thing.  While going through these headers, I was dismayed to find these:
->
-> arch/arm/mach-s3c2410/include/mach/system.h:void (*s3c24xx_idle)(void);
-> arch/arm/plat-mxc/include/mach/system.h:extern void (*imx_idle)(void);
->
-> when we have a perfectly good pm_idle hook already in place - so there's
-> no excuse for these especially when other platforms are already using
-> pm_idle to hook their platform specific idle function into.  This is
-> something that better be gone at the next merge window!
-
-Suggested-by: Russell King <linux@arm.linux.org.uk>
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+Signed-off-by: Jett.Zhou <jtzhou@marvell.com>
 ---
- arch/arm/mach-imx/mm-imx3.c             |   53 ++++++++++++++++--------------
- arch/arm/mach-mx5/mm.c                  |    6 ++-
- arch/arm/plat-mxc/include/mach/common.h |    1 -
- arch/arm/plat-mxc/include/mach/system.h |    7 +---
- arch/arm/plat-mxc/system.c              |    1 -
- 5 files changed, 33 insertions(+), 35 deletions(-)
+ drivers/mfd/88pm860x-i2c.c   |  240 ++++++++++++++++++++++++------------------
+ drivers/mfd/Kconfig          |    1 +
+ include/linux/mfd/88pm860x.h |    2 +
+ 3 files changed, 140 insertions(+), 103 deletions(-)
 
-diff --git a/arch/arm/mach-imx/mm-imx3.c b/arch/arm/mach-imx/mm-imx3.c
-index 9f0e82e..6d01de3 100644
---- a/arch/arm/mach-imx/mm-imx3.c
-+++ b/arch/arm/mach-imx/mm-imx3.c
-@@ -33,29 +33,32 @@
- static void imx3_idle(void)
- {
- 	unsigned long reg = 0;
--	__asm__ __volatile__(
--		/* disable I and D cache */
--		"mrc p15, 0, %0, c1, c0, 0\n"
--		"bic %0, %0, #0x00001000\n"
--		"bic %0, %0, #0x00000004\n"
--		"mcr p15, 0, %0, c1, c0, 0\n"
--		/* invalidate I cache */
--		"mov %0, #0\n"
--		"mcr p15, 0, %0, c7, c5, 0\n"
--		/* clear and invalidate D cache */
--		"mov %0, #0\n"
--		"mcr p15, 0, %0, c7, c14, 0\n"
--		/* WFI */
--		"mov %0, #0\n"
--		"mcr p15, 0, %0, c7, c0, 4\n"
--		"nop\n" "nop\n" "nop\n" "nop\n"
--		"nop\n" "nop\n" "nop\n"
--		/* enable I and D cache */
--		"mrc p15, 0, %0, c1, c0, 0\n"
--		"orr %0, %0, #0x00001000\n"
--		"orr %0, %0, #0x00000004\n"
--		"mcr p15, 0, %0, c1, c0, 0\n"
--		: "=r" (reg));
-+
-+	if (!need_resched())
-+		__asm__ __volatile__(
-+			/* disable I and D cache */
-+			"mrc p15, 0, %0, c1, c0, 0\n"
-+			"bic %0, %0, #0x00001000\n"
-+			"bic %0, %0, #0x00000004\n"
-+			"mcr p15, 0, %0, c1, c0, 0\n"
-+			/* invalidate I cache */
-+			"mov %0, #0\n"
-+			"mcr p15, 0, %0, c7, c5, 0\n"
-+			/* clear and invalidate D cache */
-+			"mov %0, #0\n"
-+			"mcr p15, 0, %0, c7, c14, 0\n"
-+			/* WFI */
-+			"mov %0, #0\n"
-+			"mcr p15, 0, %0, c7, c0, 4\n"
-+			"nop\n" "nop\n" "nop\n" "nop\n"
-+			"nop\n" "nop\n" "nop\n"
-+			/* enable I and D cache */
-+			"mrc p15, 0, %0, c1, c0, 0\n"
-+			"orr %0, %0, #0x00001000\n"
-+			"orr %0, %0, #0x00000004\n"
-+			"mcr p15, 0, %0, c1, c0, 0\n"
-+			: "=r" (reg));
-+	local_irq_enable();
- }
- 
- static void __iomem *imx3_ioremap(unsigned long phys_addr, size_t size,
-@@ -143,7 +146,7 @@ void __init imx31_init_early(void)
- {
- 	mxc_set_cpu_type(MXC_CPU_MX31);
- 	mxc_arch_reset_init(MX31_IO_ADDRESS(MX31_WDOG_BASE_ADDR));
--	imx_idle = imx3_idle;
-+	pm_idle = imx3_idle;
- 	imx_ioremap = imx3_ioremap;
- }
- 
-@@ -152,7 +155,7 @@ void __init imx35_init_early(void)
- 	mxc_set_cpu_type(MXC_CPU_MX35);
- 	mxc_iomux_v3_init(MX35_IO_ADDRESS(MX35_IOMUXC_BASE_ADDR));
- 	mxc_arch_reset_init(MX35_IO_ADDRESS(MX35_WDOG_BASE_ADDR));
--	imx_idle = imx3_idle;
-+	pm_idle = imx3_idle;
- 	imx_ioremap = imx3_ioremap;
- }
- 
-diff --git a/arch/arm/mach-mx5/mm.c b/arch/arm/mach-mx5/mm.c
-index 26eacc9..df4a508f 100644
---- a/arch/arm/mach-mx5/mm.c
-+++ b/arch/arm/mach-mx5/mm.c
-@@ -23,7 +23,9 @@
- 
- static void imx5_idle(void)
- {
--	mx5_cpu_lp_set(WAIT_UNCLOCKED_POWER_OFF);
-+	if (!need_resched())
-+		mx5_cpu_lp_set(WAIT_UNCLOCKED_POWER_OFF);
-+	local_irq_enable();
- }
- 
- /*
-@@ -89,7 +91,7 @@ void __init imx51_init_early(void)
- 	mxc_set_cpu_type(MXC_CPU_MX51);
- 	mxc_iomux_v3_init(MX51_IO_ADDRESS(MX51_IOMUXC_BASE_ADDR));
- 	mxc_arch_reset_init(MX51_IO_ADDRESS(MX51_WDOG1_BASE_ADDR));
--	imx_idle = imx5_idle;
-+	pm_idle = imx5_idle;
- }
- 
- void __init imx53_init_early(void)
-diff --git a/arch/arm/plat-mxc/include/mach/common.h b/arch/arm/plat-mxc/include/mach/common.h
-index 83b745a..7143d52 100644
---- a/arch/arm/plat-mxc/include/mach/common.h
-+++ b/arch/arm/plat-mxc/include/mach/common.h
-@@ -85,7 +85,6 @@ enum mxc_cpu_pwr_mode {
- };
- 
- extern void mx5_cpu_lp_set(enum mxc_cpu_pwr_mode mode);
--extern void (*imx_idle)(void);
- extern void imx_print_silicon_rev(const char *cpu, int srev);
- 
- void avic_handle_irq(struct pt_regs *);
-diff --git a/arch/arm/plat-mxc/include/mach/system.h b/arch/arm/plat-mxc/include/mach/system.h
-index cf88b35..b9895d2 100644
---- a/arch/arm/plat-mxc/include/mach/system.h
-+++ b/arch/arm/plat-mxc/include/mach/system.h
-@@ -17,14 +17,9 @@
- #ifndef __ASM_ARCH_MXC_SYSTEM_H__
- #define __ASM_ARCH_MXC_SYSTEM_H__
- 
--extern void (*imx_idle)(void);
+diff --git a/drivers/mfd/88pm860x-i2c.c b/drivers/mfd/88pm860x-i2c.c
+index e017dc8..bf5b3e0 100644
+--- a/drivers/mfd/88pm860x-i2c.c
++++ b/drivers/mfd/88pm860x-i2c.c
+@@ -12,50 +12,20 @@
+ #include <linux/module.h>
+ #include <linux/platform_device.h>
+ #include <linux/i2c.h>
++#include <linux/err.h>
+ #include <linux/mfd/88pm860x.h>
+ #include <linux/slab.h>
 -
- static inline void arch_idle(void)
+-static inline int pm860x_read_device(struct i2c_client *i2c,
+-				     int reg, int bytes, void *dest)
+-{
+-	unsigned char data;
+-	int ret;
+-
+-	data = (unsigned char)reg;
+-	ret = i2c_master_send(i2c, &data, 1);
+-	if (ret < 0)
+-		return ret;
+-
+-	ret = i2c_master_recv(i2c, dest, bytes);
+-	if (ret < 0)
+-		return ret;
+-	return 0;
+-}
+-
+-static inline int pm860x_write_device(struct i2c_client *i2c,
+-				      int reg, int bytes, void *src)
+-{
+-	unsigned char buf[bytes + 1];
+-	int ret;
+-
+-	buf[0] = (unsigned char)reg;
+-	memcpy(&buf[1], src, bytes);
+-
+-	ret = i2c_master_send(i2c, buf, bytes + 1);
+-	if (ret < 0)
+-		return ret;
+-	return 0;
+-}
++#include <linux/regmap.h>
+ 
+ int pm860x_reg_read(struct i2c_client *i2c, int reg)
  {
--	if (imx_idle != NULL)
--		(imx_idle)();
--	else
--		cpu_do_idle();
-+	cpu_do_idle();
+ 	struct pm860x_chip *chip = i2c_get_clientdata(i2c);
+-	unsigned char data;
++	struct regmap *map = (i2c == chip->client) ? chip->regmap
++				: chip->regmap_companion;
++	unsigned int data;
+ 	int ret;
+ 
+-	mutex_lock(&chip->io_lock);
+-	ret = pm860x_read_device(i2c, reg, 1, &data);
+-	mutex_unlock(&chip->io_lock);
++	ret = regmap_read(map, reg, &data);
+ 
+ 	if (ret < 0)
+ 		return ret;
+@@ -68,12 +38,11 @@ int pm860x_reg_write(struct i2c_client *i2c, int reg,
+ 		     unsigned char data)
+ {
+ 	struct pm860x_chip *chip = i2c_get_clientdata(i2c);
++	struct regmap *map = (i2c == chip->client) ? chip->regmap
++				: chip->regmap_companion;
+ 	int ret;
+ 
+-	mutex_lock(&chip->io_lock);
+-	ret = pm860x_write_device(i2c, reg, 1, &data);
+-	mutex_unlock(&chip->io_lock);
+-
++	ret = regmap_write(map, reg, data);
+ 	return ret;
+ }
+ EXPORT_SYMBOL(pm860x_reg_write);
+@@ -82,12 +51,11 @@ int pm860x_bulk_read(struct i2c_client *i2c, int reg,
+ 		     int count, unsigned char *buf)
+ {
+ 	struct pm860x_chip *chip = i2c_get_clientdata(i2c);
++	struct regmap *map = (i2c == chip->client) ? chip->regmap
++				: chip->regmap_companion;
+ 	int ret;
+ 
+-	mutex_lock(&chip->io_lock);
+-	ret = pm860x_read_device(i2c, reg, count, buf);
+-	mutex_unlock(&chip->io_lock);
+-
++	ret = regmap_raw_read(map, reg, buf, count);
+ 	return ret;
+ }
+ EXPORT_SYMBOL(pm860x_bulk_read);
+@@ -96,12 +64,11 @@ int pm860x_bulk_write(struct i2c_client *i2c, int reg,
+ 		      int count, unsigned char *buf)
+ {
+ 	struct pm860x_chip *chip = i2c_get_clientdata(i2c);
++	struct regmap *map = (i2c == chip->client) ? chip->regmap
++				: chip->regmap_companion;
+ 	int ret;
+ 
+-	mutex_lock(&chip->io_lock);
+-	ret = pm860x_write_device(i2c, reg, count, buf);
+-	mutex_unlock(&chip->io_lock);
+-
++	ret = regmap_raw_write(map, reg, buf, count);
+ 	return ret;
+ }
+ EXPORT_SYMBOL(pm860x_bulk_write);
+@@ -110,39 +77,79 @@ int pm860x_set_bits(struct i2c_client *i2c, int reg,
+ 		    unsigned char mask, unsigned char data)
+ {
+ 	struct pm860x_chip *chip = i2c_get_clientdata(i2c);
+-	unsigned char value;
++	struct regmap *map = (i2c == chip->client) ? chip->regmap
++				: chip->regmap_companion;
+ 	int ret;
+ 
+-	mutex_lock(&chip->io_lock);
+-	ret = pm860x_read_device(i2c, reg, 1, &value);
+-	if (ret < 0)
+-		goto out;
+-	value &= ~mask;
+-	value |= data;
+-	ret = pm860x_write_device(i2c, reg, 1, &value);
+-out:
+-	mutex_unlock(&chip->io_lock);
++	ret = regmap_update_bits(map, reg, mask, data);
+ 	return ret;
+ }
+ EXPORT_SYMBOL(pm860x_set_bits);
+ 
++static int read_device(struct i2c_client *i2c, int reg,
++		       int bytes, void *dest)
++{
++	unsigned char msgbuf0[I2C_SMBUS_BLOCK_MAX + 3];
++	unsigned char msgbuf1[I2C_SMBUS_BLOCK_MAX + 2];
++	struct i2c_adapter *adap = i2c->adapter;
++	struct i2c_msg msg[2] = {{i2c->addr, 0, 1, msgbuf0},
++				 {i2c->addr, I2C_M_RD, 0, msgbuf1},
++				};
++	int num = 1, ret = 0;
++
++	if (dest == NULL)
++		return -EINVAL;
++	msgbuf0[0] = (unsigned char)reg;	/* command */
++	msg[1].len = bytes;
++
++	/* if data needs to read back, num should be 2 */
++	if (bytes > 0)
++		num = 2;
++	ret = adap->algo->master_xfer(adap, msg, num);
++	memcpy(dest, msgbuf1, bytes);
++	if (ret < 0)
++		return ret;
++	return 0;
++}
++
++static int write_device(struct i2c_client *i2c, int reg,
++			int bytes, void *src)
++{
++	unsigned char buf[bytes + 1];
++	struct i2c_adapter *adap = i2c->adapter;
++	struct i2c_msg msg;
++	int ret;
++
++	buf[0] = (unsigned char)reg;
++	memcpy(&buf[1], src, bytes);
++	msg.addr = i2c->addr;
++	msg.flags = 0;
++	msg.len = bytes + 1;
++	msg.buf = buf;
++
++	ret = adap->algo->master_xfer(adap, &msg, 1);
++	if (ret < 0)
++		return ret;
++	return 0;
++}
++
+ int pm860x_page_reg_read(struct i2c_client *i2c, int reg)
+ {
+-	struct pm860x_chip *chip = i2c_get_clientdata(i2c);
+ 	unsigned char zero = 0;
+ 	unsigned char data;
+ 	int ret;
+ 
+-	mutex_lock(&chip->io_lock);
+-	pm860x_write_device(i2c, 0xFA, 0, &zero);
+-	pm860x_write_device(i2c, 0xFB, 0, &zero);
+-	pm860x_write_device(i2c, 0xFF, 0, &zero);
+-	ret = pm860x_read_device(i2c, reg, 1, &data);
++	i2c_lock_adapter(i2c->adapter);
++	read_device(i2c, 0xFA, 0, &zero);
++	read_device(i2c, 0xFB, 0, &zero);
++	read_device(i2c, 0xFF, 0, &zero);
++	ret = read_device(i2c, reg, 1, &data);
+ 	if (ret >= 0)
+ 		ret = (int)data;
+-	pm860x_write_device(i2c, 0xFE, 0, &zero);
+-	pm860x_write_device(i2c, 0xFC, 0, &zero);
+-	mutex_unlock(&chip->io_lock);
++	read_device(i2c, 0xFE, 0, &zero);
++	read_device(i2c, 0xFC, 0, &zero);
++	i2c_unlock_adapter(i2c->adapter);
++
+ 	return ret;
+ }
+ EXPORT_SYMBOL(pm860x_page_reg_read);
+@@ -150,18 +157,18 @@ EXPORT_SYMBOL(pm860x_page_reg_read);
+ int pm860x_page_reg_write(struct i2c_client *i2c, int reg,
+ 			  unsigned char data)
+ {
+-	struct pm860x_chip *chip = i2c_get_clientdata(i2c);
+ 	unsigned char zero;
+ 	int ret;
+ 
+-	mutex_lock(&chip->io_lock);
+-	pm860x_write_device(i2c, 0xFA, 0, &zero);
+-	pm860x_write_device(i2c, 0xFB, 0, &zero);
+-	pm860x_write_device(i2c, 0xFF, 0, &zero);
+-	ret = pm860x_write_device(i2c, reg, 1, &data);
+-	pm860x_write_device(i2c, 0xFE, 0, &zero);
+-	pm860x_write_device(i2c, 0xFC, 0, &zero);
+-	mutex_unlock(&chip->io_lock);
++	i2c_lock_adapter(i2c->adapter);
++	read_device(i2c, 0xFA, 0, &zero);
++	read_device(i2c, 0xFB, 0, &zero);
++	read_device(i2c, 0xFF, 0, &zero);
++	ret = write_device(i2c, reg, 1, &data);
++	read_device(i2c, 0xFE, 0, &zero);
++	read_device(i2c, 0xFC, 0, &zero);
++	i2c_unlock_adapter(i2c->adapter);
++
+ 	return ret;
+ }
+ EXPORT_SYMBOL(pm860x_page_reg_write);
+@@ -169,18 +176,18 @@ EXPORT_SYMBOL(pm860x_page_reg_write);
+ int pm860x_page_bulk_read(struct i2c_client *i2c, int reg,
+ 			  int count, unsigned char *buf)
+ {
+-	struct pm860x_chip *chip = i2c_get_clientdata(i2c);
+ 	unsigned char zero = 0;
+ 	int ret;
+ 
+-	mutex_lock(&chip->io_lock);
+-	pm860x_write_device(i2c, 0xFA, 0, &zero);
+-	pm860x_write_device(i2c, 0xFB, 0, &zero);
+-	pm860x_write_device(i2c, 0xFF, 0, &zero);
+-	ret = pm860x_read_device(i2c, reg, count, buf);
+-	pm860x_write_device(i2c, 0xFE, 0, &zero);
+-	pm860x_write_device(i2c, 0xFC, 0, &zero);
+-	mutex_unlock(&chip->io_lock);
++	i2c_lock_adapter(i2c->adapter);
++	read_device(i2c, 0xfa, 0, &zero);
++	read_device(i2c, 0xfb, 0, &zero);
++	read_device(i2c, 0xff, 0, &zero);
++	ret = read_device(i2c, reg, count, buf);
++	read_device(i2c, 0xFE, 0, &zero);
++	read_device(i2c, 0xFC, 0, &zero);
++	i2c_unlock_adapter(i2c->adapter);
++
+ 	return ret;
+ }
+ EXPORT_SYMBOL(pm860x_page_bulk_read);
+@@ -189,17 +196,21 @@ int pm860x_page_bulk_write(struct i2c_client *i2c, int reg,
+ 			   int count, unsigned char *buf)
+ {
+ 	struct pm860x_chip *chip = i2c_get_clientdata(i2c);
++	struct regmap *map = (i2c == chip->client) ? chip->regmap
++					: chip->regmap_companion;
+ 	unsigned char zero = 0;
+ 	int ret;
+ 
+-	mutex_lock(&chip->io_lock);
+-	pm860x_write_device(i2c, 0xFA, 0, &zero);
+-	pm860x_write_device(i2c, 0xFB, 0, &zero);
+-	pm860x_write_device(i2c, 0xFF, 0, &zero);
+-	ret = pm860x_write_device(i2c, reg, count, buf);
+-	pm860x_write_device(i2c, 0xFE, 0, &zero);
+-	pm860x_write_device(i2c, 0xFC, 0, &zero);
+-	mutex_unlock(&chip->io_lock);
++	i2c_lock_adapter(i2c->adapter);
++	read_device(i2c, 0xFA, 0, &zero);
++	read_device(i2c, 0xFB, 0, &zero);
++	read_device(i2c, 0xFF, 0, &zero);
++	ret = write_device(i2c, reg, count, buf);
++	read_device(i2c, 0xFE, 0, &zero);
++	read_device(i2c, 0xFC, 0, &zero);
++	i2c_unlock_adapter(i2c->adapter);
++	i2c_unlock_adapter(i2c->adapter);
++
+ 	return ret;
+ }
+ EXPORT_SYMBOL(pm860x_page_bulk_write);
+@@ -207,25 +218,26 @@ EXPORT_SYMBOL(pm860x_page_bulk_write);
+ int pm860x_page_set_bits(struct i2c_client *i2c, int reg,
+ 			 unsigned char mask, unsigned char data)
+ {
+-	struct pm860x_chip *chip = i2c_get_clientdata(i2c);
+ 	unsigned char zero;
+ 	unsigned char value;
+ 	int ret;
+ 
+-	mutex_lock(&chip->io_lock);
+-	pm860x_write_device(i2c, 0xFA, 0, &zero);
+-	pm860x_write_device(i2c, 0xFB, 0, &zero);
+-	pm860x_write_device(i2c, 0xFF, 0, &zero);
+-	ret = pm860x_read_device(i2c, reg, 1, &value);
++	i2c_lock_adapter(i2c->adapter);
++	read_device(i2c, 0xFA, 0, &zero);
++	read_device(i2c, 0xFB, 0, &zero);
++	read_device(i2c, 0xFF, 0, &zero);
++	ret = read_device(i2c, reg, 1, &value);
+ 	if (ret < 0)
+ 		goto out;
+ 	value &= ~mask;
+ 	value |= data;
+-	ret = pm860x_write_device(i2c, reg, 1, &value);
++	ret = write_device(i2c, reg, 1, &value);
++
+ out:
+-	pm860x_write_device(i2c, 0xFE, 0, &zero);
+-	pm860x_write_device(i2c, 0xFC, 0, &zero);
+-	mutex_unlock(&chip->io_lock);
++	read_device(i2c, 0xFE, 0, &zero);
++	read_device(i2c, 0xFC, 0, &zero);
++	i2c_unlock_adapter(i2c->adapter);
++
+ 	return ret;
+ }
+ EXPORT_SYMBOL(pm860x_page_set_bits);
+@@ -257,11 +269,17 @@ static int verify_addr(struct i2c_client *i2c)
+ 	return 0;
  }
  
- void arch_reset(char mode, const char *cmd);
-diff --git a/arch/arm/plat-mxc/system.c b/arch/arm/plat-mxc/system.c
-index 9dad8dc..a0bcccf 100644
---- a/arch/arm/plat-mxc/system.c
-+++ b/arch/arm/plat-mxc/system.c
-@@ -28,7 +28,6 @@
- #include <asm/system.h>
- #include <asm/mach-types.h>
++static struct regmap_config pm860x_regmap_config = {
++	.reg_bits = 8,
++	.val_bits = 8,
++};
++
+ static int __devinit pm860x_probe(struct i2c_client *client,
+ 				  const struct i2c_device_id *id)
+ {
+ 	struct pm860x_platform_data *pdata = client->dev.platform_data;
+ 	struct pm860x_chip *chip;
++	int ret;
  
--void (*imx_idle)(void) = NULL;
- void __iomem *(*imx_ioremap)(unsigned long, size_t, unsigned int) = NULL;
+ 	if (!pdata) {
+ 		pr_info("No platform data in %s!\n", __func__);
+@@ -273,6 +291,14 @@ static int __devinit pm860x_probe(struct i2c_client *client,
+ 		return -ENOMEM;
  
- static void __iomem *wdog_base;
+ 	chip->id = verify_addr(client);
++
++	chip->regmap = regmap_init_i2c(client, &pm860x_regmap_config);
++	if (IS_ERR(chip->regmap)) {
++		ret = PTR_ERR(chip->regmap);
++		dev_err(&client->dev, "Failed to allocate register map: %d\n",
++				ret);
++		return ret;
++	}
+ 	chip->client = client;
+ 	i2c_set_clientdata(client, chip);
+ 	chip->dev = &client->dev;
+@@ -290,6 +316,14 @@ static int __devinit pm860x_probe(struct i2c_client *client,
+ 		chip->companion_addr = pdata->companion_addr;
+ 		chip->companion = i2c_new_dummy(chip->client->adapter,
+ 						chip->companion_addr);
++		chip->regmap_companion = regmap_init_i2c(chip->companion,
++							&pm860x_regmap_config);
++		if (IS_ERR(chip->regmap_companion)) {
++			ret = PTR_ERR(chip->regmap_companion);
++			dev_err(&chip->companion->dev,
++				"Failed to allocate register map: %d\n", ret);
++			return ret;
++		}
+ 		i2c_set_clientdata(chip->companion, chip);
+ 	}
+ 
+diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
+index a67adcb..1973b23 100644
+--- a/drivers/mfd/Kconfig
++++ b/drivers/mfd/Kconfig
+@@ -27,6 +27,7 @@ config MFD_CORE
+ config MFD_88PM860X
+ 	bool "Support Marvell 88PM8606/88PM8607"
+ 	depends on I2C=y && GENERIC_HARDIRQS
++	select REGMAP_I2C
+ 	select MFD_CORE
+ 	help
+ 	  This supports for Marvell 88PM8606/88PM8607 Power Management IC.
+diff --git a/include/linux/mfd/88pm860x.h b/include/linux/mfd/88pm860x.h
+index 63b4fb8..f860547 100644
+--- a/include/linux/mfd/88pm860x.h
++++ b/include/linux/mfd/88pm860x.h
+@@ -301,6 +301,8 @@ struct pm860x_chip {
+ 	struct mutex		irq_lock;
+ 	struct i2c_client	*client;
+ 	struct i2c_client	*companion;	/* companion chip client */
++	struct regmap           *regmap;
++	struct regmap           *regmap_companion;
+ 
+ 	int			buck3_double;	/* DVC ramp slope double */
+ 	unsigned short		companion_addr;
 -- 
-1.7.4.1
+1.7.0.4
