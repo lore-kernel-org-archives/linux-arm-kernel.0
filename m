@@ -1,130 +1,89 @@
-From: Joerg.Roedel@amd.com (Joerg Roedel)
-Date: Fri, 11 Nov 2011 15:18:08 +0100
-Subject: [PATCH v4 2/7] iommu/core: split mapping to page sizes as
- supported by the hardware
-In-Reply-To: <1321018048.2027.44.camel@shinybook.infradead.org>
-References: <1318850846-16066-1-git-send-email-ohad@wizery.com>
- <1318850846-16066-3-git-send-email-ohad@wizery.com>
- <CANqQZNH1YRSgYRVxceicQ3szD=t7zeJjhJKEQ30PeKsxtj5V+A@mail.gmail.com>
- <1320938930.22195.17.camel@i7.infradead.org>
- <20111110170918.GE13213@amd.com>
- <1320953319.535.11.camel@i7.infradead.org>
- <20111111125837.GF13213@amd.com>
- <1321018048.2027.44.camel@shinybook.infradead.org>
-Message-ID: <20111111141807.GJ13213@amd.com>
+From: richard.zhao@linaro.org (Richard Zhao)
+Date: Fri, 11 Nov 2011 22:20:48 +0800
+Subject: [PATCH V2 01/14] clk: add helper functions clk_prepare_enable
+ and clk_disable_unprepare
+In-Reply-To: <20111111115644.GT16886@pengutronix.de>
+References: <1320973829-4388-1-git-send-email-richard.zhao@linaro.org>
+ <1320973829-4388-2-git-send-email-richard.zhao@linaro.org>
+ <20111111084950.GH16886@pengutronix.de>
+ <20111111090546.GC14617@b20223-02.ap.freescale.net>
+ <20111111091556.GI16886@pengutronix.de>
+ <20111111102727.GC12913@n2100.arm.linux.org.uk>
+ <20111111115644.GT16886@pengutronix.de>
+Message-ID: <20111111142046.GA20556@b20223-02.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 11, 2011 at 01:27:28PM +0000, David Woodhouse wrote:
-> On Fri, 2011-11-11 at 13:58 +0100, Joerg Roedel wrote:
-> > For AMD IOMMU there is a feature called not-present cache. It says that
-> > the IOMMU caches non-present entries as well and needs an IOTLB flush
-> > when something is mapped (meant for software implementations of the
-> > IOMMU).
-> > So it can't be really taken out of the fast-path. But the IOMMU driver
-> > can optimize the function so that it only flushes the IOTLB when there
-> > was an unmap-call before. 
+On Fri, Nov 11, 2011 at 12:56:44PM +0100, Sascha Hauer wrote:
+> On Fri, Nov 11, 2011 at 10:27:27AM +0000, Russell King - ARM Linux wrote:
+> > On Fri, Nov 11, 2011 at 10:15:56AM +0100, Sascha Hauer wrote:
+> > > On Fri, Nov 11, 2011 at 05:05:47PM +0800, Richard Zhao wrote:
+> > > > {
+> > > > 	int ret;
+> > > > 
+> > > > 	ret = clk_prepare(clk);
+> > > > 	if (ret)
+> > > > 		return ret;
+> > > > 	ret = clk_enable(clk);
+> > > > 	if (ret)
+> > > > 		clk_unprepare(clk);
+> > > > 	return ret;
+> > > 
+> > > Yes, looks good.
+> > 
+> > While this looks like a nice easy solution for converting existing
+> > drivers, I'd suggest thinking about this a little more...
+> > 
+> > I would suggest some thought is given to the placement of clk_enable()
+> > and clk_disable() when adding clk_prepare(), especially if your existing
+> > clk_enable() function can only be called from non-atomic contexts.
+> > 
+> > Obviously, the transition path needs to be along these lines:
+> > 
+> > 1. add clk_prepare() to drivers
+> > 2. implement clk_prepare() and make clk_enable() callable from non-atomic
+> >    contexts
+> > 3. move clk_enable() in drivers to places it can be called from non-atomic
+> >    contexts to achieve greater power savings (maybe via the runtime pm)
+Hi Russell,
+
+There are use cases calling clk_enable in atomic context, but there are even more
+cases caling in non-atomic context. The patch meant to help the latter cases.
+Tuning of driver power savings can be left to other contributers. Is it ok
+if I add below comments:
+/* clk_prepare_enable helps cases using clk_enable in non-atomic context. */
+static inline int clk_prepare_enable(struct clk *clk)
+...
+/* clk_disable_unprepare helps cases using clk_disable in non-atomic context. */
+static inline void clk_disable_unprepare(struct clk *clk)
+...
+
+Thanks
+Richard
+> > 
+> > and where a driver is shared between different sub-architectures which
+> > have non-atomic clk_enable()s, (3) can only happen when all those sub-
+> > architectures have been updated to step (2).
 > 
-> We have exactly the same situation with the Intel IOMMU (we call it
-> 'Caching Mode') for the same reasons.
+> The drivers changed here all do clk_prepare/enable in their probe
+> function. I agree that this clk_prepare_enable patch gives kind of
+> wrong motivation to just use this function and to forget about
+> potential power savings with proper integration of clk_prepare/enable.
+> I think though that it will take a long time until all drivers really
+> do this no matter if we have such a helper or not. I think that in the
+> meantime it's better to have a little helper than to clobber the probe
+> code with additional error handling.
 > 
-> I'd be wary about making the IOMMU driver *track* whether there was an
-> unmap call before ? that seems like hard work and more cache contention,
-> especially if the ->commit() call happens on a CPU other than the one
-> that just did the unmap.
-
-Well, the IOMMU driver does not need to track this globally or
-per-IOMMU. It basically tracks it per-domain. This lowers the
-cache-bouncing a bit.
-
-> I'm also not sure exactly when you'd call the ->commit() function when
-> the DMA API is being used, and which 'side' of that API the
-> deferred-flush optimisations would live.
-
-The commit function is called every time before one of the DMA-API
-functions return.
-
-> Would the optimisation be done on the generic side, only calling
-> ->commit when it absolutely *has* to happen? (Or periodically after
-> unmaps have happened to avoid entries hanging around for ever?)
+> Sascha
 > 
-> Or would the optimisation be done in the IOMMU driver, thus turning the
-> ->commit() function into more of a *hint*? You could add a 'simon_says'
-> boolean argument to it, I suppose...?
-
-The IOMMU driver can't do that because special knowledge about the
-address allocator is needed. So it has to happen in the generic part.
-Okay, that optimization does not really work with the ->commit() idea,
-as I think about it. With the requirement to call commit() on the
-map-side would result in too many flushes to happen.
-
-So it may be better to just call it iommu_flush_tlb(domain) or
-something. The user of the IOMMU-API can assume that the flush is only
-necessary on the unmap-path. Stricter flushing rules need to be handled
-in the IOMMU driver itself.
-
-> > It is also an improvement over the current
-> > situation where every iommu_unmap call results in a flush implicitly.
-> > This pretty much a no-go for using IOMMU-API in DMA mapping at the
-> > moment.
+> -- 
+> Pengutronix e.K.                           |                             |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
 > 
-> Right. That definitely needs to be handled. We just need to work out the
-> (above and other) details.
-
-Yes, I am convinced now that the commit() idea is not the right solution
-:)
-Some less generic semantics like a iommu_flush_tlb call-back would do
-better with such an optimization.
-
-> Certainly your concerns are valid, but I think we can cope with them
-> fairly reasonably. If we *do* have large number of CPUs allocating for a
-> given domain, we can move to a per-node rather than per-CPU allocator.
-> And we can have dynamically sized allocation regions, so we aren't
-> wasting too much space on unused bitmaps if you map just *one* page from
-> each of your 4096 CPUs.
-
-It also requires somewhat that the chunks are reasonably small. On a
-typical small system the amount of allocated DMA memory is rather small
-(GPUs are the exception, of course).
-
-Btw, do you have numbers how much time is spent in spinlocks for
-multi-node machines and the VT-d driver for some workloads? I remember
-that I did this measurement some time ago on a 24 core AMD machine with
-netperf on a 10GBit network card and the time spent spinning came out
-at ~5%.
-For 1Gbit network and disk-load it was around 0.5% on that machine.
-
-> > How much lock contention will be lowered also depends on the work-load.
-> > If dma-handles are frequently freed from another cpu than they were
-> > allocated from the same problem re-appears.
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 > 
-> The idea is that dma handles are *infrequently* freed, in batches. So
-> we'll bounce the lock's cache line occasionally, but not all the time.
-
-Hmm, btw, how does this batch-freeing works? Is the freeing done when
-the address space is filled up or is another approach used?
-
-> > But in the end we have to try it out and see what works best :)
-> 
-> Indeed. I'm just trying to work out if I should try to do the allocator
-> thing purely inside the Intel code first, and then try to move it out
-> and make it generic ? or if I should start with making the DMA API work
-> with a wrapper around the IOMMU API, with your ->commit() and other
-> necessary changes. I think I'd prefer the latter, if we can work out how
-> it should look.
-
-I think it is the best to start with a generic DMA-mapping
-implementation, benchmark it and then find the bottlenecks and try out
-possible optimizations. In the beginning it is hard enough to come up
-with an implementation that fits X86 and ARM at the same time. When this
-is worked out we can continue to optimize :)
-
-
-	Joerg
-
--- 
-AMD Operating System Research Center
-
-Advanced Micro Devices GmbH Einsteinring 24 85609 Dornach
-General Managers: Alberto Bozzo, Andrew Bowd
-Registration: Dornach, Landkr. Muenchen; Registerger. Muenchen, HRB Nr. 43632
