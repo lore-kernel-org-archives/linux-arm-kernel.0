@@ -1,145 +1,47 @@
-From: snjw23@gmail.com (Sylwester Nawrocki)
-Date: Fri, 11 Nov 2011 12:41:50 +0100
-Subject: [PATCH 4/4] ARM: exynos4: remove useless code to save/restore
- L2 and GIC state
-In-Reply-To: <CAK44p21H0mGnWRhMx4VSW5FCg4ytY4hzAy4CE3bjFeGan5fxRA@mail.gmail.com>
-References: <1320426228-21746-1-git-send-email-amit.kachhap@linaro.org>	<1320426228-21746-5-git-send-email-amit.kachhap@linaro.org>	<4EB421FE.407@samsung.com>
- <CAK44p21H0mGnWRhMx4VSW5FCg4ytY4hzAy4CE3bjFeGan5fxRA@mail.gmail.com>
-Message-ID: <4EBD09FE.7040805@gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 11 Nov 2011 11:41:47 +0000
+Subject: [PATCH v5 4/7] arm: omap4: hwmod: introduce emu hwmod
+In-Reply-To: <alpine.DEB.2.00.1111100152430.4195@utopia.booyaka.com>
+References: <1319467559-5518-1-git-send-email-ming.lei@canonical.com>
+ <1319467559-5518-5-git-send-email-ming.lei@canonical.com>
+ <alpine.DEB.2.00.1111080750130.10451@utopia.booyaka.com>
+ <CACVXFVMSJUT2Ac+bWetrLpbyOs6PqY+npNHsbvHipEVZ0gWdgQ@mail.gmail.com>
+ <alpine.DEB.2.00.1111100152430.4195@utopia.booyaka.com>
+Message-ID: <20111111114147.GE12410@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/11/2011 07:28 AM, Amit Kachhap wrote:
-> On 4 November 2011 23:03, Sylwester Nawrocki<s.nawrocki@samsung.com>  wrote:
->> On 11/04/2011 06:03 PM, amit.kachhap at linaro.org wrote:
->>> From: Amit Daniel Kachhap<amit.kachhap@linaro.org>
->>>
->>> Following the merge of CPU PM notifiers and L2 resume code, this patch
->>> removes useless code to save and restore L2 and GIC registers.
->>>
->>> This is now automatically covered by suspend calls which integrated
->>> CPU PM notifiers and new sleep code that allows to resume L2 before MMU
->>> is turned on.
->>>
->>> Signed-off-by: Lorenzo Pieralisi<lorenzo.pieralisi@arm.com>
->>> Signed-off-by: Amit Daniel Kachhap<amit.kachhap@linaro.org>
->>> ---
->>>   arch/arm/mach-exynos4/pm.c |   86 --------------------------------------------
->>>   1 files changed, 0 insertions(+), 86 deletions(-)
->>>
->>> diff --git a/arch/arm/mach-exynos4/pm.c b/arch/arm/mach-exynos4/pm.c
->>> index 62e4f43..7499f14 100644
->>> --- a/arch/arm/mach-exynos4/pm.c
->>> +++ b/arch/arm/mach-exynos4/pm.c
->>> @@ -63,77 +63,6 @@ static struct sleep_save exynos4_vpll_save[] = {
->>>   };
->>>
->>>   static struct sleep_save exynos4_core_save[] = {
->>> -     /* GIC side */
->>> -     SAVE_ITEM(S5P_VA_GIC_CPU + 0x000),
->>> -     SAVE_ITEM(S5P_VA_GIC_CPU + 0x004),
->>> -     SAVE_ITEM(S5P_VA_GIC_CPU + 0x008),
->>> -     SAVE_ITEM(S5P_VA_GIC_CPU + 0x00C),
->>> -     SAVE_ITEM(S5P_VA_GIC_CPU + 0x014),
->>> -     SAVE_ITEM(S5P_VA_GIC_CPU + 0x018),
->>> -     SAVE_ITEM(S5P_VA_GIC_DIST + 0x000),
->>> -     SAVE_ITEM(S5P_VA_GIC_DIST + 0x004),
->>> -     SAVE_ITEM(S5P_VA_GIC_DIST + 0x100),
->>> -     SAVE_ITEM(S5P_VA_GIC_DIST + 0x104),
->>> -     SAVE_ITEM(S5P_VA_GIC_DIST + 0x108),
->>> -     SAVE_ITEM(S5P_VA_GIC_DIST + 0x300),
->>> -     SAVE_ITEM(S5P_VA_GIC_DIST + 0x304),
->>> -     SAVE_ITEM(S5P_VA_GIC_DIST + 0x308),
->>> -     SAVE_ITEM(S5P_VA_GIC_DIST + 0x400),
->>> -     SAVE_ITEM(S5P_VA_GIC_DIST + 0x404),
->>> -     SAVE_ITEM(S5P_VA_GIC_DIST + 0x408),
->>> -     SAVE_ITEM(S5P_VA_GIC_DIST + 0x40C),
->>> -     SAVE_ITEM(S5P_VA_GIC_DIST + 0x410),
->>> -     SAVE_ITEM(S5P_VA_GIC_DIST + 0x414),
->>> -     SAVE_ITEM(S5P_VA_GIC_DIST + 0x418),
->>> -     SAVE_ITEM(S5P_VA_GIC_DIST + 0x41C),
->>> -     SAVE_ITEM(S5P_VA_GIC_DIST + 0x420),
->>> -     SAVE_ITEM(S5P_VA_GIC_DIST + 0x424),
->>> -     SAVE_ITEM(S5P_VA_GIC_DIST + 0x428),
->>> -     SAVE_ITEM(S5P_VA_GIC_DIST + 0x42C),
->>> -     SAVE_ITEM(S5P_VA_GIC_DIST + 0x430),
->>> -     SAVE_ITEM(S5P_VA_GIC_DIST + 0x434),
->>> -     SAVE_ITEM(S5P_VA_GIC_DIST + 0x438),
->>> -     SAVE_ITEM(S5P_VA_GIC_DIST + 0x43C),
->>> -     SAVE_ITEM(S5P_VA_GIC_DIST + 0x440),
->>> -     SAVE_ITEM(S5P_VA_GIC_DIST + 0x444),
->>> -     SAVE_ITEM(S5P_VA_GIC_DIST + 0x448),
->>> -     SAVE_ITEM(S5P_VA_GIC_DIST + 0x44C),
->>> -     SAVE_ITEM(S5P_VA_GIC_DIST + 0x450),
->>> -     SAVE_ITEM(S5P_VA_GIC_DIST + 0x454),
->>> -     SAVE_ITEM(S5P_VA_GIC_DIST + 0x458),
->>> -     SAVE_ITEM(S5P_VA_GIC_DIST + 0x45C),
->>> -
->>> -     SAVE_ITEM(S5P_VA_GIC_DIST + 0x800),
->>> -     SAVE_ITEM(S5P_VA_GIC_DIST + 0x804),
->>> -     SAVE_ITEM(S5P_VA_GIC_DIST + 0x808),
->>> -     SAVE_ITEM(S5P_VA_GIC_DIST + 0x80C),
->>> -     SAVE_ITEM(S5P_VA_GIC_DIST + 0x810),
->>> -     SAVE_ITEM(S5P_VA_GIC_DIST + 0x814),
->>> -     SAVE_ITEM(S5P_VA_GIC_DIST + 0x818),
->>> -     SAVE_ITEM(S5P_VA_GIC_DIST + 0x81C),
->>> -     SAVE_ITEM(S5P_VA_GIC_DIST + 0x820),
->>> -     SAVE_ITEM(S5P_VA_GIC_DIST + 0x824),
->>> -     SAVE_ITEM(S5P_VA_GIC_DIST + 0x828),
->>> -     SAVE_ITEM(S5P_VA_GIC_DIST + 0x82C),
->>> -     SAVE_ITEM(S5P_VA_GIC_DIST + 0x830),
->>> -     SAVE_ITEM(S5P_VA_GIC_DIST + 0x834),
->>> -     SAVE_ITEM(S5P_VA_GIC_DIST + 0x838),
->>> -     SAVE_ITEM(S5P_VA_GIC_DIST + 0x83C),
->>> -     SAVE_ITEM(S5P_VA_GIC_DIST + 0x840),
->>> -     SAVE_ITEM(S5P_VA_GIC_DIST + 0x844),
->>> -     SAVE_ITEM(S5P_VA_GIC_DIST + 0x848),
->>> -     SAVE_ITEM(S5P_VA_GIC_DIST + 0x84C),
->>> -     SAVE_ITEM(S5P_VA_GIC_DIST + 0x850),
->>> -     SAVE_ITEM(S5P_VA_GIC_DIST + 0x854),
->>> -     SAVE_ITEM(S5P_VA_GIC_DIST + 0x858),
->>> -     SAVE_ITEM(S5P_VA_GIC_DIST + 0x85C),
->>> -
->>> -     SAVE_ITEM(S5P_VA_GIC_DIST + 0xC00),
->>> -     SAVE_ITEM(S5P_VA_GIC_DIST + 0xC04),
->>> -     SAVE_ITEM(S5P_VA_GIC_DIST + 0xC08),
->>> -     SAVE_ITEM(S5P_VA_GIC_DIST + 0xC0C),
->>> -     SAVE_ITEM(S5P_VA_GIC_DIST + 0xC10),
->>> -     SAVE_ITEM(S5P_VA_GIC_DIST + 0xC14),
->>
->>
->> This list is not complete anyway, some peripheral devices interrupts do not
->> work after resume from system suspend to RAM.
->> Is there any code already handling GIC state during system suspend/resume cycles?
->> Or you refer to some upcoming patches ?
+[Adding Benoit to CC].
+
+On Thu, Nov 10, 2011 at 09:02:14AM +0000, Paul Walmsley wrote:
+> On Wed, 9 Nov 2011, Ming Lei wrote:
+> > Also, current arm perf code don't handle three IRQs(one pl310 irq and 
+> > two CTI irq) inside one device correctly.
 > 
-> In my next patch series I have left the GIC save/restore from platform code.
+> To fix this, that ARM perf code should either be using 
+> platform_get_irq_byname(), or the hwmod hardware data will need to be 
+> rearranged to meet the arbitrary ordering requirement.  I'd suggest 
+> pinging Will on this issue to see what he wants to do.
 
-OK, although I thought someone is just going to fix the regression introduced with
-commit:
+The issue stems from the fact that we have to route the PMU interrupts to
+the correct CPU manually (I think only MSM routes them as PPIs, which is
+clearly the correct thing to do). To do this, we expect the IRQ resources to
+be laid out in CPU order. In hindsight, maybe naming the resources might
+have been a good idea, but them we'd still have to generate the names using
+CPU numbers when iterating through the platform device.
 
-commit aab74d3e753649defa52ea43cbec1e91ebb4cc8e
-Author: Changhwan Youn <chaos.youn@samsung.com>
-Date:   Sat Jul 16 10:49:51 2011 +0900
+So although the ordering requirements are a bit of a pain, I do think it's
+reasonable for perf to expect that it's not being handed some random other
+interrupts along with those for the PMU.
 
-    ARM: EXYNOS4: Add support external GIC
-    
-    For full support of power modes, this patch adds implementation
-    external GIC on EXYNOS4.
-    
-    External GIC of Exynos4 cannot support register banking so
-    several interrupt related code for CPU1 should be different
-    from that of CPU0.
-    
-    Signed-off-by: Changhwan Youn <chaos.youn@samsung.com>
-    Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> So the clockdomain is already defined in 
+> mach-omap2/clockdomains44xx_data.c and there's code to control it - see 
+> for example clkdm_enable_idle().  But this code should not be called 
+> directly by any device driver code or driver integration code.  The thing 
+> to do here is to ask Beno?t to release the hwmod data for the DEBUGSS 
+> hwmod, then someone will need to write an MFD driver for that which 
+> exposes the PMU address space to the PMU platform driver.
 
-The external GIC has more registers and now not all of them are properly handled during
-system sleep/resume. I didn't get around yet to submit a proper solution for that.  
-I suspect per CPU distributor and CPU interface register files need to be saved/restored.
-I'm not an expert in the GIC internals though, I'm just wondering why can't GIC be left
-active during system sleep.
+Benoit? Please can you chime in here?
 
---
-Regards,
-Sylwester
+Will
