@@ -1,24 +1,69 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Fri, 11 Nov 2011 14:06:33 +0800
-Subject: [PATCH v4 2/3] ARM: mx28evk: add platform data for saif
-In-Reply-To: <20111110083852.GU16886@pengutronix.de>
-References: <1320907333-12696-1-git-send-email-b29396@freescale.com>
- <1320907333-12696-3-git-send-email-b29396@freescale.com>
- <20111110083852.GU16886@pengutronix.de>
-Message-ID: <20111111060632.GB8732@S2100-06.ap.freescale.net>
+From: shubhrajyoti@ti.com (Shubhrajyoti)
+Date: Fri, 11 Nov 2011 11:41:36 +0530
+Subject: [PATCH v7 11/21] OMAP2+: UART: Move errata handling from serial.c
+ to omap-serial
+In-Reply-To: <4EBC61DB.9020402@ti.com>
+References: <1318951576-10165-1-git-send-email-govindraj.raja@ti.com>
+ <1318951576-10165-12-git-send-email-govindraj.raja@ti.com>
+ <4EBC61DB.9020402@ti.com>
+Message-ID: <4EBCBC98.9040200@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 10, 2011 at 09:38:52AM +0100, Sascha Hauer wrote:
-[...]
-> This function pointers are not devicetree friendly. I don't know whether
-> i.MX28 will be ever converted to devicetree,
+On Friday 11 November 2011 05:14 AM, Jon Hunter wrote:
+> Hi Govindraj,
+>
+> On 10/18/2011 10:26, Govindraj.R wrote:
+>> Move the errata handling mechanism from serial.c to omap-serial file
+>> and utilise the same func in driver file.
+>>
+>> Errata i202, i291 are moved to be handled with omap-serial
+>> Moving the errata macro from serial.c file to driver header file
+>> as from on errata will be handled in driver file itself.
+>> Corrected errata id from chapter reference 2.15 to errata id i291.
+>>
+>> Removed errata and dma_enabled feilds from omap_uart_state struct
+Nitpick.
+The field spelling could be corrected.
+>> as they are no more needed with errata handling done within omap-serial.
+>>
+>> Acked-by: Alan Cox<alan@linux.intel.com>
+>> Signed-off-by: Govindraj.R<govindraj.raja@ti.com>
+>> ---
+>>   arch/arm/mach-omap2/serial.c                  |   97
+>> +++++++------------------
+>>   arch/arm/plat-omap/include/plat/omap-serial.h |    6 ++
+>>   drivers/tty/serial/omap-serial.c              |   66 ++++++++++++++++-
+>>   3 files changed, 95 insertions(+), 74 deletions(-)
+>
+> [snip]
+>
+>> +    /* Enable the MDR1 errata for OMAP3 */
+>> +    if (cpu_is_omap34xx()&&  !cpu_is_ti816x())
+>> +        omap_up.errata |= UART_ERRATA_i202_MDR1_ACCESS;
+>
+> This errata (i202) is applicable to all devices from OMAP2430 to
+> OMAP4460 (apparently this one is not getting fixed). So could you make
+> sure this is enabled for 2430, 3430, 3630, 4430 and 4460?
+>
+Yes good point.
 
-It will.  This is something on my TODO list.
-
-Regards,
-Shawn
-
-> but we should not
-> unnecessary additional hurdles.
-> 
+> [snip]
+>
+>> +/*
+>> + * Work Around for Errata i202 (3430 - 1.12, 3630 - 1.6)
+>
+> We should update the comment to be "Work Around for Errata i202 (2430,
+> 3430, 3630, 4430 and 4460)". The "1.12" and "1.6" are just the section
+> references in the errata docs, but I think that you can drop these as
+> you can just search for the errata ID which is i202.
+>
+> Cheers
+> Jon
+>
+>
+>
+> -- 
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
