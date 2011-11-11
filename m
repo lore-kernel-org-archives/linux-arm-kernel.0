@@ -1,130 +1,180 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Fri, 11 Nov 2011 12:02:38 +0800
-Subject: [PATCH 24/41] ARM: restart: mxs: use new restart hook
-In-Reply-To: <E1RN6pC-0001YC-Mx@rmk-PC.arm.linux.org.uk>
-References: <20111106173113.GI12913@n2100.arm.linux.org.uk>
- <E1RN6pC-0001YC-Mx@rmk-PC.arm.linux.org.uk>
-Message-ID: <20111111040237.GA8732@S2100-06.ap.freescale.net>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 11 Nov 2011 13:09:18 +0800
+Subject: [PATCH] arm/imx: remove imx_idle hook and use pm_idle instead
+Message-ID: <1320988158-9409-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 06, 2011 at 05:48:06PM +0000, Russell King - ARM Linux wrote:
-> Hook these platforms restart code into the new restart hook rather
-> than using arch_reset().
-> 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+The patch removes imx_idle hook and use pm_idle instead to get imx
+arch_idle prepared for the cleanup.  It's suggested by Russel King
+as below.
 
-Acked-by: Shawn Guo <shawn.guo@linaro.org>
+> The final removal of mach/system.h depends on getting rid of the arch_idle
+> thing.  While going through these headers, I was dismayed to find these:
+>
+> arch/arm/mach-s3c2410/include/mach/system.h:void (*s3c24xx_idle)(void);
+> arch/arm/plat-mxc/include/mach/system.h:extern void (*imx_idle)(void);
+>
+> when we have a perfectly good pm_idle hook already in place - so there's
+> no excuse for these especially when other platforms are already using
+> pm_idle to hook their platform specific idle function into.  This is
+> something that better be gone at the next merge window!
 
-Regards,
-Shawn
+Suggested-by: Russell King <linux@arm.linux.org.uk>
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ arch/arm/mach-imx/mm-imx3.c             |   53 ++++++++++++++++--------------
+ arch/arm/mach-mx5/mm.c                  |    6 ++-
+ arch/arm/plat-mxc/include/mach/common.h |    1 -
+ arch/arm/plat-mxc/include/mach/system.h |    7 +---
+ arch/arm/plat-mxc/system.c              |    1 -
+ 5 files changed, 33 insertions(+), 35 deletions(-)
 
-> ---
->  arch/arm/mach-mxs/include/mach/common.h |    1 +
->  arch/arm/mach-mxs/include/mach/system.h |    4 +++-
->  arch/arm/mach-mxs/mach-m28evk.c         |    1 +
->  arch/arm/mach-mxs/mach-mx23evk.c        |    1 +
->  arch/arm/mach-mxs/mach-mx28evk.c        |    1 +
->  arch/arm/mach-mxs/mach-stmp378x_devb.c  |    1 +
->  arch/arm/mach-mxs/mach-tx28.c           |    1 +
->  arch/arm/mach-mxs/system.c              |    2 +-
->  8 files changed, 10 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/mach-mxs/include/mach/common.h b/arch/arm/mach-mxs/include/mach/common.h
-> index 635bb5d..1388485 100644
-> --- a/arch/arm/mach-mxs/include/mach/common.h
-> +++ b/arch/arm/mach-mxs/include/mach/common.h
-> @@ -16,6 +16,7 @@ struct clk;
->  extern const u32 *mxs_get_ocotp(void);
->  extern int mxs_reset_block(void __iomem *);
->  extern void mxs_timer_init(struct clk *, int);
-> +extern void mxs_restart(char, const char *);
->  
->  extern int mx23_register_gpios(void);
->  extern int mx23_clocks_init(void);
-> diff --git a/arch/arm/mach-mxs/include/mach/system.h b/arch/arm/mach-mxs/include/mach/system.h
-> index 0e42823..bcd8989 100644
-> --- a/arch/arm/mach-mxs/include/mach/system.h
-> +++ b/arch/arm/mach-mxs/include/mach/system.h
-> @@ -22,6 +22,8 @@ static inline void arch_idle(void)
->  	cpu_do_idle();
->  }
->  
-> -void arch_reset(char mode, const char *cmd);
-> +static inline void arch_reset(char mode, const char *cmd)
-> +{
-> +}
->  
->  #endif /* __MACH_MXS_SYSTEM_H__ */
-> diff --git a/arch/arm/mach-mxs/mach-m28evk.c b/arch/arm/mach-mxs/mach-m28evk.c
-> index 3b1681e..7799cd9 100644
-> --- a/arch/arm/mach-mxs/mach-m28evk.c
-> +++ b/arch/arm/mach-mxs/mach-m28evk.c
-> @@ -363,4 +363,5 @@ MACHINE_START(M28EVK, "DENX M28 EVK")
->  	.init_irq	= mx28_init_irq,
->  	.init_machine	= m28evk_init,
->  	.timer		= &m28evk_timer,
-> +	.restart	= mxs_restart,
->  MACHINE_END
-> diff --git a/arch/arm/mach-mxs/mach-mx23evk.c b/arch/arm/mach-mxs/mach-mx23evk.c
-> index c325fbe..5ea1c57 100644
-> --- a/arch/arm/mach-mxs/mach-mx23evk.c
-> +++ b/arch/arm/mach-mxs/mach-mx23evk.c
-> @@ -184,4 +184,5 @@ MACHINE_START(MX23EVK, "Freescale MX23 EVK")
->  	.init_irq	= mx23_init_irq,
->  	.timer		= &mx23evk_timer,
->  	.init_machine	= mx23evk_init,
-> +	.restart	= mxs_restart,
->  MACHINE_END
-> diff --git a/arch/arm/mach-mxs/mach-mx28evk.c b/arch/arm/mach-mxs/mach-mx28evk.c
-> index ac2316d..1d2548f 100644
-> --- a/arch/arm/mach-mxs/mach-mx28evk.c
-> +++ b/arch/arm/mach-mxs/mach-mx28evk.c
-> @@ -501,4 +501,5 @@ MACHINE_START(MX28EVK, "Freescale MX28 EVK")
->  	.init_irq	= mx28_init_irq,
->  	.timer		= &mx28evk_timer,
->  	.init_machine	= mx28evk_init,
-> +	.restart	= mxs_restart,
->  MACHINE_END
-> diff --git a/arch/arm/mach-mxs/mach-stmp378x_devb.c b/arch/arm/mach-mxs/mach-stmp378x_devb.c
-> index 177e531..857e857 100644
-> --- a/arch/arm/mach-mxs/mach-stmp378x_devb.c
-> +++ b/arch/arm/mach-mxs/mach-stmp378x_devb.c
-> @@ -117,4 +117,5 @@ MACHINE_START(STMP378X, "STMP378X")
->  	.init_irq	= mx23_init_irq,
->  	.init_machine	= stmp378x_dvb_init,
->  	.timer		= &stmp378x_dvb_timer,
-> +	.restart	= mxs_restart,
->  MACHINE_END
-> diff --git a/arch/arm/mach-mxs/mach-tx28.c b/arch/arm/mach-mxs/mach-tx28.c
-> index 9a1f0e7..2c0862e 100644
-> --- a/arch/arm/mach-mxs/mach-tx28.c
-> +++ b/arch/arm/mach-mxs/mach-tx28.c
-> @@ -178,4 +178,5 @@ MACHINE_START(TX28, "Ka-Ro electronics TX28 module")
->  	.init_irq = mx28_init_irq,
->  	.timer = &tx28_timer,
->  	.init_machine = tx28_stk5v3_init,
-> +	.restart	= mxs_restart,
->  MACHINE_END
-> diff --git a/arch/arm/mach-mxs/system.c b/arch/arm/mach-mxs/system.c
-> index cab8836..b936633 100644
-> --- a/arch/arm/mach-mxs/system.c
-> +++ b/arch/arm/mach-mxs/system.c
-> @@ -42,7 +42,7 @@ static void __iomem *mxs_clkctrl_reset_addr;
->  /*
->   * Reset the system. It is called by machine_restart().
->   */
-> -void arch_reset(char mode, const char *cmd)
-> +void mxs_restart(char mode, const char *cmd)
->  {
->  	/* reset the chip */
->  	__mxs_setl(MXS_CLKCTRL_RESET_CHIP, mxs_clkctrl_reset_addr);
-> -- 
-> 1.7.4.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+diff --git a/arch/arm/mach-imx/mm-imx3.c b/arch/arm/mach-imx/mm-imx3.c
+index 9f0e82e..6d01de3 100644
+--- a/arch/arm/mach-imx/mm-imx3.c
++++ b/arch/arm/mach-imx/mm-imx3.c
+@@ -33,29 +33,32 @@
+ static void imx3_idle(void)
+ {
+ 	unsigned long reg = 0;
+-	__asm__ __volatile__(
+-		/* disable I and D cache */
+-		"mrc p15, 0, %0, c1, c0, 0\n"
+-		"bic %0, %0, #0x00001000\n"
+-		"bic %0, %0, #0x00000004\n"
+-		"mcr p15, 0, %0, c1, c0, 0\n"
+-		/* invalidate I cache */
+-		"mov %0, #0\n"
+-		"mcr p15, 0, %0, c7, c5, 0\n"
+-		/* clear and invalidate D cache */
+-		"mov %0, #0\n"
+-		"mcr p15, 0, %0, c7, c14, 0\n"
+-		/* WFI */
+-		"mov %0, #0\n"
+-		"mcr p15, 0, %0, c7, c0, 4\n"
+-		"nop\n" "nop\n" "nop\n" "nop\n"
+-		"nop\n" "nop\n" "nop\n"
+-		/* enable I and D cache */
+-		"mrc p15, 0, %0, c1, c0, 0\n"
+-		"orr %0, %0, #0x00001000\n"
+-		"orr %0, %0, #0x00000004\n"
+-		"mcr p15, 0, %0, c1, c0, 0\n"
+-		: "=r" (reg));
++
++	if (!need_resched())
++		__asm__ __volatile__(
++			/* disable I and D cache */
++			"mrc p15, 0, %0, c1, c0, 0\n"
++			"bic %0, %0, #0x00001000\n"
++			"bic %0, %0, #0x00000004\n"
++			"mcr p15, 0, %0, c1, c0, 0\n"
++			/* invalidate I cache */
++			"mov %0, #0\n"
++			"mcr p15, 0, %0, c7, c5, 0\n"
++			/* clear and invalidate D cache */
++			"mov %0, #0\n"
++			"mcr p15, 0, %0, c7, c14, 0\n"
++			/* WFI */
++			"mov %0, #0\n"
++			"mcr p15, 0, %0, c7, c0, 4\n"
++			"nop\n" "nop\n" "nop\n" "nop\n"
++			"nop\n" "nop\n" "nop\n"
++			/* enable I and D cache */
++			"mrc p15, 0, %0, c1, c0, 0\n"
++			"orr %0, %0, #0x00001000\n"
++			"orr %0, %0, #0x00000004\n"
++			"mcr p15, 0, %0, c1, c0, 0\n"
++			: "=r" (reg));
++	local_irq_enable();
+ }
+ 
+ static void __iomem *imx3_ioremap(unsigned long phys_addr, size_t size,
+@@ -143,7 +146,7 @@ void __init imx31_init_early(void)
+ {
+ 	mxc_set_cpu_type(MXC_CPU_MX31);
+ 	mxc_arch_reset_init(MX31_IO_ADDRESS(MX31_WDOG_BASE_ADDR));
+-	imx_idle = imx3_idle;
++	pm_idle = imx3_idle;
+ 	imx_ioremap = imx3_ioremap;
+ }
+ 
+@@ -152,7 +155,7 @@ void __init imx35_init_early(void)
+ 	mxc_set_cpu_type(MXC_CPU_MX35);
+ 	mxc_iomux_v3_init(MX35_IO_ADDRESS(MX35_IOMUXC_BASE_ADDR));
+ 	mxc_arch_reset_init(MX35_IO_ADDRESS(MX35_WDOG_BASE_ADDR));
+-	imx_idle = imx3_idle;
++	pm_idle = imx3_idle;
+ 	imx_ioremap = imx3_ioremap;
+ }
+ 
+diff --git a/arch/arm/mach-mx5/mm.c b/arch/arm/mach-mx5/mm.c
+index 26eacc9..df4a508f 100644
+--- a/arch/arm/mach-mx5/mm.c
++++ b/arch/arm/mach-mx5/mm.c
+@@ -23,7 +23,9 @@
+ 
+ static void imx5_idle(void)
+ {
+-	mx5_cpu_lp_set(WAIT_UNCLOCKED_POWER_OFF);
++	if (!need_resched())
++		mx5_cpu_lp_set(WAIT_UNCLOCKED_POWER_OFF);
++	local_irq_enable();
+ }
+ 
+ /*
+@@ -89,7 +91,7 @@ void __init imx51_init_early(void)
+ 	mxc_set_cpu_type(MXC_CPU_MX51);
+ 	mxc_iomux_v3_init(MX51_IO_ADDRESS(MX51_IOMUXC_BASE_ADDR));
+ 	mxc_arch_reset_init(MX51_IO_ADDRESS(MX51_WDOG1_BASE_ADDR));
+-	imx_idle = imx5_idle;
++	pm_idle = imx5_idle;
+ }
+ 
+ void __init imx53_init_early(void)
+diff --git a/arch/arm/plat-mxc/include/mach/common.h b/arch/arm/plat-mxc/include/mach/common.h
+index 83b745a..7143d52 100644
+--- a/arch/arm/plat-mxc/include/mach/common.h
++++ b/arch/arm/plat-mxc/include/mach/common.h
+@@ -85,7 +85,6 @@ enum mxc_cpu_pwr_mode {
+ };
+ 
+ extern void mx5_cpu_lp_set(enum mxc_cpu_pwr_mode mode);
+-extern void (*imx_idle)(void);
+ extern void imx_print_silicon_rev(const char *cpu, int srev);
+ 
+ void avic_handle_irq(struct pt_regs *);
+diff --git a/arch/arm/plat-mxc/include/mach/system.h b/arch/arm/plat-mxc/include/mach/system.h
+index cf88b35..b9895d2 100644
+--- a/arch/arm/plat-mxc/include/mach/system.h
++++ b/arch/arm/plat-mxc/include/mach/system.h
+@@ -17,14 +17,9 @@
+ #ifndef __ASM_ARCH_MXC_SYSTEM_H__
+ #define __ASM_ARCH_MXC_SYSTEM_H__
+ 
+-extern void (*imx_idle)(void);
+-
+ static inline void arch_idle(void)
+ {
+-	if (imx_idle != NULL)
+-		(imx_idle)();
+-	else
+-		cpu_do_idle();
++	cpu_do_idle();
+ }
+ 
+ void arch_reset(char mode, const char *cmd);
+diff --git a/arch/arm/plat-mxc/system.c b/arch/arm/plat-mxc/system.c
+index 9dad8dc..a0bcccf 100644
+--- a/arch/arm/plat-mxc/system.c
++++ b/arch/arm/plat-mxc/system.c
+@@ -28,7 +28,6 @@
+ #include <asm/system.h>
+ #include <asm/mach-types.h>
+ 
+-void (*imx_idle)(void) = NULL;
+ void __iomem *(*imx_ioremap)(unsigned long, size_t, unsigned int) = NULL;
+ 
+ static void __iomem *wdog_base;
+-- 
+1.7.4.1
