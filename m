@@ -1,60 +1,101 @@
-From: B39297@freescale.com (Wu Guoxing-B39297)
-Date: Fri, 11 Nov 2011 09:31:23 +0000
-Subject: [GIT PULL] arm/mx35/3ds: GPIO : add mc9s08dz60 gpio function
-In-Reply-To: <20111111092539.GK16886@pengutronix.de>
-References: <3D55990BDF4852409EA769663F22E54AC19541@039-SN1MPN1-006.039d.mgd.msft.net>
- <20111111092539.GK16886@pengutronix.de>
-Message-ID: <3D55990BDF4852409EA769663F22E54AC19736@039-SN1MPN1-006.039d.mgd.msft.net>
+From: p-combes@ti.com (Patrick Combes)
+Date: Fri, 11 Nov 2011 10:40:06 +0100
+Subject: [RFC][PATCH] gpiolib: add irq_wake (power-management) sysfs file
+Message-ID: <1321004406-15663-1-git-send-email-p-combes@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-  And I found that my pull request mail to Linux-arm-kernel maillist is blocked, don't know why, so I sent the request message again as bellow:
+From: Hugo Dupras <h-dupras@ti.com>
 
-  Thanks!
+By calling poll() on the /sys/class/gpio/gpioN/value sysfs file, usermode
+application can take benefit of gpio interrupts.
+However, depending on the power state reached, this interrupt may not wake-up
+the CPU.
+This patch creates a new sysfs file /sys/class/gpio/gpioN/irq_wake to enable
+usermode application to set the wake properties of a gpio IRQ.
+This option can be set or not for each gpio to preserve power consumption (e.g
+embedded systems).
 
-Best Regards
-Wu Guoxing
+Signed-off-by: Hugo Dupras <h-dupras@ti.com>
+Signed-off-by: Patrick Combes <p-combes@ti.com>
+---
+ drivers/gpio/gpiolib.c |   55 +++++++++++++++++++++++++++++++++++++++++++++++-
+ 1 files changed, 54 insertions(+), 1 deletions(-)
 
-
-The following changes since commit a59024f1ecb52972b9be5ee91b5ef38a6b263d1b:
-
-  Merge branch 'for_3.2/gpio-cleanup' of git://gitorious.org/khilman/linux-omap-pm into gpio/merge (2011-11-08 12:48:27 -0700)
-
-are available in the git repository at:
-
-  git://git.linaro.org/people/riczhao/linux-2.6.git for-gpio
-
-wu guoxing (1):
-      ARM/mx35/3ds: gpio: add mc9s08dz60 gpio function
-
-drivers/gpio/Kconfig           |    6 ++
-drivers/gpio/Makefile          |    1 +
-drivers/gpio/gpio-mc9s08dz60.c |  174 ++++++++++++++++++++++++++++++++++++++++
-3 files changed, 181 insertions(+), 0 deletions(-)
-create mode 100644 drivers/gpio/gpio-mc9s08dz60.c
-
-
-
-
------Original Message-----
-From: s.hauer@pengutronix.de [mailto:s.hauer at pengutronix.de] 
-Sent: Friday, November 11, 2011 5:26 PM
-To: Wu Guoxing-B39297
-Cc: grant.likely at secretlab.ca; linux-arm-kernel at lists.infradead.org; Marc Kleine-Budde; shawn.guo at linaro.org; Linus Walleij
-Subject: Re: [GIT PULL] arm/mx35/3ds: GPIO : add mc9s08dz60 gpio function
-
-On Fri, Nov 11, 2011 at 02:35:00AM +0000, Wu Guoxing-B39297 wrote:
-> Hi Grant:
-> 
-> Please help to pull the following GPIO patch for mc9s08dz60 that on imx mx35 pdk board.
-
-Grant is not available atm. Added Linus Walleij to Cc instead.
-
-Sascha
-
-
+diff --git a/drivers/gpio/gpiolib.c b/drivers/gpio/gpiolib.c
+index a971e3d..cf03aed 100644
+--- a/drivers/gpio/gpiolib.c
++++ b/drivers/gpio/gpiolib.c
+@@ -543,6 +543,55 @@ static ssize_t gpio_active_low_store(struct device *dev,
+ static const DEVICE_ATTR(active_low, 0644,
+ 		gpio_active_low_show, gpio_active_low_store);
+ 
++static ssize_t gpio_irq_wake_store(struct device *dev,
++		struct device_attribute *attr, const char *buf, size_t size)
++{
++	const struct gpio_desc  *desc = dev_get_drvdata(dev);
++	unsigned		gpio = desc - gpio_desc;
++	ssize_t			status;
++
++	mutex_lock(&sysfs_lock);
++
++	if (!test_bit(FLAG_EXPORT, &desc->flags))
++		status = -EIO;
++	else if (sysfs_streq(buf, "enable") || sysfs_streq(buf, "1"))
++		status = enable_irq_wake(gpio_to_irq(gpio));
++	else if (sysfs_streq(buf, "disable") || sysfs_streq(buf, "0"))
++		status = disable_irq_wake(gpio_to_irq(gpio));
++	else
++		status = -EINVAL;
++
++	mutex_unlock(&sysfs_lock);
++
++	return status ? : size;
++}
++
++static ssize_t gpio_irq_wake_show(struct device *dev,
++		struct device_attribute *attr, char *buf)
++{
++	const struct gpio_desc	*desc = dev_get_drvdata(dev);
++	unsigned		gpio = desc - gpio_desc;
++	int			irq = gpio_to_irq(gpio);
++	ssize_t			status;
++	struct irq_data		*gpio_irq_data = irq_get_irq_data(irq);
++
++	mutex_lock(&sysfs_lock);
++
++	if (gpio_irq_data)
++		status = sprintf(buf, " Wakeup %s\n",
++					irqd_is_wakeup_set(gpio_irq_data)
++					? " enable" : "disable");
++	else
++		status = -EINVAL;
++
++	mutex_unlock(&sysfs_lock);
++
++	return status;
++}
++
++static const DEVICE_ATTR(irq_wake, 0644,
++		gpio_irq_wake_show, gpio_irq_wake_store);
++
+ static const struct attribute *gpio_attrs[] = {
+ 	&dev_attr_value.attr,
+ 	&dev_attr_active_low.attr,
+@@ -744,9 +793,13 @@ int gpio_export(unsigned gpio, bool direction_may_change)
+ 			if (!status && gpio_to_irq(gpio) >= 0
+ 					&& (direction_may_change
+ 						|| !test_bit(FLAG_IS_OUT,
+-							&desc->flags)))
++							&desc->flags))) {
+ 				status = device_create_file(dev,
+ 						&dev_attr_edge);
++				if (!status)
++					status = device_create_file(dev,
++							&dev_attr_irq_wake);
++			}
+ 
+ 			if (status != 0)
+ 				device_unregister(dev);
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.7.0.4
