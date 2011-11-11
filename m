@@ -1,107 +1,94 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Fri, 11 Nov 2011 20:31:26 +0530
-Subject: [GIT PULL] VIC DT+MULTI_IRQ_HANDLER patches
-In-Reply-To: <20111111123007.GD5114@totoro>
-References: <20111111123007.GD5114@totoro>
-Message-ID: <CAJuYYwTsS65LR9_H+VK99-nJggYTmg45p=OX0gDBY=UURQZjHA@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 11 Nov 2011 16:04:22 +0100
+Subject: [PATCH 1/1] ASoC: mxs-saif: remove function in platform_data
+In-Reply-To: <1321003740-10992-1-git-send-email-b29396@freescale.com>
+References: <1321003740-10992-1-git-send-email-b29396@freescale.com>
+Message-ID: <20111111150422.GX16886@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jamie,
+On Fri, Nov 11, 2011 at 05:29:00PM +0800, Dong Aisheng wrote:
+> Add master_mode and master_id in platfrom_data since it's board
+> specific and board knows it.
+> Then we can remove the function pointer in platfrom_data to make
+> the driver more devicetree friendly.
 
-On 11 November 2011 18:00, Jamie Iles <jamie@jamieiles.com> wrote:
-> Hi Marc,
->
-> I've updated the VIC series to include export.h and added some Tested-by
-> and Acked-by's.
->
-> This is dependent on https://lkml.org/lkml/2011/11/10/186 (irq: fix
-> possible null-pointer deref irq_domain_to_irq) which hasn't been picked
-> up yet so I understand if you don't want to hold up your GIC patches,
-> but I'll defer to you on that!
->
-> Thanks,
->
-> Jamie
->
-> The following changes since commit ad2cf1a746915c5c95edaba104dcb50023fb18d1:
->
-> ?ARM: GIC: Make MULTI_IRQ_HANDLER mandatory (2011-11-08 10:10:10 +0000)
->
-> are available in the git repository at:
-> ?git://github.com/jamieiles/linux-2.6-ji.git vic-dt
->
-> Jamie Iles (11):
-> ? ? ?ARM: vic: device tree binding
-> ? ? ?ARM: vic: MULTI_IRQ_HANDLER handler
-> ? ? ?ARM: ep93xx: convert to MULTI_IRQ_HANDLER
-> ? ? ?ARM: netx: convert to MULTI_IRQ_HANDLER
-> ? ? ?ARM: nomadik: convert to MULTI_IRQ_HANDLER
-> ? ? ?ARM: spear: convert to MULTI_IRQ_HANDLER
-> ? ? ?ARM: u300: convert to MULTI_IRQ_HANDLER
-> ? ? ?ARM: versatile: convert to MULTI_IRQ_HANDLER
-> ? ? ?ARM: samsung: convert to MULTI_IRQ_HANDLER
-> ? ? ?ARM: picoxcell: convert to MULTI_IRQ_HANDLER
-> ? ? ?ARM: VIC: remove non MULTI_IRQ_HANDLER support
+Looks ok. Marc, is it ok when I take this patch? The SoC specific stuff
+for this patch depends on it.
 
-There was a patch "[PATCHv4 07/13] ARM: s3c64xx: convert to
-MULTI_IRQ_HANDLER" in your series. Is this patch dropped in this pull
-request?
+Sascha
 
-Thanks,
-Thomas.
+> 
+> Signed-off-by: Dong Aisheng <b29396@freescale.com>
+> ---
+> This patch is based on Sascha's suggestions and see using in
+> [PATCH v5 0/3] ARM: mxs: add recording support for saif
+> ---
+>  include/sound/saif.h     |    4 ++--
+>  sound/soc/mxs/mxs-saif.c |   19 ++++++++-----------
+>  2 files changed, 10 insertions(+), 13 deletions(-)
+> 
+> diff --git a/include/sound/saif.h b/include/sound/saif.h
+> index d0e0de7..f22f3e1 100644
+> --- a/include/sound/saif.h
+> +++ b/include/sound/saif.h
+> @@ -10,7 +10,7 @@
+>  #define __SOUND_SAIF_H__
+>  
+>  struct mxs_saif_platform_data {
+> -	int (*init) (void);
+> -	int (*get_master_id) (unsigned int saif_id);
+> +	bool master_mode;	/* if true use master mode */
+> +	int master_id;		/* id of the master if in slave mode */
+>  };
+>  #endif
+> diff --git a/sound/soc/mxs/mxs-saif.c b/sound/soc/mxs/mxs-saif.c
+> index 76dc74d..03b64d2 100644
+> --- a/sound/soc/mxs/mxs-saif.c
+> +++ b/sound/soc/mxs/mxs-saif.c
+> @@ -625,13 +625,6 @@ static int mxs_saif_probe(struct platform_device *pdev)
+>  	if (pdev->id >= ARRAY_SIZE(mxs_saif))
+>  		return -EINVAL;
+>  
+> -	pdata = pdev->dev.platform_data;
+> -	if (pdata && pdata->init) {
+> -		ret = pdata->init();
+> -		if (ret)
+> -			return ret;
+> -	}
+> -
+>  	saif = kzalloc(sizeof(*saif), GFP_KERNEL);
+>  	if (!saif)
+>  		return -ENOMEM;
+> @@ -639,12 +632,16 @@ static int mxs_saif_probe(struct platform_device *pdev)
+>  	mxs_saif[pdev->id] = saif;
+>  	saif->id = pdev->id;
+>  
+> -	saif->master_id = saif->id;
+> -	if (pdata && pdata->get_master_id) {
+> -		saif->master_id = pdata->get_master_id(saif->id);
+> +	pdata = pdev->dev.platform_data;
+> +	if (pdata && !pdata->master_mode) {
+> +		saif->master_id = pdata->master_id;
+>  		if (saif->master_id < 0 ||
+> -			saif->master_id >= ARRAY_SIZE(mxs_saif))
+> +			saif->master_id >= ARRAY_SIZE(mxs_saif) ||
+> +			saif->master_id == saif->id)
+> +			dev_err(&pdev->dev, "get wrong master id\n");
+>  			return -EINVAL;
+> +	} else {
+> +		saif->master_id = saif->id;
+>  	}
+>  
+>  	saif->clk = clk_get(&pdev->dev, NULL);
+> -- 
+> 1.7.0.4
+> 
+> 
+> 
 
->
-> ?Documentation/devicetree/bindings/arm/vic.txt ? ? ?| ? 29 ++++
-> ?arch/arm/common/Kconfig ? ? ? ? ? ? ? ? ? ? ? ? ? ?| ? ?2 +
-> ?arch/arm/common/vic.c ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| ?143 ++++++++++++++++----
-> ?arch/arm/include/asm/entry-macro-vic2.S ? ? ? ? ? ?| ? 57 --------
-> ?arch/arm/include/asm/hardware/vic.h ? ? ? ? ? ? ? ?| ? 10 ++-
-> ?arch/arm/mach-ep93xx/adssphere.c ? ? ? ? ? ? ? ? ? | ? ?2 +
-> ?arch/arm/mach-ep93xx/edb93xx.c ? ? ? ? ? ? ? ? ? ? | ? ?9 ++
-> ?arch/arm/mach-ep93xx/gesbc9312.c ? ? ? ? ? ? ? ? ? | ? ?2 +
-> ?arch/arm/mach-ep93xx/include/mach/entry-macro.S ? ?| ? 42 ------
-> ?arch/arm/mach-ep93xx/micro9.c ? ? ? ? ? ? ? ? ? ? ?| ? ?5 +
-> ?arch/arm/mach-ep93xx/simone.c ? ? ? ? ? ? ? ? ? ? ?| ? ?2 +
-> ?arch/arm/mach-ep93xx/snappercl15.c ? ? ? ? ? ? ? ? | ? ?2 +
-> ?arch/arm/mach-ep93xx/ts72xx.c ? ? ? ? ? ? ? ? ? ? ?| ? ?2 +
-> ?arch/arm/mach-netx/include/mach/entry-macro.S ? ? ?| ? 13 --
-> ?arch/arm/mach-netx/nxdb500.c ? ? ? ? ? ? ? ? ? ? ? | ? ?2 +
-> ?arch/arm/mach-netx/nxdkn.c ? ? ? ? ? ? ? ? ? ? ? ? | ? ?2 +
-> ?arch/arm/mach-netx/nxeb500hmi.c ? ? ? ? ? ? ? ? ? ?| ? ?2 +
-> ?arch/arm/mach-nomadik/board-nhk8815.c ? ? ? ? ? ? ?| ? ?2 +
-> ?arch/arm/mach-nomadik/include/mach/entry-macro.S ? | ? 30 ----
-> ?arch/arm/mach-picoxcell/common.c ? ? ? ? ? ? ? ? ? | ? ?9 +-
-> ?arch/arm/mach-picoxcell/include/mach/entry-macro.S | ? 11 +-
-> ?arch/arm/mach-s5p64x0/include/mach/entry-macro.S ? | ? ?7 +-
-> ?arch/arm/mach-s5p64x0/mach-smdk6440.c ? ? ? ? ? ? ?| ? ?2 +
-> ?arch/arm/mach-s5p64x0/mach-smdk6450.c ? ? ? ? ? ? ?| ? ?2 +
-> ?arch/arm/mach-s5pc100/include/mach/entry-macro.S ? | ? 25 ----
-> ?arch/arm/mach-s5pc100/mach-smdkc100.c ? ? ? ? ? ? ?| ? ?2 +
-> ?arch/arm/mach-s5pv210/include/mach/entry-macro.S ? | ? 37 -----
-> ?arch/arm/mach-s5pv210/mach-aquila.c ? ? ? ? ? ? ? ?| ? ?2 +
-> ?arch/arm/mach-s5pv210/mach-goni.c ? ? ? ? ? ? ? ? ?| ? ?2 +
-> ?arch/arm/mach-s5pv210/mach-smdkc110.c ? ? ? ? ? ? ?| ? ?2 +
-> ?arch/arm/mach-s5pv210/mach-smdkv210.c ? ? ? ? ? ? ?| ? ?2 +
-> ?arch/arm/mach-s5pv210/mach-torbreck.c ? ? ? ? ? ? ?| ? ?2 +
-> ?arch/arm/mach-spear3xx/include/mach/entry-macro.S ?| ? 27 ----
-> ?arch/arm/mach-spear3xx/spear300_evb.c ? ? ? ? ? ? ?| ? ?2 +
-> ?arch/arm/mach-spear3xx/spear310_evb.c ? ? ? ? ? ? ?| ? ?2 +
-> ?arch/arm/mach-spear3xx/spear320_evb.c ? ? ? ? ? ? ?| ? ?2 +
-> ?arch/arm/mach-spear6xx/include/mach/entry-macro.S ?| ? 36 -----
-> ?arch/arm/mach-spear6xx/spear600_evb.c ? ? ? ? ? ? ?| ? ?2 +
-> ?arch/arm/mach-u300/include/mach/entry-macro.S ? ? ?| ? 24 ----
-> ?arch/arm/mach-u300/u300.c ? ? ? ? ? ? ? ? ? ? ? ? ?| ? ?2 +
-> ?arch/arm/mach-versatile/include/mach/entry-macro.S | ? 30 ----
-> ?arch/arm/mach-versatile/versatile_ab.c ? ? ? ? ? ? | ? ?2 +
-> ?arch/arm/mach-versatile/versatile_dt.c ? ? ? ? ? ? | ? ?2 +
-> ?arch/arm/mach-versatile/versatile_pb.c ? ? ? ? ? ? | ? ?2 +
-> ?44 files changed, 231 insertions(+), 365 deletions(-)
-> ?create mode 100644 Documentation/devicetree/bindings/arm/vic.txt
-> ?delete mode 100644 arch/arm/include/asm/entry-macro-vic2.S
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
