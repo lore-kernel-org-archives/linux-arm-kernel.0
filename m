@@ -1,52 +1,38 @@
 From: richard.zhao@linaro.org (Richard Zhao)
-Date: Fri, 11 Nov 2011 09:10:26 +0800
-Subject: [PATCH V2 11/14] serial: imx: add clk_prepare/clk_unprepare
+Date: Fri, 11 Nov 2011 09:10:28 +0800
+Subject: [PATCH V2 13/14] i2c: imx: add clk_prepare/clk_unprepare
 In-Reply-To: <1320973829-4388-1-git-send-email-richard.zhao@linaro.org>
 References: <1320973829-4388-1-git-send-email-richard.zhao@linaro.org>
-Message-ID: <1320973829-4388-12-git-send-email-richard.zhao@linaro.org>
+Message-ID: <1320973829-4388-14-git-send-email-richard.zhao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
 ---
- drivers/tty/serial/imx.c |    7 +++----
- 1 files changed, 3 insertions(+), 4 deletions(-)
+ drivers/i2c/busses/i2c-imx.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
-index 163fc90..8f3709f 100644
---- a/drivers/tty/serial/imx.c
-+++ b/drivers/tty/serial/imx.c
-@@ -1390,7 +1390,7 @@ static int serial_imx_probe(struct platform_device *pdev)
- 		ret = PTR_ERR(sport->clk);
- 		goto unmap;
- 	}
--	clk_enable(sport->clk);
-+	clk_prepare_enable(sport->clk);
+diff --git a/drivers/i2c/busses/i2c-imx.c b/drivers/i2c/busses/i2c-imx.c
+index 58832e5..8d1ab6f 100644
+--- a/drivers/i2c/busses/i2c-imx.c
++++ b/drivers/i2c/busses/i2c-imx.c
+@@ -196,7 +196,7 @@ static int i2c_imx_start(struct imx_i2c_struct *i2c_imx)
  
- 	sport->port.uartclk = clk_get_rate(sport->clk);
+ 	dev_dbg(&i2c_imx->adapter.dev, "<%s>\n", __func__);
  
-@@ -1413,8 +1413,8 @@ deinit:
- 	if (pdata && pdata->exit)
- 		pdata->exit(pdev);
- clkput:
-+	clk_disable_unprepare(sport->clk);
- 	clk_put(sport->clk);
--	clk_disable(sport->clk);
- unmap:
- 	iounmap(sport->port.membase);
- free:
-@@ -1434,11 +1434,10 @@ static int serial_imx_remove(struct platform_device *pdev)
+-	clk_enable(i2c_imx->clk);
++	clk_prepare_enable(i2c_imx->clk);
+ 	writeb(i2c_imx->ifdr, i2c_imx->base + IMX_I2C_IFDR);
+ 	/* Enable I2C controller */
+ 	writeb(0, i2c_imx->base + IMX_I2C_I2SR);
+@@ -245,7 +245,7 @@ static void i2c_imx_stop(struct imx_i2c_struct *i2c_imx)
  
- 	if (sport) {
- 		uart_remove_one_port(&imx_reg, &sport->port);
-+		clk_disable_unprepare(sport->clk);
- 		clk_put(sport->clk);
- 	}
+ 	/* Disable I2C controller */
+ 	writeb(0, i2c_imx->base + IMX_I2C_I2CR);
+-	clk_disable(i2c_imx->clk);
++	clk_disable_unprepare(i2c_imx->clk);
+ }
  
--	clk_disable(sport->clk);
--
- 	if (pdata && pdata->exit)
- 		pdata->exit(pdev);
- 
+ static void __init i2c_imx_set_clk(struct imx_i2c_struct *i2c_imx,
 -- 
 1.7.5.4
