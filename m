@@ -1,24 +1,24 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 11 Nov 2011 20:10:23 +0100
-Subject: [PATCH 1/7] ARM: restart: add restart hook to machine_desc record
-In-Reply-To: <E1RN6ZV-0001Mv-LX@rmk-PC.arm.linux.org.uk>
-References: <20111106173113.GI12913@n2100.arm.linux.org.uk>
- <E1RN6ZV-0001Mv-LX@rmk-PC.arm.linux.org.uk>
-Message-ID: <CACRpkdacpA59NO_7ra4Yhnc7FGzLcCjxMDAMTDcSZ9x+ikmqrg@mail.gmail.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Fri, 11 Nov 2011 14:12:45 -0500 (EST)
+Subject: [PATCH v3] ARM: support XZ compressed kernels
+In-Reply-To: <op.v4r5q1pv2s3iss@ecaz>
+References: <1320696216-5570-1-git-send-email-kaloz@openwrt.org>
+ <op.v4r5q1pv2s3iss@ecaz>
+Message-ID: <alpine.LFD.2.02.1111111411460.3307@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 6, 2011 at 6:31 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
+On Fri, 11 Nov 2011, Imre Kaloz wrote:
 
-> Add a restart hook to the machine_desc record so we don't have to
-> populate all platforms with init_early methods to initialize the
-> arm_pm_restart function pointer.
->
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> On Mon, 07 Nov 2011 21:03:36 +0100, Imre Kaloz <kaloz@openwrt.org> wrote:
+> 
+> > Wire up support for the XZ decompressor
+> > 
+> > Signed-off-by: Imre Kaloz <kaloz@openwrt.org>
+> 
+> ping?
 
-Obviously the right thing to do.
-Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+Acked-by: Nicolas Pitre <nico@linaro.org>
 
-Thanks,
-Linus Walleij
+
+Nicolas
