@@ -1,32 +1,42 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 11 Nov 2011 13:19:20 +0000
-Subject: [GIT PULL] VIC DT+MULTI_IRQ_HANDLER patches
-In-Reply-To: <20111111123007.GD5114@totoro>
-References: <20111111123007.GD5114@totoro>
-Message-ID: <4EBD20D8.7080008@arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 11 Nov 2011 13:24:15 +0000
+Subject: [PATCH v8 16/16] ARM: LPAE: Add the Kconfig entries
+In-Reply-To: <20111111114613.GF23243@arm.com>
+References: <1320682618-1182-1-git-send-email-catalin.marinas@arm.com>
+ <1320682618-1182-17-git-send-email-catalin.marinas@arm.com>
+ <20111110225737.GX12913@n2100.arm.linux.org.uk>
+ <20111111114613.GF23243@arm.com>
+Message-ID: <20111111132415.GD12913@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/11/11 12:30, Jamie Iles wrote:
-
-Hi Jamie,
-
-> I've updated the VIC series to include export.h and added some Tested-by 
-> and Acked-by's.
+On Fri, Nov 11, 2011 at 11:46:14AM +0000, Catalin Marinas wrote:
+> So we could change this to:
 > 
-> This is dependent on https://lkml.org/lkml/2011/11/10/186 (irq: fix 
-> possible null-pointer deref irq_domain_to_irq) which hasn't been picked 
-> up yet so I understand if you don't want to hold up your GIC patches, 
-> but I'll defer to you on that!
+> config ARCH_DMA_ADDR_T_64BIT
+> 	depends on ARM_LPAE
+> 
+> and let platforms select it.
 
-Pulled, thanks. I expect the irq_domain fix to be picked up very soon,
-and it should reach mainline quickly enough.
+Actually, even this is conceptually wrong.  You really need to get away
+from the thought that a dma address in any way is encapsulated within
+the machine physical address.
 
-Resulting merge is at:
-git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git irqchip-consolidation
+They're two separate things.  For example, you could have an ARMv4 based
+system (so, 32-bit address bus) connected to a PCI bridge which supports
+64-bit addressing.  This PCI bridge could map system memory into PCI
+space greater than 4GB (ok, there are down-sides to doing this, but this
+is just an example to illustrate the point).  This would therefore require
+a 64-bit dma_addr_t.
 
-Thanks!
+The size of dma_addr_t has very little to do with the page table format
+or even the host address bus width, and is more to do with bus and
+system setup than host CPU setup.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+So, I think that we can have:
+
+config ARCH_DMA_ADDR_T_64BIT
+	bool
+
+and we just leave it at that - if a platform needs 64-bit DMA addresses,
+then selecting this symbol would be the correct approach.
