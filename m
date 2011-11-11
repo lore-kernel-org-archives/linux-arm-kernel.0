@@ -1,47 +1,66 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 11 Nov 2011 11:41:47 +0000
-Subject: [PATCH v5 4/7] arm: omap4: hwmod: introduce emu hwmod
-In-Reply-To: <alpine.DEB.2.00.1111100152430.4195@utopia.booyaka.com>
-References: <1319467559-5518-1-git-send-email-ming.lei@canonical.com>
- <1319467559-5518-5-git-send-email-ming.lei@canonical.com>
- <alpine.DEB.2.00.1111080750130.10451@utopia.booyaka.com>
- <CACVXFVMSJUT2Ac+bWetrLpbyOs6PqY+npNHsbvHipEVZ0gWdgQ@mail.gmail.com>
- <alpine.DEB.2.00.1111100152430.4195@utopia.booyaka.com>
-Message-ID: <20111111114147.GE12410@mudshark.cambridge.arm.com>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Fri, 11 Nov 2011 11:45:21 +0000
+Subject: [PATCH v4 04/10] arm/tegra: prepare early init for multiple
+ tegra variants
+In-Reply-To: <1321010541-31337-5-git-send-email-pdeschrijver@nvidia.com>
+References: <1321010541-31337-1-git-send-email-pdeschrijver@nvidia.com>
+ <1321010541-31337-5-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <20111111114521.GB5114@totoro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Adding Benoit to CC].
+Hi Peter,
 
-On Thu, Nov 10, 2011 at 09:02:14AM +0000, Paul Walmsley wrote:
-> On Wed, 9 Nov 2011, Ming Lei wrote:
-> > Also, current arm perf code don't handle three IRQs(one pl310 irq and 
-> > two CTI irq) inside one device correctly.
+On Fri, Nov 11, 2011 at 01:22:10PM +0200, Peter De Schrijver wrote:
+> This patch splits the early init code in a common and a tegra20 specific part.
+> L2 cache initialization is generalized and discovers the cache associativity
+> at runtime. Also use arm_pm_restart instead of arm_arch_reset and reset the
+> the system using the PMC reset feature rather then the CAR system reset.
 > 
-> To fix this, that ARM perf code should either be using 
-> platform_get_irq_byname(), or the hwmod hardware data will need to be 
-> rearranged to meet the arbitrary ordering requirement.  I'd suggest 
-> pinging Will on this issue to see what he wants to do.
+> Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
+> ---
+>  arch/arm/mach-tegra/board-dt.c        |   21 ++++++++++++++
+>  arch/arm/mach-tegra/board-harmony.c   |    2 +-
+>  arch/arm/mach-tegra/board-paz00.c     |    2 +-
+>  arch/arm/mach-tegra/board-seaboard.c  |    6 ++--
+>  arch/arm/mach-tegra/board-trimslice.c |    2 +-
+>  arch/arm/mach-tegra/board.h           |    6 ++--
+>  arch/arm/mach-tegra/clock.c           |    5 ---
+>  arch/arm/mach-tegra/common.c          |   47 ++++++++++++++++++++++----------
+>  8 files changed, 62 insertions(+), 29 deletions(-)
+> 
+> diff --git a/arch/arm/mach-tegra/board-dt.c b/arch/arm/mach-tegra/board-dt.c
+> index d368f8d..15ee974 100644
+> --- a/arch/arm/mach-tegra/board-dt.c
+> +++ b/arch/arm/mach-tegra/board-dt.c
+> @@ -118,6 +118,27 @@ static void __init tegra_dt_init(void)
+>  	of_platform_populate(NULL, tegra_dt_match_table, tegra20_auxdata_lookup, NULL);
+>  }
+>  
+> +static struct {
+> +	const char *machine;
+> +	void (*init)(void);
+> +} early_init[] __initdata = {
+> +#ifdef CONFIG_ARCH_TEGRA_2x_SOC
+> +	{ "nvidia,tegra20", tegra20_init_early },
+> +#endif
+> +};
+> +
+> +static void __init tegra_init_early(void)
+> +{
+> +
+> +	int i;
+> +
+> +	for (i = 0; i < ARRAY_SIZE(early_init); i++)
+> +		if (of_machine_is_compatible(early_init[i].machine))
+> +			return early_init[i].init();
+> +
+> +	pr_warn("Unknown platform detected\n");
+> +}
 
-The issue stems from the fact that we have to route the PMU interrupts to
-the correct CPU manually (I think only MSM routes them as PPIs, which is
-clearly the correct thing to do). To do this, we expect the IRQ resources to
-be laid out in CPU order. In hindsight, maybe naming the resources might
-have been a good idea, but them we'd still have to generate the names using
-CPU numbers when iterating through the platform device.
+Wouldn't it be better just to have separate machine descs for tegra20 
+and tegra30 and have a different .init_early for each?  I'm not sure 
+that this extra indirection buys us much, especially if we had to repeat 
+it for any of the other entries.
 
-So although the ordering requirements are a bit of a pain, I do think it's
-reasonable for perf to expect that it's not being handed some random other
-interrupts along with those for the PMU.
-
-> So the clockdomain is already defined in 
-> mach-omap2/clockdomains44xx_data.c and there's code to control it - see 
-> for example clkdm_enable_idle().  But this code should not be called 
-> directly by any device driver code or driver integration code.  The thing 
-> to do here is to ask Beno?t to release the hwmod data for the DEBUGSS 
-> hwmod, then someone will need to write an MFD driver for that which 
-> exposes the PMU address space to the PMU platform driver.
-
-Benoit? Please can you chime in here?
-
-Will
+Jamie
