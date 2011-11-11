@@ -1,62 +1,67 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Fri, 11 Nov 2011 15:10:40 +0000
-Subject: [GIT PULL] VIC DT+MULTI_IRQ_HANDLER patches
-In-Reply-To: <CAJuYYwTsS65LR9_H+VK99-nJggYTmg45p=OX0gDBY=UURQZjHA@mail.gmail.com>
-References: <20111111123007.GD5114@totoro>
- <CAJuYYwTsS65LR9_H+VK99-nJggYTmg45p=OX0gDBY=UURQZjHA@mail.gmail.com>
-Message-ID: <20111111151040.GF5114@totoro>
+From: niklas.hernaeus@linaro.org (Niklas Hernaeus)
+Date: Fri, 11 Nov 2011 16:05:02 +0100
+Subject: [PATCH] mach-ux500: add devicetree compat nodes
+Message-ID: <1321023902-18870-1-git-send-email-niklas.hernaeus@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 11, 2011 at 08:31:26PM +0530, Thomas Abraham wrote:
-> Hi Jamie,
-> 
-> On 11 November 2011 18:00, Jamie Iles <jamie@jamieiles.com> wrote:
-> > Hi Marc,
-> >
-> > I've updated the VIC series to include export.h and added some Tested-by
-> > and Acked-by's.
-> >
-> > This is dependent on https://lkml.org/lkml/2011/11/10/186 (irq: fix
-> > possible null-pointer deref irq_domain_to_irq) which hasn't been picked
-> > up yet so I understand if you don't want to hold up your GIC patches,
-> > but I'll defer to you on that!
-> >
-> > Thanks,
-> >
-> > Jamie
-> >
-> > The following changes since commit ad2cf1a746915c5c95edaba104dcb50023fb18d1:
-> >
-> > ?ARM: GIC: Make MULTI_IRQ_HANDLER mandatory (2011-11-08 10:10:10 +0000)
-> >
-> > are available in the git repository at:
-> > ?git://github.com/jamieiles/linux-2.6-ji.git vic-dt
-> >
-> > Jamie Iles (11):
-> > ? ? ?ARM: vic: device tree binding
-> > ? ? ?ARM: vic: MULTI_IRQ_HANDLER handler
-> > ? ? ?ARM: ep93xx: convert to MULTI_IRQ_HANDLER
-> > ? ? ?ARM: netx: convert to MULTI_IRQ_HANDLER
-> > ? ? ?ARM: nomadik: convert to MULTI_IRQ_HANDLER
-> > ? ? ?ARM: spear: convert to MULTI_IRQ_HANDLER
-> > ? ? ?ARM: u300: convert to MULTI_IRQ_HANDLER
-> > ? ? ?ARM: versatile: convert to MULTI_IRQ_HANDLER
-> > ? ? ?ARM: samsung: convert to MULTI_IRQ_HANDLER
-> > ? ? ?ARM: picoxcell: convert to MULTI_IRQ_HANDLER
-> > ? ? ?ARM: VIC: remove non MULTI_IRQ_HANDLER support
-> 
-> There was a patch "[PATCHv4 07/13] ARM: s3c64xx: convert to
-> MULTI_IRQ_HANDLER" in your series. Is this patch dropped in this pull
-> request?
+From: Linus Walleij <linus.walleij@linaro.org>
 
-Crap, that should be there.  When I was rebasing and adding your 
-Tested-by, git did say something about a bad reference but it all looked 
-OK so I thought it was fine.
+This adds devicetree compat members to all the U8500 reference
+boards.
 
-Marc, would you mind redoing the pull to get the correct series.  
-Unfortunately I had to rebase to keep it bisectable.
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/mach-ux500/board-mop500.c |   18 ++++++++++++++++++
+ 1 files changed, 18 insertions(+), 0 deletions(-)
 
-Thanks,
-
-Jamie
+diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
+index cd54aba..7cbefa7 100644
+--- a/arch/arm/mach-ux500/board-mop500.c
++++ b/arch/arm/mach-ux500/board-mop500.c
+@@ -643,6 +643,21 @@ static void __init mop500_init_machine(void)
+ 	regulator_has_full_constraints();
+ }
+ 
++static const char * mop500_dt_board_compat[] = {
++	"stericsson,mop500",
++	NULL
++};
++
++static const char * hrefv60_dt_board_compat[] = {
++	"stericsson,hrefv60",
++	NULL
++};
++
++static const char * snowball_dt_board_compat[] = {
++	"stericsson,snowball",
++	NULL
++};
++
+ MACHINE_START(U8500, "ST-Ericsson MOP500 platform")
+ 	/* Maintainer: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com> */
+ 	.boot_params	= 0x100,
+@@ -651,6 +666,7 @@ MACHINE_START(U8500, "ST-Ericsson MOP500 platform")
+ 	/* we re-use nomadik timer here */
+ 	.timer		= &ux500_timer,
+ 	.init_machine	= mop500_init_machine,
++	.dt_compat	= mop500_dt_board_compat,
+ MACHINE_END
+ 
+ MACHINE_START(HREFV60, "ST-Ericsson U8500 Platform HREFv60+")
+@@ -659,6 +675,7 @@ MACHINE_START(HREFV60, "ST-Ericsson U8500 Platform HREFv60+")
+ 	.init_irq	= ux500_init_irq,
+ 	.timer		= &ux500_timer,
+ 	.init_machine	= mop500_init_machine,
++	.dt_compat	= hrefv60_dt_board_compat,
+ MACHINE_END
+ 
+ MACHINE_START(SNOWBALL, "Calao Systems Snowball platform")
+@@ -668,4 +685,5 @@ MACHINE_START(SNOWBALL, "Calao Systems Snowball platform")
+ 	/* we re-use nomadik timer here */
+ 	.timer		= &ux500_timer,
+ 	.init_machine	= mop500_init_machine,
++	.dt_compat	= snowball_dt_board_compat,
+ MACHINE_END
+-- 
+1.7.2.5
