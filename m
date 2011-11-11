@@ -1,78 +1,231 @@
 From: govindraj.raja@ti.com (Govindraj.R)
-Date: Fri, 11 Nov 2011 15:27:26 +0530
-Subject: [PATCH v8 09/20] OMAP2+: UART: Remove uart reset function.
+Date: Fri, 11 Nov 2011 15:27:24 +0530
+Subject: [PATCH v8 07/20] OMAP2+: UART: Remove context_save and move context
+ restore to driver
 In-Reply-To: <1321005446-21741-1-git-send-email-govindraj.raja@ti.com>
 References: <1321005446-21741-1-git-send-email-govindraj.raja@ti.com>
-Message-ID: <1321005446-21741-10-git-send-email-govindraj.raja@ti.com>
+Message-ID: <1321005446-21741-8-git-send-email-govindraj.raja@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove the uart reset function which is configuring the
-TX empty irq which can now be handled within omap-serial driver.
+Remove context save function from serial.c and move context restore
+function to omap-serial. Remove all regs stored in omap_uart_state
+for contex_save/restore, reg read write funcs used in context_save/restore,
+io_addresses populated for read/write funcs.
+
+Clock gating mechanism was done in serial.c and had no info on uart state
+thus we needed context save and restore in serial.c
+With runtime conversion and clock gating done within uart driver
+context restore can be done from regs value available from uart_omap_port
+structure.
 
 Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
 ---
- arch/arm/mach-omap2/serial.c                  |   14 --------------
- arch/arm/plat-omap/include/plat/omap-serial.h |    2 ++
- drivers/tty/serial/omap-serial.c              |    1 +
- 3 files changed, 3 insertions(+), 14 deletions(-)
+ arch/arm/mach-omap2/serial.c     |  118 --------------------------------------
+ drivers/tty/serial/omap-serial.c |   24 ++++++++
+ 2 files changed, 24 insertions(+), 118 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/serial.c b/arch/arm/mach-omap2/serial.c
-index 3d5df9a..06887d3 100644
+index beb46e8..3d5df9a 100644
 --- a/arch/arm/mach-omap2/serial.c
 +++ b/arch/arm/mach-omap2/serial.c
-@@ -74,19 +74,6 @@ struct omap_uart_state {
+@@ -41,8 +41,6 @@
+ #include "control.h"
+ #include "mux.h"
+ 
+-#define UART_OMAP_WER		0x17	/* Wake-up enable register */
+-
+ #define UART_ERRATA_i202_MDR1_ACCESS	(0x1 << 1)
+ 
+ /*
+@@ -66,60 +64,16 @@ struct omap_uart_state {
+ 
+ 	int clocked;
+ 
+-	int regshift;
+-	void __iomem *membase;
+-	resource_size_t mapbase;
+-
+ 	struct list_head node;
+ 	struct omap_hwmod *oh;
+ 	struct platform_device *pdev;
+ 
+ 	u32 errata;
+-#if defined(CONFIG_ARCH_OMAP3) && defined(CONFIG_PM)
+-	int context_valid;
+-
+-	/* Registers to be saved/restored for OFF-mode */
+-	u16 dll;
+-	u16 dlh;
+-	u16 ier;
+-	u16 sysc;
+-	u16 scr;
+-	u16 wer;
+-	u16 mcr;
+-#endif
+ };
+ 
  static LIST_HEAD(uart_list);
  static u8 num_uarts;
  
--/*
-- * Internal UARTs need to be initialized for the 8250 autoconfig to work
-- * properly. Note that the TX watermark initialization may not be needed
-- * once the 8250.c watermark handling code is merged.
-- */
--
--static inline void __init omap_uart_reset(struct omap_uart_state *uart)
+-static inline unsigned int __serial_read_reg(struct uart_port *up,
+-					     int offset)
 -{
--	serial_write_reg(uart, UART_OMAP_MDR1, UART_OMAP_MDR1_DISABLE);
--	serial_write_reg(uart, UART_OMAP_SCR, 0x08);
--	serial_write_reg(uart, UART_OMAP_MDR1, UART_OMAP_MDR1_16X_MODE);
+-	offset <<= up->regshift;
+-	return (unsigned int)__raw_readb(up->membase + offset);
 -}
 -
- #if defined(CONFIG_PM) && defined(CONFIG_ARCH_OMAP3)
- 
+-static inline unsigned int serial_read_reg(struct omap_uart_state *uart,
+-					   int offset)
+-{
+-	offset <<= uart->regshift;
+-	return (unsigned int)__raw_readb(uart->membase + offset);
+-}
+-
+-static inline void __serial_write_reg(struct uart_port *up, int offset,
+-		int value)
+-{
+-	offset <<= up->regshift;
+-	__raw_writeb(value, up->membase + offset);
+-}
+-
+-static inline void serial_write_reg(struct omap_uart_state *uart, int offset,
+-				    int value)
+-{
+-	offset <<= uart->regshift;
+-	__raw_writeb(value, uart->membase + offset);
+-}
+-
  /*
-@@ -521,7 +508,6 @@ void __init omap_serial_init_port(struct omap_board_data *bdata)
+  * Internal UARTs need to be initialized for the 8250 autoconfig to work
+  * properly. Note that the TX watermark initialization may not be needed
+@@ -170,75 +124,6 @@ static void omap_uart_mdr1_errataset(struct omap_uart_state *uart, u8 mdr1_val,
+ 	}
+ }
  
- 	omap_device_enable(uart->pdev);
- 	omap_uart_idle_init(uart);
--	omap_uart_reset(uart);
- 	omap_hwmod_enable_wakeup(uart->oh);
- 	omap_device_idle(uart->pdev);
+-static void omap_uart_save_context(struct omap_uart_state *uart)
+-{
+-	u16 lcr = 0;
+-
+-	if (!enable_off_mode)
+-		return;
+-
+-	lcr = serial_read_reg(uart, UART_LCR);
+-	serial_write_reg(uart, UART_LCR, UART_LCR_CONF_MODE_B);
+-	uart->dll = serial_read_reg(uart, UART_DLL);
+-	uart->dlh = serial_read_reg(uart, UART_DLM);
+-	serial_write_reg(uart, UART_LCR, lcr);
+-	uart->ier = serial_read_reg(uart, UART_IER);
+-	uart->sysc = serial_read_reg(uart, UART_OMAP_SYSC);
+-	uart->scr = serial_read_reg(uart, UART_OMAP_SCR);
+-	uart->wer = serial_read_reg(uart, UART_OMAP_WER);
+-	serial_write_reg(uart, UART_LCR, UART_LCR_CONF_MODE_A);
+-	uart->mcr = serial_read_reg(uart, UART_MCR);
+-	serial_write_reg(uart, UART_LCR, lcr);
+-
+-	uart->context_valid = 1;
+-}
+-
+-static void omap_uart_restore_context(struct omap_uart_state *uart)
+-{
+-	u16 efr = 0;
+-
+-	if (!enable_off_mode)
+-		return;
+-
+-	if (!uart->context_valid)
+-		return;
+-
+-	uart->context_valid = 0;
+-
+-	if (uart->errata & UART_ERRATA_i202_MDR1_ACCESS)
+-		omap_uart_mdr1_errataset(uart, UART_OMAP_MDR1_DISABLE, 0xA0);
+-	else
+-		serial_write_reg(uart, UART_OMAP_MDR1, UART_OMAP_MDR1_DISABLE);
+-
+-	serial_write_reg(uart, UART_LCR, UART_LCR_CONF_MODE_B);
+-	efr = serial_read_reg(uart, UART_EFR);
+-	serial_write_reg(uart, UART_EFR, UART_EFR_ECB);
+-	serial_write_reg(uart, UART_LCR, 0x0); /* Operational mode */
+-	serial_write_reg(uart, UART_IER, 0x0);
+-	serial_write_reg(uart, UART_LCR, UART_LCR_CONF_MODE_B);
+-	serial_write_reg(uart, UART_DLL, uart->dll);
+-	serial_write_reg(uart, UART_DLM, uart->dlh);
+-	serial_write_reg(uart, UART_LCR, 0x0); /* Operational mode */
+-	serial_write_reg(uart, UART_IER, uart->ier);
+-	serial_write_reg(uart, UART_LCR, UART_LCR_CONF_MODE_A);
+-	serial_write_reg(uart, UART_MCR, uart->mcr);
+-	serial_write_reg(uart, UART_LCR, UART_LCR_CONF_MODE_B);
+-	serial_write_reg(uart, UART_EFR, efr);
+-	serial_write_reg(uart, UART_LCR, UART_LCR_WLEN8);
+-	serial_write_reg(uart, UART_OMAP_SCR, uart->scr);
+-	serial_write_reg(uart, UART_OMAP_WER, uart->wer);
+-	serial_write_reg(uart, UART_OMAP_SYSC, uart->sysc);
+-
+-	if (uart->errata & UART_ERRATA_i202_MDR1_ACCESS)
+-		omap_uart_mdr1_errataset(uart, UART_OMAP_MDR1_16X_MODE, 0xA1);
+-	else
+-		/* UART 16x mode */
+-		serial_write_reg(uart, UART_OMAP_MDR1,
+-				UART_OMAP_MDR1_16X_MODE);
+-}
+-#else
+-static inline void omap_uart_save_context(struct omap_uart_state *uart) {}
+-static inline void omap_uart_restore_context(struct omap_uart_state *uart) {}
+ #endif /* CONFIG_PM && CONFIG_ARCH_OMAP3 */
  
-diff --git a/arch/arm/plat-omap/include/plat/omap-serial.h b/arch/arm/plat-omap/include/plat/omap-serial.h
-index 70e7738..5b913c7 100644
---- a/arch/arm/plat-omap/include/plat/omap-serial.h
-+++ b/arch/arm/plat-omap/include/plat/omap-serial.h
-@@ -33,6 +33,8 @@
+ static inline void omap_uart_enable_clocks(struct omap_uart_state *uart)
+@@ -621,9 +506,6 @@ void __init omap_serial_init_port(struct omap_board_data *bdata)
+ 	omap_device_disable_idle_on_suspend(pdev);
+ 	oh->mux = omap_hwmod_mux_init(bdata->pads, bdata->pads_cnt);
  
- #define OMAP_MODE13X_SPEED	230400
+-	uart->regshift = 2;
+-	uart->mapbase = oh->slaves[0]->addr->pa_start;
+-	uart->membase = omap_hwmod_get_mpu_rt_va(oh);
+ 	uart->pdev = pdev;
  
-+#define OMAP_UART_SCR_TX_EMPTY	0x08
-+
- /* WER = 0x7F
-  * Enable module level wakeup in WER reg
-  */
+ 	oh->dev_attr = uart;
 diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
-index 5327ff0..f5a5ed6 100644
+index f16ef4b9..a834e91 100644
 --- a/drivers/tty/serial/omap-serial.c
 +++ b/drivers/tty/serial/omap-serial.c
-@@ -770,6 +770,7 @@ serial_omap_set_termios(struct uart_port *port, struct ktermios *termios,
- 	serial_out(up, UART_IER, up->ier);
- 	serial_out(up, UART_LCR, cval);		/* reset DLAB */
- 	up->lcr = cval;
-+	up->scr = OMAP_UART_SCR_TX_EMPTY;
+@@ -1408,6 +1408,25 @@ static int serial_omap_remove(struct platform_device *dev)
+ 	return 0;
+ }
  
- 	/* FIFOs and DMA Settings */
++static void serial_omap_restore_context(struct uart_omap_port *up)
++{
++	serial_out(up, UART_OMAP_MDR1, UART_OMAP_MDR1_DISABLE);
++	serial_out(up, UART_LCR, UART_LCR_CONF_MODE_B); /* Config B mode */
++	serial_out(up, UART_EFR, UART_EFR_ECB);
++	serial_out(up, UART_LCR, 0x0); /* Operational mode */
++	serial_out(up, UART_IER, 0x0);
++	serial_out(up, UART_LCR, UART_LCR_CONF_MODE_B); /* Config B mode */
++	serial_out(up, UART_LCR, 0x0); /* Operational mode */
++	serial_out(up, UART_IER, up->ier);
++	serial_out(up, UART_FCR, up->fcr);
++	serial_out(up, UART_LCR, UART_LCR_CONF_MODE_A);
++	serial_out(up, UART_MCR, up->mcr);
++	serial_out(up, UART_LCR, UART_LCR_CONF_MODE_B); /* Config B mode */
++	serial_out(up, UART_EFR, up->efr);
++	serial_out(up, UART_LCR, up->lcr);
++	serial_out(up, UART_OMAP_MDR1, UART_OMAP_MDR1_16X_MODE);
++}
++
+ #ifdef CONFIG_PM_RUNTIME
+ static int serial_omap_runtime_suspend(struct device *dev)
+ {
+@@ -1416,6 +1435,11 @@ static int serial_omap_runtime_suspend(struct device *dev)
  
+ static int serial_omap_runtime_resume(struct device *dev)
+ {
++	struct uart_omap_port *up = dev_get_drvdata(dev);
++
++	if (up)
++		serial_omap_restore_context(up);
++
+ 	return 0;
+ }
+ #endif
 -- 
 1.7.4.1
