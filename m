@@ -1,38 +1,46 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 11 Nov 2011 16:57:21 +0100
-Subject: [GIT PULL] i.MX fixes
-Message-ID: <20111111155721.GB16886@pengutronix.de>
+Date: Fri, 11 Nov 2011 16:58:51 +0100
+Subject: [PATCH 1/4] arm/imx: fix mx3_defconfig to add FEC back
+In-Reply-To: <1320914372-4416-2-git-send-email-shawn.guo@linaro.org>
+References: <1320914372-4416-1-git-send-email-shawn.guo@linaro.org>
+ <1320914372-4416-2-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20111111155851.GC16886@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof,
+On Thu, Nov 10, 2011 at 04:39:29PM +0800, Shawn Guo wrote:
+> The commit 'd880db0 arm: mx3: update defconfig' removes FEC support
+> which is not good, since FEC is useful for both developers and users.
+> 
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Sascha Hauer <s.hauer@pengutronix.de>
 
-Please pull the following. I don't know exactly when Arnd is back again,
-so I have Olof still on Cc.
+I skipped this one for now as I have hope to get the i.MX5 merge into
+-rc which would remove this file. If not, I'll send this one later.
 
 Sascha
 
-The following changes since commit 1ea6b8f48918282bdca0b32a34095504ee65bab5:
+> ---
+>  arch/arm/configs/mx3_defconfig |    1 +
+>  1 files changed, 1 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/configs/mx3_defconfig b/arch/arm/configs/mx3_defconfig
+> index cb0717f..ee50a9e 100644
+> --- a/arch/arm/configs/mx3_defconfig
+> +++ b/arch/arm/configs/mx3_defconfig
+> @@ -67,6 +67,7 @@ CONFIG_SMSC_PHY=y
+>  CONFIG_NET_ETHERNET=y
+>  CONFIG_SMSC911X=y
+>  CONFIG_DNET=y
+> +CONFIG_FEC=y
+>  # CONFIG_NETDEV_1000 is not set
+>  # CONFIG_NETDEV_10000 is not set
+>  # CONFIG_INPUT_MOUSEDEV is not set
+> -- 
+> 1.7.4.1
+> 
+> 
 
-  Linux 3.2-rc1 (2011-11-07 16:16:02 -0800)
-
-are available in the git repository at:
-  git://git.pengutronix.de/git/imx/linux-2.6.git imx-fixes-for-arnd
-
-Richard Zhao (1):
-      ARM: mx51/53: set pwm clock parent to ipg_perclk
-
-Shawn Guo (3):
-      arm/imx: fix the references to ARCH_MX3
-      arm/imx: fix AUTO_ZRELADDR selection
-      arm/imx: fix imx6q mmc error when mounting rootfs
-
- arch/arm/mach-imx/Makefile.boot     |   34 +++++++++++++++++++---------------
- arch/arm/mach-imx/clock-imx6q.c     |   17 ++++++++++++++++-
- arch/arm/mach-mx5/clock-mx51-mx53.c |    4 ++--
- arch/arm/plat-mxc/Kconfig           |    4 ++--
- drivers/mmc/host/sdhci-esdhc-imx.c  |    8 ++++++++
- 5 files changed, 47 insertions(+), 20 deletions(-)
 -- 
 Pengutronix e.K.                           |                             |
 Industrial Linux Solutions                 | http://www.pengutronix.de/  |
