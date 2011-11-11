@@ -1,46 +1,44 @@
-From: tanmay.upadhyay@einfochips.com (Tanmay Upadhyay)
-Date: Fri, 11 Nov 2011 21:32:59 +0530
-Subject: [PATCH] ARM: pxa168/gplugd: add the correct SSP device
-In-Reply-To: <1321013994-6443-1-git-send-email-eric.y.miao@gmail.com>
-References: <1321013994-6443-1-git-send-email-eric.y.miao@gmail.com>
-Message-ID: <4EBD4733.4010801@einfochips.com>
+From: cjb@laptop.org (Chris Ball)
+Date: Fri, 11 Nov 2011 11:13:10 -0500
+Subject: [PATCH] mmc mxcmmc: fix falling back to PIO
+In-Reply-To: <1321025285-22821-1-git-send-email-s.hauer@pengutronix.de>
+ (Sascha Hauer's message of "Fri, 11 Nov 2011 16:28:05 +0100")
+References: <1321025285-22821-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <871utewsbt.fsf@laptop.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Sascha,
 
-
-On Friday 11 November 2011 05:49 PM, Eric Miao wrote:
-> There is no SSP0, but SSP2 is used on gplugd.
+On Fri, Nov 11 2011, Sascha Hauer wrote:
+> When we can't configure the dma channel we want to fall
+> back to PIO. We do this by setting host->do_dma to zero.
+> This does not work as do_dma is used to see whether dma
+> can be used for the current transfer. Instead, we have
+> to set host->dma to NULL.
 >
-> Cc: Tanmay Upadhyay<tanmay.upadhyay@einfochips.com>
-> Signed-off-by: Eric Miao<eric.y.miao@gmail.com>
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> Cc: Chris Ball <cjb@laptop.org>
+> Cc: linux-mmc at vger.kernel.org
 > ---
->   arch/arm/mach-mmp/gplugd.c |    2 +-
->   1 files changed, 1 insertions(+), 1 deletions(-)
+>  drivers/mmc/host/mxcmmc.c |    1 +
+>  1 files changed, 1 insertions(+), 0 deletions(-)
 >
-> diff --git a/arch/arm/mach-mmp/gplugd.c b/arch/arm/mach-mmp/gplugd.c
-> index 6915656..0469c74 100644
-> --- a/arch/arm/mach-mmp/gplugd.c
-> +++ b/arch/arm/mach-mmp/gplugd.c
-> @@ -182,7 +182,7 @@ static void __init gplugd_init(void)
->
->   	/* on-chip devices */
->   	pxa168_add_uart(3);
-> -	pxa168_add_ssp(0);
-> +	pxa168_add_ssp(2);
->   	pxa168_add_twsi(0, NULL, ARRAY_AND_SIZE(gplugd_i2c_board_info));
->
->   	pxa168_add_eth(&gplugd_eth_platform_data);
+> diff --git a/drivers/mmc/host/mxcmmc.c b/drivers/mmc/host/mxcmmc.c
+> index 14aa213..b87143d 100644
+> --- a/drivers/mmc/host/mxcmmc.c
+> +++ b/drivers/mmc/host/mxcmmc.c
+> @@ -731,6 +731,7 @@ static void mxcmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+>  				"failed to config DMA channel. Falling back to PIO\n");
+>  			dma_release_channel(host->dma);
+>  			host->do_dma = 0;
+> +			host->dma = NULL;
+>  		}
+>  	}
 
-Hi Eric,
+Thanks, pushed to mmc-next for 3.2 with a stable@ tag added.
 
-HDMI chip (TDA9981A) on gplugD gets audio data from SSP0 - used as I2S. 
-Page # 7 of [1] & page # 1 & 3 of [2] indicates this. SSP2 is also used 
-on gplugD as SPI to talk to the NOR flash.
-
-Thanks,
-
-Tanmay
-
-[1] http://www.globalscaletechnologies.com/download/gplugD-MBV2R1-web.pdf
-[2] http://www.globalscaletechnologies.com/download/gplugD-IOV2R1-web.pdf
+- Chris.
+-- 
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+One Laptop Per Child
