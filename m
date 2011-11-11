@@ -1,49 +1,52 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Fri, 11 Nov 2011 17:01:48 +0000
-Subject: [GIT PULL] picoxcell fixes for 3.2-rc
-In-Reply-To: <CAOesGMgoFegXCc9h1oMkhkkBF9eF4P7h+sTb=0iqEa2cMzAbsg@mail.gmail.com>
-References: <20111110095649.GA16018@totoro>
- <CAOesGMgoFegXCc9h1oMkhkkBF9eF4P7h+sTb=0iqEa2cMzAbsg@mail.gmail.com>
-Message-ID: <20111111170148.GG5114@totoro>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 11 Nov 2011 17:16:50 +0000
+Subject: [03: PATCH 0/5] The remaining stuff
+In-Reply-To: <20111106175457.GK12913@n2100.arm.linux.org.uk>
+References: <20111106173113.GI12913@n2100.arm.linux.org.uk>
+ <20111106173939.GJ12913@n2100.arm.linux.org.uk>
+ <20111106175457.GK12913@n2100.arm.linux.org.uk>
+Message-ID: <20111111171650.GA4154@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 11, 2011 at 08:55:25AM -0800, Olof Johansson wrote:
-> Hi,
+On Sun, Nov 06, 2011 at 05:54:57PM +0000, Russell King - ARM Linux wrote:
+> Part 3 - the remaining stuff
 > 
-> I looked at the branch and there's one more fix in there now? Please
-> send a fresh request if that's intentional.
-
-Gah, finger trouble on my part.  Fixed now.
-
-Thanks,
-
-Jamie
-
+> These are patches which I've managed to get half way through before
+> getting - to be honest - totally hacked off with the code found in
+> various platforms (as mentioned in previous mails).
 > 
-> -Olof
+> These platforms are broken as a result of the final patch in part 2,
+> and these patches move these platforms _towards_ a solution.  They
+> are not a complete solution though, but the start of the solution.
 > 
-> On Thu, Nov 10, 2011 at 1:56 AM, Jamie Iles <jamie@jamieiles.com> wrote:
-> > Hi Olof,
-> >
-> > I sent this to yesterday and accidentally left the list off of copy. ?I
-> > know you've already sent a pull request to Linus, but if you could queue
-> > this up for the next one then that would be great!
-> >
-> > Thanks,
-> >
-> > Jamie
-> >
-> > The following changes since commit 1ea6b8f48918282bdca0b32a34095504ee65bab5:
-> >
-> > ?Linux 3.2-rc1 (2011-11-07 16:16:02 -0800)
-> >
-> > are available in the git repository at:
-> > ?git://github.com/jamieiles/linux-2.6-ji.git picoxcell-fixes
-> >
-> > Jamie Iles (1):
-> > ? ? ?ARM: picoxcell: add extra temp register to addruart
-> >
-> > ?arch/arm/mach-picoxcell/include/mach/debug-macro.S | ? ?2 +-
-> > ?1 files changed, 1 insertions(+), 1 deletions(-)
-> >
+> For instance, the Exynos4 and S5PV210 patches both consist of almost
+> a full solution -but- with the new function prototype missing because
+> there is _no_ local header file to put it in, and I'm damned well not
+> putting it in the remote plat-samsung/include/plat headers.
+> 
+> The final set of platforms - touched neither by part 3 nor 4, are
+> broken by the final patch in part 2, and at present I have no plans
+> to fix them.  I would welcome patches to fix these which address the
+> issues raised in the "pet peaves" email (which is why I have no plans
+> to fix them.)
+
+The list of platforms which are still broken (today) by part 2 of this
+series are:
+
+arch/arm/mach-davinci/include/mach/system.h
+arch/arm/mach-gemini/include/mach/system.h
+arch/arm/mach-nomadik/include/mach/system.h
+arch/arm/mach-s3c2410/include/mach/system-reset.h
+arch/arm/mach-s3c64xx/include/mach/system.h
+arch/arm/mach-shmobile/include/mach/system.h
+arch/arm/mach-vt8500/include/mach/system.h
+arch/arm/plat-samsung/include/plat/system-reset.h
+arch/arm/plat-tcc/include/mach/system.h
+
+which require assistance to get these into shape.
+
+As I've already implied, I'm quite prepared to break these platforms at
+the next merge window for the greater good if there's no sign of
+maintainers willing to help sort them out - which will then ultimately
+result in them being deleted from mainline.
