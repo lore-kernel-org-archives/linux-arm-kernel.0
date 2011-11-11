@@ -1,48 +1,32 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 11 Nov 2011 09:54:03 -0600
-Subject: [PATCH v2] ARM: highbank: convert logical CPU numbers to physical
- numbers
-In-Reply-To: <1321009767-19944-1-git-send-email-will.deacon@arm.com>
-References: <1321009767-19944-1-git-send-email-will.deacon@arm.com>
-Message-ID: <4EBD451B.8010900@gmail.com>
+From: b29396@freescale.com (Dong Aisheng)
+Date: Sat, 12 Nov 2011 00:09:05 +0800
+Subject: [PATCH 1/2] ARM: mxs/tx28: add __initconst for fec pdata
+Message-ID: <1321027746-5906-1-git-send-email-b29396@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/11/2011 05:09 AM, Will Deacon wrote:
-> This patch uses the new cpu_logical_map() macro for converting logical
-> CPU numbers into physical numbers when releasing CPUs during the SMP
-> boot and CPU hotplug paths.
-> 
-> Cc: Rob Herring <rob.herring@calxeda.com>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> ---
+Signed-off-by: Dong Aisheng <b29396@freescale.com>
+---
+ arch/arm/mach-mxs/module-tx28.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-Thanks.
-
-Acked-by: Rob Herring <rob.herring@calxeda.com>
-
->  arch/arm/mach-highbank/highbank.c |    4 ++++
->  1 files changed, 4 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-highbank/highbank.c b/arch/arm/mach-highbank/highbank.c
-> index b82dcf0..88660d5 100644
-> --- a/arch/arm/mach-highbank/highbank.c
-> +++ b/arch/arm/mach-highbank/highbank.c
-> @@ -22,6 +22,7 @@
->  #include <linux/of_irq.h>
->  #include <linux/of_platform.h>
->  #include <linux/of_address.h>
-> +#include <linux/smp.h>
->  
->  #include <asm/cacheflush.h>
->  #include <asm/unified.h>
-> @@ -72,6 +73,9 @@ static void __init highbank_map_io(void)
->  
->  void highbank_set_cpu_jump(int cpu, void *jump_addr)
->  {
-> +#ifdef CONFIG_SMP
-> +	cpu = cpu_logical_map(cpu);
-> +#endif
->  	writel(BSYM(virt_to_phys(jump_addr)), HB_JUMP_TABLE_VIRT(cpu));
->  	__cpuc_flush_dcache_area(HB_JUMP_TABLE_VIRT(cpu), 16);
->  	outer_clean_range(HB_JUMP_TABLE_PHYS(cpu),
+diff --git a/arch/arm/mach-mxs/module-tx28.c b/arch/arm/mach-mxs/module-tx28.c
+index 0fcff47..9a7b08b 100644
+--- a/arch/arm/mach-mxs/module-tx28.c
++++ b/arch/arm/mach-mxs/module-tx28.c
+@@ -66,11 +66,11 @@ static const iomux_cfg_t tx28_fec1_pads[] __initconst = {
+ 	MX28_PAD_ENET0_CRS__ENET1_RX_EN,
+ };
+ 
+-static struct fec_platform_data tx28_fec0_data = {
++static const struct fec_platform_data tx28_fec0_data __initconst = {
+ 	.phy = PHY_INTERFACE_MODE_RMII,
+ };
+ 
+-static struct fec_platform_data tx28_fec1_data = {
++static const struct fec_platform_data tx28_fec1_data __initconst = {
+ 	.phy = PHY_INTERFACE_MODE_RMII,
+ };
+ 
+-- 
+1.7.0.4
