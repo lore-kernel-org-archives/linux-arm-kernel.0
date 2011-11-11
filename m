@@ -1,33 +1,30 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 11 Nov 2011 11:59:55 +0000
-Subject: [PATCH v5 4/7] arm: omap4: hwmod: introduce emu hwmod
-In-Reply-To: <20111111114735.GC5114@totoro>
-References: <1319467559-5518-1-git-send-email-ming.lei@canonical.com>
- <1319467559-5518-5-git-send-email-ming.lei@canonical.com>
- <alpine.DEB.2.00.1111080750130.10451@utopia.booyaka.com>
- <CACVXFVMSJUT2Ac+bWetrLpbyOs6PqY+npNHsbvHipEVZ0gWdgQ@mail.gmail.com>
- <alpine.DEB.2.00.1111100152430.4195@utopia.booyaka.com>
- <20111111114147.GE12410@mudshark.cambridge.arm.com>
- <20111111114735.GC5114@totoro>
-Message-ID: <20111111115955.GG12410@mudshark.cambridge.arm.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Fri, 11 Nov 2011 20:19:54 +0800
+Subject: [PATCH] ARM: pxa168/gplugd: add the correct SSP device
+Message-ID: <1321013994-6443-1-git-send-email-eric.y.miao@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 11, 2011 at 11:47:35AM +0000, Jamie Iles wrote:
-> On Fri, Nov 11, 2011 at 11:41:47AM +0000, Will Deacon wrote:
-> > The issue stems from the fact that we have to route the PMU interrupts to
-> > the correct CPU manually (I think only MSM routes them as PPIs, which is
-> > clearly the correct thing to do). To do this, we expect the IRQ resources to
-> > be laid out in CPU order. In hindsight, maybe naming the resources might
-> > have been a good idea, but them we'd still have to generate the names using
-> > CPU numbers when iterating through the platform device.
-> 
-> There isn't yet a way to do naming of resources with DT, and although I 
-> think there was a proposal for doing named register resources I don't 
-> think this has been accepted and there wasn't anything for IRQ 
-> resources...
+There is no SSP0, but SSP2 is used on gplugd.
 
-That's good news - means I have an excuse other than laziness for not
-implementing this for perf :)
+Cc: Tanmay Upadhyay <tanmay.upadhyay@einfochips.com>
+Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
+---
+ arch/arm/mach-mmp/gplugd.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-Will
+diff --git a/arch/arm/mach-mmp/gplugd.c b/arch/arm/mach-mmp/gplugd.c
+index 6915656..0469c74 100644
+--- a/arch/arm/mach-mmp/gplugd.c
++++ b/arch/arm/mach-mmp/gplugd.c
+@@ -182,7 +182,7 @@ static void __init gplugd_init(void)
+ 
+ 	/* on-chip devices */
+ 	pxa168_add_uart(3);
+-	pxa168_add_ssp(0);
++	pxa168_add_ssp(2);
+ 	pxa168_add_twsi(0, NULL, ARRAY_AND_SIZE(gplugd_i2c_board_info));
+ 
+ 	pxa168_add_eth(&gplugd_eth_platform_data);
+-- 
+1.7.5.4
