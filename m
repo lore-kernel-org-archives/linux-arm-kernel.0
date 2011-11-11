@@ -1,176 +1,528 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Fri, 11 Nov 2011 09:18:32 +0800
-Subject: [PATCH v2 1/3] ARM: pxa168: Add SDHCI support
-In-Reply-To: <1320399547-2374-1-git-send-email-tanmay.upadhyay@einfochips.com>
-References: <1319546069-31742-1-git-send-email-tanmay.upadhyay@einfochips.com>
- <1320399547-2374-1-git-send-email-tanmay.upadhyay@einfochips.com>
-Message-ID: <CAMPhdO9EWeXw-XsjQ5x-qcAbjFDxrdz47wirFKWKV=kJFZAKiw@mail.gmail.com>
+From: myungjoo.ham@gmail.com (MyungJoo Ham)
+Date: Fri, 11 Nov 2011 10:47:44 +0900
+Subject: [PATCH 3/3] ARM: EXYNOS4: Support ASV for Exynos4210
+In-Reply-To: <1320904083-19173-4-git-send-email-boyko.lee@samsung.com>
+References: <1320904083-19173-1-git-send-email-boyko.lee@samsung.com>
+ <1320904083-19173-4-git-send-email-boyko.lee@samsung.com>
+Message-ID: <CAJ0PZbQJKzpyWgnNAP1VmKQuVc4O=uHOqU16kQ5eN+sv0pPAUA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 4, 2011 at 5:39 PM, Tanmay Upadhyay
-<tanmay.upadhyay@einfochips.com> wrote:
-> v2 - clock register for SDHCI are not common across all MMP SoCs.
-> So, move PXA168 implementation to pxa168.c
+On Thu, Nov 10, 2011 at 2:48 PM, Jongpill Lee <boyko.lee@samsung.com> wrote:
+> This patch adds function for exynos4210's asv driver.
+> On Exynos4210, we can get ASV result using by HPM and IDS value.
+> If you want to use asv result on your driver, please define
+> exynos_result_of_asv with extern.
+
+Thank you! Looks much better with a variable than a register.
+At least, it's now fully compatible with DVFS drivers. :)
+I'll add a devfreq driver for Exynos4210 bus soon.
+
 >
-> Signed-off-by: Tanmay Upadhyay <tanmay.upadhyay@einfochips.com>
+> Signed-off-by: Jongpill Lee <boyko.lee@samsung.com>
 > ---
-> ?arch/arm/mach-mmp/clock.c ? ? ? ? ? ? ? | ? ?1 +
-> ?arch/arm/mach-mmp/clock.h ? ? ? ? ? ? ? | ? ?1 +
-> ?arch/arm/mach-mmp/include/mach/pxa168.h | ? 20 +++++++++++++
-> ?arch/arm/mach-mmp/pxa168.c ? ? ? ? ? ? ?| ? 46 +++++++++++++++++++++++++++++++
-> ?4 files changed, 68 insertions(+), 0 deletions(-)
+> ?arch/arm/mach-exynos4/Makefile ? ? ? ? ? ? ? ? ?| ? ?2 +-
+> ?arch/arm/mach-exynos4/asv-4210.c ? ? ? ? ? ? ? ?| ?339 +++++++++++++++++++++++
+> ?arch/arm/mach-exynos4/asv.c ? ? ? ? ? ? ? ? ? ? | ? ?9 +-
+> ?arch/arm/mach-exynos4/include/mach/asv.h ? ? ? ?| ? ?3 +
+> ?arch/arm/mach-exynos4/include/mach/map.h ? ? ? ?| ? ?2 +
+> ?arch/arm/mach-exynos4/include/mach/regs-clock.h | ? 18 ++
+> ?arch/arm/mach-exynos4/include/mach/regs-iem.h ? | ? 27 ++
+> ?7 files changed, 397 insertions(+), 3 deletions(-)
+> ?create mode 100644 arch/arm/mach-exynos4/asv-4210.c
+> ?create mode 100644 arch/arm/mach-exynos4/include/mach/regs-iem.h
 >
-> diff --git a/arch/arm/mach-mmp/clock.c b/arch/arm/mach-mmp/clock.c
-> index 7c6f95f..eefefea 100644
-> --- a/arch/arm/mach-mmp/clock.c
-> +++ b/arch/arm/mach-mmp/clock.c
-> @@ -14,6 +14,7 @@
-> ?#include <linux/io.h>
+> diff --git a/arch/arm/mach-exynos4/Makefile b/arch/arm/mach-exynos4/Makefile
+> index 587ce90..5422b01 100644
+> --- a/arch/arm/mach-exynos4/Makefile
+> +++ b/arch/arm/mach-exynos4/Makefile
+> @@ -18,7 +18,7 @@ obj-$(CONFIG_CPU_EXYNOS4210) ?+= clock-exynos4210.o
+> ?obj-$(CONFIG_SOC_EXYNOS4212) ? += clock-exynos4212.o
+> ?obj-$(CONFIG_PM) ? ? ? ? ? ? ? += pm.o
+> ?obj-$(CONFIG_CPU_IDLE) ? ? ? ? += cpuidle.o
+> -obj-$(CONFIG_ARM_EXYNOS4210_CPUFREQ) ? += asv.o
+> +obj-$(CONFIG_ARM_EXYNOS4210_CPUFREQ) ? += asv.o asv-4210.o
 >
-> ?#include <mach/regs-apbc.h>
-> +#include <mach/regs-apmu.h>
-> ?#include "clock.h"
+> ?obj-$(CONFIG_SMP) ? ? ? ? ? ? ?+= platsmp.o headsmp.o
 >
-> ?static void apbc_clk_enable(struct clk *clk)
-> diff --git a/arch/arm/mach-mmp/clock.h b/arch/arm/mach-mmp/clock.h
-> index 3143e99..1243e4d 100644
-> --- a/arch/arm/mach-mmp/clock.h
-> +++ b/arch/arm/mach-mmp/clock.h
-> @@ -27,6 +27,7 @@ struct clk {
->
-> ?extern struct clkops apbc_clk_ops;
-> ?extern struct clkops apmu_clk_ops;
-> +extern struct clkops sdh_clk_ops;
->
-> ?#define APBC_CLK(_name, _reg, _fnclksel, _rate) ? ? ? ? ? ? ? ? ? ? ? ?\
-> ?struct clk clk_##_name = { ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
-> diff --git a/arch/arm/mach-mmp/include/mach/pxa168.h b/arch/arm/mach-mmp/include/mach/pxa168.h
-> index 7f00584..390a550 100644
-> --- a/arch/arm/mach-mmp/include/mach/pxa168.h
-> +++ b/arch/arm/mach-mmp/include/mach/pxa168.h
-> @@ -15,6 +15,7 @@ extern void pxa168_clear_keypad_wakeup(void);
-> ?#include <plat/pxa27x_keypad.h>
-> ?#include <mach/cputype.h>
-> ?#include <linux/pxa168_eth.h>
-> +#include <linux/platform_data/pxa_sdhci.h>
->
-> ?extern struct pxa_device_desc pxa168_device_uart1;
-> ?extern struct pxa_device_desc pxa168_device_uart2;
-> @@ -34,6 +35,10 @@ extern struct pxa_device_desc pxa168_device_nand;
-> ?extern struct pxa_device_desc pxa168_device_fb;
-> ?extern struct pxa_device_desc pxa168_device_keypad;
-> ?extern struct pxa_device_desc pxa168_device_eth;
-> +extern struct pxa_device_desc pxa168_device_sdh0;
-> +extern struct pxa_device_desc pxa168_device_sdh1;
-> +extern struct pxa_device_desc pxa168_device_sdh2;
-> +extern struct pxa_device_desc pxa168_device_sdh3;
->
-> ?static inline int pxa168_add_uart(int id)
-> ?{
-> @@ -125,4 +130,19 @@ static inline int pxa168_add_eth(struct pxa168_eth_platform_data *data)
-> ?{
-> ? ? ? ?return pxa_register_device(&pxa168_device_eth, data, sizeof(*data));
-> ?}
+> diff --git a/arch/arm/mach-exynos4/asv-4210.c b/arch/arm/mach-exynos4/asv-4210.c
+> new file mode 100644
+> index 0000000..1260ab8
+> --- /dev/null
+> +++ b/arch/arm/mach-exynos4/asv-4210.c
+> @@ -0,0 +1,339 @@
+> +/* linux/arch/arm/mach-exynos/asv-4210.c
+> + *
+> + * Copyright (c) 2011 Samsung Electronics Co., Ltd.
+> + * ? ? ? ? ? ? http://www.samsung.com/
+> + *
+> + * EXYNOS4210 - ASV(Adaptive Support Voltage) driver
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> +*/
 > +
-> +static inline int pxa168_add_sdh(int id, struct sdhci_pxa_platdata *data)
-> +{
-> + ? ? ? struct pxa_device_desc *d = NULL;
+> +#include <linux/init.h>
+> +#include <linux/types.h>
+> +#include <linux/kernel.h>
+> +#include <linux/err.h>
+> +#include <linux/clk.h>
+> +#include <linux/io.h>
 > +
-> + ? ? ? switch (id) {
-> + ? ? ? case 0: d = &pxa168_device_sdh0; break;
-> + ? ? ? case 1: d = &pxa168_device_sdh1; break;
-> + ? ? ? case 2: d = &pxa168_device_sdh2; break;
-> + ? ? ? case 3: d = &pxa168_device_sdh3; break;
-> + ? ? ? default:
-> + ? ? ? ? ? ? ? return -EINVAL;
-> + ? ? ? }
-> + ? ? ? return pxa_register_device(d, data, sizeof(*data));
-> +}
-> ?#endif /* __ASM_MACH_PXA168_H */
-> diff --git a/arch/arm/mach-mmp/pxa168.c b/arch/arm/mach-mmp/pxa168.c
-> index 0156f53..868605d 100644
-> --- a/arch/arm/mach-mmp/pxa168.c
-> +++ b/arch/arm/mach-mmp/pxa168.c
-> @@ -43,6 +43,14 @@ static struct mfp_addr_map pxa168_mfp_addr_map[] __initdata =
->
-> ?#define APMASK(i) ? ? ?(GPIO_REGS_VIRT + BANK_OFF(i) + 0x09c)
->
-> +/* Offset defined in arch/arm/mach-mmp/include/mach/regs-apmu.h are for MMP2
-> + * PXA168 has different offset */
-> +#undef APMU_SDH2
-> +#undef APMU_SDH3
+> +#include <plat/clock.h>
 > +
-> +#define APMU_SDH2 ? ? ?APMU_REG(0xe0)
-> +#define APMU_SDH3 ? ? ?APMU_REG(0xe4)
+> +#include <mach/regs-iem.h>
+> +#include <mach/regs-clock.h>
+> +#include <mach/asv.h>
 > +
-> ?static void __init pxa168_init_gpio(void)
-> ?{
-> ? ? ? ?int i;
-> @@ -63,6 +71,31 @@ void __init pxa168_init_irq(void)
-> ? ? ? ?pxa168_init_gpio();
-> ?}
->
-> +static void sdh_clk_enable(struct clk *clk)
-> +{
-> + ? ? ? unsigned long clk_reg_offset = (unsigned long) clk->clk_rst;
+> +/*
+> + * exynos_result_of_asv is result of ASV group.
+> + * Using by this value, other driver can adjust voltage.
+> + */
+> +unsigned int exynos_result_of_asv;
 > +
-> + ? ? ? /* Can't see any clean way to do this: Bits 3 & 0 in registers
-> + ? ? ? ?* for host 0 & 2 should be set for host 1 & 3 also */
-> + ? ? ? if (clk_reg_offset == APMU_SDH0 || clk_reg_offset == APMU_SDH1)
-> + ? ? ? ? ? ? ? __raw_writel(__raw_readl(APMU_SDH0) | 0x9, APMU_SDH0);
-> + ? ? ? if (clk_reg_offset == APMU_SDH2 || clk_reg_offset == APMU_SDH3)
-> + ? ? ? ? ? ? ? __raw_writel(__raw_readl(APMU_SDH2) | 0x9, APMU_SDH2);
-> +
-> + ? ? ? __raw_writel(__raw_readl(clk->clk_rst) | clk->enable_val, clk->clk_rst);
-> +}
-> +
-> +static void sdh_clk_disable(struct clk *clk)
-> +{
-> + ? ? ? __raw_writel(__raw_readl(clk->clk_rst) & ~(clk->enable_val),
-> + ? ? ? ? ? ? ? ? ? ? ? clk->clk_rst);
-> +}
-> +
-> +struct clkops sdh_clk_ops = {
-> + ? ? ? .enable ? ? ? ? = sdh_clk_enable,
-> + ? ? ? .disable ? ? ? ?= sdh_clk_disable,
+> +enum target_asv {
+> + ? ? ? EXYNOS4210_1200,
+> + ? ? ? EXYNOS4210_1400,
+> + ? ? ? EXYNOS4210_SINGLE_1200,
 > +};
 > +
-> ?/* APB peripheral clocks */
-> ?static APBC_CLK(uart1, PXA168_UART1, 1, 14745600);
-> ?static APBC_CLK(uart2, PXA168_UART2, 1, 14745600);
-> @@ -84,6 +117,11 @@ static APMU_CLK(nand, NAND, 0x19b, 156000000);
-> ?static APMU_CLK(lcd, LCD, 0x7f, 312000000);
-> ?static APMU_CLK(eth, ETH, 0x09, 0);
->
-> +static APMU_CLK_OPS(sdh0, SDH0, 0x12, 48000000, &sdh_clk_ops);
-> +static APMU_CLK_OPS(sdh1, SDH1, 0x12, 48000000, &sdh_clk_ops);
-> +static APMU_CLK_OPS(sdh2, SDH2, 0x12, 48000000, &sdh_clk_ops);
-> +static APMU_CLK_OPS(sdh3, SDH3, 0x12, 48000000, &sdh_clk_ops);
+> +struct asv_judge_table exynos4210_1200_limit[] = {
+> + ? ? ? /* HPM , IDS */
+> + ? ? ? {8 , 4},
+> + ? ? ? {11 , 8},
+> + ? ? ? {14 , 12},
+> + ? ? ? {18 , 17},
+> + ? ? ? {21 , 27},
+> + ? ? ? {23 , 45},
+> + ? ? ? {25 , 55},
+> +};
 > +
-> ?/* device and clock bindings */
-> ?static struct clk_lookup pxa168_clkregs[] = {
-> ? ? ? ?INIT_CLKREG(&clk_uart1, "pxa2xx-uart.0", NULL),
-> @@ -104,6 +142,10 @@ static struct clk_lookup pxa168_clkregs[] = {
-> ? ? ? ?INIT_CLKREG(&clk_lcd, "pxa168-fb", NULL),
-> ? ? ? ?INIT_CLKREG(&clk_keypad, "pxa27x-keypad", NULL),
-> ? ? ? ?INIT_CLKREG(&clk_eth, "pxa168-eth", "MFUCLK"),
-> + ? ? ? INIT_CLKREG(&clk_sdh0, "sdhci-pxav1.0", "PXA-SDHCLK"),
-> + ? ? ? INIT_CLKREG(&clk_sdh1, "sdhci-pxav1.1", "PXA-SDHCLK"),
-> + ? ? ? INIT_CLKREG(&clk_sdh2, "sdhci-pxav1.2", "PXA-SDHCLK"),
-> + ? ? ? INIT_CLKREG(&clk_sdh3, "sdhci-pxav1.3", "PXA-SDHCLK"),
+> +static struct asv_judge_table exynos4210_1400_limit[] = {
+> + ? ? ? /* HPM , IDS */
+> + ? ? ? {13 , 8},
+> + ? ? ? {17 , 12},
+> + ? ? ? {22 , 32},
+> + ? ? ? {26 , 52},
+> +};
+> +
+> +static struct asv_judge_table exynos4210_single_1200_limit[] = {
+> + ? ? ? /* HPM , IDS */
+> + ? ? ? {8 , 4},
+> + ? ? ? {14 , 12},
+> + ? ? ? {21 , 27},
+> + ? ? ? {25 , 55},
+> +};
+> +
+> +static int exynos4210_asv_pre_clock_init(void)
+> +{
+> + ? ? ? struct clk *clk_hpm;
+> + ? ? ? struct clk *clk_copy;
+> + ? ? ? struct clk *clk_parent;
+> +
+> + ? ? ? /* PWI clock setting */
+> + ? ? ? clk_copy = clk_get(NULL, "sclk_pwi");
+> + ? ? ? if (IS_ERR(clk_copy))
+> + ? ? ? ? ? ? ? goto clock_fail;
+> + ? ? ? else {
+> + ? ? ? ? ? ? ? clk_parent = clk_get(NULL, "xusbxti");
+> +
+> + ? ? ? ? ? ? ? if (IS_ERR(clk_parent)) {
+> + ? ? ? ? ? ? ? ? ? ? ? clk_put(clk_copy);
+> +
+> + ? ? ? ? ? ? ? ? ? ? ? goto clock_fail;
+> + ? ? ? ? ? ? ? }
+> + ? ? ? ? ? ? ? if (clk_set_parent(clk_copy, clk_parent))
+> + ? ? ? ? ? ? ? ? ? ? ? goto clock_fail;
+> +
+> + ? ? ? ? ? ? ? clk_put(clk_parent);
+> + ? ? ? }
+> + ? ? ? clk_set_rate(clk_copy, (48 * MHZ));
+> +
+> + ? ? ? clk_put(clk_copy);
+> +
+> + ? ? ? /* HPM clock setting */
+> + ? ? ? clk_copy = clk_get(NULL, "dout_copy");
+> + ? ? ? if (IS_ERR(clk_copy))
+> + ? ? ? ? ? ? ? goto clock_fail;
+> + ? ? ? else {
+> + ? ? ? ? ? ? ? clk_parent = clk_get(NULL, "mout_mpll");
+> + ? ? ? ? ? ? ? if (IS_ERR(clk_parent)) {
+> + ? ? ? ? ? ? ? ? ? ? ? clk_put(clk_copy);
+> +
+> + ? ? ? ? ? ? ? ? ? ? ? goto clock_fail;
+> + ? ? ? ? ? ? ? }
+> + ? ? ? ? ? ? ? if (clk_set_parent(clk_copy, clk_parent))
+> + ? ? ? ? ? ? ? ? ? ? ? goto clock_fail;
+> +
+> + ? ? ? ? ? ? ? clk_put(clk_parent);
+> + ? ? ? }
+> +
+> + ? ? ? clk_set_rate(clk_copy, (400 * MHZ));
+> +
+> + ? ? ? clk_put(clk_copy);
+> +
+> + ? ? ? clk_hpm = clk_get(NULL, "sclk_hpm");
+> + ? ? ? if (IS_ERR(clk_hpm))
+> + ? ? ? ? ? ? ? goto clock_fail;
+> +
+> + ? ? ? clk_set_rate(clk_hpm, (200 * MHZ));
+> +
+> + ? ? ? clk_put(clk_hpm);
+> +
+> + ? ? ? return 0;
+> +
+> +clock_fail:
+> + ? ? ? pr_err("EXYNOS4210: ASV: Clock init fail\n");
+> +
+> + ? ? ? return -EBUSY;
+> +}
+> +
+> +static int exynos4210_asv_pre_clock_setup(void)
+> +{
+> + ? ? ? /* APLL_CON0 level register */
+> + ? ? ? __raw_writel(0x80FA0601, S5P_APLL_CON0L8);
+> + ? ? ? __raw_writel(0x80C80601, S5P_APLL_CON0L7);
+> + ? ? ? __raw_writel(0x80C80602, S5P_APLL_CON0L6);
+> + ? ? ? __raw_writel(0x80C80604, S5P_APLL_CON0L5);
+> + ? ? ? __raw_writel(0x80C80601, S5P_APLL_CON0L4);
+> + ? ? ? __raw_writel(0x80C80601, S5P_APLL_CON0L3);
+> + ? ? ? __raw_writel(0x80C80601, S5P_APLL_CON0L2);
+> + ? ? ? __raw_writel(0x80C80601, S5P_APLL_CON0L1);
+> +
+> + ? ? ? /* IEM Divider register */
+> + ? ? ? __raw_writel(0x00500000, S5P_CLKDIV_IEM_L8);
+> + ? ? ? __raw_writel(0x00500000, S5P_CLKDIV_IEM_L7);
+> + ? ? ? __raw_writel(0x00500000, S5P_CLKDIV_IEM_L6);
+> + ? ? ? __raw_writel(0x00500000, S5P_CLKDIV_IEM_L5);
+> + ? ? ? __raw_writel(0x00500000, S5P_CLKDIV_IEM_L4);
+> + ? ? ? __raw_writel(0x00500000, S5P_CLKDIV_IEM_L3);
+> + ? ? ? __raw_writel(0x00500000, S5P_CLKDIV_IEM_L2);
+> + ? ? ? __raw_writel(0x00500000, S5P_CLKDIV_IEM_L1);
+> +
+> + ? ? ? return 0;
+> +}
+> +
+> +static int exynos4210_find_group(struct samsung_asv *asv_info,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? enum target_asv exynos4_target)
+> +{
+> + ? ? ? unsigned int ret = 0;
+> + ? ? ? unsigned int i;
+> +
+> + ? ? ? if (exynos4_target == EXYNOS4210_1200) {
+> + ? ? ? ? ? ? ? ret = ARRAY_SIZE(exynos4210_1200_limit);
+> +
+> + ? ? ? ? ? ? ? for (i = 0; i < ARRAY_SIZE(exynos4210_1200_limit); i++) {
+> + ? ? ? ? ? ? ? ? ? ? ? if (asv_info->hpm_result <= exynos4210_1200_limit[i].hpm_limit ||
+> + ? ? ? ? ? ? ? ? ? ? ? ? ?asv_info->ids_result <= exynos4210_1200_limit[i].ids_limit) {
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ret = i;
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? break;
+> + ? ? ? ? ? ? ? ? ? ? ? }
+> + ? ? ? ? ? ? ? }
+> + ? ? ? } else if (exynos4_target == EXYNOS4210_1400) {
+> + ? ? ? ? ? ? ? ret = ARRAY_SIZE(exynos4210_1400_limit);
+> +
+> + ? ? ? ? ? ? ? for (i = 0; i < ARRAY_SIZE(exynos4210_1400_limit); i++) {
+> + ? ? ? ? ? ? ? ? ? ? ? if (asv_info->hpm_result <= exynos4210_1400_limit[i].hpm_limit ||
+> + ? ? ? ? ? ? ? ? ? ? ? ? ?asv_info->ids_result <= exynos4210_1400_limit[i].ids_limit) {
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ret = i;
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? break;
+> + ? ? ? ? ? ? ? ? ? ? ? }
+> + ? ? ? ? ? ? ? }
+> + ? ? ? } else if (exynos4_target == EXYNOS4210_SINGLE_1200) {
+> + ? ? ? ? ? ? ? ret = ARRAY_SIZE(exynos4210_single_1200_limit);
+> +
+> + ? ? ? ? ? ? ? for (i = 0; i < ARRAY_SIZE(exynos4210_single_1200_limit); i++) {
+> + ? ? ? ? ? ? ? ? ? ? ? if (asv_info->hpm_result <= exynos4210_single_1200_limit[i].hpm_limit ||
+> + ? ? ? ? ? ? ? ? ? ? ? ? ?asv_info->ids_result <= exynos4210_single_1200_limit[i].ids_limit) {
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ret = i;
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? break;
+> + ? ? ? ? ? ? ? ? ? ? ? }
+> + ? ? ? ? ? ? ? }
+> + ? ? ? }
+> +
+> + ? ? ? return ret;
+> +}
+> +
+> +#define PACK_ID ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?8
+> +#define PACK_MASK ? ? ? ? ? ? ? ? ? ? ?0x3
+> +
+> +#define SUPPORT_1400MHZ ? ? ? ? ? ? ? ? ? ? ? ?(1 << 31)
+> +#define SUPPORT_1200MHZ ? ? ? ? ? ? ? ? ? ? ? ?(1 << 30)
+> +#define SUPPORT_1000MHZ ? ? ? ? ? ? ? ? ? ? ? ?(1 << 29)
+> +
+> +static int exynos4210_get_hpm(struct samsung_asv *asv_info)
+> +{
+> + ? ? ? unsigned int i;
+> + ? ? ? unsigned int tmp;
+> + ? ? ? unsigned int hpm_delay = 0;
+> + ? ? ? void __iomem *iem_base;
+> +
+> + ? ? ? iem_base = ioremap(EXYNOS4_PA_IEM, SZ_128K);
+> +
+> + ? ? ? if (!iem_base) {
+> + ? ? ? ? ? ? ? pr_err("EXYNOS4210: ASV: ioremap fail\n");
+> + ? ? ? ? ? ? ? return -EPERM;
+> + ? ? ? }
+> +
+> + ? ? ? /* Clock setting to get asv value */
+> + ? ? ? if (!asv_info->pre_clock_init)
+> + ? ? ? ? ? ? ? goto err;
+> + ? ? ? else {
+> + ? ? ? ? ? ? ? if (asv_info->pre_clock_init())
+> + ? ? ? ? ? ? ? ? ? ? ? goto err;
+> + ? ? ? ? ? ? ? else {
+> + ? ? ? ? ? ? ? ? ? ? ? /* HPM enable ?*/
+> + ? ? ? ? ? ? ? ? ? ? ? tmp = __raw_readl(iem_base + EXYNOS4_APC_CONTROL);
+> + ? ? ? ? ? ? ? ? ? ? ? tmp |= APC_HPM_EN;
+> + ? ? ? ? ? ? ? ? ? ? ? __raw_writel(tmp, (iem_base + EXYNOS4_APC_CONTROL));
+> +
+> + ? ? ? ? ? ? ? ? ? ? ? asv_info->pre_clock_setup();
+> +
+> + ? ? ? ? ? ? ? ? ? ? ? /* IEM enable */
+> + ? ? ? ? ? ? ? ? ? ? ? tmp = __raw_readl(iem_base + EXYNOS4_IECDPCCR);
+> + ? ? ? ? ? ? ? ? ? ? ? tmp |= IEC_EN;
+> + ? ? ? ? ? ? ? ? ? ? ? __raw_writel(tmp, (iem_base + EXYNOS4_IECDPCCR));
+> + ? ? ? ? ? ? ? }
+> + ? ? ? }
+> +
+> + ? ? ? /* Get HPM Delay value */
+> + ? ? ? for (i = 0; i < EXYNOS4_LOOP_CNT; i++) {
+> + ? ? ? ? ? ? ? tmp = __raw_readb(iem_base + EXYNOS4_APC_DBG_DLYCODE);
+> + ? ? ? ? ? ? ? hpm_delay += tmp;
+> + ? ? ? }
+> +
+> + ? ? ? hpm_delay /= EXYNOS4_LOOP_CNT;
+> +
+> + ? ? ? /* Store result of hpm value */
+> + ? ? ? asv_info->hpm_result = hpm_delay;
+> +
+> + ? ? ? return 0;
+> +
+> +err:
+> + ? ? ? pr_err("EXYNOS4210: ASV: Failt to get hpm function\n");
+> +
+> + ? ? ? iounmap(iem_base);
+> +
+> + ? ? ? return -EPERM;
+> +}
+> +
+> +static int exynos4210_get_ids(struct samsung_asv *asv_info)
+> +{
+> + ? ? ? unsigned int pkg_id_val;
+> +
+> + ? ? ? if (!asv_info->ids_offset || !asv_info->ids_mask) {
+> + ? ? ? ? ? ? ? pr_err("EXYNOS4210: ASV: No ids_offset or No ids_mask\n");
+> +
+> + ? ? ? ? ? ? ? return -EPERM;
+> + ? ? ? }
+> +
+> + ? ? ? pkg_id_val = __raw_readl(S5P_VA_CHIPID + 0x4);
+> + ? ? ? asv_info->pkg_id = pkg_id_val;
+> + ? ? ? asv_info->ids_result = ((pkg_id_val >> asv_info->ids_offset) &
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? asv_info->ids_mask);
+> +
+> + ? ? ? return 0;
+> +}
+> +
+> +static int exynos4210_asv_store_result(struct samsung_asv *asv_info)
+> +{
+> + ? ? ? unsigned int result_grp;
+> + ? ? ? char *support_freq;
+> + ? ? ? unsigned int exynos_idcode = 0x0;
+> +
+> + ? ? ? exynos_result_of_asv = 0;
+> +
+> + ? ? ? exynos_idcode = __raw_readl(S5P_VA_CHIPID);
+> +
+> + ? ? ? /* Single chip is only support 1.2GHz */
+> + ? ? ? if (!((exynos_idcode >> PACK_ID) & PACK_MASK)) {
+> + ? ? ? ? ? ? ? result_grp = exynos4210_find_group(asv_info, EXYNOS4210_SINGLE_1200);
+> + ? ? ? ? ? ? ? result_grp |= SUPPORT_1200MHZ;
+> + ? ? ? ? ? ? ? support_freq = "1.2GHz";
+> +
+> + ? ? ? ? ? ? ? goto set_reg;
+> + ? ? ? }
+> +
+> + ? ? ? /* Check support freq */
+> + ? ? ? switch (asv_info->pkg_id & 0x7) {
+> + ? ? ? /* Support 1.2GHz */
+> + ? ? ? case 1:
+> + ? ? ? case 7:
+> + ? ? ? ? ? ? ? result_grp = exynos4210_find_group(asv_info, EXYNOS4210_1200);
+> + ? ? ? ? ? ? ? result_grp |= SUPPORT_1200MHZ;
+> + ? ? ? ? ? ? ? support_freq = "1.2GHz";
+> + ? ? ? ? ? ? ? break;
+> + ? ? ? /* Support 1.4GHz */
+> + ? ? ? case 5:
+> + ? ? ? ? ? ? ? result_grp = exynos4210_find_group(asv_info, EXYNOS4210_1400);
+> + ? ? ? ? ? ? ? result_grp |= SUPPORT_1200MHZ;
+> + ? ? ? ? ? ? ? support_freq = "1.4GHz";
+> + ? ? ? ? ? ? ? break;
+> + ? ? ? /* Defalut support 1.0GHz */
+> + ? ? ? default:
+> + ? ? ? ? ? ? ? result_grp = exynos4210_find_group(asv_info, EXYNOS4210_1200);
+> + ? ? ? ? ? ? ? result_grp |= SUPPORT_1000MHZ;
+> + ? ? ? ? ? ? ? support_freq = "1.0GHz";
+> + ? ? ? ? ? ? ? break;
+> + ? ? ? }
+> +
+> +set_reg:
+> + ? ? ? exynos_result_of_asv = result_grp;
+> +
+> + ? ? ? pr_info("EXYNOS4: ASV: Support %s and Group is 0x%x\n",
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? support_freq, result_grp);
+> +
+> + ? ? ? return 0;
+> +}
+> +
+> +void exynos4210_asv_init(struct samsung_asv *asv_info)
+> +{
+> + ? ? ? pr_info("EXYNOS4210: Adaptive Support Voltage init\n");
+> +
+> + ? ? ? asv_info->ids_offset = 24;
+> + ? ? ? asv_info->ids_mask = 0xFF;
+> +
+> + ? ? ? asv_info->get_ids = exynos4210_get_ids;
+> + ? ? ? asv_info->get_hpm = exynos4210_get_hpm;
+> + ? ? ? asv_info->pre_clock_init = exynos4210_asv_pre_clock_init;
+> + ? ? ? asv_info->pre_clock_setup = exynos4210_asv_pre_clock_setup;
+> + ? ? ? asv_info->store_result = exynos4210_asv_store_result;
+> +}
+> diff --git a/arch/arm/mach-exynos4/asv.c b/arch/arm/mach-exynos4/asv.c
+> index b13d182..85d076e 100644
+> --- a/arch/arm/mach-exynos4/asv.c
+> +++ b/arch/arm/mach-exynos4/asv.c
+> @@ -17,6 +17,8 @@
+> ?#include <linux/io.h>
+> ?#include <linux/slab.h>
+>
+> +#include <plat/cpu.h>
+> +
+> ?#include <mach/map.h>
+> ?#include <mach/asv.h>
+>
+> @@ -26,9 +28,12 @@ static int __init exynos_asv_init(void)
+> ?{
+> ? ? ? ?exynos_asv = kzalloc(sizeof(struct samsung_asv), GFP_KERNEL);
+> ? ? ? ?if (!exynos_asv)
+> - ? ? ? ? ? ? ? return -ENOMEM;
+> + ? ? ? ? ? ? ? goto out;
+>
+> - ? ? ? /* I will add asv driver of exynos4 series to regist */
+> + ? ? ? if (soc_is_exynos4210())
+> + ? ? ? ? ? ? ? exynos4210_asv_init(exynos_asv);
+> + ? ? ? else
+> + ? ? ? ? ? ? ? goto out;
+>
+> ? ? ? ?if (exynos_asv->check_vdd_arm) {
+> ? ? ? ? ? ? ? ?if (exynos_asv->check_vdd_arm())
+> diff --git a/arch/arm/mach-exynos4/include/mach/asv.h b/arch/arm/mach-exynos4/include/mach/asv.h
+> index 9a4a8f4..cd43c48 100644
+> --- a/arch/arm/mach-exynos4/include/mach/asv.h
+> +++ b/arch/arm/mach-exynos4/include/mach/asv.h
+> @@ -14,6 +14,7 @@
+> ?#define __ASM_ARCH_ASV_H __FILE__
+>
+> ?#define JUDGE_TABLE_END ? ? ? ? ? ? ? ? ? ? ? ?NULL
+> +#define EXYNOS4_LOOP_CNT ? ? ? ? ? ? ? 10
+>
+> ?struct asv_judge_table {
+> ? ? ? ?unsigned int hpm_limit; /* HPM value to decide group of target */
+> @@ -37,4 +38,6 @@ struct samsung_asv {
+> ? ? ? ?int (*store_result)(struct samsung_asv *asv_info);
 > ?};
 >
-> ?static int __init pxa168_init(void)
-> @@ -169,3 +211,7 @@ PXA168_DEVICE(ssp5, "pxa168-ssp", 4, SSP5, 0xd4021000, 0x40, 60, 61);
-> ?PXA168_DEVICE(fb, "pxa168-fb", -1, LCD, 0xd420b000, 0x1c8);
-> ?PXA168_DEVICE(keypad, "pxa27x-keypad", -1, KEYPAD, 0xd4012000, 0x4c);
-> ?PXA168_DEVICE(eth, "pxa168-eth", -1, MFU, 0xc0800000, 0x0fff);
-> +PXA168_DEVICE(sdh0, "sdhci-pxav1", 0, SDH1, 0xd4280000, 0x100);
-> +PXA168_DEVICE(sdh1, "sdhci-pxav1", 1, SDH1, 0xd4281000, 0x100);
-> +PXA168_DEVICE(sdh2, "sdhci-pxav1", 2, SDH2, 0xd427e000, 0x100);
-> +PXA168_DEVICE(sdh3, "sdhci-pxav1", 3, SDH2, 0xd427f000, 0x100);
+> +extern void exynos4210_asv_init(struct samsung_asv *asv_info);
+> +
+> ?#endif /* __ASM_ARCH_ASV_H */
+> diff --git a/arch/arm/mach-exynos4/include/mach/map.h b/arch/arm/mach-exynos4/include/mach/map.h
+> index 918a979..81fa158 100644
+> --- a/arch/arm/mach-exynos4/include/mach/map.h
+> +++ b/arch/arm/mach-exynos4/include/mach/map.h
+> @@ -60,6 +60,8 @@
+>
+> ?#define EXYNOS4_PA_COMBINER ? ? ? ? ? ?0x10440000
+>
+> +#define EXYNOS4_PA_IEM ? ? ? ? ? ? ? ? 0x10460000
+> +
+> ?#define EXYNOS4_PA_GIC_CPU ? ? ? ? ? ? 0x10480000
+> ?#define EXYNOS4_PA_GIC_DIST ? ? ? ? ? ?0x10490000
+>
+> diff --git a/arch/arm/mach-exynos4/include/mach/regs-clock.h b/arch/arm/mach-exynos4/include/mach/regs-clock.h
+> index 6c37ebe..23ee10f 100644
+> --- a/arch/arm/mach-exynos4/include/mach/regs-clock.h
+> +++ b/arch/arm/mach-exynos4/include/mach/regs-clock.h
+> @@ -130,6 +130,24 @@
+> ?#define S5P_CLKGATE_SCLKCPU ? ? ? ? ? ?S5P_CLKREG(0x14800)
+> ?#define S5P_CLKGATE_IP_CPU ? ? ? ? ? ? S5P_CLKREG(0x14900)
+>
+> +#define S5P_APLL_CON0L8 ? ? ? ? ? ? ? ? ? ? ? ?S5P_CLKREG(0x15100)
+> +#define S5P_APLL_CON0L7 ? ? ? ? ? ? ? ? ? ? ? ?S5P_CLKREG(0x15104)
+> +#define S5P_APLL_CON0L6 ? ? ? ? ? ? ? ? ? ? ? ?S5P_CLKREG(0x15108)
+> +#define S5P_APLL_CON0L5 ? ? ? ? ? ? ? ? ? ? ? ?S5P_CLKREG(0x1510C)
+> +#define S5P_APLL_CON0L4 ? ? ? ? ? ? ? ? ? ? ? ?S5P_CLKREG(0x15110)
+> +#define S5P_APLL_CON0L3 ? ? ? ? ? ? ? ? ? ? ? ?S5P_CLKREG(0x15114)
+> +#define S5P_APLL_CON0L2 ? ? ? ? ? ? ? ? ? ? ? ?S5P_CLKREG(0x15118)
+> +#define S5P_APLL_CON0L1 ? ? ? ? ? ? ? ? ? ? ? ?S5P_CLKREG(0x1511C)
+> +
+> +#define S5P_CLKDIV_IEM_L8 ? ? ? ? ? ? ?S5P_CLKREG(0x15300)
+> +#define S5P_CLKDIV_IEM_L7 ? ? ? ? ? ? ?S5P_CLKREG(0x15304)
+> +#define S5P_CLKDIV_IEM_L6 ? ? ? ? ? ? ?S5P_CLKREG(0x15308)
+> +#define S5P_CLKDIV_IEM_L5 ? ? ? ? ? ? ?S5P_CLKREG(0x1530C)
+> +#define S5P_CLKDIV_IEM_L4 ? ? ? ? ? ? ?S5P_CLKREG(0x15310)
+> +#define S5P_CLKDIV_IEM_L3 ? ? ? ? ? ? ?S5P_CLKREG(0x15314)
+> +#define S5P_CLKDIV_IEM_L2 ? ? ? ? ? ? ?S5P_CLKREG(0x15318)
+> +#define S5P_CLKDIV_IEM_L1 ? ? ? ? ? ? ?S5P_CLKREG(0x1531C)
+> +
+> ?#define S5P_APLL_LOCKTIME ? ? ? ? ? ? ?(0x1C20) ? ? ? ?/* 300us */
+>
+> ?#define S5P_APLLCON0_ENABLE_SHIFT ? ? ?(31)
+> diff --git a/arch/arm/mach-exynos4/include/mach/regs-iem.h b/arch/arm/mach-exynos4/include/mach/regs-iem.h
+> new file mode 100644
+> index 0000000..d9bf177
+> --- /dev/null
+> +++ b/arch/arm/mach-exynos4/include/mach/regs-iem.h
+> @@ -0,0 +1,27 @@
+> +/* linux/arch/arm/mach-exynos/include/mach/regs-iem.h
+> + *
+> + * Copyright (c) 2011 Samsung Electronics Co., Ltd.
+> + * ? ? ? ? ? ? http://www.samsung.com/
+> + *
+> + * EXYNOS4 - IEM(INTELLIGENT ENERGY MANAGEMENT) register discription
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> +*/
+> +
+> +#ifndef __ASM_ARCH_REGS_IEM_H
+> +#define __ASM_ARCH_REGS_IEM_H __FILE__
+> +
+> +/* Register for IEC ?*/
+> +#define EXYNOS4_IECDPCCR ? ? ? ? ? ? ? (0x00000)
+> +
+> +/* Register for APC */
+> +#define EXYNOS4_APC_CONTROL ? ? ? ? ? ?(0x10010)
+> +#define EXYNOS4_APC_PREDLYSEL ? ? ? ? ?(0x10024)
+> +#define EXYNOS4_APC_DBG_DLYCODE ? ? ? ? ? ? ? ?(0x100E0)
+> +
+> +#define APC_HPM_EN ? ? ? ? ? ? ? ? ? ? (1 << 4)
+> +#define IEC_EN ? ? ? ? ? ? ? ? ? ? ? ? (1 << 0)
+> +
+> +#endif /* __ASM_ARCH_REGS_IEM_H */
+> --
+> 1.7.1
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+>
 
-Sorry Tanmay for late response.
 
-The problem is that I didn't seem to find sdhci-pxav1 though in drivers/mmc.
+
+-- 
+MyungJoo Ham, Ph.D.
+Mobile Software Platform Lab, DMC Business, Samsung Electronics
