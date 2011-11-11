@@ -1,66 +1,50 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 11 Nov 2011 12:56:44 +0100
-Subject: [PATCH V2 01/14] clk: add helper functions clk_prepare_enable
- and clk_disable_unprepare
-In-Reply-To: <20111111102727.GC12913@n2100.arm.linux.org.uk>
-References: <1320973829-4388-1-git-send-email-richard.zhao@linaro.org>
- <1320973829-4388-2-git-send-email-richard.zhao@linaro.org>
- <20111111084950.GH16886@pengutronix.de>
- <20111111090546.GC14617@b20223-02.ap.freescale.net>
- <20111111091556.GI16886@pengutronix.de>
- <20111111102727.GC12913@n2100.arm.linux.org.uk>
-Message-ID: <20111111115644.GT16886@pengutronix.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 11 Nov 2011 11:58:02 +0000
+Subject: [PATCH v8 13/16] ARM: LPAE: Add identity mapping support for the
+ 3-level page table format
+In-Reply-To: <20111111113601.GE23243@arm.com>
+References: <1320682618-1182-1-git-send-email-catalin.marinas@arm.com>
+ <1320682618-1182-14-git-send-email-catalin.marinas@arm.com>
+ <20111110225517.GW12913@n2100.arm.linux.org.uk>
+ <20111111113601.GE23243@arm.com>
+Message-ID: <20111111115802.GF12410@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 11, 2011 at 10:27:27AM +0000, Russell King - ARM Linux wrote:
-> On Fri, Nov 11, 2011 at 10:15:56AM +0100, Sascha Hauer wrote:
-> > On Fri, Nov 11, 2011 at 05:05:47PM +0800, Richard Zhao wrote:
-> > > {
-> > > 	int ret;
-> > > 
-> > > 	ret = clk_prepare(clk);
-> > > 	if (ret)
-> > > 		return ret;
-> > > 	ret = clk_enable(clk);
-> > > 	if (ret)
-> > > 		clk_unprepare(clk);
-> > > 	return ret;
+On Fri, Nov 11, 2011 at 11:36:01AM +0000, Catalin Marinas wrote:
+> On Thu, Nov 10, 2011 at 10:55:17PM +0000, Russell King - ARM Linux wrote:
+> > On Mon, Nov 07, 2011 at 04:16:55PM +0000, Catalin Marinas wrote:
+> > > +		pmd += pmd_index(addr);
+> > > +	} else
+> > > +		pmd = pmd_offset(pud, addr);
+> > > +
+> > > +	do {
+> > > +		next = pmd_addr_end(addr, end);
+> > > +		*pmd = __pmd((addr & PMD_MASK) | prot);
+> > > +		flush_pmd_entry(pmd);
+> > > +	} while (pmd++, addr = next, addr != end);
+> > > +}
+> > > +#else	/* !CONFIG_ARM_LPAE */
 > > 
-> > Yes, looks good.
+> > I'm not convinced about the wiseness of this.  One of the places where
+> > this code is called is from the reboot paths, which can happen in atomic
+> > context.  Trying to allocate memory in such a context is going to lead
+> > to problems, especially if support for panic'ing on OOM, and rebooting
+> > on panic'ing are both enabled.
 > 
-> While this looks like a nice easy solution for converting existing
-> drivers, I'd suggest thinking about this a little more...
-> 
-> I would suggest some thought is given to the placement of clk_enable()
-> and clk_disable() when adding clk_prepare(), especially if your existing
-> clk_enable() function can only be called from non-atomic contexts.
-> 
-> Obviously, the transition path needs to be along these lines:
-> 
-> 1. add clk_prepare() to drivers
-> 2. implement clk_prepare() and make clk_enable() callable from non-atomic
->    contexts
-> 3. move clk_enable() in drivers to places it can be called from non-atomic
->    contexts to achieve greater power savings (maybe via the runtime pm)
-> 
-> and where a driver is shared between different sub-architectures which
-> have non-atomic clk_enable()s, (3) can only happen when all those sub-
-> architectures have been updated to step (2).
+> A solution would be to have pre-set page table for identity mappings
+> (which may even come in handy for power management) and avoid the
+> allocation in idmap.c.
 
-The drivers changed here all do clk_prepare/enable in their probe
-function. I agree that this clk_prepare_enable patch gives kind of
-wrong motivation to just use this function and to forget about
-potential power savings with proper integration of clk_prepare/enable.
-I think though that it will take a long time until all drivers really
-do this no matter if we have such a helper or not. I think that in the
-meantime it's better to have a little helper than to clobber the probe
-code with additional error handling.
+Yup, that's what I do in my latest kexec series (v5) so this problem goes
+away then.
 
-Sascha
+> > Therefore, I think this patch depends on the work Will has been doing to
+> > re-structure the kexec and restart support.
+> 
+> I think Will can rebase his patches on top of mine (I touched this file
+> first :)).
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Haha, but my code doesn't depend on yours in order to work correctly!
+
+Will
