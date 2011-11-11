@@ -1,38 +1,40 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 11 Nov 2011 11:46:14 +0000
-Subject: [PATCH v8 16/16] ARM: LPAE: Add the Kconfig entries
-In-Reply-To: <20111110225737.GX12913@n2100.arm.linux.org.uk>
-References: <1320682618-1182-1-git-send-email-catalin.marinas@arm.com>
- <1320682618-1182-17-git-send-email-catalin.marinas@arm.com>
- <20111110225737.GX12913@n2100.arm.linux.org.uk>
-Message-ID: <20111111114613.GF23243@arm.com>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Fri, 11 Nov 2011 11:47:35 +0000
+Subject: [PATCH v5 4/7] arm: omap4: hwmod: introduce emu hwmod
+In-Reply-To: <20111111114147.GE12410@mudshark.cambridge.arm.com>
+References: <1319467559-5518-1-git-send-email-ming.lei@canonical.com>
+ <1319467559-5518-5-git-send-email-ming.lei@canonical.com>
+ <alpine.DEB.2.00.1111080750130.10451@utopia.booyaka.com>
+ <CACVXFVMSJUT2Ac+bWetrLpbyOs6PqY+npNHsbvHipEVZ0gWdgQ@mail.gmail.com>
+ <alpine.DEB.2.00.1111100152430.4195@utopia.booyaka.com>
+ <20111111114147.GE12410@mudshark.cambridge.arm.com>
+Message-ID: <20111111114735.GC5114@totoro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 10, 2011 at 10:57:37PM +0000, Russell King - ARM Linux wrote:
-> On Mon, Nov 07, 2011 at 04:16:58PM +0000, Catalin Marinas wrote:
-> > +config ARCH_PHYS_ADDR_T_64BIT
-> > +	def_bool ARM_LPAE
-> > +
-> > +config ARCH_DMA_ADDR_T_64BIT
-> > +	def_bool ARM_LPAE
-> > +
+On Fri, Nov 11, 2011 at 11:41:47AM +0000, Will Deacon wrote:
+> [Adding Benoit to CC].
 > 
-> I still say this shouldn't depend on the host page table format.  LPAE
-> itself has nothing to do with whether 64-bit DMA addresses are supported
-> by the system.
+> On Thu, Nov 10, 2011 at 09:02:14AM +0000, Paul Walmsley wrote:
+> > On Wed, 9 Nov 2011, Ming Lei wrote:
+> > > Also, current arm perf code don't handle three IRQs(one pl310 irq and 
+> > > two CTI irq) inside one device correctly.
+> > 
+> > To fix this, that ARM perf code should either be using 
+> > platform_get_irq_byname(), or the hwmod hardware data will need to be 
+> > rearranged to meet the arbitrary ordering requirement.  I'd suggest 
+> > pinging Will on this issue to see what he wants to do.
+> 
+> The issue stems from the fact that we have to route the PMU interrupts to
+> the correct CPU manually (I think only MSM routes them as PPIs, which is
+> clearly the correct thing to do). To do this, we expect the IRQ resources to
+> be laid out in CPU order. In hindsight, maybe naming the resources might
+> have been a good idea, but them we'd still have to generate the names using
+> CPU numbers when iterating through the platform device.
 
-So we could change this to:
+There isn't yet a way to do naming of resources with DT, and although I 
+think there was a proposal for doing named register resources I don't 
+think this has been accepted and there wasn't anything for IRQ 
+resources...
 
-config ARCH_DMA_ADDR_T_64BIT
-	depends on ARM_LPAE
-
-and let platforms select it.
-
-The x86 approach is to have another HIGHMEM64G config option for
-systems with more than 4GB of RAM and ARCH_DMA_ADDR_T_64BIT is selected
-automatically. But this comes under the assumption that there is a 1:1
-mapping between phys and bus addresses.
-
--- 
-Catalin
+Jamie
