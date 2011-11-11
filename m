@@ -1,125 +1,106 @@
 From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Fri, 11 Nov 2011 13:22:15 +0200
-Subject: [PATCH v4 09/10] arm/tegra: implement support for tegra30
+Date: Fri, 11 Nov 2011 13:22:16 +0200
+Subject: [PATCH v4 10/10] arm/tegra: add support for tegra30 based board cardhu
 In-Reply-To: <1321010541-31337-1-git-send-email-pdeschrijver@nvidia.com>
 References: <1321010541-31337-1-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <1321010541-31337-10-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <1321010541-31337-11-git-send-email-pdeschrijver@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for tegra30 SoC. This includes a device tree compatible type for
-this SoC ("nvidia,tegra30") and adds L2 cache initialization for this new SoC.
-The clock framework is still missing, which prevents most drivers from working.
-The basic IRQs are the same, so remove the dependency on
-CONFIG_ARCH_TEGRA_2x_SOC.
+Add support for the tegra30 based cardhu development board. Cardhu is a tablet
+formfactor reference design for tegra30. The patch provides a device tree for
+the board, updates Makefile.boot to build the dtb, includes the platform in
+Kconfig and updates board-dt.c.
 
 Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
 ---
- arch/arm/mach-tegra/Kconfig             |   18 +++++++++++++-----
- arch/arm/mach-tegra/board-dt.c          |    3 +++
- arch/arm/mach-tegra/board.h             |    3 +++
- arch/arm/mach-tegra/common.c            |    7 +++++++
- arch/arm/mach-tegra/include/mach/irqs.h |    2 --
- 5 files changed, 26 insertions(+), 7 deletions(-)
+ arch/arm/boot/dts/tegra-cardhu.dts |   36 ++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-tegra/Kconfig        |    7 +++++++
+ arch/arm/mach-tegra/Makefile.boot  |    1 +
+ arch/arm/mach-tegra/board-dt.c     |    1 +
+ 4 files changed, 45 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/boot/dts/tegra-cardhu.dts
 
+diff --git a/arch/arm/boot/dts/tegra-cardhu.dts b/arch/arm/boot/dts/tegra-cardhu.dts
+new file mode 100644
+index 0000000..70c41fc
+--- /dev/null
++++ b/arch/arm/boot/dts/tegra-cardhu.dts
+@@ -0,0 +1,36 @@
++/dts-v1/;
++
++/include/ "tegra30.dtsi"
++
++/ {
++	model = "NVIDIA Tegra30 Cardhu evaluation board";
++	compatible = "nvidia,cardhu", "nvidia,tegra30";
++
++	memory {
++		reg = < 0x80000000 0x40000000 >;
++	};
++
++	serial at 70006000 {
++		clock-frequency = < 408000000 >;
++	};
++
++	i2c at 7000c000 {
++		clock-frequency = <100000>;
++	};
++
++	i2c at 7000c400 {
++		clock-frequency = <100000>;
++	};
++
++	i2c at 7000c500 {
++		clock-frequency = <100000>;
++	};
++
++	i2c at 7000c700 {
++		clock-frequency = <100000>;
++	};
++
++	i2c at 7000d000 {
++		clock-frequency = <100000>;
++	};
++};
 diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
-index 2b1d49b..aad54ca 100644
+index aad54ca..6bae1bb 100644
 --- a/arch/arm/mach-tegra/Kconfig
 +++ b/arch/arm/mach-tegra/Kconfig
-@@ -2,11 +2,8 @@ if ARCH_TEGRA
+@@ -91,6 +91,13 @@ config MACH_VENTANA
+        help
+          Support for the nVidia Ventana development platform
  
- comment "NVIDIA Tegra options"
- 
--choice
--	prompt "Select Tegra processor family for target system"
--
- config ARCH_TEGRA_2x_SOC
--	bool "Tegra 2 family"
-+	bool "Enable support for Tegra20 family"
- 	select CPU_V7
- 	select ARM_GIC
- 	select ARCH_REQUIRE_GPIOLIB
-@@ -17,7 +14,18 @@ config ARCH_TEGRA_2x_SOC
- 	  Support for NVIDIA Tegra AP20 and T20 processors, based on the
- 	  ARM CortexA9MP CPU and the ARM PL310 L2 cache controller
- 
--endchoice
-+config ARCH_TEGRA_3x_SOC
-+	bool "Enable support for Tegra30 family"
-+	select CPU_V7
-+	select ARM_GIC
-+	select ARCH_REQUIRE_GPIOLIB
-+	select USB_ARCH_HAS_EHCI if USB_SUPPORT
-+	select USB_ULPI if USB_SUPPORT
-+	select USB_ULPI_VIEWPORT if USB_SUPPORT
-+	select USE_OF
-+	help
-+	  Support for NVIDIA Tegra T30 processor family, based on the
-+	  ARM CortexA9MP CPU and the ARM PL310 L2 cache controller
- 
- config TEGRA_PCI
- 	bool "PCI Express support"
++config MACH_CARDHU
++       bool "Cardhu board"
++       depends on ARCH_TEGRA_3x_SOC
++       select MACH_TEGRA_DT
++       help
++         Support for the NVIDIA Cardhu development platform
++
+ choice
+         prompt "Low-level debug console UART"
+         default TEGRA_DEBUG_UART_NONE
+diff --git a/arch/arm/mach-tegra/Makefile.boot b/arch/arm/mach-tegra/Makefile.boot
+index bd12c9f..b518848 100644
+--- a/arch/arm/mach-tegra/Makefile.boot
++++ b/arch/arm/mach-tegra/Makefile.boot
+@@ -5,3 +5,4 @@ initrd_phys-$(CONFIG_ARCH_TEGRA_2x_SOC)	:= 0x00800000
+ dtb-$(CONFIG_MACH_HARMONY) += tegra-harmony.dtb
+ dtb-$(CONFIG_MACH_SEABOARD) += tegra-seaboard.dtb
+ dtb-$(CONFIG_MACH_VENTANA) += tegra-ventana.dtb
++dtb-$(CONFIG_MACH_CARDHU) += tegra-cardhu.dtb
 diff --git a/arch/arm/mach-tegra/board-dt.c b/arch/arm/mach-tegra/board-dt.c
-index 15ee974..486b473 100644
+index 486b473..7f3b235 100644
 --- a/arch/arm/mach-tegra/board-dt.c
 +++ b/arch/arm/mach-tegra/board-dt.c
-@@ -125,6 +125,9 @@ static struct {
- #ifdef CONFIG_ARCH_TEGRA_2x_SOC
- 	{ "nvidia,tegra20", tegra20_init_early },
- #endif
-+#ifdef CONFIG_ARCH_TEGRA_3x_SOC
-+	{ "nvidia,tegra30", tegra30_init_early },
-+#endif
+@@ -146,6 +146,7 @@ static const char * tegra_dt_board_compat[] = {
+ 	"nvidia,harmony",
+ 	"nvidia,seaboard",
+ 	"nvidia,ventana",
++	"nvidia,cardhu",
+ 	NULL
  };
  
- static void __init tegra_init_early(void)
-diff --git a/arch/arm/mach-tegra/board.h b/arch/arm/mach-tegra/board.h
-index 355f488..f508cbb 100644
---- a/arch/arm/mach-tegra/board.h
-+++ b/arch/arm/mach-tegra/board.h
-@@ -26,6 +26,9 @@
- #ifdef CONFIG_ARCH_TEGRA_2x_SOC
- void __init tegra20_init_early(void);
- #endif
-+#ifdef CONFIG_ARCH_TEGRA_3x_SOC
-+void __init tegra30_init_early(void);
-+#endif
- void __init tegra_map_common_io(void);
- void __init tegra_init_irq(void);
- void __init tegra_init_clock(void);
-diff --git a/arch/arm/mach-tegra/common.c b/arch/arm/mach-tegra/common.c
-index 3ad1ca3..06f34ec 100644
---- a/arch/arm/mach-tegra/common.c
-+++ b/arch/arm/mach-tegra/common.c
-@@ -98,3 +98,10 @@ void __init tegra20_init_early(void)
- 	tegra_common_init();
- }
- #endif
-+#ifdef CONFIG_ARCH_TEGRA_3x_SOC
-+void __init tegra30_init_early(void)
-+{
-+	tegra_init_cache(0x441, 0x551);
-+	tegra_common_init();
-+}
-+#endif
-diff --git a/arch/arm/mach-tegra/include/mach/irqs.h b/arch/arm/mach-tegra/include/mach/irqs.h
-index 73265af..a2146cd 100644
---- a/arch/arm/mach-tegra/include/mach/irqs.h
-+++ b/arch/arm/mach-tegra/include/mach/irqs.h
-@@ -25,7 +25,6 @@
- 
- #define IRQ_LOCALTIMER                  29
- 
--#ifdef CONFIG_ARCH_TEGRA_2x_SOC
- /* Primary Interrupt Controller */
- #define INT_PRI_BASE			(INT_GIC_BASE + 32)
- #define INT_TMR1			(INT_PRI_BASE + 0)
-@@ -178,6 +177,5 @@
- #define NR_BOARD_IRQS			32
- 
- #define NR_IRQS				(INT_BOARD_BASE + NR_BOARD_IRQS)
--#endif
- 
- #endif
 -- 
 1.7.7.rc0.72.g4b5ea.dirty
