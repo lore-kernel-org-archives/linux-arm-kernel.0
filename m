@@ -1,55 +1,112 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Fri, 11 Nov 2011 21:01:53 +0800
-Subject: [PATCH] ARM: mmp: fix gpio-pxa.h build errors
-In-Reply-To: <CAN1soZzgMy+MTN7sRZL4=yy41rGfDZFMbEbJN-kc-OGmrRA3ng@mail.gmail.com>
-References: <1321014025-6481-1-git-send-email-eric.y.miao@gmail.com>
- <CAN1soZzgMy+MTN7sRZL4=yy41rGfDZFMbEbJN-kc-OGmrRA3ng@mail.gmail.com>
-Message-ID: <CAMPhdO9C4QvtLo7r=D26QXtAFmEvKkrEkN7mLtE-3Ob1xA14Kg@mail.gmail.com>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Fri, 11 Nov 2011 18:32:51 +0530
+Subject: [PATCH] Add dm9000 network support for OK6410 board.
+In-Reply-To: <1321006467-15824-1-git-send-email-peiyong.feng.kernel@gmail.com>
+References: <1321006467-15824-1-git-send-email-peiyong.feng.kernel@gmail.com>
+Message-ID: <CAJuYYwRueftNrWofo744vWXPa+vkgv3r4CyOr_Q_GNrcfct4YA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 11, 2011 at 8:32 PM, Haojian Zhuang
-<haojian.zhuang@gmail.com> wrote:
-> On Fri, Nov 11, 2011 at 8:20 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
->> Fix the build errors as below:
->>
->> In file included from arch/arm/mach-mmp/include/mach/gpio.h:12:0,
->> ? ? ? ? ? ? ? ? from arch/arm/include/asm/gpio.h:5,
->> ? ? ? ? ? ? ? ? from include/linux/gpio.h:30,
->> ? ? ? ? ? ? ? ? from arch/arm/mach-mmp/aspenite.c:11:
->> arch/arm/plat-pxa/include/plat/gpio.h: In function ?gpio_get_value?:
->> arch/arm/plat-pxa/include/plat/gpio.h:12:21: error: invalid operands to binary & (have ?void *? and ?int?)
->> arch/arm/plat-pxa/include/plat/gpio.h: In function ?gpio_set_value?:
->> arch/arm/plat-pxa/include/plat/gpio.h:21:15: error: lvalue required as left operand of assignment
->> arch/arm/plat-pxa/include/plat/gpio.h:23:15: error: lvalue required as left operand of assignment
->>
->> Cc: Russell King <rmk+kernel@arm.linux.org.uk>
->> Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
->> ---
->> ?arch/arm/mach-mmp/include/mach/gpio-pxa.h | ? ?2 +-
->> ?1 files changed, 1 insertions(+), 1 deletions(-)
->>
->> diff --git a/arch/arm/mach-mmp/include/mach/gpio-pxa.h b/arch/arm/mach-mmp/include/mach/gpio-pxa.h
->> index d14eeaf..99b4ce1 100644
->> --- a/arch/arm/mach-mmp/include/mach/gpio-pxa.h
->> +++ b/arch/arm/mach-mmp/include/mach/gpio-pxa.h
->> @@ -7,7 +7,7 @@
->> ?#define GPIO_REGS_VIRT (APB_VIRT_BASE + 0x19000)
->>
->> ?#define BANK_OFF(n) ? ?(((n) < 3) ? (n) << 2 : 0x100 + (((n) - 3) << 2))
->> -#define GPIO_REG(x) ? ?(GPIO_REGS_VIRT + (x))
->> +#define GPIO_REG(x) ? ?(*(volatile u32 *)(GPIO_REGS_VIRT + (x)))
->>
->> ?#define NR_BUILTIN_GPIO ? ? ? ? ? ? ? ?IRQ_GPIO_NUM
->>
->> --
->> 1.7.5.4
->>
-> This patch is already covered in my gpio patch series. :)
+On 11 November 2011 15:44, peiyong feng <peiyong.feng.kernel@gmail.com> wrote:
+> Signed-off-by: peiyong feng <peiyong.feng.kernel@gmail.com>
+> ---
+> ?arch/arm/mach-s3c64xx/mach-smdk6410.c | ? ?1 +
+> ?arch/arm/plat-samsung/devs.c ? ? ? ? ?| ? 40 +++++++++++++++++++++++++++++++++
+> ?2 files changed, 41 insertions(+), 0 deletions(-)
 
-Ah, I'll pick it out then, to get them pushed to -rc phase first.
+If the change is intended for OK6410 board, any reason for modifying
+mach-smdk6410.c board file?
 
 >
-> Thanks
-> Haojian
+> diff --git a/arch/arm/mach-s3c64xx/mach-smdk6410.c b/arch/arm/mach-s3c64xx/mach-smdk6410.c
+> index 8bc8edd..71e817a 100644
+> --- a/arch/arm/mach-s3c64xx/mach-smdk6410.c
+> +++ b/arch/arm/mach-s3c64xx/mach-smdk6410.c
+> @@ -276,6 +276,7 @@ static struct platform_device *smdk6410_devices[] __initdata = {
+> ? ? ? ?&s3c_device_fb,
+> ? ? ? ?&s3c_device_ohci,
+> ? ? ? ?&s3c_device_usb_hsotg,
+> + ? ? ? &s3c_device_dm9000,
+> ? ? ? ?&samsung_asoc_dma,
+> ? ? ? ?&s3c64xx_device_iisv4,
+> ? ? ? ?&samsung_device_keypad,
+> diff --git a/arch/arm/plat-samsung/devs.c b/arch/arm/plat-samsung/devs.c
+> index 4ca8b57..38edc1a 100644
+> --- a/arch/arm/plat-samsung/devs.c
+> +++ b/arch/arm/plat-samsung/devs.c
+> @@ -29,6 +29,7 @@
+> ?#include <linux/mtd/partitions.h>
+> ?#include <linux/mmc/host.h>
+> ?#include <linux/ioport.h>
+> +#include <linux/dm9000.h>
+>
+> ?#include <asm/irq.h>
+> ?#include <asm/pmu.h>
+> @@ -1401,6 +1402,45 @@ void __init s5p_ehci_set_platdata(struct s5p_ehci_platdata *pd)
+> ?}
+> ?#endif /* CONFIG_S5P_DEV_USB_EHCI */
+>
+> +/* Ethernet */
+> +#ifdef CONFIG_DM9000
+> +#define S3C64XX_PA_DM9000 ? ? ?(0x18000000)
+> +#define S3C64XX_SZ_DM9000 ? ? ?SZ_1M
+> +#define S3C64XX_VA_DM9000 ? ? ?S3C_ADDR(0x03b00300)
+
+There could be other boards based on other samsung soc's which would
+be using dm9000. So arch/arm/plat-samsung/devs.c might not be correct
+place for these additions. And, there is S3C64XX_PA_XM0CSN0 in
+mach-s3c64xx/include/mach/map.h which should be reused instead of
+these new macros.
+
+Please refer to other board files in arch/arm/mach-s3c64xx for
+reference on adding dm9000 support for OK6410 board.
+
+Regards,
+Thomas.
+
+> +
+> +static struct resource dm9000_resources[] = {
+> + ? ? ? [0] = {
+> + ? ? ? ? ? ? ? .start ? ? ? ? ?= S3C64XX_PA_DM9000,
+> + ? ? ? ? ? ? ? .end ? ? ? ? ? ?= S3C64XX_PA_DM9000 + 3,
+> + ? ? ? ? ? ? ? .flags ? ? ? ? ?= IORESOURCE_MEM,
+> + ? ? ? },
+> + ? ? ? [1] = {
+> + ? ? ? ? ? ? ? .start ? ? ? ? ?= S3C64XX_PA_DM9000 + 4,
+> + ? ? ? ? ? ? ? .end ? ? ? ? ? ?= S3C64XX_PA_DM9000 + S3C64XX_SZ_DM9000 - 1,
+> + ? ? ? ? ? ? ? .flags ? ? ? ? ?= IORESOURCE_MEM,
+> + ? ? ? },
+> + ? ? ? [2] = {
+> + ? ? ? ? ? ? ? .start ? ? ? ? ?= IRQ_EINT(7),
+> + ? ? ? ? ? ? ? .end ? ? ? ? ? ?= IRQ_EINT(7),
+> + ? ? ? ? ? ? ? .flags ? ? ? ? ?= IORESOURCE_IRQ | IRQF_TRIGGER_HIGH,
+> + ? ? ? },
+> +};
+> +
+> +static struct dm9000_plat_data dm9000_setup = {
+> + ? ? ? .flags ? ? ? ? ? ? ? ? ?= DM9000_PLATF_16BITONLY,
+> + ? ? ? .dev_addr ? ? ? ? ? ? ? = { 0x08, 0x90, 0x00, 0xa0, 0x90, 0x90 },
+> +};
+> +
+> +static struct platform_device s3c_device_dm9000 = {
+> + ? ? ? .name ? ? ? ? ? ? ? ? ? = "dm9000",
+> + ? ? ? .id ? ? ? ? ? ? ? ? ? ? ? ? ? ? = 0,
+> + ? ? ? .num_resources ?= ARRAY_SIZE(dm9000_resources),
+> + ? ? ? .resource ? ? ? ? ? ? ? = dm9000_resources,
+> + ? ? ? .dev ? ? ? ? ? ? ? ? ? ?= {
+> + ? ? ? ? ? ? ? .platform_data = &dm9000_setup,
+> + ? ? ? }
+> +};
+> +#endif /*#ifdef CONFIG_DM9000*/
+> ?/* USB HSOTG */
+>
+> ?#ifdef CONFIG_S3C_DEV_USB_HSOTG
+> --
+> 1.7.7.rc0.235.g8d714
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at ?http://www.tux.org/lkml/
 >
