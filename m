@@ -1,27 +1,21 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 11 Nov 2011 10:38:45 -0800
-Subject: [PATCH] merge i.MX5 into mach-imx
-In-Reply-To: <1320915966-8063-1-git-send-email-s.hauer@pengutronix.de>
-References: <1320915966-8063-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <CAOesGMhfBJrp1m2shn+PseySX8Mg-U0Bagwkq=cRaKOoe-uZ1A@mail.gmail.com>
+Date: Fri, 11 Nov 2011 10:39:57 -0800
+Subject: [GIT PULL] i.MX fixes
+In-Reply-To: <20111111155721.GB16886@pengutronix.de>
+References: <20111111155721.GB16886@pengutronix.de>
+Message-ID: <CAOesGMgqwzP3kT6=GcX96zYbdzzHhe-y1xT8WdajBL5oQrsq5A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Thu, Nov 10, 2011 at 1:06 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> Hi,
+On Fri, Nov 11, 2011 at 7:57 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> Hi Arnd, Olof,
 >
-> The following series merges i.MX5 support into mach-imx and makes it
-> possible to compile i.MX5 together with i.MX3/6. I originally wanted
-> to wait until the next merge window with this, but I think we can
-> avoid a lot of merging trouble when we just merge it during this
-> -rc cycle. What do you think?
+> Please pull the following. I don't know exactly when Arnd is back again,
+> so I have Olof still on Cc.
 
-Very nice consolidation.
+Thanks, pulled into arm-soc fixes.
 
-Merging during -rc sounds reasonable to me, but I'll leave final
-decision to Arnd when he's back.
-
+Since Linus hasn't pulled anything since I sent the original request,
+I'll re-send with this and the picoxcell fixes.
 
 -Olof
