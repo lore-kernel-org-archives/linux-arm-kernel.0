@@ -1,7 +1,7 @@
 From: jtzhou@marvell.com (Jett.Zhou)
-Date: Fri, 11 Nov 2011 15:38:25 +0800
+Date: Fri, 11 Nov 2011 15:54:46 +0800
 Subject: [V3 0/2] mfd 88pm860x bugfix and regmap
-Message-ID: <1320997107-3233-1-git-send-email-jtzhou@marvell.com>
+Message-ID: <1320998088-9986-1-git-send-email-jtzhou@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
