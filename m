@@ -1,74 +1,65 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 11 Nov 2011 15:37:14 +0800
-Subject: [PATCH v2] arm/imx: fix the references to ARCH_MX3
-In-Reply-To: <1320914372-4416-3-git-send-email-shawn.guo@linaro.org>
-References: <1320914372-4416-3-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1320997034-10051-1-git-send-email-shawn.guo@linaro.org>
+From: myungjoo.ham@gmail.com (MyungJoo Ham)
+Date: Fri, 11 Nov 2011 16:33:41 +0900
+Subject: [PATCH 1/4] ARM: exynos4: Add support for AFTR mode cpuidle state
+In-Reply-To: <1320426228-21746-2-git-send-email-amit.kachhap@linaro.org>
+References: <1320426228-21746-1-git-send-email-amit.kachhap@linaro.org>
+ <1320426228-21746-2-git-send-email-amit.kachhap@linaro.org>
+Message-ID: <CAJ0PZbTzFDvom3PoPXEvhC8JE_mV3wfYMspnQdRLO=-oz5wGkw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The config symbol ARCH_MX3 has been removed by commit 'a89cf59
-arm/imx: merge i.MX3 and i.MX6', and it should not be referenced
-any more.
+On Sat, Nov 5, 2011 at 2:03 AM,  <amit.kachhap@linaro.org> wrote:
+> From: Amit Daniel Kachhap <amit.kachhap@linaro.org>
+>
+> This patch adds support for AFTR(ARM OFF TOP RUNNING) mode in
+> cpuidle driver for EXYNOS4210. L2 cache keeps their data in this mode.
+> This patch ports the code to the latest interfaces to
+> save/restore CPU state inclusive of CPU PM notifiers, l2
+> resume and cpu_suspend/resume.
+>
+> Signed-off-by: Jaecheol Lee <jc.lee@samsung.com>
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Signed-off-by: Amit Daniel Kachhap <amit.kachhap@linaro.org>
+> ---
+[]
+> +#define REG_DIRECTGO_ADDR      (samsung_rev() == EXYNOS4210_REV_1_1 ? \
+> +                               S5P_INFORM7 : (S5P_VA_SYSRAM + 0x24))
+> +#define REG_DIRECTGO_FLAG      (samsung_rev() == EXYNOS4210_REV_1_1 ? \
+> +                               S5P_INFORM6 : (S5P_VA_SYSRAM + 0x20))
+>
+[]
+> +
+> +       __raw_writel(BSYM(virt_to_phys(s3c_cpu_resume)),
+> +                                                REG_DIRECTGO_ADDR);
+> +       __raw_writel(0xfcba0d10, REG_DIRECTGO_FLAG);
+> +
+>        return 0;
 
-The patch also change ARCH_MX* to SOC_IMX* for other platforms.
+Hello,
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-Cc: Sascha Hauer <s.hauer@pengutronix.de>
----
-Changes since v1:
- * Drop changes on drivers/dma/Kconfig, as Sascha alreay has a patch
-   to fix it.
- * Change ARCH_MX* to SOC_IMX* for other platforms as well.
 
- arch/arm/mach-imx/Makefile.boot |   34 +++++++++++++++++++---------------
- 1 files changed, 19 insertions(+), 15 deletions(-)
+Why are you using INFORM6 and 7 registers in order to save resume
+address and power-mode flags?
 
-diff --git a/arch/arm/mach-imx/Makefile.boot b/arch/arm/mach-imx/Makefile.boot
-index 22d8588..cfede57 100644
---- a/arch/arm/mach-imx/Makefile.boot
-+++ b/arch/arm/mach-imx/Makefile.boot
-@@ -1,22 +1,26 @@
--zreladdr-$(CONFIG_ARCH_MX1)	+= 0x08008000
--params_phys-$(CONFIG_ARCH_MX1)	:= 0x08000100
--initrd_phys-$(CONFIG_ARCH_MX1)	:= 0x08800000
-+zreladdr-$(CONFIG_SOC_IMX1)	+= 0x08008000
-+params_phys-$(CONFIG_SOC_IMX1)	:= 0x08000100
-+initrd_phys-$(CONFIG_SOC_IMX1)	:= 0x08800000
- 
--zreladdr-$(CONFIG_MACH_MX21)	+= 0xC0008000
--params_phys-$(CONFIG_MACH_MX21)	:= 0xC0000100
--initrd_phys-$(CONFIG_MACH_MX21)	:= 0xC0800000
-+zreladdr-$(CONFIG_SOC_IMX21)	+= 0xC0008000
-+params_phys-$(CONFIG_SOC_IMX21)	:= 0xC0000100
-+initrd_phys-$(CONFIG_SOC_IMX21)	:= 0xC0800000
- 
--zreladdr-$(CONFIG_ARCH_MX25)	+= 0x80008000
--params_phys-$(CONFIG_ARCH_MX25)	:= 0x80000100
--initrd_phys-$(CONFIG_ARCH_MX25)	:= 0x80800000
-+zreladdr-$(CONFIG_SOC_IMX25)	+= 0x80008000
-+params_phys-$(CONFIG_SOC_IMX25)	:= 0x80000100
-+initrd_phys-$(CONFIG_SOC_IMX25)	:= 0x80800000
- 
--zreladdr-$(CONFIG_MACH_MX27)	+= 0xA0008000
--params_phys-$(CONFIG_MACH_MX27)	:= 0xA0000100
--initrd_phys-$(CONFIG_MACH_MX27)	:= 0xA0800000
-+zreladdr-$(CONFIG_SOC_IMX27)	+= 0xA0008000
-+params_phys-$(CONFIG_SOC_IMX27)	:= 0xA0000100
-+initrd_phys-$(CONFIG_SOC_IMX27)	:= 0xA0800000
- 
--zreladdr-$(CONFIG_ARCH_MX3)	+= 0x80008000
--params_phys-$(CONFIG_ARCH_MX3)	:= 0x80000100
--initrd_phys-$(CONFIG_ARCH_MX3)	:= 0x80800000
-+zreladdr-$(CONFIG_SOC_IMX31)	+= 0x80008000
-+params_phys-$(CONFIG_SOC_IMX31)	:= 0x80000100
-+initrd_phys-$(CONFIG_SOC_IMX31)	:= 0x80800000
-+
-+zreladdr-$(CONFIG_SOC_IMX35)	+= 0x80008000
-+params_phys-$(CONFIG_SOC_IMX35)	:= 0x80000100
-+initrd_phys-$(CONFIG_SOC_IMX35)	:= 0x80800000
- 
- zreladdr-$(CONFIG_SOC_IMX6Q)	+= 0x10008000
- params_phys-$(CONFIG_SOC_IMX6Q)	:= 0x10000100
+INFORM0 and 1 have been used in pm.c for the exactly same purpose.
+Please use the same registers in cpuidle.c as well.
+
+The same part in bootloader (IPL) can handle whether it's
+suspend-to-RAM or AFTR and the both modes are mutually exclusive and
+you only need one value for resume PC.
+
+Therefore, you can keep the value at the same location, which is the
+method we have been using.
+
+Besides, the Exynos4210 chipmaker (S.LSI) has told that INFORM6 and 7
+registers are used by in-chip code (iROM or iRAM).
+
+
+Cheers!
+MyungJoo
+
+
+
 -- 
-1.7.4.1
+MyungJoo Ham, Ph.D.
+Mobile Software Platform Lab, DMC Business, Samsung Electronics
