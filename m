@@ -1,109 +1,141 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 11 Nov 2011 20:32:59 +0100
-Subject: [PATCH 39/41] ARM: restart: lpc32xx & u300: remove unnecessary
- printk
-In-Reply-To: <20111111190014.GB4154@n2100.arm.linux.org.uk>
-References: <20111106173113.GI12913@n2100.arm.linux.org.uk>
- <E1RN6u6-0001ZD-Ll@rmk-PC.arm.linux.org.uk>
- <CACRpkda9mC6+WrbGekJD85X4t7AsuamhP5V=YcyNQLFw0Yii7A@mail.gmail.com>
- <20111111190014.GB4154@n2100.arm.linux.org.uk>
-Message-ID: <CACRpkdaDAC4t5+-p+rWWYsNBNbkFmorehdJtUpRvzDXtQQR3_A@mail.gmail.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Fri, 11 Nov 2011 20:50:42 +0100
+Subject: [RFC 6/8] of: add clock providers
+In-Reply-To: <4EBA8735.902@gmail.com>
+References: <1320801583-12774-1-git-send-email-grant.likely@secretlab.ca>
+ <1320801583-12774-7-git-send-email-grant.likely@secretlab.ca>
+ <20111109091328.GY16886@pengutronix.de> <4EBA62AD.3000407@ti.com>
+ <4EBA8735.902@gmail.com>
+Message-ID: <4EBD7C92.7060707@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 11, 2011 at 8:00 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
+Hi Rob,
 
-> Thanks. ?Could you look at what's required for Nomadik please? ?I couldn't
-> see am obvious file to move the arch_reset code from mach/system.h into,
-> nor could I see a local header file to put the new prototype into.
+On 11/9/2011 2:59 PM, Rob Herring wrote:
+> On 11/09/2011 05:23 AM, Cousson, Benoit wrote:
+>> On 11/9/2011 10:13 AM, Sascha Hauer wrote:
+>>> On Tue, Nov 08, 2011 at 06:19:41PM -0700, Grant Likely wrote:
+>>
+>> [...]
+>>
+>>>> +Sources of clock signal can be represented by any node in the device
+>>>> +tree.  Those nodes are designated as clock providers.  Clock consumer
+>>>> +nodes use a phandle and clock specifier pair to connect clock provider
+>>>> +outputs to clock inputs.  Similar to the gpio specifiers, a clock
+>>>> +specifier is an array of one more more cells identifying the clock
+>>>> +output on a device.  The length of a clock specifier is defined by the
+>>>> +value of a #clock-cells property in the clock provider node.
+>>>> +
+>>>> +[1] http://patchwork.ozlabs.org/patch/31551/
+>>>> +
+>>>> +==Clock providers==
+>>>> +
+>>>> +Required properties:
+>>>> +#clock-cells:       Number of cells in a clock specifier; typically
+>>>> will be
+>>>> +           set to 1
+>>>> +
+>>>> +Optional properties:
+>>>> +clock-output-name: Recommended to be a list of strings of clock
+>>>> output signal
+>>>> +           names indexed by the first cell in the clock specifier.
+>>>> +           However, the meaning of clock-output-names is domain
+>>>> +           specific to the clock provider, and is only provided to
+>>>> +           encourage using the same meaning for the majority of clock
+>>>> +           providers.  This format may not work for clock providers
+>>>> +           using a complex clock specifier format.  In those cases it
+>>>> +           is recommended to omit this property and create a binding
+>>>> +           specific names property.
+>>>
+>>> If the clock-output-name property is omitted, does this mean a clock
+>>> provider only has a single output or does it mean that it's not known
+>>> how many clock outputs a provider actually has?
+>>
+>> Allowing several outputs for a single clock node might lead to a lot of
+>> confusion. What will be the meaning of a clock rate if you have several
+>> outputs at different frequency?
+>
+> You typically only have a frequency property for fixed clocks.
 
-Rubini is the master of Nomadik, but I would put that into
-mach-nomadik/cpu-8815.c.
+Yes, for DT point of view, but every clock nodes has a rate. Variable or 
+fixed.
 
-As for header the functions in cpu-8815.c are broadcast
-in mach-nomadik/include/mach/setup.h which is *wrong*,
-so I would
+> However, we should think about how to set frequency for programmable
+> clocks. Perhaps this is just making clock-frequency an array of
+> values in the same order as the outputs.
 
-- Create mach-nomadik/cpu-8815.h
-- Move the cpu_8815_* function from <mach/setup.h>
-  into this file.
-- Replace #include <mach/setup.h> with #include "cpu-8815.h"
-  in board-nhk8815.c and cpu-8815.c
-- Add the reset stuff to cpu-8815.[c|h]
+But, if we go that way the DT clock node will become more and more 
+complex with less and less chance to use some common function like 
+set_rate or clk_enable.
+If the notion of clock blob is needed we should maybe consider another 
+binding like clock-group and let the clock node be a single source of clock.
 
-Feel free to fold in the below at your convenience:
+>> I think it will be better to define a clock node as a single source of
+>> clock. If several outputs are needed, then we should define several
+>> clock nodes.
+>> If we let a clock node be any kind of big clock blob, we will never be
+>> able to define some generic reusable clock node API. Everybody will
+>> define its own custom clock blobs.
+>>
+>
+> Whether you decide to implement a blob or every single mux, divider, and
+> gate is independent from whether you use generic clock code or not. You
+> could simply define a clock controller node with lots of outputs yet
+> still use generic code to implement clock support in Linux. The reality
+> is you will probably have a mixture of generic and SOC-specific clocks.
 
->From b0f26c142e5fbc75d10e75c96f2c753b3fe7c2d9 Mon Sep 17 00:00:00 2001
-From: Linus Walleij <linus.walleij@linaro.org>
-Date: Fri, 11 Nov 2011 20:30:32 +0100
-Subject: [PATCH] ARM: nomadik: localize cpu-8815 header
+Yeah, maybe you're right, but the goal of the common clock fmwk was to 
+avoid duplication everywhere. If everybody start implementing its own 
+definition of the clock nodes here and there, I'm not sure that common 
+clock fmwk will be that useful compared to what we have today.
 
-The symbols from cpu-8815.c were being broadcast across the
-entire kernel but are only really used locally in mach-nomadik
-so let's localize them.
+For sure we should allow some custom clock implementation, but that 
+should be the exception.
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/mach-nomadik/board-nhk8815.c      |    2 ++
- arch/arm/mach-nomadik/cpu-8815.c           |    1 +
- arch/arm/mach-nomadik/cpu-8815.h           |    3 +++
- arch/arm/mach-nomadik/include/mach/setup.h |    3 ---
- 4 files changed, 6 insertions(+), 3 deletions(-)
- create mode 100644 arch/arm/mach-nomadik/cpu-8815.h
+> What is our goal here? I'm skeptical we will ever get to the point that
+> we can fully describe the clock tree for a new SOC without any code
+> changes.
 
-diff --git a/arch/arm/mach-nomadik/board-nhk8815.c
-b/arch/arm/mach-nomadik/board-nhk8815.c
-index 0cbb74c..4518050 100644
---- a/arch/arm/mach-nomadik/board-nhk8815.c
-+++ b/arch/arm/mach-nomadik/board-nhk8815.c
-@@ -34,6 +34,8 @@
- #include <mach/nand.h>
- #include <mach/fsmc.h>
+I don't think anybody is necessarily complaining about potential code 
+change.
 
-+#include "cpu-8815.h"
-+
- /* Initial value for SRC control register: all timers use MXTAL/8 source */
- #define SRC_CR_INIT_MASK	0x00007fff
- #define SRC_CR_INIT_VAL		0x2aaa8000
-diff --git a/arch/arm/mach-nomadik/cpu-8815.c b/arch/arm/mach-nomadik/cpu-8815.c
-index dc67717..c087ea9 100644
---- a/arch/arm/mach-nomadik/cpu-8815.c
-+++ b/arch/arm/mach-nomadik/cpu-8815.c
-@@ -32,6 +32,7 @@
- #include <asm/hardware/cache-l2x0.h>
+The goal, however, is a pretty good question. I'm not sure it is well 
+defined or at least the same for everybody.
 
- #include "clock.h"
-+#include "cpu-8815.h"
+One of the main incentive for OMAP at least was to get rid of the huge 
+static files inside arch/arm/mach-omap2 used so far to define the clock 
+nodes.
+The issue is that an OMAP4 clock file contains ~250 clock nodes in a ~4k 
+lines file.
+Moving that into a DT file will for sure reduce the size of the 
+arch/arm/ that was one of the complain of Linus but at the price of 
+creating an even bigger DT file.
 
- #define __MEM_4K_RESOURCE(x) \
- 	.res = {.start = (x), .end = (x) + SZ_4K - 1, .flags = IORESOURCE_MEM}
-diff --git a/arch/arm/mach-nomadik/cpu-8815.h b/arch/arm/mach-nomadik/cpu-8815.h
-new file mode 100644
-index 0000000..e041794
---- /dev/null
-+++ b/arch/arm/mach-nomadik/cpu-8815.h
-@@ -0,0 +1,3 @@
-+extern void cpu8815_map_io(void);
-+extern void cpu8815_platform_init(void);
-+extern void cpu8815_init_irq(void);
-diff --git a/arch/arm/mach-nomadik/include/mach/setup.h
-b/arch/arm/mach-nomadik/include/mach/setup.h
-index b7897ed..bcaeaf4 100644
---- a/arch/arm/mach-nomadik/include/mach/setup.h
-+++ b/arch/arm/mach-nomadik/include/mach/setup.h
-@@ -12,9 +12,6 @@
+One potential need for DT will be to get rid of the static device -> 
+clock mapping table we have at the end of the clock definition file.
 
- #ifdef CONFIG_NOMADIK_8815
+   CLK("usbhs-omap.0", "usbtll_ick", &usb_tll_hs_ick, CK_443X),
+   CLK("usbhs-omap.0", "fck", &usb_tll_hs_fck, CK_443X),
 
--extern void cpu8815_map_io(void);
--extern void cpu8815_platform_init(void);
--extern void cpu8815_init_irq(void);
- extern void nmdk_timer_init(void);
+This is even mandatory considering that the device name currently used 
+will not exist anymore with DT devices.
 
- #endif /* NOMADIK_8815 */
--- 
-1.7.3.2
+That means, that at least every leaf clocks used by drivers have to be 
+exposed in DT.
 
-Yours,
-Linus Walleij
+Should we then expose as well the whole clock tree?
+
+> Perhaps our goal is simply that clock differences across all
+> boards for an SOC can be described in DT.
+
+We clearly should exposed the ones that are configurable at board level, 
+like the main oscillator for example or the ones that are generated by 
+an Audio codec.
+
+But then, like Sascha was saying IIRC, having a mixed of DT and static 
+data might be a total mess at the end, so we might end up defining 
+everything in the DT file.
+
+Regards,
+Benoit
