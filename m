@@ -1,39 +1,34 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 11 Nov 2011 16:29:39 +0100
-Subject: [PATCH] mmc: mmci: Increase max_segs from 16 to 128
-In-Reply-To: <1320941422-1565-1-git-send-email-ulf.hansson@stericsson.com>
-References: <1320941422-1565-1-git-send-email-ulf.hansson@stericsson.com>
-Message-ID: <CACRpkdZMcD_XzgNYN=PFdt3H-LQxOh=YBbHSADauzgZ_8bMA5A@mail.gmail.com>
+From: B29396@freescale.com (Dong Aisheng-B29396)
+Date: Fri, 11 Nov 2011 15:30:04 +0000
+Subject: [PATCH 1/2] ARM: mx28evk: remove flexcan_pdata __initconst
+ attribute
+In-Reply-To: <20111111152735.GE12913@n2100.arm.linux.org.uk>
+References: <1321024360-5249-1-git-send-email-b29396@freescale.com>
+ <20111111150609.GD5011@pengutronix.de>
+ <65EE16ACC360FA4D99C96DC085B3F7722CECED@039-SN1MPN1-002.039d.mgd.msft.net>
+ <20111111152735.GE12913@n2100.arm.linux.org.uk>
+Message-ID: <65EE16ACC360FA4D99C96DC085B3F7722CED16@039-SN1MPN1-002.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 10, 2011 at 5:10 PM, Ulf Hansson <ulf.hansson@stericsson.com> wrote:
+> -----Original Message-----
+> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
+> Sent: Friday, November 11, 2011 11:28 PM
+> To: Dong Aisheng-B29396
+> Cc: Uwe Kleine-K?nig; Guo Shawn-R65073; s.hauer at pengutronix.de;
+> kernel at pengutronix.de; linux-arm-kernel at lists.infradead.org;
+> w.sang at pengutronix.de
+> Subject: Re: [PATCH 1/2] ARM: mx28evk: remove flexcan_pdata __initconst
+> attribute
+> 
+> On Fri, Nov 11, 2011 at 03:25:01PM +0000, Dong Aisheng-B29396 wrote:
+> > -static struct fec_platform_data tx28_fec0_data = {
+> > +static struct fec_platform_data __initconst tx28_fec0_data = {
+> 
+> No.  It's spelt:
+> 
+> static const struct fec_platform_data tx28_fec0_data __initconst = {
+Thanks for reminder, I missed the first const. :-)
 
-> A significant increase (10-20%) in performance throughput for
-> USB mass storage is the reason for incrementing the value.
-> By some reason the USB driver allocates buffers which requires
-> a scattergather list to contain a lot more than 16 elements to
-> get optimal performance. This change sets the maximum elements
-> to 128.
->
-> Tests with large reads and large writes (100 MiB) show that the
-> throughput increase is significant for write (10% for this test)
-> but not for read. Tests are run on a Linux host with ext4 FS on
-> the gadget mass storage device. The sg-len still exceeds 16 for
-> the read tests but the performance gain is low or nothing.
->
-> Signed-off-by: Ulf Hansson <ulf.hansson@stericsson.com>
-> Signed-off-by: Per Forlin <per.forlin@stericsson.com>
-
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-
-I will try to compile the lot of MMCI patches from Russells
-tracker and test on the PB1176 once it's there...
-
-BTW I had to do some fixup (trivial) when I applied all the
-patches from the patch tracker. Hopefully Russell can do the
-same, else we'll just create a pull request with all of them or
-something.
-
-Thanks,
-Linus Walleij
+Regards
+Dong Aisheng
