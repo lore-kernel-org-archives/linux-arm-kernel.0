@@ -1,48 +1,76 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 11 Nov 2011 16:58:51 +0100
-Subject: [PATCH 1/4] arm/imx: fix mx3_defconfig to add FEC back
-In-Reply-To: <1320914372-4416-2-git-send-email-shawn.guo@linaro.org>
-References: <1320914372-4416-1-git-send-email-shawn.guo@linaro.org>
- <1320914372-4416-2-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20111111155851.GC16886@pengutronix.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 11 Nov 2011 16:59:56 +0100
+Subject: [PATCH] mach-ux500: add devicetree compat nodes
+In-Reply-To: <4EBD3C85.1010508@gmail.com>
+References: <1321023902-18870-1-git-send-email-niklas.hernaeus@linaro.org>
+ <4EBD3C85.1010508@gmail.com>
+Message-ID: <CACRpkda-9OVP8E1qO3Nc5znw_v7cKFiv8T5HHwTCnY2C9Fg7iA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 10, 2011 at 04:39:29PM +0800, Shawn Guo wrote:
-> The commit 'd880db0 arm: mx3: update defconfig' removes FEC support
-> which is not good, since FEC is useful for both developers and users.
-> 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Sascha Hauer <s.hauer@pengutronix.de>
+On Fri, Nov 11, 2011 at 4:17 PM, Rob Herring <robherring2@gmail.com> wrote:
 
-I skipped this one for now as I have hope to get the i.MX5 merge into
--rc which would remove this file. If not, I'll send this one later.
+>> ?MACHINE_START(U8500, "ST-Ericsson MOP500 platform")
+>> ? ? ? /* Maintainer: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com> */
+>> ? ? ? .boot_params ? ?= 0x100,
+>> @@ -651,6 +666,7 @@ MACHINE_START(U8500, "ST-Ericsson MOP500 platform")
+>> ? ? ? /* we re-use nomadik timer here */
+>> ? ? ? .timer ? ? ? ? ?= &ux500_timer,
+>> ? ? ? .init_machine ? = mop500_init_machine,
+>> + ? ? .dt_compat ? ? ?= mop500_dt_board_compat,
+>> ?MACHINE_END
+>>
+>> ?MACHINE_START(HREFV60, "ST-Ericsson U8500 Platform HREFv60+")
+>> @@ -659,6 +675,7 @@ MACHINE_START(HREFV60, "ST-Ericsson U8500 Platform HREFv60+")
+>> ? ? ? .init_irq ? ? ? = ux500_init_irq,
+>> ? ? ? .timer ? ? ? ? ?= &ux500_timer,
+>> ? ? ? .init_machine ? = mop500_init_machine,
+>> + ? ? .dt_compat ? ? ?= hrefv60_dt_board_compat,
+>> ?MACHINE_END
+>>
+>> ?MACHINE_START(SNOWBALL, "Calao Systems Snowball platform")
+>> @@ -668,4 +685,5 @@ MACHINE_START(SNOWBALL, "Calao Systems Snowball platform")
+>> ? ? ? /* we re-use nomadik timer here */
+>> ? ? ? .timer ? ? ? ? ?= &ux500_timer,
+>> ? ? ? .init_machine ? = mop500_init_machine,
+>> + ? ? .dt_compat ? ? ?= snowball_dt_board_compat,
+>> ?MACHINE_END
+>
+> These all look very similar and should be combined. Why do you not have
+> 1 machine for all DT platforms as other SOCs are doing?
 
-Sascha
+This needs to be rebased for the latest kernel.
+Which looks like this:
 
-> ---
->  arch/arm/configs/mx3_defconfig |    1 +
->  1 files changed, 1 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/configs/mx3_defconfig b/arch/arm/configs/mx3_defconfig
-> index cb0717f..ee50a9e 100644
-> --- a/arch/arm/configs/mx3_defconfig
-> +++ b/arch/arm/configs/mx3_defconfig
-> @@ -67,6 +67,7 @@ CONFIG_SMSC_PHY=y
->  CONFIG_NET_ETHERNET=y
->  CONFIG_SMSC911X=y
->  CONFIG_DNET=y
-> +CONFIG_FEC=y
->  # CONFIG_NETDEV_1000 is not set
->  # CONFIG_NETDEV_10000 is not set
->  # CONFIG_INPUT_MOUSEDEV is not set
-> -- 
-> 1.7.4.1
-> 
-> 
+MACHINE_START(U8500, "ST-Ericsson MOP500 platform")
+        /* Maintainer: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com> */
+        .atag_offset    = 0x100,
+        .map_io         = u8500_map_io,
+        .init_irq       = ux500_init_irq,
+        /* we re-use nomadik timer here */
+        .timer          = &ux500_timer,
+        .init_machine   = mop500_init_machine,
+MACHINE_END
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+MACHINE_START(HREFV60, "ST-Ericsson U8500 Platform HREFv60+")
+        .atag_offset    = 0x100,
+        .map_io         = u8500_map_io,
+        .init_irq       = ux500_init_irq,
+        .timer          = &ux500_timer,
+        .init_machine   = hrefv60_init_machine,
+MACHINE_END
+
+MACHINE_START(SNOWBALL, "Calao Systems Snowball platform")
+        .atag_offset    = 0x100,
+        .map_io         = u8500_map_io,
+        .init_irq       = ux500_init_irq,
+        /* we re-use nomadik timer here */
+        .timer          = &ux500_timer,
+        .init_machine   = snowball_init_machine,
+MACHINE_END
+
+So - different .init_machine() calls, needed to simplify the board
+files as of now. (Patch from Lee Jones.)
+
+Yours,
+Linus Walleij
