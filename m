@@ -1,38 +1,43 @@
 From: richard.zhao@linaro.org (Richard Zhao)
-Date: Fri, 11 Nov 2011 09:10:23 +0800
-Subject: [PATCH V2 08/14] ARM: pm-imx5: add clk_prepare/clk_unprepare
+Date: Fri, 11 Nov 2011 09:10:25 +0800
+Subject: [PATCH V2 10/14] ARM: mxs: add clk_prepare/clk_unprepare
 In-Reply-To: <1320973829-4388-1-git-send-email-richard.zhao@linaro.org>
 References: <1320973829-4388-1-git-send-email-richard.zhao@linaro.org>
-Message-ID: <1320973829-4388-9-git-send-email-richard.zhao@linaro.org>
+Message-ID: <1320973829-4388-11-git-send-email-richard.zhao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
 ---
- arch/arm/mach-mx5/pm-imx5.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/mach-mxs/system.c |    2 +-
+ arch/arm/mach-mxs/timer.c  |    2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-mx5/pm-imx5.c b/arch/arm/mach-mx5/pm-imx5.c
-index 98052fc..2bdc85f 100644
---- a/arch/arm/mach-mx5/pm-imx5.c
-+++ b/arch/arm/mach-mx5/pm-imx5.c
-@@ -22,7 +22,7 @@ static struct clk *gpc_dvfs_clk;
+diff --git a/arch/arm/mach-mxs/system.c b/arch/arm/mach-mxs/system.c
+index 20ec3bd..9760a12 100644
+--- a/arch/arm/mach-mxs/system.c
++++ b/arch/arm/mach-mxs/system.c
+@@ -66,7 +66,7 @@ static int __init mxs_arch_reset_init(void)
  
- static int mx5_suspend_prepare(void)
- {
--	return clk_enable(gpc_dvfs_clk);
-+	return clk_prepare_enable(gpc_dvfs_clk);
+ 	clk = clk_get_sys("rtc", NULL);
+ 	if (!IS_ERR(clk))
+-		clk_enable(clk);
++		clk_prepare_enable(clk);
+ 
+ 	return 0;
  }
+diff --git a/arch/arm/mach-mxs/timer.c b/arch/arm/mach-mxs/timer.c
+index cace0d2..564a632 100644
+--- a/arch/arm/mach-mxs/timer.c
++++ b/arch/arm/mach-mxs/timer.c
+@@ -245,7 +245,7 @@ static int __init mxs_clocksource_init(struct clk *timer_clk)
  
- static int mx5_suspend_enter(suspend_state_t state)
-@@ -52,7 +52,7 @@ static int mx5_suspend_enter(suspend_state_t state)
- 
- static void mx5_suspend_finish(void)
+ void __init mxs_timer_init(struct clk *timer_clk, int irq)
  {
--	clk_disable(gpc_dvfs_clk);
-+	clk_disable_unprepare(gpc_dvfs_clk);
- }
+-	clk_enable(timer_clk);
++	clk_prepare_enable(timer_clk);
  
- static int mx5_pm_valid(suspend_state_t state)
+ 	/*
+ 	 * Initialize timers to a known state
 -- 
 1.7.5.4
