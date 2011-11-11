@@ -1,63 +1,37 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 11 Nov 2011 16:17:27 +0000
-Subject: [PATCH] ARM: OMAP: Introduce local common.h files
-In-Reply-To: <20111110233347.GZ31337@atomide.com>
-References: <20111106135250.GC15294@n2100.arm.linux.org.uk>
- <20111108004550.GH31337@atomide.com> <20111110201719.GW31337@atomide.com>
- <20111110202356.GQ15294@n2100.arm.linux.org.uk>
- <20111110215008.GX31337@atomide.com>
- <20111110222907.GR15294@n2100.arm.linux.org.uk>
- <20111110233347.GZ31337@atomide.com>
-Message-ID: <20111111161727.GS15294@n2100.arm.linux.org.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 11 Nov 2011 17:26:07 +0100
+Subject: [PATCH] mach-ux500: add devicetree compat nodes
+In-Reply-To: <4EBD49A6.2020306@gmail.com>
+References: <1321023902-18870-1-git-send-email-niklas.hernaeus@linaro.org>
+ <4EBD3C85.1010508@gmail.com>
+ <CACRpkda-9OVP8E1qO3Nc5znw_v7cKFiv8T5HHwTCnY2C9Fg7iA@mail.gmail.com>
+ <4EBD49A6.2020306@gmail.com>
+Message-ID: <CACRpkdZrWW2jUYC0P7yY322YMdn9+4_NaGPhKtpGwR+e=F6+0A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 10, 2011 at 03:33:47PM -0800, Tony Lindgren wrote:
-> * Russell King - ARM Linux <linux@arm.linux.org.uk> [111110 13:54]:
-> > Thanks, merged that into the series.  The updated OMAP patch updated is
-> > below, which has been moved to part 2.  Lastly, the final patch of part
-> > 2 has been updated to delete the empty arch_reset(), so OMAP is now
-> > entirely free of arch_reset() references.  This leaves a total of 12
-> > references left to nobble.
-> 
-> Great, good to hear.
+On Fri, Nov 11, 2011 at 5:13 PM, Rob Herring <robherring2@gmail.com> wrote:
+> On 11/11/2011 09:59 AM, Linus Walleij wrote:
+>>
+>> So - different .init_machine() calls, needed to simplify the board
+>> files as of now. (Patch from Lee Jones.)
+>
+> But ultimately I would expect that the init_machine calls to be the same
+> with a DT based machine. This goes back to do we add DT to existing
+> boards or create a new clean DT machine and add to it as boards are
+> converted?
 
-I've added this to the patch, as these no longer need to include this
-header.
+Yes that should be the ultimate goal. So the current per-board
+init functions register the I2C, MMC (SDI), SPI, UART and
+regulator devices etc. So then these drivers need to be patched to
+get their board/platform data from DT first.
 
-diff --git a/arch/arm/mach-omap1/board-voiceblue.c b/arch/arm/mach-omap1/board-voiceblue.c
-index fb61434..f83a502d 100644
---- a/arch/arm/mach-omap1/board-voiceblue.c
-+++ b/arch/arm/mach-omap1/board-voiceblue.c
-@@ -28,7 +28,6 @@
- #include <linux/export.h>
- 
- #include <mach/hardware.h>
--#include <mach/system.h>
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
-diff --git a/arch/arm/mach-omap1/reset.c b/arch/arm/mach-omap1/reset.c
-index 8b1cc6e..91d199b 100644
---- a/arch/arm/mach-omap1/reset.c
-+++ b/arch/arm/mach-omap1/reset.c
-@@ -5,7 +5,6 @@
- #include <linux/io.h>
- 
- #include <mach/hardware.h>
--#include <mach/system.h>
- #include <plat/prcm.h>
- 
- void omap1_restart(char mode, const char *cmd)
-diff --git a/arch/arm/mach-omap2/prcm.c b/arch/arm/mach-omap2/prcm.c
-index b6c8cb5..626acfa 100644
---- a/arch/arm/mach-omap2/prcm.c
-+++ b/arch/arm/mach-omap2/prcm.c
-@@ -25,7 +25,6 @@
- #include <linux/delay.h>
- #include <linux/export.h>
- 
--#include <mach/system.h>
- #include "common.h"
- #include <plat/prcm.h>
- #include <plat/irqs.h>
+In that case we should hold this patch off and only keep it for
+internal testing until all necessary drivers are ready and patched
+so we can replace all board files with a single DT-based one,
+instead of this compromise solution.
+
+Is this what everybody else does?
+
+Thanks,
+Linus Walleij
