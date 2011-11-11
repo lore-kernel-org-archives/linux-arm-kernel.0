@@ -1,19 +1,36 @@
-From: jtzhou@marvell.com (Jett.Zhou)
-Date: Fri, 11 Nov 2011 15:54:46 +0800
-Subject: [V3 0/2] mfd 88pm860x bugfix and regmap
-Message-ID: <1320998088-9986-1-git-send-email-jtzhou@marvell.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Fri, 11 Nov 2011 16:43:41 +0800
+Subject: [PATCH] Solve compilation problem when using host usb with mx27
+ boards
+In-Reply-To: <1320921777.46031.YahooMailNeo@web28503.mail.ukl.yahoo.com>
+References: <1320921777.46031.YahooMailNeo@web28503.mail.ukl.yahoo.com>
+Message-ID: <20111111084339.GH8732@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Seperate it into two patches, one is for bugfix on the 88pm860x 
-i2c interface test bank , the other is for converting 88pm860x 
-i2c interface of normal bank to use regmap API
+On Thu, Nov 10, 2011 at 10:42:57AM +0000, Aurelien Bouin wrote:
+> Without this patch, when you are compiling the kernel for mx27 mach you will get an include problem...
 
-Jett.Zhou (2):
-  mfd: fix 88pm860x test bank i2c interface bug
-  mfd: Convert 88pm860x to use regmap api
+> Signed-off-by: Aurelien bouin <a_bouin@yahoo.fr>
+> ---
+>  drivers/usb/host/ehci-mxc.c |    1 +
+>  1 files changed, 1 insertions(+), 0 deletions(-)
+> 
+> diff --git a/drivers/usb/host/ehci-mxc.c b/drivers/usb/host/ehci-mxc.c
+> index 0c058be..555a73c 100644
+> --- a/drivers/usb/host/ehci-mxc.c
+> +++ b/drivers/usb/host/ehci-mxc.c
+> @@ -24,6 +24,7 @@
+>  #include <linux/usb/ulpi.h>
+>  #include <linux/slab.h>
+>  
+> +#include <mach/hardware.h>
+>  #include <mach/mxc_ehci.h>
+>  
+>  #include <asm/mach-types.h>
 
- drivers/mfd/88pm860x-i2c.c   |  240 +++++++++++++++++++++++-------------------
- drivers/mfd/Kconfig          |    1 +
- include/linux/mfd/88pm860x.h |    3 +-
- 3 files changed, 136 insertions(+), 108 deletions(-)
+What is your base?  This has been fixed on mainline.
+
+-- 
+Regards,
+Shawn
