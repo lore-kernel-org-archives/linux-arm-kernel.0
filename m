@@ -1,69 +1,122 @@
-From: shubhrajyoti@ti.com (Shubhrajyoti)
-Date: Fri, 11 Nov 2011 11:41:36 +0530
-Subject: [PATCH v7 11/21] OMAP2+: UART: Move errata handling from serial.c
- to omap-serial
-In-Reply-To: <4EBC61DB.9020402@ti.com>
-References: <1318951576-10165-1-git-send-email-govindraj.raja@ti.com>
- <1318951576-10165-12-git-send-email-govindraj.raja@ti.com>
- <4EBC61DB.9020402@ti.com>
-Message-ID: <4EBCBC98.9040200@ti.com>
+From: amit.kachhap@linaro.org (Amit Kachhap)
+Date: Fri, 11 Nov 2011 11:58:58 +0530
+Subject: [PATCH 4/4] ARM: exynos4: remove useless code to save/restore L2
+ and GIC state
+In-Reply-To: <4EB421FE.407@samsung.com>
+References: <1320426228-21746-1-git-send-email-amit.kachhap@linaro.org>
+ <1320426228-21746-5-git-send-email-amit.kachhap@linaro.org>
+ <4EB421FE.407@samsung.com>
+Message-ID: <CAK44p21H0mGnWRhMx4VSW5FCg4ytY4hzAy4CE3bjFeGan5fxRA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 11 November 2011 05:14 AM, Jon Hunter wrote:
-> Hi Govindraj,
->
-> On 10/18/2011 10:26, Govindraj.R wrote:
->> Move the errata handling mechanism from serial.c to omap-serial file
->> and utilise the same func in driver file.
+On 4 November 2011 23:03, Sylwester Nawrocki <s.nawrocki@samsung.com> wrote:
+> On 11/04/2011 06:03 PM, amit.kachhap at linaro.org wrote:
+>> From: Amit Daniel Kachhap <amit.kachhap@linaro.org>
 >>
->> Errata i202, i291 are moved to be handled with omap-serial
->> Moving the errata macro from serial.c file to driver header file
->> as from on errata will be handled in driver file itself.
->> Corrected errata id from chapter reference 2.15 to errata id i291.
+>> Following the merge of CPU PM notifiers and L2 resume code, this patch
+>> removes useless code to save and restore L2 and GIC registers.
 >>
->> Removed errata and dma_enabled feilds from omap_uart_state struct
-Nitpick.
-The field spelling could be corrected.
->> as they are no more needed with errata handling done within omap-serial.
+>> This is now automatically covered by suspend calls which integrated
+>> CPU PM notifiers and new sleep code that allows to resume L2 before MMU
+>> is turned on.
 >>
->> Acked-by: Alan Cox<alan@linux.intel.com>
->> Signed-off-by: Govindraj.R<govindraj.raja@ti.com>
+>> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+>> Signed-off-by: Amit Daniel Kachhap <amit.kachhap@linaro.org>
 >> ---
->>   arch/arm/mach-omap2/serial.c                  |   97
->> +++++++------------------
->>   arch/arm/plat-omap/include/plat/omap-serial.h |    6 ++
->>   drivers/tty/serial/omap-serial.c              |   66 ++++++++++++++++-
->>   3 files changed, 95 insertions(+), 74 deletions(-)
+>> ?arch/arm/mach-exynos4/pm.c | ? 86 --------------------------------------------
+>> ?1 files changed, 0 insertions(+), 86 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-exynos4/pm.c b/arch/arm/mach-exynos4/pm.c
+>> index 62e4f43..7499f14 100644
+>> --- a/arch/arm/mach-exynos4/pm.c
+>> +++ b/arch/arm/mach-exynos4/pm.c
+>> @@ -63,77 +63,6 @@ static struct sleep_save exynos4_vpll_save[] = {
+>> ?};
+>>
+>> ?static struct sleep_save exynos4_core_save[] = {
+>> - ? ? /* GIC side */
+>> - ? ? SAVE_ITEM(S5P_VA_GIC_CPU + 0x000),
+>> - ? ? SAVE_ITEM(S5P_VA_GIC_CPU + 0x004),
+>> - ? ? SAVE_ITEM(S5P_VA_GIC_CPU + 0x008),
+>> - ? ? SAVE_ITEM(S5P_VA_GIC_CPU + 0x00C),
+>> - ? ? SAVE_ITEM(S5P_VA_GIC_CPU + 0x014),
+>> - ? ? SAVE_ITEM(S5P_VA_GIC_CPU + 0x018),
+>> - ? ? SAVE_ITEM(S5P_VA_GIC_DIST + 0x000),
+>> - ? ? SAVE_ITEM(S5P_VA_GIC_DIST + 0x004),
+>> - ? ? SAVE_ITEM(S5P_VA_GIC_DIST + 0x100),
+>> - ? ? SAVE_ITEM(S5P_VA_GIC_DIST + 0x104),
+>> - ? ? SAVE_ITEM(S5P_VA_GIC_DIST + 0x108),
+>> - ? ? SAVE_ITEM(S5P_VA_GIC_DIST + 0x300),
+>> - ? ? SAVE_ITEM(S5P_VA_GIC_DIST + 0x304),
+>> - ? ? SAVE_ITEM(S5P_VA_GIC_DIST + 0x308),
+>> - ? ? SAVE_ITEM(S5P_VA_GIC_DIST + 0x400),
+>> - ? ? SAVE_ITEM(S5P_VA_GIC_DIST + 0x404),
+>> - ? ? SAVE_ITEM(S5P_VA_GIC_DIST + 0x408),
+>> - ? ? SAVE_ITEM(S5P_VA_GIC_DIST + 0x40C),
+>> - ? ? SAVE_ITEM(S5P_VA_GIC_DIST + 0x410),
+>> - ? ? SAVE_ITEM(S5P_VA_GIC_DIST + 0x414),
+>> - ? ? SAVE_ITEM(S5P_VA_GIC_DIST + 0x418),
+>> - ? ? SAVE_ITEM(S5P_VA_GIC_DIST + 0x41C),
+>> - ? ? SAVE_ITEM(S5P_VA_GIC_DIST + 0x420),
+>> - ? ? SAVE_ITEM(S5P_VA_GIC_DIST + 0x424),
+>> - ? ? SAVE_ITEM(S5P_VA_GIC_DIST + 0x428),
+>> - ? ? SAVE_ITEM(S5P_VA_GIC_DIST + 0x42C),
+>> - ? ? SAVE_ITEM(S5P_VA_GIC_DIST + 0x430),
+>> - ? ? SAVE_ITEM(S5P_VA_GIC_DIST + 0x434),
+>> - ? ? SAVE_ITEM(S5P_VA_GIC_DIST + 0x438),
+>> - ? ? SAVE_ITEM(S5P_VA_GIC_DIST + 0x43C),
+>> - ? ? SAVE_ITEM(S5P_VA_GIC_DIST + 0x440),
+>> - ? ? SAVE_ITEM(S5P_VA_GIC_DIST + 0x444),
+>> - ? ? SAVE_ITEM(S5P_VA_GIC_DIST + 0x448),
+>> - ? ? SAVE_ITEM(S5P_VA_GIC_DIST + 0x44C),
+>> - ? ? SAVE_ITEM(S5P_VA_GIC_DIST + 0x450),
+>> - ? ? SAVE_ITEM(S5P_VA_GIC_DIST + 0x454),
+>> - ? ? SAVE_ITEM(S5P_VA_GIC_DIST + 0x458),
+>> - ? ? SAVE_ITEM(S5P_VA_GIC_DIST + 0x45C),
+>> -
+>> - ? ? SAVE_ITEM(S5P_VA_GIC_DIST + 0x800),
+>> - ? ? SAVE_ITEM(S5P_VA_GIC_DIST + 0x804),
+>> - ? ? SAVE_ITEM(S5P_VA_GIC_DIST + 0x808),
+>> - ? ? SAVE_ITEM(S5P_VA_GIC_DIST + 0x80C),
+>> - ? ? SAVE_ITEM(S5P_VA_GIC_DIST + 0x810),
+>> - ? ? SAVE_ITEM(S5P_VA_GIC_DIST + 0x814),
+>> - ? ? SAVE_ITEM(S5P_VA_GIC_DIST + 0x818),
+>> - ? ? SAVE_ITEM(S5P_VA_GIC_DIST + 0x81C),
+>> - ? ? SAVE_ITEM(S5P_VA_GIC_DIST + 0x820),
+>> - ? ? SAVE_ITEM(S5P_VA_GIC_DIST + 0x824),
+>> - ? ? SAVE_ITEM(S5P_VA_GIC_DIST + 0x828),
+>> - ? ? SAVE_ITEM(S5P_VA_GIC_DIST + 0x82C),
+>> - ? ? SAVE_ITEM(S5P_VA_GIC_DIST + 0x830),
+>> - ? ? SAVE_ITEM(S5P_VA_GIC_DIST + 0x834),
+>> - ? ? SAVE_ITEM(S5P_VA_GIC_DIST + 0x838),
+>> - ? ? SAVE_ITEM(S5P_VA_GIC_DIST + 0x83C),
+>> - ? ? SAVE_ITEM(S5P_VA_GIC_DIST + 0x840),
+>> - ? ? SAVE_ITEM(S5P_VA_GIC_DIST + 0x844),
+>> - ? ? SAVE_ITEM(S5P_VA_GIC_DIST + 0x848),
+>> - ? ? SAVE_ITEM(S5P_VA_GIC_DIST + 0x84C),
+>> - ? ? SAVE_ITEM(S5P_VA_GIC_DIST + 0x850),
+>> - ? ? SAVE_ITEM(S5P_VA_GIC_DIST + 0x854),
+>> - ? ? SAVE_ITEM(S5P_VA_GIC_DIST + 0x858),
+>> - ? ? SAVE_ITEM(S5P_VA_GIC_DIST + 0x85C),
+>> -
+>> - ? ? SAVE_ITEM(S5P_VA_GIC_DIST + 0xC00),
+>> - ? ? SAVE_ITEM(S5P_VA_GIC_DIST + 0xC04),
+>> - ? ? SAVE_ITEM(S5P_VA_GIC_DIST + 0xC08),
+>> - ? ? SAVE_ITEM(S5P_VA_GIC_DIST + 0xC0C),
+>> - ? ? SAVE_ITEM(S5P_VA_GIC_DIST + 0xC10),
+>> - ? ? SAVE_ITEM(S5P_VA_GIC_DIST + 0xC14),
 >
-> [snip]
 >
->> +    /* Enable the MDR1 errata for OMAP3 */
->> +    if (cpu_is_omap34xx()&&  !cpu_is_ti816x())
->> +        omap_up.errata |= UART_ERRATA_i202_MDR1_ACCESS;
->
-> This errata (i202) is applicable to all devices from OMAP2430 to
-> OMAP4460 (apparently this one is not getting fixed). So could you make
-> sure this is enabled for 2430, 3430, 3630, 4430 and 4460?
->
-Yes good point.
+> This list is not complete anyway, some peripheral devices interrupts do not
+> work after resume from system suspend to RAM.
+> Is there any code already handling GIC state during system suspend/resume cycles?
+> Or you refer to some upcoming patches ?
 
-> [snip]
+In my next patch series I have left the GIC save/restore from platform code.
+
 >
->> +/*
->> + * Work Around for Errata i202 (3430 - 1.12, 3630 - 1.6)
+> --
+> Thanks,
+> Sylwester
 >
-> We should update the comment to be "Work Around for Errata i202 (2430,
-> 3430, 3630, 4430 and 4460)". The "1.12" and "1.6" are just the section
-> references in the errata docs, but I think that you can drop these as
-> you can just search for the errata ID which is i202.
->
-> Cheers
-> Jon
->
->
->
-> -- 
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
