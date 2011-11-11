@@ -1,42 +1,44 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 11 Nov 2011 13:24:15 +0000
-Subject: [PATCH v8 16/16] ARM: LPAE: Add the Kconfig entries
-In-Reply-To: <20111111114613.GF23243@arm.com>
-References: <1320682618-1182-1-git-send-email-catalin.marinas@arm.com>
- <1320682618-1182-17-git-send-email-catalin.marinas@arm.com>
- <20111110225737.GX12913@n2100.arm.linux.org.uk>
- <20111111114613.GF23243@arm.com>
-Message-ID: <20111111132415.GD12913@n2100.arm.linux.org.uk>
+From: Joerg.Roedel@amd.com (Joerg Roedel)
+Date: Fri, 11 Nov 2011 14:24:11 +0100
+Subject: [PATCH v4 2/7] iommu/core: split mapping to page sizes as
+ supported by the hardware
+In-Reply-To: <4EBC3E20.20301@codeaurora.org>
+References: <1318850846-16066-1-git-send-email-ohad@wizery.com>
+ <1318850846-16066-3-git-send-email-ohad@wizery.com>
+ <CANqQZNH1YRSgYRVxceicQ3szD=t7zeJjhJKEQ30PeKsxtj5V+A@mail.gmail.com>
+ <1320938930.22195.17.camel@i7.infradead.org>
+ <20111110170918.GE13213@amd.com> <4EBC3E20.20301@codeaurora.org>
+Message-ID: <20111111132411.GH13213@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 11, 2011 at 11:46:14AM +0000, Catalin Marinas wrote:
-> So we could change this to:
-> 
-> config ARCH_DMA_ADDR_T_64BIT
-> 	depends on ARM_LPAE
-> 
-> and let platforms select it.
+On Thu, Nov 10, 2011 at 01:12:00PM -0800, Stepan Moskovchenko wrote:
+> I have been experimenting with an iommu_map_range call, which maps a
+> given scatterlist of discontiguous physical pages into a contiguous
+> virtual region at a given IOVA. This has some performance advantages
+> over just calling iommu_map iteratively. First, it reduces the
+> amount of table walking / calculation needed for mapping each page,
+> given how you know that all the pages will be mapped into a single
+> virtually-contiguous region (so in most cases, the first-level table
+> calculation can be reused). Second, it allows one to defer the TLB
+> (and sometimes cache) maintenance operations until the entire
+> scatterlist has been mapped, rather than doing a TLB invalidate
+> after mapping each page, as would have been the case if iommu_map
+> were just being called from within a loop. Granted, just using
+> iommu_map many times may be acceptable on the slow path, but I have
+> seen significant performance gains when using this approach on the
+> fast path.
 
-Actually, even this is conceptually wrong.  You really need to get away
-from the thought that a dma address in any way is encapsulated within
-the machine physical address.
+Yes, from a performance point-of-view that makes sense, as an addition
+to the existing iommu_map interface. Are the pages in the list allowed
+to have different page-sizes?
 
-They're two separate things.  For example, you could have an ARMv4 based
-system (so, 32-bit address bus) connected to a PCI bridge which supports
-64-bit addressing.  This PCI bridge could map system memory into PCI
-space greater than 4GB (ok, there are down-sides to doing this, but this
-is just an example to illustrate the point).  This would therefore require
-a 64-bit dma_addr_t.
 
-The size of dma_addr_t has very little to do with the page table format
-or even the host address bus width, and is more to do with bus and
-system setup than host CPU setup.
+	Joerg
 
-So, I think that we can have:
+-- 
+AMD Operating System Research Center
 
-config ARCH_DMA_ADDR_T_64BIT
-	bool
-
-and we just leave it at that - if a platform needs 64-bit DMA addresses,
-then selecting this symbol would be the correct approach.
+Advanced Micro Devices GmbH Einsteinring 24 85609 Dornach
+General Managers: Alberto Bozzo, Andrew Bowd
+Registration: Dornach, Landkr. Muenchen; Registerger. Muenchen, HRB Nr. 43632
