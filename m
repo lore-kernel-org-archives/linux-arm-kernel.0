@@ -1,46 +1,24 @@
-From: b29396@freescale.com (Dong Aisheng)
-Date: Fri, 11 Nov 2011 17:30:55 +0800
-Subject: [PATCH v5 3/3] ARM: mx28evk: set a initial clock rate for saif
-In-Reply-To: <1321003855-13430-1-git-send-email-b29396@freescale.com>
-References: <1321003855-13430-1-git-send-email-b29396@freescale.com>
-Message-ID: <1321003855-13430-4-git-send-email-b29396@freescale.com>
+From: s.hauer@pengutronix.de (s.hauer at pengutronix.de)
+Date: Fri, 11 Nov 2011 10:25:39 +0100
+Subject: [GIT PULL] arm/mx35/3ds: GPIO : add mc9s08dz60 gpio function
+In-Reply-To: <3D55990BDF4852409EA769663F22E54AC19541@039-SN1MPN1-006.039d.mgd.msft.net>
+References: <3D55990BDF4852409EA769663F22E54AC19541@039-SN1MPN1-006.039d.mgd.msft.net>
+Message-ID: <20111111092539.GK16886@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Dong Aisheng <b29396@freescale.com>
-Cc: Sascha Hauer <s.hauer@pengutronix.de>
-Cc: Wolfram Sang <w.sang@pengutronix.de>
-Cc: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
-Cc: Liam Girdwood <lrg@ti.com>
+On Fri, Nov 11, 2011 at 02:35:00AM +0000, Wu Guoxing-B39297 wrote:
+> Hi Grant:
+> 
+> Please help to pull the following GPIO patch for mc9s08dz60 that on imx mx35 pdk board.
 
----
-Changes since v1:
- * make comments a little better.
-   It's originally suggested by Uwe.
----
- arch/arm/mach-mxs/clock-mx28.c |    9 +++++++++
- 1 files changed, 9 insertions(+), 0 deletions(-)
+Grant is not available atm. Added Linus Walleij to Cc instead.
 
-diff --git a/arch/arm/mach-mxs/clock-mx28.c b/arch/arm/mach-mxs/clock-mx28.c
-index c51fe85..b0c248d 100644
---- a/arch/arm/mach-mxs/clock-mx28.c
-+++ b/arch/arm/mach-mxs/clock-mx28.c
-@@ -808,6 +808,15 @@ int __init mx28_clocks_init(void)
- 	clk_set_parent(&saif0_clk, &pll0_clk);
- 	clk_set_parent(&saif1_clk, &pll0_clk);
- 
-+	/*
-+	 * Set an initial clock rate for the saif internal logic to work
-+	 * properly. This is important when working in EXTMASTER mode that
-+	 * uses the other saif's BITCLK&LRCLK but it still needs a basic
-+	 * clock which should be fast enough for the internal logic.
-+	 */
-+	clk_set_rate(&saif0_clk, 24000000);
-+	clk_set_rate(&saif1_clk, 24000000);
-+
- 	clkdev_add_table(lookups, ARRAY_SIZE(lookups));
- 
- 	mxs_timer_init(&clk32k_clk, MX28_INT_TIMER0);
+Sascha
+
+
 -- 
-1.7.0.4
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
