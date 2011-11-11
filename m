@@ -1,38 +1,29 @@
 From: richard.zhao@linaro.org (Richard Zhao)
-Date: Fri, 11 Nov 2011 09:10:19 +0800
-Subject: [PATCH V2 04/14] ARM: mxc: pwm: add clk_prepare/clk_unprepare
+Date: Fri, 11 Nov 2011 09:10:20 +0800
+Subject: [PATCH V2 05/14] ARM: mxc: epit: add clk_prepare/clk_unprepare
 In-Reply-To: <1320973829-4388-1-git-send-email-richard.zhao@linaro.org>
 References: <1320973829-4388-1-git-send-email-richard.zhao@linaro.org>
-Message-ID: <1320973829-4388-5-git-send-email-richard.zhao@linaro.org>
+Message-ID: <1320973829-4388-6-git-send-email-richard.zhao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
 ---
- arch/arm/plat-mxc/pwm.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/plat-mxc/epit.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/plat-mxc/pwm.c b/arch/arm/plat-mxc/pwm.c
-index 42d74ea..68c7199b 100644
---- a/arch/arm/plat-mxc/pwm.c
-+++ b/arch/arm/plat-mxc/pwm.c
-@@ -118,7 +118,7 @@ int pwm_enable(struct pwm_device *pwm)
- 	int rc = 0;
+diff --git a/arch/arm/plat-mxc/epit.c b/arch/arm/plat-mxc/epit.c
+index d3467f8..9129c9e 100644
+--- a/arch/arm/plat-mxc/epit.c
++++ b/arch/arm/plat-mxc/epit.c
+@@ -203,7 +203,7 @@ static int __init epit_clockevent_init(struct clk *timer_clk)
  
- 	if (!pwm->clk_enabled) {
--		rc = clk_enable(pwm->clk);
-+		rc = clk_prepare_enable(pwm->clk);
- 		if (!rc)
- 			pwm->clk_enabled = 1;
- 	}
-@@ -131,7 +131,7 @@ void pwm_disable(struct pwm_device *pwm)
- 	writel(0, pwm->mmio_base + MX3_PWMCR);
+ void __init epit_timer_init(struct clk *timer_clk, void __iomem *base, int irq)
+ {
+-	clk_enable(timer_clk);
++	clk_prepare_enable(timer_clk);
  
- 	if (pwm->clk_enabled) {
--		clk_disable(pwm->clk);
-+		clk_disable_unprepare(pwm->clk);
- 		pwm->clk_enabled = 0;
- 	}
- }
+ 	timer_base = base;
+ 
 -- 
 1.7.5.4
