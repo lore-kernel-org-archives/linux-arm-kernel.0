@@ -1,287 +1,436 @@
 From: govindraj.raja@ti.com (Govindraj.R)
-Date: Fri, 11 Nov 2011 15:27:18 +0530
-Subject: [PATCH v8 01/20] OMAP2+: UART: cleanup + remove uart pm specific API
+Date: Fri, 11 Nov 2011 15:27:23 +0530
+Subject: [PATCH v8 06/20] OMAP2+: UART: Add runtime pm support for omap-serial
+ driver
 In-Reply-To: <1321005446-21741-1-git-send-email-govindraj.raja@ti.com>
 References: <1321005446-21741-1-git-send-email-govindraj.raja@ti.com>
-Message-ID: <1321005446-21741-2-git-send-email-govindraj.raja@ti.com>
+Message-ID: <1321005446-21741-7-git-send-email-govindraj.raja@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In preparation to UART runtime conversion remove uart specific calls
-from pm24xx/34xx files and their definition from serial.c
-These func calls will no more be used with upcoming uart runtime design.
+Adapts omap-serial driver to use pm_runtime API's.
+Use runtime runtime API's to handle uart clocks and obtain
+device_usage statics. Set runtime API's usage to irq_safe so that
+we can use get_sync from irq context. Auto-suspend for port specific
+activities and put for reg access. Moving suspend/resume hooks
+to dev_pm_ops structure and bing with config_suspend to avoid any
+compilation warning if config_suspend is disabled.
 
-1.) omap_uart_prepare_suspend :- can be taken care with driver suspend hooks.
-2.) omap_uart_enable_irqs :- Used to enable/disable uart irq's in suspend
-    path from PM code, this is removed as same is handled by
-    uart_suspend_port/uart_resume_port in omap-serial driver which will
-    do an port_shutdown on suspend freeing irq and port_startup on resume
-    enabling back irq.
-3.) Remove prepare_idle/resume_idle calls used to gate uart clocks.
-    UART clocks can be gated within driver using runtime funcs
-    and be woken up using irq_chaining from omap_prm driver.
-4.) Remove console_locking from idle path as clock gating is done withing
-    driver itself with runtime API. Remove is_suspending check used to acquire
-    console_lock.
+By default uart autosuspend delay is set to -1 to avoid character loss
+if uart's are autoidled and woken up on rx pin.
 
+After boot up UART's can be autoidled by setting autosuspend delay from sysfs.
+
+echo 3000 > /sys/devices/platform/omap/omap_uart.X/power/autosuspend_delay_ms
+X=0,1,2,3 for UART1/2/3/4. Number of uarts available may vary across omap_soc.
+
+Also if uart is not wakeup capable we can prevent runtime autosuspend by
+forbiding runtime.
+
+Acked-by: Alan Cox <alan@linux.intel.com>
 Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
 ---
- arch/arm/mach-omap2/pm24xx.c             |   18 --------
- arch/arm/mach-omap2/pm34xx.c             |   32 ---------------
- arch/arm/mach-omap2/serial.c             |   65 ------------------------------
- arch/arm/plat-omap/include/plat/serial.h |    4 --
- 4 files changed, 0 insertions(+), 119 deletions(-)
+ drivers/tty/serial/omap-serial.c |  122 ++++++++++++++++++++++++++++++++++----
+ 1 files changed, 109 insertions(+), 13 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/pm24xx.c b/arch/arm/mach-omap2/pm24xx.c
-index cf0c216..5ec2b43 100644
---- a/arch/arm/mach-omap2/pm24xx.c
-+++ b/arch/arm/mach-omap2/pm24xx.c
-@@ -30,7 +30,6 @@
- #include <linux/irq.h>
- #include <linux/time.h>
- #include <linux/gpio.h>
--#include <linux/console.h>
- 
- #include <asm/mach/time.h>
- #include <asm/mach/irq.h>
-@@ -126,27 +125,11 @@ static void omap2_enter_full_retention(void)
- 	if (omap_irq_pending())
- 		goto no_sleep;
- 
--	/* Block console output in case it is on one of the OMAP UARTs */
--	if (!is_suspending())
--		if (!console_trylock())
--			goto no_sleep;
--
--	omap_uart_prepare_idle(0);
--	omap_uart_prepare_idle(1);
--	omap_uart_prepare_idle(2);
--
- 	/* Jump to SRAM suspend code */
- 	omap2_sram_suspend(sdrc_read_reg(SDRC_DLLA_CTRL),
- 			   OMAP_SDRC_REGADDR(SDRC_DLLA_CTRL),
- 			   OMAP_SDRC_REGADDR(SDRC_POWER));
- 
--	omap_uart_resume_idle(2);
--	omap_uart_resume_idle(1);
--	omap_uart_resume_idle(0);
--
--	if (!is_suspending())
--		console_unlock();
--
- no_sleep:
- 	omap2_gpio_resume_after_idle();
- 
-@@ -290,7 +273,6 @@ static int omap2_pm_suspend(void)
- 	mir1 = omap_readl(0x480fe0a4);
- 	omap_writel(1 << 5, 0x480fe0ac);
- 
--	omap_uart_prepare_suspend();
- 	omap2_enter_full_retention();
- 
- 	omap_writel(mir1, 0x480fe0a4);
-diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
-index 9517203..2eb3215 100644
---- a/arch/arm/mach-omap2/pm34xx.c
-+++ b/arch/arm/mach-omap2/pm34xx.c
-@@ -28,7 +28,6 @@
+diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
+index 31f0cbf..f16ef4b9 100644
+--- a/drivers/tty/serial/omap-serial.c
++++ b/drivers/tty/serial/omap-serial.c
+@@ -37,11 +37,14 @@
  #include <linux/clk.h>
- #include <linux/delay.h>
- #include <linux/slab.h>
--#include <linux/console.h>
- #include <linux/mfd/omap-prm.h>
- #include <trace/events/power.h>
+ #include <linux/serial_core.h>
+ #include <linux/irq.h>
++#include <linux/pm_runtime.h>
  
-@@ -54,15 +53,6 @@
+ #include <plat/dma.h>
+ #include <plat/dmtimer.h>
+ #include <plat/omap-serial.h>
  
- #ifdef CONFIG_SUSPEND
- static suspend_state_t suspend_state = PM_SUSPEND_ON;
--static inline bool is_suspending(void)
--{
--	return (suspend_state != PM_SUSPEND_ON) && console_suspend_enabled;
--}
--#else
--static inline bool is_suspending(void)
--{
--	return false;
--}
- #endif
++#define OMAP_UART_AUTOSUSPEND_DELAY -1
++
+ static struct uart_omap_port *ui[OMAP_MAX_HSUART_PORTS];
  
- /* pm34xx errata defined in pm.h */
-@@ -337,20 +327,11 @@ void omap_sram_idle(void)
- 			omap3_enable_io_chain();
+ /* Forward declaration of functions */
+@@ -102,6 +105,8 @@ static void serial_omap_stop_rxdma(struct uart_omap_port *up)
+ 		omap_free_dma(up->uart_dma.rx_dma_channel);
+ 		up->uart_dma.rx_dma_channel = OMAP_UART_DMA_CH_FREE;
+ 		up->uart_dma.rx_dma_used = false;
++		pm_runtime_mark_last_busy(&up->pdev->dev);
++		pm_runtime_put_autosuspend(&up->pdev->dev);
+ 	}
+ }
+ 
+@@ -110,8 +115,11 @@ static void serial_omap_enable_ms(struct uart_port *port)
+ 	struct uart_omap_port *up = (struct uart_omap_port *)port;
+ 
+ 	dev_dbg(up->port.dev, "serial_omap_enable_ms+%d\n", up->pdev->id);
++
++	pm_runtime_get_sync(&up->pdev->dev);
+ 	up->ier |= UART_IER_MSI;
+ 	serial_out(up, UART_IER, up->ier);
++	pm_runtime_put(&up->pdev->dev);
+ }
+ 
+ static void serial_omap_stop_tx(struct uart_port *port)
+@@ -129,23 +137,32 @@ static void serial_omap_stop_tx(struct uart_port *port)
+ 		omap_stop_dma(up->uart_dma.tx_dma_channel);
+ 		omap_free_dma(up->uart_dma.tx_dma_channel);
+ 		up->uart_dma.tx_dma_channel = OMAP_UART_DMA_CH_FREE;
++		pm_runtime_mark_last_busy(&up->pdev->dev);
++		pm_runtime_put_autosuspend(&up->pdev->dev);
  	}
  
--	/* Block console output in case it is on one of the OMAP UARTs */
--	if (!is_suspending())
--		if (per_next_state < PWRDM_POWER_ON ||
--		    core_next_state < PWRDM_POWER_ON)
--			if (!console_trylock())
--				goto console_still_active;
--
- 	pwrdm_pre_transition();
- 
- 	/* PER */
- 	if (per_next_state < PWRDM_POWER_ON) {
- 		per_going_off = (per_next_state == PWRDM_POWER_OFF) ? 1 : 0;
--		omap_uart_prepare_idle(2);
--		omap_uart_prepare_idle(3);
- 		omap2_gpio_prepare_for_idle(per_going_off);
- 		if (per_next_state == PWRDM_POWER_OFF)
- 				omap3_per_save_context();
-@@ -358,8 +339,6 @@ void omap_sram_idle(void)
- 
- 	/* CORE */
- 	if (core_next_state < PWRDM_POWER_ON) {
--		omap_uart_prepare_idle(0);
--		omap_uart_prepare_idle(1);
- 		if (core_next_state == PWRDM_POWER_OFF) {
- 			omap3_core_save_context();
- 			omap3_cm_save_context();
-@@ -408,8 +387,6 @@ void omap_sram_idle(void)
- 			omap3_sram_restore_context();
- 			omap2_sms_restore_context();
- 		}
--		omap_uart_resume_idle(0);
--		omap_uart_resume_idle(1);
- 		if (core_next_state == PWRDM_POWER_OFF)
- 			omap2_prm_clear_mod_reg_bits(OMAP3430_AUTO_OFF_MASK,
- 					       OMAP3430_GR_MOD,
-@@ -425,14 +402,8 @@ void omap_sram_idle(void)
- 		omap2_gpio_resume_after_idle();
- 		if (per_prev_state == PWRDM_POWER_OFF)
- 			omap3_per_restore_context();
--		omap_uart_resume_idle(2);
--		omap_uart_resume_idle(3);
++	pm_runtime_get_sync(&up->pdev->dev);
+ 	if (up->ier & UART_IER_THRI) {
+ 		up->ier &= ~UART_IER_THRI;
+ 		serial_out(up, UART_IER, up->ier);
  	}
++
++	pm_runtime_mark_last_busy(&up->pdev->dev);
++	pm_runtime_put_autosuspend(&up->pdev->dev);
+ }
  
--	if (!is_suspending())
--		console_unlock();
--
--console_still_active:
- 	/* Disable IO-PAD and IO-CHAIN wakeup */
- 	if (omap3_has_io_wakeup() &&
- 	    (per_next_state < PWRDM_POWER_ON ||
-@@ -494,7 +465,6 @@ static int omap3_pm_suspend(void)
- 			goto restore;
- 	}
- 
--	omap_uart_prepare_suspend();
- 	omap3_intc_suspend();
- 
- 	omap_sram_idle();
-@@ -541,14 +511,12 @@ static int omap3_pm_begin(suspend_state_t state)
+ static void serial_omap_stop_rx(struct uart_port *port)
  {
- 	disable_hlt();
- 	suspend_state = state;
--	omap_uart_enable_irqs(0);
+ 	struct uart_omap_port *up = (struct uart_omap_port *)port;
+ 
++	pm_runtime_get_sync(&up->pdev->dev);
+ 	if (up->use_dma)
+ 		serial_omap_stop_rxdma(up);
+ 	up->ier &= ~UART_IER_RLSI;
+ 	up->port.read_status_mask &= ~UART_LSR_DR;
+ 	serial_out(up, UART_IER, up->ier);
++	pm_runtime_mark_last_busy(&up->pdev->dev);
++	pm_runtime_put_autosuspend(&up->pdev->dev);
+ }
+ 
+ static inline void receive_chars(struct uart_omap_port *up, int *status)
+@@ -262,7 +279,10 @@ static void serial_omap_start_tx(struct uart_port *port)
+ 	int ret = 0;
+ 
+ 	if (!up->use_dma) {
++		pm_runtime_get_sync(&up->pdev->dev);
+ 		serial_omap_enable_ier_thri(up);
++		pm_runtime_mark_last_busy(&up->pdev->dev);
++		pm_runtime_put_autosuspend(&up->pdev->dev);
+ 		return;
+ 	}
+ 
+@@ -272,6 +292,7 @@ static void serial_omap_start_tx(struct uart_port *port)
+ 	xmit = &up->port.state->xmit;
+ 
+ 	if (up->uart_dma.tx_dma_channel == OMAP_UART_DMA_CH_FREE) {
++		pm_runtime_get_sync(&up->pdev->dev);
+ 		ret = omap_request_dma(up->uart_dma.uart_dma_tx,
+ 				"UART Tx DMA",
+ 				(void *)uart_tx_dma_callback, up,
+@@ -354,9 +375,13 @@ static inline irqreturn_t serial_omap_irq(int irq, void *dev_id)
+ 	unsigned int iir, lsr;
+ 	unsigned long flags;
+ 
++	pm_runtime_get_sync(&up->pdev->dev);
+ 	iir = serial_in(up, UART_IIR);
+-	if (iir & UART_IIR_NO_INT)
++	if (iir & UART_IIR_NO_INT) {
++		pm_runtime_mark_last_busy(&up->pdev->dev);
++		pm_runtime_put_autosuspend(&up->pdev->dev);
+ 		return IRQ_NONE;
++	}
+ 
+ 	spin_lock_irqsave(&up->port.lock, flags);
+ 	lsr = serial_in(up, UART_LSR);
+@@ -378,6 +403,9 @@ static inline irqreturn_t serial_omap_irq(int irq, void *dev_id)
+ 		transmit_chars(up);
+ 
+ 	spin_unlock_irqrestore(&up->port.lock, flags);
++	pm_runtime_mark_last_busy(&up->pdev->dev);
++	pm_runtime_put_autosuspend(&up->pdev->dev);
++
+ 	up->port_activity = jiffies;
+ 	return IRQ_HANDLED;
+ }
+@@ -388,11 +416,12 @@ static unsigned int serial_omap_tx_empty(struct uart_port *port)
+ 	unsigned long flags = 0;
+ 	unsigned int ret = 0;
+ 
++	pm_runtime_get_sync(&up->pdev->dev);
+ 	dev_dbg(up->port.dev, "serial_omap_tx_empty+%d\n", up->pdev->id);
+ 	spin_lock_irqsave(&up->port.lock, flags);
+ 	ret = serial_in(up, UART_LSR) & UART_LSR_TEMT ? TIOCSER_TEMT : 0;
+ 	spin_unlock_irqrestore(&up->port.lock, flags);
+-
++	pm_runtime_put(&up->pdev->dev);
+ 	return ret;
+ }
+ 
+@@ -402,7 +431,10 @@ static unsigned int serial_omap_get_mctrl(struct uart_port *port)
+ 	unsigned char status;
+ 	unsigned int ret = 0;
+ 
++	pm_runtime_get_sync(&up->pdev->dev);
+ 	status = check_modem_status(up);
++	pm_runtime_put(&up->pdev->dev);
++
+ 	dev_dbg(up->port.dev, "serial_omap_get_mctrl+%d\n", up->pdev->id);
+ 
+ 	if (status & UART_MSR_DCD)
+@@ -433,8 +465,10 @@ static void serial_omap_set_mctrl(struct uart_port *port, unsigned int mctrl)
+ 	if (mctrl & TIOCM_LOOP)
+ 		mcr |= UART_MCR_LOOP;
+ 
++	pm_runtime_get_sync(&up->pdev->dev);
+ 	mcr |= up->mcr;
+ 	serial_out(up, UART_MCR, mcr);
++	pm_runtime_put(&up->pdev->dev);
+ }
+ 
+ static void serial_omap_break_ctl(struct uart_port *port, int break_state)
+@@ -443,6 +477,7 @@ static void serial_omap_break_ctl(struct uart_port *port, int break_state)
+ 	unsigned long flags = 0;
+ 
+ 	dev_dbg(up->port.dev, "serial_omap_break_ctl+%d\n", up->pdev->id);
++	pm_runtime_get_sync(&up->pdev->dev);
+ 	spin_lock_irqsave(&up->port.lock, flags);
+ 	if (break_state == -1)
+ 		up->lcr |= UART_LCR_SBC;
+@@ -450,6 +485,7 @@ static void serial_omap_break_ctl(struct uart_port *port, int break_state)
+ 		up->lcr &= ~UART_LCR_SBC;
+ 	serial_out(up, UART_LCR, up->lcr);
+ 	spin_unlock_irqrestore(&up->port.lock, flags);
++	pm_runtime_put(&up->pdev->dev);
+ }
+ 
+ static int serial_omap_startup(struct uart_port *port)
+@@ -468,6 +504,7 @@ static int serial_omap_startup(struct uart_port *port)
+ 
+ 	dev_dbg(up->port.dev, "serial_omap_startup+%d\n", up->pdev->id);
+ 
++	pm_runtime_get_sync(&up->pdev->dev);
+ 	/*
+ 	 * Clear the FIFO buffers and disable them.
+ 	 * (they will be reenabled in set_termios())
+@@ -523,6 +560,8 @@ static int serial_omap_startup(struct uart_port *port)
+ 	/* Enable module level wake up */
+ 	serial_out(up, UART_OMAP_WER, OMAP_UART_WER_MOD_WKUP);
+ 
++	pm_runtime_mark_last_busy(&up->pdev->dev);
++	pm_runtime_put_autosuspend(&up->pdev->dev);
+ 	up->port_activity = jiffies;
+ 	return 0;
+ }
+@@ -533,6 +572,8 @@ static void serial_omap_shutdown(struct uart_port *port)
+ 	unsigned long flags = 0;
+ 
+ 	dev_dbg(up->port.dev, "serial_omap_shutdown+%d\n", up->pdev->id);
++
++	pm_runtime_get_sync(&up->pdev->dev);
+ 	/*
+ 	 * Disable interrupts from this port
+ 	 */
+@@ -566,6 +607,8 @@ static void serial_omap_shutdown(struct uart_port *port)
+ 			up->uart_dma.rx_buf_dma_phys);
+ 		up->uart_dma.rx_buf = NULL;
+ 	}
++
++	pm_runtime_put(&up->pdev->dev);
+ 	free_irq(up->port.irq, up);
+ }
+ 
+@@ -680,6 +723,7 @@ serial_omap_set_termios(struct uart_port *port, struct ktermios *termios,
+ 	 * Ok, we're now changing the port state. Do it with
+ 	 * interrupts disabled.
+ 	 */
++	pm_runtime_get_sync(&up->pdev->dev);
+ 	spin_lock_irqsave(&up->port.lock, flags);
+ 
+ 	/*
+@@ -809,6 +853,7 @@ serial_omap_set_termios(struct uart_port *port, struct ktermios *termios,
+ 	serial_omap_configure_xonxoff(up, termios);
+ 
+ 	spin_unlock_irqrestore(&up->port.lock, flags);
++	pm_runtime_put(&up->pdev->dev);
+ 	dev_dbg(up->port.dev, "serial_omap_set_termios+%d\n", up->pdev->id);
+ }
+ 
+@@ -820,6 +865,8 @@ serial_omap_pm(struct uart_port *port, unsigned int state,
+ 	unsigned char efr;
+ 
+ 	dev_dbg(up->port.dev, "serial_omap_pm+%d\n", up->pdev->id);
++
++	pm_runtime_get_sync(&up->pdev->dev);
+ 	serial_out(up, UART_LCR, UART_LCR_CONF_MODE_B);
+ 	efr = serial_in(up, UART_EFR);
+ 	serial_out(up, UART_EFR, efr | UART_EFR_ECB);
+@@ -829,6 +876,15 @@ serial_omap_pm(struct uart_port *port, unsigned int state,
+ 	serial_out(up, UART_LCR, UART_LCR_CONF_MODE_B);
+ 	serial_out(up, UART_EFR, efr);
+ 	serial_out(up, UART_LCR, 0);
++
++	if (!device_may_wakeup(&up->pdev->dev)) {
++		if (!state)
++			pm_runtime_forbid(&up->pdev->dev);
++		else
++			pm_runtime_allow(&up->pdev->dev);
++	}
++
++	pm_runtime_put(&up->pdev->dev);
+ }
+ 
+ static void serial_omap_release_port(struct uart_port *port)
+@@ -906,19 +962,26 @@ static inline void wait_for_xmitr(struct uart_omap_port *up)
+ static void serial_omap_poll_put_char(struct uart_port *port, unsigned char ch)
+ {
+ 	struct uart_omap_port *up = (struct uart_omap_port *)port;
++
++	pm_runtime_get_sync(&up->pdev->dev);
+ 	wait_for_xmitr(up);
+ 	serial_out(up, UART_TX, ch);
++	pm_runtime_put(&up->pdev->dev);
+ }
+ 
+ static int serial_omap_poll_get_char(struct uart_port *port)
+ {
+ 	struct uart_omap_port *up = (struct uart_omap_port *)port;
+-	unsigned int status = serial_in(up, UART_LSR);
++	unsigned int status;
+ 
++	pm_runtime_get_sync(&up->pdev->dev);
++	status = serial_in(up, UART_LSR);
+ 	if (!(status & UART_LSR_DR))
+ 		return NO_POLL_CHAR;
+ 
+-	return serial_in(up, UART_RX);
++	status = serial_in(up, UART_RX);
++	pm_runtime_put(&up->pdev->dev);
++	return status;
+ }
+ 
+ #endif /* CONFIG_CONSOLE_POLL */
+@@ -946,6 +1009,8 @@ serial_omap_console_write(struct console *co, const char *s,
+ 	unsigned int ier;
+ 	int locked = 1;
+ 
++	pm_runtime_get_sync(&up->pdev->dev);
++
+ 	local_irq_save(flags);
+ 	if (up->port.sysrq)
+ 		locked = 0;
+@@ -978,6 +1043,8 @@ serial_omap_console_write(struct console *co, const char *s,
+ 	if (up->msr_saved_flags)
+ 		check_modem_status(up);
+ 
++	pm_runtime_mark_last_busy(&up->pdev->dev);
++	pm_runtime_put_autosuspend(&up->pdev->dev);
+ 	if (locked)
+ 		spin_unlock(&up->port.lock);
+ 	local_irq_restore(flags);
+@@ -1060,24 +1127,25 @@ static struct uart_driver serial_omap_reg = {
+ 	.cons		= OMAP_CONSOLE,
+ };
+ 
+-static int
+-serial_omap_suspend(struct platform_device *pdev, pm_message_t state)
++#ifdef CONFIG_SUSPEND
++static int serial_omap_suspend(struct device *dev)
+ {
+-	struct uart_omap_port *up = platform_get_drvdata(pdev);
++	struct uart_omap_port *up = dev_get_drvdata(dev);
+ 
+ 	if (up)
+ 		uart_suspend_port(&serial_omap_reg, &up->port);
  	return 0;
  }
  
- static void omap3_pm_end(void)
+-static int serial_omap_resume(struct platform_device *dev)
++static int serial_omap_resume(struct device *dev)
  {
- 	suspend_state = PM_SUSPEND_ON;
--	omap_uart_enable_irqs(1);
- 	enable_hlt();
- 	return;
- }
-diff --git a/arch/arm/mach-omap2/serial.c b/arch/arm/mach-omap2/serial.c
-index 9992dbf..8254067 100644
---- a/arch/arm/mach-omap2/serial.c
-+++ b/arch/arm/mach-omap2/serial.c
-@@ -367,51 +367,6 @@ static void omap_uart_idle_timer(unsigned long data)
- 	omap_uart_allow_sleep(uart);
- }
+-	struct uart_omap_port *up = platform_get_drvdata(dev);
++	struct uart_omap_port *up = dev_get_drvdata(dev);
  
--void omap_uart_prepare_idle(int num)
--{
--	struct omap_uart_state *uart;
--
--	list_for_each_entry(uart, &uart_list, node) {
--		if (num == uart->num && uart->can_sleep) {
--			omap_uart_disable_clocks(uart);
--			return;
--		}
--	}
--}
--
--void omap_uart_resume_idle(int num)
--{
--	struct omap_uart_state *uart;
--
--	list_for_each_entry(uart, &uart_list, node) {
--		if (num == uart->num && uart->can_sleep) {
--			omap_uart_enable_clocks(uart);
--
--			/* Check for IO pad wakeup */
--			if (cpu_is_omap34xx() && uart->padconf) {
--				u16 p = omap_ctrl_readw(uart->padconf);
--
--				if (p & OMAP3_PADCONF_WAKEUPEVENT0)
--					omap_uart_block_sleep(uart);
--			}
--
--			/* Check for normal UART wakeup */
--			if (__raw_readl(uart->wk_st) & uart->wk_mask)
--				omap_uart_block_sleep(uart);
--			return;
--		}
--	}
--}
--
--void omap_uart_prepare_suspend(void)
--{
--	struct omap_uart_state *uart;
--
--	list_for_each_entry(uart, &uart_list, node) {
--		omap_uart_allow_sleep(uart);
--	}
--}
--
- int omap_uart_can_sleep(void)
+ 	if (up)
+ 		uart_resume_port(&serial_omap_reg, &up->port);
+ 	return 0;
+ }
++#endif
+ 
+ static void serial_omap_rx_timeout(unsigned long uart_no)
  {
- 	struct omap_uart_state *uart;
-@@ -530,26 +485,6 @@ static void omap_uart_idle_init(struct omap_uart_state *uart)
- 	WARN_ON(ret);
+@@ -1135,6 +1203,7 @@ static int serial_omap_start_rxdma(struct uart_omap_port *up)
+ 	int ret = 0;
+ 
+ 	if (up->uart_dma.rx_dma_channel == -1) {
++		pm_runtime_get_sync(&up->pdev->dev);
+ 		ret = omap_request_dma(up->uart_dma.uart_dma_rx,
+ 				"UART Rx DMA",
+ 				(void *)uart_rx_dma_callback, up,
+@@ -1299,6 +1368,14 @@ static int serial_omap_probe(struct platform_device *pdev)
+ 		up->uart_dma.rx_dma_channel = OMAP_UART_DMA_CH_FREE;
+ 	}
+ 
++	pm_runtime_use_autosuspend(&pdev->dev);
++	pm_runtime_set_autosuspend_delay(&pdev->dev,
++			OMAP_UART_AUTOSUSPEND_DELAY);
++
++	pm_runtime_irq_safe(&pdev->dev);
++	pm_runtime_enable(&pdev->dev);
++	pm_runtime_get_sync(&pdev->dev);
++
+ 	ui[pdev->id] = up;
+ 	serial_omap_add_console_port(up);
+ 
+@@ -1306,6 +1383,7 @@ static int serial_omap_probe(struct platform_device *pdev)
+ 	if (ret != 0)
+ 		goto do_release_region;
+ 
++	pm_runtime_put(&pdev->dev);
+ 	platform_set_drvdata(pdev, up);
+ 	return 0;
+ err:
+@@ -1320,22 +1398,40 @@ static int serial_omap_remove(struct platform_device *dev)
+ {
+ 	struct uart_omap_port *up = platform_get_drvdata(dev);
+ 
+-	platform_set_drvdata(dev, NULL);
+ 	if (up) {
++		pm_runtime_disable(&up->pdev->dev);
+ 		uart_remove_one_port(&serial_omap_reg, &up->port);
+ 		kfree(up);
+ 	}
++
++	platform_set_drvdata(dev, NULL);
++	return 0;
++}
++
++#ifdef CONFIG_PM_RUNTIME
++static int serial_omap_runtime_suspend(struct device *dev)
++{
+ 	return 0;
  }
  
--void omap_uart_enable_irqs(int enable)
--{
--	int ret;
--	struct omap_uart_state *uart;
++static int serial_omap_runtime_resume(struct device *dev)
++{
++	return 0;
++}
++#endif
++
++static const struct dev_pm_ops serial_omap_dev_pm_ops = {
++	SET_SYSTEM_SLEEP_PM_OPS(serial_omap_suspend, serial_omap_resume)
++	SET_RUNTIME_PM_OPS(serial_omap_runtime_suspend,
++				serial_omap_runtime_resume, NULL)
++};
++
+ static struct platform_driver serial_omap_driver = {
+ 	.probe          = serial_omap_probe,
+ 	.remove         = serial_omap_remove,
 -
--	list_for_each_entry(uart, &uart_list, node) {
--		if (enable) {
--			pm_runtime_put_sync(&uart->pdev->dev);
--			ret = request_threaded_irq(uart->irq, NULL,
--						   omap_uart_interrupt,
--						   IRQF_SHARED,
--						   "serial idle",
--						   (void *)uart);
--		} else {
--			pm_runtime_get_noresume(&uart->pdev->dev);
--			free_irq(uart->irq, (void *)uart);
--		}
--	}
--}
--
- static ssize_t sleep_timeout_show(struct device *dev,
- 				  struct device_attribute *attr,
- 				  char *buf)
-diff --git a/arch/arm/plat-omap/include/plat/serial.h b/arch/arm/plat-omap/include/plat/serial.h
-index 1ab9fd6..73dd022 100644
---- a/arch/arm/plat-omap/include/plat/serial.h
-+++ b/arch/arm/plat-omap/include/plat/serial.h
-@@ -111,10 +111,6 @@ extern void omap_serial_init(void);
- extern void omap_serial_init_port(struct omap_board_data *bdata);
- extern int omap_uart_can_sleep(void);
- extern void omap_uart_check_wakeup(void);
--extern void omap_uart_prepare_suspend(void);
--extern void omap_uart_prepare_idle(int num);
--extern void omap_uart_resume_idle(int num);
--extern void omap_uart_enable_irqs(int enable);
- #endif
+-	.suspend	= serial_omap_suspend,
+-	.resume		= serial_omap_resume,
+ 	.driver		= {
+ 		.name	= DRIVER_NAME,
++		.pm	= &serial_omap_dev_pm_ops,
+ 	},
+ };
  
- #endif
 -- 
 1.7.4.1
