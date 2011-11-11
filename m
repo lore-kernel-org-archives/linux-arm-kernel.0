@@ -1,49 +1,26 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Fri, 11 Nov 2011 10:08:08 +0800
-Subject: [V1] mfd: Convert pm860x to use regmap api
-In-Reply-To: <20111110130225.GG21630@sirena.org.uk>
-References: <1320925406-7445-1-git-send-email-jtzhou@marvell.com>
- <20111110130225.GG21630@sirena.org.uk>
-Message-ID: <CAN1soZwdJJQDk+4gss8PhoyOikzEtAx1jqHQzXCt3u30_6LRZg@mail.gmail.com>
+From: cjb@laptop.org (Chris Ball)
+Date: Thu, 10 Nov 2011 22:14:57 -0500
+Subject: [PATCH v2 1/3] ARM: pxa168: Add SDHCI support
+In-Reply-To: <CAMPhdO9EWeXw-XsjQ5x-qcAbjFDxrdz47wirFKWKV=kJFZAKiw@mail.gmail.com>
+ (Eric Miao's message of "Fri, 11 Nov 2011 09:18:32 +0800")
+References: <1319546069-31742-1-git-send-email-tanmay.upadhyay@einfochips.com>
+ <1320399547-2374-1-git-send-email-tanmay.upadhyay@einfochips.com>
+ <CAMPhdO9EWeXw-XsjQ5x-qcAbjFDxrdz47wirFKWKV=kJFZAKiw@mail.gmail.com>
+Message-ID: <87aa83wdse.fsf@laptop.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 10, 2011 at 9:02 PM, Mark Brown
-<broonie@opensource.wolfsonmicro.com> wrote:
-> On Thu, Nov 10, 2011 at 07:43:26PM +0800, Jett.Zhou wrote:
->> Convert the register read/write code to use the register map API. We
->> still need some pm860x specific code and locking in place to make sure
->> test page read/write can not be interrupted by other i2c operation based
->> on pm860x chip;
+Hi,
+
+On Thu, Nov 10 2011, Eric Miao wrote:
+> Sorry Tanmay for late response.
 >
-> Reviewed-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
->
-> I'm assuming that the interruptions come from the fact that there's two
-> I2C clients?
->
+> The problem is that I didn't seem to find sdhci-pxav1 though in drivers/mmc.
 
-The patch is still invalid. It can't prevent pm860x i2c operation be
-interrupted by other clients.
+This is part of a three patch set with sdhci-pxav1 added in patch two.
+We're still talking about how best to handle adding the MMC side, though.
 
-There're two banks in 88pm8607. One is the normal bank, and the other
-one is the test bank. Accessing the test bank need a special I2C
-sequence.
-
-Touching to 0xFA address
-Touching to 0xFB address
-Touching to 0xFF address
-Accessing bank register
-Touching to 0xFE address
-Touching 0xFC address
-
-This sequence can't be interrupted. It means that we can't use
-i2c_master_send() to implement touching 0xFA address. Otherwise, other
-i2c operation may be inserted into 0xFA and 0xFB operation since the
-lock of i2c_adapter is already released.
-
-So you need to fix this issue for accessing test bank first. Then you
-can replace i2c read/write implementation with regmap for only normal
-bank in 88pm8607.
-
-Thanks
-Haojian
+- Chris.
+-- 
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+One Laptop Per Child
