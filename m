@@ -1,76 +1,46 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 11 Nov 2011 16:59:56 +0100
-Subject: [PATCH] mach-ux500: add devicetree compat nodes
-In-Reply-To: <4EBD3C85.1010508@gmail.com>
-References: <1321023902-18870-1-git-send-email-niklas.hernaeus@linaro.org>
- <4EBD3C85.1010508@gmail.com>
-Message-ID: <CACRpkda-9OVP8E1qO3Nc5znw_v7cKFiv8T5HHwTCnY2C9Fg7iA@mail.gmail.com>
+From: tanmay.upadhyay@einfochips.com (Tanmay Upadhyay)
+Date: Fri, 11 Nov 2011 21:32:59 +0530
+Subject: [PATCH] ARM: pxa168/gplugd: add the correct SSP device
+In-Reply-To: <1321013994-6443-1-git-send-email-eric.y.miao@gmail.com>
+References: <1321013994-6443-1-git-send-email-eric.y.miao@gmail.com>
+Message-ID: <4EBD4733.4010801@einfochips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 11, 2011 at 4:17 PM, Rob Herring <robherring2@gmail.com> wrote:
 
->> ?MACHINE_START(U8500, "ST-Ericsson MOP500 platform")
->> ? ? ? /* Maintainer: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com> */
->> ? ? ? .boot_params ? ?= 0x100,
->> @@ -651,6 +666,7 @@ MACHINE_START(U8500, "ST-Ericsson MOP500 platform")
->> ? ? ? /* we re-use nomadik timer here */
->> ? ? ? .timer ? ? ? ? ?= &ux500_timer,
->> ? ? ? .init_machine ? = mop500_init_machine,
->> + ? ? .dt_compat ? ? ?= mop500_dt_board_compat,
->> ?MACHINE_END
->>
->> ?MACHINE_START(HREFV60, "ST-Ericsson U8500 Platform HREFv60+")
->> @@ -659,6 +675,7 @@ MACHINE_START(HREFV60, "ST-Ericsson U8500 Platform HREFv60+")
->> ? ? ? .init_irq ? ? ? = ux500_init_irq,
->> ? ? ? .timer ? ? ? ? ?= &ux500_timer,
->> ? ? ? .init_machine ? = mop500_init_machine,
->> + ? ? .dt_compat ? ? ?= hrefv60_dt_board_compat,
->> ?MACHINE_END
->>
->> ?MACHINE_START(SNOWBALL, "Calao Systems Snowball platform")
->> @@ -668,4 +685,5 @@ MACHINE_START(SNOWBALL, "Calao Systems Snowball platform")
->> ? ? ? /* we re-use nomadik timer here */
->> ? ? ? .timer ? ? ? ? ?= &ux500_timer,
->> ? ? ? .init_machine ? = mop500_init_machine,
->> + ? ? .dt_compat ? ? ?= snowball_dt_board_compat,
->> ?MACHINE_END
+
+On Friday 11 November 2011 05:49 PM, Eric Miao wrote:
+> There is no SSP0, but SSP2 is used on gplugd.
 >
-> These all look very similar and should be combined. Why do you not have
-> 1 machine for all DT platforms as other SOCs are doing?
+> Cc: Tanmay Upadhyay<tanmay.upadhyay@einfochips.com>
+> Signed-off-by: Eric Miao<eric.y.miao@gmail.com>
+> ---
+>   arch/arm/mach-mmp/gplugd.c |    2 +-
+>   1 files changed, 1 insertions(+), 1 deletions(-)
+>
+> diff --git a/arch/arm/mach-mmp/gplugd.c b/arch/arm/mach-mmp/gplugd.c
+> index 6915656..0469c74 100644
+> --- a/arch/arm/mach-mmp/gplugd.c
+> +++ b/arch/arm/mach-mmp/gplugd.c
+> @@ -182,7 +182,7 @@ static void __init gplugd_init(void)
+>
+>   	/* on-chip devices */
+>   	pxa168_add_uart(3);
+> -	pxa168_add_ssp(0);
+> +	pxa168_add_ssp(2);
+>   	pxa168_add_twsi(0, NULL, ARRAY_AND_SIZE(gplugd_i2c_board_info));
+>
+>   	pxa168_add_eth(&gplugd_eth_platform_data);
 
-This needs to be rebased for the latest kernel.
-Which looks like this:
+Hi Eric,
 
-MACHINE_START(U8500, "ST-Ericsson MOP500 platform")
-        /* Maintainer: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com> */
-        .atag_offset    = 0x100,
-        .map_io         = u8500_map_io,
-        .init_irq       = ux500_init_irq,
-        /* we re-use nomadik timer here */
-        .timer          = &ux500_timer,
-        .init_machine   = mop500_init_machine,
-MACHINE_END
+HDMI chip (TDA9981A) on gplugD gets audio data from SSP0 - used as I2S. 
+Page # 7 of [1] & page # 1 & 3 of [2] indicates this. SSP2 is also used 
+on gplugD as SPI to talk to the NOR flash.
 
-MACHINE_START(HREFV60, "ST-Ericsson U8500 Platform HREFv60+")
-        .atag_offset    = 0x100,
-        .map_io         = u8500_map_io,
-        .init_irq       = ux500_init_irq,
-        .timer          = &ux500_timer,
-        .init_machine   = hrefv60_init_machine,
-MACHINE_END
+Thanks,
 
-MACHINE_START(SNOWBALL, "Calao Systems Snowball platform")
-        .atag_offset    = 0x100,
-        .map_io         = u8500_map_io,
-        .init_irq       = ux500_init_irq,
-        /* we re-use nomadik timer here */
-        .timer          = &ux500_timer,
-        .init_machine   = snowball_init_machine,
-MACHINE_END
+Tanmay
 
-So - different .init_machine() calls, needed to simplify the board
-files as of now. (Patch from Lee Jones.)
-
-Yours,
-Linus Walleij
+[1] http://www.globalscaletechnologies.com/download/gplugD-MBV2R1-web.pdf
+[2] http://www.globalscaletechnologies.com/download/gplugD-IOV2R1-web.pdf
