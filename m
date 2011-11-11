@@ -1,57 +1,40 @@
-From: b29396@freescale.com (Dong Aisheng)
-Date: Sat, 12 Nov 2011 00:09:06 +0800
-Subject: [PATCH 2/2] ARM: mx5: add __initconst for fec pdata
-In-Reply-To: <1321027746-5906-1-git-send-email-b29396@freescale.com>
-References: <1321027746-5906-1-git-send-email-b29396@freescale.com>
-Message-ID: <1321027746-5906-2-git-send-email-b29396@freescale.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 11 Nov 2011 16:57:21 +0100
+Subject: [GIT PULL] i.MX fixes
+Message-ID: <20111111155721.GB16886@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Dong Aisheng <b29396@freescale.com>
----
- arch/arm/mach-mx5/board-mx53_evk.c  |    2 +-
- arch/arm/mach-mx5/board-mx53_loco.c |    2 +-
- arch/arm/mach-mx5/board-mx53_smd.c  |    2 +-
- 3 files changed, 3 insertions(+), 3 deletions(-)
+Hi Arnd, Olof,
 
-diff --git a/arch/arm/mach-mx5/board-mx53_evk.c b/arch/arm/mach-mx5/board-mx53_evk.c
-index 6a3e616..bc3a636 100644
---- a/arch/arm/mach-mx5/board-mx53_evk.c
-+++ b/arch/arm/mach-mx5/board-mx53_evk.c
-@@ -106,7 +106,7 @@ static inline void mx53_evk_fec_reset(void)
- 	gpio_set_value(MX53_EVK_FEC_PHY_RST, 1);
- }
- 
--static struct fec_platform_data mx53_evk_fec_pdata = {
-+static const struct fec_platform_data mx53_evk_fec_pdata __initconst = {
- 	.phy = PHY_INTERFACE_MODE_RMII,
- };
- 
-diff --git a/arch/arm/mach-mx5/board-mx53_loco.c b/arch/arm/mach-mx5/board-mx53_loco.c
-index 7149416..d269ef3 100644
---- a/arch/arm/mach-mx5/board-mx53_loco.c
-+++ b/arch/arm/mach-mx5/board-mx53_loco.c
-@@ -242,7 +242,7 @@ static inline void mx53_loco_fec_reset(void)
- 	gpio_set_value(LOCO_FEC_PHY_RST, 1);
- }
- 
--static struct fec_platform_data mx53_loco_fec_data = {
-+static const struct fec_platform_data mx53_loco_fec_data __initconst = {
- 	.phy = PHY_INTERFACE_MODE_RMII,
- };
- 
-diff --git a/arch/arm/mach-mx5/board-mx53_smd.c b/arch/arm/mach-mx5/board-mx53_smd.c
-index e64fd2c..6a1fe88 100644
---- a/arch/arm/mach-mx5/board-mx53_smd.c
-+++ b/arch/arm/mach-mx5/board-mx53_smd.c
-@@ -103,7 +103,7 @@ static inline void mx53_smd_fec_reset(void)
- 	gpio_set_value(SMD_FEC_PHY_RST, 1);
- }
- 
--static struct fec_platform_data mx53_smd_fec_data = {
-+static const struct fec_platform_data mx53_smd_fec_data __initconst = {
- 	.phy = PHY_INTERFACE_MODE_RMII,
- };
- 
+Please pull the following. I don't know exactly when Arnd is back again,
+so I have Olof still on Cc.
+
+Sascha
+
+The following changes since commit 1ea6b8f48918282bdca0b32a34095504ee65bab5:
+
+  Linux 3.2-rc1 (2011-11-07 16:16:02 -0800)
+
+are available in the git repository at:
+  git://git.pengutronix.de/git/imx/linux-2.6.git imx-fixes-for-arnd
+
+Richard Zhao (1):
+      ARM: mx51/53: set pwm clock parent to ipg_perclk
+
+Shawn Guo (3):
+      arm/imx: fix the references to ARCH_MX3
+      arm/imx: fix AUTO_ZRELADDR selection
+      arm/imx: fix imx6q mmc error when mounting rootfs
+
+ arch/arm/mach-imx/Makefile.boot     |   34 +++++++++++++++++++---------------
+ arch/arm/mach-imx/clock-imx6q.c     |   17 ++++++++++++++++-
+ arch/arm/mach-mx5/clock-mx51-mx53.c |    4 ++--
+ arch/arm/plat-mxc/Kconfig           |    4 ++--
+ drivers/mmc/host/sdhci-esdhc-imx.c  |    8 ++++++++
+ 5 files changed, 47 insertions(+), 20 deletions(-)
 -- 
-1.7.0.4
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
