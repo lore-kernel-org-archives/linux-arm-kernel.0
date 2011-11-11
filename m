@@ -1,47 +1,29 @@
-From: richard.zhao@linaro.org (Richard Zhao)
-Date: Fri, 11 Nov 2011 18:50:37 +0800
-Subject: [PATCH V3 14/14] mmc: sdhci-esdhc-imx: add clk_prepare/clk_unprepare
-In-Reply-To: <1321008637-19999-1-git-send-email-richard.zhao@linaro.org>
-References: <1321008637-19999-1-git-send-email-richard.zhao@linaro.org>
-Message-ID: <1321008637-19999-15-git-send-email-richard.zhao@linaro.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 11 Nov 2011 10:54:51 +0000
+Subject: [PATCH v8 08/16] ARM: LPAE: Page table maintenance for the
+ 3-level format
+In-Reply-To: <alpine.LFD.2.02.1111101654400.3307@xanadu.home>
+References: <1320682618-1182-1-git-send-email-catalin.marinas@arm.com>
+ <1320682618-1182-9-git-send-email-catalin.marinas@arm.com>
+ <alpine.LFD.2.02.1111101654400.3307@xanadu.home>
+Message-ID: <20111111105450.GB23243@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
----
- drivers/mmc/host/sdhci-esdhc-imx.c |    6 +++---
- 1 files changed, 3 insertions(+), 3 deletions(-)
+On Thu, Nov 10, 2011 at 09:59:33PM +0000, Nicolas Pitre wrote:
+> On Mon, 7 Nov 2011, Catalin Marinas wrote:
+> 
+> > This patch modifies the pgd/pmd/pte manipulation functions to support
+> > the 3-level page table format. Since there is no need for an 'ext'
+> > argument to cpu_set_pte_ext(), this patch conditionally defines a
+> > different prototype for this function when CONFIG_ARM_LPAE.
+> 
+> Maybe it doesn't make sense to still call it cpu_set_pte_ext then?
 
-diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
-index ae57769..f1ae37e 100644
---- a/drivers/mmc/host/sdhci-esdhc-imx.c
-+++ b/drivers/mmc/host/sdhci-esdhc-imx.c
-@@ -462,7 +462,7 @@ static int __devinit sdhci_esdhc_imx_probe(struct platform_device *pdev)
- 		err = PTR_ERR(clk);
- 		goto err_clk_get;
- 	}
--	clk_enable(clk);
-+	clk_prepare_enable(clk);
- 	pltfm_host->clk = clk;
- 
- 	if (!is_imx25_esdhc(imx_data))
-@@ -550,7 +550,7 @@ no_card_detect_irq:
- 		gpio_free(boarddata->wp_gpio);
- no_card_detect_pin:
- no_board_data:
--	clk_disable(pltfm_host->clk);
-+	clk_disable_unprepare(pltfm_host->clk);
- 	clk_put(pltfm_host->clk);
- err_clk_get:
- 	kfree(imx_data);
-@@ -577,7 +577,7 @@ static int __devexit sdhci_esdhc_imx_remove(struct platform_device *pdev)
- 		gpio_free(boarddata->cd_gpio);
- 	}
- 
--	clk_disable(pltfm_host->clk);
-+	clk_disable_unprepare(pltfm_host->clk);
- 	clk_put(pltfm_host->clk);
- 	kfree(imx_data);
- 
+We could do this but it adds several #ifdef's, especially if we also
+change macro names like set_pte_ext(). Otherwise we could leave the
+latter macro unchanged and only change the name in the processor
+structure. But I think it just adds more clutter.
+
 -- 
-1.7.5.4
+Catalin
