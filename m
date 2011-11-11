@@ -1,81 +1,47 @@
-From: premi@ti.com (Premi, Sanjeev)
-Date: Fri, 11 Nov 2011 10:21:44 +0000
-Subject: [PATCH] ARM: OMAP: PM: only register TWL with voltage layer
- when device is present
-In-Reply-To: <8762irg73n.fsf@ti.com>
-References: <1320797670-21460-1-git-send-email-khilman@ti.com>
- <E28AAFD00EFAA646AE3DF9B89CD24A89036E64@DBDE01.ent.ti.com>
- <8762irg73n.fsf@ti.com>
-Message-ID: <E28AAFD00EFAA646AE3DF9B89CD24A8903E1A5@DBDE01.ent.ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 11 Nov 2011 10:27:27 +0000
+Subject: [PATCH V2 01/14] clk: add helper functions clk_prepare_enable
+ and clk_disable_unprepare
+In-Reply-To: <20111111091556.GI16886@pengutronix.de>
+References: <1320973829-4388-1-git-send-email-richard.zhao@linaro.org>
+ <1320973829-4388-2-git-send-email-richard.zhao@linaro.org>
+ <20111111084950.GH16886@pengutronix.de>
+ <20111111090546.GC14617@b20223-02.ap.freescale.net>
+ <20111111091556.GI16886@pengutronix.de>
+Message-ID: <20111111102727.GC12913@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- 
+On Fri, Nov 11, 2011 at 10:15:56AM +0100, Sascha Hauer wrote:
+> On Fri, Nov 11, 2011 at 05:05:47PM +0800, Richard Zhao wrote:
+> > {
+> > 	int ret;
+> > 
+> > 	ret = clk_prepare(clk);
+> > 	if (ret)
+> > 		return ret;
+> > 	ret = clk_enable(clk);
+> > 	if (ret)
+> > 		clk_unprepare(clk);
+> > 	return ret;
+> 
+> Yes, looks good.
 
-> -----Original Message-----
-> From: Hilman, Kevin 
-> Sent: Friday, November 11, 2011 12:04 AM
-> To: Premi, Sanjeev
-> Cc: linux-omap at vger.kernel.org; 
-> linux-arm-kernel at lists.infradead.org; Koyamangalath, Abhilash
-> Subject: Re: [PATCH] ARM: OMAP: PM: only register TWL with 
-> voltage layer when device is present
-> 
-> "Premi, Sanjeev" <premi@ti.com> writes:
-> 
-> >> Current code registers voltage layer details for TWL PMIC 
-> even when a
-> >> TWL has not been registered.  Fix this to only register 
-> the TWL with
-> >> voltage layer when the TWL PMIC is initialized by board-level code.
-> >> 
-> >> Signed-off-by: Kevin Hilman <khilman@ti.com>
-> 
-> [...]
-> 
-> > I have been out-of-loop from PM for some time. So my query may be
-> > redundant:
-> >
-> > 1) What happens when different PMIC (not TWL series) is registered
-> >    for AM35x? e.g. TPS65023
-> >    http://www.spinics.net/lists/linux-omap/msg48630.html
-> >
-> > 2) Wouldn't we still fall back into omap3_twl_init()?
-> 
-> I'm not sure I follow the question.
-> 
-> If you're not using a TWL PMIC (or similar derivative) then
-> omap*_twl_init() should not be called.
-> 
-> If you are using a TWL PMIC, then no, the omap*_twl_init functions
-> should not be called.
+While this looks like a nice easy solution for converting existing
+drivers, I'd suggest thinking about this a little more...
 
-When I read this function (in the patch), if pmic_i2c_board_info.irq
-is non-zero, omap3_twl_init() and omap4_twl_init() are called.
+I would suggest some thought is given to the placement of clk_enable()
+and clk_disable() when adding clk_prepare(), especially if your existing
+clk_enable() function can only be called from non-atomic contexts.
 
-So my question was, for the case when PMIC is not TWL family. Then,
-is checking ".irq" sufficient to prevent the execution of twl specific
-functions.
+Obviously, the transition path needs to be along these lines:
 
- void __init omap_pmic_late_init(void)
- {
- 	/* Init the OMAP TWL parameters (if PMIC has been registerd) */
- 	if (!pmic_i2c_board_info.irq)
- 		return;
- 
- 	omap3_twl_init();
- 	omap4_twl_init();
- }
+1. add clk_prepare() to drivers
+2. implement clk_prepare() and make clk_enable() callable from non-atomic
+   contexts
+3. move clk_enable() in drivers to places it can be called from non-atomic
+   contexts to achieve greater power savings (maybe via the runtime pm)
 
-Shouldn't we check for some "signature" or equiv, before calling the
-PMIC specific init? This "signature" can be set when the PMIC is
-registered?
-
-Another simplification would be to register the PMIC specific init
-function itself during registration; and call here.
-
-~sanjeev
-
-> 
-> Kevin
-> 
+and where a driver is shared between different sub-architectures which
+have non-atomic clk_enable()s, (3) can only happen when all those sub-
+architectures have been updated to step (2).
