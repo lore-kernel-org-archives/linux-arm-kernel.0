@@ -1,30 +1,68 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 11 Nov 2011 10:56:07 +0000
-Subject: [PATCH 1/2] ARM: mach-imx: convert logical CPU numbers to
- physical numbers
-In-Reply-To: <20111111100800.GA12410@mudshark.cambridge.arm.com>
-References: <1320762894-11824-1-git-send-email-will.deacon@arm.com>
- <1320762894-11824-2-git-send-email-will.deacon@arm.com>
- <20111111092925.GM16886@pengutronix.de>
- <20111111100800.GA12410@mudshark.cambridge.arm.com>
-Message-ID: <20111111105607.GC12410@mudshark.cambridge.arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 11 Nov 2011 11:00:41 +0000
+Subject: [PATCH v8 09/16] ARM: LPAE: MMU setup for the 3-level page
+ table format
+In-Reply-To: <alpine.LFD.2.02.1111101707250.3307@xanadu.home>
+References: <1320682618-1182-1-git-send-email-catalin.marinas@arm.com>
+ <1320682618-1182-10-git-send-email-catalin.marinas@arm.com>
+ <alpine.LFD.2.02.1111101707250.3307@xanadu.home>
+Message-ID: <20111111110041.GC23243@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 11, 2011 at 10:08:00AM +0000, Will Deacon wrote:
-> On Fri, Nov 11, 2011 at 09:29:25AM +0000, Sascha Hauer wrote:
-> > On Tue, Nov 08, 2011 at 02:34:53PM +0000, Will Deacon wrote:
-> > > This patch uses the new cpu_logical_map() macro for converting logical
-> > > CPU numbers into physical numbers when releasing CPUs during the SMP
-> > > boot and CPU hotplug paths.
-> > 
-> > Shawn, is this one ok?
+On Thu, Nov 10, 2011 at 10:24:58PM +0000, Nicolas Pitre wrote:
+> On Mon, 7 Nov 2011, Catalin Marinas wrote:
 > 
-> I reckon I need to post a v2 because this probably breaks when !SMP.
+> [...]
+> > +	/*
+> > +	 * Macro for setting up the TTBRx and TTBCR registers.
+> > +	 * - \ttbr1 updated.
+> > +	 */
+> > +	.macro	v7_ttb_setup, zero, ttbr0, ttbr1, tmp
+> > +	mrc	p15, 0, \tmp, c2, c0, 2		@ TTB control register
+> > +	orr	\tmp, \tmp, #TTB_EAE
+> > +	ALT_SMP(orr	\tmp, \tmp, #TTB_FLAGS_SMP)
+> > +	ALT_SMP(orr	\tmp, \tmp, #TTB_FLAGS_SMP << 16)
+> > +	ALT_UP(orr	\tmp, \tmp, #TTB_FLAGS_UP)
+> > +	ALT_UP(orr	\tmp, \tmp, #TTB_FLAGS_UP << 16)
+> 
+> The ALT_SMP() and ALT_UP() must always be paired and in the right order.  
+> The above certainly won't produce what you expect on UP.
 
-Actually, I take that back. Looks like the function is only used by
-hotplug.c and platsmp.c, both of which depend on CONFIG_SMP.
+Good catch.
 
-So yes, comments from Shawn would be great.
+> > +#if PHYS_OFFSET <= PAGE_OFFSET
+> 
+> Please don't use PHYS_OFFSET like a preprocessor macro anymore.  This is 
+> becoming a global variable these days, and already is for the majority 
+> of platforms.
 
-Will
+That's left from last year when it was still a macro. I will revisit
+this code.
+
+> > +	 * TTBR0/TTBR1 split (PAGE_OFFSET):
+> > +	 *   0x40000000: T0SZ = 2, T1SZ = 0 (not used)
+> > +	 *   0x80000000: T0SZ = 0, T1SZ = 1
+> > +	 *   0xc0000000: T0SZ = 0, T1SZ = 2
+> > +	 *
+> > +	 * Only use this feature if PHYS_OFFSET <= PAGE_OFFSET, otherwise
+> > +	 * booting secondary CPUs would end up using TTBR1 for the identity
+> > +	 * mapping set up in TTBR0.
+> > +	 */
+> > +	orr	\tmp, \tmp, #(((PAGE_OFFSET >> 30) - 1) << 16) @ TTBCR.T1SZ
+> > +#if defined CONFIG_VMSPLIT_2G
+> > +	/* PAGE_OFFSET == 0x80000000, T1SZ == 1 */
+> > +	add	\ttbr1, \ttbr1, #1 << 4		@ skip two L1 entries
+> > +#elif defined CONFIG_VMSPLIT_3G
+> > +	/* PAGE_OFFSET == 0xc0000000, T1SZ == 2 */
+> > +	add	\ttbr1, \ttbr1, #4096 * (1 + 3)	@ only L2 used, skip pgd+3*pmd
+> > +#endif
+> > +#endif	/* PHYS_OFFSET <= PAGE_OFFSET */
+> 
+> What about CONFIG_VMSPLIT_1G ?
+
+That's the default, we don't use split TTBR for that (I'll add a
+comment).
+
+-- 
+Catalin
