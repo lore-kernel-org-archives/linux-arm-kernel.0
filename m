@@ -1,99 +1,125 @@
 From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Fri, 11 Nov 2011 13:22:08 +0200
-Subject: [PATCH v4 02/10] arm/tegra: cleanup tegra20 support
+Date: Fri, 11 Nov 2011 13:22:15 +0200
+Subject: [PATCH v4 09/10] arm/tegra: implement support for tegra30
 In-Reply-To: <1321010541-31337-1-git-send-email-pdeschrijver@nvidia.com>
 References: <1321010541-31337-1-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <1321010541-31337-3-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <1321010541-31337-10-git-send-email-pdeschrijver@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* add a dependency to ARCH_TEGRA_2x_SOC in Kconfig to all tegra20 based boards
-  and TEGRA_PCI
-* make powergating dependent on ARCH_TEGRA_2x_SOC
-* remove dependency on ARCH_TEGRA_2x_SOC for clock.c
+Add support for tegra30 SoC. This includes a device tree compatible type for
+this SoC ("nvidia,tegra30") and adds L2 cache initialization for this new SoC.
+The clock framework is still missing, which prevents most drivers from working.
+The basic IRQs are the same, so remove the dependency on
+CONFIG_ARCH_TEGRA_2x_SOC.
 
 Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
 ---
- arch/arm/mach-tegra/Kconfig  |    8 ++++++++
- arch/arm/mach-tegra/Makefile |    3 +--
- 2 files changed, 9 insertions(+), 2 deletions(-)
+ arch/arm/mach-tegra/Kconfig             |   18 +++++++++++++-----
+ arch/arm/mach-tegra/board-dt.c          |    3 +++
+ arch/arm/mach-tegra/board.h             |    3 +++
+ arch/arm/mach-tegra/common.c            |    7 +++++++
+ arch/arm/mach-tegra/include/mach/irqs.h |    2 --
+ 5 files changed, 26 insertions(+), 7 deletions(-)
 
 diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
-index 91aff7c..2b1d49b 100644
+index 2b1d49b..aad54ca 100644
 --- a/arch/arm/mach-tegra/Kconfig
 +++ b/arch/arm/mach-tegra/Kconfig
-@@ -21,18 +21,21 @@ endchoice
+@@ -2,11 +2,8 @@ if ARCH_TEGRA
+ 
+ comment "NVIDIA Tegra options"
+ 
+-choice
+-	prompt "Select Tegra processor family for target system"
+-
+ config ARCH_TEGRA_2x_SOC
+-	bool "Tegra 2 family"
++	bool "Enable support for Tegra20 family"
+ 	select CPU_V7
+ 	select ARM_GIC
+ 	select ARCH_REQUIRE_GPIOLIB
+@@ -17,7 +14,18 @@ config ARCH_TEGRA_2x_SOC
+ 	  Support for NVIDIA Tegra AP20 and T20 processors, based on the
+ 	  ARM CortexA9MP CPU and the ARM PL310 L2 cache controller
+ 
+-endchoice
++config ARCH_TEGRA_3x_SOC
++	bool "Enable support for Tegra30 family"
++	select CPU_V7
++	select ARM_GIC
++	select ARCH_REQUIRE_GPIOLIB
++	select USB_ARCH_HAS_EHCI if USB_SUPPORT
++	select USB_ULPI if USB_SUPPORT
++	select USB_ULPI_VIEWPORT if USB_SUPPORT
++	select USE_OF
++	help
++	  Support for NVIDIA Tegra T30 processor family, based on the
++	  ARM CortexA9MP CPU and the ARM PL310 L2 cache controller
  
  config TEGRA_PCI
  	bool "PCI Express support"
-+	depends on ARCH_TEGRA_2x_SOC
- 	select PCI
+diff --git a/arch/arm/mach-tegra/board-dt.c b/arch/arm/mach-tegra/board-dt.c
+index 15ee974..486b473 100644
+--- a/arch/arm/mach-tegra/board-dt.c
++++ b/arch/arm/mach-tegra/board-dt.c
+@@ -125,6 +125,9 @@ static struct {
+ #ifdef CONFIG_ARCH_TEGRA_2x_SOC
+ 	{ "nvidia,tegra20", tegra20_init_early },
+ #endif
++#ifdef CONFIG_ARCH_TEGRA_3x_SOC
++	{ "nvidia,tegra30", tegra30_init_early },
++#endif
+ };
  
- comment "Tegra board type"
+ static void __init tegra_init_early(void)
+diff --git a/arch/arm/mach-tegra/board.h b/arch/arm/mach-tegra/board.h
+index 355f488..f508cbb 100644
+--- a/arch/arm/mach-tegra/board.h
++++ b/arch/arm/mach-tegra/board.h
+@@ -26,6 +26,9 @@
+ #ifdef CONFIG_ARCH_TEGRA_2x_SOC
+ void __init tegra20_init_early(void);
+ #endif
++#ifdef CONFIG_ARCH_TEGRA_3x_SOC
++void __init tegra30_init_early(void);
++#endif
+ void __init tegra_map_common_io(void);
+ void __init tegra_init_irq(void);
+ void __init tegra_init_clock(void);
+diff --git a/arch/arm/mach-tegra/common.c b/arch/arm/mach-tegra/common.c
+index 3ad1ca3..06f34ec 100644
+--- a/arch/arm/mach-tegra/common.c
++++ b/arch/arm/mach-tegra/common.c
+@@ -98,3 +98,10 @@ void __init tegra20_init_early(void)
+ 	tegra_common_init();
+ }
+ #endif
++#ifdef CONFIG_ARCH_TEGRA_3x_SOC
++void __init tegra30_init_early(void)
++{
++	tegra_init_cache(0x441, 0x551);
++	tegra_common_init();
++}
++#endif
+diff --git a/arch/arm/mach-tegra/include/mach/irqs.h b/arch/arm/mach-tegra/include/mach/irqs.h
+index 73265af..a2146cd 100644
+--- a/arch/arm/mach-tegra/include/mach/irqs.h
++++ b/arch/arm/mach-tegra/include/mach/irqs.h
+@@ -25,7 +25,6 @@
  
- config MACH_HARMONY
-        bool "Harmony board"
-+       depends on ARCH_TEGRA_2x_SOC
-        select MACH_HAS_SND_SOC_TEGRA_WM8903 if SND_SOC
-        help
-          Support for nVidia Harmony development platform
+ #define IRQ_LOCALTIMER                  29
  
- config MACH_KAEN
-        bool "Kaen board"
-+       depends on ARCH_TEGRA_2x_SOC
-        select MACH_SEABOARD
-        select MACH_HAS_SND_SOC_TEGRA_WM8903 if SND_SOC
-        help
-@@ -40,11 +43,13 @@ config MACH_KAEN
+-#ifdef CONFIG_ARCH_TEGRA_2x_SOC
+ /* Primary Interrupt Controller */
+ #define INT_PRI_BASE			(INT_GIC_BASE + 32)
+ #define INT_TMR1			(INT_PRI_BASE + 0)
+@@ -178,6 +177,5 @@
+ #define NR_BOARD_IRQS			32
  
- config MACH_PAZ00
-        bool "Paz00 board"
-+       depends on ARCH_TEGRA_2x_SOC
-        help
-          Support for the Toshiba AC100/Dynabook AZ netbook
+ #define NR_IRQS				(INT_BOARD_BASE + NR_BOARD_IRQS)
+-#endif
  
- config MACH_SEABOARD
-        bool "Seaboard board"
-+       depends on ARCH_TEGRA_2x_SOC
-        select MACH_HAS_SND_SOC_TEGRA_WM8903 if SND_SOC
-        help
-          Support for nVidia Seaboard development platform. It will
-@@ -59,18 +64,21 @@ config MACH_TEGRA_DT
- 
- config MACH_TRIMSLICE
-        bool "TrimSlice board"
-+       depends on ARCH_TEGRA_2x_SOC
-        select TEGRA_PCI
-        help
-          Support for CompuLab TrimSlice platform
- 
- config MACH_WARIO
-        bool "Wario board"
-+       depends on ARCH_TEGRA_2x_SOC
-        select MACH_SEABOARD
-        help
-          Support for the Wario version of Seaboard
- 
- config MACH_VENTANA
-        bool "Ventana board"
-+       depends on ARCH_TEGRA_2x_SOC
-        select MACH_TEGRA_DT
-        help
-          Support for the nVidia Ventana development platform
-diff --git a/arch/arm/mach-tegra/Makefile b/arch/arm/mach-tegra/Makefile
-index 91a07e1..7dc1db3 100644
---- a/arch/arm/mach-tegra/Makefile
-+++ b/arch/arm/mach-tegra/Makefile
-@@ -5,9 +5,8 @@ obj-y                                   += irq.o
- obj-y                                   += clock.o
- obj-y                                   += timer.o
- obj-y                                   += pinmux.o
--obj-y                                   += powergate.o
- obj-y					+= fuse.o
--obj-$(CONFIG_ARCH_TEGRA_2x_SOC)         += clock.o
-+obj-$(CONFIG_ARCH_TEGRA_2x_SOC)		+= powergate.o
- obj-$(CONFIG_ARCH_TEGRA_2x_SOC)         += tegra2_clocks.o
- obj-$(CONFIG_ARCH_TEGRA_2x_SOC)		+= tegra2_emc.o
- obj-$(CONFIG_ARCH_TEGRA_2x_SOC)		+= pinmux-t2-tables.o
+ #endif
 -- 
 1.7.7.rc0.72.g4b5ea.dirty
