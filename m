@@ -1,83 +1,63 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 11 Nov 2011 10:13:26 -0600
-Subject: [PATCH] mach-ux500: add devicetree compat nodes
-In-Reply-To: <CACRpkda-9OVP8E1qO3Nc5znw_v7cKFiv8T5HHwTCnY2C9Fg7iA@mail.gmail.com>
-References: <1321023902-18870-1-git-send-email-niklas.hernaeus@linaro.org>
- <4EBD3C85.1010508@gmail.com>
- <CACRpkda-9OVP8E1qO3Nc5znw_v7cKFiv8T5HHwTCnY2C9Fg7iA@mail.gmail.com>
-Message-ID: <4EBD49A6.2020306@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 11 Nov 2011 16:17:27 +0000
+Subject: [PATCH] ARM: OMAP: Introduce local common.h files
+In-Reply-To: <20111110233347.GZ31337@atomide.com>
+References: <20111106135250.GC15294@n2100.arm.linux.org.uk>
+ <20111108004550.GH31337@atomide.com> <20111110201719.GW31337@atomide.com>
+ <20111110202356.GQ15294@n2100.arm.linux.org.uk>
+ <20111110215008.GX31337@atomide.com>
+ <20111110222907.GR15294@n2100.arm.linux.org.uk>
+ <20111110233347.GZ31337@atomide.com>
+Message-ID: <20111111161727.GS15294@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/11/2011 09:59 AM, Linus Walleij wrote:
-> On Fri, Nov 11, 2011 at 4:17 PM, Rob Herring <robherring2@gmail.com> wrote:
+On Thu, Nov 10, 2011 at 03:33:47PM -0800, Tony Lindgren wrote:
+> * Russell King - ARM Linux <linux@arm.linux.org.uk> [111110 13:54]:
+> > Thanks, merged that into the series.  The updated OMAP patch updated is
+> > below, which has been moved to part 2.  Lastly, the final patch of part
+> > 2 has been updated to delete the empty arch_reset(), so OMAP is now
+> > entirely free of arch_reset() references.  This leaves a total of 12
+> > references left to nobble.
 > 
->>>  MACHINE_START(U8500, "ST-Ericsson MOP500 platform")
->>>       /* Maintainer: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com> */
->>>       .boot_params    = 0x100,
->>> @@ -651,6 +666,7 @@ MACHINE_START(U8500, "ST-Ericsson MOP500 platform")
->>>       /* we re-use nomadik timer here */
->>>       .timer          = &ux500_timer,
->>>       .init_machine   = mop500_init_machine,
->>> +     .dt_compat      = mop500_dt_board_compat,
->>>  MACHINE_END
->>>
->>>  MACHINE_START(HREFV60, "ST-Ericsson U8500 Platform HREFv60+")
->>> @@ -659,6 +675,7 @@ MACHINE_START(HREFV60, "ST-Ericsson U8500 Platform HREFv60+")
->>>       .init_irq       = ux500_init_irq,
->>>       .timer          = &ux500_timer,
->>>       .init_machine   = mop500_init_machine,
->>> +     .dt_compat      = hrefv60_dt_board_compat,
->>>  MACHINE_END
->>>
->>>  MACHINE_START(SNOWBALL, "Calao Systems Snowball platform")
->>> @@ -668,4 +685,5 @@ MACHINE_START(SNOWBALL, "Calao Systems Snowball platform")
->>>       /* we re-use nomadik timer here */
->>>       .timer          = &ux500_timer,
->>>       .init_machine   = mop500_init_machine,
->>> +     .dt_compat      = snowball_dt_board_compat,
->>>  MACHINE_END
->>
->> These all look very similar and should be combined. Why do you not have
->> 1 machine for all DT platforms as other SOCs are doing?
-> 
-> This needs to be rebased for the latest kernel.
-> Which looks like this:
-> 
-> MACHINE_START(U8500, "ST-Ericsson MOP500 platform")
->         /* Maintainer: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com> */
->         .atag_offset    = 0x100,
->         .map_io         = u8500_map_io,
->         .init_irq       = ux500_init_irq,
->         /* we re-use nomadik timer here */
->         .timer          = &ux500_timer,
->         .init_machine   = mop500_init_machine,
-> MACHINE_END
-> 
-> MACHINE_START(HREFV60, "ST-Ericsson U8500 Platform HREFv60+")
->         .atag_offset    = 0x100,
->         .map_io         = u8500_map_io,
->         .init_irq       = ux500_init_irq,
->         .timer          = &ux500_timer,
->         .init_machine   = hrefv60_init_machine,
-> MACHINE_END
-> 
-> MACHINE_START(SNOWBALL, "Calao Systems Snowball platform")
->         .atag_offset    = 0x100,
->         .map_io         = u8500_map_io,
->         .init_irq       = ux500_init_irq,
->         /* we re-use nomadik timer here */
->         .timer          = &ux500_timer,
->         .init_machine   = snowball_init_machine,
-> MACHINE_END
-> 
-> So - different .init_machine() calls, needed to simplify the board
-> files as of now. (Patch from Lee Jones.)
-> 
+> Great, good to hear.
 
-But ultimately I would expect that the init_machine calls to be the same
-with a DT based machine. This goes back to do we add DT to existing
-boards or create a new clean DT machine and add to it as boards are
-converted?
+I've added this to the patch, as these no longer need to include this
+header.
 
-Rob
+diff --git a/arch/arm/mach-omap1/board-voiceblue.c b/arch/arm/mach-omap1/board-voiceblue.c
+index fb61434..f83a502d 100644
+--- a/arch/arm/mach-omap1/board-voiceblue.c
++++ b/arch/arm/mach-omap1/board-voiceblue.c
+@@ -28,7 +28,6 @@
+ #include <linux/export.h>
+ 
+ #include <mach/hardware.h>
+-#include <mach/system.h>
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
+diff --git a/arch/arm/mach-omap1/reset.c b/arch/arm/mach-omap1/reset.c
+index 8b1cc6e..91d199b 100644
+--- a/arch/arm/mach-omap1/reset.c
++++ b/arch/arm/mach-omap1/reset.c
+@@ -5,7 +5,6 @@
+ #include <linux/io.h>
+ 
+ #include <mach/hardware.h>
+-#include <mach/system.h>
+ #include <plat/prcm.h>
+ 
+ void omap1_restart(char mode, const char *cmd)
+diff --git a/arch/arm/mach-omap2/prcm.c b/arch/arm/mach-omap2/prcm.c
+index b6c8cb5..626acfa 100644
+--- a/arch/arm/mach-omap2/prcm.c
++++ b/arch/arm/mach-omap2/prcm.c
+@@ -25,7 +25,6 @@
+ #include <linux/delay.h>
+ #include <linux/export.h>
+ 
+-#include <mach/system.h>
+ #include "common.h"
+ #include <plat/prcm.h>
+ #include <plat/irqs.h>
