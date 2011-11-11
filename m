@@ -1,63 +1,57 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 11 Nov 2011 10:29:25 +0100
-Subject: [PATCH 1/2] ARM: mach-imx: convert logical CPU numbers to
- physical numbers
-In-Reply-To: <1320762894-11824-2-git-send-email-will.deacon@arm.com>
-References: <1320762894-11824-1-git-send-email-will.deacon@arm.com>
- <1320762894-11824-2-git-send-email-will.deacon@arm.com>
-Message-ID: <20111111092925.GM16886@pengutronix.de>
+From: B39297@freescale.com (Wu Guoxing-B39297)
+Date: Fri, 11 Nov 2011 09:31:23 +0000
+Subject: [GIT PULL] arm/mx35/3ds: GPIO : add mc9s08dz60 gpio function
+In-Reply-To: <20111111092539.GK16886@pengutronix.de>
+References: <3D55990BDF4852409EA769663F22E54AC19541@039-SN1MPN1-006.039d.mgd.msft.net>
+ <20111111092539.GK16886@pengutronix.de>
+Message-ID: <3D55990BDF4852409EA769663F22E54AC19736@039-SN1MPN1-006.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 08, 2011 at 02:34:53PM +0000, Will Deacon wrote:
-> This patch uses the new cpu_logical_map() macro for converting logical
-> CPU numbers into physical numbers when releasing CPUs during the SMP
-> boot and CPU hotplug paths.
+  And I found that my pull request mail to Linux-arm-kernel maillist is blocked, don't know why, so I sent the request message again as bellow:
 
-Shawn, is this one ok?
+  Thanks!
+
+Best Regards
+Wu Guoxing
+
+
+The following changes since commit a59024f1ecb52972b9be5ee91b5ef38a6b263d1b:
+
+  Merge branch 'for_3.2/gpio-cleanup' of git://gitorious.org/khilman/linux-omap-pm into gpio/merge (2011-11-08 12:48:27 -0700)
+
+are available in the git repository at:
+
+  git://git.linaro.org/people/riczhao/linux-2.6.git for-gpio
+
+wu guoxing (1):
+      ARM/mx35/3ds: gpio: add mc9s08dz60 gpio function
+
+drivers/gpio/Kconfig           |    6 ++
+drivers/gpio/Makefile          |    1 +
+drivers/gpio/gpio-mc9s08dz60.c |  174 ++++++++++++++++++++++++++++++++++++++++
+3 files changed, 181 insertions(+), 0 deletions(-)
+create mode 100644 drivers/gpio/gpio-mc9s08dz60.c
+
+
+
+
+-----Original Message-----
+From: s.hauer@pengutronix.de [mailto:s.hauer at pengutronix.de] 
+Sent: Friday, November 11, 2011 5:26 PM
+To: Wu Guoxing-B39297
+Cc: grant.likely at secretlab.ca; linux-arm-kernel at lists.infradead.org; Marc Kleine-Budde; shawn.guo at linaro.org; Linus Walleij
+Subject: Re: [GIT PULL] arm/mx35/3ds: GPIO : add mc9s08dz60 gpio function
+
+On Fri, Nov 11, 2011 at 02:35:00AM +0000, Wu Guoxing-B39297 wrote:
+> Hi Grant:
+> 
+> Please help to pull the following GPIO patch for mc9s08dz60 that on imx mx35 pdk board.
+
+Grant is not available atm. Added Linus Walleij to Cc instead.
 
 Sascha
 
-> 
-> Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> ---
->  arch/arm/mach-imx/src.c |    3 +++
->  1 files changed, 3 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-imx/src.c b/arch/arm/mach-imx/src.c
-> index 36cacbd..63ba593 100644
-> --- a/arch/arm/mach-imx/src.c
-> +++ b/arch/arm/mach-imx/src.c
-> @@ -14,6 +14,7 @@
->  #include <linux/io.h>
->  #include <linux/of.h>
->  #include <linux/of_address.h>
-> +#include <linux/smp.h>
->  #include <asm/unified.h>
->  
->  #define SRC_SCR				0x000
-> @@ -27,6 +28,7 @@ void imx_enable_cpu(int cpu, bool enable)
->  {
->  	u32 mask, val;
->  
-> +	cpu = cpu_logical_map(cpu);
->  	mask = 1 << (BP_SRC_SCR_CORE1_ENABLE + cpu - 1);
->  	val = readl_relaxed(src_base + SRC_SCR);
->  	val = enable ? val | mask : val & ~mask;
-> @@ -35,6 +37,7 @@ void imx_enable_cpu(int cpu, bool enable)
->  
->  void imx_set_cpu_jump(int cpu, void *jump_addr)
->  {
-> +	cpu = cpu_logical_map(cpu);
->  	writel_relaxed(BSYM(virt_to_phys(jump_addr)),
->  		       src_base + SRC_GPR1 + cpu * 8);
->  }
-> -- 
-> 1.7.4.1
-> 
-> 
 
 -- 
 Pengutronix e.K.                           |                             |
