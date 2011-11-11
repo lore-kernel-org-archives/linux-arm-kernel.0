@@ -1,76 +1,52 @@
 From: b29396@freescale.com (Dong Aisheng)
-Date: Fri, 11 Nov 2011 17:29:00 +0800
-Subject: [PATCH 1/1] ASoC: mxs-saif: remove function in platform_data
-Message-ID: <1321003740-10992-1-git-send-email-b29396@freescale.com>
+Date: Fri, 11 Nov 2011 17:30:52 +0800
+Subject: [PATCH v5 0/3] ARM: mxs: add recording support for saif
+Message-ID: <1321003855-13430-1-git-send-email-b29396@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add master_mode and master_id in platfrom_data since it's board
-specific and board knows it.
-Then we can remove the function pointer in platfrom_data to make
-the driver more devicetree friendly.
+Changes since v4:
+ * use new added master_id and master_mode in platform_data.
+ The new changes depend on another patch:
+ 0001-ASoC-mxs-saif-remove-function-in-platform_data.patch
 
-Signed-off-by: Dong Aisheng <b29396@freescale.com>
----
-This patch is based on Sascha's suggestions and see using in
-[PATCH v5 0/3] ARM: mxs: add recording support for saif
----
- include/sound/saif.h     |    4 ++--
- sound/soc/mxs/mxs-saif.c |   19 ++++++++-----------
- 2 files changed, 10 insertions(+), 13 deletions(-)
+Changes since v3:
+ * remove unneeded locking according to Sascha.
+The patches are based on imx-features branch since commit:
+ca4e419c2.
 
-diff --git a/include/sound/saif.h b/include/sound/saif.h
-index d0e0de7..f22f3e1 100644
---- a/include/sound/saif.h
-+++ b/include/sound/saif.h
-@@ -10,7 +10,7 @@
- #define __SOUND_SAIF_H__
- 
- struct mxs_saif_platform_data {
--	int (*init) (void);
--	int (*get_master_id) (unsigned int saif_id);
-+	bool master_mode;	/* if true use master mode */
-+	int master_id;		/* id of the master if in slave mode */
- };
- #endif
-diff --git a/sound/soc/mxs/mxs-saif.c b/sound/soc/mxs/mxs-saif.c
-index 76dc74d..03b64d2 100644
---- a/sound/soc/mxs/mxs-saif.c
-+++ b/sound/soc/mxs/mxs-saif.c
-@@ -625,13 +625,6 @@ static int mxs_saif_probe(struct platform_device *pdev)
- 	if (pdev->id >= ARRAY_SIZE(mxs_saif))
- 		return -EINVAL;
- 
--	pdata = pdev->dev.platform_data;
--	if (pdata && pdata->init) {
--		ret = pdata->init();
--		if (ret)
--			return ret;
--	}
--
- 	saif = kzalloc(sizeof(*saif), GFP_KERNEL);
- 	if (!saif)
- 		return -ENOMEM;
-@@ -639,12 +632,16 @@ static int mxs_saif_probe(struct platform_device *pdev)
- 	mxs_saif[pdev->id] = saif;
- 	saif->id = pdev->id;
- 
--	saif->master_id = saif->id;
--	if (pdata && pdata->get_master_id) {
--		saif->master_id = pdata->get_master_id(saif->id);
-+	pdata = pdev->dev.platform_data;
-+	if (pdata && !pdata->master_mode) {
-+		saif->master_id = pdata->master_id;
- 		if (saif->master_id < 0 ||
--			saif->master_id >= ARRAY_SIZE(mxs_saif))
-+			saif->master_id >= ARRAY_SIZE(mxs_saif) ||
-+			saif->master_id == saif->id)
-+			dev_err(&pdev->dev, "get wrong master id\n");
- 			return -EINVAL;
-+	} else {
-+		saif->master_id = saif->id;
- 	}
- 
- 	saif->clk = clk_get(&pdev->dev, NULL);
--- 
-1.7.0.4
+Changes since v2:
+ * separate clkmux code into another patch according to Uwe
+ * add lock according to Wolfram
+ * Other minus fixes suggested by Uwe and Wolfram.
+ * remove Wolfram's fix saif clock setting patch which is in v2 series
+   since Wolfram will reform the clock code and send it out himself.
+   For test purpose, user still needs that patch. People can get it
+   from v2 series.
+   The patch is:
+   [PATCH v2 3/3] arm: mxs: disable clock-gates when setting saif-clocks
+
+The patches are based on imx-features branch since commit:
+f4f01e31835f.
+
+Changes since v1:
+The main changes are move mach-specific code(clkmux in DIGCTL) from
+saif driver to mach-specific layer based on Wolfram's suggestion.
+
+Note that the last patch is a RFC patch and sent out for testing
+since without that patch the saif may not work.
+
+Dong Aisheng (3):
+  ARM: mxs: add saif clkmux functions
+  ARM: mx28evk: add platform data for saif
+  ARM: mx28evk: set a initial clock rate for saif
+
+ arch/arm/mach-mxs/clock-mx28.c                  |   38 +++++++++++++++++++++++
+ arch/arm/mach-mxs/devices-mx28.h                |    3 +-
+ arch/arm/mach-mxs/devices/platform-mxs-saif.c   |    5 ++-
+ arch/arm/mach-mxs/include/mach/common.h         |    1 +
+ arch/arm/mach-mxs/include/mach/devices-common.h |    4 ++-
+ arch/arm/mach-mxs/include/mach/digctl.h         |   21 ++++++++++++
+ arch/arm/mach-mxs/mach-mx28evk.c                |   18 +++++++++-
+ 7 files changed, 84 insertions(+), 6 deletions(-)
+ create mode 100644 arch/arm/mach-mxs/include/mach/digctl.h
