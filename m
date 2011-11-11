@@ -1,33 +1,30 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 11 Nov 2011 18:48:30 -0200
-Subject: [PATCH v2] ARM: mx28evk: Simplify GPIO requests for
- mx28evk_fec_reset
-In-Reply-To: <20111110075446.GR16886@pengutronix.de>
-References: <1320870998-6200-1-git-send-email-festevam@gmail.com>
- <20111109214603.GA6316@pengutronix.de>
- <20111110075446.GR16886@pengutronix.de>
-Message-ID: <CAOMZO5DOA64OmHEn0FnqtL71FztYC9Vp=3wCDrZY+f7b8dRwzA@mail.gmail.com>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Fri, 11 Nov 2011 13:40:48 -0800
+Subject: [PATCH v4 00/10] Add support for tegra30 and cardhu
+In-Reply-To: <1321010541-31337-1-git-send-email-pdeschrijver@nvidia.com>
+References: <1321010541-31337-1-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF17408058A8@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 10, 2011 at 5:54 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> On Wed, Nov 09, 2011 at 10:46:03PM +0100, Wolfram Sang wrote:
->> On Wed, Nov 09, 2011 at 06:36:38PM -0200, Fabio Estevam wrote:
->> > From: Fabio Estevam <fabio.estevam@freescale.com>
->> >
->> > Simplify GPIO requests inside mx28evk_fec_reset by using gpio_request_array.
->> >
->> > Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
->>
->> Like it: Acked-by: Wolfram Sang <w.sang@pengutronix.de>
->
-> /me not. See my comments to v1.
+Peter De Schrijver wrote at Friday, November 11, 2011 4:22 AM:
+> This patchset adds support for the tegra30 SoC and the cardhu development
+> board.
 
-Ok, I will implement your suggestion in v3.
+Tested-by: Stephen Warren <swarren@nvidia.com>
 
-Will wait Shawn?s patch "arm/mxs: fix mmc device adding for
-mach-mx28evk" to reach rc2 first.
+Tested:
 
-Regards,
+Tegra20-only build, Tegra30-only build, Tegra20+Tegra30 build.
 
-Fabio Estevam
+Booting on Tegra30/Cardhu: Tegra30-only build, Tegra20+Tegra30 build.
+
+Booting on Tegra20/Seaboard, using DT and board files.
+
+All testing based on next-20111111, plus Will Deacon's 3 reset patches
+that this relies on.
+
+I haven't actually looked at the patches yet.
+
+-- 
+nvpublic
