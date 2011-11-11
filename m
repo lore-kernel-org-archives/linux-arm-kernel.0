@@ -1,21 +1,25 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 11 Nov 2011 10:39:57 -0800
-Subject: [GIT PULL] i.MX fixes
-In-Reply-To: <20111111155721.GB16886@pengutronix.de>
-References: <20111111155721.GB16886@pengutronix.de>
-Message-ID: <CAOesGMgqwzP3kT6=GcX96zYbdzzHhe-y1xT8WdajBL5oQrsq5A@mail.gmail.com>
+Date: Fri, 11 Nov 2011 10:40:25 -0800
+Subject: [GIT PULL] picoxcell fixes for 3.2-rc
+In-Reply-To: <20111111170148.GG5114@totoro>
+References: <20111110095649.GA16018@totoro>
+ <CAOesGMgoFegXCc9h1oMkhkkBF9eF4P7h+sTb=0iqEa2cMzAbsg@mail.gmail.com>
+ <20111111170148.GG5114@totoro>
+Message-ID: <CAOesGMgG9dxcC0uQdWQ1wW=myoM0kHyFZSAoV5vjGXHjauZZmQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 11, 2011 at 7:57 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> Hi Arnd, Olof,
+On Fri, Nov 11, 2011 at 9:01 AM, Jamie Iles <jamie@jamieiles.com> wrote:
+> On Fri, Nov 11, 2011 at 08:55:25AM -0800, Olof Johansson wrote:
+>> Hi,
+>>
+>> I looked at the branch and there's one more fix in there now? Please
+>> send a fresh request if that's intentional.
 >
-> Please pull the following. I don't know exactly when Arnd is back again,
-> so I have Olof still on Cc.
+> Gah, finger trouble on my part. ?Fixed now.
 
-Thanks, pulled into arm-soc fixes.
+No problem. Pulled into arm-soc fixes now.
 
-Since Linus hasn't pulled anything since I sent the original request,
-I'll re-send with this and the picoxcell fixes.
+Thanks!
 
 -Olof
