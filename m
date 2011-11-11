@@ -1,149 +1,250 @@
 From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Fri, 11 Nov 2011 13:22:09 +0200
-Subject: [PATCH v4 03/10] arm/tegra: prepare clock code for multiple tegra
+Date: Fri, 11 Nov 2011 13:22:10 +0200
+Subject: [PATCH v4 04/10] arm/tegra: prepare early init for multiple tegra
  variants
 In-Reply-To: <1321010541-31337-1-git-send-email-pdeschrijver@nvidia.com>
 References: <1321010541-31337-1-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <1321010541-31337-4-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <1321010541-31337-5-git-send-email-pdeschrijver@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rework the tegra20 clock code to support multiple tegra variants :
-
- * remove tegra2_periph_reset_assert/tegra2_periph_reset_deassert. This
-   functionality should be in clock.c.
- * compile tegra_sdmmc_tap_delay only on tegra20 as this feature will not
-   be available in future variants.
- * don't export clk_measure_input_freq as its functionality is also available
-   using clk_get_rate().
+This patch splits the early init code in a common and a tegra20 specific part.
+L2 cache initialization is generalized and discovers the cache associativity
+at runtime. Also use arm_pm_restart instead of arm_arch_reset and reset the
+the system using the PMC reset feature rather then the CAR system reset.
 
 Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
 ---
- arch/arm/mach-tegra/clock.c         |   14 +++++++++-----
- arch/arm/mach-tegra/clock.h         |    3 ---
- arch/arm/mach-tegra/tegra2_clocks.c |   14 +-------------
- arch/arm/mach-tegra/timer.c         |   12 ++++++++----
- 4 files changed, 18 insertions(+), 25 deletions(-)
+ arch/arm/mach-tegra/board-dt.c        |   21 ++++++++++++++
+ arch/arm/mach-tegra/board-harmony.c   |    2 +-
+ arch/arm/mach-tegra/board-paz00.c     |    2 +-
+ arch/arm/mach-tegra/board-seaboard.c  |    6 ++--
+ arch/arm/mach-tegra/board-trimslice.c |    2 +-
+ arch/arm/mach-tegra/board.h           |    6 ++--
+ arch/arm/mach-tegra/clock.c           |    5 ---
+ arch/arm/mach-tegra/common.c          |   47 ++++++++++++++++++++++----------
+ 8 files changed, 62 insertions(+), 29 deletions(-)
 
+diff --git a/arch/arm/mach-tegra/board-dt.c b/arch/arm/mach-tegra/board-dt.c
+index d368f8d..15ee974 100644
+--- a/arch/arm/mach-tegra/board-dt.c
++++ b/arch/arm/mach-tegra/board-dt.c
+@@ -118,6 +118,27 @@ static void __init tegra_dt_init(void)
+ 	of_platform_populate(NULL, tegra_dt_match_table, tegra20_auxdata_lookup, NULL);
+ }
+ 
++static struct {
++	const char *machine;
++	void (*init)(void);
++} early_init[] __initdata = {
++#ifdef CONFIG_ARCH_TEGRA_2x_SOC
++	{ "nvidia,tegra20", tegra20_init_early },
++#endif
++};
++
++static void __init tegra_init_early(void)
++{
++
++	int i;
++
++	for (i = 0; i < ARRAY_SIZE(early_init); i++)
++		if (of_machine_is_compatible(early_init[i].machine))
++			return early_init[i].init();
++
++	pr_warn("Unknown platform detected\n");
++}
++
+ static const char * tegra_dt_board_compat[] = {
+ 	"nvidia,harmony",
+ 	"nvidia,seaboard",
+diff --git a/arch/arm/mach-tegra/board-harmony.c b/arch/arm/mach-tegra/board-harmony.c
+index f0bdc5e..c422aeb 100644
+--- a/arch/arm/mach-tegra/board-harmony.c
++++ b/arch/arm/mach-tegra/board-harmony.c
+@@ -185,7 +185,7 @@ MACHINE_START(HARMONY, "harmony")
+ 	.atag_offset	= 0x100,
+ 	.fixup		= tegra_harmony_fixup,
+ 	.map_io         = tegra_map_common_io,
+-	.init_early	= tegra_init_early,
++	.init_early	= tegra20_init_early,
+ 	.init_irq       = tegra_init_irq,
+ 	.timer          = &tegra_timer,
+ 	.init_machine   = tegra_harmony_init,
+diff --git a/arch/arm/mach-tegra/board-paz00.c b/arch/arm/mach-tegra/board-paz00.c
+index 602f8dd..6997a47 100644
+--- a/arch/arm/mach-tegra/board-paz00.c
++++ b/arch/arm/mach-tegra/board-paz00.c
+@@ -188,7 +188,7 @@ MACHINE_START(PAZ00, "Toshiba AC100 / Dynabook AZ")
+ 	.atag_offset	= 0x100,
+ 	.fixup		= tegra_paz00_fixup,
+ 	.map_io         = tegra_map_common_io,
+-	.init_early	= tegra_init_early,
++	.init_early	= tegra20_init_early,
+ 	.init_irq       = tegra_init_irq,
+ 	.timer          = &tegra_timer,
+ 	.init_machine   = tegra_paz00_init,
+diff --git a/arch/arm/mach-tegra/board-seaboard.c b/arch/arm/mach-tegra/board-seaboard.c
+index bf13ea3..5e42e08 100644
+--- a/arch/arm/mach-tegra/board-seaboard.c
++++ b/arch/arm/mach-tegra/board-seaboard.c
+@@ -282,7 +282,7 @@ static void __init tegra_wario_init(void)
+ MACHINE_START(SEABOARD, "seaboard")
+ 	.atag_offset    = 0x100,
+ 	.map_io         = tegra_map_common_io,
+-	.init_early     = tegra_init_early,
++	.init_early     = tegra20_init_early,
+ 	.init_irq       = tegra_init_irq,
+ 	.timer          = &tegra_timer,
+ 	.init_machine   = tegra_seaboard_init,
+@@ -291,7 +291,7 @@ MACHINE_END
+ MACHINE_START(KAEN, "kaen")
+ 	.atag_offset    = 0x100,
+ 	.map_io         = tegra_map_common_io,
+-	.init_early     = tegra_init_early,
++	.init_early     = tegra20_init_early,
+ 	.init_irq       = tegra_init_irq,
+ 	.timer          = &tegra_timer,
+ 	.init_machine   = tegra_kaen_init,
+@@ -300,7 +300,7 @@ MACHINE_END
+ MACHINE_START(WARIO, "wario")
+ 	.atag_offset    = 0x100,
+ 	.map_io         = tegra_map_common_io,
+-	.init_early     = tegra_init_early,
++	.init_early     = tegra20_init_early,
+ 	.init_irq       = tegra_init_irq,
+ 	.timer          = &tegra_timer,
+ 	.init_machine   = tegra_wario_init,
+diff --git a/arch/arm/mach-tegra/board-trimslice.c b/arch/arm/mach-tegra/board-trimslice.c
+index e008c0e..7117e81 100644
+--- a/arch/arm/mach-tegra/board-trimslice.c
++++ b/arch/arm/mach-tegra/board-trimslice.c
+@@ -175,7 +175,7 @@ MACHINE_START(TRIMSLICE, "trimslice")
+ 	.atag_offset	= 0x100,
+ 	.fixup		= tegra_trimslice_fixup,
+ 	.map_io         = tegra_map_common_io,
+-	.init_early	= tegra_init_early,
++	.init_early	= tegra20_init_early,
+ 	.init_irq       = tegra_init_irq,
+ 	.timer          = &tegra_timer,
+ 	.init_machine   = tegra_trimslice_init,
+diff --git a/arch/arm/mach-tegra/board.h b/arch/arm/mach-tegra/board.h
+index 1d14df7..355f488 100644
+--- a/arch/arm/mach-tegra/board.h
++++ b/arch/arm/mach-tegra/board.h
+@@ -23,9 +23,9 @@
+ 
+ #include <linux/types.h>
+ 
+-void tegra_assert_system_reset(char mode, const char *cmd);
+-
+-void __init tegra_init_early(void);
++#ifdef CONFIG_ARCH_TEGRA_2x_SOC
++void __init tegra20_init_early(void);
++#endif
+ void __init tegra_map_common_io(void);
+ void __init tegra_init_irq(void);
+ void __init tegra_init_clock(void);
 diff --git a/arch/arm/mach-tegra/clock.c b/arch/arm/mach-tegra/clock.c
-index f8d41ff..47f6366 100644
+index 47f6366..e8d214d 100644
 --- a/arch/arm/mach-tegra/clock.c
 +++ b/arch/arm/mach-tegra/clock.c
-@@ -387,13 +387,15 @@ EXPORT_SYMBOL(tegra_clk_init_from_table);
- 
- void tegra_periph_reset_deassert(struct clk *c)
- {
--	tegra2_periph_reset_deassert(c);
-+	BUG_ON(!c->ops->reset);
-+	c->ops->reset(c, false);
- }
- EXPORT_SYMBOL(tegra_periph_reset_deassert);
- 
- void tegra_periph_reset_assert(struct clk *c)
- {
--	tegra2_periph_reset_assert(c);
-+	BUG_ON(!c->ops->reset);
-+	c->ops->reset(c, true);
+@@ -399,11 +399,6 @@ void tegra_periph_reset_assert(struct clk *c)
  }
  EXPORT_SYMBOL(tegra_periph_reset_assert);
  
-@@ -403,10 +405,11 @@ void __init tegra_init_clock(void)
+-void __init tegra_init_clock(void)
+-{
+-	tegra2_init_clocks();
+-}
+-
+ /*
+  * The SDMMC controllers on tegra20 have extra bits in the clock source
+  * register that adjust the delay between the clock and data to compenstate
+diff --git a/arch/arm/mach-tegra/common.c b/arch/arm/mach-tegra/common.c
+index 03c2bd4..3ad1ca3 100644
+--- a/arch/arm/mach-tegra/common.c
++++ b/arch/arm/mach-tegra/common.c
+@@ -1,5 +1,5 @@
+ /*
+- * arch/arm/mach-tegra/board-harmony.c
++ * arch/arm/mach-tegra/common.c
+  *
+  * Copyright (C) 2010 Google, Inc.
+  *
+@@ -33,16 +33,16 @@
+ 
+ void tegra_assert_system_reset(char mode, const char *cmd)
+ {
+-	void __iomem *reset = IO_ADDRESS(TEGRA_CLK_RESET_BASE + 0x04);
++	void __iomem *reset = IO_ADDRESS(TEGRA_PMC_BASE + 0);
+ 	u32 reg;
+ 
+-	/* use *_related to avoid spinlock since caches are off */
+ 	reg = readl_relaxed(reset);
+-	reg |= 0x04;
++	reg |= 0x10;
+ 	writel_relaxed(reg, reset);
  }
  
- /*
-- * The SDMMC controllers have extra bits in the clock source register that
-- * adjust the delay between the clock and data to compenstate for delays
-- * on the PCB.
-+ * The SDMMC controllers on tegra20 have extra bits in the clock source
-+ * register that adjust the delay between the clock and data to compenstate
-+ * for delays on the PCB.
-  */
+-static __initdata struct tegra_clk_init_table common_clk_init_table[] = {
 +#ifdef CONFIG_ARCH_TEGRA_2x_SOC
- void tegra_sdmmc_tap_delay(struct clk *c, int delay)
- {
- 	unsigned long flags;
-@@ -415,6 +418,7 @@ void tegra_sdmmc_tap_delay(struct clk *c, int delay)
- 	tegra2_sdmmc_tap_delay(c, delay);
- 	spin_unlock_irqrestore(&c->spinlock, flags);
- }
++static __initdata struct tegra_clk_init_table tegra20_clk_init_table[] = {
+ 	/* name		parent		rate		enabled */
+ 	{ "clk_m",	NULL,		0,		true },
+ 	{ "pll_p",	"clk_m",	216000000,	true },
+@@ -58,26 +58,43 @@ static __initdata struct tegra_clk_init_table common_clk_init_table[] = {
+ 	{ "cpu",	NULL,		0,		true },
+ 	{ NULL,		NULL,		0,		0},
+ };
 +#endif
  
- #ifdef CONFIG_DEBUG_FS
- 
-diff --git a/arch/arm/mach-tegra/clock.h b/arch/arm/mach-tegra/clock.h
-index 688316a..18df129 100644
---- a/arch/arm/mach-tegra/clock.h
-+++ b/arch/arm/mach-tegra/clock.h
-@@ -146,11 +146,8 @@ struct tegra_clk_init_table {
- };
- 
- void tegra2_init_clocks(void);
--void tegra2_periph_reset_deassert(struct clk *c);
--void tegra2_periph_reset_assert(struct clk *c);
- void clk_init(struct clk *clk);
- struct clk *tegra_get_clock_by_name(const char *name);
--unsigned long clk_measure_input_freq(void);
- int clk_reparent(struct clk *c, struct clk *parent);
- void tegra_clk_init_from_table(struct tegra_clk_init_table *table);
- unsigned long clk_get_rate_locked(struct clk *c);
-diff --git a/arch/arm/mach-tegra/tegra2_clocks.c b/arch/arm/mach-tegra/tegra2_clocks.c
-index 371869d..2ab18f6 100644
---- a/arch/arm/mach-tegra/tegra2_clocks.c
-+++ b/arch/arm/mach-tegra/tegra2_clocks.c
-@@ -174,7 +174,7 @@ static int tegra_periph_clk_enable_refcount[3 * 32];
- #define pmc_readl(reg) \
- 	__raw_readl(reg_pmc_base + (reg))
- 
--unsigned long clk_measure_input_freq(void)
-+static unsigned long clk_measure_input_freq(void)
+-static void __init tegra_init_cache(void)
++static void __init tegra_init_cache(u32 tag_latency, u32 data_latency)
  {
- 	u32 clock_autodetect;
- 	clk_writel(OSC_FREQ_DET_TRIG | 1, OSC_FREQ_DET);
-@@ -278,18 +278,6 @@ static struct clk_ops tegra_clk_m_ops = {
- 	.disable	= tegra2_clk_m_disable,
- };
+ #ifdef CONFIG_CACHE_L2X0
+ 	void __iomem *p = IO_ADDRESS(TEGRA_ARM_PERIF_BASE) + 0x3000;
++	u32 aux_ctrl, cache_type;
++
++	writel_relaxed(tag_latency, p + L2X0_TAG_LATENCY_CTRL);
++	writel_relaxed(data_latency, p + L2X0_DATA_LATENCY_CTRL);
  
--void tegra2_periph_reset_assert(struct clk *c)
--{
--	BUG_ON(!c->ops->reset);
--	c->ops->reset(c, true);
--}
--
--void tegra2_periph_reset_deassert(struct clk *c)
--{
--	BUG_ON(!c->ops->reset);
--	c->ops->reset(c, false);
--}
--
- /* super clock functions */
- /* "super clocks" on tegra have two-stage muxes and a clock skipping
-  * super divider.  We will ignore the clock skipping divider, since we
-diff --git a/arch/arm/mach-tegra/timer.c b/arch/arm/mach-tegra/timer.c
-index 2f1df47..6366654 100644
---- a/arch/arm/mach-tegra/timer.c
-+++ b/arch/arm/mach-tegra/timer.c
-@@ -182,14 +182,18 @@ static struct irqaction tegra_timer_irq = {
- static void __init tegra_init_timer(void)
+-	writel_relaxed(0x331, p + L2X0_TAG_LATENCY_CTRL);
+-	writel_relaxed(0x441, p + L2X0_DATA_LATENCY_CTRL);
++	cache_type = readl(p + L2X0_CACHE_TYPE);
++	aux_ctrl = (cache_type & 0x700) << (17-8);
++	aux_ctrl |= 0x6C000001;
+ 
+-	l2x0_init(p, 0x6C080001, 0x8200c3fe);
++	l2x0_init(p, aux_ctrl, 0x8200c3fe);
+ #endif
+ 
+ }
+ 
+-void __init tegra_init_early(void)
++static void __init tegra_setup_system_reset(void)
  {
- 	struct clk *clk;
--	unsigned long rate = clk_measure_input_freq();
-+	unsigned long rate;
- 	int ret;
+-	tegra_init_fuse();
+-	tegra_init_clock();
+-	tegra_clk_init_from_table(common_clk_init_table);
+-	tegra_init_cache();
++	arm_pm_restart = tegra_assert_system_reset;
++}
++
++static void __init tegra_common_init(void)
++{
++	tegra_setup_system_reset();
++}
  
- 	clk = clk_get_sys("timer", NULL);
--	if (IS_ERR(clk))
--		pr_warn("Unable to get timer clock\n");
--	else
-+	if (IS_ERR(clk)) {
-+		pr_warn("Unable to get timer clock."
-+			" Assuming 12Mhz input clock.\n");
-+		rate = 12000000;
-+	} else {
- 		clk_enable(clk);
-+		rate = clk_get_rate(clk);
-+	}
- 
- 	/*
- 	 * rtc registers are used by read_persistent_clock, keep the rtc clock
+-	arm_arch_reset = tegra_assert_system_reset;
++#ifdef CONFIG_ARCH_TEGRA_2x_SOC
++void __init tegra20_init_early(void)
++{
++	tegra_init_fuse();
++	tegra2_init_clocks();
++	tegra_clk_init_from_table(tegra20_clk_init_table);
++	tegra_init_cache(0x331, 0x441);
++	tegra_common_init();
+ }
++#endif
 -- 
 1.7.7.rc0.72.g4b5ea.dirty
