@@ -1,43 +1,38 @@
 From: richard.zhao@linaro.org (Richard Zhao)
-Date: Fri, 11 Nov 2011 18:50:33 +0800
-Subject: [PATCH V3 10/14] ARM: mxs: add clk_prepare/clk_unprepare
+Date: Fri, 11 Nov 2011 18:50:27 +0800
+Subject: [PATCH V3 04/14] ARM: mxc: pwm: add clk_prepare/clk_unprepare
 In-Reply-To: <1321008637-19999-1-git-send-email-richard.zhao@linaro.org>
 References: <1321008637-19999-1-git-send-email-richard.zhao@linaro.org>
-Message-ID: <1321008637-19999-11-git-send-email-richard.zhao@linaro.org>
+Message-ID: <1321008637-19999-5-git-send-email-richard.zhao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
 ---
- arch/arm/mach-mxs/system.c |    2 +-
- arch/arm/mach-mxs/timer.c  |    2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/plat-mxc/pwm.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-mxs/system.c b/arch/arm/mach-mxs/system.c
-index 20ec3bd..9760a12 100644
---- a/arch/arm/mach-mxs/system.c
-+++ b/arch/arm/mach-mxs/system.c
-@@ -66,7 +66,7 @@ static int __init mxs_arch_reset_init(void)
+diff --git a/arch/arm/plat-mxc/pwm.c b/arch/arm/plat-mxc/pwm.c
+index 42d74ea..68c7199b 100644
+--- a/arch/arm/plat-mxc/pwm.c
++++ b/arch/arm/plat-mxc/pwm.c
+@@ -118,7 +118,7 @@ int pwm_enable(struct pwm_device *pwm)
+ 	int rc = 0;
  
- 	clk = clk_get_sys("rtc", NULL);
- 	if (!IS_ERR(clk))
--		clk_enable(clk);
-+		clk_prepare_enable(clk);
+ 	if (!pwm->clk_enabled) {
+-		rc = clk_enable(pwm->clk);
++		rc = clk_prepare_enable(pwm->clk);
+ 		if (!rc)
+ 			pwm->clk_enabled = 1;
+ 	}
+@@ -131,7 +131,7 @@ void pwm_disable(struct pwm_device *pwm)
+ 	writel(0, pwm->mmio_base + MX3_PWMCR);
  
- 	return 0;
+ 	if (pwm->clk_enabled) {
+-		clk_disable(pwm->clk);
++		clk_disable_unprepare(pwm->clk);
+ 		pwm->clk_enabled = 0;
+ 	}
  }
-diff --git a/arch/arm/mach-mxs/timer.c b/arch/arm/mach-mxs/timer.c
-index cace0d2..564a632 100644
---- a/arch/arm/mach-mxs/timer.c
-+++ b/arch/arm/mach-mxs/timer.c
-@@ -245,7 +245,7 @@ static int __init mxs_clocksource_init(struct clk *timer_clk)
- 
- void __init mxs_timer_init(struct clk *timer_clk, int irq)
- {
--	clk_enable(timer_clk);
-+	clk_prepare_enable(timer_clk);
- 
- 	/*
- 	 * Initialize timers to a known state
 -- 
 1.7.5.4
