@@ -1,29 +1,30 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 11 Nov 2011 10:54:51 +0000
-Subject: [PATCH v8 08/16] ARM: LPAE: Page table maintenance for the
- 3-level format
-In-Reply-To: <alpine.LFD.2.02.1111101654400.3307@xanadu.home>
-References: <1320682618-1182-1-git-send-email-catalin.marinas@arm.com>
- <1320682618-1182-9-git-send-email-catalin.marinas@arm.com>
- <alpine.LFD.2.02.1111101654400.3307@xanadu.home>
-Message-ID: <20111111105450.GB23243@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 11 Nov 2011 10:56:07 +0000
+Subject: [PATCH 1/2] ARM: mach-imx: convert logical CPU numbers to
+ physical numbers
+In-Reply-To: <20111111100800.GA12410@mudshark.cambridge.arm.com>
+References: <1320762894-11824-1-git-send-email-will.deacon@arm.com>
+ <1320762894-11824-2-git-send-email-will.deacon@arm.com>
+ <20111111092925.GM16886@pengutronix.de>
+ <20111111100800.GA12410@mudshark.cambridge.arm.com>
+Message-ID: <20111111105607.GC12410@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 10, 2011 at 09:59:33PM +0000, Nicolas Pitre wrote:
-> On Mon, 7 Nov 2011, Catalin Marinas wrote:
+On Fri, Nov 11, 2011 at 10:08:00AM +0000, Will Deacon wrote:
+> On Fri, Nov 11, 2011 at 09:29:25AM +0000, Sascha Hauer wrote:
+> > On Tue, Nov 08, 2011 at 02:34:53PM +0000, Will Deacon wrote:
+> > > This patch uses the new cpu_logical_map() macro for converting logical
+> > > CPU numbers into physical numbers when releasing CPUs during the SMP
+> > > boot and CPU hotplug paths.
+> > 
+> > Shawn, is this one ok?
 > 
-> > This patch modifies the pgd/pmd/pte manipulation functions to support
-> > the 3-level page table format. Since there is no need for an 'ext'
-> > argument to cpu_set_pte_ext(), this patch conditionally defines a
-> > different prototype for this function when CONFIG_ARM_LPAE.
-> 
-> Maybe it doesn't make sense to still call it cpu_set_pte_ext then?
+> I reckon I need to post a v2 because this probably breaks when !SMP.
 
-We could do this but it adds several #ifdef's, especially if we also
-change macro names like set_pte_ext(). Otherwise we could leave the
-latter macro unchanged and only change the name in the processor
-structure. But I think it just adds more clutter.
+Actually, I take that back. Looks like the function is only used by
+hotplug.c and platsmp.c, both of which depend on CONFIG_SMP.
 
--- 
-Catalin
+So yes, comments from Shawn would be great.
+
+Will
