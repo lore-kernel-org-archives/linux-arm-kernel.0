@@ -1,23 +1,33 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 11 Nov 2011 14:58:34 +0000
-Subject: [PATCH v5 4/7] arm: omap4: hwmod: introduce emu hwmod
-In-Reply-To: <4EBD3785.4050102@ti.com>
-References: <1319467559-5518-1-git-send-email-ming.lei@canonical.com>
- <1319467559-5518-5-git-send-email-ming.lei@canonical.com>
- <alpine.DEB.2.00.1111080750130.10451@utopia.booyaka.com>
- <CACVXFVMSJUT2Ac+bWetrLpbyOs6PqY+npNHsbvHipEVZ0gWdgQ@mail.gmail.com>
- <alpine.DEB.2.00.1111100152430.4195@utopia.booyaka.com>
- <20111111114147.GE12410@mudshark.cambridge.arm.com>
- <20111111114735.GC5114@totoro> <4EBD3785.4050102@ti.com>
-Message-ID: <20111111145833.GL12410@mudshark.cambridge.arm.com>
+From: b29396@freescale.com (Dong Aisheng)
+Date: Fri, 11 Nov 2011 23:12:39 +0800
+Subject: [PATCH 1/2] ARM: mx28evk: remove flexcan_pdata __initconst attribute
+Message-ID: <1321024360-5249-1-git-send-email-b29396@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Benoit,
+The flexcan driver still uses it after init.
 
-On Fri, Nov 11, 2011 at 02:56:05PM +0000, Cousson, Benoit wrote:
-> It will come soon... along with the updated patch for reg-names support.
+Signed-off-by: Dong Aisheng <b29396@freescale.com>
+Cc: Sascha Hauer <s.hauer@pengutronix.de>
+Cc: Shawn Guo <shawn.guo@freescale.com>
+Cc: Wolfram Sang <w.sang@pengutronix.de>
+Cc: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+ arch/arm/mach-mxs/mach-mx28evk.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-Actually, I was hoping you could help Ming Lei with the hwmod stuff :)
-
-Will
+diff --git a/arch/arm/mach-mxs/mach-mx28evk.c b/arch/arm/mach-mxs/mach-mx28evk.c
+index 4a3cca3..226ba64 100644
+--- a/arch/arm/mach-mxs/mach-mx28evk.c
++++ b/arch/arm/mach-mxs/mach-mx28evk.c
+@@ -327,7 +327,7 @@ static void mx28evk_flexcan1_switch(int enable)
+ }
+ 
+ static const struct flexcan_platform_data
+-		mx28evk_flexcan_pdata[] __initconst = {
++		mx28evk_flexcan_pdata[] = {
+ 	{
+ 		.transceiver_switch = mx28evk_flexcan0_switch,
+ 	}, {
+-- 
+1.7.0.4
