@@ -1,29 +1,26 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Sat, 12 Nov 2011 07:19:56 +0800
-Subject: [PATCH 1/1] ASoC: mxs-saif: remove function in platform_data
-In-Reply-To: <20111111150422.GX16886@pengutronix.de>
-References: <1321003740-10992-1-git-send-email-b29396@freescale.com>
- <20111111150422.GX16886@pengutronix.de>
-Message-ID: <20111111231955.GB9471@S2100-06.ap.freescale.net>
+Date: Sat, 12 Nov 2011 07:26:35 +0800
+Subject: [PATCH 1/4] arm/imx: fix mx3_defconfig to add FEC back
+In-Reply-To: <20111111155851.GC16886@pengutronix.de>
+References: <1320914372-4416-1-git-send-email-shawn.guo@linaro.org>
+ <1320914372-4416-2-git-send-email-shawn.guo@linaro.org>
+ <20111111155851.GC16886@pengutronix.de>
+Message-ID: <20111111232635.GC9471@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 11, 2011 at 04:04:22PM +0100, Sascha Hauer wrote:
-> On Fri, Nov 11, 2011 at 05:29:00PM +0800, Dong Aisheng wrote:
-> > Add master_mode and master_id in platfrom_data since it's board
-> > specific and board knows it.
-> > Then we can remove the function pointer in platfrom_data to make
-> > the driver more devicetree friendly.
+On Fri, Nov 11, 2011 at 04:58:51PM +0100, Sascha Hauer wrote:
+> On Thu, Nov 10, 2011 at 04:39:29PM +0800, Shawn Guo wrote:
+> > The commit 'd880db0 arm: mx3: update defconfig' removes FEC support
+> > which is not good, since FEC is useful for both developers and users.
+> > 
+> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> > Cc: Sascha Hauer <s.hauer@pengutronix.de>
 > 
-> Looks ok. Marc,
-
-You meant Mark?
-
-> is it ok when I take this patch? The SoC specific stuff
-> for this patch depends on it.
+> I skipped this one for now as I have hope to get the i.MX5 merge into
+> -rc which would remove this file. If not, I'll send this one later.
 > 
-I thought I will start collecting mxs patches after v3.2-rc1.
-Do you plan to collect mxs patches for one more cycle?
+Sound good.
 
 -- 
 Regards,
