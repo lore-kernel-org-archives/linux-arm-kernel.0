@@ -1,36 +1,49 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Fri, 11 Nov 2011 16:43:41 +0800
-Subject: [PATCH] Solve compilation problem when using host usb with mx27
- boards
-In-Reply-To: <1320921777.46031.YahooMailNeo@web28503.mail.ukl.yahoo.com>
-References: <1320921777.46031.YahooMailNeo@web28503.mail.ukl.yahoo.com>
-Message-ID: <20111111084339.GH8732@S2100-06.ap.freescale.net>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 11 Nov 2011 09:49:50 +0100
+Subject: [PATCH V2 01/14] clk: add helper functions clk_prepare_enable
+ and clk_disable_unprepare
+In-Reply-To: <1320973829-4388-2-git-send-email-richard.zhao@linaro.org>
+References: <1320973829-4388-1-git-send-email-richard.zhao@linaro.org>
+ <1320973829-4388-2-git-send-email-richard.zhao@linaro.org>
+Message-ID: <20111111084950.GH16886@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 10, 2011 at 10:42:57AM +0000, Aurelien Bouin wrote:
-> Without this patch, when you are compiling the kernel for mx27 mach you will get an include problem...
-
-> Signed-off-by: Aurelien bouin <a_bouin@yahoo.fr>
+On Fri, Nov 11, 2011 at 09:10:16AM +0800, Richard Zhao wrote:
+> Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
 > ---
->  drivers/usb/host/ehci-mxc.c |    1 +
->  1 files changed, 1 insertions(+), 0 deletions(-)
+>  include/linux/clk.h |   19 +++++++++++++++++++
+>  1 files changed, 19 insertions(+), 0 deletions(-)
 > 
-> diff --git a/drivers/usb/host/ehci-mxc.c b/drivers/usb/host/ehci-mxc.c
-> index 0c058be..555a73c 100644
-> --- a/drivers/usb/host/ehci-mxc.c
-> +++ b/drivers/usb/host/ehci-mxc.c
-> @@ -24,6 +24,7 @@
->  #include <linux/usb/ulpi.h>
->  #include <linux/slab.h>
+> diff --git a/include/linux/clk.h b/include/linux/clk.h
+> index 7213b52..63985f7 100644
+> --- a/include/linux/clk.h
+> +++ b/include/linux/clk.h
+> @@ -107,6 +107,25 @@ static inline void clk_unprepare(struct clk *clk)
+>  }
+>  #endif
 >  
-> +#include <mach/hardware.h>
->  #include <mach/mxc_ehci.h>
->  
->  #include <asm/mach-types.h>
+> +static inline int clk_prepare_enable(struct clk *clk)
+> +{
+> +	int ret;
+> +
+> +	ret = clk_prepare(clk);
+> +	if (!ret)
+> +		ret = clk_enable(clk);
+> +	if (ret)
+> +		clk_unprepare(clk);
 
-What is your base?  This has been fixed on mainline.
+As Baruch already pointed out this is hard to read. Also it contains a
+bug. When clk_prepare fails clk_unprepare is called afterwards.
+
+Hint: Kernel guys are not afraid of having multiple return statements
+in a function, instead they like it when something is handled early
+without having to read the rest of the function.
+
+Sascha
 
 -- 
-Regards,
-Shawn
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
