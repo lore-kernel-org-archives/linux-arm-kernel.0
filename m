@@ -1,98 +1,44 @@
-From: dwmw2@infradead.org (David Woodhouse)
-Date: Fri, 11 Nov 2011 13:27:28 +0000
-Subject: [PATCH v4 2/7] iommu/core: split mapping to page sizes as
- supported by the hardware
-In-Reply-To: <20111111125837.GF13213@amd.com>
-References: <1318850846-16066-1-git-send-email-ohad@wizery.com>
- <1318850846-16066-3-git-send-email-ohad@wizery.com>
- <CANqQZNH1YRSgYRVxceicQ3szD=t7zeJjhJKEQ30PeKsxtj5V+A@mail.gmail.com>
- <1320938930.22195.17.camel@i7.infradead.org>
- <20111110170918.GE13213@amd.com> <1320953319.535.11.camel@i7.infradead.org>
- <20111111125837.GF13213@amd.com>
-Message-ID: <1321018048.2027.44.camel@shinybook.infradead.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 11 Nov 2011 13:41:35 +0000
+Subject: [PATCH 1/2] ARM: mach-imx: convert logical CPU numbers to
+ physical numbers
+In-Reply-To: <20111111130701.GI8732@S2100-06.ap.freescale.net>
+References: <1320762894-11824-1-git-send-email-will.deacon@arm.com>
+ <1320762894-11824-2-git-send-email-will.deacon@arm.com>
+ <20111111092925.GM16886@pengutronix.de>
+ <20111111100800.GA12410@mudshark.cambridge.arm.com>
+ <20111111105607.GC12410@mudshark.cambridge.arm.com>
+ <20111111130701.GI8732@S2100-06.ap.freescale.net>
+Message-ID: <20111111134135.GH12410@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2011-11-11 at 13:58 +0100, Joerg Roedel wrote:
-> For AMD IOMMU there is a feature called not-present cache. It says that
-> the IOMMU caches non-present entries as well and needs an IOTLB flush
-> when something is mapped (meant for software implementations of the
-> IOMMU).
-> So it can't be really taken out of the fast-path. But the IOMMU driver
-> can optimize the function so that it only flushes the IOTLB when there
-> was an unmap-call before. 
-
-We have exactly the same situation with the Intel IOMMU (we call it
-'Caching Mode') for the same reasons.
-
-I'd be wary about making the IOMMU driver *track* whether there was an
-unmap call before ? that seems like hard work and more cache contention,
-especially if the ->commit() call happens on a CPU other than the one
-that just did the unmap.
-
-I'm also not sure exactly when you'd call the ->commit() function when
-the DMA API is being used, and which 'side' of that API the
-deferred-flush optimisations would live.
-
-Would the optimisation be done on the generic side, only calling
-->commit when it absolutely *has* to happen? (Or periodically after
-unmaps have happened to avoid entries hanging around for ever?)
-
-Or would the optimisation be done in the IOMMU driver, thus turning the
-->commit() function into more of a *hint*? You could add a 'simon_says'
-boolean argument to it, I suppose...?
-
-> It is also an improvement over the current
-> situation where every iommu_unmap call results in a flush implicitly.
-> This pretty much a no-go for using IOMMU-API in DMA mapping at the
-> moment.
-
-Right. That definitely needs to be handled. We just need to work out the
-(above and other) details.
-
-> > But also, it's not *so* much of an issue to divide the space up even
-> > when it's limited. The idea was not to have it *strictly* per-CPU, but
-> > just for a CPU to try allocating from "its own" subrange first?
+On Fri, Nov 11, 2011 at 01:07:02PM +0000, Shawn Guo wrote:
+> On Fri, Nov 11, 2011 at 10:56:07AM +0000, Will Deacon wrote:
+> > On Fri, Nov 11, 2011 at 10:08:00AM +0000, Will Deacon wrote:
+> > > On Fri, Nov 11, 2011 at 09:29:25AM +0000, Sascha Hauer wrote:
+> > > > On Tue, Nov 08, 2011 at 02:34:53PM +0000, Will Deacon wrote:
+> > > > > This patch uses the new cpu_logical_map() macro for converting logical
+> > > > > CPU numbers into physical numbers when releasing CPUs during the SMP
+> > > > > boot and CPU hotplug paths.
+> > > > 
+> > > > Shawn, is this one ok?
+> > > 
+> > > I reckon I need to post a v2 because this probably breaks when !SMP.
+> > 
+> > Actually, I take that back. Looks like the function is only used by
+> > hotplug.c and platsmp.c, both of which depend on CONFIG_SMP.
+> > 
+> But the build of src.c does not depend on CONFIG_SMP.  So when building
+> with no CONFIG_SMP, we get:
 > 
-> Yeah, I get the idea. I fear that the memory consumption will get pretty
-> high with that approach. It basically means one round-robin allocator
-> per cpu and device. What does that mean on a 4096 CPU machine :)
+>   CC      arch/arm/mach-imx/src.o
+> arch/arm/mach-imx/src.c: In function ?imx_enable_cpu?:
+> arch/arm/mach-imx/src.c:31:2: error: implicit declaration of function ?cpu_logical_map?
+> make[2]: *** [arch/arm/mach-imx/src.o] Error 1
+> make[1]: *** [arch/arm/mach-imx] Error 2
 
-Well, if your network device is taking interrupts, and mapping/unmapping
-buffers across all 4096 CPUs, then your performance is screwed anyway :)
+Ok, then maybe we should #ifdef CONFIG_SMP that function entirely. If that
+sounds ok, I can post a v2.
 
-Certainly your concerns are valid, but I think we can cope with them
-fairly reasonably. If we *do* have large number of CPUs allocating for a
-given domain, we can move to a per-node rather than per-CPU allocator.
-And we can have dynamically sized allocation regions, so we aren't
-wasting too much space on unused bitmaps if you map just *one* page from
-each of your 4096 CPUs.
-
-> How much lock contention will be lowered also depends on the work-load.
-> If dma-handles are frequently freed from another cpu than they were
-> allocated from the same problem re-appears.
-
-The idea is that dma handles are *infrequently* freed, in batches. So
-we'll bounce the lock's cache line occasionally, but not all the time.
-
-In "strict" or "unmap_flush" mode, you get to go slowly unless you do
-the unmap on the same CPU that you mapped it from. I can live with that.
-
-> But in the end we have to try it out and see what works best :)
-
-Indeed. I'm just trying to work out if I should try to do the allocator
-thing purely inside the Intel code first, and then try to move it out
-and make it generic ? or if I should start with making the DMA API work
-with a wrapper around the IOMMU API, with your ->commit() and other
-necessary changes. I think I'd prefer the latter, if we can work out how
-it should look.
-
--- 
-dwmw2
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: smime.p7s
-Type: application/x-pkcs7-signature
-Size: 5818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111111/52150256/attachment-0001.bin>
+Will
