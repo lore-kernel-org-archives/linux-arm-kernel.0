@@ -1,65 +1,76 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 11 Nov 2011 10:15:56 +0100
-Subject: [PATCH V2 01/14] clk: add helper functions clk_prepare_enable
- and clk_disable_unprepare
-In-Reply-To: <20111111090546.GC14617@b20223-02.ap.freescale.net>
-References: <1320973829-4388-1-git-send-email-richard.zhao@linaro.org>
- <1320973829-4388-2-git-send-email-richard.zhao@linaro.org>
- <20111111084950.GH16886@pengutronix.de>
- <20111111090546.GC14617@b20223-02.ap.freescale.net>
-Message-ID: <20111111091556.GI16886@pengutronix.de>
+From: b29396@freescale.com (Dong Aisheng)
+Date: Fri, 11 Nov 2011 17:29:00 +0800
+Subject: [PATCH 1/1] ASoC: mxs-saif: remove function in platform_data
+Message-ID: <1321003740-10992-1-git-send-email-b29396@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 11, 2011 at 05:05:47PM +0800, Richard Zhao wrote:
-> On Fri, Nov 11, 2011 at 09:49:50AM +0100, Sascha Hauer wrote:
-> > On Fri, Nov 11, 2011 at 09:10:16AM +0800, Richard Zhao wrote:
-> > > Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
-> > > ---
-> > >  include/linux/clk.h |   19 +++++++++++++++++++
-> > >  1 files changed, 19 insertions(+), 0 deletions(-)
-> > > 
-> > > diff --git a/include/linux/clk.h b/include/linux/clk.h
-> > > index 7213b52..63985f7 100644
-> > > --- a/include/linux/clk.h
-> > > +++ b/include/linux/clk.h
-> > > @@ -107,6 +107,25 @@ static inline void clk_unprepare(struct clk *clk)
-> > >  }
-> > >  #endif
-> > >  
-> > > +static inline int clk_prepare_enable(struct clk *clk)
-> > > +{
-> > > +	int ret;
-> > > +
-> > > +	ret = clk_prepare(clk);
-> > > +	if (!ret)
-> > > +		ret = clk_enable(clk);
-> > > +	if (ret)
-> > > +		clk_unprepare(clk);
-> > 
-> > As Baruch already pointed out this is hard to read. Also it contains a
-> > bug. When clk_prepare fails clk_unprepare is called afterwards.
-> > 
-> > Hint: Kernel guys are not afraid of having multiple return statements
-> > in a function, instead they like it when something is handled early
-> > without having to read the rest of the function.
-> {
-> 	int ret;
-> 
-> 	ret = clk_prepare(clk);
-> 	if (ret)
-> 		return ret;
-> 	ret = clk_enable(clk);
-> 	if (ret)
-> 		clk_unprepare(clk);
-> 	return ret;
+Add master_mode and master_id in platfrom_data since it's board
+specific and board knows it.
+Then we can remove the function pointer in platfrom_data to make
+the driver more devicetree friendly.
 
-Yes, looks good.
+Signed-off-by: Dong Aisheng <b29396@freescale.com>
+---
+This patch is based on Sascha's suggestions and see using in
+[PATCH v5 0/3] ARM: mxs: add recording support for saif
+---
+ include/sound/saif.h     |    4 ++--
+ sound/soc/mxs/mxs-saif.c |   19 ++++++++-----------
+ 2 files changed, 10 insertions(+), 13 deletions(-)
 
-Sascha
-
+diff --git a/include/sound/saif.h b/include/sound/saif.h
+index d0e0de7..f22f3e1 100644
+--- a/include/sound/saif.h
++++ b/include/sound/saif.h
+@@ -10,7 +10,7 @@
+ #define __SOUND_SAIF_H__
+ 
+ struct mxs_saif_platform_data {
+-	int (*init) (void);
+-	int (*get_master_id) (unsigned int saif_id);
++	bool master_mode;	/* if true use master mode */
++	int master_id;		/* id of the master if in slave mode */
+ };
+ #endif
+diff --git a/sound/soc/mxs/mxs-saif.c b/sound/soc/mxs/mxs-saif.c
+index 76dc74d..03b64d2 100644
+--- a/sound/soc/mxs/mxs-saif.c
++++ b/sound/soc/mxs/mxs-saif.c
+@@ -625,13 +625,6 @@ static int mxs_saif_probe(struct platform_device *pdev)
+ 	if (pdev->id >= ARRAY_SIZE(mxs_saif))
+ 		return -EINVAL;
+ 
+-	pdata = pdev->dev.platform_data;
+-	if (pdata && pdata->init) {
+-		ret = pdata->init();
+-		if (ret)
+-			return ret;
+-	}
+-
+ 	saif = kzalloc(sizeof(*saif), GFP_KERNEL);
+ 	if (!saif)
+ 		return -ENOMEM;
+@@ -639,12 +632,16 @@ static int mxs_saif_probe(struct platform_device *pdev)
+ 	mxs_saif[pdev->id] = saif;
+ 	saif->id = pdev->id;
+ 
+-	saif->master_id = saif->id;
+-	if (pdata && pdata->get_master_id) {
+-		saif->master_id = pdata->get_master_id(saif->id);
++	pdata = pdev->dev.platform_data;
++	if (pdata && !pdata->master_mode) {
++		saif->master_id = pdata->master_id;
+ 		if (saif->master_id < 0 ||
+-			saif->master_id >= ARRAY_SIZE(mxs_saif))
++			saif->master_id >= ARRAY_SIZE(mxs_saif) ||
++			saif->master_id == saif->id)
++			dev_err(&pdev->dev, "get wrong master id\n");
+ 			return -EINVAL;
++	} else {
++		saif->master_id = saif->id;
+ 	}
+ 
+ 	saif->clk = clk_get(&pdev->dev, NULL);
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.7.0.4
