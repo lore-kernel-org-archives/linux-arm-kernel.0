@@ -1,51 +1,62 @@
-From: B29396@freescale.com (Dong Aisheng-B29396)
-Date: Fri, 11 Nov 2011 15:36:13 +0000
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 11 Nov 2011 16:42:43 +0100
 Subject: [PATCH 1/2] ARM: mx28evk: remove flexcan_pdata __initconst
  attribute
-In-Reply-To: <20111111153324.GF12913@n2100.arm.linux.org.uk>
+In-Reply-To: <65EE16ACC360FA4D99C96DC085B3F7722CECED@039-SN1MPN1-002.039d.mgd.msft.net>
 References: <1321024360-5249-1-git-send-email-b29396@freescale.com>
  <20111111150609.GD5011@pengutronix.de>
  <65EE16ACC360FA4D99C96DC085B3F7722CECED@039-SN1MPN1-002.039d.mgd.msft.net>
- <20111111152735.GE12913@n2100.arm.linux.org.uk>
- <65EE16ACC360FA4D99C96DC085B3F7722CED16@039-SN1MPN1-002.039d.mgd.msft.net>
- <20111111153324.GF12913@n2100.arm.linux.org.uk>
-Message-ID: <65EE16ACC360FA4D99C96DC085B3F7722CED4E@039-SN1MPN1-002.039d.mgd.msft.net>
+Message-ID: <20111111154243.GE5011@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
-> Sent: Friday, November 11, 2011 11:33 PM
-> To: Dong Aisheng-B29396
-> Cc: Uwe Kleine-K?nig; Guo Shawn-R65073; s.hauer at pengutronix.de;
-> kernel at pengutronix.de; linux-arm-kernel at lists.infradead.org;
-> w.sang at pengutronix.de
-> Subject: Re: [PATCH 1/2] ARM: mx28evk: remove flexcan_pdata __initconst
-> attribute
+On Fri, Nov 11, 2011 at 03:25:01PM +0000, Dong Aisheng-B29396 wrote:
+> > -----Original Message-----
+> > From: Uwe Kleine-K?nig [mailto:u.kleine-koenig at pengutronix.de]
+> > Sent: Friday, November 11, 2011 11:06 PM
+> > To: Dong Aisheng-B29396
+> > Cc: linux-arm-kernel at lists.infradead.org; kernel at pengutronix.de;
+> > s.hauer at pengutronix.de; w.sang at pengutronix.de; Guo Shawn-R65073
+> > Subject: Re: [PATCH 1/2] ARM: mx28evk: remove flexcan_pdata __initconst
+> > attribute
+> > 
+> > On Fri, Nov 11, 2011 at 11:12:39PM +0800, Dong Aisheng wrote:
+> > > The flexcan driver still uses it after init.
+> > As "it" is a copy of flexcan_pdata it's completely OK for the driver to
+> > use it.
+> > 
+> > What is the exact problem you want to address?
+> >
+> Sorry, I just checked the code and found platform_device_add_data will
+> Add a copy of platform specific data.
+> Originally I thought the driver may access the freed pdata after init.
 > 
-> On Fri, Nov 11, 2011 at 03:30:04PM +0000, Dong Aisheng-B29396 wrote:
-> > > -----Original Message-----
-> > > From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
-> > > Sent: Friday, November 11, 2011 11:28 PM
-> > > To: Dong Aisheng-B29396
-> > > Cc: Uwe Kleine-K?nig; Guo Shawn-R65073; s.hauer at pengutronix.de;
-> > > kernel at pengutronix.de; linux-arm-kernel at lists.infradead.org;
-> > > w.sang at pengutronix.de
-> > > Subject: Re: [PATCH 1/2] ARM: mx28evk: remove flexcan_pdata
-> > > __initconst attribute
-> > >
-> > > On Fri, Nov 11, 2011 at 03:25:01PM +0000, Dong Aisheng-B29396 wrote:
-> > > > -static struct fec_platform_data tx28_fec0_data = {
-> > > > +static struct fec_platform_data __initconst tx28_fec0_data = {
-> > >
-> > > No.  It's spelt:
-> > >
-> > > static const struct fec_platform_data tx28_fec0_data __initconst = {
-> > Thanks for reminder, I missed the first const. :-)
+> So, does it mean that every pdata of pdevice added
+> by mxs_add_platform_device_dmamask can be prefixed by __init*?
 > 
-> That's not the only thing.  Note the placement of the __initconst too.
+> And, below change seems correct?
+> diff --git a/arch/arm/mach-mxs/module-tx28.c b/arch/arm/mach-mxs/module-tx28.c
+> index 0fcff47..a096cca 100644
+> --- a/arch/arm/mach-mxs/module-tx28.c
+> +++ b/arch/arm/mach-mxs/module-tx28.c
+> @@ -66,11 +66,11 @@ static const iomux_cfg_t tx28_fec1_pads[] __initconst = {
+>         MX28_PAD_ENET0_CRS__ENET1_RX_EN,
+>  };
+> 
+> -static struct fec_platform_data tx28_fec0_data = {
+> +static struct fec_platform_data __initconst tx28_fec0_data = {
+>         .phy = PHY_INTERFACE_MODE_RMII,
+>  };
+> 
+> -static struct fec_platform_data tx28_fec1_data = {
+> +static struct fec_platform_data __initconst tx28_fec1_data = {
+>         .phy = PHY_INTERFACE_MODE_RMII,
+>  };
+Apart from Russell's objections, yes.
 
-Got it, thanks for your carefully review. :-)
+Best regards
+Uwe
 
-Regards
-Dong Aisheng
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
