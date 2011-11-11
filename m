@@ -1,48 +1,85 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 11 Nov 2011 10:38:17 -0600
-Subject: [PATCH] mach-ux500: add devicetree compat nodes
-In-Reply-To: <CACRpkdZrWW2jUYC0P7yY322YMdn9+4_NaGPhKtpGwR+e=F6+0A@mail.gmail.com>
-References: <1321023902-18870-1-git-send-email-niklas.hernaeus@linaro.org>
- <4EBD3C85.1010508@gmail.com>
- <CACRpkda-9OVP8E1qO3Nc5znw_v7cKFiv8T5HHwTCnY2C9Fg7iA@mail.gmail.com>
- <4EBD49A6.2020306@gmail.com>
- <CACRpkdZrWW2jUYC0P7yY322YMdn9+4_NaGPhKtpGwR+e=F6+0A@mail.gmail.com>
-Message-ID: <4EBD4F79.90302@gmail.com>
+From: external.Peter.Waechtler@de.bosch.com (EXTERNAL Waechtler Peter (Fa. TCP, CM-AI/PJ-CF31))
+Date: Fri, 11 Nov 2011 17:19:45 +0100
+Subject: what causes an "imprecise external abort"
+Message-ID: <274124B9C6907D4B8CE985903EAA19E91B2A67622C@SI-MBX06.de.bosch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/11/2011 10:26 AM, Linus Walleij wrote:
-> On Fri, Nov 11, 2011 at 5:13 PM, Rob Herring <robherring2@gmail.com> wrote:
->> On 11/11/2011 09:59 AM, Linus Walleij wrote:
->>>
->>> So - different .init_machine() calls, needed to simplify the board
->>> files as of now. (Patch from Lee Jones.)
->>
->> But ultimately I would expect that the init_machine calls to be the same
->> with a DT based machine. This goes back to do we add DT to existing
->> boards or create a new clean DT machine and add to it as boards are
->> converted?
-> 
-> Yes that should be the ultimate goal. So the current per-board
-> init functions register the I2C, MMC (SDI), SPI, UART and
-> regulator devices etc. So then these drivers need to be patched to
-> get their board/platform data from DT first.
-> 
-> In that case we should hold this patch off and only keep it for
-> internal testing until all necessary drivers are ready and patched
-> so we can replace all board files with a single DT-based one,
-> instead of this compromise solution.
-> 
-I would not hold off. You only need to have a minimal set that's enough
-to boot.
+Hi,
 
-> Is this what everybody else does?
+on an ARM11mpcore we get sporadic faults like the following - printed by a
+selfmade exception handler:
 
-That was the the consensus in Budapest in May. It's much cleaner to
-start with a new board file and then ultimately just delete the old
-ones. But it's really up to the board/SOC maintainer.
+[   14.453766] Unhandled fault: imprecise external abort (0xc06) at 0x002d3840
+LINUX : ****** EXCEPTION in process PID=322 *******
+LINUX : Bus error (object-specific hardware error), with fault addr = 0x002d3840
+LINUX : command line : "./process.out"
+LINUX : ************ thread_id 0x2b730490
+LINUX : ====== registers :
+LINUX : TRAP_NO = 0x00000000, ERROR_CODE = 0x00000c06, OLDMASK =0x00010001
+LINUX : R0  = 0x00000000, R1  = 0x00000000, R2  = 0x00000000, R3  = 0x002d3898
+LINUX : R4  = 0x002d37f8, R5  = 0x2ae97acc, R6  = 0x2b72f3c0, R7  = 0x00000078
+LINUX : R8  = 0x2aeb3000, R9  = 0x2b730490, R10 = 0x00000000, FP  = 0x2b72f404
+LINUX : IP  = 0x2b730930, SP  = 0x2b72f3c0, LR  = 0x2ae1d5c0, PC  = 0x2ae1d5c8
+LINUX : CPSR = 0x20000010,
+LINUX : ====== backtrace:
+LINUX : /lib/libc.so.6(__libc_fork+0x188)[0x2ae1d5c8]
+LINUX : libos_linux_so.so(ProcessSpawn+0x158)[0x2ac50674]
+LINUX : ./process.out(xxx+0x218)[0x1fed98]
+LINUX : libos_linux_so.so[0x2ac4fb38]
+LINUX : /lib/libpthread.so.0[0x2aebe57c]
+LINUX : /lib/libc.so.6(clone+0x88)[0x2ae4fb48]
+LINUX : ====== memory map ======
+[..]
 
-Rob
 
-> Thanks,
-> Linus Walleij
+So it's a SIGBUS - but "imprecise". Analyzing the output leads to conclusion
+that the executed code is irrelevant - i.e. no error with fork().
+
+The external means "something outside of the MMU" - for me DMA comes to mind.
+
+How can we enhance the exception handler to print the state of the AXI DMA controllers
+to get a clue if the fault has it's root cause there?
+How to achieve that? Does it sound sane? Ring any bells? (christmas is approaching;)
+
+
+
+The DFSR is 0xc06 with the folling meaning:
+DFSR= 0xC06
+[12]SD
+[11]Not read/write
+[10]Status
+[7:4] Domain,
+[3:0] Status
+Status of 1..110 -> imprecise external abort
+Domain is "0" and it was a "write" operation
+SD = 0= External Abort marked as DECERRa
+SLVERR and DECERR are the two possible types of abort reported in an AXI bus
+
+
+
+Digging in the processor manual gives in chapter 2-29:
+"Data Abort
+Data Abort on the processor can be precise or imprecise. Precise Data Aborts are those
+generated after performing an instruction side CP15 operation, and all those generated
+by the MMU:
+* alignment faults
+* translation faults
+* domain faults
+* permission faults.
+[..]
+Errors that cause externally generated Data Aborts, signaled by AXI RRESP or
+BRESP, might be precise or imprecise. Two separate Fault Status Registers encodings
+indicate if the External Abort is precise or imprecise.
+External Data Aborts are precise if:
+* all aborts to loads or stores to Strongly Ordered memory are precise
+* all aborts to loads to the Program Counter or the CPSR are precise
+* all aborts on the load part of an SWP are precise.
+All other External Aborts are imprecise.
+External aborts are supported on cacheable locations. The abort is transmitted to the
+processor only if a word requested by the processor had an External Abort."
+
+
+Best regards
+
+Peter W?chtler
