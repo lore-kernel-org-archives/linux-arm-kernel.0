@@ -1,161 +1,60 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 11 Nov 2011 21:26:30 -0600
-Subject: [PATCH v4 01/10] arm/tegra: initial device tree for tegra30
-In-Reply-To: <1321010541-31337-2-git-send-email-pdeschrijver@nvidia.com>
-References: <1321010541-31337-1-git-send-email-pdeschrijver@nvidia.com>
- <1321010541-31337-2-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <4EBDE766.5080505@gmail.com>
+Date: Fri, 11 Nov 2011 21:55:41 -0600
+Subject: [PATCH 0/2] irq/of: Enchance irq_domain support.
+In-Reply-To: <1321062616-28317-1-git-send-email-ddaney.cavm@gmail.com>
+References: <1321062616-28317-1-git-send-email-ddaney.cavm@gmail.com>
+Message-ID: <4EBDEE3D.1000000@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/11/2011 05:22 AM, Peter De Schrijver wrote:
-> This patch adds the initial device tree for tegra30
+On 11/11/2011 07:50 PM, ddaney.cavm at gmail.com wrote:
+> From: David Daney <david.daney@cavium.com>
 > 
-> Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
-> ---
->  arch/arm/boot/dts/tegra30.dtsi |  127 ++++++++++++++++++++++++++++++++++++++++
->  1 files changed, 127 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm/boot/dts/tegra30.dtsi
+> This is the first cut at hooking up my Octeon port to the irq_domain things.
 > 
-> diff --git a/arch/arm/boot/dts/tegra30.dtsi b/arch/arm/boot/dts/tegra30.dtsi
-> new file mode 100644
-> index 0000000..fabe243
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/tegra30.dtsi
-> @@ -0,0 +1,127 @@
-> +/include/ "skeleton.dtsi"
-> +
-> +/ {
-> +	compatible = "nvidia,tegra30";
+> The Octeon specific patches are part of a larger set, and will need to
+> be applied with that set, the first patch is stand-alone.
+> 
+> The basic problem being solved taken from one of my other e-mails:
+> 
+>    Unfortunately, although a good idea, kernel/irq/irqdomain.c makes a
+>    bunch of assumptions that don't hold for Octeon.  We may be able to
+>    improve it so that it flexible enough to suit us.
+> 
+> 
+>    Here are the problems I see:
+> 
+>    1) It is assumed that there is some sort of linear correspondence
+>    between 'hwirq' and 'irq', and that the range of valid values is
+>    contiguous.
+> 
+>    2) It is assumed that the concepts of nr_irq, irq_base and
+>    hwirq_base have easy to determine values and you can do iteration
+>    over their ranges by adding indexes to the bases.
+> 
 
-Needs documentation.
+I still think this is the wrong approach.
 
-> +	interrupt-parent = <&intc>;
-> +
-> +	intc: interrupt-controller at 50041000 {
-> +		compatible = "nvidia,tegra30-gic", "nvidia,tegra20-gic";
-> +		interrupt-controller;
-> +		#interrupt-cells = <1>;
-
-Is the Tegra GIC really different from a standard A9 gic? You need to
-update to use the gic binding. The cells should be 3 for example.
+Are the gpio interrupts the source of your problem here? That's how I
+read it. You have 16 GPIO irqs directly connected into lines on your
+primary interrupt controller which has 128 lines. So for a Linux irq
+number, you want to translate to a GPIO hwirq number and/or a CIU hwirq
+number. Trying to have 2 hwirq mappings for 1 Linux irq number just
+won't work. It seems to me you should use a chained handler here because
+you need to process the interrupt at both the primary ctrlr and gpio
+ctrlr levels.
 
 Rob
 
-> +		reg = < 0x50041000 0x1000 >,
-> +		      < 0x50040100 0x0100 >;
-> +	};
-> +
-> +	i2c at 7000c000 {
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		compatible =  "nvidia,tegra30-i2c", "nvidia,tegra20-i2c";
-> +		reg = <0x7000C000 0x100>;
-> +		interrupts = < 70 >;
-> +	};
-> +
-> +	i2c at 7000c400 {
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		compatible = "nvidia,tegra30-i2c", "nvidia,tegra20-i2c";
-> +		reg = <0x7000C400 0x100>;
-> +		interrupts = < 116 >;
-> +	};
-> +
-> +	i2c at 7000c500 {
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		compatible = "nvidia,tegra30-i2c", "nvidia,tegra20-i2c";
-> +		reg = <0x7000C500 0x100>;
-> +		interrupts = < 124 >;
-> +	};
-> +
-> +	i2c at 7000c700 {
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		compatible = "nvidia,tegra30-i2c", "nvidia,tegra20-i2c";
-> +		reg = <0x7000c700 0x100>;
-> +		interrupts = < 152 >;
-> +	};
-> +
-> +	i2c at 7000d000 {
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		compatible = "nvidia,tegra30-i2c", "nvidia,tegra20-i2c";
-> +		reg = <0x7000D000 0x100>;
-> +		interrupts = < 85 >;
-> +	};
-> +
-> +	gpio: gpio at 6000d000 {
-> +		compatible = "nvidia,tegra30-gpio", "nvidia,tegra20-gpio";
-> +		reg = < 0x6000d000 0x1000 >;
-> +		interrupts = < 64 65 66 67 87 119 121 >;
-> +		#gpio-cells = <2>;
-> +		gpio-controller;
-> +	};
-> +
-> +	serial at 70006000 {
-> +		compatible = "nvidia,tegra30-uart", "nvidia,tegra20-uart";
-> +		reg = <0x70006000 0x40>;
-> +		reg-shift = <2>;
-> +		interrupts = < 68 >;
-> +	};
-> +
-> +	serial at 70006040 {
-> +		compatible = "nvidia,tegra30-uart", "nvidia,tegra20-uart";
-> +		reg = <0x70006040 0x40>;
-> +		reg-shift = <2>;
-> +		interrupts = < 69 >;
-> +	};
-> +
-> +	serial at 70006200 {
-> +		compatible = "nvidia,tegra30-uart", "nvidia,tegra20-uart";
-> +		reg = <0x70006200 0x100>;
-> +		reg-shift = <2>;
-> +		interrupts = < 78 >;
-> +	};
-> +
-> +	serial at 70006300 {
-> +		compatible = "nvidia,tegra30-uart", "nvidia,tegra20-uart";
-> +		reg = <0x70006300 0x100>;
-> +		reg-shift = <2>;
-> +		interrupts = < 122 >;
-> +	};
-> +
-> +	serial at 70006400 {
-> +		compatible = "nvidia,tegra30-uart", "nvidia,tegra20-uart";
-> +		reg = <0x70006400 0x100>;
-> +		reg-shift = <2>;
-> +		interrupts = < 123 >;
-> +	};
-> +
-> +	sdhci at 78000000 {
-> +		compatible = "nvidia,tegra30-sdhci", "nvidia,tegra20-sdhci";
-> +		reg = <0x78000000 0x200>;
-> +		interrupts = < 46 >;
-> +	};
-> +
-> +	sdhci at 78000200 {
-> +		compatible = "nvidia,tegra30-sdhci", "nvidia,tegra20-sdhci";
-> +		reg = <0x78000200 0x200>;
-> +		interrupts = < 47 >;
-> +	};
-> +
-> +	sdhci at 78000400 {
-> +		compatible = "nvidia,tegra30-sdhci", "nvidia,tegra20-sdhci";
-> +		reg = <0x78000400 0x200>;
-> +		interrupts = < 51 >;
-> +	};
-> +
-> +	sdhci at 78000600 {
-> +		compatible = "nvidia,tegra30-sdhci", "nvidia,tegra20-sdhci";
-> +		reg = <0x78000600 0x200>;
-> +		interrupts = < 63 >;
-> +	};
-> +
-> +	pinmux: pinmux at 70000000 {
-> +		compatible = "nvidia,tegra30-pinmux";
-> +		reg = < 0x70000868 0xd0     /* Pad control registers */
-> +			0x70003000 0x3e0 >; /* Mux registers */
-> +	};
-> +};
+> 
+> David Daney (2):
+>   irq/of/ARM: Enhance irq iteration capability of irq_domain code.
+>   MIPS: Octeon: Add irq_create_of_mapping() and GPIO interrupts.
+> 
+>  arch/arm/common/gic.c                |   32 +++--
+>  arch/mips/Kconfig                    |    1 +
+>  arch/mips/cavium-octeon/octeon-irq.c |  279 +++++++++++++++++++++++++++++++++-
+>  include/linux/irqdomain.h            |   29 +++-
+>  kernel/irq/irqdomain.c               |   97 +++++++++---
+>  5 files changed, 390 insertions(+), 48 deletions(-)
+> 
