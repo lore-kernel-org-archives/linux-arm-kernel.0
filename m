@@ -1,68 +1,34 @@
-From: aaro.koskinen@iki.fi (Aaro Koskinen)
-Date: Sat, 12 Nov 2011 14:16:42 +0200 (EET)
-Subject: DEBUG_LL on OMAP1 (was Re: [PATCH] ARM: OMAP: Fix map_io for Amstrad
- E3)
-In-Reply-To: <20111110232349.GY31337@atomide.com>
-References: <B8A6ED05-78AC-4140-A9B8-8265F1E9C32F@iki.fi>
- <20111109231900.GS31337@atomide.com> <20111109232525.GT31337@atomide.com>
- <20111109233900.GP15294@n2100.arm.linux.org.uk>
- <20D8B951-2E77-42DF-B735-6062994D47D5@iki.fi>
- <20111110000421.GU31337@atomide.com>
- <alpine.DEB.2.00.1111102349170.19713@dell>
- <20111110232349.GY31337@atomide.com>
-Message-ID: <alpine.DEB.2.00.1111121403370.6049@dell>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Sat, 12 Nov 2011 13:49:39 +0100
+Subject: [PATCH 1/1] net: fec: convert to clk_prepare/clk_unprepare
+In-Reply-To: <1320901304-13157-1-git-send-email-richard.zhao@linaro.org>
+References: <1320901304-13157-1-git-send-email-richard.zhao@linaro.org>
+Message-ID: <20111112124939.GJ5011@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello Richard,
 
-On Thu, 10 Nov 2011, Tony Lindgren wrote:
-> * Aaro Koskinen <aaro.koskinen@iki.fi> [111110 13:31]:
->> --- a/arch/arm/mach-omap1/clock_data.c
->> +++ b/arch/arm/mach-omap1/clock_data.c
->> @@ -774,14 +774,6 @@ int __init omap1_clk_init(void)
->>  	int crystal_type = 0; /* Default 12 MHz */
->>  	u32 reg, cpu_mask;
->>
->> -#ifdef CONFIG_DEBUG_LL
->> -	/*
->> -	 * Resets some clocks that may be left on from bootloader,
->> -	 * but leaves serial clocks on.
->> -	 */
->> -	omap_writel(0x3 << 29, MOD_CONF_CTRL_0);
->> -#endif
->> -
->>  	/* USB_REQ_EN will be disabled later if necessary (usb_dc_ck) */
->>  	reg = omap_readw(SOFT_REQ_REG) & (1 << 4);
->>  	omap_writew(reg, SOFT_REQ_REG);
->
-> Hmm that should keep the serial clocks on. What other bit(s) need to
-> be on in MOD_CONF_CTRL_0 for you in addition to the serial bits?
+On Thu, Nov 10, 2011 at 01:01:44PM +0800, Richard Zhao wrote:
+> Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
+> ---
+>  drivers/net/ethernet/freescale/fec.c |    5 +++++
+>  1 files changed, 5 insertions(+), 0 deletions(-)
+> 
+> diff --git a/drivers/net/ethernet/freescale/fec.c b/drivers/net/ethernet/freescale/fec.c
+> index 1124ce0..92e3585 100644
+> --- a/drivers/net/ethernet/freescale/fec.c
+> +++ b/drivers/net/ethernet/freescale/fec.c
+> @@ -1588,6 +1588,7 @@ fec_probe(struct platform_device *pdev)
+>  		ret = PTR_ERR(fep->clk);
+>  		goto failed_clk;
+>  	}
+> +	clk_prepare(fep->clk);
+What about error checking?
 
-On my board those serial bits are zero during the early boot (and the
-serial works). By setting those bits the clock will switch from 12 ->
-48 MHz and I guess the baud rate will change and that's why the output
-turns into garbage.
+Best regards
+Uwe
 
-So I think the code should reset the other bits, and leave serial bits
-untouched:
-
-diff --git a/arch/arm/mach-omap1/clock_data.c b/arch/arm/mach-omap1/clock_data.c
-index 1297bb5..b3b69d8 100644
---- a/arch/arm/mach-omap1/clock_data.c
-+++ b/arch/arm/mach-omap1/clock_data.c
-@@ -788,7 +788,11 @@ int __init omap1_clk_init(void)
-  	 * Resets some clocks that may be left on from bootloader,
-  	 * but leaves serial clocks on.
-  	 */
--	omap_writel(0x3 << 29, MOD_CONF_CTRL_0);
-+	reg = omap_readl(MOD_CONF_CTRL_0) &
-+		((1 << CONF_MOD_UART1_CLK_MODE_R) |
-+		 (1 << CONF_MOD_UART2_CLK_MODE_R) |
-+		 (1 << CONF_MOD_UART3_CLK_MODE_R));
-+	omap_writel(reg, MOD_CONF_CTRL_0);
-  #endif
-
-  	/* USB_REQ_EN will be disabled later if necessary (usb_dc_ck) */
-
-A.
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
