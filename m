@@ -1,60 +1,101 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 11 Nov 2011 21:55:41 -0600
-Subject: [PATCH 0/2] irq/of: Enchance irq_domain support.
-In-Reply-To: <1321062616-28317-1-git-send-email-ddaney.cavm@gmail.com>
-References: <1321062616-28317-1-git-send-email-ddaney.cavm@gmail.com>
-Message-ID: <4EBDEE3D.1000000@gmail.com>
+From: inderpal.singh@linaro.org (Inderpal Singh)
+Date: Sat, 12 Nov 2011 10:31:48 +0530
+Subject: [PATCH] ARM: SAMSUNG: Save/restore GPIO drive strength across
+ suspend/resume
+Message-ID: <1321074108-10025-1-git-send-email-inderpal.singh@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/11/2011 07:50 PM, ddaney.cavm at gmail.com wrote:
-> From: David Daney <david.daney@cavium.com>
-> 
-> This is the first cut at hooking up my Octeon port to the irq_domain things.
-> 
-> The Octeon specific patches are part of a larger set, and will need to
-> be applied with that set, the first patch is stand-alone.
-> 
-> The basic problem being solved taken from one of my other e-mails:
-> 
->    Unfortunately, although a good idea, kernel/irq/irqdomain.c makes a
->    bunch of assumptions that don't hold for Octeon.  We may be able to
->    improve it so that it flexible enough to suit us.
-> 
-> 
->    Here are the problems I see:
-> 
->    1) It is assumed that there is some sort of linear correspondence
->    between 'hwirq' and 'irq', and that the range of valid values is
->    contiguous.
-> 
->    2) It is assumed that the concepts of nr_irq, irq_base and
->    hwirq_base have easy to determine values and you can do iteration
->    over their ranges by adding indexes to the bases.
-> 
+GPIO driver strength settings are not preserved across suspend/resume
+for s5pc100, s5pv210 and Exynos platforms which has been the cause of
+mmc/sd card read/write failures after resume. Fix this by saving and
+restoring the GPIO driver strength register settings across suspend/resume.
 
-I still think this is the wrong approach.
+Signed-off-by: Inderpal Singh <inderpal.singh@linaro.org>
+---
+1. This change is applicable only for s5pc100, s5pv210 and Exynos
+platforms. For all other platforms, the driver strength registers are
+part of special port configuration register (SPCON) and these
+registers are saved and restored separately from the GPIO bank
+registers. For s5pc100, s5pv210 and Exynos platforms, the driver
+strength values are saved along with the GPIO bank registers.
 
-Are the gpio interrupts the source of your problem here? That's how I
-read it. You have 16 GPIO irqs directly connected into lines on your
-primary interrupt controller which has 128 lines. So for a Linux irq
-number, you want to translate to a GPIO hwirq number and/or a CIU hwirq
-number. Trying to have 2 hwirq mappings for 1 Linux irq number just
-won't work. It seems to me you should use a chained handler here because
-you need to process the interrupt at both the primary ctrlr and gpio
-ctrlr levels.
+2. An additional entry is added to the 'pm_save' array of 'struct
+samsung_gpio_chip' for saving driver strength values.
 
-Rob
+3. Tested with v210 and v310 smdk boards
 
-> 
-> David Daney (2):
->   irq/of/ARM: Enhance irq iteration capability of irq_domain code.
->   MIPS: Octeon: Add irq_create_of_mapping() and GPIO interrupts.
-> 
->  arch/arm/common/gic.c                |   32 +++--
->  arch/mips/Kconfig                    |    1 +
->  arch/mips/cavium-octeon/octeon-irq.c |  279 +++++++++++++++++++++++++++++++++-
->  include/linux/irqdomain.h            |   29 +++-
->  kernel/irq/irqdomain.c               |   97 +++++++++---
->  5 files changed, 390 insertions(+), 48 deletions(-)
-> 
+ arch/arm/plat-samsung/include/plat/gpio-core.h |    2 +-
+ arch/arm/plat-samsung/pm-gpio.c                |   13 +++++++++++--
+ 2 files changed, 12 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/plat-samsung/include/plat/gpio-core.h b/arch/arm/plat-samsung/include/plat/gpio-core.h
+index 1fe6917..8871b4c 100644
+--- a/arch/arm/plat-samsung/include/plat/gpio-core.h
++++ b/arch/arm/plat-samsung/include/plat/gpio-core.h
+@@ -69,7 +69,7 @@ struct samsung_gpio_chip {
+ 	int			group;
+ 	spinlock_t		 lock;
+ #ifdef CONFIG_PM
+-	u32			pm_save[4];
++	u32			pm_save[5];
+ #endif
+ };
+ 
+diff --git a/arch/arm/plat-samsung/pm-gpio.c b/arch/arm/plat-samsung/pm-gpio.c
+index 4be016e..5493f38 100644
+--- a/arch/arm/plat-samsung/pm-gpio.c
++++ b/arch/arm/plat-samsung/pm-gpio.c
+@@ -21,12 +21,14 @@
+ 
+ #include <plat/gpio-core.h>
+ #include <plat/pm.h>
++#include <plat/cpu.h>
+ 
+ /* PM GPIO helpers */
+ 
+ #define OFFS_CON	(0x00)
+ #define OFFS_DAT	(0x04)
+ #define OFFS_UP		(0x08)
++#define OFFS_DRV_STRGTH	(0x0C)
+ 
+ static void samsung_gpio_pm_1bit_save(struct samsung_gpio_chip *chip)
+ {
+@@ -199,6 +201,9 @@ static void samsung_gpio_pm_4bit_save(struct samsung_gpio_chip *chip)
+ 	chip->pm_save[2] = __raw_readl(chip->base + OFFS_DAT);
+ 	chip->pm_save[3] = __raw_readl(chip->base + OFFS_UP);
+ 
++	if (soc_is_s5pc100() || soc_is_s5pv210() || soc_is_exynos4210())
++		chip->pm_save[4] = __raw_readl(chip->base + OFFS_DRV_STRGTH);
++
+ 	if (chip->chip.ngpio > 8)
+ 		chip->pm_save[0] = __raw_readl(chip->base - 4);
+ }
+@@ -285,6 +290,9 @@ static void samsung_gpio_pm_4bit_resume(struct samsung_gpio_chip *chip)
+ 	__raw_writel(chip->pm_save[2], base + OFFS_DAT);
+ 	__raw_writel(chip->pm_save[3], base + OFFS_UP);
+ 
++	if (soc_is_s5pc100() || soc_is_s5pv210() || soc_is_exynos4210())
++		__raw_writel(chip->pm_save[4], base + OFFS_DRV_STRGTH);
++
+ 	if (chip->chip.ngpio > 8) {
+ 		S3C_PMDBG("%s: CON4 %08x,%08x => %08x,%08x, DAT %08x => %08x\n",
+ 			  chip->chip.label, old_gpcon[0], old_gpcon[1],
+@@ -338,12 +346,13 @@ void samsung_pm_save_gpios(void)
+ 
+ 		samsung_pm_save_gpio(ourchip);
+ 
+-		S3C_PMDBG("%s: save %08x,%08x,%08x,%08x\n",
++		S3C_PMDBG("%s: save %08x,%08x,%08x,%08x,%08x\n",
+ 			  ourchip->chip.label,
+ 			  ourchip->pm_save[0],
+ 			  ourchip->pm_save[1],
+ 			  ourchip->pm_save[2],
+-			  ourchip->pm_save[3]);
++			  ourchip->pm_save[3],
++			  ourchip->pm_save[4]);
+ 
+ 		gpio_nr += ourchip->chip.ngpio;
+ 		gpio_nr += CONFIG_S3C_GPIO_SPACE;
+-- 
+1.7.1
