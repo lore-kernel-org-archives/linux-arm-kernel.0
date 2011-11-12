@@ -1,55 +1,68 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 12 Nov 2011 11:14:14 +0000
-Subject: [PATCH v5 3/8] ARM: idmap: populate identity map pgd at init time
-In-Reply-To: <1320767583-21162-4-git-send-email-will.deacon@arm.com>
-References: <1320767583-21162-1-git-send-email-will.deacon@arm.com>
- <1320767583-21162-4-git-send-email-will.deacon@arm.com>
-Message-ID: <20111112111414.GA27746@n2100.arm.linux.org.uk>
+From: aaro.koskinen@iki.fi (Aaro Koskinen)
+Date: Sat, 12 Nov 2011 14:16:42 +0200 (EET)
+Subject: DEBUG_LL on OMAP1 (was Re: [PATCH] ARM: OMAP: Fix map_io for Amstrad
+ E3)
+In-Reply-To: <20111110232349.GY31337@atomide.com>
+References: <B8A6ED05-78AC-4140-A9B8-8265F1E9C32F@iki.fi>
+ <20111109231900.GS31337@atomide.com> <20111109232525.GT31337@atomide.com>
+ <20111109233900.GP15294@n2100.arm.linux.org.uk>
+ <20D8B951-2E77-42DF-B735-6062994D47D5@iki.fi>
+ <20111110000421.GU31337@atomide.com>
+ <alpine.DEB.2.00.1111102349170.19713@dell>
+ <20111110232349.GY31337@atomide.com>
+Message-ID: <alpine.DEB.2.00.1111121403370.6049@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 08, 2011 at 03:52:58PM +0000, Will Deacon wrote:
-> When disabling the MMU, it is necessary to take out an identity mapping
-> for as much of the address space as possible so that the reset path can
-> be executed using its physical address. This is useful for softbooting
-> and entering low power states.
-> 
-> This patch allocates a set of pagetables during boot and populates them
-> with an identity mapping for all of memory apart from a small window
-> containing the kernel image.
+Hi,
 
-I'd like to suggest a slightly different approach, now that we have the
-'soft_restart()' thing which is guaranteed to be handling all of the
-soft-restart stuff.
+On Thu, 10 Nov 2011, Tony Lindgren wrote:
+> * Aaro Koskinen <aaro.koskinen@iki.fi> [111110 13:31]:
+>> --- a/arch/arm/mach-omap1/clock_data.c
+>> +++ b/arch/arm/mach-omap1/clock_data.c
+>> @@ -774,14 +774,6 @@ int __init omap1_clk_init(void)
+>>  	int crystal_type = 0; /* Default 12 MHz */
+>>  	u32 reg, cpu_mask;
+>>
+>> -#ifdef CONFIG_DEBUG_LL
+>> -	/*
+>> -	 * Resets some clocks that may be left on from bootloader,
+>> -	 * but leaves serial clocks on.
+>> -	 */
+>> -	omap_writel(0x3 << 29, MOD_CONF_CTRL_0);
+>> -#endif
+>> -
+>>  	/* USB_REQ_EN will be disabled later if necessary (usb_dc_ck) */
+>>  	reg = omap_readw(SOFT_REQ_REG) & (1 << 4);
+>>  	omap_writew(reg, SOFT_REQ_REG);
+>
+> Hmm that should keep the serial clocks on. What other bit(s) need to
+> be on in MOD_CONF_CTRL_0 for you in addition to the serial bits?
 
-First, what does the soft-restart code need to do?  It needs to:
-1. Perform an orderly shutdown of caches.
-2. Perform an orderly shutdown of the MMU.
-3. Jump to the supplied physical address with the caches and MMU off,
-   IRQs disabled, etc.
+On my board those serial bits are zero during the early boot (and the
+serial works). By setting those bits the clock will switch from 12 ->
+48 MHz and I guess the baud rate will change and that's why the output
+turns into garbage.
 
-And for (3) to work across the range of processors with ease, we need
-the code to run in a 1:1 mapping so turning off the MMU doesn't leads
-to unpredictable results.
+So I think the code should reset the other bits, and leave serial bits
+untouched:
 
-We can achieve most of this in the way that we're already doing, so:
-1. calling local_irq_disable() and local_fiq_disable() to disable interrupts
-2. cpu_proc_fin() to disable caches
-3. flush_cache_all() (and outer_flush_all()).
+diff --git a/arch/arm/mach-omap1/clock_data.c b/arch/arm/mach-omap1/clock_data.c
+index 1297bb5..b3b69d8 100644
+--- a/arch/arm/mach-omap1/clock_data.c
++++ b/arch/arm/mach-omap1/clock_data.c
+@@ -788,7 +788,11 @@ int __init omap1_clk_init(void)
+  	 * Resets some clocks that may be left on from bootloader,
+  	 * but leaves serial clocks on.
+  	 */
+-	omap_writel(0x3 << 29, MOD_CONF_CTRL_0);
++	reg = omap_readl(MOD_CONF_CTRL_0) &
++		((1 << CONF_MOD_UART1_CLK_MODE_R) |
++		 (1 << CONF_MOD_UART2_CLK_MODE_R) |
++		 (1 << CONF_MOD_UART3_CLK_MODE_R));
++	omap_writel(reg, MOD_CONF_CTRL_0);
+  #endif
 
-So far, that's very much what the new soft_restart() function already
-does.  But - can we be smarter about the 1:1 mapping like we are with
-the CPU suspend code?  Or, to put it another way, can we use the CPU
-suspend code's page table which it allocated, and setup a mapping to
-cover just the cpu_reset() code itself.
+  	/* USB_REQ_EN will be disabled later if necessary (usb_dc_ck) */
 
-We'd need to reorganize the cpu_reset() code to ensure that the MMU
-is actually turned off before we do the final jump, but that shouldn't
-be too hard to achieve.
-
-In other words, what I'm saying is that we don't need a 1:1 mapping
-setup for the entire userland _if_ we're careful enough with how we
-deal with the MMU-off -> jump transition.
-
-This should fix the concerns people have had with kexec and kdump, as
-well as fixing up the (broken) v6 and v7 cpu_reset() code.
+A.
