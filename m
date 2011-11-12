@@ -1,75 +1,18 @@
-From: FlorianSchandinat@gmx.de (Florian Tobias Schandinat)
-Date: Sat, 12 Nov 2011 00:16:57 +0000
-Subject: [PATCHv2] atmel_lcdfb: support new-style palette format
-In-Reply-To: <1318517152-27578-1-git-send-email-jacmet@sunsite.dk>
-References: <1318517152-27578-1-git-send-email-jacmet@sunsite.dk>
-Message-ID: <4EBDBAF9.3090805@gmx.de>
+From: davem@davemloft.net (David Miller)
+Date: Fri, 11 Nov 2011 20:43:26 -0500 (EST)
+Subject: [PATCH 1/1] net: fec: convert to clk_prepare/clk_unprepare
+In-Reply-To: <1320901304-13157-1-git-send-email-richard.zhao@linaro.org>
+References: <1320901304-13157-1-git-send-email-richard.zhao@linaro.org>
+Message-ID: <20111111.204326.828073674055146601.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/13/2011 02:45 PM, Peter Korsgaard wrote:
-> The newer Atmel SoCs use normal 16bit 565 BGR/RGB for the palette data,
-> rather than the special intensity + 555 format.
-> 
-> Fill out palette data correctly on these devices, and at the same time
-> respect the RGB/BGR wiring mode.
+From: Richard Zhao <richard.zhao@linaro.org>
+Date: Thu, 10 Nov 2011 13:01:44 +0800
 
-Applied this patch.
+> Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
 
+You're going to have to provide a more reasonable commit message.
 
-Thanks,
-
-Florian Tobias Schandinat
-
-> 
-> Signed-off-by: Peter Korsgaard <jacmet@sunsite.dk>
-> ---
-> Changes since v1:
->  - ATMEL_LCDC_WIRING_RGB/BGR was swapped
-> 
->  drivers/video/atmel_lcdfb.c |   32 ++++++++++++++++++++++++--------
->  1 files changed, 24 insertions(+), 8 deletions(-)
-> 
-> diff --git a/drivers/video/atmel_lcdfb.c b/drivers/video/atmel_lcdfb.c
-> index 63409c1..7ca3eaf 100644
-> --- a/drivers/video/atmel_lcdfb.c
-> +++ b/drivers/video/atmel_lcdfb.c
-> @@ -682,14 +682,30 @@ static int atmel_lcdfb_setcolreg(unsigned int regno, unsigned int red,
->  
->  	case FB_VISUAL_PSEUDOCOLOR:
->  		if (regno < 256) {
-> -			val  = ((red   >> 11) & 0x001f);
-> -			val |= ((green >>  6) & 0x03e0);
-> -			val |= ((blue  >>  1) & 0x7c00);
-> -
-> -			/*
-> -			 * TODO: intensity bit. Maybe something like
-> -			 *   ~(red[10] ^ green[10] ^ blue[10]) & 1
-> -			 */
-> +			if (cpu_is_at91sam9261() || cpu_is_at91sam9263()
-> +			    || cpu_is_at91sam9rl()) {
-> +				/* old style I+BGR:555 */
-> +				val  = ((red   >> 11) & 0x001f);
-> +				val |= ((green >>  6) & 0x03e0);
-> +				val |= ((blue  >>  1) & 0x7c00);
-> +
-> +				/*
-> +				 * TODO: intensity bit. Maybe something like
-> +				 *   ~(red[10] ^ green[10] ^ blue[10]) & 1
-> +				 */
-> +			} else {
-> +				/* new style BGR:565 / RGB:565 */
-> +				if (sinfo->lcd_wiring_mode ==
-> +				    ATMEL_LCDC_WIRING_RGB) {
-> +					val  = ((blue >> 11) & 0x001f);
-> +					val |= ((red  >>  0) & 0xf800);
-> +				} else {
-> +					val  = ((red  >> 11) & 0x001f);
-> +					val |= ((blue >>  0) & 0xf800);
-> +				}
-> +
-> +				val |= ((green >>  5) & 0x07e0);
-> +			}
->  
->  			lcdc_writel(sinfo, ATMEL_LCDC_LUT(regno), val);
->  			ret = 0;
+Unless it's a typo fix or similar you need to explain your change
+and why it's necessary.
