@@ -1,64 +1,161 @@
-From: stepanm@codeaurora.org (Stepan Moskovchenko)
-Date: Fri, 11 Nov 2011 18:04:22 -0800
-Subject: [PATCH v4 2/7] iommu/core: split mapping to page sizes as
- supported by the hardware
-In-Reply-To: <20111111132411.GH13213@amd.com>
-References: <1318850846-16066-1-git-send-email-ohad@wizery.com>
- <1318850846-16066-3-git-send-email-ohad@wizery.com>
- <CANqQZNH1YRSgYRVxceicQ3szD=t7zeJjhJKEQ30PeKsxtj5V+A@mail.gmail.com>
- <1320938930.22195.17.camel@i7.infradead.org> <20111110170918.GE13213@amd.com>
- <4EBC3E20.20301@codeaurora.org> <20111111132411.GH13213@amd.com>
-Message-ID: <4EBDD426.4050105@codeaurora.org>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 11 Nov 2011 21:26:30 -0600
+Subject: [PATCH v4 01/10] arm/tegra: initial device tree for tegra30
+In-Reply-To: <1321010541-31337-2-git-send-email-pdeschrijver@nvidia.com>
+References: <1321010541-31337-1-git-send-email-pdeschrijver@nvidia.com>
+ <1321010541-31337-2-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <4EBDE766.5080505@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/11/2011 5:24 AM, Joerg Roedel wrote:
-> On Thu, Nov 10, 2011 at 01:12:00PM -0800, Stepan Moskovchenko wrote:
->> I have been experimenting with an iommu_map_range call, which maps a
->> given scatterlist of discontiguous physical pages into a contiguous
->> virtual region at a given IOVA. This has some performance advantages
->> over just calling iommu_map iteratively. First, it reduces the
->> amount of table walking / calculation needed for mapping each page,
->> given how you know that all the pages will be mapped into a single
->> virtually-contiguous region (so in most cases, the first-level table
->> calculation can be reused). Second, it allows one to defer the TLB
->> (and sometimes cache) maintenance operations until the entire
->> scatterlist has been mapped, rather than doing a TLB invalidate
->> after mapping each page, as would have been the case if iommu_map
->> were just being called from within a loop. Granted, just using
->> iommu_map many times may be acceptable on the slow path, but I have
->> seen significant performance gains when using this approach on the
->> fast path.
-> Yes, from a performance point-of-view that makes sense, as an addition
-> to the existing iommu_map interface. Are the pages in the list allowed
-> to have different page-sizes?
->
->
-> 	Joerg
->
+On 11/11/2011 05:22 AM, Peter De Schrijver wrote:
+> This patch adds the initial device tree for tegra30
+> 
+> Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
+> ---
+>  arch/arm/boot/dts/tegra30.dtsi |  127 ++++++++++++++++++++++++++++++++++++++++
+>  1 files changed, 127 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/boot/dts/tegra30.dtsi
+> 
+> diff --git a/arch/arm/boot/dts/tegra30.dtsi b/arch/arm/boot/dts/tegra30.dtsi
+> new file mode 100644
+> index 0000000..fabe243
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/tegra30.dtsi
+> @@ -0,0 +1,127 @@
+> +/include/ "skeleton.dtsi"
+> +
+> +/ {
+> +	compatible = "nvidia,tegra30";
 
-Hello
+Needs documentation.
 
-Yes, the scatterlist is allowed to have different page sizes. But, they 
-are required to have a length that is a multiple of 4K. If a page in the 
-list is bigger than 4K, the code will iteratively map it with 4K pages. 
-I suppose based on how my implementation is written, it would not be too 
-difficult to add checks for the proper length and VA/PA alignments, and 
-insert a 64K / 1M / 16M mapping if the alignment is lucky and the SG 
-item is big enough.
+> +	interrupt-parent = <&intc>;
+> +
+> +	intc: interrupt-controller at 50041000 {
+> +		compatible = "nvidia,tegra30-gic", "nvidia,tegra20-gic";
+> +		interrupt-controller;
+> +		#interrupt-cells = <1>;
 
-In my particular test case, even though the pages in the list might be 
-of different sizes, they are not guaranteed to be aligned properly and I 
-would most likely have to fall back on mapping them as multiple 
-consecutive 4K pages, anyway. But even despite this, having map_range to 
-consolidate a lot of the common operations into one call sill gives me a 
-nice speed boost.
+Is the Tegra GIC really different from a standard A9 gic? You need to
+update to use the gic binding. The cells should be 3 for example.
 
-I hadn't sent the patches out because this was all for my testing, but 
-would you be interested in me adding a map_range to the API? The 
-iommu_map_range call could even do a check if the ops supports a 
-.map_range, and fall back on calling iommu_map repeatedly if the driver 
-doesn't support this operation natively. In my code, the function takes 
-a domain, iova, scatterlist, length, and prot.
+Rob
 
-Steve
+> +		reg = < 0x50041000 0x1000 >,
+> +		      < 0x50040100 0x0100 >;
+> +	};
+> +
+> +	i2c at 7000c000 {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		compatible =  "nvidia,tegra30-i2c", "nvidia,tegra20-i2c";
+> +		reg = <0x7000C000 0x100>;
+> +		interrupts = < 70 >;
+> +	};
+> +
+> +	i2c at 7000c400 {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		compatible = "nvidia,tegra30-i2c", "nvidia,tegra20-i2c";
+> +		reg = <0x7000C400 0x100>;
+> +		interrupts = < 116 >;
+> +	};
+> +
+> +	i2c at 7000c500 {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		compatible = "nvidia,tegra30-i2c", "nvidia,tegra20-i2c";
+> +		reg = <0x7000C500 0x100>;
+> +		interrupts = < 124 >;
+> +	};
+> +
+> +	i2c at 7000c700 {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		compatible = "nvidia,tegra30-i2c", "nvidia,tegra20-i2c";
+> +		reg = <0x7000c700 0x100>;
+> +		interrupts = < 152 >;
+> +	};
+> +
+> +	i2c at 7000d000 {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		compatible = "nvidia,tegra30-i2c", "nvidia,tegra20-i2c";
+> +		reg = <0x7000D000 0x100>;
+> +		interrupts = < 85 >;
+> +	};
+> +
+> +	gpio: gpio at 6000d000 {
+> +		compatible = "nvidia,tegra30-gpio", "nvidia,tegra20-gpio";
+> +		reg = < 0x6000d000 0x1000 >;
+> +		interrupts = < 64 65 66 67 87 119 121 >;
+> +		#gpio-cells = <2>;
+> +		gpio-controller;
+> +	};
+> +
+> +	serial at 70006000 {
+> +		compatible = "nvidia,tegra30-uart", "nvidia,tegra20-uart";
+> +		reg = <0x70006000 0x40>;
+> +		reg-shift = <2>;
+> +		interrupts = < 68 >;
+> +	};
+> +
+> +	serial at 70006040 {
+> +		compatible = "nvidia,tegra30-uart", "nvidia,tegra20-uart";
+> +		reg = <0x70006040 0x40>;
+> +		reg-shift = <2>;
+> +		interrupts = < 69 >;
+> +	};
+> +
+> +	serial at 70006200 {
+> +		compatible = "nvidia,tegra30-uart", "nvidia,tegra20-uart";
+> +		reg = <0x70006200 0x100>;
+> +		reg-shift = <2>;
+> +		interrupts = < 78 >;
+> +	};
+> +
+> +	serial at 70006300 {
+> +		compatible = "nvidia,tegra30-uart", "nvidia,tegra20-uart";
+> +		reg = <0x70006300 0x100>;
+> +		reg-shift = <2>;
+> +		interrupts = < 122 >;
+> +	};
+> +
+> +	serial at 70006400 {
+> +		compatible = "nvidia,tegra30-uart", "nvidia,tegra20-uart";
+> +		reg = <0x70006400 0x100>;
+> +		reg-shift = <2>;
+> +		interrupts = < 123 >;
+> +	};
+> +
+> +	sdhci at 78000000 {
+> +		compatible = "nvidia,tegra30-sdhci", "nvidia,tegra20-sdhci";
+> +		reg = <0x78000000 0x200>;
+> +		interrupts = < 46 >;
+> +	};
+> +
+> +	sdhci at 78000200 {
+> +		compatible = "nvidia,tegra30-sdhci", "nvidia,tegra20-sdhci";
+> +		reg = <0x78000200 0x200>;
+> +		interrupts = < 47 >;
+> +	};
+> +
+> +	sdhci at 78000400 {
+> +		compatible = "nvidia,tegra30-sdhci", "nvidia,tegra20-sdhci";
+> +		reg = <0x78000400 0x200>;
+> +		interrupts = < 51 >;
+> +	};
+> +
+> +	sdhci at 78000600 {
+> +		compatible = "nvidia,tegra30-sdhci", "nvidia,tegra20-sdhci";
+> +		reg = <0x78000600 0x200>;
+> +		interrupts = < 63 >;
+> +	};
+> +
+> +	pinmux: pinmux at 70000000 {
+> +		compatible = "nvidia,tegra30-pinmux";
+> +		reg = < 0x70000868 0xd0     /* Pad control registers */
+> +			0x70003000 0x3e0 >; /* Mux registers */
+> +	};
+> +};
