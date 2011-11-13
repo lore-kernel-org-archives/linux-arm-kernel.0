@@ -1,32 +1,25 @@
-From: kaloz@openwrt.org (Imre Kaloz)
-Date: Sun, 13 Nov 2011 11:56:43 +0100
-Subject: [PATCH v3] ARM: support XZ compressed kernels
-In-Reply-To: <CACRpkdb1RhmB4d2DfWp4B3OVybt-NMnku-fo+bHDuPWdi9LddQ@mail.gmail.com>
-References: <1320696216-5570-1-git-send-email-kaloz@openwrt.org>
- <CACRpkdb1RhmB4d2DfWp4B3OVybt-NMnku-fo+bHDuPWdi9LddQ@mail.gmail.com>
-Message-ID: <op.v4vsotxk2s3iss@ecaz>
+From: tom.leiming@gmail.com (Ming Lei)
+Date: Sun, 13 Nov 2011 19:04:51 +0800
+Subject: [QUESTION] omap iommu: a generic IOMMU?
+Message-ID: <CACVXFVPLgXfcpE9x2KKbU=r9_+ZeEbfo1TGndvm6yi34V15tPA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 12 Nov 2011 11:50:02 +0100, Linus Walleij  
-<linus.walleij@linaro.org> wrote:
+Hi  guys,
 
-> On Mon, Nov 7, 2011 at 9:03 PM, Imre Kaloz <kaloz@openwrt.org> wrote:
->
->> Wire up support for the XZ decompressor
->>
->> Signed-off-by: Imre Kaloz <kaloz@openwrt.org>
->
-> Looks useful.
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
->
-> Put it in Russell's patch tracker.
-> Linus Walleij
+I found that omap-iommu.c has been under drivers/iommu for some time.
 
-A previous version was there, but Russell applied it then dropped it,  
-hence I didn't want to add it again.
+Just be curious, is it a generic IOMMU so that it can be used by all IO
+peripherals in OMAP4?  Could you give some use cases about
+the omap-iommu in kernel?
 
-Russell, would you like me to add it there?
+>From related source code[1] and OMAP4 TRM[2], looks like the omap iommu
+only belongs to Cortex-M3 MPU subsystem inside OMAP4 chip, so I am wondering
+why introduces the driver for arm v7 based linux kernel...
 
+[1], arch/arm/mach-omap2/omap-iommu.c
+[2], "20.5 MMU Register Manual" of "omap4 TRM Version O"
 
-Imre
+thanks,
+-- 
+Ming Lei
