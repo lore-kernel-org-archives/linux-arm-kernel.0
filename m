@@ -1,64 +1,67 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 13 Nov 2011 21:06:20 +0000
-Subject: [PATCH] ARM: Add lsxhl machine type to mach-types
-In-Reply-To: <201111131720.22562.marek.vasut@gmail.com>
-References: <1320699251-26115-1-git-send-email-michael@walle.cc>
- <201111130129.57123.marek.vasut@gmail.com>
- <20111113082810.GF27746@n2100.arm.linux.org.uk>
- <201111131720.22562.marek.vasut@gmail.com>
-Message-ID: <20111113210620.GA8574@n2100.arm.linux.org.uk>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Sun, 13 Nov 2011 22:53:18 +0100
+Subject: [PATCH] RS485: fix inconsistencies in the meaning of some
+ variables
+In-Reply-To: <4EBA9385.7010806@evidence.eu.com>
+References: <4E492CFF.7040905@pwrnet.de> <20110822211832.GA8023@kroah.com>
+ <4EB3A009.10502@evidence.eu.com> <4EB8F6B9.6010008@atmel.com>
+ <4EB90902.4030200@evidence.eu.com>
+ <20111108134804.07095c5d@lxorguk.ukuu.org.uk>
+ <20111108142432.GA11293@kroah.com>
+ <4EBA9385.7010806@evidence.eu.com>
+Message-ID: <20111113215318.GA2966@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 13, 2011 at 05:20:22PM +0100, Marek Vasut wrote:
-> > On Sun, Nov 13, 2011 at 01:29:56AM +0100, Marek Vasut wrote:
-> > > > On Sun, Nov 13, 2011 at 12:40:42AM +0100, Michael Walle wrote:
-> > > > > then, i guess, the problem is on the uboot side, at least if they
-> > > > > want to support both device tree based and old-fashioned setup code
-> > > > > (eg. backported device support.)
-> > > > 
-> > > > If uboot wants to carry the full list, rather than copying it from
-> > > > the kernel source, they should be going straight to the main source
-> > > > of the file (which is given inside the file itself.)
-> > > > 
-> > > > Otherwise, if they want to be purely dependent on the version shipped
-> > > > with the kernel, which will have entries for platforms not merged into
-> > > > the kernel source deleted from it once they're older than 12 months -
-> > > > but which may be in u-boot, they can continue taking it out of the
-> > > > kernel tree.  I think that's sub-optimal as they'll see regressions
-> > > > from time to time when platforms have been merged into u-boot but not
-> > > > the kernel.
-> > > 
-> > > Hey,
-> > > 
-> > > U-Boot follows the in-kernel mach-types file. We had a few issues with
-> > > boards not building due to the removal of old mach types.
-> > 
-> > As the kernel version of the file is now specifically customised for
-> > the kernel, u-boot should _not_ follow the kernel version anymore, as
-> > I pointed out.  u-boot need to change this policy of theirs.
-> 
-> Why would that be so? If the users want to support the boards and the boards are 
-> broken/removed from linux, they just define the mach id by hand. That also makes 
-> it easier to detect such boards. It is also a warning that noone gives a crap 
-> about such boards and they might as well soon be removed from uboot too.
+Hi,
 
-That is a policy for uboot folk to decide upon.
+I have been working on a patch series which adds hardware RS485 to the 8250
+according to the latest developments. The series will be posted tomorrow after
+some more tests. However, there is one thing I wondered about:
 
-However, given that the policy for the kernel changed from "lets include
-everything" to "lets include only a limited amount" effectively that
-change of kernel policy has also changed the uboot policy without any
-uboot people apparantly being aware of the change.
+> From now on, SER_RS485_RTS_AFTER_SEND and SER_RS485_RTS_ON_SEND will be used to
+> set the voltage of the RTS pin (as in the crisv10.c driver); the delay will be
+> understood by looking only at the value of delay_rts_before_send and 
+> delay_rts_after_send.
 
-If uboot people are happy with the idea that entries get removed, then
-fine - but be absolutely clear that I won't be adding entries to the
-kernel's file to satisfy the cravings of someone in the uboot camp
-complaining that their entry has been deleted for whatever reason.
+Do I overlook something or is SER_RS485_RTS_AFTER_SEND always the inverted
+signal of SER_RS485_RTS_ON_SEND. So why do we need both? (BTW
+SER_RS485_RTS_ON_SEND is a non-obvious name, I think. But changing it will
+probably break even more users?)
 
-And note that _sometimes_ entries get deleted not because they aren't
-in mainline, but because they were found to be non-conformant and were
-missed during the period when I manually checked them.  So, the lack of
-an entry in the kernel's file _doesn't_ actually tell uboot why it was
-removed - it might even still be in the mainline kernel.
+> diff --git a/include/linux/serial.h b/include/linux/serial.h
+> index 97ff8e2..3d86517 100644
+> --- a/include/linux/serial.h
+> +++ b/include/linux/serial.h
+> @@ -207,13 +207,15 @@ struct serial_icounter_struct {
+>  
+>  struct serial_rs485 {
+>  	__u32	flags;			/* RS485 feature flags */
+> -#define SER_RS485_ENABLED		(1 << 0)
+> -#define SER_RS485_RTS_ON_SEND		(1 << 1)
+> -#define SER_RS485_RTS_AFTER_SEND	(1 << 2)
+> -#define SER_RS485_RTS_BEFORE_SEND	(1 << 3)
+> +#define SER_RS485_ENABLED		(1 << 0)	/* If enabled */
+> +#define SER_RS485_RTS_ON_SEND		(1 << 1)	/* Logical level for
+> +							   RTS pin when
+> +							   sending */
+> +#define SER_RS485_RTS_AFTER_SEND	(1 << 2)	/* Logical level for
+> +							   RTS pin after sent*/
 
-Case in point there: Sheeva eSATA platform.
+Nit: 80 char should be broken here, because that is not readable. Or put the
+comment above the define.
+
+Thanks,
+
+   Wolfram
+
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111113/76fe5548/attachment.sig>
