@@ -1,37 +1,51 @@
 From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 15 Nov 2011 01:42:08 +0530
-Subject: [PATCH 3/4] ARM: davinci: dm646x does not have a DSP domain
-In-Reply-To: <1321301529-7582-2-git-send-email-nsekhar@ti.com>
-References: <1321301529-7582-1-git-send-email-nsekhar@ti.com>
- <1321301529-7582-2-git-send-email-nsekhar@ti.com>
-Message-ID: <1321301529-7582-3-git-send-email-nsekhar@ti.com>
+Date: Tue, 15 Nov 2011 01:42:06 +0530
+Subject: [PATCH v4 1/4] ARM: davinci: psc: fix incorrect mask
+Message-ID: <1321301529-7582-1-git-send-email-nsekhar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix the incorrect classification of DSP clock into a
-seperate DSP domain on DM646x.
+From: Murali Karicheri <m-karicheri2@ti.com>
 
-Per the reference guide (http://www.ti.com/lit/ug/spruep9e/spruep9e.pdf)
-there is only one "AlwaysON" power domain on DM6467.
+There are 5 LSB bits defined in PDSTAT and the code
+currently uses a mask of 1 bit to check the status.
 
+Use a proper mask per the hardware specification.
+While at it, use a #define for the mask to improve
+readability.
+
+Reviewed-by: Sergei Shtylyov <sshtylyov@mvista.com>
+Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
 Signed-off-by: Sekhar Nori <nsekhar@ti.com>
 ---
-This patch has not been tested on DM6467 yet.
+ arch/arm/mach-davinci/include/mach/psc.h |    1 +
+ arch/arm/mach-davinci/psc.c              |    2 +-
+ 2 files changed, 2 insertions(+), 1 deletions(-)
 
- arch/arm/mach-davinci/dm646x.c |    1 -
- 1 files changed, 0 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/mach-davinci/dm646x.c b/arch/arm/mach-davinci/dm646x.c
-index b0c350a..d73f9f9 100644
---- a/arch/arm/mach-davinci/dm646x.c
-+++ b/arch/arm/mach-davinci/dm646x.c
-@@ -161,7 +161,6 @@ static struct clk dsp_clk = {
- 	.name = "dsp",
- 	.parent = &pll1_sysclk1,
- 	.lpsc = DM646X_LPSC_C64X_CPU,
--	.flags = PSC_DSP,
- 	.usecount = 1,			/* REVISIT how to disable? */
- };
+diff --git a/arch/arm/mach-davinci/include/mach/psc.h b/arch/arm/mach-davinci/include/mach/psc.h
+index fa59c09..8bf279a 100644
+--- a/arch/arm/mach-davinci/include/mach/psc.h
++++ b/arch/arm/mach-davinci/include/mach/psc.h
+@@ -244,6 +244,7 @@
+ #define PSC_STATE_ENABLE	3
  
+ #define MDSTAT_STATE_MASK	0x3f
++#define PDSTAT_STATE_MASK	0x1f
+ #define MDCTL_FORCE		BIT(31)
+ 
+ #ifndef __ASSEMBLER__
+diff --git a/arch/arm/mach-davinci/psc.c b/arch/arm/mach-davinci/psc.c
+index 1fb6bdf..a0e1770 100644
+--- a/arch/arm/mach-davinci/psc.c
++++ b/arch/arm/mach-davinci/psc.c
+@@ -80,7 +80,7 @@ void davinci_psc_config(unsigned int domain, unsigned int ctlr,
+ 	__raw_writel(mdctl, psc_base + MDCTL + 4 * id);
+ 
+ 	pdstat = __raw_readl(psc_base + PDSTAT);
+-	if ((pdstat & 0x00000001) == 0) {
++	if ((pdstat & PDSTAT_STATE_MASK) == 0) {
+ 		pdctl1 = __raw_readl(psc_base + PDCTL1);
+ 		pdctl1 |= 0x1;
+ 		__raw_writel(pdctl1, psc_base + PDCTL1);
 -- 
 1.6.2.4
