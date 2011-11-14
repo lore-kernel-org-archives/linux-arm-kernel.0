@@ -1,32 +1,70 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 14 Nov 2011 21:51:29 +0100
-Subject: [PATCH] at91: at91-ohci: fix set/get power
-In-Reply-To: <CAFumwP08OeGqrNrTAzYeLkB=oZtyMDEoBa9epoHcG_Wjc5CQ8g@mail.gmail.com>
-References: <1321112773-8360-1-git-send-email-plagnioj@jcrosoft.com>
- <CAFumwP08OeGqrNrTAzYeLkB=oZtyMDEoBa9epoHcG_Wjc5CQ8g@mail.gmail.com>
-Message-ID: <20111114215129.783f4ab3@skate>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 14 Nov 2011 13:01:13 -0800
+Subject: [RFC 3/5] ARM: OMAP: iommu: declare a private iommu binding struct
+In-Reply-To: <1316948337-7924-4-git-send-email-ohad@wizery.com>
+References: <1316948337-7924-1-git-send-email-ohad@wizery.com>
+ <1316948337-7924-4-git-send-email-ohad@wizery.com>
+Message-ID: <20111114210113.GM31337@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le Mon, 14 Nov 2011 22:39:21 +0200,
-Andrew Victor <avictor.za@gmail.com> a ?crit :
+* Ohad Ben-Cohen <ohad@wizery.com> [110925 03:27]:
+> Declare an omap iommu private struct, which binds an iommu user
+> to its iommu device. This struct should be placed at the iommu user's
+> dev_archdata so generic IOMMU API can be used without having to
+> utilize omap-specific plumbing anymore.
+> 
+> While at it, provide an accessor method to ease the retrieval of the
+> omap_iommu handle from a user device.
+> 
+> Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Hiroshi DOYU <Hiroshi.DOYU@nokia.com>
 
-> Shouldn't that rather be:
->    if (!gpio_is_valid(pdata->vbus_pin[port]))
->           return;
+Acked-by: Tony Lindgren <tony@atomide.com>
 
-No, because gpio_is_valid() accept 0 as a valid GPIO. Therefore, when
-you don't set anything for the .vbus_pin field, the values are zero,
-and gpio_is_valid() will tell you that it's a valid GPIO. If we wanted
-to use gpio_is_valid(), we would have to do something like .vbus_pin =
-{ -EINVAL, -EINVAL } in every board for which the vbus pin isn't used.
-It's a quite unfortunate behaviour of the current gpio subsystem.
 
-Regards,
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+> ---
+>  arch/arm/plat-omap/include/plat/iommu.h |   26 ++++++++++++++++++++++++++
+>  1 files changed, 26 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/plat-omap/include/plat/iommu.h b/arch/arm/plat-omap/include/plat/iommu.h
+> index a1d79ee..fa11ee2 100644
+> --- a/arch/arm/plat-omap/include/plat/iommu.h
+> +++ b/arch/arm/plat-omap/include/plat/iommu.h
+> @@ -111,6 +111,32 @@ struct iommu_platform_data {
+>  	u32 da_end;
+>  };
+>  
+> +/**
+> + * struct iommu_arch_data - omap iommu private data
+> + * @name: name of the iommu device
+> + * @iommu_dev: handle of the iommu device
+> + *
+> + * This is an omap iommu private data object, which binds an iommu user
+> + * to its iommu device. This object should be placed at the iommu user's
+> + * dev_archdata so generic IOMMU API can be used without having to
+> + * utilize omap-specific plumbing anymore.
+> + */
+> +struct omap_iommu_arch_data {
+> +	const char *name;
+> +	struct omap_iommu *iommu_dev;
+> +};
+> +
+> +/**
+> + * dev_to_omap_iommu() - retrieves an omap iommu object from a user device
+> + * @dev: iommu client device
+> + */
+> +static inline struct omap_iommu *dev_to_omap_iommu(struct device *dev)
+> +{
+> +	struct omap_iommu_arch_data *arch_data = dev->archdata.iommu;
+> +
+> +	return arch_data->iommu_dev;
+> +}
+> +
+>  /* IOMMU errors */
+>  #define OMAP_IOMMU_ERR_TLB_MISS		(1 << 0)
+>  #define OMAP_IOMMU_ERR_TRANS_FAULT	(1 << 1)
+> -- 
+> 1.7.4.1
+> 
