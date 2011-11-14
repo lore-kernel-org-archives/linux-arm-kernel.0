@@ -1,135 +1,92 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 14 Nov 2011 16:23:39 +0000
-Subject: [PATCH v9 03/15] ARM: LPAE: Move page table maintenance macros to
- pgtable-2level.h
+Date: Mon, 14 Nov 2011 16:23:42 +0000
+Subject: [PATCH v9 06/15] ARM: LPAE: add ISBs around MMU enabling code
 In-Reply-To: <1321287831-24560-1-git-send-email-catalin.marinas@arm.com>
 References: <1321287831-24560-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <1321287831-24560-4-git-send-email-catalin.marinas@arm.com>
+Message-ID: <1321287831-24560-7-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The page table maintenance macros need to be duplicated between the
-classic and the LPAE MMU so this patch moves those that are not common
-to the pgtable-2level.h file.
+From: Will Deacon <will.deacon@arm.com>
 
+Before we enable the MMU, we must ensure that the TTBR registers contain
+sane values. After the MMU has been enabled, we jump to the *virtual*
+address of the following function, so we also need to ensure that the
+SCTLR write has taken effect.
+
+This patch adds ISB instructions around the SCTLR write to ensure the
+visibility of the above.
+
+Signed-off-by: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm/include/asm/pgtable-2level.h |   41 +++++++++++++++++++++++++++++++++
- arch/arm/include/asm/pgtable.h        |   38 ------------------------------
- 2 files changed, 41 insertions(+), 38 deletions(-)
+ arch/arm/boot/compressed/head.S  |    1 +
+ arch/arm/include/asm/assembler.h |   11 +++++++++++
+ arch/arm/kernel/head.S           |    2 ++
+ arch/arm/kernel/sleep.S          |    2 ++
+ 4 files changed, 16 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/include/asm/pgtable-2level.h b/arch/arm/include/asm/pgtable-2level.h
-index 470457e..2317a71 100644
---- a/arch/arm/include/asm/pgtable-2level.h
-+++ b/arch/arm/include/asm/pgtable-2level.h
-@@ -140,4 +140,45 @@
- #define L_PTE_MT_DEV_CACHED	(_AT(pteval_t, 0x0b) << 2)	/* 1011 */
- #define L_PTE_MT_MASK		(_AT(pteval_t, 0x0f) << 2)
+diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
+index c2effc9..c5d6025 100644
+--- a/arch/arm/boot/compressed/head.S
++++ b/arch/arm/boot/compressed/head.S
+@@ -659,6 +659,7 @@ __armv7_mmu_cache_on:
+ 		mcrne	p15, 0, r3, c2, c0, 0	@ load page table pointer
+ 		mcrne	p15, 0, r1, c3, c0, 0	@ load domain access control
+ #endif
++		mcr	p15, 0, r0, c7, c5, 4	@ ISB
+ 		mcr	p15, 0, r0, c1, c0, 0	@ load control register
+ 		mrc	p15, 0, r0, c1, c0, 0	@ and read it back
+ 		mov	r0, #0
+diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
+index 29035e8..b6e65de 100644
+--- a/arch/arm/include/asm/assembler.h
++++ b/arch/arm/include/asm/assembler.h
+@@ -187,6 +187,17 @@
+ #endif
  
-+#ifndef __ASSEMBLY__
+ /*
++ * Instruction barrier
++ */
++	.macro	instr_sync
++#if __LINUX_ARM_ARCH__ >= 7
++	isb
++#elif __LINUX_ARM_ARCH__ == 6
++	mcr	p15, 0, r0, c7, c5, 4
++#endif
++	.endm
 +
 +/*
-+ * The "pud_xxx()" functions here are trivial when the pmd is folded into
-+ * the pud: the pud entry is never bad, always exists, and can't be set or
-+ * cleared.
-+ */
-+#define pud_none(pud)		(0)
-+#define pud_bad(pud)		(0)
-+#define pud_present(pud)	(1)
-+#define pud_clear(pudp)		do { } while (0)
-+#define set_pud(pud,pudp)	do { } while (0)
-+
-+static inline pmd_t *pmd_offset(pud_t *pud, unsigned long addr)
-+{
-+	return (pmd_t *)pud;
-+}
-+
-+#define pmd_bad(pmd)		(pmd_val(pmd) & 2)
-+
-+#define copy_pmd(pmdpd,pmdps)		\
-+	do {				\
-+		pmdpd[0] = pmdps[0];	\
-+		pmdpd[1] = pmdps[1];	\
-+		flush_pmd_entry(pmdpd);	\
-+	} while (0)
-+
-+#define pmd_clear(pmdp)			\
-+	do {				\
-+		pmdp[0] = __pmd(0);	\
-+		pmdp[1] = __pmd(0);	\
-+		clean_pmd_entry(pmdp);	\
-+	} while (0)
-+
-+/* we don't need complex calculations here as the pmd is folded into the pgd */
-+#define pmd_addr_end(addr,end) (end)
-+
-+#define set_pte_ext(ptep,pte,ext) cpu_set_pte_ext(ptep,pte,ext)
-+
-+#endif /* __ASSEMBLY__ */
-+
- #endif /* _ASM_PGTABLE_2LEVEL_H */
-diff --git a/arch/arm/include/asm/pgtable.h b/arch/arm/include/asm/pgtable.h
-index a1aca79..44b9247 100644
---- a/arch/arm/include/asm/pgtable.h
-+++ b/arch/arm/include/asm/pgtable.h
-@@ -164,41 +164,8 @@ extern pgd_t swapper_pg_dir[PTRS_PER_PGD];
- /* to find an entry in a kernel page-table-directory */
- #define pgd_offset_k(addr)	pgd_offset(&init_mm, addr)
- 
--/*
-- * The "pud_xxx()" functions here are trivial when the pmd is folded into
-- * the pud: the pud entry is never bad, always exists, and can't be set or
-- * cleared.
-- */
--#define pud_none(pud)		(0)
--#define pud_bad(pud)		(0)
--#define pud_present(pud)	(1)
--#define pud_clear(pudp)		do { } while (0)
--#define set_pud(pud,pudp)	do { } while (0)
--
--
--/* Find an entry in the second-level page table.. */
--static inline pmd_t *pmd_offset(pud_t *pud, unsigned long addr)
--{
--	return (pmd_t *)pud;
--}
--
- #define pmd_none(pmd)		(!pmd_val(pmd))
- #define pmd_present(pmd)	(pmd_val(pmd))
--#define pmd_bad(pmd)		(pmd_val(pmd) & 2)
--
--#define copy_pmd(pmdpd,pmdps)		\
--	do {				\
--		pmdpd[0] = pmdps[0];	\
--		pmdpd[1] = pmdps[1];	\
--		flush_pmd_entry(pmdpd);	\
--	} while (0)
--
--#define pmd_clear(pmdp)			\
--	do {				\
--		pmdp[0] = __pmd(0);	\
--		pmdp[1] = __pmd(0);	\
--		clean_pmd_entry(pmdp);	\
--	} while (0)
- 
- static inline pte_t *pmd_page_vaddr(pmd_t pmd)
- {
-@@ -207,10 +174,6 @@ static inline pte_t *pmd_page_vaddr(pmd_t pmd)
- 
- #define pmd_page(pmd)		pfn_to_page(__phys_to_pfn(pmd_val(pmd) & PHYS_MASK))
- 
--/* we don't need complex calculations here as the pmd is folded into the pgd */
--#define pmd_addr_end(addr,end)	(end)
--
--
- #ifndef CONFIG_HIGHPTE
- #define __pte_map(pmd)		pmd_page_vaddr(*(pmd))
- #define __pte_unmap(pte)	do { } while (0)
-@@ -232,7 +195,6 @@ static inline pte_t *pmd_page_vaddr(pmd_t pmd)
- #define pte_page(pte)		pfn_to_page(pte_pfn(pte))
- #define mk_pte(page,prot)	pfn_pte(page_to_pfn(page), prot)
- 
--#define set_pte_ext(ptep,pte,ext) cpu_set_pte_ext(ptep,pte,ext)
- #define pte_clear(mm,addr,ptep)	set_pte_ext(ptep, __pte(0), 0)
- 
- #if __LINUX_ARM_ARCH__ < 6
+  * SMP data memory barrier
+  */
+ 	.macro	smp_dmb mode
+diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
+index 566c54c..6ee994c 100644
+--- a/arch/arm/kernel/head.S
++++ b/arch/arm/kernel/head.S
+@@ -400,8 +400,10 @@ ENDPROC(__enable_mmu)
+ 	.align	5
+ __turn_mmu_on:
+ 	mov	r0, r0
++	instr_sync
+ 	mcr	p15, 0, r0, c1, c0, 0		@ write control reg
+ 	mrc	p15, 0, r3, c0, c0, 0		@ read id reg
++	instr_sync
+ 	mov	r3, r3
+ 	mov	r3, r13
+ 	mov	pc, r3
+diff --git a/arch/arm/kernel/sleep.S b/arch/arm/kernel/sleep.S
+index 020e99c..4ac45fe 100644
+--- a/arch/arm/kernel/sleep.S
++++ b/arch/arm/kernel/sleep.S
+@@ -56,8 +56,10 @@ ENDPROC(cpu_suspend_abort)
+ 	.align	5
+ ENTRY(cpu_resume_mmu)
+ 	ldr	r3, =cpu_resume_after_mmu
++	instr_sync
+ 	mcr	p15, 0, r0, c1, c0, 0	@ turn on MMU, I-cache, etc
+ 	mrc	p15, 0, r0, c0, c0, 0	@ read id reg
++	instr_sync
+ 	mov	r0, r0
+ 	mov	r0, r0
+ 	mov	pc, r3			@ jump to virtual address
