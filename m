@@ -1,34 +1,27 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Mon, 14 Nov 2011 08:49:54 -0800
-Subject: [PATCH] dts: tegra-ventana: use proper root instead of /dev/ram
-In-Reply-To: <1321251032-5461-1-git-send-email-vwadekar@nvidia.com>
-References: <1321251032-5461-1-git-send-email-vwadekar@nvidia.com>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF1740805A99@HQMAIL01.nvidia.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 14 Nov 2011 18:30:54 +0100
+Subject: [PATCH v6] AT91: Add a driver for the ADC
+Message-ID: <1321291857-26277-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Varun Wadekar wrote at Sunday, November 13, 2011 11:11 PM:
-> the root file system on ventana resides on /dev/mmcblk0p1.
+Hi all,
 
-"The" should be capitalized.
+This patchset adds the driver for the ADC in the AT91 SoC. It has been tested on
+the at91sam9g20ek and should work on sam9g45 as well.
 
-> update the dts file to use the proper root instead of /dev/ram.
-> 
-> Original-author: Pritesh Raithatha <praithatha@nvidia.com>
-> Signed-off-by: Varun Wadekar <vwadekar@nvidia.com>
+For now, it only reads values when asked for by sysfs, but eventually will
+support hardware triggers and more boards.
 
-If Pritesh did write this, and you didn't significantly rewrite it, you
-should probably re-send this after fixing the authorship information in
-git; that way "git format-patch" will emit a "From" line with Pritesh's
-information into the email body, so that the author field is set correctly
-when this is merged. Assuming this is the most recent commit in your branch,
-you'd do:
+This patchset is based on the "[PATCH 0/6 V2] IIO: Out of staging step 1: The
+core" patchset from Jonathan Cameron, applied on top of 3.1
 
-git commit --amend --author='Pritesh Raithatha <praithatha@nvidia.com>'
+Improvements from v5:
+  - Don't run the SoC specific code if the driver is not selected in the
+configuration
+  - Fix the waitqueue timeout error handling to have a more sensible behaviour
+  - Minor cosmetic improvements
 
-(although I also wonder why Pritesh didn't sign it off)
-
-The content of the patch seems fine to me.
-
--- 
-nvpublic
+Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+Cc: Patrice Vilchez <patrice.vilchez@atmel.com>
+Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
