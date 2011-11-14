@@ -1,24 +1,45 @@
-From: avictor.za@gmail.com (Andrew Victor)
-Date: Mon, 14 Nov 2011 22:39:21 +0200
-Subject: [PATCH] at91: at91-ohci: fix set/get power
-In-Reply-To: <1321112773-8360-1-git-send-email-plagnioj@jcrosoft.com>
-References: <1321112773-8360-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <CAFumwP08OeGqrNrTAzYeLkB=oZtyMDEoBa9epoHcG_Wjc5CQ8g@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 14 Nov 2011 12:46:49 -0800
+Subject: [GIT PULL] ARM: OMAP: DSS hwmod/reset fixes for 3.2
+In-Reply-To: <1320754489.1907.50.camel@deskari>
+References: <alpine.DEB.2.00.1110061806150.4611@utopia.booyaka.com>
+ <20111105003550.GM31337@atomide.com>
+ <alpine.DEB.2.00.1111080049470.12394@utopia.booyaka.com>
+ <1320746911.1907.47.camel@deskari>
+ <alpine.DEB.2.00.1111080329300.8313@utopia.booyaka.com>
+ <1320754489.1907.50.camel@deskari>
+Message-ID: <20111114204649.GL31337@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi,
+* Tomi Valkeinen <tomi.valkeinen@ti.com> [111108 03:40]:
+> On Tue, 2011-11-08 at 03:33 -0700, Paul Walmsley wrote:
+> > On Tue, 8 Nov 2011, Tomi Valkeinen wrote:
+> > 
+> > > On Tue, 2011-11-08 at 00:50 -0700, Paul Walmsley wrote:
+> > > > On Fri, 4 Nov 2011, Tony Lindgren wrote:
+> > > > 
+> > > > > * Paul Walmsley <paul@pwsan.com> [111006 16:33]:
+> > > > > > The following changes since commit be73246058737beec52ae232bcab7776332a9e06:
+> > > > > > 
+> > > > > >   ARM: OMAP2+: Remove custom init_irq for remaining boards (2011-09-26 17:50:37 -0700)
+> > > > > > 
+> > > > > > are available in the git repository at:
+> > > > > >   git://git.pwsan.com/linux-2.6 hwmod_dss_fixes_3.2
+> > > > > 
+> > > > > Looks like you should take a look at the merge conflicts with
+> > > > > this one, maybe rebase it on 994c0e992522c123298b4a91b72f5e67ba2d1123.
+> > > > 
+> > > > Do you want this series for 3.2-rc or 3.3 at this point?
+> > > 
+> > > Seems that at least HDMI output is broken due to this series missing.
+> > 
+> > OK thanks, 3.2-rc it is.
 
-> in commit aa6e52a35 we introduce the support of overcurrent notification
-> but the set and get of the power without checking if the gpio is valid or not
-
-> + ? ? ? if (pdata->vbus_pin[port] <= 0)
-> + ? ? ? ? ? ? ? return;
-
-Shouldn't that rather be:
-   if (!gpio_is_valid(pdata->vbus_pin[port]))
-          return;
-
+I suggest we only merge the ones with "fix" in the subject during the -rc
+cycle. The others add new features for the reset, so they should wait until
+v3.3 merge window.
 
 Regards,
-  Andrew Victor
+
+Tony
