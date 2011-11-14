@@ -1,47 +1,71 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Mon, 14 Nov 2011 11:59:09 +0800
-Subject: [RFC 3/8] of: create of_phandle_args to simplify return of
- phandle parsing data
-In-Reply-To: <1320801583-12774-4-git-send-email-grant.likely@secretlab.ca>
-References: <1320801583-12774-1-git-send-email-grant.likely@secretlab.ca>
- <1320801583-12774-4-git-send-email-grant.likely@secretlab.ca>
-Message-ID: <20111114035908.GA10236@S2100-06.ap.freescale.net>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Mon, 14 Nov 2011 12:21:28 +0800
+Subject: [PATCH] ARM: pxa168/gplugd: add the correct SSP device
+In-Reply-To: <4EBD4733.4010801@einfochips.com>
+References: <1321013994-6443-1-git-send-email-eric.y.miao@gmail.com>
+ <4EBD4733.4010801@einfochips.com>
+Message-ID: <CAMPhdO_X0n9L6HF1TSChzWt34=atJrr4=FR8h7PJ0hh0beJ6Pw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Grant,
+On Sat, Nov 12, 2011 at 12:02 AM, Tanmay Upadhyay
+<tanmay.upadhyay@einfochips.com> wrote:
+>
+>
+> On Friday 11 November 2011 05:49 PM, Eric Miao wrote:
+>>
+>> There is no SSP0, but SSP2 is used on gplugd.
+>>
+>> Cc: Tanmay Upadhyay<tanmay.upadhyay@einfochips.com>
+>> Signed-off-by: Eric Miao<eric.y.miao@gmail.com>
+>> ---
+>> ?arch/arm/mach-mmp/gplugd.c | ? ?2 +-
+>> ?1 files changed, 1 insertions(+), 1 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-mmp/gplugd.c b/arch/arm/mach-mmp/gplugd.c
+>> index 6915656..0469c74 100644
+>> --- a/arch/arm/mach-mmp/gplugd.c
+>> +++ b/arch/arm/mach-mmp/gplugd.c
+>> @@ -182,7 +182,7 @@ static void __init gplugd_init(void)
+>>
+>> ? ? ? ?/* on-chip devices */
+>> ? ? ? ?pxa168_add_uart(3);
+>> - ? ? ? pxa168_add_ssp(0);
+>> + ? ? ? pxa168_add_ssp(2);
+>> ? ? ? ?pxa168_add_twsi(0, NULL, ARRAY_AND_SIZE(gplugd_i2c_board_info));
+>>
+>> ? ? ? ?pxa168_add_eth(&gplugd_eth_platform_data);
+>
+> Hi Eric,
+>
+> HDMI chip (TDA9981A) on gplugD gets audio data from SSP0 - used as I2S. Page
+> # 7 of [1] & page # 1 & 3 of [2] indicates this.
 
-On Tue, Nov 08, 2011 at 06:19:38PM -0700, Grant Likely wrote:
-[...]
-> diff --git a/include/linux/of.h b/include/linux/of.h
-> index 4948552..566deab 100644
-> --- a/include/linux/of.h
-> +++ b/include/linux/of.h
-> @@ -222,6 +222,13 @@ extern const void *of_get_property(const struct device_node *node,
->  #define for_each_property(pp, properties) \
->  	for (pp = properties; pp != NULL; pp = pp->next)
->  
-> +#define MAX_PHANDLE_ARGS 8
-> +struct of_phandle_args {
-> +	struct device_node *np;
-> +	int args_count;
-> +	uint32_t args[MAX_PHANDLE_ARGS];
-> +};
-> +
+Shouldn't this be SSP1 instead, if following the public PXA168 software
+manual (there is no SSP0, and the existing code doesn't suppport it)
 
-I'm seeing a bunch of warnings like the one below when compiling imx
-with the series.  And moving the definition to somewhere before
-'#include <asm/prom.h>' in linux/of.h removes the warnings for me.
+> SSP2 is also used on gplugD
+> as SPI to talk to the NOR flash.
 
-  CC      arch/arm/kernel/devtree.o
-In file included from arch/arm/plat-mxc/include/mach/irqs.h:14:0,
-                 from arch/arm/include/asm/irq.h:4,
-                 from arch/arm/include/asm/prom.h:17,
-                 from include/linux/of.h:133,
-                 from arch/arm/kernel/devtree.c:17:
-include/asm-generic/gpio.h:133:24: warning: ?struct of_phandle_args? declared inside parameter list
-include/asm-generic/gpio.h:133:24: warning: its scope is only this definition or declaration, which is probably not what you want
+If ignoring this port at this moment, how about the patch below?
 
--- 
-Regards,
-Shawn
+    ARM: pxa168/gplugd: add the correct SSP device
+
+    There is no SSP0, but SSP1 is used on gplugd as an I2S port.
+
+    Cc: Tanmay Upadhyay <tanmay.upadhyay@einfochips.com>
+    Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
+
+diff --git a/arch/arm/mach-mmp/gplugd.c b/arch/arm/mach-mmp/gplugd.c
+index 6915656..4665767 100644
+--- a/arch/arm/mach-mmp/gplugd.c
++++ b/arch/arm/mach-mmp/gplugd.c
+@@ -182,7 +182,7 @@ static void __init gplugd_init(void)
+
+        /* on-chip devices */
+        pxa168_add_uart(3);
+-       pxa168_add_ssp(0);
++       pxa168_add_ssp(1);
+        pxa168_add_twsi(0, NULL, ARRAY_AND_SIZE(gplugd_i2c_board_info));
+
+        pxa168_add_eth(&gplugd_eth_platform_data);
