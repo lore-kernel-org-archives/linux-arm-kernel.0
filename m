@@ -1,51 +1,51 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 14 Nov 2011 11:57:50 +0100
-Subject: [PATCH] at91: at91-ohci: fix set/get power
-In-Reply-To: <1321112773-8360-1-git-send-email-plagnioj@jcrosoft.com>
-References: <1321112773-8360-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <4EC0F42E.3000808@atmel.com>
+From: per.forlin@stericsson.com (Per Forlin)
+Date: Mon, 14 Nov 2011 12:02:28 +0100
+Subject: [PATCH] ARM: mmci: add capabilities2 for MMC_CAP2
+Message-ID: <1321268548-21933-1-git-send-email-per.forlin@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/12/2011 04:46 PM, Jean-Christophe PLAGNIOL-VILLARD :
-> in commit aa6e52a35 we introduce the support of overcurrent notification
-> but the set and get of the power without checking if the gpio is valid or not
-> 
-> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+Signed-off-by: Per Forlin <per.forlin@stericsson.com>
+---
+This patch depends on patches adding CAP2 available on mmc-next.
+Chris, would you mind merging this through your tree when it
+has been accepted.
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+ drivers/mmc/host/mmci.c   |    1 +
+ include/linux/amba/mmci.h |    2 ++
+ 2 files changed, 3 insertions(+), 0 deletions(-)
 
-> ---
->  drivers/usb/host/ohci-at91.c |    6 ++++++
->  1 files changed, 6 insertions(+), 0 deletions(-)
-> 
-> diff --git a/drivers/usb/host/ohci-at91.c b/drivers/usb/host/ohci-at91.c
-> index ba3a46b..95a9fec 100644
-> --- a/drivers/usb/host/ohci-at91.c
-> +++ b/drivers/usb/host/ohci-at91.c
-> @@ -223,6 +223,9 @@ static void ohci_at91_usb_set_power(struct at91_usbh_data *pdata, int port, int
->  	if (port < 0 || port >= 2)
->  		return;
->  
-> +	if (pdata->vbus_pin[port] <= 0)
-> +		return;
-> +
->  	gpio_set_value(pdata->vbus_pin[port], !pdata->vbus_pin_inverted ^ enable);
->  }
->  
-> @@ -231,6 +234,9 @@ static int ohci_at91_usb_get_power(struct at91_usbh_data *pdata, int port)
->  	if (port < 0 || port >= 2)
->  		return -EINVAL;
->  
-> +	if (pdata->vbus_pin[port] <= 0)
-> +		return -EINVAL;
-> +
->  	return gpio_get_value(pdata->vbus_pin[port]) ^ !pdata->vbus_pin_inverted;
->  }
->  
-
-
+diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+index 4602771..c1cf80c 100644
+--- a/drivers/mmc/host/mmci.c
++++ b/drivers/mmc/host/mmci.c
+@@ -1231,6 +1231,7 @@ static int __devinit mmci_probe(struct amba_device *dev,
+ 	if (host->vcc == NULL)
+ 		mmc->ocr_avail = plat->ocr_mask;
+ 	mmc->caps = plat->capabilities;
++	mmc->caps2 = plat->capabilities2;
+ 
+ 	/*
+ 	 * We can do SGIO
+diff --git a/include/linux/amba/mmci.h b/include/linux/amba/mmci.h
+index 2111481..3749e13 100644
+--- a/include/linux/amba/mmci.h
++++ b/include/linux/amba/mmci.h
+@@ -30,6 +30,7 @@ struct dma_chan;
+  * @cd_invert: true if the gpio_cd pin value is active low
+  * @capabilities: the capabilities of the block as implemented in
+  * this platform, signify anything MMC_CAP_* from mmc/host.h
++ * @capabilities2: more capabilities, MMC_CAP2_* from mmc/host.h
+  * @dma_filter: function used to select an appropriate RX and TX
+  * DMA channel to be used for DMA, if and only if you're deploying the
+  * generic DMA engine
+@@ -52,6 +53,7 @@ struct mmci_platform_data {
+ 	int	gpio_cd;
+ 	bool	cd_invert;
+ 	unsigned long capabilities;
++	unsigned long capabilities2;
+ 	bool (*dma_filter)(struct dma_chan *chan, void *filter_param);
+ 	void *dma_rx_param;
+ 	void *dma_tx_param;
 -- 
-Nicolas Ferre
+1.6.3.3
