@@ -1,374 +1,759 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 14 Nov 2011 15:43:58 +0100
-Subject: [PATCH 06/12] ARM: at91: make pit register base soc independent
-In-Reply-To: <1321207952-13556-6-git-send-email-plagnioj@jcrosoft.com>
+Date: Mon, 14 Nov 2011 15:50:34 +0100
+Subject: [PATCH 07/12] ARM: at91: make smc register base soc independent
+In-Reply-To: <1321207952-13556-7-git-send-email-plagnioj@jcrosoft.com>
 References: <20111113180954.GD15318@game.jcrosoft.org>
- <1321207952-13556-6-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <4EC1292E.9020607@atmel.com>
+ <1321207952-13556-7-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <4EC12ABA.7060902@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+Jean-Christophe,
+
+Please, add more comments here. You add a new parameter to
+*_smc_configure(), it can be good to say something about it...
 
 On 11/13/2011 07:12 PM, Jean-Christophe PLAGNIOL-VILLARD :
 > Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 > Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-Seems good if you can address the error path comment on ioremap.
-
-You can add my "Acked-by" to your next patch series:
+With my little comments addressed:
 
 Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
 > ---
->  arch/arm/mach-at91/at91cap9.c                 |    1 +
->  arch/arm/mach-at91/at91sam9260.c              |    1 +
->  arch/arm/mach-at91/at91sam9261.c              |    1 +
->  arch/arm/mach-at91/at91sam9263.c              |    1 +
->  arch/arm/mach-at91/at91sam926x_time.c         |   35 +++++++++++++++++-------
->  arch/arm/mach-at91/at91sam9g45.c              |    1 +
->  arch/arm/mach-at91/at91sam9rl.c               |    1 +
->  arch/arm/mach-at91/generic.h                  |    1 +
->  arch/arm/mach-at91/include/mach/at91_pit.h    |    8 +++---
->  arch/arm/mach-at91/include/mach/at91cap9.h    |    2 +-
->  arch/arm/mach-at91/include/mach/at91sam9260.h |    2 +-
->  arch/arm/mach-at91/include/mach/at91sam9261.h |    2 +-
->  arch/arm/mach-at91/include/mach/at91sam9263.h |    2 +-
->  arch/arm/mach-at91/include/mach/at91sam9g45.h |    2 +-
->  arch/arm/mach-at91/include/mach/at91sam9rl.h  |    2 +-
->  15 files changed, 42 insertions(+), 20 deletions(-)
+>  arch/arm/mach-at91/at91cap9.c                  |    2 +
+>  arch/arm/mach-at91/at91rm9200.c                |    1 +
+>  arch/arm/mach-at91/at91sam9260.c               |    2 +
+>  arch/arm/mach-at91/at91sam9261.c               |    2 +
+>  arch/arm/mach-at91/at91sam9263.c               |    3 +
+>  arch/arm/mach-at91/at91sam9g45.c               |    2 +
+>  arch/arm/mach-at91/at91sam9rl.c                |    2 +
+>  arch/arm/mach-at91/board-cam60.c               |    2 +-
+>  arch/arm/mach-at91/board-cap9adk.c             |    4 +-
+>  arch/arm/mach-at91/board-cpu9krea.c            |    4 +-
+>  arch/arm/mach-at91/board-dt.c                  |    2 +-
+>  arch/arm/mach-at91/board-neocore926.c          |    2 +-
+>  arch/arm/mach-at91/board-pcontrol-g20.c        |    4 +-
+>  arch/arm/mach-at91/board-qil-a9260.c           |    2 +-
+>  arch/arm/mach-at91/board-sam9-l9260.c          |    2 +-
+>  arch/arm/mach-at91/board-sam9260ek.c           |    2 +-
+>  arch/arm/mach-at91/board-sam9261ek.c           |    4 +-
+>  arch/arm/mach-at91/board-sam9263ek.c           |    2 +-
+>  arch/arm/mach-at91/board-sam9g20ek.c           |    2 +-
+>  arch/arm/mach-at91/board-sam9m10g45ek.c        |    2 +-
+>  arch/arm/mach-at91/board-sam9rlek.c            |    2 +-
+>  arch/arm/mach-at91/board-snapper9260.c         |    2 +-
+>  arch/arm/mach-at91/board-stamp9g20.c           |    2 +-
+>  arch/arm/mach-at91/board-usb-a926x.c           |    4 +-
+>  arch/arm/mach-at91/include/mach/at91cap9.h     |    2 +-
+>  arch/arm/mach-at91/include/mach/at91sam9260.h  |    2 +-
+>  arch/arm/mach-at91/include/mach/at91sam9261.h  |    2 +-
+>  arch/arm/mach-at91/include/mach/at91sam9263.h  |    4 +-
+>  arch/arm/mach-at91/include/mach/at91sam9_smc.h |   17 ++---
+>  arch/arm/mach-at91/include/mach/at91sam9g45.h  |    2 +-
+>  arch/arm/mach-at91/include/mach/at91sam9rl.h   |    2 +-
+>  arch/arm/mach-at91/sam9_smc.c                  |  110 ++++++++++++++----------
+>  arch/arm/mach-at91/sam9_smc.h                  |    3 +-
+>  33 files changed, 114 insertions(+), 88 deletions(-)
+>  rewrite arch/arm/mach-at91/sam9_smc.c (61%)
 > 
 > diff --git a/arch/arm/mach-at91/at91cap9.c b/arch/arm/mach-at91/at91cap9.c
-> index 3687207..abfe368 100644
+> index abfe368..1ea9312 100644
 > --- a/arch/arm/mach-at91/at91cap9.c
 > +++ b/arch/arm/mach-at91/at91cap9.c
-> @@ -335,6 +335,7 @@ static void __init at91cap9_map_io(void)
+> @@ -28,6 +28,7 @@
+>  #include "soc.h"
+>  #include "generic.h"
+>  #include "clock.h"
+> +#include "sam9_smc.h"
 >  
+>  /* --------------------------------------------------------------------
+>   *  Clocks
+> @@ -336,6 +337,7 @@ static void __init at91cap9_map_io(void)
 >  static void __init at91cap9_ioremap_registers(void)
 >  {
-> +	at91sam926x_ioremap_pit(AT91CAP9_BASE_PIT);
+>  	at91sam926x_ioremap_pit(AT91CAP9_BASE_PIT);
+> +	at91sam9_ioremap_smc(0, AT91CAP9_BASE_SMC);
 >  }
 >  
 >  static void __init at91cap9_initialize(void)
+> diff --git a/arch/arm/mach-at91/at91rm9200.c b/arch/arm/mach-at91/at91rm9200.c
+> index c67d50c..c06c14f 100644
+> --- a/arch/arm/mach-at91/at91rm9200.c
+> +++ b/arch/arm/mach-at91/at91rm9200.c
+> @@ -23,6 +23,7 @@
+>  #include "soc.h"
+>  #include "generic.h"
+>  #include "clock.h"
+> +#include "sam9_smc.h"
+>  
+>  static struct map_desc at91rm9200_io_desc[] __initdata = {
+>  	{
 > diff --git a/arch/arm/mach-at91/at91sam9260.c b/arch/arm/mach-at91/at91sam9260.c
-> index 0e54928..0030d5f 100644
+> index 0030d5f..fc1f734 100644
 > --- a/arch/arm/mach-at91/at91sam9260.c
 > +++ b/arch/arm/mach-at91/at91sam9260.c
-> @@ -327,6 +327,7 @@ static void __init at91sam9260_map_io(void)
+> @@ -26,6 +26,7 @@
+>  #include "soc.h"
+>  #include "generic.h"
+>  #include "clock.h"
+> +#include "sam9_smc.h"
 >  
+>  /* --------------------------------------------------------------------
+>   *  Clocks
+> @@ -328,6 +329,7 @@ static void __init at91sam9260_map_io(void)
 >  static void __init at91sam9260_ioremap_registers(void)
 >  {
-> +	at91sam926x_ioremap_pit(AT91SAM9260_BASE_PIT);
+>  	at91sam926x_ioremap_pit(AT91SAM9260_BASE_PIT);
+> +	at91sam9_ioremap_smc(0, AT91SAM9260_BASE_SMC);
 >  }
 >  
 >  static void __init at91sam9260_initialize(void)
 > diff --git a/arch/arm/mach-at91/at91sam9261.c b/arch/arm/mach-at91/at91sam9261.c
-> index dde8318..348d5ae 100644
+> index 348d5ae..804181a 100644
 > --- a/arch/arm/mach-at91/at91sam9261.c
 > +++ b/arch/arm/mach-at91/at91sam9261.c
-> @@ -287,6 +287,7 @@ static void __init at91sam9261_map_io(void)
+> @@ -25,6 +25,7 @@
+>  #include "soc.h"
+>  #include "generic.h"
+>  #include "clock.h"
+> +#include "sam9_smc.h"
 >  
+>  /* --------------------------------------------------------------------
+>   *  Clocks
+> @@ -288,6 +289,7 @@ static void __init at91sam9261_map_io(void)
 >  static void __init at91sam9261_ioremap_registers(void)
 >  {
-> +	at91sam926x_ioremap_pit(AT91SAM9261_BASE_PIT);
+>  	at91sam926x_ioremap_pit(AT91SAM9261_BASE_PIT);
+> +	at91sam9_ioremap_smc(0, AT91SAM9261_BASE_SMC);
 >  }
 >  
 >  static void __init at91sam9261_initialize(void)
 > diff --git a/arch/arm/mach-at91/at91sam9263.c b/arch/arm/mach-at91/at91sam9263.c
-> index fc442dd..09ccf73 100644
+> index 09ccf73..b8f4996 100644
 > --- a/arch/arm/mach-at91/at91sam9263.c
 > +++ b/arch/arm/mach-at91/at91sam9263.c
-> @@ -305,6 +305,7 @@ static void __init at91sam9263_map_io(void)
+> @@ -24,6 +24,7 @@
+>  #include "soc.h"
+>  #include "generic.h"
+>  #include "clock.h"
+> +#include "sam9_smc.h"
 >  
+>  /* --------------------------------------------------------------------
+>   *  Clocks
+> @@ -306,6 +307,8 @@ static void __init at91sam9263_map_io(void)
 >  static void __init at91sam9263_ioremap_registers(void)
 >  {
-> +	at91sam926x_ioremap_pit(AT91SAM9263_BASE_PIT);
+>  	at91sam926x_ioremap_pit(AT91SAM9263_BASE_PIT);
+> +	at91sam9_ioremap_smc(0, AT91SAM9263_BASE_SMC0);
+> +	at91sam9_ioremap_smc(1, AT91SAM9263_BASE_SMC1);
 >  }
 >  
 >  static void __init at91sam9263_initialize(void)
-> diff --git a/arch/arm/mach-at91/at91sam926x_time.c b/arch/arm/mach-at91/at91sam926x_time.c
-> index 4ba8549..05ba3f6 100644
-> --- a/arch/arm/mach-at91/at91sam926x_time.c
-> +++ b/arch/arm/mach-at91/at91sam926x_time.c
-> @@ -25,7 +25,17 @@
->  
->  static u32 pit_cycle;		/* write-once */
->  static u32 pit_cnt;		/* access only w/system irq blocked */
-> +static void __iomem *pit_base_addr __read_mostly;
->  
-> +static inline unsigned int pit_read(unsigned int reg_offset)
-> +{
-> +	return __raw_readl(pit_base_addr + reg_offset);
-> +}
-> +
-> +static inline void pit_write(unsigned int reg_offset, unsigned long value)
-> +{
-> +	__raw_writel(value, pit_base_addr + reg_offset);
-> +}
->  
->  /*
->   * Clocksource:  just a monotonic counter of MCK/16 cycles.
-> @@ -39,7 +49,7 @@ static cycle_t read_pit_clk(struct clocksource *cs)
->  
->  	raw_local_irq_save(flags);
->  	elapsed = pit_cnt;
-> -	t = at91_sys_read(AT91_PIT_PIIR);
-> +	t = pit_read(AT91_PIT_PIIR);
->  	raw_local_irq_restore(flags);
->  
->  	elapsed += PIT_PICNT(t) * pit_cycle;
-> @@ -64,8 +74,8 @@ pit_clkevt_mode(enum clock_event_mode mode, struct clock_event_device *dev)
->  	switch (mode) {
->  	case CLOCK_EVT_MODE_PERIODIC:
->  		/* update clocksource counter */
-> -		pit_cnt += pit_cycle * PIT_PICNT(at91_sys_read(AT91_PIT_PIVR));
-> -		at91_sys_write(AT91_PIT_MR, (pit_cycle - 1) | AT91_PIT_PITEN
-> +		pit_cnt += pit_cycle * PIT_PICNT(pit_read(AT91_PIT_PIVR));
-> +		pit_write(AT91_PIT_MR, (pit_cycle - 1) | AT91_PIT_PITEN
->  				| AT91_PIT_PITIEN);
->  		break;
->  	case CLOCK_EVT_MODE_ONESHOT:
-> @@ -74,7 +84,7 @@ pit_clkevt_mode(enum clock_event_mode mode, struct clock_event_device *dev)
->  	case CLOCK_EVT_MODE_SHUTDOWN:
->  	case CLOCK_EVT_MODE_UNUSED:
->  		/* disable irq, leaving the clocksource active */
-> -		at91_sys_write(AT91_PIT_MR, (pit_cycle - 1) | AT91_PIT_PITEN);
-> +		pit_write(AT91_PIT_MR, (pit_cycle - 1) | AT91_PIT_PITEN);
->  		break;
->  	case CLOCK_EVT_MODE_RESUME:
->  		break;
-> @@ -103,11 +113,11 @@ static irqreturn_t at91sam926x_pit_interrupt(int irq, void *dev_id)
->  
->  	/* The PIT interrupt may be disabled, and is shared */
->  	if ((pit_clkevt.mode == CLOCK_EVT_MODE_PERIODIC)
-> -			&& (at91_sys_read(AT91_PIT_SR) & AT91_PIT_PITS)) {
-> +			&& (pit_read(AT91_PIT_SR) & AT91_PIT_PITS)) {
->  		unsigned nr_ticks;
->  
->  		/* Get number of ticks performed before irq, and ack it */
-> -		nr_ticks = PIT_PICNT(at91_sys_read(AT91_PIT_PIVR));
-> +		nr_ticks = PIT_PICNT(pit_read(AT91_PIT_PIVR));
->  		do {
->  			pit_cnt += pit_cycle;
->  			pit_clkevt.event_handler(&pit_clkevt);
-> @@ -129,14 +139,14 @@ static struct irqaction at91sam926x_pit_irq = {
->  static void at91sam926x_pit_reset(void)
->  {
->  	/* Disable timer and irqs */
-> -	at91_sys_write(AT91_PIT_MR, 0);
-> +	pit_write(AT91_PIT_MR, 0);
->  
->  	/* Clear any pending interrupts, wait for PIT to stop counting */
-> -	while (PIT_CPIV(at91_sys_read(AT91_PIT_PIVR)) != 0)
-> +	while (PIT_CPIV(pit_read(AT91_PIT_PIVR)) != 0)
->  		cpu_relax();
->  
->  	/* Start PIT but don't enable IRQ */
-> -	at91_sys_write(AT91_PIT_MR, (pit_cycle - 1) | AT91_PIT_PITEN);
-> +	pit_write(AT91_PIT_MR, (pit_cycle - 1) | AT91_PIT_PITEN);
->  }
->  
->  /*
-> @@ -178,7 +188,12 @@ static void __init at91sam926x_pit_init(void)
->  static void at91sam926x_pit_suspend(void)
->  {
->  	/* Disable timer */
-> -	at91_sys_write(AT91_PIT_MR, 0);
-> +	pit_write(AT91_PIT_MR, 0);
-> +}
-> +
-> +void at91sam926x_ioremap_pit(u32 addr)
-> +{
-> +	pit_base_addr = ioremap(addr, 16);
-
-I would prefer that you could add an error message here. I know that the
-address that is passed to this function should come from a verified
-source. But an error message could help for debugging purpose (think
-creating a new SoC).
-
-
->  }
->  
->  struct sys_timer at91sam926x_timer = {
 > diff --git a/arch/arm/mach-at91/at91sam9g45.c b/arch/arm/mach-at91/at91sam9g45.c
-> index 56282b2..aa8b441 100644
+> index aa8b441..ce3233f 100644
 > --- a/arch/arm/mach-at91/at91sam9g45.c
 > +++ b/arch/arm/mach-at91/at91sam9g45.c
-> @@ -340,6 +340,7 @@ static void __init at91sam9g45_map_io(void)
+> @@ -26,6 +26,7 @@
+>  #include "soc.h"
+>  #include "generic.h"
+>  #include "clock.h"
+> +#include "sam9_smc.h"
 >  
+>  /* --------------------------------------------------------------------
+>   *  Clocks
+> @@ -341,6 +342,7 @@ static void __init at91sam9g45_map_io(void)
 >  static void __init at91sam9g45_ioremap_registers(void)
 >  {
-> +	at91sam926x_ioremap_pit(AT91SAM9G45_BASE_PIT);
+>  	at91sam926x_ioremap_pit(AT91SAM9G45_BASE_PIT);
+> +	at91sam9_ioremap_smc(0, AT91SAM9G45_BASE_SMC);
 >  }
 >  
 >  static void __init at91sam9g45_initialize(void)
 > diff --git a/arch/arm/mach-at91/at91sam9rl.c b/arch/arm/mach-at91/at91sam9rl.c
-> index 29dae9b..291fc99 100644
+> index 291fc99..1bcccd7 100644
 > --- a/arch/arm/mach-at91/at91sam9rl.c
 > +++ b/arch/arm/mach-at91/at91sam9rl.c
-> @@ -292,6 +292,7 @@ static void __init at91sam9rl_map_io(void)
+> @@ -25,6 +25,7 @@
+>  #include "soc.h"
+>  #include "generic.h"
+>  #include "clock.h"
+> +#include "sam9_smc.h"
 >  
+>  /* --------------------------------------------------------------------
+>   *  Clocks
+> @@ -293,6 +294,7 @@ static void __init at91sam9rl_map_io(void)
 >  static void __init at91sam9rl_ioremap_registers(void)
 >  {
-> +	at91sam926x_ioremap_pit(AT91SAM9RL_BASE_PIT);
+>  	at91sam926x_ioremap_pit(AT91SAM9RL_BASE_PIT);
+> +	at91sam9_ioremap_smc(0, AT91SAM9RL_BASE_SMC);
 >  }
 >  
 >  static void __init at91sam9rl_initialize(void)
-> diff --git a/arch/arm/mach-at91/generic.h b/arch/arm/mach-at91/generic.h
-> index 11d7297..8196ecc 100644
-> --- a/arch/arm/mach-at91/generic.h
-> +++ b/arch/arm/mach-at91/generic.h
-> @@ -29,6 +29,7 @@ extern void __init at91_aic_init(unsigned int priority[]);
->   /* Timer */
->  struct sys_timer;
->  extern struct sys_timer at91rm9200_timer;
-> +extern void at91sam926x_ioremap_pit(u32 addr);
->  extern struct sys_timer at91sam926x_timer;
->  extern struct sys_timer at91x40_timer;
+> diff --git a/arch/arm/mach-at91/board-cam60.c b/arch/arm/mach-at91/board-cam60.c
+> index f90cfb3..02ded92 100644
+> --- a/arch/arm/mach-at91/board-cam60.c
+> +++ b/arch/arm/mach-at91/board-cam60.c
+> @@ -163,7 +163,7 @@ static struct sam9_smc_config __initdata cam60_nand_smc_config = {
+>  static void __init cam60_add_device_nand(void)
+>  {
+>  	/* configure chip-select 3 (NAND) */
+> -	sam9_smc_configure(3, &cam60_nand_smc_config);
+> +	sam9_smc_configure(0, 3, &cam60_nand_smc_config);
 >  
-> diff --git a/arch/arm/mach-at91/include/mach/at91_pit.h b/arch/arm/mach-at91/include/mach/at91_pit.h
-> index 974d0bd..d1f80ad 100644
-> --- a/arch/arm/mach-at91/include/mach/at91_pit.h
-> +++ b/arch/arm/mach-at91/include/mach/at91_pit.h
-> @@ -16,16 +16,16 @@
->  #ifndef AT91_PIT_H
->  #define AT91_PIT_H
+>  	at91_add_device_nand(&cam60_nand_data);
+>  }
+> diff --git a/arch/arm/mach-at91/board-cap9adk.c b/arch/arm/mach-at91/board-cap9adk.c
+> index 5dffd3b..da2616f 100644
+> --- a/arch/arm/mach-at91/board-cap9adk.c
+> +++ b/arch/arm/mach-at91/board-cap9adk.c
+> @@ -212,7 +212,7 @@ static void __init cap9adk_add_device_nand(void)
+>  		cap9adk_nand_smc_config.mode |= AT91_SMC_DBW_8;
 >  
-> -#define AT91_PIT_MR		(AT91_PIT + 0x00)	/* Mode Register */
-> +#define AT91_PIT_MR		0x00			/* Mode Register */
->  #define		AT91_PIT_PITIEN		(1 << 25)		/* Timer Interrupt Enable */
->  #define		AT91_PIT_PITEN		(1 << 24)		/* Timer Enabled */
->  #define		AT91_PIT_PIV		(0xfffff)		/* Periodic Interval Value */
+>  	/* configure chip-select 3 (NAND) */
+> -	sam9_smc_configure(3, &cap9adk_nand_smc_config);
+> +	sam9_smc_configure(0, 3, &cap9adk_nand_smc_config);
 >  
-> -#define AT91_PIT_SR		(AT91_PIT + 0x04)	/* Status Register */
-> +#define AT91_PIT_SR		0x04			/* Status Register */
->  #define		AT91_PIT_PITS		(1 << 0)		/* Timer Status */
+>  	at91_add_device_nand(&cap9adk_nand_data);
+>  }
+> @@ -282,7 +282,7 @@ static __init void cap9adk_add_device_nor(void)
+>  	at91_sys_write(AT91_MATRIX_EBICSA, csa | AT91_MATRIX_EBI_VDDIOMSEL_3_3V);
 >  
-> -#define AT91_PIT_PIVR		(AT91_PIT + 0x08)	/* Periodic Interval Value Register */
-> -#define AT91_PIT_PIIR		(AT91_PIT + 0x0c)	/* Periodic Interval Image Register */
-> +#define AT91_PIT_PIVR		0x08			/* Periodic Interval Value Register */
-> +#define AT91_PIT_PIIR		0x0c			/* Periodic Interval Image Register */
->  #define		AT91_PIT_PICNT		(0xfff << 20)		/* Interval Counter */
->  #define		AT91_PIT_CPIV		(0xfffff)		/* Inverval Value */
+>  	/* configure chip-select 0 (NOR) */
+> -	sam9_smc_configure(0, &cap9adk_nor_smc_config);
+> +	sam9_smc_configure(0, 0, &cap9adk_nor_smc_config);
 >  
+>  	platform_device_register(&cap9adk_nor_flash);
+>  }
+> diff --git a/arch/arm/mach-at91/board-cpu9krea.c b/arch/arm/mach-at91/board-cpu9krea.c
+> index fc885a4..7dd752e 100644
+> --- a/arch/arm/mach-at91/board-cpu9krea.c
+> +++ b/arch/arm/mach-at91/board-cpu9krea.c
+> @@ -156,7 +156,7 @@ static struct sam9_smc_config __initdata cpu9krea_nand_smc_config = {
+>  
+>  static void __init cpu9krea_add_device_nand(void)
+>  {
+> -	sam9_smc_configure(3, &cpu9krea_nand_smc_config);
+> +	sam9_smc_configure(0, 3, &cpu9krea_nand_smc_config);
+>  	at91_add_device_nand(&cpu9krea_nand_data);
+>  }
+>  
+> @@ -238,7 +238,7 @@ static __init void cpu9krea_add_device_nor(void)
+>  	at91_sys_write(AT91_MATRIX_EBICSA, csa | AT91_MATRIX_VDDIOMSEL_3_3V);
+>  
+>  	/* configure chip-select 0 (NOR) */
+> -	sam9_smc_configure(0, &cpu9krea_nor_smc_config);
+> +	sam9_smc_configure(0, 0, &cpu9krea_nor_smc_config);
+>  
+>  	platform_device_register(&cpu9krea_nor_flash);
+>  }
+> diff --git a/arch/arm/mach-at91/board-dt.c b/arch/arm/mach-at91/board-dt.c
+> index 0b7d327..41d84d9 100644
+> --- a/arch/arm/mach-at91/board-dt.c
+> +++ b/arch/arm/mach-at91/board-dt.c
+> @@ -82,7 +82,7 @@ static void __init ek_add_device_nand(void)
+>  		ek_nand_smc_config.mode |= AT91_SMC_DBW_8;
+>  
+>  	/* configure chip-select 3 (NAND) */
+> -	sam9_smc_configure(3, &ek_nand_smc_config);
+> +	sam9_smc_configure(0, 3, &ek_nand_smc_config);
+>  
+>  	at91_add_device_nand(&ek_nand_data);
+>  }
+> diff --git a/arch/arm/mach-at91/board-neocore926.c b/arch/arm/mach-at91/board-neocore926.c
+> index ef816c1..a9b9adc 100644
+> --- a/arch/arm/mach-at91/board-neocore926.c
+> +++ b/arch/arm/mach-at91/board-neocore926.c
+> @@ -213,7 +213,7 @@ static struct sam9_smc_config __initdata neocore926_nand_smc_config = {
+>  static void __init neocore926_add_device_nand(void)
+>  {
+>  	/* configure chip-select 3 (NAND) */
+> -	sam9_smc_configure(3, &neocore926_nand_smc_config);
+> +	sam9_smc_configure(0, 3, &neocore926_nand_smc_config);
+>  
+>  	at91_add_device_nand(&neocore926_nand_data);
+>  }
+> diff --git a/arch/arm/mach-at91/board-pcontrol-g20.c b/arch/arm/mach-at91/board-pcontrol-g20.c
+> index 49e3f69..0e3c632 100644
+> --- a/arch/arm/mach-at91/board-pcontrol-g20.c
+> +++ b/arch/arm/mach-at91/board-pcontrol-g20.c
+> @@ -96,9 +96,9 @@ static struct sam9_smc_config __initdata pcontrol_smc_config[2] = { {
+>  static void __init add_device_pcontrol(void)
+>  {
+>  	/* configure chip-select 4 (IO compatible to 8051  X4 ) */
+> -	sam9_smc_configure(4, &pcontrol_smc_config[0]);
+> +	sam9_smc_configure(0, 4, &pcontrol_smc_config[0]);
+>  	/* configure chip-select 7 (FerroRAM 256KiBx16bit MR2A16A  D4 ) */
+> -	sam9_smc_configure(7, &pcontrol_smc_config[1]);
+> +	sam9_smc_configure(0, 7, &pcontrol_smc_config[1]);
+>  }
+>  
+>  
+> diff --git a/arch/arm/mach-at91/board-qil-a9260.c b/arch/arm/mach-at91/board-qil-a9260.c
+> index 07421bd..89d44c0 100644
+> --- a/arch/arm/mach-at91/board-qil-a9260.c
+> +++ b/arch/arm/mach-at91/board-qil-a9260.c
+> @@ -161,7 +161,7 @@ static struct sam9_smc_config __initdata ek_nand_smc_config = {
+>  static void __init ek_add_device_nand(void)
+>  {
+>  	/* configure chip-select 3 (NAND) */
+> -	sam9_smc_configure(3, &ek_nand_smc_config);
+> +	sam9_smc_configure(0, 3, &ek_nand_smc_config);
+>  
+>  	at91_add_device_nand(&ek_nand_data);
+>  }
+> diff --git a/arch/arm/mach-at91/board-sam9-l9260.c b/arch/arm/mach-at91/board-sam9-l9260.c
+> index 072d53a..e0283c5 100644
+> --- a/arch/arm/mach-at91/board-sam9-l9260.c
+> +++ b/arch/arm/mach-at91/board-sam9-l9260.c
+> @@ -162,7 +162,7 @@ static struct sam9_smc_config __initdata ek_nand_smc_config = {
+>  static void __init ek_add_device_nand(void)
+>  {
+>  	/* configure chip-select 3 (NAND) */
+> -	sam9_smc_configure(3, &ek_nand_smc_config);
+> +	sam9_smc_configure(0, 3, &ek_nand_smc_config);
+>  
+>  	at91_add_device_nand(&ek_nand_data);
+>  }
+> diff --git a/arch/arm/mach-at91/board-sam9260ek.c b/arch/arm/mach-at91/board-sam9260ek.c
+> index 4f10181..00db0f8 100644
+> --- a/arch/arm/mach-at91/board-sam9260ek.c
+> +++ b/arch/arm/mach-at91/board-sam9260ek.c
+> @@ -211,7 +211,7 @@ static void __init ek_add_device_nand(void)
+>  		ek_nand_smc_config.mode |= AT91_SMC_DBW_8;
+>  
+>  	/* configure chip-select 3 (NAND) */
+> -	sam9_smc_configure(3, &ek_nand_smc_config);
+> +	sam9_smc_configure(0, 3, &ek_nand_smc_config);
+>  
+>  	at91_add_device_nand(&ek_nand_data);
+>  }
+> diff --git a/arch/arm/mach-at91/board-sam9261ek.c b/arch/arm/mach-at91/board-sam9261ek.c
+> index b005b73..a879b33 100644
+> --- a/arch/arm/mach-at91/board-sam9261ek.c
+> +++ b/arch/arm/mach-at91/board-sam9261ek.c
+> @@ -131,7 +131,7 @@ static struct sam9_smc_config __initdata dm9000_smc_config = {
+>  static void __init ek_add_device_dm9000(void)
+>  {
+>  	/* Configure chip-select 2 (DM9000) */
+> -	sam9_smc_configure(2, &dm9000_smc_config);
+> +	sam9_smc_configure(0, 2, &dm9000_smc_config);
+>  
+>  	/* Configure Reset signal as output */
+>  	at91_set_gpio_output(AT91_PIN_PC10, 0);
+> @@ -217,7 +217,7 @@ static void __init ek_add_device_nand(void)
+>  		ek_nand_smc_config.mode |= AT91_SMC_DBW_8;
+>  
+>  	/* configure chip-select 3 (NAND) */
+> -	sam9_smc_configure(3, &ek_nand_smc_config);
+> +	sam9_smc_configure(0, 3, &ek_nand_smc_config);
+>  
+>  	at91_add_device_nand(&ek_nand_data);
+>  }
+> diff --git a/arch/arm/mach-at91/board-sam9263ek.c b/arch/arm/mach-at91/board-sam9263ek.c
+> index bccdcf2..7b25ca1 100644
+> --- a/arch/arm/mach-at91/board-sam9263ek.c
+> +++ b/arch/arm/mach-at91/board-sam9263ek.c
+> @@ -218,7 +218,7 @@ static void __init ek_add_device_nand(void)
+>  		ek_nand_smc_config.mode |= AT91_SMC_DBW_8;
+>  
+>  	/* configure chip-select 3 (NAND) */
+> -	sam9_smc_configure(3, &ek_nand_smc_config);
+> +	sam9_smc_configure(0, 3, &ek_nand_smc_config);
+>  
+>  	at91_add_device_nand(&ek_nand_data);
+>  }
+> diff --git a/arch/arm/mach-at91/board-sam9g20ek.c b/arch/arm/mach-at91/board-sam9g20ek.c
+> index 64fc75c..0579f06 100644
+> --- a/arch/arm/mach-at91/board-sam9g20ek.c
+> +++ b/arch/arm/mach-at91/board-sam9g20ek.c
+> @@ -195,7 +195,7 @@ static void __init ek_add_device_nand(void)
+>  		ek_nand_smc_config.mode |= AT91_SMC_DBW_8;
+>  
+>  	/* configure chip-select 3 (NAND) */
+> -	sam9_smc_configure(3, &ek_nand_smc_config);
+> +	sam9_smc_configure(0, 3, &ek_nand_smc_config);
+>  
+>  	at91_add_device_nand(&ek_nand_data);
+>  }
+> diff --git a/arch/arm/mach-at91/board-sam9m10g45ek.c b/arch/arm/mach-at91/board-sam9m10g45ek.c
+> index 92de9127..3e0d5a9 100644
+> --- a/arch/arm/mach-at91/board-sam9m10g45ek.c
+> +++ b/arch/arm/mach-at91/board-sam9m10g45ek.c
+> @@ -175,7 +175,7 @@ static void __init ek_add_device_nand(void)
+>  		ek_nand_smc_config.mode |= AT91_SMC_DBW_8;
+>  
+>  	/* configure chip-select 3 (NAND) */
+> -	sam9_smc_configure(3, &ek_nand_smc_config);
+> +	sam9_smc_configure(0, 3, &ek_nand_smc_config);
+>  
+>  	at91_add_device_nand(&ek_nand_data);
+>  }
+> diff --git a/arch/arm/mach-at91/board-sam9rlek.c b/arch/arm/mach-at91/board-sam9rlek.c
+> index b2b7482..c561eda 100644
+> --- a/arch/arm/mach-at91/board-sam9rlek.c
+> +++ b/arch/arm/mach-at91/board-sam9rlek.c
+> @@ -119,7 +119,7 @@ static struct sam9_smc_config __initdata ek_nand_smc_config = {
+>  static void __init ek_add_device_nand(void)
+>  {
+>  	/* configure chip-select 3 (NAND) */
+> -	sam9_smc_configure(3, &ek_nand_smc_config);
+> +	sam9_smc_configure(0, 3, &ek_nand_smc_config);
+>  
+>  	at91_add_device_nand(&ek_nand_data);
+>  }
+> diff --git a/arch/arm/mach-at91/board-snapper9260.c b/arch/arm/mach-at91/board-snapper9260.c
+> index 0df01c6..645d833 100644
+> --- a/arch/arm/mach-at91/board-snapper9260.c
+> +++ b/arch/arm/mach-at91/board-snapper9260.c
+> @@ -149,7 +149,7 @@ static struct i2c_board_info __initdata snapper9260_i2c_devices[] = {
+>  static void __init snapper9260_add_device_nand(void)
+>  {
+>  	at91_set_A_periph(AT91_PIN_PC14, 0);
+> -	sam9_smc_configure(3, &snapper9260_nand_smc_config);
+> +	sam9_smc_configure(0, 3, &snapper9260_nand_smc_config);
+>  	at91_add_device_nand(&snapper9260_nand_data);
+>  }
+>  
+> diff --git a/arch/arm/mach-at91/board-stamp9g20.c b/arch/arm/mach-at91/board-stamp9g20.c
+> index 936e5fd..f94ac86 100644
+> --- a/arch/arm/mach-at91/board-stamp9g20.c
+> +++ b/arch/arm/mach-at91/board-stamp9g20.c
+> @@ -108,7 +108,7 @@ static struct sam9_smc_config __initdata nand_smc_config = {
+>  static void __init add_device_nand(void)
+>  {
+>  	/* configure chip-select 3 (NAND) */
+> -	sam9_smc_configure(3, &nand_smc_config);
+> +	sam9_smc_configure(0, 3, &nand_smc_config);
+>  
+>  	at91_add_device_nand(&nand_data);
+>  }
+> diff --git a/arch/arm/mach-at91/board-usb-a926x.c b/arch/arm/mach-at91/board-usb-a926x.c
+> index 0a20bab..6f893cf 100644
+> --- a/arch/arm/mach-at91/board-usb-a926x.c
+> +++ b/arch/arm/mach-at91/board-usb-a926x.c
+> @@ -245,9 +245,9 @@ static void __init ek_add_device_nand(void)
+>  
+>  	/* configure chip-select 3 (NAND) */
+>  	if (machine_is_usb_a9g20())
+> -		sam9_smc_configure(3, &usb_a9g20_nand_smc_config);
+> +		sam9_smc_configure(0, 3, &usb_a9g20_nand_smc_config);
+>  	else
+> -		sam9_smc_configure(3, &usb_a9260_nand_smc_config);
+> +		sam9_smc_configure(0, 3, &usb_a9260_nand_smc_config);
+>  
+>  	at91_add_device_nand(&ek_nand_data);
+>  }
 > diff --git a/arch/arm/mach-at91/include/mach/at91cap9.h b/arch/arm/mach-at91/include/mach/at91cap9.h
-> index 1cb42a6..ad8d298 100644
+> index ad8d298..d7d0b68 100644
 > --- a/arch/arm/mach-at91/include/mach/at91cap9.h
 > +++ b/arch/arm/mach-at91/include/mach/at91cap9.h
-> @@ -89,7 +89,6 @@
->  #define AT91_PMC	(0xfffffc00 - AT91_BASE_SYS)
->  #define AT91_RSTC	(0xfffffd00 - AT91_BASE_SYS)
->  #define AT91_SHDWC	(0xfffffd10 - AT91_BASE_SYS)
-> -#define AT91_PIT	(0xfffffd30 - AT91_BASE_SYS)
->  #define AT91_WDT	(0xfffffd40 - AT91_BASE_SYS)
->  #define AT91_GPBR	(cpu_is_at91cap9_revB() ?	\
->  			(0xfffffd50 - AT91_BASE_SYS) :	\
-> @@ -102,6 +101,7 @@
->  #define AT91CAP9_BASE_PIOC	0xfffff600
->  #define AT91CAP9_BASE_PIOD	0xfffff800
->  #define AT91CAP9_BASE_RTT	0xfffffd20
-> +#define AT91CAP9_BASE_PIT	0xfffffd30
+> @@ -81,7 +81,6 @@
+>   */
+>  #define AT91_BCRAMC	(0xffffe400 - AT91_BASE_SYS)
+>  #define AT91_DDRSDRC0	(0xffffe600 - AT91_BASE_SYS)
+> -#define AT91_SMC	(0xffffe800 - AT91_BASE_SYS)
+>  #define AT91_MATRIX	(0xffffea00 - AT91_BASE_SYS)
+>  #define AT91_CCFG	(0xffffeb10 - AT91_BASE_SYS)
+>  #define AT91_DBGU	(0xffffee00 - AT91_BASE_SYS)
+> @@ -96,6 +95,7 @@
 >  
->  #define AT91_USART0	AT91CAP9_BASE_US0
->  #define AT91_USART1	AT91CAP9_BASE_US1
+>  #define AT91CAP9_BASE_ECC	0xffffe200
+>  #define AT91CAP9_BASE_DMA	0xffffec00
+> +#define AT91CAP9_BASE_SMC	0xffffe800
+>  #define AT91CAP9_BASE_PIOA	0xfffff200
+>  #define AT91CAP9_BASE_PIOB	0xfffff400
+>  #define AT91CAP9_BASE_PIOC	0xfffff600
 > diff --git a/arch/arm/mach-at91/include/mach/at91sam9260.h b/arch/arm/mach-at91/include/mach/at91sam9260.h
-> index 6aa7ca9..b8c85dc 100644
+> index b8c85dc..e55ab6a 100644
 > --- a/arch/arm/mach-at91/include/mach/at91sam9260.h
 > +++ b/arch/arm/mach-at91/include/mach/at91sam9260.h
-> @@ -89,7 +89,6 @@
->  #define AT91_PMC	(0xfffffc00 - AT91_BASE_SYS)
->  #define AT91_RSTC	(0xfffffd00 - AT91_BASE_SYS)
->  #define AT91_SHDWC	(0xfffffd10 - AT91_BASE_SYS)
-> -#define AT91_PIT	(0xfffffd30 - AT91_BASE_SYS)
->  #define AT91_WDT	(0xfffffd40 - AT91_BASE_SYS)
+> @@ -81,7 +81,6 @@
+>   * System Peripherals (offset from AT91_BASE_SYS)
+>   */
+>  #define AT91_SDRAMC0	(0xffffea00 - AT91_BASE_SYS)
+> -#define AT91_SMC	(0xffffec00 - AT91_BASE_SYS)
+>  #define AT91_MATRIX	(0xffffee00 - AT91_BASE_SYS)
+>  #define AT91_CCFG	(0xffffef10 - AT91_BASE_SYS)
+>  #define AT91_AIC	(0xfffff000 - AT91_BASE_SYS)
+> @@ -93,6 +92,7 @@
 >  #define AT91_GPBR	(0xfffffd50 - AT91_BASE_SYS)
 >  
-> @@ -98,6 +97,7 @@
+>  #define AT91SAM9260_BASE_ECC	0xffffe800
+> +#define AT91SAM9260_BASE_SMC	0xffffec00
+>  #define AT91SAM9260_BASE_PIOA	0xfffff400
 >  #define AT91SAM9260_BASE_PIOB	0xfffff600
 >  #define AT91SAM9260_BASE_PIOC	0xfffff800
->  #define AT91SAM9260_BASE_RTT	0xfffffd20
-> +#define AT91SAM9260_BASE_PIT	0xfffffd30
->  
->  #define AT91_USART0	AT91SAM9260_BASE_US0
->  #define AT91_USART1	AT91SAM9260_BASE_US1
 > diff --git a/arch/arm/mach-at91/include/mach/at91sam9261.h b/arch/arm/mach-at91/include/mach/at91sam9261.h
-> index f84b713..0dccaff 100644
+> index 0dccaff..1ea2d6b 100644
 > --- a/arch/arm/mach-at91/include/mach/at91sam9261.h
 > +++ b/arch/arm/mach-at91/include/mach/at91sam9261.h
-> @@ -73,7 +73,6 @@
->  #define AT91_PMC	(0xfffffc00 - AT91_BASE_SYS)
->  #define AT91_RSTC	(0xfffffd00 - AT91_BASE_SYS)
->  #define AT91_SHDWC	(0xfffffd10 - AT91_BASE_SYS)
-> -#define AT91_PIT	(0xfffffd30 - AT91_BASE_SYS)
+> @@ -66,7 +66,6 @@
+>   * System Peripherals (offset from AT91_BASE_SYS)
+>   */
+>  #define AT91_SDRAMC0	(0xffffea00 - AT91_BASE_SYS)
+> -#define AT91_SMC	(0xffffec00 - AT91_BASE_SYS)
+>  #define AT91_MATRIX	(0xffffee00 - AT91_BASE_SYS)
+>  #define AT91_AIC	(0xfffff000 - AT91_BASE_SYS)
+>  #define AT91_DBGU	(0xfffff200 - AT91_BASE_SYS)
+> @@ -76,6 +75,7 @@
 >  #define AT91_WDT	(0xfffffd40 - AT91_BASE_SYS)
 >  #define AT91_GPBR	(0xfffffd50 - AT91_BASE_SYS)
 >  
-> @@ -81,6 +80,7 @@
+> +#define AT91SAM9261_BASE_SMC	0xffffec00
+>  #define AT91SAM9261_BASE_PIOA	0xfffff400
 >  #define AT91SAM9261_BASE_PIOB	0xfffff600
 >  #define AT91SAM9261_BASE_PIOC	0xfffff800
->  #define AT91SAM9261_BASE_RTT	0xfffffd20
-> +#define AT91SAM9261_BASE_PIT	0xfffffd30
->  
->  #define AT91_USART0	AT91SAM9261_BASE_US0
->  #define AT91_USART1	AT91SAM9261_BASE_US1
 > diff --git a/arch/arm/mach-at91/include/mach/at91sam9263.h b/arch/arm/mach-at91/include/mach/at91sam9263.h
-> index 938965e..735408e 100644
+> index 735408e..b827ff7 100644
 > --- a/arch/arm/mach-at91/include/mach/at91sam9263.h
 > +++ b/arch/arm/mach-at91/include/mach/at91sam9263.h
-> @@ -85,7 +85,6 @@
->  #define AT91_PMC	(0xfffffc00 - AT91_BASE_SYS)
->  #define AT91_RSTC	(0xfffffd00 - AT91_BASE_SYS)
->  #define AT91_SHDWC	(0xfffffd10 - AT91_BASE_SYS)
-> -#define AT91_PIT	(0xfffffd30 - AT91_BASE_SYS)
->  #define AT91_WDT	(0xfffffd40 - AT91_BASE_SYS)
+> @@ -75,9 +75,7 @@
+>   * System Peripherals (offset from AT91_BASE_SYS)
+>   */
+>  #define AT91_SDRAMC0	(0xffffe200 - AT91_BASE_SYS)
+> -#define AT91_SMC0	(0xffffe400 - AT91_BASE_SYS)
+>  #define AT91_SDRAMC1	(0xffffe800 - AT91_BASE_SYS)
+> -#define AT91_SMC1	(0xffffea00 - AT91_BASE_SYS)
+>  #define AT91_MATRIX	(0xffffec00 - AT91_BASE_SYS)
+>  #define AT91_CCFG	(0xffffed10 - AT91_BASE_SYS)
+>  #define AT91_DBGU	(0xffffee00 - AT91_BASE_SYS)
+> @@ -89,7 +87,9 @@
 >  #define AT91_GPBR	(0xfffffd60 - AT91_BASE_SYS)
 >  
-> @@ -97,6 +96,7 @@
->  #define AT91SAM9263_BASE_PIOD	0xfffff800
->  #define AT91SAM9263_BASE_PIOE	0xfffffa00
->  #define AT91SAM9263_BASE_RTT0	0xfffffd20
-> +#define AT91SAM9263_BASE_PIT	0xfffffd30
->  #define AT91SAM9263_BASE_RTT1	0xfffffd50
+>  #define AT91SAM9263_BASE_ECC0	0xffffe000
+> +#define AT91SAM9263_BASE_SMC0	0xffffe400
+>  #define AT91SAM9263_BASE_ECC1	0xffffe600
+> +#define AT91SAM9263_BASE_SMC1	0xffffea00
+>  #define AT91SAM9263_BASE_PIOA	0xfffff200
+>  #define AT91SAM9263_BASE_PIOB	0xfffff400
+>  #define AT91SAM9263_BASE_PIOC	0xfffff600
+> diff --git a/arch/arm/mach-at91/include/mach/at91sam9_smc.h b/arch/arm/mach-at91/include/mach/at91sam9_smc.h
+> index 57de620..eb18a70 100644
+> --- a/arch/arm/mach-at91/include/mach/at91sam9_smc.h
+> +++ b/arch/arm/mach-at91/include/mach/at91sam9_smc.h
+> @@ -16,7 +16,9 @@
+>  #ifndef AT91SAM9_SMC_H
+>  #define AT91SAM9_SMC_H
 >  
->  #define AT91_USART0	AT91SAM9263_BASE_US0
+> -#define AT91_SMC_SETUP(n)	(AT91_SMC + 0x00 + ((n)*0x10))	/* Setup Register for CS n */
+> +#include <mach/cpu.h>
+> +
+> +#define AT91_SMC_SETUP		0x00				/* Setup Register for CS n */
+>  #define		AT91_SMC_NWESETUP	(0x3f << 0)			/* NWE Setup Length */
+>  #define			AT91_SMC_NWESETUP_(x)	((x) << 0)
+>  #define		AT91_SMC_NCS_WRSETUP	(0x3f << 8)			/* NCS Setup Length in Write Access */
+> @@ -26,7 +28,7 @@
+>  #define		AT91_SMC_NCS_RDSETUP	(0x3f << 24)			/* NCS Setup Length in Read Access */
+>  #define			AT91_SMC_NCS_RDSETUP_(x)	((x) << 24)
+>  
+> -#define AT91_SMC_PULSE(n)	(AT91_SMC + 0x04 + ((n)*0x10))	/* Pulse Register for CS n */
+> +#define AT91_SMC_PULSE		0x04				/* Pulse Register for CS n */
+>  #define		AT91_SMC_NWEPULSE	(0x7f <<  0)			/* NWE Pulse Length */
+>  #define			AT91_SMC_NWEPULSE_(x)	((x) << 0)
+>  #define		AT91_SMC_NCS_WRPULSE	(0x7f <<  8)			/* NCS Pulse Length in Write Access */
+> @@ -36,13 +38,13 @@
+>  #define		AT91_SMC_NCS_RDPULSE	(0x7f << 24)			/* NCS Pulse Length in Read Access */
+>  #define			AT91_SMC_NCS_RDPULSE_(x)((x) << 24)
+>  
+> -#define AT91_SMC_CYCLE(n)	(AT91_SMC + 0x08 + ((n)*0x10))	/* Cycle Register for CS n */
+> +#define AT91_SMC_CYCLE		0x08				/* Cycle Register for CS n */
+>  #define		AT91_SMC_NWECYCLE	(0x1ff << 0 )			/* Total Write Cycle Length */
+>  #define			AT91_SMC_NWECYCLE_(x)	((x) << 0)
+>  #define		AT91_SMC_NRDCYCLE	(0x1ff << 16)			/* Total Read Cycle Length */
+>  #define			AT91_SMC_NRDCYCLE_(x)	((x) << 16)
+>  
+> -#define AT91_SMC_MODE(n)	(AT91_SMC + 0x0c + ((n)*0x10))	/* Mode Register for CS n */
+> +#define AT91_SMC_MODE		0x0c				/* Mode Register for CS n */
+>  #define		AT91_SMC_READMODE	(1 <<  0)			/* Read Mode */
+>  #define		AT91_SMC_WRITEMODE	(1 <<  1)			/* Write Mode */
+>  #define		AT91_SMC_EXNWMODE	(3 <<  4)			/* NWAIT Mode */
+> @@ -66,11 +68,4 @@
+>  #define			AT91_SMC_PS_16			(2 << 28)
+>  #define			AT91_SMC_PS_32			(3 << 28)
+>  
+> -#if defined(AT91_SMC1)		/* The AT91SAM9263 has 2 Static Memory contollers */
+> -#define AT91_SMC1_SETUP(n)	(AT91_SMC1 + 0x00 + ((n)*0x10))	/* Setup Register for CS n */
+> -#define AT91_SMC1_PULSE(n)	(AT91_SMC1 + 0x04 + ((n)*0x10))	/* Pulse Register for CS n */
+> -#define AT91_SMC1_CYCLE(n)	(AT91_SMC1 + 0x08 + ((n)*0x10))	/* Cycle Register for CS n */
+> -#define AT91_SMC1_MODE(n)	(AT91_SMC1 + 0x0c + ((n)*0x10))	/* Mode Register for CS n */
+> -#endif
+> -
+>  #endif
 > diff --git a/arch/arm/mach-at91/include/mach/at91sam9g45.h b/arch/arm/mach-at91/include/mach/at91sam9g45.h
-> index 00638c6..ba609f3 100644
+> index ba609f3..ac051d4 100644
 > --- a/arch/arm/mach-at91/include/mach/at91sam9g45.h
 > +++ b/arch/arm/mach-at91/include/mach/at91sam9g45.h
-> @@ -95,7 +95,6 @@
->  #define AT91_PMC	(0xfffffc00 - AT91_BASE_SYS)
->  #define AT91_RSTC	(0xfffffd00 - AT91_BASE_SYS)
->  #define AT91_SHDWC	(0xfffffd10 - AT91_BASE_SYS)
-> -#define AT91_PIT	(0xfffffd30 - AT91_BASE_SYS)
->  #define AT91_WDT	(0xfffffd40 - AT91_BASE_SYS)
->  #define AT91_GPBR	(0xfffffd60 - AT91_BASE_SYS)
->  #define AT91_RTC	(0xfffffdb0 - AT91_BASE_SYS)
-> @@ -108,6 +107,7 @@
->  #define AT91SAM9G45_BASE_PIOD	0xfffff800
->  #define AT91SAM9G45_BASE_PIOE	0xfffffa00
->  #define AT91SAM9G45_BASE_RTT	0xfffffd20
-> +#define AT91SAM9G45_BASE_PIT	0xfffffd30
+> @@ -88,7 +88,6 @@
+>   */
+>  #define AT91_DDRSDRC1	(0xffffe400 - AT91_BASE_SYS)
+>  #define AT91_DDRSDRC0	(0xffffe600 - AT91_BASE_SYS)
+> -#define AT91_SMC	(0xffffe800 - AT91_BASE_SYS)
+>  #define AT91_MATRIX	(0xffffea00 - AT91_BASE_SYS)
+>  #define AT91_DBGU	(0xffffee00 - AT91_BASE_SYS)
+>  #define AT91_AIC	(0xfffff000 - AT91_BASE_SYS)
+> @@ -101,6 +100,7 @@
 >  
->  #define AT91_USART0	AT91SAM9G45_BASE_US0
->  #define AT91_USART1	AT91SAM9G45_BASE_US1
+>  #define AT91SAM9G45_BASE_ECC	0xffffe200
+>  #define AT91SAM9G45_BASE_DMA	0xffffec00
+> +#define AT91SAM9G45_BASE_SMC	0xffffe800
+>  #define AT91SAM9G45_BASE_PIOA	0xfffff200
+>  #define AT91SAM9G45_BASE_PIOB	0xfffff400
+>  #define AT91SAM9G45_BASE_PIOC	0xfffff600
 > diff --git a/arch/arm/mach-at91/include/mach/at91sam9rl.h b/arch/arm/mach-at91/include/mach/at91sam9rl.h
-> index 099cefc..bab09a7 100644
+> index bab09a7..846139d 100644
 > --- a/arch/arm/mach-at91/include/mach/at91sam9rl.h
 > +++ b/arch/arm/mach-at91/include/mach/at91sam9rl.h
-> @@ -78,7 +78,6 @@
->  #define AT91_PMC	(0xfffffc00 - AT91_BASE_SYS)
->  #define AT91_RSTC	(0xfffffd00 - AT91_BASE_SYS)
->  #define AT91_SHDWC	(0xfffffd10 - AT91_BASE_SYS)
-> -#define AT91_PIT	(0xfffffd30 - AT91_BASE_SYS)
->  #define AT91_WDT	(0xfffffd40 - AT91_BASE_SYS)
->  #define AT91_SCKCR	(0xfffffd50 - AT91_BASE_SYS)
->  #define AT91_GPBR	(0xfffffd60 - AT91_BASE_SYS)
-> @@ -91,6 +90,7 @@
->  #define AT91SAM9RL_BASE_PIOC	0xfffff800
->  #define AT91SAM9RL_BASE_PIOD	0xfffffa00
->  #define AT91SAM9RL_BASE_RTT	0xfffffd20
-> +#define AT91SAM9RL_BASE_PIT	0xfffffd30
+> @@ -70,7 +70,6 @@
+>   * System Peripherals (offset from AT91_BASE_SYS)
+>   */
+>  #define AT91_SDRAMC0	(0xffffea00 - AT91_BASE_SYS)
+> -#define AT91_SMC	(0xffffec00 - AT91_BASE_SYS)
+>  #define AT91_MATRIX	(0xffffee00 - AT91_BASE_SYS)
+>  #define AT91_CCFG	(0xffffef10 - AT91_BASE_SYS)
+>  #define AT91_AIC	(0xfffff000 - AT91_BASE_SYS)
+> @@ -85,6 +84,7 @@
 >  
->  #define AT91_USART0	AT91SAM9RL_BASE_US0
->  #define AT91_USART1	AT91SAM9RL_BASE_US1
+>  #define AT91SAM9RL_BASE_DMA	0xffffe600
+>  #define AT91SAM9RL_BASE_ECC	0xffffe800
+> +#define AT91SAM9RL_BASE_SMC	0xffffec00
+>  #define AT91SAM9RL_BASE_PIOA	0xfffff400
+>  #define AT91SAM9RL_BASE_PIOB	0xfffff600
+>  #define AT91SAM9RL_BASE_PIOC	0xfffff800
+> diff --git a/arch/arm/mach-at91/sam9_smc.c b/arch/arm/mach-at91/sam9_smc.c
+> dissimilarity index 61%
+> index 5eab6aa6..7604ccc 100644
+> --- a/arch/arm/mach-at91/sam9_smc.c
+> +++ b/arch/arm/mach-at91/sam9_smc.c
+> @@ -1,47 +1,63 @@
+> -/*
+> - * linux/arch/arm/mach-at91/sam9_smc.c
+> - *
+> - * Copyright (C) 2008 Andrew Victor
+> - *
+> - * This program is free software; you can redistribute it and/or modify
+> - * it under the terms of the GNU General Public License version 2 as
+> - * published by the Free Software Foundation.
+> - */
+> -
+> -#include <linux/module.h>
+> -#include <linux/io.h>
+> -
+> -#include <mach/at91sam9_smc.h>
+> -
+> -#include "sam9_smc.h"
+> -
+> -void __init sam9_smc_configure(int cs, struct sam9_smc_config* config)
+> -{
+> -	/* Setup register */
+> -	at91_sys_write(AT91_SMC_SETUP(cs),
+> -		  AT91_SMC_NWESETUP_(config->nwe_setup)
+> -		| AT91_SMC_NCS_WRSETUP_(config->ncs_write_setup)
+> -		| AT91_SMC_NRDSETUP_(config->nrd_setup)
+> -		| AT91_SMC_NCS_RDSETUP_(config->ncs_read_setup)
+> -	);
+> -
+> -	/* Pulse register */
+> -	at91_sys_write(AT91_SMC_PULSE(cs),
+> -		  AT91_SMC_NWEPULSE_(config->nwe_pulse)
+> -		| AT91_SMC_NCS_WRPULSE_(config->ncs_write_pulse)
+> -                | AT91_SMC_NRDPULSE_(config->nrd_pulse)
+> -		| AT91_SMC_NCS_RDPULSE_(config->ncs_read_pulse)
+> -	);
+> -
+> -	/* Cycle register */
+> -	at91_sys_write(AT91_SMC_CYCLE(cs),
+> -		  AT91_SMC_NWECYCLE_(config->write_cycle)
+> -		| AT91_SMC_NRDCYCLE_(config->read_cycle)
+> -	);
+> -
+> -	/* Mode register */
+> -	at91_sys_write(AT91_SMC_MODE(cs),
+> -		  config->mode
+> -		| AT91_SMC_TDF_(config->tdf_cycles)
+> -	);
+> -}
+> +/*
+> + * linux/arch/arm/mach-at91/sam9_smc.c
+> + *
+> + * Copyright (C) 2008 Andrew Victor
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#include <linux/module.h>
+> +#include <linux/io.h>
+> +#include <linux/of.h>
+> +#include <linux/of_address.h>
+> +
+> +#include <mach/at91sam9_smc.h>
+> +
+> +#include "sam9_smc.h"
+> +
+> +
+> +#define AT91_SMC_CS(id, n)	(smc_base_addr[id] + ((n) * 0x10))
+> +
+> +static void __iomem *smc_base_addr[2];
+> +
+> +static void __init sam9_smc_cs_configure(void __iomem *base, struct sam9_smc_config* config)
+> +{
+> +
+> +	/* Setup register */
+> +	__raw_writel(AT91_SMC_NWESETUP_(config->nwe_setup)
+> +		   | AT91_SMC_NCS_WRSETUP_(config->ncs_write_setup)
+> +		   | AT91_SMC_NRDSETUP_(config->nrd_setup)
+> +		   | AT91_SMC_NCS_RDSETUP_(config->ncs_read_setup),
+> +		   base + AT91_SMC_SETUP);
+> +
+> +	/* Pulse register */
+> +	__raw_writel(AT91_SMC_NWEPULSE_(config->nwe_pulse)
+> +		   | AT91_SMC_NCS_WRPULSE_(config->ncs_write_pulse)
+> +		   | AT91_SMC_NRDPULSE_(config->nrd_pulse)
+> +		   | AT91_SMC_NCS_RDPULSE_(config->ncs_read_pulse),
+> +		   base + AT91_SMC_PULSE);
+> +
+> +	/* Cycle register */
+> +	__raw_writel(AT91_SMC_NWECYCLE_(config->write_cycle)
+> +		   | AT91_SMC_NRDCYCLE_(config->read_cycle),
+> +		   base + AT91_SMC_CYCLE);
+> +
+> +	/* Mode register */
+> +	__raw_writel(config->mode
+> +		   | AT91_SMC_TDF_(config->tdf_cycles),
+> +		   base + AT91_SMC_MODE);
+> +}
+> +
+> +void __init sam9_smc_configure(int id, int cs, struct sam9_smc_config* config)
+> +{
+> +	sam9_smc_cs_configure(AT91_SMC_CS(id, cs), config);
+> +}
+> +
+> +void __init at91sam9_ioremap_smc(int id, u32 addr)
+> +{
+> +	if (id > 1)
+> +		return;
+
+Blank line here
+
+> +	smc_base_addr[id] = ioremap(addr, 512);
+
+Ditto: error path to ease debugging...
+
+> +}
+> diff --git a/arch/arm/mach-at91/sam9_smc.h b/arch/arm/mach-at91/sam9_smc.h
+> index bf72cfb..039c5ce 100644
+> --- a/arch/arm/mach-at91/sam9_smc.h
+> +++ b/arch/arm/mach-at91/sam9_smc.h
+> @@ -30,4 +30,5 @@ struct sam9_smc_config {
+>  	u8 tdf_cycles:4;
+>  };
+>  
+> -extern void __init sam9_smc_configure(int cs, struct sam9_smc_config* config);
+> +extern void __init sam9_smc_configure(int id, int cs, struct sam9_smc_config* config);
+> +extern void __init at91sam9_ioremap_smc(int id, u32 addr);
 
 
 -- 
