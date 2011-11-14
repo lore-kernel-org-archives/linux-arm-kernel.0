@@ -1,80 +1,77 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 14 Nov 2011 10:24:53 -0800
-Subject: DEBUG_LL on OMAP1 (was Re: [PATCH] ARM: OMAP: Fix map_io for
- Amstrad E3)
-In-Reply-To: <alpine.DEB.2.00.1111121403370.6049@dell>
-References: <B8A6ED05-78AC-4140-A9B8-8265F1E9C32F@iki.fi>
- <20111109231900.GS31337@atomide.com>
- <20111109232525.GT31337@atomide.com>
- <20111109233900.GP15294@n2100.arm.linux.org.uk>
- <20D8B951-2E77-42DF-B735-6062994D47D5@iki.fi>
- <20111110000421.GU31337@atomide.com>
- <alpine.DEB.2.00.1111102349170.19713@dell>
- <20111110232349.GY31337@atomide.com>
- <alpine.DEB.2.00.1111121403370.6049@dell>
-Message-ID: <20111114182453.GK31337@atomide.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Mon, 14 Nov 2011 12:36:57 -0500 (EST)
+Subject: [PATCH 1/2] ARM: use cache type functions for
+ arch_get_unmapped_area
+In-Reply-To: <1320709421-14469-1-git-send-email-robherring2@gmail.com>
+References: <1320709421-14469-1-git-send-email-robherring2@gmail.com>
+Message-ID: <alpine.LFD.2.02.1111141236200.3307@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Aaro Koskinen <aaro.koskinen@iki.fi> [111112 03:42]:
-> Hi,
+On Mon, 7 Nov 2011, Rob Herring wrote:
+
+> From: Rob Herring <rob.herring@calxeda.com>
 > 
-> On Thu, 10 Nov 2011, Tony Lindgren wrote:
-> >* Aaro Koskinen <aaro.koskinen@iki.fi> [111110 13:31]:
-> >>--- a/arch/arm/mach-omap1/clock_data.c
-> >>+++ b/arch/arm/mach-omap1/clock_data.c
-> >>@@ -774,14 +774,6 @@ int __init omap1_clk_init(void)
-> >> 	int crystal_type = 0; /* Default 12 MHz */
-> >> 	u32 reg, cpu_mask;
-> >>
-> >>-#ifdef CONFIG_DEBUG_LL
-> >>-	/*
-> >>-	 * Resets some clocks that may be left on from bootloader,
-> >>-	 * but leaves serial clocks on.
-> >>-	 */
-> >>-	omap_writel(0x3 << 29, MOD_CONF_CTRL_0);
-> >>-#endif
-> >>-
-> >> 	/* USB_REQ_EN will be disabled later if necessary (usb_dc_ck) */
-> >> 	reg = omap_readw(SOFT_REQ_REG) & (1 << 4);
-> >> 	omap_writew(reg, SOFT_REQ_REG);
-> >
-> >Hmm that should keep the serial clocks on. What other bit(s) need to
-> >be on in MOD_CONF_CTRL_0 for you in addition to the serial bits?
+> There are already cache type decoding functions, so use those instead
+> of custom decode code which only works for ARMv6.
 > 
-> On my board those serial bits are zero during the early boot (and the
-> serial works). By setting those bits the clock will switch from 12 ->
-> 48 MHz and I guess the baud rate will change and that's why the output
-> turns into garbage.
+> This change also correctly enables cache colour alignment on Cortex-A9
+> whose I-cache is aliasing VIPT.
+> 
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
 
-OK, looks like on OSK5912 the uart1 serial bit is zero and must be set..
- 
-> So I think the code should reset the other bits, and leave serial bits
-> untouched:
+Acked-by: Nicolas Pitre <nico@linaro.org>
 
-Sounds like we need SoC specific init_early for omap1 too. That way we
-can also get rid of the CONFIG_OMAP_ARM_XXXMHZ Kconfig options that
-are needed to make omap1_defconfig more usable.
 
-Regards,
-
-Tony
- 
-> diff --git a/arch/arm/mach-omap1/clock_data.c b/arch/arm/mach-omap1/clock_data.c
-> index 1297bb5..b3b69d8 100644
-> --- a/arch/arm/mach-omap1/clock_data.c
-> +++ b/arch/arm/mach-omap1/clock_data.c
-> @@ -788,7 +788,11 @@ int __init omap1_clk_init(void)
->  	 * Resets some clocks that may be left on from bootloader,
->  	 * but leaves serial clocks on.
+> ---
+>  arch/arm/mm/mmap.c |   23 ++++++-----------------
+>  1 files changed, 6 insertions(+), 17 deletions(-)
+> 
+> diff --git a/arch/arm/mm/mmap.c b/arch/arm/mm/mmap.c
+> index 74be05f..80e70ef 100644
+> --- a/arch/arm/mm/mmap.c
+> +++ b/arch/arm/mm/mmap.c
+> @@ -9,8 +9,7 @@
+>  #include <linux/io.h>
+>  #include <linux/personality.h>
+>  #include <linux/random.h>
+> -#include <asm/cputype.h>
+> -#include <asm/system.h>
+> +#include <asm/cachetype.h>
+>  
+>  #define COLOUR_ALIGN(addr,pgoff)		\
+>  	((((addr)+SHMLBA-1)&~(SHMLBA-1)) +	\
+> @@ -32,25 +31,15 @@ arch_get_unmapped_area(struct file *filp, unsigned long addr,
+>  	struct mm_struct *mm = current->mm;
+>  	struct vm_area_struct *vma;
+>  	unsigned long start_addr;
+> -#if defined(CONFIG_CPU_V6) || defined(CONFIG_CPU_V6K)
+> -	unsigned int cache_type;
+> -	int do_align = 0, aliasing = 0;
+> +	int do_align = 0;
+> +	int aliasing = cache_is_vipt_aliasing() || icache_is_vipt_aliasing();
+>  
+>  	/*
+>  	 * We only need to do colour alignment if either the I or D
+> -	 * caches alias.  This is indicated by bits 9 and 21 of the
+> -	 * cache type register.
+> +	 * caches alias.
 >  	 */
-> -	omap_writel(0x3 << 29, MOD_CONF_CTRL_0);
-> +	reg = omap_readl(MOD_CONF_CTRL_0) &
-> +		((1 << CONF_MOD_UART1_CLK_MODE_R) |
-> +		 (1 << CONF_MOD_UART2_CLK_MODE_R) |
-> +		 (1 << CONF_MOD_UART3_CLK_MODE_R));
-> +	omap_writel(reg, MOD_CONF_CTRL_0);
->  #endif
-> 
->  	/* USB_REQ_EN will be disabled later if necessary (usb_dc_ck) */
+> -	cache_type = read_cpuid_cachetype();
+> -	if (cache_type != read_cpuid_id()) {
+> -		aliasing = (cache_type | cache_type >> 12) & (1 << 11);
+> -		if (aliasing)
+> -			do_align = filp || flags & MAP_SHARED;
+> -	}
+> -#else
+> -#define do_align 0
+> -#define aliasing 0
+> -#endif
+> +	if (aliasing)
+> +		do_align = filp || (flags & MAP_SHARED);
+>  
+>  	/*
+>  	 * We enforce the MAP_FIXED case.
+> -- 
+> 1.7.5.4
 > 
