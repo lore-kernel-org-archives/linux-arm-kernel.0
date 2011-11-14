@@ -1,88 +1,126 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 14 Nov 2011 12:11:25 +0100
-Subject: [PATCH] RS485: fix inconsistencies in the meaning of some
- variables
-In-Reply-To: <4EC062B7.2090100@griffin.net>
-References: <4E492CFF.7040905@pwrnet.de> <20110822211832.GA8023@kroah.com>
- <4EB3A009.10502@evidence.eu.com> <4EB8F6B9.6010008@atmel.com>
- <4EB90902.4030200@evidence.eu.com>
- <20111108134804.07095c5d@lxorguk.ukuu.org.uk>
- <20111108142432.GA11293@kroah.com> <4EBA9385.7010806@evidence.eu.com>
- <20111113215318.GA2966@pengutronix.de> <4EC062B7.2090100@griffin.net>
-Message-ID: <4EC0F75D.4060102@atmel.com>
+Date: Mon, 14 Nov 2011 12:29:00 +0100
+Subject: [PATCH 3/3] ARM: AT91: Add the ADC to the sam9g20ek board
+In-Reply-To: <1321265193-15817-4-git-send-email-maxime.ripard@free-electrons.com>
+References: <1321265193-15817-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1321265193-15817-4-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <4EC0FB7C.6000800@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/14/2011 01:37 AM, Darron Black :
-> On 11/13/2011 03:53 PM, Wolfram Sang wrote:
->> Hi,
->>
->> I have been working on a patch series which adds hardware RS485 to the
->> 8250
->> according to the latest developments. The series will be posted
->> tomorrow after
->> some more tests. However, there is one thing I wondered about:
->>
->>>  From now on, SER_RS485_RTS_AFTER_SEND and SER_RS485_RTS_ON_SEND will
->>> be used to
->>> set the voltage of the RTS pin (as in the crisv10.c driver); the
->>> delay will be
->>> understood by looking only at the value of delay_rts_before_send and
->>> delay_rts_after_send.
->> Do I overlook something or is SER_RS485_RTS_AFTER_SEND always the
->> inverted
->> signal of SER_RS485_RTS_ON_SEND. So why do we need both? (BTW
->> SER_RS485_RTS_ON_SEND is a non-obvious name, I think. But changing it
->> will
->> probably break even more users?)
-> It allows the application to configure RTS to not toggle at all in one
-> of those two scenarios.
+On 11/14/2011 11:06 AM, Maxime Ripard :
+> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Cc: Patrice Vilchez <patrice.vilchez@atmel.com>
+> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 > 
-> Perhaps the RTS toggle after transmit delay needs to be large, and
-> they'd rather do it in userspace than block in the driver. I also recall
-> a protocol that would send a master assertion command and hold on to RTS
-> afterwards. I can easily imagine needing to quickly transmit something,
-> hold on to RTS for a while, then finish your transmit later.
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+
+
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+(even if I have a tiny comment: see below)
+
+> ---
+>  arch/arm/mach-at91/at91sam9260_devices.c |   52 ++++++++++++++++++++++++++++++
+>  arch/arm/mach-at91/board-sam9g20ek.c     |   11 ++++++
+>  2 files changed, 63 insertions(+), 0 deletions(-)
 > 
-> However, I don't have any concrete examples of needing this outside that
-> vague recollection of a master assertion sequence in an old embedded
-> platform far away from Linux.
+> diff --git a/arch/arm/mach-at91/at91sam9260_devices.c b/arch/arm/mach-at91/at91sam9260_devices.c
+> index 39f81f4..0859553 100644
+> --- a/arch/arm/mach-at91/at91sam9260_devices.c
+> +++ b/arch/arm/mach-at91/at91sam9260_devices.c
+> @@ -1312,6 +1312,58 @@ void __init at91_add_device_cf(struct at91_cf_data *data)
+>  void __init at91_add_device_cf(struct at91_cf_data * data) {}
+>  #endif
+>  
+> +/* --------------------------------------------------------------------
+> + *  ADCs
+> + * -------------------------------------------------------------------- */
 
-Darron, Claudio,
+What about adding all this only if the IIO_AT91ADC is selected?
+Otherwise, you configure pins without actually using them...
 
-This explanation makes sense. Thanks for this.
-
-Bye,
-
-
->>> diff --git a/include/linux/serial.h b/include/linux/serial.h
->>> index 97ff8e2..3d86517 100644
->>> --- a/include/linux/serial.h
->>> +++ b/include/linux/serial.h
->>> @@ -207,13 +207,15 @@ struct serial_icounter_struct {
->>>
->>>   struct serial_rs485 {
->>>       __u32    flags;            /* RS485 feature flags */
->>> -#define SER_RS485_ENABLED        (1<<  0)
->>> -#define SER_RS485_RTS_ON_SEND        (1<<  1)
->>> -#define SER_RS485_RTS_AFTER_SEND    (1<<  2)
->>> -#define SER_RS485_RTS_BEFORE_SEND    (1<<  3)
->>> +#define SER_RS485_ENABLED        (1<<  0)    /* If enabled */
->>> +#define SER_RS485_RTS_ON_SEND        (1<<  1)    /* Logical level for
->>> +                               RTS pin when
->>> +                               sending */
->>> +#define SER_RS485_RTS_AFTER_SEND    (1<<  2)    /* Logical level for
->>> +                               RTS pin after sent*/
->> Nit: 80 char should be broken here, because that is not readable. Or
->> put the
->> comment above the define.
->>
->> Thanks,
->>
->>     Wolfram
->>
-> 
-> 
+> +
+> +static struct at91_adc_data adc_data;
+> +
+> +static struct resource adc_resources[] = {
+> +	[0] = {
+> +		.start	= AT91SAM9260_BASE_ADC,
+> +		.end	= AT91SAM9260_BASE_ADC + SZ_16K - 1,
+> +		.flags	= IORESOURCE_MEM,
+> +	},
+> +	[1] = {
+> +		.start	= AT91SAM9260_ID_ADC,
+> +		.end	= AT91SAM9260_ID_ADC,
+> +		.flags	= IORESOURCE_IRQ,
+> +	},
+> +};
+> +
+> +static struct platform_device at91_adc_device = {
+> +	.name		= "at91adc",
+> +	.id		= -1,
+> +	.dev		= {
+> +				.platform_data		= &adc_data,
+> +	},
+> +	.resource	= adc_resources,
+> +	.num_resources	= ARRAY_SIZE(adc_resources),
+> +};
+> +
+> +void __init at91_add_device_adc(struct at91_adc_data *data)
+> +{
+> +	if (!data)
+> +		return;
+> +
+> +	if (test_bit(0, &(data->channels_used)))
+> +		at91_set_A_periph(AT91_PIN_PC0, 0);
+> +	if (test_bit(1, &(data->channels_used)))
+> +		at91_set_A_periph(AT91_PIN_PC1, 0);
+> +	if (test_bit(2, &(data->channels_used)))
+> +		at91_set_A_periph(AT91_PIN_PC2, 0);
+> +	if (test_bit(3, &(data->channels_used)))
+> +		at91_set_A_periph(AT91_PIN_PC3, 0);
+> +
+> +	data->adc_clock = 5000000;
+> +	data->num_channels = 4;
+> +	data->startup_time = 10;
+> +
+> +	adc_data = *data;
+> +	platform_device_register(&at91_adc_device);
+> +}
+> +
+> +
+>  /* -------------------------------------------------------------------- */
+>  /*
+>   * These devices are always present and don't need any board-specific
+> diff --git a/arch/arm/mach-at91/board-sam9g20ek.c b/arch/arm/mach-at91/board-sam9g20ek.c
+> index 817f59d..e34d41a 100644
+> --- a/arch/arm/mach-at91/board-sam9g20ek.c
+> +++ b/arch/arm/mach-at91/board-sam9g20ek.c
+> @@ -314,6 +314,15 @@ static void __init ek_add_device_buttons(void)
+>  static void __init ek_add_device_buttons(void) {}
+>  #endif
+>  
+> +/*
+> + * ADCs
+> + */
+> +
+> +static struct at91_adc_data ek_adc_data = {
+> +	.channels_used = BIT(0) | BIT(1) | BIT(2) | BIT(3),
+> +	.vref = 3300,
+> +};
+> +
+>  #if defined(CONFIG_REGULATOR_FIXED_VOLTAGE) || defined(CONFIG_REGULATOR_FIXED_VOLTAGE_MODULE)
+>  static struct regulator_consumer_supply ek_audio_consumer_supplies[] = {
+>  	REGULATOR_SUPPLY("AVDD", "0-001b"),
+> @@ -389,6 +398,8 @@ static void __init ek_board_init(void)
+>  	ek_add_device_gpio_leds();
+>  	/* Push Buttons */
+>  	ek_add_device_buttons();
+> +	/* ADCs */
+> +	at91_add_device_adc(&ek_adc_data);
+>  	/* PCK0 provides MCLK to the WM8731 */
+>  	at91_set_B_periph(AT91_PIN_PC1, 0);
+>  	/* SSC (for WM8731) */
 
 
 -- 
