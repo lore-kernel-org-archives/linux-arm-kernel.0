@@ -1,106 +1,259 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 14 Nov 2011 16:23:38 +0000
-Subject: [PATCH v9 02/15] ARM: pgtable: switch to use pgtable-nopud.h
+Date: Mon, 14 Nov 2011 16:23:40 +0000
+Subject: [PATCH v9 04/15] ARM: LPAE: Move the FSR definitions to separate files
 In-Reply-To: <1321287831-24560-1-git-send-email-catalin.marinas@arm.com>
 References: <1321287831-24560-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <1321287831-24560-3-git-send-email-catalin.marinas@arm.com>
+Message-ID: <1321287831-24560-5-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Russell King <rmk+kernel@arm.linux.org.uk>
+The FSR structure is different with LPAE and this patch moves the
+classic MMU specific definition to a separate fsr-2level.c file that is
+included in fault.c. It also moves the fsr_fs and FSR bits to the
+fault.h file.
 
-Nick Piggin noted upon introducing 4level-fixup.h:
-
-| Add a temporary "fallback" header so architectures can run with
-| the 4level pagetables patch without modification. All architectures
-| should be converted to use the folding headers (include/asm-generic/
-| pgtable-nop?d.h) as soon as possible, and the fallback header removed.
-
-This makes ARM compliant with this statement.
-
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm/include/asm/pgalloc.h |    2 +-
- arch/arm/include/asm/pgtable.h |   23 +++++++++++++----------
- arch/arm/include/asm/tlb.h     |    1 +
- 3 files changed, 15 insertions(+), 11 deletions(-)
+ arch/arm/mm/fault.c      |   96 ++--------------------------------------------
+ arch/arm/mm/fault.h      |   19 +++++++++-
+ arch/arm/mm/fsr-2level.c |   78 +++++++++++++++++++++++++++++++++++++
+ 3 files changed, 100 insertions(+), 93 deletions(-)
+ create mode 100644 arch/arm/mm/fsr-2level.c
 
-diff --git a/arch/arm/include/asm/pgalloc.h b/arch/arm/include/asm/pgalloc.h
-index 3e08fd3..7418894 100644
---- a/arch/arm/include/asm/pgalloc.h
-+++ b/arch/arm/include/asm/pgalloc.h
-@@ -30,7 +30,7 @@
-  */
- #define pmd_alloc_one(mm,addr)		({ BUG(); ((pmd_t *)2); })
- #define pmd_free(mm, pmd)		do { } while (0)
--#define pgd_populate(mm,pmd,pte)	BUG()
-+#define pud_populate(mm,pmd,pte)	BUG()
+diff --git a/arch/arm/mm/fault.c b/arch/arm/mm/fault.c
+index aa33949..2a02716 100644
+--- a/arch/arm/mm/fault.c
++++ b/arch/arm/mm/fault.c
+@@ -27,19 +27,6 @@
  
- extern pgd_t *pgd_alloc(struct mm_struct *mm);
- extern void pgd_free(struct mm_struct *mm, pgd_t *pgd);
-diff --git a/arch/arm/include/asm/pgtable.h b/arch/arm/include/asm/pgtable.h
-index 9451dce..a1aca79 100644
---- a/arch/arm/include/asm/pgtable.h
-+++ b/arch/arm/include/asm/pgtable.h
-@@ -11,15 +11,16 @@
- #define _ASMARM_PGTABLE_H
+ #include "fault.h"
  
- #include <linux/const.h>
--#include <asm-generic/4level-fixup.h>
- #include <asm/proc-fns.h>
+-/*
+- * Fault status register encodings.  We steal bit 31 for our own purposes.
+- */
+-#define FSR_LNX_PF		(1 << 31)
+-#define FSR_WRITE		(1 << 11)
+-#define FSR_FS4			(1 << 10)
+-#define FSR_FS3_0		(15)
+-
+-static inline int fsr_fs(unsigned int fsr)
+-{
+-	return (fsr & FSR_FS3_0) | (fsr & FSR_FS4) >> 6;
+-}
+-
+ #ifdef CONFIG_MMU
  
- #ifndef CONFIG_MMU
+ #ifdef CONFIG_KPROBES
+@@ -489,55 +476,16 @@ do_bad(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
+ 	return 1;
+ }
  
-+#include <asm-generic/4level-fixup.h>
- #include "pgtable-nommu.h"
+-static struct fsr_info {
++struct fsr_info {
+ 	int	(*fn)(unsigned long addr, unsigned int fsr, struct pt_regs *regs);
+ 	int	sig;
+ 	int	code;
+ 	const char *name;
+-} fsr_info[] = {
+-	/*
+-	 * The following are the standard ARMv3 and ARMv4 aborts.  ARMv5
+-	 * defines these to be "precise" aborts.
+-	 */
+-	{ do_bad,		SIGSEGV, 0,		"vector exception"		   },
+-	{ do_bad,		SIGBUS,	 BUS_ADRALN,	"alignment exception"		   },
+-	{ do_bad,		SIGKILL, 0,		"terminal exception"		   },
+-	{ do_bad,		SIGBUS,	 BUS_ADRALN,	"alignment exception"		   },
+-	{ do_bad,		SIGBUS,	 0,		"external abort on linefetch"	   },
+-	{ do_translation_fault,	SIGSEGV, SEGV_MAPERR,	"section translation fault"	   },
+-	{ do_bad,		SIGBUS,	 0,		"external abort on linefetch"	   },
+-	{ do_page_fault,	SIGSEGV, SEGV_MAPERR,	"page translation fault"	   },
+-	{ do_bad,		SIGBUS,	 0,		"external abort on non-linefetch"  },
+-	{ do_bad,		SIGSEGV, SEGV_ACCERR,	"section domain fault"		   },
+-	{ do_bad,		SIGBUS,	 0,		"external abort on non-linefetch"  },
+-	{ do_bad,		SIGSEGV, SEGV_ACCERR,	"page domain fault"		   },
+-	{ do_bad,		SIGBUS,	 0,		"external abort on translation"	   },
+-	{ do_sect_fault,	SIGSEGV, SEGV_ACCERR,	"section permission fault"	   },
+-	{ do_bad,		SIGBUS,	 0,		"external abort on translation"	   },
+-	{ do_page_fault,	SIGSEGV, SEGV_ACCERR,	"page permission fault"		   },
+-	/*
+-	 * The following are "imprecise" aborts, which are signalled by bit
+-	 * 10 of the FSR, and may not be recoverable.  These are only
+-	 * supported if the CPU abort handler supports bit 10.
+-	 */
+-	{ do_bad,		SIGBUS,  0,		"unknown 16"			   },
+-	{ do_bad,		SIGBUS,  0,		"unknown 17"			   },
+-	{ do_bad,		SIGBUS,  0,		"unknown 18"			   },
+-	{ do_bad,		SIGBUS,  0,		"unknown 19"			   },
+-	{ do_bad,		SIGBUS,  0,		"lock abort"			   }, /* xscale */
+-	{ do_bad,		SIGBUS,  0,		"unknown 21"			   },
+-	{ do_bad,		SIGBUS,  BUS_OBJERR,	"imprecise external abort"	   }, /* xscale */
+-	{ do_bad,		SIGBUS,  0,		"unknown 23"			   },
+-	{ do_bad,		SIGBUS,  0,		"dcache parity error"		   }, /* xscale */
+-	{ do_bad,		SIGBUS,  0,		"unknown 25"			   },
+-	{ do_bad,		SIGBUS,  0,		"unknown 26"			   },
+-	{ do_bad,		SIGBUS,  0,		"unknown 27"			   },
+-	{ do_bad,		SIGBUS,  0,		"unknown 28"			   },
+-	{ do_bad,		SIGBUS,  0,		"unknown 29"			   },
+-	{ do_bad,		SIGBUS,  0,		"unknown 30"			   },
+-	{ do_bad,		SIGBUS,  0,		"unknown 31"			   }
+ };
  
- #else
++/* FSR definition */
++#include "fsr-2level.c"
++
+ void __init
+ hook_fault_code(int nr, int (*fn)(unsigned long, unsigned int, struct pt_regs *),
+ 		int sig, int code, const char *name)
+@@ -573,42 +521,6 @@ do_DataAbort(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
+ 	arm_notify_die("", regs, &info, fsr, 0);
+ }
  
-+#include <asm-generic/pgtable-nopud.h>
- #include <asm/memory.h>
- #include <mach/vmalloc.h>
- #include <asm/pgtable-hwdef.h>
-@@ -164,20 +165,22 @@ extern pgd_t swapper_pg_dir[PTRS_PER_PGD];
- #define pgd_offset_k(addr)	pgd_offset(&init_mm, addr)
- 
- /*
-- * The "pgd_xxx()" functions here are trivial for a folded two-level
-- * setup: the pgd is never bad, and a pmd always exists (as it's folded
-- * into the pgd entry)
-+ * The "pud_xxx()" functions here are trivial when the pmd is folded into
-+ * the pud: the pud entry is never bad, always exists, and can't be set or
-+ * cleared.
-  */
--#define pgd_none(pgd)		(0)
--#define pgd_bad(pgd)		(0)
--#define pgd_present(pgd)	(1)
--#define pgd_clear(pgdp)		do { } while (0)
--#define set_pgd(pgd,pgdp)	do { } while (0)
-+#define pud_none(pud)		(0)
-+#define pud_bad(pud)		(0)
-+#define pud_present(pud)	(1)
-+#define pud_clear(pudp)		do { } while (0)
- #define set_pud(pud,pudp)	do { } while (0)
- 
- 
- /* Find an entry in the second-level page table.. */
--#define pmd_offset(dir, addr)	((pmd_t *)(dir))
-+static inline pmd_t *pmd_offset(pud_t *pud, unsigned long addr)
+-
+-static struct fsr_info ifsr_info[] = {
+-	{ do_bad,		SIGBUS,  0,		"unknown 0"			   },
+-	{ do_bad,		SIGBUS,  0,		"unknown 1"			   },
+-	{ do_bad,		SIGBUS,  0,		"debug event"			   },
+-	{ do_bad,		SIGSEGV, SEGV_ACCERR,	"section access flag fault"	   },
+-	{ do_bad,		SIGBUS,  0,		"unknown 4"			   },
+-	{ do_translation_fault,	SIGSEGV, SEGV_MAPERR,	"section translation fault"	   },
+-	{ do_bad,		SIGSEGV, SEGV_ACCERR,	"page access flag fault"	   },
+-	{ do_page_fault,	SIGSEGV, SEGV_MAPERR,	"page translation fault"	   },
+-	{ do_bad,		SIGBUS,	 0,		"external abort on non-linefetch"  },
+-	{ do_bad,		SIGSEGV, SEGV_ACCERR,	"section domain fault"		   },
+-	{ do_bad,		SIGBUS,  0,		"unknown 10"			   },
+-	{ do_bad,		SIGSEGV, SEGV_ACCERR,	"page domain fault"		   },
+-	{ do_bad,		SIGBUS,	 0,		"external abort on translation"	   },
+-	{ do_sect_fault,	SIGSEGV, SEGV_ACCERR,	"section permission fault"	   },
+-	{ do_bad,		SIGBUS,	 0,		"external abort on translation"	   },
+-	{ do_page_fault,	SIGSEGV, SEGV_ACCERR,	"page permission fault"		   },
+-	{ do_bad,		SIGBUS,  0,		"unknown 16"			   },
+-	{ do_bad,		SIGBUS,  0,		"unknown 17"			   },
+-	{ do_bad,		SIGBUS,  0,		"unknown 18"			   },
+-	{ do_bad,		SIGBUS,  0,		"unknown 19"			   },
+-	{ do_bad,		SIGBUS,  0,		"unknown 20"			   },
+-	{ do_bad,		SIGBUS,  0,		"unknown 21"			   },
+-	{ do_bad,		SIGBUS,  0,		"unknown 22"			   },
+-	{ do_bad,		SIGBUS,  0,		"unknown 23"			   },
+-	{ do_bad,		SIGBUS,  0,		"unknown 24"			   },
+-	{ do_bad,		SIGBUS,  0,		"unknown 25"			   },
+-	{ do_bad,		SIGBUS,  0,		"unknown 26"			   },
+-	{ do_bad,		SIGBUS,  0,		"unknown 27"			   },
+-	{ do_bad,		SIGBUS,  0,		"unknown 28"			   },
+-	{ do_bad,		SIGBUS,  0,		"unknown 29"			   },
+-	{ do_bad,		SIGBUS,  0,		"unknown 30"			   },
+-	{ do_bad,		SIGBUS,  0,		"unknown 31"			   },
+-};
+-
+ void __init
+ hook_ifault_code(int nr, int (*fn)(unsigned long, unsigned int, struct pt_regs *),
+ 		 int sig, int code, const char *name)
+diff --git a/arch/arm/mm/fault.h b/arch/arm/mm/fault.h
+index 49e9e38..25b45c1 100644
+--- a/arch/arm/mm/fault.h
++++ b/arch/arm/mm/fault.h
+@@ -1,3 +1,20 @@
+-void do_bad_area(unsigned long addr, unsigned int fsr, struct pt_regs *regs);
++#ifndef __ARCH_ARM_FAULT_H
++#define __ARCH_ARM_FAULT_H
++
++/*
++ * Fault status register encodings.  We steal bit 31 for our own purposes.
++ */
++#define FSR_LNX_PF		(1 << 31)
++#define FSR_WRITE		(1 << 11)
++#define FSR_FS4			(1 << 10)
++#define FSR_FS3_0		(15)
++
++static inline int fsr_fs(unsigned int fsr)
 +{
-+	return (pmd_t *)pud;
++	return (fsr & FSR_FS3_0) | (fsr & FSR_FS4) >> 6;
 +}
  
- #define pmd_none(pmd)		(!pmd_val(pmd))
- #define pmd_present(pmd)	(pmd_val(pmd))
-diff --git a/arch/arm/include/asm/tlb.h b/arch/arm/include/asm/tlb.h
-index 265f908..b509e44 100644
---- a/arch/arm/include/asm/tlb.h
-+++ b/arch/arm/include/asm/tlb.h
-@@ -204,6 +204,7 @@ static inline void __pte_free_tlb(struct mmu_gather *tlb, pgtable_t pte,
- 
- #define pte_free_tlb(tlb, ptep, addr)	__pte_free_tlb(tlb, ptep, addr)
- #define pmd_free_tlb(tlb, pmdp, addr)	pmd_free((tlb)->mm, pmdp)
-+#define pud_free_tlb(tlb, pudp, addr)	pud_free((tlb)->mm, pudp)
- 
- #define tlb_migrate_finish(mm)		do { } while (0)
- 
++void do_bad_area(unsigned long addr, unsigned int fsr, struct pt_regs *regs);
+ unsigned long search_exception_table(unsigned long addr);
++
++#endif	/* __ARCH_ARM_FAULT_H */
+diff --git a/arch/arm/mm/fsr-2level.c b/arch/arm/mm/fsr-2level.c
+new file mode 100644
+index 0000000..18ca74c
+--- /dev/null
++++ b/arch/arm/mm/fsr-2level.c
+@@ -0,0 +1,78 @@
++static struct fsr_info fsr_info[] = {
++	/*
++	 * The following are the standard ARMv3 and ARMv4 aborts.  ARMv5
++	 * defines these to be "precise" aborts.
++	 */
++	{ do_bad,		SIGSEGV, 0,		"vector exception"		   },
++	{ do_bad,		SIGBUS,	 BUS_ADRALN,	"alignment exception"		   },
++	{ do_bad,		SIGKILL, 0,		"terminal exception"		   },
++	{ do_bad,		SIGBUS,	 BUS_ADRALN,	"alignment exception"		   },
++	{ do_bad,		SIGBUS,	 0,		"external abort on linefetch"	   },
++	{ do_translation_fault,	SIGSEGV, SEGV_MAPERR,	"section translation fault"	   },
++	{ do_bad,		SIGBUS,	 0,		"external abort on linefetch"	   },
++	{ do_page_fault,	SIGSEGV, SEGV_MAPERR,	"page translation fault"	   },
++	{ do_bad,		SIGBUS,	 0,		"external abort on non-linefetch"  },
++	{ do_bad,		SIGSEGV, SEGV_ACCERR,	"section domain fault"		   },
++	{ do_bad,		SIGBUS,	 0,		"external abort on non-linefetch"  },
++	{ do_bad,		SIGSEGV, SEGV_ACCERR,	"page domain fault"		   },
++	{ do_bad,		SIGBUS,	 0,		"external abort on translation"	   },
++	{ do_sect_fault,	SIGSEGV, SEGV_ACCERR,	"section permission fault"	   },
++	{ do_bad,		SIGBUS,	 0,		"external abort on translation"	   },
++	{ do_page_fault,	SIGSEGV, SEGV_ACCERR,	"page permission fault"		   },
++	/*
++	 * The following are "imprecise" aborts, which are signalled by bit
++	 * 10 of the FSR, and may not be recoverable.  These are only
++	 * supported if the CPU abort handler supports bit 10.
++	 */
++	{ do_bad,		SIGBUS,  0,		"unknown 16"			   },
++	{ do_bad,		SIGBUS,  0,		"unknown 17"			   },
++	{ do_bad,		SIGBUS,  0,		"unknown 18"			   },
++	{ do_bad,		SIGBUS,  0,		"unknown 19"			   },
++	{ do_bad,		SIGBUS,  0,		"lock abort"			   }, /* xscale */
++	{ do_bad,		SIGBUS,  0,		"unknown 21"			   },
++	{ do_bad,		SIGBUS,  BUS_OBJERR,	"imprecise external abort"	   }, /* xscale */
++	{ do_bad,		SIGBUS,  0,		"unknown 23"			   },
++	{ do_bad,		SIGBUS,  0,		"dcache parity error"		   }, /* xscale */
++	{ do_bad,		SIGBUS,  0,		"unknown 25"			   },
++	{ do_bad,		SIGBUS,  0,		"unknown 26"			   },
++	{ do_bad,		SIGBUS,  0,		"unknown 27"			   },
++	{ do_bad,		SIGBUS,  0,		"unknown 28"			   },
++	{ do_bad,		SIGBUS,  0,		"unknown 29"			   },
++	{ do_bad,		SIGBUS,  0,		"unknown 30"			   },
++	{ do_bad,		SIGBUS,  0,		"unknown 31"			   },
++};
++
++static struct fsr_info ifsr_info[] = {
++	{ do_bad,		SIGBUS,  0,		"unknown 0"			   },
++	{ do_bad,		SIGBUS,  0,		"unknown 1"			   },
++	{ do_bad,		SIGBUS,  0,		"debug event"			   },
++	{ do_bad,		SIGSEGV, SEGV_ACCERR,	"section access flag fault"	   },
++	{ do_bad,		SIGBUS,  0,		"unknown 4"			   },
++	{ do_translation_fault,	SIGSEGV, SEGV_MAPERR,	"section translation fault"	   },
++	{ do_bad,		SIGSEGV, SEGV_ACCERR,	"page access flag fault"	   },
++	{ do_page_fault,	SIGSEGV, SEGV_MAPERR,	"page translation fault"	   },
++	{ do_bad,		SIGBUS,	 0,		"external abort on non-linefetch"  },
++	{ do_bad,		SIGSEGV, SEGV_ACCERR,	"section domain fault"		   },
++	{ do_bad,		SIGBUS,  0,		"unknown 10"			   },
++	{ do_bad,		SIGSEGV, SEGV_ACCERR,	"page domain fault"		   },
++	{ do_bad,		SIGBUS,	 0,		"external abort on translation"	   },
++	{ do_sect_fault,	SIGSEGV, SEGV_ACCERR,	"section permission fault"	   },
++	{ do_bad,		SIGBUS,	 0,		"external abort on translation"	   },
++	{ do_page_fault,	SIGSEGV, SEGV_ACCERR,	"page permission fault"		   },
++	{ do_bad,		SIGBUS,  0,		"unknown 16"			   },
++	{ do_bad,		SIGBUS,  0,		"unknown 17"			   },
++	{ do_bad,		SIGBUS,  0,		"unknown 18"			   },
++	{ do_bad,		SIGBUS,  0,		"unknown 19"			   },
++	{ do_bad,		SIGBUS,  0,		"unknown 20"			   },
++	{ do_bad,		SIGBUS,  0,		"unknown 21"			   },
++	{ do_bad,		SIGBUS,  0,		"unknown 22"			   },
++	{ do_bad,		SIGBUS,  0,		"unknown 23"			   },
++	{ do_bad,		SIGBUS,  0,		"unknown 24"			   },
++	{ do_bad,		SIGBUS,  0,		"unknown 25"			   },
++	{ do_bad,		SIGBUS,  0,		"unknown 26"			   },
++	{ do_bad,		SIGBUS,  0,		"unknown 27"			   },
++	{ do_bad,		SIGBUS,  0,		"unknown 28"			   },
++	{ do_bad,		SIGBUS,  0,		"unknown 29"			   },
++	{ do_bad,		SIGBUS,  0,		"unknown 30"			   },
++	{ do_bad,		SIGBUS,  0,		"unknown 31"			   },
++};
