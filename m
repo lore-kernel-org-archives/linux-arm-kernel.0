@@ -1,14 +1,17 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 14 Nov 2011 12:30:04 +0100
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Mon, 14 Nov 2011 12:37:08 +0100
 Subject: [PATCH 2/3] ARM: AT91: IIO: Add AT91 ADC driver.
 In-Reply-To: <1321265193-15817-3-git-send-email-maxime.ripard@free-electrons.com>
 References: <1321265193-15817-1-git-send-email-maxime.ripard@free-electrons.com>
  <1321265193-15817-3-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <4EC0FBBC.4030001@atmel.com>
+Message-ID: <201111141237.08346.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/14/2011 11:06 AM, Maxime Ripard :
+Hi,
+
+a few nitpicks
+
 > Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
 > Cc: Patrice Vilchez <patrice.vilchez@atmel.com>
 > Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
@@ -16,14 +19,12 @@ On 11/14/2011 11:06 AM, Maxime Ripard :
 > 
 > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 > Acked-by: Jonathan Cameron <jic23@cam.ac.uk>
-
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-
 > ---
 >  drivers/iio/adc/Kconfig   |    6 +
 >  drivers/iio/adc/Makefile  |    4 +-
->  drivers/iio/adc/at91adc.c |  323 +++++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 332 insertions(+), 1 deletions(-)
+>  drivers/iio/adc/at91adc.c |  323
+> +++++++++++++++++++++++++++++++++++++++++++++ 3 files changed, 332
+> insertions(+), 1 deletions(-)
 >  create mode 100644 drivers/iio/adc/at91adc.c
 > 
 > diff --git a/drivers/iio/adc/Kconfig b/drivers/iio/adc/Kconfig
@@ -33,7 +34,7 @@ Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 > @@ -14,6 +14,12 @@ config IIO_AD799X
 >  	  i2c analog to digital convertors (ADC). Provides direct access
 >  	  via sysfs.
->  
+> 
 > +config IIO_AT91ADC
 > +	tristate "Atmel AT91 ADC"
 > +	depends on SYSFS && ARCH_AT91
@@ -49,7 +50,7 @@ Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 > +++ b/drivers/iio/adc/Makefile
 > @@ -6,4 +6,6 @@ iio_ad799x-y := ad799x_core.o
 >  obj-$(CONFIG_IIO_AD799X) += iio_ad799x.o
->  
+> 
 >  iio_max1363-y := max1363_core.o
 > -obj-$(CONFIG_IIO_MAX1363) += iio_max1363.o
 > \ No newline at end of file
@@ -104,8 +105,8 @@ Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 > +	return readl_relaxed(st->reg_base + reg);
 > +}
 > +
-> +static inline void at91adc_reg_write(struct at91adc_state *st, u8 reg, u32 val)
-> +{
+> +static inline void at91adc_reg_write(struct at91adc_state *st, u8 reg, u32
+> val) +{
 > +	writel_relaxed(val, st->reg_base + reg);
 > +}
 > +
@@ -135,6 +136,9 @@ Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 > +	int bit, idx = 0;
 > +
 > +	idev->num_channels = bitmap_weight(&(pdata->channels_used),
+
+Do you need the parenthesis here ?
+
 > +					   pdata->num_channels);
 > +	chan_array = kcalloc(idev->num_channels, sizeof(struct iio_chan_spec),
 > +			     GFP_KERNEL);
@@ -151,6 +155,11 @@ Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 > +		chan->scan_type.realbits = 10;
 > +		chan->info_mask = IIO_CHAN_INFO_SCALE_SHARED_BIT;
 > +		++idx;
+
+idx++ ... why the preincrement?
+
+Besides, can't you use "bit" as the index instead?
+
 > +	}
 > +
 > +	idev->channels = chan_array;
@@ -235,6 +244,9 @@ Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 > +		ret = -ENOMEM;
 > +		goto error_ret;
 > +	}
+
+newline
+
 > +	platform_set_drvdata(pdev, idev);
 > +
 > +	idev->dev.parent = &pdev->dev;
@@ -386,6 +398,8 @@ Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 > +MODULE_DESCRIPTION("Atmel AT91 ADC Driver");
 > +MODULE_AUTHOR("Maxime Ripard <maxime.ripard@free-electrons.com>");
 
+Looks good otherwise, please add
 
--- 
-Nicolas Ferre
+Reviewed-by: Marek Vasut <marek.vasut@gmail.com>
+
+M
