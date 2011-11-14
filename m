@@ -1,111 +1,219 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Mon, 14 Nov 2011 13:09:16 +0100
-Subject: [PATCH v2] ARM: ux500: update the MOP500 GPIO assignments
-Message-ID: <1321272556-1210-1-git-send-email-linus.walleij@stericsson.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 14 Nov 2011 13:18:25 +0100
+Subject: [PATCH] RS485: fix inconsistencies in the meaning of some
+ variables
+In-Reply-To: <4EBA9385.7010806@evidence.eu.com>
+References: <4E492CFF.7040905@pwrnet.de> <20110822211832.GA8023@kroah.com>
+ <4EB3A009.10502@evidence.eu.com> <4EB8F6B9.6010008@atmel.com>
+ <4EB90902.4030200@evidence.eu.com>
+ <20111108134804.07095c5d@lxorguk.ukuu.org.uk>
+ <20111108142432.GA11293@kroah.com> <4EBA9385.7010806@evidence.eu.com>
+Message-ID: <4EC10711.4050906@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linus Walleij <linus.walleij@linaro.org>
+On 11/09/2011 03:51 PM, Claudio Scordino :
+> Il 08/11/2011 15:24, Greg KH ha scritto:
+>> On Tue, Nov 08, 2011 at 01:48:04PM +0000, Alan Cox wrote:
+>>>> The modifications that I have proposed are very minimal, and most
+>>>> user-space code should continue to work without any difference. Any Cris
+>>>> user-space code will continue to work, because we didn't change the
+>>>> behavior of the driver. For Atmel user-space code, instead, the behavior
+>>>> of the driver changes only if flags are not set and delay variables
+>>>> contain a value different than 0 (which, hopefully, is not a very common
+>>>> situation). That's the reason why I preferred to not change the names of
+>>>> the variables, even if better names would be desirable.
+>>>
+>>> We have inconsistency between implementations. We don't have a change in
+>>> implementation. There isn't any way to resolve that except by fixing the
+>>> deviating implementation and doing it promptly.
+>>>
+>>> With my tty hat on I'm quite happy with this patch. The sooner it is
+>>> upstream the better.
+>>
+>> Ok, I'll push to get it to Linus for the next rc release.
+> 
+> Hi Greg,
+> 
+> 	in case you didn't push it yet, this is the patch with also the ack by Jesper.
+> 
+> Best regards,
+> 
+> 	Claudio
+> 
+> 
+> Subject: RS485: fix inconsistencies in the meaning of some variables
+> From: Claudio Scordino <claudio@evidence.eu.com>
+> 
+> The crisv10.c and the atmel_serial.c serial drivers intepret the fields of the
+> serial_rs485 structure in a different way.
+> In particular, crisv10.c uses SER_RS485_RTS_AFTER_SEND and 
+> SER_RS485_RTS_ON_SEND for the voltage of the RTS pin; atmel_serial.c, instead,
+> uses these values to know if a delay must be set before and after sending.
+> This patch makes the usage of these variables consistent across all drivers and
+> fixes the Documentation as well.
+>>From now on, SER_RS485_RTS_AFTER_SEND and SER_RS485_RTS_ON_SEND will be used to
+> set the voltage of the RTS pin (as in the crisv10.c driver); the delay will be
+> understood by looking only at the value of delay_rts_before_send and 
+> delay_rts_after_send.
+> 
+> Signed-off-by: Claudio Scordino <claudio@evidence.eu.com>
+> Signed-off-by: Darron Black <darron@griffin.net>
+> Acked-by: Jesper Nilsson <jesper.nilsson@axis.com>
 
-This is a more complete list of the MOP500 GPIO pins, especially
-for those used with the Snowball board. Sort GPIO number in
-falling number order so there is some structure to this file.
-Fix some whitespace issues in the process.
+Surely too late, but I add it for the record:
 
-Cc: Mian Yousaf Kaukab <mian.yousaf.kaukab@stericsson.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/mach-ux500/board-mop500.h |   62 ++++++++++++++++++++++++++++-------
- 1 files changed, 49 insertions(+), 13 deletions(-)
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-diff --git a/arch/arm/mach-ux500/board-mop500.h b/arch/arm/mach-ux500/board-mop500.h
-index e82552a..f926d3d 100644
---- a/arch/arm/mach-ux500/board-mop500.h
-+++ b/arch/arm/mach-ux500/board-mop500.h
-@@ -7,35 +7,71 @@
- #ifndef __BOARD_MOP500_H
- #define __BOARD_MOP500_H
- 
--/* snowball GPIO for MMC card */
--#define SNOWBALL_SDMMC_EN_GPIO 217
--#define SNOWBALL_SDMMC_1V8_3V_GPIO 228
--#define SNOWBALL_SDMMC_CD_GPIO 218
-+/* Snowball specific GPIO assignments, this board has no GPIO expander */
-+#define SNOWBALL_ACCEL_INT1_GPIO	163
-+#define SNOWBALL_ACCEL_INT2_GPIO	164
-+#define SNOWBALL_MAGNET_DRDY_GPIO	165
-+#define SNOWBALL_SDMMC_EN_GPIO		217
-+#define SNOWBALL_SDMMC_1V8_3V_GPIO	228
-+#define SNOWBALL_SDMMC_CD_GPIO		218
- 
- /* HREFv60-specific GPIO assignments, this board has no GPIO expander */
--#define HREFV60_TOUCH_RST_GPIO		143
--#define HREFV60_PROX_SENSE_GPIO		217
--#define HREFV60_HAL_SW_GPIO		145
--#define HREFV60_SDMMC_EN_GPIO		169
- #define HREFV60_SDMMC_1V8_3V_GPIO	5
--#define HREFV60_SDMMC_CD_GPIO		95
--#define HREFV60_ACCEL_INT1_GPIO		82
--#define HREFV60_ACCEL_INT2_GPIO		83
-+#define HREFV60_CAMERA_FLASH_ENABLE	21
- #define HREFV60_MAGNET_DRDY_GPIO	32
- #define HREFV60_DISP1_RST_GPIO		65
- #define HREFV60_DISP2_RST_GPIO		66
-+#define HREFV60_ACCEL_INT1_GPIO		82
-+#define HREFV60_ACCEL_INT2_GPIO		83
-+#define HREFV60_SDMMC_CD_GPIO		95
-+#define HREFV60_XSHUTDOWN_SECONDARY_SENSOR 140
-+#define HREFV60_TOUCH_RST_GPIO		143
-+#define HREFV60_HAL_SW_GPIO		145
-+#define HREFV60_SDMMC_EN_GPIO		169
-+#define HREFV60_MMIO_XENON_CHARGE	170
-+#define HREFV60_PROX_SENSE_GPIO		217
-+
-+/* MOP500 generic GPIOs */
-+#define CAMERA_FLASH_INT_PIN		7
-+#define CYPRESS_TOUCH_INT_PIN		84
-+#define XSHUTDOWN_PRIMARY_SENSOR	141
-+#define XSHUTDOWN_SECONDARY_SENSOR	142
-+#define CYPRESS_TOUCH_RST_GPIO		143
-+#define MOP500_HDMI_RST_GPIO		196
-+#define CYPRESS_SLAVE_SELECT_GPIO	216
- 
- /* GPIOs on the TC35892 expander */
- #define MOP500_EGPIO(x)			(NOMADIK_NR_GPIO + (x))
-+#define GPIO_MAGNET_DRDY		MOP500_EGPIO(1)
- #define GPIO_SDMMC_CD			MOP500_EGPIO(3)
-+#define GPIO_CAMERA_FLASH_ENABLE	MOP500_EGPIO(4)
-+#define GPIO_MMIO_XENON_CHARGE		MOP500_EGPIO(5)
- #define GPIO_PROX_SENSOR		MOP500_EGPIO(7)
-+#define GPIO_HAL_SENSOR			MOP500_EGPIO(8)
-+#define GPIO_ACCEL_INT1			MOP500_EGPIO(10)
-+#define GPIO_ACCEL_INT2			MOP500_EGPIO(11)
- #define GPIO_BU21013_CS			MOP500_EGPIO(13)
-+#define MOP500_DISP2_RST_GPIO		MOP500_EGPIO(14)
-+#define MOP500_DISP1_RST_GPIO		MOP500_EGPIO(15)
- #define GPIO_SDMMC_EN			MOP500_EGPIO(17)
- #define GPIO_SDMMC_1V8_3V_SEL		MOP500_EGPIO(18)
- #define MOP500_EGPIO_END		MOP500_EGPIO(24)
- 
--/* GPIOs on the AB8500 mixed-signals circuit */
--#define MOP500_AB8500_GPIO(x)		(MOP500_EGPIO_END + (x))
-+/*
-+ * GPIOs on the AB8500 mixed-signals circuit
-+ * Notice that we subtract 1 from the number passed into the macro, this is
-+ * because the AB8500 GPIO pins are enumbered starting from 1, so the value in
-+ * parens matches the GPIO pin number in the data sheet.
-+ */
-+#define MOP500_AB8500_GPIO(x)		(MOP500_EGPIO_END + (x) - 1)
-+/*Snowball AB8500 GPIO */
-+#define SNOWBALL_VSMPS2_1V8_GPIO	MOP500_AB8500_PIN_GPIO(1)	/* SYSCLKREQ2/GPIO1 */
-+#define SNOWBALL_PM_GPIO1_GPIO		MOP500_AB8500_PIN_GPIO(2)	/* SYSCLKREQ3/GPIO2 */
-+#define SNOWBALL_WLAN_CLK_REQ_GPIO	MOP500_AB8500_PIN_GPIO(3)	/* SYSCLKREQ4/GPIO3 */
-+#define SNOWBALL_PM_GPIO4_GPIO		MOP500_AB8500_PIN_GPIO(4)	/* SYSCLKREQ6/GPIO4 */
-+#define SNOWBALL_EN_3V6_GPIO		MOP500_AB8500_PIN_GPIO(16)	/* PWMOUT3/GPIO16 */
-+#define SNOWBALL_PME_ETH_GPIO		MOP500_AB8500_PIN_GPIO(24)	/* SYSCLKREQ7/GPIO24 */
-+#define SNOWBALL_EN_3V3_ETH_GPIO	MOP500_AB8500_PIN_GPIO(26)	/* GPIO26 */
- 
- struct i2c_board_info;
- 
+
+> ---
+>  Documentation/serial/serial-rs485.txt |   14 +++++++++++---
+>  drivers/tty/serial/atmel_serial.c     |   16 +++-------------
+>  drivers/tty/serial/crisv10.c          |   10 ++--------
+>  include/linux/serial.h                |   14 ++++++++------
+>  4 files changed, 24 insertions(+), 30 deletions(-)
+> 
+> diff --git a/Documentation/serial/serial-rs485.txt b/Documentation/serial/serial-rs485.txt
+> index 079cb3d..41c8378 100644
+> --- a/Documentation/serial/serial-rs485.txt
+> +++ b/Documentation/serial/serial-rs485.txt
+> @@ -97,15 +97,23 @@
+>  
+>  	struct serial_rs485 rs485conf;
+>  
+> -	/* Set RS485 mode: */
+> +	/* Enable RS485 mode: */
+>  	rs485conf.flags |= SER_RS485_ENABLED;
+>  
+> +	/* Set logical level for RTS pin equal to 1 when sending: */
+> +	rs485conf.flags |= SER_RS485_RTS_ON_SEND;
+> +	/* or, set logical level for RTS pin equal to 0 when sending: */
+> +	rs485conf.flags &= ~(SER_RS485_RTS_ON_SEND);
+> +
+> +	/* Set logical level for RTS pin equal to 1 after sending: */
+> +	rs485conf.flags |= SER_RS485_RTS_AFTER_SEND;
+> +	/* or, set logical level for RTS pin equal to 0 after sending: */
+> +	rs485conf.flags &= ~(SER_RS485_RTS_AFTER_SEND);
+> +
+>  	/* Set rts delay before send, if needed: */
+> -	rs485conf.flags |= SER_RS485_RTS_BEFORE_SEND;
+>  	rs485conf.delay_rts_before_send = ...;
+>  
+>  	/* Set rts delay after send, if needed: */
+> -	rs485conf.flags |= SER_RS485_RTS_AFTER_SEND;
+>  	rs485conf.delay_rts_after_send = ...;
+>  
+>  	/* Set this flag if you want to receive data even whilst sending data */
+> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+> index 4a0f86f..4c823f3 100644
+> --- a/drivers/tty/serial/atmel_serial.c
+> +++ b/drivers/tty/serial/atmel_serial.c
+> @@ -228,7 +228,7 @@ void atmel_config_rs485(struct uart_port *port, struct serial_rs485 *rs485conf)
+>  	if (rs485conf->flags & SER_RS485_ENABLED) {
+>  		dev_dbg(port->dev, "Setting UART to RS485\n");
+>  		atmel_port->tx_done_mask = ATMEL_US_TXEMPTY;
+> -		if (rs485conf->flags & SER_RS485_RTS_AFTER_SEND)
+> +		if ((rs485conf->delay_rts_after_send) > 0)
+>  			UART_PUT_TTGR(port, rs485conf->delay_rts_after_send);
+>  		mode |= ATMEL_US_USMODE_RS485;
+>  	} else {
+> @@ -304,7 +304,7 @@ static void atmel_set_mctrl(struct uart_port *port, u_int mctrl)
+>  
+>  	if (atmel_port->rs485.flags & SER_RS485_ENABLED) {
+>  		dev_dbg(port->dev, "Setting UART to RS485\n");
+> -		if (atmel_port->rs485.flags & SER_RS485_RTS_AFTER_SEND)
+> +		if ((atmel_port->rs485.delay_rts_after_send) > 0)
+>  			UART_PUT_TTGR(port,
+>  					atmel_port->rs485.delay_rts_after_send);
+>  		mode |= ATMEL_US_USMODE_RS485;
+> @@ -1228,7 +1228,7 @@ static void atmel_set_termios(struct uart_port *port, struct ktermios *termios,
+>  
+>  	if (atmel_port->rs485.flags & SER_RS485_ENABLED) {
+>  		dev_dbg(port->dev, "Setting UART to RS485\n");
+> -		if (atmel_port->rs485.flags & SER_RS485_RTS_AFTER_SEND)
+> +		if ((atmel_port->rs485.delay_rts_after_send) > 0)
+>  			UART_PUT_TTGR(port,
+>  					atmel_port->rs485.delay_rts_after_send);
+>  		mode |= ATMEL_US_USMODE_RS485;
+> @@ -1447,16 +1447,6 @@ static void __devinit atmel_of_init_port(struct atmel_uart_port *atmel_port,
+>  		rs485conf->delay_rts_after_send = rs485_delay[1];
+>  		rs485conf->flags = 0;
+>  
+> -		if (rs485conf->delay_rts_before_send == 0 &&
+> -		    rs485conf->delay_rts_after_send == 0) {
+> -			rs485conf->flags |= SER_RS485_RTS_ON_SEND;
+> -		} else {
+> -			if (rs485conf->delay_rts_before_send)
+> -				rs485conf->flags |= SER_RS485_RTS_BEFORE_SEND;
+> -			if (rs485conf->delay_rts_after_send)
+> -				rs485conf->flags |= SER_RS485_RTS_AFTER_SEND;
+> -		}
+> -
+>  		if (of_get_property(np, "rs485-rx-during-tx", NULL))
+>  			rs485conf->flags |= SER_RS485_RX_DURING_TX;
+>  
+> diff --git a/drivers/tty/serial/crisv10.c b/drivers/tty/serial/crisv10.c
+> index b743504..1dfba7b 100644
+> --- a/drivers/tty/serial/crisv10.c
+> +++ b/drivers/tty/serial/crisv10.c
+> @@ -3234,9 +3234,8 @@ rs_write(struct tty_struct *tty,
+>  		e100_disable_rx(info);
+>  		e100_enable_rx_irq(info);
+>  #endif
+> -		if ((info->rs485.flags & SER_RS485_RTS_BEFORE_SEND) &&
+> -			(info->rs485.delay_rts_before_send > 0))
+> -				msleep(info->rs485.delay_rts_before_send);
+> +		if (info->rs485.delay_rts_before_send > 0)
+> +			msleep(info->rs485.delay_rts_before_send);
+>  	}
+>  #endif /* CONFIG_ETRAX_RS485 */
+>  
+> @@ -3693,10 +3692,6 @@ rs_ioctl(struct tty_struct *tty,
+>  
+>  		rs485data.delay_rts_before_send = rs485ctrl.delay_rts_before_send;
+>  		rs485data.flags = 0;
+> -		if (rs485data.delay_rts_before_send != 0)
+> -			rs485data.flags |= SER_RS485_RTS_BEFORE_SEND;
+> -		else
+> -			rs485data.flags &= ~(SER_RS485_RTS_BEFORE_SEND);
+>  
+>  		if (rs485ctrl.enabled)
+>  			rs485data.flags |= SER_RS485_ENABLED;
+> @@ -4531,7 +4526,6 @@ static int __init rs_init(void)
+>  		/* Set sane defaults */
+>  		info->rs485.flags &= ~(SER_RS485_RTS_ON_SEND);
+>  		info->rs485.flags |= SER_RS485_RTS_AFTER_SEND;
+> -		info->rs485.flags &= ~(SER_RS485_RTS_BEFORE_SEND);
+>  		info->rs485.delay_rts_before_send = 0;
+>  		info->rs485.flags &= ~(SER_RS485_ENABLED);
+>  #endif
+> diff --git a/include/linux/serial.h b/include/linux/serial.h
+> index 97ff8e2..3d86517 100644
+> --- a/include/linux/serial.h
+> +++ b/include/linux/serial.h
+> @@ -207,13 +207,15 @@ struct serial_icounter_struct {
+>  
+>  struct serial_rs485 {
+>  	__u32	flags;			/* RS485 feature flags */
+> -#define SER_RS485_ENABLED		(1 << 0)
+> -#define SER_RS485_RTS_ON_SEND		(1 << 1)
+> -#define SER_RS485_RTS_AFTER_SEND	(1 << 2)
+> -#define SER_RS485_RTS_BEFORE_SEND	(1 << 3)
+> +#define SER_RS485_ENABLED		(1 << 0)	/* If enabled */
+> +#define SER_RS485_RTS_ON_SEND		(1 << 1)	/* Logical level for
+> +							   RTS pin when
+> +							   sending */
+> +#define SER_RS485_RTS_AFTER_SEND	(1 << 2)	/* Logical level for
+> +							   RTS pin after sent*/
+>  #define SER_RS485_RX_DURING_TX		(1 << 4)
+> -	__u32	delay_rts_before_send;	/* Milliseconds */
+> -	__u32	delay_rts_after_send;	/* Milliseconds */
+> +	__u32	delay_rts_before_send;	/* Delay before send (milliseconds) */
+> +	__u32	delay_rts_after_send;	/* Delay after send (milliseconds) */
+>  	__u32	padding[5];		/* Memory is cheap, new structs
+>  					   are a royal PITA .. */
+>  };
+
+
 -- 
-1.7.3.2
+Nicolas Ferre
