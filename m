@@ -1,40 +1,54 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 14 Nov 2011 10:33:27 +0000
-Subject: [PATCH v7 00/11] change pxa gpio to platform driver
-In-Reply-To: <1320806851-13928-1-git-send-email-haojian.zhuang@marvell.com>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Mon, 14 Nov 2011 18:34:06 +0800
+Subject: [PATCH v7 04/11] ARM: pxa: rename gpio_to_irq and irq_to_gpio
+In-Reply-To: <20111114103225.GB25150@n2100.arm.linux.org.uk>
 References: <1320806851-13928-1-git-send-email-haojian.zhuang@marvell.com>
-Message-ID: <20111114103327.GC25150@n2100.arm.linux.org.uk>
+ <1320806851-13928-5-git-send-email-haojian.zhuang@marvell.com>
+ <20111114100939.GA25150@n2100.arm.linux.org.uk>
+ <CAN1soZzvK_f6BrQb-S0y9e2pYBbOOYcy9BjQmE1GzfPBjrC_4w@mail.gmail.com>
+ <20111114103225.GB25150@n2100.arm.linux.org.uk>
+Message-ID: <CAN1soZymQH5Be2V85bEr3vPZSEe-S=MQxYK3B+ExPSm+cfkNzw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 09, 2011 at 10:47:20AM +0800, Haojian Zhuang wrote:
-> Changelog
-> v7:
->     1. add clk_prepare() support in gpio-pxa.c.
-> v6:
->     1. fix build issue in pxa910 since building gpio failure is found in
->        mainline.
->     2. merge two dependant patches (original v5 0005 and 0006) together.
->     3. fix gpio bit issue in corgi and spitz.
->     4. replace printk() with dev_err in clk patch.
-> v5:
->     1. use generic gpio driver. So clean gpio-pxa.h and gpio-pxa.c again.
-> v4:
->     1. append one patch for clean gpio macros and use function instead.
-> v3:
->     1. Rebase on Russell's for-next branch.
->     2. Add clock support.
->     3. Move gpio edge detection initiliaztion of arch-mmp into gpio driver.
-> 
-> v2:
->    1. Remove gpio.c from mach-pxa & mach-mmp that is introduced from v1.
->    2. Remove init function in gpio.c. Move the platfrom_device_register()
->       into platform driver.
->    3. Initialize pxa_gpio_regs in gpio-pxa.c
->    4. Simplify code of identifing pxa gpio series or mmp gpio series.
->    5. Use linux/io.h instead of asm/io.h.
-> 
+On Mon, Nov 14, 2011 at 6:32 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Mon, Nov 14, 2011 at 06:28:23PM +0800, Haojian Zhuang wrote:
+>> On Mon, Nov 14, 2011 at 6:09 PM, Russell King - ARM Linux
+>> <linux@arm.linux.org.uk> wrote:
+>> > On Wed, Nov 09, 2011 at 10:47:24AM +0800, Haojian Zhuang wrote:
+>> >> diff --git a/arch/arm/mach-pxa/cm-x2xx-pci.c b/arch/arm/mach-pxa/cm-x2xx-pci.c
+>> >> index ebd9259..e79e081 100644
+>> >> --- a/arch/arm/mach-pxa/cm-x2xx-pci.c
+>> >> +++ b/arch/arm/mach-pxa/cm-x2xx-pci.c
+>> >> @@ -43,9 +43,9 @@ void __cmx2xx_pci_init_irq(int irq_gpio)
+>> >>
+>> >> ? ? ? cmx2xx_it8152_irq_gpio = irq_gpio;
+>> >>
+>> >> - ? ? irq_set_irq_type(gpio_to_irq(irq_gpio), IRQ_TYPE_EDGE_RISING);
+>> >> + ? ? irq_set_irq_type(PXA_GPIO_TO_IRQ(irq_gpio), IRQ_TYPE_EDGE_RISING);
+>> >>
+>> >> - ? ? irq_set_chained_handler(gpio_to_irq(irq_gpio),
+>> >> + ? ? irq_set_chained_handler(PXA_GPIO_TO_IRQ(irq_gpio),
+>> >> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? cmx2xx_it8152_irq_demux);
+>> >
+>> > The only comment remaining from the previous review of these patches is
+>> > that these changes to the runtime usage of gpio_to_irq() should not be
+>> > necessary.
+>> >
+>> > If gpiolib is implemented correctly, when running on PXA,
+>> > PXA_GPIO_TO_IRQ(gpio) should be the same as gpio_to_irq(gpio).
+>> >
+>>
+>> Yes, it seems that this patch is unnecessary. So will you merge rest
+>> of those gpio patches into your git tree?
+>
+> Some of this patch is required - all the places where gpio_to_irq() is
+> used as an initializer need to be fixed. ?Those places where it is used
+> at run-time should not be fixed up though.
+>
 
-I think with the comments against patch 4 resolved, this can be merged
-via Arnd's arm-soc tree - but Arnd will prefer them to be in a git tree
-which he can pull rather than dealing with individual patches.
+OK. I'll submit a new patch series again.
+
+Thanks
+Haojian
