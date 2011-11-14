@@ -1,92 +1,146 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 15 Nov 2011 01:42:07 +0530
-Subject: [PATCH v4 2/4] ARM: davinci: psc: fix incorrect offsets
-In-Reply-To: <1321301529-7582-1-git-send-email-nsekhar@ti.com>
-References: <1321301529-7582-1-git-send-email-nsekhar@ti.com>
-Message-ID: <1321301529-7582-2-git-send-email-nsekhar@ti.com>
+From: avictor.za@gmail.com (Andrew Victor)
+Date: Mon, 14 Nov 2011 22:24:52 +0200
+Subject: [PATCH 10/12] ARM: at91: make watchdog drivers soc independent
+In-Reply-To: <1321207952-13556-10-git-send-email-plagnioj@jcrosoft.com>
+References: <20111113180954.GD15318@game.jcrosoft.org>
+ <1321207952-13556-10-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <CAFumwP0ExjSoPfM1B8d0TeMys3M9vtfz8hfXoJKqwVXWHNQt=Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Murali Karicheri <m-karicheri2@ti.com>
+hi,
 
-Seperate PDSTAT and PDCTL registers are defined for
-domain 0 and domain 1 where as the code always reads
-the domain 0 PDSTAT register and domain 1 PDCTL register.
+> switch the watchdog drivers to resource and pass it via platform_device
 
-Fix this issue. While at it, introduce usage of macros
-for register masks to improve readability.
+What's this at91_devices.c ?
+It looks like some unrelated code was included with a watchdog patch...
 
-Reviewed-by: Sergei Shtylyov <sshtylyov@mvista.com>
-Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
-Signed-off-by: Sekhar Nori <nsekhar@ti.com>
----
- arch/arm/mach-davinci/include/mach/psc.h |    4 +++-
- arch/arm/mach-davinci/psc.c              |   16 ++++++++--------
- 2 files changed, 11 insertions(+), 9 deletions(-)
+Regards,
+  Andrew Victor
 
-diff --git a/arch/arm/mach-davinci/include/mach/psc.h b/arch/arm/mach-davinci/include/mach/psc.h
-index 8bf279a..8bc3fc2 100644
---- a/arch/arm/mach-davinci/include/mach/psc.h
-+++ b/arch/arm/mach-davinci/include/mach/psc.h
-@@ -233,7 +233,7 @@
- #define PTCMD		0x120
- #define PTSTAT		0x128
- #define PDSTAT		0x200
--#define PDCTL1		0x304
-+#define PDCTL		0x300
- #define MDSTAT		0x800
- #define MDCTL		0xA00
- 
-@@ -246,6 +246,8 @@
- #define MDSTAT_STATE_MASK	0x3f
- #define PDSTAT_STATE_MASK	0x1f
- #define MDCTL_FORCE		BIT(31)
-+#define PDCTL_NEXT		BIT(1)
-+#define PDCTL_EPCGOOD		BIT(8)
- 
- #ifndef __ASSEMBLER__
- 
-diff --git a/arch/arm/mach-davinci/psc.c b/arch/arm/mach-davinci/psc.c
-index a0e1770..d7e210f 100644
---- a/arch/arm/mach-davinci/psc.c
-+++ b/arch/arm/mach-davinci/psc.c
-@@ -52,7 +52,7 @@ int __init davinci_psc_is_clk_active(unsigned int ctlr, unsigned int id)
- void davinci_psc_config(unsigned int domain, unsigned int ctlr,
- 		unsigned int id, bool enable, u32 flags)
- {
--	u32 epcpr, ptcmd, ptstat, pdstat, pdctl1, mdstat, mdctl;
-+	u32 epcpr, ptcmd, ptstat, pdstat, pdctl, mdstat, mdctl;
- 	void __iomem *psc_base;
- 	struct davinci_soc_info *soc_info = &davinci_soc_info;
- 	u32 next_state = PSC_STATE_ENABLE;
-@@ -79,11 +79,11 @@ void davinci_psc_config(unsigned int domain, unsigned int ctlr,
- 		mdctl |= MDCTL_FORCE;
- 	__raw_writel(mdctl, psc_base + MDCTL + 4 * id);
- 
--	pdstat = __raw_readl(psc_base + PDSTAT);
-+	pdstat = __raw_readl(psc_base + PDSTAT + 4 * domain);
- 	if ((pdstat & PDSTAT_STATE_MASK) == 0) {
--		pdctl1 = __raw_readl(psc_base + PDCTL1);
--		pdctl1 |= 0x1;
--		__raw_writel(pdctl1, psc_base + PDCTL1);
-+		pdctl = __raw_readl(psc_base + PDCTL + 4 * domain);
-+		pdctl |= PDCTL_NEXT;
-+		__raw_writel(pdctl, psc_base + PDCTL + 4 * domain);
- 
- 		ptcmd = 1 << domain;
- 		__raw_writel(ptcmd, psc_base + PTCMD);
-@@ -92,9 +92,9 @@ void davinci_psc_config(unsigned int domain, unsigned int ctlr,
- 			epcpr = __raw_readl(psc_base + EPCPR);
- 		} while ((((epcpr >> domain) & 1) == 0));
- 
--		pdctl1 = __raw_readl(psc_base + PDCTL1);
--		pdctl1 |= 0x100;
--		__raw_writel(pdctl1, psc_base + PDCTL1);
-+		pdctl = __raw_readl(psc_base + PDCTL + 4 * domain);
-+		pdctl |= PDCTL_EPCGOOD;
-+		__raw_writel(pdctl, psc_base + PDCTL + 4 * domain);
- 	} else {
- 		ptcmd = 1 << domain;
- 		__raw_writel(ptcmd, psc_base + PTCMD);
--- 
-1.6.2.4
+
+
+> +++ b/arch/arm/mach-at91/at91_devices.c
+> @@ -0,0 +1,122 @@
+> +/*
+> + * arch/arm/mach-at91/at91cap9_devices.c
+> + *
+> + * ?Copyright (C) 2007 Stelian Pop <stelian.pop@leadtechdesign.com>
+> + * ?Copyright (C) 2007 Lead Tech Design <www.leadtechdesign.com>
+> + * ?Copyright (C) 2007 Atmel Corporation.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + */
+> +
+> +#include <mach/gpio.h>
+> +
+> +#include "generic.h"
+> +
+> +void at91cap9_configure_dbgu_pins(void)
+> +{
+> + ? ? ? at91_set_A_periph(AT91_PIN_PC30, 0); ? ? ? ? ? ?/* DRXD */
+> + ? ? ? at91_set_A_periph(AT91_PIN_PC31, 1); ? ? ? ? ? ?/* DTXD */
+> +}
+> +
+> +void at91cap9_configure_usart0_pins(unsigned pins)
+> +{
+> + ? ? ? at91_set_A_periph(AT91_PIN_PA22, 1); ? ? ? ? ? ?/* TXD0 */
+> + ? ? ? at91_set_A_periph(AT91_PIN_PA23, 0); ? ? ? ? ? ?/* RXD0 */
+> +
+> + ? ? ? if (pins & ATMEL_UART_RTS)
+> + ? ? ? ? ? ? ? at91_set_A_periph(AT91_PIN_PA24, 0); ? ?/* RTS0 */
+> + ? ? ? if (pins & ATMEL_UART_CTS)
+> + ? ? ? ? ? ? ? at91_set_A_periph(AT91_PIN_PA25, 0); ? ?/* CTS0 */
+> +}
+> +
+> +void at91cap9_configure_usart1_pins(unsigned pins)
+> +{
+> + ? ? ? at91_set_A_periph(AT91_PIN_PD0, 1); ? ? ? ? ? ? /* TXD1 */
+> + ? ? ? at91_set_A_periph(AT91_PIN_PD1, 0); ? ? ? ? ? ? /* RXD1 */
+> +
+> + ? ? ? if (pins & ATMEL_UART_RTS)
+> + ? ? ? ? ? ? ? at91_set_B_periph(AT91_PIN_PD7, 0); ? ? /* RTS1 */
+> + ? ? ? if (pins & ATMEL_UART_CTS)
+> + ? ? ? ? ? ? ? at91_set_B_periph(AT91_PIN_PD8, 0); ? ? /* CTS1 */
+> +}
+> +
+> +void at91cap9_configure_usart2_pins(unsigned pins)
+> +{
+> + ? ? ? at91_set_A_periph(AT91_PIN_PD2, 1); ? ? ? ? ? ? /* TXD2 */
+> + ? ? ? at91_set_A_periph(AT91_PIN_PD3, 0); ? ? ? ? ? ? /* RXD2 */
+> +
+> + ? ? ? if (pins & ATMEL_UART_RTS)
+> + ? ? ? ? ? ? ? at91_set_B_periph(AT91_PIN_PD5, 0); ? ? /* RTS2 */
+> + ? ? ? if (pins & ATMEL_UART_CTS)
+> + ? ? ? ? ? ? ? at91_set_B_periph(AT91_PIN_PD6, 0); ? ? /* CTS2 */
+> +}
+> +
+> +void at91rm9200_configure_dbgu_pins(void)
+> +{
+> + ? ? ? at91_set_A_periph(AT91_PIN_PA30, 0); ? ? ? ? ? ?/* DRXD */
+> + ? ? ? at91_set_A_periph(AT91_PIN_PA31, 1); ? ? ? ? ? ?/* DTXD */
+> +}
+> +
+> +void at91rm9200_configure_usart0_pins(unsigned pins)
+> +{
+> + ? ? ? at91_set_A_periph(AT91_PIN_PA17, 1); ? ? ? ? ? ?/* TXD0 */
+> + ? ? ? at91_set_A_periph(AT91_PIN_PA18, 0); ? ? ? ? ? ?/* RXD0 */
+> +
+> + ? ? ? if (pins & ATMEL_UART_CTS)
+> + ? ? ? ? ? ? ? at91_set_A_periph(AT91_PIN_PA20, 0); ? ?/* CTS0 */
+> +
+> + ? ? ? if (pins & ATMEL_UART_RTS) {
+> + ? ? ? ? ? ? ? /*
+> + ? ? ? ? ? ? ? ?* AT91RM9200 Errata #39 - RTS0 is not internally connected to PA21.
+> + ? ? ? ? ? ? ? ?* ?We need to drive the pin manually. ?Default is off (RTS is active low).
+> + ? ? ? ? ? ? ? ?*/
+> + ? ? ? ? ? ? ? at91_set_gpio_output(AT91_PIN_PA21, 1);
+> + ? ? ? }
+> +}
+> +
+> +void at91rm9200_configure_usart1_pins(unsigned pins)
+> +{
+> + ? ? ? at91_set_A_periph(AT91_PIN_PB20, 1); ? ? ? ? ? ?/* TXD1 */
+> + ? ? ? at91_set_A_periph(AT91_PIN_PB21, 0); ? ? ? ? ? ?/* RXD1 */
+> +
+> + ? ? ? if (pins & ATMEL_UART_RI)
+> + ? ? ? ? ? ? ? at91_set_A_periph(AT91_PIN_PB18, 0); ? ?/* RI1 */
+> + ? ? ? if (pins & ATMEL_UART_DTR)
+> + ? ? ? ? ? ? ? at91_set_A_periph(AT91_PIN_PB19, 0); ? ?/* DTR1 */
+> + ? ? ? if (pins & ATMEL_UART_DCD)
+> + ? ? ? ? ? ? ? at91_set_A_periph(AT91_PIN_PB23, 0); ? ?/* DCD1 */
+> + ? ? ? if (pins & ATMEL_UART_CTS)
+> + ? ? ? ? ? ? ? at91_set_A_periph(AT91_PIN_PB24, 0); ? ?/* CTS1 */
+> + ? ? ? if (pins & ATMEL_UART_DSR)
+> + ? ? ? ? ? ? ? at91_set_A_periph(AT91_PIN_PB25, 0); ? ?/* DSR1 */
+> + ? ? ? if (pins & ATMEL_UART_RTS)
+> + ? ? ? ? ? ? ? at91_set_A_periph(AT91_PIN_PB26, 0); ? ?/* RTS1 */
+> +}
+> +
+> +void at91rm9200_configure_usart2_pins(unsigned pins)
+> +{
+> + ? ? ? at91_set_A_periph(AT91_PIN_PA22, 0); ? ? ? ? ? ?/* RXD2 */
+> + ? ? ? at91_set_A_periph(AT91_PIN_PA23, 1); ? ? ? ? ? ?/* TXD2 */
+> +
+> + ? ? ? if (pins & ATMEL_UART_CTS)
+> + ? ? ? ? ? ? ? at91_set_B_periph(AT91_PIN_PA30, 0); ? ?/* CTS2 */
+> + ? ? ? if (pins & ATMEL_UART_RTS)
+> + ? ? ? ? ? ? ? at91_set_B_periph(AT91_PIN_PA31, 0); ? ?/* RTS2 */
+> +}
+> +
+> +void at91rm9200_configure_usart3_pins(unsigned pins)
+> +{
+> + ? ? ? at91_set_B_periph(AT91_PIN_PA5, 1); ? ? ? ? ? ? /* TXD3 */
+> + ? ? ? at91_set_B_periph(AT91_PIN_PA6, 0); ? ? ? ? ? ? /* RXD3 */
+> +
+> + ? ? ? if (pins & ATMEL_UART_CTS)
+> + ? ? ? ? ? ? ? at91_set_B_periph(AT91_PIN_PB1, 0); ? ? /* CTS3 */
+> + ? ? ? if (pins & ATMEL_UART_RTS)
+> + ? ? ? ? ? ? ? at91_set_B_periph(AT91_PIN_PB0, 0); ? ? /* RTS3 */
+> +}
+> +
+> +
