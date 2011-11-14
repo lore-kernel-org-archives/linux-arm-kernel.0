@@ -1,339 +1,385 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 14 Nov 2011 16:23:44 +0000
-Subject: [PATCH v9 08/15] ARM: LPAE: Page table maintenance for the 3-level
- format
+Date: Mon, 14 Nov 2011 16:23:41 +0000
+Subject: [PATCH v9 05/15] ARM: LPAE: Factor out classic-MMU specific code into
+ proc-v7-2level.S
 In-Reply-To: <1321287831-24560-1-git-send-email-catalin.marinas@arm.com>
 References: <1321287831-24560-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <1321287831-24560-9-git-send-email-catalin.marinas@arm.com>
+Message-ID: <1321287831-24560-6-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch modifies the pgd/pmd/pte manipulation functions to support
-the 3-level page table format. Since there is no need for an 'ext'
-argument to cpu_set_pte_ext(), this patch conditionally defines a
-different prototype for this function when CONFIG_ARM_LPAE.
-
-The patch also introduces the L_PGD_SWAPPER flag to mark pgd entries
-pointing to pmd tables pre-allocated in the swapper_pg_dir and avoid
-trying to free them at run-time. This flag is 0 with the classic page
-table format.
+This patch modifies the proc-v7.S file so that it only contains code
+shared between classic MMU and LPAE. The non-common code is factored out
+into a separate file.
 
 Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm/include/asm/pgalloc.h        |   24 +++++++++++++++
- arch/arm/include/asm/pgtable-3level.h |   53 +++++++++++++++++++++++++++++++++
- arch/arm/include/asm/proc-fns.h       |   21 +++++++++++++
- arch/arm/mm/ioremap.c                 |    8 +++--
- arch/arm/mm/pgd.c                     |   51 +++++++++++++++++++++++++++++--
- 5 files changed, 150 insertions(+), 7 deletions(-)
+ arch/arm/mm/proc-v7-2level.S |  171 ++++++++++++++++++++++++++++++++++++++++++
+ arch/arm/mm/proc-v7.S        |  152 +------------------------------------
+ 2 files changed, 174 insertions(+), 149 deletions(-)
+ create mode 100644 arch/arm/mm/proc-v7-2level.S
 
-diff --git a/arch/arm/include/asm/pgalloc.h b/arch/arm/include/asm/pgalloc.h
-index 7418894..943504f 100644
---- a/arch/arm/include/asm/pgalloc.h
-+++ b/arch/arm/include/asm/pgalloc.h
-@@ -25,6 +25,26 @@
- #define _PAGE_USER_TABLE	(PMD_TYPE_TABLE | PMD_BIT4 | PMD_DOMAIN(DOMAIN_USER))
- #define _PAGE_KERNEL_TABLE	(PMD_TYPE_TABLE | PMD_BIT4 | PMD_DOMAIN(DOMAIN_KERNEL))
- 
-+#ifdef CONFIG_ARM_LPAE
-+
-+static inline pmd_t *pmd_alloc_one(struct mm_struct *mm, unsigned long addr)
-+{
-+	return (pmd_t *)get_zeroed_page(GFP_KERNEL | __GFP_REPEAT);
-+}
-+
-+static inline void pmd_free(struct mm_struct *mm, pmd_t *pmd)
-+{
-+	BUG_ON((unsigned long)pmd & (PAGE_SIZE-1));
-+	free_page((unsigned long)pmd);
-+}
-+
-+static inline void pud_populate(struct mm_struct *mm, pud_t *pud, pmd_t *pmd)
-+{
-+	set_pud(pud, __pud(__pa(pmd) | PMD_TYPE_TABLE));
-+}
-+
-+#else	/* !CONFIG_ARM_LPAE */
-+
- /*
-  * Since we have only two-level page tables, these are trivial
-  */
-@@ -32,6 +52,8 @@
- #define pmd_free(mm, pmd)		do { } while (0)
- #define pud_populate(mm,pmd,pte)	BUG()
- 
-+#endif	/* CONFIG_ARM_LPAE */
-+
- extern pgd_t *pgd_alloc(struct mm_struct *mm);
- extern void pgd_free(struct mm_struct *mm, pgd_t *pgd);
- 
-@@ -109,7 +131,9 @@ static inline void __pmd_populate(pmd_t *pmdp, phys_addr_t pte,
- {
- 	pmdval_t pmdval = (pte + PTE_HWTABLE_OFF) | prot;
- 	pmdp[0] = __pmd(pmdval);
-+#ifndef CONFIG_ARM_LPAE
- 	pmdp[1] = __pmd(pmdval + 256 * sizeof(pte_t));
-+#endif
- 	flush_pmd_entry(pmdp);
- }
- 
-diff --git a/arch/arm/include/asm/pgtable-3level.h b/arch/arm/include/asm/pgtable-3level.h
-index 79bf0ac..759af70 100644
---- a/arch/arm/include/asm/pgtable-3level.h
-+++ b/arch/arm/include/asm/pgtable-3level.h
-@@ -99,4 +99,57 @@
- #define L_PTE_MT_DEV_CACHED	(_AT(pteval_t, 3) << 2)	/* normal inner write-back */
- #define L_PTE_MT_MASK		(_AT(pteval_t, 7) << 2)
- 
+diff --git a/arch/arm/mm/proc-v7-2level.S b/arch/arm/mm/proc-v7-2level.S
+new file mode 100644
+index 0000000..3a4b3e7
+--- /dev/null
++++ b/arch/arm/mm/proc-v7-2level.S
+@@ -0,0 +1,171 @@
 +/*
-+ * Software PGD flags.
++ * arch/arm/mm/proc-v7-2level.S
++ *
++ * Copyright (C) 2001 Deep Blue Solutions Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
 + */
-+#define L_PGD_SWAPPER		(_AT(pgdval_t, 1) << 55)	/* swapper_pg_dir entry */
 +
-+#ifndef __ASSEMBLY__
++#define TTB_S		(1 << 1)
++#define TTB_RGN_NC	(0 << 3)
++#define TTB_RGN_OC_WBWA	(1 << 3)
++#define TTB_RGN_OC_WT	(2 << 3)
++#define TTB_RGN_OC_WB	(3 << 3)
++#define TTB_NOS		(1 << 5)
++#define TTB_IRGN_NC	((0 << 0) | (0 << 6))
++#define TTB_IRGN_WBWA	((0 << 0) | (1 << 6))
++#define TTB_IRGN_WT	((1 << 0) | (0 << 6))
++#define TTB_IRGN_WB	((1 << 0) | (1 << 6))
 +
-+#define pud_none(pud)		(!pud_val(pud))
-+#define pud_bad(pud)		(!(pud_val(pud) & 2))
-+#define pud_present(pud)	(pud_val(pud))
++/* PTWs cacheable, inner WB not shareable, outer WB not shareable */
++#define TTB_FLAGS_UP	TTB_IRGN_WB|TTB_RGN_OC_WB
++#define PMD_FLAGS_UP	PMD_SECT_WB
 +
-+#define pud_clear(pudp)			\
-+	do {				\
-+		*pudp = __pud(0);	\
-+		clean_pmd_entry(pudp);	\
-+	} while (0)
++/* PTWs cacheable, inner WBWA shareable, outer WBWA not shareable */
++#define TTB_FLAGS_SMP	TTB_IRGN_WBWA|TTB_S|TTB_NOS|TTB_RGN_OC_WBWA
++#define PMD_FLAGS_SMP	PMD_SECT_WBWA|PMD_SECT_S
 +
-+#define set_pud(pudp, pud)		\
-+	do {				\
-+		*pudp = pud;		\
-+		flush_pmd_entry(pudp);	\
-+	} while (0)
-+
-+static inline pmd_t *pud_page_vaddr(pud_t pud)
-+{
-+	return __va(pud_val(pud) & PHYS_MASK & (s32)PAGE_MASK);
-+}
-+
-+/* Find an entry in the second-level page table.. */
-+#define pmd_index(addr)		(((addr) >> PMD_SHIFT) & (PTRS_PER_PMD - 1))
-+static inline pmd_t *pmd_offset(pud_t *pud, unsigned long addr)
-+{
-+	return (pmd_t *)pud_page_vaddr(*pud) + pmd_index(addr);
-+}
-+
-+#define pmd_bad(pmd)		(!(pmd_val(pmd) & 2))
-+
-+#define copy_pmd(pmdpd,pmdps)		\
-+	do {				\
-+		*pmdpd = *pmdps;	\
-+		flush_pmd_entry(pmdpd);	\
-+	} while (0)
-+
-+#define pmd_clear(pmdp)			\
-+	do {				\
-+		*pmdp = __pmd(0);	\
-+		clean_pmd_entry(pmdp);	\
-+	} while (0)
-+
-+#define set_pte_ext(ptep,pte,ext) cpu_set_pte_ext(ptep,__pte(pte_val(pte)|(ext)))
-+
-+#endif /* __ASSEMBLY__ */
-+
- #endif /* _ASM_PGTABLE_3LEVEL_H */
-diff --git a/arch/arm/include/asm/proc-fns.h b/arch/arm/include/asm/proc-fns.h
-index 9e92cb2..f3628fb 100644
---- a/arch/arm/include/asm/proc-fns.h
-+++ b/arch/arm/include/asm/proc-fns.h
-@@ -65,7 +65,11 @@ extern struct processor {
- 	 * Set a possibly extended PTE.  Non-extended PTEs should
- 	 * ignore 'ext'.
- 	 */
-+#ifdef CONFIG_ARM_LPAE
-+	void (*set_pte_ext)(pte_t *ptep, pte_t pte);
-+#else
- 	void (*set_pte_ext)(pte_t *ptep, pte_t pte, unsigned int ext);
++/*
++ *	cpu_v7_switch_mm(pgd_phys, tsk)
++ *
++ *	Set the translation table base pointer to be pgd_phys
++ *
++ *	- pgd_phys - physical address of new TTB
++ *
++ *	It is assumed that:
++ *	- we are not using split page tables
++ */
++ENTRY(cpu_v7_switch_mm)
++#ifdef CONFIG_MMU
++	mov	r2, #0
++	ldr	r1, [r1, #MM_CONTEXT_ID]	@ get mm->context.id
++	ALT_SMP(orr	r0, r0, #TTB_FLAGS_SMP)
++	ALT_UP(orr	r0, r0, #TTB_FLAGS_UP)
++#ifdef CONFIG_ARM_ERRATA_430973
++	mcr	p15, 0, r2, c7, c5, 6		@ flush BTAC/BTB
 +#endif
- 
- 	/* Suspend/resume */
- 	unsigned int suspend_size;
-@@ -79,7 +83,11 @@ extern void cpu_proc_fin(void);
- extern int cpu_do_idle(void);
- extern void cpu_dcache_clean_area(void *, int);
- extern void cpu_do_switch_mm(unsigned long pgd_phys, struct mm_struct *mm);
-+#ifdef CONFIG_ARM_LPAE
-+extern void cpu_set_pte_ext(pte_t *ptep, pte_t pte);
-+#else
- extern void cpu_set_pte_ext(pte_t *ptep, pte_t pte, unsigned int ext);
++#ifdef CONFIG_ARM_ERRATA_754322
++	dsb
 +#endif
- extern void cpu_reset(unsigned long addr) __attribute__((noreturn));
- 
- /* These three are private to arch/arm/kernel/suspend.c */
-@@ -107,6 +115,18 @@ extern void cpu_resume(void);
- 
- #define cpu_switch_mm(pgd,mm) cpu_do_switch_mm(virt_to_phys(pgd),mm)
- 
-+#ifdef CONFIG_ARM_LPAE
-+#define cpu_get_pgd()	\
-+	({						\
-+		unsigned long pg, pg2;			\
-+		__asm__("mrrc	p15, 0, %0, %1, c2"	\
-+			: "=r" (pg), "=r" (pg2)		\
-+			:				\
-+			: "cc");			\
-+		pg &= ~(PTRS_PER_PGD*sizeof(pgd_t)-1);	\
-+		(pgd_t *)phys_to_virt(pg);		\
-+	})
-+#else
- #define cpu_get_pgd()	\
- 	({						\
- 		unsigned long pg;			\
-@@ -115,6 +135,7 @@ extern void cpu_resume(void);
- 		pg &= ~0x3fff;				\
- 		(pgd_t *)phys_to_virt(pg);		\
- 	})
++	mcr	p15, 0, r2, c13, c0, 1		@ set reserved context ID
++	isb
++1:	mcr	p15, 0, r0, c2, c0, 0		@ set TTB 0
++	isb
++#ifdef CONFIG_ARM_ERRATA_754322
++	dsb
 +#endif
- 
- #endif
- 
-diff --git a/arch/arm/mm/ioremap.c b/arch/arm/mm/ioremap.c
-index c3fa40d..d1f78ba 100644
---- a/arch/arm/mm/ioremap.c
-+++ b/arch/arm/mm/ioremap.c
-@@ -64,7 +64,7 @@ void __check_kvm_seq(struct mm_struct *mm)
- 	} while (seq != init_mm.context.kvm_seq);
- }
- 
--#ifndef CONFIG_SMP
-+#if !defined(CONFIG_SMP) && !defined(CONFIG_ARM_LPAE)
- /*
-  * Section support is unsafe on SMP - If you iounmap and ioremap a region,
-  * the other CPUs will not see this change until their next context switch.
-@@ -202,11 +202,13 @@ void __iomem * __arm_ioremap_pfn_caller(unsigned long pfn,
- 	unsigned long addr;
-  	struct vm_struct * area;
- 
-+#ifndef CONFIG_ARM_LPAE
- 	/*
- 	 * High mappings must be supersection aligned
- 	 */
- 	if (pfn >= 0x100000 && (__pfn_to_phys(pfn) & ~SUPERSECTION_MASK))
- 		return NULL;
++	mcr	p15, 0, r1, c13, c0, 1		@ set context ID
++	isb
 +#endif
- 
- 	/*
- 	 * Don't allow RAM to be mapped - this causes problems with ARMv6+
-@@ -228,7 +230,7 @@ void __iomem * __arm_ioremap_pfn_caller(unsigned long pfn,
-  		return NULL;
-  	addr = (unsigned long)area->addr;
- 
--#ifndef CONFIG_SMP
-+#if !defined(CONFIG_SMP) && !defined(CONFIG_ARM_LPAE)
- 	if (DOMAIN_IO == 0 &&
- 	    (((cpu_architecture() >= CPU_ARCH_ARMv6) && (get_cr() & CR_XP)) ||
- 	       cpu_is_xsc3()) && pfn >= 0x100000 &&
-@@ -320,7 +322,7 @@ __arm_ioremap_exec(unsigned long phys_addr, size_t size, bool cached)
- void __iounmap(volatile void __iomem *io_addr)
- {
- 	void *addr = (void *)(PAGE_MASK & (unsigned long)io_addr);
--#ifndef CONFIG_SMP
-+#if !defined(CONFIG_SMP) && !defined(CONFIG_ARM_LPAE)
- 	struct vm_struct **p, *tmp;
- 
- 	/*
-diff --git a/arch/arm/mm/pgd.c b/arch/arm/mm/pgd.c
-index b2027c1..a3e78cc 100644
---- a/arch/arm/mm/pgd.c
-+++ b/arch/arm/mm/pgd.c
-@@ -10,6 +10,7 @@
- #include <linux/mm.h>
- #include <linux/gfp.h>
- #include <linux/highmem.h>
-+#include <linux/slab.h>
- 
- #include <asm/pgalloc.h>
- #include <asm/page.h>
-@@ -17,6 +18,14 @@
- 
- #include "mm.h"
- 
-+#ifdef CONFIG_ARM_LPAE
-+#define __pgd_alloc()	kmalloc(PTRS_PER_PGD * sizeof(pgd_t), GFP_KERNEL)
-+#define __pgd_free(pgd)	kfree(pgd)
-+#else
-+#define __pgd_alloc()	(pgd_t *)__get_free_pages(GFP_KERNEL, 2)
-+#define __pgd_free(pgd)	free_pages((unsigned long)pgd, 2)
++	mov	pc, lr
++ENDPROC(cpu_v7_switch_mm)
++
++/*
++ *	cpu_v7_set_pte_ext(ptep, pte)
++ *
++ *	Set a level 2 translation table entry.
++ *
++ *	- ptep  - pointer to level 2 translation table entry
++ *		  (hardware version is stored at +2048 bytes)
++ *	- pte   - PTE value to store
++ *	- ext	- value for extended PTE bits
++ */
++ENTRY(cpu_v7_set_pte_ext)
++#ifdef CONFIG_MMU
++	str	r1, [r0]			@ linux version
++
++	bic	r3, r1, #0x000003f0
++	bic	r3, r3, #PTE_TYPE_MASK
++	orr	r3, r3, r2
++	orr	r3, r3, #PTE_EXT_AP0 | 2
++
++	tst	r1, #1 << 4
++	orrne	r3, r3, #PTE_EXT_TEX(1)
++
++	eor	r1, r1, #L_PTE_DIRTY
++	tst	r1, #L_PTE_RDONLY | L_PTE_DIRTY
++	orrne	r3, r3, #PTE_EXT_APX
++
++	tst	r1, #L_PTE_USER
++	orrne	r3, r3, #PTE_EXT_AP1
++#ifdef CONFIG_CPU_USE_DOMAINS
++	@ allow kernel read/write access to read-only user pages
++	tstne	r3, #PTE_EXT_APX
++	bicne	r3, r3, #PTE_EXT_APX | PTE_EXT_AP0
 +#endif
 +
- /*
-  * need to get a 16k page for level 1
-  */
-@@ -27,7 +36,7 @@ pgd_t *pgd_alloc(struct mm_struct *mm)
- 	pmd_t *new_pmd, *init_pmd;
- 	pte_t *new_pte, *init_pte;
- 
--	new_pgd = (pgd_t *)__get_free_pages(GFP_KERNEL, 2);
-+	new_pgd = __pgd_alloc();
- 	if (!new_pgd)
- 		goto no_pgd;
- 
-@@ -42,10 +51,25 @@ pgd_t *pgd_alloc(struct mm_struct *mm)
- 
- 	clean_dcache_area(new_pgd, PTRS_PER_PGD * sizeof(pgd_t));
- 
-+#ifdef CONFIG_ARM_LPAE
++	tst	r1, #L_PTE_XN
++	orrne	r3, r3, #PTE_EXT_XN
++
++	tst	r1, #L_PTE_YOUNG
++	tstne	r1, #L_PTE_PRESENT
++	moveq	r3, #0
++
++ ARM(	str	r3, [r0, #2048]! )
++ THUMB(	add	r0, r0, #2048 )
++ THUMB(	str	r3, [r0] )
++	mcr	p15, 0, r0, c7, c10, 1		@ flush_pte
++#endif
++	mov	pc, lr
++ENDPROC(cpu_v7_set_pte_ext)
++
 +	/*
-+	 * Allocate PMD table for modules and pkmap mappings.
++	 * Memory region attributes with SCTLR.TRE=1
++	 *
++	 *   n = TEX[0],C,B
++	 *   TR = PRRR[2n+1:2n]		- memory type
++	 *   IR = NMRR[2n+1:2n]		- inner cacheable property
++	 *   OR = NMRR[2n+17:2n+16]	- outer cacheable property
++	 *
++	 *			n	TR	IR	OR
++	 *   UNCACHED		000	00
++	 *   BUFFERABLE		001	10	00	00
++	 *   WRITETHROUGH	010	10	10	10
++	 *   WRITEBACK		011	10	11	11
++	 *   reserved		110
++	 *   WRITEALLOC		111	10	01	01
++	 *   DEV_SHARED		100	01
++	 *   DEV_NONSHARED	100	01
++	 *   DEV_WC		001	10
++	 *   DEV_CACHED		011	10
++	 *
++	 * Other attributes:
++	 *
++	 *   DS0 = PRRR[16] = 0		- device shareable property
++	 *   DS1 = PRRR[17] = 1		- device shareable property
++	 *   NS0 = PRRR[18] = 0		- normal shareable property
++	 *   NS1 = PRRR[19] = 1		- normal shareable property
++	 *   NOS = PRRR[24+n] = 1	- not outer shareable
 +	 */
-+	new_pud = pud_alloc(mm, new_pgd + pgd_index(MODULES_VADDR),
-+			    MODULES_VADDR);
-+	if (!new_pud)
-+		goto no_pud;
++.equ	PRRR,	0xff0a81a8
++.equ	NMRR,	0x40e040e0
 +
-+	new_pmd = pmd_alloc(mm, new_pud, 0);
-+	if (!new_pmd)
-+		goto no_pmd;
-+#endif
-+
- 	if (!vectors_high()) {
- 		/*
- 		 * On ARM, first page must always be allocated since it
--		 * contains the machine vectors.
-+		 * contains the machine vectors. The vectors are always high
-+		 * with LPAE.
- 		 */
- 		new_pud = pud_alloc(mm, new_pgd, 0);
- 		if (!new_pud)
-@@ -74,7 +98,7 @@ no_pte:
- no_pmd:
- 	pud_free(mm, new_pud);
- no_pud:
--	free_pages((unsigned long)new_pgd, 2);
-+	__pgd_free(new_pgd);
- no_pgd:
- 	return NULL;
- }
-@@ -111,5 +135,24 @@ no_pud:
- 	pgd_clear(pgd);
- 	pud_free(mm, pud);
- no_pgd:
--	free_pages((unsigned long) pgd_base, 2);
-+#ifdef CONFIG_ARM_LPAE
 +	/*
-+	 * Free modules/pkmap or identity pmd tables.
++	 * Macro for setting up the TTBRx and TTBCR registers.
++	 * - \ttb0 and \ttb1 updated with the corresponding flags.
 +	 */
-+	for (pgd = pgd_base; pgd < pgd_base + PTRS_PER_PGD; pgd++) {
-+		if (pgd_none_or_clear_bad(pgd))
-+			continue;
-+		if (pgd_val(*pgd) & L_PGD_SWAPPER)
-+			continue;
-+		pud = pud_offset(pgd, 0);
-+		if (pud_none_or_clear_bad(pud))
-+			continue;
-+		pmd = pmd_offset(pud, 0);
-+		pud_clear(pud);
-+		pmd_free(mm, pmd);
-+		pgd_clear(pgd);
-+		pud_free(mm, pud);
-+	}
-+#endif
-+	__pgd_free(pgd_base);
- }
++	.macro	v7_ttb_setup, zero, ttbr0, ttbr1, tmp
++	mcr	p15, 0, \zero, c2, c0, 2	@ TTB control register
++	ALT_SMP(orr	\ttbr0, \ttbr0, #TTB_FLAGS_SMP)
++	ALT_UP(orr	\ttbr0, \ttbr0, #TTB_FLAGS_UP)
++	ALT_SMP(orr	\ttbr1, \ttbr1, #TTB_FLAGS_SMP)
++	ALT_UP(orr	\ttbr1, \ttbr1, #TTB_FLAGS_UP)
++	mcr	p15, 0, \ttbr1, c2, c0, 1	@ load TTB1
++	.endm
++
++	__CPUINIT
++
++	/*   AT
++	 *  TFR   EV X F   I D LR    S
++	 * .EEE ..EE PUI. .T.T 4RVI ZWRS BLDP WCAM
++	 * rxxx rrxx xxx0 0101 xxxx xxxx x111 xxxx < forced
++	 *    1    0 110       0011 1100 .111 1101 < we want
++	 */
++	.align	2
++	.type	v7_crval, #object
++v7_crval:
++	crval	clear=0x0120c302, mmuset=0x10c03c7d, ucset=0x00c01c7c
++
++	.previous
+diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+index 2c559ac..8debdba 100644
+--- a/arch/arm/mm/proc-v7.S
++++ b/arch/arm/mm/proc-v7.S
+@@ -19,24 +19,7 @@
+ 
+ #include "proc-macros.S"
+ 
+-#define TTB_S		(1 << 1)
+-#define TTB_RGN_NC	(0 << 3)
+-#define TTB_RGN_OC_WBWA	(1 << 3)
+-#define TTB_RGN_OC_WT	(2 << 3)
+-#define TTB_RGN_OC_WB	(3 << 3)
+-#define TTB_NOS		(1 << 5)
+-#define TTB_IRGN_NC	((0 << 0) | (0 << 6))
+-#define TTB_IRGN_WBWA	((0 << 0) | (1 << 6))
+-#define TTB_IRGN_WT	((1 << 0) | (0 << 6))
+-#define TTB_IRGN_WB	((1 << 0) | (1 << 6))
+-
+-/* PTWs cacheable, inner WB not shareable, outer WB not shareable */
+-#define TTB_FLAGS_UP	TTB_IRGN_WB|TTB_RGN_OC_WB
+-#define PMD_FLAGS_UP	PMD_SECT_WB
+-
+-/* PTWs cacheable, inner WBWA shareable, outer WBWA not shareable */
+-#define TTB_FLAGS_SMP	TTB_IRGN_WBWA|TTB_S|TTB_NOS|TTB_RGN_OC_WBWA
+-#define PMD_FLAGS_SMP	PMD_SECT_WBWA|PMD_SECT_S
++#include "proc-v7-2level.S"
+ 
+ ENTRY(cpu_v7_proc_init)
+ 	mov	pc, lr
+@@ -97,124 +80,9 @@ ENTRY(cpu_v7_dcache_clean_area)
+ 	mov	pc, lr
+ ENDPROC(cpu_v7_dcache_clean_area)
+ 
+-/*
+- *	cpu_v7_switch_mm(pgd_phys, tsk)
+- *
+- *	Set the translation table base pointer to be pgd_phys
+- *
+- *	- pgd_phys - physical address of new TTB
+- *
+- *	It is assumed that:
+- *	- we are not using split page tables
+- */
+-ENTRY(cpu_v7_switch_mm)
+-#ifdef CONFIG_MMU
+-	mov	r2, #0
+-	ldr	r1, [r1, #MM_CONTEXT_ID]	@ get mm->context.id
+-	ALT_SMP(orr	r0, r0, #TTB_FLAGS_SMP)
+-	ALT_UP(orr	r0, r0, #TTB_FLAGS_UP)
+-#ifdef CONFIG_ARM_ERRATA_430973
+-	mcr	p15, 0, r2, c7, c5, 6		@ flush BTAC/BTB
+-#endif
+-#ifdef CONFIG_ARM_ERRATA_754322
+-	dsb
+-#endif
+-	mcr	p15, 0, r2, c13, c0, 1		@ set reserved context ID
+-	isb
+-1:	mcr	p15, 0, r0, c2, c0, 0		@ set TTB 0
+-	isb
+-#ifdef CONFIG_ARM_ERRATA_754322
+-	dsb
+-#endif
+-	mcr	p15, 0, r1, c13, c0, 1		@ set context ID
+-	isb
+-#endif
+-	mov	pc, lr
+-ENDPROC(cpu_v7_switch_mm)
+-
+-/*
+- *	cpu_v7_set_pte_ext(ptep, pte)
+- *
+- *	Set a level 2 translation table entry.
+- *
+- *	- ptep  - pointer to level 2 translation table entry
+- *		  (hardware version is stored at +2048 bytes)
+- *	- pte   - PTE value to store
+- *	- ext	- value for extended PTE bits
+- */
+-ENTRY(cpu_v7_set_pte_ext)
+-#ifdef CONFIG_MMU
+-	str	r1, [r0]			@ linux version
+-
+-	bic	r3, r1, #0x000003f0
+-	bic	r3, r3, #PTE_TYPE_MASK
+-	orr	r3, r3, r2
+-	orr	r3, r3, #PTE_EXT_AP0 | 2
+-
+-	tst	r1, #1 << 4
+-	orrne	r3, r3, #PTE_EXT_TEX(1)
+-
+-	eor	r1, r1, #L_PTE_DIRTY
+-	tst	r1, #L_PTE_RDONLY | L_PTE_DIRTY
+-	orrne	r3, r3, #PTE_EXT_APX
+-
+-	tst	r1, #L_PTE_USER
+-	orrne	r3, r3, #PTE_EXT_AP1
+-#ifdef CONFIG_CPU_USE_DOMAINS
+-	@ allow kernel read/write access to read-only user pages
+-	tstne	r3, #PTE_EXT_APX
+-	bicne	r3, r3, #PTE_EXT_APX | PTE_EXT_AP0
+-#endif
+-
+-	tst	r1, #L_PTE_XN
+-	orrne	r3, r3, #PTE_EXT_XN
+-
+-	tst	r1, #L_PTE_YOUNG
+-	tstne	r1, #L_PTE_PRESENT
+-	moveq	r3, #0
+-
+- ARM(	str	r3, [r0, #2048]! )
+- THUMB(	add	r0, r0, #2048 )
+- THUMB(	str	r3, [r0] )
+-	mcr	p15, 0, r0, c7, c10, 1		@ flush_pte
+-#endif
+-	mov	pc, lr
+-ENDPROC(cpu_v7_set_pte_ext)
+-
+ 	string	cpu_v7_name, "ARMv7 Processor"
+ 	.align
+ 
+-	/*
+-	 * Memory region attributes with SCTLR.TRE=1
+-	 *
+-	 *   n = TEX[0],C,B
+-	 *   TR = PRRR[2n+1:2n]		- memory type
+-	 *   IR = NMRR[2n+1:2n]		- inner cacheable property
+-	 *   OR = NMRR[2n+17:2n+16]	- outer cacheable property
+-	 *
+-	 *			n	TR	IR	OR
+-	 *   UNCACHED		000	00
+-	 *   BUFFERABLE		001	10	00	00
+-	 *   WRITETHROUGH	010	10	10	10
+-	 *   WRITEBACK		011	10	11	11
+-	 *   reserved		110
+-	 *   WRITEALLOC		111	10	01	01
+-	 *   DEV_SHARED		100	01
+-	 *   DEV_NONSHARED	100	01
+-	 *   DEV_WC		001	10
+-	 *   DEV_CACHED		011	10
+-	 *
+-	 * Other attributes:
+-	 *
+-	 *   DS0 = PRRR[16] = 0		- device shareable property
+-	 *   DS1 = PRRR[17] = 1		- device shareable property
+-	 *   NS0 = PRRR[18] = 0		- normal shareable property
+-	 *   NS1 = PRRR[19] = 1		- normal shareable property
+-	 *   NOS = PRRR[24+n] = 1	- not outer shareable
+-	 */
+-.equ	PRRR,	0xff0a81a8
+-.equ	NMRR,	0x40e040e0
+-
+ /* Suspend/resume support: derived from arch/arm/mach-s5pv210/sleep.S */
+ .globl	cpu_v7_suspend_size
+ .equ	cpu_v7_suspend_size, 4 * 7
+@@ -377,12 +245,7 @@ __v7_setup:
+ 	dsb
+ #ifdef CONFIG_MMU
+ 	mcr	p15, 0, r10, c8, c7, 0		@ invalidate I + D TLBs
+-	mcr	p15, 0, r10, c2, c0, 2		@ TTB control register
+-	ALT_SMP(orr	r4, r4, #TTB_FLAGS_SMP)
+-	ALT_UP(orr	r4, r4, #TTB_FLAGS_UP)
+-	ALT_SMP(orr	r8, r8, #TTB_FLAGS_SMP)
+-	ALT_UP(orr	r8, r8, #TTB_FLAGS_UP)
+-	mcr	p15, 0, r8, c2, c0, 1		@ load TTB1
++	v7_ttb_setup r10, r4, r8, r5		@ TTBCR, TTBRx setup
+ 	ldr	r5, =PRRR			@ PRRR
+ 	ldr	r6, =NMRR			@ NMRR
+ 	mcr	p15, 0, r5, c10, c2, 0		@ write PRRR
+@@ -404,16 +267,7 @@ __v7_setup:
+ 	mov	pc, lr				@ return to head.S:__ret
+ ENDPROC(__v7_setup)
+ 
+-	/*   AT
+-	 *  TFR   EV X F   I D LR    S
+-	 * .EEE ..EE PUI. .T.T 4RVI ZWRS BLDP WCAM
+-	 * rxxx rrxx xxx0 0101 xxxx xxxx x111 xxxx < forced
+-	 *    1    0 110       0011 1100 .111 1101 < we want
+-	 */
+-	.type	v7_crval, #object
+-v7_crval:
+-	crval	clear=0x0120c302, mmuset=0x10c03c7d, ucset=0x00c01c7c
+-
++	.align	2
+ __v7_setup_stack:
+ 	.space	4 * 11				@ 11 registers
+ 
