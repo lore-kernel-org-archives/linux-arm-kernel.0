@@ -1,102 +1,106 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 14 Nov 2011 16:23:36 +0000
-Subject: [PATCH v9 00/15] ARM: Add support for the Large Physical Address
- Extensions
-Message-ID: <1321287831-24560-1-git-send-email-catalin.marinas@arm.com>
+Date: Mon, 14 Nov 2011 16:23:38 +0000
+Subject: [PATCH v9 02/15] ARM: pgtable: switch to use pgtable-nopud.h
+In-Reply-To: <1321287831-24560-1-git-send-email-catalin.marinas@arm.com>
+References: <1321287831-24560-1-git-send-email-catalin.marinas@arm.com>
+Message-ID: <1321287831-24560-3-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is version 9 of the set of patches adding support for the Large
-Physical Address Extensions on the ARM architecture (available with the
-Cortex-A15 and Cortex-A7 processors).
+From: Russell King <rmk+kernel@arm.linux.org.uk>
 
-This patch set against 3.2-rc1 is available on this branch:
+Nick Piggin noted upon introducing 4level-fixup.h:
 
-git://git.kernel.org/pub/scm/linux/kernel/git/cmarinas/linux.git for-next
+| Add a temporary "fallback" header so architectures can run with
+| the 4level pagetables patch without modification. All architectures
+| should be converted to use the folding headers (include/asm-generic/
+| pgtable-nop?d.h) as soon as possible, and the fallback header removed.
 
-The patch set also includes Russell's nopud patch with an additional
-fix-up to be reviewed (they are not in mainline yet but LPAE depends on
-them).
+This makes ARM compliant with this statement.
 
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ arch/arm/include/asm/pgalloc.h |    2 +-
+ arch/arm/include/asm/pgtable.h |   23 +++++++++++++----------
+ arch/arm/include/asm/tlb.h     |    1 +
+ 3 files changed, 15 insertions(+), 11 deletions(-)
 
-Changelog (from v8, updates following review):
-
-- Removed the ATAG_MEM64 patch.
-- Removed the different PMD_SECT_XN definition for asm.
-- proc-v7.S fixes for SMP/UP instructions pairing.
-- Removed references to PHYS_OFFSET in proc-v7.S and added comment about
-  VMSPLIT_1G.
-- pr_fmt() definition removed from idmap.c.
-- ARCH_DMA_ADDR_T_64BIT now defaults to false without any dependencies.
-  Platforms should select this explicitly.
-- Reordered the nopud fixup with Russell's nopud patch.
-
-Known issues:
-
-- idmap_add_pmd() still cannot be called in an atomic context but the
-  kexec patches re-implement the setup_mm_for_reboot() function and it
-  no longer calls identity_mapping_add().
-
-
-Catalin Marinas (12):
-  ARM: pgtable: Fix compiler warning in ioremap.c introduced by nopud
-  ARM: LPAE: Move page table maintenance macros to pgtable-2level.h
-  ARM: LPAE: Move the FSR definitions to separate files
-  ARM: LPAE: Factor out classic-MMU specific code into proc-v7-2level.S
-  ARM: LPAE: Introduce the 3-level page table format definitions
-  ARM: LPAE: Page table maintenance for the 3-level format
-  ARM: LPAE: MMU setup for the 3-level page table format
-  ARM: LPAE: Invalidate the TLB before freeing the PMD
-  ARM: LPAE: Add fault handling support
-  ARM: LPAE: Add context switching support
-  ARM: LPAE: Add identity mapping support for the 3-level page table
-    format
-  ARM: LPAE: Add the Kconfig entries
-
-Russell King (1):
-  ARM: pgtable: switch to use pgtable-nopud.h
-
-Will Deacon (2):
-  ARM: LPAE: add ISBs around MMU enabling code
-  ARM: LPAE: mark memory banks with start > ULONG_MAX as highmem
-
- arch/arm/Kconfig                            |    2 +-
- arch/arm/boot/compressed/head.S             |    1 +
- arch/arm/include/asm/assembler.h            |   11 ++
- arch/arm/include/asm/page.h                 |    4 +
- arch/arm/include/asm/pgalloc.h              |   26 ++++-
- arch/arm/include/asm/pgtable-2level.h       |   41 ++++++
- arch/arm/include/asm/pgtable-3level-hwdef.h |   77 ++++++++++++
- arch/arm/include/asm/pgtable-3level-types.h |   70 +++++++++++
- arch/arm/include/asm/pgtable-3level.h       |  155 +++++++++++++++++++++++
- arch/arm/include/asm/pgtable-hwdef.h        |    4 +
- arch/arm/include/asm/pgtable.h              |   43 +------
- arch/arm/include/asm/proc-fns.h             |   21 +++
- arch/arm/include/asm/system.h               |    8 ++
- arch/arm/include/asm/tlb.h                  |   12 ++-
- arch/arm/kernel/head.S                      |   47 +++++++-
- arch/arm/kernel/hw_breakpoint.c             |    8 +-
- arch/arm/kernel/sleep.S                     |    2 +
- arch/arm/mm/Kconfig                         |   17 +++
- arch/arm/mm/alignment.c                     |    2 +-
- arch/arm/mm/context.c                       |   19 +++-
- arch/arm/mm/fault.c                         |  111 +++--------------
- arch/arm/mm/fault.h                         |   27 ++++-
- arch/arm/mm/fsr-2level.c                    |   78 ++++++++++++
- arch/arm/mm/fsr-3level.c                    |   68 ++++++++++
- arch/arm/mm/idmap.c                         |   34 +++++-
- arch/arm/mm/ioremap.c                       |   39 ++++---
- arch/arm/mm/mmu.c                           |   46 +++++++-
- arch/arm/mm/pgd.c                           |   51 +++++++-
- arch/arm/mm/proc-macros.S                   |    5 +-
- arch/arm/mm/proc-v7-2level.S                |  171 ++++++++++++++++++++++++++
- arch/arm/mm/proc-v7-3level.S                |  151 +++++++++++++++++++++++
- arch/arm/mm/proc-v7.S                       |  177 +++------------------------
- 32 files changed, 1205 insertions(+), 323 deletions(-)
- create mode 100644 arch/arm/include/asm/pgtable-3level-hwdef.h
- create mode 100644 arch/arm/include/asm/pgtable-3level-types.h
- create mode 100644 arch/arm/include/asm/pgtable-3level.h
- create mode 100644 arch/arm/mm/fsr-2level.c
- create mode 100644 arch/arm/mm/fsr-3level.c
- create mode 100644 arch/arm/mm/proc-v7-2level.S
- create mode 100644 arch/arm/mm/proc-v7-3level.S
+diff --git a/arch/arm/include/asm/pgalloc.h b/arch/arm/include/asm/pgalloc.h
+index 3e08fd3..7418894 100644
+--- a/arch/arm/include/asm/pgalloc.h
++++ b/arch/arm/include/asm/pgalloc.h
+@@ -30,7 +30,7 @@
+  */
+ #define pmd_alloc_one(mm,addr)		({ BUG(); ((pmd_t *)2); })
+ #define pmd_free(mm, pmd)		do { } while (0)
+-#define pgd_populate(mm,pmd,pte)	BUG()
++#define pud_populate(mm,pmd,pte)	BUG()
+ 
+ extern pgd_t *pgd_alloc(struct mm_struct *mm);
+ extern void pgd_free(struct mm_struct *mm, pgd_t *pgd);
+diff --git a/arch/arm/include/asm/pgtable.h b/arch/arm/include/asm/pgtable.h
+index 9451dce..a1aca79 100644
+--- a/arch/arm/include/asm/pgtable.h
++++ b/arch/arm/include/asm/pgtable.h
+@@ -11,15 +11,16 @@
+ #define _ASMARM_PGTABLE_H
+ 
+ #include <linux/const.h>
+-#include <asm-generic/4level-fixup.h>
+ #include <asm/proc-fns.h>
+ 
+ #ifndef CONFIG_MMU
+ 
++#include <asm-generic/4level-fixup.h>
+ #include "pgtable-nommu.h"
+ 
+ #else
+ 
++#include <asm-generic/pgtable-nopud.h>
+ #include <asm/memory.h>
+ #include <mach/vmalloc.h>
+ #include <asm/pgtable-hwdef.h>
+@@ -164,20 +165,22 @@ extern pgd_t swapper_pg_dir[PTRS_PER_PGD];
+ #define pgd_offset_k(addr)	pgd_offset(&init_mm, addr)
+ 
+ /*
+- * The "pgd_xxx()" functions here are trivial for a folded two-level
+- * setup: the pgd is never bad, and a pmd always exists (as it's folded
+- * into the pgd entry)
++ * The "pud_xxx()" functions here are trivial when the pmd is folded into
++ * the pud: the pud entry is never bad, always exists, and can't be set or
++ * cleared.
+  */
+-#define pgd_none(pgd)		(0)
+-#define pgd_bad(pgd)		(0)
+-#define pgd_present(pgd)	(1)
+-#define pgd_clear(pgdp)		do { } while (0)
+-#define set_pgd(pgd,pgdp)	do { } while (0)
++#define pud_none(pud)		(0)
++#define pud_bad(pud)		(0)
++#define pud_present(pud)	(1)
++#define pud_clear(pudp)		do { } while (0)
+ #define set_pud(pud,pudp)	do { } while (0)
+ 
+ 
+ /* Find an entry in the second-level page table.. */
+-#define pmd_offset(dir, addr)	((pmd_t *)(dir))
++static inline pmd_t *pmd_offset(pud_t *pud, unsigned long addr)
++{
++	return (pmd_t *)pud;
++}
+ 
+ #define pmd_none(pmd)		(!pmd_val(pmd))
+ #define pmd_present(pmd)	(pmd_val(pmd))
+diff --git a/arch/arm/include/asm/tlb.h b/arch/arm/include/asm/tlb.h
+index 265f908..b509e44 100644
+--- a/arch/arm/include/asm/tlb.h
++++ b/arch/arm/include/asm/tlb.h
+@@ -204,6 +204,7 @@ static inline void __pte_free_tlb(struct mmu_gather *tlb, pgtable_t pte,
+ 
+ #define pte_free_tlb(tlb, ptep, addr)	__pte_free_tlb(tlb, ptep, addr)
+ #define pmd_free_tlb(tlb, pmdp, addr)	pmd_free((tlb)->mm, pmdp)
++#define pud_free_tlb(tlb, pudp, addr)	pud_free((tlb)->mm, pudp)
+ 
+ #define tlb_migrate_finish(mm)		do { } while (0)
+ 
