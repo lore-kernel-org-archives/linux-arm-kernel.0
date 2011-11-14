@@ -1,50 +1,38 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 14 Nov 2011 16:47:09 +0100
-Subject: [PATCH 3/3] ARM i.MX: Update defconfig
-In-Reply-To: <20111114015828.GB10217@S2100-06.ap.freescale.net>
-References: <1320915966-8063-1-git-send-email-s.hauer@pengutronix.de>
- <1320915966-8063-4-git-send-email-s.hauer@pengutronix.de>
- <20111114015828.GB10217@S2100-06.ap.freescale.net>
-Message-ID: <20111114154709.GC27267@pengutronix.de>
+Date: Mon, 14 Nov 2011 16:49:17 +0100
+Subject: [PATCH 1/1] ASoC: mxs-saif: remove function in platform_data
+In-Reply-To: <20111111231955.GB9471@S2100-06.ap.freescale.net>
+References: <1321003740-10992-1-git-send-email-b29396@freescale.com>
+ <20111111150422.GX16886@pengutronix.de>
+ <20111111231955.GB9471@S2100-06.ap.freescale.net>
+Message-ID: <20111114154917.GD27267@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 14, 2011 at 09:58:29AM +0800, Shawn Guo wrote:
-> Hi Sascha,
+On Sat, Nov 12, 2011 at 07:19:56AM +0800, Shawn Guo wrote:
+> On Fri, Nov 11, 2011 at 04:04:22PM +0100, Sascha Hauer wrote:
+> > On Fri, Nov 11, 2011 at 05:29:00PM +0800, Dong Aisheng wrote:
+> > > Add master_mode and master_id in platfrom_data since it's board
+> > > specific and board knows it.
+> > > Then we can remove the function pointer in platfrom_data to make
+> > > the driver more devicetree friendly.
+> > 
+> > Looks ok. Marc,
 > 
-> On Thu, Nov 10, 2011 at 10:06:06AM +0100, Sascha Hauer wrote:
-> > This updates the defconfig for i.MX3, i.MX5 and i.MX6.
-> > 
-> > - all these can be compiled together now, so remove mx3_defconfig and
-> >   mx5_defconfig and introduce a imx_v6_v7_defconfig instead.
-> > 
-> Can you amend the following change to imx_v6_v7_defconfig?  With this
-> change, CONFIG_MMC_BLOCK will become built-in and I can boot the kernel
-> with Linaro rootfs on SD/MMC, which is a pretty nice thing for some
-> people.
+> You meant Mark?
 
-Ok, no problem.
+Yes, sorry.
+
+> 
+> > is it ok when I take this patch? The SoC specific stuff
+> > for this patch depends on it.
+> > 
+> I thought I will start collecting mxs patches after v3.2-rc1.
+> Do you plan to collect mxs patches for one more cycle?
+
+Go ahead if you like.
 
 Sascha
-
-> 
-> Regards,
-> Shawn
-> 
-> diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-> index 2fbcaef..3a4fb2e 100644
-> --- a/arch/arm/configs/imx_v6_v7_defconfig
-> +++ b/arch/arm/configs/imx_v6_v7_defconfig
-> @@ -132,7 +132,6 @@ CONFIG_USB_EHCI_HCD=y
->  CONFIG_USB_EHCI_MXC=y
->  CONFIG_USB_STORAGE=y
->  CONFIG_MMC=y
-> -CONFIG_MMC_BLOCK=m
->  CONFIG_MMC_SDHCI=y
->  CONFIG_MMC_SDHCI_PLTFM=y
->  CONFIG_MMC_SDHCI_ESDHC_IMX=y
-> 
-> 
 
 -- 
 Pengutronix e.K.                           |                             |
