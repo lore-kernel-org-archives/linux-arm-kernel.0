@@ -1,325 +1,544 @@
-From: manjunath.hadli@ti.com (Manjunath Hadli)
-Date: Mon, 14 Nov 2011 20:39:17 +0530
-Subject: [PATCH v2 5/5] davinci: delete individual platform header files and
- use a common header
-In-Reply-To: <1321283357-27698-1-git-send-email-manjunath.hadli@ti.com>
-References: <1321283357-27698-1-git-send-email-manjunath.hadli@ti.com>
-Message-ID: <1321283357-27698-6-git-send-email-manjunath.hadli@ti.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 14 Nov 2011 16:16:48 +0100
+Subject: [PATCH 09/12] ARM: at91: make shutdown controler soc independent
+In-Reply-To: <1321207952-13556-9-git-send-email-plagnioj@jcrosoft.com>
+References: <20111113180954.GD15318@game.jcrosoft.org>
+ <1321207952-13556-9-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <4EC130E0.7040305@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-include davinci_common.h file in files using the platform
-header file for dm355, dm365, dm644x and dm646x and delete the
-individual platform header files.
+Beware, this patch can conflict with current initiative to rework the
+reboot code.
 
-Signed-off-by: Manjunath Hadli <manjunath.hadli@ti.com>
----
- arch/arm/mach-davinci/board-dm355-evm.c     |    2 +-
- arch/arm/mach-davinci/board-dm355-leopard.c |    2 +-
- arch/arm/mach-davinci/board-dm365-evm.c     |    2 +-
- arch/arm/mach-davinci/board-dm644x-evm.c    |    2 +-
- arch/arm/mach-davinci/board-dm646x-evm.c    |    2 +-
- arch/arm/mach-davinci/board-neuros-osd2.c   |    2 +-
- arch/arm/mach-davinci/board-sffsdr.c        |    2 +-
- arch/arm/mach-davinci/dm355.c               |    2 +-
- arch/arm/mach-davinci/dm365.c               |    2 +-
- arch/arm/mach-davinci/dm644x.c              |    2 +-
- arch/arm/mach-davinci/dm646x.c              |    2 +-
- arch/arm/mach-davinci/include/mach/dm355.h  |   16 ----------------
- arch/arm/mach-davinci/include/mach/dm365.h  |   18 ------------------
- arch/arm/mach-davinci/include/mach/dm644x.h |   27 ---------------------------
- arch/arm/mach-davinci/include/mach/dm646x.h |   16 ----------------
- drivers/media/video/davinci/vpif.h          |    3 +--
- drivers/media/video/davinci/vpif_capture.h  |    1 +
- drivers/media/video/davinci/vpif_display.c  |    2 +-
- 18 files changed, 14 insertions(+), 91 deletions(-)
- delete mode 100644 arch/arm/mach-davinci/include/mach/dm355.h
- delete mode 100644 arch/arm/mach-davinci/include/mach/dm365.h
- delete mode 100644 arch/arm/mach-davinci/include/mach/dm644x.h
- delete mode 100644 arch/arm/mach-davinci/include/mach/dm646x.h
 
-diff --git a/arch/arm/mach-davinci/board-dm355-evm.c b/arch/arm/mach-davinci/board-dm355-evm.c
-index 4e0e707..ab20bd7 100644
---- a/arch/arm/mach-davinci/board-dm355-evm.c
-+++ b/arch/arm/mach-davinci/board-dm355-evm.c
-@@ -26,7 +26,7 @@
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
- 
--#include <mach/dm355.h>
-+#include <mach/davinci_common.h>
- #include <mach/i2c.h>
- #include <mach/serial.h>
- #include <mach/nand.h>
-diff --git a/arch/arm/mach-davinci/board-dm355-leopard.c b/arch/arm/mach-davinci/board-dm355-leopard.c
-index ff2d241..f2cffa1 100644
---- a/arch/arm/mach-davinci/board-dm355-leopard.c
-+++ b/arch/arm/mach-davinci/board-dm355-leopard.c
-@@ -23,7 +23,7 @@
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
- 
--#include <mach/dm355.h>
-+#include <mach/davinci_common.h>
- #include <mach/i2c.h>
- #include <mach/serial.h>
- #include <mach/nand.h>
-diff --git a/arch/arm/mach-davinci/board-dm365-evm.c b/arch/arm/mach-davinci/board-dm365-evm.c
-index 1918ae7..f338b64 100644
---- a/arch/arm/mach-davinci/board-dm365-evm.c
-+++ b/arch/arm/mach-davinci/board-dm365-evm.c
-@@ -32,7 +32,7 @@
- #include <asm/mach/arch.h>
- 
- #include <mach/mux.h>
--#include <mach/dm365.h>
-+#include <mach/davinci_common.h>
- #include <mach/common.h>
- #include <mach/i2c.h>
- #include <mach/serial.h>
-diff --git a/arch/arm/mach-davinci/board-dm644x-evm.c b/arch/arm/mach-davinci/board-dm644x-evm.c
-index 0cf8abf..c12a02e 100644
---- a/arch/arm/mach-davinci/board-dm644x-evm.c
-+++ b/arch/arm/mach-davinci/board-dm644x-evm.c
-@@ -30,7 +30,7 @@
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
- 
--#include <mach/dm644x.h>
-+#include <mach/davinci_common.h>
- #include <mach/common.h>
- #include <mach/i2c.h>
- #include <mach/serial.h>
-diff --git a/arch/arm/mach-davinci/board-dm646x-evm.c b/arch/arm/mach-davinci/board-dm646x-evm.c
-index e574d7f..d7bfc63 100644
---- a/arch/arm/mach-davinci/board-dm646x-evm.c
-+++ b/arch/arm/mach-davinci/board-dm646x-evm.c
-@@ -36,7 +36,7 @@
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
- 
--#include <mach/dm646x.h>
-+#include <mach/davinci_common.h>
- #include <mach/common.h>
- #include <mach/serial.h>
- #include <mach/i2c.h>
-diff --git a/arch/arm/mach-davinci/board-neuros-osd2.c b/arch/arm/mach-davinci/board-neuros-osd2.c
-index e5f231a..be73ed5 100644
---- a/arch/arm/mach-davinci/board-neuros-osd2.c
-+++ b/arch/arm/mach-davinci/board-neuros-osd2.c
-@@ -30,7 +30,7 @@
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
- 
--#include <mach/dm644x.h>
-+#include <mach/davinci_common.h>
- #include <mach/common.h>
- #include <mach/i2c.h>
- #include <mach/serial.h>
-diff --git a/arch/arm/mach-davinci/board-sffsdr.c b/arch/arm/mach-davinci/board-sffsdr.c
-index 5dd4da9..330c9f9 100644
---- a/arch/arm/mach-davinci/board-sffsdr.c
-+++ b/arch/arm/mach-davinci/board-sffsdr.c
-@@ -35,7 +35,7 @@
- #include <asm/mach/arch.h>
- #include <asm/mach/flash.h>
- 
--#include <mach/dm644x.h>
-+#include <mach/davinci_common.h>
- #include <mach/common.h>
- #include <mach/i2c.h>
- #include <mach/serial.h>
-diff --git a/arch/arm/mach-davinci/dm355.c b/arch/arm/mach-davinci/dm355.c
-index fe520d4..0929e0f 100644
---- a/arch/arm/mach-davinci/dm355.c
-+++ b/arch/arm/mach-davinci/dm355.c
-@@ -18,7 +18,7 @@
- 
- #include <asm/mach/map.h>
- 
--#include <mach/dm355.h>
-+#include <mach/davinci_common.h>
- #include <mach/cputype.h>
- #include <mach/edma.h>
- #include <mach/psc.h>
-diff --git a/arch/arm/mach-davinci/dm365.c b/arch/arm/mach-davinci/dm365.c
-index 77edee8..34aac1b 100644
---- a/arch/arm/mach-davinci/dm365.c
-+++ b/arch/arm/mach-davinci/dm365.c
-@@ -21,7 +21,7 @@
- 
- #include <asm/mach/map.h>
- 
--#include <mach/dm365.h>
-+#include <mach/davinci_common.h>
- #include <mach/cputype.h>
- #include <mach/edma.h>
- #include <mach/psc.h>
-diff --git a/arch/arm/mach-davinci/dm644x.c b/arch/arm/mach-davinci/dm644x.c
-index 1b4b911..c4ebee2 100644
---- a/arch/arm/mach-davinci/dm644x.c
-+++ b/arch/arm/mach-davinci/dm644x.c
-@@ -15,7 +15,7 @@
- 
- #include <asm/mach/map.h>
- 
--#include <mach/dm644x.h>
-+#include <mach/davinci_common.h>
- #include <mach/cputype.h>
- #include <mach/edma.h>
- #include <mach/irqs.h>
-diff --git a/arch/arm/mach-davinci/dm646x.c b/arch/arm/mach-davinci/dm646x.c
-index 0560e82..f543be3 100644
---- a/arch/arm/mach-davinci/dm646x.c
-+++ b/arch/arm/mach-davinci/dm646x.c
-@@ -16,7 +16,7 @@
- 
- #include <asm/mach/map.h>
- 
--#include <mach/dm646x.h>
-+#include <mach/davinci_common.h>
- #include <mach/cputype.h>
- #include <mach/edma.h>
- #include <mach/irqs.h>
-diff --git a/arch/arm/mach-davinci/include/mach/dm355.h b/arch/arm/mach-davinci/include/mach/dm355.h
-deleted file mode 100644
-index 40c298b..0000000
---- a/arch/arm/mach-davinci/include/mach/dm355.h
-+++ /dev/null
-@@ -1,16 +0,0 @@
--/*
-- * Chip specific defines for DM355 SoC
-- *
-- * Author: Kevin Hilman, Deep Root Systems, LLC
-- *
-- * 2007 (c) Deep Root Systems, LLC. This file is licensed under
-- * the terms of the GNU General Public License version 2. This program
-- * is licensed "as is" without any warranty of any kind, whether express
-- * or implied.
-- */
--#ifndef __ASM_ARCH_DM355_H
--#define __ASM_ARCH_DM355_H
--
--#include <mach/davinci_common.h>
--
--#endif /* __ASM_ARCH_DM355_H */
-diff --git a/arch/arm/mach-davinci/include/mach/dm365.h b/arch/arm/mach-davinci/include/mach/dm365.h
-deleted file mode 100644
-index 3c30934..0000000
---- a/arch/arm/mach-davinci/include/mach/dm365.h
-+++ /dev/null
-@@ -1,18 +0,0 @@
--/*
-- * Copyright (C) 2009 Texas Instruments Incorporated
-- *
-- * This program is free software; you can redistribute it and/or
-- * modify it under the terms of the GNU General Public License as
-- * published by the Free Software Foundation version 2.
-- *
-- * This program is distributed "as is" WITHOUT ANY WARRANTY of any
-- * kind, whether express or implied; without even the implied warranty
-- * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- */
--#ifndef __ASM_ARCH_DM365_H
--#define __ASM_ARCH_DM665_H
--
--#include <mach/davinci_common.h>
--
--#endif /* __ASM_ARCH_DM365_H */
-diff --git a/arch/arm/mach-davinci/include/mach/dm644x.h b/arch/arm/mach-davinci/include/mach/dm644x.h
-deleted file mode 100644
-index 186fabb..0000000
---- a/arch/arm/mach-davinci/include/mach/dm644x.h
-+++ /dev/null
-@@ -1,27 +0,0 @@
--/*
-- * This file contains the processor specific definitions
-- * of the TI DM644x.
-- *
-- * Copyright (C) 2008 Texas Instruments.
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program; if not, write to the Free Software
-- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-- *
-- */
--#ifndef __ASM_ARCH_DM644X_H
--#define __ASM_ARCH_DM644X_H
--
--#include <mach/davinci_common.h>
--
--#endif /* __ASM_ARCH_DM644X_H */
-diff --git a/arch/arm/mach-davinci/include/mach/dm646x.h b/arch/arm/mach-davinci/include/mach/dm646x.h
-deleted file mode 100644
-index 216e7c5..0000000
---- a/arch/arm/mach-davinci/include/mach/dm646x.h
-+++ /dev/null
-@@ -1,16 +0,0 @@
--/*
-- * Chip specific defines for DM646x SoC
-- *
-- * Author: Kevin Hilman, Deep Root Systems, LLC
-- *
-- * 2007 (c) Deep Root Systems, LLC. This file is licensed under
-- * the terms of the GNU General Public License version 2. This program
-- * is licensed "as is" without any warranty of any kind, whether express
-- * or implied.
-- */
--#ifndef __ASM_ARCH_DM646X_H
--#define __ASM_ARCH_DM646X_H
--
--#include <mach/davinci_common.h>
--
--#endif /* __ASM_ARCH_DM646X_H */
-diff --git a/drivers/media/video/davinci/vpif.h b/drivers/media/video/davinci/vpif.h
-index 25036cb..73b00bd 100644
---- a/drivers/media/video/davinci/vpif.h
-+++ b/drivers/media/video/davinci/vpif.h
-@@ -18,8 +18,7 @@
- 
- #include <linux/io.h>
- #include <linux/videodev2.h>
--#include <mach/hardware.h>
--#include <mach/dm646x.h>
-+#include <mach/davinci_common.h>
- #include <media/davinci/vpif_types.h>
- 
- /* Maximum channel allowed */
-diff --git a/drivers/media/video/davinci/vpif_capture.h b/drivers/media/video/davinci/vpif_capture.h
-index a693d4e..c019d26 100644
---- a/drivers/media/video/davinci/vpif_capture.h
-+++ b/drivers/media/video/davinci/vpif_capture.h
-@@ -27,6 +27,7 @@
- #include <media/v4l2-device.h>
- #include <media/videobuf-core.h>
- #include <media/videobuf-dma-contig.h>
-+#include <mach/davinci_common.h>
- #include <media/davinci/vpif_types.h>
- 
- #include "vpif.h"
-diff --git a/drivers/media/video/davinci/vpif_display.c b/drivers/media/video/davinci/vpif_display.c
-index 286f029..8921871 100644
---- a/drivers/media/video/davinci/vpif_display.c
-+++ b/drivers/media/video/davinci/vpif_display.c
-@@ -39,7 +39,7 @@
- #include <media/v4l2-ioctl.h>
- #include <media/v4l2-chip-ident.h>
- 
--#include <mach/dm646x.h>
-+#include <mach/davinci_common.h>
- 
- #include "vpif_display.h"
- #include "vpif.h"
+On 11/13/2011 07:12 PM, Jean-Christophe PLAGNIOL-VILLARD :
+> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+Check my comment below,
+
+otherwise:
+
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+> ---
+>  arch/arm/mach-at91/at91cap9.c                 |   10 +---------
+>  arch/arm/mach-at91/at91sam9260.c              |   10 +---------
+>  arch/arm/mach-at91/at91sam9261.c              |   10 +---------
+>  arch/arm/mach-at91/at91sam9263.c              |   10 +---------
+>  arch/arm/mach-at91/at91sam9g45.c              |   10 +---------
+>  arch/arm/mach-at91/at91sam9rl.c               |   10 +---------
+>  arch/arm/mach-at91/generic.h                  |    3 +++
+>  arch/arm/mach-at91/include/mach/at91_shdwc.h  |    6 +++---
+>  arch/arm/mach-at91/include/mach/at91cap9.h    |    2 +-
+>  arch/arm/mach-at91/include/mach/at91sam9260.h |    2 +-
+>  arch/arm/mach-at91/include/mach/at91sam9261.h |    2 +-
+>  arch/arm/mach-at91/include/mach/at91sam9263.h |    2 +-
+>  arch/arm/mach-at91/include/mach/at91sam9g45.h |    2 +-
+>  arch/arm/mach-at91/include/mach/at91sam9rl.h  |    2 +-
+>  arch/arm/mach-at91/setup.c                    |   15 +++++++++++++++
+>  15 files changed, 33 insertions(+), 63 deletions(-)
+> 
+> diff --git a/arch/arm/mach-at91/at91cap9.c b/arch/arm/mach-at91/at91cap9.c
+> index 1ea9312..652dbe1 100644
+> --- a/arch/arm/mach-at91/at91cap9.c
+> +++ b/arch/arm/mach-at91/at91cap9.c
+> @@ -13,7 +13,6 @@
+>   */
+>  
+>  #include <linux/module.h>
+> -#include <linux/pm.h>
+>  
+>  #include <asm/irq.h>
+>  #include <asm/mach/arch.h>
+> @@ -23,7 +22,6 @@
+>  #include <mach/at91cap9.h>
+>  #include <mach/at91_pmc.h>
+>  #include <mach/at91_rstc.h>
+> -#include <mach/at91_shdwc.h>
+>  
+>  #include "soc.h"
+>  #include "generic.h"
+> @@ -319,12 +317,6 @@ static void at91cap9_reset(void)
+>  	at91_sys_write(AT91_RSTC_CR, AT91_RSTC_KEY | AT91_RSTC_PROCRST | AT91_RSTC_PERRST);
+>  }
+>  
+> -static void at91cap9_poweroff(void)
+> -{
+> -	at91_sys_write(AT91_SHDW_CR, AT91_SHDW_KEY | AT91_SHDW_SHDW);
+> -}
+> -
+> -
+>  /* --------------------------------------------------------------------
+>   *  AT91CAP9 processor initialization
+>   * -------------------------------------------------------------------- */
+> @@ -336,6 +328,7 @@ static void __init at91cap9_map_io(void)
+>  
+>  static void __init at91cap9_ioremap_registers(void)
+>  {
+> +	at91_ioremap_shdwc(AT91CAP9_BASE_SHDWC);
+>  	at91sam926x_ioremap_pit(AT91CAP9_BASE_PIT);
+>  	at91sam9_ioremap_smc(0, AT91CAP9_BASE_SMC);
+>  }
+> @@ -343,7 +336,6 @@ static void __init at91cap9_ioremap_registers(void)
+>  static void __init at91cap9_initialize(void)
+>  {
+>  	at91_arch_reset = at91cap9_reset;
+> -	pm_power_off = at91cap9_poweroff;
+>  	at91_extern_irq = (1 << AT91CAP9_ID_IRQ0) | (1 << AT91CAP9_ID_IRQ1);
+>  
+>  	/* Register GPIO subsystem */
+> diff --git a/arch/arm/mach-at91/at91sam9260.c b/arch/arm/mach-at91/at91sam9260.c
+> index fc1f734..5a17a23 100644
+> --- a/arch/arm/mach-at91/at91sam9260.c
+> +++ b/arch/arm/mach-at91/at91sam9260.c
+> @@ -11,7 +11,6 @@
+>   */
+>  
+>  #include <linux/module.h>
+> -#include <linux/pm.h>
+>  
+>  #include <asm/irq.h>
+>  #include <asm/mach/arch.h>
+> @@ -21,7 +20,6 @@
+>  #include <mach/at91sam9260.h>
+>  #include <mach/at91_pmc.h>
+>  #include <mach/at91_rstc.h>
+> -#include <mach/at91_shdwc.h>
+>  
+>  #include "soc.h"
+>  #include "generic.h"
+> @@ -287,12 +285,6 @@ static struct at91_gpio_bank at91sam9260_gpio[] = {
+>  	}
+>  };
+>  
+> -static void at91sam9260_poweroff(void)
+> -{
+> -	at91_sys_write(AT91_SHDW_CR, AT91_SHDW_KEY | AT91_SHDW_SHDW);
+> -}
+> -
+> -
+>  /* --------------------------------------------------------------------
+>   *  AT91SAM9260 processor initialization
+>   * -------------------------------------------------------------------- */
+> @@ -328,6 +320,7 @@ static void __init at91sam9260_map_io(void)
+>  
+>  static void __init at91sam9260_ioremap_registers(void)
+>  {
+> +	at91_ioremap_shdwc(AT91SAM9260_BASE_SHDWC);
+>  	at91sam926x_ioremap_pit(AT91SAM9260_BASE_PIT);
+>  	at91sam9_ioremap_smc(0, AT91SAM9260_BASE_SMC);
+>  }
+> @@ -335,7 +328,6 @@ static void __init at91sam9260_ioremap_registers(void)
+>  static void __init at91sam9260_initialize(void)
+>  {
+>  	at91_arch_reset = at91sam9_alt_reset;
+> -	pm_power_off = at91sam9260_poweroff;
+>  	at91_extern_irq = (1 << AT91SAM9260_ID_IRQ0) | (1 << AT91SAM9260_ID_IRQ1)
+>  			| (1 << AT91SAM9260_ID_IRQ2);
+>  
+> diff --git a/arch/arm/mach-at91/at91sam9261.c b/arch/arm/mach-at91/at91sam9261.c
+> index 804181a..80e3e0f 100644
+> --- a/arch/arm/mach-at91/at91sam9261.c
+> +++ b/arch/arm/mach-at91/at91sam9261.c
+> @@ -11,7 +11,6 @@
+>   */
+>  
+>  #include <linux/module.h>
+> -#include <linux/pm.h>
+>  
+>  #include <asm/irq.h>
+>  #include <asm/mach/arch.h>
+> @@ -20,7 +19,6 @@
+>  #include <mach/at91sam9261.h>
+>  #include <mach/at91_pmc.h>
+>  #include <mach/at91_rstc.h>
+> -#include <mach/at91_shdwc.h>
+>  
+>  #include "soc.h"
+>  #include "generic.h"
+> @@ -268,12 +266,6 @@ static struct at91_gpio_bank at91sam9261_gpio[] = {
+>  	}
+>  };
+>  
+> -static void at91sam9261_poweroff(void)
+> -{
+> -	at91_sys_write(AT91_SHDW_CR, AT91_SHDW_KEY | AT91_SHDW_SHDW);
+> -}
+> -
+> -
+>  /* --------------------------------------------------------------------
+>   *  AT91SAM9261 processor initialization
+>   * -------------------------------------------------------------------- */
+> @@ -288,6 +280,7 @@ static void __init at91sam9261_map_io(void)
+>  
+>  static void __init at91sam9261_ioremap_registers(void)
+>  {
+> +	at91_ioremap_shdwc(AT91SAM9261_BASE_SHDWC);
+>  	at91sam926x_ioremap_pit(AT91SAM9261_BASE_PIT);
+>  	at91sam9_ioremap_smc(0, AT91SAM9261_BASE_SMC);
+>  }
+> @@ -295,7 +288,6 @@ static void __init at91sam9261_ioremap_registers(void)
+>  static void __init at91sam9261_initialize(void)
+>  {
+>  	at91_arch_reset = at91sam9_alt_reset;
+> -	pm_power_off = at91sam9261_poweroff;
+>  	at91_extern_irq = (1 << AT91SAM9261_ID_IRQ0) | (1 << AT91SAM9261_ID_IRQ1)
+>  			| (1 << AT91SAM9261_ID_IRQ2);
+>  
+> diff --git a/arch/arm/mach-at91/at91sam9263.c b/arch/arm/mach-at91/at91sam9263.c
+> index b8f4996..2a42b99 100644
+> --- a/arch/arm/mach-at91/at91sam9263.c
+> +++ b/arch/arm/mach-at91/at91sam9263.c
+> @@ -11,7 +11,6 @@
+>   */
+>  
+>  #include <linux/module.h>
+> -#include <linux/pm.h>
+>  
+>  #include <asm/irq.h>
+>  #include <asm/mach/arch.h>
+> @@ -19,7 +18,6 @@
+>  #include <mach/at91sam9263.h>
+>  #include <mach/at91_pmc.h>
+>  #include <mach/at91_rstc.h>
+> -#include <mach/at91_shdwc.h>
+>  
+>  #include "soc.h"
+>  #include "generic.h"
+> @@ -288,12 +286,6 @@ static struct at91_gpio_bank at91sam9263_gpio[] = {
+>  	}
+>  };
+>  
+> -static void at91sam9263_poweroff(void)
+> -{
+> -	at91_sys_write(AT91_SHDW_CR, AT91_SHDW_KEY | AT91_SHDW_SHDW);
+> -}
+> -
+> -
+>  /* --------------------------------------------------------------------
+>   *  AT91SAM9263 processor initialization
+>   * -------------------------------------------------------------------- */
+> @@ -306,6 +298,7 @@ static void __init at91sam9263_map_io(void)
+>  
+>  static void __init at91sam9263_ioremap_registers(void)
+>  {
+> +	at91_ioremap_shdwc(AT91SAM9263_BASE_SHDWC);
+>  	at91sam926x_ioremap_pit(AT91SAM9263_BASE_PIT);
+>  	at91sam9_ioremap_smc(0, AT91SAM9263_BASE_SMC0);
+>  	at91sam9_ioremap_smc(1, AT91SAM9263_BASE_SMC1);
+> @@ -314,7 +307,6 @@ static void __init at91sam9263_ioremap_registers(void)
+>  static void __init at91sam9263_initialize(void)
+>  {
+>  	at91_arch_reset = at91sam9_alt_reset;
+> -	pm_power_off = at91sam9263_poweroff;
+>  	at91_extern_irq = (1 << AT91SAM9263_ID_IRQ0) | (1 << AT91SAM9263_ID_IRQ1);
+>  
+>  	/* Register GPIO subsystem */
+> diff --git a/arch/arm/mach-at91/at91sam9g45.c b/arch/arm/mach-at91/at91sam9g45.c
+> index ce3233f..7fdf964 100644
+> --- a/arch/arm/mach-at91/at91sam9g45.c
+> +++ b/arch/arm/mach-at91/at91sam9g45.c
+> @@ -11,7 +11,6 @@
+>   */
+>  
+>  #include <linux/module.h>
+> -#include <linux/pm.h>
+>  #include <linux/dma-mapping.h>
+>  
+>  #include <asm/irq.h>
+> @@ -20,7 +19,6 @@
+>  #include <mach/at91sam9g45.h>
+>  #include <mach/at91_pmc.h>
+>  #include <mach/at91_rstc.h>
+> -#include <mach/at91_shdwc.h>
+>  #include <mach/cpu.h>
+>  
+>  #include "soc.h"
+> @@ -323,12 +321,6 @@ static void at91sam9g45_reset(void)
+>  	at91_sys_write(AT91_RSTC_CR, AT91_RSTC_KEY | AT91_RSTC_PROCRST | AT91_RSTC_PERRST);
+>  }
+>  
+> -static void at91sam9g45_poweroff(void)
+> -{
+> -	at91_sys_write(AT91_SHDW_CR, AT91_SHDW_KEY | AT91_SHDW_SHDW);
+> -}
+> -
+> -
+>  /* --------------------------------------------------------------------
+>   *  AT91SAM9G45 processor initialization
+>   * -------------------------------------------------------------------- */
+> @@ -341,6 +333,7 @@ static void __init at91sam9g45_map_io(void)
+>  
+>  static void __init at91sam9g45_ioremap_registers(void)
+>  {
+> +	at91_ioremap_shdwc(AT91SAM9G45_BASE_SHDWC);
+>  	at91sam926x_ioremap_pit(AT91SAM9G45_BASE_PIT);
+>  	at91sam9_ioremap_smc(0, AT91SAM9G45_BASE_SMC);
+>  }
+> @@ -348,7 +341,6 @@ static void __init at91sam9g45_ioremap_registers(void)
+>  static void __init at91sam9g45_initialize(void)
+>  {
+>  	at91_arch_reset = at91sam9g45_reset;
+> -	pm_power_off = at91sam9g45_poweroff;
+>  	at91_extern_irq = (1 << AT91SAM9G45_ID_IRQ0);
+>  
+>  	/* Register GPIO subsystem */
+> diff --git a/arch/arm/mach-at91/at91sam9rl.c b/arch/arm/mach-at91/at91sam9rl.c
+> index 1bcccd7..6856bad 100644
+> --- a/arch/arm/mach-at91/at91sam9rl.c
+> +++ b/arch/arm/mach-at91/at91sam9rl.c
+> @@ -10,7 +10,6 @@
+>   */
+>  
+>  #include <linux/module.h>
+> -#include <linux/pm.h>
+>  
+>  #include <asm/irq.h>
+>  #include <asm/mach/arch.h>
+> @@ -20,7 +19,6 @@
+>  #include <mach/at91sam9rl.h>
+>  #include <mach/at91_pmc.h>
+>  #include <mach/at91_rstc.h>
+> -#include <mach/at91_shdwc.h>
+>  
+>  #include "soc.h"
+>  #include "generic.h"
+> @@ -264,12 +262,6 @@ static struct at91_gpio_bank at91sam9rl_gpio[] = {
+>  	}
+>  };
+>  
+> -static void at91sam9rl_poweroff(void)
+> -{
+> -	at91_sys_write(AT91_SHDW_CR, AT91_SHDW_KEY | AT91_SHDW_SHDW);
+> -}
+> -
+> -
+>  /* --------------------------------------------------------------------
+>   *  AT91SAM9RL processor initialization
+>   * -------------------------------------------------------------------- */
+> @@ -293,6 +285,7 @@ static void __init at91sam9rl_map_io(void)
+>  
+>  static void __init at91sam9rl_ioremap_registers(void)
+>  {
+> +	at91_ioremap_shdwc(AT91SAM9RL_BASE_SHDWC);
+>  	at91sam926x_ioremap_pit(AT91SAM9RL_BASE_PIT);
+>  	at91sam9_ioremap_smc(0, AT91SAM9RL_BASE_SMC);
+>  }
+> @@ -300,7 +293,6 @@ static void __init at91sam9rl_ioremap_registers(void)
+>  static void __init at91sam9rl_initialize(void)
+>  {
+>  	at91_arch_reset = at91sam9_alt_reset;
+> -	pm_power_off = at91sam9rl_poweroff;
+>  	at91_extern_irq = (1 << AT91SAM9RL_ID_IRQ0);
+>  
+>  	/* Register GPIO subsystem */
+> diff --git a/arch/arm/mach-at91/generic.h b/arch/arm/mach-at91/generic.h
+> index 8196ecc..bc17764 100644
+> --- a/arch/arm/mach-at91/generic.h
+> +++ b/arch/arm/mach-at91/generic.h
+> @@ -60,6 +60,9 @@ extern void at91_irq_resume(void);
+>  /* reset */
+>  extern void at91sam9_alt_reset(void);
+>  
+> +/* shutdown */
+> +extern void at91_ioremap_shdwc(u32 base_addr);
+> +
+>   /* GPIO */
+>  #define AT91RM9200_PQFP		3	/* AT91RM9200 PQFP package has 3 banks */
+>  #define AT91RM9200_BGA		4	/* AT91RM9200 BGA package has 4 banks */
+> diff --git a/arch/arm/mach-at91/include/mach/at91_shdwc.h b/arch/arm/mach-at91/include/mach/at91_shdwc.h
+> index c4ce07e..e434bd0 100644
+> --- a/arch/arm/mach-at91/include/mach/at91_shdwc.h
+> +++ b/arch/arm/mach-at91/include/mach/at91_shdwc.h
+> @@ -16,11 +16,11 @@
+>  #ifndef AT91_SHDWC_H
+>  #define AT91_SHDWC_H
+>  
+> -#define AT91_SHDW_CR		(AT91_SHDWC + 0x00)	/* Shut Down Control Register */
+> +#define AT91_SHDW_CR		0x00			/* Shut Down Control Register */
+>  #define		AT91_SHDW_SHDW		(1    << 0)		/* Shut Down command */
+>  #define		AT91_SHDW_KEY		(0xa5 << 24)		/* KEY Password */
+>  
+> -#define AT91_SHDW_MR		(AT91_SHDWC + 0x04)	/* Shut Down Mode Register */
+> +#define AT91_SHDW_MR		0x04			/* Shut Down Mode Register */
+>  #define		AT91_SHDW_WKMODE0	(3 << 0)		/* Wake-up 0 Mode Selection */
+>  #define			AT91_SHDW_WKMODE0_NONE		0
+>  #define			AT91_SHDW_WKMODE0_HIGH		1
+> @@ -30,7 +30,7 @@
+>  #define			AT91_SHDW_CPTWK0_(x)	((x) << 4)
+>  #define		AT91_SHDW_RTTWKEN	(1   << 16)		/* Real Time Timer Wake-up Enable */
+>  
+> -#define AT91_SHDW_SR		(AT91_SHDWC + 0x08)	/* Shut Down Status Register */
+> +#define AT91_SHDW_SR		0x08			/* Shut Down Status Register */
+>  #define		AT91_SHDW_WAKEUP0	(1 <<  0)		/* Wake-up 0 Status */
+>  #define		AT91_SHDW_RTTWK		(1 << 16)		/* Real-time Timer Wake-up */
+>  #define		AT91_SHDW_RTCWK		(1 << 17)		/* Real-time Clock Wake-up [SAM9RL] */
+> diff --git a/arch/arm/mach-at91/include/mach/at91cap9.h b/arch/arm/mach-at91/include/mach/at91cap9.h
+> index cf8cd56..f2e7c34 100644
+> --- a/arch/arm/mach-at91/include/mach/at91cap9.h
+> +++ b/arch/arm/mach-at91/include/mach/at91cap9.h
+> @@ -86,7 +86,6 @@
+>  #define AT91_AIC	(0xfffff000 - AT91_BASE_SYS)
+>  #define AT91_PMC	(0xfffffc00 - AT91_BASE_SYS)
+>  #define AT91_RSTC	(0xfffffd00 - AT91_BASE_SYS)
+> -#define AT91_SHDWC	(0xfffffd10 - AT91_BASE_SYS)
+>  #define AT91_WDT	(0xfffffd40 - AT91_BASE_SYS)
+>  #define AT91_GPBR	(cpu_is_at91cap9_revB() ?	\
+>  			(0xfffffd50 - AT91_BASE_SYS) :	\
+> @@ -100,6 +99,7 @@
+>  #define AT91CAP9_BASE_PIOB	0xfffff400
+>  #define AT91CAP9_BASE_PIOC	0xfffff600
+>  #define AT91CAP9_BASE_PIOD	0xfffff800
+> +#define AT91CAP9_BASE_SHDWC	0xfffffd10
+>  #define AT91CAP9_BASE_RTT	0xfffffd20
+>  #define AT91CAP9_BASE_PIT	0xfffffd30
+>  
+> diff --git a/arch/arm/mach-at91/include/mach/at91sam9260.h b/arch/arm/mach-at91/include/mach/at91sam9260.h
+> index 930a7a8..6a13e9d 100644
+> --- a/arch/arm/mach-at91/include/mach/at91sam9260.h
+> +++ b/arch/arm/mach-at91/include/mach/at91sam9260.h
+> @@ -86,7 +86,6 @@
+>  #define AT91_DBGU	(0xfffff200 - AT91_BASE_SYS)
+>  #define AT91_PMC	(0xfffffc00 - AT91_BASE_SYS)
+>  #define AT91_RSTC	(0xfffffd00 - AT91_BASE_SYS)
+> -#define AT91_SHDWC	(0xfffffd10 - AT91_BASE_SYS)
+>  #define AT91_WDT	(0xfffffd40 - AT91_BASE_SYS)
+>  #define AT91_GPBR	(0xfffffd50 - AT91_BASE_SYS)
+>  
+> @@ -96,6 +95,7 @@
+>  #define AT91SAM9260_BASE_PIOA	0xfffff400
+>  #define AT91SAM9260_BASE_PIOB	0xfffff600
+>  #define AT91SAM9260_BASE_PIOC	0xfffff800
+> +#define AT91SAM9260_BASE_SHDWC	0xfffffd10
+>  #define AT91SAM9260_BASE_RTT	0xfffffd20
+>  #define AT91SAM9260_BASE_PIT	0xfffffd30
+>  
+> diff --git a/arch/arm/mach-at91/include/mach/at91sam9261.h b/arch/arm/mach-at91/include/mach/at91sam9261.h
+> index 1ea2d6b..f9b5163 100644
+> --- a/arch/arm/mach-at91/include/mach/at91sam9261.h
+> +++ b/arch/arm/mach-at91/include/mach/at91sam9261.h
+> @@ -71,7 +71,6 @@
+>  #define AT91_DBGU	(0xfffff200 - AT91_BASE_SYS)
+>  #define AT91_PMC	(0xfffffc00 - AT91_BASE_SYS)
+>  #define AT91_RSTC	(0xfffffd00 - AT91_BASE_SYS)
+> -#define AT91_SHDWC	(0xfffffd10 - AT91_BASE_SYS)
+>  #define AT91_WDT	(0xfffffd40 - AT91_BASE_SYS)
+>  #define AT91_GPBR	(0xfffffd50 - AT91_BASE_SYS)
+>  
+> @@ -79,6 +78,7 @@
+>  #define AT91SAM9261_BASE_PIOA	0xfffff400
+>  #define AT91SAM9261_BASE_PIOB	0xfffff600
+>  #define AT91SAM9261_BASE_PIOC	0xfffff800
+> +#define AT91SAM9261_BASE_SHDWC	0xfffffd10
+>  #define AT91SAM9261_BASE_RTT	0xfffffd20
+>  #define AT91SAM9261_BASE_PIT	0xfffffd30
+>  
+> diff --git a/arch/arm/mach-at91/include/mach/at91sam9263.h b/arch/arm/mach-at91/include/mach/at91sam9263.h
+> index 5b6b2b1..e8fb5bd 100644
+> --- a/arch/arm/mach-at91/include/mach/at91sam9263.h
+> +++ b/arch/arm/mach-at91/include/mach/at91sam9263.h
+> @@ -81,7 +81,6 @@
+>  #define AT91_AIC	(0xfffff000 - AT91_BASE_SYS)
+>  #define AT91_PMC	(0xfffffc00 - AT91_BASE_SYS)
+>  #define AT91_RSTC	(0xfffffd00 - AT91_BASE_SYS)
+> -#define AT91_SHDWC	(0xfffffd10 - AT91_BASE_SYS)
+>  #define AT91_WDT	(0xfffffd40 - AT91_BASE_SYS)
+>  #define AT91_GPBR	(0xfffffd60 - AT91_BASE_SYS)
+>  
+> @@ -95,6 +94,7 @@
+>  #define AT91SAM9263_BASE_PIOC	0xfffff600
+>  #define AT91SAM9263_BASE_PIOD	0xfffff800
+>  #define AT91SAM9263_BASE_PIOE	0xfffffa00
+> +#define AT91SAM9263_BASE_SHDWC	0xfffffd10
+>  #define AT91SAM9263_BASE_RTT0	0xfffffd20
+>  #define AT91SAM9263_BASE_PIT	0xfffffd30
+>  #define AT91SAM9263_BASE_RTT1	0xfffffd50
+> diff --git a/arch/arm/mach-at91/include/mach/at91sam9g45.h b/arch/arm/mach-at91/include/mach/at91sam9g45.h
+> index ac051d4..5f3453e 100644
+> --- a/arch/arm/mach-at91/include/mach/at91sam9g45.h
+> +++ b/arch/arm/mach-at91/include/mach/at91sam9g45.h
+> @@ -93,7 +93,6 @@
+>  #define AT91_AIC	(0xfffff000 - AT91_BASE_SYS)
+>  #define AT91_PMC	(0xfffffc00 - AT91_BASE_SYS)
+>  #define AT91_RSTC	(0xfffffd00 - AT91_BASE_SYS)
+> -#define AT91_SHDWC	(0xfffffd10 - AT91_BASE_SYS)
+>  #define AT91_WDT	(0xfffffd40 - AT91_BASE_SYS)
+>  #define AT91_GPBR	(0xfffffd60 - AT91_BASE_SYS)
+>  #define AT91_RTC	(0xfffffdb0 - AT91_BASE_SYS)
+> @@ -106,6 +105,7 @@
+>  #define AT91SAM9G45_BASE_PIOC	0xfffff600
+>  #define AT91SAM9G45_BASE_PIOD	0xfffff800
+>  #define AT91SAM9G45_BASE_PIOE	0xfffffa00
+> +#define AT91SAM9G45_BASE_SHDWC	0xfffffd10
+>  #define AT91SAM9G45_BASE_RTT	0xfffffd20
+>  #define AT91SAM9G45_BASE_PIT	0xfffffd30
+>  
+> diff --git a/arch/arm/mach-at91/include/mach/at91sam9rl.h b/arch/arm/mach-at91/include/mach/at91sam9rl.h
+> index c94e691..e012e69 100644
+> --- a/arch/arm/mach-at91/include/mach/at91sam9rl.h
+> +++ b/arch/arm/mach-at91/include/mach/at91sam9rl.h
+> @@ -75,7 +75,6 @@
+>  #define AT91_DBGU	(0xfffff200 - AT91_BASE_SYS)
+>  #define AT91_PMC	(0xfffffc00 - AT91_BASE_SYS)
+>  #define AT91_RSTC	(0xfffffd00 - AT91_BASE_SYS)
+> -#define AT91_SHDWC	(0xfffffd10 - AT91_BASE_SYS)
+>  #define AT91_WDT	(0xfffffd40 - AT91_BASE_SYS)
+>  #define AT91_SCKCR	(0xfffffd50 - AT91_BASE_SYS)
+>  #define AT91_GPBR	(0xfffffd60 - AT91_BASE_SYS)
+> @@ -89,6 +88,7 @@
+>  #define AT91SAM9RL_BASE_PIOB	0xfffff600
+>  #define AT91SAM9RL_BASE_PIOC	0xfffff800
+>  #define AT91SAM9RL_BASE_PIOD	0xfffffa00
+> +#define AT91SAM9RL_BASE_SHDWC	0xfffffd10
+>  #define AT91SAM9RL_BASE_RTT	0xfffffd20
+>  #define AT91SAM9RL_BASE_PIT	0xfffffd30
+>  
+> diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
+> index 63b3ac2..8ba2790 100644
+> --- a/arch/arm/mach-at91/setup.c
+> +++ b/arch/arm/mach-at91/setup.c
+> @@ -8,6 +8,7 @@
+>  #include <linux/module.h>
+>  #include <linux/io.h>
+>  #include <linux/mm.h>
+> +#include <linux/pm.h>
+>  
+>  #include <asm/mach/map.h>
+>  
+> @@ -15,6 +16,7 @@
+>  #include <mach/cpu.h>
+>  #include <mach/at91_dbgu.h>
+>  #include <mach/at91_pmc.h>
+> +#include <mach/at91_shdwc.h>
+>  
+>  #include "soc.h"
+>  #include "generic.h"
+> @@ -285,6 +287,19 @@ void __init at91_map_io(void)
+>  		at91_boot_soc.map_io();
+>  }
+>  
+> +static void __iomem *at91_shdwc;
+> +
+> +static void at91sam9_poweroff(void)
+> +{
+> +	writel(AT91_SHDW_KEY | AT91_SHDW_SHDW, at91_shdwc + AT91_SHDW_CR);
+> +}
+> +
+> +void at91_ioremap_shdwc(u32 base_addr)
+> +{
+> +	at91_shdwc = ioremap(base_addr, 16);
+
+Ditto: ioremap error path for debugging.
+
+> +	pm_power_off = at91sam9_poweroff;
+> +}
+> +
+>  void __init at91_initialize(unsigned long main_clock)
+>  {
+>  	at91_boot_soc.ioremap_registers();
+
+
 -- 
-1.6.2.4
+Nicolas Ferre
