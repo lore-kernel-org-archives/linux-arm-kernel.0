@@ -1,51 +1,89 @@
-From: per.forlin@stericsson.com (Per Forlin)
-Date: Mon, 14 Nov 2011 12:02:28 +0100
-Subject: [PATCH] ARM: mmci: add capabilities2 for MMC_CAP2
-Message-ID: <1321268548-21933-1-git-send-email-per.forlin@stericsson.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 14 Nov 2011 12:11:25 +0100
+Subject: [PATCH] RS485: fix inconsistencies in the meaning of some
+ variables
+In-Reply-To: <4EC062B7.2090100@griffin.net>
+References: <4E492CFF.7040905@pwrnet.de> <20110822211832.GA8023@kroah.com>
+ <4EB3A009.10502@evidence.eu.com> <4EB8F6B9.6010008@atmel.com>
+ <4EB90902.4030200@evidence.eu.com>
+ <20111108134804.07095c5d@lxorguk.ukuu.org.uk>
+ <20111108142432.GA11293@kroah.com> <4EBA9385.7010806@evidence.eu.com>
+ <20111113215318.GA2966@pengutronix.de> <4EC062B7.2090100@griffin.net>
+Message-ID: <4EC0F75D.4060102@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Per Forlin <per.forlin@stericsson.com>
----
-This patch depends on patches adding CAP2 available on mmc-next.
-Chris, would you mind merging this through your tree when it
-has been accepted.
+On 11/14/2011 01:37 AM, Darron Black :
+> On 11/13/2011 03:53 PM, Wolfram Sang wrote:
+>> Hi,
+>>
+>> I have been working on a patch series which adds hardware RS485 to the
+>> 8250
+>> according to the latest developments. The series will be posted
+>> tomorrow after
+>> some more tests. However, there is one thing I wondered about:
+>>
+>>>  From now on, SER_RS485_RTS_AFTER_SEND and SER_RS485_RTS_ON_SEND will
+>>> be used to
+>>> set the voltage of the RTS pin (as in the crisv10.c driver); the
+>>> delay will be
+>>> understood by looking only at the value of delay_rts_before_send and
+>>> delay_rts_after_send.
+>> Do I overlook something or is SER_RS485_RTS_AFTER_SEND always the
+>> inverted
+>> signal of SER_RS485_RTS_ON_SEND. So why do we need both? (BTW
+>> SER_RS485_RTS_ON_SEND is a non-obvious name, I think. But changing it
+>> will
+>> probably break even more users?)
+> It allows the application to configure RTS to not toggle at all in one
+> of those two scenarios.
+> 
+> Perhaps the RTS toggle after transmit delay needs to be large, and
+> they'd rather do it in userspace than block in the driver. I also recall
+> a protocol that would send a master assertion command and hold on to RTS
+> afterwards. I can easily imagine needing to quickly transmit something,
+> hold on to RTS for a while, then finish your transmit later.
+> 
+> However, I don't have any concrete examples of needing this outside that
+> vague recollection of a master assertion sequence in an old embedded
+> platform far away from Linux.
 
- drivers/mmc/host/mmci.c   |    1 +
- include/linux/amba/mmci.h |    2 ++
- 2 files changed, 3 insertions(+), 0 deletions(-)
+Darron, Claudio,
 
-diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-index 4602771..c1cf80c 100644
---- a/drivers/mmc/host/mmci.c
-+++ b/drivers/mmc/host/mmci.c
-@@ -1231,6 +1231,7 @@ static int __devinit mmci_probe(struct amba_device *dev,
- 	if (host->vcc == NULL)
- 		mmc->ocr_avail = plat->ocr_mask;
- 	mmc->caps = plat->capabilities;
-+	mmc->caps2 = plat->capabilities2;
- 
- 	/*
- 	 * We can do SGIO
-diff --git a/include/linux/amba/mmci.h b/include/linux/amba/mmci.h
-index 2111481..3749e13 100644
---- a/include/linux/amba/mmci.h
-+++ b/include/linux/amba/mmci.h
-@@ -30,6 +30,7 @@ struct dma_chan;
-  * @cd_invert: true if the gpio_cd pin value is active low
-  * @capabilities: the capabilities of the block as implemented in
-  * this platform, signify anything MMC_CAP_* from mmc/host.h
-+ * @capabilities2: more capabilities, MMC_CAP2_* from mmc/host.h
-  * @dma_filter: function used to select an appropriate RX and TX
-  * DMA channel to be used for DMA, if and only if you're deploying the
-  * generic DMA engine
-@@ -52,6 +53,7 @@ struct mmci_platform_data {
- 	int	gpio_cd;
- 	bool	cd_invert;
- 	unsigned long capabilities;
-+	unsigned long capabilities2;
- 	bool (*dma_filter)(struct dma_chan *chan, void *filter_param);
- 	void *dma_rx_param;
- 	void *dma_tx_param;
+This explanation makes sense. Thanks for this.
+
+Bye,
+
+
+>>> diff --git a/include/linux/serial.h b/include/linux/serial.h
+>>> index 97ff8e2..3d86517 100644
+>>> --- a/include/linux/serial.h
+>>> +++ b/include/linux/serial.h
+>>> @@ -207,13 +207,15 @@ struct serial_icounter_struct {
+>>>
+>>>   struct serial_rs485 {
+>>>       __u32    flags;            /* RS485 feature flags */
+>>> -#define SER_RS485_ENABLED        (1<<  0)
+>>> -#define SER_RS485_RTS_ON_SEND        (1<<  1)
+>>> -#define SER_RS485_RTS_AFTER_SEND    (1<<  2)
+>>> -#define SER_RS485_RTS_BEFORE_SEND    (1<<  3)
+>>> +#define SER_RS485_ENABLED        (1<<  0)    /* If enabled */
+>>> +#define SER_RS485_RTS_ON_SEND        (1<<  1)    /* Logical level for
+>>> +                               RTS pin when
+>>> +                               sending */
+>>> +#define SER_RS485_RTS_AFTER_SEND    (1<<  2)    /* Logical level for
+>>> +                               RTS pin after sent*/
+>> Nit: 80 char should be broken here, because that is not readable. Or
+>> put the
+>> comment above the define.
+>>
+>> Thanks,
+>>
+>>     Wolfram
+>>
+> 
+> 
+
+
 -- 
-1.6.3.3
+Nicolas Ferre
