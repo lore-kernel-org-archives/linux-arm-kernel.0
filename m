@@ -1,59 +1,53 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 14 Nov 2011 09:41:13 -0600
-Subject: [PATCH v4 01/10] arm/tegra: initial device tree for tegra30
-In-Reply-To: <20111114152518.GJ19069@tbergstrom-lnx.Nvidia.com>
-References: <1321010541-31337-1-git-send-email-pdeschrijver@nvidia.com>
- <1321010541-31337-2-git-send-email-pdeschrijver@nvidia.com>
- <4EBDE766.5080505@gmail.com>
- <20111114152518.GJ19069@tbergstrom-lnx.Nvidia.com>
-Message-ID: <4EC13699.5030205@gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 14 Nov 2011 16:47:09 +0100
+Subject: [PATCH 3/3] ARM i.MX: Update defconfig
+In-Reply-To: <20111114015828.GB10217@S2100-06.ap.freescale.net>
+References: <1320915966-8063-1-git-send-email-s.hauer@pengutronix.de>
+ <1320915966-8063-4-git-send-email-s.hauer@pengutronix.de>
+ <20111114015828.GB10217@S2100-06.ap.freescale.net>
+Message-ID: <20111114154709.GC27267@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/14/2011 09:25 AM, Peter De Schrijver wrote:
-> On Sat, Nov 12, 2011 at 04:26:30AM +0100, Rob Herring wrote:
->> On 11/11/2011 05:22 AM, Peter De Schrijver wrote:
->>> This patch adds the initial device tree for tegra30
->>>
->>> Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
->>> ---
->>>  arch/arm/boot/dts/tegra30.dtsi |  127 ++++++++++++++++++++++++++++++++++++++++
->>>  1 files changed, 127 insertions(+), 0 deletions(-)
->>>  create mode 100644 arch/arm/boot/dts/tegra30.dtsi
->>>
->>> diff --git a/arch/arm/boot/dts/tegra30.dtsi b/arch/arm/boot/dts/tegra30.dtsi
->>> new file mode 100644
->>> index 0000000..fabe243
->>> --- /dev/null
->>> +++ b/arch/arm/boot/dts/tegra30.dtsi
->>> @@ -0,0 +1,127 @@
->>> +/include/ "skeleton.dtsi"
->>> +
->>> +/ {
->>> +	compatible = "nvidia,tegra30";
->>
->> Needs documentation.
->>
->>> +	interrupt-parent = <&intc>;
->>> +
->>> +	intc: interrupt-controller at 50041000 {
->>> +		compatible = "nvidia,tegra30-gic", "nvidia,tegra20-gic";
->>> +		interrupt-controller;
->>> +		#interrupt-cells = <1>;
->>
->> Is the Tegra GIC really different from a standard A9 gic? You need to
->> update to use the gic binding. The cells should be 3 for example.
+On Mon, Nov 14, 2011 at 09:58:29AM +0800, Shawn Guo wrote:
+> Hi Sascha,
 > 
-> It has an extra 'legacy' interrupt controller like tegra20 has. This is used
-> when waking up the CPU from power off mode.
+> On Thu, Nov 10, 2011 at 10:06:06AM +0100, Sascha Hauer wrote:
+> > This updates the defconfig for i.MX3, i.MX5 and i.MX6.
+> > 
+> > - all these can be compiled together now, so remove mx3_defconfig and
+> >   mx5_defconfig and introduce a imx_v6_v7_defconfig instead.
+> > 
+> Can you amend the following change to imx_v6_v7_defconfig?  With this
+> change, CONFIG_MMC_BLOCK will become built-in and I can boot the kernel
+> with Linaro rootfs on SD/MMC, which is a pretty nice thing for some
+> people.
 
-Although that is probably not part of the GIC h/w (i.e. at a different
-address) and should be described in the dts separately. That doesn't
-change the GIC binding or the fact that you are using
-arch/arm/common/gic.c though. Whether you have a different compatible
-string or not is not really the issue. That can already be supported if
-necessary. The issue is you are not using the existing GIC binding as a
-starting point and that has implications on every node using a GIC
-interrupt.
+Ok, no problem.
 
-Rob
+Sascha
+
+> 
+> Regards,
+> Shawn
+> 
+> diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
+> index 2fbcaef..3a4fb2e 100644
+> --- a/arch/arm/configs/imx_v6_v7_defconfig
+> +++ b/arch/arm/configs/imx_v6_v7_defconfig
+> @@ -132,7 +132,6 @@ CONFIG_USB_EHCI_HCD=y
+>  CONFIG_USB_EHCI_MXC=y
+>  CONFIG_USB_STORAGE=y
+>  CONFIG_MMC=y
+> -CONFIG_MMC_BLOCK=m
+>  CONFIG_MMC_SDHCI=y
+>  CONFIG_MMC_SDHCI_PLTFM=y
+>  CONFIG_MMC_SDHCI_ESDHC_IMX=y
+> 
+> 
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
