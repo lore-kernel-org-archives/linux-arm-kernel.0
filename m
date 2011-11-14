@@ -1,123 +1,102 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 14 Nov 2011 16:23:37 +0000
-Subject: [PATCH v9 01/15] ARM: pgtable: Fix compiler warning in ioremap.c
- introduced by nopud
-In-Reply-To: <1321287831-24560-1-git-send-email-catalin.marinas@arm.com>
-References: <1321287831-24560-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <1321287831-24560-2-git-send-email-catalin.marinas@arm.com>
+Date: Mon, 14 Nov 2011 16:23:36 +0000
+Subject: [PATCH v9 00/15] ARM: Add support for the Large Physical Address
+ Extensions
+Message-ID: <1321287831-24560-1-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the arch/arm code conversion to pgtable-nopud.h, the section and
-supersection (un|re)map code triggers compiler warnings on UP systems.
-This is caused by pmd_offset() being given a pgd_t argument rather than
-a pud_t one. This patch makes the necessary conversion with the
-assumption that the pud is folded into the pgd. The page table setting
-code only loops over the pmd which is enough with the classic page
-tables. This code is not compiled when LPAE is enabled.
+This is version 9 of the set of patches adding support for the Large
+Physical Address Extensions on the ARM architecture (available with the
+Cortex-A15 and Cortex-A7 processors).
 
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
----
- arch/arm/mm/ioremap.c |   31 +++++++++++++++++++------------
- 1 files changed, 19 insertions(+), 12 deletions(-)
+This patch set against 3.2-rc1 is available on this branch:
 
-diff --git a/arch/arm/mm/ioremap.c b/arch/arm/mm/ioremap.c
-index bdb248c..c3fa40d 100644
---- a/arch/arm/mm/ioremap.c
-+++ b/arch/arm/mm/ioremap.c
-@@ -79,13 +79,16 @@ static void unmap_area_sections(unsigned long virt, unsigned long size)
- {
- 	unsigned long addr = virt, end = virt + (size & ~(SZ_1M - 1));
- 	pgd_t *pgd;
-+	pud_t *pud;
-+	pmd_t *pmdp;
- 
- 	flush_cache_vunmap(addr, end);
- 	pgd = pgd_offset_k(addr);
-+	pud = pud_offset(pgd, addr);
-+	pmdp = pmd_offset(pud, addr);
- 	do {
--		pmd_t pmd, *pmdp = pmd_offset(pgd, addr);
-+		pmd_t pmd = *pmdp;
- 
--		pmd = *pmdp;
- 		if (!pmd_none(pmd)) {
- 			/*
- 			 * Clear the PMD from the page table, and
-@@ -104,8 +107,8 @@ static void unmap_area_sections(unsigned long virt, unsigned long size)
- 				pte_free_kernel(&init_mm, pmd_page_vaddr(pmd));
- 		}
- 
--		addr += PGDIR_SIZE;
--		pgd++;
-+		addr += PMD_SIZE;
-+		pmdp += 2;
- 	} while (addr < end);
- 
- 	/*
-@@ -124,6 +127,8 @@ remap_area_sections(unsigned long virt, unsigned long pfn,
- {
- 	unsigned long addr = virt, end = virt + size;
- 	pgd_t *pgd;
-+	pud_t *pud;
-+	pmd_t *pmd;
- 
- 	/*
- 	 * Remove and free any PTE-based mapping, and
-@@ -132,17 +137,17 @@ remap_area_sections(unsigned long virt, unsigned long pfn,
- 	unmap_area_sections(virt, size);
- 
- 	pgd = pgd_offset_k(addr);
-+	pud = pud_offset(pgd, addr);
-+	pmd = pmd_offset(pud, addr);
- 	do {
--		pmd_t *pmd = pmd_offset(pgd, addr);
--
- 		pmd[0] = __pmd(__pfn_to_phys(pfn) | type->prot_sect);
- 		pfn += SZ_1M >> PAGE_SHIFT;
- 		pmd[1] = __pmd(__pfn_to_phys(pfn) | type->prot_sect);
- 		pfn += SZ_1M >> PAGE_SHIFT;
- 		flush_pmd_entry(pmd);
- 
--		addr += PGDIR_SIZE;
--		pgd++;
-+		addr += PMD_SIZE;
-+		pmd += 2;
- 	} while (addr < end);
- 
- 	return 0;
-@@ -154,6 +159,8 @@ remap_area_supersections(unsigned long virt, unsigned long pfn,
- {
- 	unsigned long addr = virt, end = virt + size;
- 	pgd_t *pgd;
-+	pud_t *pud;
-+	pmd_t *pmd;
- 
- 	/*
- 	 * Remove and free any PTE-based mapping, and
-@@ -162,6 +169,8 @@ remap_area_supersections(unsigned long virt, unsigned long pfn,
- 	unmap_area_sections(virt, size);
- 
- 	pgd = pgd_offset_k(virt);
-+	pud = pud_offset(pgd, addr);
-+	pmd = pmd_offset(pud, addr);
- 	do {
- 		unsigned long super_pmd_val, i;
- 
-@@ -170,14 +179,12 @@ remap_area_supersections(unsigned long virt, unsigned long pfn,
- 		super_pmd_val |= ((pfn >> (32 - PAGE_SHIFT)) & 0xf) << 20;
- 
- 		for (i = 0; i < 8; i++) {
--			pmd_t *pmd = pmd_offset(pgd, addr);
--
- 			pmd[0] = __pmd(super_pmd_val);
- 			pmd[1] = __pmd(super_pmd_val);
- 			flush_pmd_entry(pmd);
- 
--			addr += PGDIR_SIZE;
--			pgd++;
-+			addr += PMD_SIZE;
-+			pmd += 2;
- 		}
- 
- 		pfn += SUPERSECTION_SIZE >> PAGE_SHIFT;
+git://git.kernel.org/pub/scm/linux/kernel/git/cmarinas/linux.git for-next
+
+The patch set also includes Russell's nopud patch with an additional
+fix-up to be reviewed (they are not in mainline yet but LPAE depends on
+them).
+
+
+Changelog (from v8, updates following review):
+
+- Removed the ATAG_MEM64 patch.
+- Removed the different PMD_SECT_XN definition for asm.
+- proc-v7.S fixes for SMP/UP instructions pairing.
+- Removed references to PHYS_OFFSET in proc-v7.S and added comment about
+  VMSPLIT_1G.
+- pr_fmt() definition removed from idmap.c.
+- ARCH_DMA_ADDR_T_64BIT now defaults to false without any dependencies.
+  Platforms should select this explicitly.
+- Reordered the nopud fixup with Russell's nopud patch.
+
+Known issues:
+
+- idmap_add_pmd() still cannot be called in an atomic context but the
+  kexec patches re-implement the setup_mm_for_reboot() function and it
+  no longer calls identity_mapping_add().
+
+
+Catalin Marinas (12):
+  ARM: pgtable: Fix compiler warning in ioremap.c introduced by nopud
+  ARM: LPAE: Move page table maintenance macros to pgtable-2level.h
+  ARM: LPAE: Move the FSR definitions to separate files
+  ARM: LPAE: Factor out classic-MMU specific code into proc-v7-2level.S
+  ARM: LPAE: Introduce the 3-level page table format definitions
+  ARM: LPAE: Page table maintenance for the 3-level format
+  ARM: LPAE: MMU setup for the 3-level page table format
+  ARM: LPAE: Invalidate the TLB before freeing the PMD
+  ARM: LPAE: Add fault handling support
+  ARM: LPAE: Add context switching support
+  ARM: LPAE: Add identity mapping support for the 3-level page table
+    format
+  ARM: LPAE: Add the Kconfig entries
+
+Russell King (1):
+  ARM: pgtable: switch to use pgtable-nopud.h
+
+Will Deacon (2):
+  ARM: LPAE: add ISBs around MMU enabling code
+  ARM: LPAE: mark memory banks with start > ULONG_MAX as highmem
+
+ arch/arm/Kconfig                            |    2 +-
+ arch/arm/boot/compressed/head.S             |    1 +
+ arch/arm/include/asm/assembler.h            |   11 ++
+ arch/arm/include/asm/page.h                 |    4 +
+ arch/arm/include/asm/pgalloc.h              |   26 ++++-
+ arch/arm/include/asm/pgtable-2level.h       |   41 ++++++
+ arch/arm/include/asm/pgtable-3level-hwdef.h |   77 ++++++++++++
+ arch/arm/include/asm/pgtable-3level-types.h |   70 +++++++++++
+ arch/arm/include/asm/pgtable-3level.h       |  155 +++++++++++++++++++++++
+ arch/arm/include/asm/pgtable-hwdef.h        |    4 +
+ arch/arm/include/asm/pgtable.h              |   43 +------
+ arch/arm/include/asm/proc-fns.h             |   21 +++
+ arch/arm/include/asm/system.h               |    8 ++
+ arch/arm/include/asm/tlb.h                  |   12 ++-
+ arch/arm/kernel/head.S                      |   47 +++++++-
+ arch/arm/kernel/hw_breakpoint.c             |    8 +-
+ arch/arm/kernel/sleep.S                     |    2 +
+ arch/arm/mm/Kconfig                         |   17 +++
+ arch/arm/mm/alignment.c                     |    2 +-
+ arch/arm/mm/context.c                       |   19 +++-
+ arch/arm/mm/fault.c                         |  111 +++--------------
+ arch/arm/mm/fault.h                         |   27 ++++-
+ arch/arm/mm/fsr-2level.c                    |   78 ++++++++++++
+ arch/arm/mm/fsr-3level.c                    |   68 ++++++++++
+ arch/arm/mm/idmap.c                         |   34 +++++-
+ arch/arm/mm/ioremap.c                       |   39 ++++---
+ arch/arm/mm/mmu.c                           |   46 +++++++-
+ arch/arm/mm/pgd.c                           |   51 +++++++-
+ arch/arm/mm/proc-macros.S                   |    5 +-
+ arch/arm/mm/proc-v7-2level.S                |  171 ++++++++++++++++++++++++++
+ arch/arm/mm/proc-v7-3level.S                |  151 +++++++++++++++++++++++
+ arch/arm/mm/proc-v7.S                       |  177 +++------------------------
+ 32 files changed, 1205 insertions(+), 323 deletions(-)
+ create mode 100644 arch/arm/include/asm/pgtable-3level-hwdef.h
+ create mode 100644 arch/arm/include/asm/pgtable-3level-types.h
+ create mode 100644 arch/arm/include/asm/pgtable-3level.h
+ create mode 100644 arch/arm/mm/fsr-2level.c
+ create mode 100644 arch/arm/mm/fsr-3level.c
+ create mode 100644 arch/arm/mm/proc-v7-2level.S
+ create mode 100644 arch/arm/mm/proc-v7-3level.S
