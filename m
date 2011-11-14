@@ -1,259 +1,221 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 14 Nov 2011 15:37:43 +0100
-Subject: [PATCH 04/12] ARM: at91: make rtt register base soc independent
-In-Reply-To: <1321207952-13556-4-git-send-email-plagnioj@jcrosoft.com>
+Date: Mon, 14 Nov 2011 15:38:35 +0100
+Subject: [PATCH 05/12] ARM: at91: add ioremap_registers entry point to
+ soc setup
+In-Reply-To: <1321207952-13556-5-git-send-email-plagnioj@jcrosoft.com>
 References: <20111113180954.GD15318@game.jcrosoft.org>
- <1321207952-13556-4-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <4EC127B7.8000108@atmel.com>
+ <1321207952-13556-5-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <4EC127EB.8090400@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 11/13/2011 07:12 PM, Jean-Christophe PLAGNIOL-VILLARD :
+> this will allow to ioremap the register of the PIT, PMC and others
+> and make the code soc independent
+> 
 > Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 > Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
 
 Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
 > ---
->  arch/arm/mach-at91/at91cap9_devices.c         |    4 ++--
->  arch/arm/mach-at91/at91sam9260_devices.c      |    4 ++--
->  arch/arm/mach-at91/at91sam9261_devices.c      |    4 ++--
->  arch/arm/mach-at91/at91sam9263_devices.c      |    8 ++++----
->  arch/arm/mach-at91/at91sam9g45_devices.c      |    4 ++--
->  arch/arm/mach-at91/at91sam9rl_devices.c       |    4 ++--
->  arch/arm/mach-at91/include/mach/at91cap9.h    |    2 +-
->  arch/arm/mach-at91/include/mach/at91sam9260.h |    2 +-
->  arch/arm/mach-at91/include/mach/at91sam9261.h |    2 +-
->  arch/arm/mach-at91/include/mach/at91sam9263.h |    4 ++--
->  arch/arm/mach-at91/include/mach/at91sam9g45.h |    2 +-
->  arch/arm/mach-at91/include/mach/at91sam9rl.h  |    2 +-
->  12 files changed, 21 insertions(+), 21 deletions(-)
+>  arch/arm/mach-at91/at91cap9.c    |    5 +++++
+>  arch/arm/mach-at91/at91rm9200.c  |    5 +++++
+>  arch/arm/mach-at91/at91sam9260.c |    5 +++++
+>  arch/arm/mach-at91/at91sam9261.c |    5 +++++
+>  arch/arm/mach-at91/at91sam9263.c |    5 +++++
+>  arch/arm/mach-at91/at91sam9g45.c |    5 +++++
+>  arch/arm/mach-at91/at91sam9rl.c  |    5 +++++
+>  arch/arm/mach-at91/setup.c       |    2 ++
+>  arch/arm/mach-at91/soc.h         |    1 +
+>  9 files changed, 38 insertions(+), 0 deletions(-)
 > 
-> diff --git a/arch/arm/mach-at91/at91cap9_devices.c b/arch/arm/mach-at91/at91cap9_devices.c
-> index fb525f4..3262a7e 100644
-> --- a/arch/arm/mach-at91/at91cap9_devices.c
-> +++ b/arch/arm/mach-at91/at91cap9_devices.c
-> @@ -670,8 +670,8 @@ static void __init at91_add_device_tc(void) { }
+> diff --git a/arch/arm/mach-at91/at91cap9.c b/arch/arm/mach-at91/at91cap9.c
+> index fe00dce..3687207 100644
+> --- a/arch/arm/mach-at91/at91cap9.c
+> +++ b/arch/arm/mach-at91/at91cap9.c
+> @@ -333,6 +333,10 @@ static void __init at91cap9_map_io(void)
+>  	at91_init_sram(0, AT91CAP9_SRAM_BASE, AT91CAP9_SRAM_SIZE);
+>  }
 >  
->  static struct resource rtt_resources[] = {
->  	{
-> -		.start	= AT91_BASE_SYS + AT91_RTT,
-> -		.end	= AT91_BASE_SYS + AT91_RTT + SZ_16 - 1,
-> +		.start	= AT91CAP9_BASE_RTT,
-> +		.end	= AT91CAP9_BASE_RTT + SZ_16 - 1,
->  		.flags	= IORESOURCE_MEM,
->  	}
+> +static void __init at91cap9_ioremap_registers(void)
+> +{
+> +}
+> +
+>  static void __init at91cap9_initialize(void)
+>  {
+>  	at91_arch_reset = at91cap9_reset;
+> @@ -394,6 +398,7 @@ static unsigned int at91cap9_default_irq_priority[NR_AIC_IRQS] __initdata = {
+>  struct at91_init_soc __initdata at91cap9_soc = {
+>  	.map_io = at91cap9_map_io,
+>  	.default_irq_priority = at91cap9_default_irq_priority,
+> +	.ioremap_registers = at91cap9_ioremap_registers,
+>  	.register_clocks = at91cap9_register_clocks,
+>  	.init = at91cap9_initialize,
 >  };
-> diff --git a/arch/arm/mach-at91/at91sam9260_devices.c b/arch/arm/mach-at91/at91sam9260_devices.c
-> index 067c168..63cbfb8 100644
-> --- a/arch/arm/mach-at91/at91sam9260_devices.c
-> +++ b/arch/arm/mach-at91/at91sam9260_devices.c
-> @@ -714,8 +714,8 @@ static void __init at91_add_device_tc(void) { }
+> diff --git a/arch/arm/mach-at91/at91rm9200.c b/arch/arm/mach-at91/at91rm9200.c
+> index 8ce8675..c67d50c 100644
+> --- a/arch/arm/mach-at91/at91rm9200.c
+> +++ b/arch/arm/mach-at91/at91rm9200.c
+> @@ -307,6 +307,10 @@ static void __init at91rm9200_map_io(void)
+>  	iotable_init(at91rm9200_io_desc, ARRAY_SIZE(at91rm9200_io_desc));
+>  }
 >  
->  static struct resource rtt_resources[] = {
->  	{
-> -		.start	= AT91_BASE_SYS + AT91_RTT,
-> -		.end	= AT91_BASE_SYS + AT91_RTT + SZ_16 - 1,
-> +		.start	= AT91SAM9260_BASE_RTT,
-> +		.end	= AT91SAM9260_BASE_RTT + SZ_16 - 1,
->  		.flags	= IORESOURCE_MEM,
->  	}
+> +static void __init at91rm9200_ioremap_registers(void)
+> +{
+> +}
+> +
+>  static void __init at91rm9200_initialize(void)
+>  {
+>  	at91_arch_reset = at91rm9200_reset;
+> @@ -366,6 +370,7 @@ static unsigned int at91rm9200_default_irq_priority[NR_AIC_IRQS] __initdata = {
+>  struct at91_init_soc __initdata at91rm9200_soc = {
+>  	.map_io = at91rm9200_map_io,
+>  	.default_irq_priority = at91rm9200_default_irq_priority,
+> +	.ioremap_registers = at91rm9200_ioremap_registers,
+>  	.register_clocks = at91rm9200_register_clocks,
+>  	.init = at91rm9200_initialize,
 >  };
-> diff --git a/arch/arm/mach-at91/at91sam9261_devices.c b/arch/arm/mach-at91/at91sam9261_devices.c
-> index ae78f4d..d5bd1e7 100644
-> --- a/arch/arm/mach-at91/at91sam9261_devices.c
-> +++ b/arch/arm/mach-at91/at91sam9261_devices.c
-> @@ -600,8 +600,8 @@ static void __init at91_add_device_tc(void) { }
->  
->  static struct resource rtt_resources[] = {
->  	{
-> -		.start	= AT91_BASE_SYS + AT91_RTT,
-> -		.end	= AT91_BASE_SYS + AT91_RTT + SZ_16 - 1,
-> +		.start	= AT91SAM9261_BASE_RTT,
-> +		.end	= AT91SAM9261_BASE_RTT + SZ_16 - 1,
->  		.flags	= IORESOURCE_MEM,
+> diff --git a/arch/arm/mach-at91/at91sam9260.c b/arch/arm/mach-at91/at91sam9260.c
+> index 1e9c79f..0e54928 100644
+> --- a/arch/arm/mach-at91/at91sam9260.c
+> +++ b/arch/arm/mach-at91/at91sam9260.c
+> @@ -325,6 +325,10 @@ static void __init at91sam9260_map_io(void)
 >  	}
+>  }
+>  
+> +static void __init at91sam9260_ioremap_registers(void)
+> +{
+> +}
+> +
+>  static void __init at91sam9260_initialize(void)
+>  {
+>  	at91_arch_reset = at91sam9_alt_reset;
+> @@ -381,6 +385,7 @@ static unsigned int at91sam9260_default_irq_priority[NR_AIC_IRQS] __initdata = {
+>  struct at91_init_soc __initdata at91sam9260_soc = {
+>  	.map_io = at91sam9260_map_io,
+>  	.default_irq_priority = at91sam9260_default_irq_priority,
+> +	.ioremap_registers = at91sam9260_ioremap_registers,
+>  	.register_clocks = at91sam9260_register_clocks,
+>  	.init = at91sam9260_initialize,
 >  };
-> diff --git a/arch/arm/mach-at91/at91sam9263_devices.c b/arch/arm/mach-at91/at91sam9263_devices.c
-> index 0b1a28e..5d2b061 100644
-> --- a/arch/arm/mach-at91/at91sam9263_devices.c
-> +++ b/arch/arm/mach-at91/at91sam9263_devices.c
-> @@ -956,8 +956,8 @@ static void __init at91_add_device_tc(void) { }
+> diff --git a/arch/arm/mach-at91/at91sam9261.c b/arch/arm/mach-at91/at91sam9261.c
+> index 574aa6b..dde8318 100644
+> --- a/arch/arm/mach-at91/at91sam9261.c
+> +++ b/arch/arm/mach-at91/at91sam9261.c
+> @@ -285,6 +285,10 @@ static void __init at91sam9261_map_io(void)
+>  		at91_init_sram(0, AT91SAM9261_SRAM_BASE, AT91SAM9261_SRAM_SIZE);
+>  }
 >  
->  static struct resource rtt0_resources[] = {
->  	{
-> -		.start	= AT91_BASE_SYS + AT91_RTT0,
-> -		.end	= AT91_BASE_SYS + AT91_RTT0 + SZ_16 - 1,
-> +		.start	= AT91SAM9263_BASE_RTT0,
-> +		.end	= AT91SAM9263_BASE_RTT0 + SZ_16 - 1,
->  		.flags	= IORESOURCE_MEM,
->  	}
+> +static void __init at91sam9261_ioremap_registers(void)
+> +{
+> +}
+> +
+>  static void __init at91sam9261_initialize(void)
+>  {
+>  	at91_arch_reset = at91sam9_alt_reset;
+> @@ -341,6 +345,7 @@ static unsigned int at91sam9261_default_irq_priority[NR_AIC_IRQS] __initdata = {
+>  struct at91_init_soc __initdata at91sam9261_soc = {
+>  	.map_io = at91sam9261_map_io,
+>  	.default_irq_priority = at91sam9261_default_irq_priority,
+> +	.ioremap_registers = at91sam9261_ioremap_registers,
+>  	.register_clocks = at91sam9261_register_clocks,
+>  	.init = at91sam9261_initialize,
 >  };
-> @@ -971,8 +971,8 @@ static struct platform_device at91sam9263_rtt0_device = {
+> diff --git a/arch/arm/mach-at91/at91sam9263.c b/arch/arm/mach-at91/at91sam9263.c
+> index dee0ed7..fc442dd 100644
+> --- a/arch/arm/mach-at91/at91sam9263.c
+> +++ b/arch/arm/mach-at91/at91sam9263.c
+> @@ -303,6 +303,10 @@ static void __init at91sam9263_map_io(void)
+>  	at91_init_sram(1, AT91SAM9263_SRAM1_BASE, AT91SAM9263_SRAM1_SIZE);
+>  }
 >  
->  static struct resource rtt1_resources[] = {
->  	{
-> -		.start	= AT91_BASE_SYS + AT91_RTT1,
-> -		.end	= AT91_BASE_SYS + AT91_RTT1 + SZ_16 - 1,
-> +		.start	= AT91SAM9263_BASE_RTT1,
-> +		.end	= AT91SAM9263_BASE_RTT1 + SZ_16 - 1,
->  		.flags	= IORESOURCE_MEM,
->  	}
+> +static void __init at91sam9263_ioremap_registers(void)
+> +{
+> +}
+> +
+>  static void __init at91sam9263_initialize(void)
+>  {
+>  	at91_arch_reset = at91sam9_alt_reset;
+> @@ -358,6 +362,7 @@ static unsigned int at91sam9263_default_irq_priority[NR_AIC_IRQS] __initdata = {
+>  struct at91_init_soc __initdata at91sam9263_soc = {
+>  	.map_io = at91sam9263_map_io,
+>  	.default_irq_priority = at91sam9263_default_irq_priority,
+> +	.ioremap_registers = at91sam9263_ioremap_registers,
+>  	.register_clocks = at91sam9263_register_clocks,
+>  	.init = at91sam9263_initialize,
 >  };
-> diff --git a/arch/arm/mach-at91/at91sam9g45_devices.c b/arch/arm/mach-at91/at91sam9g45_devices.c
-> index 42bf770..bb2ba0c 100644
-> --- a/arch/arm/mach-at91/at91sam9g45_devices.c
-> +++ b/arch/arm/mach-at91/at91sam9g45_devices.c
-> @@ -1081,8 +1081,8 @@ void __init at91_add_device_tsadcc(struct at91_tsadcc_data *data) {}
+> diff --git a/arch/arm/mach-at91/at91sam9g45.c b/arch/arm/mach-at91/at91sam9g45.c
+> index 404d70c..56282b2 100644
+> --- a/arch/arm/mach-at91/at91sam9g45.c
+> +++ b/arch/arm/mach-at91/at91sam9g45.c
+> @@ -338,6 +338,10 @@ static void __init at91sam9g45_map_io(void)
+>  	init_consistent_dma_size(SZ_4M);
+>  }
 >  
->  static struct resource rtt_resources[] = {
->  	{
-> -		.start	= AT91_BASE_SYS + AT91_RTT,
-> -		.end	= AT91_BASE_SYS + AT91_RTT + SZ_16 - 1,
-> +		.start	= AT91SAM9G45_BASE_RTT,
-> +		.end	= AT91SAM9G45_BASE_RTT + SZ_16 - 1,
->  		.flags	= IORESOURCE_MEM,
->  	}
+> +static void __init at91sam9g45_ioremap_registers(void)
+> +{
+> +}
+> +
+>  static void __init at91sam9g45_initialize(void)
+>  {
+>  	at91_arch_reset = at91sam9g45_reset;
+> @@ -393,6 +397,7 @@ static unsigned int at91sam9g45_default_irq_priority[NR_AIC_IRQS] __initdata = {
+>  struct at91_init_soc __initdata at91sam9g45_soc = {
+>  	.map_io = at91sam9g45_map_io,
+>  	.default_irq_priority = at91sam9g45_default_irq_priority,
+> +	.ioremap_registers = at91sam9g45_ioremap_registers,
+>  	.register_clocks = at91sam9g45_register_clocks,
+>  	.init = at91sam9g45_initialize,
 >  };
-> diff --git a/arch/arm/mach-at91/at91sam9rl_devices.c b/arch/arm/mach-at91/at91sam9rl_devices.c
-> index 34fe5dd..f9b423b 100644
-> --- a/arch/arm/mach-at91/at91sam9rl_devices.c
-> +++ b/arch/arm/mach-at91/at91sam9rl_devices.c
-> @@ -685,8 +685,8 @@ static void __init at91_add_device_rtc(void) {}
+> diff --git a/arch/arm/mach-at91/at91sam9rl.c b/arch/arm/mach-at91/at91sam9rl.c
+> index c4004e2..29dae9b 100644
+> --- a/arch/arm/mach-at91/at91sam9rl.c
+> +++ b/arch/arm/mach-at91/at91sam9rl.c
+> @@ -290,6 +290,10 @@ static void __init at91sam9rl_map_io(void)
+>  	at91_init_sram(0, AT91SAM9RL_SRAM_BASE, sram_size);
+>  }
 >  
->  static struct resource rtt_resources[] = {
->  	{
-> -		.start	= AT91_BASE_SYS + AT91_RTT,
-> -		.end	= AT91_BASE_SYS + AT91_RTT + SZ_16 - 1,
-> +		.start	= AT91SAM9RL_BASE_RTT,
-> +		.end	= AT91SAM9RL_BASE_RTT + SZ_16 - 1,
->  		.flags	= IORESOURCE_MEM,
->  	}
+> +static void __init at91sam9rl_ioremap_registers(void)
+> +{
+> +}
+> +
+>  static void __init at91sam9rl_initialize(void)
+>  {
+>  	at91_arch_reset = at91sam9_alt_reset;
+> @@ -345,6 +349,7 @@ static unsigned int at91sam9rl_default_irq_priority[NR_AIC_IRQS] __initdata = {
+>  struct at91_init_soc __initdata at91sam9rl_soc = {
+>  	.map_io = at91sam9rl_map_io,
+>  	.default_irq_priority = at91sam9rl_default_irq_priority,
+> +	.ioremap_registers = at91sam9rl_ioremap_registers,
+>  	.register_clocks = at91sam9rl_register_clocks,
+>  	.init = at91sam9rl_initialize,
 >  };
-> diff --git a/arch/arm/mach-at91/include/mach/at91cap9.h b/arch/arm/mach-at91/include/mach/at91cap9.h
-> index a2eccb9..1cb42a6 100644
-> --- a/arch/arm/mach-at91/include/mach/at91cap9.h
-> +++ b/arch/arm/mach-at91/include/mach/at91cap9.h
-> @@ -89,7 +89,6 @@
->  #define AT91_PMC	(0xfffffc00 - AT91_BASE_SYS)
->  #define AT91_RSTC	(0xfffffd00 - AT91_BASE_SYS)
->  #define AT91_SHDWC	(0xfffffd10 - AT91_BASE_SYS)
-> -#define AT91_RTT	(0xfffffd20 - AT91_BASE_SYS)
->  #define AT91_PIT	(0xfffffd30 - AT91_BASE_SYS)
->  #define AT91_WDT	(0xfffffd40 - AT91_BASE_SYS)
->  #define AT91_GPBR	(cpu_is_at91cap9_revB() ?	\
-> @@ -102,6 +101,7 @@
->  #define AT91CAP9_BASE_PIOB	0xfffff400
->  #define AT91CAP9_BASE_PIOC	0xfffff600
->  #define AT91CAP9_BASE_PIOD	0xfffff800
-> +#define AT91CAP9_BASE_RTT	0xfffffd20
+> diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
+> index aa64294..63b3ac2 100644
+> --- a/arch/arm/mach-at91/setup.c
+> +++ b/arch/arm/mach-at91/setup.c
+> @@ -287,6 +287,8 @@ void __init at91_map_io(void)
 >  
->  #define AT91_USART0	AT91CAP9_BASE_US0
->  #define AT91_USART1	AT91CAP9_BASE_US1
-> diff --git a/arch/arm/mach-at91/include/mach/at91sam9260.h b/arch/arm/mach-at91/include/mach/at91sam9260.h
-> index 6974656..6aa7ca9 100644
-> --- a/arch/arm/mach-at91/include/mach/at91sam9260.h
-> +++ b/arch/arm/mach-at91/include/mach/at91sam9260.h
-> @@ -89,7 +89,6 @@
->  #define AT91_PMC	(0xfffffc00 - AT91_BASE_SYS)
->  #define AT91_RSTC	(0xfffffd00 - AT91_BASE_SYS)
->  #define AT91_SHDWC	(0xfffffd10 - AT91_BASE_SYS)
-> -#define AT91_RTT	(0xfffffd20 - AT91_BASE_SYS)
->  #define AT91_PIT	(0xfffffd30 - AT91_BASE_SYS)
->  #define AT91_WDT	(0xfffffd40 - AT91_BASE_SYS)
->  #define AT91_GPBR	(0xfffffd50 - AT91_BASE_SYS)
-> @@ -98,6 +97,7 @@
->  #define AT91SAM9260_BASE_PIOA	0xfffff400
->  #define AT91SAM9260_BASE_PIOB	0xfffff600
->  #define AT91SAM9260_BASE_PIOC	0xfffff800
-> +#define AT91SAM9260_BASE_RTT	0xfffffd20
+>  void __init at91_initialize(unsigned long main_clock)
+>  {
+> +	at91_boot_soc.ioremap_registers();
+> +
+>  	/* Init clock subsystem */
+>  	at91_clock_init(main_clock);
 >  
->  #define AT91_USART0	AT91SAM9260_BASE_US0
->  #define AT91_USART1	AT91SAM9260_BASE_US1
-> diff --git a/arch/arm/mach-at91/include/mach/at91sam9261.h b/arch/arm/mach-at91/include/mach/at91sam9261.h
-> index 17ae9c7..f84b713 100644
-> --- a/arch/arm/mach-at91/include/mach/at91sam9261.h
-> +++ b/arch/arm/mach-at91/include/mach/at91sam9261.h
-> @@ -73,7 +73,6 @@
->  #define AT91_PMC	(0xfffffc00 - AT91_BASE_SYS)
->  #define AT91_RSTC	(0xfffffd00 - AT91_BASE_SYS)
->  #define AT91_SHDWC	(0xfffffd10 - AT91_BASE_SYS)
-> -#define AT91_RTT	(0xfffffd20 - AT91_BASE_SYS)
->  #define AT91_PIT	(0xfffffd30 - AT91_BASE_SYS)
->  #define AT91_WDT	(0xfffffd40 - AT91_BASE_SYS)
->  #define AT91_GPBR	(0xfffffd50 - AT91_BASE_SYS)
-> @@ -81,6 +80,7 @@
->  #define AT91SAM9261_BASE_PIOA	0xfffff400
->  #define AT91SAM9261_BASE_PIOB	0xfffff600
->  #define AT91SAM9261_BASE_PIOC	0xfffff800
-> +#define AT91SAM9261_BASE_RTT	0xfffffd20
->  
->  #define AT91_USART0	AT91SAM9261_BASE_US0
->  #define AT91_USART1	AT91SAM9261_BASE_US1
-> diff --git a/arch/arm/mach-at91/include/mach/at91sam9263.h b/arch/arm/mach-at91/include/mach/at91sam9263.h
-> index a668538..938965e 100644
-> --- a/arch/arm/mach-at91/include/mach/at91sam9263.h
-> +++ b/arch/arm/mach-at91/include/mach/at91sam9263.h
-> @@ -85,10 +85,8 @@
->  #define AT91_PMC	(0xfffffc00 - AT91_BASE_SYS)
->  #define AT91_RSTC	(0xfffffd00 - AT91_BASE_SYS)
->  #define AT91_SHDWC	(0xfffffd10 - AT91_BASE_SYS)
-> -#define AT91_RTT0	(0xfffffd20 - AT91_BASE_SYS)
->  #define AT91_PIT	(0xfffffd30 - AT91_BASE_SYS)
->  #define AT91_WDT	(0xfffffd40 - AT91_BASE_SYS)
-> -#define AT91_RTT1	(0xfffffd50 - AT91_BASE_SYS)
->  #define AT91_GPBR	(0xfffffd60 - AT91_BASE_SYS)
->  
->  #define AT91SAM9263_BASE_ECC0	0xffffe000
-> @@ -98,6 +96,8 @@
->  #define AT91SAM9263_BASE_PIOC	0xfffff600
->  #define AT91SAM9263_BASE_PIOD	0xfffff800
->  #define AT91SAM9263_BASE_PIOE	0xfffffa00
-> +#define AT91SAM9263_BASE_RTT0	0xfffffd20
-> +#define AT91SAM9263_BASE_RTT1	0xfffffd50
->  
->  #define AT91_USART0	AT91SAM9263_BASE_US0
->  #define AT91_USART1	AT91SAM9263_BASE_US1
-> diff --git a/arch/arm/mach-at91/include/mach/at91sam9g45.h b/arch/arm/mach-at91/include/mach/at91sam9g45.h
-> index 29e577f..00638c6 100644
-> --- a/arch/arm/mach-at91/include/mach/at91sam9g45.h
-> +++ b/arch/arm/mach-at91/include/mach/at91sam9g45.h
-> @@ -95,7 +95,6 @@
->  #define AT91_PMC	(0xfffffc00 - AT91_BASE_SYS)
->  #define AT91_RSTC	(0xfffffd00 - AT91_BASE_SYS)
->  #define AT91_SHDWC	(0xfffffd10 - AT91_BASE_SYS)
-> -#define AT91_RTT	(0xfffffd20 - AT91_BASE_SYS)
->  #define AT91_PIT	(0xfffffd30 - AT91_BASE_SYS)
->  #define AT91_WDT	(0xfffffd40 - AT91_BASE_SYS)
->  #define AT91_GPBR	(0xfffffd60 - AT91_BASE_SYS)
-> @@ -108,6 +107,7 @@
->  #define AT91SAM9G45_BASE_PIOC	0xfffff600
->  #define AT91SAM9G45_BASE_PIOD	0xfffff800
->  #define AT91SAM9G45_BASE_PIOE	0xfffffa00
-> +#define AT91SAM9G45_BASE_RTT	0xfffffd20
->  
->  #define AT91_USART0	AT91SAM9G45_BASE_US0
->  #define AT91_USART1	AT91SAM9G45_BASE_US1
-> diff --git a/arch/arm/mach-at91/include/mach/at91sam9rl.h b/arch/arm/mach-at91/include/mach/at91sam9rl.h
-> index e564650..099cefc 100644
-> --- a/arch/arm/mach-at91/include/mach/at91sam9rl.h
-> +++ b/arch/arm/mach-at91/include/mach/at91sam9rl.h
-> @@ -78,7 +78,6 @@
->  #define AT91_PMC	(0xfffffc00 - AT91_BASE_SYS)
->  #define AT91_RSTC	(0xfffffd00 - AT91_BASE_SYS)
->  #define AT91_SHDWC	(0xfffffd10 - AT91_BASE_SYS)
-> -#define AT91_RTT	(0xfffffd20 - AT91_BASE_SYS)
->  #define AT91_PIT	(0xfffffd30 - AT91_BASE_SYS)
->  #define AT91_WDT	(0xfffffd40 - AT91_BASE_SYS)
->  #define AT91_SCKCR	(0xfffffd50 - AT91_BASE_SYS)
-> @@ -91,6 +90,7 @@
->  #define AT91SAM9RL_BASE_PIOB	0xfffff600
->  #define AT91SAM9RL_BASE_PIOC	0xfffff800
->  #define AT91SAM9RL_BASE_PIOD	0xfffffa00
-> +#define AT91SAM9RL_BASE_RTT	0xfffffd20
->  
->  #define AT91_USART0	AT91SAM9RL_BASE_US0
->  #define AT91_USART1	AT91SAM9RL_BASE_US1
+> diff --git a/arch/arm/mach-at91/soc.h b/arch/arm/mach-at91/soc.h
+> index cdf6ccf..f860a2e 100644
+> --- a/arch/arm/mach-at91/soc.h
+> +++ b/arch/arm/mach-at91/soc.h
+> @@ -7,6 +7,7 @@
+>  struct at91_init_soc {
+>  	unsigned int *default_irq_priority;
+>  	void (*map_io)(void);
+> +	void (*ioremap_registers)(void);
+>  	void (*register_clocks)(void);
+>  	void (*init)(void);
+>  };
 
 
 -- 
