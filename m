@@ -1,33 +1,111 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 14 Nov 2011 14:04:23 -0800
-Subject: [GIT PULL] ARM: OMAP: DSS hwmod/reset fixes for 3.2
-In-Reply-To: <alpine.DEB.2.00.1111141438290.19654@utopia.booyaka.com>
-References: <alpine.DEB.2.00.1110061806150.4611@utopia.booyaka.com>
- <20111105003550.GM31337@atomide.com>
- <alpine.DEB.2.00.1111080049470.12394@utopia.booyaka.com>
- <1320746911.1907.47.camel@deskari>
- <alpine.DEB.2.00.1111080329300.8313@utopia.booyaka.com>
- <1320754489.1907.50.camel@deskari>
- <20111114204649.GL31337@atomide.com>
- <alpine.DEB.2.00.1111141438290.19654@utopia.booyaka.com>
-Message-ID: <20111114220423.GQ31337@atomide.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 14 Nov 2011 16:41:04 -0600
+Subject: [PATCH 0/2] irq/of: Enchance irq_domain support.
+In-Reply-To: <4EC156D8.1080803@gmail.com>
+References: <1321062616-28317-1-git-send-email-ddaney.cavm@gmail.com>
+ <4EBDEE3D.1000000@gmail.com> <4EC156D8.1080803@gmail.com>
+Message-ID: <4EC19900.5000806@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Paul Walmsley <paul@pwsan.com> [111114 13:05]:
-> On Mon, 14 Nov 2011, Tony Lindgren wrote:
+On 11/14/2011 11:58 AM, David Daney wrote:
+> On 11/11/2011 07:55 PM, Rob Herring wrote:
+>> On 11/11/2011 07:50 PM, ddaney.cavm at gmail.com wrote:
+>>> From: David Daney<david.daney@cavium.com>
+>>>
+>>> This is the first cut at hooking up my Octeon port to the irq_domain
+>>> things.
+>>>
+>>> The Octeon specific patches are part of a larger set, and will need to
+>>> be applied with that set, the first patch is stand-alone.
+>>>
+>>> The basic problem being solved taken from one of my other e-mails:
+>>>
+>>>     Unfortunately, although a good idea, kernel/irq/irqdomain.c makes a
+>>>     bunch of assumptions that don't hold for Octeon.  We may be able to
+>>>     improve it so that it flexible enough to suit us.
+>>>
+>>>
+>>>     Here are the problems I see:
+>>>
+>>>     1) It is assumed that there is some sort of linear correspondence
+>>>     between 'hwirq' and 'irq', and that the range of valid values is
+>>>     contiguous.
+>>>
+>>>     2) It is assumed that the concepts of nr_irq, irq_base and
+>>>     hwirq_base have easy to determine values and you can do iteration
+>>>     over their ranges by adding indexes to the bases.
+>>>
+>>
+>> I still think this is the wrong approach.
+>>
+>> Are the gpio interrupts the source of your problem here?
 > 
-> > I suggest we only merge the ones with "fix" in the subject during the -rc
-> > cycle. The others add new features for the reset, so they should wait until
-> > v3.3 merge window.
+> No.
 > 
-> Most of the other patches in the branch discuss what they fix in the patch 
-> descriptions, rather than the subject lines.  Do you want the subject 
-> lines rewritten to highlight this?
+>> That's how I read it.
+> 
+> Take a look at Patch 2/2, since the GPIO irqs are contiguous over both
+> irq and hwirq numbers, I use the existing infrastructure with no
+> modifications.
+> 
 
-Well we should only merge major bugs and regressions during the -rc cycle.
-It seems that at least "OMAP: HWMOD: Unify DSS resets for OMAPs" has high
-flame potential based on that? Maybe we should wait until the next merge
-window to start removing some of these workarounds?
+I did. You are adding GPIO support to the existing support. It would be
+nice to separate that from add DT support.
 
-Tony
+>> You have 16 GPIO irqs directly connected into lines on your
+>> primary interrupt controller which has 128 lines. So for a Linux irq
+>> number, you want to translate to a GPIO hwirq number and/or a CIU hwirq
+>> number. Trying to have 2 hwirq mappings for 1 Linux irq number just
+>> won't work. It seems to me you should use a chained handler here because
+>> you need to process the interrupt at both the primary ctrlr and gpio
+>> ctrlr levels.
+>>
+> 
+> All moot as it is based on the false predicate of GPIO irqs being the
+> problem.
+> 
+Let me rephrase, if you completely ignore GPIO for a minute, what is the
+issue. Just that irq_descs are sparsely allocated for the primary
+controller. Then the GPIO interrupts are inserted into the middle of
+that irq space. Handling sparse irqs is a potentially common problem, so
+we should address that in the core irqdomain code.
+
+> 
+> The root of the problem are all of the irqs that are not GPIO.  I have:
+> 
+> o irq numbers currently in the range [9..196], with holes for any given
+> SOC/Board implementation.  SOCs currently in development will have
+> additional irq numbers with even more holes.
+> 
+> o Two different interrupt controllers.  One with 128 lines, the other
+> with  512 or more lines, both sparsely populated.  The mapping of hwirq
+> to irq is done at boot time based on the hardware the kernel image is
+> running on.  Note that the second type of irq controller support is not
+> in the kernel.org kernel, but it exists, and I intend on getting support
+> for it merged ASAP.
+
+To be clear, those are not holes in hwirq's, but many lines don't have
+connections so you are not allocating Linux irqs for them. hwirq should
+reflect interrupt numbers from the controller's perspective and be
+directly usable to index to the correct register and bit mask. There's
+no storage associated with a hwirq, so the only cost is iterating over
+them which is not done frequently.
+
+There is not a clean separation of the primary interrupt controller's
+hwirq numbers and Linux irq numbers in your patch. Then you are
+overlaying the GPIO interrupts into the Linux irq space.
+
+> At a minimum the loop in irq_domain_add() where we iterate over a linear
+> range of irq numbers is not flexible enough.  You may not like my
+> iterator functions in irq_domain_ops, but we need to provide something
+> better than the irq_domain_for_each_irq() macro.
+
+I'm just trying to back-up some and understand the problem.
+
+How about if .to_irq returns 0, the loop can just continue and skip over
+that hwirq without error.
+
+I don't think .each_hwirq is being used, so you can delete that.
+
+Rob
