@@ -1,62 +1,59 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 14 Nov 2011 16:23:48 +0000
-Subject: [PATCH v9 12/15] ARM: LPAE: Add context switching support
+Date: Mon, 14 Nov 2011 16:23:51 +0000
+Subject: [PATCH v9 15/15] ARM: LPAE: Add the Kconfig entries
 In-Reply-To: <1321287831-24560-1-git-send-email-catalin.marinas@arm.com>
 References: <1321287831-24560-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <1321287831-24560-13-git-send-email-catalin.marinas@arm.com>
+Message-ID: <1321287831-24560-16-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With LPAE, TTBRx registers are 64-bit. The ASID is stored in TTBR0
-rather than a separate Context ID register. This patch makes the
-necessary changes to handle context switching on LPAE.
+This patch adds the ARM_LPAE and ARCH_PHYS_ADDR_T_64BIT Kconfig entries
+allowing LPAE support to be compiled into the kernel.
 
 Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm/mm/context.c |   19 +++++++++++++++++--
- 1 files changed, 17 insertions(+), 2 deletions(-)
+ arch/arm/Kconfig    |    2 +-
+ arch/arm/mm/Kconfig |   17 +++++++++++++++++
+ 2 files changed, 18 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mm/context.c b/arch/arm/mm/context.c
-index 93aac06..ee9bb36 100644
---- a/arch/arm/mm/context.c
-+++ b/arch/arm/mm/context.c
-@@ -22,6 +22,21 @@ unsigned int cpu_last_asid = ASID_FIRST_VERSION;
- DEFINE_PER_CPU(struct mm_struct *, current_mm);
- #endif
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 44789ef..885c04e 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1959,7 +1959,7 @@ endchoice
  
-+#ifdef CONFIG_ARM_LPAE
-+#define cpu_set_asid(asid) {						\
-+	unsigned long ttbl, ttbh;					\
-+	asm volatile(							\
-+	"	mrrc	p15, 0, %0, %1, c2		@ read TTBR0\n"	\
-+	"	mov	%1, %2, lsl #(48 - 32)		@ set ASID\n"	\
-+	"	mcrr	p15, 0, %0, %1, c2		@ set TTBR0\n"	\
-+	: "=&r" (ttbl), "=&r" (ttbh)					\
-+	: "r" (asid & ~ASID_MASK));					\
-+}
-+#else
-+#define cpu_set_asid(asid) \
-+	asm("	mcr	p15, 0, %0, c13, c0, 1\n" : : "r" (asid))
-+#endif
+ config XIP_KERNEL
+ 	bool "Kernel Execute-In-Place from ROM"
+-	depends on !ZBOOT_ROM
++	depends on !ZBOOT_ROM && !ARM_LPAE
+ 	help
+ 	  Execute-In-Place allows the kernel to run from non-volatile storage
+ 	  directly addressable by the CPU, such as NOR flash. This saves RAM
+diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+index 67f75a0..5cf7922 100644
+--- a/arch/arm/mm/Kconfig
++++ b/arch/arm/mm/Kconfig
+@@ -629,6 +629,23 @@ config IO_36
+ 
+ comment "Processor Features"
+ 
++config ARM_LPAE
++	bool "Support for the Large Physical Address Extension"
++	depends on MMU && CPU_V7
++	help
++	  Say Y if you have an ARMv7 processor supporting the LPAE page
++	  table format and you would like to access memory beyond the
++	  4GB limit. The resulting kernel image will not run on
++	  processors without the LPA extension.
 +
- /*
-  * We fork()ed a process, and we need a new context for the child
-  * to run in.  We reserve version 0 for initial tasks so we will
-@@ -37,7 +52,7 @@ void __init_new_context(struct task_struct *tsk, struct mm_struct *mm)
- static void flush_context(void)
- {
- 	/* set the reserved ASID before flushing the TLB */
--	asm("mcr	p15, 0, %0, c13, c0, 1\n" : : "r" (0));
-+	cpu_set_asid(0);
- 	isb();
- 	local_flush_tlb_all();
- 	if (icache_is_vivt_asid_tagged()) {
-@@ -99,7 +114,7 @@ static void reset_context(void *info)
- 	set_mm_context(mm, asid);
- 
- 	/* set the new ASID */
--	asm("mcr	p15, 0, %0, c13, c0, 1\n" : : "r" (mm->context.id));
-+	cpu_set_asid(mm->context.id);
- 	isb();
- }
- 
++	  If unsure, say N.
++
++config ARCH_PHYS_ADDR_T_64BIT
++	def_bool ARM_LPAE
++
++config ARCH_DMA_ADDR_T_64BIT
++	bool
++
+ config ARM_THUMB
+ 	bool "Support Thumb user binaries"
+ 	depends on CPU_ARM720T || CPU_ARM740T || CPU_ARM920T || CPU_ARM922T || CPU_ARM925T || CPU_ARM926T || CPU_ARM940T || CPU_ARM946E || CPU_ARM1020 || CPU_ARM1020E || CPU_ARM1022 || CPU_ARM1026 || CPU_XSCALE || CPU_XSC3 || CPU_MOHAWK || CPU_V6 || CPU_V6K || CPU_V7 || CPU_FEROCEON
