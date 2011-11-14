@@ -1,332 +1,39 @@
-From: mcuos.com@gmail.com (Wan ZongShun)
-Date: Mon, 14 Nov 2011 15:13:31 +0800
-Subject: [PATCH V2] ARM: NUC900: Add PCI driver support for NUC960
-In-Reply-To: <4EBE98FC.6070903@gmail.com>
-References: <4EBE98FC.6070903@gmail.com>
-Message-ID: <4EC0BF9B.2050300@gmail.com>
+From: claudio@evidence.eu.com (Claudio Scordino)
+Date: Mon, 14 Nov 2011 09:22:18 +0100
+Subject: [PATCH] RS485: fix inconsistencies in the meaning of some
+ variables
+In-Reply-To: <20111113215318.GA2966@pengutronix.de>
+References: <4E492CFF.7040905@pwrnet.de> <20110822211832.GA8023@kroah.com>
+ <4EB3A009.10502@evidence.eu.com> <4EB8F6B9.6010008@atmel.com>
+ <4EB90902.4030200@evidence.eu.com>
+ <20111108134804.07095c5d@lxorguk.ukuu.org.uk>
+ <20111108142432.GA11293@kroah.com> <4EBA9385.7010806@evidence.eu.com>
+ <20111113215318.GA2966@pengutronix.de>
+Message-ID: <4EC0CFBA.3090202@evidence.eu.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Modify PCI driver for nuc960 per Russell's comments as following:
-(1)Use the common PCI swizzle API.
-(2)Use the pr_err insteading of prink.
-(3)Request the IO resource in ioport_resource tree.
+Il 13/11/2011 22:53, Wolfram Sang ha scritto:
+> Hi,
+> 
+> I have been working on a patch series which adds hardware RS485 to the 8250
+> according to the latest developments. The series will be posted tomorrow after
+> some more tests. However, there is one thing I wondered about:
+> 
+>>  From now on, SER_RS485_RTS_AFTER_SEND and SER_RS485_RTS_ON_SEND will be used to
+>> set the voltage of the RTS pin (as in the crisv10.c driver); the delay will be
+>> understood by looking only at the value of delay_rts_before_send and
+>> delay_rts_after_send.
+> 
+> Do I overlook something or is SER_RS485_RTS_AFTER_SEND always the inverted
+> signal of SER_RS485_RTS_ON_SEND. So why do we need both? (BTW
+> SER_RS485_RTS_ON_SEND is a non-obvious name, I think. But changing it will
+> probably break even more users?)
 
-Signed-off-by: Wan ZongShun <mcuos.com@gmail.com>
+I think so, but I'm not sure since the original version of the Cris driver (prior than the
+RS485 data structure) contained both values: a value for RTS during send and a value
+for RTS after sent. That's why both vales have been reported inside the RS485 data structure...
 
----
- arch/arm/mach-w90x900/Kconfig                 |    1 +
- arch/arm/mach-w90x900/Makefile                |    3 +
- arch/arm/mach-w90x900/include/mach/map.h      |    4 +
- arch/arm/mach-w90x900/include/mach/regs-pci.h |   37 +++++
- arch/arm/mach-w90x900/nuc960.c                |    2 +
- arch/arm/mach-w90x900/pci.c                   |  195
-+++++++++++++++++++++++++
- 6 files changed, 242 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-w90x900/include/mach/regs-pci.h
- create mode 100644 arch/arm/mach-w90x900/pci.c
+Best regards,
 
-diff --git a/arch/arm/mach-w90x900/Kconfig b/arch/arm/mach-w90x900/Kconfig
-index 69bab32..17be262 100644
---- a/arch/arm/mach-w90x900/Kconfig
-+++ b/arch/arm/mach-w90x900/Kconfig
-@@ -41,6 +41,7 @@ menu "NUC960 Machines"
- config MACH_W90N960EVB
- 	bool "Nuvoton NUC960 Evaluation Board"
- 	select CPU_NUC960
-+	select PCI
- 	help
- 	   Say Y here if you are using the Nuvoton NUC960EVB
-
-diff --git a/arch/arm/mach-w90x900/Makefile b/arch/arm/mach-w90x900/Makefile
-index 828c032..0c35800 100644
---- a/arch/arm/mach-w90x900/Makefile
-+++ b/arch/arm/mach-w90x900/Makefile
-@@ -17,3 +17,6 @@ obj-$(CONFIG_CPU_NUC960)	+= nuc960.o
- obj-$(CONFIG_MACH_W90P910EVB)	+= mach-nuc910evb.o
- obj-$(CONFIG_MACH_W90P950EVB)	+= mach-nuc950evb.o
- obj-$(CONFIG_MACH_W90N960EVB)	+= mach-nuc960evb.o
-+
-+# Add pci support for nuc960, nuc920
-+obj-$(CONFIG_PCI)		+= pci.o
-diff --git a/arch/arm/mach-w90x900/include/mach/map.h
-b/arch/arm/mach-w90x900/include/mach/map.h
-index 1a20953..69f6c73 100644
---- a/arch/arm/mach-w90x900/include/mach/map.h
-+++ b/arch/arm/mach-w90x900/include/mach/map.h
-@@ -154,4 +154,8 @@
- #define W90X900_PA_EMC		(0xB0003000)
- #define W90X900_SZ_EMC		SZ_4K
-
-+/* PCI interface controller */
-+#define	W90X900_VA_PCI		W90X900_ADDR(0x00002000)
-+#define	W90X900_PA_PCI		(0xB0002000)
-+#define	W90X900_SZ_PCI		SZ_4K
- #endif /* __ASM_ARCH_MAP_H */
-diff --git a/arch/arm/mach-w90x900/include/mach/regs-pci.h
-b/arch/arm/mach-w90x900/include/mach/regs-pci.h
-new file mode 100644
-index 0000000..d1975eb
---- /dev/null
-+++ b/arch/arm/mach-w90x900/include/mach/regs-pci.h
-@@ -0,0 +1,37 @@
-+/*
-+ * arch/arm/mach-w90x900/include/mach/regs-pci.h
-+ *
-+ * Copyright (c) 2011 Nuvoton technology corporation.
-+ *
-+ * Wan ZongShun <mcuos.com@gmail.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation;version 2 of the License.
-+ *
-+ */
-+
-+#ifndef __ASM_ARCH_REGS_PCI_H
-+#define __ASM_ARCH_REGS_PCI_H
-+
-+#define PCI_BA    W90X900_VA_PCI /* PCI Control */
-+/* PCI Control Registers */
-+#define REG_PCICTR		(PCI_BA + 0x000)
-+#define REG_PCISTR		(PCI_BA + 0x004)
-+#define REG_PCILATIMER		(PCI_BA + 0x008)
-+#define REG_PCIINTEN		(PCI_BA + 0x010)
-+#define REG_PCIINT		(PCI_BA + 0x014)
-+#define REG_CFGADDR		(PCI_BA + 0x020)
-+#define REG_CFGDATA		(PCI_BA + 0x024)
-+#define REG_PCIARB		(PCI_BA + 0x04C)
-+#define REG_PCIBIST		(PCI_BA + 0x050)
-+
-+#define NUC900_PCI_IO_BASE	0xE0000000
-+#define NUC900_PCI_IO_END	0xE000FFFF
-+#define NUC900_PCI_IO_SIZE	0x10000
-+
-+#define NUC900_PCI_MEM_BASE	0xC0000000
-+#define NUC900_PCI_MEM_END	0xDFFFEFFFF
-+#define NUC900_PCI_MEM_SIZE	0x20000000
-+
-+#endif /* ___ASM_ARCH_REGS_PCI_H */
-diff --git a/arch/arm/mach-w90x900/nuc960.c b/arch/arm/mach-w90x900/nuc960.c
-index 8851a3a..0212964 100644
---- a/arch/arm/mach-w90x900/nuc960.c
-+++ b/arch/arm/mach-w90x900/nuc960.c
-@@ -19,6 +19,7 @@
- #include <asm/mach/map.h>
- #include <mach/hardware.h>
- #include "cpu.h"
-+#include "clock.h"
-
- /* define specific CPU platform device */
-
-@@ -30,6 +31,7 @@ static struct platform_device *nuc960_dev[] __initdata = {
- /* define specific CPU platform io map */
-
- static struct map_desc nuc960evb_iodesc[] __initdata = {
-+	IODESC_ENT(PCI),
- };
-
- /*Init NUC960 evb io*/
-diff --git a/arch/arm/mach-w90x900/pci.c b/arch/arm/mach-w90x900/pci.c
-new file mode 100644
-index 0000000..74095b0
---- /dev/null
-+++ b/arch/arm/mach-w90x900/pci.c
-@@ -0,0 +1,195 @@
-+/*
-+ * linux/arch/arm/mach-w90x900/pci.c
-+ *
-+ * Copyright (c) 2008 Nuvoton technology corporation.
-+ *
-+ * Wan ZongShun <mcuos.com@gmail.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation;version 2 of the License.
-+ *
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/pci.h>
-+#include <linux/ioport.h>
-+#include <linux/interrupt.h>
-+#include <linux/spinlock.h>
-+#include <linux/init.h>
-+#include <linux/io.h>
-+#include <linux/delay.h>
-+
-+#include <mach/hardware.h>
-+#include <asm/irq.h>
-+#include <asm/system.h>
-+#include <asm/mach/pci.h>
-+
-+#include <mach/regs-pci.h>
-+#include <mach/regs-clock.h>
-+#include <mach/regs-gcr.h>
-+
-+#define EXTAL15M	(0x03 << 2)
-+#define CK33DIV5	(0x05 << 4)
-+#define RESET_VAL1	0x20C0
-+#define RESET_VAL2	0x20CF
-+
-+static int nuc900_read_config(struct pci_bus *bus, unsigned int devfn,
-+				int where,  int size, unsigned int  *val)
-+{
-+	unsigned int v;
-+
-+	__raw_writel(devfn * 0x100 + (where & 0xfffffffc), REG_CFGADDR);
-+	v = __raw_readl(REG_CFGDATA);
-+	switch (size) {
-+	case 1:
-+		*val = (v >> ((where % 4) * 8)) & 0xff;
-+		break;
-+	case 2:
-+		*val = (v >> ((where % 4) * 8)) & 0xffff;
-+		break;
-+	default:
-+		*val = v;
-+		break;
-+	}
-+
-+	return PCIBIOS_SUCCESSFUL;
-+}
-+
-+
-+static int nuc900_write_config(struct pci_bus *bus, unsigned int devfn,
-+					int where, int size, unsigned int val)
-+{
-+	unsigned int v;
-+
-+	__raw_writel(devfn * 0x100 + where, REG_CFGADDR);
-+
-+	v = __raw_readl(REG_CFGDATA);
-+
-+	__raw_writel(devfn * 0x100 + where, REG_CFGADDR);
-+
-+	switch (size) {
-+	case 1:
-+		v &= ~(0xff << (where % 4) * 8);
-+		v |= (val << (where % 4) * 8);
-+		__raw_writel(val, REG_CFGDATA);
-+		break;
-+	case 2:
-+		v &= ~(0xffff << (where % 4) * 8);
-+		v |= (val << (where % 4) * 8);
-+		__raw_writel(val, REG_CFGDATA);
-+		break;
-+	case 4:
-+		__raw_writel(val, REG_CFGDATA);
-+		break;
-+	}
-+	return PCIBIOS_SUCCESSFUL;
-+}
-+
-+static struct pci_ops pci_nuc900_ops = {
-+	.read	= nuc900_read_config,
-+	.write	= nuc900_write_config,
-+};
-+
-+static struct resource pci_io = {
-+	.name	= "NUC900 PCI IO",
-+	.start	= NUC900_PCI_IO_BASE,
-+	.end	= NUC900_PCI_IO_BASE + NUC900_PCI_IO_SIZE - 1,
-+	.flags	= IORESOURCE_IO,
-+};
-+
-+static struct resource pci_mem = {
-+	.name	= "nuc900 PCI Memory",
-+	.start	= NUC900_PCI_MEM_BASE,
-+	.end	= NUC900_PCI_MEM_BASE + NUC900_PCI_MEM_SIZE - 1,
-+	.flags	= IORESOURCE_MEM,
-+};
-+
-+static int __init pci_nuc900_setup_resources(struct resource **resource)
-+{
-+	int ret = 0;
-+
-+	ret = request_resource(&ioport_resource, &pci_io);
-+	if (ret) {
-+		pr_err("%s: failed to request resources: %d\n", __func__, ret);
-+		goto out;
-+	}
-+	ret = request_resource(&iomem_resource, &pci_mem);
-+	if (ret) {
-+		pr_err("%s: failed to request resources: %d\n", __func__, ret);
-+		goto release_io_mem;
-+	}
-+
-+	/*
-+	 * bus->resource[0] is the IO resource for this bus
-+	 * bus->resource[1] is the mem resource for this bus
-+	 * bus->resource[2] is the prefetch mem resource for this bus
-+	 */
-+	resource[0] = &pci_io;
-+	resource[1] = &pci_mem;
-+	resource[2] = NULL;
-+
-+	goto out;
-+
-+ release_io_mem:
-+	release_resource(&pci_io);
-+ out:
-+	return ret;
-+}
-+
-+int __init pci_nuc900_setup(int nr, struct pci_sys_data *sys)
-+{
-+	int ret = 0;
-+
-+	if (nr > 0)
-+		return 0;
-+
-+	sys->mem_offset = 0;
-+	sys->io_offset = 0;
-+	ret = pci_nuc900_setup_resources(sys->resource);
-+	if (ret)
-+		pr_err("%s: failed to setup resources: %d\n", __func__, ret);
-+
-+	return !ret;
-+}
-+
-+struct pci_bus *pci_nuc900_scan_bus(int nr, struct pci_sys_data *sys)
-+{
-+	return pci_scan_bus(sys->busnr, &pci_nuc900_ops, sys);
-+}
-+
-+void __init pci_nuc900_preinit(void)
-+{
-+	/* CK33 from PLL0 */
-+	__raw_writel(__raw_readl(REG_CLKSEL) & ~EXTAL15M, REG_CLKSEL);
-+	/* PCI CLOCK = 200/6 = 33Mhz */
-+	 __raw_writel(((__raw_readl(REG_CLKDIV) &
-+				(~(0xf<<4))) | CK33DIV5), REG_CLKDIV);
-+
-+	/* enable PCI clock */
-+	__raw_writel(__raw_readl(REG_CLKEN) | 0x4, REG_CLKEN);
-+
-+	__raw_writel(RESET_VAL1, REG_PCICTR);
-+
-+	mdelay(100);
-+
-+	__raw_writel(RESET_VAL2, REG_PCICTR);
-+
-+	mdelay(200);
-+}
-+
-+static struct hw_pci nuc900_pci __initdata = {
-+	.swizzle		= pci_std_swizzle,
-+	.setup			= pci_nuc900_setup,
-+	.nr_controllers		= 1,
-+	.scan			= pci_nuc900_scan_bus,
-+	.preinit		= pci_nuc900_preinit,
-+};
-+
-+static int __init nuc900_pci_init(void)
-+{
-+	pci_common_init(&nuc900_pci);
-+	return 0;
-+}
-+
-+subsys_initcall(nuc900_pci_init);
--- 
-1.7.0.4
+	Claudio
