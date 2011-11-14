@@ -1,59 +1,65 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Mon, 14 Nov 2011 11:00:45 -0800
-Subject: [PATCH] ARM: SAMSUNG: Save/restore GPIO drive strength across
- suspend/resume
-In-Reply-To: <CAJuYYwSvRYWdoccSN3nU7G4zXyTjt7vkjAd_vDx=QchG+yd5Cg@mail.gmail.com>
-References: <1321074108-10025-1-git-send-email-inderpal.singh@linaro.org>
- <CACRpkdbC=w5vRvgLVpAcmcampt-baTydpLHBexak4RzxUcO32Q@mail.gmail.com>
- <CAJuYYwSvRYWdoccSN3nU7G4zXyTjt7vkjAd_vDx=QchG+yd5Cg@mail.gmail.com>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF1740805B13@HQMAIL01.nvidia.com>
+From: nsekhar@ti.com (Nori, Sekhar)
+Date: Mon, 14 Nov 2011 19:01:59 +0000
+Subject: [03: PATCH 0/5] The remaining stuff
+In-Reply-To: <20111111171650.GA4154@n2100.arm.linux.org.uk>
+References: <20111106173113.GI12913@n2100.arm.linux.org.uk>
+ <20111106173939.GJ12913@n2100.arm.linux.org.uk>
+ <20111106175457.GK12913@n2100.arm.linux.org.uk>
+ <20111111171650.GA4154@n2100.arm.linux.org.uk>
+Message-ID: <DF0F476B391FA8409C78302C7BA518B601FCDA@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thomas Abraham wrote at Monday, November 14, 2011 6:57 AM:
-> On 12 November 2011 16:30, Linus Walleij <linus.walleij@linaro.org> wrote:
-> > On Sat, Nov 12, 2011 at 6:01 AM, Inderpal Singh
-> > <inderpal.singh@linaro.org> wrote:
-> >
-> >> GPIO driver strength settings are not preserved across suspend/resume
-> >> for s5pc100, s5pv210 and Exynos platforms which has been the cause of
-> >> mmc/sd card read/write failures after resume. Fix this by saving and
-> >> restoring the GPIO driver strength register settings across suspend/resume.
-> >>
-> >> Signed-off-by: Inderpal Singh <inderpal.singh@linaro.org>
-> >
-> > On a related theme: I am thinking about how to support preserving
-> > drive strength (etc) across suspend/resume and deepsleep in the
-> > pincontrol subsystem.
-> >
-> > Currently I am playing with the idea to let pin groups have states,
-> > as the different configurations seem to be 90% or so about very
-> > specific sleep modes, so say:
-> >
-> > pinconf_set_group_state("mmcgroup", PINCONF_STATE_ACTIVE);
-> > pinconf_set_group_state("mmcgroup", PINCONF_STATE_SUSPENDED);
-> > pinconf_set_group_state("mmcgroup", PINCONF_STATE_SLEEP);
-> 
-> 
-> The API name suggests that power state is set based on a pin group.
-> For a driver, the following could be convenient as the driver transits
-> through various power management states.
-> 
-> struct pinmux pmx;
-> pmx = pinmux_get(dev, "i2c0");
-> 
-> [...]
-> 
-> pinmux_set_state(pmx, PINCONF_STATE_SLEEP);
-> [...]
-> pinmux_set_state(pmx, PINCONF_STATE_ACTIVE);
+Hi Russell,
 
-That seems a more consistent driver-oriented API, yes.
+On Fri, Nov 11, 2011 at 22:46:50, Russell King - ARM Linux wrote:
+> On Sun, Nov 06, 2011 at 05:54:57PM +0000, Russell King - ARM Linux wrote:
+> > Part 3 - the remaining stuff
+> > 
+> > These are patches which I've managed to get half way through before
+> > getting - to be honest - totally hacked off with the code found in
+> > various platforms (as mentioned in previous mails).
+> > 
+> > These platforms are broken as a result of the final patch in part 2,
+> > and these patches move these platforms _towards_ a solution.  They
+> > are not a complete solution though, but the start of the solution.
+> > 
+> > For instance, the Exynos4 and S5PV210 patches both consist of almost
+> > a full solution -but- with the new function prototype missing because
+> > there is _no_ local header file to put it in, and I'm damned well not
+> > putting it in the remote plat-samsung/include/plat headers.
+> > 
+> > The final set of platforms - touched neither by part 3 nor 4, are
+> > broken by the final patch in part 2, and at present I have no plans
+> > to fix them.  I would welcome patches to fix these which address the
+> > issues raised in the "pet peaves" email (which is why I have no plans
+> > to fix them.)
+> 
+> The list of platforms which are still broken (today) by part 2 of this
+> series are:
+> 
+> arch/arm/mach-davinci/include/mach/system.h
+> arch/arm/mach-gemini/include/mach/system.h
+> arch/arm/mach-nomadik/include/mach/system.h
+> arch/arm/mach-s3c2410/include/mach/system-reset.h
+> arch/arm/mach-s3c64xx/include/mach/system.h
+> arch/arm/mach-shmobile/include/mach/system.h
+> arch/arm/mach-vt8500/include/mach/system.h
+> arch/arm/plat-samsung/include/plat/system-reset.h
+> arch/arm/plat-tcc/include/mach/system.h
+> 
+> which require assistance to get these into shape.
+> 
+> As I've already implied, I'm quite prepared to break these platforms at
+> the next merge window for the greater good if there's no sign of
+> maintainers willing to help sort them out - which will then ultimately
+> result in them being deleted from mainline.
 
-I'd of course lean towards adding the pin config data into the mapping
-table, and using the existing feature struct pinmux_map name field to
-name those states, and allowing dynamic transitioning between states,
-rather than adding a complete new API and namespace for these states.
+I just sent a patch for which gets reboot working on DaVinci.
+I have used the arm_pm_restart hook for now. I am working on
+moving the arch/arm/mach-davinci/common.h (and other local headers)
+to mach-davinci folder but that needs updates to some drivers like
+USB and GPIO as well. I expect to be finished in about a weeks time.
 
--- 
-nvpublic
+Thanks,
+Sekhar
