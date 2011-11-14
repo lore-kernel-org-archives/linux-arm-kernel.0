@@ -1,405 +1,344 @@
 From: marek.vasut@gmail.com (Marek Vasut)
-Date: Mon, 14 Nov 2011 12:37:08 +0100
-Subject: [PATCH 2/3] ARM: AT91: IIO: Add AT91 ADC driver.
-In-Reply-To: <1321265193-15817-3-git-send-email-maxime.ripard@free-electrons.com>
-References: <1321265193-15817-1-git-send-email-maxime.ripard@free-electrons.com>
- <1321265193-15817-3-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <201111141237.08346.marek.vasut@gmail.com>
+Date: Mon, 14 Nov 2011 12:44:38 +0100
+Subject: [PATCH V2] ARM: NUC900: Add PCI driver support for NUC960
+In-Reply-To: <4EC0BF9B.2050300@gmail.com>
+References: <4EBE98FC.6070903@gmail.com> <4EC0BF9B.2050300@gmail.com>
+Message-ID: <201111141244.39117.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-a few nitpicks
-
-> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-> Cc: Patrice Vilchez <patrice.vilchez@atmel.com>
-> Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
-> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Modify PCI driver for nuc960 per Russell's comments as following:
+> (1)Use the common PCI swizzle API.
+> (2)Use the pr_err insteading of prink.
+> (3)Request the IO resource in ioport_resource tree.
 > 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Acked-by: Jonathan Cameron <jic23@cam.ac.uk>
+> Signed-off-by: Wan ZongShun <mcuos.com@gmail.com>
+> 
 > ---
->  drivers/iio/adc/Kconfig   |    6 +
->  drivers/iio/adc/Makefile  |    4 +-
->  drivers/iio/adc/at91adc.c |  323
-> +++++++++++++++++++++++++++++++++++++++++++++ 3 files changed, 332
-> insertions(+), 1 deletions(-)
->  create mode 100644 drivers/iio/adc/at91adc.c
+>  arch/arm/mach-w90x900/Kconfig                 |    1 +
+>  arch/arm/mach-w90x900/Makefile                |    3 +
+>  arch/arm/mach-w90x900/include/mach/map.h      |    4 +
+>  arch/arm/mach-w90x900/include/mach/regs-pci.h |   37 +++++
+>  arch/arm/mach-w90x900/nuc960.c                |    2 +
+>  arch/arm/mach-w90x900/pci.c                   |  195
+> +++++++++++++++++++++++++
+>  6 files changed, 242 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/mach-w90x900/include/mach/regs-pci.h
+>  create mode 100644 arch/arm/mach-w90x900/pci.c
 > 
-> diff --git a/drivers/iio/adc/Kconfig b/drivers/iio/adc/Kconfig
-> index 3d97b21..74f4d9f 100644
-> --- a/drivers/iio/adc/Kconfig
-> +++ b/drivers/iio/adc/Kconfig
-> @@ -14,6 +14,12 @@ config IIO_AD799X
->  	  i2c analog to digital convertors (ADC). Provides direct access
->  	  via sysfs.
+> diff --git a/arch/arm/mach-w90x900/Kconfig b/arch/arm/mach-w90x900/Kconfig
+> index 69bab32..17be262 100644
+> --- a/arch/arm/mach-w90x900/Kconfig
+> +++ b/arch/arm/mach-w90x900/Kconfig
+> @@ -41,6 +41,7 @@ menu "NUC960 Machines"
+>  config MACH_W90N960EVB
+>  	bool "Nuvoton NUC960 Evaluation Board"
+>  	select CPU_NUC960
+> +	select PCI
+>  	help
+>  	   Say Y here if you are using the Nuvoton NUC960EVB
 > 
-> +config IIO_AT91ADC
-> +	tristate "Atmel AT91 ADC"
-> +	depends on SYSFS && ARCH_AT91
-> +	help
-> +	  Say yes here to build support for Atmel AT91 ADC.
+> diff --git a/arch/arm/mach-w90x900/Makefile
+> b/arch/arm/mach-w90x900/Makefile index 828c032..0c35800 100644
+> --- a/arch/arm/mach-w90x900/Makefile
+> +++ b/arch/arm/mach-w90x900/Makefile
+> @@ -17,3 +17,6 @@ obj-$(CONFIG_CPU_NUC960)	+= nuc960.o
+>  obj-$(CONFIG_MACH_W90P910EVB)	+= mach-nuc910evb.o
+>  obj-$(CONFIG_MACH_W90P950EVB)	+= mach-nuc950evb.o
+>  obj-$(CONFIG_MACH_W90N960EVB)	+= mach-nuc960evb.o
 > +
->  config IIO_MAX1363
->  	tristate "Maxim max1363 ADC driver"
->  	depends on I2C
-> diff --git a/drivers/iio/adc/Makefile b/drivers/iio/adc/Makefile
-> index c197334..776b56f 100644
-> --- a/drivers/iio/adc/Makefile
-> +++ b/drivers/iio/adc/Makefile
-> @@ -6,4 +6,6 @@ iio_ad799x-y := ad799x_core.o
->  obj-$(CONFIG_IIO_AD799X) += iio_ad799x.o
+> +# Add pci support for nuc960, nuc920
+> +obj-$(CONFIG_PCI)		+= pci.o
+> diff --git a/arch/arm/mach-w90x900/include/mach/map.h
+> b/arch/arm/mach-w90x900/include/mach/map.h
+> index 1a20953..69f6c73 100644
+> --- a/arch/arm/mach-w90x900/include/mach/map.h
+> +++ b/arch/arm/mach-w90x900/include/mach/map.h
+> @@ -154,4 +154,8 @@
+>  #define W90X900_PA_EMC		(0xB0003000)
+>  #define W90X900_SZ_EMC		SZ_4K
 > 
->  iio_max1363-y := max1363_core.o
-> -obj-$(CONFIG_IIO_MAX1363) += iio_max1363.o
-> \ No newline at end of file
-> +obj-$(CONFIG_IIO_MAX1363) += iio_max1363.o
-> +
-> +obj-$(CONFIG_IIO_AT91ADC) += at91adc.o
-> diff --git a/drivers/iio/adc/at91adc.c b/drivers/iio/adc/at91adc.c
+> +/* PCI interface controller */
+> +#define	W90X900_VA_PCI		W90X900_ADDR(0x00002000)
+> +#define	W90X900_PA_PCI		(0xB0002000)
+> +#define	W90X900_SZ_PCI		SZ_4K
+>  #endif /* __ASM_ARCH_MAP_H */
+> diff --git a/arch/arm/mach-w90x900/include/mach/regs-pci.h
+> b/arch/arm/mach-w90x900/include/mach/regs-pci.h
 > new file mode 100644
-> index 0000000..eee591d
+> index 0000000..d1975eb
 > --- /dev/null
-> +++ b/drivers/iio/adc/at91adc.c
-> @@ -0,0 +1,323 @@
+> +++ b/arch/arm/mach-w90x900/include/mach/regs-pci.h
+> @@ -0,0 +1,37 @@
 > +/*
-> + * Driver for the ADC present in the Atmel AT91 evaluation boards.
+> + * arch/arm/mach-w90x900/include/mach/regs-pci.h
 > + *
-> + * Copyright 2011 Free Electrons
+> + * Copyright (c) 2011 Nuvoton technology corporation.
 > + *
-> + * Licensed under the GPLv2 or later.
+> + * Wan ZongShun <mcuos.com@gmail.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation;version 2 of the License.
+> + *
 > + */
 > +
-> +#include <linux/bitmap.h>
-> +#include <linux/bitops.h>
-> +#include <linux/clk.h>
-> +#include <linux/err.h>
-> +#include <linux/io.h>
-> +#include <linux/interrupt.h>
-> +#include <linux/jiffies.h>
+> +#ifndef __ASM_ARCH_REGS_PCI_H
+> +#define __ASM_ARCH_REGS_PCI_H
+> +
+> +#define PCI_BA    W90X900_VA_PCI /* PCI Control */
+> +/* PCI Control Registers */
+> +#define REG_PCICTR		(PCI_BA + 0x000)
+> +#define REG_PCISTR		(PCI_BA + 0x004)
+> +#define REG_PCILATIMER		(PCI_BA + 0x008)
+> +#define REG_PCIINTEN		(PCI_BA + 0x010)
+> +#define REG_PCIINT		(PCI_BA + 0x014)
+> +#define REG_CFGADDR		(PCI_BA + 0x020)
+> +#define REG_CFGDATA		(PCI_BA + 0x024)
+> +#define REG_PCIARB		(PCI_BA + 0x04C)
+> +#define REG_PCIBIST		(PCI_BA + 0x050)
+> +
+> +#define NUC900_PCI_IO_BASE	0xE0000000
+> +#define NUC900_PCI_IO_END	0xE000FFFF
+> +#define NUC900_PCI_IO_SIZE	0x10000
+> +
+> +#define NUC900_PCI_MEM_BASE	0xC0000000
+> +#define NUC900_PCI_MEM_END	0xDFFFEFFFF
+> +#define NUC900_PCI_MEM_SIZE	0x20000000
+> +
+> +#endif /* ___ASM_ARCH_REGS_PCI_H */
+> diff --git a/arch/arm/mach-w90x900/nuc960.c
+> b/arch/arm/mach-w90x900/nuc960.c index 8851a3a..0212964 100644
+> --- a/arch/arm/mach-w90x900/nuc960.c
+> +++ b/arch/arm/mach-w90x900/nuc960.c
+> @@ -19,6 +19,7 @@
+>  #include <asm/mach/map.h>
+>  #include <mach/hardware.h>
+>  #include "cpu.h"
+> +#include "clock.h"
+> 
+>  /* define specific CPU platform device */
+> 
+> @@ -30,6 +31,7 @@ static struct platform_device *nuc960_dev[] __initdata =
+> { /* define specific CPU platform io map */
+> 
+>  static struct map_desc nuc960evb_iodesc[] __initdata = {
+> +	IODESC_ENT(PCI),
+>  };
+> 
+>  /*Init NUC960 evb io*/
+> diff --git a/arch/arm/mach-w90x900/pci.c b/arch/arm/mach-w90x900/pci.c
+> new file mode 100644
+> index 0000000..74095b0
+> --- /dev/null
+> +++ b/arch/arm/mach-w90x900/pci.c
+> @@ -0,0 +1,195 @@
+> +/*
+> + * linux/arch/arm/mach-w90x900/pci.c
+> + *
+> + * Copyright (c) 2008 Nuvoton technology corporation.
+> + *
+> + * Wan ZongShun <mcuos.com@gmail.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation;version 2 of the License.
+> + *
+> + */
+> +
 > +#include <linux/kernel.h>
-> +#include <linux/module.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/slab.h>
-> +#include <linux/wait.h>
+> +#include <linux/pci.h>
+> +#include <linux/ioport.h>
+> +#include <linux/interrupt.h>
+> +#include <linux/spinlock.h>
+> +#include <linux/init.h>
+> +#include <linux/io.h>
+> +#include <linux/delay.h>
 > +
-> +#include <linux/iio/iio.h>
+> +#include <mach/hardware.h>
+> +#include <asm/irq.h>
+> +#include <asm/system.h>
+> +#include <asm/mach/pci.h>
 > +
-> +#include <mach/at91_adc.h>
-> +#include <mach/board.h>
+> +#include <mach/regs-pci.h>
+> +#include <mach/regs-clock.h>
+> +#include <mach/regs-gcr.h>
 > +
-> +struct at91adc_state {
-> +	struct clk *clk;
-> +	bool done;
-> +	struct mutex lock;
-> +	int irq;
-> +	wait_queue_head_t wq_data_avail;
-> +	u16 last_value;
-> +	void __iomem *reg_base;
-> +	unsigned int vref_mv;
-> +};
+> +#define EXTAL15M	(0x03 << 2)
+> +#define CK33DIV5	(0x05 << 4)
+> +#define RESET_VAL1	0x20C0
+> +#define RESET_VAL2	0x20CF
 > +
-> +static inline u32 at91adc_reg_read(struct at91adc_state *st, u8 reg)
+> +static int nuc900_read_config(struct pci_bus *bus, unsigned int devfn,
+> +				int where,  int size, unsigned int  *val)
 > +{
-> +	return readl_relaxed(st->reg_base + reg);
-> +}
+> +	unsigned int v;
 > +
-> +static inline void at91adc_reg_write(struct at91adc_state *st, u8 reg, u32
-> val) +{
-> +	writel_relaxed(val, st->reg_base + reg);
-> +}
-> +
-> +static irqreturn_t at91adc_eoc_trigger(int irq, void *private)
-> +{
-> +	struct iio_dev *idev = private;
-> +	struct at91adc_state *st = iio_priv(idev);
-> +	unsigned int status = at91adc_reg_read(st, AT91_ADC_SR);
-> +
-> +	if (!(status & AT91_ADC_DRDY))
-> +		return IRQ_HANDLED;
-> +
-> +	if (status & ((2 << idev->num_channels) - 1)) {
-> +		st->done = true;
-> +		st->last_value = at91adc_reg_read(st, AT91_ADC_LCDR);
-> +	}
-> +
-> +	wake_up_interruptible(&st->wq_data_avail);
-> +
-> +	return IRQ_HANDLED;
-> +}
-> +
-> +static int at91adc_channel_init(struct iio_dev *idev,
-> +				struct at91_adc_data *pdata)
-> +{
-> +	struct iio_chan_spec *chan_array;
-> +	int bit, idx = 0;
-> +
-> +	idev->num_channels = bitmap_weight(&(pdata->channels_used),
-
-Do you need the parenthesis here ?
-
-> +					   pdata->num_channels);
-> +	chan_array = kcalloc(idev->num_channels, sizeof(struct iio_chan_spec),
-> +			     GFP_KERNEL);
-> +
-> +	if (chan_array == NULL)
-> +		return -ENOMEM;
-> +
-> +	for_each_set_bit(bit, &(pdata->channels_used), pdata->num_channels) {
-> +		struct iio_chan_spec *chan = chan_array + idx;
-> +		chan->type = IIO_VOLTAGE;
-> +		chan->indexed = 1;
-> +		chan->channel = bit;
-> +		chan->scan_type.sign = 'u';
-> +		chan->scan_type.realbits = 10;
-> +		chan->info_mask = IIO_CHAN_INFO_SCALE_SHARED_BIT;
-> +		++idx;
-
-idx++ ... why the preincrement?
-
-Besides, can't you use "bit" as the index instead?
-
-> +	}
-> +
-> +	idev->channels = chan_array;
-> +	return idev->num_channels;
-> +}
-> +
-> +static void at91adc_channel_remove(struct iio_dev *idev)
-> +{
-> +	kfree(idev->channels);
-> +}
-> +
-> +static int at91adc_read_raw(struct iio_dev *idev,
-> +			    struct iio_chan_spec const *chan,
-> +			    int *val, int *val2, long mask)
-> +{
-> +	struct at91adc_state *st = iio_priv(idev);
-> +	unsigned int scale_uv;
-> +	short ret;
-> +
-> +	switch (mask) {
-> +	case 0:
-> +		mutex_lock(&st->lock);
-> +
-> +		at91adc_reg_write(st, AT91_ADC_CHER,
-> +				  AT91_ADC_CH(chan->channel));
-> +		at91adc_reg_write(st, AT91_ADC_IER,
-> +				  AT91_ADC_EOC(chan->channel));
-> +		at91adc_reg_write(st, AT91_ADC_CR, AT91_ADC_START);
-> +
-> +		ret = wait_event_interruptible_timeout(st->wq_data_avail,
-> +						       st->done,
-> +						       msecs_to_jiffies(1000));
-> +		if (ret == -ERESTARTSYS)
-> +			break;
-> +
-> +		*val = st->last_value;
-> +
-> +		at91adc_reg_write(st, AT91_ADC_CHDR,
-> +				  AT91_ADC_CH(chan->channel));
-> +		at91adc_reg_write(st, AT91_ADC_IDR,
-> +				  AT91_ADC_EOC(chan->channel));
-> +
-> +		st->last_value = 0;
-> +		st->done = false;
-> +		mutex_unlock(&st->lock);
-> +		return IIO_VAL_INT;
-> +
-> +	case IIO_CHAN_INFO_SCALE:
-> +		scale_uv = (st->vref_mv * 1000) >> chan->scan_type.realbits;
-> +		*val = scale_uv / 1000;
-> +		*val2 = (scale_uv % 1000) * 1000;
-> +		return IIO_VAL_INT_PLUS_MICRO;
+> +	__raw_writel(devfn * 0x100 + (where & 0xfffffffc), REG_CFGADDR);
+> +	v = __raw_readl(REG_CFGDATA);
+> +	switch (size) {
+> +	case 1:
+> +		*val = (v >> ((where % 4) * 8)) & 0xff;
+> +		break;
+> +	case 2:
+> +		*val = (v >> ((where % 4) * 8)) & 0xffff;
+> +		break;
 > +	default:
+
+case 4 ? Default case should error out.
+
+> +		*val = v;
 > +		break;
 > +	}
-> +	return -EINVAL;
+> +
+> +	return PCIBIOS_SUCCESSFUL;
 > +}
 > +
-> +static const struct iio_info at91adc_info = {
-> +	.driver_module = THIS_MODULE,
-> +	.read_raw = &at91adc_read_raw,
+> +
+> +static int nuc900_write_config(struct pci_bus *bus, unsigned int devfn,
+> +					int where, int size, unsigned int val)
+> +{
+> +	unsigned int v;
+> +
+> +	__raw_writel(devfn * 0x100 + where, REG_CFGADDR);
+> +
+> +	v = __raw_readl(REG_CFGDATA);
+> +
+> +	__raw_writel(devfn * 0x100 + where, REG_CFGADDR);
+> +
+> +	switch (size) {
+> +	case 1:
+> +		v &= ~(0xff << (where % 4) * 8);
+> +		v |= (val << (where % 4) * 8);
+> +		__raw_writel(val, REG_CFGDATA);
+> +		break;
+> +	case 2:
+> +		v &= ~(0xffff << (where % 4) * 8);
+> +		v |= (val << (where % 4) * 8);
+> +		__raw_writel(val, REG_CFGDATA);
+> +		break;
+> +	case 4:
+> +		__raw_writel(val, REG_CFGDATA);
+> +		break;
+> +	}
+> +	return PCIBIOS_SUCCESSFUL;
+> +}
+> +
+> +static struct pci_ops pci_nuc900_ops = {
+> +	.read	= nuc900_read_config,
+> +	.write	= nuc900_write_config,
 > +};
 > +
-> +static int __devinit at91adc_probe(struct platform_device *pdev)
+> +static struct resource pci_io = {
+> +	.name	= "NUC900 PCI IO",
+> +	.start	= NUC900_PCI_IO_BASE,
+> +	.end	= NUC900_PCI_IO_BASE + NUC900_PCI_IO_SIZE - 1,
+> +	.flags	= IORESOURCE_IO,
+> +};
+> +
+> +static struct resource pci_mem = {
+> +	.name	= "nuc900 PCI Memory",
+> +	.start	= NUC900_PCI_MEM_BASE,
+> +	.end	= NUC900_PCI_MEM_BASE + NUC900_PCI_MEM_SIZE - 1,
+> +	.flags	= IORESOURCE_MEM,
+> +};
+> +
+> +static int __init pci_nuc900_setup_resources(struct resource **resource)
 > +{
-> +	unsigned int prsc, mstrclk, ticks;
-> +	int ret;
-> +	struct iio_dev *idev;
-> +	struct at91adc_state *st;
-> +	struct resource *res;
-> +	struct at91_adc_data *pdata = pdev->dev.platform_data;
+> +	int ret = 0;
 > +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	if (!res) {
-> +		dev_err(&pdev->dev, "No resource defined\n");
-> +		ret = -ENXIO;
-> +		goto error_ret;
-> +	}
-> +
-> +	idev = iio_device_allocate(sizeof(struct at91adc_state));
-> +	if (idev == NULL) {
-> +		ret = -ENOMEM;
-> +		goto error_ret;
+> +	ret = request_resource(&ioport_resource, &pci_io);
+> +	if (ret) {
+> +		pr_err("%s: failed to request resources: %d\n", __func__, ret);
+> +		goto out;
 > +	}
 
 newline
 
-> +	platform_set_drvdata(pdev, idev);
-> +
-> +	idev->dev.parent = &pdev->dev;
-> +	idev->name = dev_name(&pdev->dev);
-> +	idev->info = &at91adc_info;
-> +
-> +	st = iio_priv(idev);
-> +	st->irq = platform_get_irq(pdev, 0);
-> +	if (st->irq < 0) {
-> +		dev_err(&pdev->dev, "No IRQ ID is designated\n");
-> +		ret = -ENODEV;
-> +		goto error_free_device;
-> +	}
-> +
-> +	if (!request_mem_region(res->start, resource_size(res),
-> +				"AT91 adc registers")) {
-> +		dev_err(&pdev->dev, "Resources are unavailable.\n");
-> +		ret = -EBUSY;
-> +		goto error_free_device;
-> +	}
-> +
-> +	st->reg_base = ioremap(res->start, resource_size(res));
-> +	if (!st->reg_base) {
-> +		dev_err(&pdev->dev, "Failed to map registers.\n");
-> +		ret = -ENOMEM;
-> +		goto error_release_mem;
-> +	}
-> +
-> +	/*
-> +	 * Disable all IRQs before setting up the handler
-> +	 */
-> +	at91adc_reg_write(st, AT91_ADC_CR, AT91_ADC_SWRST);
-> +	at91adc_reg_write(st, AT91_ADC_IDR, 0xFFFFFFFF);
-> +	ret = request_irq(st->irq,
-> +			  at91adc_eoc_trigger, 0, pdev->dev.driver->name, idev);
+> +	ret = request_resource(&iomem_resource, &pci_mem);
 > +	if (ret) {
-> +		dev_err(&pdev->dev, "Failed to allocate IRQ.\n");
-> +		goto error_unmap_reg;
-> +	}
-> +
-> +	st->clk = clk_get(&pdev->dev, "adc_clk");
-> +	if (IS_ERR(st->clk)) {
-> +		dev_err(&pdev->dev, "Failed to get the clock.\n");
-> +		ret = PTR_ERR(st->clk);
-> +		goto error_free_irq;
-> +	}
-> +
-> +	clk_enable(st->clk);
-> +	mstrclk = clk_get_rate(st->clk);
-> +
-> +	if (!pdata) {
-> +		dev_err(&pdev->dev, "No platform data available.\n");
-> +		ret = -EINVAL;
-> +		goto error_free_clk;
-> +	}
-> +
-> +	if (!pdata->adc_clock) {
-> +		dev_err(&pdev->dev, "No ADCClock available.\n");
-> +		ret = -EINVAL;
-> +		goto error_free_clk;
+> +		pr_err("%s: failed to request resources: %d\n", __func__, ret);
+> +		goto release_io_mem;
 > +	}
 > +
 > +	/*
-> +	 * Prescaler rate computation using the formula from the Atmel's
-> +	 * datasheet : ADC Clock = MCK / ((Prescaler + 1) * 2), ADC Clock being
-> +	 * specified by the electrical characteristics of the board.
+> +	 * bus->resource[0] is the IO resource for this bus
+> +	 * bus->resource[1] is the mem resource for this bus
+> +	 * bus->resource[2] is the prefetch mem resource for this bus
 > +	 */
-> +	prsc = (mstrclk / (2 * pdata->adc_clock)) - 1;
+> +	resource[0] = &pci_io;
+> +	resource[1] = &pci_mem;
+> +	resource[2] = NULL;
 > +
-> +	if (!pdata->startup_time) {
-> +		dev_err(&pdev->dev, "No startup time available.\n");
-> +		ret = -EINVAL;
-> +		goto error_free_clk;
-> +	}
+> +	goto out;
 > +
-> +	/*
-> +	 * Number of ticks needed to cover the startup time of the ADC as
-> +	 * defined in the electrical characteristics of the board, divided by 8.
-> +	 * The formula thus is : Startup Time = (ticks + 1) * 8 / ADC Clock
-> +	 */
-> +	ticks = round_up((pdata->startup_time * pdata->adc_clock /
-> +			  1000000) - 1, 8) / 8;
-> +	at91adc_reg_write(st, AT91_ADC_MR,
-> +			  (AT91_ADC_PRESCAL_(prsc) & AT91_ADC_PRESCAL) |
-> +			  (AT91_ADC_STARTUP_(ticks) & AT91_ADC_STARTUP));
-> +
-> +	/* Setup the ADC channels available on the board */
-> +	ret = at91adc_channel_init(idev, pdata);
-> +	if (ret < 0)
-> +		goto error_free_clk;
-> +
-> +	init_waitqueue_head(&st->wq_data_avail);
-> +	mutex_init(&st->lock);
-> +
-> +	st->vref_mv = pdata->vref;
-> +
-> +	ret = iio_device_register(idev);
-> +	if (ret < 0)
-> +		goto error_free_channels;
-> +
-> +	return 0;
-> +
-> +error_free_channels:
-> +	at91adc_channel_remove(idev);
-> +error_free_clk:
-> +	clk_disable(st->clk);
-> +	clk_put(st->clk);
-> +error_free_irq:
-> +	free_irq(st->irq, st);
-> +error_unmap_reg:
-> +	iounmap(st->reg_base);
-> +error_release_mem:
-> +	release_mem_region(res->start, resource_size(res));
-> +error_free_device:
-> +	iio_device_free(idev);
-> +error_ret:
+> + release_io_mem:
+> +	release_resource(&pci_io);
+> + out:
 > +	return ret;
 > +}
 > +
-> +static int __devexit at91adc_remove(struct platform_device *pdev)
+> +int __init pci_nuc900_setup(int nr, struct pci_sys_data *sys)
 > +{
-> +	struct iio_dev *idev = platform_get_drvdata(pdev);
-> +	struct resource *res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	struct at91adc_state *st = iio_priv(idev);
+> +	int ret = 0;
 > +
-> +	iio_device_unregister(idev);
-> +	at91adc_channel_remove(idev);
-> +	clk_disable(st->clk);
-> +	clk_put(st->clk);
-> +	free_irq(st->irq, idev);
-> +	iounmap(st->reg_base);
-> +	release_mem_region(res->start, resource_size(res));
-> +	iio_device_free(idev);
+> +	if (nr > 0)
+> +		return 0;
+
+pr_err() missing in this if ?
+
 > +
+> +	sys->mem_offset = 0;
+> +	sys->io_offset = 0;
+> +	ret = pci_nuc900_setup_resources(sys->resource);
+> +	if (ret)
+> +		pr_err("%s: failed to setup resources: %d\n", __func__, ret);
+> +
+> +	return !ret;
+> +}
+> +
+> +struct pci_bus *pci_nuc900_scan_bus(int nr, struct pci_sys_data *sys)
+> +{
+> +	return pci_scan_bus(sys->busnr, &pci_nuc900_ops, sys);
+> +}
+> +
+> +void __init pci_nuc900_preinit(void)
+> +{
+> +	/* CK33 from PLL0 */
+> +	__raw_writel(__raw_readl(REG_CLKSEL) & ~EXTAL15M, REG_CLKSEL);
+> +	/* PCI CLOCK = 200/6 = 33Mhz */
+> +	 __raw_writel(((__raw_readl(REG_CLKDIV) &
+> +				(~(0xf<<4))) | CK33DIV5), REG_CLKDIV);
+> +
+> +	/* enable PCI clock */
+> +	__raw_writel(__raw_readl(REG_CLKEN) | 0x4, REG_CLKEN);
+
+What's this magic 0x4?
+
+> +
+> +	__raw_writel(RESET_VAL1, REG_PCICTR);
+> +
+> +	mdelay(100);
+> +
+> +	__raw_writel(RESET_VAL2, REG_PCICTR);
+> +
+> +	mdelay(200);
+> +}
+> +
+> +static struct hw_pci nuc900_pci __initdata = {
+> +	.swizzle		= pci_std_swizzle,
+> +	.setup			= pci_nuc900_setup,
+> +	.nr_controllers		= 1,
+> +	.scan			= pci_nuc900_scan_bus,
+> +	.preinit		= pci_nuc900_preinit,
+> +};
+> +
+> +static int __init nuc900_pci_init(void)
+> +{
+> +	pci_common_init(&nuc900_pci);
 > +	return 0;
 > +}
 > +
-> +static struct platform_driver at91adc_driver = {
-> +	.probe = at91adc_probe,
-> +	.remove = __devexit_p(at91adc_remove),
-> +	.driver = {
-> +		   .name = "at91adc",
-> +	},
-> +};
-> +
-> +module_platform_driver(at91adc_driver);
-> +
-> +MODULE_LICENSE("GPL");
-> +MODULE_DESCRIPTION("Atmel AT91 ADC Driver");
-> +MODULE_AUTHOR("Maxime Ripard <maxime.ripard@free-electrons.com>");
-
-Looks good otherwise, please add
+> +subsys_initcall(nuc900_pci_init);
 
 Reviewed-by: Marek Vasut <marek.vasut@gmail.com>
-
-M
