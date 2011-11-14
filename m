@@ -1,7 +1,7 @@
 From: jtzhou@marvell.com (Jett.Zhou)
-Date: Mon, 14 Nov 2011 13:35:58 +0800
+Date: Mon, 14 Nov 2011 13:44:28 +0800
 Subject: [V3 1/2] mfd: fix 88pm860x test bank i2c interface bug
-Message-ID: <1321248959-27156-1-git-send-email-jtzhou@marvell.com>
+Message-ID: <1321249468-27238-1-git-send-email-jtzhou@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
