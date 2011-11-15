@@ -1,25 +1,19 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 15 Nov 2011 11:16:04 +0000
-Subject: [PATCH 2/2] MAINTAINERS: Extend Samsung patterns to cover SPI
- and ASoC drivers
-In-Reply-To: <005701cca376$f6abbba0$e40332e0$%kim@samsung.com>
-References: <1320923776-26626-1-git-send-email-broonie@opensource.wolfsonmicro.com>
- <1320923776-26626-2-git-send-email-broonie@opensource.wolfsonmicro.com>
- <005701cca376$f6abbba0$e40332e0$%kim@samsung.com>
-Message-ID: <20111115111603.GC3077@opensource.wolfsonmicro.com>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Tue, 15 Nov 2011 13:18:11 +0200
+Subject: [RFC 0/5] OMAP groundwork for IOMMU-based DMA API
+In-Reply-To: <20111115111001.GB5627@amd.com>
+References: <1316948337-7924-1-git-send-email-ohad@wizery.com>
+ <20111115103926.GA5627@amd.com>
+ <CAK=WgbZ=0HctjLREv1oXEa=5ryY7C_6srO1Nt5uMowH+FyaHJQ@mail.gmail.com>
+ <20111115111001.GB5627@amd.com>
+Message-ID: <CAK=WgbY4v325R=e4dVqBcx0TWh920jrZFfgfUseDTDu4O1z3dA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 15, 2011 at 06:14:22PM +0900, Kukjin Kim wrote:
-> Mark Brown wrote:
+On Tue, Nov 15, 2011 at 1:10 PM, Roedel, Joerg <Joerg.Roedel@amd.com> wrote:
+> It is almost merged :) I just had to struggle with some compile errors
+> from upstream in my tests. But I think I will finish testing today and
+> push everything out.
+>
 
-> > +F:	drivers/spi/spi-s3c*
-> > +F:	sound/soc/samsung/*
-
-> Hmm, I'm ok on this but needs Grant's opinion :)
-
-> (Cc'ed Grant Likely)
-
-Note that you can have multiple entries for a single file, people are
-supposed to use a bit of thought when working out who to mail - if you
-use something like get_maintainers it'll return all matching entries.
+ok great thanks :)
