@@ -1,89 +1,33 @@
-From: pullip.cho@samsung.com (KyongHo Cho)
-Date: Tue, 15 Nov 2011 15:12:41 +0900
-Subject: [PATCH v6 1/2] ARM: EXYNOS: Change System MMU platform device
- definitions
-In-Reply-To: <CAH9JG2UDZ92zFiiPQYxbNJgLqcqGv_D9dFNdqJa2o+BxiUzygg@mail.gmail.com>
-References: <1321333132-17662-1-git-send-email-pullip.cho@samsung.com>
- <1321333132-17662-2-git-send-email-pullip.cho@samsung.com>
- <CAH9JG2UDZ92zFiiPQYxbNJgLqcqGv_D9dFNdqJa2o+BxiUzygg@mail.gmail.com>
-Message-ID: <CAHQjnOOMq9icOWY-b1z0YaJKZcx-b=Kv9ZT9dnwHAjVM5=hCrQ@mail.gmail.com>
+From: vwadekar@nvidia.com (Varun Wadekar)
+Date: Tue, 15 Nov 2011 11:51:27 +0530
+Subject: [PATCH v1] dts: tegra-ventana: use proper root instead of /dev/ram
+Message-ID: <1321338087-3662-1-git-send-email-vwadekar@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 15, 2011 at 2:37 PM, Kyungmin Park <kmpark@infradead.org> wrote:
->> @@ -988,6 +989,21 @@ static struct platform_device *universal_devices[]
->> __initdata = {
->> ? ? ? &cam_i_core_fixed_reg_dev,
->> ? ? ? &cam_s_if_fixed_reg_dev,
->> ? ? ? &s5p_device_fimc_md,
->> + ? ? &SYSMMU_PLATDEV(sss),
->> + ? ? &SYSMMU_PLATDEV(jpeg),
->> + ? ? &SYSMMU_PLATDEV(fimd1),
->> + ? ? &SYSMMU_PLATDEV(2d),
->> + ? ? &SYSMMU_PLATDEV(rot),
->> + ? ? &SYSMMU_PLATDEV(mdma),
->> + ? ? &SYSMMU_PLATDEV(tv),
->> + ? ? &SYSMMU_PLATDEV(mfc_l),
->> + ? ? &SYSMMU_PLATDEV(mfc_r),
->> + ? ? &SYSMMU_PLATDEV(fimc0),
->> + ? ? &SYSMMU_PLATDEV(fimc1),
->> + ? ? &SYSMMU_PLATDEV(fimc2),
->> + ? ? &SYSMMU_PLATDEV(fimc3),
->> + ? ? &SYSMMU_PLATDEV(fimd0),
->> + ? ? &SYSMMU_PLATDEV(pcie),
-> Platform device is optional for each board and pcie doesn't used at
-> mobile board. Does it require to register all platform devices at
-> board?
+From: Pritesh Raithatha <praithatha@nvidia.com>
 
-Of course we make them selectable in menuconfig according
-to the selection of their host devices. But the array definition will
-contain lots of #ifdef.
+The root file system on ventana resides on /dev/mmcblk0p1.
+Update the dts file to use the proper root instead of /dev/ram.
 
-And I defined System MMU dev for PCIe for future use
-although it is useless in mobile devices.
+Signed-off-by: Pritesh Raithatha <praithatha@nvidia.com>
+Signed-off-by: Varun Wadekar <vwadekar@nvidia.com>
+---
+ arch/arm/boot/dts/tegra-ventana.dts |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
->>
->> +static void __init sysmmu_init(void)
->> +{
->> + ? ? ASSIGN_SYSMMU_POWERDOMAIN(fimc0, &exynos4_device_pd[PD_CAM].dev);
->> + ? ? ASSIGN_SYSMMU_POWERDOMAIN(fimc1, &exynos4_device_pd[PD_CAM].dev);
->> + ? ? ASSIGN_SYSMMU_POWERDOMAIN(fimc2, &exynos4_device_pd[PD_CAM].dev);
->> + ? ? ASSIGN_SYSMMU_POWERDOMAIN(fimc3, &exynos4_device_pd[PD_CAM].dev);
->> + ? ? ASSIGN_SYSMMU_POWERDOMAIN(jpeg, &exynos4_device_pd[PD_CAM].dev);
->> + ? ? ASSIGN_SYSMMU_POWERDOMAIN(mfc_l, &exynos4_device_pd[PD_MFC].dev);
->> + ? ? ASSIGN_SYSMMU_POWERDOMAIN(mfc_r, &exynos4_device_pd[PD_MFC].dev);
->> + ? ? ASSIGN_SYSMMU_POWERDOMAIN(fimd0, &exynos4_device_pd[PD_LCD0].dev);
->> + ? ? ASSIGN_SYSMMU_POWERDOMAIN(rot, &exynos4_device_pd[PD_LCD0].dev);
->> + ? ? ASSIGN_SYSMMU_POWERDOMAIN(mdma, &exynos4_device_pd[PD_LCD0].dev);
->> + ? ? ASSIGN_SYSMMU_POWERDOMAIN(tv, &exynos4_device_pd[PD_TV].dev);
->> +
->> + ? ? sysmmu_set_owner(&SYSMMU_PLATDEV(fimc0).dev, &s5p_device_fimc0.dev);
->> + ? ? sysmmu_set_owner(&SYSMMU_PLATDEV(fimc1).dev, &s5p_device_fimc1.dev);
->> + ? ? sysmmu_set_owner(&SYSMMU_PLATDEV(fimc2).dev, &s5p_device_fimc2.dev);
->> + ? ? sysmmu_set_owner(&SYSMMU_PLATDEV(fimc3).dev, &s5p_device_fimc3.dev);
->> + ? ? sysmmu_set_owner(&SYSMMU_PLATDEV(mfc_l).dev, &s5p_device_mfc.dev);
->> + ? ? sysmmu_set_owner(&SYSMMU_PLATDEV(mfc_r).dev, &s5p_device_mfc.dev);
->> + ? ? sysmmu_set_owner(&SYSMMU_PLATDEV(fimd0).dev, &s5p_device_fimd0.dev);
->> + ? ? sysmmu_set_owner(&SYSMMU_PLATDEV(tv).dev, &s5p_device_mixer.dev);
->> +}
->> +
->> ?static void __init universal_machine_init(void)
->> ?{
->> ? ? ? universal_sdhci_init();
->> @@ -1040,6 +1080,8 @@ static void __init universal_machine_init(void)
->>
->> ? ? ? universal_camera_init();
->>
->> + ? ? sysmmu_init();
-> I think how do you implement the sysmm_init at cpu or common file? and
-> board select it to use iommu or not. no need to implement the almost
-> same codes at each board.
->
-It is not easy to move sysmmu_init() out from mach_*.c files because System MMU
-configuration is vary from boards and APs. It is just machine-specific.
-
-> Otherwise looks good.
->
-Thank you :)
-
-KyongHo.
+diff --git a/arch/arm/boot/dts/tegra-ventana.dts b/arch/arm/boot/dts/tegra-ventana.dts
+index 9b29a62..5f7fe74 100644
+--- a/arch/arm/boot/dts/tegra-ventana.dts
++++ b/arch/arm/boot/dts/tegra-ventana.dts
+@@ -8,7 +8,7 @@
+ 	compatible = "nvidia,ventana", "nvidia,tegra20";
+ 
+ 	chosen {
+-		bootargs = "vmalloc=192M video=tegrafb console=ttyS0,115200n8 root=/dev/ram rdinit=/sbin/init";
++		bootargs = "vmalloc=192M video=tegrafb console=ttyS0,115200n8 root=/dev/mmcblk0p1 rw rootwait";
+ 	};
+ 
+ 	memory {
+-- 
+1.7.1
