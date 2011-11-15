@@ -1,47 +1,35 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 15 Nov 2011 18:14:22 +0900
-Subject: [PATCH 2/2] MAINTAINERS: Extend Samsung patterns to cover SPI and
- ASoC drivers
-In-Reply-To: <1320923776-26626-2-git-send-email-broonie@opensource.wolfsonmicro.com>
-References: <1320923776-26626-1-git-send-email-broonie@opensource.wolfsonmicro.com>
- <1320923776-26626-2-git-send-email-broonie@opensource.wolfsonmicro.com>
-Message-ID: <005701cca376$f6abbba0$e40332e0$%kim@samsung.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Tue, 15 Nov 2011 10:15:22 +0100
+Subject: [PATCH 04/41] ARM: restart: at91: use new restart hook
+In-Reply-To: <20111115085202.GB8574@n2100.arm.linux.org.uk>
+References: <20111106173113.GI12913@n2100.arm.linux.org.uk>
+ <E1RN6ic-0001Wp-7t@rmk-PC.arm.linux.org.uk>
+ <20111115011610.GF15318@game.jcrosoft.org>
+ <20111115085202.GB8574@n2100.arm.linux.org.uk>
+Message-ID: <20111115091522.GB19322@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark Brown wrote:
+On 08:52 Tue 15 Nov     , Russell King - ARM Linux wrote:
+> On Tue, Nov 15, 2011 at 02:16:10AM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > On 17:41 Sun 06 Nov     , Russell King - ARM Linux wrote:
+> > > Rather than using a private function pointer, use the existing
+> > > arm_pm_restart function pointer instead.  We no longer need to enable
+> > > the I-cache in at91sam9_alt_reset() as the caches will now be on when
+> > > this function is called.
+> > > 
+> > > Update the function names to use the 'restart' terminology rather than
+> > > the 'reboot' terminology.
+> > > 
+> > > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> > > ---
+> > I'll appply this one via at91-treee as I've patch that touch this part too in
+> > the queue if you do'nt mind
 > 
-> Help people find the overall architecture.
-> 
-> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
-> ---
->  MAINTAINERS |    2 ++
->  1 files changed, 2 insertions(+), 0 deletions(-)
-> 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index a21d4fb..9eca526 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -1054,6 +1054,8 @@ F:	arch/arm/plat-s3c24xx/
->  F:	arch/arm/plat-s5p/
->  F:	drivers/*/*s3c2410*
->  F:	drivers/*/*/*s3c2410*
-> +F:	drivers/spi/spi-s3c*
-> +F:	sound/soc/samsung/*
-> 
->  ARM/S3C2410 ARM ARCHITECTURE
->  M:	Ben Dooks <ben-linux@fluff.org>
-> --
-> 1.7.7.2
+> Which will break my patch queue.  As I said to Tony, I'm looking to
+> stabilize this in about a week and a half's time, at which point
+> you'll be able to pull these changes into your tree.
+so let do the invert mine is stable will go to the next today
 
-Hmm, I'm ok on this but needs Grant's opinion :)
-
-(Cc'ed Grant Likely)
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Best Regards,
+J.
