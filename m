@@ -1,497 +1,359 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Tue, 15 Nov 2011 21:40:44 +0100
-Subject: [PATCH 11/13 v2] ARM: at91: make DBGU soc independent
+Date: Tue, 15 Nov 2011 21:40:45 +0100
+Subject: [PATCH 12/13] ARM: at91: make aic soc independent
 In-Reply-To: <20111113180954.GD15318@game.jcrosoft.org>
 References: <20111113180954.GD15318@game.jcrosoft.org>
-Message-ID: <1321389646-24112-13-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <1321389646-24112-14-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-we will select now the DBGU used by the soc at Kconfig level
-
-For the DEBUG_LL and early_printk this will allow to select which DBGU to use
-this will also allow to select them when multiple SOC are enabled
+on all at91 have the Advanced Interrupt Controller starts at address
+0xfffff000
 
 Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 ---
- arch/arm/mach-at91/Kconfig                    |   38 +++++++++++++++++++++++-
- arch/arm/mach-at91/at91cap9_devices.c         |    4 +-
- arch/arm/mach-at91/at91rm9200_devices.c       |    4 +-
- arch/arm/mach-at91/at91sam9260_devices.c      |    4 +-
- arch/arm/mach-at91/at91sam9261_devices.c      |    4 +-
- arch/arm/mach-at91/at91sam9263_devices.c      |    4 +-
- arch/arm/mach-at91/at91sam9g45_devices.c      |    4 +-
- arch/arm/mach-at91/at91sam9rl_devices.c       |    4 +-
- arch/arm/mach-at91/include/mach/at91_dbgu.h   |    2 +-
- arch/arm/mach-at91/include/mach/at91cap9.h    |    2 +-
- arch/arm/mach-at91/include/mach/at91rm9200.h  |    2 +-
- arch/arm/mach-at91/include/mach/at91sam9260.h |    2 +-
- arch/arm/mach-at91/include/mach/at91sam9261.h |    2 +-
- arch/arm/mach-at91/include/mach/at91sam9263.h |    2 +-
- arch/arm/mach-at91/include/mach/at91sam9g45.h |    2 +-
- arch/arm/mach-at91/include/mach/at91sam9rl.h  |    2 +-
- arch/arm/mach-at91/include/mach/debug-macro.S |   10 +++++-
- arch/arm/mach-at91/include/mach/hardware.h    |    6 ++++
- arch/arm/mach-at91/include/mach/uncompress.h  |    6 ++-
- arch/arm/mach-at91/setup.c                    |    7 +---
- 20 files changed, 78 insertions(+), 33 deletions(-)
+ arch/arm/mach-at91/include/mach/at91_aic.h    |   46 +++++++++++++++----------
+ arch/arm/mach-at91/include/mach/at91cap9.h    |    1 -
+ arch/arm/mach-at91/include/mach/at91rm9200.h  |    1 -
+ arch/arm/mach-at91/include/mach/at91sam9260.h |    1 -
+ arch/arm/mach-at91/include/mach/at91sam9261.h |    1 -
+ arch/arm/mach-at91/include/mach/at91sam9263.h |    1 -
+ arch/arm/mach-at91/include/mach/at91sam9g45.h |    1 -
+ arch/arm/mach-at91/include/mach/at91sam9rl.h  |    1 -
+ arch/arm/mach-at91/include/mach/at91x40.h     |    1 -
+ arch/arm/mach-at91/include/mach/entry-macro.S |   10 +++---
+ arch/arm/mach-at91/include/mach/hardware.h    |    6 +++
+ arch/arm/mach-at91/include/mach/irqs.h        |    2 +-
+ arch/arm/mach-at91/irq.c                      |   38 ++++++++++++---------
+ 13 files changed, 62 insertions(+), 48 deletions(-)
 
-diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
-index d111c3e9..fc3146f5 100644
---- a/arch/arm/mach-at91/Kconfig
-+++ b/arch/arm/mach-at91/Kconfig
-@@ -3,6 +3,12 @@ if ARCH_AT91
- config HAVE_AT91_DATAFLASH_CARD
- 	bool
+diff --git a/arch/arm/mach-at91/include/mach/at91_aic.h b/arch/arm/mach-at91/include/mach/at91_aic.h
+index 0356679..f163bb6 100644
+--- a/arch/arm/mach-at91/include/mach/at91_aic.h
++++ b/arch/arm/mach-at91/include/mach/at91_aic.h
+@@ -16,7 +16,17 @@
+ #ifndef AT91_AIC_H
+ #define AT91_AIC_H
  
-+config HAVE_AT91_DBGU0
-+	bool
+-#define AT91_AIC_SMR(n)		(AT91_AIC + ((n) * 4))	/* Source Mode Registers 0-31 */
++#ifndef __ASSEMBLY__
++extern void __iomem *at91_aic_base;
 +
-+config HAVE_AT91_DBGU1
-+	bool
++#define at91_aic_read(field) \
++	__raw_readl(at91_aic_base + field)
 +
- config HAVE_AT91_USART3
- 	bool
- 
-@@ -21,12 +27,14 @@ config ARCH_AT91RM9200
- 	bool "AT91RM9200"
- 	select CPU_ARM920T
- 	select GENERIC_CLOCKEVENTS
-+	select HAVE_AT91_DBGU0
- 	select HAVE_AT91_USART3
- 
- config ARCH_AT91SAM9260
- 	bool "AT91SAM9260 or AT91SAM9XE"
- 	select CPU_ARM926T
- 	select GENERIC_CLOCKEVENTS
-+	select HAVE_AT91_DBGU0
- 	select HAVE_AT91_USART3
- 	select HAVE_AT91_USART4
- 	select HAVE_AT91_USART5
-@@ -37,11 +45,13 @@ config ARCH_AT91SAM9261
- 	select CPU_ARM926T
- 	select GENERIC_CLOCKEVENTS
- 	select HAVE_FB_ATMEL
-+	select HAVE_AT91_DBGU0
- 
- config ARCH_AT91SAM9G10
- 	bool "AT91SAM9G10"
- 	select CPU_ARM926T
- 	select GENERIC_CLOCKEVENTS
-+	select HAVE_AT91_DBGU0
- 	select HAVE_FB_ATMEL
- 
- config ARCH_AT91SAM9263
-@@ -50,6 +60,7 @@ config ARCH_AT91SAM9263
- 	select GENERIC_CLOCKEVENTS
- 	select HAVE_FB_ATMEL
- 	select HAVE_NET_MACB
-+	select HAVE_AT91_DBGU1
- 
- config ARCH_AT91SAM9RL
- 	bool "AT91SAM9RL"
-@@ -57,11 +68,13 @@ config ARCH_AT91SAM9RL
- 	select GENERIC_CLOCKEVENTS
- 	select HAVE_AT91_USART3
- 	select HAVE_FB_ATMEL
-+	select HAVE_AT91_DBGU0
- 
- config ARCH_AT91SAM9G20
- 	bool "AT91SAM9G20"
- 	select CPU_ARM926T
- 	select GENERIC_CLOCKEVENTS
-+	select HAVE_AT91_DBGU0
- 	select HAVE_AT91_USART3
- 	select HAVE_AT91_USART4
- 	select HAVE_AT91_USART5
-@@ -74,6 +87,7 @@ config ARCH_AT91SAM9G45
- 	select HAVE_AT91_USART3
- 	select HAVE_FB_ATMEL
- 	select HAVE_NET_MACB
-+	select HAVE_AT91_DBGU1
- 
- config ARCH_AT91CAP9
- 	bool "AT91CAP9"
-@@ -81,6 +95,7 @@ config ARCH_AT91CAP9
- 	select GENERIC_CLOCKEVENTS
- 	select HAVE_FB_ATMEL
- 	select HAVE_NET_MACB
-+	select HAVE_AT91_DBGU1
- 
- config ARCH_AT91X40
- 	bool "AT91x40"
-@@ -510,8 +525,13 @@ config AT91_TIMER_HZ
- choice
- 	prompt "Select a UART for early kernel messages"
- 
--config AT91_EARLY_DBGU
--	bool "DBGU"
-+config AT91_EARLY_DBGU0
-+	bool "DBGU on rm9200, 9260/9g20, 9261/9g10 and 9rl"
-+	depends on HAVE_AT91_DBGU0
++#define at91_aic_write(field, value) \
++	__raw_writel(value, at91_aic_base + field);
++#endif
 +
-+config AT91_EARLY_DBGU1
-+	bool "DBGU on 9263, 9g45 and cap9"
-+	depends on HAVE_AT91_DBGU1
++#define AT91_AIC_SMR(n)		((n) * 4)		/* Source Mode Registers 0-31 */
+ #define		AT91_AIC_PRIOR		(7 << 0)		/* Priority Level */
+ #define		AT91_AIC_SRCTYPE	(3 << 5)		/* Interrupt Source Type */
+ #define			AT91_AIC_SRCTYPE_LOW		(0 << 5)
+@@ -24,30 +34,30 @@
+ #define			AT91_AIC_SRCTYPE_HIGH		(2 << 5)
+ #define			AT91_AIC_SRCTYPE_RISING		(3 << 5)
  
- config AT91_EARLY_USART0
- 	bool "USART0"
-@@ -537,6 +557,20 @@ config AT91_EARLY_USART5
+-#define AT91_AIC_SVR(n)		(AT91_AIC + 0x80 + ((n) * 4))	/* Source Vector Registers 0-31 */
+-#define AT91_AIC_IVR		(AT91_AIC + 0x100)	/* Interrupt Vector Register */
+-#define AT91_AIC_FVR		(AT91_AIC + 0x104)	/* Fast Interrupt Vector Register */
+-#define AT91_AIC_ISR		(AT91_AIC + 0x108)	/* Interrupt Status Register */
++#define AT91_AIC_SVR(n)		(0x80 + ((n) * 4))	/* Source Vector Registers 0-31 */
++#define AT91_AIC_IVR		0x100			/* Interrupt Vector Register */
++#define AT91_AIC_FVR		0x104			/* Fast Interrupt Vector Register */
++#define AT91_AIC_ISR		0x108			/* Interrupt Status Register */
+ #define		AT91_AIC_IRQID		(0x1f << 0)		/* Current Interrupt Identifier */
  
- endchoice
+-#define AT91_AIC_IPR		(AT91_AIC + 0x10c)	/* Interrupt Pending Register */
+-#define AT91_AIC_IMR		(AT91_AIC + 0x110)	/* Interrupt Mask Register */
+-#define AT91_AIC_CISR		(AT91_AIC + 0x114)	/* Core Interrupt Status Register */
++#define AT91_AIC_IPR		0x10c			/* Interrupt Pending Register */
++#define AT91_AIC_IMR		0x110			/* Interrupt Mask Register */
++#define AT91_AIC_CISR		0x114			/* Core Interrupt Status Register */
+ #define		AT91_AIC_NFIQ		(1 << 0)		/* nFIQ Status */
+ #define		AT91_AIC_NIRQ		(1 << 1)		/* nIRQ Status */
  
-+choice
-+	prompt "Select a DBGU for DEBUG_LL"
-+	depends on DEBUG_LL
-+
-+config AT91_DEBUG_LL_DBGU0
-+	bool "DBGU on rm9200, 9260/9g20, 9261/9g10 and 9rl"
-+	depends on HAVE_AT91_DBGU0
-+
-+config AT91_DEBUG_LL_DBGU1
-+	bool "DBGU on 9263, 9g45 and cap9"
-+	depends on HAVE_AT91_DBGU1
-+
-+endchoice
-+
- endmenu
+-#define AT91_AIC_IECR		(AT91_AIC + 0x120)	/* Interrupt Enable Command Register */
+-#define AT91_AIC_IDCR		(AT91_AIC + 0x124)	/* Interrupt Disable Command Register */
+-#define AT91_AIC_ICCR		(AT91_AIC + 0x128)	/* Interrupt Clear Command Register */
+-#define AT91_AIC_ISCR		(AT91_AIC + 0x12c)	/* Interrupt Set Command Register */
+-#define AT91_AIC_EOICR		(AT91_AIC + 0x130)	/* End of Interrupt Command Register */
+-#define AT91_AIC_SPU		(AT91_AIC + 0x134)	/* Spurious Interrupt Vector Register */
+-#define AT91_AIC_DCR		(AT91_AIC + 0x138)	/* Debug Control Register */
++#define AT91_AIC_IECR		0x120			/* Interrupt Enable Command Register */
++#define AT91_AIC_IDCR		0x124			/* Interrupt Disable Command Register */
++#define AT91_AIC_ICCR		0x128			/* Interrupt Clear Command Register */
++#define AT91_AIC_ISCR		0x12c			/* Interrupt Set Command Register */
++#define AT91_AIC_EOICR		0x130			/* End of Interrupt Command Register */
++#define AT91_AIC_SPU		0x134			/* Spurious Interrupt Vector Register */
++#define AT91_AIC_DCR		0x138			/* Debug Control Register */
+ #define		AT91_AIC_DCR_PROT	(1 << 0)		/* Protection Mode */
+ #define		AT91_AIC_DCR_GMSK	(1 << 1)		/* General Mask */
  
- endif
-diff --git a/arch/arm/mach-at91/at91cap9_devices.c b/arch/arm/mach-at91/at91cap9_devices.c
-index 019dac0..19975cf 100644
---- a/arch/arm/mach-at91/at91cap9_devices.c
-+++ b/arch/arm/mach-at91/at91cap9_devices.c
-@@ -1030,8 +1030,8 @@ void __init at91_add_device_ssc(unsigned id, unsigned pins) {}
- #if defined(CONFIG_SERIAL_ATMEL)
- static struct resource dbgu_resources[] = {
- 	[0] = {
--		.start	= AT91_BASE_SYS + AT91_DBGU,
--		.end	= AT91_BASE_SYS + AT91_DBGU + SZ_512 - 1,
-+		.start	= AT91CAP9_BASE_DBGU,
-+		.end	= AT91CAP9_BASE_DBGU + SZ_512 - 1,
- 		.flags	= IORESOURCE_MEM,
- 	},
- 	[1] = {
-diff --git a/arch/arm/mach-at91/at91rm9200_devices.c b/arch/arm/mach-at91/at91rm9200_devices.c
-index 66591fa..1007ba8 100644
---- a/arch/arm/mach-at91/at91rm9200_devices.c
-+++ b/arch/arm/mach-at91/at91rm9200_devices.c
-@@ -877,8 +877,8 @@ void __init at91_add_device_ssc(unsigned id, unsigned pins) {}
- #if defined(CONFIG_SERIAL_ATMEL)
- static struct resource dbgu_resources[] = {
- 	[0] = {
--		.start	= AT91_BASE_SYS + AT91_DBGU,
--		.end	= AT91_BASE_SYS + AT91_DBGU + SZ_512 - 1,
-+		.start	= AT91RM9200_BASE_DBGU,
-+		.end	= AT91RM9200_BASE_DBGU + SZ_512 - 1,
- 		.flags	= IORESOURCE_MEM,
- 	},
- 	[1] = {
-diff --git a/arch/arm/mach-at91/at91sam9260_devices.c b/arch/arm/mach-at91/at91sam9260_devices.c
-index 9cdaffa..5b424fc 100644
---- a/arch/arm/mach-at91/at91sam9260_devices.c
-+++ b/arch/arm/mach-at91/at91sam9260_devices.c
-@@ -846,8 +846,8 @@ void __init at91_add_device_ssc(unsigned id, unsigned pins) {}
- #if defined(CONFIG_SERIAL_ATMEL)
- static struct resource dbgu_resources[] = {
- 	[0] = {
--		.start	= AT91_BASE_SYS + AT91_DBGU,
--		.end	= AT91_BASE_SYS + AT91_DBGU + SZ_512 - 1,
-+		.start	= AT91SAM9260_BASE_DBGU,
-+		.end	= AT91SAM9260_BASE_DBGU + SZ_512 - 1,
- 		.flags	= IORESOURCE_MEM,
- 	},
- 	[1] = {
-diff --git a/arch/arm/mach-at91/at91sam9261_devices.c b/arch/arm/mach-at91/at91sam9261_devices.c
-index c59e1e9..e5cff1d 100644
---- a/arch/arm/mach-at91/at91sam9261_devices.c
-+++ b/arch/arm/mach-at91/at91sam9261_devices.c
-@@ -825,8 +825,8 @@ void __init at91_add_device_ssc(unsigned id, unsigned pins) {}
- #if defined(CONFIG_SERIAL_ATMEL)
- static struct resource dbgu_resources[] = {
- 	[0] = {
--		.start	= AT91_BASE_SYS + AT91_DBGU,
--		.end	= AT91_BASE_SYS + AT91_DBGU + SZ_512 - 1,
-+		.start	= AT91SAM9261_BASE_DBGU,
-+		.end	= AT91SAM9261_BASE_DBGU + SZ_512 - 1,
- 		.flags	= IORESOURCE_MEM,
- 	},
- 	[1] = {
-diff --git a/arch/arm/mach-at91/at91sam9263_devices.c b/arch/arm/mach-at91/at91sam9263_devices.c
-index b5f4e25..20e681c 100644
---- a/arch/arm/mach-at91/at91sam9263_devices.c
-+++ b/arch/arm/mach-at91/at91sam9263_devices.c
-@@ -1205,8 +1205,8 @@ void __init at91_add_device_ssc(unsigned id, unsigned pins) {}
+-#define AT91_AIC_FFER		(AT91_AIC + 0x140)	/* Fast Forcing Enable Register [SAM9 only] */
+-#define AT91_AIC_FFDR		(AT91_AIC + 0x144)	/* Fast Forcing Disable Register [SAM9 only] */
+-#define AT91_AIC_FFSR		(AT91_AIC + 0x148)	/* Fast Forcing Status Register [SAM9 only] */
++#define AT91_AIC_FFER		0x140			/* Fast Forcing Enable Register [SAM9 only] */
++#define AT91_AIC_FFDR		0x144			/* Fast Forcing Disable Register [SAM9 only] */
++#define AT91_AIC_FFSR		0x148			/* Fast Forcing Status Register [SAM9 only] */
  
- static struct resource dbgu_resources[] = {
- 	[0] = {
--		.start	= AT91_BASE_SYS + AT91_DBGU,
--		.end	= AT91_BASE_SYS + AT91_DBGU + SZ_512 - 1,
-+		.start	= AT91SAM9263_BASE_DBGU,
-+		.end	= AT91SAM9263_BASE_DBGU + SZ_512 - 1,
- 		.flags	= IORESOURCE_MEM,
- 	},
- 	[1] = {
-diff --git a/arch/arm/mach-at91/at91sam9g45_devices.c b/arch/arm/mach-at91/at91sam9g45_devices.c
-index 3b91706..153dad0 100644
---- a/arch/arm/mach-at91/at91sam9g45_devices.c
-+++ b/arch/arm/mach-at91/at91sam9g45_devices.c
-@@ -1341,8 +1341,8 @@ void __init at91_add_device_ssc(unsigned id, unsigned pins) {}
- #if defined(CONFIG_SERIAL_ATMEL)
- static struct resource dbgu_resources[] = {
- 	[0] = {
--		.start	= AT91_BASE_SYS + AT91_DBGU,
--		.end	= AT91_BASE_SYS + AT91_DBGU + SZ_512 - 1,
-+		.start	= AT91SAM9G45_BASE_DBGU,
-+		.end	= AT91SAM9G45_BASE_DBGU + SZ_512 - 1,
- 		.flags	= IORESOURCE_MEM,
- 	},
- 	[1] = {
-diff --git a/arch/arm/mach-at91/at91sam9rl_devices.c b/arch/arm/mach-at91/at91sam9rl_devices.c
-index c7961b4..366c1cf 100644
---- a/arch/arm/mach-at91/at91sam9rl_devices.c
-+++ b/arch/arm/mach-at91/at91sam9rl_devices.c
-@@ -917,8 +917,8 @@ void __init at91_add_device_ssc(unsigned id, unsigned pins) {}
- #if defined(CONFIG_SERIAL_ATMEL)
- static struct resource dbgu_resources[] = {
- 	[0] = {
--		.start	= AT91_BASE_SYS + AT91_DBGU,
--		.end	= AT91_BASE_SYS + AT91_DBGU + SZ_512 - 1,
-+		.start	= AT91SAM9RL_BASE_DBGU,
-+		.end	= AT91SAM9RL_BASE_DBGU + SZ_512 - 1,
- 		.flags	= IORESOURCE_MEM,
- 	},
- 	[1] = {
-diff --git a/arch/arm/mach-at91/include/mach/at91_dbgu.h b/arch/arm/mach-at91/include/mach/at91_dbgu.h
-index dbfe455a..2aa0c5e 100644
---- a/arch/arm/mach-at91/include/mach/at91_dbgu.h
-+++ b/arch/arm/mach-at91/include/mach/at91_dbgu.h
-@@ -19,7 +19,7 @@
- #define dbgu_readl(dbgu, field) \
- 	__raw_readl(AT91_VA_BASE_SYS + dbgu + AT91_DBGU_ ## field)
- 
--#ifdef AT91_DBGU
-+#if !defined(CONFIG_ARCH_AT91X40)
- #define AT91_DBGU_CR		(0x00)	/* Control Register */
- #define AT91_DBGU_MR		(0x04)	/* Mode Register */
- #define AT91_DBGU_IER		(0x08)	/* Interrupt Enable Register */
+ #endif
 diff --git a/arch/arm/mach-at91/include/mach/at91cap9.h b/arch/arm/mach-at91/include/mach/at91cap9.h
-index 750ba85..bca2b54 100644
+index bca2b54..4c0e2f6 100644
 --- a/arch/arm/mach-at91/include/mach/at91cap9.h
 +++ b/arch/arm/mach-at91/include/mach/at91cap9.h
 @@ -82,7 +82,6 @@
  #define AT91_BCRAMC	(0xffffe400 - AT91_BASE_SYS)
  #define AT91_DDRSDRC0	(0xffffe600 - AT91_BASE_SYS)
  #define AT91_MATRIX	(0xffffea00 - AT91_BASE_SYS)
--#define AT91_DBGU	(0xffffee00 - AT91_BASE_SYS)
- #define AT91_AIC	(0xfffff000 - AT91_BASE_SYS)
+-#define AT91_AIC	(0xfffff000 - AT91_BASE_SYS)
  #define AT91_PMC	(0xfffffc00 - AT91_BASE_SYS)
  #define AT91_RSTC	(0xfffffd00 - AT91_BASE_SYS)
-@@ -93,6 +92,7 @@
- #define AT91CAP9_BASE_ECC	0xffffe200
- #define AT91CAP9_BASE_DMA	0xffffec00
- #define AT91CAP9_BASE_SMC	0xffffe800
-+#define AT91CAP9_BASE_DBGU	AT91_BASE_DBGU1
- #define AT91CAP9_BASE_PIOA	0xfffff200
- #define AT91CAP9_BASE_PIOB	0xfffff400
- #define AT91CAP9_BASE_PIOC	0xfffff600
+ #define AT91_GPBR	(cpu_is_at91cap9_revB() ?	\
 diff --git a/arch/arm/mach-at91/include/mach/at91rm9200.h b/arch/arm/mach-at91/include/mach/at91rm9200.h
-index 5740954..1f767e2 100644
+index 1f767e2..90e92a8 100644
 --- a/arch/arm/mach-at91/include/mach/at91rm9200.h
 +++ b/arch/arm/mach-at91/include/mach/at91rm9200.h
-@@ -80,12 +80,12 @@
+@@ -79,7 +79,6 @@
+ /*
   * System Peripherals (offset from AT91_BASE_SYS)
   */
- #define AT91_AIC	(0xfffff000 - AT91_BASE_SYS)	/* Advanced Interrupt Controller */
--#define AT91_DBGU	(0xfffff200 - AT91_BASE_SYS)	/* Debug Unit */
+-#define AT91_AIC	(0xfffff000 - AT91_BASE_SYS)	/* Advanced Interrupt Controller */
  #define AT91_PMC	(0xfffffc00 - AT91_BASE_SYS)	/* Power Management Controller */
  #define AT91_ST		(0xfffffd00 - AT91_BASE_SYS)	/* System Timer */
  #define AT91_RTC	(0xfffffe00 - AT91_BASE_SYS)	/* Real-Time Clock */
- #define AT91_MC		(0xffffff00 - AT91_BASE_SYS)	/* Memory Controllers */
- 
-+#define AT91RM9200_BASE_DBGU	AT91_BASE_DBGU0	/* Debug Unit */
- #define AT91RM9200_BASE_PIOA	0xfffff400	/* PIO Controller A */
- #define AT91RM9200_BASE_PIOB	0xfffff600	/* PIO Controller B */
- #define AT91RM9200_BASE_PIOC	0xfffff800	/* PIO Controller C */
 diff --git a/arch/arm/mach-at91/include/mach/at91sam9260.h b/arch/arm/mach-at91/include/mach/at91sam9260.h
-index 05860c5..e360d66 100644
+index e360d66..f937c47 100644
 --- a/arch/arm/mach-at91/include/mach/at91sam9260.h
 +++ b/arch/arm/mach-at91/include/mach/at91sam9260.h
-@@ -83,13 +83,13 @@
+@@ -82,7 +82,6 @@
+  */
  #define AT91_SDRAMC0	(0xffffea00 - AT91_BASE_SYS)
  #define AT91_MATRIX	(0xffffee00 - AT91_BASE_SYS)
- #define AT91_AIC	(0xfffff000 - AT91_BASE_SYS)
--#define AT91_DBGU	(0xfffff200 - AT91_BASE_SYS)
+-#define AT91_AIC	(0xfffff000 - AT91_BASE_SYS)
  #define AT91_PMC	(0xfffffc00 - AT91_BASE_SYS)
  #define AT91_RSTC	(0xfffffd00 - AT91_BASE_SYS)
  #define AT91_GPBR	(0xfffffd50 - AT91_BASE_SYS)
- 
- #define AT91SAM9260_BASE_ECC	0xffffe800
- #define AT91SAM9260_BASE_SMC	0xffffec00
-+#define AT91SAM9260_BASE_DBGU	AT91_BASE_DBGU0
- #define AT91SAM9260_BASE_PIOA	0xfffff400
- #define AT91SAM9260_BASE_PIOB	0xfffff600
- #define AT91SAM9260_BASE_PIOC	0xfffff800
 diff --git a/arch/arm/mach-at91/include/mach/at91sam9261.h b/arch/arm/mach-at91/include/mach/at91sam9261.h
-index df2ddfd..2ccc8a53 100644
+index 2ccc8a53..175604e 100644
 --- a/arch/arm/mach-at91/include/mach/at91sam9261.h
 +++ b/arch/arm/mach-at91/include/mach/at91sam9261.h
-@@ -68,12 +68,12 @@
+@@ -67,7 +67,6 @@
+  */
  #define AT91_SDRAMC0	(0xffffea00 - AT91_BASE_SYS)
  #define AT91_MATRIX	(0xffffee00 - AT91_BASE_SYS)
- #define AT91_AIC	(0xfffff000 - AT91_BASE_SYS)
--#define AT91_DBGU	(0xfffff200 - AT91_BASE_SYS)
+-#define AT91_AIC	(0xfffff000 - AT91_BASE_SYS)
  #define AT91_PMC	(0xfffffc00 - AT91_BASE_SYS)
  #define AT91_RSTC	(0xfffffd00 - AT91_BASE_SYS)
  #define AT91_GPBR	(0xfffffd50 - AT91_BASE_SYS)
- 
- #define AT91SAM9261_BASE_SMC	0xffffec00
-+#define AT91SAM9261_BASE_DBGU	AT91_BASE_DBGU0
- #define AT91SAM9261_BASE_PIOA	0xfffff400
- #define AT91SAM9261_BASE_PIOB	0xfffff600
- #define AT91SAM9261_BASE_PIOC	0xfffff800
 diff --git a/arch/arm/mach-at91/include/mach/at91sam9263.h b/arch/arm/mach-at91/include/mach/at91sam9263.h
-index 0eb614e..aee137b 100644
+index aee137b..80c9150 100644
 --- a/arch/arm/mach-at91/include/mach/at91sam9263.h
 +++ b/arch/arm/mach-at91/include/mach/at91sam9263.h
 @@ -77,7 +77,6 @@
  #define AT91_SDRAMC0	(0xffffe200 - AT91_BASE_SYS)
  #define AT91_SDRAMC1	(0xffffe800 - AT91_BASE_SYS)
  #define AT91_MATRIX	(0xffffec00 - AT91_BASE_SYS)
--#define AT91_DBGU	(0xffffee00 - AT91_BASE_SYS)
- #define AT91_AIC	(0xfffff000 - AT91_BASE_SYS)
+-#define AT91_AIC	(0xfffff000 - AT91_BASE_SYS)
  #define AT91_PMC	(0xfffffc00 - AT91_BASE_SYS)
  #define AT91_RSTC	(0xfffffd00 - AT91_BASE_SYS)
-@@ -87,6 +86,7 @@
- #define AT91SAM9263_BASE_SMC0	0xffffe400
- #define AT91SAM9263_BASE_ECC1	0xffffe600
- #define AT91SAM9263_BASE_SMC1	0xffffea00
-+#define AT91SAM9263_BASE_DBGU	AT91_BASE_DBGU1
- #define AT91SAM9263_BASE_PIOA	0xfffff200
- #define AT91SAM9263_BASE_PIOB	0xfffff400
- #define AT91SAM9263_BASE_PIOC	0xfffff600
+ #define AT91_GPBR	(0xfffffd60 - AT91_BASE_SYS)
 diff --git a/arch/arm/mach-at91/include/mach/at91sam9g45.h b/arch/arm/mach-at91/include/mach/at91sam9g45.h
-index 65098c3..211721b 100644
+index 211721b..ac5c471 100644
 --- a/arch/arm/mach-at91/include/mach/at91sam9g45.h
 +++ b/arch/arm/mach-at91/include/mach/at91sam9g45.h
 @@ -89,7 +89,6 @@
  #define AT91_DDRSDRC1	(0xffffe400 - AT91_BASE_SYS)
  #define AT91_DDRSDRC0	(0xffffe600 - AT91_BASE_SYS)
  #define AT91_MATRIX	(0xffffea00 - AT91_BASE_SYS)
--#define AT91_DBGU	(0xffffee00 - AT91_BASE_SYS)
- #define AT91_AIC	(0xfffff000 - AT91_BASE_SYS)
+-#define AT91_AIC	(0xfffff000 - AT91_BASE_SYS)
  #define AT91_PMC	(0xfffffc00 - AT91_BASE_SYS)
  #define AT91_RSTC	(0xfffffd00 - AT91_BASE_SYS)
-@@ -99,6 +98,7 @@
- #define AT91SAM9G45_BASE_ECC	0xffffe200
- #define AT91SAM9G45_BASE_DMA	0xffffec00
- #define AT91SAM9G45_BASE_SMC	0xffffe800
-+#define AT91SAM9G45_BASE_DBGU	AT91_BASE_DBGU1
- #define AT91SAM9G45_BASE_PIOA	0xfffff200
- #define AT91SAM9G45_BASE_PIOB	0xfffff400
- #define AT91SAM9G45_BASE_PIOC	0xfffff600
+ #define AT91_GPBR	(0xfffffd60 - AT91_BASE_SYS)
 diff --git a/arch/arm/mach-at91/include/mach/at91sam9rl.h b/arch/arm/mach-at91/include/mach/at91sam9rl.h
-index 46e136d..4f7367a 100644
+index 4f7367a..c466e8c 100644
 --- a/arch/arm/mach-at91/include/mach/at91sam9rl.h
 +++ b/arch/arm/mach-at91/include/mach/at91sam9rl.h
-@@ -72,7 +72,6 @@
+@@ -71,7 +71,6 @@
+  */
  #define AT91_SDRAMC0	(0xffffea00 - AT91_BASE_SYS)
  #define AT91_MATRIX	(0xffffee00 - AT91_BASE_SYS)
- #define AT91_AIC	(0xfffff000 - AT91_BASE_SYS)
--#define AT91_DBGU	(0xfffff200 - AT91_BASE_SYS)
+-#define AT91_AIC	(0xfffff000 - AT91_BASE_SYS)
  #define AT91_PMC	(0xfffffc00 - AT91_BASE_SYS)
  #define AT91_RSTC	(0xfffffd00 - AT91_BASE_SYS)
  #define AT91_SCKCR	(0xfffffd50 - AT91_BASE_SYS)
-@@ -82,6 +81,7 @@
- #define AT91SAM9RL_BASE_DMA	0xffffe600
- #define AT91SAM9RL_BASE_ECC	0xffffe800
- #define AT91SAM9RL_BASE_SMC	0xffffec00
-+#define AT91SAM9RL_BASE_DBGU	AT91_BASE_DBGU0
- #define AT91SAM9RL_BASE_PIOA	0xfffff400
- #define AT91SAM9RL_BASE_PIOB	0xfffff600
- #define AT91SAM9RL_BASE_PIOC	0xfffff800
-diff --git a/arch/arm/mach-at91/include/mach/debug-macro.S b/arch/arm/mach-at91/include/mach/debug-macro.S
-index 0ed8648..c6bb9e2 100644
---- a/arch/arm/mach-at91/include/mach/debug-macro.S
-+++ b/arch/arm/mach-at91/include/mach/debug-macro.S
-@@ -14,9 +14,15 @@
- #include <mach/hardware.h>
- #include <mach/at91_dbgu.h>
+diff --git a/arch/arm/mach-at91/include/mach/at91x40.h b/arch/arm/mach-at91/include/mach/at91x40.h
+index a152ff8..a57829f 100644
+--- a/arch/arm/mach-at91/include/mach/at91x40.h
++++ b/arch/arm/mach-at91/include/mach/at91x40.h
+@@ -40,7 +40,6 @@
+ #define AT91_PIOA	(0xffff0000 - AT91_BASE_SYS)	/* PIO Controller A */
+ #define AT91_PS		(0xffff4000 - AT91_BASE_SYS)	/* Power Save */
+ #define AT91_WD		(0xffff8000 - AT91_BASE_SYS)	/* Watchdog Timer */
+-#define AT91_AIC	(0xfffff000 - AT91_BASE_SYS)	/* Advanced Interrupt Controller */
  
-+#if defined(CONFIG_AT91_DEBUG_LL_DBGU0)
-+#define AT91_DBGU AT91_BASE_DBGU0
-+#else
-+#define AT91_DBGU AT91_BASE_DBGU1
-+#endif
-+
- 	.macro	addruart, rp, rv, tmp
--	ldr	\rp, =(AT91_BASE_SYS + AT91_DBGU)	@ System peripherals (phys address)
--	ldr	\rv, =(AT91_VA_BASE_SYS	+ AT91_DBGU)	@ System peripherals (virt address)
-+	ldr	\rp, =AT91_DBGU				@ System peripherals (phys address)
-+	ldr	\rv, =AT91_IO_P2V(AT91_DBGU)		@ System peripherals (virt address)
+ /*
+  * The AT91x40 series doesn't have a debug unit like the other AT91 parts.
+diff --git a/arch/arm/mach-at91/include/mach/entry-macro.S b/arch/arm/mach-at91/include/mach/entry-macro.S
+index 7ab68f9..631f654 100644
+--- a/arch/arm/mach-at91/include/mach/entry-macro.S
++++ b/arch/arm/mach-at91/include/mach/entry-macro.S
+@@ -17,16 +17,16 @@
  	.endm
  
- 	.macro	senduart,rd,rx
+ 	.macro  get_irqnr_preamble, base, tmp
+-	ldr	\base, =(AT91_VA_BASE_SYS + AT91_AIC)		@ base virtual address of AIC peripheral
++	ldr	\base, =AT91_IO_P2V(AT91_AIC)		@ base virtual address of AIC peripheral
+ 	.endm
+ 
+ 	.macro  arch_ret_to_user, tmp1, tmp2
+ 	.endm
+ 
+ 	.macro	get_irqnr_and_base, irqnr, irqstat, base, tmp
+-	ldr	\irqnr, [\base, #(AT91_AIC_IVR - AT91_AIC)]	@ read IRQ vector register: de-asserts nIRQ to processor (and clears interrupt)
+-	ldr	\irqstat, [\base, #(AT91_AIC_ISR - AT91_AIC)]	@ read interrupt source number
+-	teq	\irqstat, #0					@ ISR is 0 when no current interrupt, or spurious interrupt
+-	streq	\tmp, [\base, #(AT91_AIC_EOICR - AT91_AIC)]	@ not going to be handled further, then ACK it now.
++	ldr	\irqnr, [\base, #AT91_AIC_IVR]		@ read IRQ vector register: de-asserts nIRQ to processor (and clears interrupt)
++	ldr	\irqstat, [\base, #AT91_AIC_ISR]	@ read interrupt source number
++	teq	\irqstat, #0				@ ISR is 0 when no current interrupt, or spurious interrupt
++	streq	\tmp, [\base, #AT91_AIC_EOICR]		@ not going to be handled further, then ACK it now.
+ 	.endm
+ 
 diff --git a/arch/arm/mach-at91/include/mach/hardware.h b/arch/arm/mach-at91/include/mach/hardware.h
-index 483478d..435764e 100644
+index 435764e..2d0e4e9 100644
 --- a/arch/arm/mach-at91/include/mach/hardware.h
 +++ b/arch/arm/mach-at91/include/mach/hardware.h
-@@ -16,6 +16,12 @@
+@@ -58,6 +58,12 @@
+ #endif
  
- #include <asm/sizes.h>
- 
-+/* DBGU base */
-+/* rm9200, 9260/9g20, 9261/9g10, 9rl */
-+#define AT91_BASE_DBGU0	0xfffff200
-+/* 9263, 9g45, cap9 */
-+#define AT91_BASE_DBGU1	0xffffee00
+ /*
++ * On all at91 have the Advanced Interrupt Controller starts@address
++ * 0xfffff000
++ */
++#define AT91_AIC	0xfffff000
 +
- #if defined(CONFIG_ARCH_AT91RM9200)
- #include <mach/at91rm9200.h>
- #elif defined(CONFIG_ARCH_AT91SAM9260) || defined(CONFIG_ARCH_AT91SAM9G20)
-diff --git a/arch/arm/mach-at91/include/mach/uncompress.h b/arch/arm/mach-at91/include/mach/uncompress.h
-index 18bdcde..0234fd9 100644
---- a/arch/arm/mach-at91/include/mach/uncompress.h
-+++ b/arch/arm/mach-at91/include/mach/uncompress.h
-@@ -24,8 +24,10 @@
- #include <linux/io.h>
- #include <linux/atmel_serial.h>
++/*
+  * Peripheral identifiers/interrupts.
+  */
+ #define AT91_ID_FIQ		0	/* Advanced Interrupt Controller (FIQ) */
+diff --git a/arch/arm/mach-at91/include/mach/irqs.h b/arch/arm/mach-at91/include/mach/irqs.h
+index 36bd55f..ac8b7df 100644
+--- a/arch/arm/mach-at91/include/mach/irqs.h
++++ b/arch/arm/mach-at91/include/mach/irqs.h
+@@ -31,7 +31,7 @@
+  * Acknowledge interrupt with AIC after interrupt has been handled.
+  *   (by kernel/irq.c)
+  */
+-#define irq_finish(irq) do { at91_sys_write(AT91_AIC_EOICR, 0); } while (0)
++#define irq_finish(irq) do { at91_aic_write(AT91_AIC_EOICR, 0); } while (0)
  
--#if defined(CONFIG_AT91_EARLY_DBGU)
--#define UART_OFFSET (AT91_DBGU + AT91_BASE_SYS)
-+#if defined(CONFIG_AT91_EARLY_DBGU0)
-+#define UART_OFFSET AT91_BASE_DBGU0
-+#elif defined(CONFIG_AT91_EARLY_DBGU1)
-+#define UART_OFFSET AT91_BASE_DBGU1
- #elif defined(CONFIG_AT91_EARLY_USART0)
- #define UART_OFFSET AT91_USART0
- #elif defined(CONFIG_AT91_EARLY_USART1)
-diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
-index 5b4a260..3c309dc 100644
---- a/arch/arm/mach-at91/setup.c
-+++ b/arch/arm/mach-at91/setup.c
-@@ -93,9 +93,6 @@ void at91_iounmap(volatile void __iomem *addr)
- }
- EXPORT_SYMBOL(at91_iounmap);
  
--#define AT91_DBGU0	0xfffff200
--#define AT91_DBGU1	0xffffee00
--
- static void __init soc_detect(u32 dbgu_base)
+ /*
+diff --git a/arch/arm/mach-at91/irq.c b/arch/arm/mach-at91/irq.c
+index 9665265e..be6b639 100644
+--- a/arch/arm/mach-at91/irq.c
++++ b/arch/arm/mach-at91/irq.c
+@@ -33,17 +33,18 @@
+ #include <asm/mach/irq.h>
+ #include <asm/mach/map.h>
+ 
++void __iomem *at91_aic_base;
+ 
+ static void at91_aic_mask_irq(struct irq_data *d)
  {
- 	u32 cidr, socid;
-@@ -268,9 +265,9 @@ void __init at91_map_io(void)
- 	at91_soc_initdata.type = AT91_SOC_NONE;
- 	at91_soc_initdata.subtype = AT91_SOC_SUBTYPE_NONE;
+ 	/* Disable interrupt on AIC */
+-	at91_sys_write(AT91_AIC_IDCR, 1 << d->irq);
++	at91_aic_write(AT91_AIC_IDCR, 1 << d->irq);
+ }
  
--	soc_detect(AT91_DBGU0);
-+	soc_detect(AT91_BASE_DBGU0);
- 	if (!at91_soc_is_detected())
--		soc_detect(AT91_DBGU1);
-+		soc_detect(AT91_BASE_DBGU1);
+ static void at91_aic_unmask_irq(struct irq_data *d)
+ {
+ 	/* Enable interrupt on AIC */
+-	at91_sys_write(AT91_AIC_IECR, 1 << d->irq);
++	at91_aic_write(AT91_AIC_IECR, 1 << d->irq);
+ }
  
- 	if (!at91_soc_is_detected())
- 		panic("AT91: Impossible to detect the SOC type");
+ unsigned int at91_extern_irq;
+@@ -77,8 +78,8 @@ static int at91_aic_set_type(struct irq_data *d, unsigned type)
+ 		return -EINVAL;
+ 	}
+ 
+-	smr = at91_sys_read(AT91_AIC_SMR(d->irq)) & ~AT91_AIC_SRCTYPE;
+-	at91_sys_write(AT91_AIC_SMR(d->irq), smr | srctype);
++	smr = at91_aic_read(AT91_AIC_SMR(d->irq)) & ~AT91_AIC_SRCTYPE;
++	at91_aic_write(AT91_AIC_SMR(d->irq), smr | srctype);
+ 	return 0;
+ }
+ 
+@@ -102,15 +103,15 @@ static int at91_aic_set_wake(struct irq_data *d, unsigned value)
+ 
+ void at91_irq_suspend(void)
+ {
+-	backups = at91_sys_read(AT91_AIC_IMR);
+-	at91_sys_write(AT91_AIC_IDCR, backups);
+-	at91_sys_write(AT91_AIC_IECR, wakeups);
++	backups = at91_aic_read(AT91_AIC_IMR);
++	at91_aic_write(AT91_AIC_IDCR, backups);
++	at91_aic_write(AT91_AIC_IECR, wakeups);
+ }
+ 
+ void at91_irq_resume(void)
+ {
+-	at91_sys_write(AT91_AIC_IDCR, wakeups);
+-	at91_sys_write(AT91_AIC_IECR, backups);
++	at91_aic_write(AT91_AIC_IDCR, wakeups);
++	at91_aic_write(AT91_AIC_IECR, backups);
+ }
+ 
+ #else
+@@ -133,34 +134,39 @@ void __init at91_aic_init(unsigned int priority[NR_AIC_IRQS])
+ {
+ 	unsigned int i;
+ 
++	at91_aic_base = ioremap(AT91_AIC, 512);
++
++	if (!at91_aic_base)
++		panic("Impossible to ioremap AT91_AIC\n");
++
+ 	/*
+ 	 * The IVR is used by macro get_irqnr_and_base to read and verify.
+ 	 * The irq number is NR_AIC_IRQS when a spurious interrupt has occurred.
+ 	 */
+ 	for (i = 0; i < NR_AIC_IRQS; i++) {
+ 		/* Put irq number in Source Vector Register: */
+-		at91_sys_write(AT91_AIC_SVR(i), i);
++		at91_aic_write(AT91_AIC_SVR(i), i);
+ 		/* Active Low interrupt, with the specified priority */
+-		at91_sys_write(AT91_AIC_SMR(i), AT91_AIC_SRCTYPE_LOW | priority[i]);
++		at91_aic_write(AT91_AIC_SMR(i), AT91_AIC_SRCTYPE_LOW | priority[i]);
+ 
+ 		irq_set_chip_and_handler(i, &at91_aic_chip, handle_level_irq);
+ 		set_irq_flags(i, IRQF_VALID | IRQF_PROBE);
+ 
+ 		/* Perform 8 End Of Interrupt Command to make sure AIC will not Lock out nIRQ */
+ 		if (i < 8)
+-			at91_sys_write(AT91_AIC_EOICR, 0);
++			at91_aic_write(AT91_AIC_EOICR, 0);
+ 	}
+ 
+ 	/*
+ 	 * Spurious Interrupt ID in Spurious Vector Register is NR_AIC_IRQS
+ 	 * When there is no current interrupt, the IRQ Vector Register reads the value stored in AIC_SPU
+ 	 */
+-	at91_sys_write(AT91_AIC_SPU, NR_AIC_IRQS);
++	at91_aic_write(AT91_AIC_SPU, NR_AIC_IRQS);
+ 
+ 	/* No debugging in AIC: Debug (Protect) Control Register */
+-	at91_sys_write(AT91_AIC_DCR, 0);
++	at91_aic_write(AT91_AIC_DCR, 0);
+ 
+ 	/* Disable and clear all interrupts initially */
+-	at91_sys_write(AT91_AIC_IDCR, 0xFFFFFFFF);
+-	at91_sys_write(AT91_AIC_ICCR, 0xFFFFFFFF);
++	at91_aic_write(AT91_AIC_IDCR, 0xFFFFFFFF);
++	at91_aic_write(AT91_AIC_ICCR, 0xFFFFFFFF);
+ }
 -- 
 1.7.7
