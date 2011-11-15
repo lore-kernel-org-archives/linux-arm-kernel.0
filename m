@@ -1,30 +1,63 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 15 Nov 2011 17:20:53 +0000
-Subject: [RFC][PATCH] gpiolib: add irq_wake (power-management) sysfs file
-In-Reply-To: <20111115131636.GA31028@sirena.org.uk>
-References: <1321004406-15663-1-git-send-email-p-combes@ti.com>
- <20111115131636.GA31028@sirena.org.uk>
-Message-ID: <20111115172053.GB9581@n2100.arm.linux.org.uk>
+Date: Tue, 15 Nov 2011 17:30:23 +0000
+Subject: [PATCH V2] ARM: NUC900: Add PCI driver support for NUC960
+In-Reply-To: <4EC0BF9B.2050300@gmail.com>
+References: <4EBE98FC.6070903@gmail.com> <4EC0BF9B.2050300@gmail.com>
+Message-ID: <20111115173023.GC9581@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 15, 2011 at 01:16:37PM +0000, Mark Brown wrote:
-> On Fri, Nov 11, 2011 at 10:40:06AM +0100, Patrick Combes wrote:
-> > +	else if (sysfs_streq(buf, "enable") || sysfs_streq(buf, "1"))
-> > +		status = enable_irq_wake(gpio_to_irq(gpio));
-> > +	else if (sysfs_streq(buf, "disable") || sysfs_streq(buf, "0"))
-> > +		status = disable_irq_wake(gpio_to_irq(gpio));
-> > +	else
-> > +		status = -EINVAL;
-> 
-> ...this doesn't do anything to stop userspace doing multiple enables and
-> disables.
+On Mon, Nov 14, 2011 at 03:13:31PM +0800, Wan ZongShun wrote:
+> +#define NUC900_PCI_MEM_BASE	0xC0000000
+> +#define NUC900_PCI_MEM_END	0xDFFFEFFFF
+> +#define NUC900_PCI_MEM_SIZE	0x20000000
 
-It doesn't check whether gpio_to_irq(gpio) returns something sane either.
-It should be doing something like this before taking the mutex:
+NUC900_PCI_MEM_END has more than 32 bits.
 
-	irq = gpio_to_irq(gpio);
-	if (irq <= 0)
-		return irq < 0 ? irq : -EINVAL;
+> +#define NUC900_PCI_IO_BASE	0xE0000000
+> +#define NUC900_PCI_IO_END	0xE000FFFF
+> +#define NUC900_PCI_IO_SIZE	0x10000
+...
+> +static struct resource pci_io = {
+> +	.name	= "NUC900 PCI IO",
+> +	.start	= NUC900_PCI_IO_BASE,
+> +	.end	= NUC900_PCI_IO_BASE + NUC900_PCI_IO_SIZE - 1,
+> +	.flags	= IORESOURCE_IO,
+> +};
+...
+> +static int __init pci_nuc900_setup_resources(struct resource **resource)
+> +{
+> +	int ret = 0;
+> +
+> +	ret = request_resource(&ioport_resource, &pci_io);
+> +	if (ret) {
+> +		pr_err("%s: failed to request resources: %d\n", __func__, ret);
+> +		goto out;
+> +	}
+...
+> +	/*
+> +	 * bus->resource[0] is the IO resource for this bus
+> +	 * bus->resource[1] is the mem resource for this bus
+> +	 * bus->resource[2] is the prefetch mem resource for this bus
+> +	 */
+> +	resource[0] = &pci_io;
+> +	resource[1] = &pci_mem;
+> +	resource[2] = NULL;
 
-and then doing (enable|disable)_irq_wake() on irq.
+This is better, but still not correct.
+
+1. in mach/io.h:
+
+-#define IO_SPACE_LIMIT	0xffffffff
++#define IO_SPACE_LIMIT	0xffff
+
+-#define __io(a)	__typesafe_io(a)
++#define __io(a)	((void __iomem __force *)(a) + VA_OF_IO_SPACE)
+
+where VA_OF_IO_SPACE is correctly named and typed.
+
+2. set resource[0] = &ioport_resource and get rid of pci_io entirely.
+
+3. if (!request_mem_region(PA_OF_IO_SPACE, 64K, "PCI IO emulation space"))
+	pr_warn("Unable to request PCI IO space\n");
+   in your pre-init function.
