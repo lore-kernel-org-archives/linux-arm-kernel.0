@@ -1,50 +1,102 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 15 Nov 2011 16:21:36 +0900
-Subject: [PATCH 1/2] MAINTAINERS: Add linux-samsung-soc mailing list for
- Samsung
-In-Reply-To: <1320923776-26626-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-References: <1320923776-26626-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-Message-ID: <003801cca367$360b7020$a2225060$%kim@samsung.com>
+From: pullip.cho@samsung.com (KyongHo Cho)
+Date: Tue, 15 Nov 2011 16:26:43 +0900
+Subject: [PATCH v6 2/2] iommu/exynos: Add iommu driver for Exynos Platforms
+In-Reply-To: <CAH9JG2U1L1st_D+jp0Qm42HR8Ur7JpdYz6gFJSv+z_ZkGAQv8A@mail.gmail.com>
+References: <1321333132-17662-1-git-send-email-pullip.cho@samsung.com>
+ <1321333132-17662-3-git-send-email-pullip.cho@samsung.com>
+ <CAH9JG2U1L1st_D+jp0Qm42HR8Ur7JpdYz6gFJSv+z_ZkGAQv8A@mail.gmail.com>
+Message-ID: <CAHQjnOPMxtQFn1LMsXg7JKeW-iGe87jTN_kA+6BK9MGeF=0qDw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark Brown wrote:
-> 
-> There's a Samsung-specific mailing list but it's not advertised in
-> MAINTAINERS - add it to the overall architecture to make it more
-> discoverable.
-> 
-> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+On Tue, Nov 15, 2011 at 3:05 PM, Kyungmin Park <kmpark@infradead.org> wrote:
+>> +static bool set_sysmmu_active(struct sysmmu_drvdata *data)
+>> +{
+>> + ? ? /* return true if the System MMU was not active previously
+>> + ? ? ? ?and it needs to be initialized */
+>> + ? ? data->activations++;
+>> + ? ? return data->activations == 1;
+>> +}
+> If it calls the twice, then caller get the active failed return value.
+> Are there no case to call the multiple activation?
 
-I'm okay on this,
-Acked-by: Kukjin Kim <kgene.kim@samsung.com>
+Return value of set_sysmmu_active() does not mean that activation is successful
+but that System MMU H/W is needed to be initialized.
 
-(Cc'ed Andrew Morton)
-Hi Andrew, could you please pick this up in your tree?
+System MMU driver only initializes System MMU H/W when data->activation
+becomes 1 from 0 and deinitializes when it becomes 0 from 1.
 
-Thanks.
+>> +void exynos_sysmmu_set_tablebase_pgd(struct device *owner, unsigned long
+>> pgd)
+>> +{
+>> + ? ? struct sysmmu_drvdata *data = NULL;
+>> +
+>> + ? ? while ((data = get_sysmmu_data(owner, data))) {
+>> + ? ? ? ? ? ? unsigned long flags;
+>> +
+>> + ? ? ? ? ? ? read_lock_irqsave(&data->lock, flags);
+> It should be 'write_lock_irqsave'
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+data->lock just protects contents of 'data' from race condition.
+It does not care about control registers of System MMU.
+Since no contents in 'data' is modified in this function,
+I think read_lock is more proper.
 
-> ---
->  MAINTAINERS |    1 +
->  1 files changed, 1 insertions(+), 0 deletions(-)
-> 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index c18b278..a21d4fb 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -1046,6 +1046,7 @@ ARM/SAMSUNG ARM ARCHITECTURES
->  M:	Ben Dooks <ben-linux@fluff.org>
->  M:	Kukjin Kim <kgene.kim@samsung.com>
->  L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-> +L:	linux-samsung-soc at vger.kernel.org
->  W:	http://www.fluff.org/ben/linux/
->  S:	Maintained
->  F:	arch/arm/plat-samsung/
-> --
-> 1.7.7.2
+However, suddenly, I think exynos_sysmmu_set_tablebase_pgd()
+must be removed because it modifies page table base
+that is already set with exynos_sysmmu_enable().
+
+>> +
+>> + ? ? ? ? ? ? if (is_sysmmu_active(data)) {
+>> + ? ? ? ? ? ? ? ? ? ? sysmmu_block(data->sfrbase);
+>> + ? ? ? ? ? ? ? ? ? ? __sysmmu_set_ptbase(data->sfrbase, pgd);
+>> + ? ? ? ? ? ? ? ? ? ? sysmmu_unblock(data->sfrbase);
+>> + ? ? ? ? ? ? ? ? ? ? dev_dbg(data->dev, "New page table base is %p\n",
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? (void *)pgd);
+>> + ? ? ? ? ? ? } else {
+>> + ? ? ? ? ? ? ? ? ? ? dev_dbg(data->dev,
+>> + ? ? ? ? ? ? ? ? ? ? "Disabled: Skipping setting page table base.\n");
+>> + ? ? ? ? ? ? }
+>> +
+>> + ? ? ? ? ? ? read_unlock_irqrestore(&data->lock, flags);
+> It should be 'write_unlock_irqrestore'
+
+Ditto.
+
+>> +void exynos_sysmmu_tlb_invalidate(struct device *owner)
+>> +{
+>> + ? ? struct sysmmu_drvdata *data = NULL;
+>> +
+>> + ? ? while ((data = get_sysmmu_data(owner, data))) {
+>> + ? ? ? ? ? ? unsigned long flags;
+>> +
+>> + ? ? ? ? ? ? read_lock_irqsave(&data->lock, flags);
+> doesn't use the write_lock_irqsave here?
+
+Ditto.
+
+>> +static void exynos_iommu_domain_destroy(struct iommu_domain *domain)
+>> +{
+>> + ? ? struct exynos_iommu_domain *priv = domain->priv;
+>> + ? ? struct list_head *pos, *n;
+>> +
+>> + ? ? WARN_ON(!list_empty(&priv->clients));
+>> +
+>> + ? ? spin_lock(&priv->lock);
+>> +
+>> + ? ? list_for_each_safe(pos, n, &priv->clients) {
+>> + ? ? ? ? ? ? struct iommu_client *client;
+>> +
+>> + ? ? ? ? ? ? client = list_entry(pos, struct iommu_client, node);
+>> + ? ? ? ? ? ? exynos_sysmmu_disable(client->dev);
+> I think It occurs sleeping lock error message since it calls the
+> write_lock within spin_lock.
+
+Sorry, I don't understand why it makes problem.
+
+I also tested it with various devices.
+It is also not a condition of neither deadlock nor livelock.
+
+Thank you.
+
+KyongHo.
