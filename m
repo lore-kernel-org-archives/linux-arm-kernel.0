@@ -1,31 +1,41 @@
-From: dirk.behme@de.bosch.com (Dirk Behme)
-Date: Tue, 15 Nov 2011 11:00:21 +0100
-Subject: [PATCH] merge i.MX5 into mach-imx
-In-Reply-To: <20111114015311.GA10217@S2100-06.ap.freescale.net>
-References: <1320915966-8063-1-git-send-email-s.hauer@pengutronix.de>
- <20111114015311.GA10217@S2100-06.ap.freescale.net>
-Message-ID: <4EC23835.4010504@de.bosch.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Tue, 15 Nov 2011 14:03:14 +0400
+Subject: [PATCH v2 4/5] davinci: create new common platform header for
+ davinci
+In-Reply-To: <1321283357-27698-5-git-send-email-manjunath.hadli@ti.com>
+References: <1321283357-27698-1-git-send-email-manjunath.hadli@ti.com>
+ <1321283357-27698-5-git-send-email-manjunath.hadli@ti.com>
+Message-ID: <4EC238E2.3040600@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14.11.2011 02:53, Shawn Guo wrote:
-> On Thu, Nov 10, 2011 at 10:06:03AM +0100, Sascha Hauer wrote:
->> Hi,
->>
->> The following series merges i.MX5 support into mach-imx and makes it
->> possible to compile i.MX5 together with i.MX3/6. I originally wanted
->> to wait until the next merge window with this, but I think we can
->> avoid a lot of merging trouble when we just merge it during this
->> -rc cycle. What do you think?
->>
-> Using your mx5-merge branch, on imx6q, imx51 and imx53:
-> 
-> Tested-by: Shawn Guo <shawn.guo@linaro.org>
+Hello.
 
-On imx6q (with Shawn's CONFIG_MMC_BLOCK change):
+On 14-11-2011 19:09, Manjunath Hadli wrote:
 
-Tested-by: Dirk Behme <dirk.behme@de.bosch.com>
+> remove the code from individual platform header files for
+> dm365, dm355, dm644x and dm646x and consolidate it into a
+> single and common header file davinci_common.h.
+> Include the new header file in individual platform header
+> files as a pre-cursor for deleting these headers in follow
+> up patches.
 
-Thanks
+> Signed-off-by: Manjunath Hadli<manjunath.hadli@ti.com>
+> ---
+>   .../arm/mach-davinci/include/mach/davinci_common.h |   88 ++++++++++++++++++++
+>   arch/arm/mach-davinci/include/mach/dm355.h         |   18 +----
+>   arch/arm/mach-davinci/include/mach/dm365.h         |   20 +----
+>   arch/arm/mach-davinci/include/mach/dm644x.h        |   15 +---
+>   arch/arm/mach-davinci/include/mach/dm646x.h        |   20 +----
+>   5 files changed, 92 insertions(+), 69 deletions(-)
+>   create mode 100644 arch/arm/mach-davinci/include/mach/davinci_common.h
 
-Dirk
+> diff --git a/arch/arm/mach-davinci/include/mach/davinci_common.h b/arch/arm/mach-davinci/include/mach/davinci_common.h
+> new file mode 100644
+> index 0000000..a859318
+> --- /dev/null
+> +++ b/arch/arm/mach-davinci/include/mach/davinci_common.h
+
+    Why not call it just davinci.h?
+
+WBR, Sergei
