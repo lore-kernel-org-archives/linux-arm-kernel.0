@@ -1,53 +1,32 @@
 From: swarren@nvidia.com (Stephen Warren)
-Date: Tue, 15 Nov 2011 11:07:40 -0800
-Subject: [PATCH] ARM: SAMSUNG: Save/restore GPIO drive strength across
- suspend/resume
-In-Reply-To: <CAJuYYwQNQZmMYgwcZr1M2dxfhjuJvL6AimfkQQoG_arxi6UwGg@mail.gmail.com>
-References: <1321074108-10025-1-git-send-email-inderpal.singh@linaro.org>
- <CACRpkdbC=w5vRvgLVpAcmcampt-baTydpLHBexak4RzxUcO32Q@mail.gmail.com>
- <CAJuYYwSvRYWdoccSN3nU7G4zXyTjt7vkjAd_vDx=QchG+yd5Cg@mail.gmail.com>
- <74CDBE0F657A3D45AFBB94109FB122FF1740805B13@HQMAIL01.nvidia.com>
- <CAJuYYwQNQZmMYgwcZr1M2dxfhjuJvL6AimfkQQoG_arxi6UwGg@mail.gmail.com>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF1740805E0D@HQMAIL01.nvidia.com>
+Date: Tue, 15 Nov 2011 11:16:51 -0800
+Subject: [PATCH v1] dts: tegra-ventana: use proper root instead of /dev/ram
+In-Reply-To: <1321338087-3662-1-git-send-email-vwadekar@nvidia.com>
+References: <1321338087-3662-1-git-send-email-vwadekar@nvidia.com>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF1740805E1B@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thomas Abraham wrote at Monday, November 14, 2011 12:37 PM:
-...
-> I am not sure how this works, but with dynamic transitioning, will it
-> be possible to program the pinmux registers dynamically when a
-> driver/controller decides to idle for sometime and come back up again
-> (not a system wide suspend-resume cycle). There might be a need for
-> the driver to inform the pinmux subsystem of this case and allow the
-> pinmux subsystem to re-program pinmux registers as required.
+Varun Wadekar wrote at Monday, November 14, 2011 11:21 PM:
+> From: Pritesh Raithatha <praithatha@nvidia.com>
+> 
+> The root file system on ventana resides on /dev/mmcblk0p1.
 
-Well, such a feature doesn't exist yet.
+Well, that's entirely up to however the user set up their system, although
+I admit mmcblk0p1 is likely to be the common case; I certainly carry
+basically this patch locally for many boards.
 
-But, I envisaged extending the existing:
+> Update the dts file to use the proper root instead of /dev/ram.
+> 
+> Signed-off-by: Pritesh Raithatha <praithatha@nvidia.com>
+> Signed-off-by: Varun Wadekar <vwadekar@nvidia.com>
 
-pmx = pinmux_get()
-pinmux_enable(pmx)
-...
-pinmux_disable(pmx)
-pinmux_put(pmx)
+Acked-by: Stephen Warren <swarren@nvidia.com>
 
-to something like:
-
-pmx = pinmux_get(active)
-pinmux_enable(pmx)
-...
-pinmux_switch(suspend)
-...
-pinmux_switch(active)
-...
-pinmux_disable(pmx)
-pinmux_put(pmx)
-
-(I think LinusW proposed an alternative a while back last time we talked
-about this)
-
-This has received only limited discussion though, and there are probably
-many gotchas to think through; I imagine any such feature is a way off.
+Of course, perhaps an even better solution is to just remove /chosen from
+all the board .dts files, and stop using CONFIG_APPENDED_DTB since U-boot
+supports FDT, and will update the cmdline with whatever the user chose.
+Still, I think this is probably OK for now.
 
 -- 
 nvpublic
