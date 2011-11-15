@@ -1,36 +1,47 @@
-From: jaswinder.singh@linaro.org (Jassi Brar)
-Date: Tue, 15 Nov 2011 14:41:32 +0530
-Subject: [PATCH 4/4] ARM: PL330: Fix typo in _prepare_ccr()
-In-Reply-To: <1320244259-10496-4-git-send-email-javi.merino@arm.com>
-References: <1320244259-10496-1-git-send-email-javi.merino@arm.com>
- <1320244259-10496-4-git-send-email-javi.merino@arm.com>
-Message-ID: <CAJe_Zhd78O=5UzekDA1veZaA1Ru2Bax_iBKckmdC++Kwg+pkCQ@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 15 Nov 2011 18:14:22 +0900
+Subject: [PATCH 2/2] MAINTAINERS: Extend Samsung patterns to cover SPI and
+ ASoC drivers
+In-Reply-To: <1320923776-26626-2-git-send-email-broonie@opensource.wolfsonmicro.com>
+References: <1320923776-26626-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+ <1320923776-26626-2-git-send-email-broonie@opensource.wolfsonmicro.com>
+Message-ID: <005701cca376$f6abbba0$e40332e0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2 November 2011 20:00, Javi Merino <javi.merino@arm.com> wrote:
-> scctl should be shifted by CC_SRCCTRL_SHFT and dcctl by
-> CC_DSTCCTRL_SHFT, not the other way round.
->
-> Signed-off-by: Javi Merino <javi.merino@arm.com>
-> Cc: Jassi Brar <jassi.brar@samsung.com>
+Mark Brown wrote:
+> 
+> Help people find the overall architecture.
+> 
+> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
 > ---
-> ?arch/arm/common/pl330.c | ? ?4 ++--
-> ?1 files changed, 2 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm/common/pl330.c b/arch/arm/common/pl330.c
-> index 590fd57..1817963 100644
-> --- a/arch/arm/common/pl330.c
-> +++ b/arch/arm/common/pl330.c
-> @@ -1211,8 +1211,8 @@ static inline u32 _prepare_ccr(const struct pl330_reqcfg *rqc)
-> ? ? ? ?ccr |= (rqc->brst_size << CC_SRCBRSTSIZE_SHFT);
-> ? ? ? ?ccr |= (rqc->brst_size << CC_DSTBRSTSIZE_SHFT);
->
-> - ? ? ? ccr |= (rqc->dcctl << CC_SRCCCTRL_SHFT);
-> - ? ? ? ccr |= (rqc->scctl << CC_DSTCCTRL_SHFT);
-> + ? ? ? ccr |= (rqc->scctl << CC_SRCCCTRL_SHFT);
-> + ? ? ? ccr |= (rqc->dcctl << CC_DSTCCTRL_SHFT);
->
-> ? ? ? ?ccr |= (rqc->swap << CC_SWAP_SHFT);
->
-Acked-by: Jassi Brar <jassisinghbrar@gmail.com>
+>  MAINTAINERS |    2 ++
+>  1 files changed, 2 insertions(+), 0 deletions(-)
+> 
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index a21d4fb..9eca526 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -1054,6 +1054,8 @@ F:	arch/arm/plat-s3c24xx/
+>  F:	arch/arm/plat-s5p/
+>  F:	drivers/*/*s3c2410*
+>  F:	drivers/*/*/*s3c2410*
+> +F:	drivers/spi/spi-s3c*
+> +F:	sound/soc/samsung/*
+> 
+>  ARM/S3C2410 ARM ARCHITECTURE
+>  M:	Ben Dooks <ben-linux@fluff.org>
+> --
+> 1.7.7.2
+
+Hmm, I'm ok on this but needs Grant's opinion :)
+
+(Cc'ed Grant Likely)
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
