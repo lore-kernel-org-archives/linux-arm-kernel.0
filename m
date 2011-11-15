@@ -1,124 +1,63 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Tue, 15 Nov 2011 11:59:50 -0600
-Subject: [PATCH v2 1/5] dmaengine: add ep93xx DMA support
-In-Reply-To: <4EC27EED.4030108@metasoft.pl>
-References: <cover.1306662317.git.mika.westerberg@iki.fi>
- <3ea8d56034f25cbe3fd8a4c31d7d0d1540b6ac7e.1306662317.git.mika.westerberg@iki.fi>
- <4EC27EED.4030108@metasoft.pl>
-Message-ID: <ADE657CA350FB648AAC2C43247A983F001F3E93FDC22@AUSP01VMBX24.collaborationhost.net>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 15 Nov 2011 18:40:14 +0000
+Subject: [PATCH v3] ARM: gic: allow GIC to support non-banked setups
+In-Reply-To: <4EC2A2EB.6010307@gmail.com>
+References: <1321359452-22821-1-git-send-email-marc.zyngier@arm.com>
+ <4EC26B02.8000604@gmail.com> <4EC2742A.3050301@arm.com>
+ <4EC2A2EB.6010307@gmail.com>
+Message-ID: <4EC2B20E.9070503@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, November 15, 2011 8:02 AM, Rafal Prylowski wrote:
->
-> Hello.
->
-> During adaptation of my experimental ep93xx ide driver to the new dmaengine api,
-> I discovered two issues with ep93xx dma implementation:
-
-Nice to see someone is trying to get IDE support for the ep93xx into mainline!
-Unfortunately none of my ep93xx hardware supports IDE... :-(
-
-> 1) Control register is incorrectly programmed for IDE (m2m_hw_setup),
-> probably copy-paste bug ;)
-> 2) Kernel oops when trying to stop running transfers by calling
-> dmaengine_terminate_all(...) - caused by dereferencing empty list
-> in ep93xx_dma_get_active
->
-> Following is a patch, which solves these problems for me.
->
-> Regards,
-> Rafal Prylowski
->
-> Index: linux-2.6/drivers/dma/ep93xx_dma.c
-> ===================================================================
-> --- linux-2.6.orig/drivers/dma/ep93xx_dma.c
-> +++ linux-2.6/drivers/dma/ep93xx_dma.c
-> @@ -246,6 +246,7 @@ static void ep93xx_dma_set_active(struct
->  static struct ep93xx_dma_desc *
->  ep93xx_dma_get_active(struct ep93xx_dma_chan *edmac)
->  {
-> +	BUG_ON(list_empty(&edmac->active));
-
-BUG_ON is evil...
-
-I'm not sure this is the right way to handle this.
-
-If your doing dma the list should never be empty.  If it is I think it should
-have been caught way before this.  Mika, do you have any comments?
-
-> 	return list_first_entry(&edmac->active, struct ep93xx_dma_desc, node);
-> }
+On 15/11/11 17:35, Rob Herring wrote:
+>>> On 11/15/2011 06:17 AM, Marc Zyngier wrote:
+>>>> The GIC support code is heavily using the fact that hardware
+>>>> implementations are exposing banked registers. Unfortunately, it
+>>>> looks like at least one GIC implementation (EXYNOS) offers both
+>>>> the distributor and the CPU interfaces at different addresses,
+>>>> depending on the CPU.
+>>>>
+>>>> This problem is solved by allowing the distributor and CPU interface
+>>>> addresses to be per-cpu variables for the platforms that require it.
+>>>> The EXYNOS code is updated not to mess with the GIC internals while
+>>>> handling interrupts, and struct gic_chip_data is back to being private.
+>>>> The DT binding for the gic is updated to allow an optional "cpu-offset"
+>>>> value, which is used to compute the various base addresses.
+>>>>
+>>>> Finally, a new config option (GIC_NON_BANKED) is used to control this
+>>>> feature, so the overhead is only present on kernels compiled with
+>>>> support for EXYNOS.
+>>>>
+>>>> Tested on Origen (EXYNOS4) and Panda (OMAP4).
+>>>>
+>>>> Cc: Kukjin Kim <kgene.kim@samsung.com>
+>>>> Cc: Rob Herring <robherring2@gmail.com>
+>>>> Cc: Will Deacon <will.deacon@arm.com>
+>>>> Cc: Thomas Abraham <thomas.abraham@linaro.org>
+>>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>>>> ---
+>>>> This is a minor update on the previous version, simply adding a
+>>>> config option so that normal platforms don't have to pay the
+>>>> price of the get_base() indirection.
+>>>>
+>>>> Any comment is welcome, specially on the DT binding update.
+>>>>
+>>>>  Documentation/devicetree/bindings/arm/gic.txt |    4 +
+>>>>  arch/arm/common/Kconfig                       |    3 +
+>>>>  arch/arm/common/gic.c                         |  133 +++++++++++++++++++++----
+>>>>  arch/arm/include/asm/hardware/gic.h           |   24 ++---
+>>>>  arch/arm/mach-exynos/cpu.c                    |   16 +---
+>>>>  arch/arm/mach-exynos/platsmp.c                |   28 +-----
+>>>>  arch/arm/plat-s5p/Kconfig                     |    1 +
+>>>>  7 files changed, 132 insertions(+), 77 deletions(-)
+>>>>
 > 
-> @@ -459,9 +460,6 @@ static int m2m_hw_setup(struct ep93xx_dm
->  		 * This IDE part is totally untested. Values below are taken
->  		 * from the EP93xx Users's Guide and might not be correct.
->  		 */
-> -		control |= M2M_CONTROL_NO_HDSK;
-> -		control |= M2M_CONTROL_RSS_IDE;
-> -		control |= M2M_CONTROL_PW_16;
->  
->  		if (data->direction == DMA_TO_DEVICE) {
->  			/* Worst case from the UG */
-> @@ -473,6 +471,9 @@ static int m2m_hw_setup(struct ep93xx_dm
->  			control |= M2M_CONTROL_SAH;
->  			control |= M2M_CONTROL_TM_RX;
->  		}
-> +		control |= M2M_CONTROL_NO_HDSK;
-> +		control |= M2M_CONTROL_RSS_IDE;
-> +		control |= M2M_CONTROL_PW_16;
->  		break;
-
-This looks right.  The common OR'ed in bits should be added after setting the
-direction bits.
-
->  	default:
-> @@ -668,24 +669,28 @@ static void ep93xx_dma_unmap_buffers(str
->  static void ep93xx_dma_tasklet(unsigned long data)
->  {
->  	struct ep93xx_dma_chan *edmac = (struct ep93xx_dma_chan *)data;
-> -	struct ep93xx_dma_desc *desc, *d;
-> -	dma_async_tx_callback callback;
-> -	void *callback_param;
-> +	struct ep93xx_dma_desc *desc = NULL, *d;
-> +	dma_async_tx_callback callback = NULL;
-> +	void *callback_param = NULL;
->  	LIST_HEAD(list);
->  
->  	spin_lock_irq(&edmac->lock);
-> -	desc = ep93xx_dma_get_active(edmac);
-> -	if (desc->complete) {
-> -		edmac->last_completed = desc->txd.cookie;
-> -		list_splice_init(&edmac->active, &list);
-> +	if (!list_empty(&edmac->active)) {
-> +		desc = ep93xx_dma_get_active(edmac);
-> +		if (desc->complete) {
-> +			edmac->last_completed = desc->txd.cookie;
-> +			list_splice_init(&edmac->active, &list);
-> +		}
-
-It looks like this might actually catch your BUG_ON issue above.
-
->  	}
->  	spin_unlock_irq(&edmac->lock);
->  
->  	/* Pick up the next descriptor from the queue */
->  	ep93xx_dma_advance_work(edmac);
->  
-> -	callback = desc->txd.callback;
-> -	callback_param = desc->txd.callback_param;
-> +	if (desc) {
-> +		callback = desc->txd.callback;
-> +		callback_param = desc->txd.callback_param;
-> +	}
-
-These could be moved up to where 'desc' is getting set.  You have already
-verified that the list is not empty and have a valid 'desc' pointer.  Set
-the callback pointers there to remove this extra if (desc) test.
-
+> So you can add my ack:
 > 
->  	/* Now we can release all the chained descriptors */
->  	list_for_each_entry_safe(desc, d, &list, node) {
+> Acked-by: Rob Herring <rob.herring@calxeda.com>
 
-Thanks,
-Hartley
+Thanks Rob!
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
