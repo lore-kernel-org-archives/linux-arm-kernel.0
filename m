@@ -1,72 +1,124 @@
-From: or.rmz1@gmail.com (Omar Ramirez Luna)
-Date: Tue, 15 Nov 2011 11:57:59 -0600
-Subject: [PATCH v16 09/12] OMAP: dmtimer: low-power mode support
-In-Reply-To: <1316518227-28116-10-git-send-email-tarun.kanti@ti.com>
-References: <1316518227-28116-1-git-send-email-tarun.kanti@ti.com>
- <1316518227-28116-10-git-send-email-tarun.kanti@ti.com>
-Message-ID: <CAPTm=KGDEKGxLpJt0t6k_NL5Wz81NkMmRJ+OkmyvHedd6_exgQ@mail.gmail.com>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Tue, 15 Nov 2011 11:59:50 -0600
+Subject: [PATCH v2 1/5] dmaengine: add ep93xx DMA support
+In-Reply-To: <4EC27EED.4030108@metasoft.pl>
+References: <cover.1306662317.git.mika.westerberg@iki.fi>
+ <3ea8d56034f25cbe3fd8a4c31d7d0d1540b6ac7e.1306662317.git.mika.westerberg@iki.fi>
+ <4EC27EED.4030108@metasoft.pl>
+Message-ID: <ADE657CA350FB648AAC2C43247A983F001F3E93FDC22@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tarun,
-
-On Tue, Sep 20, 2011 at 6:30 AM, Tarun Kanti DebBarma
-<tarun.kanti@ti.com> wrote:
-> Clock is enabled only when timer is started and disabled when the the timer
-> is stopped. Therefore before accessing registers in functions clock is enabled
-> and then disabled back at the end of access. Context save is done dynamically
-> whenever the registers are modified. Context restore is called when context is
-> lost.
-
-Now that handling of the clock has been decoupled from
-omap_dm_timer_request_specific/free and placed in start/stop
-functions, there is a "possible irq lock inversion dependency
-detected" for any attempt to enable the clock from soft|hard irq.
-
-My use case is as follows:
-
-DSP sends a mailbox message to ARM, this triggers a tasklet in mailbox
-for processing the message, when it reaches tidspbridge it turns out
-that the DSP wants to enable a gpt timer; however, locks involved
-"clocks_mutex" and "dm_timer_lock" now could cause a deadlock as they
-have been called from unsafe contexts in the past
-(http://pastebin.com/7Dtz8t0f).
-
-Is the intention to restrict enabling the dmtimer clocks from hard|soft irqs?
-
-...
-> @@ -303,6 +342,22 @@ void omap_dm_timer_stop(struct omap_dm_timer *timer)
-> ? ? ? ? ? ? ? ?rate = clk_get_rate(timer->fclk);
+On Tuesday, November 15, 2011 8:02 AM, Rafal Prylowski wrote:
 >
-> ? ? ? ?__omap_dm_timer_stop(timer, timer->posted, rate, is_omap2);
-> +
-> + ? ? ? if (timer->loses_context) {
-> + ? ? ? ? ? ? ? if (timer->get_context_loss_count)
-> + ? ? ? ? ? ? ? ? ? ? ? timer->ctx_loss_count =
-> + ? ? ? ? ? ? ? ? ? ? ? timer->get_context_loss_count(&timer->pdev->dev);
-> + ? ? ? }
-> +
-> + ? ? ? /*
-> + ? ? ? ?* Since the register values are computed and written within
-> + ? ? ? ?* __omap_dm_timer_stop, we need to use read to retrieve the
-> + ? ? ? ?* context.
-> + ? ? ? ?*/
-> + ? ? ? timer->context.tclr =
-> + ? ? ? ? ? ? ? ? ? ? ? omap_dm_timer_read_reg(timer, OMAP_TIMER_CTRL_REG);
-> + ? ? ? timer->context.tisr = __raw_readl(timer->irq_stat);
-> + ? ? ? omap_dm_timer_disable(timer);
-> ?}
-> ?EXPORT_SYMBOL_GPL(omap_dm_timer_stop);
+> Hello.
 >
+> During adaptation of my experimental ep93xx ide driver to the new dmaengine api,
+> I discovered two issues with ep93xx dma implementation:
 
-I didn't review the whole patch, but at least this part is not in
-mainline, it seems like the patch modified by Tony and the v16 were
-not the same.
+Nice to see someone is trying to get IDE support for the ep93xx into mainline!
+Unfortunately none of my ep93xx hardware supports IDE... :-(
 
-I could diff and include the missing parts, if someone can confirm
-that we need v16, which I believe so, since current stop function
-doesn't call omap_dm_timer_disable.
+> 1) Control register is incorrectly programmed for IDE (m2m_hw_setup),
+> probably copy-paste bug ;)
+> 2) Kernel oops when trying to stop running transfers by calling
+> dmaengine_terminate_all(...) - caused by dereferencing empty list
+> in ep93xx_dma_get_active
+>
+> Following is a patch, which solves these problems for me.
+>
+> Regards,
+> Rafal Prylowski
+>
+> Index: linux-2.6/drivers/dma/ep93xx_dma.c
+> ===================================================================
+> --- linux-2.6.orig/drivers/dma/ep93xx_dma.c
+> +++ linux-2.6/drivers/dma/ep93xx_dma.c
+> @@ -246,6 +246,7 @@ static void ep93xx_dma_set_active(struct
+>  static struct ep93xx_dma_desc *
+>  ep93xx_dma_get_active(struct ep93xx_dma_chan *edmac)
+>  {
+> +	BUG_ON(list_empty(&edmac->active));
 
-Regards,
+BUG_ON is evil...
 
-Omar
+I'm not sure this is the right way to handle this.
+
+If your doing dma the list should never be empty.  If it is I think it should
+have been caught way before this.  Mika, do you have any comments?
+
+> 	return list_first_entry(&edmac->active, struct ep93xx_dma_desc, node);
+> }
+> 
+> @@ -459,9 +460,6 @@ static int m2m_hw_setup(struct ep93xx_dm
+>  		 * This IDE part is totally untested. Values below are taken
+>  		 * from the EP93xx Users's Guide and might not be correct.
+>  		 */
+> -		control |= M2M_CONTROL_NO_HDSK;
+> -		control |= M2M_CONTROL_RSS_IDE;
+> -		control |= M2M_CONTROL_PW_16;
+>  
+>  		if (data->direction == DMA_TO_DEVICE) {
+>  			/* Worst case from the UG */
+> @@ -473,6 +471,9 @@ static int m2m_hw_setup(struct ep93xx_dm
+>  			control |= M2M_CONTROL_SAH;
+>  			control |= M2M_CONTROL_TM_RX;
+>  		}
+> +		control |= M2M_CONTROL_NO_HDSK;
+> +		control |= M2M_CONTROL_RSS_IDE;
+> +		control |= M2M_CONTROL_PW_16;
+>  		break;
+
+This looks right.  The common OR'ed in bits should be added after setting the
+direction bits.
+
+>  	default:
+> @@ -668,24 +669,28 @@ static void ep93xx_dma_unmap_buffers(str
+>  static void ep93xx_dma_tasklet(unsigned long data)
+>  {
+>  	struct ep93xx_dma_chan *edmac = (struct ep93xx_dma_chan *)data;
+> -	struct ep93xx_dma_desc *desc, *d;
+> -	dma_async_tx_callback callback;
+> -	void *callback_param;
+> +	struct ep93xx_dma_desc *desc = NULL, *d;
+> +	dma_async_tx_callback callback = NULL;
+> +	void *callback_param = NULL;
+>  	LIST_HEAD(list);
+>  
+>  	spin_lock_irq(&edmac->lock);
+> -	desc = ep93xx_dma_get_active(edmac);
+> -	if (desc->complete) {
+> -		edmac->last_completed = desc->txd.cookie;
+> -		list_splice_init(&edmac->active, &list);
+> +	if (!list_empty(&edmac->active)) {
+> +		desc = ep93xx_dma_get_active(edmac);
+> +		if (desc->complete) {
+> +			edmac->last_completed = desc->txd.cookie;
+> +			list_splice_init(&edmac->active, &list);
+> +		}
+
+It looks like this might actually catch your BUG_ON issue above.
+
+>  	}
+>  	spin_unlock_irq(&edmac->lock);
+>  
+>  	/* Pick up the next descriptor from the queue */
+>  	ep93xx_dma_advance_work(edmac);
+>  
+> -	callback = desc->txd.callback;
+> -	callback_param = desc->txd.callback_param;
+> +	if (desc) {
+> +		callback = desc->txd.callback;
+> +		callback_param = desc->txd.callback_param;
+> +	}
+
+These could be moved up to where 'desc' is getting set.  You have already
+verified that the list is not empty and have a valid 'desc' pointer.  Set
+the callback pointers there to remove this extra if (desc) test.
+
+> 
+>  	/* Now we can release all the chained descriptors */
+>  	list_for_each_entry_safe(desc, d, &list, node) {
+
+Thanks,
+Hartley
