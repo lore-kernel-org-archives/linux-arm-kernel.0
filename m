@@ -1,30 +1,187 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 15 Nov 2011 08:41:22 +0100
-Subject: [PATCH 3/5] [orion] Move address map setup out of the drivers
- and into platform.
-In-Reply-To: <alpine.LFD.2.02.1111141855340.3307@xanadu.home>
-References: <1321128007-3520-1-git-send-email-andrew@lunn.ch>
- <1321128007-3520-4-git-send-email-andrew@lunn.ch>
- <alpine.LFD.2.02.1111141855340.3307@xanadu.home>
-Message-ID: <20111115074122.GA2012@lunn.ch>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 15 Nov 2011 16:47:18 +0900
+Subject: [PATCH 3/5] ARM: restart: exynos4: use new restart hook XXX	WIP
+ XXX WHY IS THERE NO LOCAL HEADERS IN arch/arm/mach-exynos4 XXX
+In-Reply-To: <20111110231556.GY12913@n2100.arm.linux.org.uk>
+References: <20111106175457.GK12913@n2100.arm.linux.org.uk>
+ <E1RN6wy-0001aV-VK@rmk-PC.arm.linux.org.uk>
+ <20111107103048.GM12913@n2100.arm.linux.org.uk>
+ <CAH9JG2WO9LHLbLy-8Ly1UrN--L=VNuzV0yZ+5WeDxwHLbJkyOw@mail.gmail.com>
+ <20111107115223.GO12913@n2100.arm.linux.org.uk>
+ <04f101cc9dd6$4b228f20$e167ad60$%kim@samsung.com>
+ <20111110231556.GY12913@n2100.arm.linux.org.uk>
+Message-ID: <004601cca36a$ccf215e0$66d641a0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> I understand that you might want to get rid of the annoying platform 
-> data pointer for the mbus values.  But I think that this could be done 
-> some other way though.  IMHO the mbus initialization code for 
-> peripherals should remain in the drivers, and a different way to query 
-> the needed information be elaborated instead.  Otherwise this is like 
-> throwing out the baby with the bath water.
+Russell King - ARM Linux wrote:
+> 
+> On Tue, Nov 08, 2011 at 02:21:39PM +0900, Kukjin Kim wrote:
+> > Russell King - ARM Linux wrote:
+> > >
+> > > On Mon, Nov 07, 2011 at 08:17:58PM +0900, Kyungmin Park wrote:
+> > > > On 11/7/11, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+> > > > > On Sun, Nov 06, 2011 at 05:56:08PM +0000, Russell King - ARM Linux
+> > wrote:
+> > > > >> Hook these platforms restart code into the new restart hook
+rather
+> > > > >> than using arch_reset().
+> > > > >>
+> > > > >> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> > > > >> ---
+> > > > >>  arch/arm/mach-exynos4/cpu.c                 |    6 +-----
+> > > > >>  arch/arm/mach-exynos4/mach-armlex4210.c     |    1 +
+> > > > >>  arch/arm/mach-exynos4/mach-nuri.c           |    1 +
+> > > > >>  arch/arm/mach-exynos4/mach-origen.c         |    1 +
+> > > > >>  arch/arm/mach-exynos4/mach-smdk4x12.c       |    2 ++
+> > > > >>  arch/arm/mach-exynos4/mach-smdkv310.c       |    2 ++
+> > > > >>  arch/arm/mach-exynos4/mach-universal_c210.c |    1 +
+> > > > >>  7 files changed, 9 insertions(+), 5 deletions(-)
+> > > > >>
+> > > > >> diff --git a/arch/arm/mach-exynos4/cpu.c
+> > b/arch/arm/mach-exynos4/cpu.c
+> > > > >> index 5b1765b..5b1ee56 100644
+> > > > >> --- a/arch/arm/mach-exynos4/cpu.c
+> > > > >> +++ b/arch/arm/mach-exynos4/cpu.c
+> > > > >> @@ -27,7 +27,6 @@
+> > > > >>  #include <plat/fb-core.h>
+> > > > >>  #include <plat/fimc-core.h>
+> > > > >>  #include <plat/iic-core.h>
+> > > > >> -#include <plat/reset.h>
+> > > > >>  #include <plat/tv-core.h>
+> > > > >>
+> > > > >>  #include <mach/regs-irq.h>
+> > > > >> @@ -145,7 +144,7 @@ static void exynos4_idle(void)
+> > > > >>  	local_irq_enable();
+> > > > >>  }
+> > > > >>
+> > > > >> -static void exynos4_sw_reset(void)
+> > > > >> +void exynos4_restart(char mode, const char *cmd)
+> > > > >>  {
+> > > > >>  	__raw_writel(0x1, S5P_SWRESET);
+> > > > >>  }
+> > > > >> @@ -286,8 +285,5 @@ int __init exynos4_init(void)
+> > > > >>  	/* set idle function */
+> > > > >>  	pm_idle = exynos4_idle;
+> > > > >>
+> > > > >> -	/* set sw_reset function */
+> > > > >> -	s5p_reset_hook = exynos4_sw_reset;
+> > > > >> -
+> > > > >
+> > > > > I notice in last nights merge of the Samsung stuff, this has
+become
+> > > > > less trivial - it's now:
+> > > > >         /* set sw_reset function */
+> > > > >         if (soc_is_exynos4210() || soc_is_exynos4212() ||
+> > > > > soc_is_exynos4412())
+> > > > >                 s5p_reset_hook = exynos4_sw_reset;
+> > > > >
+> > > > > So which of the boards should be converted and which shouldn't ?
+> > > > > In other words, which exynos4210, 4212 or 4412 platforms?
+> > > >
+> > > > except the arch/arm/mach-exynos4/mach-smdk4x12.c, exynos4210 is
+used.
+> > > > currently all exynos4 series has same reset function. it's
+preparation
+> > > > for exynos5 series maybe.
+> > > >
+> > > > you can use the exynos4_sw_reset for all boards.
+> > >
+> > Thanks, Kyungmin.
+> >
+> > > Thanks, that gets me back to where I was with the patch before the
+> > > exynos4 move.
+> > >
+> >
+> > Thanks.
+> 
+> I have to point out that even so, this patch as it stands will break
+> the exynos build (that's why the subject line contains the XXX WIP XXX
+> stuff.)
+> 
+> As I said in my pet peaves mail, there should be a header in
+> arch/arm/mach-exynos for the data and function declarations which are
 
-I'm open to suggestion.
+OK, I see.
 
-What do you think about the idea of keeping the first two patches,
-i.e. *_mbus_dram_info out of mach-* and into plat-orion. Then
-providing a function orion_mbus_dram_info() which returns its. Keep
-the address map setup code in the drivers, remove struct
-mbus_dram_target_info from platform_data and use this function
-instead?
+> only used by and only provided by files in this directory.  Such things
+> as:
+> 
+> struct sys_timer exynos4_timer;
+> void exynos4_init_irq(void);
+> 
+> etc.  This stuff should not be inappropriately placed:
+> 
+> arch/arm/plat-samsung/include/plat/exynos4.h:extern struct sys_timer
+> exynos4_timer;
+> arch/arm/plat-samsung/include/plat/exynos4.h:extern void
+exynos4_init_irq(void);
+> 
+> (e.g.,
+> $ grep exynos4_init_irq\\\> arch/arm -r
+> arch/arm/mach-exynos/mach-nuri.c:   .init_irq       = exynos4_init_irq,
+> arch/arm/mach-exynos/mach-origen.c: .init_irq       = exynos4_init_irq,
+> arch/arm/mach-exynos/mach-armlex4210.c:     .init_irq       =
+exynos4_init_irq,
+> arch/arm/mach-exynos/mach-smdkv310.c:       .init_irq       =
+> exynos4_init_irq,
+> arch/arm/mach-exynos/mach-smdkv310.c:       .init_irq       =
+> exynos4_init_irq,
+> arch/arm/mach-exynos/mach-smdk4x12.c:       .init_irq       =
+> exynos4_init_irq,
+> arch/arm/mach-exynos/mach-smdk4x12.c:       .init_irq       =
+> exynos4_init_irq,
+> arch/arm/mach-exynos/cpu.c:void __init exynos4_init_irq(void)
+> arch/arm/mach-exynos/mach-universal_c210.c: .init_irq       =
+exynos4_init_irq,
+> arch/arm/plat-samsung/include/plat/exynos4.h:extern void
+exynos4_init_irq(void);
+> $ grep exynos4_timer arch/arm -r
+> arch/arm/mach-exynos/mach-nuri.c:   .timer          = &exynos4_timer,
+> arch/arm/mach-exynos/mach-origen.c: .timer          = &exynos4_timer,
+> arch/arm/mach-exynos/mach-armlex4210.c:     .timer          =
+> &exynos4_timer,
+> arch/arm/mach-exynos/mach-smdkv310.c:       .timer          =
+> &exynos4_timer,
+> arch/arm/mach-exynos/mach-smdkv310.c:       .timer          =
+> &exynos4_timer,
+> arch/arm/mach-exynos/mach-smdk4x12.c:       .timer          =
+> &exynos4_timer,
+> arch/arm/mach-exynos/mach-smdk4x12.c:       .timer          =
+> &exynos4_timer,
+> arch/arm/mach-exynos/mct.c:struct sys_timer exynos4_timer = {
+> arch/arm/mach-exynos/mach-universal_c210.c: .timer          =
+&exynos4_timer,
+> arch/arm/plat-samsung/include/plat/exynos4.h:extern struct sys_timer
+> exynos4_timer;
+> $ grep exynos4_register_clocks arch/arm -r
+> arch/arm/mach-exynos/clock.c:void __init exynos4_register_clocks(void)
+> arch/arm/mach-exynos/cpu.c: exynos4_register_clocks();
+> arch/arm/plat-samsung/include/plat/exynos4.h:extern void
+> exynos4_register_clock(void);
+> $ grep exynos421._register_clocks arch/arm -r
+> arch/arm/mach-exynos/clock-exynos4212.c:void __init
+> exynos4212_register_clocks(void)
+> arch/arm/mach-exynos/cpu.c:         exynos4210_register_clocks();
+> arch/arm/mach-exynos/cpu.c:         exynos4212_register_clocks();
+> arch/arm/mach-exynos/clock-exynos4210.c:void __init
+> exynos4210_register_clocks(void)
+> arch/arm/plat-samsung/include/plat/exynos4.h:extern void
+> exynos4210_register_clocks(void);
+> arch/arm/plat-samsung/include/plat/exynos4.h:extern void
+> exynos4212_register_clocks(void);
+> )
+> 
+> I suspect a sizeable proportion of plat/exynos4.h could move into
+> arch/arm/mach-exynos.
 
-	Thanks
-		Andrew
+OK, as I replied previous, I agree with you and I will sort them out as per
+your suggestion.
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
