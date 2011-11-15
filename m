@@ -1,26 +1,60 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Tue, 15 Nov 2011 02:16:10 +0100
-Subject: [PATCH 04/41] ARM: restart: at91: use new restart hook
-In-Reply-To: <E1RN6ic-0001Wp-7t@rmk-PC.arm.linux.org.uk>
-References: <20111106173113.GI12913@n2100.arm.linux.org.uk>
- <E1RN6ic-0001Wp-7t@rmk-PC.arm.linux.org.uk>
-Message-ID: <20111115011610.GF15318@game.jcrosoft.org>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 15 Nov 2011 09:54:08 +0800
+Subject: [PATCH] ARM: exynos: remove exynos4_scu_enable()
+Message-ID: <1321322048-24885-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17:41 Sun 06 Nov     , Russell King - ARM Linux wrote:
-> Rather than using a private function pointer, use the existing
-> arm_pm_restart function pointer instead.  We no longer need to enable
-> the I-cache in at91sam9_alt_reset() as the caches will now be on when
-> this function is called.
-> 
-> Update the function names to use the 'restart' terminology rather than
-> the 'reboot' terminology.
-> 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> ---
-I'll appply this one via at91-treee as I've patch that touch this part too in
-the queue if you do'nt mind
+The exynos4_scu_enable() is a duplication of scu_enable().  Since
+commit '26a527e ARM: 7100/1: smp_scu: remove __init annotation from
+scu_enable()' makes scu_enable() available for non-init codes, exynos
+can directly call scu_enable() and save exynos4_scu_enable() now.
 
-Best Regsards,
-J.
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ arch/arm/mach-exynos/pm.c |   23 +----------------------
+ 1 files changed, 1 insertions(+), 22 deletions(-)
+
+diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
+index 509a435..a4d67c7 100644
+--- a/arch/arm/mach-exynos/pm.c
++++ b/arch/arm/mach-exynos/pm.c
+@@ -213,27 +213,6 @@ static int exynos4_pm_add(struct sys_device *sysdev)
+ 	return 0;
+ }
+ 
+-/* This function copy from linux/arch/arm/kernel/smp_scu.c */
+-
+-void exynos4_scu_enable(void __iomem *scu_base)
+-{
+-	u32 scu_ctrl;
+-
+-	scu_ctrl = __raw_readl(scu_base);
+-	/* already enabled? */
+-	if (scu_ctrl & 1)
+-		return;
+-
+-	scu_ctrl |= 1;
+-	__raw_writel(scu_ctrl, scu_base);
+-
+-	/*
+-	 * Ensure that the data accessed by CPU0 before the SCU was
+-	 * initialised is visible to the other CPUs.
+-	 */
+-	flush_cache_all();
+-}
+-
+ static unsigned long pll_base_rate;
+ 
+ static void exynos4_restore_pll(void)
+@@ -402,7 +381,7 @@ static void exynos4_pm_resume(void)
+ 
+ 	exynos4_restore_pll();
+ 
+-	exynos4_scu_enable(S5P_VA_SCU);
++	scu_enable(S5P_VA_SCU);
+ 
+ #ifdef CONFIG_CACHE_L2X0
+ 	s3c_pm_do_restore_core(exynos4_l2cc_save, ARRAY_SIZE(exynos4_l2cc_save));
+-- 
+1.7.4.1
