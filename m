@@ -1,169 +1,205 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Tue, 15 Nov 2011 21:40:34 +0100
-Subject: [PATCH 2/2] ARM: at91: gpio make struct at91_gpio_bank an initdata
+Date: Tue, 15 Nov 2011 21:40:35 +0100
+Subject: [PATCH 02/13 v2] ARM: at91: make ecc register base soc independant
 In-Reply-To: <20111113180954.GD15318@game.jcrosoft.org>
 References: <20111113180954.GD15318@game.jcrosoft.org>
-Message-ID: <1321389646-24112-3-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <1321389646-24112-4-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-this will simplify the switch to the DT and later to the platform_device
-
 Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 ---
- arch/arm/mach-at91/at91cap9.c    |    2 +-
- arch/arm/mach-at91/at91rm9200.c  |    2 +-
- arch/arm/mach-at91/at91sam9260.c |    2 +-
- arch/arm/mach-at91/at91sam9261.c |    2 +-
- arch/arm/mach-at91/at91sam9263.c |    2 +-
- arch/arm/mach-at91/at91sam9g45.c |    2 +-
- arch/arm/mach-at91/at91sam9rl.c  |    2 +-
- arch/arm/mach-at91/gpio.c        |   12 ++++++------
- 8 files changed, 13 insertions(+), 13 deletions(-)
+ arch/arm/mach-at91/at91cap9_devices.c         |    4 ++--
+ arch/arm/mach-at91/at91sam9260_devices.c      |    4 ++--
+ arch/arm/mach-at91/at91sam9263_devices.c      |    4 ++--
+ arch/arm/mach-at91/at91sam9g45_devices.c      |    4 ++--
+ arch/arm/mach-at91/at91sam9rl_devices.c       |    4 ++--
+ arch/arm/mach-at91/include/mach/at91cap9.h    |    2 +-
+ arch/arm/mach-at91/include/mach/at91sam9260.h |    2 +-
+ arch/arm/mach-at91/include/mach/at91sam9263.h |    4 ++--
+ arch/arm/mach-at91/include/mach/at91sam9g45.h |    2 +-
+ arch/arm/mach-at91/include/mach/at91sam9rl.h  |    2 +-
+ 10 files changed, 16 insertions(+), 16 deletions(-)
 
-diff --git a/arch/arm/mach-at91/at91cap9.c b/arch/arm/mach-at91/at91cap9.c
-index bfffaf6..81a9f38 100644
---- a/arch/arm/mach-at91/at91cap9.c
-+++ b/arch/arm/mach-at91/at91cap9.c
-@@ -296,7 +296,7 @@ void __init at91cap9_set_console_clock(int id)
-  *  GPIO
-  * -------------------------------------------------------------------- */
- 
--static struct at91_gpio_bank at91cap9_gpio[] = {
-+static struct at91_gpio_bank at91cap9_gpio[] __initdata = {
- 	{
- 		.id		= AT91CAP9_ID_PIOABCD,
- 		.regbase	= AT91CAP9_BASE_PIOA,
-diff --git a/arch/arm/mach-at91/at91rm9200.c b/arch/arm/mach-at91/at91rm9200.c
-index 7470f63..9163d7d 100644
---- a/arch/arm/mach-at91/at91rm9200.c
-+++ b/arch/arm/mach-at91/at91rm9200.c
-@@ -273,7 +273,7 @@ void __init at91rm9200_set_console_clock(int id)
-  *  GPIO
-  * -------------------------------------------------------------------- */
- 
--static struct at91_gpio_bank at91rm9200_gpio[] = {
-+static struct at91_gpio_bank at91rm9200_gpio[] __initdata = {
- 	{
- 		.id		= AT91RM9200_ID_PIOA,
- 		.regbase	= AT91RM9200_BASE_PIOA,
-diff --git a/arch/arm/mach-at91/at91sam9260.c b/arch/arm/mach-at91/at91sam9260.c
-index 81f0b76..5e25cef 100644
---- a/arch/arm/mach-at91/at91sam9260.c
-+++ b/arch/arm/mach-at91/at91sam9260.c
-@@ -272,7 +272,7 @@ void __init at91sam9260_set_console_clock(int id)
-  *  GPIO
-  * -------------------------------------------------------------------- */
- 
--static struct at91_gpio_bank at91sam9260_gpio[] = {
-+static struct at91_gpio_bank at91sam9260_gpio[] __initdata = {
- 	{
- 		.id		= AT91SAM9260_ID_PIOA,
- 		.regbase	= AT91SAM9260_BASE_PIOA,
-diff --git a/arch/arm/mach-at91/at91sam9261.c b/arch/arm/mach-at91/at91sam9261.c
-index dd7924c..a0538c5 100644
---- a/arch/arm/mach-at91/at91sam9261.c
-+++ b/arch/arm/mach-at91/at91sam9261.c
-@@ -253,7 +253,7 @@ void __init at91sam9261_set_console_clock(int id)
-  *  GPIO
-  * -------------------------------------------------------------------- */
- 
--static struct at91_gpio_bank at91sam9261_gpio[] = {
-+static struct at91_gpio_bank at91sam9261_gpio[] __initdata = {
- 	{
- 		.id		= AT91SAM9261_ID_PIOA,
- 		.regbase	= AT91SAM9261_BASE_PIOA,
-diff --git a/arch/arm/mach-at91/at91sam9263.c b/arch/arm/mach-at91/at91sam9263.c
-index 646d424..0d90b6a 100644
---- a/arch/arm/mach-at91/at91sam9263.c
-+++ b/arch/arm/mach-at91/at91sam9263.c
-@@ -267,7 +267,7 @@ void __init at91sam9263_set_console_clock(int id)
-  *  GPIO
-  * -------------------------------------------------------------------- */
- 
--static struct at91_gpio_bank at91sam9263_gpio[] = {
-+static struct at91_gpio_bank at91sam9263_gpio[] __initdata = {
- 	{
- 		.id		= AT91SAM9263_ID_PIOA,
- 		.regbase	= AT91SAM9263_BASE_PIOA,
-diff --git a/arch/arm/mach-at91/at91sam9g45.c b/arch/arm/mach-at91/at91sam9g45.c
-index 11b31af..72c3cce 100644
---- a/arch/arm/mach-at91/at91sam9g45.c
-+++ b/arch/arm/mach-at91/at91sam9g45.c
-@@ -297,7 +297,7 @@ void __init at91sam9g45_set_console_clock(int id)
-  *  GPIO
-  * -------------------------------------------------------------------- */
- 
--static struct at91_gpio_bank at91sam9g45_gpio[] = {
-+static struct at91_gpio_bank at91sam9g45_gpio[] __initdata = {
- 	{
- 		.id		= AT91SAM9G45_ID_PIOA,
- 		.regbase	= AT91SAM9G45_BASE_PIOA,
-diff --git a/arch/arm/mach-at91/at91sam9rl.c b/arch/arm/mach-at91/at91sam9rl.c
-index 60555d4..96247f6 100644
---- a/arch/arm/mach-at91/at91sam9rl.c
-+++ b/arch/arm/mach-at91/at91sam9rl.c
-@@ -246,7 +246,7 @@ void __init at91sam9rl_set_console_clock(int id)
-  *  GPIO
-  * -------------------------------------------------------------------- */
- 
--static struct at91_gpio_bank at91sam9rl_gpio[] = {
-+static struct at91_gpio_bank at91sam9rl_gpio[] __initdata = {
- 	{
- 		.id		= AT91SAM9RL_ID_PIOA,
- 		.regbase	= AT91SAM9RL_BASE_PIOA,
-diff --git a/arch/arm/mach-at91/gpio.c b/arch/arm/mach-at91/gpio.c
-index 4059f07..9c58deb 100644
---- a/arch/arm/mach-at91/gpio.c
-+++ b/arch/arm/mach-at91/gpio.c
-@@ -29,7 +29,7 @@
- struct at91_gpio_chip {
- 	struct gpio_chip	chip;
- 	struct at91_gpio_chip	*next;		/* Bank sharing same clock */
--	struct at91_gpio_bank	*bank;		/* Bank definition */
-+	int			id;		/* ID of register bank */
- 	void __iomem		*regbase;	/* Base of register bank */
- 	struct clk		*clock;		/* associated clock */
+diff --git a/arch/arm/mach-at91/at91cap9_devices.c b/arch/arm/mach-at91/at91cap9_devices.c
+index adad70d..fb525f4 100644
+--- a/arch/arm/mach-at91/at91cap9_devices.c
++++ b/arch/arm/mach-at91/at91cap9_devices.c
+@@ -398,8 +398,8 @@ static struct resource nand_resources[] = {
+ 		.flags	= IORESOURCE_MEM,
+ 	},
+ 	[1] = {
+-		.start	= AT91_BASE_SYS + AT91_ECC,
+-		.end	= AT91_BASE_SYS + AT91_ECC + SZ_512 - 1,
++		.start	= AT91CAP9_BASE_ECC,
++		.end	= AT91CAP9_BASE_ECC + SZ_512 - 1,
+ 		.flags	= IORESOURCE_MEM,
+ 	}
  };
-@@ -286,7 +286,7 @@ static int gpio_irq_set_wake(struct irq_data *d, unsigned state)
- 	else
- 		wakeups[bank] &= ~mask;
+diff --git a/arch/arm/mach-at91/at91sam9260_devices.c b/arch/arm/mach-at91/at91sam9260_devices.c
+index 25e3464..067c168 100644
+--- a/arch/arm/mach-at91/at91sam9260_devices.c
++++ b/arch/arm/mach-at91/at91sam9260_devices.c
+@@ -399,8 +399,8 @@ static struct resource nand_resources[] = {
+ 		.flags	= IORESOURCE_MEM,
+ 	},
+ 	[1] = {
+-		.start	= AT91_BASE_SYS + AT91_ECC,
+-		.end	= AT91_BASE_SYS + AT91_ECC + SZ_512 - 1,
++		.start	= AT91SAM9260_BASE_ECC,
++		.end	= AT91SAM9260_BASE_ECC + SZ_512 - 1,
+ 		.flags	= IORESOURCE_MEM,
+ 	}
+ };
+diff --git a/arch/arm/mach-at91/at91sam9263_devices.c b/arch/arm/mach-at91/at91sam9263_devices.c
+index ad017eb..0b1a28e 100644
+--- a/arch/arm/mach-at91/at91sam9263_devices.c
++++ b/arch/arm/mach-at91/at91sam9263_devices.c
+@@ -473,8 +473,8 @@ static struct resource nand_resources[] = {
+ 		.flags	= IORESOURCE_MEM,
+ 	},
+ 	[1] = {
+-		.start	= AT91_BASE_SYS + AT91_ECC0,
+-		.end	= AT91_BASE_SYS + AT91_ECC0 + SZ_512 - 1,
++		.start	= AT91SAM9263_BASE_ECC0,
++		.end	= AT91SAM9263_BASE_ECC0 + SZ_512 - 1,
+ 		.flags	= IORESOURCE_MEM,
+ 	}
+ };
+diff --git a/arch/arm/mach-at91/at91sam9g45_devices.c b/arch/arm/mach-at91/at91sam9g45_devices.c
+index 09a16d6..d19d720 100644
+--- a/arch/arm/mach-at91/at91sam9g45_devices.c
++++ b/arch/arm/mach-at91/at91sam9g45_devices.c
+@@ -529,8 +529,8 @@ static struct resource nand_resources[] = {
+ 		.flags	= IORESOURCE_MEM,
+ 	},
+ 	[1] = {
+-		.start	= AT91_BASE_SYS + AT91_ECC,
+-		.end	= AT91_BASE_SYS + AT91_ECC + SZ_512 - 1,
++		.start	= AT91SAM9G45_BASE_ECC,
++		.end	= AT91SAM9G45_BASE_ECC + SZ_512 - 1,
+ 		.flags	= IORESOURCE_MEM,
+ 	}
+ };
+diff --git a/arch/arm/mach-at91/at91sam9rl_devices.c b/arch/arm/mach-at91/at91sam9rl_devices.c
+index 628eb56..e63ab90 100644
+--- a/arch/arm/mach-at91/at91sam9rl_devices.c
++++ b/arch/arm/mach-at91/at91sam9rl_devices.c
+@@ -248,8 +248,8 @@ static struct resource nand_resources[] = {
+ 		.flags	= IORESOURCE_MEM,
+ 	},
+ 	[1] = {
+-		.start	= AT91_BASE_SYS + AT91_ECC,
+-		.end	= AT91_BASE_SYS + AT91_ECC + SZ_512 - 1,
++		.start	= AT91SAM9RL_BASE_ECC,
++		.end	= AT91SAM9RL_BASE_ECC + SZ_512 - 1,
+ 		.flags	= IORESOURCE_MEM,
+ 	}
+ };
+diff --git a/arch/arm/mach-at91/include/mach/at91cap9.h b/arch/arm/mach-at91/include/mach/at91cap9.h
+index f65d083..5fd105d 100644
+--- a/arch/arm/mach-at91/include/mach/at91cap9.h
++++ b/arch/arm/mach-at91/include/mach/at91cap9.h
+@@ -79,7 +79,6 @@
+ /*
+  * System Peripherals (offset from AT91_BASE_SYS)
+  */
+-#define AT91_ECC	(0xffffe200 - AT91_BASE_SYS)
+ #define AT91_BCRAMC	(0xffffe400 - AT91_BASE_SYS)
+ #define AT91_DDRSDRC0	(0xffffe600 - AT91_BASE_SYS)
+ #define AT91_SMC	(0xffffe800 - AT91_BASE_SYS)
+@@ -98,6 +97,7 @@
+ 			(0xfffffd50 - AT91_BASE_SYS) :	\
+ 			(0xfffffd60 - AT91_BASE_SYS))
  
--	irq_set_irq_wake(gpio_chip[bank].bank->id, state);
-+	irq_set_irq_wake(gpio_chip[bank].id, state);
++#define AT91CAP9_BASE_ECC	0xffffe200
+ #define AT91CAP9_BASE_PIOA	0xfffff200
+ #define AT91CAP9_BASE_PIOB	0xfffff400
+ #define AT91CAP9_BASE_PIOC	0xfffff600
+diff --git a/arch/arm/mach-at91/include/mach/at91sam9260.h b/arch/arm/mach-at91/include/mach/at91sam9260.h
+index 1bea3dc..6974656 100644
+--- a/arch/arm/mach-at91/include/mach/at91sam9260.h
++++ b/arch/arm/mach-at91/include/mach/at91sam9260.h
+@@ -80,7 +80,6 @@
+ /*
+  * System Peripherals (offset from AT91_BASE_SYS)
+  */
+-#define AT91_ECC	(0xffffe800 - AT91_BASE_SYS)
+ #define AT91_SDRAMC0	(0xffffea00 - AT91_BASE_SYS)
+ #define AT91_SMC	(0xffffec00 - AT91_BASE_SYS)
+ #define AT91_MATRIX	(0xffffee00 - AT91_BASE_SYS)
+@@ -95,6 +94,7 @@
+ #define AT91_WDT	(0xfffffd40 - AT91_BASE_SYS)
+ #define AT91_GPBR	(0xfffffd50 - AT91_BASE_SYS)
  
- 	return 0;
- }
-@@ -498,7 +498,7 @@ void __init at91_gpio_irq_setup(void)
- 	for (pioc = 0, pin = PIN_BASE, this = gpio_chip, prev = NULL;
- 			pioc++ < gpio_banks;
- 			prev = this, this++) {
--		unsigned	id = this->bank->id;
-+		unsigned	id = this->id;
- 		unsigned	i;
++#define AT91SAM9260_BASE_ECC	0xffffe800
+ #define AT91SAM9260_BASE_PIOA	0xfffff400
+ #define AT91SAM9260_BASE_PIOB	0xfffff600
+ #define AT91SAM9260_BASE_PIOC	0xfffff800
+diff --git a/arch/arm/mach-at91/include/mach/at91sam9263.h b/arch/arm/mach-at91/include/mach/at91sam9263.h
+index dd54079..a668538 100644
+--- a/arch/arm/mach-at91/include/mach/at91sam9263.h
++++ b/arch/arm/mach-at91/include/mach/at91sam9263.h
+@@ -74,10 +74,8 @@
+ /*
+  * System Peripherals (offset from AT91_BASE_SYS)
+  */
+-#define AT91_ECC0	(0xffffe000 - AT91_BASE_SYS)
+ #define AT91_SDRAMC0	(0xffffe200 - AT91_BASE_SYS)
+ #define AT91_SMC0	(0xffffe400 - AT91_BASE_SYS)
+-#define AT91_ECC1	(0xffffe600 - AT91_BASE_SYS)
+ #define AT91_SDRAMC1	(0xffffe800 - AT91_BASE_SYS)
+ #define AT91_SMC1	(0xffffea00 - AT91_BASE_SYS)
+ #define AT91_MATRIX	(0xffffec00 - AT91_BASE_SYS)
+@@ -93,6 +91,8 @@
+ #define AT91_RTT1	(0xfffffd50 - AT91_BASE_SYS)
+ #define AT91_GPBR	(0xfffffd60 - AT91_BASE_SYS)
  
- 		__raw_writel(~0, this->regbase + PIO_IDR);
-@@ -613,10 +613,10 @@ void __init at91_gpio_init(struct at91_gpio_bank *data, int nr_banks)
- 	for (i = 0; i < nr_banks; i++) {
- 		at91_gpio = &gpio_chip[i];
++#define AT91SAM9263_BASE_ECC0	0xffffe000
++#define AT91SAM9263_BASE_ECC1	0xffffe600
+ #define AT91SAM9263_BASE_PIOA	0xfffff200
+ #define AT91SAM9263_BASE_PIOB	0xfffff400
+ #define AT91SAM9263_BASE_PIOC	0xfffff600
+diff --git a/arch/arm/mach-at91/include/mach/at91sam9g45.h b/arch/arm/mach-at91/include/mach/at91sam9g45.h
+index a487af5..3c0b7c1 100644
+--- a/arch/arm/mach-at91/include/mach/at91sam9g45.h
++++ b/arch/arm/mach-at91/include/mach/at91sam9g45.h
+@@ -86,7 +86,6 @@
+ /*
+  * System Peripherals (offset from AT91_BASE_SYS)
+  */
+-#define AT91_ECC	(0xffffe200 - AT91_BASE_SYS)
+ #define AT91_DDRSDRC1	(0xffffe400 - AT91_BASE_SYS)
+ #define AT91_DDRSDRC0	(0xffffe600 - AT91_BASE_SYS)
+ #define AT91_SMC	(0xffffe800 - AT91_BASE_SYS)
+@@ -103,6 +102,7 @@
+ #define AT91_GPBR	(0xfffffd60 - AT91_BASE_SYS)
+ #define AT91_RTC	(0xfffffdb0 - AT91_BASE_SYS)
  
--		at91_gpio->bank = &data[i];
-+		at91_gpio->id = data[i].id;
- 		at91_gpio->chip.base = PIN_BASE + i * 32;
++#define AT91SAM9G45_BASE_ECC	0xffffe200
+ #define AT91SAM9G45_BASE_PIOA	0xfffff200
+ #define AT91SAM9G45_BASE_PIOB	0xfffff400
+ #define AT91SAM9G45_BASE_PIOC	0xfffff600
+diff --git a/arch/arm/mach-at91/include/mach/at91sam9rl.h b/arch/arm/mach-at91/include/mach/at91sam9rl.h
+index d3ef11a..d9efe5a 100644
+--- a/arch/arm/mach-at91/include/mach/at91sam9rl.h
++++ b/arch/arm/mach-at91/include/mach/at91sam9rl.h
+@@ -70,7 +70,6 @@
+  * System Peripherals (offset from AT91_BASE_SYS)
+  */
+ #define AT91_DMA	(0xffffe600 - AT91_BASE_SYS)
+-#define AT91_ECC	(0xffffe800 - AT91_BASE_SYS)
+ #define AT91_SDRAMC0	(0xffffea00 - AT91_BASE_SYS)
+ #define AT91_SMC	(0xffffec00 - AT91_BASE_SYS)
+ #define AT91_MATRIX	(0xffffee00 - AT91_BASE_SYS)
+@@ -87,6 +86,7 @@
+ #define AT91_GPBR	(0xfffffd60 - AT91_BASE_SYS)
+ #define AT91_RTC	(0xfffffe00 - AT91_BASE_SYS)
  
--		at91_gpio->regbase = ioremap(at91_gpio->bank->regbase, 512);
-+		at91_gpio->regbase = ioremap(data->regbase, 512);
- 		if (!at91_gpio->regbase) {
- 			pr_err("at91_gpio.%d, failed to map registers, ignoring.\n", i);
- 			continue;
-@@ -632,7 +632,7 @@ void __init at91_gpio_init(struct at91_gpio_bank *data, int nr_banks)
- 		clk_enable(at91_gpio->clock);
- 
- 		/* AT91SAM9263_ID_PIOCDE groups PIOC, PIOD, PIOE */
--		if (last && last->bank->id == at91_gpio->bank->id)
-+		if (last && last->id == at91_gpio->id)
- 			last->next = at91_gpio;
- 		last = at91_gpio;
- 
++#define AT91SAM9RL_BASE_ECC	0xffffe800
+ #define AT91SAM9RL_BASE_PIOA	0xfffff400
+ #define AT91SAM9RL_BASE_PIOB	0xfffff600
+ #define AT91SAM9RL_BASE_PIOC	0xfffff800
 -- 
 1.7.7
