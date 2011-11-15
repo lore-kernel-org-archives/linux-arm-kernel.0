@@ -1,132 +1,283 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 15 Nov 2011 19:20:56 +0900
-Subject: [PATCH] Add dm9000 network support for OK6410 board.
-In-Reply-To: <CAN_1RdvdeXHdM50utA8objg46Q2GM23pwzAiB7itswrTm1FqSQ@mail.gmail.com>
-References: <1321006467-15824-1-git-send-email-peiyong.feng.kernel@gmail.com>
- <CAJuYYwRueftNrWofo744vWXPa+vkgv3r4CyOr_Q_GNrcfct4YA@mail.gmail.com>
- <CAN_1RdvdeXHdM50utA8objg46Q2GM23pwzAiB7itswrTm1FqSQ@mail.gmail.com>
-Message-ID: <006201cca380$43998e20$caccaa60$%kim@samsung.com>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Tue, 15 Nov 2011 11:20:20 +0100
+Subject: [PATCH] ARM: u300: localize GPIO assignments
+Message-ID: <1321352420-15829-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Peiyong Feng wrote:
-> 
-Hi Peiyong,
+From: Linus Walleij <linus.walleij@linaro.org>
 
-Thanks for your submitting and replying.
-But you need to make sure your e-mail uses text-typed instead of html before
-replying.
+Move the GPIO assignments for the U300 variants down to a local
+header file in the mach-u300 directory. There is no point in
+broadcasting this across the entire kernel.
 
-And there are comments below.
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/mach-u300/include/mach/gpio-u300.h |  115 ---------------------------
+ arch/arm/mach-u300/mmc.c                    |    2 +-
+ arch/arm/mach-u300/u300-gpio.h              |  114 ++++++++++++++++++++++++++
+ 3 files changed, 115 insertions(+), 116 deletions(-)
+ create mode 100644 arch/arm/mach-u300/u300-gpio.h
 
-> Well, The OK6410 board is based on smdk6410 board.
-> And there many other boards that also are based on smdk6410 like mini6410
-board.
->
-> The reasons why I modified smdk6410 board file are as follows:?
-> A. Almost all the devices on OK6410 is supported in smdk6410, and the
-device drivers of smdk6410 can work well in OK6410.
->
-Okay, you mean, just your OK6410 can work with smdk6410.
-
-> B. If we just make other board file like mini6410 which is also based on
-smdk6410, there maybe too many files that are as the same of smdk6410.
->
-Okay, you mean, we don't need duplicated codes.
-
-Right, but how do you think that if the dm9000 or something cannot be used
-on smdk6410?
-Nevertheless, we _really_ need to add it for other board not smdk6410?
-
-Actually, there are codes for SMSC Lan9115 at mach-smdk6410.c......
-
-If you want to use mach-smdk6410.c on your ok6410, well, let us think the
-way.
-
-> 2011/11/11 Thomas Abraham <thomas.abraham@linaro.org>
-> On 11 November 2011 15:44, peiyong feng <peiyong.feng.kernel@gmail.com>
-wrote:
-> > Signed-off-by: peiyong feng <peiyong.feng.kernel@gmail.com>
-> > ---
-> > ?arch/arm/mach-s3c64xx/mach-smdk6410.c | ? ?1 +
-> > ?arch/arm/plat-samsung/devs.c ? ? ? ? ?| ? 40
-+++++++++++++++++++++++++++++++++
-> > ?2 files changed, 41 insertions(+), 0 deletions(-)
-> If the change is intended for OK6410 board, any reason for modifying
-> mach-smdk6410.c board file?
->
-> >
-> > diff --git a/arch/arm/mach-s3c64xx/mach-smdk6410.c
-b/arch/arm/mach-s3c64xx/mach-smdk6410.c
-> > index 8bc8edd..71e817a 100644
-> > --- a/arch/arm/mach-s3c64xx/mach-smdk6410.c
-> > +++ b/arch/arm/mach-s3c64xx/mach-smdk6410.c
-> > @@ -276,6 +276,7 @@ static struct platform_device *smdk6410_devices[]
-__initdata = {
-> > ? ? ? ?&s3c_device_fb,
-> > ? ? ? ?&s3c_device_ohci,
-> > ? ? ? ?&s3c_device_usb_hsotg,
-> > + ? ? ? &s3c_device_dm9000,
-> > ? ? ? ?&samsung_asoc_dma,
-> > ? ? ? ?&s3c64xx_device_iisv4,
-> > ? ? ? ?&samsung_device_keypad,
-> > diff --git a/arch/arm/plat-samsung/devs.c b/arch/arm/plat-samsung/devs.c
-> > index 4ca8b57..38edc1a 100644
-> > --- a/arch/arm/plat-samsung/devs.c
-> > +++ b/arch/arm/plat-samsung/devs.c
-> > @@ -29,6 +29,7 @@
-> > ?#include <linux/mtd/partitions.h>
-> > ?#include <linux/mmc/host.h>
-> >?#include <linux/ioport.h>
-> > +#include <linux/dm9000.h>
-> >
-> > ?#include <asm/irq.h>
-> > ?#include <asm/pmu.h>
-> > @@ -1401,6 +1402,45 @@ void __init s5p_ehci_set_platdata(struct
-s5p_ehci_platdata *pd)
-> > ?}
-> > ?#endif /* CONFIG_S5P_DEV_USB_EHCI */
-> >
-> > +/* Ethernet */
-> > +#ifdef CONFIG_DM9000
-> > +#define S3C64XX_PA_DM9000 ? ? ?(0x18000000)
-> > +#define S3C64XX_SZ_DM9000 ? ? ?SZ_1M
-> > +#define S3C64XX_VA_DM9000 ? ? ?S3C_ADDR(0x03b00300)
-> There could be other boards based on other samsung soc's which would
-> be using dm9000. So arch/arm/plat-samsung/devs.c might not be correct
-> place for these additions. And, there is S3C64XX_PA_XM0CSN0 in
-> mach-s3c64xx/include/mach/map.h which should be reused instead of
-> these new macros.
->
-Yes right.
-
-Peiyong, you need to think that your codes affect others or not before
-submitting.
-
-> Please refer to other board files in arch/arm/mach-s3c64xx for
-> reference on adding dm9000 support for OK6410 board.
->
-> Regards,
-> Thomas.
->
-> > +
-> > +static struct resource dm9000_resources[] = {
-> > + ? ? ? [0] = {
-> > + ? ? ? ? ? ? ? .start ? ? ? ? ?= S3C64XX_PA_DM9000,
-> > + ? ? ? ? ? ? ? .end ? ? ? ? ? ?= S3C64XX_PA_DM9000 + 3,
-
-What is '3'?
-
-> > + ? ? ? ? ? ? ? .flags ? ? ? ? ?= IORESOURCE_MEM,
-
-And you can use DEFINE_RES_MEM macro here.
-
-(snip)
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+diff --git a/arch/arm/mach-u300/include/mach/gpio-u300.h b/arch/arm/mach-u300/include/mach/gpio-u300.h
+index 0c2b202..bf4c793 100644
+--- a/arch/arm/mach-u300/include/mach/gpio-u300.h
++++ b/arch/arm/mach-u300/include/mach/gpio-u300.h
+@@ -9,121 +9,6 @@
+ #ifndef __MACH_U300_GPIO_U300_H
+ #define __MACH_U300_GPIO_U300_H
+ 
+-/*
+- * Individual pin assignments for the B26/S26. Notice that the
+- * actual usage of these pins depends on the PAD MUX settings, that
+- * is why the same number can potentially appear several times.
+- * In the reference design each pin is only used for one purpose.
+- * These were determined by inspecting the B26/S26 schematic:
+- * 2/1911-ROA 128 1603
+- */
+-#ifdef CONFIG_MACH_U300_BS2X
+-#define U300_GPIO_PIN_UART_RX		0
+-#define U300_GPIO_PIN_UART_TX		1
+-#define U300_GPIO_PIN_GPIO02		2  /* Unrouted */
+-#define U300_GPIO_PIN_GPIO03		3  /* Unrouted */
+-#define U300_GPIO_PIN_CAM_SLEEP		4
+-#define U300_GPIO_PIN_CAM_REG_EN	5
+-#define U300_GPIO_PIN_GPIO06		6  /* Unrouted */
+-#define U300_GPIO_PIN_GPIO07		7  /* Unrouted */
+-
+-#define U300_GPIO_PIN_GPIO08		8  /* Service point SP2321 */
+-#define U300_GPIO_PIN_GPIO09		9  /* Service point SP2322 */
+-#define U300_GPIO_PIN_PHFSENSE		10 /* Headphone jack sensing */
+-#define U300_GPIO_PIN_MMC_CLKRET	11 /* Clock return from MMC/SD card */
+-#define U300_GPIO_PIN_MMC_CD		12 /* MMC Card insertion detection */
+-#define U300_GPIO_PIN_FLIPSENSE		13 /* Mechanical flip sensing */
+-#define U300_GPIO_PIN_GPIO14		14 /* DSP JTAG Port RTCK */
+-#define U300_GPIO_PIN_GPIO15		15 /* Unrouted */
+-
+-#define U300_GPIO_PIN_GPIO16		16 /* Unrouted */
+-#define U300_GPIO_PIN_GPIO17		17 /* Unrouted */
+-#define U300_GPIO_PIN_GPIO18		18 /* Unrouted */
+-#define U300_GPIO_PIN_GPIO19		19 /* Unrouted */
+-#define U300_GPIO_PIN_GPIO20		20 /* Unrouted */
+-#define U300_GPIO_PIN_GPIO21		21 /* Unrouted */
+-#define U300_GPIO_PIN_GPIO22		22 /* Unrouted */
+-#define U300_GPIO_PIN_GPIO23		23 /* Unrouted */
+-#endif
+-
+-/*
+- * Individual pin assignments for the B330/S330 and B365/S365.
+- * Notice that the actual usage of these pins depends on the
+- * PAD MUX settings, that is why the same number can potentially
+- * appear several times. In the reference design each pin is only
+- * used for one purpose. These were determined by inspecting the
+- * S365 schematic.
+- */
+-#if defined(CONFIG_MACH_U300_BS330) || defined(CONFIG_MACH_U300_BS365) || \
+-    defined(CONFIG_MACH_U300_BS335)
+-#define U300_GPIO_PIN_UART_RX		0
+-#define U300_GPIO_PIN_UART_TX		1
+-#define U300_GPIO_PIN_UART_CTS		2
+-#define U300_GPIO_PIN_UART_RTS		3
+-#define U300_GPIO_PIN_CAM_MAIN_STANDBY	4 /* Camera MAIN standby */
+-#define U300_GPIO_PIN_GPIO05		5 /* Unrouted */
+-#define U300_GPIO_PIN_MS_CD		6 /* Memory Stick Card insertion */
+-#define U300_GPIO_PIN_GPIO07		7 /* Test point TP2430 */
+-
+-#define U300_GPIO_PIN_GPIO08		8 /* Test point TP2437 */
+-#define U300_GPIO_PIN_GPIO09		9 /* Test point TP2431 */
+-#define U300_GPIO_PIN_GPIO10		10 /* Test point TP2432 */
+-#define U300_GPIO_PIN_MMC_CLKRET	11 /* Clock return from MMC/SD card */
+-#define U300_GPIO_PIN_MMC_CD		12 /* MMC Card insertion detection */
+-#define U300_GPIO_PIN_CAM_SUB_STANDBY	13 /* Camera SUB standby */
+-#define U300_GPIO_PIN_GPIO14		14 /* Test point TP2436 */
+-#define U300_GPIO_PIN_GPIO15		15 /* Unrouted */
+-
+-#define U300_GPIO_PIN_GPIO16		16 /* Test point TP2438 */
+-#define U300_GPIO_PIN_PHFSENSE		17 /* Headphone jack sensing */
+-#define U300_GPIO_PIN_GPIO18		18 /* Test point TP2439 */
+-#define U300_GPIO_PIN_GPIO19		19 /* Routed somewhere */
+-#define U300_GPIO_PIN_GPIO20		20 /* Unrouted */
+-#define U300_GPIO_PIN_GPIO21		21 /* Unrouted */
+-#define U300_GPIO_PIN_GPIO22		22 /* Unrouted */
+-#define U300_GPIO_PIN_GPIO23		23 /* Unrouted */
+-
+-#define U300_GPIO_PIN_GPIO24		24 /* Unrouted */
+-#define U300_GPIO_PIN_GPIO25		25 /* Unrouted */
+-#define U300_GPIO_PIN_GPIO26		26 /* Unrouted */
+-#define U300_GPIO_PIN_GPIO27		27 /* Unrouted */
+-#define U300_GPIO_PIN_GPIO28		28 /* Unrouted */
+-#define U300_GPIO_PIN_GPIO29		29 /* Unrouted */
+-#define U300_GPIO_PIN_GPIO30		30 /* Unrouted */
+-#define U300_GPIO_PIN_GPIO31		31 /* Unrouted */
+-
+-#define U300_GPIO_PIN_GPIO32		32 /* Unrouted */
+-#define U300_GPIO_PIN_GPIO33		33 /* Unrouted */
+-#define U300_GPIO_PIN_GPIO34		34 /* Unrouted */
+-#define U300_GPIO_PIN_GPIO35		35 /* Unrouted */
+-#define U300_GPIO_PIN_GPIO36		36 /* Unrouted */
+-#define U300_GPIO_PIN_GPIO37		37 /* Unrouted */
+-#define U300_GPIO_PIN_GPIO38		38 /* Unrouted */
+-#define U300_GPIO_PIN_GPIO39		39 /* Unrouted */
+-
+-#ifdef CONFIG_MACH_U300_BS335
+-
+-#define U300_GPIO_PIN_GPIO40		40 /* Unrouted */
+-#define U300_GPIO_PIN_GPIO41		41 /* Unrouted */
+-#define U300_GPIO_PIN_GPIO42		42 /* Unrouted */
+-#define U300_GPIO_PIN_GPIO43		43 /* Unrouted */
+-#define U300_GPIO_PIN_GPIO44		44 /* Unrouted */
+-#define U300_GPIO_PIN_GPIO45		45 /* Unrouted */
+-#define U300_GPIO_PIN_GPIO46		46 /* Unrouted */
+-#define U300_GPIO_PIN_GPIO47		47 /* Unrouted */
+-
+-#define U300_GPIO_PIN_GPIO48		48 /* Unrouted */
+-#define U300_GPIO_PIN_GPIO49		49 /* Unrouted */
+-#define U300_GPIO_PIN_GPIO50		50 /* Unrouted */
+-#define U300_GPIO_PIN_GPIO51		51 /* Unrouted */
+-#define U300_GPIO_PIN_GPIO52		52 /* Unrouted */
+-#define U300_GPIO_PIN_GPIO53		53 /* Unrouted */
+-#define U300_GPIO_PIN_GPIO54		54 /* Unrouted */
+-#define U300_GPIO_PIN_GPIO55		55 /* Unrouted */
+-#endif
+-
+-#endif
+-
+ /**
+  * enum u300_gpio_variant - the type of U300 GPIO employed
+  */
+diff --git a/arch/arm/mach-u300/mmc.c b/arch/arm/mach-u300/mmc.c
+index 4d482aa..05abd6a 100644
+--- a/arch/arm/mach-u300/mmc.c
++++ b/arch/arm/mach-u300/mmc.c
+@@ -18,8 +18,8 @@
+ #include <linux/slab.h>
+ #include <mach/coh901318.h>
+ #include <mach/dma_channels.h>
+-#include <mach/gpio-u300.h>
+ 
++#include "u300-gpio.h"
+ #include "mmc.h"
+ 
+ static struct mmci_platform_data mmc0_plat_data = {
+diff --git a/arch/arm/mach-u300/u300-gpio.h b/arch/arm/mach-u300/u300-gpio.h
+new file mode 100644
+index 0000000..847dc25
+--- /dev/null
++++ b/arch/arm/mach-u300/u300-gpio.h
+@@ -0,0 +1,114 @@
++/*
++ * Individual pin assignments for the B26/S26. Notice that the
++ * actual usage of these pins depends on the PAD MUX settings, that
++ * is why the same number can potentially appear several times.
++ * In the reference design each pin is only used for one purpose.
++ * These were determined by inspecting the B26/S26 schematic:
++ * 2/1911-ROA 128 1603
++ */
++#ifdef CONFIG_MACH_U300_BS2X
++#define U300_GPIO_PIN_UART_RX		0
++#define U300_GPIO_PIN_UART_TX		1
++#define U300_GPIO_PIN_GPIO02		2  /* Unrouted */
++#define U300_GPIO_PIN_GPIO03		3  /* Unrouted */
++#define U300_GPIO_PIN_CAM_SLEEP		4
++#define U300_GPIO_PIN_CAM_REG_EN	5
++#define U300_GPIO_PIN_GPIO06		6  /* Unrouted */
++#define U300_GPIO_PIN_GPIO07		7  /* Unrouted */
++
++#define U300_GPIO_PIN_GPIO08		8  /* Service point SP2321 */
++#define U300_GPIO_PIN_GPIO09		9  /* Service point SP2322 */
++#define U300_GPIO_PIN_PHFSENSE		10 /* Headphone jack sensing */
++#define U300_GPIO_PIN_MMC_CLKRET	11 /* Clock return from MMC/SD card */
++#define U300_GPIO_PIN_MMC_CD		12 /* MMC Card insertion detection */
++#define U300_GPIO_PIN_FLIPSENSE		13 /* Mechanical flip sensing */
++#define U300_GPIO_PIN_GPIO14		14 /* DSP JTAG Port RTCK */
++#define U300_GPIO_PIN_GPIO15		15 /* Unrouted */
++
++#define U300_GPIO_PIN_GPIO16		16 /* Unrouted */
++#define U300_GPIO_PIN_GPIO17		17 /* Unrouted */
++#define U300_GPIO_PIN_GPIO18		18 /* Unrouted */
++#define U300_GPIO_PIN_GPIO19		19 /* Unrouted */
++#define U300_GPIO_PIN_GPIO20		20 /* Unrouted */
++#define U300_GPIO_PIN_GPIO21		21 /* Unrouted */
++#define U300_GPIO_PIN_GPIO22		22 /* Unrouted */
++#define U300_GPIO_PIN_GPIO23		23 /* Unrouted */
++#endif
++
++/*
++ * Individual pin assignments for the B330/S330 and B365/S365.
++ * Notice that the actual usage of these pins depends on the
++ * PAD MUX settings, that is why the same number can potentially
++ * appear several times. In the reference design each pin is only
++ * used for one purpose. These were determined by inspecting the
++ * S365 schematic.
++ */
++#if defined(CONFIG_MACH_U300_BS330) || defined(CONFIG_MACH_U300_BS365) || \
++    defined(CONFIG_MACH_U300_BS335)
++#define U300_GPIO_PIN_UART_RX		0
++#define U300_GPIO_PIN_UART_TX		1
++#define U300_GPIO_PIN_UART_CTS		2
++#define U300_GPIO_PIN_UART_RTS		3
++#define U300_GPIO_PIN_CAM_MAIN_STANDBY	4 /* Camera MAIN standby */
++#define U300_GPIO_PIN_GPIO05		5 /* Unrouted */
++#define U300_GPIO_PIN_MS_CD		6 /* Memory Stick Card insertion */
++#define U300_GPIO_PIN_GPIO07		7 /* Test point TP2430 */
++
++#define U300_GPIO_PIN_GPIO08		8 /* Test point TP2437 */
++#define U300_GPIO_PIN_GPIO09		9 /* Test point TP2431 */
++#define U300_GPIO_PIN_GPIO10		10 /* Test point TP2432 */
++#define U300_GPIO_PIN_MMC_CLKRET	11 /* Clock return from MMC/SD card */
++#define U300_GPIO_PIN_MMC_CD		12 /* MMC Card insertion detection */
++#define U300_GPIO_PIN_CAM_SUB_STANDBY	13 /* Camera SUB standby */
++#define U300_GPIO_PIN_GPIO14		14 /* Test point TP2436 */
++#define U300_GPIO_PIN_GPIO15		15 /* Unrouted */
++
++#define U300_GPIO_PIN_GPIO16		16 /* Test point TP2438 */
++#define U300_GPIO_PIN_PHFSENSE		17 /* Headphone jack sensing */
++#define U300_GPIO_PIN_GPIO18		18 /* Test point TP2439 */
++#define U300_GPIO_PIN_GPIO19		19 /* Routed somewhere */
++#define U300_GPIO_PIN_GPIO20		20 /* Unrouted */
++#define U300_GPIO_PIN_GPIO21		21 /* Unrouted */
++#define U300_GPIO_PIN_GPIO22		22 /* Unrouted */
++#define U300_GPIO_PIN_GPIO23		23 /* Unrouted */
++
++#define U300_GPIO_PIN_GPIO24		24 /* Unrouted */
++#define U300_GPIO_PIN_GPIO25		25 /* Unrouted */
++#define U300_GPIO_PIN_GPIO26		26 /* Unrouted */
++#define U300_GPIO_PIN_GPIO27		27 /* Unrouted */
++#define U300_GPIO_PIN_GPIO28		28 /* Unrouted */
++#define U300_GPIO_PIN_GPIO29		29 /* Unrouted */
++#define U300_GPIO_PIN_GPIO30		30 /* Unrouted */
++#define U300_GPIO_PIN_GPIO31		31 /* Unrouted */
++
++#define U300_GPIO_PIN_GPIO32		32 /* Unrouted */
++#define U300_GPIO_PIN_GPIO33		33 /* Unrouted */
++#define U300_GPIO_PIN_GPIO34		34 /* Unrouted */
++#define U300_GPIO_PIN_GPIO35		35 /* Unrouted */
++#define U300_GPIO_PIN_GPIO36		36 /* Unrouted */
++#define U300_GPIO_PIN_GPIO37		37 /* Unrouted */
++#define U300_GPIO_PIN_GPIO38		38 /* Unrouted */
++#define U300_GPIO_PIN_GPIO39		39 /* Unrouted */
++
++#ifdef CONFIG_MACH_U300_BS335
++
++#define U300_GPIO_PIN_GPIO40		40 /* Unrouted */
++#define U300_GPIO_PIN_GPIO41		41 /* Unrouted */
++#define U300_GPIO_PIN_GPIO42		42 /* Unrouted */
++#define U300_GPIO_PIN_GPIO43		43 /* Unrouted */
++#define U300_GPIO_PIN_GPIO44		44 /* Unrouted */
++#define U300_GPIO_PIN_GPIO45		45 /* Unrouted */
++#define U300_GPIO_PIN_GPIO46		46 /* Unrouted */
++#define U300_GPIO_PIN_GPIO47		47 /* Unrouted */
++
++#define U300_GPIO_PIN_GPIO48		48 /* Unrouted */
++#define U300_GPIO_PIN_GPIO49		49 /* Unrouted */
++#define U300_GPIO_PIN_GPIO50		50 /* Unrouted */
++#define U300_GPIO_PIN_GPIO51		51 /* Unrouted */
++#define U300_GPIO_PIN_GPIO52		52 /* Unrouted */
++#define U300_GPIO_PIN_GPIO53		53 /* Unrouted */
++#define U300_GPIO_PIN_GPIO54		54 /* Unrouted */
++#define U300_GPIO_PIN_GPIO55		55 /* Unrouted */
++#endif
++
++#endif
+-- 
+1.7.3.2
