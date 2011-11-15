@@ -1,52 +1,35 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Tue, 15 Nov 2011 14:54:49 +0400
-Subject: [PATCH v2 5/5] davinci: delete individual platform header files
- and use a common header
-In-Reply-To: <1321283357-27698-6-git-send-email-manjunath.hadli@ti.com>
-References: <1321283357-27698-1-git-send-email-manjunath.hadli@ti.com>
- <1321283357-27698-6-git-send-email-manjunath.hadli@ti.com>
-Message-ID: <4EC244F9.1030604@mvista.com>
+From: Joerg.Roedel@amd.com (Roedel, Joerg)
+Date: Tue, 15 Nov 2011 12:10:01 +0100
+Subject: [RFC 0/5] OMAP groundwork for IOMMU-based DMA API
+In-Reply-To: <CAK=WgbZ=0HctjLREv1oXEa=5ryY7C_6srO1Nt5uMowH+FyaHJQ@mail.gmail.com>
+References: <1316948337-7924-1-git-send-email-ohad@wizery.com>
+ <20111115103926.GA5627@amd.com>
+ <CAK=WgbZ=0HctjLREv1oXEa=5ryY7C_6srO1Nt5uMowH+FyaHJQ@mail.gmail.com>
+Message-ID: <20111115111001.GB5627@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Tue, Nov 15, 2011 at 12:45:33PM +0200, Ohad Ben-Cohen wrote:
+> Hi Joerg,
+> 
+> On Tue, Nov 15, 2011 at 12:39 PM, Roedel, Joerg <Joerg.Roedel@amd.com> wrote:
+> > It doesn't apply cleanly, can you please rebase the code, collect the
+> > Acked-by's and resend?
+> 
+> Sure. I planned on resending after the "hardware pgsize" patches are
+> merged, but please tell me if you prefer it the other way around.
 
-On 14-11-2011 19:09, Manjunath Hadli wrote:
+It is almost merged :) I just had to struggle with some compile errors
+from upstream in my tests. But I think I will finish testing today and
+push everything out.
 
-> include davinci_common.h file in files using the platform
-> header file for dm355, dm365, dm644x and dm646x and delete the
-> individual platform header files.
+Thanks,
 
-> Signed-off-by: Manjunath Hadli<manjunath.hadli@ti.com>
-[...]
+	Joerg
 
-> diff --git a/drivers/media/video/davinci/vpif.h b/drivers/media/video/davinci/vpif.h
-> index 25036cb..73b00bd 100644
-> --- a/drivers/media/video/davinci/vpif.h
-> +++ b/drivers/media/video/davinci/vpif.h
-> @@ -18,8 +18,7 @@
->
->   #include<linux/io.h>
->   #include<linux/videodev2.h>
-> -#include<mach/hardware.h>
+-- 
+AMD Operating System Research Center
 
-    Why are you removing this?
-
-> -#include<mach/dm646x.h>
-> +#include<mach/davinci_common.h>
->   #include<media/davinci/vpif_types.h>
->
->   /* Maximum channel allowed */
-> diff --git a/drivers/media/video/davinci/vpif_capture.h b/drivers/media/video/davinci/vpif_capture.h
-> index a693d4e..c019d26 100644
-> --- a/drivers/media/video/davinci/vpif_capture.h
-> +++ b/drivers/media/video/davinci/vpif_capture.h
-> @@ -27,6 +27,7 @@
->   #include<media/v4l2-device.h>
->   #include<media/videobuf-core.h>
->   #include<media/videobuf-dma-contig.h>
-> +#include<mach/davinci_common.h>
-
-    Not clear why are you adding this when no platform header was included before.
-
-WBR, Sergei
+Advanced Micro Devices GmbH Einsteinring 24 85609 Dornach
+General Managers: Alberto Bozzo, Andrew Bowd
+Registration: Dornach, Landkr. Muenchen; Registerger. Muenchen, HRB Nr. 43632
