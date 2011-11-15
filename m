@@ -1,29 +1,26 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Tue, 15 Nov 2011 01:59:33 +0100
-Subject: [PATCH] at91: at91-ohci: fix set/get power
-In-Reply-To: <CAFumwP08OeGqrNrTAzYeLkB=oZtyMDEoBa9epoHcG_Wjc5CQ8g@mail.gmail.com>
-References: <1321112773-8360-1-git-send-email-plagnioj@jcrosoft.com>
- <CAFumwP08OeGqrNrTAzYeLkB=oZtyMDEoBa9epoHcG_Wjc5CQ8g@mail.gmail.com>
-Message-ID: <20111115005933.GE15318@game.jcrosoft.org>
+Date: Tue, 15 Nov 2011 02:16:10 +0100
+Subject: [PATCH 04/41] ARM: restart: at91: use new restart hook
+In-Reply-To: <E1RN6ic-0001Wp-7t@rmk-PC.arm.linux.org.uk>
+References: <20111106173113.GI12913@n2100.arm.linux.org.uk>
+ <E1RN6ic-0001Wp-7t@rmk-PC.arm.linux.org.uk>
+Message-ID: <20111115011610.GF15318@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22:39 Mon 14 Nov     , Andrew Victor wrote:
-> hi,
+On 17:41 Sun 06 Nov     , Russell King - ARM Linux wrote:
+> Rather than using a private function pointer, use the existing
+> arm_pm_restart function pointer instead.  We no longer need to enable
+> the I-cache in at91sam9_alt_reset() as the caches will now be on when
+> this function is called.
 > 
-> > in commit aa6e52a35 we introduce the support of overcurrent notification
-> > but the set and get of the power without checking if the gpio is valid or not
+> Update the function names to use the 'restart' terminology rather than
+> the 'reboot' terminology.
 > 
-> > + ? ? ? if (pdata->vbus_pin[port] <= 0)
-> > + ? ? ? ? ? ? ? return;
-> 
-> Shouldn't that rather be:
->    if (!gpio_is_valid(pdata->vbus_pin[port]))
->           return;
-Yes should be but 0 is not a valid gpio on at91
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+I'll appply this one via at91-treee as I've patch that touch this part too in
+the queue if you do'nt mind
 
-I've a patch serie to fix the gpio support for at91 so we can use
-gpio_is_valid for 3.3
-
-Best Regards,
+Best Regsards,
 J.
