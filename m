@@ -1,9 +1,9 @@
 From: richard.zhao@linaro.org (Richard Zhao)
-Date: Tue, 15 Nov 2011 14:48:07 +0800
-Subject: [PATCH V4 12/14] net: fec: add clk_prepare/clk_unprepare
+Date: Tue, 15 Nov 2011 14:48:09 +0800
+Subject: [PATCH V4 14/14] mmc: sdhci-esdhc-imx: add clk_prepare/clk_unprepare
 In-Reply-To: <1321339689-25256-1-git-send-email-richard.zhao@linaro.org>
 References: <1321339689-25256-1-git-send-email-richard.zhao@linaro.org>
-Message-ID: <1321339689-25256-13-git-send-email-richard.zhao@linaro.org>
+Message-ID: <1321339689-25256-15-git-send-email-richard.zhao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,57 +11,39 @@ It's for migrating to generic clk framework API.
 
 Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
 ---
- drivers/net/ethernet/freescale/fec.c |   10 +++++-----
- 1 files changed, 5 insertions(+), 5 deletions(-)
+ drivers/mmc/host/sdhci-esdhc-imx.c |    6 +++---
+ 1 files changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/net/ethernet/freescale/fec.c b/drivers/net/ethernet/freescale/fec.c
-index 1124ce0..e96fa44 100644
---- a/drivers/net/ethernet/freescale/fec.c
-+++ b/drivers/net/ethernet/freescale/fec.c
-@@ -1588,7 +1588,7 @@ fec_probe(struct platform_device *pdev)
- 		ret = PTR_ERR(fep->clk);
- 		goto failed_clk;
+diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
+index ae57769..f1ae37e 100644
+--- a/drivers/mmc/host/sdhci-esdhc-imx.c
++++ b/drivers/mmc/host/sdhci-esdhc-imx.c
+@@ -462,7 +462,7 @@ static int __devinit sdhci_esdhc_imx_probe(struct platform_device *pdev)
+ 		err = PTR_ERR(clk);
+ 		goto err_clk_get;
  	}
--	clk_enable(fep->clk);
-+	clk_prepare_enable(fep->clk);
+-	clk_enable(clk);
++	clk_prepare_enable(clk);
+ 	pltfm_host->clk = clk;
  
- 	ret = fec_enet_init(ndev);
- 	if (ret)
-@@ -1611,7 +1611,7 @@ failed_register:
- 	fec_enet_mii_remove(fep);
- failed_mii_init:
- failed_init:
--	clk_disable(fep->clk);
-+	clk_disable_unprepare(fep->clk);
- 	clk_put(fep->clk);
- failed_clk:
- 	for (i = 0; i < FEC_IRQ_NUM; i++) {
-@@ -1638,7 +1638,7 @@ fec_drv_remove(struct platform_device *pdev)
- 
- 	fec_stop(ndev);
- 	fec_enet_mii_remove(fep);
--	clk_disable(fep->clk);
-+	clk_disable_unprepare(fep->clk);
- 	clk_put(fep->clk);
- 	iounmap(fep->hwp);
- 	unregister_netdev(ndev);
-@@ -1664,7 +1664,7 @@ fec_suspend(struct device *dev)
- 		fec_stop(ndev);
- 		netif_device_detach(ndev);
+ 	if (!is_imx25_esdhc(imx_data))
+@@ -550,7 +550,7 @@ no_card_detect_irq:
+ 		gpio_free(boarddata->wp_gpio);
+ no_card_detect_pin:
+ no_board_data:
+-	clk_disable(pltfm_host->clk);
++	clk_disable_unprepare(pltfm_host->clk);
+ 	clk_put(pltfm_host->clk);
+ err_clk_get:
+ 	kfree(imx_data);
+@@ -577,7 +577,7 @@ static int __devexit sdhci_esdhc_imx_remove(struct platform_device *pdev)
+ 		gpio_free(boarddata->cd_gpio);
  	}
--	clk_disable(fep->clk);
-+	clk_disable_unprepare(fep->clk);
  
- 	return 0;
- }
-@@ -1675,7 +1675,7 @@ fec_resume(struct device *dev)
- 	struct net_device *ndev = dev_get_drvdata(dev);
- 	struct fec_enet_private *fep = netdev_priv(ndev);
+-	clk_disable(pltfm_host->clk);
++	clk_disable_unprepare(pltfm_host->clk);
+ 	clk_put(pltfm_host->clk);
+ 	kfree(imx_data);
  
--	clk_enable(fep->clk);
-+	clk_prepare_enable(fep->clk);
- 	if (netif_running(ndev)) {
- 		fec_restart(ndev, fep->full_duplex);
- 		netif_device_attach(ndev);
 -- 
 1.7.5.4
