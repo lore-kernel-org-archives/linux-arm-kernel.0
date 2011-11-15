@@ -1,404 +1,497 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Tue, 15 Nov 2011 21:40:43 +0100
-Subject: [PATCH 10/13 v2] ARM: at91: make watchdog drivers soc independent
+Date: Tue, 15 Nov 2011 21:40:44 +0100
+Subject: [PATCH 11/13 v2] ARM: at91: make DBGU soc independent
 In-Reply-To: <20111113180954.GD15318@game.jcrosoft.org>
 References: <20111113180954.GD15318@game.jcrosoft.org>
-Message-ID: <1321389646-24112-12-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <1321389646-24112-13-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-switch the watchdog drivers to resource and pass it via platform_device
+we will select now the DBGU used by the soc at Kconfig level
+
+For the DEBUG_LL and early_printk this will allow to select which DBGU to use
+this will also allow to select them when multiple SOC are enabled
 
 Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-Signed-off-by: Wim Van Sebroeck <wim@iguana.be>
 ---
- arch/arm/mach-at91/at91cap9_devices.c         |   11 ++++++++++-
- arch/arm/mach-at91/at91sam9260_devices.c      |   11 ++++++++++-
- arch/arm/mach-at91/at91sam9261_devices.c      |   11 ++++++++++-
- arch/arm/mach-at91/at91sam9263_devices.c      |   11 ++++++++++-
- arch/arm/mach-at91/at91sam9g45_devices.c      |   11 ++++++++++-
- arch/arm/mach-at91/at91sam9rl_devices.c       |   11 ++++++++++-
+ arch/arm/mach-at91/Kconfig                    |   38 +++++++++++++++++++++++-
+ arch/arm/mach-at91/at91cap9_devices.c         |    4 +-
+ arch/arm/mach-at91/at91rm9200_devices.c       |    4 +-
+ arch/arm/mach-at91/at91sam9260_devices.c      |    4 +-
+ arch/arm/mach-at91/at91sam9261_devices.c      |    4 +-
+ arch/arm/mach-at91/at91sam9263_devices.c      |    4 +-
+ arch/arm/mach-at91/at91sam9g45_devices.c      |    4 +-
+ arch/arm/mach-at91/at91sam9rl_devices.c       |    4 +-
+ arch/arm/mach-at91/include/mach/at91_dbgu.h   |    2 +-
  arch/arm/mach-at91/include/mach/at91cap9.h    |    2 +-
+ arch/arm/mach-at91/include/mach/at91rm9200.h  |    2 +-
  arch/arm/mach-at91/include/mach/at91sam9260.h |    2 +-
  arch/arm/mach-at91/include/mach/at91sam9261.h |    2 +-
  arch/arm/mach-at91/include/mach/at91sam9263.h |    2 +-
  arch/arm/mach-at91/include/mach/at91sam9g45.h |    2 +-
  arch/arm/mach-at91/include/mach/at91sam9rl.h  |    2 +-
- drivers/watchdog/at91sam9_wdt.c               |   22 +++++++++++++++++++---
- drivers/watchdog/at91sam9_wdt.h               |    6 +++---
- 14 files changed, 88 insertions(+), 18 deletions(-)
+ arch/arm/mach-at91/include/mach/debug-macro.S |   10 +++++-
+ arch/arm/mach-at91/include/mach/hardware.h    |    6 ++++
+ arch/arm/mach-at91/include/mach/uncompress.h  |    6 ++-
+ arch/arm/mach-at91/setup.c                    |    7 +---
+ 20 files changed, 78 insertions(+), 33 deletions(-)
 
+diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
+index d111c3e9..fc3146f5 100644
+--- a/arch/arm/mach-at91/Kconfig
++++ b/arch/arm/mach-at91/Kconfig
+@@ -3,6 +3,12 @@ if ARCH_AT91
+ config HAVE_AT91_DATAFLASH_CARD
+ 	bool
+ 
++config HAVE_AT91_DBGU0
++	bool
++
++config HAVE_AT91_DBGU1
++	bool
++
+ config HAVE_AT91_USART3
+ 	bool
+ 
+@@ -21,12 +27,14 @@ config ARCH_AT91RM9200
+ 	bool "AT91RM9200"
+ 	select CPU_ARM920T
+ 	select GENERIC_CLOCKEVENTS
++	select HAVE_AT91_DBGU0
+ 	select HAVE_AT91_USART3
+ 
+ config ARCH_AT91SAM9260
+ 	bool "AT91SAM9260 or AT91SAM9XE"
+ 	select CPU_ARM926T
+ 	select GENERIC_CLOCKEVENTS
++	select HAVE_AT91_DBGU0
+ 	select HAVE_AT91_USART3
+ 	select HAVE_AT91_USART4
+ 	select HAVE_AT91_USART5
+@@ -37,11 +45,13 @@ config ARCH_AT91SAM9261
+ 	select CPU_ARM926T
+ 	select GENERIC_CLOCKEVENTS
+ 	select HAVE_FB_ATMEL
++	select HAVE_AT91_DBGU0
+ 
+ config ARCH_AT91SAM9G10
+ 	bool "AT91SAM9G10"
+ 	select CPU_ARM926T
+ 	select GENERIC_CLOCKEVENTS
++	select HAVE_AT91_DBGU0
+ 	select HAVE_FB_ATMEL
+ 
+ config ARCH_AT91SAM9263
+@@ -50,6 +60,7 @@ config ARCH_AT91SAM9263
+ 	select GENERIC_CLOCKEVENTS
+ 	select HAVE_FB_ATMEL
+ 	select HAVE_NET_MACB
++	select HAVE_AT91_DBGU1
+ 
+ config ARCH_AT91SAM9RL
+ 	bool "AT91SAM9RL"
+@@ -57,11 +68,13 @@ config ARCH_AT91SAM9RL
+ 	select GENERIC_CLOCKEVENTS
+ 	select HAVE_AT91_USART3
+ 	select HAVE_FB_ATMEL
++	select HAVE_AT91_DBGU0
+ 
+ config ARCH_AT91SAM9G20
+ 	bool "AT91SAM9G20"
+ 	select CPU_ARM926T
+ 	select GENERIC_CLOCKEVENTS
++	select HAVE_AT91_DBGU0
+ 	select HAVE_AT91_USART3
+ 	select HAVE_AT91_USART4
+ 	select HAVE_AT91_USART5
+@@ -74,6 +87,7 @@ config ARCH_AT91SAM9G45
+ 	select HAVE_AT91_USART3
+ 	select HAVE_FB_ATMEL
+ 	select HAVE_NET_MACB
++	select HAVE_AT91_DBGU1
+ 
+ config ARCH_AT91CAP9
+ 	bool "AT91CAP9"
+@@ -81,6 +95,7 @@ config ARCH_AT91CAP9
+ 	select GENERIC_CLOCKEVENTS
+ 	select HAVE_FB_ATMEL
+ 	select HAVE_NET_MACB
++	select HAVE_AT91_DBGU1
+ 
+ config ARCH_AT91X40
+ 	bool "AT91x40"
+@@ -510,8 +525,13 @@ config AT91_TIMER_HZ
+ choice
+ 	prompt "Select a UART for early kernel messages"
+ 
+-config AT91_EARLY_DBGU
+-	bool "DBGU"
++config AT91_EARLY_DBGU0
++	bool "DBGU on rm9200, 9260/9g20, 9261/9g10 and 9rl"
++	depends on HAVE_AT91_DBGU0
++
++config AT91_EARLY_DBGU1
++	bool "DBGU on 9263, 9g45 and cap9"
++	depends on HAVE_AT91_DBGU1
+ 
+ config AT91_EARLY_USART0
+ 	bool "USART0"
+@@ -537,6 +557,20 @@ config AT91_EARLY_USART5
+ 
+ endchoice
+ 
++choice
++	prompt "Select a DBGU for DEBUG_LL"
++	depends on DEBUG_LL
++
++config AT91_DEBUG_LL_DBGU0
++	bool "DBGU on rm9200, 9260/9g20, 9261/9g10 and 9rl"
++	depends on HAVE_AT91_DBGU0
++
++config AT91_DEBUG_LL_DBGU1
++	bool "DBGU on 9263, 9g45 and cap9"
++	depends on HAVE_AT91_DBGU1
++
++endchoice
++
+ endmenu
+ 
+ endif
 diff --git a/arch/arm/mach-at91/at91cap9_devices.c b/arch/arm/mach-at91/at91cap9_devices.c
-index 3262a7e..019dac0 100644
+index 019dac0..19975cf 100644
 --- a/arch/arm/mach-at91/at91cap9_devices.c
 +++ b/arch/arm/mach-at91/at91cap9_devices.c
-@@ -694,10 +694,19 @@ static void __init at91_add_device_rtt(void)
-  * -------------------------------------------------------------------- */
- 
- #if defined(CONFIG_AT91SAM9X_WATCHDOG) || defined(CONFIG_AT91SAM9X_WATCHDOG_MODULE)
-+static struct resource wdt_resources[] = {
-+	{
-+		.start	= AT91CAP9_BASE_WDT,
-+		.end	= AT91CAP9_BASE_WDT + SZ_16 - 1,
-+		.flags	= IORESOURCE_MEM,
-+	}
-+};
-+
- static struct platform_device at91cap9_wdt_device = {
- 	.name		= "at91_wdt",
- 	.id		= -1,
--	.num_resources	= 0,
-+	.resource	= wdt_resources,
-+	.num_resources	= ARRAY_SIZE(wdt_resources),
- };
- 
- static void __init at91_add_device_watchdog(void)
+@@ -1030,8 +1030,8 @@ void __init at91_add_device_ssc(unsigned id, unsigned pins) {}
+ #if defined(CONFIG_SERIAL_ATMEL)
+ static struct resource dbgu_resources[] = {
+ 	[0] = {
+-		.start	= AT91_BASE_SYS + AT91_DBGU,
+-		.end	= AT91_BASE_SYS + AT91_DBGU + SZ_512 - 1,
++		.start	= AT91CAP9_BASE_DBGU,
++		.end	= AT91CAP9_BASE_DBGU + SZ_512 - 1,
+ 		.flags	= IORESOURCE_MEM,
+ 	},
+ 	[1] = {
+diff --git a/arch/arm/mach-at91/at91rm9200_devices.c b/arch/arm/mach-at91/at91rm9200_devices.c
+index 66591fa..1007ba8 100644
+--- a/arch/arm/mach-at91/at91rm9200_devices.c
++++ b/arch/arm/mach-at91/at91rm9200_devices.c
+@@ -877,8 +877,8 @@ void __init at91_add_device_ssc(unsigned id, unsigned pins) {}
+ #if defined(CONFIG_SERIAL_ATMEL)
+ static struct resource dbgu_resources[] = {
+ 	[0] = {
+-		.start	= AT91_BASE_SYS + AT91_DBGU,
+-		.end	= AT91_BASE_SYS + AT91_DBGU + SZ_512 - 1,
++		.start	= AT91RM9200_BASE_DBGU,
++		.end	= AT91RM9200_BASE_DBGU + SZ_512 - 1,
+ 		.flags	= IORESOURCE_MEM,
+ 	},
+ 	[1] = {
 diff --git a/arch/arm/mach-at91/at91sam9260_devices.c b/arch/arm/mach-at91/at91sam9260_devices.c
-index 63cbfb8..9cdaffa 100644
+index 9cdaffa..5b424fc 100644
 --- a/arch/arm/mach-at91/at91sam9260_devices.c
 +++ b/arch/arm/mach-at91/at91sam9260_devices.c
-@@ -738,10 +738,19 @@ static void __init at91_add_device_rtt(void)
-  * -------------------------------------------------------------------- */
- 
- #if defined(CONFIG_AT91SAM9X_WATCHDOG) || defined(CONFIG_AT91SAM9X_WATCHDOG_MODULE)
-+static struct resource wdt_resources[] = {
-+	{
-+		.start	= AT91SAM9260_BASE_WDT,
-+		.end	= AT91SAM9260_BASE_WDT + SZ_16 - 1,
-+		.flags	= IORESOURCE_MEM,
-+	}
-+};
-+
- static struct platform_device at91sam9260_wdt_device = {
- 	.name		= "at91_wdt",
- 	.id		= -1,
--	.num_resources	= 0,
-+	.resource	= wdt_resources,
-+	.num_resources	= ARRAY_SIZE(wdt_resources),
- };
- 
- static void __init at91_add_device_watchdog(void)
+@@ -846,8 +846,8 @@ void __init at91_add_device_ssc(unsigned id, unsigned pins) {}
+ #if defined(CONFIG_SERIAL_ATMEL)
+ static struct resource dbgu_resources[] = {
+ 	[0] = {
+-		.start	= AT91_BASE_SYS + AT91_DBGU,
+-		.end	= AT91_BASE_SYS + AT91_DBGU + SZ_512 - 1,
++		.start	= AT91SAM9260_BASE_DBGU,
++		.end	= AT91SAM9260_BASE_DBGU + SZ_512 - 1,
+ 		.flags	= IORESOURCE_MEM,
+ 	},
+ 	[1] = {
 diff --git a/arch/arm/mach-at91/at91sam9261_devices.c b/arch/arm/mach-at91/at91sam9261_devices.c
-index d5bd1e7..c59e1e9 100644
+index c59e1e9..e5cff1d 100644
 --- a/arch/arm/mach-at91/at91sam9261_devices.c
 +++ b/arch/arm/mach-at91/at91sam9261_devices.c
-@@ -624,10 +624,19 @@ static void __init at91_add_device_rtt(void)
-  * -------------------------------------------------------------------- */
- 
- #if defined(CONFIG_AT91SAM9X_WATCHDOG) || defined(CONFIG_AT91SAM9X_WATCHDOG_MODULE)
-+static struct resource wdt_resources[] = {
-+	{
-+		.start	= AT91SAM9261_BASE_WDT,
-+		.end	= AT91SAM9261_BASE_WDT + SZ_16 - 1,
-+		.flags	= IORESOURCE_MEM,
-+	}
-+};
-+
- static struct platform_device at91sam9261_wdt_device = {
- 	.name		= "at91_wdt",
- 	.id		= -1,
--	.num_resources	= 0,
-+	.resource	= wdt_resources,
-+	.num_resources	= ARRAY_SIZE(wdt_resources),
- };
- 
- static void __init at91_add_device_watchdog(void)
+@@ -825,8 +825,8 @@ void __init at91_add_device_ssc(unsigned id, unsigned pins) {}
+ #if defined(CONFIG_SERIAL_ATMEL)
+ static struct resource dbgu_resources[] = {
+ 	[0] = {
+-		.start	= AT91_BASE_SYS + AT91_DBGU,
+-		.end	= AT91_BASE_SYS + AT91_DBGU + SZ_512 - 1,
++		.start	= AT91SAM9261_BASE_DBGU,
++		.end	= AT91SAM9261_BASE_DBGU + SZ_512 - 1,
+ 		.flags	= IORESOURCE_MEM,
+ 	},
+ 	[1] = {
 diff --git a/arch/arm/mach-at91/at91sam9263_devices.c b/arch/arm/mach-at91/at91sam9263_devices.c
-index 5d2b061..b5f4e25 100644
+index b5f4e25..20e681c 100644
 --- a/arch/arm/mach-at91/at91sam9263_devices.c
 +++ b/arch/arm/mach-at91/at91sam9263_devices.c
-@@ -996,10 +996,19 @@ static void __init at91_add_device_rtt(void)
-  * -------------------------------------------------------------------- */
+@@ -1205,8 +1205,8 @@ void __init at91_add_device_ssc(unsigned id, unsigned pins) {}
  
- #if defined(CONFIG_AT91SAM9X_WATCHDOG) || defined(CONFIG_AT91SAM9X_WATCHDOG_MODULE)
-+static struct resource wdt_resources[] = {
-+	{
-+		.start	= AT91SAM9263_BASE_WDT,
-+		.end	= AT91SAM9263_BASE_WDT + SZ_16 - 1,
-+		.flags	= IORESOURCE_MEM,
-+	}
-+};
-+
- static struct platform_device at91sam9263_wdt_device = {
- 	.name		= "at91_wdt",
- 	.id		= -1,
--	.num_resources	= 0,
-+	.resource	= wdt_resources,
-+	.num_resources	= ARRAY_SIZE(wdt_resources),
- };
- 
- static void __init at91_add_device_watchdog(void)
+ static struct resource dbgu_resources[] = {
+ 	[0] = {
+-		.start	= AT91_BASE_SYS + AT91_DBGU,
+-		.end	= AT91_BASE_SYS + AT91_DBGU + SZ_512 - 1,
++		.start	= AT91SAM9263_BASE_DBGU,
++		.end	= AT91SAM9263_BASE_DBGU + SZ_512 - 1,
+ 		.flags	= IORESOURCE_MEM,
+ 	},
+ 	[1] = {
 diff --git a/arch/arm/mach-at91/at91sam9g45_devices.c b/arch/arm/mach-at91/at91sam9g45_devices.c
-index bb2ba0c..3b91706 100644
+index 3b91706..153dad0 100644
 --- a/arch/arm/mach-at91/at91sam9g45_devices.c
 +++ b/arch/arm/mach-at91/at91sam9g45_devices.c
-@@ -1133,10 +1133,19 @@ static void __init at91_add_device_trng(void) {}
-  * -------------------------------------------------------------------- */
- 
- #if defined(CONFIG_AT91SAM9X_WATCHDOG) || defined(CONFIG_AT91SAM9X_WATCHDOG_MODULE)
-+static struct resource wdt_resources[] = {
-+	{
-+		.start	= AT91SAM9G45_BASE_WDT,
-+		.end	= AT91SAM9G45_BASE_WDT + SZ_16 - 1,
-+		.flags	= IORESOURCE_MEM,
-+	}
-+};
-+
- static struct platform_device at91sam9g45_wdt_device = {
- 	.name		= "at91_wdt",
- 	.id		= -1,
--	.num_resources	= 0,
-+	.resource	= wdt_resources,
-+	.num_resources	= ARRAY_SIZE(wdt_resources),
- };
- 
- static void __init at91_add_device_watchdog(void)
+@@ -1341,8 +1341,8 @@ void __init at91_add_device_ssc(unsigned id, unsigned pins) {}
+ #if defined(CONFIG_SERIAL_ATMEL)
+ static struct resource dbgu_resources[] = {
+ 	[0] = {
+-		.start	= AT91_BASE_SYS + AT91_DBGU,
+-		.end	= AT91_BASE_SYS + AT91_DBGU + SZ_512 - 1,
++		.start	= AT91SAM9G45_BASE_DBGU,
++		.end	= AT91SAM9G45_BASE_DBGU + SZ_512 - 1,
+ 		.flags	= IORESOURCE_MEM,
+ 	},
+ 	[1] = {
 diff --git a/arch/arm/mach-at91/at91sam9rl_devices.c b/arch/arm/mach-at91/at91sam9rl_devices.c
-index f9b423b..c7961b4 100644
+index c7961b4..366c1cf 100644
 --- a/arch/arm/mach-at91/at91sam9rl_devices.c
 +++ b/arch/arm/mach-at91/at91sam9rl_devices.c
-@@ -709,10 +709,19 @@ static void __init at91_add_device_rtt(void)
-  * -------------------------------------------------------------------- */
+@@ -917,8 +917,8 @@ void __init at91_add_device_ssc(unsigned id, unsigned pins) {}
+ #if defined(CONFIG_SERIAL_ATMEL)
+ static struct resource dbgu_resources[] = {
+ 	[0] = {
+-		.start	= AT91_BASE_SYS + AT91_DBGU,
+-		.end	= AT91_BASE_SYS + AT91_DBGU + SZ_512 - 1,
++		.start	= AT91SAM9RL_BASE_DBGU,
++		.end	= AT91SAM9RL_BASE_DBGU + SZ_512 - 1,
+ 		.flags	= IORESOURCE_MEM,
+ 	},
+ 	[1] = {
+diff --git a/arch/arm/mach-at91/include/mach/at91_dbgu.h b/arch/arm/mach-at91/include/mach/at91_dbgu.h
+index dbfe455a..2aa0c5e 100644
+--- a/arch/arm/mach-at91/include/mach/at91_dbgu.h
++++ b/arch/arm/mach-at91/include/mach/at91_dbgu.h
+@@ -19,7 +19,7 @@
+ #define dbgu_readl(dbgu, field) \
+ 	__raw_readl(AT91_VA_BASE_SYS + dbgu + AT91_DBGU_ ## field)
  
- #if defined(CONFIG_AT91SAM9X_WATCHDOG) || defined(CONFIG_AT91SAM9X_WATCHDOG_MODULE)
-+static struct resource wdt_resources[] = {
-+	{
-+		.start	= AT91SAM9RL_BASE_WDT,
-+		.end	= AT91SAM9RL_BASE_WDT + SZ_16 - 1,
-+		.flags	= IORESOURCE_MEM,
-+	}
-+};
-+
- static struct platform_device at91sam9rl_wdt_device = {
- 	.name		= "at91_wdt",
- 	.id		= -1,
--	.num_resources	= 0,
-+	.resource	= wdt_resources,
-+	.num_resources	= ARRAY_SIZE(wdt_resources),
- };
- 
- static void __init at91_add_device_watchdog(void)
+-#ifdef AT91_DBGU
++#if !defined(CONFIG_ARCH_AT91X40)
+ #define AT91_DBGU_CR		(0x00)	/* Control Register */
+ #define AT91_DBGU_MR		(0x04)	/* Mode Register */
+ #define AT91_DBGU_IER		(0x08)	/* Interrupt Enable Register */
 diff --git a/arch/arm/mach-at91/include/mach/at91cap9.h b/arch/arm/mach-at91/include/mach/at91cap9.h
-index 5ac468c..750ba85 100644
+index 750ba85..bca2b54 100644
 --- a/arch/arm/mach-at91/include/mach/at91cap9.h
 +++ b/arch/arm/mach-at91/include/mach/at91cap9.h
-@@ -86,7 +86,6 @@
+@@ -82,7 +82,6 @@
+ #define AT91_BCRAMC	(0xffffe400 - AT91_BASE_SYS)
+ #define AT91_DDRSDRC0	(0xffffe600 - AT91_BASE_SYS)
+ #define AT91_MATRIX	(0xffffea00 - AT91_BASE_SYS)
+-#define AT91_DBGU	(0xffffee00 - AT91_BASE_SYS)
  #define AT91_AIC	(0xfffff000 - AT91_BASE_SYS)
  #define AT91_PMC	(0xfffffc00 - AT91_BASE_SYS)
  #define AT91_RSTC	(0xfffffd00 - AT91_BASE_SYS)
--#define AT91_WDT	(0xfffffd40 - AT91_BASE_SYS)
- #define AT91_GPBR	(cpu_is_at91cap9_revB() ?	\
- 			(0xfffffd50 - AT91_BASE_SYS) :	\
- 			(0xfffffd60 - AT91_BASE_SYS))
-@@ -101,6 +100,7 @@
- #define AT91CAP9_BASE_SHDWC	0xfffffd10
- #define AT91CAP9_BASE_RTT	0xfffffd20
- #define AT91CAP9_BASE_PIT	0xfffffd30
-+#define AT91CAP9_BASE_WDT	0xfffffd40
+@@ -93,6 +92,7 @@
+ #define AT91CAP9_BASE_ECC	0xffffe200
+ #define AT91CAP9_BASE_DMA	0xffffec00
+ #define AT91CAP9_BASE_SMC	0xffffe800
++#define AT91CAP9_BASE_DBGU	AT91_BASE_DBGU1
+ #define AT91CAP9_BASE_PIOA	0xfffff200
+ #define AT91CAP9_BASE_PIOB	0xfffff400
+ #define AT91CAP9_BASE_PIOC	0xfffff600
+diff --git a/arch/arm/mach-at91/include/mach/at91rm9200.h b/arch/arm/mach-at91/include/mach/at91rm9200.h
+index 5740954..1f767e2 100644
+--- a/arch/arm/mach-at91/include/mach/at91rm9200.h
++++ b/arch/arm/mach-at91/include/mach/at91rm9200.h
+@@ -80,12 +80,12 @@
+  * System Peripherals (offset from AT91_BASE_SYS)
+  */
+ #define AT91_AIC	(0xfffff000 - AT91_BASE_SYS)	/* Advanced Interrupt Controller */
+-#define AT91_DBGU	(0xfffff200 - AT91_BASE_SYS)	/* Debug Unit */
+ #define AT91_PMC	(0xfffffc00 - AT91_BASE_SYS)	/* Power Management Controller */
+ #define AT91_ST		(0xfffffd00 - AT91_BASE_SYS)	/* System Timer */
+ #define AT91_RTC	(0xfffffe00 - AT91_BASE_SYS)	/* Real-Time Clock */
+ #define AT91_MC		(0xffffff00 - AT91_BASE_SYS)	/* Memory Controllers */
  
- #define AT91_USART0	AT91CAP9_BASE_US0
- #define AT91_USART1	AT91CAP9_BASE_US1
++#define AT91RM9200_BASE_DBGU	AT91_BASE_DBGU0	/* Debug Unit */
+ #define AT91RM9200_BASE_PIOA	0xfffff400	/* PIO Controller A */
+ #define AT91RM9200_BASE_PIOB	0xfffff600	/* PIO Controller B */
+ #define AT91RM9200_BASE_PIOC	0xfffff800	/* PIO Controller C */
 diff --git a/arch/arm/mach-at91/include/mach/at91sam9260.h b/arch/arm/mach-at91/include/mach/at91sam9260.h
-index e3c819a..05860c5 100644
+index 05860c5..e360d66 100644
 --- a/arch/arm/mach-at91/include/mach/at91sam9260.h
 +++ b/arch/arm/mach-at91/include/mach/at91sam9260.h
-@@ -86,7 +86,6 @@
- #define AT91_DBGU	(0xfffff200 - AT91_BASE_SYS)
+@@ -83,13 +83,13 @@
+ #define AT91_SDRAMC0	(0xffffea00 - AT91_BASE_SYS)
+ #define AT91_MATRIX	(0xffffee00 - AT91_BASE_SYS)
+ #define AT91_AIC	(0xfffff000 - AT91_BASE_SYS)
+-#define AT91_DBGU	(0xfffff200 - AT91_BASE_SYS)
  #define AT91_PMC	(0xfffffc00 - AT91_BASE_SYS)
  #define AT91_RSTC	(0xfffffd00 - AT91_BASE_SYS)
--#define AT91_WDT	(0xfffffd40 - AT91_BASE_SYS)
  #define AT91_GPBR	(0xfffffd50 - AT91_BASE_SYS)
  
  #define AT91SAM9260_BASE_ECC	0xffffe800
-@@ -97,6 +96,7 @@
- #define AT91SAM9260_BASE_SHDWC	0xfffffd10
- #define AT91SAM9260_BASE_RTT	0xfffffd20
- #define AT91SAM9260_BASE_PIT	0xfffffd30
-+#define AT91SAM9260_BASE_WDT	0xfffffd40
- 
- #define AT91_USART0	AT91SAM9260_BASE_US0
- #define AT91_USART1	AT91SAM9260_BASE_US1
+ #define AT91SAM9260_BASE_SMC	0xffffec00
++#define AT91SAM9260_BASE_DBGU	AT91_BASE_DBGU0
+ #define AT91SAM9260_BASE_PIOA	0xfffff400
+ #define AT91SAM9260_BASE_PIOB	0xfffff600
+ #define AT91SAM9260_BASE_PIOC	0xfffff800
 diff --git a/arch/arm/mach-at91/include/mach/at91sam9261.h b/arch/arm/mach-at91/include/mach/at91sam9261.h
-index f9b5163..df2ddfd 100644
+index df2ddfd..2ccc8a53 100644
 --- a/arch/arm/mach-at91/include/mach/at91sam9261.h
 +++ b/arch/arm/mach-at91/include/mach/at91sam9261.h
-@@ -71,7 +71,6 @@
- #define AT91_DBGU	(0xfffff200 - AT91_BASE_SYS)
+@@ -68,12 +68,12 @@
+ #define AT91_SDRAMC0	(0xffffea00 - AT91_BASE_SYS)
+ #define AT91_MATRIX	(0xffffee00 - AT91_BASE_SYS)
+ #define AT91_AIC	(0xfffff000 - AT91_BASE_SYS)
+-#define AT91_DBGU	(0xfffff200 - AT91_BASE_SYS)
  #define AT91_PMC	(0xfffffc00 - AT91_BASE_SYS)
  #define AT91_RSTC	(0xfffffd00 - AT91_BASE_SYS)
--#define AT91_WDT	(0xfffffd40 - AT91_BASE_SYS)
  #define AT91_GPBR	(0xfffffd50 - AT91_BASE_SYS)
  
  #define AT91SAM9261_BASE_SMC	0xffffec00
-@@ -81,6 +80,7 @@
- #define AT91SAM9261_BASE_SHDWC	0xfffffd10
- #define AT91SAM9261_BASE_RTT	0xfffffd20
- #define AT91SAM9261_BASE_PIT	0xfffffd30
-+#define AT91SAM9261_BASE_WDT	0xfffffd40
- 
- #define AT91_USART0	AT91SAM9261_BASE_US0
- #define AT91_USART1	AT91SAM9261_BASE_US1
++#define AT91SAM9261_BASE_DBGU	AT91_BASE_DBGU0
+ #define AT91SAM9261_BASE_PIOA	0xfffff400
+ #define AT91SAM9261_BASE_PIOB	0xfffff600
+ #define AT91SAM9261_BASE_PIOC	0xfffff800
 diff --git a/arch/arm/mach-at91/include/mach/at91sam9263.h b/arch/arm/mach-at91/include/mach/at91sam9263.h
-index 28d52d5..0eb614e 100644
+index 0eb614e..aee137b 100644
 --- a/arch/arm/mach-at91/include/mach/at91sam9263.h
 +++ b/arch/arm/mach-at91/include/mach/at91sam9263.h
-@@ -81,7 +81,6 @@
+@@ -77,7 +77,6 @@
+ #define AT91_SDRAMC0	(0xffffe200 - AT91_BASE_SYS)
+ #define AT91_SDRAMC1	(0xffffe800 - AT91_BASE_SYS)
+ #define AT91_MATRIX	(0xffffec00 - AT91_BASE_SYS)
+-#define AT91_DBGU	(0xffffee00 - AT91_BASE_SYS)
  #define AT91_AIC	(0xfffff000 - AT91_BASE_SYS)
  #define AT91_PMC	(0xfffffc00 - AT91_BASE_SYS)
  #define AT91_RSTC	(0xfffffd00 - AT91_BASE_SYS)
--#define AT91_WDT	(0xfffffd40 - AT91_BASE_SYS)
- #define AT91_GPBR	(0xfffffd60 - AT91_BASE_SYS)
- 
- #define AT91SAM9263_BASE_ECC0	0xffffe000
-@@ -96,6 +95,7 @@
- #define AT91SAM9263_BASE_SHDWC	0xfffffd10
- #define AT91SAM9263_BASE_RTT0	0xfffffd20
- #define AT91SAM9263_BASE_PIT	0xfffffd30
-+#define AT91SAM9263_BASE_WDT	0xfffffd40
- #define AT91SAM9263_BASE_RTT1	0xfffffd50
- 
- #define AT91_USART0	AT91SAM9263_BASE_US0
+@@ -87,6 +86,7 @@
+ #define AT91SAM9263_BASE_SMC0	0xffffe400
+ #define AT91SAM9263_BASE_ECC1	0xffffe600
+ #define AT91SAM9263_BASE_SMC1	0xffffea00
++#define AT91SAM9263_BASE_DBGU	AT91_BASE_DBGU1
+ #define AT91SAM9263_BASE_PIOA	0xfffff200
+ #define AT91SAM9263_BASE_PIOB	0xfffff400
+ #define AT91SAM9263_BASE_PIOC	0xfffff600
 diff --git a/arch/arm/mach-at91/include/mach/at91sam9g45.h b/arch/arm/mach-at91/include/mach/at91sam9g45.h
-index 5f3453e..65098c3 100644
+index 65098c3..211721b 100644
 --- a/arch/arm/mach-at91/include/mach/at91sam9g45.h
 +++ b/arch/arm/mach-at91/include/mach/at91sam9g45.h
-@@ -93,7 +93,6 @@
+@@ -89,7 +89,6 @@
+ #define AT91_DDRSDRC1	(0xffffe400 - AT91_BASE_SYS)
+ #define AT91_DDRSDRC0	(0xffffe600 - AT91_BASE_SYS)
+ #define AT91_MATRIX	(0xffffea00 - AT91_BASE_SYS)
+-#define AT91_DBGU	(0xffffee00 - AT91_BASE_SYS)
  #define AT91_AIC	(0xfffff000 - AT91_BASE_SYS)
  #define AT91_PMC	(0xfffffc00 - AT91_BASE_SYS)
  #define AT91_RSTC	(0xfffffd00 - AT91_BASE_SYS)
--#define AT91_WDT	(0xfffffd40 - AT91_BASE_SYS)
- #define AT91_GPBR	(0xfffffd60 - AT91_BASE_SYS)
- #define AT91_RTC	(0xfffffdb0 - AT91_BASE_SYS)
- 
-@@ -108,6 +107,7 @@
- #define AT91SAM9G45_BASE_SHDWC	0xfffffd10
- #define AT91SAM9G45_BASE_RTT	0xfffffd20
- #define AT91SAM9G45_BASE_PIT	0xfffffd30
-+#define AT91SAM9G45_BASE_WDT	0xfffffd40
- 
- #define AT91_USART0	AT91SAM9G45_BASE_US0
- #define AT91_USART1	AT91SAM9G45_BASE_US1
+@@ -99,6 +98,7 @@
+ #define AT91SAM9G45_BASE_ECC	0xffffe200
+ #define AT91SAM9G45_BASE_DMA	0xffffec00
+ #define AT91SAM9G45_BASE_SMC	0xffffe800
++#define AT91SAM9G45_BASE_DBGU	AT91_BASE_DBGU1
+ #define AT91SAM9G45_BASE_PIOA	0xfffff200
+ #define AT91SAM9G45_BASE_PIOB	0xfffff400
+ #define AT91SAM9G45_BASE_PIOC	0xfffff600
 diff --git a/arch/arm/mach-at91/include/mach/at91sam9rl.h b/arch/arm/mach-at91/include/mach/at91sam9rl.h
-index 6f3a4ee..46e136d 100644
+index 46e136d..4f7367a 100644
 --- a/arch/arm/mach-at91/include/mach/at91sam9rl.h
 +++ b/arch/arm/mach-at91/include/mach/at91sam9rl.h
-@@ -75,7 +75,6 @@
- #define AT91_DBGU	(0xfffff200 - AT91_BASE_SYS)
+@@ -72,7 +72,6 @@
+ #define AT91_SDRAMC0	(0xffffea00 - AT91_BASE_SYS)
+ #define AT91_MATRIX	(0xffffee00 - AT91_BASE_SYS)
+ #define AT91_AIC	(0xfffff000 - AT91_BASE_SYS)
+-#define AT91_DBGU	(0xfffff200 - AT91_BASE_SYS)
  #define AT91_PMC	(0xfffffc00 - AT91_BASE_SYS)
  #define AT91_RSTC	(0xfffffd00 - AT91_BASE_SYS)
--#define AT91_WDT	(0xfffffd40 - AT91_BASE_SYS)
  #define AT91_SCKCR	(0xfffffd50 - AT91_BASE_SYS)
- #define AT91_GPBR	(0xfffffd60 - AT91_BASE_SYS)
- #define AT91_RTC	(0xfffffe00 - AT91_BASE_SYS)
-@@ -90,6 +89,7 @@
- #define AT91SAM9RL_BASE_SHDWC	0xfffffd10
- #define AT91SAM9RL_BASE_RTT	0xfffffd20
- #define AT91SAM9RL_BASE_PIT	0xfffffd30
-+#define AT91SAM9RL_BASE_WDT	0xfffffd40
+@@ -82,6 +81,7 @@
+ #define AT91SAM9RL_BASE_DMA	0xffffe600
+ #define AT91SAM9RL_BASE_ECC	0xffffe800
+ #define AT91SAM9RL_BASE_SMC	0xffffec00
++#define AT91SAM9RL_BASE_DBGU	AT91_BASE_DBGU0
+ #define AT91SAM9RL_BASE_PIOA	0xfffff400
+ #define AT91SAM9RL_BASE_PIOB	0xfffff600
+ #define AT91SAM9RL_BASE_PIOC	0xfffff800
+diff --git a/arch/arm/mach-at91/include/mach/debug-macro.S b/arch/arm/mach-at91/include/mach/debug-macro.S
+index 0ed8648..c6bb9e2 100644
+--- a/arch/arm/mach-at91/include/mach/debug-macro.S
++++ b/arch/arm/mach-at91/include/mach/debug-macro.S
+@@ -14,9 +14,15 @@
+ #include <mach/hardware.h>
+ #include <mach/at91_dbgu.h>
  
- #define AT91_USART0	AT91SAM9RL_BASE_US0
- #define AT91_USART1	AT91SAM9RL_BASE_US1
-diff --git a/drivers/watchdog/at91sam9_wdt.c b/drivers/watchdog/at91sam9_wdt.c
-index 87445b2..0056256 100644
---- a/drivers/watchdog/at91sam9_wdt.c
-+++ b/drivers/watchdog/at91sam9_wdt.c
-@@ -35,6 +35,11 @@
- 
- #define DRV_NAME "AT91SAM9 Watchdog"
- 
-+#define wdt_read(field) \
-+	__raw_readl(at91wdt_private.base + field)
-+#define wdt_write(field, val) \
-+	__raw_writel((val), at91wdt_private.base + field)
++#if defined(CONFIG_AT91_DEBUG_LL_DBGU0)
++#define AT91_DBGU AT91_BASE_DBGU0
++#else
++#define AT91_DBGU AT91_BASE_DBGU1
++#endif
 +
- /* AT91SAM9 watchdog runs a 12bit counter @ 256Hz,
-  * use this to convert a watchdog
-  * value from/to milliseconds.
-@@ -63,6 +68,7 @@ MODULE_PARM_DESC(nowayout, "Watchdog cannot be stopped once started "
- static void at91_ping(unsigned long data);
+ 	.macro	addruart, rp, rv, tmp
+-	ldr	\rp, =(AT91_BASE_SYS + AT91_DBGU)	@ System peripherals (phys address)
+-	ldr	\rv, =(AT91_VA_BASE_SYS	+ AT91_DBGU)	@ System peripherals (virt address)
++	ldr	\rp, =AT91_DBGU				@ System peripherals (phys address)
++	ldr	\rv, =AT91_IO_P2V(AT91_DBGU)		@ System peripherals (virt address)
+ 	.endm
  
- static struct {
-+	void __iomem *base;
- 	unsigned long next_heartbeat;	/* the next_heartbeat for the timer */
- 	unsigned long open;
- 	char expect_close;
-@@ -77,7 +83,7 @@ static struct {
-  */
- static inline void at91_wdt_reset(void)
- {
--	at91_sys_write(AT91_WDT_CR, AT91_WDT_KEY | AT91_WDT_WDRSTT);
-+	wdt_write(AT91_WDT_CR, AT91_WDT_KEY | AT91_WDT_WDRSTT);
- }
+ 	.macro	senduart,rd,rx
+diff --git a/arch/arm/mach-at91/include/mach/hardware.h b/arch/arm/mach-at91/include/mach/hardware.h
+index 483478d..435764e 100644
+--- a/arch/arm/mach-at91/include/mach/hardware.h
++++ b/arch/arm/mach-at91/include/mach/hardware.h
+@@ -16,6 +16,12 @@
  
- /*
-@@ -132,7 +138,7 @@ static int at91_wdt_settimeout(unsigned int timeout)
- 	unsigned int mr;
+ #include <asm/sizes.h>
  
- 	/* Check if disabled */
--	mr = at91_sys_read(AT91_WDT_MR);
-+	mr = wdt_read(AT91_WDT_MR);
- 	if (mr & AT91_WDT_WDDIS) {
- 		printk(KERN_ERR DRV_NAME": sorry, watchdog is disabled\n");
- 		return -EIO;
-@@ -149,7 +155,7 @@ static int at91_wdt_settimeout(unsigned int timeout)
- 		| AT91_WDT_WDDBGHLT	/* disabled in debug mode */
- 		| AT91_WDT_WDD		/* restart at any time */
- 		| (timeout & AT91_WDT_WDV);  /* timer value */
--	at91_sys_write(AT91_WDT_MR, reg);
-+	wdt_write(AT91_WDT_MR, reg);
- 
- 	return 0;
- }
-@@ -248,12 +254,22 @@ static struct miscdevice at91wdt_miscdev = {
- 
- static int __init at91wdt_probe(struct platform_device *pdev)
- {
-+	struct resource	*r;
- 	int res;
- 
- 	if (at91wdt_miscdev.parent)
- 		return -EBUSY;
- 	at91wdt_miscdev.parent = &pdev->dev;
- 
-+	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	if (!r)
-+		return -ENODEV;
-+	at91wdt_private.base = ioremap(r->start, resource_size(r));
-+	if (!at91wdt_private.base) {
-+		dev_err(&pdev->dev, "failed to map registers, aborting.\n");
-+		return -ENOMEM;
-+	}
++/* DBGU base */
++/* rm9200, 9260/9g20, 9261/9g10, 9rl */
++#define AT91_BASE_DBGU0	0xfffff200
++/* 9263, 9g45, cap9 */
++#define AT91_BASE_DBGU1	0xffffee00
 +
- 	/* Set watchdog */
- 	res = at91_wdt_settimeout(ms_to_ticks(WDT_HW_TIMEOUT * 1000));
- 	if (res)
-diff --git a/drivers/watchdog/at91sam9_wdt.h b/drivers/watchdog/at91sam9_wdt.h
-index 757f9ca..c6fbb2e6 100644
---- a/drivers/watchdog/at91sam9_wdt.h
-+++ b/drivers/watchdog/at91sam9_wdt.h
-@@ -16,11 +16,11 @@
- #ifndef AT91_WDT_H
- #define AT91_WDT_H
+ #if defined(CONFIG_ARCH_AT91RM9200)
+ #include <mach/at91rm9200.h>
+ #elif defined(CONFIG_ARCH_AT91SAM9260) || defined(CONFIG_ARCH_AT91SAM9G20)
+diff --git a/arch/arm/mach-at91/include/mach/uncompress.h b/arch/arm/mach-at91/include/mach/uncompress.h
+index 18bdcde..0234fd9 100644
+--- a/arch/arm/mach-at91/include/mach/uncompress.h
++++ b/arch/arm/mach-at91/include/mach/uncompress.h
+@@ -24,8 +24,10 @@
+ #include <linux/io.h>
+ #include <linux/atmel_serial.h>
  
--#define AT91_WDT_CR		(AT91_WDT + 0x00)	/* Watchdog Control Register */
-+#define AT91_WDT_CR		0x00			/* Watchdog Control Register */
- #define		AT91_WDT_WDRSTT		(1    << 0)		/* Restart */
- #define		AT91_WDT_KEY		(0xa5 << 24)		/* KEY Password */
+-#if defined(CONFIG_AT91_EARLY_DBGU)
+-#define UART_OFFSET (AT91_DBGU + AT91_BASE_SYS)
++#if defined(CONFIG_AT91_EARLY_DBGU0)
++#define UART_OFFSET AT91_BASE_DBGU0
++#elif defined(CONFIG_AT91_EARLY_DBGU1)
++#define UART_OFFSET AT91_BASE_DBGU1
+ #elif defined(CONFIG_AT91_EARLY_USART0)
+ #define UART_OFFSET AT91_USART0
+ #elif defined(CONFIG_AT91_EARLY_USART1)
+diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
+index 5b4a260..3c309dc 100644
+--- a/arch/arm/mach-at91/setup.c
++++ b/arch/arm/mach-at91/setup.c
+@@ -93,9 +93,6 @@ void at91_iounmap(volatile void __iomem *addr)
+ }
+ EXPORT_SYMBOL(at91_iounmap);
  
--#define AT91_WDT_MR		(AT91_WDT + 0x04)	/* Watchdog Mode Register */
-+#define AT91_WDT_MR		0x04			/* Watchdog Mode Register */
- #define		AT91_WDT_WDV		(0xfff << 0)		/* Counter Value */
- #define		AT91_WDT_WDFIEN		(1     << 12)		/* Fault Interrupt Enable */
- #define		AT91_WDT_WDRSTEN	(1     << 13)		/* Reset Processor */
-@@ -30,7 +30,7 @@
- #define		AT91_WDT_WDDBGHLT	(1     << 28)		/* Debug Halt */
- #define		AT91_WDT_WDIDLEHLT	(1     << 29)		/* Idle Halt */
+-#define AT91_DBGU0	0xfffff200
+-#define AT91_DBGU1	0xffffee00
+-
+ static void __init soc_detect(u32 dbgu_base)
+ {
+ 	u32 cidr, socid;
+@@ -268,9 +265,9 @@ void __init at91_map_io(void)
+ 	at91_soc_initdata.type = AT91_SOC_NONE;
+ 	at91_soc_initdata.subtype = AT91_SOC_SUBTYPE_NONE;
  
--#define AT91_WDT_SR		(AT91_WDT + 0x08)	/* Watchdog Status Register */
-+#define AT91_WDT_SR		0x08			/* Watchdog Status Register */
- #define		AT91_WDT_WDUNF		(1 << 0)		/* Watchdog Underflow */
- #define		AT91_WDT_WDERR		(1 << 1)		/* Watchdog Error */
+-	soc_detect(AT91_DBGU0);
++	soc_detect(AT91_BASE_DBGU0);
+ 	if (!at91_soc_is_detected())
+-		soc_detect(AT91_DBGU1);
++		soc_detect(AT91_BASE_DBGU1);
  
+ 	if (!at91_soc_is_detected())
+ 		panic("AT91: Impossible to detect the SOC type");
 -- 
 1.7.7
