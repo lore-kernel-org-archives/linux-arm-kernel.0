@@ -1,43 +1,72 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 15 Nov 2011 17:52:20 +0000
-Subject: [PATCH] MTD: nand: Making  MTD_NAND_OMAP2 depend on ARCH_OMAP2PLUS
-In-Reply-To: <1321352556-7080-1-git-send-email-shubhrajyoti@ti.com>
-References: <1321352556-7080-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <20111115175220.GA11274@n2100.arm.linux.org.uk>
+From: or.rmz1@gmail.com (Omar Ramirez Luna)
+Date: Tue, 15 Nov 2011 11:57:59 -0600
+Subject: [PATCH v16 09/12] OMAP: dmtimer: low-power mode support
+In-Reply-To: <1316518227-28116-10-git-send-email-tarun.kanti@ti.com>
+References: <1316518227-28116-1-git-send-email-tarun.kanti@ti.com>
+ <1316518227-28116-10-git-send-email-tarun.kanti@ti.com>
+Message-ID: <CAPTm=KGDEKGxLpJt0t6k_NL5Wz81NkMmRJ+OkmyvHedd6_exgQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 15, 2011 at 03:52:36PM +0530, Shubhrajyoti D wrote:
-> Making  MTD_NAND_OMAP2 depend on ARCH_OMAP2PLUS instead of
-> oring with ARCH2/3/4.
-> 
-> Reported-by: Russell King <linux@arm.linux.org.uk>
+Hi Tarun,
 
-Thanks, but please make this rmk+kernel at arm.linux.org.uk.
+On Tue, Sep 20, 2011 at 6:30 AM, Tarun Kanti DebBarma
+<tarun.kanti@ti.com> wrote:
+> Clock is enabled only when timer is started and disabled when the the timer
+> is stopped. Therefore before accessing registers in functions clock is enabled
+> and then disabled back at the end of access. Context save is done dynamically
+> whenever the registers are modified. Context restore is called when context is
+> lost.
 
-> Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
-> ---
->  drivers/mtd/nand/Kconfig |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
-> 
-> diff --git a/drivers/mtd/nand/Kconfig b/drivers/mtd/nand/Kconfig
-> index cce7b70..b68dd5e 100644
-> --- a/drivers/mtd/nand/Kconfig
-> +++ b/drivers/mtd/nand/Kconfig
-> @@ -110,7 +110,7 @@ config MTD_NAND_AMS_DELTA
->  
->  config MTD_NAND_OMAP2
->  	tristate "NAND Flash device on OMAP2, OMAP3 and OMAP4"
-> -	depends on ARM && (ARCH_OMAP2 || ARCH_OMAP3 || ARCH_OMAP4)
-> +	depends on ARCH_OMAP2PLUS
->  	help
->            Support for NAND flash on Texas Instruments OMAP2, OMAP3 and OMAP4
->  	  platforms.
-> -- 
-> 1.7.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Now that handling of the clock has been decoupled from
+omap_dm_timer_request_specific/free and placed in start/stop
+functions, there is a "possible irq lock inversion dependency
+detected" for any attempt to enable the clock from soft|hard irq.
+
+My use case is as follows:
+
+DSP sends a mailbox message to ARM, this triggers a tasklet in mailbox
+for processing the message, when it reaches tidspbridge it turns out
+that the DSP wants to enable a gpt timer; however, locks involved
+"clocks_mutex" and "dm_timer_lock" now could cause a deadlock as they
+have been called from unsafe contexts in the past
+(http://pastebin.com/7Dtz8t0f).
+
+Is the intention to restrict enabling the dmtimer clocks from hard|soft irqs?
+
+...
+> @@ -303,6 +342,22 @@ void omap_dm_timer_stop(struct omap_dm_timer *timer)
+> ? ? ? ? ? ? ? ?rate = clk_get_rate(timer->fclk);
+>
+> ? ? ? ?__omap_dm_timer_stop(timer, timer->posted, rate, is_omap2);
+> +
+> + ? ? ? if (timer->loses_context) {
+> + ? ? ? ? ? ? ? if (timer->get_context_loss_count)
+> + ? ? ? ? ? ? ? ? ? ? ? timer->ctx_loss_count =
+> + ? ? ? ? ? ? ? ? ? ? ? timer->get_context_loss_count(&timer->pdev->dev);
+> + ? ? ? }
+> +
+> + ? ? ? /*
+> + ? ? ? ?* Since the register values are computed and written within
+> + ? ? ? ?* __omap_dm_timer_stop, we need to use read to retrieve the
+> + ? ? ? ?* context.
+> + ? ? ? ?*/
+> + ? ? ? timer->context.tclr =
+> + ? ? ? ? ? ? ? ? ? ? ? omap_dm_timer_read_reg(timer, OMAP_TIMER_CTRL_REG);
+> + ? ? ? timer->context.tisr = __raw_readl(timer->irq_stat);
+> + ? ? ? omap_dm_timer_disable(timer);
+> ?}
+> ?EXPORT_SYMBOL_GPL(omap_dm_timer_stop);
+>
+
+I didn't review the whole patch, but at least this part is not in
+mainline, it seems like the patch modified by Tony and the v16 were
+not the same.
+
+I could diff and include the missing parts, if someone can confirm
+that we need v16, which I believe so, since current stop function
+doesn't call omap_dm_timer_disable.
+
+Regards,
+
+Omar
