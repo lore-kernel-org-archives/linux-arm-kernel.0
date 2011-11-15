@@ -1,46 +1,49 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Tue, 15 Nov 2011 23:00:59 +0100 (CET)
-Subject: [patch] ARM: smpboot: Enable interrupts after marking CPU
- online/active
-In-Reply-To: <4EC2DF93.2050904@codeaurora.org>
-References: <20110908215314.829452535@linutronix.de>
- <CADGdYn6V_eQJZ4=irMbSS7XJj4MJVeALxcrWdD7o2bGs1sEJZQ@mail.gmail.com>
- <20110913133258.GA6267@n2100.arm.linux.org.uk>
- <CAKfTPtCWuiOM5+sOwdh1FzXZb1EFT__tVEpRPY5suGOxpYTdQQ@mail.gmail.com>
- <20110913175312.GB6267@n2100.arm.linux.org.uk>
- <20110923084001.GP17169@n2100.arm.linux.org.uk>
- <01d501cc84d6$62720890$275619b0$%kim@samsung.com>
- <alpine.LFD.2.02.1110071354310.3240@ionos>
- <CAPz4a6CkOXp6LHX2hFYVBhXWT4rhCUzLyYTLbO7g8u_jYcHt7Q@mail.gmail.com>
- <CAPz4a6C7md+k8pCz6mJtB-v_1h-faGxQZkOqU9vHUtcG-jrYVQ@mail.gmail.com>
- <4EC2DF93.2050904@codeaurora.org>
-Message-ID: <alpine.LFD.2.02.1111152259430.4902@ionos>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Tue, 15 Nov 2011 17:14:57 -0500 (EST)
+Subject: [PATCH 3/5] [orion] Move address map setup out of the drivers and
+ into platform.
+In-Reply-To: <20111115074122.GA2012@lunn.ch>
+References: <1321128007-3520-1-git-send-email-andrew@lunn.ch>
+ <1321128007-3520-4-git-send-email-andrew@lunn.ch>
+ <alpine.LFD.2.02.1111141855340.3307@xanadu.home>
+ <20111115074122.GA2012@lunn.ch>
+Message-ID: <alpine.LFD.2.02.1111151648150.3307@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 15 Nov 2011, Stepan Moskovchenko wrote:
-> I am seeing a deadlock when executing hotplug operations with this patch
-> applied. When the secondary CPU gets brought up in _cpu_up, the cpu is turned
-> on
-> and then the online notifier gets called, which is what marks the secondary
-> CPU
-> as active. If _cpu_up on the primary CPU is preempted before the secondary CPU
-> is marked active, it is possible that the primary CPU will want to call
-> smp_call_function (or send an IPI) to the secondary CPU because it is marked
-> online. However, with this patch, the secondary CPU is still spinning on
-> !cpu_active(cpu)
-> with interrupts disabled. So, the primary CPU is now stuck in csd_lock_wait(),
-> waiting for the secondary CPU to respond, while the secondary CPU spins with
-> interrupts disabled, waiting for the primary CPU to mark it as active. So,
-> while
-> your approach to not call smp_function_single may work for you in your
-> specific
-> case, I believe there is still a problem in the general case.
-> 
-> One suggestion for resolving this might be making smp_call_function look at
-> the
-> active CPUs rather than online CPUs, or to just let the secondary CPU mark
-> itself as active rather than having the primary CPU do this, though this might
-> defeat the original intended purpose of the active mask.
+On Tue, 15 Nov 2011, Andrew Lunn wrote:
 
-What a mess. I'll have a look tomorrow.
+> > I understand that you might want to get rid of the annoying platform 
+> > data pointer for the mbus values.  But I think that this could be done 
+> > some other way though.  IMHO the mbus initialization code for 
+> > peripherals should remain in the drivers, and a different way to query 
+> > the needed information be elaborated instead.  Otherwise this is like 
+> > throwing out the baby with the bath water.
+> 
+> I'm open to suggestion.
+> 
+> What do you think about the idea of keeping the first two patches,
+> i.e. *_mbus_dram_info out of mach-* and into plat-orion. Then
+> providing a function orion_mbus_dram_info() which returns its. Keep
+> the address map setup code in the drivers, remove struct
+> mbus_dram_target_info from platform_data and use this function
+> instead?
+
+I pretty much like patch #1.  Just remember to mark unneeded data after 
+boot as __initdata.
+
+I don't see the point of patch #2.  Having a kirkwood specific piece of 
+data called kirkwood_foo rather than orion_foo makes more sense to me.
+
+Having a static orion_mbus_dram_info() function might be a problem on 
+other platforms.  for example, the mv643xx_eth driver is also used by 
+some PowerPC targets.  The sata_mv driver is shared between 
+Orion/Kirkwood/Dove SOCs and Marvell SATA controllers on PCI cards that 
+can be found on any architecture with a PCI bus.  Etc.  It is therefore 
+necessary to query those resources in a standard way and be prepared for 
+the fact that they might just be absent.  So I'd suggest looking at the 
+possibility of using IORESOURCE_BUS in the standard platform device 
+data or a similar mechanism.
+
+
+Nicolas
