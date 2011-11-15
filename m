@@ -1,47 +1,21 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Tue, 15 Nov 2011 14:40:16 +0400
-Subject: [PATCH v2 1/5] davinci: dm644x: remove the macros from the header
- to move to c file
-In-Reply-To: <1321283357-27698-2-git-send-email-manjunath.hadli@ti.com>
-References: <1321283357-27698-1-git-send-email-manjunath.hadli@ti.com>
- <1321283357-27698-2-git-send-email-manjunath.hadli@ti.com>
-Message-ID: <4EC24190.9010005@mvista.com>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Tue, 15 Nov 2011 12:45:33 +0200
+Subject: [RFC 0/5] OMAP groundwork for IOMMU-based DMA API
+In-Reply-To: <20111115103926.GA5627@amd.com>
+References: <1316948337-7924-1-git-send-email-ohad@wizery.com>
+ <20111115103926.GA5627@amd.com>
+Message-ID: <CAK=WgbZ=0HctjLREv1oXEa=5ryY7C_6srO1Nt5uMowH+FyaHJQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Hi Joerg,
 
-On 14-11-2011 19:09, Manjunath Hadli wrote:
+On Tue, Nov 15, 2011 at 12:39 PM, Roedel, Joerg <Joerg.Roedel@amd.com> wrote:
+> It doesn't apply cleanly, can you please rebase the code, collect the
+> Acked-by's and resend?
 
-> move the register base addresses and offsets used only by dm644x
-> platform file from platform header dm644x.h to dm644x.c as they
-> are used only in the c file.
+Sure. I planned on resending after the "hardware pgsize" patches are
+merged, but please tell me if you prefer it the other way around.
 
-> Signed-off-by: Manjunath Hadli<manjunath.hadli@ti.com>
-> ---
->   arch/arm/mach-davinci/dm644x.c              |    6 ++++++
->   arch/arm/mach-davinci/include/mach/dm644x.h |    7 -------
->   2 files changed, 6 insertions(+), 7 deletions(-)
-
-> diff --git a/arch/arm/mach-davinci/dm644x.c b/arch/arm/mach-davinci/dm644x.c
-> index 3470983..1b4b911 100644
-> --- a/arch/arm/mach-davinci/dm644x.c
-> +++ b/arch/arm/mach-davinci/dm644x.c
-> @@ -34,6 +34,12 @@
->    * Device specific clocks
->    */
->   #define DM644X_REF_FREQ		27000000
-
-    Add an empty line here please.
-
-> +#define DM644X_EMAC_BASE		0x01c80000
-> +#define DM644X_EMAC_MDIO_BASE		(DM644X_EMAC_BASE + 0x4000)
-> +#define DM644X_EMAC_CNTRL_OFFSET	0x0000
-> +#define DM644X_EMAC_CNTRL_MOD_OFFSET	0x1000
-> +#define DM644X_EMAC_CNTRL_RAM_OFFSET	0x2000
-> +#define DM644X_EMAC_CNTRL_RAM_SIZE	0x2000
->
->   static struct pll_data pll1_data = {
->   	.num       = 1,
-
-WBR, Sergei
+Thanks,
+Ohad.
