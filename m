@@ -1,31 +1,30 @@
-From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Tue, 15 Nov 2011 15:52:36 +0530
-Subject: [PATCH] MTD: nand: Making  MTD_NAND_OMAP2 depend on ARCH_OMAP2PLUS
-Message-ID: <1321352556-7080-1-git-send-email-shubhrajyoti@ti.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 15 Nov 2011 11:23:50 +0100
+Subject: [PATCH 2/3] ARM: AT91: IIO: Add AT91 ADC driver.
+In-Reply-To: <4EC188D2.5080706@kernel.org>
+References: <1321291857-26277-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1321291857-26277-3-git-send-email-maxime.ripard@free-electrons.com>
+ <4EC188D2.5080706@kernel.org>
+Message-ID: <4EC23DB6.1040503@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Making  MTD_NAND_OMAP2 depend on ARCH_OMAP2PLUS instead of
-oring with ARCH2/3/4.
+On 14/11/2011 22:32, Jonathan Cameron wrote:
+> Just one more query on the IIO_CHAN_INFO_SCALE read.
+> Sorry, missed this last time.  Its late so I may be going
+> mad but the units seem out by 1000.
 
-Reported-by: Russell King <linux@arm.linux.org.uk>
-Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
----
- drivers/mtd/nand/Kconfig |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+Wow, you're right. Indeed, if you multiply the value returned by
+read_raw and scale, you get a value in millivolts, not micro...
 
-diff --git a/drivers/mtd/nand/Kconfig b/drivers/mtd/nand/Kconfig
-index cce7b70..b68dd5e 100644
---- a/drivers/mtd/nand/Kconfig
-+++ b/drivers/mtd/nand/Kconfig
-@@ -110,7 +110,7 @@ config MTD_NAND_AMS_DELTA
- 
- config MTD_NAND_OMAP2
- 	tristate "NAND Flash device on OMAP2, OMAP3 and OMAP4"
--	depends on ARM && (ARCH_OMAP2 || ARCH_OMAP3 || ARCH_OMAP4)
-+	depends on ARCH_OMAP2PLUS
- 	help
-           Support for NAND flash on Texas Instruments OMAP2, OMAP3 and OMAP4
- 	  platforms.
+> Also mysterious short as return value type in read_raw.
+
+I will resend a new patchset with these two fixes.
+
+Maxime
+
 -- 
-1.7.1
+Maxime Ripard, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
