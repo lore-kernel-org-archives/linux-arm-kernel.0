@@ -1,33 +1,32 @@
-From: vwadekar@nvidia.com (Varun Wadekar)
-Date: Tue, 15 Nov 2011 11:51:27 +0530
-Subject: [PATCH v1] dts: tegra-ventana: use proper root instead of /dev/ram
-Message-ID: <1321338087-3662-1-git-send-email-vwadekar@nvidia.com>
+From: shubhrajyoti@ti.com (Shubhrajyoti D)
+Date: Tue, 15 Nov 2011 11:57:40 +0530
+Subject: [PATCH] OMAP2+: UART: Make the SERIAL_OMAP depend on ARCH_OMAP2PLUS
+Message-ID: <1321338460-1421-1-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Pritesh Raithatha <praithatha@nvidia.com>
+Making  SERIAL_OMAP depend on ARCH_OMAP2PLUS instead of
+oring with ARCH2/3/4.
 
-The root file system on ventana resides on /dev/mmcblk0p1.
-Update the dts file to use the proper root instead of /dev/ram.
-
-Signed-off-by: Pritesh Raithatha <praithatha@nvidia.com>
-Signed-off-by: Varun Wadekar <vwadekar@nvidia.com>
+Acked-by: Felipe Balbi <balbi@ti.com>
+Suggested-by: Sricharan R <r.sricharan@ti.com>
+Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
 ---
- arch/arm/boot/dts/tegra-ventana.dts |    2 +-
+ drivers/tty/serial/Kconfig |    2 +-
  1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/boot/dts/tegra-ventana.dts b/arch/arm/boot/dts/tegra-ventana.dts
-index 9b29a62..5f7fe74 100644
---- a/arch/arm/boot/dts/tegra-ventana.dts
-+++ b/arch/arm/boot/dts/tegra-ventana.dts
-@@ -8,7 +8,7 @@
- 	compatible = "nvidia,ventana", "nvidia,tegra20";
+diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
+index 5f479da..2b2b971 100644
+--- a/drivers/tty/serial/Kconfig
++++ b/drivers/tty/serial/Kconfig
+@@ -1324,7 +1324,7 @@ config SERIAL_OF_PLATFORM
  
- 	chosen {
--		bootargs = "vmalloc=192M video=tegrafb console=ttyS0,115200n8 root=/dev/ram rdinit=/sbin/init";
-+		bootargs = "vmalloc=192M video=tegrafb console=ttyS0,115200n8 root=/dev/mmcblk0p1 rw rootwait";
- 	};
- 
- 	memory {
+ config SERIAL_OMAP
+ 	tristate "OMAP serial port support"
+-	depends on ARCH_OMAP2 || ARCH_OMAP3 || ARCH_OMAP4
++	depends on ARCH_OMAP2PLUS
+ 	select SERIAL_CORE
+ 	help
+ 	  If you have a machine based on an Texas Instruments OMAP CPU you
 -- 
 1.7.1
