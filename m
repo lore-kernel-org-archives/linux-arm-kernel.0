@@ -1,448 +1,169 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Tue, 15 Nov 2011 21:40:32 +0100
-Subject: [PATCH 01/13 v2] ARM: at91: make gpio register base soc independant
+Date: Tue, 15 Nov 2011 21:40:34 +0100
+Subject: [PATCH 2/2] ARM: at91: gpio make struct at91_gpio_bank an initdata
 In-Reply-To: <20111113180954.GD15318@game.jcrosoft.org>
 References: <20111113180954.GD15318@game.jcrosoft.org>
-Message-ID: <1321389646-24112-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <1321389646-24112-3-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+this will simplify the switch to the DT and later to the platform_device
+
 Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-Reviewed-by: Ryan Mallon <rmallon@gmail.com>
 ---
- arch/arm/mach-at91/at91cap9.c                 |    8 ++++----
- arch/arm/mach-at91/at91rm9200.c               |    8 ++++----
- arch/arm/mach-at91/at91sam9260.c              |    6 +++---
- arch/arm/mach-at91/at91sam9261.c              |    6 +++---
- arch/arm/mach-at91/at91sam9263.c              |   10 +++++-----
- arch/arm/mach-at91/at91sam9g45.c              |   10 +++++-----
- arch/arm/mach-at91/at91sam9rl.c               |    8 ++++----
- arch/arm/mach-at91/generic.h                  |    2 +-
- arch/arm/mach-at91/gpio.c                     |    8 ++++++--
- arch/arm/mach-at91/include/mach/at91cap9.h    |    9 +++++----
- arch/arm/mach-at91/include/mach/at91rm9200.h  |    9 +++++----
- arch/arm/mach-at91/include/mach/at91sam9260.h |    7 ++++---
- arch/arm/mach-at91/include/mach/at91sam9261.h |    7 ++++---
- arch/arm/mach-at91/include/mach/at91sam9263.h |   11 ++++++-----
- arch/arm/mach-at91/include/mach/at91sam9g45.h |   11 ++++++-----
- arch/arm/mach-at91/include/mach/at91sam9rl.h  |    9 +++++----
- 16 files changed, 70 insertions(+), 59 deletions(-)
+ arch/arm/mach-at91/at91cap9.c    |    2 +-
+ arch/arm/mach-at91/at91rm9200.c  |    2 +-
+ arch/arm/mach-at91/at91sam9260.c |    2 +-
+ arch/arm/mach-at91/at91sam9261.c |    2 +-
+ arch/arm/mach-at91/at91sam9263.c |    2 +-
+ arch/arm/mach-at91/at91sam9g45.c |    2 +-
+ arch/arm/mach-at91/at91sam9rl.c  |    2 +-
+ arch/arm/mach-at91/gpio.c        |   12 ++++++------
+ 8 files changed, 13 insertions(+), 13 deletions(-)
 
 diff --git a/arch/arm/mach-at91/at91cap9.c b/arch/arm/mach-at91/at91cap9.c
-index ecdd54d..fe00dce 100644
+index bfffaf6..81a9f38 100644
 --- a/arch/arm/mach-at91/at91cap9.c
 +++ b/arch/arm/mach-at91/at91cap9.c
-@@ -296,19 +296,19 @@ void __init at91cap9_set_console_clock(int id)
- static struct at91_gpio_bank at91cap9_gpio[] = {
+@@ -296,7 +296,7 @@ void __init at91cap9_set_console_clock(int id)
+  *  GPIO
+  * -------------------------------------------------------------------- */
+ 
+-static struct at91_gpio_bank at91cap9_gpio[] = {
++static struct at91_gpio_bank at91cap9_gpio[] __initdata = {
  	{
  		.id		= AT91CAP9_ID_PIOABCD,
--		.offset		= AT91_PIOA,
-+		.regbase	= AT91CAP9_BASE_PIOA,
- 		.clock		= &pioABCD_clk,
- 	}, {
- 		.id		= AT91CAP9_ID_PIOABCD,
--		.offset		= AT91_PIOB,
-+		.regbase	= AT91CAP9_BASE_PIOB,
- 		.clock		= &pioABCD_clk,
- 	}, {
- 		.id		= AT91CAP9_ID_PIOABCD,
--		.offset		= AT91_PIOC,
-+		.regbase	= AT91CAP9_BASE_PIOC,
- 		.clock		= &pioABCD_clk,
- 	}, {
- 		.id		= AT91CAP9_ID_PIOABCD,
--		.offset		= AT91_PIOD,
-+		.regbase	= AT91CAP9_BASE_PIOD,
- 		.clock		= &pioABCD_clk,
- 	}
- };
+ 		.regbase	= AT91CAP9_BASE_PIOA,
 diff --git a/arch/arm/mach-at91/at91rm9200.c b/arch/arm/mach-at91/at91rm9200.c
-index 713d3bd..8ce8675 100644
+index 7470f63..9163d7d 100644
 --- a/arch/arm/mach-at91/at91rm9200.c
 +++ b/arch/arm/mach-at91/at91rm9200.c
-@@ -271,19 +271,19 @@ void __init at91rm9200_set_console_clock(int id)
- static struct at91_gpio_bank at91rm9200_gpio[] = {
+@@ -273,7 +273,7 @@ void __init at91rm9200_set_console_clock(int id)
+  *  GPIO
+  * -------------------------------------------------------------------- */
+ 
+-static struct at91_gpio_bank at91rm9200_gpio[] = {
++static struct at91_gpio_bank at91rm9200_gpio[] __initdata = {
  	{
  		.id		= AT91RM9200_ID_PIOA,
--		.offset		= AT91_PIOA,
-+		.regbase	= AT91RM9200_BASE_PIOA,
- 		.clock		= &pioA_clk,
- 	}, {
- 		.id		= AT91RM9200_ID_PIOB,
--		.offset		= AT91_PIOB,
-+		.regbase	= AT91RM9200_BASE_PIOB,
- 		.clock		= &pioB_clk,
- 	}, {
- 		.id		= AT91RM9200_ID_PIOC,
--		.offset		= AT91_PIOC,
-+		.regbase	= AT91RM9200_BASE_PIOC,
- 		.clock		= &pioC_clk,
- 	}, {
- 		.id		= AT91RM9200_ID_PIOD,
--		.offset		= AT91_PIOD,
-+		.regbase	= AT91RM9200_BASE_PIOD,
- 		.clock		= &pioD_clk,
- 	}
- };
+ 		.regbase	= AT91RM9200_BASE_PIOA,
 diff --git a/arch/arm/mach-at91/at91sam9260.c b/arch/arm/mach-at91/at91sam9260.c
-index b84a9f6..1e9c79f 100644
+index 81f0b76..5e25cef 100644
 --- a/arch/arm/mach-at91/at91sam9260.c
 +++ b/arch/arm/mach-at91/at91sam9260.c
-@@ -273,15 +273,15 @@ void __init at91sam9260_set_console_clock(int id)
- static struct at91_gpio_bank at91sam9260_gpio[] = {
+@@ -272,7 +272,7 @@ void __init at91sam9260_set_console_clock(int id)
+  *  GPIO
+  * -------------------------------------------------------------------- */
+ 
+-static struct at91_gpio_bank at91sam9260_gpio[] = {
++static struct at91_gpio_bank at91sam9260_gpio[] __initdata = {
  	{
  		.id		= AT91SAM9260_ID_PIOA,
--		.offset		= AT91_PIOA,
-+		.regbase	= AT91SAM9260_BASE_PIOA,
- 		.clock		= &pioA_clk,
- 	}, {
- 		.id		= AT91SAM9260_ID_PIOB,
--		.offset		= AT91_PIOB,
-+		.regbase	= AT91SAM9260_BASE_PIOB,
- 		.clock		= &pioB_clk,
- 	}, {
- 		.id		= AT91SAM9260_ID_PIOC,
--		.offset		= AT91_PIOC,
-+		.regbase	= AT91SAM9260_BASE_PIOC,
- 		.clock		= &pioC_clk,
- 	}
- };
+ 		.regbase	= AT91SAM9260_BASE_PIOA,
 diff --git a/arch/arm/mach-at91/at91sam9261.c b/arch/arm/mach-at91/at91sam9261.c
-index 658a5185..574aa6b 100644
+index dd7924c..a0538c5 100644
 --- a/arch/arm/mach-at91/at91sam9261.c
 +++ b/arch/arm/mach-at91/at91sam9261.c
-@@ -254,15 +254,15 @@ void __init at91sam9261_set_console_clock(int id)
- static struct at91_gpio_bank at91sam9261_gpio[] = {
+@@ -253,7 +253,7 @@ void __init at91sam9261_set_console_clock(int id)
+  *  GPIO
+  * -------------------------------------------------------------------- */
+ 
+-static struct at91_gpio_bank at91sam9261_gpio[] = {
++static struct at91_gpio_bank at91sam9261_gpio[] __initdata = {
  	{
  		.id		= AT91SAM9261_ID_PIOA,
--		.offset		= AT91_PIOA,
-+		.regbase	= AT91SAM9261_BASE_PIOA,
- 		.clock		= &pioA_clk,
- 	}, {
- 		.id		= AT91SAM9261_ID_PIOB,
--		.offset		= AT91_PIOB,
-+		.regbase	= AT91SAM9261_BASE_PIOB,
- 		.clock		= &pioB_clk,
- 	}, {
- 		.id		= AT91SAM9261_ID_PIOC,
--		.offset		= AT91_PIOC,
-+		.regbase	= AT91SAM9261_BASE_PIOC,
- 		.clock		= &pioC_clk,
- 	}
- };
+ 		.regbase	= AT91SAM9261_BASE_PIOA,
 diff --git a/arch/arm/mach-at91/at91sam9263.c b/arch/arm/mach-at91/at91sam9263.c
-index f83fbb0..dee0ed7 100644
+index 646d424..0d90b6a 100644
 --- a/arch/arm/mach-at91/at91sam9263.c
 +++ b/arch/arm/mach-at91/at91sam9263.c
-@@ -266,23 +266,23 @@ void __init at91sam9263_set_console_clock(int id)
- static struct at91_gpio_bank at91sam9263_gpio[] = {
+@@ -267,7 +267,7 @@ void __init at91sam9263_set_console_clock(int id)
+  *  GPIO
+  * -------------------------------------------------------------------- */
+ 
+-static struct at91_gpio_bank at91sam9263_gpio[] = {
++static struct at91_gpio_bank at91sam9263_gpio[] __initdata = {
  	{
  		.id		= AT91SAM9263_ID_PIOA,
--		.offset		= AT91_PIOA,
-+		.regbase	= AT91SAM9263_BASE_PIOA,
- 		.clock		= &pioA_clk,
- 	}, {
- 		.id		= AT91SAM9263_ID_PIOB,
--		.offset		= AT91_PIOB,
-+		.regbase	= AT91SAM9263_BASE_PIOB,
- 		.clock		= &pioB_clk,
- 	}, {
- 		.id		= AT91SAM9263_ID_PIOCDE,
--		.offset		= AT91_PIOC,
-+		.regbase	= AT91SAM9263_BASE_PIOC,
- 		.clock		= &pioCDE_clk,
- 	}, {
- 		.id		= AT91SAM9263_ID_PIOCDE,
--		.offset		= AT91_PIOD,
-+		.regbase	= AT91SAM9263_BASE_PIOD,
- 		.clock		= &pioCDE_clk,
- 	}, {
- 		.id		= AT91SAM9263_ID_PIOCDE,
--		.offset		= AT91_PIOE,
-+		.regbase	= AT91SAM9263_BASE_PIOE,
- 		.clock		= &pioCDE_clk,
- 	}
- };
+ 		.regbase	= AT91SAM9263_BASE_PIOA,
 diff --git a/arch/arm/mach-at91/at91sam9g45.c b/arch/arm/mach-at91/at91sam9g45.c
-index 318b040..404d70c 100644
+index 11b31af..72c3cce 100644
 --- a/arch/arm/mach-at91/at91sam9g45.c
 +++ b/arch/arm/mach-at91/at91sam9g45.c
-@@ -296,23 +296,23 @@ void __init at91sam9g45_set_console_clock(int id)
- static struct at91_gpio_bank at91sam9g45_gpio[] = {
+@@ -297,7 +297,7 @@ void __init at91sam9g45_set_console_clock(int id)
+  *  GPIO
+  * -------------------------------------------------------------------- */
+ 
+-static struct at91_gpio_bank at91sam9g45_gpio[] = {
++static struct at91_gpio_bank at91sam9g45_gpio[] __initdata = {
  	{
  		.id		= AT91SAM9G45_ID_PIOA,
--		.offset		= AT91_PIOA,
-+		.regbase	= AT91SAM9G45_BASE_PIOA,
- 		.clock		= &pioA_clk,
- 	}, {
- 		.id		= AT91SAM9G45_ID_PIOB,
--		.offset		= AT91_PIOB,
-+		.regbase	= AT91SAM9G45_BASE_PIOB,
- 		.clock		= &pioB_clk,
- 	}, {
- 		.id		= AT91SAM9G45_ID_PIOC,
--		.offset		= AT91_PIOC,
-+		.regbase	= AT91SAM9G45_BASE_PIOC,
- 		.clock		= &pioC_clk,
- 	}, {
- 		.id		= AT91SAM9G45_ID_PIODE,
--		.offset		= AT91_PIOD,
-+		.regbase	= AT91SAM9G45_BASE_PIOD,
- 		.clock		= &pioDE_clk,
- 	}, {
- 		.id		= AT91SAM9G45_ID_PIODE,
--		.offset		= AT91_PIOE,
-+		.regbase	= AT91SAM9G45_BASE_PIOE,
- 		.clock		= &pioDE_clk,
- 	}
- };
+ 		.regbase	= AT91SAM9G45_BASE_PIOA,
 diff --git a/arch/arm/mach-at91/at91sam9rl.c b/arch/arm/mach-at91/at91sam9rl.c
-index a238105..c4004e2 100644
+index 60555d4..96247f6 100644
 --- a/arch/arm/mach-at91/at91sam9rl.c
 +++ b/arch/arm/mach-at91/at91sam9rl.c
-@@ -246,19 +246,19 @@ void __init at91sam9rl_set_console_clock(int id)
- static struct at91_gpio_bank at91sam9rl_gpio[] = {
+@@ -246,7 +246,7 @@ void __init at91sam9rl_set_console_clock(int id)
+  *  GPIO
+  * -------------------------------------------------------------------- */
+ 
+-static struct at91_gpio_bank at91sam9rl_gpio[] = {
++static struct at91_gpio_bank at91sam9rl_gpio[] __initdata = {
  	{
  		.id		= AT91SAM9RL_ID_PIOA,
--		.offset		= AT91_PIOA,
-+		.regbase	= AT91SAM9RL_BASE_PIOA,
- 		.clock		= &pioA_clk,
- 	}, {
- 		.id		= AT91SAM9RL_ID_PIOB,
--		.offset		= AT91_PIOB,
-+		.regbase	= AT91SAM9RL_BASE_PIOB,
- 		.clock		= &pioB_clk,
- 	}, {
- 		.id		= AT91SAM9RL_ID_PIOC,
--		.offset		= AT91_PIOC,
-+		.regbase	= AT91SAM9RL_BASE_PIOC,
- 		.clock		= &pioC_clk,
- 	}, {
- 		.id		= AT91SAM9RL_ID_PIOD,
--		.offset		= AT91_PIOD,
-+		.regbase	= AT91SAM9RL_BASE_PIOD,
- 		.clock		= &pioD_clk,
- 	}
- };
-diff --git a/arch/arm/mach-at91/generic.h b/arch/arm/mach-at91/generic.h
-index 938b34f..11d7297 100644
---- a/arch/arm/mach-at91/generic.h
-+++ b/arch/arm/mach-at91/generic.h
-@@ -65,7 +65,7 @@ extern void at91sam9_alt_reset(void);
- 
- struct at91_gpio_bank {
- 	unsigned short id;		/* peripheral ID */
--	unsigned long offset;		/* offset from system peripheral base */
-+	unsigned long regbase;		/* offset from system peripheral base */
- 	struct clk *clock;		/* associated clock */
- };
- extern void __init at91_gpio_init(struct at91_gpio_bank *, int nr_banks);
+ 		.regbase	= AT91SAM9RL_BASE_PIOA,
 diff --git a/arch/arm/mach-at91/gpio.c b/arch/arm/mach-at91/gpio.c
-index 224e9e2..cedb753 100644
+index 4059f07..9c58deb 100644
 --- a/arch/arm/mach-at91/gpio.c
 +++ b/arch/arm/mach-at91/gpio.c
-@@ -614,8 +614,12 @@ void __init at91_gpio_init(struct at91_gpio_bank *data, int nr_banks)
+@@ -29,7 +29,7 @@
+ struct at91_gpio_chip {
+ 	struct gpio_chip	chip;
+ 	struct at91_gpio_chip	*next;		/* Bank sharing same clock */
+-	struct at91_gpio_bank	*bank;		/* Bank definition */
++	int			id;		/* ID of register bank */
+ 	void __iomem		*regbase;	/* Base of register bank */
+ 	struct clk		*clock;		/* associated clock */
+ };
+@@ -286,7 +286,7 @@ static int gpio_irq_set_wake(struct irq_data *d, unsigned state)
+ 	else
+ 		wakeups[bank] &= ~mask;
  
- 		at91_gpio->bank = &data[i];
+-	irq_set_irq_wake(gpio_chip[bank].bank->id, state);
++	irq_set_irq_wake(gpio_chip[bank].id, state);
+ 
+ 	return 0;
+ }
+@@ -498,7 +498,7 @@ void __init at91_gpio_irq_setup(void)
+ 	for (pioc = 0, pin = PIN_BASE, this = gpio_chip, prev = NULL;
+ 			pioc++ < gpio_banks;
+ 			prev = this, this++) {
+-		unsigned	id = this->bank->id;
++		unsigned	id = this->id;
+ 		unsigned	i;
+ 
+ 		__raw_writel(~0, this->regbase + PIO_IDR);
+@@ -613,10 +613,10 @@ void __init at91_gpio_init(struct at91_gpio_bank *data, int nr_banks)
+ 	for (i = 0; i < nr_banks; i++) {
+ 		at91_gpio = &gpio_chip[i];
+ 
+-		at91_gpio->bank = &data[i];
++		at91_gpio->id = data[i].id;
  		at91_gpio->chip.base = PIN_BASE + i * 32;
--		at91_gpio->regbase = at91_gpio->bank->offset +
--			(void __iomem *)AT91_VA_BASE_SYS;
-+
-+		at91_gpio->regbase = ioremap(at91_gpio->bank->regbase, 512);
-+		if (!at91_gpio->regbase) {
-+			pr_err("at91_gpio.%d, failed to map registers, ignoring.\n", i);
-+			continue;
-+		}
  
- 		/* enable PIO controller's clock */
- 		clk_enable(at91_gpio->bank->clock);
-diff --git a/arch/arm/mach-at91/include/mach/at91cap9.h b/arch/arm/mach-at91/include/mach/at91cap9.h
-index c5df1e8..f65d083 100644
---- a/arch/arm/mach-at91/include/mach/at91cap9.h
-+++ b/arch/arm/mach-at91/include/mach/at91cap9.h
-@@ -88,10 +88,6 @@
- #define AT91_DMA	(0xffffec00 - AT91_BASE_SYS)
- #define AT91_DBGU	(0xffffee00 - AT91_BASE_SYS)
- #define AT91_AIC	(0xfffff000 - AT91_BASE_SYS)
--#define AT91_PIOA	(0xfffff200 - AT91_BASE_SYS)
--#define AT91_PIOB	(0xfffff400 - AT91_BASE_SYS)
--#define AT91_PIOC	(0xfffff600 - AT91_BASE_SYS)
--#define AT91_PIOD	(0xfffff800 - AT91_BASE_SYS)
- #define AT91_PMC	(0xfffffc00 - AT91_BASE_SYS)
- #define AT91_RSTC	(0xfffffd00 - AT91_BASE_SYS)
- #define AT91_SHDWC	(0xfffffd10 - AT91_BASE_SYS)
-@@ -102,6 +98,11 @@
- 			(0xfffffd50 - AT91_BASE_SYS) :	\
- 			(0xfffffd60 - AT91_BASE_SYS))
+-		at91_gpio->regbase = ioremap(at91_gpio->bank->regbase, 512);
++		at91_gpio->regbase = ioremap(data->regbase, 512);
+ 		if (!at91_gpio->regbase) {
+ 			pr_err("at91_gpio.%d, failed to map registers, ignoring.\n", i);
+ 			continue;
+@@ -632,7 +632,7 @@ void __init at91_gpio_init(struct at91_gpio_bank *data, int nr_banks)
+ 		clk_enable(at91_gpio->clock);
  
-+#define AT91CAP9_BASE_PIOA	0xfffff200
-+#define AT91CAP9_BASE_PIOB	0xfffff400
-+#define AT91CAP9_BASE_PIOC	0xfffff600
-+#define AT91CAP9_BASE_PIOD	0xfffff800
-+
- #define AT91_USART0	AT91CAP9_BASE_US0
- #define AT91_USART1	AT91CAP9_BASE_US1
- #define AT91_USART2	AT91CAP9_BASE_US2
-diff --git a/arch/arm/mach-at91/include/mach/at91rm9200.h b/arch/arm/mach-at91/include/mach/at91rm9200.h
-index e4037b5..5740954 100644
---- a/arch/arm/mach-at91/include/mach/at91rm9200.h
-+++ b/arch/arm/mach-at91/include/mach/at91rm9200.h
-@@ -81,15 +81,16 @@
-  */
- #define AT91_AIC	(0xfffff000 - AT91_BASE_SYS)	/* Advanced Interrupt Controller */
- #define AT91_DBGU	(0xfffff200 - AT91_BASE_SYS)	/* Debug Unit */
--#define AT91_PIOA	(0xfffff400 - AT91_BASE_SYS)	/* PIO Controller A */
--#define AT91_PIOB	(0xfffff600 - AT91_BASE_SYS)	/* PIO Controller B */
--#define AT91_PIOC	(0xfffff800 - AT91_BASE_SYS)	/* PIO Controller C */
--#define AT91_PIOD	(0xfffffa00 - AT91_BASE_SYS)	/* PIO Controller D */
- #define AT91_PMC	(0xfffffc00 - AT91_BASE_SYS)	/* Power Management Controller */
- #define AT91_ST		(0xfffffd00 - AT91_BASE_SYS)	/* System Timer */
- #define AT91_RTC	(0xfffffe00 - AT91_BASE_SYS)	/* Real-Time Clock */
- #define AT91_MC		(0xffffff00 - AT91_BASE_SYS)	/* Memory Controllers */
+ 		/* AT91SAM9263_ID_PIOCDE groups PIOC, PIOD, PIOE */
+-		if (last && last->bank->id == at91_gpio->bank->id)
++		if (last && last->id == at91_gpio->id)
+ 			last->next = at91_gpio;
+ 		last = at91_gpio;
  
-+#define AT91RM9200_BASE_PIOA	0xfffff400	/* PIO Controller A */
-+#define AT91RM9200_BASE_PIOB	0xfffff600	/* PIO Controller B */
-+#define AT91RM9200_BASE_PIOC	0xfffff800	/* PIO Controller C */
-+#define AT91RM9200_BASE_PIOD	0xfffffa00	/* PIO Controller D */
-+
- #define AT91_USART0	AT91RM9200_BASE_US0
- #define AT91_USART1	AT91RM9200_BASE_US1
- #define AT91_USART2	AT91RM9200_BASE_US2
-diff --git a/arch/arm/mach-at91/include/mach/at91sam9260.h b/arch/arm/mach-at91/include/mach/at91sam9260.h
-index 9a79116..1bea3dc 100644
---- a/arch/arm/mach-at91/include/mach/at91sam9260.h
-+++ b/arch/arm/mach-at91/include/mach/at91sam9260.h
-@@ -87,9 +87,6 @@
- #define AT91_CCFG	(0xffffef10 - AT91_BASE_SYS)
- #define AT91_AIC	(0xfffff000 - AT91_BASE_SYS)
- #define AT91_DBGU	(0xfffff200 - AT91_BASE_SYS)
--#define AT91_PIOA	(0xfffff400 - AT91_BASE_SYS)
--#define AT91_PIOB	(0xfffff600 - AT91_BASE_SYS)
--#define AT91_PIOC	(0xfffff800 - AT91_BASE_SYS)
- #define AT91_PMC	(0xfffffc00 - AT91_BASE_SYS)
- #define AT91_RSTC	(0xfffffd00 - AT91_BASE_SYS)
- #define AT91_SHDWC	(0xfffffd10 - AT91_BASE_SYS)
-@@ -98,6 +95,10 @@
- #define AT91_WDT	(0xfffffd40 - AT91_BASE_SYS)
- #define AT91_GPBR	(0xfffffd50 - AT91_BASE_SYS)
- 
-+#define AT91SAM9260_BASE_PIOA	0xfffff400
-+#define AT91SAM9260_BASE_PIOB	0xfffff600
-+#define AT91SAM9260_BASE_PIOC	0xfffff800
-+
- #define AT91_USART0	AT91SAM9260_BASE_US0
- #define AT91_USART1	AT91SAM9260_BASE_US1
- #define AT91_USART2	AT91SAM9260_BASE_US2
-diff --git a/arch/arm/mach-at91/include/mach/at91sam9261.h b/arch/arm/mach-at91/include/mach/at91sam9261.h
-index ce59620..17ae9c7 100644
---- a/arch/arm/mach-at91/include/mach/at91sam9261.h
-+++ b/arch/arm/mach-at91/include/mach/at91sam9261.h
-@@ -70,9 +70,6 @@
- #define AT91_MATRIX	(0xffffee00 - AT91_BASE_SYS)
- #define AT91_AIC	(0xfffff000 - AT91_BASE_SYS)
- #define AT91_DBGU	(0xfffff200 - AT91_BASE_SYS)
--#define AT91_PIOA	(0xfffff400 - AT91_BASE_SYS)
--#define AT91_PIOB	(0xfffff600 - AT91_BASE_SYS)
--#define AT91_PIOC	(0xfffff800 - AT91_BASE_SYS)
- #define AT91_PMC	(0xfffffc00 - AT91_BASE_SYS)
- #define AT91_RSTC	(0xfffffd00 - AT91_BASE_SYS)
- #define AT91_SHDWC	(0xfffffd10 - AT91_BASE_SYS)
-@@ -81,6 +78,10 @@
- #define AT91_WDT	(0xfffffd40 - AT91_BASE_SYS)
- #define AT91_GPBR	(0xfffffd50 - AT91_BASE_SYS)
- 
-+#define AT91SAM9261_BASE_PIOA	0xfffff400
-+#define AT91SAM9261_BASE_PIOB	0xfffff600
-+#define AT91SAM9261_BASE_PIOC	0xfffff800
-+
- #define AT91_USART0	AT91SAM9261_BASE_US0
- #define AT91_USART1	AT91SAM9261_BASE_US1
- #define AT91_USART2	AT91SAM9261_BASE_US2
-diff --git a/arch/arm/mach-at91/include/mach/at91sam9263.h b/arch/arm/mach-at91/include/mach/at91sam9263.h
-index f1b9296..dd54079 100644
---- a/arch/arm/mach-at91/include/mach/at91sam9263.h
-+++ b/arch/arm/mach-at91/include/mach/at91sam9263.h
-@@ -84,11 +84,6 @@
- #define AT91_CCFG	(0xffffed10 - AT91_BASE_SYS)
- #define AT91_DBGU	(0xffffee00 - AT91_BASE_SYS)
- #define AT91_AIC	(0xfffff000 - AT91_BASE_SYS)
--#define AT91_PIOA	(0xfffff200 - AT91_BASE_SYS)
--#define AT91_PIOB	(0xfffff400 - AT91_BASE_SYS)
--#define AT91_PIOC	(0xfffff600 - AT91_BASE_SYS)
--#define AT91_PIOD	(0xfffff800 - AT91_BASE_SYS)
--#define AT91_PIOE	(0xfffffa00 - AT91_BASE_SYS)
- #define AT91_PMC	(0xfffffc00 - AT91_BASE_SYS)
- #define AT91_RSTC	(0xfffffd00 - AT91_BASE_SYS)
- #define AT91_SHDWC	(0xfffffd10 - AT91_BASE_SYS)
-@@ -98,6 +93,12 @@
- #define AT91_RTT1	(0xfffffd50 - AT91_BASE_SYS)
- #define AT91_GPBR	(0xfffffd60 - AT91_BASE_SYS)
- 
-+#define AT91SAM9263_BASE_PIOA	0xfffff200
-+#define AT91SAM9263_BASE_PIOB	0xfffff400
-+#define AT91SAM9263_BASE_PIOC	0xfffff600
-+#define AT91SAM9263_BASE_PIOD	0xfffff800
-+#define AT91SAM9263_BASE_PIOE	0xfffffa00
-+
- #define AT91_USART0	AT91SAM9263_BASE_US0
- #define AT91_USART1	AT91SAM9263_BASE_US1
- #define AT91_USART2	AT91SAM9263_BASE_US2
-diff --git a/arch/arm/mach-at91/include/mach/at91sam9g45.h b/arch/arm/mach-at91/include/mach/at91sam9g45.h
-index 406bb64..a487af5 100644
---- a/arch/arm/mach-at91/include/mach/at91sam9g45.h
-+++ b/arch/arm/mach-at91/include/mach/at91sam9g45.h
-@@ -94,11 +94,6 @@
- #define AT91_DMA	(0xffffec00 - AT91_BASE_SYS)
- #define AT91_DBGU	(0xffffee00 - AT91_BASE_SYS)
- #define AT91_AIC	(0xfffff000 - AT91_BASE_SYS)
--#define AT91_PIOA	(0xfffff200 - AT91_BASE_SYS)
--#define AT91_PIOB	(0xfffff400 - AT91_BASE_SYS)
--#define AT91_PIOC	(0xfffff600 - AT91_BASE_SYS)
--#define AT91_PIOD	(0xfffff800 - AT91_BASE_SYS)
--#define AT91_PIOE	(0xfffffa00 - AT91_BASE_SYS)
- #define AT91_PMC	(0xfffffc00 - AT91_BASE_SYS)
- #define AT91_RSTC	(0xfffffd00 - AT91_BASE_SYS)
- #define AT91_SHDWC	(0xfffffd10 - AT91_BASE_SYS)
-@@ -108,6 +103,12 @@
- #define AT91_GPBR	(0xfffffd60 - AT91_BASE_SYS)
- #define AT91_RTC	(0xfffffdb0 - AT91_BASE_SYS)
- 
-+#define AT91SAM9G45_BASE_PIOA	0xfffff200
-+#define AT91SAM9G45_BASE_PIOB	0xfffff400
-+#define AT91SAM9G45_BASE_PIOC	0xfffff600
-+#define AT91SAM9G45_BASE_PIOD	0xfffff800
-+#define AT91SAM9G45_BASE_PIOE	0xfffffa00
-+
- #define AT91_USART0	AT91SAM9G45_BASE_US0
- #define AT91_USART1	AT91SAM9G45_BASE_US1
- #define AT91_USART2	AT91SAM9G45_BASE_US2
-diff --git a/arch/arm/mach-at91/include/mach/at91sam9rl.h b/arch/arm/mach-at91/include/mach/at91sam9rl.h
-index 1aabacd..d3ef11a 100644
---- a/arch/arm/mach-at91/include/mach/at91sam9rl.h
-+++ b/arch/arm/mach-at91/include/mach/at91sam9rl.h
-@@ -77,10 +77,6 @@
- #define AT91_CCFG	(0xffffef10 - AT91_BASE_SYS)
- #define AT91_AIC	(0xfffff000 - AT91_BASE_SYS)
- #define AT91_DBGU	(0xfffff200 - AT91_BASE_SYS)
--#define AT91_PIOA	(0xfffff400 - AT91_BASE_SYS)
--#define AT91_PIOB	(0xfffff600 - AT91_BASE_SYS)
--#define AT91_PIOC	(0xfffff800 - AT91_BASE_SYS)
--#define AT91_PIOD	(0xfffffa00 - AT91_BASE_SYS)
- #define AT91_PMC	(0xfffffc00 - AT91_BASE_SYS)
- #define AT91_RSTC	(0xfffffd00 - AT91_BASE_SYS)
- #define AT91_SHDWC	(0xfffffd10 - AT91_BASE_SYS)
-@@ -91,6 +87,11 @@
- #define AT91_GPBR	(0xfffffd60 - AT91_BASE_SYS)
- #define AT91_RTC	(0xfffffe00 - AT91_BASE_SYS)
- 
-+#define AT91SAM9RL_BASE_PIOA	0xfffff400
-+#define AT91SAM9RL_BASE_PIOB	0xfffff600
-+#define AT91SAM9RL_BASE_PIOC	0xfffff800
-+#define AT91SAM9RL_BASE_PIOD	0xfffffa00
-+
- #define AT91_USART0	AT91SAM9RL_BASE_US0
- #define AT91_USART1	AT91SAM9RL_BASE_US1
- #define AT91_USART2	AT91SAM9RL_BASE_US2
 -- 
 1.7.7
