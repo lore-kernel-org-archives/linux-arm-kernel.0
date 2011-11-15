@@ -1,102 +1,30 @@
-From: pullip.cho@samsung.com (KyongHo Cho)
-Date: Tue, 15 Nov 2011 16:26:43 +0900
-Subject: [PATCH v6 2/2] iommu/exynos: Add iommu driver for Exynos Platforms
-In-Reply-To: <CAH9JG2U1L1st_D+jp0Qm42HR8Ur7JpdYz6gFJSv+z_ZkGAQv8A@mail.gmail.com>
-References: <1321333132-17662-1-git-send-email-pullip.cho@samsung.com>
- <1321333132-17662-3-git-send-email-pullip.cho@samsung.com>
- <CAH9JG2U1L1st_D+jp0Qm42HR8Ur7JpdYz6gFJSv+z_ZkGAQv8A@mail.gmail.com>
-Message-ID: <CAHQjnOPMxtQFn1LMsXg7JKeW-iGe87jTN_kA+6BK9MGeF=0qDw@mail.gmail.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 15 Nov 2011 08:41:22 +0100
+Subject: [PATCH 3/5] [orion] Move address map setup out of the drivers
+ and into platform.
+In-Reply-To: <alpine.LFD.2.02.1111141855340.3307@xanadu.home>
+References: <1321128007-3520-1-git-send-email-andrew@lunn.ch>
+ <1321128007-3520-4-git-send-email-andrew@lunn.ch>
+ <alpine.LFD.2.02.1111141855340.3307@xanadu.home>
+Message-ID: <20111115074122.GA2012@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 15, 2011 at 3:05 PM, Kyungmin Park <kmpark@infradead.org> wrote:
->> +static bool set_sysmmu_active(struct sysmmu_drvdata *data)
->> +{
->> + ? ? /* return true if the System MMU was not active previously
->> + ? ? ? ?and it needs to be initialized */
->> + ? ? data->activations++;
->> + ? ? return data->activations == 1;
->> +}
-> If it calls the twice, then caller get the active failed return value.
-> Are there no case to call the multiple activation?
+> I understand that you might want to get rid of the annoying platform 
+> data pointer for the mbus values.  But I think that this could be done 
+> some other way though.  IMHO the mbus initialization code for 
+> peripherals should remain in the drivers, and a different way to query 
+> the needed information be elaborated instead.  Otherwise this is like 
+> throwing out the baby with the bath water.
 
-Return value of set_sysmmu_active() does not mean that activation is successful
-but that System MMU H/W is needed to be initialized.
+I'm open to suggestion.
 
-System MMU driver only initializes System MMU H/W when data->activation
-becomes 1 from 0 and deinitializes when it becomes 0 from 1.
+What do you think about the idea of keeping the first two patches,
+i.e. *_mbus_dram_info out of mach-* and into plat-orion. Then
+providing a function orion_mbus_dram_info() which returns its. Keep
+the address map setup code in the drivers, remove struct
+mbus_dram_target_info from platform_data and use this function
+instead?
 
->> +void exynos_sysmmu_set_tablebase_pgd(struct device *owner, unsigned long
->> pgd)
->> +{
->> + ? ? struct sysmmu_drvdata *data = NULL;
->> +
->> + ? ? while ((data = get_sysmmu_data(owner, data))) {
->> + ? ? ? ? ? ? unsigned long flags;
->> +
->> + ? ? ? ? ? ? read_lock_irqsave(&data->lock, flags);
-> It should be 'write_lock_irqsave'
-
-data->lock just protects contents of 'data' from race condition.
-It does not care about control registers of System MMU.
-Since no contents in 'data' is modified in this function,
-I think read_lock is more proper.
-
-However, suddenly, I think exynos_sysmmu_set_tablebase_pgd()
-must be removed because it modifies page table base
-that is already set with exynos_sysmmu_enable().
-
->> +
->> + ? ? ? ? ? ? if (is_sysmmu_active(data)) {
->> + ? ? ? ? ? ? ? ? ? ? sysmmu_block(data->sfrbase);
->> + ? ? ? ? ? ? ? ? ? ? __sysmmu_set_ptbase(data->sfrbase, pgd);
->> + ? ? ? ? ? ? ? ? ? ? sysmmu_unblock(data->sfrbase);
->> + ? ? ? ? ? ? ? ? ? ? dev_dbg(data->dev, "New page table base is %p\n",
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? (void *)pgd);
->> + ? ? ? ? ? ? } else {
->> + ? ? ? ? ? ? ? ? ? ? dev_dbg(data->dev,
->> + ? ? ? ? ? ? ? ? ? ? "Disabled: Skipping setting page table base.\n");
->> + ? ? ? ? ? ? }
->> +
->> + ? ? ? ? ? ? read_unlock_irqrestore(&data->lock, flags);
-> It should be 'write_unlock_irqrestore'
-
-Ditto.
-
->> +void exynos_sysmmu_tlb_invalidate(struct device *owner)
->> +{
->> + ? ? struct sysmmu_drvdata *data = NULL;
->> +
->> + ? ? while ((data = get_sysmmu_data(owner, data))) {
->> + ? ? ? ? ? ? unsigned long flags;
->> +
->> + ? ? ? ? ? ? read_lock_irqsave(&data->lock, flags);
-> doesn't use the write_lock_irqsave here?
-
-Ditto.
-
->> +static void exynos_iommu_domain_destroy(struct iommu_domain *domain)
->> +{
->> + ? ? struct exynos_iommu_domain *priv = domain->priv;
->> + ? ? struct list_head *pos, *n;
->> +
->> + ? ? WARN_ON(!list_empty(&priv->clients));
->> +
->> + ? ? spin_lock(&priv->lock);
->> +
->> + ? ? list_for_each_safe(pos, n, &priv->clients) {
->> + ? ? ? ? ? ? struct iommu_client *client;
->> +
->> + ? ? ? ? ? ? client = list_entry(pos, struct iommu_client, node);
->> + ? ? ? ? ? ? exynos_sysmmu_disable(client->dev);
-> I think It occurs sleeping lock error message since it calls the
-> write_lock within spin_lock.
-
-Sorry, I don't understand why it makes problem.
-
-I also tested it with various devices.
-It is also not a condition of neither deadlock nor livelock.
-
-Thank you.
-
-KyongHo.
+	Thanks
+		Andrew
