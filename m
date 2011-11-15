@@ -1,9 +1,9 @@
 From: richard.zhao@linaro.org (Richard Zhao)
-Date: Tue, 15 Nov 2011 14:47:58 +0800
-Subject: [PATCH V4 03/14] ARM: mxc: ahci: add clk_prepare/clk_unprepare
+Date: Tue, 15 Nov 2011 14:47:59 +0800
+Subject: [PATCH V4 04/14] ARM: mxc: pwm: add clk_prepare/clk_unprepare
 In-Reply-To: <1321339689-25256-1-git-send-email-richard.zhao@linaro.org>
 References: <1321339689-25256-1-git-send-email-richard.zhao@linaro.org>
-Message-ID: <1321339689-25256-4-git-send-email-richard.zhao@linaro.org>
+Message-ID: <1321339689-25256-5-git-send-email-richard.zhao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,63 +11,30 @@ It's for migrating to generic clk framework API.
 
 Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
 ---
- arch/arm/plat-mxc/devices/platform-ahci-imx.c |   16 ++++++++--------
- 1 files changed, 8 insertions(+), 8 deletions(-)
+ arch/arm/plat-mxc/pwm.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/plat-mxc/devices/platform-ahci-imx.c b/arch/arm/plat-mxc/devices/platform-ahci-imx.c
-index d8a56ae..ade4a1c 100644
---- a/arch/arm/plat-mxc/devices/platform-ahci-imx.c
-+++ b/arch/arm/plat-mxc/devices/platform-ahci-imx.c
-@@ -60,9 +60,9 @@ static int imx_sata_init(struct device *dev, void __iomem *addr)
- 		dev_err(dev, "no sata clock.\n");
- 		return PTR_ERR(sata_clk);
+diff --git a/arch/arm/plat-mxc/pwm.c b/arch/arm/plat-mxc/pwm.c
+index 42d74ea..68c7199b 100644
+--- a/arch/arm/plat-mxc/pwm.c
++++ b/arch/arm/plat-mxc/pwm.c
+@@ -118,7 +118,7 @@ int pwm_enable(struct pwm_device *pwm)
+ 	int rc = 0;
+ 
+ 	if (!pwm->clk_enabled) {
+-		rc = clk_enable(pwm->clk);
++		rc = clk_prepare_enable(pwm->clk);
+ 		if (!rc)
+ 			pwm->clk_enabled = 1;
  	}
--	ret = clk_enable(sata_clk);
-+	ret = clk_prepare_enable(sata_clk);
- 	if (ret) {
--		dev_err(dev, "can't enable sata clock.\n");
-+		dev_err(dev, "can't prepare/enable sata clock.\n");
- 		goto put_sata_clk;
+@@ -131,7 +131,7 @@ void pwm_disable(struct pwm_device *pwm)
+ 	writel(0, pwm->mmio_base + MX3_PWMCR);
+ 
+ 	if (pwm->clk_enabled) {
+-		clk_disable(pwm->clk);
++		clk_disable_unprepare(pwm->clk);
+ 		pwm->clk_enabled = 0;
  	}
- 
-@@ -73,9 +73,9 @@ static int imx_sata_init(struct device *dev, void __iomem *addr)
- 		ret = PTR_ERR(sata_ref_clk);
- 		goto release_sata_clk;
- 	}
--	ret = clk_enable(sata_ref_clk);
-+	ret = clk_prepare_enable(sata_ref_clk);
- 	if (ret) {
--		dev_err(dev, "can't enable sata ref clock.\n");
-+		dev_err(dev, "can't prepare/enable sata ref clock.\n");
- 		goto put_sata_ref_clk;
- 	}
- 
-@@ -104,11 +104,11 @@ static int imx_sata_init(struct device *dev, void __iomem *addr)
- 	return 0;
- 
- release_sata_ref_clk:
--	clk_disable(sata_ref_clk);
-+	clk_disable_unprepare(sata_ref_clk);
- put_sata_ref_clk:
- 	clk_put(sata_ref_clk);
- release_sata_clk:
--	clk_disable(sata_clk);
-+	clk_disable_unprepare(sata_clk);
- put_sata_clk:
- 	clk_put(sata_clk);
- 
-@@ -117,10 +117,10 @@ put_sata_clk:
- 
- static void imx_sata_exit(struct device *dev)
- {
--	clk_disable(sata_ref_clk);
-+	clk_disable_unprepare(sata_ref_clk);
- 	clk_put(sata_ref_clk);
- 
--	clk_disable(sata_clk);
-+	clk_disable_unprepare(sata_clk);
- 	clk_put(sata_clk);
- 
  }
 -- 
 1.7.5.4
