@@ -1,32 +1,54 @@
-From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Tue, 15 Nov 2011 11:57:40 +0530
-Subject: [PATCH] OMAP2+: UART: Make the SERIAL_OMAP depend on ARCH_OMAP2PLUS
-Message-ID: <1321338460-1421-1-git-send-email-shubhrajyoti@ti.com>
+From: richard.zhao@linaro.org (Richard Zhao)
+Date: Tue, 15 Nov 2011 14:47:55 +0800
+Subject: [PATCH V4 00/14] add clk_prepare/clk_unprepare to imx drivers
+Message-ID: <1321339689-25256-1-git-send-email-richard.zhao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Making  SERIAL_OMAP depend on ARCH_OMAP2PLUS instead of
-oring with ARCH2/3/4.
+Changes since V3:
+ - add more comments
 
-Acked-by: Felipe Balbi <balbi@ti.com>
-Suggested-by: Sricharan R <r.sricharan@ti.com>
-Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
----
- drivers/tty/serial/Kconfig |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+Changes since V2:
+ - fix clk_prepare_enable bug
 
-diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
-index 5f479da..2b2b971 100644
---- a/drivers/tty/serial/Kconfig
-+++ b/drivers/tty/serial/Kconfig
-@@ -1324,7 +1324,7 @@ config SERIAL_OF_PLATFORM
- 
- config SERIAL_OMAP
- 	tristate "OMAP serial port support"
--	depends on ARCH_OMAP2 || ARCH_OMAP3 || ARCH_OMAP4
-+	depends on ARCH_OMAP2PLUS
- 	select SERIAL_CORE
- 	help
- 	  If you have a machine based on an Texas Instruments OMAP CPU you
--- 
-1.7.1
+Changes since V1:
+ - Add common helper functions clk_prepare_enable/clk_disable_unprepare
+ - serial/imx: move clk_disable_unprepare before clk_put
+
+
+Richard Zhao (14):
+      clk: add helper functions clk_prepare_enable and clk_disable_unprepare
+      ARM: mxc: time: add clk_prepare/clk_unprepare
+      ARM: mxc: ahci: add clk_prepare/clk_unprepare
+      ARM: mxc: pwm: add clk_prepare/clk_unprepare
+      ARM: mxc: epit: add clk_prepare/clk_unprepare
+      ARM: mxc: arch_reset: add clk_prepare/clk_unprepare
+      ARM: mxc: audmux-v2: add clk_prepare/clk_unprepare
+      ARM: pm-imx5: add clk_prepare/clk_unprepare
+      ARM: mx31moboard: add clk_prepare/clk_unprepare
+      ARM: mxs: add clk_prepare/clk_unprepare
+      serial: imx: add clk_prepare/clk_unprepare
+      net: fec: add clk_prepare/clk_unprepare
+      i2c: imx: add clk_prepare/clk_unprepare
+      mmc: sdhci-esdhc-imx: add clk_prepare/clk_unprepare
+
+ arch/arm/mach-imx/mach-mx31moboard.c          |    2 +-
+ arch/arm/mach-mx5/pm-imx5.c                   |    4 ++--
+ arch/arm/mach-mxs/system.c                    |    2 +-
+ arch/arm/mach-mxs/timer.c                     |    2 +-
+ arch/arm/plat-mxc/audmux-v2.c                 |    8 ++++----
+ arch/arm/plat-mxc/devices/platform-ahci-imx.c |   16 ++++++++--------
+ arch/arm/plat-mxc/epit.c                      |    2 +-
+ arch/arm/plat-mxc/pwm.c                       |    4 ++--
+ arch/arm/plat-mxc/system.c                    |    2 +-
+ arch/arm/plat-mxc/time.c                      |    2 +-
+ drivers/i2c/busses/i2c-imx.c                  |    4 ++--
+ drivers/mmc/host/sdhci-esdhc-imx.c            |    6 +++---
+ drivers/net/ethernet/freescale/fec.c          |   10 +++++-----
+ drivers/tty/serial/imx.c                      |    7 +++----
+ include/linux/clk.h                           |   22 ++++++++++++++++++++++
+ 15 files changed, 57 insertions(+), 36 deletions(-)
+
+
+Thanks
+Richard
