@@ -1,43 +1,39 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 15 Nov 2011 16:09:03 +0900
-Subject: [PATCH 6/6] ARM: S3C64XX: Modified according to SPI consolidation
- work.
-In-Reply-To: <CAAgF-Bcj3vm50YOU4Sq4cGrOE8EHixjOuFrQq-MR6FVLf7Dekg@mail.gmail.com>
-References: <1320410634-10788-1-git-send-email-padma.v@samsung.com>
- <1320410634-10788-7-git-send-email-padma.v@samsung.com>
- <20111104105710.GA12134@opensource.wolfsonmicro.com>
- <CAAgF-Bcj3vm50YOU4Sq4cGrOE8EHixjOuFrQq-MR6FVLf7Dekg@mail.gmail.com>
-Message-ID: <003401cca365$74c25920$5e470b60$%kim@samsung.com>
+Date: Tue, 15 Nov 2011 16:11:05 +0900
+Subject: [RFC][PATCH] Consolidate Samsung MAINTAINERS
+References: <201110230012.15273.heiko@sntech.de>
+ <201111041250.40613.heiko@sntech.de>
+Message-ID: <003501cca365$bdbd0e90$39372bb0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-padma venkat wrote:
+Kukjin Kim wrote:
+> 
+> Heiko St?bner wrote:
+> >
+> > Am Sonntag 23 Oktober 2011, 00:12:14 schrieb Heiko St?bner:
+> > > These days most Samsung stuff gets in the kernel through Kukjin Kim.
+> > > This patch changes MAINTAINERS to reflect this.
+> > >
+> > > By adding Kukjin Kim to the maintainers for S3C2410, S3C244x and
+> > > S3C64xx alongside Ben Dooks the extra entries become identical to the
+> > > base ARM/SAMSUNG entry and can move into it.
+> > >
+> > > Also the S3C2416 gets a maintainer through the s3c24* wildcard - as it
+> > > did not have one until now.
+> > >
+> > > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> > > ---
+> > ping?
+> >
+> Hi Heiko,
+> 
+> Basically I'm ok on this but need to get the agreement from Ben Dooks.
+> 
+Hi Ben,
 
-> Hi Mark,
-> On Fri, Nov 4, 2011 at 4:27 PM, Mark Brown
-<broonie@opensource.wolfsonmicro.com> wrote:
-> On Fri, Nov 04, 2011 at 08:43:54AM -0400, Padmavathi Venna wrote:
->
-> > +#ifdef CONFIG_S3C64XX_DEV_SPI0
-> > +static struct s3c64xx_spi_info crag6410_spi0_pdata __initdata = {
-> > + ? ? .cfg_gpio ? ? ? = s3c64xx_spi0_cfg_gpio,
-> > + ? ? .fifo_lvl_mask ?= 0x7f,
-> > + ? ? .rx_lvl_offset ?= 13,
-> > + ? ? .tx_st_done ? ? = 21,
-> > +};
-> > +#endif
-> It seems like a step backwards to have all this stuff in the individual
-> machines - most of this (everything except cfg_gpio pretty much) is a
-> property of the SoC silicon so should be somewhere central for the SoC.
-> I Will?move this stuff to SPI setup files and resend the patches.
-> Thanks
-> Padma
-
-Hi Padma,
-
-Please send text-typed e-mail when you reply :)
-
-And I agree with Mark, how was going on?
+How do you think about this?
+If you don't want this, please let me know.
 
 Thanks.
 
