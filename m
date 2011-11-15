@@ -1,9 +1,9 @@
 From: richard.zhao@linaro.org (Richard Zhao)
-Date: Tue, 15 Nov 2011 14:48:05 +0800
-Subject: [PATCH V4 10/14] ARM: mxs: add clk_prepare/clk_unprepare
+Date: Tue, 15 Nov 2011 14:48:06 +0800
+Subject: [PATCH V4 11/14] serial: imx: add clk_prepare/clk_unprepare
 In-Reply-To: <1321339689-25256-1-git-send-email-richard.zhao@linaro.org>
 References: <1321339689-25256-1-git-send-email-richard.zhao@linaro.org>
-Message-ID: <1321339689-25256-11-git-send-email-richard.zhao@linaro.org>
+Message-ID: <1321339689-25256-12-git-send-email-richard.zhao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,35 +11,44 @@ It's for migrating to generic clk framework API.
 
 Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
 ---
- arch/arm/mach-mxs/system.c |    2 +-
- arch/arm/mach-mxs/timer.c  |    2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ drivers/tty/serial/imx.c |    7 +++----
+ 1 files changed, 3 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-mxs/system.c b/arch/arm/mach-mxs/system.c
-index 20ec3bd..9760a12 100644
---- a/arch/arm/mach-mxs/system.c
-+++ b/arch/arm/mach-mxs/system.c
-@@ -66,7 +66,7 @@ static int __init mxs_arch_reset_init(void)
+diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
+index 163fc90..8f3709f 100644
+--- a/drivers/tty/serial/imx.c
++++ b/drivers/tty/serial/imx.c
+@@ -1390,7 +1390,7 @@ static int serial_imx_probe(struct platform_device *pdev)
+ 		ret = PTR_ERR(sport->clk);
+ 		goto unmap;
+ 	}
+-	clk_enable(sport->clk);
++	clk_prepare_enable(sport->clk);
  
- 	clk = clk_get_sys("rtc", NULL);
- 	if (!IS_ERR(clk))
--		clk_enable(clk);
-+		clk_prepare_enable(clk);
+ 	sport->port.uartclk = clk_get_rate(sport->clk);
  
- 	return 0;
- }
-diff --git a/arch/arm/mach-mxs/timer.c b/arch/arm/mach-mxs/timer.c
-index cace0d2..564a632 100644
---- a/arch/arm/mach-mxs/timer.c
-+++ b/arch/arm/mach-mxs/timer.c
-@@ -245,7 +245,7 @@ static int __init mxs_clocksource_init(struct clk *timer_clk)
+@@ -1413,8 +1413,8 @@ deinit:
+ 	if (pdata && pdata->exit)
+ 		pdata->exit(pdev);
+ clkput:
++	clk_disable_unprepare(sport->clk);
+ 	clk_put(sport->clk);
+-	clk_disable(sport->clk);
+ unmap:
+ 	iounmap(sport->port.membase);
+ free:
+@@ -1434,11 +1434,10 @@ static int serial_imx_remove(struct platform_device *pdev)
  
- void __init mxs_timer_init(struct clk *timer_clk, int irq)
- {
--	clk_enable(timer_clk);
-+	clk_prepare_enable(timer_clk);
+ 	if (sport) {
+ 		uart_remove_one_port(&imx_reg, &sport->port);
++		clk_disable_unprepare(sport->clk);
+ 		clk_put(sport->clk);
+ 	}
  
- 	/*
- 	 * Initialize timers to a known state
+-	clk_disable(sport->clk);
+-
+ 	if (pdata && pdata->exit)
+ 		pdata->exit(pdev);
+ 
 -- 
 1.7.5.4
