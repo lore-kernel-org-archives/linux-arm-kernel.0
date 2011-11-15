@@ -1,41 +1,38 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Tue, 15 Nov 2011 14:03:14 +0400
-Subject: [PATCH v2 4/5] davinci: create new common platform header for
- davinci
-In-Reply-To: <1321283357-27698-5-git-send-email-manjunath.hadli@ti.com>
-References: <1321283357-27698-1-git-send-email-manjunath.hadli@ti.com>
- <1321283357-27698-5-git-send-email-manjunath.hadli@ti.com>
-Message-ID: <4EC238E2.3040600@mvista.com>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Tue, 15 Nov 2011 15:42:43 +0530
+Subject: [PATCH] ARM: EXYNOS: Fixed undefined symbol compilation error.
+Message-ID: <1321351963-9940-1-git-send-email-pankaj.dubey@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Many drivers will fail to compile if compiled as module due to
+undefined symbol exynos4_ioremap.
+Fix has been added by exporting the same in cpu.c file.
 
-On 14-11-2011 19:09, Manjunath Hadli wrote:
+Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+---
+ arch/arm/mach-exynos/cpu.c |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
 
-> remove the code from individual platform header files for
-> dm365, dm355, dm644x and dm646x and consolidate it into a
-> single and common header file davinci_common.h.
-> Include the new header file in individual platform header
-> files as a pre-cursor for deleting these headers in follow
-> up patches.
-
-> Signed-off-by: Manjunath Hadli<manjunath.hadli@ti.com>
-> ---
->   .../arm/mach-davinci/include/mach/davinci_common.h |   88 ++++++++++++++++++++
->   arch/arm/mach-davinci/include/mach/dm355.h         |   18 +----
->   arch/arm/mach-davinci/include/mach/dm365.h         |   20 +----
->   arch/arm/mach-davinci/include/mach/dm644x.h        |   15 +---
->   arch/arm/mach-davinci/include/mach/dm646x.h        |   20 +----
->   5 files changed, 92 insertions(+), 69 deletions(-)
->   create mode 100644 arch/arm/mach-davinci/include/mach/davinci_common.h
-
-> diff --git a/arch/arm/mach-davinci/include/mach/davinci_common.h b/arch/arm/mach-davinci/include/mach/davinci_common.h
-> new file mode 100644
-> index 0000000..a859318
-> --- /dev/null
-> +++ b/arch/arm/mach-davinci/include/mach/davinci_common.h
-
-    Why not call it just davinci.h?
-
-WBR, Sergei
+diff --git a/arch/arm/mach-exynos/cpu.c b/arch/arm/mach-exynos/cpu.c
+index 8e09f34..027f65471 100644
+--- a/arch/arm/mach-exynos/cpu.c
++++ b/arch/arm/mach-exynos/cpu.c
+@@ -8,6 +8,7 @@
+  * published by the Free Software Foundation.
+ */
+ 
++#include <linux/module.h>
+ #include <linux/sched.h>
+ #include <linux/sysdev.h>
+ #include <linux/of.h>
+@@ -164,6 +165,7 @@ void __iomem *exynos4_ioremap(unsigned long phy, size_t size, unsigned int type)
+ 
+ 	return __arm_ioremap(phy, size, type);
+ }
++EXPORT_SYMBOL(exynos4_ioremap);
+ 
+ static void exynos_idle(void)
+ {
+-- 
+1.7.4.1
