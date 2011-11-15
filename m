@@ -1,63 +1,91 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 15 Nov 2011 17:30:23 +0000
-Subject: [PATCH V2] ARM: NUC900: Add PCI driver support for NUC960
-In-Reply-To: <4EC0BF9B.2050300@gmail.com>
-References: <4EBE98FC.6070903@gmail.com> <4EC0BF9B.2050300@gmail.com>
-Message-ID: <20111115173023.GC9581@n2100.arm.linux.org.uk>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 15 Nov 2011 11:35:39 -0600
+Subject: [PATCH v3] ARM: gic: allow GIC to support non-banked setups
+In-Reply-To: <4EC2742A.3050301@arm.com>
+References: <1321359452-22821-1-git-send-email-marc.zyngier@arm.com>
+ <4EC26B02.8000604@gmail.com> <4EC2742A.3050301@arm.com>
+Message-ID: <4EC2A2EB.6010307@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 14, 2011 at 03:13:31PM +0800, Wan ZongShun wrote:
-> +#define NUC900_PCI_MEM_BASE	0xC0000000
-> +#define NUC900_PCI_MEM_END	0xDFFFEFFFF
-> +#define NUC900_PCI_MEM_SIZE	0x20000000
+On 11/15/2011 08:16 AM, Marc Zyngier wrote:
+> Hi Rob,
+> 
+> On 15/11/11 13:37, Rob Herring wrote:
+>> Marc,
+>>
+>> On 11/15/2011 06:17 AM, Marc Zyngier wrote:
+>>> The GIC support code is heavily using the fact that hardware
+>>> implementations are exposing banked registers. Unfortunately, it
+>>> looks like at least one GIC implementation (EXYNOS) offers both
+>>> the distributor and the CPU interfaces at different addresses,
+>>> depending on the CPU.
+>>>
+>>> This problem is solved by allowing the distributor and CPU interface
+>>> addresses to be per-cpu variables for the platforms that require it.
+>>> The EXYNOS code is updated not to mess with the GIC internals while
+>>> handling interrupts, and struct gic_chip_data is back to being private.
+>>> The DT binding for the gic is updated to allow an optional "cpu-offset"
+>>> value, which is used to compute the various base addresses.
+>>>
+>>> Finally, a new config option (GIC_NON_BANKED) is used to control this
+>>> feature, so the overhead is only present on kernels compiled with
+>>> support for EXYNOS.
+>>>
+>>> Tested on Origen (EXYNOS4) and Panda (OMAP4).
+>>>
+>>> Cc: Kukjin Kim <kgene.kim@samsung.com>
+>>> Cc: Rob Herring <robherring2@gmail.com>
+>>> Cc: Will Deacon <will.deacon@arm.com>
+>>> Cc: Thomas Abraham <thomas.abraham@linaro.org>
+>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>>> ---
+>>> This is a minor update on the previous version, simply adding a
+>>> config option so that normal platforms don't have to pay the
+>>> price of the get_base() indirection.
+>>>
+>>> Any comment is welcome, specially on the DT binding update.
+>>>
+>>>  Documentation/devicetree/bindings/arm/gic.txt |    4 +
+>>>  arch/arm/common/Kconfig                       |    3 +
+>>>  arch/arm/common/gic.c                         |  133 +++++++++++++++++++++----
+>>>  arch/arm/include/asm/hardware/gic.h           |   24 ++---
+>>>  arch/arm/mach-exynos/cpu.c                    |   16 +---
+>>>  arch/arm/mach-exynos/platsmp.c                |   28 +-----
+>>>  arch/arm/plat-s5p/Kconfig                     |    1 +
+>>>  7 files changed, 132 insertions(+), 77 deletions(-)
+>>>
+>>> @@ -664,9 +756,12 @@ int __init gic_of_init(struct device_node *node, struct device_node *parent)
+>>>       cpu_base = of_iomap(node, 1);
+>>>       WARN(!cpu_base, "unable to map gic cpu registers\n");
+>>>
+>>> +     if (of_property_read_u32(node, "cpu-offset", &percpu_offset))
+>>> +             percpu_offset = 0;
+>>> +
+>>
+>> What are the chances of not having a simple offset you can index into?
+> 
+> Very slim, I think. It would make the hardware insane. Oh wait... ;-)
+> 
+>> If you add a new property, then you need to add documentation.
+> 
+> I think I added two lines to gic.txt (see first hunk of the patch).
+> 
 
-NUC900_PCI_MEM_END has more than 32 bits.
+Ah. Sorry, missed that.
 
-> +#define NUC900_PCI_IO_BASE	0xE0000000
-> +#define NUC900_PCI_IO_END	0xE000FFFF
-> +#define NUC900_PCI_IO_SIZE	0x10000
-...
-> +static struct resource pci_io = {
-> +	.name	= "NUC900 PCI IO",
-> +	.start	= NUC900_PCI_IO_BASE,
-> +	.end	= NUC900_PCI_IO_BASE + NUC900_PCI_IO_SIZE - 1,
-> +	.flags	= IORESOURCE_IO,
-> +};
-...
-> +static int __init pci_nuc900_setup_resources(struct resource **resource)
-> +{
-> +	int ret = 0;
-> +
-> +	ret = request_resource(&ioport_resource, &pci_io);
-> +	if (ret) {
-> +		pr_err("%s: failed to request resources: %d\n", __func__, ret);
-> +		goto out;
-> +	}
-...
-> +	/*
-> +	 * bus->resource[0] is the IO resource for this bus
-> +	 * bus->resource[1] is the mem resource for this bus
-> +	 * bus->resource[2] is the prefetch mem resource for this bus
-> +	 */
-> +	resource[0] = &pci_io;
-> +	resource[1] = &pci_mem;
-> +	resource[2] = NULL;
+>> You need to ioremap the secondary addresses. For that reason, adding to
+>> the regs property may be simpler.
+> 
+> My idea was to have two big regions (one for the CPU interface, one for
+> the distributor interface), encompassing the need of all CPUs. In the
+> Samsung case, it's 64kB per region (only the cpu offset changes between
+> 2 and 4 core versions).
 
-This is better, but still not correct.
+Evidently my brain is not working today... It should be fine.
 
-1. in mach/io.h:
+So you can add my ack:
 
--#define IO_SPACE_LIMIT	0xffffffff
-+#define IO_SPACE_LIMIT	0xffff
+Acked-by: Rob Herring <rob.herring@calxeda.com>
 
--#define __io(a)	__typesafe_io(a)
-+#define __io(a)	((void __iomem __force *)(a) + VA_OF_IO_SPACE)
-
-where VA_OF_IO_SPACE is correctly named and typed.
-
-2. set resource[0] = &ioport_resource and get rid of pci_io entirely.
-
-3. if (!request_mem_region(PA_OF_IO_SPACE, 64K, "PCI IO emulation space"))
-	pr_warn("Unable to request PCI IO space\n");
-   in your pre-init function.
+Rob
