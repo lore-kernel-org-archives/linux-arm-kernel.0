@@ -1,29 +1,23 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 15 Nov 2011 08:52:02 +0000
-Subject: [PATCH 04/41] ARM: restart: at91: use new restart hook
-In-Reply-To: <20111115011610.GF15318@game.jcrosoft.org>
-References: <20111106173113.GI12913@n2100.arm.linux.org.uk>
- <E1RN6ic-0001Wp-7t@rmk-PC.arm.linux.org.uk>
- <20111115011610.GF15318@game.jcrosoft.org>
-Message-ID: <20111115085202.GB8574@n2100.arm.linux.org.uk>
+Date: Tue, 15 Nov 2011 09:06:34 +0000
+Subject: [PATCH] OMAP2+: UART: Make the SERIAL_OMAP depend on
+ ARCH_OMAP2PLUS
+In-Reply-To: <1321338460-1421-1-git-send-email-shubhrajyoti@ti.com>
+References: <1321338460-1421-1-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <20111115090634.GA31462@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 15, 2011 at 02:16:10AM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> On 17:41 Sun 06 Nov     , Russell King - ARM Linux wrote:
-> > Rather than using a private function pointer, use the existing
-> > arm_pm_restart function pointer instead.  We no longer need to enable
-> > the I-cache in at91sam9_alt_reset() as the caches will now be on when
-> > this function is called.
-> > 
-> > Update the function names to use the 'restart' terminology rather than
-> > the 'reboot' terminology.
-> > 
-> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> > ---
-> I'll appply this one via at91-treee as I've patch that touch this part too in
-> the queue if you do'nt mind
+On Tue, Nov 15, 2011 at 11:57:40AM +0530, Shubhrajyoti D wrote:
+> Making  SERIAL_OMAP depend on ARCH_OMAP2PLUS instead of
+> oring with ARCH2/3/4.
+> 
+> Acked-by: Felipe Balbi <balbi@ti.com>
+> Suggested-by: Sricharan R <r.sricharan@ti.com>
+> Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
 
-Which will break my patch queue.  As I said to Tony, I'm looking to
-stabilize this in about a week and a half's time, at which point
-you'll be able to pull these changes into your tree.
+There's another one:
+
+drivers/mtd/nand/Kconfig:     depends on ARM && (ARCH_OMAP2 || ARCH_OMAP3 || ARCH_OMAP4)
+
+And the 'ARM &&' is redundant.
