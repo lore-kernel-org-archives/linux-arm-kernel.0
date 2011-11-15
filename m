@@ -1,7 +1,9 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Tue, 15 Nov 2011 21:30:57 +0100
+Date: Tue, 15 Nov 2011 21:40:33 +0100
 Subject: [PATCH 1/2] ARM: at91: switch gpio clock to clkdev
-Message-ID: <1321389058-22525-1-git-send-email-plagnioj@jcrosoft.com>
+In-Reply-To: <20111113180954.GD15318@game.jcrosoft.org>
+References: <20111113180954.GD15318@game.jcrosoft.org>
+Message-ID: <1321389646-24112-2-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
