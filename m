@@ -1,31 +1,30 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Tue, 15 Nov 2011 17:50:46 +0100
-Subject: [PATCH v5] Consolidate SRAM support
-In-Reply-To: <20110720024933.GC15388@game.jcrosoft.org>
-References: <1310300379-2882-1-git-send-email-plagnioj@jcrosoft.com>
- <20110720024933.GC15388@game.jcrosoft.org>
-Message-ID: <20111115165046.GC26396@game.jcrosoft.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 15 Nov 2011 17:20:53 +0000
+Subject: [RFC][PATCH] gpiolib: add irq_wake (power-management) sysfs file
+In-Reply-To: <20111115131636.GA31028@sirena.org.uk>
+References: <1321004406-15663-1-git-send-email-p-combes@ti.com>
+ <20111115131636.GA31028@sirena.org.uk>
+Message-ID: <20111115172053.GB9581@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04:49 Wed 20 Jul     , Jean-Christophe PLAGNIOL-VILLARD wrote:
-> On 14:19 Sun 10 Jul     , Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > From: Russell King - ARM Linux <linux@arm.linux.org.uk>
-> > 
-> > We have two SoCs using SRAM, both with their own allocation systems,
-> > and both with their own ways of copying functions into the SRAM.
-> > 
-> > Let's unify this before we have additional SoCs re-implementing this
-> > obviously common functionality themselves.
-> > 
-> > For this use the generic allocator and the newly introduce
-> > gen_pool_add_virt and gen_pool_virt_to_phys
-> > 
-> > Uio_pruss should probably take the SRAM pool pointer via
-> > platform data so that it doesn't have to include Davinci specific
-> > includes.
-> Russell can I have a go?
-ping
+On Tue, Nov 15, 2011 at 01:16:37PM +0000, Mark Brown wrote:
+> On Fri, Nov 11, 2011 at 10:40:06AM +0100, Patrick Combes wrote:
+> > +	else if (sysfs_streq(buf, "enable") || sysfs_streq(buf, "1"))
+> > +		status = enable_irq_wake(gpio_to_irq(gpio));
+> > +	else if (sysfs_streq(buf, "disable") || sysfs_streq(buf, "0"))
+> > +		status = disable_irq_wake(gpio_to_irq(gpio));
+> > +	else
+> > +		status = -EINVAL;
+> 
+> ...this doesn't do anything to stop userspace doing multiple enables and
+> disables.
 
-Best Regards,
-J.
+It doesn't check whether gpio_to_irq(gpio) returns something sane either.
+It should be doing something like this before taking the mutex:
+
+	irq = gpio_to_irq(gpio);
+	if (irq <= 0)
+		return irq < 0 ? irq : -EINVAL;
+
+and then doing (enable|disable)_irq_wake() on irq.
