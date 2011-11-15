@@ -1,7 +1,7 @@
 From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Tue, 15 Nov 2011 15:42:43 +0530
-Subject: [PATCH] ARM: EXYNOS: Fixed undefined symbol compilation error.
-Message-ID: <1321351963-9940-1-git-send-email-pankaj.dubey@samsung.com>
+Date: Tue, 15 Nov 2011 15:45:02 +0530
+Subject: [RESEND][PATCH] ARM: EXYNOS: Fixed undefined symbol compilation error.
+Message-ID: <1321352102-10021-1-git-send-email-pankaj.dubey@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
