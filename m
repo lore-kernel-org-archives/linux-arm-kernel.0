@@ -1,93 +1,97 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 15 Nov 2011 17:02:45 -0600
-Subject: [PATCH 2/2] ARM: topdown mmap support
-In-Reply-To: <alpine.LFD.2.02.1111141316440.3307@xanadu.home>
-References: <1320709421-14469-1-git-send-email-robherring2@gmail.com>
- <1320709421-14469-2-git-send-email-robherring2@gmail.com>
- <alpine.LFD.2.02.1111141237080.3307@xanadu.home> <4EC15882.7070909@gmail.com>
- <alpine.LFD.2.02.1111141316440.3307@xanadu.home>
-Message-ID: <4EC2EF95.4050205@gmail.com>
+From: dima@android.com (Dima Zavin)
+Date: Tue, 15 Nov 2011 15:27:18 -0800
+Subject: [patch] ARM: smpboot: Enable interrupts after marking CPU
+ online/active
+In-Reply-To: <4EC2DF93.2050904@codeaurora.org>
+References: <20110908215314.829452535@linutronix.de>
+ <CADGdYn6V_eQJZ4=irMbSS7XJj4MJVeALxcrWdD7o2bGs1sEJZQ@mail.gmail.com>
+ <20110913133258.GA6267@n2100.arm.linux.org.uk>
+ <CAKfTPtCWuiOM5+sOwdh1FzXZb1EFT__tVEpRPY5suGOxpYTdQQ@mail.gmail.com>
+ <20110913175312.GB6267@n2100.arm.linux.org.uk>
+ <20110923084001.GP17169@n2100.arm.linux.org.uk>
+ <01d501cc84d6$62720890$275619b0$%kim@samsung.com>
+ <alpine.LFD.2.02.1110071354310.3240@ionos>
+ <CAPz4a6CkOXp6LHX2hFYVBhXWT4rhCUzLyYTLbO7g8u_jYcHt7Q@mail.gmail.com>
+ <CAPz4a6C7md+k8pCz6mJtB-v_1h-faGxQZkOqU9vHUtcG-jrYVQ@mail.gmail.com>
+ <4EC2DF93.2050904@codeaurora.org>
+Message-ID: <CAPz4a6CXVasi2QzMc-+=Jo0RDqQvk5odF_V6q_9y5AoNVKWM-A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nicolas,
+I think your issue is the same one I had. I'm not sure if we can we
+rely on cpu_online_mask being valid unless you called
+get_online_cpus(), can we?
 
-On 11/14/2011 12:22 PM, Nicolas Pitre wrote:
-> On Mon, 14 Nov 2011, Rob Herring wrote:
-> 
->> On 11/14/2011 11:41 AM, Nicolas Pitre wrote:
->>> On Mon, 7 Nov 2011, Rob Herring wrote:
->>>
->>>> From: Rob Herring <rob.herring@calxeda.com>
->>>>
->>>> Similar to other architectures, this adds topdown mmap support in user
->>>> process address space allocation policy. This allows mmap sizes greater
->>>> than 2GB. This support is largely copied from MIPS and the generic
->>>> implementations.
->>>>
->>>> The address space randomization is moved into arch_pick_mmap_layout.
->>>
->>> This is a problem by effectively weakening the randomization greatly.  
->>> Now you get a random starting point but all mmaps are otherwise fixed 
->>> relative to each other, whereas you had random distances between each 
->>> mmaps before.
->>>
+--DIma
+
+On Tue, Nov 15, 2011 at 1:54 PM, Stepan Moskovchenko
+<stepanm@codeaurora.org> wrote:
+> On 11:59 AM, Dima Zavin wrote:
 >>
->> You mean within a single process the mmap's are not randomized? 
-> 
-> With regard to each other: not anymore with your patch.
-> 
->> Couldn't that end up wasting a lot of virtual space if you have a lot 
->> of mmaps?
-> 
-> That is what we have now without this patch.  The Potential for wasted 
-> space is 8 bits on a page level, i.e. 1MB max or 512 KB on average, per 
-> mmap.  I don't think this is that bad.
-> 
-
-No one cared about or noticed this issue until recently. That is
-changing as we start to see ARM systems with more memory and I'm sure
-we'll see more issues like this. Someone may care that they get less
-memory than other 32-bit arches. Can you really trust that apps don't do
-a large number of mmaps.
-
->> It is aligned with other arch's and the generic implementation. The
->> generic implementation doesn't even do randomization for legacy layouts.
-> 
-> Only x86 does complete ASLR besides ARM.
-
-x86 does not do per mmap randomization. Here's the output of a test
-program which does 1 to 23 MB size mmaps in 1MB steps. The gap is the
-last address - current address. I'm not sure what's going on with the
-2nd mmap gap though, but otherwise the gap matches the mmap size.
-
-mmap at 0x7f74bd1b7000, gap = 42e49000
-mmap at 0x7f74bcb1e000, gap = 699000
-mmap at 0x7f74bc81e000, gap = 300000
-mmap at 0x7f74bc41e000, gap = 400000
-mmap at 0x7f74bbf1e000, gap = 500000
-mmap at 0x7f74bb91e000, gap = 600000
-mmap at 0x7f74bb21e000, gap = 700000
-mmap at 0x7f74baa1e000, gap = 800000
-mmap at 0x7f74ba11e000, gap = 900000
-mmap at 0x7f74b971e000, gap = a00000
-mmap at 0x7f74b8c1e000, gap = b00000
-mmap at 0x7f74b801e000, gap = c00000
-mmap at 0x7f74b731e000, gap = d00000
-mmap at 0x7f74b651e000, gap = e00000
-mmap at 0x7f74b561e000, gap = f00000
-mmap at 0x7f74b461e000, gap = 1000000
-mmap at 0x7f74b351e000, gap = 1100000
-mmap at 0x7f74b231e000, gap = 1200000
-mmap at 0x7f74b101e000, gap = 1300000
-mmap at 0x7f74afc1e000, gap = 1400000
-mmap at 0x7f74ae71e000, gap = 1500000
-mmap at 0x7f74ad11e000, gap = 1600000
-
-My patch exceeds 32-bit x86 functionality which does no randomization
-for legacy layouts. It matches 32-bit and 64-bit x86 for topdown layout.
-
-I'm happy to revert the legacy part of my patch, but it's a bit mute
-point as legacy is not used by default.
-
-Rob
+>> <go go gadget message retractor>
+>>
+>> Looks like the issue ended up being the fact that the caller was
+>> accessing the cpu_online_mask without calling get_online_cpus anywhere
+>> in the path and could have picked up the the intermediate state where
+>> CPU was online but not yet active..
+>>
+>> --Dima
+>>
+>> On Wed, Oct 19, 2011 at 2:16 PM, Dima Zavin<dima@android.com> ?wrote:
+>>>
+>>> Thomas,
+>>>
+>>> I was seeing something similar, and this patch did address part of it,
+>>> but I still think we have a problem. What I am seeing is the
+>>> following:
+>>>
+>>> We have a SCHED_FIFO kernel thread which tries to do a blocking IPI
+>>> (smp_call_function_single) to all online cpus (for_each_online_cpu).
+>>> This introduces a deadlock where the FIFO thread could be preempting
+>>> the suspend thread which is the one that's trying to set the second
+>>> CPU active after it sees it going online. The second CPU marked itself
+>>> online and is then waiting for the first CPU to mark it active before
+>>> enabling irqs to service the IPI.
+>>>
+>>> It feels to me like we should probably not be sending blocking IPIs
+>>> from a FIFO thread for sanity reasons, but that does mean there's
+>>> still a deadlock present here.
+>>>
+>>> Thoughts?
+>>>
+>>> Thanks in advance.
+>>>
+>>> --Dima
+>>>
+>
+> Hello
+>
+> I am seeing a deadlock when executing hotplug operations with this patch
+> applied. When the secondary CPU gets brought up in _cpu_up, the cpu is
+> turned on
+> and then the online notifier gets called, which is what marks the secondary
+> CPU
+> as active. If _cpu_up on the primary CPU is preempted before the secondary
+> CPU
+> is marked active, it is possible that the primary CPU will want to call
+> smp_call_function (or send an IPI) to the secondary CPU because it is marked
+> online. However, with this patch, the secondary CPU is still spinning on
+> !cpu_active(cpu)
+> with interrupts disabled. So, the primary CPU is now stuck in
+> csd_lock_wait(),
+> waiting for the secondary CPU to respond, while the secondary CPU spins with
+> interrupts disabled, waiting for the primary CPU to mark it as active. So,
+> while
+> your approach to not call smp_function_single may work for you in your
+> specific
+> case, I believe there is still a problem in the general case.
+>
+> One suggestion for resolving this might be making smp_call_function look at
+> the
+> active CPUs rather than online CPUs, or to just let the secondary CPU mark
+> itself as active rather than having the primary CPU do this, though this
+> might
+> defeat the original intended purpose of the active mask.
+>
+> Steve
+>
