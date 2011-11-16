@@ -1,10 +1,10 @@
 From: nico@fluxnic.net (Nicolas Pitre)
-Date: Wed, 16 Nov 2011 00:48:28 -0500
-Subject: [PATCH 10/23] ARM: mach-kirkwood: remove arch specific special
- handling for ioremap
+Date: Wed, 16 Nov 2011 00:48:29 -0500
+Subject: [PATCH 11/23] ARM: mach-ixp23xx: remove arch specific special handling
+ for ioremap
 In-Reply-To: <1321422521-1138-1-git-send-email-nico@fluxnic.net>
 References: <1321422521-1138-1-git-send-email-nico@fluxnic.net>
-Message-ID: <1321422521-1138-11-git-send-email-nico@fluxnic.net>
+Message-ID: <1321422521-1138-12-git-send-email-nico@fluxnic.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,44 +14,46 @@ A generic version should replace this later.
 
 Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
 ---
- arch/arm/mach-kirkwood/include/mach/io.h |   25 -------------------------
- 1 files changed, 0 insertions(+), 25 deletions(-)
+ arch/arm/mach-ixp23xx/include/mach/io.h |   29 -----------------------------
+ 1 files changed, 0 insertions(+), 29 deletions(-)
 
-diff --git a/arch/arm/mach-kirkwood/include/mach/io.h b/arch/arm/mach-kirkwood/include/mach/io.h
-index 1aaddc364f..49dd0cb5e1 100644
---- a/arch/arm/mach-kirkwood/include/mach/io.h
-+++ b/arch/arm/mach-kirkwood/include/mach/io.h
-@@ -19,31 +19,6 @@ static inline void __iomem *__io(unsigned long addr)
- 					+ KIRKWOOD_PCIE_IO_VIRT_BASE);
- }
+diff --git a/arch/arm/mach-ixp23xx/include/mach/io.h b/arch/arm/mach-ixp23xx/include/mach/io.h
+index a1749d0fd8..4ce4353b9f 100644
+--- a/arch/arm/mach-ixp23xx/include/mach/io.h
++++ b/arch/arm/mach-ixp23xx/include/mach/io.h
+@@ -20,33 +20,4 @@
+ #define __io(p)		((void __iomem*)((p) + IXP23XX_PCI_IO_VIRT))
+ #define __mem_pci(a)	(a)
  
 -static inline void __iomem *
--__arch_ioremap(unsigned long paddr, size_t size, unsigned int mtype)
+-ixp23xx_ioremap(unsigned long addr, unsigned long size, unsigned int mtype)
 -{
--	void __iomem *retval;
--	unsigned long offs = paddr - KIRKWOOD_REGS_PHYS_BASE;
--	if (mtype == MT_DEVICE && size && offs < KIRKWOOD_REGS_SIZE &&
--	    size <= KIRKWOOD_REGS_SIZE && offs + size <= KIRKWOOD_REGS_SIZE) {
--		retval = (void __iomem *)KIRKWOOD_REGS_VIRT_BASE + offs;
--	} else {
--		retval = __arm_ioremap(paddr, size, mtype);
+-	if (addr >= IXP23XX_PCI_MEM_START &&
+-		addr <= IXP23XX_PCI_MEM_START + IXP23XX_PCI_MEM_SIZE) {
+-		if (addr + size > IXP23XX_PCI_MEM_START + IXP23XX_PCI_MEM_SIZE)
+-			return NULL;
+-
+-		return (void __iomem *)
+- 			((addr - IXP23XX_PCI_MEM_START) + IXP23XX_PCI_MEM_VIRT);
 -	}
 -
--	return retval;
+-	return __arm_ioremap(addr, size, mtype);
 -}
 -
 -static inline void
--__arch_iounmap(void __iomem *addr)
+-ixp23xx_iounmap(void __iomem *addr)
 -{
--	if (addr < (void __iomem *)KIRKWOOD_REGS_VIRT_BASE ||
--	    addr >= (void __iomem *)(KIRKWOOD_REGS_VIRT_BASE + KIRKWOOD_REGS_SIZE))
--		__iounmap(addr);
+-	if ((((u32)addr) >= IXP23XX_PCI_MEM_VIRT) &&
+-	    (((u32)addr) < IXP23XX_PCI_MEM_VIRT + IXP23XX_PCI_MEM_SIZE))
+-		return;
+-
+-	__iounmap(addr);
 -}
 -
--#define __arch_ioremap		__arch_ioremap
--#define __arch_iounmap		__arch_iounmap
- #define __io(a)			__io(a)
- #define __mem_pci(a)		(a)
- 
+-#define __arch_ioremap	ixp23xx_ioremap
+-#define __arch_iounmap	ixp23xx_iounmap
+-
+-
+ #endif
 -- 
 1.7.7.1.431.g10b2a
