@@ -1,177 +1,201 @@
 From: nico@fluxnic.net (Nicolas Pitre)
-Date: Wed, 16 Nov 2011 00:48:39 -0500
-Subject: [PATCH 21/23] ARM: add generic ioremap optimization by reusing static
- mappings
+Date: Wed, 16 Nov 2011 00:48:37 -0500
+Subject: [PATCH 19/23] ARM: move iotable mappings within the vmalloc region
 In-Reply-To: <1321422521-1138-1-git-send-email-nico@fluxnic.net>
 References: <1321422521-1138-1-git-send-email-nico@fluxnic.net>
-Message-ID: <1321422521-1138-22-git-send-email-nico@fluxnic.net>
+Message-ID: <1321422521-1138-20-git-send-email-nico@fluxnic.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Nicolas Pitre <nicolas.pitre@linaro.org>
 
-Now that we have all the static mappings from iotable_init() located
-in the vmalloc area, it is trivial to optimize ioremap by reusing those
-static mappings when the requested physical area fits in one of them,
-and so in a generic way for all platforms.
+In order to remove the build time variation between different SOCs with
+regards to VMALLOC_END, the iotable mappings are now allocated inside
+the vmalloc region.  This allows for VMALLOC_END to be identical across
+all machines.
+
+The value for VMALLOC_END is now set to 0xff000000 which is right where
+the consistent DMA area starts.
+
+To accommodate all static mappings on machines with possible highmem usage,
+the default vmalloc area size is changed to 240 MB so that VMALLOC_START
+is no higher than 0xf0000000 by default.
 
 Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
 ---
- arch/arm/mm/ioremap.c |   72 ++++++++++++++++++++++++++++++++----------------
- arch/arm/mm/mm.h      |   14 +++++++++
- arch/arm/mm/mmu.c     |    3 +-
- 3 files changed, 64 insertions(+), 25 deletions(-)
+ Documentation/arm/memory.txt   |   11 ++++-----
+ arch/arm/include/asm/pgtable.h |    8 +-----
+ arch/arm/mm/mmu.c              |   48 +++++++++++++++++++++++++++------------
+ 3 files changed, 39 insertions(+), 28 deletions(-)
 
-diff --git a/arch/arm/mm/ioremap.c b/arch/arm/mm/ioremap.c
-index bc7d9bd766..12c7ad215c 100644
---- a/arch/arm/mm/ioremap.c
-+++ b/arch/arm/mm/ioremap.c
-@@ -36,12 +36,6 @@
- #include <asm/mach/map.h>
- #include "mm.h"
+diff --git a/Documentation/arm/memory.txt b/Documentation/arm/memory.txt
+index 771d48d3b3..208a2d465b 100644
+--- a/Documentation/arm/memory.txt
++++ b/Documentation/arm/memory.txt
+@@ -51,15 +51,14 @@ ffc00000	ffefffff	DMA memory mapping region.  Memory returned
+ ff000000	ffbfffff	Reserved for future expansion of DMA
+ 				mapping region.
  
--/*
-- * Used by ioremap() and iounmap() code to mark (super)section-mapped
-- * I/O regions in vm_struct->flags field.
-- */
--#define VM_ARM_SECTION_MAPPING	0x80000000
+-VMALLOC_END	feffffff	Free for platform use, recommended.
+-				VMALLOC_END must be aligned to a 2MB
+-				boundary.
 -
- int ioremap_page(unsigned long virt, unsigned long phys,
- 		 const struct mem_type *mtype)
- {
-@@ -201,12 +195,6 @@ void __iomem * __arm_ioremap_pfn_caller(unsigned long pfn,
- 	if (pfn >= 0x100000 && (__pfn_to_phys(pfn) & ~SUPERSECTION_MASK))
- 		return NULL;
+ VMALLOC_START	VMALLOC_END-1	vmalloc() / ioremap() space.
+ 				Memory returned by vmalloc/ioremap will
+ 				be dynamically placed in this region.
+-				VMALLOC_START may be based upon the value
+-				of the high_memory variable.
++				Machine specific static mappings are also
++				located here through iotable_init().
++				VMALLOC_START is based upon the value
++				of the high_memory variable, and VMALLOC_END
++				is equal to 0xff000000.
  
--	/*
--	 * Don't allow RAM to be mapped - this causes problems with ARMv6+
--	 */
--	if (WARN_ON(pfn_valid(pfn)))
--		return NULL;
--
- 	type = get_mem_type(mtype);
- 	if (!type)
- 		return NULL;
-@@ -216,6 +204,34 @@ void __iomem * __arm_ioremap_pfn_caller(unsigned long pfn,
- 	 */
- 	size = PAGE_ALIGN(offset + size);
+ PAGE_OFFSET	high_memory-1	Kernel direct-mapped RAM region.
+ 				This maps the platforms RAM, and typically
+diff --git a/arch/arm/include/asm/pgtable.h b/arch/arm/include/asm/pgtable.h
+index 9451dce3a5..6cdd55cb0b 100644
+--- a/arch/arm/include/asm/pgtable.h
++++ b/arch/arm/include/asm/pgtable.h
+@@ -21,7 +21,6 @@
+ #else
  
-+	/*
-+	 * Try to reuse one of the static mapping whenever possible.
-+	 */
-+	read_lock(&vmlist_lock);
-+	for (area = vmlist; area; area = area->next) {
-+		if (!size || (sizeof(phys_addr_t) == 4 && pfn >= 0x100000))
-+			break;
-+		if (!(area->flags & VM_ARM_STATIC_MAPPING))
-+			continue;
-+		if ((area->flags & VM_ARM_MTYPE_MASK) != VM_ARM_MTYPE(mtype))
-+			continue;
-+		if (__phys_to_pfn(area->phys_addr) > pfn ||
-+		    __pfn_to_phys(pfn) + size-1 > area->phys_addr + area->size-1)
-+			continue;
-+		/* we can drop the lock here as we know *area is static */
-+		read_unlock(&vmlist_lock);
-+		addr = (unsigned long)area->addr;
-+		addr += __pfn_to_phys(pfn) - area->phys_addr;
-+		return (void __iomem *) (offset + addr);
-+	}
-+	read_unlock(&vmlist_lock);
-+
-+	/*
-+	 * Don't allow RAM to be mapped - this causes problems with ARMv6+
-+	 */
-+	if (WARN_ON(pfn_valid(pfn)))
-+		return NULL;
-+
- 	area = get_vm_area_caller(size, VM_IOREMAP, caller);
-  	if (!area)
-  		return NULL;
-@@ -313,26 +329,34 @@ __arm_ioremap_exec(unsigned long phys_addr, size_t size, bool cached)
- void __iounmap(volatile void __iomem *io_addr)
- {
- 	void *addr = (void *)(PAGE_MASK & (unsigned long)io_addr);
--#ifndef CONFIG_SMP
- 	struct vm_struct *vm;
+ #include <asm/memory.h>
+-#include <mach/vmalloc.h>
+ #include <asm/pgtable-hwdef.h>
  
--	/*
--	 * If this is a section based mapping we need to handle it
--	 * specially as the VM subsystem does not know how to handle
--	 * such a beast.
--	 */
- 	read_lock(&vmlist_lock);
- 	for (vm = vmlist; vm; vm = vm->next) {
--		if ((vm->flags & VM_IOREMAP) && (vm->addr == addr)) {
--			if (vm->flags & VM_ARM_SECTION_MAPPING) {
--				unmap_area_sections((unsigned long)vm->addr,
--						    vm->size);
--			}
-+		if (vm->addr > addr)
- 			break;
-+		if (!(vm->flags & VM_IOREMAP))
-+			continue;
-+		/* If this is a static mapping we must leave it alone */
-+		if ((vm->flags & VM_ARM_STATIC_MAPPING) &&
-+		    (vm->addr <= addr) && (vm->addr + vm->size > addr)) {
-+			read_unlock(&vmlist_lock);
-+			return;
- 		}
-+#ifndef CONFIG_SMP
-+		/*
-+		 * If this is a section based mapping we need to handle it
-+		 * specially as the VM subsystem does not know how to handle
-+		 * such a beast.
-+		 */
-+		if ((vm->addr == addr) &&
-+		    (vm->flags & VM_ARM_SECTION_MAPPING)) {
-+			unmap_area_sections((unsigned long)vm->addr, vm->size);
-+			break;
-+		}
-+#endif
- 	}
- 	read_unlock(&vmlist_lock);
+ #include <asm/pgtable-2level.h>
+@@ -33,15 +32,10 @@
+  * any out-of-bounds memory accesses will hopefully be caught.
+  * The vmalloc() routines leaves a hole of 4kB between each vmalloced
+  * area for the same reason. ;)
+- *
+- * Note that platforms may override VMALLOC_START, but they must provide
+- * VMALLOC_END.  VMALLOC_END defines the (exclusive) limit of this space,
+- * which may not overlap IO space.
+  */
+-#ifndef VMALLOC_START
+ #define VMALLOC_OFFSET		(8*1024*1024)
+ #define VMALLOC_START		(((unsigned long)high_memory + VMALLOC_OFFSET) & ~(VMALLOC_OFFSET-1))
 -#endif
++#define VMALLOC_END		0xff000000UL
  
- 	vunmap(addr);
- }
-diff --git a/arch/arm/mm/mm.h b/arch/arm/mm/mm.h
-index ad7cce3bc4..70f6d3ea48 100644
---- a/arch/arm/mm/mm.h
-+++ b/arch/arm/mm/mm.h
-@@ -21,6 +21,20 @@ const struct mem_type *get_mem_type(unsigned int type);
+ #define LIBRARY_TEXT_START	0x0c000000
  
- extern void __flush_dcache_page(struct address_space *mapping, struct page *page);
- 
-+/*
-+ * ARM specific vm_struct->flags bits.
-+ */
-+
-+/* (super)section-mapped I/O regions used by ioremap()/iounmap() */
-+#define VM_ARM_SECTION_MAPPING	0x80000000
-+
-+/* permanent static mappings from iotable_init() */
-+#define VM_ARM_STATIC_MAPPING	0x40000000
-+
-+/* mapping type (attributes) for permanent static mappings */
-+#define VM_ARM_MTYPE(mt)		((mt) << 20)
-+#define VM_ARM_MTYPE_MASK	(0x1f << 20)
-+
- #endif
- 
- #ifdef CONFIG_ZONE_DMA
 diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index 942ca8f369..acb2c7ec0a 100644
+index 0aa8b7d5b2..942ca8f369 100644
 --- a/arch/arm/mm/mmu.c
 +++ b/arch/arm/mm/mmu.c
-@@ -746,7 +746,8 @@ void __init iotable_init(struct map_desc *io_desc, int nr)
- 		vm->addr = (void *)(md->virtual & PAGE_MASK);
- 		vm->size = PAGE_ALIGN(md->length + (md->virtual & ~PAGE_MASK));
- 		vm->phys_addr = __pfn_to_phys(md->pfn); 
--		vm->flags = VM_IOREMAP;
-+		vm->flags = VM_IOREMAP | VM_ARM_STATIC_MAPPING; 
-+		vm->flags |= VM_ARM_MTYPE(md->type);
- 		vm->caller = iotable_init;
- 		vm_area_add_early(vm++);
+@@ -15,6 +15,7 @@
+ #include <linux/nodemask.h>
+ #include <linux/memblock.h>
+ #include <linux/fs.h>
++#include <linux/vmalloc.h>
+ 
+ #include <asm/cputype.h>
+ #include <asm/sections.h>
+@@ -529,13 +530,18 @@ EXPORT_SYMBOL(phys_mem_access_prot);
+ 
+ #define vectors_base()	(vectors_high() ? 0xffff0000 : 0)
+ 
+-static void __init *early_alloc(unsigned long sz)
++static void __init *early_alloc_aligned(unsigned long sz, unsigned long align)
+ {
+-	void *ptr = __va(memblock_alloc(sz, sz));
++	void *ptr = __va(memblock_alloc(sz, align));
+ 	memset(ptr, 0, sz);
+ 	return ptr;
+ }
+ 
++static void __init *early_alloc(unsigned long sz)
++{
++	return early_alloc_aligned(sz, sz);
++}
++
+ static pte_t * __init early_pte_alloc(pmd_t *pmd, unsigned long addr, unsigned long prot)
+ {
+ 	if (pmd_none(*pmd)) {
+@@ -685,9 +691,10 @@ static void __init create_mapping(struct map_desc *md)
  	}
+ 
+ 	if ((md->type == MT_DEVICE || md->type == MT_ROM) &&
+-	    md->virtual >= PAGE_OFFSET && md->virtual < VMALLOC_END) {
++	    md->virtual >= PAGE_OFFSET &&
++	    (md->virtual < VMALLOC_START || md->virtual >= VMALLOC_END)) {
+ 		printk(KERN_WARNING "BUG: mapping for 0x%08llx"
+-		       " at 0x%08lx overlaps vmalloc space\n",
++		       " at 0x%08lx out of vmalloc space\n",
+ 		       (long long)__pfn_to_phys((u64)md->pfn), md->virtual);
+ 	}
+ 
+@@ -729,18 +736,29 @@ static void __init create_mapping(struct map_desc *md)
+  */
+ void __init iotable_init(struct map_desc *io_desc, int nr)
+ {
+-	int i;
+-
+-	for (i = 0; i < nr; i++)
+-		create_mapping(io_desc + i);
++	struct map_desc *md;
++	struct vm_struct *vm;
++
++	vm = early_alloc_aligned(sizeof(*vm) * nr, __alignof__(*vm));
++
++	for (md = io_desc; nr; md++, nr--) {
++		create_mapping(md);
++		vm->addr = (void *)(md->virtual & PAGE_MASK);
++		vm->size = PAGE_ALIGN(md->length + (md->virtual & ~PAGE_MASK));
++		vm->phys_addr = __pfn_to_phys(md->pfn); 
++		vm->flags = VM_IOREMAP;
++		vm->caller = iotable_init;
++		vm_area_add_early(vm++);
++	}
+ }
+ 
+-static void * __initdata vmalloc_min = (void *)(VMALLOC_END - SZ_128M);
++static void * __initdata vmalloc_min =
++	(void *)(VMALLOC_END - (240 << 20) - VMALLOC_OFFSET);
+ 
+ /*
+  * vmalloc=size forces the vmalloc area to be exactly 'size'
+  * bytes. This can be used to increase (or decrease) the vmalloc
+- * area - the default is 128m.
++ * area - the default is 240m.
+  */
+ static int __init early_vmalloc(char *arg)
+ {
+@@ -891,10 +909,10 @@ static inline void prepare_page_table(void)
+ 
+ 	/*
+ 	 * Clear out all the kernel space mappings, except for the first
+-	 * memory bank, up to the end of the vmalloc region.
++	 * memory bank, up to the vmalloc region.
+ 	 */
+ 	for (addr = __phys_to_virt(end);
+-	     addr < VMALLOC_END; addr += PMD_SIZE)
++	     addr < VMALLOC_START; addr += PMD_SIZE)
+ 		pmd_clear(pmd_off_k(addr));
+ }
+ 
+@@ -921,8 +939,8 @@ void __init arm_mm_memblock_reserve(void)
+ }
+ 
+ /*
+- * Set up device the mappings.  Since we clear out the page tables for all
+- * mappings above VMALLOC_END, we will remove any debug device mappings.
++ * Set up the device mappings.  Since we clear out the page tables for all
++ * mappings above VMALLOC_START, we will remove any debug device mappings.
+  * This means you have to be careful how you debug this function, or any
+  * called function.  This means you can't use any function or debugging
+  * method which may touch any device, otherwise the kernel _will_ crash.
+@@ -937,7 +955,7 @@ static void __init devicemaps_init(struct machine_desc *mdesc)
+ 	 */
+ 	vectors_page = early_alloc(PAGE_SIZE);
+ 
+-	for (addr = VMALLOC_END; addr; addr += PMD_SIZE)
++	for (addr = VMALLOC_START; addr; addr += PMD_SIZE)
+ 		pmd_clear(pmd_off_k(addr));
+ 
+ 	/*
 -- 
 1.7.7.1.431.g10b2a
