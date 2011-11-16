@@ -1,72 +1,47 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Wed, 16 Nov 2011 16:30:33 +0100
-Subject: [PATCH] ARM: pxa: fix missing linux/gpio.h include
-In-Reply-To: <CAMPhdO-jKNsVnHh7m3G19wETd5+8XVkjSvyAoEANJ3rS0USaUg@mail.gmail.com>
-References: <1321454103-26596-1-git-send-email-zonque@gmail.com>
- <CAN1soZw4zPCe-VzbXjmGJ6+9yRF3H6KEPtp7kQGa3CtBPHUbfQ@mail.gmail.com>
- <CAMPhdO-jKNsVnHh7m3G19wETd5+8XVkjSvyAoEANJ3rS0USaUg@mail.gmail.com>
-Message-ID: <4EC3D719.60704@gmail.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Wed, 16 Nov 2011 15:33:05 +0000
+Subject: [PATCH 0/5] Versatile Express DT support, take 2
+In-Reply-To: <1321036026-23411-1-git-send-email-pawel.moll@arm.com>
+References: <1321036026-23411-1-git-send-email-pawel.moll@arm.com>
+Message-ID: <20111116153305.GA2073@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/16/2011 04:08 PM, Eric Miao wrote:
-> On Wed, Nov 16, 2011 at 11:03 PM, Haojian Zhuang
-> <haojian.zhuang@gmail.com> wrote:
->> On Wed, Nov 16, 2011 at 10:35 PM, Daniel Mack <zonque@gmail.com> wrote:
->>> Fixes the following compile error:
->>>
->>>  arch/arm/mach-pxa/pxa3xx.c: In function 'pxa3xx_cpu_pm_suspend':
->>>  arch/arm/mach-pxa/pxa3xx.c:156: error: implicit declaration of function 'gpio_get_value'
->>>  make[1]: *** [arch/arm/mach-pxa/pxa3xx.o] Error 1
->>>
->>> Signed-off-by: Daniel Mack <zonque@gmail.com>
->>> Cc: Haojian Zhuang <haojian.zhuang@marvell.com>
->>> Cc: Eric Miao <eric.y.miao@gmail.com>
->>> ---
->>>
->>>  I didn't closely follow all recent patches around PXA, so it might be that
->>>  this has already been cared for. Haojian?
->>>
->>>  arch/arm/mach-pxa/pxa3xx.c |    1 +
->>>  1 files changed, 1 insertions(+), 0 deletions(-)
->>>
->>> diff --git a/arch/arm/mach-pxa/pxa3xx.c b/arch/arm/mach-pxa/pxa3xx.c
->>> index 3866d52..7cddd11 100644
->>> --- a/arch/arm/mach-pxa/pxa3xx.c
->>> +++ b/arch/arm/mach-pxa/pxa3xx.c
->>> @@ -19,6 +19,7 @@
->>>  #include <linux/platform_device.h>
->>>  #include <linux/irq.h>
->>>  #include <linux/io.h>
->>> +#include <linux/gpio.h>
->>>  #include <linux/syscore_ops.h>
->>>  #include <linux/i2c/pxa-i2c.h>
->>>
->>> --
->>> 1.7.7.1
->>>
->>>
->>> _______________________________________________
->>> linux-arm-kernel mailing list
->>> linux-arm-kernel at lists.infradead.org
->>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>>
->>
->> Hi Daniel,
->>
->> At first, gpio_get_value() isn't used in arch/arm/mach-pxa/pxa3xx.c.
->>
->> Which git tree and which branch are you using now? I tried my git
->> tree, arnd/for-next, rmk/for-next. Everything is ok. I can't find any
->> build issue.
+On Fri, Nov 11, 2011 at 06:27:01PM +0000, Pawel Moll wrote:
+> Hello again,
 > 
-> Ouch! I didn't even give it a second thought to this obvious one-liner patch.
+> I've manage to clean up the VE DT patches.
+> 
+> Changes since RFC:
+> 
+> * I think I did all the changes suggested by Rob (including
+>   using "custom" clock lookups instead of auxdata - do
+>   comment, please ;-)
+> 
+> * Merged CA5s and CA9 code into one file.
+> 
+> * Added documentation for the vexpress bindings.
+> 
+> * Reorganized the tree so the "flat aliases search" patch
+>   is not longer necessary.
+> 
+> * Moved the alias node from motherboard's to tile's DTS,
+>   as this is the place to decide about serial port ordering,
+>   timers being used etc.
+> 
+> * Got the SMSC working (my fault, obviously ;-)
+> 
+> As usual - feedback more than welcome (my tests suggest
+> that the "ATAG version" still works, so feel free to test
+> at least that ;-)
 
-Gash. Not my day. We have a stupid workaround in that file that is
-buried in a very old patch. Due to recent changes in mainline, this
-doesn't build anymore, but that is something I have to keep privately.
+I haven't actually tried this code out yet, but I'm broadly in
+agreement.
 
-Thanks for the heads-up, and sorry. You can drop this patch.
+I'm happy for this series to replace my previously posted
+series, since it builds on common changes.
 
+I have a few comments on the detail -- see separate mails.
 
-Daniel
+Cheers
+---Dave
