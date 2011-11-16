@@ -1,38 +1,49 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 16 Nov 2011 17:54:15 +0000
-Subject: [PATCH v6 3/5] ARM: soft_restart: disable the outer L2 when the last
- CPU is going down
-In-Reply-To: <1321466057-19721-1-git-send-email-will.deacon@arm.com>
-References: <1321466057-19721-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1321466057-19721-4-git-send-email-will.deacon@arm.com>
+Date: Wed, 16 Nov 2011 17:54:12 +0000
+Subject: [PATCH v6 0/5] kexec fixes and soft restart code
+Message-ID: <1321466057-19721-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Soft-restarting a system with an outer, shared L2 requires us to disable
-it when no other CPUs are running.
+Hello,
 
-This patch adds an outer_disable call to soft_restart so that the last
-CPU going down will disable the L2 cache.
+This is version 6 of the patches originally posted here:
 
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/kernel/process.c |    4 ++++
- 1 files changed, 4 insertions(+), 0 deletions(-)
+v1: http://lists.infradead.org/pipermail/linux-arm-kernel/2011-June/052157.html
+v2: http://lists.infradead.org/pipermail/linux-arm-kernel/2011-June/052559.html
+v3: http://lists.infradead.org/pipermail/linux-arm-kernel/2011-June/053252.html
+v4: http://lists.infradead.org/pipermail/linux-arm-kernel/2011-August/062305.html
+v5: http://lists.infradead.org/pipermail/linux-arm-kernel/2011-November/071909.html
 
-diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
-index 577d092..664d351 100644
---- a/arch/arm/kernel/process.c
-+++ b/arch/arm/kernel/process.c
-@@ -137,6 +137,10 @@ void soft_restart(unsigned long addr)
- 	local_irq_disable();
- 	local_fiq_disable();
- 
-+	/* Disable the L2 if we're the last man standing. */
-+	if (num_online_cpus() == 1)
-+		outer_disable();
-+
- 	/* Change to the new stack and continue with the reset. */
- 	call_with_stack(__soft_restart, (void *)addr, (void *)stack);
- 
+This patch series is slightly smaller than the last post because it now
+depends on the idmap work I have posted separately here:
+
+http://lists.infradead.org/pipermail/linux-arm-kernel/2011-November/073033.html
+
+As before, this is also dependent on Russell's reset work (available in
+his reset branch).
+
+Thanks,
+
+Will
+
+
+Will Deacon (5):
+  ARM: lib: add call_with_stack function for safely changing stack
+  ARM: reset: implement soft_restart for jumping to a physical address
+  ARM: soft_restart: disable the outer L2 when the last CPU is going
+    down
+  ARM: stop: execute platform callback from cpu_stop code
+  ARM: kexec: use soft_restart for branching to the reboot buffer
+
+ arch/arm/Kconfig                |    2 +-
+ arch/arm/kernel/machine_kexec.c |   15 ++--------
+ arch/arm/kernel/process.c       |   55 ++++++++++++++++++++++++++++++--------
+ arch/arm/kernel/smp.c           |    4 +++
+ arch/arm/lib/Makefile           |    3 +-
+ arch/arm/lib/call_with_stack.S  |   44 +++++++++++++++++++++++++++++++
+ 6 files changed, 97 insertions(+), 26 deletions(-)
+ create mode 100644 arch/arm/lib/call_with_stack.S
+
 -- 
 1.7.4.1
