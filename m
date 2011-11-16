@@ -1,41 +1,29 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 16 Nov 2011 12:20:25 -0500 (EST)
-Subject: [PATCH] ARM: Use PMD_SHIFT instead of PGDIR_SHIFT in
- dma-consistent.c
-In-Reply-To: <1321461495-2860-1-git-send-email-catalin.marinas@arm.com>
-References: <1321461495-2860-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <alpine.LFD.2.02.1111161219520.3307@xanadu.home>
+From: p-combes@ti.com (Patrick Combes)
+Date: Wed, 16 Nov 2011 18:23:50 +0100
+Subject: [RFC][PATCH] gpiolib: add irq_wake (power-management) sysfs file
+In-Reply-To: <20111116143731.GG29986@opensource.wolfsonmicro.com>
+References: <1321004406-15663-1-git-send-email-p-combes@ti.com>
+ <20111115131636.GA31028@sirena.org.uk>
+ <20111116143011.GA5847@una0919255>
+ <20111116143731.GG29986@opensource.wolfsonmicro.com>
+Message-ID: <20111116172347.GC5847@una0919255>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 16 Nov 2011, Catalin Marinas wrote:
-
-> Commit 99d1717d introduces dynamic allocation of the consistent_pte
-> array. The number of PTEs should be calculated based on the number of
-> PMD entries rather than PGD, hence the PMD_SHIFT.
+On Wed, Nov 16, 2011 at 02:37:31PM +0000, Mark Brown wrote:
+> On Wed, Nov 16, 2011 at 03:30:13PM +0100, Patrick Combes wrote:
 > 
-> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Jon Medhurst <tixy@yxit.co.uk>
-> Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
-
-Acked-by: Nicolas Pitre <nico@linaro.org>
-
-
-> ---
->  arch/arm/mm/dma-mapping.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
+> > > ...this doesn't do anything to stop userspace doing multiple enables and
+> > > disables.
 > 
-> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-> index e4e7f6c..ab58456 100644
-> --- a/arch/arm/mm/dma-mapping.c
-> +++ b/arch/arm/mm/dma-mapping.c
-> @@ -168,7 +168,7 @@ static int __init consistent_init(void)
->  	pte_t *pte;
->  	int i = 0;
->  	unsigned long base = consistent_base;
-> -	unsigned long num_ptes = (CONSISTENT_END - base) >> PGDIR_SHIFT;
-> +	unsigned long num_ptes = (CONSISTENT_END - base) >> PMD_SHIFT;
->  
->  	consistent_pte = kmalloc(num_ptes * sizeof(pte_t), GFP_KERNEL);
->  	if (!consistent_pte) {
+> > Do you mean there is a need to prevent that?
+> > Basically the code above accepts both "1" or "enable" strings to enable the
+> > property. I could limit that to "enable" / "disable" if it is confusing.
 > 
+> That's not the problem.  The problem is that if you disable it might not
+> actually disable the wake if it's previously been enabled multiple times.
+
+You're right; I however wonder if this API should work as 'enable_irq_wake' or
+if it should filter multiple enables/disables. I'd have supposed it's a choice
+of implementation but based on your comment I understand filtering is the
+expected way. I'll modify the function accordingly. Thanks
