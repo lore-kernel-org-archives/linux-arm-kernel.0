@@ -1,49 +1,67 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 16 Nov 2011 23:50:24 +0000
-Subject: [PATCH] ARM: Do not call flush_cache_user_range with mmap_sem held
-In-Reply-To: <CAOesGMhWxEKUe7C4A+Xqv3RjN_u1t4k8eHWSZE4qMoBPD9=1qw@mail.gmail.com>
-References: <20111107172836.5615.64219.stgit@e102109-lin.cambridge.arm.com>
- <CAOesGMhWxEKUe7C4A+Xqv3RjN_u1t4k8eHWSZE4qMoBPD9=1qw@mail.gmail.com>
-Message-ID: <20111116235024.GH9581@n2100.arm.linux.org.uk>
+From: khilman@ti.com (Kevin Hilman)
+Date: Wed, 16 Nov 2011 15:54:36 -0800
+Subject: [PATCH] ARM: OMAP: PM: only register TWL with voltage layer when
+ device is present
+In-Reply-To: <E28AAFD00EFAA646AE3DF9B89CD24A8903E1A5@DBDE01.ent.ti.com>
+ (Sanjeev Premi's message of "Fri, 11 Nov 2011 10:21:44 +0000")
+References: <1320797670-21460-1-git-send-email-khilman@ti.com>
+ <E28AAFD00EFAA646AE3DF9B89CD24A89036E64@DBDE01.ent.ti.com>
+ <8762irg73n.fsf@ti.com>
+ <E28AAFD00EFAA646AE3DF9B89CD24A8903E1A5@DBDE01.ent.ti.com>
+Message-ID: <874ny37hdv.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 16, 2011 at 01:23:02PM -0800, Olof Johansson wrote:
-> Agreed. Russell, please consider picking this up -- the bug is very
-> real and it sounds like the objection is vague.
+"Premi, Sanjeev" <premi@ti.com> writes:
 
-No, it isn't.  It's creating an unsafe situation.  If we're going to do
-this, we might as well give up on architecture correctness because we're
-throwing out locking correctness.
+>  
+>
+>> -----Original Message-----
+>> From: Hilman, Kevin 
+>> Sent: Friday, November 11, 2011 12:04 AM
+>> To: Premi, Sanjeev
+>> Cc: linux-omap at vger.kernel.org; 
+>> linux-arm-kernel at lists.infradead.org; Koyamangalath, Abhilash
+>> Subject: Re: [PATCH] ARM: OMAP: PM: only register TWL with 
+>> voltage layer when device is present
+>> 
+>> "Premi, Sanjeev" <premi@ti.com> writes:
+>> 
+>> >> Current code registers voltage layer details for TWL PMIC 
+>> even when a
+>> >> TWL has not been registered.  Fix this to only register 
+>> the TWL with
+>> >> voltage layer when the TWL PMIC is initialized by board-level code.
+>> >> 
+>> >> Signed-off-by: Kevin Hilman <khilman@ti.com>
+>> 
+>> [...]
+>> 
+>> > I have been out-of-loop from PM for some time. So my query may be
+>> > redundant:
+>> >
+>> > 1) What happens when different PMIC (not TWL series) is registered
+>> >    for AM35x? e.g. TPS65023
+>> >    http://www.spinics.net/lists/linux-omap/msg48630.html
+>> >
+>> > 2) Wouldn't we still fall back into omap3_twl_init()?
+>> 
+>> I'm not sure I follow the question.
+>> 
+>> If you're not using a TWL PMIC (or similar derivative) then
+>> omap*_twl_init() should not be called.
+>> 
+>> If you are using a TWL PMIC, then no, the omap*_twl_init functions
+>> should not be called.
+>
+> When I read this function (in the patch), if pmic_i2c_board_info.irq
+> is non-zero, omap3_twl_init() and omap4_twl_init() are called.
+>
+> So my question was, for the case when PMIC is not TWL family. Then,
+> is checking ".irq" sufficient to prevent the execution of twl specific
+> functions.
 
-1. We look up the VMA.
-2. We pass the VMA to the cache operation.
-3. The cache operation dereferences the VMA to obtain the VMA flags.
+If PMIC is not TWL family, then I don't expect any functions in
+twl_common.c to be called.
 
-If something else happens to modify the VMA (eg, a concurrent mremap or
-munmap) then without locking, we could end up dereferencing something
-that is no longer the VMA we thought we had.
-
-Plus, consider that the VMA list is modifyable while the mmap_sem is not
-held - do we really want to see the effects of having find_vma() being
-preempted having loaded a vm_next pointer, another thread coming in,
-modifying the VMA list (possibly deleting the next vma), that memory being
-reallocated to something else, and then we resume and fall off the VMA
-list and possibly OOPS because we've accessed what we thought was the
-next vm_next pointer but it wasn't?
-
-While we can say "an application should not do that" that's not a reason
-to ignore this problem and just delete all the locking in the hope that
-we'll always have well behaving applications.
-
-So, it's *totally* unsafe to delete the locking here.
-
-The requirement is that the mmap_sem must be held while you expect to
-hold any reference to a vm_area_struct.  There's no exceptions to that.
-
-One solution to this is to use pagefault_disable()...pagefault_enable()
-around the cache operation, so that faults just cause us to skip to the
-next page.  The down-side to that is that pagefault_disable() makes us
-non-preemptible while performing the cache operation.  However, we can
-work around that by performing the cache handling in appropriately sized
-chunks.
+Kevin
