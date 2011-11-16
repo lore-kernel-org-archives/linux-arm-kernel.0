@@ -1,61 +1,93 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Wed, 16 Nov 2011 23:08:09 +0800
-Subject: [PATCH] ARM: pxa: fix missing linux/gpio.h include
-In-Reply-To: <CAN1soZw4zPCe-VzbXjmGJ6+9yRF3H6KEPtp7kQGa3CtBPHUbfQ@mail.gmail.com>
-References: <1321454103-26596-1-git-send-email-zonque@gmail.com>
- <CAN1soZw4zPCe-VzbXjmGJ6+9yRF3H6KEPtp7kQGa3CtBPHUbfQ@mail.gmail.com>
-Message-ID: <CAMPhdO-jKNsVnHh7m3G19wETd5+8XVkjSvyAoEANJ3rS0USaUg@mail.gmail.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Wed, 16 Nov 2011 16:14:40 +0100
+Subject: [PATCH 1/3] ARM: omap_device: handle first time activation of
+ console device
+In-Reply-To: <4EC3CDC4.7000108@gmail.com>
+References: <1321441346-19591-1-git-send-email-rnayak@ti.com>
+ <1321441346-19591-2-git-send-email-rnayak@ti.com>
+ <4EC3CDC4.7000108@gmail.com>
+Message-ID: <4EC3D360.8000800@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 16, 2011 at 11:03 PM, Haojian Zhuang
-<haojian.zhuang@gmail.com> wrote:
-> On Wed, Nov 16, 2011 at 10:35 PM, Daniel Mack <zonque@gmail.com> wrote:
->> Fixes the following compile error:
->>
->> ?arch/arm/mach-pxa/pxa3xx.c: In function 'pxa3xx_cpu_pm_suspend':
->> ?arch/arm/mach-pxa/pxa3xx.c:156: error: implicit declaration of function 'gpio_get_value'
->> ?make[1]: *** [arch/arm/mach-pxa/pxa3xx.o] Error 1
->>
->> Signed-off-by: Daniel Mack <zonque@gmail.com>
->> Cc: Haojian Zhuang <haojian.zhuang@marvell.com>
->> Cc: Eric Miao <eric.y.miao@gmail.com>
->> ---
->>
->> ?I didn't closely follow all recent patches around PXA, so it might be that
->> ?this has already been cared for. Haojian?
->>
->> ?arch/arm/mach-pxa/pxa3xx.c | ? ?1 +
->> ?1 files changed, 1 insertions(+), 0 deletions(-)
->>
->> diff --git a/arch/arm/mach-pxa/pxa3xx.c b/arch/arm/mach-pxa/pxa3xx.c
->> index 3866d52..7cddd11 100644
->> --- a/arch/arm/mach-pxa/pxa3xx.c
->> +++ b/arch/arm/mach-pxa/pxa3xx.c
->> @@ -19,6 +19,7 @@
->> ?#include <linux/platform_device.h>
->> ?#include <linux/irq.h>
->> ?#include <linux/io.h>
->> +#include <linux/gpio.h>
->> ?#include <linux/syscore_ops.h>
->> ?#include <linux/i2c/pxa-i2c.h>
->>
->> --
->> 1.7.7.1
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>
->
-> Hi Daniel,
->
-> At first, gpio_get_value() isn't used in arch/arm/mach-pxa/pxa3xx.c.
->
-> Which git tree and which branch are you using now? I tried my git
-> tree, arnd/for-next, rmk/for-next. Everything is ok. I can't find any
-> build issue.
+Hi Rob,
 
-Ouch! I didn't even give it a second thought to this obvious one-liner patch.
+On 11/16/2011 3:50 PM, Rob Herring wrote:
+> On 11/16/2011 05:02 AM, Rajendra Nayak wrote:
+>> console device on OMAP is never reset or idled by hwmod post
+>> initial setup, early during boot, for obvious reasons not to
+>> break early debug prints thrown on console.
+>> This leaves the console device enabled at boot and the first activation
+>> of it using hwmod needs to be handled in such a way that a disable is
+>> called followed by an enable of the hwmod, the subsequent activations
+>> can then use the default activation technique.
+>>
+>> To handle this add a new binding to identify a hwmod which is used as
+>> the console device.
+>>
+>> This patch is based on the what is done in serial.c for non-DT builds.
+>>
+>> Signed-off-by: Rajendra Nayak<rnayak@ti.com>
+>> ---
+>>   .../devicetree/bindings/arm/omap/omap.txt          |    1 +
+>>   arch/arm/plat-omap/omap_device.c                   |   33 +++++++++++++++++++-
+>>   2 files changed, 33 insertions(+), 1 deletions(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/arm/omap/omap.txt b/Documentation/devicetree/bindings/arm/omap/omap.txt
+>> index dbdab40..46ffd41 100644
+>> --- a/Documentation/devicetree/bindings/arm/omap/omap.txt
+>> +++ b/Documentation/devicetree/bindings/arm/omap/omap.txt
+>> @@ -21,6 +21,7 @@ Required properties:
+>>   Optional properties:
+>>   - ti,no_idle_on_suspend: When present, it prevents the PM to idle the module
+>>     during suspend.
+>> +- ti,console_hwmod: boolean, identifies the hwmod used as console device
+>>
+>
+> This doesn't seem right. Which console is not a h/w property. Why can't
+> you use aliases like other platforms are doing?
+>
+> Also, it's not clear in the documentation where this (and
+> ti,no_idle_on_suspend) should go in the DT. Both seem like they should
+> be kernel cmdline params.
+
+That raise the question about using DT to pass linux specific parameter.
+We already discuss that on the mailing list, but never get a clear answer.
+It seems that DT is already used to provide some OS specific information 
+using the "linux," prefix for example.
+
+There are clearly a couple of parameters that can be provided by the 
+bootloader, but that does not reflect a HW property.
+
+So what is the guideline for that, should we stick to cmdline params for 
+that?
+
+Quoting Grant's documentation, runtime configuration is supported:
+
+"Runtime configuration
+
+In most cases, a DT will be the sole method of communicating data from 
+firmware to the kernel, so also gets used to pass in runtime and 
+configuration data like the kernel parameters string and the location of 
+an initrd image.
+
+Most of this data is contained in the /chosen node, and when booting 
+Linux it will look something like this:
+
+	chosen {
+		bootargs = "console=ttyS0,115200 loglevel=8";
+		initrd-start = <0xc8000000>;
+		initrd-end = <0xc8200000>;
+	};
+
+The bootargs property contains the kernel arguments, and the initrd-* 
+properties define the address and size of an initrd blob. The chosen 
+node may also optionally contain an arbitrary number of additional 
+properties for platform-specific configuration data."
+
+
+Does that mean that this is supported only if the bootloader does not 
+support cmdline?
+
+Thanks,
+Benoit
