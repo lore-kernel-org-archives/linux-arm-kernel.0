@@ -1,116 +1,141 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 16 Nov 2011 09:41:49 -0600
-Subject: [PATCH 1/3] ARM: omap_device: handle first time activation of
- console device
-In-Reply-To: <4EC3D360.8000800@ti.com>
-References: <1321441346-19591-1-git-send-email-rnayak@ti.com>
- <1321441346-19591-2-git-send-email-rnayak@ti.com>
- <4EC3CDC4.7000108@gmail.com> <4EC3D360.8000800@ti.com>
-Message-ID: <4EC3D9BD.2080107@gmail.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Wed, 16 Nov 2011 15:42:30 +0000
+Subject: [PATCH 4/5] ARM: vexpress: Initial RS1 memory map support
+In-Reply-To: <1321036026-23411-5-git-send-email-pawel.moll@arm.com>
+References: <1321036026-23411-1-git-send-email-pawel.moll@arm.com>
+ <1321036026-23411-5-git-send-email-pawel.moll@arm.com>
+Message-ID: <20111116154230.GD2073@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Benoit,
+On Fri, Nov 11, 2011 at 06:27:05PM +0000, Pawel Moll wrote:
+> This patch adds support for RS1 memory map based Versatile Express
+> motherboard. As the RAM location has changed, the ZRE values and
+> PLAT_PHYS_OFFSET defaults are changed to the new address (all
+> future tiles will use RS1 map) and enforces AUTO_ZRELADD and
+> ARM_PATCH_PHYS_VIRT when legacy devices are being used.
+> 
+> Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+> ---
+>  arch/arm/boot/dts/vexpress-v2m-rs1.dtsi           |  190 +++++++++++++++++++++
+>  arch/arm/mach-vexpress/Kconfig                    |    9 +
+>  arch/arm/mach-vexpress/Makefile.boot              |    6 +-
+>  arch/arm/mach-vexpress/include/mach/debug-macro.S |   37 ++++-
+>  arch/arm/mach-vexpress/include/mach/uncompress.h  |   13 ++-
+>  arch/arm/mach-vexpress/v2m.c                      |   46 +++++
+>  6 files changed, 293 insertions(+), 8 deletions(-)
+>  create mode 100644 arch/arm/boot/dts/vexpress-v2m-rs1.dtsi
 
-On 11/16/2011 09:14 AM, Cousson, Benoit wrote:
-> Hi Rob,
-> 
-> On 11/16/2011 3:50 PM, Rob Herring wrote:
->> On 11/16/2011 05:02 AM, Rajendra Nayak wrote:
->>> console device on OMAP is never reset or idled by hwmod post
->>> initial setup, early during boot, for obvious reasons not to
->>> break early debug prints thrown on console.
->>> This leaves the console device enabled at boot and the first activation
->>> of it using hwmod needs to be handled in such a way that a disable is
->>> called followed by an enable of the hwmod, the subsequent activations
->>> can then use the default activation technique.
->>>
->>> To handle this add a new binding to identify a hwmod which is used as
->>> the console device.
->>>
->>> This patch is based on the what is done in serial.c for non-DT builds.
->>>
->>> Signed-off-by: Rajendra Nayak<rnayak@ti.com>
->>> ---
->>>   .../devicetree/bindings/arm/omap/omap.txt          |    1 +
->>>   arch/arm/plat-omap/omap_device.c                   |   33
->>> +++++++++++++++++++-
->>>   2 files changed, 33 insertions(+), 1 deletions(-)
->>>
->>> diff --git a/Documentation/devicetree/bindings/arm/omap/omap.txt
->>> b/Documentation/devicetree/bindings/arm/omap/omap.txt
->>> index dbdab40..46ffd41 100644
->>> --- a/Documentation/devicetree/bindings/arm/omap/omap.txt
->>> +++ b/Documentation/devicetree/bindings/arm/omap/omap.txt
->>> @@ -21,6 +21,7 @@ Required properties:
->>>   Optional properties:
->>>   - ti,no_idle_on_suspend: When present, it prevents the PM to idle
->>> the module
->>>     during suspend.
->>> +- ti,console_hwmod: boolean, identifies the hwmod used as console
->>> device
->>>
->>
->> This doesn't seem right. Which console is not a h/w property. Why can't
->> you use aliases like other platforms are doing?
->>
->> Also, it's not clear in the documentation where this (and
->> ti,no_idle_on_suspend) should go in the DT. Both seem like they should
->> be kernel cmdline params.
-> 
-> That raise the question about using DT to pass linux specific parameter.
-> We already discuss that on the mailing list, but never get a clear answer.
-> It seems that DT is already used to provide some OS specific information
-> using the "linux," prefix for example.
+[...]
 
-True, but "linux," properties will always face resistance and scrutiny.
+> diff --git a/arch/arm/mach-vexpress/Kconfig b/arch/arm/mach-vexpress/Kconfig
+> index 4c11e90..d1b0f35 100644
+> --- a/arch/arm/mach-vexpress/Kconfig
+> +++ b/arch/arm/mach-vexpress/Kconfig
+> @@ -1,6 +1,14 @@
+>  menu "Versatile Express platform type"
+>  	depends on ARCH_VEXPRESS
+> +config ARCH_VEXPRESS_LEGACY
 
-> There are clearly a couple of parameters that can be provided by the
-> bootloader, but that does not reflect a HW property.
-> 
-> So what is the guideline for that, should we stick to cmdline params for
-> that?
-> 
+Brief comment explaining what this is?
 
-I would say that if the setting does not depend on something in the DT,
-then the cmdline is the right place. If you have a property that
-references a phandle, then it can't be on the cmdline. For console
-selection, there is already a defined way to select it with
-console=blah. And there is an agreed way to define indexes in the DT
-with aliases.
+> +	bool
+> +	select AUTO_ZRELADDR
+> +	select ARM_PATCH_PHYS_VIRT
+> +
+> +config ARCH_VEXPRESS_RS1
 
-How were these properties set without DT?
+Ditto
 
-> Quoting Grant's documentation, runtime configuration is supported:
-> 
-> "Runtime configuration
-> 
-> In most cases, a DT will be the sole method of communicating data from
-> firmware to the kernel, so also gets used to pass in runtime and
-> configuration data like the kernel parameters string and the location of
-> an initrd image.
-> 
-> Most of this data is contained in the /chosen node, and when booting
-> Linux it will look something like this:
-> 
->     chosen {
->         bootargs = "console=ttyS0,115200 loglevel=8";
->         initrd-start = <0xc8000000>;
->         initrd-end = <0xc8200000>;
->     };
-> 
-> The bootargs property contains the kernel arguments, and the initrd-*
-> properties define the address and size of an initrd blob. The chosen
-> node may also optionally contain an arbitrary number of additional
-> properties for platform-specific configuration data."
-> 
-> 
-> Does that mean that this is supported only if the bootloader does not
-> support cmdline?
+> +	bool
+> +
+>  config ARCH_VEXPRESS_CA9X4
+>  	bool "Versatile Express Cortex-A9x4 tile"
+>  	select CPU_V7
+> @@ -8,6 +16,7 @@ config ARCH_VEXPRESS_CA9X4
+>  	select ARM_ERRATA_720789
+>  	select ARM_ERRATA_751472
+>  	select ARM_ERRATA_753970
+> +	select ARCH_VEXPRESS_LEGACY
 
-No. I think it means chosen can be extended. However, how many other
-chosen properties are defined? Not very many. Clearly, it's not a place
-for adding whatever random property you want. chosen is really the boot
-interface between the bootloader and kernel as it is ATAG type data.
+We should add a brief note to the help text explaining the existence
+of the new combined A9x4/A5x2 DT based support, if were planning to
+keep both variants.  (Probably wise for now, since people may be
+temporarily stuck old bootloaders etc.)
 
-Rob
+If there is no help text yet, we should add some, but it should be
+kept brief.
+
+[...]
+
+> diff --git a/arch/arm/mach-vexpress/include/mach/debug-macro.S b/arch/arm/mach-vexpress/include/mach/debug-macro.S
+> index fd9e6c7..adc94ce 100644
+> --- a/arch/arm/mach-vexpress/include/mach/debug-macro.S
+> +++ b/arch/arm/mach-vexpress/include/mach/debug-macro.S
+> @@ -10,12 +10,41 @@
+>   * published by the Free Software Foundation.
+>   */
+>  
+> -#define DEBUG_LL_UART_OFFSET	0x00009000
+> +#define VEXPRESS_PHYS_BASE_LEGACY	0x10000000
+> +#define VEXPRESS_UART_OFFSET_LEGACY	0x00009000
+> +
+> +#define VEXPRESS_PHYS_BASE_RS1		0x1c000000
+> +#define VEXPRESS_UART_OFFSET_RS1	0x00090000
+> +
+> +#define VEXPRESS_VIRT_BASE		0xf8000000
+>  
+>  		.macro	addruart,rp,rv,tmp
+> -		mov	\rp, #DEBUG_LL_UART_OFFSET
+> -		orr	\rv, \rp, #0xf8000000	@ virtual base
+> -		orr	\rp, \rp, #0x10000000	@ physical base
+> +
+> +		@ Check the MMU state
+> +#if defined(CONFIG_MMU)
+> +		mrc	p15, 0, \tmp, c1, c0	@ SCTRL
+> +		tst	\tmp, #1		@ MMU enabled?
+> +		moveq	\tmp, #VEXPRESS_PHYS_BASE_LEGACY
+> +		movne	\tmp, #VEXPRESS_VIRT_BASE
+> +#else
+> +		mov	\tmp, #VEXPRESS_PHYS_BASE_LEGACY
+> +#endif
+> +
+> +		@ PL011 present in "legacy place"?
+> +		orr	\tmp, \tmp, #VEXPRESS_UART_OFFSET_LEGACY
+> +		ldr	\tmp, [\tmp, #0xfe0]	@ PeriphID0
+> +		teq	\tmp, #0x11		@ PL011
+> +
+> +		@ Legacy memory map
+> +		moveq	\rp, #VEXPRESS_UART_OFFSET_LEGACY
+> +		orreq	\rv, \rp, #VEXPRESS_VIRT_BASE
+> +		orreq	\rp, \rp, #VEXPRESS_PHYS_BASE_LEGACY
+> +
+> +		@ RS1 memory map
+> +		movne	\rp, #VEXPRESS_UART_OFFSET_RS1
+> +		orrne	\rv, \rp, #VEXPRESS_VIRT_BASE
+> +		orrne	\rp, \rp, #VEXPRESS_PHYS_BASE_RS1
+
+I will assume that this works :)
+
+Without grokking the detail, it looks fairly reasonable.
+
+[...]
+
+> diff --git a/arch/arm/mach-vexpress/v2m.c b/arch/arm/mach-vexpress/v2m.c
+
+[...]
+
+>  void __init v2m_dt_init_early(void)
+> @@ -601,6 +643,10 @@ static struct of_dev_auxdata v2m_dt_auxdata_lookup[] __initdata = {
+>  	OF_DEV_AUXDATA("arm,vexpress-flash", V2M_NOR0, "physmap-flash",
+>  			&v2m_flash_data),
+>  	OF_DEV_AUXDATA("arm,primecell", V2M_MMCI, "mb:mmci", &v2m_mmci_data),
+> +	/* RS1 memory map */
+> +	OF_DEV_AUXDATA("arm,vexpress-flash", 0x08000000, "physmap-flash",
+> +			&v2m_flash_data),
+> +	OF_DEV_AUXDATA("arm,primecell", 0x1c050000, "mb:mmci", &v2m_mmci_data),
+
+Can we have macros instead of the magic numbers here?
+
+Cheers
+---Dave
