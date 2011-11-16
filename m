@@ -1,49 +1,54 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 16 Nov 2011 17:54:12 +0000
-Subject: [PATCH v6 0/5] kexec fixes and soft restart code
-Message-ID: <1321466057-19721-1-git-send-email-will.deacon@arm.com>
+Date: Wed, 16 Nov 2011 17:54:16 +0000
+Subject: [PATCH v6 4/5] ARM: stop: execute platform callback from cpu_stop code
+In-Reply-To: <1321466057-19721-1-git-send-email-will.deacon@arm.com>
+References: <1321466057-19721-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1321466057-19721-5-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Sending IPI_CPU_STOP to a CPU causes it to execute a busy cpu_relax
+loop forever. This makes it impossible to kexec successfully on an SMP
+system since the secondary CPUs do not reset.
 
-This is version 6 of the patches originally posted here:
+This patch adds a callback to platform_cpu_kill, defined when
+CONFIG_HOTPLUG_CPU=y, from the ipi_cpu_stop handling code. This function
+currently just returns 1 on all platforms that define it but allows them
+to do something more sophisticated in the future.
 
-v1: http://lists.infradead.org/pipermail/linux-arm-kernel/2011-June/052157.html
-v2: http://lists.infradead.org/pipermail/linux-arm-kernel/2011-June/052559.html
-v3: http://lists.infradead.org/pipermail/linux-arm-kernel/2011-June/053252.html
-v4: http://lists.infradead.org/pipermail/linux-arm-kernel/2011-August/062305.html
-v5: http://lists.infradead.org/pipermail/linux-arm-kernel/2011-November/071909.html
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/Kconfig      |    2 +-
+ arch/arm/kernel/smp.c |    4 ++++
+ 2 files changed, 5 insertions(+), 1 deletions(-)
 
-This patch series is slightly smaller than the last post because it now
-depends on the idmap work I have posted separately here:
-
-http://lists.infradead.org/pipermail/linux-arm-kernel/2011-November/073033.html
-
-As before, this is also dependent on Russell's reset work (available in
-his reset branch).
-
-Thanks,
-
-Will
-
-
-Will Deacon (5):
-  ARM: lib: add call_with_stack function for safely changing stack
-  ARM: reset: implement soft_restart for jumping to a physical address
-  ARM: soft_restart: disable the outer L2 when the last CPU is going
-    down
-  ARM: stop: execute platform callback from cpu_stop code
-  ARM: kexec: use soft_restart for branching to the reboot buffer
-
- arch/arm/Kconfig                |    2 +-
- arch/arm/kernel/machine_kexec.c |   15 ++--------
- arch/arm/kernel/process.c       |   55 ++++++++++++++++++++++++++++++--------
- arch/arm/kernel/smp.c           |    4 +++
- arch/arm/lib/Makefile           |    3 +-
- arch/arm/lib/call_with_stack.S  |   44 +++++++++++++++++++++++++++++++
- 6 files changed, 97 insertions(+), 26 deletions(-)
- create mode 100644 arch/arm/lib/call_with_stack.S
-
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 44789ef..796d8cc 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1989,7 +1989,7 @@ config XIP_PHYS_ADDR
+ 
+ config KEXEC
+ 	bool "Kexec system call (EXPERIMENTAL)"
+-	depends on EXPERIMENTAL
++	depends on EXPERIMENTAL && (!SMP || HOTPLUG_CPU)
+ 	help
+ 	  kexec is a system call that implements the ability to shutdown your
+ 	  current kernel, and to start another kernel.  It is like a reboot
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index ef5640b..9c71665 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -550,6 +550,10 @@ static void ipi_cpu_stop(unsigned int cpu)
+ 	local_fiq_disable();
+ 	local_irq_disable();
+ 
++#ifdef CONFIG_HOTPLUG_CPU
++	platform_cpu_kill(cpu);
++#endif
++
+ 	while (1)
+ 		cpu_relax();
+ }
 -- 
 1.7.4.1
