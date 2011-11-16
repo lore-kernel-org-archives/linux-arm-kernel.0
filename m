@@ -1,68 +1,106 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Wed, 16 Nov 2011 12:25:11 -0500 (EST)
-Subject: [PATCH 3/5] [orion] Move address map setup out of the drivers and
- into platform.
-In-Reply-To: <20111116164955.GA18497@lunn.ch>
-References: <1321128007-3520-1-git-send-email-andrew@lunn.ch>
- <1321128007-3520-4-git-send-email-andrew@lunn.ch>
- <alpine.LFD.2.02.1111141855340.3307@xanadu.home>
- <20111115074122.GA2012@lunn.ch>
- <alpine.LFD.2.02.1111151648150.3307@xanadu.home>
- <20111116065940.GH2953@lunn.ch>
- <alpine.LFD.2.02.1111160951060.3307@xanadu.home>
- <20111116164955.GA18497@lunn.ch>
-Message-ID: <alpine.LFD.2.02.1111161221290.3307@xanadu.home>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Wed, 16 Nov 2011 17:28:15 +0000
+Subject: [PATCH 1/5] ARM: vexpress: Get rid of MMIO_P2V
+In-Reply-To: <1321460205.3137.352.camel@hornet.cambridge.arm.com>
+References: <1321036026-23411-1-git-send-email-pawel.moll@arm.com>
+ <1321036026-23411-2-git-send-email-pawel.moll@arm.com>
+ <20111116153516.GB2073@localhost.localdomain>
+ <1321460205.3137.352.camel@hornet.cambridge.arm.com>
+Message-ID: <20111116172815.GF2073@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 16 Nov 2011, Andrew Lunn wrote:
-
-> > > How would you suggest using IORESOURCE_BUS? 
+On Wed, Nov 16, 2011 at 04:16:45PM +0000, Pawel Moll wrote:
+> On Wed, 2011-11-16 at 15:35 +0000, Dave Martin wrote:
+> > On Fri, Nov 11, 2011 at 06:27:02PM +0000, Pawel Moll wrote:
+> > > This patch gets rid of the MMIO_P2V and __MMPIO_P2V macros,
+> > > defining constant virtual base for motherboard and tile
+> > > peripherals instead.
+> > > 
+> > > Additionally, in preparation for the new motherboard memory
+> > > map, the motherboard peripherals are using base pointers
+> > > calculated in runtime, instead of compile-time calculated
+> > > values.
+> > > 
+> > > Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+> > > ---
+> > >  arch/arm/include/asm/hardware/arm_timer.h         |    5 ++
+> > >  arch/arm/mach-vexpress/core.h                     |   12 +++-
+> > >  arch/arm/mach-vexpress/ct-ca9x4.c                 |   52 ++++-------------
+> > >  arch/arm/mach-vexpress/include/mach/ct-ca9x4.h    |   13 ++---
+> > >  arch/arm/mach-vexpress/include/mach/motherboard.h |   53 ++++++++---------
+> > >  arch/arm/mach-vexpress/platsmp.c                  |    4 +-
+> > >  arch/arm/mach-vexpress/v2m.c                      |   64 ++++++++++++++-------
+> > >  7 files changed, 100 insertions(+), 103 deletions(-)
 > > 
-> > Looking at it closer, I don't think simple resource ranges would be 
-> > suitable after all.
+> > [...]
 > > 
-> > I would therefore suggest the following starting point:
-> > 
-> > diff --git a/include/linux/mbus.h b/include/linux/mbus.h
-> > index c11ff29325..2d8989c6e4 100644
-> > --- a/include/linux/mbus.h
-> > +++ b/include/linux/mbus.h
-> > @@ -32,5 +32,17 @@ struct mbus_dram_target_info
-> >  	} cs[4];
-> >  };
-> >  
-> > +/* 
-> > + * The Marvell mbus is to be found only on SOCs from the Orion family
-> > + * at the moment.  Provide a dummy stub for other architectures.
-> > + */
-> > +#ifdef CONFIG_PLAT_ORION
-> > +extern const struct mbus_dram_target_info *mrvl_mbus_dram_info(void);
-> > +#else
-> > +static inline const struct mbus_dram_target_info *mrvl_mbus_dram_info(void)
-> > +{
-> > +	return NULL;
-> > +}
-> > +#endif
-> >  
-> >  #endif
-> > 
+> > > diff --git a/arch/arm/mach-vexpress/ct-ca9x4.c b/arch/arm/mach-vexpress/ct-ca9x4.c
+> > > index 2b1e836..47c0733 100644
+> > > --- a/arch/arm/mach-vexpress/ct-ca9x4.c
+> > > +++ b/arch/arm/mach-vexpress/ct-ca9x4.c
+> > > @@ -30,57 +30,26 @@
+> > >  
+> > >  #include <plat/clcd.h>
+> > >  
+> > > -#define V2M_PA_CS7	0x10000000
+> > > -
+> > >  static struct map_desc ct_ca9x4_io_desc[] __initdata = {
+> > >  	{
+> > > -		.virtual	= __MMIO_P2V(CT_CA9X4_MPIC),
+> > > -		.pfn		= __phys_to_pfn(CT_CA9X4_MPIC),
+> > > -		.length		= SZ_16K,
+> > > -		.type		= MT_DEVICE,
+> > > +		.virtual        = V2T_PERIPH,
+> > > +		.pfn            = __phys_to_pfn(CT_CA9X4_MPIC),
+> > > +		.length         = SZ_8K,
+> >
+> > Can you explain the size change?
 > 
-> So you are suggesting each mach-* implements this function and returns
-> its specific *_dram_target_info structure? Four functions which are
-> virtually identical. I would probably just have orion_dram_target_info
-> in the plat-orion which all mach-* use and one implementation of this
-> function in plat-oriom.
+> The SCU's "Private memory region" is 8K big, not 16:
+> 
+> http://infocenter.arm.com/help/topic/com.arm.doc.ddi0407g/CACCJFCJ.html
+> http://infocenter.arm.com/help/topic/com.arm.doc.dui0448e/CHDCBJCB.html
 
-OK then, let's see how this would look like.
+OK, so that's just tidyup of an oversized mapping.  Fair enough.
 
-> I'm just trying to move towards device tree. *_dram_target_info is one
-> thing which is blocking this move. The second maybe the clock
-> speed. It would be nice to move to clkdev, and remove clk from the
-> platform_data structures.
+> 
+> > > diff --git a/arch/arm/mach-vexpress/v2m.c b/arch/arm/mach-vexpress/v2m.c
+> > > index 1fafc32..b84fa45 100644
+> > > --- a/arch/arm/mach-vexpress/v2m.c
+> > > +++ b/arch/arm/mach-vexpress/v2m.c
+> > 
+> > [...]
+> > 
+> > > @@ -413,6 +431,10 @@ static void __init v2m_populate_ct_desc(void)
+> > >  static void __init v2m_map_io(void)
+> > >  {
+> > >  	iotable_init(v2m_io_desc, ARRAY_SIZE(v2m_io_desc));
+> > > +
+> > > +	/* Will become an ioremap() when possible */
+> > > +	v2m_sysreg_base = V2M_PERIPH_P2V(V2M_SYSREGS);
+> > 
+> > linux/of_fdt.h has functions for manipulating the flattened device tree
+> > blob.
+> > 
+> > Could that solve our problem?  We just need to get the root node compatible
+> > property out.
+> 
+> What do you exaclty mean? This function is non-DT related. It's not used
+> by DT platform at all...
 
-Absolutely!  And that would allow for turning on/off the various clocks 
-dynamically with actual driver usage.
+I failed to notice that-- if this function isn't used at all for the DT case,
+then I guess this isn't important.
 
+> > Is there anything else blocking the building of legacy and RS1 memory
+> > maps into a single kernel?
+> > (I'm still hazy on how all the remapping stuff works, myself.)
+> 
+> This works now - I have a single binary kernel that works on both A9 and
+> A5 coretiles. Of course the ATAG-based support works with A9 only.
 
-Nicolas
+Cool -- we should get Ryan and Tixy to try it out, if they haven't already.
+I don't have an A5 handy...
+
+Cheers
+---Dave
