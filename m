@@ -1,70 +1,39 @@
 From: nico@fluxnic.net (Nicolas Pitre)
-Date: Wed, 16 Nov 2011 00:48:22 -0500
-Subject: [PATCH 04/23] ARM: mach-at91: remove arch specific special handling
- for ioremap
+Date: Wed, 16 Nov 2011 00:48:20 -0500
+Subject: [PATCH 02/23] ARM: mach-prima2: don't define SIRFSOC_VA in terms of
+ VMALLOC_END
 In-Reply-To: <1321422521-1138-1-git-send-email-nico@fluxnic.net>
 References: <1321422521-1138-1-git-send-email-nico@fluxnic.net>
-Message-ID: <1321422521-1138-5-git-send-email-nico@fluxnic.net>
+Message-ID: <1321422521-1138-3-git-send-email-nico@fluxnic.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Nicolas Pitre <nicolas.pitre@linaro.org>
 
-A generic version should replace this later.
+... since it is going to change.
 
 Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+Tested-by: Barry Song <baohua.song@csr.com>
 ---
- arch/arm/mach-at91/include/mach/io.h |    8 --------
- arch/arm/mach-at91/setup.c           |   18 ------------------
- 2 files changed, 0 insertions(+), 26 deletions(-)
+ arch/arm/mach-prima2/include/mach/map.h |    6 ++++--
+ 1 files changed, 4 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-at91/include/mach/io.h b/arch/arm/mach-at91/include/mach/io.h
-index 4298e7806c..4ca09ef7ca 100644
---- a/arch/arm/mach-at91/include/mach/io.h
-+++ b/arch/arm/mach-at91/include/mach/io.h
-@@ -30,14 +30,6 @@
+diff --git a/arch/arm/mach-prima2/include/mach/map.h b/arch/arm/mach-prima2/include/mach/map.h
+index 66b1ae2e55..6f24353257 100644
+--- a/arch/arm/mach-prima2/include/mach/map.h
++++ b/arch/arm/mach-prima2/include/mach/map.h
+@@ -9,8 +9,10 @@
+ #ifndef __MACH_PRIMA2_MAP_H__
+ #define __MACH_PRIMA2_MAP_H__
  
- #ifndef __ASSEMBLY__
+-#include <mach/vmalloc.h>
++#include <linux/const.h>
  
--#ifndef CONFIG_ARCH_AT91X40
--#define __arch_ioremap	at91_ioremap
--#define __arch_iounmap	at91_iounmap
--#endif
--
--void __iomem *at91_ioremap(unsigned long phys, size_t size, unsigned int type);
--void at91_iounmap(volatile void __iomem *addr);
--
- static inline unsigned int at91_sys_read(unsigned int reg_offset)
- {
- 	void __iomem *addr = (void __iomem *)AT91_VA_BASE_SYS;
-diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
-index aa64294c7d..cf98a8f94d 100644
---- a/arch/arm/mach-at91/setup.c
-+++ b/arch/arm/mach-at91/setup.c
-@@ -73,24 +73,6 @@ static struct map_desc at91_io_desc __initdata = {
- 	.type		= MT_DEVICE,
- };
+-#define SIRFSOC_VA(x)			(VMALLOC_END + ((x) & 0x00FFF000))
++#define SIRFSOC_VA_BASE		_AC(0xFEC00000, UL)
++
++#define SIRFSOC_VA(x)		(SIRFSOC_VA_BASE + ((x) & 0x00FFF000))
  
--void __iomem *at91_ioremap(unsigned long p, size_t size, unsigned int type)
--{
--	if (p >= AT91_BASE_SYS && p <= (AT91_BASE_SYS + SZ_16K - 1))
--		return (void __iomem *)AT91_IO_P2V(p);
--
--	return __arm_ioremap_caller(p, size, type, __builtin_return_address(0));
--}
--EXPORT_SYMBOL(at91_ioremap);
--
--void at91_iounmap(volatile void __iomem *addr)
--{
--	unsigned long virt = (unsigned long)addr;
--
--	if (virt >= VMALLOC_START && virt < VMALLOC_END)
--		__iounmap(addr);
--}
--EXPORT_SYMBOL(at91_iounmap);
--
- #define AT91_DBGU0	0xfffff200
- #define AT91_DBGU1	0xffffee00
- 
+ #endif
 -- 
 1.7.7.1.431.g10b2a
