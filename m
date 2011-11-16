@@ -1,43 +1,38 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Wed, 16 Nov 2011 16:05:04 +0100 (CET)
-Subject: [PATCH v2] fix compilation breakage in entry-armv.S
-In-Reply-To: <20111111151515.GA3099@localhost.localdomain>
-References: <Pine.LNX.4.64.1111081232140.10851@axis700.grange>
- <20111108114050.GC12913@n2100.arm.linux.org.uk>
- <Pine.LNX.4.64.1111081258240.10851@axis700.grange>
- <20111111151515.GA3099@localhost.localdomain>
-Message-ID: <Pine.LNX.4.64.1111161602510.3881@axis700.grange>
+From: js@sig21.net (Johannes Stezenbach)
+Date: Wed, 16 Nov 2011 16:07:22 +0100
+Subject: [alsa-devel] [PATCH] ARM: pxa: add support for Raumfeld DDX
+In-Reply-To: <4EC3B30F.60403@gmail.com>
+References: <1320661562-422-1-git-send-email-zonque@gmail.com>
+ <20111115141348.GG3077@opensource.wolfsonmicro.com>
+ <4EC3B30F.60403@gmail.com>
+Message-ID: <20111116150722.GA15580@sig21.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix compilation failure, when Thumb support is not enabled:
+On Wed, Nov 16, 2011 at 01:56:47PM +0100, Daniel Mack wrote:
+> On 11/15/2011 03:13 PM, Mark Brown wrote:
+> > On Mon, Nov 07, 2011 at 11:26:02AM +0100, Daniel Mack wrote:
+> > 
+> >> +	/* PXA DMA cannot do zero extend for 24bit samples,
+> >> +	* thus only 16bit (two samples packet into 32bit word)
+> >> +	* or 32bit samples are possible
+> >> +	*/
+> >> +	snd_pcm_hw_constraint_mask64(substream->runtime,
+> >> +				    SNDRV_PCM_HW_PARAM_FORMAT,
+> >> +				    SNDRV_PCM_FMTBIT_S16_LE  | SNDRV_PCM_FMTBIT_S16_BE |
+> >> +				    SNDRV_PCM_FMTBIT_S32_LE  | SNDRV_PCM_FMTBIT_S32_BE);
+> > 
+> > If the PXA DMA controller can't do 24 bit audio it should be imposing
+> > this constraint.
+> 
+> Right. Will fix this in the CPU DAI.
 
-arch/arm/kernel/entry-armv.S: Assembler messages:
-arch/arm/kernel/entry-armv.S:501: Error: backward ref to unknown label "2:"
-arch/arm/kernel/entry-armv.S:502: Error: backward ref to unknown label "3:"
-make[2]: *** [arch/arm/kernel/entry-armv.o] Error 1
+IIRC the PXA can handle 24bit audio, and the STA32x can handle it, too.
+However due to constraints in the clock ratios on the Raumfeld board
+this mode cannot be used.  Thus this constraint is in sound/soc/pxa/raumfeld.c.
 
-Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
----
+Does that make sense?  It's been a while since I worked on this code,
+maybe I misremember.  And I failed to mention it in the code comment :-(
 
-v2: use exactly the same preprocessor condition, as the one used for the 
-code, defining labels "2" and "3"
 
- arch/arm/kernel/entry-armv.S |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
-index 9ad50c4..b145f16 100644
---- a/arch/arm/kernel/entry-armv.S
-+++ b/arch/arm/kernel/entry-armv.S
-@@ -497,7 +497,7 @@ ENDPROC(__und_usr)
- 	.popsection
- 	.pushsection __ex_table,"a"
- 	.long	1b, 4b
--#if __LINUX_ARM_ARCH__ >= 7
-+#if CONFIG_ARM_THUMB && __LINUX_ARM_ARCH__ >= 6 && CONFIG_CPU_V7
- 	.long	2b, 4b
- 	.long	3b, 4b
- #endif
--- 
-1.7.2.5
+Johannes
