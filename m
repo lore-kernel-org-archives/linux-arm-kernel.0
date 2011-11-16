@@ -1,47 +1,36 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 16 Nov 2011 18:30:37 +0000
-Subject: [PATCH v6 3/5] ARM: soft_restart: disable the outer L2 when the
- last CPU is going down
-In-Reply-To: <4EC3FED8.7000307@codeaurora.org>
-References: <1321466057-19721-1-git-send-email-will.deacon@arm.com>
- <1321466057-19721-4-git-send-email-will.deacon@arm.com>
- <4EC3FED8.7000307@codeaurora.org>
-Message-ID: <20111116183036.GR4942@mudshark.cambridge.arm.com>
+From: vapier@gentoo.org (Mike Frysinger)
+Date: Wed, 16 Nov 2011 13:38:46 -0500
+Subject: [PATCH 3/4] mmc: Logging neatening
+In-Reply-To: <CAKYAXd8_mDF68PnEnpuZZQ+O8-QmrfRpP4jv+SpHDx1juTxFGQ@mail.gmail.com>
+References: <cover.1321398814.git.joe@perches.com>
+ <d2c1a76fea1844ae7ac3e7e17183fb39df19178e.1321398814.git.joe@perches.com>
+ <CAKYAXd8_mDF68PnEnpuZZQ+O8-QmrfRpP4jv+SpHDx1juTxFGQ@mail.gmail.com>
+Message-ID: <201111161338.53049.vapier@gentoo.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
-
-On Wed, Nov 16, 2011 at 06:20:08PM +0000, Stephen Boyd wrote:
-> On 11/16/11 09:54, Will Deacon wrote:
-> > diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
-> > index 577d092..664d351 100644
-> > --- a/arch/arm/kernel/process.c
-> > +++ b/arch/arm/kernel/process.c
-> > @@ -137,6 +137,10 @@ void soft_restart(unsigned long addr)
-> >  	local_irq_disable();
-> >  	local_fiq_disable();
-> >  
-> > +	/* Disable the L2 if we're the last man standing. */
-> > +	if (num_online_cpus() == 1)
-> > +		outer_disable();
-> > +
+On Tuesday 15 November 2011 20:48:05 NamJae Jeon wrote:
+> 2011/11/16 Joe Perches <joe@perches.com>:
+> >        mci_writel(host, CTRL, SDMMC_CTRL_INT_ENABLE); /* Enable mci
+> > interrupt */
+> > 
+> > -       dev_info(&pdev->dev, "DW MMC controller at irq %d, "
+> > -                "%d bit host data width, "
+> > -                "%u deep fifo\n",
+> > +       dev_info(&pdev->dev,
+> > +       "DW MMC controller at irq %d, %d bit host data width, %u deep
+> > fifo\n", irq, width, fifo_size);
 > 
-> When does this code execute on another cpu? My understanding is that
-> soft_restart() is only called on one CPU so I would think checking the
-> number of online cpus isn't necessary.
+> I think that tab is needed this "DW MMC controller at irq ...." ?
 
-Currently, yes, this only executes on one CPU. The code is there in case
-we want to implement a SMP kexec solution that doesn't require CPU hotplug
-at some point.
-
-I suppose you could end up in a situation where the reset path leads to a
-soft reboot and you haven't dealt with the secondaries at this point, but
-then you have bigger problems to worry about (namely that whatever you jump
-to after turning the MMU off needs to deal with the secondaries somehow).
-
-Are you seeing problems with this?
-
-Cheers,
-
-Will
+looks to me like this was the only part you replied to.  could you please snip 
+the unrelated context in the future ?  no reason to include ~1700 lines of 
+context when you only replying to like ~10 lines.
+-mike
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111116/43f34bba/attachment.sig>
