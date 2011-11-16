@@ -1,168 +1,90 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 16 Nov 2011 15:12:50 -0700
-Subject: [RFC 6/8] of: add clock providers
-In-Reply-To: <4EBD7E47.8010502@ti.com>
-References: <1320801583-12774-1-git-send-email-grant.likely@secretlab.ca>
- <1320801583-12774-7-git-send-email-grant.likely@secretlab.ca>
- <20111109091328.GY16886@pengutronix.de> <4EBA62AD.3000407@ti.com>
- <20111109114936.GL16886@pengutronix.de> <4EBD7E47.8010502@ti.com>
-Message-ID: <20111116221250.GA12884@ponder.secretlab.ca>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Thu, 17 Nov 2011 06:28:57 +0800
+Subject: Error for machine_is_m28evk
+In-Reply-To: <20111116184839.GS30612@pengutronix.de>
+References: <CAOMZO5C4=ELWef8keoT8u0H8jTPRGQ5BA_8xYyKge++s+wdNqw@mail.gmail.com>
+ <4EB8CC7B.5060503@denx.de> <20111108075349.GK2854@pengutronix.de>
+ <CAB4PhKeKdGLa74W-n1DNbUcszWMf3nymqqhuzdZoj_oQG+YNsg@mail.gmail.com>
+ <20111116084258.GF9581@n2100.arm.linux.org.uk>
+ <20111116135857.GA14656@S2100-06.ap.freescale.net>
+ <20111116184839.GS30612@pengutronix.de>
+Message-ID: <20111116222857.GB14656@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 11, 2011 at 08:57:59PM +0100, Cousson, Benoit wrote:
-> On 11/9/2011 12:49 PM, Sascha Hauer wrote:
-> >On Wed, Nov 09, 2011 at 12:23:25PM +0100, Cousson, Benoit wrote:
-> >>On 11/9/2011 10:13 AM, Sascha Hauer wrote:
-> >>>On Tue, Nov 08, 2011 at 06:19:41PM -0700, Grant Likely wrote:
-> >>
-> >>[...]
-> >>
-> >>>>+Sources of clock signal can be represented by any node in the device
-> >>>>+tree.  Those nodes are designated as clock providers.  Clock consumer
-> >>>>+nodes use a phandle and clock specifier pair to connect clock provider
-> >>>>+outputs to clock inputs.  Similar to the gpio specifiers, a clock
-> >>>>+specifier is an array of one more more cells identifying the clock
-> >>>>+output on a device.  The length of a clock specifier is defined by the
-> >>>>+value of a #clock-cells property in the clock provider node.
-> >>>>+
-> >>>>+[1] http://patchwork.ozlabs.org/patch/31551/
-> >>>>+
-> >>>>+==Clock providers==
-> >>>>+
-> >>>>+Required properties:
-> >>>>+#clock-cells:	   Number of cells in a clock specifier; typically will be
-> >>>>+		   set to 1
-> >>>>+
-> >>>>+Optional properties:
-> >>>>+clock-output-name: Recommended to be a list of strings of clock output signal
-> >>>>+		   names indexed by the first cell in the clock specifier.
-> >>>>+		   However, the meaning of clock-output-names is domain
-> >>>>+		   specific to the clock provider, and is only provided to
-> >>>>+		   encourage using the same meaning for the majority of clock
-> >>>>+		   providers.  This format may not work for clock providers
-> >>>>+		   using a complex clock specifier format.  In those cases it
-> >>>>+		   is recommended to omit this property and create a binding
-> >>>>+		   specific names property.
-> >>>
-> >>>If the clock-output-name property is omitted, does this mean a clock
-> >>>provider only has a single output or does it mean that it's not known
-> >>>how many clock outputs a provider actually has?
-
-As Rob said, it only means that there are no names assigned to those
-inputs.  In fact, it leaves it up to the specific clock binding as to
-what it really means.  One driver may require the clock-output-name
-property to be present because it uses data from there to figure out
-how to configure the clock.  Another might not require it at all and
-the only reason for its existence is informational.
-
-> >>Allowing several outputs for a single clock node might lead to a lot
-> >>of confusion. What will be the meaning of a clock rate if you have
-> >>several outputs at different frequency?
-
-No, clock-frequency is specific to the fixed-clock binding (which I
-need to document).  That may or may not be present in other clock
-provider nodes.  For instance, there is a xilinx clock divider ip
-block that doesn't have any frequency of its own, but rather has
-multiple clock outputs that are a scale of the input clock.  The node
-for that device would never have a clock-frequency property because it
-relies entirely on the upstream clock.
-
-This proposed binding is only about one thing: attaching clock
-providers to clock consumers.  It doesn't make any statements about
-how the clock provider driver is organized or how it manages its
-clocks.
-
-This is by design to prevent clock consumers from digging into a clock
-provider node manually without consulting its driver.  The consumer
-only has a reference to a clock provider node + arguments.  It is the
-job of the producer driver to interpret the arguments.
-
-The proposed API also reflects this.  The consumer driver requests a
-clock, but it is the producer driver that determines what the clock
-reference actually means, and which struct clk to return.
-
-> >>I think it will be better to define a clock node as a single source
-> >>of clock. If several outputs are needed, then we should define
-> >>several clock nodes.
-
-That is entirely up to the binding for the specific clock device(s).
-If it makes sense to have one node per clock, so be it.  If it makes
-more sense to have a clock nexus node for other hardware, then that is
-fine too.
-
-> >>If we let a clock node be any kind of big clock blob, we will never
-> >>be able to define some generic reusable clock node API. Everybody
-> >>will define its own custom clock blobs.
-> >
-> >Generally +1. I asked myself the same question whether it's a good thing
-> >to allow a node to have multiple clocks. For i.MX I can say that I don't
-> >need this and that I do not intend to use this feature. Grants concerns
-> >about this are that the clock part of the device tree might explode when
-> >we put each and every clock into the devicetree, so he wants to allow
-> >bigger blobs of multiple clocks.
+On Wed, Nov 16, 2011 at 07:48:39PM +0100, Uwe Kleine-K?nig wrote:
+> Hello,
 > 
-> I can clearly understand this concern, because in the case of OMAP4,
-> we will have to add ~250 nodes if we want to define the current
-> clock tree.
+> On Wed, Nov 16, 2011 at 09:58:58PM +0800, Shawn Guo wrote:
+> > On Wed, Nov 16, 2011 at 08:42:58AM +0000, Russell King - ARM Linux wrote:
+> > > On Wed, Nov 16, 2011 at 01:59:41PM +0800, Shawn Guo wrote:
+> > > > Hi Russell,
+> > > > 
+> > > > On Tue, Nov 08, 2011 at 08:53:47PM +0800, Shawn Guo wrote:
+> > > > > On Tue, Nov 08, 2011 at 08:53:50AM +0000, Russell King - ARM Linux wrote:
+> > > > > [...]
+> > > > > > 
+> > > > > > Maybe the answer is to just update the file anyway, and ignore peoples
+> > > > > > complaints that their entries aren't present until they come to their
+> > > > > > senses and start COMMUNICATING properly about issues they have with
+> > > > > > their fscked up entry in the database.
+> > > > > > 
+> > > > > So I assume that you will update mach-types for -rc2.  Otherwise,
+> > > > > please let me know, and I will send a patch to disable m28evk build
+> > > > > from mxs_defconfig for -rc2.
+> > > > > 
+> > > > May I know your plan of mach-types updating?  The -rc2 is out with no
+> > > > update on mach-types.
+> > > 
+> > > There is *NO* bloody way I'm updating this *known* *build* *breaking*
+> > > thing in an -rc series.  I've already stated my reasons, and I _know_
+> > > it will break stuff.  I've pointed out what the changes are.  It's in
+> > > linux-next.  No one has responded to that.
+> > > 
+> > Then, can I send the following patch for -rc3 to fix the mxs build
+> > (I noticed the statement '# Please do not send patches to this file;
+> > it is automatically generated!' in the file)?  Or do I have to disable
+> > the m28evk from mxs build?
+> it would not be the first patch to mach-types. And the next update
+> doesn't harm as it should include the entry for m28evk.
 
-I'm really not convinced that it is a good idea to break out the
-entire clock tree into one node per struct clk.  To begin with, that
-looks to be very centric around the current 'struct clk' Linux
-abstraction, which is potentially in flux.  Also, looking at Sascha's
-initial RFC for describing the clock tree, I see cases where it looks
-like a clock nexus node really makes sense.  For instance, the
-'divider-ipg at 0x53fd4014' node which has a list of child nodes
-which merely provide a register offset and shift value
-(reg=0x53fd4068..0x53fd4084, shift=0x0..0xf).  It would be natural to
-instead encode that as part of the clock reference, or map it directly
-from the clock reference (ie, assign names to each of the clocks, and
-let the clock provider driver match up the name to the reg offset &
-shift values).
+Ok, that's what I think too.
 
-I had originally thought that it would be better to use names directly
-for references to clocks (ie. clock = <phandle>,"name") , but after
-actually playing with it and looking at the existing DT conventions,
-I've reverted to cell values for the arguments and a separate set of
-clock-{input,output}-name properties for attaching meaningful names,
-just like we decided to do for assigning names to 'reg' properties.
-
-> >My impression gets more and more that we either put the clock tree in the
-> >devicetree or we do not do it, but there's not much room in between.
-
-I disagree here entirely because there is a lot of room in between.
-Drivers still need to understand the hardware block they are driving,
-and there will still be a lot of hardware-specific knowledge encoded
-into clock provider drivers (just as there is for every other kind of
-driver).  The trick (and even artistry) is to determine the ideal
-balance between hard coding static hardware details and
-parameterization of interconnects between blocks.
-
+> > 
+> > Regards,
+> > Shawn
+> > 
+> > ---8<----
+> > commit acbff8107c90a4d2a436cca53535f2fd35d109e7
+> > Author: Shawn Guo <shawn.guo@linaro.org>
+> > Date:   Wed Nov 16 21:44:33 2011 +0800
+> > 
+> >     ARM: Update mach-types to fix mxs build breakage
+> > 
+> >     Add entry m28evk to fix the following mxs build breakage.
+> > 
+> >       CHK     include/generated/compile.h
+> >       CC      arch/arm/mach-mxs/clock-mx28.o
+> >     arch/arm/mach-mxs/clock-mx28.c: In function 'clk_misc_init':
+> >     arch/arm/mach-mxs/clock-mx28.c:748: error: implicit declaration of
+> >     function 'machine_is_m28evk'
+> >     make[1]: *** [arch/arm/mach-mxs/clock-mx28.o] Error 1
+> >     make: *** [arch/arm/mach-mxs] Error 2
+> > 
+> >     Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 > 
-> If we are not ready to accept 4k lines of clock data inside the
-> devicetree, which is indeed huge and mostly useless, then I think we
-> should just expose the leaf clocks. But then they will depend on
-> parent that will not be in DT but in static files, which might be
-> weird.
+> Alternatively do
 > 
-> I'm not sure what the right answer is :-(
+> 	#ifndef machine_is_m28evk
+> 	#define machine_is_m28evk() 0
+> 	#endif
+> 
+> before it's use in arch/arm/mach-mxs/include/mach/mxs.h to fix the build
+> failure.
+> 
+Thanks.  But patching mach-types seems better to me.
 
-I think you're right.  Expose the leaf clocks, and maybe the
-interconnects between clock providers.  There is no need to expose
-every single intermediary clock, especially when those clocks are
-merely internal to a device IP block and are never exposed to
-anything outside of itself.
-
-I'm even okay with having a single clock driver for an entire SoC if
-there isn't a very high likelyhood of any of it's internal clock
-components will ever get reused somewhere else.  When compared with
-board designs, internal SoC clock structure really doesn't change much
-at all so there isn't the same need for breaking all the detail out to
-the device tree.
-
-Oh, and it shouldn't be weird because even clock nexus nodes that
-handle several clock outputs can have clock inputs from other sources.
-For instance, there could be a node for the clock provided by the
-on-board crystal.
-
-g.
+-- 
+Regards,
+Shawn
