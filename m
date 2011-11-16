@@ -1,45 +1,33 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Wed, 16 Nov 2011 17:55:06 +0000
-Subject: [PATCH 3/5] ARM: vexpress: Add DT support in v2m
-In-Reply-To: <20111116175050.GH2073@localhost.localdomain>
-References: <1321036026-23411-1-git-send-email-pawel.moll@arm.com>
- <1321036026-23411-4-git-send-email-pawel.moll@arm.com>
- <20111116154402.GE2073@localhost.localdomain> <4EC3E446.4030608@gmail.com>
- <1321461458.3137.374.camel@hornet.cambridge.arm.com>
- <4EC3EBEC.3020601@gmail.com>
- <1321463271.3137.380.camel@hornet.cambridge.arm.com>
- <20111116173945.GG2073@localhost.localdomain>
- <20111116175050.GH2073@localhost.localdomain>
-Message-ID: <1321466106.3137.397.camel@hornet.cambridge.arm.com>
+From: mirqus@gmail.com (=?ISO-8859-2?Q?Micha=B3_Miros=B3aw?=)
+Date: Wed, 16 Nov 2011 18:57:21 +0100
+Subject: [PATCH 1/3] drivers: base: add support for stmp-style devices
+In-Reply-To: <201111161744.19733.arnd@arndb.de>
+References: <1321440459-4527-1-git-send-email-w.sang@pengutronix.de>
+ <1321440459-4527-2-git-send-email-w.sang@pengutronix.de>
+ <201111161744.19733.arnd@arndb.de>
+Message-ID: <CAHXqBFJigr+Ut5vaY-g0uDU3GnHyvHfJH9RsTUBRQ6kW8BmhsQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2011-11-16 at 17:50 +0000, Dave Martin wrote:
-> Come to think of it, is the problem here that we're trying to describe
-> the _motherboard_ using the compatible property on the root node.
-> This is why I talked about universal/generic features -- the set of
-> features common to all platforms sharing a single motherboard
-> configuration.
-> 
-> Arguably that's wrong, and that compatible property belongs on the
-> motherboard node itself, so (excuse the random syntax):
-> 
-> / {
-> 	compatible = "arm,vexpress-v2p-ca9", "arm,vexpress";
-> 
-> 	motherboard {
-> 		compatible = "arm,vexpress-v2m-legacy", "simple-bus";
-> 	};
-> };
+2011/11/16 Arnd Bergmann <arnd@arndb.de>:
+> On Wednesday 16 November 2011, Wolfram Sang wrote:
+[...]
+>> --- /dev/null
+>> +++ b/include/linux/stmp_device.h
+>> @@ -0,0 +1,19 @@
+>> +#ifndef __STMP_DEVICE_H__
+>> +#define __STMP_DEVICE_H__
+>> +
+>> +#define STMP_SET_ADDR ? ? ? ? ? ? ? ?0x4
+>> +#define STMP_CLR_ADDR ? ? ? ? ? ? ? ?0x8
+>> +#define STMP_TOG_ADDR ? ? ? ? ? ? ? ?0xc
+>
+> The register numbers should probably go into the implementation file,
+> they are not an interface.
 
-> If putting a suitable compatible property on the motherboard node is
-> feasible, it should work for this case.
+Those are offsets - for every register there are "shadow" registers
+that do implicit OR, AND NOT, XOR of that register with value written.
+There might be better names for those.
 
-Yep, that works for me :-) Probably even easier to implement than custom
-property.
-
-I'll get it into the code tomorrow.
-
-Cheers!
-
-Pawe?
+Best Regards,
+Micha? Miros?aw
