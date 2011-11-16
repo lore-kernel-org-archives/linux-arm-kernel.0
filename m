@@ -1,85 +1,86 @@
-From: michael@walle.cc (Michael Walle)
-Date: Thu, 17 Nov 2011 00:34:02 +0100
-Subject: orion/kirkwood and device tree
-In-Reply-To: <20111104092159.GG634@kw.sim.vm.gnt>
-References: <20111031105740.GC29402@lunn.ch>
- <201111032250.59528.michael@walle.cc> <20111104092159.GG634@kw.sim.vm.gnt>
-Message-ID: <201111170034.02758.michael@walle.cc>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Wed, 16 Nov 2011 18:45:30 -0500 (EST)
+Subject: [PATCH 2/2] ARM: topdown mmap support
+In-Reply-To: <4EC2EF95.4050205@gmail.com>
+References: <1320709421-14469-1-git-send-email-robherring2@gmail.com>
+ <1320709421-14469-2-git-send-email-robherring2@gmail.com>
+ <alpine.LFD.2.02.1111141237080.3307@xanadu.home> <4EC15882.7070909@gmail.com>
+ <alpine.LFD.2.02.1111141316440.3307@xanadu.home> <4EC2EF95.4050205@gmail.com>
+Message-ID: <alpine.LFD.2.02.1111161837500.3307@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag 04 November 2011, 10:21:59 schrieb Simon Guinot:
-> Hi Michael,
+On Tue, 15 Nov 2011, Rob Herring wrote:
+
+> Nicolas,
 > 
-> On Thu, Nov 03, 2011 at 10:50:59PM +0100, Michael Walle wrote:
-> > Am Donnerstag 03 November 2011, 19:47:45 schrieb Jason:
-> > > Michael,
-> > > 
-> > > On Wed, Nov 02, 2011 at 11:03:04PM +0100, Michael Walle wrote:
-> > > > Am Mittwoch 02 November 2011, 17:50:57 schrieb Jason:
-> > > > > Michael,
-> > > > > 
-> > > > > On Mon, Oct 31, 2011 at 11:50:28PM +0100, Michael Walle wrote:
-> > > > > > i've already ported some marvell devices to DT. spi-orion,
-> > > > > > orion-wdt, rtc-mv and mv_cesa. Atm i'm struggling with how to
-> > > > > > pass
-> > > > > > kirkwood_mbus_dram_info to the device drivers (the old method is
-> > > > > > to pass it through platform_data)
-> > > > > 
-> > > > > Do you have a public git tree I could pull from, by chance?  I
-> > > > > don't care about the state, I'd like to learn by example and start
-> > > > > pitching in.
-> > > > 
-> > > > yeah i pushed it to github:
-> > > > https://github.com/mwalle/linux/tree/kirkwood-devtree
-> > > 
-> > > This is great!  I was having trouble figuring out how to do the
-> > > interrupt controller, and you have that.  I'll look more closely this
-> > > evening.
-> > > 
-> > > My only comment so far is that I think a lot of what you have in
-> > > lschlv2.dts can be in kirkwood.dtsi.  That way other boards don't have
-> > > to copy it (serial, spi, ehci, wdt, rtc, crypto).
+> On 11/14/2011 12:22 PM, Nicolas Pitre wrote:
+> > On Mon, 14 Nov 2011, Rob Herring wrote:
 > > 
-> > yeah i had it there and it should be definitely put back to
-> > kirkwood.dtsi. the reason i've put it into lschv2.dts atm is that there
-> > is the clock property for every device, which may be different for
-> > different platforms.
+> >> On 11/14/2011 11:41 AM, Nicolas Pitre wrote:
+> >>> On Mon, 7 Nov 2011, Rob Herring wrote:
+> >>>
+> >>>> From: Rob Herring <rob.herring@calxeda.com>
+> >>>>
+> >>>> Similar to other architectures, this adds topdown mmap support in user
+> >>>> process address space allocation policy. This allows mmap sizes greater
+> >>>> than 2GB. This support is largely copied from MIPS and the generic
+> >>>> implementations.
+> >>>>
+> >>>> The address space randomization is moved into arch_pick_mmap_layout.
+> >>>
+> >>> This is a problem by effectively weakening the randomization greatly.  
+> >>> Now you get a random starting point but all mmaps are otherwise fixed 
+> >>> relative to each other, whereas you had random distances between each 
+> >>> mmaps before.
+> >>>
+> >>
+> >> You mean within a single process the mmap's are not randomized? 
 > > 
-> > > Oh, also, I think the board-dt.c should be pulling the phys addresses
-> > > from the dt, it looks like you're still relying on the #defines...
+> > With regard to each other: not anymore with your patch.
 > > 
-> > i haven't looked at ethernet/mdio yet ;)
+> >> Couldn't that end up wasting a lot of virtual space if you have a lot 
+> >> of mmaps?
+> > 
+> > That is what we have now without this patch.  The Potential for wasted 
+> > space is 8 bits on a page level, i.e. 1MB max or 512 KB on average, per 
+> > mmap.  I don't think this is that bad.
+> > 
 > 
-> It is good to see some work to add DT support for Kirkwood SoCs.
->
-> What are your plans concerning the MPPs configuration ? Is it possible to
-> embed this configuration into a DT ?
-I guess it have to ;)
+> No one cared about or noticed this issue until recently. That is
+> changing as we start to see ARM systems with more memory and I'm sure
+> we'll see more issues like this. Someone may care that they get less
+> memory than other 32-bit arches. Can you really trust that apps don't do
+> a large number of mmaps.
+> 
+> >> It is aligned with other arch's and the generic implementation. The
+> >> generic implementation doesn't even do randomization for legacy layouts.
+> > 
+> > Only x86 does complete ASLR besides ARM.
+> 
+> x86 does not do per mmap randomization. Here's the output of a test
+> program which does 1 to 23 MB size mmaps in 1MB steps. The gap is the
+> last address - current address. I'm not sure what's going on with the
+> 2nd mmap gap though, but otherwise the gap matches the mmap size.
 
-> What kind of node could hold a such information ?
+OK, after verification I agree.
 
-What do you think about sth like the following:
+> My patch exceeds 32-bit x86 functionality which does no randomization
+> for legacy layouts. It matches 32-bit and 64-bit x86 for topdown layout.
 
-	mpp at f1010000 {
-		compatible = "marvell,kirkwood-mpp";
-		interrupts = <35 36 37 38 39 40 41>;
-		gpio-conf = <10 0   /* HDD Power Enable */
-		             11 0   /* USB Vbus Enable */
-		             18 0   /* FAN High Enable# */
-		             19 0   /* FAN Low Enable# */
-		             36 0   /* Function Blue LED */
-		             37 0   /* Alarm LED */
-		             38 0   /* Info LED */
-		             39 0   /* Power LED */
-		             40 0   /* Fan Lock */
-		             41 0   /* Function Button */
-		             42 0   /* Power Switch */
-		             43 0   /* Power Auto Switch */
-		             48 0>; /* Function Red LED */
-	};
+I don't think we should skip randomization for the legacy layout.  
+Without your patch we have only one layout and it is already randomized 
+by default. There are other knobs for inhibiting randomization already.
 
-gpio-conf is an array with <mpp num, mpp sel> tuples.
+> I'm happy to revert the legacy part of my patch, but it's a bit mute
+> point as legacy is not used by default.
 
--- 
-Michael
+I'm actually wondering if we should carry a legacy layout at all on 
+ARM...
+
+Otherwise for the patch:
+
+Acked-by: Nicolas Pitre <nico@linaro.org>
+
+
+Nicolas
