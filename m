@@ -1,48 +1,120 @@
-From: mad_soft@inbox.ru (Dmitry Artamonow)
-Date: Wed, 16 Nov 2011 12:46:13 +0400
-Subject: [PATCH] watchdog: fix initialisation printout in s3c2410_wdt
-Message-ID: <1321433173-17757-1-git-send-email-mad_soft@inbox.ru>
+From: prylowski@metasoft.pl (Rafal Prylowski)
+Date: Wed, 16 Nov 2011 10:00:46 +0100
+Subject: [PATCH v2 1/5] dmaengine: add ep93xx DMA support
+In-Reply-To: <ADE657CA350FB648AAC2C43247A983F001F3E93FDC22@AUSP01VMBX24.collaborationhost.net>
+References: <cover.1306662317.git.mika.westerberg@iki.fi>
+ <3ea8d56034f25cbe3fd8a4c31d7d0d1540b6ac7e.1306662317.git.mika.westerberg@iki.fi>
+ <4EC27EED.4030108@metasoft.pl>
+ <ADE657CA350FB648AAC2C43247A983F001F3E93FDC22@AUSP01VMBX24.collaborationhost.net>
+Message-ID: <4EC37BBE.6030008@metasoft.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Looks like a typo creeped in, and driver prints
-s3c2410-wdt s3c2410-wdt: watchdog active, reset abled, irq abled
+Hello.
 
-instead of
-s3c2410-wdt s3c2410-wdt: watchdog active, reset enabled, irq enabled
+> Nice to see someone is trying to get IDE support for the ep93xx into mainline!
+> Unfortunately none of my ep93xx hardware supports IDE... :-(
+> 
 
-Also it may completely disinform about irq status, as it prints
-"irq enabled" when S3C2410_WTCON_INTEN is in fact 0.
+This driver is a result of work of several people, which I've seen on linux-ide
+mailing list. I only added this dmaengine support. I really would like to
+see it in mainline, but I think it's still not ready for inclusion.
 
-Fix it.
+>>  	default:
+>> @@ -668,24 +669,28 @@ static void ep93xx_dma_unmap_buffers(str
+>>  static void ep93xx_dma_tasklet(unsigned long data)
+>>  {
+>>  	struct ep93xx_dma_chan *edmac = (struct ep93xx_dma_chan *)data;
+>> -	struct ep93xx_dma_desc *desc, *d;
+>> -	dma_async_tx_callback callback;
+>> -	void *callback_param;
+>> +	struct ep93xx_dma_desc *desc = NULL, *d;
+>> +	dma_async_tx_callback callback = NULL;
+>> +	void *callback_param = NULL;
+>>  	LIST_HEAD(list);
+>>  
+>>  	spin_lock_irq(&edmac->lock);
+>> -	desc = ep93xx_dma_get_active(edmac);
+>> -	if (desc->complete) {
+>> -		edmac->last_completed = desc->txd.cookie;
+>> -		list_splice_init(&edmac->active, &list);
+>> +	if (!list_empty(&edmac->active)) {
+>> +		desc = ep93xx_dma_get_active(edmac);
+>> +		if (desc->complete) {
+>> +			edmac->last_completed = desc->txd.cookie;
+>> +			list_splice_init(&edmac->active, &list);
+>> +		}
+> 
+> It looks like this might actually catch your BUG_ON issue above.
 
-Signed-off-by: Dmitry Artamonow <mad_soft@inbox.ru>
----
+Yes, I only inserted BUG_ON in ep93xx_dma_get_active() to be sure, that
+nowhere else in code happens similar problem.
+But now I'm not so sure, that I encountered bug in ep93xx_dma.c, or
+maybe I'm misusing dmaengine api (calling dmaengine_termiante_all from
+invalid context?). I don't have enough knowledge to judge this.
 
-It seems to be here for a long time, but I don't think it's
-important enough for cc-ing stable.
+> 
+>>  	}
+>>  	spin_unlock_irq(&edmac->lock);
+>>  
+>>  	/* Pick up the next descriptor from the queue */
+>>  	ep93xx_dma_advance_work(edmac);
+>>  
+>> -	callback = desc->txd.callback;
+>> -	callback_param = desc->txd.callback_param;
+>> +	if (desc) {
+>> +		callback = desc->txd.callback;
+>> +		callback_param = desc->txd.callback_param;
+>> +	}
+> 
+> These could be moved up to where 'desc' is getting set.  You have already
+> verified that the list is not empty and have a valid 'desc' pointer.  Set
+> the callback pointers there to remove this extra if (desc) test.
+> 
 
-Also I haven't tested it, as I don't have a hardware, but it's
-rather trivial (and yes, I checked with datasheet that 1 in
-S3C2410_WTCON_*EN bits really means 'enabled')
+Following is a patch with suggestions applied (patch addressing problem with
+incorrect programming of control register is in another mail sent in reply to
+Mika Westerberg).
 
- drivers/watchdog/s3c2410_wdt.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+Regards,
+Rafal Prylowski.
 
-diff --git a/drivers/watchdog/s3c2410_wdt.c b/drivers/watchdog/s3c2410_wdt.c
-index 5de7e4f..a79e384 100644
---- a/drivers/watchdog/s3c2410_wdt.c
-+++ b/drivers/watchdog/s3c2410_wdt.c
-@@ -401,8 +401,8 @@ static int __devinit s3c2410wdt_probe(struct platform_device *pdev)
+Index: linux-2.6/drivers/dma/ep93xx_dma.c
+===================================================================
+--- linux-2.6.orig/drivers/dma/ep93xx_dma.c
++++ linux-2.6/drivers/dma/ep93xx_dma.c
+@@ -669,24 +669,25 @@ static void ep93xx_dma_tasklet(unsigned 
+ {
+ 	struct ep93xx_dma_chan *edmac = (struct ep93xx_dma_chan *)data;
+ 	struct ep93xx_dma_desc *desc, *d;
+-	dma_async_tx_callback callback;
+-	void *callback_param;
++	dma_async_tx_callback callback = NULL;
++	void *callback_param = NULL;
+ 	LIST_HEAD(list);
  
- 	dev_info(dev, "watchdog %sactive, reset %sabled, irq %sabled\n",
- 		 (wtcon & S3C2410_WTCON_ENABLE) ?  "" : "in",
--		 (wtcon & S3C2410_WTCON_RSTEN) ? "" : "dis",
--		 (wtcon & S3C2410_WTCON_INTEN) ? "" : "en");
-+		 (wtcon & S3C2410_WTCON_RSTEN) ? "en" : "dis",
-+		 (wtcon & S3C2410_WTCON_INTEN) ? "en" : "dis");
+ 	spin_lock_irq(&edmac->lock);
+-	desc = ep93xx_dma_get_active(edmac);
+-	if (desc->complete) {
+-		edmac->last_completed = desc->txd.cookie;
+-		list_splice_init(&edmac->active, &list);
++	if (!list_empty(&edmac->active)) {
++		desc = ep93xx_dma_get_active(edmac);
++		if (desc->complete) {
++			edmac->last_completed = desc->txd.cookie;
++			list_splice_init(&edmac->active, &list);
++		}
++		callback = desc->txd.callback;
++		callback_param = desc->txd.callback_param;
+ 	}
+ 	spin_unlock_irq(&edmac->lock);
  
- 	return 0;
+ 	/* Pick up the next descriptor from the queue */
+ 	ep93xx_dma_advance_work(edmac);
  
--- 
-1.7.5.1.300.gc565c
+-	callback = desc->txd.callback;
+-	callback_param = desc->txd.callback_param;
+-
+ 	/* Now we can release all the chained descriptors */
+ 	list_for_each_entry_safe(desc, d, &list, node) {
+ 		/*
