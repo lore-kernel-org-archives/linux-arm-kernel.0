@@ -1,86 +1,49 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Wed, 16 Nov 2011 18:45:30 -0500 (EST)
-Subject: [PATCH 2/2] ARM: topdown mmap support
-In-Reply-To: <4EC2EF95.4050205@gmail.com>
-References: <1320709421-14469-1-git-send-email-robherring2@gmail.com>
- <1320709421-14469-2-git-send-email-robherring2@gmail.com>
- <alpine.LFD.2.02.1111141237080.3307@xanadu.home> <4EC15882.7070909@gmail.com>
- <alpine.LFD.2.02.1111141316440.3307@xanadu.home> <4EC2EF95.4050205@gmail.com>
-Message-ID: <alpine.LFD.2.02.1111161837500.3307@xanadu.home>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 16 Nov 2011 23:50:24 +0000
+Subject: [PATCH] ARM: Do not call flush_cache_user_range with mmap_sem held
+In-Reply-To: <CAOesGMhWxEKUe7C4A+Xqv3RjN_u1t4k8eHWSZE4qMoBPD9=1qw@mail.gmail.com>
+References: <20111107172836.5615.64219.stgit@e102109-lin.cambridge.arm.com>
+ <CAOesGMhWxEKUe7C4A+Xqv3RjN_u1t4k8eHWSZE4qMoBPD9=1qw@mail.gmail.com>
+Message-ID: <20111116235024.GH9581@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 15 Nov 2011, Rob Herring wrote:
+On Wed, Nov 16, 2011 at 01:23:02PM -0800, Olof Johansson wrote:
+> Agreed. Russell, please consider picking this up -- the bug is very
+> real and it sounds like the objection is vague.
 
-> Nicolas,
-> 
-> On 11/14/2011 12:22 PM, Nicolas Pitre wrote:
-> > On Mon, 14 Nov 2011, Rob Herring wrote:
-> > 
-> >> On 11/14/2011 11:41 AM, Nicolas Pitre wrote:
-> >>> On Mon, 7 Nov 2011, Rob Herring wrote:
-> >>>
-> >>>> From: Rob Herring <rob.herring@calxeda.com>
-> >>>>
-> >>>> Similar to other architectures, this adds topdown mmap support in user
-> >>>> process address space allocation policy. This allows mmap sizes greater
-> >>>> than 2GB. This support is largely copied from MIPS and the generic
-> >>>> implementations.
-> >>>>
-> >>>> The address space randomization is moved into arch_pick_mmap_layout.
-> >>>
-> >>> This is a problem by effectively weakening the randomization greatly.  
-> >>> Now you get a random starting point but all mmaps are otherwise fixed 
-> >>> relative to each other, whereas you had random distances between each 
-> >>> mmaps before.
-> >>>
-> >>
-> >> You mean within a single process the mmap's are not randomized? 
-> > 
-> > With regard to each other: not anymore with your patch.
-> > 
-> >> Couldn't that end up wasting a lot of virtual space if you have a lot 
-> >> of mmaps?
-> > 
-> > That is what we have now without this patch.  The Potential for wasted 
-> > space is 8 bits on a page level, i.e. 1MB max or 512 KB on average, per 
-> > mmap.  I don't think this is that bad.
-> > 
-> 
-> No one cared about or noticed this issue until recently. That is
-> changing as we start to see ARM systems with more memory and I'm sure
-> we'll see more issues like this. Someone may care that they get less
-> memory than other 32-bit arches. Can you really trust that apps don't do
-> a large number of mmaps.
-> 
-> >> It is aligned with other arch's and the generic implementation. The
-> >> generic implementation doesn't even do randomization for legacy layouts.
-> > 
-> > Only x86 does complete ASLR besides ARM.
-> 
-> x86 does not do per mmap randomization. Here's the output of a test
-> program which does 1 to 23 MB size mmaps in 1MB steps. The gap is the
-> last address - current address. I'm not sure what's going on with the
-> 2nd mmap gap though, but otherwise the gap matches the mmap size.
+No, it isn't.  It's creating an unsafe situation.  If we're going to do
+this, we might as well give up on architecture correctness because we're
+throwing out locking correctness.
 
-OK, after verification I agree.
+1. We look up the VMA.
+2. We pass the VMA to the cache operation.
+3. The cache operation dereferences the VMA to obtain the VMA flags.
 
-> My patch exceeds 32-bit x86 functionality which does no randomization
-> for legacy layouts. It matches 32-bit and 64-bit x86 for topdown layout.
+If something else happens to modify the VMA (eg, a concurrent mremap or
+munmap) then without locking, we could end up dereferencing something
+that is no longer the VMA we thought we had.
 
-I don't think we should skip randomization for the legacy layout.  
-Without your patch we have only one layout and it is already randomized 
-by default. There are other knobs for inhibiting randomization already.
+Plus, consider that the VMA list is modifyable while the mmap_sem is not
+held - do we really want to see the effects of having find_vma() being
+preempted having loaded a vm_next pointer, another thread coming in,
+modifying the VMA list (possibly deleting the next vma), that memory being
+reallocated to something else, and then we resume and fall off the VMA
+list and possibly OOPS because we've accessed what we thought was the
+next vm_next pointer but it wasn't?
 
-> I'm happy to revert the legacy part of my patch, but it's a bit mute
-> point as legacy is not used by default.
+While we can say "an application should not do that" that's not a reason
+to ignore this problem and just delete all the locking in the hope that
+we'll always have well behaving applications.
 
-I'm actually wondering if we should carry a legacy layout at all on 
-ARM...
+So, it's *totally* unsafe to delete the locking here.
 
-Otherwise for the patch:
+The requirement is that the mmap_sem must be held while you expect to
+hold any reference to a vm_area_struct.  There's no exceptions to that.
 
-Acked-by: Nicolas Pitre <nico@linaro.org>
-
-
-Nicolas
+One solution to this is to use pagefault_disable()...pagefault_enable()
+around the cache operation, so that faults just cause us to skip to the
+next page.  The down-side to that is that pagefault_disable() makes us
+non-preemptible while performing the cache operation.  However, we can
+work around that by performing the cache handling in appropriately sized
+chunks.
