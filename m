@@ -1,39 +1,136 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Wed, 16 Nov 2011 22:53:04 +0800
-Subject: [GIT PULL] pxa: fixes for v3.2-rc1
-Message-ID: <CAMPhdO_bAdTMAVZcgCwS568hPMzHZa7iwy5pUa-N2BOreaZFfw@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 16 Nov 2011 08:59:38 -0600
+Subject: [PATCH 2/3] omap-serial: Add minimal device tree support
+In-Reply-To: <1321441346-19591-3-git-send-email-rnayak@ti.com>
+References: <1321441346-19591-1-git-send-email-rnayak@ti.com>
+ <1321441346-19591-3-git-send-email-rnayak@ti.com>
+Message-ID: <4EC3CFDA.1070804@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 1ea6b8f48918282bdca0b32a34095504ee65bab5:
+On 11/16/2011 05:02 AM, Rajendra Nayak wrote:
+> Adapt the driver to device tree and pass minimal platform
+> data from device tree needed for console boot.
+> No power management features will be suppported for now
+> since it requires more tweaks around OCP settings
+> to toggle forceidle/noidle/smaridle bits and handling
+> remote wakeup and dynamic muxing.
+> 
+> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+> ---
+>  .../devicetree/bindings/serial/omap_serial.txt     |    9 +++++
+>  drivers/tty/serial/omap-serial.c                   |   37 +++++++++++++++++++-
+>  2 files changed, 45 insertions(+), 1 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/serial/omap_serial.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/serial/omap_serial.txt b/Documentation/devicetree/bindings/serial/omap_serial.txt
+> new file mode 100644
+> index 0000000..bf6d631
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/serial/omap_serial.txt
+> @@ -0,0 +1,9 @@
+> +OMAP UART controller
+> +
+> +Required properties:
+> +- compatible : should be "ti,omap-uart"
 
-  Linux 3.2-rc1 (2011-11-07 16:16:02 -0800)
+This seems too generic. There are no h/w differences in the uart since
+the 1st OMAP1 device?
 
-are available in the git repository at:
-  git://github.com/ycmiao/pxa-linux.git fix
+> +- ti,hwmods : Must be "uart<n>", n being the instance number (1-based)
+> +
+> +Optional properties:
+> +- clock-frequency : frequency of the clock input to the UART
+> +- ti,console_hwmod : boolean, UART used as debug console
+> diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
+> index e1c8527..e3419c6 100644
+> --- a/drivers/tty/serial/omap-serial.c
+> +++ b/drivers/tty/serial/omap-serial.c
+> @@ -38,6 +38,7 @@
+>  #include <linux/serial_core.h>
+>  #include <linux/irq.h>
+>  #include <linux/pm_runtime.h>
+> +#include <linux/of.h>
+>  
+>  #include <plat/dma.h>
+>  #include <plat/dmtimer.h>
+> @@ -1322,6 +1323,22 @@ static void uart_tx_dma_callback(int lch, u16 ch_status, void *data)
+>  	return;
+>  }
+>  
+> +static struct omap_uart_port_info *of_get_uart_port_info(struct device *dev)
+> +{
+> +	struct omap_uart_port_info *omap_up_info;
+> +
+> +	omap_up_info = devm_kzalloc(dev, sizeof(*omap_up_info), GFP_KERNEL);
+> +	if (!omap_up_info)
+> +		return NULL; /* out of memory */
+> +
+> +	of_property_read_u32(dev->of_node, "clock-frequency",
+> +					 &(*omap_up_info).uartclk);
 
-Daniel Mack (1):
-      ARM: pxa: fix missing linux/gpio.h include
+&omap_up_info->uartclk
 
-Eric Miao (1):
-      ARM: pxa168/gplugd: add the correct SSP device
+You want 0 to be the default freq?
 
-Haojian Zhuang (2):
-      ARM: pxa: fix inconsistent CONFIG_USB_PXA27X
-      ARM: mmp: fix build error on gpio
+> +
+> +	return omap_up_info;
+> +}
+> +
+> +static atomic_t omap_uart_next_id = ATOMIC_INIT(0);
+> +
+>  static int serial_omap_probe(struct platform_device *pdev)
+>  {
+>  	struct uart_omap_port	*up;
+> @@ -1329,6 +1346,11 @@ static int serial_omap_probe(struct platform_device *pdev)
+>  	struct omap_uart_port_info *omap_up_info = pdev->dev.platform_data;
+>  	int ret = -ENOSPC;
+>  
+> +	if (pdev->dev.of_node) {
+> +		omap_up_info = of_get_uart_port_info(&pdev->dev);
+> +		pdev->id = atomic_inc_return(&omap_uart_next_id) - 1;
 
- arch/arm/configs/ezx_defconfig            |    2 +-
- arch/arm/configs/imote2_defconfig         |    2 +-
- arch/arm/configs/magician_defconfig       |    2 +-
- arch/arm/configs/zeus_defconfig           |    2 +-
- arch/arm/mach-mmp/gplugd.c                |    2 +-
- arch/arm/mach-mmp/include/mach/gpio-pxa.h |    2 +-
- arch/arm/mach-pxa/balloon3.c              |    2 +-
- arch/arm/mach-pxa/colibri-pxa320.c        |    2 +-
- arch/arm/mach-pxa/gumstix.c               |    2 +-
- arch/arm/mach-pxa/include/mach/palm27x.h  |    4 ++--
- arch/arm/mach-pxa/palm27x.c               |    4 ++--
- arch/arm/mach-pxa/palmtc.c                |    2 +-
- arch/arm/mach-pxa/pxa3xx.c                |    1 +
- arch/arm/mach-pxa/vpac270.c               |    2 +-
- 14 files changed, 16 insertions(+), 15 deletions(-)
+I don't think a driver changing this value is a good idea. Look at other
+serial drivers like iMX for how they use aliases.
+
+> +	}
+> +
+>  	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>  	if (!mem) {
+>  		dev_err(&pdev->dev, "no mem resource?\n");
+> @@ -1523,7 +1545,7 @@ static int serial_omap_runtime_suspend(struct device *dev)
+>  	if (!up)
+>  		return -EINVAL;
+>  
+> -	if (!pdata->enable_wakeup)
+> +	if (!pdata || !pdata->enable_wakeup)
+>  		return 0;
+>  
+>  	if (pdata->get_context_loss_count)
+> @@ -1582,12 +1604,25 @@ static const struct dev_pm_ops serial_omap_dev_pm_ops = {
+>  				serial_omap_runtime_resume, NULL)
+>  };
+>  
+> +#if defined(CONFIG_OF)
+> +static const struct of_device_id omap_serial_of_match[] = {
+> +	{
+> +		.compatible = "ti,omap-uart",
+> +	},
+> +	{},
+> +};
+> +MODULE_DEVICE_TABLE(of, omap_serial_of_match);
+> +#else
+> +#define omap_serial_of_match NULL
+> +#endif
+> +
+>  static struct platform_driver serial_omap_driver = {
+>  	.probe          = serial_omap_probe,
+>  	.remove         = serial_omap_remove,
+>  	.driver		= {
+>  		.name	= DRIVER_NAME,
+>  		.pm	= &serial_omap_dev_pm_ops,
+> +		.of_match_table = omap_serial_of_match,
+
+Use of_match_ptr and get rid of the #else
+
+Rob
