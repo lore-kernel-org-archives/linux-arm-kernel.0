@@ -1,147 +1,154 @@
 From: dave.martin@linaro.org (Dave Martin)
-Date: Wed, 16 Nov 2011 18:03:12 +0000
-Subject: [PATCH 4/5] ARM: vexpress: Initial RS1 memory map support
-In-Reply-To: <1321460897.3137.364.camel@hornet.cambridge.arm.com>
+Date: Wed, 16 Nov 2011 18:17:03 +0000
+Subject: [PATCH 5/5] ARM: vexpress: DT-based support for CoreTiles
+ Express A5x2 and A9x4
+In-Reply-To: <1321460559.3137.358.camel@hornet.cambridge.arm.com>
 References: <1321036026-23411-1-git-send-email-pawel.moll@arm.com>
- <1321036026-23411-5-git-send-email-pawel.moll@arm.com>
- <20111116154230.GD2073@localhost.localdomain>
- <1321460897.3137.364.camel@hornet.cambridge.arm.com>
-Message-ID: <20111116180312.GJ2073@localhost.localdomain>
+ <1321036026-23411-6-git-send-email-pawel.moll@arm.com>
+ <20111116153656.GC2073@localhost.localdomain>
+ <1321460559.3137.358.camel@hornet.cambridge.arm.com>
+Message-ID: <20111116181703.GK2073@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 16, 2011 at 04:28:17PM +0000, Pawel Moll wrote:
-> On Wed, 2011-11-16 at 15:42 +0000, Dave Martin wrote:
-> > > +config ARCH_VEXPRESS_LEGACY
-> > Brief comment explaining what this is?
-> > > +config ARCH_VEXPRESS_RS1
-> > Ditto
-> 
-> Ok.
-> 
-> > > +	bool
+On Wed, Nov 16, 2011 at 04:22:39PM +0000, Pawel Moll wrote:
+> On Wed, 2011-11-16 at 15:36 +0000, Dave Martin wrote:
+> > > +/include/ "skeleton.dtsi"
 > > > +
-> > >  config ARCH_VEXPRESS_CA9X4
-> > >  	bool "Versatile Express Cortex-A9x4 tile"
-> > >  	select CPU_V7
-> > > @@ -8,6 +16,7 @@ config ARCH_VEXPRESS_CA9X4
-> > >  	select ARM_ERRATA_720789
-> > >  	select ARM_ERRATA_751472
-> > >  	select ARM_ERRATA_753970
-> > > +	select ARCH_VEXPRESS_LEGACY
+> > > +/ {
+> > > +	model = "V2P-CA5s";
+> > > +	arm,hbi = <0x225>;
 > > 
-> > We should add a brief note to the help text explaining the existence
-> > of the new combined A9x4/A5x2 DT based support, if were planning to
-> > keep both variants.  (Probably wise for now, since people may be
-> > temporarily stuck old bootloaders etc.)
-> > 
-> > If there is no help text yet, we should add some, but it should be
-> > kept brief.
+> > Are these part numbers formally hex numbers?  Is so, fine.  Otherwise
+> > maybe it would me safer to make properties of this kind strings.
 > 
-> No probs. All suggestions and "templates" welcomed :-)
+> Hex values. See
+> http://infocenter.arm.com/help/topic/com.arm.doc.dui0447e/CACBEHGJ.html
 
-There were some instances in my previous series.  I think they were
-mostly one-liners.
+Ok, I guess that's correct, then.
+
+> > > +config ARCH_VEXPRESS_V2P_CA5S_CA9
+> > > +	bool "DT: CoreTiles Express A5x2 and A9x4"
+> > 
+> > This "DT" stuff is a bit cryptic -- also it's an implementation feature
+> > rather than part of the core nature of this config option.
+> 
+> Yeah, I know. I just didn't feel very verbose doing the Kconfig changes.
+
+As a newcomer to the Linux kernel a while ago, I found the plethora of
+rather descriptive config help text really helpful.
+
+
+These days, there are too many items (particulary from vendor trees)
+where the help text, if present at all, is something like:
+
+config BLAG_SLAD_BUP
+	help
+	  Enable the BLAG slad bup
+
+
+or
+
+config SCARY_UNSAFE_ONLY_ENABLE_IF_YOU_KNOW_WHAT_IT_DOES
+
+	(no help to explain what the option does)
+
+or examples such as the RCU subsystem, where although the invididual
+items are reasonably documented, there is nowhere a statement of
+what RCU does, why you want it, or even what it stands for.  Of
+course, it's obvious to people who already know what it is, but
+those aren't the people who documentation is written for.
+
+
+
+I think we should do our best to sustain the quality, especially for
+early examples of particular features which may get used as exemplars.
 
 > 
+> > Also, pedaitically, the product name is "CoreTile Express".
+> 
+> Ha ha - I wanted to express the plurality of A5 _and_ a9 ;-) Never mind,
+> will change it.
+
+I know -- I did say it was a pedantic point.  Change that or not, as you
+wish.
+ 
+> > Finally, this option does not support those core tiles, as such; rather
+> > it supports particular whole-platform configurations involving those
+> > core tiles.
 > > 
-> > [...]
+> > How about "CoreTile Express A5x2 and A9x4 based platform support"
+> 
+> Fine with me - I'll use your wording :-)
+> 
+> > > +	select ARCH_VEXPRESS_RS1
+> > > +	select ARCH_VEXPRESS_DT
+> > > +	select ARM_ERRATA_720789
+> > > +	select ARM_ERRATA_751472
+> > > +	select ARM_ERRATA_753970
+> > > +	help
+> > > +	  This option enabled Device Tree based support for
+> > > +	  CoreTile Express A5x2 (V2P-CA5s) and
+> > > +	  CoreTile Express A9x4 (V2P-CA9).
+> > > +
+> > > +	  Note that you must provide kernel with a valid DTB
+> > > +	  for the board if you want to use this option.
 > > 
-> > > diff --git a/arch/arm/mach-vexpress/include/mach/debug-macro.S b/arch/arm/mach-vexpress/include/mach/debug-macro.S
-> > > index fd9e6c7..adc94ce 100644
-> > > --- a/arch/arm/mach-vexpress/include/mach/debug-macro.S
-> > > +++ b/arch/arm/mach-vexpress/include/mach/debug-macro.S
-> > > @@ -10,12 +10,41 @@
-> > >   * published by the Free Software Foundation.
-> > >   */
+> > For the above reasons, the following alternative text might be a bit
+> > more user-friendly:
+> > 
+> > 	help
+> > 	  This option enables support for systems using any of the the following
+> > 	  ARM core tiles on the Versatile Express motherboard:
+> > 
+> > 	      CoreTile Express A5x2 (V2P-CA5s)
+> > 	      CoreTile Express A9x4 (V2P-CA9)
+> > 
+> > 	  You must boot using a Flattened Device Tree in order to use these
+> > 	  platforms.  The traditional (ATAGs) boot method is not usable on
+> > 	  these boards with this option.
+> > 
+> > 	  If you want your kernel to run on one of these platforms and your
+> > 	  bootloader supports Flattened Device Tree based booting, say Y.
+> 
+> Same here - will copy this :-)
+> 
+> > Do we still support the "old style" V2P-CA9x4 support?  If so, we could
+> > add a comment explaining that is available as an alternative, for now.
+> 
+> We do, with the non-DT option (Russell wouldn't be very happy if his
+> serial port multiplexer stopped working ;-)
+> 
+> > >  endmenu
+> > > diff --git a/arch/arm/mach-vexpress/Makefile b/arch/arm/mach-vexpress/Makefile
+> > > index 90551b9..06e3687 100644
+> > > --- a/arch/arm/mach-vexpress/Makefile
+> > > +++ b/arch/arm/mach-vexpress/Makefile
+> > > @@ -4,5 +4,6 @@
 > > >  
-> > > -#define DEBUG_LL_UART_OFFSET	0x00009000
-> > > +#define VEXPRESS_PHYS_BASE_LEGACY	0x10000000
-> > > +#define VEXPRESS_UART_OFFSET_LEGACY	0x00009000
-> > > +
-> > > +#define VEXPRESS_PHYS_BASE_RS1		0x1c000000
-> > > +#define VEXPRESS_UART_OFFSET_RS1	0x00090000
-> > > +
-> > > +#define VEXPRESS_VIRT_BASE		0xf8000000
-> > >  
-> > >  		.macro	addruart,rp,rv,tmp
-> > > -		mov	\rp, #DEBUG_LL_UART_OFFSET
-> > > -		orr	\rv, \rp, #0xf8000000	@ virtual base
-> > > -		orr	\rp, \rp, #0x10000000	@ physical base
-> > > +
-> > > +		@ Check the MMU state
-> > > +#if defined(CONFIG_MMU)
-> > > +		mrc	p15, 0, \tmp, c1, c0	@ SCTRL
-> > > +		tst	\tmp, #1		@ MMU enabled?
-> > > +		moveq	\tmp, #VEXPRESS_PHYS_BASE_LEGACY
-> > > +		movne	\tmp, #VEXPRESS_VIRT_BASE
-> > > +#else
-> > > +		mov	\tmp, #VEXPRESS_PHYS_BASE_LEGACY
-> > > +#endif
-> > > +
-> > > +		@ PL011 present in "legacy place"?
-> > > +		orr	\tmp, \tmp, #VEXPRESS_UART_OFFSET_LEGACY
-> > > +		ldr	\tmp, [\tmp, #0xfe0]	@ PeriphID0
-> > > +		teq	\tmp, #0x11		@ PL011
-> > > +
-> > > +		@ Legacy memory map
-> > > +		moveq	\rp, #VEXPRESS_UART_OFFSET_LEGACY
-> > > +		orreq	\rv, \rp, #VEXPRESS_VIRT_BASE
-> > > +		orreq	\rp, \rp, #VEXPRESS_PHYS_BASE_LEGACY
-> > > +
-> > > +		@ RS1 memory map
-> > > +		movne	\rp, #VEXPRESS_UART_OFFSET_RS1
-> > > +		orrne	\rv, \rp, #VEXPRESS_VIRT_BASE
-> > > +		orrne	\rp, \rp, #VEXPRESS_PHYS_BASE_RS1
-> > 
-> > I will assume that this works :)
-> 
-> It does, tested :-) The probing order "legacy-then-RS1" is carefully
-> selected - it doesn't work the other way round.
-> 
-> > Without grokking the detail, it looks fairly reasonable.
-> 
-> I was considering something similar to
-> "arch/arm/mach-omap2/include/mach/debug-macro.S", but it made the code
-> even more obscure.
-
-I would hope that the LL debug stuff can eventually be tidied up so that
-we can choose the right UART via the DT.  But that's really a wishlist
-thing.  Until (or unless) that happens, I guess code such as the above
-should be fine.
-
-> 
-> > [...]
-> > 
-> > > diff --git a/arch/arm/mach-vexpress/v2m.c b/arch/arm/mach-vexpress/v2m.c
+> > >  obj-y					:= v2m.o
+> > >  obj-$(CONFIG_ARCH_VEXPRESS_CA9X4)	+= ct-ca9x4.o
+> > > +obj-$(CONFIG_ARCH_VEXPRESS_V2P_CA5S_CA9) += v2p-ca5s_ca9.o
+> > >  obj-$(CONFIG_SMP)			+= platsmp.o
+> > >  obj-$(CONFIG_HOTPLUG_CPU)		+= hotplug.o
+> > > diff --git a/arch/arm/mach-vexpress/v2p-ca5s_ca9.c b/arch/arm/mach-vexpress/v2p-ca5s_ca9.c
 > > 
 > > [...]
 > > 
-> > >  void __init v2m_dt_init_early(void)
-> > > @@ -601,6 +643,10 @@ static struct of_dev_auxdata v2m_dt_auxdata_lookup[] __initdata = {
-> > >  	OF_DEV_AUXDATA("arm,vexpress-flash", V2M_NOR0, "physmap-flash",
-> > >  			&v2m_flash_data),
-> > >  	OF_DEV_AUXDATA("arm,primecell", V2M_MMCI, "mb:mmci", &v2m_mmci_data),
-> > > +	/* RS1 memory map */
-> > > +	OF_DEV_AUXDATA("arm,vexpress-flash", 0x08000000, "physmap-flash",
-> > > +			&v2m_flash_data),
-> > > +	OF_DEV_AUXDATA("arm,primecell", 0x1c050000, "mb:mmci", &v2m_mmci_data),
+> > > +DT_MACHINE_START(VEXPRESS_V2P_CA5S_CA9, "ARM Versatile Express")
 > > 
-> > Can we have macros instead of the magic numbers here?
+> > We could try to name the platform fully here, but these strings would
+> > get very long -- so I agree it best to leave that to be specified in
+> > the device tree.
 > 
-> I don't see any point:
-> 1. These value are used only and only here, so #defining them would just
-> add extra lines of traffic.
-> 2. They correspond to numbers (as in: numbers) in DTS.
-> 3. They will disappear once I'm done with MMCI and sysreg bindings. So
-> probably long before this series is actually merged...
+> Having such machine name here and model in the dts gives such a nice
+> message in the log:
+> 
+> Machine: ARM Versatile Express, model: V2P-CA9
+> 
+> Which is sort-of-correct.
 
-If as you rightly point out, this stuff is only here temporarily, then
-I don't have a strong view on it.
-
-If there will be no reason every to have macros for those addresses,
-then it's true that adding them only to remove them later will cause
-needless churn.
+Happy to go with your judgment on that.
 
 Cheers
 ---Dave
