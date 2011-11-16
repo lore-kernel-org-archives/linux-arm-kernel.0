@@ -1,36 +1,76 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 16 Nov 2011 11:26:49 +0100
-Subject: [PATCH] arm: device.h: Add dma_mask to pdev_archdata structure
-In-Reply-To: <20111116082926.GE9581@n2100.arm.linux.org.uk>
-References: <1321415178-12179-1-git-send-email-festevam@gmail.com>
- <20111116082926.GE9581@n2100.arm.linux.org.uk>
-Message-ID: <20111116102649.GQ30612@pengutronix.de>
+From: simon@sequanux.org (Simon Guinot)
+Date: Wed, 16 Nov 2011 11:25:50 +0100
+Subject: [PATCH v2] ARM: kirkwood: add LaCie Network Space Lite v2 support
+In-Reply-To: <1321433573-3851-1-git-send-email-cvubrugier@lacie.com>
+References: <1321433573-3851-1-git-send-email-cvubrugier@lacie.com>
+Message-ID: <20111116102549.GF29864@kw.sim.vm.gnt>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 16, 2011 at 08:29:26AM +0000, Russell King - ARM Linux wrote:
-> On Wed, Nov 16, 2011 at 01:46:18AM -0200, Fabio Estevam wrote:
-> > Fix the following build error when doing a 'make mx3_defconfig'
-> > 
-> > CC [M]  drivers/usb/host/fsl-mph-dr-of.o
-> > drivers/usb/host/fsl-mph-dr-of.c: In function 'fsl_usb2_device_register':
-> > drivers/usb/host/fsl-mph-dr-of.c:97: error: 'struct pdev_archdata' has no member named 'dma_mask'
-> > make[3]: *** [drivers/usb/host/fsl-mph-dr-of.o] Error 1
-> > make[2]: *** [drivers/usb/host] Error 2
-> > make[1]: *** [drivers/usb] Error 2
-> > make: *** [drivers] Error 2
+Hi Christophe,
+
+On Wed, Nov 16, 2011 at 09:52:53AM +0100, Christophe Vu-Brugier wrote:
+> The LaCie Network Space Lite v2 shares most of its characteristics
+> with the LaCie Network Space v2.
 > 
-> Why is this required for just MX3?  Why should we take the hit of adding
-> this (needlessly) for the other sub-architectures?  Why is MX3 doing this
-> differently?
-fsl-mph-dr-of.c is a driver that works on ARM and POWERPC. The latter
-has dma_mask in pdev_archdata and fsl-mph-dr-of.c uses it to hold the
-value pointed to by pdev->dev.dma_mask. AFAIK a driver should consider
-pdev->dev.dma_mask readonly, shouldn't it?
+> Hardware:
+>  * CPU: Marvell 88F6192 800Mhz
+>  * SDRAM memory: 128 MiB DDR2
+>  * Gigabit ethernet: PHY Marvell 88E1318
+>  * Flash memory: Macronix MX25L4005A 512 KiB
+>  * i2c EEPROM: 512 bytes
+>  * 2 USB2 ports: host and host/device
+>  * 1 push button
+>  * 2 LEDs (red and blue)
+> 
+> Signed-off-by: Christophe Vu-Brugier <cvubrugier@lacie.com>
+> ---
+> The patch has been rebased on top of the 'reset' branch. It depends on
+> the following commit:
+> 
+>   2f82cc8 ARM: restart: kirkwood: use new restart hook
+> 
+> Changes since v1:
+>  * reorder machine_desc initializers
+>  * use the leds-gpio driver to manage the blue LED
+> 
+>  arch/arm/mach-kirkwood/Kconfig             |    6 +++
+>  arch/arm/mach-kirkwood/Makefile            |    1 +
+>  arch/arm/mach-kirkwood/netspace_v2-setup.c |   61 +++++++++++++++++++++++++++-
+>  3 files changed, 66 insertions(+), 2 deletions(-)
 
-Best regards
-Uwe
+... snip ...
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> @@ -268,6 +313,18 @@ MACHINE_START(NETSPACE_V2, "LaCie Network Space v2")
+>  MACHINE_END
+>  #endif
+>  
+> +#ifdef CONFIG_MACH_NETSPACE_LITE_V2
+> +MACHINE_START(NETSPACE_LITE_V2, "LaCie Network Space Lite v2")
+> +	.atag_offset	= 0x100,
+> +	.map_io		= kirkwood_map_io,
+> +	.init_early	= kirkwood_init_early,
+> +	.init_irq	= kirkwood_init_irq,
+> +	.timer		= &kirkwood_timer,
+> +	.init_machine	= netspace_v2_init,
+> +	.restart	= kirkwood_restart,
+> +MACHINE_END
+> +#endif
+> +
+
+As suggested by Nicolas, I would have preferred to have a fixed
+machine_desc parameter ordering for Kirkwood machines before adding
+support for the Lite. Please, could you provide a such patch ?
+
+Except that, this patch looks good to me.
+
+Thanks,
+
+Simon
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111116/410e8ff5/attachment.sig>
