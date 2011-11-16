@@ -1,32 +1,41 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 16 Nov 2011 11:54:35 +0000
-Subject: Crash when memset of shared mapped memory in ARM
-In-Reply-To: <20111116084547.GG9581@n2100.arm.linux.org.uk>
-References: <CAJ8eaTzOtgMzcZeRr6f=+WhtsykK1NZraOGBPoqGncwcAGcTyQ@mail.gmail.com>
- <20111116084547.GG9581@n2100.arm.linux.org.uk>
-Message-ID: <20111116115435.GI4942@mudshark.cambridge.arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 16 Nov 2011 12:27:39 +0000
+Subject: [PATCH REPOST] genirq: don't allow per cpu interrupts to be suspended
+Message-ID: <1321446459-31409-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(Replying to Russell so as to lose the -request addresses)
+The power management functions related to interrupts do not know
+(yet) about per-cpu interrupts and end up calling the wrong
+low-level methods to enable/disable interrupts.
 
-On Wed, Nov 16, 2011 at 08:45:47AM +0000, Russell King - ARM Linux wrote:
-> Please do not spam mailing lists -request addresses when you post.  The
-> -request addresses are there for you to give the mailing list software
-> _instructions_ on what to do with your subscription.  It is not for
-> posts to the mailing list.
+This leads to all kind of interesting issues (action taken on one
+CPU only, updating a refcount which is not used otherwise...).
 
-For what it's worth, I was brave/daft enough to compile and run the testcase
-with an -rc1 kernel and Linaro 11.09 filesystem on the quad A9 Versatile
-Express:
+The workaround for the time being is simply to flag these interrupts
+with IRQF_NO_SUSPEND. At least on ARM, these interrupts are actually
+dealt with at the architecture level.
 
-root at dancing-fool:~# ./yad
-mmap: addr 0x20000000
-root at dancing-fool:~# ./yad
-shm_open: File exists
-mmap: addr 0x20000000
+Reported-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Tested-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ kernel/irq/manage.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-Looks like I'm missing the fireworks, despite the weirdy MAP_SHARED |
-MAP_FIXED mmap flags.
-
-Will
+diff --git a/kernel/irq/manage.c b/kernel/irq/manage.c
+index 63c1625..6e04134 100644
+--- a/kernel/irq/manage.c
++++ b/kernel/irq/manage.c
+@@ -1596,7 +1596,7 @@ int request_percpu_irq(unsigned int irq, irq_handler_t handler,
+ 		return -ENOMEM;
+ 
+ 	action->handler = handler;
+-	action->flags = IRQF_PERCPU;
++	action->flags = IRQF_PERCPU | IRQF_NO_SUSPEND;
+ 	action->name = devname;
+ 	action->percpu_dev_id = dev_id;
+ 
+-- 
+1.7.0.4
