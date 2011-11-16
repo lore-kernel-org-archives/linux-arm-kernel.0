@@ -1,82 +1,72 @@
-From: tarun.kanti@ti.com (DebBarma, Tarun Kanti)
-Date: Wed, 16 Nov 2011 11:48:10 +0530
-Subject: [PATCH v16 09/12] OMAP: dmtimer: low-power mode support
-In-Reply-To: <CAPTm=KGDEKGxLpJt0t6k_NL5Wz81NkMmRJ+OkmyvHedd6_exgQ@mail.gmail.com>
-References: <1316518227-28116-1-git-send-email-tarun.kanti@ti.com>
- <1316518227-28116-10-git-send-email-tarun.kanti@ti.com>
- <CAPTm=KGDEKGxLpJt0t6k_NL5Wz81NkMmRJ+OkmyvHedd6_exgQ@mail.gmail.com>
-Message-ID: <CAC83ZvJSev97waAOuzoJsFTX4vmeVFxkg6BzpjQm+Tjo3cbhpg@mail.gmail.com>
+From: jaswinder.singh@linaro.org (Jassi Brar)
+Date: Wed, 16 Nov 2011 11:54:09 +0530
+Subject: [PATCH 1/4] ARM: PL330: Don't call the callbacks if there isn't
+ any active transfer
+In-Reply-To: <CABb+yY1atyLA8Ej57JBEM0JL3oK5e6+1vO0UH5VTNiBsKQPueA@mail.gmail.com>
+References: <1320244259-10496-1-git-send-email-javi.merino@arm.com>
+ <CAJe_Zhf+PAeM+wquQykXNDG74Nc+jQNXrp+RLMKSySCNPum8Tg@mail.gmail.com>
+ <4EC28A76.7080606@arm.com>
+ <CABb+yY1atyLA8Ej57JBEM0JL3oK5e6+1vO0UH5VTNiBsKQPueA@mail.gmail.com>
+Message-ID: <CAJe_ZhftO+481BfL0ErEcM_brfmSuTXkTEniLRYxxM2T7OM2QA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 15, 2011 at 11:27 PM, Omar Ramirez Luna <or.rmz1@gmail.com> wrote:
-> Hi Tarun,
->
-> On Tue, Sep 20, 2011 at 6:30 AM, Tarun Kanti DebBarma
-> <tarun.kanti@ti.com> wrote:
->> Clock is enabled only when timer is started and disabled when the the timer
->> is stopped. Therefore before accessing registers in functions clock is enabled
->> and then disabled back at the end of access. Context save is done dynamically
->> whenever the registers are modified. Context restore is called when context is
->> lost.
->
-> Now that handling of the clock has been decoupled from
-> omap_dm_timer_request_specific/free and placed in start/stop
-> functions, there is a "possible irq lock inversion dependency
-> detected" for any attempt to enable the clock from soft|hard irq.
->
-> My use case is as follows:
->
-> DSP sends a mailbox message to ARM, this triggers a tasklet in mailbox
-> for processing the message, when it reaches tidspbridge it turns out
-> that the DSP wants to enable a gpt timer; however, locks involved
-> "clocks_mutex" and "dm_timer_lock" now could cause a deadlock as they
-> have been called from unsafe contexts in the past
-> (http://pastebin.com/7Dtz8t0f).
->
-> Is the intention to restrict enabling the dmtimer clocks from hard|soft irqs?
-The aim is to prevent client drivers perform clock enable/disable independently.
-Instead just use the request/start/stop APIs. In that way we can make clock
-enable/disable functions static in the future.
->
-> ...
->> @@ -303,6 +342,22 @@ void omap_dm_timer_stop(struct omap_dm_timer *timer)
->> ? ? ? ? ? ? ? ?rate = clk_get_rate(timer->fclk);
+On 15 November 2011 22:30, Jassi Brar <jassisinghbrar@gmail.com> wrote:
+> On Tue, Nov 15, 2011 at 9:21 PM, Javi Merino <javi.merino@arm.com> wrote:
+>> On 15/11/11 07:51, Jassi Brar wrote:
+>>>> There can be a stale struct pl330_req pointer from a previous run, but the
+>>>> memory may be free already.
+>>>>
+>>> Sorry I am unable to fathom the scenario. The pl330_request_channel resets
+>>> both pl330_req pointers. Maybe some real failure you saw, could help
+>>> me understand.
 >>
->> ? ? ? ?__omap_dm_timer_stop(timer, timer->posted, rate, is_omap2);
->> +
->> + ? ? ? if (timer->loses_context) {
->> + ? ? ? ? ? ? ? if (timer->get_context_loss_count)
->> + ? ? ? ? ? ? ? ? ? ? ? timer->ctx_loss_count =
->> + ? ? ? ? ? ? ? ? ? ? ? timer->get_context_loss_count(&timer->pdev->dev);
->> + ? ? ? }
->> +
->> + ? ? ? /*
->> + ? ? ? ?* Since the register values are computed and written within
->> + ? ? ? ?* __omap_dm_timer_stop, we need to use read to retrieve the
->> + ? ? ? ?* context.
->> + ? ? ? ?*/
->> + ? ? ? timer->context.tclr =
->> + ? ? ? ? ? ? ? ? ? ? ? omap_dm_timer_read_reg(timer, OMAP_TIMER_CTRL_REG);
->> + ? ? ? timer->context.tisr = __raw_readl(timer->irq_stat);
->> + ? ? ? omap_dm_timer_disable(timer);
->> ?}
->> ?EXPORT_SYMBOL_GPL(omap_dm_timer_stop);
+>> You request a channel, submit a xfer, it finishes successfully and
+>> pl330_update() is called, which calls r->xfer_cb() and marks the request
+>> as done by making req->mc_len = 0 . ?Then, if you call
+>> pl330_release_channel(), _callback(thrd->req[0].r, PL330_ERR_ABORT) is
+>> called and, as thrd_req[0].r and thrd_req[0].r->xfer_cb are not null,
+>> r->xfer_cb() is called again. ?That's wrong, the xfer finished (maybe
+>> long time ago) and the callback was called back then. ?You shouldn't
+>> call it again with an error. ?You should only do so if the transfer was
+>> running or scheduled to run, that's why I suggest calling _callback() if
+>> !IS_FREE(req).
 >>
+> Usually flush is called before releasing the channel, which would
+> have taken care of it. But I agree, flush shouldn't be necessary.
 >
-> I didn't review the whole patch, but at least this part is not in
-> mainline, it seems like the patch modified by Tony and the v16 were
-> not the same.
+> MARK_FREE(_pl330_req) ?with _pl330_req.r != NULL ? doesn't look neat.
+> So maybe we should move ? _pl330_req.r = NULL ? into MARK_FREE macro.
+> Which would require moving 'struct list_head rqd' from _pl330_req to
+> pl330_req, that should be ok though I think.
 >
-> I could diff and include the missing parts, if someone can confirm
-> that we need v16, which I believe so, since current stop function
-> doesn't call omap_dm_timer_disable.
-You are right. This change some how got missed in mainline.
-I have posted a patch for this already.
---
-Tarun
->
-> Regards,
->
-> Omar
->
+I think the following strikes just the right balance and should fix
+the issue ...
+
+diff --git a/arch/arm/common/pl330.c b/arch/arm/common/pl330.c
+index 7129cfb..ecbca3f 100644
+--- a/arch/arm/common/pl330.c
++++ b/arch/arm/common/pl330.c
+@@ -1480,13 +1480,19 @@ int pl330_update(const struct pl330_info *pi)
+
+ 	/* Now that we are in no hurry, do the callbacks */
+ 	while (!list_empty(&pl330->req_done)) {
++		struct pl330_req *r;
++
+ 		rqdone = container_of(pl330->req_done.next,
+ 					struct _pl330_req, rqd);
+
+ 		list_del_init(&rqdone->rqd);
+
++		/* Detach the req */
++		r = rqdone->r;
++		rqdone->r = NULL;
++
+ 		spin_unlock_irqrestore(&pl330->lock, flags);
+-		_callback(rqdone->r, PL330_ERR_NONE);
++		_callback(r, PL330_ERR_NONE);
+ 		spin_lock_irqsave(&pl330->lock, flags);
+ 	}
+---
+Thanks
+-j
