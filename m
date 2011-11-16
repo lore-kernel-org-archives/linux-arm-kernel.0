@@ -1,36 +1,26 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 16 Nov 2011 01:46:18 -0200
-Subject: [PATCH] arm: device.h: Add dma_mask to pdev_archdata structure
-Message-ID: <1321415178-12179-1-git-send-email-festevam@gmail.com>
+From: davidb@codeaurora.org (David Brown)
+Date: Tue, 15 Nov 2011 21:00:46 -0800
+Subject: [PATCH 4/4] mmc: Add mmc_host_<level> logging
+In-Reply-To: <631c53d126feff0a99b61d9c9a00b308d2b638ee.1321398815.git.joe@perches.com>
+References: <cover.1321398814.git.joe@perches.com>
+ <631c53d126feff0a99b61d9c9a00b308d2b638ee.1321398815.git.joe@perches.com>
+Message-ID: <20111116050046.GA422@huya.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix the following build error when doing a 'make mx3_defconfig'
+On Tue, Nov 15, 2011 at 03:32:08PM -0800, Joe Perches wrote:
 
-CC [M]  drivers/usb/host/fsl-mph-dr-of.o
-drivers/usb/host/fsl-mph-dr-of.c: In function 'fsl_usb2_device_register':
-drivers/usb/host/fsl-mph-dr-of.c:97: error: 'struct pdev_archdata' has no member named 'dma_mask'
-make[3]: *** [drivers/usb/host/fsl-mph-dr-of.o] Error 1
-make[2]: *** [drivers/usb/host] Error 2
-make[1]: *** [drivers/usb] Error 2
-make: *** [drivers] Error 2
+> Centralize the pr_<level> uses of mmc_hostname into specific
+> mmc_host_<level> calls to allow a flexible presentation style
+> and shorten the code a bit.
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/include/asm/device.h |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+>  drivers/mmc/host/msm_sdcc.c     |  101 ++++++++++++++++++---------------------
 
-diff --git a/arch/arm/include/asm/device.h b/arch/arm/include/asm/device.h
-index 7aa3680..6ec60f6 100644
---- a/arch/arm/include/asm/device.h
-+++ b/arch/arm/include/asm/device.h
-@@ -21,6 +21,7 @@ struct pdev_archdata {
- #ifdef CONFIG_ARCH_OMAP
- 	struct omap_device *od;
- #endif
-+	u64 dma_mask;
- };
- 
- #endif
+The MSM ones at least are quite straightforward, so I'm fine with this
+part of the change.
+
+Acked-by: David Brown <davidb@codeaurora.org>
+
 -- 
-1.7.1
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
