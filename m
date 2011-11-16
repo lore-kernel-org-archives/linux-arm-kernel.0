@@ -1,93 +1,104 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Wed, 16 Nov 2011 19:14:35 +0000
-Subject: [PATCH 3/5] ARM: vexpress: Add DT support in v2m
-In-Reply-To: <1321465054.3137.386.camel@hornet.cambridge.arm.com>
-References: <1321036026-23411-1-git-send-email-pawel.moll@arm.com>
- <1321036026-23411-4-git-send-email-pawel.moll@arm.com>
- <20111116154402.GE2073@localhost.localdomain>
- <4EC3E446.4030608@gmail.com>
- <1321461458.3137.374.camel@hornet.cambridge.arm.com>
- <4EC3EBEC.3020601@gmail.com>
- <1321463271.3137.380.camel@hornet.cambridge.arm.com>
- <1321465054.3137.386.camel@hornet.cambridge.arm.com>
-Message-ID: <20111116191435.GL2073@localhost.localdomain>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Wed, 16 Nov 2011 20:19:02 +0100
+Subject: [PATCH 1/3] drivers: base: add support for stmp-style devices
+In-Reply-To: <201111161744.19733.arnd@arndb.de>
+References: <1321440459-4527-1-git-send-email-w.sang@pengutronix.de>
+ <1321440459-4527-2-git-send-email-w.sang@pengutronix.de>
+ <201111161744.19733.arnd@arndb.de>
+Message-ID: <20111116191902.GA8843@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 16, 2011 at 05:37:34PM +0000, Pawel Moll wrote:
-> On Wed, 2011-11-16 at 17:07 +0000, Pawel Moll wrote:
-> > > > I'd rather second Dave's idea of having
-> > > > 
-> > > >>> 	compatible = "arm,vexpress-<model>", "arm-vexpress-rs1", "arm-vexpress";
-> > > > 
-> > > > and
-> > > > 
-> > > >>> +	compatible = "arm,vexpress-<model>", "arm,vexpress-legacy", "arm-vexpress";
-> > > 
-> > > If arm,vexpress-ca9 is the only legacy platform, then just drop
-> > > arm,vexpress-legacy altogether.
-> > 
-> > It's not. There is additional one, which is not publicly available, but
-> > is using the motherboard in legacy mode.
+On Wed, Nov 16, 2011 at 05:44:19PM +0000, Arnd Bergmann wrote:
+> On Wednesday 16 November 2011, Wolfram Sang wrote:
+> > Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
 > 
-> Alternatively, I could add motherboard node property, something like:
+> Introducing new core code definitely requires a long patch description.
+> How about copying the description from the introductory mail here?
+
+What I mainly forgot was s/PATCH/RFC/, and I'm sorry about that. I know this
+series is not suitable to be applied directly, I was mainly looking for
+comments from the arm people who are affected by this change.
+
+> > +static int stmp_clear_poll_bit(void __iomem *addr, u32 mask)
+> > +{
+> > +	int timeout = 0x400;
+> > +
+> > +	writel(mask, addr + STMP_CLR_ADDR);
+> > +	udelay(1);
+> > +	while ((readl(addr) & mask) && --timeout)
+> > +		/* nothing */;
+> > +
+> > +	return !timeout;
+> > +}
 > 
-> / {
->         motherboard {
-> 		arm,v2m-memory-map = "legacy";
+> For portable code, you should use cpu_relax() inside of the loop.
 > 
-> and
+> Is the udelay() actually necessary here?
+
+I am just copying the code from the current mxs-implementation. I think fixups
+(yes, needed!) should go in with seperate patches. Should have said so
+explicitly.
+
+> > +	ret = stmp_clear_poll_bit(reset_addr, STMP_MODULE_SFTRST);
+> > +	if (unlikely(ret))
+> > +		goto error;
 > 
-> / {
->         motherboard {
-> 		arm,v2m-memory-map = "rs1";
+> Please don't use likely()/unlikely() in code that is not very
+> performance sensitive. It will usually just increase the code size
+> but not actually have a measurable benefit.
+
+Ditto.
+
+> > +	if (unlikely(!timeout))
+> > +		goto error;
 > 
-> That way the "legacies" and "rses" will disappear from the main
-> compatible value:
+> Since the run-time of a readl() may vary greatly, counting to 400
+> for a timeout seems completely arbitrary and unhelpful.
+
+Ditto, I know. I talked about such things in Prague this year :)
+
+> 	long timeout = jiffies + HZ / 10; /* wait for at most 100ms */
 > 
-> 	compatible = "arm,vexpress-<model>", "arm-vexpress";
+> 	do {
+> 		...
+> 	} while (time_before(jiffies, timeout));
+
+Better, but not perfect ;) But I'll skip the discussion here...
+
+> > +EXPORT_SYMBOL(stmp_reset_block);
 > 
-> and everyone will be happy :-) There will be a bit more hassle with
-> getting this property in v2m.c, but not too much. Does it make any
-> sense?
+> EXPORT_SYMBOL_GPL?
 
-Yes, I think this will work.
+Fine with me.
 
-Because this value is not used for driver binding etc., there's no need
-for it to be a compatible string: a property is just fine.  So, actually
-it may be better.
+> > +#define STMP_SET_ADDR		0x4
+> > +#define STMP_CLR_ADDR		0x8
+> > +#define STMP_TOG_ADDR		0xc
+> 
+> The register numbers should probably go into the implementation file,
+> they are not an interface.
 
+As said, those are offsets. Especially useful for:
 
-Because this is a new binding, we can also describe _exactly_ the meaning
-of this property being absent.  In other words, we can say that if the
-am,v2m-memory-map property is absent, the memory map is the legacy
-memory map.  If the property is present with value "rs1", we have the
-rs1 memory map.  We can easily add extra values in the future as needed,
-without any risk of incompatibility with the legacy case.
+	offset = enabled ? STMP_SET_ADDR : STMP_CLR_ADDR;
+	writel(bits1, reg1 + offset);
+	writel(bits2, reg2 + offset);
+	...
 
-So how about:
+That will either set or clear bits, depending on 'enabled'.
 
-// Legacy case
-/ {
-	motherboard {
-		// arm,v2m-memory-map absent
+Regards,
 
+   Wolfram
 
-// RS1 case
-/ {
-	motherboard {
-		arm,v2m-memory-map = "rs1";
-
-If you prefer an explicit = "legacy" for the legacy case though,
-I'm fine with that too.
-
-
-When we remove compatible strings from the compatible set on the other
-hand, the device described by the node just becomes more and more
-general which isn't what we want: legacy is not a generalisation of rs1,
-nor vice versa; they are just plain different.  Because properties
-don't have these implies generalisation/specialisation semantics, we
-don't have this problem when using a property.
-
-Cheers
----Dave
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111116/64590afd/attachment.sig>
