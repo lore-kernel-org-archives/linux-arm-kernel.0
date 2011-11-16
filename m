@@ -1,102 +1,93 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 16 Nov 2011 12:06:56 -0700
-Subject: [RFC 6/8] of: add clock providers
-In-Reply-To: <20111114021359.GA25796@b20223-02.ap.freescale.net>
-References: <1320801583-12774-1-git-send-email-grant.likely@secretlab.ca>
- <1320801583-12774-7-git-send-email-grant.likely@secretlab.ca>
- <4EB9EA46.3030300@gmail.com>
- <20111114021359.GA25796@b20223-02.ap.freescale.net>
-Message-ID: <CACxGe6tHF7K4y9FqUxYraK0pgRRtN671-pp3Z88SEj4nStQiCg@mail.gmail.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Wed, 16 Nov 2011 19:14:35 +0000
+Subject: [PATCH 3/5] ARM: vexpress: Add DT support in v2m
+In-Reply-To: <1321465054.3137.386.camel@hornet.cambridge.arm.com>
+References: <1321036026-23411-1-git-send-email-pawel.moll@arm.com>
+ <1321036026-23411-4-git-send-email-pawel.moll@arm.com>
+ <20111116154402.GE2073@localhost.localdomain>
+ <4EC3E446.4030608@gmail.com>
+ <1321461458.3137.374.camel@hornet.cambridge.arm.com>
+ <4EC3EBEC.3020601@gmail.com>
+ <1321463271.3137.380.camel@hornet.cambridge.arm.com>
+ <1321465054.3137.386.camel@hornet.cambridge.arm.com>
+Message-ID: <20111116191435.GL2073@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 13, 2011 at 7:14 PM, Richard Zhao <richard.zhao@linaro.org> wrote:
-> On Tue, Nov 08, 2011 at 08:49:42PM -0600, Rob Herring wrote:
->> > +For example:
->> > +
->> > + ? ?oscillator {
->> > + ? ? ? ?#clock-cells = <1>;
->> > + ? ? ? ?clock-output-name = "ckil", "ckih";
->> > + ? ?};
->> > +
->> > +- this node defines a device with two clock outputs, the first named
->> > + ?"ckil" and the second named "ckih". ?Consumer nodes always reference
->> > + ?clocks by index. The names should reflect the clock output signal
->> > + ?names for the device.
->> > +
->> > +==Clock consumers==
->> > +
->> > +Required properties:
->> > +clock-input: ? ? ? List of phandle and clock specifier pairs, one pair
->> > + ? ? ? ? ? for each clock input to the device.
->> > +clock-input-name: List of clock input name strings sorted in the same
->> > + ? ? ? ? ? order as the clock-input property. ?Consumers drivers
->> > + ? ? ? ? ? will use clock-input-name to match clock input names
->> > + ? ? ? ? ? with clock-input specifiers.
->> > +
->> > +For example:
->> > +
->> > + ? ?uart {
->> > + ? ? ? ?clock-input = <&osc 1> <&ref 0>;
->> > + ? ? ? ?clock-input-name = "baud", "register";
->> > + ? ?};
->>
->> This is duplicated below.
+On Wed, Nov 16, 2011 at 05:37:34PM +0000, Pawel Moll wrote:
+> On Wed, 2011-11-16 at 17:07 +0000, Pawel Moll wrote:
+> > > > I'd rather second Dave's idea of having
+> > > > 
+> > > >>> 	compatible = "arm,vexpress-<model>", "arm-vexpress-rs1", "arm-vexpress";
+> > > > 
+> > > > and
+> > > > 
+> > > >>> +	compatible = "arm,vexpress-<model>", "arm,vexpress-legacy", "arm-vexpress";
+> > > 
+> > > If arm,vexpress-ca9 is the only legacy platform, then just drop
+> > > arm,vexpress-legacy altogether.
+> > 
+> > It's not. There is additional one, which is not publicly available, but
+> > is using the motherboard in legacy mode.
+> 
+> Alternatively, I could add motherboard node property, something like:
+> 
+> / {
+>         motherboard {
+> 		arm,v2m-memory-map = "legacy";
+> 
+> and
+> 
+> / {
+>         motherboard {
+> 		arm,v2m-memory-map = "rs1";
+> 
+> That way the "legacies" and "rses" will disappear from the main
+> compatible value:
+> 
+> 	compatible = "arm,vexpress-<model>", "arm-vexpress";
+> 
+> and everyone will be happy :-) There will be a bit more hassle with
+> getting this property in v2m.c, but not too much. Does it make any
+> sense?
 
-I'm okay with that. It's not entirely the same, and I think having
-several examples is helpful.
+Yes, I think this will work.
+
+Because this value is not used for driver binding etc., there's no need
+for it to be a compatible string: a property is just fine.  So, actually
+it may be better.
 
 
->> > + ? ?/* external oscillator */
->> > + ? ?osc: oscillator {
->> > + ? ? ? ?compatible = "fixed-clock";
->> > + ? ? ? ?#clock-cells = <1>;
->> > + ? ? ? ?frequency ?= <32678>;
->>
->> The code is using "clock-frequency" here.
+Because this is a new binding, we can also describe _exactly_ the meaning
+of this property being absent.  In other words, we can say that if the
+am,v2m-memory-map property is absent, the memory map is the legacy
+memory map.  If the property is present with value "rs1", we have the
+rs1 memory map.  We can easily add extra values in the future as needed,
+without any risk of incompatibility with the legacy case.
 
-Fixed
+So how about:
 
->>
->> > + ? ? ? ?clock-output-name = "osc";
->> > + ? ?};
->> > +
->> > + ? ?/* phase-locked-loop device, generates a higher frequency clock
->> > + ? ? * from the external oscillator reference */
->> > + ? ?pll: pll {
->> > + ? ? ? ?compatible = "some-pll-interface"
->> > + ? ? ? ?#clock-cells = <1>;
->> > + ? ? ? ?clock-input = <&osc 0>;
->>
->> There's a mismatch in #clock-cells size and this.
->
-> osc #clock-cells is 1. "0" is one cell too. Nothing wrong. Correct my understanding?
+// Legacy case
+/ {
+	motherboard {
+		// arm,v2m-memory-map absent
 
-Richard is correct.  The #clock-cells value needs to be 1, which in
-the clock binding means one cell for the phandle and one cell for the
-attached arguments.  Exactly the same as the gpio binding.
 
->> > +static struct clk *__of_clk_get_from_provider(struct of_phandle_args *clkspec)
->> > +{
->> > + ? struct of_clk_provider *provider;
->> > + ? struct clk *clk = NULL;
->> > +
->> > + ? /* Check if we have such a provider in our array */
->> > + ? mutex_lock(&of_clk_lock);
->> > + ? list_for_each_entry(provider, &of_clk_providers, link) {
->> > + ? ? ? ? ? if (provider->node == clkspec->np)
->> > + ? ? ? ? ? ? ? ? ? clk = provider->get(clkspec, provider->data);
->>
->> How about:
->>
->> if (provider->get)
->> ? ? ? clk = provider->get(clkspec, provider->data);
->> else
->> ? ? ? clk = provider->data;
+// RS1 case
+/ {
+	motherboard {
+		arm,v2m-memory-map = "rs1";
 
-I'd rather make it a requirement for every clock driver to provide the
-get hook; even if it uses a stock version that simply returns ->data.
+If you prefer an explicit = "legacy" for the legacy case though,
+I'm fine with that too.
 
-Thanks for the review.
 
-g.
+When we remove compatible strings from the compatible set on the other
+hand, the device described by the node just becomes more and more
+general which isn't what we want: legacy is not a generalisation of rs1,
+nor vice versa; they are just plain different.  Because properties
+don't have these implies generalisation/specialisation semantics, we
+don't have this problem when using a property.
+
+Cheers
+---Dave
