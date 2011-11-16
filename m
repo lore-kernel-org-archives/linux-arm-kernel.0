@@ -1,33 +1,19 @@
-From: joe@perches.com (Joe Perches)
-Date: Tue, 15 Nov 2011 17:18:14 -0800
-Subject: [PATCH 4/4] mmc: Add mmc_host_<level> logging
-In-Reply-To: <CAKYAXd9iQzvZBJL+0xPhKyC5hf-frPpMLhdWr3ygbztGiYtNJQ@mail.gmail.com>
+From: linkinjeon@gmail.com (NamJae Jeon)
+Date: Wed, 16 Nov 2011 10:18:52 +0900
+Subject: [PATCH 1/4] mmc: Update logging style
+In-Reply-To: <c75784ed1efa8636f7177cd5662c35fa6a8d03df.1321398814.git.joe@perches.com>
 References: <cover.1321398814.git.joe@perches.com>
- <631c53d126feff0a99b61d9c9a00b308d2b638ee.1321398815.git.joe@perches.com>
- <CAKYAXd_wtGVQYgr_MUtVGGpkpqJgF56bfm0zO-nnAK0YpkT+bg@mail.gmail.com>
- <1321405049.21286.35.camel@Joe-Laptop>
- <CAKYAXd9iQzvZBJL+0xPhKyC5hf-frPpMLhdWr3ygbztGiYtNJQ@mail.gmail.com>
-Message-ID: <1321406294.9189.2.camel@Joe-Laptop>
+ <c75784ed1efa8636f7177cd5662c35fa6a8d03df.1321398814.git.joe@perches.com>
+Message-ID: <CAKYAXd_gSohnAc9tpK53bjpoeSJ=0fMWz38SeLzHtRzvGTNgGQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2011-11-16 at 10:14 +0900, NamJae Jeon wrote:
-> 2011/11/16 Joe Perches <joe@perches.com>:
-> > On Wed, 2011-11-16 at 09:52 +0900, NamJae Jeon wrote:
-> >> 2011/11/16 Joe Perches <joe@perches.com>:
-> >> > Centralize the pr_<level> uses of mmc_hostname into specific
-> >> > mmc_host_<level> calls to allow a flexible presentation style
-> >> > and shorten the code a bit.
-> >> I don't know why pr_info should be surely replaced by mmc_host_info.
-> >> if it is needed for only host name, I think that existing
-> >> pr_info/err/debug is sufficient.
-> > Please trim your replies and read the patch description.
-> my concern is that they feel confuse when coder add print code because
-> they should use mmc_host<level> for hostname, and pr_<level> is used
-> in the other case.
-
-That's one point of view.
-
-It is the same issue though as using dev_<level>
-when you have a struct device * and also using
-pr_<level> otherwise.
+2011/11/16 Joe Perches <joe@perches.com>:
+> Convert pr_warning to pr_warn.
+> Coalesce format strings.
+> Align arguments.
+> Add missing \n.
+>
+> Signed-off-by: Joe Perches <joe@perches.com>
+Reviewed-by: NamJae Jeon <linkinjeon@gmail.com>
+> ---
