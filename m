@@ -1,108 +1,31 @@
 From: nico@fluxnic.net (Nicolas Pitre)
-Date: Wed, 16 Nov 2011 00:48:23 -0500
-Subject: [PATCH 05/23] ARM: mach-davinci: remove arch specific special handling
- for ioremap
+Date: Wed, 16 Nov 2011 00:48:21 -0500
+Subject: [PATCH 03/23] ARM: plat-mxc: remove inclusion of <mach/vmalloc.h>
 In-Reply-To: <1321422521-1138-1-git-send-email-nico@fluxnic.net>
 References: <1321422521-1138-1-git-send-email-nico@fluxnic.net>
-Message-ID: <1321422521-1138-6-git-send-email-nico@fluxnic.net>
+Message-ID: <1321422521-1138-4-git-send-email-nico@fluxnic.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Nicolas Pitre <nicolas.pitre@linaro.org>
 
-A generic version should replace this later.
-
 Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
 ---
- arch/arm/mach-davinci/Makefile          |    2 +-
- arch/arm/mach-davinci/include/mach/io.h |    8 -----
- arch/arm/mach-davinci/io.c              |   48 -------------------------------
- 3 files changed, 1 insertions(+), 57 deletions(-)
- delete mode 100644 arch/arm/mach-davinci/io.c
+ arch/arm/plat-mxc/include/mach/mx1.h |    2 --
+ 1 files changed, 0 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/Makefile b/arch/arm/mach-davinci/Makefile
-index 495e31306f..2db78bd5c8 100644
---- a/arch/arm/mach-davinci/Makefile
-+++ b/arch/arm/mach-davinci/Makefile
-@@ -4,7 +4,7 @@
- #
+diff --git a/arch/arm/plat-mxc/include/mach/mx1.h b/arch/arm/plat-mxc/include/mach/mx1.h
+index 97b19e7800..2b7c08d13e 100644
+--- a/arch/arm/plat-mxc/include/mach/mx1.h
++++ b/arch/arm/plat-mxc/include/mach/mx1.h
+@@ -12,8 +12,6 @@
+ #ifndef __MACH_MX1_H__
+ #define __MACH_MX1_H__
  
- # Common objects
--obj-y 			:= time.o clock.o serial.o io.o psc.o \
-+obj-y 			:= time.o clock.o serial.o psc.o \
- 			   dma.o usb.o common.o sram.o aemif.o
- 
- obj-$(CONFIG_DAVINCI_MUX)		+= mux.o
-diff --git a/arch/arm/mach-davinci/include/mach/io.h b/arch/arm/mach-davinci/include/mach/io.h
-index d1b954955c..b2267d1e1a 100644
---- a/arch/arm/mach-davinci/include/mach/io.h
-+++ b/arch/arm/mach-davinci/include/mach/io.h
-@@ -21,12 +21,4 @@
- #define __mem_pci(a)		(a)
- #define __mem_isa(a)		(a)
- 
--#ifndef __ASSEMBLER__
--#define __arch_ioremap		davinci_ioremap
--#define __arch_iounmap		davinci_iounmap
+-#include <mach/vmalloc.h>
 -
--void __iomem *davinci_ioremap(unsigned long phys, size_t size,
--			      unsigned int type);
--void davinci_iounmap(volatile void __iomem *addr);
--#endif
- #endif /* __ASM_ARCH_IO_H */
-diff --git a/arch/arm/mach-davinci/io.c b/arch/arm/mach-davinci/io.c
-deleted file mode 100644
-index 8ea60a8b24..0000000000
---- a/arch/arm/mach-davinci/io.c
-+++ /dev/null
-@@ -1,48 +0,0 @@
--/*
-- * DaVinci I/O mapping code
-- *
-- * Copyright (C) 2005-2006 Texas Instruments
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- */
--
--#include <linux/module.h>
--#include <linux/io.h>
--
--#include <asm/tlb.h>
--#include <asm/mach/map.h>
--
--#include <mach/common.h>
--
--/*
-- * Intercept ioremap() requests for addresses in our fixed mapping regions.
-- */
--void __iomem *davinci_ioremap(unsigned long p, size_t size, unsigned int type)
--{
--	struct map_desc *desc = davinci_soc_info.io_desc;
--	int desc_num = davinci_soc_info.io_desc_num;
--	int i;
--
--	for (i = 0; i < desc_num; i++, desc++) {
--		unsigned long iophys = __pfn_to_phys(desc->pfn);
--		unsigned long iosize = desc->length;
--
--		if (p >= iophys && (p + size) <= (iophys + iosize))
--			return __io(desc->virtual + p - iophys);
--	}
--
--	return __arm_ioremap_caller(p, size, type,
--					__builtin_return_address(0));
--}
--EXPORT_SYMBOL(davinci_ioremap);
--
--void davinci_iounmap(volatile void __iomem *addr)
--{
--	unsigned long virt = (unsigned long)addr;
--
--	if (virt >= VMALLOC_START && virt < VMALLOC_END)
--		__iounmap(addr);
--}
--EXPORT_SYMBOL(davinci_iounmap);
+ /*
+  * Memory map
+  */
 -- 
 1.7.7.1.431.g10b2a
