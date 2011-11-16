@@ -1,46 +1,72 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Wed, 16 Nov 2011 23:15:34 +0800
-Subject: [GIT PULL] pxa: fixes for v3.2-rc1
-In-Reply-To: <CAMPhdO_bAdTMAVZcgCwS568hPMzHZa7iwy5pUa-N2BOreaZFfw@mail.gmail.com>
-References: <CAMPhdO_bAdTMAVZcgCwS568hPMzHZa7iwy5pUa-N2BOreaZFfw@mail.gmail.com>
-Message-ID: <CAMPhdO-i2VXnJz8VY6w+oafng6x8v2g69XE9kdYrZGJNDhiyRg@mail.gmail.com>
+From: zonque@gmail.com (Daniel Mack)
+Date: Wed, 16 Nov 2011 16:30:33 +0100
+Subject: [PATCH] ARM: pxa: fix missing linux/gpio.h include
+In-Reply-To: <CAMPhdO-jKNsVnHh7m3G19wETd5+8XVkjSvyAoEANJ3rS0USaUg@mail.gmail.com>
+References: <1321454103-26596-1-git-send-email-zonque@gmail.com>
+ <CAN1soZw4zPCe-VzbXjmGJ6+9yRF3H6KEPtp7kQGa3CtBPHUbfQ@mail.gmail.com>
+ <CAMPhdO-jKNsVnHh7m3G19wETd5+8XVkjSvyAoEANJ3rS0USaUg@mail.gmail.com>
+Message-ID: <4EC3D719.60704@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sorry Arnd, please hold on pull this. We have some concerns
-to one of the patch. I'll update the GIT PULL a bit later.
+On 11/16/2011 04:08 PM, Eric Miao wrote:
+> On Wed, Nov 16, 2011 at 11:03 PM, Haojian Zhuang
+> <haojian.zhuang@gmail.com> wrote:
+>> On Wed, Nov 16, 2011 at 10:35 PM, Daniel Mack <zonque@gmail.com> wrote:
+>>> Fixes the following compile error:
+>>>
+>>>  arch/arm/mach-pxa/pxa3xx.c: In function 'pxa3xx_cpu_pm_suspend':
+>>>  arch/arm/mach-pxa/pxa3xx.c:156: error: implicit declaration of function 'gpio_get_value'
+>>>  make[1]: *** [arch/arm/mach-pxa/pxa3xx.o] Error 1
+>>>
+>>> Signed-off-by: Daniel Mack <zonque@gmail.com>
+>>> Cc: Haojian Zhuang <haojian.zhuang@marvell.com>
+>>> Cc: Eric Miao <eric.y.miao@gmail.com>
+>>> ---
+>>>
+>>>  I didn't closely follow all recent patches around PXA, so it might be that
+>>>  this has already been cared for. Haojian?
+>>>
+>>>  arch/arm/mach-pxa/pxa3xx.c |    1 +
+>>>  1 files changed, 1 insertions(+), 0 deletions(-)
+>>>
+>>> diff --git a/arch/arm/mach-pxa/pxa3xx.c b/arch/arm/mach-pxa/pxa3xx.c
+>>> index 3866d52..7cddd11 100644
+>>> --- a/arch/arm/mach-pxa/pxa3xx.c
+>>> +++ b/arch/arm/mach-pxa/pxa3xx.c
+>>> @@ -19,6 +19,7 @@
+>>>  #include <linux/platform_device.h>
+>>>  #include <linux/irq.h>
+>>>  #include <linux/io.h>
+>>> +#include <linux/gpio.h>
+>>>  #include <linux/syscore_ops.h>
+>>>  #include <linux/i2c/pxa-i2c.h>
+>>>
+>>> --
+>>> 1.7.7.1
+>>>
+>>>
+>>> _______________________________________________
+>>> linux-arm-kernel mailing list
+>>> linux-arm-kernel at lists.infradead.org
+>>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>>
+>>
+>> Hi Daniel,
+>>
+>> At first, gpio_get_value() isn't used in arch/arm/mach-pxa/pxa3xx.c.
+>>
+>> Which git tree and which branch are you using now? I tried my git
+>> tree, arnd/for-next, rmk/for-next. Everything is ok. I can't find any
+>> build issue.
+> 
+> Ouch! I didn't even give it a second thought to this obvious one-liner patch.
 
-On Wed, Nov 16, 2011 at 10:53 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
-> The following changes since commit 1ea6b8f48918282bdca0b32a34095504ee65bab5:
->
-> ?Linux 3.2-rc1 (2011-11-07 16:16:02 -0800)
->
-> are available in the git repository at:
-> ?git://github.com/ycmiao/pxa-linux.git fix
->
-> Daniel Mack (1):
-> ? ? ?ARM: pxa: fix missing linux/gpio.h include
->
-> Eric Miao (1):
-> ? ? ?ARM: pxa168/gplugd: add the correct SSP device
->
-> Haojian Zhuang (2):
-> ? ? ?ARM: pxa: fix inconsistent CONFIG_USB_PXA27X
-> ? ? ?ARM: mmp: fix build error on gpio
->
-> ?arch/arm/configs/ezx_defconfig ? ? ? ? ? ?| ? ?2 +-
-> ?arch/arm/configs/imote2_defconfig ? ? ? ? | ? ?2 +-
-> ?arch/arm/configs/magician_defconfig ? ? ? | ? ?2 +-
-> ?arch/arm/configs/zeus_defconfig ? ? ? ? ? | ? ?2 +-
-> ?arch/arm/mach-mmp/gplugd.c ? ? ? ? ? ? ? ?| ? ?2 +-
-> ?arch/arm/mach-mmp/include/mach/gpio-pxa.h | ? ?2 +-
-> ?arch/arm/mach-pxa/balloon3.c ? ? ? ? ? ? ?| ? ?2 +-
-> ?arch/arm/mach-pxa/colibri-pxa320.c ? ? ? ?| ? ?2 +-
-> ?arch/arm/mach-pxa/gumstix.c ? ? ? ? ? ? ? | ? ?2 +-
-> ?arch/arm/mach-pxa/include/mach/palm27x.h ?| ? ?4 ++--
-> ?arch/arm/mach-pxa/palm27x.c ? ? ? ? ? ? ? | ? ?4 ++--
-> ?arch/arm/mach-pxa/palmtc.c ? ? ? ? ? ? ? ?| ? ?2 +-
-> ?arch/arm/mach-pxa/pxa3xx.c ? ? ? ? ? ? ? ?| ? ?1 +
-> ?arch/arm/mach-pxa/vpac270.c ? ? ? ? ? ? ? | ? ?2 +-
-> ?14 files changed, 16 insertions(+), 15 deletions(-)
->
+Gash. Not my day. We have a stupid workaround in that file that is
+buried in a very old patch. Due to recent changes in mainline, this
+doesn't build anymore, but that is something I have to keep privately.
+
+Thanks for the heads-up, and sorry. You can drop this patch.
+
+
+Daniel
