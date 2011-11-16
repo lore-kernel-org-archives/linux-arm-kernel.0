@@ -1,99 +1,55 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 16 Nov 2011 17:54:13 +0000
-Subject: [PATCH v6 1/5] ARM: lib: add call_with_stack function for safely
- changing stack
+Date: Wed, 16 Nov 2011 17:54:17 +0000
+Subject: [PATCH v6 5/5] ARM: kexec: use soft_restart for branching to the
+ reboot buffer
 In-Reply-To: <1321466057-19721-1-git-send-email-will.deacon@arm.com>
 References: <1321466057-19721-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1321466057-19721-2-git-send-email-will.deacon@arm.com>
+Message-ID: <1321466057-19721-6-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When disabling the MMU, it is necessary to take out a 1:1 identity map
-of the reset code so that it can safely be executed with and without
-the MMU active. To avoid the situation where the physical address of the
-reset code aliases with the virtual address of the active stack (which
-cannot be included in the 1:1 mapping), it is desirable to change to a
-new stack at a location which is less likely to alias.
+Now that there is a common way to reset the machine, let's use it
+instead of reinventing the wheel in the kexec backend.
 
-This code adds a new lib function, call_with_stack:
-
-	void call_with_stack(void (*fn)(void *), void *arg, void *sp);
-
-which changes the stack to point at the sp parameter, before invoking
-fn(arg) with the new stack selected.
-
-Reviewed-by: Nicolas Pitre <nicolas.pitre@linaro.org>
-Signed-off-by: Dave Martin <dave.martin@linaro.org>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/lib/Makefile          |    3 +-
- arch/arm/lib/call_with_stack.S |   44 ++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 46 insertions(+), 1 deletions(-)
- create mode 100644 arch/arm/lib/call_with_stack.S
+ arch/arm/kernel/machine_kexec.c |   15 +++------------
+ 1 files changed, 3 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm/lib/Makefile b/arch/arm/lib/Makefile
-index cf73a7f..0ade0ac 100644
---- a/arch/arm/lib/Makefile
-+++ b/arch/arm/lib/Makefile
-@@ -13,7 +13,8 @@ lib-y		:= backtrace.o changebit.o csumipv6.o csumpartial.o   \
- 		   testchangebit.o testclearbit.o testsetbit.o        \
- 		   ashldi3.o ashrdi3.o lshrdi3.o muldi3.o             \
- 		   ucmpdi2.o lib1funcs.o div64.o                      \
--		   io-readsb.o io-writesb.o io-readsl.o io-writesl.o
-+		   io-readsb.o io-writesb.o io-readsl.o io-writesl.o  \
-+		   call_with_stack.o
+diff --git a/arch/arm/kernel/machine_kexec.c b/arch/arm/kernel/machine_kexec.c
+index 29620b6..764bd45 100644
+--- a/arch/arm/kernel/machine_kexec.c
++++ b/arch/arm/kernel/machine_kexec.c
+@@ -12,12 +12,11 @@
+ #include <asm/mmu_context.h>
+ #include <asm/cacheflush.h>
+ #include <asm/mach-types.h>
++#include <asm/system.h>
  
- mmu-y	:= clear_user.o copy_page.o getuser.o putuser.o
+ extern const unsigned char relocate_new_kernel[];
+ extern const unsigned int relocate_new_kernel_size;
  
-diff --git a/arch/arm/lib/call_with_stack.S b/arch/arm/lib/call_with_stack.S
-new file mode 100644
-index 0000000..916c80f
---- /dev/null
-+++ b/arch/arm/lib/call_with_stack.S
-@@ -0,0 +1,44 @@
-+/*
-+ * arch/arm/lib/call_with_stack.S
-+ *
-+ * Copyright (C) 2011 ARM Ltd.
-+ * Written by Will Deacon <will.deacon@arm.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
-+ */
+-extern void setup_mm_for_reboot(void);
+-
+ extern unsigned long kexec_start_address;
+ extern unsigned long kexec_indirection_page;
+ extern unsigned long kexec_mach_type;
+@@ -111,14 +110,6 @@ void machine_kexec(struct kimage *image)
+ 
+ 	if (kexec_reinit)
+ 		kexec_reinit();
+-	local_irq_disable();
+-	local_fiq_disable();
+-	setup_mm_for_reboot();
+-	flush_cache_all();
+-	outer_flush_all();
+-	outer_disable();
+-	cpu_proc_fin();
+-	outer_inv_all();
+-	flush_cache_all();
+-	cpu_reset(reboot_code_buffer_phys);
 +
-+#include <linux/linkage.h>
-+#include <asm/assembler.h>
-+
-+/*
-+ * void call_with_stack(void (*fn)(void *), void *arg, void *sp)
-+ *
-+ * Change the stack to that pointed at by sp, then invoke fn(arg) with
-+ * the new stack.
-+ */
-+ENTRY(call_with_stack)
-+	str	sp, [r2, #-4]!
-+	str	lr, [r2, #-4]!
-+
-+	mov	sp, r2
-+	mov	r2, r0
-+	mov	r0, r1
-+
-+	adr	lr, BSYM(1f)
-+	mov	pc, r2
-+
-+1:	ldr	lr, [sp]
-+	ldr	sp, [sp, #4]
-+	mov	pc, lr
-+ENDPROC(call_with_stack)
++	soft_restart(reboot_code_buffer_phys);
+ }
 -- 
 1.7.4.1
