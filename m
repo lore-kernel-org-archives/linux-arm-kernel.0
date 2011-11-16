@@ -1,38 +1,49 @@
 From: nico@fluxnic.net (Nicolas Pitre)
-Date: Wed, 16 Nov 2011 00:48:33 -0500
-Subject: [PATCH 15/23] ARM: realview-eb11mp: fix map_desc alignment
+Date: Wed, 16 Nov 2011 00:48:41 -0500
+Subject: [PATCH 23/23] ARM: move VMALLOC_END down temporarily for shmobile
 In-Reply-To: <1321422521-1138-1-git-send-email-nico@fluxnic.net>
 References: <1321422521-1138-1-git-send-email-nico@fluxnic.net>
-Message-ID: <1321422521-1138-16-git-send-email-nico@fluxnic.net>
+Message-ID: <1321422521-1138-24-git-send-email-nico@fluxnic.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rob Herring <rob.herring@calxeda.com>
+From: Nicolas Pitre <nicolas.pitre@linaro.org>
 
-REALVIEW_EB11MP_GIC_CPU_BASE is not 4KB aligned which causes an
-overlapping mapping. Use REALVIEW_EB11MP_SCU_BASE instead which is
-aligned.
+THIS IS A TEMPORARY HACK.  The purpose of this is _only_ to avoid a
+regression on an existing machine while a better fix is implemented.
 
-Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+On shmobile the consistent DMA memory area was set to 158MB in commit
+28f0721a79 with no explanation.  The documented size for this area should
+vary between 2MB and 14MB, and none of the other ARM targets exceed that.
+
+The included #warning is therefore meant to be noisy on purpose to get
+shmobile maintainers attention and this commit reverted once this
+consistent DMA size conflict is resolved.
+
 Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+Cc: Magnus Damm <damm@opensource.se>
+Cc: Paul Mundt <lethal@linux-sh.org>
 ---
- arch/arm/mach-realview/realview_eb.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/include/asm/pgtable.h |    7 +++++++
+ 1 files changed, 7 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-realview/realview_eb.c b/arch/arm/mach-realview/realview_eb.c
-index 026c66ad7e..a9874e176f 100644
---- a/arch/arm/mach-realview/realview_eb.c
-+++ b/arch/arm/mach-realview/realview_eb.c
-@@ -91,8 +91,8 @@ static struct map_desc realview_eb_io_desc[] __initdata = {
+diff --git a/arch/arm/include/asm/pgtable.h b/arch/arm/include/asm/pgtable.h
+index 6cdd55cb0b..bcae9b81a6 100644
+--- a/arch/arm/include/asm/pgtable.h
++++ b/arch/arm/include/asm/pgtable.h
+@@ -37,6 +37,13 @@
+ #define VMALLOC_START		(((unsigned long)high_memory + VMALLOC_OFFSET) & ~(VMALLOC_OFFSET-1))
+ #define VMALLOC_END		0xff000000UL
  
- static struct map_desc realview_eb11mp_io_desc[] __initdata = {
- 	{
--		.virtual	= IO_ADDRESS(REALVIEW_EB11MP_GIC_CPU_BASE),
--		.pfn		= __phys_to_pfn(REALVIEW_EB11MP_GIC_CPU_BASE),
-+		.virtual	= IO_ADDRESS(REALVIEW_EB11MP_SCU_BASE),
-+		.pfn		= __phys_to_pfn(REALVIEW_EB11MP_SCU_BASE),
- 		.length		= SZ_4K,
- 		.type		= MT_DEVICE,
- 	}, {
++/* This is a temporary hack until shmobile's DMA area size is sorted out */
++#ifdef CONFIG_ARCH_SHMOBILE
++#warning "SH-Mobile's consistent DMA size conflicts with VMALLOC_END by 144MB"
++#undef VMALLOC_END
++#define VMALLOC_END		0xF6000000UL
++#endif
++
+ #define LIBRARY_TEXT_START	0x0c000000
+ 
+ #ifndef __ASSEMBLY__
 -- 
 1.7.7.1.431.g10b2a
