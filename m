@@ -1,69 +1,58 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Wed, 16 Nov 2011 14:51:26 +0100
-Subject: [PATCH] arm: mx28: check for gated clocks when setting saif
- divider
-In-Reply-To: <65EE16ACC360FA4D99C96DC085B3F7722D4E65@039-SN1MPN1-002.039d.mgd.msft.net>
-References: <1315650583-4793-1-git-send-email-w.sang@pengutronix.de>
- <20111116132222.GD2596@pengutronix.de>
- <65EE16ACC360FA4D99C96DC085B3F7722D4E65@039-SN1MPN1-002.039d.mgd.msft.net>
-Message-ID: <20111116135125.GE2596@pengutronix.de>
+From: zonque@gmail.com (Daniel Mack)
+Date: Wed, 16 Nov 2011 15:06:46 +0100
+Subject: [PATCH] ARM: pxa: add support for Raumfeld DDX
+In-Reply-To: <20111116131910.GE29986@opensource.wolfsonmicro.com>
+References: <1320661562-422-1-git-send-email-zonque@gmail.com>
+ <20111115141348.GG3077@opensource.wolfsonmicro.com>
+ <4EC3B30F.60403@gmail.com>
+ <20111116131910.GE29986@opensource.wolfsonmicro.com>
+Message-ID: <4EC3C376.3040007@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 16, 2011 at 01:35:04PM +0000, Dong Aisheng-B29396 wrote:
-> > -----Original Message-----
-> > From: Wolfram Sang [mailto:w.sang at pengutronix.de]
-> > Sent: Wednesday, November 16, 2011 9:22 PM
-> > To: linux-arm-kernel at lists.infradead.org
-> > Cc: Sascha Hauer; Guo Shawn-R65073; Dong Aisheng-B29396
-> > Subject: Re: [PATCH] arm: mx28: check for gated clocks when setting saif
-> > divider
-> > 
-> > On Sat, Sep 10, 2011 at 12:29:43PM +0200, Wolfram Sang wrote:
-> > > Like with all other clocks, the divider for the SAIF devices should
-> > > not be altered when the clock is gated. Bail out when this is the case
-> > > like the other clocks do.
-> > >
-> > > Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
-> > > Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> > > Cc: Shawn Guo <shawn.guo@freescale.com>
-> > > Cc: Dong Aisheng-B29396 <B29396@freescale.com>
-> > > ---
-> > >
-> > > Aisheng: I think this is the correct solution for clock-mx28.c. If
-> > > setting the rate of the saif clocks hit the error path, it should be
-> > fixed in the driver?
-> > 
-> > Ping. Trying to catch up, has this been resolved meanwhile?
-> > 
-> Sorry, I missed this patch.
+On 11/16/2011 02:19 PM, Mark Brown wrote:
+> On Wed, Nov 16, 2011 at 01:56:47PM +0100, Daniel Mack wrote:
+>> On 11/15/2011 03:13 PM, Mark Brown wrote:
 > 
-> If I understand right, the convention way is to clk_set_rate() then
-> clk_enable().I f that, is it reasonable for driver to do something like:
-> Clk_enable -> clk_set_rate->clk_disable to set a proper rate,
-> then when needs the clock on, do clk_enable again?
+>>> Is this really a single driver?  Looking at the code it looks like
+>>> there's little if any code sharing between the different machines, it'd
+>>> help with maintainability to have multiple simple drivers.
+> 
+>> Hmm. This new version of Raumfeld's hardware features a new ADC and DAC,
+>> and the configuration to use is determined by looking at the system
+>> revision. If this would be split into multiple smaller drivers, there
+>> would be need for a 'master' to dispatch the possible options. I think
+> 
+> No, not really.
+> 
+>> I'll do that once the next generation is about to land, and leave it as
+>> it is for now. Ok for you?
+> 
+> What I'd expect here is that the arch/arm code would register a
+> different platform device depending on which board it's running on
+> (though actually controlling I2C device registration is enough as ASoC
+> won't probe the sound driver until the components appear).
 
-Confused, do you really mean enable -> set_rate -> disable? Because you
-can't set clocks when they are enabled?
+Ok, I can do this. However, the two driver will share some logic wrt
+GPIO lines that put the codecs into reset. But ok, we can live with that
+I guess, as it in fact makes the driver smaller and easier to read.
 
-Well, to be honest, this is all is not very nice due to mxs
-restrictions. I chose this approach because this is the common pattern
-in all other clocks. There might be a better way of handling this, but
-then we'd need to adapt all other clocks as well. What we definately
-should not have is one kind of handling the 'already enabled' case for a
-few clocks and another kind for others.
+>>>> +	fmt = SND_SOC_DAIFMT_I2S |
+>>>> +	      SND_SOC_DAIFMT_NB_NF |
+>>>> +	      SND_SOC_DAIFMT_CBS_CFS;
+> 
+>>> Set this using dai_fmt in hte machine driver.
+> 
+>> Can you elaborate on this one? I couldn't find an example for this, sorry.
+> 
+> Look at the snd_soc_dai_link definition, and things like speyside.
 
-Regards,
+Sorry, I still don't get it. All implementations I can find call
+snd_soc_dai_set_fmt() for the cpu and codec dais from the
+.ops->hw_params function they reference from their snd_soc_dai_links.
+Just like this new code does as well. What am I missing?
 
-   Wolfram
 
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111116/aa84fca4/attachment.sig>
+Thanks for your review,
+
+Daniel
