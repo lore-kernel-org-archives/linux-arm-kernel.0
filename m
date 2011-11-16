@@ -1,38 +1,22 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Wed, 16 Nov 2011 15:35:03 +0100
-Subject: [PATCH] ARM: pxa: fix missing linux/gpio.h include
-Message-ID: <1321454103-26596-1-git-send-email-zonque@gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 16 Nov 2011 14:37:31 +0000
+Subject: [RFC][PATCH] gpiolib: add irq_wake (power-management) sysfs file
+In-Reply-To: <20111116143011.GA5847@una0919255>
+References: <1321004406-15663-1-git-send-email-p-combes@ti.com>
+ <20111115131636.GA31028@sirena.org.uk>
+ <20111116143011.GA5847@una0919255>
+Message-ID: <20111116143731.GG29986@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fixes the following compile error:
+On Wed, Nov 16, 2011 at 03:30:13PM +0100, Patrick Combes wrote:
 
-  arch/arm/mach-pxa/pxa3xx.c: In function 'pxa3xx_cpu_pm_suspend':
-  arch/arm/mach-pxa/pxa3xx.c:156: error: implicit declaration of function 'gpio_get_value'
-  make[1]: *** [arch/arm/mach-pxa/pxa3xx.o] Error 1
+> > ...this doesn't do anything to stop userspace doing multiple enables and
+> > disables.
 
-Signed-off-by: Daniel Mack <zonque@gmail.com>
-Cc: Haojian Zhuang <haojian.zhuang@marvell.com>
-Cc: Eric Miao <eric.y.miao@gmail.com>
----
+> Do you mean there is a need to prevent that?
+> Basically the code above accepts both "1" or "enable" strings to enable the
+> property. I could limit that to "enable" / "disable" if it is confusing.
 
- I didn't closely follow all recent patches around PXA, so it might be that
- this has already been cared for. Haojian?
-
- arch/arm/mach-pxa/pxa3xx.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/mach-pxa/pxa3xx.c b/arch/arm/mach-pxa/pxa3xx.c
-index 3866d52..7cddd11 100644
---- a/arch/arm/mach-pxa/pxa3xx.c
-+++ b/arch/arm/mach-pxa/pxa3xx.c
-@@ -19,6 +19,7 @@
- #include <linux/platform_device.h>
- #include <linux/irq.h>
- #include <linux/io.h>
-+#include <linux/gpio.h>
- #include <linux/syscore_ops.h>
- #include <linux/i2c/pxa-i2c.h>
- 
--- 
-1.7.7.1
+That's not the problem.  The problem is that if you disable it might not
+actually disable the wake if it's previously been enabled multiple times.
