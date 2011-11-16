@@ -1,19 +1,16 @@
-From: linkinjeon@gmail.com (NamJae Jeon)
-Date: Wed, 16 Nov 2011 10:18:52 +0900
-Subject: [PATCH 1/4] mmc: Update logging style
-In-Reply-To: <c75784ed1efa8636f7177cd5662c35fa6a8d03df.1321398814.git.joe@perches.com>
+From: joe@perches.com (Joe Perches)
+Date: Tue, 15 Nov 2011 17:50:36 -0800
+Subject: [PATCH 3/4] mmc: Logging neatening
+In-Reply-To: <CAKYAXd8_mDF68PnEnpuZZQ+O8-QmrfRpP4jv+SpHDx1juTxFGQ@mail.gmail.com>
 References: <cover.1321398814.git.joe@perches.com>
- <c75784ed1efa8636f7177cd5662c35fa6a8d03df.1321398814.git.joe@perches.com>
-Message-ID: <CAKYAXd_gSohnAc9tpK53bjpoeSJ=0fMWz38SeLzHtRzvGTNgGQ@mail.gmail.com>
+ <d2c1a76fea1844ae7ac3e7e17183fb39df19178e.1321398814.git.joe@perches.com>
+ <CAKYAXd8_mDF68PnEnpuZZQ+O8-QmrfRpP4jv+SpHDx1juTxFGQ@mail.gmail.com>
+Message-ID: <1321408236.9189.3.camel@Joe-Laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/11/16 Joe Perches <joe@perches.com>:
-> Convert pr_warning to pr_warn.
-> Coalesce format strings.
-> Align arguments.
-> Add missing \n.
->
-> Signed-off-by: Joe Perches <joe@perches.com>
-Reviewed-by: NamJae Jeon <linkinjeon@gmail.com>
-> ---
+On Wed, 2011-11-16 at 10:48 +0900, NamJae Jeon wrote:
+
+[123K of untrimmed reply]
+
+If you wrote something, I didn't find it.
