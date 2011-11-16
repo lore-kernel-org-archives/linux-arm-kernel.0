@@ -1,64 +1,41 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Wed, 16 Nov 2011 16:03:54 +0530
-Subject: [PATCH] watchdog: fix initialisation printout in s3c2410_wdt
-In-Reply-To: <1321433173-17757-1-git-send-email-mad_soft@inbox.ru>
-References: <1321433173-17757-1-git-send-email-mad_soft@inbox.ru>
-Message-ID: <CAJuYYwTv3d9Wg8TDBEkc0r3BweUiLdqVwGdMU4iKpK0B+EM=GA@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 16 Nov 2011 10:38:10 +0000
+Subject: [PATCH] ARM: Add TLB flushing for both entries in a PMD
+Message-ID: <20111116103810.12733.23637.stgit@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16 November 2011 14:16, Dmitry Artamonow <mad_soft@inbox.ru> wrote:
-> Looks like a typo creeped in, and driver prints
-> s3c2410-wdt s3c2410-wdt: watchdog active, reset abled, irq abled
->
-> instead of
-> s3c2410-wdt s3c2410-wdt: watchdog active, reset enabled, irq enabled
->
-> Also it may completely disinform about irq status, as it prints
-> "irq enabled" when S3C2410_WTCON_INTEN is in fact 0.
->
-> Fix it.
->
-> Signed-off-by: Dmitry Artamonow <mad_soft@inbox.ru>
-> ---
->
-> It seems to be here for a long time, but I don't think it's
-> important enough for cc-ing stable.
->
-> Also I haven't tested it, as I don't have a hardware, but it's
-> rather trivial (and yes, I checked with datasheet that 1 in
-> S3C2410_WTCON_*EN bits really means 'enabled')
->
+Linux uses two PMD entries for a PTE with the classic page table format,
+covering 2MB range. However, the __pte_free_tlb() function only adds a
+single TLB flush corresponding to 1MB range covering 'addr'. On
+Cortex-A15, level 1 entries can be cached by the TLB independently of
+the level 2 entries and without additional flushing a PMD entry would be
+left pointing at the wrong PTE. The patch limits the TLB flushing range
+to two 4KB pages around the 1MB boundary within PMD.
 
-Tested on Exynos4210 based Origen board. This patch fixed in incorrect
-"irq enabled" message at bootup. Thanks for this fix.
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+---
+ arch/arm/include/asm/tlb.h |   10 +++++++++-
+ 1 files changed, 9 insertions(+), 1 deletions(-)
 
-Tested-by: Thomas Abraham <thomas.abraham@linaro.org>
-
-> ?drivers/watchdog/s3c2410_wdt.c | ? ?4 ++--
-> ?1 files changed, 2 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/watchdog/s3c2410_wdt.c b/drivers/watchdog/s3c2410_wdt.c
-> index 5de7e4f..a79e384 100644
-> --- a/drivers/watchdog/s3c2410_wdt.c
-> +++ b/drivers/watchdog/s3c2410_wdt.c
-> @@ -401,8 +401,8 @@ static int __devinit s3c2410wdt_probe(struct platform_device *pdev)
->
-> ? ? ? ?dev_info(dev, "watchdog %sactive, reset %sabled, irq %sabled\n",
-> ? ? ? ? ? ? ? ? (wtcon & S3C2410_WTCON_ENABLE) ? ?"" : "in",
-> - ? ? ? ? ? ? ? ?(wtcon & S3C2410_WTCON_RSTEN) ? "" : "dis",
-> - ? ? ? ? ? ? ? ?(wtcon & S3C2410_WTCON_INTEN) ? "" : "en");
-> + ? ? ? ? ? ? ? ?(wtcon & S3C2410_WTCON_RSTEN) ? "en" : "dis",
-> + ? ? ? ? ? ? ? ?(wtcon & S3C2410_WTCON_INTEN) ? "en" : "dis");
->
-> ? ? ? ?return 0;
->
-> --
-> 1.7.5.1.300.gc565c
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+diff --git a/arch/arm/include/asm/tlb.h b/arch/arm/include/asm/tlb.h
+index 265f908..0504364 100644
+--- a/arch/arm/include/asm/tlb.h
++++ b/arch/arm/include/asm/tlb.h
+@@ -198,7 +198,15 @@ static inline void __pte_free_tlb(struct mmu_gather *tlb, pgtable_t pte,
+ 	unsigned long addr)
+ {
+ 	pgtable_page_dtor(pte);
+-	tlb_add_flush(tlb, addr);
++
++	/*
++	 * With the classic ARM MMU, a pte page has two corresponding pmd
++	 * entries, each covering 1MB.
++	 */
++	addr &= PMD_MASK;
++	tlb_add_flush(tlb, addr + SZ_1M - PAGE_SIZE);
++	tlb_add_flush(tlb, addr + SZ_1M);
++
+ 	tlb_remove_page(tlb, pte);
+ }
+ 
