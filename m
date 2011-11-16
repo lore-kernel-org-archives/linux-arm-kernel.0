@@ -1,50 +1,46 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 16 Nov 2011 08:50:44 -0600
-Subject: [PATCH 1/3] ARM: omap_device: handle first time activation of
- console device
-In-Reply-To: <1321441346-19591-2-git-send-email-rnayak@ti.com>
-References: <1321441346-19591-1-git-send-email-rnayak@ti.com>
- <1321441346-19591-2-git-send-email-rnayak@ti.com>
-Message-ID: <4EC3CDC4.7000108@gmail.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Wed, 16 Nov 2011 22:52:09 +0800
+Subject: [PATCH] ARM: pxa: fix missing linux/gpio.h include
+In-Reply-To: <1321454103-26596-1-git-send-email-zonque@gmail.com>
+References: <1321454103-26596-1-git-send-email-zonque@gmail.com>
+Message-ID: <CAMPhdO87XqTNKaEiDWp2iC7MfQPvJRexiwu0jH_0PJ82V4S6FQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/16/2011 05:02 AM, Rajendra Nayak wrote:
-> console device on OMAP is never reset or idled by hwmod post
-> initial setup, early during boot, for obvious reasons not to
-> break early debug prints thrown on console.
-> This leaves the console device enabled at boot and the first activation
-> of it using hwmod needs to be handled in such a way that a disable is
-> called followed by an enable of the hwmod, the subsequent activations
-> can then use the default activation technique.
-> 
-> To handle this add a new binding to identify a hwmod which is used as
-> the console device.
-> 
-> This patch is based on the what is done in serial.c for non-DT builds.
-> 
-> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+On Wed, Nov 16, 2011 at 10:35 PM, Daniel Mack <zonque@gmail.com> wrote:
+> Fixes the following compile error:
+>
+> ?arch/arm/mach-pxa/pxa3xx.c: In function 'pxa3xx_cpu_pm_suspend':
+> ?arch/arm/mach-pxa/pxa3xx.c:156: error: implicit declaration of function 'gpio_get_value'
+> ?make[1]: *** [arch/arm/mach-pxa/pxa3xx.o] Error 1
+>
+> Signed-off-by: Daniel Mack <zonque@gmail.com>
+> Cc: Haojian Zhuang <haojian.zhuang@marvell.com>
+> Cc: Eric Miao <eric.y.miao@gmail.com>
+
+Applied.
+
 > ---
->  .../devicetree/bindings/arm/omap/omap.txt          |    1 +
->  arch/arm/plat-omap/omap_device.c                   |   33 +++++++++++++++++++-
->  2 files changed, 33 insertions(+), 1 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/omap/omap.txt b/Documentation/devicetree/bindings/arm/omap/omap.txt
-> index dbdab40..46ffd41 100644
-> --- a/Documentation/devicetree/bindings/arm/omap/omap.txt
-> +++ b/Documentation/devicetree/bindings/arm/omap/omap.txt
-> @@ -21,6 +21,7 @@ Required properties:
->  Optional properties:
->  - ti,no_idle_on_suspend: When present, it prevents the PM to idle the module
->    during suspend.
-> +- ti,console_hwmod: boolean, identifies the hwmod used as console device
->  
-
-This doesn't seem right. Which console is not a h/w property. Why can't
-you use aliases like other platforms are doing?
-
-Also, it's not clear in the documentation where this (and
-ti,no_idle_on_suspend) should go in the DT. Both seem like they should
-be kernel cmdline params.
-
-Rob
+>
+> ?I didn't closely follow all recent patches around PXA, so it might be that
+> ?this has already been cared for. Haojian?
+>
+> ?arch/arm/mach-pxa/pxa3xx.c | ? ?1 +
+> ?1 files changed, 1 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/mach-pxa/pxa3xx.c b/arch/arm/mach-pxa/pxa3xx.c
+> index 3866d52..7cddd11 100644
+> --- a/arch/arm/mach-pxa/pxa3xx.c
+> +++ b/arch/arm/mach-pxa/pxa3xx.c
+> @@ -19,6 +19,7 @@
+> ?#include <linux/platform_device.h>
+> ?#include <linux/irq.h>
+> ?#include <linux/io.h>
+> +#include <linux/gpio.h>
+> ?#include <linux/syscore_ops.h>
+> ?#include <linux/i2c/pxa-i2c.h>
+>
+> --
+> 1.7.7.1
+>
+>
