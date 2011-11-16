@@ -1,64 +1,61 @@
 From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Wed, 16 Nov 2011 11:47:36 +0100
-Subject: [PATCH 0/3] make stmp-style devices mach-independent
-Message-ID: <1321440459-4527-1-git-send-email-w.sang@pengutronix.de>
+Date: Wed, 16 Nov 2011 11:47:38 +0100
+Subject: [PATCH 2/3] i2c: mxs: use global reset function
+In-Reply-To: <1321440459-4527-1-git-send-email-w.sang@pengutronix.de>
+References: <1321440459-4527-1-git-send-email-w.sang@pengutronix.de>
+Message-ID: <1321440459-4527-3-git-send-email-w.sang@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It seems I haven't been following the lists too closely lately, so I might have
-missed similar patches. Yet, I noticed some patches dealing with drivers using
-mxs-specific features, so they need to include mach-specific files which is
-troublesome. I started to address the problem as well some time ago, so I push
-out the patches now as RFC to enrich the discussion. The patches are rebased to
-linux 3.2-rc2 and are boot tested.
+The former mach specific reset_block function has been converted to a global
+one. Use the new one to remove mach dependency from the driver.
 
-The basics: mach-mxs uses ip-cores which follow a register layout I have
-first seen on STMP SoCs. That means, every register has four incarnations:
- - one u32 to store a value
- - a SET register where every 1-bit sets the corresponding bit,
-   others are unaffected
- - similar with a CLR register
- - and a TGL (toggle) register
-
-Also, the 2 MSBs in register 0 are always the same and can be used to reset the
-block.
-
-All this is strictly speaking not mach-specific (but ip-core specific) and,
-thus, doesn't need to be in mach-mxs/include. As I have been told, mx50 and
-mx6(?) might also use IP cores following the STMP-style; so I wondered if it
-can't be exported like the following patch series does:
-
-Introduce a stmp-style device, put the code around that in a public place
-(currently drivers/base/; dunno if that is the best place, though), and let
-drivers for stmp-style devices select that code.
-
-Voila, mach dependency gone, reusable code introduced. Note that I didn't
-remove the duplicated code from mach-mxs yet, first all drivers have to be
-converted.
-
-Right thing to do? If so, I'll repost properly to the right lists. Fishing for
-feedback right now :)
-
-Thanks,
-
-   Wolfram
-
-Wolfram Sang (3):
-  drivers: base: add support for stmp-style devices
-  i2c: mxs: use global reset function
-  rtc: stmp3xxx: use global stmp_device functionality
-
- drivers/base/Kconfig         |    3 ++
- drivers/base/Makefile        |    1 +
- drivers/base/stmp_device.c   |   80 ++++++++++++++++++++++++++++++++++++++++++
+Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
+---
  drivers/i2c/busses/Kconfig   |    1 +
- drivers/i2c/busses/i2c-mxs.c |    9 +----
- drivers/rtc/Kconfig          |    1 +
- drivers/rtc/rtc-stmp3xxx.c   |   29 +++++----------
- include/linux/stmp_device.h  |   19 ++++++++++
- 8 files changed, 117 insertions(+), 26 deletions(-)
- create mode 100644 drivers/base/stmp_device.c
- create mode 100644 include/linux/stmp_device.h
+ drivers/i2c/busses/i2c-mxs.c |    9 ++-------
+ 2 files changed, 3 insertions(+), 7 deletions(-)
 
+diff --git a/drivers/i2c/busses/Kconfig b/drivers/i2c/busses/Kconfig
+index a3afac4..76714a8 100644
+--- a/drivers/i2c/busses/Kconfig
++++ b/drivers/i2c/busses/Kconfig
+@@ -467,6 +467,7 @@ config I2C_MV64XXX
+ config I2C_MXS
+ 	tristate "Freescale i.MX28 I2C interface"
+ 	depends on SOC_IMX28
++	select STMP_DEVICE
+ 	help
+ 	  Say Y here if you want to use the I2C bus controller on
+ 	  the Freescale i.MX28 processors.
+diff --git a/drivers/i2c/busses/i2c-mxs.c b/drivers/i2c/busses/i2c-mxs.c
+index 7e78f7c..8b92e40 100644
+--- a/drivers/i2c/busses/i2c-mxs.c
++++ b/drivers/i2c/busses/i2c-mxs.c
+@@ -26,8 +26,7 @@
+ #include <linux/platform_device.h>
+ #include <linux/jiffies.h>
+ #include <linux/io.h>
+-
+-#include <mach/common.h>
++#include <linux/stmp_device.h>
+ 
+ #define DRIVER_NAME "mxs-i2c"
+ 
+@@ -110,13 +109,9 @@ struct mxs_i2c_dev {
+ 	struct i2c_adapter adapter;
+ };
+ 
+-/*
+- * TODO: check if calls to here are really needed. If not, we could get rid of
+- * mxs_reset_block and the mach-dependency. Needs an I2C analyzer, probably.
+- */
+ static void mxs_i2c_reset(struct mxs_i2c_dev *i2c)
+ {
+-	mxs_reset_block(i2c->regs);
++	stmp_reset_block(i2c->regs);
+ 	writel(MXS_I2C_IRQ_MASK << 8, i2c->regs + MXS_I2C_CTRL1_SET);
+ 	writel(MXS_I2C_QUEUECTRL_PIO_QUEUE_MODE,
+ 			i2c->regs + MXS_I2C_QUEUECTRL_SET);
 -- 
 1.7.7.1
