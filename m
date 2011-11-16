@@ -1,54 +1,44 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 16 Nov 2011 11:54:38 -0700
-Subject: [RFC 7/8] arm/clkdev: lookup clocks from OF clock providers
-In-Reply-To: <4EB9E726.2000500@gmail.com>
-References: <1320801583-12774-1-git-send-email-grant.likely@secretlab.ca>
- <1320801583-12774-8-git-send-email-grant.likely@secretlab.ca>
- <4EB9E726.2000500@gmail.com>
-Message-ID: <CACxGe6u=oph84k4uS6V3EJN=aiQfHxVOGPahOuWB4Vfx-6bEHA@mail.gmail.com>
+From: weber@corscience.de (Thomas Weber)
+Date: Wed, 16 Nov 2011 19:56:12 +0100
+Subject: [PATCHv2] ARM: OMAP: hsmmc: Fix mux for non-OMAP pins
+Message-ID: <1321469772-801-1-git-send-email-weber@corscience.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 8, 2011 at 7:36 PM, Rob Herring <robherring2@gmail.com> wrote:
-> On 11/08/2011 07:19 PM, Grant Likely wrote:
->> From: Jeremy Kerr <jeremy.kerr@canonical.com>
->>
->> Hook the OF clock provider infrastructure to clk_get.
->>
->> Signed-off-by: Jeremy Kerr <jeremy.kerr@canonical.com>
->> Signed-off-by: Grant Likely <grant.likely@secretlab.ca>
->> ---
->> ?drivers/clk/clkdev.c | ? ?7 +++++++
->> ?1 files changed, 7 insertions(+), 0 deletions(-)
->>
->> diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
->> index 6db161f..63f81c9 100644
->> --- a/drivers/clk/clkdev.c
->> +++ b/drivers/clk/clkdev.c
->> @@ -19,6 +19,8 @@
->> ?#include <linux/mutex.h>
->> ?#include <linux/clk.h>
->> ?#include <linux/clkdev.h>
->> +#include <linux/of.h>
->> +#include <linux/of_clk.h>
->>
->> ?static LIST_HEAD(clocks);
->> ?static DEFINE_MUTEX(clocks_mutex);
->> @@ -78,6 +80,11 @@ EXPORT_SYMBOL(clk_get_sys);
->> ?struct clk *clk_get(struct device *dev, const char *con_id)
->> ?{
->> ? ? ? const char *dev_id = dev ? dev_name(dev) : NULL;
->> + ? ? struct clk *clk;
->> +
->
-> Need NULL check for dev (and then init clk to NULL):
->
-> ? ? ? ?if (dev && dev->of_node)
->> + ? ? clk = of_clk_get_by_name(dev->of_node, con_id);
->
->> + ? ? if (clk && __clk_get(clk))
->> + ? ? ? ? ? ? return clk;
+The Devkit8000 uses a TWL4030 pin for card detection.
+Thats why the error:
+_omap_mux_init_gpio: Could not set gpio192
+occurs.
 
-Fixed, thanks.
+This patch checks that the pin is on OMAP before
+calling omap_mux_init_gpio.
 
-g.
+Signed-off-by: Thomas Weber <weber@corscience.de>
+---
+Changelog:
+v2: Remove backslash at end of line
+
+ arch/arm/mach-omap2/hsmmc.c |    6 ++++--
+ 1 files changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/hsmmc.c b/arch/arm/mach-omap2/hsmmc.c
+index f4a1020..c3aea79 100644
+--- a/arch/arm/mach-omap2/hsmmc.c
++++ b/arch/arm/mach-omap2/hsmmc.c
+@@ -200,10 +200,12 @@ static int nop_mmc_set_power(struct device *dev, int slot, int power_on,
+ static inline void omap_hsmmc_mux(struct omap_mmc_platform_data *mmc_controller,
+ 			int controller_nr)
+ {
+-	if (gpio_is_valid(mmc_controller->slots[0].switch_pin))
++	if (gpio_is_valid(mmc_controller->slots[0].switch_pin) &&
++		(mmc_controller->slots[0].switch_pin < OMAP_MAX_GPIO_LINES))
+ 		omap_mux_init_gpio(mmc_controller->slots[0].switch_pin,
+ 					OMAP_PIN_INPUT_PULLUP);
+-	if (gpio_is_valid(mmc_controller->slots[0].gpio_wp))
++	if (gpio_is_valid(mmc_controller->slots[0].gpio_wp) &&
++		(mmc_controller->slots[0].gpio_wp < OMAP_MAX_GPIO_LINES))
+ 		omap_mux_init_gpio(mmc_controller->slots[0].gpio_wp,
+ 					OMAP_PIN_INPUT_PULLUP);
+ 	if (cpu_is_omap34xx()) {
+-- 
+1.7.7.3
