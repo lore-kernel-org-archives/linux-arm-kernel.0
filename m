@@ -1,32 +1,32 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 16 Nov 2011 11:36:36 +0000
-Subject: [GIT PULL] Missing CPU mapping updates
-Message-ID: <20111116113636.GH4942@mudshark.cambridge.arm.com>
+Date: Wed, 16 Nov 2011 11:54:35 +0000
+Subject: Crash when memset of shared mapped memory in ARM
+In-Reply-To: <20111116084547.GG9581@n2100.arm.linux.org.uk>
+References: <CAJ8eaTzOtgMzcZeRr6f=+WhtsykK1NZraOGBPoqGncwcAGcTyQ@mail.gmail.com>
+ <20111116084547.GG9581@n2100.arm.linux.org.uk>
+Message-ID: <20111116115435.GI4942@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+(Replying to Russell so as to lose the -request addresses)
 
-Highbank and IMX6 were merged recently and therefore missed out on the
-logical CPU mapping updates. I've fixed them up in the branch below - please
-pull!
+On Wed, Nov 16, 2011 at 08:45:47AM +0000, Russell King - ARM Linux wrote:
+> Please do not spam mailing lists -request addresses when you post.  The
+> -request addresses are there for you to give the mailing list software
+> _instructions_ on what to do with your subscription.  It is not for
+> posts to the mailing list.
 
-Thanks,
+For what it's worth, I was brave/daft enough to compile and run the testcase
+with an -rc1 kernel and Linaro 11.09 filesystem on the quad A9 Versatile
+Express:
+
+root at dancing-fool:~# ./yad
+mmap: addr 0x20000000
+root at dancing-fool:~# ./yad
+shm_open: File exists
+mmap: addr 0x20000000
+
+Looks like I'm missing the fireworks, despite the weirdy MAP_SHARED |
+MAP_FIXED mmap flags.
 
 Will
-
-
-The following changes since commit cfcfc9eca2bcbd26a8e206baeb005b055dbf8e37:
-
-  Linux 3.2-rc2 (2011-11-15 15:02:59 -0200)
-
-are available in the git repository at:
-  git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git for-arnd
-
-Will Deacon (2):
-      ARM: highbank: convert logical CPU numbers to physical numbers
-      ARM: mach-imx: convert logical CPU numbers to physical numbers
-
- arch/arm/mach-highbank/highbank.c |    4 ++++
- arch/arm/mach-imx/src.c           |    7 +++++++
- 2 files changed, 11 insertions(+), 0 deletions(-)
