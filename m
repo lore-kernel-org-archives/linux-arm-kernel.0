@@ -1,94 +1,54 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Wed, 16 Nov 2011 08:30:09 +0530
-Subject: [PATCH] Add dm9000 network support for OK6410 board.
-In-Reply-To: <CAN_1Rdv8SZXu2RSJgXT9KJXp30UKgZGLhOHX7igLQuv92UZ6tA@mail.gmail.com>
-References: <1321006467-15824-1-git-send-email-peiyong.feng.kernel@gmail.com>
- <CAJuYYwRueftNrWofo744vWXPa+vkgv3r4CyOr_Q_GNrcfct4YA@mail.gmail.com>
- <CAN_1RdvdeXHdM50utA8objg46Q2GM23pwzAiB7itswrTm1FqSQ@mail.gmail.com>
- <006201cca380$43998e20$caccaa60$%kim@samsung.com>
- <CAN_1Rdv8SZXu2RSJgXT9KJXp30UKgZGLhOHX7igLQuv92UZ6tA@mail.gmail.com>
-Message-ID: <CAJuYYwSyatMAvJEZsTdoHf72ivfB1UJdhjnP0qPSH+S3TPuu+A@mail.gmail.com>
+From: B29396@freescale.com (Dong Aisheng-B29396)
+Date: Wed, 16 Nov 2011 03:37:53 +0000
+Subject: [PATCH 1/1] gpio: gpio-mxs: remove the duplicated micro define
+References: <1321350910-8685-1-git-send-email-dong.aisheng@linaro.org>
+ <74CDBE0F657A3D45AFBB94109FB122FF1740805DF4@HQMAIL01.nvidia.com>
+Message-ID: <65EE16ACC360FA4D99C96DC085B3F7722D0FCB@039-SN1MPN1-002.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16 November 2011 07:40, Peiyong Feng <peiyong.feng.kernel@gmail.com> wrote:
-> HI Kukjin,
->
-> Thanks a lot for your comments and reply.
->
->
-> 2011/11/15 Kukjin Kim <kgene.kim@samsung.com>:
->> Peiyong Feng wrote:
->>>
->> Hi Peiyong,
->>
->> Thanks for your submitting and replying.
->> But you need to make sure your e-mail uses text-typed instead of html before
->> replying.
->>
->> And there are comments below.
->>
->>> Well, The OK6410 board is based on smdk6410 board.
->>> And there many other boards that also are based on smdk6410 like mini6410
->> board.
->>>
->>> The reasons why I modified smdk6410 board file are as follows:
->>> A. Almost all the devices on OK6410 is supported in smdk6410, and the
->> device drivers of smdk6410 can work well in OK6410.
->>>
->> Okay, you mean, just your OK6410 can work with smdk6410.
->>
-> As far as I know, there are some boards based on smdk6410 with the
-> suffix 6410 like OK6410, mini6410, tiny6410, etc.
-> The ?difference between them is very small.
+> -----Original Message-----
+> From: Dong Aisheng-B29396
+> Sent: Wednesday, November 16, 2011 11:31 AM
+> To: 'Stephen Warren'; Dong Aisheng; linux-kernel at vger.kernel.org
+> Cc: grant.likely at secretlab.ca; arnd at arndb.de; s.hauer at pengutronix.de; Guo
+> Shawn-R65073; kernel at pengutronix.de
+> Subject: RE: [PATCH 1/1] gpio: gpio-mxs: remove the duplicated micro
+> define
+> 
+>  -----Original Message-----
+> > From: linux-kernel-owner at vger.kernel.org [mailto:linux-kernel-
+> > owner at vger.kernel.org] On Behalf Of Stephen Warren
+> > Sent: Wednesday, November 16, 2011 2:42 AM
+> > To: Dong Aisheng; linux-kernel at vger.kernel.org
+> > Cc: grant.likely at secretlab.ca; arnd at arndb.de; s.hauer at pengutronix.de;
+> > Guo Shawn-R65073; kernel at pengutronix.de
+> > Subject: RE: [PATCH 1/1] gpio: gpio-mxs: remove the duplicated micro
+> > define
+> >
+> > Dong Aisheng wrote at Tuesday, November 15, 2011 2:55 AM:
+> > ...
+> > > diff --git a/drivers/gpio/gpio-mxs.c b/drivers/gpio/gpio-mxs.c
+> > ...
+> > > -#define MXS_SET		0x4
+> > > -#define MXS_CLR		0x8
+> >
+> > If the long-term direction on MXS is to move to gpiolib, won't
+> It looks gpio-mxs driver is already using gpiolib.
+> 
+> > MX_SET_ADDR etc. and the inline functions that use it eventually be
+> > removed from mach-mxs/include/mach/mxs.h hence requiring the #define
+> > be moved back into the GPIO driver?
+> >
+> Yes, i agree with you.
+> Eventually we will remove using <mach/mxs.h>.
+> Thanks for the comments.
+> 
+Sorry for missing Linux-arm-kernel list. Add it.
+BTW, one concern is that if we move defines like #define MXS_SET into driver,
+then every drivers wanting to use it will define it respectively which will
+cause a little code duplication.
+Not sure if people would like it.
 
-smdk6410 and ok6410 boards use (based on) Samsung's s3c6410 processor.
-Boards based on s3c6410 processor should reuse existing upstream
-support available for s3c6410. But, the boards themselves are
-different. Both smdk6410 and ok6410 have a common s3c6410, but the
-peripherals on the board are all different. So, the statement "there
-are some boards based on smdk6410" is not right. The correct one would
-be "there are some boards based on s3c6410".
-
->
-> I give two examples:
-> 1. The DM9000 network card`s irq ?on OK6410 ?is IRQ_EINT(7)
-> ? ?while the SMSC911x network card`s irq on smdk6410 is
-> ? IRQ_EINT(10), and their CS is the same 0x18000000.
-
-True, but smdk6410 does not have a DM9000 and adding DM9000 device
-information in smdk6410 board file is not the right thing.
-
->
-> 2. Another example is the LCD. As we all know, the kernel has
-> implemented a very good framework for framebuffer devices.
-> different LCD device can work with just the right arguments like
-> left_margin, right_margin, hsync_len, vsync_len, xres, yres, etc.
-> And their LCD controller is the same.
->>> B. If we just make other board file like mini6410 which is also based on
->> smdk6410, there maybe too many files that are as the same of smdk6410.
->>>
->> Okay, you mean, we don't need duplicated codes.
->>
->> Right, but how do you think that if the dm9000 or something cannot be used
->> on smdk6410?
->> Nevertheless, we _really_ need to add it for other board not smdk6410?
->>
->> Actually, there are codes for SMSC Lan9115 at mach-smdk6410.c......
->>
->> If you want to use mach-smdk6410.c on your ok6410, well, let us think the
->> way.
->
-> Well, this is the point. How can we deal with the various boards with
-> the little difference and make them work with the kernel.
-
-What is needed is a separate board file ok6410 board. All the s3c6410
-related drivers and machine code would be reused, but board specific
-data would be contained in the ok6410 board file. You could have a
-look at all the arch/arm/mach-s3c64xx/mach-xxx.c files to know how
-different boards reuse existing s3c6410 mainline support.
-
-Thanks,
-Thomas.
-
-[...]
+Regards
+Dong Aisheng
