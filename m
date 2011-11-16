@@ -1,77 +1,57 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Wed, 16 Nov 2011 20:45:33 +0100
-Subject: [PATCH] ARM: u300: update defconfig
-Message-ID: <1321472733-26031-1-git-send-email-linus.walleij@stericsson.com>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Wed, 16 Nov 2011 14:04:12 -0600
+Subject: [PATCH v8 11/20] OMAP2+: UART: Move errata handling from serial.c
+ to omap-serial
+In-Reply-To: <CAAL8m4xYUd=5g7VOa7Ofnm6nRs8U1a7W+sofAkeCVOOURRfVXg@mail.gmail.com>
+References: <1321005551-21786-1-git-send-email-govindraj.raja@ti.com>
+ <1321005551-21786-2-git-send-email-govindraj.raja@ti.com>
+ <4EC17123.2070505@ti.com>
+ <CAAL8m4xYUd=5g7VOa7Ofnm6nRs8U1a7W+sofAkeCVOOURRfVXg@mail.gmail.com>
+Message-ID: <4EC4173C.7090200@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linus Walleij <linus.walleij@linaro.org>
+Hi Govindraj,
 
-This updates the U300 defconfig to support some new drivers like
-FSMC, sets it to use the MMC clock gating scheme, and removes
-some stale config options.
+On 11/16/2011 4:13, Govindraj wrote:
+> On Tue, Nov 15, 2011 at 1:20 AM, Jon Hunter<jon-hunter@ti.com>  wrote:
+>> Hi Govindraj,
+>
+> [...]
+>
+>>>
+>>>         oh = uart->oh;
+>>> -       uart->dma_enabled = 0;
+>>>         name = DRIVER_NAME;
+>>>
+>>>         omap_up.dma_enabled = uart->dma_enabled;
+>>>         omap_up.uartclk = OMAP24XX_BASE_BAUD * 16;
+>>>         omap_up.flags = UPF_BOOT_AUTOCONF;
+>>>         omap_up.get_context_loss_count =
+>>> omap_pm_get_dev_context_loss_count;
+>>> +       omap_up.set_forceidle = omap_uart_set_forceidle;
+>>> +       omap_up.set_noidle = omap_uart_set_noidle;
+>>> +
+>>> +       /* Enable the MDR1 errata for OMAP2/3/4 */
+>>> +       if ((cpu_is_omap2430() || cpu_is_omap34xx() ||
+>>> cpu_is_omap44xx())&&
+>>> +                                               !cpu_is_ti816x())
+>>> +               omap_up.errata |= UART_ERRATA_i202_MDR1_ACCESS;
+>>
+>> I am not sure that this will apply the errata for OMAP3630 devices. I think
+>> we need cpu_is_omap36xx() above too. Or you may wish to do
+>> !cpu_class_is_omap1 and !cpu_is_omap2420.
+>>
+>
+> Yes correct, I have updated this patch as here [1].
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/configs/u300_defconfig |   13 ++++++-------
- 1 files changed, 6 insertions(+), 7 deletions(-)
+Thanks! Looks good.
 
-diff --git a/arch/arm/configs/u300_defconfig b/arch/arm/configs/u300_defconfig
-index 4a5a126..374000e 100644
---- a/arch/arm/configs/u300_defconfig
-+++ b/arch/arm/configs/u300_defconfig
-@@ -14,8 +14,6 @@ CONFIG_MODULE_UNLOAD=y
- CONFIG_ARCH_U300=y
- CONFIG_MACH_U300=y
- CONFIG_MACH_U300_BS335=y
--CONFIG_MACH_U300_DUAL_RAM=y
--CONFIG_U300_DEBUG=y
- CONFIG_MACH_U300_SPIDUMMY=y
- CONFIG_NO_HZ=y
- CONFIG_HIGH_RES_TIMERS=y
-@@ -26,19 +24,21 @@ CONFIG_ZBOOT_ROM_BSS=0x0
- CONFIG_CMDLINE="root=/dev/ram0 rw rootfstype=rootfs console=ttyAMA0,115200n8 lpj=515072"
- CONFIG_CPU_IDLE=y
- CONFIG_FPE_NWFPE=y
--CONFIG_PM=y
- # CONFIG_SUSPEND is not set
- CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
- # CONFIG_PREVENT_FIRMWARE_BUILD is not set
--# CONFIG_MISC_DEVICES is not set
-+CONFIG_MTD=y
-+CONFIG_MTD_CMDLINE_PARTS=y
-+CONFIG_MTD_NAND=y
-+CONFIG_MTD_NAND_FSMC=y
- # CONFIG_INPUT_MOUSEDEV is not set
- CONFIG_INPUT_EVDEV=y
- # CONFIG_KEYBOARD_ATKBD is not set
- # CONFIG_INPUT_MOUSE is not set
- # CONFIG_SERIO is not set
-+CONFIG_LEGACY_PTY_COUNT=16
- CONFIG_SERIAL_AMBA_PL011=y
- CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
--CONFIG_LEGACY_PTY_COUNT=16
- # CONFIG_HW_RANDOM is not set
- CONFIG_I2C=y
- # CONFIG_HWMON is not set
-@@ -51,6 +51,7 @@ CONFIG_BACKLIGHT_CLASS_DEVICE=y
- # CONFIG_HID_SUPPORT is not set
- # CONFIG_USB_SUPPORT is not set
- CONFIG_MMC=y
-+CONFIG_MMC_CLKGATE=y
- CONFIG_MMC_ARMMMCI=y
- CONFIG_RTC_CLASS=y
- # CONFIG_RTC_HCTOSYS is not set
-@@ -65,10 +66,8 @@ CONFIG_NLS_CODEPAGE_437=y
- CONFIG_NLS_ISO8859_1=y
- CONFIG_PRINTK_TIME=y
- CONFIG_DEBUG_FS=y
--CONFIG_DEBUG_KERNEL=y
- # CONFIG_SCHED_DEBUG is not set
- CONFIG_TIMER_STATS=y
- # CONFIG_DEBUG_PREEMPT is not set
- CONFIG_DEBUG_INFO=y
--# CONFIG_RCU_CPU_STALL_DETECTOR is not set
- # CONFIG_CRC32 is not set
--- 
-1.7.3.2
+> btw, omap-serial is applicable only for omap2+ so
+> I think cpu_class_is omap1 not applicable here
+> need to be handled in /mach-omap1/serial.c.
+
+Duh! I missed that. We are good then.
+
+Cheers
+Jon
