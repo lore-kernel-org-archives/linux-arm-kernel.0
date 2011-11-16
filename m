@@ -1,86 +1,131 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Wed, 16 Nov 2011 17:39:45 +0000
-Subject: [PATCH 3/5] ARM: vexpress: Add DT support in v2m
-In-Reply-To: <1321463271.3137.380.camel@hornet.cambridge.arm.com>
-References: <1321036026-23411-1-git-send-email-pawel.moll@arm.com>
- <1321036026-23411-4-git-send-email-pawel.moll@arm.com>
- <20111116154402.GE2073@localhost.localdomain>
- <4EC3E446.4030608@gmail.com>
- <1321461458.3137.374.camel@hornet.cambridge.arm.com>
- <4EC3EBEC.3020601@gmail.com>
- <1321463271.3137.380.camel@hornet.cambridge.arm.com>
-Message-ID: <20111116173945.GG2073@localhost.localdomain>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 16 Nov 2011 17:44:19 +0000
+Subject: [PATCH 1/3] drivers: base: add support for stmp-style devices
+In-Reply-To: <1321440459-4527-2-git-send-email-w.sang@pengutronix.de>
+References: <1321440459-4527-1-git-send-email-w.sang@pengutronix.de>
+ <1321440459-4527-2-git-send-email-w.sang@pengutronix.de>
+Message-ID: <201111161744.19733.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 16, 2011 at 05:07:51PM +0000, Pawel Moll wrote:
-> On Wed, 2011-11-16 at 16:59 +0000, Rob Herring wrote:
-> > It has nothing to do with taste and obviously documentation changes over
-> > time. I'm going to start naming everything with legacy because someday
-> > it all will be...
-> > 
-> > It's about how you create compatible strings. They should not be
-> > generic, but specific to particular hardware version. If you happen to
-> > be compatible with older h/w then you can claim compatibility with that
-> > older h/w.
-> 
-> Notice that it's not:
-> 
-> 	compatible=legacy
-> 
-> not even:
-> 
-> 	compatible=arm,legacy
-> 
-> It's:
-> 	
-> 	compatible=arm,vexpress-legacy
-> 
-> A specific variant of Versatile Express hardware. It's just that the
-> "legacy" word carries some meaning. Would it looked better if it was
-> called:
-> 
-> 	compatible=arm,vexpress-nalatenskap
-> 
-> ? (thanks, google translate ;-)
+On Wednesday 16 November 2011, Wolfram Sang wrote:
+> Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
 
-Come to think of it, is the problem here that we're trying to describe
-the _motherboard_ using the compatible property on the root node.
-This is why I talked about universal/generic features -- the set of
-features common to all platforms sharing a single motherboard
-configuration.
+Introducing new core code definitely requires a long patch description.
+How about copying the description from the introductory mail here?
 
-Arguably that's wrong, and that compatible property belongs on the
-motherboard node itself, so:
+>  drivers/base/Kconfig        |    3 ++
+>  drivers/base/Makefile       |    1 +
+>  drivers/base/stmp_device.c  |   80 +++++++++++++++++++++++++++++++++++++++++++
+>  include/linux/stmp_device.h |   19 ++++++++++
+>  4 files changed, 103 insertions(+), 0 deletions(-)
+>  create mode 100644 drivers/base/stmp_device.c
+>  create mode 100644 include/linux/stmp_device.h
 
-/ {
-	compatible = "arm,vexpress-ca9x4"
+I'm not convinced that drivers/base is the right place, but I also can't
+think of anything better right now.
+
+> diff --git a/drivers/base/stmp_device.c b/drivers/base/stmp_device.c
+
+> +/*
+> + * Clear the bit and poll it cleared.  This is usually called with
+> + * a reset address and mask being either SFTRST(bit 31) or CLKGATE
+> + * (bit 30).
+> + */
+> +static int stmp_clear_poll_bit(void __iomem *addr, u32 mask)
+> +{
+> +	int timeout = 0x400;
+> +
+> +	writel(mask, addr + STMP_CLR_ADDR);
+> +	udelay(1);
+> +	while ((readl(addr) & mask) && --timeout)
+> +		/* nothing */;
+> +
+> +	return !timeout;
+> +}
+
+For portable code, you should use cpu_relax() inside of the loop.
+
+Is the udelay() actually necessary here?
+
+> +int stmp_reset_block(void __iomem *reset_addr)
+> +{
+> +	int ret;
+> +	int timeout = 0x400;
+> +
+> +	/* clear and poll SFTRST */
+> +	ret = stmp_clear_poll_bit(reset_addr, STMP_MODULE_SFTRST);
+> +	if (unlikely(ret))
+> +		goto error;
+
+Please don't use likely()/unlikely() in code that is not very
+performance sensitive. It will usually just increase the code size
+but not actually have a measurable benefit.
+
+> +	/* clear CLKGATE */
+> +	writel(STMP_MODULE_CLKGATE, reset_addr + STMP_CLR_ADDR);
+> +
+> +	/* set SFTRST to reset the block */
+> +	writel(STMP_MODULE_SFTRST, reset_addr + STMP_SET_ADDR);
+> +	udelay(1);
+> +
+> +	/* poll CLKGATE becoming set */
+> +	while ((!(readl(reset_addr) & STMP_MODULE_CLKGATE)) && --timeout)
+> +		/* nothing */;
+> +	if (unlikely(!timeout))
+> +		goto error;
+
+Since the run-time of a readl() may vary greatly, counting to 400
+for a timeout seems completely arbitrary and unhelpful.
+
+A better construct is 
+
+	long timeout = jiffies + HZ / 10; /* wait for at most 100ms */
+
+	do {
+		...
+	} while (time_before(jiffies, timeout));
+
+or the ktime equivalent of that if you are waiting for very short times.
+
+> +	/* clear and poll SFTRST */
+> +	ret = stmp_clear_poll_bit(reset_addr, STMP_MODULE_SFTRST);
+> +	if (unlikely(ret))
+> +		goto error;
+> +
+> +	/* clear and poll CLKGATE */
+> +	ret = stmp_clear_poll_bit(reset_addr, STMP_MODULE_CLKGATE);
+> +	if (unlikely(ret))
+> +		goto error;
+> +
+> +	return 0;
+> +
+> +error:
+> +	pr_err("%s(%p): module reset timeout\n", __func__, reset_addr);
+> +	return -ETIMEDOUT;
+> +}
+> +EXPORT_SYMBOL(stmp_reset_block);
+
+EXPORT_SYMBOL_GPL?
+
+> diff --git a/include/linux/stmp_device.h b/include/linux/stmp_device.h
+> new file mode 100644
+> index 0000000..330f8d8
+> --- /dev/null
+> +++ b/include/linux/stmp_device.h
+> @@ -0,0 +1,19 @@
+> +#ifndef __STMP_DEVICE_H__
+> +#define __STMP_DEVICE_H__
+> +
+> +#define STMP_SET_ADDR		0x4
+> +#define STMP_CLR_ADDR		0x8
+> +#define STMP_TOG_ADDR		0xc
+
+The register numbers should probably go into the implementation file,
+they are not an interface.
+
+> +extern int stmp_reset_block(void __iomem *);
+> +#endif /* __STMP_DEVICE_H__ */
 
 
-> 
-> > >> If you defined the property when the
-> > >> original vexpress was designed, it never would have had legacy in the
-> > >> name. Generally speaking you never change bindings on old platforms.
-> > >>
-> > >> So I would have "arm,vexpress" mean legacy and "arm,vexpress-rs1" be the
-> > >> new memory map.
-> > > 
-> > > I'd rather second Dave's idea of having
-> > > 
-> > >>> 	compatible = "arm,vexpress-<model>", "arm-vexpress-rs1", "arm-vexpress";
-> > > 
-> > > and
-> > > 
-> > >>> +	compatible = "arm,vexpress-<model>", "arm,vexpress-legacy", "arm-vexpress";
-> > 
-> > If arm,vexpress-ca9 is the only legacy platform, then just drop
-> > arm,vexpress-legacy altogether.
-> 
-> It's not. There is additional one, which is not publicly available, but
-> is using the motherboard in legacy mode.
-> 
-> Cheers!
-> 
-> Pawe?
-> 
-> 
+	Arnd
