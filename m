@@ -1,76 +1,64 @@
-From: simon@sequanux.org (Simon Guinot)
-Date: Wed, 16 Nov 2011 11:25:50 +0100
-Subject: [PATCH v2] ARM: kirkwood: add LaCie Network Space Lite v2 support
-In-Reply-To: <1321433573-3851-1-git-send-email-cvubrugier@lacie.com>
-References: <1321433573-3851-1-git-send-email-cvubrugier@lacie.com>
-Message-ID: <20111116102549.GF29864@kw.sim.vm.gnt>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Wed, 16 Nov 2011 16:03:54 +0530
+Subject: [PATCH] watchdog: fix initialisation printout in s3c2410_wdt
+In-Reply-To: <1321433173-17757-1-git-send-email-mad_soft@inbox.ru>
+References: <1321433173-17757-1-git-send-email-mad_soft@inbox.ru>
+Message-ID: <CAJuYYwTv3d9Wg8TDBEkc0r3BweUiLdqVwGdMU4iKpK0B+EM=GA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christophe,
-
-On Wed, Nov 16, 2011 at 09:52:53AM +0100, Christophe Vu-Brugier wrote:
-> The LaCie Network Space Lite v2 shares most of its characteristics
-> with the LaCie Network Space v2.
-> 
-> Hardware:
->  * CPU: Marvell 88F6192 800Mhz
->  * SDRAM memory: 128 MiB DDR2
->  * Gigabit ethernet: PHY Marvell 88E1318
->  * Flash memory: Macronix MX25L4005A 512 KiB
->  * i2c EEPROM: 512 bytes
->  * 2 USB2 ports: host and host/device
->  * 1 push button
->  * 2 LEDs (red and blue)
-> 
-> Signed-off-by: Christophe Vu-Brugier <cvubrugier@lacie.com>
+On 16 November 2011 14:16, Dmitry Artamonow <mad_soft@inbox.ru> wrote:
+> Looks like a typo creeped in, and driver prints
+> s3c2410-wdt s3c2410-wdt: watchdog active, reset abled, irq abled
+>
+> instead of
+> s3c2410-wdt s3c2410-wdt: watchdog active, reset enabled, irq enabled
+>
+> Also it may completely disinform about irq status, as it prints
+> "irq enabled" when S3C2410_WTCON_INTEN is in fact 0.
+>
+> Fix it.
+>
+> Signed-off-by: Dmitry Artamonow <mad_soft@inbox.ru>
 > ---
-> The patch has been rebased on top of the 'reset' branch. It depends on
-> the following commit:
-> 
->   2f82cc8 ARM: restart: kirkwood: use new restart hook
-> 
-> Changes since v1:
->  * reorder machine_desc initializers
->  * use the leds-gpio driver to manage the blue LED
-> 
->  arch/arm/mach-kirkwood/Kconfig             |    6 +++
->  arch/arm/mach-kirkwood/Makefile            |    1 +
->  arch/arm/mach-kirkwood/netspace_v2-setup.c |   61 +++++++++++++++++++++++++++-
->  3 files changed, 66 insertions(+), 2 deletions(-)
+>
+> It seems to be here for a long time, but I don't think it's
+> important enough for cc-ing stable.
+>
+> Also I haven't tested it, as I don't have a hardware, but it's
+> rather trivial (and yes, I checked with datasheet that 1 in
+> S3C2410_WTCON_*EN bits really means 'enabled')
+>
 
-... snip ...
+Tested on Exynos4210 based Origen board. This patch fixed in incorrect
+"irq enabled" message at bootup. Thanks for this fix.
 
-> @@ -268,6 +313,18 @@ MACHINE_START(NETSPACE_V2, "LaCie Network Space v2")
->  MACHINE_END
->  #endif
->  
-> +#ifdef CONFIG_MACH_NETSPACE_LITE_V2
-> +MACHINE_START(NETSPACE_LITE_V2, "LaCie Network Space Lite v2")
-> +	.atag_offset	= 0x100,
-> +	.map_io		= kirkwood_map_io,
-> +	.init_early	= kirkwood_init_early,
-> +	.init_irq	= kirkwood_init_irq,
-> +	.timer		= &kirkwood_timer,
-> +	.init_machine	= netspace_v2_init,
-> +	.restart	= kirkwood_restart,
-> +MACHINE_END
-> +#endif
-> +
+Tested-by: Thomas Abraham <thomas.abraham@linaro.org>
 
-As suggested by Nicolas, I would have preferred to have a fixed
-machine_desc parameter ordering for Kirkwood machines before adding
-support for the Lite. Please, could you provide a such patch ?
-
-Except that, this patch looks good to me.
-
-Thanks,
-
-Simon
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111116/410e8ff5/attachment.sig>
+> ?drivers/watchdog/s3c2410_wdt.c | ? ?4 ++--
+> ?1 files changed, 2 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/watchdog/s3c2410_wdt.c b/drivers/watchdog/s3c2410_wdt.c
+> index 5de7e4f..a79e384 100644
+> --- a/drivers/watchdog/s3c2410_wdt.c
+> +++ b/drivers/watchdog/s3c2410_wdt.c
+> @@ -401,8 +401,8 @@ static int __devinit s3c2410wdt_probe(struct platform_device *pdev)
+>
+> ? ? ? ?dev_info(dev, "watchdog %sactive, reset %sabled, irq %sabled\n",
+> ? ? ? ? ? ? ? ? (wtcon & S3C2410_WTCON_ENABLE) ? ?"" : "in",
+> - ? ? ? ? ? ? ? ?(wtcon & S3C2410_WTCON_RSTEN) ? "" : "dis",
+> - ? ? ? ? ? ? ? ?(wtcon & S3C2410_WTCON_INTEN) ? "" : "en");
+> + ? ? ? ? ? ? ? ?(wtcon & S3C2410_WTCON_RSTEN) ? "en" : "dis",
+> + ? ? ? ? ? ? ? ?(wtcon & S3C2410_WTCON_INTEN) ? "en" : "dis");
+>
+> ? ? ? ?return 0;
+>
+> --
+> 1.7.5.1.300.gc565c
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
