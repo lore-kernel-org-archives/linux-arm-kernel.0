@@ -1,73 +1,75 @@
-From: B29396@freescale.com (Dong Aisheng-B29396)
-Date: Wed, 16 Nov 2011 13:35:04 +0000
-Subject: [PATCH] arm: mx28: check for gated clocks when setting saif
- divider
-In-Reply-To: <20111116132222.GD2596@pengutronix.de>
-References: <1315650583-4793-1-git-send-email-w.sang@pengutronix.de>
- <20111116132222.GD2596@pengutronix.de>
-Message-ID: <65EE16ACC360FA4D99C96DC085B3F7722D4E65@039-SN1MPN1-002.039d.mgd.msft.net>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Wed, 16 Nov 2011 21:58:58 +0800
+Subject: Error for machine_is_m28evk
+In-Reply-To: <20111116084258.GF9581@n2100.arm.linux.org.uk>
+References: <CAOMZO5C4=ELWef8keoT8u0H8jTPRGQ5BA_8xYyKge++s+wdNqw@mail.gmail.com>
+ <4EB8CC7B.5060503@denx.de> <20111108075349.GK2854@pengutronix.de>
+ <CAB4PhKeKdGLa74W-n1DNbUcszWMf3nymqqhuzdZoj_oQG+YNsg@mail.gmail.com>
+ <20111116084258.GF9581@n2100.arm.linux.org.uk>
+Message-ID: <20111116135857.GA14656@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Wolfram Sang [mailto:w.sang at pengutronix.de]
-> Sent: Wednesday, November 16, 2011 9:22 PM
-> To: linux-arm-kernel at lists.infradead.org
-> Cc: Sascha Hauer; Guo Shawn-R65073; Dong Aisheng-B29396
-> Subject: Re: [PATCH] arm: mx28: check for gated clocks when setting saif
-> divider
+On Wed, Nov 16, 2011 at 08:42:58AM +0000, Russell King - ARM Linux wrote:
+> On Wed, Nov 16, 2011 at 01:59:41PM +0800, Shawn Guo wrote:
+> > Hi Russell,
+> > 
+> > On Tue, Nov 08, 2011 at 08:53:47PM +0800, Shawn Guo wrote:
+> > > On Tue, Nov 08, 2011 at 08:53:50AM +0000, Russell King - ARM Linux wrote:
+> > > [...]
+> > > > 
+> > > > Maybe the answer is to just update the file anyway, and ignore peoples
+> > > > complaints that their entries aren't present until they come to their
+> > > > senses and start COMMUNICATING properly about issues they have with
+> > > > their fscked up entry in the database.
+> > > > 
+> > > So I assume that you will update mach-types for -rc2.  Otherwise,
+> > > please let me know, and I will send a patch to disable m28evk build
+> > > from mxs_defconfig for -rc2.
+> > > 
+> > May I know your plan of mach-types updating?  The -rc2 is out with no
+> > update on mach-types.
 > 
-> On Sat, Sep 10, 2011 at 12:29:43PM +0200, Wolfram Sang wrote:
-> > Like with all other clocks, the divider for the SAIF devices should
-> > not be altered when the clock is gated. Bail out when this is the case
-> > like the other clocks do.
-> >
-> > Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
-> > Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> > Cc: Shawn Guo <shawn.guo@freescale.com>
-> > Cc: Dong Aisheng-B29396 <B29396@freescale.com>
-> > ---
-> >
-> > Aisheng: I think this is the correct solution for clock-mx28.c. If
-> > setting the rate of the saif clocks hit the error path, it should be
-> fixed in the driver?
+> There is *NO* bloody way I'm updating this *known* *build* *breaking*
+> thing in an -rc series.  I've already stated my reasons, and I _know_
+> it will break stuff.  I've pointed out what the changes are.  It's in
+> linux-next.  No one has responded to that.
 > 
-> Ping. Trying to catch up, has this been resolved meanwhile?
-> 
-Sorry, I missed this patch.
+Then, can I send the following patch for -rc3 to fix the mxs build
+(I noticed the statement '# Please do not send patches to this file;
+it is automatically generated!' in the file)?  Or do I have to disable
+the m28evk from mxs build?
 
-If I understand right, the convention way is to clk_set_rate() then
-clk_enable().I f that, is it reasonable for driver to do something like:
-Clk_enable -> clk_set_rate->clk_disable to set a proper rate,
-then when needs the clock on, do clk_enable again?
+Regards,
+Shawn
 
+---8<----
+commit acbff8107c90a4d2a436cca53535f2fd35d109e7
+Author: Shawn Guo <shawn.guo@linaro.org>
+Date:   Wed Nov 16 21:44:33 2011 +0800
 
-> >
-> >  arch/arm/mach-mxs/clock-mx28.c |    4 ++++
-> >  1 files changed, 4 insertions(+), 0 deletions(-)
-> >
-> > diff --git a/arch/arm/mach-mxs/clock-mx28.c
-> > b/arch/arm/mach-mxs/clock-mx28.c index 63d6117..c9482b5 100644
-> > --- a/arch/arm/mach-mxs/clock-mx28.c
-> > +++ b/arch/arm/mach-mxs/clock-mx28.c
-> > @@ -457,6 +457,10 @@ static int name##_set_rate(struct clk *clk,
-> unsigned long rate)		\
-> >  	reg = __raw_readl(CLKCTRL_BASE_ADDR + HW_CLKCTRL_##rs);		\
-> >  	reg &= ~BM_CLKCTRL_##rs##_DIV;					\
-> >  	reg |= div << BP_CLKCTRL_##rs##_DIV;				\
-> > +	if (reg & (1 << clk->enable_shift)) {				\
-> > +		pr_err("%s: clock is gated\n", __func__);		\
-> > +		return -EINVAL;						\
-> > +	}								\
-> >  	__raw_writel(reg, CLKCTRL_BASE_ADDR + HW_CLKCTRL_##rs);		\
-> >  									\
-> >  	for (i = 10000; i; i--)						\
-> > --
-> > 1.7.5.4
-> >
-> 
-> --
-> Pengutronix e.K.                           | Wolfram Sang
-> |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/
-> |
+    ARM: Update mach-types to fix mxs build breakage
+
+    Add entry m28evk to fix the following mxs build breakage.
+
+      CHK     include/generated/compile.h
+      CC      arch/arm/mach-mxs/clock-mx28.o
+    arch/arm/mach-mxs/clock-mx28.c: In function 'clk_misc_init':
+    arch/arm/mach-mxs/clock-mx28.c:748: error: implicit declaration of
+    function 'machine_is_m28evk'
+    make[1]: *** [arch/arm/mach-mxs/clock-mx28.o] Error 1
+    make: *** [arch/arm/mach-mxs] Error 2
+
+    Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+
+diff --git a/arch/arm/tools/mach-types b/arch/arm/tools/mach-types
+index 5bdeef9..ccbe16f 100644
+--- a/arch/arm/tools/mach-types
++++ b/arch/arm/tools/mach-types
+@@ -1123,5 +1123,6 @@ blissc                    MACH_BLISSC             BLISSC                  3491
+ thales_adc             MACH_THALES_ADC         THALES_ADC              3492
+ ubisys_p9d_evp         MACH_UBISYS_P9D_EVP     UBISYS_P9D_EVP          3493
+ atdgp318               MACH_ATDGP318           ATDGP318                3494
++m28evk                 MACH_M28EVK             M28EVK                  3613
+ smdk4212               MACH_SMDK4212           SMDK4212                3638
+ smdk4412               MACH_SMDK4412           SMDK4412                3765
