@@ -1,104 +1,37 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Wed, 16 Nov 2011 11:47:39 +0100
-Subject: [PATCH 3/3] rtc: stmp3xxx: use global stmp_device functionality
-In-Reply-To: <1321440459-4527-1-git-send-email-w.sang@pengutronix.de>
-References: <1321440459-4527-1-git-send-email-w.sang@pengutronix.de>
-Message-ID: <1321440459-4527-4-git-send-email-w.sang@pengutronix.de>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Wed, 16 Nov 2011 16:32:23 +0530
+Subject: [PATCH 0/3] OMAP serial device tree support
+Message-ID: <1321441346-19591-1-git-send-email-rnayak@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The former mach specific reset_block function has been converted to a global
-one. Use the new one to remove mach dependency from the driver. Also simplify
-code using the new STMP_REG_* macros.
+This series adds minimal device tree support for
+OMAP-serial driver, and is based on top of the latest
+runtime-PM changes from Govind[1] posted here[2].
 
-Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
----
- drivers/rtc/Kconfig        |    1 +
- drivers/rtc/rtc-stmp3xxx.c |   29 ++++++++++-------------------
- 2 files changed, 11 insertions(+), 19 deletions(-)
+The series passes minimal data that allows serial console
+boot, with UART's initialised from device tree.
+However some of low power support for UART and remote
+wakeup needs more work.
+Boot tested on OMAP4 panda and OMAP4 sdp boards.
 
-diff --git a/drivers/rtc/Kconfig b/drivers/rtc/Kconfig
-index 53eb4e5..babdd5d 100644
---- a/drivers/rtc/Kconfig
-+++ b/drivers/rtc/Kconfig
-@@ -983,6 +983,7 @@ config RTC_DRV_COH901331
- config RTC_DRV_STMP
- 	tristate "Freescale STMP3xxx/i.MX23/i.MX28 RTC"
- 	depends on ARCH_MXS
-+	select STMP_DEVICE
- 	help
- 	  If you say yes here you will get support for the onboard
- 	  STMP3xxx/i.MX23/i.MX28 RTC.
-diff --git a/drivers/rtc/rtc-stmp3xxx.c b/drivers/rtc/rtc-stmp3xxx.c
-index 7315068..23db0ed 100644
---- a/drivers/rtc/rtc-stmp3xxx.c
-+++ b/drivers/rtc/rtc-stmp3xxx.c
-@@ -25,11 +25,9 @@
- #include <linux/interrupt.h>
- #include <linux/rtc.h>
- #include <linux/slab.h>
--
--#include <mach/common.h>
-+#include <linux/stmp_device.h>
- 
- #define STMP3XXX_RTC_CTRL			0x0
--#define STMP3XXX_RTC_CTRL_SET			0x4
- #define STMP3XXX_RTC_CTRL_CLR			0x8
- #define STMP3XXX_RTC_CTRL_ALARM_IRQ_EN		0x00000001
- #define STMP3XXX_RTC_CTRL_ONEMSEC_IRQ_EN	0x00000002
-@@ -44,7 +42,6 @@
- #define STMP3XXX_RTC_ALARM			0x40
- 
- #define STMP3XXX_RTC_PERSISTENT0		0x60
--#define STMP3XXX_RTC_PERSISTENT0_SET		0x64
- #define STMP3XXX_RTC_PERSISTENT0_CLR		0x68
- #define STMP3XXX_RTC_PERSISTENT0_ALARM_WAKE_EN	0x00000002
- #define STMP3XXX_RTC_PERSISTENT0_ALARM_EN	0x00000004
-@@ -106,20 +103,14 @@ static irqreturn_t stmp3xxx_rtc_interrupt(int irq, void *dev_id)
- static int stmp3xxx_alarm_irq_enable(struct device *dev, unsigned int enabled)
- {
- 	struct stmp3xxx_rtc_data *rtc_data = dev_get_drvdata(dev);
-+	u32 set_clr_offset = enabled ? STMP_SET_ADDR : STMP_CLR_ADDR;
-+
-+	writel(STMP3XXX_RTC_PERSISTENT0_ALARM_EN |
-+		STMP3XXX_RTC_PERSISTENT0_ALARM_WAKE_EN,
-+		rtc_data->io + STMP3XXX_RTC_PERSISTENT0 + set_clr_offset);
-+	writel(STMP3XXX_RTC_CTRL_ALARM_IRQ_EN,
-+		rtc_data->io + STMP3XXX_RTC_CTRL + set_clr_offset);
- 
--	if (enabled) {
--		writel(STMP3XXX_RTC_PERSISTENT0_ALARM_EN |
--				STMP3XXX_RTC_PERSISTENT0_ALARM_WAKE_EN,
--				rtc_data->io + STMP3XXX_RTC_PERSISTENT0_SET);
--		writel(STMP3XXX_RTC_CTRL_ALARM_IRQ_EN,
--				rtc_data->io + STMP3XXX_RTC_CTRL_SET);
--	} else {
--		writel(STMP3XXX_RTC_PERSISTENT0_ALARM_EN |
--				STMP3XXX_RTC_PERSISTENT0_ALARM_WAKE_EN,
--				rtc_data->io + STMP3XXX_RTC_PERSISTENT0_CLR);
--		writel(STMP3XXX_RTC_CTRL_ALARM_IRQ_EN,
--				rtc_data->io + STMP3XXX_RTC_CTRL_CLR);
--	}
- 	return 0;
- }
- 
-@@ -206,7 +197,7 @@ static int stmp3xxx_rtc_probe(struct platform_device *pdev)
- 
- 	platform_set_drvdata(pdev, rtc_data);
- 
--	mxs_reset_block(rtc_data->io);
-+	stmp_reset_block(rtc_data->io);
- 	writel(STMP3XXX_RTC_PERSISTENT0_ALARM_EN |
- 			STMP3XXX_RTC_PERSISTENT0_ALARM_WAKE_EN |
- 			STMP3XXX_RTC_PERSISTENT0_ALARM_WAKE,
-@@ -253,7 +244,7 @@ static int stmp3xxx_rtc_resume(struct platform_device *dev)
- {
- 	struct stmp3xxx_rtc_data *rtc_data = platform_get_drvdata(dev);
- 
--	mxs_reset_block(rtc_data->io);
-+	stmp_reset_block(rtc_data->io);
- 	writel(STMP3XXX_RTC_PERSISTENT0_ALARM_EN |
- 			STMP3XXX_RTC_PERSISTENT0_ALARM_WAKE_EN |
- 			STMP3XXX_RTC_PERSISTENT0_ALARM_WAKE,
--- 
-1.7.7.1
+[1] git://gitorious.org/runtime_3-0/runtime_3-0.git 3.2-rc1_uart_runtime
+[2] http://www.mail-archive.com/linux-omap at vger.kernel.org/msg58486.html
+
+Rajendra Nayak (3):
+  ARM: omap_device: handle first time activation of console device
+  omap-serial: Add minimal device tree support
+  ARM: omap: pass minimal SoC/board data for UART from dt
+
+ .../devicetree/bindings/arm/omap/omap.txt          |    1 +
+ .../devicetree/bindings/serial/omap_serial.txt     |    8 ++++
+ arch/arm/boot/dts/omap3-beagle.dts                 |   17 +++++++++
+ arch/arm/boot/dts/omap3.dtsi                       |   27 ++++++++++++++
+ arch/arm/boot/dts/omap4-panda.dts                  |   17 +++++++++
+ arch/arm/boot/dts/omap4-sdp.dts                    |   17 +++++++++
+ arch/arm/boot/dts/omap4.dtsi                       |   24 +++++++++++++
+ arch/arm/mach-omap2/board-generic.c                |    1 -
+ arch/arm/plat-omap/omap_device.c                   |   33 +++++++++++++++++-
+ drivers/tty/serial/omap-serial.c                   |   37 +++++++++++++++++++-
+ 10 files changed, 179 insertions(+), 3 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/serial/omap_serial.txt
