@@ -1,80 +1,49 @@
-From: eric.miao@linaro.org (Eric Miao)
-Date: Thu, 17 Nov 2011 19:22:51 +0800
-Subject: [RFC 1/1] ARM: imx6q: move clock register map to
- machine_desc.map_io
-In-Reply-To: <20111117092815.GH14656@S2100-06.ap.freescale.net>
-References: <1321494612-24795-1-git-send-email-richard.zhao@linaro.org>
- <CAMPhdO8vE4cer-EQZ53VDQrZpQ1JVvus2=RpDCfdJRa7gwLUqg@mail.gmail.com>
- <20111117032012.GF14656@S2100-06.ap.freescale.net>
- <20111117084453.GK9581@n2100.arm.linux.org.uk>
- <20111117090731.GG14656@S2100-06.ap.freescale.net>
- <CAMPhdO8u0jjR0po_rrd6w-pimX7ypvXdri933mANTQ3APt=3zg@mail.gmail.com>
- <20111117092815.GH14656@S2100-06.ap.freescale.net>
-Message-ID: <CAMPhdO9bzAO5DgLCHD7EsM5mjoE-+4d9QvcgiUqKvDFFD4AnrA@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 17 Nov 2011 11:25:08 +0000
+Subject: [PATCH] ARM: Do not call flush_cache_user_range with mmap_sem held
+In-Reply-To: <20111117110339.GO9581@n2100.arm.linux.org.uk>
+References: <20111107172836.5615.64219.stgit@e102109-lin.cambridge.arm.com>
+ <CAOesGMhWxEKUe7C4A+Xqv3RjN_u1t4k8eHWSZE4qMoBPD9=1qw@mail.gmail.com>
+ <20111116235024.GH9581@n2100.arm.linux.org.uk>
+ <20111117102205.GF4748@arm.com>
+ <20111117104245.GL9581@n2100.arm.linux.org.uk>
+ <20111117105935.GH4748@arm.com>
+ <20111117110339.GO9581@n2100.arm.linux.org.uk>
+Message-ID: <20111117112508.GA20412@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 17, 2011 at 5:28 PM, Shawn Guo <shawn.guo@freescale.com> wrote:
-> On Thu, Nov 17, 2011 at 05:03:15PM +0800, Eric Miao wrote:
->> On Thu, Nov 17, 2011 at 5:07 PM, Shawn Guo <shawn.guo@freescale.com> wrote:
->> > On Thu, Nov 17, 2011 at 08:44:53AM +0000, Russell King - ARM Linux wrote:
->> >> On Thu, Nov 17, 2011 at 11:20:13AM +0800, Shawn Guo wrote:
->> >> > On Thu, Nov 17, 2011 at 10:56:53AM +0800, Eric Miao wrote:
->> >> > > On Thu, Nov 17, 2011 at 9:50 AM, Richard Zhao <richard.zhao@linaro.org> wrote:
->> >> > > > If the map is in machine_desc.timer.init, the registers will not be
->> >> > > > able to access after bootup (probably after "Freeing init memory").
->> >> > >
->> >> > > Given that devicemaps_init() does additional work after creating
->> >> > > the mapping, flushing TLB and cache, machine_desc->map_io() is
->> >> > > what I assume the best place for these static IO mappings than
->> >> > > elsewhere.
->> >> > >
->> >> > > Shawn?
->> >> > >
->> >> > I'm still trying to understand what happened. ?I do not understand
->> >> > how the map can become unusable after "Freeing init memory". ?Also
->> >> > I can not reproduce the problem on my side.
->> >>
->> >> It's very simple. ?iotable_init() allocates memory using memblock.
->> >> memblock marks the memory it allocates in its reserved map. ?At the
->> >> end of map_io(), the information stored inside memblock is transferred
->> >> to bootmem and then the normal page allocator. ?Once this is done,
->> >> memblock must not be changed because there is no way to couple any
->> >> further memblock allocations into the normal page allocator.
->> >>
->> >> Look. ?I've made this point before and I'm getting pissed off with
->> >> people who think they know better. ?The callbacks in the machine
->> >> descriptor are NAMED. ?They're NAMED for a reason - they have a PURPOSE
->> >> and that PURPOSE is well defined because there are DEPENDENCIES there.
->> >> They tell you what you SHOULD be doing in there. ?Doing something else
->> >> will result in BAD THINGS happening.
->> >>
->> >> If people can't understand this, then the only solution is to make the
->> >> backing functions for this stuff (like iotable_init() etc) BUG() when
->> >> they're abused. ?That means adding a lot more checks and slowing down
->> >> the boot because people seem to be incapable of comprehending that
->> >> initialisation needs to be done in a well defined order.
->> >>
->> > Russell,
->> >
->> > Thanks for help understand the issue.
->> >
->> > Richard,
->> >
->> > Please revise the patch to introduce function like imx6q_clock_map_io()
->> > to be called in imx6q_map_io().
->>
->> Or simply imx6q_io_desc[], and doing a iotable_init() for all (and
->> considering ANATOP not necessarily include clocks registers only)
->> other possible static IO mappings in the future.
->>
-> I do not see any more possible static IO mapping in the future. On the
-> contrary, the static mapping for clocks could possibly be removed when
-> we migrate to common clock framework and create clocks dynamically from
-> device tree.
+On Thu, Nov 17, 2011 at 11:03:39AM +0000, Russell King - ARM Linux wrote:
+> On Thu, Nov 17, 2011 at 10:59:36AM +0000, Catalin Marinas wrote:
+> > On Thu, Nov 17, 2011 at 10:42:46AM +0000, Russell King - ARM Linux wrote:
+> > > On Thu, Nov 17, 2011 at 10:22:05AM +0000, Catalin Marinas wrote:
+> > > > BTW, we could even go a step further an remove the vma checks entirely,
+> > > > just use access_ok() since __cpuc_coherent_user_range() can handle
+> > > > unmapped ranges properly (though it may introduce some latency if some
+> > > > user app passes a 3G range but we can change the fixup code to abort the
+> > > > operation when it gets a fault that can't be fixed up).
+> > > 
+> > > So, do you think that it is acceptable to be able to pass into this from
+> > > userspace the arguments '0', '~0', '0' and have the kernel spin over the
+> > > entire 4G space, including IO space on any of the supported architectures.
+> > 
+> > We have access_ok() to check for user only space.
+> > 
+> > > Note that pre-ARMv6 CPUs will spin over that range in 32-byte steps
+> > > whether or not there's a page present.
+> > 
+> > You are right, the pre-v6 hardware would not trigger a fault. So if we
+> > don't want another #ifdef in this function, we just keep the vma checks
+> > for all architecture versions.
+> > 
+> > But I consider that the original patch is still valid.
+> 
+> You thinks it's safe to walk the vma list with no locks held?
 
-Fair enough and it would be ideal if static IO mapping is not necessary.
+No, I don't, but the patch only releases the semaphore when calling the
+cache flushing function. The vmas are walked with the semaphore held.
 
-And I don't have a strong preference of having a single array for all these
-mappings or having separate function for each of them. It just looks a bit
-redundant to have a one-line function here.
+Please read the patch I posted properly.
+
+-- 
+Catalin
