@@ -1,35 +1,68 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 17 Nov 2011 17:23:19 +0000
-Subject: [GIT PULL] ARM irqchip consolidation
-In-Reply-To: <4EC39D44.8000706@arm.com>
-References: <4EC39D44.8000706@arm.com>
-Message-ID: <20111117172319.GX9581@n2100.arm.linux.org.uk>
+Date: Thu, 17 Nov 2011 17:24:38 +0000
+Subject: [PATCH 02/41] ARM: restart: remove poodle restart handler
+In-Reply-To: <E1RN6hx-0001Wh-C9@rmk-PC.arm.linux.org.uk>
+References: <20111106173113.GI12913@n2100.arm.linux.org.uk>
+ <E1RN6hx-0001Wh-C9@rmk-PC.arm.linux.org.uk>
+Message-ID: <20111117172438.GY9581@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 16, 2011 at 11:23:48AM +0000, Marc Zyngier wrote:
-> I've collected patches converting GIC and VIC based platforms to use the
-> MULTI_IRQ_HANDLER configuration option in a single branch (as they depend
-> on a common patch).
+Ack?
+
+On Sun, Nov 06, 2011 at 05:40:37PM +0000, Russell King - ARM Linux wrote:
+> The poodle restart handler was added in 74617fb6b8 (3593/1: Add reboot
+> and shutdown handlers for Zaurus handhelds), and at that time it was
+> necessary to deal with the RCSR register.  This commit also forced all
+> restarts to use the 'hard' restart method.
 > 
-> It also include the patch adding non-banked support to the GIC, which is
-> required to convert EXYNOS to MULTI_IRQ_HANDLER in a sane way (not to
-> mention fixing obvious bugs).
+> In dc38e2ad53 (pxa: Fix RCSR handling), the RCSR handling was removed,
+> leaving just the forcing to use a 'hard' restart.  As hard restarts are
+> the default (in the absense of a reboot= command line argument), this
+> seems pointless.  In any case, Richard Purdie says:
 > 
-> If you're happy with this, feel free to pull this branch.
-
-We need to sort out the conflicts between this and the arch_reset stuff
-I'm carrying, because I'm not going to fight git from this early in the
-cycle, dealing with stuff like this:
-
-CONFLICT (delete/modify): arch/arm/mach-omap2/include/mach/omap4-common.h deleted in HEAD and modified in devel-stable. Version devel-stable of arch/arm/mach-omap2/include/mach/omap4-common.h left in tree.
-
-which is immune to git rerere, and I'm sure as hell not going to keep on
-merging this with my for-next branch.
-
-Even though I've split out the conflicting cleanup commits from the
-arch_reset() stuff, many of them still don't have acked-bys from the
-maintainers of the affected code, so I don't feel like I can commit
-them to being stable.
-
-What we need are more responsive platform maintainers!
+> > From what I remember that hardware either always reboots or always
+> > halts. I think the option was therefore left hardcoded to make it clear
+> > it wasn't expected to work. Later Zaurii models could do either but
+> > required some manual poking of registers to make it happen iirc.
+> >
+> > Regardless, you can probably clean this up as you suggest now.
+> 
+> So, lets remove the unnecessary interception and rely on the default
+> restart mode.
+> 
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+>  arch/arm/mach-pxa/poodle.c |    6 ------
+>  1 files changed, 0 insertions(+), 6 deletions(-)
+> 
+> diff --git a/arch/arm/mach-pxa/poodle.c b/arch/arm/mach-pxa/poodle.c
+> index 948ce3e..1c597ad 100644
+> --- a/arch/arm/mach-pxa/poodle.c
+> +++ b/arch/arm/mach-pxa/poodle.c
+> @@ -419,17 +419,11 @@ static void poodle_poweroff(void)
+>  	arm_machine_restart('h', NULL);
+>  }
+>  
+> -static void poodle_restart(char mode, const char *cmd)
+> -{
+> -	arm_machine_restart('h', cmd);
+> -}
+> -
+>  static void __init poodle_init(void)
+>  {
+>  	int ret = 0;
+>  
+>  	pm_power_off = poodle_poweroff;
+> -	arm_pm_restart = poodle_restart;
+>  
+>  	PCFR |= PCFR_OPDE;
+>  
+> -- 
+> 1.7.4.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
