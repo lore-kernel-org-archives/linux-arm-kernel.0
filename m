@@ -1,312 +1,93 @@
-From: manjunath.hadli@ti.com (Manjunath Hadli)
-Date: Thu, 17 Nov 2011 15:48:58 +0530
-Subject: [PATCH v3 5/5] ARM: davinci: delete individual platform header files
- and use a common header
-In-Reply-To: <1321525138-3928-1-git-send-email-manjunath.hadli@ti.com>
-References: <1321525138-3928-1-git-send-email-manjunath.hadli@ti.com>
-Message-ID: <1321525138-3928-6-git-send-email-manjunath.hadli@ti.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 17 Nov 2011 10:22:05 +0000
+Subject: [PATCH] ARM: Do not call flush_cache_user_range with mmap_sem held
+In-Reply-To: <20111116235024.GH9581@n2100.arm.linux.org.uk>
+References: <20111107172836.5615.64219.stgit@e102109-lin.cambridge.arm.com>
+ <CAOesGMhWxEKUe7C4A+Xqv3RjN_u1t4k8eHWSZE4qMoBPD9=1qw@mail.gmail.com>
+ <20111116235024.GH9581@n2100.arm.linux.org.uk>
+Message-ID: <20111117102205.GF4748@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-include davinci_common.h file in files using the platform
-header file for dm355, dm365, dm644x and dm646x and delete the
-individual platform header files.
+On Wed, Nov 16, 2011 at 11:50:24PM +0000, Russell King - ARM Linux wrote:
+> On Wed, Nov 16, 2011 at 01:23:02PM -0800, Olof Johansson wrote:
+> > Agreed. Russell, please consider picking this up -- the bug is very
+> > real and it sounds like the objection is vague.
+> 
+> No, it isn't.  It's creating an unsafe situation.  If we're going to do
+> this, we might as well give up on architecture correctness because we're
+> throwing out locking correctness.
+> 
+> 1. We look up the VMA.
+> 2. We pass the VMA to the cache operation.
+> 3. The cache operation dereferences the VMA to obtain the VMA flags.
 
-Signed-off-by: Manjunath Hadli <manjunath.hadli@ti.com>
----
- arch/arm/mach-davinci/board-dm355-evm.c     |    2 +-
- arch/arm/mach-davinci/board-dm355-leopard.c |    2 +-
- arch/arm/mach-davinci/board-dm365-evm.c     |    2 +-
- arch/arm/mach-davinci/board-dm644x-evm.c    |    2 +-
- arch/arm/mach-davinci/board-dm646x-evm.c    |    2 +-
- arch/arm/mach-davinci/board-neuros-osd2.c   |    2 +-
- arch/arm/mach-davinci/board-sffsdr.c        |    2 +-
- arch/arm/mach-davinci/dm355.c               |    2 +-
- arch/arm/mach-davinci/dm365.c               |    2 +-
- arch/arm/mach-davinci/dm644x.c              |    2 +-
- arch/arm/mach-davinci/dm646x.c              |    2 +-
- arch/arm/mach-davinci/include/mach/dm355.h  |   16 ----------------
- arch/arm/mach-davinci/include/mach/dm365.h  |   18 ------------------
- arch/arm/mach-davinci/include/mach/dm644x.h |   27 ---------------------------
- arch/arm/mach-davinci/include/mach/dm646x.h |   16 ----------------
- drivers/media/video/davinci/vpif.h          |    3 +--
- drivers/media/video/davinci/vpif_display.c  |    2 +-
- 17 files changed, 13 insertions(+), 91 deletions(-)
- delete mode 100644 arch/arm/mach-davinci/include/mach/dm355.h
- delete mode 100644 arch/arm/mach-davinci/include/mach/dm365.h
- delete mode 100644 arch/arm/mach-davinci/include/mach/dm644x.h
- delete mode 100644 arch/arm/mach-davinci/include/mach/dm646x.h
+Not anymore - if you look at the patch, flush_cache_user_range() no
+longer gets the vma. We just use the vma to adjust the start/end and
+that's done with the mmap_sem down. I won't comment on the rest of your
+reply since it's based on the assumption that we pass vma to
+flush_cache_user_range().
 
-diff --git a/arch/arm/mach-davinci/board-dm355-evm.c b/arch/arm/mach-davinci/board-dm355-evm.c
-index 4e0e707..7b98160 100644
---- a/arch/arm/mach-davinci/board-dm355-evm.c
-+++ b/arch/arm/mach-davinci/board-dm355-evm.c
-@@ -26,7 +26,7 @@
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
+
+BTW, we could even go a step further an remove the vma checks entirely,
+just use access_ok() since __cpuc_coherent_user_range() can handle
+unmapped ranges properly (though it may introduce some latency if some
+user app passes a 3G range but we can change the fixup code to abort the
+operation when it gets a fault that can't be fixed up).
+
+
+diff --git a/arch/arm/include/asm/cacheflush.h b/arch/arm/include/asm/cacheflush.h
+index d5d8d5c..1252a26 100644
+--- a/arch/arm/include/asm/cacheflush.h
++++ b/arch/arm/include/asm/cacheflush.h
+@@ -249,7 +249,7 @@ extern void flush_cache_page(struct vm_area_struct *vma, unsigned long user_addr
+  * Harvard caches are synchronised for the user space address range.
+  * This is used for the ARM private sys_cacheflush system call.
+  */
+-#define flush_cache_user_range(vma,start,end) \
++#define flush_cache_user_range(start,end) \
+ 	__cpuc_coherent_user_range((start) & PAGE_MASK, PAGE_ALIGN(end))
  
--#include <mach/dm355.h>
-+#include <mach/davinci.h>
- #include <mach/i2c.h>
- #include <mach/serial.h>
- #include <mach/nand.h>
-diff --git a/arch/arm/mach-davinci/board-dm355-leopard.c b/arch/arm/mach-davinci/board-dm355-leopard.c
-index ff2d241..b4f9558 100644
---- a/arch/arm/mach-davinci/board-dm355-leopard.c
-+++ b/arch/arm/mach-davinci/board-dm355-leopard.c
-@@ -23,7 +23,7 @@
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
- 
--#include <mach/dm355.h>
-+#include <mach/davinci.h>
- #include <mach/i2c.h>
- #include <mach/serial.h>
- #include <mach/nand.h>
-diff --git a/arch/arm/mach-davinci/board-dm365-evm.c b/arch/arm/mach-davinci/board-dm365-evm.c
-index 1918ae7..7aec2ab 100644
---- a/arch/arm/mach-davinci/board-dm365-evm.c
-+++ b/arch/arm/mach-davinci/board-dm365-evm.c
-@@ -32,7 +32,7 @@
- #include <asm/mach/arch.h>
- 
- #include <mach/mux.h>
--#include <mach/dm365.h>
-+#include <mach/davinci.h>
- #include <mach/common.h>
- #include <mach/i2c.h>
- #include <mach/serial.h>
-diff --git a/arch/arm/mach-davinci/board-dm644x-evm.c b/arch/arm/mach-davinci/board-dm644x-evm.c
-index 0cf8abf..880aa0c 100644
---- a/arch/arm/mach-davinci/board-dm644x-evm.c
-+++ b/arch/arm/mach-davinci/board-dm644x-evm.c
-@@ -30,7 +30,7 @@
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
- 
--#include <mach/dm644x.h>
-+#include <mach/davinci.h>
- #include <mach/common.h>
- #include <mach/i2c.h>
- #include <mach/serial.h>
-diff --git a/arch/arm/mach-davinci/board-dm646x-evm.c b/arch/arm/mach-davinci/board-dm646x-evm.c
-index e574d7f..383acdf 100644
---- a/arch/arm/mach-davinci/board-dm646x-evm.c
-+++ b/arch/arm/mach-davinci/board-dm646x-evm.c
-@@ -36,7 +36,7 @@
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
- 
--#include <mach/dm646x.h>
-+#include <mach/davinci.h>
- #include <mach/common.h>
- #include <mach/serial.h>
- #include <mach/i2c.h>
-diff --git a/arch/arm/mach-davinci/board-neuros-osd2.c b/arch/arm/mach-davinci/board-neuros-osd2.c
-index e5f231a..a4608cf 100644
---- a/arch/arm/mach-davinci/board-neuros-osd2.c
-+++ b/arch/arm/mach-davinci/board-neuros-osd2.c
-@@ -30,7 +30,7 @@
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
- 
--#include <mach/dm644x.h>
-+#include <mach/davinci.h>
- #include <mach/common.h>
- #include <mach/i2c.h>
- #include <mach/serial.h>
-diff --git a/arch/arm/mach-davinci/board-sffsdr.c b/arch/arm/mach-davinci/board-sffsdr.c
-index 5dd4da9..b993ac6 100644
---- a/arch/arm/mach-davinci/board-sffsdr.c
-+++ b/arch/arm/mach-davinci/board-sffsdr.c
-@@ -35,7 +35,7 @@
- #include <asm/mach/arch.h>
- #include <asm/mach/flash.h>
- 
--#include <mach/dm644x.h>
-+#include <mach/davinci.h>
- #include <mach/common.h>
- #include <mach/i2c.h>
- #include <mach/serial.h>
-diff --git a/arch/arm/mach-davinci/dm355.c b/arch/arm/mach-davinci/dm355.c
-index fe520d4..2e29ed0 100644
---- a/arch/arm/mach-davinci/dm355.c
-+++ b/arch/arm/mach-davinci/dm355.c
-@@ -18,7 +18,7 @@
- 
- #include <asm/mach/map.h>
- 
--#include <mach/dm355.h>
-+#include <mach/davinci.h>
- #include <mach/cputype.h>
- #include <mach/edma.h>
- #include <mach/psc.h>
-diff --git a/arch/arm/mach-davinci/dm365.c b/arch/arm/mach-davinci/dm365.c
-index 77edee8..6b8ce8c 100644
---- a/arch/arm/mach-davinci/dm365.c
-+++ b/arch/arm/mach-davinci/dm365.c
-@@ -21,7 +21,7 @@
- 
- #include <asm/mach/map.h>
- 
--#include <mach/dm365.h>
-+#include <mach/davinci.h>
- #include <mach/cputype.h>
- #include <mach/edma.h>
- #include <mach/psc.h>
-diff --git a/arch/arm/mach-davinci/dm644x.c b/arch/arm/mach-davinci/dm644x.c
-index 27d1371..401f916 100644
---- a/arch/arm/mach-davinci/dm644x.c
-+++ b/arch/arm/mach-davinci/dm644x.c
-@@ -15,7 +15,7 @@
- 
- #include <asm/mach/map.h>
- 
--#include <mach/dm644x.h>
-+#include <mach/davinci.h>
- #include <mach/cputype.h>
- #include <mach/edma.h>
- #include <mach/irqs.h>
-diff --git a/arch/arm/mach-davinci/dm646x.c b/arch/arm/mach-davinci/dm646x.c
-index 0560e82..850ad3c 100644
---- a/arch/arm/mach-davinci/dm646x.c
-+++ b/arch/arm/mach-davinci/dm646x.c
-@@ -16,7 +16,7 @@
- 
- #include <asm/mach/map.h>
- 
--#include <mach/dm646x.h>
-+#include <mach/davinci.h>
- #include <mach/cputype.h>
- #include <mach/edma.h>
- #include <mach/irqs.h>
-diff --git a/arch/arm/mach-davinci/include/mach/dm355.h b/arch/arm/mach-davinci/include/mach/dm355.h
-deleted file mode 100644
-index 14e7766..0000000
---- a/arch/arm/mach-davinci/include/mach/dm355.h
-+++ /dev/null
-@@ -1,16 +0,0 @@
--/*
-- * Chip specific defines for DM355 SoC
-- *
-- * Author: Kevin Hilman, Deep Root Systems, LLC
-- *
-- * 2007 (c) Deep Root Systems, LLC. This file is licensed under
-- * the terms of the GNU General Public License version 2. This program
-- * is licensed "as is" without any warranty of any kind, whether express
-- * or implied.
-- */
--#ifndef __ASM_ARCH_DM355_H
--#define __ASM_ARCH_DM355_H
+ /*
+diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
+index 99a5727..b215e39 100644
+--- a/arch/arm/kernel/traps.c
++++ b/arch/arm/kernel/traps.c
+@@ -474,23 +474,12 @@ static int bad_syscall(int n, struct pt_regs *regs)
+ static inline void
+ do_cache_op(unsigned long start, unsigned long end, int flags)
+ {
+-	struct mm_struct *mm = current->active_mm;
+-	struct vm_area_struct *vma;
 -
--#include <mach/davinci.h>
--
--#endif /* __ASM_ARCH_DM355_H */
-diff --git a/arch/arm/mach-davinci/include/mach/dm365.h b/arch/arm/mach-davinci/include/mach/dm365.h
-deleted file mode 100644
-index 3433d72..0000000
---- a/arch/arm/mach-davinci/include/mach/dm365.h
-+++ /dev/null
-@@ -1,18 +0,0 @@
--/*
-- * Copyright (C) 2009 Texas Instruments Incorporated
-- *
-- * This program is free software; you can redistribute it and/or
-- * modify it under the terms of the GNU General Public License as
-- * published by the Free Software Foundation version 2.
-- *
-- * This program is distributed "as is" WITHOUT ANY WARRANTY of any
-- * kind, whether express or implied; without even the implied warranty
-- * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- */
--#ifndef __ASM_ARCH_DM365_H
--#define __ASM_ARCH_DM665_H
--
--#include <mach/davinci.h>
--
--#endif /* __ASM_ARCH_DM365_H */
-diff --git a/arch/arm/mach-davinci/include/mach/dm644x.h b/arch/arm/mach-davinci/include/mach/dm644x.h
-deleted file mode 100644
-index 99e9525..0000000
---- a/arch/arm/mach-davinci/include/mach/dm644x.h
-+++ /dev/null
-@@ -1,27 +0,0 @@
--/*
-- * This file contains the processor specific definitions
-- * of the TI DM644x.
-- *
-- * Copyright (C) 2008 Texas Instruments.
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program; if not, write to the Free Software
-- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-- *
-- */
--#ifndef __ASM_ARCH_DM644X_H
--#define __ASM_ARCH_DM644X_H
--
--#include <mach/davinci.h>
--
--#endif /* __ASM_ARCH_DM644X_H */
-diff --git a/arch/arm/mach-davinci/include/mach/dm646x.h b/arch/arm/mach-davinci/include/mach/dm646x.h
-deleted file mode 100644
-index 8bdea80..0000000
---- a/arch/arm/mach-davinci/include/mach/dm646x.h
-+++ /dev/null
-@@ -1,16 +0,0 @@
--/*
-- * Chip specific defines for DM646x SoC
-- *
-- * Author: Kevin Hilman, Deep Root Systems, LLC
-- *
-- * 2007 (c) Deep Root Systems, LLC. This file is licensed under
-- * the terms of the GNU General Public License version 2. This program
-- * is licensed "as is" without any warranty of any kind, whether express
-- * or implied.
-- */
--#ifndef __ASM_ARCH_DM646X_H
--#define __ASM_ARCH_DM646X_H
--
--#include <mach/davinci.h>
--
--#endif /* __ASM_ARCH_DM646X_H */
-diff --git a/drivers/media/video/davinci/vpif.h b/drivers/media/video/davinci/vpif.h
-index 25036cb..1e0fef9 100644
---- a/drivers/media/video/davinci/vpif.h
-+++ b/drivers/media/video/davinci/vpif.h
-@@ -18,8 +18,7 @@
+ 	if (end < start || flags)
+ 		return;
++	if (!access_ok(VERIFY_WRITE, start, end - start))
++		return;
  
- #include <linux/io.h>
- #include <linux/videodev2.h>
--#include <mach/hardware.h>
--#include <mach/dm646x.h>
-+#include <mach/davinci.h>
- #include <media/davinci/vpif_types.h>
+-	down_read(&mm->mmap_sem);
+-	vma = find_vma(mm, start);
+-	if (vma && vma->vm_start < end) {
+-		if (start < vma->vm_start)
+-			start = vma->vm_start;
+-		if (end > vma->vm_end)
+-			end = vma->vm_end;
+-
+-		flush_cache_user_range(vma, start, end);
+-	}
+-	up_read(&mm->mmap_sem);
++	flush_cache_user_range(start, end);
+ }
  
- /* Maximum channel allowed */
-diff --git a/drivers/media/video/davinci/vpif_display.c b/drivers/media/video/davinci/vpif_display.c
-index 286f029..4766d41 100644
---- a/drivers/media/video/davinci/vpif_display.c
-+++ b/drivers/media/video/davinci/vpif_display.c
-@@ -39,7 +39,7 @@
- #include <media/v4l2-ioctl.h>
- #include <media/v4l2-chip-ident.h>
+ /*
+@@ -816,6 +805,6 @@ void __init early_trap_init(void)
+ 	memcpy((void *)(vectors + KERN_RESTART_CODE - CONFIG_VECTORS_BASE),
+ 	       syscall_restart_code, sizeof(syscall_restart_code));
  
--#include <mach/dm646x.h>
-+#include <mach/davinci.h>
- 
- #include "vpif_display.h"
- #include "vpif.h"
+-	flush_icache_range(vectors, vectors + PAGE_SIZE);
++	flush_icache_range(CONFIG_VECTORS_BASE, CONFIG_VECTORS_BASE+PAGE_SIZE);
+ 	modify_domain(DOMAIN_USER, DOMAIN_CLIENT);
+ }
+
 -- 
-1.6.2.4
+Catalin
