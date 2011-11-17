@@ -1,55 +1,76 @@
 From: manjunath.hadli@ti.com (Manjunath Hadli)
-Date: Thu, 17 Nov 2011 15:48:53 +0530
-Subject: [PATCH v3 0/5] ARM: davinci: re-arrange definitions to have a common
- davinci header
-Message-ID: <1321525138-3928-1-git-send-email-manjunath.hadli@ti.com>
+Date: Thu, 17 Nov 2011 15:48:55 +0530
+Subject: [PATCH v3 2/5] ARM: davinci: dm365: remove the macros from the header
+ to move to c file
+In-Reply-To: <1321525138-3928-1-git-send-email-manjunath.hadli@ti.com>
+References: <1321525138-3928-1-git-send-email-manjunath.hadli@ti.com>
+Message-ID: <1321525138-3928-3-git-send-email-manjunath.hadli@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Re-arrange definitions and remove unnecessary code so that we can
-have a common header for all davinci platforms. This will enable
-us to share defines and enable common routines to be used without
-polluting hardware.h.
- This patch set forms the base for a later set of patches for having
-a common system module base address (DAVINCI_SYSTEM_MODULE_BASE).
+move the register base addresses and offsets used only by dm365
+platform file from platform header dm365.h to dm365.c as they
+are used only in the c file.
 
-Changes from previous version(As per Sergei's comments):
-1. Renamed davinci_common.h to davinci.h.
-2. Added extra line whereever appropriate.
-3. removed unnecessary header inclusion.
+Signed-off-by: Manjunath Hadli <manjunath.hadli@ti.com>
+---
+ arch/arm/mach-davinci/dm365.c              |   16 ++++++++++++++++
+ arch/arm/mach-davinci/include/mach/dm365.h |   16 ----------------
+ 2 files changed, 16 insertions(+), 16 deletions(-)
 
-Manjunath Hadli (5):
-  ARM: davinci: dm644x: remove the macros from the header to move to c
-    file
-  ARM: davinci: dm365: remove the macros from the header to move to c
-    file
-  ARM: davinci: dm646x: remove the macros from the header to move to c
-    file
-  ARM: davinci: create new common platform header for davinci
-  ARM: davinci: delete individual platform header files and use a
-    common header
-
- arch/arm/mach-davinci/board-dm355-evm.c      |    2 +-
- arch/arm/mach-davinci/board-dm355-leopard.c  |    2 +-
- arch/arm/mach-davinci/board-dm365-evm.c      |    2 +-
- arch/arm/mach-davinci/board-dm644x-evm.c     |    2 +-
- arch/arm/mach-davinci/board-dm646x-evm.c     |    2 +-
- arch/arm/mach-davinci/board-neuros-osd2.c    |    2 +-
- arch/arm/mach-davinci/board-sffsdr.c         |    2 +-
- arch/arm/mach-davinci/dm355.c                |    2 +-
- arch/arm/mach-davinci/dm365.c                |   18 +++++-
- arch/arm/mach-davinci/dm644x.c               |    9 +++-
- arch/arm/mach-davinci/dm646x.c               |    9 +++-
- arch/arm/mach-davinci/include/mach/davinci.h |   88 ++++++++++++++++++++++++++
- arch/arm/mach-davinci/include/mach/dm355.h   |   32 ---------
- arch/arm/mach-davinci/include/mach/dm365.h   |   52 ---------------
- arch/arm/mach-davinci/include/mach/dm644x.h  |   47 --------------
- arch/arm/mach-davinci/include/mach/dm646x.h  |   41 ------------
- drivers/media/video/davinci/vpif.h           |    3 +-
- drivers/media/video/davinci/vpif_display.c   |    2 +-
- 18 files changed, 131 insertions(+), 186 deletions(-)
- create mode 100644 arch/arm/mach-davinci/include/mach/davinci.h
- delete mode 100644 arch/arm/mach-davinci/include/mach/dm355.h
- delete mode 100644 arch/arm/mach-davinci/include/mach/dm365.h
- delete mode 100644 arch/arm/mach-davinci/include/mach/dm644x.h
- delete mode 100644 arch/arm/mach-davinci/include/mach/dm646x.h
+diff --git a/arch/arm/mach-davinci/dm365.c b/arch/arm/mach-davinci/dm365.c
+index 679e168..77edee8 100644
+--- a/arch/arm/mach-davinci/dm365.c
++++ b/arch/arm/mach-davinci/dm365.c
+@@ -40,6 +40,22 @@
+ 
+ #define DM365_REF_FREQ		24000000	/* 24 MHz on the DM365 EVM */
+ 
++/* Base of key scan register bank */
++#define DM365_KEYSCAN_BASE		0x01c69400
++
++#define DM365_RTC_BASE			0x01c69000
++
++#define DAVINCI_DM365_VC_BASE		0x01d0c000
++#define DAVINCI_DMA_VC_TX		2
++#define DAVINCI_DMA_VC_RX		3
++
++#define DM365_EMAC_BASE			0x01d07000
++#define DM365_EMAC_MDIO_BASE		(DM365_EMAC_BASE + 0x4000)
++#define DM365_EMAC_CNTRL_OFFSET		0x0000
++#define DM365_EMAC_CNTRL_MOD_OFFSET	0x3000
++#define DM365_EMAC_CNTRL_RAM_OFFSET	0x1000
++#define DM365_EMAC_CNTRL_RAM_SIZE	0x2000
++
+ static struct pll_data pll1_data = {
+ 	.num		= 1,
+ 	.phys_base	= DAVINCI_PLL1_BASE,
+diff --git a/arch/arm/mach-davinci/include/mach/dm365.h b/arch/arm/mach-davinci/include/mach/dm365.h
+index 2563bf4..51924de 100644
+--- a/arch/arm/mach-davinci/include/mach/dm365.h
++++ b/arch/arm/mach-davinci/include/mach/dm365.h
+@@ -20,22 +20,6 @@
+ #include <mach/keyscan.h>
+ #include <media/davinci/vpfe_capture.h>
+ 
+-#define DM365_EMAC_BASE			(0x01D07000)
+-#define DM365_EMAC_MDIO_BASE		(DM365_EMAC_BASE + 0x4000)
+-#define DM365_EMAC_CNTRL_OFFSET		(0x0000)
+-#define DM365_EMAC_CNTRL_MOD_OFFSET	(0x3000)
+-#define DM365_EMAC_CNTRL_RAM_OFFSET	(0x1000)
+-#define DM365_EMAC_CNTRL_RAM_SIZE	(0x2000)
+-
+-/* Base of key scan register bank */
+-#define DM365_KEYSCAN_BASE		(0x01C69400)
+-
+-#define DM365_RTC_BASE			(0x01C69000)
+-
+-#define DAVINCI_DM365_VC_BASE		(0x01D0C000)
+-#define DAVINCI_DMA_VC_TX		2
+-#define DAVINCI_DMA_VC_RX		3
+-
+ #define DM365_ASYNC_EMIF_CONTROL_BASE	0x01D10000
+ #define DM365_ASYNC_EMIF_DATA_CE0_BASE	0x02000000
+ #define DM365_ASYNC_EMIF_DATA_CE1_BASE	0x04000000
+-- 
+1.6.2.4
