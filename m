@@ -1,292 +1,346 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 17 Nov 2011 17:30:27 +0000
-Subject: [PATCH 18/41] ARM: restart: ixp4xx: use new restart hook
-In-Reply-To: <E1RN6nE-0001Xl-8i@rmk-PC.arm.linux.org.uk>
+Date: Thu, 17 Nov 2011 17:42:47 +0000
+Subject: [PATCH 6/7] ARM: restart: only perform setup for restart when
+ soft-restarting
+In-Reply-To: <E1RN6b9-0001NG-NS@rmk-PC.arm.linux.org.uk>
 References: <20111106173113.GI12913@n2100.arm.linux.org.uk>
- <E1RN6nE-0001Xl-8i@rmk-PC.arm.linux.org.uk>
-Message-ID: <20111117173027.GE9581@n2100.arm.linux.org.uk>
+ <E1RN6b9-0001NG-NS@rmk-PC.arm.linux.org.uk>
+Message-ID: <20111117174247.GF9581@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Ack?
 
-On Sun, Nov 06, 2011 at 05:46:04PM +0000, Russell King - ARM Linux wrote:
-> Hook these platforms restart code into the new restart hook rather
-> than using arch_reset().
+(If you're in the To: list I'm expecting a reply because this patch is
+touching something you're responsible for.  Thanks.)
+
+On Sun, Nov 06, 2011 at 05:33:35PM +0000, Russell King - ARM Linux wrote:
+> We only need to set the system up for a soft-restart if we're going to
+> be doing a soft-restart.  Provide a new function (soft_restart()) which
+> does the setup and final call for this, and make platforms use it.
+> Eliminate the call to setup_restart() from the default handler.
+> 
+> This means that platforms arch_reset() function is no longer called with
+> the page tables prepared for a soft-restart, and caches will still be
+> enabled.
 > 
 > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 > ---
->  arch/arm/mach-ixp4xx/avila-setup.c           |    2 ++
->  arch/arm/mach-ixp4xx/common.c                |   20 ++++++++++++++++++++
->  arch/arm/mach-ixp4xx/coyote-setup.c          |    2 ++
->  arch/arm/mach-ixp4xx/dsmg600-setup.c         |    1 +
->  arch/arm/mach-ixp4xx/fsg-setup.c             |    1 +
->  arch/arm/mach-ixp4xx/gateway7001-setup.c     |    1 +
->  arch/arm/mach-ixp4xx/goramo_mlr.c            |    1 +
->  arch/arm/mach-ixp4xx/gtwx5715-setup.c        |    1 +
->  arch/arm/mach-ixp4xx/include/mach/platform.h |    1 +
->  arch/arm/mach-ixp4xx/include/mach/system.h   |   21 ---------------------
->  arch/arm/mach-ixp4xx/ixdp425-setup.c         |    1 +
->  arch/arm/mach-ixp4xx/nas100d-setup.c         |    1 +
->  arch/arm/mach-ixp4xx/nslu2-setup.c           |    1 +
->  arch/arm/mach-ixp4xx/omixp-setup.c           |    3 +++
->  arch/arm/mach-ixp4xx/vulcan-setup.c          |    1 +
->  arch/arm/mach-ixp4xx/wg302v2-setup.c         |    1 +
->  16 files changed, 38 insertions(+), 21 deletions(-)
+>  arch/arm/include/asm/system.h                     |    1 +
+>  arch/arm/kernel/process.c                         |   13 +++++++++++--
+>  arch/arm/mach-clps711x/include/mach/system.h      |    2 +-
+>  arch/arm/mach-ebsa110/include/mach/system.h       |    2 +-
+>  arch/arm/mach-footbridge/include/mach/system.h    |    2 +-
+>  arch/arm/mach-iop32x/include/mach/system.h        |    2 +-
+>  arch/arm/mach-iop33x/include/mach/system.h        |    2 +-
+>  arch/arm/mach-ixp4xx/include/mach/system.h        |    2 +-
+>  arch/arm/mach-ks8695/include/mach/system.h        |    2 +-
+>  arch/arm/mach-mmp/include/mach/system.h           |    4 ++--
+>  arch/arm/mach-mxs/system.c                        |    2 +-
+>  arch/arm/mach-pnx4008/include/mach/system.h       |    2 +-
+>  arch/arm/mach-pxa/reset.c                         |    2 +-
+>  arch/arm/mach-rpc/include/mach/system.h           |    2 +-
+>  arch/arm/mach-s3c2410/include/mach/system-reset.h |    4 ++--
+>  arch/arm/mach-s3c64xx/include/mach/system.h       |    2 +-
+>  arch/arm/mach-sa1100/include/mach/system.h        |    2 +-
+>  arch/arm/mach-shmobile/include/mach/system.h      |    2 +-
+>  arch/arm/mach-w90x900/include/mach/system.h       |    2 +-
+>  arch/arm/plat-mxc/system.c                        |    2 +-
+>  arch/arm/plat-spear/include/plat/system.h         |    2 +-
+>  21 files changed, 33 insertions(+), 23 deletions(-)
 > 
-> diff --git a/arch/arm/mach-ixp4xx/avila-setup.c b/arch/arm/mach-ixp4xx/avila-setup.c
-> index 37609a2..a7277ad 100644
-> --- a/arch/arm/mach-ixp4xx/avila-setup.c
-> +++ b/arch/arm/mach-ixp4xx/avila-setup.c
-> @@ -172,6 +172,7 @@ MACHINE_START(AVILA, "Gateworks Avila Network Platform")
->  #if defined(CONFIG_PCI)
->  	.dma_zone_size	= SZ_64M,
->  #endif
-> +	.restart	= ixp4xx_restart,
->  MACHINE_END
+> diff --git a/arch/arm/include/asm/system.h b/arch/arm/include/asm/system.h
+> index 984014b..fe7de75 100644
+> --- a/arch/arm/include/asm/system.h
+> +++ b/arch/arm/include/asm/system.h
+> @@ -101,6 +101,7 @@ extern int __pure cpu_architecture(void);
+>  extern void cpu_init(void);
 >  
->   /*
-> @@ -190,6 +191,7 @@ MACHINE_START(LOFT, "Giant Shoulder Inc Loft board")
->  #if defined(CONFIG_PCI)
->  	.dma_zone_size	= SZ_64M,
->  #endif
-> +	.restart	= ixp4xx_restart,
->  MACHINE_END
->  #endif
+>  void arm_machine_restart(char mode, const char *cmd);
+> +void soft_restart(unsigned long);
+>  extern void (*arm_pm_restart)(char str, const char *cmd);
 >  
-> diff --git a/arch/arm/mach-ixp4xx/common.c b/arch/arm/mach-ixp4xx/common.c
-> index 0777257..4a02619 100644
-> --- a/arch/arm/mach-ixp4xx/common.c
-> +++ b/arch/arm/mach-ixp4xx/common.c
-> @@ -500,3 +500,23 @@ static void __init ixp4xx_clockevent_init(void)
+>  #define UDBG_UNDEFINED	(1 << 0)
+> diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+> index dca7971..52b4306 100644
+> --- a/arch/arm/kernel/process.c
+> +++ b/arch/arm/kernel/process.c
+> @@ -92,7 +92,7 @@ static int __init hlt_setup(char *__unused)
+>  __setup("nohlt", nohlt_setup);
+>  __setup("hlt", hlt_setup);
 >  
->  	clockevents_register_device(&clockevent_ixp4xx);
->  }
-> +
-> +void ixp4xx_restart(char mode, const char *cmd)
-> +{
-> +	if ( 1 && mode == 's') {
-> +		/* Jump into ROM at address 0 */
-> +		soft_restart(0);
-> +	} else {
-> +		/* Use on-chip reset capability */
-> +
-> +		/* set the "key" register to enable access to
-> +		 * "timer" and "enable" registers
-> +		 */
-> +		*IXP4XX_OSWK = IXP4XX_WDT_KEY;
-> +
-> +		/* write 0 to the timer register for an immediate reset */
-> +		*IXP4XX_OSWT = 0;
-> +
-> +		*IXP4XX_OSWE = IXP4XX_WDT_RESET_ENABLE | IXP4XX_WDT_COUNT_ENABLE;
-> +	}
-> +}
-> diff --git a/arch/arm/mach-ixp4xx/coyote-setup.c b/arch/arm/mach-ixp4xx/coyote-setup.c
-> index 81dfec3..a74f86c 100644
-> --- a/arch/arm/mach-ixp4xx/coyote-setup.c
-> +++ b/arch/arm/mach-ixp4xx/coyote-setup.c
-> @@ -117,6 +117,7 @@ MACHINE_START(ADI_COYOTE, "ADI Engineering Coyote")
->  #if defined(CONFIG_PCI)
->  	.dma_zone_size	= SZ_64M,
->  #endif
-> +	.restart	= ixp4xx_restart,
->  MACHINE_END
->  #endif
->  
-> @@ -132,6 +133,7 @@ MACHINE_START(IXDPG425, "Intel IXDPG425")
->  	.timer		= &ixp4xx_timer,
->  	.atag_offset	= 0x100,
->  	.init_machine	= coyote_init,
-> +	.restart	= ixp4xx_restart,
->  MACHINE_END
->  #endif
->  
-> diff --git a/arch/arm/mach-ixp4xx/dsmg600-setup.c b/arch/arm/mach-ixp4xx/dsmg600-setup.c
-> index 8837fbc..67be177 100644
-> --- a/arch/arm/mach-ixp4xx/dsmg600-setup.c
-> +++ b/arch/arm/mach-ixp4xx/dsmg600-setup.c
-> @@ -286,4 +286,5 @@ MACHINE_START(DSMG600, "D-Link DSM-G600 RevA")
->  #if defined(CONFIG_PCI)
->  	.dma_zone_size	= SZ_64M,
->  #endif
-> +	.restart	= ixp4xx_restart,
->  MACHINE_END
-> diff --git a/arch/arm/mach-ixp4xx/fsg-setup.c b/arch/arm/mach-ixp4xx/fsg-setup.c
-> index 2887c35..6d58182 100644
-> --- a/arch/arm/mach-ixp4xx/fsg-setup.c
-> +++ b/arch/arm/mach-ixp4xx/fsg-setup.c
-> @@ -277,5 +277,6 @@ MACHINE_START(FSG, "Freecom FSG-3")
->  #if defined(CONFIG_PCI)
->  	.dma_zone_size	= SZ_64M,
->  #endif
-> +	.restart	= ixp4xx_restart,
->  MACHINE_END
->  
-> diff --git a/arch/arm/mach-ixp4xx/gateway7001-setup.c b/arch/arm/mach-ixp4xx/gateway7001-setup.c
-> index d69d1b0..7ecf9b2 100644
-> --- a/arch/arm/mach-ixp4xx/gateway7001-setup.c
-> +++ b/arch/arm/mach-ixp4xx/gateway7001-setup.c
-> @@ -104,5 +104,6 @@ MACHINE_START(GATEWAY7001, "Gateway 7001 AP")
->  #if defined(CONFIG_PCI)
->  	.dma_zone_size	= SZ_64M,
->  #endif
-> +	.restart	= ixp4xx_restart,
->  MACHINE_END
->  #endif
-> diff --git a/arch/arm/mach-ixp4xx/goramo_mlr.c b/arch/arm/mach-ixp4xx/goramo_mlr.c
-> index bf6678d..c0e3d69 100644
-> --- a/arch/arm/mach-ixp4xx/goramo_mlr.c
-> +++ b/arch/arm/mach-ixp4xx/goramo_mlr.c
-> @@ -504,4 +504,5 @@ MACHINE_START(GORAMO_MLR, "MultiLink")
->  #if defined(CONFIG_PCI)
->  	.dma_zone_size	= SZ_64M,
->  #endif
-> +	.restart	= ixp4xx_restart,
->  MACHINE_END
-> diff --git a/arch/arm/mach-ixp4xx/gtwx5715-setup.c b/arch/arm/mach-ixp4xx/gtwx5715-setup.c
-> index aa029fc..a23f893 100644
-> --- a/arch/arm/mach-ixp4xx/gtwx5715-setup.c
-> +++ b/arch/arm/mach-ixp4xx/gtwx5715-setup.c
-> @@ -172,6 +172,7 @@ MACHINE_START(GTWX5715, "Gemtek GTWX5715 (Linksys WRV54G)")
->  #if defined(CONFIG_PCI)
->  	.dma_zone_size	= SZ_64M,
->  #endif
-> +	.restart	= ixp4xx_restart,
->  MACHINE_END
->  
->  
-> diff --git a/arch/arm/mach-ixp4xx/include/mach/platform.h b/arch/arm/mach-ixp4xx/include/mach/platform.h
-> index e824c02..df9250b 100644
-> --- a/arch/arm/mach-ixp4xx/include/mach/platform.h
-> +++ b/arch/arm/mach-ixp4xx/include/mach/platform.h
-> @@ -125,6 +125,7 @@ extern void ixp4xx_init_irq(void);
->  extern void ixp4xx_sys_init(void);
->  extern void ixp4xx_timer_init(void);
->  extern struct sys_timer ixp4xx_timer;
-> +extern void ixp4xx_restart(char, const char *);
->  extern void ixp4xx_pci_preinit(void);
->  struct pci_sys_data;
->  extern int ixp4xx_setup(int nr, struct pci_sys_data *sys);
-> diff --git a/arch/arm/mach-ixp4xx/include/mach/system.h b/arch/arm/mach-ixp4xx/include/mach/system.h
-> index 24337d9..72db2bb 100644
-> --- a/arch/arm/mach-ixp4xx/include/mach/system.h
-> +++ b/arch/arm/mach-ixp4xx/include/mach/system.h
-> @@ -8,9 +8,6 @@
->   * published by the Free Software Foundation.
->   *
->   */
-> -
-> -#include <mach/hardware.h>
-> -
->  static inline void arch_idle(void)
+> -void arm_machine_restart(char mode, const char *cmd)
+> +void soft_restart(unsigned long addr)
 >  {
->  	/* ixp4xx does not implement the XScale PWRMODE register,
-> @@ -21,24 +18,6 @@ static inline void arch_idle(void)
->  #endif
+>  	/* Disable interrupts first */
+>  	local_irq_disable();
+> @@ -114,7 +114,16 @@ void arm_machine_restart(char mode, const char *cmd)
+>  	/* Push out any further dirty data, and ensure cache is empty */
+>  	flush_cache_all();
+>  
+> -	/* Now call the architecture specific reboot code. */
+> +	cpu_reset(addr);
+> +}
+> +
+> +void arm_machine_restart(char mode, const char *cmd)
+> +{
+> +	/* Disable interrupts first */
+> +	local_irq_disable();
+> +	local_fiq_disable();
+> +
+> +	/* Call the architecture specific reboot code. */
+>  	arch_reset(mode, cmd);
 >  }
 >  
-> -
+> diff --git a/arch/arm/mach-clps711x/include/mach/system.h b/arch/arm/mach-clps711x/include/mach/system.h
+> index f916cd7..6c11993 100644
+> --- a/arch/arm/mach-clps711x/include/mach/system.h
+> +++ b/arch/arm/mach-clps711x/include/mach/system.h
+> @@ -34,7 +34,7 @@ static inline void arch_idle(void)
+>  
 >  static inline void arch_reset(char mode, const char *cmd)
 >  {
-> -	if ( 1 && mode == 's') {
-> -		/* Jump into ROM at address 0 */
-> -		soft_restart(0);
-> -	} else {
-> -		/* Use on-chip reset capability */
-> -
-> -		/* set the "key" register to enable access to
-> -		 * "timer" and "enable" registers
-> -		 */
-> -		*IXP4XX_OSWK = IXP4XX_WDT_KEY;
-> -
-> -		/* write 0 to the timer register for an immediate reset */
-> -		*IXP4XX_OSWT = 0;
-> -
-> -		*IXP4XX_OSWE = IXP4XX_WDT_RESET_ENABLE | IXP4XX_WDT_COUNT_ENABLE;
-> -	}
+> -	cpu_reset(0);
+> +	soft_restart(0);
 >  }
-> -
-> diff --git a/arch/arm/mach-ixp4xx/ixdp425-setup.c b/arch/arm/mach-ixp4xx/ixdp425-setup.c
-> index f235f82..8a38b39 100644
-> --- a/arch/arm/mach-ixp4xx/ixdp425-setup.c
-> +++ b/arch/arm/mach-ixp4xx/ixdp425-setup.c
-> @@ -261,6 +261,7 @@ MACHINE_START(IXDP425, "Intel IXDP425 Development Platform")
->  #if defined(CONFIG_PCI)
->  	.dma_zone_size	= SZ_64M,
->  #endif
-> +	.restart	= ixp4xx_restart,
->  MACHINE_END
->  #endif
 >  
-> diff --git a/arch/arm/mach-ixp4xx/nas100d-setup.c b/arch/arm/mach-ixp4xx/nas100d-setup.c
-> index de716fa..1010eb7 100644
-> --- a/arch/arm/mach-ixp4xx/nas100d-setup.c
-> +++ b/arch/arm/mach-ixp4xx/nas100d-setup.c
-> @@ -321,4 +321,5 @@ MACHINE_START(NAS100D, "Iomega NAS 100d")
->  #if defined(CONFIG_PCI)
->  	.dma_zone_size	= SZ_64M,
 >  #endif
-> +	.restart	= ixp4xx_restart,
->  MACHINE_END
-> diff --git a/arch/arm/mach-ixp4xx/nslu2-setup.c b/arch/arm/mach-ixp4xx/nslu2-setup.c
-> index ac81ccb..aa355c3 100644
-> --- a/arch/arm/mach-ixp4xx/nslu2-setup.c
-> +++ b/arch/arm/mach-ixp4xx/nslu2-setup.c
-> @@ -307,4 +307,5 @@ MACHINE_START(NSLU2, "Linksys NSLU2")
->  #if defined(CONFIG_PCI)
->  	.dma_zone_size	= SZ_64M,
->  #endif
-> +	.restart	= ixp4xx_restart,
->  MACHINE_END
-> diff --git a/arch/arm/mach-ixp4xx/omixp-setup.c b/arch/arm/mach-ixp4xx/omixp-setup.c
-> index 3b6a81a..0940869 100644
-> --- a/arch/arm/mach-ixp4xx/omixp-setup.c
-> +++ b/arch/arm/mach-ixp4xx/omixp-setup.c
-> @@ -246,6 +246,7 @@ MACHINE_START(DEVIXP, "Omicron DEVIXP")
->  	.init_irq	= ixp4xx_init_irq,
->  	.timer          = &ixp4xx_timer,
->  	.init_machine	= omixp_init,
-> +	.restart	= ixp4xx_restart,
->  MACHINE_END
->  #endif
+> diff --git a/arch/arm/mach-ebsa110/include/mach/system.h b/arch/arm/mach-ebsa110/include/mach/system.h
+> index 9a26245..0d5df72 100644
+> --- a/arch/arm/mach-ebsa110/include/mach/system.h
+> +++ b/arch/arm/mach-ebsa110/include/mach/system.h
+> @@ -34,6 +34,6 @@ static inline void arch_idle(void)
+>  	asm volatile ("mcr p15, 0, ip, c15, c1, 2" : : : "cc");
+>  }
 >  
-> @@ -259,6 +260,7 @@ MACHINE_START(MICCPT, "Omicron MICCPT")
->  #if defined(CONFIG_PCI)
->  	.dma_zone_size	= SZ_64M,
->  #endif
-> +	.restart	= ixp4xx_restart,
->  MACHINE_END
->  #endif
+> -#define arch_reset(mode, cmd)	cpu_reset(0x80000000)
+> +#define arch_reset(mode, cmd)	soft_restart(0x80000000)
 >  
-> @@ -269,5 +271,6 @@ MACHINE_START(MIC256, "Omicron MIC256")
->  	.init_irq	= ixp4xx_init_irq,
->  	.timer          = &ixp4xx_timer,
->  	.init_machine	= omixp_init,
-> +	.restart	= ixp4xx_restart,
->  MACHINE_END
 >  #endif
-> diff --git a/arch/arm/mach-ixp4xx/vulcan-setup.c b/arch/arm/mach-ixp4xx/vulcan-setup.c
-> index 27e469e..9dec206 100644
-> --- a/arch/arm/mach-ixp4xx/vulcan-setup.c
-> +++ b/arch/arm/mach-ixp4xx/vulcan-setup.c
-> @@ -244,4 +244,5 @@ MACHINE_START(ARCOM_VULCAN, "Arcom/Eurotech Vulcan")
->  #if defined(CONFIG_PCI)
->  	.dma_zone_size	= SZ_64M,
+> diff --git a/arch/arm/mach-footbridge/include/mach/system.h b/arch/arm/mach-footbridge/include/mach/system.h
+> index 0b29315..249f895 100644
+> --- a/arch/arm/mach-footbridge/include/mach/system.h
+> +++ b/arch/arm/mach-footbridge/include/mach/system.h
+> @@ -24,7 +24,7 @@ static inline void arch_reset(char mode, const char *cmd)
+>  		/*
+>  		 * Jump into the ROM
+>  		 */
+> -		cpu_reset(0x41000000);
+> +		soft_restart(0x41000000);
+>  	} else {
+>  		if (machine_is_netwinder()) {
+>  			/* open up the SuperIO chip
+> diff --git a/arch/arm/mach-iop32x/include/mach/system.h b/arch/arm/mach-iop32x/include/mach/system.h
+> index a4b808f..4865a9b 100644
+> --- a/arch/arm/mach-iop32x/include/mach/system.h
+> +++ b/arch/arm/mach-iop32x/include/mach/system.h
+> @@ -30,5 +30,5 @@ static inline void arch_reset(char mode, const char *cmd)
+>  	*IOP3XX_PCSR = 0x30;
+>  
+>  	/* Jump into ROM at address 0 */
+> -	cpu_reset(0);
+> +	soft_restart(0);
+>  }
+> diff --git a/arch/arm/mach-iop33x/include/mach/system.h b/arch/arm/mach-iop33x/include/mach/system.h
+> index f192a34..86d1b20 100644
+> --- a/arch/arm/mach-iop33x/include/mach/system.h
+> +++ b/arch/arm/mach-iop33x/include/mach/system.h
+> @@ -19,5 +19,5 @@ static inline void arch_reset(char mode, const char *cmd)
+>  	*IOP3XX_PCSR = 0x30;
+>  
+>  	/* Jump into ROM at address 0 */
+> -	cpu_reset(0);
+> +	soft_restart(0);
+>  }
+> diff --git a/arch/arm/mach-ixp4xx/include/mach/system.h b/arch/arm/mach-ixp4xx/include/mach/system.h
+> index 54c0af7..24337d9 100644
+> --- a/arch/arm/mach-ixp4xx/include/mach/system.h
+> +++ b/arch/arm/mach-ixp4xx/include/mach/system.h
+> @@ -26,7 +26,7 @@ static inline void arch_reset(char mode, const char *cmd)
+>  {
+>  	if ( 1 && mode == 's') {
+>  		/* Jump into ROM at address 0 */
+> -		cpu_reset(0);
+> +		soft_restart(0);
+>  	} else {
+>  		/* Use on-chip reset capability */
+>  
+> diff --git a/arch/arm/mach-ks8695/include/mach/system.h b/arch/arm/mach-ks8695/include/mach/system.h
+> index fb1dda9..ceb19c9 100644
+> --- a/arch/arm/mach-ks8695/include/mach/system.h
+> +++ b/arch/arm/mach-ks8695/include/mach/system.h
+> @@ -32,7 +32,7 @@ static void arch_reset(char mode, const char *cmd)
+>  	unsigned int reg;
+>  
+>  	if (mode == 's')
+> -		cpu_reset(0);
+> +		soft_restart(0);
+>  
+>  	/* disable timer0 */
+>  	reg = __raw_readl(KS8695_TMR_VA + KS8695_TMCON);
+> diff --git a/arch/arm/mach-mmp/include/mach/system.h b/arch/arm/mach-mmp/include/mach/system.h
+> index 1a8a25e..cb06379 100644
+> --- a/arch/arm/mach-mmp/include/mach/system.h
+> +++ b/arch/arm/mach-mmp/include/mach/system.h
+> @@ -19,8 +19,8 @@ static inline void arch_idle(void)
+>  static inline void arch_reset(char mode, const char *cmd)
+>  {
+>  	if (cpu_is_pxa168())
+> -		cpu_reset(0xffff0000);
+> +		soft_restart(0xffff0000);
+>  	else
+> -		cpu_reset(0);
+> +		soft_restart(0);
+>  }
+>  #endif /* __ASM_MACH_SYSTEM_H */
+> diff --git a/arch/arm/mach-mxs/system.c b/arch/arm/mach-mxs/system.c
+> index 20ec3bd..cab8836 100644
+> --- a/arch/arm/mach-mxs/system.c
+> +++ b/arch/arm/mach-mxs/system.c
+> @@ -53,7 +53,7 @@ void arch_reset(char mode, const char *cmd)
+>  	mdelay(50);
+>  
+>  	/* We'll take a jump through zero as a poor second */
+> -	cpu_reset(0);
+> +	soft_restart(0);
+>  }
+>  
+>  static int __init mxs_arch_reset_init(void)
+> diff --git a/arch/arm/mach-pnx4008/include/mach/system.h b/arch/arm/mach-pnx4008/include/mach/system.h
+> index 5dda2bb..5d6384a 100644
+> --- a/arch/arm/mach-pnx4008/include/mach/system.h
+> +++ b/arch/arm/mach-pnx4008/include/mach/system.h
+> @@ -32,7 +32,7 @@ static void arch_idle(void)
+>  
+>  static inline void arch_reset(char mode, const char *cmd)
+>  {
+> -	cpu_reset(0);
+> +	soft_restart(0);
+>  }
+>  
 >  #endif
-> +	.restart	= ixp4xx_restart,
->  MACHINE_END
-> diff --git a/arch/arm/mach-ixp4xx/wg302v2-setup.c b/arch/arm/mach-ixp4xx/wg302v2-setup.c
-> index b14144b..5ac0f0a 100644
-> --- a/arch/arm/mach-ixp4xx/wg302v2-setup.c
-> +++ b/arch/arm/mach-ixp4xx/wg302v2-setup.c
-> @@ -105,5 +105,6 @@ MACHINE_START(WG302V2, "Netgear WG302 v2 / WAG302 v2")
->  #if defined(CONFIG_PCI)
->  	.dma_zone_size	= SZ_64M,
+> diff --git a/arch/arm/mach-pxa/reset.c b/arch/arm/mach-pxa/reset.c
+> index 01e9d64..b8bcda1 100644
+> --- a/arch/arm/mach-pxa/reset.c
+> +++ b/arch/arm/mach-pxa/reset.c
+> @@ -88,7 +88,7 @@ void arch_reset(char mode, const char *cmd)
+>  	switch (mode) {
+>  	case 's':
+>  		/* Jump into ROM at address 0 */
+> -		cpu_reset(0);
+> +		soft_restart(0);
+>  		break;
+>  	case 'g':
+>  		do_gpio_reset();
+> diff --git a/arch/arm/mach-rpc/include/mach/system.h b/arch/arm/mach-rpc/include/mach/system.h
+> index 45c7b93..a354f4d 100644
+> --- a/arch/arm/mach-rpc/include/mach/system.h
+> +++ b/arch/arm/mach-rpc/include/mach/system.h
+> @@ -23,5 +23,5 @@ static inline void arch_reset(char mode, const char *cmd)
+>  	/*
+>  	 * Jump into the ROM
+>  	 */
+> -	cpu_reset(0);
+> +	soft_restart(0);
+>  }
+> diff --git a/arch/arm/mach-s3c2410/include/mach/system-reset.h b/arch/arm/mach-s3c2410/include/mach/system-reset.h
+> index 6faadce..913893d 100644
+> --- a/arch/arm/mach-s3c2410/include/mach/system-reset.h
+> +++ b/arch/arm/mach-s3c2410/include/mach/system-reset.h
+> @@ -19,7 +19,7 @@ static void
+>  arch_reset(char mode, const char *cmd)
+>  {
+>  	if (mode == 's') {
+> -		cpu_reset(0);
+> +		soft_restart(0);
+>  	}
+>  
+>  	if (s3c24xx_reset_hook)
+> @@ -28,5 +28,5 @@ arch_reset(char mode, const char *cmd)
+>  	arch_wdt_reset();
+>  
+>  	/* we'll take a jump through zero as a poor second */
+> -	cpu_reset(0);
+> +	soft_restart(0);
+>  }
+> diff --git a/arch/arm/mach-s3c64xx/include/mach/system.h b/arch/arm/mach-s3c64xx/include/mach/system.h
+> index 2e58cb7..d8ca578 100644
+> --- a/arch/arm/mach-s3c64xx/include/mach/system.h
+> +++ b/arch/arm/mach-s3c64xx/include/mach/system.h
+> @@ -24,7 +24,7 @@ static void arch_reset(char mode, const char *cmd)
+>  		arch_wdt_reset();
+>  
+>  	/* if all else fails, or mode was for soft, jump to 0 */
+> -	cpu_reset(0);
+> +	soft_restart(0);
+>  }
+>  
+>  #endif /* __ASM_ARCH_IRQ_H */
+> diff --git a/arch/arm/mach-sa1100/include/mach/system.h b/arch/arm/mach-sa1100/include/mach/system.h
+> index ba9da9f..345d35b 100644
+> --- a/arch/arm/mach-sa1100/include/mach/system.h
+> +++ b/arch/arm/mach-sa1100/include/mach/system.h
+> @@ -14,7 +14,7 @@ static inline void arch_reset(char mode, const char *cmd)
+>  {
+>  	if (mode == 's') {
+>  		/* Jump into ROM at address 0 */
+> -		cpu_reset(0);
+> +		soft_restart(0);
+>  	} else {
+>  		/* Use on-chip reset capability */
+>  		RSRR = RSRR_SWR;
+> diff --git a/arch/arm/mach-shmobile/include/mach/system.h b/arch/arm/mach-shmobile/include/mach/system.h
+> index 76a687e..956ac18 100644
+> --- a/arch/arm/mach-shmobile/include/mach/system.h
+> +++ b/arch/arm/mach-shmobile/include/mach/system.h
+> @@ -8,7 +8,7 @@ static inline void arch_idle(void)
+>  
+>  static inline void arch_reset(char mode, const char *cmd)
+>  {
+> -	cpu_reset(0);
+> +	soft_restart(0);
+>  }
+>  
 >  #endif
-> +	.restart	= ixp4xx_restart,
->  MACHINE_END
->  #endif
+> diff --git a/arch/arm/mach-w90x900/include/mach/system.h b/arch/arm/mach-w90x900/include/mach/system.h
+> index ce228bd..68875a1 100644
+> --- a/arch/arm/mach-w90x900/include/mach/system.h
+> +++ b/arch/arm/mach-w90x900/include/mach/system.h
+> @@ -33,7 +33,7 @@ static void arch_reset(char mode, const char *cmd)
+>  {
+>  	if (mode == 's') {
+>  		/* Jump into ROM at address 0 */
+> -		cpu_reset(0);
+> +		soft_restart(0);
+>  	} else {
+>  		__raw_writel(WTE | WTRE | WTCLK, WTCR);
+>  	}
+> diff --git a/arch/arm/plat-mxc/system.c b/arch/arm/plat-mxc/system.c
+> index 9dad8dc..b1cfc6a 100644
+> --- a/arch/arm/plat-mxc/system.c
+> +++ b/arch/arm/plat-mxc/system.c
+> @@ -70,7 +70,7 @@ void arch_reset(char mode, const char *cmd)
+>  	mdelay(50);
+>  
+>  	/* we'll take a jump through zero as a poor second */
+> -	cpu_reset(0);
+> +	soft_restart(0);
+>  }
+>  
+>  void mxc_arch_reset_init(void __iomem *base)
+> diff --git a/arch/arm/plat-spear/include/plat/system.h b/arch/arm/plat-spear/include/plat/system.h
+> index a235fa0..1171f22 100644
+> --- a/arch/arm/plat-spear/include/plat/system.h
+> +++ b/arch/arm/plat-spear/include/plat/system.h
+> @@ -31,7 +31,7 @@ static inline void arch_reset(char mode, const char *cmd)
+>  {
+>  	if (mode == 's') {
+>  		/* software reset, Jump into ROM at address 0 */
+> -		cpu_reset(0);
+> +		soft_restart(0);
+>  	} else {
+>  		/* hardware reset, Use on-chip reset capability */
+>  		sysctl_soft_reset((void __iomem *)VA_SPEAR_SYS_CTRL_BASE);
 > -- 
 > 1.7.4.4
 > 
