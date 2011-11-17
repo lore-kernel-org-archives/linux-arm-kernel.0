@@ -1,79 +1,80 @@
-From: amit.kachhap@linaro.org (Amit Kachhap)
-Date: Thu, 17 Nov 2011 16:52:23 +0530
-Subject: [PATCH 1/4] ARM: exynos4: Add support for AFTR mode cpuidle state
-In-Reply-To: <CAJ0PZbTzFDvom3PoPXEvhC8JE_mV3wfYMspnQdRLO=-oz5wGkw@mail.gmail.com>
-References: <1320426228-21746-1-git-send-email-amit.kachhap@linaro.org>
- <1320426228-21746-2-git-send-email-amit.kachhap@linaro.org>
- <CAJ0PZbTzFDvom3PoPXEvhC8JE_mV3wfYMspnQdRLO=-oz5wGkw@mail.gmail.com>
-Message-ID: <CAK44p20KprcRRhGg_-9zftsiFDNZEP11u4qYujOHcZwPcMH=HQ@mail.gmail.com>
+From: eric.miao@linaro.org (Eric Miao)
+Date: Thu, 17 Nov 2011 19:22:51 +0800
+Subject: [RFC 1/1] ARM: imx6q: move clock register map to
+ machine_desc.map_io
+In-Reply-To: <20111117092815.GH14656@S2100-06.ap.freescale.net>
+References: <1321494612-24795-1-git-send-email-richard.zhao@linaro.org>
+ <CAMPhdO8vE4cer-EQZ53VDQrZpQ1JVvus2=RpDCfdJRa7gwLUqg@mail.gmail.com>
+ <20111117032012.GF14656@S2100-06.ap.freescale.net>
+ <20111117084453.GK9581@n2100.arm.linux.org.uk>
+ <20111117090731.GG14656@S2100-06.ap.freescale.net>
+ <CAMPhdO8u0jjR0po_rrd6w-pimX7ypvXdri933mANTQ3APt=3zg@mail.gmail.com>
+ <20111117092815.GH14656@S2100-06.ap.freescale.net>
+Message-ID: <CAMPhdO9bzAO5DgLCHD7EsM5mjoE-+4d9QvcgiUqKvDFFD4AnrA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 November 2011 13:03, MyungJoo Ham <myungjoo.ham@gmail.com> wrote:
-> On Sat, Nov 5, 2011 at 2:03 AM, ?<amit.kachhap@linaro.org> wrote:
->> From: Amit Daniel Kachhap <amit.kachhap@linaro.org>
+On Thu, Nov 17, 2011 at 5:28 PM, Shawn Guo <shawn.guo@freescale.com> wrote:
+> On Thu, Nov 17, 2011 at 05:03:15PM +0800, Eric Miao wrote:
+>> On Thu, Nov 17, 2011 at 5:07 PM, Shawn Guo <shawn.guo@freescale.com> wrote:
+>> > On Thu, Nov 17, 2011 at 08:44:53AM +0000, Russell King - ARM Linux wrote:
+>> >> On Thu, Nov 17, 2011 at 11:20:13AM +0800, Shawn Guo wrote:
+>> >> > On Thu, Nov 17, 2011 at 10:56:53AM +0800, Eric Miao wrote:
+>> >> > > On Thu, Nov 17, 2011 at 9:50 AM, Richard Zhao <richard.zhao@linaro.org> wrote:
+>> >> > > > If the map is in machine_desc.timer.init, the registers will not be
+>> >> > > > able to access after bootup (probably after "Freeing init memory").
+>> >> > >
+>> >> > > Given that devicemaps_init() does additional work after creating
+>> >> > > the mapping, flushing TLB and cache, machine_desc->map_io() is
+>> >> > > what I assume the best place for these static IO mappings than
+>> >> > > elsewhere.
+>> >> > >
+>> >> > > Shawn?
+>> >> > >
+>> >> > I'm still trying to understand what happened. ?I do not understand
+>> >> > how the map can become unusable after "Freeing init memory". ?Also
+>> >> > I can not reproduce the problem on my side.
+>> >>
+>> >> It's very simple. ?iotable_init() allocates memory using memblock.
+>> >> memblock marks the memory it allocates in its reserved map. ?At the
+>> >> end of map_io(), the information stored inside memblock is transferred
+>> >> to bootmem and then the normal page allocator. ?Once this is done,
+>> >> memblock must not be changed because there is no way to couple any
+>> >> further memblock allocations into the normal page allocator.
+>> >>
+>> >> Look. ?I've made this point before and I'm getting pissed off with
+>> >> people who think they know better. ?The callbacks in the machine
+>> >> descriptor are NAMED. ?They're NAMED for a reason - they have a PURPOSE
+>> >> and that PURPOSE is well defined because there are DEPENDENCIES there.
+>> >> They tell you what you SHOULD be doing in there. ?Doing something else
+>> >> will result in BAD THINGS happening.
+>> >>
+>> >> If people can't understand this, then the only solution is to make the
+>> >> backing functions for this stuff (like iotable_init() etc) BUG() when
+>> >> they're abused. ?That means adding a lot more checks and slowing down
+>> >> the boot because people seem to be incapable of comprehending that
+>> >> initialisation needs to be done in a well defined order.
+>> >>
+>> > Russell,
+>> >
+>> > Thanks for help understand the issue.
+>> >
+>> > Richard,
+>> >
+>> > Please revise the patch to introduce function like imx6q_clock_map_io()
+>> > to be called in imx6q_map_io().
 >>
->> This patch adds support for AFTR(ARM OFF TOP RUNNING) mode in
->> cpuidle driver for EXYNOS4210. L2 cache keeps their data in this mode.
->> This patch ports the code to the latest interfaces to
->> save/restore CPU state inclusive of CPU PM notifiers, l2
->> resume and cpu_suspend/resume.
+>> Or simply imx6q_io_desc[], and doing a iotable_init() for all (and
+>> considering ANATOP not necessarily include clocks registers only)
+>> other possible static IO mappings in the future.
 >>
->> Signed-off-by: Jaecheol Lee <jc.lee@samsung.com>
->> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
->> Signed-off-by: Amit Daniel Kachhap <amit.kachhap@linaro.org>
->> ---
-> []
->> +#define REG_DIRECTGO_ADDR ? ? ?(samsung_rev() == EXYNOS4210_REV_1_1 ? \
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? S5P_INFORM7 : (S5P_VA_SYSRAM + 0x24))
->> +#define REG_DIRECTGO_FLAG ? ? ?(samsung_rev() == EXYNOS4210_REV_1_1 ? \
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? S5P_INFORM6 : (S5P_VA_SYSRAM + 0x20))
->>
-> []
->> +
->> + ? ? ? __raw_writel(BSYM(virt_to_phys(s3c_cpu_resume)),
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?REG_DIRECTGO_ADDR);
->> + ? ? ? __raw_writel(0xfcba0d10, REG_DIRECTGO_FLAG);
->> +
->> ? ? ? ?return 0;
->
-> Hello,
->
->
-> Why are you using INFORM6 and 7 registers in order to save resume
-> address and power-mode flags?
->
-> INFORM0 and 1 have been used in pm.c for the exactly same purpose.
-> Please use the same registers in cpuidle.c as well.
->
-> The same part in bootloader (IPL) can handle whether it's
-> suspend-to-RAM or AFTR and the both modes are mutually exclusive and
-> you only need one value for resume PC.
->
-> Therefore, you can keep the value at the same location, which is the
-> method we have been using.
-Hi,
+> I do not see any more possible static IO mapping in the future. On the
+> contrary, the static mapping for clocks could possibly be removed when
+> we migrate to common clock framework and create clocks dynamically from
+> device tree.
 
-I tried using INFORM0 and INFORM1 in cpuidle and make it same as pm.c.
-But this doesnt work. Looks like my irom fused code checks for the
-wakeup source and needs INFORM7 and INFORM6 for non sleep wakeups. My
-cpu version is S5PV310AH--0AH1113(Origen board).
-I suggest adding support for both type of wakeups(directly from irom
-and through bootloader).
+Fair enough and it would be ideal if static IO mapping is not necessary.
 
-Thanks,
-Amit D
->
-> Besides, the Exynos4210 chipmaker (S.LSI) has told that INFORM6 and 7
-> registers are used by in-chip code (iROM or iRAM).
->
->
-> Cheers!
-> MyungJoo
->
->
->
-> --
-> MyungJoo Ham, Ph.D.
-> Mobile Software Platform Lab, DMC Business, Samsung Electronics
->
+And I don't have a strong preference of having a single array for all these
+mappings or having separate function for each of them. It just looks a bit
+redundant to have a one-line function here.
