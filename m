@@ -1,24 +1,39 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 17 Nov 2011 08:42:21 +0100
-Subject: [PATCH] ARM: mmci: add capabilities2 for MMC_CAP2
-In-Reply-To: <1321268548-21933-1-git-send-email-per.forlin@stericsson.com>
-References: <1321268548-21933-1-git-send-email-per.forlin@stericsson.com>
-Message-ID: <CACRpkdYLoQowxtg3qqSyi5cS26z1e_=p12EKKkSzvcKP96YLnQ@mail.gmail.com>
+From: tom.leiming@gmail.com (Ming Lei)
+Date: Thu, 17 Nov 2011 15:53:05 +0800
+Subject: arm pmu interrupt on pandaboard
+In-Reply-To: <1321513474.40681.YahooMailNeo@web125720.mail.ne1.yahoo.com>
+References: <1321513474.40681.YahooMailNeo@web125720.mail.ne1.yahoo.com>
+Message-ID: <CACVXFVOirXk63bxNbkAAoVg2syQAKkXL_zL4ONbkh9uZfaw55A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 14, 2011 at 12:02 PM, Per Forlin <per.forlin@stericsson.com> wrote:
+Hi,
 
-Some more verbose blurb on the patch here maybe?
+On Thu, Nov 17, 2011 at 3:04 PM, Fan Ye <mouseyefan@yahoo.com> wrote:
+> Hi Tom,
+> I am currently working on PMU interrupt on Pandaboard.I use the patch sent
+> by you:
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2011-March/045283.html
+>
+> But it will fail to boot the kernel. So I also apply the following patch:
+> http://lists.linaro.org/pipermail/linaro-dev/2011-April/004019.html
+>
+> Now the kernel can boot up successfully. But I find that PMU interrupt is
+> not?triggered?even if the PMU overflow happens and the interrupt is enabled
+> in the?PMINTENSET register.
 
-> Signed-off-by: Per Forlin <per.forlin@stericsson.com>
-> ---
-> This patch depends on patches adding CAP2 available on mmc-next.
-> Chris, would you mind merging this through your tree when it
-> has been accepted.
+I have posted some new code about the issue, see
 
-Seems like the right way to pass caps from the platform.
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+       http://marc.info/?t=131946776600001&r=1&w=2
 
-Yours,
-Linus Walleij
+I think this one can make your pmu work, :-)
+
+> The code base I am using is
+> http://git.linaro.org/gitweb?p=kernel/linux-linaro-2.6.39.git;a=summary
+> Thank you very much.
+> Ye Fan
+>
+
+thanks,
+-- 
+Ming Lei
