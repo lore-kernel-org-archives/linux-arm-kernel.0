@@ -1,101 +1,205 @@
-From: premi@ti.com (Premi, Sanjeev)
-Date: Thu, 17 Nov 2011 13:20:04 +0000
-Subject: [PATCH] ARM: OMAP: PM: only register TWL with voltage layer
- when device is present
-In-Reply-To: <874ny37hdv.fsf@ti.com>
-References: <1320797670-21460-1-git-send-email-khilman@ti.com>
- <E28AAFD00EFAA646AE3DF9B89CD24A89036E64@DBDE01.ent.ti.com>
- <8762irg73n.fsf@ti.com>
- <E28AAFD00EFAA646AE3DF9B89CD24A8903E1A5@DBDE01.ent.ti.com>
- <874ny37hdv.fsf@ti.com>
-Message-ID: <E28AAFD00EFAA646AE3DF9B89CD24A8904BF32@DBDE01.ent.ti.com>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Thu, 17 Nov 2011 14:40:00 +0100
+Subject: [PATCH] ARM: fix unwinding for XIP kernels
+Message-ID: <1321537200-9532-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Hilman, Kevin 
-> Sent: Thursday, November 17, 2011 5:25 AM
-> To: Premi, Sanjeev
-> Cc: linux-omap at vger.kernel.org; 
-> linux-arm-kernel at lists.infradead.org; Koyamangalath, Abhilash
-> Subject: Re: [PATCH] ARM: OMAP: PM: only register TWL with 
-> voltage layer when device is present
-> 
-> "Premi, Sanjeev" <premi@ti.com> writes:
-> 
-> >  
-> >
-> >> -----Original Message-----
-> >> From: Hilman, Kevin 
-> >> Sent: Friday, November 11, 2011 12:04 AM
-> >> To: Premi, Sanjeev
-> >> Cc: linux-omap at vger.kernel.org; 
-> >> linux-arm-kernel at lists.infradead.org; Koyamangalath, Abhilash
-> >> Subject: Re: [PATCH] ARM: OMAP: PM: only register TWL with 
-> >> voltage layer when device is present
-> >> 
-> >> "Premi, Sanjeev" <premi@ti.com> writes:
-> >> 
-> >> >> Current code registers voltage layer details for TWL PMIC 
-> >> even when a
-> >> >> TWL has not been registered.  Fix this to only register 
-> >> the TWL with
-> >> >> voltage layer when the TWL PMIC is initialized by 
-> board-level code.
-> >> >> 
-> >> >> Signed-off-by: Kevin Hilman <khilman@ti.com>
-> >> 
-> >> [...]
-> >> 
-> >> > I have been out-of-loop from PM for some time. So my query may be
-> >> > redundant:
-> >> >
-> >> > 1) What happens when different PMIC (not TWL series) is 
-> registered
-> >> >    for AM35x? e.g. TPS65023
-> >> >    http://www.spinics.net/lists/linux-omap/msg48630.html
-> >> >
-> >> > 2) Wouldn't we still fall back into omap3_twl_init()?
-> >> 
-> >> I'm not sure I follow the question.
-> >> 
-> >> If you're not using a TWL PMIC (or similar derivative) then
-> >> omap*_twl_init() should not be called.
-> >> 
-> >> If you are using a TWL PMIC, then no, the omap*_twl_init functions
-> >> should not be called.
-> >
-> > When I read this function (in the patch), if pmic_i2c_board_info.irq
-> > is non-zero, omap3_twl_init() and omap4_twl_init() are called.
-> >
-> > So my question was, for the case when PMIC is not TWL family. Then,
-> > is checking ".irq" sufficient to prevent the execution of 
-> twl specific
-> > functions.
-> 
-> If PMIC is not TWL family, then I don't expect any functions in
-> twl_common.c to be called.
+The linker places the unwind tables in readonly sections. So when using
+an XIP kernel these are located in ROM and cannot be modified.
 
-This is the reason I wanted to know if the check on ".irq" in the
-patch is sufficient. If any PMIC requires & sets "pmic_i2c_board_info.irq"
-then both omap3_twl_init() and omap4_twl_init() will be called.
+For that reason don't convert the symbol addresses during boot (or
+module loading) but only when interpreting them in search_index().
+Moreover several consts are added to catch future writes and rename the
+member "addr" of struct unwind_idx to "addr_offset" to better match the
+new semantic.
 
-[quote]
- void __init omap_pmic_late_init(void)
- {
- 	/* Init the OMAP TWL parameters (if PMIC has been registerd) */
- 	if (!pmic_i2c_board_info.irq)
- 		return;
+This fixes unwinding on XIP which compared prel31 offsets to absolute
+addresses because the initial conversion from prel31 to absolute failed.
+
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+Hello,
+
+this is broken since unwinding was introduce in v2.6.30-rc1.
+
+Best regards
+Uwe
+
+ arch/arm/include/asm/unwind.h |   15 ++----------
+ arch/arm/kernel/setup.c       |    2 -
+ arch/arm/kernel/unwind.c      |   48 ++++++++++++----------------------------
+ 3 files changed, 18 insertions(+), 47 deletions(-)
+
+diff --git a/arch/arm/include/asm/unwind.h b/arch/arm/include/asm/unwind.h
+index a5edf42..2ae0e0a 100644
+--- a/arch/arm/include/asm/unwind.h
++++ b/arch/arm/include/asm/unwind.h
+@@ -30,14 +30,14 @@ enum unwind_reason_code {
+ };
  
- 	omap3_twl_init();
- 	omap4_twl_init();
+ struct unwind_idx {
+-	unsigned long addr;
++	unsigned long addr_offset;
+ 	unsigned long insn;
+ };
+ 
+ struct unwind_table {
+ 	struct list_head list;
+-	struct unwind_idx *start;
+-	struct unwind_idx *stop;
++	const struct unwind_idx *start;
++	const struct unwind_idx *stop;
+ 	unsigned long begin_addr;
+ 	unsigned long end_addr;
+ };
+@@ -49,15 +49,6 @@ extern struct unwind_table *unwind_table_add(unsigned long start,
+ extern void unwind_table_del(struct unwind_table *tab);
+ extern void unwind_backtrace(struct pt_regs *regs, struct task_struct *tsk);
+ 
+-#ifdef CONFIG_ARM_UNWIND
+-extern int __init unwind_init(void);
+-#else
+-static inline int __init unwind_init(void)
+-{
+-	return 0;
+-}
+-#endif
+-
+ #endif	/* !__ASSEMBLY__ */
+ 
+ #ifdef CONFIG_ARM_UNWIND
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index 7e7977a..cf9d71a 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -893,8 +893,6 @@ void __init setup_arch(char **cmdline_p)
+ {
+ 	struct machine_desc *mdesc;
+ 
+-	unwind_init();
+-
+ 	setup_processor();
+ 	mdesc = setup_machine_fdt(__atags_pointer);
+ 	if (!mdesc)
+diff --git a/arch/arm/kernel/unwind.c b/arch/arm/kernel/unwind.c
+index e7e8365..ad3f06f 100644
+--- a/arch/arm/kernel/unwind.c
++++ b/arch/arm/kernel/unwind.c
+@@ -67,7 +67,7 @@ EXPORT_SYMBOL(__aeabi_unwind_cpp_pr2);
+ 
+ struct unwind_ctrl_block {
+ 	unsigned long vrs[16];		/* virtual register set */
+-	unsigned long *insn;		/* pointer to the current instructions word */
++	const unsigned long *insn;	/* pointer to the current instructions word */
+ 	int entries;			/* number of entries left to interpret */
+ 	int byte;			/* current byte number in the instructions word */
+ };
+@@ -83,8 +83,8 @@ enum regs {
+ 	PC = 15
+ };
+ 
+-extern struct unwind_idx __start_unwind_idx[];
+-extern struct unwind_idx __stop_unwind_idx[];
++extern const struct unwind_idx __start_unwind_idx[];
++extern const struct unwind_idx __stop_unwind_idx[];
+ 
+ static DEFINE_SPINLOCK(unwind_lock);
+ static LIST_HEAD(unwind_tables);
+@@ -101,22 +101,22 @@ static LIST_HEAD(unwind_tables);
+  * Binary search in the unwind index. The entries entries are
+  * guaranteed to be sorted in ascending order by the linker.
+  */
+-static struct unwind_idx *search_index(unsigned long addr,
+-				       struct unwind_idx *first,
+-				       struct unwind_idx *last)
++static const struct unwind_idx *search_index(unsigned long addr,
++				       const struct unwind_idx *first,
++				       const struct unwind_idx *last)
+ {
+ 	pr_debug("%s(%08lx, %p, %p)\n", __func__, addr, first, last);
+ 
+-	if (addr < first->addr) {
++	if (addr < prel31_to_addr(&first->addr_offset)) {
+ 		pr_warning("unwind: Unknown symbol address %08lx\n", addr);
+ 		return NULL;
+-	} else if (addr >= last->addr)
++	} else if (addr >= prel31_to_addr(&last->addr_offset))
+ 		return last;
+ 
+ 	while (first < last - 1) {
+-		struct unwind_idx *mid = first + ((last - first + 1) >> 1);
++		const struct unwind_idx *mid = first + ((last - first + 1) >> 1);
+ 
+-		if (addr < mid->addr)
++		if (addr < prel31_to_addr(&mid->addr_offset))
+ 			last = mid;
+ 		else
+ 			first = mid;
+@@ -125,9 +125,9 @@ static struct unwind_idx *search_index(unsigned long addr,
+ 	return first;
  }
-[/quote]
-
-OR, is there something - beyond this patch that I may be missing.
-
-~sanjeev
-
-> 
-> Kevin
-> 
+ 
+-static struct unwind_idx *unwind_find_idx(unsigned long addr)
++static const struct unwind_idx *unwind_find_idx(unsigned long addr)
+ {
+-	struct unwind_idx *idx = NULL;
++	const struct unwind_idx *idx = NULL;
+ 	unsigned long flags;
+ 
+ 	pr_debug("%s(%08lx)\n", __func__, addr);
+@@ -274,7 +274,7 @@ static int unwind_exec_insn(struct unwind_ctrl_block *ctrl)
+ int unwind_frame(struct stackframe *frame)
+ {
+ 	unsigned long high, low;
+-	struct unwind_idx *idx;
++	const struct unwind_idx *idx;
+ 	struct unwind_ctrl_block ctrl;
+ 
+ 	/* only go to a higher address on the stack */
+@@ -399,7 +399,6 @@ struct unwind_table *unwind_table_add(unsigned long start, unsigned long size,
+ 				      unsigned long text_size)
+ {
+ 	unsigned long flags;
+-	struct unwind_idx *idx;
+ 	struct unwind_table *tab = kmalloc(sizeof(*tab), GFP_KERNEL);
+ 
+ 	pr_debug("%s(%08lx, %08lx, %08lx, %08lx)\n", __func__, start, size,
+@@ -408,15 +407,11 @@ struct unwind_table *unwind_table_add(unsigned long start, unsigned long size,
+ 	if (!tab)
+ 		return tab;
+ 
+-	tab->start = (struct unwind_idx *)start;
+-	tab->stop = (struct unwind_idx *)(start + size);
++	tab->start = (const struct unwind_idx *)start;
++	tab->stop = (const struct unwind_idx *)(start + size);
+ 	tab->begin_addr = text_addr;
+ 	tab->end_addr = text_addr + text_size;
+ 
+-	/* Convert the symbol addresses to absolute values */
+-	for (idx = tab->start; idx < tab->stop; idx++)
+-		idx->addr = prel31_to_addr(&idx->addr);
+-
+ 	spin_lock_irqsave(&unwind_lock, flags);
+ 	list_add_tail(&tab->list, &unwind_tables);
+ 	spin_unlock_irqrestore(&unwind_lock, flags);
+@@ -437,16 +432,3 @@ void unwind_table_del(struct unwind_table *tab)
+ 
+ 	kfree(tab);
+ }
+-
+-int __init unwind_init(void)
+-{
+-	struct unwind_idx *idx;
+-
+-	/* Convert the symbol addresses to absolute values */
+-	for (idx = __start_unwind_idx; idx < __stop_unwind_idx; idx++)
+-		idx->addr = prel31_to_addr(&idx->addr);
+-
+-	pr_debug("unwind: ARM stack unwinding initialised\n");
+-
+-	return 0;
+-}
+-- 
+1.7.7.1
