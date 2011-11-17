@@ -1,36 +1,29 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Thu, 17 Nov 2011 10:29:46 +0100
-Subject: [PATCH] arm: mx28: check for gated clocks when setting saif
- divider
-In-Reply-To: <20111117011833.GD14656@S2100-06.ap.freescale.net>
-References: <1315650583-4793-1-git-send-email-w.sang@pengutronix.de>
- <20111116132222.GD2596@pengutronix.de>
- <65EE16ACC360FA4D99C96DC085B3F7722D4E65@039-SN1MPN1-002.039d.mgd.msft.net>
- <20111116135125.GE2596@pengutronix.de>
- <20111117011833.GD14656@S2100-06.ap.freescale.net>
-Message-ID: <20111117092946.GA2535@pengutronix.de>
+From: gwenhael.goavec-merou@armadeus.com (Gwenhael Goavec-Merou)
+Date: Thu, 17 Nov 2011 10:28:39 +0100
+Subject: [PATCH] [ARM] APF9328 needs CONFIG_MTD_CFI_INTELEXT to boot on its
+ NOR FLASH.
+Message-ID: <1321522119-17571-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > I chose this approach because this is the common pattern
-> > in all other clocks. There might be a better way of handling this, but
-> > then we'd need to adapt all other clocks as well. What we definately
-> > should not have is one kind of handling the 'already enabled' case for a
-> > few clocks and another kind for others.
-> > 
-> What about leaving it as it is for now, and try to consolidate when
-> we rework the code for common clock framework migration?
 
-In general, very fine with me. I seem to recall saif-drivers will need a
-hack then, but Aisheng surely knows better.
+Signed-off-by: Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>
+Signed-off-by: Julien Boibessot <julien.boibessot@armadeus.com>
+---
+ arch/arm/mach-imx/Kconfig |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
+diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+index 5f7f9c2..144f007 100644
+--- a/arch/arm/mach-imx/Kconfig
++++ b/arch/arm/mach-imx/Kconfig
+@@ -112,6 +112,7 @@ config MACH_APF9328
+ 	bool "APF9328"
+ 	select SOC_IMX1
+ 	select IMX_HAVE_PLATFORM_IMX_UART
++	select MTD_CFI_INTELEXT
+ 	help
+ 	  Say Yes here if you are using the Armadeus APF9328 development board
+ 
 -- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111117/454a0c31/attachment.sig>
+1.7.3.4
