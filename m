@@ -1,81 +1,58 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Thu, 17 Nov 2011 15:46:02 +0530
-Subject: [PATCH 1/3] ARM: omap_device: handle first time activation of
- console device
-In-Reply-To: <4EC4D96C.9050804@ti.com>
-References: <1321441346-19591-1-git-send-email-rnayak@ti.com>
- <1321441346-19591-2-git-send-email-rnayak@ti.com> <4EC3D037.6020901@ti.com>
- <4EC4B56F.2040504@ti.com> <4EC4D96C.9050804@ti.com>
-Message-ID: <4EC4DEE2.10006@ti.com>
+From: manjunath.hadli@ti.com (Manjunath Hadli)
+Date: Thu, 17 Nov 2011 15:48:56 +0530
+Subject: [PATCH v3 3/5] ARM: davinci: dm646x: remove the macros from the
+ header to move to c file
+In-Reply-To: <1321525138-3928-1-git-send-email-manjunath.hadli@ti.com>
+References: <1321525138-3928-1-git-send-email-manjunath.hadli@ti.com>
+Message-ID: <1321525138-3928-4-git-send-email-manjunath.hadli@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[]...
->>>
->>> Why do we have to idle -> enable? The module is already enabled, isn't
->>> it?
->>> The comment is not super clear for me :-)
->>> Is the goal is to reset the IP?
->>
->> Yes, now that I read it, it does sound confusing. I should have at-least
->> read it once before I picked it from serial.c
->>
->> But anyway, here's what the problem is.
->>
->> I feel its partly to do with the inability of hwmod to handle some
->> modules which are left enabled post a setup, due to the
->> 'HWMOD_INIT_NO_IDLE' flag set.
->> Such modules end up with a hwmod state as '_HWMOD_STATE_ENABLED' post
->> a setup. Now when a driver for such devices/modules tries to enable the
->> module the first time, hwmod throws up a big WARN stating the hwmod is
->> already in an enabled state.
->
-> OK, now, that makes sense :-)
-> We have hwmod in ENABLE state whereas the omap_device is still in IDLE
-> or even DISABLE.
+move the register base addresses and offsets used only by dm646x
+platform file from platform header dm646x.h to dm646x.c as they
+are used only in the c file.
 
-Right.
+Signed-off-by: Manjunath Hadli <manjunath.hadli@ti.com>
+---
+ arch/arm/mach-davinci/dm646x.c              |    7 +++++++
+ arch/arm/mach-davinci/include/mach/dm646x.h |    7 -------
+ 2 files changed, 7 insertions(+), 7 deletions(-)
 
->
->> [uart used as console is one such module, which cannot be idled post a
->> setup by hwmod]
->>
->> If hwmod could be made in some way intelligent enough to know that the
->> module is in enabled state because of the 'HWMOD_INIT_NO_IDLE' itself,
->> a lot of this hackery might not be needed at all.
->
-> Fully agree, the fmwk should handle that.
->
->> Simplest way to do it could be to just add another intermediate state,
->> something like '_HWMOD_STATE_ENABLED_AT_INIT'.
->> I will post a patch for this, see if you like it being handled that way.
->
-> That seems to be good. I'm just wondering if we need to introduce a new
-> state for that or use a dedicated flag.
-> My concern is just that we will have two flavors of HWMOD_STATE_ENABLED
-> that we will have to check in various places in the hwmod core code.
->
-> Maybe that's not such a big deal. Go ahead, and we will see how it looks
-> like.
-
-I initially thought I could do that using the existing flag itself, but
-the key is that its needed only the first time a enable is done on the
-hwmod. The rest of the state handling remains the same.
-I just posted the patch, so that should make it more clear.
-
->
->> The other part of the problem is also with the inability to hook up
->> 'custom' omap_device_pm_latency for omap devices created from DT.
->> Maybe a lot of such cases which need custom activate/deactivate
->> functions might have to be handled in some way in the framework
->> itself like the one above.
->
-> For the moment, it looks like only the serial is requiring such custom
-
-yes.
-
-> stuff, but anyway, we should have a mechanism to allow that...
->
-> Thanks,
-> Benoit
->
+diff --git a/arch/arm/mach-davinci/dm646x.c b/arch/arm/mach-davinci/dm646x.c
+index 0b68ed5..0560e82 100644
+--- a/arch/arm/mach-davinci/dm646x.c
++++ b/arch/arm/mach-davinci/dm646x.c
+@@ -46,6 +46,13 @@
+ #define DM646X_REF_FREQ		27000000
+ #define DM646X_AUX_FREQ		24000000
+ 
++#define DM646X_EMAC_BASE		0x01c80000
++#define DM646X_EMAC_MDIO_BASE		(DM646X_EMAC_BASE + 0x4000)
++#define DM646X_EMAC_CNTRL_OFFSET	0x0000
++#define DM646X_EMAC_CNTRL_MOD_OFFSET	0x1000
++#define DM646X_EMAC_CNTRL_RAM_OFFSET	0x2000
++#define DM646X_EMAC_CNTRL_RAM_SIZE	0x2000
++
+ static struct pll_data pll1_data = {
+ 	.num       = 1,
+ 	.phys_base = DAVINCI_PLL1_BASE,
+diff --git a/arch/arm/mach-davinci/include/mach/dm646x.h b/arch/arm/mach-davinci/include/mach/dm646x.h
+index a8ee6c9..eb95864 100644
+--- a/arch/arm/mach-davinci/include/mach/dm646x.h
++++ b/arch/arm/mach-davinci/include/mach/dm646x.h
+@@ -18,13 +18,6 @@
+ #include <linux/davinci_emac.h>
+ #include <media/davinci/vpif_types.h>
+ 
+-#define DM646X_EMAC_BASE		(0x01C80000)
+-#define DM646X_EMAC_MDIO_BASE		(DM646X_EMAC_BASE + 0x4000)
+-#define DM646X_EMAC_CNTRL_OFFSET	(0x0000)
+-#define DM646X_EMAC_CNTRL_MOD_OFFSET	(0x1000)
+-#define DM646X_EMAC_CNTRL_RAM_OFFSET	(0x2000)
+-#define DM646X_EMAC_CNTRL_RAM_SIZE	(0x2000)
+-
+ #define DM646X_ASYNC_EMIF_CONTROL_BASE	0x20008000
+ #define DM646X_ASYNC_EMIF_CS2_SPACE_BASE 0x42000000
+ 
+-- 
+1.6.2.4
