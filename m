@@ -1,45 +1,109 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Thu, 17 Nov 2011 14:48:17 +0400
-Subject: [PATCH v3 4/5] ARM: davinci: create new common platform header
- for davinci
-In-Reply-To: <1321525138-3928-5-git-send-email-manjunath.hadli@ti.com>
-References: <1321525138-3928-1-git-send-email-manjunath.hadli@ti.com>
- <1321525138-3928-5-git-send-email-manjunath.hadli@ti.com>
-Message-ID: <4EC4E671.8030105@mvista.com>
+From: govindraj.ti@gmail.com (Govindraj)
+Date: Thu, 17 Nov 2011 16:18:55 +0530
+Subject: [PATCH] ARM: omap_hwmod: Add a new state to handle hwmods left
+ enabled at init
+In-Reply-To: <1321524690-10302-1-git-send-email-rnayak@ti.com>
+References: <1321524690-10302-1-git-send-email-rnayak@ti.com>
+Message-ID: <CAAL8m4yQTB_vJe9G8ArJx1Uoatd8ffXYY7NqEyM6zgCiygFc0A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Thu, Nov 17, 2011 at 3:41 PM, Rajendra Nayak <rnayak@ti.com> wrote:
+> A hwmod with a 'HWMOD_INIT_NO_IDLE' flag set, is left in
+> enabled state by the hwmod framework post the initial setup.
+> Once a real user of the device (a driver) tries to enable it
+> at a later point, the hmwod framework throws a WARN() about
+> the device being already in enabled state.
+>
+> Fix this by introducing a new state '_HWMOD_STATE_ENABLED_AT_INIT'
+> to identify such devices/hwmods, so nothing but just a state
+> change to '_HWMOD_STATE_ENABLED' can be done when the device/hwmod
+> is requested to be enabled (the first time) by its driver/user.
+>
+> A good example of a such a device is an UART used as debug console.
+> The UART module needs to be kept enabled through the boot, until the
+> UART driver takes control of it, for debug prints to appear on
+> the console.
+>
+> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
 
-On 17-11-2011 14:18, Manjunath Hadli wrote:
+tested with uart runtime v8 patch series works fine.
+helps to simply the serial.c code without using custom console activate funcs.
+thanks for handling this within the framework.
 
-> remove the code from individual platform header files for
-> dm365, dm355, dm644x and dm646x and consolidate it into a
-> single and common header file davinci_common.h.
-> Include the new header file in individual platform header
-> files as a pre-cursor for deleting these headers in follow
-> up patches.
+FWIW,
 
-> Signed-off-by: Manjunath Hadli<manjunath.hadli@ti.com>
-[...]
+Tested-by: Govindraj.R <govindraj.raja@ti.com>
 
-> diff --git a/arch/arm/mach-davinci/include/mach/davinci.h b/arch/arm/mach-davinci/include/mach/davinci.h
-> new file mode 100644
-> index 0000000..49bf2f3
-> --- /dev/null
-> +++ b/arch/arm/mach-davinci/include/mach/davinci.h
-> @@ -0,0 +1,88 @@
-[...]
-> +/* DM355 base addresses */
-> +#define DM355_ASYNC_EMIF_CONTROL_BASE	0x01e10000
-> +#define DM355_ASYNC_EMIF_DATA_CE0_BASE	0x02000000
+--
+Thanks,
+Govindraj.R
 
-> +/* DM365 base addresses */
-> +#define DM365_ASYNC_EMIF_CONTROL_BASE	0x01d10000
-> +#define DM365_ASYNC_EMIF_DATA_CE0_BASE	0x02000000
-> +#define DM365_ASYNC_EMIF_DATA_CE1_BASE	0x04000000
 
-    Note that DM355/365 EMIF CE0/1 bases are similar -- perhaps it's worth to 
-have the single definition for them now, like DM3X5_ASYNC_EMIF_DATA_CE<n>_BASE.
-
-WBR, Sergei
+> ---
+> ?arch/arm/mach-omap2/omap_hwmod.c ? ? ? ? ? ? | ? 16 ++++++++++++++--
+> ?arch/arm/plat-omap/include/plat/omap_hwmod.h | ? ?1 +
+> ?2 files changed, 15 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+> index d7f4623..7d94cc3 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod.c
+> @@ -1441,6 +1441,17 @@ static int _enable(struct omap_hwmod *oh)
+>
+> ? ? ? ?pr_debug("omap_hwmod: %s: enabling\n", oh->name);
+>
+> + ? ? ? /*
+> + ? ? ? ?* hwmods' with HWMOD_INIT_NO_IDLE flag set, are left
+> + ? ? ? ?* in enabled state at init.
+> + ? ? ? ?* Now that someone is really trying to enable them,
+> + ? ? ? ?* just update the state.
+> + ? ? ? ?*/
+> + ? ? ? if (oh->_state == _HWMOD_STATE_ENABLED_AT_INIT) {
+> + ? ? ? ? ? ? ? oh->_state = _HWMOD_STATE_ENABLED;
+> + ? ? ? ? ? ? ? return 0;
+> + ? ? ? }
+> +
+> ? ? ? ?if (oh->_state != _HWMOD_STATE_INITIALIZED &&
+> ? ? ? ? ? ?oh->_state != _HWMOD_STATE_IDLE &&
+> ? ? ? ? ? ?oh->_state != _HWMOD_STATE_DISABLED) {
+> @@ -1449,7 +1460,6 @@ static int _enable(struct omap_hwmod *oh)
+> ? ? ? ? ? ? ? ?return -EINVAL;
+> ? ? ? ?}
+>
+> -
+> ? ? ? ?/*
+> ? ? ? ? * If an IP contains only one HW reset line, then de-assert it in order
+> ? ? ? ? * to allow the module state transition. Otherwise the PRCM will return
+> @@ -1744,8 +1754,10 @@ static int _setup(struct omap_hwmod *oh, void *data)
+> ? ? ? ? * it should be set by the core code as a runtime flag during startup
+> ? ? ? ? */
+> ? ? ? ?if ((oh->flags & HWMOD_INIT_NO_IDLE) &&
+> - ? ? ? ? ? (postsetup_state == _HWMOD_STATE_IDLE))
+> + ? ? ? ? ? (postsetup_state == _HWMOD_STATE_IDLE)) {
+> + ? ? ? ? ? ? ? oh->_state = _HWMOD_STATE_ENABLED_AT_INIT;
+> ? ? ? ? ? ? ? ?postsetup_state = _HWMOD_STATE_ENABLED;
+> + ? ? ? }
+>
+> ? ? ? ?if (postsetup_state == _HWMOD_STATE_IDLE)
+> ? ? ? ? ? ? ? ?_idle(oh);
+> diff --git a/arch/arm/plat-omap/include/plat/omap_hwmod.h b/arch/arm/plat-omap/include/plat/omap_hwmod.h
+> index 1b81dfb..cd49d60 100644
+> --- a/arch/arm/plat-omap/include/plat/omap_hwmod.h
+> +++ b/arch/arm/plat-omap/include/plat/omap_hwmod.h
+> @@ -436,6 +436,7 @@ struct omap_hwmod_omap4_prcm {
+> ?#define _HWMOD_STATE_ENABLED ? ? ? ? ? ? ? ? ? 4
+> ?#define _HWMOD_STATE_IDLE ? ? ? ? ? ? ? ? ? ? ?5
+> ?#define _HWMOD_STATE_DISABLED ? ? ? ? ? ? ? ? ?6
+> +#define _HWMOD_STATE_ENABLED_AT_INIT ? ? ? ? ? 7
+>
+> ?/**
+> ?* struct omap_hwmod_class - the type of an IP block
+> --
+> 1.7.1
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+>
