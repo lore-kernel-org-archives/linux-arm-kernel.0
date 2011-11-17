@@ -1,42 +1,33 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Thu, 17 Nov 2011 11:36:33 -0800
-Subject: [PATCH] arm: omap2: fix build failure
-In-Reply-To: <CACVXFVMtaiFiKSRh8geVpOzymtZsaUKc9tDHfgJYR57N+RQZ-g@mail.gmail.com>
- (Ming Lei's message of "Thu, 17 Nov 2011 11:00:18 +0800")
-References: <1320726849-11854-1-git-send-email-tom.leiming@gmail.com>
- <87mxc61kpw.fsf@ti.com>
- <CACVXFVMtaiFiKSRh8geVpOzymtZsaUKc9tDHfgJYR57N+RQZ-g@mail.gmail.com>
-Message-ID: <87aa7u4k3i.fsf@ti.com>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Thu, 17 Nov 2011 11:39:14 -0800
+Subject: [PATCH 01/10] arm/tegra: initial device tree for tegra30
+In-Reply-To: <1321546766-26770-2-git-send-email-pdeschrijver@nvidia.com>
+References: <1321546766-26770-1-git-send-email-pdeschrijver@nvidia.com>
+ <1321546766-26770-2-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF1740D74C46@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ming Lei <tom.leiming@gmail.com> writes:
+Peter De Schrijver wrote at Thursday, November 17, 2011 9:19 AM:
+> This patch adds the initial device tree for tegra30
 
-> On Wed, Nov 9, 2011 at 3:24 AM, Kevin Hilman <khilman@ti.com> wrote:
->> tom.leiming at gmail.com writes:
->>
->>> From: Ming Lei <tom.leiming@gmail.com>
->>>
->>> The patch fixes the compile failure:
->>>
->>> ? CC ? ? ?arch/arm/mach-omap2/cpuidle34xx.o
->>> arch/arm/mach-omap2/cpuidle34xx.c:317:12: error: 'THIS_MODULE'
->>> undeclared here (not in a function)
->>> make[1]: *** [arch/arm/mach-omap2/cpuidle34xx.o] Error 1
->>> make: *** [arch/arm/mach-omap2] Error 2
->>> make: *** Waiting for unfinished jobs....
->>>
->>> Signed-off-by: Ming Lei <tom.leiming@gmail.com>
->>
->> FYI...
->>
->> Tony has already queued fix for this in his fixes branch.
->>
->> ? ? http://marc.info/?l=linux-arm-kernel&m=132071036621713&w=2
->
-> The fix is not merged into 3.2.0-rc2-next-20111116+ yet...
+> diff --git a/Documentation/devicetree/bindings/arm/tegra.txt
+...
+> +* harmony: tegra20 based development board
+> +Required root node properties:
+> + - compatible = "nvidia,harmony", "nvidia,tegra20";
+> +
+> +* seaboard: tegra20 based clamshell reference design
+> +Required root node properties:
+> + - compatible = "nvidia,seaboard", "nvidia,tegra20";
 
-OK, but that doesn't mean you have to keep sending it.  It just means
-Tony's fixes branch isn't in -next (yet.)
+Do we really want to list all the board names here? In the future, there
+could be tens or hundreds. I would argue that we should just document
+nvidia,tegra20 and nvidia,tegra30.
 
-Kevin
+At a later point, we should fix board-dt.c to solely look for those
+compatible values, although this will have to wait until the pinmux DT
+bindings are present. Then, the kernel won't care about the board names.
+
+-- 
+nvpublic
