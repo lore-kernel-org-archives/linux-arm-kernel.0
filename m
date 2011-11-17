@@ -1,19 +1,27 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Wed, 16 Nov 2011 16:11:50 -0800
-Subject: [PATCH Resend] ARM: OMAP2+: Remove empty io.h
-In-Reply-To: <1321459012-15418-1-git-send-email-weber@corscience.de> (Thomas
- Weber's message of "Wed, 16 Nov 2011 16:56:52 +0100")
-References: <1321459012-15418-1-git-send-email-weber@corscience.de>
-Message-ID: <87d3cr620p.fsf@ti.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 16 Nov 2011 19:15:55 -0500 (EST)
+Subject: [PATCH] ARM: Use PMD_SHIFT instead of PGDIR_SHIFT in
+ dma-consistent.c
+In-Reply-To: <20111116235941.GI9581@n2100.arm.linux.org.uk>
+References: <1321461495-2860-1-git-send-email-catalin.marinas@arm.com>
+ <20111116235941.GI9581@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.02.1111161911530.3307@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thomas Weber <weber@corscience.de> writes:
+On Wed, 16 Nov 2011, Russell King - ARM Linux wrote:
 
-> The file arch/arm/mach-omap2/io.h is empty, so we can remove it.
->
-> Signed-off-by: Thomas Weber <weber@corscience.de>
+> On Wed, Nov 16, 2011 at 04:38:15PM +0000, Catalin Marinas wrote:
+> > Commit 99d1717d introduces dynamic allocation of the consistent_pte
+> 
+> Always include the commit summary when quoting the commit ID.  Shortened
+> commit IDs aren't guaranteed to remain unique for any amount of time, and
+> so become ambiguous (and actually more difficult to locate when that
+> happens.)
 
-It's empty and unused elsewhere.
+Or at least provide more than the minimum amount of SHA1 characters to 
+describe the commit.  Something like 12 or more characters is likely to 
+remain unambiguous for a couple decades.
 
-Acked-by: Kevin Hilman <khilman@ti.com>
+
+Nicolas
