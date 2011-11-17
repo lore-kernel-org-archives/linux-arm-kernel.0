@@ -1,77 +1,263 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 17 Nov 2011 15:47:05 -0600
-Subject: [PATCH v2 1/2] ARM: use cache type functions for
- arch_get_unmapped_area
-Message-ID: <1321566426-31184-1-git-send-email-robherring2@gmail.com>
+Date: Thu, 17 Nov 2011 15:47:06 -0600
+Subject: [PATCH v2 2/2] ARM: topdown mmap support
+In-Reply-To: <1321566426-31184-1-git-send-email-robherring2@gmail.com>
+References: <1321566426-31184-1-git-send-email-robherring2@gmail.com>
+Message-ID: <1321566426-31184-2-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rob Herring <rob.herring@calxeda.com>
 
-There are already cache type decoding functions, so use those instead
-of custom decode code which only works for ARMv6.
+Similar to other architectures, this adds topdown mmap support in user
+process address space allocation policy. This allows mmap sizes greater
+than 2GB. This support is largely copied from MIPS and the generic
+implementations.
 
-This change also correctly enables cache colour alignment on Cortex-A9
-whose I-cache is aliasing VIPT.
+The address space randomization is moved into arch_pick_mmap_layout.
+
+Tested on V-Express with ubuntu and a mmap test from here:
+https://bugs.launchpad.net/bugs/861296
 
 Signed-off-by: Rob Herring <rob.herring@calxeda.com>
 Acked-by: Nicolas Pitre <nico@linaro.org>
 ---
-v2:
+v2: 
 - remove icache_is_vipt_aliasing check
 
-Nico, can you pick up these 2 patches into the Linaro kernel to get some
-testing?
+ arch/arm/include/asm/pgtable.h   |    1 +
+ arch/arm/include/asm/processor.h |    2 +
+ arch/arm/mm/mmap.c               |  173 ++++++++++++++++++++++++++++++++++++-
+ 3 files changed, 171 insertions(+), 5 deletions(-)
 
-Rob
-
- arch/arm/mm/mmap.c |   23 ++++++-----------------
- 1 files changed, 6 insertions(+), 17 deletions(-)
-
+diff --git a/arch/arm/include/asm/pgtable.h b/arch/arm/include/asm/pgtable.h
+index 9451dce..2f659e2 100644
+--- a/arch/arm/include/asm/pgtable.h
++++ b/arch/arm/include/asm/pgtable.h
+@@ -336,6 +336,7 @@ static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
+  * We provide our own arch_get_unmapped_area to cope with VIPT caches.
+  */
+ #define HAVE_ARCH_UNMAPPED_AREA
++#define HAVE_ARCH_UNMAPPED_AREA_TOPDOWN
+ 
+ /*
+  * remap a physical page `pfn' of size `size' with page protection `prot'
+diff --git a/arch/arm/include/asm/processor.h b/arch/arm/include/asm/processor.h
+index b2d9df5..ce280b8 100644
+--- a/arch/arm/include/asm/processor.h
++++ b/arch/arm/include/asm/processor.h
+@@ -123,6 +123,8 @@ static inline void prefetch(const void *ptr)
+ 
+ #endif
+ 
++#define HAVE_ARCH_PICK_MMAP_LAYOUT
++
+ #endif
+ 
+ #endif /* __ASM_ARM_PROCESSOR_H */
 diff --git a/arch/arm/mm/mmap.c b/arch/arm/mm/mmap.c
-index 74be05f..44b628e 100644
+index 44b628e..ce8cb19 100644
 --- a/arch/arm/mm/mmap.c
 +++ b/arch/arm/mm/mmap.c
-@@ -9,8 +9,7 @@
- #include <linux/io.h>
- #include <linux/personality.h>
+@@ -11,10 +11,49 @@
  #include <linux/random.h>
--#include <asm/cputype.h>
--#include <asm/system.h>
-+#include <asm/cachetype.h>
+ #include <asm/cachetype.h>
  
++static inline unsigned long COLOUR_ALIGN_DOWN(unsigned long addr,
++					      unsigned long pgoff)
++{
++	unsigned long base = addr & ~(SHMLBA-1);
++	unsigned long off = (pgoff << PAGE_SHIFT) & (SHMLBA-1);
++
++	if (base + off <= addr)
++		return base + off;
++
++	return base - off;
++}
++
  #define COLOUR_ALIGN(addr,pgoff)		\
  	((((addr)+SHMLBA-1)&~(SHMLBA-1)) +	\
-@@ -32,25 +31,15 @@ arch_get_unmapped_area(struct file *filp, unsigned long addr,
- 	struct mm_struct *mm = current->mm;
- 	struct vm_area_struct *vma;
- 	unsigned long start_addr;
--#if defined(CONFIG_CPU_V6) || defined(CONFIG_CPU_V6K)
--	unsigned int cache_type;
--	int do_align = 0, aliasing = 0;
+ 	 (((pgoff)<<PAGE_SHIFT) & (SHMLBA-1)))
+ 
++/* gap between mmap and stack */
++#define MIN_GAP (128*1024*1024UL)
++#define MAX_GAP ((TASK_SIZE)/6*5)
++
++static int mmap_is_legacy(void)
++{
++	if (current->personality & ADDR_COMPAT_LAYOUT)
++		return 1;
++
++	if (rlimit(RLIMIT_STACK) == RLIM_INFINITY)
++		return 1;
++
++	return sysctl_legacy_va_layout;
++}
++
++static unsigned long mmap_base(unsigned long rnd)
++{
++	unsigned long gap = rlimit(RLIMIT_STACK);
++
++	if (gap < MIN_GAP)
++		gap = MIN_GAP;
++	else if (gap > MAX_GAP)
++		gap = MAX_GAP;
++
++	return PAGE_ALIGN(TASK_SIZE - gap - rnd);
++}
++
+ /*
+  * We need to ensure that shared mappings are correctly aligned to
+  * avoid aliasing issues with VIPT caches.  We need to ensure that
+@@ -68,13 +107,9 @@ arch_get_unmapped_area(struct file *filp, unsigned long addr,
+ 	if (len > mm->cached_hole_size) {
+ 	        start_addr = addr = mm->free_area_cache;
+ 	} else {
+-	        start_addr = addr = TASK_UNMAPPED_BASE;
++	        start_addr = addr = mm->mmap_base;
+ 	        mm->cached_hole_size = 0;
+ 	}
+-	/* 8 bits of randomness in 20 address space bits */
+-	if ((current->flags & PF_RANDOMIZE) &&
+-	    !(current->personality & ADDR_NO_RANDOMIZE))
+-		addr += (get_random_int() % (1 << 8)) << PAGE_SHIFT;
+ 
+ full_search:
+ 	if (do_align)
+@@ -111,6 +146,134 @@ full_search:
+ 	}
+ }
+ 
++unsigned long
++arch_get_unmapped_area_topdown(struct file *filp, const unsigned long addr0,
++			const unsigned long len, const unsigned long pgoff,
++			const unsigned long flags)
++{
++	struct vm_area_struct *vma;
++	struct mm_struct *mm = current->mm;
++	unsigned long addr = addr0;
 +	int do_align = 0;
 +	int aliasing = cache_is_vipt_aliasing();
- 
- 	/*
- 	 * We only need to do colour alignment if either the I or D
--	 * caches alias.  This is indicated by bits 9 and 21 of the
--	 * cache type register.
++
++	/*
++	 * We only need to do colour alignment if either the I or D
 +	 * caches alias.
- 	 */
--	cache_type = read_cpuid_cachetype();
--	if (cache_type != read_cpuid_id()) {
--		aliasing = (cache_type | cache_type >> 12) & (1 << 11);
--		if (aliasing)
--			do_align = filp || flags & MAP_SHARED;
--	}
--#else
--#define do_align 0
--#define aliasing 0
--#endif
++	 */
 +	if (aliasing)
 +		do_align = filp || (flags & MAP_SHARED);
++
++	/* requested length too big for entire address space */
++	if (len > TASK_SIZE)
++		return -ENOMEM;
++
++	if (flags & MAP_FIXED) {
++		if (aliasing && flags & MAP_SHARED &&
++		    (addr - (pgoff << PAGE_SHIFT)) & (SHMLBA - 1))
++			return -EINVAL;
++		return addr;
++	}
++
++	/* requesting a specific address */
++	if (addr) {
++		if (do_align)
++			addr = COLOUR_ALIGN(addr, pgoff);
++		else
++			addr = PAGE_ALIGN(addr);
++		vma = find_vma(mm, addr);
++		if (TASK_SIZE - len >= addr &&
++				(!vma || addr + len <= vma->vm_start))
++			return addr;
++	}
++
++	/* check if free_area_cache is useful for us */
++	if (len <= mm->cached_hole_size) {
++		mm->cached_hole_size = 0;
++		mm->free_area_cache = mm->mmap_base;
++	}
++
++	/* either no address requested or can't fit in requested address hole */
++	addr = mm->free_area_cache;
++	if (do_align) {
++		unsigned long base = COLOUR_ALIGN_DOWN(addr - len, pgoff);
++		addr = base + len;
++	}
++
++	/* make sure it can fit in the remaining address space */
++	if (addr > len) {
++		vma = find_vma(mm, addr-len);
++		if (!vma || addr <= vma->vm_start)
++			/* remember the address as a hint for next time */
++			return (mm->free_area_cache = addr-len);
++	}
++
++	if (mm->mmap_base < len)
++		goto bottomup;
++
++	addr = mm->mmap_base - len;
++	if (do_align)
++		addr = COLOUR_ALIGN_DOWN(addr, pgoff);
++
++	do {
++		/*
++		 * Lookup failure means no vma is above this address,
++		 * else if new region fits below vma->vm_start,
++		 * return with success:
++		 */
++		vma = find_vma(mm, addr);
++		if (!vma || addr+len <= vma->vm_start)
++			/* remember the address as a hint for next time */
++			return (mm->free_area_cache = addr);
++
++		/* remember the largest hole we saw so far */
++		if (addr + mm->cached_hole_size < vma->vm_start)
++			mm->cached_hole_size = vma->vm_start - addr;
++
++		/* try just below the current vma->vm_start */
++		addr = vma->vm_start - len;
++		if (do_align)
++			addr = COLOUR_ALIGN_DOWN(addr, pgoff);
++	} while (len < vma->vm_start);
++
++bottomup:
++	/*
++	 * A failed mmap() very likely causes application failure,
++	 * so fall back to the bottom-up function here. This scenario
++	 * can happen with large stack limits and large mmap()
++	 * allocations.
++	 */
++	mm->cached_hole_size = ~0UL;
++	mm->free_area_cache = TASK_UNMAPPED_BASE;
++	addr = arch_get_unmapped_area(filp, addr0, len, pgoff, flags);
++	/*
++	 * Restore the topdown base:
++	 */
++	mm->free_area_cache = mm->mmap_base;
++	mm->cached_hole_size = ~0UL;
++
++	return addr;
++}
++
++void arch_pick_mmap_layout(struct mm_struct *mm)
++{
++	unsigned long random_factor = 0UL;
++
++	/* 8 bits of randomness in 20 address space bits */
++	if ((current->flags & PF_RANDOMIZE) &&
++	    !(current->personality & ADDR_NO_RANDOMIZE))
++		random_factor = (get_random_int() % (1 << 8)) << PAGE_SHIFT;
++
++	if (mmap_is_legacy()) {
++		mm->mmap_base = TASK_UNMAPPED_BASE + random_factor;
++		mm->get_unmapped_area = arch_get_unmapped_area;
++		mm->unmap_area = arch_unmap_area;
++	} else {
++		mm->mmap_base = mmap_base(random_factor);
++		mm->get_unmapped_area = arch_get_unmapped_area_topdown;
++		mm->unmap_area = arch_unmap_area_topdown;
++	}
++}
  
- 	/*
- 	 * We enforce the MAP_FIXED case.
+ /*
+  * You really shouldn't be using read() or write() on /dev/mem.  This
 -- 
 1.7.5.4
