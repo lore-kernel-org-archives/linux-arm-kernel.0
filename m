@@ -1,152 +1,70 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 16 Nov 2011 19:04:27 -0600
-Subject: [PATCH 3/3] ARM: omap: pass minimal SoC/board data for UART from
- dt
-In-Reply-To: <1321441346-19591-4-git-send-email-rnayak@ti.com>
-References: <1321441346-19591-1-git-send-email-rnayak@ti.com>
- <1321441346-19591-4-git-send-email-rnayak@ti.com>
-Message-ID: <4EC45D9B.5020006@gmail.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Thu, 17 Nov 2011 09:18:34 +0800
+Subject: [PATCH] arm: mx28: check for gated clocks when setting saif
+ divider
+In-Reply-To: <20111116135125.GE2596@pengutronix.de>
+References: <1315650583-4793-1-git-send-email-w.sang@pengutronix.de>
+ <20111116132222.GD2596@pengutronix.de>
+ <65EE16ACC360FA4D99C96DC085B3F7722D4E65@039-SN1MPN1-002.039d.mgd.msft.net>
+ <20111116135125.GE2596@pengutronix.de>
+Message-ID: <20111117011833.GD14656@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/16/2011 05:02 AM, Rajendra Nayak wrote:
-> Pass minimal data needed for console boot, from dt, for
-> OMAP4 panda/sdp and OMAP3 beagle boards, and get rid of the
-> static initialization from generic board file.
+On Wed, Nov 16, 2011 at 02:51:26PM +0100, Wolfram Sang wrote:
+> On Wed, Nov 16, 2011 at 01:35:04PM +0000, Dong Aisheng-B29396 wrote:
+> > > -----Original Message-----
+> > > From: Wolfram Sang [mailto:w.sang at pengutronix.de]
+> > > Sent: Wednesday, November 16, 2011 9:22 PM
+> > > To: linux-arm-kernel at lists.infradead.org
+> > > Cc: Sascha Hauer; Guo Shawn-R65073; Dong Aisheng-B29396
+> > > Subject: Re: [PATCH] arm: mx28: check for gated clocks when setting saif
+> > > divider
+> > > 
+> > > On Sat, Sep 10, 2011 at 12:29:43PM +0200, Wolfram Sang wrote:
+> > > > Like with all other clocks, the divider for the SAIF devices should
+> > > > not be altered when the clock is gated. Bail out when this is the case
+> > > > like the other clocks do.
+> > > >
+> > > > Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
+> > > > Cc: Sascha Hauer <s.hauer@pengutronix.de>
+> > > > Cc: Shawn Guo <shawn.guo@freescale.com>
+> > > > Cc: Dong Aisheng-B29396 <B29396@freescale.com>
+> > > > ---
+> > > >
+> > > > Aisheng: I think this is the correct solution for clock-mx28.c. If
+> > > > setting the rate of the saif clocks hit the error path, it should be
+> > > fixed in the driver?
+> > > 
+> > > Ping. Trying to catch up, has this been resolved meanwhile?
+> > > 
+> > Sorry, I missed this patch.
+> > 
+> > If I understand right, the convention way is to clk_set_rate() then
+> > clk_enable().I f that, is it reasonable for driver to do something like:
+> > Clk_enable -> clk_set_rate->clk_disable to set a proper rate,
+> > then when needs the clock on, do clk_enable again?
 > 
-> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
-> ---
->  arch/arm/boot/dts/omap3-beagle.dts  |   17 +++++++++++++++++
->  arch/arm/boot/dts/omap3.dtsi        |   27 +++++++++++++++++++++++++++
->  arch/arm/boot/dts/omap4-panda.dts   |   17 +++++++++++++++++
->  arch/arm/boot/dts/omap4-sdp.dts     |   17 +++++++++++++++++
->  arch/arm/boot/dts/omap4.dtsi        |   24 ++++++++++++++++++++++++
->  arch/arm/mach-omap2/board-generic.c |    1 -
->  6 files changed, 102 insertions(+), 1 deletions(-)
+> Confused, do you really mean enable -> set_rate -> disable? Because you
+> can't set clocks when they are enabled?
 > 
-> diff --git a/arch/arm/boot/dts/omap3-beagle.dts b/arch/arm/boot/dts/omap3-beagle.dts
-> index 9486be6..4c8f11e 100644
-> --- a/arch/arm/boot/dts/omap3-beagle.dts
-> +++ b/arch/arm/boot/dts/omap3-beagle.dts
-> @@ -27,3 +27,20 @@
->  		reg = <0x80000000 0x20000000>; /* 512 MB */
->  	};
->  };
-> +
-> +&uart1 {
-> +	clock-frequency = <48000000>;
-> +};
-> +
-> +&uart2 {
-> +	clock-frequency = <48000000>;
-> +};
-> +
-> +&uart3 {
-> +	ti,console_hwmod;
-> +	clock-frequency = <48000000>;
-> +};
-> +
-> +&uart4 {
-> +	clock-frequency = <48000000>;
-> +};
-> diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
-> index d202bb5..ea591c5 100644
-> --- a/arch/arm/boot/dts/omap3.dtsi
-> +++ b/arch/arm/boot/dts/omap3.dtsi
-> @@ -13,6 +13,13 @@
->  / {
->  	compatible = "ti,omap3430", "ti,omap3";
->  
-> +	aliases {
-> +		uart1 = &uart1;
-> +		uart2 = &uart2;
-> +		uart3 = &uart3;
-> +		uart4 = &uart4;
-> +	};
-> +
->  	cpus {
->  		cpu at 0 {
->  			compatible = "arm,cortex-a8";
-> @@ -59,5 +66,25 @@
->  			interrupt-controller;
->  			#interrupt-cells = <1>;
->  		};
-> +
-> +		uart1: uart at 1 {
+> Well, to be honest, this is all is not very nice due to mxs
+> restrictions.
 
-Use the generic name serial and the address: uart1: serial at 1234abcd
+When the code was written, it inherited the restriction from FSL
+internal code.  I doubt the restriction is the hardware one, and I
+would try to remove the restriction when migrating to common clock
+framework.
 
-> +			compatible = "ti,omap-uart";
-> +			ti,hwmods = "uart1";
-> +		};
-> +
-> +		uart2: uart at 2 {
-> +			compatible = "ti,omap-uart";
-> +			ti,hwmods = "uart2";
-> +		};
-> +
-> +		uart3: uart at 3 {
-> +			compatible = "ti,omap-uart";
-> +			ti,hwmods = "uart3";
-> +		};
-> +
-> +		uart4: uart at 4 {
-> +			compatible = "ti,omap-uart";
-> +			ti,hwmods = "uart4";
-> +		};
->  	};
->  };
-> diff --git a/arch/arm/boot/dts/omap4-panda.dts b/arch/arm/boot/dts/omap4-panda.dts
-> index c702657..aa65449 100644
-> --- a/arch/arm/boot/dts/omap4-panda.dts
-> +++ b/arch/arm/boot/dts/omap4-panda.dts
-> @@ -27,3 +27,20 @@
->  		reg = <0x80000000 0x40000000>; /* 1 GB */
->  	};
->  };
-> +
-> +&uart1 {
-> +	clock-frequency = <48000000>;
-> +};
-> +
-> +&uart2 {
-> +	clock-frequency = <48000000>;
-> +};
-> +
-> +&uart3 {
-> +	ti,console_hwmod;
-> +	clock-frequency = <48000000>;
-> +};
-> +
-> +&uart4 {
-> +	clock-frequency = <48000000>;
-> +};
-> diff --git a/arch/arm/boot/dts/omap4-sdp.dts b/arch/arm/boot/dts/omap4-sdp.dts
-> index 066e28c..524f5bf 100644
-> --- a/arch/arm/boot/dts/omap4-sdp.dts
-> +++ b/arch/arm/boot/dts/omap4-sdp.dts
-> @@ -27,3 +27,20 @@
->  		reg = <0x80000000 0x40000000>; /* 1 GB */
->  	};
->  };
-> +
-> +&uart1 {
-> +	clock-frequency = <48000000>;
-> +};
-> +
-> +&uart2 {
-> +	clock-frequency = <48000000>;
-> +};
-> +
-> +&uart3 {
-> +	ti,console_hwmod;
-> +	clock-frequency = <48000000>;
-> +};
-> +
-> +&uart4 {
-> +	clock-frequency = <48000000>;
+> I chose this approach because this is the common pattern
+> in all other clocks. There might be a better way of handling this, but
+> then we'd need to adapt all other clocks as well. What we definately
+> should not have is one kind of handling the 'already enabled' case for a
+> few clocks and another kind for others.
+> 
+What about leaving it as it is for now, and try to consolidate when
+we rework the code for common clock framework migration?
 
-It doesn't seem that this frequency ever varies and is likely to be
-replaced with clock bindings, so maybe just put it in the dtsi files.
-
-Rob
+-- 
+Regards,
+Shawn
