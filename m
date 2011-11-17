@@ -1,17 +1,22 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 16 Nov 2011 23:59:41 +0000
-Subject: [PATCH] ARM: Use PMD_SHIFT instead of PGDIR_SHIFT in
- dma-consistent.c
-In-Reply-To: <1321461495-2860-1-git-send-email-catalin.marinas@arm.com>
-References: <1321461495-2860-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <20111116235941.GI9581@n2100.arm.linux.org.uk>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 17 Nov 2011 09:00:30 +0900
+Subject: s5p tree moved back to kernel.org
+Message-ID: <018401cca4bb$ebf71560$c3e54020$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 16, 2011 at 04:38:15PM +0000, Catalin Marinas wrote:
-> Commit 99d1717d introduces dynamic allocation of the consistent_pte
+Hi Stephen,
 
-Always include the commit summary when quoting the commit ID.  Shortened
-commit IDs aren't guaranteed to remain unique for any amount of time, and
-so become ambiguous (and actually more difficult to locate when that
-happens.)
+Could you please change my tree to following?
+
+git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+for-next
+
+If any problems, please let me know.
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
