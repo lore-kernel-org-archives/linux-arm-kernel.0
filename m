@@ -1,57 +1,38 @@
-From: manjunath.hadli@ti.com (Hadli, Manjunath)
-Date: Thu, 17 Nov 2011 10:59:35 +0000
-Subject: [PATCH v3 4/5] ARM: davinci: create new common platform header
- for davinci
-In-Reply-To: <4EC4E671.8030105@mvista.com>
-References: <1321525138-3928-1-git-send-email-manjunath.hadli@ti.com>
- <1321525138-3928-5-git-send-email-manjunath.hadli@ti.com>
- <4EC4E671.8030105@mvista.com>
-Message-ID: <E99FAA59F8D8D34D8A118DD37F7C8F750107D5@DBDE01.ent.ti.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 17 Nov 2011 10:59:36 +0000
+Subject: [PATCH] ARM: Do not call flush_cache_user_range with mmap_sem held
+In-Reply-To: <20111117104245.GL9581@n2100.arm.linux.org.uk>
+References: <20111107172836.5615.64219.stgit@e102109-lin.cambridge.arm.com>
+ <CAOesGMhWxEKUe7C4A+Xqv3RjN_u1t4k8eHWSZE4qMoBPD9=1qw@mail.gmail.com>
+ <20111116235024.GH9581@n2100.arm.linux.org.uk>
+ <20111117102205.GF4748@arm.com>
+ <20111117104245.GL9581@n2100.arm.linux.org.uk>
+Message-ID: <20111117105935.GH4748@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sergei,
-  Thank you for the comments.
+On Thu, Nov 17, 2011 at 10:42:46AM +0000, Russell King - ARM Linux wrote:
+> On Thu, Nov 17, 2011 at 10:22:05AM +0000, Catalin Marinas wrote:
+> > BTW, we could even go a step further an remove the vma checks entirely,
+> > just use access_ok() since __cpuc_coherent_user_range() can handle
+> > unmapped ranges properly (though it may introduce some latency if some
+> > user app passes a 3G range but we can change the fixup code to abort the
+> > operation when it gets a fault that can't be fixed up).
+> 
+> So, do you think that it is acceptable to be able to pass into this from
+> userspace the arguments '0', '~0', '0' and have the kernel spin over the
+> entire 4G space, including IO space on any of the supported architectures.
 
-On Thu, Nov 17, 2011 at 16:18:17, Sergei Shtylyov wrote:
-> Hello.
-> 
-> On 17-11-2011 14:18, Manjunath Hadli wrote:
-> 
-> > remove the code from individual platform header files for dm365, 
-> > dm355, dm644x and dm646x and consolidate it into a single and common 
-> > header file davinci_common.h.
-> > Include the new header file in individual platform header files as a 
-> > pre-cursor for deleting these headers in follow up patches.
-> 
-> > Signed-off-by: Manjunath Hadli<manjunath.hadli@ti.com>
-> [...]
-> 
-> > diff --git a/arch/arm/mach-davinci/include/mach/davinci.h 
-> > b/arch/arm/mach-davinci/include/mach/davinci.h
-> > new file mode 100644
-> > index 0000000..49bf2f3
-> > --- /dev/null
-> > +++ b/arch/arm/mach-davinci/include/mach/davinci.h
-> > @@ -0,0 +1,88 @@
-> [...]
-> > +/* DM355 base addresses */
-> > +#define DM355_ASYNC_EMIF_CONTROL_BASE	0x01e10000
-> > +#define DM355_ASYNC_EMIF_DATA_CE0_BASE	0x02000000
-> 
-> > +/* DM365 base addresses */
-> > +#define DM365_ASYNC_EMIF_CONTROL_BASE	0x01d10000
-> > +#define DM365_ASYNC_EMIF_DATA_CE0_BASE	0x02000000
-> > +#define DM365_ASYNC_EMIF_DATA_CE1_BASE	0x04000000
-> 
->     Note that DM355/365 EMIF CE0/1 bases are similar -- perhaps it's worth to have the single definition for them now, like DM3X5_ASYNC_EMIF_DATA_CE<n>_BASE.
-There is only DM355 and DM365. DM3X5 has not been used anywhere till now.
-Too much generalization in naming might lead to confusion?
-I guess we will keep it as-is for the sake of clarity. What do you say?
+We have access_ok() to check for user only space.
 
-> 
-> WBR, Sergei
-> 
+> Note that pre-ARMv6 CPUs will spin over that range in 32-byte steps
+> whether or not there's a page present.
 
-Thank s and Regards,
--Manju
+You are right, the pre-v6 hardware would not trigger a fault. So if we
+don't want another #ifdef in this function, we just keep the vma checks
+for all architecture versions.
+
+But I consider that the original patch is still valid.
+
+-- 
+Catalin
