@@ -1,125 +1,39 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Thu, 17 Nov 2011 17:23:28 +0530
-Subject: [PATCH] ARM: omap_hwmod: Add a new state to handle hwmods left
- enabled at init
-In-Reply-To: <4EC4E45B.5080106@ti.com>
-References: <1321524690-10302-1-git-send-email-rnayak@ti.com>
- <4EC4E45B.5080106@ti.com>
-Message-ID: <4EC4F5B8.1070706@ti.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Thu, 17 Nov 2011 12:10:18 +0000
+Subject: Crash when memset of shared mapped memory in ARM
+In-Reply-To: <20111116115435.GI4942@mudshark.cambridge.arm.com>
+References: <CAJ8eaTzOtgMzcZeRr6f=+WhtsykK1NZraOGBPoqGncwcAGcTyQ@mail.gmail.com>
+ <20111116084547.GG9581@n2100.arm.linux.org.uk>
+ <20111116115435.GI4942@mudshark.cambridge.arm.com>
+Message-ID: <20111117121017.GA3044@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 17 November 2011 04:09 PM, Cousson, Benoit wrote:
-> + Paul
->
-> On 11/17/2011 11:11 AM, Rajendra Nayak wrote:
->> A hwmod with a 'HWMOD_INIT_NO_IDLE' flag set, is left in
->> enabled state by the hwmod framework post the initial setup.
->> Once a real user of the device (a driver) tries to enable it
->> at a later point, the hmwod framework throws a WARN() about
->
-> typo: -------------------^
->
->> the device being already in enabled state.
->>
->> Fix this by introducing a new state '_HWMOD_STATE_ENABLED_AT_INIT'
->> to identify such devices/hwmods, so nothing but just a state
->> change to '_HWMOD_STATE_ENABLED' can be done when the device/hwmod
->> is requested to be enabled (the first time) by its driver/user.
->>
->> A good example of a such a device is an UART used as debug console.
->> The UART module needs to be kept enabled through the boot, until the
->> UART driver takes control of it, for debug prints to appear on
->> the console.
->>
->> Signed-off-by: Rajendra Nayak<rnayak@ti.com>
->> ---
->> arch/arm/mach-omap2/omap_hwmod.c | 16 ++++++++++++++--
->> arch/arm/plat-omap/include/plat/omap_hwmod.h | 1 +
->> 2 files changed, 15 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/arm/mach-omap2/omap_hwmod.c
->> b/arch/arm/mach-omap2/omap_hwmod.c
->> index d7f4623..7d94cc3 100644
->> --- a/arch/arm/mach-omap2/omap_hwmod.c
->> +++ b/arch/arm/mach-omap2/omap_hwmod.c
->> @@ -1441,6 +1441,17 @@ static int _enable(struct omap_hwmod *oh)
->>
->> pr_debug("omap_hwmod: %s: enabling\n", oh->name);
->>
->> + /*
->> + * hwmods' with HWMOD_INIT_NO_IDLE flag set, are left
->
-> Is the ' needed here? But I'm not an expert in English grammar...
+On Wed, Nov 16, 2011 at 11:54:35AM +0000, Will Deacon wrote:
+> (Replying to Russell so as to lose the -request addresses)
+> 
+> On Wed, Nov 16, 2011 at 08:45:47AM +0000, Russell King - ARM Linux wrote:
+> > Please do not spam mailing lists -request addresses when you post.  The
+> > -request addresses are there for you to give the mailing list software
+> > _instructions_ on what to do with your subscription.  It is not for
+> > posts to the mailing list.
+> 
+> For what it's worth, I was brave/daft enough to compile and run the testcase
+> with an -rc1 kernel and Linaro 11.09 filesystem on the quad A9 Versatile
+> Express:
+> 
+> root at dancing-fool:~# ./yad
+> mmap: addr 0x20000000
+> root at dancing-fool:~# ./yad
+> shm_open: File exists
+> mmap: addr 0x20000000
+> 
+> Looks like I'm missing the fireworks, despite the weirdy MAP_SHARED |
+> MAP_FIXED mmap flags.
 
-Me neither, lets ask Paul :)
+I did't see any problem on a random 3.1-rc4 kernel either on A9...
 
->
->> + * in enabled state at init.
->> + * Now that someone is really trying to enable them,
->> + * just update the state.
->> + */
->> + if (oh->_state == _HWMOD_STATE_ENABLED_AT_INIT) {
->> + oh->_state = _HWMOD_STATE_ENABLED;
->> + return 0;
->> + }
->> +
->> if (oh->_state != _HWMOD_STATE_INITIALIZED&&
->> oh->_state != _HWMOD_STATE_IDLE&&
->> oh->_state != _HWMOD_STATE_DISABLED) {
->> @@ -1449,7 +1460,6 @@ static int _enable(struct omap_hwmod *oh)
->> return -EINVAL;
->> }
->>
->> -
->
-> Not related to the patch changelog but that make senses to do it, so
-> just update the changelog.
+(Since when was MAP_SHARED "weirdy"...?)
 
-No, its just a stay change. I'll get rid of it.
-
->
->> /*
->> * If an IP contains only one HW reset line, then de-assert it in order
->> * to allow the module state transition. Otherwise the PRCM will return
->> @@ -1744,8 +1754,10 @@ static int _setup(struct omap_hwmod *oh, void
->> *data)
->> * it should be set by the core code as a runtime flag during startup
->> */
->> if ((oh->flags& HWMOD_INIT_NO_IDLE)&&
->> - (postsetup_state == _HWMOD_STATE_IDLE))
->> + (postsetup_state == _HWMOD_STATE_IDLE)) {
->> + oh->_state = _HWMOD_STATE_ENABLED_AT_INIT;
->> postsetup_state = _HWMOD_STATE_ENABLED;
->> + }
->>
->> if (postsetup_state == _HWMOD_STATE_IDLE)
->> _idle(oh);
->> diff --git a/arch/arm/plat-omap/include/plat/omap_hwmod.h
->> b/arch/arm/plat-omap/include/plat/omap_hwmod.h
->> index 1b81dfb..cd49d60 100644
->> --- a/arch/arm/plat-omap/include/plat/omap_hwmod.h
->> +++ b/arch/arm/plat-omap/include/plat/omap_hwmod.h
->> @@ -436,6 +436,7 @@ struct omap_hwmod_omap4_prcm {
->> #define _HWMOD_STATE_ENABLED 4
->> #define _HWMOD_STATE_IDLE 5
->> #define _HWMOD_STATE_DISABLED 6
->> +#define _HWMOD_STATE_ENABLED_AT_INIT 7
->
-> You should update the comment before... yeah I know, the other states
-> are not documented, but they are much more understandable than this new
-> one.
-
-Yeah, makes sense. Will add comments.
-
->
->> /**
->> * struct omap_hwmod_class - the type of an IP block
->
-> +1 Looks good to me but someone else must approve...
-> Oops, sorry its not Gerrit :-)
->
-> Acked-by: Benoit Cousson <b-cousson@ti.com>
->
-> Thanks,
-> Benoit
+Cheers
+---Dave
