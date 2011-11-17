@@ -1,117 +1,33 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Thu, 17 Nov 2011 18:48:01 +0000
-Subject: [PATCH] ARM: unwind: add unwind directives to bitops assembly
- macros
-In-Reply-To: <1321553096-11859-1-git-send-email-will.deacon@arm.com>
-References: <1321553096-11859-1-git-send-email-will.deacon@arm.com>
-Message-ID: <20111117184801.GF3044@localhost.localdomain>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Thu, 17 Nov 2011 10:51:35 -0800
+Subject: [PATCH] arm/tegra: convert tegra20 to GIC devicetree binding
+In-Reply-To: <1321542430-17971-1-git-send-email-pdeschrijver@nvidia.com>
+References: <1321542430-17971-1-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF1740D74C1E@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 17, 2011 at 06:04:56PM +0000, Will Deacon wrote:
-> The bitops functions (e.g. _test_and_set_bit) on ARM do not have unwind
-> annotations and therefore the kernel cannot backtrace out of them on a
-> fatal error (for example, NULL pointer dereference).
+Peter De Schrijver wrote at Thursday, November 17, 2011 8:07 AM:
+> Convert tegra20 IRQ intialization to the GIC devicetree binding. Modify the
+> interrupt definitions in the dts files according to
+> Documentation/devicetree/bindings/arm/gic.txt
 > 
-> This patch annotates the bitops assembly macros with UNWIND annotations
-> so that we can produce a meaningful backtrace on error.
+> Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
 
-I take it these macros aren't likely ever to get used except in the
-definition of complete functions (as in testsetbit.S etc.)?
+tegra-harmony.dts contains an interrupts property that wasn't updated,
+for the WM8903 codec.
 
-One way to make the correct behaviour explicit would be to put the
-function boilerplate into the macros instead:
+board-dt.c contains logic to search for a node with compatible of
+nvidia,tegra20-gic, and then call irq_domain_add_simple. I assume that
+logic is replaced by the new common GIC code, and so should be removed
+from board-dt.c entirely?
 
-#include <linux/linkage.h>
-#include <asm/unwind.h>
+>  	serial at 70006000 {
+>  		compatible = "nvidia,tegra20-uart";
+> -		reg = <0x70006000 0x40>;
+> +		reg = <0x70006000 0x040>;
 
-	.macro bitop name, instr
-ENTRY(\name )
-UNWIND(	.fnstart	)
-	@ stuff
-	@ bx lr / mov pc,lr
-UNWIND(	.fnend		)
-ENDPROC(\name )
-	.endm
+Here and a few other places, why change the reg property?
 
-That makes it harder to misuse the macros or to typo the ENDPROC()
-directive, as well as allowing a few lines to be eliminated from the
-other .S files.
-
-Cheers
----Dave
-
-> 
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> ---
->  arch/arm/lib/bitops.h |   10 ++++++++++
->  1 files changed, 10 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/lib/bitops.h b/arch/arm/lib/bitops.h
-> index 10d868a..640ce58 100644
-> --- a/arch/arm/lib/bitops.h
-> +++ b/arch/arm/lib/bitops.h
-> @@ -1,5 +1,8 @@
-> +#include <asm/unwind.h>
-> +
->  #if __LINUX_ARM_ARCH__ >= 6
->  	.macro	bitop, instr
-> +UNWIND(	.fnstart	)
->  	ands	ip, r1, #3
->  	strneb	r1, [ip]		@ assert word-aligned
->  	mov	r2, #1
-> @@ -13,9 +16,11 @@
->  	cmp	r0, #0
->  	bne	1b
->  	bx	lr
-> +UNWIND(	.fnend		)
->  	.endm
->  
->  	.macro	testop, instr, store
-> +UNWIND(	.fnstart	)
->  	ands	ip, r1, #3
->  	strneb	r1, [ip]		@ assert word-aligned
->  	mov	r2, #1
-> @@ -34,9 +39,11 @@
->  	cmp	r0, #0
->  	movne	r0, #1
->  2:	bx	lr
-> +UNWIND(	.fnend		)
->  	.endm
->  #else
->  	.macro	bitop, instr
-> +UNWIND(	.fnstart	)
->  	ands	ip, r1, #3
->  	strneb	r1, [ip]		@ assert word-aligned
->  	and	r2, r0, #31
-> @@ -49,6 +56,7 @@
->  	str	r2, [r1, r0, lsl #2]
->  	restore_irqs ip
->  	mov	pc, lr
-> +UNWIND(	.fnend		)
->  	.endm
->  
->  /**
-> @@ -60,6 +68,7 @@
->   * to avoid dirtying the data cache.
->   */
->  	.macro	testop, instr, store
-> +UNWIND(	.fnstart	)
->  	ands	ip, r1, #3
->  	strneb	r1, [ip]		@ assert word-aligned
->  	and	r3, r0, #31
-> @@ -73,5 +82,6 @@
->  	moveq	r0, #0
->  	restore_irqs ip
->  	mov	pc, lr
-> +UNWIND(	.fnend		)
->  	.endm
->  #endif
-> -- 
-> 1.7.4.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+-- 
+nvpublic
