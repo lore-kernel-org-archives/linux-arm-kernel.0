@@ -1,65 +1,252 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Thu, 17 Nov 2011 14:41:16 +0000
-Subject: [PATCH 3/5] ARM: vexpress: Add DT support in v2m
-In-Reply-To: <1321537813.3137.475.camel@hornet.cambridge.arm.com>
-References: <1321036026-23411-1-git-send-email-pawel.moll@arm.com>
- <1321036026-23411-4-git-send-email-pawel.moll@arm.com>
- <20111116154402.GE2073@localhost.localdomain>
- <1321461315.3137.371.camel@hornet.cambridge.arm.com>
- <20111116175757.GI2073@localhost.localdomain>
- <1321537813.3137.475.camel@hornet.cambridge.arm.com>
-Message-ID: <20111117144116.GC3044@localhost.localdomain>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Thu, 17 Nov 2011 17:07:09 +0200
+Subject: [PATCH] arm/tegra: convert tegra20 to GIC devicetree binding
+Message-ID: <1321542430-17971-1-git-send-email-pdeschrijver@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 17, 2011 at 01:50:13PM +0000, Pawel Moll wrote:
-> On Wed, 2011-11-16 at 17:57 +0000, Dave Martin wrote:
-> > > > We should specify a list of all the "standard" aliases used by the
-> > > > generic motherboard code here, since these are part of the contract
-> > > > between each board-specific device tree and the motherboard code.
-> > > > 
-> > > > Is "timer" the only one, or are there others?
-> > > 
-> > > One and only. There were more, but I got rid of them.
-> > 
-> > Are the other alises still used?  If not, we should perhaps get rid of
-> > them, or keep them on an as-needed basis only?
-> 
-> I've included the serialX and i2cX aliases purely because the other
-> boards do (including Grant's versatile dts).
-> 
-> > Since alises are by definition a point of standardisation (otherwise
-> > there's no need for an alias) I think they need to be documented alongside
-> > bindings wherever we have them.
-> 
-> You are right, but I think this is out of the vexpress scope. The
-> serialX aliases, for example, are already used by some drivers:
-> 
->    4   1788  drivers/tty/serial/atmel_serial.c <<atmel_serial_probe>>
->              ret = of_alias_get_id(np, "serial");
->    5   1301  drivers/tty/serial/imx.c <<serial_imx_probe_dt>>
->              ret = of_alias_get_id(np, "serial");
-> 
-> so it sounds like a generic policy-to-be-made.
+Convert tegra20 IRQ intialization to the GIC devicetree binding. Modify the
+interrupt definitions in the dts files according to
+Documentation/devicetree/bindings/arm/gic.txt
 
-OK, it makes sense to follow other boards in that case.  This could be
-a topic for separate discussion, but I agree it's probably out of scope
-here.
+Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
+---
+ arch/arm/boot/dts/tegra-paz00.dts |    2 +-
+ arch/arm/boot/dts/tegra20.dtsi    |   52 ++++++++++++++++++------------------
+ arch/arm/mach-tegra/irq.c         |   18 +++++++++++-
+ 3 files changed, 43 insertions(+), 29 deletions(-)
 
-> > > > For "non-interactive" config items, can we still please have comments
-> > > > indicating what the item means and how it should be used?
-> > > > 
-> > > > Such comments can be very brief, but having at least something makes the
-> > > > configs easier to understand and maintain, in my view.
-> > > 
-> > > Em, what bits do you refer to? The lines you quoted are not changed...
-> > 
-> > Hmmm, editing snafu there.
-> > 
-> > I think I was referring to the ARCH_VEXPRESS_DT item, which is defined
-> > just after the lines I quoted.
-> 
-> Ok, will do.
-
-Cheers
----Dave
+diff --git a/arch/arm/boot/dts/tegra-paz00.dts b/arch/arm/boot/dts/tegra-paz00.dts
+index 15a949f..7ff8f6f 100644
+--- a/arch/arm/boot/dts/tegra-paz00.dts
++++ b/arch/arm/boot/dts/tegra-paz00.dts
+@@ -32,7 +32,7 @@
+ 		#size-cells = <0>;
+ 		compatible = "nvidia,nvec";
+ 		reg = <0x7000C500 0x100>;
+-		interrupts = <124>;
++		interrupts = <0 92 0x04>;
+ 		clock-frequency = <80000>;
+ 		request-gpios = <&gpio 170 0>;
+ 		slave-addr = <138>;
+diff --git a/arch/arm/boot/dts/tegra20.dtsi b/arch/arm/boot/dts/tegra20.dtsi
+index 795b921..cd01b01 100644
+--- a/arch/arm/boot/dts/tegra20.dtsi
++++ b/arch/arm/boot/dts/tegra20.dtsi
+@@ -5,9 +5,9 @@
+ 	interrupt-parent = <&intc>;
+ 
+ 	intc: interrupt-controller at 50041000 {
+-		compatible = "nvidia,tegra20-gic";
++		compatible = "arm,cortex-a9-gic";
+ 		interrupt-controller;
+-		#interrupt-cells = <1>;
++		#interrupt-cells = <3>;
+ 		reg = < 0x50041000 0x1000 >,
+ 		      < 0x50040100 0x0100 >;
+ 	};
+@@ -17,7 +17,7 @@
+ 		#size-cells = <0>;
+ 		compatible = "nvidia,tegra20-i2c";
+ 		reg = <0x7000C000 0x100>;
+-		interrupts = < 70 >;
++		interrupts = < 0 38 0x04 >;
+ 	};
+ 
+ 	i2c at 7000c400 {
+@@ -25,7 +25,7 @@
+ 		#size-cells = <0>;
+ 		compatible = "nvidia,tegra20-i2c";
+ 		reg = <0x7000C400 0x100>;
+-		interrupts = < 116 >;
++		interrupts = < 0 84 0x04 >;
+ 	};
+ 
+ 	i2c at 7000c500 {
+@@ -33,7 +33,7 @@
+ 		#size-cells = <0>;
+ 		compatible = "nvidia,tegra20-i2c";
+ 		reg = <0x7000C500 0x100>;
+-		interrupts = < 124 >;
++		interrupts = < 0 92 0x04 >;
+ 	};
+ 
+ 	i2c at 7000d000 {
+@@ -41,7 +41,7 @@
+ 		#size-cells = <0>;
+ 		compatible = "nvidia,tegra20-i2c";
+ 		reg = <0x7000D000 0x200>;
+-		interrupts = < 85 >;
++		interrupts = < 0 53 0x04 >;
+ 	};
+ 
+ 	i2s at 70002800 {
+@@ -49,7 +49,7 @@
+ 		#size-cells = <0>;
+ 		compatible = "nvidia,tegra20-i2s";
+ 		reg = <0x70002800 0x200>;
+-		interrupts = < 45 >;
++		interrupts = < 0 13 0x04 >;
+ 		dma-channel = < 2 >;
+ 	};
+ 
+@@ -58,7 +58,7 @@
+ 		#size-cells = <0>;
+ 		compatible = "nvidia,tegra20-i2s";
+ 		reg = <0x70002a00 0x200>;
+-		interrupts = < 35 >;
++		interrupts = < 0 3 0x04 >;
+ 		dma-channel = < 1 >;
+ 	};
+ 
+@@ -72,7 +72,7 @@
+ 	gpio: gpio at 6000d000 {
+ 		compatible = "nvidia,tegra20-gpio";
+ 		reg = < 0x6000d000 0x1000 >;
+-		interrupts = < 64 65 66 67 87 119 121 >;
++		interrupts = < 0 32 0x04 0 33 0x04 0 34 0x04 0 35 0x04 0 55 0x04 0 87 0x04 0 89 0x04 >;
+ 		#gpio-cells = <2>;
+ 		gpio-controller;
+ 	};
+@@ -87,81 +87,81 @@
+ 
+ 	serial at 70006000 {
+ 		compatible = "nvidia,tegra20-uart";
+-		reg = <0x70006000 0x40>;
++		reg = <0x70006000 0x040>;
+ 		reg-shift = <2>;
+-		interrupts = < 68 >;
++		interrupts = < 0 36 0x04 >;
+ 	};
+ 
+ 	serial at 70006040 {
+ 		compatible = "nvidia,tegra20-uart";
+-		reg = <0x70006040 0x40>;
++		reg = <0x70006040 0x040>;
+ 		reg-shift = <2>;
+-		interrupts = < 69 >;
++		interrupts = < 0 37 0x04 >;
+ 	};
+ 
+ 	serial at 70006200 {
+ 		compatible = "nvidia,tegra20-uart";
+ 		reg = <0x70006200 0x100>;
+ 		reg-shift = <2>;
+-		interrupts = < 78 >;
++		interrupts = < 0 46 0x04 >;
+ 	};
+ 
+ 	serial at 70006300 {
+ 		compatible = "nvidia,tegra20-uart";
+ 		reg = <0x70006300 0x100>;
+ 		reg-shift = <2>;
+-		interrupts = < 122 >;
++		interrupts = < 0 90 0x04 >;
+ 	};
+ 
+ 	serial at 70006400 {
+ 		compatible = "nvidia,tegra20-uart";
+ 		reg = <0x70006400 0x100>;
+ 		reg-shift = <2>;
+-		interrupts = < 123 >;
++		interrupts = < 0 91 0x04 >;
+ 	};
+ 
+ 	sdhci at c8000000 {
+ 		compatible = "nvidia,tegra20-sdhci";
+ 		reg = <0xc8000000 0x200>;
+-		interrupts = < 46 >;
++		interrupts = < 0 14 0x04 >;
+ 	};
+ 
+ 	sdhci at c8000200 {
+ 		compatible = "nvidia,tegra20-sdhci";
+ 		reg = <0xc8000200 0x200>;
+-		interrupts = < 47 >;
++		interrupts = < 0 15 0x04 >;
+ 	};
+ 
+ 	sdhci at c8000400 {
+ 		compatible = "nvidia,tegra20-sdhci";
+ 		reg = <0xc8000400 0x200>;
+-		interrupts = < 51 >;
++		interrupts = < 0 19 0x04 >;
+ 	};
+ 
+ 	sdhci at c8000600 {
+ 		compatible = "nvidia,tegra20-sdhci";
+ 		reg = <0xc8000600 0x200>;
+-		interrupts = < 63 >;
++		interrupts = < 0 31 0x04 >;
+ 	};
+ 
+ 	usb at c5000000 {
+ 		compatible = "nvidia,tegra20-ehci", "usb-ehci";
+-		reg = <0xc5000000 0x4000>;
+-		interrupts = < 52 >;
++		reg = <0xc5000000 0x04000>;
++		interrupts = < 0 20 0x04 >;
+ 		phy_type = "utmi";
+ 	};
+ 
+ 	usb at c5004000 {
+ 		compatible = "nvidia,tegra20-ehci", "usb-ehci";
+-		reg = <0xc5004000 0x4000>;
+-		interrupts = < 53 >;
++		reg = <0xc5004000 0x04000>;
++		interrupts = < 0 21 0x04 >;
+ 		phy_type = "ulpi";
+ 	};
+ 
+ 	usb at c5008000 {
+ 		compatible = "nvidia,tegra20-ehci", "usb-ehci";
+-		reg = <0xc5008000 0x4000>;
+-		interrupts = < 129 >;
++		reg = <0xc5008000 0x04000>;
++		interrupts = < 0 97 0x04 >;
+ 		phy_type = "utmi";
+ 	};
+ };
+diff --git a/arch/arm/mach-tegra/irq.c b/arch/arm/mach-tegra/irq.c
+index 8ad82af..c6d02a4 100644
+--- a/arch/arm/mach-tegra/irq.c
++++ b/arch/arm/mach-tegra/irq.c
+@@ -21,6 +21,7 @@
+ #include <linux/interrupt.h>
+ #include <linux/irq.h>
+ #include <linux/io.h>
++#include <linux/of_irq.h>
+ 
+ #include <asm/hardware/gic.h>
+ 
+@@ -109,6 +110,11 @@ static int tegra_retrigger(struct irq_data *d)
+ 	return 1;
+ }
+ 
++static const struct of_device_id tegra_irq_match[] __initconst = {
++	{ .compatible = "arm,cortex-a9-gic", .data = gic_of_init },
++	{ /* sentinel */ }
++};
++
+ void __init tegra_init_irq(void)
+ {
+ 	int i;
+@@ -125,6 +131,14 @@ void __init tegra_init_irq(void)
+ 	gic_arch_extn.irq_unmask = tegra_unmask;
+ 	gic_arch_extn.irq_retrigger = tegra_retrigger;
+ 
+-	gic_init(0, 29, IO_ADDRESS(TEGRA_ARM_INT_DIST_BASE),
+-		 IO_ADDRESS(TEGRA_ARM_PERIF_BASE + 0x100));
++#ifdef CONFIG_OF
++	/* Check if there is a devicetree present as of_irq_init doesn't
++	 * indicate if an interrupt controller node was found.
++	 */
++	if (of_find_node_by_path("/"))
++		of_irq_init(tegra_irq_match);
++	else
++#endif
++		gic_init(0, 29, IO_ADDRESS(TEGRA_ARM_INT_DIST_BASE),
++			IO_ADDRESS(TEGRA_ARM_PERIF_BASE + 0x100));
+ }
+-- 
+1.7.7.rc0.72.g4b5ea.dirty
