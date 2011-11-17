@@ -1,77 +1,60 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 17 Nov 2011 15:43:09 +0000
-Subject: [PATCH 1/5] ARM: vexpress: Get rid of MMIO_P2V
-In-Reply-To: <1321036026-23411-2-git-send-email-pawel.moll@arm.com>
-References: <1321036026-23411-1-git-send-email-pawel.moll@arm.com>
- <1321036026-23411-2-git-send-email-pawel.moll@arm.com>
-Message-ID: <20111117154308.GS9581@n2100.arm.linux.org.uk>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 17 Nov 2011 09:44:15 -0600
+Subject: [PATCH] arm/tegra: convert tegra20 to GIC devicetree binding
+In-Reply-To: <1321542430-17971-1-git-send-email-pdeschrijver@nvidia.com>
+References: <1321542430-17971-1-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <4EC52BCF.7020609@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 11, 2011 at 06:27:02PM +0000, Pawel Moll wrote:
-> @@ -17,3 +14,12 @@ struct amba_device name##_device = {		\
->  	.irq		= IRQ_##base,		\
->  	/* .dma		= DMA_##base,*/		\
->  }
-> +
-> +/* 2MB large area for motherboard's peripherals static mapping */
-> +#define V2M_PERIPH 0xf8000000
-> +#define V2M_PERIPH_P2V(offset) ((void __iomem *)(V2M_PERIPH | (offset)))
-> +
-> +/* Tile's peripherals static mappings should start here */
-> +#define V2T_PERIPH 0xf8200000
-> +#define V2T_PERIPH_P2V(offset) ((void __iomem *)(V2T_PERIPH | (offset)))
-> +
+On 11/17/2011 09:07 AM, Peter De Schrijver wrote:
+> Convert tegra20 IRQ intialization to the GIC devicetree binding. Modify the
+> interrupt definitions in the dts files according to
+> Documentation/devicetree/bindings/arm/gic.txt
+> 
+> Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
 
-Please get rid of these blank lines at the end of files.
+One minor comment below, but otherwise:
 
-> diff --git a/arch/arm/mach-vexpress/v2m.c b/arch/arm/mach-vexpress/v2m.c
-> index 1fafc32..b84fa45 100644
-> --- a/arch/arm/mach-vexpress/v2m.c
-> +++ b/arch/arm/mach-vexpress/v2m.c
-> @@ -39,29 +39,41 @@
+Acked-by: Rob Herring <rob.herring@calxeda.com>
+
+> ---
+>  arch/arm/boot/dts/tegra-paz00.dts |    2 +-
+>  arch/arm/boot/dts/tegra20.dtsi    |   52 ++++++++++++++++++------------------
+>  arch/arm/mach-tegra/irq.c         |   18 +++++++++++-
+>  3 files changed, 43 insertions(+), 29 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/tegra-paz00.dts b/arch/arm/boot/dts/tegra-paz00.dts
+> index 15a949f..7ff8f6f 100644
+> --- a/arch/arm/boot/dts/tegra-paz00.dts
+> +++ b/arch/arm/boot/dts/tegra-paz00.dts
+> @@ -32,7 +32,7 @@
+>  		#size-cells = <0>;
+>  		compatible = "nvidia,nvec";
+>  		reg = <0x7000C500 0x100>;
+> -		interrupts = <124>;
+> +		interrupts = <0 92 0x04>;
+>  		clock-frequency = <80000>;
+>  		request-gpios = <&gpio 170 0>;
+>  		slave-addr = <138>;
+> diff --git a/arch/arm/boot/dts/tegra20.dtsi b/arch/arm/boot/dts/tegra20.dtsi
+> index 795b921..cd01b01 100644
+> --- a/arch/arm/boot/dts/tegra20.dtsi
+> +++ b/arch/arm/boot/dts/tegra20.dtsi
+> @@ -5,9 +5,9 @@
+>  	interrupt-parent = <&intc>;
 >  
->  static struct map_desc v2m_io_desc[] __initdata = {
->  	{
-> -		.virtual	= __MMIO_P2V(V2M_PA_CS7),
-> +		.virtual	= V2M_PERIPH,
->  		.pfn		= __phys_to_pfn(V2M_PA_CS7),
->  		.length		= SZ_128K,
->  		.type		= MT_DEVICE,
->  	},
->  };
->  
-> +static void __iomem *v2m_sysreg_base;
-> +
-> +
-> +
+>  	intc: interrupt-controller at 50041000 {
+> -		compatible = "nvidia,tegra20-gic";
+> +		compatible = "arm,cortex-a9-gic";
+>  		interrupt-controller;
 
-More useless blank lines.
+You should add an "interrupt-parent;" here so the gic's parent is null
+and not the gic.
 
->  static void __init v2m_timer_init(void)
->  {
-> +	void *sysctl_base;
-> +	void *timer01_base;
-
-Do you not use sparse?  __iomem.
-
-> +	unsigned int timer01_irq;
->  	u32 scctrl;
->  
-> +		sysctl_base = ioremap(V2M_SYSCTL, SZ_4K);
-> +		BUG_ON(!sysctl_base);
-> +		timer01_base = ioremap(V2M_TIMER01, SZ_4K);
-> +		BUG_ON(!timer01_base);
-> +		timer01_irq = IRQ_V2M_TIMER0;
-
-What's going on with the indentation here?
-
-> @@ -413,6 +431,10 @@ static void __init v2m_populate_ct_desc(void)
->  static void __init v2m_map_io(void)
->  {
->  	iotable_init(v2m_io_desc, ARRAY_SIZE(v2m_io_desc));
-> +
-> +	/* Will become an ioremap() when possible */
-> +	v2m_sysreg_base = V2M_PERIPH_P2V(V2M_SYSREGS);
-
-It won't if it stays here.
+Rob
+> -		#interrupt-cells = <1>;
+> +		#interrupt-cells = <3>;
+>  		reg = < 0x50041000 0x1000 >,
+>  		      < 0x50040100 0x0100 >;
+>  	};
