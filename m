@@ -1,88 +1,30 @@
-From: B29396@freescale.com (Dong Aisheng-B29396)
-Date: Thu, 17 Nov 2011 06:57:38 +0000
-Subject: [PATCH 0/3] make stmp-style devices mach-independent
-In-Reply-To: <1321440459-4527-1-git-send-email-w.sang@pengutronix.de>
-References: <1321440459-4527-1-git-send-email-w.sang@pengutronix.de>
-Message-ID: <65EE16ACC360FA4D99C96DC085B3F7722E3955@039-SN1MPN1-002.039d.mgd.msft.net>
+From: ryan.harkin@linaro.org (Ryan Harkin)
+Date: Thu, 17 Nov 2011 07:02:36 +0000
+Subject: [PATCH 1/5] ARM: vexpress: Get rid of MMIO_P2V
+In-Reply-To: <1321464634.3137.382.camel@hornet.cambridge.arm.com>
+References: <1321036026-23411-1-git-send-email-pawel.moll@arm.com>
+ <1321036026-23411-2-git-send-email-pawel.moll@arm.com>
+ <20111116153516.GB2073@localhost.localdomain>
+ <1321460205.3137.352.camel@hornet.cambridge.arm.com>
+ <20111116172815.GF2073@localhost.localdomain>
+ <1321464634.3137.382.camel@hornet.cambridge.arm.com>
+Message-ID: <1321513356.2638.1.camel@vaio.config>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Wolfram Sang [mailto:w.sang at pengutronix.de]
-> Sent: Wednesday, November 16, 2011 6:48 PM
-> To: linux-arm-kernel at lists.infradead.org
-> Cc: Sascha Hauer; Guo Shawn-R65073; Dong Aisheng-B29396; Arnd Bergmann;
-> Wolfram Sang
-> Subject: [PATCH 0/3] make stmp-style devices mach-independent
+On Wed, 2011-11-16 at 17:30 +0000, Pawel Moll wrote:
+> On Wed, 2011-11-16 at 17:28 +0000, Dave Martin wrote:
+> > > > Is there anything else blocking the building of legacy and RS1 memory
+> > > > maps into a single kernel?
+> > > > (I'm still hazy on how all the remapping stuff works, myself.)
+> > > 
+> > > This works now - I have a single binary kernel that works on both A9 and
+> > > A5 coretiles. Of course the ATAG-based support works with A9 only.
+> > 
+> > Cool -- we should get Ryan and Tixy to try it out, if they haven't already.
+> > I don't have an A5 handy...
 > 
-> It seems I haven't been following the lists too closely lately, so I
-> might have missed similar patches. Yet, I noticed some patches dealing
-> with drivers using mxs-specific features, so they need to include mach-
-> specific files which is troublesome. I started to address the problem as
-> well some time ago, so I push out the patches now as RFC to enrich the
-> discussion. The patches are rebased to linux 3.2-rc2 and are boot tested.
-> 
-> The basics: mach-mxs uses ip-cores which follow a register layout I have
-> first seen on STMP SoCs. That means, every register has four incarnations:
->  - one u32 to store a value
->  - a SET register where every 1-bit sets the corresponding bit,
->    others are unaffected
->  - similar with a CLR register
->  - and a TGL (toggle) register
-> 
-> Also, the 2 MSBs in register 0 are always the same and can be used to
-> reset the block.
-> 
-> All this is strictly speaking not mach-specific (but ip-core specific)
-> and, thus, doesn't need to be in mach-mxs/include. As I have been told,
-> mx50 and
-> mx6(?) might also use IP cores following the STMP-style; so I wondered if
-> it can't be exported like the following patch series does:
-> 
-> Introduce a stmp-style device, put the code around that in a public place
-> (currently drivers/base/; dunno if that is the best place, though), and
-> let drivers for stmp-style devices select that code.
-> 
-> Voila, mach dependency gone, reusable code introduced. Note that I didn't
-> remove the duplicated code from mach-mxs yet, first all drivers have to
-> be converted.
-> 
-> Right thing to do? If so, I'll repost properly to the right lists.
-> Fishing for feedback right now :)
+> Good idea. I'll send them instructions how to boot "DT-enabled" kernel
+> using Boot Monitor tomorrow and ask to try the series.
 
-Good thing to do.
-I think it addressed my concern which raised in another patch
-[PATCH 1/1] gpio: gpio-mxs: remove the duplicated micro define.
-
-One thing is that for some people not know the history
-between smtp and mxs, it maybe a little confused to see calling smtp_xx code
-in mxs code.
-Just as Shawn said, if we will final move to mxs in the long term,
-maybe mxs name is better, right?
-
-
-> Thanks,
-> 
->    Wolfram
-> 
-> Wolfram Sang (3):
->   drivers: base: add support for stmp-style devices
->   i2c: mxs: use global reset function
->   rtc: stmp3xxx: use global stmp_device functionality
-> 
->  drivers/base/Kconfig         |    3 ++
->  drivers/base/Makefile        |    1 +
->  drivers/base/stmp_device.c   |   80
-> ++++++++++++++++++++++++++++++++++++++++++
->  drivers/i2c/busses/Kconfig   |    1 +
->  drivers/i2c/busses/i2c-mxs.c |    9 +----
->  drivers/rtc/Kconfig          |    1 +
->  drivers/rtc/rtc-stmp3xxx.c   |   29 +++++----------
->  include/linux/stmp_device.h  |   19 ++++++++++
->  8 files changed, 117 insertions(+), 26 deletions(-)  create mode 100644
-> drivers/base/stmp_device.c  create mode 100644
-> include/linux/stmp_device.h
-> 
-> --
-> 1.7.7.1
-> 
+I have both boards here waiting your command.
