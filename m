@@ -1,37 +1,110 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Thu, 17 Nov 2011 14:38:11 +0400
-Subject: [PATCH v3 5/5] ARM: davinci: delete individual platform header
- files and use a common header
-In-Reply-To: <1321525138-3928-6-git-send-email-manjunath.hadli@ti.com>
-References: <1321525138-3928-1-git-send-email-manjunath.hadli@ti.com>
- <1321525138-3928-6-git-send-email-manjunath.hadli@ti.com>
-Message-ID: <4EC4E413.3020708@mvista.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Thu, 17 Nov 2011 11:39:23 +0100
+Subject: [PATCH] ARM: omap_hwmod: Add a new state to handle hwmods left
+ enabled at init
+In-Reply-To: <1321524690-10302-1-git-send-email-rnayak@ti.com>
+References: <1321524690-10302-1-git-send-email-rnayak@ti.com>
+Message-ID: <4EC4E45B.5080106@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
++ Paul
 
-On 17-11-2011 14:18, Manjunath Hadli wrote:
+On 11/17/2011 11:11 AM, Rajendra Nayak wrote:
+> A hwmod with a 'HWMOD_INIT_NO_IDLE' flag set, is left in
+> enabled state by the hwmod framework post the initial setup.
+> Once a real user of the device (a driver) tries to enable it
+> at a later point, the hmwod framework throws a WARN() about
 
-> include davinci_common.h file in files using the platform
+typo: -------------------^
 
-   Just davinci.h now.
-
-> header file for dm355, dm365, dm644x and dm646x and delete the
-> individual platform header files.
-
-> Signed-off-by: Manjunath Hadli<manjunath.hadli@ti.com>
-
-> diff --git a/drivers/media/video/davinci/vpif.h b/drivers/media/video/davinci/vpif.h
-> index 25036cb..1e0fef9 100644
-> --- a/drivers/media/video/davinci/vpif.h
-> +++ b/drivers/media/video/davinci/vpif.h
-> @@ -18,8 +18,7 @@
+> the device being already in enabled state.
 >
->   #include<linux/io.h>
->   #include<linux/videodev2.h>
-> -#include<mach/hardware.h>
+> Fix this by introducing a new state '_HWMOD_STATE_ENABLED_AT_INIT'
+> to identify such devices/hwmods, so nothing but just a state
+> change to '_HWMOD_STATE_ENABLED' can be done when the device/hwmod
+> is requested to be enabled (the first time) by its driver/user.
+>
+> A good example of a such a device is an UART used as debug console.
+> The UART module needs to be kept enabled through the boot, until the
+> UART driver takes control of it, for debug prints to appear on
+> the console.
+>
+> Signed-off-by: Rajendra Nayak<rnayak@ti.com>
+> ---
+>   arch/arm/mach-omap2/omap_hwmod.c             |   16 ++++++++++++++--
+>   arch/arm/plat-omap/include/plat/omap_hwmod.h |    1 +
+>   2 files changed, 15 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+> index d7f4623..7d94cc3 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod.c
+> @@ -1441,6 +1441,17 @@ static int _enable(struct omap_hwmod *oh)
+>
+>   	pr_debug("omap_hwmod: %s: enabling\n", oh->name);
+>
+> +	/*
+> +	 * hwmods' with HWMOD_INIT_NO_IDLE flag set, are left
 
-    You need to either describe this change, or do it in a sperate patch.
+Is the ' needed here? But I'm not an expert in English grammar...
 
-WBR, Sergei
+> +	 * in enabled state at init.
+> +	 * Now that someone is really trying to enable them,
+> +	 * just update the state.
+> +	 */
+> +	if (oh->_state == _HWMOD_STATE_ENABLED_AT_INIT) {
+> +		oh->_state = _HWMOD_STATE_ENABLED;
+> +		return 0;
+> +	}
+> +
+>   	if (oh->_state != _HWMOD_STATE_INITIALIZED&&
+>   	oh->_state != _HWMOD_STATE_IDLE&&
+>   	oh->_state != _HWMOD_STATE_DISABLED) {
+> @@ -1449,7 +1460,6 @@ static int _enable(struct omap_hwmod *oh)
+>   		return -EINVAL;
+>   	}
+>
+> -
+
+Not related to the patch changelog but that make senses to do it, so 
+just update the changelog.
+
+>   	/*
+>   	 * If an IP contains only one HW reset line, then de-assert it in order
+>   	 * to allow the module state transition. Otherwise the PRCM will return
+> @@ -1744,8 +1754,10 @@ static int _setup(struct omap_hwmod *oh, void *data)
+>   	 * it should be set by the core code as a runtime flag during startup
+>   	 */
+>   	if ((oh->flags&  HWMOD_INIT_NO_IDLE)&&
+> -	    (postsetup_state == _HWMOD_STATE_IDLE))
+> +	    (postsetup_state == _HWMOD_STATE_IDLE)) {
+> +		oh->_state = _HWMOD_STATE_ENABLED_AT_INIT;
+>   		postsetup_state = _HWMOD_STATE_ENABLED;
+> +	}
+>
+>   	if (postsetup_state == _HWMOD_STATE_IDLE)
+>   		_idle(oh);
+> diff --git a/arch/arm/plat-omap/include/plat/omap_hwmod.h b/arch/arm/plat-omap/include/plat/omap_hwmod.h
+> index 1b81dfb..cd49d60 100644
+> --- a/arch/arm/plat-omap/include/plat/omap_hwmod.h
+> +++ b/arch/arm/plat-omap/include/plat/omap_hwmod.h
+> @@ -436,6 +436,7 @@ struct omap_hwmod_omap4_prcm {
+>   #define _HWMOD_STATE_ENABLED			4
+>   #define _HWMOD_STATE_IDLE			5
+>   #define _HWMOD_STATE_DISABLED			6
+> +#define _HWMOD_STATE_ENABLED_AT_INIT		7
+
+You should update the comment before... yeah I know, the other states 
+are not documented, but they are much more understandable than this new one.
+
+>   /**
+>    * struct omap_hwmod_class - the type of an IP block
+
++1 Looks good to me but someone else must approve...
+Oops, sorry its not Gerrit :-)
+
+Acked-by: Benoit Cousson <b-cousson@ti.com>
+
+Thanks,
+Benoit
