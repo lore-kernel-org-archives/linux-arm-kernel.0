@@ -1,49 +1,93 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Thu, 17 Nov 2011 21:41:20 +0800
-Subject: [PATCH] ARM: l2x0: fix compile error on !CONFIG_USE_OF
-In-Reply-To: <1320864823-5015-1-git-send-email-olof@lixom.net>
-References: <1320864823-5015-1-git-send-email-olof@lixom.net>
-Message-ID: <CAGsJ_4yrHqzXeBbG6AKyzsqPjt7VLBiStqBi0wnCvFauPbuERw@mail.gmail.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Thu, 17 Nov 2011 13:47:55 +0000
+Subject: [PATCH 0/4] Consolidate identity mapping code in idmap.c
+In-Reply-To: <1321462094-6647-1-git-send-email-will.deacon@arm.com>
+References: <1321462094-6647-1-git-send-email-will.deacon@arm.com>
+Message-ID: <20111117134755.GB3044@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/11/10 Olof Johansson <olof@lixom.net>:
-> fae2b89ab1 (ARM: l2x0: add empty l2x0_of_init) adds a static inline
-> function that returns -ENODEV, but at least on tegra cache-l2x0.h is
-> included without errno.h being pulled in first, resulting in compile
-> errors if OF isn't enabled:
->
-> In file included from arch/arm/mach-tegra/common.c:26:
-> arch/arm/include/asm/hardware/cache-l2x0.h: In function 'l2x0_of_init':
-> arch/arm/include/asm/hardware/cache-l2x0.h:110: error: 'ENODEV' undeclared (first use in this function)
-> arch/arm/include/asm/hardware/cache-l2x0.h:110: error: (Each undeclared identifier is reported only once
-> arch/arm/include/asm/hardware/cache-l2x0.h:110: error: for each function it appears in.)
->
-> Add errno.h to the include file to make it self-contained.
->
-> Signed-off-by: Olof Johansson <olof@lixom.net>
-> Cc: Rob Herring <rob.herring@calxeda.com>
+On Wed, Nov 16, 2011 at 04:48:10PM +0000, Will Deacon wrote:
+> Hello,
+> 
+> This patch series consolidates the identity mapping code into idmap.c,
+> where a single set of page tables (idmap_pgd) are allocated and populated
+> at init time for use by subsystems such as soft reboot, kexec and CPU
+> suspend.
+> 
+> A new linker section (.idmap.text) is introduced so that code which
+> needs to be identity mapped can be annotated with __idmap or, if written
+> in assembly, placed there explicitly.
+> 
+> CPU suspend, cpu_*_reset and setup_mm_for_reboot are all updated to work
+> with the new mapping code.
+> 
+> This is currently based on 3.2-rc2, but will be based on Russell's reset
+> branch when it comes to merging (where the prototype of
+> setup_mm_for_reboot has changed slightly). Furthermore, I have rebased
+> my kexec series against this which I will post separately.
+> 
+> Comments welcome.
 
-Acked-by: Barry Song <baohua.song@csr.com>
+I haven't exhaustively checked every detail, but this looks like a
+cleaner, more scalabale and more robust way to handle code which needs
+to be identity-mapped compared with what we had previously; so I'm in
+favour of it.
 
-> ---
-> ?arch/arm/include/asm/hardware/cache-l2x0.h | ? ?2 ++
-> ?1 files changed, 2 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/include/asm/hardware/cache-l2x0.h b/arch/arm/include/asm/hardware/cache-l2x0.h
-> index 1db1143..7df239b 100644
-> --- a/arch/arm/include/asm/hardware/cache-l2x0.h
-> +++ b/arch/arm/include/asm/hardware/cache-l2x0.h
-> @@ -20,6 +20,8 @@
-> ?#ifndef __ASM_ARM_HARDWARE_L2X0_H
-> ?#define __ASM_ARM_HARDWARE_L2X0_H
->
-> +#include <linux/errno.h>
-> +
-> ?#define L2X0_CACHE_ID ? ? ? ? ? ? ? ? ?0x000
-> ?#define L2X0_CACHE_TYPE ? ? ? ? ? ? ? ? ? ? ? ?0x004
-> ?#define L2X0_CTRL ? ? ? ? ? ? ? ? ? ? ?0x100
-> --
-> 1.7.5.4
->
->
+FWIW
+
+Acked-by: Dave Martin <dave.martin@linaro.org>
+
+> 
+> Cheers,
+> 
+> Will
+> 
+> 
+> Will Deacon (4):
+>   ARM: idmap: populate identity map pgd at init time using .init.text
+>   ARM: suspend: use idmap_pgd instead of suspend_pgd
+>   ARM: proc-*.S: place cpu_reset functions into .idmap.text section
+>   ARM: idmap: use idmap_pgd when setting up mm for reboot
+> 
+>  arch/arm/include/asm/idmap.h      |   11 ++++++++
+>  arch/arm/kernel/sleep.S           |    2 +
+>  arch/arm/kernel/suspend.c         |   17 ++----------
+>  arch/arm/kernel/vmlinux.lds.S     |    1 +
+>  arch/arm/mm/idmap.c               |   49 ++++++++++++++++++++++++++++++-------
+>  arch/arm/mm/proc-arm1020.S        |    3 ++
+>  arch/arm/mm/proc-arm1020e.S       |    3 ++
+>  arch/arm/mm/proc-arm1022.S        |    3 ++
+>  arch/arm/mm/proc-arm1026.S        |    3 ++
+>  arch/arm/mm/proc-arm6_7.S         |    4 +++
+>  arch/arm/mm/proc-arm720.S         |    3 ++
+>  arch/arm/mm/proc-arm740.S         |    3 ++
+>  arch/arm/mm/proc-arm7tdmi.S       |    3 ++
+>  arch/arm/mm/proc-arm920.S         |    3 ++
+>  arch/arm/mm/proc-arm922.S         |    3 ++
+>  arch/arm/mm/proc-arm925.S         |    3 ++
+>  arch/arm/mm/proc-arm926.S         |    3 ++
+>  arch/arm/mm/proc-arm940.S         |    3 ++
+>  arch/arm/mm/proc-arm946.S         |    3 ++
+>  arch/arm/mm/proc-arm9tdmi.S       |    3 ++
+>  arch/arm/mm/proc-fa526.S          |    3 ++
+>  arch/arm/mm/proc-feroceon.S       |    3 ++
+>  arch/arm/mm/proc-mohawk.S         |    3 ++
+>  arch/arm/mm/proc-sa110.S          |    3 ++
+>  arch/arm/mm/proc-sa1100.S         |    3 ++
+>  arch/arm/mm/proc-v6.S             |    3 ++
+>  arch/arm/mm/proc-v7.S             |    2 +
+>  arch/arm/mm/proc-xsc3.S           |    3 ++
+>  arch/arm/mm/proc-xscale.S         |    3 ++
+>  include/asm-generic/vmlinux.lds.h |    6 ++++
+>  30 files changed, 135 insertions(+), 23 deletions(-)
+>  create mode 100644 arch/arm/include/asm/idmap.h
+> 
+> -- 
+> 1.7.4.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
