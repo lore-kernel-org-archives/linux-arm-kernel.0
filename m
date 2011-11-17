@@ -1,38 +1,21 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Thu, 17 Nov 2011 11:20:39 -0800
-Subject: [PATCH] ARM: OMAP: PM: only register TWL with voltage layer when
- device is present
-In-Reply-To: <E28AAFD00EFAA646AE3DF9B89CD24A8904BF32@DBDE01.ent.ti.com>
- (Sanjeev Premi's message of "Thu, 17 Nov 2011 13:20:04 +0000")
-References: <1320797670-21460-1-git-send-email-khilman@ti.com>
- <E28AAFD00EFAA646AE3DF9B89CD24A89036E64@DBDE01.ent.ti.com>
- <8762irg73n.fsf@ti.com>
- <E28AAFD00EFAA646AE3DF9B89CD24A8903E1A5@DBDE01.ent.ti.com>
- <874ny37hdv.fsf@ti.com>
- <E28AAFD00EFAA646AE3DF9B89CD24A8904BF32@DBDE01.ent.ti.com>
-Message-ID: <878vne5zeg.fsf@ti.com>
+From: greg@kroah.com (Greg KH)
+Date: Thu, 17 Nov 2011 11:12:06 -0800
+Subject: [PATCH 0/3] Support Samsung S5P OHCI device and driver
+In-Reply-To: <1473398.119441321339796993.JavaMail.weblogic@epml28>
+References: <1473398.119441321339796993.JavaMail.weblogic@epml28>
+Message-ID: <20111117191206.GB30586@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"Premi, Sanjeev" <premi@ti.com> writes:
+On Tue, Nov 15, 2011 at 06:49:58AM +0000, Jingoo Han wrote:
+> Hello.
+> 
+> This patch series adds USB OHCI device and initial driver for Samsung
+> S5P SoCs and is based from Linux 3.2-rc1. I have tested on SMDKV310 board
+> using EXYNOS4.
 
-[...]
+This is to be sent through some arm tree, not the usb tree, right?
 
->> 
->> If PMIC is not TWL family, then I don't expect any functions in
->> twl_common.c to be called.
->
-> This is the reason I wanted to know if the check on ".irq" in the
-> patch is sufficient. If any PMIC requires & sets "pmic_i2c_board_info.irq"
-> then both omap3_twl_init() and omap4_twl_init() will be called.
+thanks,
 
-Only TWL PMICs should be calling these functions, as they are in code
-for TWL PMICs *only*.
-
-If you have a non-TWL PMIC, then you should not be using the omap_pmic_*
-functions.
-
-Admittedly, these omap_pmic_* functions should be renamed to be clear
-that they are TWL specific.
-
-Kevin
+greg k-h
