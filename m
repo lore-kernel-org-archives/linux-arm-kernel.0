@@ -1,38 +1,38 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 17 Nov 2011 10:59:36 +0000
-Subject: [PATCH] ARM: Do not call flush_cache_user_range with mmap_sem held
-In-Reply-To: <20111117104245.GL9581@n2100.arm.linux.org.uk>
-References: <20111107172836.5615.64219.stgit@e102109-lin.cambridge.arm.com>
- <CAOesGMhWxEKUe7C4A+Xqv3RjN_u1t4k8eHWSZE4qMoBPD9=1qw@mail.gmail.com>
- <20111116235024.GH9581@n2100.arm.linux.org.uk>
- <20111117102205.GF4748@arm.com>
- <20111117104245.GL9581@n2100.arm.linux.org.uk>
-Message-ID: <20111117105935.GH4748@arm.com>
+From: hdoyu@nvidia.com (hdoyu at nvidia.com)
+Date: Thu, 17 Nov 2011 13:01:04 +0200
+Subject: [PATCH 0/3] ARM: iommu: tegra: Add initial Tegra IOMMU driver
+Message-ID: <1321527667-12923-1-git-send-email-hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 17, 2011 at 10:42:46AM +0000, Russell King - ARM Linux wrote:
-> On Thu, Nov 17, 2011 at 10:22:05AM +0000, Catalin Marinas wrote:
-> > BTW, we could even go a step further an remove the vma checks entirely,
-> > just use access_ok() since __cpuc_coherent_user_range() can handle
-> > unmapped ranges properly (though it may introduce some latency if some
-> > user app passes a 3G range but we can change the fixup code to abort the
-> > operation when it gets a fault that can't be fixed up).
-> 
-> So, do you think that it is acceptable to be able to pass into this from
-> userspace the arguments '0', '~0', '0' and have the kernel spin over the
-> entire 4G space, including IO space on any of the supported architectures.
+From: Hiroshi DOYU <hdoyu@nvidia.com>
 
-We have access_ok() to check for user only space.
+Hi,
 
-> Note that pre-ARMv6 CPUs will spin over that range in 32-byte steps
-> whether or not there's a page present.
+This patchset adds support for Tegra IOMMU driver for Tegra2/3.
 
-You are right, the pre-v6 hardware would not trigger a fault. So if we
-don't want another #ifdef in this function, we just keep the vma checks
-for all architecture versions.
+Presently this driver is specific to Tegra platform, but some of
+functionalities could be replaced with a generic IOMMU framework. This
+is expected to ease finding similarities with different platforms,
+with the intention of solving problems once in a generic framework
+which everyone can use.
 
-But I consider that the original patch is still valid.
+Originally this was developed under git://nv-tegra.nvidia.com/linux-2.6.git,
+and they are cleaned up for upstreaming.
 
--- 
-Catalin
+Hiroshi DOYU (3):
+  ARM: iommu: tegra/common: Initial support for IOVMM driver
+  ARM: iommu: tegra2: Initial support for GART driver
+  ARM: iommu: tegra3: Initial support for SMMU driver
+
+ arch/arm/mach-tegra/include/mach/iovmm.h |  283 +++++++
+ drivers/iommu/Kconfig                    |   34 +
+ drivers/iommu/Makefile                   |    3 +
+ drivers/iommu/tegra-gart.c               |  357 ++++++++
+ drivers/iommu/tegra-iovmm.c              |  936 ++++++++++++++++++++
+ drivers/iommu/tegra-smmu.c               | 1358 ++++++++++++++++++++++++++++++
+ 6 files changed, 2971 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-tegra/include/mach/iovmm.h
+ create mode 100644 drivers/iommu/tegra-gart.c
+ create mode 100644 drivers/iommu/tegra-iovmm.c
+ create mode 100644 drivers/iommu/tegra-smmu.c
