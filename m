@@ -1,156 +1,51 @@
 From: padma.kvr@gmail.com (padma venkat)
-Date: Thu, 17 Nov 2011 07:09:02 +0530
-Subject: [PATCH 1/6] ARM: SAMSUNG: Consolidation of SPI platform devices
- to plat-samsung
-In-Reply-To: <003301cca365$6e8758d0$4b960a70$%kim@samsung.com>
+Date: Thu, 17 Nov 2011 07:11:08 +0530
+Subject: [PATCH 6/6] ARM: S3C64XX: Modified according to SPI consolidation
+ work.
+In-Reply-To: <003401cca365$74c25920$5e470b60$%kim@samsung.com>
 References: <1320410634-10788-1-git-send-email-padma.v@samsung.com>
- <1320410634-10788-2-git-send-email-padma.v@samsung.com>
- <003301cca365$6e8758d0$4b960a70$%kim@samsung.com>
-Message-ID: <CAAgF-Bcs+ycmN2-McrXiZ4n3dXs5vM9oYxnkCF1G6-c+H84Nvg@mail.gmail.com>
+ <1320410634-10788-7-git-send-email-padma.v@samsung.com>
+ <20111104105710.GA12134@opensource.wolfsonmicro.com>
+ <CAAgF-Bcj3vm50YOU4Sq4cGrOE8EHixjOuFrQq-MR6FVLf7Dekg@mail.gmail.com>
+ <003401cca365$74c25920$5e470b60$%kim@samsung.com>
+Message-ID: <CAAgF-Bdt0zuGNLGq8D=-26v_8WZi6Ley=iCG7j-N03G9k+3WKw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Kukjin,
 
-On Tue, Nov 15, 2011 at 12:38 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> Padmavathi Venna wrote:
+On Tue, Nov 15, 2011 at 12:39 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> padma venkat wrote:
+>
+>> Hi Mark,
+>> On Fri, Nov 4, 2011 at 4:27 PM, Mark Brown
+> <broonie@opensource.wolfsonmicro.com> wrote:
+>> On Fri, Nov 04, 2011 at 08:43:54AM -0400, Padmavathi Venna wrote:
 >>
->> SPI platform device definitions consolidated from respective machine
->> folder to plat-samsung
->>
->> Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
->> ---
->> ?arch/arm/mach-s3c64xx/Makefile ? ? ? ? ? ? ? ? ? | ? ?1 -
->> ?arch/arm/mach-s3c64xx/dev-spi.c ? ? ? ? ? ? ? ? ?| ?172 -----------------
->> ?arch/arm/mach-s5p64x0/Makefile ? ? ? ? ? ? ? ? ? | ? ?1 -
->> ?arch/arm/mach-s5p64x0/dev-spi.c ? ? ? ? ? ? ? ? ?| ?218
-> ---------------------
->> ?arch/arm/mach-s5pc100/Makefile ? ? ? ? ? ? ? ? ? | ? ?1 -
->> ?arch/arm/mach-s5pc100/dev-spi.c ? ? ? ? ? ? ? ? ?| ?220
-> ----------------------
->> ?arch/arm/mach-s5pv210/Makefile ? ? ? ? ? ? ? ? ? | ? ?1 -
->> ?arch/arm/mach-s5pv210/dev-spi.c ? ? ? ? ? ? ? ? ?| ?169 -----------------
->> ?arch/arm/plat-samsung/Kconfig ? ? ? ? ? ? ? ? ? ?| ? 14 ++-
->> ?arch/arm/plat-samsung/devs.c ? ? ? ? ? ? ? ? ? ? | ?112 +++++++++++
->> ?arch/arm/plat-samsung/include/plat/devs.h ? ? ? ?| ? ?8 +-
->> ?arch/arm/plat-samsung/include/plat/s3c64xx-spi.h | ? 13 +-
->> ?12 files changed, 133 insertions(+), 797 deletions(-)
->> ?delete mode 100644 arch/arm/mach-s3c64xx/dev-spi.c
->> ?delete mode 100644 arch/arm/mach-s5p64x0/dev-spi.c
->> ?delete mode 100644 arch/arm/mach-s5pc100/dev-spi.c
->> ?delete mode 100644 arch/arm/mach-s5pv210/dev-spi.c
->>
+>> > +#ifdef CONFIG_S3C64XX_DEV_SPI0
+>> > +static struct s3c64xx_spi_info crag6410_spi0_pdata __initdata = {
+>> > + ? ? .cfg_gpio ? ? ? = s3c64xx_spi0_cfg_gpio,
+>> > + ? ? .fifo_lvl_mask ?= 0x7f,
+>> > + ? ? .rx_lvl_offset ?= 13,
+>> > + ? ? .tx_st_done ? ? = 21,
+>> > +};
+>> > +#endif
+>> It seems like a step backwards to have all this stuff in the individual
+>> machines - most of this (everything except cfg_gpio pretty much) is a
+>> property of the SoC silicon so should be somewhere central for the SoC.
+>> I Will?move this stuff to SPI setup files and resend the patches.
+>> Thanks
+>> Padma
 >
 > Hi Padma,
 >
-> Basically, looks good and there are some comments below.
->
-> (snip)
->
->> diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-samsung/Kconfig
->> index 313eb26..8a2b23a 100644
->> --- a/arch/arm/plat-samsung/Kconfig
->> +++ b/arch/arm/plat-samsung/Kconfig
->> @@ -226,7 +226,19 @@ config SAMSUNG_DEV_IDE
->> ? ? ? help
->> ? ? ? ? Compile in platform device definitions for IDE
->>
->> -config S3C64XX_DEV_SPI
->> +config S3C64XX_DEV_SPI0
->> + ? ? bool
->> + ? ? help
->> + ? ? ? Compile in platform device definitions for S3C64XX's type
->> + ? ? ? SPI controllers.
->> +
->> +config S3C64XX_DEV_SPI1
->> + ? ? bool
->> + ? ? help
->> + ? ? ? Compile in platform device definitions for S3C64XX's type
->> + ? ? ? SPI controllers.
->> +
->> +config S3C64XX_DEV_SPI2
->
-> Yeah, needs above config to check the channel now...but I'm thinking need to
-> sort out it anyway.
->
->> ? ? ? bool
->> ? ? ? help
->> ? ? ? ? Compile in platform device definitions for S3C64XX's type
->> diff --git a/arch/arm/plat-samsung/devs.c b/arch/arm/plat-samsung/devs.c
->> index 4ca8b57..76e374d 100644
->> --- a/arch/arm/plat-samsung/devs.c
->> +++ b/arch/arm/plat-samsung/devs.c
->> @@ -61,6 +61,7 @@
->> ?#include <plat/regs-iic.h>
->> ?#include <plat/regs-serial.h>
->> ?#include <plat/regs-spi.h>
->> +#include <plat/s3c64xx-spi.h>
->>
->> ?static u64 samsung_device_dma_mask = DMA_BIT_MASK(32);
->>
->> @@ -1461,3 +1462,114 @@ struct platform_device s3c_device_wdt = {
->> ? ? ? .resource ? ? ? = s3c_wdt_resource,
->> ?};
->> ?#endif /* CONFIG_S3C_DEV_WDT */
->> +
->> +#ifdef CONFIG_S3C64XX_DEV_SPI0
->> +static struct resource s3c64xx_spi0_resource[] = {
->> + ? ? [0] = DEFINE_RES_MEM(S3C_PA_SPI0, SZ_256),
->> + ? ? [1] = DEFINE_RES_DMA(DMACH_SPI0_TX),
->> + ? ? [2] = DEFINE_RES_DMA(DMACH_SPI0_RX),
->> + ? ? [3] = DEFINE_RES_IRQ(IRQ_SPI0),
->> +};
->> +
->> +struct platform_device s3c64xx_device_spi0 = {
->> + ? ? .name ? ? ? ? ? = "s3c64xx-spi",
->> + ? ? .id ? ? ? ? ? ? = 0,
->> + ? ? .num_resources ?= ARRAY_SIZE(s3c64xx_spi0_resource),
->> + ? ? .resource ? ? ? = s3c64xx_spi0_resource,
->> + ? ? .dev = {
->> + ? ? ? ? ? ? .dma_mask ? ? ? ? ? ? ? = &samsung_device_dma_mask,
->> + ? ? ? ? ? ? .coherent_dma_mask ? ? ?= DMA_BIT_MASK(32),
->> + ? ? },
->> +};
->> +
->> +void __init s3c64xx_spi0_set_info(struct s3c64xx_spi_info *pd,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? int src_clk_nr, int num_cs)
->
-> How about 's3c64xx_spi_set_platdata' like others in plat-samsung/devs.c?
->
->> +{
->> + ? ? if (!pd) {
->> + ? ? ? ? ? ? pr_err("%s:Need to pass platform data\n", __func__);
->> + ? ? ? ? ? ? return;
->> + ? ? }
->
-> Needs empty line here.
+> Please send text-typed e-mail when you reply :)
 Okey.
 >
->> + ? ? /* Reject invalid configuration */
->> + ? ? if (!num_cs || src_clk_nr < 0) {
->> + ? ? ? ? ? ? pr_err("%s: Invalid SPI configuration\n", __func__);
->> + ? ? ? ? ? ? return;
->> + ? ? }
->
-> Same as above.
-Okey.
->
->> + ? ? pd->num_cs = num_cs;
->> + ? ? pd->src_clk_nr = src_clk_nr;
->> + ? ? s3c_set_platdata(pd, sizeof(*pd), &s3c64xx_device_spi0);
->
-> If we know the SPI controller number here, we can merge this function to
-> just one. So how about to add it to the 'struct s3c64xx_spi_info'?
-Yes. It is good to have the controller number in the SPI Controller
-defining structure.
-So I will rebase the patches based on latest for-next branch and
-submit the patches.
-
+> And I agree with Mark, how was going on?
+I will send the patches by tomorrow.
 Thanks&Regards
 Padma
->> +}
->
-> (snip)
 >
 > Thanks.
 >
