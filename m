@@ -1,49 +1,38 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 17 Nov 2011 20:07:42 +0100
-Subject: [WISH] git-rerere handling delete/modify conflicts [Was: Re: [GIT
- PULL] ARM irqchip consolidation]
-In-Reply-To: <20111117172319.GX9581@n2100.arm.linux.org.uk>
-References: <4EC39D44.8000706@arm.com>
- <20111117172319.GX9581@n2100.arm.linux.org.uk>
-Message-ID: <20111117190742.GV30612@pengutronix.de>
+From: khilman@ti.com (Kevin Hilman)
+Date: Thu, 17 Nov 2011 11:20:39 -0800
+Subject: [PATCH] ARM: OMAP: PM: only register TWL with voltage layer when
+ device is present
+In-Reply-To: <E28AAFD00EFAA646AE3DF9B89CD24A8904BF32@DBDE01.ent.ti.com>
+ (Sanjeev Premi's message of "Thu, 17 Nov 2011 13:20:04 +0000")
+References: <1320797670-21460-1-git-send-email-khilman@ti.com>
+ <E28AAFD00EFAA646AE3DF9B89CD24A89036E64@DBDE01.ent.ti.com>
+ <8762irg73n.fsf@ti.com>
+ <E28AAFD00EFAA646AE3DF9B89CD24A8903E1A5@DBDE01.ent.ti.com>
+ <874ny37hdv.fsf@ti.com>
+ <E28AAFD00EFAA646AE3DF9B89CD24A8904BF32@DBDE01.ent.ti.com>
+Message-ID: <878vne5zeg.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 17, 2011 at 05:23:19PM +0000, Russell King - ARM Linux wrote:
-> On Wed, Nov 16, 2011 at 11:23:48AM +0000, Marc Zyngier wrote:
-> > I've collected patches converting GIC and VIC based platforms to use the
-> > MULTI_IRQ_HANDLER configuration option in a single branch (as they depend
-> > on a common patch).
-> > 
-> > It also include the patch adding non-banked support to the GIC, which is
-> > required to convert EXYNOS to MULTI_IRQ_HANDLER in a sane way (not to
-> > mention fixing obvious bugs).
-> > 
-> > If you're happy with this, feel free to pull this branch.
-> 
-> We need to sort out the conflicts between this and the arch_reset stuff
-> I'm carrying, because I'm not going to fight git from this early in the
-> cycle, dealing with stuff like this:
-> 
-> CONFLICT (delete/modify): arch/arm/mach-omap2/include/mach/omap4-common.h deleted in HEAD and modified in devel-stable. Version devel-stable of arch/arm/mach-omap2/include/mach/omap4-common.h left in tree.
-> 
-> which is immune to git rerere, and I'm sure as hell not going to keep on
-> merging this with my for-next branch.
-> 
-> Even though I've split out the conflicting cleanup commits from the
-> arch_reset() stuff, many of them still don't have acked-bys from the
-> maintainers of the affected code, so I don't feel like I can commit
-> them to being stable.
-> 
-> What we need are more responsive platform maintainers!
-and git rerere handling delete/modify conflicts. I don't know how it
-works internally, but I guess it's not trivial? Just in case it is and
-the only thing that stops you implementing it is that you don't know
-there is a need for it: voil?.
+"Premi, Sanjeev" <premi@ti.com> writes:
 
-Thanks
-Uwe
+[...]
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+>> 
+>> If PMIC is not TWL family, then I don't expect any functions in
+>> twl_common.c to be called.
+>
+> This is the reason I wanted to know if the check on ".irq" in the
+> patch is sufficient. If any PMIC requires & sets "pmic_i2c_board_info.irq"
+> then both omap3_twl_init() and omap4_twl_init() will be called.
+
+Only TWL PMICs should be calling these functions, as they are in code
+for TWL PMICs *only*.
+
+If you have a non-TWL PMIC, then you should not be using the omap_pmic_*
+functions.
+
+Admittedly, these omap_pmic_* functions should be renamed to be clear
+that they are TWL specific.
+
+Kevin
