@@ -1,74 +1,62 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 17 Nov 2011 16:55:51 +0000
-Subject: [PATCH 04/10] arm/tegra: prepare early init for multiple tegra
- variants
-In-Reply-To: <1321546766-26770-5-git-send-email-pdeschrijver@nvidia.com>
-References: <1321546766-26770-1-git-send-email-pdeschrijver@nvidia.com>
- <1321546766-26770-5-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <20111117165551.GV9581@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 17 Nov 2011 17:00:59 +0000
+Subject: [PATCH v7 01/11] ARM: mmp: fix build error on gpio
+In-Reply-To: <CAMPhdO-27ZMV+z5b8j1NEPmUMHx=6cOe0dxvDgbM+2KGeAWXKg@mail.gmail.com>
+References: <1320806851-13928-1-git-send-email-haojian.zhuang@marvell.com>
+ <201111171516.24237.arnd@arndb.de>
+ <CAMPhdO-27ZMV+z5b8j1NEPmUMHx=6cOe0dxvDgbM+2KGeAWXKg@mail.gmail.com>
+Message-ID: <201111171700.59750.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 17, 2011 at 06:19:18PM +0200, Peter De Schrijver wrote:
-> This patch splits the early init code in a common and a tegra20 specific part.
-> L2 cache initialization is generalized and discovers the cache associativity
-> at runtime. Also use arm_pm_restart instead of arm_arch_reset and reset the
-> the system using the PMC reset feature rather then the CAR system reset.
+On Thursday 17 November 2011, Eric Miao wrote:
+> On Thu, Nov 17, 2011 at 11:16 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Wednesday 09 November 2011, Haojian Zhuang wrote:
+> >> Parameters of GPIO_REG() should be assigned as volatile.
+> >>
+> >> arch/arm/plat-pxa/include/plat/gpio.h: In function ?gpio_get_value?:
+> >> arch/arm/plat-pxa/include/plat/gpio.h:12:21: error: invalid operands to
+> >> binary & (have ?void *? and ?int?)
+> >> arch/arm/plat-pxa/include/plat/gpio.h: In function ?gpio_set_value?:
+> >> arch/arm/plat-pxa/include/plat/gpio.h:21:4: error: lvalue required as
+> >> left operand of assignment
+> >> arch/arm/plat-pxa/include/plat/gpio.h:23:4: error: lvalue required as
+> >> left operand of assignment
+> >>
+> >> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+> >> ---
+> >>  arch/arm/mach-mmp/include/mach/gpio-pxa.h |    2 +-
+> >>  1 files changed, 1 insertions(+), 1 deletions(-)
+> >>
+> >> diff --git a/arch/arm/mach-mmp/include/mach/gpio-pxa.h b/arch/arm/mach-mmp/include/mach/gpio-pxa.h
+> >> index d14eeaf..99b4ce1 100644
+> >> --- a/arch/arm/mach-mmp/include/mach/gpio-pxa.h
+> >> +++ b/arch/arm/mach-mmp/include/mach/gpio-pxa.h
+> >> @@ -7,7 +7,7 @@
+> >>  #define GPIO_REGS_VIRT (APB_VIRT_BASE + 0x19000)
+> >>
+> >>  #define BANK_OFF(n)    (((n) < 3) ? (n) << 2 : 0x100 + (((n) - 3) << 2))
+> >> -#define GPIO_REG(x)    (GPIO_REGS_VIRT + (x))
+> >> +#define GPIO_REG(x)    (*(volatile u32 *)(GPIO_REGS_VIRT + (x)))
+> >>
+> >>  #define NR_BUILTIN_GPIO                IRQ_GPIO_NUM
+> >
+> > Note that this is not the correct fix, it just restores the previous
+> > state after I broke the original code in an "evil" merge commit
+> > that tried to merge the gpio branch with my patch that changed the
+> > mmio annotations.
+> >
+> > Anyway, everything seems fine now, since patch 9/11 removes the code
+> > either way.
+> 
+> Yeah, but having a patch here really helps to make a buildable
+> state of the history.
+> 
+> Shall I go ahead and send the GIT PULL with this patch? or you have
+> another idea?
 
-I'm already carrying this, and the follow-on patch to remove the
-arch_reset() from tegra entirely.
+Actually it turns out that Russell has already sent an identical
+fix upstream, and that has made it into 3.2-rc1, so I think it should
+be fine now without your patch.
 
-8<===
-ARM: restart: tegra: use new restart hook
-
-Hook these platforms restart code into the arm_pm_restart hook rather
-than using arch_reset().
-
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- arch/arm/mach-tegra/common.c              |    5 ++---
- arch/arm/mach-tegra/include/mach/system.h |    6 +++---
- 2 files changed, 5 insertions(+), 6 deletions(-)
-
-diff --git a/arch/arm/mach-tegra/common.c b/arch/arm/mach-tegra/common.c
-index 690b888..1374d10 100644
---- a/arch/arm/mach-tegra/common.c
-+++ b/arch/arm/mach-tegra/common.c
-@@ -31,9 +31,7 @@
- #include "clock.h"
- #include "fuse.h"
- 
--void (*arch_reset)(char mode, const char *cmd) = tegra_assert_system_reset;
--
--void tegra_assert_system_reset(char mode, const char *cmd)
-+static void tegra_assert_system_reset(char mode, const char *cmd)
- {
- 	void __iomem *reset = IO_ADDRESS(TEGRA_CLK_RESET_BASE + 0x04);
- 	u32 reg;
-@@ -76,6 +74,7 @@ static void __init tegra_init_cache(void)
- 
- void __init tegra_init_early(void)
- {
-+	arm_pm_restart = tegra_assert_system_reset;
- 	tegra_init_fuse();
- 	tegra_init_clock();
- 	tegra_clk_init_from_table(common_clk_init_table);
-diff --git a/arch/arm/mach-tegra/include/mach/system.h b/arch/arm/mach-tegra/include/mach/system.h
-index 027c421..b87b8a4 100644
---- a/arch/arm/mach-tegra/include/mach/system.h
-+++ b/arch/arm/mach-tegra/include/mach/system.h
-@@ -21,9 +21,9 @@
- #ifndef __MACH_TEGRA_SYSTEM_H
- #define __MACH_TEGRA_SYSTEM_H
- 
--#include <mach/iomap.h>
--
--extern void (*arch_reset)(char mode, const char *cmd);
-+static inline void arch_reset(char mode, const char *cmd)
-+{
-+}
- 
- static inline void arch_idle(void)
- {
--- 
-1.7.4.4
+	Arnd
