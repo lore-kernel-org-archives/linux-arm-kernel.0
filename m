@@ -1,30 +1,33 @@
-From: ryan.harkin@linaro.org (Ryan Harkin)
-Date: Thu, 17 Nov 2011 07:02:36 +0000
-Subject: [PATCH 1/5] ARM: vexpress: Get rid of MMIO_P2V
-In-Reply-To: <1321464634.3137.382.camel@hornet.cambridge.arm.com>
-References: <1321036026-23411-1-git-send-email-pawel.moll@arm.com>
- <1321036026-23411-2-git-send-email-pawel.moll@arm.com>
- <20111116153516.GB2073@localhost.localdomain>
- <1321460205.3137.352.camel@hornet.cambridge.arm.com>
- <20111116172815.GF2073@localhost.localdomain>
- <1321464634.3137.382.camel@hornet.cambridge.arm.com>
-Message-ID: <1321513356.2638.1.camel@vaio.config>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 17 Nov 2011 09:08:38 +0200
+Subject: [PATCH/RESEND #3 6/7] arm: omap: smartreflex: fix IRQ handling bug
+In-Reply-To: <87r51762a7.fsf@ti.com>
+References: <1321346765-16633-1-git-send-email-balbi@ti.com>
+ <1321346765-16633-7-git-send-email-balbi@ti.com>
+ <87r51762a7.fsf@ti.com>
+Message-ID: <20111117070836.GA30936@legolas.emea.dhcp.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2011-11-16 at 17:30 +0000, Pawel Moll wrote:
-> On Wed, 2011-11-16 at 17:28 +0000, Dave Martin wrote:
-> > > > Is there anything else blocking the building of legacy and RS1 memory
-> > > > maps into a single kernel?
-> > > > (I'm still hazy on how all the remapping stuff works, myself.)
-> > > 
-> > > This works now - I have a single binary kernel that works on both A9 and
-> > > A5 coretiles. Of course the ATAG-based support works with A9 only.
-> > 
-> > Cool -- we should get Ryan and Tixy to try it out, if they haven't already.
-> > I don't have an A5 handy...
+On Wed, Nov 16, 2011 at 04:06:08PM -0800, Kevin Hilman wrote:
+> Felipe Balbi <balbi@ti.com> writes:
 > 
-> Good idea. I'll send them instructions how to boot "DT-enabled" kernel
-> using Boot Monitor tomorrow and ask to try the series.
+> F> fix a bug which has been on this driver since
+> > it was added by the original commit 984aa6db
+> > which would never clear IRQSTATUS bits.
+> >
+> > Signed-off-by: Felipe Balbi <balbi@ti.com>
+> 
+> Queuing this fix for v3.2-rc (branch: for_3.2/fixes/pm)
 
-I have both boards here waiting your command.
+should it go to stable too ??
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111117/340ef8ba/attachment.sig>
