@@ -1,75 +1,36 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Thu, 17 Nov 2011 17:37:48 +0800
-Subject: [RFC 1/1] ARM: imx6q: move clock register map to
- machine_desc.map_io
-In-Reply-To: <20111117090548.GD23392@b20223-02.ap.freescale.net>
-References: <1321494612-24795-1-git-send-email-richard.zhao@linaro.org>
- <CAMPhdO8vE4cer-EQZ53VDQrZpQ1JVvus2=RpDCfdJRa7gwLUqg@mail.gmail.com>
- <20111117032012.GF14656@S2100-06.ap.freescale.net>
- <20111117084453.GK9581@n2100.arm.linux.org.uk>
- <20111117090731.GG14656@S2100-06.ap.freescale.net>
- <20111117090548.GD23392@b20223-02.ap.freescale.net>
-Message-ID: <20111117093747.GI14656@S2100-06.ap.freescale.net>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Thu, 17 Nov 2011 10:29:46 +0100
+Subject: [PATCH] arm: mx28: check for gated clocks when setting saif
+ divider
+In-Reply-To: <20111117011833.GD14656@S2100-06.ap.freescale.net>
+References: <1315650583-4793-1-git-send-email-w.sang@pengutronix.de>
+ <20111116132222.GD2596@pengutronix.de>
+ <65EE16ACC360FA4D99C96DC085B3F7722D4E65@039-SN1MPN1-002.039d.mgd.msft.net>
+ <20111116135125.GE2596@pengutronix.de>
+ <20111117011833.GD14656@S2100-06.ap.freescale.net>
+Message-ID: <20111117092946.GA2535@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 17, 2011 at 05:05:49PM +0800, Richard Zhao wrote:
-> On Thu, Nov 17, 2011 at 05:07:32PM +0800, Shawn Guo wrote:
-> > On Thu, Nov 17, 2011 at 08:44:53AM +0000, Russell King - ARM Linux wrote:
-> > > On Thu, Nov 17, 2011 at 11:20:13AM +0800, Shawn Guo wrote:
-> > > > On Thu, Nov 17, 2011 at 10:56:53AM +0800, Eric Miao wrote:
-> > > > > On Thu, Nov 17, 2011 at 9:50 AM, Richard Zhao <richard.zhao@linaro.org> wrote:
-> > > > > > If the map is in machine_desc.timer.init, the registers will not be
-> > > > > > able to access after bootup (probably after "Freeing init memory").
-> > > > > 
-> > > > > Given that devicemaps_init() does additional work after creating
-> > > > > the mapping, flushing TLB and cache, machine_desc->map_io() is
-> > > > > what I assume the best place for these static IO mappings than
-> > > > > elsewhere.
-> > > > > 
-> > > > > Shawn?
-> > > > > 
-> > > > I'm still trying to understand what happened.  I do not understand
-> > > > how the map can become unusable after "Freeing init memory".  Also
-> > > > I can not reproduce the problem on my side.
-> > > 
-> > > It's very simple.  iotable_init() allocates memory using memblock.
-> > > memblock marks the memory it allocates in its reserved map.  At the
-> > > end of map_io(), the information stored inside memblock is transferred
-> > > to bootmem and then the normal page allocator.  Once this is done,
-> > > memblock must not be changed because there is no way to couple any
-> > > further memblock allocations into the normal page allocator.
-> Thanks very much.
-> > > 
-> > > Look.  I've made this point before and I'm getting pissed off with
-> > > people who think they know better.  The callbacks in the machine
-> > > descriptor are NAMED.  They're NAMED for a reason - they have a PURPOSE
-> > > and that PURPOSE is well defined because there are DEPENDENCIES there.
-> > > They tell you what you SHOULD be doing in there.  Doing something else
-> > > will result in BAD THINGS happening.
-> > > 
-> > > If people can't understand this, then the only solution is to make the
-> > > backing functions for this stuff (like iotable_init() etc) BUG() when
-> > > they're abused.  That means adding a lot more checks and slowing down
-> > > the boot because people seem to be incapable of comprehending that
-> > > initialisation needs to be done in a well defined order.
-> > > 
-> > Russell,
+> > I chose this approach because this is the common pattern
+> > in all other clocks. There might be a better way of handling this, but
+> > then we'd need to adapt all other clocks as well. What we definately
+> > should not have is one kind of handling the 'already enabled' case for a
+> > few clocks and another kind for others.
 > > 
-> > Thanks for help understand the issue.
-> > 
-> > Richard,
-> > 
-> > Please revise the patch to introduce function like imx6q_clock_map_io()
-> > to be called in imx6q_map_io().
-> Is there any reason we need to put every module map_io into individual
-> map functions? I think map everyting we need in a single array, like we
-> did, is a good way.
-> 
-When I submitted the imx6q support, I was convinced by Arnd's comment
-that instead of putting all map_desc entries in mach-imx6q.c, defining
-them locally in the drivers using them seems clean to me.
+> What about leaving it as it is for now, and try to consolidate when
+> we rework the code for common clock framework migration?
+
+In general, very fine with me. I seem to recall saif-drivers will need a
+hack then, but Aisheng surely knows better.
 
 -- 
-Regards,
-Shawn
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111117/454a0c31/attachment.sig>
