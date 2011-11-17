@@ -1,110 +1,30 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Thu, 17 Nov 2011 11:39:23 +0100
-Subject: [PATCH] ARM: omap_hwmod: Add a new state to handle hwmods left
- enabled at init
-In-Reply-To: <1321524690-10302-1-git-send-email-rnayak@ti.com>
-References: <1321524690-10302-1-git-send-email-rnayak@ti.com>
-Message-ID: <4EC4E45B.5080106@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 17 Nov 2011 10:42:46 +0000
+Subject: [PATCH] ARM: Do not call flush_cache_user_range with mmap_sem held
+In-Reply-To: <20111117102205.GF4748@arm.com>
+References: <20111107172836.5615.64219.stgit@e102109-lin.cambridge.arm.com>
+ <CAOesGMhWxEKUe7C4A+Xqv3RjN_u1t4k8eHWSZE4qMoBPD9=1qw@mail.gmail.com>
+ <20111116235024.GH9581@n2100.arm.linux.org.uk>
+ <20111117102205.GF4748@arm.com>
+Message-ID: <20111117104245.GL9581@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ Paul
+On Thu, Nov 17, 2011 at 10:22:05AM +0000, Catalin Marinas wrote:
+> BTW, we could even go a step further an remove the vma checks entirely,
+> just use access_ok() since __cpuc_coherent_user_range() can handle
+> unmapped ranges properly (though it may introduce some latency if some
+> user app passes a 3G range but we can change the fixup code to abort the
+> operation when it gets a fault that can't be fixed up).
 
-On 11/17/2011 11:11 AM, Rajendra Nayak wrote:
-> A hwmod with a 'HWMOD_INIT_NO_IDLE' flag set, is left in
-> enabled state by the hwmod framework post the initial setup.
-> Once a real user of the device (a driver) tries to enable it
-> at a later point, the hmwod framework throws a WARN() about
+So, do you think that it is acceptable to be able to pass into this from
+userspace the arguments '0', '~0', '0' and have the kernel spin over the
+entire 4G space, including IO space on any of the supported architectures.
 
-typo: -------------------^
+Note that pre-ARMv6 CPUs will spin over that range in 32-byte steps
+whether or not there's a page present.
 
-> the device being already in enabled state.
->
-> Fix this by introducing a new state '_HWMOD_STATE_ENABLED_AT_INIT'
-> to identify such devices/hwmods, so nothing but just a state
-> change to '_HWMOD_STATE_ENABLED' can be done when the device/hwmod
-> is requested to be enabled (the first time) by its driver/user.
->
-> A good example of a such a device is an UART used as debug console.
-> The UART module needs to be kept enabled through the boot, until the
-> UART driver takes control of it, for debug prints to appear on
-> the console.
->
-> Signed-off-by: Rajendra Nayak<rnayak@ti.com>
-> ---
->   arch/arm/mach-omap2/omap_hwmod.c             |   16 ++++++++++++++--
->   arch/arm/plat-omap/include/plat/omap_hwmod.h |    1 +
->   2 files changed, 15 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-> index d7f4623..7d94cc3 100644
-> --- a/arch/arm/mach-omap2/omap_hwmod.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod.c
-> @@ -1441,6 +1441,17 @@ static int _enable(struct omap_hwmod *oh)
->
->   	pr_debug("omap_hwmod: %s: enabling\n", oh->name);
->
-> +	/*
-> +	 * hwmods' with HWMOD_INIT_NO_IDLE flag set, are left
+Note that this can starve other threads in the system from running.  That's
+a great local DoS attack possible from any priviledge level.
 
-Is the ' needed here? But I'm not an expert in English grammar...
-
-> +	 * in enabled state at init.
-> +	 * Now that someone is really trying to enable them,
-> +	 * just update the state.
-> +	 */
-> +	if (oh->_state == _HWMOD_STATE_ENABLED_AT_INIT) {
-> +		oh->_state = _HWMOD_STATE_ENABLED;
-> +		return 0;
-> +	}
-> +
->   	if (oh->_state != _HWMOD_STATE_INITIALIZED&&
->   	oh->_state != _HWMOD_STATE_IDLE&&
->   	oh->_state != _HWMOD_STATE_DISABLED) {
-> @@ -1449,7 +1460,6 @@ static int _enable(struct omap_hwmod *oh)
->   		return -EINVAL;
->   	}
->
-> -
-
-Not related to the patch changelog but that make senses to do it, so 
-just update the changelog.
-
->   	/*
->   	 * If an IP contains only one HW reset line, then de-assert it in order
->   	 * to allow the module state transition. Otherwise the PRCM will return
-> @@ -1744,8 +1754,10 @@ static int _setup(struct omap_hwmod *oh, void *data)
->   	 * it should be set by the core code as a runtime flag during startup
->   	 */
->   	if ((oh->flags&  HWMOD_INIT_NO_IDLE)&&
-> -	    (postsetup_state == _HWMOD_STATE_IDLE))
-> +	    (postsetup_state == _HWMOD_STATE_IDLE)) {
-> +		oh->_state = _HWMOD_STATE_ENABLED_AT_INIT;
->   		postsetup_state = _HWMOD_STATE_ENABLED;
-> +	}
->
->   	if (postsetup_state == _HWMOD_STATE_IDLE)
->   		_idle(oh);
-> diff --git a/arch/arm/plat-omap/include/plat/omap_hwmod.h b/arch/arm/plat-omap/include/plat/omap_hwmod.h
-> index 1b81dfb..cd49d60 100644
-> --- a/arch/arm/plat-omap/include/plat/omap_hwmod.h
-> +++ b/arch/arm/plat-omap/include/plat/omap_hwmod.h
-> @@ -436,6 +436,7 @@ struct omap_hwmod_omap4_prcm {
->   #define _HWMOD_STATE_ENABLED			4
->   #define _HWMOD_STATE_IDLE			5
->   #define _HWMOD_STATE_DISABLED			6
-> +#define _HWMOD_STATE_ENABLED_AT_INIT		7
-
-You should update the comment before... yeah I know, the other states 
-are not documented, but they are much more understandable than this new one.
-
->   /**
->    * struct omap_hwmod_class - the type of an IP block
-
-+1 Looks good to me but someone else must approve...
-Oops, sorry its not Gerrit :-)
-
-Acked-by: Benoit Cousson <b-cousson@ti.com>
-
-Thanks,
-Benoit
+That's why the VMA checks were added 9 years ago.
