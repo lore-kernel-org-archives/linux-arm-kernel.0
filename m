@@ -1,47 +1,59 @@
-From: B29396@freescale.com (Dong Aisheng-B29396)
-Date: Thu, 17 Nov 2011 09:42:00 +0000
-Subject: [PATCH] arm: mx28: check for gated clocks when setting saif
- divider
-In-Reply-To: <20111117092946.GA2535@pengutronix.de>
-References: <1315650583-4793-1-git-send-email-w.sang@pengutronix.de>
- <20111116132222.GD2596@pengutronix.de>
- <65EE16ACC360FA4D99C96DC085B3F7722D4E65@039-SN1MPN1-002.039d.mgd.msft.net>
- <20111116135125.GE2596@pengutronix.de>
- <20111117011833.GD14656@S2100-06.ap.freescale.net>
- <20111117092946.GA2535@pengutronix.de>
-Message-ID: <65EE16ACC360FA4D99C96DC085B3F7722E3B2F@039-SN1MPN1-002.039d.mgd.msft.net>
+From: tarun.kanti@ti.com (DebBarma, Tarun Kanti)
+Date: Thu, 17 Nov 2011 15:12:26 +0530
+Subject: [PATCH v16 09/12] OMAP: dmtimer: low-power mode support
+In-Reply-To: <CAPTm=KHxSvyCb4i02vnuU9Wz-0j3h+h_UvDc0An5mwb2472dPg@mail.gmail.com>
+References: <1316518227-28116-1-git-send-email-tarun.kanti@ti.com>
+ <1316518227-28116-10-git-send-email-tarun.kanti@ti.com>
+ <CAPTm=KGDEKGxLpJt0t6k_NL5Wz81NkMmRJ+OkmyvHedd6_exgQ@mail.gmail.com>
+ <CAC83ZvJSev97waAOuzoJsFTX4vmeVFxkg6BzpjQm+Tjo3cbhpg@mail.gmail.com>
+ <CAPTm=KHxSvyCb4i02vnuU9Wz-0j3h+h_UvDc0An5mwb2472dPg@mail.gmail.com>
+Message-ID: <CAC83Zv+8+gh_bvtp90s+jiQNuxLcA=R2503V9swupnA1S91L_Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Wolfram Sang [mailto:w.sang at pengutronix.de]
-> Sent: Thursday, November 17, 2011 5:30 PM
-> To: Guo Shawn-R65073
-> Cc: Dong Aisheng-B29396; linux-arm-kernel at lists.infradead.org; Sascha
-> Hauer; Guo Shawn-R65073
-> Subject: Re: [PATCH] arm: mx28: check for gated clocks when setting saif
-> divider
-> 
-> > > I chose this approach because this is the common pattern in all
-> > > other clocks. There might be a better way of handling this, but then
-> > > we'd need to adapt all other clocks as well. What we definately
-> > > should not have is one kind of handling the 'already enabled' case
-> > > for a few clocks and another kind for others.
-> > >
-> > What about leaving it as it is for now, and try to consolidate when we
-> > rework the code for common clock framework migration?
-> 
-> In general, very fine with me. I seem to recall saif-drivers will need a
-> hack then, but Aisheng surely knows better.
-> 
-Yes, saif driver enables clock until trigger happens. Before that,
-it needs set the clock rate as preparation.
-Obviously, it cannot work since current clock code does not allow to set rate
-before the clock is enabled.
-
-My consider is that can my mxs-specific patchs adding record support go in first
-since it's only related to clock driver?
-Then this clock issue can be fixed later when move to common clock.
-
-Regards
-Dong Aisheng 
+On Thu, Nov 17, 2011 at 6:23 AM, Omar Ramirez Luna <or.rmz1@gmail.com> wrote:
+> On Wed, Nov 16, 2011 at 12:18 AM, DebBarma, Tarun Kanti
+> <tarun.kanti@ti.com> wrote:
+> ...
+>>> My use case is as follows:
+>>>
+>>> DSP sends a mailbox message to ARM, this triggers a tasklet in mailbox
+>>> for processing the message, when it reaches tidspbridge it turns out
+>>> that the DSP wants to enable a gpt timer; however, locks involved
+>>> "clocks_mutex" and "dm_timer_lock" now could cause a deadlock as they
+>>> have been called from unsafe contexts in the past
+>>> (http://pastebin.com/7Dtz8t0f).
+>>>
+>>> Is the intention to restrict enabling the dmtimer clocks from hard|soft irqs?
+>> The aim is to prevent client drivers perform clock enable/disable independently.
+>> Instead just use the request/start/stop APIs. In that way we can make clock
+>> enable/disable functions static in the future.
+>
+> Those are the APIs I'm using, omap_dm_timer_request_specific from a
+> softirq triggers this warning, this was not hinted by the patch or
+> cover letter of the series, hence the question:
+>
+> Was this change intentional? Does omap_dm_timer_request_specific
+> should be allowed on other contexts (soft|hard irq)?
+omap_dm_timer_request_specific() uses spin_lock_irqsave and
+spin_unlock_irqrestore
+to protect the timer list. There is nothing specific to prevent this
+function from being
+called from interrupt context. But you probably have to be careful to
+avoid deadlock
+in the interrupt context by disabling interrupts appropriately so that
+we avoid trying
+to re-acquire the lock. If you send me the code snippet I can have a look.
+--
+Tarun
+>
+> ...
+>> You are right. This change some how got missed in mainline.
+>> I have posted a patch for this already.
+>
+> Ok.
+>
+> Regards,
+>
+> Omar
+>
