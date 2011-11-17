@@ -1,8 +1,8 @@
 From: rnayak@ti.com (Rajendra Nayak)
-Date: Thu, 17 Nov 2011 15:40:31 +0530
-Subject: [PATCH 1/3] ARM: omap_hwmod: Add a new state to handle hwmods left
+Date: Thu, 17 Nov 2011 15:41:30 +0530
+Subject: [PATCH] ARM: omap_hwmod: Add a new state to handle hwmods left
  enabled at init
-Message-ID: <1321524631-10249-1-git-send-email-rnayak@ti.com>
+Message-ID: <1321524690-10302-1-git-send-email-rnayak@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
