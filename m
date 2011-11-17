@@ -1,38 +1,47 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Thu, 17 Nov 2011 11:32:40 +0100
-Subject: [PATCH 0/3] make stmp-style devices mach-independent
-In-Reply-To: <20111117014946.GE14656@S2100-06.ap.freescale.net>
-References: <1321440459-4527-1-git-send-email-w.sang@pengutronix.de>
- <20111117014946.GE14656@S2100-06.ap.freescale.net>
-Message-ID: <20111117103240.GE2535@pengutronix.de>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Thu, 17 Nov 2011 14:35:49 +0400
+Subject: [PATCH v3 4/5] ARM: davinci: create new common platform header
+ for davinci
+In-Reply-To: <1321525138-3928-5-git-send-email-manjunath.hadli@ti.com>
+References: <1321525138-3928-1-git-send-email-manjunath.hadli@ti.com>
+ <1321525138-3928-5-git-send-email-manjunath.hadli@ti.com>
+Message-ID: <4EC4E385.7030101@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > Right thing to do?
-> 
-> I think it's the right thing to do.  But I do not like the name as
-> stmp-style device.  Why not just mxs-style device?  Name mxs is born
-> to replace stmp, and keeping using two names may confuse people.
+Hello.
 
-I chose it because it was the first platform where I saw this kind of
-layout. I don't like it too much as well, but couldn't find any better.
-What I liked about it being different to 'mxs' is that you could easily
-grep which drivers still need to be converted :) I am also not sure if
-it is less confusing if you have mxs-style devices (compared to
-stmp-style devices) on, say, MX6. Something platform-independent would
-be cool...
+On 17-11-2011 14:18, Manjunath Hadli wrote:
 
-Thanks,
+> remove the code from individual platform header files for
+> dm365, dm355, dm644x and dm646x and consolidate it into a
+> single and common header file davinci_common.h.
+> Include the new header file in individual platform header
+> files as a pre-cursor for deleting these headers in follow
+> up patches.
 
-   Wolfram
+> Signed-off-by: Manjunath Hadli<manjunath.hadli@ti.com>
 
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111117/e6f443f0/attachment.sig>
+    Sorry, didn't notice something in the first review...
+
+> diff --git a/arch/arm/mach-davinci/include/mach/davinci.h b/arch/arm/mach-davinci/include/mach/davinci.h
+> new file mode 100644
+> index 0000000..49bf2f3
+> --- /dev/null
+> +++ b/arch/arm/mach-davinci/include/mach/davinci.h
+> @@ -0,0 +1,88 @@
+> +/*
+> + * This file contains the processor specific definitions
+> + * of the TI DM644x, DM355, DM365, and DM646X.
+
+    DM646x for consistency.
+
+> +/* DM644X function declarations */
+
+    DM644x for consistency.
+
+> +/* DM646X function declarations */
+
+    DM646x for consistency.
+
+WBR, Sergei
