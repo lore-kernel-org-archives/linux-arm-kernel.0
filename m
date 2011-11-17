@@ -1,69 +1,99 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 17 Nov 2011 16:05:37 +0000
-Subject: [PATCH 3/5] ARM: vexpress: Add DT support in v2m
-In-Reply-To: <1321036026-23411-4-git-send-email-pawel.moll@arm.com>
-References: <1321036026-23411-1-git-send-email-pawel.moll@arm.com>
- <1321036026-23411-4-git-send-email-pawel.moll@arm.com>
-Message-ID: <20111117160536.GU9581@n2100.arm.linux.org.uk>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Thu, 17 Nov 2011 18:19:16 +0200
+Subject: [PATCH 02/10] arm/tegra: cleanup tegra20 support
+In-Reply-To: <1321546766-26770-1-git-send-email-pdeschrijver@nvidia.com>
+References: <1321546766-26770-1-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <1321546766-26770-3-git-send-email-pdeschrijver@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 11, 2011 at 06:27:04PM +0000, Pawel Moll wrote:
-> +#if defined(CONFIG_ARCH_VEXPRESS_DT)
-> +		int err;
-> +		const char *path;
-> +		struct device_node *node;
-> +
-> +		node = of_find_compatible_node(NULL, NULL, "arm,sp810");
-> +		BUG_ON(!node);
-> +		sysctl_base = of_iomap(node, 0);
-> +		BUG_ON(!sysctl_base);
-> +
-> +		err = of_property_read_string(of_aliases, "timer", &path);
-> +		BUG_ON(err);
-> +		node = of_find_node_by_path(path);
-> +		BUG_ON(!node);
-> +		timer01_base = of_iomap(node, 0);
-> +		BUG_ON(!timer01_base);
-> +		timer01_irq = irq_of_parse_and_map(node, 0);
+* add a dependency to ARCH_TEGRA_2x_SOC in Kconfig to all tegra20 based boards
+  and TEGRA_PCI
+* make powergating dependent on ARCH_TEGRA_2x_SOC
+* remove dependency on ARCH_TEGRA_2x_SOC for clock.c
 
-Are you sure you have enough BUG_ON()s there?  It's well worth reading
-Linus' various messages on the use of BUG(), which can be found:
+Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
+---
+ arch/arm/mach-tegra/Kconfig  |    8 ++++++++
+ arch/arm/mach-tegra/Makefile |    3 +--
+ 2 files changed, 9 insertions(+), 2 deletions(-)
 
-	http://yarchive.net/comp/linux/BUG.html
-
-The lack of the timer and sysctl registers are really a 'report and maybe
-we could get a message out' kind of scenario rather than a 'oops, kill
-the machine'.
-
-> +#endif
-> +	} else {
->  		sysctl_base = ioremap(V2M_SYSCTL, SZ_4K);
->  		BUG_ON(!sysctl_base);
->  		timer01_base = ioremap(V2M_TIMER01, SZ_4K);
->  		BUG_ON(!timer01_base);
->  		timer01_irq = IRQ_V2M_TIMER0;
-> +	}
-
-And in any case, both these paths have a common set of BUG_ON()s:
-	BUG_ON(!sysctl_base);
-	BUG_ON(!timer01_base);
-
-So do we really need them having this independently?
-
-> @@ -383,11 +412,18 @@ static struct clk_lookup v2m_lookups[] = {
->  	},
->  };
->  
-> +static void __init v2m_system_id(void)
-> +{
-> +	if (!system_rev)
-> +		system_rev = readl(v2m_sysreg_base + V2M_SYS_ID);
-
-You do understand that system_rev is for the system _revision_ not for
-some kind of system ID.  For example, it's to identify whether we're on
-a revision 4, 5 or 6 system.
-
-However, with DT the differences in system revision should be encoded
-into the DT itself, and the kernel should not be making choices about
-the hardware off this.
+diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
+index 91aff7c..2b1d49b 100644
+--- a/arch/arm/mach-tegra/Kconfig
++++ b/arch/arm/mach-tegra/Kconfig
+@@ -21,18 +21,21 @@ endchoice
+ 
+ config TEGRA_PCI
+ 	bool "PCI Express support"
++	depends on ARCH_TEGRA_2x_SOC
+ 	select PCI
+ 
+ comment "Tegra board type"
+ 
+ config MACH_HARMONY
+        bool "Harmony board"
++       depends on ARCH_TEGRA_2x_SOC
+        select MACH_HAS_SND_SOC_TEGRA_WM8903 if SND_SOC
+        help
+          Support for nVidia Harmony development platform
+ 
+ config MACH_KAEN
+        bool "Kaen board"
++       depends on ARCH_TEGRA_2x_SOC
+        select MACH_SEABOARD
+        select MACH_HAS_SND_SOC_TEGRA_WM8903 if SND_SOC
+        help
+@@ -40,11 +43,13 @@ config MACH_KAEN
+ 
+ config MACH_PAZ00
+        bool "Paz00 board"
++       depends on ARCH_TEGRA_2x_SOC
+        help
+          Support for the Toshiba AC100/Dynabook AZ netbook
+ 
+ config MACH_SEABOARD
+        bool "Seaboard board"
++       depends on ARCH_TEGRA_2x_SOC
+        select MACH_HAS_SND_SOC_TEGRA_WM8903 if SND_SOC
+        help
+          Support for nVidia Seaboard development platform. It will
+@@ -59,18 +64,21 @@ config MACH_TEGRA_DT
+ 
+ config MACH_TRIMSLICE
+        bool "TrimSlice board"
++       depends on ARCH_TEGRA_2x_SOC
+        select TEGRA_PCI
+        help
+          Support for CompuLab TrimSlice platform
+ 
+ config MACH_WARIO
+        bool "Wario board"
++       depends on ARCH_TEGRA_2x_SOC
+        select MACH_SEABOARD
+        help
+          Support for the Wario version of Seaboard
+ 
+ config MACH_VENTANA
+        bool "Ventana board"
++       depends on ARCH_TEGRA_2x_SOC
+        select MACH_TEGRA_DT
+        help
+          Support for the nVidia Ventana development platform
+diff --git a/arch/arm/mach-tegra/Makefile b/arch/arm/mach-tegra/Makefile
+index c9ec38e..26ff456 100644
+--- a/arch/arm/mach-tegra/Makefile
++++ b/arch/arm/mach-tegra/Makefile
+@@ -5,9 +5,8 @@ obj-y                                   += irq.o
+ obj-y                                   += clock.o
+ obj-y                                   += timer.o
+ obj-y                                   += pinmux.o
+-obj-y                                   += powergate.o
+ obj-y					+= fuse.o
+-obj-$(CONFIG_ARCH_TEGRA_2x_SOC)         += clock.o
++obj-$(CONFIG_ARCH_TEGRA_2x_SOC)		+= powergate.o
+ obj-$(CONFIG_ARCH_TEGRA_2x_SOC)         += tegra2_clocks.o
+ obj-$(CONFIG_ARCH_TEGRA_2x_SOC)		+= tegra2_emc.o
+ obj-$(CONFIG_ARCH_TEGRA_2x_SOC)		+= pinmux-t2-tables.o
+-- 
+1.7.7.rc0.72.g4b5ea.dirty
