@@ -1,55 +1,58 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Thu, 17 Nov 2011 23:33:23 +0800
-Subject: [PATCH v7 01/11] ARM: mmp: fix build error on gpio
-In-Reply-To: <201111171516.24237.arnd@arndb.de>
-References: <1320806851-13928-1-git-send-email-haojian.zhuang@marvell.com>
- <1320806851-13928-2-git-send-email-haojian.zhuang@marvell.com>
- <201111171516.24237.arnd@arndb.de>
-Message-ID: <CAMPhdO-27ZMV+z5b8j1NEPmUMHx=6cOe0dxvDgbM+2KGeAWXKg@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 17 Nov 2011 15:36:24 +0000
+Subject: [PATCH 4/5] ARM: vexpress: Initial RS1 memory map support
+In-Reply-To: <1321036026-23411-5-git-send-email-pawel.moll@arm.com>
+References: <1321036026-23411-1-git-send-email-pawel.moll@arm.com>
+ <1321036026-23411-5-git-send-email-pawel.moll@arm.com>
+Message-ID: <20111117153624.GR9581@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 17, 2011 at 11:16 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Wednesday 09 November 2011, Haojian Zhuang wrote:
->> Parameters of GPIO_REG() should be assigned as volatile.
->>
->> arch/arm/plat-pxa/include/plat/gpio.h: In function ?gpio_get_value?:
->> arch/arm/plat-pxa/include/plat/gpio.h:12:21: error: invalid operands to
->> binary & (have ?void *? and ?int?)
->> arch/arm/plat-pxa/include/plat/gpio.h: In function ?gpio_set_value?:
->> arch/arm/plat-pxa/include/plat/gpio.h:21:4: error: lvalue required as
->> left operand of assignment
->> arch/arm/plat-pxa/include/plat/gpio.h:23:4: error: lvalue required as
->> left operand of assignment
->>
->> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
->> ---
->> ?arch/arm/mach-mmp/include/mach/gpio-pxa.h | ? ?2 +-
->> ?1 files changed, 1 insertions(+), 1 deletions(-)
->>
->> diff --git a/arch/arm/mach-mmp/include/mach/gpio-pxa.h b/arch/arm/mach-mmp/include/mach/gpio-pxa.h
->> index d14eeaf..99b4ce1 100644
->> --- a/arch/arm/mach-mmp/include/mach/gpio-pxa.h
->> +++ b/arch/arm/mach-mmp/include/mach/gpio-pxa.h
->> @@ -7,7 +7,7 @@
->> ?#define GPIO_REGS_VIRT (APB_VIRT_BASE + 0x19000)
->>
->> ?#define BANK_OFF(n) ? ?(((n) < 3) ? (n) << 2 : 0x100 + (((n) - 3) << 2))
->> -#define GPIO_REG(x) ? ?(GPIO_REGS_VIRT + (x))
->> +#define GPIO_REG(x) ? ?(*(volatile u32 *)(GPIO_REGS_VIRT + (x)))
->>
->> ?#define NR_BUILTIN_GPIO ? ? ? ? ? ? ? ?IRQ_GPIO_NUM
->
-> Note that this is not the correct fix, it just restores the previous
-> state after I broke the original code in an "evil" merge commit
-> that tried to merge the gpio branch with my patch that changed the
-> mmio annotations.
->
-> Anyway, everything seems fine now, since patch 9/11 removes the code
-> either way.
+On Fri, Nov 11, 2011 at 06:27:05PM +0000, Pawel Moll wrote:
+> diff --git a/arch/arm/mach-vexpress/Kconfig b/arch/arm/mach-vexpress/Kconfig
+> index 4c11e90..d1b0f35 100644
+> --- a/arch/arm/mach-vexpress/Kconfig
+> +++ b/arch/arm/mach-vexpress/Kconfig
+> @@ -1,6 +1,14 @@
+>  menu "Versatile Express platform type"
+>  	depends on ARCH_VEXPRESS
+>  
+> +config ARCH_VEXPRESS_LEGACY
+> +	bool
+> +	select AUTO_ZRELADDR
+> +	select ARM_PATCH_PHYS_VIRT
+> +
+> +config ARCH_VEXPRESS_RS1
+> +	bool
+> +
+>  config ARCH_VEXPRESS_CA9X4
+>  	bool "Versatile Express Cortex-A9x4 tile"
+>  	select CPU_V7
+> @@ -8,6 +16,7 @@ config ARCH_VEXPRESS_CA9X4
+>  	select ARM_ERRATA_720789
+>  	select ARM_ERRATA_751472
+>  	select ARM_ERRATA_753970
+> +	select ARCH_VEXPRESS_LEGACY
 
-Yeah, but having a patch here really helps to make a buildable
-state of the history.
+This doesn't make sense.  Why should CA9x4 be forced to use the P2V stuff
+and the AUTO_ZRELADDR stuff?  Hint: it works fine today without.
 
-Shall I go ahead and send the GIT PULL with this patch? or you have
-another idea?
+>  
+>  config ARCH_VEXPRESS_DT
+>  	bool
+> diff --git a/arch/arm/mach-vexpress/Makefile.boot b/arch/arm/mach-vexpress/Makefile.boot
+> index 8630b3d..3278615 100644
+> --- a/arch/arm/mach-vexpress/Makefile.boot
+> +++ b/arch/arm/mach-vexpress/Makefile.boot
+> @@ -1,3 +1,3 @@
+> -   zreladdr-y	+= 0x60008000
+> -params_phys-y	:= 0x60000100
+> -initrd_phys-y	:= 0x60800000
+> +   zreladdr-y	+= 0x80008000
+> +params_phys-y	:= 0x80000100
+> +initrd_phys-y	:= 0x80800000
+
+So is this the reason - you don't want to turn this into a config, so you
+want to force all the automatic zreladdr stuff on?  You do know that this
+will probably cause uboot to load the uImage at 0x80008000 instead of
+0x60008000, and therefore we'll lose half the RAM on this board?
