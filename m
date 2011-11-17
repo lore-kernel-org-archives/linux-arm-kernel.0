@@ -1,11 +1,11 @@
 From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Thu, 17 Nov 2011 14:35:49 +0400
-Subject: [PATCH v3 4/5] ARM: davinci: create new common platform header
- for davinci
-In-Reply-To: <1321525138-3928-5-git-send-email-manjunath.hadli@ti.com>
+Date: Thu, 17 Nov 2011 14:38:11 +0400
+Subject: [PATCH v3 5/5] ARM: davinci: delete individual platform header
+ files and use a common header
+In-Reply-To: <1321525138-3928-6-git-send-email-manjunath.hadli@ti.com>
 References: <1321525138-3928-1-git-send-email-manjunath.hadli@ti.com>
- <1321525138-3928-5-git-send-email-manjunath.hadli@ti.com>
-Message-ID: <4EC4E385.7030101@mvista.com>
+ <1321525138-3928-6-git-send-email-manjunath.hadli@ti.com>
+Message-ID: <4EC4E413.3020708@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,35 +13,25 @@ Hello.
 
 On 17-11-2011 14:18, Manjunath Hadli wrote:
 
-> remove the code from individual platform header files for
-> dm365, dm355, dm644x and dm646x and consolidate it into a
-> single and common header file davinci_common.h.
-> Include the new header file in individual platform header
-> files as a pre-cursor for deleting these headers in follow
-> up patches.
+> include davinci_common.h file in files using the platform
+
+   Just davinci.h now.
+
+> header file for dm355, dm365, dm644x and dm646x and delete the
+> individual platform header files.
 
 > Signed-off-by: Manjunath Hadli<manjunath.hadli@ti.com>
 
-    Sorry, didn't notice something in the first review...
+> diff --git a/drivers/media/video/davinci/vpif.h b/drivers/media/video/davinci/vpif.h
+> index 25036cb..1e0fef9 100644
+> --- a/drivers/media/video/davinci/vpif.h
+> +++ b/drivers/media/video/davinci/vpif.h
+> @@ -18,8 +18,7 @@
+>
+>   #include<linux/io.h>
+>   #include<linux/videodev2.h>
+> -#include<mach/hardware.h>
 
-> diff --git a/arch/arm/mach-davinci/include/mach/davinci.h b/arch/arm/mach-davinci/include/mach/davinci.h
-> new file mode 100644
-> index 0000000..49bf2f3
-> --- /dev/null
-> +++ b/arch/arm/mach-davinci/include/mach/davinci.h
-> @@ -0,0 +1,88 @@
-> +/*
-> + * This file contains the processor specific definitions
-> + * of the TI DM644x, DM355, DM365, and DM646X.
-
-    DM646x for consistency.
-
-> +/* DM644X function declarations */
-
-    DM644x for consistency.
-
-> +/* DM646X function declarations */
-
-    DM646x for consistency.
+    You need to either describe this change, or do it in a sperate patch.
 
 WBR, Sergei
