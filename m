@@ -1,38 +1,38 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 17 Nov 2011 10:26:23 +0000
-Subject: [PATCH] ARM: Do not call flush_cache_user_range with mmap_sem held
-In-Reply-To: <CAOesGMgmVdck4rP9iQ+eBc+R1p-eVChnumiszB_D77Q0Rtyf3Q@mail.gmail.com>
-References: <20111107172836.5615.64219.stgit@e102109-lin.cambridge.arm.com>
- <CAOesGMhWxEKUe7C4A+Xqv3RjN_u1t4k8eHWSZE4qMoBPD9=1qw@mail.gmail.com>
- <20111116235024.GH9581@n2100.arm.linux.org.uk>
- <CAOesGMgmVdck4rP9iQ+eBc+R1p-eVChnumiszB_D77Q0Rtyf3Q@mail.gmail.com>
-Message-ID: <20111117102623.GG4748@arm.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Thu, 17 Nov 2011 11:32:40 +0100
+Subject: [PATCH 0/3] make stmp-style devices mach-independent
+In-Reply-To: <20111117014946.GE14656@S2100-06.ap.freescale.net>
+References: <1321440459-4527-1-git-send-email-w.sang@pengutronix.de>
+ <20111117014946.GE14656@S2100-06.ap.freescale.net>
+Message-ID: <20111117103240.GE2535@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 17, 2011 at 12:16:17AM +0000, Olof Johansson wrote:
-> On Wed, Nov 16, 2011 at 3:50 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > On Wed, Nov 16, 2011 at 01:23:02PM -0800, Olof Johansson wrote:
-> >> Agreed. Russell, please consider picking this up -- the bug is very
-> >> real and it sounds like the objection is vague.
-> >
-> > No, it isn't. ?It's creating an unsafe situation. ?If we're going to do
-> > this, we might as well give up on architecture correctness because we're
-> > throwing out locking correctness.
-> >
-> > 1. We look up the VMA.
-> > 2. We pass the VMA to the cache operation.
-> > 3. The cache operation dereferences the VMA to obtain the VMA flags.
-...
-> We also don't continue iterating over the vmas, we only flush for the
-> first one in the range that we find. That is possibly a bug.
+> > Right thing to do?
+> 
+> I think it's the right thing to do.  But I do not like the name as
+> stmp-style device.  Why not just mxs-style device?  Name mxs is born
+> to replace stmp, and keeping using two names may confuse people.
 
-I don't remember the details but couple of years ago someone working on
-Java in ARM pointed out that a cache operation spanning two vmas only
-flushes a single one. I think the JIT was modified since as I haven't
-heard back but I would be more in favour of just dropping the vma
-checks altogether.
+I chose it because it was the first platform where I saw this kind of
+layout. I don't like it too much as well, but couldn't find any better.
+What I liked about it being different to 'mxs' is that you could easily
+grep which drivers still need to be converted :) I am also not sure if
+it is less confusing if you have mxs-style devices (compared to
+stmp-style devices) on, say, MX6. Something platform-independent would
+be cool...
+
+Thanks,
+
+   Wolfram
 
 -- 
-Catalin
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111117/e6f443f0/attachment.sig>
