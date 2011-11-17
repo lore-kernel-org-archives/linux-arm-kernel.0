@@ -1,46 +1,77 @@
-From: weber@corscience.de (Thomas Weber)
-Date: Thu, 17 Nov 2011 22:39:40 +0100
-Subject: [PATCHv2] ARM: OMAP: hsmmc: Fix mux for non-OMAP pins
-In-Reply-To: <1321565988-4511-1-git-send-email-weber@corscience.de>
-References: <1321565988-4511-1-git-send-email-weber@corscience.de>
-Message-ID: <1321565988-4511-3-git-send-email-weber@corscience.de>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 17 Nov 2011 15:47:05 -0600
+Subject: [PATCH v2 1/2] ARM: use cache type functions for
+ arch_get_unmapped_area
+Message-ID: <1321566426-31184-1-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Devkit8000 uses a TWL4030 pin for card detection.
-Thats why the error:
-_omap_mux_init_gpio: Could not set gpio192
-occurs.
+From: Rob Herring <rob.herring@calxeda.com>
 
-This patch checks that the pin is on OMAP before
-calling omap_mux_init_gpio.
+There are already cache type decoding functions, so use those instead
+of custom decode code which only works for ARMv6.
 
-Signed-off-by: Thomas Weber <weber@corscience.de>
+This change also correctly enables cache colour alignment on Cortex-A9
+whose I-cache is aliasing VIPT.
+
+Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+Acked-by: Nicolas Pitre <nico@linaro.org>
 ---
-Changelog:
-v2: Remove backslash at end of line
+v2:
+- remove icache_is_vipt_aliasing check
 
- arch/arm/mach-omap2/hsmmc.c |    6 ++++--
- 1 files changed, 4 insertions(+), 2 deletions(-)
+Nico, can you pick up these 2 patches into the Linaro kernel to get some
+testing?
 
-diff --git a/arch/arm/mach-omap2/hsmmc.c b/arch/arm/mach-omap2/hsmmc.c
-index f4a1020..c3aea79 100644
---- a/arch/arm/mach-omap2/hsmmc.c
-+++ b/arch/arm/mach-omap2/hsmmc.c
-@@ -200,10 +200,12 @@ static int nop_mmc_set_power(struct device *dev, int slot, int power_on,
- static inline void omap_hsmmc_mux(struct omap_mmc_platform_data *mmc_controller,
- 			int controller_nr)
- {
--	if (gpio_is_valid(mmc_controller->slots[0].switch_pin))
-+	if (gpio_is_valid(mmc_controller->slots[0].switch_pin) &&
-+		(mmc_controller->slots[0].switch_pin < OMAP_MAX_GPIO_LINES))
- 		omap_mux_init_gpio(mmc_controller->slots[0].switch_pin,
- 					OMAP_PIN_INPUT_PULLUP);
--	if (gpio_is_valid(mmc_controller->slots[0].gpio_wp))
-+	if (gpio_is_valid(mmc_controller->slots[0].gpio_wp) &&
-+		(mmc_controller->slots[0].gpio_wp < OMAP_MAX_GPIO_LINES))
- 		omap_mux_init_gpio(mmc_controller->slots[0].gpio_wp,
- 					OMAP_PIN_INPUT_PULLUP);
- 	if (cpu_is_omap34xx()) {
+Rob
+
+ arch/arm/mm/mmap.c |   23 ++++++-----------------
+ 1 files changed, 6 insertions(+), 17 deletions(-)
+
+diff --git a/arch/arm/mm/mmap.c b/arch/arm/mm/mmap.c
+index 74be05f..44b628e 100644
+--- a/arch/arm/mm/mmap.c
++++ b/arch/arm/mm/mmap.c
+@@ -9,8 +9,7 @@
+ #include <linux/io.h>
+ #include <linux/personality.h>
+ #include <linux/random.h>
+-#include <asm/cputype.h>
+-#include <asm/system.h>
++#include <asm/cachetype.h>
+ 
+ #define COLOUR_ALIGN(addr,pgoff)		\
+ 	((((addr)+SHMLBA-1)&~(SHMLBA-1)) +	\
+@@ -32,25 +31,15 @@ arch_get_unmapped_area(struct file *filp, unsigned long addr,
+ 	struct mm_struct *mm = current->mm;
+ 	struct vm_area_struct *vma;
+ 	unsigned long start_addr;
+-#if defined(CONFIG_CPU_V6) || defined(CONFIG_CPU_V6K)
+-	unsigned int cache_type;
+-	int do_align = 0, aliasing = 0;
++	int do_align = 0;
++	int aliasing = cache_is_vipt_aliasing();
+ 
+ 	/*
+ 	 * We only need to do colour alignment if either the I or D
+-	 * caches alias.  This is indicated by bits 9 and 21 of the
+-	 * cache type register.
++	 * caches alias.
+ 	 */
+-	cache_type = read_cpuid_cachetype();
+-	if (cache_type != read_cpuid_id()) {
+-		aliasing = (cache_type | cache_type >> 12) & (1 << 11);
+-		if (aliasing)
+-			do_align = filp || flags & MAP_SHARED;
+-	}
+-#else
+-#define do_align 0
+-#define aliasing 0
+-#endif
++	if (aliasing)
++		do_align = filp || (flags & MAP_SHARED);
+ 
+ 	/*
+ 	 * We enforce the MAP_FIXED case.
 -- 
-1.7.7.3
+1.7.5.4
