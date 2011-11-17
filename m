@@ -1,109 +1,26 @@
-From: govindraj.ti@gmail.com (Govindraj)
-Date: Thu, 17 Nov 2011 16:18:55 +0530
-Subject: [PATCH] ARM: omap_hwmod: Add a new state to handle hwmods left
- enabled at init
-In-Reply-To: <1321524690-10302-1-git-send-email-rnayak@ti.com>
-References: <1321524690-10302-1-git-send-email-rnayak@ti.com>
-Message-ID: <CAAL8m4yQTB_vJe9G8ArJx1Uoatd8ffXYY7NqEyM6zgCiygFc0A@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 17 Nov 2011 10:49:48 +0000
+Subject: [PATCH] ARM: Do not call flush_cache_user_range with mmap_sem held
+In-Reply-To: <20111117102623.GG4748@arm.com>
+References: <20111107172836.5615.64219.stgit@e102109-lin.cambridge.arm.com>
+ <CAOesGMhWxEKUe7C4A+Xqv3RjN_u1t4k8eHWSZE4qMoBPD9=1qw@mail.gmail.com>
+ <20111116235024.GH9581@n2100.arm.linux.org.uk>
+ <CAOesGMgmVdck4rP9iQ+eBc+R1p-eVChnumiszB_D77Q0Rtyf3Q@mail.gmail.com>
+ <20111117102623.GG4748@arm.com>
+Message-ID: <20111117104948.GN9581@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 17, 2011 at 3:41 PM, Rajendra Nayak <rnayak@ti.com> wrote:
-> A hwmod with a 'HWMOD_INIT_NO_IDLE' flag set, is left in
-> enabled state by the hwmod framework post the initial setup.
-> Once a real user of the device (a driver) tries to enable it
-> at a later point, the hmwod framework throws a WARN() about
-> the device being already in enabled state.
->
-> Fix this by introducing a new state '_HWMOD_STATE_ENABLED_AT_INIT'
-> to identify such devices/hwmods, so nothing but just a state
-> change to '_HWMOD_STATE_ENABLED' can be done when the device/hwmod
-> is requested to be enabled (the first time) by its driver/user.
->
-> A good example of a such a device is an UART used as debug console.
-> The UART module needs to be kept enabled through the boot, until the
-> UART driver takes control of it, for debug prints to appear on
-> the console.
->
-> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+On Thu, Nov 17, 2011 at 10:26:23AM +0000, Catalin Marinas wrote:
+> I don't remember the details but couple of years ago someone working on
+> Java in ARM pointed out that a cache operation spanning two vmas only
+> flushes a single one. I think the JIT was modified since as I haven't
+> heard back but I would be more in favour of just dropping the vma
+> checks altogether.
 
-tested with uart runtime v8 patch series works fine.
-helps to simply the serial.c code without using custom console activate funcs.
-thanks for handling this within the framework.
-
-FWIW,
-
-Tested-by: Govindraj.R <govindraj.raja@ti.com>
-
---
-Thanks,
-Govindraj.R
-
-
-> ---
-> ?arch/arm/mach-omap2/omap_hwmod.c ? ? ? ? ? ? | ? 16 ++++++++++++++--
-> ?arch/arm/plat-omap/include/plat/omap_hwmod.h | ? ?1 +
-> ?2 files changed, 15 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-> index d7f4623..7d94cc3 100644
-> --- a/arch/arm/mach-omap2/omap_hwmod.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod.c
-> @@ -1441,6 +1441,17 @@ static int _enable(struct omap_hwmod *oh)
->
-> ? ? ? ?pr_debug("omap_hwmod: %s: enabling\n", oh->name);
->
-> + ? ? ? /*
-> + ? ? ? ?* hwmods' with HWMOD_INIT_NO_IDLE flag set, are left
-> + ? ? ? ?* in enabled state at init.
-> + ? ? ? ?* Now that someone is really trying to enable them,
-> + ? ? ? ?* just update the state.
-> + ? ? ? ?*/
-> + ? ? ? if (oh->_state == _HWMOD_STATE_ENABLED_AT_INIT) {
-> + ? ? ? ? ? ? ? oh->_state = _HWMOD_STATE_ENABLED;
-> + ? ? ? ? ? ? ? return 0;
-> + ? ? ? }
-> +
-> ? ? ? ?if (oh->_state != _HWMOD_STATE_INITIALIZED &&
-> ? ? ? ? ? ?oh->_state != _HWMOD_STATE_IDLE &&
-> ? ? ? ? ? ?oh->_state != _HWMOD_STATE_DISABLED) {
-> @@ -1449,7 +1460,6 @@ static int _enable(struct omap_hwmod *oh)
-> ? ? ? ? ? ? ? ?return -EINVAL;
-> ? ? ? ?}
->
-> -
-> ? ? ? ?/*
-> ? ? ? ? * If an IP contains only one HW reset line, then de-assert it in order
-> ? ? ? ? * to allow the module state transition. Otherwise the PRCM will return
-> @@ -1744,8 +1754,10 @@ static int _setup(struct omap_hwmod *oh, void *data)
-> ? ? ? ? * it should be set by the core code as a runtime flag during startup
-> ? ? ? ? */
-> ? ? ? ?if ((oh->flags & HWMOD_INIT_NO_IDLE) &&
-> - ? ? ? ? ? (postsetup_state == _HWMOD_STATE_IDLE))
-> + ? ? ? ? ? (postsetup_state == _HWMOD_STATE_IDLE)) {
-> + ? ? ? ? ? ? ? oh->_state = _HWMOD_STATE_ENABLED_AT_INIT;
-> ? ? ? ? ? ? ? ?postsetup_state = _HWMOD_STATE_ENABLED;
-> + ? ? ? }
->
-> ? ? ? ?if (postsetup_state == _HWMOD_STATE_IDLE)
-> ? ? ? ? ? ? ? ?_idle(oh);
-> diff --git a/arch/arm/plat-omap/include/plat/omap_hwmod.h b/arch/arm/plat-omap/include/plat/omap_hwmod.h
-> index 1b81dfb..cd49d60 100644
-> --- a/arch/arm/plat-omap/include/plat/omap_hwmod.h
-> +++ b/arch/arm/plat-omap/include/plat/omap_hwmod.h
-> @@ -436,6 +436,7 @@ struct omap_hwmod_omap4_prcm {
-> ?#define _HWMOD_STATE_ENABLED ? ? ? ? ? ? ? ? ? 4
-> ?#define _HWMOD_STATE_IDLE ? ? ? ? ? ? ? ? ? ? ?5
-> ?#define _HWMOD_STATE_DISABLED ? ? ? ? ? ? ? ? ?6
-> +#define _HWMOD_STATE_ENABLED_AT_INIT ? ? ? ? ? 7
->
-> ?/**
-> ?* struct omap_hwmod_class - the type of an IP block
-> --
-> 1.7.1
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
->
+To put this bluntly, if you still think that after my previous reply
+to you, then you shouldn't be touching the kernel because you don't
+understand the effects of the changes you're proposing - and that's
+already making the allowance that you should _already_ had thought
+about the security aspects of what you were suggesting _before_ posting
+such a buggered suggestion.
