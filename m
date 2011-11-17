@@ -1,93 +1,60 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Thu, 17 Nov 2011 13:47:55 +0000
-Subject: [PATCH 0/4] Consolidate identity mapping code in idmap.c
-In-Reply-To: <1321462094-6647-1-git-send-email-will.deacon@arm.com>
-References: <1321462094-6647-1-git-send-email-will.deacon@arm.com>
-Message-ID: <20111117134755.GB3044@localhost.localdomain>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Thu, 17 Nov 2011 13:50:13 +0000
+Subject: [PATCH 3/5] ARM: vexpress: Add DT support in v2m
+In-Reply-To: <20111116175757.GI2073@localhost.localdomain>
+References: <1321036026-23411-1-git-send-email-pawel.moll@arm.com>
+ <1321036026-23411-4-git-send-email-pawel.moll@arm.com>
+ <20111116154402.GE2073@localhost.localdomain>
+ <1321461315.3137.371.camel@hornet.cambridge.arm.com>
+ <20111116175757.GI2073@localhost.localdomain>
+Message-ID: <1321537813.3137.475.camel@hornet.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 16, 2011 at 04:48:10PM +0000, Will Deacon wrote:
-> Hello,
+On Wed, 2011-11-16 at 17:57 +0000, Dave Martin wrote:
+> > > We should specify a list of all the "standard" aliases used by the
+> > > generic motherboard code here, since these are part of the contract
+> > > between each board-specific device tree and the motherboard code.
+> > > 
+> > > Is "timer" the only one, or are there others?
+> > 
+> > One and only. There were more, but I got rid of them.
 > 
-> This patch series consolidates the identity mapping code into idmap.c,
-> where a single set of page tables (idmap_pgd) are allocated and populated
-> at init time for use by subsystems such as soft reboot, kexec and CPU
-> suspend.
-> 
-> A new linker section (.idmap.text) is introduced so that code which
-> needs to be identity mapped can be annotated with __idmap or, if written
-> in assembly, placed there explicitly.
-> 
-> CPU suspend, cpu_*_reset and setup_mm_for_reboot are all updated to work
-> with the new mapping code.
-> 
-> This is currently based on 3.2-rc2, but will be based on Russell's reset
-> branch when it comes to merging (where the prototype of
-> setup_mm_for_reboot has changed slightly). Furthermore, I have rebased
-> my kexec series against this which I will post separately.
-> 
-> Comments welcome.
+> Are the other alises still used?  If not, we should perhaps get rid of
+> them, or keep them on an as-needed basis only?
 
-I haven't exhaustively checked every detail, but this looks like a
-cleaner, more scalabale and more robust way to handle code which needs
-to be identity-mapped compared with what we had previously; so I'm in
-favour of it.
+I've included the serialX and i2cX aliases purely because the other
+boards do (including Grant's versatile dts).
 
-FWIW
+> Since alises are by definition a point of standardisation (otherwise
+> there's no need for an alias) I think they need to be documented alongside
+> bindings wherever we have them.
 
-Acked-by: Dave Martin <dave.martin@linaro.org>
+You are right, but I think this is out of the vexpress scope. The
+serialX aliases, for example, are already used by some drivers:
 
+   4   1788  drivers/tty/serial/atmel_serial.c <<atmel_serial_probe>>
+             ret = of_alias_get_id(np, "serial");
+   5   1301  drivers/tty/serial/imx.c <<serial_imx_probe_dt>>
+             ret = of_alias_get_id(np, "serial");
+
+so it sounds like a generic policy-to-be-made.
+
+> > > For "non-interactive" config items, can we still please have comments
+> > > indicating what the item means and how it should be used?
+> > > 
+> > > Such comments can be very brief, but having at least something makes the
+> > > configs easier to understand and maintain, in my view.
+> > 
+> > Em, what bits do you refer to? The lines you quoted are not changed...
 > 
-> Cheers,
+> Hmmm, editing snafu there.
 > 
-> Will
-> 
-> 
-> Will Deacon (4):
->   ARM: idmap: populate identity map pgd at init time using .init.text
->   ARM: suspend: use idmap_pgd instead of suspend_pgd
->   ARM: proc-*.S: place cpu_reset functions into .idmap.text section
->   ARM: idmap: use idmap_pgd when setting up mm for reboot
-> 
->  arch/arm/include/asm/idmap.h      |   11 ++++++++
->  arch/arm/kernel/sleep.S           |    2 +
->  arch/arm/kernel/suspend.c         |   17 ++----------
->  arch/arm/kernel/vmlinux.lds.S     |    1 +
->  arch/arm/mm/idmap.c               |   49 ++++++++++++++++++++++++++++++-------
->  arch/arm/mm/proc-arm1020.S        |    3 ++
->  arch/arm/mm/proc-arm1020e.S       |    3 ++
->  arch/arm/mm/proc-arm1022.S        |    3 ++
->  arch/arm/mm/proc-arm1026.S        |    3 ++
->  arch/arm/mm/proc-arm6_7.S         |    4 +++
->  arch/arm/mm/proc-arm720.S         |    3 ++
->  arch/arm/mm/proc-arm740.S         |    3 ++
->  arch/arm/mm/proc-arm7tdmi.S       |    3 ++
->  arch/arm/mm/proc-arm920.S         |    3 ++
->  arch/arm/mm/proc-arm922.S         |    3 ++
->  arch/arm/mm/proc-arm925.S         |    3 ++
->  arch/arm/mm/proc-arm926.S         |    3 ++
->  arch/arm/mm/proc-arm940.S         |    3 ++
->  arch/arm/mm/proc-arm946.S         |    3 ++
->  arch/arm/mm/proc-arm9tdmi.S       |    3 ++
->  arch/arm/mm/proc-fa526.S          |    3 ++
->  arch/arm/mm/proc-feroceon.S       |    3 ++
->  arch/arm/mm/proc-mohawk.S         |    3 ++
->  arch/arm/mm/proc-sa110.S          |    3 ++
->  arch/arm/mm/proc-sa1100.S         |    3 ++
->  arch/arm/mm/proc-v6.S             |    3 ++
->  arch/arm/mm/proc-v7.S             |    2 +
->  arch/arm/mm/proc-xsc3.S           |    3 ++
->  arch/arm/mm/proc-xscale.S         |    3 ++
->  include/asm-generic/vmlinux.lds.h |    6 ++++
->  30 files changed, 135 insertions(+), 23 deletions(-)
->  create mode 100644 arch/arm/include/asm/idmap.h
-> 
-> -- 
-> 1.7.4.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> I think I was referring to the ARCH_VEXPRESS_DT item, which is defined
+> just after the lines I quoted.
+
+Ok, will do.
+
+Cheers!
+
+Pawe?
