@@ -1,58 +1,193 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 17 Nov 2011 18:08:59 +0000
-Subject: [GIT PULL] ARM irqchip consolidation
-In-Reply-To: <20111117172319.GX9581@n2100.arm.linux.org.uk>
-References: <4EC39D44.8000706@arm.com>
- <20111117172319.GX9581@n2100.arm.linux.org.uk>
-Message-ID: <4EC54DBB.9090309@arm.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 17 Nov 2011 19:18:53 +0100
+Subject: [PATCH 1/2] ARM: mx51/53: correct misuse of _clk_max_enable and
+ _clk_max_disable
+In-Reply-To: <1320634936-7898-1-git-send-email-richard.zhao@linaro.org>
+References: <1320634936-7898-1-git-send-email-richard.zhao@linaro.org>
+Message-ID: <20111117181853.GS27267@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/11/11 17:23, Russell King - ARM Linux wrote:
-> On Wed, Nov 16, 2011 at 11:23:48AM +0000, Marc Zyngier wrote:
->> I've collected patches converting GIC and VIC based platforms to use the
->> MULTI_IRQ_HANDLER configuration option in a single branch (as they depend
->> on a common patch).
->>
->> It also include the patch adding non-banked support to the GIC, which is
->> required to convert EXYNOS to MULTI_IRQ_HANDLER in a sane way (not to
->> mention fixing obvious bugs).
->>
->> If you're happy with this, feel free to pull this branch.
+On Mon, Nov 07, 2011 at 11:02:15AM +0800, Richard Zhao wrote:
+> Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
+> ---
+>  arch/arm/mach-mx5/clock-mx51-mx53.c |   70 +++++++++++++++++++---------------
+>  1 files changed, 39 insertions(+), 31 deletions(-)
+
+What exactly is the misuse of clk_max_enable/disable you are talking
+about? What does this fix? Why is a clk_round_rate involved?
+This patch seems to do more than the subject says. You should split
+it and improve the description.
+
+Sascha
+
 > 
-> We need to sort out the conflicts between this and the arch_reset stuff
-> I'm carrying, because I'm not going to fight git from this early in the
-> cycle, dealing with stuff like this:
+> diff --git a/arch/arm/mach-mx5/clock-mx51-mx53.c b/arch/arm/mach-mx5/clock-mx51-mx53.c
+> index a3ca4ce..507d24c 100644
+> --- a/arch/arm/mach-mx5/clock-mx51-mx53.c
+> +++ b/arch/arm/mach-mx5/clock-mx51-mx53.c
+> @@ -1013,20 +1013,6 @@ static struct clk mipi_hsp_clk = {
+>  		.secondary	= s,			\
+>  	}
+>  
+> -#define DEFINE_CLOCK_MAX(name, i, er, es, pfx, p, s)	\
+> -	static struct clk name = {			\
+> -		.id		= i,			\
+> -		.enable_reg	= er,			\
+> -		.enable_shift	= es,			\
+> -		.get_rate	= pfx##_get_rate,	\
+> -		.set_rate	= pfx##_set_rate,	\
+> -		.set_parent	= pfx##_set_parent,	\
+> -		.enable		= _clk_max_enable,	\
+> -		.disable	= _clk_max_disable,	\
+> -		.parent		= p,			\
+> -		.secondary	= s,			\
+> -	}
+> -
+>  #define CLK_GET_RATE(name, nr, bitsname)				\
+>  static unsigned long clk_##name##_get_rate(struct clk *clk)		\
+>  {									\
+> @@ -1088,6 +1074,25 @@ static int clk_##name##_set_rate(struct clk *clk, unsigned long rate)	\
+>  	return 0;							\
+>  }
+>  
+> +#define CLK_ROUND_RATE(name , nr, bitsname)				\
+> +static unsigned long clk_##name##_round_rate(struct clk *clk,		\
+> +						unsigned long rate)	\
+> +{									\
+> +	u32 div, parent_rate;						\
+> +	u32 pre = 0, post = 0;						\
+> +									\
+> +	parent_rate = clk_get_rate(clk->parent);			\
+> +	div = DIV_ROUND_UP(parent_rate, rate);				\
+> +									\
+> +	__calc_pre_post_dividers(div, &pre, &post,			\
+> +		(MXC_CCM_CSCDR##nr##_##bitsname##_CLK_PRED_MASK >>	\
+> +		MXC_CCM_CSCDR##nr##_##bitsname##_CLK_PRED_OFFSET) + 1,	\
+> +		(MXC_CCM_CSCDR##nr##_##bitsname##_CLK_PODF_MASK >>	\
+> +		MXC_CCM_CSCDR##nr##_##bitsname##_CLK_PODF_OFFSET) + 1);	\
+> +									\
+> +	return parent_rate / pre / post;				\
+> +}
+> +
+>  /* UART */
+>  CLK_GET_RATE(uart, 1, UART)
+>  CLK_SET_PARENT(uart, 1, UART)
+> @@ -1157,11 +1162,13 @@ static struct clk ecspi_main_clk = {
+>  CLK_GET_RATE(esdhc1, 1, ESDHC1_MSHC1)
+>  CLK_SET_PARENT(esdhc1, 1, ESDHC1_MSHC1)
+>  CLK_SET_RATE(esdhc1, 1, ESDHC1_MSHC1)
+> +CLK_ROUND_RATE(esdhc1, 1, ESDHC1_MSHC1)
+>  
+>  /* mx51 specific */
+>  CLK_GET_RATE(esdhc2, 1, ESDHC2_MSHC2)
+>  CLK_SET_PARENT(esdhc2, 1, ESDHC2_MSHC2)
+>  CLK_SET_RATE(esdhc2, 1, ESDHC2_MSHC2)
+> +CLK_ROUND_RATE(esdhc2, 1, ESDHC2_MSHC2)
+>  
+>  static int clk_esdhc3_set_parent(struct clk *clk, struct clk *parent)
+>  {
+> @@ -1215,6 +1222,7 @@ static int clk_esdhc2_mx53_set_parent(struct clk *clk, struct clk *parent)
+>  CLK_GET_RATE(esdhc3_mx53, 1, ESDHC3_MX53)
+>  CLK_SET_PARENT(esdhc3_mx53, 1, ESDHC3_MX53)
+>  CLK_SET_RATE(esdhc3_mx53, 1, ESDHC3_MX53)
+> +CLK_ROUND_RATE(esdhc3_mx53, 1, ESDHC3_MX53)
+>  
+>  static int clk_esdhc4_mx53_set_parent(struct clk *clk, struct clk *parent)
+>  {
+> @@ -1341,18 +1349,18 @@ DEFINE_CLOCK(sdma_clk, 1, MXC_CCM_CCGR4, MXC_CCM_CCGRx_CG15_OFFSET,
+>  
+>  /* eSDHC */
+>  DEFINE_CLOCK_FULL(esdhc1_ipg_clk, 0, MXC_CCM_CCGR3, MXC_CCM_CCGRx_CG0_OFFSET,
+> -	NULL,  NULL, _clk_max_enable, _clk_max_disable, &ipg_clk, NULL);
+> -DEFINE_CLOCK_MAX(esdhc1_clk, 0, MXC_CCM_CCGR3, MXC_CCM_CCGRx_CG1_OFFSET,
+> +	NULL,  NULL, _clk_ccgr_enable, _clk_ccgr_disable, &ipg_clk, NULL);
+> +DEFINE_CLOCK_CCGR(esdhc1_clk, 0, MXC_CCM_CCGR3, MXC_CCM_CCGRx_CG1_OFFSET,
+>  	clk_esdhc1, &pll2_sw_clk, &esdhc1_ipg_clk);
+>  DEFINE_CLOCK_FULL(esdhc2_ipg_clk, 1, MXC_CCM_CCGR3, MXC_CCM_CCGRx_CG2_OFFSET,
+> -	NULL,  NULL, _clk_max_enable, _clk_max_disable, &ipg_clk, NULL);
+> +	NULL,  NULL, _clk_ccgr_enable, _clk_ccgr_disable, &ipg_clk, NULL);
+>  DEFINE_CLOCK_FULL(esdhc3_ipg_clk, 2, MXC_CCM_CCGR3, MXC_CCM_CCGRx_CG4_OFFSET,
+> -	NULL,  NULL, _clk_max_enable, _clk_max_disable, &ipg_clk, NULL);
+> +	NULL,  NULL, _clk_ccgr_enable, _clk_ccgr_disable, &ipg_clk, NULL);
+>  DEFINE_CLOCK_FULL(esdhc4_ipg_clk, 3, MXC_CCM_CCGR3, MXC_CCM_CCGRx_CG6_OFFSET,
+> -	NULL,  NULL, _clk_max_enable, _clk_max_disable, &ipg_clk, NULL);
+> +	NULL,  NULL, _clk_ccgr_enable, _clk_ccgr_disable, &ipg_clk, NULL);
+>  
+>  /* mx51 specific */
+> -DEFINE_CLOCK_MAX(esdhc2_clk, 1, MXC_CCM_CCGR3, MXC_CCM_CCGRx_CG3_OFFSET,
+> +DEFINE_CLOCK_CCGR(esdhc2_clk, 1, MXC_CCM_CCGR3, MXC_CCM_CCGRx_CG3_OFFSET,
+>  	clk_esdhc2, &pll2_sw_clk, &esdhc2_ipg_clk);
+>  
+>  static struct clk esdhc3_clk = {
+> @@ -1361,8 +1369,8 @@ static struct clk esdhc3_clk = {
+>  	.set_parent = clk_esdhc3_set_parent,
+>  	.enable_reg = MXC_CCM_CCGR3,
+>  	.enable_shift = MXC_CCM_CCGRx_CG5_OFFSET,
+> -	.enable  = _clk_max_enable,
+> -	.disable = _clk_max_disable,
+> +	.enable  = _clk_ccgr_enable,
+> +	.disable = _clk_ccgr_disable,
+>  	.secondary = &esdhc3_ipg_clk,
+>  };
+>  static struct clk esdhc4_clk = {
+> @@ -1371,8 +1379,8 @@ static struct clk esdhc4_clk = {
+>  	.set_parent = clk_esdhc4_set_parent,
+>  	.enable_reg = MXC_CCM_CCGR3,
+>  	.enable_shift = MXC_CCM_CCGRx_CG7_OFFSET,
+> -	.enable  = _clk_max_enable,
+> -	.disable = _clk_max_disable,
+> +	.enable  = _clk_ccgr_enable,
+> +	.disable = _clk_ccgr_disable,
+>  	.secondary = &esdhc4_ipg_clk,
+>  };
+>  
+> @@ -1383,12 +1391,12 @@ static struct clk esdhc2_mx53_clk = {
+>  	.set_parent = clk_esdhc2_mx53_set_parent,
+>  	.enable_reg = MXC_CCM_CCGR3,
+>  	.enable_shift = MXC_CCM_CCGRx_CG3_OFFSET,
+> -	.enable  = _clk_max_enable,
+> -	.disable = _clk_max_disable,
+> +	.enable  = _clk_ccgr_enable,
+> +	.disable = _clk_ccgr_disable,
+>  	.secondary = &esdhc3_ipg_clk,
+>  };
+>  
+> -DEFINE_CLOCK_MAX(esdhc3_mx53_clk, 2, MXC_CCM_CCGR3, MXC_CCM_CCGRx_CG5_OFFSET,
+> +DEFINE_CLOCK_CCGR(esdhc3_mx53_clk, 2, MXC_CCM_CCGR3, MXC_CCM_CCGRx_CG5_OFFSET,
+>  	clk_esdhc3_mx53, &pll2_sw_clk, &esdhc2_ipg_clk);
+>  
+>  static struct clk esdhc4_mx53_clk = {
+> @@ -1397,17 +1405,17 @@ static struct clk esdhc4_mx53_clk = {
+>  	.set_parent = clk_esdhc4_mx53_set_parent,
+>  	.enable_reg = MXC_CCM_CCGR3,
+>  	.enable_shift = MXC_CCM_CCGRx_CG7_OFFSET,
+> -	.enable  = _clk_max_enable,
+> -	.disable = _clk_max_disable,
+> +	.enable  = _clk_ccgr_enable,
+> +	.disable = _clk_ccgr_disable,
+>  	.secondary = &esdhc4_ipg_clk,
+>  };
+>  
+>  static struct clk sata_clk = {
+>  	.parent = &ipg_clk,
+> -	.enable = _clk_max_enable,
+> +	.enable = _clk_ccgr_enable,
+>  	.enable_reg = MXC_CCM_CCGR4,
+>  	.enable_shift = MXC_CCM_CCGRx_CG1_OFFSET,
+> -	.disable = _clk_max_disable,
+> +	.disable = _clk_ccgr_disable,
+>  };
+>  
+>  static struct clk ahci_phy_clk = {
+> -- 
+> 1.7.5.4
 > 
-> CONFLICT (delete/modify): arch/arm/mach-omap2/include/mach/omap4-common.h deleted in HEAD and modified in devel-stable. Version devel-stable of arch/arm/mach-omap2/include/mach/omap4-common.h left in tree.
 > 
-> which is immune to git rerere, and I'm sure as hell not going to keep on
-> merging this with my for-next branch.
+> 
 
-If you have a stable branch on which I can rebase, I'm happy to do it
-(I've just resolved these conflicts on -next). If it's more convenient
-to do it later in the cycle, I can wait. Just let me know what is the
-most convenient route for you.
-
-> Even though I've split out the conflicting cleanup commits from the
-> arch_reset() stuff, many of them still don't have acked-bys from the
-> maintainers of the affected code, so I don't feel like I can commit
-> them to being stable.
-
-While I perfectly understand how important it is to wait for maintainers
-to ack the patches, these patches have been posted multiple times over
-the past weeks/months, directly Cc-ing the relevant maintainers. Most of
-them have contributed Acked-by/Tested-by. In a few cases, the patches
-have fallen on deaf ears.
-
-Are these platforms now unmaintained? At that point, I'd be quite
-tempted to simply apply the patches and wait until someone screams back
-at me.
-
-> What we need are more responsive platform maintainers!
-
-Amen.
-
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
