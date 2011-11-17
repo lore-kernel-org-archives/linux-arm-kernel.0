@@ -1,47 +1,24 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Thu, 17 Nov 2011 13:01:16 +0530
-Subject: [PATCH 1/3] ARM: omap_device: handle first time activation of
- console device
-In-Reply-To: <4EC3CDC4.7000108@gmail.com>
-References: <1321441346-19591-1-git-send-email-rnayak@ti.com>
- <1321441346-19591-2-git-send-email-rnayak@ti.com>
- <4EC3CDC4.7000108@gmail.com>
-Message-ID: <4EC4B844.5060603@ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 17 Nov 2011 08:42:21 +0100
+Subject: [PATCH] ARM: mmci: add capabilities2 for MMC_CAP2
+In-Reply-To: <1321268548-21933-1-git-send-email-per.forlin@stericsson.com>
+References: <1321268548-21933-1-git-send-email-per.forlin@stericsson.com>
+Message-ID: <CACRpkdYLoQowxtg3qqSyi5cS26z1e_=p12EKKkSzvcKP96YLnQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+On Mon, Nov 14, 2011 at 12:02 PM, Per Forlin <per.forlin@stericsson.com> wrote:
 
-On Wednesday 16 November 2011 08:20 PM, Rob Herring wrote:
-[]...
->>
->> diff --git a/Documentation/devicetree/bindings/arm/omap/omap.txt b/Documentation/devicetree/bindings/arm/omap/omap.txt
->> index dbdab40..46ffd41 100644
->> --- a/Documentation/devicetree/bindings/arm/omap/omap.txt
->> +++ b/Documentation/devicetree/bindings/arm/omap/omap.txt
->> @@ -21,6 +21,7 @@ Required properties:
->>   Optional properties:
->>   - ti,no_idle_on_suspend: When present, it prevents the PM to idle the module
->>     during suspend.
->> +- ti,console_hwmod: boolean, identifies the hwmod used as console device
->>
->
-> This doesn't seem right. Which console is not a h/w property. Why can't
-> you use aliases like other platforms are doing?
+Some more verbose blurb on the patch here maybe?
 
-After thinking of this some more, I figured its more of a hwmod problem
-to be solved, than with being able to identify which console.
-Will post a separate patch to fix it up in hmwod and drop this from the
-DT series.
+> Signed-off-by: Per Forlin <per.forlin@stericsson.com>
+> ---
+> This patch depends on patches adding CAP2 available on mmc-next.
+> Chris, would you mind merging this through your tree when it
+> has been accepted.
 
-Thanks for the review.
+Seems like the right way to pass caps from the platform.
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-regards,
-Rajendra
-
->
-> Also, it's not clear in the documentation where this (and
-> ti,no_idle_on_suspend) should go in the DT. Both seem like they should
-> be kernel cmdline params.
->
-> Rob
+Yours,
+Linus Walleij
