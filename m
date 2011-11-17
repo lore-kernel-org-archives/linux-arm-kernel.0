@@ -1,33 +1,57 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 17 Nov 2011 09:08:38 +0200
-Subject: [PATCH/RESEND #3 6/7] arm: omap: smartreflex: fix IRQ handling bug
-In-Reply-To: <87r51762a7.fsf@ti.com>
-References: <1321346765-16633-1-git-send-email-balbi@ti.com>
- <1321346765-16633-7-git-send-email-balbi@ti.com>
- <87r51762a7.fsf@ti.com>
-Message-ID: <20111117070836.GA30936@legolas.emea.dhcp.ti.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Thu, 17 Nov 2011 12:49:11 +0530
+Subject: [PATCH 1/3] ARM: omap_device: handle first time activation of
+ console device
+In-Reply-To: <4EC3D037.6020901@ti.com>
+References: <1321441346-19591-1-git-send-email-rnayak@ti.com>
+ <1321441346-19591-2-git-send-email-rnayak@ti.com> <4EC3D037.6020901@ti.com>
+Message-ID: <4EC4B56F.2040504@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 16, 2011 at 04:06:08PM -0800, Kevin Hilman wrote:
-> Felipe Balbi <balbi@ti.com> writes:
-> 
-> F> fix a bug which has been on this driver since
-> > it was added by the original commit 984aa6db
-> > which would never clear IRQSTATUS bits.
-> >
-> > Signed-off-by: Felipe Balbi <balbi@ti.com>
-> 
-> Queuing this fix for v3.2-rc (branch: for_3.2/fixes/pm)
+[...]
+>> +static int omap_console_hwmod_enable(struct omap_device *od)
+>> +{
+>> +	console_lock();
+>> +	/*
+>> +	 * For early console we prevented hwmod reset and idle
+>
+> A period is missing. Or maybe it should a comma with not capital letter.
+>
+>> +	 * So before we enable the uart clocks idle the console
+>> +	 * uart clocks, then enable back the console uart hwmod.
+>> +	 */
+>> +	omap_hwmod_idle(od->hwmods[0]);
+>> +	omap_hwmod_enable(od->hwmods[0]);
+>
+> Why do we have to idle ->  enable? The module is already enabled, isn't it?
+> The comment is not super clear for me :-)
+> Is the goal is to reset the IP?
 
-should it go to stable too ??
+Yes, now that I read it, it does sound confusing. I should have at-least
+read it once before I picked it from serial.c
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111117/340ef8ba/attachment.sig>
+But anyway, here's what the problem is.
+
+I feel its partly to do with the inability of hwmod to handle some
+modules which are left enabled post a setup, due to the
+'HWMOD_INIT_NO_IDLE' flag set.
+Such modules end up with a hwmod state as '_HWMOD_STATE_ENABLED' post
+a setup. Now when a driver for such devices/modules tries to enable the
+module the first time, hwmod throws up a big WARN stating the hwmod is
+already in an enabled state.
+[uart used as console is one such module, which cannot be idled post a
+setup by hwmod]
+
+If hwmod could be made in some way intelligent enough to know that the
+module is in enabled state because of the 'HWMOD_INIT_NO_IDLE' itself,
+a lot of this hackery might not be needed at all.
+Simplest way to do it could be to just add another intermediate state,
+something like  '_HWMOD_STATE_ENABLED_AT_INIT'.
+I will post a patch for this, see if you like it being handled that way.
+
+The other part of the problem is also with the inability to hook up
+'custom' omap_device_pm_latency for omap devices created from DT.
+Maybe a lot of such cases which need custom activate/deactivate
+functions might have to be handled in some way in the framework
+itself like the one above.
