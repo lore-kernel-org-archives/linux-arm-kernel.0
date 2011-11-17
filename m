@@ -1,47 +1,117 @@
 From: dave.martin@linaro.org (Dave Martin)
-Date: Thu, 17 Nov 2011 18:37:26 +0000
-Subject: [PATCH 3/5] ARM: vexpress: Add DT support in v2m
-In-Reply-To: <20111117160536.GU9581@n2100.arm.linux.org.uk>
-References: <1321036026-23411-1-git-send-email-pawel.moll@arm.com>
- <1321036026-23411-4-git-send-email-pawel.moll@arm.com>
- <20111117160536.GU9581@n2100.arm.linux.org.uk>
-Message-ID: <20111117183726.GE3044@localhost.localdomain>
+Date: Thu, 17 Nov 2011 18:48:01 +0000
+Subject: [PATCH] ARM: unwind: add unwind directives to bitops assembly
+ macros
+In-Reply-To: <1321553096-11859-1-git-send-email-will.deacon@arm.com>
+References: <1321553096-11859-1-git-send-email-will.deacon@arm.com>
+Message-ID: <20111117184801.GF3044@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 17, 2011 at 04:05:37PM +0000, Russell King - ARM Linux wrote:
-
-[...]
-
-> > @@ -383,11 +412,18 @@ static struct clk_lookup v2m_lookups[] = {
-> >  	},
-> >  };
-> >  
-> > +static void __init v2m_system_id(void)
-> > +{
-> > +	if (!system_rev)
-> > +		system_rev = readl(v2m_sysreg_base + V2M_SYS_ID);
+On Thu, Nov 17, 2011 at 06:04:56PM +0000, Will Deacon wrote:
+> The bitops functions (e.g. _test_and_set_bit) on ARM do not have unwind
+> annotations and therefore the kernel cannot backtrace out of them on a
+> fatal error (for example, NULL pointer dereference).
 > 
-> You do understand that system_rev is for the system _revision_ not for
-> some kind of system ID.  For example, it's to identify whether we're on
-> a revision 4, 5 or 6 system.
-> 
-> However, with DT the differences in system revision should be encoded
-> into the DT itself, and the kernel should not be making choices about
-> the hardware off this.
+> This patch annotates the bitops assembly macros with UNWIND annotations
+> so that we can produce a meaningful backtrace on error.
 
-I can't comment on whether this is an abuse of system_rev, since I'm
-not too familiar with that.
+I take it these macros aren't likely ever to get used except in the
+definition of complete functions (as in testsetbit.S etc.)?
 
-I feel that Whether the value of the V2M_SYS_ID register should be put
-in the DT is more doubtful though: the DT must describe the hardware
-which cannot be probed.  Hardware features which can be probed can still
-be described in the DT and sometimes this is advantageous -- nonetheless
-it does break the one-definition principle and may lead to problems.
-One scenario where this does make sense is if the bootloader discovers
-that value and injects it into the DT.  However, that would broaden the
-interface between the bootloader and kernel in a platform-specific way
-and may cause problems itself.
+One way to make the correct behaviour explicit would be to put the
+function boilerplate into the macros instead:
+
+#include <linux/linkage.h>
+#include <asm/unwind.h>
+
+	.macro bitop name, instr
+ENTRY(\name )
+UNWIND(	.fnstart	)
+	@ stuff
+	@ bx lr / mov pc,lr
+UNWIND(	.fnend		)
+ENDPROC(\name )
+	.endm
+
+That makes it harder to misuse the macros or to typo the ENDPROC()
+directive, as well as allowing a few lines to be eliminated from the
+other .S files.
 
 Cheers
 ---Dave
+
+> 
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm/lib/bitops.h |   10 ++++++++++
+>  1 files changed, 10 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/lib/bitops.h b/arch/arm/lib/bitops.h
+> index 10d868a..640ce58 100644
+> --- a/arch/arm/lib/bitops.h
+> +++ b/arch/arm/lib/bitops.h
+> @@ -1,5 +1,8 @@
+> +#include <asm/unwind.h>
+> +
+>  #if __LINUX_ARM_ARCH__ >= 6
+>  	.macro	bitop, instr
+> +UNWIND(	.fnstart	)
+>  	ands	ip, r1, #3
+>  	strneb	r1, [ip]		@ assert word-aligned
+>  	mov	r2, #1
+> @@ -13,9 +16,11 @@
+>  	cmp	r0, #0
+>  	bne	1b
+>  	bx	lr
+> +UNWIND(	.fnend		)
+>  	.endm
+>  
+>  	.macro	testop, instr, store
+> +UNWIND(	.fnstart	)
+>  	ands	ip, r1, #3
+>  	strneb	r1, [ip]		@ assert word-aligned
+>  	mov	r2, #1
+> @@ -34,9 +39,11 @@
+>  	cmp	r0, #0
+>  	movne	r0, #1
+>  2:	bx	lr
+> +UNWIND(	.fnend		)
+>  	.endm
+>  #else
+>  	.macro	bitop, instr
+> +UNWIND(	.fnstart	)
+>  	ands	ip, r1, #3
+>  	strneb	r1, [ip]		@ assert word-aligned
+>  	and	r2, r0, #31
+> @@ -49,6 +56,7 @@
+>  	str	r2, [r1, r0, lsl #2]
+>  	restore_irqs ip
+>  	mov	pc, lr
+> +UNWIND(	.fnend		)
+>  	.endm
+>  
+>  /**
+> @@ -60,6 +68,7 @@
+>   * to avoid dirtying the data cache.
+>   */
+>  	.macro	testop, instr, store
+> +UNWIND(	.fnstart	)
+>  	ands	ip, r1, #3
+>  	strneb	r1, [ip]		@ assert word-aligned
+>  	and	r3, r0, #31
+> @@ -73,5 +82,6 @@
+>  	moveq	r0, #0
+>  	restore_irqs ip
+>  	mov	pc, lr
+> +UNWIND(	.fnend		)
+>  	.endm
+>  #endif
+> -- 
+> 1.7.4.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
