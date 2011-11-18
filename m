@@ -1,117 +1,54 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 18 Nov 2011 11:12:40 +0100
-Subject: [PATCH 3/3] ARM: AT91: Add the ADC to the sam9g20ek board
-In-Reply-To: <1321611160-3685-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1321611160-3685-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1321611160-3685-4-git-send-email-maxime.ripard@free-electrons.com>
+From: rpurdie@rpsys.net (Richard Purdie)
+Date: Fri, 18 Nov 2011 10:13:03 +0000
+Subject: [PATCH 6/7] ARM: restart: only perform setup for restart when
+ soft-restarting
+In-Reply-To: <20111117174247.GF9581@n2100.arm.linux.org.uk>
+References: <20111106173113.GI12913@n2100.arm.linux.org.uk>
+ <E1RN6b9-0001NG-NS@rmk-PC.arm.linux.org.uk>
+ <20111117174247.GF9581@n2100.arm.linux.org.uk>
+Message-ID: <1321611183.27449.59.camel@ted>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-Cc: Patrice Vilchez <patrice.vilchez@atmel.com>
-Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- arch/arm/mach-at91/at91sam9260_devices.c |   55 ++++++++++++++++++++++++++++++
- arch/arm/mach-at91/board-sam9g20ek.c     |   11 ++++++
- 2 files changed, 66 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/mach-at91/at91sam9260_devices.c b/arch/arm/mach-at91/at91sam9260_devices.c
-index 39f81f4..3b754ba 100644
---- a/arch/arm/mach-at91/at91sam9260_devices.c
-+++ b/arch/arm/mach-at91/at91sam9260_devices.c
-@@ -1312,6 +1312,61 @@ void __init at91_add_device_cf(struct at91_cf_data *data)
- void __init at91_add_device_cf(struct at91_cf_data * data) {}
- #endif
- 
-+/* --------------------------------------------------------------------
-+ *  ADCs
-+ * -------------------------------------------------------------------- */
-+
-+#if defined(CONFIG_IIO_AT91ADC) || defined(CONFIG_IIO_AT91ADC_MODULE)
-+static struct at91_adc_data adc_data;
-+
-+static struct resource adc_resources[] = {
-+	[0] = {
-+		.start	= AT91SAM9260_BASE_ADC,
-+		.end	= AT91SAM9260_BASE_ADC + SZ_16K - 1,
-+		.flags	= IORESOURCE_MEM,
-+	},
-+	[1] = {
-+		.start	= AT91SAM9260_ID_ADC,
-+		.end	= AT91SAM9260_ID_ADC,
-+		.flags	= IORESOURCE_IRQ,
-+	},
-+};
-+
-+static struct platform_device at91_adc_device = {
-+	.name		= "at91adc",
-+	.id		= -1,
-+	.dev		= {
-+				.platform_data		= &adc_data,
-+	},
-+	.resource	= adc_resources,
-+	.num_resources	= ARRAY_SIZE(adc_resources),
-+};
-+
-+void __init at91_add_device_adc(struct at91_adc_data *data)
-+{
-+	if (!data)
-+		return;
-+
-+	if (test_bit(0, &data->channels_used))
-+		at91_set_A_periph(AT91_PIN_PC0, 0);
-+	if (test_bit(1, &data->channels_used))
-+		at91_set_A_periph(AT91_PIN_PC1, 0);
-+	if (test_bit(2, &data->channels_used))
-+		at91_set_A_periph(AT91_PIN_PC2, 0);
-+	if (test_bit(3, &data->channels_used))
-+		at91_set_A_periph(AT91_PIN_PC3, 0);
-+
-+	data->adc_clock = 5000000;
-+	data->num_channels = 4;
-+	data->startup_time = 10;
-+
-+	adc_data = *data;
-+	platform_device_register(&at91_adc_device);
-+}
-+#else
-+void __init at91_add_device_adc(struct at91_adc_data *data) {}
-+#endif
-+
- /* -------------------------------------------------------------------- */
- /*
-  * These devices are always present and don't need any board-specific
-diff --git a/arch/arm/mach-at91/board-sam9g20ek.c b/arch/arm/mach-at91/board-sam9g20ek.c
-index 817f59d..e34d41a 100644
---- a/arch/arm/mach-at91/board-sam9g20ek.c
-+++ b/arch/arm/mach-at91/board-sam9g20ek.c
-@@ -314,6 +314,15 @@ static void __init ek_add_device_buttons(void)
- static void __init ek_add_device_buttons(void) {}
- #endif
- 
-+/*
-+ * ADCs
-+ */
-+
-+static struct at91_adc_data ek_adc_data = {
-+	.channels_used = BIT(0) | BIT(1) | BIT(2) | BIT(3),
-+	.vref = 3300,
-+};
-+
- #if defined(CONFIG_REGULATOR_FIXED_VOLTAGE) || defined(CONFIG_REGULATOR_FIXED_VOLTAGE_MODULE)
- static struct regulator_consumer_supply ek_audio_consumer_supplies[] = {
- 	REGULATOR_SUPPLY("AVDD", "0-001b"),
-@@ -389,6 +398,8 @@ static void __init ek_board_init(void)
- 	ek_add_device_gpio_leds();
- 	/* Push Buttons */
- 	ek_add_device_buttons();
-+	/* ADCs */
-+	at91_add_device_adc(&ek_adc_data);
- 	/* PCK0 provides MCLK to the WM8731 */
- 	at91_set_B_periph(AT91_PIN_PC1, 0);
- 	/* SSC (for WM8731) */
--- 
-1.7.4.1
+On Thu, 2011-11-17 at 17:42 +0000, Russell King - ARM Linux wrote:
+> Ack?
+> 
+> (If you're in the To: list I'm expecting a reply because this patch is
+> touching something you're responsible for.  Thanks.)
+> 
+> On Sun, Nov 06, 2011 at 05:33:35PM +0000, Russell King - ARM Linux wrote:
+> > We only need to set the system up for a soft-restart if we're going to
+> > be doing a soft-restart.  Provide a new function (soft_restart()) which
+> > does the setup and final call for this, and make platforms use it.
+> > Eliminate the call to setup_restart() from the default handler.
+> > 
+> > This means that platforms arch_reset() function is no longer called with
+> > the page tables prepared for a soft-restart, and caches will still be
+> > enabled.
+> > 
+> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Acked-by: Richard Purdie <richard.purdie@linuxfoundation.org>
+> > ---
+> >  arch/arm/include/asm/system.h                     |    1 +
+> >  arch/arm/kernel/process.c                         |   13 +++++++++++--
+> >  arch/arm/mach-clps711x/include/mach/system.h      |    2 +-
+> >  arch/arm/mach-ebsa110/include/mach/system.h       |    2 +-
+> >  arch/arm/mach-footbridge/include/mach/system.h    |    2 +-
+> >  arch/arm/mach-iop32x/include/mach/system.h        |    2 +-
+> >  arch/arm/mach-iop33x/include/mach/system.h        |    2 +-
+> >  arch/arm/mach-ixp4xx/include/mach/system.h        |    2 +-
+> >  arch/arm/mach-ks8695/include/mach/system.h        |    2 +-
+> >  arch/arm/mach-mmp/include/mach/system.h           |    4 ++--
+> >  arch/arm/mach-mxs/system.c                        |    2 +-
+> >  arch/arm/mach-pnx4008/include/mach/system.h       |    2 +-
+> >  arch/arm/mach-pxa/reset.c                         |    2 +-
+> >  arch/arm/mach-rpc/include/mach/system.h           |    2 +-
+> >  arch/arm/mach-s3c2410/include/mach/system-reset.h |    4 ++--
+> >  arch/arm/mach-s3c64xx/include/mach/system.h       |    2 +-
+> >  arch/arm/mach-sa1100/include/mach/system.h        |    2 +-
+> >  arch/arm/mach-shmobile/include/mach/system.h      |    2 +-
+> >  arch/arm/mach-w90x900/include/mach/system.h       |    2 +-
+> >  arch/arm/plat-mxc/system.c                        |    2 +-
+> >  arch/arm/plat-spear/include/plat/system.h         |    2 +-
+> >  21 files changed, 33 insertions(+), 23 deletions(-)
+> > 
