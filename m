@@ -1,37 +1,52 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 18 Nov 2011 14:56:35 +0000
-Subject: [PATCH v5 4/7] arm: omap4: hwmod: introduce emu hwmod
-In-Reply-To: <4EC6566C.70202@ti.com>
-References: <1319467559-5518-1-git-send-email-ming.lei@canonical.com>
- <1319467559-5518-5-git-send-email-ming.lei@canonical.com>
- <alpine.DEB.2.00.1111080750130.10451@utopia.booyaka.com>
- <CACVXFVMSJUT2Ac+bWetrLpbyOs6PqY+npNHsbvHipEVZ0gWdgQ@mail.gmail.com>
- <alpine.DEB.2.00.1111100152430.4195@utopia.booyaka.com>
- <4EC6566C.70202@ti.com>
-Message-ID: <20111118145635.GB17991@mudshark.cambridge.arm.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Fri, 18 Nov 2011 15:23:22 +0000
+Subject: [PATCH v2] fix compilation breakage in entry-armv.S
+In-Reply-To: <Pine.LNX.4.64.1111161602510.3881@axis700.grange>
+References: <Pine.LNX.4.64.1111081232140.10851@axis700.grange>
+ <20111108114050.GC12913@n2100.arm.linux.org.uk>
+ <Pine.LNX.4.64.1111081258240.10851@axis700.grange>
+ <20111111151515.GA3099@localhost.localdomain>
+ <Pine.LNX.4.64.1111161602510.3881@axis700.grange>
+Message-ID: <20111118152321.GA30405@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Benoit,
-
-On Fri, Nov 18, 2011 at 12:58:20PM +0000, Cousson, Benoit wrote:
-> Hi Ming Lei,
+On Wed, Nov 16, 2011 at 04:05:04PM +0100, Guennadi Liakhovetski wrote:
+> Fix compilation failure, when Thumb support is not enabled:
 > 
-> Sorry, for the delay, it took me some time to gather the exhaustive data for that block. 
+> arch/arm/kernel/entry-armv.S: Assembler messages:
+> arch/arm/kernel/entry-armv.S:501: Error: backward ref to unknown label "2:"
+> arch/arm/kernel/entry-armv.S:502: Error: backward ref to unknown label "3:"
+> make[2]: *** [arch/arm/kernel/entry-armv.o] Error 1
+> 
+> Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
 
-Thanks for looking at this! I don't think we'd have managed to get all of
-the magic numbers in the right place ourselves :)
+That looks fine to me.
 
-Ming Lei - can you take this into your patch series please?
+If Russell is OK with this, please send the patch to his patch system
+so we can get this merged.
 
-Then we'll have:
+Reviewed-by: Dave Martin <dave.martin@linaro.org>
 
-	- The two perf patches in my tree
-	- The hwmod fix in Tony's tree (pending pull)
-	- Your patches plus this one for hooking everything together
-
-The sooner we can push these into -next, the better.
-
-Cheers,
-
-Will
+> v2: use exactly the same preprocessor condition, as the one used for the 
+> code, defining labels "2" and "3"
+> 
+>  arch/arm/kernel/entry-armv.S |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
+> index 9ad50c4..b145f16 100644
+> --- a/arch/arm/kernel/entry-armv.S
+> +++ b/arch/arm/kernel/entry-armv.S
+> @@ -497,7 +497,7 @@ ENDPROC(__und_usr)
+>  	.popsection
+>  	.pushsection __ex_table,"a"
+>  	.long	1b, 4b
+> -#if __LINUX_ARM_ARCH__ >= 7
+> +#if CONFIG_ARM_THUMB && __LINUX_ARM_ARCH__ >= 6 && CONFIG_CPU_V7
+>  	.long	2b, 4b
+>  	.long	3b, 4b
+>  #endif
+> -- 
+> 1.7.2.5
+> 
