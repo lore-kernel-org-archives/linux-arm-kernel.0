@@ -1,299 +1,135 @@
-From: padma.v@samsung.com (Padmavathi Venna)
-Date: Fri, 18 Nov 2011 09:40:07 -0500
-Subject: [PATCH V2] ARM: EXYNOS4: Add SPI support
-Message-ID: <1321627207-20045-1-git-send-email-padma.v@samsung.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Fri, 18 Nov 2011 05:54:42 +0100
+Subject: [alsa-devel] [PATCH v5 1/3] ARM: mxs: add saif clkmux functions
+In-Reply-To: <1321003855-13430-2-git-send-email-b29396@freescale.com>
+References: <1321003855-13430-1-git-send-email-b29396@freescale.com>
+ <1321003855-13430-2-git-send-email-b29396@freescale.com>
+Message-ID: <201111180554.42242.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add SPI setup files for GPIO configurations and platform data
-initialization.
-Add SPI clkdev support.
+> Signed-off-by: Dong Aisheng <b29396@freescale.com>
+> Cc: Sascha Hauer <s.hauer@pengutronix.de>
+> Cc: Wolfram Sang <w.sang@pengutronix.de>
+> Cc: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> Cc: Liam Girdwood <lrg@ti.com>
+> 
+> ---
+> changes since v4:
+>  * remove get_master_id function.
+>    Instead, we use master_mode and master_id in platform_data to tell
+>    saif driver the correct master id for each saifs.
+> changes since v3:
+>  * remove the unneeded locking according to Sascha
+> changes since v2:
+>  * This patch is separated from the following patch based on
+>    suggestions from Uwe.
+>    [PATCH 2/3] ARM: mx28evk: add platform data for saif
+> ---
+>  arch/arm/mach-mxs/clock-mx28.c          |   29
+> +++++++++++++++++++++++++++++ arch/arm/mach-mxs/include/mach/common.h |   
+> 1 +
+>  arch/arm/mach-mxs/include/mach/digctl.h |   21 +++++++++++++++++++++
+>  3 files changed, 51 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-mxs/clock-mx28.c
+> b/arch/arm/mach-mxs/clock-mx28.c index 7954013..c51fe85 100644
+> --- a/arch/arm/mach-mxs/clock-mx28.c
+> +++ b/arch/arm/mach-mxs/clock-mx28.c
+> @@ -22,6 +22,7 @@
+>  #include <linux/io.h>
+>  #include <linux/jiffies.h>
+>  #include <linux/clkdev.h>
+> +#include <linux/spinlock.h>
+> 
+>  #include <asm/clkdev.h>
+>  #include <asm/div64.h>
+> @@ -29,6 +30,7 @@
+>  #include <mach/mx28.h>
+>  #include <mach/common.h>
+>  #include <mach/clock.h>
+> +#include <mach/digctl.h>
+> 
+>  #include "regs-clkctrl-mx28.h"
+> 
+> @@ -43,6 +45,33 @@ static struct clk emi_clk;
+>  static struct clk saif0_clk;
+>  static struct clk saif1_clk;
+>  static struct clk clk32k_clk;
+> +static DEFINE_SPINLOCK(clkmux_lock);
+> +
+> +/*
+> + * HW_SAIF_CLKMUX_SEL:
+> + *  DIRECT(0x0): SAIF0 clock pins selected for SAIF0 input clocks, and
+> SAIF1 + *		clock pins selected for SAIF1 input clocks.
+> + *  CROSSINPUT(0x1): SAIF1 clock inputs selected for SAIF0 input clocks,
+> and + *		SAIF0 clock inputs selected for SAIF1 input clocks.
+> + *  EXTMSTR0(0x2): SAIF0 clock pin selected for both SAIF0 and SAIF1 input
+> + *		clocks.
+> + *  EXTMSTR1(0x3): SAIF1 clock pin selected for both SAIF0 and SAIF1 input
+> + *		clocks.
+> + */
+> +int mxs_saif_clkmux_select(unsigned int clkmux)
+> +{
+> +	if (clkmux > 0x3)
+> +		return -EINVAL;
+> +
+> +	spin_lock(&clkmux_lock);
+> +	__raw_writel(BM_DIGCTL_CTRL_SAIF_CLKMUX,
+> +			DIGCTRL_BASE_ADDR + HW_DIGCTL_CTRL + MXS_CLR_ADDR);
+> +	__raw_writel(clkmux << BP_DIGCTL_CTRL_SAIF_CLKMUX,
+> +			DIGCTRL_BASE_ADDR + HW_DIGCTL_CTRL + MXS_SET_ADDR);
+> +	spin_unlock(&clkmux_lock);
+> +
+> +	return 0;
+> +}
+> 
+>  static int _raw_clk_enable(struct clk *clk)
+>  {
+> diff --git a/arch/arm/mach-mxs/include/mach/common.h
+> b/arch/arm/mach-mxs/include/mach/common.h index 635bb5d..3bbb94f 100644
+> --- a/arch/arm/mach-mxs/include/mach/common.h
+> +++ b/arch/arm/mach-mxs/include/mach/common.h
+> @@ -16,6 +16,7 @@ struct clk;
+>  extern const u32 *mxs_get_ocotp(void);
+>  extern int mxs_reset_block(void __iomem *);
+>  extern void mxs_timer_init(struct clk *, int);
+> +extern int mxs_saif_clkmux_select(unsigned int clkmux);
+> 
+>  extern int mx23_register_gpios(void);
+>  extern int mx23_clocks_init(void);
+> diff --git a/arch/arm/mach-mxs/include/mach/digctl.h
+> b/arch/arm/mach-mxs/include/mach/digctl.h new file mode 100644
+> index 0000000..9bd0496
+> --- /dev/null
+> +++ b/arch/arm/mach-mxs/include/mach/digctl.h
+> @@ -0,0 +1,21 @@
+> +/*
+> + * Copyright 2011 Freescale Semiconductor, Inc. All Rights Reserved.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#ifndef __MACH_DIGCTL_H__
+> +#define __MACH_DIGCTL_H__
+> +
+> +/* MXS DIGCTL SAIF CLKMUX */
+> +#define MXS_DIGCTL_SAIF_CLKMUX_DIRECT		0x0
+> +#define MXS_DIGCTL_SAIF_CLKMUX_CROSSINPUT	0x1
+> +#define MXS_DIGCTL_SAIF_CLKMUX_EXTMSTR0		0x2
+> +#define MXS_DIGCTL_SAIF_CLKMUX_EXTMSTR1		0x3
+> +
+> +#define HW_DIGCTL_CTRL			0x0
+> +#define  BP_DIGCTL_CTRL_SAIF_CLKMUX	(10)
 
-Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
----
- arch/arm/mach-exynos/Kconfig                   |    5 ++
- arch/arm/mach-exynos/Makefile                  |    1 +
- arch/arm/mach-exynos/clock.c                   |   73 ++++++++++++++----------
- arch/arm/mach-exynos/include/mach/irqs.h       |    3 +
- arch/arm/mach-exynos/include/mach/map.h        |    7 ++
- arch/arm/mach-exynos/include/mach/spi-clocks.h |   17 +++++
- arch/arm/mach-exynos/setup-spi.c               |   75 ++++++++++++++++++++++++
- 7 files changed, 151 insertions(+), 30 deletions(-)
- create mode 100644 arch/arm/mach-exynos/include/mach/spi-clocks.h
- create mode 100644 arch/arm/mach-exynos/setup-spi.c
+Do you need the parenthesis above ?
 
-diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
-index 0afcc3b..c925fec 100644
---- a/arch/arm/mach-exynos/Kconfig
-+++ b/arch/arm/mach-exynos/Kconfig
-@@ -148,6 +148,11 @@ config EXYNOS4_SETUP_USB_PHY
- 	help
- 	  Common setup code for USB PHY controller
- 
-+config EXYNOS4_SETUP_SPI
-+	bool
-+	help
-+	  Common setup code for SPI GPIO configurations.
-+
- # machine support
- 
- if ARCH_EXYNOS4
-diff --git a/arch/arm/mach-exynos/Makefile b/arch/arm/mach-exynos/Makefile
-index 57e5296..979fdd3 100644
---- a/arch/arm/mach-exynos/Makefile
-+++ b/arch/arm/mach-exynos/Makefile
-@@ -60,3 +60,4 @@ obj-$(CONFIG_EXYNOS4_SETUP_I2C7)	+= setup-i2c7.o
- obj-$(CONFIG_EXYNOS4_SETUP_KEYPAD)	+= setup-keypad.o
- obj-$(CONFIG_EXYNOS4_SETUP_SDHCI_GPIO)	+= setup-sdhci-gpio.o
- obj-$(CONFIG_EXYNOS4_SETUP_USB_PHY)	+= setup-usb-phy.o
-+obj-$(CONFIG_EXYNOS4_SETUP_SPI)		+= setup-spi.o
-diff --git a/arch/arm/mach-exynos/clock.c b/arch/arm/mach-exynos/clock.c
-index 5d8d483..da50b1a 100644
---- a/arch/arm/mach-exynos/clock.c
-+++ b/arch/arm/mach-exynos/clock.c
-@@ -1111,36 +1111,6 @@ static struct clksrc_clk clksrcs[] = {
- 		.reg_div = { .reg = S5P_CLKDIV_LCD0, .shift = 0, .size = 4 },
- 	}, {
- 		.clk		= {
--			.name		= "sclk_spi",
--			.devname	= "s3c64xx-spi.0",
--			.enable		= exynos4_clksrc_mask_peril1_ctrl,
--			.ctrlbit	= (1 << 16),
--		},
--		.sources = &clkset_group,
--		.reg_src = { .reg = S5P_CLKSRC_PERIL1, .shift = 16, .size = 4 },
--		.reg_div = { .reg = S5P_CLKDIV_PERIL1, .shift = 0, .size = 4 },
--	}, {
--		.clk		= {
--			.name		= "sclk_spi",
--			.devname	= "s3c64xx-spi.1",
--			.enable		= exynos4_clksrc_mask_peril1_ctrl,
--			.ctrlbit	= (1 << 20),
--		},
--		.sources = &clkset_group,
--		.reg_src = { .reg = S5P_CLKSRC_PERIL1, .shift = 20, .size = 4 },
--		.reg_div = { .reg = S5P_CLKDIV_PERIL1, .shift = 16, .size = 4 },
--	}, {
--		.clk		= {
--			.name		= "sclk_spi",
--			.devname	= "s3c64xx-spi.2",
--			.enable		= exynos4_clksrc_mask_peril1_ctrl,
--			.ctrlbit	= (1 << 24),
--		},
--		.sources = &clkset_group,
--		.reg_src = { .reg = S5P_CLKSRC_PERIL1, .shift = 24, .size = 4 },
--		.reg_div = { .reg = S5P_CLKDIV_PERIL2, .shift = 0, .size = 4 },
--	}, {
--		.clk		= {
- 			.name		= "sclk_fimg2d",
- 		},
- 		.sources = &clkset_mout_g2d,
-@@ -1257,6 +1227,42 @@ static struct clksrc_clk clk_sclk_mmc3 = {
- 	.reg_div = { .reg = S5P_CLKDIV_FSYS2, .shift = 24, .size = 8 },
- };
- 
-+static struct clksrc_clk clk_sclk_spi0 = {
-+	.clk		= {
-+		.name		= "sclk_spi",
-+		.devname		= "s3c64xx-spi.0",
-+		.enable		= exynos4_clksrc_mask_peril1_ctrl,
-+		.ctrlbit		= (1 << 16),
-+	},
-+	.sources = &clkset_group,
-+	.reg_src = { .reg = S5P_CLKSRC_PERIL1, .shift = 16, .size = 4 },
-+	.reg_div = { .reg = S5P_CLKDIV_PERIL1, .shift = 0, .size = 4 },
-+};
-+
-+static struct clksrc_clk clk_sclk_spi1 = {
-+	.clk		= {
-+		.name		= "sclk_spi",
-+		.devname		= "s3c64xx-spi.1",
-+		.enable		= exynos4_clksrc_mask_peril1_ctrl,
-+		.ctrlbit		= (1 << 20),
-+	},
-+	.sources = &clkset_group,
-+	.reg_src = { .reg = S5P_CLKSRC_PERIL1, .shift = 20, .size = 4 },
-+	.reg_div = { .reg = S5P_CLKDIV_PERIL1, .shift = 16, .size = 4 },
-+};
-+
-+static struct clksrc_clk clk_sclk_spi2 = {
-+	.clk		= {
-+		.name		= "sclk_spi",
-+		.devname		= "s3c64xx-spi.2",
-+		.enable		= exynos4_clksrc_mask_peril1_ctrl,
-+		.ctrlbit		= (1 << 24),
-+	},
-+	.sources = &clkset_group,
-+	.reg_src = { .reg = S5P_CLKSRC_PERIL1, .shift = 24, .size = 4 },
-+	.reg_div = { .reg = S5P_CLKDIV_PERIL2, .shift = 0, .size = 4 },
-+};
-+
- /* Clock initialization code */
- static struct clksrc_clk *sysclks[] = {
- 	&clk_mout_apll,
-@@ -1305,6 +1311,10 @@ static struct clksrc_clk *clksrc_cdev[] = {
- 	&clk_sclk_mmc1,
- 	&clk_sclk_mmc2,
- 	&clk_sclk_mmc3,
-+	&clk_sclk_spi0,
-+	&clk_sclk_spi1,
-+	&clk_sclk_spi2,
-+
- };
- 
- static struct clk_lookup exynos4_clk_lookup[] = {
-@@ -1318,6 +1328,9 @@ static struct clk_lookup exynos4_clk_lookup[] = {
- 	CLKDEV_INIT("s3c-sdhci.3", "mmc_busclk.2", &clk_sclk_mmc3.clk),
- 	CLKDEV_INIT("dma-pl330.0", "apb_pclk", &clk_pdma0),
- 	CLKDEV_INIT("dma-pl330.1", "apb_pclk", &clk_pdma1),
-+	CLKDEV_INIT("s3c64xx-spi.0", "spi_busclk0", &clk_sclk_spi0.clk),
-+	CLKDEV_INIT("s3c64xx-spi.1", "spi_busclk0", &clk_sclk_spi1.clk),
-+	CLKDEV_INIT("s3c64xx-spi.2", "spi_busclk0", &clk_sclk_spi2.clk),
- };
- 
- static int xtal_rate;
-diff --git a/arch/arm/mach-exynos/include/mach/irqs.h b/arch/arm/mach-exynos/include/mach/irqs.h
-index 713dd52..f77bce0 100644
---- a/arch/arm/mach-exynos/include/mach/irqs.h
-+++ b/arch/arm/mach-exynos/include/mach/irqs.h
-@@ -72,6 +72,9 @@
- #define IRQ_IIC5		IRQ_SPI(63)
- #define IRQ_IIC6		IRQ_SPI(64)
- #define IRQ_IIC7		IRQ_SPI(65)
-+#define IRQ_SPI0		IRQ_SPI(66)
-+#define IRQ_SPI1		IRQ_SPI(67)
-+#define IRQ_SPI2		IRQ_SPI(68)
- 
- #define IRQ_USB_HOST		IRQ_SPI(70)
- #define IRQ_USB_HSOTG		IRQ_SPI(71)
-diff --git a/arch/arm/mach-exynos/include/mach/map.h b/arch/arm/mach-exynos/include/mach/map.h
-index 058541d..e6ba01d 100644
---- a/arch/arm/mach-exynos/include/mach/map.h
-+++ b/arch/arm/mach-exynos/include/mach/map.h
-@@ -87,6 +87,10 @@
- #define EXYNOS4_PA_SYSMMU_TV		0x12E20000
- #define EXYNOS4_PA_SYSMMU_MFC_L		0x13620000
- #define EXYNOS4_PA_SYSMMU_MFC_R		0x13630000
-+#define EXYNOS4_PA_SPI0			0x13920000
-+#define EXYNOS4_PA_SPI1			0x13930000
-+#define EXYNOS4_PA_SPI2			0x13940000
-+
- 
- #define EXYNOS4_PA_GPIO1		0x11400000
- #define EXYNOS4_PA_GPIO2		0x11000000
-@@ -148,6 +152,9 @@
- #define S3C_PA_RTC			EXYNOS4_PA_RTC
- #define S3C_PA_WDT			EXYNOS4_PA_WATCHDOG
- #define S3C_PA_UART			EXYNOS4_PA_UART
-+#define S3C_PA_SPI0			EXYNOS4_PA_SPI0
-+#define S3C_PA_SPI1			EXYNOS4_PA_SPI1
-+#define S3C_PA_SPI2			EXYNOS4_PA_SPI2
- 
- #define S5P_PA_CHIPID			EXYNOS4_PA_CHIPID
- #define S5P_PA_EHCI			EXYNOS4_PA_EHCI
-diff --git a/arch/arm/mach-exynos/include/mach/spi-clocks.h b/arch/arm/mach-exynos/include/mach/spi-clocks.h
-new file mode 100644
-index 0000000..9774389
---- /dev/null
-+++ b/arch/arm/mach-exynos/include/mach/spi-clocks.h
-@@ -0,0 +1,17 @@
-+/* linux/arch/arm/mach-exynos4/include/mach/spi-clocks.h
-+ *
-+ * Copyright (C) 2011 Samsung Electronics Co. Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#ifndef __ASM_ARCH_SPI_CLKS_H
-+#define __ASM_ARCH_SPI_CLKS_H __FILE__
-+
-+/* Must source from SCLK_SPI */
-+#define EXYNOS4_SPI_SRCCLK_SCLK		0
-+
-+#endif /* __ASM_ARCH_SPI_CLKS_H */
-+
-diff --git a/arch/arm/mach-exynos/setup-spi.c b/arch/arm/mach-exynos/setup-spi.c
-new file mode 100644
-index 0000000..e264595
---- /dev/null
-+++ b/arch/arm/mach-exynos/setup-spi.c
-@@ -0,0 +1,75 @@
-+/* linux/arch/arm/mach-exynos4/setup-spi0.c
-+ *
-+ * Copyright (C) 2011 Samsung Electronics Ltd.
-+ *             http://www.samsung.com/
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/gpio.h>
-+#include <linux/platform_device.h>
-+
-+#include <plat/gpio-cfg.h>
-+#include <plat/s3c64xx-spi.h>
-+
-+#ifdef CONFIG_S3C64XX_DEV_SPI0
-+struct s3c64xx_spi_info s3c64xx_spi0_pdata __initdata = {
-+	.fifo_lvl_mask	= 0x1ff,
-+	.rx_lvl_offset	= 15,
-+	.high_speed	= 1,
-+	.clk_from_cmu	= true,
-+	.tx_st_done	= 25,
-+	.cntrlr_no	= 0,
-+};
-+
-+int s3c64xx_spi0_cfg_gpio(struct platform_device *dev)
-+{
-+	s3c_gpio_cfgpin(EXYNOS4_GPB(0), S3C_GPIO_SFN(2));
-+	s3c_gpio_setpull(EXYNOS4_GPB(0), S3C_GPIO_PULL_UP);
-+	s3c_gpio_cfgall_range(EXYNOS4_GPB(2), 2,
-+			      S3C_GPIO_SFN(2), S3C_GPIO_PULL_UP);
-+	return 0;
-+}
-+#endif
-+
-+#ifdef CONFIG_S3C64XX_DEV_SPI1
-+struct s3c64xx_spi_info s3c64xx_spi1_pdata __initdata = {
-+	.fifo_lvl_mask	= 0x7f,
-+	.rx_lvl_offset	= 15,
-+	.high_speed	= 1,
-+	.clk_from_cmu	= true,
-+	.tx_st_done	= 25,
-+	.cntrlr_no	= 1,
-+};
-+
-+int s3c64xx_spi1_cfg_gpio(struct platform_device *dev)
-+{
-+	s3c_gpio_cfgpin(EXYNOS4_GPB(4), S3C_GPIO_SFN(2));
-+	s3c_gpio_setpull(EXYNOS4_GPB(4), S3C_GPIO_PULL_UP);
-+	s3c_gpio_cfgall_range(EXYNOS4_GPB(6), 2,
-+			      S3C_GPIO_SFN(2), S3C_GPIO_PULL_UP);
-+	return 0;
-+}
-+#endif
-+
-+#ifdef CONFIG_S3C64XX_DEV_SPI2
-+struct s3c64xx_spi_info s3c64xx_spi2_pdata __initdata = {
-+	.fifo_lvl_mask	= 0x7f,
-+	.rx_lvl_offset	= 15,
-+	.high_speed	= 1,
-+	.clk_from_cmu	= true,
-+	.tx_st_done	= 25,
-+	.cntrlr_no	= 2,
-+};
-+
-+int s3c64xx_spi2_cfg_gpio(struct platform_device *dev)
-+{
-+	s3c_gpio_cfgpin(EXYNOS4_GPC1(1), S3C_GPIO_SFN(5));
-+	s3c_gpio_setpull(EXYNOS4_GPC1(1), S3C_GPIO_PULL_UP);
-+	s3c_gpio_cfgall_range(EXYNOS4_GPC1(3), 2,
-+			      S3C_GPIO_SFN(5), S3C_GPIO_PULL_UP);
-+	return 0;
-+}
-+#endif
--- 
-1.7.1
+> +#define  BM_DIGCTL_CTRL_SAIF_CLKMUX	(0x3 << 10)
+> +#endif
+
+Please add my
+
+Reviewed-by: Marek Vasut <marek.vasut@gmail.com>
