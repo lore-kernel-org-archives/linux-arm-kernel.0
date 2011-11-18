@@ -1,49 +1,142 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 18 Nov 2011 19:46:00 +0000
-Subject: [PATCH 18/41] ARM: restart: ixp4xx: use new restart hook
-In-Reply-To: <m339dlsweq.fsf@intrepid.localdomain>
-References: <20111106173113.GI12913@n2100.arm.linux.org.uk>
- <E1RN6nE-0001Xl-8i@rmk-PC.arm.linux.org.uk>
- <20111117173027.GE9581@n2100.arm.linux.org.uk>
- <m339dlsweq.fsf@intrepid.localdomain>
-Message-ID: <20111118194600.GK9581@n2100.arm.linux.org.uk>
+Date: Fri, 18 Nov 2011 19:48:48 +0000
+Subject: [PATCH] ARM: w90x900: add common nuc9xx.h
+Message-ID: <E1RRUQa-0005MI-5C@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 18, 2011 at 08:49:01AM +0100, Krzysztof Halasa wrote:
-> Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
-> 
-> >> Hook these platforms restart code into the new restart hook rather
-> >> than using arch_reset().
-> 
-> Looks good basically, except a detail:
-> 
-> >> --- a/arch/arm/mach-ixp4xx/common.c
-> >> +++ b/arch/arm/mach-ixp4xx/common.c
-> >> @@ -500,3 +500,23 @@ static void __init ixp4xx_clockevent_init(void)
-> >>  
-> >>  	clockevents_register_device(&clockevent_ixp4xx);
-> >>  }
-> >> +
-> >> +void ixp4xx_restart(char mode, const char *cmd)
-> >> +{
-> >> +	if ( 1 && mode == 's') {
->            ^^^^^^^
-> This one. Yeah, I can see where does it come from.
+Rather than having separate extern declarations in nuc9*.h, provide
+a common header file containing these definitions.
 
-It's weird, I suspect it was supposed to be 1 || there, but I've no idea
-what the intention is there.  So I left the code as-is.
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+This is a preparatory patch for fixing w90x900 for the restart changes,
+and is the last patch which is currently in linux-next without any
+appropriate acks.
 
-> Otherwise,
-> Acked-by: Krzysztof Ha?asa <khc@pm.waw.pl>
+ arch/arm/mach-w90x900/irq.c    |    2 ++
+ arch/arm/mach-w90x900/nuc910.h |    9 +--------
+ arch/arm/mach-w90x900/nuc950.h |    9 +--------
+ arch/arm/mach-w90x900/nuc960.h |    9 +--------
+ arch/arm/mach-w90x900/nuc9xx.h |   23 +++++++++++++++++++++++
+ arch/arm/mach-w90x900/time.c   |    2 ++
+ 6 files changed, 30 insertions(+), 24 deletions(-)
+ create mode 100644 arch/arm/mach-w90x900/nuc9xx.h
 
-I'm going to assume that applies to this version - because I think fixing
-that should be done independently of this patch series.
-
-> >> +		/* Jump into ROM at address 0 */
-> >> +		soft_restart(0);
-> 
-> OTOH I probably need to investigate this soft_restart, "when time
-> permits", that's another story of course.
-> -- 
-> Krzysztof Halasa
+diff --git a/arch/arm/mach-w90x900/irq.c b/arch/arm/mach-w90x900/irq.c
+index 7bf143c..b466e24 100644
+--- a/arch/arm/mach-w90x900/irq.c
++++ b/arch/arm/mach-w90x900/irq.c
+@@ -28,6 +28,8 @@
+ #include <mach/hardware.h>
+ #include <mach/regs-irq.h>
+ 
++#include "nuc9xx.h"
++
+ struct group_irq {
+ 	unsigned long		gpen;
+ 	unsigned int		enabled;
+diff --git a/arch/arm/mach-w90x900/nuc910.h b/arch/arm/mach-w90x900/nuc910.h
+index 83e9ba5..b14c71a 100644
+--- a/arch/arm/mach-w90x900/nuc910.h
++++ b/arch/arm/mach-w90x900/nuc910.h
+@@ -12,14 +12,7 @@
+  * published by the Free Software Foundation.
+  *
+  */
+-
+-struct map_desc;
+-struct sys_timer;
+-
+-/* core initialisation functions */
+-
+-extern void nuc900_init_irq(void);
+-extern struct sys_timer nuc900_timer;
++#include "nuc9xx.h"
+ 
+ /* extern file from nuc910.c */
+ 
+diff --git a/arch/arm/mach-w90x900/nuc950.h b/arch/arm/mach-w90x900/nuc950.h
+index 98a1148..6e9de30 100644
+--- a/arch/arm/mach-w90x900/nuc950.h
++++ b/arch/arm/mach-w90x900/nuc950.h
+@@ -12,14 +12,7 @@
+  * published by the Free Software Foundation.
+  *
+  */
+-
+-struct map_desc;
+-struct sys_timer;
+-
+-/* core initialisation functions */
+-
+-extern void nuc900_init_irq(void);
+-extern struct sys_timer nuc900_timer;
++#include "nuc9xx.h"
+ 
+ /* extern file from nuc950.c */
+ 
+diff --git a/arch/arm/mach-w90x900/nuc960.h b/arch/arm/mach-w90x900/nuc960.h
+index f0c07cb..9f6df9a 100644
+--- a/arch/arm/mach-w90x900/nuc960.h
++++ b/arch/arm/mach-w90x900/nuc960.h
+@@ -12,14 +12,7 @@
+  * published by the Free Software Foundation.
+  *
+  */
+-
+-struct map_desc;
+-struct sys_timer;
+-
+-/* core initialisation functions */
+-
+-extern void nuc900_init_irq(void);
+-extern struct sys_timer nuc900_timer;
++#include "nuc9xx.h"
+ 
+ /* extern file from nuc960.c */
+ 
+diff --git a/arch/arm/mach-w90x900/nuc9xx.h b/arch/arm/mach-w90x900/nuc9xx.h
+new file mode 100644
+index 0000000..847c4f3
+--- /dev/null
++++ b/arch/arm/mach-w90x900/nuc9xx.h
+@@ -0,0 +1,23 @@
++/*
++ * arch/arm/mach-w90x900/nuc9xx.h
++ *
++ * Copied from nuc910.h, which had:
++ *
++ * Copyright (c) 2008 Nuvoton corporation
++ *
++ * Header file for NUC900 CPU support
++ *
++ * Wan ZongShun <mcuos.com@gmail.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ */
++struct map_desc;
++struct sys_timer;
++
++/* core initialisation functions */
++
++extern void nuc900_init_irq(void);
++extern struct sys_timer nuc900_timer;
+diff --git a/arch/arm/mach-w90x900/time.c b/arch/arm/mach-w90x900/time.c
+index a2c4e2d..fa27c49 100644
+--- a/arch/arm/mach-w90x900/time.c
++++ b/arch/arm/mach-w90x900/time.c
+@@ -33,6 +33,8 @@
+ #include <mach/map.h>
+ #include <mach/regs-timer.h>
+ 
++#include "nuc9xx.h"
++
+ #define RESETINT	0x1f
+ #define PERIOD		(0x01 << 27)
+ #define ONESHOT		(0x00 << 27)
+-- 
+1.7.4.4
