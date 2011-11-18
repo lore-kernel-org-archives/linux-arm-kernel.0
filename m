@@ -1,62 +1,45 @@
-From: or.rmz1@gmail.com (Omar Ramirez Luna)
-Date: Thu, 17 Nov 2011 20:19:50 -0600
-Subject: [PATCH v16 09/12] OMAP: dmtimer: low-power mode support
-In-Reply-To: <CAC83Zv+8+gh_bvtp90s+jiQNuxLcA=R2503V9swupnA1S91L_Q@mail.gmail.com>
-References: <1316518227-28116-1-git-send-email-tarun.kanti@ti.com>
- <1316518227-28116-10-git-send-email-tarun.kanti@ti.com>
- <CAPTm=KGDEKGxLpJt0t6k_NL5Wz81NkMmRJ+OkmyvHedd6_exgQ@mail.gmail.com>
- <CAC83ZvJSev97waAOuzoJsFTX4vmeVFxkg6BzpjQm+Tjo3cbhpg@mail.gmail.com>
- <CAPTm=KHxSvyCb4i02vnuU9Wz-0j3h+h_UvDc0An5mwb2472dPg@mail.gmail.com>
- <CAC83Zv+8+gh_bvtp90s+jiQNuxLcA=R2503V9swupnA1S91L_Q@mail.gmail.com>
-Message-ID: <CAPTm=KEJsX0AszZW7wKYrY-M6QqZMctHRqW70DNQ6x6LdHXXkA@mail.gmail.com>
+From: viresh.kumar@st.com (Viresh Kumar)
+Date: Fri, 18 Nov 2011 08:59:14 +0530
+Subject: [PATCH 6/7] ARM: restart: only perform setup for restart when
+ soft-restarting
+In-Reply-To: <20111117174247.GF9581@n2100.arm.linux.org.uk>
+References: <20111106173113.GI12913@n2100.arm.linux.org.uk>
+ <E1RN6b9-0001NG-NS@rmk-PC.arm.linux.org.uk>
+ <20111117174247.GF9581@n2100.arm.linux.org.uk>
+Message-ID: <4EC5D10A.1020402@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 17, 2011 at 3:42 AM, DebBarma, Tarun Kanti
-<tarun.kanti@ti.com> wrote:
-...
->>>> Is the intention to restrict enabling the dmtimer clocks from hard|soft irqs?
->>> The aim is to prevent client drivers perform clock enable/disable independently.
->>> Instead just use the request/start/stop APIs. In that way we can make clock
->>> enable/disable functions static in the future.
+On 11/17/2011 11:12 PM, Russell King - ARM Linux wrote:
+>> We only need to set the system up for a soft-restart if we're going to
+>> be doing a soft-restart.  Provide a new function (soft_restart()) which
+>> does the setup and final call for this, and make platforms use it.
+>> Eliminate the call to setup_restart() from the default handler.
 >>
->> Those are the APIs I'm using, omap_dm_timer_request_specific from a
->> softirq triggers this warning, this was not hinted by the patch or
->> cover letter of the series, hence the question:
+>> This means that platforms arch_reset() function is no longer called with
+>> the page tables prepared for a soft-restart, and caches will still be
+>> enabled.
 >>
->> Was this change intentional? Does omap_dm_timer_request_specific
->> should be allowed on other contexts (soft|hard irq)?
-> omap_dm_timer_request_specific() uses spin_lock_irqsave and
-> spin_unlock_irqrestore
-> to protect the timer list. There is nothing specific to prevent this
-> function from being
-> called from interrupt context. But you probably have to be careful to
-> avoid deadlock
-> in the interrupt context by disabling interrupts appropriately so that
-> we avoid trying
-> to re-acquire the lock.
+>> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+>> ---
+> 
+> diff --git a/arch/arm/plat-spear/include/plat/system.h b/arch/arm/plat-spear/include/plat/system.h
+>> index a235fa0..1171f22 100644
+>> --- a/arch/arm/plat-spear/include/plat/system.h
+>> +++ b/arch/arm/plat-spear/include/plat/system.h
+>> @@ -31,7 +31,7 @@ static inline void arch_reset(char mode, const char *cmd)
+>>  {
+>>       if (mode == 's') {
+>>               /* software reset, Jump into ROM at address 0 */
+>> -             cpu_reset(0);
+>> +             soft_restart(0);
+>>       } else {
+>>               /* hardware reset, Use on-chip reset capability */
+>>               sysctl_soft_reset((void __iomem *)VA_SPEAR_SYS_CTRL_BASE);
 
-? ...interrupt context should have interrupts disabled.
+For SPEAr:
 
->If you send me the code snippet I can have a look.
+Acked-by: Viresh Kumar <viresh.kumar@st.com>
 
-Here it is a module that triggers this:
-
-http://pastebin.com/bfcWtmQp
-
-Please apply this patch too, otherwise OOT modules disable lockdep:
-
-http://comments.gmane.org/gmane.linux.kernel/1216036
-
-Also enable Schedule-while-atomic checks as this triggers errors even
-on process context, I have prepared a patch for those, will submit
-soon.
-
-And BTW, these errors are seen since patch "ARM: OMAP: dmtimer:
-switch-over to platform device driver", where code to do clk_get was
-placed under spin_lock_irqsave, clk_get is the one holding a
-mutex_lock which can't be done under a spin_lock.
-
-Regards,
-
-Omar
+-- 
+viresh
