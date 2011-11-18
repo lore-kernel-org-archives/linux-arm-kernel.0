@@ -1,35 +1,39 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Fri, 18 Nov 2011 14:03:52 +0200
-Subject: [PATCH] arm/tegra: convert tegra20 to GIC devicetree binding
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF1740D74C1E@HQMAIL01.nvidia.com>
-References: <1321542430-17971-1-git-send-email-pdeschrijver@nvidia.com>
- <74CDBE0F657A3D45AFBB94109FB122FF1740D74C1E@HQMAIL01.nvidia.com>
-Message-ID: <20111118120352.GZ19069@tbergstrom-lnx.Nvidia.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 18 Nov 2011 12:08:17 +0000
+Subject: [PATCH 1/4] ARM: idmap: populate identity map pgd at init time
+ using .init.text
+In-Reply-To: <CAHkRjk6DCipMmqQMiLqZ8aAQs6LLsC5=2buPARfouNpnezCJog@mail.gmail.com>
+References: <1321462094-6647-1-git-send-email-will.deacon@arm.com>
+ <1321462094-6647-2-git-send-email-will.deacon@arm.com>
+ <CAHkRjk6DCipMmqQMiLqZ8aAQs6LLsC5=2buPARfouNpnezCJog@mail.gmail.com>
+Message-ID: <20111118120817.GE2765@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 17, 2011 at 07:51:35PM +0100, Stephen Warren wrote:
-> Peter De Schrijver wrote at Thursday, November 17, 2011 8:07 AM:
-> > Convert tegra20 IRQ intialization to the GIC devicetree binding. Modify the
-> > interrupt definitions in the dts files according to
-> > Documentation/devicetree/bindings/arm/gic.txt
-> > 
-> > Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
+On Fri, Nov 18, 2011 at 12:02:03PM +0000, Catalin Marinas wrote:
+> On 16 November 2011 16:48, Will Deacon <will.deacon@arm.com> wrote:
+> > --- a/include/asm-generic/vmlinux.lds.h
+> > +++ b/include/asm-generic/vmlinux.lds.h
+> > @@ -425,6 +425,12 @@
+> > ? ? ? ? ? ? ? ?*(.kprobes.text) ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+> > ? ? ? ? ? ? ? ?VMLINUX_SYMBOL(__kprobes_text_end) = .;
+> >
+> > +#define IDMAP_TEXT ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
+> > + ? ? ? ? ? ? ? ALIGN_FUNCTION(); ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
+> > + ? ? ? ? ? ? ? VMLINUX_SYMBOL(__idmap_text_start) = .; ? ? ? ? ? ? ? ? \
+> > + ? ? ? ? ? ? ? *(.idmap.text) ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+> > + ? ? ? ? ? ? ? VMLINUX_SYMBOL(__idmap_text_end) = .;
+> > +
+> > ?#define ENTRY_TEXT ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
+> > ? ? ? ? ? ? ? ?ALIGN_FUNCTION(); ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
+> > ? ? ? ? ? ? ? ?VMLINUX_SYMBOL(__entry_text_start) = .; ? ? ? ? ? ? ? ? \
 > 
-> tegra-harmony.dts contains an interrupts property that wasn't updated,
-> for the WM8903 codec.
+> Since IDMAP is specific to ARM, we should just add the IDMAP_TEXT
+> macro to vmlinux.lds.S.
 
-But that's a GPIO interrupt no?
+Argh, well spotted! ctags launched me there and I didn't realise I was outside
+of my usual stomping ground.
 
-> 
-> board-dt.c contains logic to search for a node with compatible of
-> nvidia,tegra20-gic, and then call irq_domain_add_simple. I assume that
-> logic is replaced by the new common GIC code, and so should be removed
-> from board-dt.c entirely?
-> 
+I'll fix this.
 
-Need to check that...
-
-Cheers,
-
-Peter.
+Will
