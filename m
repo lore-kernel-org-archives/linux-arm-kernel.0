@@ -1,40 +1,40 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 18 Nov 2011 17:49:34 +0000
+Date: Fri, 18 Nov 2011 17:52:03 +0000
 Subject: [PATCH 3/5] ARM: vexpress: Add DT support in v2m
-In-Reply-To: <1321618849.24216.323.camel@hornet.cambridge.arm.com>
+In-Reply-To: <20111117183726.GE3044@localhost.localdomain>
 References: <1321036026-23411-1-git-send-email-pawel.moll@arm.com>
  <1321036026-23411-4-git-send-email-pawel.moll@arm.com>
- <20111116154402.GE2073@localhost.localdomain> <4EC3E446.4030608@gmail.com>
- <1321461458.3137.374.camel@hornet.cambridge.arm.com>
- <4EC3EBEC.3020601@gmail.com>
- <1321463271.3137.380.camel@hornet.cambridge.arm.com>
- <20111117155334.GT9581@n2100.arm.linux.org.uk>
- <1321618849.24216.323.camel@hornet.cambridge.arm.com>
-Message-ID: <20111118174934.GH9581@n2100.arm.linux.org.uk>
+ <20111117160536.GU9581@n2100.arm.linux.org.uk>
+ <20111117183726.GE3044@localhost.localdomain>
+Message-ID: <20111118175203.GI9581@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 18, 2011 at 12:20:49PM +0000, Pawel Moll wrote:
-> On Thu, 2011-11-17 at 15:53 +0000, Russell King - ARM Linux wrote:
-> > Again, this is _not_ how DT is supposed to work.  DT is about describing
-> > the hardware, not describing the state of something.  
+On Thu, Nov 17, 2011 at 06:37:26PM +0000, Dave Martin wrote:
+> On Thu, Nov 17, 2011 at 04:05:37PM +0000, Russell King - ARM Linux wrote:
+> > You do understand that system_rev is for the system _revision_ not for
+> > some kind of system ID.  For example, it's to identify whether we're on
+> > a revision 4, 5 or 6 system.
+> > 
+> > However, with DT the differences in system revision should be encoded
+> > into the DT itself, and the kernel should not be making choices about
+> > the hardware off this.
 > 
-> And that's exactly what I was trying to do. Describe the hardware, using
-> terminology *used by the hardware designers* - fact that you have chosen
-> to ignore, fair enough.
+> I can't comment on whether this is an abuse of system_rev, since I'm
+> not too familiar with that.
+> 
+> I feel that Whether the value of the V2M_SYS_ID register should be put
+> in the DT is more doubtful though: the DT must describe the hardware
+> which cannot be probed.
 
-Again, you're totally FAILING to get the point.
+That is exactly my point - but we don't want V2M_SYS_ID controlling what
+hardware is there because then you'll end up having _drivers_ having to
+be aware of the system revision.
 
-Had DT support been created before the new version came out there would
-be no 'legacy' in terminology what so ever.  _That's_ the whole point.
+Instead, the differences in device IP - when they're not discoverable
+from the device itself - should be encoded in DT to allow the device IP
+to be reused on different platforms which may not even have a V2M_SYS_ID
+register.
 
-What you're using is *todays* terminology, not the terminology used at
-the point of *creation*.
-
-Why can't you get it through your thick skull that at some day, the
-entire Cortex-A5 series of CPUs is going to be called 'legacy'.  And
-at that point, will you be wanting to rename all the properties because
-of that change?  No.  That's insane.  So why the fuck do it now to the
-CA9x5?
-
-Try thinking.  It's good for the mind.
+That's what my objection is about: nothing should be using the overall
+system revision to determine anything about it.
