@@ -1,10 +1,10 @@
 From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Fri, 18 Nov 2011 14:03:09 +0200
+Date: Fri, 18 Nov 2011 14:03:52 +0200
 Subject: [PATCH] arm/tegra: convert tegra20 to GIC devicetree binding
 In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF1740D74C1E@HQMAIL01.nvidia.com>
 References: <1321542430-17971-1-git-send-email-pdeschrijver@nvidia.com>
  <74CDBE0F657A3D45AFBB94109FB122FF1740D74C1E@HQMAIL01.nvidia.com>
-Message-ID: <20111118120309.GY19069@tbergstrom-lnx.Nvidia.com>
+Message-ID: <20111118120352.GZ19069@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -18,20 +18,17 @@ On Thu, Nov 17, 2011 at 07:51:35PM +0100, Stephen Warren wrote:
 > 
 > tegra-harmony.dts contains an interrupts property that wasn't updated,
 > for the WM8903 codec.
+
+But that's a GPIO interrupt no?
+
 > 
 > board-dt.c contains logic to search for a node with compatible of
 > nvidia,tegra20-gic, and then call irq_domain_add_simple. I assume that
 > logic is replaced by the new common GIC code, and so should be removed
 > from board-dt.c entirely?
 > 
-> >  	serial at 70006000 {
-> >  		compatible = "nvidia,tegra20-uart";
-> > -		reg = <0x70006000 0x40>;
-> > +		reg = <0x70006000 0x040>;
-> 
-> Here and a few other places, why change the reg property?
 
-Oops. That was probably an overly agressive search and replace :)
+Need to check that...
 
 Cheers,
 
