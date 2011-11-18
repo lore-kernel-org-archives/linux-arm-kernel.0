@@ -1,75 +1,64 @@
 From: rpurdie@rpsys.net (Richard Purdie)
-Date: Fri, 18 Nov 2011 10:11:33 +0000
-Subject: [PATCH 28/41] ARM: restart: pxa: use new restart hook
-In-Reply-To: <20111117172734.GZ9581@n2100.arm.linux.org.uk>
+Date: Fri, 18 Nov 2011 10:11:51 +0000
+Subject: [PATCH 02/41] ARM: restart: remove poodle restart handler
+In-Reply-To: <20111117172438.GY9581@n2100.arm.linux.org.uk>
 References: <20111106173113.GI12913@n2100.arm.linux.org.uk>
- <E1RN6qW-0001YV-U3@rmk-PC.arm.linux.org.uk>
- <20111117172734.GZ9581@n2100.arm.linux.org.uk>
-Message-ID: <1321611093.27449.56.camel@ted>
+ <E1RN6hx-0001Wh-C9@rmk-PC.arm.linux.org.uk>
+ <20111117172438.GY9581@n2100.arm.linux.org.uk>
+Message-ID: <1321611111.27449.57.camel@ted>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2011-11-17 at 17:27 +0000, Russell King - ARM Linux wrote:
+On Thu, 2011-11-17 at 17:24 +0000, Russell King - ARM Linux wrote:
 > Ack?
 > 
-> On Sun, Nov 06, 2011 at 05:49:28PM +0000, Russell King - ARM Linux wrote:
-> > Hook these platforms restart code into the new restart hook rather
-> > than using arch_reset().
+> On Sun, Nov 06, 2011 at 05:40:37PM +0000, Russell King - ARM Linux wrote:
+> > The poodle restart handler was added in 74617fb6b8 (3593/1: Add reboot
+> > and shutdown handlers for Zaurus handhelds), and at that time it was
+> > necessary to deal with the RCSR register.  This commit also forced all
+> > restarts to use the 'hard' restart method.
+> > 
+> > In dc38e2ad53 (pxa: Fix RCSR handling), the RCSR handling was removed,
+> > leaving just the forcing to use a 'hard' restart.  As hard restarts are
+> > the default (in the absense of a reboot= command line argument), this
+> > seems pointless.  In any case, Richard Purdie says:
+> > 
+> > > From what I remember that hardware either always reboots or always
+> > > halts. I think the option was therefore left hardcoded to make it clear
+> > > it wasn't expected to work. Later Zaurii models could do either but
+> > > required some manual poking of registers to make it happen iirc.
+> > >
+> > > Regardless, you can probably clean this up as you suggest now.
+> > 
+> > So, lets remove the unnecessary interception and rely on the default
+> > restart mode.
 > > 
 > > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-Acked-by: Richard Purdie <richard.purdie@linuxfoundation.org>
 
+Acked-by: Richard Purdie <richard.purdie@linuxfoundation.org>
 > > ---
-> >  arch/arm/mach-pxa/balloon3.c            |    1 +
-> >  arch/arm/mach-pxa/capc7117.c            |    3 ++-
-> >  arch/arm/mach-pxa/cm-x2xx.c             |    1 +
-> >  arch/arm/mach-pxa/cm-x300.c             |    1 +
-> >  arch/arm/mach-pxa/colibri-pxa270.c      |    2 ++
-> >  arch/arm/mach-pxa/colibri-pxa300.c      |    1 +
-> >  arch/arm/mach-pxa/colibri-pxa320.c      |    1 +
-> >  arch/arm/mach-pxa/corgi.c               |    8 +++++---
-> >  arch/arm/mach-pxa/csb726.c              |    1 +
-> >  arch/arm/mach-pxa/em-x270.c             |    2 ++
-> >  arch/arm/mach-pxa/eseries.c             |    6 ++++++
-> >  arch/arm/mach-pxa/ezx.c                 |    6 ++++++
-> >  arch/arm/mach-pxa/generic.h             |    2 ++
-> >  arch/arm/mach-pxa/gumstix.c             |    1 +
-> >  arch/arm/mach-pxa/h5000.c               |    1 +
-> >  arch/arm/mach-pxa/himalaya.c            |    1 +
-> >  arch/arm/mach-pxa/hx4700.c              |    1 +
-> >  arch/arm/mach-pxa/icontrol.c            |    3 ++-
-> >  arch/arm/mach-pxa/idp.c                 |    1 +
-> >  arch/arm/mach-pxa/include/mach/system.h |   10 +++-------
-> >  arch/arm/mach-pxa/littleton.c           |    1 +
-> >  arch/arm/mach-pxa/lpd270.c              |    1 +
-> >  arch/arm/mach-pxa/lubbock.c             |    1 +
-> >  arch/arm/mach-pxa/magician.c            |    1 +
-> >  arch/arm/mach-pxa/mainstone.c           |    1 +
-> >  arch/arm/mach-pxa/mioa701.c             |    6 +++---
-> >  arch/arm/mach-pxa/mp900.c               |    1 +
-> >  arch/arm/mach-pxa/palmld.c              |    3 ++-
-> >  arch/arm/mach-pxa/palmt5.c              |    3 ++-
-> >  arch/arm/mach-pxa/palmtc.c              |    3 ++-
-> >  arch/arm/mach-pxa/palmte2.c             |    3 ++-
-> >  arch/arm/mach-pxa/palmtreo.c            |    2 ++
-> >  arch/arm/mach-pxa/palmtx.c              |    3 ++-
-> >  arch/arm/mach-pxa/palmz72.c             |    3 ++-
-> >  arch/arm/mach-pxa/pcm027.c              |    1 +
-> >  arch/arm/mach-pxa/poodle.c              |    3 ++-
-> >  arch/arm/mach-pxa/raumfeld.c            |    3 +++
-> >  arch/arm/mach-pxa/reset.c               |    5 ++++-
-> >  arch/arm/mach-pxa/saar.c                |    1 +
-> >  arch/arm/mach-pxa/saarb.c               |    1 +
-> >  arch/arm/mach-pxa/spitz.c               |    6 ++++--
-> >  arch/arm/mach-pxa/stargate2.c           |    2 ++
-> >  arch/arm/mach-pxa/tavorevb.c            |    1 +
-> >  arch/arm/mach-pxa/tavorevb3.c           |    1 +
-> >  arch/arm/mach-pxa/tosa.c                |    4 ++--
-> >  arch/arm/mach-pxa/trizeps4.c            |    2 ++
-> >  arch/arm/mach-pxa/viper.c               |    1 +
-> >  arch/arm/mach-pxa/vpac270.c             |    3 ++-
-> >  arch/arm/mach-pxa/xcep.c                |    1 +
-> >  arch/arm/mach-pxa/z2.c                  |    1 +
-> >  arch/arm/mach-pxa/zeus.c                |    1 +
-> >  arch/arm/mach-pxa/zylonite.c            |    1 +
-> >  52 files changed, 95 insertions(+), 28 deletions(-)
+> >  arch/arm/mach-pxa/poodle.c |    6 ------
+> >  1 files changed, 0 insertions(+), 6 deletions(-)
+> > 
+> > diff --git a/arch/arm/mach-pxa/poodle.c b/arch/arm/mach-pxa/poodle.c
+> > index 948ce3e..1c597ad 100644
+> > --- a/arch/arm/mach-pxa/poodle.c
+> > +++ b/arch/arm/mach-pxa/poodle.c
+> > @@ -419,17 +419,11 @@ static void poodle_poweroff(void)
+> >  	arm_machine_restart('h', NULL);
+> >  }
+> >  
+> > -static void poodle_restart(char mode, const char *cmd)
+> > -{
+> > -	arm_machine_restart('h', cmd);
+> > -}
+> > -
+> >  static void __init poodle_init(void)
+> >  {
+> >  	int ret = 0;
+> >  
+> >  	pm_power_off = poodle_poweroff;
+> > -	arm_pm_restart = poodle_restart;
+> >  
+> >  	PCFR |= PCFR_OPDE;
+> >  
