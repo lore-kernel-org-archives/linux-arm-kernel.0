@@ -1,47 +1,72 @@
-From: javier.martin@vista-silicon.com (javier Martin)
-Date: Fri, 18 Nov 2011 17:27:12 +0100
-Subject: [PATCH] MEM2MEM: Add support for eMMa-PrP mem2mem operations.
-In-Reply-To: <4EC682B8.10300@gmail.com>
-References: <1321460614-2108-1-git-send-email-javier.martin@vista-silicon.com>
- <4EC682B8.10300@gmail.com>
-Message-ID: <CACKLOr0spqXzYZUPcDkDxCqZXkCM+F6crEQ3R0VbS-HGvZADtA@mail.gmail.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Fri, 18 Nov 2011 17:43:10 +0100
+Subject: [PATCH 03/11] mm: mmzone: introduce zone_pfn_same_memmap()
+In-Reply-To: <1321634598-16859-1-git-send-email-m.szyprowski@samsung.com>
+References: <1321634598-16859-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1321634598-16859-4-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sylwester,
-thank you for your review.
+From: Michal Nazarewicz <mina86@mina86.com>
 
-On 18 November 2011 17:07, Sylwester Nawrocki <snjw23@gmail.com> wrote:
-> Hi Javier,
->
-> Good to see non Samsung device using v4l2 mem-to-mem framework. What is your
-> experience, have you encountered any specific problems with it ?
+This commit introduces zone_pfn_same_memmap() function which checkes
+whether two PFNs within the same zone have struct pages within the
+same memmap.  This check is needed because in general pointer
+arithmetic on struct pages may lead to invalid pointers.
 
-I've found the framework quite convenient and comfortable, it
-definitely saves a lot of work and coding once you understand it
-properly.
-For a simple device as i.MX2 eMMa-PrP a driver can be in a working
-state in a couple of days. I've not found any drawbacks.
+On memory models that are not affected, zone_pfn_same_memmap() is
+defined as always returning true so the call should be optimised
+at compile time.
 
-> And just out of curiosity, are you planning to develop video codec driver
-> in v4l2 for i.MX27 as well ?
+Signed-off-by: Michal Nazarewicz <mina86@mina86.com>
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+---
+ include/linux/mmzone.h |   16 ++++++++++++++++
+ mm/compaction.c        |    5 ++++-
+ 2 files changed, 20 insertions(+), 1 deletions(-)
 
-It depends on the result of a proof of concept we are preparing now.
-But yes, it could be possible. AFAIK, Sascha Hauer (added to CC) has a
-prototype driver for this one though.
-
-> I have a few comments, please see below...
-
-It seems I'll have to prepare a second version with all the fixes
-you've pointed out which seem quite reasonable to me.
-
-Regards.
-
+diff --git a/include/linux/mmzone.h b/include/linux/mmzone.h
+index 188cb2f..84e07d0 100644
+--- a/include/linux/mmzone.h
++++ b/include/linux/mmzone.h
+@@ -1166,6 +1166,22 @@ static inline int memmap_valid_within(unsigned long pfn,
+ }
+ #endif /* CONFIG_ARCH_HAS_HOLES_MEMORYMODEL */
+ 
++#if defined(CONFIG_SPARSEMEM) && !defined(CONFIG_SPARSEMEM_VMEMMAP)
++/*
++ * Both PFNs must be from the same zone!  If this function returns
++ * true, pfn_to_page(pfn1) + (pfn2 - pfn1) == pfn_to_page(pfn2).
++ */
++static inline bool zone_pfn_same_memmap(unsigned long pfn1, unsigned long pfn2)
++{
++	return pfn_to_section_nr(pfn1) == pfn_to_section_nr(pfn2);
++}
++
++#else
++
++#define zone_pfn_same_memmap(pfn1, pfn2) (true)
++
++#endif
++
+ #endif /* !__GENERATING_BOUNDS.H */
+ #endif /* !__ASSEMBLY__ */
+ #endif /* _LINUX_MMZONE_H */
+diff --git a/mm/compaction.c b/mm/compaction.c
+index 6afae0e..09c9702 100644
+--- a/mm/compaction.c
++++ b/mm/compaction.c
+@@ -111,7 +111,10 @@ skip:
+ 
+ next:
+ 		pfn += isolated;
+-		page += isolated;
++		if (zone_pfn_same_memmap(pfn - isolated, pfn))
++			page += isolated;
++		else
++			page = pfn_to_page(pfn);
+ 	}
+ 
+ 	trace_mm_compaction_isolate_freepages(nr_scanned, total_isolated);
 -- 
-Javier Martin
-Vista Silicon S.L.
-CDTUC - FASE C - Oficina S-345
-Avda de los Castros s/n
-39005- Santander. Cantabria. Spain
-+34 942 25 32 60
-www.vista-silicon.com
+1.7.1.569.g6f426
