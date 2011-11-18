@@ -1,643 +1,488 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 18 Nov 2011 07:59:32 +0100
-Subject: [PATCH 4/4] [orion] Remove address map info from all platform data
- strucutures.
-In-Reply-To: <1321599572-705-1-git-send-email-andrew@lunn.ch>
-References: <1321599572-705-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1321599572-705-5-git-send-email-andrew@lunn.ch>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Fri, 18 Nov 2011 08:27:29 +0100
+Subject: [PATCH 2/3] ARM: iommu: tegra2: Initial support for GART driver
+In-Reply-To: <1321527667-12923-3-git-send-email-hdoyu@nvidia.com>
+References: <1321527667-12923-1-git-send-email-hdoyu@nvidia.com>
+ <1321527667-12923-3-git-send-email-hdoyu@nvidia.com>
+Message-ID: <20111118072729.GC20125@avionic-0098.mockup.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Andrew Lunn <andrew@lunn.ch>
----
- arch/arm/mach-dove/common.c                   |   15 +++------
- arch/arm/mach-kirkwood/common.c               |   16 +++------
- arch/arm/mach-mv78xx0/common.c                |   21 +++++-------
- arch/arm/mach-orion5x/common.c                |   15 +++------
- arch/arm/plat-orion/common.c                  |   43 +++++-------------------
- arch/arm/plat-orion/include/plat/audio.h      |    3 --
- arch/arm/plat-orion/include/plat/common.h     |   17 ++-------
- arch/arm/plat-orion/include/plat/ehci-orion.h |    1 -
- arch/arm/plat-orion/include/plat/mv_xor.h     |    6 ---
- arch/arm/plat-orion/include/plat/mvsdio.h     |    1 -
- include/linux/ata_platform.h                  |    3 --
- 11 files changed, 36 insertions(+), 105 deletions(-)
+* hdoyu at nvidia.com wrote:
+> From: Hiroshi DOYU <hdoyu@nvidia.com>
+> 
+> Tegra 2 IOMMU H/W dependent part, GART (Graphics Address Relocation
+> Table). This is one of the tegra_iovmm_device to register to the upper
+> tegra IOVMM framework. This supports only single virtual address
+> space(tegra_iovmm_domain), and manages a simple 1-to-1 mapping
+> H/W translation pagetable.
 
-diff --git a/arch/arm/mach-dove/common.c b/arch/arm/mach-dove/common.c
-index 29c1881..29ff0d0 100644
---- a/arch/arm/mach-dove/common.c
-+++ b/arch/arm/mach-dove/common.c
-@@ -14,7 +14,6 @@
- #include <linux/platform_device.h>
- #include <linux/pci.h>
- #include <linux/clk.h>
--#include <linux/mbus.h>
- #include <linux/ata_platform.h>
- #include <linux/gpio.h>
- #include <asm/page.h>
-@@ -72,8 +71,7 @@ void __init dove_map_io(void)
-  ****************************************************************************/
- void __init dove_ehci0_init(void)
- {
--	orion_ehci_init(&orion_mbus_dram_info,
--			DOVE_USB0_PHYS_BASE, IRQ_DOVE_USB0);
-+	orion_ehci_init(DOVE_USB0_PHYS_BASE, IRQ_DOVE_USB0);
- }
- 
- /*****************************************************************************
-@@ -81,8 +79,7 @@ void __init dove_ehci0_init(void)
-  ****************************************************************************/
- void __init dove_ehci1_init(void)
- {
--	orion_ehci_1_init(&orion_mbus_dram_info,
--			  DOVE_USB1_PHYS_BASE, IRQ_DOVE_USB1);
-+	orion_ehci_1_init(DOVE_USB1_PHYS_BASE, IRQ_DOVE_USB1);
- }
- 
- /*****************************************************************************
-@@ -90,7 +87,7 @@ void __init dove_ehci1_init(void)
-  ****************************************************************************/
- void __init dove_ge00_init(struct mv643xx_eth_platform_data *eth_data)
- {
--	orion_ge00_init(eth_data, &orion_mbus_dram_info,
-+	orion_ge00_init(eth_data,
- 			DOVE_GE00_PHYS_BASE, IRQ_DOVE_GE00_SUM,
- 			0, get_tclk());
- }
-@@ -108,8 +105,7 @@ void __init dove_rtc_init(void)
-  ****************************************************************************/
- void __init dove_sata_init(struct mv_sata_platform_data *sata_data)
- {
--	orion_sata_init(sata_data, &orion_mbus_dram_info,
--			DOVE_SATA_PHYS_BASE, IRQ_DOVE_SATA);
-+	orion_sata_init(sata_data, DOVE_SATA_PHYS_BASE, IRQ_DOVE_SATA);
- 
- }
- 
-@@ -199,8 +195,7 @@ struct sys_timer dove_timer = {
-  ****************************************************************************/
- void __init dove_xor0_init(void)
- {
--	orion_xor0_init(&orion_mbus_dram_info,
--			DOVE_XOR0_PHYS_BASE, DOVE_XOR0_HIGH_PHYS_BASE,
-+	orion_xor0_init(DOVE_XOR0_PHYS_BASE, DOVE_XOR0_HIGH_PHYS_BASE,
- 			IRQ_DOVE_XOR_00, IRQ_DOVE_XOR_01);
- }
- 
-diff --git a/arch/arm/mach-kirkwood/common.c b/arch/arm/mach-kirkwood/common.c
-index d8b4ed2..6badde5 100644
---- a/arch/arm/mach-kirkwood/common.c
-+++ b/arch/arm/mach-kirkwood/common.c
-@@ -12,7 +12,6 @@
- #include <linux/init.h>
- #include <linux/platform_device.h>
- #include <linux/serial_8250.h>
--#include <linux/mbus.h>
- #include <linux/ata_platform.h>
- #include <linux/mtd/nand.h>
- #include <linux/dma-mapping.h>
-@@ -74,8 +73,7 @@ unsigned int kirkwood_clk_ctrl = CGC_DUNIT | CGC_RESERVED;
- void __init kirkwood_ehci_init(void)
- {
- 	kirkwood_clk_ctrl |= CGC_USB0;
--	orion_ehci_init(&orion_mbus_dram_info,
--			USB_PHYS_BASE, IRQ_KIRKWOOD_USB);
-+	orion_ehci_init(USB_PHYS_BASE, IRQ_KIRKWOOD_USB);
- }
- 
- 
-@@ -86,7 +84,7 @@ void __init kirkwood_ge00_init(struct mv643xx_eth_platform_data *eth_data)
- {
- 	kirkwood_clk_ctrl |= CGC_GE0;
- 
--	orion_ge00_init(eth_data, &orion_mbus_dram_info,
-+	orion_ge00_init(eth_data,
- 			GE00_PHYS_BASE, IRQ_KIRKWOOD_GE00_SUM,
- 			IRQ_KIRKWOOD_GE00_ERR, kirkwood_tclk);
- }
-@@ -100,7 +98,7 @@ void __init kirkwood_ge01_init(struct mv643xx_eth_platform_data *eth_data)
- 
- 	kirkwood_clk_ctrl |= CGC_GE1;
- 
--	orion_ge01_init(eth_data, &orion_mbus_dram_info,
-+	orion_ge01_init(eth_data,
- 			GE01_PHYS_BASE, IRQ_KIRKWOOD_GE01_SUM,
- 			IRQ_KIRKWOOD_GE01_ERR, kirkwood_tclk);
- }
-@@ -179,8 +177,7 @@ void __init kirkwood_sata_init(struct mv_sata_platform_data *sata_data)
- 	if (sata_data->n_ports > 1)
- 		kirkwood_clk_ctrl |= CGC_SATA1;
- 
--	orion_sata_init(sata_data, &orion_mbus_dram_info,
--			SATA_PHYS_BASE, IRQ_KIRKWOOD_SATA);
-+	orion_sata_init(sata_data, SATA_PHYS_BASE, IRQ_KIRKWOOD_SATA);
- }
- 
- 
-@@ -222,7 +219,6 @@ void __init kirkwood_sdio_init(struct mvsdio_platform_data *mvsdio_data)
- 		mvsdio_data->clock = 100000000;
- 	else
- 		mvsdio_data->clock = 200000000;
--	mvsdio_data->dram = &orion_mbus_dram_info;
- 	kirkwood_clk_ctrl |= CGC_SDIO;
- 	kirkwood_sdio.dev.platform_data = mvsdio_data;
- 	platform_device_register(&kirkwood_sdio);
-@@ -286,8 +282,7 @@ static void __init kirkwood_xor0_init(void)
- {
- 	kirkwood_clk_ctrl |= CGC_XOR0;
- 
--	orion_xor0_init(&orion_mbus_dram_info,
--			XOR0_PHYS_BASE, XOR0_HIGH_PHYS_BASE,
-+	orion_xor0_init(XOR0_PHYS_BASE, XOR0_HIGH_PHYS_BASE,
- 			IRQ_KIRKWOOD_XOR_00, IRQ_KIRKWOOD_XOR_01);
- }
- 
-@@ -365,7 +360,6 @@ static struct resource kirkwood_i2s_resources[] = {
- };
- 
- static struct kirkwood_asoc_platform_data kirkwood_i2s_data = {
--	.dram        = &orion_mbus_dram_info,
- 	.burst       = 128,
- };
- 
-diff --git a/arch/arm/mach-mv78xx0/common.c b/arch/arm/mach-mv78xx0/common.c
-index be0c232..534ce20 100644
---- a/arch/arm/mach-mv78xx0/common.c
-+++ b/arch/arm/mach-mv78xx0/common.c
-@@ -12,7 +12,6 @@
- #include <linux/init.h>
- #include <linux/platform_device.h>
- #include <linux/serial_8250.h>
--#include <linux/mbus.h>
- #include <linux/ata_platform.h>
- #include <linux/ethtool.h>
- #include <asm/mach/map.h>
-@@ -170,8 +169,7 @@ void __init mv78xx0_map_io(void)
-  ****************************************************************************/
- void __init mv78xx0_ehci0_init(void)
- {
--	orion_ehci_init(&orion_mbus_dram_info,
--			USB0_PHYS_BASE, IRQ_MV78XX0_USB_0);
-+	orion_ehci_init(USB0_PHYS_BASE, IRQ_MV78XX0_USB_0);
- }
- 
- 
-@@ -180,8 +178,7 @@ void __init mv78xx0_ehci0_init(void)
-  ****************************************************************************/
- void __init mv78xx0_ehci1_init(void)
- {
--	orion_ehci_1_init(&orion_mbus_dram_info,
--			  USB1_PHYS_BASE, IRQ_MV78XX0_USB_1);
-+	orion_ehci_1_init(USB1_PHYS_BASE, IRQ_MV78XX0_USB_1);
- }
- 
- 
-@@ -190,8 +187,7 @@ void __init mv78xx0_ehci1_init(void)
-  ****************************************************************************/
- void __init mv78xx0_ehci2_init(void)
- {
--	orion_ehci_2_init(&orion_mbus_dram_info,
--			  USB2_PHYS_BASE, IRQ_MV78XX0_USB_2);
-+	orion_ehci_2_init(USB2_PHYS_BASE, IRQ_MV78XX0_USB_2);
- }
- 
- 
-@@ -200,7 +196,7 @@ void __init mv78xx0_ehci2_init(void)
-  ****************************************************************************/
- void __init mv78xx0_ge00_init(struct mv643xx_eth_platform_data *eth_data)
- {
--	orion_ge00_init(eth_data, &orion_mbus_dram_info,
-+	orion_ge00_init(eth_data,
- 			GE00_PHYS_BASE, IRQ_MV78XX0_GE00_SUM,
- 			IRQ_MV78XX0_GE_ERR, get_tclk());
- }
-@@ -211,7 +207,7 @@ void __init mv78xx0_ge00_init(struct mv643xx_eth_platform_data *eth_data)
-  ****************************************************************************/
- void __init mv78xx0_ge01_init(struct mv643xx_eth_platform_data *eth_data)
- {
--	orion_ge01_init(eth_data, &orion_mbus_dram_info,
-+	orion_ge01_init(eth_data,
- 			GE01_PHYS_BASE, IRQ_MV78XX0_GE01_SUM,
- 			NO_IRQ, get_tclk());
- }
-@@ -235,7 +231,7 @@ void __init mv78xx0_ge10_init(struct mv643xx_eth_platform_data *eth_data)
- 		eth_data->duplex = DUPLEX_FULL;
- 	}
- 
--	orion_ge10_init(eth_data, &orion_mbus_dram_info,
-+	orion_ge10_init(eth_data,
- 			GE10_PHYS_BASE, IRQ_MV78XX0_GE10_SUM,
- 			NO_IRQ, get_tclk());
- }
-@@ -259,7 +255,7 @@ void __init mv78xx0_ge11_init(struct mv643xx_eth_platform_data *eth_data)
- 		eth_data->duplex = DUPLEX_FULL;
- 	}
- 
--	orion_ge11_init(eth_data, &orion_mbus_dram_info,
-+	orion_ge11_init(eth_data,
- 			GE11_PHYS_BASE, IRQ_MV78XX0_GE11_SUM,
- 			NO_IRQ, get_tclk());
- }
-@@ -278,8 +274,7 @@ void __init mv78xx0_i2c_init(void)
-  ****************************************************************************/
- void __init mv78xx0_sata_init(struct mv_sata_platform_data *sata_data)
- {
--	orion_sata_init(sata_data, &orion_mbus_dram_info,
--			SATA_PHYS_BASE, IRQ_MV78XX0_SATA);
-+	orion_sata_init(sata_data, SATA_PHYS_BASE, IRQ_MV78XX0_SATA);
- }
- 
- 
-diff --git a/arch/arm/mach-orion5x/common.c b/arch/arm/mach-orion5x/common.c
-index 27addd5..c0dea6e 100644
---- a/arch/arm/mach-orion5x/common.c
-+++ b/arch/arm/mach-orion5x/common.c
-@@ -15,7 +15,6 @@
- #include <linux/platform_device.h>
- #include <linux/dma-mapping.h>
- #include <linux/serial_8250.h>
--#include <linux/mbus.h>
- #include <linux/mv643xx_i2c.h>
- #include <linux/ata_platform.h>
- #include <net/dsa.h>
-@@ -72,8 +71,7 @@ void __init orion5x_map_io(void)
-  ****************************************************************************/
- void __init orion5x_ehci0_init(void)
- {
--	orion_ehci_init(&orion_mbus_dram_info,
--			ORION5X_USB0_PHYS_BASE, IRQ_ORION5X_USB0_CTRL);
-+	orion_ehci_init(ORION5X_USB0_PHYS_BASE, IRQ_ORION5X_USB0_CTRL);
- }
- 
- 
-@@ -82,8 +80,7 @@ void __init orion5x_ehci0_init(void)
-  ****************************************************************************/
- void __init orion5x_ehci1_init(void)
- {
--	orion_ehci_1_init(&orion_mbus_dram_info,
--			  ORION5X_USB1_PHYS_BASE, IRQ_ORION5X_USB1_CTRL);
-+	orion_ehci_1_init(ORION5X_USB1_PHYS_BASE, IRQ_ORION5X_USB1_CTRL);
- }
- 
- 
-@@ -92,7 +89,7 @@ void __init orion5x_ehci1_init(void)
-  ****************************************************************************/
- void __init orion5x_eth_init(struct mv643xx_eth_platform_data *eth_data)
- {
--	orion_ge00_init(eth_data, &orion_mbus_dram_info,
-+	orion_ge00_init(eth_data,
- 			ORION5X_ETH_PHYS_BASE, IRQ_ORION5X_ETH_SUM,
- 			IRQ_ORION5X_ETH_ERR, orion5x_tclk);
- }
-@@ -122,8 +119,7 @@ void __init orion5x_i2c_init(void)
-  ****************************************************************************/
- void __init orion5x_sata_init(struct mv_sata_platform_data *sata_data)
- {
--	orion_sata_init(sata_data, &orion_mbus_dram_info,
--			ORION5X_SATA_PHYS_BASE, IRQ_ORION5X_SATA);
-+	orion_sata_init(sata_data, ORION5X_SATA_PHYS_BASE, IRQ_ORION5X_SATA);
- }
- 
- 
-@@ -159,8 +155,7 @@ void __init orion5x_uart1_init(void)
-  ****************************************************************************/
- void __init orion5x_xor_init(void)
- {
--	orion_xor0_init(&orion_mbus_dram_info,
--			ORION5X_XOR_PHYS_BASE,
-+	orion_xor0_init(ORION5X_XOR_PHYS_BASE,
- 			ORION5X_XOR_PHYS_BASE + 0x200,
- 			IRQ_ORION5X_XOR0, IRQ_ORION5X_XOR1);
- }
-diff --git a/arch/arm/plat-orion/common.c b/arch/arm/plat-orion/common.c
-index 9e5451b..e5a2fde 100644
---- a/arch/arm/plat-orion/common.c
-+++ b/arch/arm/plat-orion/common.c
-@@ -13,7 +13,6 @@
- #include <linux/platform_device.h>
- #include <linux/dma-mapping.h>
- #include <linux/serial_8250.h>
--#include <linux/mbus.h>
- #include <linux/ata_platform.h>
- #include <linux/mv643xx_eth.h>
- #include <linux/mv643xx_i2c.h>
-@@ -203,13 +202,12 @@ void __init orion_rtc_init(unsigned long mapbase,
-  ****************************************************************************/
- static __init void ge_complete(
- 	struct mv643xx_eth_shared_platform_data *orion_ge_shared_data,
--	struct mbus_dram_target_info *mbus_dram_info, int tclk,
-+	int tclk,
- 	struct resource *orion_ge_resource, unsigned long irq,
- 	struct platform_device *orion_ge_shared,
- 	struct mv643xx_eth_platform_data *eth_data,
- 	struct platform_device *orion_ge)
- {
--	orion_ge_shared_data->dram = mbus_dram_info;
- 	orion_ge_shared_data->t_clk = tclk;
- 	orion_ge_resource->start = irq;
- 	orion_ge_resource->end = irq;
-@@ -259,7 +257,6 @@ static struct platform_device orion_ge00 = {
- };
- 
- void __init orion_ge00_init(struct mv643xx_eth_platform_data *eth_data,
--			    struct mbus_dram_target_info *mbus_dram_info,
- 			    unsigned long mapbase,
- 			    unsigned long irq,
- 			    unsigned long irq_err,
-@@ -267,7 +264,7 @@ void __init orion_ge00_init(struct mv643xx_eth_platform_data *eth_data,
- {
- 	fill_resources(&orion_ge00_shared, orion_ge00_shared_resources,
- 		       mapbase + 0x2000, SZ_16K - 1, irq_err);
--	ge_complete(&orion_ge00_shared_data, mbus_dram_info, tclk,
-+	ge_complete(&orion_ge00_shared_data, tclk,
- 		    orion_ge00_resources, irq, &orion_ge00_shared,
- 		    eth_data, &orion_ge00);
- }
-@@ -313,7 +310,6 @@ static struct platform_device orion_ge01 = {
- };
- 
- void __init orion_ge01_init(struct mv643xx_eth_platform_data *eth_data,
--			    struct mbus_dram_target_info *mbus_dram_info,
- 			    unsigned long mapbase,
- 			    unsigned long irq,
- 			    unsigned long irq_err,
-@@ -321,7 +317,7 @@ void __init orion_ge01_init(struct mv643xx_eth_platform_data *eth_data,
- {
- 	fill_resources(&orion_ge01_shared, orion_ge01_shared_resources,
- 		       mapbase + 0x2000, SZ_16K - 1, irq_err);
--	ge_complete(&orion_ge01_shared_data, mbus_dram_info, tclk,
-+	ge_complete(&orion_ge01_shared_data, tclk,
- 		    orion_ge01_resources, irq, &orion_ge01_shared,
- 		    eth_data, &orion_ge01);
- }
-@@ -367,7 +363,6 @@ static struct platform_device orion_ge10 = {
- };
- 
- void __init orion_ge10_init(struct mv643xx_eth_platform_data *eth_data,
--			    struct mbus_dram_target_info *mbus_dram_info,
- 			    unsigned long mapbase,
- 			    unsigned long irq,
- 			    unsigned long irq_err,
-@@ -375,7 +370,7 @@ void __init orion_ge10_init(struct mv643xx_eth_platform_data *eth_data,
- {
- 	fill_resources(&orion_ge10_shared, orion_ge10_shared_resources,
- 		       mapbase + 0x2000, SZ_16K - 1, irq_err);
--	ge_complete(&orion_ge10_shared_data, mbus_dram_info, tclk,
-+	ge_complete(&orion_ge10_shared_data, tclk,
- 		    orion_ge10_resources, irq, &orion_ge10_shared,
- 		    eth_data, &orion_ge10);
- }
-@@ -421,7 +416,6 @@ static struct platform_device orion_ge11 = {
- };
- 
- void __init orion_ge11_init(struct mv643xx_eth_platform_data *eth_data,
--			    struct mbus_dram_target_info *mbus_dram_info,
- 			    unsigned long mapbase,
- 			    unsigned long irq,
- 			    unsigned long irq_err,
-@@ -429,7 +423,7 @@ void __init orion_ge11_init(struct mv643xx_eth_platform_data *eth_data,
- {
- 	fill_resources(&orion_ge11_shared, orion_ge11_shared_resources,
- 		       mapbase + 0x2000, SZ_16K - 1, irq_err);
--	ge_complete(&orion_ge11_shared_data, mbus_dram_info, tclk,
-+	ge_complete(&orion_ge11_shared_data, tclk,
- 		    orion_ge11_resources, irq, &orion_ge11_shared,
- 		    eth_data, &orion_ge11);
- }
-@@ -592,8 +586,6 @@ void __init orion_wdt_init(unsigned long tclk)
- /*****************************************************************************
-  * XOR
-  ****************************************************************************/
--static struct mv_xor_platform_shared_data orion_xor_shared_data;
--
- static u64 orion_xor_dmamask = DMA_BIT_MASK(32);
- 
- void __init orion_xor_init_channels(
-@@ -632,9 +624,6 @@ static struct resource orion_xor0_shared_resources[] = {
- static struct platform_device orion_xor0_shared = {
- 	.name		= MV_XOR_SHARED_NAME,
- 	.id		= 0,
--	.dev		= {
--		.platform_data = &orion_xor_shared_data,
--	},
- 	.num_resources	= ARRAY_SIZE(orion_xor0_shared_resources),
- 	.resource	= orion_xor0_shared_resources,
- };
-@@ -687,14 +676,11 @@ static struct platform_device orion_xor01_channel = {
- 	},
- };
- 
--void __init orion_xor0_init(struct mbus_dram_target_info *mbus_dram_info,
--			    unsigned long mapbase_low,
-+void __init orion_xor0_init(unsigned long mapbase_low,
- 			    unsigned long mapbase_high,
- 			    unsigned long irq_0,
- 			    unsigned long irq_1)
- {
--	orion_xor_shared_data.dram = mbus_dram_info;
--
- 	orion_xor0_shared_resources[0].start = mapbase_low;
- 	orion_xor0_shared_resources[0].end = mapbase_low + 0xff;
- 	orion_xor0_shared_resources[1].start = mapbase_high;
-@@ -727,9 +713,6 @@ static struct resource orion_xor1_shared_resources[] = {
- static struct platform_device orion_xor1_shared = {
- 	.name		= MV_XOR_SHARED_NAME,
- 	.id		= 1,
--	.dev		= {
--		.platform_data = &orion_xor_shared_data,
--	},
- 	.num_resources	= ARRAY_SIZE(orion_xor1_shared_resources),
- 	.resource	= orion_xor1_shared_resources,
- };
-@@ -828,11 +811,9 @@ static struct platform_device orion_ehci = {
- 	},
- };
- 
--void __init orion_ehci_init(struct mbus_dram_target_info *mbus_dram_info,
--			    unsigned long mapbase,
-+void __init orion_ehci_init(unsigned long mapbase,
- 			    unsigned long irq)
- {
--	orion_ehci_data.dram = mbus_dram_info;
- 	fill_resources(&orion_ehci, orion_ehci_resources, mapbase, SZ_4K - 1,
- 		       irq);
- 
-@@ -854,11 +835,9 @@ static struct platform_device orion_ehci_1 = {
- 	},
- };
- 
--void __init orion_ehci_1_init(struct mbus_dram_target_info *mbus_dram_info,
--			      unsigned long mapbase,
-+void __init orion_ehci_1_init(unsigned long mapbase,
- 			      unsigned long irq)
- {
--	orion_ehci_data.dram = mbus_dram_info;
- 	fill_resources(&orion_ehci_1, orion_ehci_1_resources,
- 		       mapbase, SZ_4K - 1, irq);
- 
-@@ -880,11 +859,9 @@ static struct platform_device orion_ehci_2 = {
- 	},
- };
- 
--void __init orion_ehci_2_init(struct mbus_dram_target_info *mbus_dram_info,
--			      unsigned long mapbase,
-+void __init orion_ehci_2_init(unsigned long mapbase,
- 			      unsigned long irq)
- {
--	orion_ehci_data.dram = mbus_dram_info;
- 	fill_resources(&orion_ehci_2, orion_ehci_2_resources,
- 		       mapbase, SZ_4K - 1, irq);
- 
-@@ -911,11 +888,9 @@ static struct platform_device orion_sata = {
- };
- 
- void __init orion_sata_init(struct mv_sata_platform_data *sata_data,
--			    struct mbus_dram_target_info *mbus_dram_info,
- 			    unsigned long mapbase,
- 			    unsigned long irq)
- {
--	sata_data->dram = mbus_dram_info;
- 	orion_sata.dev.platform_data = sata_data;
- 	fill_resources(&orion_sata, orion_sata_resources,
- 		       mapbase, 0x5000 - 1, irq);
-diff --git a/arch/arm/plat-orion/include/plat/audio.h b/arch/arm/plat-orion/include/plat/audio.h
-index 9cf1f78..885f8ab 100644
---- a/arch/arm/plat-orion/include/plat/audio.h
-+++ b/arch/arm/plat-orion/include/plat/audio.h
-@@ -1,11 +1,8 @@
- #ifndef __PLAT_AUDIO_H
- #define __PLAT_AUDIO_H
- 
--#include <linux/mbus.h>
--
- struct kirkwood_asoc_platform_data {
- 	u32 tclk;
--	struct mbus_dram_target_info *dram;
- 	int burst;
- };
- #endif
-diff --git a/arch/arm/plat-orion/include/plat/common.h b/arch/arm/plat-orion/include/plat/common.h
-index a63c357..0fe08d7 100644
---- a/arch/arm/plat-orion/include/plat/common.h
-+++ b/arch/arm/plat-orion/include/plat/common.h
-@@ -37,28 +37,24 @@ void __init orion_rtc_init(unsigned long mapbase,
- 			   unsigned long irq);
- 
- void __init orion_ge00_init(struct mv643xx_eth_platform_data *eth_data,
--			    struct mbus_dram_target_info *mbus_dram_info,
- 			    unsigned long mapbase,
- 			    unsigned long irq,
- 			    unsigned long irq_err,
- 			    int tclk);
- 
- void __init orion_ge01_init(struct mv643xx_eth_platform_data *eth_data,
--			    struct mbus_dram_target_info *mbus_dram_info,
- 			    unsigned long mapbase,
- 			    unsigned long irq,
- 			    unsigned long irq_err,
- 			    int tclk);
- 
- void __init orion_ge10_init(struct mv643xx_eth_platform_data *eth_data,
--			    struct mbus_dram_target_info *mbus_dram_info,
- 			    unsigned long mapbase,
- 			    unsigned long irq,
- 			    unsigned long irq_err,
- 			    int tclk);
- 
- void __init orion_ge11_init(struct mv643xx_eth_platform_data *eth_data,
--			    struct mbus_dram_target_info *mbus_dram_info,
- 			    unsigned long mapbase,
- 			    unsigned long irq,
- 			    unsigned long irq_err,
-@@ -82,8 +78,7 @@ void __init orion_spi_1_init(unsigned long mapbase,
- 
- void __init orion_wdt_init(unsigned long tclk);
- 
--void __init orion_xor0_init(struct mbus_dram_target_info *mbus_dram_info,
--			    unsigned long mapbase_low,
-+void __init orion_xor0_init(unsigned long mapbase_low,
- 			    unsigned long mapbase_high,
- 			    unsigned long irq_0,
- 			    unsigned long irq_1);
-@@ -93,20 +88,16 @@ void __init orion_xor1_init(unsigned long mapbase_low,
- 			    unsigned long irq_0,
- 			    unsigned long irq_1);
- 
--void __init orion_ehci_init(struct mbus_dram_target_info *mbus_dram_info,
--			    unsigned long mapbase,
-+void __init orion_ehci_init(unsigned long mapbase,
- 			    unsigned long irq);
- 
--void __init orion_ehci_1_init(struct mbus_dram_target_info *mbus_dram_info,
--			      unsigned long mapbase,
-+void __init orion_ehci_1_init(unsigned long mapbase,
- 			      unsigned long irq);
- 
--void __init orion_ehci_2_init(struct mbus_dram_target_info *mbus_dram_info,
--			      unsigned long mapbase,
-+void __init orion_ehci_2_init(unsigned long mapbase,
- 			      unsigned long irq);
- 
- void __init orion_sata_init(struct mv_sata_platform_data *sata_data,
--			    struct mbus_dram_target_info *mbus_dram_info,
- 			    unsigned long mapbase,
- 			    unsigned long irq);
- 
-diff --git a/arch/arm/plat-orion/include/plat/ehci-orion.h b/arch/arm/plat-orion/include/plat/ehci-orion.h
-index 4ec668e..6fc78e4 100644
---- a/arch/arm/plat-orion/include/plat/ehci-orion.h
-+++ b/arch/arm/plat-orion/include/plat/ehci-orion.h
-@@ -19,7 +19,6 @@ enum orion_ehci_phy_ver {
- };
- 
- struct orion_ehci_data {
--	struct mbus_dram_target_info	*dram;
- 	enum orion_ehci_phy_ver phy_version;
- };
- 
-diff --git a/arch/arm/plat-orion/include/plat/mv_xor.h b/arch/arm/plat-orion/include/plat/mv_xor.h
-index bd5f3bd..2ba1f7d 100644
---- a/arch/arm/plat-orion/include/plat/mv_xor.h
-+++ b/arch/arm/plat-orion/include/plat/mv_xor.h
-@@ -13,12 +13,6 @@
- #define MV_XOR_SHARED_NAME	"mv_xor_shared"
- #define MV_XOR_NAME		"mv_xor"
- 
--struct mbus_dram_target_info;
--
--struct mv_xor_platform_shared_data {
--	struct mbus_dram_target_info	*dram;
--};
--
- struct mv_xor_platform_data {
- 	struct platform_device		*shared;
- 	int				hw_id;
-diff --git a/arch/arm/plat-orion/include/plat/mvsdio.h b/arch/arm/plat-orion/include/plat/mvsdio.h
-index 14ca886..1190efe 100644
---- a/arch/arm/plat-orion/include/plat/mvsdio.h
-+++ b/arch/arm/plat-orion/include/plat/mvsdio.h
-@@ -12,7 +12,6 @@
- #include <linux/mbus.h>
- 
- struct mvsdio_platform_data {
--	struct mbus_dram_target_info *dram;
- 	unsigned int clock;
- 	int gpio_card_detect;
- 	int gpio_write_protect;
-diff --git a/include/linux/ata_platform.h b/include/linux/ata_platform.h
-index 9a26c83..b856a2a 100644
---- a/include/linux/ata_platform.h
-+++ b/include/linux/ata_platform.h
-@@ -27,10 +27,7 @@ extern int __devexit __pata_platform_remove(struct device *dev);
- /*
-  * Marvell SATA private data
-  */
--struct mbus_dram_target_info;
--
- struct mv_sata_platform_data {
--	struct mbus_dram_target_info	*dram;
- 	int	n_ports; /* number of sata ports */
- };
- 
--- 
-1.7.2.5
+I know I'm nitpicking, but this has inconsistent spelling for "Tegra" again.
+
+> Signed-off-by: Hiroshi DOYU <hdoyu@nvidia.com>
+> Cc: Hiro Sugawara <hsugawara@nvidia.com>
+> Cc: Krishna Reddy <vdumpa@nvidia.com>
+> ---
+>  drivers/iommu/Kconfig      |   10 ++
+>  drivers/iommu/Makefile     |    1 +
+>  drivers/iommu/tegra-gart.c |  357 ++++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 368 insertions(+), 0 deletions(-)
+>  create mode 100644 drivers/iommu/tegra-gart.c
+> 
+> diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
+> index 487d1ee..7f342e8 100644
+> --- a/drivers/iommu/Kconfig
+> +++ b/drivers/iommu/Kconfig
+> @@ -133,6 +133,16 @@ config OMAP_IOMMU_DEBUG
+>  
+>  
+>  # Tegra IOMMU support
+> +config TEGRA_IOVMM_GART
+> +	bool "Enable I/O virtual memory manager for GART"
+> +	depends on ARCH_TEGRA_2x_SOC
+> +	default y
+> +	select TEGRA_IOVMM
+> +	help
+> +	  Enables support for remapping discontiguous physical memory
+> +	  shared with the operating system into contiguous I/O virtual
+> +	  space through the GART (Graphics Address Relocation Table)
+> +	  hardware included on Tegra SoCs.
+>  
+>  config TEGRA_IOVMM
+>  	bool
+
+I think you should move TEGRA_IOVMM_GART below TEGRA_IOVMM. Also, is it not
+possible to build this as a module?
+
+> diff --git a/drivers/iommu/Makefile b/drivers/iommu/Makefile
+> index 365eefb..4b61b05 100644
+> --- a/drivers/iommu/Makefile
+> +++ b/drivers/iommu/Makefile
+> @@ -8,3 +8,4 @@ obj-$(CONFIG_OMAP_IOMMU) += omap-iommu.o
+>  obj-$(CONFIG_OMAP_IOVMM) += omap-iovmm.o
+>  obj-$(CONFIG_OMAP_IOMMU_DEBUG) += omap-iommu-debug.o
+>  obj-$(CONFIG_TEGRA_IOVMM) += tegra-iovmm.o
+> +obj-$(CONFIG_TEGRA_IOVMM_GART) += tegra-gart.o
+> diff --git a/drivers/iommu/tegra-gart.c b/drivers/iommu/tegra-gart.c
+> new file mode 100644
+> index 0000000..24f893b
+> --- /dev/null
+> +++ b/drivers/iommu/tegra-gart.c
+> @@ -0,0 +1,357 @@
+> +/*
+> + * Tegra I/O VMM implementation for GART devices in Tegra and Tegra 2 series
+> + * systems-on-a-chip.
+> + *
+> + * Copyright (c) 2010-2011, NVIDIA Corporation.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful, but WITHOUT
+> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+> + * more details.
+> + *
+> + * You should have received a copy of the GNU General Public License along
+> + * with this program; if not, write to the Free Software Foundation, Inc.,
+> + * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+> + */
+> +
+> +#include <linux/module.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/spinlock.h>
+> +#include <linux/slab.h>
+> +#include <linux/vmalloc.h>
+> +#include <linux/mm.h>
+> +#include <linux/io.h>
+> +
+> +#include <asm/cacheflush.h>
+> +
+> +#include <mach/iovmm.h>
+> +
+> +#define GART_CONFIG		0x24
+> +#define GART_ENTRY_ADDR		0x28
+> +#define GART_ENTRY_DATA		0x2c
+> +
+> +#define VMM_NAME "iovmm-gart"
+> +#define DRIVER_NAME "tegra_gart"
+> +
+> +#define GART_PAGE_SHIFT		12
+> +#define GART_PAGE_SIZE		(1 << GART_PAGE_SHIFT)
+> +#define GART_PAGE_MASK		(~(GART_PAGE_SIZE - 1))
+> +
+> +struct gart_device {
+> +	void __iomem		*regs;
+> +	u32			*savedata;
+> +	u32			page_count; /* total remappable size */
+> +	tegra_iovmm_addr_t	iovmm_base; /* offset to apply to vmm_area */
+> +	spinlock_t		pte_lock;
+> +	struct tegra_iovmm_device iovmm;
+> +	struct tegra_iovmm_domain domain;
+> +	bool			enable;
+> +};
+> +
+> +static inline void __gart_set_pte(struct gart_device *gart,
+> +				tegra_iovmm_addr_t offs, u32 pte)
+> +{
+> +	writel(offs, gart->regs + GART_ENTRY_ADDR);
+> +	writel(pte, gart->regs + GART_ENTRY_DATA);
+> +	/*
+> +	 * Any interaction between any block on PPSB and a block on
+> +	 * APB or AHB must have these barriers to ensure the APB/AHB
+> +	 * bus transaction is complete before initiating activity on
+> +	 * the PPSB block.
+> +	 */
+> +	wmb();
+> +}
+> +
+> +static inline void gart_set_pte(struct gart_device *gart,
+> +				tegra_iovmm_addr_t offs, u32 pte)
+> +{
+> +	spin_lock(&gart->pte_lock);
+> +
+> +	__gart_set_pte(gart, offs, pte);
+> +
+> +	spin_unlock(&gart->pte_lock);
+> +}
+> +
+> +static int gart_map(struct tegra_iovmm_domain *, struct tegra_iovmm_area *);
+> +static void gart_unmap(struct tegra_iovmm_domain *,
+> +	struct tegra_iovmm_area *, bool);
+> +static void gart_map_pfn(struct tegra_iovmm_domain *,
+> +	struct tegra_iovmm_area *, tegra_iovmm_addr_t, unsigned long);
+> +static struct tegra_iovmm_domain *gart_alloc_domain(
+> +	struct tegra_iovmm_device *, struct tegra_iovmm_client *);
+> +
+> +static int gart_probe(struct platform_device *);
+> +static int gart_remove(struct platform_device *);
+> +static int gart_suspend(struct tegra_iovmm_device *dev);
+> +static void gart_resume(struct tegra_iovmm_device *dev);
+> +
+> +
+> +static struct tegra_iovmm_device_ops tegra_iovmm_gart_ops = {
+> +	.map		= gart_map,
+> +	.unmap		= gart_unmap,
+> +	.map_pfn	= gart_map_pfn,
+> +	.alloc_domain	= gart_alloc_domain,
+> +	.suspend	= gart_suspend,
+> +	.resume		= gart_resume,
+> +};
+> +
+> +static struct platform_driver tegra_iovmm_gart_drv = {
+> +	.probe		= gart_probe,
+> +	.remove		= gart_remove,
+> +	.driver		= {
+> +		.name	= DRIVER_NAME,
+> +	},
+> +};
+> +
+
+You should probably move both of these structures to the end of the file so
+you can get rid of the prototypes above.
+
+> +static int gart_suspend(struct tegra_iovmm_device *dev)
+> +{
+> +	struct gart_device *gart = container_of(dev, struct gart_device, iovmm);
+> +	unsigned int i;
+> +	unsigned long reg;
+> +
+> +	if (!gart)
+> +		return -ENODEV;
+
+gart (or dev for that matter) can never actually be NULL here.
+
+> +
+> +	if (!gart->enable)
+> +		return 0;
+> +
+> +	spin_lock(&gart->pte_lock);
+> +	reg = gart->iovmm_base;
+> +	for (i = 0; i < gart->page_count; i++) {
+> +		writel(reg, gart->regs + GART_ENTRY_ADDR);
+> +		gart->savedata[i] = readl(gart->regs + GART_ENTRY_DATA);
+> +		dmb();
+> +		reg += GART_PAGE_SIZE;
+> +	}
+> +	spin_unlock(&gart->pte_lock);
+> +	return 0;
+> +}
+> +
+> +static void do_gart_setup(struct gart_device *gart, const u32 *data)
+> +{
+> +	unsigned long reg;
+> +	unsigned int i;
+> +
+> +	reg = gart->iovmm_base;
+> +	for (i = 0; i < gart->page_count; i++) {
+> +		__gart_set_pte(gart, reg, data ? data[i] : 0);
+> +		reg += GART_PAGE_SIZE;
+> +	}
+> +
+> +	writel(1, gart->regs + GART_CONFIG);
+> +}
+> +
+> +static void gart_resume(struct tegra_iovmm_device *dev)
+> +{
+> +	struct gart_device *gart = container_of(dev, struct gart_device, iovmm);
+> +
+> +	if (!gart || !gart->enable || (gart->enable && !gart->savedata))
+> +		return;
+
+Same here.
+
+> +
+> +	spin_lock(&gart->pte_lock);
+> +	do_gart_setup(gart, gart->savedata);
+> +	spin_unlock(&gart->pte_lock);
+> +}
+> +
+> +static int gart_remove(struct platform_device *pdev)
+> +{
+> +	struct gart_device *gart = platform_get_drvdata(pdev);
+> +
+> +	if (!gart)
+> +		return 0;
+> +
+
+I don't think this can happen here either.
+
+> +	if (gart->enable)
+> +		writel(0, gart->regs + GART_CONFIG);
+> +
+> +	gart->enable = 0;
+> +	platform_set_drvdata(pdev, NULL);
+> +	tegra_iovmm_unregister(&gart->iovmm);
+> +	if (gart->savedata)
+> +		vfree(gart->savedata);
+> +	if (gart->regs)
+> +		iounmap(gart->regs);
+> +	kfree(gart);
+> +	return 0;
+> +}
+> +
+> +static int gart_probe(struct platform_device *pdev)
+> +{
+> +	struct gart_device *gart;
+> +	struct resource *res, *res_remap;
+> +	void __iomem *gart_regs;
+> +	int e;
+> +
+> +	if (!pdev) {
+> +		pr_err(DRIVER_NAME ": platform_device required\n");
+> +		return -ENODEV;
+> +	}
+
+This check can be dropped.
+
+> +
+> +	if (PAGE_SHIFT != GART_PAGE_SHIFT) {
+> +		pr_err(DRIVER_NAME ": GART and CPU page size must match\n");
+> +		return -ENXIO;
+> +	}
+
+This should probably be checked at build time using BUILD_BUG_ON().
+
+> +
+> +	/* the GART memory aperture is required */
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	res_remap = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+> +
+> +	if (!res || !res_remap) {
+> +		pr_err(DRIVER_NAME ": GART memory aperture expected\n");
+> +		return -ENXIO;
+> +	}
+> +	gart = kzalloc(sizeof(*gart), GFP_KERNEL);
+> +	if (!gart) {
+> +		pr_err(DRIVER_NAME ": failed to allocate tegra_iovmm_device\n");
+> +		return -ENOMEM;
+> +	}
+> +
+> +	gart_regs = ioremap_wc(res->start, res->end - res->start + 1);
+
+resource_size(res)
+
+> +	if (!gart_regs) {
+> +		pr_err(DRIVER_NAME ": failed to remap GART registers\n");
+> +		e = -ENXIO;
+> +		goto fail;
+> +	}
+> +
+> +	gart->iovmm.name = VMM_NAME;
+> +	gart->iovmm.ops = &tegra_iovmm_gart_ops;
+> +	gart->iovmm.pgsize_bits = GART_PAGE_SHIFT;
+> +	spin_lock_init(&gart->pte_lock);
+> +
+> +	platform_set_drvdata(pdev, gart);
+> +
+> +	e = tegra_iovmm_register(&gart->iovmm);
+> +	if (e)
+> +		goto fail;
+> +
+> +	e = tegra_iovmm_domain_init(&gart->domain, &gart->iovmm,
+> +		(tegra_iovmm_addr_t)res_remap->start,
+> +		(tegra_iovmm_addr_t)res_remap->end + 1);
+
+Why "end + 1"?
+
+> +	if (e)
+> +		goto fail;
+> +
+> +	gart->regs = gart_regs;
+> +	gart->iovmm_base = (tegra_iovmm_addr_t)res_remap->start;
+> +	gart->page_count = res_remap->end - res_remap->start + 1;
+
+resource_size(res_remap)
+
+> +	gart->page_count >>= GART_PAGE_SHIFT;
+> +
+> +	gart->savedata = vmalloc(sizeof(u32) * gart->page_count);
+> +	if (!gart->savedata) {
+> +		pr_err(DRIVER_NAME ": failed to allocate context save area\n");
+> +		e = -ENOMEM;
+> +		goto fail;
+> +	}
+> +
+> +	spin_lock(&gart->pte_lock);
+> +
+> +	do_gart_setup(gart, NULL);
+> +	gart->enable = 1;
+> +
+> +	spin_unlock(&gart->pte_lock);
+
+Is the lock required here? Nothing else should be using the device until
+after the probe function returns 0.
+
+Also, wouldn't it be safer to move this complete setup code before the call
+to tegra_iovmm_register()?
+
+> +	return 0;
+> +
+> +fail:
+> +	if (gart_regs)
+> +		iounmap(gart_regs);
+> +	if (gart && gart->savedata)
+> +		vfree(gart->savedata);
+> +	kfree(gart);
+> +	return e;
+> +}
+> +
+> +static int __devinit gart_init(void)
+> +{
+> +	return platform_driver_register(&tegra_iovmm_gart_drv);
+> +}
+> +
+> +static void __exit gart_exit(void)
+> +{
+> +	return platform_driver_unregister(&tegra_iovmm_gart_drv);
+> +}
+
+Gratuitous "return".
+
+> +
+> +#define GART_PTE(_pfn) (0x80000000ul | ((_pfn) << PAGE_SHIFT))
+> +
+> +
+> +static int gart_map(struct tegra_iovmm_domain *domain,
+> +	struct tegra_iovmm_area *iovma)
+> +{
+> +	struct gart_device *gart =
+> +		container_of(domain, struct gart_device, domain);
+> +	unsigned long gart_page, count;
+> +	unsigned int i;
+> +
+> +	gart_page = iovma->iovm_start;
+> +	count = iovma->iovm_length >> GART_PAGE_SHIFT;
+> +
+> +	for (i = 0; i < count; i++) {
+> +		unsigned long pfn;
+> +
+> +		pfn = iovma->ops->lock_makeresident(iovma, i << PAGE_SHIFT);
+> +		if (!pfn_valid(pfn))
+> +			goto fail;
+> +
+> +		gart_set_pte(gart, gart_page, GART_PTE(pfn));
+> +		gart_page += GART_PAGE_SIZE;
+> +	}
+> +
+> +	return 0;
+> +
+> +fail:
+> +	spin_lock(&gart->pte_lock);
+> +	while (i--) {
+> +		iovma->ops->release(iovma, i << PAGE_SHIFT);
+> +		gart_page -= GART_PAGE_SIZE;
+> +		__gart_set_pte(gart, gart_page, 0);
+> +	}
+> +	spin_unlock(&gart->pte_lock);
+> +
+> +	return -ENOMEM;
+> +}
+> +
+> +static void gart_unmap(struct tegra_iovmm_domain *domain,
+> +	struct tegra_iovmm_area *iovma, bool decommit)
+> +{
+> +	struct gart_device *gart =
+> +		container_of(domain, struct gart_device, domain);
+> +	unsigned long gart_page, count;
+> +	unsigned int i;
+> +
+> +	count = iovma->iovm_length >> GART_PAGE_SHIFT;
+> +	gart_page = iovma->iovm_start;
+> +
+> +	spin_lock(&gart->pte_lock);
+> +	for (i = 0; i < count; i++) {
+> +		if (iovma->ops && iovma->ops->release)
+> +			iovma->ops->release(iovma, i << PAGE_SHIFT);
+> +
+> +		__gart_set_pte(gart, gart_page, 0);
+> +		gart_page += GART_PAGE_SIZE;
+> +	}
+> +	spin_unlock(&gart->pte_lock);
+> +}
+> +
+> +static void gart_map_pfn(struct tegra_iovmm_domain *domain,
+> +	struct tegra_iovmm_area *iovma, tegra_iovmm_addr_t offs,
+> +	unsigned long pfn)
+> +{
+> +	struct gart_device *gart =
+> +		container_of(domain, struct gart_device, domain);
+> +
+> +	BUG_ON(!pfn_valid(pfn));
+> +
+> +	gart_set_pte(gart, offs, GART_PTE(pfn));
+> +}
+> +
+> +static struct tegra_iovmm_domain *gart_alloc_domain(
+> +	struct tegra_iovmm_device *dev, struct tegra_iovmm_client *client)
+> +{
+> +	struct gart_device *gart = container_of(dev, struct gart_device, iovmm);
+> +	return &gart->domain;
+> +}
+
+All of these functions should go before the platform_driver code.
+
+> +
+> +subsys_initcall(gart_init);
+
+module_init()?
+
+> +module_exit(gart_exit);
+> -- 
+> 1.7.0.4
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-tegra" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+> 
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111118/78a51ee9/attachment.sig>
