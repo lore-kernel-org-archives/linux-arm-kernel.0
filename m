@@ -1,125 +1,40 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Fri, 18 Nov 2011 09:55:36 -0800
-Subject: [PATCH] ARM: omap_hwmod: Add a new state to handle hwmods left
- enabled at init
-In-Reply-To: <4EC61FC1.8080002@ti.com> (Benoit Cousson's message of "Fri, 18
- Nov 2011 10:05:05 +0100")
-References: <1321524690-10302-1-git-send-email-rnayak@ti.com>
- <87fwhm4k5s.fsf@ti.com> <4EC5FED0.3000202@ti.com>
- <4EC61FC1.8080002@ti.com>
-Message-ID: <87zkftxqlj.fsf@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 18 Nov 2011 17:56:41 +0000
+Subject: [PATCH 4/5] ARM: vexpress: Initial RS1 memory map support
+In-Reply-To: <1321618850.24216.324.camel@hornet.cambridge.arm.com>
+References: <1321036026-23411-1-git-send-email-pawel.moll@arm.com>
+ <1321036026-23411-5-git-send-email-pawel.moll@arm.com>
+ <20111117153624.GR9581@n2100.arm.linux.org.uk>
+ <1321618850.24216.324.camel@hornet.cambridge.arm.com>
+Message-ID: <20111118175641.GJ9581@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"Cousson, Benoit" <b-cousson@ti.com> writes:
+On Fri, Nov 18, 2011 at 12:20:50PM +0000, Pawel Moll wrote:
+> On Thu, 2011-11-17 at 15:36 +0000, Russell King - ARM Linux wrote:
+> >  You do know that this
+> > will probably cause uboot to load the uImage at 0x80008000 instead of
+> > 0x60008000, and therefore we'll lose half the RAM on this board?
+> 
+> I missed that - I don't use uboot, so I don't build uImages.
+> 
+> As the ARCH_VEXPRESS_LEGACY will be no more (see my other response) I'll
+> revert the order, so the _RS1 will enforce P2V, AUTO_ZRELADDR and change
+> the zrealaddr-y & friends (as in: 0x6* when no _RS1, 0x8* when _RS1=y).
+> Is there any other way of having single binary kernel booting from both
+> 0x60008000 and 0x80008000?
 
-> Hi Kevin and Rajendra,
->
-> On 11/18/2011 7:44 AM, Rajendra Nayak wrote:
->> Hi Kevin,
->>
->> On Friday 18 November 2011 01:05 AM, Kevin Hilman wrote:
->>> Rajendra Nayak<rnayak@ti.com> writes:
->>>
->>>> A hwmod with a 'HWMOD_INIT_NO_IDLE' flag set, is left in
->>>> enabled state by the hwmod framework post the initial setup.
->>>> Once a real user of the device (a driver) tries to enable it
->>>> at a later point, the hmwod framework throws a WARN() about
->>>> the device being already in enabled state.
->>>>
->>>> Fix this by introducing a new state '_HWMOD_STATE_ENABLED_AT_INIT'
->>>> to identify such devices/hwmods, so nothing but just a state
->>>> change to '_HWMOD_STATE_ENABLED' can be done when the device/hwmod
->>>> is requested to be enabled (the first time) by its driver/user.
->>>>
->>>> A good example of a such a device is an UART used as debug console.
->>>> The UART module needs to be kept enabled through the boot, until the
->>>> UART driver takes control of it, for debug prints to appear on
->>>> the console.
->>>
->>> Nice. This is indeed much cleaner than what we're doing in the UART
->>> code. However...
->>>
->>>> Signed-off-by: Rajendra Nayak<rnayak@ti.com>
->>>> ---
->>>> arch/arm/mach-omap2/omap_hwmod.c | 16 ++++++++++++++--
->>>> arch/arm/plat-omap/include/plat/omap_hwmod.h | 1 +
->>>> 2 files changed, 15 insertions(+), 2 deletions(-)
->>>>
->>>> diff --git a/arch/arm/mach-omap2/omap_hwmod.c
->>>> b/arch/arm/mach-omap2/omap_hwmod.c
->>>> index d7f4623..7d94cc3 100644
->>>> --- a/arch/arm/mach-omap2/omap_hwmod.c
->>>> +++ b/arch/arm/mach-omap2/omap_hwmod.c
->>>> @@ -1441,6 +1441,17 @@ static int _enable(struct omap_hwmod *oh)
->>>>
->>>> pr_debug("omap_hwmod: %s: enabling\n", oh->name);
->>>>
->>>> + /*
->>>> + * hwmods' with HWMOD_INIT_NO_IDLE flag set, are left
->>>
->>> (no the ' isn't necessary)
->>>
->>>> + * in enabled state at init.
->>>> + * Now that someone is really trying to enable them,
->>>> + * just update the state.
->>>> + */
->>>> + if (oh->_state == _HWMOD_STATE_ENABLED_AT_INIT) {
->>>> + oh->_state = _HWMOD_STATE_ENABLED;
->>>> + return 0;
->>>> + }
->>>
->>> ...this subtly changes the behavior, at least compared to how the UART
->>> code handles this today.
->>>
->>> One thing that this doesn't do that the current UART code does is ensure
->>> that the IP is actually in a state that can properly idle after this is
->>> done.
->>>
->>> For example, if the bootloader is dumb (most are) and has configured the
->>> UARTs in mode that prevents idle (e.g. no-idle mode), then these UARTs
->>> will never allow the SoC to hit low power states.
->
-> That will not happen because we already did the complete enable
-> sequence during setup phase that will set the sysconfig properly.
-> So the device is properly initialized, we just skipped the idle phase
-> because we wanted to keep the device operational for the console.
+Not with uboot - uboot has been broken for many years in regard of
+being able to load kernel images inteligently - it has to be told
+explicitly where to load the image in system memory, so if the uImage
+is built for 0x80008000, uboot will load it at that address no matter
+if there's RAM there or not.
 
-Ah, perfect.
+That interacts with the P2V stuff and makes PHYS_OFFSET be 0x80000000
+rather than 0x60000000 - and my guess is that it'll still pass in
+memory information describing the RAM at 0x60000000 which may result
+in the kernel failing to boot.
 
->>> So, what's really needed is not just a return here, but an _idle() and
->>> then continue so we know that the HW is in a state that we know can
->>> idle from here on out.
->
-> We are in the enable call, so the driver / omap_device does expect the
-> IP to be operational at the moment, we cannot put it into idle.
->
->> I don't know if I completely understand what you are saying.
->> The above change is in the _enable() call which would be triggered
->> as part of runtime call from the serial driver to enable the module.
->> (Since the module is already enabled, you just change state to suggest
->> its now enabled by its user, rather than 'left enabled' at init)
->> There would be another call from the serial driver to idle it when
->> a corresponding hwmod _idle() call would idle the device.
->> I don't seem to understand why would a call to _idle() be needed
->> in an _enable() call.
->
-> Yep, I agree. I think Kevin's point is due to the previous sequence
-> used by the uart:
->
-> +	omap_hwmod_idle(od->hwmods[0]);
-> +	omap_hwmod_enable(od->hwmods[0]);
->
-> But that sequence is not needed for my point of view. The device is
-> already properly enabled. I don't think it was even needed in the
-> previous code. The hwmod was already enabled properly, only the
-> omap_device was disabled. So the original omap_console_hwmod_enable
-> should just do nothing.
-
-OK, thanks for the clarification.
-
-In that case, this patch
-
-Acked-by: Kevin Hilman <khilman@ti.com>
-
-Kevin
+There's no way around this with uboot at the moment, and I don't
+expect the uboots in the field already on devices to be updated to
+solve this.
