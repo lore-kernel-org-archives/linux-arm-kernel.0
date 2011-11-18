@@ -1,60 +1,43 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Fri, 18 Nov 2011 12:18:40 -0800
-Subject: [PATCH 03/10] arm/tegra: prepare clock code for multiple tegra
- variants
-In-Reply-To: <20111118190649.GB31678@quad.lixom.net>
-References: <1321546766-26770-1-git-send-email-pdeschrijver@nvidia.com>
- <1321546766-26770-4-git-send-email-pdeschrijver@nvidia.com>
- <20111118190649.GB31678@quad.lixom.net>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF1740D74F48@HQMAIL01.nvidia.com>
+From: haohui.mai@gmail.com (Haohui Mai)
+Date: Fri, 18 Nov 2011 14:32:55 -0600
+Subject: Question about unaligned memory access on ARMv7
+Message-ID: <4EC6C0F7.5040203@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Olof Johansson wrote at Friday, November 18, 2011 12:07 PM:
-> On Thu, Nov 17, 2011 at 06:19:17PM +0200, Peter De Schrijver wrote:
-> > Rework the tegra20 clock code to support multiple tegra variants :
-> >
-> >  * remove tegra2_periph_reset_assert/tegra2_periph_reset_deassert. This
-> >    functionality should be in clock.c.
-> >  * compile tegra_sdmmc_tap_delay only on tegra20 as this feature will not
-> >    be available in future variants.
-> >  * don't export clk_measure_input_freq as its functionality is also available
-> >    using clk_get_rate().
-...
-> > @@ -403,10 +405,11 @@ void __init tegra_init_clock(void)
-> >  }
-> >
-> >  /*
-> > - * The SDMMC controllers have extra bits in the clock source register that
-> > - * adjust the delay between the clock and data to compenstate for delays
-> > - * on the PCB.
-> > + * The SDMMC controllers on tegra20 have extra bits in the clock source
-> > + * register that adjust the delay between the clock and data to compenstate
-> > + * for delays on the PCB.
-> >   */
-> > +#ifdef CONFIG_ARCH_TEGRA_2x_SOC
-> >  void tegra_sdmmc_tap_delay(struct clk *c, int delay)
-> >  {
-> >  	unsigned long flags;
-> > @@ -415,6 +418,7 @@ void tegra_sdmmc_tap_delay(struct clk *c, int delay)
-> >  	tegra2_sdmmc_tap_delay(c, delay);
-> >  	spin_unlock_irqrestore(&c->spinlock, flags);
-> >  }
-> > +#endif
-> 
-> Ifdeffing this out doesn't quite make sense. Better to do a #ifdef in the
-> include file with an #else case that fills in an empty function. This
-> needs to be abstracted differently for the two platforms anyway but
-> that can be done separately from this. Does tegra3 have tap delay setup
-> as well? (I don't have the TRM handy right now).
+Hi,
 
-I vote just rip this function out altogether.
+My linux kernel complained about the user space binaries doing unaligned
+memory access.
 
-It isn't used in mainline, chromeos-2.6.38, chromeos-3.0, nor our internal
-2.6.36 or 2.6.39 kernels.
+Here is one of the log:
 
-Equally, I can't find any documentation of the register bits this code
-touches in either Tegra20 or Tegra30 TRMs.
+[ 1056.522396] Alignment trap: rsyslogd (1400) PC=0x4004450e
+Instr=0xe8541f00 Address=0x409f84f5 FSR 0x001
 
--- 
-nvpublic
+
+$ echo "0xe8 0x54 0x1f 0x00"|/opt/local/ibos/bin/llvm-mc --disassemble
+-triple=thumb-apple-darwin9
+     strb    r0, [r5, r3]
+     movs    r7, r3
+
+I'm using the NVIDIA Harmony board, which has a Cortex-A9MP dual core
+CPU. According to the specification, this instruction is legitimate and
+shouldn't fault.
+
+I checked in arch/arm/mm/alignment.c, the function
+do_alignment_t32_to_handler will ignore this because the CPU should be
+able to handle it.
+
+I also checked with the newest version of arch/arm/mm/alignment and I
+noticed no changes.
+
+Am I missing some erratas that can possibly fix this bug?
+
+PS: I'm using a sufficiently old (2.6.32.9) kernel and I'm unable to
+update it because a bug in the bootloader. :-(
+
+Any suggestions are appreciated.
+
+Cheers,
+Haohui
