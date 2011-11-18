@@ -1,40 +1,125 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 18 Nov 2011 17:52:03 +0000
-Subject: [PATCH 3/5] ARM: vexpress: Add DT support in v2m
-In-Reply-To: <20111117183726.GE3044@localhost.localdomain>
-References: <1321036026-23411-1-git-send-email-pawel.moll@arm.com>
- <1321036026-23411-4-git-send-email-pawel.moll@arm.com>
- <20111117160536.GU9581@n2100.arm.linux.org.uk>
- <20111117183726.GE3044@localhost.localdomain>
-Message-ID: <20111118175203.GI9581@n2100.arm.linux.org.uk>
+From: khilman@ti.com (Kevin Hilman)
+Date: Fri, 18 Nov 2011 09:55:36 -0800
+Subject: [PATCH] ARM: omap_hwmod: Add a new state to handle hwmods left
+ enabled at init
+In-Reply-To: <4EC61FC1.8080002@ti.com> (Benoit Cousson's message of "Fri, 18
+ Nov 2011 10:05:05 +0100")
+References: <1321524690-10302-1-git-send-email-rnayak@ti.com>
+ <87fwhm4k5s.fsf@ti.com> <4EC5FED0.3000202@ti.com>
+ <4EC61FC1.8080002@ti.com>
+Message-ID: <87zkftxqlj.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 17, 2011 at 06:37:26PM +0000, Dave Martin wrote:
-> On Thu, Nov 17, 2011 at 04:05:37PM +0000, Russell King - ARM Linux wrote:
-> > You do understand that system_rev is for the system _revision_ not for
-> > some kind of system ID.  For example, it's to identify whether we're on
-> > a revision 4, 5 or 6 system.
-> > 
-> > However, with DT the differences in system revision should be encoded
-> > into the DT itself, and the kernel should not be making choices about
-> > the hardware off this.
-> 
-> I can't comment on whether this is an abuse of system_rev, since I'm
-> not too familiar with that.
-> 
-> I feel that Whether the value of the V2M_SYS_ID register should be put
-> in the DT is more doubtful though: the DT must describe the hardware
-> which cannot be probed.
+"Cousson, Benoit" <b-cousson@ti.com> writes:
 
-That is exactly my point - but we don't want V2M_SYS_ID controlling what
-hardware is there because then you'll end up having _drivers_ having to
-be aware of the system revision.
+> Hi Kevin and Rajendra,
+>
+> On 11/18/2011 7:44 AM, Rajendra Nayak wrote:
+>> Hi Kevin,
+>>
+>> On Friday 18 November 2011 01:05 AM, Kevin Hilman wrote:
+>>> Rajendra Nayak<rnayak@ti.com> writes:
+>>>
+>>>> A hwmod with a 'HWMOD_INIT_NO_IDLE' flag set, is left in
+>>>> enabled state by the hwmod framework post the initial setup.
+>>>> Once a real user of the device (a driver) tries to enable it
+>>>> at a later point, the hmwod framework throws a WARN() about
+>>>> the device being already in enabled state.
+>>>>
+>>>> Fix this by introducing a new state '_HWMOD_STATE_ENABLED_AT_INIT'
+>>>> to identify such devices/hwmods, so nothing but just a state
+>>>> change to '_HWMOD_STATE_ENABLED' can be done when the device/hwmod
+>>>> is requested to be enabled (the first time) by its driver/user.
+>>>>
+>>>> A good example of a such a device is an UART used as debug console.
+>>>> The UART module needs to be kept enabled through the boot, until the
+>>>> UART driver takes control of it, for debug prints to appear on
+>>>> the console.
+>>>
+>>> Nice. This is indeed much cleaner than what we're doing in the UART
+>>> code. However...
+>>>
+>>>> Signed-off-by: Rajendra Nayak<rnayak@ti.com>
+>>>> ---
+>>>> arch/arm/mach-omap2/omap_hwmod.c | 16 ++++++++++++++--
+>>>> arch/arm/plat-omap/include/plat/omap_hwmod.h | 1 +
+>>>> 2 files changed, 15 insertions(+), 2 deletions(-)
+>>>>
+>>>> diff --git a/arch/arm/mach-omap2/omap_hwmod.c
+>>>> b/arch/arm/mach-omap2/omap_hwmod.c
+>>>> index d7f4623..7d94cc3 100644
+>>>> --- a/arch/arm/mach-omap2/omap_hwmod.c
+>>>> +++ b/arch/arm/mach-omap2/omap_hwmod.c
+>>>> @@ -1441,6 +1441,17 @@ static int _enable(struct omap_hwmod *oh)
+>>>>
+>>>> pr_debug("omap_hwmod: %s: enabling\n", oh->name);
+>>>>
+>>>> + /*
+>>>> + * hwmods' with HWMOD_INIT_NO_IDLE flag set, are left
+>>>
+>>> (no the ' isn't necessary)
+>>>
+>>>> + * in enabled state at init.
+>>>> + * Now that someone is really trying to enable them,
+>>>> + * just update the state.
+>>>> + */
+>>>> + if (oh->_state == _HWMOD_STATE_ENABLED_AT_INIT) {
+>>>> + oh->_state = _HWMOD_STATE_ENABLED;
+>>>> + return 0;
+>>>> + }
+>>>
+>>> ...this subtly changes the behavior, at least compared to how the UART
+>>> code handles this today.
+>>>
+>>> One thing that this doesn't do that the current UART code does is ensure
+>>> that the IP is actually in a state that can properly idle after this is
+>>> done.
+>>>
+>>> For example, if the bootloader is dumb (most are) and has configured the
+>>> UARTs in mode that prevents idle (e.g. no-idle mode), then these UARTs
+>>> will never allow the SoC to hit low power states.
+>
+> That will not happen because we already did the complete enable
+> sequence during setup phase that will set the sysconfig properly.
+> So the device is properly initialized, we just skipped the idle phase
+> because we wanted to keep the device operational for the console.
 
-Instead, the differences in device IP - when they're not discoverable
-from the device itself - should be encoded in DT to allow the device IP
-to be reused on different platforms which may not even have a V2M_SYS_ID
-register.
+Ah, perfect.
 
-That's what my objection is about: nothing should be using the overall
-system revision to determine anything about it.
+>>> So, what's really needed is not just a return here, but an _idle() and
+>>> then continue so we know that the HW is in a state that we know can
+>>> idle from here on out.
+>
+> We are in the enable call, so the driver / omap_device does expect the
+> IP to be operational at the moment, we cannot put it into idle.
+>
+>> I don't know if I completely understand what you are saying.
+>> The above change is in the _enable() call which would be triggered
+>> as part of runtime call from the serial driver to enable the module.
+>> (Since the module is already enabled, you just change state to suggest
+>> its now enabled by its user, rather than 'left enabled' at init)
+>> There would be another call from the serial driver to idle it when
+>> a corresponding hwmod _idle() call would idle the device.
+>> I don't seem to understand why would a call to _idle() be needed
+>> in an _enable() call.
+>
+> Yep, I agree. I think Kevin's point is due to the previous sequence
+> used by the uart:
+>
+> +	omap_hwmod_idle(od->hwmods[0]);
+> +	omap_hwmod_enable(od->hwmods[0]);
+>
+> But that sequence is not needed for my point of view. The device is
+> already properly enabled. I don't think it was even needed in the
+> previous code. The hwmod was already enabled properly, only the
+> omap_device was disabled. So the original omap_console_hwmod_enable
+> should just do nothing.
+
+OK, thanks for the clarification.
+
+In that case, this patch
+
+Acked-by: Kevin Hilman <khilman@ti.com>
+
+Kevin
