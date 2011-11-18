@@ -1,53 +1,47 @@
-From: conqrx@gmail.com (=?ISO-8859-1?B?TW9sbuFyIEfhYm9y?=)
-Date: Fri, 18 Nov 2011 12:54:42 +0100
-Subject: Porting the 2.6.38 linux kernel to ARM11 MPcore
-Message-ID: <CAK-0apYKjvxXasEfYCocjqEan5dKoXJgMON2gC-nMenKQaU9UQ@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 18 Nov 2011 12:02:03 +0000
+Subject: [PATCH 1/4] ARM: idmap: populate identity map pgd at init time
+ using .init.text
+In-Reply-To: <1321462094-6647-2-git-send-email-will.deacon@arm.com>
+References: <1321462094-6647-1-git-send-email-will.deacon@arm.com>
+ <1321462094-6647-2-git-send-email-will.deacon@arm.com>
+Message-ID: <CAHkRjk6DCipMmqQMiLqZ8aAQs6LLsC5=2buPARfouNpnezCJog@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear everyone,
+On 16 November 2011 16:48, Will Deacon <will.deacon@arm.com> wrote:
+> When disabling and re-enabling the MMU, it is necessary to take out an
+> identity mapping for the code that manipulates the SCTLR in order to
+> avoid it disappearing from under our feet. This is useful when soft
+> rebooting and returning from CPU suspend.
+>
+> This patch allocates a set of page tables during boot and populates them
+> with an identity mapping for the .idmap.text section. This means that
+> users of the identity map do not need to manage their own pgd and can
+> instead annotate their functions with __idmap or, in the case of assembly
+> code, place them in the correct section.
+>
+> Tested-by: Lorenzo Pieralisi <Lorenzo.Pieralisi@arm.com>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+...
+> --- a/include/asm-generic/vmlinux.lds.h
+> +++ b/include/asm-generic/vmlinux.lds.h
+> @@ -425,6 +425,12 @@
+> ? ? ? ? ? ? ? ?*(.kprobes.text) ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+> ? ? ? ? ? ? ? ?VMLINUX_SYMBOL(__kprobes_text_end) = .;
+>
+> +#define IDMAP_TEXT ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
+> + ? ? ? ? ? ? ? ALIGN_FUNCTION(); ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
+> + ? ? ? ? ? ? ? VMLINUX_SYMBOL(__idmap_text_start) = .; ? ? ? ? ? ? ? ? \
+> + ? ? ? ? ? ? ? *(.idmap.text) ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+> + ? ? ? ? ? ? ? VMLINUX_SYMBOL(__idmap_text_end) = .;
+> +
+> ?#define ENTRY_TEXT ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
+> ? ? ? ? ? ? ? ?ALIGN_FUNCTION(); ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
+> ? ? ? ? ? ? ? ?VMLINUX_SYMBOL(__entry_text_start) = .; ? ? ? ? ? ? ? ? \
 
-im working on a project wich aims at porting the 2.6.38 kernel to an
-arm11 mpcore based board.
+Since IDMAP is specific to ARM, we should just add the IDMAP_TEXT
+macro to vmlinux.lds.S.
 
-The kernel fails to boot, in the paging_init func, it throws an
-exception (pc: FFFF_000C) when executing the third mcr instruction in
-the list below:
-
-0xc000bf34  <>:    blx	r3
-0xc000bf38  <>:    mov	r5, #0	; 0x0
-0xc000bf3c  <>:    mcr	15, 0, r5, cr7, cr10, {4}
-0xc000bf40  <>:    mcr	15, 0, r5, cr8, cr6, {0}
-0xc000bf44  <>:    mcr	15, 0, r5, cr8, cr5, {0} //throws an exception
-here, Invalidate Instruction TLB Register
-0xc000bf48  <>:    mcr	15, 0, r5, cr7, cr5, {6}
-0xc000bf4c  <>:    mcr	15, 0, r5, cr7, cr10, {4}
-0xc000bf50  <>:    mcr	15, 0, r5, cr7, cr5, {4}
-0xc000bf54  <>:    ldr	lr, [pc, #176]	; 0xc000c00c
-
-The kernel has been patched with the 2.6.38-arm1 patch, and configured
-to be as minimal as possible (the vmlinux.elf is 1.8MB) and
-cross-compiled with the?Codesourcery gcc toolchain.
-The minimal size is improtant because the aim is to make the kernel
-run with only 5-6MB of memory (from c0000000 to c0500000).
-The 'boot_loader' i wrote passes the atag pointers (basically core and
-memory) and the kernel seemingly reads and parses them fine. The
-__log_buf before the exception:
-
-<5>Linux version 2.6.38-rc8 (VirtualBox) (gcc version 4.5.2 (Sourcery
-G++ Lite 2011.03-41) ) #6 Wed Nov 9 21:59:29 CET 2011
-<4>CPU: ARMv6-compatible processor [410fb025] revision 5 (ARMv7), cr=08c5387f"
-<4>CPU: VIPT nonaliasing data cache, VIPT aliasing instruction cache
-<4>Machine: ARM-RealView PB11MPCore
-<5>Ignoring RAM at c0000000-c04fffff (vmalloc region overlap).
-
-The last one might be solved with setting the high mem option before
-compiling (it might be a problem as i load the whole kernel to that
-region).
-
-Im only a beginner,?and im sorry for the low quality of the question,
-i appreciate any help. Even comments on how 'accomplishable' this
-project is. Also, the board is not a realview board, but it might not
-be an issue at this stage.
-
-Thank you in advance.
+-- 
+Catalin
