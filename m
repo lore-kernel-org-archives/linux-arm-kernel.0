@@ -1,43 +1,29 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Fri, 18 Nov 2011 13:28:14 -0500 (EST)
-Subject: [PATCH] ARM: fix unwinding for XIP kernels
-In-Reply-To: <20111117141706.GI4748@arm.com>
-References: <1321537200-9532-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <20111117141706.GI4748@arm.com>
-Message-ID: <alpine.LFD.2.02.1111181321390.13989@xanadu.home>
+From: khilman@ti.com (Kevin Hilman)
+Date: Fri, 18 Nov 2011 10:39:41 -0800
+Subject: [PATCH 07/23] ARM: plat-omap: remove arch specific special
+ handling for ioremap
+In-Reply-To: <1321422521-1138-8-git-send-email-nico@fluxnic.net> (Nicolas
+ Pitre's message of "Wed, 16 Nov 2011 00:48:25 -0500")
+References: <1321422521-1138-1-git-send-email-nico@fluxnic.net>
+ <1321422521-1138-8-git-send-email-nico@fluxnic.net>
+Message-ID: <87ty61xok2.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 17 Nov 2011, Catalin Marinas wrote:
+Nicolas Pitre <nico@fluxnic.net> writes:
 
-> On Thu, Nov 17, 2011 at 01:40:00PM +0000, Uwe Kleine-K?nig wrote:
-> > The linker places the unwind tables in readonly sections. So when using
-> > an XIP kernel these are located in ROM and cannot be modified.
-> > 
-> > For that reason don't convert the symbol addresses during boot (or
-> > module loading) but only when interpreting them in search_index().
-> > Moreover several consts are added to catch future writes and rename the
-> > member "addr" of struct unwind_idx to "addr_offset" to better match the
-> > new semantic.
-> > 
-> > This fixes unwinding on XIP which compared prel31 offsets to absolute
-> > addresses because the initial conversion from prel31 to absolute failed.
-> 
-> My only worry - does this increase the index search by doing the prel31
-> conversion every time? It could affect tools like lockdep that need to
-> get the backtrace regularly at run-time.
+> From: Nicolas Pitre <nicolas.pitre@linaro.org>
+>
+> A generic version should replace this later.
+>
+> As io.c has become nearly empty, omap_init_consistent_dma_size() is moved
+> into common.c so that io.c can be removed entirely.
+>
+> Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
 
-We're talking about two constant shifts and an add.  something that 
-myght take around 2 cycles on ARM.  Hardly noticeable I would say, 
-especially given that lockdep is already quite costly and hardly 
-something you want to keep around in production anyway.
+Boot tested on OMAP3430/n900, OMAP3530/Overo, OMAP3630/Zoom3,
+OMAP4430/Panda
 
-On the plus side, this fixes the XIP case, and allow for backtrace to be 
-usable pretty early without any explicit initialization.
+Tested-by: Kevin Hilman <khilman@ti.com>
 
-As far as I'm concerned (which isn't much as this is not my code):
-
-Acked-by: Nicolas Pitre <nico@linaro.org>
-
-
-Nicolas
+Kevin
