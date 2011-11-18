@@ -1,147 +1,281 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Fri, 18 Nov 2011 05:58:14 +0100
-Subject: [alsa-devel] [PATCH v5 2/3] ARM: mx28evk: add platform data for
- saif
-In-Reply-To: <1321003855-13430-3-git-send-email-b29396@freescale.com>
-References: <1321003855-13430-1-git-send-email-b29396@freescale.com>
- <1321003855-13430-3-git-send-email-b29396@freescale.com>
-Message-ID: <201111180558.14836.marek.vasut@gmail.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Fri, 18 Nov 2011 14:04:33 +0800
+Subject: [PATCH v3] I2C: add CSR SiRFprimaII on-chip I2C controllers driver
+In-Reply-To: <CAM=Q2ct4AKfYSHSu1KwYcW4YZ20QAJsOuHc9fg=oD5Rj7StB7g@mail.gmail.com>
+References: <1321544354-3084-1-git-send-email-21cnbao@gmail.com>
+ <CAM=Q2ct4AKfYSHSu1KwYcW4YZ20QAJsOuHc9fg=oD5Rj7StB7g@mail.gmail.com>
+Message-ID: <CAGsJ_4wedp6rqM0HuTEZHQ9D77drTp92Sbft10L6OWYg6sS=wA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> This is for supporting saif record function.
-> 
-> Signed-off-by: Dong Aisheng <b29396@freescale.com>
-> Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> Cc: Wolfram Sang <w.sang@pengutronix.de>
-> Cc: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
-> Cc: Liam Girdwood <lrg@ti.com>
-> 
-> ---
-> Changes since v4:
->  * Using the new added master_id and master_mode in platfrom_data
-> No changes since v3:
-> Changes since v2:
->  * separate clkmux code into another patch
->  * A few minus fixes suggested by Uwe & Wolfram.
-> Changes since v1:
->  * move saif clkmux code into mach-specific part
-> ---
->  arch/arm/mach-mxs/devices-mx28.h                |    3 ++-
->  arch/arm/mach-mxs/devices/platform-mxs-saif.c   |    5 +++--
->  arch/arm/mach-mxs/include/mach/devices-common.h |    4 +++-
->  arch/arm/mach-mxs/mach-mx28evk.c                |   18 ++++++++++++++++--
->  4 files changed, 24 insertions(+), 6 deletions(-)
-> 
-> diff --git a/arch/arm/mach-mxs/devices-mx28.h
-> b/arch/arm/mach-mxs/devices-mx28.h index c888710..4f50094 100644
-> --- a/arch/arm/mach-mxs/devices-mx28.h
-> +++ b/arch/arm/mach-mxs/devices-mx28.h
-> @@ -47,6 +47,7 @@ struct platform_device *__init mx28_add_mxsfb(
->  		const struct mxsfb_platform_data *pdata);
-> 
->  extern const struct mxs_saif_data mx28_saif_data[] __initconst;
-> -#define mx28_add_saif(id)              mxs_add_saif(&mx28_saif_data[id])
-> +#define mx28_add_saif(id, pdata) \
-> +	mxs_add_saif(&mx28_saif_data[id], pdata)
-> 
->  struct platform_device *__init mx28_add_rtc_stmp3xxx(void);
-> diff --git a/arch/arm/mach-mxs/devices/platform-mxs-saif.c
-> b/arch/arm/mach-mxs/devices/platform-mxs-saif.c index 1ec965e..f6e3a60
-> 100644
-> --- a/arch/arm/mach-mxs/devices/platform-mxs-saif.c
-> +++ b/arch/arm/mach-mxs/devices/platform-mxs-saif.c
-> @@ -32,7 +32,8 @@ const struct mxs_saif_data mx28_saif_data[] __initconst =
-> { };
->  #endif
-> 
-> -struct platform_device *__init mxs_add_saif(const struct mxs_saif_data
-> *data) +struct platform_device *__init mxs_add_saif(const struct
-> mxs_saif_data *data, +				const struct 
-mxs_saif_platform_data *pdata)
->  {
->  	struct resource res[] = {
->  		{
-> @@ -56,5 +57,5 @@ struct platform_device *__init mxs_add_saif(const struct
-> mxs_saif_data *data) };
-> 
->  	return mxs_add_platform_device("mxs-saif", data->id, res,
-> -					ARRAY_SIZE(res), NULL, 0);
-> +				ARRAY_SIZE(res), pdata, sizeof(*pdata));
+Hi Shubhrajyoti,
+Thanks for reviewing
 
-Wasn't there some ARRAY_AND_SIZE() macro somewhere? I checked and it's now used 
-in three instances -- PXA, MMP, UX500 and maybe somewhere else -- can you move 
-it to common header and use here?
+2011/11/18 Shubhrajyoti Datta <omaplinuxkernel@gmail.com>:
+> Hi Zhiwu,
+>
+> On Thu, Nov 17, 2011 at 9:09 PM, Barry Song <21cnbao@gmail.com> wrote:
+>>
+>> From: Zhiwu Song <Zhiwu.Song@csr.com>
+>>
+>> SiRFprimaII is the latest generation application processor from CSR?s
+>> multi-function SoC product family.
+>> The SoC support codes are in arch/arm/mach-prima2 from Linux mainline
+>> 3.0.
+>> There are two I2C controllers on primaII, features include:
+>> ? Two I2C controller modules are on chip
+>> ? RISC I/O bus read write register
+>> ? Up to 16 bytes data buffer for issuing commands and writing data
+>> ?at the same time
+>> ? Up to 16 commands, and receiving read data 16 bytes at a time
+>> ? Error INT report (ACK check)
+>> ? No-ACK bus protocols (SCCB bus protocols)
+>>
+>> Signed-off-by: Zhiwu Song <Zhiwu.Song@csr.com>
+>> Signed-off-by: Xiangzhen Ye <Xiangzhen.Ye@csr.com>
+>> Signed-off-by: Barry Song <Baohua.Song@csr.com>
+>> ---
+>> ?-v3:
+>> ?add lost clk_enable/disable in suspend/resume function while reading/
+>> ?writing i2c controller registers.
+>> ?without this, suspend will hang.
 
->  }
-> diff --git a/arch/arm/mach-mxs/include/mach/devices-common.h
-> b/arch/arm/mach-mxs/include/mach/devices-common.h index a8080f4..dc369c1
-> 100644
-> --- a/arch/arm/mach-mxs/include/mach/devices-common.h
-> +++ b/arch/arm/mach-mxs/include/mach/devices-common.h
-> @@ -94,6 +94,7 @@ struct platform_device *__init mxs_add_mxs_pwm(
->  		resource_size_t iobase, int id);
-> 
->  /* saif */
-> +#include <sound/saif.h>
+forgot this fix was done by Yuping Luo <Yuping.Luo@csr.com>. so he
+should get a Signed-off-by.
 
-It looks weird to intermix includes and code :-(
+>>
+>> ?arch/arm/mach-prima2/pm.c ? ? | ? ?1 +
+>> ?arch/arm/mach-prima2/prima2.c | ? ?1 +
+>> ?drivers/i2c/busses/Kconfig ? ?| ? ?7 +
+>> ?drivers/i2c/busses/Makefile ? | ? ?1 +
+>> ?drivers/i2c/busses/i2c-sirf.c | ?438
+>> +++++++++++++++++++++++++++++++++++++++++
+>> ?drivers/i2c/busses/i2c-sirf.h | ? 61 ++++++
+>> ?6 files changed, 509 insertions(+), 0 deletions(-)
+>> ?create mode 100644 drivers/i2c/busses/i2c-sirf.c
+>> ?create mode 100644 drivers/i2c/busses/i2c-sirf.h
+>>
+>> diff --git a/arch/arm/mach-prima2/pm.c b/arch/arm/mach-prima2/pm.c
+>> index cb53160..26ebb57 100644
+>> --- a/arch/arm/mach-prima2/pm.c
+>> +++ b/arch/arm/mach-prima2/pm.c
+>> @@ -9,6 +9,7 @@
+>> ?#include <linux/kernel.h>
+>> ?#include <linux/suspend.h>
+>> ?#include <linux/slab.h>
+>> +#include <linux/module.h>
+>> ?#include <linux/of.h>
+>> ?#include <linux/of_address.h>
+>> ?#include <linux/of_device.h>
+>> diff --git a/arch/arm/mach-prima2/prima2.c b/arch/arm/mach-prima2/prima2.c
 
->  struct mxs_saif_data {
->  	int id;
->  	resource_size_t iobase;
-> @@ -103,4 +104,5 @@ struct mxs_saif_data {
->  };
-> 
->  struct platform_device *__init mxs_add_saif(
-> -		const struct mxs_saif_data *data);
-> +		const struct mxs_saif_data *data,
-> +		const struct mxs_saif_platform_data *pdata);
-> diff --git a/arch/arm/mach-mxs/mach-mx28evk.c
-> b/arch/arm/mach-mxs/mach-mx28evk.c index 4a3cca3..cfe7910 100644
-> --- a/arch/arm/mach-mxs/mach-mx28evk.c
-> +++ b/arch/arm/mach-mxs/mach-mx28evk.c
-> @@ -28,6 +28,7 @@
-> 
->  #include <mach/common.h>
->  #include <mach/iomux-mx28.h>
-> +#include <mach/digctl.h>
-> 
->  #include "devices-mx28.h"
-> 
-> @@ -417,6 +418,18 @@ static void __init mx28evk_add_regulators(void)
->  static void __init mx28evk_add_regulators(void) {}
->  #endif
-> 
-> +static const struct mxs_saif_platform_data
-> +			mx28evk_mxs_saif_pdata[] __initconst = {
-> +	/* working on EXTMSTR0 mode (saif0 master, saif1 slave) */
-> +	{
-> +		.master_mode = 1;
-> +		.master_id = 0;
-> +	}, {
-> +		.master_mode = 0;
-> +		.master_id = 0;
-> +	},
-> +};
-> +
->  static void __init mx28evk_init(void)
->  {
->  	int ret;
-> @@ -457,8 +470,9 @@ static void __init mx28evk_init(void)
-> 
->  	mx28_add_mxsfb(&mx28evk_mxsfb_pdata);
-> 
-> -	mx28_add_saif(0);
-> -	mx28_add_saif(1);
-> +	mxs_saif_clkmux_select(MXS_DIGCTL_SAIF_CLKMUX_EXTMSTR0);
-> +	mx28_add_saif(0, &mx28evk_mxs_saif_pdata[0]);
-> +	mx28_add_saif(1, &mx28evk_mxs_saif_pdata[1]);
-> 
->  	mx28_add_mxs_i2c(0);
->  	i2c_register_board_info(0, mxs_i2c0_board_info,
+>> +config I2C_SIRF
+>> + ? ? ? tristate "CSR SiRFprimaII I2C interface"
+>> + ? ? ? depends on ARCH_PRIMA2
+>> + ? ? ? help
+>> + ? ? ? ? If you say yes to this option, support will be included for the
+>> + ? ? ? ? CSR SiRFprimaII I2C interface.
+>
+> Since it is tristate the module ..
 
-Otherwise,
+this is just a minor issue, if you like some changes, i can make it better.
 
-Reviewed-by: Marek Vasut <marek.vasut@gmail.com>
+>
+>>
+>> +
+>> ?config I2C_SIMTEC
+>> ? ? ? ?tristate "Simtec Generic I2C interface"
+>> ? ? ? ?select I2C_ALGOBIT
+>> diff --git a/drivers/i2c/busses/Makefile b/drivers/i2c/busses/Makefile
+>> index fba6da6..c30db66 100644
+>> --- a/drivers/i2c/busses/Makefile
+>> +++ b/drivers/i2c/busses/Makefile
+>> @@ -62,6 +62,7 @@ obj-$(CONFIG_I2C_S3C2410) ? ? += i2c-s3c2410.o
+>> ?obj-$(CONFIG_I2C_S6000) ? ? ? ? ? ? ? ?+= i2c-s6000.o
+>> ?obj-$(CONFIG_I2C_SH7760) ? ? ? += i2c-sh7760.o
+>> ?obj-$(CONFIG_I2C_SH_MOBILE) ? ?+= i2c-sh_mobile.o
+>> +obj-$(CONFIG_I2C_SIRF) ? ? ? ? += i2c-sirf.o
+>> ?obj-$(CONFIG_I2C_SIMTEC) ? ? ? += i2c-simtec.o
+>> ?obj-$(CONFIG_I2C_STU300) ? ? ? += i2c-stu300.o
+>> ?obj-$(CONFIG_I2C_TEGRA) ? ? ? ? ? ? ? ?+= i2c-tegra.o
+>> diff --git a/drivers/i2c/busses/i2c-sirf.c b/drivers/i2c/busses/i2c-sirf.c
+>> new file mode 100644
+>> index 0000000..2988124
+>> --- /dev/null
+>> +++ b/drivers/i2c/busses/i2c-sirf.c
+>> @@ -0,0 +1,438 @@
+>> +/*
+>> + * I2C bus driver for CSR SiRFprimaII
+>> + *
+>> + * Copyright (c) 2011 Cambridge Silicon Radio Limited, a CSR plc group
+>> company.
+>> + *
+>> + * Licensed under GPLv2 or later.
+>> + */
+>> +
+>> +#include <linux/interrupt.h>
+>> +#include <linux/kernel.h>
+>> +#include <linux/module.h>
+>> +#include <linux/slab.h>
+>> +#include <linux/init.h>
+>> +#include <linux/sched.h>
+>
+> Are all these files needed?
+
+-#include <linux/init.h>
+-#include <linux/sched.h>
+
+>> + ? ? ? ? ? ? ? dev_err(&pdev->dev, "Unable to get MEM resource\n");
+>> + ? ? ? ? ? ? ? err = -EINVAL;
+>> + ? ? ? ? ? ? ? goto out;
+>> + ? ? ? }
+>> +
+>> + ? ? ? siic->base =
+>> + ? ? ? ? ? ? ? devm_ioremap(&pdev->dev, mem_res->start, (mem_res->end -
+>> mem_res->start + 1));
+>> + ? ? ? if (siic->base == NULL) {
+>> + ? ? ? ? ? ? ? dev_err(&pdev->dev, "IO remap failed!\n");
+>> + ? ? ? ? ? ? ? err = -ENOMEM;
+>> + ? ? ? ? ? ? ? goto out;
+>> + ? ? ? }
+>> +
+>> + ? ? ? siic->irq = platform_get_irq(pdev, 0);
+>> + ? ? ? if (!siic->irq) {
+>> + ? ? ? ? ? ? ? err = -EINVAL;
+>> + ? ? ? ? ? ? ? goto out;
+>> + ? ? ? }
+>> + ? ? ? err = devm_request_irq(&pdev->dev, siic->irq, i2c_sirfsoc_irq, 0,
+>> + ? ? ? ? ? ? ? dev_name(&pdev->dev), siic);
+>> + ? ? ? if (err)
+>> + ? ? ? ? ? ? ? goto out;
+>> +
+>> + ? ? ? new_adapter->algo = &i2c_sirfsoc_algo;
+>> + ? ? ? new_adapter->algo_data = siic;
+>> +
+>> + ? ? ? new_adapter->dev.parent = &pdev->dev;
+>> + ? ? ? new_adapter->nr = pdev->id;
+>> +
+>> + ? ? ? strlcpy(new_adapter->name, "sirfsoc-i2c",
+>> sizeof(new_adapter->name));
+>> +
+>> + ? ? ? platform_set_drvdata(pdev, new_adapter);
+>> + ? ? ? init_completion(&siic->done);
+>> +
+>> + ? ? ? /* Controller Initalisation */
+>> +
+>> + ? ? ? writel(SIRFSOC_I2C_RESET, siic->base + SIRFSOC_I2C_CTRL);
+>> + ? ? ? while (readl(siic->base + SIRFSOC_I2C_CTRL) & SIRFSOC_I2C_RESET)
+>> + ? ? ? ? ? ? ? cpu_relax();
+>> + ? ? ? writel(SIRFSOC_I2C_CORE_EN | SIRFSOC_I2C_MASTER_MODE,
+>> + ? ? ? ? ? ? ? siic->base + SIRFSOC_I2C_CTRL);
+>> +
+>> + ? ? ? siic->clk = clk;
+>> + ? ? ? siic->speed = SIRFSOC_I2C_DEFAULT_SPEED;
+>> + ? ? ? if (siic->speed < 100000)
+>> + ? ? ? ? ? ? ? regval =
+>> + ? ? ? ? ? ? ? ? ? ? ? (2 * ctrl_speed) / (2 * siic->speed * 11);
+>> + ? ? ? else
+>> + ? ? ? ? ? ? ? regval = ctrl_speed / (siic->speed * 5);
+>> +
+>> + ? ? ? writel(regval, siic->base + SIRFSOC_I2C_CLK_CTRL);
+>> + ? ? ? if (regval > 0xFF)
+>> + ? ? ? ? ? ? ? writel(0xFF, siic->base + SIRFSOC_I2C_SDA_DELAY);
+>> + ? ? ? else
+>> + ? ? ? ? ? ? ? writel(regval, siic->base + SIRFSOC_I2C_SDA_DELAY);
+>> +
+>> + ? ? ? err = i2c_add_numbered_adapter(new_adapter);
+>> + ? ? ? if (err < 0) {
+>> + ? ? ? ? ? ? ? dev_err(&pdev->dev, "Can't add new i2c adapter\n");
+>> + ? ? ? ? ? ? ? goto out;
+>> + ? ? ? }
+>> +
+>> + ? ? ? clk_disable(clk);
+>> +
+>> + ? ? ? dev_info(&pdev->dev, " I2C adapter ready to operate\n");
+>> +
+>> + ? ? ? return 0;
+>> +
+>> +out:
+>> + ? ? ? clk_disable(clk);
+>> +err_clk_en:
+>> + ? ? ? clk_unprepare(clk);
+>> +err_clk_prep:
+>> + ? ? ? clk_put(clk);
+>> +err_get_clk:
+>
+> We are not freeing any allocated memories?
+
+you might want to read Jamie's earlier feedback in v1. that is why we
+move to devm_alloc in v2.
+
+>>
+>> + ? ? ? return err;
+>> +}
+>> +
+>> +static int __devexit i2c_sirfsoc_remove(struct platform_device *pdev)
+>> +{
+>> + ? ? ? struct i2c_adapter *adapter = platform_get_drvdata(pdev);
+>> + ? ? ? struct sirfsoc_i2c *siic = adapter->algo_data;
+>> +
+>> + ? ? ? writel(SIRFSOC_I2C_RESET, siic->base + SIRFSOC_I2C_CTRL);
+>> + ? ? ? i2c_del_adapter(adapter);
+>> + ? ? ? clk_disable(siic->clk);
+>> + ? ? ? clk_unprepare(siic->clk);
+>> + ? ? ? clk_put(siic->clk);
+>> + ? ? ? return 0;
+>> +}
+>> +
+>> +#ifdef CONFIG_PM
+>> +static int i2c_sirfsoc_suspend(struct platform_device *pdev, pm_message_t
+>> msg)
+>> +{
+>> + ? ? ? struct i2c_adapter *adapter = platform_get_drvdata(pdev);
+>> + ? ? ? struct sirfsoc_i2c *siic = adapter->algo_data;
+>> +
+>> + ? ? ? clk_enable(siic->clk);
+>> + ? ? ? siic->sda_delay = readl(siic->base + SIRFSOC_I2C_SDA_DELAY);
+>> + ? ? ? siic->clk_div = readl(siic->base + SIRFSOC_I2C_CLK_CTRL);
+>> + ? ? ? clk_disable(siic->clk);
+>> + ? ? ? return 0;
+>> +}
+>> +
+>> +static int i2c_sirfsoc_resume(struct platform_device *pdev)
+>> +{
+>> + ? ? ? struct i2c_adapter *adapter = platform_get_drvdata(pdev);
+>> + ? ? ? struct sirfsoc_i2c *siic = adapter->algo_data;
+>> +
+>> + ? ? ? clk_enable(siic->clk);
+>> + ? ? ? writel(SIRFSOC_I2C_RESET, siic->base + SIRFSOC_I2C_CTRL);
+>> + ? ? ? writel(SIRFSOC_I2C_CORE_EN | SIRFSOC_I2C_MASTER_MODE,
+>> + ? ? ? ? ? ? ? siic->base + SIRFSOC_I2C_CTRL);
+>> + ? ? ? writel(siic->clk_div, siic->base + SIRFSOC_I2C_CLK_CTRL);
+>> + ? ? ? writel(siic->sda_delay, siic->base + SIRFSOC_I2C_SDA_DELAY);
+>> + ? ? ? clk_disable(siic->clk);
+>> + ? ? ? return 0;
+>> +}
+>> +#else
+>> +#define i2c_sirfsoc_suspend ? ?NULL
+>> +#define i2c_sirfsoc_resume ? ? NULL
+>> +#endif
+>> +
+>> +static const struct of_device_id sirfsoc_i2c_of_match[] __devinitconst =
+>> {
+>> + ? ? ? { .compatible = "sirf,prima2-i2c", },
+>> + ? ? ? {},
+>> +};
+>> +MODULE_DEVICE_TABLE(of, sirfsoc_i2c_of_match);
+>> +
+>> +static struct platform_driver i2c_sirfsoc_driver = {
+>> + ? ? ? .driver = {
+>> + ? ? ? ? ? ? ? .name = "sirfsoc_i2c",
+>> + ? ? ? ? ? ? ? .owner = THIS_MODULE,
+>> + ? ? ? ? ? ? ? .of_match_table = sirfsoc_i2c_of_match,
+>> + ? ? ? },
+>> + ? ? ? .probe = i2c_sirfsoc_probe,
+>> + ? ? ? .remove = __devexit_p(i2c_sirfsoc_remove),
+>
+> Could we move to pm ops ?
+
+i prefer to keep the current way as most people are doing.
+
+-barry
