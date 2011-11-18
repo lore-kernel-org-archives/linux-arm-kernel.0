@@ -1,36 +1,58 @@
-From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
-Date: Fri, 18 Nov 2011 21:13:28 +0000
-Subject: Question about unaligned memory access on ARMv7
-References: <4EC6C0F7.5040203@gmail.com>
-Message-ID: <yw1x4ny15e2v.fsf@unicorn.mansr.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Fri, 18 Nov 2011 13:20:23 -0800
+Subject: [GIT PULL] cpufreq: OMAP: move to drivers/cpufreq and updates for v3.3
+Message-ID: <871ut5w2js.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Haohui Mai <haohui.mai@gmail.com> writes:
+Hi Dave,
 
-> Hi,
->
-> My linux kernel complained about the user space binaries doing unaligned
-> memory access.
->
-> Here is one of the log:
->
-> [ 1056.522396] Alignment trap: rsyslogd (1400) PC=0x4004450e
-> Instr=0xe8541f00 Address=0x409f84f5 FSR 0x001
+Here's the updated pull request after a rebase onto v3.2-rc1 and some
+fixes to address other changes that went into v3.2.
 
-That is an LDREX instruction.  It does not support unaligned addresses.
+This is targetted for v3.3, so I'd like to get it into your tree and
+into linux-next.
 
-> $ echo "0xe8 0x54 0x1f 0x00"|/opt/local/ibos/bin/llvm-mc --disassemble
-> -triple=thumb-apple-darwin9
->     strb    r0, [r5, r3]
->     movs    r7, r3
+Also, let me know if you want a MAINTAINERS entry for this file, as I'm
+happy to maintain it.
 
-You got the byte order wrong there.
+Kevin
 
-> Any suggestions are appreciated.
 
-Fix your application.
+The following changes since commit 1ea6b8f48918282bdca0b32a34095504ee65bab5:
 
--- 
-M?ns Rullg?rd
-mans at mansr.com
+  Linux 3.2-rc1 (2011-11-07 16:16:02 -0800)
+
+are available in the git repository at:
+  git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git for_3.3/omap-cpufreq
+
+Colin Cross (1):
+      cpufreq: OMAP: notify even with bad boot frequency
+
+Kevin Hilman (1):
+      cpufreq: OMAP: fixup for omap_device changes, include <linux/module.h>
+
+Nishanth Menon (6):
+      cpufreq: OMAP: move clk name decision to init
+      cpufreq: OMAP: deny initialization if no mpudev
+      cpufreq: OMAP: dont support !freq_table
+      cpufreq: OMAP: only supports OPP library
+      cpufreq: OMAP: put clk if cpu_init failed
+      cpufreq: OMAP: fix freq_table leak
+
+Russell King (1):
+      cpufreq: OMAP: Add SMP support for OMAP4+
+
+Santosh Shilimkar (1):
+      cpufreq: OMAP: cleanup for multi-SoC support, move into drivers/cpufreq
+
+Todd Poynor (1):
+      cpufreq: OMAP: Enable all CPUs in shared policy mask
+
+ arch/arm/plat-omap/Makefile    |    1 -
+ arch/arm/plat-omap/cpu-omap.c  |  171 -------------------------
+ drivers/cpufreq/Makefile       |    1 +
+ drivers/cpufreq/omap-cpufreq.c |  274 ++++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 275 insertions(+), 172 deletions(-)
+ delete mode 100644 arch/arm/plat-omap/cpu-omap.c
+ create mode 100644 drivers/cpufreq/omap-cpufreq.c
