@@ -1,73 +1,123 @@
-From: B29396@freescale.com (Dong Aisheng-B29396)
-Date: Fri, 18 Nov 2011 03:51:35 +0000
-Subject: [PATCH v5 0/3] ARM: mxs: add recording support for saif
-In-Reply-To: <1321003855-13430-1-git-send-email-b29396@freescale.com>
-References: <1321003855-13430-1-git-send-email-b29396@freescale.com>
-Message-ID: <65EE16ACC360FA4D99C96DC085B3F7722E464C@039-SN1MPN1-002.039d.mgd.msft.net>
+From: myungjoo.ham@gmail.com (MyungJoo Ham)
+Date: Fri, 18 Nov 2011 13:07:22 +0900
+Subject: [PATCH 1/4] ARM: exynos4: Add support for AFTR mode cpuidle state
+In-Reply-To: <CAK44p20KprcRRhGg_-9zftsiFDNZEP11u4qYujOHcZwPcMH=HQ@mail.gmail.com>
+References: <1320426228-21746-1-git-send-email-amit.kachhap@linaro.org>
+ <1320426228-21746-2-git-send-email-amit.kachhap@linaro.org>
+ <CAJ0PZbTzFDvom3PoPXEvhC8JE_mV3wfYMspnQdRLO=-oz5wGkw@mail.gmail.com>
+ <CAK44p20KprcRRhGg_-9zftsiFDNZEP11u4qYujOHcZwPcMH=HQ@mail.gmail.com>
+Message-ID: <CAJ0PZbS+qyGsgPbUeupvZrYcjWQ6psVq1euOuB4j1TJoGsPqOw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi All,
-
-> -----Original Message-----
-> From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-
-> kernel-bounces at lists.infradead.org] On Behalf Of Dong Aisheng
-> Sent: Friday, November 11, 2011 5:31 PM
-> To: linux-arm-kernel at lists.infradead.org
-> Cc: alsa-devel at alsa-project.org; s.hauer at pengutronix.de;
-> broonie at opensource.wolfsonmicro.com; w.sang at pengutronix.de;
-> kernel at pengutronix.de; u.kleine-koenig at pengutronix.de; lrg at ti.com; Guo
-> Shawn-R65073
-> Subject: [PATCH v5 0/3] ARM: mxs: add recording support for saif
+On Thu, Nov 17, 2011 at 8:22 PM, Amit Kachhap <amit.kachhap@linaro.org> wrote:
+> On 11 November 2011 13:03, MyungJoo Ham <myungjoo.ham@gmail.com> wrote:
+>> On Sat, Nov 5, 2011 at 2:03 AM, ?<amit.kachhap@linaro.org> wrote:
+>>> From: Amit Daniel Kachhap <amit.kachhap@linaro.org>
+>>>
+>>> This patch adds support for AFTR(ARM OFF TOP RUNNING) mode in
+>>> cpuidle driver for EXYNOS4210. L2 cache keeps their data in this mode.
+>>> This patch ports the code to the latest interfaces to
+>>> save/restore CPU state inclusive of CPU PM notifiers, l2
+>>> resume and cpu_suspend/resume.
+>>>
+>>> Signed-off-by: Jaecheol Lee <jc.lee@samsung.com>
+>>> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+>>> Signed-off-by: Amit Daniel Kachhap <amit.kachhap@linaro.org>
+>>> ---
+>> []
+>>> +#define REG_DIRECTGO_ADDR ? ? ?(samsung_rev() == EXYNOS4210_REV_1_1 ? \
+>>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? S5P_INFORM7 : (S5P_VA_SYSRAM + 0x24))
+>>> +#define REG_DIRECTGO_FLAG ? ? ?(samsung_rev() == EXYNOS4210_REV_1_1 ? \
+>>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? S5P_INFORM6 : (S5P_VA_SYSRAM + 0x20))
+>>>
+>> []
+>>> +
+>>> + ? ? ? __raw_writel(BSYM(virt_to_phys(s3c_cpu_resume)),
+>>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?REG_DIRECTGO_ADDR);
+>>> + ? ? ? __raw_writel(0xfcba0d10, REG_DIRECTGO_FLAG);
+>>> +
+>>> ? ? ? ?return 0;
+>>
+>> Hello,
+>>
+>>
+>> Why are you using INFORM6 and 7 registers in order to save resume
+>> address and power-mode flags?
+>>
+>> INFORM0 and 1 have been used in pm.c for the exactly same purpose.
+>> Please use the same registers in cpuidle.c as well.
+>>
+>> The same part in bootloader (IPL) can handle whether it's
+>> suspend-to-RAM or AFTR and the both modes are mutually exclusive and
+>> you only need one value for resume PC.
+>>
+>> Therefore, you can keep the value at the same location, which is the
+>> method we have been using.
+> Hi,
 >
-> Changes since v4:
->  * use new added master_id and master_mode in platform_data.
->  The new changes depend on another patch:
->  0001-ASoC-mxs-saif-remove-function-in-platform_data.patch
-> 
-> Changes since v3:
->  * remove unneeded locking according to Sascha.
-> The patches are based on imx-features branch since commit:
-> ca4e419c2.
-> 
-> Changes since v2:
->  * separate clkmux code into another patch according to Uwe
->  * add lock according to Wolfram
->  * Other minus fixes suggested by Uwe and Wolfram.
->  * remove Wolfram's fix saif clock setting patch which is in v2 series
->    since Wolfram will reform the clock code and send it out himself.
->    For test purpose, user still needs that patch. People can get it
->    from v2 series.
->    The patch is:
->    [PATCH v2 3/3] arm: mxs: disable clock-gates when setting saif-clocks
-> 
-> The patches are based on imx-features branch since commit:
-> f4f01e31835f.
-> 
-> Changes since v1:
-> The main changes are move mach-specific code(clkmux in DIGCTL) from saif
-> driver to mach-specific layer based on Wolfram's suggestion.
-> 
-> Note that the last patch is a RFC patch and sent out for testing since
-> without that patch the saif may not work.
-> 
-> Dong Aisheng (3):
->   ARM: mxs: add saif clkmux functions
->   ARM: mx28evk: add platform data for saif
->   ARM: mx28evk: set a initial clock rate for saif
-> 
->  arch/arm/mach-mxs/clock-mx28.c                  |   38
-> +++++++++++++++++++++++
->  arch/arm/mach-mxs/devices-mx28.h                |    3 +-
->  arch/arm/mach-mxs/devices/platform-mxs-saif.c   |    5 ++-
->  arch/arm/mach-mxs/include/mach/common.h         |    1 +
->  arch/arm/mach-mxs/include/mach/devices-common.h |    4 ++-
->  arch/arm/mach-mxs/include/mach/digctl.h         |   21 ++++++++++++
->  arch/arm/mach-mxs/mach-mx28evk.c                |   18 +++++++++-
->  7 files changed, 84 insertions(+), 6 deletions(-)  create mode 100644
-> arch/arm/mach-mxs/include/mach/digctl.h
-> 
-Any comment or tag for this new series?
+> I tried using INFORM0 and INFORM1 in cpuidle and make it same as pm.c.
+> But this doesnt work. Looks like my irom fused code checks for the
+> wakeup source and needs INFORM7 and INFORM6 for non sleep wakeups. My
+> cpu version is S5PV310AH--0AH1113(Origen board).
+> I suggest adding support for both type of wakeups(directly from irom
+> and through bootloader).
+>
+Hello Amit,
 
-Regards
-Dong Aisheng
+Have you checked the part that checks flags for AFTR mode and
+Suspend-to-RAM in IPL?
+
+If your code is checking AFTR flags with INFORM6/7 and PM flags with
+INFORM0/1, that is terribly wrong as those two modes are mutually
+exclusive and are very similar in terms of IPL codes.
+
+Also, the IPL-bootloader code runs in IRAM where CPU determines
+whether to continue to boot or jump to resume address of
+suspend-to-RAM or deepidle (AFTR/LPA/...).
+
+If yours works with INFORM0/1 for PM, it should work with INFORM0/1 in
+AFTR as well if your (S/W loadable) IPL code is correct and INFORM6/7
+is not touched regardless of how your IROM code is written. Please
+check your IPL code and try to let AFTR use the same address with PM.
+There is no reason to use another INFORM registers for AFTR only.
+Please note that pm-related IPL code is not in ROM, but loaded by ROM
+part of IPL to RAM from a storage.
+
+
+
+To jc.lee,
+
+Could you please check whether your IPL code checks for INFORM0/1 for
+both PM and AFTR or INFORM0/1 for PM and INFORM6/7 for AFTR?
+If the latter is what your IPL does, then, how does it react when both
+INFORM0/1 and INFORM6/7 are set for both PM and AFTR?
+The IPL code we have uses INFORM0/1 for both PM and AFTR/LPA.
+
+
+Cheers!
+MyungJoo
+
+> Thanks,
+> Amit D
+>>
+>> Besides, the Exynos4210 chipmaker (S.LSI) has told that INFORM6 and 7
+>> registers are used by in-chip code (iROM or iRAM).
+>>
+>>
+>> Cheers!
+>> MyungJoo
+>>
+>>
+>>
+>> --
+>> MyungJoo Ham, Ph.D.
+>> Mobile Software Platform Lab, DMC Business, Samsung Electronics
+>>
+>
+
+
+
+-- 
+MyungJoo Ham, Ph.D.
+Mobile Software Platform Lab, DMC Business, Samsung Electronics
