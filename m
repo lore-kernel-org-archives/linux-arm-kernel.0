@@ -1,49 +1,49 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 18 Nov 2011 13:30:37 -0600
-Subject: [PATCH 01/10] arm/tegra: initial device tree for tegra30
-In-Reply-To: <20111118184942.GA31678@quad.lixom.net>
-References: <1321546766-26770-1-git-send-email-pdeschrijver@nvidia.com>
- <1321546766-26770-2-git-send-email-pdeschrijver@nvidia.com>
- <74CDBE0F657A3D45AFBB94109FB122FF1740D74C46@HQMAIL01.nvidia.com>
- <20111118184942.GA31678@quad.lixom.net>
-Message-ID: <4EC6B25D.70708@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 18 Nov 2011 19:46:00 +0000
+Subject: [PATCH 18/41] ARM: restart: ixp4xx: use new restart hook
+In-Reply-To: <m339dlsweq.fsf@intrepid.localdomain>
+References: <20111106173113.GI12913@n2100.arm.linux.org.uk>
+ <E1RN6nE-0001Xl-8i@rmk-PC.arm.linux.org.uk>
+ <20111117173027.GE9581@n2100.arm.linux.org.uk>
+ <m339dlsweq.fsf@intrepid.localdomain>
+Message-ID: <20111118194600.GK9581@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/18/2011 12:49 PM, Olof Johansson wrote:
-> On Thu, Nov 17, 2011 at 11:39:14AM -0800, Stephen Warren wrote:
->> Peter De Schrijver wrote at Thursday, November 17, 2011 9:19 AM:
->>> This patch adds the initial device tree for tegra30
->>
->>> diff --git a/Documentation/devicetree/bindings/arm/tegra.txt
->> ...
->>> +* harmony: tegra20 based development board
->>> +Required root node properties:
->>> + - compatible = "nvidia,harmony", "nvidia,tegra20";
->>> +
->>> +* seaboard: tegra20 based clamshell reference design
->>> +Required root node properties:
->>> + - compatible = "nvidia,seaboard", "nvidia,tegra20";
->>
->> Do we really want to list all the board names here? In the future, there
->> could be tens or hundreds. I would argue that we should just document
->> nvidia,tegra20 and nvidia,tegra30.
+On Fri, Nov 18, 2011 at 08:49:01AM +0100, Krzysztof Halasa wrote:
+> Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
 > 
-> Agreed.
-
-It's not really any different than mach-types which does have every
-board in it.
-
-I think if a board requires a new dts, then it needs a unique name.
-
+> >> Hook these platforms restart code into the new restart hook rather
+> >> than using arch_reset().
 > 
->> At a later point, we should fix board-dt.c to solely look for those
->> compatible values, although this will have to wait until the pinmux DT
->> bindings are present. Then, the kernel won't care about the board names.
+> Looks good basically, except a detail:
 > 
-> Exactly.
+> >> --- a/arch/arm/mach-ixp4xx/common.c
+> >> +++ b/arch/arm/mach-ixp4xx/common.c
+> >> @@ -500,3 +500,23 @@ static void __init ixp4xx_clockevent_init(void)
+> >>  
+> >>  	clockevents_register_device(&clockevent_ixp4xx);
+> >>  }
+> >> +
+> >> +void ixp4xx_restart(char mode, const char *cmd)
+> >> +{
+> >> +	if ( 1 && mode == 's') {
+>            ^^^^^^^
+> This one. Yeah, I can see where does it come from.
 
-That is perfectly acceptable, but you should still have the option to do
-something specific for any given board.
+It's weird, I suspect it was supposed to be 1 || there, but I've no idea
+what the intention is there.  So I left the code as-is.
 
-Rob
+> Otherwise,
+> Acked-by: Krzysztof Ha?asa <khc@pm.waw.pl>
+
+I'm going to assume that applies to this version - because I think fixing
+that should be done independently of this patch series.
+
+> >> +		/* Jump into ROM at address 0 */
+> >> +		soft_restart(0);
+> 
+> OTOH I probably need to investigate this soft_restart, "when time
+> permits", that's another story of course.
+> -- 
+> Krzysztof Halasa
