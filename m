@@ -1,488 +1,190 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Fri, 18 Nov 2011 08:27:29 +0100
-Subject: [PATCH 2/3] ARM: iommu: tegra2: Initial support for GART driver
-In-Reply-To: <1321527667-12923-3-git-send-email-hdoyu@nvidia.com>
-References: <1321527667-12923-1-git-send-email-hdoyu@nvidia.com>
- <1321527667-12923-3-git-send-email-hdoyu@nvidia.com>
-Message-ID: <20111118072729.GC20125@avionic-0098.mockup.avionic-design.de>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 18 Nov 2011 08:48:31 +0100
+Subject: [RFC 6/8] of: add clock providers
+In-Reply-To: <20111116221250.GA12884@ponder.secretlab.ca>
+References: <1320801583-12774-1-git-send-email-grant.likely@secretlab.ca>
+ <1320801583-12774-7-git-send-email-grant.likely@secretlab.ca>
+ <20111109091328.GY16886@pengutronix.de> <4EBA62AD.3000407@ti.com>
+ <20111109114936.GL16886@pengutronix.de> <4EBD7E47.8010502@ti.com>
+ <20111116221250.GA12884@ponder.secretlab.ca>
+Message-ID: <20111118074831.GW27267@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* hdoyu at nvidia.com wrote:
-> From: Hiroshi DOYU <hdoyu@nvidia.com>
+On Wed, Nov 16, 2011 at 03:12:50PM -0700, Grant Likely wrote:
+> On Fri, Nov 11, 2011 at 08:57:59PM +0100, Cousson, Benoit wrote:
+> > On 11/9/2011 12:49 PM, Sascha Hauer wrote:
+> > >On Wed, Nov 09, 2011 at 12:23:25PM +0100, Cousson, Benoit wrote:
+> > >>On 11/9/2011 10:13 AM, Sascha Hauer wrote:
+> > >>>On Tue, Nov 08, 2011 at 06:19:41PM -0700, Grant Likely wrote:
+> > >>
+> > >>[...]
+> > >>
+> > >>>>+Sources of clock signal can be represented by any node in the device
+> > >>>>+tree.  Those nodes are designated as clock providers.  Clock consumer
+> > >>>>+nodes use a phandle and clock specifier pair to connect clock provider
+> > >>>>+outputs to clock inputs.  Similar to the gpio specifiers, a clock
+> > >>>>+specifier is an array of one more more cells identifying the clock
+> > >>>>+output on a device.  The length of a clock specifier is defined by the
+> > >>>>+value of a #clock-cells property in the clock provider node.
+> > >>>>+
+> > >>>>+[1] http://patchwork.ozlabs.org/patch/31551/
+> > >>>>+
+> > >>>>+==Clock providers==
+> > >>>>+
+> > >>>>+Required properties:
+> > >>>>+#clock-cells:	   Number of cells in a clock specifier; typically will be
+> > >>>>+		   set to 1
+> > >>>>+
+> > >>>>+Optional properties:
+> > >>>>+clock-output-name: Recommended to be a list of strings of clock output signal
+> > >>>>+		   names indexed by the first cell in the clock specifier.
+> > >>>>+		   However, the meaning of clock-output-names is domain
+> > >>>>+		   specific to the clock provider, and is only provided to
+> > >>>>+		   encourage using the same meaning for the majority of clock
+> > >>>>+		   providers.  This format may not work for clock providers
+> > >>>>+		   using a complex clock specifier format.  In those cases it
+> > >>>>+		   is recommended to omit this property and create a binding
+> > >>>>+		   specific names property.
+> > >>>
+> > >>>If the clock-output-name property is omitted, does this mean a clock
+> > >>>provider only has a single output or does it mean that it's not known
+> > >>>how many clock outputs a provider actually has?
 > 
-> Tegra 2 IOMMU H/W dependent part, GART (Graphics Address Relocation
-> Table). This is one of the tegra_iovmm_device to register to the upper
-> tegra IOVMM framework. This supports only single virtual address
-> space(tegra_iovmm_domain), and manages a simple 1-to-1 mapping
-> H/W translation pagetable.
-
-I know I'm nitpicking, but this has inconsistent spelling for "Tegra" again.
-
-> Signed-off-by: Hiroshi DOYU <hdoyu@nvidia.com>
-> Cc: Hiro Sugawara <hsugawara@nvidia.com>
-> Cc: Krishna Reddy <vdumpa@nvidia.com>
-> ---
->  drivers/iommu/Kconfig      |   10 ++
->  drivers/iommu/Makefile     |    1 +
->  drivers/iommu/tegra-gart.c |  357 ++++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 368 insertions(+), 0 deletions(-)
->  create mode 100644 drivers/iommu/tegra-gart.c
+> As Rob said, it only means that there are no names assigned to those
+> inputs.  In fact, it leaves it up to the specific clock binding as to
+> what it really means.  One driver may require the clock-output-name
+> property to be present because it uses data from there to figure out
+> how to configure the clock.  Another might not require it at all and
+> the only reason for its existence is informational.
 > 
-> diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
-> index 487d1ee..7f342e8 100644
-> --- a/drivers/iommu/Kconfig
-> +++ b/drivers/iommu/Kconfig
-> @@ -133,6 +133,16 @@ config OMAP_IOMMU_DEBUG
->  
->  
->  # Tegra IOMMU support
-> +config TEGRA_IOVMM_GART
-> +	bool "Enable I/O virtual memory manager for GART"
-> +	depends on ARCH_TEGRA_2x_SOC
-> +	default y
-> +	select TEGRA_IOVMM
-> +	help
-> +	  Enables support for remapping discontiguous physical memory
-> +	  shared with the operating system into contiguous I/O virtual
-> +	  space through the GART (Graphics Address Relocation Table)
-> +	  hardware included on Tegra SoCs.
->  
->  config TEGRA_IOVMM
->  	bool
-
-I think you should move TEGRA_IOVMM_GART below TEGRA_IOVMM. Also, is it not
-possible to build this as a module?
-
-> diff --git a/drivers/iommu/Makefile b/drivers/iommu/Makefile
-> index 365eefb..4b61b05 100644
-> --- a/drivers/iommu/Makefile
-> +++ b/drivers/iommu/Makefile
-> @@ -8,3 +8,4 @@ obj-$(CONFIG_OMAP_IOMMU) += omap-iommu.o
->  obj-$(CONFIG_OMAP_IOVMM) += omap-iovmm.o
->  obj-$(CONFIG_OMAP_IOMMU_DEBUG) += omap-iommu-debug.o
->  obj-$(CONFIG_TEGRA_IOVMM) += tegra-iovmm.o
-> +obj-$(CONFIG_TEGRA_IOVMM_GART) += tegra-gart.o
-> diff --git a/drivers/iommu/tegra-gart.c b/drivers/iommu/tegra-gart.c
-> new file mode 100644
-> index 0000000..24f893b
-> --- /dev/null
-> +++ b/drivers/iommu/tegra-gart.c
-> @@ -0,0 +1,357 @@
-> +/*
-> + * Tegra I/O VMM implementation for GART devices in Tegra and Tegra 2 series
-> + * systems-on-a-chip.
-> + *
-> + * Copyright (c) 2010-2011, NVIDIA Corporation.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful, but WITHOUT
-> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-> + * more details.
-> + *
-> + * You should have received a copy of the GNU General Public License along
-> + * with this program; if not, write to the Free Software Foundation, Inc.,
-> + * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
-> + */
-> +
-> +#include <linux/module.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/spinlock.h>
-> +#include <linux/slab.h>
-> +#include <linux/vmalloc.h>
-> +#include <linux/mm.h>
-> +#include <linux/io.h>
-> +
-> +#include <asm/cacheflush.h>
-> +
-> +#include <mach/iovmm.h>
-> +
-> +#define GART_CONFIG		0x24
-> +#define GART_ENTRY_ADDR		0x28
-> +#define GART_ENTRY_DATA		0x2c
-> +
-> +#define VMM_NAME "iovmm-gart"
-> +#define DRIVER_NAME "tegra_gart"
-> +
-> +#define GART_PAGE_SHIFT		12
-> +#define GART_PAGE_SIZE		(1 << GART_PAGE_SHIFT)
-> +#define GART_PAGE_MASK		(~(GART_PAGE_SIZE - 1))
-> +
-> +struct gart_device {
-> +	void __iomem		*regs;
-> +	u32			*savedata;
-> +	u32			page_count; /* total remappable size */
-> +	tegra_iovmm_addr_t	iovmm_base; /* offset to apply to vmm_area */
-> +	spinlock_t		pte_lock;
-> +	struct tegra_iovmm_device iovmm;
-> +	struct tegra_iovmm_domain domain;
-> +	bool			enable;
-> +};
-> +
-> +static inline void __gart_set_pte(struct gart_device *gart,
-> +				tegra_iovmm_addr_t offs, u32 pte)
-> +{
-> +	writel(offs, gart->regs + GART_ENTRY_ADDR);
-> +	writel(pte, gart->regs + GART_ENTRY_DATA);
-> +	/*
-> +	 * Any interaction between any block on PPSB and a block on
-> +	 * APB or AHB must have these barriers to ensure the APB/AHB
-> +	 * bus transaction is complete before initiating activity on
-> +	 * the PPSB block.
-> +	 */
-> +	wmb();
-> +}
-> +
-> +static inline void gart_set_pte(struct gart_device *gart,
-> +				tegra_iovmm_addr_t offs, u32 pte)
-> +{
-> +	spin_lock(&gart->pte_lock);
-> +
-> +	__gart_set_pte(gart, offs, pte);
-> +
-> +	spin_unlock(&gart->pte_lock);
-> +}
-> +
-> +static int gart_map(struct tegra_iovmm_domain *, struct tegra_iovmm_area *);
-> +static void gart_unmap(struct tegra_iovmm_domain *,
-> +	struct tegra_iovmm_area *, bool);
-> +static void gart_map_pfn(struct tegra_iovmm_domain *,
-> +	struct tegra_iovmm_area *, tegra_iovmm_addr_t, unsigned long);
-> +static struct tegra_iovmm_domain *gart_alloc_domain(
-> +	struct tegra_iovmm_device *, struct tegra_iovmm_client *);
-> +
-> +static int gart_probe(struct platform_device *);
-> +static int gart_remove(struct platform_device *);
-> +static int gart_suspend(struct tegra_iovmm_device *dev);
-> +static void gart_resume(struct tegra_iovmm_device *dev);
-> +
-> +
-> +static struct tegra_iovmm_device_ops tegra_iovmm_gart_ops = {
-> +	.map		= gart_map,
-> +	.unmap		= gart_unmap,
-> +	.map_pfn	= gart_map_pfn,
-> +	.alloc_domain	= gart_alloc_domain,
-> +	.suspend	= gart_suspend,
-> +	.resume		= gart_resume,
-> +};
-> +
-> +static struct platform_driver tegra_iovmm_gart_drv = {
-> +	.probe		= gart_probe,
-> +	.remove		= gart_remove,
-> +	.driver		= {
-> +		.name	= DRIVER_NAME,
-> +	},
-> +};
-> +
-
-You should probably move both of these structures to the end of the file so
-you can get rid of the prototypes above.
-
-> +static int gart_suspend(struct tegra_iovmm_device *dev)
-> +{
-> +	struct gart_device *gart = container_of(dev, struct gart_device, iovmm);
-> +	unsigned int i;
-> +	unsigned long reg;
-> +
-> +	if (!gart)
-> +		return -ENODEV;
-
-gart (or dev for that matter) can never actually be NULL here.
-
-> +
-> +	if (!gart->enable)
-> +		return 0;
-> +
-> +	spin_lock(&gart->pte_lock);
-> +	reg = gart->iovmm_base;
-> +	for (i = 0; i < gart->page_count; i++) {
-> +		writel(reg, gart->regs + GART_ENTRY_ADDR);
-> +		gart->savedata[i] = readl(gart->regs + GART_ENTRY_DATA);
-> +		dmb();
-> +		reg += GART_PAGE_SIZE;
-> +	}
-> +	spin_unlock(&gart->pte_lock);
-> +	return 0;
-> +}
-> +
-> +static void do_gart_setup(struct gart_device *gart, const u32 *data)
-> +{
-> +	unsigned long reg;
-> +	unsigned int i;
-> +
-> +	reg = gart->iovmm_base;
-> +	for (i = 0; i < gart->page_count; i++) {
-> +		__gart_set_pte(gart, reg, data ? data[i] : 0);
-> +		reg += GART_PAGE_SIZE;
-> +	}
-> +
-> +	writel(1, gart->regs + GART_CONFIG);
-> +}
-> +
-> +static void gart_resume(struct tegra_iovmm_device *dev)
-> +{
-> +	struct gart_device *gart = container_of(dev, struct gart_device, iovmm);
-> +
-> +	if (!gart || !gart->enable || (gart->enable && !gart->savedata))
-> +		return;
-
-Same here.
-
-> +
-> +	spin_lock(&gart->pte_lock);
-> +	do_gart_setup(gart, gart->savedata);
-> +	spin_unlock(&gart->pte_lock);
-> +}
-> +
-> +static int gart_remove(struct platform_device *pdev)
-> +{
-> +	struct gart_device *gart = platform_get_drvdata(pdev);
-> +
-> +	if (!gart)
-> +		return 0;
-> +
-
-I don't think this can happen here either.
-
-> +	if (gart->enable)
-> +		writel(0, gart->regs + GART_CONFIG);
-> +
-> +	gart->enable = 0;
-> +	platform_set_drvdata(pdev, NULL);
-> +	tegra_iovmm_unregister(&gart->iovmm);
-> +	if (gart->savedata)
-> +		vfree(gart->savedata);
-> +	if (gart->regs)
-> +		iounmap(gart->regs);
-> +	kfree(gart);
-> +	return 0;
-> +}
-> +
-> +static int gart_probe(struct platform_device *pdev)
-> +{
-> +	struct gart_device *gart;
-> +	struct resource *res, *res_remap;
-> +	void __iomem *gart_regs;
-> +	int e;
-> +
-> +	if (!pdev) {
-> +		pr_err(DRIVER_NAME ": platform_device required\n");
-> +		return -ENODEV;
-> +	}
-
-This check can be dropped.
-
-> +
-> +	if (PAGE_SHIFT != GART_PAGE_SHIFT) {
-> +		pr_err(DRIVER_NAME ": GART and CPU page size must match\n");
-> +		return -ENXIO;
-> +	}
-
-This should probably be checked at build time using BUILD_BUG_ON().
-
-> +
-> +	/* the GART memory aperture is required */
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	res_remap = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-> +
-> +	if (!res || !res_remap) {
-> +		pr_err(DRIVER_NAME ": GART memory aperture expected\n");
-> +		return -ENXIO;
-> +	}
-> +	gart = kzalloc(sizeof(*gart), GFP_KERNEL);
-> +	if (!gart) {
-> +		pr_err(DRIVER_NAME ": failed to allocate tegra_iovmm_device\n");
-> +		return -ENOMEM;
-> +	}
-> +
-> +	gart_regs = ioremap_wc(res->start, res->end - res->start + 1);
-
-resource_size(res)
-
-> +	if (!gart_regs) {
-> +		pr_err(DRIVER_NAME ": failed to remap GART registers\n");
-> +		e = -ENXIO;
-> +		goto fail;
-> +	}
-> +
-> +	gart->iovmm.name = VMM_NAME;
-> +	gart->iovmm.ops = &tegra_iovmm_gart_ops;
-> +	gart->iovmm.pgsize_bits = GART_PAGE_SHIFT;
-> +	spin_lock_init(&gart->pte_lock);
-> +
-> +	platform_set_drvdata(pdev, gart);
-> +
-> +	e = tegra_iovmm_register(&gart->iovmm);
-> +	if (e)
-> +		goto fail;
-> +
-> +	e = tegra_iovmm_domain_init(&gart->domain, &gart->iovmm,
-> +		(tegra_iovmm_addr_t)res_remap->start,
-> +		(tegra_iovmm_addr_t)res_remap->end + 1);
-
-Why "end + 1"?
-
-> +	if (e)
-> +		goto fail;
-> +
-> +	gart->regs = gart_regs;
-> +	gart->iovmm_base = (tegra_iovmm_addr_t)res_remap->start;
-> +	gart->page_count = res_remap->end - res_remap->start + 1;
-
-resource_size(res_remap)
-
-> +	gart->page_count >>= GART_PAGE_SHIFT;
-> +
-> +	gart->savedata = vmalloc(sizeof(u32) * gart->page_count);
-> +	if (!gart->savedata) {
-> +		pr_err(DRIVER_NAME ": failed to allocate context save area\n");
-> +		e = -ENOMEM;
-> +		goto fail;
-> +	}
-> +
-> +	spin_lock(&gart->pte_lock);
-> +
-> +	do_gart_setup(gart, NULL);
-> +	gart->enable = 1;
-> +
-> +	spin_unlock(&gart->pte_lock);
-
-Is the lock required here? Nothing else should be using the device until
-after the probe function returns 0.
-
-Also, wouldn't it be safer to move this complete setup code before the call
-to tegra_iovmm_register()?
-
-> +	return 0;
-> +
-> +fail:
-> +	if (gart_regs)
-> +		iounmap(gart_regs);
-> +	if (gart && gart->savedata)
-> +		vfree(gart->savedata);
-> +	kfree(gart);
-> +	return e;
-> +}
-> +
-> +static int __devinit gart_init(void)
-> +{
-> +	return platform_driver_register(&tegra_iovmm_gart_drv);
-> +}
-> +
-> +static void __exit gart_exit(void)
-> +{
-> +	return platform_driver_unregister(&tegra_iovmm_gart_drv);
-> +}
-
-Gratuitous "return".
-
-> +
-> +#define GART_PTE(_pfn) (0x80000000ul | ((_pfn) << PAGE_SHIFT))
-> +
-> +
-> +static int gart_map(struct tegra_iovmm_domain *domain,
-> +	struct tegra_iovmm_area *iovma)
-> +{
-> +	struct gart_device *gart =
-> +		container_of(domain, struct gart_device, domain);
-> +	unsigned long gart_page, count;
-> +	unsigned int i;
-> +
-> +	gart_page = iovma->iovm_start;
-> +	count = iovma->iovm_length >> GART_PAGE_SHIFT;
-> +
-> +	for (i = 0; i < count; i++) {
-> +		unsigned long pfn;
-> +
-> +		pfn = iovma->ops->lock_makeresident(iovma, i << PAGE_SHIFT);
-> +		if (!pfn_valid(pfn))
-> +			goto fail;
-> +
-> +		gart_set_pte(gart, gart_page, GART_PTE(pfn));
-> +		gart_page += GART_PAGE_SIZE;
-> +	}
-> +
-> +	return 0;
-> +
-> +fail:
-> +	spin_lock(&gart->pte_lock);
-> +	while (i--) {
-> +		iovma->ops->release(iovma, i << PAGE_SHIFT);
-> +		gart_page -= GART_PAGE_SIZE;
-> +		__gart_set_pte(gart, gart_page, 0);
-> +	}
-> +	spin_unlock(&gart->pte_lock);
-> +
-> +	return -ENOMEM;
-> +}
-> +
-> +static void gart_unmap(struct tegra_iovmm_domain *domain,
-> +	struct tegra_iovmm_area *iovma, bool decommit)
-> +{
-> +	struct gart_device *gart =
-> +		container_of(domain, struct gart_device, domain);
-> +	unsigned long gart_page, count;
-> +	unsigned int i;
-> +
-> +	count = iovma->iovm_length >> GART_PAGE_SHIFT;
-> +	gart_page = iovma->iovm_start;
-> +
-> +	spin_lock(&gart->pte_lock);
-> +	for (i = 0; i < count; i++) {
-> +		if (iovma->ops && iovma->ops->release)
-> +			iovma->ops->release(iovma, i << PAGE_SHIFT);
-> +
-> +		__gart_set_pte(gart, gart_page, 0);
-> +		gart_page += GART_PAGE_SIZE;
-> +	}
-> +	spin_unlock(&gart->pte_lock);
-> +}
-> +
-> +static void gart_map_pfn(struct tegra_iovmm_domain *domain,
-> +	struct tegra_iovmm_area *iovma, tegra_iovmm_addr_t offs,
-> +	unsigned long pfn)
-> +{
-> +	struct gart_device *gart =
-> +		container_of(domain, struct gart_device, domain);
-> +
-> +	BUG_ON(!pfn_valid(pfn));
-> +
-> +	gart_set_pte(gart, offs, GART_PTE(pfn));
-> +}
-> +
-> +static struct tegra_iovmm_domain *gart_alloc_domain(
-> +	struct tegra_iovmm_device *dev, struct tegra_iovmm_client *client)
-> +{
-> +	struct gart_device *gart = container_of(dev, struct gart_device, iovmm);
-> +	return &gart->domain;
-> +}
-
-All of these functions should go before the platform_driver code.
-
-> +
-> +subsys_initcall(gart_init);
-
-module_init()?
-
-> +module_exit(gart_exit);
-> -- 
-> 1.7.0.4
+> > >>Allowing several outputs for a single clock node might lead to a lot
+> > >>of confusion. What will be the meaning of a clock rate if you have
+> > >>several outputs at different frequency?
 > 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-tegra" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> No, clock-frequency is specific to the fixed-clock binding (which I
+> need to document).  That may or may not be present in other clock
+> provider nodes.  For instance, there is a xilinx clock divider ip
+> block that doesn't have any frequency of its own, but rather has
+> multiple clock outputs that are a scale of the input clock.  The node
+> for that device would never have a clock-frequency property because it
+> relies entirely on the upstream clock.
 > 
+> This proposed binding is only about one thing: attaching clock
+> providers to clock consumers.  It doesn't make any statements about
+> how the clock provider driver is organized or how it manages its
+> clocks.
 > 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111118/78a51ee9/attachment.sig>
+> This is by design to prevent clock consumers from digging into a clock
+> provider node manually without consulting its driver.  The consumer
+> only has a reference to a clock provider node + arguments.  It is the
+> job of the producer driver to interpret the arguments.
+> 
+> The proposed API also reflects this.  The consumer driver requests a
+> clock, but it is the producer driver that determines what the clock
+> reference actually means, and which struct clk to return.
+> 
+> > >>I think it will be better to define a clock node as a single source
+> > >>of clock. If several outputs are needed, then we should define
+> > >>several clock nodes.
+> 
+> That is entirely up to the binding for the specific clock device(s).
+> If it makes sense to have one node per clock, so be it.  If it makes
+> more sense to have a clock nexus node for other hardware, then that is
+> fine too.
+> 
+> > >>If we let a clock node be any kind of big clock blob, we will never
+> > >>be able to define some generic reusable clock node API. Everybody
+> > >>will define its own custom clock blobs.
+> > >
+> > >Generally +1. I asked myself the same question whether it's a good thing
+> > >to allow a node to have multiple clocks. For i.MX I can say that I don't
+> > >need this and that I do not intend to use this feature. Grants concerns
+> > >about this are that the clock part of the device tree might explode when
+> > >we put each and every clock into the devicetree, so he wants to allow
+> > >bigger blobs of multiple clocks.
+> > 
+> > I can clearly understand this concern, because in the case of OMAP4,
+> > we will have to add ~250 nodes if we want to define the current
+> > clock tree.
+> 
+> I'm really not convinced that it is a good idea to break out the
+> entire clock tree into one node per struct clk.  To begin with, that
+> looks to be very centric around the current 'struct clk' Linux
+> abstraction, which is potentially in flux.  Also, looking at Sascha's
+> initial RFC for describing the clock tree, I see cases where it looks
+> like a clock nexus node really makes sense.  For instance, the
+> 'divider-ipg at 0x53fd4014' node which has a list of child nodes
+> which merely provide a register offset and shift value
+> (reg=0x53fd4068..0x53fd4084, shift=0x0..0xf).
+
+Yes, these are 6 (or 7) registers which contains all the gates. But not
+all of these gates are children of the ipg clock, some are derived from
+other clocks. So describing this as a nexus clock would give you 6 nexus
+clocks, each having 16 parents and 16 children (we have 2 bits per gate).
+Many of these clock gates go to external devices, but others are also
+used internally by the clock module.
+With the clock gates you picked the only example in the i.MX clock
+module which has a straight forward register layout. All other muxes
+and dividers are spread randomly in the registers.
+
+> It would be natural to
+> instead encode that as part of the clock reference, or map it directly
+> from the clock reference (ie, assign names to each of the clocks, and
+> let the clock provider driver match up the name to the reg offset &
+> shift values).
+> 
+> I had originally thought that it would be better to use names directly
+> for references to clocks (ie. clock = <phandle>,"name") , but after
+> actually playing with it and looking at the existing DT conventions,
+> I've reverted to cell values for the arguments and a separate set of
+> clock-{input,output}-name properties for attaching meaningful names,
+> just like we decided to do for assigning names to 'reg' properties.
+> 
+> > >My impression gets more and more that we either put the clock tree in the
+> > >devicetree or we do not do it, but there's not much room in between.
+> 
+> I disagree here entirely because there is a lot of room in between.
+> Drivers still need to understand the hardware block they are driving,
+> and there will still be a lot of hardware-specific knowledge encoded
+> into clock provider drivers (just as there is for every other kind of
+> driver).  The trick (and even artistry) is to determine the ideal
+> balance between hard coding static hardware details and
+> parameterization of interconnects between blocks.
+
+That's part of the problem. When in copy-a-new-clktree-from-datasheet-to-c
+mode I don't want to be an artist at all. Instead I want to be a trained
+monkey. Too many people have tried to be intelligent when hacking the
+clock files which explains the mess we currently have.
+
+Ok, as you know my original goal was only to describe the building
+blocks as what they are and not arbitrarily grouped together. Originally
+I did not even have the device tree in mind. I am perfectly fine with
+describing the clock module as a single blob with few input clocks
+and many many output clocks. Then we can internally (in C code) still
+describe the building blocks.
+
+One thing I like about the full description in the device tree is
+that boards would be able to adjust divider/mux settings directly in the
+device tree, but we can do without.
+
+One thing though needs a better solution I think. What if a clock module
+has 100 outputs? An UART might look like this then:
+
+uart {
+	clock-input = <&ccm 23> <&ccm 97>;
+	clock-input-name = "baud", "register";
+};
+
+This would be hard to verify for correctness because of the high
+numbers. Also, when a maintainer gets two patches which both add
+a forgotten clock to the device tree he can't just merge them but
+instead has to adjust the numbers in one patch.
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
