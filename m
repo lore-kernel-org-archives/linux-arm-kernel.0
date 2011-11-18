@@ -1,301 +1,283 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Fri, 18 Nov 2011 17:43:13 +0100
-Subject: [PATCH 06/11] mm: mmzone: MIGRATE_CMA migration type added
+Date: Fri, 18 Nov 2011 17:43:12 +0100
+Subject: [PATCH 05/11] mm: page_alloc: introduce alloc_contig_range()
 In-Reply-To: <1321634598-16859-1-git-send-email-m.szyprowski@samsung.com>
 References: <1321634598-16859-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1321634598-16859-7-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1321634598-16859-6-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Michal Nazarewicz <mina86@mina86.com>
 
-The MIGRATE_CMA migration type has two main characteristics:
-(i) only movable pages can be allocated from MIGRATE_CMA
-pageblocks and (ii) page allocator will never change migration
-type of MIGRATE_CMA pageblocks.
+This commit adds the alloc_contig_range() function which tries
+to allocate given range of pages.  It tries to migrate all
+already allocated pages that fall in the range thus freeing them.
+Once all pages in the range are freed they are removed from the
+buddy system thus allocated for the caller to use.
 
-This guarantees (to some degree) that page in a MIGRATE_CMA page
-block can always be migrated somewhere else (unless there's no
-memory left in the system).
-
-It is designed to be used for allocating big chunks (eg. 10MiB)
-of physically contiguous memory.  Once driver requests
-contiguous memory, pages from MIGRATE_CMA pageblocks may be
-migrated away to create a contiguous block.
-
-To minimise number of migrations, MIGRATE_CMA migration type
-is the last type tried when page allocator falls back to other
-migration types then requested.
+__alloc_contig_migrate_range() borrows some code from KAMEZAWA
+Hiroyuki's __alloc_contig_pages().
 
 Signed-off-by: Michal Nazarewicz <mina86@mina86.com>
-[m.szyprowski: removed CONFIG_CMA_MIGRATE_TYPE]
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- include/linux/mmzone.h         |   41 ++++++++++++++++++++----
- include/linux/page-isolation.h |    3 ++
- mm/Kconfig                     |    2 +-
- mm/compaction.c                |   11 +++++--
- mm/page_alloc.c                |   68 ++++++++++++++++++++++++++++++---------
- 5 files changed, 98 insertions(+), 27 deletions(-)
+ include/linux/page-isolation.h |    3 +
+ mm/page_alloc.c                |  223 ++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 226 insertions(+), 0 deletions(-)
 
-diff --git a/include/linux/mmzone.h b/include/linux/mmzone.h
-index 84e07d0..604a235 100644
---- a/include/linux/mmzone.h
-+++ b/include/linux/mmzone.h
-@@ -35,13 +35,35 @@
-  */
- #define PAGE_ALLOC_COSTLY_ORDER 3
- 
--#define MIGRATE_UNMOVABLE     0
--#define MIGRATE_RECLAIMABLE   1
--#define MIGRATE_MOVABLE       2
--#define MIGRATE_PCPTYPES      3 /* the number of types on the pcp lists */
--#define MIGRATE_RESERVE       3
--#define MIGRATE_ISOLATE       4 /* can't allocate from here */
--#define MIGRATE_TYPES         5
-+enum {
-+	MIGRATE_UNMOVABLE,
-+	MIGRATE_RECLAIMABLE,
-+	MIGRATE_MOVABLE,
-+	MIGRATE_PCPTYPES,	/* the number of types on the pcp lists */
-+	MIGRATE_RESERVE = MIGRATE_PCPTYPES,
-+	/*
-+	 * MIGRATE_CMA migration type is designed to mimic the way
-+	 * ZONE_MOVABLE works.  Only movable pages can be allocated
-+	 * from MIGRATE_CMA pageblocks and page allocator never
-+	 * implicitly change migration type of MIGRATE_CMA pageblock.
-+	 *
-+	 * The way to use it is to change migratetype of a range of
-+	 * pageblocks to MIGRATE_CMA which can be done by
-+	 * __free_pageblock_cma() function.  What is important though
-+	 * is that a range of pageblocks must be aligned to
-+	 * MAX_ORDER_NR_PAGES should biggest page be bigger then
-+	 * a single pageblock.
-+	 */
-+	MIGRATE_CMA,
-+	MIGRATE_ISOLATE,	/* can't allocate from here */
-+	MIGRATE_TYPES
-+};
-+
-+#ifdef CONFIG_CMA
-+#  define is_migrate_cma(migratetype) unlikely((migratetype) == MIGRATE_CMA)
-+#else
-+#  define is_migrate_cma(migratetype) false
-+#endif
- 
- #define for_each_migratetype_order(order, type) \
- 	for (order = 0; order < MAX_ORDER; order++) \
-@@ -54,6 +76,11 @@ static inline int get_pageblock_migratetype(struct page *page)
- 	return get_pageblock_flags_group(page, PB_migrate, PB_migrate_end);
- }
- 
-+static inline bool is_pageblock_cma(struct page *page)
-+{
-+	return is_migrate_cma(get_pageblock_migratetype(page));
-+}
-+
- struct free_area {
- 	struct list_head	free_list[MIGRATE_TYPES];
- 	unsigned long		nr_free;
 diff --git a/include/linux/page-isolation.h b/include/linux/page-isolation.h
-index d305080..af650db 100644
+index 051c1b1..d305080 100644
 --- a/include/linux/page-isolation.h
 +++ b/include/linux/page-isolation.h
-@@ -37,4 +37,7 @@ extern void unset_migratetype_isolate(struct page *page);
- int alloc_contig_range(unsigned long start, unsigned long end);
- void free_contig_range(unsigned long pfn, unsigned nr_pages);
+@@ -33,5 +33,8 @@ test_pages_isolated(unsigned long start_pfn, unsigned long end_pfn);
+ extern int set_migratetype_isolate(struct page *page);
+ extern void unset_migratetype_isolate(struct page *page);
  
-+/* CMA stuff */
-+extern void init_cma_reserved_pageblock(struct page *page);
-+
++/* The below functions must be run on a range from a single zone. */
++int alloc_contig_range(unsigned long start, unsigned long end);
++void free_contig_range(unsigned long pfn, unsigned nr_pages);
+ 
  #endif
-diff --git a/mm/Kconfig b/mm/Kconfig
-index 011b110..e080cac 100644
---- a/mm/Kconfig
-+++ b/mm/Kconfig
-@@ -192,7 +192,7 @@ config COMPACTION
- config MIGRATION
- 	bool "Page migration"
- 	def_bool y
--	depends on NUMA || ARCH_ENABLE_MEMORY_HOTREMOVE || COMPACTION
-+	depends on NUMA || ARCH_ENABLE_MEMORY_HOTREMOVE || COMPACTION || CMA
- 	help
- 	  Allows the migration of the physical location of pages of processes
- 	  while the virtual addresses are not changed. This is useful in
-diff --git a/mm/compaction.c b/mm/compaction.c
-index e71ceaf..3e07341 100644
---- a/mm/compaction.c
-+++ b/mm/compaction.c
-@@ -19,6 +19,11 @@
- #define CREATE_TRACE_POINTS
- #include <trace/events/compaction.h>
- 
-+static inline bool is_migrate_cma_or_movable(int migratetype)
-+{
-+	return is_migrate_cma(migratetype) || migratetype == MIGRATE_MOVABLE;
-+}
-+
- unsigned long release_freepages(struct list_head *freelist)
- {
- 	struct page *page, *next;
-@@ -114,8 +119,8 @@ static bool suitable_migration_target(struct page *page)
- 	if (PageBuddy(page) && page_order(page) >= pageblock_order)
- 		return true;
- 
--	/* If the block is MIGRATE_MOVABLE, allow migration */
--	if (migratetype == MIGRATE_MOVABLE)
-+	/* If the block is MIGRATE_MOVABLE or MIGRATE_CMA, allow migration */
-+	if (is_migrate_cma_or_movable(migratetype))
- 		return true;
- 
- 	/* Otherwise skip the block */
-@@ -324,7 +329,7 @@ isolate_migratepages_range(struct zone *zone, struct compact_control *cc,
- 		 */
- 		pageblock_nr = low_pfn >> pageblock_order;
- 		if (!cc->sync && last_pageblock_nr != pageblock_nr &&
--				get_pageblock_migratetype(page) != MIGRATE_MOVABLE) {
-+		    is_migrate_cma_or_movable(get_pageblock_migratetype(page))) {
- 			low_pfn += pageblock_nr_pages;
- 			low_pfn = ALIGN(low_pfn, pageblock_nr_pages) - 1;
- 			last_pageblock_nr = pageblock_nr;
 diff --git a/mm/page_alloc.c b/mm/page_alloc.c
-index b7aac26..9ec73f4 100644
+index 58d1a2e..b7aac26 100644
 --- a/mm/page_alloc.c
 +++ b/mm/page_alloc.c
-@@ -733,6 +733,26 @@ void __meminit __free_pages_bootmem(struct page *page, unsigned int order)
- 	}
+@@ -57,6 +57,7 @@
+ #include <linux/ftrace_event.h>
+ #include <linux/memcontrol.h>
+ #include <linux/prefetch.h>
++#include <linux/migrate.h>
+ 
+ #include <asm/tlbflush.h>
+ #include <asm/div64.h>
+@@ -5687,6 +5688,228 @@ out:
+ 	spin_unlock_irqrestore(&zone->lock, flags);
  }
  
-+#ifdef CONFIG_CMA
-+/*
-+ * Free whole pageblock and set it's migration type to MIGRATE_CMA.
-+ */
-+void __init init_cma_reserved_pageblock(struct page *page)
++static unsigned long pfn_align_to_maxpage_down(unsigned long pfn)
 +{
-+	unsigned i = pageblock_nr_pages;
-+	struct page *p = page;
-+
-+	do {
-+		__ClearPageReserved(p);
-+		set_page_count(p, 0);
-+	} while (++p, --i);
-+
-+	set_page_refcounted(page);
-+	set_pageblock_migratetype(page, MIGRATE_CMA);
-+	__free_pages(page, pageblock_order);
-+	totalram_pages += pageblock_nr_pages;
++	return pfn & ~(MAX_ORDER_NR_PAGES - 1);
 +}
-+#endif
- 
- /*
-  * The order of subdivision here is critical for the IO subsystem.
-@@ -841,11 +861,10 @@ struct page *__rmqueue_smallest(struct zone *zone, unsigned int order,
-  * This array describes the order lists are fallen back to when
-  * the free lists for the desirable migrate type are depleted
-  */
--static int fallbacks[MIGRATE_TYPES][MIGRATE_TYPES-1] = {
-+static int fallbacks[MIGRATE_PCPTYPES][4] = {
- 	[MIGRATE_UNMOVABLE]   = { MIGRATE_RECLAIMABLE, MIGRATE_MOVABLE,   MIGRATE_RESERVE },
- 	[MIGRATE_RECLAIMABLE] = { MIGRATE_UNMOVABLE,   MIGRATE_MOVABLE,   MIGRATE_RESERVE },
--	[MIGRATE_MOVABLE]     = { MIGRATE_RECLAIMABLE, MIGRATE_UNMOVABLE, MIGRATE_RESERVE },
--	[MIGRATE_RESERVE]     = { MIGRATE_RESERVE,     MIGRATE_RESERVE,   MIGRATE_RESERVE }, /* Never used */
-+	[MIGRATE_MOVABLE]     = { MIGRATE_RECLAIMABLE, MIGRATE_UNMOVABLE, MIGRATE_CMA    , MIGRATE_RESERVE },
- };
- 
- /*
-@@ -940,12 +959,12 @@ __rmqueue_fallback(struct zone *zone, int order, int start_migratetype)
- 	/* Find the largest possible block of pages in the other list */
- 	for (current_order = MAX_ORDER-1; current_order >= order;
- 						--current_order) {
--		for (i = 0; i < MIGRATE_TYPES - 1; i++) {
-+		for (i = 0; i < ARRAY_SIZE(fallbacks[0]); i++) {
- 			migratetype = fallbacks[start_migratetype][i];
- 
- 			/* MIGRATE_RESERVE handled later if necessary */
- 			if (migratetype == MIGRATE_RESERVE)
--				continue;
-+				break;
- 
- 			area = &(zone->free_area[current_order]);
- 			if (list_empty(&area->free_list[migratetype]))
-@@ -960,11 +979,18 @@ __rmqueue_fallback(struct zone *zone, int order, int start_migratetype)
- 			 * pages to the preferred allocation list. If falling
- 			 * back for a reclaimable kernel allocation, be more
- 			 * aggressive about taking ownership of free pages
-+			 *
-+			 * On the other hand, never change migration
-+			 * type of MIGRATE_CMA pageblocks nor move CMA
-+			 * pages on different free lists. We don't
-+			 * want unmovable pages to be allocated from
-+			 * MIGRATE_CMA areas.
- 			 */
--			if (unlikely(current_order >= (pageblock_order >> 1)) ||
--					start_migratetype == MIGRATE_RECLAIMABLE ||
--					page_group_by_mobility_disabled) {
--				unsigned long pages;
-+			if (!is_pageblock_cma(page) &&
-+			    (unlikely(current_order >= pageblock_order / 2) ||
-+			     start_migratetype == MIGRATE_RECLAIMABLE ||
-+			     page_group_by_mobility_disabled)) {
-+				int pages;
- 				pages = move_freepages_block(zone, page,
- 								start_migratetype);
- 
-@@ -982,11 +1008,14 @@ __rmqueue_fallback(struct zone *zone, int order, int start_migratetype)
- 			rmv_page_order(page);
- 
- 			/* Take ownership for orders >= pageblock_order */
--			if (current_order >= pageblock_order)
-+			if (current_order >= pageblock_order &&
-+			    !is_pageblock_cma(page))
- 				change_pageblock_range(page, current_order,
- 							start_migratetype);
- 
--			expand(zone, page, order, current_order, area, migratetype);
-+			expand(zone, page, order, current_order, area,
-+			       is_migrate_cma(start_migratetype)
-+			     ? start_migratetype : migratetype);
- 
- 			trace_mm_page_alloc_extfrag(page, order, current_order,
- 				start_migratetype, migratetype);
-@@ -1058,7 +1087,10 @@ static int rmqueue_bulk(struct zone *zone, unsigned int order,
- 			list_add(&page->lru, list);
- 		else
- 			list_add_tail(&page->lru, list);
--		set_page_private(page, migratetype);
-+		if (is_pageblock_cma(page))
-+			set_page_private(page, MIGRATE_CMA);
-+		else
-+			set_page_private(page, migratetype);
- 		list = &page->lru;
- 	}
- 	__mod_zone_page_state(zone, NR_FREE_PAGES, -(i << order));
-@@ -1289,8 +1321,12 @@ int split_free_page(struct page *page)
- 
- 	if (order >= pageblock_order - 1) {
- 		struct page *endpage = page + (1 << order) - 1;
--		for (; page < endpage; page += pageblock_nr_pages)
--			set_pageblock_migratetype(page, MIGRATE_MOVABLE);
-+		for (; page < endpage; page += pageblock_nr_pages) {
-+			int mt = get_pageblock_migratetype(page);
-+			if (mt != MIGRATE_ISOLATE && !is_migrate_cma(mt))
-+				set_pageblock_migratetype(page,
-+							  MIGRATE_MOVABLE);
++
++static unsigned long pfn_align_to_maxpage_up(unsigned long pfn)
++{
++	return ALIGN(pfn, MAX_ORDER_NR_PAGES);
++}
++
++static int __alloc_contig_migrate_range(unsigned long start, unsigned long end)
++{
++	/* This function is based on compact_zone() from compaction.c. */
++
++	unsigned long pfn = start;
++	int ret = -EBUSY;
++	unsigned tries = 0;
++
++	struct compact_control cc = {
++		.nr_migratepages = 0,
++		.nr_freepages = 0,
++		.order = -1,
++		.zone = page_zone(pfn_to_page(start)),
++		.sync = true,
++		.migrate_pfn = 0,
++	};
++	INIT_LIST_HEAD(&cc.freepages);
++	INIT_LIST_HEAD(&cc.migratepages);
++
++	/*
++	 * Compaction code uses two pointers, a "migrate_pfn" and
++	 * "free_pfn".  The first one goes from the beginning, and the
++	 * second one from the end of the zone.  Once they meet,
++	 * compaction stops.
++	 *
++	 * This is good behaviour if you want to migrate all pages to
++	 * the end of the zone put that's not what we want.  We want
++	 * to migrate pages from [start, end) *anywhere* inside the
++	 * zone.  To do that, we set "migrate_pfn" to the beginning of
++	 * the zone and never touch it again so compaction will finish
++	 * only when the "free_pfn" pointer reaches beginning of the
++	 * zone.
++	 */
++
++	cc.migrate_pfn = cc.zone->zone_start_pfn;
++	cc.free_pfn = cc.migrate_pfn + cc.zone->spanned_pages;
++	cc.free_pfn &= ~(pageblock_nr_pages-1);
++
++	migrate_prep_local();
++
++	while (pfn < end || cc.nr_migratepages) {
++		/* Abort on signal */
++		if (fatal_signal_pending(current)) {
++			ret = -EINTR;
++			goto done;
 +		}
- 	}
- 
- 	return 1 << order;
-@@ -5574,8 +5610,8 @@ __count_immobile_pages(struct zone *zone, struct page *page, int count)
- 	 */
- 	if (zone_idx(zone) == ZONE_MOVABLE)
- 		return true;
--
--	if (get_pageblock_migratetype(page) == MIGRATE_MOVABLE)
-+	if (get_pageblock_migratetype(page) == MIGRATE_MOVABLE ||
-+	    is_pageblock_cma(page))
- 		return true;
- 
- 	pfn = page_to_pfn(page);
++
++		/* Are there any pages left? */
++		if (cc.nr_freepages && cc.free_pfn <= cc.migrate_pfn) {
++			/* We've run out of pages to migrate to. */
++			ret = -EBUSY;
++			goto done;
++		}
++
++		/* Get some pages to migrate. */
++		if (list_empty(&cc.migratepages)) {
++			cc.nr_migratepages = 0;
++			pfn = isolate_migratepages_range(cc.zone, &cc,
++							 pfn, end);
++			if (!pfn) {
++				ret = -EINTR;
++				goto done;
++			}
++			tries = 0;
++		}
++
++		/* Try to migrate. */
++		ret = migrate_pages(&cc.migratepages, compaction_alloc,
++				    (unsigned long)&cc, false, cc.sync);
++
++		/* Migrated all of them? Great! */
++		if (list_empty(&cc.migratepages))
++			continue;
++
++		/* Try five times. */
++		if (++tries == 5) {
++			ret = ret < 0 ? ret : -EBUSY;
++			goto done;
++		}
++
++		/* Before each time drain everything and reschedule. */
++		lru_add_drain_all();
++		drain_all_pages();
++		cond_resched();
++	}
++	ret = 0;
++
++done:
++	/* Make sure all pages are isolated. */
++	if (!ret) {
++		lru_add_drain_all();
++		drain_all_pages();
++		if (WARN_ON(test_pages_isolated(start, end)))
++			ret = -EBUSY;
++	}
++
++	/* Release pages */
++	putback_lru_pages(&cc.migratepages);
++	cc.nr_freepages -= release_freepages(&cc.freepages);
++	VM_BUG_ON(cc.nr_freepages != 0);
++
++	return ret;
++}
++
++/**
++ * alloc_contig_range() -- tries to allocate given range of pages
++ * @start:	start PFN to allocate
++ * @end:	one-past-the-last PFN to allocate
++ *
++ * The PFN range does not have to be pageblock or MAX_ORDER_NR_PAGES
++ * aligned, hovewer it's callers responsibility to guarantee that we
++ * are the only thread that changes migrate type of pageblocks the
++ * pages fall in.
++ *
++ * Returns zero on success or negative error code.  On success all
++ * pages which PFN is in (start, end) are allocated for the caller and
++ * need to be freed with free_contig_range().
++ */
++int alloc_contig_range(unsigned long start, unsigned long end)
++{
++	unsigned long outer_start, outer_end;
++	int ret;
++
++	/*
++	 * What we do here is we mark all pageblocks in range as
++	 * MIGRATE_ISOLATE.  Because of the way page allocator work, we
++	 * align the range to MAX_ORDER pages so that page allocator
++	 * won't try to merge buddies from different pageblocks and
++	 * change MIGRATE_ISOLATE to some other migration type.
++	 *
++	 * Once the pageblocks are marked as MIGRATE_ISOLATE, we
++	 * migrate the pages from an unaligned range (ie. pages that
++	 * we are interested in).  This will put all the pages in
++	 * range back to page allocator as MIGRATE_ISOLATE.
++	 *
++	 * When this is done, we take the pages in range from page
++	 * allocator removing them from the buddy system.  This way
++	 * page allocator will never consider using them.
++	 *
++	 * This lets us mark the pageblocks back as
++	 * MIGRATE_CMA/MIGRATE_MOVABLE so that free pages in the
++	 * MAX_ORDER aligned range but not in the unaligned, original
++	 * range are put back to page allocator so that buddy can use
++	 * them.
++	 */
++
++	ret = start_isolate_page_range(pfn_align_to_maxpage_down(start),
++				       pfn_align_to_maxpage_up(end));
++	if (ret)
++		goto done;
++
++	ret = __alloc_contig_migrate_range(start, end);
++	if (ret)
++		goto done;
++
++	/*
++	 * Pages from [start, end) are within a MAX_ORDER_NR_PAGES
++	 * aligned blocks that are marked as MIGRATE_ISOLATE.  What's
++	 * more, all pages in [start, end) are free in page allocator.
++	 * What we are going to do is to allocate all pages from
++	 * [start, end) (that is remove them from page allocater).
++	 *
++	 * The only problem is that pages at the beginning and@the
++	 * end of interesting range may be not aligned with pages that
++	 * page allocator holds, ie. they can be part of higher order
++	 * pages.  Because of this, we reserve the bigger range and
++	 * once this is done free the pages we are not interested in.
++	 */
++
++	ret = 0;
++	while (!PageBuddy(pfn_to_page(start & (~0UL << ret))))
++		if (WARN_ON(++ret >= MAX_ORDER)) {
++			ret = -EINVAL;
++			goto done;
++		}
++
++	outer_start = start & (~0UL << ret);
++	outer_end = isolate_freepages_range(page_zone(pfn_to_page(outer_start)),
++					    outer_start, end, NULL);
++	if (!outer_end) {
++		ret = -EBUSY;
++		goto done;
++	}
++	outer_end += outer_start;
++
++	/* Free head and tail (if any) */
++	if (start != outer_start)
++		free_contig_range(outer_start, start - outer_start);
++	if (end != outer_end)
++		free_contig_range(end, outer_end - end);
++
++	ret = 0;
++done:
++	undo_isolate_page_range(pfn_align_to_maxpage_down(start),
++				pfn_align_to_maxpage_up(end));
++	return ret;
++}
++
++void free_contig_range(unsigned long pfn, unsigned nr_pages)
++{
++	struct page *page = pfn_to_page(pfn);
++
++	while (nr_pages--) {
++		__free_page(page);
++		++pfn;
++		if (likely(zone_pfn_same_memmap(pfn - 1, pfn)))
++			++page;
++		else
++			page = pfn_to_page(pfn);
++	}
++}
++
+ #ifdef CONFIG_MEMORY_HOTREMOVE
+ /*
+  * All pages in the range must be isolated before calling this.
 -- 
 1.7.1.569.g6f426
