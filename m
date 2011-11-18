@@ -1,48 +1,88 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 18 Nov 2011 17:40:01 +0000
-Subject: [PATCH] ARM: unwind: add unwind directives to bitops assembly
- macros
-In-Reply-To: <20111117184801.GF3044@localhost.localdomain>
-References: <1321553096-11859-1-git-send-email-will.deacon@arm.com>
- <20111117184801.GF3044@localhost.localdomain>
-Message-ID: <20111118174001.GF17991@mudshark.cambridge.arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 18 Nov 2011 17:44:20 +0000
+Subject: [PATCH 1/5] ARM: vexpress: Get rid of MMIO_P2V
+In-Reply-To: <1321618848.24216.322.camel@hornet.cambridge.arm.com>
+References: <1321036026-23411-1-git-send-email-pawel.moll@arm.com>
+ <1321036026-23411-2-git-send-email-pawel.moll@arm.com>
+ <20111117154308.GS9581@n2100.arm.linux.org.uk>
+ <1321618848.24216.322.camel@hornet.cambridge.arm.com>
+Message-ID: <20111118174420.GG9581@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 17, 2011 at 06:48:01PM +0000, Dave Martin wrote:
-> On Thu, Nov 17, 2011 at 06:04:56PM +0000, Will Deacon wrote:
-> > The bitops functions (e.g. _test_and_set_bit) on ARM do not have unwind
-> > annotations and therefore the kernel cannot backtrace out of them on a
-> > fatal error (for example, NULL pointer dereference).
+On Fri, Nov 18, 2011 at 12:20:48PM +0000, Pawel Moll wrote:
+> On Thu, 2011-11-17 at 15:43 +0000, Russell King - ARM Linux wrote:
+> > > +/* Tile's peripherals static mappings should start here */
+> > > +#define V2T_PERIPH 0xf8200000
+> > > +#define V2T_PERIPH_P2V(offset) ((void __iomem *)(V2T_PERIPH | (offset)))
+> > > +
 > > 
-> > This patch annotates the bitops assembly macros with UNWIND annotations
-> > so that we can produce a meaningful backtrace on error.
+> > Please get rid of these blank lines at the end of files.
 > 
-> I take it these macros aren't likely ever to get used except in the
-> definition of complete functions (as in testsetbit.S etc.)?
-
-Currently they're only used in that way and I don't see why that would
-change.
-
-> One way to make the correct behaviour explicit would be to put the
-> function boilerplate into the macros instead:
+> Patch splitting leftover. Will fix.
 > 
-> #include <linux/linkage.h>
-> #include <asm/unwind.h>
+> > > +static void __iomem *v2m_sysreg_base;
+> > > +
+> > > +
+> > > +
+> > 
+> > More useless blank lines.
 > 
-> 	.macro bitop name, instr
-> ENTRY(\name )
-> UNWIND(	.fnstart	)
-> 	@ stuff
-> 	@ bx lr / mov pc,lr
-> UNWIND(	.fnend		)
-> ENDPROC(\name )
-> 	.endm
+> Ok, will change that. I just like the way that the data are visually
+> separated from the code like here:
 > 
-> That makes it harder to misuse the macros or to typo the ENDPROC()
-> directive, as well as allowing a few lines to be eliminated from the
-> other .S files.
+> ceade897 (Russell King 2010-02-11 21:44:53 +0000  68)         .init   = v2m_timer_init,
+> ceade897 (Russell King 2010-02-11 21:44:53 +0000  69) };
+> ceade897 (Russell King 2010-02-11 21:44:53 +0000  70) 
+> ceade897 (Russell King 2010-02-11 21:44:53 +0000  71) 
+> ceade897 (Russell King 2010-02-11 21:44:53 +0000  72) static DEFINE_SPINLOCK(v2m_cfg_lock);
+> 
+> or here:
+> 
+> ceade897 (Russell King 2010-02-11 21:44:53 +0000 289)         &rtc_device,
+> ceade897 (Russell King 2010-02-11 21:44:53 +0000 290) };
+> ceade897 (Russell King 2010-02-11 21:44:53 +0000 291) 
+> ceade897 (Russell King 2010-02-11 21:44:53 +0000 292) 
+> ceade897 (Russell King 2010-02-11 21:44:53 +0000 293) static long v2m_osc_round(struct clk *clk, unsigned long rate)
 
-That's not a bad idea, I'll re-roll the patch next week.
+Note the difference in the number.  Two is acceptable to split sections
+of code.  Three is getting excessive.
 
-Will
+> 
+> > >  static void __init v2m_timer_init(void)
+> > >  {
+> > > +	void *sysctl_base;
+> > > +	void *timer01_base;
+> > 
+> > Do you not use sparse?  __iomem.
+> 
+> Ok.
+> 
+> > > +	unsigned int timer01_irq;
+> > >  	u32 scctrl;
+> > >  
+> > > +		sysctl_base = ioremap(V2M_SYSCTL, SZ_4K);
+> > > +		BUG_ON(!sysctl_base);
+> > > +		timer01_base = ioremap(V2M_TIMER01, SZ_4K);
+> > > +		BUG_ON(!timer01_base);
+> > > +		timer01_irq = IRQ_V2M_TIMER0;
+> > 
+> > What's going on with the indentation here?
+> 
+> Patch-splitting artefact again, will fix.
+> 
+> > > @@ -413,6 +431,10 @@ static void __init v2m_populate_ct_desc(void)
+> > >  static void __init v2m_map_io(void)
+> > >  {
+> > >  	iotable_init(v2m_io_desc, ARRAY_SIZE(v2m_io_desc));
+> > > +
+> > > +	/* Will become an ioremap() when possible */
+> > > +	v2m_sysreg_base = V2M_PERIPH_P2V(V2M_SYSREGS);
+> > 
+> > It won't if it stays here.
+> 
+> Excuse my inferior English language capabilities, but what do you
+> suggest here?
+
+What I'm saying is your comment is wrong.  ioremap() will never be
+possible in the map_io function.
