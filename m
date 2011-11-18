@@ -1,58 +1,36 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Fri, 18 Nov 2011 13:20:23 -0800
-Subject: [GIT PULL] cpufreq: OMAP: move to drivers/cpufreq and updates for v3.3
-Message-ID: <871ut5w2js.fsf@ti.com>
+From: psandeep.s@gmail.com (sandeep patil)
+Date: Fri, 18 Nov 2011 13:20:48 -0800
+Subject: [Linaro-mm-sig] [PATCHv17 0/11] Contiguous Memory Allocator
+In-Reply-To: <1321634598-16859-1-git-send-email-m.szyprowski@samsung.com>
+References: <1321634598-16859-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <CA+K6fF6SH6BNoKgwArcqvyav4b=C5SGvymo5LS3akfD_yE_beg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dave,
+On Fri, Nov 18, 2011 at 8:43 AM, Marek Szyprowski
+<m.szyprowski@samsung.com> wrote:
+> Welcome everyone once again,
 
-Here's the updated pull request after a rebase onto v3.2-rc1 and some
-fixes to address other changes that went into v3.2.
-
-This is targetted for v3.3, so I'd like to get it into your tree and
-into linux-next.
-
-Also, let me know if you want a MAINTAINERS entry for this file, as I'm
-happy to maintain it.
-
-Kevin
+> Please notice that this patch series is aimed to start further
+> discussion. There are still few issues that need to be resolved before
+> CMA will be really ready. The most hot problem is the issue with movable
+> pages that causes migration to fail from time to time. Our investigation
+> leads us to the point that these rare pages cannot be migrated because
+> there are some pending io operations on them.
 
 
-The following changes since commit 1ea6b8f48918282bdca0b32a34095504ee65bab5:
+I am running a simple test to allocate contiguous regions and write a log on
+in a file on sdcard simultaneously. I can reproduce this migration failure 100%
+times with it.
+when I tracked the pages that failed to migrate, I found them on the
+buffer head lru
+list with a reference held on the buffer_head in the page, which
+causes drop_buffers()
+to fail.
 
-  Linux 3.2-rc1 (2011-11-07 16:16:02 -0800)
+So, i guess my question is, until all the migration failures are
+tracked down and fixed,
+is there a plan to retry the contiguous allocation from a new range in
+the CMA region?
 
-are available in the git repository at:
-  git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git for_3.3/omap-cpufreq
-
-Colin Cross (1):
-      cpufreq: OMAP: notify even with bad boot frequency
-
-Kevin Hilman (1):
-      cpufreq: OMAP: fixup for omap_device changes, include <linux/module.h>
-
-Nishanth Menon (6):
-      cpufreq: OMAP: move clk name decision to init
-      cpufreq: OMAP: deny initialization if no mpudev
-      cpufreq: OMAP: dont support !freq_table
-      cpufreq: OMAP: only supports OPP library
-      cpufreq: OMAP: put clk if cpu_init failed
-      cpufreq: OMAP: fix freq_table leak
-
-Russell King (1):
-      cpufreq: OMAP: Add SMP support for OMAP4+
-
-Santosh Shilimkar (1):
-      cpufreq: OMAP: cleanup for multi-SoC support, move into drivers/cpufreq
-
-Todd Poynor (1):
-      cpufreq: OMAP: Enable all CPUs in shared policy mask
-
- arch/arm/plat-omap/Makefile    |    1 -
- arch/arm/plat-omap/cpu-omap.c  |  171 -------------------------
- drivers/cpufreq/Makefile       |    1 +
- drivers/cpufreq/omap-cpufreq.c |  274 ++++++++++++++++++++++++++++++++++++++++
- 4 files changed, 275 insertions(+), 172 deletions(-)
- delete mode 100644 arch/arm/plat-omap/cpu-omap.c
- create mode 100644 drivers/cpufreq/omap-cpufreq.c
+~ sandeep
