@@ -1,33 +1,47 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Fri, 18 Nov 2011 08:25:33 -0800
-Subject: [PATCH] arm/tegra: convert tegra20 to GIC devicetree binding
-In-Reply-To: <20111118120352.GZ19069@tbergstrom-lnx.Nvidia.com>
-References: <1321542430-17971-1-git-send-email-pdeschrijver@nvidia.com>
- <74CDBE0F657A3D45AFBB94109FB122FF1740D74C1E@HQMAIL01.nvidia.com>
- <20111118120352.GZ19069@tbergstrom-lnx.Nvidia.com>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF1740D74E63@HQMAIL01.nvidia.com>
+From: javier.martin@vista-silicon.com (javier Martin)
+Date: Fri, 18 Nov 2011 17:27:12 +0100
+Subject: [PATCH] MEM2MEM: Add support for eMMa-PrP mem2mem operations.
+In-Reply-To: <4EC682B8.10300@gmail.com>
+References: <1321460614-2108-1-git-send-email-javier.martin@vista-silicon.com>
+ <4EC682B8.10300@gmail.com>
+Message-ID: <CACKLOr0spqXzYZUPcDkDxCqZXkCM+F6crEQ3R0VbS-HGvZADtA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Peter De Schrijver wrote at Friday, November 18, 2011 5:04 AM:
-> On Thu, Nov 17, 2011 at 07:51:35PM +0100, Stephen Warren wrote:
-> > Peter De Schrijver wrote at Thursday, November 17, 2011 8:07 AM:
-> > > Convert tegra20 IRQ intialization to the GIC devicetree binding. Modify the
-> > > interrupt definitions in the dts files according to
-> > > Documentation/devicetree/bindings/arm/gic.txt
-> > >
-> > > Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
-> >
-> > tegra-harmony.dts contains an interrupts property that wasn't updated,
-> > for the WM8903 codec.
-> 
-> But that's a GPIO interrupt no?
+Hi Sylwester,
+thank you for your review.
 
-The interrupt line from codec to Tegra is a GPIO, yes.
+On 18 November 2011 17:07, Sylwester Nawrocki <snjw23@gmail.com> wrote:
+> Hi Javier,
+>
+> Good to see non Samsung device using v4l2 mem-to-mem framework. What is your
+> experience, have you encountered any specific problems with it ?
 
-But the WM8903 still has the same interrupt-parent as everything else,
-since it's inherited from /interrupt-parent and doesn't define its own.
-Perhaps this is a mistake?
+I've found the framework quite convenient and comfortable, it
+definitely saves a lot of work and coding once you understand it
+properly.
+For a simple device as i.MX2 eMMa-PrP a driver can be in a working
+state in a couple of days. I've not found any drawbacks.
+
+> And just out of curiosity, are you planning to develop video codec driver
+> in v4l2 for i.MX27 as well ?
+
+It depends on the result of a proof of concept we are preparing now.
+But yes, it could be possible. AFAIK, Sascha Hauer (added to CC) has a
+prototype driver for this one though.
+
+> I have a few comments, please see below...
+
+It seems I'll have to prepare a second version with all the fixes
+you've pointed out which seem quite reasonable to me.
+
+Regards.
 
 -- 
-nvpublic
+Javier Martin
+Vista Silicon S.L.
+CDTUC - FASE C - Oficina S-345
+Avda de los Castros s/n
+39005- Santander. Cantabria. Spain
++34 942 25 32 60
+www.vista-silicon.com
