@@ -1,56 +1,43 @@
-From: premi@ti.com (Premi, Sanjeev)
-Date: Fri, 18 Nov 2011 17:58:14 +0000
-Subject: [PATCH] ARM: OMAP: PM: only register TWL with voltage layer
- when device is present
-In-Reply-To: <878vne5zeg.fsf@ti.com>
-References: <1320797670-21460-1-git-send-email-khilman@ti.com>
- <E28AAFD00EFAA646AE3DF9B89CD24A89036E64@DBDE01.ent.ti.com>
- <8762irg73n.fsf@ti.com>
- <E28AAFD00EFAA646AE3DF9B89CD24A8903E1A5@DBDE01.ent.ti.com>
- <874ny37hdv.fsf@ti.com>
- <E28AAFD00EFAA646AE3DF9B89CD24A8904BF32@DBDE01.ent.ti.com>
- <878vne5zeg.fsf@ti.com>
-Message-ID: <E28AAFD00EFAA646AE3DF9B89CD24A89052B4A@DBDE01.ent.ti.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Fri, 18 Nov 2011 13:28:14 -0500 (EST)
+Subject: [PATCH] ARM: fix unwinding for XIP kernels
+In-Reply-To: <20111117141706.GI4748@arm.com>
+References: <1321537200-9532-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <20111117141706.GI4748@arm.com>
+Message-ID: <alpine.LFD.2.02.1111181321390.13989@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Hilman, Kevin 
-> Sent: Friday, November 18, 2011 12:51 AM
-> To: Premi, Sanjeev
-> Cc: linux-omap at vger.kernel.org; 
-> linux-arm-kernel at lists.infradead.org; Koyamangalath, Abhilash
-> Subject: Re: [PATCH] ARM: OMAP: PM: only register TWL with 
-> voltage layer when device is present
-> 
-> "Premi, Sanjeev" <premi@ti.com> writes:
-> 
-> [...]
-> 
-> >> 
-> >> If PMIC is not TWL family, then I don't expect any functions in
-> >> twl_common.c to be called.
-> >
-> > This is the reason I wanted to know if the check on ".irq" in the
-> > patch is sufficient. If any PMIC requires & sets 
-> "pmic_i2c_board_info.irq"
-> > then both omap3_twl_init() and omap4_twl_init() will be called.
-> 
-> Only TWL PMICs should be calling these functions, as they are in code
-> for TWL PMICs *only*.
-> 
-> If you have a non-TWL PMIC, then you should not be using the 
-> omap_pmic_*
-> functions.
-> 
-> Admittedly, these omap_pmic_* functions should be renamed to be clear
-> that they are TWL specific.
+On Thu, 17 Nov 2011, Catalin Marinas wrote:
 
-Thanks. We also need mechanism - may be name - to identify the PMIC family
-at this stage; and that should be used to select the corresponding init function.
-
-~sanjeev
-
+> On Thu, Nov 17, 2011 at 01:40:00PM +0000, Uwe Kleine-K?nig wrote:
+> > The linker places the unwind tables in readonly sections. So when using
+> > an XIP kernel these are located in ROM and cannot be modified.
+> > 
+> > For that reason don't convert the symbol addresses during boot (or
+> > module loading) but only when interpreting them in search_index().
+> > Moreover several consts are added to catch future writes and rename the
+> > member "addr" of struct unwind_idx to "addr_offset" to better match the
+> > new semantic.
+> > 
+> > This fixes unwinding on XIP which compared prel31 offsets to absolute
+> > addresses because the initial conversion from prel31 to absolute failed.
 > 
-> Kevin
-> 
+> My only worry - does this increase the index search by doing the prel31
+> conversion every time? It could affect tools like lockdep that need to
+> get the backtrace regularly at run-time.
+
+We're talking about two constant shifts and an add.  something that 
+myght take around 2 cycles on ARM.  Hardly noticeable I would say, 
+especially given that lockdep is already quite costly and hardly 
+something you want to keep around in production anyway.
+
+On the plus side, this fixes the XIP case, and allow for backtrace to be 
+usable pretty early without any explicit initialization.
+
+As far as I'm concerned (which isn't much as this is not my code):
+
+Acked-by: Nicolas Pitre <nico@linaro.org>
+
+
+Nicolas
