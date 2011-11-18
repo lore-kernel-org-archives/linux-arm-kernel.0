@@ -1,36 +1,49 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Fri, 18 Nov 2011 11:22:40 -0800
-Subject: [PATCH 2/2] arm: omap: smartreflex: fix IRQ handling bug
-In-Reply-To: <1321644160-19981-1-git-send-email-khilman@ti.com>
-References: <1321644160-19981-1-git-send-email-khilman@ti.com>
-Message-ID: <1321644160-19981-3-git-send-email-khilman@ti.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 18 Nov 2011 13:30:37 -0600
+Subject: [PATCH 01/10] arm/tegra: initial device tree for tegra30
+In-Reply-To: <20111118184942.GA31678@quad.lixom.net>
+References: <1321546766-26770-1-git-send-email-pdeschrijver@nvidia.com>
+ <1321546766-26770-2-git-send-email-pdeschrijver@nvidia.com>
+ <74CDBE0F657A3D45AFBB94109FB122FF1740D74C46@HQMAIL01.nvidia.com>
+ <20111118184942.GA31678@quad.lixom.net>
+Message-ID: <4EC6B25D.70708@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Felipe Balbi <balbi@ti.com>
+On 11/18/2011 12:49 PM, Olof Johansson wrote:
+> On Thu, Nov 17, 2011 at 11:39:14AM -0800, Stephen Warren wrote:
+>> Peter De Schrijver wrote at Thursday, November 17, 2011 9:19 AM:
+>>> This patch adds the initial device tree for tegra30
+>>
+>>> diff --git a/Documentation/devicetree/bindings/arm/tegra.txt
+>> ...
+>>> +* harmony: tegra20 based development board
+>>> +Required root node properties:
+>>> + - compatible = "nvidia,harmony", "nvidia,tegra20";
+>>> +
+>>> +* seaboard: tegra20 based clamshell reference design
+>>> +Required root node properties:
+>>> + - compatible = "nvidia,seaboard", "nvidia,tegra20";
+>>
+>> Do we really want to list all the board names here? In the future, there
+>> could be tens or hundreds. I would argue that we should just document
+>> nvidia,tegra20 and nvidia,tegra30.
+> 
+> Agreed.
 
-fix a bug which has been on this driver since
-it was added by the original commit 984aa6db
-which would never clear IRQSTATUS bits.
+It's not really any different than mach-types which does have every
+board in it.
 
-Signed-off-by: Felipe Balbi <balbi@ti.com>
-Signed-off-by: Kevin Hilman <khilman@ti.com>
----
- arch/arm/mach-omap2/smartreflex.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+I think if a board requires a new dts, then it needs a unique name.
 
-diff --git a/arch/arm/mach-omap2/smartreflex.c b/arch/arm/mach-omap2/smartreflex.c
-index 6a4f683..cf246b3 100644
---- a/arch/arm/mach-omap2/smartreflex.c
-+++ b/arch/arm/mach-omap2/smartreflex.c
-@@ -139,7 +139,7 @@ static irqreturn_t sr_interrupt(int irq, void *data)
- 		sr_write_reg(sr_info, ERRCONFIG_V1, status);
- 	} else if (sr_info->ip_type == SR_TYPE_V2) {
- 		/* Read the status bits */
--		sr_read_reg(sr_info, IRQSTATUS);
-+		status = sr_read_reg(sr_info, IRQSTATUS);
- 
- 		/* Clear them by writing back */
- 		sr_write_reg(sr_info, IRQSTATUS, status);
--- 
-1.7.6
+> 
+>> At a later point, we should fix board-dt.c to solely look for those
+>> compatible values, although this will have to wait until the pinmux DT
+>> bindings are present. Then, the kernel won't care about the board names.
+> 
+> Exactly.
+
+That is perfectly acceptable, but you should still have the option to do
+something specific for any given board.
+
+Rob
