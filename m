@@ -1,83 +1,47 @@
 From: pawel.moll@arm.com (Pawel Moll)
-Date: Fri, 18 Nov 2011 12:20:48 +0000
-Subject: [PATCH 1/5] ARM: vexpress: Get rid of MMIO_P2V
-In-Reply-To: <20111117154308.GS9581@n2100.arm.linux.org.uk>
+Date: Fri, 18 Nov 2011 12:20:49 +0000
+Subject: [PATCH 3/5] ARM: vexpress: Add DT support in v2m
+In-Reply-To: <20111117155334.GT9581@n2100.arm.linux.org.uk>
 References: <1321036026-23411-1-git-send-email-pawel.moll@arm.com>
- <1321036026-23411-2-git-send-email-pawel.moll@arm.com>
- <20111117154308.GS9581@n2100.arm.linux.org.uk>
-Message-ID: <1321618848.24216.322.camel@hornet.cambridge.arm.com>
+ <1321036026-23411-4-git-send-email-pawel.moll@arm.com>
+ <20111116154402.GE2073@localhost.localdomain> <4EC3E446.4030608@gmail.com>
+ <1321461458.3137.374.camel@hornet.cambridge.arm.com>
+ <4EC3EBEC.3020601@gmail.com>
+ <1321463271.3137.380.camel@hornet.cambridge.arm.com>
+ <20111117155334.GT9581@n2100.arm.linux.org.uk>
+Message-ID: <1321618849.24216.323.camel@hornet.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2011-11-17 at 15:43 +0000, Russell King - ARM Linux wrote:
-> > +/* Tile's peripherals static mappings should start here */
-> > +#define V2T_PERIPH 0xf8200000
-> > +#define V2T_PERIPH_P2V(offset) ((void __iomem *)(V2T_PERIPH | (offset)))
-> > +
-> 
-> Please get rid of these blank lines at the end of files.
+On Thu, 2011-11-17 at 15:53 +0000, Russell King - ARM Linux wrote:
+> You're totally failing to understand the point.
 
-Patch splitting leftover. Will fix.
+That's your opinion, I think otherwise, won't try to convince you.
 
-> > +static void __iomem *v2m_sysreg_base;
-> > +
-> > +
-> > +
-> 
-> More useless blank lines.
+> The point is that when Versatile Express first came out, it had a memory
+> map.  At this point in time, there was nothing 'legacy' about it, it was
+> the latest and greatest thing.
 
-Ok, will change that. I just like the way that the data are visually
-separated from the code like here:
+That's right. And then when the new variant was created *hardware
+designers* decided to call the previous one "legacy". I couldn't care
+less what word was it, could be even "bublebee" from my point of view.
 
-ceade897 (Russell King 2010-02-11 21:44:53 +0000  68)         .init   = v2m_timer_init,
-ceade897 (Russell King 2010-02-11 21:44:53 +0000  69) };
-ceade897 (Russell King 2010-02-11 21:44:53 +0000  70) 
-ceade897 (Russell King 2010-02-11 21:44:53 +0000  71) 
-ceade897 (Russell King 2010-02-11 21:44:53 +0000  72) static DEFINE_SPINLOCK(v2m_cfg_lock);
+> Again, this is _not_ how DT is supposed to work.  DT is about describing
+> the hardware, not describing the state of something.  
 
-or here:
+And that's exactly what I was trying to do. Describe the hardware, using
+terminology *used by the hardware designers* - fact that you have chosen
+to ignore, fair enough.
 
-ceade897 (Russell King 2010-02-11 21:44:53 +0000 289)         &rtc_device,
-ceade897 (Russell King 2010-02-11 21:44:53 +0000 290) };
-ceade897 (Russell King 2010-02-11 21:44:53 +0000 291) 
-ceade897 (Russell King 2010-02-11 21:44:53 +0000 292) 
-ceade897 (Russell King 2010-02-11 21:44:53 +0000 293) static long v2m_osc_round(struct clk *clk, unsigned long rate)
+> So, get rid of that 'legacy' crap in DT naming.  It doesn't belong.  Or
+> we'll start talling the Cortex-A5 stuff 'legacy' right now as well.
 
-> >  static void __init v2m_timer_init(void)
-> >  {
-> > +	void *sysctl_base;
-> > +	void *timer01_base;
-> 
-> Do you not use sparse?  __iomem.
+As the compatible values will be limited to the tile name and the
+information about the motherboard "mode" will be passed through private
+node property, I will follow Dave's suggestion of using "empty value"
+for legacy/original/whatever variant. Hopefully this will end this topic
+which is already too long.
 
-Ok.
-
-> > +	unsigned int timer01_irq;
-> >  	u32 scctrl;
-> >  
-> > +		sysctl_base = ioremap(V2M_SYSCTL, SZ_4K);
-> > +		BUG_ON(!sysctl_base);
-> > +		timer01_base = ioremap(V2M_TIMER01, SZ_4K);
-> > +		BUG_ON(!timer01_base);
-> > +		timer01_irq = IRQ_V2M_TIMER0;
-> 
-> What's going on with the indentation here?
-
-Patch-splitting artefact again, will fix.
-
-> > @@ -413,6 +431,10 @@ static void __init v2m_populate_ct_desc(void)
-> >  static void __init v2m_map_io(void)
-> >  {
-> >  	iotable_init(v2m_io_desc, ARRAY_SIZE(v2m_io_desc));
-> > +
-> > +	/* Will become an ioremap() when possible */
-> > +	v2m_sysreg_base = V2M_PERIPH_P2V(V2M_SYSREGS);
-> 
-> It won't if it stays here.
-
-Excuse my inferior English language capabilities, but what do you
-suggest here?
-
-All comments appreciated as always, thanks!
+Thanks for all comments!
 
 Pawel
