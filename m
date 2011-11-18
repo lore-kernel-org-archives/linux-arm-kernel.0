@@ -1,142 +1,60 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 18 Nov 2011 19:48:48 +0000
-Subject: [PATCH] ARM: w90x900: add common nuc9xx.h
-Message-ID: <E1RRUQa-0005MI-5C@rmk-PC.arm.linux.org.uk>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Fri, 18 Nov 2011 12:18:40 -0800
+Subject: [PATCH 03/10] arm/tegra: prepare clock code for multiple tegra
+ variants
+In-Reply-To: <20111118190649.GB31678@quad.lixom.net>
+References: <1321546766-26770-1-git-send-email-pdeschrijver@nvidia.com>
+ <1321546766-26770-4-git-send-email-pdeschrijver@nvidia.com>
+ <20111118190649.GB31678@quad.lixom.net>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF1740D74F48@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rather than having separate extern declarations in nuc9*.h, provide
-a common header file containing these definitions.
+Olof Johansson wrote at Friday, November 18, 2011 12:07 PM:
+> On Thu, Nov 17, 2011 at 06:19:17PM +0200, Peter De Schrijver wrote:
+> > Rework the tegra20 clock code to support multiple tegra variants :
+> >
+> >  * remove tegra2_periph_reset_assert/tegra2_periph_reset_deassert. This
+> >    functionality should be in clock.c.
+> >  * compile tegra_sdmmc_tap_delay only on tegra20 as this feature will not
+> >    be available in future variants.
+> >  * don't export clk_measure_input_freq as its functionality is also available
+> >    using clk_get_rate().
+...
+> > @@ -403,10 +405,11 @@ void __init tegra_init_clock(void)
+> >  }
+> >
+> >  /*
+> > - * The SDMMC controllers have extra bits in the clock source register that
+> > - * adjust the delay between the clock and data to compenstate for delays
+> > - * on the PCB.
+> > + * The SDMMC controllers on tegra20 have extra bits in the clock source
+> > + * register that adjust the delay between the clock and data to compenstate
+> > + * for delays on the PCB.
+> >   */
+> > +#ifdef CONFIG_ARCH_TEGRA_2x_SOC
+> >  void tegra_sdmmc_tap_delay(struct clk *c, int delay)
+> >  {
+> >  	unsigned long flags;
+> > @@ -415,6 +418,7 @@ void tegra_sdmmc_tap_delay(struct clk *c, int delay)
+> >  	tegra2_sdmmc_tap_delay(c, delay);
+> >  	spin_unlock_irqrestore(&c->spinlock, flags);
+> >  }
+> > +#endif
+> 
+> Ifdeffing this out doesn't quite make sense. Better to do a #ifdef in the
+> include file with an #else case that fills in an empty function. This
+> needs to be abstracted differently for the two platforms anyway but
+> that can be done separately from this. Does tegra3 have tap delay setup
+> as well? (I don't have the TRM handy right now).
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
-This is a preparatory patch for fixing w90x900 for the restart changes,
-and is the last patch which is currently in linux-next without any
-appropriate acks.
+I vote just rip this function out altogether.
 
- arch/arm/mach-w90x900/irq.c    |    2 ++
- arch/arm/mach-w90x900/nuc910.h |    9 +--------
- arch/arm/mach-w90x900/nuc950.h |    9 +--------
- arch/arm/mach-w90x900/nuc960.h |    9 +--------
- arch/arm/mach-w90x900/nuc9xx.h |   23 +++++++++++++++++++++++
- arch/arm/mach-w90x900/time.c   |    2 ++
- 6 files changed, 30 insertions(+), 24 deletions(-)
- create mode 100644 arch/arm/mach-w90x900/nuc9xx.h
+It isn't used in mainline, chromeos-2.6.38, chromeos-3.0, nor our internal
+2.6.36 or 2.6.39 kernels.
 
-diff --git a/arch/arm/mach-w90x900/irq.c b/arch/arm/mach-w90x900/irq.c
-index 7bf143c..b466e24 100644
---- a/arch/arm/mach-w90x900/irq.c
-+++ b/arch/arm/mach-w90x900/irq.c
-@@ -28,6 +28,8 @@
- #include <mach/hardware.h>
- #include <mach/regs-irq.h>
- 
-+#include "nuc9xx.h"
-+
- struct group_irq {
- 	unsigned long		gpen;
- 	unsigned int		enabled;
-diff --git a/arch/arm/mach-w90x900/nuc910.h b/arch/arm/mach-w90x900/nuc910.h
-index 83e9ba5..b14c71a 100644
---- a/arch/arm/mach-w90x900/nuc910.h
-+++ b/arch/arm/mach-w90x900/nuc910.h
-@@ -12,14 +12,7 @@
-  * published by the Free Software Foundation.
-  *
-  */
--
--struct map_desc;
--struct sys_timer;
--
--/* core initialisation functions */
--
--extern void nuc900_init_irq(void);
--extern struct sys_timer nuc900_timer;
-+#include "nuc9xx.h"
- 
- /* extern file from nuc910.c */
- 
-diff --git a/arch/arm/mach-w90x900/nuc950.h b/arch/arm/mach-w90x900/nuc950.h
-index 98a1148..6e9de30 100644
---- a/arch/arm/mach-w90x900/nuc950.h
-+++ b/arch/arm/mach-w90x900/nuc950.h
-@@ -12,14 +12,7 @@
-  * published by the Free Software Foundation.
-  *
-  */
--
--struct map_desc;
--struct sys_timer;
--
--/* core initialisation functions */
--
--extern void nuc900_init_irq(void);
--extern struct sys_timer nuc900_timer;
-+#include "nuc9xx.h"
- 
- /* extern file from nuc950.c */
- 
-diff --git a/arch/arm/mach-w90x900/nuc960.h b/arch/arm/mach-w90x900/nuc960.h
-index f0c07cb..9f6df9a 100644
---- a/arch/arm/mach-w90x900/nuc960.h
-+++ b/arch/arm/mach-w90x900/nuc960.h
-@@ -12,14 +12,7 @@
-  * published by the Free Software Foundation.
-  *
-  */
--
--struct map_desc;
--struct sys_timer;
--
--/* core initialisation functions */
--
--extern void nuc900_init_irq(void);
--extern struct sys_timer nuc900_timer;
-+#include "nuc9xx.h"
- 
- /* extern file from nuc960.c */
- 
-diff --git a/arch/arm/mach-w90x900/nuc9xx.h b/arch/arm/mach-w90x900/nuc9xx.h
-new file mode 100644
-index 0000000..847c4f3
---- /dev/null
-+++ b/arch/arm/mach-w90x900/nuc9xx.h
-@@ -0,0 +1,23 @@
-+/*
-+ * arch/arm/mach-w90x900/nuc9xx.h
-+ *
-+ * Copied from nuc910.h, which had:
-+ *
-+ * Copyright (c) 2008 Nuvoton corporation
-+ *
-+ * Header file for NUC900 CPU support
-+ *
-+ * Wan ZongShun <mcuos.com@gmail.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ */
-+struct map_desc;
-+struct sys_timer;
-+
-+/* core initialisation functions */
-+
-+extern void nuc900_init_irq(void);
-+extern struct sys_timer nuc900_timer;
-diff --git a/arch/arm/mach-w90x900/time.c b/arch/arm/mach-w90x900/time.c
-index a2c4e2d..fa27c49 100644
---- a/arch/arm/mach-w90x900/time.c
-+++ b/arch/arm/mach-w90x900/time.c
-@@ -33,6 +33,8 @@
- #include <mach/map.h>
- #include <mach/regs-timer.h>
- 
-+#include "nuc9xx.h"
-+
- #define RESETINT	0x1f
- #define PERIOD		(0x01 << 27)
- #define ONESHOT		(0x00 << 27)
+Equally, I can't find any documentation of the register bits this code
+touches in either Tegra20 or Tegra30 TRMs.
+
 -- 
-1.7.4.4
+nvpublic
