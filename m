@@ -1,30 +1,34 @@
-From: thomas@m3y3r.de (Thomas Meyer)
-Date: Thu, 17 Nov 2011 23:43:40 +0100
-Subject: [PATCH] ARM: SAMSUNG: Use kmemdup rather than duplicating its
- implementation
-Message-ID: <1321569820.1624.268.camel@localhost.localdomain>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Fri, 18 Nov 2011 10:04:00 +0000
+Subject: [PATCH 0/23] mach/vmalloc.h removal, and ioremap optimization
+In-Reply-To: <1321422521-1138-1-git-send-email-nico@fluxnic.net>
+References: <1321422521-1138-1-git-send-email-nico@fluxnic.net>
+Message-ID: <20111118100400.GB8023@totoro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The semantic patch that makes this change is available
-in scripts/coccinelle/api/memdup.cocci.
+On Wed, Nov 16, 2011 at 12:48:18AM -0500, Nicolas Pitre wrote:
+> This patch series removes all instances of mach/vmalloc.h in order to
+> have a more unified memory map across all ARM architectures.  To do so,
+> the static mappings are moved inside the vmalloc area.  And finally this
+> allows for a generic optimization to ioremap where static mappings are
+> reused whenever possible, using common code instead of having this
+> duplicated in a couple places.
+> 
+> This series provides a net reduction of more than 1200 lines of code.
+> 
+> One regression was discovered on shmobile during testing because that
+> platform asks for 158MB of consistent DMA memory while the documented
+> maximum is 14MB.  Inspection of the code doesn't tell why this is
+> required, and listed maintainers did not respond yet, two months
+> after repeated inquiries.  So a temporary exception to the definition
+> of VMALLOC_END was added for CONFIG_SHMOBILE and a noisy warning to
+> get those maintainers' attention.
+> 
+> This patch series was initially submitted for inclusion for v3.1, and
+> withdrawn due to too many problems found on OMAP.  Those problems are
+> now fixed in current mainline.  This is therefore rebased on v3.2-rc2.
 
-Signed-off-by: Thomas Meyer <thomas@m3y3r.de>
----
+Works great on picoxcell.  Thanks Nicolas!
 
-diff -u -p a/arch/arm/plat-s3c24xx/dma.c b/arch/arm/plat-s3c24xx/dma.c
---- a/arch/arm/plat-s3c24xx/dma.c 2011-11-07 19:37:20.736205210 +0100
-+++ b/arch/arm/plat-s3c24xx/dma.c 2011-11-08 11:03:41.719762852 +0100
-@@ -1437,11 +1437,10 @@ int __init s3c24xx_dma_init_map(struct s
- 	size_t map_sz = sizeof(*nmap) * sel->map_size;
- 	int ptr;
- 
--	nmap = kmalloc(map_sz, GFP_KERNEL);
-+	nmap = kmemdup(sel->map, map_sz, GFP_KERNEL);
- 	if (nmap == NULL)
- 		return -ENOMEM;
- 
--	memcpy(nmap, sel->map, map_sz);
- 	memcpy(&dma_sel, sel, sizeof(*sel));
- 
- 	dma_sel.map = nmap;
+Tested-by: Jamie Iles <jamie@jamieiles.com>
