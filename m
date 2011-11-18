@@ -1,36 +1,32 @@
-From: psandeep.s@gmail.com (sandeep patil)
-Date: Fri, 18 Nov 2011 13:20:48 -0800
-Subject: [Linaro-mm-sig] [PATCHv17 0/11] Contiguous Memory Allocator
-In-Reply-To: <1321634598-16859-1-git-send-email-m.szyprowski@samsung.com>
-References: <1321634598-16859-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <CA+K6fF6SH6BNoKgwArcqvyav4b=C5SGvymo5LS3akfD_yE_beg@mail.gmail.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Fri, 18 Nov 2011 13:24:38 -0800
+Subject: [PATCH v8 17/20] OMAP2+: UART: Use custom activate func for
+ console uart.
+In-Reply-To: <1321005712-21871-3-git-send-email-govindraj.raja@ti.com>
+ (Govindraj R.'s message of "Fri, 11 Nov 2011 15:31:50 +0530")
+References: <1321005712-21871-1-git-send-email-govindraj.raja@ti.com>
+ <1321005712-21871-3-git-send-email-govindraj.raja@ti.com>
+Message-ID: <87vcqhuns9.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 18, 2011 at 8:43 AM, Marek Szyprowski
-<m.szyprowski@samsung.com> wrote:
-> Welcome everyone once again,
+"Govindraj.R" <govindraj.raja@ti.com> writes:
 
-> Please notice that this patch series is aimed to start further
-> discussion. There are still few issues that need to be resolved before
-> CMA will be really ready. The most hot problem is the issue with movable
-> pages that causes migration to fail from time to time. Our investigation
-> leads us to the point that these rare pages cannot be migrated because
-> there are some pending io operations on them.
+> Omap-uart can be used as console uart to print early boot
+> messages using earlyprintk so for console uart prevent
+> hwmod reset or idling during bootup.
+>
+> Identify the console_uart set the id and use the custom
+> pm_latency ops for console uart for the first time
+> to idle console uart left enabled from bootup and then enable
+> them back and reset pm_latency ops to default ops.
+>
+> Thanks to Kevin Hilman <khilman@ti.com> for suggesting
+> this approach.
 
+You're welcome, but Rajendra's solution is much better. ;)
 
-I am running a simple test to allocate contiguous regions and write a log on
-in a file on sdcard simultaneously. I can reproduce this migration failure 100%
-times with it.
-when I tracked the pages that failed to migrate, I found them on the
-buffer head lru
-list with a reference held on the buffer_head in the page, which
-causes drop_buffers()
-to fail.
+Can you updated your branch without these custom hooks and using
+Rajendra's INIT_NO_IDLE change to the hwmod core.
 
-So, i guess my question is, until all the migration failures are
-tracked down and fixed,
-is there a plan to retry the contiguous allocation from a new range in
-the CMA region?
-
-~ sandeep
+Kevin
