@@ -1,33 +1,31 @@
 From: jochen@scram.de (Jochen Friedrich)
-Date: Sat, 19 Nov 2011 19:24:01 +0100
-Subject: [PATCH] ARM: sa1100: Fix nanoengine compile error.
-Message-ID: <1321727041-26594-1-git-send-email-jochen@scram.de>
+Date: Sat, 19 Nov 2011 19:26:37 +0100
+Subject: [PATCH] ARM: sa1100: collie: Remove irq_to_gpio from power driver
+Message-ID: <1321727197-26686-1-git-send-email-jochen@scram.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-  CC      arch/arm/mach-sa1100/nanoengine.o
-arch/arm/mach-sa1100/nanoengine.c:75:11: error: 'PAGE_SHIFT' undeclared here (not in a function)
-make[1]: *** [arch/arm/mach-sa1100/nanoengine.o] Error 1
-make: *** [arch/arm/mach-sa1100] Error 2
-
-Add missing include of asm/page.h
+Since 9d08d5d77a355510c2f5657c86b0a4b25acfe72c, irq_to_gpio() is no
+longer available but still in use by collie_battery.c. As it's just
+for a debug message, just get rid of this call.
 
 Signed-off-by: Jochen Friedrich <jochen@scram.de>
 ---
- arch/arm/mach-sa1100/nanoengine.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+ drivers/power/collie_battery.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-sa1100/nanoengine.c b/arch/arm/mach-sa1100/nanoengine.c
-index 032f388..d480438 100644
---- a/arch/arm/mach-sa1100/nanoengine.c
-+++ b/arch/arm/mach-sa1100/nanoengine.c
-@@ -19,6 +19,7 @@
+diff --git a/drivers/power/collie_battery.c b/drivers/power/collie_battery.c
+index 548d263..7a40fce 100644
+--- a/drivers/power/collie_battery.c
++++ b/drivers/power/collie_battery.c
+@@ -146,7 +146,7 @@ static void collie_bat_external_power_changed(struct power_supply *psy)
  
- #include <asm/mach-types.h>
- #include <asm/setup.h>
-+#include <asm/page.h>
- 
- #include <asm/mach/arch.h>
- #include <asm/mach/flash.h>
+ static irqreturn_t collie_bat_gpio_isr(int irq, void *data)
+ {
+-	pr_info("collie_bat_gpio irq: %d\n", gpio_get_value(irq_to_gpio(irq)));
++	pr_info("collie_bat_gpio irq\n");
+ 	schedule_work(&bat_work);
+ 	return IRQ_HANDLED;
+ }
 -- 
 1.7.7.3
