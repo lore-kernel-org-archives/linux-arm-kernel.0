@@ -1,72 +1,37 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 18 Nov 2011 16:25:42 -0800
-Subject: [PATCH] arm: omap2: select ARM_AMBA if OMAP3_EMU is defined
-In-Reply-To: <1320726974-11912-1-git-send-email-tom.leiming@gmail.com>
-References: <1320726974-11912-1-git-send-email-tom.leiming@gmail.com>
-Message-ID: <20111119002542.GY31337@atomide.com>
+From: nm@ti.com (Menon, Nishanth)
+Date: Fri, 18 Nov 2011 18:35:53 -0600
+Subject: [PATCH/RESEND #3 1/7] OMAP3+: PM: SR: add suspend/resume handlers
+In-Reply-To: <87vcqj62gd.fsf@ti.com>
+References: <1321346765-16633-1-git-send-email-balbi@ti.com>
+ <1321346765-16633-2-git-send-email-balbi@ti.com> <87vcqj62gd.fsf@ti.com>
+Message-ID: <CAOMWX4egSeBfHdD4LHxtvvaQj+MK0ecRrQGdQ+ELDRUz5tFUEg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* tom.leiming at gmail.com <tom.leiming@gmail.com> [111107 20:02]:
-> From: Ming Lei <tom.leiming@gmail.com>
-> 
-> This patch selects ARM_AMBA if OMAP3_EMU is defined because
-> OC_ETM depends on ARM_AMBA, so fix the link failure[1].
+On Wed, Nov 16, 2011 at 18:02, Kevin Hilman <khilman@ti.com> wrote:
+> Felipe Balbi <balbi@ti.com> writes:
+>
+>> From: Nishanth Menon <nm@ti.com>
+>>
+>> SmartReflex should be disabled while entering low power mode due to
+>> the following reasons:
+> [...]
+>
+> Nishanth, in the end, didn't you decide to drop this patch?
+>
 
-Thanks applying into fixes.
+Yes, I did eventually, once we implemented DVFS for GPU, Ducati, HSI,
+and other drivers, there was no real way to ensure sequence of suspend
+sequencing even after moving this to suspend_noirq. some of the other
+reasons:
 
-Tony
+if I disabled Smartreflex and went to Nominal voltage on MPU, and say
+MPU was at "performance" mode of 1.5GHz or so, thermal scenarios got
+worse due on hot corner samples - these tend to have higher leakage
+and thermal characteristics tend to be more pronounced. The option of
+throttling frequency down while suspend was not really a good option
+in comparison to switching off smart reflex in the last possible
+moment - in pmxxx.c
 
-> 
-> [1],
-> arch/arm/kernel/built-in.o: In function `etm_remove':
-> /home/tom/git/omap/linux-2.6-omap/arch/arm/kernel/etm.c:609: undefined
-> reference to `amba_release_regions'
-> arch/arm/kernel/built-in.o: In function `etb_remove':
-> /home/tom/git/omap/linux-2.6-omap/arch/arm/kernel/etm.c:409: undefined
-> reference to `amba_release_regions'
-> arch/arm/kernel/built-in.o: In function `etm_init':
-> /home/tom/git/omap/linux-2.6-omap/arch/arm/kernel/etm.c:640: undefined
-> reference to `amba_driver_register'
-> /home/tom/git/omap/linux-2.6-omap/arch/arm/kernel/etm.c:646: undefined
-> reference to `amba_driver_register'
-> /home/tom/git/omap/linux-2.6-omap/arch/arm/kernel/etm.c:648: undefined
-> reference to `amba_driver_unregister'
-> arch/arm/kernel/built-in.o: In function `etm_probe':
-> /home/tom/git/omap/linux-2.6-omap/arch/arm/kernel/etm.c:545: undefined
-> reference to `amba_request_regions'
-> /home/tom/git/omap/linux-2.6-omap/arch/arm/kernel/etm.c:595: undefined
-> reference to `amba_release_regions'
-> arch/arm/kernel/built-in.o: In function `etb_probe':
-> /home/tom/git/omap/linux-2.6-omap/arch/arm/kernel/etm.c:347: undefined
-> reference to `amba_request_regions'
-> /home/tom/git/omap/linux-2.6-omap/arch/arm/kernel/etm.c:392: undefined
-> reference to `amba_release_regions'
-> arch/arm/mach-omap2/built-in.o: In function `emu_init':
-> /home/tom/git/omap/linux-2.6-omap/arch/arm/mach-omap2/emu.c:62:
-> undefined reference to `amba_device_register'
-> /home/tom/git/omap/linux-2.6-omap/arch/arm/mach-omap2/emu.c:63:
-> undefined reference to `amba_device_register'
-> make: *** [.tmp_vmlinux1] Error 1
-> making modules
-> 
-> Signed-off-by: Ming Lei <tom.leiming@gmail.com>
-> ---
->  arch/arm/mach-omap2/Kconfig |    1 +
->  1 files changed, 1 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-> index 5034147..e1293aa 100644
-> --- a/arch/arm/mach-omap2/Kconfig
-> +++ b/arch/arm/mach-omap2/Kconfig
-> @@ -334,6 +334,7 @@ config MACH_OMAP4_PANDA
->  config OMAP3_EMU
->  	bool "OMAP3 debugging peripherals"
->  	depends on ARCH_OMAP3
-> +	select ARM_AMBA
->  	select OC_ETM
->  	help
->  	  Say Y here to enable debugging hardware of omap3
-> -- 
-> 1.7.5.4
-> 
+Regards,
+Nishanth Menon
