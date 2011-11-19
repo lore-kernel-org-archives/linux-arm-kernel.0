@@ -1,55 +1,54 @@
-From: ming.lei@canonical.com (Ming Lei)
-Date: Sat, 19 Nov 2011 22:42:25 +0800
-Subject: [PATCH v5 4/7] arm: omap4: hwmod: introduce emu hwmod
-In-Reply-To: <20111118145635.GB17991@mudshark.cambridge.arm.com>
-References: <1319467559-5518-1-git-send-email-ming.lei@canonical.com>
- <1319467559-5518-5-git-send-email-ming.lei@canonical.com>
- <alpine.DEB.2.00.1111080750130.10451@utopia.booyaka.com>
- <CACVXFVMSJUT2Ac+bWetrLpbyOs6PqY+npNHsbvHipEVZ0gWdgQ@mail.gmail.com>
- <alpine.DEB.2.00.1111100152430.4195@utopia.booyaka.com>
- <4EC6566C.70202@ti.com>
- <20111118145635.GB17991@mudshark.cambridge.arm.com>
-Message-ID: <CACVXFVNuz62+2DzOks3-0io2Ni=LK5SJienU4GcGRMtkh92vvQ@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Sat, 19 Nov 2011 15:11:54 +0000
+Subject: ARM SWP/SWPB emulation support
+In-Reply-To: <4EC6E87A.4070501@codeaurora.org>
+References: <4EC6E87A.4070501@codeaurora.org>
+Message-ID: <CAHkRjk6Ynfh9+UbTuAtyiXCOF-yDbTNxi0ikF5ttwHViisZRZA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+On 18 November 2011 23:21, Stepan Moskovchenko <stepanm@codeaurora.org> wrote:
+> I have two questions regarding the following patch:
+>
+> commit 64d2dc384e41e2b7acead6804593ddaaf8aad8e1
+> Author: Leif Lindholm<leif.lindholm@arm.com>
+> Date: ? Thu Sep 16 18:00:47 2010 +0100
+> ARM: 6396/1: Add SWP/SWPB emulation for ARMv7 processors
+>
+> First, the Kconfig text for the patch says the following:
+>
+> ?"In some older versions of glibc [<=2.8] SWP is used during futex
+> ?trylock() operations with the assumption that the code will not
+> ?be preempted. This invalid assumption may be more likely to fail
+> ?with SWP emulation enabled, leading to deadlock of the user
+> ?application."
+>
+> I see that the SWP emulation is done using LDREX / STREX instructions, so it
+> looks like the SWP emulation should happen in an atomic manner with respect
+> to
+> loading the previous value at the address being swapped with, and storing
+> the
+> new value. Does this text simply imply that the old glibc implementation of
+> futex trylock() is incorrect in the specific way it uses SWP instructions,
+> or
+> does it mean that there is a specific atomicity problem within the SWP
+> emulation
+> code itself?
 
-On Fri, Nov 18, 2011 at 10:56 PM, Will Deacon <will.deacon@arm.com> wrote:
-> Hi Benoit,
->
-> On Fri, Nov 18, 2011 at 12:58:20PM +0000, Cousson, Benoit wrote:
->> Hi Ming Lei,
->>
->> Sorry, for the delay, it took me some time to gather the exhaustive data for that block.
->
-> Thanks for looking at this! I don't think we'd have managed to get all of
-> the magic numbers in the right place ourselves :)
->
-> Ming Lei - can you take this into your patch series please?
+The old glibc code assumes that a code sequence that includes SWP is
+atomic, not that the SWP instruction itself is atomic. It works as
+long as there is no interrupt during that sequence. With the SWP
+emulation, the SWP instruction traps into the kernel and the atomicity
+is automatically broken (Linux may reschedule a different task). The
+SWP emulation in the kernel provides an atomic implementation of SWP
+using LDREX/STREX (though only in relation to other CPUs in the inner
+shareable domain, it doesn't do bus locking to be used with devices).
 
-Yes, I have made omap4 pmu work already with Benoit's patch,
-and if no one has objections on other patches(5/7, 6/7, 7/7), I
-can post out the next version for -next tree.
+> Second, I noticed that the SWP emulation code does not look at the condition
+> code for the SWP instruction being emulated.
 
->
-> Then we'll have:
->
-> ? ? ? ?- The two perf patches in my tree
-> ? ? ? ?- The hwmod fix in Tony's tree (pending pull)
-> ? ? ? ?- Your patches plus this one for hooking everything together
->
-> The sooner we can push these into -next, the better.
->
-> Cheers,
->
-> Will
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
->
+Leif is just looking at this and should post a patch probably next
+week (it was already spotted by someone else).
 
-thanks,
---
-Ming Lei
+-- 
+Catalin
