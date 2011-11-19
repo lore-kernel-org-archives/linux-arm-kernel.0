@@ -1,31 +1,33 @@
-From: jochen@scram.de (Jochen Friedrich)
-Date: Sat, 19 Nov 2011 19:26:37 +0100
-Subject: [PATCH] ARM: sa1100: collie: Remove irq_to_gpio from power driver
-Message-ID: <1321727197-26686-1-git-send-email-jochen@scram.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 19 Nov 2011 19:03:38 +0000
+Subject: [PATCH v2] fix compilation breakage in entry-armv.S
+In-Reply-To: <20111118152321.GA30405@localhost.localdomain>
+References: <Pine.LNX.4.64.1111081232140.10851@axis700.grange>
+ <20111108114050.GC12913@n2100.arm.linux.org.uk>
+ <Pine.LNX.4.64.1111081258240.10851@axis700.grange>
+ <20111111151515.GA3099@localhost.localdomain>
+ <Pine.LNX.4.64.1111161602510.3881@axis700.grange>
+ <20111118152321.GA30405@localhost.localdomain>
+Message-ID: <20111119190338.GL9581@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since 9d08d5d77a355510c2f5657c86b0a4b25acfe72c, irq_to_gpio() is no
-longer available but still in use by collie_battery.c. As it's just
-for a debug message, just get rid of this call.
+On Fri, Nov 18, 2011 at 03:23:22PM +0000, Dave Martin wrote:
+> On Wed, Nov 16, 2011 at 04:05:04PM +0100, Guennadi Liakhovetski wrote:
+> > Fix compilation failure, when Thumb support is not enabled:
+> > 
+> > arch/arm/kernel/entry-armv.S: Assembler messages:
+> > arch/arm/kernel/entry-armv.S:501: Error: backward ref to unknown label "2:"
+> > arch/arm/kernel/entry-armv.S:502: Error: backward ref to unknown label "3:"
+> > make[2]: *** [arch/arm/kernel/entry-armv.o] Error 1
+> > 
+> > Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+> 
+> That looks fine to me.
+> 
+> If Russell is OK with this, please send the patch to his patch system
+> so we can get this merged.
+> 
+> Reviewed-by: Dave Martin <dave.martin@linaro.org>
 
-Signed-off-by: Jochen Friedrich <jochen@scram.de>
----
- drivers/power/collie_battery.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
-
-diff --git a/drivers/power/collie_battery.c b/drivers/power/collie_battery.c
-index 548d263..7a40fce 100644
---- a/drivers/power/collie_battery.c
-+++ b/drivers/power/collie_battery.c
-@@ -146,7 +146,7 @@ static void collie_bat_external_power_changed(struct power_supply *psy)
- 
- static irqreturn_t collie_bat_gpio_isr(int irq, void *data)
- {
--	pr_info("collie_bat_gpio irq: %d\n", gpio_get_value(irq_to_gpio(irq)));
-+	pr_info("collie_bat_gpio irq\n");
- 	schedule_work(&bat_work);
- 	return IRQ_HANDLED;
- }
--- 
-1.7.7.3
+Yes, looks fine to me too.
