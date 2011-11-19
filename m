@@ -1,111 +1,381 @@
-From: mika.westerberg@iki.fi (Mika Westerberg)
-Date: Sat, 19 Nov 2011 14:38:37 +0200
-Subject: [PATCH v2 1/5] dmaengine: add ep93xx DMA support
-In-Reply-To: <4EC374F0.8000400@metasoft.pl>
-References: <cover.1306662317.git.mika.westerberg@iki.fi>
- <3ea8d56034f25cbe3fd8a4c31d7d0d1540b6ac7e.1306662317.git.mika.westerberg@iki.fi>
- <4EC27EED.4030108@metasoft.pl>
- <20111116065512.GB2703@mwesterb-mobl.ger.corp.intel.com>
- <4EC374F0.8000400@metasoft.pl>
-Message-ID: <20111119123837.GA2711@mwesterb-mobl.ger.corp.intel.com>
+From: ming.lei@canonical.com (Ming Lei)
+Date: Sat, 19 Nov 2011 22:37:08 +0800
+Subject: [PATCH v5 4/7] arm: omap4: hwmod: introduce emu hwmod
+In-Reply-To: <4EC6566C.70202@ti.com>
+References: <1319467559-5518-1-git-send-email-ming.lei@canonical.com>
+ <1319467559-5518-5-git-send-email-ming.lei@canonical.com>
+ <alpine.DEB.2.00.1111080750130.10451@utopia.booyaka.com>
+ <CACVXFVMSJUT2Ac+bWetrLpbyOs6PqY+npNHsbvHipEVZ0gWdgQ@mail.gmail.com>
+ <alpine.DEB.2.00.1111100152430.4195@utopia.booyaka.com>
+ <4EC6566C.70202@ti.com>
+Message-ID: <CACVXFVN+8RXsheCwoneCz3AZcmhjfoOy+aG=PQVbuUMdpKaG5A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sorry for delay. I've been busy with other things.
+Hi Benoit,
 
-On Wed, Nov 16, 2011 at 09:31:44AM +0100, Rafal Prylowski wrote:
-> 
-> sd 0:0:0:0: [sda] 625142448 512-byte logical blocks: (320 GB/298 GiB)
-> sd 0:0:0:0: [sda] Write Protect is off
-> sd 0:0:0:0: [sda] Write cache: enabled, read cache: enabled, doesn't support DPO
->  or FUA
-> Internal error: Oops - undefined instruction: 0 [#1]
-> CPU: 0    Not tainted  (3.2.0-rc1EP-1+ #1008)
-> PC is at 0xc184c868
-> LR is at ep93xx_dma_tasklet+0xec/0x164
-> pc : [<c184c868>]    lr : [<c012b528>]    psr: 00000013
-> sp : c02b7e70  ip : ffffffff  fp : c02b7ea4
-> r10: 00000100  r9 : 80000013  r8 : c02b7e50
-> r7 : c02b7e70  r6 : c02b7ea4  r5 : 000000a4  r4 : c02b7e70
-> r3 : c02b751d  r2 : 8ae34598  r1 : c184c6e0  r0 : c02b7ea4
-> Flags: nzcv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment kernel
-> Control: c000717f  Table: c0004000  DAC: 00000017
-> Process swapper (pid: 0, stack limit = 0xc02b6270)
-> Stack: (0xc02b7e70 to 0xc02b8000)
-> 7e60:                                     c02b7ea4 c02b7e70 c0008b64 c02bd5c4
-> 7e80: c02d60e0 00000000 00000000 c02bd44c c02d60e0 00000100 c02b7ec4 c02b7ea8
-> 7ea0: c001c49c c012b44c 00000018 00000001 c02d60e0 c02b6000 c02b7f04 c02b7ec8
-> 7ec0: c001cbc0 c001c3e4 c02b7eec c02b7ed8 00000006 0000000a c02bf674 c02c458c
-> 7ee0: 00000011 00000000 c02b7f7c c0004000 41129200 c02b0c80 c02b7f14 c02b7f08
-> 7f00: c001cdd0 c001cb38 c02b7f34 c02b7f18 c000983c c001cd98 c0009a60 60000013
-> 7f20: fefb0001 c02b7f7c c02b7f44 c02b7f38 c0008190 c0009810 c02b7f9c c02b7f48
-> 7f40: c0008b64 c0008190 c02c2bf8 00000002 c02b7f90 60000013 c02b6000 c02d1504
-> 7f60: c02baa88 c02baa80 c0004000 41129200 c02b0c80 c02b7f9c c02b7fa0 c02b7f90
-> 7f80: c0009a54 c0009a60 60000013 ffffffff c02b7fbc c02b7fa0 c000a03c c0009a40
-> 7fa0: c02b80b0 c02b19dc c02b19d8 c02baa80 c02b7fcc c02b7fc0 c02384e4 c0009fd4
-> 7fc0: c02b7ff4 c02b7fd0 c029d924 c0238494 c029d49c 00000000 00000000 c02b19dc
-> 7fe0: c0007175 c02b803c 00000000 c02b7ff8 c000803c c029d700 00000000 00000000
-> Backtrace:
-> [<c012b43c>] (ep93xx_dma_tasklet+0x0/0x164) from [<c001c49c>] (tasklet_action+0x
-> c8/0xdc)
-> [<c001c3d4>] (tasklet_action+0x0/0xdc) from [<c001cbc0>] (__do_softirq+0x98/0x15
-> 4)
->  r7:c02b6000 r6:c02d60e0 r5:00000001 r4:00000018
-> [<c001cb28>] (__do_softirq+0x0/0x154) from [<c001cdd0>] (irq_exit+0x48/0x50)
-> [<c001cd88>] (irq_exit+0x0/0x50) from [<c000983c>] (handle_IRQ+0x3c/0x8c)
-> [<c0009800>] (handle_IRQ+0x0/0x8c) from [<c0008190>] (asm_do_IRQ+0x10/0x14)
->  r7:c02b7f7c r6:fefb0001 r5:60000013 r4:c0009a60
-> [<c0008180>] (asm_do_IRQ+0x0/0x14) from [<c0008b64>] (__irq_svc+0x24/0xc0)
-> Exception stack(0xc02b7f48 to 0xc02b7f90)
-> 7f40:                   c02c2bf8 00000002 c02b7f90 60000013 c02b6000 c02d1504
-> 7f60: c02baa88 c02baa80 c0004000 41129200 c02b0c80 c02b7f9c c02b7fa0 c02b7f90
-> 7f80: c0009a54 c0009a60 60000013 ffffffff
-> [<c0009a30>] (default_idle+0x0/0x34) from [<c000a03c>] (cpu_idle+0x78/0xb0)
-> [<c0009fc4>] (cpu_idle+0x0/0xb0) from [<c02384e4>] (rest_init+0x60/0x78)
->  r7:c02baa80 r6:c02b19d8 r5:c02b19dc r4:c02b80b0
-> [<c0238484>] (rest_init+0x0/0x78) from [<c029d924>] (start_kernel+0x234/0x278)
-> [<c029d6f0>] (start_kernel+0x0/0x278) from [<c000803c>] (0xc000803c)
->  r5:c02b803c r4:c0007175
-> Code: 42555300 54535953 643d4d45 65766972 (53007372)
-> ---[ end trace a494979f60859f42 ]---
+On Fri, Nov 18, 2011 at 8:58 PM, Cousson, Benoit <b-cousson@ti.com> wrote:
+> Hi Ming Lei,
+>
+> Sorry, for the delay, it took me some time to gather the exhaustive data for that block.
 
-It looks like following scenario happened:
+The work is really great.
 
-	1. DMA interrupt is asserted
+> On 11/10/2011 10:02 AM, Paul Walmsley wrote:
+>> Hello Ming Lei,
+>>
+>> just a few quick comments for now -
+>>
+>> On Wed, 9 Nov 2011, Ming Lei wrote:
+>>
+>>> On Tue, Nov 8, 2011 at 11:26 PM, Paul Walmsley<paul@pwsan.com> ?wrote:
+>>>
+>>>>> +static struct omap_hwmod_irq_info omap44xx_emu_irqs[] = {
+>>>>> + ? ? { .name = "cti0", .irq = 1 + OMAP44XX_IRQ_GIC_START },
+>>>>> + ? ? { .name = "cti1", .irq = 2 + OMAP44XX_IRQ_GIC_START },
+>>>>> + ? ? { .irq = -1 }
+>>>>> +};
+>>>>
+>>>> Are you sure these are part of the emulation IP? ?We already have those
+>>>
+>>> I am not sure, I just figure out one way to make omap4 pmu work. Since there
+>>> are few descriptions in TRM about it, it is a hacking based on [1], :-)
+>>>
+>>>> IRQs in the MPU hwmod, see omap44xx_mpu_irqs[] in the same file.
+>>>
+>>> I just see it, but looks like the "mpu" hwmod isn't populated as omap_device,
+>>> so the CTI irqs aren't requested now.
+>>
+>> Okay. ?Maybe you can probably add some code in mach-omap2/devices.c to
+>> build an omap_device for this for right now? ?I am not 100% sure whether
+>> those cti0/1 interrupts should be associated with the MPU or with the
+>> DEBUGSS but Beno?t might be able to answer this.
+>>
+>>> Also, current arm perf code don't handle three IRQs(one pl310 irq and
+>>> two CTI irq) inside one device correctly.
+>>
+>> To fix this, that ARM perf code should either be using
+>> platform_get_irq_byname(), or the hwmod hardware data will need to be
+>> rearranged to meet the arbitrary ordering requirement. ?I'd suggest
+>> pinging Will on this issue to see what he wants to do.
+>>
+>>> So any suggestion about CTI IRQs connecting to which hwmod, so that they can
+>>> be found by pmu driver?
+>>>
+>>>>> +/*emu hwmod*/
+>>>>> +static struct omap_hwmod omap44xx_emu_hwmod = {
+>>>>> + ? ? .name ? ? ? ? ? = "emu",
+>>>>> + ? ? .class ? ? ? ? ?=&omap44xx_emu_hwmod_class,
+>>>>> + ? ? .clkdm_name ? ? = "emu_sys_clkdm",
+>>>>> + ? ? .prcm = {
+>>>>> + ? ? ? ? ? ? .omap4 = {
+>>>>> + ? ? ? ? ? ? ? ? ? ? .clkctrl_offs = OMAP4_CM_EMU_CLKSTCTRL_OFFSET,
+>>>>
+>>>> This doesn't look right either: EMU is a clockdomain, not an IP block.
+>>>
+>>> I defined the 'emu' hwmod to control the clock state transition of the EMU
+>>> clock domain by writing to CLKTRCTRL.CM_EMU_CLKSTCTRL with standard
+>>> hwmod interface(_enable / _idle). Is there any other neat way to do it?
+>>
+>> So the clockdomain is already defined in
+>> mach-omap2/clockdomains44xx_data.c and there's code to control it - see
+>> for example clkdm_enable_idle(). ?But this code should not be called
+>> directly by any device driver code or driver integration code. ?The thing
+>> to do here is to ask Beno?t to release the hwmod data for the DEBUGSS
+>> hwmod, then someone will need to write an MFD driver for that which
+>> exposes the PMU address space to the PMU platform driver.
+>
+> Following that discussion, here is the patch to expose debugss hwmod.
+>
+> I have moved the CTIs irq from MPU to debugss and exposed all the internals IP that are part of the OMAP debug subsystem.
+>
+> Since the DEBUGSS cannot be accessed at boot time if the l3_main_3 and the l3_instr interconnects are not enable, you will have some warnings.
+>
 
-	2. Interrupt is handled by ep93xx_dma_interrupt()
+Currently these two modules are enabled in my patch 5/7 and 6/7, and the
+pmu omap device is built from the three IPs: debugss, l3_main_3 and
+the l3_instr,
+so that these two modules can be enabled in omap_device_enable().
 
-	3. It schedules the ep93xx_dma_tasklet() but for some reason the
-	   tasklet is not immediately run when the interrupt handler returns.
+I don't know how to enable the two IPs in other ways, also I am not
+sure if the way
+is suitable, but it does work, could you help to review the two patches?
 
-	4. Your driver calls dma_terminate_all() making the active list empty
-	   and disabling the channel & interrupt.
+> [ ? ?0.416992] omap_hwmod: debugss: softreset failed (waited 10000 usec)
+> [ ? ?0.426727] omap_hwmod: debugss: _wait_target_disable failed
+>
+> Just let me know if you have any issue with that patch.
 
-	5. ep93xx_dma_tasklet() is run and since the list is empty, it gets
-	   pointer to some garbage which then OOPses as it tries to execute
-	   ->complete() which points to memory containing:
+In fact, now it is very easy to enable pmu on omap with your patch,
+I have made omap4 pmu work already using debugss:
 
-	Code: 42555300 54535953 643d4d45 65766972 (53007372)
+     - replace the patch 3/7 with your debugss patch(replace 'emu'
+with 'debugss')
+     - modify the patch  5/7 to create pmu omap device from 'debugss'
+instead of 'emu'
 
-	translated to ascii:
+thanks,
+--
+Ming Lei
 
-	\0SUBSYSTEM=drivers\0S
-
-	probably the memory was re-used by some uevent.
-
-I wasn't able to reproduce this but can you try if following patch helps? I'm
-not sure if it is correct but at least we get more information about the
-problem.
-
-diff --git a/drivers/dma/ep93xx_dma.c b/drivers/dma/ep93xx_dma.c
-index 6181811..5b717da 100644
---- a/drivers/dma/ep93xx_dma.c
-+++ b/drivers/dma/ep93xx_dma.c
-@@ -1106,6 +1106,7 @@ static int ep93xx_dma_terminate_all(struct ep93xx_dma_chan *edmac)
- 	spin_lock_irqsave(&edmac->lock, flags);
- 	/* First we disable and flush the DMA channel */
- 	edmac->edma->hw_shutdown(edmac);
-+	tasklet_kill(&edmac->tasklet);
- 	clear_bit(EP93XX_DMA_IS_CYCLIC, &edmac->flags);
- 	list_splice_init(&edmac->active, &list);
- 	list_splice_init(&edmac->queue, &list);
+>
+> Please note that will will need the fix "ARM: OMAP: hwmod: Fix the addr space, irq, dma count APIs" to avoid hwmod core messing up with the resources.
+>
+> I've just posted a pull request for Tony to get it for -rc3.
+> http://comments.gmane.org/gmane.linux.ports.arm.kernel/140458
+>
+> I pushed these two patches on a branch based on mainline for your convenience.
+>
+> git://gitorious.org/omap-pm/linux.git wip-emu/debuss_hwmod
+>
+> Regards,
+> Benoit
+>
+> ---
+> From: Benoit Cousson <b-cousson@ti.com>
+> Date: Fri, 18 Nov 2011 11:42:12 +0100
+> Subject: [PATCH] ARM: OMAP4: hwmod data: Add support for the debug modules
+>
+> The OMAP4 DEBUG subsystem contains all the IPs used for emulation,
+> included the ones from the CortexA9 MPU.
+> Expose the individual modules base address.
+>
+> Re-map the CTIs IRQs from MPU to DEBUGSS.
+>
+> Signed-off-by: Benoit Cousson <b-cousson@ti.com>
+> Cc: Ming Lei <ming.lei@canonical.com>
+> ---
+> ?arch/arm/mach-omap2/omap_hwmod_44xx_data.c | ?177 +++++++++++++++++++++++++++-
+> ?1 files changed, 174 insertions(+), 3 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+> index 7695e5d..6cf21ee 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+> @@ -47,6 +47,7 @@
+>
+> ?/* Backward references (IPs with Bus Master capability) */
+> ?static struct omap_hwmod omap44xx_aess_hwmod;
+> +static struct omap_hwmod omap44xx_debugss_hwmod;
+> ?static struct omap_hwmod omap44xx_dma_system_hwmod;
+> ?static struct omap_hwmod omap44xx_dmm_hwmod;
+> ?static struct omap_hwmod omap44xx_dsp_hwmod;
+> @@ -337,6 +338,14 @@ static struct omap_hwmod omap44xx_l3_main_1_hwmod = {
+> ?};
+>
+> ?/* l3_main_2 */
+> +/* debugss -> l3_main_2 */
+> +static struct omap_hwmod_ocp_if omap44xx_debugss__l3_main_2 = {
+> + ? ? ? .master ? ? ? ? = &omap44xx_debugss_hwmod,
+> + ? ? ? .slave ? ? ? ? ?= &omap44xx_l3_main_2_hwmod,
+> + ? ? ? .clk ? ? ? ? ? ?= "dbgclk_mux_ck",
+> + ? ? ? .user ? ? ? ? ? = OCP_USER_MPU | OCP_USER_SDMA,
+> +};
+> +
+> ?/* dma_system -> l3_main_2 */
+> ?static struct omap_hwmod_ocp_if omap44xx_dma_system__l3_main_2 = {
+> ? ? ? ?.master ? ? ? ? = &omap44xx_dma_system_hwmod,
+> @@ -686,7 +695,6 @@ static struct omap_hwmod omap44xx_mpu_private_hwmod = {
+> ?* ?ctrl_module_pad_core
+> ?* ?ctrl_module_pad_wkup
+> ?* ?ctrl_module_wkup
+> - * ?debugss
+> ?* ?efuse_ctrl_cust
+> ?* ?efuse_ctrl_std
+> ?* ?elm
+> @@ -908,6 +916,168 @@ static struct omap_hwmod omap44xx_counter_32k_hwmod = {
+> ?};
+>
+> ?/*
+> + * 'debugss' class
+> + * debug and emulation sub system
+> + */
+> +
+> +static struct omap_hwmod_class_sysconfig omap44xx_debugss_sysc = {
+> + ? ? ? .rev_offs ? ? ? = 0x0000,
+> + ? ? ? .sysc_offs ? ? ?= 0x0010,
+> + ? ? ? .syss_offs ? ? ?= 0x0014,
+> + ? ? ? .sysc_flags ? ? = (SYSC_HAS_SOFTRESET | SYSS_HAS_RESET_STATUS),
+> + ? ? ? .sysc_fields ? ?= &omap_hwmod_sysc_type1,
+> +};
+> +
+> +static struct omap_hwmod_class omap44xx_debugss_hwmod_class = {
+> + ? ? ? .name ? = "debugss",
+> + ? ? ? .sysc ? = &omap44xx_debugss_sysc,
+> +};
+> +
+> +/* debugss */
+> +static struct omap_hwmod_irq_info omap44xx_debugss_irqs[] = {
+> + ? ? ? { .name = "cti0", .irq = 1 + OMAP44XX_IRQ_GIC_START },
+> + ? ? ? { .name = "cti1", .irq = 2 + OMAP44XX_IRQ_GIC_START },
+> + ? ? ? { .irq = -1 }
+> +};
+> +
+> +/* debugss master ports */
+> +static struct omap_hwmod_ocp_if *omap44xx_debugss_masters[] = {
+> + ? ? ? &omap44xx_debugss__l3_main_2,
+> +};
+> +
+> +static struct omap_hwmod_addr_space omap44xx_debugss_addrs[] = {
+> + ? ? ? {
+> + ? ? ? ? ? ? ? .name ? ? ? ? ? = "mipi_stm_add_sp_0",
+> + ? ? ? ? ? ? ? .pa_start ? ? ? = 0x54000000,
+> + ? ? ? ? ? ? ? .pa_end ? ? ? ? = 0x540fffff,
+> + ? ? ? },
+> + ? ? ? {
+> + ? ? ? ? ? ? ? .name ? ? ? ? ? = "mipi_stm_add_sp_1",
+> + ? ? ? ? ? ? ? .pa_start ? ? ? = 0x54100000,
+> + ? ? ? ? ? ? ? .pa_end ? ? ? ? = 0x5413ffff,
+> + ? ? ? },
+> + ? ? ? {
+> + ? ? ? ? ? ? ? .name ? ? ? ? ? = "mpu_c0_debug",
+> + ? ? ? ? ? ? ? .pa_start ? ? ? = 0x54140000,
+> + ? ? ? ? ? ? ? .pa_end ? ? ? ? = 0x54141fff,
+> + ? ? ? },
+> + ? ? ? {
+> + ? ? ? ? ? ? ? .name ? ? ? ? ? = "mpu_c1_debug",
+> + ? ? ? ? ? ? ? .pa_start ? ? ? = 0x54142000,
+> + ? ? ? ? ? ? ? .pa_end ? ? ? ? = 0x54143fff,
+> + ? ? ? },
+> + ? ? ? {
+> + ? ? ? ? ? ? ? .name ? ? ? ? ? = "cti0_mpu",
+> + ? ? ? ? ? ? ? .pa_start ? ? ? = 0x54148000,
+> + ? ? ? ? ? ? ? .pa_end ? ? ? ? = 0x54148fff,
+> + ? ? ? },
+> + ? ? ? {
+> + ? ? ? ? ? ? ? .name ? ? ? ? ? = "cti1_mpu",
+> + ? ? ? ? ? ? ? .pa_start ? ? ? = 0x54149000,
+> + ? ? ? ? ? ? ? .pa_end ? ? ? ? = 0x54149fff,
+> + ? ? ? },
+> + ? ? ? {
+> + ? ? ? ? ? ? ? .name ? ? ? ? ? = "ptm0_mpu",
+> + ? ? ? ? ? ? ? .pa_start ? ? ? = 0x5414c000,
+> + ? ? ? ? ? ? ? .pa_end ? ? ? ? = 0x5414cfff,
+> + ? ? ? },
+> + ? ? ? {
+> + ? ? ? ? ? ? ? .name ? ? ? ? ? = "ptm1_mpu",
+> + ? ? ? ? ? ? ? .pa_start ? ? ? = 0x5414d000,
+> + ? ? ? ? ? ? ? .pa_end ? ? ? ? = 0x5414dfff,
+> + ? ? ? },
+> + ? ? ? {
+> + ? ? ? ? ? ? ? .name ? ? ? ? ? = "tf_mpu",
+> + ? ? ? ? ? ? ? .pa_start ? ? ? = 0x54158000,
+> + ? ? ? ? ? ? ? .pa_end ? ? ? ? = 0x54158fff,
+> + ? ? ? },
+> + ? ? ? {
+> + ? ? ? ? ? ? ? .name ? ? ? ? ? = "dap_pc_mpu",
+> + ? ? ? ? ? ? ? .pa_start ? ? ? = 0x54159000,
+> + ? ? ? ? ? ? ? .pa_end ? ? ? ? = 0x54159fff,
+> + ? ? ? },
+> + ? ? ? {
+> + ? ? ? ? ? ? ? .name ? ? ? ? ? = "apb_bridge_a_ctrl_time_out",
+> + ? ? ? ? ? ? ? .pa_start ? ? ? = 0x5415f000,
+> + ? ? ? ? ? ? ? .pa_end ? ? ? ? = 0x5415ffff,
+> + ? ? ? },
+> + ? ? ? {
+> + ? ? ? ? ? ? ? .name ? ? ? ? ? = "drm",
+> + ? ? ? ? ? ? ? .pa_start ? ? ? = 0x54160000,
+> + ? ? ? ? ? ? ? .pa_end ? ? ? ? = 0x54160fff,
+> + ? ? ? },
+> + ? ? ? {
+> + ? ? ? ? ? ? ? .name ? ? ? ? ? = "mipi_stm",
+> + ? ? ? ? ? ? ? .pa_start ? ? ? = 0x54161000,
+> + ? ? ? ? ? ? ? .pa_end ? ? ? ? = 0x54161fff,
+> + ? ? ? ? ? ? ? .flags ? ? ? ? ?= ADDR_TYPE_RT
+> + ? ? ? },
+> + ? ? ? {
+> + ? ? ? ? ? ? ? .name ? ? ? ? ? = "csetb",
+> + ? ? ? ? ? ? ? .pa_start ? ? ? = 0x54162000,
+> + ? ? ? ? ? ? ? .pa_end ? ? ? ? = 0x54162fff,
+> + ? ? ? },
+> + ? ? ? {
+> + ? ? ? ? ? ? ? .name ? ? ? ? ? = "cstpiu",
+> + ? ? ? ? ? ? ? .pa_start ? ? ? = 0x54163000,
+> + ? ? ? ? ? ? ? .pa_end ? ? ? ? = 0x54163fff,
+> + ? ? ? },
+> + ? ? ? {
+> + ? ? ? ? ? ? ? .name ? ? ? ? ? = "cstf1",
+> + ? ? ? ? ? ? ? .pa_start ? ? ? = 0x54164000,
+> + ? ? ? ? ? ? ? .pa_end ? ? ? ? = 0x54164fff,
+> + ? ? ? },
+> + ? ? ? {
+> + ? ? ? ? ? ? ? .name ? ? ? ? ? = "cstf2",
+> + ? ? ? ? ? ? ? .pa_start ? ? ? = 0x54165000,
+> + ? ? ? ? ? ? ? .pa_end ? ? ? ? = 0x54165fff,
+> + ? ? ? },
+> + ? ? ? {
+> + ? ? ? ? ? ? ? .name ? ? ? ? ? = "l4_cfg_emu_conf_regs",
+> + ? ? ? ? ? ? ? .pa_start ? ? ? = 0x54167000,
+> + ? ? ? ? ? ? ? .pa_end ? ? ? ? = 0x54167fff,
+> + ? ? ? },
+> + ? ? ? {
+> + ? ? ? ? ? ? ? .name ? ? ? ? ? = "l3_instr_emu_conf_regs",
+> + ? ? ? ? ? ? ? .pa_start ? ? ? = 0x54180000,
+> + ? ? ? ? ? ? ? .pa_end ? ? ? ? = 0x54180fff,
+> + ? ? ? },
+> + ? ? ? { }
+> +};
+> +
+> +/* l3_instr -> debugss */
+> +static struct omap_hwmod_ocp_if omap44xx_l3_instr__debugss = {
+> + ? ? ? .master ? ? ? ? = &omap44xx_l3_instr_hwmod,
+> + ? ? ? .slave ? ? ? ? ?= &omap44xx_debugss_hwmod,
+> + ? ? ? .clk ? ? ? ? ? ?= "l3_div_ck",
+> + ? ? ? .addr ? ? ? ? ? = omap44xx_debugss_addrs,
+> + ? ? ? .user ? ? ? ? ? = OCP_USER_MPU | OCP_USER_SDMA,
+> +};
+> +
+> +/* debugss slave ports */
+> +static struct omap_hwmod_ocp_if *omap44xx_debugss_slaves[] = {
+> + ? ? ? &omap44xx_l3_instr__debugss,
+> +};
+> +
+> +static struct omap_hwmod omap44xx_debugss_hwmod = {
+> + ? ? ? .name ? ? ? ? ? = "debugss",
+> + ? ? ? .class ? ? ? ? ?= &omap44xx_debugss_hwmod_class,
+> + ? ? ? .clkdm_name ? ? = "emu_sys_clkdm",
+> + ? ? ? .mpu_irqs ? ? ? = omap44xx_debugss_irqs,
+> + ? ? ? .main_clk ? ? ? = "trace_clk_div_ck",
+> + ? ? ? .prcm = {
+> + ? ? ? ? ? ? ? .omap4 = {
+> + ? ? ? ? ? ? ? ? ? ? ? .clkctrl_offs = OMAP4_CM_EMU_DEBUGSS_CLKCTRL_OFFSET,
+> + ? ? ? ? ? ? ? ? ? ? ? .context_offs = OMAP4_RM_EMU_DEBUGSS_CONTEXT_OFFSET,
+> + ? ? ? ? ? ? ? },
+> + ? ? ? },
+> + ? ? ? .slaves ? ? ? ? = omap44xx_debugss_slaves,
+> + ? ? ? .slaves_cnt ? ? = ARRAY_SIZE(omap44xx_debugss_slaves),
+> + ? ? ? .masters ? ? ? ?= omap44xx_debugss_masters,
+> + ? ? ? .masters_cnt ? ?= ARRAY_SIZE(omap44xx_debugss_masters),
+> +};
+> +
+> +/*
+> ?* 'dma' class
+> ?* dma controller for data exchange between memory to memory (i.e. internal or
+> ?* external memory) and gp peripherals to memory or memory to gp peripherals
+> @@ -3902,8 +4072,6 @@ static struct omap_hwmod_class omap44xx_mpu_hwmod_class = {
+> ?/* mpu */
+> ?static struct omap_hwmod_irq_info omap44xx_mpu_irqs[] = {
+> ? ? ? ?{ .name = "pl310", .irq = 0 + OMAP44XX_IRQ_GIC_START },
+> - ? ? ? { .name = "cti0", .irq = 1 + OMAP44XX_IRQ_GIC_START },
+> - ? ? ? { .name = "cti1", .irq = 2 + OMAP44XX_IRQ_GIC_START },
+> ? ? ? ?{ .irq = -1 }
+> ?};
+>
+> @@ -5308,6 +5476,9 @@ static __initdata struct omap_hwmod *omap44xx_hwmods[] = {
+> ? ? ? ?/* counter class */
+> ?/* ? ? &omap44xx_counter_32k_hwmod, */
+>
+> + ? ? ? /* debugss class */
+> + ? ? ? &omap44xx_debugss_hwmod,
+> +
+> ? ? ? ?/* dma class */
+> ? ? ? ?&omap44xx_dma_system_hwmod,
+>
+> --
+> 1.7.0.4
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+>
