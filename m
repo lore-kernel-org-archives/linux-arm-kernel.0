@@ -1,105 +1,78 @@
 From: hvaibhav@ti.com (Vaibhav Hiremath)
-Date: Sun, 20 Nov 2011 22:49:15 +0530
-Subject: [RFC PATCH 11/11] arm:omap:am33xx: Add am335x support in generic
- omap_hwmod
+Date: Sun, 20 Nov 2011 22:49:13 +0530
+Subject: [RFC PATCH 09/11] arm:omap:am33xx: Integrate AM33XX hwmods to omap
+ HWMOD framework
 In-Reply-To: <1321809555-13833-1-git-send-email-hvaibhav@ti.com>
 References: <1321809555-13833-1-git-send-email-hvaibhav@ti.com>
-Message-ID: <1321809555-13833-12-git-send-email-hvaibhav@ti.com>
+Message-ID: <1321809555-13833-10-git-send-email-hvaibhav@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-AM335X is bit different than OMAP3/4 architecture when it comes to
-PRCM module, for example, the way module is enabled/disabled.
-Although it is closer to OMAP4 architecure but the register offset
-and PRCM partitions won't match, so we need to seperate API's
-for AM335X.
+Hook up AM33XX HWMOD data to OMAP framework.
 
+Signed-off-by: Afzal Mohammed <afzal@ti.com>
 Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
 ---
- arch/arm/mach-omap2/omap_hwmod.c |   29 +++++++++++++++++++++++------
- 1 files changed, 23 insertions(+), 6 deletions(-)
+ arch/arm/mach-omap2/Makefile     |    1 +
+ arch/arm/mach-omap2/io.c         |    2 ++
+ arch/arm/mach-omap2/omap_hwmod.c |   13 +++++++++----
+ 3 files changed, 12 insertions(+), 4 deletions(-)
 
+diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
+index 19330dc..706a8ef 100644
+--- a/arch/arm/mach-omap2/Makefile
++++ b/arch/arm/mach-omap2/Makefile
+@@ -168,6 +168,7 @@ obj-$(CONFIG_SOC_OMAP2430)		+= omap_hwmod_2xxx_ipblock_data.o \
+ obj-$(CONFIG_ARCH_OMAP3)		+= omap_hwmod_2xxx_3xxx_ipblock_data.o \
+ 					   omap_hwmod_2xxx_3xxx_interconnect_data.o \
+ 					   omap_hwmod_3xxx_data.o
++obj-$(CONFIG_SOC_OMAPAM33XX)		+= omap_hwmod_33xx_data.o
+ obj-$(CONFIG_ARCH_OMAP4)		+= omap_hwmod_44xx_data.o
+
+ # EMU peripherals
+diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
+index 82e2817..3afe4e6 100644
+--- a/arch/arm/mach-omap2/io.c
++++ b/arch/arm/mach-omap2/io.c
+@@ -468,6 +468,8 @@ void __init am33xx_init_early(void)
+ 	am33xx_voltagedomains_init();
+ 	am33xx_powerdomains_init();
+ 	am33xx_clockdomains_init();
++	am33xx_hwmod_init();
++	omap_hwmod_init_postsetup();
+ 	omap3xxx_clk_init();
+ }
+ #endif
 diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index dfd3743..4360cb7 100644
+index 6b3088d..dfd3743 100644
 --- a/arch/arm/mach-omap2/omap_hwmod.c
 +++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -147,6 +147,7 @@
-
- #include "cm2xxx_3xxx.h"
- #include "cminst44xx.h"
-+#include "cminst33xx.h"
- #include "prm2xxx_3xxx.h"
- #include "prm44xx.h"
- #include "prminst44xx.h"
-@@ -689,7 +690,7 @@ static void _disable_optional_clocks(struct omap_hwmod *oh)
- static void _enable_module(struct omap_hwmod *oh)
+@@ -1051,7 +1051,7 @@ static struct omap_hwmod *_lookup(const char *name)
+  */
+ static int _init_clkdm(struct omap_hwmod *oh)
  {
- 	/* The module mode does not exist prior OMAP4 */
 -	if (cpu_is_omap24xx() || cpu_is_omap34xx())
-+	if (!cpu_is_am33xx() && (cpu_is_omap24xx() || cpu_is_omap34xx()))
- 		return;
-
- 	if (!oh->clkdm || !oh->prcm.omap4.modulemode)
-@@ -698,7 +699,13 @@ static void _enable_module(struct omap_hwmod *oh)
- 	pr_debug("omap_hwmod: %s: _enable_module: %d\n",
- 		 oh->name, oh->prcm.omap4.modulemode);
-
--	omap4_cminst_module_enable(oh->prcm.omap4.modulemode,
-+	if (cpu_is_am33xx())
-+		am33xx_cminst_module_enable(oh->prcm.omap4.modulemode,
-+				   oh->clkdm->cm_inst,
-+				   oh->clkdm->clkdm_offs,
-+				   oh->prcm.omap4.clkctrl_offs);
-+	else
-+		omap4_cminst_module_enable(oh->prcm.omap4.modulemode,
- 				   oh->clkdm->prcm_partition,
- 				   oh->clkdm->cm_inst,
- 				   oh->clkdm->clkdm_offs,
-@@ -715,7 +722,7 @@ static void _enable_module(struct omap_hwmod *oh)
- static void _disable_module(struct omap_hwmod *oh)
- {
- 	/* The module mode does not exist prior OMAP4 */
--	if (cpu_is_omap24xx() || cpu_is_omap34xx())
-+	if (!cpu_is_am33xx() && (cpu_is_omap24xx() || cpu_is_omap34xx()))
- 		return;
-
- 	if (!oh->clkdm || !oh->prcm.omap4.modulemode)
-@@ -723,7 +730,12 @@ static void _disable_module(struct omap_hwmod *oh)
-
- 	pr_debug("omap_hwmod: %s: _disable_module\n", oh->name);
-
--	omap4_cminst_module_disable(oh->clkdm->prcm_partition,
-+	if (cpu_is_am33xx())
-+		am33xx_cminst_module_disable(oh->clkdm->cm_inst,
-+				    oh->clkdm->clkdm_offs,
-+				    oh->prcm.omap4.clkctrl_offs);
-+	else
-+		omap4_cminst_module_disable(oh->clkdm->prcm_partition,
- 				    oh->clkdm->cm_inst,
- 				    oh->clkdm->clkdm_offs,
- 				    oh->prcm.omap4.clkctrl_offs);
-@@ -1169,7 +1181,7 @@ static int _wait_target_ready(struct omap_hwmod *oh)
- static int _wait_target_disable(struct omap_hwmod *oh)
- {
- 	/* TODO: For now just handle OMAP4+ */
--	if (cpu_is_omap24xx() || cpu_is_omap34xx())
-+	if (!cpu_is_am33xx() && (cpu_is_omap24xx() || cpu_is_omap34xx()))
++	if (cpu_is_omap24xx() || (cpu_is_omap34xx() && !cpu_is_am33xx()))
  		return 0;
 
- 	if (!oh)
-@@ -1181,7 +1193,12 @@ static int _wait_target_disable(struct omap_hwmod *oh)
- 	if (oh->flags & HWMOD_NO_IDLEST)
- 		return 0;
+ 	if (!oh->clkdm_name) {
+@@ -1134,9 +1134,14 @@ static int _wait_target_ready(struct omap_hwmod *oh)
+ 	/* XXX check clock enable states */
 
--	return omap4_cminst_wait_module_idle(oh->clkdm->prcm_partition,
-+	if (cpu_is_am33xx())
-+		return am33xx_cminst_wait_module_idle(oh->clkdm->cm_inst,
-+					     oh->clkdm->clkdm_offs,
-+					     oh->prcm.omap4.clkctrl_offs);
-+	else
-+		return omap4_cminst_wait_module_idle(oh->clkdm->prcm_partition,
- 					     oh->clkdm->cm_inst,
- 					     oh->clkdm->clkdm_offs,
- 					     oh->prcm.omap4.clkctrl_offs);
+ 	if (cpu_is_omap24xx() || cpu_is_omap34xx()) {
+-		ret = omap2_cm_wait_module_ready(oh->prcm.omap2.module_offs,
+-						 oh->prcm.omap2.idlest_reg_id,
+-						 oh->prcm.omap2.idlest_idle_bit);
++		if (cpu_is_am33xx())
++			ret = am33xx_cm_wait_module_ready(oh->clkdm->cm_inst,
++						oh->prcm.omap4.clkctrl_offs);
++		else
++			ret = omap2_cm_wait_module_ready(
++						oh->prcm.omap2.module_offs,
++						oh->prcm.omap2.idlest_reg_id,
++						oh->prcm.omap2.idlest_idle_bit);
+ 	} else if (cpu_is_omap44xx()) {
+ 		if (!oh->clkdm)
+ 			return -EINVAL;
 --
 1.7.0.4
