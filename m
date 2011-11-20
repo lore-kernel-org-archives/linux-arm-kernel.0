@@ -1,75 +1,73 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Sun, 20 Nov 2011 10:55:28 +0000
-Subject: [PATCH] arm: Add condition code check to SWP emulator
-In-Reply-To: <20111120084111.GM9581@n2100.arm.linux.org.uk>
-References: <CAHkRjk6Ynfh9+UbTuAtyiXCOF-yDbTNxi0ikF5ttwHViisZRZA@mail.gmail.com>
- <1321751070-7932-1-git-send-email-stepanm@codeaurora.org>
- <20111120084111.GM9581@n2100.arm.linux.org.uk>
-Message-ID: <CAHkRjk4QZxoVmCsB1A3DVb5_WCUvN5NfbYz8PNL_7np7+wHGzQ@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Sun, 20 Nov 2011 12:28:09 +0100
+Subject: [PATCH] ARM: fix unwinding for XIP kernels
+In-Reply-To: <20111117141706.GI4748@arm.com>
+References: <1321537200-9532-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <20111117141706.GI4748@arm.com>
+Message-ID: <20111120112809.GZ30612@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20 November 2011 08:41, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Sat, Nov 19, 2011 at 05:04:30PM -0800, Stepan Moskovchenko wrote:
->> +static int check_condition(struct pt_regs *regs, unsigned int insn)
->> +{
->> + ? ? unsigned int base_cond, neg, cond = 0;
->> + ? ? unsigned int cpsr_z, cpsr_c, cpsr_n, cpsr_v;
->> +
->> + ? ? cpsr_n = (regs->ARM_cpsr & PSR_N_BIT) ? 1 : 0;
->> + ? ? cpsr_z = (regs->ARM_cpsr & PSR_Z_BIT) ? 1 : 0;
->> + ? ? cpsr_c = (regs->ARM_cpsr & PSR_C_BIT) ? 1 : 0;
->> + ? ? cpsr_v = (regs->ARM_cpsr & PSR_V_BIT) ? 1 : 0;
->> +
->> + ? ? /* Upper 3 bits indicate condition, lower bit incicates negation */
->> + ? ? base_cond = insn >> 29;
->> + ? ? neg = insn & BIT(28) ? 1 : 0;
->> +
->> + ? ? switch (base_cond) {
->> + ? ? case 0x0: ? ? ? /* equal */
->> + ? ? ? ? ? ? cond = cpsr_z;
->> + ? ? ? ? ? ? break;
->> +
->> + ? ? case 0x1: ? ? ? /* carry set */
->> + ? ? ? ? ? ? cond = cpsr_c;
->> + ? ? ? ? ? ? break;
->> +
->> + ? ? case 0x2: ? ? ? /* minus / negative */
->> + ? ? ? ? ? ? cond = cpsr_n;
->> + ? ? ? ? ? ? break;
->> +
->> + ? ? case 0x3: ? ? ? /* overflow */
->> + ? ? ? ? ? ? cond = cpsr_v;
->> + ? ? ? ? ? ? break;
->> +
->> + ? ? case 0x4: ? ? ? /* unsigned higher */
->> + ? ? ? ? ? ? cond = (cpsr_c == 1) && (cpsr_z == 0);
->> + ? ? ? ? ? ? break;
->> +
->> + ? ? case 0x5: ? ? ? /* signed greater / equal */
->> + ? ? ? ? ? ? cond = (cpsr_n == cpsr_v);
->> + ? ? ? ? ? ? break;
->> +
->> + ? ? case 0x6: ? ? ? /* signed greater */
->> + ? ? ? ? ? ? cond = (cpsr_z == 0) && (cpsr_n == cpsr_v);
->> + ? ? ? ? ? ? break;
->> +
->> + ? ? case 0x7: ? ? ? /* always */
->> + ? ? ? ? ? ? cond = 1;
->> + ? ? ? ? ? ? break;
->> + ? ? };
->> +
->> + ? ? return cond && !neg;
->
-> There's a much better algorithm to check this. ?See the bottom of
-> arch/arm/nwfpe/fpopcode.c.
->
-> It would probably be best for there to be a common function for doing
-> this kind of check, rather than having several implementations of it
-> scattered around the kernel.
+On Thu, Nov 17, 2011 at 02:17:06PM +0000, Catalin Marinas wrote:
+> On Thu, Nov 17, 2011 at 01:40:00PM +0000, Uwe Kleine-K?nig wrote:
+> > The linker places the unwind tables in readonly sections. So when using
+> > an XIP kernel these are located in ROM and cannot be modified.
+> > 
+> > For that reason don't convert the symbol addresses during boot (or
+> > module loading) but only when interpreting them in search_index().
+> > Moreover several consts are added to catch future writes and rename the
+> > member "addr" of struct unwind_idx to "addr_offset" to better match the
+> > new semantic.
+> > 
+> > This fixes unwinding on XIP which compared prel31 offsets to absolute
+> > addresses because the initial conversion from prel31 to absolute failed.
+> 
+> My only worry - does this increase the index search by doing the prel31
+> conversion every time? It could affect tools like lockdep that need to
+> get the backtrace regularly at run-time.
+I did a first test now using 
 
-That's what Leif started doing.
+	static int __init unwind_test(void)
+	{
+	      unsigned long flags;
+	      u64 start, end;
+	      register unsigned long current_sp asm ("sp");
+	      int i;
+
+	      struct stackframe init_frame;
+
+	      init_frame.fp = (unsigned long)__builtin_frame_address(0);
+	      init_frame.sp = current_sp;
+	      init_frame.lr = (unsigned long)__builtin_return_address(0);
+	      init_frame.pc = (unsigned long)unwind_test;
+
+	      local_irq_save(flags);
+	      start = timestamp();
+	      for (i = 0; i < 100; ++i) {
+		      struct stackframe frame = init_frame;
+		      while (!unwind_frame(&frame));
+	      }
+	      end = timestamp();
+	      local_irq_restore(flags);
+
+	      pr_info("%s: ************************ unwind test took %llu\n",
+			      __func__, (unsigned long long)(end - start));
+	      return 0;
+	}
+	late_initcall(unwind_test);
+
+where timestamp reads and returns the value of a cpu counter on an mx35
+machine.
+
+The increase in runtime of my patch is@approx 7% for the above test
+case.
+
+I will try later to optimise a bit more as I wrote earlier in this
+thread.
+
+Best regards
+Uwe
 
 -- 
-Catalin
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
