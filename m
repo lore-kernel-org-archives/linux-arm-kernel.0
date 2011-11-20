@@ -1,254 +1,52 @@
-From: jochen@scram.de (Jochen Friedrich)
-Date: Sun, 20 Nov 2011 21:37:50 +0100
-Subject: [PATCH] Initial DT support for SIMpad devices.
-Message-ID: <1321821470-32396-1-git-send-email-jochen@scram.de>
+From: joe@perches.com (Joe Perches)
+Date: Sun, 20 Nov 2011 12:47:48 -0800
+Subject: [PATCH] ARM: sa1100: refactor sa1100 serial driver
+In-Reply-To: <1321821127-32231-1-git-send-email-jochen@scram.de>
+References: <1321821127-32231-1-git-send-email-jochen@scram.de>
+Message-ID: <1321822068.17619.3.camel@Joe-Laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Jochen Friedrich <jochen@scram.de>
----
- .../devicetree/bindings/vendor-prefixes.txt        |    1 +
- arch/arm/boot/dts/sa1110.dtsi                      |   72 ++++++++++++++++++++
- arch/arm/boot/dts/simpad.dts                       |   49 +++++++++++++
- arch/arm/mach-sa1100/Kconfig                       |   13 ++++
- arch/arm/mach-sa1100/Makefile.boot                 |    1 +
- arch/arm/mach-sa1100/simpad.c                      |   29 ++++++++-
- 6 files changed, 164 insertions(+), 1 deletions(-)
- create mode 100644 arch/arm/boot/dts/sa1110.dtsi
- create mode 100644 arch/arm/boot/dts/simpad.dts
+On Sun, 2011-11-20 at 21:32 +0100, Jochen Friedrich wrote:
+> - move pin initialization into board files
+> - make use of resources in platform device
+>   rather than hardcoding them in the driver
+> - add DT support
 
-diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-index 5b14518..cbe7046 100644
---- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-+++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-@@ -34,6 +34,7 @@ qcom	Qualcomm, Inc.
- ramtron	Ramtron International
- samsung	Samsung Semiconductor
- schindler	Schindler
-+siemens	SIEMENS
- simtek
- sirf	SiRF Technology, Inc.
- stericsson	ST-Ericsson
-diff --git a/arch/arm/boot/dts/sa1110.dtsi b/arch/arm/boot/dts/sa1110.dtsi
-new file mode 100644
-index 0000000..e1ca379
---- /dev/null
-+++ b/arch/arm/boot/dts/sa1110.dtsi
-@@ -0,0 +1,72 @@
-+/*
-+ * sa1110.dtsi - Device Tree Include file for Intel SA1110 SoC
-+ *
-+ *  Copyright (C) 2011 Jochen Friedrich <jochen@scram.de>
-+ *
-+ * Licensed under GPLv2 or later.
-+ */
-+
-+/include/ "skeleton.dtsi"
-+
-+/ {
-+	model = "Intel SA1110 SoC";
-+	compatible = "intel,sa1110";
-+	interrupt-parent = <&aic>;
-+
-+	cpus {
-+		cpu at 0 {
-+			compatible = "intel,sa1110";
-+		};
-+	};
-+
-+	localbus {
-+		compatible = "intel,sa1110-localbus";
-+		#address-cells = <2>;
-+		#size-cells = <1>;
-+
-+		ranges = <
-+			0x0 0x0 0x00000000 0x08000000
-+			0x1 0x0 0x08000000 0x08000000
-+			0x2 0x0 0x10000000 0x08000000
-+			0x3 0x0 0x18000000 0x08000000
-+			0x4 0x0 0x40000000 0x08000000
-+			0x5 0x0 0x48000000 0x08000000
-+		>;
-+	};
-+
-+	soc {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+
-+		uart0: serial at 0x80010000 {
-+			compatible = "intel,sa1100-uart";
-+			reg = <0x80010000 0x24>;
-+			interrupts = <15>;
-+			status = "disabled";
-+		};
-+
-+		uart1: serial at 0x80030000 {
-+			compatible = "intel,sa1100-uart";
-+			reg = <0x80030000 0x24>;
-+			interrupts = <16>;
-+			status = "disabled";
-+		};
-+
-+		uart2: serial at 0x80050000 {
-+			compatible = "intel,sa1100-uart";
-+			reg = <0x80050000 0x24>;
-+			interrupts = <17>;
-+			status = "disabled";
-+		};
-+
-+		aic: interrupt-controller at 0x90050000 {
-+			compatible = "intel,sa1110-icr";
-+			reg = <0x90050000 0x24>;
-+			#interrupt-cells = <1>;
-+			interrupt-controller;
-+			interrupt-parent;
-+		};
-+	};
-+};
-diff --git a/arch/arm/boot/dts/simpad.dts b/arch/arm/boot/dts/simpad.dts
-new file mode 100644
-index 0000000..fdd7969
---- /dev/null
-+++ b/arch/arm/boot/dts/simpad.dts
-@@ -0,0 +1,49 @@
-+/dts-v1/;
-+/include/ "sa1110.dtsi"
-+
-+/ {
-+	model = "SIEMENS, SIMpad";
-+	compatible = "siemens,simpad";
-+
-+	aliases {
-+		serial0 = &uart2;
-+		serial1 = &uart0;
-+	};
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x0 0x08000000>;
-+	};
-+
-+	chosen {
-+		bootargs = "console=ttySA0";
-+	};
-+
-+	localbus {
-+		flash at 0,0 {
-+			compatible = "cfi-flash";
-+			reg = <0 0 0x08000000>;
-+			bank-width = <1>;
-+			#size-cells = <1>;
-+			#address-cells = <1>;
-+		};
-+
-+		flash at 1,0 {
-+			compatible = "cfi-flash";
-+			reg = <1 0 0x08000000>;
-+			bank-width = <1>;
-+			#size-cells = <1>;
-+			#address-cells = <1>;
-+		};
-+	};
-+
-+	soc {
-+		uart0: serial at 0x80010000 {
-+			status = "okay";
-+		};
-+
-+		uart2: serial at 0x80050000 {
-+			status = "okay";
-+		};
-+	};
-+};
-diff --git a/arch/arm/mach-sa1100/Kconfig b/arch/arm/mach-sa1100/Kconfig
-index 42625e4..31238c3 100644
---- a/arch/arm/mach-sa1100/Kconfig
-+++ b/arch/arm/mach-sa1100/Kconfig
-@@ -157,6 +157,19 @@ config SA1100_SIMPAD
- 	  like CL4 in additional it has a PCMCIA-Slot. For more information
- 	  visit <http://www.usa.siemens.com/> or <http://www.siemens.ch/>.
- 
-+config SA1100_SIMPAD_DT
-+	bool "Simpad with device tree support"
-+	select CPU_FREQ_SA1110
-+	select SA1100_SIMPAD
-+	select USE_OF
-+	help
-+	  The SIEMENS webpad SIMpad is based on the StrongARM 1110. There
-+	  are two different versions CL4 and SL4. CL4 has 32MB RAM and 16MB
-+	  FLASH. The SL4 version got 64 MB RAM and 32 MB FLASH and a
-+	  PCMCIA-Slot. The version for the Germany Telecom (DTAG) is the same
-+	  like CL4 in additional it has a PCMCIA-Slot. For more information
-+	  visit <http://www.usa.siemens.com/> or <http://www.siemens.ch/>.
-+
- config SA1100_SSP
- 	tristate "Generic PIO SSP"
- 	help
-diff --git a/arch/arm/mach-sa1100/Makefile.boot b/arch/arm/mach-sa1100/Makefile.boot
-index 5a616f6..1d17767 100644
---- a/arch/arm/mach-sa1100/Makefile.boot
-+++ b/arch/arm/mach-sa1100/Makefile.boot
-@@ -6,3 +6,4 @@ endif
- params_phys-y	:= 0xc0000100
- initrd_phys-y	:= 0xc0800000
- 
-+dtb-$(CONFIG_SA1100_SIMPAD_DT)		+= simpad.dtb
-diff --git a/arch/arm/mach-sa1100/simpad.c b/arch/arm/mach-sa1100/simpad.c
-index d3c9d2b..9d6f663 100644
---- a/arch/arm/mach-sa1100/simpad.c
-+++ b/arch/arm/mach-sa1100/simpad.c
-@@ -10,6 +10,7 @@
- #include <linux/string.h> 
- #include <linux/pm.h>
- #include <linux/platform_device.h>
-+#include <linux/of_platform.h>
- #include <linux/mtd/mtd.h>
- #include <linux/mtd/partitions.h>
- #include <linux/io.h>
-@@ -211,8 +212,9 @@ static void __init simpad_map_io(void)
- 
- 	sa1100_register_uart_fns(&simpad_port_fns);
- 	sa1100_register_uart(0, 3);  /* serial interface */
-+#ifndef CONFIG_OF
- 	sa1100_register_uart(1, 1);  /* DECT             */
--
-+#endif
- 	// Reassign UART 1 pins
- 	GAFR |= GPIO_UART_TXD | GPIO_UART_RXD;
- 	GPDR |= GPIO_UART_TXD | GPIO_LDD13 | GPIO_LDD15;
-@@ -392,6 +394,31 @@ static int __init simpad_init(void)
- 
- arch_initcall(simpad_init);
- 
-+#ifdef CONFIG_OF
-+const struct of_device_id simpad_bus_match_table[] = {
-+	{ .compatible = "simple-bus", },
-+	{ .compatible = "intel,sa1110-localbus", },
-+	{} /* Empty terminated list */
-+};
-+
-+static void __init simpad_dt_device_init(void)
-+{
-+	of_platform_populate(NULL, simpad_bus_match_table, NULL, NULL);
-+}
-+
-+static const char *simpad_dt_board_compat[] __initdata = {
-+	"siemens,simpad",
-+	NULL
-+};
-+
-+DT_MACHINE_START(simpad_dt, "SIMpad")
-+	.timer		= &sa1100_timer,
-+	.map_io		= simpad_map_io,
-+	.init_irq	= sa1100_init_irq,
-+	.init_machine	= simpad_dt_device_init,
-+	.dt_compat	= simpad_dt_board_compat,
-+MACHINE_END
-+#endif
- 
- MACHINE_START(SIMPAD, "Simpad")
- 	/* Maintainer: Holger Freyther */
--- 
-1.7.7.3
+trivia:
+
+> diff --git a/arch/arm/mach-sa1100/generic.c b/arch/arm/mach-sa1100/generic.c
+[]
+> @@ -166,7 +166,7 @@ static struct platform_device sa11x0udc_device = {
+>  static struct resource sa11x0uart1_resources[] = {
+>  	[0] = {
+>  		.start	= __PREG(Ser1UTCR0),
+> -		.end	= __PREG(Ser1UTCR0) + 0xffff,
+> +		.end	= __PREG(Ser1UTCR0) + 0x24,
+
+#define for 0x24? or is it really 0x23?
+(start + size - 1)
+
+> @@ -178,15 +178,35 @@ static struct resource sa11x0uart1_resources[] = {
+[]
+> +static struct resource sa11x0uart2_resources[] = {
+> +	[0] = {
+> +		.start	= __PREG(Ser2UTCR0),
+> +		.end	= __PREG(Ser2UTCR0) + 0x24,
+
+here too
+
+> +static struct platform_device sa11x0uart2_device = {
+> +	.name		= "sa11x0-uart",
+> +	.id		= -1,
+> +	.num_resources	= ARRAY_SIZE(sa11x0uart2_resources),
+> +	.resource	= sa11x0uart2_resources,
+> +};
+> +
+>  static struct resource sa11x0uart3_resources[] = {
+>  	[0] = {
+>  		.start	= __PREG(Ser3UTCR0),
+> -		.end	= __PREG(Ser3UTCR0) + 0xffff,
+> +		.end	= __PREG(Ser3UTCR0) + 0x24,
+
+etc
