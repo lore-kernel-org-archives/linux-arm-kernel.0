@@ -1,73 +1,118 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Sun, 20 Nov 2011 12:28:09 +0100
-Subject: [PATCH] ARM: fix unwinding for XIP kernels
-In-Reply-To: <20111117141706.GI4748@arm.com>
-References: <1321537200-9532-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <20111117141706.GI4748@arm.com>
-Message-ID: <20111120112809.GZ30612@pengutronix.de>
+From: hvaibhav@ti.com (Vaibhav Hiremath)
+Date: Sun, 20 Nov 2011 22:49:04 +0530
+Subject: [RFC PATCH 00/11] arm:omap:am33xx: Add basic voltage, power,
+ clock & HWMOD data
+Message-ID: <1321809555-13833-1-git-send-email-hvaibhav@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 17, 2011 at 02:17:06PM +0000, Catalin Marinas wrote:
-> On Thu, Nov 17, 2011 at 01:40:00PM +0000, Uwe Kleine-K?nig wrote:
-> > The linker places the unwind tables in readonly sections. So when using
-> > an XIP kernel these are located in ROM and cannot be modified.
-> > 
-> > For that reason don't convert the symbol addresses during boot (or
-> > module loading) but only when interpreting them in search_index().
-> > Moreover several consts are added to catch future writes and rename the
-> > member "addr" of struct unwind_idx to "addr_offset" to better match the
-> > new semantic.
-> > 
-> > This fixes unwinding on XIP which compared prel31 offsets to absolute
-> > addresses because the initial conversion from prel31 to absolute failed.
-> 
-> My only worry - does this increase the index search by doing the prel31
-> conversion every time? It could affect tools like lockdep that need to
-> get the backtrace regularly at run-time.
-I did a first test now using 
+This patch series adds support for AM335X basic voltage, power,
+clock and HWMOD data to existing OMAP framework.
+Care has been taken while adding new API's to make sure that
+we don't duplicate the code, and API's being added only
+wherever required (where we didn't had any option).
 
-	static int __init unwind_test(void)
-	{
-	      unsigned long flags;
-	      u64 start, end;
-	      register unsigned long current_sp asm ("sp");
-	      int i;
+The main purpose of this patch-series is to get early feedback &
+review comments from list.
 
-	      struct stackframe init_frame;
+NOTE: Also please note that, most of the files are auto-generated
+using HW data base and then modified based on latest kernel changes &
+bug fixes.
 
-	      init_frame.fp = (unsigned long)__builtin_frame_address(0);
-	      init_frame.sp = current_sp;
-	      init_frame.lr = (unsigned long)__builtin_return_address(0);
-	      init_frame.pc = (unsigned long)unwind_test;
+For further information on AM33XX family of devices, please
+refer to below links,
 
-	      local_irq_save(flags);
-	      start = timestamp();
-	      for (i = 0; i < 100; ++i) {
-		      struct stackframe frame = init_frame;
-		      while (!unwind_frame(&frame));
-	      }
-	      end = timestamp();
-	      local_irq_restore(flags);
+Official website -
+http://www.ti.com/product/am3359
 
-	      pr_info("%s: ************************ unwind test took %llu\n",
-			      __func__, (unsigned long long)(end - start));
-	      return 0;
-	}
-	late_initcall(unwind_test);
+Link to Public TRM -
+http://www.ti.com/lit/ug/spruh73a/spruh73a.pdf
 
-where timestamp reads and returns the value of a cpu counter on an mx35
-machine.
+This patch series has beed created on top of linux-omap/master +
+AM33XX baseport patches submitted previously.
+Link to AM335X Baseport patches -
 
-The increase in runtime of my patch is@approx 7% for the above test
-case.
+http://www.spinics.net/lists/linux-omap/msg60088.html
+http://www.spinics.net/lists/linux-omap/msg60087.html
+http://www.spinics.net/lists/linux-omap/msg60090.html
+http://www.spinics.net/lists/linux-omap/msg60089.html
 
-I will try later to optimise a bit more as I wrote earlier in this
-thread.
+Testing -
+	- These patches has been tested on OMAP3EVM to make sure
+	 nothing has been broken.
+	- Patches has also been tested on AM335X EVM
+	(with few additional patches).
+	- All the patches can be accessible from,
+http://arago-project.org/git/people/?p=vaibhav/ti-psp-omap-video.git;a=summary am335x-staging
 
-Best regards
-Uwe
+Afzal Mohammed (6):
+  arm:omap:am33xx: Add voltage domain data
+  arm:omap:am33xx: Integrate voltage domain
+  arm:omap:am33xx: Add power domain data
+  arm:omap:am33xx: Integrate powerdomain to OMAP power framework
+  arm:omap:am33xx: Add Clock & clockdomain data
+  arm:omap:am33xx: Integrate clock & clockdomain to OMAP clock
+    framework
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Vaibhav Hiremath (5):
+  arm:omap:am33xx: Add irq, dma and module base addr to SoC header
+    files
+  arm:omap:am33xx: Add HWMOD data
+  arm:omap:am33xx: Integrate AM33XX hwmods to omap HWMOD framework
+  ARM:omap:am33xx: Add clock control api's
+  arm:omap:am33xx: Add am335x support in generic omap_hwmod
+
+ arch/arm/mach-omap2/Makefile                  |    9 +
+ arch/arm/mach-omap2/clock33xx.c               |   82 +
+ arch/arm/mach-omap2/clock33xx.h               |   40 +
+ arch/arm/mach-omap2/clock33xx_data.c          | 1936 +++++++++++++++++++
+ arch/arm/mach-omap2/clock3xxx_data.c          |    5 +-
+ arch/arm/mach-omap2/clockdomain.h             |    1 +
+ arch/arm/mach-omap2/clockdomain2xxx_3xxx.c    |   18 +-
+ arch/arm/mach-omap2/clockdomains33xx_data.c   |  223 +++
+ arch/arm/mach-omap2/cm-regbits-33xx.h         |  683 +++++++
+ arch/arm/mach-omap2/cm2xxx_3xxx.c             |   34 +
+ arch/arm/mach-omap2/cm2xxx_3xxx.h             |    6 +
+ arch/arm/mach-omap2/cm33xx.c                  |   51 +
+ arch/arm/mach-omap2/cm33xx.h                  |  390 ++++
+ arch/arm/mach-omap2/cminst33xx.c              |  311 ++++
+ arch/arm/mach-omap2/cminst33xx.h              |   63 +
+ arch/arm/mach-omap2/io.c                      |    5 +
+ arch/arm/mach-omap2/omap_hwmod.c              |   42 +-
+ arch/arm/mach-omap2/omap_hwmod_33xx_data.c    | 2474 +++++++++++++++++++++++++
+ arch/arm/mach-omap2/powerdomain.h             |    4 +-
+ arch/arm/mach-omap2/powerdomain33xx.c         |  155 ++
+ arch/arm/mach-omap2/powerdomains33xx_data.c   |  115 ++
+ arch/arm/mach-omap2/prm-regbits-33xx.h        |  357 ++++
+ arch/arm/mach-omap2/prm33xx.h                 |  123 ++
+ arch/arm/mach-omap2/prminst33xx.c             |   74 +
+ arch/arm/mach-omap2/prminst33xx.h             |   25 +
+ arch/arm/mach-omap2/voltage.h                 |    1 +
+ arch/arm/mach-omap2/voltagedomains33xx_data.c |   37 +
+ arch/arm/plat-omap/include/plat/am33xx.h      |   40 +
+ arch/arm/plat-omap/include/plat/dma-33xx.h    |   85 +
+ arch/arm/plat-omap/include/plat/dma.h         |    1 +
+ arch/arm/plat-omap/include/plat/irqs-33xx.h   |  143 ++
+ arch/arm/plat-omap/include/plat/irqs.h        |    1 +
+ arch/arm/plat-omap/include/plat/omap_hwmod.h  |    1 +
+ arch/arm/plat-omap/include/plat/serial.h      |    5 +
+ 34 files changed, 7525 insertions(+), 15 deletions(-)
+ create mode 100644 arch/arm/mach-omap2/clock33xx.c
+ create mode 100644 arch/arm/mach-omap2/clock33xx.h
+ create mode 100644 arch/arm/mach-omap2/clock33xx_data.c
+ create mode 100644 arch/arm/mach-omap2/clockdomains33xx_data.c
+ create mode 100644 arch/arm/mach-omap2/cm-regbits-33xx.h
+ create mode 100644 arch/arm/mach-omap2/cm33xx.c
+ create mode 100644 arch/arm/mach-omap2/cm33xx.h
+ create mode 100644 arch/arm/mach-omap2/cminst33xx.c
+ create mode 100644 arch/arm/mach-omap2/cminst33xx.h
+ create mode 100644 arch/arm/mach-omap2/omap_hwmod_33xx_data.c
+ create mode 100644 arch/arm/mach-omap2/powerdomain33xx.c
+ create mode 100644 arch/arm/mach-omap2/powerdomains33xx_data.c
+ create mode 100644 arch/arm/mach-omap2/prm-regbits-33xx.h
+ create mode 100644 arch/arm/mach-omap2/prm33xx.h
+ create mode 100644 arch/arm/mach-omap2/prminst33xx.c
+ create mode 100644 arch/arm/mach-omap2/prminst33xx.h
+ create mode 100644 arch/arm/mach-omap2/voltagedomains33xx_data.c
+ create mode 100644 arch/arm/plat-omap/include/plat/dma-33xx.h
+ create mode 100644 arch/arm/plat-omap/include/plat/irqs-33xx.h
