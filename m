@@ -1,7 +1,9 @@
 From: zhangwm@marvell.com (Neil Zhang)
-Date: Mon, 21 Nov 2011 11:32:43 +0800
+Date: Mon, 21 Nov 2011 11:32:44 +0800
 Subject: [PATCH V1] ARM: mmp: fix gpio operation error
-Message-ID: <1321846364-30466-1-git-send-email-zhangwm@marvell.com>
+In-Reply-To: <1321846364-30466-1-git-send-email-zhangwm@marvell.com>
+References: <1321846364-30466-1-git-send-email-zhangwm@marvell.com>
+Message-ID: <1321846364-30466-2-git-send-email-zhangwm@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
