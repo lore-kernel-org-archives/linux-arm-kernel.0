@@ -1,46 +1,34 @@
-From: tanmay.upadhyay@einfochips.com (Tanmay Upadhyay)
-Date: Mon, 21 Nov 2011 09:57:35 +0530
-Subject: [PATCH v2 4/4] ARM: pxa168/gplugd: Add support for SD port 1
-In-Reply-To: <87r51fwxgt.fsf@laptop.org>
-References: <87r51fwxgt.fsf@laptop.org>
-Message-ID: <1321849655-3056-1-git-send-email-tanmay.upadhyay@einfochips.com>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Mon, 21 Nov 2011 12:39:15 +0800
+Subject: [PATCH V1] ARM: mmp: fix gpio operation error
+In-Reply-To: <1321846364-30466-2-git-send-email-zhangwm@marvell.com>
+References: <1321846364-30466-1-git-send-email-zhangwm@marvell.com>
+ <1321846364-30466-2-git-send-email-zhangwm@marvell.com>
+Message-ID: <CAN1soZwLY=B8J+-5DfV15DOm7+Mx2Mz_b+hT5Hu-+8jENCXHfA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-v2 - after sdhci-pxav1 driver is merged with sdhci-pxav2, pass
-     pxav1_controller = 1
-   - as sdhci device numbering now starts from 1, call
-     pxa168_add_sdh accordingly
+On Mon, Nov 21, 2011 at 11:32 AM, Neil Zhang <zhangwm@marvell.com> wrote:
+> Fix the following build error on Marvell mmp platform.
+>
+> In file included from arch/arm/mach-mmp/include/mach/gpio.h:12,
+> ? ? ? ? ? ? ? ? from /home/zhangwm/Public/linux-3.0/arch/arm/include/asm/gpio.h:5,
+> ? ? ? ? ? ? ? ? from include/linux/gpio.h:30,
+> ? ? ? ? ? ? ? ? from arch/arm/mach-mmp/tavorevb.c:10:
+> arch/arm/plat-pxa/include/plat/gpio.h: In function 'gpio_get_value':
+> arch/arm/plat-pxa/include/plat/gpio.h:12: error: invalid operands to
+> binary & (have 'void *' and 'int')
+> arch/arm/plat-pxa/include/plat/gpio.h: In function 'gpio_set_value':
+> arch/arm/plat-pxa/include/plat/gpio.h:21: error: lvalue required as left
+> operand of assignment
+> arch/arm/plat-pxa/include/plat/gpio.h:23: error: lvalue required as left
+> operand of assignment
+> make[1]: *** [arch/arm/mach-mmp/tavorevb.o] Error 1
+> make: *** [arch/arm/mach-mmp] Error 2
+>
+> Signed-off-by: Neil Zhang <zhangwm@marvell.com>
 
-Signed-off-by: Tanmay Upadhyay <tanmay.upadhyay@einfochips.com>
-Reviewed-by: Philip Rakity <prakity@marvell.com>
----
- arch/arm/mach-mmp/gplugd.c |    6 ++++++
- 1 files changed, 6 insertions(+), 0 deletions(-)
+This bug is already fixed. So this patch is unnecessary.
 
-diff --git a/arch/arm/mach-mmp/gplugd.c b/arch/arm/mach-mmp/gplugd.c
-index 6915656..d7947e7 100644
---- a/arch/arm/mach-mmp/gplugd.c
-+++ b/arch/arm/mach-mmp/gplugd.c
-@@ -154,6 +154,11 @@ struct pxa168_eth_platform_data gplugd_eth_platform_data = {
- 	.init        = gplugd_eth_init,
- };
- 
-+struct sdhci_pxa_platdata gplugd_sdh_platdata = {
-+	.delay_in_ms = 5,
-+	.pxav1_controller = 1,
-+};
-+
- static void __init select_disp_freq(void)
- {
- 	/* set GPIO 35 & clear GPIO 85 to set LCD External Clock to 74.25 MHz */
-@@ -186,6 +191,7 @@ static void __init gplugd_init(void)
- 	pxa168_add_twsi(0, NULL, ARRAY_AND_SIZE(gplugd_i2c_board_info));
- 
- 	pxa168_add_eth(&gplugd_eth_platform_data);
-+	pxa168_add_sdh(1, &gplugd_sdh_platdata);
- }
- 
- MACHINE_START(GPLUGD, "PXA168-based GuruPlug Display (gplugD) Platform")
--- 
-1.7.0.4
+Thanks
+Haojian
