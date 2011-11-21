@@ -1,51 +1,35 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 21 Nov 2011 19:25:09 +0900
-Subject: [GIT PULL] Samsung fixes for v3.2
-Message-ID: <03e501cca837$d893e320$89bba960$%kim@samsung.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 21 Nov 2011 10:29:06 +0000
+Subject: [GIT PULL] Missing CPU mapping updates
+In-Reply-To: <20111116113636.GH4942@mudshark.cambridge.arm.com>
+References: <20111116113636.GH4942@mudshark.cambridge.arm.com>
+Message-ID: <20111121102906.GA2437@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Arnd,
 
-Please pull samsung-fixes for v3.2 from:
+On Wed, Nov 16, 2011 at 11:36:36AM +0000, Will Deacon wrote:
+> Highbank and IMX6 were merged recently and therefore missed out on the
+> logical CPU mapping updates. I've fixed them up in the branch below - please
+> pull!
 
-git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-samsung-fixes
+I'd like these to go in for 3.2, so please can you pull them into arm-soc?
+Sorry to pester, but in Prague you said that's what you wanted us to do!
 
-This includes fix of inclusion header.
-If any problems, please let me know.
+Will
 
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
-
-The following changes since commit 1ea6b8f48918282bdca0b32a34095504ee65bab5:
-
-  Linux 3.2-rc1 (2011-11-07 16:16:02 -0800)
-
-are available in the git repository at:
-  git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-samsung-fixes
-
-Axel Lin (1):
-      ARM: SAMSUNG: include linux/types.h at gpio-cfg.h
-
-Kukjin Kim (2):
-      ARM: S5P: Fix export.h inclusion
-      ARM: SAMSUNG: inclusion export.h instead of module.h
-
-Kyungmin Park (1):
-      ARM: EXYNOS: Fix compiler error with THIS_MODULE
-
- arch/arm/mach-exynos/cpuidle.c                |    2 ++
- arch/arm/mach-s3c64xx/mach-crag6410-module.c  |    2 +-
- arch/arm/plat-s3c24xx/cpu-freq-debugfs.c      |    2 +-
- arch/arm/plat-s5p/sysmmu.c                    |    1 +
- arch/arm/plat-samsung/include/plat/gpio-cfg.h |    2 ++
- arch/arm/plat-samsung/pd.c                    |    2 +-
- arch/arm/plat-samsung/pwm.c                   |    2 +-
- 7 files changed, 9 insertions(+), 4 deletions(-)
+> The following changes since commit cfcfc9eca2bcbd26a8e206baeb005b055dbf8e37:
+> 
+>   Linux 3.2-rc2 (2011-11-15 15:02:59 -0200)
+> 
+> are available in the git repository at:
+>   git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git for-arnd
+> 
+> Will Deacon (2):
+>       ARM: highbank: convert logical CPU numbers to physical numbers
+>       ARM: mach-imx: convert logical CPU numbers to physical numbers
+> 
+>  arch/arm/mach-highbank/highbank.c |    4 ++++
+>  arch/arm/mach-imx/src.c           |    7 +++++++
+>  2 files changed, 11 insertions(+), 0 deletions(-)
