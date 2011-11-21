@@ -1,71 +1,70 @@
 From: nico@fluxnic.net (Nicolas Pitre)
-Date: Mon, 21 Nov 2011 14:29:06 -0500 (EST)
-Subject: [PATCH 6/6] ARM: support kernel modules in BE8 mode
-In-Reply-To: <1321322785-2981-6-git-send-email-junxiao.bi@windriver.com>
+Date: Mon, 21 Nov 2011 13:32:52 -0500 (EST)
+Subject: [PATCH 1/6] ARM: fix be8 support for phys/virt address conversion
+In-Reply-To: <1321322785-2981-1-git-send-email-junxiao.bi@windriver.com>
 References: <1321322785-2981-1-git-send-email-junxiao.bi@windriver.com>
- <1321322785-2981-6-git-send-email-junxiao.bi@windriver.com>
-Message-ID: <alpine.LFD.2.02.1111211427400.17904@xanadu.home>
+Message-ID: <alpine.LFD.2.02.1111211330060.17904@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Tue, 15 Nov 2011, Junxiao Bi wrote:
 
-> From: Stanley.Miao <stanley.miao@windriver.com>
+> phys_to_virt() and virt_to_phys() is implemented by one assembler instruction,
+> add/sub an offset between the physical and virtual address. For some arm machines
+> with CONFIG_ARM_PATCH_PHYS_VIRT defined, this offset is unknown at compile time,
+> it is calculated dynamically at run time and then patched to the add/sub instruction.
+> To support BE8 mode, firstly we need to convert the instruntion to big-endian after
+> loading it from the memory, and then modify its offset field, at last convert it to
+> little-endian and write it back to the memory.
 > 
-> In BE8 mode, data must be manipulated in big endian format while
-> text must be little endian. Therefore, when relocating the text
-> section of module in BE8 mode, we must convert the location offset
-> of the text to big endian from the native little endian. After
-> the relocation is complete, the location offset value is re-written
-> as little endian.
-> 
-> Since only BE8 mode has such special requirement while other big endian
-> mode not, cpu_to_le32 and le32_to_cpu can not be used to relocate the
-> text. We introduce write_instr* and read_instr* to do it.
-> 
-> Signed-off-by: Stanley.Miao <stanley.miao@windriver.com>
 > Signed-off-by: Junxiao Bi <junxiao.bi@windriver.com>
+
+Reviewed-by: Nicolas Pitre <nico@linaro.org>
+
 > ---
->  arch/arm/Makefile         |    1 +
->  arch/arm/include/asm/io.h |   12 ++++++++++
->  arch/arm/kernel/module.c  |   51 +++++++++++++++++++++++----------------------
->  3 files changed, 39 insertions(+), 25 deletions(-)
+>  arch/arm/kernel/head.S |   12 ++++++++++++
+>  1 files changed, 12 insertions(+), 0 deletions(-)
 > 
-> diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-> index dfcf3b0..c858184 100644
-> --- a/arch/arm/Makefile
-> +++ b/arch/arm/Makefile
-> @@ -13,6 +13,7 @@
->  LDFLAGS_vmlinux	:=-p --no-undefined -X
->  ifeq ($(CONFIG_CPU_ENDIAN_BE8),y)
->  LDFLAGS_vmlinux	+= --be8
-> +LDFLAGS_MODULE	+= --be8
->  endif
->  
->  OBJCOPYFLAGS	:=-O binary -R .comment -S
-> diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
-> index 065d100..4b6c7de 100644
-> --- a/arch/arm/include/asm/io.h
-> +++ b/arch/arm/include/asm/io.h
-> @@ -210,6 +210,18 @@ extern void _memset_io(volatile void __iomem *, int, size_t);
->   * Again, this are defined to perform little endian accesses.  See the
->   * IO port primitives for more information.
->   */
+> diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
+> index 566c54c..838fb0c 100644
+> --- a/arch/arm/kernel/head.S
+> +++ b/arch/arm/kernel/head.S
+> @@ -522,8 +522,14 @@ __fixup_a_pv_table:
+>  	b	2f
+>  1:	add     r7, r3
+>  	ldrh	ip, [r7, #2]
 > +#ifdef CONFIG_CPU_ENDIAN_BE8
-> +#define read_instr32(c)		__swab32(*(u32 *)(c))
-> +#define read_instr16(c)		__swab16(*(u16 *)(c))
-> +#define write_instr32(v, a)	(*(u32 *)(a) = __swab32((__force __u32)(v)))
-> +#define write_instr16(v, a)	(*(u16 *)(a) = __swab16((__force __u16)(v)))
-> +#else
-> +#define read_instr32(c)		(*(u32 *)(c))
-> +#define read_instr16(c)		(*(u16 *)(c))
-> +#define write_instr32(v, a)	(*(u32 *)(a) = (v))
-> +#define write_instr16(v, a)	(*(u16 *)(a) = (v))
+> +	rev16	ip, ip
 > +#endif
-
-NAK.  This has nothing to do with IO.
-
-If only module.c requires this, please move those definitions there.
-
-
-Nicolas
+>  	and	ip, 0x8f00
+>  	orr	ip, r6	@ mask in offset bits 31-24
+> +#ifdef CONFIG_CPU_ENDIAN_BE8
+> +	rev16	ip, ip
+> +#endif
+>  	strh	ip, [r7, #2]
+>  2:	cmp	r4, r5
+>  	ldrcc	r7, [r4], #4	@ use branch for delay slot
+> @@ -532,8 +538,14 @@ __fixup_a_pv_table:
+>  #else
+>  	b	2f
+>  1:	ldr	ip, [r7, r3]
+> +#ifdef CONFIG_CPU_ENDIAN_BE8
+> +	rev	ip, ip
+> +#endif
+>  	bic	ip, ip, #0x000000ff
+>  	orr	ip, ip, r6	@ mask in offset bits 31-24
+> +#ifdef CONFIG_CPU_ENDIAN_BE8
+> +	rev	ip, ip
+> +#endif
+>  	str	ip, [r7, r3]
+>  2:	cmp	r4, r5
+>  	ldrcc	r7, [r4], #4	@ use branch for delay slot
+> -- 
+> 1.7.0.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
