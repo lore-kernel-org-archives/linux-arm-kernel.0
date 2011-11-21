@@ -1,31 +1,50 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Mon, 21 Nov 2011 14:47:49 +0100
-Subject: [PATCH v2] arm/imx: fix the references to ARCH_MX3
-In-Reply-To: <1320997034-10051-1-git-send-email-shawn.guo@linaro.org>
-References: <1320914372-4416-3-git-send-email-shawn.guo@linaro.org>
- <1320997034-10051-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1321883269.32195.9.camel@x61.thuisdomein>
+From: govindraj.ti@gmail.com (Govindraj)
+Date: Mon, 21 Nov 2011 19:17:42 +0530
+Subject: [PATCH v8 17/20] OMAP2+: UART: Use custom activate func for
+ console uart.
+In-Reply-To: <87vcqhuns9.fsf@ti.com>
+References: <1321005712-21871-1-git-send-email-govindraj.raja@ti.com>
+ <1321005712-21871-3-git-send-email-govindraj.raja@ti.com>
+ <87vcqhuns9.fsf@ti.com>
+Message-ID: <CAAL8m4yft7_SQFrXtDZg5X5SJrKep0_j5D9_y1-QooSox+HZpg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2011-11-11 at 15:37 +0800, Shawn Guo wrote: 
-> The config symbol ARCH_MX3 has been removed by commit 'a89cf59
-> arm/imx: merge i.MX3 and i.MX6', and it should not be referenced
-> any more.
-> 
-> The patch also change ARCH_MX* to SOC_IMX* for other platforms.
-> 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> ---
-> Changes since v1:
->  * Drop changes on drivers/dma/Kconfig, as Sascha alreay has a patch
->    to fix it.
+On Sat, Nov 19, 2011 at 2:54 AM, Kevin Hilman <khilman@ti.com> wrote:
+> "Govindraj.R" <govindraj.raja@ti.com> writes:
+>
+>> Omap-uart can be used as console uart to print early boot
+>> messages using earlyprintk so for console uart prevent
+>> hwmod reset or idling during bootup.
+>>
+>> Identify the console_uart set the id and use the custom
+>> pm_latency ops for console uart for the first time
+>> to idle console uart left enabled from bootup and then enable
+>> them back and reset pm_latency ops to default ops.
+>>
+>> Thanks to Kevin Hilman <khilman@ti.com> for suggesting
+>> this approach.
+>
+> You're welcome, but Rajendra's solution is much better. ;)
 
-This appears to be to the patch that ended up as commit 59198b6cb2 in
-the mainline tree. But in mainline there are still those two references
-to ARCH_MX3 in drivers/dma/Kconfig. Can I ask what happened to this
-patch of Sascha that Shawn mentions?
+Agree.
 
+>
+> Can you updated your branch without these custom hooks and using
+> Rajendra's INIT_NO_IDLE change to the hwmod core.
+>
 
-Paul Bolle
+Yes done, rebased on 3.2-rc2 and created a new branch [1].
+
+Removed custom activate function usage and used Rajendra's hwmod patch[2]
+
+--
+Thanks,
+Govindraj.R
+
+[1]:
+git://gitorious.org/runtime_3-0/runtime_3-0.git
+3.2-rc1_uart_runtime
+
+[2]:
+http://permalink.gmane.org/gmane.linux.ports.arm.omap/66974
