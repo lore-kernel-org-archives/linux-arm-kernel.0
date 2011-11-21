@@ -1,56 +1,65 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 21 Nov 2011 13:18:55 +0000
-Subject: Porting the 2.6.38 linux kernel to ARM11 MPcore
-In-Reply-To: <CAK-0apYKjvxXasEfYCocjqEan5dKoXJgMON2gC-nMenKQaU9UQ@mail.gmail.com>
-References: <CAK-0apYKjvxXasEfYCocjqEan5dKoXJgMON2gC-nMenKQaU9UQ@mail.gmail.com>
-Message-ID: <CAHkRjk491+H9Wh-uV8807VSkZ4Mk+UK3Jv6EThtOsRb7ULpUjg@mail.gmail.com>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Mon, 21 Nov 2011 14:34:05 +0100
+Subject: [PATCH] ARM: imx: drop 'ARCH_MX31' and 'ARCH_MX35'
+Message-ID: <1321882445.32195.3.camel@x61.thuisdomein>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18 November 2011 11:54, Moln?r G?bor <conqrx@gmail.com> wrote:
-> im working on a project wich aims at porting the 2.6.38 kernel to an
-> arm11 mpcore based board.
->
-> The kernel fails to boot, in the paging_init func, it throws an
-> exception (pc: FFFF_000C) when executing the third mcr instruction in
-> the list below:
->
-> 0xc000bf34 ?<>: ? ?blx ?r3
-> 0xc000bf38 ?<>: ? ?mov ?r5, #0 ?; 0x0
-> 0xc000bf3c ?<>: ? ?mcr ?15, 0, r5, cr7, cr10, {4}
-> 0xc000bf40 ?<>: ? ?mcr ?15, 0, r5, cr8, cr6, {0}
-> 0xc000bf44 ?<>: ? ?mcr ?15, 0, r5, cr8, cr5, {0} //throws an exception
-> here, Invalidate Instruction TLB Register
-> 0xc000bf48 ?<>: ? ?mcr ?15, 0, r5, cr7, cr5, {6}
-> 0xc000bf4c ?<>: ? ?mcr ?15, 0, r5, cr7, cr10, {4}
-> 0xc000bf50 ?<>: ? ?mcr ?15, 0, r5, cr7, cr5, {4}
-> 0xc000bf54 ?<>: ? ?ldr ?lr, [pc, #176] ?; 0xc000c00c
+Commit 27ad4bf72a ("ARM: imx: move mx3 support to mach-imx") kept
+ARCH_MX31 and ARCH_MX35 'for compatibility'. Now that they aren't
+actually used anymore, they can be dropped entirely.
 
-So you get a prefetch abort as soon as the TLBs are invalidated, which
-means that the page table is not set up correctly.
+Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
+---
+"git grep" tested only.
 
-What's your RAM configuration (start address, size)?
+ arch/arm/mach-imx/Kconfig |   13 -------------
+ 1 files changed, 0 insertions(+), 13 deletions(-)
 
-> The kernel has been patched with the 2.6.38-arm1 patch, and configured
-> to be as minimal as possible (the vmlinux.elf is 1.8MB) and
-> cross-compiled with the?Codesourcery gcc toolchain.
-> The minimal size is improtant because the aim is to make the kernel
-> run with only 5-6MB of memory (from c0000000 to c0500000).
-> The 'boot_loader' i wrote passes the atag pointers (basically core and
-> memory) and the kernel seemingly reads and parses them fine. The
-> __log_buf before the exception:
->
-> <5>Linux version 2.6.38-rc8 (VirtualBox) (gcc version 4.5.2 (Sourcery
-> G++ Lite 2011.03-41) ) #6 Wed Nov 9 21:59:29 CET 2011
-> <4>CPU: ARMv6-compatible processor [410fb025] revision 5 (ARMv7), cr=08c5387f"
-> <4>CPU: VIPT nonaliasing data cache, VIPT aliasing instruction cache
-> <4>Machine: ARM-RealView PB11MPCore
-> <5>Ignoring RAM at c0000000-c04fffff (vmalloc region overlap).
-
-Does your physical RAM start at 0xc0000000 and it is all ignored?
-Setting highmem would fix as all your lowmem (including the kernel
-code) would be unmapped, hence the fault. What's the VMALLOC_END
-defined to?
-
+diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+index 5f7f9c2..c44aa97 100644
+--- a/arch/arm/mach-imx/Kconfig
++++ b/arch/arm/mach-imx/Kconfig
+@@ -10,11 +10,6 @@ config HAVE_IMX_MMDC
+ config HAVE_IMX_SRC
+ 	bool
+ 
+-#
+-# ARCH_MX31 and ARCH_MX35 are left for compatibility
+-# Some usages assume that having one of them implies not having (e.g.) ARCH_MX2.
+-# To easily distinguish good and reviewed from unreviewed usages new (and IMHO
+-# more sensible) names are used: SOC_IMX31 and SOC_IMX35
+ config ARCH_MX1
+ 	bool
+ 
+@@ -27,12 +22,6 @@ config ARCH_MX25
+ config MACH_MX27
+ 	bool
+ 
+-config ARCH_MX31
+-	bool
+-
+-config ARCH_MX35
+-	bool
+-
+ config SOC_IMX1
+ 	bool
+ 	select ARCH_MX1
+@@ -72,7 +61,6 @@ config SOC_IMX31
+ 	select CPU_V6
+ 	select IMX_HAVE_PLATFORM_MXC_RNGA
+ 	select ARCH_MXC_AUDMUX_V2
+-	select ARCH_MX31
+ 	select MXC_AVIC
+ 	select SMP_ON_UP if SMP
+ 
+@@ -82,7 +70,6 @@ config SOC_IMX35
+ 	select ARCH_MXC_IOMUX_V3
+ 	select ARCH_MXC_AUDMUX_V2
+ 	select HAVE_EPIT
+-	select ARCH_MX35
+ 	select MXC_AVIC
+ 	select SMP_ON_UP if SMP
+ 
 -- 
-Catalin
+1.7.7.3
