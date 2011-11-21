@@ -1,40 +1,45 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 21 Nov 2011 18:35:45 +0000
-Subject: [PATCH] ARM: fix unwinding for XIP kernels
-In-Reply-To: <20111120112809.GZ30612@pengutronix.de>
-References: <1321537200-9532-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <20111117141706.GI4748@arm.com>
- <20111120112809.GZ30612@pengutronix.de>
-Message-ID: <20111121183545.GF3272@arm.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Mon, 21 Nov 2011 10:38:09 -0800
+Subject: [PATCH v3] ARM: OMAP2+: hwmod: Add a new state to handle hwmods
+ left enabled at init
+In-Reply-To: <1321877570-4333-1-git-send-email-rnayak@ti.com> (Rajendra
+ Nayak's message of "Mon, 21 Nov 2011 17:42:50 +0530")
+References: <1321877570-4333-1-git-send-email-rnayak@ti.com>
+Message-ID: <87vcqdqq26.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 20, 2011 at 11:28:09AM +0000, Uwe Kleine-K?nig wrote:
-> On Thu, Nov 17, 2011 at 02:17:06PM +0000, Catalin Marinas wrote:
-> > On Thu, Nov 17, 2011 at 01:40:00PM +0000, Uwe Kleine-K?nig wrote:
-> > > The linker places the unwind tables in readonly sections. So when using
-> > > an XIP kernel these are located in ROM and cannot be modified.
-> > > 
-> > > For that reason don't convert the symbol addresses during boot (or
-> > > module loading) but only when interpreting them in search_index().
-> > > Moreover several consts are added to catch future writes and rename the
-> > > member "addr" of struct unwind_idx to "addr_offset" to better match the
-> > > new semantic.
-> > > 
-> > > This fixes unwinding on XIP which compared prel31 offsets to absolute
-> > > addresses because the initial conversion from prel31 to absolute failed.
-> > 
-> > My only worry - does this increase the index search by doing the prel31
-> > conversion every time? It could affect tools like lockdep that need to
-> > get the backtrace regularly at run-time.
-> I did a first test now using 
-> 
-> 	static int __init unwind_test(void)
+Rajendra Nayak <rnayak@ti.com> writes:
 
-With your latest patch, have you tried dropping __init from this
-function? Since the .init.text section goes after the unwind_idx tables,
-all the prel31 offsets are positive and the number of init functions is
-smaller than the run-time ones.
+> An hwmod with a 'HWMOD_INIT_NO_IDLE' flag set, is left in
+> enabled state by the hwmod framework post the initial setup.
+> Once a real user of the device (a driver) tries to enable it
+> at a later point, the hwmod framework throws a WARN() about
+> the device being already in enabled state.
+>
+> Fix this by introducing a new state '_HWMOD_STATE_ENABLED_AT_INIT'
+> to identify such devices/hwmods. When the device/hwmod
+> is requested to be enabled (the first time) by its driver/user,
+> nothing except the mux-enable and a state change to '_HWMOD_STATE_ENABLED'
+> is needed. The mux data is board specific and is unavailable during
+> initial enable() of the device, done by the framework as part of
+> setup().
+>
+> A good example of a such a device is an UART used as debug console.
+> The UART module needs to be kept enabled through the boot, until the
+> UART driver takes control of it, for debug prints to appear on
+> the console.
+>
+> Acked-by: Kevin Hilman <khilman@ti.com>
+> Acked-by: Benoit Cousson <b-cousson@ti.com>
 
--- 
-Catalin
+Looks like we need a
+
+Tested-by: Govindraj Raja <govindraj.raja@ti.com>
+
+here as well.   Thanks Govindraj for testing.
+
+> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+
+
+Kevin
