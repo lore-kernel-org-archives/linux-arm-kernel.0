@@ -1,102 +1,80 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Mon, 21 Nov 2011 09:11:01 +0100
-Subject: [PATCH 1/3] ARM: iommu: tegra/common: Initial support for IOVMM
- driver
-In-Reply-To: <20111117203202.GB20889@avionic-0098.mockup.avionic-design.de>
-References: <1321527667-12923-1-git-send-email-hdoyu@nvidia.com><1321527667-12923-2-git-send-email-hdoyu@nvidia.com><20111117203202.GB20889@avionic-0098.mockup.avionic-design.de>
-Message-ID: <20111121.101101.272842631528669512.hdoyu@nvidia.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Mon, 21 Nov 2011 14:02:06 +0530
+Subject: [PATCH v2 1/5] dmaengine: add ep93xx DMA support
+In-Reply-To: <20111121080158.GA2713@mwesterb-mobl.ger.corp.intel.com>
+References: <cover.1306662317.git.mika.westerberg@iki.fi>
+ <3ea8d56034f25cbe3fd8a4c31d7d0d1540b6ac7e.1306662317.git.mika.westerberg@iki.fi>
+ <4EC27EED.4030108@metasoft.pl>
+ <20111116065512.GB2703@mwesterb-mobl.ger.corp.intel.com>
+ <4EC374F0.8000400@metasoft.pl>
+ <20111119123837.GA2711@mwesterb-mobl.ger.corp.intel.com>
+ <4ECA0147.4020806@metasoft.pl>
+ <20111121080158.GA2713@mwesterb-mobl.ger.corp.intel.com>
+Message-ID: <1321864326.1516.211.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thierry,
-
-From: Thierry Reding <thierry.reding@avionic-design.de>
-Subject: Re: [PATCH 1/3] ARM: iommu: tegra/common: Initial support for IOVMM driver
-Date: Thu, 17 Nov 2011 21:32:02 +0100
-Message-ID: <20111117203202.GB20889@avionic-0098.mockup.avionic-design.de>
-
-> * PGP Signed by an unknown key
+On Mon, 2011-11-21 at 10:01 +0200, Mika Westerberg wrote:
+> On Mon, Nov 21, 2011 at 08:44:07AM +0100, Rafal Prylowski wrote:
+> > 
+> > I'm calling dma_terminate_all from interrupt. It seems that tasklet_kill is not
+> > allowed to be called from this context.
 > 
-> I'm not very knowledgeable about IOMMUs in general, so my comments are more
-> about general style.
-
-Thank you for your review. Mostly I'll take them in the next version
-of patchset.
-
-> * hdoyu at nvidia.com wrote:
-> > From: Hiroshi DOYU <hdoyu@nvidia.com>
-> >
-> > This is the tegra specific IOMMU framework, independent of H/W. H/W
+> Ah, right.
 > 
-> You should keep the spelling of "Tegra" consistent.
+> One more try - this time we set a flag which prevents the tasktlet from
+> referencing an empty list.
+Rather than this why not actually check for list_empty and process only
+when it is not empty?
+Also you should check the return of the ep93xx_dma_get_active() which
+should return NULL if it didn't find anything in active list
 > 
-> > dependent modules are to be registered to this framework so that this
-> > can support different IOMMU H/Ws among Tegra generations, Tegra2/GART,
-> > and Tegra3/SMMU H/Ws.
-> >
-> > Most of this part could be replaced with a generic IOMMU
-> > framework. This is expected to ease finding similarities with
-> > different platforms, with the intention of solving problems once in a
-> > generic framework which everyone can use.
-> >
-> > Signed-off-by: Hiroshi DOYU <hdoyu@nvidia.com>
-> > Cc: Hiro Sugawara <hsugawara@nvidia.com>
-> > Cc: Krishna Reddy <vdumpa@nvidia.com>
-> > ---
-> >  arch/arm/mach-tegra/include/mach/iovmm.h |  283 +++++++++
-> >  drivers/iommu/Kconfig                    |    6 +
-> >  drivers/iommu/Makefile                   |    1 +
-> >  drivers/iommu/tegra-iovmm.c              |  936 ++++++++++++++++++++++++++++++
-> >  4 files changed, 1226 insertions(+), 0 deletions(-)
-> >  create mode 100644 arch/arm/mach-tegra/include/mach/iovmm.h
-> >  create mode 100644 drivers/iommu/tegra-iovmm.c
-> >
-> > diff --git a/arch/arm/mach-tegra/include/mach/iovmm.h b/arch/arm/mach-tegra/include/mach/iovmm.h
-> > new file mode 100644
-> > index 0000000..6fd0bb6
-> > --- /dev/null
-> > +++ b/arch/arm/mach-tegra/include/mach/iovmm.h
-> > @@ -0,0 +1,283 @@
-> > +/*
-> > + * Copyright (c) 2010-2011, NVIDIA Corporation.
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License as published by
-> > + * the Free Software Foundation; either version 2 of the License, or
-> > + * (at your option) any later version.
-> > + *
-> > + * This program is distributed i the hope that it will be useful, but WITHOUT
-> > + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-> > + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-> > + * more details.
-> > + *
-> > + * You should have received a copy of the GNU General Public License along
-> > + * with this program; if not, write to the Free Software Foundation, Inc.,
-> > + * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
-> > + */
-> > +
-> > +#include <linux/list.h>
-> > +#include <linux/platform_device.h>
-> > +#include <linux/miscdevice.h>
-> > +#include <linux/rbtree.h>
-> > +#include <linux/rwsem.h>
-> > +#include <linux/spinlock.h>
-> > +#include <linux/types.h>
-> > +
-> > +#ifndef _MACH_TEGRA_IOVMM_H_
-> > +#define _MACH_TEGRA_IOVMM_H_
-> > +
-> > +typedef u32 tegra_iovmm_addr_t;
-> > +
-> > +struct tegra_iovmm_device_ops;
-> > +
-> > +/* each I/O virtual memory manager unit should register a device with
-> > + * the iovmm system
-> > + */
+> diff --git a/drivers/dma/ep93xx_dma.c b/drivers/dma/ep93xx_dma.c
+> index 6181811..f7244b3 100644
+> --- a/drivers/dma/ep93xx_dma.c
+> +++ b/drivers/dma/ep93xx_dma.c
+> @@ -155,6 +155,8 @@ struct ep93xx_dma_chan {
+>  	unsigned long			flags;
+>  /* Channel is configured for cyclic transfers */
+>  #define EP93XX_DMA_IS_CYCLIC		0
+> +/* Channel is enabled */
+> +#define EP93xx_DMA_IS_RUNNING		1
+>  
+>  	int				buffer;
+>  	dma_cookie_t			last_completed;
+> @@ -673,6 +675,9 @@ static void ep93xx_dma_tasklet(unsigned long data)
+>  	void *callback_param;
+>  	LIST_HEAD(list);
+>  
+> +	if (!test_bit(EP93XX_DMA_IS_RUNNING, &edmac->flags))
+> +		return;
+> +
+>  	spin_lock_irq(&edmac->lock);
+>  	desc = ep93xx_dma_get_active(edmac);
+>  	if (desc->complete) {
+> @@ -758,6 +763,8 @@ static dma_cookie_t ep93xx_dma_tx_submit(struct dma_async_tx_descriptor *tx)
+>  	edmac->chan.cookie = cookie;
+>  	desc->txd.cookie = cookie;
+>  
+> +	set_bit(EP93XX_DMA_IS_RUNNING, &edmac->flags);
+> +
+>  	/*
+>  	 * If nothing is currently prosessed, we push this descriptor
+>  	 * directly to the hardware. Otherwise we put the descriptor
+> @@ -1106,6 +1113,7 @@ static int ep93xx_dma_terminate_all(struct ep93xx_dma_chan *edmac)
+>  	spin_lock_irqsave(&edmac->lock, flags);
+>  	/* First we disable and flush the DMA channel */
+>  	edmac->edma->hw_shutdown(edmac);
+> +	clear_bit(EP93XX_DMA_IS_RUNNING, &edmac->flags);
+>  	clear_bit(EP93XX_DMA_IS_CYCLIC, &edmac->flags);
+>  	list_splice_init(&edmac->active, &list);
+>  	list_splice_init(&edmac->queue, &list);
 > 
-> Generally, multi-line comments have the starting /* and ending */ on separate
-> lines. Also since this API is public it may be better to document it using
-> kerneldoc.
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-I'll leave this kerneldoc out for a while since those public API may
-be replaced with geneic IOMMU ones.
+
+-- 
+~Vinod
