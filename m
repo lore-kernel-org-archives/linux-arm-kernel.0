@@ -1,96 +1,40 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Mon, 21 Nov 2011 17:42:50 +0530
-Subject: [PATCH v3] ARM: OMAP2+: hwmod: Add a new state to handle hwmods left
- enabled at init
-Message-ID: <1321877570-4333-1-git-send-email-rnayak@ti.com>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Mon, 21 Nov 2011 14:22:12 +0200
+Subject: [PATCH] arm/tegra: convert tegra20 to GIC devicetree binding
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF1740D74E63@HQMAIL01.nvidia.com>
+References: <1321542430-17971-1-git-send-email-pdeschrijver@nvidia.com>
+ <74CDBE0F657A3D45AFBB94109FB122FF1740D74C1E@HQMAIL01.nvidia.com>
+ <20111118120352.GZ19069@tbergstrom-lnx.Nvidia.com>
+ <74CDBE0F657A3D45AFBB94109FB122FF1740D74E63@HQMAIL01.nvidia.com>
+Message-ID: <20111121122212.GL19069@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-An hwmod with a 'HWMOD_INIT_NO_IDLE' flag set, is left in
-enabled state by the hwmod framework post the initial setup.
-Once a real user of the device (a driver) tries to enable it
-at a later point, the hwmod framework throws a WARN() about
-the device being already in enabled state.
+On Fri, Nov 18, 2011 at 05:25:33PM +0100, Stephen Warren wrote:
+> Peter De Schrijver wrote at Friday, November 18, 2011 5:04 AM:
+> > On Thu, Nov 17, 2011 at 07:51:35PM +0100, Stephen Warren wrote:
+> > > Peter De Schrijver wrote at Thursday, November 17, 2011 8:07 AM:
+> > > > Convert tegra20 IRQ intialization to the GIC devicetree binding. Modify the
+> > > > interrupt definitions in the dts files according to
+> > > > Documentation/devicetree/bindings/arm/gic.txt
+> > > >
+> > > > Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
+> > >
+> > > tegra-harmony.dts contains an interrupts property that wasn't updated,
+> > > for the WM8903 codec.
+> > 
+> > But that's a GPIO interrupt no?
+> 
+> The interrupt line from codec to Tegra is a GPIO, yes.
+> 
+> But the WM8903 still has the same interrupt-parent as everything else,
+> since it's inherited from /interrupt-parent and doesn't define its own.
+> Perhaps this is a mistake?
 
-Fix this by introducing a new state '_HWMOD_STATE_ENABLED_AT_INIT'
-to identify such devices/hwmods. When the device/hwmod
-is requested to be enabled (the first time) by its driver/user,
-nothing except the mux-enable and a state change to '_HWMOD_STATE_ENABLED'
-is needed. The mux data is board specific and is unavailable during
-initial enable() of the device, done by the framework as part of
-setup().
+Yes. I think this is a mistake. If we want the device tree to reflect the
+hardware, I think the WM8903 node should specify the GPIO, not the IRQ
+number.
 
-A good example of a such a device is an UART used as debug console.
-The UART module needs to be kept enabled through the boot, until the
-UART driver takes control of it, for debug prints to appear on
-the console.
+Cheers,
 
-Acked-by: Kevin Hilman <khilman@ti.com>
-Acked-by: Benoit Cousson <b-cousson@ti.com>
-Signed-off-by: Rajendra Nayak <rnayak@ti.com>
----
- arch/arm/mach-omap2/omap_hwmod.c             |   23 ++++++++++++++++++++++-
- arch/arm/plat-omap/include/plat/omap_hwmod.h |    6 ++++++
- 2 files changed, 28 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index 6b3088d..166a42d 100644
---- a/arch/arm/mach-omap2/omap_hwmod.c
-+++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -1441,6 +1441,25 @@ static int _enable(struct omap_hwmod *oh)
- 
- 	pr_debug("omap_hwmod: %s: enabling\n", oh->name);
- 
-+	/*
-+	 * hwmods' with HWMOD_INIT_NO_IDLE flag set, are left
-+	 * in enabled state at init.
-+	 * Now that someone is really trying to enable them,
-+	 * just update the state.
-+	 */
-+	if (oh->_state == _HWMOD_STATE_ENABLED_AT_INIT) {
-+		/*
-+		 * If the caller has mux data populated, do the mux'ing
-+		 * which wouldn't have been done as part of the _enable()
-+		 * done during setup.
-+		 */
-+		if (oh->mux)
-+			omap_hwmod_mux(oh->mux, _HWMOD_STATE_ENABLED);
-+
-+		oh->_state = _HWMOD_STATE_ENABLED;
-+		return 0;
-+	}
-+
- 	if (oh->_state != _HWMOD_STATE_INITIALIZED &&
- 	    oh->_state != _HWMOD_STATE_IDLE &&
- 	    oh->_state != _HWMOD_STATE_DISABLED) {
-@@ -1744,8 +1763,10 @@ static int _setup(struct omap_hwmod *oh, void *data)
- 	 * it should be set by the core code as a runtime flag during startup
- 	 */
- 	if ((oh->flags & HWMOD_INIT_NO_IDLE) &&
--	    (postsetup_state == _HWMOD_STATE_IDLE))
-+	    (postsetup_state == _HWMOD_STATE_IDLE)) {
-+		oh->_state = _HWMOD_STATE_ENABLED_AT_INIT;
- 		postsetup_state = _HWMOD_STATE_ENABLED;
-+	}
- 
- 	if (postsetup_state == _HWMOD_STATE_IDLE)
- 		_idle(oh);
-diff --git a/arch/arm/plat-omap/include/plat/omap_hwmod.h b/arch/arm/plat-omap/include/plat/omap_hwmod.h
-index 8b372ed..2bd3929 100644
---- a/arch/arm/plat-omap/include/plat/omap_hwmod.h
-+++ b/arch/arm/plat-omap/include/plat/omap_hwmod.h
-@@ -436,6 +436,12 @@ struct omap_hwmod_omap4_prcm {
- #define _HWMOD_STATE_ENABLED			4
- #define _HWMOD_STATE_IDLE			5
- #define _HWMOD_STATE_DISABLED			6
-+/*
-+ * This state signifies the hwmod was left enabled
-+ * after init, by the framework, because of the
-+ * 'HWMOD_INIT_NO_IDLE' flag.
-+ */
-+#define _HWMOD_STATE_ENABLED_AT_INIT		7
- 
- /**
-  * struct omap_hwmod_class - the type of an IP block
--- 
-1.7.1
+Peter.
