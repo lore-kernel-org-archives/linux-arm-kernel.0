@@ -1,187 +1,52 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Mon, 21 Nov 2011 00:12:42 +0100
-Subject: [PATCH RFC] ARM: unwind: optimize to not convert each table value but
- the address
-In-Reply-To: <20111120225207.GB30612@pengutronix.de>
-References: <20111120225207.GB30612@pengutronix.de>
-Message-ID: <1321830763-7227-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: olof@lixom.net (Olof Johansson)
+Date: Sun, 20 Nov 2011 16:49:30 -0800
+Subject: [PATCH v1] dts: tegra-ventana: use proper root instead of /dev/ram
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF1740805E1B@HQMAIL01.nvidia.com>
+References: <1321338087-3662-1-git-send-email-vwadekar@nvidia.com>
+ <74CDBE0F657A3D45AFBB94109FB122FF1740805E1B@HQMAIL01.nvidia.com>
+Message-ID: <20111121004930.GA17338@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The offsets in the unwind index section are signed 31 bit numbers and
-the structs are sorted by this offset. So it first has offsets between
-0x40000000 and 0x7fffffff (i.e. the negative offsets) and then offsets
-between 0x00000000 and 0x3fffffff. When seperating these two blocks the
-numbers are sorted even when interpreting the offsets as unsigned longs.
+On Tue, Nov 15, 2011 at 11:16:51AM -0800, Stephen Warren wrote:
+> Varun Wadekar wrote at Monday, November 14, 2011 11:21 PM:
+> > From: Pritesh Raithatha <praithatha@nvidia.com>
+> > 
+> > The root file system on ventana resides on /dev/mmcblk0p1.
+> 
+> Well, that's entirely up to however the user set up their system, although
+> I admit mmcblk0p1 is likely to be the common case; I certainly carry
+> basically this patch locally for many boards.
+> 
+> > Update the dts file to use the proper root instead of /dev/ram.
+> > 
+> > Signed-off-by: Pritesh Raithatha <praithatha@nvidia.com>
+> > Signed-off-by: Varun Wadekar <vwadekar@nvidia.com>
+> 
+> Acked-by: Stephen Warren <swarren@nvidia.com>
+> 
+> Of course, perhaps an even better solution is to just remove /chosen from
+> all the board .dts files, and stop using CONFIG_APPENDED_DTB since U-boot
+> supports FDT, and will update the cmdline with whatever the user chose.
+> Still, I think this is probably OK for now.
 
-So instead of converting each offset hit during bisection to an absolute
-address, first determine which of the blocks needs to be searched and
-then adapt the key to find for the offset while bisecting using a simple
-unsigned long comparison.
+Actually, removing the default root path is probably a better idea, since it
+will vary from installation to installation and doesn't make sense to hard
+code.
 
-In my tests this is faster than the original implementation modifying
-the unwind index section by 4.5%.
+There's two ways to solve this with u-boot:
 
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Nicolas Pitre <nico@fluxnic.net>
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
- arch/arm/include/asm/unwind.h |    1 +
- arch/arm/kernel/unwind.c      |   89 ++++++++++++++++++++++++++++++++--------
- 2 files changed, 72 insertions(+), 18 deletions(-)
+* Boot with an u-boot that knows how to pass a device tree (and add the
+  bootargs to it before launching the kernel, and do so by either booting
+  a fitImage or by loading the device tree explicitly.
 
-diff --git a/arch/arm/include/asm/unwind.h b/arch/arm/include/asm/unwind.h
-index 2ae0e0a..d1c3f3a 100644
---- a/arch/arm/include/asm/unwind.h
-+++ b/arch/arm/include/asm/unwind.h
-@@ -37,6 +37,7 @@ struct unwind_idx {
- struct unwind_table {
- 	struct list_head list;
- 	const struct unwind_idx *start;
-+	const struct unwind_idx *origin;
- 	const struct unwind_idx *stop;
- 	unsigned long begin_addr;
- 	unsigned long end_addr;
-diff --git a/arch/arm/kernel/unwind.c b/arch/arm/kernel/unwind.c
-index ad3f06f..eaf5bbd 100644
---- a/arch/arm/kernel/unwind.c
-+++ b/arch/arm/kernel/unwind.c
-@@ -84,6 +84,7 @@ enum regs {
- };
- 
- extern const struct unwind_idx __start_unwind_idx[];
-+static const struct unwind_idx *__origin_unwind_idx;
- extern const struct unwind_idx __stop_unwind_idx[];
- 
- static DEFINE_SPINLOCK(unwind_lock);
-@@ -98,31 +99,76 @@ static LIST_HEAD(unwind_tables);
- })
- 
- /*
-- * Binary search in the unwind index. The entries entries are
-+ * Binary search in the unwind index. The entries are
-  * guaranteed to be sorted in ascending order by the linker.
-+ *
-+ * start = first entry
-+ * origin = first entry with positive offset (or end if there is no such entry)
-+ * stop - 1 = last entry
-  */
- static const struct unwind_idx *search_index(unsigned long addr,
--				       const struct unwind_idx *first,
--				       const struct unwind_idx *last)
-+				       const struct unwind_idx *start,
-+				       const struct unwind_idx *origin,
-+				       const struct unwind_idx *stop)
- {
--	pr_debug("%s(%08lx, %p, %p)\n", __func__, addr, first, last);
-+	unsigned long addr_prel31;
-+
-+	pr_debug("%s(%08lx, %p, %p, %p)\n", __func__, addr, start, origin, stop);
-+
-+	/*
-+	 * only search in the section with the matching sign. This way the
-+	 * prel31 numbers can be compared as unsigned longs.
-+	 */
-+	if (addr < (unsigned long)start)
-+		/* negative offsets: [start; origin) */
-+		stop = origin;
-+	else
-+		/* positive offsets: [origin; stop) */
-+		start = origin;
-+
-+	/* prel31 for address relavive to start */
-+	addr_prel31 = (addr - (unsigned long)start) & 0x7fffffff;
-+
-+	while (start < stop - 1) {
-+		const struct unwind_idx *mid = start + ((stop - start) >> 1);
-+
-+		/*
-+		 * As addr_prel31 is relative to start an offset is needed to
-+		 * make it relative to mid.
-+		 */
-+		if (addr_prel31 - ((unsigned long)mid - (unsigned long)start) < mid->addr_offset)
-+			stop = mid;
-+		else {
-+			/* keep addr_prel31 relative to start */
-+			addr_prel31 -= ((unsigned long)mid - (unsigned long)start);
-+			start = mid;
-+		}
-+	}
- 
--	if (addr < prel31_to_addr(&first->addr_offset)) {
-+	if (likely(start->addr_offset <= addr_prel31))
-+		return start;
-+	else {
- 		pr_warning("unwind: Unknown symbol address %08lx\n", addr);
- 		return NULL;
--	} else if (addr >= prel31_to_addr(&last->addr_offset))
--		return last;
-+	}
-+}
- 
--	while (first < last - 1) {
--		const struct unwind_idx *mid = first + ((last - first + 1) >> 1);
-+static const struct unwind_idx *unwind_find_origin(const struct unwind_idx *start,
-+		const struct unwind_idx *stop)
-+{
-+	pr_debug("%s(%p, %p)\n", __func__, start, stop);
-+	while (start < stop - 1) {
-+		const struct unwind_idx *mid = start + ((stop - start) >> 1);
- 
--		if (addr < prel31_to_addr(&mid->addr_offset))
--			last = mid;
-+		if (mid->addr_offset >= 0x40000000)
-+			/* negative offset */
-+			start = mid;
- 		else
--			first = mid;
-+			/* positive offset */
-+			stop = mid;
- 	}
--
--	return first;
-+	pr_debug("%s -> %p\n", __func__, stop);
-+	return stop;
- }
- 
- static const struct unwind_idx *unwind_find_idx(unsigned long addr)
-@@ -132,11 +178,16 @@ static const struct unwind_idx *unwind_find_idx(unsigned long addr)
- 
- 	pr_debug("%s(%08lx)\n", __func__, addr);
- 
--	if (core_kernel_text(addr))
-+	if (core_kernel_text(addr)) {
-+		if (unlikely(!__origin_unwind_idx))
-+			__origin_unwind_idx = unwind_find_origin(__start_unwind_idx,
-+					__stop_unwind_idx);
-+
- 		/* main unwind table */
- 		idx = search_index(addr, __start_unwind_idx,
--				   __stop_unwind_idx - 1);
--	else {
-+				   __origin_unwind_idx,
-+				   __stop_unwind_idx);
-+	} else {
- 		/* module unwind tables */
- 		struct unwind_table *table;
- 
-@@ -145,7 +196,8 @@ static const struct unwind_idx *unwind_find_idx(unsigned long addr)
- 			if (addr >= table->begin_addr &&
- 			    addr < table->end_addr) {
- 				idx = search_index(addr, table->start,
--						   table->stop - 1);
-+						   table->origin,
-+						   table->stop);
- 				/* Move-to-front to exploit common traces */
- 				list_move(&table->list, &unwind_tables);
- 				break;
-@@ -409,6 +461,7 @@ struct unwind_table *unwind_table_add(unsigned long start, unsigned long size,
- 
- 	tab->start = (const struct unwind_idx *)start;
- 	tab->stop = (const struct unwind_idx *)(start + size);
-+	tab->origin = unwind_find_origin(tab->start, tab->stop);
- 	tab->begin_addr = text_addr;
- 	tab->end_addr = text_addr + text_size;
- 
--- 
-1.7.7.2
+* Use the appended-dtb kernel format, and select the ARM_ATAG_DTB_COMPAT
+  option. That will mean that the bootargs passed in from atags are moved over
+  to the device tree.
+
+So, I would rather see a patch removing the root= argument alltogether.
+
+
+Thanks!
+
+-Olof
