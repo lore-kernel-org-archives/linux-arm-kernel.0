@@ -1,154 +1,98 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Mon, 21 Nov 2011 10:48:30 +0000
-Subject: [PATCH 2/2] ARM: amba: Auto-generate AMBA driver module aliases
- during modpost
-In-Reply-To: <1321872510-2562-1-git-send-email-dave.martin@linaro.org>
-References: <1321872510-2562-1-git-send-email-dave.martin@linaro.org>
-Message-ID: <1321872510-2562-3-git-send-email-dave.martin@linaro.org>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Mon, 21 Nov 2011 16:34:20 +0530
+Subject: [PATCH v2] ARM: OMAP2+: hwmod: Add a new state to handle hwmods
+ left enabled at init
+In-Reply-To: <CAAL8m4xY=dRKuY697zdWaqUowyHecfC7cLRiPYNjdaCd4oau-A@mail.gmail.com>
+References: <1321856114-11260-1-git-send-email-rnayak@ti.com>
+ <CAAL8m4xY=dRKuY697zdWaqUowyHecfC7cLRiPYNjdaCd4oau-A@mail.gmail.com>
+Message-ID: <4ECA3034.2070104@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the necessary support in file2alias.c to define
-suitable aliases based on the amba_id table in AMBA driver modules.
+On Monday 21 November 2011 03:33 PM, Govindraj wrote:
+> Hi Rajendra,
+>
+> On Mon, Nov 21, 2011 at 11:45 AM, Rajendra Nayak<rnayak@ti.com>  wrote:
+>> An hwmod with a 'HWMOD_INIT_NO_IDLE' flag set, is left in
+>> enabled state by the hwmod framework post the initial setup.
+>> Once a real user of the device (a driver) tries to enable it
+>> at a later point, the hwmod framework throws a WARN() about
+>> the device being already in enabled state.
+>>
+>> Fix this by introducing a new state '_HWMOD_STATE_ENABLED_AT_INIT'
+>> to identify such devices/hwmods, so nothing but just a state
+>> change to '_HWMOD_STATE_ENABLED' can be done when the device/hwmod
+>> is requested to be enabled (the first time) by its driver/user.
+>>
+>> A good example of a such a device is an UART used as debug console.
+>> The UART module needs to be kept enabled through the boot, until the
+>> UART driver takes control of it, for debug prints to appear on
+>> the console.
+>>
+>> Acked-by: Kevin Hilman<khilman@ti.com>
+>> Acked-by: Benoit Cousson<b-cousson@ti.com>
+>> Signed-off-by: Rajendra Nayak<rnayak@ti.com>
+>> ---
+>> changes in v2:
+>> Fixed minor typos, removed stay change, updated comment
+>> in header.
+>>
+>>   arch/arm/mach-omap2/omap_hwmod.c             |   15 ++++++++++++++-
+>>   arch/arm/plat-omap/include/plat/omap_hwmod.h |    6 ++++++
+>>   2 files changed, 20 insertions(+), 1 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+>> index 6b3088d..72ee723 100644
+>> --- a/arch/arm/mach-omap2/omap_hwmod.c
+>> +++ b/arch/arm/mach-omap2/omap_hwmod.c
+>> @@ -1441,6 +1441,17 @@ static int _enable(struct omap_hwmod *oh)
+>>
+>>         pr_debug("omap_hwmod: %s: enabling\n", oh->name);
+>>
+>> +       /*
+>> +        * hwmods' with HWMOD_INIT_NO_IDLE flag set, are left
+>> +        * in enabled state at init.
+>> +        * Now that someone is really trying to enable them,
+>> +        * just update the state.
+>> +        */
+>> +       if (oh->_state == _HWMOD_STATE_ENABLED_AT_INIT) {
+>> +               oh->_state = _HWMOD_STATE_ENABLED;
+>> +               return 0;
+>> +       }
+>> +
+>
+> one issue returning from here without doing
+> omap_hwmod_mux(oh->mux, _HWMOD_STATE_ENABLED);
+>
+> causes hmux->enabled to be false after first _enable (get_sync)
+>
+> and for first _idle(put/put_sync)
+>
+> omap_hwmod_mux(oh->mux, _HWMOD_STATE_IDLE);
+> will not happen and will not enable rx_pad wake-up for uart.
+> so this is causing wake-up failures from off mode.
 
-This should be sufficient to allow such modules to be auto-loaded
-via udev.  The AMBA bus driver's uevent hotplug code is also
-modified to pass an approriate MODALIAS string in the event.
+Ok, so this looks like is something that happens additionally
+with a driver-enable, which does not happen as part of the
+framework-enable (as part of setup).
+Thanks for digging it up.
 
-For simplicity, the AMBA ID is treated an an opaque 32-bit numeber.
-Module alises use patterns as appropriate to describe the value-
-mask pairs described in the driver's amba_id list.
+An easy way to fix it would be to handle the muxing along with the
+state change..
 
-The proposed alias format is (extended regex):
+if (oh->_state == _HWMOD_STATE_ENABLED_AT_INIT) {
+	/*
+	 * If the caller has mux data populated, do the mux'ing
+	 * which wouldn't have been done as part of the _enable()
+	 * done during setup.
+	 */
+	if (oh->mux)
+		omap_hwmod_mux(oh->mux, _HWMOD_STATE_ENABLED);
+	oh->_state = _HWMOD_STATE_ENABLED;
+	return 0;
+}
 
-    ^amba:d(HEX){8}$
+Will respin with the changes, and hopefully this should fix the wakeup
+issues from OFF.
 
-Where HEX is a single upper-case HEX digit or a pattern (? or []
-expression) matching a single upper-case HEX digit, as expected by
-udev.
-
-"d" is short for "device", following existing alias naming
-conventions for other device types.  This adds some flexibility for
-unambiguously extending the alias format in the future by adding
-additional leading and trailing fields, if this turns out to be
-necessary.
-
-Signed-off-by: Dave Martin <dave.martin@linaro.org>
-Acked-by: Pawel Moll <pawel.moll@arm.com>
----
- drivers/amba/bus.c       |    9 +++++-
- scripts/mod/file2alias.c |   72 ++++++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 80 insertions(+), 1 deletions(-)
-
-diff --git a/drivers/amba/bus.c b/drivers/amba/bus.c
-index bd230e8..a8c598c 100644
---- a/drivers/amba/bus.c
-+++ b/drivers/amba/bus.c
-@@ -52,7 +52,14 @@ static int amba_uevent(struct device *dev, struct kobj_uevent_env *env)
- 	int retval = 0;
- 
- 	retval = add_uevent_var(env, "AMBA_ID=%08x", pcdev->periphid);
--	return retval;
-+	if (retval)
-+		return retval;
-+
-+	retval = add_uevent_var(env, "MODALIAS=amba:d%08X", pcdev->periphid);
-+	if (retval)
-+		return retval;
-+
-+	return 0;
- }
- #else
- #define amba_uevent NULL
-diff --git a/scripts/mod/file2alias.c b/scripts/mod/file2alias.c
-index f936d1f..363ab46 100644
---- a/scripts/mod/file2alias.c
-+++ b/scripts/mod/file2alias.c
-@@ -880,6 +880,74 @@ static int do_isapnp_entry(const char *filename,
- 	return 1;
- }
- 
-+/*
-+ * Append a match expression for a single masked hex digit.
-+ * outp points to a pointer to the character at which to append.
-+ *	*outp is updated on return to point just after the appended text,
-+ *	to facilitate further appending.
-+ */
-+static void append_nibble_mask(char **outp,
-+			       unsigned int nibble, unsigned int mask)
-+{
-+	char *p = *outp;
-+	unsigned int i;
-+
-+	switch (mask) {
-+	case 0:
-+		*p++ = '?';
-+		break;
-+
-+	case 0xf:
-+		p += sprintf(p, "%X",  nibble);
-+		break;
-+
-+	default:
-+		/*
-+		 * Dumbly emit a match pattern for all possible matching
-+		 * digits.  This could be improved in some cases using ranges,
-+		 * but it has the advantage of being trivially correct, and is
-+		 * often optimal.
-+		 */
-+		*p++ = '[';
-+		for (i = 0; i < 0x10; i++)
-+			if ((i & mask) == nibble)
-+				p += sprintf(p, "%X", i);
-+		*p++ = ']';
-+	}
-+
-+	/* Ensure that the string remains NUL-terminated: */
-+	*p = '\0';
-+
-+	/* Advance the caller's end-of-string pointer: */
-+	*outp = p;
-+}
-+
-+/*
-+ * looks like: "amba:dN"
-+ *
-+ * N is exactly 8 digits, where each is an upper-case hex digit, or
-+ *	a ? or [] pattern matching exactly one digit.
-+ */
-+static int do_amba_entry(const char *filename,
-+			 struct amba_id *id, char *alias)
-+{
-+	unsigned int digit;
-+	char *p = alias;
-+
-+	if ((id->id & id->mask) != id->id)
-+		fatal("%s: Masked-off bit(s) of AMBA device ID are non-zero: "
-+		      "id=0x%08X, mask=0x%08X.  Please fix this driver.\n",
-+		      filename, id->id, id->mask);
-+
-+	p += sprintf(alias, "amba:d");
-+	for (digit = 0; digit < 8; digit++)
-+		append_nibble_mask(&p,
-+				   (id->id >> (4 * (7 - digit))) & 0xf,
-+				   (id->mask >> (4 * (7 - digit))) & 0xf);
-+
-+	return 1;
-+}
-+
- /* Ignore any prefix, eg. some architectures prepend _ */
- static inline int sym_is(const char *symbol, const char *name)
- {
-@@ -1047,6 +1115,10 @@ void handle_moddevtable(struct module *mod, struct elf_info *info,
- 		do_table(symval, sym->st_size,
- 			sizeof(struct isapnp_device_id), "isa",
- 			do_isapnp_entry, mod);
-+	else if (sym_is(symname, "__mod_amba_device_table"))
-+		do_table(symval, sym->st_size,
-+			sizeof(struct amba_id), "amba",
-+			do_amba_entry, mod);
- 	free(zeros);
- }
- 
--- 
-1.7.4.1
+>
