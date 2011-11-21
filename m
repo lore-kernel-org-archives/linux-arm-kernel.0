@@ -1,151 +1,48 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Mon, 21 Nov 2011 23:37:18 +0800
-Subject: [RFC 6/8] of: add clock providers
-In-Reply-To: <1320801583-12774-7-git-send-email-grant.likely@secretlab.ca>
-References: <1320801583-12774-1-git-send-email-grant.likely@secretlab.ca>
- <1320801583-12774-7-git-send-email-grant.likely@secretlab.ca>
-Message-ID: <20111121153716.GA16417@S2100-06.ap.freescale.net>
+From: ming.lei@canonical.com (Ming Lei)
+Date: Mon, 21 Nov 2011 23:30:02 +0800
+Subject: [PATCH v5 4/7] arm: omap4: hwmod: introduce emu hwmod
+In-Reply-To: <20111121151612.GF20611@mudshark.cambridge.arm.com>
+References: <1319467559-5518-5-git-send-email-ming.lei@canonical.com>
+ <alpine.DEB.2.00.1111080750130.10451@utopia.booyaka.com>
+ <CACVXFVMSJUT2Ac+bWetrLpbyOs6PqY+npNHsbvHipEVZ0gWdgQ@mail.gmail.com>
+ <alpine.DEB.2.00.1111100152430.4195@utopia.booyaka.com>
+ <4EC6566C.70202@ti.com>
+ <20111118145635.GB17991@mudshark.cambridge.arm.com>
+ <CACVXFVNuz62+2DzOks3-0io2Ni=LK5SJienU4GcGRMtkh92vvQ@mail.gmail.com>
+ <alpine.DEB.2.00.1111192019200.30133@utopia.booyaka.com>
+ <20111121135828.GC20611@mudshark.cambridge.arm.com>
+ <CACVXFVMzmjzi=3YxSG8EP+eb=8pe9Oo50MBmn+_cdkaVJkyGdA@mail.gmail.com>
+ <20111121151612.GF20611@mudshark.cambridge.arm.com>
+Message-ID: <CACVXFVMFA4ry2fg3o8O9r0BFnUbbHZ6bg_fYzNhbXpobCEcfqw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 08, 2011 at 06:19:41PM -0700, Grant Likely wrote:
-> Based on work by Ben Herrenschmidt and Jeremy Kerr, this patch adds an
-> of_clk_get function to allow platforms to retrieve clock data from the
-> device tree.
-> 
-> Platform register a provider through of_clk_add_provider, which will be
-> called when a device references the provider's OF node for a clock
-> reference.
-> 
-> Signed-off-by: Grant Likely <grant.likely@secretlab.ca>
-> ---
->  .../devicetree/bindings/clock/clock-bindings.txt   |  109 +++++++++++++++++
->  drivers/of/Kconfig                                 |    6 +
->  drivers/of/Makefile                                |    1 +
->  drivers/of/clock.c                                 |  129 ++++++++++++++++++++
->  include/linux/of_clk.h                             |   37 ++++++
->  5 files changed, 282 insertions(+), 0 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/clock/clock-bindings.txt
->  create mode 100644 drivers/of/clock.c
->  create mode 100644 include/linux/of_clk.h
-> 
-> diff --git a/Documentation/devicetree/bindings/clock/clock-bindings.txt b/Documentation/devicetree/bindings/clock/clock-bindings.txt
-> new file mode 100644
-> index 0000000..4770c7e
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/clock/clock-bindings.txt
-> @@ -0,0 +1,109 @@
-> +This binding is a work-in-progress, and are based on some experimental
-> +work by benh[1].
-> +
-> +Sources of clock signal can be represented by any node in the device
-> +tree.  Those nodes are designated as clock providers.  Clock consumer
-> +nodes use a phandle and clock specifier pair to connect clock provider
-> +outputs to clock inputs.  Similar to the gpio specifiers, a clock
-> +specifier is an array of one more more cells identifying the clock
-> +output on a device.  The length of a clock specifier is defined by the
-> +value of a #clock-cells property in the clock provider node.
-> +
-> +[1] http://patchwork.ozlabs.org/patch/31551/
-> +
-> +==Clock providers==
-> +
-> +Required properties:
-> +#clock-cells:	   Number of cells in a clock specifier; typically will be
-> +		   set to 1
-> +
-> +Optional properties:
-> +clock-output-name: Recommended to be a list of strings of clock output signal
-> +		   names indexed by the first cell in the clock specifier.
-> +		   However, the meaning of clock-output-names is domain
+On Mon, Nov 21, 2011 at 11:16 PM, Will Deacon <will.deacon@arm.com> wrote:
+> On Mon, Nov 21, 2011 at 02:53:54PM +0000, Ming Lei wrote:
+>> On Mon, Nov 21, 2011 at 9:58 PM, Will Deacon <will.deacon@arm.com> wrote:
+>> > On Sun, Nov 20, 2011 at 03:27:19AM +0000, Paul Walmsley wrote:
+>> >> The OMAP-specific parts should be queued up in my/Beno?t's/Tony's trees,
+>> >> rather than placed directly into -next. ?Otherwise they are likely to
+>> >> generate merge conflicts with other OMAP changes that we may generate.
+>> >>
+>> >> So I'd suggest splitting patches 1-3 off into a separate series that Will
+>> >> can pass on to -next if he wishes.
+>> >
+>> > Fine by me. If Ming Lei posts a new series so that everything is in one
+>> > thread then I can pick out the bits I want.
+>>
+>> You mean the 3rd patch is the debugss patch posted by Benoit?
+>> The original 3rd patch is not needed any more once the debugss patch
+>> is taken.
+>
+> Ah sorry, I lost track a bit. In that case, I'll just keep hold of the two
+> patches I have and deal with them appropriately.
 
-s/clock-output-names/clock-output-name?
+Sorry too, :-)
 
-> +		   specific to the clock provider, and is only provided to
-> +		   encourage using the same meaning for the majority of clock
-> +		   providers.  This format may not work for clock providers
-> +		   using a complex clock specifier format.  In those cases it
-> +		   is recommended to omit this property and create a binding
-> +		   specific names property.
-> +
-> +		   Clock consumer nodes must never directly reference
-> +		   the provider's clock-output-names property.
+It should be that both 3/7 and 4/7 are not needed any more.
+Benoit's debugss patch will replace the 4/7 patch(introduce emu hwmod).
 
-s/clock-output-names/clock-output-name?
-
-> +
-> +For example:
-> +
-> +    oscillator {
-> +        #clock-cells = <1>;
-> +        clock-output-name = "ckil", "ckih";
-> +    };
-> +
-> +- this node defines a device with two clock outputs, the first named
-> +  "ckil" and the second named "ckih".  Consumer nodes always reference
-> +  clocks by index. The names should reflect the clock output signal
-> +  names for the device.
-> +
-> +==Clock consumers==
-> +
-> +Required properties:
-> +clock-input:	List of phandle and clock specifier pairs, one pair
-> +		for each clock input to the device.
-> +clock-input-name: List of clock input name strings sorted in the same
-> +		order as the clock-input property.  Consumers drivers
-> +		will use clock-input-name to match clock input names
-> +		with clock-input specifiers.
-> +
-> +For example:
-> +
-> +    uart {
-> +        clock-input = <&osc 1> <&ref 0>;
-				 ^
-Comma is missed?
-
-> +        clock-input-name = "baud", "register";
-> +    };
-
-[...]
-
-> +struct clk *of_clk_get(struct device_node *np, int index)
-> +{
-> +	struct of_phandle_args clkspec;
-> +	struct clk *clk;
-> +	int rc;
-> +
-> +	if (index < 0)
-> +		return NULL;
-> +
-> +	rc = of_parse_phandle_with_args(np, "clock", "#clock-cells", index,
-
-According to binding document above, s/clock/clock-input?
-
-> +					&clkspec);
-> +	if (rc)
-> +		return NULL;
-> +
-> +	clk = __of_clk_get_from_provider(&clkspec);
-> +	of_node_put(clkspec.np);
-> +	return clk;
-> +}
-> +
-> +struct clk *of_clk_get_by_name(struct device_node *np, const char *name)
-> +{
-> +	int index = 0;
-> +
-> +	if (name)
-> +		index = of_property_match_string(np, "clock-input-names", name);
-
-If it fails to match name, we may want to force 'index' back to 0.
-
-Also according to binding document above,
-s/clock-input-names/clock-input-name?  Hope you do not want to
-change binding document to get them aligned.  I have written code
-per binding document :)
-
-Regards,
-Shawn
-
-> +	return of_clk_get(np, index);
-> +}
+thanks,
+--
+Ming Lei
