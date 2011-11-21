@@ -1,208 +1,40 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Mon, 21 Nov 2011 23:50:42 +0800
-Subject: [RFC 3/8] of: create of_phandle_args to simplify return of
- phandle parsing data
-In-Reply-To: <1320801583-12774-4-git-send-email-grant.likely@secretlab.ca>
-References: <1320801583-12774-1-git-send-email-grant.likely@secretlab.ca>
- <1320801583-12774-4-git-send-email-grant.likely@secretlab.ca>
-Message-ID: <20111121155042.GB16417@S2100-06.ap.freescale.net>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 21 Nov 2011 16:34:00 +0000
+Subject: [PATCH RFC] ARM: unwind: optimize to not convert each table
+ value but the address
+In-Reply-To: <1321830763-7227-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <20111120225207.GB30612@pengutronix.de>
+ <1321830763-7227-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20111121163359.GD3272@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 08, 2011 at 06:19:38PM -0700, Grant Likely wrote:
-[...]
->  /**
-> - * of_parse_phandles_with_args - Find a node pointed by phandle in a list
-> + * of_parse_phandle_with_args - Find a node pointed by phandle in a list
->   * @np:		pointer to a device tree node containing a list
->   * @list_name:	property name that contains a list
->   * @cells_name:	property name that specifies phandles' arguments count
->   * @index:	index of a phandle to parse out
-> - * @out_node:	optional pointer to device_node struct pointer (will be filled)
-> - * @out_args:	optional pointer to arguments pointer (will be filled)
-> + * @out_args:	optional pointer to output arguments structure (will be filled)
->   *
->   * This function is useful to parse lists of phandles and their arguments.
-> - * Returns 0 on success and fills out_node and out_args, on error returns
-> - * appropriate errno value.
-> + * Returns 0 on success and fills out_args, on error returns appropriate
-> + * errno value.
->   *
->   * Example:
->   *
-> @@ -851,94 +850,105 @@ EXPORT_SYMBOL(of_parse_phandle);
->   * }
->   *
->   * To get a device_node of the `node2' node you may call this:
-> - * of_parse_phandles_with_args(node3, "list", "#list-cells", 2, &node2, &args);
-> + * of_parse_phandle_with_args(node3, "list", "#list-cells", 2, &args);
+On Sun, Nov 20, 2011 at 11:12:42PM +0000, Uwe Kleine-K?nig wrote:
+> The offsets in the unwind index section are signed 31 bit numbers and
+> the structs are sorted by this offset. So it first has offsets between
+> 0x40000000 and 0x7fffffff (i.e. the negative offsets) and then offsets
+> between 0x00000000 and 0x3fffffff. When seperating these two blocks the
+> numbers are sorted even when interpreting the offsets as unsigned longs.
+> 
+> So instead of converting each offset hit during bisection to an absolute
+> address, first determine which of the blocks needs to be searched and
+> then adapt the key to find for the offset while bisecting using a simple
+> unsigned long comparison.
+> 
+> In my tests this is faster than the original implementation modifying
+> the unwind index section by 4.5%.
 
-Not introduced by this patch, but if I read the code correctly,
-the fourth parameter should be 1?
+If you don't care about the 7% unwinding performance drop on XIP
+kernels, we could just have a prel31_lt() macro (or whatever other name)
+which is a standard '<' comparison on !XIP kernels and does the prel31
+conversion with XIP. It's only two places in search_index() where it is
+needed and the code would still be more readable than the changes in
+this patch :).
 
->   */
-> -int of_parse_phandles_with_args(struct device_node *np, const char *list_name,
-> +int of_parse_phandle_with_args(struct device_node *np, const char *list_name,
->  				const char *cells_name, int index,
-> -				struct device_node **out_node,
-> -				const void **out_args)
-> +				struct of_phandle_args *out_args)
->  {
->  	int ret = -EINVAL;
-> -	const __be32 *list;
-> -	const __be32 *list_end;
-> -	int size;
-> -	int cur_index = 0;
-> +	const __be32 *list, *list_end;
-> +	int size, cur_index = 0;
-> +	uint32_t count = 0;
->  	struct device_node *node = NULL;
-> -	const void *args = NULL;
-> +	phandle phandle;
->  
-> +	/* Retrieve the phandle list property */
->  	list = of_get_property(np, list_name, &size);
-> -	if (!list) {
-> -		ret = -ENOENT;
-> +	if (!list)
->  		goto err0;
-> -	}
->  	list_end = list + size / sizeof(*list);
->  
-> +	/*
-> +	 * Loop over all the entries in the list, parsing the #cells property
-> +	 * for each one to determine how long each argument list is
-> +	 */
->  	while (list < list_end) {
-> -		const __be32 *cells;
-> -		phandle phandle;
-> +		count = 0;
->  
-> +		/*
-> +		 * If phandle is null, then it is an empty entry with no args,
-> +		 * skip forward to the next entry
-> +		 */
->  		phandle = be32_to_cpup(list++);
-> -		args = list;
-> -
-> -		/* one cell hole in the list = <>; */
-> -		if (!phandle)
-> -			goto next;
-> -
-> -		node = of_find_node_by_phandle(phandle);
-> -		if (!node) {
-> -			pr_debug("%s: could not find phandle\n",
-> -				 np->full_name);
-> -			goto err0;
-> -		}
-> +		if (phandle) {
-> +			/*
-> +			 * Find the provider node and parse the #*-cells
-> +			 * property to determine how long the arguements are
-> +			 */
-> +			node = of_find_node_by_phandle(phandle);
-> +			if (!node) {
-> +				pr_debug("%s: could not find phandle\n",
-> +					 np->full_name);
-> +				ret = -EINVAL;
-> +				goto err0;
-> +			}
-> +			if (of_property_read_u32(node, cells_name, &count)) {
-> +				pr_debug("%s: could not get %s for %s\n",
-> +					 np->full_name, cells_name,
-> +					 node->full_name);
-> +				ret = -EINVAL;
-> +				goto err1;
-> +			}
->  
-> -		cells = of_get_property(node, cells_name, &size);
-> -		if (!cells || size != sizeof(*cells)) {
-> -			pr_debug("%s: could not get %s for %s\n",
-> -				 np->full_name, cells_name, node->full_name);
-> -			goto err1;
-> +			/*
-> +			 * Make sure that the arguments actually fit in the
-> +			 * remaining property data length
-> +			 */
-> +			if (list + count > list_end) {
-> +				pr_debug("%s: insufficient arguments length\n",
-> +					 np->full_name);
-> +				goto err1;
-> +			}
->  		}
->  
-> -		list += be32_to_cpup(cells);
-> -		if (list > list_end) {
-> -			pr_debug("%s: insufficient arguments length\n",
-> -				 np->full_name);
-> -			goto err1;
-> -		}
-> -next:
-> -		if (cur_index == index)
-> +		/*
-> +		 * All of the error cases in the loop bail out to the err
-> +		 * labels, so at this point, the parsing was successful, but
-> +		 * it might be an empty entry
-> +		 */
-> +		if (cur_index == index) {
-> +			ret = phandle ? 0 : -ENOENT;
+If you still want such improvement, I'll do a proper review of the
+patch.
 
-We have some return code here ...
-
->  			break;
-> +		}
->  
->  		of_node_put(node);
->  		node = NULL;
-> -		args = NULL;
-> +		list += count;
->  		cur_index++;
->  	}
->  
-> -	if (!node) {
-> -		/*
-> -		 * args w/o node indicates that the loop above has stopped at
-> -		 * the 'hole' cell. Report this differently.
-> -		 */
-> -		if (args)
-> -			ret = -EEXIST;
-> -		else
-> -			ret = -ENOENT;
-> +	if (!node)
->  		goto err0;
-> -	}
-> -
-> -	if (out_node)
-> -		*out_node = node;
-> -	if (out_args)
-> -		*out_args = args;
->  
-> +	if (out_args) {
-> +		int i;
-> +		if (WARN_ON(count > MAX_PHANDLE_ARGS))
-> +			count = MAX_PHANDLE_ARGS;
-> +		out_args->np = node;
-> +		out_args->args_count = count;
-> +		for (i = 0; i < count; i++)
-> +			out_args->args[i] = be32_to_cpup(list++);
-> +	}
->  	return 0;
-
-... should this be "return ret"?
-
-> -err1:
-> +
-> + err1:
->  	of_node_put(node);
-> -err0:
-> + err0:
->  	pr_debug("%s failed with status %d\n", __func__, ret);
->  	return ret;
->  }
-> -EXPORT_SYMBOL(of_parse_phandles_with_args);
-> +EXPORT_SYMBOL(of_parse_phandle_with_args);
->  
+Thanks.
 
 -- 
-Regards,
-Shawn
+Catalin
