@@ -1,37 +1,52 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 21 Nov 2011 17:45:00 +0000
-Subject: [GIT PULL] ARM perf fixes for 3.2
-Message-ID: <20111121174500.GJ20611@mudshark.cambridge.arm.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 21 Nov 2011 11:45:27 -0600
+Subject: [RFC PATCH] arm/imx6: convert clock to device tree
+In-Reply-To: <1321895502-32341-1-git-send-email-shawn.guo@linaro.org>
+References: <1321895502-32341-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <4ECA8E37.8010307@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+On 11/21/2011 11:11 AM, Shawn Guo wrote:
+> It converts imx6 clock code to common clock frame and device tree.
+> 
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> ---
+> As I promised to Arnd, I will convert imx6 clock code to common clock
+> frame and in turn device tree.  Here it is.
+> 
+> It's based on Mike's common-clk pre-v3 and Grant's clock device tree
+> binding series.
+> 
+> Along with the conversion to device tree, I feel it's a great idea to
+> introduce '#clock-cells'.  With adopting it, I'm using 70 nodes to
+> describe 110 clocks (~35% nodes reduced).  However, the current design
+> of '#clock-cells' makes the user a little difficult.  For example, when
+> a consumer node references to provider node which is a blob of 4 clocks,
+> it has to fill 4 parameters into the phandle.
+> 
+> usdhc at 02198000 { /* uSDHC3 */
+> 	compatible = "fsl,imx6q-usdhc";
+> 	reg = <0x02198000 0x4000>;
+> 	interrupts = <0 24 0x04>;
+> 	clock-input = <&usdhc_clk 2 0 0 0>; <--
+> 	clock-input-name = "usdhc3";
+> };
+> 
+> But we actually need to pass only one parameter to point out the index
+> of the clock in the blob.  It's a little silly to put a number of
+> meaningless 0 there to fill the length of the phandle parameters.  Can
+> we rework the dt core code to make the following one work?
+> 
+> usdhc at 02198000 { /* uSDHC3 */
+> 	compatible = "fsl,imx6q-usdhc";
+> 	reg = <0x02198000 0x4000>;
+> 	interrupts = <0 24 0x04>;
+> 	clock-input = <&usdhc_clk 2>; <--
+> 	clock-input-name = "usdhc3";
+> };
 
-Please pull these perf fixes for 3.2. Without them, modules trying to use
-the PMU will not compile (I accidently dropped an EXPORT_SYMBOL) and, more
-seriously, perf can be made to dereference NULL if the user tries to
-schedule an event group.
+What you want is how it is supposed to work. Why do you think it is not
+this way?
 
-Thanks to Tixy and Pawel for reporting the issues.
-
-Cheers,
-
-Will
-
-
-The following changes since commit cfcfc9eca2bcbd26a8e206baeb005b055dbf8e37:
-
-  Linux 3.2-rc2 (2011-11-15 15:02:59 -0200)
-
-are available in the git repository at:
-  git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git for-rmk
-
-Will Deacon (3):
-      ARM: PMU: re-export release_pmu symbol to modules
-      ARM: PMU: remove pmu_init declaration
-      ARM: perf: initialise used_mask for fake PMU during validation
-
- arch/arm/include/asm/pmu.h   |   10 ----------
- arch/arm/kernel/perf_event.c |    8 +++++++-
- arch/arm/kernel/pmu.c        |    1 +
- 3 files changed, 8 insertions(+), 11 deletions(-)
+Rob
