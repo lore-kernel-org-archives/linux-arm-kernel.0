@@ -1,96 +1,105 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Mon, 21 Nov 2011 10:00:20 +0000
-Subject: [GIT PULL] Support for Cadence GEM in the MACB driver
-Message-ID: <20111121100020.GB7314@totoro>
+From: govindraj.ti@gmail.com (Govindraj)
+Date: Mon, 21 Nov 2011 15:33:13 +0530
+Subject: [PATCH v2] ARM: OMAP2+: hwmod: Add a new state to handle hwmods
+ left enabled at init
+In-Reply-To: <1321856114-11260-1-git-send-email-rnayak@ti.com>
+References: <1321856114-11260-1-git-send-email-rnayak@ti.com>
+Message-ID: <CAAL8m4xY=dRKuY697zdWaqUowyHecfC7cLRiPYNjdaCd4oau-A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Hi Rajendra,
 
-Please consider pulling the patches to add support for Cadence GEM to 
-the MACB driver.  These have been ready to go for a little while but got 
-held up with the rename of Ethernet drivers in the last merge window.  
-It would be great if we can get some exposure in -next for a little 
-while before the next merge window.
+On Mon, Nov 21, 2011 at 11:45 AM, Rajendra Nayak <rnayak@ti.com> wrote:
+> An hwmod with a 'HWMOD_INIT_NO_IDLE' flag set, is left in
+> enabled state by the hwmod framework post the initial setup.
+> Once a real user of the device (a driver) tries to enable it
+> at a later point, the hwmod framework throws a WARN() about
+> the device being already in enabled state.
+>
+> Fix this by introducing a new state '_HWMOD_STATE_ENABLED_AT_INIT'
+> to identify such devices/hwmods, so nothing but just a state
+> change to '_HWMOD_STATE_ENABLED' can be done when the device/hwmod
+> is requested to be enabled (the first time) by its driver/user.
+>
+> A good example of a such a device is an UART used as debug console.
+> The UART module needs to be kept enabled through the boot, until the
+> UART driver takes control of it, for debug prints to appear on
+> the console.
+>
+> Acked-by: Kevin Hilman <khilman@ti.com>
+> Acked-by: Benoit Cousson <b-cousson@ti.com>
+> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+> ---
+> changes in v2:
+> Fixed minor typos, removed stay change, updated comment
+> in header.
+>
+> ?arch/arm/mach-omap2/omap_hwmod.c ? ? ? ? ? ? | ? 15 ++++++++++++++-
+> ?arch/arm/plat-omap/include/plat/omap_hwmod.h | ? ?6 ++++++
+> ?2 files changed, 20 insertions(+), 1 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+> index 6b3088d..72ee723 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod.c
+> @@ -1441,6 +1441,17 @@ static int _enable(struct omap_hwmod *oh)
+>
+> ? ? ? ?pr_debug("omap_hwmod: %s: enabling\n", oh->name);
+>
+> + ? ? ? /*
+> + ? ? ? ?* hwmods' with HWMOD_INIT_NO_IDLE flag set, are left
+> + ? ? ? ?* in enabled state at init.
+> + ? ? ? ?* Now that someone is really trying to enable them,
+> + ? ? ? ?* just update the state.
+> + ? ? ? ?*/
+> + ? ? ? if (oh->_state == _HWMOD_STATE_ENABLED_AT_INIT) {
+> + ? ? ? ? ? ? ? oh->_state = _HWMOD_STATE_ENABLED;
+> + ? ? ? ? ? ? ? return 0;
+> + ? ? ? }
+> +
 
+one issue returning from here without doing
+omap_hwmod_mux(oh->mux, _HWMOD_STATE_ENABLED);
+
+causes hmux->enabled to be false after first _enable (get_sync)
+
+and for first _idle(put/put_sync)
+
+omap_hwmod_mux(oh->mux, _HWMOD_STATE_IDLE);
+will not happen and will not enable rx_pad wake-up for uart.
+so this is causing wake-up failures from off mode.
+
+[code_snip]
+
+void omap_hwmod_mux(struct omap_hwmod_mux_info *hmux, u8 state)
+{
+        int i;
+
+         /* Runtime idling of dynamic pads */
+        if (state == _HWMOD_STATE_IDLE && hmux->enabled) {
+                for (i = 0; i < hmux->nr_pads_dynamic; i++) {
+                        struct omap_device_pad *pad = hmux->pads_dynamic[i];
+                        int val = -EINVAL;
+
+                        val = pad->idle;
+                        omap_mux_write(pad->partition, val,
+                                        pad->mux->reg_offset);
+                }
+
+                return;
+        }
+
+       [..]
+
+      if (state == _HWMOD_STATE_ENABLED)
+                hmux->enabled = true;
+      else
+                hmux->enabled = false;
+}
+
+[..]
+
+--
 Thanks,
-
-Jamie
-
-The following changes since commit cfcfc9eca2bcbd26a8e206baeb005b055dbf8e37:
-
-  Linux 3.2-rc2 (2011-11-15 15:02:59 -0200)
-
-are available in the git repository at:
-  git://github.com/jamieiles/linux-2.6-ji.git macb-gem
-
-Jamie Iles (9):
-      at91: provide macb clks with "pclk" and "hclk" name
-      macb: remove conditional clk handling
-      macb: unify at91 and avr32 platform data
-      macb: convert printk to netdev_ and friends
-      macb: initial support for Cadence GEM
-      macb: support higher rate GEM MDIO clock divisors
-      macb: support statistics for GEM devices
-      macb: support DMA bus widths > 32 bits
-      macb: allow GEM to have configurable receive buffer size
-
- arch/arm/mach-at91/at91cap9.c               |    8 +-
- arch/arm/mach-at91/at91cap9_devices.c       |    6 +-
- arch/arm/mach-at91/at91rm9200_devices.c     |    6 +-
- arch/arm/mach-at91/at91sam9260.c            |    8 +-
- arch/arm/mach-at91/at91sam9260_devices.c    |    6 +-
- arch/arm/mach-at91/at91sam9263.c            |    8 +-
- arch/arm/mach-at91/at91sam9263_devices.c    |    6 +-
- arch/arm/mach-at91/at91sam9g45.c            |    8 +-
- arch/arm/mach-at91/at91sam9g45_devices.c    |    6 +-
- arch/arm/mach-at91/board-1arm.c             |    2 +-
- arch/arm/mach-at91/board-afeb-9260v1.c      |    2 +-
- arch/arm/mach-at91/board-cam60.c            |    2 +-
- arch/arm/mach-at91/board-cap9adk.c          |    2 +-
- arch/arm/mach-at91/board-carmeva.c          |    2 +-
- arch/arm/mach-at91/board-cpu9krea.c         |    2 +-
- arch/arm/mach-at91/board-cpuat91.c          |    2 +-
- arch/arm/mach-at91/board-csb337.c           |    2 +-
- arch/arm/mach-at91/board-csb637.c           |    2 +-
- arch/arm/mach-at91/board-eb9200.c           |    2 +-
- arch/arm/mach-at91/board-ecbat91.c          |    2 +-
- arch/arm/mach-at91/board-eco920.c           |    2 +-
- arch/arm/mach-at91/board-foxg20.c           |    2 +-
- arch/arm/mach-at91/board-gsia18s.c          |    2 +-
- arch/arm/mach-at91/board-kafa.c             |    2 +-
- arch/arm/mach-at91/board-kb9202.c           |    2 +-
- arch/arm/mach-at91/board-neocore926.c       |    2 +-
- arch/arm/mach-at91/board-pcontrol-g20.c     |    2 +-
- arch/arm/mach-at91/board-picotux200.c       |    2 +-
- arch/arm/mach-at91/board-qil-a9260.c        |    2 +-
- arch/arm/mach-at91/board-rm9200dk.c         |    2 +-
- arch/arm/mach-at91/board-rm9200ek.c         |    2 +-
- arch/arm/mach-at91/board-rsi-ews.c          |    2 +-
- arch/arm/mach-at91/board-sam9-l9260.c       |    2 +-
- arch/arm/mach-at91/board-sam9260ek.c        |    2 +-
- arch/arm/mach-at91/board-sam9263ek.c        |    2 +-
- arch/arm/mach-at91/board-sam9g20ek.c        |    2 +-
- arch/arm/mach-at91/board-sam9m10g45ek.c     |    2 +-
- arch/arm/mach-at91/board-snapper9260.c      |    2 +-
- arch/arm/mach-at91/board-stamp9g20.c        |    2 +-
- arch/arm/mach-at91/board-usb-a926x.c        |    2 +-
- arch/arm/mach-at91/board-yl-9200.c          |    2 +-
- arch/arm/mach-at91/include/mach/board.h     |   14 +-
- arch/avr32/boards/atngw100/setup.c          |    2 +-
- arch/avr32/boards/atstk1000/atstk1002.c     |    2 +-
- arch/avr32/boards/favr-32/setup.c           |    2 +-
- arch/avr32/boards/hammerhead/setup.c        |    2 +-
- arch/avr32/boards/merisc/setup.c            |    2 +-
- arch/avr32/boards/mimc200/setup.c           |    2 +-
- arch/avr32/mach-at32ap/at32ap700x.c         |    8 +-
- arch/avr32/mach-at32ap/include/mach/board.h |    7 +-
- drivers/net/ethernet/Makefile               |    2 +-
- drivers/net/ethernet/cadence/Kconfig        |   16 +-
- drivers/net/ethernet/cadence/at91_ether.c   |    3 +-
- drivers/net/ethernet/cadence/at91_ether.h   |    4 +-
- drivers/net/ethernet/cadence/macb.c         |  344 +++++++++++++++++----------
- drivers/net/ethernet/cadence/macb.h         |  150 ++++++++++++-
- include/linux/platform_data/macb.h          |   17 ++
- 57 files changed, 492 insertions(+), 211 deletions(-)
- create mode 100644 include/linux/platform_data/macb.h
+Govindraj.R
