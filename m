@@ -1,80 +1,29 @@
 From: jochen@scram.de (Jochen Friedrich)
-Date: Mon, 21 Nov 2011 15:32:56 +0100
-Subject: [PATCH] Initial DT support for SIMpad devices.
-In-Reply-To: <20111121095020.GA7314@totoro>
-References: <1321821470-32396-1-git-send-email-jochen@scram.de>
- <20111121095020.GA7314@totoro>
-Message-ID: <4ECA6118.1050806@scram.de>
+Date: Mon, 21 Nov 2011 15:37:41 +0100
+Subject: [PATCH] ARM: sa1100: refactor sa1100 serial driver
+In-Reply-To: <1321822068.17619.3.camel@Joe-Laptop>
+References: <1321821127-32231-1-git-send-email-jochen@scram.de>
+ <1321822068.17619.3.camel@Joe-Laptop>
+Message-ID: <4ECA6235.4030108@scram.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jamie,
+Hi Joe,
 
->> +	localbus {
->> +		compatible = "intel,sa1110-localbus";
+> trivia:
 >
-> Could this claim compatibility with simple-bus?
-
-I wasn't sure about this. I took a look in the powerpc DTS files for reference and they used
-some kind of <chip>-localbus compatible entries. So I took the same approach here.
-
->> +		uart2: serial at 0x80050000 {
->> +			compatible = "intel,sa1100-uart";
->> +			reg =<0x80050000 0x24>;
->> +			interrupts =<17>;
->> +			status = "disabled";
+>> diff --git a/arch/arm/mach-sa1100/generic.c b/arch/arm/mach-sa1100/generic.c
+> []
+>> @@ -166,7 +166,7 @@ static struct platform_device sa11x0udc_device = {
+>>   static struct resource sa11x0uart1_resources[] = {
+>>   	[0] = {
+>>   		.start	= __PREG(Ser1UTCR0),
+>> -		.end	= __PREG(Ser1UTCR0) + 0xffff,
+>> +		.end	= __PREG(Ser1UTCR0) + 0x24,
 >
-> Hmm, I couldn't see status defined in the UART binding or where it was
-> used...  Is this required?
+> #define for 0x24? or is it really 0x23?
+> (start + size - 1)
 
-status is a global property and it's being used in drivers/of/base.c, of_device_is_available().
-It is used in other dtsi files like e.g. at91sam9g45.dtsi as well to define optional nodes.
+Thanks, I'll fix this.
 
->> +/ {
->> +	model = "SIEMENS, SIMpad";
->> +	compatible = "siemens,simpad";
->
-> It may be worth adding the SoC compatible string after the board one for
-> completeness.
-
-Do you mean something like this?
-
-	compatible = "siemens,simpad", "intel,sa1100";
-
->> +	chosen {
->> +		bootargs = "console=ttySA0";
->
-> It is preferred for the bootloader to set these up rather than having
-> them statically in the DTS if at all possible.
-
-Yes, my boot loader does this, but simpad support is not in official U-BOOT yet.
-This allows testing with a different boot loader like the hh.org one and a Linux
-binary with DTB appended.
-
->> +const struct of_device_id simpad_bus_match_table[] = {
->> +	{ .compatible = "simple-bus", },
->> +	{ .compatible = "intel,sa1110-localbus", },
->> +	{} /* Empty terminated list */
->> +};
->> +
->> +static void __init simpad_dt_device_init(void)
->> +{
->> +	of_platform_populate(NULL, simpad_bus_match_table, NULL, NULL);
->> +}
->
-> If the localbus was compatible with simple-bus then you could do:
->
-> 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
->
-> and remove simpad_bus_match_table.
-
-True, I just wasn't sure if it's OK to do so.
-
->> +static const char *simpad_dt_board_compat[] __initdata = {
->
-> I think this should be __initconst.
-
-OK.
-
-Thanks,
-Jochen
+Jochen.
