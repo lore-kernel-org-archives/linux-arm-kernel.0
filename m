@@ -1,57 +1,122 @@
 From: leif.lindholm@arm.com (Leif Lindholm)
-Date: Mon, 21 Nov 2011 18:30:58 +0000
-Subject: [PATCH 3/4] [RFC] Add condition code checking to SWP emulation
- handler.
-In-Reply-To: <20111121183046.28964.23829.stgit@localhost6.localdomain6>
-References: <20111121183046.28964.23829.stgit@localhost6.localdomain6>
-Message-ID: <20111121183058.28964.79067.stgit@localhost6.localdomain6>
+Date: Mon, 21 Nov 2011 18:30:46 +0000
+Subject: [PATCH 1/4] [RFC] Add generic ARM instruction set condition code
+ checks.
+Message-ID: <20111121183046.28964.23829.stgit@localhost6.localdomain6>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes two separate issues with the SWP emulation handler:
-1: Certain processors implementing the ARMv7-A can (legally) take an
-   undef exception even when the condition code would have meant that
-   the instruction should not have been executed.
-2: Opcodes with all flags set (condition code = 0xf) have been reused
-   in recent, and not-so-recent, versions of the ARM architecture to
-   implement unconditional extensions to the instruction set. The
-   existing code would still have processed any undefs triggered by
-   executing an opcode with such a value.
-
-This patch uses the new generic ARM instruction set condition code
-checks to implement proper handling of these situations.
+This patch breaks the ARM condition checking code out of nwfpe/fpopcode.{ch}
+into a standalone file for opcode operations. It also modifies the code
+somwhat for coding style adherence, and adds some temporary variables for
+increased readability.
 
 Signed-off-by: Leif Lindholm <leif.lindholm@arm.com>
 ---
- arch/arm/kernel/swp_emulate.c |   11 +++++++++++
- 1 files changed, 11 insertions(+), 0 deletions(-)
+ arch/arm/include/asm/opcodes.h |   14 +++++++++
+ arch/arm/kernel/Makefile       |    2 +
+ arch/arm/kernel/opcodes.c      |   61 ++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 76 insertions(+), 1 deletions(-)
+ create mode 100644 arch/arm/include/asm/opcodes.h
+ create mode 100644 arch/arm/kernel/opcodes.c
 
-diff --git a/arch/arm/kernel/swp_emulate.c b/arch/arm/kernel/swp_emulate.c
-index 5f452f8..2e379d5 100644
---- a/arch/arm/kernel/swp_emulate.c
-+++ b/arch/arm/kernel/swp_emulate.c
-@@ -25,6 +25,7 @@
- #include <linux/syscalls.h>
- #include <linux/perf_event.h>
- 
-+#include <asm/opcodes.h>
- #include <asm/traps.h>
- #include <asm/uaccess.h>
- 
-@@ -183,6 +184,16 @@ static int swp_handler(struct pt_regs *regs, unsigned int instr)
- 	unsigned int address, destreg, data, type;
- 	unsigned int res = 0;
- 
-+	res = arm_check_condition(instr, regs->ARM_cpsr);
-+	if (!res) {
-+		/* Condition failed - return to next instruction */
-+		regs->ARM_pc += 4;
-+		return 0;
-+	} else if (res != 1) {
-+		/* If unconditional encoding - not a SWP, undef */
-+		return -EFAULT;
-+	}
+diff --git a/arch/arm/include/asm/opcodes.h b/arch/arm/include/asm/opcodes.h
+new file mode 100644
+index 0000000..4c18fcb
+--- /dev/null
++++ b/arch/arm/include/asm/opcodes.h
+@@ -0,0 +1,14 @@
++/*
++ *  arch/arm/include/asm/opcodes.h
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
 +
- 	perf_sw_event(PERF_COUNT_SW_EMULATION_FAULTS, 1, regs, regs->ARM_pc);
++#ifndef __ASM_ARM_OPCODES_H
++#define __ASM_ARM_OPCODES_H
++
++extern unsigned int arm_check_condition(unsigned int opcode, unsigned int psr);
++
++#endif /* __ASM_ARM_OPCODES_H */
+diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
+index 16eed6a..43b740d 100644
+--- a/arch/arm/kernel/Makefile
++++ b/arch/arm/kernel/Makefile
+@@ -13,7 +13,7 @@ CFLAGS_REMOVE_return_address.o = -pg
  
- 	if (current->pid != previous_pid) {
+ # Object file lists.
+ 
+-obj-y		:= elf.o entry-armv.o entry-common.o irq.o \
++obj-y		:= elf.o entry-armv.o entry-common.o irq.o opcodes.o \
+ 		   process.o ptrace.o return_address.o setup.o signal.o \
+ 		   sys_arm.o stacktrace.o time.o traps.o
+ 
+diff --git a/arch/arm/kernel/opcodes.c b/arch/arm/kernel/opcodes.c
+new file mode 100644
+index 0000000..8adc20c
+--- /dev/null
++++ b/arch/arm/kernel/opcodes.c
+@@ -0,0 +1,61 @@
++/*
++ *  linux/arch/arm/kernel/opcodes.c
++ *
++ *  A32 condition code lookup feature moved from nwfpe/fpopcode.c
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <asm/opcodes.h>
++
++#define ARM_OPCODE_UNCONDITIONAL 0xf
++
++/*
++ * condition code lookup table
++ * index into the table is test code: EQ, NE, ... LT, GT, AL, NV
++ *
++ * bit position in short is condition code: NZCV
++ */
++static const unsigned short cc_map[16] = {
++	0xF0F0,			/* EQ == Z set            */
++	0x0F0F,			/* NE                     */
++	0xCCCC,			/* CS == C set            */
++	0x3333,			/* CC                     */
++	0xFF00,			/* MI == N set            */
++	0x00FF,			/* PL                     */
++	0xAAAA,			/* VS == V set            */
++	0x5555,			/* VC                     */
++	0x0C0C,			/* HI == C set && Z clear */
++	0xF3F3,			/* LS == C clear || Z set */
++	0xAA55,			/* GE == (N==V)           */
++	0x55AA,			/* LT == (N!=V)           */
++	0x0A05,			/* GT == (!Z && (N==V))   */
++	0xF5FA,			/* LE == (Z || (N!=V))    */
++	0xFFFF,			/* AL always              */
++	0			/* NV                     */
++};
++
++/*
++ * Returns:
++ * 0 - if condition fails
++ * 1 - if condition passes (including AL)
++ * 2 - if unconditional encoding (or before ARMv3, NV condition)
++ *
++ * Code that needs to check whether a condition has explicitly passed,
++ * should compare the return value to 1.
++ * Code that wants to check if a condition means that the instruction
++ * should be executed, should compare the return value to !0.
++ */
++unsigned int arm_check_condition(unsigned int opcode, unsigned int psr)
++{
++	unsigned int cc_bits  = opcode >> 28;
++	unsigned int psr_cond = psr >> 28;
++
++	/* NV condition or unconditional */
++	if (cc_bits == ARM_OPCODE_UNCONDITIONAL)
++		return 2;
++
++	return (cc_map[cc_bits] >> (psr_cond)) & 1;
++}
