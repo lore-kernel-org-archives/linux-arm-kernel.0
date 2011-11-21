@@ -1,29 +1,76 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 21 Nov 2011 22:00:29 +0000
-Subject: [GIT PULL] ARM irqchip consolidation
-In-Reply-To: <4EC54DBB.9090309@arm.com>
-References: <4EC39D44.8000706@arm.com>
- <20111117172319.GX9581@n2100.arm.linux.org.uk> <4EC54DBB.9090309@arm.com>
-Message-ID: <20111121220029.GT9581@n2100.arm.linux.org.uk>
+From: kmpark@infradead.org (Kyungmin Park)
+Date: Tue, 22 Nov 2011 08:55:27 +0900
+Subject: [GIT PULL] Samsung fixes for v3.2
+In-Reply-To: <03e501cca837$d893e320$89bba960$%kim@samsung.com>
+References: <03e501cca837$d893e320$89bba960$%kim@samsung.com>
+Message-ID: <CAH9JG2XcUHUpU5OQyv4+Q9bzbqxsekF8yvUuK4Gb6EDBpQMucw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 17, 2011 at 06:08:59PM +0000, Marc Zyngier wrote:
-> If you have a stable branch on which I can rebase, I'm happy to do it
-> (I've just resolved these conflicts on -next). If it's more convenient
-> to do it later in the cycle, I can wait. Just let me know what is the
-> most convenient route for you.
+Hi,
 
-I've now merged the restart changes into the 'devel' branch, and then
-followed on with your changes on top of that - fixing the conflicts
-along the way.
+Don't you fix the mct compiler error if LOCAL_TIMERS are not defined?
 
-I decided not to push it out in the devel-stable branch until you've
-had a chance to verify that the conflict resolution is correct - I've
-added some limited explanations in the merge commit for the two things
-which weren't a trivial resolution.  Once you've confirmed it's fine,
-I'll push the stuff over to the devel-stable branch.
+arch/arm/mach-exynos/mct.c: In function 'exynos4_timer_resources':
+arch/arm/mach-exynos/mct.c:451: error: 'exynos4_mct_tick_isr'
+undeclared (first use in this function)
+arch/arm/mach-exynos/mct.c:451: error: (Each undeclared identifier is
+reported only once
+arch/arm/mach-exynos/mct.c:451: error: for each function it appears in.)
+make[1]: *** [arch/arm/mach-exynos/mct.o] Error 1
 
-The devel branch also has nico's vmalloc stuff in too, and the whole
-lot should end up in linux-next later this week (maybe even tomorrow
-if sfr hasn't already picked up my tree.)
+Thank you,
+Kyungmin Park
+
+On 11/21/11, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> Hi Arnd,
+>
+> Please pull samsung-fixes for v3.2 from:
+>
+> git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> samsung-fixes
+>
+> This includes fix of inclusion header.
+> If any problems, please let me know.
+>
+> Thanks.
+>
+> Best regards,
+> Kgene.
+> --
+> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+> SW Solution Development Team, Samsung Electronics Co., Ltd.
+>
+> The following changes since commit 1ea6b8f48918282bdca0b32a34095504ee65bab5:
+>
+>   Linux 3.2-rc1 (2011-11-07 16:16:02 -0800)
+>
+> are available in the git repository at:
+>   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> samsung-fixes
+>
+> Axel Lin (1):
+>       ARM: SAMSUNG: include linux/types.h at gpio-cfg.h
+>
+> Kukjin Kim (2):
+>       ARM: S5P: Fix export.h inclusion
+>       ARM: SAMSUNG: inclusion export.h instead of module.h
+>
+> Kyungmin Park (1):
+>       ARM: EXYNOS: Fix compiler error with THIS_MODULE
+>
+>  arch/arm/mach-exynos/cpuidle.c                |    2 ++
+>  arch/arm/mach-s3c64xx/mach-crag6410-module.c  |    2 +-
+>  arch/arm/plat-s3c24xx/cpu-freq-debugfs.c      |    2 +-
+>  arch/arm/plat-s5p/sysmmu.c                    |    1 +
+>  arch/arm/plat-samsung/include/plat/gpio-cfg.h |    2 ++
+>  arch/arm/plat-samsung/pd.c                    |    2 +-
+>  arch/arm/plat-samsung/pwm.c                   |    2 +-
+>  7 files changed, 9 insertions(+), 4 deletions(-)
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc"
+> in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
