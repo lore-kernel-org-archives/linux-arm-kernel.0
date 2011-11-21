@@ -1,137 +1,57 @@
 From: leif.lindholm@arm.com (Leif Lindholm)
-Date: Mon, 21 Nov 2011 18:31:04 +0000
-Subject: [PATCH 4/4] [RFC] Use generic ARM instruction set condition code
- checks for kprobes.
+Date: Mon, 21 Nov 2011 18:30:58 +0000
+Subject: [PATCH 3/4] [RFC] Add condition code checking to SWP emulation
+ handler.
 In-Reply-To: <20111121183046.28964.23829.stgit@localhost6.localdomain6>
 References: <20111121183046.28964.23829.stgit@localhost6.localdomain6>
-Message-ID: <20111121183104.28964.87120.stgit@localhost6.localdomain6>
+Message-ID: <20111121183058.28964.79067.stgit@localhost6.localdomain6>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch changes the kprobes implementation to use the generic ARM
-instruction set condition code checks, rather than a dedicated
-implementation.
+This patch fixes two separate issues with the SWP emulation handler:
+1: Certain processors implementing the ARMv7-A can (legally) take an
+   undef exception even when the condition code would have meant that
+   the instruction should not have been executed.
+2: Opcodes with all flags set (condition code = 0xf) have been reused
+   in recent, and not-so-recent, versions of the ARM architecture to
+   implement unconditional extensions to the instruction set. The
+   existing code would still have processed any undefs triggered by
+   executing an opcode with such a value.
 
-Note, this is a direct interface change, and the resulting code is not
-the prettiest, but this is an RFC only.
+This patch uses the new generic ARM instruction set condition code
+checks to implement proper handling of these situations.
 
-This code builds and links, but current 3.2-rc2 does not boot on my
-Versatile Express board with CONFIG_ARM_KPROBES_TEST enabled either
-with or without this patch.
-
-Cc: Tixy <tixy@yxit.co.uk>
 Signed-off-by: Leif Lindholm <leif.lindholm@arm.com>
 ---
- arch/arm/kernel/kprobes-test.c |   71 +++-------------------------------------
- 1 files changed, 5 insertions(+), 66 deletions(-)
+ arch/arm/kernel/swp_emulate.c |   11 +++++++++++
+ 1 files changed, 11 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/kernel/kprobes-test.c b/arch/arm/kernel/kprobes-test.c
-index e17cdd6..6f5328a 100644
---- a/arch/arm/kernel/kprobes-test.c
-+++ b/arch/arm/kernel/kprobes-test.c
-@@ -202,6 +202,8 @@
- #include <linux/slab.h>
- #include <linux/kprobes.h>
+diff --git a/arch/arm/kernel/swp_emulate.c b/arch/arm/kernel/swp_emulate.c
+index 5f452f8..2e379d5 100644
+--- a/arch/arm/kernel/swp_emulate.c
++++ b/arch/arm/kernel/swp_emulate.c
+@@ -25,6 +25,7 @@
+ #include <linux/syscalls.h>
+ #include <linux/perf_event.h>
  
 +#include <asm/opcodes.h>
+ #include <asm/traps.h>
+ #include <asm/uaccess.h>
+ 
+@@ -183,6 +184,16 @@ static int swp_handler(struct pt_regs *regs, unsigned int instr)
+ 	unsigned int address, destreg, data, type;
+ 	unsigned int res = 0;
+ 
++	res = arm_check_condition(instr, regs->ARM_cpsr);
++	if (!res) {
++		/* Condition failed - return to next instruction */
++		regs->ARM_pc += 4;
++		return 0;
++	} else if (res != 1) {
++		/* If unconditional encoding - not a SWP, undef */
++		return -EFAULT;
++	}
 +
- #include "kprobes.h"
- #include "kprobes-test.h"
+ 	perf_sw_event(PERF_COUNT_SW_EMULATION_FAULTS, 1, regs, regs->ARM_pc);
  
-@@ -1048,69 +1050,6 @@ static int test_instance;
-  */
- #define PSR_IGNORE_BITS (PSR_A_BIT | PSR_F_BIT)
- 
--static unsigned long test_check_cc(int cc, unsigned long cpsr)
--{
--	unsigned long temp;
--
--	switch (cc) {
--	case 0x0: /* eq */
--		return cpsr & PSR_Z_BIT;
--
--	case 0x1: /* ne */
--		return (~cpsr) & PSR_Z_BIT;
--
--	case 0x2: /* cs */
--		return cpsr & PSR_C_BIT;
--
--	case 0x3: /* cc */
--		return (~cpsr) & PSR_C_BIT;
--
--	case 0x4: /* mi */
--		return cpsr & PSR_N_BIT;
--
--	case 0x5: /* pl */
--		return (~cpsr) & PSR_N_BIT;
--
--	case 0x6: /* vs */
--		return cpsr & PSR_V_BIT;
--
--	case 0x7: /* vc */
--		return (~cpsr) & PSR_V_BIT;
--
--	case 0x8: /* hi */
--		cpsr &= ~(cpsr >> 1); /* PSR_C_BIT &= ~PSR_Z_BIT */
--		return cpsr & PSR_C_BIT;
--
--	case 0x9: /* ls */
--		cpsr &= ~(cpsr >> 1); /* PSR_C_BIT &= ~PSR_Z_BIT */
--		return (~cpsr) & PSR_C_BIT;
--
--	case 0xa: /* ge */
--		cpsr ^= (cpsr << 3); /* PSR_N_BIT ^= PSR_V_BIT */
--		return (~cpsr) & PSR_N_BIT;
--
--	case 0xb: /* lt */
--		cpsr ^= (cpsr << 3); /* PSR_N_BIT ^= PSR_V_BIT */
--		return cpsr & PSR_N_BIT;
--
--	case 0xc: /* gt */
--		temp = cpsr ^ (cpsr << 3); /* PSR_N_BIT ^= PSR_V_BIT */
--		temp |= (cpsr << 1);	   /* PSR_N_BIT |= PSR_Z_BIT */
--		return (~temp) & PSR_N_BIT;
--
--	case 0xd: /* le */
--		temp = cpsr ^ (cpsr << 3); /* PSR_N_BIT ^= PSR_V_BIT */
--		temp |= (cpsr << 1);	   /* PSR_N_BIT |= PSR_Z_BIT */
--		return temp & PSR_N_BIT;
--
--	case 0xe: /* al */
--	case 0xf: /* unconditional */
--		return true;
--	}
--	BUG();
--	return false;
--}
--
- static int is_last_scenario;
- static int probe_should_run; /* 0 = no, 1 = yes, -1 = unknown */
- static int memory_needs_checking;
-@@ -1128,7 +1067,7 @@ static unsigned long test_context_cpsr(int scenario)
- 
- 	if (!test_case_is_thumb) {
- 		/* Testing ARM code */
--		probe_should_run = test_check_cc(current_instruction >> 28, cpsr) != 0;
-+		probe_should_run = arm_check_condition(current_instruction, cpsr) != 0;
- 		if (scenario == 15)
- 			is_last_scenario = true;
- 
-@@ -1136,7 +1075,7 @@ static unsigned long test_context_cpsr(int scenario)
- 		/* Testing Thumb code without setting ITSTATE */
- 		if (kprobe_test_cc_position) {
- 			int cc = (current_instruction >> kprobe_test_cc_position) & 0xf;
--			probe_should_run = test_check_cc(cc, cpsr) != 0;
-+			probe_should_run = arm_check_condition(cc << 28, cpsr) != 0;
- 		}
- 
- 		if (scenario == 15)
-@@ -1163,7 +1102,7 @@ static unsigned long test_context_cpsr(int scenario)
- 		cpsr |= (mask & 0x8) << 23;	/* ITSTATE<1> */
- 		cpsr |= (mask & 0x10) << 21;	/* ITSTATE<0> */
- 
--		probe_should_run = test_check_cc((cpsr >> 12) & 0xf, cpsr) != 0;
-+		probe_should_run = arm_check_condition(((cpsr >> 12) & 0xf) << 28, cpsr) != 0;
- 
- 	} else {
- 		/* Testing Thumb code with several combinations of ITSTATE */
+ 	if (current->pid != previous_pid) {
