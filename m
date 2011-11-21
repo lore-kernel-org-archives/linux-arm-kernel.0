@@ -1,19 +1,74 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 21 Nov 2011 19:08:48 +0000
-Subject: [PATCH 1/4] [RFC] Add generic ARM instruction set condition
- code checks.
-In-Reply-To: <20111121183046.28964.23829.stgit@localhost6.localdomain6>
-References: <20111121183046.28964.23829.stgit@localhost6.localdomain6>
-Message-ID: <20111121190848.GS9581@n2100.arm.linux.org.uk>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Mon, 21 Nov 2011 14:11:12 -0500 (EST)
+Subject: [PATCH 2/6] ARM: gic: fix big endian support
+In-Reply-To: <1321322785-2981-2-git-send-email-junxiao.bi@windriver.com>
+References: <1321322785-2981-1-git-send-email-junxiao.bi@windriver.com>
+ <1321322785-2981-2-git-send-email-junxiao.bi@windriver.com>
+Message-ID: <alpine.LFD.2.02.1111211334320.17904@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 21, 2011 at 06:30:46PM +0000, Leif Lindholm wrote:
-> +/*
-> + * Returns:
-> + * 0 - if condition fails
-> + * 1 - if condition passes (including AL)
-> + * 2 - if unconditional encoding (or before ARMv3, NV condition)
+On Tue, 15 Nov 2011, Junxiao Bi wrote:
 
-The comment is wrong.  NV always meant 'never execute' including v3,
-v4 and v5 architectures.
+> The irq state from gic is in little-endian mode. We need do endian
+> conversion for it in big-endian machine. Usually byte swapping of
+> 32-bits word needs 4 assembler instructions for arm machine which
+> arch < 6. But since the high order half word of the irq state is
+> zero, there is a way that can use lesser instrunctions to improve
+> the performance since we only need a bytes swaping of half word.
+> That's what swab16_low_half and swab16_high_half do.
+> 
+> Signed-off-by: Junxiao Bi <junxiao.bi@windriver.com>
+
+Comments below.
+
+> ---
+>  arch/arm/include/asm/assembler.h                |   27 +++++++++++++++++++++++
+>  arch/arm/include/asm/hardware/entry-macro-gic.S |    7 ++++++
+>  2 files changed, 34 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
+> index 29035e8..3ddee22 100644
+> --- a/arch/arm/include/asm/assembler.h
+> +++ b/arch/arm/include/asm/assembler.h
+> @@ -302,4 +302,31 @@
+>  	.size \name , . - \name
+>  	.endm
+>  
+> +/*
+> + * swab16_low_half is used to swap the bytes order of the low order
+> + * half word, it assumes that the high order half word is zero.
+> + * swab16_high_half is used to swap the bytes order of the high order
+> + * half word, it assumes that the low order half word is zero.
+> + */
+> +#if __LINUX_ARM_ARCH__ >= 6
+> +	.macro swab16_low_half, reg
+> +	rev \reg, \reg
+> +	.endm
+> +
+> +	.macro swab16_high_half, reg
+> +	rev \reg, \reg
+> +	.endm
+> +#else
+> +	.macro swab16_low_half, reg
+> +	mov \reg, \reg, ror #8
+> +	orr \reg, \reg, \reg, lsr #16
+> +	bic \reg, \reg, \reg, lsl #16
+> +	.endm
+
+I fail to see how this macro would be generally useful.  Presuming that 
+the top or bottom half has to be zero is not particularly practical.  
+
+> +	.macro swab16_high_half, reg
+> +	swab16_low_half \reg
+> +	mov \reg, \reg, lsl #16
+> +	.endm
+
+And this doesn't end up cheaper than a plain swab32.
+
+Furthermore, you're using those macros 1) in the gic code, and 2) onli 
+in the BE8 case.  Both of those conditions are only possible on ARMv6 
+and above anyway, so I'd simply open code a rev instruction inline.
+
+
+Nicolas
