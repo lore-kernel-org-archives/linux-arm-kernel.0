@@ -1,69 +1,28 @@
-From: omar.ramirez@ti.com (Ramirez Luna, Omar)
-Date: Mon, 21 Nov 2011 10:42:52 -0600
-Subject: [PATCH] ARM: OMAP: dmtimer: fix missing content/correction in
- low-power mode support
-In-Reply-To: <1320732026-6783-1-git-send-email-tarun.kanti@ti.com>
-References: <1320732026-6783-1-git-send-email-tarun.kanti@ti.com>
-Message-ID: <CAB-zwWiNc=aFMd2ccyL=s1c5qa8dnu6c-M29K1CrezJ01YXZWg@mail.gmail.com>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Mon, 21 Nov 2011 08:56:46 -0800
+Subject: [PATCH v1] dts: tegra-ventana: use proper root instead of /dev/ram
+In-Reply-To: <20111121004930.GA17338@quad.lixom.net>
+References: <1321338087-3662-1-git-send-email-vwadekar@nvidia.com>
+ <74CDBE0F657A3D45AFBB94109FB122FF1740805E1B@HQMAIL01.nvidia.com>
+ <20111121004930.GA17338@quad.lixom.net>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF174F08C0B8@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Tue, Nov 8, 2011 at 12:00 AM, Tarun Kanti DebBarma
-<tarun.kanti@ti.com> wrote:
-> Since omap_dm_timer_write_reg/__omap_dm_timer_write is now modified
-> to use timer->func_base OCP_CFG should not use this wrapper anymore.
-> Instead use __raw_writel() directly and use timer->io_base instead
-> to write to OCP_CFG.
->
-> The timer->sys_stat is valid only if timer->revision is 1. In the
-> context restore function make this correction.
->
-> Save the contexts and loss count when timer is stopped.
-> Also, disable the clock. Else, clock usecount would become imbalanced.
->
-> Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
+Olof Johansson wrote at Sunday, November 20, 2011 5:50 PM:
+> On Tue, Nov 15, 2011 at 11:16:51AM -0800, Stephen Warren wrote:
+> > Varun Wadekar wrote at Monday, November 14, 2011 11:21 PM:
+> > > From: Pritesh Raithatha <praithatha@nvidia.com>
+> > >
+> > > The root file system on ventana resides on /dev/mmcblk0p1.
 ...
-> diff --git a/arch/arm/plat-omap/dmtimer.c b/arch/arm/plat-omap/dmtimer.c
-> index af3b92b..f042c82 100644
-> --- a/arch/arm/plat-omap/dmtimer.c
-> +++ b/arch/arm/plat-omap/dmtimer.c
+> Actually, removing the default root path is probably a better idea, since it
+> will vary from installation to installation and doesn't make sense to hard
+> code.
 ...
-> @@ -357,6 +357,21 @@ int omap_dm_timer_stop(struct omap_dm_timer *timer)
->
-> ? ? ? ?__omap_dm_timer_stop(timer, timer->posted, rate);
->
-> + ? ? ? if (timer->loses_context) {
-> + ? ? ? ? ? ? ? if (timer->get_context_loss_count)
+> So, I would rather see a patch removing the root= argument alltogether.
 
-Maybe: if (timer->loses_context && timer->get_context_loss_count)
+OK, I'll whip up a patch for that along with a few other minor DTS fixes.
 
-> + ? ? ? ? ? ? ? ? ? ? ? timer->ctx_loss_count =
-> + ? ? ? ? ? ? ? ? ? ? ? timer->get_context_loss_count(&timer->pdev->dev);
-
-could get rid  of this weird one-line formatting
-
-> + ? ? ? }
-> +
-> + ? ? ? /*
-> + ? ? ? ?* Since the register values are computed and written within
-> + ? ? ? ?* __omap_dm_timer_stop, we need to use read to retrieve the
-> + ? ? ? ?* context.
-> + ? ? ? ?*/
-> + ? ? ? timer->context.tclr =
-> + ? ? ? ? ? ? ? ? ? ? ? omap_dm_timer_read_reg(timer, OMAP_TIMER_CTRL_REG);
-> + ? ? ? timer->context.tisr = __raw_readl(timer->irq_stat);
-> + ? ? ? omap_dm_timer_disable(timer);
-
-FWIW, functionally it looks good to me, besides it fixes the broken
-dmtimer start/stop sequence from 3.2-rc1. Tested with tidspbridge on
-omap3.
-
-If needed:
-
-Tested-by: Omar Ramirez Luna <omar.ramirez@ti.com>
-
-Regards,
-
-Omar
+-- 
+nvpublic
