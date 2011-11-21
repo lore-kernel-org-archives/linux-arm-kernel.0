@@ -1,309 +1,148 @@
-From: jochen@scram.de (Jochen Friedrich)
-Date: Mon, 21 Nov 2011 21:58:33 +0100
-Subject: [PATCHv2] Initial DT support for SIMpad devices.
-Message-ID: <1321909114-25355-1-git-send-email-jochen@scram.de>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Mon, 21 Nov 2011 14:44:10 -0700
+Subject: [PATCH 4/5] arm/dt: tegra: Fix serial nodes to match board files
+In-Reply-To: <1321911851-10091-1-git-send-email-swarren@nvidia.com>
+References: <1321911851-10091-1-git-send-email-swarren@nvidia.com>
+Message-ID: <1321911851-10091-4-git-send-email-swarren@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Jochen Friedrich <jochen@scram.de>
+Mark any serial ports that aren't registered by the board files as disabled
+in the device-tree files.
+
+In practice, none of the now-disabled ports ended up succeeding device
+probing because of the missing clock-frequency property. However,
+explicitly marking the devices disabled has the advantage of squashing
+the dev_warn() the failed probe causes, and documenting that we intend
+the port not to be used, rather than accidentally left out the property.
+
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
 ---
+ arch/arm/boot/dts/tegra-harmony.dts   |   16 ++++++++++++++++
+ arch/arm/boot/dts/tegra-seaboard.dts  |   16 ++++++++++++++++
+ arch/arm/boot/dts/tegra-trimslice.dts |   16 ++++++++++++++++
+ arch/arm/boot/dts/tegra-ventana.dts   |   16 ++++++++++++++++
+ 4 files changed, 64 insertions(+), 0 deletions(-)
 
-V2: 
-- make localbus "simple-bus" compatible.
-- add soc compatible entry to board.
-- add sample partition table to DTS.
-- fix flash bus width.
-- switch to DT initialization of flash.
-
- .../devicetree/bindings/vendor-prefixes.txt        |    1 +
- arch/arm/boot/dts/sa1110.dtsi                      |   72 +++++++++++++++++++
- arch/arm/boot/dts/simpad.dts                       |   75 ++++++++++++++++++++
- arch/arm/mach-sa1100/Kconfig                       |   13 ++++
- arch/arm/mach-sa1100/Makefile.boot                 |    1 +
- arch/arm/mach-sa1100/simpad.c                      |   27 +++++++-
- 6 files changed, 188 insertions(+), 1 deletions(-)
- create mode 100644 arch/arm/boot/dts/sa1110.dtsi
- create mode 100644 arch/arm/boot/dts/simpad.dts
-
-diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-index 5b14518..cbe7046 100644
---- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-+++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-@@ -34,6 +34,7 @@ qcom	Qualcomm, Inc.
- ramtron	Ramtron International
- samsung	Samsung Semiconductor
- schindler	Schindler
-+siemens	SIEMENS
- simtek
- sirf	SiRF Technology, Inc.
- stericsson	ST-Ericsson
-diff --git a/arch/arm/boot/dts/sa1110.dtsi b/arch/arm/boot/dts/sa1110.dtsi
-new file mode 100644
-index 0000000..af0dc7c
---- /dev/null
-+++ b/arch/arm/boot/dts/sa1110.dtsi
-@@ -0,0 +1,72 @@
-+/*
-+ * sa1110.dtsi - Device Tree Include file for Intel SA1110 SoC
-+ *
-+ *  Copyright (C) 2011 Jochen Friedrich <jochen@scram.de>
-+ *
-+ * Licensed under GPLv2 or later.
-+ */
-+
-+/include/ "skeleton.dtsi"
-+
-+/ {
-+	model = "Intel SA1110 SoC";
-+	compatible = "intel,sa1110";
-+	interrupt-parent = <&aic>;
-+
-+	cpus {
-+		cpu at 0 {
-+			compatible = "intel,sa1110";
-+		};
+diff --git a/arch/arm/boot/dts/tegra-harmony.dts b/arch/arm/boot/dts/tegra-harmony.dts
+index ca6fa10..ac179a0 100644
+--- a/arch/arm/boot/dts/tegra-harmony.dts
++++ b/arch/arm/boot/dts/tegra-harmony.dts
+@@ -47,10 +47,26 @@
+ 		ext-mic-en-gpios = <&gpio 185 0>;
+ 	};
+ 
++	serial at 70006000 {
++		status = "disable";
 +	};
 +
-+	localbus {
-+		compatible = "simple-bus";
-+		#address-cells = <2>;
-+		#size-cells = <1>;
-+
-+		ranges = <
-+			0x0 0x0 0x00000000 0x08000000
-+			0x1 0x0 0x08000000 0x08000000
-+			0x2 0x0 0x10000000 0x08000000
-+			0x3 0x0 0x18000000 0x08000000
-+			0x4 0x0 0x40000000 0x08000000
-+			0x5 0x0 0x48000000 0x08000000
-+		>;
++	serial at 70006040 {
++		status = "disable";
 +	};
 +
-+	soc {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+
-+		uart0: serial at 0x80010000 {
-+			compatible = "intel,sa1100-uart";
-+			reg = <0x80010000 0x24>;
-+			interrupts = <15>;
-+			status = "disabled";
-+		};
-+
-+		uart1: serial at 0x80030000 {
-+			compatible = "intel,sa1100-uart";
-+			reg = <0x80030000 0x24>;
-+			interrupts = <16>;
-+			status = "disabled";
-+		};
-+
-+		uart2: serial at 0x80050000 {
-+			compatible = "intel,sa1100-uart";
-+			reg = <0x80050000 0x24>;
-+			interrupts = <17>;
-+			status = "disabled";
-+		};
-+
-+		aic: interrupt-controller at 0x90050000 {
-+			compatible = "intel,sa1110-icr";
-+			reg = <0x90050000 0x24>;
-+			#interrupt-cells = <1>;
-+			interrupt-controller;
-+			interrupt-parent;
-+		};
-+	};
-+};
-diff --git a/arch/arm/boot/dts/simpad.dts b/arch/arm/boot/dts/simpad.dts
-new file mode 100644
-index 0000000..4e5fbde
---- /dev/null
-+++ b/arch/arm/boot/dts/simpad.dts
-@@ -0,0 +1,75 @@
-+/dts-v1/;
-+/include/ "sa1110.dtsi"
-+
-+/ {
-+	model = "SIEMENS, SIMpad";
-+	compatible = "siemens,simpad", "intel,sa1110";
-+
-+	aliases {
-+		serial0 = &uart2;
-+		serial1 = &uart0;
++	serial at 70006200 {
++		status = "disable";
 +	};
 +
-+	memory {
-+		device_type = "memory";
-+		reg = <0x0 0x08000000>;
+ 	serial at 70006300 {
+ 		clock-frequency = < 216000000 >;
+ 	};
+ 
++	serial at 70006400 {
++		status = "disable";
 +	};
 +
-+	chosen {
-+		bootargs = "console=ttySA0";
+ 	sdhci at c8000200 {
+ 		cd-gpios = <&gpio 69 0>; /* gpio PI5 */
+ 		wp-gpios = <&gpio 57 0>; /* gpio PH1 */
+diff --git a/arch/arm/boot/dts/tegra-seaboard.dts b/arch/arm/boot/dts/tegra-seaboard.dts
+index 92da1f1..cbb2f08 100644
+--- a/arch/arm/boot/dts/tegra-seaboard.dts
++++ b/arch/arm/boot/dts/tegra-seaboard.dts
+@@ -27,10 +27,26 @@
+ 		clock-frequency = <400000>;
+ 	};
+ 
++	serial at 70006000 {
++		status = "disable";
 +	};
 +
-+	localbus {
-+		flash at 0,0 {
-+			compatible = "cfi-flash";
-+			reg = <0 0 0x08000000>;
-+			bank-width = <2>;
-+			#size-cells = <1>;
-+			#address-cells = <1>;
-+
-+			partition at 0 {
-+				label = "u-boot";
-+				reg = <0x00000000 0x00040000>;
-+			};
-+			partition at 40000 {
-+				label = "u-boot-env";
-+				reg = <0x00040000 0x00020000>;
-+			};
-+			partition at 60000 {
-+				label = "dtb";
-+				reg = <0x00060000 0x00020000>;
-+			};
-+			partition at 80000 {
-+				label = "kernel";
-+				reg = <0x00080000 0x00200000>;
-+			};
-+			partition at 280000 {
-+				label = "rootfs";
-+				reg = <0x00280000 0x07d80000>;
-+			};
-+		};
-+
-+		flash at 1,0 {
-+			compatible = "cfi-flash";
-+			reg = <1 0 0x08000000>;
-+			bank-width = <2>;
-+			#size-cells = <1>;
-+			#address-cells = <1>;
-+
-+			partition at 0 {
-+				label = "home";
-+				reg = <0x00000000 0x08000000>;
-+			};
-+		};
++	serial at 70006040 {
++		status = "disable";
 +	};
 +
-+	soc {
-+		uart0: serial at 0x80010000 {
-+			status = "okay";
-+		};
-+
-+		uart2: serial at 0x80050000 {
-+			status = "okay";
-+		};
++	serial at 70006200 {
++		status = "disable";
 +	};
-+};
-diff --git a/arch/arm/mach-sa1100/Kconfig b/arch/arm/mach-sa1100/Kconfig
-index 42625e4..31238c3 100644
---- a/arch/arm/mach-sa1100/Kconfig
-+++ b/arch/arm/mach-sa1100/Kconfig
-@@ -157,6 +157,19 @@ config SA1100_SIMPAD
- 	  like CL4 in additional it has a PCMCIA-Slot. For more information
- 	  visit <http://www.usa.siemens.com/> or <http://www.siemens.ch/>.
- 
-+config SA1100_SIMPAD_DT
-+	bool "Simpad with device tree support"
-+	select CPU_FREQ_SA1110
-+	select SA1100_SIMPAD
-+	select USE_OF
-+	help
-+	  The SIEMENS webpad SIMpad is based on the StrongARM 1110. There
-+	  are two different versions CL4 and SL4. CL4 has 32MB RAM and 16MB
-+	  FLASH. The SL4 version got 64 MB RAM and 32 MB FLASH and a
-+	  PCMCIA-Slot. The version for the Germany Telecom (DTAG) is the same
-+	  like CL4 in additional it has a PCMCIA-Slot. For more information
-+	  visit <http://www.usa.siemens.com/> or <http://www.siemens.ch/>.
 +
- config SA1100_SSP
- 	tristate "Generic PIO SSP"
- 	help
-diff --git a/arch/arm/mach-sa1100/Makefile.boot b/arch/arm/mach-sa1100/Makefile.boot
-index 5a616f6..1d17767 100644
---- a/arch/arm/mach-sa1100/Makefile.boot
-+++ b/arch/arm/mach-sa1100/Makefile.boot
-@@ -6,3 +6,4 @@ endif
- params_phys-y	:= 0xc0000100
- initrd_phys-y	:= 0xc0800000
+ 	serial at 70006300 {
+ 		clock-frequency = < 216000000 >;
+ 	};
  
-+dtb-$(CONFIG_SA1100_SIMPAD_DT)		+= simpad.dtb
-diff --git a/arch/arm/mach-sa1100/simpad.c b/arch/arm/mach-sa1100/simpad.c
-index d3c9d2b..fb8b224 100644
---- a/arch/arm/mach-sa1100/simpad.c
-+++ b/arch/arm/mach-sa1100/simpad.c
-@@ -10,6 +10,7 @@
- #include <linux/string.h> 
- #include <linux/pm.h>
- #include <linux/platform_device.h>
-+#include <linux/of_platform.h>
- #include <linux/mtd/mtd.h>
- #include <linux/mtd/partitions.h>
- #include <linux/io.h>
-@@ -151,6 +152,7 @@ static struct sa1100_port_fns simpad_port_fns __initdata = {
- };
- 
- 
-+#ifndef CONFIG_OF
- static struct mtd_partition simpad_partitions[] = {
- 	{
- 		.name       = "SIMpad boot firmware",
-@@ -186,6 +188,7 @@ static struct resource simpad_flash_resources [] = {
- 		.flags     = IORESOURCE_MEM,
- 	}
- };
-+#endif
- 
- static struct mcp_plat_data simpad_mcp_data = {
- 	.mccr0		= MCCR0_ADM,
-@@ -211,8 +214,9 @@ static void __init simpad_map_io(void)
- 
- 	sa1100_register_uart_fns(&simpad_port_fns);
- 	sa1100_register_uart(0, 3);  /* serial interface */
-+#ifndef CONFIG_OF
- 	sa1100_register_uart(1, 1);  /* DECT             */
--
-+#endif
- 	// Reassign UART 1 pins
- 	GAFR |= GPIO_UART_TXD | GPIO_UART_RXD;
- 	GPDR |= GPIO_UART_TXD | GPIO_LDD13 | GPIO_LDD15;
-@@ -379,8 +383,10 @@ static int __init simpad_init(void)
- 
- 	pm_power_off = simpad_power_off;
- 
-+#ifndef CONFIG_OF
- 	sa11x0_register_mtd(&simpad_flash_data, simpad_flash_resources,
- 			      ARRAY_SIZE(simpad_flash_resources));
-+#endif
- 	sa11x0_register_mcp(&simpad_mcp_data);
- 
- 	ret = platform_add_devices(devices, ARRAY_SIZE(devices));
-@@ -392,6 +398,25 @@ static int __init simpad_init(void)
- 
- arch_initcall(simpad_init);
- 
-+#ifdef CONFIG_OF
-+static void __init simpad_dt_device_init(void)
-+{
-+	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-+}
++	serial at 70006400 {
++		status = "disable";
++	};
 +
-+static const char *simpad_dt_board_compat[] __initconst = {
-+	"siemens,simpad",
-+	NULL
-+};
-+
-+DT_MACHINE_START(simpad_dt, "SIMpad")
-+	.timer		= &sa1100_timer,
-+	.map_io		= simpad_map_io,
-+	.init_irq	= sa1100_init_irq,
-+	.init_machine	= simpad_dt_device_init,
-+	.dt_compat	= simpad_dt_board_compat,
-+MACHINE_END
-+#endif
+ 	sdhci at c8000400 {
+ 		cd-gpios = <&gpio 69 0>; /* gpio PI5 */
+ 		wp-gpios = <&gpio 57 0>; /* gpio PH1 */
+diff --git a/arch/arm/boot/dts/tegra-trimslice.dts b/arch/arm/boot/dts/tegra-trimslice.dts
+index b1aaa45..6060ce0 100644
+--- a/arch/arm/boot/dts/tegra-trimslice.dts
++++ b/arch/arm/boot/dts/tegra-trimslice.dts
+@@ -30,6 +30,22 @@
+ 		clock-frequency = < 216000000 >;
+ 	};
  
- MACHINE_START(SIMPAD, "Simpad")
- 	/* Maintainer: Holger Freyther */
++	serial at 70006040 {
++		status = "disable";
++	};
++
++	serial at 70006200 {
++		status = "disable";
++	};
++
++	serial at 70006300 {
++		status = "disable";
++	};
++
++	serial at 70006400 {
++		status = "disable";
++	};
++
+ 	sdhci at c8000600 {
+ 		cd-gpios = <&gpio 121 0>;
+ 		wp-gpios = <&gpio 122 0>;
+diff --git a/arch/arm/boot/dts/tegra-ventana.dts b/arch/arm/boot/dts/tegra-ventana.dts
+index 0f14ee3..5ac0aa3 100644
+--- a/arch/arm/boot/dts/tegra-ventana.dts
++++ b/arch/arm/boot/dts/tegra-ventana.dts
+@@ -26,10 +26,26 @@
+ 		clock-frequency = <400000>;
+ 	};
+ 
++	serial at 70006000 {
++		status = "disable";
++	};
++
++	serial at 70006040 {
++		status = "disable";
++	};
++
++	serial at 70006200 {
++		status = "disable";
++	};
++
+ 	serial at 70006300 {
+ 		clock-frequency = < 216000000 >;
+ 	};
+ 
++	serial at 70006400 {
++		status = "disable";
++	};
++
+ 	sdhci at c8000400 {
+ 		cd-gpios = <&gpio 69 0>; /* gpio PI5 */
+ 		wp-gpios = <&gpio 57 0>; /* gpio PH1 */
 -- 
-1.7.7.3
+1.7.0.4
