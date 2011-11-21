@@ -1,37 +1,56 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 21 Nov 2011 14:10:22 +0100
-Subject: [PATCH 2/2] ARM: amba: Auto-generate AMBA driver module aliases
- during modpost
-In-Reply-To: <1321872510-2562-3-git-send-email-dave.martin@linaro.org>
-References: <1321872510-2562-1-git-send-email-dave.martin@linaro.org>
- <1321872510-2562-3-git-send-email-dave.martin@linaro.org>
-Message-ID: <20111121131022.GE30612@pengutronix.de>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 21 Nov 2011 13:18:55 +0000
+Subject: Porting the 2.6.38 linux kernel to ARM11 MPcore
+In-Reply-To: <CAK-0apYKjvxXasEfYCocjqEan5dKoXJgMON2gC-nMenKQaU9UQ@mail.gmail.com>
+References: <CAK-0apYKjvxXasEfYCocjqEan5dKoXJgMON2gC-nMenKQaU9UQ@mail.gmail.com>
+Message-ID: <CAHkRjk491+H9Wh-uV8807VSkZ4Mk+UK3Jv6EThtOsRb7ULpUjg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Dave,
+On 18 November 2011 11:54, Moln?r G?bor <conqrx@gmail.com> wrote:
+> im working on a project wich aims at porting the 2.6.38 kernel to an
+> arm11 mpcore based board.
+>
+> The kernel fails to boot, in the paging_init func, it throws an
+> exception (pc: FFFF_000C) when executing the third mcr instruction in
+> the list below:
+>
+> 0xc000bf34 ?<>: ? ?blx ?r3
+> 0xc000bf38 ?<>: ? ?mov ?r5, #0 ?; 0x0
+> 0xc000bf3c ?<>: ? ?mcr ?15, 0, r5, cr7, cr10, {4}
+> 0xc000bf40 ?<>: ? ?mcr ?15, 0, r5, cr8, cr6, {0}
+> 0xc000bf44 ?<>: ? ?mcr ?15, 0, r5, cr8, cr5, {0} //throws an exception
+> here, Invalidate Instruction TLB Register
+> 0xc000bf48 ?<>: ? ?mcr ?15, 0, r5, cr7, cr5, {6}
+> 0xc000bf4c ?<>: ? ?mcr ?15, 0, r5, cr7, cr10, {4}
+> 0xc000bf50 ?<>: ? ?mcr ?15, 0, r5, cr7, cr5, {4}
+> 0xc000bf54 ?<>: ? ?ldr ?lr, [pc, #176] ?; 0xc000c00c
 
-On Mon, Nov 21, 2011 at 10:48:30AM +0000, Dave Martin wrote:
-> --- a/drivers/amba/bus.c
-> +++ b/drivers/amba/bus.c
-> @@ -52,7 +52,14 @@ static int amba_uevent(struct device *dev, struct kobj_uevent_env *env)
->  	int retval = 0;
->  
->  	retval = add_uevent_var(env, "AMBA_ID=%08x", pcdev->periphid);
-> -	return retval;
-> +	if (retval)
-> +		return retval;
-> +
-> +	retval = add_uevent_var(env, "MODALIAS=amba:d%08X", pcdev->periphid);
-> +	if (retval)
-> +		return retval;
-> +
-> +	return 0;
-Just return retval here?
+So you get a prefetch abort as soon as the TLBs are invalidated, which
+means that the page table is not set up correctly.
 
-Best regards
-Uwe
+What's your RAM configuration (start address, size)?
+
+> The kernel has been patched with the 2.6.38-arm1 patch, and configured
+> to be as minimal as possible (the vmlinux.elf is 1.8MB) and
+> cross-compiled with the?Codesourcery gcc toolchain.
+> The minimal size is improtant because the aim is to make the kernel
+> run with only 5-6MB of memory (from c0000000 to c0500000).
+> The 'boot_loader' i wrote passes the atag pointers (basically core and
+> memory) and the kernel seemingly reads and parses them fine. The
+> __log_buf before the exception:
+>
+> <5>Linux version 2.6.38-rc8 (VirtualBox) (gcc version 4.5.2 (Sourcery
+> G++ Lite 2011.03-41) ) #6 Wed Nov 9 21:59:29 CET 2011
+> <4>CPU: ARMv6-compatible processor [410fb025] revision 5 (ARMv7), cr=08c5387f"
+> <4>CPU: VIPT nonaliasing data cache, VIPT aliasing instruction cache
+> <4>Machine: ARM-RealView PB11MPCore
+> <5>Ignoring RAM at c0000000-c04fffff (vmalloc region overlap).
+
+Does your physical RAM start at 0xc0000000 and it is all ignored?
+Setting highmem would fix as all your lowmem (including the kernel
+code) would be unmapped, hence the fault. What's the VMALLOC_END
+defined to?
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Catalin
