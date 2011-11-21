@@ -1,40 +1,22 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Mon, 21 Nov 2011 14:22:12 +0200
-Subject: [PATCH] arm/tegra: convert tegra20 to GIC devicetree binding
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF1740D74E63@HQMAIL01.nvidia.com>
-References: <1321542430-17971-1-git-send-email-pdeschrijver@nvidia.com>
- <74CDBE0F657A3D45AFBB94109FB122FF1740D74C1E@HQMAIL01.nvidia.com>
- <20111118120352.GZ19069@tbergstrom-lnx.Nvidia.com>
- <74CDBE0F657A3D45AFBB94109FB122FF1740D74E63@HQMAIL01.nvidia.com>
-Message-ID: <20111121122212.GL19069@tbergstrom-lnx.Nvidia.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 21 Nov 2011 12:31:53 +0000
+Subject: [PATCH 0/2 REPOST] ARM: amba: Enable module alias
+ autogeneration for AMBA drivers
+In-Reply-To: <1321872510-2562-1-git-send-email-dave.martin@linaro.org>
+References: <1321872510-2562-1-git-send-email-dave.martin@linaro.org>
+Message-ID: <20111121123153.GQ9581@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 18, 2011 at 05:25:33PM +0100, Stephen Warren wrote:
-> Peter De Schrijver wrote at Friday, November 18, 2011 5:04 AM:
-> > On Thu, Nov 17, 2011 at 07:51:35PM +0100, Stephen Warren wrote:
-> > > Peter De Schrijver wrote at Thursday, November 17, 2011 8:07 AM:
-> > > > Convert tegra20 IRQ intialization to the GIC devicetree binding. Modify the
-> > > > interrupt definitions in the dts files according to
-> > > > Documentation/devicetree/bindings/arm/gic.txt
-> > > >
-> > > > Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
-> > >
-> > > tegra-harmony.dts contains an interrupts property that wasn't updated,
-> > > for the WM8903 codec.
-> > 
-> > But that's a GPIO interrupt no?
+On Mon, Nov 21, 2011 at 10:48:28AM +0000, Dave Martin wrote:
+> [This is a partial repost of a series previously posted to alkml.
 > 
-> The interrupt line from codec to Tegra is a GPIO, yes.
-> 
-> But the WM8903 still has the same interrupt-parent as everything else,
-> since it's inherited from /interrupt-parent and doesn't define its own.
-> Perhaps this is a mistake?
+> This post contains the core changes.  The driver-specific changes
+> can be found on alkml.]
 
-Yes. I think this is a mistake. If we want the device tree to reflect the
-hardware, I think the WM8903 node should specify the GPIO, not the IRQ
-number.
+As this has been posted a few times to LKML and no one seems to have
+interest in it, I'll take the silence as indicating no objections
+to the changes in include/linux/mod_devicetable.h and
+scripts/mod/file2alias.c.
 
-Cheers,
-
-Peter.
+So I think this is ready for merging.
