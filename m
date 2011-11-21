@@ -1,82 +1,179 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Mon, 21 Nov 2011 12:21:20 +0200
-Subject: [PATCH] hwspinlock: core: support for TEGRA hardware spinlocks
-In-Reply-To: <4EC205AC.4000202@nvidia.com>
-References: <1321334342-3283-1-git-send-email-vwadekar@nvidia.com>
- <4EC205AC.4000202@nvidia.com>
-Message-ID: <CAK=WgbYW_YH+b3xu1R+mDNPXj57mQ8547dzOJ7VUf2Y1wa8JnQ@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 21 Nov 2011 10:23:14 +0000
+Subject: [PATCH v2] ARM: unwind: add unwind directives to bitops assembly
+ macros
+Message-ID: <1321870994-2914-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Varun,
+The bitops functions (e.g. _test_and_set_bit) on ARM do not have unwind
+annotations and therefore the kernel cannot backtrace out of them on a
+fatal error (for example, NULL pointer dereference).
 
-On Tue, Nov 15, 2011 at 8:24 AM, Varun Wadekar <vwadekar@nvidia.com> wrote:
->> +The Tegra line of processors has a CPU and a COP similar to the OMAP processors.
->> +The Tegra SoC has a hardware block which arbitrates access to different hardware
->> +modules on the SoC between the CPU and the COP. The hardware spinlock block
->> +also has the capability to interrupt the caller when it has access to the
->> +requested hardware module. To facilitate SoCs like Tegra which do a lot more
->> +than just share data structures between the CPU and the COP, a new callback,
->> +int (*lock_timeout)(struct hwspinlock *lock, unsigned int to), has been added
->> +to struct hwspinlock_ops. The drivers which support functionality similar to
->> +the Tegra SoCs, will use lock_timeout to grant access to the hardware spinlock
->> +block on the SoCs. Such SoC drivers will not support all the apis exposed
->> +by the hwspinlock framework. More information below.
-...
->> ? ? - lock a previously-assigned hwspinlock with a timeout limit (specified in
->> ? ? ? msecs). If the hwspinlock is already taken, the function will busy loop
->> ? ? ? waiting for it to be released, but give up when the timeout elapses.
->> - ? ? Upon a successful return from this function, preemption is disabled so
->> - ? ? the caller must not sleep, and is advised to release the hwspinlock as
->> + ? ? If the underlying hardware driver supports lock_timeout in it's ops structure
->> + ? ? then upon a successful return from this function, the caller is allowed
->> + ? ? to sleep since we do not disable premption or interrupts in this scenario.
->> + ? ? If not, upon a successful return from this function, preemption is disabled
->> + ? ? so the caller must not sleep, and is advised to release the hwspinlock as
->> ? ? ? soon as possible, in order to minimize remote cores polling on the
->> ? ? ? hardware interconnect.
->> ? ? ? Returns 0 when successful and an appropriate error code otherwise (most
-...
->> @@ -182,6 +186,9 @@ int __hwspin_lock_timeout(struct hwspinlock *hwlock, unsigned int to,
->>
->> ? ? ? expire = msecs_to_jiffies(to) + jiffies;
->>
->> + ? ? if (hwlock->bank->ops->lock_timeout)
->> + ? ? ? ? ? ? return hwlock->bank->ops->lock_timeout(hwlock, expire);
->> +
->> ? ? ? for (;;) {
->> ? ? ? ? ? ? ? /* Try to take the hwspinlock */
->> ? ? ? ? ? ? ? ret = __hwspin_trylock(hwlock, mode, flags);
+This patch annotates the bitops assembly macros with UNWIND annotations
+so that we can produce a meaningful backtrace on error. Callers of the
+macros are modified to pass their function name as a macro parameter,
+enforcing that the macros are used as standalone function implementations.
 
-I'm afraid this makes it impossible to write generic drivers, as the
-locking requirements of __hwspin_lock_timeout() depend now on the
-underlying hardware: on OMAP it's a spinlock, and on Tegra it becomes
-a semaphore. We should instead provide driver authors a well defined
-API that is consistent across all systems.
+Cc: Dave Martin <dave.martin@linaro.org>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
 
-In addition this proposal hides the entire ->lock_time()
-implementation in the platform-specific driver, but we really only
-want to hide the platform-specific differences, and keep the generic
-parts in the core, so other platforms wouldn't have to duplicate it.
+v2: Added function name argument to bitops macros, as suggested by Dave.
 
-I think we should:
-1. define a new 'struct hwsemaphore' object (or hwmutex to get shorter
-api names..).
-2. allow users to request either a hwspinlock or a hwsemaphore. it's
-up to the drivers to request the synchronization primitive they need.
-If it's not supported by the hardware, the request will fail.
-3. add API to manipulate these new hwsemaphore objects (lock_timeout, unlock)
-4. abstract only the bare minimum hw differences in the
-platform-specific drivers, and keep generic parts in the core
+ arch/arm/lib/bitops.h        |   26 ++++++++++++++++++++++----
+ arch/arm/lib/changebit.S     |    4 +---
+ arch/arm/lib/clearbit.S      |    4 +---
+ arch/arm/lib/setbit.S        |    4 +---
+ arch/arm/lib/testchangebit.S |    4 +---
+ arch/arm/lib/testclearbit.S  |    4 +---
+ arch/arm/lib/testsetbit.S    |    4 +---
+ 7 files changed, 28 insertions(+), 22 deletions(-)
 
-This way drivers will always know whether a certain hardware
-synchronization primitive allow them to sleep or not. It's much less
-error prone too; a casual reader of the code will immediately tell the
-difference between hwspin_lock and hwsemaphore_lock.
-
-Eventually we will probably also have to rename the hwspinlock
-subsystem to something like hwlock, but that's just a minor detail at
-this point.
-
-Thanks,
-Ohad.
+diff --git a/arch/arm/lib/bitops.h b/arch/arm/lib/bitops.h
+index 10d868a..d6408d1 100644
+--- a/arch/arm/lib/bitops.h
++++ b/arch/arm/lib/bitops.h
+@@ -1,5 +1,9 @@
++#include <asm/unwind.h>
++
+ #if __LINUX_ARM_ARCH__ >= 6
+-	.macro	bitop, instr
++	.macro	bitop, name, instr
++ENTRY(	\name		)
++UNWIND(	.fnstart	)
+ 	ands	ip, r1, #3
+ 	strneb	r1, [ip]		@ assert word-aligned
+ 	mov	r2, #1
+@@ -13,9 +17,13 @@
+ 	cmp	r0, #0
+ 	bne	1b
+ 	bx	lr
++UNWIND(	.fnend		)
++ENDPROC(\name		)
+ 	.endm
+ 
+-	.macro	testop, instr, store
++	.macro	testop, name, instr, store
++ENTRY(	\name		)
++UNWIND(	.fnstart	)
+ 	ands	ip, r1, #3
+ 	strneb	r1, [ip]		@ assert word-aligned
+ 	mov	r2, #1
+@@ -34,9 +42,13 @@
+ 	cmp	r0, #0
+ 	movne	r0, #1
+ 2:	bx	lr
++UNWIND(	.fnend		)
++ENDPROC(\name		)
+ 	.endm
+ #else
+-	.macro	bitop, instr
++	.macro	bitop, name, instr
++ENTRY(	\name		)
++UNWIND(	.fnstart	)
+ 	ands	ip, r1, #3
+ 	strneb	r1, [ip]		@ assert word-aligned
+ 	and	r2, r0, #31
+@@ -49,6 +61,8 @@
+ 	str	r2, [r1, r0, lsl #2]
+ 	restore_irqs ip
+ 	mov	pc, lr
++UNWIND(	.fnend		)
++ENDPROC(\name		)
+ 	.endm
+ 
+ /**
+@@ -59,7 +73,9 @@
+  * Note: we can trivially conditionalise the store instruction
+  * to avoid dirtying the data cache.
+  */
+-	.macro	testop, instr, store
++	.macro	testop, name, instr, store
++ENTRY(	\name		)
++UNWIND(	.fnstart	)
+ 	ands	ip, r1, #3
+ 	strneb	r1, [ip]		@ assert word-aligned
+ 	and	r3, r0, #31
+@@ -73,5 +89,7 @@
+ 	moveq	r0, #0
+ 	restore_irqs ip
+ 	mov	pc, lr
++UNWIND(	.fnend		)
++ENDPROC(\name		)
+ 	.endm
+ #endif
+diff --git a/arch/arm/lib/changebit.S b/arch/arm/lib/changebit.S
+index 68ed5b6..f402786 100644
+--- a/arch/arm/lib/changebit.S
++++ b/arch/arm/lib/changebit.S
+@@ -12,6 +12,4 @@
+ #include "bitops.h"
+                 .text
+ 
+-ENTRY(_change_bit)
+-	bitop	eor
+-ENDPROC(_change_bit)
++bitop	_change_bit, eor
+diff --git a/arch/arm/lib/clearbit.S b/arch/arm/lib/clearbit.S
+index 4c04c3b..f6b75fb 100644
+--- a/arch/arm/lib/clearbit.S
++++ b/arch/arm/lib/clearbit.S
+@@ -12,6 +12,4 @@
+ #include "bitops.h"
+                 .text
+ 
+-ENTRY(_clear_bit)
+-	bitop	bic
+-ENDPROC(_clear_bit)
++bitop	_clear_bit, bic
+diff --git a/arch/arm/lib/setbit.S b/arch/arm/lib/setbit.S
+index bbee5c6..618feda 100644
+--- a/arch/arm/lib/setbit.S
++++ b/arch/arm/lib/setbit.S
+@@ -12,6 +12,4 @@
+ #include "bitops.h"
+ 		.text
+ 
+-ENTRY(_set_bit)
+-	bitop	orr
+-ENDPROC(_set_bit)
++bitop	_set_bit, orr
+diff --git a/arch/arm/lib/testchangebit.S b/arch/arm/lib/testchangebit.S
+index 15a4d43..4becdc3 100644
+--- a/arch/arm/lib/testchangebit.S
++++ b/arch/arm/lib/testchangebit.S
+@@ -12,6 +12,4 @@
+ #include "bitops.h"
+                 .text
+ 
+-ENTRY(_test_and_change_bit)
+-	testop	eor, str
+-ENDPROC(_test_and_change_bit)
++testop	_test_and_change_bit, eor, str
+diff --git a/arch/arm/lib/testclearbit.S b/arch/arm/lib/testclearbit.S
+index 521b66b..918841d 100644
+--- a/arch/arm/lib/testclearbit.S
++++ b/arch/arm/lib/testclearbit.S
+@@ -12,6 +12,4 @@
+ #include "bitops.h"
+                 .text
+ 
+-ENTRY(_test_and_clear_bit)
+-	testop	bicne, strne
+-ENDPROC(_test_and_clear_bit)
++testop	_test_and_clear_bit, bicne, strne
+diff --git a/arch/arm/lib/testsetbit.S b/arch/arm/lib/testsetbit.S
+index 1c98cc2..8d1b2fe 100644
+--- a/arch/arm/lib/testsetbit.S
++++ b/arch/arm/lib/testsetbit.S
+@@ -12,6 +12,4 @@
+ #include "bitops.h"
+                 .text
+ 
+-ENTRY(_test_and_set_bit)
+-	testop	orreq, streq
+-ENDPROC(_test_and_set_bit)
++testop	_test_and_set_bit, orreq, streq
+-- 
+1.7.4.1
