@@ -1,30 +1,64 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Mon, 21 Nov 2011 07:31:01 +0200
-Subject: [PATCH 0/3] ARM: iommu: tegra: Add initial Tegra IOMMU driver
-In-Reply-To: <20111118104354.GA19737@8bytes.org>
-References: <1321527667-12923-1-git-send-email-hdoyu@nvidia.com>
- <CAHQjnOM-N9suPrv_nSRQsxGCNrf77rFLNtRcOdsjyz_O6bGdpA@mail.gmail.com>
- <20111118104354.GA19737@8bytes.org>
-Message-ID: <20111121073101.6b369421.hdoyu@nvidia.com>
+From: junxiao.bi@windriver.com (Bi Junxiao)
+Date: Mon, 21 Nov 2011 13:44:25 +0800
+Subject: [PATCH 1/6] ARM: fix be8 support for phys/virt address conversion
+In-Reply-To: <1321322785-2981-1-git-send-email-junxiao.bi@windriver.com>
+References: <1321322785-2981-1-git-send-email-junxiao.bi@windriver.com>
+Message-ID: <4EC9E539.9060801@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joerg,
+Hi Russell,
 
-On Fri, 18 Nov 2011 11:43:54 +0100
-Joerg Roedel <joro@8bytes.org> wrote:
+Would you please help to review this patch series?
 
-> On Fri, Nov 18, 2011 at 07:19:53PM +0900, KyongHo Cho wrote:
-> 
-> > I found that those patches are not IOMMU API implementations.
-> > I wonder why they need to be located in drivers/iommu?
-> 
-> The current effort goes into creating a generic framework for IOMMUs.
-> These patches create their own framework which is totally the wrong
-> direction, they even implement their own version of an IOMMU-API.
-> 
-> I object against merging them until they are converted to the generic
-> IOMMU-API.
+Great thanks.
 
-Ok, I'll in v2 of this patchset.
-That was a plan, mentioned in the cover letter of this patchset.
+on 11/15/2011 10:06 AM Junxiao Bi wrote:
+> phys_to_virt() and virt_to_phys() is implemented by one assembler instruction,
+> add/sub an offset between the physical and virtual address. For some arm machines
+> with CONFIG_ARM_PATCH_PHYS_VIRT defined, this offset is unknown at compile time,
+> it is calculated dynamically at run time and then patched to the add/sub instruction.
+> To support BE8 mode, firstly we need to convert the instruntion to big-endian after
+> loading it from the memory, and then modify its offset field, at last convert it to
+> little-endian and write it back to the memory.
+>
+> Signed-off-by: Junxiao Bi<junxiao.bi@windriver.com>
+> ---
+>   arch/arm/kernel/head.S |   12 ++++++++++++
+>   1 files changed, 12 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
+> index 566c54c..838fb0c 100644
+> --- a/arch/arm/kernel/head.S
+> +++ b/arch/arm/kernel/head.S
+> @@ -522,8 +522,14 @@ __fixup_a_pv_table:
+>   	b	2f
+>   1:	add     r7, r3
+>   	ldrh	ip, [r7, #2]
+> +#ifdef CONFIG_CPU_ENDIAN_BE8
+> +	rev16	ip, ip
+> +#endif
+>   	and	ip, 0x8f00
+>   	orr	ip, r6	@ mask in offset bits 31-24
+> +#ifdef CONFIG_CPU_ENDIAN_BE8
+> +	rev16	ip, ip
+> +#endif
+>   	strh	ip, [r7, #2]
+>   2:	cmp	r4, r5
+>   	ldrcc	r7, [r4], #4	@ use branch for delay slot
+> @@ -532,8 +538,14 @@ __fixup_a_pv_table:
+>   #else
+>   	b	2f
+>   1:	ldr	ip, [r7, r3]
+> +#ifdef CONFIG_CPU_ENDIAN_BE8
+> +	rev	ip, ip
+> +#endif
+>   	bic	ip, ip, #0x000000ff
+>   	orr	ip, ip, r6	@ mask in offset bits 31-24
+> +#ifdef CONFIG_CPU_ENDIAN_BE8
+> +	rev	ip, ip
+> +#endif
+>   	str	ip, [r7, r3]
+>   2:	cmp	r4, r5
+>   	ldrcc	r7, [r4], #4	@ use branch for delay slot
+>    
