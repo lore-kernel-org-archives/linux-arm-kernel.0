@@ -1,51 +1,80 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Mon, 21 Nov 2011 16:29:19 +0200
-Subject: [PATCH 06/10] arm/tegra: prepare pinmux code for multiple
- tegra variants
-In-Reply-To: <20111118214116.GC31678@quad.lixom.net>
-References: <1321546766-26770-1-git-send-email-pdeschrijver@nvidia.com>
- <1321546766-26770-7-git-send-email-pdeschrijver@nvidia.com>
- <20111118214116.GC31678@quad.lixom.net>
-Message-ID: <20111121142919.GN19069@tbergstrom-lnx.Nvidia.com>
+From: jochen@scram.de (Jochen Friedrich)
+Date: Mon, 21 Nov 2011 15:32:56 +0100
+Subject: [PATCH] Initial DT support for SIMpad devices.
+In-Reply-To: <20111121095020.GA7314@totoro>
+References: <1321821470-32396-1-git-send-email-jochen@scram.de>
+ <20111121095020.GA7314@totoro>
+Message-ID: <4ECA6118.1050806@scram.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 18, 2011 at 10:41:16PM +0100, Olof Johansson wrote:
-> On Thu, Nov 17, 2011 at 06:19:20PM +0200, Peter De Schrijver wrote:
-> > This patch modifies the pinmux code to be useable for multiple tegra variants.
-> > Some tegra20 specific constants will be replaced by variables which will be
-> > initialized to the appropriate value at runtime.
-> >
-> > Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
-> > ---
-> >  arch/arm/mach-tegra/board-harmony-pcie.c     |    1 +
-> >  arch/arm/mach-tegra/board-harmony-pinmux.c   |    1 +
-> >  arch/arm/mach-tegra/board-paz00-pinmux.c     |    1 +
-> >  arch/arm/mach-tegra/board-trimslice-pinmux.c |    1 +
-> >  arch/arm/mach-tegra/include/mach/pinmux.h    |   25 +++----
-> >  arch/arm/mach-tegra/pinmux-tegra20-tables.c  |   15 +++-
-> >  arch/arm/mach-tegra/pinmux.c                 |  105 ++++++++++++++-----------
-> >  7 files changed, 86 insertions(+), 63 deletions(-)
-> >
-> > diff --git a/arch/arm/mach-tegra/board-harmony-pcie.c b/arch/arm/mach-tegra/board-harmony-pcie.c
-> > index 6db7d69..bd402d0 100644
-> > --- a/arch/arm/mach-tegra/board-harmony-pcie.c
-> > +++ b/arch/arm/mach-tegra/board-harmony-pcie.c
-> > @@ -23,6 +23,7 @@
-> >  #include <asm/mach-types.h>
-> >
-> >  #include <mach/pinmux.h>
-> > +#include <mach/pinmux-tegra20.h>
-> 
-> Boards shouldn't have to include this. The idea is that you should only
-> have to do board code against the pinmux.h interface, which internally
-> abstracts it for tegra 20 vs tegra 30.
+Hi Jamie,
 
-The pinmux naming is still SoC specific. Unless we move this to devicetree
-(which should be part of a different patchset), I don't see how we can solve
-this, except by renaming all the pingroups. That would cause a lot more
-changes though.
+>> +	localbus {
+>> +		compatible = "intel,sa1110-localbus";
+>
+> Could this claim compatibility with simple-bus?
 
-Cheers,
+I wasn't sure about this. I took a look in the powerpc DTS files for reference and they used
+some kind of <chip>-localbus compatible entries. So I took the same approach here.
 
-Peter.
+>> +		uart2: serial at 0x80050000 {
+>> +			compatible = "intel,sa1100-uart";
+>> +			reg =<0x80050000 0x24>;
+>> +			interrupts =<17>;
+>> +			status = "disabled";
+>
+> Hmm, I couldn't see status defined in the UART binding or where it was
+> used...  Is this required?
+
+status is a global property and it's being used in drivers/of/base.c, of_device_is_available().
+It is used in other dtsi files like e.g. at91sam9g45.dtsi as well to define optional nodes.
+
+>> +/ {
+>> +	model = "SIEMENS, SIMpad";
+>> +	compatible = "siemens,simpad";
+>
+> It may be worth adding the SoC compatible string after the board one for
+> completeness.
+
+Do you mean something like this?
+
+	compatible = "siemens,simpad", "intel,sa1100";
+
+>> +	chosen {
+>> +		bootargs = "console=ttySA0";
+>
+> It is preferred for the bootloader to set these up rather than having
+> them statically in the DTS if at all possible.
+
+Yes, my boot loader does this, but simpad support is not in official U-BOOT yet.
+This allows testing with a different boot loader like the hh.org one and a Linux
+binary with DTB appended.
+
+>> +const struct of_device_id simpad_bus_match_table[] = {
+>> +	{ .compatible = "simple-bus", },
+>> +	{ .compatible = "intel,sa1110-localbus", },
+>> +	{} /* Empty terminated list */
+>> +};
+>> +
+>> +static void __init simpad_dt_device_init(void)
+>> +{
+>> +	of_platform_populate(NULL, simpad_bus_match_table, NULL, NULL);
+>> +}
+>
+> If the localbus was compatible with simple-bus then you could do:
+>
+> 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+>
+> and remove simpad_bus_match_table.
+
+True, I just wasn't sure if it's OK to do so.
+
+>> +static const char *simpad_dt_board_compat[] __initdata = {
+>
+> I think this should be __initconst.
+
+OK.
+
+Thanks,
+Jochen
