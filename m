@@ -1,66 +1,39 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Mon, 21 Nov 2011 14:47:46 +0000
-Subject: [PATCH] Initial DT support for SIMpad devices.
-In-Reply-To: <4ECA6118.1050806@scram.de>
-References: <1321821470-32396-1-git-send-email-jochen@scram.de>
- <20111121095020.GA7314@totoro> <4ECA6118.1050806@scram.de>
-Message-ID: <20111121144746.GB25627@totoro>
+From: ming.lei@canonical.com (Ming Lei)
+Date: Mon, 21 Nov 2011 22:53:54 +0800
+Subject: [PATCH v5 4/7] arm: omap4: hwmod: introduce emu hwmod
+In-Reply-To: <20111121135828.GC20611@mudshark.cambridge.arm.com>
+References: <1319467559-5518-1-git-send-email-ming.lei@canonical.com>
+ <1319467559-5518-5-git-send-email-ming.lei@canonical.com>
+ <alpine.DEB.2.00.1111080750130.10451@utopia.booyaka.com>
+ <CACVXFVMSJUT2Ac+bWetrLpbyOs6PqY+npNHsbvHipEVZ0gWdgQ@mail.gmail.com>
+ <alpine.DEB.2.00.1111100152430.4195@utopia.booyaka.com>
+ <4EC6566C.70202@ti.com>
+ <20111118145635.GB17991@mudshark.cambridge.arm.com>
+ <CACVXFVNuz62+2DzOks3-0io2Ni=LK5SJienU4GcGRMtkh92vvQ@mail.gmail.com>
+ <alpine.DEB.2.00.1111192019200.30133@utopia.booyaka.com>
+ <20111121135828.GC20611@mudshark.cambridge.arm.com>
+Message-ID: <CACVXFVMzmjzi=3YxSG8EP+eb=8pe9Oo50MBmn+_cdkaVJkyGdA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jochen,
+Hi,
 
-On Mon, Nov 21, 2011 at 03:32:56PM +0100, Jochen Friedrich wrote:
-> >>+	localbus {
-> >>+		compatible = "intel,sa1110-localbus";
-> >
-> >Could this claim compatibility with simple-bus?
-> 
-> I wasn't sure about this. I took a look in the powerpc DTS files for reference and they used
-> some kind of <chip>-localbus compatible entries. So I took the same approach here.
+On Mon, Nov 21, 2011 at 9:58 PM, Will Deacon <will.deacon@arm.com> wrote:
+> On Sun, Nov 20, 2011 at 03:27:19AM +0000, Paul Walmsley wrote:
+>> The OMAP-specific parts should be queued up in my/Beno?t's/Tony's trees,
+>> rather than placed directly into -next. ?Otherwise they are likely to
+>> generate merge conflicts with other OMAP changes that we may generate.
+>>
+>> So I'd suggest splitting patches 1-3 off into a separate series that Will
+>> can pass on to -next if he wishes.
+>
+> Fine by me. If Ming Lei posts a new series so that everything is in one
+> thread then I can pick out the bits I want.
 
-Hmm, I haven't seen any of the ARM platforms doing this, and unless the 
-sa1110 bus has some extra knobs that need tweaking, then simple-bus 
-should be fine.
+You mean the 3rd patch is the debugss patch posted by Benoit?
+The original 3rd patch is not needed any more once the debugss patch
+is taken.
 
-> >>+		uart2: serial at 0x80050000 {
-> >>+			compatible = "intel,sa1100-uart";
-> >>+			reg =<0x80050000 0x24>;
-> >>+			interrupts =<17>;
-> >>+			status = "disabled";
-> >
-> >Hmm, I couldn't see status defined in the UART binding or where it was
-> >used...  Is this required?
-> 
-> status is a global property and it's being used in drivers/of/base.c, of_device_is_available().
-> It is used in other dtsi files like e.g. at91sam9g45.dtsi as well to define optional nodes.
-
-Ahh, I wasn't aware of that one - thanks!
-
-> >>+/ {
-> >>+	model = "SIEMENS, SIMpad";
-> >>+	compatible = "siemens,simpad";
-> >
-> >It may be worth adding the SoC compatible string after the board one for
-> >completeness.
-> 
-> Do you mean something like this?
-> 
-> 	compatible = "siemens,simpad", "intel,sa1100";
-
-Yup, that looks about right.
-
-> >>+	chosen {
-> >>+		bootargs = "console=ttySA0";
-> >
-> >It is preferred for the bootloader to set these up rather than having
-> >them statically in the DTS if at all possible.
-> 
-> Yes, my boot loader does this, but simpad support is not in official U-BOOT yet.
-> This allows testing with a different boot loader like the hh.org one and a Linux
-> binary with DTB appended.
-
-OK, I guess that's fair enough, though I certainly shouldn't be 
-considered an authoritative source on this!
-
-Jamie
+thanks,
+--
+Ming Lei
