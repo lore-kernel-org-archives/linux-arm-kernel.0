@@ -1,48 +1,208 @@
-From: ming.lei@canonical.com (Ming Lei)
-Date: Mon, 21 Nov 2011 23:30:02 +0800
-Subject: [PATCH v5 4/7] arm: omap4: hwmod: introduce emu hwmod
-In-Reply-To: <20111121151612.GF20611@mudshark.cambridge.arm.com>
-References: <1319467559-5518-5-git-send-email-ming.lei@canonical.com>
- <alpine.DEB.2.00.1111080750130.10451@utopia.booyaka.com>
- <CACVXFVMSJUT2Ac+bWetrLpbyOs6PqY+npNHsbvHipEVZ0gWdgQ@mail.gmail.com>
- <alpine.DEB.2.00.1111100152430.4195@utopia.booyaka.com>
- <4EC6566C.70202@ti.com>
- <20111118145635.GB17991@mudshark.cambridge.arm.com>
- <CACVXFVNuz62+2DzOks3-0io2Ni=LK5SJienU4GcGRMtkh92vvQ@mail.gmail.com>
- <alpine.DEB.2.00.1111192019200.30133@utopia.booyaka.com>
- <20111121135828.GC20611@mudshark.cambridge.arm.com>
- <CACVXFVMzmjzi=3YxSG8EP+eb=8pe9Oo50MBmn+_cdkaVJkyGdA@mail.gmail.com>
- <20111121151612.GF20611@mudshark.cambridge.arm.com>
-Message-ID: <CACVXFVMFA4ry2fg3o8O9r0BFnUbbHZ6bg_fYzNhbXpobCEcfqw@mail.gmail.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Mon, 21 Nov 2011 23:50:42 +0800
+Subject: [RFC 3/8] of: create of_phandle_args to simplify return of
+ phandle parsing data
+In-Reply-To: <1320801583-12774-4-git-send-email-grant.likely@secretlab.ca>
+References: <1320801583-12774-1-git-send-email-grant.likely@secretlab.ca>
+ <1320801583-12774-4-git-send-email-grant.likely@secretlab.ca>
+Message-ID: <20111121155042.GB16417@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 21, 2011 at 11:16 PM, Will Deacon <will.deacon@arm.com> wrote:
-> On Mon, Nov 21, 2011 at 02:53:54PM +0000, Ming Lei wrote:
->> On Mon, Nov 21, 2011 at 9:58 PM, Will Deacon <will.deacon@arm.com> wrote:
->> > On Sun, Nov 20, 2011 at 03:27:19AM +0000, Paul Walmsley wrote:
->> >> The OMAP-specific parts should be queued up in my/Beno?t's/Tony's trees,
->> >> rather than placed directly into -next. ?Otherwise they are likely to
->> >> generate merge conflicts with other OMAP changes that we may generate.
->> >>
->> >> So I'd suggest splitting patches 1-3 off into a separate series that Will
->> >> can pass on to -next if he wishes.
->> >
->> > Fine by me. If Ming Lei posts a new series so that everything is in one
->> > thread then I can pick out the bits I want.
->>
->> You mean the 3rd patch is the debugss patch posted by Benoit?
->> The original 3rd patch is not needed any more once the debugss patch
->> is taken.
->
-> Ah sorry, I lost track a bit. In that case, I'll just keep hold of the two
-> patches I have and deal with them appropriately.
+On Tue, Nov 08, 2011 at 06:19:38PM -0700, Grant Likely wrote:
+[...]
+>  /**
+> - * of_parse_phandles_with_args - Find a node pointed by phandle in a list
+> + * of_parse_phandle_with_args - Find a node pointed by phandle in a list
+>   * @np:		pointer to a device tree node containing a list
+>   * @list_name:	property name that contains a list
+>   * @cells_name:	property name that specifies phandles' arguments count
+>   * @index:	index of a phandle to parse out
+> - * @out_node:	optional pointer to device_node struct pointer (will be filled)
+> - * @out_args:	optional pointer to arguments pointer (will be filled)
+> + * @out_args:	optional pointer to output arguments structure (will be filled)
+>   *
+>   * This function is useful to parse lists of phandles and their arguments.
+> - * Returns 0 on success and fills out_node and out_args, on error returns
+> - * appropriate errno value.
+> + * Returns 0 on success and fills out_args, on error returns appropriate
+> + * errno value.
+>   *
+>   * Example:
+>   *
+> @@ -851,94 +850,105 @@ EXPORT_SYMBOL(of_parse_phandle);
+>   * }
+>   *
+>   * To get a device_node of the `node2' node you may call this:
+> - * of_parse_phandles_with_args(node3, "list", "#list-cells", 2, &node2, &args);
+> + * of_parse_phandle_with_args(node3, "list", "#list-cells", 2, &args);
 
-Sorry too, :-)
+Not introduced by this patch, but if I read the code correctly,
+the fourth parameter should be 1?
 
-It should be that both 3/7 and 4/7 are not needed any more.
-Benoit's debugss patch will replace the 4/7 patch(introduce emu hwmod).
+>   */
+> -int of_parse_phandles_with_args(struct device_node *np, const char *list_name,
+> +int of_parse_phandle_with_args(struct device_node *np, const char *list_name,
+>  				const char *cells_name, int index,
+> -				struct device_node **out_node,
+> -				const void **out_args)
+> +				struct of_phandle_args *out_args)
+>  {
+>  	int ret = -EINVAL;
+> -	const __be32 *list;
+> -	const __be32 *list_end;
+> -	int size;
+> -	int cur_index = 0;
+> +	const __be32 *list, *list_end;
+> +	int size, cur_index = 0;
+> +	uint32_t count = 0;
+>  	struct device_node *node = NULL;
+> -	const void *args = NULL;
+> +	phandle phandle;
+>  
+> +	/* Retrieve the phandle list property */
+>  	list = of_get_property(np, list_name, &size);
+> -	if (!list) {
+> -		ret = -ENOENT;
+> +	if (!list)
+>  		goto err0;
+> -	}
+>  	list_end = list + size / sizeof(*list);
+>  
+> +	/*
+> +	 * Loop over all the entries in the list, parsing the #cells property
+> +	 * for each one to determine how long each argument list is
+> +	 */
+>  	while (list < list_end) {
+> -		const __be32 *cells;
+> -		phandle phandle;
+> +		count = 0;
+>  
+> +		/*
+> +		 * If phandle is null, then it is an empty entry with no args,
+> +		 * skip forward to the next entry
+> +		 */
+>  		phandle = be32_to_cpup(list++);
+> -		args = list;
+> -
+> -		/* one cell hole in the list = <>; */
+> -		if (!phandle)
+> -			goto next;
+> -
+> -		node = of_find_node_by_phandle(phandle);
+> -		if (!node) {
+> -			pr_debug("%s: could not find phandle\n",
+> -				 np->full_name);
+> -			goto err0;
+> -		}
+> +		if (phandle) {
+> +			/*
+> +			 * Find the provider node and parse the #*-cells
+> +			 * property to determine how long the arguements are
+> +			 */
+> +			node = of_find_node_by_phandle(phandle);
+> +			if (!node) {
+> +				pr_debug("%s: could not find phandle\n",
+> +					 np->full_name);
+> +				ret = -EINVAL;
+> +				goto err0;
+> +			}
+> +			if (of_property_read_u32(node, cells_name, &count)) {
+> +				pr_debug("%s: could not get %s for %s\n",
+> +					 np->full_name, cells_name,
+> +					 node->full_name);
+> +				ret = -EINVAL;
+> +				goto err1;
+> +			}
+>  
+> -		cells = of_get_property(node, cells_name, &size);
+> -		if (!cells || size != sizeof(*cells)) {
+> -			pr_debug("%s: could not get %s for %s\n",
+> -				 np->full_name, cells_name, node->full_name);
+> -			goto err1;
+> +			/*
+> +			 * Make sure that the arguments actually fit in the
+> +			 * remaining property data length
+> +			 */
+> +			if (list + count > list_end) {
+> +				pr_debug("%s: insufficient arguments length\n",
+> +					 np->full_name);
+> +				goto err1;
+> +			}
+>  		}
+>  
+> -		list += be32_to_cpup(cells);
+> -		if (list > list_end) {
+> -			pr_debug("%s: insufficient arguments length\n",
+> -				 np->full_name);
+> -			goto err1;
+> -		}
+> -next:
+> -		if (cur_index == index)
+> +		/*
+> +		 * All of the error cases in the loop bail out to the err
+> +		 * labels, so at this point, the parsing was successful, but
+> +		 * it might be an empty entry
+> +		 */
+> +		if (cur_index == index) {
+> +			ret = phandle ? 0 : -ENOENT;
 
-thanks,
---
-Ming Lei
+We have some return code here ...
+
+>  			break;
+> +		}
+>  
+>  		of_node_put(node);
+>  		node = NULL;
+> -		args = NULL;
+> +		list += count;
+>  		cur_index++;
+>  	}
+>  
+> -	if (!node) {
+> -		/*
+> -		 * args w/o node indicates that the loop above has stopped at
+> -		 * the 'hole' cell. Report this differently.
+> -		 */
+> -		if (args)
+> -			ret = -EEXIST;
+> -		else
+> -			ret = -ENOENT;
+> +	if (!node)
+>  		goto err0;
+> -	}
+> -
+> -	if (out_node)
+> -		*out_node = node;
+> -	if (out_args)
+> -		*out_args = args;
+>  
+> +	if (out_args) {
+> +		int i;
+> +		if (WARN_ON(count > MAX_PHANDLE_ARGS))
+> +			count = MAX_PHANDLE_ARGS;
+> +		out_args->np = node;
+> +		out_args->args_count = count;
+> +		for (i = 0; i < count; i++)
+> +			out_args->args[i] = be32_to_cpup(list++);
+> +	}
+>  	return 0;
+
+... should this be "return ret"?
+
+> -err1:
+> +
+> + err1:
+>  	of_node_put(node);
+> -err0:
+> + err0:
+>  	pr_debug("%s failed with status %d\n", __func__, ret);
+>  	return ret;
+>  }
+> -EXPORT_SYMBOL(of_parse_phandles_with_args);
+> +EXPORT_SYMBOL(of_parse_phandle_with_args);
+>  
+
+-- 
+Regards,
+Shawn
