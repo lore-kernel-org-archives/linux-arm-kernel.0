@@ -1,40 +1,69 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 21 Nov 2011 16:34:00 +0000
-Subject: [PATCH RFC] ARM: unwind: optimize to not convert each table
- value but the address
-In-Reply-To: <1321830763-7227-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <20111120225207.GB30612@pengutronix.de>
- <1321830763-7227-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <20111121163359.GD3272@arm.com>
+From: omar.ramirez@ti.com (Ramirez Luna, Omar)
+Date: Mon, 21 Nov 2011 10:42:52 -0600
+Subject: [PATCH] ARM: OMAP: dmtimer: fix missing content/correction in
+ low-power mode support
+In-Reply-To: <1320732026-6783-1-git-send-email-tarun.kanti@ti.com>
+References: <1320732026-6783-1-git-send-email-tarun.kanti@ti.com>
+Message-ID: <CAB-zwWiNc=aFMd2ccyL=s1c5qa8dnu6c-M29K1CrezJ01YXZWg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 20, 2011 at 11:12:42PM +0000, Uwe Kleine-K?nig wrote:
-> The offsets in the unwind index section are signed 31 bit numbers and
-> the structs are sorted by this offset. So it first has offsets between
-> 0x40000000 and 0x7fffffff (i.e. the negative offsets) and then offsets
-> between 0x00000000 and 0x3fffffff. When seperating these two blocks the
-> numbers are sorted even when interpreting the offsets as unsigned longs.
-> 
-> So instead of converting each offset hit during bisection to an absolute
-> address, first determine which of the blocks needs to be searched and
-> then adapt the key to find for the offset while bisecting using a simple
-> unsigned long comparison.
-> 
-> In my tests this is faster than the original implementation modifying
-> the unwind index section by 4.5%.
+Hi,
 
-If you don't care about the 7% unwinding performance drop on XIP
-kernels, we could just have a prel31_lt() macro (or whatever other name)
-which is a standard '<' comparison on !XIP kernels and does the prel31
-conversion with XIP. It's only two places in search_index() where it is
-needed and the code would still be more readable than the changes in
-this patch :).
+On Tue, Nov 8, 2011 at 12:00 AM, Tarun Kanti DebBarma
+<tarun.kanti@ti.com> wrote:
+> Since omap_dm_timer_write_reg/__omap_dm_timer_write is now modified
+> to use timer->func_base OCP_CFG should not use this wrapper anymore.
+> Instead use __raw_writel() directly and use timer->io_base instead
+> to write to OCP_CFG.
+>
+> The timer->sys_stat is valid only if timer->revision is 1. In the
+> context restore function make this correction.
+>
+> Save the contexts and loss count when timer is stopped.
+> Also, disable the clock. Else, clock usecount would become imbalanced.
+>
+> Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
+...
+> diff --git a/arch/arm/plat-omap/dmtimer.c b/arch/arm/plat-omap/dmtimer.c
+> index af3b92b..f042c82 100644
+> --- a/arch/arm/plat-omap/dmtimer.c
+> +++ b/arch/arm/plat-omap/dmtimer.c
+...
+> @@ -357,6 +357,21 @@ int omap_dm_timer_stop(struct omap_dm_timer *timer)
+>
+> ? ? ? ?__omap_dm_timer_stop(timer, timer->posted, rate);
+>
+> + ? ? ? if (timer->loses_context) {
+> + ? ? ? ? ? ? ? if (timer->get_context_loss_count)
 
-If you still want such improvement, I'll do a proper review of the
-patch.
+Maybe: if (timer->loses_context && timer->get_context_loss_count)
 
-Thanks.
+> + ? ? ? ? ? ? ? ? ? ? ? timer->ctx_loss_count =
+> + ? ? ? ? ? ? ? ? ? ? ? timer->get_context_loss_count(&timer->pdev->dev);
 
--- 
-Catalin
+could get rid  of this weird one-line formatting
+
+> + ? ? ? }
+> +
+> + ? ? ? /*
+> + ? ? ? ?* Since the register values are computed and written within
+> + ? ? ? ?* __omap_dm_timer_stop, we need to use read to retrieve the
+> + ? ? ? ?* context.
+> + ? ? ? ?*/
+> + ? ? ? timer->context.tclr =
+> + ? ? ? ? ? ? ? ? ? ? ? omap_dm_timer_read_reg(timer, OMAP_TIMER_CTRL_REG);
+> + ? ? ? timer->context.tisr = __raw_readl(timer->irq_stat);
+> + ? ? ? omap_dm_timer_disable(timer);
+
+FWIW, functionally it looks good to me, besides it fixes the broken
+dmtimer start/stop sequence from 3.2-rc1. Tested with tidspbridge on
+omap3.
+
+If needed:
+
+Tested-by: Omar Ramirez Luna <omar.ramirez@ti.com>
+
+Regards,
+
+Omar
