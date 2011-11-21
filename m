@@ -1,119 +1,105 @@
 From: swarren@nvidia.com (Stephen Warren)
-Date: Mon, 21 Nov 2011 14:44:11 -0700
-Subject: [PATCH 5/5] arm/dt: tegra: Fix SDHCI nodes to match board files
+Date: Mon, 21 Nov 2011 14:44:08 -0700
+Subject: [PATCH 2/5] arm/dt: tegra: Remove /chosen node
 In-Reply-To: <1321911851-10091-1-git-send-email-swarren@nvidia.com>
 References: <1321911851-10091-1-git-send-email-swarren@nvidia.com>
-Message-ID: <1321911851-10091-5-git-send-email-swarren@nvidia.com>
+Message-ID: <1321911851-10091-2-git-send-email-swarren@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark any SDHCI controllers that aren't registered by the board files as
-disabled in the device-tree files.
+The command-lines present in the existing /chosen node are not necessarily
+correct for all users. Ideally, we should simply use the command-line
+supplied by the boot-loader.
 
-In practice, these controllers:
-
-* Have nothing hooked up to them at all, or
-* For ports intended for SDIO usage, the drivers for anything that might
-  be attached are not in the device-tree yet. If/when drivers appear, the
-  SD/MMC port can be re-enabled.
-
-The only possible exception is TrimSlice's mico SD slot, but that wasn't
-enabled in the board files before anyway, and doesn't work when all the
-SDHCI controllers are enabled anyway.
+In fact, using the boot-loader's cmdline is quite easy; either the
+bootloader fully supports DT, in which case it can modify the DT passed
+to the kernel to include its command-line, or CONFIG_APPENDED_DTB can
+be used in conjunction with CONFIG_ARM_ATAG_DTB_COMPAT, and the kernel
+will substitute the bootloader's command-line into the DT.
 
 Signed-off-by: Stephen Warren <swarren@nvidia.com>
 ---
- arch/arm/boot/dts/tegra-harmony.dts   |    8 ++++++++
- arch/arm/boot/dts/tegra-seaboard.dts  |    8 ++++++++
- arch/arm/boot/dts/tegra-trimslice.dts |   12 ++++++++++++
- arch/arm/boot/dts/tegra-ventana.dts   |    8 ++++++++
- 4 files changed, 36 insertions(+), 0 deletions(-)
+ arch/arm/boot/dts/tegra-harmony.dts   |    4 ----
+ arch/arm/boot/dts/tegra-paz00.dts     |    4 ----
+ arch/arm/boot/dts/tegra-seaboard.dts  |    4 ----
+ arch/arm/boot/dts/tegra-trimslice.dts |    4 ----
+ arch/arm/boot/dts/tegra-ventana.dts   |    4 ----
+ 5 files changed, 0 insertions(+), 20 deletions(-)
 
 diff --git a/arch/arm/boot/dts/tegra-harmony.dts b/arch/arm/boot/dts/tegra-harmony.dts
-index ac179a0..80afa1b 100644
+index a802324..ca6fa10 100644
 --- a/arch/arm/boot/dts/tegra-harmony.dts
 +++ b/arch/arm/boot/dts/tegra-harmony.dts
-@@ -67,12 +67,20 @@
- 		status = "disable";
- 	};
+@@ -6,10 +6,6 @@
+ 	model = "NVIDIA Tegra2 Harmony evaluation board";
+ 	compatible = "nvidia,harmony", "nvidia,tegra20";
  
-+	sdhci at c8000000 {
-+		status = "disable";
-+	};
-+
- 	sdhci at c8000200 {
- 		cd-gpios = <&gpio 69 0>; /* gpio PI5 */
- 		wp-gpios = <&gpio 57 0>; /* gpio PH1 */
- 		power-gpios = <&gpio 155 0>; /* gpio PT3 */
+-	chosen {
+-		bootargs = "vmalloc=192M video=tegrafb console=ttyS0,115200n8 root=/dev/mmcblk0p2 rw rootwait";
+-	};
+-
+ 	memory at 0 {
+ 		reg = < 0x00000000 0x40000000 >;
  	};
+diff --git a/arch/arm/boot/dts/tegra-paz00.dts b/arch/arm/boot/dts/tegra-paz00.dts
+index 1cd0cfe..4f6a8aa 100644
+--- a/arch/arm/boot/dts/tegra-paz00.dts
++++ b/arch/arm/boot/dts/tegra-paz00.dts
+@@ -6,10 +6,6 @@
+ 	model = "Toshiba AC100 / Dynabook AZ";
+ 	compatible = "compal,paz00", "nvidia,tegra20";
  
-+	sdhci at c8000400 {
-+		status = "disable";
-+	};
-+
- 	sdhci at c8000600 {
- 		cd-gpios = <&gpio 58 0>; /* gpio PH2 */
- 		wp-gpios = <&gpio 59 0>; /* gpio PH3 */
+-	chosen {
+-		bootargs = "console=ttyS0,115200n8 root=/dev/mmcblk0p1";
+-	};
+-
+ 	memory at 0 {
+ 		reg = <0x00000000 0x20000000>;
+ 	};
 diff --git a/arch/arm/boot/dts/tegra-seaboard.dts b/arch/arm/boot/dts/tegra-seaboard.dts
-index cbb2f08..f552bcc 100644
+index 60724e4..d1ada26 100644
 --- a/arch/arm/boot/dts/tegra-seaboard.dts
 +++ b/arch/arm/boot/dts/tegra-seaboard.dts
-@@ -47,6 +47,14 @@
- 		status = "disable";
- 	};
+@@ -6,10 +6,6 @@
+ 	model = "NVIDIA Seaboard";
+ 	compatible = "nvidia,seaboard", "nvidia,tegra20";
  
-+	sdhci at c8000000 {
-+		status = "disable";
-+	};
-+
-+	sdhci at c8000200 {
-+		status = "disable";
-+	};
-+
- 	sdhci at c8000400 {
- 		cd-gpios = <&gpio 69 0>; /* gpio PI5 */
- 		wp-gpios = <&gpio 57 0>; /* gpio PH1 */
+-	chosen {
+-		bootargs = "vmalloc=192M video=tegrafb console=ttyS0,115200n8 root=/dev/mmcblk1p3 rw rootwait";
+-	};
+-
+ 	memory {
+ 		device_type = "memory";
+ 		reg = < 0x00000000 0x40000000 >;
 diff --git a/arch/arm/boot/dts/tegra-trimslice.dts b/arch/arm/boot/dts/tegra-trimslice.dts
-index 6060ce0..3b3ee7d 100644
+index 95117d3..cf8e561 100644
 --- a/arch/arm/boot/dts/tegra-trimslice.dts
 +++ b/arch/arm/boot/dts/tegra-trimslice.dts
-@@ -46,6 +46,18 @@
- 		status = "disable";
- 	};
+@@ -6,10 +6,6 @@
+ 	model = "Compulab TrimSlice board";
+ 	compatible = "compulab,trimslice", "nvidia,tegra20";
  
-+	sdhci at c8000000 {
-+		status = "disable";
-+	};
-+
-+	sdhci at c8000200 {
-+		status = "disable";
-+	};
-+
-+	sdhci at c8000400 {
-+		status = "disable";
-+	};
-+
- 	sdhci at c8000600 {
- 		cd-gpios = <&gpio 121 0>;
- 		wp-gpios = <&gpio 122 0>;
+-	chosen {
+-		bootargs = "vmalloc=192M video=tegrafb console=ttyS0,115200n8 root=/dev/mmcblk0p1 rw rootwait";
+-	};
+-
+ 	memory at 0 {
+ 		reg = < 0x00000000 0x40000000 >;
+ 	};
 diff --git a/arch/arm/boot/dts/tegra-ventana.dts b/arch/arm/boot/dts/tegra-ventana.dts
-index 5ac0aa3..c7d3b87 100644
+index 2af12fa..1c09485 100644
 --- a/arch/arm/boot/dts/tegra-ventana.dts
 +++ b/arch/arm/boot/dts/tegra-ventana.dts
-@@ -46,6 +46,14 @@
- 		status = "disable";
- 	};
+@@ -6,10 +6,6 @@
+ 	model = "NVIDIA Tegra2 Ventana evaluation board";
+ 	compatible = "nvidia,ventana", "nvidia,tegra20";
  
-+	sdhci at c8000000 {
-+		status = "disable";
-+	};
-+
-+	sdhci at c8000200 {
-+		status = "disable";
-+	};
-+
- 	sdhci at c8000400 {
- 		cd-gpios = <&gpio 69 0>; /* gpio PI5 */
- 		wp-gpios = <&gpio 57 0>; /* gpio PH1 */
+-	chosen {
+-		bootargs = "vmalloc=192M video=tegrafb console=ttyS0,115200n8 root=/dev/ram rdinit=/sbin/init";
+-	};
+-
+ 	memory {
+ 		reg = < 0x00000000 0x40000000 >;
+ 	};
 -- 
 1.7.0.4
