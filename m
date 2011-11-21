@@ -1,34 +1,96 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 21 Nov 2011 09:56:58 +0000
-Subject: [01: PATCH 0/7] Preparation for arch_reset changes
-In-Reply-To: <20111106173113.GI12913@n2100.arm.linux.org.uk>
-References: <20111106173113.GI12913@n2100.arm.linux.org.uk>
-Message-ID: <20111121095658.GO9581@n2100.arm.linux.org.uk>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Mon, 21 Nov 2011 10:00:20 +0000
+Subject: [GIT PULL] Support for Cadence GEM in the MACB driver
+Message-ID: <20111121100020.GB7314@totoro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As of today, I'm going to start freezing the restart changes, which
-covers those which have been in linux-next so far.  I've collected up
-all the acks, etc, to date, and will not be applying any more to these
-commits.
+Hi Arnd,
 
-At the end of today, I'll merge these into my 'devel-stable' branch
-to signify their new status, so if anyone has any objections they need
-to speak up _now_.
+Please consider pulling the patches to add support for Cadence GEM to 
+the MACB driver.  These have been ready to go for a little while but got 
+held up with the rename of Ethernet drivers in the last merge window.  
+It would be great if we can get some exposure in -next for a little 
+while before the next merge window.
 
-The base set of changes are:
+Thanks,
 
-ARM: restart: only perform setup for restart when soft-restarting
-ARM: restart: remove argument to setup_mm_for_reboot()
-ARM: restart: move reboot failure handing into machine_restart()
-ARM: restart: add default restart modes for PXA mioa701, spitz and tosa
-ARM: restart: allow platforms more flexibility specifying restart mode
-ARM: restart: add restart hook to machine_desc record
+Jamie
 
-and the cleanups to prepare for the rest of the restart changes:
+The following changes since commit cfcfc9eca2bcbd26a8e206baeb005b055dbf8e37:
 
-ARM: restart: remove poodle restart handler
-ARM: w90x900: add common nuc9xx.h
-ARM: clps711x: consolidate irq/mm/time code into a single file
-ARM: 7159/1: OMAP: Introduce local common.h files
-ARM: restart: remove local_irq_disable() from within arch_reset()
+  Linux 3.2-rc2 (2011-11-15 15:02:59 -0200)
+
+are available in the git repository at:
+  git://github.com/jamieiles/linux-2.6-ji.git macb-gem
+
+Jamie Iles (9):
+      at91: provide macb clks with "pclk" and "hclk" name
+      macb: remove conditional clk handling
+      macb: unify at91 and avr32 platform data
+      macb: convert printk to netdev_ and friends
+      macb: initial support for Cadence GEM
+      macb: support higher rate GEM MDIO clock divisors
+      macb: support statistics for GEM devices
+      macb: support DMA bus widths > 32 bits
+      macb: allow GEM to have configurable receive buffer size
+
+ arch/arm/mach-at91/at91cap9.c               |    8 +-
+ arch/arm/mach-at91/at91cap9_devices.c       |    6 +-
+ arch/arm/mach-at91/at91rm9200_devices.c     |    6 +-
+ arch/arm/mach-at91/at91sam9260.c            |    8 +-
+ arch/arm/mach-at91/at91sam9260_devices.c    |    6 +-
+ arch/arm/mach-at91/at91sam9263.c            |    8 +-
+ arch/arm/mach-at91/at91sam9263_devices.c    |    6 +-
+ arch/arm/mach-at91/at91sam9g45.c            |    8 +-
+ arch/arm/mach-at91/at91sam9g45_devices.c    |    6 +-
+ arch/arm/mach-at91/board-1arm.c             |    2 +-
+ arch/arm/mach-at91/board-afeb-9260v1.c      |    2 +-
+ arch/arm/mach-at91/board-cam60.c            |    2 +-
+ arch/arm/mach-at91/board-cap9adk.c          |    2 +-
+ arch/arm/mach-at91/board-carmeva.c          |    2 +-
+ arch/arm/mach-at91/board-cpu9krea.c         |    2 +-
+ arch/arm/mach-at91/board-cpuat91.c          |    2 +-
+ arch/arm/mach-at91/board-csb337.c           |    2 +-
+ arch/arm/mach-at91/board-csb637.c           |    2 +-
+ arch/arm/mach-at91/board-eb9200.c           |    2 +-
+ arch/arm/mach-at91/board-ecbat91.c          |    2 +-
+ arch/arm/mach-at91/board-eco920.c           |    2 +-
+ arch/arm/mach-at91/board-foxg20.c           |    2 +-
+ arch/arm/mach-at91/board-gsia18s.c          |    2 +-
+ arch/arm/mach-at91/board-kafa.c             |    2 +-
+ arch/arm/mach-at91/board-kb9202.c           |    2 +-
+ arch/arm/mach-at91/board-neocore926.c       |    2 +-
+ arch/arm/mach-at91/board-pcontrol-g20.c     |    2 +-
+ arch/arm/mach-at91/board-picotux200.c       |    2 +-
+ arch/arm/mach-at91/board-qil-a9260.c        |    2 +-
+ arch/arm/mach-at91/board-rm9200dk.c         |    2 +-
+ arch/arm/mach-at91/board-rm9200ek.c         |    2 +-
+ arch/arm/mach-at91/board-rsi-ews.c          |    2 +-
+ arch/arm/mach-at91/board-sam9-l9260.c       |    2 +-
+ arch/arm/mach-at91/board-sam9260ek.c        |    2 +-
+ arch/arm/mach-at91/board-sam9263ek.c        |    2 +-
+ arch/arm/mach-at91/board-sam9g20ek.c        |    2 +-
+ arch/arm/mach-at91/board-sam9m10g45ek.c     |    2 +-
+ arch/arm/mach-at91/board-snapper9260.c      |    2 +-
+ arch/arm/mach-at91/board-stamp9g20.c        |    2 +-
+ arch/arm/mach-at91/board-usb-a926x.c        |    2 +-
+ arch/arm/mach-at91/board-yl-9200.c          |    2 +-
+ arch/arm/mach-at91/include/mach/board.h     |   14 +-
+ arch/avr32/boards/atngw100/setup.c          |    2 +-
+ arch/avr32/boards/atstk1000/atstk1002.c     |    2 +-
+ arch/avr32/boards/favr-32/setup.c           |    2 +-
+ arch/avr32/boards/hammerhead/setup.c        |    2 +-
+ arch/avr32/boards/merisc/setup.c            |    2 +-
+ arch/avr32/boards/mimc200/setup.c           |    2 +-
+ arch/avr32/mach-at32ap/at32ap700x.c         |    8 +-
+ arch/avr32/mach-at32ap/include/mach/board.h |    7 +-
+ drivers/net/ethernet/Makefile               |    2 +-
+ drivers/net/ethernet/cadence/Kconfig        |   16 +-
+ drivers/net/ethernet/cadence/at91_ether.c   |    3 +-
+ drivers/net/ethernet/cadence/at91_ether.h   |    4 +-
+ drivers/net/ethernet/cadence/macb.c         |  344 +++++++++++++++++----------
+ drivers/net/ethernet/cadence/macb.h         |  150 ++++++++++++-
+ include/linux/platform_data/macb.h          |   17 ++
+ 57 files changed, 492 insertions(+), 211 deletions(-)
+ create mode 100644 include/linux/platform_data/macb.h
