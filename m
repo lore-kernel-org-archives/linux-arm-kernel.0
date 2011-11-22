@@ -1,28 +1,29 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 22 Nov 2011 11:55:52 +0100
-Subject: [PATCH 1/3] dmaengine: at_hdmac: add const to struct
- platform_device_id definition
-Message-ID: <25000153a64c2845223be78ee55e01e034613601.1321959137.git.nicolas.ferre@atmel.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 22 Nov 2011 11:21:34 +0000
+Subject: [01: PATCH 0/7] Preparation for arch_reset changes
+In-Reply-To: <20111121095658.GO9581@n2100.arm.linux.org.uk>
+References: <20111106173113.GI12913@n2100.arm.linux.org.uk>
+ <20111121095658.GO9581@n2100.arm.linux.org.uk>
+Message-ID: <20111122112134.GH20518@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- drivers/dma/at_hdmac.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+Hi Russell,
 
-diff --git a/drivers/dma/at_hdmac.c b/drivers/dma/at_hdmac.c
-index 3b0c28f..3b44f24 100644
---- a/drivers/dma/at_hdmac.c
-+++ b/drivers/dma/at_hdmac.c
-@@ -1191,7 +1191,7 @@ static const struct of_device_id atmel_dma_dt_ids[] = {
- MODULE_DEVICE_TABLE(of, atmel_dma_dt_ids);
- #endif
- 
--static struct platform_device_id atdma_devtypes[] = {
-+static const struct platform_device_id atdma_devtypes[] = {
- 	{
- 		.name = "at91sam9rl_dma",
- 		.driver_data = ATDMA_DEVTYPE_SAM9RL,
--- 
-1.7.5.4
+On Mon, Nov 21, 2011 at 09:56:58AM +0000, Russell King - ARM Linux wrote:
+> As of today, I'm going to start freezing the restart changes, which
+> covers those which have been in linux-next so far.  I've collected up
+> all the acks, etc, to date, and will not be applying any more to these
+> commits.
+> 
+> At the end of today, I'll merge these into my 'devel-stable' branch
+> to signify their new status, so if anyone has any objections they need
+> to speak up _now_.
+
+Is your reset branch stable now? I only ask because it doesn't look like
+you've merged these into devel-stable so I wondered if you have any further
+changes pending.
+
+Thanks,
+
+Will
