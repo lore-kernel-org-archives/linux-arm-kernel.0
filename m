@@ -1,32 +1,32 @@
-From: rubini@unipv.it (Alessandro Rubini)
-Date: Tue, 22 Nov 2011 16:19:42 +0100
-Subject: [GIT PULL] ARM: amba: Enable module alias autogeneration for
- AMBA drivers
-In-Reply-To: <20111122120756.GF2066@localhost.localdomain>
-References: <20111122120756.GF2066@localhost.localdomain>
- <1321961573-4562-1-git-send-email-dave.martin@linaro.org>
- <20111122115632.GA5165@mail.gnudd.com>
-Message-ID: <20111122151942.GA24821@mail.gnudd.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 22 Nov 2011 15:24:31 +0000
+Subject: [01: PATCH 0/7] Preparation for arch_reset changes
+In-Reply-To: <20111122112134.GH20518@mudshark.cambridge.arm.com>
+References: <20111106173113.GI12913@n2100.arm.linux.org.uk>
+ <20111121095658.GO9581@n2100.arm.linux.org.uk>
+ <20111122112134.GH20518@mudshark.cambridge.arm.com>
+Message-ID: <20111122152431.GY9581@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>   lkml.org/lkml/2011/11/4/125 (0/2: description of the work)
->>   lkml.org/lkml/2011/11/4/126 (1/2: turn the if plethora to table lookup)
->>   lkml.org/lkml/2011/11/4/127 (2/2: partial split to type-specific files).
+On Tue, Nov 22, 2011 at 11:21:34AM +0000, Will Deacon wrote:
+> Hi Russell,
 > 
-> Splitting this up doesn't look like a silly idea -- I thought it was
-> unfortunate to have to patch a core file just to add a bus type.
->
-> I guess the question is how many new buses we get over time.
+> On Mon, Nov 21, 2011 at 09:56:58AM +0000, Russell King - ARM Linux wrote:
+> > As of today, I'm going to start freezing the restart changes, which
+> > covers those which have been in linux-next so far.  I've collected up
+> > all the acks, etc, to date, and will not be applying any more to these
+> > commits.
+> > 
+> > At the end of today, I'll merge these into my 'devel-stable' branch
+> > to signify their new status, so if anyone has any objections they need
+> > to speak up _now_.
+> 
+> Is your reset branch stable now? I only ask because it doesn't look like
+> you've merged these into devel-stable so I wondered if you have any further
+> changes pending.
 
-Well, CERN will have 2 in a short time. And I'm sure the bus concept
-is so good that a number of them exists as external patches. Being
-forced to patch a core file is not good, with conflicts that accumulate
-over time.
-
-I'd better be able to drop in my own file and add a kconfig-aware line
-in Makefile.  I think the implementation is straightforward. Who should
-I send it to?
-
-thanks
-/alessandro
+See the message I sent to Marc about his irqchip consolidation - I was
+waiting for Marc to confirm that the resolution was good before I push
+the stuff over to the devel-stable branch.  Marc has confirmed that
+shortly after your message, so we're all good for this evening.
