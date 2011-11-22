@@ -1,320 +1,343 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 22 Nov 2011 09:48:55 +0800
-Subject: [RFC PATCH 2/3] arm/imx: add a generic clock implementation for imx
-In-Reply-To: <1321926536-671-1-git-send-email-shawn.guo@linaro.org>
-References: <1321926536-671-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1321926536-671-3-git-send-email-shawn.guo@linaro.org>
+From: mturquette@ti.com (Mike Turquette)
+Date: Mon, 21 Nov 2011 17:40:47 -0800
+Subject: [PATCH v3 5/5] clk: export tree topology and clk data via sysfs
+In-Reply-To: <1321926047-14211-1-git-send-email-mturquette@linaro.org>
+References: <1321926047-14211-1-git-send-email-mturquette@linaro.org>
+Message-ID: <1321926047-14211-6-git-send-email-mturquette@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It adds a generic clock implementation which applies on several
-modern imx generations.
+Introduces kobject support for the common struct clk, exports per-clk
+data via read-only callbacks and models the clk tree topology in sysfs.
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+Also adds support for generating the clk tree in clk_init and migrating
+nodes when input sources are switches in clk_set_parent.
+
+Signed-off-by: Mike Turquette <mturquette@linaro.org>
 ---
- arch/arm/mach-imx/clock.c |  222 +++++++++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-imx/clock.h |   64 +++++++++++++
- 2 files changed, 286 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-imx/clock.c
- create mode 100644 arch/arm/mach-imx/clock.h
+ drivers/clk/Kconfig     |   10 +++
+ drivers/clk/Makefile    |    1 +
+ drivers/clk/clk-sysfs.c |  199 +++++++++++++++++++++++++++++++++++++++++++++++
+ drivers/clk/clk.c       |    5 +-
+ include/linux/clk.h     |   36 ++++++++-
+ 5 files changed, 248 insertions(+), 3 deletions(-)
+ create mode 100644 drivers/clk/clk-sysfs.c
 
-diff --git a/arch/arm/mach-imx/clock.c b/arch/arm/mach-imx/clock.c
+diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
+index ba7eb8c..8f8e7ac 100644
+--- a/drivers/clk/Kconfig
++++ b/drivers/clk/Kconfig
+@@ -19,3 +19,13 @@ config GENERIC_CLK_BASIC
+ 	help
+ 	   Allow use of basic, single-function clock types.  These
+ 	   common definitions can be used across many platforms.
++
++config GENERIC_CLK_SYSFS
++	bool "Clock tree topology and debug info"
++	depends on EXPERIMENTAL && GENERIC_CLK
++	help
++	   Creates clock tree represenation in sysfs.  Directory names
++	   and hierarchy represent clock names and tree structure,
++	   respectively.  Each directory exports clock rate, flags,
++	   prepare_count and enable_count info as read-only for debug
++	   purposes.
+diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+index 68b20a1..806a9999 100644
+--- a/drivers/clk/Makefile
++++ b/drivers/clk/Makefile
+@@ -2,3 +2,4 @@
+ obj-$(CONFIG_CLKDEV_LOOKUP)		+= clkdev.o
+ obj-$(CONFIG_GENERIC_CLK)		+= clk.o
+ obj-$(CONFIG_GENERIC_CLK_BASIC)		+= clk-basic.o
++obj-$(CONFIG_GENERIC_CLK_SYSFS)		+= clk-sysfs.o
+diff --git a/drivers/clk/clk-sysfs.c b/drivers/clk/clk-sysfs.c
 new file mode 100644
-index 0000000..6243622
+index 0000000..8ccf9e3
 --- /dev/null
-+++ b/arch/arm/mach-imx/clock.c
-@@ -0,0 +1,222 @@
++++ b/drivers/clk/clk-sysfs.c
+@@ -0,0 +1,199 @@
 +/*
-+ * Copyright 2011 Freescale Semiconductor, Inc.
-+ * Copyright 2011 Linaro Ltd.
++ * Copyright (C) 2011 Linaro Ltd <mturquette@linaro.org>
 + *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
 + *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
++ * Clock tree topology and debug info for the common clock framework
 + */
 +
-+#include <linux/init.h>
-+#include <linux/types.h>
++#include <linux/clk.h>
++#include <linux/kobject.h>
++#include <linux/sysfs.h>
 +#include <linux/err.h>
-+#include <linux/clk.h>
-+#include <linux/io.h>
-+#include <asm/processor.h>
-+#include "clock.h"
 +
-+int clk_imx_enable(struct clk_hw *hw)
-+{
-+	struct clk_imx_gate *g = to_clk_imx(hw)->gate;
-+	u32 val;
++#define MAX_STRING_LENGTH	32
 +
-+	if (!g)
-+		return 0;
++static struct kobject *clk_kobj;
++LIST_HEAD(kobj_list);
 +
-+	val = readl_relaxed(g->reg);
-+	if (g->gate_set_bit)
-+		val &= ~g->mask;
-+	else
-+		val |= g->mask;
-+	writel_relaxed(val, g->reg);
-+
-+	return 0;
-+}
-+
-+void clk_imx_disable(struct clk_hw *hw)
-+{
-+	struct clk_imx_gate *g = to_clk_imx(hw)->gate;
-+	u32 val;
-+
-+	if (!g)
-+		return;
-+
-+	val = readl_relaxed(g->reg);
-+	if (g->gate_set_bit)
-+		val |= g->mask;
-+	else
-+		val &= ~g->mask;
-+	writel_relaxed(val, g->reg);
-+}
-+
-+struct clk *clk_imx_get_parent(struct clk_hw *hw)
-+{
-+	struct clk_imx_mux *m = to_clk_imx(hw)->mux;
-+	u32 i;
-+
-+	if (!m)
-+		return to_clk_imx(hw)->parent->clk;
-+
-+	i = readl_relaxed(m->reg) >> m->shift;
-+	i &= (1 << m->width) - 1;
-+
-+	if (i >= m->num_parents)
-+		return ERR_PTR(-EINVAL);
-+
-+	return m->parents[i]->clk;
-+}
-+
-+static int clk_imx_busy_wait(struct clk_imx_busy *b)
-+{
-+	int timeout = 0x100000;
-+
-+	while ((readl_relaxed(b->reg) & b->mask) && --timeout)
-+		cpu_relax();
-+
-+	if (unlikely(!timeout))
-+		return -EBUSY;
-+
-+	return 0;
-+}
-+
-+static int clk_imx_set_parent(struct clk_hw *hw, struct clk *parent)
-+{
-+	struct clk_imx_mux *m = to_clk_imx(hw)->mux;
-+	int i;
-+	u32 val;
-+
-+	if (!m)
-+		return -EINVAL;
-+
-+	for (i = 0; i < m->num_parents; i++)
-+		if (parent == m->parents[i]->clk)
-+			break;
-+
-+	if (i == m->num_parents)
-+		return -EINVAL;
-+
-+	val = readl_relaxed(m->reg);
-+	val &= ~(((1 << m->width) - 1) << m->shift);
-+	val |= i << m->shift;
-+	writel_relaxed(val, m->reg);
-+
-+	return (m->busy) ? clk_imx_busy_wait(m->busy) : 0;
-+}
-+
-+static unsigned long clk_imx_recalc_rate(struct clk_hw *hw)
-+{
-+	struct clk_imx_div *d = to_clk_imx(hw)->div;
-+	u32 val, pred, podf;
-+
-+	if (!d)
-+		return clk_get_rate(clk_get_parent(hw->clk));
-+
-+	val = readl_relaxed(d->reg);
-+	pred = (val >> d->shift_pred & ((1 << d->width_pred) - 1)) + 1;
-+	podf = (val >> d->shift_podf & ((1 << d->width_podf) - 1)) + 1;
-+
-+	return clk_get_rate(clk_get_parent(hw->clk)) / (pred * podf);
-+}
-+
-+static void calc_pred_podf_dividers(u32 div, u32 *pred, u32 *podf)
-+{
-+	u32 min_pred, temp_pred, old_err, err;
-+
-+	if (div >= 512) {
-+		*pred = 8;
-+		*podf = 64;
-+	} else if (div >= 8) {
-+		min_pred = (div - 1) / 64 + 1;
-+		old_err = 8;
-+		for (temp_pred = 8; temp_pred >= min_pred; temp_pred--) {
-+			err = div % temp_pred;
-+			if (err == 0) {
-+				*pred = temp_pred;
-+				break;
-+			}
-+			err = temp_pred - err;
-+			if (err < old_err) {
-+				old_err = err;
-+				*pred = temp_pred;
-+			}
-+		}
-+		*podf = (div + *pred - 1) / *pred;
-+	} else if (div < 8) {
-+		*pred = div;
-+		*podf = 1;
-+	}
-+}
-+
-+static long clk_imx_round_rate(struct clk_hw *hw, unsigned long rate)
-+{
-+	struct clk_imx_div *d = to_clk_imx(hw)->div;
-+	u32 div, div_max, pred = 0, podf;
-+	unsigned long parent_rate = clk_get_rate(clk_get_parent(hw->clk));
-+
-+	if (!d)
-+		return -EINVAL;
-+
-+	div = parent_rate / rate;
-+	if (div == 0 || parent_rate % rate)
-+		div++;
-+
-+	if (d->width_pred) {
-+		calc_pred_podf_dividers(div, &pred, &podf);
-+		div = pred * podf;
-+	} else {
-+		div_max = 1 << d->width_podf;
-+		if (div > div_max)
-+			div = div_max;
-+	}
-+
-+	return parent_rate / div;
-+}
-+
-+static int clk_imx_set_rate(struct clk_hw *hw, unsigned long rate,
-+			    unsigned long *parent_rate)
-+{
-+	struct clk_imx_div *d = to_clk_imx(hw)->div;
-+	u32 val, div, pred = 0, podf;
-+
-+	if (!d)
-+		return -EINVAL;
-+
-+	*parent_rate = clk_get_rate(clk_get_parent(hw->clk));
-+
-+	div = *parent_rate / rate;
-+	if (div == 0)
-+		div++;
-+
-+	if ((*parent_rate / div != rate) || div >
-+	    (1 << d->width_pred) * (1 << d->width_podf))
-+		return -EINVAL;
-+
-+	if (d->width_pred) {
-+		calc_pred_podf_dividers(div, &pred, &podf);
-+	} else {
-+		pred = 1;
-+		podf = div;
-+	}
-+
-+	val = readl_relaxed(d->reg);
-+	val &= ~(((1 << d->width_pred) - 1) << d->shift_pred);
-+	val &= ~(((1 << d->width_podf) - 1) << d->shift_podf);
-+	val |= (pred - 1) << d->shift_pred;
-+	val |= (podf - 1) << d->shift_podf;
-+	writel_relaxed(val, d->reg);
-+
-+	return (d->busy) ? clk_imx_busy_wait(d->busy) : 0;
-+}
-+
-+const struct clk_hw_ops clk_imx_ops = {
-+	.enable		= clk_imx_enable,
-+	.disable	= clk_imx_disable,
-+	.recalc_rate	= clk_imx_recalc_rate,
-+	.round_rate	= clk_imx_round_rate,
-+	.set_rate	= clk_imx_set_rate,
-+	.get_parent	= clk_imx_get_parent,
-+	.set_parent	= clk_imx_set_parent,
++struct clk_attribute {
++	struct attribute attr;
++	ssize_t (*show)(struct clk *clk, char *buf);
 +};
-diff --git a/arch/arm/mach-imx/clock.h b/arch/arm/mach-imx/clock.h
-new file mode 100644
-index 0000000..49e42b9
---- /dev/null
-+++ b/arch/arm/mach-imx/clock.h
-@@ -0,0 +1,64 @@
-+/*
-+ * Copyright 2011 Freescale Semiconductor, Inc.
-+ * Copyright 2011 Linaro Ltd.
++
++static ssize_t clk_rate_show(struct clk *clk, char *buf)
++{
++	if (IS_ERR_OR_NULL(clk))
++		return -ENODEV;
++
++	return snprintf(buf, MAX_STRING_LENGTH, "%lu\n", clk->rate);
++}
++
++static ssize_t clk_flags_show(struct clk *clk, char *buf)
++{
++	if (IS_ERR_OR_NULL(clk))
++		return -ENODEV;
++
++	return snprintf(buf, MAX_STRING_LENGTH, "0x%lX\n", clk->flags);
++}
++
++static ssize_t clk_prepare_count_show(struct clk *clk, char *buf)
++{
++	if (IS_ERR_OR_NULL(clk))
++		return -ENODEV;
++
++	return snprintf(buf, MAX_STRING_LENGTH, "%d\n", clk->prepare_count);
++}
++
++static ssize_t clk_enable_count_show(struct clk *clk, char *buf)
++{
++	if (IS_ERR_OR_NULL(clk))
++		return -ENODEV;
++
++	return snprintf(buf, MAX_STRING_LENGTH, "%d\n", clk->enable_count);
++}
++
++static ssize_t clk_show(struct kobject *kobj, struct attribute *attr,
++		char *buf)
++{
++	struct clk *clk;
++	struct clk_attribute *clk_attr;
++	ssize_t ret = -EINVAL;
++
++	clk = container_of(kobj, struct clk, kobj);
++	clk_attr = container_of(attr, struct clk_attribute, attr);
++
++	if (!clk || !clk_attr)
++		goto out;
++
++	/* we don't do any locking for debug operations */
++
++	/* refcount++ */
++	kobject_get(&clk->kobj);
++
++	if (clk_attr->show)
++		ret = clk_attr->show(clk, buf);
++	else
++		ret = -EIO;
++
++	/* refcount-- */
++	kobject_put(&clk->kobj);
++
++out:
++	return ret;
++}
++
++static struct clk_attribute clk_rate = __ATTR_RO(clk_rate);
++static struct clk_attribute clk_flags = __ATTR_RO(clk_flags);
++static struct clk_attribute clk_prepare_count = __ATTR_RO(clk_prepare_count);
++static struct clk_attribute clk_enable_count = __ATTR_RO(clk_enable_count);
++
++static struct attribute *clk_default_attrs[] = {
++	&clk_rate.attr,
++	&clk_flags.attr,
++	&clk_prepare_count.attr,
++	&clk_enable_count.attr,
++	NULL,
++};
++
++static const struct sysfs_ops clk_ops = {
++	.show	= clk_show,
++};
++
++static void clk_release(struct kobject *kobj)
++{
++	struct clk *clk;
++
++	clk = container_of(kobj, struct clk, kobj);
++
++	complete(&clk->kobj_unregister);
++}
++
++static struct kobj_type clk_ktype = {
++	.sysfs_ops	= &clk_ops,
++	.default_attrs	= clk_default_attrs,
++	.release	= clk_release,
++};
++
++int clk_kobj_add(struct clk *clk)
++{
++	if (IS_ERR(clk))
++		return -EINVAL;
++
++	/*
++	 * Some kobject trickery!
++	 *
++	 * We want to (ab)use the kobject infrastructure to track our
++	 * tree topology for us, specifically the root clocks (which are
++	 * otherwise not remembered in a global list).
++	 *
++	 * Unfortunately we might not be able to allocate memory yet
++	 * when this path is hit.  This pretty much rules out anything
++	 * that looks or smells like kobject_add, since there are
++	 * allocations for kobject->name and a dependency on sysfs being
++	 * initialized.
++	 *
++	 * To get around this we initialize the kobjects and (ab)use
++	 * struct kobject's list_head member, "entry".  Later on we walk
++	 * this list in clk_sysfs_tree_create() to make proper
++	 * kobject_add calls once it is safe to do so.
++	 *
++	 * FIXME - this is starting to smell alot like clkdev (i.e.
++	 * tracking the clocks in a list)
++	 */
++
++	kobject_init(&clk->kobj, &clk_ktype);
++	list_add_tail(&clk->kobj.entry, &kobj_list);
++	return 0;
++}
++
++int clk_kobj_reparent(struct clk *clk, struct clk *parent)
++{
++	int ret;
++
++	if (!clk || !parent)
++		return -EINVAL;
++
++	ret = kobject_move(&clk->kobj, &parent->kobj);
++	if (ret)
++		pr_warning("%s: failed to reparent %s to %s in sysfs\n",
++				__func__, clk->name, parent->name);
++
++	return ret;
++}
++
++static int __init clk_sysfs_init(void)
++{
++	struct list_head *tmp;
++
++	clk_kobj = kobject_create_and_add("clk", NULL);
++
++	WARN_ON(!clk_kobj);
++
++	list_for_each(tmp, &kobj_list) {
++		struct kobject *kobj;
++		struct clk *clk;
++		struct kobject *parent_kobj = NULL;
++		int ret;
++
++		kobj = container_of(tmp, struct kobject, entry);
++
++		clk = container_of(kobj, struct clk, kobj);
++
++		/* assumes list is ordered */
++		if (clk->parent)
++			parent_kobj = &clk->parent->kobj;
++		else
++			parent_kobj = clk_kobj;
++
++		ret = kobject_add(kobj, parent_kobj, clk->name);
++		if (ret)
++			pr_warning("%s: failed to create sysfs entry for %s\n",
++					__func__, clk->name);
++	}
++
++	return 0;
++}
++late_initcall(clk_sysfs_init);
+diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+index 12c9994..85dabdb 100644
+--- a/drivers/clk/clk.c
++++ b/drivers/clk/clk.c
+@@ -436,7 +436,8 @@ void __clk_reparent(struct clk *clk, struct clk *new_parent)
+ 
+ 	clk->parent = new_parent;
+ 
+-	/* FIXME update sysfs clock topology */
++	/* update sysfs clock topology */
++	clk_kobj_reparent(clk, clk->parent);
+ }
+ 
+ /**
+@@ -531,6 +532,8 @@ void clk_init(struct device *dev, struct clk *clk)
+ 	else
+ 		clk->rate = 0;
+ 
++	clk_kobj_add(clk);
++
+ 	mutex_unlock(&prepare_lock);
+ 
+ 	return;
+diff --git a/include/linux/clk.h b/include/linux/clk.h
+index 8ed354a..99337ca 100644
+--- a/include/linux/clk.h
++++ b/include/linux/clk.h
+@@ -14,8 +14,8 @@
+ #define __LINUX_CLK_H
+ 
+ #include <linux/kernel.h>
+-
+-#include <linux/kernel.h>
++#include <linux/kobject.h>
++#include <linux/completion.h>
+ #include <linux/errno.h>
+ 
+ struct device;
+@@ -46,6 +46,10 @@ struct clk {
+ 	unsigned int		prepare_count;
+ 	struct hlist_head	children;
+ 	struct hlist_node	child_node;
++#ifdef CONFIG_GENERIC_CLK_SYSFS
++	struct kobject		kobj;
++	struct completion	kobj_unregister;
++#endif
+ };
+ 
+ /**
+@@ -177,6 +181,34 @@ int clk_register_gate(struct device *dev, const char *name, unsigned long flags,
+  */
+ void clk_init(struct device *dev, struct clk *clk);
+ 
++#ifdef CONFIG_GENERIC_CLK_SYSFS
++/**
++ * clk_kobj_add - create a clk entry in sysfs
++ * @clk: clk to model in sysfs
 + *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
++ * Create a directory in sysfs with the same name as clk.  Also creates
++ * read-only entries for the common struct clk members (rate, flags,
++ * prepare_count & enable_count).  The topology of the tree is
++ * represented by the sysfs directory structure itself.
 + */
-+#ifndef __MACH_IMX_CLK_H
-+#define __MACH_IMX_CLK_H
++int clk_kobj_add(struct clk *clk);
 +
-+#include <linux/types.h>
-+#include <linux/clk.h>
++/**
++ * clk_kobj_reparent - reparent a clk entry in sysfs
++ * @clk: the child clk that is switching parents
++ * @parent: the new parent clk
++ *
++ * Simple call to kobject_move to keep sysfs up to date with the
++ * hardware clock topology
++ */
++int clk_kobj_reparent(struct clk *clk, struct clk *parent);
++#else
++static inline int clk_kobj_add(struct clk *clk)
++{ return 0; }
++static inline int clk_kobj_reparent(struct clk *clk, struct clk *parent)
++{ return 0; }
++#endif
 +
-+struct clk_imx_busy {
-+	void __iomem *reg;
-+	u32 mask;
-+};
-+
-+struct clk_imx_gate {
-+	void __iomem *reg;
-+	u32 mask;
-+	int gate_set_bit;
-+	int powerup_set_bit;
-+};
-+
-+struct clk_imx_div {
-+	void __iomem *reg;
-+	u32 shift_pred;
-+	u32 width_pred;
-+	u32 shift_podf;
-+	u32 width_podf;
-+	struct clk_imx_busy *busy;
-+};
-+
-+struct clk_imx_mux {
-+	void __iomem *reg;
-+	u32 shift;
-+	u32 width;
-+	struct clk_imx_busy *busy;
-+	struct clk_hw **parents;
-+	int num_parents;
-+};
-+
-+struct clk_hw_imx {
-+	struct clk_hw hw;
-+	struct clk_imx_gate *gate;
-+	struct clk_imx_div *div;
-+	struct clk_imx_mux *mux;
-+	struct clk_hw *parent;
-+};
-+
-+#define to_clk_imx(c) container_of(c, struct clk_hw_imx, hw)
-+
-+extern const struct clk_hw_ops clk_imx_ops;
-+
-+extern int clk_imx_enable(struct clk_hw *hw);
-+extern void clk_imx_disable(struct clk_hw *hw);
-+extern struct clk *clk_imx_get_parent(struct clk_hw *hw);
-+
-+#endif /* __MACH_IMX_CLK_H */
+ #endif /* !CONFIG_GENERIC_CLK */
+ 
+ /**
 -- 
 1.7.4.1
