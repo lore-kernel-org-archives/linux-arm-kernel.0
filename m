@@ -1,47 +1,39 @@
-From: b29396@freescale.com (Dong Aisheng)
-Date: Tue, 22 Nov 2011 23:54:25 +0800
-Subject: [PATCH v7 3/3] ARM: mx28evk: set a initial clock rate for saif
-In-Reply-To: <a>
-References: <a>
-Message-ID: <1321977265-14959-4-git-send-email-b29396@freescale.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 22 Nov 2011 15:48:38 +0000
+Subject: [PATCH] arm/imx: use Kconfig choice for low-level debug UART
+ selection
+In-Reply-To: <20111122133040.GG19986@pengutronix.de>
+References: <1313530873-24961-1-git-send-email-will.deacon@arm.com>
+ <1313729819-30301-1-git-send-email-shawn.guo@linaro.org>
+ <20111122085834.GB19986@pengutronix.de>
+ <20111122115017.GK20518@mudshark.cambridge.arm.com>
+ <20111122130233.GF19986@pengutronix.de>
+ <20111122132055.GA32572@mudshark.cambridge.arm.com>
+ <20111122133040.GG19986@pengutronix.de>
+Message-ID: <20111122154838.GZ9581@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Dong Aisheng <b29396@freescale.com>
-Acked-by: Marek Vasut <marek.vasut@gmail.com>
-Cc: Sascha Hauer <s.hauer@pengutronix.de>
-Cc: Wolfram Sang <w.sang@pengutronix.de>
-Cc: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
-Cc: Liam Girdwood <lrg@ti.com>
+On Tue, Nov 22, 2011 at 02:30:40PM +0100, Uwe Kleine-K?nig wrote:
+> On Tue, Nov 22, 2011 at 01:20:55PM +0000, Will Deacon wrote:
+> > On Tue, Nov 22, 2011 at 01:02:33PM +0000, Uwe Kleine-K?nig wrote:
+> > > On Tue, Nov 22, 2011 at 11:50:17AM +0000, Will Deacon wrote:
+> > > > In the end I'd like to remove DEBUG_LL_UART_NONE. It's only there to service
+> > > > the platforms which have not yet added an entry to the choice.
+> > > Why not remove it already now? If I remove it together with the entry
+> > > for my machine and modify mach/debug-macro.S to do the right thing
+> > > for my machine even without DEBUG_IMX25_UART, my build just works.
+> > 
+> > I'm fairly sure this will break the build for everybody who doesn't have an
+> > entry in Kconfig.debug choice if they try and select DEBUG_LL.
+> Ah, I see the problem. It's more subtile than just failure to build: it
+> autoselects DEBUG_ICEDCC then.
 
----
-Changes since v1:
- * make comments a little better.
-   It's originally suggested by Uwe.
----
- arch/arm/mach-mxs/clock-mx28.c |    9 +++++++++
- 1 files changed, 9 insertions(+), 0 deletions(-)
+Which results in a kernel which builds fine, but when they attempt to
+boot it appears to lock fairly solidly.  So we had to add this option
+to allow the possibility for unconverted platforms to continue working.
 
-diff --git a/arch/arm/mach-mxs/clock-mx28.c b/arch/arm/mach-mxs/clock-mx28.c
-index c51fe85..b0c248d 100644
---- a/arch/arm/mach-mxs/clock-mx28.c
-+++ b/arch/arm/mach-mxs/clock-mx28.c
-@@ -808,6 +808,15 @@ int __init mx28_clocks_init(void)
- 	clk_set_parent(&saif0_clk, &pll0_clk);
- 	clk_set_parent(&saif1_clk, &pll0_clk);
- 
-+	/*
-+	 * Set an initial clock rate for the saif internal logic to work
-+	 * properly. This is important when working in EXTMASTER mode that
-+	 * uses the other saif's BITCLK&LRCLK but it still needs a basic
-+	 * clock which should be fast enough for the internal logic.
-+	 */
-+	clk_set_rate(&saif0_clk, 24000000);
-+	clk_set_rate(&saif1_clk, 24000000);
-+
- 	clkdev_add_table(lookups, ARRAY_SIZE(lookups));
- 
- 	mxs_timer_init(&clk32k_clk, MX28_INT_TIMER0);
--- 
-1.7.0.4
+At this point, I think the right answer is to remove the option in
+linux-next, and tell anyone who complains that they need to convert
+their platform properly.  (We're going to need them converted in this
+way anyway for the single zImage project.)
