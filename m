@@ -1,31 +1,37 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 22 Nov 2011 09:23:14 +0100
-Subject: [RFC PATCH 0/3] Convert imx6 clock to device tree
-In-Reply-To: <1321926536-671-1-git-send-email-shawn.guo@linaro.org>
-References: <1321926536-671-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20111122082314.GB27267@pengutronix.de>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Tue, 22 Nov 2011 09:24:42 +0100
+Subject: [PATCH 2/7] spi/pl022: fix build warnings
+Message-ID: <1321950282-4716-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 22, 2011 at 09:48:53AM +0800, Shawn Guo wrote:
-> As I promised to Arnd, I will convert imx6 clock code to common clock
-> framework and in turn device tree at the earliest time.  Here it is.
+From: Jonas Aaberg <jonas.aberg@stericsson.com>
 
-Very nice ;) I like the patches.
+The driver build complains with newer compilers unless you
+initialize this struct properly.
 
-Is there a way to improve the way how the entities find their base
-addresses? Currently the C code figures out the base addresses based
-on compatible. Maybe we could put the crm clocks and anatop clocks into
-two different nodes instead of putting them all directly under clocks{}.
+Reviewed-by: Viresh Kumar <viresh.kumar@st.com>
+Signed-off-by: Jonas Aaberg <jonas.aberg@stericsson.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ChangeLog v1->v2:
+- Add Viresh's Reviewed-by
+---
+ drivers/spi/spi-pl022.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-Could you split the last patch into two, one adding new device tree
-clock support in a new file and another removing the old clock support?
-This would help reviewing.
-
-Sascha
-
+diff --git a/drivers/spi/spi-pl022.c b/drivers/spi/spi-pl022.c
+index 5b7209f..0d0b165 100644
+--- a/drivers/spi/spi-pl022.c
++++ b/drivers/spi/spi-pl022.c
+@@ -1886,7 +1886,7 @@ static int pl022_setup(struct spi_device *spi)
+ {
+ 	struct pl022_config_chip const *chip_info;
+ 	struct chip_data *chip;
+-	struct ssp_clock_params clk_freq = {0, };
++	struct ssp_clock_params clk_freq = { .cpsdvsr = 0, .scr = 0};
+ 	int status = 0;
+ 	struct pl022 *pl022 = spi_master_get_devdata(spi->master);
+ 	unsigned int bits = spi->bits_per_word;
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.7.3.2
