@@ -1,38 +1,79 @@
-From: joe@perches.com (Joe Perches)
-Date: Mon, 21 Nov 2011 17:24:17 -0800
-Subject: [PATCH] ARM: mx5: Fix checkpatch warnings in cpu-imx5.c
-In-Reply-To: <1321900012-8351-2-git-send-email-fabio.estevam@freescale.com>
-References: <1321900012-8351-1-git-send-email-fabio.estevam@freescale.com>
- <1321900012-8351-2-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <1321925057.1131.2.camel@Joe-Laptop>
+From: junxiao.bi@windriver.com (Bi Junxiao)
+Date: Tue, 22 Nov 2011 09:32:16 +0800
+Subject: [PATCH 6/6] ARM: support kernel modules in BE8 mode
+In-Reply-To: <alpine.LFD.2.02.1111211427400.17904@xanadu.home>
+References: <1321322785-2981-1-git-send-email-junxiao.bi@windriver.com>
+ <1321322785-2981-6-git-send-email-junxiao.bi@windriver.com>
+ <alpine.LFD.2.02.1111211427400.17904@xanadu.home>
+Message-ID: <4ECAFBA0.2030001@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2011-11-21 at 16:26 -0200, Fabio Estevam wrote:
-> WARNING: line over 80 characters
-
-Trivia...
-
-> #70: FILE: arm/mach-imx/cpu-imx5.c:70:
-> +	if (mx51_revision() < IMX_CHIP_REVISION_3_0 && (elf_hwcap & HWCAP_NEON)) {
-[]
-> diff --git a/arch/arm/mach-imx/cpu-imx5.c b/arch/arm/mach-imx/cpu-imx5.c
-[]
-> @@ -67,7 +67,8 @@ static int __init mx51_neon_fixup(void)
->  	if (!cpu_is_mx51())
->  		return 0;
->  
-> -	if (mx51_revision() < IMX_CHIP_REVISION_3_0 && (elf_hwcap & HWCAP_NEON)) {
-> +	if (mx51_revision() < IMX_CHIP_REVISION_3_0 &&
-> +					(elf_hwcap & HWCAP_NEON)) {
->  		elf_hwcap &= ~HWCAP_NEON;
->  		pr_info("Turning off NEON support, detected broken NEON implementation\n");
->  	}
-
-Perhaps more readable as:
-
-	if (elf_hwcap & HWCAP_NEON &&
-	    mx51_revision() < IMX_CIP_REVISION_3_0) {
-		elf_hwcap &= ~HWCAP_NEON;
-		etc...
-		
+on 11/22/2011 03:29 AM Nicolas Pitre wrote:
+> On Tue, 15 Nov 2011, Junxiao Bi wrote:
+>
+>    
+>> From: Stanley.Miao<stanley.miao@windriver.com>
+>>
+>> In BE8 mode, data must be manipulated in big endian format while
+>> text must be little endian. Therefore, when relocating the text
+>> section of module in BE8 mode, we must convert the location offset
+>> of the text to big endian from the native little endian. After
+>> the relocation is complete, the location offset value is re-written
+>> as little endian.
+>>
+>> Since only BE8 mode has such special requirement while other big endian
+>> mode not, cpu_to_le32 and le32_to_cpu can not be used to relocate the
+>> text. We introduce write_instr* and read_instr* to do it.
+>>
+>> Signed-off-by: Stanley.Miao<stanley.miao@windriver.com>
+>> Signed-off-by: Junxiao Bi<junxiao.bi@windriver.com>
+>> ---
+>>   arch/arm/Makefile         |    1 +
+>>   arch/arm/include/asm/io.h |   12 ++++++++++
+>>   arch/arm/kernel/module.c  |   51 +++++++++++++++++++++++----------------------
+>>   3 files changed, 39 insertions(+), 25 deletions(-)
+>>
+>> diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+>> index dfcf3b0..c858184 100644
+>> --- a/arch/arm/Makefile
+>> +++ b/arch/arm/Makefile
+>> @@ -13,6 +13,7 @@
+>>   LDFLAGS_vmlinux	:=-p --no-undefined -X
+>>   ifeq ($(CONFIG_CPU_ENDIAN_BE8),y)
+>>   LDFLAGS_vmlinux	+= --be8
+>> +LDFLAGS_MODULE	+= --be8
+>>   endif
+>>
+>>   OBJCOPYFLAGS	:=-O binary -R .comment -S
+>> diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
+>> index 065d100..4b6c7de 100644
+>> --- a/arch/arm/include/asm/io.h
+>> +++ b/arch/arm/include/asm/io.h
+>> @@ -210,6 +210,18 @@ extern void _memset_io(volatile void __iomem *, int, size_t);
+>>    * Again, this are defined to perform little endian accesses.  See the
+>>    * IO port primitives for more information.
+>>    */
+>> +#ifdef CONFIG_CPU_ENDIAN_BE8
+>> +#define read_instr32(c)		__swab32(*(u32 *)(c))
+>> +#define read_instr16(c)		__swab16(*(u16 *)(c))
+>> +#define write_instr32(v, a)	(*(u32 *)(a) = __swab32((__force __u32)(v)))
+>> +#define write_instr16(v, a)	(*(u16 *)(a) = __swab16((__force __u16)(v)))
+>> +#else
+>> +#define read_instr32(c)		(*(u32 *)(c))
+>> +#define read_instr16(c)		(*(u16 *)(c))
+>> +#define write_instr32(v, a)	(*(u32 *)(a) = (v))
+>> +#define write_instr16(v, a)	(*(u16 *)(a) = (v))
+>> +#endif
+>>      
+> NAK.  This has nothing to do with IO.
+>
+> If only module.c requires this, please move those definitions there.
+>    
+Not only modules, all components that needs to read and write text 
+segment like kprobes also needs this. As it is special to arm be8, how 
+about define it in arch/arm/include/asm/swab.h?
+>
+> Nicolas
+>
+>    
