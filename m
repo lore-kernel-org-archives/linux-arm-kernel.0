@@ -1,31 +1,69 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 22 Nov 2011 13:42:22 +0000
-Subject: [PATCH v6 1/5] ARM: lib: add call_with_stack function for safely
- changing stack
-In-Reply-To: <1321466057-19721-2-git-send-email-will.deacon@arm.com>
-References: <1321466057-19721-1-git-send-email-will.deacon@arm.com>
- <1321466057-19721-2-git-send-email-will.deacon@arm.com>
-Message-ID: <CAHkRjk7J=hiR3c1JH-sScGb58fY-6CJ+RH7_aF+SSZQW3vYWZg@mail.gmail.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Tue, 22 Nov 2011 08:44:37 -0500 (EST)
+Subject: [PATCH 21/23] ARM: add generic ioremap optimization by reusing
+ static mappings
+In-Reply-To: <20111122101627.GX9581@n2100.arm.linux.org.uk>
+References: <1321422521-1138-1-git-send-email-nico@fluxnic.net>
+ <1321422521-1138-22-git-send-email-nico@fluxnic.net>
+ <20111122101627.GX9581@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.02.1111220842181.17904@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16 November 2011 17:54, Will Deacon <will.deacon@arm.com> wrote:
-> When disabling the MMU, it is necessary to take out a 1:1 identity map
-> of the reset code so that it can safely be executed with and without
-> the MMU active. To avoid the situation where the physical address of the
-> reset code aliases with the virtual address of the active stack (which
-> cannot be included in the 1:1 mapping), it is desirable to change to a
-> new stack at a location which is less likely to alias.
->
-> This code adds a new lib function, call_with_stack:
->
-> ? ? ? ?void call_with_stack(void (*fn)(void *), void *arg, void *sp);
->
-> which changes the stack to point at the sp parameter, before invoking
-> fn(arg) with the new stack selected.
->
-> Reviewed-by: Nicolas Pitre <nicolas.pitre@linaro.org>
-> Signed-off-by: Dave Martin <dave.martin@linaro.org>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
+On Tue, 22 Nov 2011, Russell King - ARM Linux wrote:
 
-Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+> On Wed, Nov 16, 2011 at 12:48:39AM -0500, Nicolas Pitre wrote:
+> > @@ -201,12 +195,6 @@ void __iomem * __arm_ioremap_pfn_caller(unsigned long pfn,
+> >  	if (pfn >= 0x100000 && (__pfn_to_phys(pfn) & ~SUPERSECTION_MASK))
+> >  		return NULL;
+> >  
+> > -	/*
+> > -	 * Don't allow RAM to be mapped - this causes problems with ARMv6+
+> > -	 */
+> > -	if (WARN_ON(pfn_valid(pfn)))
+> > -		return NULL;
+> > -
+> >  	type = get_mem_type(mtype);
+> >  	if (!type)
+> >  		return NULL;
+> > @@ -216,6 +204,34 @@ void __iomem * __arm_ioremap_pfn_caller(unsigned long pfn,
+> >  	 */
+> >  	size = PAGE_ALIGN(offset + size);
+> >  
+> > +	/*
+> > +	 * Try to reuse one of the static mapping whenever possible.
+> > +	 */
+> > +	read_lock(&vmlist_lock);
+> > +	for (area = vmlist; area; area = area->next) {
+> > +		if (!size || (sizeof(phys_addr_t) == 4 && pfn >= 0x100000))
+> > +			break;
+> > +		if (!(area->flags & VM_ARM_STATIC_MAPPING))
+> > +			continue;
+> > +		if ((area->flags & VM_ARM_MTYPE_MASK) != VM_ARM_MTYPE(mtype))
+> > +			continue;
+> > +		if (__phys_to_pfn(area->phys_addr) > pfn ||
+> > +		    __pfn_to_phys(pfn) + size-1 > area->phys_addr + area->size-1)
+> > +			continue;
+> > +		/* we can drop the lock here as we know *area is static */
+> > +		read_unlock(&vmlist_lock);
+> > +		addr = (unsigned long)area->addr;
+> > +		addr += __pfn_to_phys(pfn) - area->phys_addr;
+> > +		return (void __iomem *) (offset + addr);
+> > +	}
+> > +	read_unlock(&vmlist_lock);
+> > +
+> > +	/*
+> > +	 * Don't allow RAM to be mapped - this causes problems with ARMv6+
+> > +	 */
+> > +	if (WARN_ON(pfn_valid(pfn)))
+> > +		return NULL;
+> 
+> Why are you moving this check?  System RAM should never end up in the
+> vmlist.
+
+Because some architectures, such as OMAP, are relying on the ioremap 
+optimization that reuse static mappings being functional even before the 
+memory management is initialized.
+
+
+Nicolas
