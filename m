@@ -1,30 +1,25 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Tue, 22 Nov 2011 09:38:02 +0100
-Subject: [PATCH 5/5] arm/dt: tegra: Fix SDHCI nodes to match board files
-In-Reply-To: <1321911851-10091-5-git-send-email-swarren@nvidia.com>
-References: <1321911851-10091-1-git-send-email-swarren@nvidia.com>
- <1321911851-10091-5-git-send-email-swarren@nvidia.com>
-Message-ID: <20111122083802.GK21480@game.jcrosoft.org>
+From: prylowski@metasoft.pl (Rafal Prylowski)
+Date: Tue, 22 Nov 2011 09:45:03 +0100
+Subject: [PATCH v2 1/5] dmaengine: add ep93xx DMA support
+In-Reply-To: <20111122064727.GB15889@mwesterb-mobl.ger.corp.intel.com>
+References: <cover.1306662317.git.mika.westerberg@iki.fi>
+ <3ea8d56034f25cbe3fd8a4c31d7d0d1540b6ac7e.1306662317.git.mika.westerberg@iki.fi>
+ <4EC27EED.4030108@metasoft.pl>
+ <20111116065512.GB2703@mwesterb-mobl.ger.corp.intel.com>
+ <4EC374F0.8000400@metasoft.pl>
+ <20111119123837.GA2711@mwesterb-mobl.ger.corp.intel.com>
+ <4ECA0147.4020806@metasoft.pl>
+ <20111121080158.GA2713@mwesterb-mobl.ger.corp.intel.com>
+ <4ECA11C5.802@metasoft.pl>
+ <20111122064727.GB15889@mwesterb-mobl.ger.corp.intel.com>
+Message-ID: <4ECB610F.7020904@metasoft.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14:44 Mon 21 Nov     , Stephen Warren wrote:
-> Mark any SDHCI controllers that aren't registered by the board files as
-> disabled in the device-tree files.
+On 2011-11-22 07:47, Mika Westerberg wrote:
+> Let me know if this works for you. Basically it's the patch from you except
+> that we use a flag to indicate if the channel is running or not.
 > 
-> In practice, these controllers:
-> 
-> * Have nothing hooked up to them at all, or
-> * For ports intended for SDIO usage, the drivers for anything that might
->   be attached are not in the device-tree yet. If/when drivers appear, the
->   SD/MMC port can be re-enabled.
-> 
-> The only possible exception is TrimSlice's mico SD slot, but that wasn't
-> enabled in the board files before anyway, and doesn't work when all the
-> SDHCI controllers are enabled anyway.
-it will be better to invert the logic
 
-just enable what you are supposed too
-
-Best Regards,
-J.
+It works correctly. All of my simple hdd tests completed without any problems.
+Thanks.
