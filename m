@@ -1,36 +1,32 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Tue, 22 Nov 2011 10:03:16 -0500
-Subject: [PATCH v3 4/5] clk: basic gateable and fixed-rate clks
-In-Reply-To: <201111221311.00117.arnd.bergmann@linaro.org>
-References: <1321926047-14211-1-git-send-email-mturquette@linaro.org>
- <1321926047-14211-5-git-send-email-mturquette@linaro.org>
- <201111221311.00117.arnd.bergmann@linaro.org>
-Message-ID: <1321974200.2412.25.camel@deneb.redhat.com>
+From: rubini@unipv.it (Alessandro Rubini)
+Date: Tue, 22 Nov 2011 16:19:42 +0100
+Subject: [GIT PULL] ARM: amba: Enable module alias autogeneration for
+ AMBA drivers
+In-Reply-To: <20111122120756.GF2066@localhost.localdomain>
+References: <20111122120756.GF2066@localhost.localdomain>
+ <1321961573-4562-1-git-send-email-dave.martin@linaro.org>
+ <20111122115632.GA5165@mail.gnudd.com>
+Message-ID: <20111122151942.GA24821@mail.gnudd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2011-11-22 at 13:11 +0000, Arnd Bergmann wrote:
-> On Tuesday 22 November 2011, Mike Turquette wrote:
-> > +static void clk_hw_gate_set_bit(struct clk *clk)
-> > +{
-> > +       struct clk_hw_gate *gate = to_clk_hw_gate(clk);
-> > +       u32 reg;
-> > +
-> > +       reg = __raw_readl(gate->reg);
-> > +       reg |= BIT(gate->bit_idx);
-> > +       __raw_writel(reg, gate->reg);
-> > +}
+>>   lkml.org/lkml/2011/11/4/125 (0/2: description of the work)
+>>   lkml.org/lkml/2011/11/4/126 (1/2: turn the if plethora to table lookup)
+>>   lkml.org/lkml/2011/11/4/127 (2/2: partial split to type-specific files).
 > 
-> You cannot rely on __raw_readl() to do the right thing, especially
-> in architecture independent code. The safe (but slightly inefficient)
-> solution would be readl/writel. For ARM-only code, it would be best
-> to use readl_relaxed()/writel_relaxed(), but most architectures do
-> not implement that. We can probably add a set of helpers in asm-generic/
-> to define them to the default functions, like "#define readl_relaxed(x)
-> readl(x)", which I think is a good idea anyway.
-> 
+> Splitting this up doesn't look like a silly idea -- I thought it was
+> unfortunate to have to patch a core file just to add a bus type.
+>
+> I guess the question is how many new buses we get over time.
 
-readl/writel won't work for big endian CPU when the registers are on a
-bus that does the endian swabbing in hardware.
+Well, CERN will have 2 in a short time. And I'm sure the bus concept
+is so good that a number of them exists as external patches. Being
+forced to patch a core file is not good, with conflicts that accumulate
+over time.
 
---Mark
+I'd better be able to drop in my own file and add a kconfig-aware line
+in Makefile.  I think the implementation is straightforward. Who should
+I send it to?
+
+thanks
+/alessandro
