@@ -1,25 +1,59 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 22 Nov 2011 10:04:35 +0000
-Subject: Inclusion of ARM perf tree in linux-next
-Message-ID: <20111122100435.GC20518@mudshark.cambridge.arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 22 Nov 2011 10:16:27 +0000
+Subject: [PATCH 21/23] ARM: add generic ioremap optimization by reusing
+ static mappings
+In-Reply-To: <1321422521-1138-22-git-send-email-nico@fluxnic.net>
+References: <1321422521-1138-1-git-send-email-nico@fluxnic.net>
+ <1321422521-1138-22-git-send-email-nico@fluxnic.net>
+Message-ID: <20111122101627.GX9581@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+On Wed, Nov 16, 2011 at 12:48:39AM -0500, Nicolas Pitre wrote:
+> @@ -201,12 +195,6 @@ void __iomem * __arm_ioremap_pfn_caller(unsigned long pfn,
+>  	if (pfn >= 0x100000 && (__pfn_to_phys(pfn) & ~SUPERSECTION_MASK))
+>  		return NULL;
+>  
+> -	/*
+> -	 * Don't allow RAM to be mapped - this causes problems with ARMv6+
+> -	 */
+> -	if (WARN_ON(pfn_valid(pfn)))
+> -		return NULL;
+> -
+>  	type = get_mem_type(mtype);
+>  	if (!type)
+>  		return NULL;
+> @@ -216,6 +204,34 @@ void __iomem * __arm_ioremap_pfn_caller(unsigned long pfn,
+>  	 */
+>  	size = PAGE_ALIGN(offset + size);
+>  
+> +	/*
+> +	 * Try to reuse one of the static mapping whenever possible.
+> +	 */
+> +	read_lock(&vmlist_lock);
+> +	for (area = vmlist; area; area = area->next) {
+> +		if (!size || (sizeof(phys_addr_t) == 4 && pfn >= 0x100000))
+> +			break;
+> +		if (!(area->flags & VM_ARM_STATIC_MAPPING))
+> +			continue;
+> +		if ((area->flags & VM_ARM_MTYPE_MASK) != VM_ARM_MTYPE(mtype))
+> +			continue;
+> +		if (__phys_to_pfn(area->phys_addr) > pfn ||
+> +		    __pfn_to_phys(pfn) + size-1 > area->phys_addr + area->size-1)
+> +			continue;
+> +		/* we can drop the lock here as we know *area is static */
+> +		read_unlock(&vmlist_lock);
+> +		addr = (unsigned long)area->addr;
+> +		addr += __pfn_to_phys(pfn) - area->phys_addr;
+> +		return (void __iomem *) (offset + addr);
+> +	}
+> +	read_unlock(&vmlist_lock);
+> +
+> +	/*
+> +	 * Don't allow RAM to be mapped - this causes problems with ARMv6+
+> +	 */
+> +	if (WARN_ON(pfn_valid(pfn)))
+> +		return NULL;
 
-I maintain the ARM perf backend and would be very grateful if you could
-please include this branch in linux-next:
-
-git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git for-next/perf
-
-This request has arisen specifically from some work with the OMAP guys
-where it would be useful to spot any conflicts for 3.3, however I think it's
-generally a good idea for me to give some of the perf changes an airing
-before they get merged anyway.
-
-The merge path for these patches into mainline is usually via Russell, but
-platform updates may go via arm-soc (Arnd).
-
-Thanks,
-
-Will
+Why are you moving this check?  System RAM should never end up in the
+vmlist.
