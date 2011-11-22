@@ -1,41 +1,55 @@
 From: greg@kroah.com (Greg KH)
-Date: Tue, 22 Nov 2011 11:13:47 -0800
-Subject: [PATCH v3 5/5] clk: export tree topology and clk data via sysfs
-In-Reply-To: <CAPtuhThPQtWwihE8aGru55k87oV7QOr=O836TTJ+=30d6dtVhA@mail.gmail.com>
+Date: Tue, 22 Nov 2011 11:12:26 -0800
+Subject: [PATCH v3 0/5] common clk framework
+In-Reply-To: <CAPtuhTgFPZA9U-8heNw1eNUnHLFv2w+LzXg5rdjSx3J53Xy+2g@mail.gmail.com>
 References: <1321926047-14211-1-git-send-email-mturquette@linaro.org>
- <1321926047-14211-6-git-send-email-mturquette@linaro.org>
- <20111122154900.GB18954@kroah.com>
- <CAPtuhThPQtWwihE8aGru55k87oV7QOr=O836TTJ+=30d6dtVhA@mail.gmail.com>
-Message-ID: <20111122191347.GB4844@kroah.com>
+ <20111122154259.GA18954@kroah.com>
+ <20111122174544.GA19739@n2100.arm.linux.org.uk>
+ <CAPtuhTgFPZA9U-8heNw1eNUnHLFv2w+LzXg5rdjSx3J53Xy+2g@mail.gmail.com>
+Message-ID: <20111122191226.GA4844@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 22, 2011 at 09:57:41AM -0800, Mike Turquette wrote:
-> > Ah, comments like this warm my heart.
+On Tue, Nov 22, 2011 at 10:09:29AM -0800, Mike Turquette wrote:
+> On Tue, Nov 22, 2011 at 9:45 AM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > On Tue, Nov 22, 2011 at 07:42:59AM -0800, Greg KH wrote:
+> >> On Mon, Nov 21, 2011 at 05:40:42PM -0800, Mike Turquette wrote:
+> >> > ? .sysfs support. ?Visualize your clk tree at /sys/clk! ?Where would be
+> >> > a better place to put the clk tree besides the root of /sys/?
+> >>
+> >> Um, in the "proper" place for it under /sys/devices like the rest of the
+> >> device tree is?
 > >
-> > Come on, no abusing the kobject code please, if have problems with how
-> > the kernel core works, and it doesn't do things you want it to, then why
-> > not change it to work properly for you, or at the least, ASK ME!!!
+> > I'd suggest that making the clock tree visible in sysfs (and therefore
+> > part of the kernel ABI) is not a good idea. ?Some of the nodes in there
+> > will be specific to the implementation. ?Exposing the clock nodes means
+> > that if you have to change the clock tree structure, you change the
+> > visible userspace ABI.
 > 
-> Ok, I'm asking you now.  There are two ways to solve this problem:
+> It is true that the ABI will change dynamically.
 > 
-> 1) have kobject core create the lists linking the objects but defer
-> allocations and any interactions with sysfs until later in the boot
-> sequence, OR
+> >
+> > So, I'd suggest that we need to see a justification for this, rather
+> > than exposing this stuff via debugfs as has been done with existing
+> > implementations.
 > 
-> 2) my code can create a list of clks (the same way that clkdev does)
-> and defer kobject/sysfs stuff until later, which walks the list made
-> during early-boot
+> Userspace tools like powerdebug (and maybe someday powertop) hope to
+> use a reliable-looking interface to view clk data.  There are obvious
+> uses for this data in a debug tool, the most obvious of which is
+> "which clk isn't turning off when it should?".
 > 
-> #1 is most closely aligned with the code I have here, #2 presents
-> challenges that I haven't really though through.  I know that OMAP
-> uses the clk framework VERY early in it's boot sequence, but as long
-> as the per-clk data is properly initialized then it should be OK.
+> I can migrate this stuff to debugfs, but it adds the burden of having
+> debugfs enabled for folks that want to view this data.  I would also
+> argue that sysfs is there to model various aspects of system topology
+> and a clk tree certainly fits the bill.
 > 
-> What do you think?
+> If others also agree that it should reside only in debugfs then I'll
+> move it there for V4.
 
-#3 - use debugfs and don't try to create a sysfs interface for the clock
-structures :)
+If it's only for debug stuff, then yes, it belongs in debugfs.  All
+distros turn debugfs on these days, and for an embedded system, the code
+is quite small so there should not be much overhead.
 
 thanks,
 
