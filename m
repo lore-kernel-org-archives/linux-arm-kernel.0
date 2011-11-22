@@ -1,77 +1,52 @@
-From: javi.merino@arm.com (Javi Merino)
-Date: Tue, 22 Nov 2011 17:16:22 +0000
-Subject: [PATCH 1/4] ARM: PL330: Don't call the callbacks if there isn't
- any active transfer
-In-Reply-To: <CAJe_ZhftO+481BfL0ErEcM_brfmSuTXkTEniLRYxxM2T7OM2QA@mail.gmail.com>
-References: <1320244259-10496-1-git-send-email-javi.merino@arm.com>	<CAJe_Zhf+PAeM+wquQykXNDG74Nc+jQNXrp+RLMKSySCNPum8Tg@mail.gmail.com>	<4EC28A76.7080606@arm.com>	<CABb+yY1atyLA8Ej57JBEM0JL3oK5e6+1vO0UH5VTNiBsKQPueA@mail.gmail.com>
- <CAJe_ZhftO+481BfL0ErEcM_brfmSuTXkTEniLRYxxM2T7OM2QA@mail.gmail.com>
-Message-ID: <4ECBD8E6.3010605@arm.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Tue, 22 Nov 2011 09:42:58 -0800
+Subject: [PATCH v3 5/5] clk: export tree topology and clk data via sysfs
+In-Reply-To: <201111221307.14942.arnd.bergmann@linaro.org>
+References: <1321926047-14211-1-git-send-email-mturquette@linaro.org>
+ <1321926047-14211-6-git-send-email-mturquette@linaro.org>
+ <201111221307.14942.arnd.bergmann@linaro.org>
+Message-ID: <CAPtuhTiVR6NQfgH6-JGd6EC68bdOb6JwDKqaiswS8YR3sNt-Vg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/11/11 06:24, Jassi Brar wrote:
-> On 15 November 2011 22:30, Jassi Brar <jassisinghbrar@gmail.com> wrote:
->> On Tue, Nov 15, 2011 at 9:21 PM, Javi Merino <javi.merino@arm.com> wrote:
->>> On 15/11/11 07:51, Jassi Brar wrote:
->>>>> There can be a stale struct pl330_req pointer from a previous run, but the
->>>>> memory may be free already.
->>>>>
->>>> Sorry I am unable to fathom the scenario. The pl330_request_channel resets
->>>> both pl330_req pointers. Maybe some real failure you saw, could help
->>>> me understand.
->>>
->>> You request a channel, submit a xfer, it finishes successfully and
->>> pl330_update() is called, which calls r->xfer_cb() and marks the request
->>> as done by making req->mc_len = 0 .  Then, if you call
->>> pl330_release_channel(), _callback(thrd->req[0].r, PL330_ERR_ABORT) is
->>> called and, as thrd_req[0].r and thrd_req[0].r->xfer_cb are not null,
->>> r->xfer_cb() is called again.  That's wrong, the xfer finished (maybe
->>> long time ago) and the callback was called back then.  You shouldn't
->>> call it again with an error.  You should only do so if the transfer was
->>> running or scheduled to run, that's why I suggest calling _callback() if
->>> !IS_FREE(req).
->>>
->> Usually flush is called before releasing the channel, which would
->> have taken care of it. But I agree, flush shouldn't be necessary.
+On Tue, Nov 22, 2011 at 5:07 AM, Arnd Bergmann <arnd.bergmann@linaro.org> wrote:
+> On Tuesday 22 November 2011, Mike Turquette wrote:
+>> Introduces kobject support for the common struct clk, exports per-clk
+>> data via read-only callbacks and models the clk tree topology in sysfs.
 >>
->> MARK_FREE(_pl330_req)  with _pl330_req.r != NULL   doesn't look neat.
->> So maybe we should move   _pl330_req.r = NULL   into MARK_FREE macro.
->> Which would require moving 'struct list_head rqd' from _pl330_req to
->> pl330_req, that should be ok though I think.
+>> Also adds support for generating the clk tree in clk_init and migrating
+>> nodes when input sources are switches in clk_set_parent.
 >>
-> I think the following strikes just the right balance and should fix
-> the issue ...
-> 
-> diff --git a/arch/arm/common/pl330.c b/arch/arm/common/pl330.c
-> index 7129cfb..ecbca3f 100644
-> --- a/arch/arm/common/pl330.c
-> +++ b/arch/arm/common/pl330.c
-> @@ -1480,13 +1480,19 @@ int pl330_update(const struct pl330_info *pi)
-> 
->  	/* Now that we are in no hurry, do the callbacks */
->  	while (!list_empty(&pl330->req_done)) {
-> +		struct pl330_req *r;
-> +
->  		rqdone = container_of(pl330->req_done.next,
->  					struct _pl330_req, rqd);
-> 
->  		list_del_init(&rqdone->rqd);
-> 
-> +		/* Detach the req */
-> +		r = rqdone->r;
-> +		rqdone->r = NULL;
-> +
->  		spin_unlock_irqrestore(&pl330->lock, flags);
-> -		_callback(rqdone->r, PL330_ERR_NONE);
-> +		_callback(r, PL330_ERR_NONE);
->  		spin_lock_irqsave(&pl330->lock, flags);
->  	}
+>> Signed-off-by: Mike Turquette <mturquette@linaro.org>
+>> ---
+>> ?drivers/clk/Kconfig ? ? | ? 10 +++
+>> ?drivers/clk/Makefile ? ?| ? ?1 +
+>> ?drivers/clk/clk-sysfs.c | ?199 +++++++++++++++++++++++++++++++++++++++++++++++
+>> ?drivers/clk/clk.c ? ? ? | ? ?5 +-
+>> ?include/linux/clk.h ? ? | ? 36 ++++++++-
+>> ?5 files changed, 248 insertions(+), 3 deletions(-)
+>> ?create mode 100644 drivers/clk/clk-sysfs.c
+>
+> Since this introduces a new top-level hierarchy in sysfs, it certainly needs
+> to be reviewed by Greg K-H (on Cc now). Also, you have to add a proper
+> documentation for every new node and attribute in Documentation/ABI along
+> with the code.
 
-Right, and there's no need to patch pl330_chan_ctrl() in PL330_OP_ABORT
-because _pl330_req.r is set to NULL in there already.
+I don't intend to keep it in the top-level /sys/ directory.  I
+mentioned that in the coverletter, but not here.  I wasn't sure where
+to put it, and I knew reviewers would be happy to point the right
+place out to me.
 
-I'll try this patch and if it works we can submit it instead of my
-original one.
+>> +static struct kobject *clk_kobj;
+>> +LIST_HEAD(kobj_list);
+>
+> The list head should be static.
+
+Will put into V4.
 
 Thanks,
-Javi
+Mike
+
+>
+> ? ? ? ?Arnd
+>
