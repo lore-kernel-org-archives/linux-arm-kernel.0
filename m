@@ -1,35 +1,28 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 22 Nov 2011 14:30:40 +0100
-Subject: [PATCH] arm/imx: use Kconfig choice for low-level debug UART
- selection
-In-Reply-To: <20111122132055.GA32572@mudshark.cambridge.arm.com>
-References: <1313530873-24961-1-git-send-email-will.deacon@arm.com>
- <1313729819-30301-1-git-send-email-shawn.guo@linaro.org>
- <20111122085834.GB19986@pengutronix.de>
- <20111122115017.GK20518@mudshark.cambridge.arm.com>
- <20111122130233.GF19986@pengutronix.de>
- <20111122132055.GA32572@mudshark.cambridge.arm.com>
-Message-ID: <20111122133040.GG19986@pengutronix.de>
+From: rabin@rab.in (Rabin Vincent)
+Date: Tue, 22 Nov 2011 19:02:13 +0530
+Subject: [PATCH 2/4] ARM: extract out insn generation code from ftrace
+In-Reply-To: <20111122120252.GE2066@localhost.localdomain>
+References: <1321888429-3519-1-git-send-email-rabin@rab.in>
+ <1321888429-3519-2-git-send-email-rabin@rab.in>
+ <20111122120252.GE2066@localhost.localdomain>
+Message-ID: <CAH+eYFBz_aEeC3DwGF2mdpVepburzCBJqD0n1LFjL1y5dqOXHw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 22, 2011 at 01:20:55PM +0000, Will Deacon wrote:
-> On Tue, Nov 22, 2011 at 01:02:33PM +0000, Uwe Kleine-K?nig wrote:
-> > On Tue, Nov 22, 2011 at 11:50:17AM +0000, Will Deacon wrote:
-> > > In the end I'd like to remove DEBUG_LL_UART_NONE. It's only there to service
-> > > the platforms which have not yet added an entry to the choice.
-> > Why not remove it already now? If I remove it together with the entry
-> > for my machine and modify mach/debug-macro.S to do the right thing
-> > for my machine even without DEBUG_IMX25_UART, my build just works.
-> 
-> I'm fairly sure this will break the build for everybody who doesn't have an
-> entry in Kconfig.debug choice if they try and select DEBUG_LL.
-Ah, I see the problem. It's more subtile than just failure to build: it
-autoselects DEBUG_ICEDCC then.
+On Tue, Nov 22, 2011 at 17:32, Dave Martin <dave.martin@linaro.org> wrote:
+> On Mon, Nov 21, 2011 at 08:43:47PM +0530, Rabin Vincent wrote:
+>> ?static int ftrace_modify_code(unsigned long pc, unsigned long old,
+>> @@ -256,7 +203,7 @@ static int __ftrace_modify_caller(unsigned long *callsite,
+>> ?{
+>> ? ? ? unsigned long caller_fn = (unsigned long) func;
+>> ? ? ? unsigned long pc = (unsigned long) callsite;
+>> - ? ? unsigned long branch = ftrace_gen_branch(pc, caller_fn, false);
+>> + ? ? unsigned long branch = arm_gen_branch(pc, caller_fn);
+>> ? ? ? unsigned long nop = 0xe1a00000; /* mov r0, r0 */
+>
+> Does this code get used in Thumb-2 kernels? ?So far as I can tell, this
+> code is used... but it looks like it shouldn't work, due to the ARM
+> specifics.
 
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+It's not used on Thumb-2.  This is only used by the function graph
+tracer and that depends on !THUMB2_KERNEL.
