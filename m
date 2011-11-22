@@ -1,27 +1,148 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 22 Nov 2011 17:45:44 +0000
-Subject: [PATCH v3 0/5] common clk framework
-In-Reply-To: <20111122154259.GA18954@kroah.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Tue, 22 Nov 2011 09:57:41 -0800
+Subject: [PATCH v3 5/5] clk: export tree topology and clk data via sysfs
+In-Reply-To: <20111122154900.GB18954@kroah.com>
 References: <1321926047-14211-1-git-send-email-mturquette@linaro.org>
- <20111122154259.GA18954@kroah.com>
-Message-ID: <20111122174544.GA19739@n2100.arm.linux.org.uk>
+ <1321926047-14211-6-git-send-email-mturquette@linaro.org>
+ <20111122154900.GB18954@kroah.com>
+Message-ID: <CAPtuhThPQtWwihE8aGru55k87oV7QOr=O836TTJ+=30d6dtVhA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 22, 2011 at 07:42:59AM -0800, Greg KH wrote:
-> On Mon, Nov 21, 2011 at 05:40:42PM -0800, Mike Turquette wrote:
-> >   .sysfs support.  Visualize your clk tree at /sys/clk!  Where would be
-> > a better place to put the clk tree besides the root of /sys/?
-> 
-> Um, in the "proper" place for it under /sys/devices like the rest of the
-> device tree is?
+On Tue, Nov 22, 2011 at 7:49 AM, Greg KH <greg@kroah.com> wrote:
+> On Mon, Nov 21, 2011 at 05:40:47PM -0800, Mike Turquette wrote:
+>> Introduces kobject support for the common struct clk, exports per-clk
+>> data via read-only callbacks and models the clk tree topology in sysfs.
+>>
+>> Also adds support for generating the clk tree in clk_init and migrating
+>> nodes when input sources are switches in clk_set_parent.
+>>
+>> Signed-off-by: Mike Turquette <mturquette@linaro.org>
+>
+> Thanks Arnd for pointing me at this.
+>
+>> +#define MAX_STRING_LENGTH ? ?32
+>
+> Why?
 
-I'd suggest that making the clock tree visible in sysfs (and therefore
-part of the kernel ABI) is not a good idea.  Some of the nodes in there
-will be specific to the implementation.  Exposing the clock nodes means
-that if you have to change the clock tree structure, you change the
-visible userspace ABI.
+Copy paste from other implementations.  What do you recommend?
 
-So, I'd suggest that we need to see a justification for this, rather
-than exposing this stuff via debugfs as has been done with existing
-implementations.
+>
+>> +static struct kobject *clk_kobj;
+>> +LIST_HEAD(kobj_list);
+>
+> Um, no, please NEVER use raw kobjects, you should be using struct device
+> instead. ?Please change the code to do that.
+
+Today the clk tree doesn't create a struct device for each clk, which
+I assume would be necessary to do what you're talking about.  Is that
+right?
+
+Maybe that will be necessary with the device tree stuff anyways... any
+feedback from Sascha or Grant on that?
+
+>
+>> +static ssize_t clk_show(struct kobject *kobj, struct attribute *attr,
+>> + ? ? ? ? ? ? char *buf)
+>> +{
+>> + ? ? struct clk *clk;
+>> + ? ? struct clk_attribute *clk_attr;
+>> + ? ? ssize_t ret = -EINVAL;
+>> +
+>> + ? ? clk = container_of(kobj, struct clk, kobj);
+>> + ? ? clk_attr = container_of(attr, struct clk_attribute, attr);
+>> +
+>> + ? ? if (!clk || !clk_attr)
+>> + ? ? ? ? ? ? goto out;
+>> +
+>> + ? ? /* we don't do any locking for debug operations */
+>> +
+>> + ? ? /* refcount++ */
+>> + ? ? kobject_get(&clk->kobj);
+>> +
+>> + ? ? if (clk_attr->show)
+>> + ? ? ? ? ? ? ret = clk_attr->show(clk, buf);
+>> + ? ? else
+>> + ? ? ? ? ? ? ret = -EIO;
+>> +
+>> + ? ? /* refcount-- */
+>> + ? ? kobject_put(&clk->kobj);
+>
+> Why in the world would you be incrementing and decrementing the
+> reference count of the kobject in the show function? ?What are you
+> trying to protect here that is not already protected by the core?
+
+Will remove in v4.
+
+>
+>
+>> +static void clk_release(struct kobject *kobj)
+>> +{
+>> + ? ? struct clk *clk;
+>> +
+>> + ? ? clk = container_of(kobj, struct clk, kobj);
+>> +
+>> + ? ? complete(&clk->kobj_unregister);
+>> +}
+>
+> Look Ma, a memory leak!
+
+Oops.  Will fix in V4.
+
+>
+>> +static struct kobj_type clk_ktype = {
+>> + ? ? .sysfs_ops ? ? ?= &clk_ops,
+>> + ? ? .default_attrs ?= clk_default_attrs,
+>> + ? ? .release ? ? ? ?= clk_release,
+>> +};
+>> +
+>> +int clk_kobj_add(struct clk *clk)
+>> +{
+>> + ? ? if (IS_ERR(clk))
+>> + ? ? ? ? ? ? return -EINVAL;
+>> +
+>> + ? ? /*
+>> + ? ? ?* Some kobject trickery!
+>> + ? ? ?*
+>> + ? ? ?* We want to (ab)use the kobject infrastructure to track our
+>> + ? ? ?* tree topology for us, specifically the root clocks (which are
+>> + ? ? ?* otherwise not remembered in a global list).
+>> + ? ? ?* Unfortunately we might not be able to allocate memory yet
+>> + ? ? ?* when this path is hit. ?This pretty much rules out anything
+>> + ? ? ?* that looks or smells like kobject_add, since there are
+>> + ? ? ?* allocations for kobject->name and a dependency on sysfs being
+>> + ? ? ?* initialized.
+>> + ? ? ?*
+>> + ? ? ?* To get around this we initialize the kobjects and (ab)use
+>> + ? ? ?* struct kobject's list_head member, "entry". ?Later on we walk
+>> + ? ? ?* this list in clk_sysfs_tree_create() to make proper
+>> + ? ? ?* kobject_add calls once it is safe to do so.
+>> + ? ? ?*
+>> + ? ? ?* FIXME - this is starting to smell alot like clkdev (i.e.
+>> + ? ? ?* tracking the clocks in a list)
+>
+> Ah, comments like this warm my heart.
+>
+> Come on, no abusing the kobject code please, if have problems with how
+> the kernel core works, and it doesn't do things you want it to, then why
+> not change it to work properly for you, or at the least, ASK ME!!!
+
+Ok, I'm asking you now.  There are two ways to solve this problem:
+
+1) have kobject core create the lists linking the objects but defer
+allocations and any interactions with sysfs until later in the boot
+sequence, OR
+
+2) my code can create a list of clks (the same way that clkdev does)
+and defer kobject/sysfs stuff until later, which walks the list made
+during early-boot
+
+#1 is most closely aligned with the code I have here, #2 presents
+challenges that I haven't really though through.  I know that OMAP
+uses the clk framework VERY early in it's boot sequence, but as long
+as the per-clk data is properly initialized then it should be OK.
+
+What do you think?
+
+Regards,
+Mike
