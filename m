@@ -1,35 +1,43 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Tue, 22 Nov 2011 08:25:03 -0800
-Subject: [PATCH 1/5] arm/dt: tegra: Remove /memreserve/ from device-tree
- files
-In-Reply-To: <2308525.meomQFtUnY@ax5200p>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Tue, 22 Nov 2011 17:23:38 +0100
+Subject: [PATCH 5/5] arm/dt: tegra: Fix SDHCI nodes to match board files
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF174F08C3AF@HQMAIL01.nvidia.com>
 References: <1321911851-10091-1-git-send-email-swarren@nvidia.com>
- <2308525.meomQFtUnY@ax5200p>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF174F08C3BC@HQMAIL01.nvidia.com>
+ <1321911851-10091-5-git-send-email-swarren@nvidia.com>
+ <20111122083802.GK21480@game.jcrosoft.org>
+ <74CDBE0F657A3D45AFBB94109FB122FF174F08C3AF@HQMAIL01.nvidia.com>
+Message-ID: <20111122162338.GN21480@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marc Dietrich wrote at Tuesday, November 22, 2011 3:42 AM:
-> On Monday 21 November 2011 14:44:07 Stephen Warren wrote:
-> > There are no drivers in the kernel at present which can make use of the
-> > memory reserved by /memreserve/, so there is no point reserving it. Remove
-> > /memreserve/ to allow the user more memory. It's also unclear whether any
-> > future driver would actually require /memreserve/, or allocate memory
-> > through some other mechanism.
+On 08:12 Tue 22 Nov     , Stephen Warren wrote:
+> Jean-Christophe PLAGNIOL-VILLARD wrote at Tuesday, November 22, 2011 1:38 AM:
+> > On 14:44 Mon 21 Nov     , Stephen Warren wrote:
+> > > Mark any SDHCI controllers that aren't registered by the board files as
+> > > disabled in the device-tree files.
+> > >
+> > > In practice, these controllers:
+> > >
+> > > * Have nothing hooked up to them at all, or
+> > > * For ports intended for SDIO usage, the drivers for anything that might
+> > >   be attached are not in the device-tree yet. If/when drivers appear, the
+> > >   SD/MMC port can be re-enabled.
+> > >
+> > > The only possible exception is TrimSlice's mico SD slot, but that wasn't
+> > > enabled in the board files before anyway, and doesn't work when all the
+> > > SDHCI controllers are enabled anyway.
+> > it will be better to invert the logic
+> > 
+> > just enable what you are supposed too
 > 
-> while this gives 512 MB of usable memory on my AC100, it causes some funny
-> pictures on the screen ;-) I guess our bootloader (fastboot) already setups
-> the frambuffer there (and enables the backlight). I guess it shouldn't be
-> harmful as nothing else writes to this memory area. Otherwise you may add that
-> the bootloader (or the kernel cmdline supplied by the bootloader) is now
-> responsible for the reservation to the description.
+> It used to be that way when the files were first added, but they got
+> switched around this way to match standard practice.
+this is a bad practice because you can enable stuff that a hardware is not
+supposed to use
 
-Ah yes, I guess that would happen. I'm only testing with mainline U-Boot...
+and this silenty without anyone notice until you test the hardware
 
-I'd suggest this is acceptable fallout for now; I don't believe it will
-cause any active problems, and as you say, you can get the bootloader to
-set a command-line that excludes the frame-buffer if you want to solve
-this. Do you agree?
+and you add more line and changeset
 
--- 
-nvpublic
+Best Regrds,
+J.
