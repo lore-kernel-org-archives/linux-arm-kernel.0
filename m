@@ -1,44 +1,94 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Tue, 22 Nov 2011 10:20:39 +0000
-Subject: [GIT PULL] Support for Cadence GEM in the MACB driver
-In-Reply-To: <20111122100032.GL21480@game.jcrosoft.org>
-References: <20111121100020.GB7314@totoro>
- <20111122100032.GL21480@game.jcrosoft.org>
-Message-ID: <20111122102039.GB8872@totoro>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Tue, 22 Nov 2011 10:33:08 +0000
+Subject: [PATCH 2/6] ARM: gic: fix big endian support
+In-Reply-To: <4ECAFF2C.1010604@windriver.com>
+References: <1321322785-2981-1-git-send-email-junxiao.bi@windriver.com>
+ <1321322785-2981-2-git-send-email-junxiao.bi@windriver.com>
+ <alpine.LFD.2.02.1111211334320.17904@xanadu.home>
+ <4ECAFF2C.1010604@windriver.com>
+Message-ID: <20111122103308.GB2066@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jean-Christophe,
+On Tue, Nov 22, 2011 at 09:47:24AM +0800, Bi Junxiao wrote:
+> on 11/22/2011 03:11 AM Nicolas Pitre wrote:
+> >On Tue, 15 Nov 2011, Junxiao Bi wrote:
+> >
+> >>The irq state from gic is in little-endian mode. We need do endian
+> >>conversion for it in big-endian machine. Usually byte swapping of
+> >>32-bits word needs 4 assembler instructions for arm machine which
+> >>arch<  6. But since the high order half word of the irq state is
+> >>zero, there is a way that can use lesser instrunctions to improve
+> >>the performance since we only need a bytes swaping of half word.
+> >>That's what swab16_low_half and swab16_high_half do.
+> >>
+> >>Signed-off-by: Junxiao Bi<junxiao.bi@windriver.com>
+> >Comments below.
+> >
+> >>---
+> >>  arch/arm/include/asm/assembler.h                |   27 +++++++++++++++++++++++
+> >>  arch/arm/include/asm/hardware/entry-macro-gic.S |    7 ++++++
+> >>  2 files changed, 34 insertions(+), 0 deletions(-)
+> >>
+> >>diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
+> >>index 29035e8..3ddee22 100644
+> >>--- a/arch/arm/include/asm/assembler.h
+> >>+++ b/arch/arm/include/asm/assembler.h
+> >>@@ -302,4 +302,31 @@
+> >>  	.size \name , . - \name
+> >>  	.endm
+> >>
+> >>+/*
+> >>+ * swab16_low_half is used to swap the bytes order of the low order
+> >>+ * half word, it assumes that the high order half word is zero.
+> >>+ * swab16_high_half is used to swap the bytes order of the high order
+> >>+ * half word, it assumes that the low order half word is zero.
+> >>+ */
+> >>+#if __LINUX_ARM_ARCH__>= 6
+> >>+	.macro swab16_low_half, reg
+> >>+	rev \reg, \reg
+> >>+	.endm
+> >>+
+> >>+	.macro swab16_high_half, reg
+> >>+	rev \reg, \reg
+> >>+	.endm
+> >>+#else
+> >>+	.macro swab16_low_half, reg
+> >>+	mov \reg, \reg, ror #8
+> >>+	orr \reg, \reg, \reg, lsr #16
+> >>+	bic \reg, \reg, \reg, lsl #16
+> >>+	.endm
 
-On Tue, Nov 22, 2011 at 11:00:32AM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> On 10:00 Mon 21 Nov     , Jamie Iles wrote:
-> > Hi Arnd,
-> > 
-> > Please consider pulling the patches to add support for Cadence GEM to 
-> > the MACB driver.  These have been ready to go for a little while but got 
-> > held up with the rename of Ethernet drivers in the last merge window.  
-> > It would be great if we can get some exposure in -next for a little 
-> > while before the next merge window.
-> > 
-> > Thanks,
-> > 
-> > Jamie
-> > 
-> > The following changes since commit cfcfc9eca2bcbd26a8e206baeb005b055dbf8e37:
-> > 
-> >   Linux 3.2-rc2 (2011-11-15 15:02:59 -0200)
-> > 
-> > are available in the git repository at:
-> >   git://github.com/jamieiles/linux-2.6-ji.git macb-gem
-> Arnd please wait
-> 
-> please update his patch
-> 
-> "at91: provide macb clks with "pclk" and "hclk" name"
-> 
-> with the version I send to the ML
+Your v6 and <v6 implementations don't seem to produce the same result
+for swab16_low_half.
 
-Is that a patch that you've already posted or will be posting?  Is there 
-a board that I've missed?  I thought I had them all.
+If reg=0x0000AABB  on >=v6 you transform it to 0xBBAA0000, but on <v6
+you translate it to 0x0000BBAA.
 
-Jamie
+Perhaps you meant to use the rev16 instruction instead of rev?
+
+> >I fail to see how this macro would be generally useful.  Presuming that
+> >the top or bottom half has to be zero is not particularly practical.
+> We can use it to swap bytes order of a 16-bits number in 32-bits
+> register in which case the top or bottom half will be zero. For the
+> \irqstat register, as the original implementation assumes its top
+> half is zero, so I make the same assumption.
+> >>+	.macro swab16_high_half, reg
+> >>+	swab16_low_half \reg
+> >>+	mov \reg, \reg, lsl #16
+> >>+	.endm
+> >And this doesn't end up cheaper than a plain swab32.
+> This macro has an advantage that it only needs one register. For
+> swab32, it will need another temporary register besides the target
+> register.
+> >Furthermore, you're using those macros 1) in the gic code, and 2) onli
+> >in the BE8 case.  Both of those conditions are only possible on ARMv6
+> >and above anyway, so I'd simply open code a rev instruction inline.
+> This is not be8 specific. It will be needed for both be8 and be32.
+> So the machine with arch < 6 also needs to be supported.
+
+I also thought the GIC doesn't get used with <v6?  I thought the GIC was
+too new for that, but I'm not an expert on it.
+
+Cheers
+---Dave
