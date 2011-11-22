@@ -1,32 +1,17 @@
-From: greg@kroah.com (Greg KH)
-Date: Tue, 22 Nov 2011 11:20:30 -0800
-Subject: [GIT PULL] ARM: amba: Enable module alias autogeneration for
- AMBA drivers
-In-Reply-To: <20111122115632.GA5165@mail.gnudd.com>
-References: <1321961573-4562-1-git-send-email-dave.martin@linaro.org>
- <20111122115632.GA5165@mail.gnudd.com>
-Message-ID: <20111122192030.GA4930@kroah.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 22 Nov 2011 19:27:41 +0000
+Subject: -next fails to boot as of today on S3C6410
+Message-ID: <20111122192741.GG30583@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 22, 2011 at 12:56:32PM +0100, Alessandro Rubini wrote:
-> > I have Acks on some of the driver patches and no comments on the
-> > rest.  I've been circulating these for some time, so if you're
-> > happy to pull those driver patches via your tree, please go ahead.
-> 
-> Sure I have no problem with the nomadik-rng.c, (so please have my
-> Acked-by: -- sorry for not noting it earlier) but I think this
-> file2alias thing needs a serious rework to split each bus in a
-> different file, using ELF sections like we do elsewhere.
-> 
-> I posted a patch last week but I got no comment at all. Maybe this
-> is the time to ask for comments? I can rebase and repost if needed.
-> 
->   lkml.org/lkml/2011/11/4/125 (0/2: description of the work)
->   lkml.org/lkml/2011/11/4/126 (1/2: turn the if plethora to table lookup)
->   lkml.org/lkml/2011/11/4/127 (2/2: partial split to type-specific files).
+Testing with my s3c6410 based platform I'm seeing no output after
+"Uncompressing Linux... done, booting the kernel." when running -next.
+Yesterday's -next booted fine.
 
-Ah, I missed that, yes, this would be a good thing to have, we've been
-wanting it for _years_.
-
-greg k-h
+I've verified that this was introduced in the Russell's for-next, and
+bisection of that branch tells me that the offending commit is "ARM:
+vic: device tree binding" though an attempt to revert that in -next
+failed.  This is especially surprising as I have USE_OF turned off, I'm
+guessing that the issue is something to do with the conversion to use an
+irq_domain that happened in there.
