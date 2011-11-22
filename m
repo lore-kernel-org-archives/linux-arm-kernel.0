@@ -1,44 +1,44 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Tue, 22 Nov 2011 10:18:57 +0000
-Subject: [PATCH 1/4] [RFC] Add generic ARM instruction set condition code
- checks.
-In-Reply-To: <20111121190848.GS9581@n2100.arm.linux.org.uk>
-References: <20111121183046.28964.23829.stgit@localhost6.localdomain6>
- <20111121190848.GS9581@n2100.arm.linux.org.uk>
-Message-ID: <20111122101846.GA2066@localhost.localdomain>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Tue, 22 Nov 2011 10:20:39 +0000
+Subject: [GIT PULL] Support for Cadence GEM in the MACB driver
+In-Reply-To: <20111122100032.GL21480@game.jcrosoft.org>
+References: <20111121100020.GB7314@totoro>
+ <20111122100032.GL21480@game.jcrosoft.org>
+Message-ID: <20111122102039.GB8872@totoro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 21, 2011 at 07:08:48PM +0000, Russell King - ARM Linux wrote:
-> On Mon, Nov 21, 2011 at 06:30:46PM +0000, Leif Lindholm wrote:
-> > +/*
-> > + * Returns:
-> > + * 0 - if condition fails
-> > + * 1 - if condition passes (including AL)
-> > + * 2 - if unconditional encoding (or before ARMv3, NV condition)
+Hi Jean-Christophe,
+
+On Tue, Nov 22, 2011 at 11:00:32AM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> On 10:00 Mon 21 Nov     , Jamie Iles wrote:
+> > Hi Arnd,
+> > 
+> > Please consider pulling the patches to add support for Cadence GEM to 
+> > the MACB driver.  These have been ready to go for a little while but got 
+> > held up with the rename of Ethernet drivers in the last merge window.  
+> > It would be great if we can get some exposure in -next for a little 
+> > while before the next merge window.
+> > 
+> > Thanks,
+> > 
+> > Jamie
+> > 
+> > The following changes since commit cfcfc9eca2bcbd26a8e206baeb005b055dbf8e37:
+> > 
+> >   Linux 3.2-rc2 (2011-11-15 15:02:59 -0200)
+> > 
+> > are available in the git repository at:
+> >   git://github.com/jamieiles/linux-2.6-ji.git macb-gem
+> Arnd please wait
 > 
-> The comment is wrong.  NV always meant 'never execute' including v3,
-> v4 and v5 architectures.
+> please update his patch
+> 
+> "at91: provide macb clks with "pclk" and "hclk" name"
+> 
+> with the version I send to the ML
 
-Actually, if the v5 ARM ARM is to believed this was only true prior to
-ARMv3.
+Is that a patch that you've already posted or will be posting?  Is there 
+a board that I've missed?  I thought I had them all.
 
-Apparently the behaviour of instructions encoded with the NV condition
-code is UNPREDICTABLE in v3 and v4.  With the exception of the ARMv5 BLX
-<label> and v5E PLD instructions, I've no idea whether any actual
-implementation did anything crazy with these opcodes though, prior to
-ARMv6.
-
-Perhaps someone implemented some v4/v3 parts with custom instructions in
-this space, or dealt with the NV condition in a unexpected way -- I'm
-not aware of any such implementation, though.
-
-Maybe the comment can be reworded more conservatively, such as
-
-"2 - NV condition, or separate unconditional opcode space from v5
-onwards"
-
-That wording judiciously doesn't say anything about v3/v4.
-
-Cheers
----Dave
+Jamie
