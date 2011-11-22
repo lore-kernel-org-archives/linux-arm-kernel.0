@@ -1,53 +1,38 @@
-From: mturquette@ti.com (Turquette, Mike)
-Date: Tue, 22 Nov 2011 12:19:51 -0800
-Subject: [PATCH v3 5/5] clk: export tree topology and clk data via sysfs
-In-Reply-To: <9315670.oOZAWsuHPb@wuerfel>
-References: <1321926047-14211-1-git-send-email-mturquette@linaro.org>
- <CAPtuhTheG-mvoGMaB2y9BSKF-abm2yigoN-SXaeCb+P5R6t_Dg@mail.gmail.com>
- <CACxGe6vK-vHvSbd9N2k3FZY4gGVS_DETx0BbfPgNghTkOncjpg@mail.gmail.com>
- <9315670.oOZAWsuHPb@wuerfel>
-Message-ID: <CAJOA=zOp3o=bdryFbz6LVQF5fxPvhVWKme_GD3fyQr7=-n2E_g@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 22 Nov 2011 20:24:25 +0000
+Subject: [PATCH] arm/imx: use Kconfig choice for low-level debug UART
+ selection
+In-Reply-To: <20111122164707.GJ6624@sirena.org.uk>
+References: <1313530873-24961-1-git-send-email-will.deacon@arm.com>
+ <1313729819-30301-1-git-send-email-shawn.guo@linaro.org>
+ <20111122085834.GB19986@pengutronix.de>
+ <20111122115017.GK20518@mudshark.cambridge.arm.com>
+ <20111122130233.GF19986@pengutronix.de>
+ <20111122132055.GA32572@mudshark.cambridge.arm.com>
+ <20111122133040.GG19986@pengutronix.de>
+ <20111122154838.GZ9581@n2100.arm.linux.org.uk>
+ <20111122163812.GH19986@pengutronix.de> <20111122164707.GJ6624@sirena.org.uk>
+Message-ID: <20111122202425.GD9581@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 22, 2011 at 12:02 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Tuesday 22 November 2011 12:19:51 Grant Likely wrote:
->> On Tue, Nov 22, 2011 at 11:01 AM, Mike Turquette <mturquette@linaro.org> wrote:
->>
->> > Others have requested to have knobs made available for actually
->> > performing clk_enable/clk_disable and even clk_set_rate from
->> > userspace. ?I hate this idea and won't implement it. ?I encourage
->> > anyone that needs this to do it in debugfs.
->> >
->> > Does that work-split make sense to you, or do you still not like the
->> > idea of having topology and read-only info in sysfs?
->>
->> Unless there is a solid real-world use case for exporting this data to
->> userspace, I do not think sysfs is a good idea. ?As long as the usage
->> (beyond debug) is theoretical I think the whole thing should be in
->> debugfs. ?It can always be moved at a later date If a real use case
->> does become important.
->
-> I would recomment not to spend any time on implementing a debugfs interface
-> for this right now. As far as I can tell, nothing relies on exporting
-> the structure to user space, so Mike's time is better spent on getting the
-> other four patches merged.
+On Tue, Nov 22, 2011 at 04:47:07PM +0000, Mark Brown wrote:
+> On Tue, Nov 22, 2011 at 05:38:12PM +0100, Uwe Kleine-K?nig wrote:
+> > On Tue, Nov 22, 2011 at 03:48:38PM +0000, Russell King - ARM Linux wrote:
+> 
+> > > > Ah, I see the problem. It's more subtile than just failure to build: it
+> > > > autoselects DEBUG_ICEDCC then.
+> 
+> > > At this point, I think the right answer is to remove the option in
+> > > linux-next, and tell anyone who complains that they need to convert
+> > > their platform properly.  (We're going to need them converted in this
+> > > way anyway for the single zImage project.)
+> 
+> > I agree.
+> 
+> It'd be nice if things could be arranged so that the build breaks rather
+> than selecting ICEDCC on unconverted platforms - when you run into the
+> problem it's not that easy to diagnose.
 
-Seems to be some consensus on this.  Will drop userspace-visible clk
-tree from V4 patchset.
-
-Regards,
-Mike
-
->
-> Note that the static topology information about clocks will already be
-> visible in /proc/devicetree when that is enabled and the clocks are
-> described in the .dts file.
->
-> ? ? ? ?Arnd
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+Well, we could leave the choice as is, and make the NONE option cause a
+#error.
