@@ -1,65 +1,60 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Wed, 23 Nov 2011 01:36:46 +1100
-Subject: Inclusion of ARM perf tree in linux-next
-In-Reply-To: <20111122100435.GC20518@mudshark.cambridge.arm.com>
-References: <20111122100435.GC20518@mudshark.cambridge.arm.com>
-Message-ID: <20111123013646.8acd19e7f4c615a7bf8306a4@canb.auug.org.au>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 22 Nov 2011 15:44:33 +0100
+Subject: [PATCH v8] AT91: Add a driver for the ADC
+In-Reply-To: <4ECBB226.4080404@free-electrons.com>
+References: <1321611160-3685-1-git-send-email-maxime.ripard@free-electrons.com>
+ <4ECBB226.4080404@free-electrons.com>
+Message-ID: <4ECBB551.4@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
-
-On Tue, 22 Nov 2011 10:04:35 +0000 Will Deacon <will.deacon@arm.com> wrote:
->
-> I maintain the ARM perf backend and would be very grateful if you could
-> please include this branch in linux-next:
+On 11/22/2011 03:31 PM, Maxime Ripard :
+> Hi,
 > 
-> git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git for-next/perf
+> So, I guess that we have a pretty good driver with that version. What
+> can we do for the inclusion in the kernel now ?
+
+I propose that:
+
+1/ We take the patch #1/3 for inclusion through arm-soc during 3.2
+2/ Jonathan takes the #2/3 in his IIO subsystem
+3/ We take board related patch #3/3 for inclusion during 3.3 (next)
+4/ And we may add other boards support if we are quick for 3.3...
+
+Does is sound good to all of you?
+
+Bye,
+
 > 
-> This request has arisen specifically from some work with the OMAP guys
-> where it would be useful to spot any conflicts for 3.3, however I think it's
-> generally a good idea for me to give some of the perf changes an airing
-> before they get merged anyway.
+> Maxime
+> 
+> On 18/11/2011 11:12, Maxime Ripard wrote:
+>> Hi all,
+>>
+>> This patchset adds the driver for the ADC in the AT91 SoC. It has been tested on
+>> the at91sam9g20ek and should work on sam9g45 as well.
+>>
+>> For now, it only reads values when asked for by sysfs, but eventually will
+>> support hardware triggers and more boards.
+>>
+>> This patchset is based on the "[PATCH 0/6 V2] IIO: Out of staging step 1: The
+>> core" patchset from Jonathan Cameron, applied on top of 3.1
+>>
+>> Improvements from v7:
+>>   - Fix the channels mask bug
+>>
+>> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+>> Cc: Patrice Vilchez <patrice.vilchez@atmel.com>
+>> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+> 
 
-I have added that tree now with you as the contact.
-
-Thanks for adding your subsystem tree as a participant of linux-next.  As
-you may know, this is not a judgment of your code.  The purpose of
-linux-next is for integration testing and to lower the impact of
-conflicts between subsystems in the next merge window. 
-
-You will need to ensure that the patches/commits in your tree/series have
-been:
-     * submitted under GPL v2 (or later) and include the Contributor's
-	Signed-off-by,
-     * posted to the relevant mailing list,
-     * reviewed by you (or another maintainer of your subsystem tree),
-     * successfully unit tested, and 
-     * destined for the current or next Linux merge window.
-
-Basically, this should be just what you would send to Linus (or ask him
-to fetch).  It is allowed to be rebased if you deem it necessary.
 
 -- 
-Cheers,
-Stephen Rothwell 
-sfr at canb.auug.org.au
-
-Legal Stuff:
-By participating in linux-next, your subsystem tree contributions are
-public and will be included in the linux-next trees.  You may be sent
-e-mail messages indicating errors or other issues when the
-patches/commits from your subsystem tree are merged and tested in
-linux-next.  These messages may also be cross-posted to the linux-next
-mailing list, the linux-kernel mailing list, etc.  The linux-next tree
-project and IBM (my employer) make no warranties regarding the linux-next
-project, the testing procedures, the results, the e-mails, etc.  If you
-don't agree to these ground rules, let me know and I'll remove your tree
-from participation in linux-next.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111123/719847b0/attachment.sig>
+Nicolas Ferre
