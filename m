@@ -1,112 +1,43 @@
 From: nico@fluxnic.net (Nicolas Pitre)
-Date: Mon, 21 Nov 2011 23:10:03 -0500 (EST)
-Subject: [PATCH 2/6] ARM: gic: fix big endian support
-In-Reply-To: <4ECAFF2C.1010604@windriver.com>
+Date: Mon, 21 Nov 2011 23:17:01 -0500 (EST)
+Subject: [PATCH 6/6] ARM: support kernel modules in BE8 mode
+In-Reply-To: <4ECAFBA0.2030001@windriver.com>
 References: <1321322785-2981-1-git-send-email-junxiao.bi@windriver.com>
- <1321322785-2981-2-git-send-email-junxiao.bi@windriver.com>
- <alpine.LFD.2.02.1111211334320.17904@xanadu.home>
- <4ECAFF2C.1010604@windriver.com>
-Message-ID: <alpine.LFD.2.02.1111212245250.17904@xanadu.home>
+ <1321322785-2981-6-git-send-email-junxiao.bi@windriver.com>
+ <alpine.LFD.2.02.1111211427400.17904@xanadu.home>
+ <4ECAFBA0.2030001@windriver.com>
+Message-ID: <alpine.LFD.2.02.1111212310520.17904@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Tue, 22 Nov 2011, Bi Junxiao wrote:
 
-> on 11/22/2011 03:11 AM Nicolas Pitre wrote:
+> on 11/22/2011 03:29 AM Nicolas Pitre wrote:
 > > On Tue, 15 Nov 2011, Junxiao Bi wrote:
 > > 
 > >    
-> > > The irq state from gic is in little-endian mode. We need do endian
-> > > conversion for it in big-endian machine. Usually byte swapping of
-> > > 32-bits word needs 4 assembler instructions for arm machine which
-> > > arch<  6. But since the high order half word of the irq state is
-> > > zero, there is a way that can use lesser instrunctions to improve
-> > > the performance since we only need a bytes swaping of half word.
-> > > That's what swab16_low_half and swab16_high_half do.
+> > > From: Stanley.Miao<stanley.miao@windriver.com>
 > > > 
-> > > Signed-off-by: Junxiao Bi<junxiao.bi@windriver.com>
-> > >      
-> > Comments below.
-> > 
-> >    
-> > > ---
-> > >   arch/arm/include/asm/assembler.h                |   27
-> > > +++++++++++++++++++++++
-> > >   arch/arm/include/asm/hardware/entry-macro-gic.S |    7 ++++++
-> > >   2 files changed, 34 insertions(+), 0 deletions(-)
+> > > In BE8 mode, data must be manipulated in big endian format while
+> > > text must be little endian. Therefore, when relocating the text
+> > > section of module in BE8 mode, we must convert the location offset
+> > > of the text to big endian from the native little endian. After
+> > > the relocation is complete, the location offset value is re-written
+> > > as little endian.
 > > > 
-> > > diff --git a/arch/arm/include/asm/assembler.h
-> > > b/arch/arm/include/asm/assembler.h
-> > > index 29035e8..3ddee22 100644
-> > > --- a/arch/arm/include/asm/assembler.h
-> > > +++ b/arch/arm/include/asm/assembler.h
-> > > @@ -302,4 +302,31 @@
-> > >   	.size \name , . - \name
-> > >   	.endm
-> > > 
-> > > +/*
-> > > + * swab16_low_half is used to swap the bytes order of the low order
-> > > + * half word, it assumes that the high order half word is zero.
-> > > + * swab16_high_half is used to swap the bytes order of the high order
-> > > + * half word, it assumes that the low order half word is zero.
-> > > + */
-> > > +#if __LINUX_ARM_ARCH__>= 6
-> > > +	.macro swab16_low_half, reg
-> > > +	rev \reg, \reg
-> > > +	.endm
-> > > +
-> > > +	.macro swab16_high_half, reg
-> > > +	rev \reg, \reg
-> > > +	.endm
-> > > +#else
-> > > +	.macro swab16_low_half, reg
-> > > +	mov \reg, \reg, ror #8
-> > > +	orr \reg, \reg, \reg, lsr #16
-> > > +	bic \reg, \reg, \reg, lsl #16
-> > > +	.endm
-> > >      
-> > I fail to see how this macro would be generally useful.  Presuming that
-> > the top or bottom half has to be zero is not particularly practical.
+> > > Since only BE8 mode has such special requirement while other big endian
+> > > mode not, cpu_to_le32 and le32_to_cpu can not be used to relocate the
+> > > text. We introduce write_instr* and read_instr* to do it.
+[...]
+> > If only module.c requires this, please move those definitions there.
 > >    
-> We can use it to swap bytes order of a 16-bits number in 32-bits register in
-> which case the top or bottom half will be zero. For the \irqstat register, as
-> the original implementation assumes its top half is zero, so I make the same
-> assumption.
+> Not only modules, all components that needs to read and write text segment
+> like kprobes also needs this. As it is special to arm be8, how about define it
+> in arch/arm/include/asm/swab.h?
 
-The problem is that you're loading some assumption about a particular 
-register onto a generic macro.  Unless this is a very common pattern, I 
-don't think this needs to be made generic.
-
-> > > +	.macro swab16_high_half, reg
-> > > +	swab16_low_half \reg
-> > > +	mov \reg, \reg, lsl #16
-> > > +	.endm
-> > >      
-> > And this doesn't end up cheaper than a plain swab32.
-> >    
-> This macro has an advantage that it only needs one register. For swab32, it
-> will need another temporary register besides the target register.
-
-Sure, but I don't think we're so short of registers.  And BE on 
-pre-ARMv6 is not that common either.  So, unless this particular pattern 
-is heavily used on pre-ARMv6 BE systems, I don't think it is reasonable 
-to create a generic macro with such specific assumptions.
-
-> > Furthermore, you're using those macros 1) in the gic code, and 2) onli
-> > in the BE8 case.  Both of those conditions are only possible on ARMv6
-> > and above anyway, so I'd simply open code a rev instruction inline.
-> >    
-> This is not be8 specific. It will be needed for both be8 and be32. So the
-> machine with arch < 6 also needs to be supported.
-
-There is no gic on machines with arch < 6, no?
-
-If you meant for those macros to be used for other purposes then they 
-deserve a patch of their own.
-
-And Russell just merged in his devel branch a patch from Marc Zyngier 
-completely removing entry-macro-gic.S anyway, so this patch as it is 
-will be moot soon.
+There is a patch series proposed by Leif Lindholm adding generic ARM 
+instruction condition code check that creates an opcode.h file.  That 
+would be an ideal location for opcode accessor definitions.
 
 
 Nicolas
