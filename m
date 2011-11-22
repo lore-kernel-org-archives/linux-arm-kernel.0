@@ -1,92 +1,47 @@
-From: marvin24@gmx.de (Marc Dietrich)
-Date: Tue, 22 Nov 2011 11:41:57 +0100
-Subject: [PATCH 1/5] arm/dt: tegra: Remove /memreserve/ from device-tree
- files
-In-Reply-To: <1321911851-10091-1-git-send-email-swarren@nvidia.com>
-References: <1321911851-10091-1-git-send-email-swarren@nvidia.com>
-Message-ID: <2308525.meomQFtUnY@ax5200p>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 22 Nov 2011 11:43:18 +0100
+Subject: [PATCH] dma i.MX: remove individual SOC dependency
+Message-ID: <1321958598-27260-1-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+The individual SoC dependency in Kconfig hardly scales anymore.
+Instead of having such a fine grained dependency just depend
+on ARCH_MXC and risk that the uninformed user has to look in
+the help text to figure out which driver is the correct one.
 
-On Monday 21 November 2011 14:44:07 Stephen Warren wrote:
-> There are no drivers in the kernel at present which can make use of the
-> memory reserved by /memreserve/, so there is no point reserving it. Remove
-> /memreserve/ to allow the user more memory. It's also unclear whether any
-> future driver would actually require /memreserve/, or allocate memory
-> through some other mechanism.
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+Cc: Vinod Koul <vinod.koul@intel.com>
+---
+ drivers/dma/Kconfig |    6 +++---
+ 1 files changed, 3 insertions(+), 3 deletions(-)
 
-while this gives 512 MB of usable memory on my AC100, it causes some funny 
-pictures on the screen ;-) I guess our bootloader (fastboot) already setups 
-the frambuffer there (and enables the backlight). I guess it shouldn't be 
-harmful as nothing else writes to this memory area. Otherwise you may add that 
-the bootloader (or the kernel cmdline supplied by the bootloader) is now 
-responsible for the reservation to the description.
-
-Marc
-
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
-> ---
->  arch/arm/boot/dts/tegra-harmony.dts   |    1 -
->  arch/arm/boot/dts/tegra-paz00.dts     |    1 -
->  arch/arm/boot/dts/tegra-seaboard.dts  |    1 -
->  arch/arm/boot/dts/tegra-trimslice.dts |    1 -
->  arch/arm/boot/dts/tegra-ventana.dts   |    1 -
->  5 files changed, 0 insertions(+), 5 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/tegra-harmony.dts
-> b/arch/arm/boot/dts/tegra-harmony.dts index 0e225b8..a802324 100644
-> --- a/arch/arm/boot/dts/tegra-harmony.dts
-> +++ b/arch/arm/boot/dts/tegra-harmony.dts
-> @@ -1,6 +1,5 @@
->  /dts-v1/;
-> 
-> -/memreserve/ 0x1c000000 0x04000000;
->  /include/ "tegra20.dtsi"
-> 
->  / {
-> diff --git a/arch/arm/boot/dts/tegra-paz00.dts
-> b/arch/arm/boot/dts/tegra-paz00.dts index 15a949f..1cd0cfe 100644
-> --- a/arch/arm/boot/dts/tegra-paz00.dts
-> +++ b/arch/arm/boot/dts/tegra-paz00.dts
-> @@ -1,6 +1,5 @@
->  /dts-v1/;
-> 
-> -/memreserve/ 0x1c000000 0x04000000;
->  /include/ "tegra20.dtsi"
-> 
->  / {
-> diff --git a/arch/arm/boot/dts/tegra-seaboard.dts
-> b/arch/arm/boot/dts/tegra-seaboard.dts index 88c682a..60724e4 100644
-> --- a/arch/arm/boot/dts/tegra-seaboard.dts
-> +++ b/arch/arm/boot/dts/tegra-seaboard.dts
-> @@ -1,6 +1,5 @@
->  /dts-v1/;
-> 
-> -/memreserve/ 0x1c000000 0x04000000;
->  /include/ "tegra20.dtsi"
-> 
->  / {
-> diff --git a/arch/arm/boot/dts/tegra-trimslice.dts
-> b/arch/arm/boot/dts/tegra-trimslice.dts index d3d0d20..95117d3 100644
-> --- a/arch/arm/boot/dts/tegra-trimslice.dts
-> +++ b/arch/arm/boot/dts/tegra-trimslice.dts
-> @@ -1,6 +1,5 @@
->  /dts-v1/;
-> 
-> -/memreserve/ 0x1c000000 0x04000000;
->  /include/ "tegra20.dtsi"
-> 
->  / {
-> diff --git a/arch/arm/boot/dts/tegra-ventana.dts
-> b/arch/arm/boot/dts/tegra-ventana.dts index 3f9abd6..2af12fa 100644
-> --- a/arch/arm/boot/dts/tegra-ventana.dts
-> +++ b/arch/arm/boot/dts/tegra-ventana.dts
-> @@ -1,6 +1,5 @@
->  /dts-v1/;
-> 
-> -/memreserve/ 0x1c000000 0x04000000;
->  /include/ "tegra20.dtsi"
-> 
->  / {
+diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
+index ab8f469..e514c45 100644
+--- a/drivers/dma/Kconfig
++++ b/drivers/dma/Kconfig
+@@ -124,7 +124,7 @@ config MV_XOR
+ 
+ config MX3_IPU
+ 	bool "MX3x Image Processing Unit support"
+-	depends on ARCH_MX3
++	depends on ARCH_MXC
+ 	select DMA_ENGINE
+ 	default y
+ 	help
+@@ -216,11 +216,11 @@ config PCH_DMA
+ 
+ config IMX_SDMA
+ 	tristate "i.MX SDMA support"
+-	depends on ARCH_MX25 || ARCH_MX3 || ARCH_MX5
++	depends on ARCH_MXC
+ 	select DMA_ENGINE
+ 	help
+ 	  Support the i.MX SDMA engine. This engine is integrated into
+-	  Freescale i.MX25/31/35/51 chips.
++	  Freescale i.MX25/31/35/51/53 chips.
+ 
+ config IMX_DMA
+ 	tristate "i.MX DMA support"
+-- 
+1.7.7.1
