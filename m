@@ -1,75 +1,39 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Tue, 22 Nov 2011 11:32:53 +0000
-Subject: [GIT PULL] ARM: amba: Enable module alias autogeneration for AMBA
- drivers
-Message-ID: <1321961573-4562-1-git-send-email-dave.martin@linaro.org>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Tue, 22 Nov 2011 13:40:04 +0200
+Subject: [PATCH 0/7] Introducing a generic AMP framework
+In-Reply-To: <874nywpfkd.fsf@rustcorp.com.au>
+References: <1319536106-25802-1-git-send-email-ohad@wizery.com>
+ <874nywpfkd.fsf@rustcorp.com.au>
+Message-ID: <CAK=WgbaF=yvGXvJdENrMoi4wWxaQa3UpbtsRm3mcA3cFdDCitA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+On Wed, Oct 26, 2011 at 6:00 AM, Rusty Russell <rusty@rustcorp.com.au> wrote:
+> On Tue, 25 Oct 2011 11:48:19 +0200, Ohad Ben-Cohen <ohad@wizery.com> wrote:
+>> Modern SoCs typically employ a central symmetric multiprocessing (SMP)
+>> application processor running Linux, with several other asymmetric
+>> multiprocessing (AMP) heterogeneous processors running different instances
+>> of operating system, whether Linux or any other flavor of real-time OS.
+>
+> OK, I'm not even sure who this should go through
 
-This series enables the general infrastructure for modalias
-generation to work for AMBA devices, and enables it in the affected
-drivers.
+We shortly discussed this in ELCE, and this can either go through the
+arm-soc tree or directly to Linus; however Arnd prefers really.
 
-Since there are several patches here, I though it better to send a
-pull request.
+The previous RFC iteration was reviewed quite extensively (especially
+by Grant. thanks Grant!) but I was hoping to get some more review or
+feedback on this iteration as well (any form of Acked-by, Reviewed-by,
++1-by or No-way-by are welcome).
 
-The first two patches (subject lines "ARM: amba: ...") are the core
-patches; the remainder of the patches are the driver changes --
-each is trivial and simply adds a MODULE_DEVICE_ALIAS() entry.
+At this point I know of at least four vendors (besides TI) who are
+actively looking into supporting this, and it's getting a bit hard to
+collaborate, so I plan to get this into linux-next later this week
+(minus the virtio-spec.txt change which I'll send directly to you,
+Rusty) in the hope of getting this merged into 3.3.
 
-I have Acks on some of the driver patches and no comments on the
-rest.  I've been circulating these for some time, so if you're
-happy to pull those driver patches via your tree, please go ahead.
+>, but no objections here
 
-Otherwise, let me know and I can continue trying to push the driver
-patches via other routes.
+Can I add your Acked-by on the virtio parts (mainly patches 3 and 6) ?
 
-Cheers
----Dave
-
-The following changes since commit cfcfc9eca2bcbd26a8e206baeb005b055dbf8e37:
-
-  Linux 3.2-rc2 (2011-11-15 15:02:59 -0200)
-
-are available in the git repository at:
-  git://git.linaro.org/people/dmart/linux-2.6-arm.git arm/amba-modalias+for-rmk
-
-Dave Martin (16):
-      ARM: amba: Move definition of struct amba_id to mod_devicetable.h
-      ARM: amba: Auto-generate AMBA driver module aliases during modpost
-      hwrng: nomadik: Enable module alias autogeneration for AMBA drivers
-      dmaengine: pl08x: Enable module alias autogeneration for AMBA drivers
-      dmaengine: pl330: Enable module alias autogeneration for AMBA drivers
-      gpio: pl061: Enable module alias autogeneration for AMBA drivers
-      input: ambakmi: Enable module alias autogeneration for AMBA drivers
-      mmc: mmci: Enable module alias autogeneration for AMBA drivers
-      rtc: pl030: Enable module alias autogeneration for AMBA drivers
-      rtc: pl031: Enable module alias autogeneration for AMBA drivers
-      spi: pl022: Enable module alias autogeneration for AMBA drivers
-      serial: pl010: Enable module alias autogeneration for AMBA drivers
-      serial: pl011: Enable module alias autogeneration for AMBA drivers
-      fbdev: amba: Enable module alias autogeneration for AMBA drivers
-      watchdog: sp805: Enable module alias autogeneration for AMBA drivers
-      sound: aaci: Enable module alias autogeneration for AMBA drivers
-
- drivers/amba/bus.c                   |    4 ++
- drivers/char/hw_random/nomadik-rng.c |    2 +
- drivers/dma/amba-pl08x.c             |    2 +
- drivers/dma/pl330.c                  |    2 +
- drivers/gpio/gpio-pl061.c            |    2 +
- drivers/input/serio/ambakmi.c        |    2 +
- drivers/mmc/host/mmci.c              |    2 +
- drivers/rtc/rtc-pl030.c              |    2 +
- drivers/rtc/rtc-pl031.c              |    2 +
- drivers/spi/spi-pl022.c              |    2 +
- drivers/tty/serial/amba-pl010.c      |    2 +
- drivers/tty/serial/amba-pl011.c      |    2 +
- drivers/video/amba-clcd.c            |    2 +
- drivers/watchdog/sp805_wdt.c         |    2 +
- include/linux/amba/bus.h             |    7 +---
- include/linux/mod_devicetable.h      |   18 ++++++++
- scripts/mod/file2alias.c             |   72 ++++++++++++++++++++++++++++++++++
- sound/arm/aaci.c                     |    2 +
- 18 files changed, 123 insertions(+), 6 deletions(-)
+Thanks!
+Ohad.
