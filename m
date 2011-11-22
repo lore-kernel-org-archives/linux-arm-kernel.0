@@ -1,100 +1,31 @@
-From: mika.westerberg@iki.fi (Mika Westerberg)
-Date: Tue, 22 Nov 2011 08:47:27 +0200
-Subject: [PATCH v2 1/5] dmaengine: add ep93xx DMA support
-In-Reply-To: <4ECA11C5.802@metasoft.pl>
-References: <cover.1306662317.git.mika.westerberg@iki.fi>
- <3ea8d56034f25cbe3fd8a4c31d7d0d1540b6ac7e.1306662317.git.mika.westerberg@iki.fi>
- <4EC27EED.4030108@metasoft.pl>
- <20111116065512.GB2703@mwesterb-mobl.ger.corp.intel.com>
- <4EC374F0.8000400@metasoft.pl>
- <20111119123837.GA2711@mwesterb-mobl.ger.corp.intel.com>
- <4ECA0147.4020806@metasoft.pl>
- <20111121080158.GA2713@mwesterb-mobl.ger.corp.intel.com>
- <4ECA11C5.802@metasoft.pl>
-Message-ID: <20111122064727.GB15889@mwesterb-mobl.ger.corp.intel.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 22 Nov 2011 09:23:14 +0100
+Subject: [RFC PATCH 0/3] Convert imx6 clock to device tree
+In-Reply-To: <1321926536-671-1-git-send-email-shawn.guo@linaro.org>
+References: <1321926536-671-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20111122082314.GB27267@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 21, 2011 at 09:54:29AM +0100, Rafal Prylowski wrote:
-> 
-> This patch works partially for me. Drive is detected correctly, I can do simple test with
-> hdparm, mount partitions, create file with 'touch' command, but when trying to fill
-> partition with data I get:
-> 
-> # dd if=/dev/zero of=/mnt/b/zero4 bs=4M
-> Internal error: Oops - undefined instruction: 0 [#1]
+On Tue, Nov 22, 2011 at 09:48:53AM +0800, Shawn Guo wrote:
+> As I promised to Arnd, I will convert imx6 clock code to common clock
+> framework and in turn device tree at the earliest time.  Here it is.
 
-Right. It still should call ep93xx_dma_advance_work(). Like the patch below.
+Very nice ;) I like the patches.
 
-Let me know if this works for you. Basically it's the patch from you except
-that we use a flag to indicate if the channel is running or not.
+Is there a way to improve the way how the entities find their base
+addresses? Currently the C code figures out the base addresses based
+on compatible. Maybe we could put the crm clocks and anatop clocks into
+two different nodes instead of putting them all directly under clocks{}.
 
-I would like to keep it this way (given that it solves the crash you are
-seeing, that is) to make sure that we can expect that the active list is never
-empty when the channel is operating.
+Could you split the last patch into two, one adding new device tree
+clock support in a new file and another removing the old clock support?
+This would help reviewing.
 
-diff --git a/drivers/dma/ep93xx_dma.c b/drivers/dma/ep93xx_dma.c
-index 6181811..2670005 100644
---- a/drivers/dma/ep93xx_dma.c
-+++ b/drivers/dma/ep93xx_dma.c
-@@ -155,6 +155,8 @@ struct ep93xx_dma_chan {
- 	unsigned long			flags;
- /* Channel is configured for cyclic transfers */
- #define EP93XX_DMA_IS_CYCLIC		0
-+/* Channel is enabled */
-+#define EP93XX_DMA_IS_RUNNING		1
- 
- 	int				buffer;
- 	dma_cookie_t			last_completed;
-@@ -669,24 +671,25 @@ static void ep93xx_dma_tasklet(unsigned long data)
- {
- 	struct ep93xx_dma_chan *edmac = (struct ep93xx_dma_chan *)data;
- 	struct ep93xx_dma_desc *desc, *d;
--	dma_async_tx_callback callback;
--	void *callback_param;
-+	dma_async_tx_callback callback = NULL;
-+	void *callback_param = NULL;
- 	LIST_HEAD(list);
- 
- 	spin_lock_irq(&edmac->lock);
--	desc = ep93xx_dma_get_active(edmac);
--	if (desc->complete) {
--		edmac->last_completed = desc->txd.cookie;
--		list_splice_init(&edmac->active, &list);
-+	if (test_bit(EP93XX_DMA_IS_RUNNING, &edmac->flags)) {
-+		desc = ep93xx_dma_get_active(edmac);
-+		if (desc->complete) {
-+			edmac->last_completed = desc->txd.cookie;
-+			list_splice_init(&edmac->active, &list);
-+		}
-+		callback = desc->txd.callback;
-+		callback_param = desc->txd.callback_param;
- 	}
- 	spin_unlock_irq(&edmac->lock);
- 
- 	/* Pick up the next descriptor from the queue */
- 	ep93xx_dma_advance_work(edmac);
- 
--	callback = desc->txd.callback;
--	callback_param = desc->txd.callback_param;
--
- 	/* Now we can release all the chained descriptors */
- 	list_for_each_entry_safe(desc, d, &list, node) {
- 		/*
-@@ -758,6 +761,8 @@ static dma_cookie_t ep93xx_dma_tx_submit(struct dma_async_tx_descriptor *tx)
- 	edmac->chan.cookie = cookie;
- 	desc->txd.cookie = cookie;
- 
-+	set_bit(EP93XX_DMA_IS_RUNNING, &edmac->flags);
-+
- 	/*
- 	 * If nothing is currently prosessed, we push this descriptor
- 	 * directly to the hardware. Otherwise we put the descriptor
-@@ -1106,6 +1111,7 @@ static int ep93xx_dma_terminate_all(struct ep93xx_dma_chan *edmac)
- 	spin_lock_irqsave(&edmac->lock, flags);
- 	/* First we disable and flush the DMA channel */
- 	edmac->edma->hw_shutdown(edmac);
-+	clear_bit(EP93XX_DMA_IS_RUNNING, &edmac->flags);
- 	clear_bit(EP93XX_DMA_IS_CYCLIC, &edmac->flags);
- 	list_splice_init(&edmac->active, &list);
- 	list_splice_init(&edmac->queue, &list);
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
