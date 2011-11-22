@@ -1,93 +1,40 @@
 From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Tue, 22 Nov 2011 09:25:01 +0100
-Subject: [PATCH 4/7] spi/pl022: move device disable to workqueue thread
-Message-ID: <1321950301-4782-1-git-send-email-linus.walleij@stericsson.com>
+Date: Tue, 22 Nov 2011 09:25:09 +0100
+Subject: [PATCH 5/7] spi/pl022: disable the PL022 block when unused
+Message-ID: <1321950309-4816-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Chris Blair <chris.blair@stericsson.com>
+From: Virupax Sadashivpetimath <virupax.sadashivpetimath@stericsson.com>
 
-Moves the disabling of the device and clocks to the same thread in
-which the device and clocks are enabled. This avoids SMP issues where
-the device can be enabled for a transfer by one thread and then
-disabled by the completion of the previous transfer in another thread.
+Make sure we clear the enable bit when the block is not used.
+This will save some energy in certain hardware versions.
 
-Signed-off-by: Chris Blair <chris.blair@stericsson.com>
+Reviewed-by: Viresh Kumar <viresh.kumar@st.com>
+Signed-off-by: Virupax Sadashivpetimath <virupax.sadashivpetimath@stericsson.com>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
 ChangeLog v1->v2:
-- Moved this patch before the block disable patch at request from
-  Viresh.
-- Insert blank line...
+- Move this patch after the movement of disabling code to workqueue
+  at Viresh:s request.
+- Add Vireshs Reviewed-by
 ---
- drivers/spi/spi-pl022.c |   26 +++++++++++++++++---------
- 1 files changed, 17 insertions(+), 9 deletions(-)
+ drivers/spi/spi-pl022.c |    3 +++
+ 1 files changed, 3 insertions(+), 0 deletions(-)
 
 diff --git a/drivers/spi/spi-pl022.c b/drivers/spi/spi-pl022.c
-index b4038f9..8cdf052 100644
+index 8cdf052..82a929f 100644
 --- a/drivers/spi/spi-pl022.c
 +++ b/drivers/spi/spi-pl022.c
-@@ -512,8 +512,6 @@ static void giveback(struct pl022 *pl022)
- 	msg->state = NULL;
- 	if (msg->complete)
- 		msg->complete(msg->context);
--	/* This message is completed, so let's turn off the clocks & power */
--	pm_runtime_put(&pl022->adev->dev);
- }
- 
- /**
-@@ -1509,14 +1507,19 @@ static void pump_messages(struct work_struct *work)
- 	struct pl022 *pl022 =
- 		container_of(work, struct pl022, pump_messages);
- 	unsigned long flags;
-+	bool was_busy = false;
- 
- 	/* Lock queue and check for queue work */
+@@ -1513,6 +1513,9 @@ static void pump_messages(struct work_struct *work)
  	spin_lock_irqsave(&pl022->queue_lock, flags);
  	if (list_empty(&pl022->queue) || !pl022->running) {
-+		if (pl022->busy) {
-+			pm_runtime_put(&pl022->adev->dev);
-+		}
+ 		if (pl022->busy) {
++			/* nothing more to do - disable spi/ssp and power off */
++			writew((readw(SSP_CR1(pl022->virtbase)) &
++				(~SSP_CR1_MASK_SSE)), SSP_CR1(pl022->virtbase));
+ 			pm_runtime_put(&pl022->adev->dev);
+ 		}
  		pl022->busy = false;
- 		spin_unlock_irqrestore(&pl022->queue_lock, flags);
- 		return;
- 	}
-+
- 	/* Make sure we are not already running a message */
- 	if (pl022->cur_msg) {
- 		spin_unlock_irqrestore(&pl022->queue_lock, flags);
-@@ -1527,7 +1530,10 @@ static void pump_messages(struct work_struct *work)
- 	    list_entry(pl022->queue.next, struct spi_message, queue);
- 
- 	list_del_init(&pl022->cur_msg->queue);
--	pl022->busy = true;
-+	if (pl022->busy)
-+		was_busy = true;
-+	else
-+		pl022->busy = true;
- 	spin_unlock_irqrestore(&pl022->queue_lock, flags);
- 
- 	/* Initial message state */
-@@ -1537,12 +1543,14 @@ static void pump_messages(struct work_struct *work)
- 
- 	/* Setup the SPI using the per chip configuration */
- 	pl022->cur_chip = spi_get_ctldata(pl022->cur_msg->spi);
--	/*
--	 * We enable the core voltage and clocks here, then the clocks
--	 * and core will be disabled when giveback() is called in each method
--	 * (poll/interrupt/DMA)
--	 */
--	pm_runtime_get_sync(&pl022->adev->dev);
-+	if (!was_busy)
-+		/*
-+		 * We enable the core voltage and clocks here, then the clocks
-+		 * and core will be disabled when this workqueue is run again
-+		 * and there is no more work to be done.
-+		 */
-+		pm_runtime_get_sync(&pl022->adev->dev);
-+
- 	restore_state(pl022);
- 	flush(pl022);
- 
 -- 
 1.7.3.2
