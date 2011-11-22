@@ -1,25 +1,24 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 22 Nov 2011 19:30:57 +0000
-Subject: [PATCH v3 0/5] common clk framework
-In-Reply-To: <20111122191226.GA4844@kroah.com>
-References: <1321926047-14211-1-git-send-email-mturquette@linaro.org>
- <20111122154259.GA18954@kroah.com>
- <20111122174544.GA19739@n2100.arm.linux.org.uk>
- <CAPtuhTgFPZA9U-8heNw1eNUnHLFv2w+LzXg5rdjSx3J53Xy+2g@mail.gmail.com>
- <20111122191226.GA4844@kroah.com>
-Message-ID: <20111122193057.GA20179@sirena.org.uk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 22 Nov 2011 19:31:24 +0000
+Subject: -next fails to boot as of today on S3C6410
+In-Reply-To: <20111122192741.GG30583@opensource.wolfsonmicro.com>
+References: <20111122192741.GG30583@opensource.wolfsonmicro.com>
+Message-ID: <20111122193124.GB9581@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 22, 2011 at 11:12:26AM -0800, Greg KH wrote:
-> On Tue, Nov 22, 2011 at 10:09:29AM -0800, Mike Turquette wrote:
+On Tue, Nov 22, 2011 at 07:27:41PM +0000, Mark Brown wrote:
+> Testing with my s3c6410 based platform I'm seeing no output after
+> "Uncompressing Linux... done, booting the kernel." when running -next.
+> Yesterday's -next booted fine.
+> 
+> I've verified that this was introduced in the Russell's for-next, and
+> bisection of that branch tells me that the offending commit is "ARM:
+> vic: device tree binding" though an attempt to revert that in -next
+> failed.  This is especially surprising as I have USE_OF turned off, I'm
+> guessing that the issue is something to do with the conversion to use an
+> irq_domain that happened in there.
 
-> > If others also agree that it should reside only in debugfs then I'll
-> > move it there for V4.
-
-> If it's only for debug stuff, then yes, it belongs in debugfs.  All
-> distros turn debugfs on these days, and for an embedded system, the code
-> is quite small so there should not be much overhead.
-
-Most of the embedded distros included, there's too much useful stuff in
-there.
+Thanks for the report.  I'll hold off pushing this stuff into the
+devel-stable branch while Jamie looks into this so that we can fix
+it and avoid having a bisection failure in this set of commits.
