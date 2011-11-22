@@ -1,48 +1,112 @@
 From: nico@fluxnic.net (Nicolas Pitre)
-Date: Mon, 21 Nov 2011 22:44:30 -0500 (EST)
-Subject: [PATCH v2 2/2] ARM: topdown mmap support
-In-Reply-To: <4ECB1186.1020601@gmail.com>
-References: <1321566426-31184-1-git-send-email-robherring2@gmail.com>
- <1321566426-31184-2-git-send-email-robherring2@gmail.com>
- <4ECB1186.1020601@gmail.com>
-Message-ID: <alpine.LFD.2.02.1111212242160.17904@xanadu.home>
+Date: Mon, 21 Nov 2011 23:10:03 -0500 (EST)
+Subject: [PATCH 2/6] ARM: gic: fix big endian support
+In-Reply-To: <4ECAFF2C.1010604@windriver.com>
+References: <1321322785-2981-1-git-send-email-junxiao.bi@windriver.com>
+ <1321322785-2981-2-git-send-email-junxiao.bi@windriver.com>
+ <alpine.LFD.2.02.1111211334320.17904@xanadu.home>
+ <4ECAFF2C.1010604@windriver.com>
+Message-ID: <alpine.LFD.2.02.1111212245250.17904@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 21 Nov 2011, Rob Herring wrote:
+On Tue, 22 Nov 2011, Bi Junxiao wrote:
 
-> On 11/17/2011 03:47 PM, Rob Herring wrote:
-> > From: Rob Herring <rob.herring@calxeda.com>
+> on 11/22/2011 03:11 AM Nicolas Pitre wrote:
+> > On Tue, 15 Nov 2011, Junxiao Bi wrote:
 > > 
-> > Similar to other architectures, this adds topdown mmap support in user
-> > process address space allocation policy. This allows mmap sizes greater
-> > than 2GB. This support is largely copied from MIPS and the generic
-> > implementations.
+> >    
+> > > The irq state from gic is in little-endian mode. We need do endian
+> > > conversion for it in big-endian machine. Usually byte swapping of
+> > > 32-bits word needs 4 assembler instructions for arm machine which
+> > > arch<  6. But since the high order half word of the irq state is
+> > > zero, there is a way that can use lesser instrunctions to improve
+> > > the performance since we only need a bytes swaping of half word.
+> > > That's what swab16_low_half and swab16_high_half do.
+> > > 
+> > > Signed-off-by: Junxiao Bi<junxiao.bi@windriver.com>
+> > >      
+> > Comments below.
 > > 
-> > The address space randomization is moved into arch_pick_mmap_layout.
-> > 
-> > Tested on V-Express with ubuntu and a mmap test from here:
-> > https://bugs.launchpad.net/bugs/861296
-> > 
-> > Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> > Acked-by: Nicolas Pitre <nico@linaro.org>
-> > ---
-> > v2: 
-> > - remove icache_is_vipt_aliasing check
-> > 
-> >  arch/arm/include/asm/pgtable.h   |    1 +
-> >  arch/arm/include/asm/processor.h |    2 +
-> >  arch/arm/mm/mmap.c               |  173 ++++++++++++++++++++++++++++++++++++-
-> >  3 files changed, 171 insertions(+), 5 deletions(-)
-> > 
-> 
-> Russell,
-> 
-> I submitted these 2 patches to the patch system. Can you please pull
-> into your next branch so they can get some more testing.
+> >    
+> > > ---
+> > >   arch/arm/include/asm/assembler.h                |   27
+> > > +++++++++++++++++++++++
+> > >   arch/arm/include/asm/hardware/entry-macro-gic.S |    7 ++++++
+> > >   2 files changed, 34 insertions(+), 0 deletions(-)
+> > > 
+> > > diff --git a/arch/arm/include/asm/assembler.h
+> > > b/arch/arm/include/asm/assembler.h
+> > > index 29035e8..3ddee22 100644
+> > > --- a/arch/arm/include/asm/assembler.h
+> > > +++ b/arch/arm/include/asm/assembler.h
+> > > @@ -302,4 +302,31 @@
+> > >   	.size \name , . - \name
+> > >   	.endm
+> > > 
+> > > +/*
+> > > + * swab16_low_half is used to swap the bytes order of the low order
+> > > + * half word, it assumes that the high order half word is zero.
+> > > + * swab16_high_half is used to swap the bytes order of the high order
+> > > + * half word, it assumes that the low order half word is zero.
+> > > + */
+> > > +#if __LINUX_ARM_ARCH__>= 6
+> > > +	.macro swab16_low_half, reg
+> > > +	rev \reg, \reg
+> > > +	.endm
+> > > +
+> > > +	.macro swab16_high_half, reg
+> > > +	rev \reg, \reg
+> > > +	.endm
+> > > +#else
+> > > +	.macro swab16_low_half, reg
+> > > +	mov \reg, \reg, ror #8
+> > > +	orr \reg, \reg, \reg, lsr #16
+> > > +	bic \reg, \reg, \reg, lsl #16
+> > > +	.endm
+> > >      
+> > I fail to see how this macro would be generally useful.  Presuming that
+> > the top or bottom half has to be zero is not particularly practical.
+> >    
+> We can use it to swap bytes order of a 16-bits number in 32-bits register in
+> which case the top or bottom half will be zero. For the \irqstat register, as
+> the original implementation assumes its top half is zero, so I make the same
+> assumption.
 
-For the record, I included an earlier version of those patches in the 
-Linaro kernel a week ago, and no breakage were reported so far.
+The problem is that you're loading some assumption about a particular 
+register onto a generic macro.  Unless this is a very common pattern, I 
+don't think this needs to be made generic.
+
+> > > +	.macro swab16_high_half, reg
+> > > +	swab16_low_half \reg
+> > > +	mov \reg, \reg, lsl #16
+> > > +	.endm
+> > >      
+> > And this doesn't end up cheaper than a plain swab32.
+> >    
+> This macro has an advantage that it only needs one register. For swab32, it
+> will need another temporary register besides the target register.
+
+Sure, but I don't think we're so short of registers.  And BE on 
+pre-ARMv6 is not that common either.  So, unless this particular pattern 
+is heavily used on pre-ARMv6 BE systems, I don't think it is reasonable 
+to create a generic macro with such specific assumptions.
+
+> > Furthermore, you're using those macros 1) in the gic code, and 2) onli
+> > in the BE8 case.  Both of those conditions are only possible on ARMv6
+> > and above anyway, so I'd simply open code a rev instruction inline.
+> >    
+> This is not be8 specific. It will be needed for both be8 and be32. So the
+> machine with arch < 6 also needs to be supported.
+
+There is no gic on machines with arch < 6, no?
+
+If you meant for those macros to be used for other purposes then they 
+deserve a patch of their own.
+
+And Russell just merged in his devel branch a patch from Marc Zyngier 
+completely removing entry-macro-gic.S anyway, so this patch as it is 
+will be moot soon.
 
 
 Nicolas
