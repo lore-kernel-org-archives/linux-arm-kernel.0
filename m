@@ -1,188 +1,60 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 22 Nov 2011 21:55:52 +0100
-Subject: [PATCH v2 2/2] MEM2MEM: Add support for eMMa-PrP mem2mem
- operations.
-In-Reply-To: <1321963316-9058-3-git-send-email-javier.martin@vista-silicon.com>
-References: <1321963316-9058-1-git-send-email-javier.martin@vista-silicon.com>
- <1321963316-9058-3-git-send-email-javier.martin@vista-silicon.com>
-Message-ID: <20111122205552.GO27267@pengutronix.de>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Tue, 22 Nov 2011 21:02:58 +0000
+Subject: [PATCH v8] AT91: Add a driver for the ADC
+In-Reply-To: <4ECBB551.4@atmel.com>
+References: <1321611160-3685-1-git-send-email-maxime.ripard@free-electrons.com>
+ <4ECBB226.4080404@free-electrons.com> <4ECBB551.4@atmel.com>
+Message-ID: <4ECC0E02.60807@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Javier,
-
-On Tue, Nov 22, 2011 at 01:01:56PM +0100, Javier Martin wrote:
-> Changes since v1:
-> - Embed queue data in ctx structure to allow multi instance.
-> - Remove redundant job_ready callback.
-> - Adjust format against device capabilities.
-> - Register/unregister video device at the right time.
-> - Other minor coding fixes.
+On 11/22/2011 02:44 PM, Nicolas Ferre wrote:
+> On 11/22/2011 03:31 PM, Maxime Ripard :
+>> Hi,
+>>
+>> So, I guess that we have a pretty good driver with that version. What
+>> can we do for the inclusion in the kernel now ?
 > 
-> Signed-off-by: Javier Martin <javier.martin@vista-silicon.com>
-> ---
->  drivers/media/video/Kconfig       |   10 +
->  drivers/media/video/Makefile      |    2 +
->  drivers/media/video/mx2_emmaprp.c | 1035 +++++++++++++++++++++++++++++++++++++
->  3 files changed, 1047 insertions(+), 0 deletions(-)
->  create mode 100644 drivers/media/video/mx2_emmaprp.c
+> I propose that:
 > 
-> diff --git a/drivers/media/video/Kconfig b/drivers/media/video/Kconfig
-> index b303a3f..77d7921 100644
-> --- a/drivers/media/video/Kconfig
-> +++ b/drivers/media/video/Kconfig
-> @@ -1107,4 +1107,14 @@ config VIDEO_SAMSUNG_S5P_MFC
->  	help
->  	    MFC 5.1 driver for V4L2.
->  
-> +config VIDEO_MX2_EMMAPRP
-> +	tristate "MX2 eMMa-PrP support"
-> +	depends on VIDEO_DEV && VIDEO_V4L2 && MACH_MX27
-
-Please do not add new references to MACH_MX27. Use SOC_IMX27 instead.
-
-> +	select VIDEOBUF2_DMA_CONTIG
-> +	select V4L2_MEM2MEM_DEV
-> +	help
-> +	    MX2X chips have a PrP that can be used to process buffers from
-> +	    memory to memory. Operations include resizing and format
-> +	    conversion.
-> +
-
-[...]
-
-> +
-> +static int emmaprp_probe(struct platform_device *pdev)
-> +{
-> +	struct emmaprp_dev *pcdev;
-> +	struct video_device *vfd;
-> +	struct resource *res_emma;
-> +	int irq_emma;
-> +	int ret;
-> +
-> +	pcdev = kzalloc(sizeof *pcdev, GFP_KERNEL);
-> +	if (!pcdev)
-> +		return -ENOMEM;
-> +
-> +	spin_lock_init(&pcdev->irqlock);
-> +
-> +	pcdev->clk_emma = clk_get(NULL, "emma");
-
-You should change the entry for the emma in
-arch/arm/mach-imx/clock-imx27.c to the following:
-
-_REGISTER_CLOCK("m2m-emmaprp", NULL, emma_clk)
-
-and use clk_get(&pdev->dev, NULL) here.
-
-> +	if (IS_ERR(pcdev->clk_emma)) {
-> +		ret = PTR_ERR(pcdev->clk_emma);
-> +		goto free_dev;
-> +	}
-> +
-> +	irq_emma = platform_get_irq(pdev, 0);
-> +	res_emma = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	if (irq_emma < 0 || res_emma == NULL) {
-> +		dev_err(&pdev->dev, "Missing platform resources data\n");
-> +		ret = -ENODEV;
-> +		goto free_clk;
-> +	}
-> +
-> +	ret = v4l2_device_register(&pdev->dev, &pcdev->v4l2_dev);
-> +	if (ret)
-> +		goto free_clk;
-> +
-> +	mutex_init(&pcdev->dev_mutex);
-> +
-> +	vfd = video_device_alloc();
-> +	if (!vfd) {
-> +		v4l2_err(&pcdev->v4l2_dev, "Failed to allocate video device\n");
-> +		ret = -ENOMEM;
-> +		goto unreg_dev;
-> +	}
-> +
-> +	*vfd = emmaprp_videodev;
-> +	vfd->lock = &pcdev->dev_mutex;
-> +
-> +	video_set_drvdata(vfd, pcdev);
-> +	snprintf(vfd->name, sizeof(vfd->name), "%s", emmaprp_videodev.name);
-> +	pcdev->vfd = vfd;
-> +	v4l2_info(&pcdev->v4l2_dev, EMMAPRP_MODULE_NAME
-> +			" Device registered as /dev/video%d\n", vfd->num);
-> +
-> +	platform_set_drvdata(pdev, pcdev);
-> +
-> +	if (!request_mem_region(res_emma->start, resource_size(res_emma),
-> +				MEM2MEM_NAME)) {
-> +		ret = -EBUSY;
-> +		goto rel_vdev;
-> +	}
-> +
-> +	pcdev->base_emma = ioremap(res_emma->start, resource_size(res_emma));
-> +	if (!pcdev->base_emma) {
-> +		ret = -ENOMEM;
-> +		goto rel_mem;
-> +	}
-> +	pcdev->irq_emma = irq_emma;
-> +	pcdev->res_emma = res_emma;
-> +
-> +	ret = request_irq(pcdev->irq_emma, emmaprp_irq, 0,
-> +			  MEM2MEM_NAME, pcdev);
-> +	if (ret)
-> +		goto rel_map;
-> +
-
-consider using devm_request_mem_region, devm_ioremap and
-devm_request_irq here. It simplifies your error handling considerably.
-
-> +
-> +	pcdev->alloc_ctx = vb2_dma_contig_init_ctx(&pdev->dev);
-> +	if (IS_ERR(pcdev->alloc_ctx)) {
-> +		v4l2_err(&pcdev->v4l2_dev, "Failed to alloc vb2 context\n");
-> +		ret = PTR_ERR(pcdev->alloc_ctx);
-> +		goto rel_irq;
-> +	}
-> +
-> +	pcdev->m2m_dev = v4l2_m2m_init(&m2m_ops);
-> +	if (IS_ERR(pcdev->m2m_dev)) {
-> +		v4l2_err(&pcdev->v4l2_dev, "Failed to init mem2mem device\n");
-> +		ret = PTR_ERR(pcdev->m2m_dev);
-> +		goto rel_ctx;
-> +	}
-> +
-
-[...]
-
-> +
-> +static struct platform_driver emmaprp_pdrv = {
-> +	.probe		= emmaprp_probe,
-> +	.remove		= emmaprp_remove,
-> +	.driver		= {
-> +		.name	= MEM2MEM_NAME,
-> +		.owner	= THIS_MODULE,
-> +	},
-> +};
-> +
-> +static void __exit emmaprp_exit(void)
-> +{
-> +	platform_driver_unregister(&emmaprp_pdrv);
-> +}
-> +
-> +static int __init emmaprp_init(void)
-> +{
-> +	return platform_driver_register(&emmaprp_pdrv);
-> +}
-> +
-> +module_init(emmaprp_init);
-> +module_exit(emmaprp_exit);
-> +
-
-No blank line at end of file please.
-
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> 1/ We take the patch #1/3 for inclusion through arm-soc during 3.2
+> 2/ Jonathan takes the #2/3 in his IIO subsystem
+Works for me. Poke me when 1 is in place.
+> 3/ We take board related patch #3/3 for inclusion during 3.3 (next)
+> 4/ And we may add other boards support if we are quick for 3.3...
+> 
+> Does is sound good to all of you?
+> 
+> Bye,
+> 
+>>
+>> Maxime
+>>
+>> On 18/11/2011 11:12, Maxime Ripard wrote:
+>>> Hi all,
+>>>
+>>> This patchset adds the driver for the ADC in the AT91 SoC. It has been tested on
+>>> the at91sam9g20ek and should work on sam9g45 as well.
+>>>
+>>> For now, it only reads values when asked for by sysfs, but eventually will
+>>> support hardware triggers and more boards.
+>>>
+>>> This patchset is based on the "[PATCH 0/6 V2] IIO: Out of staging step 1: The
+>>> core" patchset from Jonathan Cameron, applied on top of 3.1
+>>>
+>>> Improvements from v7:
+>>>   - Fix the channels mask bug
+>>>
+>>> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+>>> Cc: Patrice Vilchez <patrice.vilchez@atmel.com>
+>>> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+>>>
+>>>
+>>> _______________________________________________
+>>> linux-arm-kernel mailing list
+>>> linux-arm-kernel at lists.infradead.org
+>>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>
+>>
+> 
+> 
