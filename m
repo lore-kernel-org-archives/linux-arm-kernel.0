@@ -1,338 +1,1186 @@
-From: mturquette@ti.com (Mike Turquette)
-Date: Mon, 21 Nov 2011 17:40:44 -0800
-Subject: [PATCH v3 2/5] Documentation: common clk API
-In-Reply-To: <1321926047-14211-1-git-send-email-mturquette@linaro.org>
-References: <1321926047-14211-1-git-send-email-mturquette@linaro.org>
-Message-ID: <1321926047-14211-3-git-send-email-mturquette@linaro.org>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 22 Nov 2011 09:48:54 +0800
+Subject: [RFC PATCH 1/3] arm/imx6: describe clocks in device tree source
+In-Reply-To: <1321926536-671-1-git-send-email-shawn.guo@linaro.org>
+References: <1321926536-671-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1321926536-671-2-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Provide documentation for the common clk structures and APIs.  This code
-can be found in drivers/clk/ and include/linux/clk.h.
+It adds document for imx clock device tree bindings and then describes
+imx6 clocks in dts.
 
-Signed-off-by: Mike Turquette <mturquette@linaro.org>
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- Documentation/clk.txt |  312 +++++++++++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 312 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/clk.txt
+ .../devicetree/bindings/clock/clock-imx.txt        |  124 +++
+ arch/arm/boot/dts/imx6q.dtsi                       |  943 +++++++++++++++++++-
+ 2 files changed, 1058 insertions(+), 9 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/clock-imx.txt
 
-diff --git a/Documentation/clk.txt b/Documentation/clk.txt
+diff --git a/Documentation/devicetree/bindings/clock/clock-imx.txt b/Documentation/devicetree/bindings/clock/clock-imx.txt
 new file mode 100644
-index 0000000..ef4333d
+index 0000000..5c597d9
 --- /dev/null
-+++ b/Documentation/clk.txt
-@@ -0,0 +1,312 @@
-+		The Common Clk Framework
-+		Mike Turquette <mturquette@ti.com>
++++ b/Documentation/devicetree/bindings/clock/clock-imx.txt
+@@ -0,0 +1,124 @@
++* Device Tree Bindings for Freescale i.MX Clock
 +
-+	Part 1 - common data structures and API
++== Clock Gate ==
 +
-+The common clk framework is a combination of a common definition of
-+struct clk which can be used across most platforms as well as a set of
-+driver-facing APIs which operate on those clks.  Platforms can enable it
-+by selecting CONFIG_GENERIC_CLK.
++Required properties:
++- imx,clock-gate:  It's a two 32-bit integers array.  The first
++  integer specifies the offset of the gate register, and the second
++  one specifies the bit mask of the gate for this clock.
 +
-+Below is the common struct clk definition from include/linux.clk.h.  It
-+is modified slightly for brevity:
++== Clock Divider ==
 +
-+struct clk {
-+	const char              *name;
-+	const struct clk_hw_ops *ops;
-+	struct clk              *parent;
-+	unsigned long           rate;
-+	unsigned long           flags;
-+	unsigned int            enable_count;
-+	unsigned int            prepare_count;
-+	struct hlist_head       children;
-+	struct hlist_node       child_node;
++Required properties:
++- imx,clock-divider:  It's a five 32-bit integers array.  The first
++  integer specifies the offset of the divider register.  The second
++  and the third one specify the shift and width of the pre-divider
++  bits for the clock, which is not necessarily present and the values
++  can just be 0.  The last two specify the shift and width of the
++  post-divider bits.
++
++Optional properties:
++- imx,busy-divider:  Some imx clocks needs to wait for a busy status
++  cleared when the clock rate gets changed.  This property is a two
++  32-bit integers array.  The first integer specifies the offset of
++  the busy register, and the second one specifies the busy bit mask.
++
++== Clock Multiplexer ==
++
++Required properties:
++- imx,clock-multiplexer:  It's a three 32-bit integers array.  The
++  first integer specifies the offset of the multiplexer register.
++  The second and the third one specify the shift and width of the
++  multiplexer bits for this clock.
++
++Optional properties:
++- imx,busy-multiplexer:  Some imx clocks needs to wait for a busy
++  status cleared when the parent gets changed.  This property is a two
++  32-bit integers array.  The first integer specifies the offset of
++  the busy register, and the second one specifies the busy bit mask.
++
++A typical imx clock could have gate, divider, multiplexer, but it's
++also very true that a imx clock just has the subset of these three
++properties.
++
++When #clock-cells > 1, this single clock node actually describes
++multiple clocks.  Thus all the properties under the node should
++contains the description for all of the clocks, except properties
++clock-input and clock-input-name which are used to describe the
++parents of the clock.  That means only the clocks sharing the exactly
++same parents could possible described by single node.
++
++Examples:
++
++pll2_pfd_clk: pll2-pfd {
++	compatible = "fsl,imx6q-pfd";
++	#clock-cells = <3>;
++	imx,clock-gate = <0x100 0x80>,
++			 <0x100 0x8000>,
++			 <0x100 0x800000>;
++	imx,clock-divider = <0x100 0 0 0 6>,
++			    <0x100 0 0 8 6>,
++			    <0x100 0 0 16 6>;
++	clock-input = <&pll_bus_clk 0>;
++	clock-input-name = "pll2-bus";
++	clock-output-name = "pll2-pfd-352m",
++			    "pll2-pfd-594m",
++			    "pll2-pfd-400m";
 +};
 +
-+The .name, .parent and .children members make up the core of the clk
-+tree topology which can be visualized by enabling
-+CONFIG_COMMON_CLK_SYSFS.  The ops member points to an instance of struct
-+clk_hw_ops:
-+
-+	struct clk_hw_ops {
-+		int             (*prepare)(struct clk *clk);
-+		void            (*unprepare)(struct clk *clk);
-+		int             (*enable)(struct clk *clk);
-+		void            (*disable)(struct clk *clk);
-+		unsigned long   (*recalc_rate)(struct clk *clk);
-+		long            (*round_rate)(struct clk *clk, unsigned long,
-+				unsigned long *);
-+		int             (*set_parent)(struct clk *clk, struct clk *);
-+		struct clk *    (*get_parent)(struct clk *clk);
-+		int             (*set_rate)(struct clk *clk, unsigned long);
-+	};
-+
-+These callbacks correspond to the clk API that has existed in
-+include/linux/clk.h for a while.  Below is a quick summary of the
-+operations in that header, as implemented in drivers/clk/clk.c.  These
-+comprise the driver-facing API:
-+
-+clk_prepare - does everything needed to get a clock ready to generate a
-+proper signal which may include ungating the clk and actually generating
-+that signal.  clk_prepare MUST be called before clk_enable.  This call
-+holds the global prepare_mutex, which also prevents clk rates and
-+topology from changing while held.  This API is meant to be the "slow"
-+part of a clk enable sequence, if applicable.  This function must not be
-+called in an interrupt context.
-+
-+clk_unprepare - the opposite of clk_prepare: does everything needed to
-+make a clk no longer ready to generate a proper signal, which may
-+include gating an active clk.  clk_disable must be called before
-+clk_unprepare.  All of the same rules for clk_prepare apply.
-+
-+clk_enable - ungate a clock and immediately start generating a valid clk
-+signal.  This is the "fast" part of a clk enable sequence, and maybe the
-+only functional part of that sequence.  Regardless clk_prepare must be
-+called BEFORE clk_enable.  The enable_spinlock is held across this call,
-+which means that clk_enable must not sleep.
-+
-+clk_disable - the opposite of clk_enable: gates a clock immediately.
-+clk_disable must be called before calling clk_unprepare.  All of the
-+same rules for clk_enable apply.
-+
-+clk_get_rate - Returns the cached rate for the clk.  Does NOT query the
-+hardware state.  No lock is held.
-+
-+clk_get_parent - Returns the cached parent for the clk.  Does NOT query
-+the hardware state.  No lock is held.
-+
-+clk_set_rate - Attempts to change the clk rate to the one specified.
-+Depending on a variety of common flags it may fail to maintain system
-+stability or result in a variety of other clk rates changing.  Holds the
-+same prepare_mutex held by clk_prepare/clk_unprepare and clk_set_parent.
-+
-+clk_set_parent - Switches the input source for a clk.  This only applies
-+to mux clks with multiple parents.  Holds the same prepare_mutex held by
-+clk_prepare/clk_unprepare and clk_set_rate.
-+
-+	Part 2 - hardware clk implementations
-+
-+The strength of the common struct clk comes from its .ops pointer and
-+the ability for platform and driver code to wrap the struct clk instance
-+with hardware-specific data which the operations in the .ops pointer
-+have knowledge of.  To illustrate consider the simple gateable clk
-+implementation in drivers/clk/clk-basic.c:
-+
-+struct clk_hw_gate {
-+	struct clk      clk;
-+	struct clk      *fixed_parent;
-+	void __iomem    *reg;
-+	u8              bit_idx;
++usdhc_clk: usdhc {
++	compatible = "fsl,imx6q-clock";
++	#clock-cells = <4>;
++	imx,clock-gate = <0x80 0xc>,
++			 <0x80 0x30>,
++			 <0x80 0xc0>,
++			 <0x80 0x300>;
++	imx,clock-divider = <0x24 0 0 11 3>,
++			    <0x24 0 0 16 3>,
++			    <0x24 0 0 19 3>,
++			    <0x24 0 0 22 3>;
++	imx,clock-multiplexer = <0x1c 16 1>,
++				<0x1c 17 1>,
++				<0x1c 18 1>,
++				<0x1c 19 1>;
++	clock-input = <&pll2_pfd_clk 2 0 0>,
++		      <&pll2_pfd_clk 0 0 0>;
++	clock-input-name = "pll2-pfd-400m",
++			   "pll2-pfd-352m";
++	clock-output-name = "usdhc1",
++			    "usdhc2",
++			    "usdhc3",
++			    "usdhc3";
 +};
 +
-+struct clk_hw_gate contains the clk as well as hardware-specific
-+knowledge about which register and bit controls this clk's gating.  The
-+fixed-parent member is also there as a way to initialize the topology.
-+
-+Let's walk through enabling this clk from driver code:
-+
-+	struct clk *clk;
-+	clk = clk_get(NULL, "my_gateable_clk");
-+
-+	clk_prepare(clk);
-+	clk_enable(clk);
-+
-+Note that clk_prepare MUST be called before clk_enable even if
-+clk_prepare does nothing (which in this case is true).
-+
-+The call graph for clk_enable is very simple:
-+
-+clk_enable(clk);
-+	clk->enable(clk);
-+			clk_hw_gate_enable_set(clk);
-+				clk_hw_gate_set_bit(clk);
-+
-+And the definition of clk_hw_gate_set_bit:
-+
-+static void clk_hw_gate_set_bit(struct clk *clk)
-+{
-+	struct clk_hw_gate *gate = to_clk_hw_gate(clk);
-+	u32 reg;
-+
-+	reg = __raw_readl(gate->reg);
-+	reg |= BIT(gate->bit_idx);
-+	__raw_writel(reg, gate->reg);
-+}
-+
-+Note that in the final call to clk_hw_gate_set_bit there is use of
-+to_clk_hw_gate, which is defined as:
-+
-+#define to_clk_hw_gate(ck) container_of(ck, struct clk_hw_gate, clk)
-+
-+This simple abstration is what allows the common clk framework to scale
-+across many platforms.  The struct clk definition remains the same while
-+the hardware operations in the .ops pointer know the details of the clk
-+hardware.  A little pointer arithmetic to get to the data is all that
-+the ops need.
-+
-+	Part 3 - Supporting your own clk hardware
-+
-+To construct a clk hardware structure for your platform you simply need
-+to define the following:
-+
-+struct clk_hw_your_clk {
-+	struct clk;
-+	unsigned long some_data;
-+	struct your_struct *some_more_data;
++usdhc at 02190000 { /* uSDHC1 */
++	compatible = "fsl,imx6q-usdhc";
++	reg = <0x02190000 0x4000>;
++	interrupts = <0 22 0x04>;
++	clock-input = <&usdhc_clk 0 0 0 0>;
++	clock-input-name = "usdhc1";
 +};
 +
-+To take advantage of your data you'll need to support valid operations
-+for your clk:
-+
-+struct clk_hw_ops clk_hw_ops_your_clk {
-+	.enable		= &clk_hw_your_clk_enable;
-+	.disable	= &clk_hw_your_clk_disable;
++usdhc at 02194000 { /* uSDHC2 */
++	compatible = "fsl,imx6q-usdhc";
++	reg = <0x02194000 0x4000>;
++	interrupts = <0 23 0x04>;
++	clock-input = <&usdhc_clk 1 0 0 0>;
++	clock-input-name = "usdhc2";
 +};
 +
-+Implement the above functions using container_of:
-+
-+int clk_hw_your_clk_enable(struct clk *clk)
-+{
-+	struct clk_hw_your_clk *yclk;
-+
-+	yclk = container_of(clk, struct clk_hw_your_clk, clk);
-+
-+	magic(yclk);
++usdhc at 02198000 { /* uSDHC3 */
++	compatible = "fsl,imx6q-usdhc";
++	reg = <0x02198000 0x4000>;
++	interrupts = <0 24 0x04>;
++	clock-input = <&usdhc_clk 2 0 0 0>;
++	clock-input-name = "usdhc3";
 +};
 +
-+If you are statically allocating all of your clk_hw_your_clk instances
-+then you will still need to initialize some stuff in struct clk with the
-+clk_init function from include/linux/clk.h:
++usdhc at 0219c000 { /* uSDHC4 */
++	compatible = "fsl,imx6q-usdhc";
++	reg = <0x0219c000 0x4000>;
++	interrupts = <0 25 0x04>;
++	clock-input = <&usdhc_clk 3 0 0 0>;
++	clock-input-name = "usdhc4";
++};
+diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
+index 7dda599..a5b9c5e 100644
+--- a/arch/arm/boot/dts/imx6q.dtsi
++++ b/arch/arm/boot/dts/imx6q.dtsi
+@@ -64,19 +64,922 @@
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+ 
+-		ckil {
+-			compatible = "fsl,imx-ckil", "fixed-clock";
+-			clock-frequency = <32768>;
++		dummy_clk: dummy {
++			compatible = "dummy-clock";
++			#clock-cells = <1>;
++			clock-output-name = "dummy";
+ 		};
+ 
+-		ckih1 {
+-			compatible = "fsl,imx-ckih1", "fixed-clock";
+-			clock-frequency = <0>;
++		ref_clk: ref {
++			compatible = "fixed-clock";
++			#clock-cells = <3>;
++			clock-frequency = <24000000 32768 0>;
++			clock-output-name = "osc",
++					    "ckil",
++					    "ckih";
+ 		};
+ 
+-		osc {
+-			compatible = "fsl,imx-osc", "fixed-clock";
+-			clock-frequency = <24000000>;
++		pll_sys_clk: pll-sys {
++			compatible = "fsl,imx6q-pll-sys";
++			#clock-cells = <1>;
++			imx,clock-gate = <0x0 0x2000>;
++			imx,clock-divider = <0x0 0 0 0 7>;
++			clock-input = <&ref_clk 0 0 0>;
++			clock-input-name = "osc";
++			clock-output-name = "pll1-sys";
++		};
 +
-+clk_init(&yclk->clk);
++		pll_bus_clk: pll-bus {
++			compatible = "fsl,imx6q-pll";
++			#clock-cells = <1>;
++			imx,clock-gate = <0x30 0x2000>;
++			imx,clock-divider = <0x30 0 0 0 1>;
++			clock-input = <&ref_clk 0 0 0>;
++			clock-input-name = "osc";
++			clock-output-name = "pll2-bus";
++		};
 +
-+If you are dynamically creating clks or using device tree then you might
-+want a hardware-specific register function:
++		pll_usb_clk: pll-usb {
++			compatible = "fsl,imx6q-pll-usb";
++			#clock-cells = <2>;
++			imx,clock-gate = <0x10 0x2000>,
++					 <0x20 0x2000>;
++			imx,clock-divider = <0x10 0 0 0 2>,
++					    <0x20 0 0 0 2>;
++			clock-input = <&ref_clk 0 0 0>;
++			clock-input-name = "osc";
++			clock-output-name = "pll3-usb-otg",
++					    "pll7-usb-host";
++		};
 +
-+int clk_hw_your_clk_register(const char *name, unsigned long flags,
-+		unsigned long some_data,
-+		struct your_struct *some_more_data)
-+{
-+	struct clk_hw_your_clk *yclk;
++		pll_av_clk: pll-av {
++			compatible = "fsl,imx6q-pll-av";
++			#clock-cells = <2>;
++			imx,clock-gate = <0x70 0x2000>,
++					 <0xa0 0x2000>;
++			imx,clock-divider = <0x70 0 0 0 7>,
++					    <0xa0 0 0 0 7>;
++			clock-input = <&ref_clk 0 0 0>;
++			clock-input-name = "osc";
++			clock-output-name = "pll4-audio",
++					    "pll5-video";
++		};
 +
-+	yclk = kmalloc(sizeof(struct clk_hw_your_clk), GFP_KERNEL);
++		pll_mlb_clk: pll-mlb {
++			compatible = "fsl,imx6q-pll";
++			#clock-cells = <1>;
++			imx,clock-gate = <0xd0 0x2000>;
++			clock-input = <&ref_clk 0 0 0>;
++			clock-input-name = "osc";
++			clock-output-name = "pll6-mlb";
++		};
 +
-+	yclk->some_data = some_data;
-+	yclk->some_more_data = some_more_data;
++		pll_enet_clk: pll-enet {
++			compatible = "fsl,imx6q-pll-enet";
++			#clock-cells = <1>;
++			imx,clock-gate = <0xe0 0x182000>;
++			imx,clock-divider = <0xe0 0 0 0 2>;
++			clock-input = <&ref_clk 0 0 0>;
++			clock-input-name = "osc";
++			clock-output-name = "pll8-enet";
++		};
 +
-+	yclk->clk.name = name;
-+	yclk->clk.flags = flags;
++		pll2_pfd_clk: pll2-pfd {
++			compatible = "fsl,imx6q-pfd";
++			#clock-cells = <3>;
++			imx,clock-gate = <0x100 0x80>,
++					 <0x100 0x8000>,
++					 <0x100 0x800000>;
++			imx,clock-divider = <0x100 0 0 0 6>,
++					    <0x100 0 0 8 6>,
++					    <0x100 0 0 16 6>;
++			clock-input = <&pll_bus_clk 0>;
++			clock-input-name = "pll2-bus";
++			clock-output-name = "pll2-pfd-352m",
++					    "pll2-pfd-594m",
++					    "pll2-pfd-400m";
++		};
 +
-+	clk_init(&yclk->clk);
++		pll3_pfd_clk: pll3-pfd {
++			compatible = "fsl,imx6q-pfd";
++			#clock-cells = <4>;
++			imx,clock-gate = <0xf0 0x80>,
++					 <0xf0 0x8000>,
++					 <0xf0 0x800000>,
++					 <0xf0 0x80000000>;
++			imx,clock-divider = <0xf0 0 0 0 6>,
++					    <0xf0 0 0 8 6>,
++					    <0xf0 0 0 16 6>,
++					    <0xf0 0 0 24 6>;
++			clock-input = <&pll_usb_clk 0 0>;
++			clock-input-name = "pll3-usb-otg";
++			clock-output-name = "pll3-pfd-720m",
++					    "pll3-pfd-540m",
++					    "pll3-pfd-508m",
++					    "pll3-pfd-454m";
++		};
 +
-+	return 0;
-+}
++		pll2_div_clk: pll2-200m {
++			compatible = "divider-fixed-clock";
++			#clock-cells = <1>;
++			clock-divider = <2>;
++			clock-input = <&pll2_pfd_clk 2 0 0>;
++			clock-input-name = "pll2-pfd-400m";
++			clock-output-name = "pll2-200m";
++		};
 +
-+	Part 4 - clk_set_rate
++		pll3_div_clk: pll3-div {
++			compatible = "divider-fixed-clock";
++			#clock-cells = <3>;
++			clock-divider = <4 6 8>;
++			clock-input = <&pll_usb_clk 0 0>;
++			clock-input-name = "pll3-usb";
++			clock-output-name = "pll3-120m",
++					    "pll3-80m",
++					    "pll3-60m";
++		};
 +
-+clk_set_rate deserves a special mention because it is more complex than
-+the other operations.  There are three key concepts to the common
-+clk_set_rate implementation:
++		step_clk: step {
++			compatible = "fsl,imx6q-clock";
++			#clock-cells = <1>;
++			imx,clock-multiplexer = <0xc 8 1>;
++			clock-input = <&ref_clk 0 0 0>,
++				      <&pll2_pfd_clk 2 0 0>;
++			clock-input-name = "osc",
++					   "pll2-pfd-400m";
++			clock-output-name = "step";
++		};
 +
-+1) recursively traversing up the clk tree and changing clk rates, one
-+parent at a time, if each clk allows it
-+2) failing to change rate if the clk is enabled and must only change
-+rates while disabled
-+2) using clk rate change notifiers to allow devices to handle dynamic
-+rate changes for clks which do support changing rates while enabled
++		pll1_sw_clk: pll1-sw {
++			compatible = "fsl,imx6q-clock";
++			#clock-cells = <1>;
++			imx,clock-multiplexer = <0xc 2 1>;
++			clock-input = <&pll_sys_clk 0>,
++				      <&step_clk 0>;
++			clock-input-name = "pll1-sys",
++					   "step";
++			clock-output-name = "pll1-sw";
++		};
 +
-+For the simple, non-recursive case the call graph looks like:
++		periph_pre_clk: periph-pre {
++			compatible = "fsl,imx6q-clock";
++			#clock-cells = <2>;
++			imx,clock-multiplexer = <0x18 18 2>,
++						<0x18 21 2>;
++			clock-input = <&pll_bus_clk 0>,
++				      <&pll2_pfd_clk 2 0 0>,
++				      <&pll2_pfd_clk 0 0 0>,
++				      <&pll2_div_clk 0>;
++			clock-input-name = "pll2-bus",
++					   "pll2-pfd-400m",
++					   "pll2-pfd-352m",
++					   "pll2-200m";
++			clock-output-name = "periph-pre",
++					    "periph2-pre";
++		};
 +
-+clk_set_rate(clk, rate);
-+	__clk_set_rate(clk, rate);
-+		clk->round_rate(clk, rate *parent_rate);
-+		clk->set_rate(clk, rate);
++		periph_clk2_clk: periph-clk2 {
++			compatible = "fsl,imx6q-clock";
++			#clock-cells = <2>;
++			imx,clock-divider = <0x14 0 0 27 3>,
++					    <0x14 0 0 0 3>;
++			imx,clock-multiplexer = <0x18 12 1>,
++						<0x18 20 1>;
++			clock-input = <&pll_usb_clk 0 0>,
++				      <&ref_clk 0 0 0>;
++			clock-input-name = "pll3-usb-otg",
++					   "osc";
++			clock-output-name = "periph-clk2",
++					    "periph2-clk2";
++		};
 +
-+You might be wondering what that third paramater in .round_rate is.  If
-+a clk supports the CLK_PARENT_SET_RATE flag then that enables it's
-+hardware-specific .round_rate function to provide a new rate that the
-+parent should transition to.  For example, imagine a rate-adjustable clk
-+A that is the parent of clk B, which has a fixed divider of 2.
++		periph_clk: periph {
++			compatible = "fsl,imx6q-clock";
++			#clock-cells = <1>;
++			imx,clock-multiplexer = <0x14 25 1>;
++			imx,busy-multiplexer = <0x48 0x20>;
++			clock-input = <&periph_pre_clk 0 0>,
++				      <&periph_clk2_clk 0 0>;
++			clock-input-name = "periph-pre",
++					   "periph-clk2";
++			clock-output-name = "periph";
++		};
 +
-+	clk A	(rate = 10MHz) (possible rates = 5MHz, 10MHz, 20MHz)
-+	  |
-+	  |
-+	  |
-+	clk B	(rate = 5MHz) (fixed divider of 2)
++		periph2_clk: periph2 {
++			compatible = "fsl,imx6q-clock";
++			#clock-cells = <1>;
++			imx,clock-multiplexer = <0x14 26 1>;
++			imx,busy-multiplexer = <0x48 0x8>;
++			clock-input = <&periph_pre_clk 1 0>,
++				      <&periph_clk2_clk 1 0>;
++			clock-input-name = "periph2-pre",
++					   "periph2-clk2";
++			clock-output-name = "periph2";
++		};
 +
-+In the above scenario clk B will always have half the rate of clk A.  If
-+clk B is to generate a 10MHz clk then clk A must generate 20MHz in turn.
-+The driver writer could hack in knowledge of clk A, but in reality clk B
-+drives the devices operation and the driver shouldn't know the details
-+of the clk tree topology.  In this case it would be nice for clk B to
-+propagate it's request up to clk A.
++		axi_clk: axi {
++			compatible = "fsl,imx6q-clock";
++			#clock-cells = <1>;
++			imx,clock-divider = <0x14 0 0 16 3>;
++			imx,busy-divider = <0x48 0x1>;
++			imx,clock-multiplexer = <0x14 6 2>;
++			clock-input = <&periph_clk 0>,
++				      <&pll2_pfd_clk 2 0 0>,
++				      <&pll3_pfd_clk 1 0 0 0>;
++			clock-input-name = "periph",
++					   "pll2-pfd-400m",
++					   "pll3-pfd-540m";
++			clock-output-name = "axi";
++		};
 +
-+Here the call graph for our above example:
++		mmdc_ch0_axi_clk: mmdc-ch0-axi {
++			compatible = "fsl,imx6q-clock";
++			#clock-cells = <1>;
++			imx,clock-gate = <0x74 0x300000>;
++			imx,clock-divider = <0x14 0 0 19 3>;
++			imx,busy-divider = <0x48 0x10>;
++			clock-input = <&periph_clk 0>;
++			clock-input-name = "periph";
++			clock-output-name = "mmdc-ch0-axi";
++		};
 +
-+clk_set_rate(clk, rate);
-+	__clk_set_rate(clk, rate);
-+		clk->round_rate(clk, rate *parent_rate);
-+		clk->set_rate(clk, rate);
-+		__clk_set_rate(clk->parent, parent_rate);
-+			clk->round_rate(clk, rate *parent_rate);
-+			clk->set_rate(clk, rate);
++		mmdc_ch1_axi_clk: mmdc-ch1-axi {
++			compatible = "fsl,imx6q-clock";
++			#clock-cells = <1>;
++			imx,clock-gate = <0x74 0xc00000>;
++			imx,clock-divider = <0x14 0 0 3 3>;
++			imx,busy-divider = <0x48 0x4>;
++			clock-input = <&periph2_clk 0>;
++			clock-input-name = "periph2";
++			clock-output-name = "mmdc-ch1-axi";
++		};
 +
-+Note that the burden of figuring out whether to recurse upwards falls on
-+the hardware-specific .round_rate function.  The common clk framework
-+does not have the context to make such complicated decisions in a
-+generic way for all platforms.
++		arm_clk: arm {
++			compatible = "fsl,imx6q-clock";
++			#clock-cells = <1>;
++			imx,clock-divider = <0x10 0 0 0 3>;
++			imx,busy-divider = <0x48 0x10000>;
++			clock-input = <&pll1_sw_clk 0>;
++			clock-input-name = "pll1-sw";
++			clock-output-name = "arm";
++		};
 +
-+Another caveat is that child clks might run at weird intermediate
-+frequencies during a complex upwards propagation, as illustrated below:
++		ahb_clk: ahb {
++			compatible = "fsl,imx6q-clock";
++			#clock-cells = <1>;
++			imx,clock-divider = <0x14 0 0 10 3>;
++			imx,busy-divider = <0x48 0x2>;
++			clock-input = <&periph_clk 0>;
++			clock-input-name = "periph";
++			clock-output-name = "ahb";
++		};
 +
-+	clk A  (pll 100MHz - 300MHz)	(currently locked at 200MHz)
-+	  |
-+	  |
-+	  |
-+	clk B  (divide by 1 or 2)	(currently divide by 2, 100MHz)
-+	  |
-+	  |
-+	  |
-+	clk C  (divide by 1 or 2)	(currently divide by 1, 100MHz)
++		ipg_clk: ipg {
++			compatible = "fsl,imx6q-clock";
++			#clock-cells = <1>;
++			imx,clock-divider = <0x14 0 0 8 2>;
++			clock-input = <&ahb_clk 0>;
++			clock-input-name = "ahb";
++			clock-output-name = "ipg";
++		};
 +
-+The call graph below, with some bracketed annotations, describes how
-+this might work with some clever .round_rate callbacks when trying to
-+set clk C to run at 26MHz:
++		ipg_per_clk: ipg-per {
++			compatible = "fsl,imx6q-clock";
++			#clock-cells = <1>;
++			imx,clock-divider = <0x1c 0 0 0 6>;
++			clock-input = <&ipg_clk 0>;
++			clock-input-name = "ipg";
++			clock-output-name = "ipg-per";
++		};
 +
-+clk_set_rate(C, 26MHz);
-+	__clk_set_rate(C, 26MHz);
-+		clk->round_rate(C, 26MHz, *parent_rate);
-+		[ round_rate returns 50MHz ]
-+		[ &parent_rate is 52MHz ]
-+		clk->set_rate(C, 50Mhz);
-+		[ clk C is set to 50MHz, which sets divider to 2 ]
-+		__clk_set_rate(clk->parent, parent_rate);
-+			clk->round_rate(B, 52MHz, *parent_rate);
-+			[ round_rate returns 100MHz ]
-+			[ &parent_rate is 104MHz ]
-+			clk->set_rate(B, 100MHz);
-+			[ clk B stays at 100MHz, divider stays at 2 ]
-+			__clk_set_rate(clk->parent, parent_rate);
-+				[ round_rate returns 104MHz ]
-+				[ &parent_rate is ignored ]
-+				clk->set_rate(A, 104MHz);
-+				[ clk A is set to 104MHz]
++		aips_tz_clk: aips-tz {
++			compatible = "fsl,imx6q-clock";
++			#clock-cells = <2>;
++			imx,clock-gate = <0x68 0x3>,
++					 <0x68 0xc>;
++			clock-input = <&ahb_clk 0>;
++			clock-input-name = "ahb";
++			clock-output-name = "aips-tz1",
++					    "aips-tz2";
++		};
 +
-+The end result is that clk C runs at 26MHz.  Each .set_rate callback
-+actually sets the intermediate rate, which nicely reflects reality.
-+Once clk rate change notifiers are supported then it is expected that
-+PRECHANGE notifiers will "stack" in situations with recursive
-+clk_set_rate calls.
++		apbh_dma_clk: apbh-dma {
++			compatible = "fsl,imx6q-clock";
++			#clock-cells = <1>;
++			imx,clock-gate = <0x68 0x30>;
++			clock-input = <&ahb_clk 0>;
++			clock-input-name = "ahb";
++			clock-output-name = "apbh-dma";
++		};
 +
-+Thus a driver X which subcribes to rate-change notifers for clk C would
-+have received 2 PRECHANGE notifiers in the above example.  The first
-+would have notified the driver that clk C was changing from 100MHz to
-+50MHz.  The second PRECHANGE notifier would have told driver X that clk
-+C had changed from 50MHz to 26MHz.  There would not be a PRECHANGE
-+notifier corresponding to __clk_set_rate(B, 50MHz) since B is already
-+running at that rate and the notification would be unnecessary.
++		audio_clk: audio {
++			compatible = "fsl,imx6q-clock";
++			#clock-cells = <3>;
++			imx,clock-gate = <0x6c 0x30000>,
++					 <0x68 0xc0>,
++					 <0x7c 0xc000>;
++			imx,clock-divider = <0x28 9 3 25 3>,
++					    <0x30 12 3 9 3>,
++					    <0x30 25 3 22 3>;
++			imx,clock-multiplexer = <0x20 19 2>,
++						<0x30 7 2>,
++						<0x30 20 2>;
++			clock-input = <&pll_av_clk 0 0>,
++				      <&pll3_pfd_clk 2 0 0 0>,
++				      <&pll3_pfd_clk 3 0 0 0>,
++				      <&pll_usb_clk 0 0>;
++			clock-input-name = "pll4-audio",
++					   "pll3-pfd-508m",
++					   "pll3-pfd-454m",
++					   "pll3-usb-otg";
++			clock-output-name = "esai",
++					    "asrc",
++					    "spdif";
++		};
 +
-+clk_set_rate is written in such a way that POSTCHANGE notifiers and
-+ABORTCHANGE notifiers will only be sent once.  Each will start
-+propagation from the highest point in the tree which was affected by the
-+operation.
++		can_root_clk: can-root {
++			compatible = "fsl,imx6q-clock";
++			#clock-cells = <1>;
++			imx,clock-divider = <0x20 0 0 2 6>;
++			clock-input = <&pll_usb_clk 0 0>;
++			clock-input-name = "pll3-usb-otg";
++			clock-output-name = "can-root";
++		};
++
++		can_clk: can {
++			compatible = "fsl,imx6q-clock";
++			#clock-cells = <4>;
++			imx,clock-gate = <0x68 0xc000>,
++					 <0x68 0x30000>,
++					 <0x68 0xc0000>,
++					 <0x68 0x300000>;
++			clock-input = <&can_root_clk 0>;
++			clock-input-name = "can-root";
++			clock-output-name = "can1",
++					    "can1-serial",
++					    "can2",
++					    "can2-serial";
++		};
++
++		ecspi_root_clk: ecspi-root {
++			compatible = "fsl,imx6q-clock";
++			#clock-cells = <1>;
++			imx,clock-divider = <0x38 0 0 19 6>;
++			clock-input = <&pll3_div_clk 2 0 0>;
++			clock-input-name = "pll3-60m";
++			clock-output-name = "ecspi-root";
++		};
++
++		ecspi_clk: ecspi {
++			compatible = "fsl,imx6q-clock";
++			#clock-cells = <5>;
++			imx,clock-gate = <0x6c 0x3>,
++					 <0x6c 0xc>,
++					 <0x6c 0x30>,
++					 <0x6c 0xc0>,
++					 <0x6c 0x300>;
++			clock-input = <&ecspi_root_clk 0>;
++			clock-input-name = "ecspi-root";
++			clock-output-name = "ecspi1",
++					    "ecspi2",
++					    "ecspi3",
++					    "ecspi4",
++					    "ecspi5";
++		};
++
++		enet_clk: enet {
++			compatible = "fsl,imx6q-clock";
++			#clock-cells = <1>;
++			imx,clock-gate = <0x6c 0xc00>;
++			clock-input = <&ipg_clk 0>;
++			clock-input-name = "ipg";
++			clock-output-name = "enet";
++		};
++
++		gpt_clk: gpt {
++			compatible = "fsl,imx6q-clock";
++			#clock-cells = <2>;
++			imx,clock-gate = <0x6c 0x300000>,
++					 <0x6c 0xc00000>;
++			clock-input = <&ipg_per_clk 0>;
++			clock-input-name = "ipg-per";
++			clock-output-name = "gpt",
++					    "gpt-serial";
++		};
++
++		gpu_axi_clk: gpu-axi {
++			compatible = "fsl,imx6q-clock";
++			#clock-cells = <2>;
++			imx,clock-multiplexer = <0x18 0 1>,
++						<0x18 1 1>;
++			clock-input = <&axi_clk 0>,
++				      <&ahb_clk 0>;
++			clock-input-name = "axi",
++					   "ahb";
++			clock-output-name = "gpu2d-axi",
++					    "gpu3d-axi";
++		};
++
++		gpu2d_core_clk: gpu2d-core {
++			compatible = "fsl,imx6q-clock";
++			#clock-cells = <1>;
++			imx,clock-gate = <0x6c 0x3000000>;
++			imx,clock-divider = <0x18 0 0 23 3>;
++			imx,clock-multiplexer = <0x18 16 2>;
++			clock-input = <&axi_clk 0>,
++				      <&pll_usb_clk 0 0>,
++				      <&pll2_pfd_clk 0 0 0>,
++				      <&pll2_pfd_clk 2 0 0>;
++			clock-input-name = "axi",
++					   "pll3-usb-otg",
++					   "pll2-pfd-352m",
++					   "pll2-pfd-400m";
++			clock-output-name = "gpu2d-core";
++		};
++
++		gpu3d_core_clk: gpu3d-core {
++			compatible = "fsl,imx6q-clock";
++			#clock-cells = <1>;
++			imx,clock-gate = <0x6c 0xc000000>;
++			imx,clock-divider = <0x18 0 0 26 3>;
++			imx,clock-multiplexer = <0x18 4 2>;
++			clock-input = <&mmdc_ch0_axi_clk 0>,
++				      <&pll_usb_clk 0 0>,
++				      <&pll2_pfd_clk 1 0 0>,
++				      <&pll2_pfd_clk 2 0 0>;
++			clock-input-name = "mmdc-ch0-axi",
++					   "pll3-usb-otg",
++					   "pll2-pfd-594m",
++					   "pll2-pfd-400m";
++			clock-output-name = "gpu3d-core";
++		};
++
++		gpu3d_shader_clk: gpu3d-shader {
++			compatible = "fsl,imx6q-clock";
++			#clock-cells = <1>;
++			imx,clock-divider = <0x18 0 0 29 3>;
++			imx,clock-multiplexer = <0x18 8 2>;
++			clock-input = <&mmdc_ch0_axi_clk 0>,
++				      <&pll_usb_clk 0 0>,
++				      <&pll2_pfd_clk 1 0 0>,
++				      <&pll3_pfd_clk 0 0 0 0>;
++			clock-input-name = "mmdc-ch0-axi",
++					   "pll3-usb-otg",
++					   "pll2-pfd-594m",
++					   "pll3-pfd-720m";
++			clock-output-name = "gpu3d-shader";
++		};
++
++		hdmi_iahb_clk: hdmi-iahb {
++			compatible = "fsl,imx6q-clock";
++			#clock-cells = <1>;
++			imx,clock-gate = <0x70 0x3>;
++			clock-input = <&ahb_clk 0>;
++			clock-input-name = "ahb";
++			clock-output-name = "hdmi-iahb";
++		};
++
++		hdmi_isfr_clk: hdmi-isfr {
++			compatible = "fsl,imx6q-clock";
++			#clock-cells = <1>;
++			imx,clock-gate = <0x70 0x3>;
++			clock-input = <&pll3_pfd_clk 1 0 0 0>;
++			clock-input-name = "pll3-pfd-540m";
++			clock-output-name = "hdmi-isfr";
++		};
++
++		i2c_clk: i2c {
++			compatible = "fsl,imx6q-clock";
++			#clock-cells = <3>;
++			imx,clock-gate = <0x70 0xc0>,
++					 <0x70 0x300>,
++					 <0x70 0xc00>;
++			clock-input = <&ipg_per_clk 0>;
++			clock-input-name = "ipg-per";
++			clock-output-name = "i2c1",
++					    "i2c2",
++					    "i2c3";
++		};
++
++		iim_clk: iim {
++			compatible = "fsl,imx6q-clock";
++			#clock-cells = <1>;
++			imx,clock-gate = <0x70 0x3000>;
++			clock-input = <&ipg_clk 0>;
++			clock-input-name = "ipg";
++			clock-output-name = "iim";
++		};
++
++		ipu_clk: ipu {
++			compatible = "fsl,imx6q-clock";
++			#clock-cells = <2>;
++			imx,clock-gate = <0x74 0x3>,
++					 <0x74 0xc0>;
++			imx,clock-divider = <0x3c 0 0 11 3>,
++					    <0x3c 0 0 16 3>;
++			imx,clock-multiplexer = <0x3c 9 2>,
++						<0x3c 14 2>;
++			clock-input = <&mmdc_ch0_axi_clk 0>,
++				      <&pll2_pfd_clk 2 0 0>,
++				      <&pll3_div_clk 0 0 0>,
++				      <&pll3_pfd_clk 1 0 0 0>;
++			clock-input-name = "mmdc-ch0-axi",
++					   "pll2-pfd-400m",
++					   "pll3-120m",
++					   "pll3-pfd-540m";
++			clock-output-name = "ipu1",
++					    "ipu2";
++		};
++
++		ldb_di_clk: ldb-di {
++			compatible = "fsl,imx6q-ldb-di-clock";
++			#clock-cells = <2>;
++			imx,clock-gate = <0x74 0x3000>,
++					 <0x74 0xc000>;
++			imx,clock-divider = <0x20 0 0 10 1>,
++					    <0x20 0 0 11 1>;
++			imx,clock-multiplexer = <0x2c 9 3>,
++						<0x2c 12 3>;
++			clock-input = <&pll_av_clk 1 0>,
++				      <&pll2_pfd_clk 0 0 0>,
++				      <&pll2_pfd_clk 2 0 0>,
++				      <&pll3_pfd_clk 1 0 0 0>,
++				      <&pll_usb_clk 0 0>;
++			clock-input-name = "pll5-video",
++					   "pll2-pfd-352m",
++					   "pll2-pfd-400m",
++					   "pll3-pfd-540m",
++					   "pll3-usb-otg";
++			clock-output-name = "ldb-di0",
++					    "ldb-di1";
++		};
++
++		ipu_di_pre_clk: ipu-di-pre {
++			compatible = "fsl,imx6q-clock";
++			#clock-cells = <4>;
++			imx,clock-divider = <0x34 0 0 3 3>,
++					    <0x34 0 0 12 3>,
++					    <0x38 0 0 3 3>,
++					    <0x38 0 0 12 3>;
++			imx,clock-multiplexer = <0x34 6 3>,
++						<0x34 15 3>,
++						<0x38 6 3>,
++						<0x38 15 3>;
++			clock-input = <&mmdc_ch0_axi_clk 0>,
++				      <&pll_usb_clk 0 0>,
++				      <&pll_av_clk 1 0>,
++				      <&pll2_pfd_clk 0 0 0>,
++				      <&pll2_pfd_clk 2 0 0>,
++				      <&pll3_pfd_clk 1 0 0 0>;
++			clock-input-name = "mmdc-ch0-axi",
++					   "pll3-usb-otg",
++					   "pll5-video",
++					   "pll2-pfd-352m",
++					   "pll2-pfd-400m",
++					   "pll3-pfd-540m";
++			clock-output-name = "ipu1-di0-pre",
++					    "ipu1-di1-pre",
++					    "ipu2-di0-pre",
++					    "ipu2-di1-pre";
++		};
++
++		ipu1_di0_clk: ipu1-di0 {
++			compatible = "fsl,imx6q-clock";
++			#clock-cells = <1>;
++			imx,clock-gate = <0x74 0xc>;
++			imx,clock-multiplexer = <0x34 0 3>;
++			clock-input = <&ipu_di_pre_clk 0 0 0 0>,
++				      <&dummy_clk 0>,
++				      <&dummy_clk 0>,
++				      <&ldb_di_clk 0 0>,
++				      <&ldb_di_clk 1 0>;
++			clock-input-name = "ipu1-di0-pre",
++					   "dummy",
++					   "dummy",
++					   "ldb-di0",
++					   "ldb-di1";
++			clock-output-name = "ipu1-di0";
++		};
++
++		ipu1_di1_clk: ipu1-di1 {
++			compatible = "fsl,imx6q-clock";
++			#clock-cells = <1>;
++			imx,clock-gate = <0x74 0x30>;
++			imx,clock-multiplexer = <0x34 9 3>;
++			clock-input = <&ipu_di_pre_clk 1 0 0 0>,
++				      <&dummy_clk 0>,
++				      <&dummy_clk 0>,
++				      <&ldb_di_clk 0 0>,
++				      <&ldb_di_clk 1 0>;
++			clock-input-name = "ipu1-di1-pre",
++					   "dummy",
++					   "dummy",
++					   "ldb-di0",
++					   "ldb-di1";
++			clock-output-name = "ipu1-di1";
++		};
++
++		ipu2_di0_clk: ipu2-di0 {
++			compatible = "fsl,imx6q-clock";
++			#clock-cells = <1>;
++			imx,clock-gate = <0x74 0x300>;
++			imx,clock-multiplexer = <0x38 0 3>;
++			clock-input = <&ipu_di_pre_clk 2 0 0 0>,
++				      <&dummy_clk 0>,
++				      <&dummy_clk 0>,
++				      <&ldb_di_clk 0 0>,
++				      <&ldb_di_clk 1 0>;
++			clock-input-name = "ipu2-di0-pre",
++					   "dummy",
++					   "dummy",
++					   "ldb-di0",
++					   "ldb-di1";
++			clock-output-name = "ipu2-di0";
++		};
++
++		ipu2_di1_clk: ipu2-di1 {
++			compatible = "fsl,imx6q-clock";
++			#clock-cells = <1>;
++			imx,clock-gate = <0x74 0xc00>;
++			imx,clock-multiplexer = <0x38 9 3>;
++			clock-input = <&ipu_di_pre_clk 3 0 0 0>,
++				      <&dummy_clk 0>,
++				      <&dummy_clk 0>,
++				      <&ldb_di_clk 0 0>,
++				      <&ldb_di_clk 1 0>;
++			clock-input-name = "ipu2-di1-pre",
++					   "dummy",
++					   "dummy",
++					   "ldb-di0",
++					   "ldb-di1";
++			clock-output-name = "ipu2-di1";
++		};
++
++		hsi_tx_clk: hsi-tx {
++			compatible = "fsl,imx6q-clock";
++			#clock-cells = <1>;
++			imx,clock-gate = <0x74 0x30000>;
++			imx,clock-divider = <0x30 0 0 29 3>;
++			imx,clock-multiplexer = <0x30 28 1>;
++			clock-input = <&pll3_div_clk 0 0 0>,
++				      <&pll2_pfd_clk 2 0 0>;
++			clock-input-name = "pll3-120m",
++					   "pll2-pfd-400m";
++			clock-output-name = "hsi-tx";
++		};
++
++		mlb_clk: mlb {
++			compatible = "fsl,imx6q-clock";
++			#clock-cells = <1>;
++			imx,clock-gate = <0x74 0xc0000>;
++			clock-input = <&pll_mlb_clk 0>;
++			clock-input-name = "pll6-mlb";
++			clock-output-name = "mlb";
++		};
++
++		mmdc_ipg_clk: mmdc-ipg {
++			compatible = "fsl,imx6q-clock";
++			#clock-cells = <2>;
++			imx,clock-gate = <0x74 0x3000000>,
++					 <0x74 0xc000000>;
++			clock-input = <&ipg_clk 0>;
++			clock-input-name = "ipg";
++			clock-output-name = "mmdc-ch0-ipg",
++					    "mmdc-ch1-ipg";
++		};
++
++		openvg_axi_clk: openvg-axi {
++			compatible = "fsl,imx6q-clock";
++			#clock-cells = <1>;
++			imx,clock-gate = <0x74 0xc000000>;
++			clock-input = <&axi_clk 0>;
++			clock-input-name = "axi";
++			clock-output-name = "openvg-axi";
++		};
++
++		pcie_axi_clk: pcie-axi {
++			compatible = "fsl,imx6q-clock";
++			#clock-cells = <1>;
++			imx,clock-gate = <0x78 0x3>;
++			imx,clock-multiplexer = <0x18 10 1>;
++			clock-input = <&axi_clk 0>,
++				      <&ahb_clk 0>;
++			clock-input-name = "axi",
++					   "ahb";
++			clock-output-name = "pcie-axi";
++		};
++
++		pwm_clk: pwm {
++			compatible = "fsl,imx6q-clock";
++			#clock-cells = <4>;
++			imx,clock-gate = <0x78 0x30000>,
++					 <0x78 0xc0000>,
++					 <0x78 0x300000>,
++					 <0x78 0xc00000>;
++			clock-input = <&ipg_per_clk 0>;
++			clock-input-name = "ipg-per";
++			clock-output-name = "pwm1",
++					    "pwm2",
++					    "pwm3",
++					    "pwm4";
++		};
++
++		sata_clk: sata {
++			compatible = "fsl,imx6q-clock";
++			#clock-cells = <1>;
++			imx,clock-gate = <0x7c 0x30>;
++			clock-input = <&ipg_clk 0>;
++			clock-input-name = "ipg";
++			clock-output-name = "sata";
++		};
++
++		sdma_clk: sdma {
++			compatible = "fsl,imx6q-clock";
++			#clock-cells = <1>;
++			imx,clock-gate = <0x7c 0xc0>;
++			clock-input = <&ahb_clk 0>;
++			clock-input-name = "ahb";
++			clock-output-name = "sdma";
++		};
++
++		spba_clk: spba {
++			compatible = "fsl,imx6q-clock";
++			#clock-cells = <1>;
++			imx,clock-gate = <0x7c 0x3000>;
++			clock-input = <&ipg_clk 0>;
++			clock-input-name = "ipg";
++			clock-output-name = "spba";
++		};
++
++		ssi_clk: ssi {
++			compatible = "fsl,imx6q-clock";
++			#clock-cells = <3>;
++			imx,clock-gate = <0x7c 0xc0000>,
++					 <0x7c 0x300000>,
++					 <0x7c 0xc00000>;
++			imx,clock-divider = <0x28 6 3 0 6>,
++					    <0x2c 6 3 0 6>,
++					    <0x28 6 3 0 6>;
++			imx,clock-multiplexer = <0x1c 10 2>,
++						<0x1c 12 2>,
++						<0x1c 14 2>;
++			clock-input = <&pll3_pfd_clk 2 0 0 0>,
++				      <&pll3_pfd_clk 3 0 0 0>,
++				      <&pll_av_clk 0 0>;
++			clock-input-name = "pll3-pfd-508m",
++					   "pll3-pfd-454m",
++					   "pll4-audio";
++			clock-output-name = "ssi1",
++					    "ssi2",
++					    "ssi3";
++		};
++
++		uart_clk: uart {
++			compatible = "fsl,imx6q-clock";
++			#clock-cells = <2>;
++			imx,clock-gate = <0x7c 0x3000000>,
++					 <0x7c 0xc000000>;
++			imx,clock-divider = <0x24 0 0 0 6>,
++					    <0x24 0 0 0 6>;
++			clock-input = <&pll3_div_clk 1 0 0>;
++			clock-input-name = "pll3-80m";
++			clock-output-name = "uart",
++					    "uart-serial";
++		};
++
++		usboh3_clk: usboh3 {
++			compatible = "fsl,imx6q-clock";
++			#clock-cells = <1>;
++			imx,clock-gate = <0x80 0x3>;
++			clock-input = <&ipg_clk 0>;
++			clock-input-name = "ipg";
++			clock-output-name = "usboh3";
++		};
++
++		usdhc_clk: usdhc {
++			compatible = "fsl,imx6q-clock";
++			#clock-cells = <4>;
++			imx,clock-gate = <0x80 0xc>,
++					 <0x80 0x30>,
++					 <0x80 0xc0>,
++					 <0x80 0x300>;
++			imx,clock-divider = <0x24 0 0 11 3>,
++					    <0x24 0 0 16 3>,
++					    <0x24 0 0 19 3>,
++					    <0x24 0 0 22 3>;
++			imx,clock-multiplexer = <0x1c 16 1>,
++						<0x1c 17 1>,
++						<0x1c 18 1>,
++						<0x1c 19 1>;
++			clock-input = <&pll2_pfd_clk 2 0 0>,
++				      <&pll2_pfd_clk 0 0 0>;
++			clock-input-name = "pll2-pfd-400m",
++					   "pll2-pfd-352m";
++			clock-output-name = "usdhc1",
++					    "usdhc2",
++					    "usdhc3",
++					    "usdhc3";
++		};
++
++		enfc_clk: enfc {
++			compatible = "fsl,imx6q-clock";
++			#clock-cells = <1>;
++			imx,clock-gate = <0x70 0xc000>;
++			imx,clock-divider = <0x2c 18 3 21 6>;
++			imx,clock-multiplexer = <0x2c 16 2>;
++			clock-input = <&pll2_pfd_clk 0 0 0>,
++				      <&pll_bus_clk 0>,
++				      <&pll_usb_clk 0 0>,
++				      <&pll2_pfd_clk 2 0 0>;
++			clock-input-name = "pll2-pfd-352m",
++					   "pll2-bus",
++					   "pll3-usb-otg",
++					   "pll2-pfd-400m";
++			clock-output-name = "enfc";
++		};
++
++		gpmi_bch_apb_clk: gpmi-bch-apb {
++			compatible = "fsl,imx6q-clock";
++			#clock-cells = <1>;
++			imx,clock-gate = <0x78 0x3000000>;
++			clock-input = <&usdhc_clk 2 0 0 0>;
++			clock-input-name = "usdhc3";
++			clock-output-name = "gpmi-bch-apb";
++		};
++
++		gpmi_bch_clk: gpmi-bch {
++			compatible = "fsl,imx6q-clock";
++			#clock-cells = <1>;
++			imx,clock-gate = <0x78 0xc000000>;
++			clock-input = <&usdhc_clk 3 0 0 0>;
++			clock-input-name = "usdhc4";
++			clock-output-name = "gpmi-bch";
++		};
++
++		gpmi_io_clk: gpmi-io {
++			compatible = "fsl,imx6q-clock";
++			#clock-cells = <1>;
++			imx,clock-gate = <0x78 0x30000000>;
++			clock-input = <&enfc_clk 0>;
++			clock-input-name = "enfc";
++			clock-output-name = "gpmi-io";
++		};
++
++		gpmi_apb_clk: gpmi-apb {
++			compatible = "fsl,imx6q-clock";
++			#clock-cells = <1>;
++			imx,clock-gate = <0x78 0xc0000000>;
++			clock-input = <&usdhc_clk 2 0 0 0>;
++			clock-input-name = "usdhc3";
++			clock-output-name = "gpmi-apb";
++		};
++
++		emi_clk: emi {
++			compatible = "fsl,imx6q-clock";
++			#clock-cells = <2>;
++			imx,clock-gate = <0x80 0xc00>,
++					 <0x80 0xc00>;
++			imx,clock-divider = <0x1c 0 0 20 3>,
++					    <0x1c 0 0 23 3>;
++			imx,clock-multiplexer = <0x1c 27 2>,
++						<0x1c 29 2>;
++			clock-input = <&axi_clk 0>,
++				      <&pll_usb_clk 0 0>,
++				      <&pll2_pfd_clk 2 0 0>,
++				      <&pll2_pfd_clk 0 0 0>;
++			clock-input-name = "axi",
++					   "pll3-usb-otg",
++					   "pll2-pfd-400m",
++					   "pll2-pfd-352m";
++			clock-output-name = "emi",
++					    "emi-slow";
++		};
++
++		vdo_axi_clk: vdo-axi {
++			compatible = "fsl,imx6q-clock";
++			#clock-cells = <1>;
++			imx,clock-gate = <0x80 0x3000>;
++			imx,clock-multiplexer = <0x18 11 1>;
++			clock-input = <&axi_clk 0>,
++				      <&ahb_clk 0>;
++			clock-input-name = "axi",
++					   "ahb";
++			clock-output-name = "vdo-axi";
++		};
++
++		vpu_axi_clk: vpu-axi {
++			compatible = "fsl,imx6q-clock";
++			#clock-cells = <1>;
++			imx,clock-gate = <0x80 0xc000>;
++			imx,clock-divider = <0x24 0 0 25 3>;
++			imx,clock-multiplexer = <0x18 14 2>;
++			clock-input = <&axi_clk 0>,
++				      <&pll2_pfd_clk 2 0 0>,
++				      <&pll2_pfd_clk 0 0 0>;
++			clock-input-name = "axi",
++					   "pll2-pfd-400m",
++					   "pll2-pfd-352m";
++			clock-output-name = "vpu-axi";
+ 		};
+ 	};
+ 
+@@ -169,6 +1072,8 @@
+ 					compatible = "fsl,imx6q-uart", "fsl,imx21-uart";
+ 					reg = <0x02020000 0x4000>;
+ 					interrupts = <0 26 0x04>;
++					clock-input = <&uart_clk 0 0>;
++					clock-input-name = "uart";
+ 					status = "disabled";
+ 				};
+ 
+@@ -245,6 +1150,8 @@
+ 				compatible = "fsl,imx6q-gpt";
+ 				reg = <0x02098000 0x4000>;
+ 				interrupts = <0 55 0x04>;
++				clock-input = <&gpt_clk 0 0>,
++					      <&gpt_clk 1 0>;
+ 			};
+ 
+ 			gpio0: gpio at 0209c000 { /* GPIO1 */
+@@ -426,6 +1333,8 @@
+ 				compatible = "fsl,imx6q-fec";
+ 				reg = <0x02188000 0x4000>;
+ 				interrupts = <0 118 0x04 0 119 0x04>;
++				clock-input = <&enet_clk 0>;
++				clock-input-name = "enet";
+ 				status = "disabled";
+ 			};
+ 
+@@ -438,6 +1347,8 @@
+ 				compatible = "fsl,imx6q-usdhc";
+ 				reg = <0x02190000 0x4000>;
+ 				interrupts = <0 22 0x04>;
++				clock-input = <&usdhc_clk 0 0 0 0>;
++				clock-input-name = "usdhc1";
+ 				status = "disabled";
+ 			};
+ 
+@@ -445,6 +1356,8 @@
+ 				compatible = "fsl,imx6q-usdhc";
+ 				reg = <0x02194000 0x4000>;
+ 				interrupts = <0 23 0x04>;
++				clock-input = <&usdhc_clk 1 0 0 0>;
++				clock-input-name = "usdhc2";
+ 				status = "disabled";
+ 			};
+ 
+@@ -452,6 +1365,8 @@
+ 				compatible = "fsl,imx6q-usdhc";
+ 				reg = <0x02198000 0x4000>;
+ 				interrupts = <0 24 0x04>;
++				clock-input = <&usdhc_clk 2 0 0 0>;
++				clock-input-name = "usdhc3";
+ 				status = "disabled";
+ 			};
+ 
+@@ -459,6 +1374,8 @@
+ 				compatible = "fsl,imx6q-usdhc";
+ 				reg = <0x0219c000 0x4000>;
+ 				interrupts = <0 25 0x04>;
++				clock-input = <&usdhc_clk 3 0 0 0>;
++				clock-input-name = "usdhc4";
+ 				status = "disabled";
+ 			};
+ 
+@@ -547,6 +1464,8 @@
+ 				compatible = "fsl,imx6q-uart", "fsl,imx21-uart";
+ 				reg = <0x021e8000 0x4000>;
+ 				interrupts = <0 27 0x04>;
++				clock-input = <&uart_clk 0 0>;
++				clock-input-name = "uart";
+ 				status = "disabled";
+ 			};
+ 
+@@ -554,6 +1473,8 @@
+ 				compatible = "fsl,imx6q-uart", "fsl,imx21-uart";
+ 				reg = <0x021ec000 0x4000>;
+ 				interrupts = <0 28 0x04>;
++				clock-input = <&uart_clk 0 0>;
++				clock-input-name = "uart";
+ 				status = "disabled";
+ 			};
+ 
+@@ -561,6 +1482,8 @@
+ 				compatible = "fsl,imx6q-uart", "fsl,imx21-uart";
+ 				reg = <0x021f0000 0x4000>;
+ 				interrupts = <0 29 0x04>;
++				clock-input = <&uart_clk 0 0>;
++				clock-input-name = "uart";
+ 				status = "disabled";
+ 			};
+ 
+@@ -568,6 +1491,8 @@
+ 				compatible = "fsl,imx6q-uart", "fsl,imx21-uart";
+ 				reg = <0x021f4000 0x4000>;
+ 				interrupts = <0 30 0x04>;
++				clock-input = <&uart_clk 0 0>;
++				clock-input-name = "uart";
+ 				status = "disabled";
+ 			};
+ 		};
 -- 
 1.7.4.1
