@@ -1,38 +1,72 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Tue, 22 Nov 2011 13:56:27 +0000
-Subject: [PATCH 2/4] ARM: extract out insn generation code from ftrace
-In-Reply-To: <CAH+eYFBz_aEeC3DwGF2mdpVepburzCBJqD0n1LFjL1y5dqOXHw@mail.gmail.com>
-References: <1321888429-3519-1-git-send-email-rabin@rab.in>
- <1321888429-3519-2-git-send-email-rabin@rab.in>
- <20111122120252.GE2066@localhost.localdomain>
- <CAH+eYFBz_aEeC3DwGF2mdpVepburzCBJqD0n1LFjL1y5dqOXHw@mail.gmail.com>
-Message-ID: <20111122135627.GH2066@localhost.localdomain>
+From: eliad@wizery.com (Eliad Peller)
+Date: Tue, 22 Nov 2011 16:02:17 +0200
+Subject: [PATCH 1/3] omap_hsmmc: consider MMC_PM_KEEP_POWER on suspend/resume
+Message-ID: <1321970539-7104-1-git-send-email-eliad@wizery.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 22, 2011 at 07:02:13PM +0530, Rabin Vincent wrote:
-> On Tue, Nov 22, 2011 at 17:32, Dave Martin <dave.martin@linaro.org> wrote:
-> > On Mon, Nov 21, 2011 at 08:43:47PM +0530, Rabin Vincent wrote:
-> >> ?static int ftrace_modify_code(unsigned long pc, unsigned long old,
-> >> @@ -256,7 +203,7 @@ static int __ftrace_modify_caller(unsigned long *callsite,
-> >> ?{
-> >> ? ? ? unsigned long caller_fn = (unsigned long) func;
-> >> ? ? ? unsigned long pc = (unsigned long) callsite;
-> >> - ? ? unsigned long branch = ftrace_gen_branch(pc, caller_fn, false);
-> >> + ? ? unsigned long branch = arm_gen_branch(pc, caller_fn);
-> >> ? ? ? unsigned long nop = 0xe1a00000; /* mov r0, r0 */
-> >
-> > Does this code get used in Thumb-2 kernels? ?So far as I can tell, this
-> > code is used... but it looks like it shouldn't work, due to the ARM
-> > specifics.
-> 
-> It's not used on Thumb-2.  This is only used by the function graph
-> tracer and that depends on !THUMB2_KERNEL.
+When an mmc card has the MMC_PM_KEEP_POWER flag, it shouldn't
+be powered off on suspend (and thus doesn't have to be powered-on
+on resume)
 
-I assume there's no special reason why this doesn't work with a Thumb-2
-kernel, other than that it simply hasn't implemented yet?
+While on it, change the suspend flow a bit, to make it a bit
+easier to follow.
 
-Are there any particular problems blocking this?
+Signed-off-by: Eliad Peller <eliad@wizery.com>
+---
+ drivers/mmc/host/omap_hsmmc.c |   24 +++++++++++++++---------
+ 1 files changed, 15 insertions(+), 9 deletions(-)
 
-Cheers
----Dave
+diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
+index 21e4a79..ec7c83c 100644
+--- a/drivers/mmc/host/omap_hsmmc.c
++++ b/drivers/mmc/host/omap_hsmmc.c
+@@ -2174,13 +2174,7 @@ static int omap_hsmmc_suspend(struct device *dev)
+ 		cancel_work_sync(&host->mmc_carddetect_work);
+ 		ret = mmc_suspend_host(host->mmc);
+ 
+-		if (ret == 0) {
+-			omap_hsmmc_disable_irq(host);
+-			OMAP_HSMMC_WRITE(host->base, HCTL,
+-				OMAP_HSMMC_READ(host->base, HCTL) & ~SDBP);
+-			if (host->got_dbclk)
+-				clk_disable(host->dbclk);
+-		} else {
++		if (ret) {
+ 			host->suspended = 0;
+ 			if (host->pdata->resume) {
+ 				ret = host->pdata->resume(&pdev->dev,
+@@ -2189,9 +2183,20 @@ static int omap_hsmmc_suspend(struct device *dev)
+ 					dev_dbg(mmc_dev(host->mmc),
+ 						"Unmask interrupt failed\n");
+ 			}
++			goto err;
+ 		}
+-		pm_runtime_put_sync(host->dev);
++
++		if (!(host->mmc->pm_flags & MMC_PM_KEEP_POWER)) {
++			omap_hsmmc_disable_irq(host);
++			OMAP_HSMMC_WRITE(host->base, HCTL,
++				OMAP_HSMMC_READ(host->base, HCTL) & ~SDBP);
++		}
++		if (host->got_dbclk)
++			clk_disable(host->dbclk);
++
+ 	}
++err:
++	pm_runtime_put_sync(host->dev);
+ 	return ret;
+ }
+ 
+@@ -2211,7 +2216,8 @@ static int omap_hsmmc_resume(struct device *dev)
+ 		if (host->got_dbclk)
+ 			clk_enable(host->dbclk);
+ 
+-		omap_hsmmc_conf_bus_power(host);
++		if (!(host->mmc->pm_flags & MMC_PM_KEEP_POWER))
++			omap_hsmmc_conf_bus_power(host);
+ 
+ 		if (host->pdata->resume) {
+ 			ret = host->pdata->resume(&pdev->dev, host->slot_id);
+-- 
+1.7.6.401.g6a319
