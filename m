@@ -1,43 +1,41 @@
 From: dave.martin@linaro.org (Dave Martin)
-Date: Tue, 22 Nov 2011 12:02:52 +0000
-Subject: [PATCH 2/4] ARM: extract out insn generation code from ftrace
-In-Reply-To: <1321888429-3519-2-git-send-email-rabin@rab.in>
-References: <1321888429-3519-1-git-send-email-rabin@rab.in>
- <1321888429-3519-2-git-send-email-rabin@rab.in>
-Message-ID: <20111122120252.GE2066@localhost.localdomain>
+Date: Tue, 22 Nov 2011 12:07:56 +0000
+Subject: [GIT PULL] ARM: amba: Enable module alias autogeneration for
+ AMBA drivers
+In-Reply-To: <20111122115632.GA5165@mail.gnudd.com>
+References: <1321961573-4562-1-git-send-email-dave.martin@linaro.org>
+ <20111122115632.GA5165@mail.gnudd.com>
+Message-ID: <20111122120756.GF2066@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 21, 2011 at 08:43:47PM +0530, Rabin Vincent wrote:
-> Extract out the instruction generation code so that it can be used
-> for jump labels too.
+On Tue, Nov 22, 2011 at 12:56:32PM +0100, Alessandro Rubini wrote:
+> > I have Acks on some of the driver patches and no comments on the
+> > rest.  I've been circulating these for some time, so if you're
+> > happy to pull those driver patches via your tree, please go ahead.
 > 
-> Signed-off-by: Rabin Vincent <rabin@rab.in>
-> ---
->  arch/arm/kernel/Makefile |    5 ++-
->  arch/arm/kernel/ftrace.c |   61 +++-------------------------------------------
->  arch/arm/kernel/insn.c   |   60 +++++++++++++++++++++++++++++++++++++++++++++
->  arch/arm/kernel/insn.h   |   19 ++++++++++++++
->  4 files changed, 86 insertions(+), 59 deletions(-)
->  create mode 100644 arch/arm/kernel/insn.c
->  create mode 100644 arch/arm/kernel/insn.h
+> Sure I have no problem with the nomadik-rng.c, (so please have my
+> Acked-by: -- sorry for not noting it earlier) but I think this
+
+thanks
+
+> file2alias thing needs a serious rework to split each bus in a
+> different file, using ELF sections like we do elsewhere.
 > 
-> diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
+> I posted a patch last week but I got no comment at all. Maybe this
+> is the time to ask for comments? I can rebase and repost if needed.
+> 
+>   lkml.org/lkml/2011/11/4/125 (0/2: description of the work)
+>   lkml.org/lkml/2011/11/4/126 (1/2: turn the if plethora to table lookup)
+>   lkml.org/lkml/2011/11/4/127 (2/2: partial split to type-specific files).
 
-[...]
+Splitting this up doesn't look like a silly idea -- I thought it was
+unfortunate to have to patch a core file just to add a bus type.
 
->  static int ftrace_modify_code(unsigned long pc, unsigned long old,
-> @@ -256,7 +203,7 @@ static int __ftrace_modify_caller(unsigned long *callsite,
->  {
->  	unsigned long caller_fn = (unsigned long) func;
->  	unsigned long pc = (unsigned long) callsite;
-> -	unsigned long branch = ftrace_gen_branch(pc, caller_fn, false);
-> +	unsigned long branch = arm_gen_branch(pc, caller_fn);
->  	unsigned long nop = 0xe1a00000;	/* mov r0, r0 */
-
-Does this code get used in Thumb-2 kernels?  So far as I can tell, this
-code is used... but it looks like it shouldn't work, due to the ARM
-specifics.
+I guess the question is how many new buses we get over time.  If they
+only get added gradually, people might not be too concerned.  Of course,
+this is one of those maintenance issues which can only get worse as time
+goes on.
 
 Cheers
 ---Dave
