@@ -1,42 +1,28 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 22 Nov 2011 17:34:52 -0600
-Subject: -next fails to boot as of today on S3C6410
-In-Reply-To: <20111122222135.GB7845@gallagher>
-References: <20111122192741.GG30583@opensource.wolfsonmicro.com>
- <20111122193124.GB9581@n2100.arm.linux.org.uk>
- <20111122193957.GH30583@opensource.wolfsonmicro.com>
- <20111122222135.GB7845@gallagher>
-Message-ID: <4ECC319C.20409@gmail.com>
+From: jbaron@redhat.com (Jason Baron)
+Date: Tue, 22 Nov 2011 18:50:41 -0500
+Subject: [PATCH 4/4] ARM: add jump label support
+In-Reply-To: <20111122233949.GA24453@redhat.com>
+References: <1321888429-3519-1-git-send-email-rabin@rab.in>
+ <1321888429-3519-4-git-send-email-rabin@rab.in>
+ <20111122194213.GC9581@n2100.arm.linux.org.uk>
+ <4ECC2A07.8050701@codeaurora.org>
+ <20111122233949.GA24453@redhat.com>
+Message-ID: <20111122235041.GB24453@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/22/2011 04:21 PM, Jamie Iles wrote:
-> Hi Mark,
+On Tue, Nov 22, 2011 at 06:39:50PM -0500, Jason Baron wrote:
+> Right, for jump labels we have a script at: scripts/gcc-goto.sh, which
+> basically just checks if we can compile 'asm goto' without error, so for
+> %c, you could probably have some simple 'asm()' that uses %c, and see if
+> it compiles. Although, I'm not sure if there's a arch specific dir, for
+> such a thing?
 > 
-> On Tue, Nov 22, 2011 at 07:39:57PM +0000, Mark Brown wrote:
->> On Tue, Nov 22, 2011 at 07:31:24PM +0000, Russell King - ARM Linux wrote:
->>> On Tue, Nov 22, 2011 at 07:27:41PM +0000, Mark Brown wrote:
->>
->>>> I've verified that this was introduced in the Russell's for-next, and
->>>> bisection of that branch tells me that the offending commit is "ARM:
->>>> vic: device tree binding" though an attempt to revert that in -next
->>>> failed.  This is especially surprising as I have USE_OF turned off, I'm
->>
->>> Thanks for the report.  I'll hold off pushing this stuff into the
->>> devel-stable branch while Jamie looks into this so that we can fix
->>> it and avoid having a bisection failure in this set of commits.
->>
->> Thanks.  Note that I'm not 100% sure I believe the bisection result as
->> reverting didn't fix the issue and I've stared at the code a bit without
->> seeing anything that set off alarm bells.
+> thanks,
 > 
-> No, you're right - this is the offending commit.  It actually needs 
-> this[1] fix and things should be okay.
-> 
-> Thomas, Rob, would one of you be able to apply this please?  I'm not 
-> sure if this would normally go through Grant or not.
-> 
+> -Jason
 
-I think it should go thru Thomas or have his ack if not.
+hmm...actually we could add it to the top level scripts/gcc-goto.sh,
+that would be fine, I can take a look at that...
 
-Rob
+-Jason
