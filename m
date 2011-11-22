@@ -1,69 +1,45 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Tue, 22 Nov 2011 08:44:37 -0500 (EST)
-Subject: [PATCH 21/23] ARM: add generic ioremap optimization by reusing
- static mappings
-In-Reply-To: <20111122101627.GX9581@n2100.arm.linux.org.uk>
-References: <1321422521-1138-1-git-send-email-nico@fluxnic.net>
- <1321422521-1138-22-git-send-email-nico@fluxnic.net>
- <20111122101627.GX9581@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.02.1111220842181.17904@xanadu.home>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Tue, 22 Nov 2011 19:14:14 +0530
+Subject: [PATCH v2 2/4] omap-serial: Use default clock speed (48Mhz) if not
+ specified
+In-Reply-To: <1321969456-24266-1-git-send-email-rnayak@ti.com>
+References: <1321969456-24266-1-git-send-email-rnayak@ti.com>
+Message-ID: <1321969456-24266-3-git-send-email-rnayak@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 22 Nov 2011, Russell King - ARM Linux wrote:
+Use a default clock speed of 48Mhz, instead of ending up with 0,
+if platforms fail to specify a valid clock speed.
 
-> On Wed, Nov 16, 2011 at 12:48:39AM -0500, Nicolas Pitre wrote:
-> > @@ -201,12 +195,6 @@ void __iomem * __arm_ioremap_pfn_caller(unsigned long pfn,
-> >  	if (pfn >= 0x100000 && (__pfn_to_phys(pfn) & ~SUPERSECTION_MASK))
-> >  		return NULL;
-> >  
-> > -	/*
-> > -	 * Don't allow RAM to be mapped - this causes problems with ARMv6+
-> > -	 */
-> > -	if (WARN_ON(pfn_valid(pfn)))
-> > -		return NULL;
-> > -
-> >  	type = get_mem_type(mtype);
-> >  	if (!type)
-> >  		return NULL;
-> > @@ -216,6 +204,34 @@ void __iomem * __arm_ioremap_pfn_caller(unsigned long pfn,
-> >  	 */
-> >  	size = PAGE_ALIGN(offset + size);
-> >  
-> > +	/*
-> > +	 * Try to reuse one of the static mapping whenever possible.
-> > +	 */
-> > +	read_lock(&vmlist_lock);
-> > +	for (area = vmlist; area; area = area->next) {
-> > +		if (!size || (sizeof(phys_addr_t) == 4 && pfn >= 0x100000))
-> > +			break;
-> > +		if (!(area->flags & VM_ARM_STATIC_MAPPING))
-> > +			continue;
-> > +		if ((area->flags & VM_ARM_MTYPE_MASK) != VM_ARM_MTYPE(mtype))
-> > +			continue;
-> > +		if (__phys_to_pfn(area->phys_addr) > pfn ||
-> > +		    __pfn_to_phys(pfn) + size-1 > area->phys_addr + area->size-1)
-> > +			continue;
-> > +		/* we can drop the lock here as we know *area is static */
-> > +		read_unlock(&vmlist_lock);
-> > +		addr = (unsigned long)area->addr;
-> > +		addr += __pfn_to_phys(pfn) - area->phys_addr;
-> > +		return (void __iomem *) (offset + addr);
-> > +	}
-> > +	read_unlock(&vmlist_lock);
-> > +
-> > +	/*
-> > +	 * Don't allow RAM to be mapped - this causes problems with ARMv6+
-> > +	 */
-> > +	if (WARN_ON(pfn_valid(pfn)))
-> > +		return NULL;
-> 
-> Why are you moving this check?  System RAM should never end up in the
-> vmlist.
+Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+---
+ drivers/tty/serial/omap-serial.c |    7 +++++++
+ 1 files changed, 7 insertions(+), 0 deletions(-)
 
-Because some architectures, such as OMAP, are relying on the ioremap 
-optimization that reuse static mappings being functional even before the 
-memory management is initialized.
-
-
-Nicolas
+diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
+index a02cc9f..f14b9c5 100644
+--- a/drivers/tty/serial/omap-serial.c
++++ b/drivers/tty/serial/omap-serial.c
+@@ -43,6 +43,8 @@
+ #include <plat/dmtimer.h>
+ #include <plat/omap-serial.h>
+ 
++#define DEFAULT_CLK_SPEED 48000000 /* 48Mhz*/
++
+ static struct uart_omap_port *ui[OMAP_MAX_HSUART_PORTS];
+ 
+ /* Forward declaration of functions */
+@@ -1386,6 +1388,11 @@ static int serial_omap_probe(struct platform_device *pdev)
+ 
+ 	up->port.flags = omap_up_info->flags;
+ 	up->port.uartclk = omap_up_info->uartclk;
++	if (!up->port.uartclk) {
++		up->port.uartclk = DEFAULT_CLK_SPEED;
++		dev_warn(&pdev->dev, "No clock speed specified: using default:"
++						"%d\n", DEFAULT_CLK_SPEED);
++	}
+ 	up->uart_dma.uart_base = mem->start;
+ 	up->errata = omap_up_info->errata;
+ 
+-- 
+1.7.1
