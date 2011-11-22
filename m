@@ -1,94 +1,87 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Tue, 22 Nov 2011 10:33:08 +0000
-Subject: [PATCH 2/6] ARM: gic: fix big endian support
-In-Reply-To: <4ECAFF2C.1010604@windriver.com>
-References: <1321322785-2981-1-git-send-email-junxiao.bi@windriver.com>
- <1321322785-2981-2-git-send-email-junxiao.bi@windriver.com>
- <alpine.LFD.2.02.1111211334320.17904@xanadu.home>
- <4ECAFF2C.1010604@windriver.com>
-Message-ID: <20111122103308.GB2066@localhost.localdomain>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 22 Nov 2011 11:33:58 +0100
+Subject: [PATCH] ARM: imx: drop 'ARCH_MX31' and 'ARCH_MX35'
+In-Reply-To: <1321882445.32195.3.camel@x61.thuisdomein>
+References: <1321882445.32195.3.camel@x61.thuisdomein>
+Message-ID: <20111122103358.GA24770@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 22, 2011 at 09:47:24AM +0800, Bi Junxiao wrote:
-> on 11/22/2011 03:11 AM Nicolas Pitre wrote:
-> >On Tue, 15 Nov 2011, Junxiao Bi wrote:
-> >
-> >>The irq state from gic is in little-endian mode. We need do endian
-> >>conversion for it in big-endian machine. Usually byte swapping of
-> >>32-bits word needs 4 assembler instructions for arm machine which
-> >>arch<  6. But since the high order half word of the irq state is
-> >>zero, there is a way that can use lesser instrunctions to improve
-> >>the performance since we only need a bytes swaping of half word.
-> >>That's what swab16_low_half and swab16_high_half do.
-> >>
-> >>Signed-off-by: Junxiao Bi<junxiao.bi@windriver.com>
-> >Comments below.
-> >
-> >>---
-> >>  arch/arm/include/asm/assembler.h                |   27 +++++++++++++++++++++++
-> >>  arch/arm/include/asm/hardware/entry-macro-gic.S |    7 ++++++
-> >>  2 files changed, 34 insertions(+), 0 deletions(-)
-> >>
-> >>diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
-> >>index 29035e8..3ddee22 100644
-> >>--- a/arch/arm/include/asm/assembler.h
-> >>+++ b/arch/arm/include/asm/assembler.h
-> >>@@ -302,4 +302,31 @@
-> >>  	.size \name , . - \name
-> >>  	.endm
-> >>
-> >>+/*
-> >>+ * swab16_low_half is used to swap the bytes order of the low order
-> >>+ * half word, it assumes that the high order half word is zero.
-> >>+ * swab16_high_half is used to swap the bytes order of the high order
-> >>+ * half word, it assumes that the low order half word is zero.
-> >>+ */
-> >>+#if __LINUX_ARM_ARCH__>= 6
-> >>+	.macro swab16_low_half, reg
-> >>+	rev \reg, \reg
-> >>+	.endm
-> >>+
-> >>+	.macro swab16_high_half, reg
-> >>+	rev \reg, \reg
-> >>+	.endm
-> >>+#else
-> >>+	.macro swab16_low_half, reg
-> >>+	mov \reg, \reg, ror #8
-> >>+	orr \reg, \reg, \reg, lsr #16
-> >>+	bic \reg, \reg, \reg, lsl #16
-> >>+	.endm
+On Mon, Nov 21, 2011 at 02:34:05PM +0100, Paul Bolle wrote:
+> Commit 27ad4bf72a ("ARM: imx: move mx3 support to mach-imx") kept
+> ARCH_MX31 and ARCH_MX35 'for compatibility'. Now that they aren't
+> actually used anymore, they can be dropped entirely.
 
-Your v6 and <v6 implementations don't seem to produce the same result
-for swab16_low_half.
+Added.
 
-If reg=0x0000AABB  on >=v6 you transform it to 0xBBAA0000, but on <v6
-you translate it to 0x0000BBAA.
+Thanks
+ Sascha
 
-Perhaps you meant to use the rev16 instruction instead of rev?
+> 
+> Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
+> ---
+> "git grep" tested only.
+> 
+>  arch/arm/mach-imx/Kconfig |   13 -------------
+>  1 files changed, 0 insertions(+), 13 deletions(-)
+> 
+> diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+> index 5f7f9c2..c44aa97 100644
+> --- a/arch/arm/mach-imx/Kconfig
+> +++ b/arch/arm/mach-imx/Kconfig
+> @@ -10,11 +10,6 @@ config HAVE_IMX_MMDC
+>  config HAVE_IMX_SRC
+>  	bool
+>  
+> -#
+> -# ARCH_MX31 and ARCH_MX35 are left for compatibility
+> -# Some usages assume that having one of them implies not having (e.g.) ARCH_MX2.
+> -# To easily distinguish good and reviewed from unreviewed usages new (and IMHO
+> -# more sensible) names are used: SOC_IMX31 and SOC_IMX35
+>  config ARCH_MX1
+>  	bool
+>  
+> @@ -27,12 +22,6 @@ config ARCH_MX25
+>  config MACH_MX27
+>  	bool
+>  
+> -config ARCH_MX31
+> -	bool
+> -
+> -config ARCH_MX35
+> -	bool
+> -
+>  config SOC_IMX1
+>  	bool
+>  	select ARCH_MX1
+> @@ -72,7 +61,6 @@ config SOC_IMX31
+>  	select CPU_V6
+>  	select IMX_HAVE_PLATFORM_MXC_RNGA
+>  	select ARCH_MXC_AUDMUX_V2
+> -	select ARCH_MX31
+>  	select MXC_AVIC
+>  	select SMP_ON_UP if SMP
+>  
+> @@ -82,7 +70,6 @@ config SOC_IMX35
+>  	select ARCH_MXC_IOMUX_V3
+>  	select ARCH_MXC_AUDMUX_V2
+>  	select HAVE_EPIT
+> -	select ARCH_MX35
+>  	select MXC_AVIC
+>  	select SMP_ON_UP if SMP
+>  
+> -- 
+> 1.7.7.3
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
 
-> >I fail to see how this macro would be generally useful.  Presuming that
-> >the top or bottom half has to be zero is not particularly practical.
-> We can use it to swap bytes order of a 16-bits number in 32-bits
-> register in which case the top or bottom half will be zero. For the
-> \irqstat register, as the original implementation assumes its top
-> half is zero, so I make the same assumption.
-> >>+	.macro swab16_high_half, reg
-> >>+	swab16_low_half \reg
-> >>+	mov \reg, \reg, lsl #16
-> >>+	.endm
-> >And this doesn't end up cheaper than a plain swab32.
-> This macro has an advantage that it only needs one register. For
-> swab32, it will need another temporary register besides the target
-> register.
-> >Furthermore, you're using those macros 1) in the gic code, and 2) onli
-> >in the BE8 case.  Both of those conditions are only possible on ARMv6
-> >and above anyway, so I'd simply open code a rev instruction inline.
-> This is not be8 specific. It will be needed for both be8 and be32.
-> So the machine with arch < 6 also needs to be supported.
-
-I also thought the GIC doesn't get used with <v6?  I thought the GIC was
-too new for that, but I'm not an expert on it.
-
-Cheers
----Dave
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
