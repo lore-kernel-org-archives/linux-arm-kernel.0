@@ -1,37 +1,50 @@
-From: N.Voss@weinmann.de (Voss, Nikolaus)
-Date: Tue, 22 Nov 2011 17:26:18 +0100
-Subject: [PATCH v5 3/4] drivers/i2c/busses/i2c-at91.c: add new driver
-In-Reply-To: <D99582E5322435468A77E74BB0039E7B1D1655BF4D@SRV02.hamburg.garz-fricke.de>
-References: <D99582E5322435468A77E74BB0039E7B1D1655BF4D@SRV02.hamburg.garz-fricke.de>
-Message-ID: <EF2E73589CA71846A15D0B2CDF79505D087B40D16B@wm021.weinmann.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 22 Nov 2011 17:38:12 +0100
+Subject: [PATCH] arm/imx: use Kconfig choice for low-level debug UART
+ selection
+In-Reply-To: <20111122154838.GZ9581@n2100.arm.linux.org.uk>
+References: <1313530873-24961-1-git-send-email-will.deacon@arm.com>
+ <1313729819-30301-1-git-send-email-shawn.guo@linaro.org>
+ <20111122085834.GB19986@pengutronix.de>
+ <20111122115017.GK20518@mudshark.cambridge.arm.com>
+ <20111122130233.GF19986@pengutronix.de>
+ <20111122132055.GA32572@mudshark.cambridge.arm.com>
+ <20111122133040.GG19986@pengutronix.de>
+ <20111122154838.GZ9581@n2100.arm.linux.org.uk>
+Message-ID: <20111122163812.GH19986@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Carsten Behling wrote on 2011-11-22:
-> +static void at91_twi_read_next_byte(struct at91_twi_dev *dev)
-> +{
-> +       *dev->buf = at91_twi_read(dev, AT91_TWI_RHR) & 0xff;
-> +
-> +       /* send stop if second but last byte has been read */
-> +       if (--dev->buf_len == 1)
-> +               at91_twi_write(dev, AT91_TWI_CR, AT91_TWI_STOP);
+On Tue, Nov 22, 2011 at 03:48:38PM +0000, Russell King - ARM Linux wrote:
+> On Tue, Nov 22, 2011 at 02:30:40PM +0100, Uwe Kleine-K?nig wrote:
+> > On Tue, Nov 22, 2011 at 01:20:55PM +0000, Will Deacon wrote:
+> > > On Tue, Nov 22, 2011 at 01:02:33PM +0000, Uwe Kleine-K?nig wrote:
+> > > > On Tue, Nov 22, 2011 at 11:50:17AM +0000, Will Deacon wrote:
+> > > > > In the end I'd like to remove DEBUG_LL_UART_NONE. It's only there to service
+> > > > > the platforms which have not yet added an entry to the choice.
+> > > > Why not remove it already now? If I remove it together with the entry
+> > > > for my machine and modify mach/debug-macro.S to do the right thing
+> > > > for my machine even without DEBUG_IMX25_UART, my build just works.
+> > > 
+> > > I'm fairly sure this will break the build for everybody who doesn't have an
+> > > entry in Kconfig.debug choice if they try and select DEBUG_LL.
+> > Ah, I see the problem. It's more subtile than just failure to build: it
+> > autoselects DEBUG_ICEDCC then.
 > 
-> 
-> 
-> If dev->buf_len =1 at the beginning of a read transfer, a stop condition will
-> never be send.
+> Which results in a kernel which builds fine, but when they attempt to
+> boot it appears to lock fairly solidly.  So we had to add this option
+> to allow the possibility for unconverted platforms to continue working.
+yes.
 
-this case is already catched in at91_do_twi_transfer():
+> At this point, I think the right answer is to remove the option in
+> linux-next, and tell anyone who complains that they need to convert
+> their platform properly.  (We're going to need them converted in this
+> way anyway for the single zImage project.)
+I agree.
 
-+       if (dev->msg->flags & I2C_M_RD) {
-+               unsigned start_flags = AT91_TWI_START;
-+
-+               /* if only one byte is to be read, immediately stop transfer */
-+               if (dev->buf_len <= 1 && !(dev->msg->flags & I2C_M_RECV_LEN))
-+                       start_flags |= AT91_TWI_STOP;
-+               at91_twi_write(dev, AT91_TWI_CR, start_flags);
+Best regards
+Uwe
 
-Thanks for reviewing,
-Niko
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
