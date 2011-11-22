@@ -1,34 +1,130 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Tue, 22 Nov 2011 09:53:56 +0530
-Subject: [PATCH] IMX/DMA : set the DMA direction in the sdma_control()
-In-Reply-To: <1321605482-6616-1-git-send-email-b32955@freescale.com>
-References: <1321605482-6616-1-git-send-email-b32955@freescale.com>
-Message-ID: <1321935836.1516.220.camel@vkoul-udesk3>
+From: junxiao.bi@windriver.com (Bi Junxiao)
+Date: Tue, 22 Nov 2011 13:22:33 +0800
+Subject: [PATCH 2/6] ARM: gic: fix big endian support
+In-Reply-To: <alpine.LFD.2.02.1111212245250.17904@xanadu.home>
+References: <1321322785-2981-1-git-send-email-junxiao.bi@windriver.com>
+ <1321322785-2981-2-git-send-email-junxiao.bi@windriver.com>
+ <alpine.LFD.2.02.1111211334320.17904@xanadu.home>
+ <4ECAFF2C.1010604@windriver.com>
+ <alpine.LFD.2.02.1111212245250.17904@xanadu.home>
+Message-ID: <4ECB3199.8030206@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2011-11-18 at 16:38 +0800, Huang Shijie wrote:
-> Set the right DMA direction in the sdma_control(), else
-> we will get the wrong log when enable the DYNAMIC_DEBUG.
-> 
-> Signed-off-by: Huang Shijie <b32955@freescale.com>
-> ---
->  drivers/dma/imx-sdma.c |    1 +
->  1 files changed, 1 insertions(+), 0 deletions(-)
-> 
-> diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
-> index f993955..37b8f84 100644
-> --- a/drivers/dma/imx-sdma.c
-> +++ b/drivers/dma/imx-sdma.c
-> @@ -1102,6 +1102,7 @@ static int sdma_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
->  			sdmac->watermark_level = dmaengine_cfg->dst_maxburst;
->  			sdmac->word_size = dmaengine_cfg->dst_addr_width;
->  		}
-> +		sdmac->direction = dmaengine_cfg->direction;
->  		return sdma_config_channel(sdmac);
->  	default:
->  		return -ENOSYS;
-Applied thanks
-
--- 
-~Vinod
+on 11/22/2011 12:10 PM Nicolas Pitre wrote:
+> On Tue, 22 Nov 2011, Bi Junxiao wrote:
+>
+>    
+>> on 11/22/2011 03:11 AM Nicolas Pitre wrote:
+>>      
+>>> On Tue, 15 Nov 2011, Junxiao Bi wrote:
+>>>
+>>>
+>>>        
+>>>> The irq state from gic is in little-endian mode. We need do endian
+>>>> conversion for it in big-endian machine. Usually byte swapping of
+>>>> 32-bits word needs 4 assembler instructions for arm machine which
+>>>> arch<   6. But since the high order half word of the irq state is
+>>>> zero, there is a way that can use lesser instrunctions to improve
+>>>> the performance since we only need a bytes swaping of half word.
+>>>> That's what swab16_low_half and swab16_high_half do.
+>>>>
+>>>> Signed-off-by: Junxiao Bi<junxiao.bi@windriver.com>
+>>>>
+>>>>          
+>>> Comments below.
+>>>
+>>>
+>>>        
+>>>> ---
+>>>>    arch/arm/include/asm/assembler.h                |   27
+>>>> +++++++++++++++++++++++
+>>>>    arch/arm/include/asm/hardware/entry-macro-gic.S |    7 ++++++
+>>>>    2 files changed, 34 insertions(+), 0 deletions(-)
+>>>>
+>>>> diff --git a/arch/arm/include/asm/assembler.h
+>>>> b/arch/arm/include/asm/assembler.h
+>>>> index 29035e8..3ddee22 100644
+>>>> --- a/arch/arm/include/asm/assembler.h
+>>>> +++ b/arch/arm/include/asm/assembler.h
+>>>> @@ -302,4 +302,31 @@
+>>>>    	.size \name , . - \name
+>>>>    	.endm
+>>>>
+>>>> +/*
+>>>> + * swab16_low_half is used to swap the bytes order of the low order
+>>>> + * half word, it assumes that the high order half word is zero.
+>>>> + * swab16_high_half is used to swap the bytes order of the high order
+>>>> + * half word, it assumes that the low order half word is zero.
+>>>> + */
+>>>> +#if __LINUX_ARM_ARCH__>= 6
+>>>> +	.macro swab16_low_half, reg
+>>>> +	rev \reg, \reg
+>>>> +	.endm
+>>>> +
+>>>> +	.macro swab16_high_half, reg
+>>>> +	rev \reg, \reg
+>>>> +	.endm
+>>>> +#else
+>>>> +	.macro swab16_low_half, reg
+>>>> +	mov \reg, \reg, ror #8
+>>>> +	orr \reg, \reg, \reg, lsr #16
+>>>> +	bic \reg, \reg, \reg, lsl #16
+>>>> +	.endm
+>>>>
+>>>>          
+>>> I fail to see how this macro would be generally useful.  Presuming that
+>>> the top or bottom half has to be zero is not particularly practical.
+>>>
+>>>        
+>> We can use it to swap bytes order of a 16-bits number in 32-bits register in
+>> which case the top or bottom half will be zero. For the \irqstat register, as
+>> the original implementation assumes its top half is zero, so I make the same
+>> assumption.
+>>      
+> The problem is that you're loading some assumption about a particular
+> register onto a generic macro.  Unless this is a very common pattern, I
+> don't think this needs to be made generic.
+>
+>    
+>>>> +	.macro swab16_high_half, reg
+>>>> +	swab16_low_half \reg
+>>>> +	mov \reg, \reg, lsl #16
+>>>> +	.endm
+>>>>
+>>>>          
+>>> And this doesn't end up cheaper than a plain swab32.
+>>>
+>>>        
+>> This macro has an advantage that it only needs one register. For swab32, it
+>> will need another temporary register besides the target register.
+>>      
+> Sure, but I don't think we're so short of registers.  And BE on
+> pre-ARMv6 is not that common either.  So, unless this particular pattern
+> is heavily used on pre-ARMv6 BE systems, I don't think it is reasonable
+> to create a generic macro with such specific assumptions.
+>
+>    
+>>> Furthermore, you're using those macros 1) in the gic code, and 2) onli
+>>> in the BE8 case.  Both of those conditions are only possible on ARMv6
+>>> and above anyway, so I'd simply open code a rev instruction inline.
+>>>
+>>>        
+>> This is not be8 specific. It will be needed for both be8 and be32. So the
+>> machine with arch<  6 also needs to be supported.
+>>      
+> There is no gic on machines with arch<  6, no?
+>
+> If you meant for those macros to be used for other purposes then they
+> deserve a patch of their own.
+>    
+I didn't find other need of the macro yet. I will leave it aside.
+> And Russell just merged in his devel branch a patch from Marc Zyngier
+> completely removing entry-macro-gic.S anyway, so this patch as it is
+> will be moot soon.
+>
+>    
+OK, thank you for reviewing it. I will drop this patch.
+> Nicolas
+>
+>    
