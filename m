@@ -1,34 +1,43 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 22 Nov 2011 15:02:31 -0800
-Subject: [PATCH 4/4] ARM: add jump label support
-In-Reply-To: <20111122194213.GC9581@n2100.arm.linux.org.uk>
-References: <1321888429-3519-1-git-send-email-rabin@rab.in>
- <1321888429-3519-4-git-send-email-rabin@rab.in>
- <20111122194213.GC9581@n2100.arm.linux.org.uk>
-Message-ID: <4ECC2A07.8050701@codeaurora.org>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Tue, 22 Nov 2011 23:03:15 +0000
+Subject: -next fails to boot as of today on S3C6410
+In-Reply-To: <20111122225847.GA3005@opensource.wolfsonmicro.com>
+References: <20111122192741.GG30583@opensource.wolfsonmicro.com>
+ <20111122193124.GB9581@n2100.arm.linux.org.uk>
+ <20111122193957.GH30583@opensource.wolfsonmicro.com>
+ <20111122222135.GB7845@gallagher>
+ <20111122225847.GA3005@opensource.wolfsonmicro.com>
+Message-ID: <20111122230315.GC7845@gallagher>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/22/11 11:42, Russell King - ARM Linux wrote:
-> On Mon, Nov 21, 2011 at 08:43:49PM +0530, Rabin Vincent wrote:
->> Add the arch-specific code to support jump labels for ARM and Thumb-2.
->>
->> Note that to build succesfully it requires (what will be) GCC 4.7.0
->> because of incomplete support for the '%c' specifier in earlier
->> versions:
->>
->> 	http://gcc.gnu.org/bugzilla/show_bug.cgi?id=48637
->>
->> Cc: Jason Baron <jbaron@redhat.com>
->> Signed-off-by: Rabin Vincent <rabin@rab.in>
-> This appears to imply that with this patch, we're upping the minimum
-> gcc version for successfully building kernels to 4.7.0.  That's _way_
-> too early (I'm using 4.3.5 here and don't have plans to update.)
+On Tue, Nov 22, 2011 at 10:58:49PM +0000, Mark Brown wrote:
+> On Tue, Nov 22, 2011 at 10:21:35PM +0000, Jamie Iles wrote:
+> > On Tue, Nov 22, 2011 at 07:39:57PM +0000, Mark Brown wrote:
+> 
+> > > Thanks.  Note that I'm not 100% sure I believe the bisection result as
+> > > reverting didn't fix the issue and I've stared at the code a bit without
+> > > seeing anything that set off alarm bells.
+> 
+> > No, you're right - this is the offending commit.  It actually needs 
+> > this[1] fix and things should be okay.
+> 
+> > Thomas, Rob, would one of you be able to apply this please?  I'm not 
+> > sure if this would normally go through Grant or not.
+> 
+> Gah, right.  I'll give this a test tomorrow.
+> 
+> You *really* should point out dependencies like this when sending
+> patches so we can avoid this sort of bisection breakage when posting
+> things so that whoever's applying the patches can avoid introducing this
+> sort of breakage and so that we don't have people like me sitting trying
+> to work out if they did something thick.
 
-Is there a way to detect that the compiler doesn't support %c? Perhaps
-we can do that in the same spirit of how we detect asm goto support for
-jump labels.
+Sorry about that.  At the time I thought the fix was small enough that 
+it would get applied quickly without problems and would be in way before 
+these patches, but I didn't follow it up early enough.  I'll make sure 
+that it doesn't happen again though.
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Thanks,
+
+Jamie
