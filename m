@@ -1,63 +1,38 @@
 From: dave.martin@linaro.org (Dave Martin)
-Date: Tue, 22 Nov 2011 13:54:48 +0000
-Subject: [PATCH v6 2/5] ARM: reset: implement soft_restart for jumping to
- a physical address
-In-Reply-To: <CAHkRjk4e7EEVsoM9oPBa993FZubO5trXDmw6S3VAq4s4wLTwzg@mail.gmail.com>
-References: <1321466057-19721-1-git-send-email-will.deacon@arm.com>
- <1321466057-19721-3-git-send-email-will.deacon@arm.com>
- <CAHkRjk4e7EEVsoM9oPBa993FZubO5trXDmw6S3VAq4s4wLTwzg@mail.gmail.com>
-Message-ID: <20111122135448.GG2066@localhost.localdomain>
+Date: Tue, 22 Nov 2011 13:56:27 +0000
+Subject: [PATCH 2/4] ARM: extract out insn generation code from ftrace
+In-Reply-To: <CAH+eYFBz_aEeC3DwGF2mdpVepburzCBJqD0n1LFjL1y5dqOXHw@mail.gmail.com>
+References: <1321888429-3519-1-git-send-email-rabin@rab.in>
+ <1321888429-3519-2-git-send-email-rabin@rab.in>
+ <20111122120252.GE2066@localhost.localdomain>
+ <CAH+eYFBz_aEeC3DwGF2mdpVepburzCBJqD0n1LFjL1y5dqOXHw@mail.gmail.com>
+Message-ID: <20111122135627.GH2066@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 22, 2011 at 01:41:24PM +0000, Catalin Marinas wrote:
-> On 16 November 2011 17:54, Will Deacon <will.deacon@arm.com> wrote:
-> > Tools such as kexec and CPU hotplug require a way to reset the processor
-> > and branch to some code in physical space. This requires various bits of
-> > jiggery pokery with the caches and MMU which, when it goes wrong, tends
-> > to lock up the system.
+On Tue, Nov 22, 2011 at 07:02:13PM +0530, Rabin Vincent wrote:
+> On Tue, Nov 22, 2011 at 17:32, Dave Martin <dave.martin@linaro.org> wrote:
+> > On Mon, Nov 21, 2011 at 08:43:47PM +0530, Rabin Vincent wrote:
+> >> ?static int ftrace_modify_code(unsigned long pc, unsigned long old,
+> >> @@ -256,7 +203,7 @@ static int __ftrace_modify_caller(unsigned long *callsite,
+> >> ?{
+> >> ? ? ? unsigned long caller_fn = (unsigned long) func;
+> >> ? ? ? unsigned long pc = (unsigned long) callsite;
+> >> - ? ? unsigned long branch = ftrace_gen_branch(pc, caller_fn, false);
+> >> + ? ? unsigned long branch = arm_gen_branch(pc, caller_fn);
+> >> ? ? ? unsigned long nop = 0xe1a00000; /* mov r0, r0 */
 > >
-> > This patch fleshes out the soft_restart implementation so that it
-> > branches to the reset code using the identity mapping. This requires us
-> > to change to a temporary stack, held within the kernel image as a static
-> > array, to avoid conflicting with the new view of memory.
-> >
-> > Signed-off-by: Will Deacon <will.deacon@arm.com>
-> > ---
-> > ?arch/arm/kernel/process.c | ? 51 ++++++++++++++++++++++++++++++++++----------
-> > ?1 files changed, 39 insertions(+), 12 deletions(-)
-> >
-> > diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
-> > index a92ca50..577d092 100644
-> > --- a/arch/arm/kernel/process.c
-> > +++ b/arch/arm/kernel/process.c
-> > @@ -92,29 +92,56 @@ static int __init hlt_setup(char *__unused)
-> > ?__setup("nohlt", nohlt_setup);
-> > ?__setup("hlt", hlt_setup);
-> >
-> > -void soft_restart(unsigned long addr)
-> > +extern void call_with_stack(void (*fn)(void *), void *arg, void *sp);
-> > +typedef void (*phys_reset_t)(unsigned long);
-> > +
-> > +/*
-> > + * A temporary stack to use for CPU reset. This is static so that we
-> > + * don't clobber it with the identity mapping. When running with this
-> > + * stack, any references to the current task *will not work* so you
-> > + * should really do as little as possible before jumping to your reset
-> > + * code.
-> > + */
-> > +#define SOFT_RESTART_STACK_WORDS ? ? ? 32
-> > +static u32 soft_restart_stack[SOFT_RESTART_STACK_WORDS];
+> > Does this code get used in Thumb-2 kernels? ?So far as I can tell, this
+> > code is used... but it looks like it shouldn't work, due to the ARM
+> > specifics.
 > 
-> Just for ABI stack alignment requirements, do we get the right
-> alignment of this array in memory?
+> It's not used on Thumb-2.  This is only used by the function graph
+> tracer and that depends on !THUMB2_KERNEL.
 
-Could we fix that by making it a u64 array?
+I assume there's no special reason why this doesn't work with a Thumb-2
+kernel, other than that it simply hasn't implemented yet?
 
-In architecture versions where it matters, the compiler should also 64-
-bit align such an array.
-
-Of we're paranoid, we could align the initial stack pointer explicitly.
+Are there any particular problems blocking this?
 
 Cheers
 ---Dave
