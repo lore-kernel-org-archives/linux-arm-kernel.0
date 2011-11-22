@@ -1,30 +1,28 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 22 Nov 2011 11:50:17 +0000
-Subject: [PATCH] arm/imx: use Kconfig choice for low-level debug UART
- selection
-In-Reply-To: <20111122085834.GB19986@pengutronix.de>
-References: <1313530873-24961-1-git-send-email-will.deacon@arm.com>
- <1313729819-30301-1-git-send-email-shawn.guo@linaro.org>
- <20111122085834.GB19986@pengutronix.de>
-Message-ID: <20111122115017.GK20518@mudshark.cambridge.arm.com>
+From: rubini@unipv.it (Alessandro Rubini)
+Date: Tue, 22 Nov 2011 12:56:32 +0100
+Subject: [GIT PULL] ARM: amba: Enable module alias autogeneration for
+ AMBA drivers
+In-Reply-To: <1321961573-4562-1-git-send-email-dave.martin@linaro.org>
+References: <1321961573-4562-1-git-send-email-dave.martin@linaro.org> 
+Message-ID: <20111122115632.GA5165@mail.gnudd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
+> I have Acks on some of the driver patches and no comments on the
+> rest.  I've been circulating these for some time, so if you're
+> happy to pull those driver patches via your tree, please go ahead.
 
-On Tue, Nov 22, 2011 at 08:58:34AM +0000, Uwe Kleine-K?nig wrote:
-> On Fri, Aug 19, 2011 at 12:56:59PM +0800, Shawn Guo wrote:
-> > Now that the DEBUG_LL UART can be selected by a Kconfig choice,
-> > simplify the #ifdefery in debug-macro.S and add entries to the
-> > top-level Kconfig.debug instead.
-> now that this patch is in Linus' tree as
-> f350b86121c7a004a5f866333fa1d23fe30263a6, this breaks the build when
-> selecting DEBUG_LL_UART_NONE (as our autobuilder did somehow). Maybe
-> that is OK because DEBUG_LL is an expert option? If not, either the
-> autoselection has to return or DEBUG_LL_UART_NONE shouldn't be
-> selectable for imx.
+Sure I have no problem with the nomadik-rng.c, (so please have my
+Acked-by: -- sorry for not noting it earlier) but I think this
+file2alias thing needs a serious rework to split each bus in a
+different file, using ELF sections like we do elsewhere.
 
-In the end I'd like to remove DEBUG_LL_UART_NONE. It's only there to service
-the platforms which have not yet added an entry to the choice.
+I posted a patch last week but I got no comment at all. Maybe this
+is the time to ask for comments? I can rebase and repost if needed.
 
-Will
+  lkml.org/lkml/2011/11/4/125 (0/2: description of the work)
+  lkml.org/lkml/2011/11/4/126 (1/2: turn the if plethora to table lookup)
+  lkml.org/lkml/2011/11/4/127 (2/2: partial split to type-specific files).
+
+thanks
+/alessandro
