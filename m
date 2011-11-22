@@ -1,44 +1,45 @@
-From: mika.westerberg@iki.fi (Mika Westerberg)
-Date: Tue, 22 Nov 2011 07:59:25 +0200
-Subject: [PATCH v2 1/5] dmaengine: add ep93xx DMA support
-In-Reply-To: <1321864326.1516.211.camel@vkoul-udesk3>
-References: <cover.1306662317.git.mika.westerberg@iki.fi>
- <3ea8d56034f25cbe3fd8a4c31d7d0d1540b6ac7e.1306662317.git.mika.westerberg@iki.fi>
- <4EC27EED.4030108@metasoft.pl>
- <20111116065512.GB2703@mwesterb-mobl.ger.corp.intel.com>
- <4EC374F0.8000400@metasoft.pl>
- <20111119123837.GA2711@mwesterb-mobl.ger.corp.intel.com>
- <4ECA0147.4020806@metasoft.pl>
- <20111121080158.GA2713@mwesterb-mobl.ger.corp.intel.com>
- <1321864326.1516.211.camel@vkoul-udesk3>
-Message-ID: <20111122055925.GA15889@mwesterb-mobl.ger.corp.intel.com>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Tue, 22 Nov 2011 15:08:57 +0900
+Subject: [PATCH] ARM: Kota2 mach-type update fix
+Message-ID: <20111122060857.23951.50598.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 21, 2011 at 02:02:06PM +0530, Vinod Koul wrote:
-> On Mon, 2011-11-21 at 10:01 +0200, Mika Westerberg wrote:
-> > On Mon, Nov 21, 2011 at 08:44:07AM +0100, Rafal Prylowski wrote:
-> > > 
-> > > I'm calling dma_terminate_all from interrupt. It seems that tasklet_kill is not
-> > > allowed to be called from this context.
-> > 
-> > Ah, right.
-> > 
-> > One more try - this time we set a flag which prevents the tasktlet from
-> > referencing an empty list.
+From: Magnus Damm <damm@opensource.se>
 
-> Rather than this why not actually check for list_empty and process only
-> when it is not empty?
+This patch adds kota2 to the in-kernel ARM mach-type file.
 
-I was thinking that it should be an error if the active list is empty when the
-tasklet is run.
+Basic board support is included in 3.2-rc and the mach-type
+has been registered in the ARM machine repository as
 
-> Also you should check the return of the ep93xx_dma_get_active() which
-> should return NULL if it didn't find anything in active list
+3616 Renesas SH-Mobile kota2.x Board kota2 Yusuke Goda mainlined
 
-Right - if the list is allowed to be empty.
+The file arch/arm/tools/mach-types is however missing Kota2
+which makes build of sh73a0 based boards fail with:
 
-I'll re-check the patch from Rafal. Maybe it's better to adapt with the fact
-that dma_terminate_all() can be called in any context any time and modify the
-driver accordingly (e.g like you say, return NULL if the list is empty handle
-it correctly).
+arch/arm/mach-shmobile/platsmp.c: In function 'shmobile_smp_get_core_count':
+arch/arm/mach-shmobile/platsmp.c:28:2: error: implicit declaration of function 'machine_is_kota2'
+make[1]: *** [arch/arm/mach-shmobile/platsmp.o] Error 1
+
+arch/arm/mach-shmobile/board-kota2.c:448:136: error: 'MACH_TYPE_KOTA2' undeclared here (not in a function)
+make[1]: *** [arch/arm/mach-shmobile/board-kota2.o] Error 1
+make: *** [arch/arm/mach-shmobile] Error 2
+
+Signed-off-by: Magnus Damm <damm@opensource.se>
+---
+
+ I propose that Paul Mundt merges this patch together with other
+ SH-Mobile ARM related fixes.
+
+ arch/arm/tools/mach-types |    1 +
+ 1 file changed, 1 insertion(+)
+
+--- 0001/arch/arm/tools/mach-types
++++ work/arch/arm/tools/mach-types	2011-11-14 16:55:38.000000000 +0900
+@@ -1123,5 +1123,6 @@ blissc			MACH_BLISSC		BLISSC			3491
+ thales_adc		MACH_THALES_ADC		THALES_ADC		3492
+ ubisys_p9d_evp		MACH_UBISYS_P9D_EVP	UBISYS_P9D_EVP		3493
+ atdgp318		MACH_ATDGP318		ATDGP318		3494
++kota2			MACH_KOTA2		KOTA2			3616
+ smdk4212		MACH_SMDK4212		SMDK4212		3638
+ smdk4412		MACH_SMDK4412		SMDK4412		3765
