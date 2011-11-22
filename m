@@ -1,109 +1,25 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Tue, 22 Nov 2011 11:00:32 +0100
-Subject: [GIT PULL] Support for Cadence GEM in the MACB driver
-In-Reply-To: <20111121100020.GB7314@totoro>
-References: <20111121100020.GB7314@totoro>
-Message-ID: <20111122100032.GL21480@game.jcrosoft.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 22 Nov 2011 10:04:35 +0000
+Subject: Inclusion of ARM perf tree in linux-next
+Message-ID: <20111122100435.GC20518@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10:00 Mon 21 Nov     , Jamie Iles wrote:
-> Hi Arnd,
-> 
-> Please consider pulling the patches to add support for Cadence GEM to 
-> the MACB driver.  These have been ready to go for a little while but got 
-> held up with the rename of Ethernet drivers in the last merge window.  
-> It would be great if we can get some exposure in -next for a little 
-> while before the next merge window.
-> 
-> Thanks,
-> 
-> Jamie
-> 
-> The following changes since commit cfcfc9eca2bcbd26a8e206baeb005b055dbf8e37:
-> 
->   Linux 3.2-rc2 (2011-11-15 15:02:59 -0200)
-> 
-> are available in the git repository at:
->   git://github.com/jamieiles/linux-2.6-ji.git macb-gem
-Arnd please wait
+Hi Stephen,
 
-please update his patch
+I maintain the ARM perf backend and would be very grateful if you could
+please include this branch in linux-next:
 
-"at91: provide macb clks with "pclk" and "hclk" name"
+git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git for-next/perf
 
-with the version I send to the ML
+This request has arisen specifically from some work with the OMAP guys
+where it would be useful to spot any conflicts for 3.3, however I think it's
+generally a good idea for me to give some of the perf changes an airing
+before they get merged anyway.
 
-Best Regards,
-J.
-> 
-> Jamie Iles (9):
->       at91: provide macb clks with "pclk" and "hclk" name
->       macb: remove conditional clk handling
->       macb: unify at91 and avr32 platform data
->       macb: convert printk to netdev_ and friends
->       macb: initial support for Cadence GEM
->       macb: support higher rate GEM MDIO clock divisors
->       macb: support statistics for GEM devices
->       macb: support DMA bus widths > 32 bits
->       macb: allow GEM to have configurable receive buffer size
-> 
->  arch/arm/mach-at91/at91cap9.c               |    8 +-
->  arch/arm/mach-at91/at91cap9_devices.c       |    6 +-
->  arch/arm/mach-at91/at91rm9200_devices.c     |    6 +-
->  arch/arm/mach-at91/at91sam9260.c            |    8 +-
->  arch/arm/mach-at91/at91sam9260_devices.c    |    6 +-
->  arch/arm/mach-at91/at91sam9263.c            |    8 +-
->  arch/arm/mach-at91/at91sam9263_devices.c    |    6 +-
->  arch/arm/mach-at91/at91sam9g45.c            |    8 +-
->  arch/arm/mach-at91/at91sam9g45_devices.c    |    6 +-
->  arch/arm/mach-at91/board-1arm.c             |    2 +-
->  arch/arm/mach-at91/board-afeb-9260v1.c      |    2 +-
->  arch/arm/mach-at91/board-cam60.c            |    2 +-
->  arch/arm/mach-at91/board-cap9adk.c          |    2 +-
->  arch/arm/mach-at91/board-carmeva.c          |    2 +-
->  arch/arm/mach-at91/board-cpu9krea.c         |    2 +-
->  arch/arm/mach-at91/board-cpuat91.c          |    2 +-
->  arch/arm/mach-at91/board-csb337.c           |    2 +-
->  arch/arm/mach-at91/board-csb637.c           |    2 +-
->  arch/arm/mach-at91/board-eb9200.c           |    2 +-
->  arch/arm/mach-at91/board-ecbat91.c          |    2 +-
->  arch/arm/mach-at91/board-eco920.c           |    2 +-
->  arch/arm/mach-at91/board-foxg20.c           |    2 +-
->  arch/arm/mach-at91/board-gsia18s.c          |    2 +-
->  arch/arm/mach-at91/board-kafa.c             |    2 +-
->  arch/arm/mach-at91/board-kb9202.c           |    2 +-
->  arch/arm/mach-at91/board-neocore926.c       |    2 +-
->  arch/arm/mach-at91/board-pcontrol-g20.c     |    2 +-
->  arch/arm/mach-at91/board-picotux200.c       |    2 +-
->  arch/arm/mach-at91/board-qil-a9260.c        |    2 +-
->  arch/arm/mach-at91/board-rm9200dk.c         |    2 +-
->  arch/arm/mach-at91/board-rm9200ek.c         |    2 +-
->  arch/arm/mach-at91/board-rsi-ews.c          |    2 +-
->  arch/arm/mach-at91/board-sam9-l9260.c       |    2 +-
->  arch/arm/mach-at91/board-sam9260ek.c        |    2 +-
->  arch/arm/mach-at91/board-sam9263ek.c        |    2 +-
->  arch/arm/mach-at91/board-sam9g20ek.c        |    2 +-
->  arch/arm/mach-at91/board-sam9m10g45ek.c     |    2 +-
->  arch/arm/mach-at91/board-snapper9260.c      |    2 +-
->  arch/arm/mach-at91/board-stamp9g20.c        |    2 +-
->  arch/arm/mach-at91/board-usb-a926x.c        |    2 +-
->  arch/arm/mach-at91/board-yl-9200.c          |    2 +-
->  arch/arm/mach-at91/include/mach/board.h     |   14 +-
->  arch/avr32/boards/atngw100/setup.c          |    2 +-
->  arch/avr32/boards/atstk1000/atstk1002.c     |    2 +-
->  arch/avr32/boards/favr-32/setup.c           |    2 +-
->  arch/avr32/boards/hammerhead/setup.c        |    2 +-
->  arch/avr32/boards/merisc/setup.c            |    2 +-
->  arch/avr32/boards/mimc200/setup.c           |    2 +-
->  arch/avr32/mach-at32ap/at32ap700x.c         |    8 +-
->  arch/avr32/mach-at32ap/include/mach/board.h |    7 +-
->  drivers/net/ethernet/Makefile               |    2 +-
->  drivers/net/ethernet/cadence/Kconfig        |   16 +-
->  drivers/net/ethernet/cadence/at91_ether.c   |    3 +-
->  drivers/net/ethernet/cadence/at91_ether.h   |    4 +-
->  drivers/net/ethernet/cadence/macb.c         |  344 +++++++++++++++++----------
->  drivers/net/ethernet/cadence/macb.h         |  150 ++++++++++++-
->  include/linux/platform_data/macb.h          |   17 ++
->  57 files changed, 492 insertions(+), 211 deletions(-)
->  create mode 100644 include/linux/platform_data/macb.h
+The merge path for these patches into mainline is usually via Russell, but
+platform updates may go via arm-soc (Arnd).
+
+Thanks,
+
+Will
