@@ -1,60 +1,108 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Tue, 22 Nov 2011 21:02:58 +0000
-Subject: [PATCH v8] AT91: Add a driver for the ADC
-In-Reply-To: <4ECBB551.4@atmel.com>
-References: <1321611160-3685-1-git-send-email-maxime.ripard@free-electrons.com>
- <4ECBB226.4080404@free-electrons.com> <4ECBB551.4@atmel.com>
-Message-ID: <4ECC0E02.60807@kernel.org>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 22 Nov 2011 22:06:32 +0100
+Subject: [PATCH v2 1/2] MX2: Add platform definitions for eMMa-PrP device.
+In-Reply-To: <1321963316-9058-2-git-send-email-javier.martin@vista-silicon.com>
+References: <1321963316-9058-1-git-send-email-javier.martin@vista-silicon.com>
+ <1321963316-9058-2-git-send-email-javier.martin@vista-silicon.com>
+Message-ID: <20111122210632.GS27267@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/22/2011 02:44 PM, Nicolas Ferre wrote:
-> On 11/22/2011 03:31 PM, Maxime Ripard :
->> Hi,
->>
->> So, I guess that we have a pretty good driver with that version. What
->> can we do for the inclusion in the kernel now ?
+On Tue, Nov 22, 2011 at 01:01:55PM +0100, Javier Martin wrote:
+> eMMa-PrP device included in Freescale i.MX2 chips can also
+> be used separately to process memory buffers.
 > 
-> I propose that:
+> Signed-off-by: Javier Martin <javier.martin@vista-silicon.com>
+> ---
+>  arch/arm/mach-imx/devices-imx27.h               |    2 +
+>  arch/arm/plat-mxc/devices/platform-mx2-camera.c |   33 +++++++++++++++++++++++
+>  arch/arm/plat-mxc/include/mach/devices-common.h |    2 +
+>  3 files changed, 37 insertions(+), 0 deletions(-)
 > 
-> 1/ We take the patch #1/3 for inclusion through arm-soc during 3.2
-> 2/ Jonathan takes the #2/3 in his IIO subsystem
-Works for me. Poke me when 1 is in place.
-> 3/ We take board related patch #3/3 for inclusion during 3.3 (next)
-> 4/ And we may add other boards support if we are quick for 3.3...
+> diff --git a/arch/arm/mach-imx/devices-imx27.h b/arch/arm/mach-imx/devices-imx27.h
+> index 2f727d7..519aa36 100644
+> --- a/arch/arm/mach-imx/devices-imx27.h
+> +++ b/arch/arm/mach-imx/devices-imx27.h
+> @@ -50,6 +50,8 @@ extern const struct imx_imx_uart_1irq_data imx27_imx_uart_data[];
+>  extern const struct imx_mx2_camera_data imx27_mx2_camera_data;
+>  #define imx27_add_mx2_camera(pdata)	\
+>  	imx_add_mx2_camera(&imx27_mx2_camera_data, pdata)
+> +#define imx27_alloc_mx2_emmaprp(pdata)	\
+> +	imx_alloc_mx2_emmaprp(&imx27_mx2_camera_data)
+>  
+>  extern const struct imx_mxc_ehci_data imx27_mxc_ehci_otg_data;
+>  #define imx27_add_mxc_ehci_otg(pdata)	\
+> diff --git a/arch/arm/plat-mxc/devices/platform-mx2-camera.c b/arch/arm/plat-mxc/devices/platform-mx2-camera.c
+> index b3f4828..4a8bd73 100644
+> --- a/arch/arm/plat-mxc/devices/platform-mx2-camera.c
+> +++ b/arch/arm/plat-mxc/devices/platform-mx2-camera.c
+> @@ -6,6 +6,7 @@
+>   * the terms of the GNU General Public License version 2 as published by the
+>   * Free Software Foundation.
+>   */
+> +#include <linux/dma-mapping.h>
+>  #include <mach/hardware.h>
+>  #include <mach/devices-common.h>
+>  
+> @@ -62,3 +63,35 @@ struct platform_device *__init imx_add_mx2_camera(
+>  			res, data->iobaseemmaprp ? 4 : 2,
+>  			pdata, sizeof(*pdata), DMA_BIT_MASK(32));
+>  }
+> +
+> +struct platform_device *__init imx_alloc_mx2_emmaprp(
+> +		const struct imx_mx2_camera_data *data)
+
+Why only alloc and not register?
+
+> +{
+> +	struct resource res[] = {
+> +		{
+> +			.start = data->iobaseemmaprp,
+> +			.end = data->iobaseemmaprp + data->iosizeemmaprp - 1,
+> +			.flags = IORESOURCE_MEM,
+> +		}, {
+> +			.start = data->irqemmaprp,
+> +			.end = data->irqemmaprp,
+> +			.flags = IORESOURCE_IRQ,
+> +		},
+> +	};
+> +	struct platform_device *pdev;
+> +	int ret = -ENOMEM;
+> +
+> +	pdev = platform_device_alloc("m2m-emmaprp", 0);
+> +	if (!pdev)
+> +		goto err;
+> +
+> +	ret = platform_device_add_resources(pdev, res, ARRAY_SIZE(res));
+> +	if (ret)
+> +		goto err;
+> +
+> +	return pdev;
+> +err:
+> +	platform_device_put(pdev);
+> +	return ERR_PTR(-ENODEV);
+> +
+> +}
+> diff --git a/arch/arm/plat-mxc/include/mach/devices-common.h b/arch/arm/plat-mxc/include/mach/devices-common.h
+> index def9ba5..ce64bd5 100644
+> --- a/arch/arm/plat-mxc/include/mach/devices-common.h
+> +++ b/arch/arm/plat-mxc/include/mach/devices-common.h
+> @@ -223,6 +223,8 @@ struct imx_mx2_camera_data {
+>  struct platform_device *__init imx_add_mx2_camera(
+>  		const struct imx_mx2_camera_data *data,
+>  		const struct mx2_camera_platform_data *pdata);
+> +struct platform_device *__init imx_alloc_mx2_emmaprp(
+> +		const struct imx_mx2_camera_data *data);
+>  
+>  #include <mach/mxc_ehci.h>
+>  struct imx_mxc_ehci_data {
+> -- 
+> 1.7.0.4
 > 
-> Does is sound good to all of you?
 > 
-> Bye,
-> 
->>
->> Maxime
->>
->> On 18/11/2011 11:12, Maxime Ripard wrote:
->>> Hi all,
->>>
->>> This patchset adds the driver for the ADC in the AT91 SoC. It has been tested on
->>> the at91sam9g20ek and should work on sam9g45 as well.
->>>
->>> For now, it only reads values when asked for by sysfs, but eventually will
->>> support hardware triggers and more boards.
->>>
->>> This patchset is based on the "[PATCH 0/6 V2] IIO: Out of staging step 1: The
->>> core" patchset from Jonathan Cameron, applied on top of 3.1
->>>
->>> Improvements from v7:
->>>   - Fix the channels mask bug
->>>
->>> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
->>> Cc: Patrice Vilchez <patrice.vilchez@atmel.com>
->>> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
->>>
->>>
->>> _______________________________________________
->>> linux-arm-kernel mailing list
->>> linux-arm-kernel at lists.infradead.org
->>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>
->>
-> 
-> 
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
