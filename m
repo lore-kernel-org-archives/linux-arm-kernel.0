@@ -1,78 +1,88 @@
 From: junxiao.bi@windriver.com (Bi Junxiao)
-Date: Tue, 22 Nov 2011 09:32:16 +0800
-Subject: [PATCH 6/6] ARM: support kernel modules in BE8 mode
-In-Reply-To: <alpine.LFD.2.02.1111211427400.17904@xanadu.home>
+Date: Tue, 22 Nov 2011 09:47:24 +0800
+Subject: [PATCH 2/6] ARM: gic: fix big endian support
+In-Reply-To: <alpine.LFD.2.02.1111211334320.17904@xanadu.home>
 References: <1321322785-2981-1-git-send-email-junxiao.bi@windriver.com>
- <1321322785-2981-6-git-send-email-junxiao.bi@windriver.com>
- <alpine.LFD.2.02.1111211427400.17904@xanadu.home>
-Message-ID: <4ECAFBA0.2030001@windriver.com>
+ <1321322785-2981-2-git-send-email-junxiao.bi@windriver.com>
+ <alpine.LFD.2.02.1111211334320.17904@xanadu.home>
+Message-ID: <4ECAFF2C.1010604@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-on 11/22/2011 03:29 AM Nicolas Pitre wrote:
+on 11/22/2011 03:11 AM Nicolas Pitre wrote:
 > On Tue, 15 Nov 2011, Junxiao Bi wrote:
 >
 >    
->> From: Stanley.Miao<stanley.miao@windriver.com>
+>> The irq state from gic is in little-endian mode. We need do endian
+>> conversion for it in big-endian machine. Usually byte swapping of
+>> 32-bits word needs 4 assembler instructions for arm machine which
+>> arch<  6. But since the high order half word of the irq state is
+>> zero, there is a way that can use lesser instrunctions to improve
+>> the performance since we only need a bytes swaping of half word.
+>> That's what swab16_low_half and swab16_high_half do.
 >>
->> In BE8 mode, data must be manipulated in big endian format while
->> text must be little endian. Therefore, when relocating the text
->> section of module in BE8 mode, we must convert the location offset
->> of the text to big endian from the native little endian. After
->> the relocation is complete, the location offset value is re-written
->> as little endian.
->>
->> Since only BE8 mode has such special requirement while other big endian
->> mode not, cpu_to_le32 and le32_to_cpu can not be used to relocate the
->> text. We introduce write_instr* and read_instr* to do it.
->>
->> Signed-off-by: Stanley.Miao<stanley.miao@windriver.com>
 >> Signed-off-by: Junxiao Bi<junxiao.bi@windriver.com>
->> ---
->>   arch/arm/Makefile         |    1 +
->>   arch/arm/include/asm/io.h |   12 ++++++++++
->>   arch/arm/kernel/module.c  |   51 +++++++++++++++++++++++----------------------
->>   3 files changed, 39 insertions(+), 25 deletions(-)
->>
->> diff --git a/arch/arm/Makefile b/arch/arm/Makefile
->> index dfcf3b0..c858184 100644
->> --- a/arch/arm/Makefile
->> +++ b/arch/arm/Makefile
->> @@ -13,6 +13,7 @@
->>   LDFLAGS_vmlinux	:=-p --no-undefined -X
->>   ifeq ($(CONFIG_CPU_ENDIAN_BE8),y)
->>   LDFLAGS_vmlinux	+= --be8
->> +LDFLAGS_MODULE	+= --be8
->>   endif
->>
->>   OBJCOPYFLAGS	:=-O binary -R .comment -S
->> diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
->> index 065d100..4b6c7de 100644
->> --- a/arch/arm/include/asm/io.h
->> +++ b/arch/arm/include/asm/io.h
->> @@ -210,6 +210,18 @@ extern void _memset_io(volatile void __iomem *, int, size_t);
->>    * Again, this are defined to perform little endian accesses.  See the
->>    * IO port primitives for more information.
->>    */
->> +#ifdef CONFIG_CPU_ENDIAN_BE8
->> +#define read_instr32(c)		__swab32(*(u32 *)(c))
->> +#define read_instr16(c)		__swab16(*(u16 *)(c))
->> +#define write_instr32(v, a)	(*(u32 *)(a) = __swab32((__force __u32)(v)))
->> +#define write_instr16(v, a)	(*(u16 *)(a) = __swab16((__force __u16)(v)))
->> +#else
->> +#define read_instr32(c)		(*(u32 *)(c))
->> +#define read_instr16(c)		(*(u16 *)(c))
->> +#define write_instr32(v, a)	(*(u32 *)(a) = (v))
->> +#define write_instr16(v, a)	(*(u16 *)(a) = (v))
->> +#endif
 >>      
-> NAK.  This has nothing to do with IO.
+> Comments below.
 >
-> If only module.c requires this, please move those definitions there.
 >    
-Not only modules, all components that needs to read and write text 
-segment like kprobes also needs this. As it is special to arm be8, how 
-about define it in arch/arm/include/asm/swab.h?
+>> ---
+>>   arch/arm/include/asm/assembler.h                |   27 +++++++++++++++++++++++
+>>   arch/arm/include/asm/hardware/entry-macro-gic.S |    7 ++++++
+>>   2 files changed, 34 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
+>> index 29035e8..3ddee22 100644
+>> --- a/arch/arm/include/asm/assembler.h
+>> +++ b/arch/arm/include/asm/assembler.h
+>> @@ -302,4 +302,31 @@
+>>   	.size \name , . - \name
+>>   	.endm
+>>
+>> +/*
+>> + * swab16_low_half is used to swap the bytes order of the low order
+>> + * half word, it assumes that the high order half word is zero.
+>> + * swab16_high_half is used to swap the bytes order of the high order
+>> + * half word, it assumes that the low order half word is zero.
+>> + */
+>> +#if __LINUX_ARM_ARCH__>= 6
+>> +	.macro swab16_low_half, reg
+>> +	rev \reg, \reg
+>> +	.endm
+>> +
+>> +	.macro swab16_high_half, reg
+>> +	rev \reg, \reg
+>> +	.endm
+>> +#else
+>> +	.macro swab16_low_half, reg
+>> +	mov \reg, \reg, ror #8
+>> +	orr \reg, \reg, \reg, lsr #16
+>> +	bic \reg, \reg, \reg, lsl #16
+>> +	.endm
+>>      
+> I fail to see how this macro would be generally useful.  Presuming that
+> the top or bottom half has to be zero is not particularly practical.
+>    
+We can use it to swap bytes order of a 16-bits number in 32-bits 
+register in which case the top or bottom half will be zero. For the 
+\irqstat register, as the original implementation assumes its top half 
+is zero, so I make the same assumption.
+>    
+>> +	.macro swab16_high_half, reg
+>> +	swab16_low_half \reg
+>> +	mov \reg, \reg, lsl #16
+>> +	.endm
+>>      
+> And this doesn't end up cheaper than a plain swab32.
+>    
+This macro has an advantage that it only needs one register. For swab32, 
+it will need another temporary register besides the target register.
+> Furthermore, you're using those macros 1) in the gic code, and 2) onli
+> in the BE8 case.  Both of those conditions are only possible on ARMv6
+> and above anyway, so I'd simply open code a rev instruction inline.
+>    
+This is not be8 specific. It will be needed for both be8 and be32. So 
+the machine with arch < 6 also needs to be supported.
 >
 > Nicolas
 >
