@@ -1,50 +1,36 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 22 Nov 2011 17:38:12 +0100
-Subject: [PATCH] arm/imx: use Kconfig choice for low-level debug UART
- selection
-In-Reply-To: <20111122154838.GZ9581@n2100.arm.linux.org.uk>
-References: <1313530873-24961-1-git-send-email-will.deacon@arm.com>
- <1313729819-30301-1-git-send-email-shawn.guo@linaro.org>
- <20111122085834.GB19986@pengutronix.de>
- <20111122115017.GK20518@mudshark.cambridge.arm.com>
- <20111122130233.GF19986@pengutronix.de>
- <20111122132055.GA32572@mudshark.cambridge.arm.com>
- <20111122133040.GG19986@pengutronix.de>
- <20111122154838.GZ9581@n2100.arm.linux.org.uk>
-Message-ID: <20111122163812.GH19986@pengutronix.de>
+From: boojin.kim@samsung.com (Boojin Kim)
+Date: Tue, 22 Nov 2011 11:03:22 +0900
+Subject: [PATCH] ASoC: SAMSUNG: Fix build error
+Message-ID: <1321927402-28898-1-git-send-email-boojin.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 22, 2011 at 03:48:38PM +0000, Russell King - ARM Linux wrote:
-> On Tue, Nov 22, 2011 at 02:30:40PM +0100, Uwe Kleine-K?nig wrote:
-> > On Tue, Nov 22, 2011 at 01:20:55PM +0000, Will Deacon wrote:
-> > > On Tue, Nov 22, 2011 at 01:02:33PM +0000, Uwe Kleine-K?nig wrote:
-> > > > On Tue, Nov 22, 2011 at 11:50:17AM +0000, Will Deacon wrote:
-> > > > > In the end I'd like to remove DEBUG_LL_UART_NONE. It's only there to service
-> > > > > the platforms which have not yet added an entry to the choice.
-> > > > Why not remove it already now? If I remove it together with the entry
-> > > > for my machine and modify mach/debug-macro.S to do the right thing
-> > > > for my machine even without DEBUG_IMX25_UART, my build just works.
-> > > 
-> > > I'm fairly sure this will break the build for everybody who doesn't have an
-> > > entry in Kconfig.debug choice if they try and select DEBUG_LL.
-> > Ah, I see the problem. It's more subtile than just failure to build: it
-> > autoselects DEBUG_ICEDCC then.
-> 
-> Which results in a kernel which builds fine, but when they attempt to
-> boot it appears to lock fairly solidly.  So we had to add this option
-> to allow the possibility for unconverted platforms to continue working.
-yes.
+This patch adds <linux/modules.h> to fix following build errors.
 
-> At this point, I think the right answer is to remove the option in
-> linux-next, and tell anyone who complains that they need to convert
-> their platform properly.  (We're going to need them converted in this
-> way anyway for the single zImage project.)
-I agree.
+sound/soc/codecs/wm8994.c: In function 'wm8994_readable':
+sound/soc/codecs/wm8994.c:58: warning: unused variable 'wm8994'
+sound/soc/samsung/smdk_wm8994.c:176: error: expected declaration specifiers or '...' before string constant
+sound/soc/samsung/smdk_wm8994.c:176: warning: data definition has no type or storage class
+sound/soc/samsung/smdk_wm8994.c:176: warning: type defaults to 'int' in declaration of 'MODULE_DESCRIPTION'
+sound/soc/samsung/smdk_wm8994.c:176: warning: function declaration isn't a prototype
+sound/soc/samsung/smdk_wm8994.c:177: error: expected declaration specifiers or '...' before string constant
 
-Best regards
-Uwe
+Signed-off-by: Boojin Kim <boojin.kim@samsung.com>
+---
+ sound/soc/samsung/smdk_wm8994.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
+diff --git a/sound/soc/samsung/smdk_wm8994.c b/sound/soc/samsung/smdk_wm8994.c
+index f75e439..ad9ac42 100644
+--- a/sound/soc/samsung/smdk_wm8994.c
++++ b/sound/soc/samsung/smdk_wm8994.c
+@@ -9,6 +9,7 @@
+ 
+ #include "../codecs/wm8994.h"
+ #include <sound/pcm_params.h>
++#include <linux/module.h>
+ 
+  /*
+   * Default CFG switch settings to use this driver:
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+1.7.1
