@@ -1,42 +1,44 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 22 Nov 2011 13:48:52 +0800
-Subject: [PATCH 1/2] ARM: mxs/tx28: add __initconst for fec pdata
-In-Reply-To: <1321027746-5906-1-git-send-email-b29396@freescale.com>
-References: <1321027746-5906-1-git-send-email-b29396@freescale.com>
-Message-ID: <20111122054851.GF16417@S2100-06.ap.freescale.net>
+From: mika.westerberg@iki.fi (Mika Westerberg)
+Date: Tue, 22 Nov 2011 07:59:25 +0200
+Subject: [PATCH v2 1/5] dmaengine: add ep93xx DMA support
+In-Reply-To: <1321864326.1516.211.camel@vkoul-udesk3>
+References: <cover.1306662317.git.mika.westerberg@iki.fi>
+ <3ea8d56034f25cbe3fd8a4c31d7d0d1540b6ac7e.1306662317.git.mika.westerberg@iki.fi>
+ <4EC27EED.4030108@metasoft.pl>
+ <20111116065512.GB2703@mwesterb-mobl.ger.corp.intel.com>
+ <4EC374F0.8000400@metasoft.pl>
+ <20111119123837.GA2711@mwesterb-mobl.ger.corp.intel.com>
+ <4ECA0147.4020806@metasoft.pl>
+ <20111121080158.GA2713@mwesterb-mobl.ger.corp.intel.com>
+ <1321864326.1516.211.camel@vkoul-udesk3>
+Message-ID: <20111122055925.GA15889@mwesterb-mobl.ger.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 12, 2011 at 12:09:05AM +0800, Dong Aisheng wrote:
-> Signed-off-by: Dong Aisheng <b29396@freescale.com>
-> ---
+On Mon, Nov 21, 2011 at 02:02:06PM +0530, Vinod Koul wrote:
+> On Mon, 2011-11-21 at 10:01 +0200, Mika Westerberg wrote:
+> > On Mon, Nov 21, 2011 at 08:44:07AM +0100, Rafal Prylowski wrote:
+> > > 
+> > > I'm calling dma_terminate_all from interrupt. It seems that tasklet_kill is not
+> > > allowed to be called from this context.
+> > 
+> > Ah, right.
+> > 
+> > One more try - this time we set a flag which prevents the tasktlet from
+> > referencing an empty list.
 
-Applied, thanks.
+> Rather than this why not actually check for list_empty and process only
+> when it is not empty?
 
-Regards,
-Shawn
+I was thinking that it should be an error if the active list is empty when the
+tasklet is run.
 
->  arch/arm/mach-mxs/module-tx28.c |    4 ++--
->  1 files changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/mach-mxs/module-tx28.c b/arch/arm/mach-mxs/module-tx28.c
-> index 0fcff47..9a7b08b 100644
-> --- a/arch/arm/mach-mxs/module-tx28.c
-> +++ b/arch/arm/mach-mxs/module-tx28.c
-> @@ -66,11 +66,11 @@ static const iomux_cfg_t tx28_fec1_pads[] __initconst = {
->  	MX28_PAD_ENET0_CRS__ENET1_RX_EN,
->  };
->  
-> -static struct fec_platform_data tx28_fec0_data = {
-> +static const struct fec_platform_data tx28_fec0_data __initconst = {
->  	.phy = PHY_INTERFACE_MODE_RMII,
->  };
->  
-> -static struct fec_platform_data tx28_fec1_data = {
-> +static const struct fec_platform_data tx28_fec1_data __initconst = {
->  	.phy = PHY_INTERFACE_MODE_RMII,
->  };
->  
-> -- 
-> 1.7.0.4
-> 
+> Also you should check the return of the ep93xx_dma_get_active() which
+> should return NULL if it didn't find anything in active list
+
+Right - if the list is allowed to be empty.
+
+I'll re-check the patch from Rafal. Maybe it's better to adapt with the fact
+that dma_terminate_all() can be called in any context any time and modify the
+driver accordingly (e.g like you say, return NULL if the list is empty handle
+it correctly).
