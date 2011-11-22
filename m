@@ -1,38 +1,42 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 22 Nov 2011 20:24:25 +0000
-Subject: [PATCH] arm/imx: use Kconfig choice for low-level debug UART
- selection
-In-Reply-To: <20111122164707.GJ6624@sirena.org.uk>
-References: <1313530873-24961-1-git-send-email-will.deacon@arm.com>
- <1313729819-30301-1-git-send-email-shawn.guo@linaro.org>
- <20111122085834.GB19986@pengutronix.de>
- <20111122115017.GK20518@mudshark.cambridge.arm.com>
- <20111122130233.GF19986@pengutronix.de>
- <20111122132055.GA32572@mudshark.cambridge.arm.com>
- <20111122133040.GG19986@pengutronix.de>
- <20111122154838.GZ9581@n2100.arm.linux.org.uk>
- <20111122163812.GH19986@pengutronix.de> <20111122164707.GJ6624@sirena.org.uk>
-Message-ID: <20111122202425.GD9581@n2100.arm.linux.org.uk>
+Date: Tue, 22 Nov 2011 20:42:38 +0000
+Subject: [PATCH 1/2] ARM: debug: Add CLSP711X_UART1 config choice
+In-Reply-To: <4E77C84E.9040202@codeaurora.org>
+References: <20110916114140.GA31334@e102144-lin.cambridge.arm.com>
+ <1316455300-5752-1-git-send-email-sboyd@codeaurora.org>
+ <20110919212502.GB23613@e102144-lin.cambridge.arm.com>
+ <4E77BE34.6070702@codeaurora.org>
+ <20110919224151.GB28237@n2100.arm.linux.org.uk>
+ <4E77C84E.9040202@codeaurora.org>
+Message-ID: <20111122204238.GE9581@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 22, 2011 at 04:47:07PM +0000, Mark Brown wrote:
-> On Tue, Nov 22, 2011 at 05:38:12PM +0100, Uwe Kleine-K?nig wrote:
-> > On Tue, Nov 22, 2011 at 03:48:38PM +0000, Russell King - ARM Linux wrote:
-> 
-> > > > Ah, I see the problem. It's more subtile than just failure to build: it
-> > > > autoselects DEBUG_ICEDCC then.
-> 
-> > > At this point, I think the right answer is to remove the option in
-> > > linux-next, and tell anyone who complains that they need to convert
-> > > their platform properly.  (We're going to need them converted in this
-> > > way anyway for the single zImage project.)
-> 
-> > I agree.
-> 
-> It'd be nice if things could be arranged so that the build breaks rather
-> than selecting ICEDCC on unconverted platforms - when you run into the
-> problem it's not that easy to diagnose.
+On Mon, Sep 19, 2011 at 03:55:10PM -0700, Stephen Boyd wrote:
+> Ah ok. How about this instead?
 
-Well, we could leave the choice as is, and make the NONE option cause a
-#error.
+Better...
+
+> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+> index 9661c51..31896f4 100644
+> --- a/arch/arm/Kconfig.debug
+> +++ b/arch/arm/Kconfig.debug
+> @@ -93,14 +93,19 @@ choice
+>                   It does include a timeout to ensure that the system does not
+>                   totally freeze when there is nothing connected to read.
+>  
+> +       config DEBUG_FOOTBRIDGE_COM1
+> +               bool "Kernel low-level debugging messages via footbridge 8250 at PCI COM1"
+
+I don't think PC-isms help here - especially when these aren't labelled
+using this terminology on devices.  Netwinder called it just a simple
+"Serial" on the rear panel.
+
+		bool "Kernel low-level debugging messages via 8250 serial port at 0x3f8"
+
+> +               depends on FOOTBRIDGE
+> +               help
+> +                 Say Y here if you want the debug print routines to direct
+> +                 their output to the 8250 at PCI COM1.
+
+Same kind of fixup here.  Other than that, it seems fine.
