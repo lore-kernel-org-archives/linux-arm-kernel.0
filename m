@@ -1,59 +1,44 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 22 Nov 2011 10:16:27 +0000
-Subject: [PATCH 21/23] ARM: add generic ioremap optimization by reusing
- static mappings
-In-Reply-To: <1321422521-1138-22-git-send-email-nico@fluxnic.net>
-References: <1321422521-1138-1-git-send-email-nico@fluxnic.net>
- <1321422521-1138-22-git-send-email-nico@fluxnic.net>
-Message-ID: <20111122101627.GX9581@n2100.arm.linux.org.uk>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Tue, 22 Nov 2011 10:18:57 +0000
+Subject: [PATCH 1/4] [RFC] Add generic ARM instruction set condition code
+ checks.
+In-Reply-To: <20111121190848.GS9581@n2100.arm.linux.org.uk>
+References: <20111121183046.28964.23829.stgit@localhost6.localdomain6>
+ <20111121190848.GS9581@n2100.arm.linux.org.uk>
+Message-ID: <20111122101846.GA2066@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 16, 2011 at 12:48:39AM -0500, Nicolas Pitre wrote:
-> @@ -201,12 +195,6 @@ void __iomem * __arm_ioremap_pfn_caller(unsigned long pfn,
->  	if (pfn >= 0x100000 && (__pfn_to_phys(pfn) & ~SUPERSECTION_MASK))
->  		return NULL;
->  
-> -	/*
-> -	 * Don't allow RAM to be mapped - this causes problems with ARMv6+
-> -	 */
-> -	if (WARN_ON(pfn_valid(pfn)))
-> -		return NULL;
-> -
->  	type = get_mem_type(mtype);
->  	if (!type)
->  		return NULL;
-> @@ -216,6 +204,34 @@ void __iomem * __arm_ioremap_pfn_caller(unsigned long pfn,
->  	 */
->  	size = PAGE_ALIGN(offset + size);
->  
-> +	/*
-> +	 * Try to reuse one of the static mapping whenever possible.
-> +	 */
-> +	read_lock(&vmlist_lock);
-> +	for (area = vmlist; area; area = area->next) {
-> +		if (!size || (sizeof(phys_addr_t) == 4 && pfn >= 0x100000))
-> +			break;
-> +		if (!(area->flags & VM_ARM_STATIC_MAPPING))
-> +			continue;
-> +		if ((area->flags & VM_ARM_MTYPE_MASK) != VM_ARM_MTYPE(mtype))
-> +			continue;
-> +		if (__phys_to_pfn(area->phys_addr) > pfn ||
-> +		    __pfn_to_phys(pfn) + size-1 > area->phys_addr + area->size-1)
-> +			continue;
-> +		/* we can drop the lock here as we know *area is static */
-> +		read_unlock(&vmlist_lock);
-> +		addr = (unsigned long)area->addr;
-> +		addr += __pfn_to_phys(pfn) - area->phys_addr;
-> +		return (void __iomem *) (offset + addr);
-> +	}
-> +	read_unlock(&vmlist_lock);
-> +
-> +	/*
-> +	 * Don't allow RAM to be mapped - this causes problems with ARMv6+
-> +	 */
-> +	if (WARN_ON(pfn_valid(pfn)))
-> +		return NULL;
+On Mon, Nov 21, 2011 at 07:08:48PM +0000, Russell King - ARM Linux wrote:
+> On Mon, Nov 21, 2011 at 06:30:46PM +0000, Leif Lindholm wrote:
+> > +/*
+> > + * Returns:
+> > + * 0 - if condition fails
+> > + * 1 - if condition passes (including AL)
+> > + * 2 - if unconditional encoding (or before ARMv3, NV condition)
+> 
+> The comment is wrong.  NV always meant 'never execute' including v3,
+> v4 and v5 architectures.
 
-Why are you moving this check?  System RAM should never end up in the
-vmlist.
+Actually, if the v5 ARM ARM is to believed this was only true prior to
+ARMv3.
+
+Apparently the behaviour of instructions encoded with the NV condition
+code is UNPREDICTABLE in v3 and v4.  With the exception of the ARMv5 BLX
+<label> and v5E PLD instructions, I've no idea whether any actual
+implementation did anything crazy with these opcodes though, prior to
+ARMv6.
+
+Perhaps someone implemented some v4/v3 parts with custom instructions in
+this space, or dealt with the NV condition in a unexpected way -- I'm
+not aware of any such implementation, though.
+
+Maybe the comment can be reworded more conservatively, such as
+
+"2 - NV condition, or separate unconditional opcode space from v5
+onwards"
+
+That wording judiciously doesn't say anything about v3/v4.
+
+Cheers
+---Dave
