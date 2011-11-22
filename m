@@ -1,296 +1,161 @@
-From: tixy@yxit.co.uk (Tixy)
-Date: Tue, 22 Nov 2011 08:48:53 +0000
-Subject: [PATCH 3/4] ARM: extract out code patch function from kprobes
-In-Reply-To: <1321888429-3519-3-git-send-email-rabin@rab.in>
-References: <1321888429-3519-1-git-send-email-rabin@rab.in>
- <1321888429-3519-3-git-send-email-rabin@rab.in>
-Message-ID: <1321951733.2557.35.camel@computer2>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 22 Nov 2011 09:56:49 +0100
+Subject: [RFC PATCH 1/3] arm/imx6: describe clocks in device tree source
+In-Reply-To: <1321926536-671-2-git-send-email-shawn.guo@linaro.org>
+References: <1321926536-671-1-git-send-email-shawn.guo@linaro.org>
+ <1321926536-671-2-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20111122085649.GC27267@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2011-11-21 at 20:43 +0530, Rabin Vincent wrote:
-> Extract out the code patching code from kprobes so that it can be used
-> from the jump label code.  Additionally, the separated code:
+On Tue, Nov 22, 2011 at 09:48:54AM +0800, Shawn Guo wrote:
+> It adds document for imx clock device tree bindings and then describes
+> imx6 clocks in dts.
 > 
->  - Uses the IS_ENABLED() macros instead of the #ifdefs for THUMB2
->    support
-> 
->  - Unifies the two separate functions in kprobes, providing one function
->    that uses stop_machine() internally, and one that can be called from
->    stop_machine() directly
-> 
->  - Patches the text on all CPUs only on processors requiring software
->    broadcasting of cache operations
-> 
-> Cc: Jon Medhurst <tixy@yxit.co.uk>
-> Signed-off-by: Rabin Vincent <rabin@rab.in>
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 > ---
-
-Looks good. I've a couple of minor inline comments below.
-
->  arch/arm/kernel/Makefile  |    3 +-
->  arch/arm/kernel/kprobes.c |   86 ++++++++++++--------------------------------
->  arch/arm/kernel/patch.c   |   72 +++++++++++++++++++++++++++++++++++++
->  arch/arm/kernel/patch.h   |    7 ++++
->  4 files changed, 105 insertions(+), 63 deletions(-)
->  create mode 100644 arch/arm/kernel/patch.c
->  create mode 100644 arch/arm/kernel/patch.h
+>  .../devicetree/bindings/clock/clock-imx.txt        |  124 +++
+>  arch/arm/boot/dts/imx6q.dtsi                       |  943 +++++++++++++++++++-
+>  2 files changed, 1058 insertions(+), 9 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/clock/clock-imx.txt
 > 
-> diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
-> index a2f34a3..adf02ed 100644
-> --- a/arch/arm/kernel/Makefile
-> +++ b/arch/arm/kernel/Makefile
-> @@ -8,6 +8,7 @@ AFLAGS_head.o        := -DTEXT_OFFSET=$(TEXT_OFFSET)
->  ifdef CONFIG_FUNCTION_TRACER
->  CFLAGS_REMOVE_ftrace.o = -pg
->  CFLAGS_REMOVE_insn.o = -pg
-> +CFLAGS_REMOVE_patch.o = -pg
->  endif
->  
->  CFLAGS_REMOVE_return_address.o = -pg
-> @@ -38,7 +39,7 @@ obj-$(CONFIG_HAVE_ARM_TWD)	+= smp_twd.o
->  obj-$(CONFIG_DYNAMIC_FTRACE)	+= ftrace.o insn.o
->  obj-$(CONFIG_FUNCTION_GRAPH_TRACER)	+= ftrace.o insn.o
->  obj-$(CONFIG_KEXEC)		+= machine_kexec.o relocate_kernel.o
-> -obj-$(CONFIG_KPROBES)		+= kprobes.o kprobes-common.o
-> +obj-$(CONFIG_KPROBES)		+= kprobes.o kprobes-common.o patch.o
->  ifdef CONFIG_THUMB2_KERNEL
->  obj-$(CONFIG_KPROBES)		+= kprobes-thumb.o
->  else
-> diff --git a/arch/arm/kernel/kprobes.c b/arch/arm/kernel/kprobes.c
-> index 129c116..ab1869d 100644
-> --- a/arch/arm/kernel/kprobes.c
-> +++ b/arch/arm/kernel/kprobes.c
-> @@ -29,6 +29,7 @@
->  #include <asm/cacheflush.h>
->  
->  #include "kprobes.h"
-> +#include "patch.h"
->  
->  #define MIN_STACK_SIZE(addr) 				\
->  	min((unsigned long)MAX_STACK_SIZE,		\
-> @@ -103,57 +104,33 @@ int __kprobes arch_prepare_kprobe(struct kprobe *p)
->  	return 0;
->  }
->  
-> -#ifdef CONFIG_THUMB2_KERNEL
-> -
-> -/*
-> - * For a 32-bit Thumb breakpoint spanning two memory words we need to take
-> - * special precautions to insert the breakpoint atomically, especially on SMP
-> - * systems. This is achieved by calling this arming function using stop_machine.
-> - */
-> -static int __kprobes set_t32_breakpoint(void *addr)
-> -{
-> -	((u16 *)addr)[0] = KPROBE_THUMB32_BREAKPOINT_INSTRUCTION >> 16;
-> -	((u16 *)addr)[1] = KPROBE_THUMB32_BREAKPOINT_INSTRUCTION & 0xffff;
-> -	flush_insns(addr, 2*sizeof(u16));
-> -	return 0;
-> -}
-> -
->  void __kprobes arch_arm_kprobe(struct kprobe *p)
->  {
-> -	uintptr_t addr = (uintptr_t)p->addr & ~1; /* Remove any Thumb flag */
-> -
-> -	if (!is_wide_instruction(p->opcode)) {
-> -		*(u16 *)addr = KPROBE_THUMB16_BREAKPOINT_INSTRUCTION;
-> -		flush_insns(addr, sizeof(u16));
-> -	} else if (addr & 2) {
-> -		/* A 32-bit instruction spanning two words needs special care */
-> -		stop_machine(set_t32_breakpoint, (void *)addr, &cpu_online_map);
-> +	unsigned int brkp;
-> +	void *addr;
-> +
-> +	if (IS_ENABLED(CONFIG_THUMB2_KERNEL)) {
-> +		/* Remove any Thumb flag */
-> +		addr = (void *)((uintptr_t)p->addr & ~1);
-> +
-> +		if (is_wide_instruction(p->opcode))
-> +			brkp = KPROBE_THUMB32_BREAKPOINT_INSTRUCTION;
-> +		else
-> +			brkp = KPROBE_THUMB16_BREAKPOINT_INSTRUCTION;
->  	} else {
-> -		/* Word aligned 32-bit instruction can be written atomically */
-> -		u32 bkp = KPROBE_THUMB32_BREAKPOINT_INSTRUCTION;
-> -#ifndef __ARMEB__ /* Swap halfwords for little-endian */
-> -		bkp = (bkp >> 16) | (bkp << 16);
-> -#endif
-> -		*(u32 *)addr = bkp;
-> -		flush_insns(addr, sizeof(u32));
-> -	}
-> -}
-> +		kprobe_opcode_t insn = p->opcode;
->  
-> -#else /* !CONFIG_THUMB2_KERNEL */
-> +		addr = p->addr;
-> +		brkp = KPROBE_ARM_BREAKPOINT_INSTRUCTION;
->  
-> -void __kprobes arch_arm_kprobe(struct kprobe *p)
-> -{
-> -	kprobe_opcode_t insn = p->opcode;
-> -	kprobe_opcode_t brkp = KPROBE_ARM_BREAKPOINT_INSTRUCTION;
-> -	if (insn >= 0xe0000000)
-> -		brkp |= 0xe0000000;  /* Unconditional instruction */
-> -	else
-> -		brkp |= insn & 0xf0000000;  /* Copy condition from insn */
-> -	*p->addr = brkp;
-> -	flush_insns(p->addr, sizeof(p->addr[0]));
-> -}
-> +		if (insn >= 0xe0000000)
-> +			brkp |= 0xe0000000;  /* Unconditional instruction */
-> +		else
-> +			brkp |= insn & 0xf0000000;  /* Copy condition from insn */
-> +	}
->  
-> -#endif /* !CONFIG_THUMB2_KERNEL */
-> +	patch_text(addr, brkp);
-> +}
->  
->  /*
->   * The actual disarming is done here on each CPU and synchronized using
-> @@ -166,25 +143,10 @@ void __kprobes arch_arm_kprobe(struct kprobe *p)
->  int __kprobes __arch_disarm_kprobe(void *p)
->  {
->  	struct kprobe *kp = p;
-> -#ifdef CONFIG_THUMB2_KERNEL
-> -	u16 *addr = (u16 *)((uintptr_t)kp->addr & ~1);
-> -	kprobe_opcode_t insn = kp->opcode;
-> -	unsigned int len;
-> +	void *addr = (void *)((uintptr_t)kp->addr & ~1);
->  
-> -	if (is_wide_instruction(insn)) {
-> -		((u16 *)addr)[0] = insn>>16;
-> -		((u16 *)addr)[1] = insn;
-> -		len = 2*sizeof(u16);
-> -	} else {
-> -		((u16 *)addr)[0] = insn;
-> -		len = sizeof(u16);
-> -	}
-> -	flush_insns(addr, len);
-> +	__patch_text(addr, kp->opcode);
->  
-> -#else /* !CONFIG_THUMB2_KERNEL */
-> -	*kp->addr = kp->opcode;
-> -	flush_insns(kp->addr, sizeof(kp->addr[0]));
-> -#endif
->  	return 0;
->  }
->  
-> diff --git a/arch/arm/kernel/patch.c b/arch/arm/kernel/patch.c
+> diff --git a/Documentation/devicetree/bindings/clock/clock-imx.txt b/Documentation/devicetree/bindings/clock/clock-imx.txt
 > new file mode 100644
-> index 0000000..3f93190
+> index 0000000..5c597d9
 > --- /dev/null
-> +++ b/arch/arm/kernel/patch.c
-> @@ -0,0 +1,72 @@
-> +#include <linux/kernel.h>
-> +#include <linux/kprobes.h>
-> +#include <linux/stop_machine.h>
+> +++ b/Documentation/devicetree/bindings/clock/clock-imx.txt
+> @@ -0,0 +1,124 @@
+> +* Device Tree Bindings for Freescale i.MX Clock
 > +
-> +#include <asm/cacheflush.h>
-> +#include <asm/smp_plat.h>
+> +== Clock Gate ==
 > +
-> +#include "patch.h"
-> +
-> +struct patch {
-> +	void *addr;
-> +	unsigned int insn;
-> +};
-> +
-> +void __kprobes __patch_text(void *addr, unsigned int insn)
-> +{
-> +	bool thumb2 = IS_ENABLED(CONFIG_THUMB2_KERNEL);
-> +	int size;
-> +
-> +	if (thumb2 && !is_wide_instruction(insn)) {
-> +		*(u16 *)addr = insn;
-> +		size = sizeof(u16);
-> +	} else if (thumb2 && ((unsigned long)addr & 2)) {
+> +Required properties:
+> +- imx,clock-gate:  It's a two 32-bit integers array.  The first
+> +  integer specifies the offset of the gate register, and the second
+> +  one specifies the bit mask of the gate for this clock.
 
-For pointer arithmetic, is casting to (uintptr_t) preferred to (unsigned
-long)? (There are several other places in this file where this comment
-applies.)
+On i.MX53 we have two bit gates:
 
-> +		u16 *addrw = addr;
+00b disable
+01b disable in stop mode, enable in run mode
+10b reserved
+11b enable
 
-Here's some very pedantic nit-picking...
-I guess the 'w' in 'addrw' comes from X86 land meaning 'word'?
-'h' for 'half-word' would be more appropriate for ARM.
+I can't find this description in my i.MX6RM, but I suppose it's the same
+here. Do you have plans for these? Currently only disable and enable
+seem to be handled.
+
 
 > +
-> +		addrw[0] = insn >> 16;
-> +		addrw[1] = insn & 0xffff;
-> +
-> +		size = sizeof(u32);
-> +	} else {
-> +#ifndef __ARMEB__
-> +		if (thumb2)
-> +			insn = (insn >> 16) | (insn << 16);
-> +#endif
-> +
-> +		*(u32 *)addr = insn;
-> +		size = sizeof(u32);
-> +	}
-> +
-> +	flush_icache_range((unsigned long)(addr),
-> +			   (unsigned long)(addr) + size);
-> +}
-> +
-> +static int __kprobes patch_text_stop_machine(void *data)
-> +{
-> +	struct patch *patch = data;
-> +
-> +	__patch_text(patch->addr, patch->insn);
-> +
-> +	return 0;
-> +}
-> +
-> +void __kprobes patch_text(void *addr, unsigned int insn)
-> +{
-> +	bool stopmachine;
-> +	struct patch patch = {
-> +		.addr = addr,
-> +		.insn = insn,
-> +	};
-> +
-> +	stopmachine = cache_ops_need_broadcast() ||
-> +		      (IS_ENABLED(CONFIG_THUMB2_KERNEL)
-> +		       && is_wide_instruction(insn)
-> +		       && ((unsigned long)addr & 2));
-> +
-> +	if (!stopmachine)
-> +		__patch_text(addr, insn);
-> +	else if (cache_ops_need_broadcast())
-> +		stop_machine(patch_text_stop_machine, &patch, cpu_online_mask);
-> +	else
-> +		stop_machine(patch_text_stop_machine, &patch, NULL);
-> +}
+> +		pll2_pfd_clk: pll2-pfd {
+> +			compatible = "fsl,imx6q-pfd";
+> +			#clock-cells = <3>;
+> +			imx,clock-gate = <0x100 0x80>,
+> +					 <0x100 0x8000>,
+> +					 <0x100 0x800000>;
+> +			imx,clock-divider = <0x100 0 0 0 6>,
+> +					    <0x100 0 0 8 6>,
+> +					    <0x100 0 0 16 6>;
+> +			clock-input = <&pll_bus_clk 0>;
+> +			clock-input-name = "pll2-bus";
+> +			clock-output-name = "pll2-pfd-352m",
+> +					    "pll2-pfd-594m",
+> +					    "pll2-pfd-400m";
+> +		};
 
-This inlines the cache_ops_need_broadcast() code twice. We could instead
-either cache the result in a local variable, or rewrite if/else clause
-to something like...
+Does this pll simultaneously have three different output frequencies?
+I'm not familiar with the i.MX6 yet.
 
-	if (cache_ops_need_broadcast())
-		stop_machine(patch_text_stop_machine, &patch, cpu_online_mask);
-	else {
-		bool straddles_word = IS_ENABLED(CONFIG_THUMB2_KERNEL)
-					&& is_wide_instruction(insn)
-					&& ((unsigned long)addr & 2))
-		if (straddles_word)
-			stop_machine(patch_text_stop_machine, &patch, NULL);
-		else
-			__patch_text(addr, insn);
-	}
+> +
+> +		can_root_clk: can-root {
+> +			compatible = "fsl,imx6q-clock";
+> +			#clock-cells = <1>;
+> +			imx,clock-divider = <0x20 0 0 2 6>;
+> +			clock-input = <&pll_usb_clk 0 0>;
+> +			clock-input-name = "pll3-usb-otg";
+> +			clock-output-name = "can-root";
+> +		};
+> +
+> +		can_clk: can {
+> +			compatible = "fsl,imx6q-clock";
+> +			#clock-cells = <4>;
+> +			imx,clock-gate = <0x68 0xc000>,
+> +					 <0x68 0x30000>,
+> +					 <0x68 0xc0000>,
+> +					 <0x68 0x300000>;
+> +			clock-input = <&can_root_clk 0>;
+> +			clock-input-name = "can-root";
+> +			clock-output-name = "can1",
+> +					    "can1-serial",
+> +					    "can2",
+> +					    "can2-serial";
+> +		};
+> +
+> +		ecspi_root_clk: ecspi-root {
+> +			compatible = "fsl,imx6q-clock";
+> +			#clock-cells = <1>;
+> +			imx,clock-divider = <0x38 0 0 19 6>;
+> +			clock-input = <&pll3_div_clk 2 0 0>;
+> +			clock-input-name = "pll3-60m";
+> +			clock-output-name = "ecspi-root";
+> +		};
 
-> diff --git a/arch/arm/kernel/patch.h b/arch/arm/kernel/patch.h
-> new file mode 100644
-> index 0000000..b4731f2
-> --- /dev/null
-> +++ b/arch/arm/kernel/patch.h
-> @@ -0,0 +1,7 @@
-> +#ifndef _ARM_KERNEL_PATCH_H
-> +#define _ARM_KERNEL_PATCH_H
+I'm not sure you do yourself a favour if you skip all the muxes and
+assume reset default for them. The ecspi-root parent is a mux The mux
+seems to be missing in the can clock, uart and probably others.
+
 > +
-> +void patch_text(void *addr, unsigned int insn);
-> +void __patch_text(void *addr, unsigned int insn);
+> +		ecspi_clk: ecspi {
+> +			compatible = "fsl,imx6q-clock";
+> +			#clock-cells = <5>;
+> +			imx,clock-gate = <0x6c 0x3>,
+> +					 <0x6c 0xc>,
+> +					 <0x6c 0x30>,
+> +					 <0x6c 0xc0>,
+> +					 <0x6c 0x300>;
+> +			clock-input = <&ecspi_root_clk 0>;
+> +			clock-input-name = "ecspi-root";
+> +			clock-output-name = "ecspi1",
+> +					    "ecspi2",
+> +					    "ecspi3",
+> +					    "ecspi4",
+> +					    "ecspi5";
+> +		};
 > +
-> +#endif
+
+[...]
+
+> +
+> +		uart_clk: uart {
+> +			compatible = "fsl,imx6q-clock";
+> +			#clock-cells = <2>;
+> +			imx,clock-gate = <0x7c 0x3000000>,
+> +					 <0x7c 0xc000000>;
+> +			imx,clock-divider = <0x24 0 0 0 6>,
+> +					    <0x24 0 0 0 6>;
+> +			clock-input = <&pll3_div_clk 1 0 0>;
+> +			clock-input-name = "pll3-80m";
+> +			clock-output-name = "uart",
+> +					    "uart-serial";
+> +		};
+
+This seems wrong. The UARTs have two clocks, the register clock and the
+baud clock. parent of the baud clock is uart-root (the mux is missing
+here) and parent of the register clock is the ipg clock. This node only
+has one parent.
+
+> +
+> +		usboh3_clk: usboh3 {
+> +			compatible = "fsl,imx6q-clock";
+> +			#clock-cells = <1>;
+> +			imx,clock-gate = <0x80 0x3>;
+> +			clock-input = <&ipg_clk 0>;
+> +			clock-input-name = "ipg";
+> +			clock-output-name = "usboh3";
+> +		};
+> +
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
