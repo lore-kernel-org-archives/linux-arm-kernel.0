@@ -1,30 +1,26 @@
-From: arnd.bergmann@linaro.org (Arnd Bergmann)
-Date: Tue, 22 Nov 2011 13:11:00 +0000
-Subject: [PATCH v3 4/5] clk: basic gateable and fixed-rate clks
-In-Reply-To: <1321926047-14211-5-git-send-email-mturquette@linaro.org>
-References: <1321926047-14211-1-git-send-email-mturquette@linaro.org>
- <1321926047-14211-5-git-send-email-mturquette@linaro.org>
-Message-ID: <201111221311.00117.arnd.bergmann@linaro.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 22 Nov 2011 13:20:55 +0000
+Subject: [PATCH] arm/imx: use Kconfig choice for low-level debug UART
+ selection
+In-Reply-To: <20111122130233.GF19986@pengutronix.de>
+References: <1313530873-24961-1-git-send-email-will.deacon@arm.com>
+ <1313729819-30301-1-git-send-email-shawn.guo@linaro.org>
+ <20111122085834.GB19986@pengutronix.de>
+ <20111122115017.GK20518@mudshark.cambridge.arm.com>
+ <20111122130233.GF19986@pengutronix.de>
+Message-ID: <20111122132055.GA32572@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 22 November 2011, Mike Turquette wrote:
-> +static void clk_hw_gate_set_bit(struct clk *clk)
-> +{
-> +       struct clk_hw_gate *gate = to_clk_hw_gate(clk);
-> +       u32 reg;
-> +
-> +       reg = __raw_readl(gate->reg);
-> +       reg |= BIT(gate->bit_idx);
-> +       __raw_writel(reg, gate->reg);
-> +}
+On Tue, Nov 22, 2011 at 01:02:33PM +0000, Uwe Kleine-K?nig wrote:
+> On Tue, Nov 22, 2011 at 11:50:17AM +0000, Will Deacon wrote:
+> > In the end I'd like to remove DEBUG_LL_UART_NONE. It's only there to service
+> > the platforms which have not yet added an entry to the choice.
+> Why not remove it already now? If I remove it together with the entry
+> for my machine and modify mach/debug-macro.S to do the right thing
+> for my machine even without DEBUG_IMX25_UART, my build just works.
 
-You cannot rely on __raw_readl() to do the right thing, especially
-in architecture independent code. The safe (but slightly inefficient)
-solution would be readl/writel. For ARM-only code, it would be best
-to use readl_relaxed()/writel_relaxed(), but most architectures do
-not implement that. We can probably add a set of helpers in asm-generic/
-to define them to the default functions, like "#define readl_relaxed(x)
-readl(x)", which I think is a good idea anyway.
+I'm fairly sure this will break the build for everybody who doesn't have an
+entry in Kconfig.debug choice if they try and select DEBUG_LL.
 
-	Arnd
+Will
