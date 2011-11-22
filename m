@@ -1,39 +1,27 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 22 Nov 2011 15:48:38 +0000
-Subject: [PATCH] arm/imx: use Kconfig choice for low-level debug UART
- selection
-In-Reply-To: <20111122133040.GG19986@pengutronix.de>
-References: <1313530873-24961-1-git-send-email-will.deacon@arm.com>
- <1313729819-30301-1-git-send-email-shawn.guo@linaro.org>
- <20111122085834.GB19986@pengutronix.de>
- <20111122115017.GK20518@mudshark.cambridge.arm.com>
- <20111122130233.GF19986@pengutronix.de>
- <20111122132055.GA32572@mudshark.cambridge.arm.com>
- <20111122133040.GG19986@pengutronix.de>
-Message-ID: <20111122154838.GZ9581@n2100.arm.linux.org.uk>
+From: greg@kroah.com (Greg KH)
+Date: Tue, 22 Nov 2011 07:42:59 -0800
+Subject: [PATCH v3 0/5] common clk framework
+In-Reply-To: <1321926047-14211-1-git-send-email-mturquette@linaro.org>
+References: <1321926047-14211-1-git-send-email-mturquette@linaro.org>
+Message-ID: <20111122154259.GA18954@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 22, 2011 at 02:30:40PM +0100, Uwe Kleine-K?nig wrote:
-> On Tue, Nov 22, 2011 at 01:20:55PM +0000, Will Deacon wrote:
-> > On Tue, Nov 22, 2011 at 01:02:33PM +0000, Uwe Kleine-K?nig wrote:
-> > > On Tue, Nov 22, 2011 at 11:50:17AM +0000, Will Deacon wrote:
-> > > > In the end I'd like to remove DEBUG_LL_UART_NONE. It's only there to service
-> > > > the platforms which have not yet added an entry to the choice.
-> > > Why not remove it already now? If I remove it together with the entry
-> > > for my machine and modify mach/debug-macro.S to do the right thing
-> > > for my machine even without DEBUG_IMX25_UART, my build just works.
-> > 
-> > I'm fairly sure this will break the build for everybody who doesn't have an
-> > entry in Kconfig.debug choice if they try and select DEBUG_LL.
-> Ah, I see the problem. It's more subtile than just failure to build: it
-> autoselects DEBUG_ICEDCC then.
+On Mon, Nov 21, 2011 at 05:40:42PM -0800, Mike Turquette wrote:
+>   .sysfs support.  Visualize your clk tree at /sys/clk!  Where would be
+> a better place to put the clk tree besides the root of /sys/?
 
-Which results in a kernel which builds fine, but when they attempt to
-boot it appears to lock fairly solidly.  So we had to add this option
-to allow the possibility for unconverted platforms to continue working.
+Um, in the "proper" place for it under /sys/devices like the rest of the
+device tree is?
 
-At this point, I think the right answer is to remove the option in
-linux-next, and tell anyone who complains that they need to convert
-their platform properly.  (We're going to need them converted in this
-way anyway for the single zImage project.)
+> When a consensus on this is reached I'll submit the proper changes to
+> Documentation/ABI/testing/.
+
+I would like to see this documentation now, as it explains what you are
+trying to do with the userspace api.
+
+More comments on your sysfs patch...
+
+thanks,
+
+greg k-h
