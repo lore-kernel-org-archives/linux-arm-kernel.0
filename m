@@ -1,108 +1,62 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 22 Nov 2011 22:06:32 +0100
-Subject: [PATCH v2 1/2] MX2: Add platform definitions for eMMa-PrP device.
-In-Reply-To: <1321963316-9058-2-git-send-email-javier.martin@vista-silicon.com>
-References: <1321963316-9058-1-git-send-email-javier.martin@vista-silicon.com>
- <1321963316-9058-2-git-send-email-javier.martin@vista-silicon.com>
-Message-ID: <20111122210632.GS27267@pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 22 Nov 2011 22:19:53 +0100
+Subject: [PATCH] arm/imx: use Kconfig choice for low-level debug UART
+ selection
+In-Reply-To: <20111122202425.GD9581@n2100.arm.linux.org.uk>
+References: <1313530873-24961-1-git-send-email-will.deacon@arm.com>
+ <20111122164707.GJ6624@sirena.org.uk>
+ <20111122202425.GD9581@n2100.arm.linux.org.uk>
+Message-ID: <1484610.g1p0X99tcV@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 22, 2011 at 01:01:55PM +0100, Javier Martin wrote:
-> eMMa-PrP device included in Freescale i.MX2 chips can also
-> be used separately to process memory buffers.
+On Tuesday 22 November 2011 20:24:25 Russell King - ARM Linux wrote:
+> On Tue, Nov 22, 2011 at 04:47:07PM +0000, Mark Brown wrote:
+> > On Tue, Nov 22, 2011 at 05:38:12PM +0100, Uwe Kleine-K?nig wrote:
+> > > On Tue, Nov 22, 2011 at 03:48:38PM +0000, Russell King - ARM Linux wrote:
+> > 
+> > > > > Ah, I see the problem. It's more subtile than just failure to build: it
+> > > > > autoselects DEBUG_ICEDCC then.
+> > 
+> > > > At this point, I think the right answer is to remove the option in
+> > > > linux-next, and tell anyone who complains that they need to convert
+> > > > their platform properly.  (We're going to need them converted in this
+> > > > way anyway for the single zImage project.)
+> > 
+> > > I agree.
+> > 
+> > It'd be nice if things could be arranged so that the build breaks rather
+> > than selecting ICEDCC on unconverted platforms - when you run into the
+> > problem it's not that easy to diagnose.
 > 
-> Signed-off-by: Javier Martin <javier.martin@vista-silicon.com>
-> ---
->  arch/arm/mach-imx/devices-imx27.h               |    2 +
->  arch/arm/plat-mxc/devices/platform-mx2-camera.c |   33 +++++++++++++++++++++++
->  arch/arm/plat-mxc/include/mach/devices-common.h |    2 +
->  3 files changed, 37 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-imx/devices-imx27.h b/arch/arm/mach-imx/devices-imx27.h
-> index 2f727d7..519aa36 100644
-> --- a/arch/arm/mach-imx/devices-imx27.h
-> +++ b/arch/arm/mach-imx/devices-imx27.h
-> @@ -50,6 +50,8 @@ extern const struct imx_imx_uart_1irq_data imx27_imx_uart_data[];
->  extern const struct imx_mx2_camera_data imx27_mx2_camera_data;
->  #define imx27_add_mx2_camera(pdata)	\
->  	imx_add_mx2_camera(&imx27_mx2_camera_data, pdata)
-> +#define imx27_alloc_mx2_emmaprp(pdata)	\
-> +	imx_alloc_mx2_emmaprp(&imx27_mx2_camera_data)
->  
->  extern const struct imx_mxc_ehci_data imx27_mxc_ehci_otg_data;
->  #define imx27_add_mxc_ehci_otg(pdata)	\
-> diff --git a/arch/arm/plat-mxc/devices/platform-mx2-camera.c b/arch/arm/plat-mxc/devices/platform-mx2-camera.c
-> index b3f4828..4a8bd73 100644
-> --- a/arch/arm/plat-mxc/devices/platform-mx2-camera.c
-> +++ b/arch/arm/plat-mxc/devices/platform-mx2-camera.c
-> @@ -6,6 +6,7 @@
->   * the terms of the GNU General Public License version 2 as published by the
->   * Free Software Foundation.
->   */
-> +#include <linux/dma-mapping.h>
->  #include <mach/hardware.h>
->  #include <mach/devices-common.h>
->  
-> @@ -62,3 +63,35 @@ struct platform_device *__init imx_add_mx2_camera(
->  			res, data->iobaseemmaprp ? 4 : 2,
->  			pdata, sizeof(*pdata), DMA_BIT_MASK(32));
->  }
-> +
-> +struct platform_device *__init imx_alloc_mx2_emmaprp(
-> +		const struct imx_mx2_camera_data *data)
+> Well, we could leave the choice as is, and make the NONE option cause a
+> #error.
 
-Why only alloc and not register?
+In my randconfig branch, I have a temporary patch doing
 
-> +{
-> +	struct resource res[] = {
-> +		{
-> +			.start = data->iobaseemmaprp,
-> +			.end = data->iobaseemmaprp + data->iosizeemmaprp - 1,
-> +			.flags = IORESOURCE_MEM,
-> +		}, {
-> +			.start = data->irqemmaprp,
-> +			.end = data->irqemmaprp,
-> +			.flags = IORESOURCE_IRQ,
-> +		},
-> +	};
-> +	struct platform_device *pdev;
-> +	int ret = -ENOMEM;
-> +
-> +	pdev = platform_device_alloc("m2m-emmaprp", 0);
-> +	if (!pdev)
-> +		goto err;
-> +
-> +	ret = platform_device_add_resources(pdev, res, ARRAY_SIZE(res));
-> +	if (ret)
-> +		goto err;
-> +
-> +	return pdev;
-> +err:
-> +	platform_device_put(pdev);
-> +	return ERR_PTR(-ENODEV);
-> +
-> +}
-> diff --git a/arch/arm/plat-mxc/include/mach/devices-common.h b/arch/arm/plat-mxc/include/mach/devices-common.h
-> index def9ba5..ce64bd5 100644
-> --- a/arch/arm/plat-mxc/include/mach/devices-common.h
-> +++ b/arch/arm/plat-mxc/include/mach/devices-common.h
-> @@ -223,6 +223,8 @@ struct imx_mx2_camera_data {
->  struct platform_device *__init imx_add_mx2_camera(
->  		const struct imx_mx2_camera_data *data,
->  		const struct mx2_camera_platform_data *pdata);
-> +struct platform_device *__init imx_alloc_mx2_emmaprp(
-> +		const struct imx_mx2_camera_data *data);
->  
->  #include <mach/mxc_ehci.h>
->  struct imx_mxc_ehci_data {
-> -- 
-> 1.7.0.4
-> 
-> 
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -83,6 +83,8 @@ choice
+        depends on DEBUG_LL
+ 
+        config DEBUG_LL_UART_NONE
++               depends on !FOOTBRIDGE && !ARCH_CLPS711X && !ARCH_MXC && \
++                          !PLAT_SAMSUNG && !ARCH_REALVIEW && !ARCH_HIGHBANK
+                bool "No low-level debugging UART"
+                help
+                  Say Y here if your platform doesn't provide a UART option
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+We can also move ICEDCC to the bottom of the list to ensure that the default
+choice is a platform specific one.
+
+In order to make the conversion nicer (avoiding a conflicting patch
+every time someone adds "depends on !MY_PLATFORM", how about expressing
+it as this:
+
+	config DEBUG_LL_UART_NONE
+		depends on !DEBUG_LL_LEGACY
+
+and then selecting DEBUG_LL_LEGACY from all platforms that do their own
+thing. That would avoid the possible randconfig errors.
+
+	Arnd
