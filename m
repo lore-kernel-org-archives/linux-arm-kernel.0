@@ -1,161 +1,30 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 22 Nov 2011 09:56:49 +0100
-Subject: [RFC PATCH 1/3] arm/imx6: describe clocks in device tree source
-In-Reply-To: <1321926536-671-2-git-send-email-shawn.guo@linaro.org>
-References: <1321926536-671-1-git-send-email-shawn.guo@linaro.org>
- <1321926536-671-2-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20111122085649.GC27267@pengutronix.de>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 22 Nov 2011 09:58:34 +0100
+Subject: [PATCH] arm/imx: use Kconfig choice for low-level debug UART
+ selection
+In-Reply-To: <1313729819-30301-1-git-send-email-shawn.guo@linaro.org>
+References: <1313530873-24961-1-git-send-email-will.deacon@arm.com>
+ <1313729819-30301-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20111122085834.GB19986@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 22, 2011 at 09:48:54AM +0800, Shawn Guo wrote:
-> It adds document for imx clock device tree bindings and then describes
-> imx6 clocks in dts.
-> 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> ---
->  .../devicetree/bindings/clock/clock-imx.txt        |  124 +++
->  arch/arm/boot/dts/imx6q.dtsi                       |  943 +++++++++++++++++++-
->  2 files changed, 1058 insertions(+), 9 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/clock/clock-imx.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/clock/clock-imx.txt b/Documentation/devicetree/bindings/clock/clock-imx.txt
-> new file mode 100644
-> index 0000000..5c597d9
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/clock/clock-imx.txt
-> @@ -0,0 +1,124 @@
-> +* Device Tree Bindings for Freescale i.MX Clock
-> +
-> +== Clock Gate ==
-> +
-> +Required properties:
-> +- imx,clock-gate:  It's a two 32-bit integers array.  The first
-> +  integer specifies the offset of the gate register, and the second
-> +  one specifies the bit mask of the gate for this clock.
+Hello Shawn,
 
-On i.MX53 we have two bit gates:
+On Fri, Aug 19, 2011 at 12:56:59PM +0800, Shawn Guo wrote:
+> Now that the DEBUG_LL UART can be selected by a Kconfig choice,
+> simplify the #ifdefery in debug-macro.S and add entries to the
+> top-level Kconfig.debug instead.
+now that this patch is in Linus' tree as
+f350b86121c7a004a5f866333fa1d23fe30263a6, this breaks the build when
+selecting DEBUG_LL_UART_NONE (as our autobuilder did somehow). Maybe
+that is OK because DEBUG_LL is an expert option? If not, either the
+autoselection has to return or DEBUG_LL_UART_NONE shouldn't be
+selectable for imx.
 
-00b disable
-01b disable in stop mode, enable in run mode
-10b reserved
-11b enable
+Best regards
+Uwe
 
-I can't find this description in my i.MX6RM, but I suppose it's the same
-here. Do you have plans for these? Currently only disable and enable
-seem to be handled.
-
-
-> +
-> +		pll2_pfd_clk: pll2-pfd {
-> +			compatible = "fsl,imx6q-pfd";
-> +			#clock-cells = <3>;
-> +			imx,clock-gate = <0x100 0x80>,
-> +					 <0x100 0x8000>,
-> +					 <0x100 0x800000>;
-> +			imx,clock-divider = <0x100 0 0 0 6>,
-> +					    <0x100 0 0 8 6>,
-> +					    <0x100 0 0 16 6>;
-> +			clock-input = <&pll_bus_clk 0>;
-> +			clock-input-name = "pll2-bus";
-> +			clock-output-name = "pll2-pfd-352m",
-> +					    "pll2-pfd-594m",
-> +					    "pll2-pfd-400m";
-> +		};
-
-Does this pll simultaneously have three different output frequencies?
-I'm not familiar with the i.MX6 yet.
-
-> +
-> +		can_root_clk: can-root {
-> +			compatible = "fsl,imx6q-clock";
-> +			#clock-cells = <1>;
-> +			imx,clock-divider = <0x20 0 0 2 6>;
-> +			clock-input = <&pll_usb_clk 0 0>;
-> +			clock-input-name = "pll3-usb-otg";
-> +			clock-output-name = "can-root";
-> +		};
-> +
-> +		can_clk: can {
-> +			compatible = "fsl,imx6q-clock";
-> +			#clock-cells = <4>;
-> +			imx,clock-gate = <0x68 0xc000>,
-> +					 <0x68 0x30000>,
-> +					 <0x68 0xc0000>,
-> +					 <0x68 0x300000>;
-> +			clock-input = <&can_root_clk 0>;
-> +			clock-input-name = "can-root";
-> +			clock-output-name = "can1",
-> +					    "can1-serial",
-> +					    "can2",
-> +					    "can2-serial";
-> +		};
-> +
-> +		ecspi_root_clk: ecspi-root {
-> +			compatible = "fsl,imx6q-clock";
-> +			#clock-cells = <1>;
-> +			imx,clock-divider = <0x38 0 0 19 6>;
-> +			clock-input = <&pll3_div_clk 2 0 0>;
-> +			clock-input-name = "pll3-60m";
-> +			clock-output-name = "ecspi-root";
-> +		};
-
-I'm not sure you do yourself a favour if you skip all the muxes and
-assume reset default for them. The ecspi-root parent is a mux The mux
-seems to be missing in the can clock, uart and probably others.
-
-> +
-> +		ecspi_clk: ecspi {
-> +			compatible = "fsl,imx6q-clock";
-> +			#clock-cells = <5>;
-> +			imx,clock-gate = <0x6c 0x3>,
-> +					 <0x6c 0xc>,
-> +					 <0x6c 0x30>,
-> +					 <0x6c 0xc0>,
-> +					 <0x6c 0x300>;
-> +			clock-input = <&ecspi_root_clk 0>;
-> +			clock-input-name = "ecspi-root";
-> +			clock-output-name = "ecspi1",
-> +					    "ecspi2",
-> +					    "ecspi3",
-> +					    "ecspi4",
-> +					    "ecspi5";
-> +		};
-> +
-
-[...]
-
-> +
-> +		uart_clk: uart {
-> +			compatible = "fsl,imx6q-clock";
-> +			#clock-cells = <2>;
-> +			imx,clock-gate = <0x7c 0x3000000>,
-> +					 <0x7c 0xc000000>;
-> +			imx,clock-divider = <0x24 0 0 0 6>,
-> +					    <0x24 0 0 0 6>;
-> +			clock-input = <&pll3_div_clk 1 0 0>;
-> +			clock-input-name = "pll3-80m";
-> +			clock-output-name = "uart",
-> +					    "uart-serial";
-> +		};
-
-This seems wrong. The UARTs have two clocks, the register clock and the
-baud clock. parent of the baud clock is uart-root (the mux is missing
-here) and parent of the register clock is the ipg clock. This node only
-has one parent.
-
-> +
-> +		usboh3_clk: usboh3 {
-> +			compatible = "fsl,imx6q-clock";
-> +			#clock-cells = <1>;
-> +			imx,clock-gate = <0x80 0x3>;
-> +			clock-input = <&ipg_clk 0>;
-> +			clock-input-name = "ipg";
-> +			clock-output-name = "usboh3";
-> +		};
-> +
 -- 
-Pengutronix e.K.                           |                             |
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
 Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
