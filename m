@@ -1,92 +1,25 @@
-From: snjw23@gmail.com (Sylwester Nawrocki)
-Date: Tue, 22 Nov 2011 20:29:16 +0100
-Subject: [PATCH v2 1/2] MX2: Add platform definitions for eMMa-PrP device.
-In-Reply-To: <1321963316-9058-2-git-send-email-javier.martin@vista-silicon.com>
-References: <1321963316-9058-1-git-send-email-javier.martin@vista-silicon.com>
- <1321963316-9058-2-git-send-email-javier.martin@vista-silicon.com>
-Message-ID: <4ECBF80C.20701@gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 22 Nov 2011 19:30:57 +0000
+Subject: [PATCH v3 0/5] common clk framework
+In-Reply-To: <20111122191226.GA4844@kroah.com>
+References: <1321926047-14211-1-git-send-email-mturquette@linaro.org>
+ <20111122154259.GA18954@kroah.com>
+ <20111122174544.GA19739@n2100.arm.linux.org.uk>
+ <CAPtuhTgFPZA9U-8heNw1eNUnHLFv2w+LzXg5rdjSx3J53Xy+2g@mail.gmail.com>
+ <20111122191226.GA4844@kroah.com>
+Message-ID: <20111122193057.GA20179@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Javier,
+On Tue, Nov 22, 2011 at 11:12:26AM -0800, Greg KH wrote:
+> On Tue, Nov 22, 2011 at 10:09:29AM -0800, Mike Turquette wrote:
 
-On 11/22/2011 01:01 PM, Javier Martin wrote:
-> eMMa-PrP device included in Freescale i.MX2 chips can also
-> be used separately to process memory buffers.
-> 
-> Signed-off-by: Javier Martin<javier.martin@vista-silicon.com>
-> ---
->   arch/arm/mach-imx/devices-imx27.h               |    2 +
->   arch/arm/plat-mxc/devices/platform-mx2-camera.c |   33 +++++++++++++++++++++++
->   arch/arm/plat-mxc/include/mach/devices-common.h |    2 +
->   3 files changed, 37 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-imx/devices-imx27.h b/arch/arm/mach-imx/devices-imx27.h
-> index 2f727d7..519aa36 100644
-> --- a/arch/arm/mach-imx/devices-imx27.h
-> +++ b/arch/arm/mach-imx/devices-imx27.h
-> @@ -50,6 +50,8 @@ extern const struct imx_imx_uart_1irq_data imx27_imx_uart_data[];
->   extern const struct imx_mx2_camera_data imx27_mx2_camera_data;
->   #define imx27_add_mx2_camera(pdata)	\
->   	imx_add_mx2_camera(&imx27_mx2_camera_data, pdata)
-> +#define imx27_alloc_mx2_emmaprp(pdata)	\
-> +	imx_alloc_mx2_emmaprp(&imx27_mx2_camera_data)
-> 
->   extern const struct imx_mxc_ehci_data imx27_mxc_ehci_otg_data;
->   #define imx27_add_mxc_ehci_otg(pdata)	\
-> diff --git a/arch/arm/plat-mxc/devices/platform-mx2-camera.c b/arch/arm/plat-mxc/devices/platform-mx2-camera.c
-> index b3f4828..4a8bd73 100644
-> --- a/arch/arm/plat-mxc/devices/platform-mx2-camera.c
-> +++ b/arch/arm/plat-mxc/devices/platform-mx2-camera.c
-> @@ -6,6 +6,7 @@
->    * the terms of the GNU General Public License version 2 as published by the
->    * Free Software Foundation.
->    */
-> +#include<linux/dma-mapping.h>
->   #include<mach/hardware.h>
->   #include<mach/devices-common.h>
-> 
-> @@ -62,3 +63,35 @@ struct platform_device *__init imx_add_mx2_camera(
->   			res, data->iobaseemmaprp ? 4 : 2,
->   			pdata, sizeof(*pdata), DMA_BIT_MASK(32));
->   }
-> +
-> +struct platform_device *__init imx_alloc_mx2_emmaprp(
-> +		const struct imx_mx2_camera_data *data)
-> +{
-> +	struct resource res[] = {
-> +		{
-> +			.start = data->iobaseemmaprp,
-> +			.end = data->iobaseemmaprp + data->iosizeemmaprp - 1,
-> +			.flags = IORESOURCE_MEM,
-> +		}, {
-> +			.start = data->irqemmaprp,
-> +			.end = data->irqemmaprp,
-> +			.flags = IORESOURCE_IRQ,
-> +		},
-> +	};
-> +	struct platform_device *pdev;
-> +	int ret = -ENOMEM;
-> +
-> +	pdev = platform_device_alloc("m2m-emmaprp", 0);
-> +	if (!pdev)
-> +		goto err;
-> +
-> +	ret = platform_device_add_resources(pdev, res, ARRAY_SIZE(res));
-> +	if (ret)
-> +		goto err;
-> +
-> +	return pdev;
-> +err:
-> +	platform_device_put(pdev);
-> +	return ERR_PTR(-ENODEV);
+> > If others also agree that it should reside only in debugfs then I'll
+> > move it there for V4.
 
-I guess you intended to have
- 
-+	return ERR_PTR(ret);
+> If it's only for debug stuff, then yes, it belongs in debugfs.  All
+> distros turn debugfs on these days, and for an embedded system, the code
+> is quite small so there should not be much overhead.
 
-here ?
-
---
-Regards,
-Sylwester
+Most of the embedded distros included, there's too much useful stuff in
+there.
