@@ -1,28 +1,89 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 22 Nov 2011 15:29:00 +0000
-Subject: [01: PATCH 0/7] Preparation for arch_reset changes
-In-Reply-To: <20111122152431.GY9581@n2100.arm.linux.org.uk>
-References: <20111106173113.GI12913@n2100.arm.linux.org.uk>
- <20111121095658.GO9581@n2100.arm.linux.org.uk>
- <20111122112134.GH20518@mudshark.cambridge.arm.com>
- <20111122152431.GY9581@n2100.arm.linux.org.uk>
-Message-ID: <20111122152900.GJ32572@mudshark.cambridge.arm.com>
+From: b29396@freescale.com (Dong Aisheng)
+Date: Tue, 22 Nov 2011 23:52:21 +0800
+Subject: [PATCH v2 1/1] ASoC: mxs-saif: remove function in platform_data
+In-Reply-To: <y>
+References: <y>
+Message-ID: <1321977141-14882-1-git-send-email-b29396@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 22, 2011 at 03:24:31PM +0000, Russell King - ARM Linux wrote:
-> On Tue, Nov 22, 2011 at 11:21:34AM +0000, Will Deacon wrote:
-> > Is your reset branch stable now? I only ask because it doesn't look like
-> > you've merged these into devel-stable so I wondered if you have any further
-> > changes pending.
-> 
-> See the message I sent to Marc about his irqchip consolidation - I was
-> waiting for Marc to confirm that the resolution was good before I push
-> the stuff over to the devel-stable branch.  Marc has confirmed that
-> shortly after your message, so we're all good for this evening.
+Add master_mode and master_id in platfrom_data since it's board
+specific and board knows it.
+Then we can remove the function pointer in platfrom_data to make
+the driver more devicetree friendly.
 
-Ok, cracking, I'll rebase my stuff tonight or tomorrow morning.
+Signed-off-by: Dong Aisheng <b29396@freescale.com>
+Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
 
-Thanks,
+---
+Changes v1->v2:
+ Missed a parenthesis as follows, add it and resend.
+ Sorry for inconvenience.
 
-Will
+ Changes based on v1:
+-                       saif->master_id == saif->id)
++                       saif->master_id == saif->id) {
+                        dev_err(&pdev->dev, "get wrong master id\n");
+                        return -EINVAL;
++               }
+---
+ include/sound/saif.h     |    4 ++--
+ sound/soc/mxs/mxs-saif.c |   20 +++++++++-----------
+ 2 files changed, 11 insertions(+), 13 deletions(-)
+
+diff --git a/include/sound/saif.h b/include/sound/saif.h
+index d0e0de7..f22f3e1 100644
+--- a/include/sound/saif.h
++++ b/include/sound/saif.h
+@@ -10,7 +10,7 @@
+ #define __SOUND_SAIF_H__
+ 
+ struct mxs_saif_platform_data {
+-	int (*init) (void);
+-	int (*get_master_id) (unsigned int saif_id);
++	bool master_mode;	/* if true use master mode */
++	int master_id;		/* id of the master if in slave mode */
+ };
+ #endif
+diff --git a/sound/soc/mxs/mxs-saif.c b/sound/soc/mxs/mxs-saif.c
+index 76dc74d..1ef697f 100644
+--- a/sound/soc/mxs/mxs-saif.c
++++ b/sound/soc/mxs/mxs-saif.c
+@@ -625,13 +625,6 @@ static int mxs_saif_probe(struct platform_device *pdev)
+ 	if (pdev->id >= ARRAY_SIZE(mxs_saif))
+ 		return -EINVAL;
+ 
+-	pdata = pdev->dev.platform_data;
+-	if (pdata && pdata->init) {
+-		ret = pdata->init();
+-		if (ret)
+-			return ret;
+-	}
+-
+ 	saif = kzalloc(sizeof(*saif), GFP_KERNEL);
+ 	if (!saif)
+ 		return -ENOMEM;
+@@ -639,12 +632,17 @@ static int mxs_saif_probe(struct platform_device *pdev)
+ 	mxs_saif[pdev->id] = saif;
+ 	saif->id = pdev->id;
+ 
+-	saif->master_id = saif->id;
+-	if (pdata && pdata->get_master_id) {
+-		saif->master_id = pdata->get_master_id(saif->id);
++	pdata = pdev->dev.platform_data;
++	if (pdata && !pdata->master_mode) {
++		saif->master_id = pdata->master_id;
+ 		if (saif->master_id < 0 ||
+-			saif->master_id >= ARRAY_SIZE(mxs_saif))
++			saif->master_id >= ARRAY_SIZE(mxs_saif) ||
++			saif->master_id == saif->id) {
++			dev_err(&pdev->dev, "get wrong master id\n");
+ 			return -EINVAL;
++		}
++	} else {
++		saif->master_id = saif->id;
+ 	}
+ 
+ 	saif->clk = clk_get(&pdev->dev, NULL);
+-- 
+1.7.0.4
