@@ -1,39 +1,54 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Tue, 22 Nov 2011 13:40:04 +0200
-Subject: [PATCH 0/7] Introducing a generic AMP framework
-In-Reply-To: <874nywpfkd.fsf@rustcorp.com.au>
-References: <1319536106-25802-1-git-send-email-ohad@wizery.com>
- <874nywpfkd.fsf@rustcorp.com.au>
-Message-ID: <CAK=WgbaF=yvGXvJdENrMoi4wWxaQa3UpbtsRm3mcA3cFdDCitA@mail.gmail.com>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Tue, 22 Nov 2011 20:41:57 +0900
+Subject: [PATCH] ARM: Kota2 mach-type update fix
+In-Reply-To: <20111122092615.GA26411@linux-sh.org>
+References: <20111122060857.23951.50598.sendpatchset@w520>
+ <20111122092615.GA26411@linux-sh.org>
+Message-ID: <CANqRtoTvMpivHN0tZVTEY6SfkBrNLpu=rkRXUXKJG4J0UNCzhg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 26, 2011 at 6:00 AM, Rusty Russell <rusty@rustcorp.com.au> wrote:
-> On Tue, 25 Oct 2011 11:48:19 +0200, Ohad Ben-Cohen <ohad@wizery.com> wrote:
->> Modern SoCs typically employ a central symmetric multiprocessing (SMP)
->> application processor running Linux, with several other asymmetric
->> multiprocessing (AMP) heterogeneous processors running different instances
->> of operating system, whether Linux or any other flavor of real-time OS.
->
-> OK, I'm not even sure who this should go through
+On Tue, Nov 22, 2011 at 6:26 PM, Paul Mundt <lethal@linux-sh.org> wrote:
+> On Tue, Nov 22, 2011 at 03:08:57PM +0900, Magnus Damm wrote:
+>> From: Magnus Damm <damm@opensource.se>
+>>
+>> This patch adds kota2 to the in-kernel ARM mach-type file.
+>>
+>> Basic board support is included in 3.2-rc and the mach-type
+>> has been registered in the ARM machine repository as
+>>
+>> 3616 Renesas SH-Mobile kota2.x Board kota2 Yusuke Goda mainlined
+>>
+>> The file arch/arm/tools/mach-types is however missing Kota2
+>> which makes build of sh73a0 based boards fail with:
+>>
+>> arch/arm/mach-shmobile/platsmp.c: In function 'shmobile_smp_get_core_count':
+>> arch/arm/mach-shmobile/platsmp.c:28:2: error: implicit declaration of function 'machine_is_kota2'
+>> make[1]: *** [arch/arm/mach-shmobile/platsmp.o] Error 1
+>>
+>> arch/arm/mach-shmobile/board-kota2.c:448:136: error: 'MACH_TYPE_KOTA2' undeclared here (not in a function)
+>> make[1]: *** [arch/arm/mach-shmobile/board-kota2.o] Error 1
+>> make: *** [arch/arm/mach-shmobile] Error 2
+>>
+>> Signed-off-by: Magnus Damm <damm@opensource.se>
+>> ---
+>>
+>> ?I propose that Paul Mundt merges this patch together with other
+>> ?SH-Mobile ARM related fixes.
+>>
+> Err, no. I'm not patching machine-generated files which precisely say not
+> to patch them at the top of the file. If there is a missing definition
+> for an upstream board then the file needs to be regenerated with the new
+> definitions, plain and simple.
 
-We shortly discussed this in ELCE, and this can either go through the
-arm-soc tree or directly to Linus; however Arnd prefers really.
+Following the comment sure sounds like a good idea, but according to
+the git logs people seem to update the file:
 
-The previous RFC iteration was reviewed quite extensively (especially
-by Grant. thanks Grant!) but I was hoping to get some more review or
-feedback on this iteration as well (any form of Acked-by, Reviewed-by,
-+1-by or No-way-by are welcome).
+1d08fd9 Update Nook Color machine 3284 to common Encore name
 
-At this point I know of at least four vendors (besides TI) who are
-actively looking into supporting this, and it's getting a bit hard to
-collaborate, so I plan to get this into linux-next later this week
-(minus the virtio-spec.txt change which I'll send directly to you,
-Rusty) in the hope of getting this merged into 3.3.
+Russell, do you mind if we update the mach-type file to include Kota2?
+It's already registered via the web interface.
 
->, but no objections here
+Cheers,
 
-Can I add your Acked-by on the virtio parts (mainly patches 3 and 6) ?
-
-Thanks!
-Ohad.
+/ magnus
