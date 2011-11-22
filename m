@@ -1,45 +1,38 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 22 Nov 2011 19:42:13 +0000
-Subject: [PATCH 4/4] ARM: add jump label support
-In-Reply-To: <1321888429-3519-4-git-send-email-rabin@rab.in>
-References: <1321888429-3519-1-git-send-email-rabin@rab.in>
- <1321888429-3519-4-git-send-email-rabin@rab.in>
-Message-ID: <20111122194213.GC9581@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 22 Nov 2011 21:02:08 +0100
+Subject: [PATCH v3 5/5] clk: export tree topology and clk data via sysfs
+In-Reply-To: <CACxGe6vK-vHvSbd9N2k3FZY4gGVS_DETx0BbfPgNghTkOncjpg@mail.gmail.com>
+References: <1321926047-14211-1-git-send-email-mturquette@linaro.org>
+ <CAPtuhTheG-mvoGMaB2y9BSKF-abm2yigoN-SXaeCb+P5R6t_Dg@mail.gmail.com>
+ <CACxGe6vK-vHvSbd9N2k3FZY4gGVS_DETx0BbfPgNghTkOncjpg@mail.gmail.com>
+Message-ID: <9315670.oOZAWsuHPb@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 21, 2011 at 08:43:49PM +0530, Rabin Vincent wrote:
-> Add the arch-specific code to support jump labels for ARM and Thumb-2.
+On Tuesday 22 November 2011 12:19:51 Grant Likely wrote:
+> On Tue, Nov 22, 2011 at 11:01 AM, Mike Turquette <mturquette@linaro.org> wrote:
+>
+> > Others have requested to have knobs made available for actually
+> > performing clk_enable/clk_disable and even clk_set_rate from
+> > userspace.  I hate this idea and won't implement it.  I encourage
+> > anyone that needs this to do it in debugfs.
+> >
+> > Does that work-split make sense to you, or do you still not like the
+> > idea of having topology and read-only info in sysfs?
 > 
-> Note that to build succesfully it requires (what will be) GCC 4.7.0
-> because of incomplete support for the '%c' specifier in earlier
-> versions:
-> 
-> 	http://gcc.gnu.org/bugzilla/show_bug.cgi?id=48637
-> 
-> Cc: Jason Baron <jbaron@redhat.com>
-> Signed-off-by: Rabin Vincent <rabin@rab.in>
+> Unless there is a solid real-world use case for exporting this data to
+> userspace, I do not think sysfs is a good idea.  As long as the usage
+> (beyond debug) is theoretical I think the whole thing should be in
+> debugfs.  It can always be moved at a later date If a real use case
+> does become important.
 
-This appears to imply that with this patch, we're upping the minimum
-gcc version for successfully building kernels to 4.7.0.  That's _way_
-too early (I'm using 4.3.5 here and don't have plans to update.)
+I would recomment not to spend any time on implementing a debugfs interface
+for this right now. As far as I can tell, nothing relies on exporting
+the structure to user space, so Mike's time is better spent on getting the
+other four patches merged.
 
-> +static inline unsigned long
-> +arm_gen_nop(void)
-> +{
-> +#ifdef CONFIG_THUMB2_KERNEL
-> +	return 0xf3af8000; /* nop.w */
-> +#elif defined(CONFIG_CPU_32v6K)
-> +	return 0xe320f000; /* nop */
-> +#else
-> +	return 0xe1a00000; /* mov r0, r0 */
+Note that the static topology information about clocks will already be
+visible in /proc/devicetree when that is enabled and the clocks are
+described in the .dts file.
 
-There really is no point making the distinction between the new nop
-and the old nop instructions.  The difference between them is that the
-new nop is a true 'no operation' whereas the old nop causes exactly
-what the instruction says to happen - which in effect is a no-op.
-
-Obviously, doing a true no-operation may require in less power, but
-if you're using this code, you're debugging, so power usage isn't
-really a concern.  So lets keep the code simple and just use the old
-nop here.  It won't go away.
+	Arnd
