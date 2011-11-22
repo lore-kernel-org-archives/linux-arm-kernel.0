@@ -1,38 +1,30 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 22 Nov 2011 11:47:49 +0000
-Subject: [GIT PULL] ARM irqchip consolidation
-In-Reply-To: <20111121220029.GT9581@n2100.arm.linux.org.uk>
-References: <4EC39D44.8000706@arm.com>
- <20111117172319.GX9581@n2100.arm.linux.org.uk> <4EC54DBB.9090309@arm.com>
- <20111121220029.GT9581@n2100.arm.linux.org.uk>
-Message-ID: <4ECB8BE5.7050003@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 22 Nov 2011 11:50:17 +0000
+Subject: [PATCH] arm/imx: use Kconfig choice for low-level debug UART
+ selection
+In-Reply-To: <20111122085834.GB19986@pengutronix.de>
+References: <1313530873-24961-1-git-send-email-will.deacon@arm.com>
+ <1313729819-30301-1-git-send-email-shawn.guo@linaro.org>
+ <20111122085834.GB19986@pengutronix.de>
+Message-ID: <20111122115017.GK20518@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+Hi Uwe,
 
-On 21/11/11 22:00, Russell King - ARM Linux wrote:
-> On Thu, Nov 17, 2011 at 06:08:59PM +0000, Marc Zyngier wrote:
->> If you have a stable branch on which I can rebase, I'm happy to do it
->> (I've just resolved these conflicts on -next). If it's more convenient
->> to do it later in the cycle, I can wait. Just let me know what is the
->> most convenient route for you.
-> 
-> I've now merged the restart changes into the 'devel' branch, and then
-> followed on with your changes on top of that - fixing the conflicts
-> along the way.
-> 
-> I decided not to push it out in the devel-stable branch until you've
-> had a chance to verify that the conflict resolution is correct - I've
-> added some limited explanations in the merge commit for the two things
-> which weren't a trivial resolution.  Once you've confirmed it's fine,
-> I'll push the stuff over to the devel-stable branch.
+On Tue, Nov 22, 2011 at 08:58:34AM +0000, Uwe Kleine-K?nig wrote:
+> On Fri, Aug 19, 2011 at 12:56:59PM +0800, Shawn Guo wrote:
+> > Now that the DEBUG_LL UART can be selected by a Kconfig choice,
+> > simplify the #ifdefery in debug-macro.S and add entries to the
+> > top-level Kconfig.debug instead.
+> now that this patch is in Linus' tree as
+> f350b86121c7a004a5f866333fa1d23fe30263a6, this breaks the build when
+> selecting DEBUG_LL_UART_NONE (as our autobuilder did somehow). Maybe
+> that is OK because DEBUG_LL is an expert option? If not, either the
+> autoselection has to return or DEBUG_LL_UART_NONE shouldn't be
+> selectable for imx.
 
-I had a quick look at linux-next, and the conflict resolution seem
-perfectly sound.
+In the end I'd like to remove DEBUG_LL_UART_NONE. It's only there to service
+the platforms which have not yet added an entry to the choice.
 
-Thanks a lot for going through this, very much appreciated.
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Will
