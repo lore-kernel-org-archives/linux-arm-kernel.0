@@ -1,63 +1,72 @@
-From: conqrx@gmail.com (=?ISO-8859-1?B?TW9sbuFyIEfhYm9y?=)
-Date: Tue, 22 Nov 2011 01:01:48 +0100
-Subject: Porting the 2.6.38 linux kernel to ARM11 MPcore
-In-Reply-To: <CAHkRjk491+H9Wh-uV8807VSkZ4Mk+UK3Jv6EThtOsRb7ULpUjg@mail.gmail.com>
-References: <CAK-0apYKjvxXasEfYCocjqEan5dKoXJgMON2gC-nMenKQaU9UQ@mail.gmail.com>
- <CAHkRjk491+H9Wh-uV8807VSkZ4Mk+UK3Jv6EThtOsRb7ULpUjg@mail.gmail.com>
-Message-ID: <CAK-0apaX6gPrHPWiE6zDCey7NvnMU2J5fOR0OXr_ZQCc+TUmyA@mail.gmail.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Tue, 22 Nov 2011 09:31:48 +0800
+Subject: [RFC PATCH] arm/imx6: convert clock to device tree
+In-Reply-To: <4ECA8E37.8010307@gmail.com>
+References: <1321895502-32341-1-git-send-email-shawn.guo@linaro.org>
+ <4ECA8E37.8010307@gmail.com>
+Message-ID: <20111122013147.GD16417@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thank you for your reply!
+On Mon, Nov 21, 2011 at 11:45:27AM -0600, Rob Herring wrote:
+> On 11/21/2011 11:11 AM, Shawn Guo wrote:
+> > It converts imx6 clock code to common clock frame and device tree.
+> > 
+> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> > ---
+> > As I promised to Arnd, I will convert imx6 clock code to common clock
+> > frame and in turn device tree.  Here it is.
+> > 
+> > It's based on Mike's common-clk pre-v3 and Grant's clock device tree
+> > binding series.
+> > 
+> > Along with the conversion to device tree, I feel it's a great idea to
+> > introduce '#clock-cells'.  With adopting it, I'm using 70 nodes to
+> > describe 110 clocks (~35% nodes reduced).  However, the current design
+> > of '#clock-cells' makes the user a little difficult.  For example, when
+> > a consumer node references to provider node which is a blob of 4 clocks,
+> > it has to fill 4 parameters into the phandle.
+> > 
+> > usdhc at 02198000 { /* uSDHC3 */
+> > 	compatible = "fsl,imx6q-usdhc";
+> > 	reg = <0x02198000 0x4000>;
+> > 	interrupts = <0 24 0x04>;
+> > 	clock-input = <&usdhc_clk 2 0 0 0>; <--
+> > 	clock-input-name = "usdhc3";
+> > };
+> > 
+> > But we actually need to pass only one parameter to point out the index
+> > of the clock in the blob.  It's a little silly to put a number of
+> > meaningless 0 there to fill the length of the phandle parameters.  Can
+> > we rework the dt core code to make the following one work?
+> > 
+> > usdhc at 02198000 { /* uSDHC3 */
+> > 	compatible = "fsl,imx6q-usdhc";
+> > 	reg = <0x02198000 0x4000>;
+> > 	interrupts = <0 24 0x04>;
+> > 	clock-input = <&usdhc_clk 2>; <--
+> > 	clock-input-name = "usdhc3";
+> > };
+> 
+> What you want is how it is supposed to work. Why do you think it is not
+> this way?
+> 
+Looking at of_parse_phandle_with_args(), if we do not fill up these
+zeros, it will bail out as following.
 
-2011/11/21 Catalin Marinas <catalin.marinas@arm.com>:
-> On 18 November 2011 11:54, Moln?r G?bor <conqrx@gmail.com> wrote:
->> im working on a project wich aims at porting the 2.6.38 kernel to an
->> arm11 mpcore based board.
->>
->> The kernel fails to boot, in the paging_init func, it throws an
->> exception (pc: FFFF_000C) when executing the third mcr instruction in
->> the list below:
->>
->> 0xc000bf34 ?<>: ? ?blx ?r3
->> 0xc000bf38 ?<>: ? ?mov ?r5, #0 ?; 0x0
->> 0xc000bf3c ?<>: ? ?mcr ?15, 0, r5, cr7, cr10, {4}
->> 0xc000bf40 ?<>: ? ?mcr ?15, 0, r5, cr8, cr6, {0}
->> 0xc000bf44 ?<>: ? ?mcr ?15, 0, r5, cr8, cr5, {0} //throws an exception
->> here, Invalidate Instruction TLB Register
->> 0xc000bf48 ?<>: ? ?mcr ?15, 0, r5, cr7, cr5, {6}
->> 0xc000bf4c ?<>: ? ?mcr ?15, 0, r5, cr7, cr10, {4}
->> 0xc000bf50 ?<>: ? ?mcr ?15, 0, r5, cr7, cr5, {4}
->> 0xc000bf54 ?<>: ? ?ldr ?lr, [pc, #176] ?; 0xc000c00c
->
-> So you get a prefetch abort as soon as the TLBs are invalidated, which
-> means that the page table is not set up correctly.
->
-> What's your RAM configuration (start address, size)?
+		/*
+		 * Make sure that the arguments actually fit in the
+		 * remaining property data length
+		 */
+		if (list + count > list_end) {
+			pr_debug("%s: insufficient arguments length\n",
+				 np->full_name);
+			goto err1;
+		}
 
-In the current configuration the start address is c0000000 and the
-size is 500000.
-The .elf kernel image is loaded at the c0008000 'start' address.
+BTW, it seems the patch is too big to reach the mailing list.  I will
+split it and repost.
 
->> The kernel has been patched with the 2.6.38-arm1 patch, and configured
->> to be as minimal as possible (the vmlinux.elf is 1.8MB) and
->> cross-compiled with the?Codesourcery gcc toolchain.
->> The minimal size is improtant because the aim is to make the kernel
->> run with only 5-6MB of memory (from c0000000 to c0500000).
->> The 'boot_loader' i wrote passes the atag pointers (basically core and
->> memory) and the kernel seemingly reads and parses them fine. The
->> __log_buf before the exception:
->>
->> <5>Linux version 2.6.38-rc8 (VirtualBox) (gcc version 4.5.2 (Sourcery
->> G++ Lite 2011.03-41) ) #6 Wed Nov 9 21:59:29 CET 2011
->> <4>CPU: ARMv6-compatible processor [410fb025] revision 5 (ARMv7), cr=08c5387f"
->> <4>CPU: VIPT nonaliasing data cache, VIPT aliasing instruction cache
->> <4>Machine: ARM-RealView PB11MPCore
->> <5>Ignoring RAM at c0000000-c04fffff (vmalloc region overlap).
->
-> Does your physical RAM start at 0xc0000000 and it is all ignored?
-> Setting highmem would fix as all your lowmem (including the kernel
-> code) would be unmapped, hence the fault. What's the VMALLOC_END
-> defined to?
-
-Yes it seems to be all ignored, i will check VMALLOC_END as soon as i can.
+-- 
+Regards,
+Shawn
