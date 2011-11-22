@@ -1,60 +1,49 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 22 Nov 2011 15:44:33 +0100
-Subject: [PATCH v8] AT91: Add a driver for the ADC
-In-Reply-To: <4ECBB226.4080404@free-electrons.com>
-References: <1321611160-3685-1-git-send-email-maxime.ripard@free-electrons.com>
- <4ECBB226.4080404@free-electrons.com>
-Message-ID: <4ECBB551.4@atmel.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Tue, 22 Nov 2011 15:59:22 +0100
+Subject: [GIT PULL] Support for Cadence GEM in the MACB driver
+In-Reply-To: <20111122102039.GB8872@totoro>
+References: <20111121100020.GB7314@totoro>
+ <20111122100032.GL21480@game.jcrosoft.org>
+ <20111122102039.GB8872@totoro>
+Message-ID: <20111122145922.GM21480@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/22/2011 03:31 PM, Maxime Ripard :
-> Hi,
+On 10:20 Tue 22 Nov     , Jamie Iles wrote:
+> Hi Jean-Christophe,
 > 
-> So, I guess that we have a pretty good driver with that version. What
-> can we do for the inclusion in the kernel now ?
-
-I propose that:
-
-1/ We take the patch #1/3 for inclusion through arm-soc during 3.2
-2/ Jonathan takes the #2/3 in his IIO subsystem
-3/ We take board related patch #3/3 for inclusion during 3.3 (next)
-4/ And we may add other boards support if we are quick for 3.3...
-
-Does is sound good to all of you?
-
-Bye,
-
+> On Tue, Nov 22, 2011 at 11:00:32AM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > On 10:00 Mon 21 Nov     , Jamie Iles wrote:
+> > > Hi Arnd,
+> > > 
+> > > Please consider pulling the patches to add support for Cadence GEM to 
+> > > the MACB driver.  These have been ready to go for a little while but got 
+> > > held up with the rename of Ethernet drivers in the last merge window.  
+> > > It would be great if we can get some exposure in -next for a little 
+> > > while before the next merge window.
+> > > 
+> > > Thanks,
+> > > 
+> > > Jamie
+> > > 
+> > > The following changes since commit cfcfc9eca2bcbd26a8e206baeb005b055dbf8e37:
+> > > 
+> > >   Linux 3.2-rc2 (2011-11-15 15:02:59 -0200)
+> > > 
+> > > are available in the git repository at:
+> > >   git://github.com/jamieiles/linux-2.6-ji.git macb-gem
+> > Arnd please wait
+> > 
+> > please update his patch
+> > 
+> > "at91: provide macb clks with "pclk" and "hclk" name"
+> > 
+> > with the version I send to the ML
 > 
-> Maxime
-> 
-> On 18/11/2011 11:12, Maxime Ripard wrote:
->> Hi all,
->>
->> This patchset adds the driver for the ADC in the AT91 SoC. It has been tested on
->> the at91sam9g20ek and should work on sam9g45 as well.
->>
->> For now, it only reads values when asked for by sysfs, but eventually will
->> support hardware triggers and more boards.
->>
->> This patchset is based on the "[PATCH 0/6 V2] IIO: Out of staging step 1: The
->> core" patchset from Jonathan Cameron, applied on top of 3.1
->>
->> Improvements from v7:
->>   - Fix the channels mask bug
->>
->> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
->> Cc: Patrice Vilchez <patrice.vilchez@atmel.com>
->> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
-> 
+> Is that a patch that you've already posted or will be posting?
+http://patchwork.ozlabs.org/patch/109265/
 
+but please specify the device too
 
--- 
-Nicolas Ferre
+Best Regards,
+J.
