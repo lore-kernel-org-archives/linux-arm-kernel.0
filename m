@@ -1,54 +1,38 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Tue, 22 Nov 2011 20:41:57 +0900
-Subject: [PATCH] ARM: Kota2 mach-type update fix
-In-Reply-To: <20111122092615.GA26411@linux-sh.org>
-References: <20111122060857.23951.50598.sendpatchset@w520>
- <20111122092615.GA26411@linux-sh.org>
-Message-ID: <CANqRtoTvMpivHN0tZVTEY6SfkBrNLpu=rkRXUXKJG4J0UNCzhg@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 22 Nov 2011 11:47:49 +0000
+Subject: [GIT PULL] ARM irqchip consolidation
+In-Reply-To: <20111121220029.GT9581@n2100.arm.linux.org.uk>
+References: <4EC39D44.8000706@arm.com>
+ <20111117172319.GX9581@n2100.arm.linux.org.uk> <4EC54DBB.9090309@arm.com>
+ <20111121220029.GT9581@n2100.arm.linux.org.uk>
+Message-ID: <4ECB8BE5.7050003@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 22, 2011 at 6:26 PM, Paul Mundt <lethal@linux-sh.org> wrote:
-> On Tue, Nov 22, 2011 at 03:08:57PM +0900, Magnus Damm wrote:
->> From: Magnus Damm <damm@opensource.se>
->>
->> This patch adds kota2 to the in-kernel ARM mach-type file.
->>
->> Basic board support is included in 3.2-rc and the mach-type
->> has been registered in the ARM machine repository as
->>
->> 3616 Renesas SH-Mobile kota2.x Board kota2 Yusuke Goda mainlined
->>
->> The file arch/arm/tools/mach-types is however missing Kota2
->> which makes build of sh73a0 based boards fail with:
->>
->> arch/arm/mach-shmobile/platsmp.c: In function 'shmobile_smp_get_core_count':
->> arch/arm/mach-shmobile/platsmp.c:28:2: error: implicit declaration of function 'machine_is_kota2'
->> make[1]: *** [arch/arm/mach-shmobile/platsmp.o] Error 1
->>
->> arch/arm/mach-shmobile/board-kota2.c:448:136: error: 'MACH_TYPE_KOTA2' undeclared here (not in a function)
->> make[1]: *** [arch/arm/mach-shmobile/board-kota2.o] Error 1
->> make: *** [arch/arm/mach-shmobile] Error 2
->>
->> Signed-off-by: Magnus Damm <damm@opensource.se>
->> ---
->>
->> ?I propose that Paul Mundt merges this patch together with other
->> ?SH-Mobile ARM related fixes.
->>
-> Err, no. I'm not patching machine-generated files which precisely say not
-> to patch them at the top of the file. If there is a missing definition
-> for an upstream board then the file needs to be regenerated with the new
-> definitions, plain and simple.
+Hi Russell,
 
-Following the comment sure sounds like a good idea, but according to
-the git logs people seem to update the file:
+On 21/11/11 22:00, Russell King - ARM Linux wrote:
+> On Thu, Nov 17, 2011 at 06:08:59PM +0000, Marc Zyngier wrote:
+>> If you have a stable branch on which I can rebase, I'm happy to do it
+>> (I've just resolved these conflicts on -next). If it's more convenient
+>> to do it later in the cycle, I can wait. Just let me know what is the
+>> most convenient route for you.
+> 
+> I've now merged the restart changes into the 'devel' branch, and then
+> followed on with your changes on top of that - fixing the conflicts
+> along the way.
+> 
+> I decided not to push it out in the devel-stable branch until you've
+> had a chance to verify that the conflict resolution is correct - I've
+> added some limited explanations in the merge commit for the two things
+> which weren't a trivial resolution.  Once you've confirmed it's fine,
+> I'll push the stuff over to the devel-stable branch.
 
-1d08fd9 Update Nook Color machine 3284 to common Encore name
+I had a quick look at linux-next, and the conflict resolution seem
+perfectly sound.
 
-Russell, do you mind if we update the mach-type file to include Kota2?
-It's already registered via the web interface.
+Thanks a lot for going through this, very much appreciated.
 
-Cheers,
-
-/ magnus
+	M.
+-- 
+Jazz is not dead. It just smells funny...
