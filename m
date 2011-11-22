@@ -1,27 +1,42 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 22 Nov 2011 13:45:49 +0800
-Subject: [PATCH] ARM: mxs: fix machines' initializers order
-In-Reply-To: <1321865755-7423-1-git-send-email-lauri.hintsala@bluegiga.com>
-References: <1321865755-7423-1-git-send-email-lauri.hintsala@bluegiga.com>
-Message-ID: <20111122054548.GE16417@S2100-06.ap.freescale.net>
+Date: Tue, 22 Nov 2011 13:48:52 +0800
+Subject: [PATCH 1/2] ARM: mxs/tx28: add __initconst for fec pdata
+In-Reply-To: <1321027746-5906-1-git-send-email-b29396@freescale.com>
+References: <1321027746-5906-1-git-send-email-b29396@freescale.com>
+Message-ID: <20111122054851.GF16417@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 21, 2011 at 10:55:55AM +0200, Lauri Hintsala wrote:
-> Initializers of m28evk and stmp378x_devb fixed to be in order
-> they are called.
-> 
+On Sat, Nov 12, 2011 at 12:09:05AM +0800, Dong Aisheng wrote:
+> Signed-off-by: Dong Aisheng <b29396@freescale.com>
 > ---
 
-You may not want to put a '---' here, because all the texts after
-that will get dropped when I run 'git am' to apply the patch.  I
-have applied the patch with this fixed.  Thanks.
+Applied, thanks.
 
 Regards,
 Shawn
 
-> reference: http://article.gmane.org/gmane.linux.ports.arm.omap/50721
+>  arch/arm/mach-mxs/module-tx28.c |    4 ++--
+>  1 files changed, 2 insertions(+), 2 deletions(-)
 > 
-> cc: Shawn Guo <shawn.guo@linaro.org>
-> Signed-off-by: Lauri Hintsala <lauri.hintsala@bluegiga.com>
-> ---
+> diff --git a/arch/arm/mach-mxs/module-tx28.c b/arch/arm/mach-mxs/module-tx28.c
+> index 0fcff47..9a7b08b 100644
+> --- a/arch/arm/mach-mxs/module-tx28.c
+> +++ b/arch/arm/mach-mxs/module-tx28.c
+> @@ -66,11 +66,11 @@ static const iomux_cfg_t tx28_fec1_pads[] __initconst = {
+>  	MX28_PAD_ENET0_CRS__ENET1_RX_EN,
+>  };
+>  
+> -static struct fec_platform_data tx28_fec0_data = {
+> +static const struct fec_platform_data tx28_fec0_data __initconst = {
+>  	.phy = PHY_INTERFACE_MODE_RMII,
+>  };
+>  
+> -static struct fec_platform_data tx28_fec1_data = {
+> +static const struct fec_platform_data tx28_fec1_data __initconst = {
+>  	.phy = PHY_INTERFACE_MODE_RMII,
+>  };
+>  
+> -- 
+> 1.7.0.4
+> 
