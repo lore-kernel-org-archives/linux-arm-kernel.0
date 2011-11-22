@@ -1,148 +1,115 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Tue, 22 Nov 2011 09:57:41 -0800
-Subject: [PATCH v3 5/5] clk: export tree topology and clk data via sysfs
-In-Reply-To: <20111122154900.GB18954@kroah.com>
-References: <1321926047-14211-1-git-send-email-mturquette@linaro.org>
- <1321926047-14211-6-git-send-email-mturquette@linaro.org>
- <20111122154900.GB18954@kroah.com>
-Message-ID: <CAPtuhThPQtWwihE8aGru55k87oV7QOr=O836TTJ+=30d6dtVhA@mail.gmail.com>
+From: rabin@rab.in (Rabin Vincent)
+Date: Tue, 22 Nov 2011 23:30:11 +0530
+Subject: [PATCH 1/4] ARM: ftrace: use canonical Thumb-2 wide instruction
+ format
+In-Reply-To: <20111122120242.GD2066@localhost.localdomain>
+References: <1321888429-3519-1-git-send-email-rabin@rab.in>
+ <20111122120242.GD2066@localhost.localdomain>
+Message-ID: <CAH+eYFBfcpKYrq-kyV4RZ-s1En5Q2wy6dhuEsk6KNgk-zb7wDw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 22, 2011 at 7:49 AM, Greg KH <greg@kroah.com> wrote:
-> On Mon, Nov 21, 2011 at 05:40:47PM -0800, Mike Turquette wrote:
->> Introduces kobject support for the common struct clk, exports per-clk
->> data via read-only callbacks and models the clk tree topology in sysfs.
+On Tue, Nov 22, 2011 at 17:32, Dave Martin <dave.martin@linaro.org> wrote:
+> On Mon, Nov 21, 2011 at 08:43:46PM +0530, Rabin Vincent wrote:
+>> +#ifndef __ARMEB__
+>> + ? ? if (IS_ENABLED(CONFIG_THUMB2_KERNEL)) {
+>> + ? ? ? ? ? ? old = (old >> 16) | (old << 16);
+>> + ? ? ? ? ? ? new = (new >> 16) | (new << 16);
+>
+> I think swahw32() in <linux/swab.h> can be used for this operation.
+
+Yes.
+
+> Really though, we need a common set of "load and store instruction"
+> macros, rather than duplicating this knowledge everywhere.
+
+Yes, though this ftrace code may not be able to use them directly since
+it uses probe_kernel_read()/write().
+
+> In particular, we really want those macros to encapsulate the
+> #ifdef __ARMEB__ stuff.
+
+The ifdef for ARMEB is a bit jarring, especially since now we can even
+get rid of ifdefs for CONFIG_THUMB2_KERNEL.  An arm_is_bigendian() or
+somesuch macro in a header would be preferable for this, I think.
+
+>
+>
+>> + ? ? }
+>> +#endif
 >>
->> Also adds support for generating the clk tree in clk_init and migrating
->> nodes when input sources are switches in clk_set_parent.
+>> - ? ? if (replaced != old)
+>> - ? ? ? ? ? ? return -EINVAL;
+>> + ? ? if (old) {
+>> + ? ? ? ? ? ? if (probe_kernel_read(&replaced, (void *)pc, MCOUNT_INSN_SIZE))
+>> + ? ? ? ? ? ? ? ? ? ? return -EFAULT;
+>> +
+>> + ? ? ? ? ? ? if (replaced != old)
+>> + ? ? ? ? ? ? ? ? ? ? return -EINVAL;
+>> + ? ? }
 >>
->> Signed-off-by: Mike Turquette <mturquette@linaro.org>
+>> ? ? ? if (probe_kernel_write((void *)pc, &new, MCOUNT_INSN_SIZE))
+>> ? ? ? ? ? ? ? return -EPERM;
+>> @@ -141,23 +150,21 @@ static int ftrace_modify_code(unsigned long pc, unsigned long old,
+>>
+>> ?int ftrace_update_ftrace_func(ftrace_func_t func)
+>> ?{
+>> - ? ? unsigned long pc, old;
+>> + ? ? unsigned long pc;
+>> ? ? ? unsigned long new;
+>> ? ? ? int ret;
+>>
+>> ? ? ? pc = (unsigned long)&ftrace_call;
+>> - ? ? memcpy(&old, &ftrace_call, MCOUNT_INSN_SIZE);
+>> ? ? ? new = ftrace_call_replace(pc, (unsigned long)func);
+>>
+>> - ? ? ret = ftrace_modify_code(pc, old, new);
+>> + ? ? ret = ftrace_modify_code(pc, 0, new);
+>>
+>> ?#ifdef CONFIG_OLD_MCOUNT
+>> ? ? ? if (!ret) {
+>> ? ? ? ? ? ? ? pc = (unsigned long)&ftrace_call_old;
+>> - ? ? ? ? ? ? memcpy(&old, &ftrace_call_old, MCOUNT_INSN_SIZE);
+>> ? ? ? ? ? ? ? new = ftrace_call_replace(pc, (unsigned long)func);
+>>
+>> - ? ? ? ? ? ? ret = ftrace_modify_code(pc, old, new);
+>> + ? ? ? ? ? ? ret = ftrace_modify_code(pc, 0, new);
+>> ? ? ? }
+>> ?#endif
 >
-> Thanks Arnd for pointing me at this.
->
->> +#define MAX_STRING_LENGTH ? ?32
->
-> Why?
+> Why don't we check the old value any more?
 
-Copy paste from other implementations.  What do you recommend?
+The ftrace_modify_code() checks the location its modifying to ensure
+that the old value was what it expected it to be -- this is useful for
+example if we have problems with the recordmcount code that makes it
+record wrong locations.
 
->
->> +static struct kobject *clk_kobj;
->> +LIST_HEAD(kobj_list);
->
-> Um, no, please NEVER use raw kobjects, you should be using struct device
-> instead. ?Please change the code to do that.
+In this particular case however, what we're modifying is not code at an
+mcount location but some of the code in entry-common.S which is at the
+location of a known symbol.  The safety check for the old value was
+quite useless in this case because we were just memcpy()ing the content
+of the location and passing that in as the old value.
 
-Today the clk tree doesn't create a struct device for each clk, which
-I assume would be necessary to do what you're talking about.  Is that
-right?
+The reason it's done in this patch is that because of converting to the
+canonical format, we'd need an additional ifdef-ARMEB/swahw32() here
+after doing the memcpy(), for the memcmp() in ftrace_modify_code() to
+succeed.  Instead, we just avoid the comparison for this case.
 
-Maybe that will be necessary with the device tree stuff anyways... any
-feedback from Sascha or Grant on that?
+> It would be good to see something in comments or the commit log
+> clarifying this.
 
->
->> +static ssize_t clk_show(struct kobject *kobj, struct attribute *attr,
->> + ? ? ? ? ? ? char *buf)
->> +{
->> + ? ? struct clk *clk;
->> + ? ? struct clk_attribute *clk_attr;
->> + ? ? ssize_t ret = -EINVAL;
->> +
->> + ? ? clk = container_of(kobj, struct clk, kobj);
->> + ? ? clk_attr = container_of(attr, struct clk_attribute, attr);
->> +
->> + ? ? if (!clk || !clk_attr)
->> + ? ? ? ? ? ? goto out;
->> +
->> + ? ? /* we don't do any locking for debug operations */
->> +
->> + ? ? /* refcount++ */
->> + ? ? kobject_get(&clk->kobj);
->> +
->> + ? ? if (clk_attr->show)
->> + ? ? ? ? ? ? ret = clk_attr->show(clk, buf);
->> + ? ? else
->> + ? ? ? ? ? ? ret = -EIO;
->> +
->> + ? ? /* refcount-- */
->> + ? ? kobject_put(&clk->kobj);
->
-> Why in the world would you be incrementing and decrementing the
-> reference count of the kobject in the show function? ?What are you
-> trying to protect here that is not already protected by the core?
-
-Will remove in v4.
+Agreed.  Perhaps it should even be done in a separate patch.
 
 >
->
->> +static void clk_release(struct kobject *kobj)
->> +{
->> + ? ? struct clk *clk;
->> +
->> + ? ? clk = container_of(kobj, struct clk, kobj);
->> +
->> + ? ? complete(&clk->kobj_unregister);
->> +}
->
-> Look Ma, a memory leak!
+> To what extent can this be unified with the kprobes functionality?
+> (if you've already done that, ignore this comment -- I confess I
+> don't understand all the details of these patches...)
 
-Oops.  Will fix in V4.
+With this patch series:
+ - kprobes and jump labels use the common text patching code
+ - jump labels and ftrace use the common instruction generation code
 
->
->> +static struct kobj_type clk_ktype = {
->> + ? ? .sysfs_ops ? ? ?= &clk_ops,
->> + ? ? .default_attrs ?= clk_default_attrs,
->> + ? ? .release ? ? ? ?= clk_release,
->> +};
->> +
->> +int clk_kobj_add(struct clk *clk)
->> +{
->> + ? ? if (IS_ERR(clk))
->> + ? ? ? ? ? ? return -EINVAL;
->> +
->> + ? ? /*
->> + ? ? ?* Some kobject trickery!
->> + ? ? ?*
->> + ? ? ?* We want to (ab)use the kobject infrastructure to track our
->> + ? ? ?* tree topology for us, specifically the root clocks (which are
->> + ? ? ?* otherwise not remembered in a global list).
->> + ? ? ?* Unfortunately we might not be able to allocate memory yet
->> + ? ? ?* when this path is hit. ?This pretty much rules out anything
->> + ? ? ?* that looks or smells like kobject_add, since there are
->> + ? ? ?* allocations for kobject->name and a dependency on sysfs being
->> + ? ? ?* initialized.
->> + ? ? ?*
->> + ? ? ?* To get around this we initialize the kobjects and (ab)use
->> + ? ? ?* struct kobject's list_head member, "entry". ?Later on we walk
->> + ? ? ?* this list in clk_sysfs_tree_create() to make proper
->> + ? ? ?* kobject_add calls once it is safe to do so.
->> + ? ? ?*
->> + ? ? ?* FIXME - this is starting to smell alot like clkdev (i.e.
->> + ? ? ?* tracking the clocks in a list)
->
-> Ah, comments like this warm my heart.
->
-> Come on, no abusing the kobject code please, if have problems with how
-> the kernel core works, and it doesn't do things you want it to, then why
-> not change it to work properly for you, or at the least, ASK ME!!!
-
-Ok, I'm asking you now.  There are two ways to solve this problem:
-
-1) have kobject core create the lists linking the objects but defer
-allocations and any interactions with sysfs until later in the boot
-sequence, OR
-
-2) my code can create a list of clks (the same way that clkdev does)
-and defer kobject/sysfs stuff until later, which walks the list made
-during early-boot
-
-#1 is most closely aligned with the code I have here, #2 presents
-challenges that I haven't really though through.  I know that OMAP
-uses the clk framework VERY early in it's boot sequence, but as long
-as the per-clk data is properly initialized then it should be OK.
-
-What do you think?
-
-Regards,
-Mike
+kprobes and ftrace, however, don't share anything.  We could make ftrace
+use __patch_text(), although that would only save half-a-dozen lines of
+code and also remove the use of probe_kernel_write(), which all the
+other arch ftrace implementations use.
