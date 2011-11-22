@@ -1,43 +1,37 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Tue, 22 Nov 2011 17:23:38 +0100
-Subject: [PATCH 5/5] arm/dt: tegra: Fix SDHCI nodes to match board files
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF174F08C3AF@HQMAIL01.nvidia.com>
-References: <1321911851-10091-1-git-send-email-swarren@nvidia.com>
- <1321911851-10091-5-git-send-email-swarren@nvidia.com>
- <20111122083802.GK21480@game.jcrosoft.org>
- <74CDBE0F657A3D45AFBB94109FB122FF174F08C3AF@HQMAIL01.nvidia.com>
-Message-ID: <20111122162338.GN21480@game.jcrosoft.org>
+From: N.Voss@weinmann.de (Voss, Nikolaus)
+Date: Tue, 22 Nov 2011 17:26:18 +0100
+Subject: [PATCH v5 3/4] drivers/i2c/busses/i2c-at91.c: add new driver
+In-Reply-To: <D99582E5322435468A77E74BB0039E7B1D1655BF4D@SRV02.hamburg.garz-fricke.de>
+References: <D99582E5322435468A77E74BB0039E7B1D1655BF4D@SRV02.hamburg.garz-fricke.de>
+Message-ID: <EF2E73589CA71846A15D0B2CDF79505D087B40D16B@wm021.weinmann.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08:12 Tue 22 Nov     , Stephen Warren wrote:
-> Jean-Christophe PLAGNIOL-VILLARD wrote at Tuesday, November 22, 2011 1:38 AM:
-> > On 14:44 Mon 21 Nov     , Stephen Warren wrote:
-> > > Mark any SDHCI controllers that aren't registered by the board files as
-> > > disabled in the device-tree files.
-> > >
-> > > In practice, these controllers:
-> > >
-> > > * Have nothing hooked up to them at all, or
-> > > * For ports intended for SDIO usage, the drivers for anything that might
-> > >   be attached are not in the device-tree yet. If/when drivers appear, the
-> > >   SD/MMC port can be re-enabled.
-> > >
-> > > The only possible exception is TrimSlice's mico SD slot, but that wasn't
-> > > enabled in the board files before anyway, and doesn't work when all the
-> > > SDHCI controllers are enabled anyway.
-> > it will be better to invert the logic
-> > 
-> > just enable what you are supposed too
+Hi,
+
+Carsten Behling wrote on 2011-11-22:
+> +static void at91_twi_read_next_byte(struct at91_twi_dev *dev)
+> +{
+> +       *dev->buf = at91_twi_read(dev, AT91_TWI_RHR) & 0xff;
+> +
+> +       /* send stop if second but last byte has been read */
+> +       if (--dev->buf_len == 1)
+> +               at91_twi_write(dev, AT91_TWI_CR, AT91_TWI_STOP);
 > 
-> It used to be that way when the files were first added, but they got
-> switched around this way to match standard practice.
-this is a bad practice because you can enable stuff that a hardware is not
-supposed to use
+> 
+> 
+> If dev->buf_len =1 at the beginning of a read transfer, a stop condition will
+> never be send.
 
-and this silenty without anyone notice until you test the hardware
+this case is already catched in at91_do_twi_transfer():
 
-and you add more line and changeset
++       if (dev->msg->flags & I2C_M_RD) {
++               unsigned start_flags = AT91_TWI_START;
++
++               /* if only one byte is to be read, immediately stop transfer */
++               if (dev->buf_len <= 1 && !(dev->msg->flags & I2C_M_RECV_LEN))
++                       start_flags |= AT91_TWI_STOP;
++               at91_twi_write(dev, AT91_TWI_CR, start_flags);
 
-Best Regrds,
-J.
+Thanks for reviewing,
+Niko
