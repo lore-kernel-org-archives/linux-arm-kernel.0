@@ -1,29 +1,75 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 22 Nov 2011 11:21:34 +0000
-Subject: [01: PATCH 0/7] Preparation for arch_reset changes
-In-Reply-To: <20111121095658.GO9581@n2100.arm.linux.org.uk>
-References: <20111106173113.GI12913@n2100.arm.linux.org.uk>
- <20111121095658.GO9581@n2100.arm.linux.org.uk>
-Message-ID: <20111122112134.GH20518@mudshark.cambridge.arm.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Tue, 22 Nov 2011 11:32:53 +0000
+Subject: [GIT PULL] ARM: amba: Enable module alias autogeneration for AMBA
+ drivers
+Message-ID: <1321961573-4562-1-git-send-email-dave.martin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Russell,
 
-On Mon, Nov 21, 2011 at 09:56:58AM +0000, Russell King - ARM Linux wrote:
-> As of today, I'm going to start freezing the restart changes, which
-> covers those which have been in linux-next so far.  I've collected up
-> all the acks, etc, to date, and will not be applying any more to these
-> commits.
-> 
-> At the end of today, I'll merge these into my 'devel-stable' branch
-> to signify their new status, so if anyone has any objections they need
-> to speak up _now_.
+This series enables the general infrastructure for modalias
+generation to work for AMBA devices, and enables it in the affected
+drivers.
 
-Is your reset branch stable now? I only ask because it doesn't look like
-you've merged these into devel-stable so I wondered if you have any further
-changes pending.
+Since there are several patches here, I though it better to send a
+pull request.
 
-Thanks,
+The first two patches (subject lines "ARM: amba: ...") are the core
+patches; the remainder of the patches are the driver changes --
+each is trivial and simply adds a MODULE_DEVICE_ALIAS() entry.
 
-Will
+I have Acks on some of the driver patches and no comments on the
+rest.  I've been circulating these for some time, so if you're
+happy to pull those driver patches via your tree, please go ahead.
+
+Otherwise, let me know and I can continue trying to push the driver
+patches via other routes.
+
+Cheers
+---Dave
+
+The following changes since commit cfcfc9eca2bcbd26a8e206baeb005b055dbf8e37:
+
+  Linux 3.2-rc2 (2011-11-15 15:02:59 -0200)
+
+are available in the git repository at:
+  git://git.linaro.org/people/dmart/linux-2.6-arm.git arm/amba-modalias+for-rmk
+
+Dave Martin (16):
+      ARM: amba: Move definition of struct amba_id to mod_devicetable.h
+      ARM: amba: Auto-generate AMBA driver module aliases during modpost
+      hwrng: nomadik: Enable module alias autogeneration for AMBA drivers
+      dmaengine: pl08x: Enable module alias autogeneration for AMBA drivers
+      dmaengine: pl330: Enable module alias autogeneration for AMBA drivers
+      gpio: pl061: Enable module alias autogeneration for AMBA drivers
+      input: ambakmi: Enable module alias autogeneration for AMBA drivers
+      mmc: mmci: Enable module alias autogeneration for AMBA drivers
+      rtc: pl030: Enable module alias autogeneration for AMBA drivers
+      rtc: pl031: Enable module alias autogeneration for AMBA drivers
+      spi: pl022: Enable module alias autogeneration for AMBA drivers
+      serial: pl010: Enable module alias autogeneration for AMBA drivers
+      serial: pl011: Enable module alias autogeneration for AMBA drivers
+      fbdev: amba: Enable module alias autogeneration for AMBA drivers
+      watchdog: sp805: Enable module alias autogeneration for AMBA drivers
+      sound: aaci: Enable module alias autogeneration for AMBA drivers
+
+ drivers/amba/bus.c                   |    4 ++
+ drivers/char/hw_random/nomadik-rng.c |    2 +
+ drivers/dma/amba-pl08x.c             |    2 +
+ drivers/dma/pl330.c                  |    2 +
+ drivers/gpio/gpio-pl061.c            |    2 +
+ drivers/input/serio/ambakmi.c        |    2 +
+ drivers/mmc/host/mmci.c              |    2 +
+ drivers/rtc/rtc-pl030.c              |    2 +
+ drivers/rtc/rtc-pl031.c              |    2 +
+ drivers/spi/spi-pl022.c              |    2 +
+ drivers/tty/serial/amba-pl010.c      |    2 +
+ drivers/tty/serial/amba-pl011.c      |    2 +
+ drivers/video/amba-clcd.c            |    2 +
+ drivers/watchdog/sp805_wdt.c         |    2 +
+ include/linux/amba/bus.h             |    7 +---
+ include/linux/mod_devicetable.h      |   18 ++++++++
+ scripts/mod/file2alias.c             |   72 ++++++++++++++++++++++++++++++++++
+ sound/arm/aaci.c                     |    2 +
+ 18 files changed, 123 insertions(+), 6 deletions(-)
