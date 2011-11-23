@@ -1,82 +1,80 @@
 From: tarun.kanti@ti.com (DebBarma, Tarun Kanti)
-Date: Wed, 23 Nov 2011 18:01:35 +0530
-Subject: [PATCH v8 24/24] gpio/omap: handle set_dataout reg capable IP on
- restore
-In-Reply-To: <CAC83Zv+gac_Wd8+V+o6USxv73ia5i8JLjLDHj8VQiRiqZ7DOtQ@mail.gmail.com>
-References: <1317803593-12259-1-git-send-email-tarun.kanti@ti.com>
- <1317803593-12259-25-git-send-email-tarun.kanti@ti.com>
- <87aa8bde2d.fsf@ti.com>
- <CAC83Zv+gac_Wd8+V+o6USxv73ia5i8JLjLDHj8VQiRiqZ7DOtQ@mail.gmail.com>
-Message-ID: <CAC83ZvL9w=7RhAuT=5ahbDX+d6miQMif1ngOenEiqP4UN2+mzg@mail.gmail.com>
+Date: Wed, 23 Nov 2011 18:03:09 +0530
+Subject: [PATCH] ARM: OMAP: dmtimer: fix missing content/correction in
+ low-power mode support
+In-Reply-To: <CAB-zwWiNc=aFMd2ccyL=s1c5qa8dnu6c-M29K1CrezJ01YXZWg@mail.gmail.com>
+References: <1320732026-6783-1-git-send-email-tarun.kanti@ti.com>
+ <CAB-zwWiNc=aFMd2ccyL=s1c5qa8dnu6c-M29K1CrezJ01YXZWg@mail.gmail.com>
+Message-ID: <CAC83ZvK7-jfXm0YZo45pcd7D4_Ad858u1WJY1ozfy+z31Zk5Wg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 7, 2011 at 5:35 PM, DebBarma, Tarun Kanti
-<tarun.kanti@ti.com> wrote:
-> On Fri, Nov 4, 2011 at 10:23 PM, Kevin Hilman <khilman@ti.com> wrote:
->> Tarun Kanti DebBarma <tarun.kanti@ti.com> writes:
+On Mon, Nov 21, 2011 at 10:12 PM, Ramirez Luna, Omar
+<omar.ramirez@ti.com> wrote:
+> Hi,
+>
+> On Tue, Nov 8, 2011 at 12:00 AM, Tarun Kanti DebBarma
+> <tarun.kanti@ti.com> wrote:
+>> Since omap_dm_timer_write_reg/__omap_dm_timer_write is now modified
+>> to use timer->func_base OCP_CFG should not use this wrapper anymore.
+>> Instead use __raw_writel() directly and use timer->io_base instead
+>> to write to OCP_CFG.
 >>
->>> From: Nishanth Menon <nm@ti.com>
->>>
->>> GPIO IP revisions such as those used in OMAP4 have a set_dataout
->>> while the previous revisions used a single dataout register.
->>> Depending on what is available restore the dataout settings
->>> to the right register.
->>>
->>> Signed-off-by: Nishanth Menon <nm@ti.com>
->>> Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
->>> Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->>> ---
->>> ?drivers/gpio/gpio-omap.c | ? ?9 +++++++--
->>> ?1 files changed, 7 insertions(+), 2 deletions(-)
->>>
->>> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
->>> index 4009446..3df7a98 100644
->>> --- a/drivers/gpio/gpio-omap.c
->>> +++ b/drivers/gpio/gpio-omap.c
->>> @@ -1073,7 +1073,7 @@ static int __devinit omap_gpio_probe(struct platform_device *pdev)
->>> ? ? ? bank->get_context_loss_count = pdata->get_context_loss_count;
->>> ? ? ? bank->regs = pdata->regs;
->>>
->>> - ? ? if (bank->regs->set_dataout && bank->regs->clr_dataout)
->>> + ? ? if (bank->regs->set_dataout)
+>> The timer->sys_stat is valid only if timer->revision is 1. In the
+>> context restore function make this correction.
 >>
->> This change isn't right.
+>> Save the contexts and loss count when timer is stopped.
+>> Also, disable the clock. Else, clock usecount would become imbalanced.
 >>
->> The _set_gpio_dataout_reg function depends on the existence of
->> ->clr_dataout too.
-> Ok, I will add the clr_dataout condtion as well.
+>> Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
+> ...
+>> diff --git a/arch/arm/plat-omap/dmtimer.c b/arch/arm/plat-omap/dmtimer.c
+>> index af3b92b..f042c82 100644
+>> --- a/arch/arm/plat-omap/dmtimer.c
+>> +++ b/arch/arm/plat-omap/dmtimer.c
+> ...
+>> @@ -357,6 +357,21 @@ int omap_dm_timer_stop(struct omap_dm_timer *timer)
+>>
+>> ? ? ? ?__omap_dm_timer_stop(timer, timer->posted, rate);
+>>
+>> + ? ? ? if (timer->loses_context) {
+>> + ? ? ? ? ? ? ? if (timer->get_context_loss_count)
+>
+> Maybe: if (timer->loses_context && timer->get_context_loss_count)
+Sure.
+>
+>> + ? ? ? ? ? ? ? ? ? ? ? timer->ctx_loss_count =
+>> + ? ? ? ? ? ? ? ? ? ? ? timer->get_context_loss_count(&timer->pdev->dev);
+>
+> could get rid ?of this weird one-line formatting
+ok.
+>
+>> + ? ? ? }
+>> +
+>> + ? ? ? /*
+>> + ? ? ? ?* Since the register values are computed and written within
+>> + ? ? ? ?* __omap_dm_timer_stop, we need to use read to retrieve the
+>> + ? ? ? ?* context.
+>> + ? ? ? ?*/
+>> + ? ? ? timer->context.tclr =
+>> + ? ? ? ? ? ? ? ? ? ? ? omap_dm_timer_read_reg(timer, OMAP_TIMER_CTRL_REG);
+>> + ? ? ? timer->context.tisr = __raw_readl(timer->irq_stat);
+>> + ? ? ? omap_dm_timer_disable(timer);
+>
+> FWIW, functionally it looks good to me, besides it fixes the broken
+> dmtimer start/stop sequence from 3.2-rc1. Tested with tidspbridge on
+> omap3.
+Thanks.
 
 >
->>
->>> ? ? ? ? ? ? ? bank->set_dataout = _set_gpio_dataout_reg;
->>> ? ? ? else
->>> ? ? ? ? ? ? ? bank->set_dataout = _set_gpio_dataout_mask;
->>> @@ -1351,7 +1351,12 @@ static void omap_gpio_restore_context(struct gpio_bank *bank)
->>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? bank->base + bank->regs->risingdetect);
->>> ? ? ? __raw_writel(bank->context.fallingdetect,
->>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? bank->base + bank->regs->fallingdetect);
->>> - ? ? __raw_writel(bank->context.dataout, bank->base + bank->regs->dataout);
->>> + ? ? if (bank->regs->set_dataout)
->>
->> Why the check again? ?The check has already been done in probe.
->>
->> Just use bank->set_dataout() here.
-> Sure, i will make the change.
-When I look at the signature of set_dataout(), it does not seem straight forward
-to be used here. It expects (struct gpio_bank *bank, int gpio, int enable) to be
-passed to it.
-set_dataout (struct gpio_bank *bank, int gpio, int enable)
-{
-        void __iomem *reg = bank->base;
-        u32 l = GPIO_BIT(bank, gpio);
-...
-        if (enable)
-...
-        else
-...
-        __raw_writel(l, reg);
-
-}
+> If needed:
+>
+> Tested-by: Omar Ramirez Luna <omar.ramirez@ti.com>
+Sure. Thanks.
 --
 Tarun
+>
+> Regards,
+>
+> Omar
+>
