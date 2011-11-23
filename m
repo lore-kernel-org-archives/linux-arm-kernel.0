@@ -1,38 +1,35 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 23 Nov 2011 21:15:05 +0000
-Subject: [GIT PULL] ARM: pxa: change gpio to platform driver
-In-Reply-To: <CAN1soZw6JuNsty91xQP2G4NLodAz5GfOVUO7xYo+fdx8u0chvg@mail.gmail.com>
-References: <CAN1soZw6JuNsty91xQP2G4NLodAz5GfOVUO7xYo+fdx8u0chvg@mail.gmail.com>
-Message-ID: <201111232115.05818.arnd@arndb.de>
+Date: Wed, 23 Nov 2011 21:15:13 +0000
+Subject: [GIT PULL v2] pxa: fixes for v3.2-rc1
+In-Reply-To: <CAMPhdO8cJxSnTzNEeu+D-cOxQr7_OU6oOA55AhQbO6vHe0f11A@mail.gmail.com>
+References: <CAMPhdO8cJxSnTzNEeu+D-cOxQr7_OU6oOA55AhQbO6vHe0f11A@mail.gmail.com>
+Message-ID: <201111232115.13430.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 15 November 2011, Haojian Zhuang wrote:
-> The following changes since commit 31555213f03bca37d2c02e10946296052f4ecfcd:
+On Friday 18 November 2011, Eric Miao wrote:
+> The following changes since commit 1ea6b8f48918282bdca0b32a34095504ee65bab5:
 > 
->   Revert "hvc_console: display printk messages on console."
-> (2011-11-06 22:22:16 -0800)
+>   Linux 3.2-rc1 (2011-11-07 16:16:02 -0800)
 > 
 > are available in the git repository at:
->   git://github.com/hzhuang1/linux.git gpio
+>   git://github.com/ycmiao/pxa-linux.git fix
 > 
-> Haojian Zhuang (11):
->       ARM: pxa: rename IRQ_GPIO to PXA_GPIO_TO_IRQ
->       ARM: pxa: use chained interrupt for GPIO0 and GPIO1
->       ARM: pxa: rename gpio_to_irq and irq_to_gpio
->       ARM: pxa: recognize gpio number and type
->       ARM: pxa: rename NR_BUILTIN_GPIO
->       ARM: pxa: use little endian read write in gpio driver
->       ARM: pxa: use generic gpio operation instead of gpio register
->       ARM: pxa: change gpio to platform device
->       ARM: mmp: clear gpio edge detect
->       ARM: pxa: add clk support in gpio driver
->       driver: pcmcia: replace IRQ_GPIO() with gpio_to_irq()
+> Eric Miao (1):
+>       ARM: pxa168/gplugd: add the correct SSP device
+> 
+> Haojian Zhuang (2):
+>       ARM: pxa: fix inconsistent CONFIG_USB_PXA27X
+>       ARM: mmp: fix build error on gpio
+> 
 
-Sorry for the long delay. I needed time to settle back in after my vacation
-at arrange with the git tree being shared and on kernel.org now.
+Looks all good, sorry for the delay on my side.
 
-I've pulled it into the drivers/pxa-gpio branch of arm-soc and plan to
-submit it as part of the next/drivers branch in the next merge window.
+Should the "ARM: pxa168/gplugd: add the correct SSP device" have a
+"Cc: stable at kernel.org" tag? It's not clear from the patch.
+If it applies to older kernels as well, please make sure that Greg
+picks it up once Linus merges it, and next time mark stable bug
+fixes right away, or mention in the pull request that it's only
+regressions.
 
 	Arnd
