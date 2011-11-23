@@ -1,27 +1,43 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 23 Nov 2011 21:15:23 +0000
-Subject: [GIT PULL] Missing CPU mapping updates
-In-Reply-To: <20111121102906.GA2437@mudshark.cambridge.arm.com>
-References: <20111116113636.GH4942@mudshark.cambridge.arm.com>
- <20111121102906.GA2437@mudshark.cambridge.arm.com>
-Message-ID: <201111232115.23950.arnd@arndb.de>
+Date: Wed, 23 Nov 2011 21:15:35 +0000
+Subject: [GIT PULL] mxs: fixes for v3.2-rc
+In-Reply-To: <20111117123740.GK14656@S2100-06.ap.freescale.net>
+References: <20111117123740.GK14656@S2100-06.ap.freescale.net>
+Message-ID: <201111232115.36143.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 21 November 2011, Will Deacon wrote:
-> On Wed, Nov 16, 2011 at 11:36:36AM +0000, Will Deacon wrote:
-> > Highbank and IMX6 were merged recently and therefore missed out on the
-> > logical CPU mapping updates. I've fixed them up in the branch below - please
-> > pull!
+On Thursday 17 November 2011, Shawn Guo wrote:
+> Hi Arnd,
 > 
-> I'd like these to go in for 3.2, so please can you pull them into arm-soc?
+> Please pull the mxs fixes below for v3.2-rc.
+> 
+> Regards,
+> Shawn
+> 
+> The following changes since commit cfcfc9eca2bcbd26a8e206baeb005b055dbf8e37:
+> 
+>   Linux 3.2-rc2 (2011-11-15 15:02:59 -0200)
+> 
+> are available in the git repository at:
+>   git://git.linaro.org/people/shawnguo/linux-2.6.git mxs/fixes
+> 
+> Shawn Guo (1):
+>       ARM: Update mach-types to fix mxs build breakage
+> 
+> Wolfram Sang (1):
+>       arm: mx28: fix bit operation in clock setting
 
-Done now, sorry for the delay.
 
-> Sorry to pester, but in Prague you said that's what you wanted us to do!
+Hi Shawn,
 
-That is right, it was my fault for not realizing I wouldn't be able to
-deal with this during UDS or my following vacation, and I also forgot
-to talk to Olof about it.
+Sorry for taking so long before I actually looked at this.
+
+I've applied the fixes to the fixes branch for 3.2 but I noticed
+that Wolfram's patch was missing a 'Cc: stable at kernel.org' tag,
+which I added. Please confirm that this was correct so I can forward
+the patch, and make sure you add the stable tag where appropriate
+in the future (or explain why a patch should not be applied to the
+stable tree if it looks like it should).
 
 	Arnd
