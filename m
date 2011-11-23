@@ -1,36 +1,52 @@
-From: rabin@rab.in (Rabin Vincent)
-Date: Wed, 23 Nov 2011 23:17:54 +0530
-Subject: [PATCH v5 6/7] arm: omap4: support pmu
-In-Reply-To: <1319467559-5518-7-git-send-email-ming.lei@canonical.com>
-References: <1319467559-5518-1-git-send-email-ming.lei@canonical.com>
- <1319467559-5518-7-git-send-email-ming.lei@canonical.com>
-Message-ID: <CAH+eYFD==CbcTWha=4pLVaaeE32gN4_BPdKv0Eo-XNhiz8CM-g@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 23 Nov 2011 17:51:49 +0000
+Subject: Porting the 2.6.38 linux kernel to ARM11 MPcore
+In-Reply-To: <CAK-0apYKjvxXasEfYCocjqEan5dKoXJgMON2gC-nMenKQaU9UQ@mail.gmail.com>
+References: <CAK-0apYKjvxXasEfYCocjqEan5dKoXJgMON2gC-nMenKQaU9UQ@mail.gmail.com>
+Message-ID: <201111231751.49580.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 24, 2011 at 20:15,  <ming.lei@canonical.com> wrote:
-> ?static struct platform_device* __init omap4_init_pmu(void)
-> ?{
-> ? ? ? ?int id = -1;
-> @@ -420,6 +472,10 @@ static struct platform_device* __init omap4_init_pmu(void)
-> ? ? ? ? ? ? ? ?return NULL;
-> ? ? ? ?}
+On Friday 18 November 2011, Moln?r G?bor wrote:
+> im working on a project wich aims at porting the 2.6.38 kernel to an
+> arm11 mpcore based board.
+> 
+> ...
 >
-> + ? ? ? omap4_pmu_data.handle_irq = omap4_pmu_handler;
-> + ? ? ? omap4_pmu_data.enable_irq = omap4_enable_cti;
-> + ? ? ? omap4_pmu_data.disable_irq = omap4_disable_cti;
-> +
-> ? ? ? ?pd = omap_device_build_ss(dev_name, id, oh, 3, &omap4_pmu_data,
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?sizeof(omap4_pmu_data),
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?omap_pmu_latency,
-> @@ -440,7 +496,9 @@ static void __init omap_init_pmu(void)
-> ? ? ? ? ? ? ? ?pd = omap4_init_pmu();
-> ? ? ? ? ? ? ? ?if (!pd)
-> ? ? ? ? ? ? ? ? ? ? ? ?return;
-> - ? ? ? ? ? ? ? omap_device_enable(pd);
-> +
-> + ? ? ? ? ? ? ? omap_device_enable(&od->pdev);
-> + ? ? ? ? ? ? ? omap4_configure_pmu_irq();
+> Im only a beginner, and im sorry for the low quality of the question,
+> i appreciate any help. Even comments on how 'accomplishable' this
+> project is. Also, the board is not a realview board, but it might not
+> be an issue at this stage.
 
-This doesn't build, because there's no "od" in this function.  I guess
-you shouldn't be changing the omap_device_enable() call.
+Hi Moln?r,
+
+I hope I'm not discouraging you too much, but from a high-level perspective
+this sounds like a rather pointless goal, mostly because 2.6.38 is
+rather old now and doing a port for that version would end up looking
+very different from how we are doing things for new kernel releases.
+
+Now if you were thinking about doing a port for mainline Linux (currently
+that means targetting developing on 3.2-rc and targetting 3.3 or 3.4),
+things would look much brighter.
+
+The most important question is what hardware "platform" this port is for,
+not so much the CPU core. The only two platform we support in Linux with
+an ARM11 MPCore are cns3xxx and realview. You already mentioned that you
+don't target realview. If your board is instead based on a Cavium Networks
+SOC, things should be fairly easy and you only need to add a new machine
+description in arch/arm/mach-cns3xxx. If you are working with an SOC
+from a different family that is already supported by Linux, you have
+to add support for the specific SOC, and the work involved in that 
+depends a lot on the particular SOC.
+
+For any other SOC that has no support whatsoever in Linux, I would suggest
+getting the latest Linux kernel from git (3.2-rc2) and looking at the
+highbank, prima2, picoxcell and zynq platforms in there. The code you
+need to write should look similar to any of these, rather than the realview
+platform, which is a fairly unusual one. In case of a new SOC platform,
+you should be prepared to also write device drivers for any vendor
+specific component that you want to support, e.g. network, mmc, audio,
+so I would recommend first researching how many of the components on
+the board already have drivers in Linux.
+
+	Arnd
