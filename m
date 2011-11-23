@@ -1,53 +1,31 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 23 Nov 2011 14:08:42 -0500 (EST)
-Subject: -next fails to boot as of today on S3C6410
-In-Reply-To: <20111123175446.GI30049@opensource.wolfsonmicro.com>
-References: <20111122193957.GH30583@opensource.wolfsonmicro.com>
- <20111122222135.GB7845@gallagher>
- <20111123120534.GO21073@opensource.wolfsonmicro.com>
- <20111123122855.GB7382@totoro>
- <20111123130134.GB12227@opensource.wolfsonmicro.com>
- <20111123133237.GC7382@totoro>
- <20111123135033.GA20272@opensource.wolfsonmicro.com>
- <20111123143322.GD7382@totoro>
- <20111123145517.GE20272@opensource.wolfsonmicro.com>
- <4ECD32CA.2030601@gmail.com>
- <20111123175446.GI30049@opensource.wolfsonmicro.com>
-Message-ID: <alpine.LFD.2.02.1111231402370.17904@xanadu.home>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 23 Nov 2011 19:09:54 +0000
+Subject: [PATCH v3 5/5] clk: export tree topology and clk data via sysfs
+In-Reply-To: <20111123185518.GG31337@atomide.com>
+References: <1321926047-14211-1-git-send-email-mturquette@linaro.org>
+ <1321926047-14211-6-git-send-email-mturquette@linaro.org>
+ <20111122154900.GB18954@kroah.com>
+ <CAPtuhThPQtWwihE8aGru55k87oV7QOr=O836TTJ+=30d6dtVhA@mail.gmail.com>
+ <20111122191347.GB4844@kroah.com>
+ <20111123165903.GF31337@atomide.com>
+ <20111123180651.GB19739@n2100.arm.linux.org.uk>
+ <20111123185518.GG31337@atomide.com>
+Message-ID: <20111123190954.GA4365@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 23 Nov 2011, Mark Brown wrote:
+On Wed, Nov 23, 2011 at 10:55:19AM -0800, Tony Lindgren wrote:
+> * Russell King - ARM Linux <linux@arm.linux.org.uk> [111123 09:31]:
 
-> On Wed, Nov 23, 2011 at 11:52:10AM -0600, Rob Herring wrote:
-> > On 11/23/2011 08:55 AM, Mark Brown wrote:
-> 
-> > > My bisect turned up a second candidate - Nicholas' commit 549158d (ARM:
-> > > move iotable mappings within the vmalloc region).  I reverted that and
-> > > subsequent commits depending on it and my system now appears to boot
-> > > fine with -next (with OF turned on to get the ops for the VIC).  This
-> > > code is all a bit deep for me so I've no real idea what might be wrong.
-> 
-> > The first suspect should be overlapping static mappings in the iotable.
-> > This was allowed before and now is not. Looking at some of the 6410
-> > platforms, I don't see any though. But you didn't mention which platform
-> > you are on. There is a 1KB mapping which is a bit unusual.
-> 
-> I'm on Cragganmore 6410 which just calls a bunch of arch-generic stuff
-> (though now I look I do see a comment saying that we're relying on some
-> setup from the bootloader which I get may have been trashed...).
+> > Keep the clk API as a fundamental thing which should be initialized early
+> > so we don't have to invent new clk APIs to get around its unavailability.
 
-I'm working on a way to get sensible debug messages out.
+> What else are you aware of that is really needed early for clocks other
+> than clockevent?
 
-The problem is that, as soon as we execute this loop in 
-devicemaps_init():
-
-        for (addr = VMALLOC_START; addr; addr += PMD_SIZE)
-                pmd_clear(pmd_off_k(addr));
-
-we lose all means of communication with the outside world until 
-mdesc->map_io() and the following TLB/cache flushes are done.  It is 
-most likely that you are having a problem in the middle of that.
-
-
-Nicolas
+If nothing else we'd have to resolve all the device probe ordering
+issues (Grant's patches seem a bit stalled) and convert all the systems
+using the API to handle deferring probes until their clocks appear.
+Using an early initcall of some kind would help with that but it does
+seem like a lot of trouble and I'd expect it'll end up getting forced in
+on most systems anyway.
