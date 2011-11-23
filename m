@@ -1,35 +1,72 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 23 Nov 2011 21:15:13 +0000
-Subject: [GIT PULL v2] pxa: fixes for v3.2-rc1
-In-Reply-To: <CAMPhdO8cJxSnTzNEeu+D-cOxQr7_OU6oOA55AhQbO6vHe0f11A@mail.gmail.com>
-References: <CAMPhdO8cJxSnTzNEeu+D-cOxQr7_OU6oOA55AhQbO6vHe0f11A@mail.gmail.com>
-Message-ID: <201111232115.13430.arnd@arndb.de>
+Date: Wed, 23 Nov 2011 21:15:08 +0000
+Subject: [AT91 PULL] defconfig pullrequest
+In-Reply-To: <4ECD04AB.7000900@atmel.com>
+References: <20111102155803.GE7136@game.jcrosoft.org>
+ <CAOesGMirB+wWB7D93d7Q9V0+Mt-PAbcaYvio9UJ27T-4zODPzQ@mail.gmail.com>
+ <4ECD04AB.7000900@atmel.com>
+Message-ID: <201111232115.08556.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 18 November 2011, Eric Miao wrote:
-> The following changes since commit 1ea6b8f48918282bdca0b32a34095504ee65bab5:
+On Wednesday 23 November 2011, Nicolas Ferre wrote:
+> On 11/10/2011 02:35 AM, Olof Johansson :
+> > On Wed, Nov 9, 2011 at 5:29 PM, Jean-Christophe PLAGNIOL-VILLARD
+> > <plagnioj@jcrosoft.com> wrote:
+> >> On 01:37 Thu 10 Nov     , Jean-Christophe PLAGNIOL-VILLARD wrote:
+> >>> On 08:01 Wed 09 Nov     , Olof Johansson wrote:
+> >>>> Hi,
+> >>>>
+> >>>> On Wed, Nov 9, 2011 at 6:41 AM, Jean-Christophe PLAGNIOL-VILLARD
+> >>>> <plagnioj@jcrosoft.com> wrote:
+> >>>>
+> >>>>>        when do you pull this one?
+> >>>>>
+> >>>>>        can it go to the 3.2?
+> >>>>
+> >>>> Arnd is offline most of this week, so I'll reply.
+> >>>>
+> >>>> The merge window is closed and only bug fixes should be sent upstream
+> >>>> at this time, so this should go into a 3.3-targeted branch now.
+> >>>>
+> >>>> The pull request was sent halfway through the merge window, which to
+> >>>> be strict means that it was already too late. Next time, please make
+> >>>> sure your branches are staged in the arm-soc tree before the window
+> >>>> opens, ideally around -rc6 or -rc7 time frame.
+> >>> the pull was send first before the release of 3.1 originaly it's a resend of
+> >>> the previous one split in 2 pull
+> >>>
+> >>> so was suposed to be merged before
+> >> I forget to mention it but there was an agreement with arnd durring the kernel
+> >> summit to pull the defconfig part and let the gpio go for 3.3
+> > 
+> > Ok. I'll defer to Arnd when he's back next week then!
 > 
->   Linux 3.2-rc1 (2011-11-07 16:16:02 -0800)
-> 
-> are available in the git repository at:
->   git://github.com/ycmiao/pxa-linux.git fix
-> 
-> Eric Miao (1):
->       ARM: pxa168/gplugd: add the correct SSP device
-> 
-> Haojian Zhuang (2):
->       ARM: pxa: fix inconsistent CONFIG_USB_PXA27X
->       ARM: mmp: fix build error on gpio
-> 
+> Arnd, ping?
 
-Looks all good, sorry for the delay on my side.
+Sorry for the delay in replying.
 
-Should the "ARM: pxa168/gplugd: add the correct SSP device" have a
-"Cc: stable at kernel.org" tag? It's not clear from the patch.
-If it applies to older kernels as well, please make sure that Greg
-picks it up once Linus merges it, and next time mark stable bug
-fixes right away, or mention in the pull request that it's only
-regressions.
+I looked at
+
+  git://github.com/at91linux/linux-at91.git j/for-arnd-defconfig
+
+again, and the changes in there do not match the description, so I'm not
+pulling them like this:
+
+1. The series was not rebased to leave out the gpio patches, the HEAD of
+the branch still contains them.
+
+2. The patches are described as 'rename ...config to ...config', but they
+actually modify the files as well.
+
+3. There are in fact merge conflicts against 3.2-rc2.
+
+I can still take the changes, but please rebase them. It would also be
+better to split the patches on functional changes, instead of per file,
+and make sure that each patch only does what the description says, like:
+
+* ARM: at91: enable additional boards in existing defconfig files
+* ARM: at91: refresh defconfig files for 3.2
+* ARM: at91: rename defconfig files appropriately
 
 	Arnd
