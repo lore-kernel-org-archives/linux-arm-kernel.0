@@ -1,55 +1,126 @@
-From: javi.merino@arm.com (Javi Merino)
-Date: Wed, 23 Nov 2011 09:46:18 +0000
-Subject: [PATCH 1/4] ARM: PL330: Don't call the callbacks if there isn't
- any active transfer
-In-Reply-To: <4ECBD8E6.3010605@arm.com>
-References: <1320244259-10496-1-git-send-email-javi.merino@arm.com>	<CAJe_Zhf+PAeM+wquQykXNDG74Nc+jQNXrp+RLMKSySCNPum8Tg@mail.gmail.com>	<4EC28A76.7080606@arm.com>	<CABb+yY1atyLA8Ej57JBEM0JL3oK5e6+1vO0UH5VTNiBsKQPueA@mail.gmail.com>
- <CAJe_ZhftO+481BfL0ErEcM_brfmSuTXkTEniLRYxxM2T7OM2QA@mail.gmail.com>
- <4ECBD8E6.3010605@arm.com>
-Message-ID: <4ECCC0EA.2030503@arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 23 Nov 2011 09:50:09 +0000
+Subject: [PATCH] arm/tegra: Fix build error with tegra_assert_system_reset
+In-Reply-To: <1322009631-711-1-git-send-email-swarren@nvidia.com>
+References: <1322009631-711-1-git-send-email-swarren@nvidia.com>
+Message-ID: <20111123095009.GG9581@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jassi,
-
-On 22/11/11 17:16, Javi Merino wrote:
-> On 16/11/11 06:24, Jassi Brar wrote:
->> On 15 November 2011 22:30, Jassi Brar <jassisinghbrar@gmail.com> wrote:
->> I think the following strikes just the right balance and should fix
->> the issue ...
->>
->> diff --git a/arch/arm/common/pl330.c b/arch/arm/common/pl330.c
->> index 7129cfb..ecbca3f 100644
->> --- a/arch/arm/common/pl330.c
->> +++ b/arch/arm/common/pl330.c
->> @@ -1480,13 +1480,19 @@ int pl330_update(const struct pl330_info *pi)
->>
->>  	/* Now that we are in no hurry, do the callbacks */
->>  	while (!list_empty(&pl330->req_done)) {
->> +		struct pl330_req *r;
->> +
->>  		rqdone = container_of(pl330->req_done.next,
->>  					struct _pl330_req, rqd);
->>
->>  		list_del_init(&rqdone->rqd);
->>
->> +		/* Detach the req */
->> +		r = rqdone->r;
->> +		rqdone->r = NULL;
->> +
->>  		spin_unlock_irqrestore(&pl330->lock, flags);
->> -		_callback(rqdone->r, PL330_ERR_NONE);
->> +		_callback(r, PL330_ERR_NONE);
->>  		spin_lock_irqsave(&pl330->lock, flags);
->>  	}
+On Tue, Nov 22, 2011 at 05:53:51PM -0700, Stephen Warren wrote:
+> Build error:
 > 
-> I'll try this patch and if it works we can submit it instead of my
-> original one.
+> error: static declaration of 'tegra_assert_system_reset' follows non-static
+> declaration
+> 
+> Fix:
+> 
+> Remove the non-static declaration; the function should be local now.
+> 
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
 
-It worked!  Can you please send it to Russell's patch system?  You can
-add a:
+Thanks Stephen.  I'd prefer to fix this a different way, moving tegra to
+use the .restart method instead.  So, I'm about to merge this into the
+commit which created your error.
 
-Tested-by: Javi Merino <javi.merino@arm.com>
-
-Cheers,
-Javi
+diff --git a/arch/arm/mach-tegra/board-dt.c b/arch/arm/mach-tegra/board-dt.c
+index f6f03ce..e417a83 100644
+--- a/arch/arm/mach-tegra/board-dt.c
++++ b/arch/arm/mach-tegra/board-dt.c
+@@ -134,5 +134,6 @@ DT_MACHINE_START(TEGRA_DT, "nVidia Tegra (Flattened Device Tree)")
+ 	.handle_irq	= gic_handle_irq,
+ 	.timer		= &tegra_timer,
+ 	.init_machine	= tegra_dt_init,
++	.restart	= tegra_assert_system_reset,
+ 	.dt_compat	= tegra_dt_board_compat,
+ MACHINE_END
+diff --git a/arch/arm/mach-tegra/board-harmony.c b/arch/arm/mach-tegra/board-harmony.c
+index fd190a8..70ee674 100644
+--- a/arch/arm/mach-tegra/board-harmony.c
++++ b/arch/arm/mach-tegra/board-harmony.c
+@@ -191,4 +191,5 @@ MACHINE_START(HARMONY, "harmony")
+ 	.handle_irq	= gic_handle_irq,
+ 	.timer          = &tegra_timer,
+ 	.init_machine   = tegra_harmony_init,
++	.restart	= tegra_assert_system_reset,
+ MACHINE_END
+diff --git a/arch/arm/mach-tegra/board-paz00.c b/arch/arm/mach-tegra/board-paz00.c
+index 0b7e1cf..33d6205 100644
+--- a/arch/arm/mach-tegra/board-paz00.c
++++ b/arch/arm/mach-tegra/board-paz00.c
+@@ -194,4 +194,5 @@ MACHINE_START(PAZ00, "Toshiba AC100 / Dynabook AZ")
+ 	.handle_irq	= gic_handle_irq,
+ 	.timer          = &tegra_timer,
+ 	.init_machine   = tegra_paz00_init,
++	.restart	= tegra_assert_system_reset,
+ MACHINE_END
+diff --git a/arch/arm/mach-tegra/board-seaboard.c b/arch/arm/mach-tegra/board-seaboard.c
+index 7328379..c1599eb 100644
+--- a/arch/arm/mach-tegra/board-seaboard.c
++++ b/arch/arm/mach-tegra/board-seaboard.c
+@@ -288,6 +288,7 @@ MACHINE_START(SEABOARD, "seaboard")
+ 	.handle_irq	= gic_handle_irq,
+ 	.timer          = &tegra_timer,
+ 	.init_machine   = tegra_seaboard_init,
++	.restart	= tegra_assert_system_reset,
+ MACHINE_END
+ 
+ MACHINE_START(KAEN, "kaen")
+@@ -298,6 +299,7 @@ MACHINE_START(KAEN, "kaen")
+ 	.handle_irq	= gic_handle_irq,
+ 	.timer          = &tegra_timer,
+ 	.init_machine   = tegra_kaen_init,
++	.restart	= tegra_assert_system_reset,
+ MACHINE_END
+ 
+ MACHINE_START(WARIO, "wario")
+@@ -308,4 +310,5 @@ MACHINE_START(WARIO, "wario")
+ 	.handle_irq	= gic_handle_irq,
+ 	.timer          = &tegra_timer,
+ 	.init_machine   = tegra_wario_init,
++	.restart	= tegra_assert_system_reset,
+ MACHINE_END
+diff --git a/arch/arm/mach-tegra/board-trimslice.c b/arch/arm/mach-tegra/board-trimslice.c
+index 60a36a2..c242314 100644
+--- a/arch/arm/mach-tegra/board-trimslice.c
++++ b/arch/arm/mach-tegra/board-trimslice.c
+@@ -180,4 +180,5 @@ MACHINE_START(TRIMSLICE, "trimslice")
+ 	.handle_irq	= gic_handle_irq,
+ 	.timer          = &tegra_timer,
+ 	.init_machine   = tegra_trimslice_init,
++	.restart	= tegra_assert_system_reset,
+ MACHINE_END
+diff --git a/arch/arm/mach-tegra/board.h b/arch/arm/mach-tegra/board.h
+index f159577..1d14df7 100644
+--- a/arch/arm/mach-tegra/board.h
++++ b/arch/arm/mach-tegra/board.h
+@@ -23,6 +23,8 @@
+ 
+ #include <linux/types.h>
+ 
++void tegra_assert_system_reset(char mode, const char *cmd);
++
+ void __init tegra_init_early(void);
+ void __init tegra_map_common_io(void);
+ void __init tegra_init_irq(void);
+diff --git a/arch/arm/mach-tegra/common.c b/arch/arm/mach-tegra/common.c
+index 1374d10..20f396d 100644
+--- a/arch/arm/mach-tegra/common.c
++++ b/arch/arm/mach-tegra/common.c
+@@ -31,7 +31,7 @@
+ #include "clock.h"
+ #include "fuse.h"
+ 
+-static void tegra_assert_system_reset(char mode, const char *cmd)
++void tegra_assert_system_reset(char mode, const char *cmd)
+ {
+ 	void __iomem *reset = IO_ADDRESS(TEGRA_CLK_RESET_BASE + 0x04);
+ 	u32 reg;
+@@ -74,7 +74,6 @@ static void __init tegra_init_cache(void)
+ 
+ void __init tegra_init_early(void)
+ {
+-	arm_pm_restart = tegra_assert_system_reset;
+ 	tegra_init_fuse();
+ 	tegra_init_clock();
+ 	tegra_clk_init_from_table(common_clk_init_table);
