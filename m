@@ -1,29 +1,25 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Wed, 23 Nov 2011 11:57:39 +0100
-Subject: [PATCH 11/17] ASoC: Tegra I2S: Add device tree binding
-In-Reply-To: <20111123104845.GM4332@opensource.wolfsonmicro.com>
-References: <1322011285-4002-1-git-send-email-swarren@nvidia.com>
- <1322011285-4002-12-git-send-email-swarren@nvidia.com>
- <20111123070449.GD5255@avionic-0098.adnet.avionic-design.de>
- <20111123104845.GM4332@opensource.wolfsonmicro.com>
-Message-ID: <20111123105739.GA8406@avionic-0098.adnet.avionic-design.de>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Wed, 23 Nov 2011 11:58:21 +0100
+Subject: [PATCH] IMX/SDMA : save the real count for one DMA transaction.
+In-Reply-To: <1322039585-7901-1-git-send-email-b32955@freescale.com>
+References: <1322039585-7901-1-git-send-email-b32955@freescale.com>
+Message-ID: <20111123105821.GC4063@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Mark Brown wrote:
-> On Wed, Nov 23, 2011 at 08:04:49AM +0100, Thierry Reding wrote:
-> 
-> Always delete unneeded context from your mails so that people can
-> actually find the content you've added and don't have to scroll through
-> the entire patch.
 
-Understood.
+> +	/* save the real count we received or transmitted. */
+> +	chan->private = (void *)count;
 
-Thierry
+And if someone later needs another variable which is private?
+
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: not available
+Name: signature.asc
 Type: application/pgp-signature
 Size: 198 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111123/42d687c8/attachment.sig>
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111123/f7f9bd81/attachment.sig>
