@@ -1,35 +1,32 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 23 Nov 2011 17:54:47 +0000
-Subject: -next fails to boot as of today on S3C6410
-In-Reply-To: <4ECD32CA.2030601@gmail.com>
-References: <20111122193957.GH30583@opensource.wolfsonmicro.com>
- <20111122222135.GB7845@gallagher>
- <20111123120534.GO21073@opensource.wolfsonmicro.com>
- <20111123122855.GB7382@totoro>
- <20111123130134.GB12227@opensource.wolfsonmicro.com>
- <20111123133237.GC7382@totoro>
- <20111123135033.GA20272@opensource.wolfsonmicro.com>
- <20111123143322.GD7382@totoro>
- <20111123145517.GE20272@opensource.wolfsonmicro.com>
- <4ECD32CA.2030601@gmail.com>
-Message-ID: <20111123175446.GI30049@opensource.wolfsonmicro.com>
+Date: Wed, 23 Nov 2011 18:03:45 +0000
+Subject: [PATCH 09/17] ASoC: Tegra I2S: Remove dependency on pdev->id
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF174F08C711@HQMAIL01.nvidia.com>
+References: <1322011285-4002-1-git-send-email-swarren@nvidia.com>
+ <1322011285-4002-10-git-send-email-swarren@nvidia.com>
+ <20111123110338.GC21073@opensource.wolfsonmicro.com>
+ <74CDBE0F657A3D45AFBB94109FB122FF174F08C711@HQMAIL01.nvidia.com>
+Message-ID: <20111123180345.GJ30049@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 23, 2011 at 11:52:10AM -0600, Rob Herring wrote:
-> On 11/23/2011 08:55 AM, Mark Brown wrote:
+On Wed, Nov 23, 2011 at 09:54:21AM -0800, Stephen Warren wrote:
+> Mark Brown wrote at Wednesday, November 23, 2011 4:04 AM:
 
-> > My bisect turned up a second candidate - Nicholas' commit 549158d (ARM:
-> > move iotable mappings within the vmalloc region).  I reverted that and
-> > subsequent commits depending on it and my system now appears to boot
-> > fine with -next (with OF turned on to get the ops for the VIC).  This
-> > code is all a bit deep for me so I've no real idea what might be wrong.
+> > This should really be part of the same commit as the arch/arm side
+> > change in order to avoid bisection breaks as from the point of view of
+> > non-DT systems it's moving the number into the name.
 
-> The first suspect should be overlapping static mappings in the iotable.
-> This was allowed before and now is not. Looking at some of the 6410
-> platforms, I don't see any though. But you didn't mention which platform
-> you are on. There is a 1KB mapping which is a bit unusual.
+> Sorry, I don't quite follow here; the original hard-coded dai structures
+> already had the ID in the name, and hence exactly match the platform
+> device names tegra-i2s.0 and tegra-i2s.1:
 
-I'm on Cragganmore 6410 which just calls a bunch of arch-generic stuff
-(though now I look I do see a comment saying that we're relying on some
-setup from the bootloader which I get may have been trashed...).
+If you're renaming the devices I'd expect the device to driver binding
+to break as the device name changes - actually looking at the code again
+I'm a bit depressed that the platform driver binding works at all with
+this as you've not renamed the driver but you have renamed the devices
+and they're still binding.  I'd have expected the match to be on a
+(name, id) not on the result of rendering those down to a display name.
+
+The whole bodge here just smells a bit to be honest, we ought to be able
+to match things up without jumping through this hoop.
