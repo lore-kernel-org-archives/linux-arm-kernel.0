@@ -1,43 +1,28 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 23 Nov 2011 21:15:35 +0000
-Subject: [GIT PULL] mxs: fixes for v3.2-rc
-In-Reply-To: <20111117123740.GK14656@S2100-06.ap.freescale.net>
-References: <20111117123740.GK14656@S2100-06.ap.freescale.net>
-Message-ID: <201111232115.36143.arnd@arndb.de>
+Date: Wed, 23 Nov 2011 21:15:21 +0000
+Subject: [GIT PULL] i.MXf fixes/cleanups
+In-Reply-To: <20111122104043.GG27267@pengutronix.de>
+References: <20111122104043.GG27267@pengutronix.de>
+Message-ID: <201111232115.21936.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 17 November 2011, Shawn Guo wrote:
-> Hi Arnd,
+On Tuesday 22 November 2011, Sascha Hauer wrote:
+> Please pull the following for -rc. It contains build fixes and also
+> some cleanups.
 > 
-> Please pull the mxs fixes below for v3.2-rc.
-> 
-> Regards,
-> Shawn
+> Sascha
 > 
 > The following changes since commit cfcfc9eca2bcbd26a8e206baeb005b055dbf8e37:
 > 
 >   Linux 3.2-rc2 (2011-11-15 15:02:59 -0200)
 > 
 > are available in the git repository at:
->   git://git.linaro.org/people/shawnguo/linux-2.6.git mxs/fixes
-> 
-> Shawn Guo (1):
->       ARM: Update mach-types to fix mxs build breakage
-> 
-> Wolfram Sang (1):
->       arm: mx28: fix bit operation in clock setting
+>   git://git.pengutronix.de/git/imx/linux-2.6.git imx-for-arnd
 
+Pulled, thanks!
 
-Hi Shawn,
-
-Sorry for taking so long before I actually looked at this.
-
-I've applied the fixes to the fixes branch for 3.2 but I noticed
-that Wolfram's patch was missing a 'Cc: stable at kernel.org' tag,
-which I added. Please confirm that this was correct so I can forward
-the patch, and make sure you add the stable tag where appropriate
-in the future (or explain why a patch should not be applied to the
-stable tree if it looks like it should).
+I've checked that all of the fixes only apply to 3.2, so we don't need
+to mark them as 'Cc: stable'.
 
 	Arnd
