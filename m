@@ -1,628 +1,412 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Wed, 23 Nov 2011 16:28:42 +0000
-Subject: [RFC PATCH 2/2] modpost: use config and ELF sections to build
- file2alias
-In-Reply-To: <5fc02021bb75a6d325b7ebcdd657ca81667fe8b2.1320408578.git.rubini@gnudd.com>
-Message-ID: <20111123162842.GC2050@localhost.localdomain>
+From: lost.distance@yahoo.com (Paul Parsons)
+Date: Wed, 23 Nov 2011 16:45:25 +0000 (GMT)
+Subject: [PATCH v3 1/2] pxa/hx4700: Add Synaptics NavPoint (PXA27x SSP/SPI)
+ driver
+Message-ID: <1322066725.99549.YahooMailClassic@web29017.mail.ird.yahoo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Taking a look at your original series...
+Add support for the Synaptics NavPoint touchpad connected to a PXA27x SSP port
+in SPI slave mode. The driver implements a simple navigation pad. The four
+raised dots are mapped to UP/DOWN/LEFT/RIGHT buttons and the centre of the
+touchpad is mapped to the ENTER button.
 
-On Tue, Nov 22, 2011 at 12:56:32PM +0100, Alessandro Rubini wrote:
+Signed-off-by: Paul Parsons <lost.distance@yahoo.com>
+---
 
-[...]
+V3:
+Patch numbered 1/n because hx4700 platform glue depends on driver.
+Removed reference to hx4700 in Kconfig description.
+Keep the list sorted in Makefile.
+Use tabs for alignment in struct driver_data declaration.
+Removed ternary operator.
+Added module header byte definition to document magic numbers.
+drv_data, ssp, input assignments moved to declaration lines.
+navpoint_suspend() and navpoint_resume() now compiled unconditionally.
+X/Y coordinate limits now provided by module parameters.
+GPIO102 configuration moved from mfp-pxa27x.h to hx4700.c.
+navpoint_suspend() and navpoint_resume() now clear/set GPIO102 unconditionally.
+Driver can now be built as a module.
 
-> lkml.org/lkml/2011/11/4/125 (0/2: description of the work)                                                                                                                                                  
-> lkml.org/lkml/2011/11/4/126 (1/2: turn the if plethora to table lookup)                                                                                                                                     
-> lkml.org/lkml/2011/11/4/127 (2/2: partial split to type-specific files).                                                                                                                                    
-
-I'm not the expert here, but I have a few comments that might be
-useful.
-
-On Fri, 4 Nov 2011 13:23:21 +0100, Alessandro Rubini <rubini@gnudd.com> wrote:
-> diff --git a/scripts/mod/Makefile b/scripts/mod/Makefile
-> index ff954f8..96c3b58 100644
-> --- a/scripts/mod/Makefile
-> +++ b/scripts/mod/Makefile
-> @@ -1,7 +1,18 @@
->  hostprogs-y	:= modpost mk_elfconfig
->  always		:= $(hostprogs-y) empty.o
->  
-> -modpost-objs	:= modpost.o file2alias.o sumversion.o
-> +# we can use bool or tristate options here
-> +modpost-y	:= modpost.o file2alias.o sumversion.o
-> +modpost-$(CONFIG_ACPI)		+= alias_acpi.o
-> +modpost-$(CONFIG_BCMA)		+= alias_bcma.o
-> +modpost-$(CONFIG_PCI)		+= alias_pci.o
-> +modpost-$(CONFIG_SPI)		+= alias_spi.o
-> +modpost-y	+= $(modpost-m)
-> +
-> +
-> +modpost-objs	+= $(modpost-y)
-> +
-> +HOSTLDFLAGS := $(obj)/modpost.lds
->  
->  # dependencies on generated files need to be listed explicitly
->  
-> diff --git a/scripts/mod/alias_acpi.c b/scripts/mod/alias_acpi.c
-> new file mode 100644
-> index 0000000..acb6842
-> --- /dev/null
-> +++ b/scripts/mod/alias_acpi.c
-> @@ -0,0 +1,14 @@
-> +#include "modpost.h"
-> +#include "device_switch.h"
-> +
-> +/* looks like: "acpi:ACPI0003 or acpi:PNP0C0B" or "acpi:LNXVIDEO" */
-> +static int do_acpi_entry(const char *filename,
-> +			struct acpi_device_id *id, char *alias)
-> +{
-> +	sprintf(alias, "acpi*:%s:*", id->id);
-> +	return 1;
-> +}
-> +
-> +static struct devtable_switch dt_sw_acpi[] __DEVTABLE_SWITCH = {
-> +	E("acpi", "__mod_acpi_device_table", acpi_device_id, do_acpi_entry),
-> +};
-
-In files which define multiple bus types, there's no reason to put them
-all in the same array, so we can avoid the explicit boilerplate.
-
-Assuming this technique is used at all (see comments below), a modified
-approach like the following would be possible:
-
-device_switch.h:
-
-#include <linux/compiler.h>
-
-#define DEVTABLE_SWITCH(device_id, symname, structname, function) \
-        __DEVTABLE_SWITCH(__LINE__, device_id, symname, structname, function)
-
-#define __DEVTABLE_SWITCH(line_num, device_id, symname, structname, function) \
-        static const struct devtable_swith __dt_sw_##device_id##_##line_num \
-                __section(.devtable.switch) __used = {          \
-                        .device_id = #device_id,                \
-                        .symname = symname,                     \
-                        .id_size = sizeof(struct structname)    \
-                        .function = function                    \
-                }
-
-__LINE__ is used simply to generate unique local symbol names in case a
-file wants to define multiple entries.  If we don't think that will ever
-happen, that trick isn't needed.
-
-At time of use, this just becomes:
-
-#incluce "device_switch.h"
-
-DEVTABLE_SWITCH(acpi, "__mod_acpi_device_table", acpi_device_id, do_acpi_entry);
-
-
-Notwithstanding this, your version does look like it should work.
-
-> diff --git a/scripts/mod/alias_bcma.c b/scripts/mod/alias_bcma.c
-> new file mode 100644
-> index 0000000..87fa860
-> --- /dev/null
-> +++ b/scripts/mod/alias_bcma.c
-> @@ -0,0 +1,25 @@
-> +
-> +#include "modpost.h"
-> +#include "device_switch.h"
-> +
-> +/* Looks like: bcma:mNidNrevNclN. */
-> +static int do_bcma_entry(const char *filename,
-> +			 struct bcma_device_id *id, char *alias)
-> +{
-> +	id->manuf = TO_NATIVE(id->manuf);
-> +	id->id = TO_NATIVE(id->id);
-> +	id->rev = TO_NATIVE(id->rev);
-> +	id->class = TO_NATIVE(id->class);
-> +
-> +	strcpy(alias, "bcma:");
-> +	ADD(alias, "m", id->manuf != BCMA_ANY_MANUF, id->manuf);
-> +	ADD(alias, "id", id->id != BCMA_ANY_ID, id->id);
-> +	ADD(alias, "rev", id->rev != BCMA_ANY_REV, id->rev);
-> +	ADD(alias, "cl", id->class != BCMA_ANY_CLASS, id->class);
-> +	add_wildcard(alias);
-> +	return 1;
-> +}
-> +
-> +static struct devtable_switch dt_sw_bcma[] __DEVTABLE_SWITCH = {
-> +	E("bcma", "__mod_bcma_device_table", bcma_device_id, do_bcma_entry),
-> +};
-> diff --git a/scripts/mod/alias_pci.c b/scripts/mod/alias_pci.c
-> new file mode 100644
-> index 0000000..90f3a9a
-> --- /dev/null
-> +++ b/scripts/mod/alias_pci.c
-> @@ -0,0 +1,49 @@
-> +#include "modpost.h"
-> +#include "device_switch.h"
-> +
-> +/* Looks like: pci:vNdNsvNsdNbcNscNiN. */
-> +static int do_pci_entry(const char *filename,
-> +			struct pci_device_id *id, char *alias)
-> +{
-> +	/* Class field can be divided into these three. */
-> +	unsigned char baseclass, subclass, interface,
-> +		baseclass_mask, subclass_mask, interface_mask;
-> +
-> +	id->vendor = TO_NATIVE(id->vendor);
-> +	id->device = TO_NATIVE(id->device);
-> +	id->subvendor = TO_NATIVE(id->subvendor);
-> +	id->subdevice = TO_NATIVE(id->subdevice);
-> +	id->class = TO_NATIVE(id->class);
-> +	id->class_mask = TO_NATIVE(id->class_mask);
-> +
-> +	strcpy(alias, "pci:");
-> +	ADD(alias, "v", id->vendor != PCI_ANY_ID, id->vendor);
-> +	ADD(alias, "d", id->device != PCI_ANY_ID, id->device);
-> +	ADD(alias, "sv", id->subvendor != PCI_ANY_ID, id->subvendor);
-> +	ADD(alias, "sd", id->subdevice != PCI_ANY_ID, id->subdevice);
-> +
-> +	baseclass = (id->class) >> 16;
-> +	baseclass_mask = (id->class_mask) >> 16;
-> +	subclass = (id->class) >> 8;
-> +	subclass_mask = (id->class_mask) >> 8;
-> +	interface = id->class;
-> +	interface_mask = id->class_mask;
-> +
-> +	if ((baseclass_mask != 0 && baseclass_mask != 0xFF)
-> +	    || (subclass_mask != 0 && subclass_mask != 0xFF)
-> +	    || (interface_mask != 0 && interface_mask != 0xFF)) {
-> +		warn("Can't handle masks in %s:%04X\n",
-> +		     filename, id->class_mask);
-> +		return 0;
-> +	}
-> +
-> +	ADD(alias, "bc", baseclass_mask == 0xFF, baseclass);
-> +	ADD(alias, "sc", subclass_mask == 0xFF, subclass);
-> +	ADD(alias, "i", interface_mask == 0xFF, interface);
-> +	add_wildcard(alias);
-> +	return 1;
-> +}
-> +
-> +static struct devtable_switch dt_sw_pci[] __DEVTABLE_SWITCH = {
-> +	E("pci", "__mod_pci_device_table", pci_device_id, do_pci_entry),
-> +};
-> diff --git a/scripts/mod/alias_spi.c b/scripts/mod/alias_spi.c
-> new file mode 100644
-> index 0000000..d509820
-> --- /dev/null
-> +++ b/scripts/mod/alias_spi.c
-> @@ -0,0 +1,15 @@
-> +#include "modpost.h"
-> +#include "device_switch.h"
-> +
-> +/* Looks like: spi:S */
-> +static int do_spi_entry(const char *filename, struct spi_device_id *id,
-> +			char *alias)
-> +{
-> +	sprintf(alias, SPI_MODULE_PREFIX "%s", id->name);
-> +
-> +	return 1;
-> +}
-> +
-> +static struct devtable_switch dt_sw_spi[] __DEVTABLE_SWITCH = {
-> +	E("spi", "__mod_spi_device_table", spi_device_id, do_spi_entry),
-> +};
-> diff --git a/scripts/mod/device_switch.h b/scripts/mod/device_switch.h
-> new file mode 100644
-> index 0000000..9443cd5
-> --- /dev/null
-> +++ b/scripts/mod/device_switch.h
-> @@ -0,0 +1,47 @@
-> +/* We use the ELF typedefs for kernel_ulong_t but bite the bullet and
-> + * use either stdint.h or inttypes.h for the rest. */
-> +#if KERNEL_ELFCLASS == ELFCLASS32
-> +typedef Elf32_Addr	kernel_ulong_t;
-> +#define BITS_PER_LONG 32
-> +#else
-> +typedef Elf64_Addr	kernel_ulong_t;
-> +#define BITS_PER_LONG 64
-> +#endif
-> +#ifdef __sun__
-> +#include <inttypes.h>
-> +#else
-> +#include <stdint.h>
-> +#endif
-> +
-> +#include <ctype.h>
-> +
-> +typedef uint32_t	__u32;
-> +typedef uint16_t	__u16;
-> +typedef unsigned char	__u8;
-> +
-> +/* Big exception to the "don't include kernel headers into userspace, which
-> + * even potentially has different endianness and word sizes, since
-> + * we handle those differences explicitly below */
-> +#include "../../include/linux/mod_devicetable.h"
-> +
-> +#define ADD(str, sep, cond, field)                              \
-> +do {                                                            \
-> +        strcat(str, sep);                                       \
-> +        if (cond)                                               \
-> +                sprintf(str + strlen(str),                      \
-> +                        sizeof(field) == 1 ? "%02X" :           \
-> +                        sizeof(field) == 2 ? "%04X" :           \
-> +                        sizeof(field) == 4 ? "%08X" : "",       \
-> +                        field);                                 \
-> +        else                                                    \
-> +                sprintf(str + strlen(str), "*");                \
-> +} while(0)
-> +
-> +/* Always end in a wildcard, for future extension */
-> +static inline void add_wildcard(char *str)
-> +{
-> +	int len = strlen(str);
-> +
-> +	if (str[len - 1] != '*')
-> +		strcat(str + len, "*");
-> +}
-> diff --git a/scripts/mod/file2alias.c b/scripts/mod/file2alias.c
-> index 1247bc9..8e91fe4 100644
-> --- a/scripts/mod/file2alias.c
-> +++ b/scripts/mod/file2alias.c
-> @@ -11,54 +11,7 @@
->   */
->  
->  #include "modpost.h"
-> -
-> -/* We use the ELF typedefs for kernel_ulong_t but bite the bullet and
-> - * use either stdint.h or inttypes.h for the rest. */
-> -#if KERNEL_ELFCLASS == ELFCLASS32
-> -typedef Elf32_Addr	kernel_ulong_t;
-> -#define BITS_PER_LONG 32
-> -#else
-> -typedef Elf64_Addr	kernel_ulong_t;
-> -#define BITS_PER_LONG 64
-> -#endif
-> -#ifdef __sun__
-> -#include <inttypes.h>
-> -#else
-> -#include <stdint.h>
-> -#endif
-> -
-> -#include <ctype.h>
-> -
-> -typedef uint32_t	__u32;
-> -typedef uint16_t	__u16;
-> -typedef unsigned char	__u8;
-> -
-> -/* Big exception to the "don't include kernel headers into userspace, which
-> - * even potentially has different endianness and word sizes, since
-> - * we handle those differences explicitly below */
-> -#include "../../include/linux/mod_devicetable.h"
-> -
-> -#define ADD(str, sep, cond, field)                              \
-> -do {                                                            \
-> -        strcat(str, sep);                                       \
-> -        if (cond)                                               \
-> -                sprintf(str + strlen(str),                      \
-> -                        sizeof(field) == 1 ? "%02X" :           \
-> -                        sizeof(field) == 2 ? "%04X" :           \
-> -                        sizeof(field) == 4 ? "%08X" : "",       \
-> -                        field);                                 \
-> -        else                                                    \
-> -                sprintf(str + strlen(str), "*");                \
-> -} while(0)
-> -
-> -/* Always end in a wildcard, for future extension */
-> -static inline void add_wildcard(char *str)
-> -{
-> -	int len = strlen(str);
-> -
-> -	if (str[len - 1] != '*')
-> -		strcat(str + len, "*");
-> -}
-> +#include "device_switch.h"
->  
->  unsigned int cross_build = 0;
->  /**
-> @@ -314,49 +267,6 @@ static int do_ieee1394_entry(const char *filename,
->  	return 1;
->  }
->  
-> -/* Looks like: pci:vNdNsvNsdNbcNscNiN. */
-> -static int do_pci_entry(const char *filename,
-> -			struct pci_device_id *id, char *alias)
-> -{
-> -	/* Class field can be divided into these three. */
-> -	unsigned char baseclass, subclass, interface,
-> -		baseclass_mask, subclass_mask, interface_mask;
-> -
-> -	id->vendor = TO_NATIVE(id->vendor);
-> -	id->device = TO_NATIVE(id->device);
-> -	id->subvendor = TO_NATIVE(id->subvendor);
-> -	id->subdevice = TO_NATIVE(id->subdevice);
-> -	id->class = TO_NATIVE(id->class);
-> -	id->class_mask = TO_NATIVE(id->class_mask);
-> -
-> -	strcpy(alias, "pci:");
-> -	ADD(alias, "v", id->vendor != PCI_ANY_ID, id->vendor);
-> -	ADD(alias, "d", id->device != PCI_ANY_ID, id->device);
-> -	ADD(alias, "sv", id->subvendor != PCI_ANY_ID, id->subvendor);
-> -	ADD(alias, "sd", id->subdevice != PCI_ANY_ID, id->subdevice);
-> -
-> -	baseclass = (id->class) >> 16;
-> -	baseclass_mask = (id->class_mask) >> 16;
-> -	subclass = (id->class) >> 8;
-> -	subclass_mask = (id->class_mask) >> 8;
-> -	interface = id->class;
-> -	interface_mask = id->class_mask;
-> -
-> -	if ((baseclass_mask != 0 && baseclass_mask != 0xFF)
-> -	    || (subclass_mask != 0 && subclass_mask != 0xFF)
-> -	    || (interface_mask != 0 && interface_mask != 0xFF)) {
-> -		warn("Can't handle masks in %s:%04X\n",
-> -		     filename, id->class_mask);
-> -		return 0;
-> -	}
-> -
-> -	ADD(alias, "bc", baseclass_mask == 0xFF, baseclass);
-> -	ADD(alias, "sc", subclass_mask == 0xFF, subclass);
-> -	ADD(alias, "i", interface_mask == 0xFF, interface);
-> -	add_wildcard(alias);
-> -	return 1;
-> -}
-> -
->  /* looks like: "ccw:tNmNdtNdmN" */
->  static int do_ccw_entry(const char *filename,
->  			struct ccw_device_id *id, char *alias)
-> @@ -415,14 +325,6 @@ static int do_serio_entry(const char *filename,
->  	return 1;
->  }
->  
-> -/* looks like: "acpi:ACPI0003 or acpi:PNP0C0B" or "acpi:LNXVIDEO" */
-> -static int do_acpi_entry(const char *filename,
-> -			struct acpi_device_id *id, char *alias)
-> -{
-> -	sprintf(alias, "acpi*:%s:*", id->id);
-> -	return 1;
-> -}
-> -
->  /* looks like: "pnp:dD" */
->  static void do_pnp_device_entry(void *symval, unsigned long size,
->  				struct module *mod)
-> @@ -702,24 +604,6 @@ static int do_ssb_entry(const char *filename,
->  	return 1;
->  }
->  
-> -/* Looks like: bcma:mNidNrevNclN. */
-> -static int do_bcma_entry(const char *filename,
-> -			 struct bcma_device_id *id, char *alias)
-> -{
-> -	id->manuf = TO_NATIVE(id->manuf);
-> -	id->id = TO_NATIVE(id->id);
-> -	id->rev = TO_NATIVE(id->rev);
-> -	id->class = TO_NATIVE(id->class);
-> -
-> -	strcpy(alias, "bcma:");
-> -	ADD(alias, "m", id->manuf != BCMA_ANY_MANUF, id->manuf);
-> -	ADD(alias, "id", id->id != BCMA_ANY_ID, id->id);
-> -	ADD(alias, "rev", id->rev != BCMA_ANY_REV, id->rev);
-> -	ADD(alias, "cl", id->class != BCMA_ANY_CLASS, id->class);
-> -	add_wildcard(alias);
-> -	return 1;
-> -}
-> -
->  /* Looks like: virtio:dNvN */
->  static int do_virtio_entry(const char *filename, struct virtio_device_id *id,
->  			   char *alias)
-> @@ -765,13 +649,14 @@ static int do_i2c_entry(const char *filename, struct i2c_device_id *id,
->  	return 1;
->  }
->  
-> -/* Looks like: spi:S */
-> -static int do_spi_entry(const char *filename, struct spi_device_id *id,
-> -			char *alias)
-> +static void dmi_ascii_filter(char *d, const char *s)
->  {
-> -	sprintf(alias, SPI_MODULE_PREFIX "%s", id->name);
-> +	/* Filter out characters we don't want to see in the modalias string */
-> +	for (; *s; s++)
-> +		if (*s > ' ' && *s < 127 && *s != ':')
-> +			*(d++) = *s;
->  
-> -	return 1;
-> +	*d = 0;
->  }
->  
->  static const struct dmifield {
-> @@ -793,17 +678,6 @@ static const struct dmifield {
->  	{ NULL,  DMI_NONE }
->  };
->  
-> -static void dmi_ascii_filter(char *d, const char *s)
-> -{
-> -	/* Filter out characters we don't want to see in the modalias string */
-> -	for (; *s; s++)
-> -		if (*s > ' ' && *s < 127 && *s != ':')
-> -			*(d++) = *s;
-> -
-> -	*d = 0;
-> -}
-> -
-> -
->  static int do_dmi_entry(const char *filename, struct dmi_system_id *id,
->  			char *alias)
->  {
-> @@ -891,7 +765,7 @@ static inline int sym_is(const char *symbol, const char *name)
->  	return match[strlen(name)] == '\0';
->  }
->  
-> -static void do_table(void *symval, unsigned long size,
-> +void do_table(void *symval, unsigned long size,
->  		     unsigned long id_size,
->  		     const char *device_id,
->  		     void *function,
-> @@ -913,17 +787,7 @@ static void do_table(void *symval, unsigned long size,
->  	}
->  }
->  
-> -/* This array collects all instances that use the generic do_table above */
-> -struct devtable_switch {
-> -	const char *device_id;
-> -	const char *symname;
-> -	unsigned long id_size;
-> -	void *function;
-> -};
-> -#define E(id, name, structname, f) {id, name, sizeof(struct structname), f}
-> -
-> -static struct devtable_switch devtable_switch[] = {
-> -	E("pci", "__mod_pci_device_table", pci_device_id, do_pci_entry),
-> +static struct devtable_switch devtable_switch[] __DEVTABLE_SWITCH = {
->  	E("hid", "__mod_hid_device_table", hid_device_id, do_hid_entry),
->  	E("ieee1394", "__mod_ieee1394_device_table",
->  	  ieee1394_device_id, do_ieee1394_entry),
-> @@ -931,7 +795,6 @@ static struct devtable_switch devtable_switch[] = {
->  	E("ap", "__mod_ap_device_table", ap_device_id, do_ap_entry),
->  	E("css", "__mod_css_device_table", css_device_id, do_css_entry),
->  	E("seio", "__mod_serio_device_table", serio_device_id, do_serio_entry),
-> -	E("acpi", "__mod_acpi_device_table", acpi_device_id, do_acpi_entry),
->  	E("pcmcia", "__mod_pcmcia_device_table",
->  	  pcmcia_device_id, do_pcmcia_entry),
->  	E("of", "__mod_of_device_table", of_device_id, do_of_entry),
-> @@ -942,13 +805,11 @@ static struct devtable_switch devtable_switch[] = {
->  	  parisc_device_id, do_parisc_entry),
->  	E("sdio", "__mod_sdio_device_table", sdio_device_id, do_sdio_entry),
->  	E("ssb", "__mod_ssb_device_table", ssb_device_id, do_ssb_entry),
-> -	E("bcma", "__mod_bcma_device_table", bcma_device_id, do_bcma_entry),
->  	E("virtio", "__mod_virtio_device_table",
->  	  virtio_device_id, do_virtio_entry),
->  	E("vmbus", "__mod_vmbus_device_table",
->  	  hv_vmbus_device_id, do_vmbus_entry),
->  	E("i2c", "__mod_i2c_device_table", i2c_device_id, do_i2c_entry),
-> -	E("spi", "__mod_spi_device_table", spi_device_id, do_spi_entry),
->  	E("dmi", "__mod_dmi_device_table", dmi_system_id, do_dmi_entry),
->  	E("platform", "__mod_platform_device_table",
->  	  platform_device_id, do_platform_entry),
-> @@ -989,11 +850,10 @@ void handle_moddevtable(struct module *mod, struct elf_info *info,
->  	else if (sym_is(symname, "__mod_pnp_card_device_table"))
->  		do_pnp_card_entries(symval, sym->st_size, mod);
->  	else {
-> -		struct devtable_switch *p = devtable_switch;
-> -		int i;
-> +		struct devtable_switch *p;
->  
->  		/* scan the array */
-> -		for (i = 0; i < ARRAY_SIZE(devtable_switch); i++, p++) {
-> +		for (p = __dt_sw_first; p < __dt_sw_last; p++) {
->  			if (sym_is(symname, p->symname)) {
->  				do_table(symval, sym->st_size, p->id_size,
->  					 p->device_id, p->function, mod);
-> diff --git a/scripts/mod/modpost.h b/scripts/mod/modpost.h
-> index 2031119..ea98de3 100644
-> --- a/scripts/mod/modpost.h
-> +++ b/scripts/mod/modpost.h
-> @@ -169,6 +169,24 @@ void handle_moddevtable(struct module *mod, struct elf_info *info,
->  			Elf_Sym *sym, const char *symname);
->  void add_moddevtable(struct buffer *buf, struct module *mod);
->  
-> +void do_table(void *symval, unsigned long size,
-> +	      unsigned long id_size,
-> +	      const char *device_id,
-> +	      void *function,
-> +	      struct module *mod);
-> +
-> +/* An array of these is assembled at compile time */
-> +struct devtable_switch {
-> +	const char *device_id;
-> +	const char *symname;
-> +	unsigned long id_size;
-> +	void *function;
-> +};
-> +#define E(id, name, structname, f) {id, name, sizeof(struct structname), f}
-> +#define __DEVTABLE_SWITCH __attribute__((section(".devtable_switch"),used))
-
-I have some misgivings about using this kind of toolchain trick where it
-is not needed -- though this is partly a matter of taste.
-
-(To clarify, I believe this technique isn't needed except when the
-resulting tables need to be inspectable from a binary only
-environment, such as the running kernel image or tools like modinfo.)
-
-All we really need here is to include the required set of headers at
-compile-time, rather than doing these link-time tricks.  This is
-essentially just a source transofmration and can probably be done
-straightforwardly with an autogenerated include file, a couple of
-Makefile rules and some scripting or preprocessor tricks to paste
-the relevant entries into a common array.
-
-If you think that's worth a try, we can discuss it further.
-
-> +
-> +extern struct devtable_switch __dt_sw_first[], __dt_sw_last[];
-> +
->  /* sumversion.c */
->  void maybe_frob_rcs_version(const char *modfilename,
->                           char *version,
-> diff --git a/scripts/mod/modpost.lds b/scripts/mod/modpost.lds
-> new file mode 100644
-> index 0000000..0642326
-> --- /dev/null
-> +++ b/scripts/mod/modpost.lds
-> @@ -0,0 +1,9 @@
-> +SECTIONS
-> +{
-> +     .data : {
-> +             . = ALIGN(0x40);
-> +             __dt_sw_first = .;
-> +             *(.devtable_switch);
-> +             __dt_sw_last = .;
-> +             }
-> +}
-> --
-> 1.6.0.2
->
->
-
-For myself, I have some misgivings about using this kind of toolchain
-trick where it is not needed -- though this is partly a matter of taste.
-
-(To clarify, I think this stuff is only needed where the resulting
-tables need to be inspectable from a binary-only environment, such
-as in the running kernel, or when using kernel image analysis tools
-which are not supposed to depend in having a configured kernel source
-tree handy, such as modinfo.)
-
-The problem to be solved here is essentially a source transofmration
-and should be possible to do straightforwardly with an autogenerated
-include file, a couple of Makefile rules and some scripting or
-preprocessor tricks to paste the relevant entries into a common
-array.
-
-If you think that's worth a try, we can discuss it further.
-
-> +
-> +extern struct devtable_switch __dt_sw_first[], __dt_sw_last[];
-> +
->  /* sumversion.c */
->  void maybe_frob_rcs_version(const char *modfilename,
->  			    char *version,
-> diff --git a/scripts/mod/modpost.lds b/scripts/mod/modpost.lds
-> new file mode 100644
-> index 0000000..0642326
-> --- /dev/null
-> +++ b/scripts/mod/modpost.lds
-> @@ -0,0 +1,9 @@
-> +SECTIONS
-> +{
-> +	.data : {
-> +		. = ALIGN(0x40);
-> +		__dt_sw_first = .;
-> +		*(.devtable_switch);
-> +		__dt_sw_last = .;
-> +		}
-> +}
-> -- 
-> 1.6.0.2
-> 
-> 
-
-Otherwise, this series looks like a sensible evolution to me.
-
-Cheers
----Dave
+diff -uprN clean-3.2-rc2/arch/arm/mach-pxa/include/mach/mfp-pxa27x.h linux-3.2-rc2/arch/arm/mach-pxa/include/mach/mfp-pxa27x.h
+--- clean-3.2-rc2/arch/arm/mach-pxa/include/mach/mfp-pxa27x.h	2011-11-15 17:02:59.000000000 +0000
++++ linux-3.2-rc2/arch/arm/mach-pxa/include/mach/mfp-pxa27x.h	2011-11-20 00:12:00.947519171 +0000
+@@ -206,6 +206,7 @@
+ #define GPIO113_I2S_SYSCLK	MFP_CFG_OUT(GPIO113, AF1, DRIVE_LOW)
+ 
+ /* SSP 1 */
++#define GPIO23_SSP1_SCLK_IN	MFP_CFG_IN(GPIO23, AF2)
+ #define GPIO23_SSP1_SCLK	MFP_CFG_OUT(GPIO23, AF2, DRIVE_LOW)
+ #define GPIO29_SSP1_SCLK	MFP_CFG_IN(GPIO29, AF3)
+ #define GPIO27_SSP1_SYSCLK	MFP_CFG_OUT(GPIO27, AF1, DRIVE_LOW)
+diff -uprN clean-3.2-rc2/drivers/input/mouse/Kconfig linux-3.2-rc2/drivers/input/mouse/Kconfig
+--- clean-3.2-rc2/drivers/input/mouse/Kconfig	2011-11-15 17:02:59.000000000 +0000
++++ linux-3.2-rc2/drivers/input/mouse/Kconfig	2011-11-20 00:12:00.947519171 +0000
+@@ -322,4 +322,13 @@ config MOUSE_SYNAPTICS_I2C
+ 	  To compile this driver as a module, choose M here: the
+ 	  module will be called synaptics_i2c.
+ 
++config MOUSE_NAVPOINT_PXA27x
++	tristate "Synaptics NavPoint (PXA27x SSP/SPI)"
++	depends on PXA27x && PXA_SSP
++	help
++	  This option enables support for the Synaptics NavPoint connected to
++	  a PXA27x SSP port in SPI slave mode. The driver implements a simple
++	  navigation pad. The four raised dots are mapped to UP/DOWN/LEFT/RIGHT
++	  buttons and the centre of the touchpad is mapped to the ENTER button.
++
+ endif
+diff -uprN clean-3.2-rc2/drivers/input/mouse/Makefile linux-3.2-rc2/drivers/input/mouse/Makefile
+--- clean-3.2-rc2/drivers/input/mouse/Makefile	2011-11-15 17:02:59.000000000 +0000
++++ linux-3.2-rc2/drivers/input/mouse/Makefile	2011-11-20 00:12:00.947519171 +0000
+@@ -12,6 +12,7 @@ obj-$(CONFIG_MOUSE_GPIO)		+= gpio_mouse.
+ obj-$(CONFIG_MOUSE_INPORT)		+= inport.o
+ obj-$(CONFIG_MOUSE_LOGIBM)		+= logibm.o
+ obj-$(CONFIG_MOUSE_MAPLE)		+= maplemouse.o
++obj-$(CONFIG_MOUSE_NAVPOINT_PXA27x)	+= navpoint.o
+ obj-$(CONFIG_MOUSE_PC110PAD)		+= pc110pad.o
+ obj-$(CONFIG_MOUSE_PS2)			+= psmouse.o
+ obj-$(CONFIG_MOUSE_PXA930_TRKBALL)	+= pxa930_trkball.o
+diff -uprN clean-3.2-rc2/drivers/input/mouse/navpoint.c linux-3.2-rc2/drivers/input/mouse/navpoint.c
+--- clean-3.2-rc2/drivers/input/mouse/navpoint.c	1970-01-01 01:00:00.000000000 +0100
++++ linux-3.2-rc2/drivers/input/mouse/navpoint.c	2011-11-20 00:12:00.947519171 +0000
+@@ -0,0 +1,323 @@
++/*
++ *  Copyright (C) 2011 Paul Parsons <lost.distance@yahoo.com>
++ *
++ *  This program is free software; you can redistribute it and/or modify
++ *  it under the terms of the GNU General Public License version 2 as
++ *  published by the Free Software Foundation.
++ */
++
++#include <linux/kernel.h>
++#include <linux/init.h>
++#include <linux/module.h>
++#include <linux/platform_device.h>
++#include <linux/clk.h>
++#include <linux/delay.h>
++#include <linux/gpio.h>
++#include <linux/input.h>
++#include <linux/input/navpoint.h>
++#include <linux/interrupt.h>
++#include <linux/pxa2xx_ssp.h>
++#include <linux/slab.h>
++
++/*
++ *	Synaptics NavPoint (PXA27x SSP/SPI) driver.
++ */
++
++/*
++ *	Synaptics Modular Embedded Protocol: Module Packet Format.
++ *	Module header byte 2:0 = Length (# bytes that follow)
++ *	Module header byte 4:3 = Control
++ *	Module header byte 7:5 = Module Address
++ */
++#define HEADER_LENGTH(byte)	((byte) & 0x07)
++#define HEADER_CONTROL(byte)	(((byte) >> 3) & 0x03)
++#define HEADER_ADDRESS(byte)	((byte) >> 5)
++
++struct driver_data {
++	struct ssp_device	*ssp;
++	int			gpio;
++	struct input_dev	*input;
++	int			index;
++	uint8_t			data[1+HEADER_LENGTH(0xff)];
++	int			pressed;	/* 1 = pressed, 0 = released */
++	unsigned		code;		/* Code of last key pressed */
++};
++
++static const u32 sscr0 = 0
++	| SSCR0_TUM		/* TIM = 1; No TUR interrupts */
++	| SSCR0_RIM		/* RIM = 1; No ROR interrupts */
++	| SSCR0_SSE		/* SSE = 1; SSP enabled */
++	| SSCR0_Motorola	/* FRF = 0; Motorola SPI */
++	| SSCR0_DataSize(16)	/* DSS = 15; Data size = 16-bit */
++	;
++static const u32 sscr1 = 0
++	| SSCR1_SCFR		/* SCFR = 1; SSPSCLK only during transfers */
++	| SSCR1_SCLKDIR		/* SCLKDIR = 1; Slave mode */
++	| SSCR1_SFRMDIR		/* SFRMDIR = 1; Slave mode */
++	| SSCR1_RWOT		/* RWOT = 1; Receive without transmit mode */
++	| SSCR1_RxTresh(1)	/* RFT = 0; Receive FIFO threshold = 1 */
++	| SSCR1_SPH		/* SPH = 1; SSPSCLK inactive 0.5 + 1 cycles */
++	| SSCR1_RIE		/* RIE = 1; Receive FIFO interrupt enabled */
++	;
++static const u32 sssr = 0
++	| SSSR_BCE		/* BCE = 1; Clear BCE */
++	| SSSR_TUR		/* TUR = 1; Clear TUR */
++	| SSSR_EOC		/* EOC = 1; Clear EOC */
++	| SSSR_TINT		/* TINT = 1; Clear TINT */
++	| SSSR_PINT		/* PINT = 1; Clear PINT */
++	| SSSR_ROR		/* ROR = 1; Clear ROR */
++	;
++
++/*
++ *	MEP Query $22: Touchpad Coordinate Range Query is not supported by
++ *	the NavPoint module, so sampled values provide the default limits.
++ */
++
++static int west = 2416;		/* 1/3 width */
++module_param(west, int, 0644);
++MODULE_PARM_DESC(west, "X coordinate limit for KEY_LEFT. Default = 2416");
++static int east = 3904;		/* 2/3 width */
++module_param(east, int, 0644);
++MODULE_PARM_DESC(east, "X coordinate limit for KEY_RIGHT. Default = 3904");
++static int south = 2480;	/* 1/3 height */
++module_param(south, int, 0644);
++MODULE_PARM_DESC(south, "Y coordinate limit for KEY_DOWN. Default = 2480");
++static int north = 3424;	/* 2/3 height */
++module_param(north, int, 0644);
++MODULE_PARM_DESC(north, "Y coordinate limit for KEY_UP. Default = 3424");
++
++static void navpoint_packet(void *dev)
++{
++	struct driver_data *drv_data = dev;
++	int pressed;
++	unsigned x, y;
++	unsigned code;
++
++	switch (drv_data->data[0]) {
++	case 0xff:	/* Garbage (packet?) between reset and Hello packet */
++	case 0x00:	/* Module 0, NULL packet */
++		break;
++	case 0x0e:	/* Module 0, Absolute packet */
++		pressed = (drv_data->data[1] & 0x01);
++		if ((drv_data->pressed ^ pressed) == 0)	/* No change */
++			break;
++		drv_data->pressed = pressed;
++		x = ((drv_data->data[2] & 0x1f) << 8) | drv_data->data[3];
++		y = ((drv_data->data[4] & 0x1f) << 8) | drv_data->data[5];
++		if (x < west)
++			code = KEY_LEFT;
++		else if (x > east)
++			code = KEY_RIGHT;
++		else if (y < south)
++			code = KEY_DOWN;
++		else if (y > north)
++			code = KEY_UP;
++		else
++			code = KEY_ENTER;
++		if (pressed)
++			drv_data->code = code;
++		input_report_key(drv_data->input, drv_data->code, pressed);
++		input_sync(drv_data->input);
++		break;
++	case 0x19:	/* Module 0, Hello packet */
++		if ((drv_data->data[1] & 0xf0) == 0x10)
++			break;
++		/* FALLTHROUGH */
++	default:
++		dev_warn(dev, "spurious packet: 0x%02x,0x%02x,...\n",
++			drv_data->data[0],
++			drv_data->data[1]);
++		break;
++	}
++
++	drv_data->index = 0;
++}
++
++static irqreturn_t navpoint_int(int irq, void *dev)
++{
++	struct driver_data *drv_data = dev;
++	struct ssp_device *ssp = drv_data->ssp;
++	u32 status;
++	irqreturn_t ret;
++
++	status = pxa_ssp_read_reg(ssp, SSSR);
++	ret = IRQ_NONE;
++
++	if (status & sssr) {
++		dev_warn(dev, "spurious interrupt: 0x%02x\n", status);
++		pxa_ssp_write_reg(ssp, SSSR, (status & sssr));
++		ret = IRQ_HANDLED;
++	}
++
++	if (status & SSSR_RFS) {
++		while (status & SSSR_RNE) {
++			u32 data;
++
++			data = pxa_ssp_read_reg(ssp, SSDR);
++			drv_data->data[drv_data->index + 0] = (data >> 8);
++			drv_data->data[drv_data->index + 1] = data;
++			drv_data->index += 2;
++			if (HEADER_LENGTH(drv_data->data[0]) < drv_data->index)
++				navpoint_packet(dev);
++			status = pxa_ssp_read_reg(ssp, SSSR);
++		}
++		ret = IRQ_HANDLED;
++	}
++
++	return ret;
++}
++
++int navpoint_suspend(struct device *dev)
++{
++	struct driver_data *drv_data = dev_get_drvdata(dev);
++	struct ssp_device *ssp = drv_data->ssp;
++
++	gpio_set_value(drv_data->gpio, 0);
++
++	pxa_ssp_write_reg(ssp, SSCR0, 0);
++
++	clk_disable(ssp->clk);
++
++	return 0;
++}
++
++int navpoint_resume(struct device *dev)
++{
++	struct driver_data *drv_data = dev_get_drvdata(dev);
++	struct ssp_device *ssp = drv_data->ssp;
++
++	clk_enable(ssp->clk);
++
++	pxa_ssp_write_reg(ssp, SSCR1, sscr1);
++	pxa_ssp_write_reg(ssp, SSSR, sssr);
++	pxa_ssp_write_reg(ssp, SSTO, 0);
++	pxa_ssp_write_reg(ssp, SSCR0, sscr0);	/* SSCR0_SSE written last */
++
++	gpio_set_value(drv_data->gpio, 1);
++
++	/* Wait until SSP port is ready for slave clock operations */
++	while (pxa_ssp_read_reg(ssp, SSSR) & SSSR_CSS)
++		msleep(1);
++
++	return 0;
++}
++
++#ifdef CONFIG_SUSPEND
++static const struct dev_pm_ops navpoint_pm_ops = {
++	.suspend	= navpoint_suspend,
++	.resume		= navpoint_resume,
++};
++#endif
++
++static int __devinit navpoint_probe(struct platform_device *pdev)
++{
++	struct navpoint_platform_data *pdata = pdev->dev.platform_data;
++	int ret;
++	struct driver_data *drv_data;
++	struct ssp_device *ssp;
++	struct input_dev *input;
++
++	drv_data = kzalloc(sizeof(struct driver_data), GFP_KERNEL);
++	if (!drv_data) {
++		ret = -ENOMEM;
++		goto ret0;
++	}
++
++	ssp = pxa_ssp_request(pdata->port, pdev->name);
++	if (!ssp) {
++		ret = -ENODEV;
++		goto ret1;
++	}
++
++	ret = request_irq(ssp->irq, navpoint_int, 0, pdev->name, drv_data);
++	if (ret)
++		goto ret2;
++
++	input = input_allocate_device();
++	if (!input) {
++		ret = -ENOMEM;
++		goto ret3;
++	}
++	input->name = pdev->name;
++	__set_bit(EV_KEY, input->evbit);
++	__set_bit(KEY_ENTER, input->keybit);
++	__set_bit(KEY_UP, input->keybit);
++	__set_bit(KEY_LEFT, input->keybit);
++	__set_bit(KEY_RIGHT, input->keybit);
++	__set_bit(KEY_DOWN, input->keybit);
++	input->dev.parent = &pdev->dev;
++	ret = input_register_device(input);
++	if (ret)
++		goto ret4;
++
++	drv_data->ssp = ssp;
++	drv_data->gpio = pdata->gpio;
++	drv_data->input = input;
++
++	platform_set_drvdata(pdev, drv_data);
++
++	(void) navpoint_resume(&pdev->dev);
++
++	dev_info(&pdev->dev, "ssp%d, irq %d\n", pdata->port, ssp->irq);
++
++	return 0;
++
++ret4:
++	input_free_device(input);
++ret3:
++	free_irq(ssp->irq, drv_data);
++ret2:
++	pxa_ssp_free(ssp);
++ret1:
++	kfree(drv_data);
++ret0:
++	return ret;
++}
++
++static int __devexit navpoint_remove(struct platform_device *pdev)
++{
++	struct driver_data *drv_data = platform_get_drvdata(pdev);
++	struct ssp_device *ssp = drv_data->ssp;
++	struct input_dev *input = drv_data->input;
++
++	(void) navpoint_suspend(&pdev->dev);
++
++	input_unregister_device(input);
++
++	free_irq(ssp->irq, drv_data);
++
++	pxa_ssp_free(ssp);
++
++	kfree(drv_data);
++
++	return 0;
++}
++
++static struct platform_driver navpoint_driver = {
++	.probe		= navpoint_probe,
++	.remove		= __devexit_p(navpoint_remove),
++	.driver = {
++		.name	= "navpoint",
++		.owner	= THIS_MODULE,
++#ifdef CONFIG_SUSPEND
++		.pm	= &navpoint_pm_ops,
++#endif
++	},
++};
++
++static int __init navpoint_init(void)
++{
++	return platform_driver_register(&navpoint_driver);
++}
++
++static void __exit navpoint_exit(void)
++{
++	platform_driver_unregister(&navpoint_driver);
++}
++
++module_init(navpoint_init);
++module_exit(navpoint_exit);
++
++MODULE_AUTHOR("Paul Parsons <lost.distance@yahoo.com>");
++MODULE_DESCRIPTION("Synaptics NavPoint (PXA27x SSP/SPI) driver");
++MODULE_LICENSE("GPL");
+diff -uprN clean-3.2-rc2/include/linux/input/navpoint.h linux-3.2-rc2/include/linux/input/navpoint.h
+--- clean-3.2-rc2/include/linux/input/navpoint.h	1970-01-01 01:00:00.000000000 +0100
++++ linux-3.2-rc2/include/linux/input/navpoint.h	2011-11-20 00:12:00.947519171 +0000
+@@ -0,0 +1,12 @@
++/*
++ *  Copyright (C) 2011 Paul Parsons <lost.distance@yahoo.com>
++ *
++ *  This program is free software; you can redistribute it and/or modify
++ *  it under the terms of the GNU General Public License version 2 as
++ *  published by the Free Software Foundation.
++ */
++
++struct navpoint_platform_data {
++	int		port;		/* PXA SSP port for pxa_ssp_request() */
++	int		gpio;		/* GPIO for power on/off */
++};
