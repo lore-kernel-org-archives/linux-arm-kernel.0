@@ -1,40 +1,72 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 22 Nov 2011 19:46:39 -0800
-Subject: [PATCH] ARM: mm: ensure TTBR0 is restored when changing ASID
- on rollover
-In-Reply-To: <20110608205553.GD13151@n2100.arm.linux.org.uk>
-References: <1307443118-11573-1-git-send-email-will.deacon@arm.com>
- <20110608200106.GA13151@n2100.arm.linux.org.uk>
- <20110608202323.GA4430@e102144-lin.cambridge.arm.com>
- <20110608203615.GB13151@n2100.arm.linux.org.uk>
- <20110608204949.GA4713@e102144-lin.cambridge.arm.com>
- <20110608205553.GD13151@n2100.arm.linux.org.uk>
-Message-ID: <4ECC6C9F.9020909@codeaurora.org>
+From: skannan@codeaurora.org (Saravana Kannan)
+Date: Tue, 22 Nov 2011 19:48:52 -0800
+Subject: [PATCH v3 5/5] clk: export tree topology and clk data via sysfs
+In-Reply-To: <20111122191347.GB4844@kroah.com>
+References: <1321926047-14211-1-git-send-email-mturquette@linaro.org>
+ <1321926047-14211-6-git-send-email-mturquette@linaro.org>
+ <20111122154900.GB18954@kroah.com>
+ <CAPtuhThPQtWwihE8aGru55k87oV7QOr=O836TTJ+=30d6dtVhA@mail.gmail.com>
+ <20111122191347.GB4844@kroah.com>
+Message-ID: <4ECC6D24.9030509@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sorry to dig up an old thread....
-
-On 06/08/11 13:55, Russell King - ARM Linux wrote:
-> On Wed, Jun 08, 2011 at 09:49:49PM +0100, Will Deacon wrote:
->>> Let's take out these changes and sort it out properly - not only do we
->>> need to sort out these problems but we should also get rid of the
->>> __ARCH_WANT_INTERRUPTS_ON_CTXSW thing completely.  I have a patch which
->>> I've only tested on SA-1110 which does this so far, but it needs a little
->>> more work to clean up some stuff.
->> Could you post that code please? I can then rebase these patches against
->> it for future inclusion in mainline.
-> I'd like to finish sorting it out properly first, so that it's all sane.
+On 11/22/2011 11:13 AM, Greg KH wrote:
+> On Tue, Nov 22, 2011 at 09:57:41AM -0800, Mike Turquette wrote:
+>>> Ah, comments like this warm my heart.
+>>>
+>>> Come on, no abusing the kobject code please, if have problems with how
+>>> the kernel core works, and it doesn't do things you want it to, then why
+>>> not change it to work properly for you, or at the least, ASK ME!!!
+>>
+>> Ok, I'm asking you now.  There are two ways to solve this problem:
+>>
+>> 1) have kobject core create the lists linking the objects but defer
+>> allocations and any interactions with sysfs until later in the boot
+>> sequence, OR
+>>
+>> 2) my code can create a list of clks (the same way that clkdev does)
+>> and defer kobject/sysfs stuff until later, which walks the list made
+>> during early-boot
+>>
+>> #1 is most closely aligned with the code I have here, #2 presents
+>> challenges that I haven't really though through.  I know that OMAP
+>> uses the clk framework VERY early in it's boot sequence, but as long
+>> as the per-clk data is properly initialized then it should be OK.
+>>
+>> What do you think?
 >
->> Does the removal of
->> __ARCH_WANT_INTERRUPTS_ON_CTXSW mean that switch_mm will run with interrupts
->> disabled by default?
-> Yes, just like all but one other arch in the kernel.  The scheduler
-> folk would like to see this symbol die...
+> #3 - use debugfs and don't try to create a sysfs interface for the clock
+> structures :)
 
-Was this patch ever posted? This looks like a particularly annoying
-problem to debug if it actually occurs (plus ARM is the final holdout
-for this symbol now).
+I would prefer debugfs too, but for my own selfish reasons. In our 
+current implementation, we have debugfs files: turn on/off a clock, to 
+measure a clock (yeah, we have a "measuring" hw block inside the SoC), 
+list the supported rates of a clock, etc. We use these files to test the 
+clock driver. These certainly would not be acceptable candidates for sysfs.
+
+If the common clock framework uses sysfs for the tree, then the mach-msm 
+will have to have its own implementation of debugfs. That's not so nice 
+for two reasons:
+1. I think these files would be useful for other arch/machs too, but it 
+would be odd for the common clock code to expose sysfs and debugfs files 
+for each clock.
+2. Since it won't be in the common code, each arch/mach will be 
+repeating the debugfs code to expose their own enable/disable files.
+
+To me, the ideal choice would be for each clocks to have a directory 
+under /debug/clk/ without following the clock topology. Then, inside 
+each clock specific directory, there will be an enable, rate, parent 
+(symlink to parent clock dir under /debug/clk/) files.
+
+The clock specific drivers will be able to get the handle to the clk 
+specific debugfs directory and add their own extra files. Or could be 
+made to pass a list of file/ops/perms as part of the 
+clock_init/registration.
+
+Thanks,
+Saravana
+
 
 -- 
 Sent by an employee of the Qualcomm Innovation Center, Inc.
