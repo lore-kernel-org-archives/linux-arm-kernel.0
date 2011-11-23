@@ -1,32 +1,77 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 23 Nov 2011 15:11:27 -0800
-Subject: [GIT PULL] omap fixes for v3.2-rc2
-In-Reply-To: <21329850.CZjvquqxJn@wuerfel>
-References: <20111119194408.GD31337@atomide.com>
- <201111232115.41035.arnd@arndb.de>
- <20111123220358.GI31337@atomide.com> <21329850.CZjvquqxJn@wuerfel>
-Message-ID: <20111123231127.GJ31337@atomide.com>
+From: ben-i2c@fluff.org (Ben Dooks)
+Date: Wed, 23 Nov 2011 23:32:38 +0000
+Subject: [PATCH v7 0/5] AT91: replace broken TWI driver i2c-at91.c
+In-Reply-To: <cover.1322062555.git.n.voss@weinmann.de>
+References: <cover.1322062555.git.n.voss@weinmann.de>
+Message-ID: <20111123233238.GL19115@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Arnd Bergmann <arnd@arndb.de> [111123 13:47]:
-> On Wednesday 23 November 2011 14:03:58 Tony Lindgren wrote:
-> > 
-> > The earlier patches are based on the earlier fixes (while waiting
-> > for them to get merged). So that's certainly not a random commit.
-> > Or at least was not at that time  I can rebase those too anyways
-> > now that the earlier fixes are merged.
-> 
-> No need to do that unless you are rebasing them anyway. IMHO
-> it's fine if you have all your bug fixes in one branch based
-> on the previous bug fixes you sent, but it's of course also
-> fine to start a fresh branch for each pull request.
-> 
-> In general, I would recommend not rebasing when you have the
-> choice, because that means your patches are not as well tested.
 
-Well I can keep only four of them because of the pull on a random
-commit. Looks like four of them apply to v3.1, will send them
-off to stable at vger.kernel.org and send you two new pull requests.
+On Wed, Nov 23, 2011 at 04:35:55PM +0100, Nikolaus Voss wrote:
+> The old driver has two main deficencies:
+> i)  No repeated start (Sr) condiction is possible, this makes it unusable
+>     e.g. for most SMBus transfers.
+> ii) I/O was done with polling/busy waiting what caused over-/underruns
+>     even at light system loads and clock speeds.
+> 
+> The new driver overcomes these deficencies and in addition allows for
+> more than one TWI interface.
+> 
+> A remaining limitation is the fact, that only one repeated start is
+> possible (two concatenated messages). This limitation is imposed by
+> the hardware. However, this should not be a problem as all common
+> i2c-client communication does not rely on more than one repeated start.
+> 
+> v7: Patch 4/5: i)  fix bug if internal address > 1 byte
+>                ii) send stop when len == 1
+>                    (both reported by Carsten Behling)
+> v6: Patch 5/5: support for I2C_SMBUS_BLOCK_DATA transfers.
+>     Better use of clk_(un)prepare().
+>     More sensible transfer timeout.
+> v5: Another round of review comments from Ryan Mallon, Felipe Balbi
+>     and Russell King: convert twi clk to use .dev_id, cleanups
+> v4: Integrated more review comments from Ryan Mallon and Felipe Balbi:
+>     Moved register include file to local include, code cleanups
+> v3: Integrated review comments from Ryan Mallon and Felipe Balbi
+> v2: Fixed whitespace issue
+> 
+> Nikolaus Voss (5):
+>   drivers/i2c/busses/i2c-at91.c: remove broken driver
+>   Replace clk_lookup.con_id with clk_lookup.dev_id entries for twi clk
+>   drivers/i2c/busses/i2c-at91.c: add new driver
+>   G45 TWI: remove open drain setting for twi function gpios
+>   i2c-at91.c: add SMBUS_READ_BLOCK_DATA functionality
 
-Tony
+Is the original driver so broken that the two could not co-exist, or are
+we making so many changes that there's no point in keeping the original
+one?
+ 
+>  arch/arm/mach-at91/at91cap9.c              |    1 +
+>  arch/arm/mach-at91/at91rm9200.c            |    1 +
+>  arch/arm/mach-at91/at91sam9260.c           |    1 +
+>  arch/arm/mach-at91/at91sam9261.c           |    1 +
+>  arch/arm/mach-at91/at91sam9263.c           |    1 +
+>  arch/arm/mach-at91/at91sam9g45.c           |    2 +
+>  arch/arm/mach-at91/at91sam9g45_devices.c   |    6 -
+>  arch/arm/mach-at91/at91sam9rl.c            |    2 +
+>  arch/arm/mach-at91/include/mach/at91_twi.h |   68 ----
+>  drivers/i2c/busses/Kconfig                 |   11 +-
+>  drivers/i2c/busses/i2c-at91.c              |  529 +++++++++++++++++-----------
+>  drivers/i2c/busses/i2c-at91.h              |   80 +++++
+>  12 files changed, 408 insertions(+), 295 deletions(-)
+>  delete mode 100644 arch/arm/mach-at91/include/mach/at91_twi.h
+>  create mode 100644 drivers/i2c/busses/i2c-at91.h
+> 
+> -- 
+> 1.7.5.4
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-i2c" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+-- 
+Ben Dooks, ben at fluff.org, http://www.fluff.org/ben/
+
+Large Hadron Colada: A large Pina Colada that makes the universe disappear.
