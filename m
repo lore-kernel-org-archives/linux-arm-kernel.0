@@ -1,48 +1,72 @@
-From: linux@solonet.org.ua (Denis Kuzmenko)
-Date: Wed, 23 Nov 2011 20:11:27 +0200
-Subject: [PATCH resend] arm: s3c24xx: Add new LCD (W35i) support for Mini2440
- board
-In-Reply-To: <4EC588A8.3030907@solonet.org.ua>
-References: <4EC588A8.3030907@solonet.org.ua>
-Message-ID: <4ECD374F.5060208@solonet.org.ua>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 23 Nov 2011 19:36:40 +0100
+Subject: BUG: sleeping function called from invalid context
+In-Reply-To: <CAOMZO5DSvLU0ACJPZ69tzY0PjMijibSzwCEwBhu=5=mg7ncF=g@mail.gmail.com>
+References: <4ECCDAA2.4070502@prolan.hu>
+ <CAOMZO5DSvLU0ACJPZ69tzY0PjMijibSzwCEwBhu=5=mg7ncF=g@mail.gmail.com>
+Message-ID: <20111123183640.GQ19986@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add new LCD (W35i) support for Mini2440 board
+Hello,
 
-Signed-off-by: Denis Kuzmenko <linux@solonet.org.ua>
----
+On Wed, Nov 23, 2011 at 10:44:50AM -0200, Fabio Estevam wrote:
+> On Wed, Nov 23, 2011 at 9:36 AM, Peter Rusko <rusko.peter@prolan.hu> wrote:
+> > While trying to use the LRADC and touchscreen functionality on imx28,
+> > I've run into this problem:
+> >
+> > udevd[523]: starting version 171
+> > BUG: sleeping function called from invalid context at kernel/mutex.c:271
+> > in_atomic(): 1, irqs_disabled(): 128, pid: 523, name: udevd
+> > no locks held by udevd/523.
+> > irq event stamp: 956
+> > hardirqs last ?enabled at (956): [<c032e56c>]
+> > _raw_write_unlock_irqrestore+0x3c/0x68
+> > hardirqs last disabled at (955): [<c032e6ec>]
+> > _raw_write_lock_irqsave+0x1c/0x58
+> > softirqs last ?enabled at (843): [<c0025c78>] irq_exit+0x54/0xb0
+> > softirqs last disabled at (792): [<c0025c78>] irq_exit+0x54/0xb0
+> > [<c0013238>] (unwind_backtrace+0x0/0xe0) from [<c032d198>]
+> > (mutex_lock_nested+0x24/0x31c)
+> > [<c032d198>] (mutex_lock_nested+0x24/0x31c) from [<c0017570>]
+> > (clk_enable+0x20/0x48)
+> > [<c0017570>] (clk_enable+0x20/0x48) from [<c023173c>]
+> > (pl011_console_write+0x20/0x78)
+> > [<c023173c>] (pl011_console_write+0x20/0x78) from [<c0020780>]
+> > (__call_console_drivers+0x84/0x9c)
+> > [<c0020780>] (__call_console_drivers+0x84/0x9c) from [<c0020ba0>]
+> > (console_unlock+0xfc/0x1ec)
+> > [<c0020ba0>] (console_unlock+0xfc/0x1ec) from [<c0021150>]
+> > (vprintk+0x3b0/0x440)
+> > [<c0021150>] (vprintk+0x3b0/0x440) from [<c032b4d4>] (printk+0x18/0x24)
+> > [<c032b4d4>] (printk+0x18/0x24) from [<c0233a5c>] (kmsg_writev+0xd8/0xfc)
+> > [<c0233a5c>] (kmsg_writev+0xd8/0xfc) from [<c008f58c>]
+> > (do_sync_write+0x98/0xd4)
+> > [<c008f58c>] (do_sync_write+0x98/0xd4) from [<c008fe98>]
+> > (vfs_write+0xc8/0x138)
+> > [<c008fe98>] (vfs_write+0xc8/0x138) from [<c00900e0>] (sys_write+0x3c/0x68)
+> > [<c00900e0>] (sys_write+0x3c/0x68) from [<c000e180>]
+> > (ret_fast_syscall+0x0/0x38)
+> >
+> > It seems that the printk calls cause the problem (it's not just with udev,
+> > seems to have the problem with all printk calls). The touchscreen
+> > works perfectly and I'd like to submit a patch which supports it, but I
+> > keep getting the same messages. What can cause the problem, why is it an
+> > atomic context within the udevd?
+> 
+> Looks like the same error I faced before:
+> http://marc.info/?l=linux-arm-kernel&m=131914543319956&w=2
+which resulted in some concerns about locking correctness. On i.MX28 we
+usually use
 
-I need to refer this patch but can't find it on lkml.org
-Maybe I haven't send it...
-Sorry for bothering if I did so.
+	http://thread.gmane.org/gmane.linux.ports.arm.kernel/100744/focus=100746
 
-diff --git a/arch/arm/mach-s3c2440/mach-mini2440.c b/arch/arm/mach-s3c2440/mach-mini2440.c
-index fc2dc0b..951eadd 100644
---- a/arch/arm/mach-s3c2440/mach-mini2440.c
-+++ b/arch/arm/mach-s3c2440/mach-mini2440.c
-@@ -167,6 +167,24 @@ static struct s3c2410fb_display mini2440_lcd_cfg[] __initdata = {
- 		.lcdcon5	= (S3C2410_LCDCON5_FRM565 |
- 				   S3C2410_LCDCON5_HWSWP),
- 	},
-+	/* mini2440 + 3.5" TFT (LCD-W35i, LQ035Q1DG06 type) + touchscreen*/
-+	[3] = {
-+		_LCD_DECLARE(
-+			/* clock */
-+			7,
-+			/* xres, margin_right, margin_left, hsync */
-+			320, 68, 66, 4,
-+			/* yres, margin_top, margin_bottom, vsync */
-+			240, 4, 4, 9,
-+			/* refresh rate */
-+			60),
-+		.lcdcon5	= (S3C2410_LCDCON5_FRM565 |
-+				   S3C2410_LCDCON5_INVVDEN |
-+				   S3C2410_LCDCON5_INVVFRAME |
-+				   S3C2410_LCDCON5_INVVLINE |
-+				   S3C2410_LCDCON5_INVVCLK |
-+				   S3C2410_LCDCON5_HWSWP),
-+	},
- };
- 
- /* todo - put into gpio header */
+(though this patch wasn't accepted either. The right fix is to convert
+mxs to the upcoming clk framework, which didn't land into mainline yet.)
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
