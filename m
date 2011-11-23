@@ -1,34 +1,18 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Wed, 23 Nov 2011 12:06:26 +0100
-Subject: [PATCH] IMX/SDMA : save the real count for one DMA transaction.
-In-Reply-To: <4ECCD34C.1090400@freescale.com>
-References: <1322039585-7901-1-git-send-email-b32955@freescale.com>
- <20111123105821.GC4063@pengutronix.de>
- <4ECCD34C.1090400@freescale.com>
-Message-ID: <20111123110626.GD4063@pengutronix.de>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 23 Nov 2011 11:07:16 +0000
+Subject: [PATCH 10/17] ASoC: Tegra DAS: Add device tree binding
+In-Reply-To: <1322011285-4002-11-git-send-email-swarren@nvidia.com>
+References: <1322011285-4002-1-git-send-email-swarren@nvidia.com>
+ <1322011285-4002-11-git-send-email-swarren@nvidia.com>
+Message-ID: <20111123110716.GD21073@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Nov 22, 2011 at 06:21:18PM -0700, Stephen Warren wrote:
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
 
-> >> +	/* save the real count we received or transmitted. */
-> >> +	chan->private = (void *)count;
-> > And if someone later needs another variable which is private?
-> >
-> I ever wanted to add an new parameter `void *` to dma_aync_tx_callback,
-> but it seemed i have
-> to change a lot of files.
-> 
-> Do you have any better suggestion?
+Applied, thanks - the binding seems entirely uncontroversial as there's
+just a compatible and register binding, if there are problems we can
+always revert or fix before 3.3.
 
-Use a private struct and put count in there.
-
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111123/79e7a6d7/attachment.sig>
+BTW, you probably want to look at your CC list, it's rather large.
