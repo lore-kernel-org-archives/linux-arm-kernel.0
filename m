@@ -1,35 +1,69 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Wed, 23 Nov 2011 12:28:55 +0000
-Subject: -next fails to boot as of today on S3C6410
-In-Reply-To: <20111123120534.GO21073@opensource.wolfsonmicro.com>
-References: <20111122192741.GG30583@opensource.wolfsonmicro.com>
- <20111122193124.GB9581@n2100.arm.linux.org.uk>
- <20111122193957.GH30583@opensource.wolfsonmicro.com>
- <20111122222135.GB7845@gallagher>
- <20111123120534.GO21073@opensource.wolfsonmicro.com>
-Message-ID: <20111123122855.GB7382@totoro>
+From: javier.martin@vista-silicon.com (javier Martin)
+Date: Wed, 23 Nov 2011 13:32:29 +0100
+Subject: [PATCH v2 2/2] MEM2MEM: Add support for eMMa-PrP mem2mem
+ operations.
+In-Reply-To: <20111122205552.GO27267@pengutronix.de>
+References: <1321963316-9058-1-git-send-email-javier.martin@vista-silicon.com>
+ <1321963316-9058-3-git-send-email-javier.martin@vista-silicon.com>
+ <20111122205552.GO27267@pengutronix.de>
+Message-ID: <CACKLOr0-GzO0r0ERCQvqCn2oDkDE816+MHsu=bLbA5BkEBAqYA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+Hi Sascha,
+I was just trying to fix the issues you pointed previously and I have
+a question for you.
 
-On Wed, Nov 23, 2011 at 12:05:35PM +0000, Mark Brown wrote:
-> On Tue, Nov 22, 2011 at 10:21:35PM +0000, Jamie Iles wrote:
-> 
-> > No, you're right - this is the offending commit.  It actually needs 
-> > this[1] fix and things should be okay.
-> 
-> > 1. https://lkml.org/lkml/2011/11/10/186
-> 
-> I've tested with that patch and it doesn't seem to be the only fix
-> that's required - my system still exhibits the same behaviour.
+On 22 November 2011 21:55, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> Hi Javier,
+>> +
+>> +static int emmaprp_probe(struct platform_device *pdev)
+>> +{
+>> + ? ? struct emmaprp_dev *pcdev;
+>> + ? ? struct video_device *vfd;
+>> + ? ? struct resource *res_emma;
+>> + ? ? int irq_emma;
+>> + ? ? int ret;
+>> +
+>> + ? ? pcdev = kzalloc(sizeof *pcdev, GFP_KERNEL);
+>> + ? ? if (!pcdev)
+>> + ? ? ? ? ? ? return -ENOMEM;
+>> +
+>> + ? ? spin_lock_init(&pcdev->irqlock);
+>> +
+>> + ? ? pcdev->clk_emma = clk_get(NULL, "emma");
+>
+> You should change the entry for the emma in
+> arch/arm/mach-imx/clock-imx27.c to the following:
+>
+> _REGISTER_CLOCK("m2m-emmaprp", NULL, emma_clk)
+>
+> and use clk_get(&pdev->dev, NULL) here.
+>
 
-Hmm, I really can't see what could cause this - we don't have a to_irq() 
-ops method, hwirq_base is correctly initialised to 0 with 32 irqs per 
-VIC and we aren't using dynamic irq_desc's.
+Is this what you are asking for?
 
-Do you have any low-level serial debug?
+--- a/arch/arm/mach-imx/clock-imx27.c
++++ b/arch/arm/mach-imx/clock-imx27.c
+@@ -661,7 +661,7 @@ static struct clk_lookup lookups[] = {
+        _REGISTER_CLOCK(NULL, "dma", dma_clk)
+        _REGISTER_CLOCK(NULL, "rtic", rtic_clk)
+        _REGISTER_CLOCK(NULL, "brom", brom_clk)
+-       _REGISTER_CLOCK(NULL, "emma", emma_clk)
++       _REGISTER_CLOCK("m2m-emmaprp", NULL, emma_clk)
+        _REGISTER_CLOCK(NULL, "slcdc", slcdc_clk)
+        _REGISTER_CLOCK("imx27-fec.0", NULL, fec_clk)
+        _REGISTER_CLOCK(NULL, "emi", emi_clk)
 
-Thanks,
+If I do that, mx2_camera.c will stop working.
+Furthermore it does not work for this driver either (I get an error on
+clk_get() ).
 
-Jamie
+-- 
+Javier Martin
+Vista Silicon S.L.
+CDTUC - FASE C - Oficina S-345
+Avda de los Castros s/n
+39005- Santander. Cantabria. Spain
++34 942 25 32 60
+www.vista-silicon.com
