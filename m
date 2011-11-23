@@ -1,127 +1,96 @@
 From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Wed, 23 Nov 2011 08:04:49 +0100
-Subject: [PATCH 11/17] ASoC: Tegra I2S: Add device tree binding
-In-Reply-To: <1322011285-4002-12-git-send-email-swarren@nvidia.com>
+Date: Wed, 23 Nov 2011 08:05:59 +0100
+Subject: [PATCH 12/17] ASoC: Tegra+WM8903 machine: Use devm_ APIs and
+ module_platform_driver
+In-Reply-To: <1322011285-4002-13-git-send-email-swarren@nvidia.com>
 References: <1322011285-4002-1-git-send-email-swarren@nvidia.com>
- <1322011285-4002-12-git-send-email-swarren@nvidia.com>
-Message-ID: <20111123070449.GD5255@avionic-0098.adnet.avionic-design.de>
+ <1322011285-4002-13-git-send-email-swarren@nvidia.com>
+Message-ID: <20111123070559.GE5255@avionic-0098.adnet.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 * Stephen Warren wrote:
+> module_platform_drive saves some boiler-plate code.
+
+module_platform_driver
+
+Thierry
+
+> 
+> The devm_ APIs remove the need to manually clean up allocations,
+> thus removing some code.
+> 
 > Signed-off-by: Stephen Warren <swarren@nvidia.com>
 > ---
->  .../devicetree/bindings/sound/tegra20-i2s.txt      |   16 +++++++++++
->  sound/soc/tegra/tegra_i2s.c                        |   29 ++++++++++++++++---
->  2 files changed, 40 insertions(+), 5 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/sound/tegra20-i2s.txt
+>  sound/soc/tegra/tegra_wm8903.c |   26 +++++++-------------------
+>  1 files changed, 7 insertions(+), 19 deletions(-)
 > 
-> diff --git a/Documentation/devicetree/bindings/sound/tegra20-i2s.txt b/Documentation/devicetree/bindings/sound/tegra20-i2s.txt
-> new file mode 100644
-> index 0000000..d38abdc
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/sound/tegra20-i2s.txt
-> @@ -0,0 +1,16 @@
-> +NVIDIA Tegra 20 I2S controller
-> +
-> +Required properties:
-> +- compatible : "nvidia,tegra20-i2s"
-> +- reg : Should contain I2S registers location and length
-> +- interrupts : Should contain I2S interrupt
-> +- dma-channel : The Tegra DMA controller's channel ID for this I2S controller
-> +
-> +Example:
-> +
-> +i2s at 70002800 {
-> +	compatible = "nvidia,tegra20-i2s";
-> +	reg = <0x70002800 0x200>;
-> +	interrupts = < 45 >;
-> +	dma-channel = < 2 >;
-> +};
-> diff --git a/sound/soc/tegra/tegra_i2s.c b/sound/soc/tegra/tegra_i2s.c
-> index 3c0cbd2..b4e19a5 100644
-> --- a/sound/soc/tegra/tegra_i2s.c
-> +++ b/sound/soc/tegra/tegra_i2s.c
-> @@ -36,6 +36,7 @@
->  #include <linux/seq_file.h>
->  #include <linux/slab.h>
->  #include <linux/io.h>
-> +#include <linux/of.h>
->  #include <mach/iomap.h>
->  #include <sound/core.h>
->  #include <sound/pcm.h>
-> @@ -332,6 +333,7 @@ static __devinit int tegra_i2s_platform_probe(struct platform_device *pdev)
->  	struct tegra_i2s * i2s;
->  	struct resource *mem, *memregion, *dmareq;
->  	int ret;
-> +	u32 dma_ch;
->  
->  	i2s = devm_kzalloc(&pdev->dev, sizeof(struct tegra_i2s), GFP_KERNEL);
->  	if (!i2s) {
-> @@ -360,9 +362,19 @@ static __devinit int tegra_i2s_platform_probe(struct platform_device *pdev)
->  
->  	dmareq = platform_get_resource(pdev, IORESOURCE_DMA, 0);
->  	if (!dmareq) {
-> -		dev_err(&pdev->dev, "No DMA resource\n");
-> -		ret = -ENODEV;
-> -		goto err_clk_put;
-> +		/*
-> +		 * FIXME: Perhaps there should be a standard binding for this
-> +		 * that ends up creating the IORESOURCE_DMA resource for us.
-> +		 */
-> +		if (of_property_read_u32(pdev->dev.of_node,
-> +					 "nvidia,dma-channels",
-
-The binding documentation says the property is called "nvidia,dma-channel"
-but you use "nvidia,dma-channel*s*" here.
-
-> +					 &dma_ch) < 0) {
-> +			dev_err(&pdev->dev, "No DMA resource\n");
-> +			ret = -ENODEV;
-> +			goto err_clk_put;
-> +		}
-> +	} else {
-> +		dma_ch = dmareq->start;
+> diff --git a/sound/soc/tegra/tegra_wm8903.c b/sound/soc/tegra/tegra_wm8903.c
+> index 9b0ee15..33feee8 100644
+> --- a/sound/soc/tegra/tegra_wm8903.c
+> +++ b/sound/soc/tegra/tegra_wm8903.c
+> @@ -390,17 +390,19 @@ static __devinit int tegra_wm8903_driver_probe(struct platform_device *pdev)
+>  		return -EINVAL;
 >  	}
 >  
->  	memregion = devm_request_mem_region(&pdev->dev, mem->start,
-> @@ -383,12 +395,12 @@ static __devinit int tegra_i2s_platform_probe(struct platform_device *pdev)
->  	i2s->capture_dma_data.addr = mem->start + TEGRA_I2S_FIFO2;
->  	i2s->capture_dma_data.wrap = 4;
->  	i2s->capture_dma_data.width = 32;
-> -	i2s->capture_dma_data.req_sel = dmareq->start;
-> +	i2s->capture_dma_data.req_sel = dma_ch;
+> -	machine = kzalloc(sizeof(struct tegra_wm8903), GFP_KERNEL);
+> +	machine = devm_kzalloc(&pdev->dev, sizeof(struct tegra_wm8903),
+> +			       GFP_KERNEL);
+>  	if (!machine) {
+>  		dev_err(&pdev->dev, "Can't allocate tegra_wm8903 struct\n");
+> -		return -ENOMEM;
+> +		ret = -ENOMEM;
+> +		goto err;
+>  	}
 >  
->  	i2s->playback_dma_data.addr = mem->start + TEGRA_I2S_FIFO1;
->  	i2s->playback_dma_data.wrap = 4;
->  	i2s->playback_dma_data.width = 32;
-> -	i2s->playback_dma_data.req_sel = dmareq->start;
-> +	i2s->playback_dma_data.req_sel = dma_ch;
+>  	machine->pdata = pdata;
 >  
->  	i2s->reg_ctrl = TEGRA_I2S_CTRL_FIFO_FORMAT_PACKED;
+>  	ret = tegra_asoc_utils_init(&machine->util_data, &pdev->dev);
+>  	if (ret)
+> -		goto err_free_machine;
+> +		goto err;
 >  
-> @@ -422,10 +434,16 @@ static int __devexit tegra_i2s_platform_remove(struct platform_device *pdev)
+>  	card->dev = &pdev->dev;
+>  	platform_set_drvdata(pdev, card);
+> @@ -431,8 +433,7 @@ static __devinit int tegra_wm8903_driver_probe(struct platform_device *pdev)
+>  
+>  err_fini_utils:
+>  	tegra_asoc_utils_fini(&machine->util_data);
+> -err_free_machine:
+> -	kfree(machine);
+> +err:
+>  	return ret;
+>  }
+>  
+> @@ -460,8 +461,6 @@ static int __devexit tegra_wm8903_driver_remove(struct platform_device *pdev)
+>  
+>  	tegra_asoc_utils_fini(&machine->util_data);
+>  
+> -	kfree(machine);
+> -
 >  	return 0;
 >  }
 >  
-> +static const struct of_device_id tegra_i2s_of_match[] __devinitconst = {
-> +	{ .compatible = "nvidia,tegra20-i2s", },
-> +	{},
-> +};
-> +
->  static struct platform_driver tegra_i2s_driver = {
->  	.driver = {
->  		.name = DRV_NAME,
->  		.owner = THIS_MODULE,
-> +		.of_match_table = tegra_i2s_of_match,
->  	},
->  	.probe = tegra_i2s_platform_probe,
->  	.remove = __devexit_p(tegra_i2s_platform_remove),
-> @@ -436,3 +454,4 @@ MODULE_AUTHOR("Stephen Warren <swarren@nvidia.com>");
->  MODULE_DESCRIPTION("Tegra I2S ASoC driver");
->  MODULE_LICENSE("GPL");
->  MODULE_ALIAS("platform:" DRV_NAME);
-> +MODULE_DEVICE_TABLE(of, tegra_i2s_of_match);
+> @@ -474,18 +473,7 @@ static struct platform_driver tegra_wm8903_driver = {
+>  	.probe = tegra_wm8903_driver_probe,
+>  	.remove = __devexit_p(tegra_wm8903_driver_remove),
+>  };
+> -
+> -static int __init tegra_wm8903_modinit(void)
+> -{
+> -	return platform_driver_register(&tegra_wm8903_driver);
+> -}
+> -module_init(tegra_wm8903_modinit);
+> -
+> -static void __exit tegra_wm8903_modexit(void)
+> -{
+> -	platform_driver_unregister(&tegra_wm8903_driver);
+> -}
+> -module_exit(tegra_wm8903_modexit);
+> +module_platform_driver(tegra_wm8903_driver);
+>  
+>  MODULE_AUTHOR("Stephen Warren <swarren@nvidia.com>");
+>  MODULE_DESCRIPTION("Tegra+WM8903 machine ASoC driver");
 > -- 
 > 1.7.0.4
 > 
@@ -137,4 +106,4 @@ Name: not available
 Type: application/pgp-signature
 Size: 198 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111123/83872507/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111123/f4782419/attachment.sig>
