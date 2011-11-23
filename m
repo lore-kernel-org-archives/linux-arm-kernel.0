@@ -1,20 +1,22 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 23 Nov 2011 11:05:00 -0200
-Subject: BUG: sleeping function called from invalid context
-In-Reply-To: <CAOMZO5DSvLU0ACJPZ69tzY0PjMijibSzwCEwBhu=5=mg7ncF=g@mail.gmail.com>
-References: <4ECCDAA2.4070502@prolan.hu>
- <CAOMZO5DSvLU0ACJPZ69tzY0PjMijibSzwCEwBhu=5=mg7ncF=g@mail.gmail.com>
-Message-ID: <CAOMZO5A1dfkG9UOE6MqBFKG6LV=T8G0-SWedNbhErhAZiEm83A@mail.gmail.com>
+Date: Wed, 23 Nov 2011 11:10:09 -0200
+Subject: [PATCH v2 2/2] MEM2MEM: Add support for eMMa-PrP mem2mem
+ operations.
+In-Reply-To: <1321963316-9058-3-git-send-email-javier.martin@vista-silicon.com>
+References: <1321963316-9058-1-git-send-email-javier.martin@vista-silicon.com>
+ <1321963316-9058-3-git-send-email-javier.martin@vista-silicon.com>
+Message-ID: <CAOMZO5Bt-_VGYEZ7a=iaThdxoQb2gpo5Wa1ydUobLLUBVEPRWA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 23, 2011 at 10:44 AM, Fabio Estevam <festevam@gmail.com> wrote:
+On Tue, Nov 22, 2011 at 10:01 AM, Javier Martin
+<javier.martin@vista-silicon.com> wrote:
 
-> Looks like the same error I faced before:
-> http://marc.info/?l=linux-arm-kernel&m=131914543319956&w=2
+> +/* In bytes, per queue */
+> +#define MEM2MEM_VID_MEM_LIMIT ?(16 * SZ_1M)
 
-Also, can you please try Sascha's imx-features branch?
-http://git.pengutronix.de/?p=imx/linux-2.6.git;a=shortlog;h=refs/heads/imx-features
+You could use SZ_16M instead.
 
-It contains a patch series from Richard Zhao that introduces
-clk_prepare that may possibly help with this issue.
+Regards,
+
+Fabio Estevam
