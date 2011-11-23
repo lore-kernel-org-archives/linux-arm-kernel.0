@@ -1,68 +1,25 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Wed, 23 Nov 2011 05:22:27 +0200
-Subject: [PATCH 06/10] arm/tegra: prepare pinmux code for multiple
- tegra variants
-In-Reply-To: <20111122190146.GA31361@quad.lixom.net>
-References: <1321546766-26770-1-git-send-email-pdeschrijver@nvidia.com>
- <1321546766-26770-7-git-send-email-pdeschrijver@nvidia.com>
- <20111118214116.GC31678@quad.lixom.net>
- <20111121142919.GN19069@tbergstrom-lnx.Nvidia.com>
- <20111122190146.GA31361@quad.lixom.net>
-Message-ID: <20111123032227.GO19069@tbergstrom-lnx.Nvidia.com>
+From: consul.kautuk@gmail.com (kautuk.c @samsung.com)
+Date: Wed, 23 Nov 2011 08:53:23 +0530
+Subject: [PATCH 1/1 v5] arm: fault.c: Port OOM changes into do_page_fault
+In-Reply-To: <20111122191729.GA9581@n2100.arm.linux.org.uk>
+References: <1321985779-5810-1-git-send-email-consul.kautuk@gmail.com>
+ <CAFPAmTQ3su_tuwHEBKPwn4YFX8sWs0x1agYfyzTnOdBaVRL21Q@mail.gmail.com>
+ <20111122191729.GA9581@n2100.arm.linux.org.uk>
+Message-ID: <CAFPAmTTM=jwpFkTQFnZySC2YuEdPEqM=yhbJYN-7fufr56Ssmw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 22, 2011 at 08:01:46PM +0100, Olof Johansson wrote:
-> On Mon, Nov 21, 2011 at 04:29:19PM +0200, Peter De Schrijver wrote:
-> > On Fri, Nov 18, 2011 at 10:41:16PM +0100, Olof Johansson wrote:
-> > > On Thu, Nov 17, 2011 at 06:19:20PM +0200, Peter De Schrijver wrote:
-> > > > This patch modifies the pinmux code to be useable for multiple tegra variants.
-> > > > Some tegra20 specific constants will be replaced by variables which will be
-> > > > initialized to the appropriate value at runtime.
-> > > >
-> > > > Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
-> > > > ---
-> > > >  arch/arm/mach-tegra/board-harmony-pcie.c     |    1 +
-> > > >  arch/arm/mach-tegra/board-harmony-pinmux.c   |    1 +
-> > > >  arch/arm/mach-tegra/board-paz00-pinmux.c     |    1 +
-> > > >  arch/arm/mach-tegra/board-trimslice-pinmux.c |    1 +
-> > > >  arch/arm/mach-tegra/include/mach/pinmux.h    |   25 +++----
-> > > >  arch/arm/mach-tegra/pinmux-tegra20-tables.c  |   15 +++-
-> > > >  arch/arm/mach-tegra/pinmux.c                 |  105 ++++++++++++++-----------
-> > > >  7 files changed, 86 insertions(+), 63 deletions(-)
-> > > >
-> > > > diff --git a/arch/arm/mach-tegra/board-harmony-pcie.c b/arch/arm/mach-tegra/board-harmony-pcie.c
-> > > > index 6db7d69..bd402d0 100644
-> > > > --- a/arch/arm/mach-tegra/board-harmony-pcie.c
-> > > > +++ b/arch/arm/mach-tegra/board-harmony-pcie.c
-> > > > @@ -23,6 +23,7 @@
-> > > >  #include <asm/mach-types.h>
-> > > >
-> > > >  #include <mach/pinmux.h>
-> > > > +#include <mach/pinmux-tegra20.h>
-> > > 
-> > > Boards shouldn't have to include this. The idea is that you should only
-> > > have to do board code against the pinmux.h interface, which internally
-> > > abstracts it for tegra 20 vs tegra 30.
-> > 
-> > The pinmux naming is still SoC specific. Unless we move this to devicetree
-> > (which should be part of a different patchset), I don't see how we can solve
-> > this, except by renaming all the pingroups. That would cause a lot more
-> > changes though.
-> 
-> If the pinmux naming and numbering is unique per SoC then sharing
-> namespace for them could be a source of confusion. If we need to keep
-> them around much longer, then doing that rename would be a good idea. But
-> we can do that separately from this change. So the include change is ok
-> for now.
-> 
-> My other comments about the code changes still stands though, so please
-> address those.
-> 
+Hi,
 
-I'm working on those. I'm on a businesstrip now, so things might go a bit
-slower.
+On Wed, Nov 23, 2011 at 12:47 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Tue, Nov 22, 2011 at 01:33:42PM -0500, kautuk.c @samsung.com wrote:
+>> Please disregard this one due to the following line :
+>> From: Kautuk <kautuk@ubuntu.(none)>
+>>
+>> There was something wrong in my git configuration.
+>
+> Which is the correct one? ?The first?
+>
 
-Cheers,
-
-Peter.
+This one is correct, i.e., this email chain you have replied to.
