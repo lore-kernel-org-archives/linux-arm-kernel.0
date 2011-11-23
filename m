@@ -1,442 +1,427 @@
 From: pawel.moll@arm.com (Pawel Moll)
-Date: Wed, 23 Nov 2011 15:01:45 +0000
-Subject: [PATCH v2 1/4] ARM: vexpress: Get rid of MMIO_P2V
+Date: Wed, 23 Nov 2011 15:01:47 +0000
+Subject: [PATCH v2 3/4] ARM: vexpress: Initial RS1 memory map support
 In-Reply-To: <1322060508-11298-1-git-send-email-pawel.moll@arm.com>
 References: <1322060508-11298-1-git-send-email-pawel.moll@arm.com>
-Message-ID: <1322060508-11298-2-git-send-email-pawel.moll@arm.com>
+Message-ID: <1322060508-11298-4-git-send-email-pawel.moll@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch gets rid of the MMIO_P2V and __MMPIO_P2V macros,
-defining constant virtual base for motherboard and tile
-peripherals instead.
-
-Additionally, in preparation for the new motherboard memory
-map, the motherboard peripherals are using base pointers
-calculated in runtime, instead of compile-time calculated
-values.
+This patch adds support for RS1 memory map based Versatile Express
+motherboard.
 
 Signed-off-by: Pawel Moll <pawel.moll@arm.com>
 ---
- arch/arm/include/asm/hardware/arm_timer.h         |    5 ++
- arch/arm/mach-vexpress/core.h                     |   11 ++-
- arch/arm/mach-vexpress/ct-ca9x4.c                 |   52 +++-----------
- arch/arm/mach-vexpress/include/mach/ct-ca9x4.h    |   13 ++--
- arch/arm/mach-vexpress/include/mach/motherboard.h |   52 +++++++-------
- arch/arm/mach-vexpress/platsmp.c                  |    4 +-
- arch/arm/mach-vexpress/v2m.c                      |   76 +++++++++++++--------
- 7 files changed, 104 insertions(+), 109 deletions(-)
+ arch/arm/boot/dts/vexpress-v2m-rs1.dtsi           |  192 +++++++++++++++++++++
+ arch/arm/mach-vexpress/Kconfig                    |    8 +
+ arch/arm/mach-vexpress/Makefile.boot              |    6 +
+ arch/arm/mach-vexpress/include/mach/debug-macro.S |   37 ++++-
+ arch/arm/mach-vexpress/include/mach/uncompress.h  |   13 ++-
+ arch/arm/mach-vexpress/v2m.c                      |   64 +++++++-
+ 6 files changed, 314 insertions(+), 6 deletions(-)
+ create mode 100644 arch/arm/boot/dts/vexpress-v2m-rs1.dtsi
 
-diff --git a/arch/arm/include/asm/hardware/arm_timer.h b/arch/arm/include/asm/hardware/arm_timer.h
-index c0f4e7b..d6030ff 100644
---- a/arch/arm/include/asm/hardware/arm_timer.h
-+++ b/arch/arm/include/asm/hardware/arm_timer.h
-@@ -9,7 +9,12 @@
-  *
-  * Integrator AP has 16-bit timers, Integrator CP, Versatile and Realview
-  * can have 16-bit or 32-bit selectable via a bit in the control register.
-+ *
-+ * Every SP804 contains two identical timers.
-  */
-+#define TIMER_1_BASE	0x00
-+#define TIMER_2_BASE	0x20
-+
- #define TIMER_LOAD	0x00			/* ACVR rw */
- #define TIMER_VALUE	0x04			/* ACVR ro */
- #define TIMER_CTRL	0x08			/* ACVR rw */
-diff --git a/arch/arm/mach-vexpress/core.h b/arch/arm/mach-vexpress/core.h
-index f439715..d3dd491 100644
---- a/arch/arm/mach-vexpress/core.h
-+++ b/arch/arm/mach-vexpress/core.h
-@@ -1,6 +1,3 @@
--#define __MMIO_P2V(x)	(((x) & 0xfffff) | (((x) & 0x0f000000) >> 4) | 0xf8000000)
--#define MMIO_P2V(x)	((void __iomem *)__MMIO_P2V(x))
--
- #define AMBA_DEVICE(name,busid,base,plat)	\
- struct amba_device name##_device = {		\
- 	.dev		= {			\
-@@ -17,3 +14,11 @@ struct amba_device name##_device = {		\
- 	.irq		= IRQ_##base,		\
- 	/* .dma		= DMA_##base,*/		\
- }
-+
-+/* 2MB large area for motherboard's peripherals static mapping */
-+#define V2M_PERIPH 0xf8000000
-+#define V2M_PERIPH_P2V(offset) ((void __iomem *)(V2M_PERIPH | (offset)))
-+
-+/* Tile's peripherals static mappings should start here */
-+#define V2T_PERIPH 0xf8200000
-+#define V2T_PERIPH_P2V(offset) ((void __iomem *)(V2T_PERIPH | (offset)))
-diff --git a/arch/arm/mach-vexpress/ct-ca9x4.c b/arch/arm/mach-vexpress/ct-ca9x4.c
-index 2b1e836..bfd3919 100644
---- a/arch/arm/mach-vexpress/ct-ca9x4.c
-+++ b/arch/arm/mach-vexpress/ct-ca9x4.c
-@@ -30,57 +30,26 @@
- 
- #include <plat/clcd.h>
- 
--#define V2M_PA_CS7	0x10000000
--
- static struct map_desc ct_ca9x4_io_desc[] __initdata = {
- 	{
--		.virtual	= __MMIO_P2V(CT_CA9X4_MPIC),
--		.pfn		= __phys_to_pfn(CT_CA9X4_MPIC),
--		.length		= SZ_16K,
--		.type		= MT_DEVICE,
--	}, {
--		.virtual	= __MMIO_P2V(CT_CA9X4_SP804_TIMER),
--		.pfn		= __phys_to_pfn(CT_CA9X4_SP804_TIMER),
--		.length		= SZ_4K,
--		.type		= MT_DEVICE,
--	}, {
--		.virtual	= __MMIO_P2V(CT_CA9X4_L2CC),
--		.pfn		= __phys_to_pfn(CT_CA9X4_L2CC),
--		.length		= SZ_4K,
--		.type		= MT_DEVICE,
-+		.virtual        = V2T_PERIPH,
-+		.pfn            = __phys_to_pfn(CT_CA9X4_MPIC),
-+		.length         = SZ_8K,
-+		.type           = MT_DEVICE,
- 	},
- };
- 
- static void __init ct_ca9x4_map_io(void)
- {
--#ifdef CONFIG_LOCAL_TIMERS
--	twd_base = MMIO_P2V(A9_MPCORE_TWD);
--#endif
- 	iotable_init(ct_ca9x4_io_desc, ARRAY_SIZE(ct_ca9x4_io_desc));
- }
- 
- static void __init ct_ca9x4_init_irq(void)
- {
--	gic_init(0, 29, MMIO_P2V(A9_MPCORE_GIC_DIST),
--		 MMIO_P2V(A9_MPCORE_GIC_CPU));
--}
--
--#if 0
--static void __init ct_ca9x4_timer_init(void)
--{
--	writel(0, MMIO_P2V(CT_CA9X4_TIMER0) + TIMER_CTRL);
--	writel(0, MMIO_P2V(CT_CA9X4_TIMER1) + TIMER_CTRL);
--
--	sp804_clocksource_init(MMIO_P2V(CT_CA9X4_TIMER1), "ct-timer1");
--	sp804_clockevents_init(MMIO_P2V(CT_CA9X4_TIMER0), IRQ_CT_CA9X4_TIMER0,
--		"ct-timer0");
-+	gic_init(0, 29, V2T_PERIPH_P2V(A9_MPCORE_GIC_DIST),
-+		 V2T_PERIPH_P2V(A9_MPCORE_GIC_CPU));
- }
- 
--static struct sys_timer ct_ca9x4_timer = {
--	.init	= ct_ca9x4_timer_init,
--};
--#endif
--
- static void ct_ca9x4_clcd_enable(struct clcd_fb *fb)
- {
- 	v2m_cfg_write(SYS_CFG_MUXFPGA | SYS_CFG_SITE_DB1, 0);
-@@ -193,6 +162,9 @@ static struct platform_device pmu_device = {
- 
- static void __init ct_ca9x4_init_early(void)
- {
-+#ifdef CONFIG_LOCAL_TIMERS
-+	twd_base = V2T_PERIPH_P2V(A9_MPCORE_TWD);
-+#endif
- 	clkdev_add_table(lookups, ARRAY_SIZE(lookups));
- }
- 
-@@ -201,7 +173,7 @@ static void __init ct_ca9x4_init(void)
- 	int i;
- 
- #ifdef CONFIG_CACHE_L2X0
--	void __iomem *l2x0_base = MMIO_P2V(CT_CA9X4_L2CC);
-+	void __iomem *l2x0_base = ioremap(CT_CA9X4_L2CC, SZ_4K);
- 
- 	/* set RAM latencies to 1 cycle for this core tile. */
- 	writel(0, l2x0_base + L2X0_TAG_LATENCY_CTRL);
-@@ -219,7 +191,7 @@ static void __init ct_ca9x4_init(void)
- #ifdef CONFIG_SMP
- static void ct_ca9x4_init_cpu_map(void)
- {
--	int i, ncores = scu_get_core_count(MMIO_P2V(A9_MPCORE_SCU));
-+	int i, ncores = scu_get_core_count(V2T_PERIPH_P2V(A9_MPCORE_SCU));
- 
- 	if (ncores > nr_cpu_ids) {
- 		pr_warn("SMP: %u cores greater than maximum (%u), clipping\n",
-@@ -235,7 +207,7 @@ static void ct_ca9x4_init_cpu_map(void)
- 
- static void ct_ca9x4_smp_enable(unsigned int max_cpus)
- {
--	scu_enable(MMIO_P2V(A9_MPCORE_SCU));
-+	scu_enable(V2T_PERIPH_P2V(A9_MPCORE_SCU));
- }
- #endif
- 
-diff --git a/arch/arm/mach-vexpress/include/mach/ct-ca9x4.h b/arch/arm/mach-vexpress/include/mach/ct-ca9x4.h
-index a34d3d4..8f962fb 100644
---- a/arch/arm/mach-vexpress/include/mach/ct-ca9x4.h
-+++ b/arch/arm/mach-vexpress/include/mach/ct-ca9x4.h
-@@ -22,14 +22,11 @@
- #define CT_CA9X4_SYSWDT		(0x1e007000)
- #define CT_CA9X4_L2CC		(0x1e00a000)
- 
--#define CT_CA9X4_TIMER0		(CT_CA9X4_SP804_TIMER + 0x000)
--#define CT_CA9X4_TIMER1		(CT_CA9X4_SP804_TIMER + 0x020)
--
--#define A9_MPCORE_SCU		(CT_CA9X4_MPIC + 0x0000)
--#define A9_MPCORE_GIC_CPU	(CT_CA9X4_MPIC + 0x0100)
--#define A9_MPCORE_GIT		(CT_CA9X4_MPIC + 0x0200)
--#define A9_MPCORE_TWD		(CT_CA9X4_MPIC + 0x0600)
--#define A9_MPCORE_GIC_DIST	(CT_CA9X4_MPIC + 0x1000)
-+#define A9_MPCORE_SCU		0x0000
-+#define A9_MPCORE_GIC_CPU	0x0100
-+#define A9_MPCORE_GIT		0x0200
-+#define A9_MPCORE_TWD		0x0600
-+#define A9_MPCORE_GIC_DIST	0x1000
- 
- /*
-  * Interrupts.  Those in {} are for AMBA devices
-diff --git a/arch/arm/mach-vexpress/include/mach/motherboard.h b/arch/arm/mach-vexpress/include/mach/motherboard.h
-index 0a3a375..b4c498c 100644
---- a/arch/arm/mach-vexpress/include/mach/motherboard.h
-+++ b/arch/arm/mach-vexpress/include/mach/motherboard.h
-@@ -39,33 +39,30 @@
- #define V2M_CF			(V2M_PA_CS7 + 0x0001a000)
- #define V2M_CLCD		(V2M_PA_CS7 + 0x0001f000)
- 
--#define V2M_SYS_ID		(V2M_SYSREGS + 0x000)
--#define V2M_SYS_SW		(V2M_SYSREGS + 0x004)
--#define V2M_SYS_LED		(V2M_SYSREGS + 0x008)
--#define V2M_SYS_100HZ		(V2M_SYSREGS + 0x024)
--#define V2M_SYS_FLAGS		(V2M_SYSREGS + 0x030)
--#define V2M_SYS_FLAGSSET	(V2M_SYSREGS + 0x030)
--#define V2M_SYS_FLAGSCLR	(V2M_SYSREGS + 0x034)
--#define V2M_SYS_NVFLAGS		(V2M_SYSREGS + 0x038)
--#define V2M_SYS_NVFLAGSSET	(V2M_SYSREGS + 0x038)
--#define V2M_SYS_NVFLAGSCLR	(V2M_SYSREGS + 0x03c)
--#define V2M_SYS_MCI		(V2M_SYSREGS + 0x048)
--#define V2M_SYS_FLASH		(V2M_SYSREGS + 0x03c)
--#define V2M_SYS_CFGSW		(V2M_SYSREGS + 0x058)
--#define V2M_SYS_24MHZ		(V2M_SYSREGS + 0x05c)
--#define V2M_SYS_MISC		(V2M_SYSREGS + 0x060)
--#define V2M_SYS_DMA		(V2M_SYSREGS + 0x064)
--#define V2M_SYS_PROCID0		(V2M_SYSREGS + 0x084)
--#define V2M_SYS_PROCID1		(V2M_SYSREGS + 0x088)
--#define V2M_SYS_CFGDATA		(V2M_SYSREGS + 0x0a0)
--#define V2M_SYS_CFGCTRL		(V2M_SYSREGS + 0x0a4)
--#define V2M_SYS_CFGSTAT		(V2M_SYSREGS + 0x0a8)
--
--#define V2M_TIMER0		(V2M_TIMER01 + 0x000)
--#define V2M_TIMER1		(V2M_TIMER01 + 0x020)
--
--#define V2M_TIMER2		(V2M_TIMER23 + 0x000)
--#define V2M_TIMER3		(V2M_TIMER23 + 0x020)
+diff --git a/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi b/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi
+new file mode 100644
+index 0000000..c8af670
+--- /dev/null
++++ b/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi
+@@ -0,0 +1,192 @@
 +/*
-+ * Offsets from SYSREGS base
++ * ARM Ltd. Versatile Express
++ *
++ * Motherboard Express uATX
++ * V2M-P1
++ *
++ * HBI-0190D
++ *
++ * RS1 memory map ("ARM Cortex-A Series memory map" in the board's
++ * Technical Reference Manual)
++ *
++ * WARNING! The hardware described in this file is independent from the
++ * original variant (vexpress-v2m.dtsi), but there is a strong
++ * correspondence between the two configurations.
++ *
++ * TAKE CARE WHEN MAINTAINING THIS FILE TO PROPAGATE ANY RELEVANT
++ * CHANGES TO vexpress-v2m.dtsi!
 + */
-+#define V2M_SYS_ID		0x000
-+#define V2M_SYS_SW		0x004
-+#define V2M_SYS_LED		0x008
-+#define V2M_SYS_100HZ		0x024
-+#define V2M_SYS_FLAGS		0x030
-+#define V2M_SYS_FLAGSSET	0x030
-+#define V2M_SYS_FLAGSCLR	0x034
-+#define V2M_SYS_NVFLAGS		0x038
-+#define V2M_SYS_NVFLAGSSET	0x038
-+#define V2M_SYS_NVFLAGSCLR	0x03c
-+#define V2M_SYS_MCI		0x048
-+#define V2M_SYS_FLASH		0x03c
-+#define V2M_SYS_CFGSW		0x058
-+#define V2M_SYS_24MHZ		0x05c
-+#define V2M_SYS_MISC		0x060
-+#define V2M_SYS_DMA		0x064
-+#define V2M_SYS_PROCID0		0x084
-+#define V2M_SYS_PROCID1		0x088
-+#define V2M_SYS_CFGDATA		0x0a0
-+#define V2M_SYS_CFGCTRL		0x0a4
-+#define V2M_SYS_CFGSTAT		0x0a8
++
++/ {
++	motherboard {
++		compatible = "simple-bus";
++		arm,v2m-memory-map = "rs1";
++		#address-cells = <2>; /* SMB chipselect number and offset */
++		#size-cells = <1>;
++		#interrupt-cells = <1>;
++
++		flash at 0,00000000 {
++			compatible = "arm,vexpress-flash", "cfi-flash";
++			reg = <0 0x00000000 0x04000000>,
++			      <4 0x00000000 0x04000000>;
++			bank-width = <4>;
++		};
++
++		psram at 1,00000000 {
++			compatible = "mtd-ram";
++			reg = <1 0x00000000 0x02000000>;
++			bank-width = <4>;
++		};
++
++		ethernet at 2,02000000 {
++			compatible = "smsc,lan9118", "smsc,lan9115";
++			reg = <2 0x02000000 0x10000>;
++			interrupts = <15>;
++			phy-mode = "mii";
++			reg-io-width = <4>;
++			smsc,irq-active-high;
++			smsc,irq-push-pull;
++		};
++
++		usb at 2,03000000 {
++			compatible = "nxp,usb-isp1761";
++			reg = <2 0x03000000 0x20000>;
++			interrupts = <16>;
++			port1-otg;
++		};
++
++		iofpga at 3,00000000 {
++			compatible = "arm,amba-bus", "simple-bus";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges = <0 3 0 0x200000>;
++
++			sysreg at 010000 {
++				compatible = "arm,vexpress-sysreg";
++				reg = <0x010000 0x1000>;
++			};
++
++			sysctl at 020000 {
++				compatible = "arm,sp810", "arm,primecell";
++				reg = <0x020000 0x1000>;
++			};
++
++			/* PCI-E I2C bus */
++			mb_i2c_pcie: i2c at 030000 {
++				compatible = "arm,versatile-i2c";
++				reg = <0x030000 0x1000>;
++
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				pcie-switch at 60 {
++					compatible = "idt,89hpes32h8";
++					reg = <0x60>;
++				};
++			};
++
++			aaci at 040000 {
++				compatible = "arm,pl041", "arm,primecell";
++				reg = <0x040000 0x1000>;
++				interrupts = <11>;
++			};
++
++			mmci at 050000 {
++				compatible = "arm,pl180", "arm,primecell";
++				reg = <0x050000 0x1000>;
++				interrupts = <9 10>;
++			};
++
++			kmi at 060000 {
++				compatible = "arm,pl050", "arm,primecell";
++				reg = <0x060000 0x1000>;
++				interrupts = <12>;
++			};
++
++			kmi at 070000 {
++				compatible = "arm,pl050", "arm,primecell";
++				reg = <0x070000 0x1000>;
++				interrupts = <13>;
++			};
++
++			mb_serial0: uart at 090000 {
++				compatible = "arm,pl011", "arm,primecell";
++				reg = <0x090000 0x1000>;
++				interrupts = <5>;
++			};
++
++			mb_serial1: uart at 0a0000 {
++				compatible = "arm,pl011", "arm,primecell";
++				reg = <0x0a0000 0x1000>;
++				interrupts = <6>;
++			};
++
++			mb_serial2: uart at 0b0000 {
++				compatible = "arm,pl011", "arm,primecell";
++				reg = <0x0b0000 0x1000>;
++				interrupts = <7>;
++			};
++
++			mb_serial3: uart at 0c0000 {
++				compatible = "arm,pl011", "arm,primecell";
++				reg = <0x0c0000 0x1000>;
++				interrupts = <8>;
++			};
++
++			wdt at 0f0000 {
++				compatible = "arm,sp805", "arm,primecell";
++				reg = <0x0f0000 0x1000>;
++				interrupts = <0>;
++			};
++
++			mb_timer01: timer at 110000 {
++				compatible = "arm,sp804", "arm,primecell";
++				reg = <0x110000 0x1000>;
++				interrupts = <2>;
++			};
++
++			mb_timer23: timer at 120000 {
++				compatible = "arm,sp804", "arm,primecell";
++				reg = <0x120000 0x1000>;
++			};
++
++			/* DVI I2C bus */
++			mb_i2c_dvi: i2c at 160000 {
++				compatible = "arm,versatile-i2c";
++				reg = <0x160000 0x1000>;
++
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				dvi-transmitter at 39 {
++					compatible = "sil,sii9022-tpi", "sil,sii9022";
++					reg = <0x39>;
++				};
++
++				dvi-transmitter at 60 {
++					compatible = "sil,sii9022-cpi", "sil,sii9022";
++					reg = <0x60>;
++				};
++			};
++
++			rtc at 170000 {
++				compatible = "arm,pl031", "arm,primecell";
++				reg = <0x170000 0x1000>;
++				interrupts = <4>;
++			};
++
++			compact-flash at 1a0000 {
++				compatible = "ata-generic";
++				reg = <0x1a0000 0x100
++				       0x1a0100 0xf00>;
++				reg-shift = <2>;
++			};
++
++			clcd at 1f0000 {
++				compatible = "arm,pl111", "arm,primecell";
++				reg = <0x1f0000 0x1000>;
++				interrupts = <14>;
++			};
++		};
++	};
++};
+diff --git a/arch/arm/mach-vexpress/Kconfig b/arch/arm/mach-vexpress/Kconfig
+index 6a6fa22..2180888 100644
+--- a/arch/arm/mach-vexpress/Kconfig
++++ b/arch/arm/mach-vexpress/Kconfig
+@@ -15,4 +15,12 @@ config ARCH_VEXPRESS_DT
+ 	help
+ 	  VE platform *requiring* Flattened Device Tree to boot.
  
++config ARCH_VEXPRESS_RS1
++	bool
++	select AUTO_ZRELADDR
++	select ARM_PATCH_PHYS_VIRT
++	help
++	  RS1 VE memory map (i.a. motherboard peripherals at
++	  0x1c000000, RAM at 0x80000000).
++
+ endmenu
+diff --git a/arch/arm/mach-vexpress/Makefile.boot b/arch/arm/mach-vexpress/Makefile.boot
+index 8630b3d..05b77a5 100644
+--- a/arch/arm/mach-vexpress/Makefile.boot
++++ b/arch/arm/mach-vexpress/Makefile.boot
+@@ -1,3 +1,9 @@
++ifeq ($(CONFIG_ARCH_VEXPRESS_RS1),y)
++   zreladdr-y	+= 0x80008000
++params_phys-y	:= 0x80000100
++initrd_phys-y	:= 0x80800000
++else
+    zreladdr-y	+= 0x60008000
+ params_phys-y	:= 0x60000100
+ initrd_phys-y	:= 0x60800000
++endif
+diff --git a/arch/arm/mach-vexpress/include/mach/debug-macro.S b/arch/arm/mach-vexpress/include/mach/debug-macro.S
+index fd9e6c7..8010ff9 100644
+--- a/arch/arm/mach-vexpress/include/mach/debug-macro.S
++++ b/arch/arm/mach-vexpress/include/mach/debug-macro.S
+@@ -10,12 +10,41 @@
+  * published by the Free Software Foundation.
+  */
+ 
+-#define DEBUG_LL_UART_OFFSET	0x00009000
++#define DEBUG_LL_PHYS_BASE		0x10000000
++#define DEBUG_LL_UART_OFFSET		0x00009000
++
++#define DEBUG_LL_PHYS_BASE_RS1		0x1c000000
++#define DEBUG_LL_UART_OFFSET_RS1	0x00090000
++
++#define DEBUG_LL_VIRT_BASE		0xf8000000
+ 
+ 		.macro	addruart,rp,rv,tmp
+-		mov	\rp, #DEBUG_LL_UART_OFFSET
+-		orr	\rv, \rp, #0xf8000000	@ virtual base
+-		orr	\rp, \rp, #0x10000000	@ physical base
++
++		@ Check the MMU state
++#if defined(CONFIG_MMU)
++		mrc	p15, 0, \tmp, c1, c0	@ SCTRL
++		tst	\tmp, #1		@ MMU enabled?
++		moveq	\tmp, #DEBUG_LL_PHYS_BASE
++		movne	\tmp, #DEBUG_LL_VIRT_BASE
++#else
++		mov	\tmp, #DEBUG_LL_PHYS_BASE
++#endif
++
++		@ PL011 present in "original" place?
++		orr	\tmp, \tmp, #DEBUG_LL_UART_OFFSET
++		ldr	\tmp, [\tmp, #0xfe0]	@ PeriphID0
++		teq	\tmp, #0x11		@ PL011
++
++		@ Original memory map
++		moveq	\rp, #DEBUG_LL_UART_OFFSET
++		orreq	\rv, \rp, #DEBUG_LL_VIRT_BASE
++		orreq	\rp, \rp, #DEBUG_LL_PHYS_BASE
++
++		@ RS1 memory map
++		movne	\rp, #DEBUG_LL_UART_OFFSET_RS1
++		orrne	\rv, \rp, #DEBUG_LL_VIRT_BASE
++		orrne	\rp, \rp, #DEBUG_LL_PHYS_BASE_RS1
++
+ 		.endm
+ 
+ #include <asm/hardware/debug-pl01x.S>
+diff --git a/arch/arm/mach-vexpress/include/mach/uncompress.h b/arch/arm/mach-vexpress/include/mach/uncompress.h
+index 7972c57..c491565 100644
+--- a/arch/arm/mach-vexpress/include/mach/uncompress.h
++++ b/arch/arm/mach-vexpress/include/mach/uncompress.h
+@@ -22,7 +22,18 @@
+ #define AMBA_UART_CR(base)	(*(volatile unsigned char *)((base) + 0x30))
+ #define AMBA_UART_FR(base)	(*(volatile unsigned char *)((base) + 0x18))
+ 
+-#define get_uart_base()	(0x10000000 + 0x00009000)
++#define AMBA_PERIPH_ID0(base)	(*(volatile unsigned char *)((base) + 0xfe0))
++
++#define UART_BASE	0x10009000
++#define UART_BASE_RS1	0x1c090000
++
++static unsigned long get_uart_base(void)
++{
++	if (AMBA_PERIPH_ID0(UART_BASE) == 0x11)
++		return UART_BASE;
++	else
++		return UART_BASE_RS1;
++}
  
  /*
-@@ -117,6 +114,7 @@
- 
- int v2m_cfg_write(u32 devfn, u32 data);
- int v2m_cfg_read(u32 devfn, u32 *data);
-+void v2m_flags_set(u32 data);
- 
- /*
-  * Core tile IDs
-diff --git a/arch/arm/mach-vexpress/platsmp.c b/arch/arm/mach-vexpress/platsmp.c
-index 2b5f7ac..e8be99d 100644
---- a/arch/arm/mach-vexpress/platsmp.c
-+++ b/arch/arm/mach-vexpress/platsmp.c
-@@ -45,7 +45,5 @@ void __init platform_smp_prepare_cpus(unsigned int max_cpus)
- 	 * until it receives a soft interrupt, and then the
- 	 * secondary CPU branches to this address.
- 	 */
--	writel(~0, MMIO_P2V(V2M_SYS_FLAGSCLR));
--	writel(BSYM(virt_to_phys(versatile_secondary_startup)),
--		MMIO_P2V(V2M_SYS_FLAGSSET));
-+	v2m_flags_set(BSYM(virt_to_phys(versatile_secondary_startup)));
- }
+  * This does not append a newline
 diff --git a/arch/arm/mach-vexpress/v2m.c b/arch/arm/mach-vexpress/v2m.c
-index 1fafc32..ee52b35 100644
+index fd7ee1f..7af6f36 100644
 --- a/arch/arm/mach-vexpress/v2m.c
 +++ b/arch/arm/mach-vexpress/v2m.c
-@@ -39,29 +39,41 @@
+@@ -92,7 +92,7 @@ static void __init v2m_timer_init(void)
+ 		writel(scctrl, sysctl_base + SCCTRL);
+ 	}
  
- static struct map_desc v2m_io_desc[] __initdata = {
- 	{
--		.virtual	= __MMIO_P2V(V2M_PA_CS7),
+-	WARN_ON(!timer01_base || timer01_irq != NO_IRQ);
++	WARN_ON(!timer01_base || timer01_irq == NO_IRQ);
+ 	if (timer01_base && timer01_irq != NO_IRQ) {
+ 		writel(0, timer01_base + TIMER_1_BASE + TIMER_CTRL);
+ 		writel(0, timer01_base + TIMER_2_BASE + TIMER_CTRL);
+@@ -503,9 +503,38 @@ MACHINE_END
+ 
+ #if defined(CONFIG_ARCH_VEXPRESS_DT)
+ 
++static struct map_desc v2m_rs1_io_desc[] __initdata = {
++	{
 +		.virtual	= V2M_PERIPH,
- 		.pfn		= __phys_to_pfn(V2M_PA_CS7),
- 		.length		= SZ_128K,
- 		.type		= MT_DEVICE,
- 	},
- };
- 
-+static void __iomem *v2m_sysreg_base;
++		.pfn		= __phys_to_pfn(0x1c000000),
++		.length		= SZ_2M,
++		.type		= MT_DEVICE,
++	},
++};
 +
- static void __init v2m_timer_init(void)
- {
--	u32 scctrl;
--
--	/* Select 1MHz TIMCLK as the reference clock for SP804 timers */
--	scctrl = readl(MMIO_P2V(V2M_SYSCTL + SCCTRL));
--	scctrl |= SCCTRL_TIMEREN0SEL_TIMCLK;
--	scctrl |= SCCTRL_TIMEREN1SEL_TIMCLK;
--	writel(scctrl, MMIO_P2V(V2M_SYSCTL + SCCTRL));
--
--	writel(0, MMIO_P2V(V2M_TIMER0) + TIMER_CTRL);
--	writel(0, MMIO_P2V(V2M_TIMER1) + TIMER_CTRL);
--
--	sp804_clocksource_init(MMIO_P2V(V2M_TIMER1), "v2m-timer1");
--	sp804_clockevents_init(MMIO_P2V(V2M_TIMER0), IRQ_V2M_TIMER0,
--		"v2m-timer0");
-+	void __iomem *sysctl_base;
-+	void __iomem *timer01_base;
-+
-+	sysctl_base = ioremap(V2M_SYSCTL, SZ_4K);
-+	WARN_ON(!sysctl_base);
-+	if (sysctl_base) {
-+		/* Select 1MHz TIMCLK as the reference clock for SP804 timers */
-+		u32 scctrl = readl(sysctl_base + SCCTRL);
-+		scctrl |= SCCTRL_TIMEREN0SEL_TIMCLK;
-+		scctrl |= SCCTRL_TIMEREN1SEL_TIMCLK;
-+		writel(scctrl, sysctl_base + SCCTRL);
-+	}
-+
-+	timer01_base = ioremap(V2M_TIMER01, SZ_4K);
-+	WARN_ON(!timer01_base);
-+	if (timer01_base) {
-+		writel(0, timer01_base + TIMER_1_BASE + TIMER_CTRL);
-+		writel(0, timer01_base + TIMER_2_BASE + TIMER_CTRL);
-+
-+		sp804_clocksource_init(timer01_base + TIMER_2_BASE,
-+				"v2m-timer1");
-+		sp804_clockevents_init(timer01_base + TIMER_1_BASE,
-+				IRQ_V2M_TIMER0, "v2m-timer0");
-+	}
- }
- 
- static struct sys_timer v2m_timer = {
-@@ -81,14 +93,14 @@ int v2m_cfg_write(u32 devfn, u32 data)
- 	devfn |= SYS_CFG_START | SYS_CFG_WRITE;
- 
- 	spin_lock(&v2m_cfg_lock);
--	val = readl(MMIO_P2V(V2M_SYS_CFGSTAT));
--	writel(val & ~SYS_CFG_COMPLETE, MMIO_P2V(V2M_SYS_CFGSTAT));
-+	val = readl(v2m_sysreg_base + V2M_SYS_CFGSTAT);
-+	writel(val & ~SYS_CFG_COMPLETE, v2m_sysreg_base + V2M_SYS_CFGSTAT);
- 
--	writel(data, MMIO_P2V(V2M_SYS_CFGDATA));
--	writel(devfn, MMIO_P2V(V2M_SYS_CFGCTRL));
-+	writel(data, v2m_sysreg_base +  V2M_SYS_CFGDATA);
-+	writel(devfn, v2m_sysreg_base + V2M_SYS_CFGCTRL);
- 
- 	do {
--		val = readl(MMIO_P2V(V2M_SYS_CFGSTAT));
-+		val = readl(v2m_sysreg_base + V2M_SYS_CFGSTAT);
- 	} while (val == 0);
- 	spin_unlock(&v2m_cfg_lock);
- 
-@@ -102,22 +114,28 @@ int v2m_cfg_read(u32 devfn, u32 *data)
- 	devfn |= SYS_CFG_START;
- 
- 	spin_lock(&v2m_cfg_lock);
--	writel(0, MMIO_P2V(V2M_SYS_CFGSTAT));
--	writel(devfn, MMIO_P2V(V2M_SYS_CFGCTRL));
-+	writel(0, v2m_sysreg_base + V2M_SYS_CFGSTAT);
-+	writel(devfn, v2m_sysreg_base + V2M_SYS_CFGCTRL);
- 
- 	mb();
- 
- 	do {
- 		cpu_relax();
--		val = readl(MMIO_P2V(V2M_SYS_CFGSTAT));
-+		val = readl(v2m_sysreg_base + V2M_SYS_CFGSTAT);
- 	} while (val == 0);
- 
--	*data = readl(MMIO_P2V(V2M_SYS_CFGDATA));
-+	*data = readl(v2m_sysreg_base + V2M_SYS_CFGDATA);
- 	spin_unlock(&v2m_cfg_lock);
- 
- 	return !!(val & SYS_CFG_ERR);
- }
- 
-+void __init v2m_flags_set(u32 data)
++static int __init v2m_dt_scan_memory_map(unsigned long node, const char *uname,
++		int depth, void *data)
 +{
-+	writel(~0, v2m_sysreg_base + V2M_SYS_FLAGSCLR);
-+	writel(data, v2m_sysreg_base + V2M_SYS_FLAGSSET);
++	const char **map = data;
++
++	if (strcmp(uname, "motherboard") != 0)
++		return 0;
++
++	*map = of_get_flat_dt_prop(node, "arm,v2m-memory-map", NULL);
++
++	return 1;
 +}
 +
- 
- static struct resource v2m_pcie_i2c_resource = {
- 	.start	= V2M_SERIAL_BUS_PCI,
-@@ -203,7 +221,7 @@ static struct platform_device v2m_usb_device = {
- 
- static void v2m_flash_set_vpp(struct platform_device *pdev, int on)
+ void __init v2m_dt_map_io(void)
  {
--	writel(on != 0, MMIO_P2V(V2M_SYS_FLASH));
-+	writel(on != 0, v2m_sysreg_base + V2M_SYS_FLASH);
++	const char *map = NULL;
++
++	of_scan_flat_dt(v2m_dt_scan_memory_map, &map);
++
++	if (map && strcmp(map, "rs1") == 0)
+ 		iotable_init(v2m_rs1_io_desc, ARRAY_SIZE(v2m_rs1_io_desc));
++	else
++		iotable_init(v2m_io_desc, ARRAY_SIZE(v2m_io_desc));
  }
  
- static struct physmap_flash_data v2m_flash_data = {
-@@ -257,7 +275,7 @@ static struct platform_device v2m_cf_device = {
+ static struct clk_lookup v2m_dt_lookups[] = {
+@@ -548,6 +577,35 @@ static struct clk_lookup v2m_dt_lookups[] = {
+ 		.dev_id		= "1001f000.clcd",
+ 		.clk		= &osc1_clk,
+ 	},
++	/* RS1 memory map */
++	{	/* PL180 MMCI */
++		.dev_id		= "mb:mmci", /* 1c050000.mmci */
++		.clk		= &osc2_clk,
++	}, {	/* PL050 KMI0 */
++		.dev_id		= "1c060000.kmi",
++		.clk		= &osc2_clk,
++	}, {	/* PL050 KMI1 */
++		.dev_id		= "1c070000.kmi",
++		.clk		= &osc2_clk,
++	}, {	/* PL011 UART0 */
++		.dev_id		= "1c090000.uart",
++		.clk		= &osc2_clk,
++	}, {	/* PL011 UART1 */
++		.dev_id		= "1c0a0000.uart",
++		.clk		= &osc2_clk,
++	}, {	/* PL011 UART2 */
++		.dev_id		= "1c0b0000.uart",
++		.clk		= &osc2_clk,
++	}, {	/* PL011 UART3 */
++		.dev_id		= "1c0c0000.uart",
++		.clk		= &osc2_clk,
++	}, {	/* SP805 WDT */
++		.dev_id		= "1c0f0000.wdt",
++		.clk		= &v2m_ref_clk,
++	}, {	/* PL111 CLCD */
++		.dev_id		= "1c1f0000.clcd",
++		.clk		= &osc1_clk,
++	},
+ };
  
- static unsigned int v2m_mmci_status(struct device *dev)
- {
--	return readl(MMIO_P2V(V2M_SYS_MCI)) & (1 << 0);
-+	return readl(v2m_sysreg_base + V2M_SYS_MCI) & (1 << 0);
- }
+ void __init v2m_dt_init_early(void)
+@@ -586,6 +644,10 @@ static struct of_dev_auxdata v2m_dt_auxdata_lookup[] __initdata = {
+ 	OF_DEV_AUXDATA("arm,vexpress-flash", V2M_NOR0, "physmap-flash",
+ 			&v2m_flash_data),
+ 	OF_DEV_AUXDATA("arm,primecell", V2M_MMCI, "mb:mmci", &v2m_mmci_data),
++	/* RS1 memory map */
++	OF_DEV_AUXDATA("arm,vexpress-flash", 0x08000000, "physmap-flash",
++			&v2m_flash_data),
++	OF_DEV_AUXDATA("arm,primecell", 0x1c050000, "mb:mmci", &v2m_mmci_data),
+ 	{}
+ };
  
- static struct mmci_platform_data v2m_mmci_data = {
-@@ -370,7 +388,7 @@ static void __init v2m_init_early(void)
- {
- 	ct_desc->init_early();
- 	clkdev_add_table(v2m_lookups, ARRAY_SIZE(v2m_lookups));
--	versatile_sched_clock_init(MMIO_P2V(V2M_SYS_24MHZ), 24000000);
-+	versatile_sched_clock_init(v2m_sysreg_base + V2M_SYS_24MHZ, 24000000);
- }
- 
- static void v2m_power_off(void)
-@@ -399,7 +417,8 @@ static void __init v2m_populate_ct_desc(void)
- 	u32 current_tile_id;
- 
- 	ct_desc = NULL;
--	current_tile_id = readl(MMIO_P2V(V2M_SYS_PROCID0)) & V2M_CT_ID_MASK;
-+	current_tile_id = readl(v2m_sysreg_base + V2M_SYS_PROCID0)
-+				& V2M_CT_ID_MASK;
- 
- 	for (i = 0; i < ARRAY_SIZE(ct_descs) && !ct_desc; ++i)
- 		if (ct_descs[i]->id == current_tile_id)
-@@ -413,6 +432,7 @@ static void __init v2m_populate_ct_desc(void)
- static void __init v2m_map_io(void)
- {
- 	iotable_init(v2m_io_desc, ARRAY_SIZE(v2m_io_desc));
-+	v2m_sysreg_base = V2M_PERIPH_P2V(V2M_SYSREGS);
- 	v2m_populate_ct_desc();
- 	ct_desc->map_io();
- }
 -- 
 1.6.3.3
