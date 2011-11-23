@@ -1,16 +1,52 @@
-From: gigin_jose@yahoo.co.in (GIGIN JOSE)
-Date: Wed, 23 Nov 2011 09:01:58 +0000 (UTC)
-Subject: wake up from sleep on s3c2416
-Message-ID: <loom.20111123T061009-728@post.gmane.org>
+From: b32955@freescale.com (Huang Shijie)
+Date: Wed, 23 Nov 2011 17:13:05 +0800
+Subject: [PATCH] IMX/SDMA : save the real count for one DMA transaction.
+Message-ID: <1322039585-7901-1-git-send-email-b32955@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I am working on s3c2416 SOC with embedded linux operating system. I need to wake 
-up the system from sleep mode. Will the wake up from sleep mode happen from a 
-single external interrupt source ? ie, if I need to use EINT0 as my wake up 
-source, will the wake up event be disabled from EINT1 or any other external 
-interrupt sources ? 
+When we use the SDMA in the UART driver(such as imx6q), we will
+meet one situation:
+  Assume we set 64 bytes for the RX DMA buffer.
+The receiving DMA buffer is not full, but the an Aging DMA request
+will be received by the SDMA controller if we enable the
+IDDMAEN(UCR4[6]).
+  The UART driver needs to know the count of the real received bytes,
+and push them to upper layer.
 
-How can I configure the condition to wake up before going to power down mode ? 
+  So reuse the `private` field of dma_chan{}. Store the count of received bytes
+to it, and use it in the UART driver.
 
-Thank You
+Signed-off-by: Huang Shijie <b32955@freescale.com>
+---
+ drivers/dma/imx-sdma.c |    6 ++++++
+ 1 files changed, 6 insertions(+), 0 deletions(-)
+
+diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
+index f993955..19ce579 100644
+--- a/drivers/dma/imx-sdma.c
++++ b/drivers/dma/imx-sdma.c
+@@ -501,6 +501,8 @@ static void sdma_handle_channel_loop(struct sdma_channel *sdmac)
+ static void mxc_sdma_handle_channel_normal(struct sdma_channel *sdmac)
+ {
+ 	struct sdma_buffer_descriptor *bd;
++	struct dma_chan *chan = &sdmac->chan;
++	unsigned int count;
+ 	int i, error = 0;
+ 
+ 	/*
+@@ -512,8 +514,12 @@ static void mxc_sdma_handle_channel_normal(struct sdma_channel *sdmac)
+ 
+ 		 if (bd->mode.status & (BD_DONE | BD_RROR))
+ 			error = -EIO;
++		 count += bd->mode.count;
+ 	}
+ 
++	/* save the real count we received or transmitted. */
++	chan->private = (void *)count;
++
+ 	if (error)
+ 		sdmac->status = DMA_ERROR;
+ 	else
+-- 
+1.7.3.2
