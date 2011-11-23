@@ -1,19 +1,23 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 23 Nov 2011 11:03:38 +0000
-Subject: [PATCH 09/17] ASoC: Tegra I2S: Remove dependency on pdev->id
-In-Reply-To: <1322011285-4002-10-git-send-email-swarren@nvidia.com>
-References: <1322011285-4002-1-git-send-email-swarren@nvidia.com>
- <1322011285-4002-10-git-send-email-swarren@nvidia.com>
-Message-ID: <20111123110338.GC21073@opensource.wolfsonmicro.com>
+From: b32955@freescale.com (Huang Shijie)
+Date: Wed, 23 Nov 2011 19:04:44 +0800
+Subject: [PATCH] IMX/SDMA : save the real count for one DMA transaction.
+In-Reply-To: <20111123105821.GC4063@pengutronix.de>
+References: <1322039585-7901-1-git-send-email-b32955@freescale.com>
+ <20111123105821.GC4063@pengutronix.de>
+Message-ID: <4ECCD34C.1090400@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 22, 2011 at 06:21:17PM -0700, Stephen Warren wrote:
+Hi,
+>> +	/* save the real count we received or transmitted. */
+>> +	chan->private = (void *)count;
+> And if someone later needs another variable which is private?
+>
+I ever wanted to add an new parameter `void *` to dma_aync_tx_callback,
+but it seemed i have
+to change a lot of files.
 
-> +	i2s->dai = tegra_i2s_dai_template;
-> +	i2s->dai.name = pdev->name;
-> +
+Do you have any better suggestion?
 
-This should really be part of the same commit as the arch/arm side
-change in order to avoid bisection breaks as from the point of view of
-non-DT systems it's moving the number into the name.
+thanks
+Huang Shijie
