@@ -1,73 +1,34 @@
-From: javier.martin@vista-silicon.com (javier Martin)
-Date: Wed, 23 Nov 2011 11:55:12 +0100
-Subject: [PATCH v2 1/2] MX2: Add platform definitions for eMMa-PrP device.
-In-Reply-To: <20111122210632.GS27267@pengutronix.de>
-References: <1321963316-9058-1-git-send-email-javier.martin@vista-silicon.com>
- <1321963316-9058-2-git-send-email-javier.martin@vista-silicon.com>
- <20111122210632.GS27267@pengutronix.de>
-Message-ID: <CACKLOr1Fi+wx1wDeOCR3rw3OdYYDB9Jq8S_XtDf7Mf7TtQxwgQ@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 23 Nov 2011 10:57:01 +0000
+Subject: [PATCH] arm/imx: use Kconfig choice for low-level debug UART
+ selection
+In-Reply-To: <20111122230030.GB3005@opensource.wolfsonmicro.com>
+References: <1313530873-24961-1-git-send-email-will.deacon@arm.com>
+ <20111122164707.GJ6624@sirena.org.uk>
+ <20111122202425.GD9581@n2100.arm.linux.org.uk>
+ <1484610.g1p0X99tcV@wuerfel>
+ <20111122230030.GB3005@opensource.wolfsonmicro.com>
+Message-ID: <20111123105701.GE25848@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
+On Tue, Nov 22, 2011 at 11:00:31PM +0000, Mark Brown wrote:
+> On Tue, Nov 22, 2011 at 10:19:53PM +0100, Arnd Bergmann wrote:
+> 
+> > and then selecting DEBUG_LL_LEGACY from all platforms that do their own
+> > thing. That would avoid the possible randconfig errors.
+> 
+> Your fix seems good to me, and avoids causing hassle for randconfig
+> folks, though Russell's will be more likely to encourage people to
+> convert I guess.
 
-On 22 November 2011 22:06, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> On Tue, Nov 22, 2011 at 01:01:55PM +0100, Javier Martin wrote:
->> eMMa-PrP device included in Freescale i.MX2 chips can also
->> be used separately to process memory buffers.
->>
->> Signed-off-by: Javier Martin <javier.martin@vista-silicon.com>
->> ---
->> ?arch/arm/mach-imx/devices-imx27.h ? ? ? ? ? ? ? | ? ?2 +
->> ?arch/arm/plat-mxc/devices/platform-mx2-camera.c | ? 33 +++++++++++++++++++++++
->> ?arch/arm/plat-mxc/include/mach/devices-common.h | ? ?2 +
->> ?3 files changed, 37 insertions(+), 0 deletions(-)
->>
->> diff --git a/arch/arm/mach-imx/devices-imx27.h b/arch/arm/mach-imx/devices-imx27.h
->> index 2f727d7..519aa36 100644
->> --- a/arch/arm/mach-imx/devices-imx27.h
->> +++ b/arch/arm/mach-imx/devices-imx27.h
->> @@ -50,6 +50,8 @@ extern const struct imx_imx_uart_1irq_data imx27_imx_uart_data[];
->> ?extern const struct imx_mx2_camera_data imx27_mx2_camera_data;
->> ?#define imx27_add_mx2_camera(pdata) ?\
->> ? ? ? imx_add_mx2_camera(&imx27_mx2_camera_data, pdata)
->> +#define imx27_alloc_mx2_emmaprp(pdata) ? ? ? \
->> + ? ? imx_alloc_mx2_emmaprp(&imx27_mx2_camera_data)
->>
->> ?extern const struct imx_mxc_ehci_data imx27_mxc_ehci_otg_data;
->> ?#define imx27_add_mxc_ehci_otg(pdata) ? ? ? ?\
->> diff --git a/arch/arm/plat-mxc/devices/platform-mx2-camera.c b/arch/arm/plat-mxc/devices/platform-mx2-camera.c
->> index b3f4828..4a8bd73 100644
->> --- a/arch/arm/plat-mxc/devices/platform-mx2-camera.c
->> +++ b/arch/arm/plat-mxc/devices/platform-mx2-camera.c
->> @@ -6,6 +6,7 @@
->> ? * the terms of the GNU General Public License version 2 as published by the
->> ? * Free Software Foundation.
->> ? */
->> +#include <linux/dma-mapping.h>
->> ?#include <mach/hardware.h>
->> ?#include <mach/devices-common.h>
->>
->> @@ -62,3 +63,35 @@ struct platform_device *__init imx_add_mx2_camera(
->> ? ? ? ? ? ? ? ? ? ? ? res, data->iobaseemmaprp ? 4 : 2,
->> ? ? ? ? ? ? ? ? ? ? ? pdata, sizeof(*pdata), DMA_BIT_MASK(32));
->> ?}
->> +
->> +struct platform_device *__init imx_alloc_mx2_emmaprp(
->> + ? ? ? ? ? ? const struct imx_mx2_camera_data *data)
->
-> Why only alloc and not register?
+Although Russell's approach is a build breaker for those platforms that have
+not yet made the switch, that does provide an incentive for the platform
+maintainers to update their code. If we settle for a legacy solution it will
+probably sit around forever.
 
-You are right. That would make things more compact at board level as
-it is done with other devices such as SSI, etc...
-I will send a v3 version of this patch soon addressing this.
+Given that we're now past -rc2, it might be best to wait until the next
+merge window to introduce the #error logic, so the LEGACY solution could be
+a stopgap for 3.2.
 
-Regards.
--- 
-Javier Martin
-Vista Silicon S.L.
-CDTUC - FASE C - Oficina S-345
-Avda de los Castros s/n
-39005- Santander. Cantabria. Spain
-+34 942 25 32 60
-www.vista-silicon.com
+Will
