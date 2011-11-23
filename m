@@ -1,23 +1,48 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 23 Nov 2011 18:06:51 +0000
-Subject: [PATCH v3 5/5] clk: export tree topology and clk data via sysfs
-In-Reply-To: <20111123165903.GF31337@atomide.com>
-References: <1321926047-14211-1-git-send-email-mturquette@linaro.org>
- <1321926047-14211-6-git-send-email-mturquette@linaro.org>
- <20111122154900.GB18954@kroah.com>
- <CAPtuhThPQtWwihE8aGru55k87oV7QOr=O836TTJ+=30d6dtVhA@mail.gmail.com>
- <20111122191347.GB4844@kroah.com> <20111123165903.GF31337@atomide.com>
-Message-ID: <20111123180651.GB19739@n2100.arm.linux.org.uk>
+From: linux@solonet.org.ua (Denis Kuzmenko)
+Date: Wed, 23 Nov 2011 20:11:27 +0200
+Subject: [PATCH resend] arm: s3c24xx: Add new LCD (W35i) support for Mini2440
+ board
+In-Reply-To: <4EC588A8.3030907@solonet.org.ua>
+References: <4EC588A8.3030907@solonet.org.ua>
+Message-ID: <4ECD374F.5060208@solonet.org.ua>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 23, 2011 at 08:59:04AM -0800, Tony Lindgren wrote:
-> ..let's plan on getting rid of the early usage of clocks instead so
-> you don't have the issue of deferring stuff.
+Add new LCD (W35i) support for Mini2440 board
 
-No - we have too many platforms already using them early to do a change
-like this - and to do such a change will force them to invent some other
-way.  That's just stupid.
+Signed-off-by: Denis Kuzmenko <linux@solonet.org.ua>
+---
 
-Keep the clk API as a fundamental thing which should be initialized early
-so we don't have to invent new clk APIs to get around its unavailability.
+I need to refer this patch but can't find it on lkml.org
+Maybe I haven't send it...
+Sorry for bothering if I did so.
+
+diff --git a/arch/arm/mach-s3c2440/mach-mini2440.c b/arch/arm/mach-s3c2440/mach-mini2440.c
+index fc2dc0b..951eadd 100644
+--- a/arch/arm/mach-s3c2440/mach-mini2440.c
++++ b/arch/arm/mach-s3c2440/mach-mini2440.c
+@@ -167,6 +167,24 @@ static struct s3c2410fb_display mini2440_lcd_cfg[] __initdata = {
+ 		.lcdcon5	= (S3C2410_LCDCON5_FRM565 |
+ 				   S3C2410_LCDCON5_HWSWP),
+ 	},
++	/* mini2440 + 3.5" TFT (LCD-W35i, LQ035Q1DG06 type) + touchscreen*/
++	[3] = {
++		_LCD_DECLARE(
++			/* clock */
++			7,
++			/* xres, margin_right, margin_left, hsync */
++			320, 68, 66, 4,
++			/* yres, margin_top, margin_bottom, vsync */
++			240, 4, 4, 9,
++			/* refresh rate */
++			60),
++		.lcdcon5	= (S3C2410_LCDCON5_FRM565 |
++				   S3C2410_LCDCON5_INVVDEN |
++				   S3C2410_LCDCON5_INVVFRAME |
++				   S3C2410_LCDCON5_INVVLINE |
++				   S3C2410_LCDCON5_INVVCLK |
++				   S3C2410_LCDCON5_HWSWP),
++	},
+ };
+ 
+ /* todo - put into gpio header */
