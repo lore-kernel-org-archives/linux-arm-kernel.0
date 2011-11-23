@@ -1,413 +1,125 @@
-From: skannan@codeaurora.org (Saravana Kannan)
-Date: Tue, 22 Nov 2011 18:03:01 -0800
-Subject: [PATCH v3 2/5] Documentation: common clk API
-In-Reply-To: <1321926047-14211-3-git-send-email-mturquette@linaro.org>
-References: <1321926047-14211-1-git-send-email-mturquette@linaro.org>
- <1321926047-14211-3-git-send-email-mturquette@linaro.org>
-Message-ID: <4ECC5455.6040806@codeaurora.org>
+From: junxiao.bi@windriver.com (Bi Junxiao)
+Date: Wed, 23 Nov 2011 10:32:11 +0800
+Subject: [PATCH 2/6] ARM: gic: fix big endian support
+In-Reply-To: <20111122103308.GB2066@localhost.localdomain>
+References: <1321322785-2981-1-git-send-email-junxiao.bi@windriver.com>
+ <1321322785-2981-2-git-send-email-junxiao.bi@windriver.com>
+ <alpine.LFD.2.02.1111211334320.17904@xanadu.home>
+ <4ECAFF2C.1010604@windriver.com>
+ <20111122103308.GB2066@localhost.localdomain>
+Message-ID: <4ECC5B2B.6030300@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/21/2011 05:40 PM, Mike Turquette wrote:
-> Provide documentation for the common clk structures and APIs.  This code
-> can be found in drivers/clk/ and include/linux/clk.h.
+on 11/22/2011 06:33 PM Dave Martin wrote:
+> On Tue, Nov 22, 2011 at 09:47:24AM +0800, Bi Junxiao wrote:
+>    
+>> on 11/22/2011 03:11 AM Nicolas Pitre wrote:
+>>      
+>>> On Tue, 15 Nov 2011, Junxiao Bi wrote:
+>>>
+>>>        
+>>>> The irq state from gic is in little-endian mode. We need do endian
+>>>> conversion for it in big-endian machine. Usually byte swapping of
+>>>> 32-bits word needs 4 assembler instructions for arm machine which
+>>>> arch<   6. But since the high order half word of the irq state is
+>>>> zero, there is a way that can use lesser instrunctions to improve
+>>>> the performance since we only need a bytes swaping of half word.
+>>>> That's what swab16_low_half and swab16_high_half do.
+>>>>
+>>>> Signed-off-by: Junxiao Bi<junxiao.bi@windriver.com>
+>>>>          
+>>> Comments below.
+>>>
+>>>        
+>>>> ---
+>>>>   arch/arm/include/asm/assembler.h                |   27 +++++++++++++++++++++++
+>>>>   arch/arm/include/asm/hardware/entry-macro-gic.S |    7 ++++++
+>>>>   2 files changed, 34 insertions(+), 0 deletions(-)
+>>>>
+>>>> diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
+>>>> index 29035e8..3ddee22 100644
+>>>> --- a/arch/arm/include/asm/assembler.h
+>>>> +++ b/arch/arm/include/asm/assembler.h
+>>>> @@ -302,4 +302,31 @@
+>>>>   	.size \name , . - \name
+>>>>   	.endm
+>>>>
+>>>> +/*
+>>>> + * swab16_low_half is used to swap the bytes order of the low order
+>>>> + * half word, it assumes that the high order half word is zero.
+>>>> + * swab16_high_half is used to swap the bytes order of the high order
+>>>> + * half word, it assumes that the low order half word is zero.
+>>>> + */
+>>>> +#if __LINUX_ARM_ARCH__>= 6
+>>>> +	.macro swab16_low_half, reg
+>>>> +	rev \reg, \reg
+>>>> +	.endm
+>>>> +
+>>>> +	.macro swab16_high_half, reg
+>>>> +	rev \reg, \reg
+>>>> +	.endm
+>>>> +#else
+>>>> +	.macro swab16_low_half, reg
+>>>> +	mov \reg, \reg, ror #8
+>>>> +	orr \reg, \reg, \reg, lsr #16
+>>>> +	bic \reg, \reg, \reg, lsl #16
+>>>> +	.endm
+>>>>          
+> Your v6 and<v6 implementations don't seem to produce the same result
+> for swab16_low_half.
 >
-> Signed-off-by: Mike Turquette<mturquette@linaro.org>
-> ---
->   Documentation/clk.txt |  312 +++++++++++++++++++++++++++++++++++++++++++++++++
->   1 files changed, 312 insertions(+), 0 deletions(-)
->   create mode 100644 Documentation/clk.txt
+> If reg=0x0000AABB  on>=v6 you transform it to 0xBBAA0000, but on<v6
+> you translate it to 0x0000BBAA.
+>    
+For swab16_low_half, it assumes that the high order half of the word is 
+zero. This mean 0x0000AABB is not a qualified number, but 0xAABB0000 is, 
+it can translate to 0x0000BBAA with this macro which is the same result 
+with "rev".
+> Perhaps you meant to use the rev16 instruction instead of rev?
+>    
+This macro is trying to swap bytes order of a 32-bit word. It make the 
+assumption about the high half for a more cheaper and less register 
+usage implementation than swab32. When I first develop this code, 
+test_for_ltirq is still in entry-macro-gic.S(now it is deleted), I can 
+not find a temporary register for swab32 which needs two registers in 
+it. So I introduced this macro. I am not sure whether there are other 
+cases like test_for_ltirq. Is this marco useful? If so I can make a 
+separate patch for it.
+>    
+>>> I fail to see how this macro would be generally useful.  Presuming that
+>>> the top or bottom half has to be zero is not particularly practical.
+>>>        
+>> We can use it to swap bytes order of a 16-bits number in 32-bits
+>> register in which case the top or bottom half will be zero. For the
+>> \irqstat register, as the original implementation assumes its top
+>> half is zero, so I make the same assumption.
+>>      
+>>>> +	.macro swab16_high_half, reg
+>>>> +	swab16_low_half \reg
+>>>> +	mov \reg, \reg, lsl #16
+>>>> +	.endm
+>>>>          
+>>> And this doesn't end up cheaper than a plain swab32.
+>>>        
+>> This macro has an advantage that it only needs one register. For
+>> swab32, it will need another temporary register besides the target
+>> register.
+>>      
+>>> Furthermore, you're using those macros 1) in the gic code, and 2) onli
+>>> in the BE8 case.  Both of those conditions are only possible on ARMv6
+>>> and above anyway, so I'd simply open code a rev instruction inline.
+>>>        
+>> This is not be8 specific. It will be needed for both be8 and be32.
+>> So the machine with arch<  6 also needs to be supported.
+>>      
+> I also thought the GIC doesn't get used with<v6?  I thought the GIC was
+> too new for that, but I'm not an expert on it.
+>    
+I am also not sure about it. I didn't find a official document describe 
+this.
+> Cheers
+> ---Dave
 >
-> diff --git a/Documentation/clk.txt b/Documentation/clk.txt
-> new file mode 100644
-> index 0000000..ef4333d
-> --- /dev/null
-> +++ b/Documentation/clk.txt
-> @@ -0,0 +1,312 @@
-> +		The Common Clk Framework
-> +		Mike Turquette<mturquette@ti.com>
-> +
-> +	Part 1 - common data structures and API
-> +
-> +The common clk framework is a combination of a common definition of
-> +struct clk which can be used across most platforms as well as a set of
-> +driver-facing APIs which operate on those clks.  Platforms can enable it
-> +by selecting CONFIG_GENERIC_CLK.
-> +
-> +Below is the common struct clk definition from include/linux.clk.h.  It
-
-Typo
-
-> +is modified slightly for brevity:
-> +
-> +struct clk {
-> +	const char              *name;
-> +	const struct clk_hw_ops *ops;
-
-No strong opinion, but can we call this clk_ops for brevity?
-
-> +	struct clk              *parent;
-> +	unsigned long           rate;
-> +	unsigned long           flags;
-> +	unsigned int            enable_count;
-> +	unsigned int            prepare_count;
-> +	struct hlist_head       children;
-> +	struct hlist_node       child_node;
-> +};
-> +
-> +The .name, .parent and .children members make up the core of the clk
-> +tree topology which can be visualized by enabling
-> +CONFIG_COMMON_CLK_SYSFS.  The ops member points to an instance of struct
-> +clk_hw_ops:
-> +
-> +	struct clk_hw_ops {
-> +		int             (*prepare)(struct clk *clk);
-> +		void            (*unprepare)(struct clk *clk);
-> +		int             (*enable)(struct clk *clk);
-> +		void            (*disable)(struct clk *clk);
-> +		unsigned long   (*recalc_rate)(struct clk *clk);
-> +		long            (*round_rate)(struct clk *clk, unsigned long,
-> +				unsigned long *);
-> +		int             (*set_parent)(struct clk *clk, struct clk *);
-> +		struct clk *    (*get_parent)(struct clk *clk);
-> +		int             (*set_rate)(struct clk *clk, unsigned long);
-> +	};
-> +
-> +These callbacks correspond to the clk API that has existed in
-> +include/linux/clk.h for a while.  Below is a quick summary of the
-> +operations in that header, as implemented in drivers/clk/clk.c.  These
-> +comprise the driver-facing API:
-> +
-> +clk_prepare - does everything needed to get a clock ready to generate a
-> +proper signal which may include ungating the clk and actually generating
-> +that signal.  clk_prepare MUST be called before clk_enable.  This call
-> +holds the global prepare_mutex, which also prevents clk rates and
-> +topology from changing while held.  This API is meant to be the "slow"
-> +part of a clk enable sequence, if applicable.  This function must not be
-> +called in an interrupt context.
-
-in an atomic context?
-
-> +
-> +clk_unprepare - the opposite of clk_prepare: does everything needed to
-> +make a clk no longer ready to generate a proper signal, which may
-> +include gating an active clk.  clk_disable must be called before
-> +clk_unprepare.  All of the same rules for clk_prepare apply.
-> +
-> +clk_enable - ungate a clock and immediately start generating a valid clk
-> +signal.  This is the "fast" part of a clk enable sequence, and maybe the
-> +only functional part of that sequence.  Regardless clk_prepare must be
-> +called BEFORE clk_enable.  The enable_spinlock is held across this call,
-> +which means that clk_enable must not sleep.
-> +
-> +clk_disable - the opposite of clk_enable: gates a clock immediately.
-> +clk_disable must be called before calling clk_unprepare.  All of the
-> +same rules for clk_enable apply.
-> +
-> +clk_get_rate - Returns the cached rate for the clk.  Does NOT query the
-> +hardware state.  No lock is held.
-
-I wrote the stuff below and then realized that this ops is not really 
-present in the code. Looks like stale doc. Can you please remove this? 
-But I think the comments below do hold true for the actual 
-clk_set_rate()/get_rate() implementation. I will try to repeat this as 
-part of the actual code review.
-
-I will be looking into the other patches in order, so, forgive me if I'm 
-asking a question that has an obvious answer in the remaining patches.
-
-I think a lock needs to be taken for this call too. What prevents a 
-clock set rate from getting called and modifying the cached rate 
-variable while it's bring read. I don't think we should have a common 
-code assume that read/write of longs are atomic.
-
-> +
-> +clk_get_parent - Returns the cached parent for the clk.  Does NOT query
-> +the hardware state.  No lock is held.
-
-Same question as above. Can we assume a read of a pointer variable is 
-atomic? I'm not sure. I think this needs locking too.
-
-> +
-> +clk_set_rate - Attempts to change the clk rate to the one specified.
-> +Depending on a variety of common flags it may fail to maintain system
-> +stability or result in a variety of other clk rates changing.
-
-I'm not sure if this is intentional or if it's a mistake in phrasing it. 
-IMHO, the rates of other clocks that are actually made available to 
-device drivers should not be changed. This call might trigger rate 
-changes inside the tree to accommodate the request from various 
-children, but should not affect the rate of the leaf nodes.
-
-Can you please clarify the intention and/or the wording?
-
-> Holds the
-> +same prepare_mutex held by clk_prepare/clk_unprepare and clk_set_parent.
-> +
-> +clk_set_parent - Switches the input source for a clk.  This only applies
-> +to mux clks with multiple parents.  Holds the same prepare_mutex held by
-> +clk_prepare/clk_unprepare and clk_set_rate.
-> +
-> +	Part 2 - hardware clk implementations
-> +
-> +The strength of the common struct clk comes from its .ops pointer and
-> +the ability for platform and driver code to wrap the struct clk instance
-> +with hardware-specific data which the operations in the .ops pointer
-> +have knowledge of.  To illustrate consider the simple gateable clk
-> +implementation in drivers/clk/clk-basic.c:
-> +
-> +struct clk_hw_gate {
-> +	struct clk      clk;
-> +	struct clk      *fixed_parent;
-> +	void __iomem    *reg;
-> +	u8              bit_idx;
-> +};
-
-This is exactly how we do it in the MSM code for various clock types. 
-So, this is awesome. Will make my life easier. I can't wait to get the 
-MSM clock code upstream without pissing off Linus.
-
-> +
-> +struct clk_hw_gate contains the clk as well as hardware-specific
-> +knowledge about which register and bit controls this clk's gating.  The
-> +fixed-parent member is also there as a way to initialize the topology.
-> +
-> +Let's walk through enabling this clk from driver code:
-> +
-> +	struct clk *clk;
-> +	clk = clk_get(NULL, "my_gateable_clk");
-> +
-> +	clk_prepare(clk);
-> +	clk_enable(clk);
-> +
-> +Note that clk_prepare MUST be called before clk_enable even if
-> +clk_prepare does nothing (which in this case is true).
-> +
-> +The call graph for clk_enable is very simple:
-> +
-> +clk_enable(clk);
-> +	clk->enable(clk);
-> +			clk_hw_gate_enable_set(clk);
-> +				clk_hw_gate_set_bit(clk);
-> +
-> +And the definition of clk_hw_gate_set_bit:
-> +
-> +static void clk_hw_gate_set_bit(struct clk *clk)
-> +{
-> +	struct clk_hw_gate *gate = to_clk_hw_gate(clk);
-> +	u32 reg;
-> +
-> +	reg = __raw_readl(gate->reg);
-> +	reg |= BIT(gate->bit_idx);
-> +	__raw_writel(reg, gate->reg);
-> +}
-> +
-> +Note that in the final call to clk_hw_gate_set_bit there is use of
-> +to_clk_hw_gate, which is defined as:
-> +
-> +#define to_clk_hw_gate(ck) container_of(ck, struct clk_hw_gate, clk)
-> +
-> +This simple abstration is what allows the common clk framework to scale
-> +across many platforms.  The struct clk definition remains the same while
-> +the hardware operations in the .ops pointer know the details of the clk
-> +hardware.  A little pointer arithmetic to get to the data is all that
-> +the ops need.
-
-Glad you went with this approach and killed clk_hw after our discussion.
-
-> +
-> +	Part 3 - Supporting your own clk hardware
-> +
-> +To construct a clk hardware structure for your platform you simply need
-> +to define the following:
-> +
-> +struct clk_hw_your_clk {
-> +	struct clk;
-> +	unsigned long some_data;
-> +	struct your_struct *some_more_data;
-> +};
-> +
-> +To take advantage of your data you'll need to support valid operations
-> +for your clk:
-> +
-> +struct clk_hw_ops clk_hw_ops_your_clk {
-> +	.enable		=&clk_hw_your_clk_enable;
-> +	.disable	=&clk_hw_your_clk_disable;
-> +};
-> +
-> +Implement the above functions using container_of:
-> +
-> +int clk_hw_your_clk_enable(struct clk *clk)
-> +{
-> +	struct clk_hw_your_clk *yclk;
-> +
-> +	yclk = container_of(clk, struct clk_hw_your_clk, clk);
-> +
-> +	magic(yclk);
-> +};
-> +
-> +If you are statically allocating all of your clk_hw_your_clk instances
-> +then you will still need to initialize some stuff in struct clk with the
-> +clk_init function from include/linux/clk.h:
-> +
-> +clk_init(&yclk->clk);
-> +
-> +If you are dynamically creating clks or using device tree then you might
-> +want a hardware-specific register function:
-> +
-> +int clk_hw_your_clk_register(const char *name, unsigned long flags,
-> +		unsigned long some_data,
-> +		struct your_struct *some_more_data)
-> +{
-> +	struct clk_hw_your_clk *yclk;
-> +
-> +	yclk = kmalloc(sizeof(struct clk_hw_your_clk), GFP_KERNEL);
-> +
-> +	yclk->some_data = some_data;
-> +	yclk->some_more_data = some_more_data;
-> +
-> +	yclk->clk.name = name;
-> +	yclk->clk.flags = flags;
-> +
-> +	clk_init(&yclk->clk);
-> +
-> +	return 0;
-> +}
-> +
-> +	Part 4 - clk_set_rate
-> +
-> +clk_set_rate deserves a special mention because it is more complex than
-> +the other operations.  There are three key concepts to the common
-> +clk_set_rate implementation:
-> +
-> +1) recursively traversing up the clk tree and changing clk rates, one
-> +parent at a time, if each clk allows it
-> +2) failing to change rate if the clk is enabled and must only change
-> +rates while disabled
-
-Is this really true? Based on a quick glance at the other patches, it 
-doesn't look it disallows set rate if the clock is enabled. Which is 
-correct, because clock rates can be change while they are enabled (I'm 
-referring to leaf clocks) as long as the hardware supports doing it 
-correctly. So, this needs rewording? I'm guessing you are trying to say 
-that you can't change the parent rate if it has multiple enabled child 
-clocks running off of it and one of them wants to cause a parent rate 
-change? I'm not sure if even that should be enforced in the common code 
--- doesn't look like you do either.
-
-> +2) using clk rate change notifiers to allow devices to handle dynamic
-Must be 3)
-> +rate changes for clks which do support changing rates while enabled
-
-Again, I guess this applies to the other clock. Not the one for which 
-clk_set_rate() is being called.
-
-> +
-> +For the simple, non-recursive case the call graph looks like:
-> +
-> +clk_set_rate(clk, rate);
-> +	__clk_set_rate(clk, rate);
-> +		clk->round_rate(clk, rate *parent_rate);
-> +		clk->set_rate(clk, rate);
-> +
-> +You might be wondering what that third paramater in .round_rate is.  If
-> +a clk supports the CLK_PARENT_SET_RATE flag then that enables it's
-> +hardware-specific .round_rate function to provide a new rate that the
-> +parent should transition to.  For example, imagine a rate-adjustable clk
-> +A that is the parent of clk B, which has a fixed divider of 2.
-> +
-> +	clk A	(rate = 10MHz) (possible rates = 5MHz, 10MHz, 20MHz)
-> +	  |
-> +	  |
-> +	  |
-> +	clk B	(rate = 5MHz) (fixed divider of 2)
-> +
-> +In the above scenario clk B will always have half the rate of clk A.  If
-> +clk B is to generate a 10MHz clk then clk A must generate 20MHz in turn.
-> +The driver writer could hack in knowledge of clk A, but in reality clk B
-> +drives the devices operation and the driver shouldn't know the details
-> +of the clk tree topology.  In this case it would be nice for clk B to
-> +propagate it's request up to clk A.
-> +
-> +Here the call graph for our above example:
-> +
-> +clk_set_rate(clk, rate);
-> +	__clk_set_rate(clk, rate);
-> +		clk->round_rate(clk, rate *parent_rate);
-> +		clk->set_rate(clk, rate);
-> +		__clk_set_rate(clk->parent, parent_rate);
-> +			clk->round_rate(clk, rate *parent_rate);
-> +			clk->set_rate(clk, rate);
-> +
-> +Note that the burden of figuring out whether to recurse upwards falls on
-> +the hardware-specific .round_rate function.  The common clk framework
-> +does not have the context to make such complicated decisions in a
-> +generic way for all platforms.
-> +
-> +Another caveat is that child clks might run at weird intermediate
-> +frequencies during a complex upwards propagation, as illustrated below:
-> +
-> +	clk A  (pll 100MHz - 300MHz)	(currently locked at 200MHz)
-> +	  |
-> +	  |
-> +	  |
-> +	clk B  (divide by 1 or 2)	(currently divide by 2, 100MHz)
-> +	  |
-> +	  |
-> +	  |
-> +	clk C  (divide by 1 or 2)	(currently divide by 1, 100MHz)
-> +
-> +The call graph below, with some bracketed annotations, describes how
-> +this might work with some clever .round_rate callbacks when trying to
-> +set clk C to run at 26MHz:
-> +
-> +clk_set_rate(C, 26MHz);
-> +	__clk_set_rate(C, 26MHz);
-> +		clk->round_rate(C, 26MHz, *parent_rate);
-> +		[ round_rate returns 50MHz ]
-> +		[&parent_rate is 52MHz ]
-> +		clk->set_rate(C, 50Mhz);
-> +		[ clk C is set to 50MHz, which sets divider to 2 ]
-> +		__clk_set_rate(clk->parent, parent_rate);
-> +			clk->round_rate(B, 52MHz, *parent_rate);
-> +			[ round_rate returns 100MHz ]
-> +			[&parent_rate is 104MHz ]
-> +			clk->set_rate(B, 100MHz);
-> +			[ clk B stays at 100MHz, divider stays at 2 ]
-> +			__clk_set_rate(clk->parent, parent_rate);
-> +				[ round_rate returns 104MHz ]
-> +				[&parent_rate is ignored ]
-> +				clk->set_rate(A, 104MHz);
-> +				[ clk A is set to 104MHz]
-> +
-
-I will come back to this topic later on. I like the idea of propagating 
-the needs to the parent, but not sure if the current implementation will 
-work for all types of clock trees/set rates even though the HW might 
-actually allow it to be done right.
-
-> +The end result is that clk C runs at 26MHz.  Each .set_rate callback
-> +actually sets the intermediate rate, which nicely reflects reality.
-> +Once clk rate change notifiers are supported then it is expected that
-> +PRECHANGE notifiers will "stack" in situations with recursive
-> +clk_set_rate calls.
-> +
-> +Thus a driver X which subcribes to rate-change notifers for clk C would
-> +have received 2 PRECHANGE notifiers in the above example.  The first
-> +would have notified the driver that clk C was changing from 100MHz to
-> +50MHz.  The second PRECHANGE notifier would have told driver X that clk
-> +C had changed from 50MHz to 26MHz.  There would not be a PRECHANGE
-> +notifier corresponding to __clk_set_rate(B, 50MHz) since B is already
-> +running at that rate and the notification would be unnecessary.
-> +
-> +clk_set_rate is written in such a way that POSTCHANGE notifiers and
-> +ABORTCHANGE notifiers will only be sent once.  Each will start
-> +propagation from the highest point in the tree which was affected by the
-> +operation.
-
-Thanks,
-Saravana
-
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+>
+>    
