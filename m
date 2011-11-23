@@ -1,46 +1,28 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Wed, 23 Nov 2011 16:53:38 +0100
-Subject: [PATCH] ARM: vic: register the VIC for ST-modified VIC's
-In-Reply-To: <20111123154332.GE7382@totoro>
-References: <1322062110-24084-1-git-send-email-jamie@jamieiles.com>
- <4ECD13AE.6060409@stericsson.com> <20111123154332.GE7382@totoro>
-Message-ID: <4ECD1702.90808@stericsson.com>
+From: a.p.zijlstra@chello.nl (Peter Zijlstra)
+Date: Wed, 23 Nov 2011 16:57:31 +0100
+Subject: HW perf initialisation as early_initcall
+In-Reply-To: <20111123153016.GQ25848@mudshark.cambridge.arm.com>
+References: <20111123145658.GM25848@mudshark.cambridge.arm.com>
+ <1322060889.14799.73.camel@twins>
+ <20111123153016.GQ25848@mudshark.cambridge.arm.com>
+Message-ID: <1322063851.14799.77.camel@twins>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/23/2011 04:43 PM, Jamie Iles wrote:
-> On Wed, Nov 23, 2011 at 04:39:26PM +0100, Linus Walleij wrote:
->    
->> On 11/23/2011 04:28 PM, Jamie Iles wrote:
->>      
->>> When probing the VIC, the ST variant has a different probing method to
->>> account for the extra interrupts which meant we didn't previously call
->>> vic_register() which registered the irq_domain.
->>>
->>> Cc: Linus Walleij<linus.walleij@stericsson.com>
->>> Cc: Russell King<rmk+linux@arm.linux.org.uk>
->>> Cc: Marc Zyngier<marc.zyngier@arm.com>
->>> Signed-off-by: Jamie Iles<jamie@jamieiles.com>
->>> ---
->>>
->>> I _think_ it's just Nomadik affected here which I don't have access to.
->>> I can send an updated pull request or put it in Russell's tracker,
->>> whichever is easiest.
->>>        
->> This also affects mach-u300 and mach-ep93xx OTOH.
->>
->> This seems to be based on something else that is out-of-tree
->> so I don't get the whole picture...
->>      
-> Sorry, should have specified the base - this is the VIC device
-> tree/MULTI_IRQ_HANDLER stuff that is in next.  I did look at u300 and
-> ep93xx, but it looks like their VIC's are 0x1000/0x10000 apart
-> respectively when registered so weren't the ST type that supported 64
-> IRQ's.
->    
+On Wed, 2011-11-23 at 15:30 +0000, Will Deacon wrote:
+> We don't use this on ARM so I'm not familiar with it.
+> 
+NMI watchdog is basically a perf counter that fires every few seconds
+and checks if the system is still making progress (much like the regular
+soft watchdog stuff we have). If it thinks we're stuck it prints stack
+traces to the console etc..
 
-Aha OK now I get the difference.
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Handy for if you do dumb stuff like:
 
-Thanks!
-Linus Walleij
+  local_irq_disable();
+  while (1)
+    ;
+
+Which oddly enough seems to happen way too often ;-)
+
+Anyway, it all depends on having NMIs in the first place.
