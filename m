@@ -1,81 +1,55 @@
-From: carsten.behling@garz-fricke.com (Carsten Behling)
-Date: Wed, 23 Nov 2011 10:31:44 +0100
-Subject: AW: [PATCH v5 3/4] drivers/i2c/busses/i2c-at91.c: add new driver
-In-Reply-To: <EF2E73589CA71846A15D0B2CDF79505D087B40D16B@wm021.weinmann.com>
-References: <D99582E5322435468A77E74BB0039E7B1D1655BF4D@SRV02.hamburg.garz-fricke.de>
- <EF2E73589CA71846A15D0B2CDF79505D087B40D16B@wm021.weinmann.com>
-Message-ID: <D99582E5322435468A77E74BB0039E7B1D1655BFBB@SRV02.hamburg.garz-fricke.de>
+From: javi.merino@arm.com (Javi Merino)
+Date: Wed, 23 Nov 2011 09:46:18 +0000
+Subject: [PATCH 1/4] ARM: PL330: Don't call the callbacks if there isn't
+ any active transfer
+In-Reply-To: <4ECBD8E6.3010605@arm.com>
+References: <1320244259-10496-1-git-send-email-javi.merino@arm.com>	<CAJe_Zhf+PAeM+wquQykXNDG74Nc+jQNXrp+RLMKSySCNPum8Tg@mail.gmail.com>	<4EC28A76.7080606@arm.com>	<CABb+yY1atyLA8Ej57JBEM0JL3oK5e6+1vO0UH5VTNiBsKQPueA@mail.gmail.com>
+ <CAJe_ZhftO+481BfL0ErEcM_brfmSuTXkTEniLRYxxM2T7OM2QA@mail.gmail.com>
+ <4ECBD8E6.3010605@arm.com>
+Message-ID: <4ECCC0EA.2030503@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> this case is already catched in at91_do_twi_transfer():
+Hi Jassi,
 
-Sorry, I did not found this code in your patch.
-(http://www.mail-archive.com/linux-i2c at vger.kernel.org/msg06556.html):
-
-> +       if (is_read) {
-> +               if (!dev->buf_len)
-> +                       at91_twi_write(dev, AT91_TWI_CR,
-> +                                      AT91_TWI_START | AT91_TWI_STOP);
-> +               else
-> +                       at91_twi_write(dev, AT91_TWI_CR, AT91_TWI_START);
-> +               at91_twi_write(dev, AT91_TWI_IER,
-> +                              AT91_TWI_TXCOMP | AT91_TWI_RXRDY);
-> +       } else {
-> +               at91_twi_write_next_byte(dev);
-> +               at91_twi_write(dev, AT91_TWI_IER,
-> +                              AT91_TWI_TXCOMP | AT91_TWI_TXRDY);
-> +       }
-
-Is there a more recent version ?
-
-Mit freundlichen Gr??en / Best regards
-Carsten Behling
-
-Development Engineer
-Garz & Fricke GmbH
-Tempowerkring 2, 21079 Hamburg - Germany
-Amtsgericht Hamburg HRB 60514
-Gesch?ftsf?hrer: Manfred Garz, Matthias Fricke
-Phone: +49 (0) 40 791 899 - 56
-Fax:    +49 40 / 791 899 - 39
-www.garz-fricke.com 
-
- 
-
-
------Urspr?ngliche Nachricht-----
-Von: Voss, Nikolaus [mailto:N.Voss at weinmann.de] 
-Gesendet: Dienstag, 22. November 2011 17:26
-An: Carsten Behling
-Cc: 'linux-i2c at vger.kernel.org'; 'linux-arm-kernel at lists.infradead.org'; 'linux-kernel at vger.kernel.org'
-Betreff: RE: [PATCH v5 3/4] drivers/i2c/busses/i2c-at91.c: add new driver
-
-Hi,
-
-Carsten Behling wrote on 2011-11-22:
-> +static void at91_twi_read_next_byte(struct at91_twi_dev *dev)
-> +{
-> +       *dev->buf = at91_twi_read(dev, AT91_TWI_RHR) & 0xff;
-> +
-> +       /* send stop if second but last byte has been read */
-> +       if (--dev->buf_len == 1)
-> +               at91_twi_write(dev, AT91_TWI_CR, AT91_TWI_STOP);
+On 22/11/11 17:16, Javi Merino wrote:
+> On 16/11/11 06:24, Jassi Brar wrote:
+>> On 15 November 2011 22:30, Jassi Brar <jassisinghbrar@gmail.com> wrote:
+>> I think the following strikes just the right balance and should fix
+>> the issue ...
+>>
+>> diff --git a/arch/arm/common/pl330.c b/arch/arm/common/pl330.c
+>> index 7129cfb..ecbca3f 100644
+>> --- a/arch/arm/common/pl330.c
+>> +++ b/arch/arm/common/pl330.c
+>> @@ -1480,13 +1480,19 @@ int pl330_update(const struct pl330_info *pi)
+>>
+>>  	/* Now that we are in no hurry, do the callbacks */
+>>  	while (!list_empty(&pl330->req_done)) {
+>> +		struct pl330_req *r;
+>> +
+>>  		rqdone = container_of(pl330->req_done.next,
+>>  					struct _pl330_req, rqd);
+>>
+>>  		list_del_init(&rqdone->rqd);
+>>
+>> +		/* Detach the req */
+>> +		r = rqdone->r;
+>> +		rqdone->r = NULL;
+>> +
+>>  		spin_unlock_irqrestore(&pl330->lock, flags);
+>> -		_callback(rqdone->r, PL330_ERR_NONE);
+>> +		_callback(r, PL330_ERR_NONE);
+>>  		spin_lock_irqsave(&pl330->lock, flags);
+>>  	}
 > 
-> 
-> 
-> If dev->buf_len =1 at the beginning of a read transfer, a stop condition will
-> never be send.
+> I'll try this patch and if it works we can submit it instead of my
+> original one.
 
-this case is already catched in at91_do_twi_transfer():
+It worked!  Can you please send it to Russell's patch system?  You can
+add a:
 
-+       if (dev->msg->flags & I2C_M_RD) {
-+               unsigned start_flags = AT91_TWI_START;
-+
-+               /* if only one byte is to be read, immediately stop transfer */
-+               if (dev->buf_len <= 1 && !(dev->msg->flags & I2C_M_RECV_LEN))
-+                       start_flags |= AT91_TWI_STOP;
-+               at91_twi_write(dev, AT91_TWI_CR, start_flags);
+Tested-by: Javi Merino <javi.merino@arm.com>
 
-Thanks for reviewing,
-Niko
+Cheers,
+Javi
