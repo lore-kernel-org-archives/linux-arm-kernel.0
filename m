@@ -1,42 +1,56 @@
-From: javier.martin@vista-silicon.com (javier Martin)
-Date: Wed, 23 Nov 2011 16:23:34 +0100
-Subject: [PATCH v3 2/2] MEM2MEM: Add support for eMMa-PrP mem2mem
- operations.
-In-Reply-To: <CAOMZO5AEZZEYSMXtXwCw4Qx9sY5hzZmd7t7b4teROntskBmbVQ@mail.gmail.com>
-References: <1322061227-6631-1-git-send-email-javier.martin@vista-silicon.com>
- <1322061227-6631-3-git-send-email-javier.martin@vista-silicon.com>
- <CAOMZO5AEZZEYSMXtXwCw4Qx9sY5hzZmd7t7b4teROntskBmbVQ@mail.gmail.com>
-Message-ID: <CACKLOr15XpqX2f0zjXRJHpj0YjQsU=STkKrTztpqkzdBKUoqtA@mail.gmail.com>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Wed, 23 Nov 2011 15:28:30 +0000
+Subject: [PATCH] ARM: vic: register the VIC for ST-modified VIC's
+Message-ID: <1322062110-24084-1-git-send-email-jamie@jamieiles.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio,
+When probing the VIC, the ST variant has a different probing method to
+account for the extra interrupts which meant we didn't previously call
+vic_register() which registered the irq_domain.
 
-On 23 November 2011 16:19, Fabio Estevam <festevam@gmail.com> wrote:
-> Javier,
->
-> On Wed, Nov 23, 2011 at 1:13 PM, Javier Martin
-> <javier.martin@vista-silicon.com> wrote:
->> Changes since v2:
->> - Use devres to simplify error handling.
->> - Remove unused structures.
->> - Fix clock handling.
->> - Other minor problems.
->
-> It would be better if you put such comments below the --- line.
->
-> For the commit message you can use the one you did for the cover
-> letter (0/2) patch:
+Cc: Linus Walleij <linus.walleij@stericsson.com>
+Cc: Russell King <rmk+linux@arm.linux.org.uk>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Jamie Iles <jamie@jamieiles.com>
+---
 
-Thanks that's good advice.
-I assume this is not quite an issue that requires the patch to be sent again.
-Right?
+I _think_ it's just Nomadik affected here which I don't have access to.
+I can send an updated pull request or put it in Russell's tracker,
+whichever is easiest.
 
+ arch/arm/common/vic.c |    5 +++--
+ 1 files changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/common/vic.c b/arch/arm/common/vic.c
+index 6ed41ec..7728750 100644
+--- a/arch/arm/common/vic.c
++++ b/arch/arm/common/vic.c
+@@ -318,7 +318,7 @@ static void __init vic_set_irq_sources(void __iomem *base,
+  *  and 020 within the page. We call this "second block".
+  */
+ static void __init vic_init_st(void __iomem *base, unsigned int irq_start,
+-				u32 vic_sources)
++			       u32 vic_sources, struct device_node *node)
+ {
+ 	unsigned int i;
+ 	int vic_2nd_block = ((unsigned long)base & ~PAGE_MASK) != 0;
+@@ -345,6 +345,7 @@ static void __init vic_init_st(void __iomem *base, unsigned int irq_start,
+ 	}
+ 
+ 	vic_set_irq_sources(base, irq_start, vic_sources);
++	vic_register(base, irq_start, 0, node);
+ }
+ 
+ static void __init __vic_init(void __iomem *base, unsigned int irq_start,
+@@ -367,7 +368,7 @@ static void __init __vic_init(void __iomem *base, unsigned int irq_start,
+ 
+ 	switch(vendor) {
+ 	case AMBA_VENDOR_ST:
+-		vic_init_st(base, irq_start, vic_sources);
++		vic_init_st(base, irq_start, vic_sources, node);
+ 		return;
+ 	default:
+ 		printk(KERN_WARNING "VIC: unknown vendor, continuing anyways\n");
 -- 
-Javier Martin
-Vista Silicon S.L.
-CDTUC - FASE C - Oficina S-345
-Avda de los Castros s/n
-39005- Santander. Cantabria. Spain
-+34 942 25 32 60
-www.vista-silicon.com
+1.7.4.1
