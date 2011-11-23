@@ -1,57 +1,52 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Wed, 23 Nov 2011 21:40:30 +0100
-Subject: [alsa-devel] [PATCH 07/17] ASoC: Tegra DAS: Use devm_ APIs and
- module_platform_driver
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF174F08C6F3@HQMAIL01.nvidia.com>
-References: <1322011285-4002-1-git-send-email-swarren@nvidia.com>
- <1322011285-4002-8-git-send-email-swarren@nvidia.com>
- <20111123065808.GB5255@avionic-0098.adnet.avionic-design.de>
- <74CDBE0F657A3D45AFBB94109FB122FF174F08C6F3@HQMAIL01.nvidia.com>
-Message-ID: <20111123204030.GA7485@avionic-0098.adnet.avionic-design.de>
+From: mturquette@ti.com (Turquette, Mike)
+Date: Wed, 23 Nov 2011 12:43:43 -0800
+Subject: [PATCH v3 5/5] clk: export tree topology and clk data via sysfs
+In-Reply-To: <4ECC6D24.9030509@codeaurora.org>
+References: <1321926047-14211-1-git-send-email-mturquette@linaro.org>
+ <1321926047-14211-6-git-send-email-mturquette@linaro.org>
+ <20111122154900.GB18954@kroah.com>
+ <CAPtuhThPQtWwihE8aGru55k87oV7QOr=O836TTJ+=30d6dtVhA@mail.gmail.com>
+ <20111122191347.GB4844@kroah.com> <4ECC6D24.9030509@codeaurora.org>
+Message-ID: <CAJOA=zNQb5448Xh6weiow5pcO6C=DwNxOknXW18C5RYvH_s75g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Stephen Warren wrote:
-> Thierry Reding wrote at Tuesday, November 22, 2011 11:58 PM:
-> > * Stephen Warren wrote:
-> > > module_platform_drive saves some boiler-plate code.
-> > >
-> > > The devm_ APIs remove the need to manually clean up allocations,
-> > > thus removing some code.
-> ...
-> > >  static int __devexit tegra_das_remove(struct platform_device *pdev)
-> > >  {
-> > > -	struct resource *res;
-> > > -
-> > >  	if (!das)
-> > >  		return -ENODEV;
-> > >
-> > > -	platform_set_drvdata(pdev, NULL);
-> > > -
-> > [...]
-> > 
-> > Setting the driver data to NULL may still be a good idea.
-> 
-> When Mark Brown reviewed the TrimSlice machine driver, he mentioned that
-> clearing the drvdata was pointless; nothing should be using it when the
-> device is not created.
-> 
-> As background, soon after that, I modified the tegra_wm8903.c machine
-> driver along the same lines, but evidently didn't update tegra_das.c
-> in a similar way, but would have if I'd been paying attention...
+On Tue, Nov 22, 2011 at 7:48 PM, Saravana Kannan <skannan@codeaurora.org> wrote:
+> On 11/22/2011 11:13 AM, Greg KH wrote:
+>>
+>> On Tue, Nov 22, 2011 at 09:57:41AM -0800, Mike Turquette wrote:
+>>>>
+>>>> Ah, comments like this warm my heart.
+>>>>
+>>>> Come on, no abusing the kobject code please, if have problems with how
+>>>> the kernel core works, and it doesn't do things you want it to, then why
+>>>> not change it to work properly for you, or at the least, ASK ME!!!
+>>>
+>>> Ok, I'm asking you now. ?There are two ways to solve this problem:
+>>>
+>>> 1) have kobject core create the lists linking the objects but defer
+>>> allocations and any interactions with sysfs until later in the boot
+>>> sequence, OR
+>>>
+>>> 2) my code can create a list of clks (the same way that clkdev does)
+>>> and defer kobject/sysfs stuff until later, which walks the list made
+>>> during early-boot
+>>>
+>>> #1 is most closely aligned with the code I have here, #2 presents
+>>> challenges that I haven't really though through. ?I know that OMAP
+>>> uses the clk framework VERY early in it's boot sequence, but as long
+>>> as the per-clk data is properly initialized then it should be OK.
+>>>
+>>> What do you think?
+>>
+>> #3 - use debugfs and don't try to create a sysfs interface for the clock
+>> structures :)
+>
+> I would prefer debugfs too, but for my own selfish reasons. In our current
 
-Thinking about this some more I have to agree. The only one using the driver
-data would be the driver, which in turn shouldn't be doing anything with it
-after remove is called.
+I'll cook up debugfs code for the fwk and drop sysfs.  Maybe not part
+of V4 (per Arnd's suggestion to focus on upstreamable bits), or maybe
+I will if I have time.
 
-I was just commenting on it because I've seen it done in a lot of drivers and
-thought it was common (best) practice.
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111123/21c11281/attachment-0001.sig>
+Regards,
+Mike
