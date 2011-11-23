@@ -1,26 +1,20 @@
-From: javier.martin@vista-silicon.com (javier Martin)
-Date: Wed, 23 Nov 2011 11:29:30 +0100
-Subject: [PATCH v2 2/2] MEM2MEM: Add support for eMMa-PrP mem2mem
- operations.
-In-Reply-To: <20111122205552.GO27267@pengutronix.de>
-References: <1321963316-9058-1-git-send-email-javier.martin@vista-silicon.com>
- <1321963316-9058-3-git-send-email-javier.martin@vista-silicon.com>
- <20111122205552.GO27267@pengutronix.de>
-Message-ID: <CACKLOr0r=pNYntman3cy67eSVGajp4jNzabjwPagT_A+-jKWOw@mail.gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 23 Nov 2011 10:38:59 +0000
+Subject: [PATCH 01/17] arm/tegra: board-dt: audio: Enable clocks, fix
+ AUXDATA
+In-Reply-To: <1322011285-4002-2-git-send-email-swarren@nvidia.com>
+References: <1322011285-4002-1-git-send-email-swarren@nvidia.com>
+ <1322011285-4002-2-git-send-email-swarren@nvidia.com>
+Message-ID: <20111123103858.GK4332@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha and Sylwester,
-you comments are very appreciated.
+On Tue, Nov 22, 2011 at 06:21:09PM -0700, Stephen Warren wrote:
 
-I will send an v3 version solving all the issues you mentioned.
+>  	OF_DEV_AUXDATA("nvidia,tegra20-i2c", TEGRA_DVC_BASE, "tegra-i2c.3", NULL),
+>  	OF_DEV_AUXDATA("nvidia,tegra20-i2s", TEGRA_I2S1_BASE, "tegra-i2s.0", NULL),
+> -	OF_DEV_AUXDATA("nvidia,tegra20-i2s", TEGRA_I2S1_BASE, "tegra-i2s.1", NULL),
+> +	OF_DEV_AUXDATA("nvidia,tegra20-i2s", TEGRA_I2S2_BASE, "tegra-i2s.1", NULL),
 
-Regards
--- 
-Javier Martin
-Vista Silicon S.L.
-CDTUC - FASE C - Oficina S-345
-Avda de los Castros s/n
-39005- Santander. Cantabria. Spain
-+34 942 25 32 60
-www.vista-silicon.com
+This looks like a straight bug fix which is independant of the below
+change?
