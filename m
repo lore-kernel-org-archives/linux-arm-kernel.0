@@ -1,22 +1,73 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 23 Nov 2011 11:10:09 -0200
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 23 Nov 2011 14:12:50 +0100
 Subject: [PATCH v2 2/2] MEM2MEM: Add support for eMMa-PrP mem2mem
  operations.
-In-Reply-To: <1321963316-9058-3-git-send-email-javier.martin@vista-silicon.com>
+In-Reply-To: <CACKLOr0-GzO0r0ERCQvqCn2oDkDE816+MHsu=bLbA5BkEBAqYA@mail.gmail.com>
 References: <1321963316-9058-1-git-send-email-javier.martin@vista-silicon.com>
  <1321963316-9058-3-git-send-email-javier.martin@vista-silicon.com>
-Message-ID: <CAOMZO5Bt-_VGYEZ7a=iaThdxoQb2gpo5Wa1ydUobLLUBVEPRWA@mail.gmail.com>
+ <20111122205552.GO27267@pengutronix.de>
+ <CACKLOr0-GzO0r0ERCQvqCn2oDkDE816+MHsu=bLbA5BkEBAqYA@mail.gmail.com>
+Message-ID: <20111123131250.GT27267@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 22, 2011 at 10:01 AM, Javier Martin
-<javier.martin@vista-silicon.com> wrote:
+On Wed, Nov 23, 2011 at 01:32:29PM +0100, javier Martin wrote:
+> Hi Sascha,
+> I was just trying to fix the issues you pointed previously and I have
+> a question for you.
+> 
+> On 22 November 2011 21:55, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> > Hi Javier,
+> >> +
+> >> +static int emmaprp_probe(struct platform_device *pdev)
+> >> +{
+> >> + ? ? struct emmaprp_dev *pcdev;
+> >> + ? ? struct video_device *vfd;
+> >> + ? ? struct resource *res_emma;
+> >> + ? ? int irq_emma;
+> >> + ? ? int ret;
+> >> +
+> >> + ? ? pcdev = kzalloc(sizeof *pcdev, GFP_KERNEL);
+> >> + ? ? if (!pcdev)
+> >> + ? ? ? ? ? ? return -ENOMEM;
+> >> +
+> >> + ? ? spin_lock_init(&pcdev->irqlock);
+> >> +
+> >> + ? ? pcdev->clk_emma = clk_get(NULL, "emma");
+> >
+> > You should change the entry for the emma in
+> > arch/arm/mach-imx/clock-imx27.c to the following:
+> >
+> > _REGISTER_CLOCK("m2m-emmaprp", NULL, emma_clk)
+> >
+> > and use clk_get(&pdev->dev, NULL) here.
+> >
+> 
+> Is this what you are asking for?
+> 
+> --- a/arch/arm/mach-imx/clock-imx27.c
+> +++ b/arch/arm/mach-imx/clock-imx27.c
+> @@ -661,7 +661,7 @@ static struct clk_lookup lookups[] = {
+>         _REGISTER_CLOCK(NULL, "dma", dma_clk)
+>         _REGISTER_CLOCK(NULL, "rtic", rtic_clk)
+>         _REGISTER_CLOCK(NULL, "brom", brom_clk)
+> -       _REGISTER_CLOCK(NULL, "emma", emma_clk)
+> +       _REGISTER_CLOCK("m2m-emmaprp", NULL, emma_clk)
+>         _REGISTER_CLOCK(NULL, "slcdc", slcdc_clk)
+>         _REGISTER_CLOCK("imx27-fec.0", NULL, fec_clk)
+>         _REGISTER_CLOCK(NULL, "emi", emi_clk)
+> 
+> If I do that, mx2_camera.c will stop working.
 
-> +/* In bytes, per queue */
-> +#define MEM2MEM_VID_MEM_LIMIT ?(16 * SZ_1M)
+This depends on the platform device id. If you use with -1
+you have to use "m2m-emmaprp", if you use 0 (as you did I think)
+you have to use "m2m-emmaprp.0". Basically the string has to
+match the device name as found in /sys/devices/platform/
 
-You could use SZ_16M instead.
+Sascha
 
-Regards,
-
-Fabio Estevam
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
