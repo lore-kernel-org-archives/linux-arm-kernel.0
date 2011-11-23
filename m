@@ -1,33 +1,78 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 23 Nov 2011 16:10:14 +0000
-Subject: [PATCH 0/7] Introducing a generic AMP framework
-In-Reply-To: <CAK=WgbYyrbZLmDOx8yKWwjhn2MYN8669FDRvsYZSyLj1equcTw@mail.gmail.com>
-References: <1319536106-25802-1-git-send-email-ohad@wizery.com>
- <4ECC67B9.4050306@codeaurora.org>
- <CAK=WgbYyrbZLmDOx8yKWwjhn2MYN8669FDRvsYZSyLj1equcTw@mail.gmail.com>
-Message-ID: <20111123161012.GA31423@sirena.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 23 Nov 2011 16:18:45 +0000
+Subject: [PATCH v7 3/5] drivers/i2c/busses/i2c-at91.c: add new driver
+In-Reply-To: <ee23c49c5a190a2cce0859f7828c2dc771ff3207.1322062555.git.n.voss@weinmann.de>
+References: <cover.1322062555.git.n.voss@weinmann.de>
+ <ee23c49c5a190a2cce0859f7828c2dc771ff3207.1322062555.git.n.voss@weinmann.de>
+Message-ID: <201111231618.45951.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 23, 2011 at 12:27:31PM +0200, Ohad Ben-Cohen wrote:
-> On Wed, Nov 23, 2011 at 5:25 AM, Saravana Kannan <skannan@codeaurora.org> wrote:
+On Tuesday 08 November 2011, Nikolaus Voss wrote:
 
-> > Sorry for the rant, this naming just rubs me the wrong way. I definitely
-> > appreciate the idea behind these patches.
 
-> I don't share the same naming concerns you have (if any, then
-> confusion with the bluetooth AMP patches and prefixes is more of a
-> concern to me), but I don't care deeply about names.
+> +
+> +static unsigned at91_twi_read(struct at91_twi_dev *dev, unsigned reg)
+> +{
+> +	return __raw_readl(dev->base + reg);
+> +}
+> +
+> +static void at91_twi_write(struct at91_twi_dev *dev, unsigned reg, unsigned val)
+> +{
+> +	__raw_writel(val, dev->base + reg);
+> +}
 
-I guess one very real potential for confusion here is the big/little
-stuff that ARM are pushing for next generation SoCs where a Linux image
-does actually run on muliple asymmetric cores.
+Better use readl/writel or readl_relaxed/writel_relaxed.
 
-> Feel free to offer a different name, though really 'amp' here only
-> describes the general model and motivation and is rarely used
-> throughout the code; we mostly either use 'remoteproc' or 'rpmsg',
-> which respectively refer to the two frameworks that are being added
-> (the former responsible for controlling the state of the remote
-> processors, and the latter for communicating with them).
+> +/*
+> + * Calculate and set symmetric clock as stated in datasheet:
+> + * twi_clk = F_MAIN / (2 * cdiv * (1 << ckdiv) + 4)
+> + */
+> +static void __devinit at91_set_twi_clock(struct at91_twi_dev *dev, int twi_clk)
+> +{
+> +	const int div = DIV_ROUND_UP(clk_get_rate(dev->clk), 2 * twi_clk) - 2;
+> +	int ckdiv = fls(div >> 8);
+> +	const int cdiv = div >> ckdiv;
+> +
+> +	if (cpu_is_at91rm9200() && (ckdiv > 5)) {
+> +		dev_warn(dev->dev, "AT91RM9200 erratum 22: using ckdiv = 5.\n");
+> +		ckdiv = 5;
+> +	}
 
-How about using remoteproc then?
+Don't check a global property like this locally in the driver. Instead,
+make it a property of the device that you check here and set it based on
+the the device name set by the platform, or by a device tree property.
+
+> diff --git a/drivers/i2c/busses/i2c-at91.h b/drivers/i2c/busses/i2c-at91.h
+> new file mode 100644
+> index 0000000..a898159
+> --- /dev/null
+> +++ b/drivers/i2c/busses/i2c-at91.h
+> @@ -0,0 +1,80 @@
+> +
+> +#ifndef AT91_TWI_H
+> +#define AT91_TWI_H
+> +
+
+No need for a header file if all the values in it are used in only one
+source file. Just move everything to i2c_at91.c
+
+> +#define	AT91_TWI_MMR		0x04		/* Master Mode Register */
+> +#define	AT91_TWI_IADRSZ		(3    <<  8)	/* Internal Device Address
+> +						 *  Size */
+> +#define	AT91_TWI_IADRSZ_NO	(0 << 8)
+> +#define	AT91_TWI_IADRSZ_1	(1 << 8)
+> +#define	AT91_TWI_IADRSZ_2	(2 << 8)
+> +#define	AT91_TWI_IADRSZ_3	(3 << 8)
+> +#define	AT91_TWI_MREAD		(1    << 12)	/* Master Read Direction */
+> +#define	AT91_TWI_DADR		(0x7f << 16)	/* Device Address */
+
+These are harder to read than just using hexadecimal bitmasks:
+
+#define	AT91_TWI_MMR		0x00000004
+#define	AT91_TWI_IADRSZ		0x00000300
+#define	AT91_TWI_IADRSZ_NO	0x00000000
+#define	AT91_TWI_IADRSZ_1	0x00000100
+...
+
+	Arnd
