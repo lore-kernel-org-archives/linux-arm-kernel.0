@@ -1,40 +1,101 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 23 Nov 2011 13:50:34 +0000
-Subject: -next fails to boot as of today on S3C6410
-In-Reply-To: <20111123133237.GC7382@totoro>
-References: <20111122192741.GG30583@opensource.wolfsonmicro.com>
- <20111122193124.GB9581@n2100.arm.linux.org.uk>
- <20111122193957.GH30583@opensource.wolfsonmicro.com>
- <20111122222135.GB7845@gallagher>
- <20111123120534.GO21073@opensource.wolfsonmicro.com>
- <20111123122855.GB7382@totoro>
- <20111123130134.GB12227@opensource.wolfsonmicro.com>
- <20111123133237.GC7382@totoro>
-Message-ID: <20111123135033.GA20272@opensource.wolfsonmicro.com>
+From: conqrx@gmail.com (=?ISO-8859-1?B?TW9sbuFyIEfhYm9y?=)
+Date: Wed, 23 Nov 2011 15:14:06 +0100
+Subject: Porting the 2.6.38 linux kernel to ARM11 MPcore
+In-Reply-To: <CAK-0apaX6gPrHPWiE6zDCey7NvnMU2J5fOR0OXr_ZQCc+TUmyA@mail.gmail.com>
+References: <CAK-0apYKjvxXasEfYCocjqEan5dKoXJgMON2gC-nMenKQaU9UQ@mail.gmail.com>
+ <CAHkRjk491+H9Wh-uV8807VSkZ4Mk+UK3Jv6EThtOsRb7ULpUjg@mail.gmail.com>
+ <CAK-0apaX6gPrHPWiE6zDCey7NvnMU2J5fOR0OXr_ZQCc+TUmyA@mail.gmail.com>
+Message-ID: <CAK-0apbxgJj6JHXOCaLf0tPgw3nPrBRnkYB23-brsRmdbBLz5g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 23, 2011 at 01:32:37PM +0000, Jamie Iles wrote:
-> On Wed, Nov 23, 2011 at 01:01:35PM +0000, Mark Brown wrote:
+> Does your physical RAM start at 0xc0000000 and it is all ignored?
+> Setting highmem would fix as all your lowmem (including the kernel
+> code) would be unmapped, hence the fault. What's the VMALLOC_END
+> defined to?
 
-> > I tried adding some yesterday around the VIC registration in the CPU
-> > code but it didn't actually appear on the console so I'm none the wiser.
+#define VMALLOC_END             0xf8000000
 
-> OK.  You mentioned you had trouble reverting the patch yesterday - I've 
-> pushed a branch (git://github.com/jamieiles/linux-2.6-ji.git 
-> vic-dt-revert-next) which is today's next with all of the VIC patches 
-> reverted if you want to try that to be sure.  I've built s3c6400_defconfig 
-> successfully, but can't test it unless there's a qemu model somewhere?
+For the platform i use. The size of vmalloc is the default (128MB).
 
-It wasn't the mechanics of reverting that caused problems, it was the
-fact that when I reverted things still didn't work.  Actually, I've gone
-back and retested with the for-next branch from today and it appears
-that for some reason the issue has gone away there which is a bit
-confusing though as I write this it occurs to me that I did turn device
-tree back on (my board doesn't use it but I typically build it in) which
-I had off when I tested yesterday and would explain the issue.
+If HIGHMEM is not set, this area is executed:
 
-It looks like there's a second bug breaking the boot in there - testing
-your commit the board boots but if I test the tip of Russell's for-next
-then that breaks again.  I'm just starting another bisect and
-considering sending a patch to add a git finger-point alias.
+>/*
+>792                  * Check whether this memory bank would entirely overlap
+>793                  * the vmalloc area.
+>794                  */
+>795                 if (__va(bank->start) >= vmalloc_min ||
+>796                     __va(bank->start) < (void *)PAGE_OFFSET) {
+>797                         printk(KERN_NOTICE "Ignoring RAM at %.8lx-%.8lx "
+>798                                "(vmalloc region overlap).\n",
+>799                                bank->start, bank->start + bank->size - 1);
+>800                         continue;
+>801                 }
+
+static void * __initdata vmalloc_min = (void *)(VMALLOC_END - SZ_128M);
+
+The kernel is loaded on the phisical address: 0xc0000000-0xc05000000.
+(This region is given as atag_mem as well).
+
+At the current configuration i believe vmalloc should be at
+0xF0000000-0xF8000000.
+
+Why does this overlap with 0xC0000000-0xC0500000?
+
+
+
+2011/11/22 Moln?r G?bor <conqrx@gmail.com>:
+> Thank you for your reply!
+>
+> 2011/11/21 Catalin Marinas <catalin.marinas@arm.com>:
+>> On 18 November 2011 11:54, Moln?r G?bor <conqrx@gmail.com> wrote:
+>>> im working on a project wich aims at porting the 2.6.38 kernel to an
+>>> arm11 mpcore based board.
+>>>
+>>> The kernel fails to boot, in the paging_init func, it throws an
+>>> exception (pc: FFFF_000C) when executing the third mcr instruction in
+>>> the list below:
+>>>
+>>> 0xc000bf34 ?<>: ? ?blx ?r3
+>>> 0xc000bf38 ?<>: ? ?mov ?r5, #0 ?; 0x0
+>>> 0xc000bf3c ?<>: ? ?mcr ?15, 0, r5, cr7, cr10, {4}
+>>> 0xc000bf40 ?<>: ? ?mcr ?15, 0, r5, cr8, cr6, {0}
+>>> 0xc000bf44 ?<>: ? ?mcr ?15, 0, r5, cr8, cr5, {0} //throws an exception
+>>> here, Invalidate Instruction TLB Register
+>>> 0xc000bf48 ?<>: ? ?mcr ?15, 0, r5, cr7, cr5, {6}
+>>> 0xc000bf4c ?<>: ? ?mcr ?15, 0, r5, cr7, cr10, {4}
+>>> 0xc000bf50 ?<>: ? ?mcr ?15, 0, r5, cr7, cr5, {4}
+>>> 0xc000bf54 ?<>: ? ?ldr ?lr, [pc, #176] ?; 0xc000c00c
+>>
+>> So you get a prefetch abort as soon as the TLBs are invalidated, which
+>> means that the page table is not set up correctly.
+>>
+>> What's your RAM configuration (start address, size)?
+>
+> In the current configuration the start address is c0000000 and the
+> size is 500000.
+> The .elf kernel image is loaded at the c0008000 'start' address.
+>
+>>> The kernel has been patched with the 2.6.38-arm1 patch, and configured
+>>> to be as minimal as possible (the vmlinux.elf is 1.8MB) and
+>>> cross-compiled with the?Codesourcery gcc toolchain.
+>>> The minimal size is improtant because the aim is to make the kernel
+>>> run with only 5-6MB of memory (from c0000000 to c0500000).
+>>> The 'boot_loader' i wrote passes the atag pointers (basically core and
+>>> memory) and the kernel seemingly reads and parses them fine. The
+>>> __log_buf before the exception:
+>>>
+>>> <5>Linux version 2.6.38-rc8 (VirtualBox) (gcc version 4.5.2 (Sourcery
+>>> G++ Lite 2011.03-41) ) #6 Wed Nov 9 21:59:29 CET 2011
+>>> <4>CPU: ARMv6-compatible processor [410fb025] revision 5 (ARMv7), cr=08c5387f"
+>>> <4>CPU: VIPT nonaliasing data cache, VIPT aliasing instruction cache
+>>> <4>Machine: ARM-RealView PB11MPCore
+>>> <5>Ignoring RAM at c0000000-c04fffff (vmalloc region overlap).
+>>
+>> Does your physical RAM start at 0xc0000000 and it is all ignored?
+>> Setting highmem would fix as all your lowmem (including the kernel
+>> code) would be unmapped, hence the fault. What's the VMALLOC_END
+>> defined to?
+>
+> Yes it seems to be all ignored, i will check VMALLOC_END as soon as i can.
+>
