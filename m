@@ -1,51 +1,53 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 23 Nov 2011 14:32:31 +0000
-Subject: Porting the 2.6.38 linux kernel to ARM11 MPcore
-In-Reply-To: <CAK-0apbxgJj6JHXOCaLf0tPgw3nPrBRnkYB23-brsRmdbBLz5g@mail.gmail.com>
-References: <CAK-0apYKjvxXasEfYCocjqEan5dKoXJgMON2gC-nMenKQaU9UQ@mail.gmail.com>
- <CAHkRjk491+H9Wh-uV8807VSkZ4Mk+UK3Jv6EThtOsRb7ULpUjg@mail.gmail.com>
- <CAK-0apaX6gPrHPWiE6zDCey7NvnMU2J5fOR0OXr_ZQCc+TUmyA@mail.gmail.com>
- <CAK-0apbxgJj6JHXOCaLf0tPgw3nPrBRnkYB23-brsRmdbBLz5g@mail.gmail.com>
-Message-ID: <20111123143231.GA9148@arm.com>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Wed, 23 Nov 2011 14:33:22 +0000
+Subject: -next fails to boot as of today on S3C6410
+In-Reply-To: <20111123135033.GA20272@opensource.wolfsonmicro.com>
+References: <20111122192741.GG30583@opensource.wolfsonmicro.com>
+ <20111122193124.GB9581@n2100.arm.linux.org.uk>
+ <20111122193957.GH30583@opensource.wolfsonmicro.com>
+ <20111122222135.GB7845@gallagher>
+ <20111123120534.GO21073@opensource.wolfsonmicro.com>
+ <20111123122855.GB7382@totoro>
+ <20111123130134.GB12227@opensource.wolfsonmicro.com>
+ <20111123133237.GC7382@totoro>
+ <20111123135033.GA20272@opensource.wolfsonmicro.com>
+Message-ID: <20111123143322.GD7382@totoro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 23, 2011 at 02:14:06PM +0000, Moln?r G?bor wrote:
-> > Does your physical RAM start at 0xc0000000 and it is all ignored?
-> > Setting highmem would fix as all your lowmem (including the kernel
-> > code) would be unmapped, hence the fault. What's the VMALLOC_END
-> > defined to?
+On Wed, Nov 23, 2011 at 01:50:34PM +0000, Mark Brown wrote:
+> On Wed, Nov 23, 2011 at 01:32:37PM +0000, Jamie Iles wrote:
+> > On Wed, Nov 23, 2011 at 01:01:35PM +0000, Mark Brown wrote:
 > 
-> #define VMALLOC_END             0xf8000000
+> > > I tried adding some yesterday around the VIC registration in the CPU
+> > > code but it didn't actually appear on the console so I'm none the wiser.
 > 
-> For the platform i use. The size of vmalloc is the default (128MB).
+> > OK.  You mentioned you had trouble reverting the patch yesterday - I've 
+> > pushed a branch (git://github.com/jamieiles/linux-2.6-ji.git 
+> > vic-dt-revert-next) which is today's next with all of the VIC patches 
+> > reverted if you want to try that to be sure.  I've built s3c6400_defconfig 
+> > successfully, but can't test it unless there's a qemu model somewhere?
 > 
-> If HIGHMEM is not set, this area is executed:
-> 
-> >/*
-> >792                  * Check whether this memory bank would entirely overlap
-> >793                  * the vmalloc area.
-> >794                  */
-> >795                 if (__va(bank->start) >= vmalloc_min ||
-> >796                     __va(bank->start) < (void *)PAGE_OFFSET) {
-> >797                         printk(KERN_NOTICE "Ignoring RAM at %.8lx-%.8lx "
-> >798                                "(vmalloc region overlap).\n",
-> >799                                bank->start, bank->start + bank->size - 1);
-> >800                         continue;
-> >801                 }
-> 
-> static void * __initdata vmalloc_min = (void *)(VMALLOC_END - SZ_128M);
-> 
-> The kernel is loaded on the phisical address: 0xc0000000-0xc05000000.
-> (This region is given as atag_mem as well).
-> 
-> At the current configuration i believe vmalloc should be at
-> 0xF0000000-0xF8000000.
-> 
-> Why does this overlap with 0xC0000000-0xC0500000?
+> It wasn't the mechanics of reverting that caused problems, it was the
+> fact that when I reverted things still didn't work.  Actually, I've gone
+> back and retested with the for-next branch from today and it appears
+> that for some reason the issue has gone away there which is a bit
+> confusing though as I write this it occurs to me that I did turn device
+> tree back on (my board doesn't use it but I typically build it in) which
+> I had off when I tested yesterday and would explain the issue.
 
-So it doesn't, in which case you may want to place some printk's in the
-kernel around the message reporting that your block of RAM is ignored.
+OK, I've just tried hacking something on picoxcell that uses IRQ numbers 
+starting at 32 rather than 0 and registering the vic manually rather 
+than using the device tree binding and it all runs nicely.  So USE_OF is 
+enabled, but it's as close as I can get to your system and it isn't 
+using any of the DT stuff in the VIC driver.
 
--- 
-Catalin
+> It looks like there's a second bug breaking the boot in there - testing
+> your commit the board boots but if I test the tip of Russell's for-next
+> then that breaks again.  I'm just starting another bisect and
+> considering sending a patch to add a git finger-point alias.
+
+Thanks for your patience Mark!  Please let me know if there's anything I 
+can do to help.
+
+Jamie
