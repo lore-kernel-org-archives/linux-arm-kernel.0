@@ -1,32 +1,23 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 23 Nov 2011 18:03:45 +0000
-Subject: [PATCH 09/17] ASoC: Tegra I2S: Remove dependency on pdev->id
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF174F08C711@HQMAIL01.nvidia.com>
-References: <1322011285-4002-1-git-send-email-swarren@nvidia.com>
- <1322011285-4002-10-git-send-email-swarren@nvidia.com>
- <20111123110338.GC21073@opensource.wolfsonmicro.com>
- <74CDBE0F657A3D45AFBB94109FB122FF174F08C711@HQMAIL01.nvidia.com>
-Message-ID: <20111123180345.GJ30049@opensource.wolfsonmicro.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 23 Nov 2011 18:06:51 +0000
+Subject: [PATCH v3 5/5] clk: export tree topology and clk data via sysfs
+In-Reply-To: <20111123165903.GF31337@atomide.com>
+References: <1321926047-14211-1-git-send-email-mturquette@linaro.org>
+ <1321926047-14211-6-git-send-email-mturquette@linaro.org>
+ <20111122154900.GB18954@kroah.com>
+ <CAPtuhThPQtWwihE8aGru55k87oV7QOr=O836TTJ+=30d6dtVhA@mail.gmail.com>
+ <20111122191347.GB4844@kroah.com> <20111123165903.GF31337@atomide.com>
+Message-ID: <20111123180651.GB19739@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 23, 2011 at 09:54:21AM -0800, Stephen Warren wrote:
-> Mark Brown wrote at Wednesday, November 23, 2011 4:04 AM:
+On Wed, Nov 23, 2011 at 08:59:04AM -0800, Tony Lindgren wrote:
+> ..let's plan on getting rid of the early usage of clocks instead so
+> you don't have the issue of deferring stuff.
 
-> > This should really be part of the same commit as the arch/arm side
-> > change in order to avoid bisection breaks as from the point of view of
-> > non-DT systems it's moving the number into the name.
+No - we have too many platforms already using them early to do a change
+like this - and to do such a change will force them to invent some other
+way.  That's just stupid.
 
-> Sorry, I don't quite follow here; the original hard-coded dai structures
-> already had the ID in the name, and hence exactly match the platform
-> device names tegra-i2s.0 and tegra-i2s.1:
-
-If you're renaming the devices I'd expect the device to driver binding
-to break as the device name changes - actually looking at the code again
-I'm a bit depressed that the platform driver binding works at all with
-this as you've not renamed the driver but you have renamed the devices
-and they're still binding.  I'd have expected the match to be on a
-(name, id) not on the result of rendering those down to a display name.
-
-The whole bodge here just smells a bit to be honest, we ought to be able
-to match things up without jumping through this hoop.
+Keep the clk API as a fundamental thing which should be initialized early
+so we don't have to invent new clk APIs to get around its unavailability.
