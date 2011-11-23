@@ -1,25 +1,51 @@
-From: plaes@plaes.org (plaes at plaes.org)
-Date: Wed, 23 Nov 2011 16:26:57 +0200
-Subject: [PATCH] ARM: mach-orion5x: Use hex2bin that is present in kernel lib
-Message-ID: <1322058417.2472.9.camel@localhost.localdomain>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Wed, 23 Nov 2011 14:42:25 +0000
+Subject: [PATCH] ARM: Add optimised swahb32() byteswap helper for v6 and above
+Message-ID: <1322059345-18842-1-git-send-email-dave.martin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey!
+ARMv6 and later processors have the REV16 instruction, which swaps
+the bytes within each halfword of a register value.
 
-I noticed there was some duplicate code under arm/mach-orion5x directory
-so I ended up with a patch that uses existing library function present
-in kernel code.
+This is already used to implement swab16(), but since the native
+operation performaed by REV16 is actually swahb32(), this patch
+renames the existing swab16() helper accordingly and defines
+__arch_swab16() in terms of it.  This allows calls to both swab16()
+and swahb32() to be optimised.
 
-I regretfully have to admit that this patch is NOT even compile-tested,
-but I hope that it still useful in case it happens to break something...
+The compiler's generated code might improve someday, but as of
+4.5.2 the code generated for pure C implementing these 16-bit
+bytesswaps remains pessimal.
 
-P?ikest,
-Priit ;)
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0001-ARM-mach-orion5x-Use-hex2bin-that-is-present-in-kern.patch
-Type: text/x-patch
-Size: 3160 bytes
-Desc: 
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111123/fc6de17f/attachment.bin>
+swahb32() is useful for converting 32-bit Thumb instructions
+between integer and memory representation on BE8 platforms (among
+other uses).
+
+Signed-off-by: Dave Martin <dave.martin@linaro.org>
+---
+ arch/arm/include/asm/swab.h |    5 +++--
+ 1 files changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/include/asm/swab.h b/arch/arm/include/asm/swab.h
+index 9997ad2..32ee164 100644
+--- a/arch/arm/include/asm/swab.h
++++ b/arch/arm/include/asm/swab.h
+@@ -24,12 +24,13 @@
+ 
+ #if defined(__KERNEL__) && __LINUX_ARM_ARCH__ >= 6
+ 
+-static inline __attribute_const__ __u16 __arch_swab16(__u16 x)
++static inline __attribute_const__ __u32 __arch_swahb32(__u32 x)
+ {
+ 	__asm__ ("rev16 %0, %1" : "=r" (x) : "r" (x));
+ 	return x;
+ }
+-#define __arch_swab16 __arch_swab16
++#define __arch_swahb32 __arch_swahb32
++#define __arch_swab16(x) ((__u16)__arch_swahb32(x))
+ 
+ static inline __attribute_const__ __u32 __arch_swab32(__u32 x)
+ {
+-- 
+1.7.4.1
