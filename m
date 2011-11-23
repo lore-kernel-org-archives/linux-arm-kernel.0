@@ -1,105 +1,216 @@
-From: junxiao.bi@windriver.com (Bi Junxiao)
-Date: Wed, 23 Nov 2011 11:30:58 +0800
-Subject: [PATCH 6/6] ARM: support kernel modules in BE8 mode
-In-Reply-To: <20111122104700.GC2066@localhost.localdomain>
-References: <20111122104700.GC2066@localhost.localdomain>
-Message-ID: <4ECC68F2.5030803@windriver.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 22 Nov 2011 19:27:52 -0800
+Subject: [PATCH 1/7] amp/remoteproc: add framework for controlling remote
+ processors
+In-Reply-To: <1319536106-25802-2-git-send-email-ohad@wizery.com>
+References: <1319536106-25802-1-git-send-email-ohad@wizery.com>
+ <1319536106-25802-2-git-send-email-ohad@wizery.com>
+Message-ID: <4ECC6838.1010009@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-on 11/22/2011 06:47 PM Dave Martin wrote:
-> On Tue, Nov 22, 2011 at 09:32:16AM +0800, Bi Junxiao wrote:
->    
->> on 11/22/2011 03:29 AM Nicolas Pitre wrote:
->>      
->>> On Tue, 15 Nov 2011, Junxiao Bi wrote:
->>>
->>>        
->>>> From: Stanley.Miao<stanley.miao@windriver.com>
->>>>
->>>> In BE8 mode, data must be manipulated in big endian format while
->>>> text must be little endian. Therefore, when relocating the text
->>>> section of module in BE8 mode, we must convert the location offset
->>>> of the text to big endian from the native little endian. After
->>>> the relocation is complete, the location offset value is re-written
->>>> as little endian.
->>>>
->>>> Since only BE8 mode has such special requirement while other big endian
->>>> mode not, cpu_to_le32 and le32_to_cpu can not be used to relocate the
->>>> text. We introduce write_instr* and read_instr* to do it.
->>>>
->>>> Signed-off-by: Stanley.Miao<stanley.miao@windriver.com>
->>>> Signed-off-by: Junxiao Bi<junxiao.bi@windriver.com>
->>>> ---
->>>>   arch/arm/Makefile         |    1 +
->>>>   arch/arm/include/asm/io.h |   12 ++++++++++
->>>>   arch/arm/kernel/module.c  |   51 +++++++++++++++++++++++----------------------
->>>>   3 files changed, 39 insertions(+), 25 deletions(-)
->>>>
->>>> diff --git a/arch/arm/Makefile b/arch/arm/Makefile
->>>> index dfcf3b0..c858184 100644
->>>> --- a/arch/arm/Makefile
->>>> +++ b/arch/arm/Makefile
->>>> @@ -13,6 +13,7 @@
->>>>   LDFLAGS_vmlinux	:=-p --no-undefined -X
->>>>   ifeq ($(CONFIG_CPU_ENDIAN_BE8),y)
->>>>   LDFLAGS_vmlinux	+= --be8
->>>> +LDFLAGS_MODULE	+= --be8
->>>>   endif
->>>>
->>>>   OBJCOPYFLAGS	:=-O binary -R .comment -S
->>>> diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
->>>> index 065d100..4b6c7de 100644
->>>> --- a/arch/arm/include/asm/io.h
->>>> +++ b/arch/arm/include/asm/io.h
->>>> @@ -210,6 +210,18 @@ extern void _memset_io(volatile void __iomem *, int, size_t);
->>>>    * Again, this are defined to perform little endian accesses.  See the
->>>>    * IO port primitives for more information.
->>>>    */
->>>> +#ifdef CONFIG_CPU_ENDIAN_BE8
->>>> +#define read_instr32(c)		__swab32(*(u32 *)(c))
->>>> +#define read_instr16(c)		__swab16(*(u16 *)(c))
->>>> +#define write_instr32(v, a)	(*(u32 *)(a) = __swab32((__force __u32)(v)))
->>>> +#define write_instr16(v, a)	(*(u16 *)(a) = __swab16((__force __u16)(v)))
->>>> +#else
->>>> +#define read_instr32(c)		(*(u32 *)(c))
->>>> +#define read_instr16(c)		(*(u16 *)(c))
->>>> +#define write_instr32(v, a)	(*(u32 *)(a) = (v))
->>>> +#define write_instr16(v, a)	(*(u16 *)(a) = (v))
->>>> +#endif
->>>>          
->>> NAK.  This has nothing to do with IO.
->>>
->>> If only module.c requires this, please move those definitions there.
->>>        
->> Not only modules, all components that needs to read and write text
->> segment like kprobes also needs this. As it is special to arm be8,
->> how about define it in arch/arm/include/asm/swab.h?
->>      
-> I'm not sure where the correct place is, but I think having macros
-> doing something along these lines would be useful.  The module loader
-> is one relevant place, but there is also kprobes, and Rabin's recent
-> ftrace series highlights the potential usefulness too.
->
-> There are a lot of #ifdefs and swab hacks spread around various places
-> wherever we need to load/store/relocate instructions.  Abstracting this
-> properly so we don't need a load of fragile #ifdefs for the big-endian
-> case is clearly a good idea.
->
-> Because the Thumb 32-bit case is different from the ARM case, I would
-> also recommend having three macro variants instead of two:
->
-> *_instr_arm()
-> *_instr_thumb16()
-> *_instr_thumb32()
->    
-These name makes more sense than mine.  I will use them. But it seems 
-that we don't need all the three. It is enough with the first two.
-For reading and writing thumb code, there is no difference as 32-bit 
-thumb code is organized as two 16-bit parts. To read a 32-bit thumb 
-code, we need using read_instr16 to read the first part, then check if 
-it's a 32-bit thumb, if so then use read_instr16 to read the second part.
-> Cheers
-> ---Dave
->
->    
+On 10/25/11 02:48, Ohad Ben-Cohen wrote:
+> +static int rproc_load_segments(struct rproc *rproc, const u8 *elf_data)
+> +{
+> +	struct device *dev = rproc->dev;
+> +	struct elf32_hdr *ehdr;
+> +	struct elf32_phdr *phdr;
+> +	int i, ret = 0;
+> +
+> +	ehdr = (struct elf32_hdr *)elf_data;
+> +	phdr = (struct elf32_phdr *)(elf_data + ehdr->e_phoff);
+> +
+> +	/* go through the available ELF segments */
+> +	for (i = 0; i < ehdr->e_phnum; i++, phdr++) {
+> +		u32 da = phdr->p_paddr;
+> +		u32 memsz = phdr->p_memsz;
+> +		u32 filesz = phdr->p_filesz;
+> +		void *ptr;
+> +
+> +		if (phdr->p_type != PT_LOAD)
+> +			continue;
+> +
+> +		dev_dbg(dev, "phdr: type %d da 0x%x memsz 0x%x filesz 0x%x\n",
+> +					phdr->p_type, da, memsz, filesz);
+> +
+> +		if (filesz > memsz) {
+> +			dev_err(dev, "bad phdr filesz 0x%x memsz 0x%x\n",
+> +							filesz, memsz);
+> +			ret = -EINVAL;
+> +			break;
+> +		}
+> +
+> +		/* grab the kernel address for this device address */
+> +		ptr = rproc_da_to_va(rproc, da, memsz);
+> +		if (!ptr) {
+> +			dev_err(dev, "bad phdr da 0x%x mem 0x%x\n", da, memsz);
+> +			ret = -EINVAL;
+> +			break;
+> +		}
+> +
+> +		/* put the segment where the remote processor expects it */
+> +		if (phdr->p_filesz)
+> +			memcpy(ptr, elf_data + phdr->p_offset, filesz);
+
+How big are the images you're loading? I had to split the memcpy up into
+megabyte chunks because I was running out of virtual memory to map in
+two huge chunks (one for the firmware and one for the image's resting
+place). This may work for now, but I think it will fail for limited
+virtual memory environments. Unless CMA solves this problem?
+
+Also, this code assumes the firmware is actually as big as the elf
+header says it is. It should be checking to make sure the elf_data is
+actually big enough to copy from.
+
+> +
+> +		/*
+> +		 * Zero out remaining memory for this segment.
+> +		 *
+> +		 * This isn't strictly required since dma_alloc_coherent already
+> +		 * did this for us. albeit harmless, we may consider removing
+> +		 * this.
+> +		 */
+> +		if (memsz > filesz)
+> +			memset(ptr + filesz, 0, memsz - filesz);
+> +	}
+> +
+> +	return ret;
+> +}
+> +
+[...]
+> +int rproc_register(struct rproc *rproc)
+> +{
+> +	struct device *dev = rproc->dev;
+> +	int ret = 0;
+> +
+> +	/* expose to rproc_get_by_name users */
+> +	klist_add_tail(&rproc->node, &rprocs);
+> +
+> +	dev_info(rproc->dev, "%s is available\n", rproc->name);
+> +
+> +	/* create debugfs entries */
+> +	rproc_create_debug_dir(rproc);
+> +
+> +	/* rproc_unregister() calls must wait until async loader completes */
+> +	init_completion(&rproc->firmware_loading_complete);
+> +
+> +	/*
+> +	 * We must retrieve early virtio configuration info from
+> +	 * the firmware (e.g. whether to register a virtio rpmsg device,
+> +	 * what virtio features does it support, ...).
+> +	 *
+> +	 * We're initiating an asynchronous firmware loading, so we can
+> +	 * be built-in kernel code, without hanging the boot process.
+> +	 */
+> +	ret = request_firmware_nowait(THIS_MODULE, FW_ACTION_HOTPLUG,
+> +					rproc->firmware, dev, GFP_KERNEL,
+> +					rproc, rproc_fw_config_virtio);
+
+This is a bit odd. If I understand correctly, you load the firmware at
+least twice. Once to see if the firmware has any virtio devices in the
+resource table, and again when the image is actually loaded into RAM. Is
+there any way to avoid loading it twice? I ask because we have something
+like a 20Mb image that needs to be loaded and I'd like to avoid loading
+it twice just to read a section out of it the first time.
+
+> +	if (ret < 0) {
+> +		dev_err(dev, "request_firmware_nowait failed: %d\n", ret);
+> +		complete_all(&rproc->firmware_loading_complete);
+> +		klist_remove(&rproc->node);
+> +	}
+> +
+> +	return ret;
+> +}
+[...]
+> +struct rproc *rproc_alloc(struct device *dev, const char *name,
+> +				const struct rproc_ops *ops,
+> +				const char *firmware, int len)
+> +{
+> +	struct rproc *rproc;
+> +
+> +	if (!dev || !name || !ops)
+> +		return NULL;
+> +
+> +	rproc = kzalloc(sizeof(struct rproc) + len, GFP_KERNEL);
+> +	if (!rproc) {
+> +		dev_err(dev, "%s: kzalloc failed\n", __func__);
+> +		return NULL;
+> +	}
+> +
+> +	rproc->dev = dev;
+
+What do you do if dev goes away? Does request_firmware() work? What do
+you think about making remoteproc into a bus? I imagine this function
+would allocate a struct device and then rproc_register() would actually
+hook it into the device layer. Then we could use the device we allocate
+here for the firmware requests and we also have a nice namespace for all
+remote processors in the system. Plus all the management code for
+refcounting would come for free with the device layer (modulo the
+rproc_boot() count).
+
+> +	rproc->name = name;
+> +	rproc->ops = ops;
+> +	rproc->firmware = firmware;
+> +	rproc->priv = &rproc[1];
+> +
+> +	atomic_set(&rproc->power, 0);
+> +
+> +	kref_init(&rproc->refcount);
+> +
+> +	mutex_init(&rproc->lock);
+> +
+> +	INIT_LIST_HEAD(&rproc->carveouts);
+> +	INIT_LIST_HEAD(&rproc->mappings);
+> +	INIT_LIST_HEAD(&rproc->traces);
+> +
+> +	rproc->state = RPROC_OFFLINE;
+> +
+> +	return rproc;
+> +}
+> +EXPORT_SYMBOL(rproc_alloc);
+> +
+[...]
+> +/**
+> + * enum fw_resource_type - types of resource entries
+> + *
+> + * @RSC_CARVEOUT:   request for allocation of a physically contiguous
+> + *		    memory region.
+> + * @RSC_DEVMEM:     request to iommu_map a memory-based peripheral.
+> + * @RSC_TRACE:	    announces the availability of a trace buffer into which
+> + *		    the remote processor will be writing logs. In this case,
+> + *		    'da' indicates the device address where logs are written to,
+> + *		    and 'len' is the size of the trace buffer.
+> + * @RSC_VRING:	    request for allocation of a virtio vring (address should
+> + *		    be indicated in 'da', and 'len' should contain the number
+> + *		    of buffers supported by the vring).
+> + * @RSC_VIRTIO_DEV: this entry declares about support for a virtio device,
+
+What is RSC_VIRTIO_CFG?
+
+> +enum fw_resource_type {
+> +	RSC_CARVEOUT	= 0,
+> +	RSC_DEVMEM	= 1,
+> +	RSC_TRACE	= 2,
+> +	RSC_VRING	= 3,
+> +	RSC_VIRTIO_DEV	= 4,
+> +	RSC_VIRTIO_CFG	= 5,
+> +};
+
+For MSM I see two main pain points:
+
+ * CMA is new and untested on MSM. I imagine in MSM's situation we would
+carve out the memory chunks early on for each processor and then only
+remove that memory if the processor is booted? I hope that just works
+somehow.
+
+ * rproc is tied to virtio fairly closely. We probably won't be using
+virtio anytime soon on MSM, unless we can do smd over virtio or
+something. I'm not particularly knowledgeable about that though. Would
+something like that be possible?
+
+We would also have to keep using the rproc_get_by_name() approach until
+we can actually start tying rproc devices to other devices in the kernel.
+
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
