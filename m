@@ -1,61 +1,106 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 23 Nov 2011 08:59:04 -0800
-Subject: [PATCH v3 5/5] clk: export tree topology and clk data via sysfs
-In-Reply-To: <20111122191347.GB4844@kroah.com>
-References: <1321926047-14211-1-git-send-email-mturquette@linaro.org>
- <1321926047-14211-6-git-send-email-mturquette@linaro.org>
- <20111122154900.GB18954@kroah.com>
- <CAPtuhThPQtWwihE8aGru55k87oV7QOr=O836TTJ+=30d6dtVhA@mail.gmail.com>
- <20111122191347.GB4844@kroah.com>
-Message-ID: <20111123165903.GF31337@atomide.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Wed, 23 Nov 2011 18:19:35 +0100
+Subject: [AT91 PULL] gpio cleanup pull request for 3.3
+Message-ID: <20111123171935.GC15531@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+Hi Arnd,
 
-* Greg KH <greg@kroah.com> [111122 10:51]:
-> On Tue, Nov 22, 2011 at 09:57:41AM -0800, Mike Turquette wrote:
-> > > Ah, comments like this warm my heart.
-> > >
-> > > Come on, no abusing the kobject code please, if have problems with how
-> > > the kernel core works, and it doesn't do things you want it to, then why
-> > > not change it to work properly for you, or at the least, ASK ME!!!
-> > 
-> > Ok, I'm asking you now.  There are two ways to solve this problem:
-> > 
-> > 1) have kobject core create the lists linking the objects but defer
-> > allocations and any interactions with sysfs until later in the boot
-> > sequence, OR
+	this pull containt the first patch series that rework the gpio to make it more standard
+	and to allow the multi soc and simplify the adding of the DT
+	
+	this pull depends on previous one for the ioremaps
+	
+The following changes since commit 55c71f1a3e29cc7cd761a358deac96d3e952128f:
 
-Please just make it all a loadable module using regular devices. That
-makes the development a lot easier and as a side effect also guarantees
-we're using standard interfaces.
+  ARM: at91: make rm9200 rtc drivers soc independent (2011-11-23 23:00:11 +0800)
 
-Sure most platforms using it want it compiled in at least for now,
-but in the long run it should be possible to load it when we get to
-initramfs. For the early usage of clocks..
+are available in the git repository at:
+  git://github.com/at91linux/linux-at91.git for-arnd-3.3-gpio
 
-> > 2) my code can create a list of clks (the same way that clkdev does)
-> > and defer kobject/sysfs stuff until later, which walks the list made
-> > during early-boot
+Jean-Christophe PLAGNIOL-VILLARD (12):
+      ARM: at91: switch gpio clock to clkdev
+      ARM: at91: gpio make struct at91_gpio_bank an initdata
+      ARM: at91/boards: use -EINVAL for invalid gpio
+      ARM: at91/soc: use gpio_is_valid to check the gpio
+      ARM: at91/pata: use gpio_is_valid to check the gpio
+      ARM: at91/ide: use gpio_is_valid to check the gpio
+      ARM: at91/mmc: use gpio_is_valid to check the gpio
+      ARM: at91/nand: use gpio_is_valid to check the gpio
+      ARM: at91/ohci: use gpio_is_valid to check the gpio
+      ARM: at91/udc: use gpio_is_valid to check the gpio
+      ARM: at91/gpio: drop PIN_BASE
+      ARM: at91/gpio: fix display of number of irq setuped
 
-..let's plan on getting rid of the early usage of clocks instead so
-you don't have the issue of deferring stuff.
-
-> > #1 is most closely aligned with the code I have here, #2 presents
-> > challenges that I haven't really though through.  I know that OMAP
-> > uses the clk framework VERY early in it's boot sequence, but as long
-> > as the per-clk data is properly initialized then it should be OK.
-> > 
-> > What do you think?
-
-We initialize clocksource/clockevent clocks early, but we can do that
-without clock fwk initially, then let a clockevent driver take over
-later on. That should solve your issues #1 and #2.
-
-> #3 - use debugfs and don't try to create a sysfs interface for the clock
-> structures :)
-
-Sounds like the debugfs is the way to go :)
-
-Tony
+ arch/arm/mach-at91/at91cap9.c            |   10 +-
+ arch/arm/mach-at91/at91cap9_devices.c    |   20 +-
+ arch/arm/mach-at91/at91rm9200.c          |   10 +-
+ arch/arm/mach-at91/at91rm9200_devices.c  |   22 +-
+ arch/arm/mach-at91/at91sam9260.c         |    8 +-
+ arch/arm/mach-at91/at91sam9260_devices.c |   26 ++--
+ arch/arm/mach-at91/at91sam9261.c         |    8 +-
+ arch/arm/mach-at91/at91sam9261_devices.c |   14 +-
+ arch/arm/mach-at91/at91sam9263.c         |   12 +-
+ arch/arm/mach-at91/at91sam9263_devices.c |   26 ++--
+ arch/arm/mach-at91/at91sam9g45.c         |   12 +-
+ arch/arm/mach-at91/at91sam9g45_devices.c |   20 +-
+ arch/arm/mach-at91/at91sam9rl.c          |   10 +-
+ arch/arm/mach-at91/at91sam9rl_devices.c  |   16 +-
+ arch/arm/mach-at91/board-1arm.c          |    2 +
+ arch/arm/mach-at91/board-afeb-9260v1.c   |    8 +-
+ arch/arm/mach-at91/board-cam60.c         |    4 +-
+ arch/arm/mach-at91/board-cap9adk.c       |   15 +-
+ arch/arm/mach-at91/board-carmeva.c       |    7 +-
+ arch/arm/mach-at91/board-cpu9krea.c      |    8 +-
+ arch/arm/mach-at91/board-cpuat91.c       |    5 +
+ arch/arm/mach-at91/board-csb337.c        |    5 +-
+ arch/arm/mach-at91/board-csb637.c        |    2 +
+ arch/arm/mach-at91/board-dt.c            |    1 +
+ arch/arm/mach-at91/board-eb9200.c        |    9 +-
+ arch/arm/mach-at91/board-ecbat91.c       |    5 +
+ arch/arm/mach-at91/board-eco920.c        |    5 +
+ arch/arm/mach-at91/board-flexibity.c     |    5 +-
+ arch/arm/mach-at91/board-foxg20.c        |    7 +-
+ arch/arm/mach-at91/board-gsia18s.c       |    5 +-
+ arch/arm/mach-at91/board-kafa.c          |    2 +
+ arch/arm/mach-at91/board-kb9202.c        |    6 +-
+ arch/arm/mach-at91/board-neocore926.c    |    5 +-
+ arch/arm/mach-at91/board-pcontrol-g20.c  |    2 +
+ arch/arm/mach-at91/board-picotux200.c    |    3 +
+ arch/arm/mach-at91/board-qil-a9260.c     |   12 +-
+ arch/arm/mach-at91/board-rm9200dk.c      |   11 +-
+ arch/arm/mach-at91/board-rm9200ek.c      |    3 +
+ arch/arm/mach-at91/board-rsi-ews.c       |    2 +
+ arch/arm/mach-at91/board-sam9-l9260.c    |    8 +-
+ arch/arm/mach-at91/board-sam9260ek.c     |   12 +-
+ arch/arm/mach-at91/board-sam9261ek.c     |    9 +-
+ arch/arm/mach-at91/board-sam9263ek.c     |    8 +-
+ arch/arm/mach-at91/board-sam9g20ek.c     |    9 +-
+ arch/arm/mach-at91/board-sam9m10g45ek.c  |    4 +
+ arch/arm/mach-at91/board-sam9rlek.c      |    7 +-
+ arch/arm/mach-at91/board-snapper9260.c   |    6 +
+ arch/arm/mach-at91/board-stamp9g20.c     |   12 +-
+ arch/arm/mach-at91/board-usb-a926x.c     |    6 +-
+ arch/arm/mach-at91/board-yl-9200.c       |    7 +-
+ arch/arm/mach-at91/generic.h             |    1 -
+ arch/arm/mach-at91/gpio.c                |   79 ++++----
+ arch/arm/mach-at91/include/mach/board.h  |   30 ++--
+ arch/arm/mach-at91/include/mach/gpio.h   |  328 +++++++++++++++---------------
+ drivers/ata/pata_at91.c                  |    6 +-
+ drivers/ide/at91_ide.c                   |    2 +-
+ drivers/mmc/host/at91_mci.c              |   30 ++--
+ drivers/mtd/nand/atmel_nand.c            |    8 +-
+ drivers/usb/gadget/at91_udc.c            |   14 +-
+ drivers/usb/host/ohci-at91.c             |   12 +-
+ 60 files changed, 542 insertions(+), 409 deletions(-)
+ 
+Best Regards,
+J.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 835 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111123/d6d18568/attachment.sig>
