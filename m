@@ -1,56 +1,26 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 23 Nov 2011 14:17:50 -0800
-Subject: [RFC V1 2/8] clk: pass parent rate if recalc_rate is NULL
-In-Reply-To: <1322046755-13511-3-git-send-email-richard.zhao@linaro.org>
-References: <1322046755-13511-1-git-send-email-richard.zhao@linaro.org>
- <1322046755-13511-3-git-send-email-richard.zhao@linaro.org>
-Message-ID: <CAPtuhThkadZ9CDnizqZOuUUC47so=PqW3j4gEHiBCoAz2SccAw@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 23 Nov 2011 23:22:28 +0100
+Subject: [GIT PULL] omap fixes for v3.2-rc2
+In-Reply-To: <20111123220358.GI31337@atomide.com>
+References: <20111119194408.GD31337@atomide.com>
+ <201111232115.41035.arnd@arndb.de> <20111123220358.GI31337@atomide.com>
+Message-ID: <21329850.CZjvquqxJn@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 23, 2011 at 3:12 AM, Richard Zhao <richard.zhao@linaro.org> wrote:
-> Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
-> ---
-> ?drivers/clk/clk.c | ? ?4 ++++
-> ?1 files changed, 4 insertions(+), 0 deletions(-)
->
-> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> index ed557c9..2d8422f 100644
-> --- a/drivers/clk/clk.c
-> +++ b/drivers/clk/clk.c
-> @@ -256,6 +256,8 @@ static void clk_recalc_rates(struct clk *clk)
->
-> ? ? ? ?if (clk->ops->recalc_rate)
-> ? ? ? ? ? ? ? ?clk->rate = clk->ops->recalc_rate(clk);
-> + ? ? ? else if (clk->parent)
-> + ? ? ? ? ? ? ? clk->rate = clk->parent->rate;
+On Wednesday 23 November 2011 14:03:58 Tony Lindgren wrote:
+> 
+> The earlier patches are based on the earlier fixes (while waiting
+> for them to get merged). So that's certainly not a random commit.
+> Or at least was not at that time  I can rebase those too anyways
+> now that the earlier fixes are merged.
 
-My code at Linaro Connect did this but Saravana expressed that this
-was not a safe assumption to make.  I suppose it depends on how many
-clks you want to model, but don't provide good support with
-clk_hw_ops.
+No need to do that unless you are rebasing them anyway. IMHO
+it's fine if you have all your bug fixes in one branch based
+on the previous bug fixes you sent, but it's of course also
+fine to start a fresh branch for each pull request.
 
-I'm inclined to leave it out if it is making assumptions that work for
-one platform but not another.  Saravana can you clarify if I
-understood you correctly?
+In general, I would recommend not rebasing when you have the
+choice, because that means your patches are not as well tested.
 
-Regards,
-Mike
-
->
-> ? ? ? ?if (old_rate == clk->rate)
-> ? ? ? ? ? ? ? ?return;
-> @@ -527,6 +529,8 @@ void clk_init(struct device *dev, struct clk *clk)
->
-> ? ? ? ?if (clk->ops->recalc_rate)
-> ? ? ? ? ? ? ? ?clk->rate = clk->ops->recalc_rate(clk);
-> + ? ? ? else if (clk->parent)
-> + ? ? ? ? ? ? ? clk->rate = clk->parent->rate;
-> ? ? ? ?else
-> ? ? ? ? ? ? ? ?clk->rate = 0;
->
-> --
-> 1.7.5.4
->
->
->
+	Arnd
