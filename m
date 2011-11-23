@@ -1,86 +1,157 @@
 From: swarren@nvidia.com (Stephen Warren)
-Date: Tue, 22 Nov 2011 18:21:21 -0700
-Subject: [PATCH 13/17] ASoC: Tegra TrimSlice machine: Use devm_ APIs and
- module_platform_driver
+Date: Tue, 22 Nov 2011 18:21:22 -0700
+Subject: [PATCH 14/17] ASoC: Implement "auto nc pins" feature
 In-Reply-To: <1322011285-4002-1-git-send-email-swarren@nvidia.com>
 References: <1322011285-4002-1-git-send-email-swarren@nvidia.com>
-Message-ID: <1322011285-4002-14-git-send-email-swarren@nvidia.com>
+Message-ID: <1322011285-4002-15-git-send-email-swarren@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-module_platform_drive saves some boiler-plate code.
+Codecs often have a large number of external pins, and not all of these pins
+will be connected on all board designs. Some machine drivers therefore call
+snd_soc_dapm_nc_pin() for all the unused pins, in order to tell the ASoC core
+never to activate them.
 
-The devm_ APIs remove the need to manually clean up allocations,
-thus removing some code.
+However, the information needed to derive the set of unused pins may be
+present in card->dapm_routes. Hence, the ASoC core could automatically
+disable unconnected pins. This patch implements such a feature.
+
+This feature is optional; it could cause problems on machines with incomplete
+dapm routes. To request the feature, set a card's auto_nc_codec_pins field to
+true.
+
+This has been tested with soc/tegra/tegra_wm8903.c and soc/tegra/trimslice.c.
 
 Signed-off-by: Stephen Warren <swarren@nvidia.com>
 ---
- sound/soc/tegra/trimslice.c |   26 +++++++-------------------
- 1 files changed, 7 insertions(+), 19 deletions(-)
+ include/sound/soc-dapm.h |    1 +
+ include/sound/soc.h      |    1 +
+ sound/soc/soc-core.c     |    4 ++
+ sound/soc/soc-dapm.c     |   73 ++++++++++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 79 insertions(+), 0 deletions(-)
 
-diff --git a/sound/soc/tegra/trimslice.c b/sound/soc/tegra/trimslice.c
-index 2699a6f..d564b40 100644
---- a/sound/soc/tegra/trimslice.c
-+++ b/sound/soc/tegra/trimslice.c
-@@ -170,15 +170,17 @@ static __devinit int tegra_snd_trimslice_probe(struct platform_device *pdev)
- 	struct tegra_trimslice *trimslice;
- 	int ret;
+diff --git a/include/sound/soc-dapm.h b/include/sound/soc-dapm.h
+index 17a4c17..0c159a7 100644
+--- a/include/sound/soc-dapm.h
++++ b/include/sound/soc-dapm.h
+@@ -380,6 +380,7 @@ int snd_soc_dapm_force_enable_pin(struct snd_soc_dapm_context *dapm,
+ 				  const char *pin);
+ int snd_soc_dapm_ignore_suspend(struct snd_soc_dapm_context *dapm,
+ 				const char *pin);
++void snd_soc_dapm_auto_nc_codec_pins(struct snd_soc_codec *codec);
  
--	trimslice = kzalloc(sizeof(struct tegra_trimslice), GFP_KERNEL);
-+	trimslice = devm_kzalloc(&pdev->dev, sizeof(struct tegra_trimslice),
-+				 GFP_KERNEL);
- 	if (!trimslice) {
- 		dev_err(&pdev->dev, "Can't allocate tegra_trimslice\n");
--		return -ENOMEM;
-+		ret = -ENOMEM;
-+		goto err;
- 	}
+ /* Mostly internal - should not normally be used */
+ void dapm_mark_dirty(struct snd_soc_dapm_widget *w, const char *reason);
+diff --git a/include/sound/soc.h b/include/sound/soc.h
+index b21b304..3728533 100644
+--- a/include/sound/soc.h
++++ b/include/sound/soc.h
+@@ -815,6 +815,7 @@ struct snd_soc_card {
+ 	int num_dapm_widgets;
+ 	const struct snd_soc_dapm_route *dapm_routes;
+ 	int num_dapm_routes;
++	bool auto_nc_codec_pins;
  
- 	ret = tegra_asoc_utils_init(&trimslice->util_data, &pdev->dev);
- 	if (ret)
--		goto err_free_trimslice;
-+		goto err;
+ 	struct work_struct deferred_resume_work;
  
- 	card->dev = &pdev->dev;
- 	platform_set_drvdata(pdev, card);
-@@ -195,8 +197,7 @@ static __devinit int tegra_snd_trimslice_probe(struct platform_device *pdev)
+diff --git a/sound/soc/soc-core.c b/sound/soc/soc-core.c
+index a5d3685..47e919b 100644
+--- a/sound/soc/soc-core.c
++++ b/sound/soc/soc-core.c
+@@ -1482,6 +1482,10 @@ static void snd_soc_instantiate_card(struct snd_soc_card *card)
  
- err_fini_utils:
- 	tegra_asoc_utils_fini(&trimslice->util_data);
--err_free_trimslice:
--	kfree(trimslice);
-+err:
- 	return ret;
+ 	snd_soc_dapm_new_widgets(&card->dapm);
+ 
++	if (card->auto_nc_codec_pins)
++		list_for_each_entry(codec, &codec_list, list)
++			snd_soc_dapm_auto_nc_codec_pins(codec);
++
+ 	ret = snd_card_register(card->snd_card);
+ 	if (ret < 0) {
+ 		printk(KERN_ERR "asoc: failed to register soundcard for %s\n", card->name);
+diff --git a/sound/soc/soc-dapm.c b/sound/soc/soc-dapm.c
+index f42e8b9..1ecd1b4 100644
+--- a/sound/soc/soc-dapm.c
++++ b/sound/soc/soc-dapm.c
+@@ -2947,6 +2947,79 @@ int snd_soc_dapm_ignore_suspend(struct snd_soc_dapm_context *dapm,
  }
+ EXPORT_SYMBOL_GPL(snd_soc_dapm_ignore_suspend);
  
-@@ -209,8 +210,6 @@ static int __devexit tegra_snd_trimslice_remove(struct platform_device *pdev)
- 
- 	tegra_asoc_utils_fini(&trimslice->util_data);
- 
--	kfree(trimslice);
--
- 	return 0;
- }
- 
-@@ -222,18 +221,7 @@ static struct platform_driver tegra_snd_trimslice_driver = {
- 	.probe = tegra_snd_trimslice_probe,
- 	.remove = __devexit_p(tegra_snd_trimslice_remove),
- };
--
--static int __init snd_tegra_trimslice_init(void)
--{
--	return platform_driver_register(&tegra_snd_trimslice_driver);
--}
--module_init(snd_tegra_trimslice_init);
--
--static void __exit snd_tegra_trimslice_exit(void)
--{
--	platform_driver_unregister(&tegra_snd_trimslice_driver);
--}
--module_exit(snd_tegra_trimslice_exit);
-+module_platform_driver(tegra_snd_trimslice_driver);
- 
- MODULE_AUTHOR("Mike Rapoport <mike@compulab.co.il>");
- MODULE_DESCRIPTION("Trimslice machine ASoC driver");
++static bool snd_soc_dapm_widget_in_card_paths(struct snd_soc_card *card,
++					      struct snd_soc_dapm_widget *w)
++{
++	struct snd_soc_dapm_path *p;
++
++	list_for_each_entry(p, &card->paths, list) {
++		if ((p->source == w) || (p->sink == w)) {
++			dev_dbg(card->dev,
++			    "... Path %s(id:%d dapm:%p) - %s(id:%d dapm:%p)\n",
++			    p->source->name, p->source->id, p->source->dapm,
++			    p->sink->name, p->sink->id, p->sink->dapm);
++
++			/* Connected to something other than the codec */
++			if (p->source->dapm != p->sink->dapm)
++				return true;
++			/*
++			 * Loopback connection from codec external pin to
++			 * codec external pin
++			 */
++			if (p->sink->id == snd_soc_dapm_input) {
++				switch (p->source->id) {
++				case snd_soc_dapm_output:
++				case snd_soc_dapm_micbias:
++					return true;
++				default:
++					break;
++				}
++			}
++		}
++	}
++
++	return false;
++}
++
++/**
++ * snd_soc_dapm_auto_nc_codec_pins - call snd_soc_dapm_nc_pin for unused pins
++ * @codec: The codec whose pins should be processed
++ *
++ * Automatically call snd_soc_dapm_nc_pin() for any external pins in the codec
++ * which are unused. Pins are used if they are connected externally to the
++ * codec, whether that be to some other device, or a loop-back connection to
++ * the codec itself.
++ */
++void snd_soc_dapm_auto_nc_codec_pins(struct snd_soc_codec *codec)
++{
++	struct snd_soc_card *card = codec->card;
++	struct snd_soc_dapm_context *dapm = &codec->dapm;
++	struct snd_soc_dapm_widget *w;
++
++	dev_dbg(card->dev, "Auto NC: DAPMs: card:%p codec:%p\n",
++		&card->dapm, &codec->dapm);
++
++	list_for_each_entry(w, &card->widgets, list) {
++		if (w->dapm != dapm)
++			continue;
++		switch (w->id) {
++		case snd_soc_dapm_input:
++		case snd_soc_dapm_output:
++		case snd_soc_dapm_micbias:
++			dev_dbg(card->dev, "Auto NC: Checking widget %s\n",
++				w->name);
++			if (!snd_soc_dapm_widget_in_card_paths(card, w)) {
++				dev_dbg(card->dev,
++					"... Not in map; disabling\n");
++				snd_soc_dapm_nc_pin(dapm, w->name);
++			}
++			break;
++		default:
++			break;
++		}
++	}
++}
++
+ /**
+  * snd_soc_dapm_free - free dapm resources
+  * @dapm: DAPM context
 -- 
 1.7.0.4
