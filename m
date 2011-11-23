@@ -1,29 +1,36 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Wed, 23 Nov 2011 09:44:54 -0800
-Subject: [PATCH 01/17] arm/tegra: board-dt: audio: Enable clocks, fix
- AUXDATA
-In-Reply-To: <20111123103858.GK4332@opensource.wolfsonmicro.com>
-References: <1322011285-4002-1-git-send-email-swarren@nvidia.com>
- <1322011285-4002-2-git-send-email-swarren@nvidia.com>
- <20111123103858.GK4332@opensource.wolfsonmicro.com>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF174F08C708@HQMAIL01.nvidia.com>
+From: rabin@rab.in (Rabin Vincent)
+Date: Wed, 23 Nov 2011 23:17:54 +0530
+Subject: [PATCH v5 6/7] arm: omap4: support pmu
+In-Reply-To: <1319467559-5518-7-git-send-email-ming.lei@canonical.com>
+References: <1319467559-5518-1-git-send-email-ming.lei@canonical.com>
+ <1319467559-5518-7-git-send-email-ming.lei@canonical.com>
+Message-ID: <CAH+eYFD==CbcTWha=4pLVaaeE32gN4_BPdKv0Eo-XNhiz8CM-g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark Brown wrote at Wednesday, November 23, 2011 3:39 AM:
-> On Tue, Nov 22, 2011 at 06:21:09PM -0700, Stephen Warren wrote:
-> 
-> >  	OF_DEV_AUXDATA("nvidia,tegra20-i2c", TEGRA_DVC_BASE, "tegra-i2c.3", NULL),
-> >  	OF_DEV_AUXDATA("nvidia,tegra20-i2s", TEGRA_I2S1_BASE, "tegra-i2s.0", NULL),
-> > -	OF_DEV_AUXDATA("nvidia,tegra20-i2s", TEGRA_I2S1_BASE, "tegra-i2s.1", NULL),
-> > +	OF_DEV_AUXDATA("nvidia,tegra20-i2s", TEGRA_I2S2_BASE, "tegra-i2s.1", NULL),
-> 
-> This looks like a straight bug fix which is independant of the below
-> change?
+On Mon, Oct 24, 2011 at 20:15,  <ming.lei@canonical.com> wrote:
+> ?static struct platform_device* __init omap4_init_pmu(void)
+> ?{
+> ? ? ? ?int id = -1;
+> @@ -420,6 +472,10 @@ static struct platform_device* __init omap4_init_pmu(void)
+> ? ? ? ? ? ? ? ?return NULL;
+> ? ? ? ?}
+>
+> + ? ? ? omap4_pmu_data.handle_irq = omap4_pmu_handler;
+> + ? ? ? omap4_pmu_data.enable_irq = omap4_enable_cti;
+> + ? ? ? omap4_pmu_data.disable_irq = omap4_disable_cti;
+> +
+> ? ? ? ?pd = omap_device_build_ss(dev_name, id, oh, 3, &omap4_pmu_data,
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?sizeof(omap4_pmu_data),
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?omap_pmu_latency,
+> @@ -440,7 +496,9 @@ static void __init omap_init_pmu(void)
+> ? ? ? ? ? ? ? ?pd = omap4_init_pmu();
+> ? ? ? ? ? ? ? ?if (!pd)
+> ? ? ? ? ? ? ? ? ? ? ? ?return;
+> - ? ? ? ? ? ? ? omap_device_enable(pd);
+> +
+> + ? ? ? ? ? ? ? omap_device_enable(&od->pdev);
+> + ? ? ? ? ? ? ? omap4_configure_pmu_irq();
 
-That is true.
-
-Olof/Colin, do you want me to split this up?
-
--- 
-nvpublic
+This doesn't build, because there's no "od" in this function.  I guess
+you shouldn't be changing the omap_device_enable() call.
