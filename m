@@ -1,78 +1,47 @@
 From: swarren@nvidia.com (Stephen Warren)
-Date: Tue, 22 Nov 2011 18:21:08 -0700
-Subject: [PATCH 00/17] ASoC: Add Tegra DT, cleanup, and related
-Message-ID: <1322011285-4002-1-git-send-email-swarren@nvidia.com>
+Date: Tue, 22 Nov 2011 18:21:09 -0700
+Subject: [PATCH 01/17] arm/tegra: board-dt: audio: Enable clocks, fix AUXDATA
+In-Reply-To: <1322011285-4002-1-git-send-email-swarren@nvidia.com>
+References: <1322011285-4002-1-git-send-email-swarren@nvidia.com>
+Message-ID: <1322011285-4002-2-git-send-email-swarren@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These patches add device tree bindings for all the Tegra ASoC components,
-and the WM8903 codec. Also included is some general Tegra driver cleanup,
-and a solution for the "snd_soc_dapm_nc_pin" open-coding.
+Certain clocks are required for core audio functionality. Set up the
+appropriate parenting relationships, and enable clocks that must be
+on permanently.
 
-The ASoC and arch/arm changes should be independent enought that they can
-be applied to their separate trees without issue to those trees standalone,
-and will meet in linux-next just fine.
+Fix the address of the I2S2 controller in the AUXDATA table.
 
-The arch/arm .dts/*.dts changes depend on the .dtsi/.dts cleanup patches
-that I posted yesterday for context.
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+ arch/arm/mach-tegra/board-dt.c |    7 ++++++-
+ 1 files changed, 6 insertions(+), 1 deletions(-)
 
-I tested this on:
-
-Harmony, Seaboard: non-DT and DT: Tested audio capture & playback.
-
-Trimslice: non-DT and DT: Tested audio playback. Capture appears to be
-broken before my patches.
-
-Ventana: DT: Tested audio capture & playback.
-
-Paz00: DT: Tested booting with the patches applied.
-
-John Bonesio (2):
-  ASoC: Add device tree binding for WM8903
-  ASoC: Tegra+WM8903 machine: Add device tree binding
-
-Stephen Warren (15):
-  arm/tegra: board-dt: audio: Enable clocks, fix AUXDATA
-  arm/dt: Tegra: Clean up I2S and DAS nodes
-  arm/dt: Tegra: Enable audio on WM8903 boards, disable others
-  ASoC: Tegra: Move DAS configuration into machine drivers
-  ASoC: Tegra PCM: Use module_platform_driver
-  ASoC: Tegra DAS: Use devm_ APIs and module_platform_driver
-  ASoC: Tegra I2S: Use devm_ APIs and module_platform_driver
-  ASoC: Tegra I2S: Remove dependency on pdev->id
-  ASoC: Tegra DAS: Add device tree binding
-  ASoC: Tegra I2S: Add device tree binding
-  ASoC: Tegra+WM8903 machine: Use devm_ APIs and module_platform_driver
-  ASoC: Tegra TrimSlice machine: Use devm_ APIs and
-    module_platform_driver
-  ASoC: Implement "auto nc pins" feature
-  ASoC: Tegra+WM903 machine: Use new auto_nc_codec_pins feature
-  ASoC: TrimSlice machine: Use new auto_nc_codec_pins feature
-
- .../bindings/sound/tegra-audio-wm8903.txt          |   63 +++++++
- .../devicetree/bindings/sound/tegra20-das.txt      |   12 ++
- .../devicetree/bindings/sound/tegra20-i2s.txt      |   16 ++
- Documentation/devicetree/bindings/sound/wm8903.txt |   48 +++++
- arch/arm/boot/dts/tegra-harmony.dts                |   29 +++-
- arch/arm/boot/dts/tegra-paz00.dts                  |   12 ++
- arch/arm/boot/dts/tegra-seaboard.dts               |   36 ++++
- arch/arm/boot/dts/tegra-trimslice.dts              |   12 ++
- arch/arm/boot/dts/tegra-ventana.dts                |   38 ++++
- arch/arm/boot/dts/tegra20.dtsi                     |   10 +-
- arch/arm/mach-tegra/board-dt.c                     |    7 +-
- include/sound/soc-dapm.h                           |    1 +
- include/sound/soc.h                                |    1 +
- sound/soc/codecs/wm8903.c                          |   48 +++++-
- sound/soc/soc-core.c                               |    4 +
- sound/soc/soc-dapm.c                               |   73 ++++++++
- sound/soc/tegra/tegra_das.c                        |   53 ++----
- sound/soc/tegra/tegra_i2s.c                        |  164 ++++++-----------
- sound/soc/tegra/tegra_i2s.h                        |    1 +
- sound/soc/tegra/tegra_pcm.c                        |   13 +--
- sound/soc/tegra/tegra_wm8903.c                     |  193 +++++++++++++-------
- sound/soc/tegra/trimslice.c                        |   45 +++---
- 22 files changed, 620 insertions(+), 259 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/sound/tegra-audio-wm8903.txt
- create mode 100644 Documentation/devicetree/bindings/sound/tegra20-das.txt
- create mode 100644 Documentation/devicetree/bindings/sound/tegra20-i2s.txt
- create mode 100644 Documentation/devicetree/bindings/sound/wm8903.txt
+diff --git a/arch/arm/mach-tegra/board-dt.c b/arch/arm/mach-tegra/board-dt.c
+index efb308e..343469c 100644
+--- a/arch/arm/mach-tegra/board-dt.c
++++ b/arch/arm/mach-tegra/board-dt.c
+@@ -62,7 +62,7 @@ struct of_dev_auxdata tegra20_auxdata_lookup[] __initdata = {
+ 	OF_DEV_AUXDATA("nvidia,tegra20-i2c", TEGRA_I2C3_BASE, "tegra-i2c.2", NULL),
+ 	OF_DEV_AUXDATA("nvidia,tegra20-i2c", TEGRA_DVC_BASE, "tegra-i2c.3", NULL),
+ 	OF_DEV_AUXDATA("nvidia,tegra20-i2s", TEGRA_I2S1_BASE, "tegra-i2s.0", NULL),
+-	OF_DEV_AUXDATA("nvidia,tegra20-i2s", TEGRA_I2S1_BASE, "tegra-i2s.1", NULL),
++	OF_DEV_AUXDATA("nvidia,tegra20-i2s", TEGRA_I2S2_BASE, "tegra-i2s.1", NULL),
+ 	OF_DEV_AUXDATA("nvidia,tegra20-das", TEGRA_APB_MISC_DAS_BASE, "tegra-das", NULL),
+ 	OF_DEV_AUXDATA("nvidia,tegra20-ehci", TEGRA_USB_BASE, "tegra-ehci.0",
+ 		       &tegra_ehci1_device.dev.platform_data),
+@@ -79,6 +79,11 @@ static __initdata struct tegra_clk_init_table tegra_dt_clk_init_table[] = {
+ 	{ "usbd",	"clk_m",	12000000,	false },
+ 	{ "usb2",	"clk_m",	12000000,	false },
+ 	{ "usb3",	"clk_m",	12000000,	false },
++	{ "pll_a",      "pll_p_out1",   56448000,       true },
++	{ "pll_a_out0", "pll_a",        11289600,       true },
++	{ "cdev1",      NULL,           0,              true },
++	{ "i2s1",       "pll_a_out0",   11289600,       false},
++	{ "i2s2",       "pll_a_out0",   11289600,       false},
+ 	{ NULL,		NULL,		0,		0},
+ };
+ 
+-- 
+1.7.0.4
