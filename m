@@ -1,105 +1,62 @@
 From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Wed, 23 Nov 2011 08:06:27 +0100
-Subject: [PATCH 13/17] ASoC: Tegra TrimSlice machine: Use devm_ APIs and
- module_platform_driver
-In-Reply-To: <1322011285-4002-14-git-send-email-swarren@nvidia.com>
+Date: Wed, 23 Nov 2011 08:15:28 +0100
+Subject: [PATCH 17/17] ASoC: Tegra+WM8903 machine: Add device tree binding
+In-Reply-To: <1322011285-4002-18-git-send-email-swarren@nvidia.com>
 References: <1322011285-4002-1-git-send-email-swarren@nvidia.com>
- <1322011285-4002-14-git-send-email-swarren@nvidia.com>
-Message-ID: <20111123070627.GF5255@avionic-0098.adnet.avionic-design.de>
+ <1322011285-4002-18-git-send-email-swarren@nvidia.com>
+Message-ID: <20111123071528.GA12558@avionic-0098.adnet.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 * Stephen Warren wrote:
-> module_platform_drive saves some boiler-plate code.
-
-Some here.
-
+> From: John Bonesio <bones@secretlab.ca>
 > 
-> The devm_ APIs remove the need to manually clean up allocations,
-> thus removing some code.
+> This driver is parameterized in two ways:
 > 
+> a) Platform data, which supplies a set of GPIOs used by the driver.
+>    These GPIOs can now be parsed out of device tree.
+> 
+> b) Machine-specific DAPM route arrays embedded into the ASoC machine
+>    driver itself. The driver picks the appropriate array to use using
+>    machine_is_*(). This array can now be parsed straight out of device
+>    tree, allowing the machine driver to be completely machine agnostic.
+> 
+> swarren applied the following modifications:
+> * Moved all pdata and DT parsing into one place.
+> * Added DAPM route parsing from DT.
+> * Added tegra_pcm device registration.
+> * Documented DT binding.
+> 
+> Signed-off-by: John Bonesio <bones@secretlab.ca>
+> Signed-off-by: Grant Likely <grant.likely@secretlab.ca>
 > Signed-off-by: Stephen Warren <swarren@nvidia.com>
 > ---
->  sound/soc/tegra/trimslice.c |   26 +++++++-------------------
->  1 files changed, 7 insertions(+), 19 deletions(-)
-> 
-> diff --git a/sound/soc/tegra/trimslice.c b/sound/soc/tegra/trimslice.c
-> index 2699a6f..d564b40 100644
-> --- a/sound/soc/tegra/trimslice.c
-> +++ b/sound/soc/tegra/trimslice.c
-> @@ -170,15 +170,17 @@ static __devinit int tegra_snd_trimslice_probe(struct platform_device *pdev)
->  	struct tegra_trimslice *trimslice;
->  	int ret;
->  
-> -	trimslice = kzalloc(sizeof(struct tegra_trimslice), GFP_KERNEL);
-> +	trimslice = devm_kzalloc(&pdev->dev, sizeof(struct tegra_trimslice),
-> +				 GFP_KERNEL);
->  	if (!trimslice) {
->  		dev_err(&pdev->dev, "Can't allocate tegra_trimslice\n");
-> -		return -ENOMEM;
-> +		ret = -ENOMEM;
-> +		goto err;
+>  .../bindings/sound/tegra-audio-wm8903.txt          |   63 +++++++++
+>  sound/soc/tegra/tegra_wm8903.c                     |  133 ++++++++++++++++----
+>  2 files changed, 171 insertions(+), 25 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/sound/tegra-audio-wm8903.txt
+[...]
+> diff --git a/sound/soc/tegra/tegra_wm8903.c b/sound/soc/tegra/tegra_wm8903.c
+[...]
+> @@ -262,6 +266,83 @@ static int tegra_wm8903_init(struct snd_soc_pcm_runtime *rtd)
+>  		return ret;
 >  	}
 >  
->  	ret = tegra_asoc_utils_init(&trimslice->util_data, &pdev->dev);
->  	if (ret)
-> -		goto err_free_trimslice;
-> +		goto err;
->  
->  	card->dev = &pdev->dev;
->  	platform_set_drvdata(pdev, card);
-> @@ -195,8 +197,7 @@ static __devinit int tegra_snd_trimslice_probe(struct platform_device *pdev)
->  
->  err_fini_utils:
->  	tegra_asoc_utils_fini(&trimslice->util_data);
-> -err_free_trimslice:
-> -	kfree(trimslice);
-> +err:
->  	return ret;
->  }
->  
-> @@ -209,8 +210,6 @@ static int __devexit tegra_snd_trimslice_remove(struct platform_device *pdev)
->  
->  	tegra_asoc_utils_fini(&trimslice->util_data);
->  
-> -	kfree(trimslice);
-> -
->  	return 0;
->  }
->  
-> @@ -222,18 +221,7 @@ static struct platform_driver tegra_snd_trimslice_driver = {
->  	.probe = tegra_snd_trimslice_probe,
->  	.remove = __devexit_p(tegra_snd_trimslice_remove),
->  };
-> -
-> -static int __init snd_tegra_trimslice_init(void)
-> -{
-> -	return platform_driver_register(&tegra_snd_trimslice_driver);
-> -}
-> -module_init(snd_tegra_trimslice_init);
-> -
-> -static void __exit snd_tegra_trimslice_exit(void)
-> -{
-> -	platform_driver_unregister(&tegra_snd_trimslice_driver);
-> -}
-> -module_exit(snd_tegra_trimslice_exit);
-> +module_platform_driver(tegra_snd_trimslice_driver);
->  
->  MODULE_AUTHOR("Mike Rapoport <mike@compulab.co.il>");
->  MODULE_DESCRIPTION("Trimslice machine ASoC driver");
-> -- 
-> 1.7.0.4
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-tegra" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
-> 
+> +	pdata = &machine->pdata;
+> +	np = card->dev->of_node;
+> +
+> +	if (card->dev->platform_data) {
+> +		*pdata = *(struct tegra_wm8903_platform_data *)
+> +						card->dev->platform_data;
+[...]
+
+Minor nit: perhaps this should use memcpy() instead?
+
+Thierry
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: not available
 Type: application/pgp-signature
 Size: 198 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111123/9a5fe6ca/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111123/679042e8/attachment.sig>
