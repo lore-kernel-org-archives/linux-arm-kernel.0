@@ -1,28 +1,287 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 23 Nov 2011 21:14:11 +0000
-Subject: [GIT PULL] Support for Cadence GEM in the MACB driver
-In-Reply-To: <20111121100020.GB7314@totoro>
-References: <20111121100020.GB7314@totoro>
-Message-ID: <201111232114.12124.arnd@arndb.de>
+From: mturquette@ti.com (Turquette, Mike)
+Date: Wed, 23 Nov 2011 13:30:53 -0800
+Subject: [PATCH v3 3/5] clk: introduce the common clock framework
+In-Reply-To: <4ECC6487.1060300@codeaurora.org>
+References: <1321926047-14211-1-git-send-email-mturquette@linaro.org>
+ <1321926047-14211-4-git-send-email-mturquette@linaro.org>
+ <4ECC6487.1060300@codeaurora.org>
+Message-ID: <CAJOA=zN0_cY8gmMN3YE=M9ktxokE3kBvU+5bzGU9b4JO_NO4cw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 21 November 2011, Jamie Iles wrote:
-> Hi Arnd,
-> 
-> Please consider pulling the patches to add support for Cadence GEM to 
-> the MACB driver.  These have been ready to go for a little while but got 
-> held up with the rename of Ethernet drivers in the last merge window.  
-> It would be great if we can get some exposure in -next for a little 
-> while before the next merge window.
+On Tue, Nov 22, 2011 at 7:12 PM, Saravana Kannan <skannan@codeaurora.org> wrote:
+> On 11/21/2011 05:40 PM, Mike Turquette wrote:
+>> +void __clk_unprepare(struct clk *clk)
+>> +{
+>> + ? ? ? if (!clk)
+>> + ? ? ? ? ? ? ? return;
+>> +
+>> + ? ? ? if (WARN_ON(clk->prepare_count == 0))
+>> + ? ? ? ? ? ? ? return;
+>> +
+>> + ? ? ? if (--clk->prepare_count> ?0)
+>
+> Space before ">"?
 
-Hi Jamie,
+Will fix all spacing errors in v4.
 
-I was actually meaning to pull these in time for 3.2, but for some reason
-this got dropped on the floor when I was travelling just before
-and during the merge window.
+>> +int __clk_enable(struct clk *clk)
+>> +{
+>> + ? ? ? int ret = 0;
+>> +
+>> + ? ? ? if (!clk)
+>> + ? ? ? ? ? ? ? return 0;
+>> +
+>> + ? ? ? if (WARN_ON(clk->prepare_count == 0))
+>> + ? ? ? ? ? ? ? return -ESHUTDOWN;
+>
+> EPERM? EBADFD?
 
-Anyway, I've pulled them into the next/driver branch of the arm-soc tree
-now. Thanks for your patience!
+This came from discussion out of Jeremy's original patches and I'm
+inclined to keep it there.
 
-	Arnd
+>> +unsigned long clk_get_rate(struct clk *clk)
+>> +{
+>> + ? ? ? if (!clk)
+>> + ? ? ? ? ? ? ? return 0;
+>> +
+>> + ? ? ? return clk->rate;
+>
+> I think you need to grab the prepare_mutex here too. Otherwise another call
+> to clk_set_rate() could be changing clk->rate while it's being read here. It
+> shouldn't be a problem in ARM where I think 32bit reads are atomic. But I'm
+> not sure you can say the same for all archs.
+
+Hmm, need to decide if code calling this will likely hold the mutex
+itself.  The comment can be updated to say "caller must hold
+prepare_mutex", but that may be undo burden for a driver that just
+wants to know a clk rate.  Thoughts?
+
+>> +/**
+>> + * clk_recalc_rates
+>> + * @clk: first clk in the subtree
+>> + *
+>> + * Walks the subtree of clks starting with clk and recalculates rates as
+>> it
+>> + * goes. ?Note that if a clk does not implement the recalc_rate operation
+>> then
+>> + * propagation of that subtree stops and all of that clks children will
+>> not
+>> + * have their rates updated. ?Caller must hold prepare_lock.
+>
+> May be call this functions __clk_recalc_rates() to match the naming
+> convention of the other fns that don't grab locks?
+
+Other functions have __private_func syntax for one of two reasons:
+
+1) the outer function holds a lock, and sometimes we want to access
+the inner function from some other code path that avoids nested
+locking (e.g. clk_enable)
+
+2) the outer function sets up some staging data for a recursive
+mechanism to use (e.g. clk_set_rate)
+
+clk_recalc_rates doesn't hold a lock nor does it have staging data, so
+it would just end up looking like:
+
+__clk_recalc_rates(struct clk *clk)
+{
+do the real work
+}
+
+clk_recalc_rates(struct clk *clk)
+{
+__clk_recalc_rates(clk)
+}
+
+There is no obvious gain for splitting the function.
+
+>
+>> + */
+>> +static void clk_recalc_rates(struct clk *clk)
+>> +{
+>> + ? ? ? unsigned long old_rate;
+>> + ? ? ? struct hlist_node *tmp;
+>> + ? ? ? struct clk *child;
+>> +
+>> + ? ? ? old_rate = clk->rate;
+>> +
+>> + ? ? ? if (clk->ops->recalc_rate)
+>> + ? ? ? ? ? ? ? clk->rate = clk->ops->recalc_rate(clk);
+>
+> Any reason you can't just do "else return" instead of the check below? That
+> would be more straight-forward and also remove the need for old_rate.
+
+old_rate doesn't protect against not having a .recalc_rate pointer.
+It is an optimization for when a clks rate hasn't changed and there is
+no reason to traverse the tree.  In the case where there is no
+.recalc_rate pointer then it serves the dual-purpose of bailing out
+early.
+
+>> +struct clk *__clk_set_rate(struct clk *clk, unsigned long rate)
+>> +{
+>> + ? ? ? struct clk *fail_clk = NULL;
+>> + ? ? ? int ret;
+>> + ? ? ? unsigned long old_rate = clk->rate;
+>> + ? ? ? unsigned long new_rate;
+>> + ? ? ? unsigned long parent_old_rate;
+>> + ? ? ? unsigned long parent_new_rate = 0;
+>> + ? ? ? struct clk *child;
+>> + ? ? ? struct hlist_node *tmp;
+>> +
+>> + ? ? ? /* bail early if we can't change rate while clk is enabled */
+>> + ? ? ? if ((clk->flags& ?CLK_GATE_SET_RATE)&& ?clk->enable_count)
+>> + ? ? ? ? ? ? ? return clk;
+>
+> Spacing fix near & and &&.
+
+Will fix in V4.
+
+>
+>> +
+>> + ? ? ? /* find the new rate and see if parent rate should change too */
+>> + ? ? ? WARN_ON(!clk->ops->round_rate);
+>
+> It looks like you don't consider absence of round_rate as an error (going by
+> clk_round_rate()), so why warn on this? See below for additional comments.
+>
+>> + ? ? ? new_rate = clk->ops->round_rate(clk, rate,&parent_new_rate);
+
+The above will cause a NULL ptr deref if you don't have a .round_rate
+defined, so I'd say having .round_rate isn't very optional for
+clk_set_rate support :-)
+
+The question is, should it be?  For very simple clocking schemes where
+the PLL locking rates will never vary from board to board or the
+oscillators won't get changed across products... I guess it's not
+necessary.  I can conditionally check for it before calling unless
+others feel that .round_rate should be mandatory for .set_rate.  Need
+feedback on that.
+
+>
+> Should we split the "figuring out the parent rate" and "round rate"?
+
+No.  These two are inherently linked.  If you set them independently
+you will have some crazy code trying to make sure that the clk's rate
+and the parent's rate that are being programmed make sense.  Best to
+control is centrally.
+
+> If any clock driver doesn't care for propagation (too simple clock tree or
+> very versatile clock tree), and doesn't want to implement ops->round_rate,
+> this code is still forcing them to implement ops->round_rate(). But then
+> clk_round_rate() thinks it's okay if that ops->round_rate() is not
+> implemented. This is a bit inconsistent.
+>
+> May be we should just add ops->propagate_parent() that is optional and takes
+
+I don't like this at all.  ops->propagate_parent() would just be
+another call to __clk_set_rate, so why obscure it?  I encourage you to
+convert your platform over to this code and try it on for size first;
+I think it will do the job for you.
+
+> in the result of ops->round_rate()? If a clock needs propagation, it will
+> implement and return the new parent rate.
+>
+>> +int clk_set_rate(struct clk *clk, unsigned long rate)
+>> +{
+>> + ? ? ? struct clk *fail_clk;
+>> + ? ? ? int ret = 0;
+>> +
+>> + ? ? ? if (!clk->ops->set_rate)
+>> + ? ? ? ? ? ? ? return -ENOSYS;
+>> +
+>> + ? ? ? /* bail early if nothing to do */
+>> + ? ? ? if (rate == clk->rate)
+>> + ? ? ? ? ? ? ? return rate;
+>
+> This check needs to be after the lock is taken.
+
+Will fix in v4.
+
+>
+>> +
+>> + ? ? ? /* prevent racing with updates to the clock topology */
+>> + ? ? ? mutex_lock(&prepare_lock);
+>> + ? ? ? fail_clk = __clk_set_rate(clk, rate);
+>> + ? ? ? if (fail_clk) {
+>> + ? ? ? ? ? ? ? pr_warn("%s: failed to set %s rate to %lu\n",
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? __func__, fail_clk->name, rate);
+>
+> Going by the current implementation, the "fail_clk" is not necessarily the
+> same as "clk". But the "rate" you are printing is always the rate for "clk".
+
+Since this isn't python and we're not returning multiple values from a
+function call I'll just change the error to:
+
+pr_warn("%s: failed to set %s rate\n", __func__, fail_clk->name);
+
+>
+> if (fail_clk == clk)
+> ?print blah
+> else
+> ?print blah bloo
+>
+> ?
+>
+>> +struct clk *clk_get_parent(struct clk *clk)
+>> +{
+>> + ? ? ? if (!clk)
+>> + ? ? ? ? ? ? ? return NULL;
+>> +
+>> + ? ? ? return clk->parent;
+>
+> Same comment as get_rate(). I think this needs locking too to avoid maligned
+> reads.
+
+I'm not so sure.  clk_get_rate is more difficult because I can imagine
+driver code calling that for any number of reasons, so maybe the
+locking should be in that function.
+
+However clk_get_parent is a different beast. If you want the parent
+pointer then odds are that you are already holding the prepare_mutex.
+Again I feel that the comment should just be updated to say "caller
+must hold prepare_mutex".  Objections to this approach?
+
+>
+>> +}
+>> +EXPORT_SYMBOL_GPL(clk_get_parent);
+>> +
+>> +void __clk_reparent(struct clk *clk, struct clk *new_parent)
+>> +{
+>> + ? ? ? hlist_del(&clk->child_node);
+>> + ? ? ? hlist_add_head(&clk->child_node,&new_parent->children);
+>
+> Check new_parent != NULL before trying to add the clock to its children
+> list?
+
+Will add to v4.
+
+>> +int clk_set_parent(struct clk *clk, struct clk *parent)
+>> +{
+>> + ? ? ? int ret = 0;
+>> +
+>> + ? ? ? if (!clk || !clk->ops)
+>
+> I would like NULL clocks to be treated as real/proper clocks. So, can we
+> split this into two "if"s please? And return 0 for (!clk)?
+
+Eww that's gross. How about include/linux/clk.h has an "extern struct
+clk dummy_clk" that has no ops and no parent and you can use to stub
+out support for clks that you don't really manage.  I'd prefer that
+over treating NULL clks as legit.
+
+>
+>> + ? ? ? ? ? ? ? return -EINVAL;
+>> +
+>> + ? ? ? if (!clk->ops->set_parent)
+>> + ? ? ? ? ? ? ? return -ENOSYS;
+>> +
+>> + ? ? ? if (clk->parent == parent)
+>> + ? ? ? ? ? ? ? return 0;
+>
+> This check should be done after taking the lock.
+
+Will fix in V4.
+
+Thanks for the review,
+Mike
