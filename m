@@ -1,101 +1,100 @@
-From: conqrx@gmail.com (=?ISO-8859-1?B?TW9sbuFyIEfhYm9y?=)
-Date: Wed, 23 Nov 2011 15:14:06 +0100
-Subject: Porting the 2.6.38 linux kernel to ARM11 MPcore
-In-Reply-To: <CAK-0apaX6gPrHPWiE6zDCey7NvnMU2J5fOR0OXr_ZQCc+TUmyA@mail.gmail.com>
-References: <CAK-0apYKjvxXasEfYCocjqEan5dKoXJgMON2gC-nMenKQaU9UQ@mail.gmail.com>
- <CAHkRjk491+H9Wh-uV8807VSkZ4Mk+UK3Jv6EThtOsRb7ULpUjg@mail.gmail.com>
- <CAK-0apaX6gPrHPWiE6zDCey7NvnMU2J5fOR0OXr_ZQCc+TUmyA@mail.gmail.com>
-Message-ID: <CAK-0apbxgJj6JHXOCaLf0tPgw3nPrBRnkYB23-brsRmdbBLz5g@mail.gmail.com>
+From: carsten.behling@garz-fricke.com (Carsten Behling)
+Date: Wed, 23 Nov 2011 15:21:52 +0100
+Subject: AW: [PATCH v5 3/4] drivers/i2c/busses/i2c-at91.c: add new driver
+In-Reply-To: <EF2E73589CA71846A15D0B2CDF79505D087B40D349@wm021.weinmann.com>
+References: <D99582E5322435468A77E74BB0039E7B1D1655BF4D@SRV02.hamburg.garz-fricke.de>
+ <EF2E73589CA71846A15D0B2CDF79505D087B40D16B@wm021.weinmann.com>
+ <D99582E5322435468A77E74BB0039E7B1D1655BFBB@SRV02.hamburg.garz-fricke.de>
+ <EF2E73589CA71846A15D0B2CDF79505D087B40D349@wm021.weinmann.com>
+Message-ID: <D99582E5322435468A77E74BB0039E7B1D1655C047@SRV02.hamburg.garz-fricke.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Does your physical RAM start at 0xc0000000 and it is all ignored?
-> Setting highmem would fix as all your lowmem (including the kernel
-> code) would be unmapped, hence the fault. What's the VMALLOC_END
-> defined to?
+Hi,
 
-#define VMALLOC_END             0xf8000000
+I try to use the at24 eeprom driver on top of this driver.
 
-For the platform i use. The size of vmalloc is the default (128MB).
+This EEPROM (24c32) works with two address bytes.
 
-If HIGHMEM is not set, this area is executed:
+Writing results in a call to at91_twi_xfer() with num=1.
+In this case the internal address register is not used and the address is sent out within the buffer.
 
->/*
->792                  * Check whether this memory bank would entirely overlap
->793                  * the vmalloc area.
->794                  */
->795                 if (__va(bank->start) >= vmalloc_min ||
->796                     __va(bank->start) < (void *)PAGE_OFFSET) {
->797                         printk(KERN_NOTICE "Ignoring RAM at %.8lx-%.8lx "
->798                                "(vmalloc region overlap).\n",
->799                                bank->start, bank->start + bank->size - 1);
->800                         continue;
->801                 }
+Reading results in a call to at91_twi_xfer() with num=2.
+In this case the internal address register is used.
 
-static void * __initdata vmalloc_min = (void *)(VMALLOC_END - SZ_128M);
+However the MSB of the internal address resides in msg->buf[0] and the LSB resides in msg->buf[1] of the first message.
 
-The kernel is loaded on the phisical address: 0xc0000000-0xc05000000.
-(This region is given as atag_mem as well).
+As a result the code:
 
-At the current configuration i believe vmalloc should be at
-0xF0000000-0xF8000000.
++		for (i = 0; i < msg->len; ++i) {
++			internal_address |= ((unsigned)msg->buf[i]) << (8 * i);
++			int_addr_flag += AT91_TWI_IADRSZ_1;
++		}
++		at91_twi_write(dev, AT91_TWI_IADR, internal_address);
 
-Why does this overlap with 0xC0000000-0xC0500000?
+constructs an internal address in a wrong byte order.
+
+Example: Try to read from address 0x100:
+
+msg[0]->buf[0] = 0x1; 
+msg[0]->buf[1] = 0x0;
+
+results in
+
+internal_address = 0x1;
+
+I think it must be:
+
++		for (i = 0; i < msg->len; ++i) {
++			internal_address |= ((unsigned)msg->buf[msg->len-1-i]) << (8 * i);
++			int_addr_flag += AT91_TWI_IADRSZ_1;
++		}
++		at91_twi_write(dev, AT91_TWI_IADR, internal_address);
+
+... or the at24 eeprom driver constructs the wrong internal address ...
+
+Mit freundlichen Gr??en / Best regards
+Carsten Behling
+
+Development Engineer
+Garz & Fricke GmbH
+Tempowerkring 2, 21079 Hamburg - Germany
+Amtsgericht Hamburg HRB 60514
+Gesch?ftsf?hrer: Manfred Garz, Matthias Fricke
+Phone: +49 (0) 40 791 899 - 56
+Fax:    +49 40 / 791 899 - 39
+www.garz-fricke.com 
+
+ 
 
 
+-----Urspr?ngliche Nachricht-----
+Von: Voss, Nikolaus [mailto:N.Voss at weinmann.de] 
+Gesendet: Mittwoch, 23. November 2011 11:29
+An: Carsten Behling
+Cc: 'linux-i2c at vger.kernel.org'; 'linux-arm-kernel at lists.infradead.org'; 'linux-kernel@vger.kernel.org'
+Betreff: RE: [PATCH v5 3/4] drivers/i2c/busses/i2c-at91.c: add new driver
 
-2011/11/22 Moln?r G?bor <conqrx@gmail.com>:
-> Thank you for your reply!
->
-> 2011/11/21 Catalin Marinas <catalin.marinas@arm.com>:
->> On 18 November 2011 11:54, Moln?r G?bor <conqrx@gmail.com> wrote:
->>> im working on a project wich aims at porting the 2.6.38 kernel to an
->>> arm11 mpcore based board.
->>>
->>> The kernel fails to boot, in the paging_init func, it throws an
->>> exception (pc: FFFF_000C) when executing the third mcr instruction in
->>> the list below:
->>>
->>> 0xc000bf34 ?<>: ? ?blx ?r3
->>> 0xc000bf38 ?<>: ? ?mov ?r5, #0 ?; 0x0
->>> 0xc000bf3c ?<>: ? ?mcr ?15, 0, r5, cr7, cr10, {4}
->>> 0xc000bf40 ?<>: ? ?mcr ?15, 0, r5, cr8, cr6, {0}
->>> 0xc000bf44 ?<>: ? ?mcr ?15, 0, r5, cr8, cr5, {0} //throws an exception
->>> here, Invalidate Instruction TLB Register
->>> 0xc000bf48 ?<>: ? ?mcr ?15, 0, r5, cr7, cr5, {6}
->>> 0xc000bf4c ?<>: ? ?mcr ?15, 0, r5, cr7, cr10, {4}
->>> 0xc000bf50 ?<>: ? ?mcr ?15, 0, r5, cr7, cr5, {4}
->>> 0xc000bf54 ?<>: ? ?ldr ?lr, [pc, #176] ?; 0xc000c00c
->>
->> So you get a prefetch abort as soon as the TLBs are invalidated, which
->> means that the page table is not set up correctly.
->>
->> What's your RAM configuration (start address, size)?
->
-> In the current configuration the start address is c0000000 and the
-> size is 500000.
-> The .elf kernel image is loaded at the c0008000 'start' address.
->
->>> The kernel has been patched with the 2.6.38-arm1 patch, and configured
->>> to be as minimal as possible (the vmlinux.elf is 1.8MB) and
->>> cross-compiled with the?Codesourcery gcc toolchain.
->>> The minimal size is improtant because the aim is to make the kernel
->>> run with only 5-6MB of memory (from c0000000 to c0500000).
->>> The 'boot_loader' i wrote passes the atag pointers (basically core and
->>> memory) and the kernel seemingly reads and parses them fine. The
->>> __log_buf before the exception:
->>>
->>> <5>Linux version 2.6.38-rc8 (VirtualBox) (gcc version 4.5.2 (Sourcery
->>> G++ Lite 2011.03-41) ) #6 Wed Nov 9 21:59:29 CET 2011
->>> <4>CPU: ARMv6-compatible processor [410fb025] revision 5 (ARMv7), cr=08c5387f"
->>> <4>CPU: VIPT nonaliasing data cache, VIPT aliasing instruction cache
->>> <4>Machine: ARM-RealView PB11MPCore
->>> <5>Ignoring RAM at c0000000-c04fffff (vmalloc region overlap).
->>
->> Does your physical RAM start at 0xc0000000 and it is all ignored?
->> Setting highmem would fix as all your lowmem (including the kernel
->> code) would be unmapped, hence the fault. What's the VMALLOC_END
->> defined to?
->
-> Yes it seems to be all ignored, i will check VMALLOC_END as soon as i can.
->
+Hi,
+
+Carsten Behling wrote on 2011-11-23:
+
+>> this case is already catched in at91_do_twi_transfer():
+> 
+> Sorry, I did not found this code in your patch.
+> (http://www.mail-archive.com/linux-i2c at vger.kernel.org/msg06556.html):
+> 
+>> +       if (is_read) {
+>> +               if (!dev->buf_len)
+
+yes, this won't work for buf_len == 1. It is corrected in
+https://lkml.org/lkml/2011/11/18/223 which I held back for some time
+as it should have been just a feature extension. I was not aware it
+also fixed the buf_len = 1 bug. Sorry for that...
+
+(Explanation: in the first implementation I immediately decremented
+buf_len, so buf_len == 1 could not occur. Later I removed that but
+did not fully fold it into the base patch.)
+
+Thanks,
+Niko
