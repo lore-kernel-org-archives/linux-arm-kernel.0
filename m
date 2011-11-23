@@ -1,66 +1,63 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 23 Nov 2011 10:20:28 +0000
-Subject: [PATCH 04/17] ASoC: Add device tree binding for WM8903
-In-Reply-To: <1322011285-4002-5-git-send-email-swarren@nvidia.com>
-References: <1322011285-4002-1-git-send-email-swarren@nvidia.com>
- <1322011285-4002-5-git-send-email-swarren@nvidia.com>
-Message-ID: <20111123102027.GB4332@opensource.wolfsonmicro.com>
+From: chaos.youn@samsung.com (Changhwan Youn)
+Date: Wed, 23 Nov 2011 19:21:37 +0900
+Subject: [PATCH] ARM: Add TLB flushing for both entries in a PMD
+In-Reply-To: <20111116103810.12733.23637.stgit@e102109-lin.cambridge.arm.com>
+References: <20111116103810.12733.23637.stgit@e102109-lin.cambridge.arm.com>
+Message-ID: <004d01cca9c9$aeeb0420$0cc10c60$%youn@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 22, 2011 at 06:21:12PM -0700, Stephen Warren wrote:
+Hi,
 
-> +  - irq-active-low : Indicates whether the IRQ output should be active low
-> +    (property present) or active high (property absent).
+I have tested this patch on several exynos machines which 
+have a9 cores and it worked fine.
+Though I'm not sure that android boot and running simple applications
+are enough test for this patch.
 
-I think we ought to be coming up with a standard binding for this stuff 
-rather than having every device defining it's own way of plugging the
-interrupt lines together - many devices have lots of flexibility with
-how their interrupt line signals for compatibility reasons.
-
-> +  - gpio-cfg : A list of GPIO pin mux register values. The list must be 5
-> +    entries long. If absent, no configuration of these registers is
-> +    performed.
-
-What's a "GPIO pin mux"?
-
-> +	/* 0x8000 = Not configured */
-> +	gpio-cfg = < 0x8000 0x8000 0 0x8000 0x8000 >;
-
-The 0x8000 isn't documented in the binding and this doesn't seem
-terribly idiomatic for device tree.
-
-> -static void wm8903_init_gpio(struct snd_soc_codec *codec)
-> +static void wm8903_init_gpio(struct snd_soc_codec *codec,
-> +			     struct wm8903_platform_data *pdata)
-
-Why?
-
->  static int wm8903_probe(struct snd_soc_codec *codec)
+On Wednesday, November 16, 2011 7:38 PM, Catalin Marinas wrote:
+> 
+> Linux uses two PMD entries for a PTE with the classic page table format,
+> covering 2MB range. However, the __pte_free_tlb() function only adds a
+> single TLB flush corresponding to 1MB range covering 'addr'. On
+> Cortex-A15, level 1 entries can be cached by the TLB independently of
+> the level 2 entries and without additional flushing a PMD entry would be
+> left pointing at the wrong PTE. The patch limits the TLB flushing range
+> to two 4KB pages around the 1MB boundary within PMD.
+> 
+> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+> ---
+>  arch/arm/include/asm/tlb.h |   10 +++++++++-
+>  1 files changed, 9 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/tlb.h b/arch/arm/include/asm/tlb.h
+> index 265f908..0504364 100644
+> --- a/arch/arm/include/asm/tlb.h
+> +++ b/arch/arm/include/asm/tlb.h
+> @@ -198,7 +198,15 @@ static inline void __pte_free_tlb(struct mmu_gather *tlb,
+pgtable_t pte,
+>  	unsigned long addr)
 >  {
->  	struct wm8903_platform_data *pdata = dev_get_platdata(codec->dev);
-> +	struct wm8903_platform_data lpdata;
+>  	pgtable_page_dtor(pte);
+> -	tlb_add_flush(tlb, addr);
+> +
+> +	/*
+> +	 * With the classic ARM MMU, a pte page has two corresponding pmd
+> +	 * entries, each covering 1MB.
+> +	 */
+> +	addr &= PMD_MASK;
+> +	tlb_add_flush(tlb, addr + SZ_1M - PAGE_SIZE);
 
-Why and what is "lpdata" supposed to mean?
+The address of tlb_add_flush is modified from 'addr' to 'addr + SZ_1M -
+PAGE_SIZE'.
+Is the previous implementation wrong or just the address of tlb_add_flush is not
+important
+if it's in the same PMD?
 
-> +	if (!pdata && codec->dev->of_node) {
-> +		lpdata.irq_active_low = 0;
-> +		lpdata.micdet_cfg = 0;
+> +	tlb_add_flush(tlb, addr + SZ_1M);
+> +
+>  	tlb_remove_page(tlb, pte);
+>  }
+> 
 
-This should be set by default.
-
-> +		lpdata.micdet_delay = 100;
-> +		lpdata.gpio_base = -1;
-
-This means that the defaults are in different different places if we
-have platform data and if we have device tree.  We should restructure
-the code so that we only have defaults in one place.
-
-> +		if (of_property_read_u32(np, "micdet-cfg", &val32) >= 0)
-> +			lpdata.micdet_cfg = val32;
-
-I'd rather have defaults as an else case I think.
-
-> +#if defined(CONFIG_OF)
-
-ifdef.
+Regards,
+Changhwan
