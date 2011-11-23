@@ -1,27 +1,34 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Wed, 23 Nov 2011 12:27:31 +0200
-Subject: [PATCH 0/7] Introducing a generic AMP framework
-In-Reply-To: <4ECC67B9.4050306@codeaurora.org>
-References: <1319536106-25802-1-git-send-email-ohad@wizery.com>
- <4ECC67B9.4050306@codeaurora.org>
-Message-ID: <CAK=WgbYyrbZLmDOx8yKWwjhn2MYN8669FDRvsYZSyLj1equcTw@mail.gmail.com>
+From: N.Voss@weinmann.de (Voss, Nikolaus)
+Date: Wed, 23 Nov 2011 11:28:47 +0100
+Subject: [PATCH v5 3/4] drivers/i2c/busses/i2c-at91.c: add new driver
+In-Reply-To: <D99582E5322435468A77E74BB0039E7B1D1655BFBB@SRV02.hamburg.garz-fricke.de>
+References: <D99582E5322435468A77E74BB0039E7B1D1655BF4D@SRV02.hamburg.garz-fricke.de>
+ <EF2E73589CA71846A15D0B2CDF79505D087B40D16B@wm021.weinmann.com>
+ <D99582E5322435468A77E74BB0039E7B1D1655BFBB@SRV02.hamburg.garz-fricke.de>
+Message-ID: <EF2E73589CA71846A15D0B2CDF79505D087B40D349@wm021.weinmann.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 23, 2011 at 5:25 AM, Saravana Kannan <skannan@codeaurora.org> wrote:
-> Sorry for the rant, this naming just rubs me the wrong way. I definitely
-> appreciate the idea behind these patches.
+Hi,
 
-I don't share the same naming concerns you have (if any, then
-confusion with the bluetooth AMP patches and prefixes is more of a
-concern to me), but I don't care deeply about names.
+Carsten Behling wrote on 2011-11-23:
 
-Feel free to offer a different name, though really 'amp' here only
-describes the general model and motivation and is rarely used
-throughout the code; we mostly either use 'remoteproc' or 'rpmsg',
-which respectively refer to the two frameworks that are being added
-(the former responsible for controlling the state of the remote
-processors, and the latter for communicating with them).
+>> this case is already catched in at91_do_twi_transfer():
+> 
+> Sorry, I did not found this code in your patch.
+> (http://www.mail-archive.com/linux-i2c at vger.kernel.org/msg06556.html):
+> 
+>> +       if (is_read) {
+>> +               if (!dev->buf_len)
+
+yes, this won't work for buf_len == 1. It is corrected in
+https://lkml.org/lkml/2011/11/18/223 which I held back for some time
+as it should have been just a feature extension. I was not aware it
+also fixed the buf_len = 1 bug. Sorry for that...
+
+(Explanation: in the first implementation I immediately decremented
+buf_len, so buf_len == 1 could not occur. Later I removed that but
+did not fully fold it into the base patch.)
 
 Thanks,
-Ohad.
+Niko
