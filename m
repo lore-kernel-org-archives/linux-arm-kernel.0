@@ -1,38 +1,29 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 23 Nov 2011 11:19:19 -0800
-Subject: [PATCH v3 5/5] clk: export tree topology and clk data via sysfs
-In-Reply-To: <20111123190954.GA4365@opensource.wolfsonmicro.com>
-References: <1321926047-14211-1-git-send-email-mturquette@linaro.org>
- <1321926047-14211-6-git-send-email-mturquette@linaro.org>
- <20111122154900.GB18954@kroah.com>
- <CAPtuhThPQtWwihE8aGru55k87oV7QOr=O836TTJ+=30d6dtVhA@mail.gmail.com>
- <20111122191347.GB4844@kroah.com>
- <20111123165903.GF31337@atomide.com>
- <20111123180651.GB19739@n2100.arm.linux.org.uk>
- <20111123185518.GG31337@atomide.com>
- <20111123190954.GA4365@opensource.wolfsonmicro.com>
-Message-ID: <20111123191919.GH31337@atomide.com>
+From: mad_soft@inbox.ru (Dmitry Artamonow)
+Date: Wed, 23 Nov 2011 23:51:44 +0400
+Subject: [PATCH v3 1/2] pxa/hx4700: Add Synaptics NavPoint (PXA27x
+ SSP/SPI) driver
+In-Reply-To: <1322066725.99549.YahooMailClassic@web29017.mail.ird.yahoo.com>
+References: <1322066725.99549.YahooMailClassic@web29017.mail.ird.yahoo.com>
+Message-ID: <20111123195144.GB9918@rainbow>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Mark Brown <broonie@opensource.wolfsonmicro.com> [111123 10:34]:
-> On Wed, Nov 23, 2011 at 10:55:19AM -0800, Tony Lindgren wrote:
-> > * Russell King - ARM Linux <linux@arm.linux.org.uk> [111123 09:31]:
+On 16:45 Wed 23 Nov     , Paul Parsons wrote:
+> Add support for the Synaptics NavPoint touchpad connected to a PXA27x SSP port
+> in SPI slave mode. The driver implements a simple navigation pad. The four
+> raised dots are mapped to UP/DOWN/LEFT/RIGHT buttons and the centre of the
+> touchpad is mapped to the ENTER button.
 > 
-> > > Keep the clk API as a fundamental thing which should be initialized early
-> > > so we don't have to invent new clk APIs to get around its unavailability.
-> 
-> > What else are you aware of that is really needed early for clocks other
-> > than clockevent?
-> 
-> If nothing else we'd have to resolve all the device probe ordering
-> issues (Grant's patches seem a bit stalled) and convert all the systems
-> using the API to handle deferring probes until their clocks appear.
-> Using an early initcall of some kind would help with that but it does
-> seem like a lot of trouble and I'd expect it'll end up getting forced in
-> on most systems anyway.
+> Signed-off-by: Paul Parsons <lost.distance@yahoo.com>
+> ---
 
-Yes the ordering depends on the system. In any case, initcalls are
-not super early compared to setup_timer.
+Both patches look good to me. Sadly, I can't test them as Navpoint on my
+hx4700 is broken for a long time :(
 
-Tony
+BTW, it's funny that driver is placed in input/mouse, but actually
+reports only keyboard events :)
+Anyway, reporting coordinates can be added at some later point.
+
+-- 
+Best regards,
+Dmitry "MAD" Artamonow
