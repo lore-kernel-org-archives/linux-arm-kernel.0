@@ -1,10 +1,10 @@
 From: swarren@nvidia.com (Stephen Warren)
-Date: Tue, 22 Nov 2011 18:21:15 -0700
-Subject: [PATCH 07/17] ASoC: Tegra DAS: Use devm_ APIs and
+Date: Tue, 22 Nov 2011 18:21:16 -0700
+Subject: [PATCH 08/17] ASoC: Tegra I2S: Use devm_ APIs and
  module_platform_driver
 In-Reply-To: <1322011285-4002-1-git-send-email-swarren@nvidia.com>
 References: <1322011285-4002-1-git-send-email-swarren@nvidia.com>
-Message-ID: <1322011285-4002-8-git-send-email-swarren@nvidia.com>
+Message-ID: <1322011285-4002-9-git-send-email-swarren@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,109 +15,125 @@ thus removing some code.
 
 Signed-off-by: Stephen Warren <swarren@nvidia.com>
 ---
- sound/soc/tegra/tegra_das.c |   45 +++++++++---------------------------------
+ sound/soc/tegra/tegra_i2s.c |   45 +++++++++---------------------------------
  1 files changed, 10 insertions(+), 35 deletions(-)
 
-diff --git a/sound/soc/tegra/tegra_das.c b/sound/soc/tegra/tegra_das.c
-index 3b55a44..fa3a442 100644
---- a/sound/soc/tegra/tegra_das.c
-+++ b/sound/soc/tegra/tegra_das.c
-@@ -172,11 +172,11 @@ static int __devinit tegra_das_probe(struct platform_device *pdev)
- 	if (das)
- 		return -ENODEV;
+diff --git a/sound/soc/tegra/tegra_i2s.c b/sound/soc/tegra/tegra_i2s.c
+index 33e62fc..76014f0 100644
+--- a/sound/soc/tegra/tegra_i2s.c
++++ b/sound/soc/tegra/tegra_i2s.c
+@@ -362,11 +362,11 @@ static __devinit int tegra_i2s_platform_probe(struct platform_device *pdev)
+ 		return -EINVAL;
+ 	}
  
--	das = kzalloc(sizeof(struct tegra_das), GFP_KERNEL);
-+	das = devm_kzalloc(&pdev->dev, sizeof(struct tegra_das), GFP_KERNEL);
- 	if (!das) {
- 		dev_err(&pdev->dev, "Can't allocate tegra_das\n");
+-	i2s = kzalloc(sizeof(struct tegra_i2s), GFP_KERNEL);
++	i2s = devm_kzalloc(&pdev->dev, sizeof(struct tegra_i2s), GFP_KERNEL);
+ 	if (!i2s) {
+ 		dev_err(&pdev->dev, "Can't allocate tegra_i2s\n");
  		ret = -ENOMEM;
 -		goto exit;
 +		goto err;
  	}
- 	das->dev = &pdev->dev;
+ 	dev_set_drvdata(&pdev->dev, i2s);
  
-@@ -184,22 +184,22 @@ static int __devinit tegra_das_probe(struct platform_device *pdev)
- 	if (!res) {
- 		dev_err(&pdev->dev, "No memory resource\n");
- 		ret = -ENODEV;
+@@ -374,7 +374,7 @@ static __devinit int tegra_i2s_platform_probe(struct platform_device *pdev)
+ 	if (IS_ERR(i2s->clk_i2s)) {
+ 		dev_err(&pdev->dev, "Can't retrieve i2s clock\n");
+ 		ret = PTR_ERR(i2s->clk_i2s);
 -		goto err_free;
 +		goto err;
  	}
  
--	region = request_mem_region(res->start, resource_size(res),
--					pdev->name);
-+	region = devm_request_mem_region(&pdev->dev, res->start,
-+					 resource_size(res), pdev->name);
- 	if (!region) {
+ 	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+@@ -391,19 +391,19 @@ static __devinit int tegra_i2s_platform_probe(struct platform_device *pdev)
+ 		goto err_clk_put;
+ 	}
+ 
+-	memregion = request_mem_region(mem->start, resource_size(mem),
+-					DRV_NAME);
++	memregion = devm_request_mem_region(&pdev->dev, mem->start,
++					    resource_size(mem), DRV_NAME);
+ 	if (!memregion) {
  		dev_err(&pdev->dev, "Memory region already claimed\n");
  		ret = -EBUSY;
--		goto err_free;
-+		goto err;
+ 		goto err_clk_put;
  	}
  
--	das->regs = ioremap(res->start, resource_size(res));
-+	das->regs = devm_ioremap(&pdev->dev, res->start, resource_size(res));
- 	if (!das->regs) {
+-	i2s->regs = ioremap(mem->start, resource_size(mem));
++	i2s->regs = devm_ioremap(&pdev->dev, mem->start, resource_size(mem));
+ 	if (!i2s->regs) {
  		dev_err(&pdev->dev, "ioremap failed\n");
  		ret = -ENOMEM;
 -		goto err_release;
-+		goto err;
++		goto err_clk_put;
  	}
  
- 	tegra_das_debug_add(das);
-@@ -208,32 +208,18 @@ static int __devinit tegra_das_probe(struct platform_device *pdev)
+ 	i2s->capture_dma_data.addr = mem->start + TEGRA_I2S_FIFO2;
+@@ -422,43 +422,29 @@ static __devinit int tegra_i2s_platform_probe(struct platform_device *pdev)
+ 	if (ret) {
+ 		dev_err(&pdev->dev, "Could not register DAI: %d\n", ret);
+ 		ret = -ENOMEM;
+-		goto err_unmap;
++		goto err_clk_put;
+ 	}
+ 
+ 	tegra_i2s_debug_add(i2s, pdev->id);
  
  	return 0;
  
+-err_unmap:
+-	iounmap(i2s->regs);
 -err_release:
--	release_mem_region(res->start, resource_size(res));
+-	release_mem_region(mem->start, resource_size(mem));
+ err_clk_put:
+ 	clk_put(i2s->clk_i2s);
 -err_free:
--	kfree(das);
-+err:
- 	das = NULL;
+-	kfree(i2s);
 -exit:
++err:
  	return ret;
  }
  
- static int __devexit tegra_das_remove(struct platform_device *pdev)
+ static int __devexit tegra_i2s_platform_remove(struct platform_device *pdev)
  {
+ 	struct tegra_i2s *i2s = dev_get_drvdata(&pdev->dev);
 -	struct resource *res;
--
- 	if (!das)
- 		return -ENODEV;
  
--	platform_set_drvdata(pdev, NULL);
--
- 	tegra_das_debug_remove(das);
+ 	snd_soc_unregister_dai(&pdev->dev);
  
--	iounmap(das->regs);
+ 	tegra_i2s_debug_remove(i2s);
+ 
+-	iounmap(i2s->regs);
 -
 -	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 -	release_mem_region(res->start, resource_size(res));
 -
--	kfree(das);
- 	das = NULL;
+ 	clk_put(i2s->clk_i2s);
  
+-	kfree(i2s);
+-
  	return 0;
-@@ -246,18 +232,7 @@ static struct platform_driver tegra_das_driver = {
- 		.name = DRV_NAME,
- 	},
+ }
+ 
+@@ -470,18 +456,7 @@ static struct platform_driver tegra_i2s_driver = {
+ 	.probe = tegra_i2s_platform_probe,
+ 	.remove = __devexit_p(tegra_i2s_platform_remove),
  };
 -
--static int __init tegra_das_modinit(void)
+-static int __init snd_tegra_i2s_init(void)
 -{
--	return platform_driver_register(&tegra_das_driver);
+-	return platform_driver_register(&tegra_i2s_driver);
 -}
--module_init(tegra_das_modinit);
+-module_init(snd_tegra_i2s_init);
 -
--static void __exit tegra_das_modexit(void)
+-static void __exit snd_tegra_i2s_exit(void)
 -{
--	platform_driver_unregister(&tegra_das_driver);
+-	platform_driver_unregister(&tegra_i2s_driver);
 -}
--module_exit(tegra_das_modexit);
-+module_platform_driver(tegra_das_driver);
+-module_exit(snd_tegra_i2s_exit);
++module_platform_driver(tegra_i2s_driver);
  
  MODULE_AUTHOR("Stephen Warren <swarren@nvidia.com>");
- MODULE_DESCRIPTION("Tegra DAS driver");
+ MODULE_DESCRIPTION("Tegra I2S ASoC driver");
 -- 
 1.7.0.4
