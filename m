@@ -1,18 +1,43 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 23 Nov 2011 17:51:57 +0000
-Subject: Porting the 2.6.38 linux kernel to ARM11 MPcore
-In-Reply-To: <CAK-0apYKjvxXasEfYCocjqEan5dKoXJgMON2gC-nMenKQaU9UQ@mail.gmail.com>
-References: <CAK-0apYKjvxXasEfYCocjqEan5dKoXJgMON2gC-nMenKQaU9UQ@mail.gmail.com>
-Message-ID: <20111123175157.GH9581@n2100.arm.linux.org.uk>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 23 Nov 2011 11:52:10 -0600
+Subject: -next fails to boot as of today on S3C6410
+In-Reply-To: <20111123145517.GE20272@opensource.wolfsonmicro.com>
+References: <20111122192741.GG30583@opensource.wolfsonmicro.com>
+ <20111122193124.GB9581@n2100.arm.linux.org.uk>
+ <20111122193957.GH30583@opensource.wolfsonmicro.com>
+ <20111122222135.GB7845@gallagher>
+ <20111123120534.GO21073@opensource.wolfsonmicro.com>
+ <20111123122855.GB7382@totoro>
+ <20111123130134.GB12227@opensource.wolfsonmicro.com>
+ <20111123133237.GC7382@totoro>
+ <20111123135033.GA20272@opensource.wolfsonmicro.com>
+ <20111123143322.GD7382@totoro>
+ <20111123145517.GE20272@opensource.wolfsonmicro.com>
+Message-ID: <4ECD32CA.2030601@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 18, 2011 at 12:54:42PM +0100, Moln?r G?bor wrote:
-> <5>Linux version 2.6.38-rc8 (VirtualBox) (gcc version 4.5.2 (Sourcery
-> G++ Lite 2011.03-41) ) #6 Wed Nov 9 21:59:29 CET 2011
-> <4>CPU: ARMv6-compatible processor [410fb025] revision 5 (ARMv7), cr=08c5387f"
-> <4>CPU: VIPT nonaliasing data cache, VIPT aliasing instruction cache
-> <4>Machine: ARM-RealView PB11MPCore
-> <5>Ignoring RAM at c0000000-c04fffff (vmalloc region overlap).
+On 11/23/2011 08:55 AM, Mark Brown wrote:
+> On Wed, Nov 23, 2011 at 02:33:22PM +0000, Jamie Iles wrote:
+>> On Wed, Nov 23, 2011 at 01:50:34PM +0000, Mark Brown wrote:
+> 
+>>> It looks like there's a second bug breaking the boot in there - testing
+>>> your commit the board boots but if I test the tip of Russell's for-next
+>>> then that breaks again.  I'm just starting another bisect and
+>>> considering sending a patch to add a git finger-point alias.
+> 
+>> Thanks for your patience Mark!  Please let me know if there's anything I 
+>> can do to help.
+> 
+> My bisect turned up a second candidate - Nicholas' commit 549158d (ARM:
+> move iotable mappings within the vmalloc region).  I reverted that and
+> subsequent commits depending on it and my system now appears to boot
+> fine with -next (with OF turned on to get the ops for the VIC).  This
+> code is all a bit deep for me so I've no real idea what might be wrong.
 
-This tells me your PHYS_OFFSET is set incorrectly.
+The first suspect should be overlapping static mappings in the iotable.
+This was allowed before and now is not. Looking at some of the 6410
+platforms, I don't see any though. But you didn't mention which platform
+you are on. There is a 1KB mapping which is a bit unusual.
+
+Rob
