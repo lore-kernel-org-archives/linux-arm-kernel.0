@@ -1,80 +1,62 @@
-From: tarun.kanti@ti.com (DebBarma, Tarun Kanti)
-Date: Wed, 23 Nov 2011 18:03:09 +0530
-Subject: [PATCH] ARM: OMAP: dmtimer: fix missing content/correction in
- low-power mode support
-In-Reply-To: <CAB-zwWiNc=aFMd2ccyL=s1c5qa8dnu6c-M29K1CrezJ01YXZWg@mail.gmail.com>
-References: <1320732026-6783-1-git-send-email-tarun.kanti@ti.com>
- <CAB-zwWiNc=aFMd2ccyL=s1c5qa8dnu6c-M29K1CrezJ01YXZWg@mail.gmail.com>
-Message-ID: <CAC83ZvK7-jfXm0YZo45pcd7D4_Ad858u1WJY1ozfy+z31Zk5Wg@mail.gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 23 Nov 2011 10:44:50 -0200
+Subject: BUG: sleeping function called from invalid context
+In-Reply-To: <4ECCDAA2.4070502@prolan.hu>
+References: <4ECCDAA2.4070502@prolan.hu>
+Message-ID: <CAOMZO5DSvLU0ACJPZ69tzY0PjMijibSzwCEwBhu=5=mg7ncF=g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 21, 2011 at 10:12 PM, Ramirez Luna, Omar
-<omar.ramirez@ti.com> wrote:
-> Hi,
->
-> On Tue, Nov 8, 2011 at 12:00 AM, Tarun Kanti DebBarma
-> <tarun.kanti@ti.com> wrote:
->> Since omap_dm_timer_write_reg/__omap_dm_timer_write is now modified
->> to use timer->func_base OCP_CFG should not use this wrapper anymore.
->> Instead use __raw_writel() directly and use timer->io_base instead
->> to write to OCP_CFG.
->>
->> The timer->sys_stat is valid only if timer->revision is 1. In the
->> context restore function make this correction.
->>
->> Save the contexts and loss count when timer is stopped.
->> Also, disable the clock. Else, clock usecount would become imbalanced.
->>
->> Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
-> ...
->> diff --git a/arch/arm/plat-omap/dmtimer.c b/arch/arm/plat-omap/dmtimer.c
->> index af3b92b..f042c82 100644
->> --- a/arch/arm/plat-omap/dmtimer.c
->> +++ b/arch/arm/plat-omap/dmtimer.c
-> ...
->> @@ -357,6 +357,21 @@ int omap_dm_timer_stop(struct omap_dm_timer *timer)
->>
->> ? ? ? ?__omap_dm_timer_stop(timer, timer->posted, rate);
->>
->> + ? ? ? if (timer->loses_context) {
->> + ? ? ? ? ? ? ? if (timer->get_context_loss_count)
->
-> Maybe: if (timer->loses_context && timer->get_context_loss_count)
-Sure.
->
->> + ? ? ? ? ? ? ? ? ? ? ? timer->ctx_loss_count =
->> + ? ? ? ? ? ? ? ? ? ? ? timer->get_context_loss_count(&timer->pdev->dev);
->
-> could get rid ?of this weird one-line formatting
-ok.
->
->> + ? ? ? }
->> +
->> + ? ? ? /*
->> + ? ? ? ?* Since the register values are computed and written within
->> + ? ? ? ?* __omap_dm_timer_stop, we need to use read to retrieve the
->> + ? ? ? ?* context.
->> + ? ? ? ?*/
->> + ? ? ? timer->context.tclr =
->> + ? ? ? ? ? ? ? ? ? ? ? omap_dm_timer_read_reg(timer, OMAP_TIMER_CTRL_REG);
->> + ? ? ? timer->context.tisr = __raw_readl(timer->irq_stat);
->> + ? ? ? omap_dm_timer_disable(timer);
->
-> FWIW, functionally it looks good to me, besides it fixes the broken
-> dmtimer start/stop sequence from 3.2-rc1. Tested with tidspbridge on
-> omap3.
-Thanks.
+Peter,
 
+On Wed, Nov 23, 2011 at 9:36 AM, Peter Rusko <rusko.peter@prolan.hu> wrote:
+> Hi all,
 >
-> If needed:
+> While trying to use the LRADC and touchscreen functionality on imx28,
+> I've run into this problem:
 >
-> Tested-by: Omar Ramirez Luna <omar.ramirez@ti.com>
-Sure. Thanks.
---
-Tarun
+> udevd[523]: starting version 171
+> BUG: sleeping function called from invalid context at kernel/mutex.c:271
+> in_atomic(): 1, irqs_disabled(): 128, pid: 523, name: udevd
+> no locks held by udevd/523.
+> irq event stamp: 956
+> hardirqs last ?enabled at (956): [<c032e56c>]
+> _raw_write_unlock_irqrestore+0x3c/0x68
+> hardirqs last disabled at (955): [<c032e6ec>]
+> _raw_write_lock_irqsave+0x1c/0x58
+> softirqs last ?enabled at (843): [<c0025c78>] irq_exit+0x54/0xb0
+> softirqs last disabled at (792): [<c0025c78>] irq_exit+0x54/0xb0
+> [<c0013238>] (unwind_backtrace+0x0/0xe0) from [<c032d198>]
+> (mutex_lock_nested+0x24/0x31c)
+> [<c032d198>] (mutex_lock_nested+0x24/0x31c) from [<c0017570>]
+> (clk_enable+0x20/0x48)
+> [<c0017570>] (clk_enable+0x20/0x48) from [<c023173c>]
+> (pl011_console_write+0x20/0x78)
+> [<c023173c>] (pl011_console_write+0x20/0x78) from [<c0020780>]
+> (__call_console_drivers+0x84/0x9c)
+> [<c0020780>] (__call_console_drivers+0x84/0x9c) from [<c0020ba0>]
+> (console_unlock+0xfc/0x1ec)
+> [<c0020ba0>] (console_unlock+0xfc/0x1ec) from [<c0021150>]
+> (vprintk+0x3b0/0x440)
+> [<c0021150>] (vprintk+0x3b0/0x440) from [<c032b4d4>] (printk+0x18/0x24)
+> [<c032b4d4>] (printk+0x18/0x24) from [<c0233a5c>] (kmsg_writev+0xd8/0xfc)
+> [<c0233a5c>] (kmsg_writev+0xd8/0xfc) from [<c008f58c>]
+> (do_sync_write+0x98/0xd4)
+> [<c008f58c>] (do_sync_write+0x98/0xd4) from [<c008fe98>]
+> (vfs_write+0xc8/0x138)
+> [<c008fe98>] (vfs_write+0xc8/0x138) from [<c00900e0>] (sys_write+0x3c/0x68)
+> [<c00900e0>] (sys_write+0x3c/0x68) from [<c000e180>]
+> (ret_fast_syscall+0x0/0x38)
 >
-> Regards,
->
-> Omar
->
+> It seems that the printk calls cause the problem (it's not just with udev,
+> seems to have the problem with all printk calls). The touchscreen
+> works perfectly and I'd like to submit a patch which supports it, but I
+> keep getting the same messages. What can cause the problem, why is it an
+> atomic context within the udevd?
+
+Looks like the same error I faced before:
+http://marc.info/?l=linux-arm-kernel&m=131914543319956&w=2
+
+Regards,
+
+Fabio Estevam
