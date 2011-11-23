@@ -1,28 +1,43 @@
-From: philipp.zabel@gmail.com (Philipp Zabel)
-Date: Wed, 23 Nov 2011 23:49:01 +0100
-Subject: [PATCH v3 1/2] pxa/hx4700: Add Synaptics NavPoint (PXA27x
- SSP/SPI) driver
-In-Reply-To: <1322081102.2448.YahooMailClassic@web29004.mail.ird.yahoo.com>
-References: <1322081102.2448.YahooMailClassic@web29004.mail.ird.yahoo.com>
-Message-ID: <1322088541.18388.16.camel@flow>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 23 Nov 2011 22:51:24 +0000
+Subject: BUG: sleeping function called from invalid context
+In-Reply-To: <20111123183640.GQ19986@pengutronix.de>
+References: <4ECCDAA2.4070502@prolan.hu>
+ <CAOMZO5DSvLU0ACJPZ69tzY0PjMijibSzwCEwBhu=5=mg7ncF=g@mail.gmail.com>
+ <20111123183640.GQ19986@pengutronix.de>
+Message-ID: <20111123225124.GK9581@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, den 23.11.2011, 20:45 +0000 schrieb Paul Parsons:
-> --- On Wed, 23/11/11, Dmitry Artamonow <mad_soft@inbox.ru> wrote:
-> > BTW, it's funny that driver is placed in input/mouse, but
-> > actually
-> > reports only keyboard events :)
-> > Anyway, reporting coordinates can be added at some later
-> > point.
+On Wed, Nov 23, 2011 at 07:36:40PM +0100, Uwe Kleine-K?nig wrote:
+> Hello,
 > 
-> That's right, the underlying hardware is a touchpad so the driver could report mouse events if required. Obviously the hx4700 already has a working touchscreen so it's not obvious what benefit a second mouse device would add. And I'm not aware of any other platforms which use the NavPoint.
+> On Wed, Nov 23, 2011 at 10:44:50AM -0200, Fabio Estevam wrote:
+> > Looks like the same error I faced before:
+> > http://marc.info/?l=linux-arm-kernel&m=131914543319956&w=2
+> which resulted in some concerns about locking correctness. On i.MX28 we
+> usually use
+> 
+> 	http://thread.gmane.org/gmane.linux.ports.arm.kernel/100744/focus=100746
+> 
+> (though this patch wasn't accepted either. The right fix is to convert
+> mxs to the upcoming clk framework, which didn't land into mainline yet.)
 
-I agree, the NavPoint is pretty useless as a touchpad.
+Irrespective of the clk framework.  If you convert to the clk_prepare()
+methodology, then you fix this bug.  You can do this as a two-step thing.
+First, convert _all_ your drivers to issue the correct clk_prepare() and
+clk_unprepare() calls at the appropriate time.  Once that's all done,
+convert your clk API implementation to doing the sleeping parts of your
+existing clk_enable() in clk_prepare() and leave the non-sleeping parts
+in clk_enable().  (Ditto for clk_disable() vs clk_unprepare().)
 
-I think there's some kind of Logitech Wireless Keyboard / Remote that
-has a NavPoint, but I'm not aware of anything with them that would run
-linux either.
+You'll need to do most of the driver work _before_ the clk framework
+lands, because it becomes mandatory for your drivers to call clk_prepare()
+with that.
 
-regards
-Philipp
+Plus, on the implementation side, you'll already have done the work to
+separate the two for the clk framework, which in theory should mean that
+its easier to convert.
+
+So really, there's no excuse not to fix this for the imx/mxwhatever SoCs
+today - the clk framework is totally irrelevant as far as this goes.
