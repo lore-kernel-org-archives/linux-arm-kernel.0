@@ -1,42 +1,29 @@
 From: swarren@nvidia.com (Stephen Warren)
-Date: Wed, 23 Nov 2011 09:29:24 -0800
-Subject: [alsa-devel] [PATCH 07/17] ASoC: Tegra DAS: Use devm_ APIs and
- module_platform_driver
-In-Reply-To: <20111123065808.GB5255@avionic-0098.adnet.avionic-design.de>
+Date: Wed, 23 Nov 2011 09:44:54 -0800
+Subject: [PATCH 01/17] arm/tegra: board-dt: audio: Enable clocks, fix
+ AUXDATA
+In-Reply-To: <20111123103858.GK4332@opensource.wolfsonmicro.com>
 References: <1322011285-4002-1-git-send-email-swarren@nvidia.com>
- <1322011285-4002-8-git-send-email-swarren@nvidia.com>
- <20111123065808.GB5255@avionic-0098.adnet.avionic-design.de>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF174F08C6F3@HQMAIL01.nvidia.com>
+ <1322011285-4002-2-git-send-email-swarren@nvidia.com>
+ <20111123103858.GK4332@opensource.wolfsonmicro.com>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF174F08C708@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thierry Reding wrote at Tuesday, November 22, 2011 11:58 PM:
-> * Stephen Warren wrote:
-> > module_platform_drive saves some boiler-plate code.
-> >
-> > The devm_ APIs remove the need to manually clean up allocations,
-> > thus removing some code.
-...
-> >  static int __devexit tegra_das_remove(struct platform_device *pdev)
-> >  {
-> > -	struct resource *res;
-> > -
-> >  	if (!das)
-> >  		return -ENODEV;
-> >
-> > -	platform_set_drvdata(pdev, NULL);
-> > -
-> [...]
+Mark Brown wrote at Wednesday, November 23, 2011 3:39 AM:
+> On Tue, Nov 22, 2011 at 06:21:09PM -0700, Stephen Warren wrote:
 > 
-> Setting the driver data to NULL may still be a good idea.
+> >  	OF_DEV_AUXDATA("nvidia,tegra20-i2c", TEGRA_DVC_BASE, "tegra-i2c.3", NULL),
+> >  	OF_DEV_AUXDATA("nvidia,tegra20-i2s", TEGRA_I2S1_BASE, "tegra-i2s.0", NULL),
+> > -	OF_DEV_AUXDATA("nvidia,tegra20-i2s", TEGRA_I2S1_BASE, "tegra-i2s.1", NULL),
+> > +	OF_DEV_AUXDATA("nvidia,tegra20-i2s", TEGRA_I2S2_BASE, "tegra-i2s.1", NULL),
+> 
+> This looks like a straight bug fix which is independant of the below
+> change?
 
-When Mark Brown reviewed the TrimSlice machine driver, he mentioned that
-clearing the drvdata was pointless; nothing should be using it when the
-device is not created.
+That is true.
 
-As background, soon after that, I modified the tegra_wm8903.c machine
-driver along the same lines, but evidently didn't update tegra_das.c
-in a similar way, but would have if I'd been paying attention...
+Olof/Colin, do you want me to split this up?
 
 -- 
 nvpublic
