@@ -1,17 +1,38 @@
-From: lost.distance@yahoo.com (Paul Parsons)
-Date: Wed, 23 Nov 2011 20:45:02 +0000 (GMT)
-Subject: [PATCH v3 1/2] pxa/hx4700: Add Synaptics NavPoint (PXA27x
- SSP/SPI) driver
-In-Reply-To: <20111123195144.GB9918@rainbow>
-Message-ID: <1322081102.2448.YahooMailClassic@web29004.mail.ird.yahoo.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 23 Nov 2011 21:15:05 +0000
+Subject: [GIT PULL] ARM: pxa: change gpio to platform driver
+In-Reply-To: <CAN1soZw6JuNsty91xQP2G4NLodAz5GfOVUO7xYo+fdx8u0chvg@mail.gmail.com>
+References: <CAN1soZw6JuNsty91xQP2G4NLodAz5GfOVUO7xYo+fdx8u0chvg@mail.gmail.com>
+Message-ID: <201111232115.05818.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
---- On Wed, 23/11/11, Dmitry Artamonow <mad_soft@inbox.ru> wrote:
-> BTW, it's funny that driver is placed in input/mouse, but
-> actually
-> reports only keyboard events :)
-> Anyway, reporting coordinates can be added at some later
-> point.
+On Tuesday 15 November 2011, Haojian Zhuang wrote:
+> The following changes since commit 31555213f03bca37d2c02e10946296052f4ecfcd:
+> 
+>   Revert "hvc_console: display printk messages on console."
+> (2011-11-06 22:22:16 -0800)
+> 
+> are available in the git repository at:
+>   git://github.com/hzhuang1/linux.git gpio
+> 
+> Haojian Zhuang (11):
+>       ARM: pxa: rename IRQ_GPIO to PXA_GPIO_TO_IRQ
+>       ARM: pxa: use chained interrupt for GPIO0 and GPIO1
+>       ARM: pxa: rename gpio_to_irq and irq_to_gpio
+>       ARM: pxa: recognize gpio number and type
+>       ARM: pxa: rename NR_BUILTIN_GPIO
+>       ARM: pxa: use little endian read write in gpio driver
+>       ARM: pxa: use generic gpio operation instead of gpio register
+>       ARM: pxa: change gpio to platform device
+>       ARM: mmp: clear gpio edge detect
+>       ARM: pxa: add clk support in gpio driver
+>       driver: pcmcia: replace IRQ_GPIO() with gpio_to_irq()
 
-That's right, the underlying hardware is a touchpad so the driver could report mouse events if required. Obviously the hx4700 already has a working touchscreen so it's not obvious what benefit a second mouse device would add. And I'm not aware of any other platforms which use the NavPoint.
+Sorry for the long delay. I needed time to settle back in after my vacation
+at arrange with the git tree being shared and on kernel.org now.
+
+I've pulled it into the drivers/pxa-gpio branch of arm-soc and plan to
+submit it as part of the next/drivers branch in the next merge window.
+
+	Arnd
