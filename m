@@ -1,93 +1,35 @@
-From: lost.distance@yahoo.com (Paul Parsons)
-Date: Wed, 23 Nov 2011 16:46:39 +0000 (GMT)
-Subject: [PATCH v3 2/2] pxa/hx4700: Add Synaptics NavPoint (PXA27x SSP/SPI)
- driver
-Message-ID: <1322066799.17556.YahooMailClassic@web29016.mail.ird.yahoo.com>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Wed, 23 Nov 2011 08:50:16 -0800
+Subject: [PATCH 03/17] arm/dt: Tegra: Enable audio on WM8903 boards,
+ disable others
+In-Reply-To: <1322011285-4002-4-git-send-email-swarren@nvidia.com>
+References: <1322011285-4002-1-git-send-email-swarren@nvidia.com>
+ <1322011285-4002-4-git-send-email-swarren@nvidia.com>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF174F08C6C3@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for the Synaptics NavPoint touchpad connected to a PXA27x SSP port
-in SPI slave mode. The driver implements a simple navigation pad. The four
-raised dots are mapped to UP/DOWN/LEFT/RIGHT buttons and the centre of the
-touchpad is mapped to the ENTER button.
+Stephen Warren wrote at Tuesday, November 22, 2011 6:21 PM:
+> Add complete bindings to instantiate and configure the codec and
+> top-level audio complex on all currently supported boards using the
+> Tegra+WM8903 audio driver.
+...
+> diff --git a/arch/arm/boot/dts/tegra-harmony.dts b/arch/arm/boot/dts/tegra-harmony.dts
+...
+> +	sound {
+> +		compatible = "nvidia,tegra-audio-wm8903-harmony",
+> +                             "nvidia,tegra-audio-wm8903";
 
-Signed-off-by: Paul Parsons <lost.distance@yahoo.com>
----
+Thinking about that more, I'd like to change this from nvidia,tegra-audio*
+to nvidia,tegra20-audio*. That's because the current ASoC machine driver,
+which is what matches that compatible flag, is slightly Tegra20-specific
+because it makes calls to the Tegra20-specific DAS driver. On Tegra30, this
+is replaced by a Tegra30 (and later?) AHUB driver. To avoid the
+Tegra+WM8903 ASoC machine driver module depending on both the Tegra20 DAS
+module and the Tegra30 AHUB module, I'd like to create separate ASoC
+machine drivers for the two Tegra chips, which parameterize a core machine
+driver (e.g. by passing an ops/vtable). This requires versioned compatible
+flags so that different drivers can be instantiated.
 
-V3:
-Patch numbered 2/n because hx4700 platform glue depends on driver.
-GPIO102 configuration moved from mfp-pxa27x.h to hx4700.c.
-Renamed GPIO102_HX4700_SYNAPTICS_POWER_ON to keep global_gpios[] within 80 cols.
-
-diff -uprN clean-3.2-rc2/arch/arm/mach-pxa/hx4700.c linux-3.2-rc2/arch/arm/mach-pxa/hx4700.c
---- clean-3.2-rc2/arch/arm/mach-pxa/hx4700.c	2011-11-15 17:02:59.000000000 +0000
-+++ linux-3.2-rc2/arch/arm/mach-pxa/hx4700.c	2011-11-20 00:14:05.252421407 +0000
-@@ -22,6 +22,7 @@
- #include <linux/gpio.h>
- #include <linux/gpio_keys.h>
- #include <linux/input.h>
-+#include <linux/input/navpoint.h>
- #include <linux/lcd.h>
- #include <linux/mfd/htc-egpio.h>
- #include <linux/mfd/asic3.h>
-@@ -111,7 +112,7 @@ static unsigned long hx4700_pin_config[]
- 	GPIO113_I2S_SYSCLK,
- 
- 	/* SSP 1 (NavPoint) */
--	GPIO23_SSP1_SCLK,
-+	GPIO23_SSP1_SCLK_IN,
- 	GPIO24_SSP1_SFRM,
- 	GPIO25_SSP1_TXD,
- 	GPIO26_SSP1_RXD,
-@@ -181,6 +182,23 @@ static struct platform_device gpio_keys
- };
- 
- /*
-+ * Synaptics NavPoint connected to SSP1
-+ */
-+
-+static struct navpoint_platform_data navpoint_platform_data = {
-+	.port	= 1,
-+	.gpio	= GPIO102_HX4700_SYNAPTICS_ON,
-+};
-+
-+static struct platform_device navpoint = {
-+	.name	= "navpoint",
-+	.id	= -1,
-+	.dev = {
-+		.platform_data = &navpoint_platform_data,
-+	},
-+};
-+
-+/*
-  * ASIC3
-  */
- 
-@@ -782,6 +800,7 @@ static struct platform_device pcmcia = {
- static struct platform_device *devices[] __initdata = {
- 	&asic3,
- 	&gpio_keys,
-+	&navpoint,
- 	&backlight,
- 	&w3220,
- 	&hx4700_lcd,
-@@ -806,6 +825,7 @@ static struct gpio global_gpios[] = {
- 	{ GPIO32_HX4700_RS232_ON,         GPIOF_OUT_INIT_HIGH, "RS232_ON" },
- 	{ GPIO71_HX4700_ASIC3_nRESET,     GPIOF_OUT_INIT_HIGH, "ASIC3_nRESET" },
- 	{ GPIO82_HX4700_EUART_RESET,      GPIOF_OUT_INIT_HIGH, "EUART_RESET" },
-+	{ GPIO102_HX4700_SYNAPTICS_ON,    GPIOF_OUT_INIT_LOW,  "SYNAPTICS_ON" },
- 	{ GPIO105_HX4700_nIR_ON,          GPIOF_OUT_INIT_HIGH, "nIR_EN" },
- };
- 
-diff -uprN clean-3.2-rc2/arch/arm/mach-pxa/include/mach/hx4700.h linux-3.2-rc2/arch/arm/mach-pxa/include/mach/hx4700.h
---- clean-3.2-rc2/arch/arm/mach-pxa/include/mach/hx4700.h	2011-11-15 17:02:59.000000000 +0000
-+++ linux-3.2-rc2/arch/arm/mach-pxa/include/mach/hx4700.h	2011-11-20 00:14:44.968709678 +0000
-@@ -62,7 +62,7 @@
- #define GPIO97_HX4700_nBL_DETECT		97
- #define GPIO99_HX4700_KEY_CONTACTS		99
- #define GPIO100_HX4700_AUTO_SENSE		100 /* BL auto brightness */
--#define GPIO102_HX4700_SYNAPTICS_POWER_ON	102
-+#define GPIO102_HX4700_SYNAPTICS_ON		102
- #define GPIO103_HX4700_SYNAPTICS_INT		103
- #define GPIO105_HX4700_nIR_ON			105
- #define GPIO106_HX4700_CPU_BT_nRESET		106
+-- 
+nvpublic
