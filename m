@@ -1,35 +1,27 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 23 Nov 2011 21:15:17 +0000
-Subject: [GIT PULL] Samsung fixes for v3.2
-In-Reply-To: <03e501cca837$d893e320$89bba960$%kim@samsung.com>
-References: <03e501cca837$d893e320$89bba960$%kim@samsung.com>
-Message-ID: <201111232115.18048.arnd@arndb.de>
+Date: Wed, 23 Nov 2011 21:15:23 +0000
+Subject: [GIT PULL] Missing CPU mapping updates
+In-Reply-To: <20111121102906.GA2437@mudshark.cambridge.arm.com>
+References: <20111116113636.GH4942@mudshark.cambridge.arm.com>
+ <20111121102906.GA2437@mudshark.cambridge.arm.com>
+Message-ID: <201111232115.23950.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 21 November 2011, Kukjin Kim wrote:
-> Please pull samsung-fixes for v3.2 from:
+On Monday 21 November 2011, Will Deacon wrote:
+> On Wed, Nov 16, 2011 at 11:36:36AM +0000, Will Deacon wrote:
+> > Highbank and IMX6 were merged recently and therefore missed out on the
+> > logical CPU mapping updates. I've fixed them up in the branch below - please
+> > pull!
 > 
-> git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> samsung-fixes
-> 
-> This includes fix of inclusion header.
-> If any problems, please let me know.
-> 
+> I'd like these to go in for 3.2, so please can you pull them into arm-soc?
 
-Pulled, thanks!
+Done now, sorry for the delay.
 
-On Monday 21 November 2011, Kyungmin Park wrote:
-> Don't you fix the mct compiler error if LOCAL_TIMERS are not defined?
-> 
-> arch/arm/mach-exynos/mct.c: In function 'exynos4_timer_resources':
-> arch/arm/mach-exynos/mct.c:451: error: 'exynos4_mct_tick_isr'
-> undeclared (first use in this function)
-> arch/arm/mach-exynos/mct.c:451: error: (Each undeclared identifier is
-> reported only once
-> arch/arm/mach-exynos/mct.c:451: error: for each function it appears in.)
-> make[1]: *** [arch/arm/mach-exynos/mct.o] Error 1
+> Sorry to pester, but in Prague you said that's what you wanted us to do!
 
-Has a patch been posted for this?
+That is right, it was my fault for not realizing I wouldn't be able to
+deal with this during UDS or my following vacation, and I also forgot
+to talk to Olof about it.
 
 	Arnd
