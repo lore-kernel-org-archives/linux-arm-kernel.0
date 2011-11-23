@@ -1,57 +1,66 @@
-From: javier.martin@vista-silicon.com (javier Martin)
-Date: Wed, 23 Nov 2011 11:05:41 +0100
-Subject: [PATCH v2 1/2] MX2: Add platform definitions for eMMa-PrP device.
-In-Reply-To: <4ECBF80C.20701@gmail.com>
-References: <1321963316-9058-1-git-send-email-javier.martin@vista-silicon.com>
- <1321963316-9058-2-git-send-email-javier.martin@vista-silicon.com>
- <4ECBF80C.20701@gmail.com>
-Message-ID: <CACKLOr1om8qwXL_pFr+aFGCh7paH-px9+FpmKNCPJyQmjf-zvA@mail.gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 23 Nov 2011 10:20:28 +0000
+Subject: [PATCH 04/17] ASoC: Add device tree binding for WM8903
+In-Reply-To: <1322011285-4002-5-git-send-email-swarren@nvidia.com>
+References: <1322011285-4002-1-git-send-email-swarren@nvidia.com>
+ <1322011285-4002-5-git-send-email-swarren@nvidia.com>
+Message-ID: <20111123102027.GB4332@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 November 2011 20:29, Sylwester Nawrocki <snjw23@gmail.com> wrote:
-> Hi Javier,
->> +struct platform_device *__init imx_alloc_mx2_emmaprp(
->> + ? ? ? ? ? ? const struct imx_mx2_camera_data *data)
->> +{
->> + ? ? struct resource res[] = {
->> + ? ? ? ? ? ? {
->> + ? ? ? ? ? ? ? ? ? ? .start = data->iobaseemmaprp,
->> + ? ? ? ? ? ? ? ? ? ? .end = data->iobaseemmaprp + data->iosizeemmaprp - 1,
->> + ? ? ? ? ? ? ? ? ? ? .flags = IORESOURCE_MEM,
->> + ? ? ? ? ? ? }, {
->> + ? ? ? ? ? ? ? ? ? ? .start = data->irqemmaprp,
->> + ? ? ? ? ? ? ? ? ? ? .end = data->irqemmaprp,
->> + ? ? ? ? ? ? ? ? ? ? .flags = IORESOURCE_IRQ,
->> + ? ? ? ? ? ? },
->> + ? ? };
->> + ? ? struct platform_device *pdev;
->> + ? ? int ret = -ENOMEM;
->> +
->> + ? ? pdev = platform_device_alloc("m2m-emmaprp", 0);
->> + ? ? if (!pdev)
->> + ? ? ? ? ? ? goto err;
->> +
->> + ? ? ret = platform_device_add_resources(pdev, res, ARRAY_SIZE(res));
->> + ? ? if (ret)
->> + ? ? ? ? ? ? goto err;
->> +
->> + ? ? return pdev;
->> +err:
->> + ? ? platform_device_put(pdev);
->> + ? ? return ERR_PTR(-ENODEV);
->
-> I guess you intended to have
->
-> + ? ? ? return ERR_PTR(ret);
+On Tue, Nov 22, 2011 at 06:21:12PM -0700, Stephen Warren wrote:
 
-Sure, thanks for the tip.
+> +  - irq-active-low : Indicates whether the IRQ output should be active low
+> +    (property present) or active high (property absent).
 
--- 
-Javier Martin
-Vista Silicon S.L.
-CDTUC - FASE C - Oficina S-345
-Avda de los Castros s/n
-39005- Santander. Cantabria. Spain
-+34 942 25 32 60
-www.vista-silicon.com
+I think we ought to be coming up with a standard binding for this stuff 
+rather than having every device defining it's own way of plugging the
+interrupt lines together - many devices have lots of flexibility with
+how their interrupt line signals for compatibility reasons.
+
+> +  - gpio-cfg : A list of GPIO pin mux register values. The list must be 5
+> +    entries long. If absent, no configuration of these registers is
+> +    performed.
+
+What's a "GPIO pin mux"?
+
+> +	/* 0x8000 = Not configured */
+> +	gpio-cfg = < 0x8000 0x8000 0 0x8000 0x8000 >;
+
+The 0x8000 isn't documented in the binding and this doesn't seem
+terribly idiomatic for device tree.
+
+> -static void wm8903_init_gpio(struct snd_soc_codec *codec)
+> +static void wm8903_init_gpio(struct snd_soc_codec *codec,
+> +			     struct wm8903_platform_data *pdata)
+
+Why?
+
+>  static int wm8903_probe(struct snd_soc_codec *codec)
+>  {
+>  	struct wm8903_platform_data *pdata = dev_get_platdata(codec->dev);
+> +	struct wm8903_platform_data lpdata;
+
+Why and what is "lpdata" supposed to mean?
+
+> +	if (!pdata && codec->dev->of_node) {
+> +		lpdata.irq_active_low = 0;
+> +		lpdata.micdet_cfg = 0;
+
+This should be set by default.
+
+> +		lpdata.micdet_delay = 100;
+> +		lpdata.gpio_base = -1;
+
+This means that the defaults are in different different places if we
+have platform data and if we have device tree.  We should restructure
+the code so that we only have defaults in one place.
+
+> +		if (of_property_read_u32(np, "micdet-cfg", &val32) >= 0)
+> +			lpdata.micdet_cfg = val32;
+
+I'd rather have defaults as an else case I think.
+
+> +#if defined(CONFIG_OF)
+
+ifdef.
