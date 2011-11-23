@@ -1,20 +1,43 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 23 Nov 2011 11:15:10 +0000
-Subject: [PATCH 14/17] ASoC: Implement "auto nc pins" feature
-In-Reply-To: <1322011285-4002-15-git-send-email-swarren@nvidia.com>
-References: <1322011285-4002-1-git-send-email-swarren@nvidia.com>
- <1322011285-4002-15-git-send-email-swarren@nvidia.com>
-Message-ID: <20111123111510.GH21073@opensource.wolfsonmicro.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Wed, 23 Nov 2011 12:18:16 +0100
+Subject: [PATCH] IMX/SDMA : save the real count for one DMA transaction.
+In-Reply-To: <4ECCD553.5020804@freescale.com>
+References: <1322039585-7901-1-git-send-email-b32955@freescale.com>
+ <20111123105821.GC4063@pengutronix.de>
+ <4ECCD34C.1090400@freescale.com>
+ <20111123110626.GD4063@pengutronix.de>
+ <4ECCD553.5020804@freescale.com>
+Message-ID: <20111123111816.GF4063@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 22, 2011 at 06:21:22PM -0700, Stephen Warren wrote:
-> Codecs often have a large number of external pins, and not all of these pins
-> will be connected on all board designs. Some machine drivers therefore call
-> snd_soc_dapm_nc_pin() for all the unused pins, in order to tell the ASoC core
-> never to activate them.
+On Wed, Nov 23, 2011 at 07:13:23PM +0800, Huang Shijie wrote:
+> 
+> >>>> +	/* save the real count we received or transmitted. */
+> >>>> +	chan->private = (void *)count;
+> >>> And if someone later needs another variable which is private?
+> >>>
+> >> I ever wanted to add an new parameter `void *` to dma_aync_tx_callback,
+> >> but it seemed i have
+> >> to change a lot of files.
+> >>
+> >> Do you have any better suggestion?
+> > Use a private struct and put count in there.
+> >
+> Where to put the private struct? in the imx-sdma.c ?
+> If i put it there, how can i get it in the UART driver with the current
+> DMA API?
 
-This looks good from a code point of view but can you please rename the
-flag that needs to be set to something like "fully_routed" so that if we
-think of anything else we can do with a fully specified card routing map
-then the flag name doesn't look wrong.
+So, in the UART driver you assume that void* is an int? Or how do you
+currently use count?
+
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111123/ad9bf81d/attachment.sig>
