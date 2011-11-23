@@ -1,80 +1,160 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 23 Nov 2011 15:30:16 +0000
-Subject: HW perf initialisation as early_initcall
-In-Reply-To: <1322060889.14799.73.camel@twins>
-References: <20111123145658.GM25848@mudshark.cambridge.arm.com>
- <1322060889.14799.73.camel@twins>
-Message-ID: <20111123153016.GQ25848@mudshark.cambridge.arm.com>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Wed, 23 Nov 2011 17:34:50 +0200
+Subject: [PATCH 1/7] amp/remoteproc: add framework for controlling remote
+ processors
+In-Reply-To: <4ECC6838.1010009@codeaurora.org>
+References: <1319536106-25802-1-git-send-email-ohad@wizery.com>
+ <1319536106-25802-2-git-send-email-ohad@wizery.com>
+ <4ECC6838.1010009@codeaurora.org>
+Message-ID: <CAK=WgbbzLKA_D85vOR02fuoCeGugS-rDUup9RihN+Q6TaSudnQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 23, 2011 at 03:08:09PM +0000, Peter Zijlstra wrote:
-> On Wed, 2011-11-23 at 14:56 +0000, Will Deacon wrote:
-> > In commit 004417a6 ("perf, arch: Cleanup perf-pmu init vs lockup-detector"),
-> > you moved the arch hw perf initialisation into an early initcall to satisfy a
-> > race with the NMI lock detector (I'm not clear on what the relationship is).
-> 
-> NMI watchdog uses perf, getting the NMI watchdog up early is good,
-> getting it up before perf is initialized, not so very good :-)
+Hi Stephen,
 
-Ah, ok. We don't use this on ARM so I'm not familiar with it.
+Thanks for the review !
 
-> > Anyway, with ARM big/little platforms on the horizon we have the fun of
-> > heterogeneous PMUs in the sense that:
-> > 
-> > 	- They may have different numbers of event counters
-> > 	- They may support different event types (possibly a distinct set)
-> > 	- The event encodings for the generalised events may be different
-> > 
-> > The latter two points I think can be solved in the back-end by making events
-> > affine to a particular PMU type (that is, they are only scheduled when the
-> > profiled task is running on a given PMU type), although I'm not sure how this
-> > will be exposed to userspace yet. It might be nice to register a separate
-> > PMU with perf altogether, but I don't think the userspace tools are there
-> > yet in terms of specifying the destination PMU for an event.
-> 
-> Ow gawd, that's horrid, will you please kick your cpu folks for me.
+On Wed, Nov 23, 2011 at 5:27 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> How big are the images you're loading? I had to split the memcpy up into
+> megabyte chunks because I was running out of virtual memory to map in
+> two huge chunks (one for the firmware and one for the image's resting
+> place). This may work for now, but I think it will fail for limited
+> virtual memory environments. Unless CMA solves this problem?
 
-Just keep telling yourself that it makes the software more interesting :)
+It definitely should.
 
-> > The first point is part of a bigger problem, namely that we can only find
-> > out the PMU topology of the system by probing the device tree. For older
-> > platforms, we will still probe the PMU of the boot CPU by inspecting the ID
-> > registers.
-> 
-> And here I throught DT was up _waaay_ early because its used to bring up
-> the platform itself, do I need to re-educate myself?
+The images we specifically load aren't that big (~5MB) but some of the
+use cases we have do require around a whopping 100MB, and with CMA
+things just work (we do have to reserve a private CMA pool obviously,
+but it's a no brainer).
 
-Well, I can probably probe the tree manually if I need to, it would just be
-nice to use the same probe function for DT and platform_device
-initialisation.
+> Also, this code assumes the firmware is actually as big as the elf
+> header says it is. It should be checking to make sure the elf_data is
+> actually big enough to copy from.
 
-> > My question is: does the hw perf initialisation really need to be an
-> > early_initcall and, if so, how much of the perf backend needs to be up and
-> > running? It may be that the early initcall assumes all PMUs are the same and
-> > then later on I go and rewrite things like the number of counters.
-> 
-> I think you can get away with doing it later, since you don't use the
-> NMI watchdog (although if you ever get NMI like functionality you really
-> should).
+Good point, thanks.
 
-Ok, thanks. I'm still just thinking my way around the problem but that's
-useful to know.
+> This is a bit odd. If I understand correctly, you load the firmware at
+> least twice. Once to see if the firmware has any virtio devices in the
+> resource table, and again when the image is actually loaded into RAM.
 
-> > Of course, any ideas regarding the above are more than welcome!
-> 
-> Yeah, I'll try and let it soak in my brain, who knows what it'll come up
-> with ;-)
+Right; the firmware is loaded once at boot time, and then every time
+the remote processor is powered up.
 
-Cheers. I think a key point to bear in mind is that it doesn't make sense to
-combine event counts from the two PMUs. The microarchitectures are different
-so we want to record them separately, even if the event encoding is the
-same (then you could see how many cycles you spent on big and how many on
-little, for example). An additional software event for cluster switch may
-also be useful.
+The former is required since we publish the remote services and their
+configurations (i.e. virtio devices, features and configurations) in
+the firmware, as a separate section (i.e. the "resource table"). We
+could use a separate file for this table, but we chose to couple it
+with the firmware in order to eliminate potential problems where the
+wrong resource table is loaded for a given firmware. It really makes
+sense since the resource table reflects the capabilities/requirements
+of the firmware.
 
-The main problem I'm having is fitting this into userspace where we probably
-want to specify the PMU for each event and also have some method for
-handling the generic events.
+> Is
+> there any way to avoid loading it twice? I ask because we have something
+> like a 20Mb image that needs to be loaded and I'd like to avoid loading
+> it twice just to read a section out of it the first time.
 
-Will
+Sure, we could think of several approaches to optimize this, e.g.
+either keep the firmware loaded after boot (possibly to some limited
+period of time) or just allow platforms to provide their resource
+table as a separate file.
+
+Though frankly I'd just prefer to trust the page cache to eliminate
+any redundant overhead (at least when the rproc is powered up close
+enough to boot time), or just ignore this issue completely: since this
+overhead happens only once on boot, and users tend not to really power
+off their devices so much, i'm not sure how painful it really is ?
+
+> What do you do if dev goes away?
+
+Call rproc_unregister(), which blocks if request_firmware_nowait()
+didn't complete yet.
+
+> What do you think about making remoteproc into a bus?
+
+That's a really interesting idea, with some nice properties.
+
+But I'm not sure if the bus model fits our use cases: buses
+exclusively couple a single driver to any given hardware instance
+(i.e. device), and I think that a remote processor is more like an
+IOMMU: it's a hardware device that is being used by many drivers, and
+not exclusively driven by a single one. So we really end up having
+several (completely different) drivers that depend on this hardware
+block, and need some API to power it up, rather than having a single
+driver that manipulates it exclusively.
+
+> I imagine this function
+> would allocate a struct device and then rproc_register() would actually
+> hook it into the device layer. Then we could use the device we allocate
+> here for the firmware requests and we also have a nice namespace for all
+> remote processors in the system. Plus all the management code for
+> refcounting would come for free with the device layer (modulo the
+> rproc_boot() count).
+
+We can probably still do this even without turning remoteproc into a
+bus (i.e. by creating this device inside rproc_register()). I
+originally pondered whether to do this or not, as many other kernel
+frameworks do this too when their ->register() API is invoked, but I
+couldn't think of any strong advantages in doing so. Sounds like it
+does worth exploring thought, thanks for the comment.
+
+> What is RSC_VIRTIO_CFG?
+
+Sorry, that's an undocumented (and unused) resource entry that is going away.
+
+It was supposed to specify virtio device features for a given virtio
+device, but I'm removing it as part of the resource table overhaul I'm
+doing: once the resource entries will have a variable length, the
+virtio header will just be an inherent part of the virtio device
+resource entry.
+
+> For MSM I see two main pain points:
+>
+> ?* CMA is new and untested on MSM. I imagine in MSM's situation we would
+> carve out the memory chunks early on for each processor and then only
+> remove that memory if the processor is booted? I hope that just works
+> somehow.
+
+For ARM v6+, CMA just works. It's really simple and straight forward to use.
+
+> ?* rproc is tied to virtio fairly closely.
+
+Only for firmwares that supports virtio. If yours doesn't, you can
+probably just ignore the virtio parts (though I really recommend to
+think of supporting it in the next relevant generation of chipsets of
+yours. It really is great.)
+
+> We probably won't be using
+> virtio anytime soon on MSM, unless we can do smd over virtio or
+> something. I'm not particularly knowledgeable about that though. Would
+> something like that be possible?
+
+Virtio today is highly coupled with its vring transport, which defines
+the shared memory "wire" protocol. Using it as-is pretty much means
+replacing smd completely (I assume that by smd you mostly care about
+keeping your firmware images as-is, which pretty much means using the
+smd's shared memory transport).
+
+But there's another way: virtio was originally designed to support
+several different transports, and actually had pluggable virtqueue ops
+which allowed several different transport implementations to co-exist.
+Since virtio_ring was the only transport that anyone ever used for a
+few years, the virtqueue ops were squashed and today virtio directly
+calls virtio_vring (see 7c5e9ed0c84e7d70d887878574590638d5572659).
+
+By reverting the aforementioned commit, you can potentially do virtio
+over smd, where smd will plug as another virtqueue_ops implementation.
+This is probably worth exploring, as you could then use rpmsg and the
+plethora of virtio drivers without really changing your firmware.
+
+> We would also have to keep using the rproc_get_by_name() approach until
+> we can actually start tying rproc devices to other devices in the kernel.
+
+I kept rproc_get_by_name() mainly for you guys :)
+
+I'd really want us to scrutinize its use cases though and see if we
+can get rid of it, as explained in the commentary.
+
+Thanks again for your review,
+Ohad.
