@@ -1,100 +1,51 @@
-From: carsten.behling@garz-fricke.com (Carsten Behling)
-Date: Wed, 23 Nov 2011 15:21:52 +0100
-Subject: AW: [PATCH v5 3/4] drivers/i2c/busses/i2c-at91.c: add new driver
-In-Reply-To: <EF2E73589CA71846A15D0B2CDF79505D087B40D349@wm021.weinmann.com>
-References: <D99582E5322435468A77E74BB0039E7B1D1655BF4D@SRV02.hamburg.garz-fricke.de>
- <EF2E73589CA71846A15D0B2CDF79505D087B40D16B@wm021.weinmann.com>
- <D99582E5322435468A77E74BB0039E7B1D1655BFBB@SRV02.hamburg.garz-fricke.de>
- <EF2E73589CA71846A15D0B2CDF79505D087B40D349@wm021.weinmann.com>
-Message-ID: <D99582E5322435468A77E74BB0039E7B1D1655C047@SRV02.hamburg.garz-fricke.de>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 23 Nov 2011 14:32:31 +0000
+Subject: Porting the 2.6.38 linux kernel to ARM11 MPcore
+In-Reply-To: <CAK-0apbxgJj6JHXOCaLf0tPgw3nPrBRnkYB23-brsRmdbBLz5g@mail.gmail.com>
+References: <CAK-0apYKjvxXasEfYCocjqEan5dKoXJgMON2gC-nMenKQaU9UQ@mail.gmail.com>
+ <CAHkRjk491+H9Wh-uV8807VSkZ4Mk+UK3Jv6EThtOsRb7ULpUjg@mail.gmail.com>
+ <CAK-0apaX6gPrHPWiE6zDCey7NvnMU2J5fOR0OXr_ZQCc+TUmyA@mail.gmail.com>
+ <CAK-0apbxgJj6JHXOCaLf0tPgw3nPrBRnkYB23-brsRmdbBLz5g@mail.gmail.com>
+Message-ID: <20111123143231.GA9148@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-I try to use the at24 eeprom driver on top of this driver.
-
-This EEPROM (24c32) works with two address bytes.
-
-Writing results in a call to at91_twi_xfer() with num=1.
-In this case the internal address register is not used and the address is sent out within the buffer.
-
-Reading results in a call to at91_twi_xfer() with num=2.
-In this case the internal address register is used.
-
-However the MSB of the internal address resides in msg->buf[0] and the LSB resides in msg->buf[1] of the first message.
-
-As a result the code:
-
-+		for (i = 0; i < msg->len; ++i) {
-+			internal_address |= ((unsigned)msg->buf[i]) << (8 * i);
-+			int_addr_flag += AT91_TWI_IADRSZ_1;
-+		}
-+		at91_twi_write(dev, AT91_TWI_IADR, internal_address);
-
-constructs an internal address in a wrong byte order.
-
-Example: Try to read from address 0x100:
-
-msg[0]->buf[0] = 0x1; 
-msg[0]->buf[1] = 0x0;
-
-results in
-
-internal_address = 0x1;
-
-I think it must be:
-
-+		for (i = 0; i < msg->len; ++i) {
-+			internal_address |= ((unsigned)msg->buf[msg->len-1-i]) << (8 * i);
-+			int_addr_flag += AT91_TWI_IADRSZ_1;
-+		}
-+		at91_twi_write(dev, AT91_TWI_IADR, internal_address);
-
-... or the at24 eeprom driver constructs the wrong internal address ...
-
-Mit freundlichen Gr??en / Best regards
-Carsten Behling
-
-Development Engineer
-Garz & Fricke GmbH
-Tempowerkring 2, 21079 Hamburg - Germany
-Amtsgericht Hamburg HRB 60514
-Gesch?ftsf?hrer: Manfred Garz, Matthias Fricke
-Phone: +49 (0) 40 791 899 - 56
-Fax:    +49 40 / 791 899 - 39
-www.garz-fricke.com 
-
- 
-
-
------Urspr?ngliche Nachricht-----
-Von: Voss, Nikolaus [mailto:N.Voss at weinmann.de] 
-Gesendet: Mittwoch, 23. November 2011 11:29
-An: Carsten Behling
-Cc: 'linux-i2c at vger.kernel.org'; 'linux-arm-kernel at lists.infradead.org'; 'linux-kernel@vger.kernel.org'
-Betreff: RE: [PATCH v5 3/4] drivers/i2c/busses/i2c-at91.c: add new driver
-
-Hi,
-
-Carsten Behling wrote on 2011-11-23:
-
->> this case is already catched in at91_do_twi_transfer():
+On Wed, Nov 23, 2011 at 02:14:06PM +0000, Moln?r G?bor wrote:
+> > Does your physical RAM start at 0xc0000000 and it is all ignored?
+> > Setting highmem would fix as all your lowmem (including the kernel
+> > code) would be unmapped, hence the fault. What's the VMALLOC_END
+> > defined to?
 > 
-> Sorry, I did not found this code in your patch.
-> (http://www.mail-archive.com/linux-i2c at vger.kernel.org/msg06556.html):
+> #define VMALLOC_END             0xf8000000
 > 
->> +       if (is_read) {
->> +               if (!dev->buf_len)
+> For the platform i use. The size of vmalloc is the default (128MB).
+> 
+> If HIGHMEM is not set, this area is executed:
+> 
+> >/*
+> >792                  * Check whether this memory bank would entirely overlap
+> >793                  * the vmalloc area.
+> >794                  */
+> >795                 if (__va(bank->start) >= vmalloc_min ||
+> >796                     __va(bank->start) < (void *)PAGE_OFFSET) {
+> >797                         printk(KERN_NOTICE "Ignoring RAM at %.8lx-%.8lx "
+> >798                                "(vmalloc region overlap).\n",
+> >799                                bank->start, bank->start + bank->size - 1);
+> >800                         continue;
+> >801                 }
+> 
+> static void * __initdata vmalloc_min = (void *)(VMALLOC_END - SZ_128M);
+> 
+> The kernel is loaded on the phisical address: 0xc0000000-0xc05000000.
+> (This region is given as atag_mem as well).
+> 
+> At the current configuration i believe vmalloc should be at
+> 0xF0000000-0xF8000000.
+> 
+> Why does this overlap with 0xC0000000-0xC0500000?
 
-yes, this won't work for buf_len == 1. It is corrected in
-https://lkml.org/lkml/2011/11/18/223 which I held back for some time
-as it should have been just a feature extension. I was not aware it
-also fixed the buf_len = 1 bug. Sorry for that...
+So it doesn't, in which case you may want to place some printk's in the
+kernel around the message reporting that your block of RAM is ignored.
 
-(Explanation: in the first implementation I immediately decremented
-buf_len, so buf_len == 1 could not occur. Later I removed that but
-did not fully fold it into the base patch.)
-
-Thanks,
-Niko
+-- 
+Catalin
