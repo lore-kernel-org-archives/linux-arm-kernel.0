@@ -1,31 +1,66 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 23 Nov 2011 23:39:57 +0000
-Subject: [PATCH] arm: dma:  Drop GFP_COMP for DMA memory allocations
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF174F08C785@HQMAIL01.nvidia.com>
-References: <1320442539-7753-1-git-send-email-swarren@nvidia.com>
- <74CDBE0F657A3D45AFBB94109FB122FF174080512F@HQMAIL01.nvidia.com>
- <74CDBE0F657A3D45AFBB94109FB122FF174F08C785@HQMAIL01.nvidia.com>
-Message-ID: <20111123233957.GM9581@n2100.arm.linux.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 23 Nov 2011 15:55:29 -0800
+Subject: [GIT PULL] omap fixes for v3.2-rc2, take 2
+Message-ID: <20111123235529.GK31337@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 23, 2011 at 11:10:03AM -0800, Stephen Warren wrote:
-> Stephen Warren wrote at Wednesday, November 09, 2011 11:04 AM:
-> > Stephen Warren wrote at Friday, November 04, 2011 3:36 PM:
-> > > dma_alloc_coherent wants to split pages after allocation in order to
-> > > reduce the memory footprint. This does not work well with GFP_COMP
-> > > pages, so drop this flag before allocation.
-> > >
-> > > This patch is ported from arch/avr32
-> > > (commit 3611553ef985ef7c5863c8a94641738addd04cff).
-> > >
-> > > Signed-off-by: Sumit Bhattacharya <sumitb@nvidia.com>
-> > > Tested-by: Varun Colbert <vcolbert@nvidia.com>
-> > > [swarren: s/HUGETLB_PAGE/HUGETLBFS/ in comment, minor comment cleanup]
-> > > Signed-off-by: Stephen Warren <swarren@nvidia.com>
-> > 
-> > Russell, does this look good to go in the patch system now?
-> 
-> ping?
+Hi Arnd,
 
-I think so.
+This one has the DSS patches left out, some patches sent to
+stable, and based on -rc2.
+
+Regards,
+
+Tony
+
+The following changes since commit cfcfc9eca2bcbd26a8e206baeb005b055dbf8e37:
+  Linus Torvalds (1):
+        Linux 3.2-rc2
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap fixes
+
+Felipe Balbi (1):
+      ARM: OMAP: smartreflex: fix IRQ handling bug
+
+Govindraj.R (1):
+      ARM: OMAP2+: Fix Compilation error when omap_l3_noc built as module
+
+Kevin Hilman (2):
+      ARM: OMAP3: CPUidle: include <linux/export.h>
+      ARM: OMAP: PM: only register TWL with voltage layer when device is present
+
+Ming Lei (1):
+      ARM: OMAP2: select ARM_AMBA if OMAP3_EMU is defined
+
+Thomas Weber (1):
+      ARM: OMAP2+: Remove empty io.h
+
+Tony Lindgren (4):
+      ARM: OMAP: Fix map_io for Amstrad E3
+      ARM: OMAP: Fix dpll_data compile error when omap2 only is selected
+      ARM: OMAP: Fix reprogramming of dpll1 rate
+      Merge branch 'fixes-v3.2-rc2' into fixes
+
+sricharan (1):
+      ARM: OMAP: hwmod: Fix the addr space, irq, dma count APIs
+
+ arch/arm/configs/omap1_defconfig        |    1 -
+ arch/arm/mach-omap1/Kconfig             |    8 -----
+ arch/arm/mach-omap1/board-ams-delta.c   |   10 ++++--
+ arch/arm/mach-omap1/clock.h             |    3 +-
+ arch/arm/mach-omap1/clock_data.c        |   53 ++++++++++++++++++++-----------
+ arch/arm/mach-omap1/devices.c           |    3 ++
+ arch/arm/mach-omap2/Kconfig             |    1 +
+ arch/arm/mach-omap2/cpuidle34xx.c       |    1 +
+ arch/arm/mach-omap2/omap_hwmod.c        |    6 ++--
+ arch/arm/mach-omap2/omap_l3_noc.c       |    2 +-
+ arch/arm/mach-omap2/pm.c                |    6 +--
+ arch/arm/mach-omap2/smartreflex.c       |    2 +-
+ arch/arm/mach-omap2/twl-common.c        |   11 ++++++
+ arch/arm/mach-omap2/twl-common.h        |    3 ++
+ arch/arm/plat-omap/include/plat/clock.h |    2 +-
+ 15 files changed, 70 insertions(+), 42 deletions(-)
+ delete mode 100644 arch/arm/mach-omap2/io.h
