@@ -1,59 +1,73 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Wed, 23 Nov 2011 16:17:49 +0530
-Subject: [PATCH v2 1/5] dmaengine: add ep93xx DMA support
-In-Reply-To: <20111122055925.GA15889@mwesterb-mobl.ger.corp.intel.com>
-References: <cover.1306662317.git.mika.westerberg@iki.fi>
- <3ea8d56034f25cbe3fd8a4c31d7d0d1540b6ac7e.1306662317.git.mika.westerberg@iki.fi>
- <4EC27EED.4030108@metasoft.pl>
- <20111116065512.GB2703@mwesterb-mobl.ger.corp.intel.com>
- <4EC374F0.8000400@metasoft.pl>
- <20111119123837.GA2711@mwesterb-mobl.ger.corp.intel.com>
- <4ECA0147.4020806@metasoft.pl>
- <20111121080158.GA2713@mwesterb-mobl.ger.corp.intel.com>
- <1321864326.1516.211.camel@vkoul-udesk3>
- <20111122055925.GA15889@mwesterb-mobl.ger.corp.intel.com>
-Message-ID: <1322045269.1516.247.camel@vkoul-udesk3>
+From: javier.martin@vista-silicon.com (javier Martin)
+Date: Wed, 23 Nov 2011 11:55:12 +0100
+Subject: [PATCH v2 1/2] MX2: Add platform definitions for eMMa-PrP device.
+In-Reply-To: <20111122210632.GS27267@pengutronix.de>
+References: <1321963316-9058-1-git-send-email-javier.martin@vista-silicon.com>
+ <1321963316-9058-2-git-send-email-javier.martin@vista-silicon.com>
+ <20111122210632.GS27267@pengutronix.de>
+Message-ID: <CACKLOr1Fi+wx1wDeOCR3rw3OdYYDB9Jq8S_XtDf7Mf7TtQxwgQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2011-11-22 at 07:59 +0200, Mika Westerberg wrote:
-> On Mon, Nov 21, 2011 at 02:02:06PM +0530, Vinod Koul wrote:
-> > On Mon, 2011-11-21 at 10:01 +0200, Mika Westerberg wrote:
-> > > On Mon, Nov 21, 2011 at 08:44:07AM +0100, Rafal Prylowski wrote:
-> > > > 
-> > > > I'm calling dma_terminate_all from interrupt. It seems that tasklet_kill is not
-> > > > allowed to be called from this context.
-> > > 
-> > > Ah, right.
-> > > 
-> > > One more try - this time we set a flag which prevents the tasktlet from
-> > > referencing an empty list.
-> 
-> > Rather than this why not actually check for list_empty and process only
-> > when it is not empty?
-> 
-> I was thinking that it should be an error if the active list is empty when the
-> tasklet is run.
-well where would you return the error from tasklet?
+Hi Sascha,
 
-> 
-> > Also you should check the return of the ep93xx_dma_get_active() which
-> > should return NULL if it didn't find anything in active list
-> 
-> Right - if the list is allowed to be empty.
-> 
-> I'll re-check the patch from Rafal. Maybe it's better to adapt with the fact
-> that dma_terminate_all() can be called in any context any time and modify the
-> driver accordingly (e.g like you say, return NULL if the list is empty handle
-> it correctly).
-Yes dma_terminate_all() is allowed to be called by the driver in any
-context. It may wish to terminate at any point and this can potentially
-lead to race condition when you do actual hardware right to terminate
-just when hardware sent the interrupt. And your tasklet is scheduled
-after the list becomes empty.
-So its better approach to check for list in tasklet and return of
-ep93xx_dma_get_active() for a valid descriptor
+On 22 November 2011 22:06, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> On Tue, Nov 22, 2011 at 01:01:55PM +0100, Javier Martin wrote:
+>> eMMa-PrP device included in Freescale i.MX2 chips can also
+>> be used separately to process memory buffers.
+>>
+>> Signed-off-by: Javier Martin <javier.martin@vista-silicon.com>
+>> ---
+>> ?arch/arm/mach-imx/devices-imx27.h ? ? ? ? ? ? ? | ? ?2 +
+>> ?arch/arm/plat-mxc/devices/platform-mx2-camera.c | ? 33 +++++++++++++++++++++++
+>> ?arch/arm/plat-mxc/include/mach/devices-common.h | ? ?2 +
+>> ?3 files changed, 37 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-imx/devices-imx27.h b/arch/arm/mach-imx/devices-imx27.h
+>> index 2f727d7..519aa36 100644
+>> --- a/arch/arm/mach-imx/devices-imx27.h
+>> +++ b/arch/arm/mach-imx/devices-imx27.h
+>> @@ -50,6 +50,8 @@ extern const struct imx_imx_uart_1irq_data imx27_imx_uart_data[];
+>> ?extern const struct imx_mx2_camera_data imx27_mx2_camera_data;
+>> ?#define imx27_add_mx2_camera(pdata) ?\
+>> ? ? ? imx_add_mx2_camera(&imx27_mx2_camera_data, pdata)
+>> +#define imx27_alloc_mx2_emmaprp(pdata) ? ? ? \
+>> + ? ? imx_alloc_mx2_emmaprp(&imx27_mx2_camera_data)
+>>
+>> ?extern const struct imx_mxc_ehci_data imx27_mxc_ehci_otg_data;
+>> ?#define imx27_add_mxc_ehci_otg(pdata) ? ? ? ?\
+>> diff --git a/arch/arm/plat-mxc/devices/platform-mx2-camera.c b/arch/arm/plat-mxc/devices/platform-mx2-camera.c
+>> index b3f4828..4a8bd73 100644
+>> --- a/arch/arm/plat-mxc/devices/platform-mx2-camera.c
+>> +++ b/arch/arm/plat-mxc/devices/platform-mx2-camera.c
+>> @@ -6,6 +6,7 @@
+>> ? * the terms of the GNU General Public License version 2 as published by the
+>> ? * Free Software Foundation.
+>> ? */
+>> +#include <linux/dma-mapping.h>
+>> ?#include <mach/hardware.h>
+>> ?#include <mach/devices-common.h>
+>>
+>> @@ -62,3 +63,35 @@ struct platform_device *__init imx_add_mx2_camera(
+>> ? ? ? ? ? ? ? ? ? ? ? res, data->iobaseemmaprp ? 4 : 2,
+>> ? ? ? ? ? ? ? ? ? ? ? pdata, sizeof(*pdata), DMA_BIT_MASK(32));
+>> ?}
+>> +
+>> +struct platform_device *__init imx_alloc_mx2_emmaprp(
+>> + ? ? ? ? ? ? const struct imx_mx2_camera_data *data)
+>
+> Why only alloc and not register?
 
+You are right. That would make things more compact at board level as
+it is done with other devices such as SSI, etc...
+I will send a v3 version of this patch soon addressing this.
 
+Regards.
 -- 
-~Vinod
+Javier Martin
+Vista Silicon S.L.
+CDTUC - FASE C - Oficina S-345
+Avda de los Castros s/n
+39005- Santander. Cantabria. Spain
++34 942 25 32 60
+www.vista-silicon.com
