@@ -1,42 +1,51 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 23 Nov 2011 21:15:40 +0000
-Subject: [GIT PULL] omap fixes for v3.2-rc2
-In-Reply-To: <20111119194408.GD31337@atomide.com>
-References: <20111119194408.GD31337@atomide.com>
-Message-ID: <201111232115.41035.arnd@arndb.de>
+Date: Wed, 23 Nov 2011 21:15:45 +0000
+Subject: [GIT PULL] mx5 merge
+In-Reply-To: <20111116075053.GG27267@pengutronix.de>
+References: <20111116075053.GG27267@pengutronix.de>
+Message-ID: <201111232115.45313.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 19 November 2011, Tony Lindgren wrote:
-> Please pull omap fixes from:
+On Wednesday 16 November 2011, Sascha Hauer wrote:
+> Please pull the following branch which merges the mx5 architecture into
+> mach-imx. As said before, I'd love to get this into this -rc cycle
+> because we would get unnecessary merge conflicts later. Anyway, if you
+> think that this is a really bad idea please pull it for next.
 > 
-> git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap fixes
+> Sascha
 > 
-> Most of this pull request are fixes needed by Tomi for the
-> display driver clocking.
+> The following changes since commit 1ea6b8f48918282bdca0b32a34095504ee65bab5:
 > 
+>   Linux 3.2-rc1 (2011-11-07 16:16:02 -0800)
+> 
+> are available in the git repository at:
+>   git://git.pengutronix.de/git/imx/linux-2.6.git mx5-merge
 
-Hi Tony,
+Hi Sascha,
 
-Sorry for the delay on my side, I've only today looked at this series.
-The patches all look ok, as far as I can tell, but please rebase
-the series to make it easier to see what is going on:
+I've pulled it into the imx/move branch, to be merged through the next/move
+branch in arm-soc now.
 
-* At least one of the sub-branches is based on a random commit on
-  Linus' tree. Please always base patches on an -rc for consistency!
+Sorry for not replying earlier. I think the best plan is to do it at the
+end of a merge window, but I didn't feel comfortable at the end of the
+3.2-rc1 because I had not seen the patches before.
 
-* Out of the 20 patches, not one is marked for 'stable' backports.
-  I really want to make sure this time that all long-standing bugs
-  get fixed in stable releases, so please go through the list and
-  add 'Cc: stable at kernel.org' to the ones you want to have backported.
-  If all patches are actually addressing regressions, just tell me
-  in the introductory mail next time.
+Since almost all the files are trivially moved, I think we can best avoid
+all merge conflicts by applying the move changeset last after all other
+changes to mx5 code have gone in. I'll gladly take care of regenerating
+the patch before I send it (and letting you double-check the result).
 
-* Since a lot of patches address the dss, it would be nice to have
-  a separate pull request for those. It's not really important, but
-  I feel that it's easier to review stuff that is less mixed and
-  splitting them out should be easy if you rebase the series anyway.
+However, what I'd like you to do is minimize the changes that don't
+just move entire files around by submitting them as a cleanup branch
+that I can apply *before* all other patches. I think we should have
+separate patches for these changes:
 
-Thanks for your patience,
+* merge mach-mx5/system.c into pm-imx5.c
+* merge arch/arm/mach-mx5/Kconfig into arch/arm/mach-imx/Kconfig
+* ARM i.MX5: remove unnecessary includes from board files
+
+If we do these early, the remaining move will be even more trivial
+than the current series.
 
 	Arnd
