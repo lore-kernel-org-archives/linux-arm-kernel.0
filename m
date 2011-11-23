@@ -1,52 +1,81 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Wed, 23 Nov 2011 17:13:05 +0800
-Subject: [PATCH] IMX/SDMA : save the real count for one DMA transaction.
-Message-ID: <1322039585-7901-1-git-send-email-b32955@freescale.com>
+From: carsten.behling@garz-fricke.com (Carsten Behling)
+Date: Wed, 23 Nov 2011 10:31:44 +0100
+Subject: AW: [PATCH v5 3/4] drivers/i2c/busses/i2c-at91.c: add new driver
+In-Reply-To: <EF2E73589CA71846A15D0B2CDF79505D087B40D16B@wm021.weinmann.com>
+References: <D99582E5322435468A77E74BB0039E7B1D1655BF4D@SRV02.hamburg.garz-fricke.de>
+ <EF2E73589CA71846A15D0B2CDF79505D087B40D16B@wm021.weinmann.com>
+Message-ID: <D99582E5322435468A77E74BB0039E7B1D1655BFBB@SRV02.hamburg.garz-fricke.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When we use the SDMA in the UART driver(such as imx6q), we will
-meet one situation:
-  Assume we set 64 bytes for the RX DMA buffer.
-The receiving DMA buffer is not full, but the an Aging DMA request
-will be received by the SDMA controller if we enable the
-IDDMAEN(UCR4[6]).
-  The UART driver needs to know the count of the real received bytes,
-and push them to upper layer.
+> this case is already catched in at91_do_twi_transfer():
 
-  So reuse the `private` field of dma_chan{}. Store the count of received bytes
-to it, and use it in the UART driver.
+Sorry, I did not found this code in your patch.
+(http://www.mail-archive.com/linux-i2c at vger.kernel.org/msg06556.html):
 
-Signed-off-by: Huang Shijie <b32955@freescale.com>
----
- drivers/dma/imx-sdma.c |    6 ++++++
- 1 files changed, 6 insertions(+), 0 deletions(-)
+> +       if (is_read) {
+> +               if (!dev->buf_len)
+> +                       at91_twi_write(dev, AT91_TWI_CR,
+> +                                      AT91_TWI_START | AT91_TWI_STOP);
+> +               else
+> +                       at91_twi_write(dev, AT91_TWI_CR, AT91_TWI_START);
+> +               at91_twi_write(dev, AT91_TWI_IER,
+> +                              AT91_TWI_TXCOMP | AT91_TWI_RXRDY);
+> +       } else {
+> +               at91_twi_write_next_byte(dev);
+> +               at91_twi_write(dev, AT91_TWI_IER,
+> +                              AT91_TWI_TXCOMP | AT91_TWI_TXRDY);
+> +       }
 
-diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
-index f993955..19ce579 100644
---- a/drivers/dma/imx-sdma.c
-+++ b/drivers/dma/imx-sdma.c
-@@ -501,6 +501,8 @@ static void sdma_handle_channel_loop(struct sdma_channel *sdmac)
- static void mxc_sdma_handle_channel_normal(struct sdma_channel *sdmac)
- {
- 	struct sdma_buffer_descriptor *bd;
-+	struct dma_chan *chan = &sdmac->chan;
-+	unsigned int count;
- 	int i, error = 0;
+Is there a more recent version ?
+
+Mit freundlichen Gr??en / Best regards
+Carsten Behling
+
+Development Engineer
+Garz & Fricke GmbH
+Tempowerkring 2, 21079 Hamburg - Germany
+Amtsgericht Hamburg HRB 60514
+Gesch?ftsf?hrer: Manfred Garz, Matthias Fricke
+Phone: +49 (0) 40 791 899 - 56
+Fax:    +49 40 / 791 899 - 39
+www.garz-fricke.com 
+
  
- 	/*
-@@ -512,8 +514,12 @@ static void mxc_sdma_handle_channel_normal(struct sdma_channel *sdmac)
- 
- 		 if (bd->mode.status & (BD_DONE | BD_RROR))
- 			error = -EIO;
-+		 count += bd->mode.count;
- 	}
- 
-+	/* save the real count we received or transmitted. */
-+	chan->private = (void *)count;
+
+
+-----Urspr?ngliche Nachricht-----
+Von: Voss, Nikolaus [mailto:N.Voss at weinmann.de] 
+Gesendet: Dienstag, 22. November 2011 17:26
+An: Carsten Behling
+Cc: 'linux-i2c at vger.kernel.org'; 'linux-arm-kernel at lists.infradead.org'; 'linux-kernel at vger.kernel.org'
+Betreff: RE: [PATCH v5 3/4] drivers/i2c/busses/i2c-at91.c: add new driver
+
+Hi,
+
+Carsten Behling wrote on 2011-11-22:
+> +static void at91_twi_read_next_byte(struct at91_twi_dev *dev)
+> +{
+> +       *dev->buf = at91_twi_read(dev, AT91_TWI_RHR) & 0xff;
+> +
+> +       /* send stop if second but last byte has been read */
+> +       if (--dev->buf_len == 1)
+> +               at91_twi_write(dev, AT91_TWI_CR, AT91_TWI_STOP);
+> 
+> 
+> 
+> If dev->buf_len =1 at the beginning of a read transfer, a stop condition will
+> never be send.
+
+this case is already catched in at91_do_twi_transfer():
+
++       if (dev->msg->flags & I2C_M_RD) {
++               unsigned start_flags = AT91_TWI_START;
 +
- 	if (error)
- 		sdmac->status = DMA_ERROR;
- 	else
--- 
-1.7.3.2
++               /* if only one byte is to be read, immediately stop transfer */
++               if (dev->buf_len <= 1 && !(dev->msg->flags & I2C_M_RECV_LEN))
++                       start_flags |= AT91_TWI_STOP;
++               at91_twi_write(dev, AT91_TWI_CR, start_flags);
+
+Thanks for reviewing,
+Niko
