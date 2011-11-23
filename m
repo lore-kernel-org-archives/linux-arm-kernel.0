@@ -1,26 +1,20 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 23 Nov 2011 13:01:35 +0000
-Subject: -next fails to boot as of today on S3C6410
-In-Reply-To: <20111123122855.GB7382@totoro>
-References: <20111122192741.GG30583@opensource.wolfsonmicro.com>
- <20111122193124.GB9581@n2100.arm.linux.org.uk>
- <20111122193957.GH30583@opensource.wolfsonmicro.com>
- <20111122222135.GB7845@gallagher>
- <20111123120534.GO21073@opensource.wolfsonmicro.com>
- <20111123122855.GB7382@totoro>
-Message-ID: <20111123130134.GB12227@opensource.wolfsonmicro.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 23 Nov 2011 11:05:00 -0200
+Subject: BUG: sleeping function called from invalid context
+In-Reply-To: <CAOMZO5DSvLU0ACJPZ69tzY0PjMijibSzwCEwBhu=5=mg7ncF=g@mail.gmail.com>
+References: <4ECCDAA2.4070502@prolan.hu>
+ <CAOMZO5DSvLU0ACJPZ69tzY0PjMijibSzwCEwBhu=5=mg7ncF=g@mail.gmail.com>
+Message-ID: <CAOMZO5A1dfkG9UOE6MqBFKG6LV=T8G0-SWedNbhErhAZiEm83A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 23, 2011 at 12:28:55PM +0000, Jamie Iles wrote:
+On Wed, Nov 23, 2011 at 10:44 AM, Fabio Estevam <festevam@gmail.com> wrote:
 
-> Hmm, I really can't see what could cause this - we don't have a to_irq() 
-> ops method, hwirq_base is correctly initialised to 0 with 32 irqs per 
-> VIC and we aren't using dynamic irq_desc's.
+> Looks like the same error I faced before:
+> http://marc.info/?l=linux-arm-kernel&m=131914543319956&w=2
 
-Are you sure the numbers come out the same as they would otherwise.
+Also, can you please try Sascha's imx-features branch?
+http://git.pengutronix.de/?p=imx/linux-2.6.git;a=shortlog;h=refs/heads/imx-features
 
-> Do you have any low-level serial debug?
-
-I tried adding some yesterday around the VIC registration in the CPU
-code but it didn't actually appear on the console so I'm none the wiser.
+It contains a patch series from Richard Zhao that introduces
+clk_prepare that may possibly help with this issue.
