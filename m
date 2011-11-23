@@ -1,22 +1,33 @@
-From: eric.miao@linaro.org (Eric Miao)
-Date: Wed, 23 Nov 2011 23:19:14 +0800
-Subject: [PATCH] ASoC: skip resume of soc-audio devices without codecs
-In-Reply-To: <20111123145828.GG20272@opensource.wolfsonmicro.com>
-References: <1322059020-24305-1-git-send-email-eric.miao@linaro.org>
- <20111123145828.GG20272@opensource.wolfsonmicro.com>
-Message-ID: <CAMPhdO-f+tjbbyDuFDPUwERKpHfUuJJTha_pzc6BVBqy4LFrWw@mail.gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 23 Nov 2011 13:19:49 -0200
+Subject: [PATCH v3 2/2] MEM2MEM: Add support for eMMa-PrP mem2mem
+ operations.
+In-Reply-To: <1322061227-6631-3-git-send-email-javier.martin@vista-silicon.com>
+References: <1322061227-6631-1-git-send-email-javier.martin@vista-silicon.com>
+ <1322061227-6631-3-git-send-email-javier.martin@vista-silicon.com>
+Message-ID: <CAOMZO5AEZZEYSMXtXwCw4Qx9sY5hzZmd7t7b4teROntskBmbVQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 23, 2011 at 10:58 PM, Mark Brown
-<broonie@opensource.wolfsonmicro.com> wrote:
-> On Wed, Nov 23, 2011 at 10:37:00PM +0800, Eric Miao wrote:
->> There are cases where there is no working codec on the soc-audio devices,
->> and snd_soc_suspend() will skip such device when suspending. Yet its
->> counterpart snd_soc_resume() does not check this, causing complaints
->> about spinlock lockup:
->
-> Oh, and I just noticed that you didn't CC either Liam or the ALSA list
-> which you really should've done.
+Javier,
 
-Noted.
+On Wed, Nov 23, 2011 at 1:13 PM, Javier Martin
+<javier.martin@vista-silicon.com> wrote:
+> Changes since v2:
+> - Use devres to simplify error handling.
+> - Remove unused structures.
+> - Fix clock handling.
+> - Other minor problems.
+
+It would be better if you put such comments below the --- line.
+
+For the commit message you can use the one you did for the cover
+letter (0/2) patch:
+
+"i.MX2x SoCs have a PrP which is capable of resizing and format
+conversion of video frames. This driver provides support for
+resizing and format conversion from YUYV to YUV420.
+
+This operation is of the utmost importance since some of these
+SoCs like i.MX27 include an H.264 video codec which only
+accepts YUV420 as input."
