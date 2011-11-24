@@ -1,39 +1,25 @@
 From: buytenh@wantstofly.org (Lennert Buytenhek)
-Date: Thu, 24 Nov 2011 07:40:18 +0100
-Subject: [PATCH] ARM: mach-orion5x: Use hex2bin that is present in kernel
- lib
-In-Reply-To: <1322058417.2472.9.camel@localhost.localdomain>
-References: <1322058417.2472.9.camel@localhost.localdomain>
-Message-ID: <20111124064018.GD795@wantstofly.org>
+Date: Thu, 24 Nov 2011 07:45:17 +0100
+Subject: [PATCH 14/41] ARM: restart: iop3xx: use new restart hook
+In-Reply-To: <20111117172858.GA9581@n2100.arm.linux.org.uk>
+References: <20111106173113.GI12913@n2100.arm.linux.org.uk>
+ <E1RN6lu-0001XV-D3@rmk-PC.arm.linux.org.uk>
+ <20111117172858.GA9581@n2100.arm.linux.org.uk>
+Message-ID: <20111124064517.GE795@wantstofly.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 23, 2011 at 04:26:57PM +0200, plaes at plaes.org wrote:
+On Thu, Nov 17, 2011 at 05:28:58PM +0000, Russell King - ARM Linux wrote:
 
-> Hey!
-
-Hello!
-
-
-> I noticed there was some duplicate code under arm/mach-orion5x directory
-> so I ended up with a patch that uses existing library function present
-> in kernel code.
+> Ack?
 > 
-> I regretfully have to admit that this patch is NOT even compile-tested,
-> but I hope that it still useful in case it happens to break something...
->
-> [...]
->
->  	for (i = 0; i < 6; i++)	{
-> -		int byte;
-> -
-> -		byte = dns323_parse_hex_byte(mac_page + (i * 3));
-> -		if (byte < 0) {
-> +		if (hex2bin(addr[i], mac_page + (i * 3), 2))
->  			goto error_fail;
+> On Sun, Nov 06, 2011 at 05:44:42PM +0000, Russell King - ARM Linux wrote:
+> > Hook these platforms restart code into the arm_pm_restart hook rather
+> > than using arch_reset().
+> > 
+> > In doing so, we split out the n2100 platform specific restart handler
+> > into the n2100 platform file.
+> > 
+> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
-I don't think that this does what you think it does...
-
-
-thanks,
-Lennert
+Acked-by: Lennert Buytenhek <buytenh@wantstofly.org>
