@@ -1,22 +1,124 @@
-From: cbouatmailru@gmail.com (Anton Vorontsov)
-Date: Fri, 25 Nov 2011 02:22:46 +0400
-Subject: [PATCH] ARM: sa1100: collie: Remove irq_to_gpio from power driver
-In-Reply-To: <1321727197-26686-1-git-send-email-jochen@scram.de>
-References: <1321727197-26686-1-git-send-email-jochen@scram.de>
-Message-ID: <20111124222246.GA19585@oksana.dev.rtsoft.ru>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Thu, 24 Nov 2011 22:26:01 +0000
+Subject: [PATCH 1/3] ARM: at91/aic: add device tree support for AIC
+In-Reply-To: <167b5ccfc31d9637186c5201cd83cb62df81fc0f.1322171620.git.nicolas.ferre@atmel.com>
+References: <167b5ccfc31d9637186c5201cd83cb62df81fc0f.1322171620.git.nicolas.ferre@atmel.com>
+Message-ID: <20111124222601.GA28582@gallagher>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 19, 2011 at 07:26:37PM +0100, Jochen Friedrich wrote:
-> Since 9d08d5d77a355510c2f5657c86b0a4b25acfe72c, irq_to_gpio() is no
-> longer available but still in use by collie_battery.c. As it's just
-> for a debug message, just get rid of this call.
+Hi Nicolas,
+
+On Thu, Nov 24, 2011 at 10:56:27PM +0100, Nicolas Ferre wrote:
+> Ioremap registers from DT specification and adding
+> of a simple irq domain for AIC interrupts.
 > 
-> Signed-off-by: Jochen Friedrich <jochen@scram.de>
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 > ---
 
-Applied to battery-urgent.git, thanks!
+Apologies if I've missed it somewhere but I think this needs to be 
+documented in Documentation/devicetree.
 
--- 
-Anton Vorontsov
-Email: cbouatmailru at gmail.com
+[...]
+> diff --git a/arch/arm/mach-at91/irq.c b/arch/arm/mach-at91/irq.c
+> index be6b639..80783b0 100644
+> --- a/arch/arm/mach-at91/irq.c
+> +++ b/arch/arm/mach-at91/irq.c
+> @@ -24,6 +24,8 @@
+>  #include <linux/module.h>
+>  #include <linux/mm.h>
+>  #include <linux/types.h>
+> +#include <linux/of_address.h>
+> +#include <linux/irqdomain.h>
+>  
+>  #include <mach/hardware.h>
+>  #include <asm/irq.h>
+> @@ -34,6 +36,7 @@
+>  #include <asm/mach/map.h>
+>  
+>  void __iomem *at91_aic_base;
+> +static struct irq_domain at91_aic_domain;
+>  
+>  static void at91_aic_mask_irq(struct irq_data *d)
+>  {
+> @@ -127,14 +130,44 @@ static struct irq_chip at91_aic_chip = {
+>  	.irq_set_wake	= at91_aic_set_wake,
+>  };
+>  
+> +#if defined(CONFIG_OF)
+> +static struct of_device_id aic_ids[]  = {
+> +	{ .compatible = "atmel,at91rm9200-aic" },
+> +	{ /*sentinel*/ }
+> +};
+> +
+> +static int __init at91_aic_of_init(void)
+> +{
+> +	struct device_node *np;
+> +
+> +	np = of_find_matching_node(NULL, aic_ids);
+> +	if (np == NULL)
+> +		return -ENODEV;
+> +
+> +	at91_aic_base = of_iomap(np, 0);
+> +	at91_aic_domain.of_node = np;
+
+I think this needs to be:
+
+	at91_aic_domain.of_node = of_node_get(np);
+
+to keep the reference count.
+
+> +	/* Keep refcount of the node */
+> +
+> +	return 0;
+> +}
+> +#else
+> +static int __init at91_aic_of_init(void)
+> +{
+> +	return -ENOSYS;
+> +}
+> +#endif
+
+I think it's preferred if you use of_irq_init() here as it can handle 
+the ordering of IRQ controllers.  There are GIC and VIC bindings in 
+-next that use this and provide a way for non-DT platforms to still use 
+the drivers.
+
+>  /*
+>   * Initialize the AIC interrupt controller.
+>   */
+>  void __init at91_aic_init(unsigned int priority[NR_AIC_IRQS])
+>  {
+>  	unsigned int i;
+> +	int ret;
+>  
+> -	at91_aic_base = ioremap(AT91_AIC, 512);
+> +	ret = at91_aic_of_init();
+> +	if (ret < 0)
+> +		at91_aic_base = ioremap(AT91_AIC, 512);
+>  
+>  	if (!at91_aic_base)
+>  		panic("Impossible to ioremap AT91_AIC\n");
+> @@ -169,4 +202,10 @@ void __init at91_aic_init(unsigned int priority[NR_AIC_IRQS])
+>  	/* Disable and clear all interrupts initially */
+>  	at91_aic_write(AT91_AIC_IDCR, 0xFFFFFFFF);
+>  	at91_aic_write(AT91_AIC_ICCR, 0xFFFFFFFF);
+> +
+> +	/* Add irq domain for AIC */
+> +	at91_aic_domain.irq_base = at91_aic_domain.hwirq_base = 0;
+> +	at91_aic_domain.nr_irq = NR_AIC_IRQS;
+> +	at91_aic_domain.ops = &irq_domain_simple_ops;
+
+irq_domain_simple_ops is only exported when CONFIG_OF_IRQ=y, so this 
+probably won't work for !CONFIG_USE_OF.
+
+> +	irq_domain_add(&at91_aic_domain);
+>  }
+> -- 
+> 1.7.5.4
+> 
+> _______________________________________________
+> devicetree-discuss mailing list
+> devicetree-discuss at lists.ozlabs.org
+> https://lists.ozlabs.org/listinfo/devicetree-discuss
