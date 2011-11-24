@@ -1,28 +1,31 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 24 Nov 2011 08:41:46 +0100
-Subject: [PATCH v7 0/3] ARM: mxs: add recording support for saif
-In-Reply-To: <20111124074619.GJ17979@S2100-06.ap.freescale.net>
-References: <a> <1321977265-14959-1-git-send-email-b29396@freescale.com>
- <20111124073605.GI17979@S2100-06.ap.freescale.net>
- <20111124074619.GJ17979@S2100-06.ap.freescale.net>
-Message-ID: <20111124074146.GT19986@pengutronix.de>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 24 Nov 2011 15:52:20 +0800
+Subject: [PATCH] i2c-mxs: fix compile warning in mxs_i2c_xfer()
+Message-ID: <1322121140-5216-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 24, 2011 at 03:46:20PM +0800, Shawn Guo wrote:
-> On Thu, Nov 24, 2011 at 03:36:05PM +0800, Shawn Guo wrote:
-> > During the testing, the saif driver's dependency on
-> > REGULATOR_FIXED_VOLTAGE was found.  I guess it should be resolved
-> > in sound/soc/mxs/Kconfig rather than leaving it to users.
-> > 
-> Also SND_SOC_MXS_SGTL5000 should probably depends on I2C_MXS than I2C.
-Hmm, I think it's common and accepted that an i2c device doesn't depend
-on an i2c bus driver. In this case it's quite probable that you want
-I2C_MXS, but technically you could also use I2C_GPIO.
+  CC      drivers/i2c/busses/i2c-mxs.o
+drivers/i2c/busses/i2c-mxs.c: In function ?mxs_i2c_xfer?:
+drivers/i2c/busses/i2c-mxs.c:196:6: warning: ?data? may be used uninitialized in this function
 
-Best regards
-Uwe
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ drivers/i2c/busses/i2c-mxs.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
+diff --git a/drivers/i2c/busses/i2c-mxs.c b/drivers/i2c/busses/i2c-mxs.c
+index 7e78f7c..00f098f 100644
+--- a/drivers/i2c/busses/i2c-mxs.c
++++ b/drivers/i2c/busses/i2c-mxs.c
+@@ -193,7 +193,7 @@ static int mxs_i2c_wait_for_data(struct mxs_i2c_dev *i2c)
+ 
+ static int mxs_i2c_finish_read(struct mxs_i2c_dev *i2c, u8 *buf, int len)
+ {
+-	u32 data;
++	u32 data = 0;
+ 	int i;
+ 
+ 	for (i = 0; i < len; i++) {
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+1.7.4.1
