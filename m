@@ -1,134 +1,147 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 24 Nov 2011 20:34:43 +0000
-Subject: [PATCH] arm/tegra: Fix build error with tegra_assert_system_reset
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF174F08C6CC@HQMAIL01.nvidia.com>
-References: <1322009631-711-1-git-send-email-swarren@nvidia.com>
- <20111123095009.GG9581@n2100.arm.linux.org.uk>
- <74CDBE0F657A3D45AFBB94109FB122FF174F08C6CC@HQMAIL01.nvidia.com>
-Message-ID: <20111124203443.GU9581@n2100.arm.linux.org.uk>
+Date: Thu, 24 Nov 2011 20:37:48 +0000
+Subject: [PATCH] ARM: w90x900: add common nuc9xx.h
+In-Reply-To: <CAKT61h9v8uVBF3orXOESq8piajzxY4VXCQ7Ox8g96dndGUwoXg@mail.gmail.com>
+References: <E1RRUQa-0005MI-5C@rmk-PC.arm.linux.org.uk>
+ <CAKT61h9v8uVBF3orXOESq8piajzxY4VXCQ7Ox8g96dndGUwoXg@mail.gmail.com>
+Message-ID: <20111124203748.GV9581@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 23, 2011 at 08:59:48AM -0800, Stephen Warren wrote:
-> OK, I tested that and it works too.
-
-Great.  Here's the final patch - could I have an ack for it please?
+On Mon, Nov 21, 2011 at 11:56:04AM +0800, Wan ZongShun wrote:
+> 2011/11/19 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> > Rather than having separate extern declarations in nuc9*.h, provide
+> > a common header file containing these definitions.
+> >
+> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> 
+> Tested-by :Wan Zongshun <mcuos.com@gmail.com>
 
 Thanks.
 
-8<======
-ARM: restart: tegra: use new restart hook
+Here's the follow-on patch for w90x900 for the restart fixups.  Ack?
+
+8<=====
+ARM: restart: w90x900: use new restart hook
 
 Hook these platforms restart code into the new restart hook rather
 than using arch_reset().
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mach-tegra/board-dt.c            |    1 +
- arch/arm/mach-tegra/board-harmony.c       |    1 +
- arch/arm/mach-tegra/board-paz00.c         |    1 +
- arch/arm/mach-tegra/board-seaboard.c      |    3 +++
- arch/arm/mach-tegra/board-trimslice.c     |    1 +
- arch/arm/mach-tegra/common.c              |    2 --
- arch/arm/mach-tegra/include/mach/system.h |    6 +++---
- 7 files changed, 10 insertions(+), 5 deletions(-)
+ arch/arm/mach-w90x900/cpu.c                 |   16 ++++++++++++++++
+ arch/arm/mach-w90x900/include/mach/system.h |   17 -----------------
+ arch/arm/mach-w90x900/mach-nuc910evb.c      |    1 +
+ arch/arm/mach-w90x900/mach-nuc950evb.c      |    1 +
+ arch/arm/mach-w90x900/mach-nuc960evb.c      |    1 +
+ arch/arm/mach-w90x900/nuc9xx.h              |    1 +
+ 6 files changed, 20 insertions(+), 17 deletions(-)
 
-diff --git a/arch/arm/mach-tegra/board-dt.c b/arch/arm/mach-tegra/board-dt.c
-index d368f8d..a00713c 100644
---- a/arch/arm/mach-tegra/board-dt.c
-+++ b/arch/arm/mach-tegra/board-dt.c
-@@ -131,5 +131,6 @@ DT_MACHINE_START(TEGRA_DT, "nVidia Tegra (Flattened Device Tree)")
- 	.init_irq	= tegra_init_irq,
- 	.timer		= &tegra_timer,
- 	.init_machine	= tegra_dt_init,
-+	.restart	= tegra_assert_system_reset,
- 	.dt_compat	= tegra_dt_board_compat,
- MACHINE_END
-diff --git a/arch/arm/mach-tegra/board-harmony.c b/arch/arm/mach-tegra/board-harmony.c
-index f0bdc5e..7eaa52d 100644
---- a/arch/arm/mach-tegra/board-harmony.c
-+++ b/arch/arm/mach-tegra/board-harmony.c
-@@ -189,4 +189,5 @@ MACHINE_START(HARMONY, "harmony")
- 	.init_irq       = tegra_init_irq,
- 	.timer          = &tegra_timer,
- 	.init_machine   = tegra_harmony_init,
-+	.restart	= tegra_assert_system_reset,
- MACHINE_END
-diff --git a/arch/arm/mach-tegra/board-paz00.c b/arch/arm/mach-tegra/board-paz00.c
-index 55c55ba..28c97e3 100644
---- a/arch/arm/mach-tegra/board-paz00.c
-+++ b/arch/arm/mach-tegra/board-paz00.c
-@@ -192,4 +192,5 @@ MACHINE_START(PAZ00, "Toshiba AC100 / Dynabook AZ")
- 	.init_irq       = tegra_init_irq,
- 	.timer          = &tegra_timer,
- 	.init_machine   = tegra_paz00_init,
-+	.restart	= tegra_assert_system_reset,
- MACHINE_END
-diff --git a/arch/arm/mach-tegra/board-seaboard.c b/arch/arm/mach-tegra/board-seaboard.c
-index bf13ea3..9b2eca1 100644
---- a/arch/arm/mach-tegra/board-seaboard.c
-+++ b/arch/arm/mach-tegra/board-seaboard.c
-@@ -286,6 +286,7 @@ MACHINE_START(SEABOARD, "seaboard")
- 	.init_irq       = tegra_init_irq,
- 	.timer          = &tegra_timer,
- 	.init_machine   = tegra_seaboard_init,
-+	.restart	= tegra_assert_system_reset,
- MACHINE_END
+diff --git a/arch/arm/mach-w90x900/cpu.c b/arch/arm/mach-w90x900/cpu.c
+index 0a235e5..604e1db 100644
+--- a/arch/arm/mach-w90x900/cpu.c
++++ b/arch/arm/mach-w90x900/cpu.c
+@@ -33,9 +33,11 @@
+ #include <mach/regs-serial.h>
+ #include <mach/regs-clock.h>
+ #include <mach/regs-ebi.h>
++#include <mach/regs-timer.h>
  
- MACHINE_START(KAEN, "kaen")
-@@ -295,6 +296,7 @@ MACHINE_START(KAEN, "kaen")
- 	.init_irq       = tegra_init_irq,
- 	.timer          = &tegra_timer,
- 	.init_machine   = tegra_kaen_init,
-+	.restart	= tegra_assert_system_reset,
- MACHINE_END
- 
- MACHINE_START(WARIO, "wario")
-@@ -304,4 +306,5 @@ MACHINE_START(WARIO, "wario")
- 	.init_irq       = tegra_init_irq,
- 	.timer          = &tegra_timer,
- 	.init_machine   = tegra_wario_init,
-+	.restart	= tegra_assert_system_reset,
- MACHINE_END
-diff --git a/arch/arm/mach-tegra/board-trimslice.c b/arch/arm/mach-tegra/board-trimslice.c
-index 1a6617b..1fa9e48 100644
---- a/arch/arm/mach-tegra/board-trimslice.c
-+++ b/arch/arm/mach-tegra/board-trimslice.c
-@@ -178,4 +178,5 @@ MACHINE_START(TRIMSLICE, "trimslice")
- 	.init_irq       = tegra_init_irq,
- 	.timer          = &tegra_timer,
- 	.init_machine   = tegra_trimslice_init,
-+	.restart	= tegra_assert_system_reset,
- MACHINE_END
-diff --git a/arch/arm/mach-tegra/common.c b/arch/arm/mach-tegra/common.c
-index 690b888..20f396d 100644
---- a/arch/arm/mach-tegra/common.c
-+++ b/arch/arm/mach-tegra/common.c
-@@ -31,8 +31,6 @@
+ #include "cpu.h"
  #include "clock.h"
- #include "fuse.h"
++#include "nuc9xx.h"
  
--void (*arch_reset)(char mode, const char *cmd) = tegra_assert_system_reset;
--
- void tegra_assert_system_reset(char mode, const char *cmd)
- {
- 	void __iomem *reset = IO_ADDRESS(TEGRA_CLK_RESET_BASE + 0x04);
-diff --git a/arch/arm/mach-tegra/include/mach/system.h b/arch/arm/mach-tegra/include/mach/system.h
-index 027c421..b87b8a4 100644
---- a/arch/arm/mach-tegra/include/mach/system.h
-+++ b/arch/arm/mach-tegra/include/mach/system.h
-@@ -21,9 +21,9 @@
- #ifndef __MACH_TEGRA_SYSTEM_H
- #define __MACH_TEGRA_SYSTEM_H
+ /* Initial IO mappings */
  
--#include <mach/iomap.h>
--
--extern void (*arch_reset)(char mode, const char *cmd);
-+static inline void arch_reset(char mode, const char *cmd)
+@@ -222,3 +224,17 @@ void __init nuc900_init_clocks(void)
+ 	clkdev_add_table(nuc900_clkregs, ARRAY_SIZE(nuc900_clkregs));
+ }
+ 
++#define	WTCR	(TMR_BA + 0x1C)
++#define	WTCLK	(1 << 10)
++#define	WTE	(1 << 7)
++#define	WTRE	(1 << 1)
++
++void nuc9xx_restart(char mode, const char *cmd)
 +{
++	if (mode == 's') {
++		/* Jump into ROM@address 0 */
++		soft_restart(0);
++	} else {
++		__raw_writel(WTE | WTRE | WTCLK, WTCR);
++	}
 +}
- 
- static inline void arch_idle(void)
+diff --git a/arch/arm/mach-w90x900/include/mach/system.h b/arch/arm/mach-w90x900/include/mach/system.h
+index 68875a1..001a2f9 100644
+--- a/arch/arm/mach-w90x900/include/mach/system.h
++++ b/arch/arm/mach-w90x900/include/mach/system.h
+@@ -14,28 +14,11 @@
+  * (at your option) any later version.
+  *
+  */
+-
+-#include <linux/io.h>
+-#include <asm/proc-fns.h>
+-#include <mach/map.h>
+-#include <mach/regs-timer.h>
+-
+-#define	WTCR	(TMR_BA + 0x1C)
+-#define	WTCLK	(1 << 10)
+-#define	WTE	(1 << 7)
+-#define	WTRE	(1 << 1)
+-
+ static void arch_idle(void)
  {
+ }
+ 
+ static void arch_reset(char mode, const char *cmd)
+ {
+-	if (mode == 's') {
+-		/* Jump into ROM@address 0 */
+-		soft_restart(0);
+-	} else {
+-		__raw_writel(WTE | WTRE | WTCLK, WTCR);
+-	}
+ }
+ 
+diff --git a/arch/arm/mach-w90x900/mach-nuc910evb.c b/arch/arm/mach-w90x900/mach-nuc910evb.c
+index 31c1090..b4243e4 100644
+--- a/arch/arm/mach-w90x900/mach-nuc910evb.c
++++ b/arch/arm/mach-w90x900/mach-nuc910evb.c
+@@ -38,4 +38,5 @@ MACHINE_START(W90P910EVB, "W90P910EVB")
+ 	.init_irq	= nuc900_init_irq,
+ 	.init_machine	= nuc910evb_init,
+ 	.timer		= &nuc900_timer,
++	.restart	= nuc9xx_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-w90x900/mach-nuc950evb.c b/arch/arm/mach-w90x900/mach-nuc950evb.c
+index 4062e55..067d8f9 100644
+--- a/arch/arm/mach-w90x900/mach-nuc950evb.c
++++ b/arch/arm/mach-w90x900/mach-nuc950evb.c
+@@ -41,4 +41,5 @@ MACHINE_START(W90P950EVB, "W90P950EVB")
+ 	.init_irq	= nuc900_init_irq,
+ 	.init_machine	= nuc950evb_init,
+ 	.timer		= &nuc900_timer,
++	.restart	= nuc9xx_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-w90x900/mach-nuc960evb.c b/arch/arm/mach-w90x900/mach-nuc960evb.c
+index 0ab9995..cbb3adc 100644
+--- a/arch/arm/mach-w90x900/mach-nuc960evb.c
++++ b/arch/arm/mach-w90x900/mach-nuc960evb.c
+@@ -38,4 +38,5 @@ MACHINE_START(W90N960EVB, "W90N960EVB")
+ 	.init_irq	= nuc900_init_irq,
+ 	.init_machine	= nuc960evb_init,
+ 	.timer		= &nuc900_timer,
++	.restart	= nuc9xx_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-w90x900/nuc9xx.h b/arch/arm/mach-w90x900/nuc9xx.h
+index 847c4f3..91acb40 100644
+--- a/arch/arm/mach-w90x900/nuc9xx.h
++++ b/arch/arm/mach-w90x900/nuc9xx.h
+@@ -21,3 +21,4 @@ struct sys_timer;
+ 
+ extern void nuc900_init_irq(void);
+ extern struct sys_timer nuc900_timer;
++extern void nuc9xx_restart(char, const char *);
 -- 
 1.7.4.4
