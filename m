@@ -1,31 +1,31 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 24 Nov 2011 15:52:20 +0800
-Subject: [PATCH] i2c-mxs: fix compile warning in mxs_i2c_xfer()
-Message-ID: <1322121140-5216-1-git-send-email-shawn.guo@linaro.org>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Thu, 24 Nov 2011 08:49:38 +0100
+Subject: [PATCH v7 0/3] ARM: mxs: add recording support for saif
+In-Reply-To: <20111124074619.GJ17979@S2100-06.ap.freescale.net>
+References: <a> <1321977265-14959-1-git-send-email-b29396@freescale.com>
+ <20111124073605.GI17979@S2100-06.ap.freescale.net>
+ <20111124074619.GJ17979@S2100-06.ap.freescale.net>
+Message-ID: <20111124074938.GA8439@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-  CC      drivers/i2c/busses/i2c-mxs.o
-drivers/i2c/busses/i2c-mxs.c: In function ?mxs_i2c_xfer?:
-drivers/i2c/busses/i2c-mxs.c:196:6: warning: ?data? may be used uninitialized in this function
+On Thu, Nov 24, 2011 at 03:46:20PM +0800, Shawn Guo wrote:
+> On Thu, Nov 24, 2011 at 03:36:05PM +0800, Shawn Guo wrote:
+> > During the testing, the saif driver's dependency on
+> > REGULATOR_FIXED_VOLTAGE was found.  I guess it should be resolved
+> > in sound/soc/mxs/Kconfig rather than leaving it to users.
+> > 
+> Also SND_SOC_MXS_SGTL5000 should probably depends on I2C_MXS than I2C.
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- drivers/i2c/busses/i2c-mxs.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+Please explain.
 
-diff --git a/drivers/i2c/busses/i2c-mxs.c b/drivers/i2c/busses/i2c-mxs.c
-index 7e78f7c..00f098f 100644
---- a/drivers/i2c/busses/i2c-mxs.c
-+++ b/drivers/i2c/busses/i2c-mxs.c
-@@ -193,7 +193,7 @@ static int mxs_i2c_wait_for_data(struct mxs_i2c_dev *i2c)
- 
- static int mxs_i2c_finish_read(struct mxs_i2c_dev *i2c, u8 *buf, int len)
- {
--	u32 data;
-+	u32 data = 0;
- 	int i;
- 
- 	for (i = 0; i < len; i++) {
 -- 
-1.7.4.1
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111124/be61508b/attachment.sig>
