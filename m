@@ -1,45 +1,74 @@
-From: cbouatmailru@gmail.com (Anton Vorontsov)
-Date: Fri, 25 Nov 2011 01:00:36 +0400
-Subject: [PATCH 06/41] ARM: restart: cns3xxx: use new restart hook
-In-Reply-To: <20111124203037.GR9581@n2100.arm.linux.org.uk>
-References: <20111106173113.GI12913@n2100.arm.linux.org.uk>
- <E1RN6jH-0001Wy-5x@rmk-PC.arm.linux.org.uk>
- <20111124203037.GR9581@n2100.arm.linux.org.uk>
-Message-ID: <20111124210036.GA26662@oksana.dev.rtsoft.ru>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 24 Nov 2011 21:10:08 +0000
+Subject: [PATCH] mx28: added LRADC and touchscreen support
+In-Reply-To: <1322135394-4097-1-git-send-email-rusko.peter@prolan.hu>
+References: <1322135394-4097-1-git-send-email-rusko.peter@prolan.hu>
+Message-ID: <20111124211008.GX9581@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 24, 2011 at 08:30:38PM +0000, Russell King - ARM Linux wrote:
-> Ack?
+On Thu, Nov 24, 2011 at 12:49:54PM +0100, Peter Rusko wrote:
+> +struct platform_device * __init mx28_add_lradc(
+> +		const struct mxs_lradc_plat_data *pdata)
+> +{
+> +	struct resource res[] = {
+> +		{
+> +			.start = MX28_LRADC_BASE_ADDR,
+> +			.end = MX28_LRADC_BASE_ADDR + SZ_16K - 1,
+> +			.flags = IORESOURCE_MEM,
+> +		},
+> +	};
 
-Sure, except that pm.c now needs to include core.h (or the prototype
-has to be added to pm.h). Otherwise I'm getting the following warning:
+I've pointed this out to people before, and I'll do it again.  I wish
+people would take a moment to think about the code they write...
 
-    CHECK   arch/arm/mach-cns3xxx/pm.c
-  arch/arm/mach-cns3xxx/pm.c:92:6: warning: symbol 'cns3xxx_restart' was not declared. Should it be static?
+How the compiler can implement the above is as this equivalent C code:
 
-Following hunk helps:
+static struct res_initializer[] = {
+	{
+		.start = MX28_LRADC_BASE_ADDR,
+		.end = MX28_LRADC_BASE_ADDR + SZ_16K - 1,
+		.flags = IORESOURCE_MEM,
+	},
+};
 
-diff --git a/arch/arm/mach-cns3xxx/pm.c b/arch/arm/mach-cns3xxx/pm.c
-index 5136c4c..335494c 100644
---- a/arch/arm/mach-cns3xxx/pm.c
-+++ b/arch/arm/mach-cns3xxx/pm.c
-@@ -14,6 +14,7 @@
- #include <mach/system.h>
- #include <mach/cns3xxx.h>
- #include <mach/pm.h>
-+#include "core.h"
- 
- void cns3xxx_pwr_clk_en(unsigned int block)
- {
+struct platform_device * __init mx28_add_lradc(
+		const struct mxs_lradc_plat_data *pdata)
+{
+	struct resource res[ARRAY_SIZE(res_initializer)];
+	memcpy(res, res_initializer, sizeof(res_initializer));
 
+Or it can put the constants into the literal pool and manually build the
+structure on the stack using individual loads and stores.
 
-Other than that,
+So, you're not gaining any efficency by attempting this trick - in fact,
+your total data + code is larger than just this:
 
-Acked-by: Anton Vorontsov <cbouatmailru@gmail.com>
+static struct res[] __initdata = {
+	{
+		.start = MX28_LRADC_BASE_ADDR,
+		.end = MX28_LRADC_BASE_ADDR + SZ_16K - 1,
+		.flags = IORESOURCE_MEM,
+	},
+};
 
-Thanks!
+struct platform_device * __init mx28_add_lradc(
+		const struct mxs_lradc_plat_data *pdata)
+{
+	return mxs_add_platform_device("mxs-lradc", 0,
+			res, ARRAY_SIZE(res), pdata, sizeof(*pdata));
+}
 
--- 
-Anton Vorontsov
-Email: cbouatmailru at gmail.com
+because doing it this way eliminates the additional stack storage and
+manual or otherwise memcpy.  Moreover, you can mark the struct resource
+__initdata and have it discarded at runtime.
+
+Here's what I get with gcc 4.3.5 which illustrates the point:
+
+   text    data     bss     dec     hex filename
+    124       0       0     124      7c t.onstack.O2.o (-O2)
+    122       0       0     122      7a t.onstack.Os.o (-Os)
+     76      28       0     104      68 t.offstack.o
+
+So, there's no need to make things more complex and bigger - just put
+the resource outside the function and mark it __initdata.
