@@ -1,123 +1,74 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Thu, 24 Nov 2011 17:07:01 -0500 (EST)
-Subject: [PATCH 07/41] ARM: restart: dove: use new restart hook
-In-Reply-To: <E1RN6jb-0001X2-K7@rmk-PC.arm.linux.org.uk>
-References: <20111106173113.GI12913@n2100.arm.linux.org.uk>
- <E1RN6jb-0001X2-K7@rmk-PC.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.02.1111241706430.17904@xanadu.home>
+From: rmallon@gmail.com (Ryan Mallon)
+Date: Fri, 25 Nov 2011 09:13:02 +1100
+Subject: [PATCH v7 0/5] AT91: replace broken TWI driver i2c-at91.c
+In-Reply-To: <EF2E73589CA71846A15D0B2CDF79505D087B44FD63@wm021.weinmann.com>
+References: <cover.1322062555.git.n.voss@weinmann.de>
+ <20111123233238.GL19115@trinity.fluff.org>
+ <EF2E73589CA71846A15D0B2CDF79505D087B44FD63@wm021.weinmann.com>
+Message-ID: <4ECEC16E.5080806@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 6 Nov 2011, Russell King - ARM Linux wrote:
+On 24/11/11 17:33, Voss, Nikolaus wrote:
 
-> Hook these platforms restart code into the new restart hook rather than
-> using arch_reset().
+> Hi,
 > 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> Ben Dooks wrote on 2011-11-24:
+>> On Wed, Nov 23, 2011 at 04:35:55PM +0100, Nikolaus Voss wrote:
+>>> The old driver has two main deficencies:
+>>> i)  No repeated start (Sr) condiction is possible, this makes it unusable
+>>>     e.g. for most SMBus transfers.
+>>> ii) I/O was done with polling/busy waiting what caused over-/underruns
+>>>     even at light system loads and clock speeds.
+>>>
+>>> The new driver overcomes these deficencies and in addition allows for
+>>> more than one TWI interface.
+>>>
+>>> A remaining limitation is the fact, that only one repeated start is
+>>> possible (two concatenated messages). This limitation is imposed by
+>>> the hardware. However, this should not be a problem as all common
+>>> i2c-client communication does not rely on more than one repeated start.
+>>>
+>>> v7: Patch 4/5: i)  fix bug if internal address > 1 byte
+>>>                ii) send stop when len == 1
+>>>                    (both reported by Carsten Behling)
+>>> v6: Patch 5/5: support for I2C_SMBUS_BLOCK_DATA transfers.
+>>>     Better use of clk_(un)prepare().
+>>>     More sensible transfer timeout.
+>>> v5: Another round of review comments from Ryan Mallon, Felipe Balbi
+>>>     and Russell King: convert twi clk to use .dev_id, cleanups
+>>> v4: Integrated more review comments from Ryan Mallon and Felipe Balbi:
+>>>     Moved register include file to local include, code cleanups
+>>> v3: Integrated review comments from Ryan Mallon and Felipe Balbi
+>>> v2: Fixed whitespace issue
+>>>
+>>> Nikolaus Voss (5):
+>>>   drivers/i2c/busses/i2c-at91.c: remove broken driver
+>>>   Replace clk_lookup.con_id with clk_lookup.dev_id entries for twi clk
+>>>   drivers/i2c/busses/i2c-at91.c: add new driver
+>>>   G45 TWI: remove open drain setting for twi function gpios
+>>>   i2c-at91.c: add SMBUS_READ_BLOCK_DATA functionality
+>>
+>> Is the original driver so broken that the two could not co-exist, or are
+>> we making so many changes that there's no point in keeping the original
+>> one?
+> 
+> The old driver was marked as broken for the above reasons and I can hardly
+> imagine any setup in which it would be preferable to i2c-gpio. So it does
+> not make any sense to keep the old driver alive. Though inspired by the old
+> driver, the new one is almost a rewrite from scratch, so for better reviewing,
+> I removed the old instead of doing a diff.
 
-Acked-by: Nicolas Pitre <nico@linaro.org>
 
-> ---
->  arch/arm/mach-dove/cm-a510.c             |    1 +
->  arch/arm/mach-dove/common.c              |   16 ++++++++++++++++
->  arch/arm/mach-dove/common.h              |    1 +
->  arch/arm/mach-dove/dove-db-setup.c       |    1 +
->  arch/arm/mach-dove/include/mach/system.h |   14 --------------
->  5 files changed, 19 insertions(+), 14 deletions(-)
-> 
-> diff --git a/arch/arm/mach-dove/cm-a510.c b/arch/arm/mach-dove/cm-a510.c
-> index c8a406f..792b4e2 100644
-> --- a/arch/arm/mach-dove/cm-a510.c
-> +++ b/arch/arm/mach-dove/cm-a510.c
-> @@ -93,4 +93,5 @@ MACHINE_START(CM_A510, "Compulab CM-A510 Board")
->  	.init_early	= dove_init_early,
->  	.init_irq	= dove_init_irq,
->  	.timer		= &dove_timer,
-> +	.restart	= dove_restart,
->  MACHINE_END
-> diff --git a/arch/arm/mach-dove/common.c b/arch/arm/mach-dove/common.c
-> index a9e0dae..13bb236 100644
-> --- a/arch/arm/mach-dove/common.c
-> +++ b/arch/arm/mach-dove/common.c
-> @@ -292,3 +292,19 @@ void __init dove_init(void)
->  	dove_xor0_init();
->  	dove_xor1_init();
->  }
-> +
-> +void dove_restart(char mode, const char *cmd)
-> +{
-> +	/*
-> +	 * Enable soft reset to assert RSTOUTn.
-> +	 */
-> +	writel(SOFT_RESET_OUT_EN, RSTOUTn_MASK);
-> +
-> +	/*
-> +	 * Assert soft reset.
-> +	 */
-> +	writel(SOFT_RESET, SYSTEM_SOFT_RESET);
-> +
-> +	while (1)
-> +		;
-> +}
-> diff --git a/arch/arm/mach-dove/common.h b/arch/arm/mach-dove/common.h
-> index 6a2046e..4202730 100644
-> --- a/arch/arm/mach-dove/common.h
-> +++ b/arch/arm/mach-dove/common.h
-> @@ -39,5 +39,6 @@ void dove_spi1_init(void);
->  void dove_i2c_init(void);
->  void dove_sdio0_init(void);
->  void dove_sdio1_init(void);
-> +void dove_restart(char, const char *);
->  
->  #endif
-> diff --git a/arch/arm/mach-dove/dove-db-setup.c b/arch/arm/mach-dove/dove-db-setup.c
-> index 11ea34e..ea77ae4 100644
-> --- a/arch/arm/mach-dove/dove-db-setup.c
-> +++ b/arch/arm/mach-dove/dove-db-setup.c
-> @@ -100,4 +100,5 @@ MACHINE_START(DOVE_DB, "Marvell DB-MV88AP510-BP Development Board")
->  	.init_early	= dove_init_early,
->  	.init_irq	= dove_init_irq,
->  	.timer		= &dove_timer,
-> +	.restart	= dove_restart,
->  MACHINE_END
-> diff --git a/arch/arm/mach-dove/include/mach/system.h b/arch/arm/mach-dove/include/mach/system.h
-> index 356afda..25a3a65 100644
-> --- a/arch/arm/mach-dove/include/mach/system.h
-> +++ b/arch/arm/mach-dove/include/mach/system.h
-> @@ -9,8 +9,6 @@
->  #ifndef __ASM_ARCH_SYSTEM_H
->  #define __ASM_ARCH_SYSTEM_H
->  
-> -#include <mach/bridge-regs.h>
-> -
->  static inline void arch_idle(void)
->  {
->  	cpu_do_idle();
-> @@ -18,18 +16,6 @@ static inline void arch_idle(void)
->  
->  static inline void arch_reset(char mode, const char *cmd)
->  {
-> -	/*
-> -	 * Enable soft reset to assert RSTOUTn.
-> -	 */
-> -	writel(SOFT_RESET_OUT_EN, RSTOUTn_MASK);
-> -
-> -	/*
-> -	 * Assert soft reset.
-> -	 */
-> -	writel(SOFT_RESET, SYSTEM_SOFT_RESET);
-> -
-> -	while (1)
-> -		;
->  }
->  
->  
-> -- 
-> 1.7.4.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+I can confirm this. I worked on a number of AT91 based platforms with
+several different i2c client devices and we always had to use the
+i2c-gpio driver because the at91-i2c driver would not reliably work with
+our client devices.
+
+None of the at91 defconfigs select I2C_AT91, so it should be fairly safe
+to remove the old driver. Getting this driver into linux-next (if it
+isn't already) would be good so we can see if it does cause problems for
+anybody.
+
+Thanks,
+~Ryan
