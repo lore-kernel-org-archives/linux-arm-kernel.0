@@ -1,36 +1,64 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Thu, 24 Nov 2011 15:36:05 +0800
-Subject: [PATCH v7 0/3] ARM: mxs: add recording support for saif
-In-Reply-To: <1321977265-14959-1-git-send-email-b29396@freescale.com>
-References: <a>
- <1321977265-14959-1-git-send-email-b29396@freescale.com>
-Message-ID: <20111124073605.GI17979@S2100-06.ap.freescale.net>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 24 Nov 2011 08:27:29 +0100
+Subject: [GIT PULL] mx5 merge
+In-Reply-To: <201111232115.45313.arnd@arndb.de>
+References: <20111116075053.GG27267@pengutronix.de>
+ <201111232115.45313.arnd@arndb.de>
+Message-ID: <20111124072729.GU27267@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 22, 2011 at 11:54:22PM +0800, Dong Aisheng wrote:
-[...]
-> Dong Aisheng (3):
->   ARM: mxs: add saif clkmux functions
->   ARM: mx28evk: add platform data for saif
->   ARM: mx28evk: set a initial clock rate for saif
-> 
->  arch/arm/mach-mxs/clock-mx28.c                  |   38 +++++++++++++++++++++++
->  arch/arm/mach-mxs/devices-mx28.h                |    3 +-
->  arch/arm/mach-mxs/devices/platform-mxs-saif.c   |    5 ++-
->  arch/arm/mach-mxs/include/mach/common.h         |    1 +
->  arch/arm/mach-mxs/include/mach/devices-common.h |    4 ++-
->  arch/arm/mach-mxs/include/mach/digctl.h         |   21 ++++++++++++
->  arch/arm/mach-mxs/mach-mx28evk.c                |   18 +++++++++-
->  7 files changed, 84 insertions(+), 6 deletions(-)
->  create mode 100644 arch/arm/mach-mxs/include/mach/digctl.h
-> 
-Applied, thanks.
+Hi Arnd,
 
-During the testing, the saif driver's dependency on
-REGULATOR_FIXED_VOLTAGE was found.  I guess it should be resolved
-in sound/soc/mxs/Kconfig rather than leaving it to users.
+On Wed, Nov 23, 2011 at 09:15:45PM +0000, Arnd Bergmann wrote:
+> On Wednesday 16 November 2011, Sascha Hauer wrote:
+> > Please pull the following branch which merges the mx5 architecture into
+> > mach-imx. As said before, I'd love to get this into this -rc cycle
+> > because we would get unnecessary merge conflicts later. Anyway, if you
+> > think that this is a really bad idea please pull it for next.
+> > 
+> > Sascha
+> > 
+> > The following changes since commit 1ea6b8f48918282bdca0b32a34095504ee65bab5:
+> > 
+> >   Linux 3.2-rc1 (2011-11-07 16:16:02 -0800)
+> > 
+> > are available in the git repository at:
+> >   git://git.pengutronix.de/git/imx/linux-2.6.git mx5-merge
+> 
+> Hi Sascha,
+> 
+> I've pulled it into the imx/move branch, to be merged through the next/move
+> branch in arm-soc now.
+> 
+> Sorry for not replying earlier. I think the best plan is to do it at the
+> end of a merge window, but I didn't feel comfortable at the end of the
+> 3.2-rc1 because I had not seen the patches before.
+> 
+> Since almost all the files are trivially moved, I think we can best avoid
+> all merge conflicts by applying the move changeset last after all other
+> changes to mx5 code have gone in. I'll gladly take care of regenerating
+> the patch before I send it (and letting you double-check the result).
+> 
+> However, what I'd like you to do is minimize the changes that don't
+> just move entire files around by submitting them as a cleanup branch
+> that I can apply *before* all other patches. I think we should have
+> separate patches for these changes:
+> 
+> * merge mach-mx5/system.c into pm-imx5.c
+> * merge arch/arm/mach-mx5/Kconfig into arch/arm/mach-imx/Kconfig
+> * ARM i.MX5: remove unnecessary includes from board files
+> 
+> If we do these early, the remaining move will be even more trivial
+> than the current series.
+
+Ok, sounds like a plan
+
+Thanks
+ Sascha
 
 -- 
-Regards,
-Shawn
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
