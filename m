@@ -1,74 +1,56 @@
-From: lost.distance@yahoo.com (Paul Parsons)
-Date: Thu, 24 Nov 2011 02:53:27 +0000 (GMT)
-Subject: [PATCH v3 1/2] pxa/hx4700: Add Synaptics NavPoint (PXA27x
- SSP/SPI) driver
-In-Reply-To: <20111123230138.GL9581@n2100.arm.linux.org.uk>
-Message-ID: <1322103207.2627.YahooMailClassic@web29004.mail.ird.yahoo.com>
+From: b32955@freescale.com (Huang Shijie)
+Date: Thu, 24 Nov 2011 10:56:18 +0800
+Subject: [PATCH] IMX/SDMA : save the real count for one DMA transaction.
+In-Reply-To: <20111123113656.GG4063@pengutronix.de>
+References: <1322039585-7901-1-git-send-email-b32955@freescale.com>
+ <20111123105821.GC4063@pengutronix.de> <4ECCD34C.1090400@freescale.com>
+ <20111123110626.GD4063@pengutronix.de> <4ECCD553.5020804@freescale.com>
+ <20111123111816.GF4063@pengutronix.de> <4ECCD910.1010004@freescale.com>
+ <20111123113656.GG4063@pengutronix.de>
+Message-ID: <4ECDB252.3090006@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
---- On Wed, 23/11/11, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-> So 'dev' is a driver_data structure.
-> but you pass it to dev_warn().  This is not what
-> dev_warn() is expecting.
+? 2011?11?23? 19:36, Wolfram Sang ??:
+> On Wed, Nov 23, 2011 at 07:29:20PM +0800, Huang Shijie wrote:
+>>> On Wed, Nov 23, 2011 at 07:13:23PM +0800, Huang Shijie wrote:
+>>>>>>>> +	/* save the real count we received or transmitted. */
+>>>>>>>> +	chan->private = (void *)count;
+>>>>>>> And if someone later needs another variable which is private?
+>>>>>>>
+>>>>>> I ever wanted to add an new parameter `void *` to dma_aync_tx_callback,
+>>>>>> but it seemed i have
+>>>>>> to change a lot of files.
+>>>>>>
+>>>>>> Do you have any better suggestion?
+>>>>> Use a private struct and put count in there.
+>>>>>
+>>>> Where to put the private struct? in the imx-sdma.c ?
+>>>> If i put it there, how can i get it in the UART driver with the current
+>>>> DMA API?
+>>> So, in the UART driver you assume that void* is an int? Or how do you
+>>> currently use count?
+>>>
+>> In the UART driver, I use the following lines:
+>> -------------------------------------------------------
+>> + struct dma_chan *chan = sport->dma_chan_rx;
+>> + unsigned int count = (unsigned int)chan->private;
+>> -------------------------------------------------------
+> And why can't you use a struct here? chan->private->count?
+>
+> Even then, I doubt if you can get this into mainline. But when you try,
+I wish to post the UART code as well as this patch.
+But the PINMUX driver of mx6q is not ready now(so do the mx23/28).
+I have to send out this single patch now.
 
-Correct; alas Philipp discovered this the hard way. I'm on it.
+thanks.
 
-> > +int navpoint_suspend(struct device *dev)
-> 
-> static?
-
-Yes, will do.
-
-> > +int navpoint_resume(struct device *dev)
-> 
-> static?
-
-Ditto.
-
-> > +    /* Wait until SSP port is ready
-> for slave clock operations */
-> > +    while (pxa_ssp_read_reg(ssp, SSSR)
-> & SSSR_CSS)
-> > +        msleep(1);
-> 
-> What if it never becomes ready?  Should this time
-> out?
-
-This loop was an early sanity check which I never removed. But I agree that broken hardware might cause it to hang. So I'll either remove it or, more usefully, add a timeout with error message.
-
-> > +    drv_data = kzalloc(sizeof(struct
-> driver_data), GFP_KERNEL);
-> 
-> We normally like to see sizeof(*drv_data) now.
-
-OK.
-
-> > +    ret = request_irq(ssp->irq,
-> navpoint_int, 0, pdev->name, drv_data);
-> > +    if (ret)
-> > +        goto ret2;
-> 
-> What if you immediately receive an interrupt right now,
-> after requesting
-> this interrupt?  Will your handler try to dereference
-> anything in
-> drv_data which is -currently- NULL ?  (I think you'll
-> oops when
-> dereferencing drv_data->ssp->something.)
-
-Shouldn't happen because the SSP port is not enabled until the later call to navpoint_resume(). However, Philipp has discovered spurious interrupts with the haret bootloader; perhaps it already enabled the SSP port. I'm on it.
-
-> > +    (void)
-> navpoint_resume(&pdev->dev);
-> 
-> That cast to 'void' is not required.
-
-True, but that function must return a value and I was just documenting the fact that it's being intentionally ignored here. I'm happy to remove it.
-
-> > +    (void)
-> navpoint_suspend(&pdev->dev);
-> 
-> Cast to void is not required.
-
-Ditto.
+Huang Shijie
+> please always post a user for this change (or a reference to it), that
+> is, the uart-driver. Otherwise there is no reason to include a change.
+>
+> Regards,
+>
+>    Wolfram
+>
+>
