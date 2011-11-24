@@ -1,29 +1,82 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 24 Nov 2011 09:01:41 +0000
-Subject: BUG: sleeping function called from invalid context
-In-Reply-To: <20111124071406.GS19986@pengutronix.de>
-References: <4ECCDAA2.4070502@prolan.hu>
- <CAOMZO5DSvLU0ACJPZ69tzY0PjMijibSzwCEwBhu=5=mg7ncF=g@mail.gmail.com>
- <20111123183640.GQ19986@pengutronix.de>
- <20111123225124.GK9581@n2100.arm.linux.org.uk>
- <20111124071406.GS19986@pengutronix.de>
-Message-ID: <20111124090141.GN9581@n2100.arm.linux.org.uk>
+From: B29396@freescale.com (Dong Aisheng-B29396)
+Date: Thu, 24 Nov 2011 09:02:21 +0000
+Subject: [PATCH] i2c-mxs: fix compile warning in mxs_i2c_xfer()
+In-Reply-To: <20111124083747.GE8439@pengutronix.de>
+References: <1322121140-5216-1-git-send-email-shawn.guo@linaro.org>
+ <20111124082903.GV19986@pengutronix.de>
+ <20111124083747.GE8439@pengutronix.de>
+Message-ID: <65EE16ACC360FA4D99C96DC085B3F77233A4E4@039-SN1MPN1-002.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 24, 2011 at 08:14:06AM +0100, Uwe Kleine-K?nig wrote:
-> On Wed, Nov 23, 2011 at 10:51:24PM +0000, Russell King - ARM Linux wrote:
-> > So really, there's no excuse not to fix this for the imx/mxwhatever SoCs
-> > today - the clk framework is totally irrelevant as far as this goes.
-> I think doing the clk_prepare seperation and converting to the clk
-> framework in one step will be easier.
+> -----Original Message-----
+> From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-
+> kernel-bounces at lists.infradead.org] On Behalf Of Wolfram Sang
+> Sent: Thursday, November 24, 2011 4:38 PM
+> To: Uwe Kleine-K?nig
+> Cc: Shawn Guo; linux-arm-kernel at lists.infradead.org; Ben Dooks; linux-
+> i2c at vger.kernel.org
+> Subject: Re: [PATCH] i2c-mxs: fix compile warning in mxs_i2c_xfer()
+> 
+> On Thu, Nov 24, 2011 at 09:29:03AM +0100, Uwe Kleine-K?nig wrote:
+> > Hello Shawn,
+> >
+> > On Thu, Nov 24, 2011 at 03:52:20PM +0800, Shawn Guo wrote:
+> > >   CC      drivers/i2c/busses/i2c-mxs.o
+> > > drivers/i2c/busses/i2c-mxs.c: In function ?mxs_i2c_xfer?:
+> > > drivers/i2c/busses/i2c-mxs.c:196:6: warning: ?data? may be used
+> > > uninitialized in this function
+> > >
+> > > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> > > ---
+> > >  drivers/i2c/busses/i2c-mxs.c |    2 +-
+> > >  1 files changed, 1 insertions(+), 1 deletions(-)
+> > >
+> > > diff --git a/drivers/i2c/busses/i2c-mxs.c
+> > > b/drivers/i2c/busses/i2c-mxs.c index 7e78f7c..00f098f 100644
+> > > --- a/drivers/i2c/busses/i2c-mxs.c
+> > > +++ b/drivers/i2c/busses/i2c-mxs.c
+> > > @@ -193,7 +193,7 @@ static int mxs_i2c_wait_for_data(struct
+> > > mxs_i2c_dev *i2c)
+> > >
+> > >  static int mxs_i2c_finish_read(struct mxs_i2c_dev *i2c, u8 *buf,
+> > > int len)  {
+> > > -	u32 data;
+> > > +	u32 data = 0;
+> > >  	int i;
+> > >
+> > >  	for (i = 0; i < len; i++) {
+> > Looks like a stupid compiler. Then better use
+> >
+> > 	u32 uninitialized_var(data);
+> 
+> Leave it as it is and fix the compiler? Will do another test later to
+> make sure.
+> 
 
->From a point of view of being able to separate the changes so there isn't
-a flag day, you're wrong.  clk_prepare() is already present in the kernel
-as dummy functions, and all you need to do at this point is arrange for
-the drivers to make the appropriate calls.  There's no need to write one
-line of code behind clk_prepare() at the current time.
+Compiler is wrong?
+Just from the code that it seems to be right the 'data' might be used
+uninitialized.
 
-If you then want to provide a clk_prepare() implementation, then you need
-to select CONFIG_HAVE_CLK_PREPARE to prevent the dummy function being
-used.
+Something I missed?
+
+static int mxs_i2c_finish_read(struct mxs_i2c_dev *i2c, u8 *buf, int len)
+{
+        u32 data;
+        int i;
+
+        for (i = 0; i < len; i++) {
+                if ((i & 3) == 0) {
+                        if (mxs_i2c_wait_for_data(i2c))
+                                return -ETIMEDOUT;
+                        data = readl(i2c->regs + MXS_I2C_QUEUEDATA);
+                }
+                buf[i] = data & 0xff;
+                data >>= 8;
+        }
+
+        return 0;
+}
+
+Regards
+Dong Aisheng
