@@ -1,86 +1,158 @@
-From: richard.zhao@linaro.org (Richard Zhao)
-Date: Thu, 24 Nov 2011 08:30:46 +0800
-Subject: [RFC V1 1/8] clk: support static parent
-In-Reply-To: <CAPtuhThVr8si2wRpx0i32=PQCC=4h1GZr6HkRsCLHbfXBef4XA@mail.gmail.com>
-References: <1322046755-13511-1-git-send-email-richard.zhao@linaro.org>
- <1322046755-13511-2-git-send-email-richard.zhao@linaro.org>
- <CAPtuhThVr8si2wRpx0i32=PQCC=4h1GZr6HkRsCLHbfXBef4XA@mail.gmail.com>
-Message-ID: <20111124003044.GA15876@b20223-02.ap.freescale.net>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 23 Nov 2011 19:32:58 -0500 (EST)
+Subject: -next fails to boot as of today on S3C6410
+In-Reply-To: <alpine.LFD.2.02.1111231402370.17904@xanadu.home>
+References: <20111122193957.GH30583@opensource.wolfsonmicro.com>
+ <20111122222135.GB7845@gallagher>
+ <20111123120534.GO21073@opensource.wolfsonmicro.com>
+ <20111123122855.GB7382@totoro>
+ <20111123130134.GB12227@opensource.wolfsonmicro.com>
+ <20111123133237.GC7382@totoro>
+ <20111123135033.GA20272@opensource.wolfsonmicro.com>
+ <20111123143322.GD7382@totoro>
+ <20111123145517.GE20272@opensource.wolfsonmicro.com>
+ <4ECD32CA.2030601@gmail.com>
+ <20111123175446.GI30049@opensource.wolfsonmicro.com>
+ <alpine.LFD.2.02.1111231402370.17904@xanadu.home>
+Message-ID: <alpine.LFD.2.02.1111231929050.17904@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 23, 2011 at 02:11:40PM -0800, Mike Turquette wrote:
-> Hi Richard,
-> 
-> Thanks for porting your platform so quickly!
-My pleasure!
-> 
-> On Wed, Nov 23, 2011 at 3:12 AM, Richard Zhao <richard.zhao@linaro.org> wrote:
-> > Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
-> > ---
-> > ?drivers/clk/clk.c | ? 10 ++++------
-> > ?1 files changed, 4 insertions(+), 6 deletions(-)
-> >
-> > diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> > index 85dabdb31..ed557c9 100644
-> > --- a/drivers/clk/clk.c
-> > +++ b/drivers/clk/clk.c
-> > @@ -519,13 +519,11 @@ void clk_init(struct device *dev, struct clk *clk)
-> >
-> > ? ? ? ?mutex_lock(&prepare_lock);
-> >
-> > - ? ? ? if (clk->ops->get_parent) {
-> > + ? ? ? if (clk->ops->get_parent)
-> > ? ? ? ? ? ? ? ?clk->parent = clk->ops->get_parent(clk);
-If it has .get_parent, we use .get_parent to get parent.
-> > - ? ? ? ? ? ? ? if (clk->parent)
-> > - ? ? ? ? ? ? ? ? ? ? ? hlist_add_head(&clk->child_node,
-> > - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? &clk->parent->children);
-> > - ? ? ? } else
-> > - ? ? ? ? ? ? ? clk->parent = NULL;
-> > + ? ? ? if (clk->parent)
-I assume .parent is set to zero when struct clk alloc memory. So the
-value .parent is either get from .get_parent or a fixed parent.
-> > + ? ? ? ? ? ? ? hlist_add_head(&clk->child_node,
-> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? &clk->parent->children);
-> 
-> I'll have to NACK this.  I don't think we should trust .parent in
-> struct clk for initialization.
-> 
-> Rather, if your clk has a fixed parent then I would prefer for you to
-> put that parent inside your struct clk_hw_whatever and have your
-> .get_parent callback return clk_hw_whatever->fixed_parent.
-Yes, It's what I did on your v2 patch, which struct clk is allocated by
-the framework. But now we don't have to repeat the work clk by clk.
-> 
-> The reason for this is that some folks with mux clks might be tempted
-> to populate .parent statically, but maybe the bootloader changed it
-> and now it can't be trusted.  I'd prefer to rule out this possibility
-> entirely by always relying on a .get_parent function.
-This patch didn't remove .get_parent call. We trust .get_parent most.
-If .get_parent must not be NULL, clocks without mux have to duplicate
-the redundant get_parent function.
+On Wed, 23 Nov 2011, Nicolas Pitre wrote:
 
-Thanks
-Richard
+> On Wed, 23 Nov 2011, Mark Brown wrote:
 > 
-> Check out the way that the simple fixed-rate clk and simple gateable
-> clk does this in drivers/clk/clk-basic.c
+> > On Wed, Nov 23, 2011 at 11:52:10AM -0600, Rob Herring wrote:
+> > > On 11/23/2011 08:55 AM, Mark Brown wrote:
+> > 
+> > > > My bisect turned up a second candidate - Nicholas' commit 549158d (ARM:
+> > > > move iotable mappings within the vmalloc region).  I reverted that and
+> > > > subsequent commits depending on it and my system now appears to boot
+> > > > fine with -next (with OF turned on to get the ops for the VIC).  This
+> > > > code is all a bit deep for me so I've no real idea what might be wrong.
+> > 
+> > > The first suspect should be overlapping static mappings in the iotable.
+> > > This was allowed before and now is not. Looking at some of the 6410
+> > > platforms, I don't see any though. But you didn't mention which platform
+> > > you are on. There is a 1KB mapping which is a bit unusual.
+> > 
+> > I'm on Cragganmore 6410 which just calls a bunch of arch-generic stuff
+> > (though now I look I do see a comment saying that we're relying on some
+> > setup from the bootloader which I get may have been trashed...).
 > 
-> Regards,
-> Mike
+> I'm working on a way to get sensible debug messages out.
 > 
-> >
-> > ? ? ? ?if (clk->ops->recalc_rate)
-> > ? ? ? ? ? ? ? ?clk->rate = clk->ops->recalc_rate(clk);
-> > --
-> > 1.7.5.4
-> >
-> >
-> >
+> The problem is that, as soon as we execute this loop in 
+> devicemaps_init():
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>         for (addr = VMALLOC_START; addr; addr += PMD_SIZE)
+>                 pmd_clear(pmd_off_k(addr));
 > 
+> we lose all means of communication with the outside world until 
+> mdesc->map_io() and the following TLB/cache flushes are done.  It is 
+> most likely that you are having a problem in the middle of that.
+
+OK, here it is.  Please try this patch:
+
+-------- >8
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index acb2c7ec0a..51b4307591 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -939,23 +939,54 @@ void __init arm_mm_memblock_reserve(void)
+ #endif
+ }
+ 
++#ifdef CONFIG_DEBUG_LL
++
+ /*
+- * Set up the device mappings.  Since we clear out the page tables for all
+- * mappings above VMALLOC_START, we will remove any debug device mappings.
+- * This means you have to be careful how you debug this function, or any
+- * called function.  This means you can't use any function or debugging
+- * method which may touch any device, otherwise the kernel _will_ crash.
++ * The remainder of the page table containing debug mappings will be
++ * cleared and recreated by devicemaps_init().  To allow for debug devices
++ * to remain accessible, we create a temporary copy of the current page table
++ * here and switch to it, and switch back once the final mappings have
++ * been created.
++ */
++
++static pgd_t * __init install_temp_mm(void)
++{
++	pgd_t *temp_pgd = early_alloc(PTRS_PER_PGD * sizeof(pgd_t));
++	pgd_t *init_pgd = pgd_offset_k(0);
++	memcpy(temp_pgd + USER_PTRS_PER_PGD, init_pgd + USER_PTRS_PER_PGD,
++	       (PTRS_PER_PGD - USER_PTRS_PER_PGD) * sizeof(pgd_t));
++	clean_dcache_area(temp_pgd, PTRS_PER_PGD * sizeof(pgd_t));
++	cpu_switch_mm(temp_pgd, &init_mm);
++	return temp_pgd;
++}
++
++static void __init clear_temp_mm(pgd_t *temp_pgd)
++{
++	cpu_switch_mm(init_mm.pgd, &init_mm);
++	memblock_free(__pa(temp_pgd), PTRS_PER_PGD * sizeof(pgd_t));
++}
++
++#else
++#define set_temp_mm()	(NULL)
++#define clear_temp_mm()	do { } while (0)
++#endif
++
++/*
++ * Set up the device mappings.
+  */
+ static void __init devicemaps_init(struct machine_desc *mdesc)
+ {
+ 	struct map_desc map;
+ 	unsigned long addr;
++	pgd_t *temp_pgd;
+ 
+ 	/*
+ 	 * Allocate the vector page early.
+ 	 */
+ 	vectors_page = early_alloc(PAGE_SIZE);
+ 
++	temp_pgd = install_temp_mm();
++
+ 	for (addr = VMALLOC_START; addr; addr += PMD_SIZE)
+ 		pmd_clear(pmd_off_k(addr));
+ 
+@@ -1012,6 +1043,8 @@ static void __init devicemaps_init(struct machine_desc *mdesc)
+ 	if (mdesc->map_io)
+ 		mdesc->map_io();
+ 
++	clear_temp_mm(temp_pgd);
++
+ 	/*
+ 	 * Finally flush the caches and tlb to ensure that we're in a
+ 	 * consistent state wrt the writebuffer.  This also ensures that
+-------- >8
+
+Then, if you didn't already do so, you should enable CONFIG_DEBUG_LL 
+and hack something like this into the printk code:
+
+-------- >8
+diff --git a/kernel/printk.c b/kernel/printk.c
+index 1455a0d4ee..b543370cfd 100644
+--- a/kernel/printk.c
++++ b/kernel/printk.c
+@@ -876,6 +876,11 @@ asmlinkage int vprintk(const char *fmt, va_list args)
+ 	printed_len += vscnprintf(printk_buf + printed_len,
+ 				  sizeof(printk_buf) - printed_len, fmt, args);
+ 
++	{
++		extern void printascii(char *);
++		printascii(printk_buf);
++	}
++
+ 	p = printk_buf;
+ 
+ 	/* Read log level and handle special printk prefix */
+-------- >8
+
+That should provide you with the ability to figure out what's wrong.
+
+
+Nicolas
