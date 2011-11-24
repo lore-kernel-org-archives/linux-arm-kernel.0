@@ -1,38 +1,16 @@
-From: rusko.peter@prolan.hu (Peter Rusko)
-Date: Thu, 24 Nov 2011 16:45:52 +0100
-Subject: [PATCH] mx28: added LRADC and touchscreen support
-In-Reply-To: <20111124125952.GD18060@S2100-06.ap.freescale.net>
-References: <1322135394-4097-1-git-send-email-rusko.peter@prolan.hu>
- <20111124125952.GD18060@S2100-06.ap.freescale.net>
-Message-ID: <4ECE66B0.5010802@prolan.hu>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 24 Nov 2011 15:57:20 +0000
+Subject: [GIT PULL] omap fixes for v3.2-rc2, take 2
+In-Reply-To: <20111123235529.GK31337@atomide.com>
+References: <20111123235529.GK31337@atomide.com>
+Message-ID: <201111241557.20661.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> I think this patch should probably be split into 4.
->
->   * lradc drivers/staging/iio/adc/ (rather than drivers/misc/) part
->   * lradc arch/arm/mach-mxs part
->   * touchscreen drivers/input/touchscreen part
->   * touchscreen arch/arm/mach-mxs part
->
-> And you need to look into MAINTAINERS for the mailing list and people
-> that the 'drivers' part should be sent to.
->
+On Wednesday 23 November 2011, Tony Lindgren wrote:
+> This one has the DSS patches left out, some patches sent to
+> stable, and based on -rc2.
 
-You're right, I'm working on it.
+Excellent, pulled into fixes now! Thanks for the quick update,
 
-Shall I split the arch/arm/mach-mxs parts? In this patch I use 
-HAVE_MXS_LRADC to compile both of them. I think they come together, the 
-ADC supports the touchscreen, so there is no need to split them.
-
--- 
-Rusk? P?ter
-Fejleszt?m?rn?k
-
-Prolan Zrt. / Prolan Co.
-Hungary 2011 Budakal?sz, Szentendrei ?t 1-3.
-Tel./Phone: +36 20 954 3118
-Fax: +36 26 540 420
-E-mail: rusko.peter at prolan.hu
-Web: www.prolan.hu
-Timezone:CET
+	Arnd
