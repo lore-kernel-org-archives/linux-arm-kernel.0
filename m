@@ -1,28 +1,59 @@
-From: eric.miao@linaro.org (Eric Miao)
-Date: Thu, 24 Nov 2011 13:56:56 +0800
-Subject: [PATCH] ASoC: skip resume of soc-audio devices without codecs
-In-Reply-To: <CAMPhdO-f+tjbbyDuFDPUwERKpHfUuJJTha_pzc6BVBqy4LFrWw@mail.gmail.com>
-References: <1322059020-24305-1-git-send-email-eric.miao@linaro.org>
- <20111123145828.GG20272@opensource.wolfsonmicro.com>
- <CAMPhdO-f+tjbbyDuFDPUwERKpHfUuJJTha_pzc6BVBqy4LFrWw@mail.gmail.com>
-Message-ID: <CAMPhdO8J=ZLxt7SMry-jgGUTu+KGQaGAVdKfgGkeqAD5_Y=ojQ@mail.gmail.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Thu, 24 Nov 2011 14:32:16 +0800
+Subject: BUG: sleeping function called from invalid context
+In-Reply-To: <20111123225124.GK9581@n2100.arm.linux.org.uk>
+References: <4ECCDAA2.4070502@prolan.hu>
+ <CAOMZO5DSvLU0ACJPZ69tzY0PjMijibSzwCEwBhu=5=mg7ncF=g@mail.gmail.com>
+ <20111123183640.GQ19986@pengutronix.de>
+ <20111123225124.GK9581@n2100.arm.linux.org.uk>
+Message-ID: <20111124063215.GF17979@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 23, 2011 at 11:19 PM, Eric Miao <eric.miao@linaro.org> wrote:
-> On Wed, Nov 23, 2011 at 10:58 PM, Mark Brown
-> <broonie@opensource.wolfsonmicro.com> wrote:
->> On Wed, Nov 23, 2011 at 10:37:00PM +0800, Eric Miao wrote:
->>> There are cases where there is no working codec on the soc-audio devices,
->>> and snd_soc_suspend() will skip such device when suspending. Yet its
->>> counterpart snd_soc_resume() does not check this, causing complaints
->>> about spinlock lockup:
->>
->> Oh, and I just noticed that you didn't CC either Liam or the ALSA list
->> which you really should've done.
->
-> Noted.
->
+Hi Peter,
 
-BTW - I think it's applicable to previous kernel as well, so Cc stable
-might be a good idea.
+You can go ahead to submit your LRADC/Touch patches, and I will find
+some time to get this fixed following Russell's suggestion.
+
+Regards,
+Shawn
+
+On Wed, Nov 23, 2011 at 10:51:24PM +0000, Russell King - ARM Linux wrote:
+> On Wed, Nov 23, 2011 at 07:36:40PM +0100, Uwe Kleine-K?nig wrote:
+> > Hello,
+> > 
+> > On Wed, Nov 23, 2011 at 10:44:50AM -0200, Fabio Estevam wrote:
+> > > Looks like the same error I faced before:
+> > > http://marc.info/?l=linux-arm-kernel&m=131914543319956&w=2
+> > which resulted in some concerns about locking correctness. On i.MX28 we
+> > usually use
+> > 
+> > 	http://thread.gmane.org/gmane.linux.ports.arm.kernel/100744/focus=100746
+> > 
+> > (though this patch wasn't accepted either. The right fix is to convert
+> > mxs to the upcoming clk framework, which didn't land into mainline yet.)
+> 
+> Irrespective of the clk framework.  If you convert to the clk_prepare()
+> methodology, then you fix this bug.  You can do this as a two-step thing.
+> First, convert _all_ your drivers to issue the correct clk_prepare() and
+> clk_unprepare() calls at the appropriate time.  Once that's all done,
+> convert your clk API implementation to doing the sleeping parts of your
+> existing clk_enable() in clk_prepare() and leave the non-sleeping parts
+> in clk_enable().  (Ditto for clk_disable() vs clk_unprepare().)
+> 
+> You'll need to do most of the driver work _before_ the clk framework
+> lands, because it becomes mandatory for your drivers to call clk_prepare()
+> with that.
+> 
+> Plus, on the implementation side, you'll already have done the work to
+> separate the two for the clk framework, which in theory should mean that
+> its easier to convert.
+> 
+> So really, there's no excuse not to fix this for the imx/mxwhatever SoCs
+> today - the clk framework is totally irrelevant as far as this goes.
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
