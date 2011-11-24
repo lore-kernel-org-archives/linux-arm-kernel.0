@@ -1,59 +1,38 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 23 Nov 2011 15:55:42 -0800
-Subject: [GIT PULL] DSS fixes for v3.2-rc2
-Message-ID: <20111123235542.GL31337@atomide.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Thu, 24 Nov 2011 08:30:13 +0800
+Subject: [GIT PULL v2] pxa: fixes for v3.2-rc1
+In-Reply-To: <201111232115.13430.arnd@arndb.de>
+References: <CAMPhdO8cJxSnTzNEeu+D-cOxQr7_OU6oOA55AhQbO6vHe0f11A@mail.gmail.com>
+ <201111232115.13430.arnd@arndb.de>
+Message-ID: <CAMPhdO_476W6iWFL=GH19oNcyUKZ-LAjm83UROB3dgQA21L_AA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On Thu, Nov 24, 2011 at 5:15 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Friday 18 November 2011, Eric Miao wrote:
+>> The following changes since commit 1ea6b8f48918282bdca0b32a34095504ee65bab5:
+>>
+>> ? Linux 3.2-rc1 (2011-11-07 16:16:02 -0800)
+>>
+>> are available in the git repository at:
+>> ? git://github.com/ycmiao/pxa-linux.git fix
+>>
+>> Eric Miao (1):
+>> ? ? ? ARM: pxa168/gplugd: add the correct SSP device
+>>
+>> Haojian Zhuang (2):
+>> ? ? ? ARM: pxa: fix inconsistent CONFIG_USB_PXA27X
+>> ? ? ? ARM: mmp: fix build error on gpio
+>>
+>
+> Looks all good, sorry for the delay on my side.
+>
+> Should the "ARM: pxa168/gplugd: add the correct SSP device" have a
+> "Cc: stable at kernel.org" tag? It's not clear from the patch.
+> If it applies to older kernels as well, please make sure that Greg
+> picks it up once Linus merges it, and next time mark stable bug
+> fixes right away, or mention in the pull request that it's only
+> regressions.
 
-This one has been separated out from the rest of the fixes.
-
-If some of these need to go to stable, then Tomi should
-do the rebasing and send them to stable at vger.kernel.org
-as they don't apply cleanly on v3.1.
-
-Regards,
-
-Tony
-
-
-The following changes since commit cfcfc9eca2bcbd26a8e206baeb005b055dbf8e37:
-  Linus Torvalds (1):
-        Linux 3.2-rc2
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap fixes-dss
-
-Archit Taneja (1):
-      ARM: OMAP2PLUS: DSS: Ensure DSS works correctly if display is enabled in bootloader
-
-Tomi Valkeinen (9):
-      ARM: OMAP2xxx: HWMOD: Fix DSS reset
-      ARM: OMAP2xxx: HWMOD: fix DSS clock data
-      ARM: OMAP3: HWMOD: Fix DSS reset
-      ARM: OMAP3: HWMOD: fix DSS clock data
-      ARM: OMAP4: HWMOD: remove extra clocks
-      ARM: OMAP4: HWMOD: Add HWMOD_CONTROL_OPT_CLKS_IN_RESET for dss_core
-      ARM: OMAP4: HWMOD: fix DSS clock data
-      ARM: OMAP2/3: HWMOD: Add SYSS_HAS_RESET_STATUS for dss
-      ARM: OMAP: HWMOD: Unify DSS resets for OMAPs
-
-Tony Lindgren (1):
-      Merge branch 'hwmod_dss_fixes_3.2rc' of git://git.pwsan.com/linux-2.6 into fixes-dss
-
- arch/arm/mach-omap2/Makefile                       |    5 +-
- arch/arm/mach-omap2/display.c                      |  159 ++++++++++++++++++++
- arch/arm/mach-omap2/display.h                      |   29 ++++
- arch/arm/mach-omap2/omap_hwmod_2420_data.c         |   17 ++-
- arch/arm/mach-omap2/omap_hwmod_2430_data.c         |   17 ++-
- .../mach-omap2/omap_hwmod_2xxx_3xxx_ipblock_data.c |    5 +-
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         |   37 ++++-
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c         |   24 ++--
- arch/arm/mach-omap2/omap_hwmod_common_data.c       |    4 +
- arch/arm/mach-omap2/omap_hwmod_common_data.h       |    4 +
- arch/arm/plat-omap/include/plat/common.h           |    3 +
- include/video/omapdss.h                            |    7 -
- 12 files changed, 276 insertions(+), 35 deletions(-)
- create mode 100644 arch/arm/mach-omap2/display.h
+Yes, it does apply to older kernel. Thanks for spotting that, will
+mark more carefully next time.
