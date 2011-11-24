@@ -1,31 +1,69 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 24 Nov 2011 17:05:19 +0100
-Subject: [PATCH] ARM : fix /proc/interrupts per online cpu
-Message-ID: <1322150719-28243-1-git-send-email-daniel.lezcano@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 24 Nov 2011 16:06:54 +0000
+Subject: [GIT PULL] DSS fixes for v3.2-rc2
+In-Reply-To: <20111123235542.GL31337@atomide.com>
+References: <20111123235542.GL31337@atomide.com>
+Message-ID: <201111241606.54879.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The loop should look at the online cpus instead of the present cpus
-in order to hide the offline cpus in procfs like it is done on the
-other architectures.
+On Wednesday 23 November 2011, Tony Lindgren wrote:
+> Hi Arnd,
+> 
+> This one has been separated out from the rest of the fixes.
 
-Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
----
- arch/arm/kernel/smp.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+Pulled into the fixes branch now. I'll send out the branch
+after testing it on tomorrow's linux-next.
 
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index ef5640b..050f826 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -444,7 +444,7 @@ void show_ipi_list(struct seq_file *p, int prec)
- 	for (i = 0; i < NR_IPI; i++) {
- 		seq_printf(p, "%*s%u: ", prec - 1, "IPI", i);
- 
--		for_each_present_cpu(cpu)
-+		for_each_online_cpu(cpu)
- 			seq_printf(p, "%10u ",
- 				   __get_irq_stat(cpu, ipi_irqs[i]));
- 
--- 
-1.7.4.1
+> If some of these need to go to stable, then Tomi should
+> do the rebasing and send them to stable at vger.kernel.org
+> as they don't apply cleanly on v3.1.
+
+Ok. I've taken Tomi on Cc as a reminder for him, although I guess
+you already discussed it with him.
+
+Kiitoksia paljon,
+
+	Arnd
+
+> 
+> The following changes since commit cfcfc9eca2bcbd26a8e206baeb005b055dbf8e37:
+>   Linus Torvalds (1):
+>         Linux 3.2-rc2
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap fixes-dss
+> 
+> Archit Taneja (1):
+>       ARM: OMAP2PLUS: DSS: Ensure DSS works correctly if display is enabled in bootloader
+> 
+> Tomi Valkeinen (9):
+>       ARM: OMAP2xxx: HWMOD: Fix DSS reset
+>       ARM: OMAP2xxx: HWMOD: fix DSS clock data
+>       ARM: OMAP3: HWMOD: Fix DSS reset
+>       ARM: OMAP3: HWMOD: fix DSS clock data
+>       ARM: OMAP4: HWMOD: remove extra clocks
+>       ARM: OMAP4: HWMOD: Add HWMOD_CONTROL_OPT_CLKS_IN_RESET for dss_core
+>       ARM: OMAP4: HWMOD: fix DSS clock data
+>       ARM: OMAP2/3: HWMOD: Add SYSS_HAS_RESET_STATUS for dss
+>       ARM: OMAP: HWMOD: Unify DSS resets for OMAPs
+> 
+> Tony Lindgren (1):
+>       Merge branch 'hwmod_dss_fixes_3.2rc' of git://git.pwsan.com/linux-2.6 into fixes-dss
+> 
+>  arch/arm/mach-omap2/Makefile                       |    5 +-
+>  arch/arm/mach-omap2/display.c                      |  159 ++++++++++++++++++++
+>  arch/arm/mach-omap2/display.h                      |   29 ++++
+>  arch/arm/mach-omap2/omap_hwmod_2420_data.c         |   17 ++-
+>  arch/arm/mach-omap2/omap_hwmod_2430_data.c         |   17 ++-
+>  .../mach-omap2/omap_hwmod_2xxx_3xxx_ipblock_data.c |    5 +-
+>  arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         |   37 ++++-
+>  arch/arm/mach-omap2/omap_hwmod_44xx_data.c         |   24 ++--
+>  arch/arm/mach-omap2/omap_hwmod_common_data.c       |    4 +
+>  arch/arm/mach-omap2/omap_hwmod_common_data.h       |    4 +
+>  arch/arm/plat-omap/include/plat/common.h           |    3 +
+>  include/video/omapdss.h                            |    7 -
+>  12 files changed, 276 insertions(+), 35 deletions(-)
+>  create mode 100644 arch/arm/mach-omap2/display.h
+> 
