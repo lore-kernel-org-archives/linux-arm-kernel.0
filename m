@@ -1,48 +1,75 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 24 Nov 2011 08:14:06 +0100
-Subject: BUG: sleeping function called from invalid context
-In-Reply-To: <20111123225124.GK9581@n2100.arm.linux.org.uk>
-References: <4ECCDAA2.4070502@prolan.hu>
- <CAOMZO5DSvLU0ACJPZ69tzY0PjMijibSzwCEwBhu=5=mg7ncF=g@mail.gmail.com>
- <20111123183640.GQ19986@pengutronix.de>
- <20111123225124.GK9581@n2100.arm.linux.org.uk>
-Message-ID: <20111124071406.GS19986@pengutronix.de>
+From: junxiao.bi@windriver.com (Bi Junxiao)
+Date: Thu, 24 Nov 2011 15:22:34 +0800
+Subject: [PATCH 1/4] ARM: ftrace: use canonical Thumb-2 wide instruction
+ format
+In-Reply-To: <20111123144238.GB2050@localhost.localdomain>
+References: <1321888429-3519-1-git-send-email-rabin@rab.in>
+ <20111122120242.GD2066@localhost.localdomain>
+ <CAH+eYFBfcpKYrq-kyV4RZ-s1En5Q2wy6dhuEsk6KNgk-zb7wDw@mail.gmail.com>
+ <20111123144238.GB2050@localhost.localdomain>
+Message-ID: <4ECDF0BA.1050707@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 23, 2011 at 10:51:24PM +0000, Russell King - ARM Linux wrote:
-> On Wed, Nov 23, 2011 at 07:36:40PM +0100, Uwe Kleine-K?nig wrote:
-> > Hello,
-> > 
-> > On Wed, Nov 23, 2011 at 10:44:50AM -0200, Fabio Estevam wrote:
-> > > Looks like the same error I faced before:
-> > > http://marc.info/?l=linux-arm-kernel&m=131914543319956&w=2
-> > which resulted in some concerns about locking correctness. On i.MX28 we
-> > usually use
-> > 
-> > 	http://thread.gmane.org/gmane.linux.ports.arm.kernel/100744/focus=100746
-> > 
-> > (though this patch wasn't accepted either. The right fix is to convert
-> > mxs to the upcoming clk framework, which didn't land into mainline yet.)
-> 
-> Irrespective of the clk framework.  If you convert to the clk_prepare()
-> methodology, then you fix this bug.  You can do this as a two-step thing.
-Yeah, OK, I should have said:
-
-	The right fix is to make clk_enable atomic on mxs which back
-	then was agreed to be done when converting to the new clk
-	framework.
-
-> [..]
+on 11/23/2011 10:42 PM Dave Martin wrote:
+> On Tue, Nov 22, 2011 at 11:30:11PM +0530, Rabin Vincent wrote:
+>    
+>> On Tue, Nov 22, 2011 at 17:32, Dave Martin<dave.martin@linaro.org>  wrote:
+>>      
+>>> On Mon, Nov 21, 2011 at 08:43:46PM +0530, Rabin Vincent wrote:
+>>>        
+>>>> +#ifndef __ARMEB__
+>>>> +     if (IS_ENABLED(CONFIG_THUMB2_KERNEL)) {
+>>>> +             old = (old>>  16) | (old<<  16);
+>>>> +             new = (new>>  16) | (new<<  16);
+>>>>          
+>>> I think swahw32() in<linux/swab.h>  can be used for this operation.
+>>>        
+>> Yes.
+>>
+>>      
+>>> Really though, we need a common set of "load and store instruction"
+>>> macros, rather than duplicating this knowledge everywhere.
+>>>        
+>> Yes, though this ftrace code may not be able to use them directly since
+>> it uses probe_kernel_read()/write().
+>>      
+> In that case what we would want are macros to convert instructions between
+> integer and in-memory representation, rather than conflating all that
+> together in some memory accessor macros.
 >
-> So really, there's no excuse not to fix this for the imx/mxwhatever SoCs
-> today - the clk framework is totally irrelevant as far as this goes.
-I think doing the clk_prepare seperation and converting to the clk
-framework in one step will be easier.
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> How about:
+>
+> #include<linux/swab.h>
+>
+> #ifdef __ARMEB__
+> #define insn_to_mem_arm(insn) swab32(insn)
+> #define insn_to_mem_thumb16(insn) swab16(insn)
+> #define insn_to_mem_thumb32(insn) swab16(insn)
+> #else
+> #define insn_to_mem_arm(insn) (insn)
+> #define insn_to_mem_thumb16(insn) (insn)
+> #define insn_to_mem_thumb32(insn) shahw32(insn)
+> #endif
+>
+> #define mem_to_insn_arm(insn) insn_to_mem_asm(insn)
+> #define mem_to_insn_thumb16(insn) insn_to_mem_thumb16(insn)
+> #define mem_to_insn_thumb32(insn) insn_to_mem_thumb32(insn)
+>
+> Because these are all straightforward swap operations, we don't really
+> need separate forwards and backwards operations, but having the separate
+> names may make calling code easier to read.
+>
+> I'm still not sure exactly which header this belongs in, but it's a core
+> ARM thing; not local to kprobes or ftrace, etc.
+>
+>    
+Yes, these macros are useful for be8 support. Do they deserve a 
+separated header file as there is no appropriate one for them now?
+> If this looks sensible, it would also make sense for Junxiao Bi to build
+> his big-endian fixes on it.
+>
+> Cheers
+> ---Dave
+>
+>    
