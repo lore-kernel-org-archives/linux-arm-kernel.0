@@ -1,43 +1,40 @@
-From: plaes@plaes.org (plaes at plaes.org)
-Date: Thu, 24 Nov 2011 11:49:33 +0200
-Subject: [PATCH] ARM: mach-orion5x: Use hex2bin that is present in
- kernel lib
-In-Reply-To: <20111124064018.GD795@wantstofly.org>
-References: <1322058417.2472.9.camel@localhost.localdomain>
- <20111124064018.GD795@wantstofly.org>
-Message-ID: <1322128173.31424.12.camel@localhost.localdomain>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 24 Nov 2011 11:16:00 +0100
+Subject: bug of gpio transition in pinmux driver
+In-Reply-To: <CAN1soZyX-jJAw4UcQUkgaYC9YosB1znbcFwiijjkyvidPXgp4w@mail.gmail.com>
+References: <CAN1soZyX-jJAw4UcQUkgaYC9YosB1znbcFwiijjkyvidPXgp4w@mail.gmail.com>
+Message-ID: <CACRpkdYQaXtYBwgmovJwz4Kg=zcV=s7RZ0XJJkdgiW0Qnf9dcw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-?hel kenal p?eval, N, 2011-11-24 kell 07:40, kirjutas Lennert Buytenhek:
-> On Wed, Nov 23, 2011 at 04:26:57PM +0200, plaes at plaes.org wrote:
+On Wed, Nov 23, 2011 at 2:13 PM, Haojian Zhuang
+<haojian.zhuang@gmail.com> wrote:
+
+> There's a bug in pinmux driver. We can request gpio via
+> pinmux_request_gpio(@gpio). @gpio is the gpio number.
 >
-[...]
-> >
-> > [...]
-> >
-> >  	for (i = 0; i < 6; i++)	{
-> > -		int byte;
-> > -
-> > -		byte = dns323_parse_hex_byte(mac_page + (i * 3));
-> > -		if (byte < 0) {
-> > +		if (hex2bin(addr[i], mac_page + (i * 3), 2))
-> >  			goto error_fail;
-> 
-> I don't think that this does what you think it does...
+> In pinmux_request_gpio():
+> ? ?pin = @gpio - range->base;
+> ? ?pin_request(pin);
+>
+> This pin is the index of pinctrl_pin_desc[]. What's the definition of
+> pinctrl_pin_desc's index? It's the index of PAD, not GPIO. Since the
+> goal of pinmux_request_gpio() is to avoid define too much gpio groups.
+> We need to add the transition between gpio and pad. It's clear that
+> the transition of "pin = @gpio - range->base" can't fit every silicon.
+> Especially, one gpio can be routed to two pads in PXA silicon.
 
-Indeed. I assume that it didn't even compile. I have fixed the two
-issues I found in the previous patch and tweaked the printk output for
-TS-x09. Run-tested with similar code on x86 so now I'm confident enough
-to sign it off ;)
+I think this issue is addressed in the patch named
+"pinctrl: add a pin_base for sparse gpio-ranges"
+from Chanho Park.
 
-P?ikest,
-Priit Laes ;)
+I have this patch included in linux-next, and the patch named
+"pinctrl: GPIO direction support for muxing" is also
+related.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0001-ARM-mach-orion5x-Use-hex2bin-that-is-present-in-kern.patch
-Type: text/x-patch
-Size: 3353 bytes
-Desc: 
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111124/e786a30b/attachment.bin>
+You can also find this in my "for-next" branch of the
+pinctrl git here:
+http://git.linaro.org/gitweb?p=people/triad/linux-pinctrl.git;a=summary
+
+Yours,
+Linus Walleij
