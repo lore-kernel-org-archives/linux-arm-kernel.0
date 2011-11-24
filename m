@@ -1,16 +1,31 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 24 Nov 2011 15:57:20 +0000
-Subject: [GIT PULL] omap fixes for v3.2-rc2, take 2
-In-Reply-To: <20111123235529.GK31337@atomide.com>
-References: <20111123235529.GK31337@atomide.com>
-Message-ID: <201111241557.20661.arnd@arndb.de>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Thu, 24 Nov 2011 17:05:19 +0100
+Subject: [PATCH] ARM : fix /proc/interrupts per online cpu
+Message-ID: <1322150719-28243-1-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 23 November 2011, Tony Lindgren wrote:
-> This one has the DSS patches left out, some patches sent to
-> stable, and based on -rc2.
+The loop should look at the online cpus instead of the present cpus
+in order to hide the offline cpus in procfs like it is done on the
+other architectures.
 
-Excellent, pulled into fixes now! Thanks for the quick update,
+Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+---
+ arch/arm/kernel/smp.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-	Arnd
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index ef5640b..050f826 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -444,7 +444,7 @@ void show_ipi_list(struct seq_file *p, int prec)
+ 	for (i = 0; i < NR_IPI; i++) {
+ 		seq_printf(p, "%*s%u: ", prec - 1, "IPI", i);
+ 
+-		for_each_present_cpu(cpu)
++		for_each_online_cpu(cpu)
+ 			seq_printf(p, "%10u ",
+ 				   __get_irq_stat(cpu, ipi_irqs[i]));
+ 
+-- 
+1.7.4.1
