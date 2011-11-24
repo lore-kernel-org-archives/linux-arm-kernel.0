@@ -1,78 +1,53 @@
-From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
-Date: Thu, 24 Nov 2011 10:11:47 +0100
-Subject: [PATCH] i2c-mxs: fix compile warning in mxs_i2c_xfer()
-In-Reply-To: <65EE16ACC360FA4D99C96DC085B3F77233A4E4@039-SN1MPN1-002.039d.mgd.msft.net>
-References: <1322121140-5216-1-git-send-email-shawn.guo@linaro.org>
- <20111124082903.GV19986@pengutronix.de>
- <20111124083747.GE8439@pengutronix.de>
- <65EE16ACC360FA4D99C96DC085B3F77233A4E4@039-SN1MPN1-002.039d.mgd.msft.net>
-Message-ID: <20174.2643.823394.322927@ipc1.ka-ro>
+From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
+Date: Thu, 24 Nov 2011 01:28:06 -0800 (PST)
+Subject: [PATCH] ARM: Kota2 mach-type update fix
+In-Reply-To: <20111124082342.GD32112@linux-sh.org>
+References: <20111122060857.23951.50598.sendpatchset@w520>
+ <20111122092615.GA26411@linux-sh.org>
+ <CANqRtoTvMpivHN0tZVTEY6SfkBrNLpu=rkRXUXKJG4J0UNCzhg@mail.gmail.com>
+ <20111124082342.GD32112@linux-sh.org>
+Message-ID: <87zkflg999.wl%kuninori.morimoto.gx@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-Dong Aisheng-B29396 writes:
-> > -----Original Message-----
-> > From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-
-> > kernel-bounces at lists.infradead.org] On Behalf Of Wolfram Sang
-> > Sent: Thursday, November 24, 2011 4:38 PM
-> > To: Uwe Kleine-K?nig
-> > Cc: Shawn Guo; linux-arm-kernel at lists.infradead.org; Ben Dooks; linux-
-> > i2c at vger.kernel.org
-> > Subject: Re: [PATCH] i2c-mxs: fix compile warning in mxs_i2c_xfer()
+Hi Paul
+
+> > >> From: Magnus Damm <damm@opensource.se>
+> > >>
+> > >> This patch adds kota2 to the in-kernel ARM mach-type file.
+> > >>
+> > >> Basic board support is included in 3.2-rc and the mach-type
+> > >> has been registered in the ARM machine repository as
+> > >>
+> > >> 3616 Renesas SH-Mobile kota2.x Board kota2 Yusuke Goda mainlined
+> > >>
+> > >> The file arch/arm/tools/mach-types is however missing Kota2
+> > >> which makes build of sh73a0 based boards fail with:
+> > >>
+> > >> arch/arm/mach-shmobile/platsmp.c: In function 'shmobile_smp_get_core_count':
+> > >> arch/arm/mach-shmobile/platsmp.c:28:2: error: implicit declaration of function 'machine_is_kota2'
+> > >> make[1]: *** [arch/arm/mach-shmobile/platsmp.o] Error 1
+> > >>
+> > >> arch/arm/mach-shmobile/board-kota2.c:448:136: error: 'MACH_TYPE_KOTA2' undeclared here (not in a function)
+> > >> make[1]: *** [arch/arm/mach-shmobile/board-kota2.o] Error 1
+> > >> make: *** [arch/arm/mach-shmobile] Error 2
+> > >>
+> > >> Signed-off-by: Magnus Damm <damm@opensource.se>
+> > >> ---
+(snip)
+> > Russell, do you mind if we update the mach-type file to include Kota2?
+> > It's already registered via the web interface.
 > > 
-> > On Thu, Nov 24, 2011 at 09:29:03AM +0100, Uwe Kleine-K?nig wrote:
-> > > Hello Shawn,
-> > >
-> > > On Thu, Nov 24, 2011 at 03:52:20PM +0800, Shawn Guo wrote:
-> > > >   CC      drivers/i2c/busses/i2c-mxs.o
-> > > > drivers/i2c/busses/i2c-mxs.c: In function ?mxs_i2c_xfer?:
-> > > > drivers/i2c/busses/i2c-mxs.c:196:6: warning: ?data? may be used
-> > > > uninitialized in this function
-> > > >
-> > > > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> > > > ---
-> > > >  drivers/i2c/busses/i2c-mxs.c |    2 +-
-> > > >  1 files changed, 1 insertions(+), 1 deletions(-)
-> > > >
-> > > > diff --git a/drivers/i2c/busses/i2c-mxs.c
-> > > > b/drivers/i2c/busses/i2c-mxs.c index 7e78f7c..00f098f 100644
-> > > > --- a/drivers/i2c/busses/i2c-mxs.c
-> > > > +++ b/drivers/i2c/busses/i2c-mxs.c
-> > > > @@ -193,7 +193,7 @@ static int mxs_i2c_wait_for_data(struct
-> > > > mxs_i2c_dev *i2c)
-> > > >
-> > > >  static int mxs_i2c_finish_read(struct mxs_i2c_dev *i2c, u8 *buf,
-> > > > int len)  {
-> > > > -	u32 data;
-> > > > +	u32 data = 0;
-> > > >  	int i;
-> > > >
-> > > >  	for (i = 0; i < len; i++) {
-> > > Looks like a stupid compiler. Then better use
-> > >
-> > > 	u32 uninitialized_var(data);
-> > 
-> > Leave it as it is and fix the compiler? Will do another test later to
-> > make sure.
-> > 
-> 
-> Compiler is wrong?
-> Just from the code that it seems to be right the 'data' might be used
-> uninitialized.
-> 
-Only iff you assume that (0 & 3) could be != 0...
+> I'll add it with Russell's Acked-by, otherwise we'll simply have to wait
+> for the next batch of mach-types updates.
+
+Can I add A1 bonito mach-type too?
+I can not find it either
 
 
-Lothar Wa?mann
--- 
-___________________________________________________________
+3623 	Renesas R-Mobile A1 EVB 	bonito 	Kuninori Morimoto
 
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+Best regards
+---
+Kuninori Morimoto
