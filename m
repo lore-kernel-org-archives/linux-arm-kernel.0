@@ -1,59 +1,46 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Thu, 24 Nov 2011 14:32:16 +0800
-Subject: BUG: sleeping function called from invalid context
-In-Reply-To: <20111123225124.GK9581@n2100.arm.linux.org.uk>
-References: <4ECCDAA2.4070502@prolan.hu>
- <CAOMZO5DSvLU0ACJPZ69tzY0PjMijibSzwCEwBhu=5=mg7ncF=g@mail.gmail.com>
- <20111123183640.GQ19986@pengutronix.de>
- <20111123225124.GK9581@n2100.arm.linux.org.uk>
-Message-ID: <20111124063215.GF17979@S2100-06.ap.freescale.net>
+Date: Thu, 24 Nov 2011 14:37:22 +0800
+Subject: [PATCH] ARM: imx: drop 'ARCH_MX31' and 'ARCH_MX35'
+In-Reply-To: <20111122090718.GD27267@pengutronix.de>
+References: <1321882445.32195.3.camel@x61.thuisdomein>
+ <20111121133603.GR9581@n2100.arm.linux.org.uk>
+ <20111122090718.GD27267@pengutronix.de>
+Message-ID: <20111124063720.GG17979@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
+On Tue, Nov 22, 2011 at 10:07:18AM +0100, Sascha Hauer wrote:
+[...]
+> Indeed, I never realized that it's missing arch/arm/mach-imx
+> 
+> 8<----------------------------------------
+> 
+> MAINTAINERS: Add missing directory
+> 
+> arch/arm/mach-imx/ is part of the i.MX support. Add it.
+> 
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> ---
+>  MAINTAINERS |    1 +
+>  1 files changed, 1 insertions(+), 0 deletions(-)
+> 
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index 071a996..c9ae02a 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -789,6 +789,7 @@ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+>  S:	Maintained
+>  T:	git git://git.pengutronix.de/git/imx/linux-2.6.git
+>  F:	arch/arm/mach-mx*/
+> +F:	arch/arm/mach-imx/
+>  F:	arch/arm/plat-mxc/
+>  
+>  ARM/FREESCALE IMX51
 
-You can go ahead to submit your LRADC/Touch patches, and I will find
-some time to get this fixed following Russell's suggestion.
+I think as the part of the update, 'arch/arm/mach-mx*/' should be
+removed, since I'm now responsible for maintaining mach-mxs, and
+mach-mx5 is going into mach-imx anyway.
 
+-- 
 Regards,
 Shawn
-
-On Wed, Nov 23, 2011 at 10:51:24PM +0000, Russell King - ARM Linux wrote:
-> On Wed, Nov 23, 2011 at 07:36:40PM +0100, Uwe Kleine-K?nig wrote:
-> > Hello,
-> > 
-> > On Wed, Nov 23, 2011 at 10:44:50AM -0200, Fabio Estevam wrote:
-> > > Looks like the same error I faced before:
-> > > http://marc.info/?l=linux-arm-kernel&m=131914543319956&w=2
-> > which resulted in some concerns about locking correctness. On i.MX28 we
-> > usually use
-> > 
-> > 	http://thread.gmane.org/gmane.linux.ports.arm.kernel/100744/focus=100746
-> > 
-> > (though this patch wasn't accepted either. The right fix is to convert
-> > mxs to the upcoming clk framework, which didn't land into mainline yet.)
-> 
-> Irrespective of the clk framework.  If you convert to the clk_prepare()
-> methodology, then you fix this bug.  You can do this as a two-step thing.
-> First, convert _all_ your drivers to issue the correct clk_prepare() and
-> clk_unprepare() calls at the appropriate time.  Once that's all done,
-> convert your clk API implementation to doing the sleeping parts of your
-> existing clk_enable() in clk_prepare() and leave the non-sleeping parts
-> in clk_enable().  (Ditto for clk_disable() vs clk_unprepare().)
-> 
-> You'll need to do most of the driver work _before_ the clk framework
-> lands, because it becomes mandatory for your drivers to call clk_prepare()
-> with that.
-> 
-> Plus, on the implementation side, you'll already have done the work to
-> separate the two for the clk framework, which in theory should mean that
-> its easier to convert.
-> 
-> So really, there's no excuse not to fix this for the imx/mxwhatever SoCs
-> today - the clk framework is totally irrelevant as far as this goes.
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
