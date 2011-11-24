@@ -1,65 +1,137 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 24 Nov 2011 15:16:49 +0100
-Subject: BUG: sleeping function called from invalid context
-In-Reply-To: <20111124102909.GO9581@n2100.arm.linux.org.uk>
-References: <4ECCDAA2.4070502@prolan.hu>
- <CAOMZO5DSvLU0ACJPZ69tzY0PjMijibSzwCEwBhu=5=mg7ncF=g@mail.gmail.com>
- <20111123183640.GQ19986@pengutronix.de>
- <20111123225124.GK9581@n2100.arm.linux.org.uk>
- <20111124071406.GS19986@pengutronix.de>
- <20111124090141.GN9581@n2100.arm.linux.org.uk>
- <20111124090514.GW19986@pengutronix.de>
- <20111124102909.GO9581@n2100.arm.linux.org.uk>
-Message-ID: <20111124141649.GY19986@pengutronix.de>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Thu, 24 Nov 2011 15:19:23 +0100
+Subject: [PATCH 3/3] ARM: AT91: Add the ADC to the sam9g20ek board
+In-Reply-To: <1322134040-32382-4-git-send-email-maxime.ripard@free-electrons.com>
+References: <1322134040-32382-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1322134040-32382-4-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20111124141923.GI15531@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 24, 2011 at 10:29:09AM +0000, Russell King - ARM Linux wrote:
-> On Thu, Nov 24, 2011 at 10:05:14AM +0100, Uwe Kleine-K?nig wrote:
-> > On Thu, Nov 24, 2011 at 09:01:41AM +0000, Russell King - ARM Linux wrote:
-> > > On Thu, Nov 24, 2011 at 08:14:06AM +0100, Uwe Kleine-K?nig wrote:
-> > > > On Wed, Nov 23, 2011 at 10:51:24PM +0000, Russell King - ARM Linux wrote:
-> > > > > So really, there's no excuse not to fix this for the imx/mxwhatever SoCs
-> > > > > today - the clk framework is totally irrelevant as far as this goes.
-> > > > I think doing the clk_prepare seperation and converting to the clk
-> > > > framework in one step will be easier.
-> > > 
-> > > From a point of view of being able to separate the changes so there isn't
-> > > a flag day, you're wrong.  clk_prepare() is already present in the kernel
-> > > as dummy functions, and all you need to do at this point is arrange for
-> > > the drivers to make the appropriate calls.  There's no need to write one
-> > > line of code behind clk_prepare() at the current time.
-> > Yeah, but adding clk_prepare to the serial driver doesn't help me to get
-> > rid of the BUG reported in this thread without giving it some meaning in
-> > the platform, right?
-Note that I wrote that in reply to you saying "There's no need to write
-one line of code behind clk_prepare() at the current time.".
-
-> So, let's be honest about why this bug isn't being fixed then.  Your
-> attitude to this problem is ignore it and to do nothing, rather than
-> trying to fix it via a perfectly good transition path provided for
-> you.
-I don't think the mxs clock code needs a transition. I guess it will be
-mostly reimplemented when the clk framework is settled. And I consider
-it quite normal to live with code that is not optimal because there are
-bigger changes in the queue that would make fixing the current code
-useless. 
- 
-> Okay, now we can see clearly why the bug is still there.  Thanks.
+On 12:27 Thu 24 Nov     , Maxime Ripard wrote:
+> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Cc: Patrice Vilchez <patrice.vilchez@atmel.com>
+> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 > 
-> Given such an attitude, remind me why I should care whether iMX breaks
-> while we do the consolidation and cleanup work to core code, such as
-> the recent restart changes.
-There are several active contributors to i.MX that invest much time to
-adapt i.MX to the current changes. Be it Shawn who does much DT stuff,
-Sascha who proposed things for the clk framework or Richard who
-converted i.MX5x to the the latest clk framework patches. That's why you
-should care. And that is independant of me not doing much for i.MX
-during the last few cycles.
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+please update and u get
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 
-Best regards
-Uwe
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+no need to Cc if sob
+
+ditto for all patch
+> ---
+>  arch/arm/mach-at91/at91sam9260_devices.c |   55 ++++++++++++++++++++++++++++++
+>  arch/arm/mach-at91/board-sam9g20ek.c     |   11 ++++++
+>  2 files changed, 66 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-at91/at91sam9260_devices.c b/arch/arm/mach-at91/at91sam9260_devices.c
+> index 39f81f4..3b754ba 100644
+> --- a/arch/arm/mach-at91/at91sam9260_devices.c
+> +++ b/arch/arm/mach-at91/at91sam9260_devices.c
+> @@ -1312,6 +1312,61 @@ void __init at91_add_device_cf(struct at91_cf_data *data)
+>  void __init at91_add_device_cf(struct at91_cf_data * data) {}
+>  #endif
+>  
+> +/* --------------------------------------------------------------------
+> + *  ADCs
+> + * -------------------------------------------------------------------- */
+> +
+> +#if defined(CONFIG_IIO_AT91ADC) || defined(CONFIG_IIO_AT91ADC_MODULE)
+> +static struct at91_adc_data adc_data;
+> +
+> +static struct resource adc_resources[] = {
+> +	[0] = {
+> +		.start	= AT91SAM9260_BASE_ADC,
+> +		.end	= AT91SAM9260_BASE_ADC + SZ_16K - 1,
+> +		.flags	= IORESOURCE_MEM,
+> +	},
+> +	[1] = {
+> +		.start	= AT91SAM9260_ID_ADC,
+> +		.end	= AT91SAM9260_ID_ADC,
+> +		.flags	= IORESOURCE_IRQ,
+> +	},
+> +};
+> +
+> +static struct platform_device at91_adc_device = {
+> +	.name		= "at91adc",
+at91_adc please
+> +	.id		= -1,
+> +	.dev		= {
+> +				.platform_data		= &adc_data,
+> +	},
+> +	.resource	= adc_resources,
+> +	.num_resources	= ARRAY_SIZE(adc_resources),
+> +};
+> +
+> +void __init at91_add_device_adc(struct at91_adc_data *data)
+> +{
+> +	if (!data)
+> +		return;
+> +
+> +	if (test_bit(0, &data->channels_used))
+> +		at91_set_A_periph(AT91_PIN_PC0, 0);
+> +	if (test_bit(1, &data->channels_used))
+> +		at91_set_A_periph(AT91_PIN_PC1, 0);
+> +	if (test_bit(2, &data->channels_used))
+> +		at91_set_A_periph(AT91_PIN_PC2, 0);
+> +	if (test_bit(3, &data->channels_used))
+> +		at91_set_A_periph(AT91_PIN_PC3, 0);
+> +
+> +	data->adc_clock = 5000000;
+please put a comment here for the clock
+> +	data->num_channels = 4;
+> +	data->startup_time = 10;
+> +
+> +	adc_data = *data;
+> +	platform_device_register(&at91_adc_device);
+> +}
+> +#else
+> +void __init at91_add_device_adc(struct at91_adc_data *data) {}
+> +#endif
+> +
+>  /* -------------------------------------------------------------------- */
+>  /*
+>   * These devices are always present and don't need any board-specific
+> diff --git a/arch/arm/mach-at91/board-sam9g20ek.c b/arch/arm/mach-at91/board-sam9g20ek.c
+> index 817f59d..e34d41a 100644
+> --- a/arch/arm/mach-at91/board-sam9g20ek.c
+> +++ b/arch/arm/mach-at91/board-sam9g20ek.c
+> @@ -314,6 +314,15 @@ static void __init ek_add_device_buttons(void)
+>  static void __init ek_add_device_buttons(void) {}
+>  #endif
+
+Best Regards,
+J.
+>  
+> +/*
+> + * ADCs
+> + */
+> +
+> +static struct at91_adc_data ek_adc_data = {
+> +	.channels_used = BIT(0) | BIT(1) | BIT(2) | BIT(3),
+> +	.vref = 3300,
+> +};
+> +
+>  #if defined(CONFIG_REGULATOR_FIXED_VOLTAGE) || defined(CONFIG_REGULATOR_FIXED_VOLTAGE_MODULE)
+>  static struct regulator_consumer_supply ek_audio_consumer_supplies[] = {
+>  	REGULATOR_SUPPLY("AVDD", "0-001b"),
+> @@ -389,6 +398,8 @@ static void __init ek_board_init(void)
+>  	ek_add_device_gpio_leds();
+>  	/* Push Buttons */
+>  	ek_add_device_buttons();
+> +	/* ADCs */
+> +	at91_add_device_adc(&ek_adc_data);
+>  	/* PCK0 provides MCLK to the WM8731 */
+>  	at91_set_B_periph(AT91_PIN_PC1, 0);
+>  	/* SSC (for WM8731) */
+> -- 
+> 1.7.4.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
