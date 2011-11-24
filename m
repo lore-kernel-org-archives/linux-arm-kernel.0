@@ -1,53 +1,94 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Thu, 24 Nov 2011 20:59:53 +0800
-Subject: [PATCH] mx28: added LRADC and touchscreen support
-In-Reply-To: <1322135394-4097-1-git-send-email-rusko.peter@prolan.hu>
-References: <1322135394-4097-1-git-send-email-rusko.peter@prolan.hu>
-Message-ID: <20111124125952.GD18060@S2100-06.ap.freescale.net>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Thu, 24 Nov 2011 13:52:33 +0100
+Subject: Changing IOMMU-API for generic DMA-mapping supported by the
+ hardware
+In-Reply-To: <20111111131728.GG13213@amd.com>
+References: <1318850846-16066-1-git-send-email-ohad@wizery.com>
+ <1318850846-16066-3-git-send-email-ohad@wizery.com>
+ <CANqQZNH1YRSgYRVxceicQ3szD=t7zeJjhJKEQ30PeKsxtj5V+A@mail.gmail.com>
+ <1320938930.22195.17.camel@i7.infradead.org> <20111110170918.GE13213@amd.com>
+ <1320953319.535.11.camel@i7.infradead.org> <20111111131728.GG13213@amd.com>
+Message-ID: <023b01ccaaa7$ef16c910$cd445b30$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 24, 2011 at 12:49:54PM +0100, Peter Rusko wrote:
-> This patch is based on the Freescale SDK 2010.08. It supports the on-chip
-> Low Resolution ADC and a capacitive touchscreen connected to it.
-> 
-> Tested on Ka-Ro TX28 module
-> 
-> Signed-off-by: Peter Rusko <rusko.peter@prolan.hu>
-> ---
->  arch/arm/mach-mxs/devices-mx28.h                |    6 +
->  arch/arm/mach-mxs/devices/Kconfig               |    3 +
->  arch/arm/mach-mxs/devices/Makefile              |    1 +
->  arch/arm/mach-mxs/devices/platform-mxs-lradc.c  |   25 +
->  arch/arm/mach-mxs/devices/platform-mxs-ts.c     |   34 +
->  arch/arm/mach-mxs/include/mach/devices-common.h |   22 +
->  arch/arm/mach-mxs/include/mach/lradc.h          |   61 ++
->  arch/arm/mach-mxs/include/mach/mx28.h           |    4 +-
->  arch/arm/mach-mxs/include/mach/regs-lradc.h     |  772 +++++++++++++++++++++++
->  drivers/input/touchscreen/Kconfig               |   11 +
->  drivers/input/touchscreen/Makefile              |    1 +
->  drivers/input/touchscreen/mxs_ts.c              |  470 ++++++++++++++
->  drivers/misc/Kconfig                            |    3 +
->  drivers/misc/Makefile                           |    1 +
->  drivers/misc/mxs_lradc.c                        |  381 +++++++++++
->  15 files changed, 1793 insertions(+), 2 deletions(-)
->  create mode 100644 arch/arm/mach-mxs/devices/platform-mxs-lradc.c
->  create mode 100644 arch/arm/mach-mxs/devices/platform-mxs-ts.c
->  create mode 100644 arch/arm/mach-mxs/include/mach/lradc.h
->  create mode 100644 arch/arm/mach-mxs/include/mach/regs-lradc.h
->  create mode 100644 drivers/input/touchscreen/mxs_ts.c
->  create mode 100644 drivers/misc/mxs_lradc.c
-> 
-I think this patch should probably be split into 4.
+Hello,
 
- * lradc drivers/staging/iio/adc/ (rather than drivers/misc/) part
- * lradc arch/arm/mach-mxs part
- * touchscreen drivers/input/touchscreen part
- * touchscreen arch/arm/mach-mxs part
+On Friday, November 11, 2011 2:17 PM Joerg Roedel wrote:
 
-And you need to look into MAINTAINERS for the mailing list and people
-that the 'drivers' part should be sent to.
+> Okay, seperate thread for this one.
 
+If possible, I would like to be CCed: in the next mails in this topic. 
+
+For a last few months I've been working on DMA-mapping changes on ARM
+architecture in order to add support for IOMMU-aware DMA mapper. The
+last version of my patches are available here:
+http://lists.linaro.org/pipermail/linaro-mm-sig/2011-October/000745.html
+
+The next version will be posted soon.
+ 
+> On Thu, Nov 10, 2011 at 07:28:39PM +0000, David Woodhouse wrote:
+> > > The plan is to have a single DMA-API implementation for all IOMMU
+> > > drivers (X86 and ARM) which just uses the IOMMU-API. But to make this
+> > > performing reasonalbly well a few changes to the IOMMU-API are required.
+> > > I already have some ideas which we can discuss if you want.
+> >
+> > Yeah, that sounds useful.
+> 
+> As I said some changes to the IOMMU-API are required in my opinion.
+> These changes should also allow it to move over old-style IOMMUs like
+> Calgary or GART later.
+> 
+> The basic idea is that IOMMU drivers should be required to put every
+> device they are responsible for into a default domain. The DMA mapping
+> code can query this default domain for each device.
+
+Good idea.
+ 
+> Also the default domain has capabilities that can be queried. Those
+> capabilities include the size and offset of the address space they can
+> re-map. For GART and Calgary this will be the aperture, for VT-d and AMD
+> IOMMU the whole 64bit address space. Another capability is whether
+> addresses outside of that area are 1-1 mapped or no accessible to the
+> device.
+>
+> The generic DMA-mapping code will use that information to initialize its
+> allocator and uses iommu_map/iommu_unmap to create and destroy mappings
+> as requested by the DMA-API (but the DMA-mapping code does not need to
+> create a domain of its own).
+> 
+> The good thing about these default domains is that IOMMU drivers can
+> implement their own optimizations on it. The AMD IOMMU driver for
+> example already makes a distinction between dma-mapping domains and
+> other protection-domains. The optimization for dma-mapping domains is
+> that the leaf-pages of the page-table are keept in an array so that it
+> is very easy to find the PTE for an address. Those optimizations are
+> still possible with the default-domain concept.
+> 
+> In short, the benefits of the default-domain concept are:
+> 
+> 	1) It allows existing optimizations for the DMA-mapping code
+> 	   paths to persist
+> 	2) It also fits old-style IOMMUs like GART, Calgary and others
+> 
+> An open problem is how to report reserved ranges of an address-space.
+> These ranges might exist from a BIOS requirement for 1-1 mapping of
+> certain address ranges (in AMD jargon: Unity mapped ranges, something
+> similar exists on VT-d afaik) or hardware requirements like the reserved
+> address range used for MSI interrupts.
+
+In my DMA-mapping IOMMU integration I've used a dma_iommu_mapping structure,
+which contains a pointer to iommu domain, a bitmap and a lock. Maybe we 
+should consider extending iommu domain with allocation bitmap (or other 
+structure that hold information about used/unused iova ranges)? From the
+DMA-mapping (as a IOMMU client) perspective we only need 2 more callbacks
+in IOMMU API: alloc_iova_range() and free_iova_range(). 
+
+Each IOMMU implementation can provide these calls based on internal bitmap
+allocator which will also cover the issue with reserved ranges. What do you
+think about such solution?
+
+Best regards
 -- 
-Regards,
-Shawn
+Marek Szyprowski
+Samsung Poland R&D Center
