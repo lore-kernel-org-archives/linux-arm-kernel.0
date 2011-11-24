@@ -1,56 +1,113 @@
 From: b32955@freescale.com (Huang Shijie)
-Date: Thu, 24 Nov 2011 10:56:18 +0800
-Subject: [PATCH] IMX/SDMA : save the real count for one DMA transaction.
-In-Reply-To: <20111123113656.GG4063@pengutronix.de>
-References: <1322039585-7901-1-git-send-email-b32955@freescale.com>
- <20111123105821.GC4063@pengutronix.de> <4ECCD34C.1090400@freescale.com>
- <20111123110626.GD4063@pengutronix.de> <4ECCD553.5020804@freescale.com>
- <20111123111816.GF4063@pengutronix.de> <4ECCD910.1010004@freescale.com>
- <20111123113656.GG4063@pengutronix.de>
-Message-ID: <4ECDB252.3090006@freescale.com>
+Date: Thu, 24 Nov 2011 11:11:01 +0800
+Subject: [PATCH V3 3/6] MTD : add the database for the NANDs
+In-Reply-To: <CAN8TOE9-iEPyWXLsxddeofazgrCWDWKgrx6eBkr7vdKErfgeCA@mail.gmail.com>
+References: <1301474413-28821-1-git-send-email-b32955@freescale.com>	<1301474413-28821-4-git-send-email-b32955@freescale.com>	<201103301046.04357.ffainelli@freebox.fr>	<4D92F277.7060607@freescale.com>	<1301566248.2828.40.camel@localhost>	<AANLkTi=59br1KueZupGevB4DgP7UqBKRgbGgRvsjgH-8@mail.gmail.com>
+ <CAN8TOE9-iEPyWXLsxddeofazgrCWDWKgrx6eBkr7vdKErfgeCA@mail.gmail.com>
+Message-ID: <4ECDB5C5.3010903@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2011?11?23? 19:36, Wolfram Sang ??:
-> On Wed, Nov 23, 2011 at 07:29:20PM +0800, Huang Shijie wrote:
->>> On Wed, Nov 23, 2011 at 07:13:23PM +0800, Huang Shijie wrote:
->>>>>>>> +	/* save the real count we received or transmitted. */
->>>>>>>> +	chan->private = (void *)count;
->>>>>>> And if someone later needs another variable which is private?
->>>>>>>
->>>>>> I ever wanted to add an new parameter `void *` to dma_aync_tx_callback,
->>>>>> but it seemed i have
->>>>>> to change a lot of files.
->>>>>>
->>>>>> Do you have any better suggestion?
->>>>> Use a private struct and put count in there.
+Hi Brian:
+> Hi,
+>
+> I see nothing has happened with this thread recently. It doesn't
+> deserve to die though.
+>
+> On Thu, Mar 31, 2011 at 10:17 AM, Huang Shijie<shijie8@gmail.com>  wrote:
+>> 2011/3/31 Artem Bityutskiy<dedekind1@gmail.com>:
+>>>>> If you have new chips to support in the future, you should add them in
+>>>>> drivers/mtd/nand/nand_ids.c and not keep this file.
 >>>>>
->>>> Where to put the private struct? in the imx-sdma.c ?
->>>> If i put it there, how can i get it in the UART driver with the current
->>>> DMA API?
->>> So, in the UART driver you assume that void* is an int? Or how do you
->>> currently use count?
+>>>> The data structure  nand_flash_dev{} does not contain enough information.
+>>>> So I want to the nand_device_info{} to replace it in future.
+>>> Just add this information, if it is of generic nature (like SLC/MLC
+>>> flag, required ECC strength, etc).
+> Are SLC/MLC and ECC strength necessary to track? I don't see a good
+We do not necessary  to track it.  For normal nand, I can compute it 
+myself ,
+just as the current driver does; for ONFI nand ,we should parse it out 
+from the Parameter Page.
+It need an extra patch to do this.
+> benefit to cost ratio of trying to detect ECC strength especially,
+> since the levels specified in data sheets vary without much pattern
+> and nobody provides a way for decoding this from ID; do you really
+> want to have to make separate chip entries for every single chip that
+> comes around?
+>
+>>>>> I still do not understand why this would be needed, is it because the generic
+>>>>> code does not provide enough informations for your driver?
+>>>>>
+>>>> yes.
+>>>>
+>>>> IMHO, the generic code is somehow trapped in a wrong way. :(
+> I may agree, but can you be more specific on the trap?
+>
+>>>> Paring the id bytes is not sufficient to get all the information you
+>>>> need which is faced by me.
+> What's an alternative to "paring the id bytes"?
+>
+>>>> What's more, I think the paring code is ugly, see the nand_get_flash_type().
+>>> You are welcome to fix this. There is _a lot_ of ugly code in MTD
+>>> because no one loves it. Give it some love :-)
+> While I agree that a lot of this is ugly, it is mostly a matter of
+> necessity. NAND manufacturers do not have a standard (ONFI doesn't
+> really count, since there's basically 1 manufacturer using it), and so
+> the most "generic" code is to have different code paths for different
+> manufacturers (often with exceptions to each rule, since even a single
+> manufacturer changes its standards arbitrarily). Then you find
+> manufacturers like Toshiba that recently don't have any (published)
+> pattern at all for detecting OOB size generically.
+bad news.  I do not have such chip yet, If i have , i will test it, and 
+change the current MTD code.
+> Thus, it seems to me like we will need some form of the approach
+> provided by Huang. As I've found, there are some things that just
+> can't be decoded from the ID these days, so our ID table will need to
+> be able to track:
+> * full ID string (not just the 2nd byte "Device ID")
+> * relevant bad block scanning options
+>
+> FWIW, we already implement an exception table in our own driver that
+> includes the above 2 items, for chips that can't be handled with the
+> table/detection structure as-is. We don't particularly need SLC/MLC
+> but I don't object to recording it if we can determine it reliably,
+> and while ECC level could be useful, it is difficult to discover
+> generically, as I mentioned above.
+>
+I do not use the SLC/MLC info now.
+>>>> Why not create a new database which contains all the necessary
+>>>> information for a nand, and can be easy
+>>>> find by the id bytes as the keyword?
+>>> You can create this database by extending/improving/cleaning up the
+>>> existing code base with a nice series of patches.
 >>>
->> In the UART driver, I use the following lines:
->> -------------------------------------------------------
->> + struct dma_chan *chan = sport->dma_chan_rx;
->> + unsigned int count = (unsigned int)chan->private;
->> -------------------------------------------------------
-> And why can't you use a struct here? chan->private->count?
->
-> Even then, I doubt if you can get this into mainline. But when you try,
-I wish to post the UART code as well as this patch.
-But the PINMUX driver of mx6q is not ready now(so do the mx23/28).
-I have to send out this single patch now.
+>> ok. I will try to fix the generic code before my driver is submitted.
+> What happened to this statement? I see that your driver was submitted,
+> but no efforts were made for chip detection cleanup. Were you
+> satisfied with the current detection?
+When i am free, I will change the current code. But i am a little busy 
+now :(
 
-thanks.
 
+
+Best Regards
 Huang Shijie
-> please always post a user for this change (or a reference to it), that
-> is, the uart-driver. Otherwise there is no reason to include a change.
+> While we're on the subject, I'll direct your attention to this NAND
+> data table that I've worked on. It should provide a decent summary of
+> most of the data sheets I have sorted through. It should also show you
+> that certain things are going to be very hard to detect (e.g., ECC
+> level). It should also show that while some chips are not supported by
+> standard code (e.g., weird bad block scanning features that haven't
+> been supported, non-standard OOB sizes with no given pattern in the
+> datasheets), the vast majority of the chips I've come across should be
+> detected properly:
 >
-> Regards,
+> http://linux-mtd.infradead.org/nand-data/nanddata.html
 >
->    Wolfram
+> And of course, please contribute to
+> git://git.infradead.org/mtd-www.git if you have additions or edits for
+> the table. It's not perfect, but it can help for sorting through
+> different chips.
 >
+> Brian
 >
