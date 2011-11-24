@@ -1,30 +1,50 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 24 Nov 2011 15:00:52 +0000
-Subject: [AT91 PULL v2] defconfig pull request
-In-Reply-To: <20111124140658.GH15531@game.jcrosoft.org>
-References: <20111102155803.GE7136@game.jcrosoft.org>
- <201111232115.08556.arnd@arndb.de> <20111124140658.GH15531@game.jcrosoft.org>
-Message-ID: <201111241500.52871.arnd@arndb.de>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 24 Nov 2011 13:01:15 -0200
+Subject: [PATCH] mx28: added LRADC and touchscreen support
+In-Reply-To: <CAOMZO5BzmVvj1iupeLUTOdK+dw-zsuPLaG9VkYPXcX6EgdRgSw@mail.gmail.com>
+References: <1322135394-4097-1-git-send-email-rusko.peter@prolan.hu>
+ <20174.19732.607965.664497@ipc1.ka-ro>
+ <CAOMZO5BzmVvj1iupeLUTOdK+dw-zsuPLaG9VkYPXcX6EgdRgSw@mail.gmail.com>
+Message-ID: <CAOMZO5AnEb3hUQMT80jodG=CbkGbyWSLXrhDWzYXge5qH3iMZw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 24 November 2011, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> Hi,
-> 
-> 	this a split of the previous pull request that containt onlythe
-> 	defconfig
-> 
-> 	the gpio part will for 3.2
-> 
-> 	this pull request will introduce a defconfig per soc with all machine
-> 	enabled (today we can not compile multiple soc together we work on it)
-> 
-> 	This will allow us to check that we break no board
-> 
-> 	v2:
-> 	update patch as sugested by Arnd
+Peter,
 
-Ok, pulled into 'fixes' now. I ended up rebasing to v3.2-rc2 to have a
-clean base instead of a random point between rc2 and rc3.
+On Thu, Nov 24, 2011 at 12:44 PM, Fabio Estevam <festevam@gmail.com> wrote:
+> On Thu, Nov 24, 2011 at 11:56 AM, Lothar Wa?mann <LW@karo-electronics.de> wrote:
+>
+>>> +static int lradc_freq = LRADC_CLOCK_6MHZ;
+>>> +
+>>> +static int __init lradc_freq_setup(char *str)
+>>> +{
+>>> + ? ? long freq;
+>>> +
+>>> + ? ? if (kstrtol(str, 0, &freq) < 0)
+>>> + ? ? ? ? ? ? return 0;
+>>> +
+>>> + ? ? if (freq < 0)
+>>> + ? ? ? ? ? ? return 0;
+>>> + ? ? if (freq >= 6)
+>>> + ? ? ? ? ? ? lradc_freq = LRADC_CLOCK_6MHZ;
+>>> + ? ? else if (freq >= 4)
+>>> + ? ? ? ? ? ? lradc_freq = LRADC_CLOCK_4MHZ;
+>>> + ? ? else if (freq >= 3)
+>>> + ? ? ? ? ? ? lradc_freq = LRADC_CLOCK_3MHZ;
+>>> + ? ? else if (freq >= 2)
+>>> + ? ? ? ? ? ? lradc_freq = LRADC_CLOCK_2MHZ;
+>>> + ? ? else
+>>> + ? ? ? ? ? ? return 0;
+>>> + ? ? return 1;
+>>> +}
+>>> +
+>>> +__setup("lradc_freq=", lradc_freq_setup);
+>>>
+>> How do you set lradc_freq when the driver is compiled as a module?
+>> module_param() would work for the driver compiled as a module as well
+>> as built-in
+>
+> What about passing lradc_freq as platform data?
 
-	Arnd
+You can also look at this AT91 ADC driver patch for reference:
+http://www.spinics.net/lists/arm-kernel/msg148461.html
