@@ -1,113 +1,167 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Thu, 24 Nov 2011 11:11:01 +0800
-Subject: [PATCH V3 3/6] MTD : add the database for the NANDs
-In-Reply-To: <CAN8TOE9-iEPyWXLsxddeofazgrCWDWKgrx6eBkr7vdKErfgeCA@mail.gmail.com>
-References: <1301474413-28821-1-git-send-email-b32955@freescale.com>	<1301474413-28821-4-git-send-email-b32955@freescale.com>	<201103301046.04357.ffainelli@freebox.fr>	<4D92F277.7060607@freescale.com>	<1301566248.2828.40.camel@localhost>	<AANLkTi=59br1KueZupGevB4DgP7UqBKRgbGgRvsjgH-8@mail.gmail.com>
- <CAN8TOE9-iEPyWXLsxddeofazgrCWDWKgrx6eBkr7vdKErfgeCA@mail.gmail.com>
-Message-ID: <4ECDB5C5.3010903@freescale.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Thu, 24 Nov 2011 12:01:29 +0800
+Subject: [RFC PATCH 1/3] arm/imx6: describe clocks in device tree source
+In-Reply-To: <20111122085649.GC27267@pengutronix.de>
+References: <1321926536-671-1-git-send-email-shawn.guo@linaro.org>
+ <1321926536-671-2-git-send-email-shawn.guo@linaro.org>
+ <20111122085649.GC27267@pengutronix.de>
+Message-ID: <20111124040128.GC17979@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Brian:
-> Hi,
->
-> I see nothing has happened with this thread recently. It doesn't
-> deserve to die though.
->
-> On Thu, Mar 31, 2011 at 10:17 AM, Huang Shijie<shijie8@gmail.com>  wrote:
->> 2011/3/31 Artem Bityutskiy<dedekind1@gmail.com>:
->>>>> If you have new chips to support in the future, you should add them in
->>>>> drivers/mtd/nand/nand_ids.c and not keep this file.
->>>>>
->>>> The data structure  nand_flash_dev{} does not contain enough information.
->>>> So I want to the nand_device_info{} to replace it in future.
->>> Just add this information, if it is of generic nature (like SLC/MLC
->>> flag, required ECC strength, etc).
-> Are SLC/MLC and ECC strength necessary to track? I don't see a good
-We do not necessary  to track it.  For normal nand, I can compute it 
-myself ,
-just as the current driver does; for ONFI nand ,we should parse it out 
-from the Parameter Page.
-It need an extra patch to do this.
-> benefit to cost ratio of trying to detect ECC strength especially,
-> since the levels specified in data sheets vary without much pattern
-> and nobody provides a way for decoding this from ID; do you really
-> want to have to make separate chip entries for every single chip that
-> comes around?
->
->>>>> I still do not understand why this would be needed, is it because the generic
->>>>> code does not provide enough informations for your driver?
->>>>>
->>>> yes.
->>>>
->>>> IMHO, the generic code is somehow trapped in a wrong way. :(
-> I may agree, but can you be more specific on the trap?
->
->>>> Paring the id bytes is not sufficient to get all the information you
->>>> need which is faced by me.
-> What's an alternative to "paring the id bytes"?
->
->>>> What's more, I think the paring code is ugly, see the nand_get_flash_type().
->>> You are welcome to fix this. There is _a lot_ of ugly code in MTD
->>> because no one loves it. Give it some love :-)
-> While I agree that a lot of this is ugly, it is mostly a matter of
-> necessity. NAND manufacturers do not have a standard (ONFI doesn't
-> really count, since there's basically 1 manufacturer using it), and so
-> the most "generic" code is to have different code paths for different
-> manufacturers (often with exceptions to each rule, since even a single
-> manufacturer changes its standards arbitrarily). Then you find
-> manufacturers like Toshiba that recently don't have any (published)
-> pattern at all for detecting OOB size generically.
-bad news.  I do not have such chip yet, If i have , i will test it, and 
-change the current MTD code.
-> Thus, it seems to me like we will need some form of the approach
-> provided by Huang. As I've found, there are some things that just
-> can't be decoded from the ID these days, so our ID table will need to
-> be able to track:
-> * full ID string (not just the 2nd byte "Device ID")
-> * relevant bad block scanning options
->
-> FWIW, we already implement an exception table in our own driver that
-> includes the above 2 items, for chips that can't be handled with the
-> table/detection structure as-is. We don't particularly need SLC/MLC
-> but I don't object to recording it if we can determine it reliably,
-> and while ECC level could be useful, it is difficult to discover
-> generically, as I mentioned above.
->
-I do not use the SLC/MLC info now.
->>>> Why not create a new database which contains all the necessary
->>>> information for a nand, and can be easy
->>>> find by the id bytes as the keyword?
->>> You can create this database by extending/improving/cleaning up the
->>> existing code base with a nice series of patches.
->>>
->> ok. I will try to fix the generic code before my driver is submitted.
-> What happened to this statement? I see that your driver was submitted,
-> but no efforts were made for chip detection cleanup. Were you
-> satisfied with the current detection?
-When i am free, I will change the current code. But i am a little busy 
-now :(
+On Tue, Nov 22, 2011 at 09:56:49AM +0100, Sascha Hauer wrote:
+> On Tue, Nov 22, 2011 at 09:48:54AM +0800, Shawn Guo wrote:
+> > It adds document for imx clock device tree bindings and then describes
+> > imx6 clocks in dts.
+> > 
+> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> > ---
+> >  .../devicetree/bindings/clock/clock-imx.txt        |  124 +++
+> >  arch/arm/boot/dts/imx6q.dtsi                       |  943 +++++++++++++++++++-
+> >  2 files changed, 1058 insertions(+), 9 deletions(-)
+> >  create mode 100644 Documentation/devicetree/bindings/clock/clock-imx.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/clock/clock-imx.txt b/Documentation/devicetree/bindings/clock/clock-imx.txt
+> > new file mode 100644
+> > index 0000000..5c597d9
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/clock/clock-imx.txt
+> > @@ -0,0 +1,124 @@
+> > +* Device Tree Bindings for Freescale i.MX Clock
+> > +
+> > +== Clock Gate ==
+> > +
+> > +Required properties:
+> > +- imx,clock-gate:  It's a two 32-bit integers array.  The first
+> > +  integer specifies the offset of the gate register, and the second
+> > +  one specifies the bit mask of the gate for this clock.
+> 
+> On i.MX53 we have two bit gates:
+> 
+> 00b disable
+> 01b disable in stop mode, enable in run mode
+> 10b reserved
+> 11b enable
+> 
+> I can't find this description in my i.MX6RM, but I suppose it's the same
+> here. Do you have plans for these? Currently only disable and enable
+> seem to be handled.
+> 
+Yes, imx6 is same as imx5 on this.  It's something missing from clock
+driver rather than binding.  The binding only describes the shift and
+mask of the gate bits, and the encoding of the bits is left to clock
+driver.  And I plan to add support for cases 01b and 10b when the need
+occurs.
 
+> 
+> > +
+> > +		pll2_pfd_clk: pll2-pfd {
+> > +			compatible = "fsl,imx6q-pfd";
+> > +			#clock-cells = <3>;
+> > +			imx,clock-gate = <0x100 0x80>,
+> > +					 <0x100 0x8000>,
+> > +					 <0x100 0x800000>;
+> > +			imx,clock-divider = <0x100 0 0 0 6>,
+> > +					    <0x100 0 0 8 6>,
+> > +					    <0x100 0 0 16 6>;
+> > +			clock-input = <&pll_bus_clk 0>;
+> > +			clock-input-name = "pll2-bus";
+> > +			clock-output-name = "pll2-pfd-352m",
+> > +					    "pll2-pfd-594m",
+> > +					    "pll2-pfd-400m";
+> > +		};
+> 
+> Does this pll simultaneously have three different output frequencies?
+> I'm not familiar with the i.MX6 yet.
+> 
+This is not a PLL.  Instead, they are 3 PFDs having the PLL2 as the
+parent clock.
 
+> > +
+> > +		can_root_clk: can-root {
+> > +			compatible = "fsl,imx6q-clock";
+> > +			#clock-cells = <1>;
+> > +			imx,clock-divider = <0x20 0 0 2 6>;
+> > +			clock-input = <&pll_usb_clk 0 0>;
+> > +			clock-input-name = "pll3-usb-otg";
+> > +			clock-output-name = "can-root";
+> > +		};
+> > +
+> > +		can_clk: can {
+> > +			compatible = "fsl,imx6q-clock";
+> > +			#clock-cells = <4>;
+> > +			imx,clock-gate = <0x68 0xc000>,
+> > +					 <0x68 0x30000>,
+> > +					 <0x68 0xc0000>,
+> > +					 <0x68 0x300000>;
+> > +			clock-input = <&can_root_clk 0>;
+> > +			clock-input-name = "can-root";
+> > +			clock-output-name = "can1",
+> > +					    "can1-serial",
+> > +					    "can2",
+> > +					    "can2-serial";
+> > +		};
+> > +
+> > +		ecspi_root_clk: ecspi-root {
+> > +			compatible = "fsl,imx6q-clock";
+> > +			#clock-cells = <1>;
+> > +			imx,clock-divider = <0x38 0 0 19 6>;
+> > +			clock-input = <&pll3_div_clk 2 0 0>;
+> > +			clock-input-name = "pll3-60m";
+> > +			clock-output-name = "ecspi-root";
+> > +		};
+> 
+> I'm not sure you do yourself a favour if you skip all the muxes and
+> assume reset default for them. The ecspi-root parent is a mux The mux
+> seems to be missing in the can clock, uart and probably others.
+> 
+I'm looking at IMX6DQRM.pdf 'Rev. B, 07/2011'.  I do not see mux for
+ECSPI_CLK_ROOT as well as other clocks you mentioned.  Instead, I can
+only see divider for these clocks.  Can you point out the registers
+and bits of these muxes you are seeing with these clocks?
 
-Best Regards
-Huang Shijie
-> While we're on the subject, I'll direct your attention to this NAND
-> data table that I've worked on. It should provide a decent summary of
-> most of the data sheets I have sorted through. It should also show you
-> that certain things are going to be very hard to detect (e.g., ECC
-> level). It should also show that while some chips are not supported by
-> standard code (e.g., weird bad block scanning features that haven't
-> been supported, non-standard OOB sizes with no given pattern in the
-> datasheets), the vast majority of the chips I've come across should be
-> detected properly:
->
-> http://linux-mtd.infradead.org/nand-data/nanddata.html
->
-> And of course, please contribute to
-> git://git.infradead.org/mtd-www.git if you have additions or edits for
-> the table. It's not perfect, but it can help for sorting through
-> different chips.
->
-> Brian
->
+> > +
+> > +		ecspi_clk: ecspi {
+> > +			compatible = "fsl,imx6q-clock";
+> > +			#clock-cells = <5>;
+> > +			imx,clock-gate = <0x6c 0x3>,
+> > +					 <0x6c 0xc>,
+> > +					 <0x6c 0x30>,
+> > +					 <0x6c 0xc0>,
+> > +					 <0x6c 0x300>;
+> > +			clock-input = <&ecspi_root_clk 0>;
+> > +			clock-input-name = "ecspi-root";
+> > +			clock-output-name = "ecspi1",
+> > +					    "ecspi2",
+> > +					    "ecspi3",
+> > +					    "ecspi4",
+> > +					    "ecspi5";
+> > +		};
+> > +
+> 
+> [...]
+> 
+> > +
+> > +		uart_clk: uart {
+> > +			compatible = "fsl,imx6q-clock";
+> > +			#clock-cells = <2>;
+> > +			imx,clock-gate = <0x7c 0x3000000>,
+> > +					 <0x7c 0xc000000>;
+> > +			imx,clock-divider = <0x24 0 0 0 6>,
+> > +					    <0x24 0 0 0 6>;
+> > +			clock-input = <&pll3_div_clk 1 0 0>;
+> > +			clock-input-name = "pll3-80m";
+> > +			clock-output-name = "uart",
+> > +					    "uart-serial";
+> > +		};
+> 
+> This seems wrong. The UARTs have two clocks, the register clock and the
+> baud clock. parent of the baud clock is uart-root (the mux is missing
+> here) and parent of the register clock is the ipg clock. This node only
+> has one parent.
+> 
+Yes, this is wrong.  Thanks for catching.  But still I do not see mux
+for uart-root but only divider.
+
+Regards,
+Shawn
