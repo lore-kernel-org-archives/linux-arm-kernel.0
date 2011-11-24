@@ -1,94 +1,28 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Thu, 24 Nov 2011 13:52:33 +0100
-Subject: Changing IOMMU-API for generic DMA-mapping supported by the
- hardware
-In-Reply-To: <20111111131728.GG13213@amd.com>
-References: <1318850846-16066-1-git-send-email-ohad@wizery.com>
- <1318850846-16066-3-git-send-email-ohad@wizery.com>
- <CANqQZNH1YRSgYRVxceicQ3szD=t7zeJjhJKEQ30PeKsxtj5V+A@mail.gmail.com>
- <1320938930.22195.17.camel@i7.infradead.org> <20111110170918.GE13213@amd.com>
- <1320953319.535.11.camel@i7.infradead.org> <20111111131728.GG13213@amd.com>
-Message-ID: <023b01ccaaa7$ef16c910$cd445b30$%szyprowski@samsung.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 24 Nov 2011 12:56:16 +0000
+Subject: -next fails to boot as of today on S3C6410
+In-Reply-To: <alpine.LFD.2.02.1111231929050.17904@xanadu.home>
+References: <20111123122855.GB7382@totoro>
+ <20111123130134.GB12227@opensource.wolfsonmicro.com>
+ <20111123133237.GC7382@totoro>
+ <20111123135033.GA20272@opensource.wolfsonmicro.com>
+ <20111123143322.GD7382@totoro>
+ <20111123145517.GE20272@opensource.wolfsonmicro.com>
+ <4ECD32CA.2030601@gmail.com>
+ <20111123175446.GI30049@opensource.wolfsonmicro.com>
+ <alpine.LFD.2.02.1111231402370.17904@xanadu.home>
+ <alpine.LFD.2.02.1111231929050.17904@xanadu.home>
+Message-ID: <20111124125615.GJ8470@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Wed, Nov 23, 2011 at 07:32:58PM -0500, Nicolas Pitre wrote:
 
-On Friday, November 11, 2011 2:17 PM Joerg Roedel wrote:
+> That should provide you with the ability to figure out what's wrong.
 
-> Okay, seperate thread for this one.
-
-If possible, I would like to be CCed: in the next mails in this topic. 
-
-For a last few months I've been working on DMA-mapping changes on ARM
-architecture in order to add support for IOMMU-aware DMA mapper. The
-last version of my patches are available here:
-http://lists.linaro.org/pipermail/linaro-mm-sig/2011-October/000745.html
-
-The next version will be posted soon.
- 
-> On Thu, Nov 10, 2011 at 07:28:39PM +0000, David Woodhouse wrote:
-> > > The plan is to have a single DMA-API implementation for all IOMMU
-> > > drivers (X86 and ARM) which just uses the IOMMU-API. But to make this
-> > > performing reasonalbly well a few changes to the IOMMU-API are required.
-> > > I already have some ideas which we can discuss if you want.
-> >
-> > Yeah, that sounds useful.
-> 
-> As I said some changes to the IOMMU-API are required in my opinion.
-> These changes should also allow it to move over old-style IOMMUs like
-> Calgary or GART later.
-> 
-> The basic idea is that IOMMU drivers should be required to put every
-> device they are responsible for into a default domain. The DMA mapping
-> code can query this default domain for each device.
-
-Good idea.
- 
-> Also the default domain has capabilities that can be queried. Those
-> capabilities include the size and offset of the address space they can
-> re-map. For GART and Calgary this will be the aperture, for VT-d and AMD
-> IOMMU the whole 64bit address space. Another capability is whether
-> addresses outside of that area are 1-1 mapped or no accessible to the
-> device.
->
-> The generic DMA-mapping code will use that information to initialize its
-> allocator and uses iommu_map/iommu_unmap to create and destroy mappings
-> as requested by the DMA-API (but the DMA-mapping code does not need to
-> create a domain of its own).
-> 
-> The good thing about these default domains is that IOMMU drivers can
-> implement their own optimizations on it. The AMD IOMMU driver for
-> example already makes a distinction between dma-mapping domains and
-> other protection-domains. The optimization for dma-mapping domains is
-> that the leaf-pages of the page-table are keept in an array so that it
-> is very easy to find the PTE for an address. Those optimizations are
-> still possible with the default-domain concept.
-> 
-> In short, the benefits of the default-domain concept are:
-> 
-> 	1) It allows existing optimizations for the DMA-mapping code
-> 	   paths to persist
-> 	2) It also fits old-style IOMMUs like GART, Calgary and others
-> 
-> An open problem is how to report reserved ranges of an address-space.
-> These ranges might exist from a BIOS requirement for 1-1 mapping of
-> certain address ranges (in AMD jargon: Unity mapped ranges, something
-> similar exists on VT-d afaik) or hardware requirements like the reserved
-> address range used for MSI interrupts.
-
-In my DMA-mapping IOMMU integration I've used a dma_iommu_mapping structure,
-which contains a pointer to iommu domain, a bitmap and a lock. Maybe we 
-should consider extending iommu domain with allocation bitmap (or other 
-structure that hold information about used/unused iova ranges)? From the
-DMA-mapping (as a IOMMU client) perspective we only need 2 more callbacks
-in IOMMU API: alloc_iova_range() and free_iova_range(). 
-
-Each IOMMU implementation can provide these calls based on internal bitmap
-allocator which will also cover the issue with reserved ranges. What do you
-think about such solution?
-
-Best regards
--- 
-Marek Szyprowski
-Samsung Poland R&D Center
+Found one problem which I just sent a patch for, iotable_init() was not
+coping with being passed an empty table which it had previously been OK
+with.  However, the boot still dies shortly afterwards when we try to
+read the CPU ID in s3c64xx_init_cpu() and presumably take an exception
+due to the system address either not being mapped or mapped somewhere
+other than where the code expects.
