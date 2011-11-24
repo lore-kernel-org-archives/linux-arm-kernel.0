@@ -1,43 +1,100 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 24 Nov 2011 10:29:09 +0000
-Subject: BUG: sleeping function called from invalid context
-In-Reply-To: <20111124090514.GW19986@pengutronix.de>
-References: <4ECCDAA2.4070502@prolan.hu>
- <CAOMZO5DSvLU0ACJPZ69tzY0PjMijibSzwCEwBhu=5=mg7ncF=g@mail.gmail.com>
- <20111123183640.GQ19986@pengutronix.de>
- <20111123225124.GK9581@n2100.arm.linux.org.uk>
- <20111124071406.GS19986@pengutronix.de>
- <20111124090141.GN9581@n2100.arm.linux.org.uk>
- <20111124090514.GW19986@pengutronix.de>
-Message-ID: <20111124102909.GO9581@n2100.arm.linux.org.uk>
+From: N.Voss@weinmann.de (Voss, Nikolaus)
+Date: Thu, 24 Nov 2011 11:33:41 +0100
+Subject: [PATCH v7 3/5] drivers/i2c/busses/i2c-at91.c: add new driver
+In-Reply-To: <201111231618.45951.arnd@arndb.de>
+References: <cover.1322062555.git.n.voss@weinmann.de>
+ <ee23c49c5a190a2cce0859f7828c2dc771ff3207.1322062555.git.n.voss@weinmann.de>
+ <201111231618.45951.arnd@arndb.de>
+Message-ID: <EF2E73589CA71846A15D0B2CDF79505D087B44FEAF@wm021.weinmann.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 24, 2011 at 10:05:14AM +0100, Uwe Kleine-K?nig wrote:
-> On Thu, Nov 24, 2011 at 09:01:41AM +0000, Russell King - ARM Linux wrote:
-> > On Thu, Nov 24, 2011 at 08:14:06AM +0100, Uwe Kleine-K?nig wrote:
-> > > On Wed, Nov 23, 2011 at 10:51:24PM +0000, Russell King - ARM Linux wrote:
-> > > > So really, there's no excuse not to fix this for the imx/mxwhatever SoCs
-> > > > today - the clk framework is totally irrelevant as far as this goes.
-> > > I think doing the clk_prepare seperation and converting to the clk
-> > > framework in one step will be easier.
-> > 
-> > From a point of view of being able to separate the changes so there isn't
-> > a flag day, you're wrong.  clk_prepare() is already present in the kernel
-> > as dummy functions, and all you need to do at this point is arrange for
-> > the drivers to make the appropriate calls.  There's no need to write one
-> > line of code behind clk_prepare() at the current time.
-> Yeah, but adding clk_prepare to the serial driver doesn't help me to get
-> rid of the BUG reported in this thread without giving it some meaning in
-> the platform, right?
+Hi,
 
-So, let's be honest about why this bug isn't being fixed then.  Your
-attitude to this problem is ignore it and to do nothing, rather than
-trying to fix it via a perfectly good transition path provided for
-you.
+Arnd Bergmann wrote on 2011-11-23:
+> On Tuesday 08 November 2011, Nikolaus Voss wrote:
+> 
+> 
+> > +
+> > +static unsigned at91_twi_read(struct at91_twi_dev *dev, unsigned reg)
+> > +{
+> > +	return __raw_readl(dev->base + reg);
+> > +}
+> > +
+> > +static void at91_twi_write(struct at91_twi_dev *dev, unsigned reg, unsigned
+> val)
+> > +{
+> > +	__raw_writel(val, dev->base + reg);
+> > +}
+> 
+> Better use readl/writel or readl_relaxed/writel_relaxed.
 
-Okay, now we can see clearly why the bug is still there.  Thanks.
+ok, changed.
 
-Given such an attitude, remind me why I should care whether iMX breaks
-while we do the consolidation and cleanup work to core code, such as
-the recent restart changes.
+> 
+> > +/*
+> > + * Calculate and set symmetric clock as stated in datasheet:
+> > + * twi_clk = F_MAIN / (2 * cdiv * (1 << ckdiv) + 4)
+> > + */
+> > +static void __devinit at91_set_twi_clock(struct at91_twi_dev *dev, int
+> twi_clk)
+> > +{
+> > +	const int div = DIV_ROUND_UP(clk_get_rate(dev->clk), 2 * twi_clk) - 2;
+> > +	int ckdiv = fls(div >> 8);
+> > +	const int cdiv = div >> ckdiv;
+> > +
+> > +	if (cpu_is_at91rm9200() && (ckdiv > 5)) {
+> > +		dev_warn(dev->dev, "AT91RM9200 erratum 22: using ckdiv = 5.\n");
+> > +		ckdiv = 5;
+> > +	}
+> 
+> Don't check a global property like this locally in the driver. Instead,
+> make it a property of the device that you check here and set it based on
+> the the device name set by the platform, or by a device tree property.
+
+Yes, this is a known problem and was discussed in
+https://lkml.org/lkml/2011/11/8/217 . The main problem is that there a no
+revisions for specific at91 IP devices but the revision is implicitly
+defined by the cpu type and version. Changing this would need to add some
+arch infrastructure which I think is beyond the scope of this driver.
+
+> > diff --git a/drivers/i2c/busses/i2c-at91.h b/drivers/i2c/busses/i2c-at91.h
+> > new file mode 100644
+> > index 0000000..a898159
+> > --- /dev/null
+> > +++ b/drivers/i2c/busses/i2c-at91.h
+> > @@ -0,0 +1,80 @@
+> > +
+> > +#ifndef AT91_TWI_H
+> > +#define AT91_TWI_H
+> > +
+> 
+> No need for a header file if all the values in it are used in only one
+> source file. Just move everything to i2c_at91.c
+> 
+> > +#define	AT91_TWI_MMR		0x04		/* Master Mode Register */
+> > +#define	AT91_TWI_IADRSZ		(3    <<  8)	/* Internal Device Address
+> > +						 *  Size */
+> > +#define	AT91_TWI_IADRSZ_NO	(0 << 8)
+> > +#define	AT91_TWI_IADRSZ_1	(1 << 8)
+> > +#define	AT91_TWI_IADRSZ_2	(2 << 8)
+> > +#define	AT91_TWI_IADRSZ_3	(3 << 8)
+> > +#define	AT91_TWI_MREAD		(1    << 12)	/* Master Read Direction
+> */
+> > +#define	AT91_TWI_DADR		(0x7f << 16)	/* Device Address */
+> 
+> These are harder to read than just using hexadecimal bitmasks:
+> 
+> #define	AT91_TWI_MMR		0x00000004
+> #define	AT91_TWI_IADRSZ		0x00000300
+> #define	AT91_TWI_IADRSZ_NO	0x00000000
+> #define	AT91_TWI_IADRSZ_1	0x00000100
+> ...
+
+I agree, but this header file was already used by the old driver and
+converting would add possible errors to register definitions which are
+not (yet) used. That's why I've left it as is and just made it a local
+include.
+
+Thanks,
+Niko
