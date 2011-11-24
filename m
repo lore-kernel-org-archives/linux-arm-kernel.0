@@ -1,69 +1,41 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 24 Nov 2011 16:06:54 +0000
-Subject: [GIT PULL] DSS fixes for v3.2-rc2
-In-Reply-To: <20111123235542.GL31337@atomide.com>
-References: <20111123235542.GL31337@atomide.com>
-Message-ID: <201111241606.54879.arnd@arndb.de>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 24 Nov 2011 16:08:53 +0000
+Subject: -next fails to boot as of today on S3C6410
+In-Reply-To: <20111124125615.GJ8470@opensource.wolfsonmicro.com>
+References: <20111123130134.GB12227@opensource.wolfsonmicro.com>
+ <20111123133237.GC7382@totoro>
+ <20111123135033.GA20272@opensource.wolfsonmicro.com>
+ <20111123143322.GD7382@totoro>
+ <20111123145517.GE20272@opensource.wolfsonmicro.com>
+ <4ECD32CA.2030601@gmail.com>
+ <20111123175446.GI30049@opensource.wolfsonmicro.com>
+ <alpine.LFD.2.02.1111231402370.17904@xanadu.home>
+ <alpine.LFD.2.02.1111231929050.17904@xanadu.home>
+ <20111124125615.GJ8470@opensource.wolfsonmicro.com>
+Message-ID: <20111124160853.GB2509@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 23 November 2011, Tony Lindgren wrote:
-> Hi Arnd,
-> 
-> This one has been separated out from the rest of the fixes.
+On Thu, Nov 24, 2011 at 12:56:16PM +0000, Mark Brown wrote:
+> On Wed, Nov 23, 2011 at 07:32:58PM -0500, Nicolas Pitre wrote:
 
-Pulled into the fixes branch now. I'll send out the branch
-after testing it on tomorrow's linux-next.
+> > That should provide you with the ability to figure out what's wrong.
 
-> If some of these need to go to stable, then Tomi should
-> do the rebasing and send them to stable at vger.kernel.org
-> as they don't apply cleanly on v3.1.
+> Found one problem which I just sent a patch for, iotable_init() was not
+> coping with being passed an empty table which it had previously been OK
+> with.  However, the boot still dies shortly afterwards when we try to
+> read the CPU ID in s3c64xx_init_cpu() and presumably take an exception
+> due to the system address either not being mapped or mapped somewhere
+> other than where the code expects.
 
-Ok. I've taken Tomi on Cc as a reminder for him, although I guess
-you already discussed it with him.
+I went back and had another look at this - the reason we're dying in
+s3c64xx_init_cpu() is that it attempts to use the virtual address to
+read the ID register but due to the debug patch Nicholas provided to
+keep the serial port alive when I have DEBUG_LL turned on the mappings
+set up by the CPU initialization were not actually being used by the
+kernel yet.  The upshot is that the boot problems in current -next are
+fixed by the combination of the irq_domain patch and the patch I posted
+earlier today and DEBUG_LL will need something a bit different to keep
+it running while doing the remapping.
 
-Kiitoksia paljon,
-
-	Arnd
-
-> 
-> The following changes since commit cfcfc9eca2bcbd26a8e206baeb005b055dbf8e37:
->   Linus Torvalds (1):
->         Linux 3.2-rc2
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap fixes-dss
-> 
-> Archit Taneja (1):
->       ARM: OMAP2PLUS: DSS: Ensure DSS works correctly if display is enabled in bootloader
-> 
-> Tomi Valkeinen (9):
->       ARM: OMAP2xxx: HWMOD: Fix DSS reset
->       ARM: OMAP2xxx: HWMOD: fix DSS clock data
->       ARM: OMAP3: HWMOD: Fix DSS reset
->       ARM: OMAP3: HWMOD: fix DSS clock data
->       ARM: OMAP4: HWMOD: remove extra clocks
->       ARM: OMAP4: HWMOD: Add HWMOD_CONTROL_OPT_CLKS_IN_RESET for dss_core
->       ARM: OMAP4: HWMOD: fix DSS clock data
->       ARM: OMAP2/3: HWMOD: Add SYSS_HAS_RESET_STATUS for dss
->       ARM: OMAP: HWMOD: Unify DSS resets for OMAPs
-> 
-> Tony Lindgren (1):
->       Merge branch 'hwmod_dss_fixes_3.2rc' of git://git.pwsan.com/linux-2.6 into fixes-dss
-> 
->  arch/arm/mach-omap2/Makefile                       |    5 +-
->  arch/arm/mach-omap2/display.c                      |  159 ++++++++++++++++++++
->  arch/arm/mach-omap2/display.h                      |   29 ++++
->  arch/arm/mach-omap2/omap_hwmod_2420_data.c         |   17 ++-
->  arch/arm/mach-omap2/omap_hwmod_2430_data.c         |   17 ++-
->  .../mach-omap2/omap_hwmod_2xxx_3xxx_ipblock_data.c |    5 +-
->  arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         |   37 ++++-
->  arch/arm/mach-omap2/omap_hwmod_44xx_data.c         |   24 ++--
->  arch/arm/mach-omap2/omap_hwmod_common_data.c       |    4 +
->  arch/arm/mach-omap2/omap_hwmod_common_data.h       |    4 +
->  arch/arm/plat-omap/include/plat/common.h           |    3 +
->  include/video/omapdss.h                            |    7 -
->  12 files changed, 276 insertions(+), 35 deletions(-)
->  create mode 100644 arch/arm/mach-omap2/display.h
-> 
+Thanks to everyone who helped debug this.
