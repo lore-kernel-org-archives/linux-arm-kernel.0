@@ -1,35 +1,49 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 24 Nov 2011 16:13:37 +0000
-Subject: cpu_pm breaks 3.2 boot on platforms with cascading GICs
-Message-ID: <20111124161336.GB22031@mudshark.cambridge.arm.com>
+Date: Thu, 24 Nov 2011 16:35:49 +0000
+Subject: GIC irq_start detection breaks 3.2 boot on platforms without PPIs
+Message-ID: <20111124163548.GC22031@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Colin,
+Hi Rob,
 
-Commit 254056f3 ("ARM: gic: Use cpu pm notifiers to save gic state") adds
-cpu_pm notifier support to the GIC. The problem is that you register a notifier
-for each GIC registered via gic_init, so on a platform with cascading GICs the
-notifier is registered multiple times.
+In commit 4294f8baa ("ARM: gic: add irq_domain support"), you define
+irq_start as irq_start = (irq_start & ~31) + 16; (later this was predicated
+on irq_start > 0).
 
-The fun part about this is that the way the notifier chain is constructed
-you end up with the GIC notifier pointing to itself as the next node, so you
-get a cycle in the chain. The next poor subsystem that tries to register a
-notifier (in my case, VFP) gets stuck in notifier_chain_register because the
-loop:
+For platforms without any PPIs (i.e. irq_start is passed as a multiple of
+32) then this leads to IRQs being off by 16. Something like this fixes it:
 
-	while ((*nl) != NULL) {
-		if (n->priority > (*nl)->priority)
-			break;
-		nl = &((*nl)->next);
-	}
 
-will never exit!
+diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
+index 0e6ae47..0c2d077 100644
+--- a/arch/arm/common/gic.c
++++ b/arch/arm/common/gic.c
+@@ -581,13 +581,16 @@ void __init gic_init(unsigned int gic_nr, int irq_start,
+         * For primary GICs, skip over SGIs.
+         * For secondary GICs, skip over PPIs, too.
+         */
++       domain->hwirq_base = 32;
+        if (gic_nr == 0) {
+                gic_cpu_base_addr = cpu_base;
+-               domain->hwirq_base = 16;
+-               if (irq_start > 0)
+-                       irq_start = (irq_start & ~31) + 16;
+-       } else
+-               domain->hwirq_base = 32;
++
++               if ((irq_start & 31) > 0) {
++                       domain->hwirq_base = 16;
++                       if (irq_start != -1)
++                               irq_start = (irq_start & ~31) + 16;
++               }
++       }
+ 
+        /*
+         * Find out how many interrupts are supported.
 
-I'm not sure how you want to handle this. Clearly you should only register one
-notifier for the GIC, but it does need to handle the cascading situation
-properly.
 
-This affects current mainline, so we need a solution for 3.2.
+which I can't say I'm especially pleased with but this code is really hard to
+get right!
 
 Will
