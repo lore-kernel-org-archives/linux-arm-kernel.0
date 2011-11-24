@@ -1,36 +1,30 @@
-From: robin@protonic.nl (Robin van der Gracht)
-Date: Thu, 24 Nov 2011 11:58:15 +0100
-Subject: [PATCH] mfd: fixed mixed up ADC single channel readout
-Message-ID: <1322132295-7511-1-git-send-email-robin@protonic.nl>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Thu, 24 Nov 2011 10:59:19 +0000
+Subject: [PATCH] ARM: vic: register the VIC for ST-modified VIC's
+In-Reply-To: <1322062110-24084-1-git-send-email-jamie@jamieiles.com>
+References: <1322062110-24084-1-git-send-email-jamie@jamieiles.com>
+Message-ID: <20111124105919.GC5048@totoro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In single channel mode, when reading the ADC result, the index value
-is still set to the channel selected for this reading.
-This mixes up the order of the values returned. This causes problems when
-the converted results are made available in pairs (i.e. battery current reading)
-To straighten this up, the index value needs to be reset, so that the
-converted values are read at the assigned channel.
+On Wed, Nov 23, 2011 at 03:28:30PM +0000, Jamie Iles wrote:
+> When probing the VIC, the ST variant has a different probing method to
+> account for the extra interrupts which meant we didn't previously call
+> vic_register() which registered the irq_domain.
+> 
+> Cc: Linus Walleij <linus.walleij@stericsson.com>
+> Cc: Russell King <rmk+linux@arm.linux.org.uk>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: Jamie Iles <jamie@jamieiles.com>
+> ---
+> 
+> I _think_ it's just Nomadik affected here which I don't have access to.
+> I can send an updated pull request or put it in Russell's tracker,
+> whichever is easiest.
 
-Signed-off-by: Robin van der Gracht <robin@protonic.nl>
----
- drivers/mfd/mc13xxx-core.c |    4 ++++
- 1 files changed, 4 insertions(+), 0 deletions(-)
+Russell, would this be best in your patch tracker?  I've just tried a 
+test merge of the irqchip consolidation branch into your devel branch 
+and got some conflicts that I think you've already fixed up once.  The 
+patch applies cleanly to your current devel branch.
 
-diff --git a/drivers/mfd/mc13xxx-core.c b/drivers/mfd/mc13xxx-core.c
-index e6bb4b3..3582f15 100644
---- a/drivers/mfd/mc13xxx-core.c
-+++ b/drivers/mfd/mc13xxx-core.c
-@@ -650,6 +650,10 @@ int mc13xxx_adc_do_conversion(struct mc13xxx *mc13xxx, unsigned int mode,
- 
- 	mc13xxx_lock(mc13xxx);
- 
-+	mc13xxx_reg_read(mc13xxx, MC13XXX_ADC1, &adc1);
-+	adc1 &= ~(0x7 << MC13XXX_ADC1_CHAN0_SHIFT);
-+	mc13xxx_reg_write(mc13xxx, MC13XXX_ADC1, adc1);
-+
- 	mc13xxx_irq_free(mc13xxx, MC13XXX_IRQ_ADCDONE, &adcdone_data);
- 
- 	if (ret > 0)
--- 
-1.7.4.1
+Jamie
