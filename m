@@ -1,96 +1,38 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Thu, 24 Nov 2011 20:21:55 +0800
-Subject: [RFC PATCH 0/3] Convert imx6 clock to device tree
-In-Reply-To: <20111124084923.GW27267@pengutronix.de>
-References: <1321926536-671-1-git-send-email-shawn.guo@linaro.org>
- <20111122082314.GB27267@pengutronix.de>
- <20111124025902.GB17979@S2100-06.ap.freescale.net>
- <20111124084923.GW27267@pengutronix.de>
-Message-ID: <20111124122153.GC18060@S2100-06.ap.freescale.net>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 24 Nov 2011 12:47:59 +0000
+Subject: [PATCH] ARM: Handle empty maps in iotable_init()
+Message-ID: <1322138879-14280-1-git-send-email-broonie@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 24, 2011 at 09:49:23AM +0100, Sascha Hauer wrote:
-> On Thu, Nov 24, 2011 at 10:59:03AM +0800, Shawn Guo wrote:
-> > On Tue, Nov 22, 2011 at 09:23:14AM +0100, Sascha Hauer wrote:
-> > > On Tue, Nov 22, 2011 at 09:48:53AM +0800, Shawn Guo wrote:
-> > > > As I promised to Arnd, I will convert imx6 clock code to common clock
-> > > > framework and in turn device tree at the earliest time.  Here it is.
-> > > 
-> > > Very nice ;) I like the patches.
-> > > 
-> > > Is there a way to improve the way how the entities find their base
-> > > addresses? Currently the C code figures out the base addresses based
-> > > on compatible.
-> > 
-> > May I understand the problem with doing that?
-> > 
-> > > Maybe we could put the crm clocks and anatop clocks into
-> > > two different nodes instead of putting them all directly under clocks{}.
-> > > 
-> > I do not quite understand this.  Are you suggesting we keep using the
-> > static base address definition in C code for ccm and anatop rather than
-> > retrieving them from device tree?  No, we do not want to do this.  So
-> > if we need to get the addresses from device tree anyhow, using
-> > compatible to find the correct node is the best way to me.
-> 
-> What I meant is that currently there are many clock nodes which do have
-> a register offset associated with them, but the base address has to be
-> guessed in C code, like this:
-> 
-> >	if (of_device_is_compatible(np, "fsl,imx6q-pll-sys")) {
-> >		base = anatop_base;
-> >		ops = &pll_sys_ops;
-> >	} else if (of_device_is_compatible(np, "fsl,imx6q-pll-usb")) {
-> >		base = anatop_base;
-> >		ops = &pll_ops;
-> >		powerup_set_bit = true;
-> >	} else if (of_device_is_compatible(np, "fsl,imx6q-pll-av")) {
-> >		base = anatop_base;
-> >		ops = &pll_av_ops;
-> >	} else if (of_device_is_compatible(np, "fsl,imx6q-pll-enet")) {
-> >		base = anatop_base;
-> >		ops = &pll_enet_ops;
-> >	} else if (of_device_is_compatible(np, "fsl,imx6q-pll")) {
-> >		base = anatop_base;
-> >		ops = &pll_ops;
-> >	} else if (of_device_is_compatible(np, "fsl,imx6q-pfd")) {
-> >		base = anatop_base;
-> >		ops = &pfd_ops;
-> >		gate_set_bit = true;
-> >	} else if (of_device_is_compatible(np, "fsl,imx6q-ldb-di-clock")) {
-> >		base = ccm_base;
-> >		ops = &ldb_di_clk_ops;
-> >	}
-> 
-> Wouldn't it be possible to arrange the devicetree like this:
+Some CPUs (such as the S3C6410) have been relying on being able to call
+iotable_init() with no io_descs in order to simplify passing through
+machine-specific io_descs. The changes in "ARM: move iotable mappings
+within the vmalloc region" broke this by adding an early_alloc_aligned()
+for an array of vm_structs. Fix this by returning early if no descriptors
+have been passed.
 
-Yes, it is possible and actually better.  Thanks for the suggestion.
+I'm not sure if this is the most tasteful fix but it preserves existing
+behaviour and allows boot to proceed on my system.
 
-> 
-> 	ccm at 020c4000 {
-> 		compatible = "fsl,imx6q-ccm";
-> 		reg = <0x020c4000 0x4000>;
-> 		interrupts = <0 87 0x04 0 88 0x04>;
-> 		clocks {
-> 			/* put ccm clocks here */
-> 		}
-> 	}
-> 
-> 	anatop at 020c8000 {
-> 		compatible = "fsl,imx6q-anatop";
-> 		reg = <0x020c8000 0x1000>;
-> 		interrupts = <0 49 0x04 0 54 0x04 0 127 0x04>;
-> 		clocks {
-> 			/* put anatop clocks here */
-> 		}
-> 	}
-> 
-> Of course this has a high cost on indention levels.
-> 
-I think I will drop node 'clocks' and list those clock nodes directly
-under ccm and anatop nodes to save one level indention.
+Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+---
+ arch/arm/mm/mmu.c |    3 +++
+ 1 files changed, 3 insertions(+), 0 deletions(-)
 
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index c05315b..d842a57 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -763,6 +763,9 @@ void __init iotable_init(struct map_desc *io_desc, int nr)
+ 	struct map_desc *md;
+ 	struct vm_struct *vm;
+ 
++	if (!nr)
++		return;
++
+ 	vm = early_alloc_aligned(sizeof(*vm) * nr, __alignof__(*vm));
+ 
+ 	for (md = io_desc; nr; md++, nr--) {
 -- 
-Regards,
-Shawn
+1.7.7.3
