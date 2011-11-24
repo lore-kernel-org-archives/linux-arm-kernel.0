@@ -1,45 +1,53 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 24 Nov 2011 13:40:22 -0500 (EST)
-Subject: -next fails to boot as of today on S3C6410
-In-Reply-To: <alpine.LFD.2.02.1111241336320.17904@xanadu.home>
-References: <20111123145517.GE20272@opensource.wolfsonmicro.com>
- <4ECD32CA.2030601@gmail.com>
- <20111123175446.GI30049@opensource.wolfsonmicro.com>
- <alpine.LFD.2.02.1111231402370.17904@xanadu.home>
- <alpine.LFD.2.02.1111231929050.17904@xanadu.home>
- <20111124125615.GJ8470@opensource.wolfsonmicro.com>
- <20111124160853.GB2509@sirena.org.uk>
- <alpine.LFD.2.02.1111241254310.17904@xanadu.home>
- <20111124180228.GA32119@opensource.wolfsonmicro.com>
- <alpine.LFD.2.02.1111241316510.17904@xanadu.home>
- <20111124183153.GA3395@opensource.wolfsonmicro.com>
- <alpine.LFD.2.02.1111241336320.17904@xanadu.home>
-Message-ID: <alpine.LFD.2.02.1111241339480.17904@xanadu.home>
+From: cbouatmailru@gmail.com (Anton Vorontsov)
+Date: Thu, 24 Nov 2011 22:42:15 +0400
+Subject: [PATCH v5] power: bq20z75: devicetree init support
+In-Reply-To: <1316031547-18281-1-git-send-email-rklein@nvidia.com>
+References: <1316031547-18281-1-git-send-email-rklein@nvidia.com>
+Message-ID: <20111124184215.GA29135@oksana.dev.rtsoft.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 24 Nov 2011, Nicolas Pitre wrote:
+Hello Rhyland,
 
-> On Thu, 24 Nov 2011, Mark Brown wrote:
-> 
-> > On Thu, Nov 24, 2011 at 01:22:35PM -0500, Nicolas Pitre wrote:
-> > > On Thu, 24 Nov 2011, Mark Brown wrote:
-> > 
-> > > > Ah, right - I was assuming that the existing code was OK (given that
-> > > > it's been in use for years).  What should it be doing to trigger the
-> > > > flush?
-> > 
-> > > Calling s3c_init_cpu(() elsewhere i.e. outside of the s3c64xx_init_io() 
-> > > call path, but after the later has been called, would be best.  Maybe 
-> > > from mdesc->init_early() ?
-> > 
-> > It looks like that'll need more substantial refactoring than I have the
-> > time to do right now, currently the CPU ID is immediately used to decide
-> > how to carry on with low level setup.
-> 
-> Where, and from what call path?
+Got this:
 
-Nevermind.  I see the problem now.  :-/
+  CC [M]  drivers/power/bq20z75.o
+drivers/power/bq20z75.c: In function ?bq20z75_of_populate_pdata?:
+drivers/power/bq20z75.c:630:21: error: storage size of ?gpio_flags? isn?t known
+drivers/power/bq20z75.c:668:2: error: implicit declaration of function ?of_get_named_gpio_flags? [-Werror=implicit-function-declaration]
+drivers/power/bq20z75.c:671:19: error: ?OF_GPIO_ACTIVE_LOW? undeclared (first use in this function)
+drivers/power/bq20z75.c:671:19: note: each undeclared identifier is reported only once for each function it appears in
+drivers/power/bq20z75.c:630:21: warning: unused variable ?gpio_flags? [-Wunused-variable]
+drivers/power/bq20z75.c:627:29: warning: unused variable ?dtid? [-Wunused-variable]
+
+I fixed this by...
+
+On Wed, Sep 14, 2011 at 01:19:07PM -0700, Rhyland Klein wrote:
+
+> +#if defined(CONFIG_OF)
+> +#include <linux/of_device.h>
+
+Adding linux/of_gpio.h
+
+> +static const struct of_device_id bq20z75_dt_ids[] = {
+> +	{ .compatible = "ti,bq20z75" },
+> +	{ }
+> +};
+> +MODULE_DEVICE_TABLE(i2c, bq20z75_dt_ids);
+> +
+> +static struct bq20z75_platform_data *bq20z75_of_populate_pdata(
+> +	struct i2c_client *client)
+> +{
+> +	const struct of_device_id *dtid;
+
+And deleting that line.
 
 
-Nicolas
+Applied to battery-2.6.git, but please double check if everything
+is OK.
+
+Thanks,
+
+-- 
+Anton Vorontsov
+Email: cbouatmailru at gmail.com
