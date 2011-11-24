@@ -1,22 +1,32 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu, 24 Nov 2011 15:29:26 +0100
-Subject: [PATCH 1/3] ARM: AT91: Add platform data for the ADCs
-In-Reply-To: <1322134040-32382-2-git-send-email-maxime.ripard@free-electrons.com>
-References: <1322134040-32382-1-git-send-email-maxime.ripard@free-electrons.com>
- <1322134040-32382-2-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20111124142926.GK15531@game.jcrosoft.org>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 24 Nov 2011 15:37:33 +0100
+Subject: [PATCH] mfd: Fixed unconditional reset of the ADC reading enable
+ bits
+In-Reply-To: <1322132160-7451-1-git-send-email-robin@protonic.nl>
+References: <1322132160-7451-1-git-send-email-robin@protonic.nl>
+Message-ID: <20111124143733.GZ19986@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12:27 Thu 24 Nov     , Maxime Ripard wrote:
-> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-> Cc: Patrice Vilchez <patrice.vilchez@atmel.com>
-> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+On Thu, Nov 24, 2011 at 11:56:00AM +0100, Robin van der Gracht wrote:
+> When the ADC is being prepared for a single or multiple channel reading,
+> the adc0 register is reconfigured without taking the lithium cell, charge
+> current and battery current reading enable bits into account. Which results
+> in clearing the bits.
 > 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Acked-by: Jonathan Cameron <jic23@cam.ac.uk>
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> Signed-off-by: Robin van der Gracht <robin@protonic.nl>
+> ---
+> [...]
+>  	case MC13XXX_ADC_MODE_SINGLE_CHAN:
+> -		adc0 |= old_adc0 & MC13XXX_ADC0_TSMOD_MASK;
+> +		adc0 |= old_adc0 & (MC13XXX_ADC0_TSMOD_MASK |
+> +			MC13XXX_ADC0_EN_READING_MASK);
+Maybe also put MC13XXX_ADC0_TSMOD_MASK into MC13XXX_ADC0_EN_READING_MASK
+and only use the latter here?
 
-Best Regards,
-J.
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
