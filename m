@@ -1,53 +1,44 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 24 Nov 2011 10:35:02 +0000
-Subject: [PATCH] ARM: Kota2 mach-type update fix
-In-Reply-To: <87zkflg999.wl%kuninori.morimoto.gx@renesas.com>
-References: <20111122060857.23951.50598.sendpatchset@w520>
- <20111122092615.GA26411@linux-sh.org>
- <CANqRtoTvMpivHN0tZVTEY6SfkBrNLpu=rkRXUXKJG4J0UNCzhg@mail.gmail.com>
- <20111124082342.GD32112@linux-sh.org>
- <87zkflg999.wl%kuninori.morimoto.gx@renesas.com>
-Message-ID: <20111124103502.GP9581@n2100.arm.linux.org.uk>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Thu, 24 Nov 2011 11:46:37 +0100
+Subject: [PATCH v7 0/3] ARM: mxs: add recording support for saif
+In-Reply-To: <20111124082312.GA18060@S2100-06.ap.freescale.net>
+References: <a> <1321977265-14959-1-git-send-email-b29396@freescale.com>
+ <20111124073605.GI17979@S2100-06.ap.freescale.net>
+ <20111124074619.GJ17979@S2100-06.ap.freescale.net>
+ <20111124074938.GA8439@pengutronix.de>
+ <20111124082312.GA18060@S2100-06.ap.freescale.net>
+Message-ID: <20111124104637.GC2563@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 24, 2011 at 01:28:06AM -0800, Kuninori Morimoto wrote:
-> 
-> Hi Paul
-> 
-> > > >> From: Magnus Damm <damm@opensource.se>
-> > > >>
-> > > >> This patch adds kota2 to the in-kernel ARM mach-type file.
-> > > >>
-> > > >> Basic board support is included in 3.2-rc and the mach-type
-> > > >> has been registered in the ARM machine repository as
-> > > >>
-> > > >> 3616 Renesas SH-Mobile kota2.x Board kota2 Yusuke Goda mainlined
-> > > >>
-> > > >> The file arch/arm/tools/mach-types is however missing Kota2
-> > > >> which makes build of sh73a0 based boards fail with:
-> > > >>
-> > > >> arch/arm/mach-shmobile/platsmp.c: In function 'shmobile_smp_get_core_count':
-> > > >> arch/arm/mach-shmobile/platsmp.c:28:2: error: implicit declaration of function 'machine_is_kota2'
-> > > >> make[1]: *** [arch/arm/mach-shmobile/platsmp.o] Error 1
-> > > >>
-> > > >> arch/arm/mach-shmobile/board-kota2.c:448:136: error: 'MACH_TYPE_KOTA2' undeclared here (not in a function)
-> > > >> make[1]: *** [arch/arm/mach-shmobile/board-kota2.o] Error 1
-> > > >> make: *** [arch/arm/mach-shmobile] Error 2
-> > > >>
-> > > >> Signed-off-by: Magnus Damm <damm@opensource.se>
-> > > >> ---
-> (snip)
-> > > Russell, do you mind if we update the mach-type file to include Kota2?
-> > > It's already registered via the web interface.
-> > > 
-> > I'll add it with Russell's Acked-by, otherwise we'll simply have to wait
-> > for the next batch of mach-types updates.
-> 
-> Can I add A1 bonito mach-type too?
-> I can not find it either
-> 
-> 
-> 3623 	Renesas R-Mobile A1 EVB 	bonito 	Kuninori Morimoto
 
-No, because it's not in the kernel source.
+> > > Also SND_SOC_MXS_SGTL5000 should probably depends on I2C_MXS than I2C.
+> > 
+> > Please explain.
+> > 
+> Sorry.  I meant 'select I2C_MXS'.
+
+>From kconfig-language.txt:
+
+  Note:
+        select should be used with care. select will force
+        a symbol to a value without visiting the dependencies.
+        By abusing select you are able to select a symbol FOO even
+        if FOO depends on BAR that is not set.
+        In general use select only for non-visible symbols
+        (no prompts anywhere) and for symbols with no dependencies.
+        That will limit the usefulness but on the other hand avoid
+        the illegal configurations all over.
+
+So, NACK from me.
+
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111124/ea4d9bd3/attachment.sig>
