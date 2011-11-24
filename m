@@ -1,47 +1,55 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 24 Nov 2011 09:17:25 +0100
-Subject: [RFC PATCH 1/3] arm/imx6: describe clocks in device tree source
-In-Reply-To: <20111124040128.GC17979@S2100-06.ap.freescale.net>
-References: <1321926536-671-1-git-send-email-shawn.guo@linaro.org>
- <1321926536-671-2-git-send-email-shawn.guo@linaro.org>
- <20111122085649.GC27267@pengutronix.de>
- <20111124040128.GC17979@S2100-06.ap.freescale.net>
-Message-ID: <20111124081725.GV27267@pengutronix.de>
+From: lethal@linux-sh.org (Paul Mundt)
+Date: Thu, 24 Nov 2011 17:23:42 +0900
+Subject: [PATCH] ARM: Kota2 mach-type update fix
+In-Reply-To: <CANqRtoTvMpivHN0tZVTEY6SfkBrNLpu=rkRXUXKJG4J0UNCzhg@mail.gmail.com>
+References: <20111122060857.23951.50598.sendpatchset@w520>
+ <20111122092615.GA26411@linux-sh.org>
+ <CANqRtoTvMpivHN0tZVTEY6SfkBrNLpu=rkRXUXKJG4J0UNCzhg@mail.gmail.com>
+Message-ID: <20111124082342.GD32112@linux-sh.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 24, 2011 at 12:01:29PM +0800, Shawn Guo wrote:
-> On Tue, Nov 22, 2011 at 09:56:49AM +0100, Sascha Hauer wrote:
-> > On Tue, Nov 22, 2011 at 09:48:54AM +0800, Shawn Guo wrote:
-> > > It adds document for imx clock device tree bindings and then describes
-> > > imx6 clocks in dts.
-> > > 
-> > > +
-> > > +		ecspi_root_clk: ecspi-root {
-> > > +			compatible = "fsl,imx6q-clock";
-> > > +			#clock-cells = <1>;
-> > > +			imx,clock-divider = <0x38 0 0 19 6>;
-> > > +			clock-input = <&pll3_div_clk 2 0 0>;
-> > > +			clock-input-name = "pll3-60m";
-> > > +			clock-output-name = "ecspi-root";
-> > > +		};
-> > 
-> > I'm not sure you do yourself a favour if you skip all the muxes and
-> > assume reset default for them. The ecspi-root parent is a mux The mux
-> > seems to be missing in the can clock, uart and probably others.
-> > 
-> I'm looking at IMX6DQRM.pdf 'Rev. B, 07/2011'.  I do not see mux for
-> ECSPI_CLK_ROOT as well as other clocks you mentioned.  Instead, I can
-> only see divider for these clocks.  Can you point out the registers
-> and bits of these muxes you are seeing with these clocks?
-
-No, I can't find them either ;) I must have looked into the wrong manual
-at that moment. Sorry for the noise.
-
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+On Tue, Nov 22, 2011 at 08:41:57PM +0900, Magnus Damm wrote:
+> On Tue, Nov 22, 2011 at 6:26 PM, Paul Mundt <lethal@linux-sh.org> wrote:
+> > On Tue, Nov 22, 2011 at 03:08:57PM +0900, Magnus Damm wrote:
+> >> From: Magnus Damm <damm@opensource.se>
+> >>
+> >> This patch adds kota2 to the in-kernel ARM mach-type file.
+> >>
+> >> Basic board support is included in 3.2-rc and the mach-type
+> >> has been registered in the ARM machine repository as
+> >>
+> >> 3616 Renesas SH-Mobile kota2.x Board kota2 Yusuke Goda mainlined
+> >>
+> >> The file arch/arm/tools/mach-types is however missing Kota2
+> >> which makes build of sh73a0 based boards fail with:
+> >>
+> >> arch/arm/mach-shmobile/platsmp.c: In function 'shmobile_smp_get_core_count':
+> >> arch/arm/mach-shmobile/platsmp.c:28:2: error: implicit declaration of function 'machine_is_kota2'
+> >> make[1]: *** [arch/arm/mach-shmobile/platsmp.o] Error 1
+> >>
+> >> arch/arm/mach-shmobile/board-kota2.c:448:136: error: 'MACH_TYPE_KOTA2' undeclared here (not in a function)
+> >> make[1]: *** [arch/arm/mach-shmobile/board-kota2.o] Error 1
+> >> make: *** [arch/arm/mach-shmobile] Error 2
+> >>
+> >> Signed-off-by: Magnus Damm <damm@opensource.se>
+> >> ---
+> >>
+> >> ?I propose that Paul Mundt merges this patch together with other
+> >> ?SH-Mobile ARM related fixes.
+> >>
+> > Err, no. I'm not patching machine-generated files which precisely say not
+> > to patch them at the top of the file. If there is a missing definition
+> > for an upstream board then the file needs to be regenerated with the new
+> > definitions, plain and simple.
+> 
+> Following the comment sure sounds like a good idea, but according to
+> the git logs people seem to update the file:
+> 
+> 1d08fd9 Update Nook Color machine 3284 to common Encore name
+> 
+> Russell, do you mind if we update the mach-type file to include Kota2?
+> It's already registered via the web interface.
+> 
+I'll add it with Russell's Acked-by, otherwise we'll simply have to wait
+for the next batch of mach-types updates.
