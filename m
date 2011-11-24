@@ -1,355 +1,65 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu, 24 Nov 2011 14:58:05 +0100
-Subject: [PATCH 2/3] ARM: at91: refresh soc defconfig files for 3.2
-In-Reply-To: <201111232115.08556.arnd@arndb.de>
-References: <201111232115.08556.arnd@arndb.de>
-Message-ID: <1322143086-1788-2-git-send-email-plagnioj@jcrosoft.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 24 Nov 2011 15:16:49 +0100
+Subject: BUG: sleeping function called from invalid context
+In-Reply-To: <20111124102909.GO9581@n2100.arm.linux.org.uk>
+References: <4ECCDAA2.4070502@prolan.hu>
+ <CAOMZO5DSvLU0ACJPZ69tzY0PjMijibSzwCEwBhu=5=mg7ncF=g@mail.gmail.com>
+ <20111123183640.GQ19986@pengutronix.de>
+ <20111123225124.GK9581@n2100.arm.linux.org.uk>
+ <20111124071406.GS19986@pengutronix.de>
+ <20111124090141.GN9581@n2100.arm.linux.org.uk>
+ <20111124090514.GW19986@pengutronix.de>
+ <20111124102909.GO9581@n2100.arm.linux.org.uk>
+Message-ID: <20111124141649.GY19986@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-Cc: Arnd Bergmann <arnd@arndb.de>
----
- arch/arm/configs/at91cap9_defconfig    |    7 -----
- arch/arm/configs/at91rm9200_defconfig  |   47 +++++++++----------------------
- arch/arm/configs/at91sam9260_defconfig |    4 ---
- arch/arm/configs/at91sam9g20_defconfig |   12 +-------
- arch/arm/configs/at91sam9g45_defconfig |    6 +---
- arch/arm/configs/at91sam9rl_defconfig  |    5 ---
- 6 files changed, 16 insertions(+), 65 deletions(-)
+On Thu, Nov 24, 2011 at 10:29:09AM +0000, Russell King - ARM Linux wrote:
+> On Thu, Nov 24, 2011 at 10:05:14AM +0100, Uwe Kleine-K?nig wrote:
+> > On Thu, Nov 24, 2011 at 09:01:41AM +0000, Russell King - ARM Linux wrote:
+> > > On Thu, Nov 24, 2011 at 08:14:06AM +0100, Uwe Kleine-K?nig wrote:
+> > > > On Wed, Nov 23, 2011 at 10:51:24PM +0000, Russell King - ARM Linux wrote:
+> > > > > So really, there's no excuse not to fix this for the imx/mxwhatever SoCs
+> > > > > today - the clk framework is totally irrelevant as far as this goes.
+> > > > I think doing the clk_prepare seperation and converting to the clk
+> > > > framework in one step will be easier.
+> > > 
+> > > From a point of view of being able to separate the changes so there isn't
+> > > a flag day, you're wrong.  clk_prepare() is already present in the kernel
+> > > as dummy functions, and all you need to do at this point is arrange for
+> > > the drivers to make the appropriate calls.  There's no need to write one
+> > > line of code behind clk_prepare() at the current time.
+> > Yeah, but adding clk_prepare to the serial driver doesn't help me to get
+> > rid of the BUG reported in this thread without giving it some meaning in
+> > the platform, right?
+Note that I wrote that in reply to you saying "There's no need to write
+one line of code behind clk_prepare() at the current time.".
 
-diff --git a/arch/arm/configs/at91cap9_defconfig b/arch/arm/configs/at91cap9_defconfig
-index ffb1edd..8826eb2 100644
---- a/arch/arm/configs/at91cap9_defconfig
-+++ b/arch/arm/configs/at91cap9_defconfig
-@@ -38,7 +38,6 @@ CONFIG_IP_PNP_RARP=y
- # CONFIG_IPV6 is not set
- CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
- CONFIG_MTD=y
--CONFIG_MTD_PARTITIONS=y
- CONFIG_MTD_CMDLINE_PARTS=y
- CONFIG_MTD_CHAR=y
- CONFIG_MTD_BLOCK=y
-@@ -52,16 +51,12 @@ CONFIG_MTD_NAND_ATMEL=y
- CONFIG_BLK_DEV_LOOP=y
- CONFIG_BLK_DEV_RAM=y
- CONFIG_BLK_DEV_RAM_SIZE=8192
--CONFIG_ATMEL_SSC=y
- CONFIG_SCSI=y
- CONFIG_BLK_DEV_SD=y
- CONFIG_SCSI_MULTI_LUN=y
- CONFIG_NETDEVICES=y
--CONFIG_NET_ETHERNET=y
- CONFIG_MII=y
- CONFIG_MACB=y
--# CONFIG_NETDEV_1000 is not set
--# CONFIG_NETDEV_10000 is not set
- # CONFIG_INPUT_MOUSEDEV_PSAUX is not set
- CONFIG_INPUT_EVDEV=y
- # CONFIG_INPUT_KEYBOARD is not set
-@@ -81,7 +76,6 @@ CONFIG_WATCHDOG=y
- CONFIG_WATCHDOG_NOWAYOUT=y
- CONFIG_FB=y
- CONFIG_FB_ATMEL=y
--# CONFIG_VGA_CONSOLE is not set
- CONFIG_LOGO=y
- # CONFIG_LOGO_LINUX_MONO is not set
- # CONFIG_LOGO_LINUX_CLUT224 is not set
-@@ -99,7 +93,6 @@ CONFIG_MMC_AT91=m
- CONFIG_RTC_CLASS=y
- CONFIG_RTC_DRV_AT91SAM9=y
- CONFIG_EXT2_FS=y
--CONFIG_INOTIFY=y
- CONFIG_VFAT_FS=y
- CONFIG_TMPFS=y
- CONFIG_JFFS2_FS=y
-diff --git a/arch/arm/configs/at91rm9200_defconfig b/arch/arm/configs/at91rm9200_defconfig
-index 38cb7c9..bbe4e1a 100644
---- a/arch/arm/configs/at91rm9200_defconfig
-+++ b/arch/arm/configs/at91rm9200_defconfig
-@@ -5,7 +5,6 @@ CONFIG_SYSVIPC=y
- CONFIG_IKCONFIG=y
- CONFIG_IKCONFIG_PROC=y
- CONFIG_LOG_BUF_SHIFT=14
--CONFIG_SYSFS_DEPRECATED_V2=y
- CONFIG_BLK_DEV_INITRD=y
- CONFIG_MODULES=y
- CONFIG_MODULE_FORCE_LOAD=y
-@@ -56,7 +55,6 @@ CONFIG_IP_PNP=y
- CONFIG_IP_PNP_DHCP=y
- CONFIG_IP_PNP_BOOTP=y
- CONFIG_NET_IPIP=m
--CONFIG_NET_IPGRE=m
- CONFIG_INET_AH=m
- CONFIG_INET_ESP=m
- CONFIG_INET_IPCOMP=m
-@@ -75,18 +73,8 @@ CONFIG_IPV6_TUNNEL=m
- CONFIG_BRIDGE=m
- CONFIG_VLAN_8021Q=m
- CONFIG_BT=m
--CONFIG_BT_L2CAP=m
--CONFIG_BT_SCO=m
--CONFIG_BT_RFCOMM=m
--CONFIG_BT_RFCOMM_TTY=y
--CONFIG_BT_BNEP=m
--CONFIG_BT_BNEP_MC_FILTER=y
--CONFIG_BT_BNEP_PROTO_FILTER=y
--CONFIG_BT_HIDP=m
- CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
- CONFIG_MTD=y
--CONFIG_MTD_CONCAT=y
--CONFIG_MTD_PARTITIONS=y
- CONFIG_MTD_CMDLINE_PARTS=y
- CONFIG_MTD_AFS_PARTS=y
- CONFIG_MTD_CHAR=y
-@@ -108,8 +96,6 @@ CONFIG_BLK_DEV_LOOP=y
- CONFIG_BLK_DEV_NBD=y
- CONFIG_BLK_DEV_RAM=y
- CONFIG_BLK_DEV_RAM_SIZE=8192
--CONFIG_ATMEL_TCLIB=y
--CONFIG_EEPROM_LEGACY=m
- CONFIG_SCSI=y
- CONFIG_BLK_DEV_SD=y
- CONFIG_BLK_DEV_SR=m
-@@ -119,14 +105,23 @@ CONFIG_SCSI_MULTI_LUN=y
- # CONFIG_SCSI_LOWLEVEL is not set
- CONFIG_NETDEVICES=y
- CONFIG_TUN=m
-+CONFIG_ARM_AT91_ETHER=y
- CONFIG_PHYLIB=y
- CONFIG_DAVICOM_PHY=y
- CONFIG_SMSC_PHY=y
- CONFIG_MICREL_PHY=y
--CONFIG_NET_ETHERNET=y
--CONFIG_ARM_AT91_ETHER=y
--# CONFIG_NETDEV_1000 is not set
--# CONFIG_NETDEV_10000 is not set
-+CONFIG_PPP=y
-+CONFIG_PPP_BSDCOMP=y
-+CONFIG_PPP_DEFLATE=y
-+CONFIG_PPP_FILTER=y
-+CONFIG_PPP_MPPE=m
-+CONFIG_PPP_MULTILINK=y
-+CONFIG_PPPOE=m
-+CONFIG_PPP_ASYNC=y
-+CONFIG_SLIP=m
-+CONFIG_SLIP_COMPRESSED=y
-+CONFIG_SLIP_SMART=y
-+CONFIG_SLIP_MODE_SLIP6=y
- CONFIG_USB_CATC=m
- CONFIG_USB_KAWETH=m
- CONFIG_USB_PEGASUS=m
-@@ -139,18 +134,6 @@ CONFIG_USB_NET_RNDIS_HOST=m
- CONFIG_USB_ALI_M5632=y
- CONFIG_USB_AN2720=y
- CONFIG_USB_EPSON2888=y
--CONFIG_PPP=y
--CONFIG_PPP_MULTILINK=y
--CONFIG_PPP_FILTER=y
--CONFIG_PPP_ASYNC=y
--CONFIG_PPP_DEFLATE=y
--CONFIG_PPP_BSDCOMP=y
--CONFIG_PPP_MPPE=m
--CONFIG_PPPOE=m
--CONFIG_SLIP=m
--CONFIG_SLIP_COMPRESSED=y
--CONFIG_SLIP_SMART=y
--CONFIG_SLIP_MODE_SLIP6=y
- # CONFIG_INPUT_MOUSEDEV_PSAUX is not set
- CONFIG_INPUT_MOUSEDEV_SCREEN_X=640
- CONFIG_INPUT_MOUSEDEV_SCREEN_Y=480
-@@ -158,9 +141,9 @@ CONFIG_INPUT_EVDEV=y
- CONFIG_KEYBOARD_GPIO=y
- # CONFIG_INPUT_MOUSE is not set
- CONFIG_INPUT_TOUCHSCREEN=y
-+CONFIG_LEGACY_PTY_COUNT=32
- CONFIG_SERIAL_ATMEL=y
- CONFIG_SERIAL_ATMEL_CONSOLE=y
--CONFIG_LEGACY_PTY_COUNT=32
- CONFIG_HW_RANDOM=y
- CONFIG_I2C=y
- CONFIG_I2C_CHARDEV=y
-@@ -290,7 +273,6 @@ CONFIG_NFS_V3_ACL=y
- CONFIG_NFS_V4=y
- CONFIG_ROOT_NFS=y
- CONFIG_NFSD=y
--CONFIG_SMB_FS=m
- CONFIG_CIFS=m
- CONFIG_PARTITION_ADVANCED=y
- CONFIG_MAC_PARTITION=y
-@@ -335,7 +317,6 @@ CONFIG_NLS_UTF8=y
- CONFIG_MAGIC_SYSRQ=y
- CONFIG_DEBUG_FS=y
- CONFIG_DEBUG_KERNEL=y
--# CONFIG_RCU_CPU_STALL_DETECTOR is not set
- # CONFIG_FTRACE is not set
- CONFIG_CRYPTO_PCBC=y
- CONFIG_CRYPTO_SHA1=y
-diff --git a/arch/arm/configs/at91sam9260_defconfig b/arch/arm/configs/at91sam9260_defconfig
-index f8a9226..8a4c22d 100644
---- a/arch/arm/configs/at91sam9260_defconfig
-+++ b/arch/arm/configs/at91sam9260_defconfig
-@@ -33,12 +33,10 @@ CONFIG_IP_PNP_BOOTP=y
- CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
- CONFIG_BLK_DEV_RAM=y
- CONFIG_BLK_DEV_RAM_SIZE=8192
--CONFIG_ATMEL_SSC=y
- CONFIG_SCSI=y
- CONFIG_BLK_DEV_SD=y
- CONFIG_SCSI_MULTI_LUN=y
- CONFIG_NETDEVICES=y
--CONFIG_NET_ETHERNET=y
- CONFIG_MII=y
- CONFIG_MACB=y
- # CONFIG_INPUT_MOUSEDEV_PSAUX is not set
-@@ -55,7 +53,6 @@ CONFIG_I2C_GPIO=y
- CONFIG_WATCHDOG=y
- CONFIG_WATCHDOG_NOWAYOUT=y
- CONFIG_AT91SAM9X_WATCHDOG=y
--# CONFIG_VGA_CONSOLE is not set
- # CONFIG_USB_HID is not set
- CONFIG_USB=y
- CONFIG_USB_DEVICEFS=y
-@@ -71,7 +68,6 @@ CONFIG_USB_G_SERIAL=m
- CONFIG_RTC_CLASS=y
- CONFIG_RTC_DRV_AT91SAM9=y
- CONFIG_EXT2_FS=y
--CONFIG_INOTIFY=y
- CONFIG_VFAT_FS=y
- CONFIG_TMPFS=y
- CONFIG_CRAMFS=y
-diff --git a/arch/arm/configs/at91sam9g20_defconfig b/arch/arm/configs/at91sam9g20_defconfig
-index 9e90e6d..23966c6 100644
---- a/arch/arm/configs/at91sam9g20_defconfig
-+++ b/arch/arm/configs/at91sam9g20_defconfig
-@@ -23,7 +23,6 @@ CONFIG_ZBOOT_ROM_TEXT=0x0
- CONFIG_ZBOOT_ROM_BSS=0x0
- CONFIG_CMDLINE="mem=64M console=ttyS0,115200 initrd=0x21100000,3145728 root=/dev/ram0 rw"
- CONFIG_FPE_NWFPE=y
--CONFIG_PM=y
- CONFIG_NET=y
- CONFIG_PACKET=y
- CONFIG_UNIX=y
-@@ -37,8 +36,6 @@ CONFIG_IP_PNP_BOOTP=y
- # CONFIG_IPV6 is not set
- CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
- CONFIG_MTD=y
--CONFIG_MTD_CONCAT=y
--CONFIG_MTD_PARTITIONS=y
- CONFIG_MTD_CMDLINE_PARTS=y
- CONFIG_MTD_CHAR=y
- CONFIG_MTD_BLOCK=y
-@@ -48,17 +45,13 @@ CONFIG_MTD_NAND_ATMEL=y
- CONFIG_BLK_DEV_LOOP=y
- CONFIG_BLK_DEV_RAM=y
- CONFIG_BLK_DEV_RAM_SIZE=8192
--CONFIG_ATMEL_SSC=y
- CONFIG_SCSI=y
- CONFIG_BLK_DEV_SD=y
- CONFIG_SCSI_MULTI_LUN=y
- # CONFIG_SCSI_LOWLEVEL is not set
- CONFIG_NETDEVICES=y
--CONFIG_NET_ETHERNET=y
- CONFIG_MII=y
- CONFIG_MACB=y
--# CONFIG_NETDEV_1000 is not set
--# CONFIG_NETDEV_10000 is not set
- # CONFIG_INPUT_MOUSEDEV_PSAUX is not set
- CONFIG_INPUT_MOUSEDEV_SCREEN_X=320
- CONFIG_INPUT_MOUSEDEV_SCREEN_Y=240
-@@ -66,15 +59,14 @@ CONFIG_INPUT_EVDEV=y
- # CONFIG_KEYBOARD_ATKBD is not set
- CONFIG_KEYBOARD_GPIO=y
- # CONFIG_INPUT_MOUSE is not set
-+CONFIG_LEGACY_PTY_COUNT=16
- CONFIG_SERIAL_ATMEL=y
- CONFIG_SERIAL_ATMEL_CONSOLE=y
--CONFIG_LEGACY_PTY_COUNT=16
- CONFIG_HW_RANDOM=y
- CONFIG_SPI=y
- CONFIG_SPI_ATMEL=y
- CONFIG_SPI_SPIDEV=y
- # CONFIG_HWMON is not set
--# CONFIG_VGA_CONSOLE is not set
- CONFIG_SOUND=y
- CONFIG_SND=y
- CONFIG_SND_SEQUENCER=y
-@@ -82,7 +74,6 @@ CONFIG_SND_MIXER_OSS=y
- CONFIG_SND_PCM_OSS=y
- CONFIG_SND_SEQUENCER_OSS=y
- # CONFIG_SND_VERBOSE_PROCFS is not set
--CONFIG_SND_AT73C213=y
- CONFIG_USB=y
- CONFIG_USB_DEVICEFS=y
- # CONFIG_USB_DEVICE_CLASS is not set
-@@ -105,7 +96,6 @@ CONFIG_LEDS_TRIGGER_HEARTBEAT=y
- CONFIG_RTC_CLASS=y
- CONFIG_RTC_DRV_AT91SAM9=y
- CONFIG_EXT2_FS=y
--CONFIG_INOTIFY=y
- CONFIG_MSDOS_FS=y
- CONFIG_VFAT_FS=y
- CONFIG_TMPFS=y
-diff --git a/arch/arm/configs/at91sam9g45_defconfig b/arch/arm/configs/at91sam9g45_defconfig
-index c5876d2..7f8f999 100644
---- a/arch/arm/configs/at91sam9g45_defconfig
-+++ b/arch/arm/configs/at91sam9g45_defconfig
-@@ -73,11 +73,8 @@ CONFIG_SCSI_MULTI_LUN=y
- # CONFIG_SCSI_LOWLEVEL is not set
- CONFIG_NETDEVICES=y
- CONFIG_MII=y
--CONFIG_DAVICOM_PHY=y
--CONFIG_NET_ETHERNET=y
- CONFIG_MACB=y
--# CONFIG_NETDEV_1000 is not set
--# CONFIG_NETDEV_10000 is not set
-+CONFIG_DAVICOM_PHY=y
- CONFIG_LIBERTAS_THINFIRM=m
- CONFIG_LIBERTAS_THINFIRM_USB=m
- CONFIG_AT76C50X_USB=m
-@@ -131,7 +128,6 @@ CONFIG_I2C_GPIO=y
- CONFIG_SPI=y
- CONFIG_SPI_ATMEL=y
- # CONFIG_HWMON is not set
--# CONFIG_MFD_SUPPORT is not set
- CONFIG_FB=y
- CONFIG_FB_ATMEL=y
- CONFIG_FB_UDL=m
-diff --git a/arch/arm/configs/at91sam9rl_defconfig b/arch/arm/configs/at91sam9rl_defconfig
-index 75621e4..ad562ee 100644
---- a/arch/arm/configs/at91sam9rl_defconfig
-+++ b/arch/arm/configs/at91sam9rl_defconfig
-@@ -23,8 +23,6 @@ CONFIG_NET=y
- CONFIG_UNIX=y
- CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
- CONFIG_MTD=y
--CONFIG_MTD_CONCAT=y
--CONFIG_MTD_PARTITIONS=y
- CONFIG_MTD_CMDLINE_PARTS=y
- CONFIG_MTD_CHAR=y
- CONFIG_MTD_BLOCK=y
-@@ -35,7 +33,6 @@ CONFIG_BLK_DEV_LOOP=y
- CONFIG_BLK_DEV_RAM=y
- CONFIG_BLK_DEV_RAM_COUNT=4
- CONFIG_BLK_DEV_RAM_SIZE=24576
--CONFIG_ATMEL_SSC=y
- CONFIG_SCSI=y
- CONFIG_BLK_DEV_SD=y
- CONFIG_SCSI_MULTI_LUN=y
-@@ -62,13 +59,11 @@ CONFIG_WATCHDOG_NOWAYOUT=y
- CONFIG_AT91SAM9X_WATCHDOG=y
- CONFIG_FB=y
- CONFIG_FB_ATMEL=y
--# CONFIG_VGA_CONSOLE is not set
- CONFIG_MMC=y
- CONFIG_MMC_AT91=m
- CONFIG_RTC_CLASS=y
- CONFIG_RTC_DRV_AT91SAM9=y
- CONFIG_EXT2_FS=y
--CONFIG_INOTIFY=y
- CONFIG_MSDOS_FS=y
- CONFIG_VFAT_FS=y
- CONFIG_TMPFS=y
+> So, let's be honest about why this bug isn't being fixed then.  Your
+> attitude to this problem is ignore it and to do nothing, rather than
+> trying to fix it via a perfectly good transition path provided for
+> you.
+I don't think the mxs clock code needs a transition. I guess it will be
+mostly reimplemented when the clk framework is settled. And I consider
+it quite normal to live with code that is not optimal because there are
+bigger changes in the queue that would make fixing the current code
+useless. 
+ 
+> Okay, now we can see clearly why the bug is still there.  Thanks.
+> 
+> Given such an attitude, remind me why I should care whether iMX breaks
+> while we do the consolidation and cleanup work to core code, such as
+> the recent restart changes.
+There are several active contributors to i.MX that invest much time to
+adapt i.MX to the current changes. Be it Shawn who does much DT stuff,
+Sascha who proposed things for the clk framework or Richard who
+converted i.MX5x to the the latest clk framework patches. That's why you
+should care. And that is independant of me not doing much for i.MX
+during the last few cycles.
+
+Best regards
+Uwe
+
 -- 
-1.7.7
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
