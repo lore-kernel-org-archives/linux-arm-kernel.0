@@ -1,53 +1,45 @@
-From: cbouatmailru@gmail.com (Anton Vorontsov)
-Date: Thu, 24 Nov 2011 22:42:15 +0400
-Subject: [PATCH v5] power: bq20z75: devicetree init support
-In-Reply-To: <1316031547-18281-1-git-send-email-rklein@nvidia.com>
-References: <1316031547-18281-1-git-send-email-rklein@nvidia.com>
-Message-ID: <20111124184215.GA29135@oksana.dev.rtsoft.ru>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 24 Nov 2011 18:49:46 +0000
+Subject: -next fails to boot as of today on S3C6410
+In-Reply-To: <alpine.LFD.2.02.1111241336320.17904@xanadu.home>
+References: <20111123175446.GI30049@opensource.wolfsonmicro.com>
+ <alpine.LFD.2.02.1111231402370.17904@xanadu.home>
+ <alpine.LFD.2.02.1111231929050.17904@xanadu.home>
+ <20111124125615.GJ8470@opensource.wolfsonmicro.com>
+ <20111124160853.GB2509@sirena.org.uk>
+ <alpine.LFD.2.02.1111241254310.17904@xanadu.home>
+ <20111124180228.GA32119@opensource.wolfsonmicro.com>
+ <alpine.LFD.2.02.1111241316510.17904@xanadu.home>
+ <20111124183153.GA3395@opensource.wolfsonmicro.com>
+ <alpine.LFD.2.02.1111241336320.17904@xanadu.home>
+Message-ID: <20111124184946.GB3395@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Rhyland,
+On Thu, Nov 24, 2011 at 01:37:51PM -0500, Nicolas Pitre wrote:
+> On Thu, 24 Nov 2011, Mark Brown wrote:
 
-Got this:
+> > It looks like that'll need more substantial refactoring than I have the
+> > time to do right now, currently the CPU ID is immediately used to decide
+> > how to carry on with low level setup.
 
-  CC [M]  drivers/power/bq20z75.o
-drivers/power/bq20z75.c: In function ?bq20z75_of_populate_pdata?:
-drivers/power/bq20z75.c:630:21: error: storage size of ?gpio_flags? isn?t known
-drivers/power/bq20z75.c:668:2: error: implicit declaration of function ?of_get_named_gpio_flags? [-Werror=implicit-function-declaration]
-drivers/power/bq20z75.c:671:19: error: ?OF_GPIO_ACTIVE_LOW? undeclared (first use in this function)
-drivers/power/bq20z75.c:671:19: note: each undeclared identifier is reported only once for each function it appears in
-drivers/power/bq20z75.c:630:21: warning: unused variable ?gpio_flags? [-Wunused-variable]
-drivers/power/bq20z75.c:627:29: warning: unused variable ?dtid? [-Wunused-variable]
+> Where, and from what call path?
 
-I fixed this by...
+s3c64xx_init_io() is:
 
-On Wed, Sep 14, 2011 at 01:19:07PM -0700, Rhyland Klein wrote:
+	/* initialise the io descriptors we need for initialisation */
+	iotable_init(s3c_iodesc, ARRAY_SIZE(s3c_iodesc));
+	iotable_init(mach_desc, size);
+	init_consistent_dma_size(SZ_8M);
 
-> +#if defined(CONFIG_OF)
-> +#include <linux/of_device.h>
+	/* detect cpu id */
+	s3c64xx_init_cpu();
 
-Adding linux/of_gpio.h
+	s3c_init_cpu(samsung_cpu_id, cpu_ids, ARRAY_SIZE(cpu_ids));
 
-> +static const struct of_device_id bq20z75_dt_ids[] = {
-> +	{ .compatible = "ti,bq20z75" },
-> +	{ }
-> +};
-> +MODULE_DEVICE_TABLE(i2c, bq20z75_dt_ids);
-> +
-> +static struct bq20z75_platform_data *bq20z75_of_populate_pdata(
-> +	struct i2c_client *client)
-> +{
-> +	const struct of_device_id *dtid;
+where s3c64xx_init_cpu() is the function relying on the effects of the
+first iotable_init().  It initializes samsung_cpu_id for the call to 
+s3c_init_cpu() which calls the callbacks in s3c6400.c or s3c6410.c.
 
-And deleting that line.
-
-
-Applied to battery-2.6.git, but please double check if everything
-is OK.
-
-Thanks,
-
--- 
-Anton Vorontsov
-Email: cbouatmailru at gmail.com
+Simply moving the detection to init_early() fails though I only tried
+briefly.
