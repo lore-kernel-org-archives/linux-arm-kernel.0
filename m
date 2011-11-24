@@ -1,55 +1,44 @@
-From: lethal@linux-sh.org (Paul Mundt)
-Date: Thu, 24 Nov 2011 17:23:42 +0900
-Subject: [PATCH] ARM: Kota2 mach-type update fix
-In-Reply-To: <CANqRtoTvMpivHN0tZVTEY6SfkBrNLpu=rkRXUXKJG4J0UNCzhg@mail.gmail.com>
-References: <20111122060857.23951.50598.sendpatchset@w520>
- <20111122092615.GA26411@linux-sh.org>
- <CANqRtoTvMpivHN0tZVTEY6SfkBrNLpu=rkRXUXKJG4J0UNCzhg@mail.gmail.com>
-Message-ID: <20111124082342.GD32112@linux-sh.org>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 24 Nov 2011 09:29:03 +0100
+Subject: [PATCH] i2c-mxs: fix compile warning in mxs_i2c_xfer()
+In-Reply-To: <1322121140-5216-1-git-send-email-shawn.guo@linaro.org>
+References: <1322121140-5216-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20111124082903.GV19986@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 22, 2011 at 08:41:57PM +0900, Magnus Damm wrote:
-> On Tue, Nov 22, 2011 at 6:26 PM, Paul Mundt <lethal@linux-sh.org> wrote:
-> > On Tue, Nov 22, 2011 at 03:08:57PM +0900, Magnus Damm wrote:
-> >> From: Magnus Damm <damm@opensource.se>
-> >>
-> >> This patch adds kota2 to the in-kernel ARM mach-type file.
-> >>
-> >> Basic board support is included in 3.2-rc and the mach-type
-> >> has been registered in the ARM machine repository as
-> >>
-> >> 3616 Renesas SH-Mobile kota2.x Board kota2 Yusuke Goda mainlined
-> >>
-> >> The file arch/arm/tools/mach-types is however missing Kota2
-> >> which makes build of sh73a0 based boards fail with:
-> >>
-> >> arch/arm/mach-shmobile/platsmp.c: In function 'shmobile_smp_get_core_count':
-> >> arch/arm/mach-shmobile/platsmp.c:28:2: error: implicit declaration of function 'machine_is_kota2'
-> >> make[1]: *** [arch/arm/mach-shmobile/platsmp.o] Error 1
-> >>
-> >> arch/arm/mach-shmobile/board-kota2.c:448:136: error: 'MACH_TYPE_KOTA2' undeclared here (not in a function)
-> >> make[1]: *** [arch/arm/mach-shmobile/board-kota2.o] Error 1
-> >> make: *** [arch/arm/mach-shmobile] Error 2
-> >>
-> >> Signed-off-by: Magnus Damm <damm@opensource.se>
-> >> ---
-> >>
-> >> ?I propose that Paul Mundt merges this patch together with other
-> >> ?SH-Mobile ARM related fixes.
-> >>
-> > Err, no. I'm not patching machine-generated files which precisely say not
-> > to patch them at the top of the file. If there is a missing definition
-> > for an upstream board then the file needs to be regenerated with the new
-> > definitions, plain and simple.
+Hello Shawn,
+
+On Thu, Nov 24, 2011 at 03:52:20PM +0800, Shawn Guo wrote:
+>   CC      drivers/i2c/busses/i2c-mxs.o
+> drivers/i2c/busses/i2c-mxs.c: In function ?mxs_i2c_xfer?:
+> drivers/i2c/busses/i2c-mxs.c:196:6: warning: ?data? may be used uninitialized in this function
 > 
-> Following the comment sure sounds like a good idea, but according to
-> the git logs people seem to update the file:
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> ---
+>  drivers/i2c/busses/i2c-mxs.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
 > 
-> 1d08fd9 Update Nook Color machine 3284 to common Encore name
-> 
-> Russell, do you mind if we update the mach-type file to include Kota2?
-> It's already registered via the web interface.
-> 
-I'll add it with Russell's Acked-by, otherwise we'll simply have to wait
-for the next batch of mach-types updates.
+> diff --git a/drivers/i2c/busses/i2c-mxs.c b/drivers/i2c/busses/i2c-mxs.c
+> index 7e78f7c..00f098f 100644
+> --- a/drivers/i2c/busses/i2c-mxs.c
+> +++ b/drivers/i2c/busses/i2c-mxs.c
+> @@ -193,7 +193,7 @@ static int mxs_i2c_wait_for_data(struct mxs_i2c_dev *i2c)
+>  
+>  static int mxs_i2c_finish_read(struct mxs_i2c_dev *i2c, u8 *buf, int len)
+>  {
+> -	u32 data;
+> +	u32 data = 0;
+>  	int i;
+>  
+>  	for (i = 0; i < len; i++) {
+Looks like a stupid compiler. Then better use 
+
+	u32 uninitialized_var(data);
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
