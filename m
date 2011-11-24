@@ -1,48 +1,42 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Thu, 24 Nov 2011 10:42:42 +0800
-Subject: [PATCH] IMX/SDMA : save the real count for one DMA transaction.
-In-Reply-To: <1322048442.1516.274.camel@vkoul-udesk3>
-References: <1322039585-7901-1-git-send-email-b32955@freescale.com>	
- <20111123105821.GC4063@pengutronix.de> <4ECCD34C.1090400@freescale.com>	
- <20111123110626.GD4063@pengutronix.de> <4ECCD553.5020804@freescale.com>	
- <20111123111816.GF4063@pengutronix.de> <4ECCD910.1010004@freescale.com>
- <1322048442.1516.274.camel@vkoul-udesk3>
-Message-ID: <4ECDAF22.6060308@freescale.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Thu, 24 Nov 2011 10:59:03 +0800
+Subject: [RFC PATCH 0/3] Convert imx6 clock to device tree
+In-Reply-To: <20111122082314.GB27267@pengutronix.de>
+References: <1321926536-671-1-git-send-email-shawn.guo@linaro.org>
+ <20111122082314.GB27267@pengutronix.de>
+Message-ID: <20111124025902.GB17979@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2011?11?23? 19:40, Vinod Koul ??:
-> On Wed, 2011-11-23 at 19:29 +0800, Huang Shijie wrote:
->>> On Wed, Nov 23, 2011 at 07:13:23PM +0800, Huang Shijie wrote:
->>>>>>>> +	/* save the real count we received or transmitted. */
->>>>>>>> +	chan->private = (void *)count;
->>>>>>> And if someone later needs another variable which is private?
->>>>>>>
->>>>>> I ever wanted to add an new parameter `void *` to dma_aync_tx_callback,
->>>>>> but it seemed i have
->>>>>> to change a lot of files.
->>>>>>
->>>>>> Do you have any better suggestion?
->>>>> Use a private struct and put count in there.
->>>>>
->>>> Where to put the private struct? in the imx-sdma.c ?
->>>> If i put it there, how can i get it in the UART driver with the current
->>>> DMA API?
->>> So, in the UART driver you assume that void* is an int? Or how do you
->>> currently use count?
->>>
->> In the UART driver, I use the following lines:
->> -------------------------------------------------------
->> + struct dma_chan *chan = sport->dma_chan_rx;
->> + unsigned int count = (unsigned int)chan->private;
->> -------------------------------------------------------
-> Chan->private is a depreciated field, and will be removed soon...
-> possibly 3.3, so obviosly any usage of it is incorrect
->
-> Why dont you use .device_tx_status callback and return the number of
-> bytes remaining to be transmitted in residue value of the struct
-> dma_tx_state. That should be size - count.
->
-Thanks a lot.
+On Tue, Nov 22, 2011 at 09:23:14AM +0100, Sascha Hauer wrote:
+> On Tue, Nov 22, 2011 at 09:48:53AM +0800, Shawn Guo wrote:
+> > As I promised to Arnd, I will convert imx6 clock code to common clock
+> > framework and in turn device tree at the earliest time.  Here it is.
+> 
+> Very nice ;) I like the patches.
+> 
+> Is there a way to improve the way how the entities find their base
+> addresses? Currently the C code figures out the base addresses based
+> on compatible.
 
-Huang Shijie
+May I understand the problem with doing that?
+
+> Maybe we could put the crm clocks and anatop clocks into
+> two different nodes instead of putting them all directly under clocks{}.
+> 
+I do not quite understand this.  Are you suggesting we keep using the
+static base address definition in C code for ccm and anatop rather than
+retrieving them from device tree?  No, we do not want to do this.  So
+if we need to get the addresses from device tree anyhow, using
+compatible to find the correct node is the best way to me.
+
+> Could you split the last patch into two, one adding new device tree
+> clock support in a new file and another removing the old clock support?
+> This would help reviewing.
+> 
+Yes, will do.  I would also rename the new file back to clock-imx6q.c
+in the last patch, because I want to keep using that file name.
+
+-- 
+Regards,
+Shawn
