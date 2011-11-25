@@ -1,59 +1,40 @@
-From: leif.lindholm@arm.com (Leif Lindholm)
-Date: Fri, 25 Nov 2011 17:19:53 +0000
-Subject: [PATCH 3/4] Add condition code checking to SWP emulation handler.
-In-Reply-To: <20111125171621.14878.49918.stgit@localhost6.localdomain6>
-References: <20111125171621.14878.49918.stgit@localhost6.localdomain6>
-Message-ID: <20111125171947.14878.76518.stgit@localhost6.localdomain6>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 25 Nov 2011 17:19:38 +0000
+Subject: [V1 3/3] RTC: sa1100: support sa1100, pxa and mmp soc families
+In-Reply-To: <CAN1soZzfN2aNNH5Hmuv79Y-u-GR2Mnfh3oR2D2QWZNFV6-N+YQ@mail.gmail.com>
+References: <1322219217-1866-1-git-send-email-jtzhou@marvell.com>
+ <201111251505.29823.arnd@arndb.de>
+ <CAN1soZzfN2aNNH5Hmuv79Y-u-GR2Mnfh3oR2D2QWZNFV6-N+YQ@mail.gmail.com>
+Message-ID: <201111251719.39636.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes two separate issues with the SWP emulation handler:
-1: Certain processors implementing ARMv7-A can (legally) take an
-   undef exception even when the condition code would have meant that
-   the instruction should not have been executed.
-2: Opcodes with all flags set (condition code = 0xf) have been reused
-   in recent, and not-so-recent, versions of the ARM architecture to
-   implement unconditional extensions to the instruction set. The
-   existing code would still have processed any undefs triggered by
-   executing an opcode with such a value.
+On Friday 25 November 2011, Haojian Zhuang wrote:
+> On Fri, Nov 25, 2011 at 11:05 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Friday 25 November 2011, Jett.Zhou wrote:
+> >> Since the regmap of rtc on sa1100, pxa and mmp Marvell soc families are
+> >> almost the same, so re-arch the rtc-sa1100 to support them.
+> >>
+> >> Signed-off-by: Jett.Zhou <jtzhou@marvell.com>
+> >> ---
+> >>  arch/arm/mach-pxa/devices.c    |   20 +++
+> >>  arch/arm/mach-sa1100/generic.c |   20 +++
+> >>  drivers/rtc/Kconfig            |    2 +-
+> >>  drivers/rtc/rtc-sa1100.c       |  276 ++++++++++++++++++++++++++++------------
+> >>  4 files changed, 238 insertions(+), 80 deletions(-)
+> >
+> > I looked through the series and found nothing to complain about ;-)
+> >
+> > Excellent cleanup!
+> >
+> > Acked-by: Arnd Bergmann <arnd@arndb.de>
+> >
+> >
+> How about merging this patch series into arch-pxa git tree?
+> 
 
-This patch uses the new generic ARM instruction set condition code
-checks to implement proper handling of these situations.
+I could do that with an Ack from Alessandro, but normally it should
+go through his tree. I guess it should also go through the rtc-linux
+mailing list, though I don't know how active that is.
 
-Signed-off-by: Leif Lindholm <leif.lindholm@arm.com>
----
- arch/arm/kernel/swp_emulate.c |   14 ++++++++++++++
- 1 files changed, 14 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/kernel/swp_emulate.c b/arch/arm/kernel/swp_emulate.c
-index 5f452f8..8629bf7 100644
---- a/arch/arm/kernel/swp_emulate.c
-+++ b/arch/arm/kernel/swp_emulate.c
-@@ -25,6 +25,7 @@
- #include <linux/syscalls.h>
- #include <linux/perf_event.h>
- 
-+#include <asm/opcodes.h>
- #include <asm/traps.h>
- #include <asm/uaccess.h>
- 
-@@ -185,6 +186,19 @@ static int swp_handler(struct pt_regs *regs, unsigned int instr)
- 
- 	perf_sw_event(PERF_COUNT_SW_EMULATION_FAULTS, 1, regs, regs->ARM_pc);
- 
-+	res = arm_check_condition(instr, regs->ARM_cpsr);
-+	switch (res) {
-+	case ARM_OPCODE_CONDTEST_FAIL: {
-+		/* Condition failed - return to next instruction */
-+		regs->ARM_pc += 4;
-+		return 0;
-+	} break;
-+	case ARM_OPCODE_CONDTEST_UNCOND: {
-+		/* If unconditional encoding - not a SWP, undef */
-+		return -EFAULT;
-+	} break;
-+	}
-+
- 	if (current->pid != previous_pid) {
- 		pr_debug("\"%s\" (%ld) uses deprecated SWP{B} instruction\n",
- 			 current->comm, (unsigned long)current->pid);
+	Arnd
