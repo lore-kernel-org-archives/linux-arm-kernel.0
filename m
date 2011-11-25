@@ -1,7 +1,7 @@
 From: jtzhou@marvell.com (Jett.Zhou)
-Date: Fri, 25 Nov 2011 18:53:26 +0800
+Date: Fri, 25 Nov 2011 19:06:10 +0800
 Subject: [V1 1/3] RTC: sa1100: Clean out ost register
-Message-ID: <1322218408-1674-1-git-send-email-jtzhou@marvell.com>
+Message-ID: <1322219170-1774-1-git-send-email-jtzhou@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
