@@ -1,180 +1,287 @@
-From: viresh.kumar@st.com (Viresh Kumar)
-Date: Fri, 25 Nov 2011 09:05:07 +0530
-Subject: [PATCH 33/41] ARM: restart: spear: use new restart hook
-In-Reply-To: <20111124203240.GT9581@n2100.arm.linux.org.uk>
-References: <20111106173113.GI12913@n2100.arm.linux.org.uk>
- <E1RN6s9-0001Yp-Sd@rmk-PC.arm.linux.org.uk>
- <20111124203240.GT9581@n2100.arm.linux.org.uk>
-Message-ID: <4ECF0CEB.9060108@st.com>
+From: amit.kachhap@gmail.com (amit kachhap)
+Date: Fri, 25 Nov 2011 09:10:29 +0530
+Subject: [PATCH V3 1/6] ARM: exynos: Add AFTR mode cpuidle state on
+ EXYNOS4210
+In-Reply-To: <CAG17yqQ_-9JkrR_kaSbx6MH=x99Hyb5eF-o-dXeExEDewmyJzQ@mail.gmail.com>
+References: <1321954532-18724-1-git-send-email-amit.kachhap@linaro.org>
+ <1321954532-18724-2-git-send-email-amit.kachhap@linaro.org>
+ <CAG17yqQ_-9JkrR_kaSbx6MH=x99Hyb5eF-o-dXeExEDewmyJzQ@mail.gmail.com>
+Message-ID: <CADGdYn5w8JzEH7wVo6aYBqxHifEWzS1Kk2upiGN61TYBeWQ6PQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/25/2011 2:02 AM, Russell King - ARM Linux wrote:
-> Ack?
-> 
-> On Sun, Nov 06, 2011 at 05:51:09PM +0000, Russell King - ARM Linux wrote:
->> Hook these platforms restart code into the new restart hook rather
->> than using arch_reset().
+On Thu, Nov 24, 2011 at 9:37 AM, Inderpal Singh
+<inderpal.singh@linaro.org> wrote:
+> Hi Amit,
+>
+> On 22 November 2011 15:05, Amit Daniel Kachhap <amit.kachhap@linaro.org> wrote:
 >>
->> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+>> This patch adds support AFTR(ARM OFF TOP RUNNING) mode in
+>> cpuidle driver. L2 cache keeps their data in this mode.
+>> This patch ports the code to the latest interfaces to
+>> save/restore CPU state inclusive of CPU PM notifiers, l2
+>> resume and cpu_suspend/resume.
+>>
+>> Signed-off-by: Jaecheol Lee <jc.lee@samsung.com>
+>> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+>> Signed-off-by: Amit Daniel Kachhap <amit.kachhap@linaro.org>
 >> ---
->>  arch/arm/mach-spear3xx/include/mach/generic.h |    2 +
->>  arch/arm/mach-spear3xx/spear300_evb.c         |    1 +
->>  arch/arm/mach-spear3xx/spear310_evb.c         |    1 +
->>  arch/arm/mach-spear3xx/spear320_evb.c         |    1 +
->>  arch/arm/mach-spear6xx/include/mach/generic.h |    2 +
->>  arch/arm/mach-spear6xx/spear600_evb.c         |    1 +
->>  arch/arm/plat-spear/Makefile                  |    2 +-
->>  arch/arm/plat-spear/include/plat/system.h     |   11 ----------
->>  arch/arm/plat-spear/restart.c                 |   27 +++++++++++++++++++++++++
->>  9 files changed, 36 insertions(+), 12 deletions(-)
->>  create mode 100644 arch/arm/plat-spear/restart.c
+>> ?arch/arm/mach-exynos/cpuidle.c ? ? ? ? ?| ?152 ++++++++++++++++++++++++++++++-
+>> ?arch/arm/mach-exynos/include/mach/pmu.h | ? ?2 +
+>> ?2 files changed, 151 insertions(+), 3 deletions(-)
 >>
-
-Sorry for missing it earlier.
-
-Acked-by: Viresh Kumar <viresh.kumar@st.com>
-
->> diff --git a/arch/arm/mach-spear3xx/include/mach/generic.h b/arch/arm/mach-spear3xx/include/mach/generic.h
->> index b8f31c3..14276e5 100644
->> --- a/arch/arm/mach-spear3xx/include/mach/generic.h
->> +++ b/arch/arm/mach-spear3xx/include/mach/generic.h
->> @@ -42,6 +42,8 @@ void __init spear3xx_map_io(void);
->>  void __init spear3xx_init_irq(void);
->>  void __init spear3xx_init(void);
->>  
->> +void spear_restart(char, const char *);
+>> diff --git a/arch/arm/mach-exynos/cpuidle.c b/arch/arm/mach-exynos/cpuidle.c
+>> index 21403c8..89afa93 100644
+>> --- a/arch/arm/mach-exynos/cpuidle.c
+>> +++ b/arch/arm/mach-exynos/cpuidle.c
+>> @@ -12,15 +12,37 @@
+>> ?#include <linux/module.h>
+>> ?#include <linux/init.h>
+>> ?#include <linux/cpuidle.h>
+>> +#include <linux/cpu_pm.h>
+>> ?#include <linux/io.h>
+>> ?#include <linux/export.h>
+>> ?#include <linux/time.h>
+>>
+>> ?#include <asm/proc-fns.h>
+>> +#include <asm/smp_scu.h>
+>> +#include <asm/suspend.h>
+>> +#include <asm/unified.h>
+>> +#include <mach/regs-pmu.h>
+>> +#include <mach/pmu.h>
 >> +
->>  /* pad mux declarations */
->>  #define PMX_FIRDA_MASK		(1 << 14)
->>  #define PMX_I2C_MASK		(1 << 13)
->> diff --git a/arch/arm/mach-spear3xx/spear300_evb.c b/arch/arm/mach-spear3xx/spear300_evb.c
->> index a5ff98e..8b429f0 100644
->> --- a/arch/arm/mach-spear3xx/spear300_evb.c
->> +++ b/arch/arm/mach-spear3xx/spear300_evb.c
->> @@ -69,4 +69,5 @@ MACHINE_START(SPEAR300, "ST-SPEAR300-EVB")
->>  	.init_irq	=	spear3xx_init_irq,
->>  	.timer		=	&spear3xx_timer,
->>  	.init_machine	=	spear300_evb_init,
->> +	.restart	=	spear_restart,
->>  MACHINE_END
->> diff --git a/arch/arm/mach-spear3xx/spear310_evb.c b/arch/arm/mach-spear3xx/spear310_evb.c
->> index 45d180d..a11d6ea 100644
->> --- a/arch/arm/mach-spear3xx/spear310_evb.c
->> +++ b/arch/arm/mach-spear3xx/spear310_evb.c
->> @@ -75,4 +75,5 @@ MACHINE_START(SPEAR310, "ST-SPEAR310-EVB")
->>  	.init_irq	=	spear3xx_init_irq,
->>  	.timer		=	&spear3xx_timer,
->>  	.init_machine	=	spear310_evb_init,
->> +	.restart	=	spear_restart,
->>  MACHINE_END
->> diff --git a/arch/arm/mach-spear3xx/spear320_evb.c b/arch/arm/mach-spear3xx/spear320_evb.c
->> index 2287984..4239a70 100644
->> --- a/arch/arm/mach-spear3xx/spear320_evb.c
->> +++ b/arch/arm/mach-spear3xx/spear320_evb.c
->> @@ -73,4 +73,5 @@ MACHINE_START(SPEAR320, "ST-SPEAR320-EVB")
->>  	.init_irq	=	spear3xx_init_irq,
->>  	.timer		=	&spear3xx_timer,
->>  	.init_machine	=	spear320_evb_init,
->> +	.restart	=	spear_restart,
->>  MACHINE_END
->> diff --git a/arch/arm/mach-spear6xx/include/mach/generic.h b/arch/arm/mach-spear6xx/include/mach/generic.h
->> index 183f023..116b993 100644
->> --- a/arch/arm/mach-spear6xx/include/mach/generic.h
->> +++ b/arch/arm/mach-spear6xx/include/mach/generic.h
->> @@ -41,6 +41,8 @@ void __init spear6xx_init(void);
->>  void __init spear600_init(void);
->>  void __init spear6xx_clk_init(void);
->>  
->> +void spear_restart(char, const char *);
+>> +#include <plat/exynos4.h>
+>> +#include <plat/cpu.h>
 >> +
->>  /* Add spear600 machine device structure declarations here */
->>  
->>  #endif /* __MACH_GENERIC_H */
->> diff --git a/arch/arm/mach-spear6xx/spear600_evb.c b/arch/arm/mach-spear6xx/spear600_evb.c
->> index 8238fe3..0a16559 100644
->> --- a/arch/arm/mach-spear6xx/spear600_evb.c
->> +++ b/arch/arm/mach-spear6xx/spear600_evb.c
->> @@ -48,4 +48,5 @@ MACHINE_START(SPEAR600, "ST-SPEAR600-EVB")
->>  	.init_irq	=	spear6xx_init_irq,
->>  	.timer		=	&spear6xx_timer,
->>  	.init_machine	=	spear600_evb_init,
->> +	.restart	=	spear_restart,
->>  MACHINE_END
->> diff --git a/arch/arm/plat-spear/Makefile b/arch/arm/plat-spear/Makefile
->> index b4f340b..e0f2e5b 100644
->> --- a/arch/arm/plat-spear/Makefile
->> +++ b/arch/arm/plat-spear/Makefile
->> @@ -3,6 +3,6 @@
->>  #
->>  
->>  # Common support
->> -obj-y	:= clock.o time.o
->> +obj-y	:= clock.o restart.o time.o
->>  
->>  obj-$(CONFIG_ARCH_SPEAR3XX)	+= shirq.o padmux.o
->> diff --git a/arch/arm/plat-spear/include/plat/system.h b/arch/arm/plat-spear/include/plat/system.h
->> index 1171f22..4a0d125 100644
->> --- a/arch/arm/plat-spear/include/plat/system.h
->> +++ b/arch/arm/plat-spear/include/plat/system.h
->> @@ -14,10 +14,6 @@
->>  #ifndef __PLAT_SYSTEM_H
->>  #define __PLAT_SYSTEM_H
->>  
->> -#include <linux/io.h>
->> -#include <asm/hardware/sp810.h>
->> -#include <mach/hardware.h>
->> -
->>  static inline void arch_idle(void)
->>  {
->>  	/*
->> @@ -29,13 +25,6 @@ static inline void arch_idle(void)
->>  
->>  static inline void arch_reset(char mode, const char *cmd)
->>  {
->> -	if (mode == 's') {
->> -		/* software reset, Jump into ROM at address 0 */
->> -		soft_restart(0);
->> -	} else {
->> -		/* hardware reset, Use on-chip reset capability */
->> -		sysctl_soft_reset((void __iomem *)VA_SPEAR_SYS_CTRL_BASE);
->> -	}
->>  }
->>  
->>  #endif /* __PLAT_SYSTEM_H */
->> diff --git a/arch/arm/plat-spear/restart.c b/arch/arm/plat-spear/restart.c
->> new file mode 100644
->> index 0000000..2b4e3d8
->> --- /dev/null
->> +++ b/arch/arm/plat-spear/restart.c
->> @@ -0,0 +1,27 @@
->> +/*
->> + * arch/arm/plat-spear/restart.c
->> + *
->> + * SPEAr platform specific restart functions
->> + *
->> + * Copyright (C) 2009 ST Microelectronics
->> + * Viresh Kumar<viresh.kumar@st.com>
->> + *
->> + * This file is licensed under the terms of the GNU General Public
->> + * License version 2. This program is licensed "as is" without any
->> + * warranty of any kind, whether express or implied.
->> + */
->> +#include <linux/io.h>
->> +#include <asm/hardware/sp810.h>
->> +#include <mach/hardware.h>
->> +#include <mach/generic.h>
+>> +#define REG_DIRECTGO_ADDR ? ? ?(samsung_rev() == EXYNOS4210_REV_1_1 ? \
+>> + ? ? ? ? ? ? ? ? ? ? ? S5P_INFORM7 : (samsung_rev() == EXYNOS4210_REV_1_0 ? \
+>> + ? ? ? ? ? ? ? ? ? ? ? (S5P_VA_SYSRAM + 0x24) : S5P_INFORM0))
+>> +#define REG_DIRECTGO_FLAG ? ? ?(samsung_rev() == EXYNOS4210_REV_1_1 ? \
+>> + ? ? ? ? ? ? ? ? ? ? ? S5P_INFORM6 : (samsung_rev() == EXYNOS4210_REV_1_0 ? \
+>> + ? ? ? ? ? ? ? ? ? ? ? (S5P_VA_SYSRAM + 0x20) : S5P_INFORM1))
 >> +
->> +void spear_restart(char mode, const char *cmd)
+>> +#define S5P_CHECK_AFTR ? ? ? ? (samsung_rev() == EXYNOS4210_REV_1_0 ? \
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? 0xBAD00000 : 0xFCBA0D10)
+>>
+>> ?static int exynos4_enter_idle(struct cpuidle_device *dev,
+>> ? ? ? ? ? ? ? ? ? ? ? ?struct cpuidle_driver *drv,
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?int index);
+>> +static int exynos4_enter_lowpower(struct cpuidle_device *dev,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct cpuidle_driver *drv,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? int index);
+>>
+>> ?static struct cpuidle_state exynos4_cpuidle_set[] = {
+>> ? ? ? ?[0] = {
+>> @@ -28,9 +50,17 @@ static struct cpuidle_state exynos4_cpuidle_set[] = {
+>> ? ? ? ? ? ? ? ?.exit_latency ? ? ? ? ? = 1,
+>> ? ? ? ? ? ? ? ?.target_residency ? ? ? = 100000,
+>> ? ? ? ? ? ? ? ?.flags ? ? ? ? ? ? ? ? ?= CPUIDLE_FLAG_TIME_VALID,
+>> - ? ? ? ? ? ? ? .name ? ? ? ? ? ? ? ? ? = "IDLE",
+>> + ? ? ? ? ? ? ? .name ? ? ? ? ? ? ? ? ? = "C0",
+>> ? ? ? ? ? ? ? ?.desc ? ? ? ? ? ? ? ? ? = "ARM clock gating(WFI)",
+>> ? ? ? ?},
+>> + ? ? ? [1] = {
+>> + ? ? ? ? ? ? ? .enter ? ? ? ? ? ? ? ? ?= exynos4_enter_lowpower,
+>> + ? ? ? ? ? ? ? .exit_latency ? ? ? ? ? = 300,
+>> + ? ? ? ? ? ? ? .target_residency ? ? ? = 100000,
+>> + ? ? ? ? ? ? ? .flags ? ? ? ? ? ? ? ? ?= CPUIDLE_FLAG_TIME_VALID,
+>> + ? ? ? ? ? ? ? .name ? ? ? ? ? ? ? ? ? = "C1",
+>> + ? ? ? ? ? ? ? .desc ? ? ? ? ? ? ? ? ? = "ARM power down",
+>> + ? ? ? },
+>> ?};
+>>
+>> ?static DEFINE_PER_CPU(struct cpuidle_device, exynos4_cpuidle_device);
+>> @@ -40,9 +70,101 @@ static struct cpuidle_driver exynos4_idle_driver = {
+>> ? ? ? ?.owner ? ? ? ? ?= THIS_MODULE,
+>> ?};
+>>
+>> +/* Ext-GIC nIRQ/nFIQ is the only wakeup source in AFTR */
+>> +static void exynos4_set_wakeupmask(void)
 >> +{
->> +	if (mode == 's') {
->> +		/* software reset, Jump into ROM at address 0 */
->> +		soft_restart(0);
->> +	} else {
->> +		/* hardware reset, Use on-chip reset capability */
->> +		sysctl_soft_reset((void __iomem *)VA_SPEAR_SYS_CTRL_BASE);
->> +	}
+>> + ? ? ? __raw_writel(0x0000ff3e, S5P_WAKEUP_MASK);
 >> +}
->> -- 
->> 1.7.4.4
+>> +
+>> +static unsigned int g_pwr_ctrl, g_diag_reg;
+>> +
+>> +static void save_cpu_arch_register(void)
+>> +{
+>> + ? ? ? /*read power control register*/
+>> + ? ? ? asm("mrc p15, 0, %0, c15, c0, 0" : "=r"(g_pwr_ctrl) : : "cc");
+>> + ? ? ? /*read diagnostic register*/
+>> + ? ? ? asm("mrc p15, 0, %0, c15, c0, 1" : "=r"(g_diag_reg) : : "cc");
+>> + ? ? ? return;
+>> +}
+>> +
+>> +static void restore_cpu_arch_register(void)
+>> +{
+>> + ? ? ? /*write power control register*/
+>> + ? ? ? asm("mcr p15, 0, %0, c15, c0, 0" : : "r"(g_pwr_ctrl) : "cc");
+>> + ? ? ? /*write diagnostic register*/
+>> + ? ? ? asm("mcr p15, 0, %0, c15, c0, 1" : : "r"(g_diag_reg) : "cc");
+>> + ? ? ? return;
+>> +}
+>> +
+>> +static int idle_finisher(unsigned long flags)
+>> +{
+>> + ? ? ? cpu_do_idle();
+>> + ? ? ? return 1;
+>> +}
+>> +
+>> +static int exynos4_enter_core0_aftr(struct cpuidle_device *dev,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct cpuidle_driver *drv,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? int index)
+>> +{
+>> + ? ? ? struct timeval before, after;
+>> + ? ? ? int idle_time;
+>> + ? ? ? unsigned long tmp;
+>> +
+>> + ? ? ? local_irq_disable();
+>> + ? ? ? do_gettimeofday(&before);
+>> +
+>> + ? ? ? exynos4_set_wakeupmask();
+>> +
+>> + ? ? ? /* Set value of power down register for aftr mode */
+>> + ? ? ? exynos4_sys_powerdown_conf(SYS_AFTR);
+>> +
+>> + ? ? ? __raw_writel(BSYM(virt_to_phys(s3c_cpu_resume)),
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?REG_DIRECTGO_ADDR);
+>> + ? ? ? __raw_writel(S5P_CHECK_AFTR, REG_DIRECTGO_FLAG);
+>> +
+>> + ? ? ? save_cpu_arch_register();
+>> +
+>> + ? ? ? /* Setting Central Sequence Register for power down mode */
+>> + ? ? ? tmp = __raw_readl(S5P_CENTRAL_SEQ_CONFIGURATION);
+>> + ? ? ? tmp &= ~S5P_CENTRAL_LOWPWR_CFG;
+>> + ? ? ? __raw_writel(tmp, S5P_CENTRAL_SEQ_CONFIGURATION);
+>> +
+>> + ? ? ? cpu_pm_enter();
+>> + ? ? ? cpu_suspend(0, idle_finisher);
+>> +
+>> + ? ? ? scu_enable(S5P_VA_SCU);
+>> + ? ? ? cpu_pm_exit();
+>> +
+>> + ? ? ? restore_cpu_arch_register();
+>> +
+>> + ? ? ? /*
+>> + ? ? ? ?* If PMU failed while entering sleep mode, WFI will be
+>> + ? ? ? ?* ignored by PMU and then exiting cpu_do_idle().
+>> + ? ? ? ?* S5P_CENTRAL_LOWPWR_CFG bit will not be set automatically
+>> + ? ? ? ?* in this situation.
+>> + ? ? ? ?*/
+>> + ? ? ? tmp = __raw_readl(S5P_CENTRAL_SEQ_CONFIGURATION);
+>> + ? ? ? if (!(tmp & S5P_CENTRAL_LOWPWR_CFG)) {
+>> + ? ? ? ? ? ? ? tmp |= S5P_CENTRAL_LOWPWR_CFG;
+>> + ? ? ? ? ? ? ? __raw_writel(tmp, S5P_CENTRAL_SEQ_CONFIGURATION);
+>> + ? ? ? }
+>> +
+>> + ? ? ? /* Clear wakeup state register */
+>> + ? ? ? __raw_writel(0x0, S5P_WAKEUP_STAT);
+>> +
+>> + ? ? ? do_gettimeofday(&after);
+>> +
+>> + ? ? ? local_irq_enable();
+>> + ? ? ? idle_time = (after.tv_sec - before.tv_sec) * USEC_PER_SEC +
+>> + ? ? ? ? ? ? ? ? ? (after.tv_usec - before.tv_usec);
+>> +
+>> + ? ? ? dev->last_residency = idle_time;
+>> + ? ? ? return index;
+>> +}
+>> +
+>> ?static int exynos4_enter_idle(struct cpuidle_device *dev,
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?struct cpuidle_driver *drv,
+>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? int index)
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? int index)
+>> ?{
+>> ? ? ? ?struct timeval before, after;
+>> ? ? ? ?int idle_time;
+>> @@ -61,6 +183,24 @@ static int exynos4_enter_idle(struct cpuidle_device *dev,
+>> ? ? ? ?return index;
+>> ?}
 >>
+>> +static int exynos4_enter_lowpower(struct cpuidle_device *dev,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct cpuidle_driver *drv,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? int index)
+>> +{
+>> + ? ? ? int new_index = index;
+>> +
+>> + ? ? ? /* This mode only can be entered when other core's are offline */
+>> + ? ? ? if (num_online_cpus() > 1) {
+>> + ? ? ? ? ? ? ? new_index = drv->safe_state_index;
+>> + ? ? ? ? ? ? ? BUG_ON(new_index > drv->state_count);
+>
+> drv->state_count is not being initialized anywhere.
+> Moreover, do we need BUG_ON? As we now return index to the cpuidle framework,
+> can we not enter C0 and framework will know that we entered C0 instead of C1 ?
+
+drv->state_count is initialised. Actually it is not visible in this
+patch diff. The BUG_ON
+will never enter as we always initialize the safe_state_index.
+>
+>> + ? ? ? }
+>> +
+>> + ? ? ? if (new_index == 0)
+>> + ? ? ? ? ? ? ? return exynos4_enter_idle(dev, drv, new_index);
+>> + ? ? ? else
+>> + ? ? ? ? ? ? ? return exynos4_enter_core0_aftr(dev, drv, new_index);
+>> +}
+>> +
+>> ?static int __init exynos4_init_cpuidle(void)
+>> ?{
+>> ? ? ? ?int i, max_cpuidle_state, cpu_id;
+>> @@ -75,19 +215,25 @@ static int __init exynos4_init_cpuidle(void)
+>> ? ? ? ? ? ? ? ?memcpy(&drv->states[i], &exynos4_cpuidle_set[i],
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?sizeof(struct cpuidle_state));
+>> ? ? ? ?}
+>> + ? ? ? drv->safe_state_index = 0;
+>> ? ? ? ?cpuidle_register_driver(&exynos4_idle_driver);
+>>
+>> ? ? ? ?for_each_cpu(cpu_id, cpu_online_mask) {
+>> ? ? ? ? ? ? ? ?device = &per_cpu(exynos4_cpuidle_device, cpu_id);
+>> ? ? ? ? ? ? ? ?device->cpu = cpu_id;
+>>
+>> - ? ? ? ? ? ? ? device->state_count = drv->state_count;
+>> + ? ? ? ? ? ? ? if (cpu_id == 0)
+>> + ? ? ? ? ? ? ? ? ? ? ? device->state_count = (sizeof(exynos4_cpuidle_set) /
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?sizeof(struct cpuidle_state));
+>> + ? ? ? ? ? ? ? else
+>> + ? ? ? ? ? ? ? ? ? ? ? device->state_count = 1; ? ? ? ?/* Support IDLE only */
+>>
+>> ? ? ? ? ? ? ? ?if (cpuidle_register_device(device)) {
+>> ? ? ? ? ? ? ? ? ? ? ? ?printk(KERN_ERR "CPUidle register device failed\n,");
+>> ? ? ? ? ? ? ? ? ? ? ? ?return -EIO;
+>> ? ? ? ? ? ? ? ?}
+>> ? ? ? ?}
+>> +
+>> ? ? ? ?return 0;
+>> ?}
+>> ?device_initcall(exynos4_init_cpuidle);
+>> diff --git a/arch/arm/mach-exynos/include/mach/pmu.h b/arch/arm/mach-exynos/include/mach/pmu.h
+>> index 632dd56..e76b7fa 100644
+>> --- a/arch/arm/mach-exynos/include/mach/pmu.h
+>> +++ b/arch/arm/mach-exynos/include/mach/pmu.h
+>> @@ -22,11 +22,13 @@ enum sys_powerdown {
+>> ? ? ? ?NUM_SYS_POWERDOWN,
+>> ?};
+>>
+>> +extern unsigned long l2x0_regs_phys;
+>> ?struct exynos4_pmu_conf {
+>> ? ? ? ?void __iomem *reg;
+>> ? ? ? ?unsigned int val[NUM_SYS_POWERDOWN];
+>> ?};
+>>
+>> ?extern void exynos4_sys_powerdown_conf(enum sys_powerdown mode);
+>> +extern void s3c_cpu_resume(void);
+>>
+>> ?#endif /* __ASM_ARCH_PMU_H */
+>> --
+>> 1.7.1
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+>
