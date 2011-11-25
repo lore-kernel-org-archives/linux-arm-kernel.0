@@ -1,58 +1,129 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Fri, 25 Nov 2011 14:47:08 +0100
-Subject: [PATCH] at91_ether: use gpio_is_valid for phy IRQ line
-In-Reply-To: <20111124222836.GB28582@gallagher>
-References: <1322128098-17724-1-git-send-email-jamie@jamieiles.com>
- <1322169674-4109-1-git-send-email-nicolas.ferre@atmel.com>
- <20111124222836.GB28582@gallagher>
-Message-ID: <20111125134708.GM15531@game.jcrosoft.org>
+Date: Fri, 25 Nov 2011 14:51:06 +0100
+Subject: [PATCH 1/3] ARM: at91/aic: add device tree support for AIC
+In-Reply-To: <20111124222601.GA28582@gallagher>
+References: <167b5ccfc31d9637186c5201cd83cb62df81fc0f.1322171620.git.nicolas.ferre@atmel.com>
+ <20111124222601.GA28582@gallagher>
+Message-ID: <20111125135106.GN15531@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22:28 Thu 24 Nov     , Jamie Iles wrote:
+On 22:26 Thu 24 Nov     , Jamie Iles wrote:
 > Hi Nicolas,
 > 
-> On Thu, Nov 24, 2011 at 10:21:14PM +0100, Nicolas Ferre wrote:
-> > Use the generic gpiolib gpio_is_valid() function to test
-> > if the phy IRQ line GPIO is actually provided.
-> > 
-> > For non-connected or non-existing phy IRQ lines, -EINVAL
-> > value is used for phy_irq_pin field of struct at91_eth_data.
+> On Thu, Nov 24, 2011 at 10:56:27PM +0100, Nicolas Ferre wrote:
+> > Ioremap registers from DT specification and adding
+> > of a simple irq domain for AIC interrupts.
 > > 
 > > Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> > Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 > > ---
-> >  drivers/net/ethernet/cadence/at91_ether.c |   23 +++++++++++++----------
-> >  1 files changed, 13 insertions(+), 10 deletions(-)
-> > 
-> > diff --git a/drivers/net/ethernet/cadence/at91_ether.c b/drivers/net/ethernet/cadence/at91_ether.c
-> > index 56624d3..a1c4143 100644
-> > --- a/drivers/net/ethernet/cadence/at91_ether.c
-> > +++ b/drivers/net/ethernet/cadence/at91_ether.c
-> > @@ -255,8 +255,7 @@ static void enable_phyirq(struct net_device *dev)
-> >  	unsigned int dsintr, irq_number;
-> >  	int status;
+> 
+> Apologies if I've missed it somewhere but I think this needs to be 
+> documented in Documentation/devicetree.
+> 
+> [...]
+> > diff --git a/arch/arm/mach-at91/irq.c b/arch/arm/mach-at91/irq.c
+> > index be6b639..80783b0 100644
+> > --- a/arch/arm/mach-at91/irq.c
+> > +++ b/arch/arm/mach-at91/irq.c
+> > @@ -24,6 +24,8 @@
+> >  #include <linux/module.h>
+> >  #include <linux/mm.h>
+> >  #include <linux/types.h>
+> > +#include <linux/of_address.h>
+> > +#include <linux/irqdomain.h>
 > >  
-> > -	irq_number = lp->board_data.phy_irq_pin;
-> > -	if (!irq_number) {
-> > +	if (!gpio_is_valid(lp->board_data.phy_irq_pin)) {
-> >  		/*
-> >  		 * PHY doesn't have an IRQ pin (RTL8201, DP83847, AC101L),
-> >  		 * or board does not have it connected.
-> > @@ -265,6 +264,7 @@ static void enable_phyirq(struct net_device *dev)
-> >  		return;
-> >  	}
+> >  #include <mach/hardware.h>
+> >  #include <asm/irq.h>
+> > @@ -34,6 +36,7 @@
+> >  #include <asm/mach/map.h>
 > >  
-> > +	irq_number = lp->board_data.phy_irq_pin;
+> >  void __iomem *at91_aic_base;
+> > +static struct irq_domain at91_aic_domain;
+> >  
+> >  static void at91_aic_mask_irq(struct irq_data *d)
+> >  {
+> > @@ -127,14 +130,44 @@ static struct irq_chip at91_aic_chip = {
+> >  	.irq_set_wake	= at91_aic_set_wake,
+> >  };
+> >  
+> > +#if defined(CONFIG_OF)
+> > +static struct of_device_id aic_ids[]  = {
+> > +	{ .compatible = "atmel,at91rm9200-aic" },
+> > +	{ /*sentinel*/ }
+> > +};
+> > +
+> > +static int __init at91_aic_of_init(void)
+> > +{
+> > +	struct device_node *np;
+> > +
+> > +	np = of_find_matching_node(NULL, aic_ids);
+> > +	if (np == NULL)
+> > +		return -ENODEV;
+> > +
+> > +	at91_aic_base = of_iomap(np, 0);
+> > +	at91_aic_domain.of_node = np;
 > 
-> Does this need to be:
+> I think this needs to be:
 > 
-> 	irq_number = gpio_to_irq(lp->board_data.phy_irq_pin);
+> 	at91_aic_domain.of_node = of_node_get(np);
 > 
-> and the same for the other occurrences?  Otherwise this looks like the 
-> right thing to me.
-yes
+> to keep the reference count.
+> 
+> > +	/* Keep refcount of the node */
+> > +
+> > +	return 0;
+> > +}
+> > +#else
+> > +static int __init at91_aic_of_init(void)
+> > +{
+> > +	return -ENOSYS;
+> > +}
+> > +#endif
+> 
+> I think it's preferred if you use of_irq_init() here as it can handle 
+> the ordering of IRQ controllers.  There are GIC and VIC bindings in 
+> -next that use this and provide a way for non-DT platforms to still use 
+> the drivers.
+which is the case here as if the of_init fail we failback to the non-dt init
 
-Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+and this IP is AT91 only
+
+Best Regards,
+J.
+> 
+> >  /*
+> >   * Initialize the AIC interrupt controller.
+> >   */
+> >  void __init at91_aic_init(unsigned int priority[NR_AIC_IRQS])
+> >  {
+> >  	unsigned int i;
+> > +	int ret;
+> >  
+> > -	at91_aic_base = ioremap(AT91_AIC, 512);
+> > +	ret = at91_aic_of_init();
+> > +	if (ret < 0)
+> > +		at91_aic_base = ioremap(AT91_AIC, 512);
+> >  
+> >  	if (!at91_aic_base)
+> >  		panic("Impossible to ioremap AT91_AIC\n");
+> > @@ -169,4 +202,10 @@ void __init at91_aic_init(unsigned int priority[NR_AIC_IRQS])
+> >  	/* Disable and clear all interrupts initially */
+> >  	at91_aic_write(AT91_AIC_IDCR, 0xFFFFFFFF);
+> >  	at91_aic_write(AT91_AIC_ICCR, 0xFFFFFFFF);
+> > +
+> > +	/* Add irq domain for AIC */
+> > +	at91_aic_domain.irq_base = at91_aic_domain.hwirq_base = 0;
+> > +	at91_aic_domain.nr_irq = NR_AIC_IRQS;
+> > +	at91_aic_domain.ops = &irq_domain_simple_ops;
+> 
+> irq_domain_simple_ops is only exported when CONFIG_OF_IRQ=y, so this 
+> probably won't work for !CONFIG_USE_OF.
+so we need to use 
+	if (IS_BUILT_IN(CONFIG_USE_OF)) {
+	}
+
 
 Best Regards,
 J.
