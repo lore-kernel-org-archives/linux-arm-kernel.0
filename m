@@ -1,150 +1,159 @@
-From: matthieu.castet@parrot.com (Matthieu CASTET)
-Date: Fri, 25 Nov 2011 11:21:42 +0100
-Subject: [PATCH v2] PM: HIBERNATION: skip the swap size check if the
- snapshot image size is anticipative
-In-Reply-To: <1322208422-12346-1-git-send-email-Barry.Song@csr.com>
-References: <1322208422-12346-1-git-send-email-Barry.Song@csr.com>
-Message-ID: <4ECF6C36.8000702@parrot.com>
+From: tarun.kanti@ti.com (DebBarma, Tarun Kanti)
+Date: Fri, 25 Nov 2011 16:00:27 +0530
+Subject: [PATCH v8 00/24] gpio/omap: driver cleanup and fixes
+In-Reply-To: <CAC83ZvKd3iBrQS5wESnAok8W_a4z-3jZYz17wy376sZJw6sCWg@mail.gmail.com>
+References: <1317803593-12259-1-git-send-email-tarun.kanti@ti.com>
+ <87obwsg9ua.fsf@ti.com>
+ <CAC83ZvKd3iBrQS5wESnAok8W_a4z-3jZYz17wy376sZJw6sCWg@mail.gmail.com>
+Message-ID: <CAC83Zv++T96AZRHbEiS_UaGp=Dmu+zQ8se97oaBLhg_+eW-smA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Nov 4, 2011 at 2:57 PM, DebBarma, Tarun Kanti
+<tarun.kanti@ti.com> wrote:
+> On Fri, Nov 4, 2011 at 3:14 AM, Kevin Hilman <khilman@ti.com> wrote:
+>> Tarun Kanti DebBarma <tarun.kanti@ti.com> writes:
+>>
+>>> This series is continuation of cleanup of OMAP GPIO driver and fixes.
+>>
+>> Using this series on 3630/Zoom3, UART wakeups no longer work from
+>> suspend. ?That suggests that GPIO wakeups from retention/off are not
+>> working.
+>>
+>> Please test GPIO wakeups from retention/off. ?One way is to use Zoom3
+>> UART wakeup from suspend using by enabling UART wakeups and suspending:
+>>
+>> ? # echo enabled > /sys/devices/platform/serial8250.0/tty/ttyS0/power/wakeup
+>> ? # echo mem > /sys/power/state
+> Ok, I will test and make necessary fix.
+I have done retention test of the latest series on Zoom3. When I try
+running off mode
+test it says support is not present because of an errata. Here is the
+overall log:
 
-but did embedded system will really use swap interface ?
+/ # mount -t debugfs debugfs /proc/sys/debug
+/ # echo enabled > /sys/devices/platform/serial8250.0/tty/ttyS0/power/wakeup
+/ # echo mem > /sys/power/state
+[   18.359161] PM: Syncing filesystems ... done.
+[   18.477172] PM: Preparing system for mem sleep
+[   18.501037] Freezing user space processes ... (elapsed 0.02 seconds) done.
+[   18.528564] Freezing remaining freezable tasks ... (elapsed 0.02
+seconds) done.
+[   18.559020] PM: Entering mem sleep
+[   18.594299] ------------[ cut here ]------------
+[   18.599090] WARNING: at drivers/mmc/core/core.c:453
+mmc_wait_for_cmd+0x74/0x80()
+[   18.606536] Modules linked in:
+[   18.609649] [<c001ba18>] (unwind_backtrace+0x0/0xf4) from
+[<c0052d88>] (warn_slowpath_common+0x4c/0x64)
+[   18.619110] [<c0052d88>] (warn_slowpath_common+0x4c/0x64) from
+[<c0052dbc>] (warn_slowpath_null+0x1c/0x24)
+[   18.628845] [<c0052dbc>] (warn_slowpath_null+0x1c/0x24) from
+[<c0365f8c>] (mmc_wait_for_cmd+0x74/0x80)
+[   18.638183] [<c0365f8c>] (mmc_wait_for_cmd+0x74/0x80) from
+[<c0368e54>] (mmc_switch+0x84/0x140)
+[   18.646942] [<c0368e54>] (mmc_switch+0x84/0x140) from [<c0364ab0>]
+(mmc_power_off+0xd8/0x108)
+[   18.655548] [<c0364ab0>] (mmc_power_off+0xd8/0x108) from
+[<c036558c>] (mmc_suspend_host+0xf0/0x1d4)
+[   18.664672] [<c036558c>] (mmc_suspend_host+0xf0/0x1d4) from
+[<c0376be8>] (omap_hsmmc_suspend+0x6c/0x100)
+[   18.674194] [<c0376be8>] (omap_hsmmc_suspend+0x6c/0x100) from
+[<c02b1c50>] (platform_pm_suspend+0x2c/0x54)
+[   18.683929] [<c02b1c50>] (platform_pm_suspend+0x2c/0x54) from
+[<c02b58f0>] (pm_op+0x6c/0xc0)
+[   18.692443] [<c02b58f0>] (pm_op+0x6c/0xc0) from [<c02b5dcc>]
+(__device_suspend+0xc0/0x1e4)
+[   18.701080] [<c02b5dcc>] (__device_suspend+0xc0/0x1e4) from
+[<c02b5fd4>] (dpm_suspend+0x58/0x214)
+[   18.710021] [<c02b5fd4>] (dpm_suspend+0x58/0x214) from [<c0099950>]
+(suspend_devices_and_enter+0x78/0x2d8)
+[   18.719757] [<c0099950>] (suspend_devices_and_enter+0x78/0x2d8)
+from [<c0099cf0>] (enter_state+0x140/0x180)
+[   18.729553] [<c0099cf0>] (enter_state+0x140/0x180) from
+[<c0098adc>] (state_store+0xe4/0x170)
+[   18.738159] [<c0098adc>] (state_store+0xe4/0x170) from [<c0246ae8>]
+(kobj_attr_store+0x18/0x1c)
+[   18.746917] [<c0246ae8>] (kobj_attr_store+0x18/0x1c) from
+[<c0162e04>] (sysfs_write_file+0xfc/0x180)
+[   18.756103] [<c0162e04>] (sysfs_write_file+0xfc/0x180) from
+[<c0102940>] (vfs_write+0xb0/0x134)
+[   18.764862] [<c0102940>] (vfs_write+0xb0/0x134) from [<c0102a94>]
+(sys_write+0x40/0x70)
+[   18.772949] [<c0102a94>] (sys_write+0x40/0x70) from [<c0014040>]
+(ret_fast_syscall+0x0/0x3c)
+[   18.781433] ---[ end trace 1b75b31a2719ed1e ]---
+[   18.786102] ------------[ cut here ]------------
+[   18.790771] WARNING: at drivers/mmc/core/core.c:210
+__mmc_start_req+0xe4/0x10c()
+[   18.798156] Modules linked in:
+[   18.801300] [<c001ba18>] (unwind_backtrace+0x0/0xf4) from
+[<c0052d88>] (warn_slowpath_common+0x4c/0x64)
+[   18.810760] [<c0052d88>] (warn_slowpath_common+0x4c/0x64) from
+[<c0052dbc>] (warn_slowpath_null+0x1c/0x24)
+[   18.820465] [<c0052dbc>] (warn_slowpath_null+0x1c/0x24) from
+[<c0365e6c>] (__mmc_start_req+0xe4/0x10c)
+[   18.829833] [<c0365e6c>] (__mmc_start_req+0xe4/0x10c) from
+[<c0365f08>] (mmc_wait_for_req+0x10/0x20)
+[   18.839019] [<c0365f08>] (mmc_wait_for_req+0x10/0x20) from
+[<c0365f74>] (mmc_wait_for_cmd+0x5c/0x80)
+[   18.848205] [<c0365f74>] (mmc_wait_for_cmd+0x5c/0x80) from
+[<c0368e54>] (mmc_switch+0x84/0x140)
+[   18.856964] [<c0368e54>] (mmc_switch+0x84/0x140) from [<c0364ab0>]
+(mmc_power_off+0xd8/0x108)
+[   18.865570] [<c0364ab0>] (mmc_power_off+0xd8/0x108) from
+[<c036558c>] (mmc_suspend_host+0xf0/0x1d4)
+[   18.874664] [<c036558c>] (mmc_suspend_host+0xf0/0x1d4) from
+[<c0376be8>] (omap_hsmmc_suspend+0x6c/0x100)
+[   18.884216] [<c0376be8>] (omap_hsmmc_suspend+0x6c/0x100) from
+[<c02b1c50>] (platform_pm_suspend+0x2c/0x54)
+[   18.893920] [<c02b1c50>] (platform_pm_suspend+0x2c/0x54) from
+[<c02b58f0>] (pm_op+0x6c/0xc0)
+[   18.902435] [<c02b58f0>] (pm_op+0x6c/0xc0) from [<c02b5dcc>]
+(__device_suspend+0xc0/0x1e4)
+[   18.910736] [<c02b5dcc>] (__device_suspend+0xc0/0x1e4) from
+[<c02b5fd4>] (dpm_suspend+0x58/0x214)
+[   18.919677] [<c02b5fd4>] (dpm_suspend+0x58/0x214) from [<c0099950>]
+(suspend_devices_and_enter+0x78/0x2d8)
+[   18.929382] [<c0099950>] (suspend_devices_and_enter+0x78/0x2d8)
+from [<c0099cf0>] (enter_state+0x140/0x180)
+[   18.939178] [<c0099cf0>] (enter_state+0x140/0x180) from
+[<c0098adc>] (state_store+0xe4/0x170)
+[   18.947784] [<c0098adc>] (state_store+0xe4/0x170) from [<c0246ae8>]
+(kobj_attr_store+0x18/0x1c)
+[   18.956542] [<c0246ae8>] (kobj_attr_store+0x18/0x1c) from
+[<c0162e04>] (sysfs_write_file+0xfc/0x180)
+[   18.965728] [<c0162e04>] (sysfs_write_file+0xfc/0x180) from
+[<c0102940>] (vfs_write+0xb0/0x134)
+[   18.974487] [<c0102940>] (vfs_write+0xb0/0x134) from [<c0102a94>]
+(sys_write+0x40/0x70)
+[   18.982543] [<c0102a94>] (sys_write+0x40/0x70) from [<c0014040>]
+(ret_fast_syscall+0x0/0x3c)
+[   18.991027] ---[ end trace 1b75b31a2719ed1f ]---
+[   18.996124] Device failed to respond within 0 poweroff time.
+Forcefully powering down the device
+[   19.010314] PM: suspend of devices complete after 434.539 msecs
+[   19.019683] PM: late suspend of devices complete after 3.417 msecs
+[   19.026000] Disabling non-boot CPUs ...
+[   28.653900] Powerdomain (core_pwrdm) didn't enter target state 1
+[   28.659912] Could not enter target state in pm_suspend
+[   28.667297] PM: early resume of devices complete after 2.044 msecs
+[   28.904083] PM: resume of devices complete after 228.668 msecs
+[   28.914062] PM: Finishing wakeup.
+[   28.917388] Restarting tasks ... done.
+/ #
+/ # cat /proc/sys/debug/pm_debug/count | grep per_pwrdm
+per_pwrdm (ON),OFF:0,RET:88,INA:0,ON:89,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0
+per_clkdm->per_pwrdm (18)
+/ # cat /proc/sys/debug/pm_debug/count | grep per_pwrdm
+per_pwrdm (ON),OFF:0,RET:127,INA:0,ON:128,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0
+per_clkdm->per_pwrdm (18)
+/ # cat /proc/sys/debug/pm_debug/count | grep per_pwrdm
+per_pwrdm (ON),OFF:0,RET:155,INA:0,ON:156,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0
+per_clkdm->per_pwrdm (18)
+/ # echo 1 > /proc/sys/debug/pm_debug/enable_off_mode
+[  119.895996] omap3_pm_off_mode_enable: Core OFF disabled due to errata i583
 
-Often they don't have swap and can already save suspend image in disk/nand :
-- SNAPSHOT_CREATE_IMAGE
-- read it from /dev/snapshot and write it to a file.
-
-The only problem with the current interface, is that you can't SNAPSHOT_UNFREEZE
-before reading the image.
-But this is need for some filesystem that have thread.
-
-
-For example we have a demo where we save the suspend image in a ubi volume and
-restore it from bootloader.
-
-
-Matthieu
-
-Barry Song a ?crit :
-> From: Barry Song <baohua.song@csr.com>
-> 
-> Current swsusp requires swap partitions even larger than real saved pages
-> based on the worst compression ratio:
-> but for an embedded system, which has limited storage space, then it might
-> can't give the large partition to save snapshot.
-> In the another way, some embedded systems can definitely know the most size
-> needed for snapshot since they run some specific application lists.
-> So this patch provides the possibility for users to tell kernel even
-> the system has a little snapshot partition, but it is still enough.
-> For example, if the system need to save 120MB memory, origin swsusp will require
-> a 130MB partition to save snapshot. but if users know 30MB is enough for them(
-> compressed image will be less than 30MB), they just make a 30MB partition by
-> echo 0 > /sys/power/check_swap_size
-> 
-> Signed-off-by: Barry Song <Baohua.Song@csr.com>
-> Cc: Xiangzhen Ye <Xiangzhen.Ye@csr.com>
-> ---
->  -v2:drop swap_enough bootargs and use /sys/power/check_swap_size node
-> 
->  Documentation/power/interface.txt |    5 +++++
->  kernel/power/hibernate.c          |   22 ++++++++++++++++++++++
->  kernel/power/power.h              |    2 ++
->  kernel/power/swap.c               |    9 +++++++++
->  4 files changed, 38 insertions(+), 0 deletions(-)
-> 
-> diff --git a/Documentation/power/interface.txt b/Documentation/power/interface.txt
-> index c537834..5e205f0 100644
-> --- a/Documentation/power/interface.txt
-> +++ b/Documentation/power/interface.txt
-> @@ -47,6 +47,11 @@ Writing to this file will accept one of
->         'testproc'
->         'test'
->  
-> +/sys/power/check_swap_size controls whether we can skip checking the swap
-> +partition size by worst compression ratio. If users know the swap partition
-> +is enough for compressed snapshot, write 0 to /sys/power/check_swap_size.
-> +It is useful for an embedded system with known running softwares.
-> +
->  /sys/power/image_size controls the size of the image created by
->  the suspend-to-disk mechanism.  It can be written a string
->  representing a non-negative integer that will be used as an upper
-> diff --git a/kernel/power/hibernate.c b/kernel/power/hibernate.c
-> index 1c53f7f..5552473 100644
-> --- a/kernel/power/hibernate.c
-> +++ b/kernel/power/hibernate.c
-> @@ -1024,11 +1024,33 @@ static ssize_t reserved_size_store(struct kobject *kobj,
->  
->  power_attr(reserved_size);
->  
-> +static ssize_t check_swap_size_show(struct kobject *kobj, struct kobj_attribute *attr,
-> +			       char *buf)
-> +{
-> +	return sprintf(buf, "%d\n", check_swap_size);
-> +}
-> +
-> +static ssize_t check_swap_size_store(struct kobject *kobj, struct kobj_attribute *attr,
-> +				const char *buf, size_t n)
-> +{
-> +	int check_size;
-> +
-> +	if (sscanf(buf, "%d", &check_size) == 1) {
-> +		check_swap_size = check_size;
-> +		return n;
-> +	}
-> +
-> +	return -EINVAL;
-> +}
-> +
-> +power_attr(check_swap_size);
-> +
->  static struct attribute * g[] = {
->  	&disk_attr.attr,
->  	&resume_attr.attr,
->  	&image_size_attr.attr,
->  	&reserved_size_attr.attr,
-> +	&check_swap_size_attr.attr,
->  	NULL,
->  };
->  
-> diff --git a/kernel/power/power.h b/kernel/power/power.h
-> index 23a2db1..4f0fa78 100644
-> --- a/kernel/power/power.h
-> +++ b/kernel/power/power.h
-> @@ -74,6 +74,8 @@ static struct kobj_attribute _name##_attr = {	\
->  
->  /* Preferred image size in bytes (default 500 MB) */
->  extern unsigned long image_size;
-> +/* If 0, skip checking whether the swap size is enough for compressed snapshot */
-> +extern int check_swap_size;
->  /* Size of memory reserved for drivers (default SPARE_PAGES x PAGE_SIZE) */
->  extern unsigned long reserved_size;
->  extern int in_suspend;
-> diff --git a/kernel/power/swap.c b/kernel/power/swap.c
-> index 11a594c..db90195 100644
-> --- a/kernel/power/swap.c
-> +++ b/kernel/power/swap.c
-> @@ -37,6 +37,12 @@
->  #define HIBERNATE_SIG	"S1SUSPEND"
->  
->  /*
-> + * if users know swap partitions are enough for compressed snapshots,
-> + * echo 0 > /sys/power/check_swap_size
-> + */
-> +int check_swap_size = 1;
-> +
-> +/*
->   *	The swap map is a data structure used for keeping track of each page
->   *	written to a swap partition.  It consists of many swap_map_page
->   *	structures that contain each an array of MAP_PAGE_ENTRIES swap entries.
-> @@ -772,6 +778,9 @@ static int enough_swap(unsigned int nr_pages, unsigned int flags)
->  	unsigned int free_swap = count_swap_pages(root_swap, 1);
->  	unsigned int required;
->  
-> +	if (!check_swap_size)
-> +		return 1;
-> +
->  	pr_debug("PM: Free swap pages: %u\n", free_swap);
->  
->  	required = PAGES_FOR_IO + ((flags & SF_NOCOMPRESS_MODE) ?
+--
+Tarun
+[...]
