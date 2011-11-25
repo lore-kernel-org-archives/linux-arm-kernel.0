@@ -1,62 +1,70 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Fri, 25 Nov 2011 10:08:06 +0100
-Subject: [PATCH] i2c-mxs: fix compile warning in mxs_i2c_xfer()
-In-Reply-To: <20111125011519.GA18403@S2100-06.ap.freescale.net>
-References: <1322121140-5216-1-git-send-email-shawn.guo@linaro.org>
- <20111124082903.GV19986@pengutronix.de>
- <20111124083747.GE8439@pengutronix.de>
- <20111125011519.GA18403@S2100-06.ap.freescale.net>
-Message-ID: <20111125090806.GA2535@pengutronix.de>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Fri, 25 Nov 2011 10:10:58 +0000
+Subject: [PATCH 1/4] ARM: ftrace: use canonical Thumb-2 wide instruction
+ format
+In-Reply-To: <4ECDF0BA.1050707@windriver.com>
+References: <1321888429-3519-1-git-send-email-rabin@rab.in>
+ <20111122120242.GD2066@localhost.localdomain>
+ <CAH+eYFBfcpKYrq-kyV4RZ-s1En5Q2wy6dhuEsk6KNgk-zb7wDw@mail.gmail.com>
+ <20111123144238.GB2050@localhost.localdomain>
+ <4ECDF0BA.1050707@windriver.com>
+Message-ID: <20111125101058.GA2098@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 25, 2011 at 09:15:20AM +0800, Shawn Guo wrote:
-> On Thu, Nov 24, 2011 at 09:37:47AM +0100, Wolfram Sang wrote:
-> > On Thu, Nov 24, 2011 at 09:29:03AM +0100, Uwe Kleine-K?nig wrote:
-> > > Hello Shawn,
-> > > 
-> > > On Thu, Nov 24, 2011 at 03:52:20PM +0800, Shawn Guo wrote:
-> > > >   CC      drivers/i2c/busses/i2c-mxs.o
-> > > > drivers/i2c/busses/i2c-mxs.c: In function ?mxs_i2c_xfer?:
-> > > > drivers/i2c/busses/i2c-mxs.c:196:6: warning: ?data? may be used uninitialized in this function
-> > > > 
-> > > > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> > > > ---
-> > > >  drivers/i2c/busses/i2c-mxs.c |    2 +-
-> > > >  1 files changed, 1 insertions(+), 1 deletions(-)
-> > > > 
-> > > > diff --git a/drivers/i2c/busses/i2c-mxs.c b/drivers/i2c/busses/i2c-mxs.c
-> > > > index 7e78f7c..00f098f 100644
-> > > > --- a/drivers/i2c/busses/i2c-mxs.c
-> > > > +++ b/drivers/i2c/busses/i2c-mxs.c
-> > > > @@ -193,7 +193,7 @@ static int mxs_i2c_wait_for_data(struct mxs_i2c_dev *i2c)
-> > > >  
-> > > >  static int mxs_i2c_finish_read(struct mxs_i2c_dev *i2c, u8 *buf, int len)
-> > > >  {
-> > > > -	u32 data;
-> > > > +	u32 data = 0;
-> > > >  	int i;
-> > > >  
-> > > >  	for (i = 0; i < len; i++) {
-> > > Looks like a stupid compiler. Then better use 
-> > > 
-> > > 	u32 uninitialized_var(data);
-> > 
-> > Leave it as it is and fix the compiler? Will do another test later to make
-> > sure.
-> > 
-> Ben, do you have an opinion on this, leave it there or fix it?
+On Thu, Nov 24, 2011 at 03:22:34PM +0800, Bi Junxiao wrote:
+> on 11/23/2011 10:42 PM Dave Martin wrote:
+> >On Tue, Nov 22, 2011 at 11:30:11PM +0530, Rabin Vincent wrote:
+> >>On Tue, Nov 22, 2011 at 17:32, Dave Martin<dave.martin@linaro.org>  wrote:
+> >>>On Mon, Nov 21, 2011 at 08:43:46PM +0530, Rabin Vincent wrote:
+> >>>>+#ifndef __ARMEB__
+> >>>>+     if (IS_ENABLED(CONFIG_THUMB2_KERNEL)) {
+> >>>>+             old = (old>>  16) | (old<<  16);
+> >>>>+             new = (new>>  16) | (new<<  16);
+> >>>I think swahw32() in<linux/swab.h>  can be used for this operation.
+> >>Yes.
+> >>
+> >>>Really though, we need a common set of "load and store instruction"
+> >>>macros, rather than duplicating this knowledge everywhere.
+> >>Yes, though this ftrace code may not be able to use them directly since
+> >>it uses probe_kernel_read()/write().
+> >In that case what we would want are macros to convert instructions between
+> >integer and in-memory representation, rather than conflating all that
+> >together in some memory accessor macros.
+> >
+> >How about:
+> >
+> >#include<linux/swab.h>
+> >
+> >#ifdef __ARMEB__
+> >#define insn_to_mem_arm(insn) swab32(insn)
+> >#define insn_to_mem_thumb16(insn) swab16(insn)
+> >#define insn_to_mem_thumb32(insn) swab16(insn)
+> >#else
+> >#define insn_to_mem_arm(insn) (insn)
+> >#define insn_to_mem_thumb16(insn) (insn)
+> >#define insn_to_mem_thumb32(insn) shahw32(insn)
+> >#endif
+> >
+> >#define mem_to_insn_arm(insn) insn_to_mem_asm(insn)
+> >#define mem_to_insn_thumb16(insn) insn_to_mem_thumb16(insn)
+> >#define mem_to_insn_thumb32(insn) insn_to_mem_thumb32(insn)
+> >
+> >Because these are all straightforward swap operations, we don't really
+> >need separate forwards and backwards operations, but having the separate
+> >names may make calling code easier to read.
+> >
+> >I'm still not sure exactly which header this belongs in, but it's a core
+> >ARM thing; not local to kprobes or ftrace, etc.
+> >
+> Yes, these macros are useful for be8 support. Do they deserve a
+> separated header file as there is no appropriate one for them now?
+> >If this looks sensible, it would also make sense for Junxiao Bi to build
+> >his big-endian fixes on it.
 
-Sorry, forgot the tests yesterday. I don't like random annotations
-because of faulty compilers. Please fix that one. NACK from me.
+I don't really see a header where this stuff fits.
 
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111125/d660798d/attachment.sig>
+I'll post an RFC.
+
+Cheers
+---Dave
