@@ -1,163 +1,180 @@
-From: mcuos.com@gmail.com (Wan ZongShun)
-Date: Fri, 25 Nov 2011 11:11:18 +0800
-Subject: [PATCH] ARM: w90x900: add common nuc9xx.h
-In-Reply-To: <20111124203748.GV9581@n2100.arm.linux.org.uk>
-References: <E1RRUQa-0005MI-5C@rmk-PC.arm.linux.org.uk>
- <CAKT61h9v8uVBF3orXOESq8piajzxY4VXCQ7Ox8g96dndGUwoXg@mail.gmail.com>
- <20111124203748.GV9581@n2100.arm.linux.org.uk>
-Message-ID: <CAKT61h-0=kdv2wzFrfJyA6zMDaV+Bf4iwrGx4YShm=2KrLDB9Q@mail.gmail.com>
+From: viresh.kumar@st.com (Viresh Kumar)
+Date: Fri, 25 Nov 2011 09:05:07 +0530
+Subject: [PATCH 33/41] ARM: restart: spear: use new restart hook
+In-Reply-To: <20111124203240.GT9581@n2100.arm.linux.org.uk>
+References: <20111106173113.GI12913@n2100.arm.linux.org.uk>
+ <E1RN6s9-0001Yp-Sd@rmk-PC.arm.linux.org.uk>
+ <20111124203240.GT9581@n2100.arm.linux.org.uk>
+Message-ID: <4ECF0CEB.9060108@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/11/25 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> On Mon, Nov 21, 2011 at 11:56:04AM +0800, Wan ZongShun wrote:
->> 2011/11/19 Russell King - ARM Linux <linux@arm.linux.org.uk>:
->> > Rather than having separate extern declarations in nuc9*.h, provide
->> > a common header file containing these definitions.
->> >
->> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+On 11/25/2011 2:02 AM, Russell King - ARM Linux wrote:
+> Ack?
+> 
+> On Sun, Nov 06, 2011 at 05:51:09PM +0000, Russell King - ARM Linux wrote:
+>> Hook these platforms restart code into the new restart hook rather
+>> than using arch_reset().
 >>
->> Tested-by :Wan Zongshun <mcuos.com@gmail.com>
->
-> Thanks.
->
-> Here's the follow-on patch for w90x900 for the restart fixups. ?Ack?
->
-> 8<=====
-> ARM: restart: w90x900: use new restart hook
->
-> Hook these platforms restart code into the new restart hook rather
-> than using arch_reset().
->
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+>> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+>> ---
+>>  arch/arm/mach-spear3xx/include/mach/generic.h |    2 +
+>>  arch/arm/mach-spear3xx/spear300_evb.c         |    1 +
+>>  arch/arm/mach-spear3xx/spear310_evb.c         |    1 +
+>>  arch/arm/mach-spear3xx/spear320_evb.c         |    1 +
+>>  arch/arm/mach-spear6xx/include/mach/generic.h |    2 +
+>>  arch/arm/mach-spear6xx/spear600_evb.c         |    1 +
+>>  arch/arm/plat-spear/Makefile                  |    2 +-
+>>  arch/arm/plat-spear/include/plat/system.h     |   11 ----------
+>>  arch/arm/plat-spear/restart.c                 |   27 +++++++++++++++++++++++++
+>>  9 files changed, 36 insertions(+), 12 deletions(-)
+>>  create mode 100644 arch/arm/plat-spear/restart.c
+>>
 
-Acked-by :Wan Zongshun <mcuos.com@gmail.com>
+Sorry for missing it earlier.
 
-Thanks!
+Acked-by: Viresh Kumar <viresh.kumar@st.com>
 
-> ---
-> ?arch/arm/mach-w90x900/cpu.c ? ? ? ? ? ? ? ? | ? 16 ++++++++++++++++
-> ?arch/arm/mach-w90x900/include/mach/system.h | ? 17 -----------------
-> ?arch/arm/mach-w90x900/mach-nuc910evb.c ? ? ?| ? ?1 +
-> ?arch/arm/mach-w90x900/mach-nuc950evb.c ? ? ?| ? ?1 +
-> ?arch/arm/mach-w90x900/mach-nuc960evb.c ? ? ?| ? ?1 +
-> ?arch/arm/mach-w90x900/nuc9xx.h ? ? ? ? ? ? ?| ? ?1 +
-> ?6 files changed, 20 insertions(+), 17 deletions(-)
->
-> diff --git a/arch/arm/mach-w90x900/cpu.c b/arch/arm/mach-w90x900/cpu.c
-> index 0a235e5..604e1db 100644
-> --- a/arch/arm/mach-w90x900/cpu.c
-> +++ b/arch/arm/mach-w90x900/cpu.c
-> @@ -33,9 +33,11 @@
-> ?#include <mach/regs-serial.h>
-> ?#include <mach/regs-clock.h>
-> ?#include <mach/regs-ebi.h>
-> +#include <mach/regs-timer.h>
->
-> ?#include "cpu.h"
-> ?#include "clock.h"
-> +#include "nuc9xx.h"
->
-> ?/* Initial IO mappings */
->
-> @@ -222,3 +224,17 @@ void __init nuc900_init_clocks(void)
-> ? ? ? ?clkdev_add_table(nuc900_clkregs, ARRAY_SIZE(nuc900_clkregs));
-> ?}
->
-> +#define ? ? ? ?WTCR ? ?(TMR_BA + 0x1C)
-> +#define ? ? ? ?WTCLK ? (1 << 10)
-> +#define ? ? ? ?WTE ? ? (1 << 7)
-> +#define ? ? ? ?WTRE ? ?(1 << 1)
-> +
-> +void nuc9xx_restart(char mode, const char *cmd)
-> +{
-> + ? ? ? if (mode == 's') {
-> + ? ? ? ? ? ? ? /* Jump into ROM at address 0 */
-> + ? ? ? ? ? ? ? soft_restart(0);
-> + ? ? ? } else {
-> + ? ? ? ? ? ? ? __raw_writel(WTE | WTRE | WTCLK, WTCR);
-> + ? ? ? }
-> +}
-> diff --git a/arch/arm/mach-w90x900/include/mach/system.h b/arch/arm/mach-w90x900/include/mach/system.h
-> index 68875a1..001a2f9 100644
-> --- a/arch/arm/mach-w90x900/include/mach/system.h
-> +++ b/arch/arm/mach-w90x900/include/mach/system.h
-> @@ -14,28 +14,11 @@
-> ?* (at your option) any later version.
-> ?*
-> ?*/
-> -
-> -#include <linux/io.h>
-> -#include <asm/proc-fns.h>
-> -#include <mach/map.h>
-> -#include <mach/regs-timer.h>
-> -
-> -#define ? ? ? ?WTCR ? ?(TMR_BA + 0x1C)
-> -#define ? ? ? ?WTCLK ? (1 << 10)
-> -#define ? ? ? ?WTE ? ? (1 << 7)
-> -#define ? ? ? ?WTRE ? ?(1 << 1)
-> -
-> ?static void arch_idle(void)
-> ?{
-> ?}
->
-> ?static void arch_reset(char mode, const char *cmd)
-> ?{
-> - ? ? ? if (mode == 's') {
-> - ? ? ? ? ? ? ? /* Jump into ROM at address 0 */
-> - ? ? ? ? ? ? ? soft_restart(0);
-> - ? ? ? } else {
-> - ? ? ? ? ? ? ? __raw_writel(WTE | WTRE | WTCLK, WTCR);
-> - ? ? ? }
-> ?}
->
-> diff --git a/arch/arm/mach-w90x900/mach-nuc910evb.c b/arch/arm/mach-w90x900/mach-nuc910evb.c
-> index 31c1090..b4243e4 100644
-> --- a/arch/arm/mach-w90x900/mach-nuc910evb.c
-> +++ b/arch/arm/mach-w90x900/mach-nuc910evb.c
-> @@ -38,4 +38,5 @@ MACHINE_START(W90P910EVB, "W90P910EVB")
-> ? ? ? ?.init_irq ? ? ? = nuc900_init_irq,
-> ? ? ? ?.init_machine ? = nuc910evb_init,
-> ? ? ? ?.timer ? ? ? ? ?= &nuc900_timer,
-> + ? ? ? .restart ? ? ? ?= nuc9xx_restart,
-> ?MACHINE_END
-> diff --git a/arch/arm/mach-w90x900/mach-nuc950evb.c b/arch/arm/mach-w90x900/mach-nuc950evb.c
-> index 4062e55..067d8f9 100644
-> --- a/arch/arm/mach-w90x900/mach-nuc950evb.c
-> +++ b/arch/arm/mach-w90x900/mach-nuc950evb.c
-> @@ -41,4 +41,5 @@ MACHINE_START(W90P950EVB, "W90P950EVB")
-> ? ? ? ?.init_irq ? ? ? = nuc900_init_irq,
-> ? ? ? ?.init_machine ? = nuc950evb_init,
-> ? ? ? ?.timer ? ? ? ? ?= &nuc900_timer,
-> + ? ? ? .restart ? ? ? ?= nuc9xx_restart,
-> ?MACHINE_END
-> diff --git a/arch/arm/mach-w90x900/mach-nuc960evb.c b/arch/arm/mach-w90x900/mach-nuc960evb.c
-> index 0ab9995..cbb3adc 100644
-> --- a/arch/arm/mach-w90x900/mach-nuc960evb.c
-> +++ b/arch/arm/mach-w90x900/mach-nuc960evb.c
-> @@ -38,4 +38,5 @@ MACHINE_START(W90N960EVB, "W90N960EVB")
-> ? ? ? ?.init_irq ? ? ? = nuc900_init_irq,
-> ? ? ? ?.init_machine ? = nuc960evb_init,
-> ? ? ? ?.timer ? ? ? ? ?= &nuc900_timer,
-> + ? ? ? .restart ? ? ? ?= nuc9xx_restart,
-> ?MACHINE_END
-> diff --git a/arch/arm/mach-w90x900/nuc9xx.h b/arch/arm/mach-w90x900/nuc9xx.h
-> index 847c4f3..91acb40 100644
-> --- a/arch/arm/mach-w90x900/nuc9xx.h
-> +++ b/arch/arm/mach-w90x900/nuc9xx.h
-> @@ -21,3 +21,4 @@ struct sys_timer;
->
-> ?extern void nuc900_init_irq(void);
-> ?extern struct sys_timer nuc900_timer;
-> +extern void nuc9xx_restart(char, const char *);
-> --
-> 1.7.4.4
->
->
->
-
-
-
--- 
-Wan ZongShun.
-www.mcuos.com
+>> diff --git a/arch/arm/mach-spear3xx/include/mach/generic.h b/arch/arm/mach-spear3xx/include/mach/generic.h
+>> index b8f31c3..14276e5 100644
+>> --- a/arch/arm/mach-spear3xx/include/mach/generic.h
+>> +++ b/arch/arm/mach-spear3xx/include/mach/generic.h
+>> @@ -42,6 +42,8 @@ void __init spear3xx_map_io(void);
+>>  void __init spear3xx_init_irq(void);
+>>  void __init spear3xx_init(void);
+>>  
+>> +void spear_restart(char, const char *);
+>> +
+>>  /* pad mux declarations */
+>>  #define PMX_FIRDA_MASK		(1 << 14)
+>>  #define PMX_I2C_MASK		(1 << 13)
+>> diff --git a/arch/arm/mach-spear3xx/spear300_evb.c b/arch/arm/mach-spear3xx/spear300_evb.c
+>> index a5ff98e..8b429f0 100644
+>> --- a/arch/arm/mach-spear3xx/spear300_evb.c
+>> +++ b/arch/arm/mach-spear3xx/spear300_evb.c
+>> @@ -69,4 +69,5 @@ MACHINE_START(SPEAR300, "ST-SPEAR300-EVB")
+>>  	.init_irq	=	spear3xx_init_irq,
+>>  	.timer		=	&spear3xx_timer,
+>>  	.init_machine	=	spear300_evb_init,
+>> +	.restart	=	spear_restart,
+>>  MACHINE_END
+>> diff --git a/arch/arm/mach-spear3xx/spear310_evb.c b/arch/arm/mach-spear3xx/spear310_evb.c
+>> index 45d180d..a11d6ea 100644
+>> --- a/arch/arm/mach-spear3xx/spear310_evb.c
+>> +++ b/arch/arm/mach-spear3xx/spear310_evb.c
+>> @@ -75,4 +75,5 @@ MACHINE_START(SPEAR310, "ST-SPEAR310-EVB")
+>>  	.init_irq	=	spear3xx_init_irq,
+>>  	.timer		=	&spear3xx_timer,
+>>  	.init_machine	=	spear310_evb_init,
+>> +	.restart	=	spear_restart,
+>>  MACHINE_END
+>> diff --git a/arch/arm/mach-spear3xx/spear320_evb.c b/arch/arm/mach-spear3xx/spear320_evb.c
+>> index 2287984..4239a70 100644
+>> --- a/arch/arm/mach-spear3xx/spear320_evb.c
+>> +++ b/arch/arm/mach-spear3xx/spear320_evb.c
+>> @@ -73,4 +73,5 @@ MACHINE_START(SPEAR320, "ST-SPEAR320-EVB")
+>>  	.init_irq	=	spear3xx_init_irq,
+>>  	.timer		=	&spear3xx_timer,
+>>  	.init_machine	=	spear320_evb_init,
+>> +	.restart	=	spear_restart,
+>>  MACHINE_END
+>> diff --git a/arch/arm/mach-spear6xx/include/mach/generic.h b/arch/arm/mach-spear6xx/include/mach/generic.h
+>> index 183f023..116b993 100644
+>> --- a/arch/arm/mach-spear6xx/include/mach/generic.h
+>> +++ b/arch/arm/mach-spear6xx/include/mach/generic.h
+>> @@ -41,6 +41,8 @@ void __init spear6xx_init(void);
+>>  void __init spear600_init(void);
+>>  void __init spear6xx_clk_init(void);
+>>  
+>> +void spear_restart(char, const char *);
+>> +
+>>  /* Add spear600 machine device structure declarations here */
+>>  
+>>  #endif /* __MACH_GENERIC_H */
+>> diff --git a/arch/arm/mach-spear6xx/spear600_evb.c b/arch/arm/mach-spear6xx/spear600_evb.c
+>> index 8238fe3..0a16559 100644
+>> --- a/arch/arm/mach-spear6xx/spear600_evb.c
+>> +++ b/arch/arm/mach-spear6xx/spear600_evb.c
+>> @@ -48,4 +48,5 @@ MACHINE_START(SPEAR600, "ST-SPEAR600-EVB")
+>>  	.init_irq	=	spear6xx_init_irq,
+>>  	.timer		=	&spear6xx_timer,
+>>  	.init_machine	=	spear600_evb_init,
+>> +	.restart	=	spear_restart,
+>>  MACHINE_END
+>> diff --git a/arch/arm/plat-spear/Makefile b/arch/arm/plat-spear/Makefile
+>> index b4f340b..e0f2e5b 100644
+>> --- a/arch/arm/plat-spear/Makefile
+>> +++ b/arch/arm/plat-spear/Makefile
+>> @@ -3,6 +3,6 @@
+>>  #
+>>  
+>>  # Common support
+>> -obj-y	:= clock.o time.o
+>> +obj-y	:= clock.o restart.o time.o
+>>  
+>>  obj-$(CONFIG_ARCH_SPEAR3XX)	+= shirq.o padmux.o
+>> diff --git a/arch/arm/plat-spear/include/plat/system.h b/arch/arm/plat-spear/include/plat/system.h
+>> index 1171f22..4a0d125 100644
+>> --- a/arch/arm/plat-spear/include/plat/system.h
+>> +++ b/arch/arm/plat-spear/include/plat/system.h
+>> @@ -14,10 +14,6 @@
+>>  #ifndef __PLAT_SYSTEM_H
+>>  #define __PLAT_SYSTEM_H
+>>  
+>> -#include <linux/io.h>
+>> -#include <asm/hardware/sp810.h>
+>> -#include <mach/hardware.h>
+>> -
+>>  static inline void arch_idle(void)
+>>  {
+>>  	/*
+>> @@ -29,13 +25,6 @@ static inline void arch_idle(void)
+>>  
+>>  static inline void arch_reset(char mode, const char *cmd)
+>>  {
+>> -	if (mode == 's') {
+>> -		/* software reset, Jump into ROM at address 0 */
+>> -		soft_restart(0);
+>> -	} else {
+>> -		/* hardware reset, Use on-chip reset capability */
+>> -		sysctl_soft_reset((void __iomem *)VA_SPEAR_SYS_CTRL_BASE);
+>> -	}
+>>  }
+>>  
+>>  #endif /* __PLAT_SYSTEM_H */
+>> diff --git a/arch/arm/plat-spear/restart.c b/arch/arm/plat-spear/restart.c
+>> new file mode 100644
+>> index 0000000..2b4e3d8
+>> --- /dev/null
+>> +++ b/arch/arm/plat-spear/restart.c
+>> @@ -0,0 +1,27 @@
+>> +/*
+>> + * arch/arm/plat-spear/restart.c
+>> + *
+>> + * SPEAr platform specific restart functions
+>> + *
+>> + * Copyright (C) 2009 ST Microelectronics
+>> + * Viresh Kumar<viresh.kumar@st.com>
+>> + *
+>> + * This file is licensed under the terms of the GNU General Public
+>> + * License version 2. This program is licensed "as is" without any
+>> + * warranty of any kind, whether express or implied.
+>> + */
+>> +#include <linux/io.h>
+>> +#include <asm/hardware/sp810.h>
+>> +#include <mach/hardware.h>
+>> +#include <mach/generic.h>
+>> +
+>> +void spear_restart(char mode, const char *cmd)
+>> +{
+>> +	if (mode == 's') {
+>> +		/* software reset, Jump into ROM at address 0 */
+>> +		soft_restart(0);
+>> +	} else {
+>> +		/* hardware reset, Use on-chip reset capability */
+>> +		sysctl_soft_reset((void __iomem *)VA_SPEAR_SYS_CTRL_BASE);
+>> +	}
+>> +}
+>> -- 
+>> 1.7.4.4
+>>
