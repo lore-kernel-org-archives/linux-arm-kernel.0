@@ -1,135 +1,53 @@
-From: Barry.Song@csr.com (Barry Song)
-Date: Fri, 25 Nov 2011 00:07:02 -0800
-Subject: [PATCH v2] PM: HIBERNATION: skip the swap size check if the snapshot
- image size is anticipative
-Message-ID: <1322208422-12346-1-git-send-email-Barry.Song@csr.com>
+From: chaos.youn@samsung.com (Changhwan Youn)
+Date: Fri, 25 Nov 2011 17:50:48 +0900
+Subject: [PATCH] ARM: Add TLB flushing for both entries in a PMD
+In-Reply-To: <20111123104531.GC29609@arm.com>
+References: <20111116103810.12733.23637.stgit@e102109-lin.cambridge.arm.com>
+ <004d01cca9c9$aeeb0420$0cc10c60$%youn@samsung.com>
+ <20111123104531.GC29609@arm.com>
+Message-ID: <003401ccab4f$57882cd0$06988670$%youn@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Barry Song <baohua.song@csr.com>
+On Wednesday, November 23, 2011 7:46 PM, Catalin Marinas wrote:
+> To: Changhwan Youn
+> Cc: linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH] ARM: Add TLB flushing for both entries in a PMD
+> 
+> On Wed, Nov 23, 2011 at 10:21:37AM +0000, Changhwan Youn wrote:
+> > I have tested this patch on several exynos machines which
+> > have a9 cores and it worked fine.
+> > Though I'm not sure that android boot and running simple applications
+> > are enough test for this patch.
+> 
+> Thanks for testing but the A9 would work fine without this patch. The
+> problem is on A15 where level 1 page table entries (pgd) are cached by
+> the TLB independently of level 2 entries (pte). The original code is
+> only flushing one entry in level 1 rather than 2.
 
-Current swsusp requires swap partitions even larger than real saved pages
-based on the worst compression ratio:
-but for an embedded system, which has limited storage space, then it might
-can't give the large partition to save snapshot.
-In the another way, some embedded systems can definitely know the most size
-needed for snapshot since they run some specific application lists.
-So this patch provides the possibility for users to tell kernel even
-the system has a little snapshot partition, but it is still enough.
-For example, if the system need to save 120MB memory, origin swsusp will require
-a 130MB partition to save snapshot. but if users know 30MB is enough for them(
-compressed image will be less than 30MB), they just make a 30MB partition by
-echo 0 > /sys/power/check_swap_size
+Thank you for the answer.
+The one thing I don't understand is why A9 works fine without this
+patch. I know that A9 has worked fine without this patch.
+It seems that without this patch, invalid VA->PA mapping can remains in TLB
+and this can cause wrong PA access by user process.
+Can you explain why there's no wrong PA access in A9?
 
-Signed-off-by: Barry Song <Baohua.Song@csr.com>
-Cc: Xiangzhen Ye <Xiangzhen.Ye@csr.com>
----
- -v2:drop swap_enough bootargs and use /sys/power/check_swap_size node
+Thank you.
+> 
+> The problem was visible with a stress-test application doing mmap/munmap
+> and then continuously getting level 2 translation fault even if the page
+> table looked fine to the kernel (because of stale level 1 entry in the
+> TLB).
+> 
+> LPAE is not affected, only the classic page table format.
+> 
+> --
+> Catalin
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
- Documentation/power/interface.txt |    5 +++++
- kernel/power/hibernate.c          |   22 ++++++++++++++++++++++
- kernel/power/power.h              |    2 ++
- kernel/power/swap.c               |    9 +++++++++
- 4 files changed, 38 insertions(+), 0 deletions(-)
-
-diff --git a/Documentation/power/interface.txt b/Documentation/power/interface.txt
-index c537834..5e205f0 100644
---- a/Documentation/power/interface.txt
-+++ b/Documentation/power/interface.txt
-@@ -47,6 +47,11 @@ Writing to this file will accept one of
-        'testproc'
-        'test'
- 
-+/sys/power/check_swap_size controls whether we can skip checking the swap
-+partition size by worst compression ratio. If users know the swap partition
-+is enough for compressed snapshot, write 0 to /sys/power/check_swap_size.
-+It is useful for an embedded system with known running softwares.
-+
- /sys/power/image_size controls the size of the image created by
- the suspend-to-disk mechanism.  It can be written a string
- representing a non-negative integer that will be used as an upper
-diff --git a/kernel/power/hibernate.c b/kernel/power/hibernate.c
-index 1c53f7f..5552473 100644
---- a/kernel/power/hibernate.c
-+++ b/kernel/power/hibernate.c
-@@ -1024,11 +1024,33 @@ static ssize_t reserved_size_store(struct kobject *kobj,
- 
- power_attr(reserved_size);
- 
-+static ssize_t check_swap_size_show(struct kobject *kobj, struct kobj_attribute *attr,
-+			       char *buf)
-+{
-+	return sprintf(buf, "%d\n", check_swap_size);
-+}
-+
-+static ssize_t check_swap_size_store(struct kobject *kobj, struct kobj_attribute *attr,
-+				const char *buf, size_t n)
-+{
-+	int check_size;
-+
-+	if (sscanf(buf, "%d", &check_size) == 1) {
-+		check_swap_size = check_size;
-+		return n;
-+	}
-+
-+	return -EINVAL;
-+}
-+
-+power_attr(check_swap_size);
-+
- static struct attribute * g[] = {
- 	&disk_attr.attr,
- 	&resume_attr.attr,
- 	&image_size_attr.attr,
- 	&reserved_size_attr.attr,
-+	&check_swap_size_attr.attr,
- 	NULL,
- };
- 
-diff --git a/kernel/power/power.h b/kernel/power/power.h
-index 23a2db1..4f0fa78 100644
---- a/kernel/power/power.h
-+++ b/kernel/power/power.h
-@@ -74,6 +74,8 @@ static struct kobj_attribute _name##_attr = {	\
- 
- /* Preferred image size in bytes (default 500 MB) */
- extern unsigned long image_size;
-+/* If 0, skip checking whether the swap size is enough for compressed snapshot */
-+extern int check_swap_size;
- /* Size of memory reserved for drivers (default SPARE_PAGES x PAGE_SIZE) */
- extern unsigned long reserved_size;
- extern int in_suspend;
-diff --git a/kernel/power/swap.c b/kernel/power/swap.c
-index 11a594c..db90195 100644
---- a/kernel/power/swap.c
-+++ b/kernel/power/swap.c
-@@ -37,6 +37,12 @@
- #define HIBERNATE_SIG	"S1SUSPEND"
- 
- /*
-+ * if users know swap partitions are enough for compressed snapshots,
-+ * echo 0 > /sys/power/check_swap_size
-+ */
-+int check_swap_size = 1;
-+
-+/*
-  *	The swap map is a data structure used for keeping track of each page
-  *	written to a swap partition.  It consists of many swap_map_page
-  *	structures that contain each an array of MAP_PAGE_ENTRIES swap entries.
-@@ -772,6 +778,9 @@ static int enough_swap(unsigned int nr_pages, unsigned int flags)
- 	unsigned int free_swap = count_swap_pages(root_swap, 1);
- 	unsigned int required;
- 
-+	if (!check_swap_size)
-+		return 1;
-+
- 	pr_debug("PM: Free swap pages: %u\n", free_swap);
- 
- 	required = PAGES_FOR_IO + ((flags & SF_NOCOMPRESS_MODE) ?
--- 
-1.7.1
-
-
-
-Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
-More information can be found at www.csr.com. Follow CSR on Twitter at http://twitter.com/CSR_PLC and read our blog at www.csr.com/blog
+Regards,
+Changhwan
