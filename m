@@ -1,35 +1,72 @@
-From: h.feurstein@gmail.com (Hubert Feurstein)
-Date: Fri, 25 Nov 2011 16:42:13 +0100
-Subject: [PATCH v7 0/5] AT91: replace broken TWI driver i2c-at91.c
-In-Reply-To: <cover.1322062555.git.n.voss@weinmann.de>
-References: <cover.1322062555.git.n.voss@weinmann.de>
-Message-ID: <4ECFB755.6060509@gmail.com>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Fri, 25 Nov 2011 17:02:54 +0100
+Subject: [Linaro-mm-sig] [RFC 1/2] dma-buf: Introduce dma buffer sharing
+ mechanism
+In-Reply-To: <CAPM=9tzAgCSDgdvi=9QZa-gEVXwKp_gpCPTtQ10XS=Z9K4805w@mail.gmail.com>
+References: <1318325033-32688-1-git-send-email-sumit.semwal@ti.com>
+ <1318325033-32688-2-git-send-email-sumit.semwal@ti.com>
+ <CAPM=9tzAgCSDgdvi=9QZa-gEVXwKp_gpCPTtQ10XS=Z9K4805w@mail.gmail.com>
+Message-ID: <20111125160254.GA3980@phenom.ffwll.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-I've tested this driver on a 2.6.38 kernel with several i2c clients
-(temp-sensor, audio-codec, touchscreen-controller, w1-bridge,
-io-expanders) and works without problems. SoC: at91sam9g45
-
-Because of the 2.6.38 kernel, I had to skip "[PATCH v7 2/5] Replace
-clk_lookup.con_id with clk_lookup.dev_id entries for twi clk" and used
-instead: at91_clock_associate("twi0_clk", &at91sam9g45_twi0_device.dev,
-"twi_clk");
-
-Best Regards
-Hubert
-
-On 2011-11-23 16:35, Nikolaus Voss wrote:
-> The old driver has two main deficencies:
-> i)  No repeated start (Sr) condiction is possible, this makes it unusable
->     e.g. for most SMBus transfers.
-> ii) I/O was done with polling/busy waiting what caused over-/underruns
->     even at light system loads and clock speeds.
+On Fri, Nov 25, 2011 at 02:13:22PM +0000, Dave Airlie wrote:
+> On Tue, Oct 11, 2011 at 10:23 AM, Sumit Semwal <sumit.semwal@ti.com> wrote:
+> > This is the first step in defining a dma buffer sharing mechanism.
+> >
+> > A new buffer object dma_buf is added, with operations and API to allow easy
+> > sharing of this buffer object across devices.
+> >
+> > The framework allows:
+> > - a new buffer-object to be created with fixed size.
+> > - different devices to 'attach' themselves to this buffer, to facilitate
+> > ?backing storage negotiation, using dma_buf_attach() API.
+> > - association of a file pointer with each user-buffer and associated
+> > ? allocator-defined operations on that buffer. This operation is called the
+> > ? 'export' operation.
+> > - this exported buffer-object to be shared with the other entity by asking for
+> > ? its 'file-descriptor (fd)', and sharing the fd across.
+> > - a received fd to get the buffer object back, where it can be accessed using
+> > ? the associated exporter-defined operations.
+> > - the exporter and user to share the scatterlist using get_scatterlist and
+> > ? put_scatterlist operations.
+> >
+> > Atleast one 'attach()' call is required to be made prior to calling the
+> > get_scatterlist() operation.
+> >
+> > Couple of building blocks in get_scatterlist() are added to ease introduction
+> > of sync'ing across exporter and users, and late allocation by the exporter.
+> >
+> > mmap() file operation is provided for the associated 'fd', as wrapper over the
+> > optional allocator defined mmap(), to be used by devices that might need one.
+> >
+> > More details are there in the documentation patch.
+> >
 > 
-> The new driver overcomes these deficencies and in addition allows for
-> more than one TWI interface.
+> Some questions, I've started playing around with using this framework
+> to do buffer sharing between DRM devices,
 > 
+> Why struct scatterlist and not struct sg_table? it seems like I really
+> want to use an sg_table,
 
-Tested-by: Hubert Feurstein <h.feurstein@gmail.com>
+No reason at all besides that intel-gtt is using scatterlist internally
+(and only kludges the sg_table together in an ad-hoc fashion) and so I
+haven't noticed. sg_table for more consistency with the dma api sounds
+good.
+
+> I'm not convinced fd's are really useful over just some idr allocated
+> handle, so far I'm just returning the "fd" to userspace as a handle,
+> and passing it back in the other side, so I'm not really sure what an
+> fd wins us here, apart from the mmap thing which I think shouldn't be
+> here anyways.
+> (if fd's do win us more we should probably record that in the docs patch).
+
+Imo fds are nice because their known and there's already all the
+preexisting infrastructure for them around. And if we ever get fancy with
+e.g. sync objects we can easily add poll support (or some insane ioctls).
+But I agree that "we can mmap" is bust as a reason and should just die.
+-Daniel
+-- 
+Daniel Vetter
+Mail: daniel at ffwll.ch
+Mobile: +41 (0)79 365 57 48
