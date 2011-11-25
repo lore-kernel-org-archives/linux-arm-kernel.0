@@ -1,34 +1,39 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Sat, 26 Nov 2011 00:56:35 +0800
-Subject: [V1 3/3] RTC: sa1100: support sa1100, pxa and mmp soc families
-In-Reply-To: <201111251505.29823.arnd@arndb.de>
-References: <1322219217-1866-1-git-send-email-jtzhou@marvell.com>
- <201111251505.29823.arnd@arndb.de>
-Message-ID: <CAN1soZzfN2aNNH5Hmuv79Y-u-GR2Mnfh3oR2D2QWZNFV6-N+YQ@mail.gmail.com>
+From: leif.lindholm@arm.com (Leif Lindholm)
+Date: Fri, 25 Nov 2011 17:19:12 +0000
+Subject: [PATCH 0/4] Add generic ARM ISA condition code checks
+Message-ID: <20111125171621.14878.49918.stgit@localhost6.localdomain6>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 25, 2011 at 11:05 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Friday 25 November 2011, Jett.Zhou wrote:
->> Since the regmap of rtc on sa1100, pxa and mmp Marvell soc families are
->> almost the same, so re-arch the rtc-sa1100 to support them.
->>
->> Signed-off-by: Jett.Zhou <jtzhou@marvell.com>
->> ---
->> ?arch/arm/mach-pxa/devices.c ? ?| ? 20 +++
->> ?arch/arm/mach-sa1100/generic.c | ? 20 +++
->> ?drivers/rtc/Kconfig ? ? ? ? ? ?| ? ?2 +-
->> ?drivers/rtc/rtc-sa1100.c ? ? ? | ?276 ++++++++++++++++++++++++++++------------
->> ?4 files changed, 238 insertions(+), 80 deletions(-)
->
-> I looked through the series and found nothing to complain about ;-)
->
-> Excellent cleanup!
->
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
->
->
-How about merging this patch series into arch-pxa git tree?
+There are several locations in the kernel where software needs to
+inspect the condition codes of trapped instructions. The original
+bitmask implementation in the nwfpe code does this in an efficient
+manner. This series breaks this code out of nwfpe/fpopcode.{ch} into
+a standalone file for opcode operations, and contains additional
+patches to kprobes and SWP eumlation to use this interface.
 
-Best Regards
-Haojian
+---
+
+Reworked based on feedback on RFC set submitted on 2011-11-21.
+
+Leif Lindholm (4):
+      Add generic ARM instruction set condition code checks.
+      Use generic ARM instruction set condition code checks for nwfpe.
+      Add condition code checking to SWP emulation handler.
+      Use generic ARM instruction set condition code checks for kprobes.
+
+
+ arch/arm/include/asm/opcodes.h |   20 ++++++++++++
+ arch/arm/kernel/Makefile       |    2 +
+ arch/arm/kernel/kprobes-test.c |   66 ++++-----------------------------------
+ arch/arm/kernel/opcodes.c      |   68 ++++++++++++++++++++++++++++++++++++++++
+ arch/arm/kernel/swp_emulate.c  |   14 ++++++++
+ arch/arm/nwfpe/entry.S         |    8 +++--
+ arch/arm/nwfpe/fpopcode.c      |   26 ---------------
+ arch/arm/nwfpe/fpopcode.h      |    3 --
+ 8 files changed, 114 insertions(+), 93 deletions(-)
+ create mode 100644 arch/arm/include/asm/opcodes.h
+ create mode 100644 arch/arm/kernel/opcodes.c
+
+-- 
+Signature
