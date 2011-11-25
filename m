@@ -1,23 +1,30 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 25 Nov 2011 22:44:01 +0100
-Subject: [PATCH 41/41] ARM: restart: remove the now empty arch_reset()
-In-Reply-To: <E1RN6ul-0001ZP-07@rmk-PC.arm.linux.org.uk>
-References: <20111106173113.GI12913@n2100.arm.linux.org.uk>
- <E1RN6ul-0001ZP-07@rmk-PC.arm.linux.org.uk>
-Message-ID: <CACRpkdZ-w5k-wJTr3Y=X_Cqj41cF_twNCdFOYrkNCgbwoVYZmg@mail.gmail.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Fri, 25 Nov 2011 23:26:48 +0100
+Subject: USB Serial Gadget regression on pxa27x-udc
+In-Reply-To: <1322234805.41847.YahooMailClassic@web29003.mail.ird.yahoo.com>
+ (Paul Parsons's message of "Fri, 25 Nov 2011 15:26:45 +0000 (GMT)")
+References: <1322234805.41847.YahooMailClassic@web29003.mail.ird.yahoo.com>
+Message-ID: <87lir3kfdj.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 6, 2011 at 6:53 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
+Paul Parsons <lost.distance@yahoo.com> writes:
 
-> Remove the now empty arch_reset() from all the mach/system.h includes,
-> and remove its callsite. ?Remove arm_machine_restart() as this function
-> no longer does anything useful.
+> The USB serial gadget on pxa27x-udc seems to be broken in 3.1.0.
 >
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> It was working OK on my hx4700 running 3.0.1. But with 3.1.0 (and at least 3.2.0-rc2 and 3.2.0-rc3) I now see the following warning:
+>
+> pxa27x-udc pxa27x-udc: ep0:handle_ep0:should never get in WAIT_ACK_SET_CONF_INTERF state here!!!
+>
+> I can still seemingly connect to the hx4700 from my linux host using cu(1) as
+> before, but no characters get transferred in either direction.
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Assuming you're using the serial gadget (g_serial) on the hx4700x in "non-ACM
+mode", there's a submitted fix for that in [1].
 
-Thanks,
-Linus Walleij
+Cheers.
+
+-- 
+Robert
+
+[1]: http://www.spinics.net/lists/linux-usb/msg54600.html
