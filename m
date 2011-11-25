@@ -1,65 +1,82 @@
 From: haojian.zhuang@marvell.com (Haojian Zhuang)
-Date: Sat, 26 Nov 2011 07:08:59 +0800
-Subject: [PATCH 2/7] gpio: make pxa gpio depend on pinmux
+Date: Sat, 26 Nov 2011 07:09:01 +0800
+Subject: [PATCH 4/7] tty: serial: support pinmux in pxa serial
 In-Reply-To: <1322262544-7854-1-git-send-email-haojian.zhuang@marvell.com>
 References: <1322262544-7854-1-git-send-email-haojian.zhuang@marvell.com>
-Message-ID: <1322262544-7854-3-git-send-email-haojian.zhuang@marvell.com>
+Message-ID: <1322262544-7854-5-git-send-email-haojian.zhuang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Haojian Zhuang <hzhuang1@hexinfolabs.org>
 
-While gpio_request() is called, pinmux_request_gpio() would be called
-too. Then alternate function of pin can be changed to gpio directly.
+PXA serial driver can configure pin directly.
 
 Signed-off-by: Haojian Zhuang <hzhuang1@hexinfolabs.org>
 ---
- drivers/gpio/gpio-pxa.c |   15 ++++++++++++++-
- 1 files changed, 14 insertions(+), 1 deletions(-)
+ drivers/tty/serial/pxa.c |   16 +++++++++++++++-
+ 1 files changed, 15 insertions(+), 1 deletions(-)
 
-diff --git a/drivers/gpio/gpio-pxa.c b/drivers/gpio/gpio-pxa.c
-index b2d3ee1..8808004 100644
---- a/drivers/gpio/gpio-pxa.c
-+++ b/drivers/gpio/gpio-pxa.c
-@@ -19,6 +19,7 @@
- #include <linux/irq.h>
- #include <linux/io.h>
+diff --git a/drivers/tty/serial/pxa.c b/drivers/tty/serial/pxa.c
+index 5c8e3bb..98df48d 100644
+--- a/drivers/tty/serial/pxa.c
++++ b/drivers/tty/serial/pxa.c
+@@ -37,6 +37,7 @@
+ #include <linux/delay.h>
+ #include <linux/interrupt.h>
  #include <linux/platform_device.h>
 +#include <linux/pinctrl/pinmux.h>
- #include <linux/syscore_ops.h>
- #include <linux/slab.h>
+ #include <linux/tty.h>
+ #include <linux/tty_flip.h>
+ #include <linux/serial_core.h>
+@@ -51,6 +52,7 @@ struct uart_pxa_port {
+ 	unsigned char           mcr;
+ 	unsigned int            lsr_break_flag;
+ 	struct clk		*clk;
++	struct pinmux		*pmx;
+ 	char			*name;
+ };
  
-@@ -267,6 +268,16 @@ static void pxa_gpio_set(struct gpio_chip *chip, unsigned offset, int value)
- 				(value ? GPSR_OFFSET : GPCR_OFFSET));
- }
+@@ -802,6 +804,13 @@ static int serial_pxa_probe(struct platform_device *dev)
+ 		goto err_free;
+ 	}
  
-+static int pxa_gpio_request(struct gpio_chip *chip, unsigned offset)
-+{
-+	return pinmux_request_gpio(chip->base + offset);
-+}
++	sport->pmx = pinmux_get(&dev->dev, NULL);
++	if (IS_ERR(sport->pmx)) {
++		ret = PTR_ERR(sport->pmx);
++		goto err_clk;
++	}
++	pinmux_enable(sport->pmx);
 +
-+static void pxa_gpio_free(struct gpio_chip *chip, unsigned offset)
-+{
-+	pinmux_free_gpio(chip->base + offset);
-+}
-+
- static int __devinit pxa_init_gpio_chip(int gpio_end)
- {
- 	int i, gpio, nbanks = gpio_to_bank(gpio_end) + 1;
-@@ -292,6 +303,8 @@ static int __devinit pxa_init_gpio_chip(int gpio_end)
- 		c->get = pxa_gpio_get;
- 		c->set = pxa_gpio_set;
- 		c->to_irq = pxa_gpio_to_irq;
-+		c->request = pxa_gpio_request;
-+		c->free = pxa_gpio_free;
+ 	sport->port.type = PORT_PXA;
+ 	sport->port.iotype = UPIO_MEM;
+ 	sport->port.mapbase = mmres->start;
+@@ -826,7 +835,7 @@ static int serial_pxa_probe(struct platform_device *dev)
+ 	sport->port.membase = ioremap(mmres->start, resource_size(mmres));
+ 	if (!sport->port.membase) {
+ 		ret = -ENOMEM;
+-		goto err_clk;
++		goto err_pmx;
+ 	}
  
- 		/* number of GPIOs on last bank may be less than 32 */
- 		c->ngpio = (gpio + 31 > gpio_end) ? (gpio_end - gpio + 1) : 32;
-@@ -612,4 +625,4 @@ static int __init pxa_gpio_sysinit(void)
- 	register_syscore_ops(&pxa_gpio_syscore_ops);
+ 	serial_pxa_ports[dev->id] = sport;
+@@ -836,6 +845,9 @@ static int serial_pxa_probe(struct platform_device *dev)
+ 
  	return 0;
- }
--postcore_initcall(pxa_gpio_sysinit);
-+postcore_initcall_sync(pxa_gpio_sysinit);
+ 
++ err_pmx:
++	pinmux_disable(sport->pmx);
++	pinmux_put(sport->pmx);
+  err_clk:
+ 	clk_put(sport->clk);
+  err_free:
+@@ -851,6 +863,8 @@ static int serial_pxa_remove(struct platform_device *dev)
+ 
+ 	uart_remove_one_port(&serial_pxa_reg, &sport->port);
+ 	clk_put(sport->clk);
++	pinmux_disable(sport->pmx);
++	pinmux_put(sport->pmx);
+ 	kfree(sport);
+ 
+ 	return 0;
 -- 
 1.7.0.4
