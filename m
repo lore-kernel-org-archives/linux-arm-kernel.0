@@ -1,35 +1,56 @@
-From: leif.lindholm@arm.com (Leif Lindholm)
-Date: Fri, 25 Nov 2011 13:29:13 +0000
-Subject: [PATCH 4/4] [RFC] Use generic ARM instruction set condition code
- checks for kprobes.
-In-Reply-To: <1322163625.2233.53.camel@computer2>
-References: <20111121183046.28964.23829.stgit@localhost6.localdomain6>	
- <20111121183104.28964.87120.stgit@localhost6.localdomain6>	
- <1321953203.2557.55.camel@computer2> <4ECE78B6.9040408@arm.com>
- <1322163625.2233.53.camel@computer2>
-Message-ID: <4ECF9829.8010101@arm.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Fri, 25 Nov 2011 21:42:46 +0800
+Subject: [PATCH v2] PM: HIBERNATION: skip the swap size check if the
+ snapshot image size is anticipative
+In-Reply-To: <4ECF6C36.8000702@parrot.com>
+References: <1322208422-12346-1-git-send-email-Barry.Song@csr.com>
+ <4ECF6C36.8000702@parrot.com>
+Message-ID: <CAGsJ_4yse3kjRd+GGeZ81WEJPM0gEX=Ljik_EpGjnwS8pjxfMA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/24/11 19:40, Tixy wrote:
->> Now, disabling the SWP emulation, it still fails - but at least not as
->> an oops this time:
->> <<<
->> FAIL: test memory differs
->> FAIL: Test strd r2, [r3], r4
->> FAIL: Scenario 0
-...
->> FATAL: Error inserting test_kprobes
->>
-> The kprobes instruction emulation has stored the original value of r3
-> into memory, whereas the real instruction has store the updated value of
-> r3. Either this instruction form is UNPREDICTABLE, in which case the
-> test code should not be trying to test it, otherwise the instruction
-> emulation code needs fixing. Either way, a patch is needed. I'll look
-> into this.
+Hi Matthieu,
 
-Yes, this instruction form is UNPREDICTABLE, and some quick experiments 
-show that it behaves differently on for example Cortex-A8 and Cortex-A9.
+2011/11/25 Matthieu CASTET <matthieu.castet@parrot.com>
+>
+> Hi,
+>
+> but did embedded system will really use swap interface ?
 
-/
-     Leif
+if you self-define the hibernation flow, you don't need swap. but for
+embedded system, we actually can still use the standard flow, swapon
+before hibernation, and swapoff after restore. so the swap partition
+only works as a partition to save used pages based on swap format. it
+is not a runtime swap partition at all.
+
+>
+> Often they don't have swap and can already save suspend image in disk/nand :
+> - SNAPSHOT_CREATE_IMAGE
+> - read it from /dev/snapshot and write it to a file.
+>
+> The only problem with the current interface, is that you can't SNAPSHOT_UNFREEZE
+> before reading the image.
+> But this is need for some filesystem that have thread.
+>
+>
+> For example we have a demo where we save the suspend image in a ubi volume and
+> restore it from bootloader.
+yes. we can definitely resume snapshot from bootloader directly, that
+depends on your self-defined hibernation flow. if that works well, it
+will save about 0.5s kernel boot time for a typical cortex-a9 ARM 1Ghz
+system.
+
+but you still need to take care you only compress and save used pages
+but not all pages. sync, drop page caches and kill non-system
+processes will help much to decrease hibernation image size. and
+standard hibernation flow will only save used pages, that is very
+important for decreasing snapshot size and restore faster.
+
+i am happy to hear you have a demo. do you have a website to show your
+demo and techinical details?
+
+>
+>
+> Matthieu
+>
+-barry
