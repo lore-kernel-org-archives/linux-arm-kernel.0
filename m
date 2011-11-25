@@ -1,33 +1,50 @@
-From: a.zummo@towertech.it (Alessandro Zummo)
-Date: Fri, 25 Nov 2011 19:42:21 +0100
-Subject: [V1 3/3] RTC: sa1100: support sa1100, pxa and mmp soc families
-In-Reply-To: <201111251719.39636.arnd@arndb.de>
-References: <1322219217-1866-1-git-send-email-jtzhou@marvell.com>
- <201111251505.29823.arnd@arndb.de>
- <CAN1soZzfN2aNNH5Hmuv79Y-u-GR2Mnfh3oR2D2QWZNFV6-N+YQ@mail.gmail.com>
- <201111251719.39636.arnd@arndb.de>
-Message-ID: <20111125194221.66869a6f@linux.lan.towertech.it>
+From: prakity@marvell.com (Philip Rakity)
+Date: Fri, 25 Nov 2011 10:53:04 -0800
+Subject: [PATCH v2 3/4] mmc: sdhci-pxa: Add SDHCI driver for PXA16x
+In-Reply-To: <CAMj5Bki3Ev8K63538-dNbyijUw1oNTLChADLd4=Ef-LeCkoacw@mail.gmail.com>
+References: <87r51fwxgt.fsf@laptop.org>
+ <1321849609-3013-1-git-send-email-tanmay.upadhyay@einfochips.com>
+ <CAMj5Bki3Ev8K63538-dNbyijUw1oNTLChADLd4=Ef-LeCkoacw@mail.gmail.com>
+Message-ID: <2E59C2F0-403B-4F61-971D-14C17FEDF96A@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 25 Nov 2011 17:19:38 +0000
-Arnd Bergmann <arnd@arndb.de> wrote:
 
-> I could do that with an Ack from Alessandro, but normally it should
-> go through his tree. I guess it should also go through the rtc-linux
-> mailing list, though I don't know how active that is.
+On Nov 25, 2011, at 4:47 AM, zhangfei gao wrote:
 
- Hi,
+> 
+> 
+> On Mon, Nov 21, 2011 at 12:26 PM, Tanmay Upadhyay <tanmay.upadhyay@einfochips.com> wrote:
+> PXA16x devices uses SDHCI controller v1. As it's not much different
+> than v2 controller, v1 driver is merged with sdhci-pxav2 driver
+> 
+> v2 - instead of having separate file sdhci-pxav1, merge code with
+>     sdhci-pxav2 driver code as suggested by Chris Ball
+> 
+> Signed-off-by: Philip Rakity <prakity@marvell.com>
+> Signed-off-by: Tanmay Upadhyay <tanmay.upadhyay@einfochips.com>
+> ---
+> +/*
+> + * we cannot talk to controller for 8 bus cycles according to sdio spec
+> + * at lowest speed this is 100,000 HZ per cycle or 800,000 cycles
+> + * which is quite a LONG TIME on a fast cpu -- so delay if needed
+> + */
+> 
+> Would you mind provide more info, still not understand.
+> What sdio spec 12.1 says cards shall switch speed mode within 8 clocks after the end bit of the corresponding response.
+> 
 
-  I keep any eye on the list but the patches can go thru their specific
- subsystem tree. Given that the RTC are closely coupled with a specific board/arch,
- it makes no sense to handle them differently.
 
--- 
+The pxa168 h/w controller is broken.  It does NOT wait  for the 8 clocks.
 
- Best regards,
 
- Alessandro Zummo,
-  Tower Technologies - Torino, Italy
-
-  http://www.towertech.it
+> +static void platform_specific_completion(struct sdhci_host *host)
+> +{
+> +       struct platform_device *pdev = to_platform_device(mmc_dev(host->mmc));
+> +       struct sdhci_pxa_platdata *pdata = pdev->dev.platform_data;
+> +
+> +       if (host->clock < 3200000 && pdata && pdata->delay_in_ms)
+> +               mdelay(pdata->delay_in_ms);
+> +}
+> +
+> 
