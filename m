@@ -1,64 +1,57 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 25 Nov 2011 14:56:01 +0100
-Subject: [PATCH] at91_ether: use gpio_is_valid for phy IRQ line
-In-Reply-To: <20111125134708.GM15531@game.jcrosoft.org>
-References: <1322128098-17724-1-git-send-email-jamie@jamieiles.com>
- <1322169674-4109-1-git-send-email-nicolas.ferre@atmel.com>
- <20111124222836.GB28582@gallagher> <20111125134708.GM15531@game.jcrosoft.org>
-Message-ID: <4ECF9E71.2050305@atmel.com>
+From: airlied@gmail.com (Dave Airlie)
+Date: Fri, 25 Nov 2011 14:13:22 +0000
+Subject: [Linaro-mm-sig] [RFC 1/2] dma-buf: Introduce dma buffer sharing
+ mechanism
+In-Reply-To: <1318325033-32688-2-git-send-email-sumit.semwal@ti.com>
+References: <1318325033-32688-1-git-send-email-sumit.semwal@ti.com>
+ <1318325033-32688-2-git-send-email-sumit.semwal@ti.com>
+Message-ID: <CAPM=9tzAgCSDgdvi=9QZa-gEVXwKp_gpCPTtQ10XS=Z9K4805w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/25/2011 02:47 PM, Jean-Christophe PLAGNIOL-VILLARD :
-> On 22:28 Thu 24 Nov     , Jamie Iles wrote:
->> Hi Nicolas,
->>
->> On Thu, Nov 24, 2011 at 10:21:14PM +0100, Nicolas Ferre wrote:
->>> Use the generic gpiolib gpio_is_valid() function to test
->>> if the phy IRQ line GPIO is actually provided.
->>>
->>> For non-connected or non-existing phy IRQ lines, -EINVAL
->>> value is used for phy_irq_pin field of struct at91_eth_data.
->>>
->>> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
->>> ---
->>>  drivers/net/ethernet/cadence/at91_ether.c |   23 +++++++++++++----------
->>>  1 files changed, 13 insertions(+), 10 deletions(-)
->>>
->>> diff --git a/drivers/net/ethernet/cadence/at91_ether.c b/drivers/net/ethernet/cadence/at91_ether.c
->>> index 56624d3..a1c4143 100644
->>> --- a/drivers/net/ethernet/cadence/at91_ether.c
->>> +++ b/drivers/net/ethernet/cadence/at91_ether.c
->>> @@ -255,8 +255,7 @@ static void enable_phyirq(struct net_device *dev)
->>>  	unsigned int dsintr, irq_number;
->>>  	int status;
->>>  
->>> -	irq_number = lp->board_data.phy_irq_pin;
->>> -	if (!irq_number) {
->>> +	if (!gpio_is_valid(lp->board_data.phy_irq_pin)) {
->>>  		/*
->>>  		 * PHY doesn't have an IRQ pin (RTL8201, DP83847, AC101L),
->>>  		 * or board does not have it connected.
->>> @@ -265,6 +264,7 @@ static void enable_phyirq(struct net_device *dev)
->>>  		return;
->>>  	}
->>>  
->>> +	irq_number = lp->board_data.phy_irq_pin;
->>
->> Does this need to be:
->>
->> 	irq_number = gpio_to_irq(lp->board_data.phy_irq_pin);
->>
->> and the same for the other occurrences?  Otherwise this looks like the 
->> right thing to me.
-> yes
+On Tue, Oct 11, 2011 at 10:23 AM, Sumit Semwal <sumit.semwal@ti.com> wrote:
+> This is the first step in defining a dma buffer sharing mechanism.
+>
+> A new buffer object dma_buf is added, with operations and API to allow easy
+> sharing of this buffer object across devices.
+>
+> The framework allows:
+> - a new buffer-object to be created with fixed size.
+> - different devices to 'attach' themselves to this buffer, to facilitate
+> ?backing storage negotiation, using dma_buf_attach() API.
+> - association of a file pointer with each user-buffer and associated
+> ? allocator-defined operations on that buffer. This operation is called the
+> ? 'export' operation.
+> - this exported buffer-object to be shared with the other entity by asking for
+> ? its 'file-descriptor (fd)', and sharing the fd across.
+> - a received fd to get the buffer object back, where it can be accessed using
+> ? the associated exporter-defined operations.
+> - the exporter and user to share the scatterlist using get_scatterlist and
+> ? put_scatterlist operations.
+>
+> Atleast one 'attach()' call is required to be made prior to calling the
+> get_scatterlist() operation.
+>
+> Couple of building blocks in get_scatterlist() are added to ease introduction
+> of sync'ing across exporter and users, and late allocation by the exporter.
+>
+> mmap() file operation is provided for the associated 'fd', as wrapper over the
+> optional allocator defined mmap(), to be used by devices that might need one.
+>
+> More details are there in the documentation patch.
+>
 
-True but I prefered to separate changes. As it was not addressed like
-this in the code I clung to it. I will post an additional patch on top
-of this one to add the gpio_to_irq() call.
+Some questions, I've started playing around with using this framework
+to do buffer sharing between DRM devices,
 
-> Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Why struct scatterlist and not struct sg_table? it seems like I really
+want to use an sg_table,
 
-Best regards,
--- 
-Nicolas Ferre
+I'm not convinced fd's are really useful over just some idr allocated
+handle, so far I'm just returning the "fd" to userspace as a handle,
+and passing it back in the other side, so I'm not really sure what an
+fd wins us here, apart from the mmap thing which I think shouldn't be
+here anyways.
+(if fd's do win us more we should probably record that in the docs patch).
+
+Dave.
