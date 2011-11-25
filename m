@@ -1,56 +1,58 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Fri, 25 Nov 2011 21:42:46 +0800
-Subject: [PATCH v2] PM: HIBERNATION: skip the swap size check if the
- snapshot image size is anticipative
-In-Reply-To: <4ECF6C36.8000702@parrot.com>
-References: <1322208422-12346-1-git-send-email-Barry.Song@csr.com>
- <4ECF6C36.8000702@parrot.com>
-Message-ID: <CAGsJ_4yse3kjRd+GGeZ81WEJPM0gEX=Ljik_EpGjnwS8pjxfMA@mail.gmail.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Fri, 25 Nov 2011 14:47:08 +0100
+Subject: [PATCH] at91_ether: use gpio_is_valid for phy IRQ line
+In-Reply-To: <20111124222836.GB28582@gallagher>
+References: <1322128098-17724-1-git-send-email-jamie@jamieiles.com>
+ <1322169674-4109-1-git-send-email-nicolas.ferre@atmel.com>
+ <20111124222836.GB28582@gallagher>
+Message-ID: <20111125134708.GM15531@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Matthieu,
+On 22:28 Thu 24 Nov     , Jamie Iles wrote:
+> Hi Nicolas,
+> 
+> On Thu, Nov 24, 2011 at 10:21:14PM +0100, Nicolas Ferre wrote:
+> > Use the generic gpiolib gpio_is_valid() function to test
+> > if the phy IRQ line GPIO is actually provided.
+> > 
+> > For non-connected or non-existing phy IRQ lines, -EINVAL
+> > value is used for phy_irq_pin field of struct at91_eth_data.
+> > 
+> > Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> > ---
+> >  drivers/net/ethernet/cadence/at91_ether.c |   23 +++++++++++++----------
+> >  1 files changed, 13 insertions(+), 10 deletions(-)
+> > 
+> > diff --git a/drivers/net/ethernet/cadence/at91_ether.c b/drivers/net/ethernet/cadence/at91_ether.c
+> > index 56624d3..a1c4143 100644
+> > --- a/drivers/net/ethernet/cadence/at91_ether.c
+> > +++ b/drivers/net/ethernet/cadence/at91_ether.c
+> > @@ -255,8 +255,7 @@ static void enable_phyirq(struct net_device *dev)
+> >  	unsigned int dsintr, irq_number;
+> >  	int status;
+> >  
+> > -	irq_number = lp->board_data.phy_irq_pin;
+> > -	if (!irq_number) {
+> > +	if (!gpio_is_valid(lp->board_data.phy_irq_pin)) {
+> >  		/*
+> >  		 * PHY doesn't have an IRQ pin (RTL8201, DP83847, AC101L),
+> >  		 * or board does not have it connected.
+> > @@ -265,6 +264,7 @@ static void enable_phyirq(struct net_device *dev)
+> >  		return;
+> >  	}
+> >  
+> > +	irq_number = lp->board_data.phy_irq_pin;
+> 
+> Does this need to be:
+> 
+> 	irq_number = gpio_to_irq(lp->board_data.phy_irq_pin);
+> 
+> and the same for the other occurrences?  Otherwise this looks like the 
+> right thing to me.
+yes
 
-2011/11/25 Matthieu CASTET <matthieu.castet@parrot.com>
->
-> Hi,
->
-> but did embedded system will really use swap interface ?
+Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 
-if you self-define the hibernation flow, you don't need swap. but for
-embedded system, we actually can still use the standard flow, swapon
-before hibernation, and swapoff after restore. so the swap partition
-only works as a partition to save used pages based on swap format. it
-is not a runtime swap partition at all.
-
->
-> Often they don't have swap and can already save suspend image in disk/nand :
-> - SNAPSHOT_CREATE_IMAGE
-> - read it from /dev/snapshot and write it to a file.
->
-> The only problem with the current interface, is that you can't SNAPSHOT_UNFREEZE
-> before reading the image.
-> But this is need for some filesystem that have thread.
->
->
-> For example we have a demo where we save the suspend image in a ubi volume and
-> restore it from bootloader.
-yes. we can definitely resume snapshot from bootloader directly, that
-depends on your self-defined hibernation flow. if that works well, it
-will save about 0.5s kernel boot time for a typical cortex-a9 ARM 1Ghz
-system.
-
-but you still need to take care you only compress and save used pages
-but not all pages. sync, drop page caches and kill non-system
-processes will help much to decrease hibernation image size. and
-standard hibernation flow will only save used pages, that is very
-important for decreasing snapshot size and restore faster.
-
-i am happy to hear you have a demo. do you have a website to show your
-demo and techinical details?
-
->
->
-> Matthieu
->
--barry
+Best Regards,
+J.
