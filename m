@@ -1,77 +1,69 @@
 From: haojian.zhuang@marvell.com (Haojian Zhuang)
-Date: Sat, 26 Nov 2011 07:09:00 +0800
-Subject: [PATCH 3/7] ARM: pxa: enable pinmux in pxa pwm
+Date: Sat, 26 Nov 2011 07:09:02 +0800
+Subject: [PATCH 5/7] fb: pxa: support pinmux operation
 In-Reply-To: <1322262544-7854-1-git-send-email-haojian.zhuang@marvell.com>
 References: <1322262544-7854-1-git-send-email-haojian.zhuang@marvell.com>
-Message-ID: <1322262544-7854-4-git-send-email-haojian.zhuang@marvell.com>
+Message-ID: <1322262544-7854-6-git-send-email-haojian.zhuang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Haojian Zhuang <hzhuang1@hexinfolabs.org>
-
-Add pinmux operations in pxa pwm driver.
-
-Signed-off-by: Haojian Zhuang <hzhuang1@hexinfolabs.org>
+Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
 ---
- arch/arm/plat-pxa/pwm.c |   15 ++++++++++++++-
- 1 files changed, 14 insertions(+), 1 deletions(-)
+ drivers/video/pxafb.c |   10 ++++++++++
+ drivers/video/pxafb.h |    1 +
+ 2 files changed, 11 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/plat-pxa/pwm.c b/arch/arm/plat-pxa/pwm.c
-index ef32686..93c0986 100644
---- a/arch/arm/plat-pxa/pwm.c
-+++ b/arch/arm/plat-pxa/pwm.c
-@@ -14,6 +14,7 @@
- #include <linux/module.h>
- #include <linux/kernel.h>
+diff --git a/drivers/video/pxafb.c b/drivers/video/pxafb.c
+index 1d1e4f1..af5f618 100644
+--- a/drivers/video/pxafb.c
++++ b/drivers/video/pxafb.c
+@@ -47,6 +47,7 @@
+ #include <linux/ioport.h>
+ #include <linux/cpufreq.h>
  #include <linux/platform_device.h>
 +#include <linux/pinctrl/pinmux.h>
- #include <linux/slab.h>
- #include <linux/err.h>
+ #include <linux/dma-mapping.h>
  #include <linux/clk.h>
-@@ -47,6 +48,7 @@ struct pwm_device {
- 	struct list_head	node;
- 	struct pwm_device	*secondary;
- 	struct platform_device	*pdev;
+ #include <linux/err.h>
+@@ -1799,11 +1800,18 @@ static struct pxafb_info * __devinit pxafb_init_fbinfo(struct device *dev)
+ 	memset(fbi, 0, sizeof(struct pxafb_info));
+ 	fbi->dev = dev;
+ 
++	fbi->pmx = pinmux_get(dev, NULL);
++	if (IS_ERR(fbi->pmx)) {
++		kfree(fbi);
++		return NULL;
++	}
+ 	fbi->clk = clk_get(dev, NULL);
+ 	if (IS_ERR(fbi->clk)) {
++		pinmux_put(fbi->pmx);
+ 		kfree(fbi);
+ 		return NULL;
+ 	}
++	pinmux_enable(fbi->pmx);
+ 
+ 	strcpy(fbi->fb.fix.id, PXA_NAME);
+ 
+@@ -2293,6 +2301,8 @@ static int __devexit pxafb_remove(struct platform_device *dev)
+ 	release_mem_region(r->start, resource_size(r));
+ 
+ 	clk_put(fbi->clk);
++	pinmux_disable(fbi->pmx);
++	pinmux_put(fbi->pmx);
+ 	kfree(fbi);
+ 
+ 	return 0;
+diff --git a/drivers/video/pxafb.h b/drivers/video/pxafb.h
+index 26ba9fa..d232816 100644
+--- a/drivers/video/pxafb.h
++++ b/drivers/video/pxafb.h
+@@ -110,6 +110,7 @@ struct pxafb_info {
+ 	struct fb_info		fb;
+ 	struct device		*dev;
+ 	struct clk		*clk;
 +	struct pinmux		*pmx;
  
- 	const char	*label;
- 	struct clk	*clk;
-@@ -187,10 +189,16 @@ static int __devinit pwm_probe(struct platform_device *pdev)
- 		return -ENOMEM;
- 	}
+ 	void __iomem		*mmio_base;
  
-+	pwm->pmx = pinmux_get(&pdev->dev, NULL);
-+	if (IS_ERR(pwm->pmx)) {
-+		ret = PTR_ERR(pwm->pmx);
-+		goto err_free;
-+	}
-+	pinmux_enable(pwm->pmx);
- 	pwm->clk = clk_get(&pdev->dev, NULL);
- 	if (IS_ERR(pwm->clk)) {
- 		ret = PTR_ERR(pwm->clk);
--		goto err_free;
-+		goto err_free_pwm;
- 	}
- 	pwm->clk_enabled = 0;
- 
-@@ -245,6 +253,9 @@ err_free_mem:
- 	release_mem_region(r->start, resource_size(r));
- err_free_clk:
- 	clk_put(pwm->clk);
-+err_free_pwm:
-+	pinmux_disable(pwm->pmx);
-+	pinmux_put(pwm->pmx);
- err_free:
- 	kfree(pwm);
- 	return ret;
-@@ -275,6 +286,8 @@ static int __devexit pwm_remove(struct platform_device *pdev)
- 	release_mem_region(r->start, resource_size(r));
- 
- 	clk_put(pwm->clk);
-+	pinmux_disable(pwm->pmx);
-+	pinmux_put(pwm->pmx);
- 	kfree(pwm);
- 	return 0;
- }
 -- 
 1.7.0.4
