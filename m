@@ -1,51 +1,51 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Sat, 26 Nov 2011 15:00:31 +0100
-Subject: [Linaro-mm-sig] [RFC 1/2] dma-buf: Introduce dma buffer sharing
- mechanism
-In-Reply-To: <CAPM=9txtWiQuF+jNZXDogCMy+nsM=00Bv3uxAiu5oKnn-KxjAA@mail.gmail.com>
-References: <1318325033-32688-1-git-send-email-sumit.semwal@ti.com>
- <1318325033-32688-2-git-send-email-sumit.semwal@ti.com>
- <CAPM=9tzjO7poyz_uYFFgONxzuTB86kKej8f2XBDHLGdUPZHvjg@mail.gmail.com>
- <CAPM=9txtWiQuF+jNZXDogCMy+nsM=00Bv3uxAiu5oKnn-KxjAA@mail.gmail.com>
-Message-ID: <CAKMK7uE14gOsTUYZknmSArkzG2zSSbpDeU0dxqAtLVUmvh-5bA@mail.gmail.com>
+From: greg@kroah.com (Greg KH)
+Date: Sat, 26 Nov 2011 07:04:18 -0800
+Subject: [PATCH 3/3] drivers/misc: introduce face detection module
+ driver(fdif)
+In-Reply-To: <20111126111247.43cb5d35@lxorguk.ukuu.org.uk>
+References: <1322281904-14526-1-git-send-email-tom.leiming@gmail.com>
+ <1322281904-14526-4-git-send-email-tom.leiming@gmail.com>
+ <20111126111247.43cb5d35@lxorguk.ukuu.org.uk>
+Message-ID: <20111126150418.GA11680@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 25, 2011 at 17:28, Dave Airlie <airlied@gmail.com> wrote:
-> I've rebuilt my PRIME interface on top of dmabuf to see how it would work,
->
-> I've got primed gears running again on top, but I expect all my object
-> lifetime and memory ownership rules need fixing up (i.e. leaks like a
-> sieve).
->
-> http://cgit.freedesktop.org/~airlied/linux/log/?h=drm-prime-dmabuf
->
-> has the i915/nouveau patches for the kernel to produce the prime interface.
+On Sat, Nov 26, 2011 at 11:12:47AM +0000, Alan Cox wrote:
+> On Sat, 26 Nov 2011 12:31:44 +0800
+> tom.leiming at gmail.com wrote:
+> 
+> > From: Ming Lei <ming.lei@canonical.com>
+> > 
+> > One face detection IP[1] is integared inside OMAP4 SoC, so
+> > introduce this driver to make face detection function work
+> > on OMAP4 SoC.
+> > 
+> > This driver is platform independent, so in theory can
+> > be used to drive same IP module on other platforms.
+> > 
+> > [1], ch9 of OMAP4 TRM
+> > 
+> > Signed-off-by: Ming Lei <ming.lei@canonical.com>
+> 
+> If you are submitting it then it ought to have your sign off too. This
+> looks hardly ready for submission however.
+> 
+> > +config FDIF
+> > +	tristate "Face Detection module"
+> > +	help
+> > +	  The FDIF is a face detection module, which can be integrated into
+> > +	  SoCs to detect the location of human beings' face in one image. At
+> > +	  least now, TI OMAP4 has the module inside.
+> 
+> So we have a completelt device specific API for what is becoming a more
+> general feature and on some hardware is tied to camera and the like. This
+> seems wrong
+> 
+> IMHO this should be part of video4linux because that'll make the
+> integrated stuff work sanely and for your cases it still provided the
+> right kind of mmap and format interfaces you need.
 
-I've noticed that your implementations for get_scatterlist (at least
-for the i915 driver) doesn't return the sg table mapped into the
-device address space. I've checked and the documentation makes it
-clear that this should be the case (and we really need this to support
-certain insane hw), but the get/put_scatterlist names are a bit
-misleading. Proposal:
+I agree, as-is, this isn't ok, sorry, please work with the v4l
+developers on this.
 
-- use struct sg_table instead of scatterlist like you've already done
-in you branch. Simply more consistent with the dma api.
-
-- rename get/put_scatterlist into map/unmap for consistency with all
-the map/unmap dma api functions. The attachement would then serve as
-the abstract cookie to the backing storage, similar to how struct page
-* works as an abstract cookie for dma_map/unmap_page. The only special
-thing is that struct device * parameter because that's already part of
-the attachment.
-
-- add new wrapper functions dma_buf_map_attachment and
-dma_buf_unmap_attachement to hide all the pointer/vtable-chasing that
-we currently expose to users of this interface.
-
-Comments?
-
-Cheers, Daniel
--- 
-Daniel Vetter
-daniel.vetter at ffwll.ch - +41 (0) 79 364 57 48 - http://blog.ffwll.ch
+greg k-h
