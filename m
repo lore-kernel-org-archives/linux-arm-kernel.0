@@ -1,68 +1,28 @@
-From: robdclark@gmail.com (Rob Clark)
-Date: Sun, 27 Nov 2011 00:59:30 -0600
-Subject: [Linaro-mm-sig] [RFC 1/2] dma-buf: Introduce dma buffer sharing
- mechanism
-In-Reply-To: <CAKMK7uE14gOsTUYZknmSArkzG2zSSbpDeU0dxqAtLVUmvh-5bA@mail.gmail.com>
-References: <1318325033-32688-1-git-send-email-sumit.semwal@ti.com>
- <1318325033-32688-2-git-send-email-sumit.semwal@ti.com>
- <CAPM=9tzjO7poyz_uYFFgONxzuTB86kKej8f2XBDHLGdUPZHvjg@mail.gmail.com>
- <CAPM=9txtWiQuF+jNZXDogCMy+nsM=00Bv3uxAiu5oKnn-KxjAA@mail.gmail.com>
- <CAKMK7uE14gOsTUYZknmSArkzG2zSSbpDeU0dxqAtLVUmvh-5bA@mail.gmail.com>
-Message-ID: <CAF6AEGtgjjtVraeji09zKJSTmokmQqfk5S8LfHoMhHJY03dLkg@mail.gmail.com>
+From: greg@kroah.com (Greg KH)
+Date: Sat, 26 Nov 2011 19:36:42 -0800
+Subject: [PATCH v2 0/4] OMAP serial device tree support
+In-Reply-To: <1321969456-24266-1-git-send-email-rnayak@ti.com>
+References: <1321969456-24266-1-git-send-email-rnayak@ti.com>
+Message-ID: <20111127033642.GA28378@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 26, 2011 at 8:00 AM, Daniel Vetter <daniel@ffwll.ch> wrote:
-> On Fri, Nov 25, 2011 at 17:28, Dave Airlie <airlied@gmail.com> wrote:
->> I've rebuilt my PRIME interface on top of dmabuf to see how it would work,
->>
->> I've got primed gears running again on top, but I expect all my object
->> lifetime and memory ownership rules need fixing up (i.e. leaks like a
->> sieve).
->>
->> http://cgit.freedesktop.org/~airlied/linux/log/?h=drm-prime-dmabuf
->>
->> has the i915/nouveau patches for the kernel to produce the prime interface.
->
-> I've noticed that your implementations for get_scatterlist (at least
-> for the i915 driver) doesn't return the sg table mapped into the
-> device address space. I've checked and the documentation makes it
-> clear that this should be the case (and we really need this to support
-> certain insane hw), but the get/put_scatterlist names are a bit
-> misleading. Proposal:
->
-> - use struct sg_table instead of scatterlist like you've already done
-> in you branch. Simply more consistent with the dma api.
+On Tue, Nov 22, 2011 at 07:14:12PM +0530, Rajendra Nayak wrote:
+> v2 is based on the latest omap-serial runtime patches, which
+> can be found here[1]
+> 
+> The series passes minimal data that allows serial console
+> boot, with UART's initialised from device tree.
+> However some of low power support for UART and remote
+> wakeup needs more work.
+> Boot tested on OMAP4 panda and OMAP4 sdp boards.
+> 
+> Patches can be found here..
+> git://gitorious.org/omap-pm/linux.git for-dt/serial
 
-yup
+What tree are these going to go through, some device tree one, or do you
+want me to take the serial driver patches?
 
-> - rename get/put_scatterlist into map/unmap for consistency with all
-> the map/unmap dma api functions. The attachement would then serve as
-> the abstract cookie to the backing storage, similar to how struct page
-> * works as an abstract cookie for dma_map/unmap_page. The only special
-> thing is that struct device * parameter because that's already part of
-> the attachment.
+thanks,
 
-yup
-
-> - add new wrapper functions dma_buf_map_attachment and
-> dma_buf_unmap_attachement to hide all the pointer/vtable-chasing that
-> we currently expose to users of this interface.
-
-I thought that was one of the earlier comments on the initial dmabuf
-patch, but either way: yup
-
-BR,
--R
-
-> Comments?
->
-> Cheers, Daniel
-> --
-> Daniel Vetter
-> daniel.vetter at ffwll.ch - +41 (0) 79 364 57 48 - http://blog.ffwll.ch
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-media" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
->
+greg k-h
