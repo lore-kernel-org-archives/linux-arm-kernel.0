@@ -1,39 +1,28 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Sat, 26 Nov 2011 19:07:37 -0700 (MST)
-Subject: [PATCH v5 4/7] arm: omap4: hwmod: introduce emu hwmod
-In-Reply-To: <alpine.DEB.2.00.1111261854340.6289@utopia.booyaka.com>
-References: <1319467559-5518-1-git-send-email-ming.lei@canonical.com>
- <1319467559-5518-5-git-send-email-ming.lei@canonical.com>
- <alpine.DEB.2.00.1111080750130.10451@utopia.booyaka.com>
- <CACVXFVMSJUT2Ac+bWetrLpbyOs6PqY+npNHsbvHipEVZ0gWdgQ@mail.gmail.com>
- <alpine.DEB.2.00.1111100152430.4195@utopia.booyaka.com>
- <4EC6566C.70202@ti.com>
- <alpine.DEB.2.00.1111261854340.6289@utopia.booyaka.com>
-Message-ID: <alpine.DEB.2.00.1111261906010.6289@utopia.booyaka.com>
+From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
+Date: Sun, 27 Nov 2011 04:32:26 +0100
+Subject: [PATCH 0/5] ARM: OMAP1: Fix dpll1 reprogramming related issues
+Message-ID: <1322364751-29980-1-git-send-email-jkrzyszt@tis.icnet.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 26 Nov 2011, Paul Walmsley wrote:
+After dpll1 reprogramming has been moved from setup_arch() to
+kernel_init(), I've been observing several issues, resulting in
+undesired system behaviour on my Amstrad Delta. This series fixes
+those issues.
 
-> Hi Beno?t,
-> 
-> a question about this patch.
+Janusz Krzysztofik (5):
+  ARM: OMAP1: Fix dpll1 default rate reprogramming method
+  ARM: OMAP1: Fix ckctl value used for dpll1 defualt rate
+  ARM: OMAP1: Fix dpll1 reprogramming not actually allowed
+  init/calibrate.c: allow for recalibration of loops per jiffy
+  ARM: OMAP1: recalibrate loops per jiffy after dpll1 reprogram
 
-...
+ arch/arm/mach-omap1/clock.c      |   10 +---------
+ arch/arm/mach-omap1/clock_data.c |    9 +++++++--
+ arch/arm/plat-omap/sram.c        |    3 +++
+ include/linux/delay.h            |    4 +++-
+ init/calibrate.c                 |    6 ++++--
+ 5 files changed, 18 insertions(+), 14 deletions(-)
 
-> > +		.name		= "mipi_stm",
-> > +		.pa_start	= 0x54161000,
-> > +		.pa_end		= 0x54161fff,
-> > +		.flags		= ADDR_TYPE_RT
-
-> ... none of the address spaces above have the ADDR_TYPE_RT flag set.
-> Without this flag set, the hwmod code won't know where to access the OCP 
-> registers.
-
-Ugh, it's above; I just missed it.  Sorry about that.
-
-So just out of curiosity, do those SYSCONFIG registers in the STM address 
-space apply to the entire DEBUGSS, or just the STM IP block?
-
-
-- Paul
+-- 
+1.7.3.4
