@@ -1,79 +1,30 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Sun, 27 Nov 2011 22:02:32 +0100 (CET)
-Subject: [PATCH 20/62] mmc: remove the second argument of k[un]map_atomic()
-In-Reply-To: <1322371662-26166-21-git-send-email-amwang@redhat.com>
-References: <1322371662-26166-1-git-send-email-amwang@redhat.com>
- <1322371662-26166-21-git-send-email-amwang@redhat.com>
-Message-ID: <Pine.LNX.4.64.1111272159520.8317@axis700.grange>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Sun, 27 Nov 2011 22:04:58 +0000
+Subject: [PATCH] ARM: S3C64XX: Remove extern from definition of framebuffer
+ setup call
+Message-ID: <1322431498-6555-1-git-send-email-broonie@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Cong Wang
+The extern is only useful on prototypes.
 
-Thanks for the patch, one small comment though:
-
-On Sun, 27 Nov 2011, Cong Wang wrote:
-
-> 
-> Signed-off-by: Cong Wang <amwang@redhat.com>
-> ---
->  drivers/mmc/host/at91_mci.c |    8 ++++----
->  drivers/mmc/host/msm_sdcc.c |    6 +++---
->  drivers/mmc/host/sdhci.c    |    4 ++--
->  drivers/mmc/host/tifm_sd.c  |   16 ++++++++--------
->  drivers/mmc/host/tmio_mmc.c |    1 -
->  drivers/mmc/host/tmio_mmc.h |    4 ++--
->  6 files changed, 19 insertions(+), 20 deletions(-)
-
-[snip]
-
-> diff --git a/drivers/mmc/host/tmio_mmc.c b/drivers/mmc/host/tmio_mmc.c
-> index a4ea102..4626ef2 100644
-> --- a/drivers/mmc/host/tmio_mmc.c
-> +++ b/drivers/mmc/host/tmio_mmc.c
-> @@ -20,7 +20,6 @@
->  #include <linux/module.h>
->  #include <linux/pagemap.h>
->  #include <linux/scatterlist.h>
-> -
->  #include "tmio_mmc.h"
->  
->  #ifdef CONFIG_PM
-
-This hunk doesn't belong here, please, drop it.
-
-Otherwise for TMIO
-
-Acked-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
-
-Thanks
-Guennadi
-
-> diff --git a/drivers/mmc/host/tmio_mmc.h b/drivers/mmc/host/tmio_mmc.h
-> index 3020f98..a95e6d9 100644
-> --- a/drivers/mmc/host/tmio_mmc.h
-> +++ b/drivers/mmc/host/tmio_mmc.h
-> @@ -105,13 +105,13 @@ static inline char *tmio_mmc_kmap_atomic(struct scatterlist *sg,
->  					 unsigned long *flags)
->  {
->  	local_irq_save(*flags);
-> -	return kmap_atomic(sg_page(sg), KM_BIO_SRC_IRQ) + sg->offset;
-> +	return kmap_atomic(sg_page(sg)) + sg->offset;
->  }
->  
->  static inline void tmio_mmc_kunmap_atomic(struct scatterlist *sg,
->  					  unsigned long *flags, void *virt)
->  {
-> -	kunmap_atomic(virt - sg->offset, KM_BIO_SRC_IRQ);
-> +	kunmap_atomic(virt - sg->offset);
->  	local_irq_restore(*flags);
->  }
->  
-> -- 
-> 1.7.4.4
-> 
-
+Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
 ---
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+ arch/arm/mach-s3c64xx/setup-fb-24bpp.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/mach-s3c64xx/setup-fb-24bpp.c b/arch/arm/mach-s3c64xx/setup-fb-24bpp.c
+index 83d2afb..2cf8002 100644
+--- a/arch/arm/mach-s3c64xx/setup-fb-24bpp.c
++++ b/arch/arm/mach-s3c64xx/setup-fb-24bpp.c
+@@ -20,7 +20,7 @@
+ #include <plat/fb.h>
+ #include <plat/gpio-cfg.h>
+ 
+-extern void s3c64xx_fb_gpio_setup_24bpp(void)
++void s3c64xx_fb_gpio_setup_24bpp(void)
+ {
+ 	s3c_gpio_cfgrange_nopull(S3C64XX_GPI(0), 16, S3C_GPIO_SFN(2));
+ 	s3c_gpio_cfgrange_nopull(S3C64XX_GPJ(0), 12, S3C_GPIO_SFN(2));
+-- 
+1.7.7.3
