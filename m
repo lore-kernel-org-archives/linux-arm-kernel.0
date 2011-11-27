@@ -1,82 +1,120 @@
 From: tixy@yxit.co.uk (Tixy)
-Date: Sun, 27 Nov 2011 12:14:40 +0000
-Subject: [PATCH] ARM: kprobes: Restrict probing SWP instructions to ARMv5
- and below
-Message-ID: <1322396080.2408.5.camel@computer2>
+Date: Sun, 27 Nov 2011 12:24:59 +0000
+Subject: [PATCH 4/4] Use generic ARM instruction set condition code
+ checks for kprobes.
+In-Reply-To: <20111125171958.14878.38094.stgit@localhost6.localdomain6>
+References: <20111125171621.14878.49918.stgit@localhost6.localdomain6>
+ <20111125171958.14878.38094.stgit@localhost6.localdomain6>
+Message-ID: <1322396699.2408.7.camel@computer2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SWP instruction is deprecated on ARMv6 and with ARMv7 it will be
-UNDEFINED when CONFIG_SWP_EMULATE is selected. In this case, probing a
-SWP instruction will cause an oops when the kprobes emulation code
-executes an undefined instruction.
+On Fri, 2011-11-25 at 17:20 +0000, Leif Lindholm wrote:
+> This patch changes the kprobes implementation to use the generic ARM
+> instruction set condition code checks, rather than a dedicated
+> implementation.
+> 
+> Cc: Tixy <tixy@yxit.co.uk>
+> Signed-off-by: Leif Lindholm <leif.lindholm@arm.com>
 
-As the SWP instruction should be rare or non-existent in kernels for
-ARMv6 and later, we can simply avoid these problems by not allowing
-probing of these.
+Acked-by: Jon Medhurst <tixy@yxit.co.uk>
 
-Signed-off-by: Jon Medhurst <tixy@yxit.co.uk>
----
- arch/arm/kernel/kprobes-arm.c      |    4 +++-
- arch/arm/kernel/kprobes-test-arm.c |   25 ++++++++++++++++---------
- 2 files changed, 19 insertions(+), 10 deletions(-)
-
-diff --git a/arch/arm/kernel/kprobes-arm.c b/arch/arm/kernel/kprobes-arm.c
-index 9fe8910..8a30c89 100644
---- a/arch/arm/kernel/kprobes-arm.c
-+++ b/arch/arm/kernel/kprobes-arm.c
-@@ -519,10 +519,12 @@ static const union decode_item arm_cccc_0000_____1001_table[] = {
- static const union decode_item arm_cccc_0001_____1001_table[] = {
- 	/* Synchronization primitives					*/
- 
-+#if __LINUX_ARM_ARCH__ < 6
-+	/* Deprecated on ARMv6 and may be UNDEFINED on v7		*/
- 	/* SMP/SWPB		cccc 0001 0x00 xxxx xxxx xxxx 1001 xxxx */
- 	DECODE_EMULATEX	(0x0fb000f0, 0x01000090, emulate_rd12rn16rm0_rwflags_nopc,
- 						 REGS(NOPC, NOPC, 0, 0, NOPC)),
--
-+#endif
- 	/* LDREX/STREX{,D,B,H}	cccc 0001 1xxx xxxx xxxx xxxx 1001 xxxx */
- 	/* And unallocated instructions...				*/
- 	DECODE_END
-diff --git a/arch/arm/kernel/kprobes-test-arm.c b/arch/arm/kernel/kprobes-test-arm.c
-index edf9ad8..ba32b39 100644
---- a/arch/arm/kernel/kprobes-test-arm.c
-+++ b/arch/arm/kernel/kprobes-test-arm.c
-@@ -427,18 +427,25 @@ void kprobe_arm_test_cases(void)
- 
- 	TEST_GROUP("Synchronization primitives")
- 
--	/*
--	 * Use hard coded constants for SWP instructions to avoid warnings
--	 * about deprecated instructions.
--	 */
--	TEST_RP( ".word 0xe108e097 @ swp	lr, r",7,VAL2,", [r",8,0,"]")
--	TEST_R(  ".word 0x610d0091 @ swpvs	r0, r",1,VAL1,", [sp]")
--	TEST_RP( ".word 0xe10cd09e @ swp	sp, r",14,VAL2,", [r",12,13*4,"]")
-+#if __LINUX_ARM_ARCH__ < 6
-+	TEST_RP("swp	lr, r",7,VAL2,", [r",8,0,"]")
-+	TEST_R( "swpvs	r0, r",1,VAL1,", [sp]")
-+	TEST_RP("swp	sp, r",14,VAL2,", [r",12,13*4,"]")
-+#else
-+	TEST_UNSUPPORTED(".word 0xe108e097 @ swp	lr, r7, [r8]")
-+	TEST_UNSUPPORTED(".word 0x610d0091 @ swpvs	r0, r1, [sp]")
-+	TEST_UNSUPPORTED(".word 0xe10cd09e @ swp	sp, r14 [r12]")
-+#endif
- 	TEST_UNSUPPORTED(".word 0xe102f091 @ swp pc, r1, [r2]")
- 	TEST_UNSUPPORTED(".word 0xe102009f @ swp r0, pc, [r2]")
- 	TEST_UNSUPPORTED(".word 0xe10f0091 @ swp r0, r1, [pc]")
--	TEST_RP( ".word 0xe148e097 @ swpb	lr, r",7,VAL2,", [r",8,0,"]")
--	TEST_R(  ".word 0x614d0091 @ swpvsb	r0, r",1,VAL1,", [sp]")
-+#if __LINUX_ARM_ARCH__ < 6
-+	TEST_RP("swpb	lr, r",7,VAL2,", [r",8,0,"]")
-+	TEST_R( "swpvsb	r0, r",1,VAL1,", [sp]")
-+#else
-+	TEST_UNSUPPORTED(".word 0xe148e097 @ swpb	lr, r7, [r8]")
-+	TEST_UNSUPPORTED(".word 0x614d0091 @ swpvsb	r0, r1, [sp]")
-+#endif
- 	TEST_UNSUPPORTED(".word 0xe142f091 @ swpb pc, r1, [r2]")
- 
- 	TEST_UNSUPPORTED(".word	0xe1100090") /* Unallocated space */
--- 
-1.7.2.5
+> ---
+>  arch/arm/kernel/kprobes-test.c |   66 ++++------------------------------------
+>  1 files changed, 6 insertions(+), 60 deletions(-)
+> 
+> diff --git a/arch/arm/kernel/kprobes-test.c b/arch/arm/kernel/kprobes-test.c
+> index e17cdd6..278c275 100644
+> --- a/arch/arm/kernel/kprobes-test.c
+> +++ b/arch/arm/kernel/kprobes-test.c
+> @@ -202,6 +202,8 @@
+>  #include <linux/slab.h>
+>  #include <linux/kprobes.h>
+>  
+> +#include <asm/opcodes.h>
+> +
+>  #include "kprobes.h"
+>  #include "kprobes-test.h"
+>  
+> @@ -1048,67 +1050,11 @@ static int test_instance;
+>   */
+>  #define PSR_IGNORE_BITS (PSR_A_BIT | PSR_F_BIT)
+>  
+> -static unsigned long test_check_cc(int cc, unsigned long cpsr)
+> +inline unsigned long test_check_cc(int cc, unsigned long cpsr)
+>  {
+> -	unsigned long temp;
+> -
+> -	switch (cc) {
+> -	case 0x0: /* eq */
+> -		return cpsr & PSR_Z_BIT;
+> -
+> -	case 0x1: /* ne */
+> -		return (~cpsr) & PSR_Z_BIT;
+> -
+> -	case 0x2: /* cs */
+> -		return cpsr & PSR_C_BIT;
+> -
+> -	case 0x3: /* cc */
+> -		return (~cpsr) & PSR_C_BIT;
+> -
+> -	case 0x4: /* mi */
+> -		return cpsr & PSR_N_BIT;
+> -
+> -	case 0x5: /* pl */
+> -		return (~cpsr) & PSR_N_BIT;
+> -
+> -	case 0x6: /* vs */
+> -		return cpsr & PSR_V_BIT;
+> -
+> -	case 0x7: /* vc */
+> -		return (~cpsr) & PSR_V_BIT;
+> +	int ret = arm_check_condition(cc << 28, cpsr);
+>  
+> -	case 0x8: /* hi */
+> -		cpsr &= ~(cpsr >> 1); /* PSR_C_BIT &= ~PSR_Z_BIT */
+> -		return cpsr & PSR_C_BIT;
+> -
+> -	case 0x9: /* ls */
+> -		cpsr &= ~(cpsr >> 1); /* PSR_C_BIT &= ~PSR_Z_BIT */
+> -		return (~cpsr) & PSR_C_BIT;
+> -
+> -	case 0xa: /* ge */
+> -		cpsr ^= (cpsr << 3); /* PSR_N_BIT ^= PSR_V_BIT */
+> -		return (~cpsr) & PSR_N_BIT;
+> -
+> -	case 0xb: /* lt */
+> -		cpsr ^= (cpsr << 3); /* PSR_N_BIT ^= PSR_V_BIT */
+> -		return cpsr & PSR_N_BIT;
+> -
+> -	case 0xc: /* gt */
+> -		temp = cpsr ^ (cpsr << 3); /* PSR_N_BIT ^= PSR_V_BIT */
+> -		temp |= (cpsr << 1);	   /* PSR_N_BIT |= PSR_Z_BIT */
+> -		return (~temp) & PSR_N_BIT;
+> -
+> -	case 0xd: /* le */
+> -		temp = cpsr ^ (cpsr << 3); /* PSR_N_BIT ^= PSR_V_BIT */
+> -		temp |= (cpsr << 1);	   /* PSR_N_BIT |= PSR_Z_BIT */
+> -		return temp & PSR_N_BIT;
+> -
+> -	case 0xe: /* al */
+> -	case 0xf: /* unconditional */
+> -		return true;
+> -	}
+> -	BUG();
+> -	return false;
+> +	return (ret != ARM_OPCODE_CONDTEST_FAIL);
+>  }
+>  
+>  static int is_last_scenario;
+> @@ -1128,7 +1074,7 @@ static unsigned long test_context_cpsr(int scenario)
+>  
+>  	if (!test_case_is_thumb) {
+>  		/* Testing ARM code */
+> -		probe_should_run = test_check_cc(current_instruction >> 28, cpsr) != 0;
+> +		probe_should_run = arm_check_condition(current_instruction, cpsr) != 0;
+>  		if (scenario == 15)
+>  			is_last_scenario = true;
+>  
+> 
+> 
