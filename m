@@ -1,35 +1,62 @@
 From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
-Date: Sun, 27 Nov 2011 04:32:28 +0100
-Subject: [PATCH 2/5] ARM: OMAP1: Fix ckctl value used for dpll1 defualt rate
+Date: Sun, 27 Nov 2011 04:32:30 +0100
+Subject: [PATCH 4/5] init/calibrate.c: allow for recalibration of loops per
+ jiffy
 In-Reply-To: <1322364751-29980-1-git-send-email-jkrzyszt@tis.icnet.pl>
 References: <1322364751-29980-1-git-send-email-jkrzyszt@tis.icnet.pl>
-Message-ID: <1322364751-29980-3-git-send-email-jkrzyszt@tis.icnet.pl>
+Message-ID: <1322364751-29980-5-git-send-email-jkrzyszt@tis.icnet.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the exact value found in omap1_rate_table, otherwise I have been
-experiencing issues with correct timekeeping on my Amstrad Delta.
+This is required on ARM OMAP1 platform, after DPLL reprogramming has
+been fixed by moving it from setup_arch() to kernel_init().
 
-Created and tested on top of patch "ARM: OMAP1: Fix dpll1 default rate
-reprogramming method".
+Created against linux-3.2-rc2.
 
 Signed-off-by: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
+Cc: Andrew Morton <akpm@linux-foundation.org>
+Cc: Sameer Nanda <snanda@chromium.org>
 ---
- arch/arm/mach-omap1/clock_data.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ include/linux/delay.h |    4 +++-
+ init/calibrate.c      |    6 ++++--
+ 2 files changed, 7 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-omap1/clock_data.c b/arch/arm/mach-omap1/clock_data.c
-index 4550415..201b1f2 100644
---- a/arch/arm/mach-omap1/clock_data.c
-+++ b/arch/arm/mach-omap1/clock_data.c
-@@ -937,7 +937,7 @@ void __init omap1_clk_late_init(void)
- 		/*
- 		 * Reprogramming the DPLL is tricky, it must be done from SRAM.
- 		 */
--		omap_sram_reprogram_clock(0x2290, 0x1005);
-+		omap_sram_reprogram_clock(0x2290, 0x0005);
- 		ck_dpll1.rate = OMAP1_DPLL1_SANE_VALUE;
- 	}
- 	propagate_rate(&ck_dpll1);
+diff --git a/include/linux/delay.h b/include/linux/delay.h
+index a6ecb34..ed0fbbe 100644
+--- a/include/linux/delay.h
++++ b/include/linux/delay.h
+@@ -42,7 +42,9 @@ static inline void ndelay(unsigned long x)
+ #endif
+ 
+ extern unsigned long lpj_fine;
+-void calibrate_delay(void);
++void _calibrate_delay(bool redo);
++#define calibrate_delay() _calibrate_delay(0)
++#define recalibrate_delay() _calibrate_delay(1)
+ void msleep(unsigned int msecs);
+ unsigned long msleep_interruptible(unsigned int msecs);
+ void usleep_range(unsigned long min, unsigned long max);
+diff --git a/init/calibrate.c b/init/calibrate.c
+index 24df797..f7c1593 100644
+--- a/init/calibrate.c
++++ b/init/calibrate.c
+@@ -246,13 +246,15 @@ recalibrate:
+ 
+ static DEFINE_PER_CPU(unsigned long, cpu_loops_per_jiffy) = { 0 };
+ 
+-void __cpuinit calibrate_delay(void)
++void __cpuinit _calibrate_delay(bool redo)
+ {
+ 	unsigned long lpj;
+ 	static bool printed;
+ 	int this_cpu = smp_processor_id();
+ 
+-	if (per_cpu(cpu_loops_per_jiffy, this_cpu)) {
++	if (redo)
++		printed = 0;
++	if (!redo && per_cpu(cpu_loops_per_jiffy, this_cpu)) {
+ 		lpj = per_cpu(cpu_loops_per_jiffy, this_cpu);
+ 		pr_info("Calibrating delay loop (skipped) "
+ 				"already calibrated this CPU");
 -- 
 1.7.3.4
