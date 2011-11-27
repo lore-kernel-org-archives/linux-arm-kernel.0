@@ -1,28 +1,18 @@
-From: greg@kroah.com (Greg KH)
-Date: Sat, 26 Nov 2011 19:36:42 -0800
-Subject: [PATCH v2 0/4] OMAP serial device tree support
-In-Reply-To: <1321969456-24266-1-git-send-email-rnayak@ti.com>
-References: <1321969456-24266-1-git-send-email-rnayak@ti.com>
-Message-ID: <20111127033642.GA28378@kroah.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Sun, 27 Nov 2011 11:14:41 +0000
+Subject: [PATCH] ASoC: skip resume of soc-audio devices without codecs
+In-Reply-To: <CAMPhdO8J=ZLxt7SMry-jgGUTu+KGQaGAVdKfgGkeqAD5_Y=ojQ@mail.gmail.com>
+References: <1322059020-24305-1-git-send-email-eric.miao@linaro.org>
+ <20111123145828.GG20272@opensource.wolfsonmicro.com>
+ <CAMPhdO-f+tjbbyDuFDPUwERKpHfUuJJTha_pzc6BVBqy4LFrWw@mail.gmail.com>
+ <CAMPhdO8J=ZLxt7SMry-jgGUTu+KGQaGAVdKfgGkeqAD5_Y=ojQ@mail.gmail.com>
+Message-ID: <20111127111440.GA2896@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 22, 2011 at 07:14:12PM +0530, Rajendra Nayak wrote:
-> v2 is based on the latest omap-serial runtime patches, which
-> can be found here[1]
-> 
-> The series passes minimal data that allows serial console
-> boot, with UART's initialised from device tree.
-> However some of low power support for UART and remote
-> wakeup needs more work.
-> Boot tested on OMAP4 panda and OMAP4 sdp boards.
-> 
-> Patches can be found here..
-> git://gitorious.org/omap-pm/linux.git for-dt/serial
+On Thu, Nov 24, 2011 at 01:56:56PM +0800, Eric Miao wrote:
 
-What tree are these going to go through, some device tree one, or do you
-want me to take the serial driver patches?
+> BTW - I think it's applicable to previous kernel as well, so Cc stable
+> might be a good idea.
 
-thanks,
-
-greg k-h
+Please go ahead and push that change.
