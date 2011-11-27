@@ -1,70 +1,68 @@
-From: mturquette@ti.com (Turquette, Mike)
-Date: Sat, 26 Nov 2011 22:03:47 -0800
-Subject: [PATCH v3 4/5] clk: basic gateable and fixed-rate clks
-In-Reply-To: <20111126134807.GD19025@S2100-06.ap.freescale.net>
-References: <1321926047-14211-1-git-send-email-mturquette@linaro.org>
- <1321926047-14211-5-git-send-email-mturquette@linaro.org>
- <20111126134807.GD19025@S2100-06.ap.freescale.net>
-Message-ID: <CAJOA=zOMKKRKZ2P8XKAVLPWbhttizWubRiTjtCBz=myjivnRaA@mail.gmail.com>
+From: robdclark@gmail.com (Rob Clark)
+Date: Sun, 27 Nov 2011 00:59:30 -0600
+Subject: [Linaro-mm-sig] [RFC 1/2] dma-buf: Introduce dma buffer sharing
+ mechanism
+In-Reply-To: <CAKMK7uE14gOsTUYZknmSArkzG2zSSbpDeU0dxqAtLVUmvh-5bA@mail.gmail.com>
+References: <1318325033-32688-1-git-send-email-sumit.semwal@ti.com>
+ <1318325033-32688-2-git-send-email-sumit.semwal@ti.com>
+ <CAPM=9tzjO7poyz_uYFFgONxzuTB86kKej8f2XBDHLGdUPZHvjg@mail.gmail.com>
+ <CAPM=9txtWiQuF+jNZXDogCMy+nsM=00Bv3uxAiu5oKnn-KxjAA@mail.gmail.com>
+ <CAKMK7uE14gOsTUYZknmSArkzG2zSSbpDeU0dxqAtLVUmvh-5bA@mail.gmail.com>
+Message-ID: <CAF6AEGtgjjtVraeji09zKJSTmokmQqfk5S8LfHoMhHJY03dLkg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 26, 2011 at 5:48 AM, Shawn Guo <shawn.guo@freescale.com> wrote:
-> On Mon, Nov 21, 2011 at 05:40:46PM -0800, Mike Turquette wrote:
->> Many platforms support simple gateable clks and fixed-rate clks that
->> should not be re-implemented by every platform.
+On Sat, Nov 26, 2011 at 8:00 AM, Daniel Vetter <daniel@ffwll.ch> wrote:
+> On Fri, Nov 25, 2011 at 17:28, Dave Airlie <airlied@gmail.com> wrote:
+>> I've rebuilt my PRIME interface on top of dmabuf to see how it would work,
 >>
->> This patch introduces a gateable clk with a common programming model of
->> gate control via a write of 1 bit to a register. ?Both set-to-enable and
->> clear-to-enable are supported.
+>> I've got primed gears running again on top, but I expect all my object
+>> lifetime and memory ownership rules need fixing up (i.e. leaks like a
+>> sieve).
 >>
->> Also introduced is a fixed-rate clk which has no reprogrammable aspects.
+>> http://cgit.freedesktop.org/~airlied/linux/log/?h=drm-prime-dmabuf
 >>
->> The purpose of both types of clks is documented in drivers/clk/basic.c.
->>
-> What I have seen is drivers/clk/clk-basic.c.
-
-Will fix in v4.
-
->> +int clk_register_gate(struct device *dev, const char *name, unsigned long flags,
->> + ? ? ? ? ? ? struct clk *fixed_parent, void __iomem *reg, u8 bit_idx,
->> + ? ? ? ? ? ? int set_to_enable)
->> +{
->> + ? ? struct clk_hw_gate *gclk;
->> + ? ? struct clk *clk;
->> +
->> + ? ? gclk = kmalloc(sizeof(struct clk_hw_gate), GFP_KERNEL);
->> +
->> + ? ? if (!gclk) {
->> + ? ? ? ? ? ? pr_err("%s: could not allocate gated clk\n", __func__);
->> + ? ? ? ? ? ? return -ENOMEM;
->> + ? ? }
->> +
->> + ? ? clk = &gclk->clk;
->> +
->> + ? ? /* struct clk_hw_gate assignments */
->> + ? ? gclk->fixed_parent = fixed_parent;
->> + ? ? gclk->reg = reg;
->> + ? ? gclk->bit_idx = bit_idx;
->> +
->> + ? ? /* struct clk assignments */
->> + ? ? clk->name = name;
->> + ? ? clk->flags = flags;
->> +
->> + ? ? if (set_to_enable)
->> + ? ? ? ? ? ? clk->ops = &clk_hw_gate_set_enable_ops;
->> + ? ? else
->> + ? ? ? ? ? ? clk->ops = &clk_hw_gate_set_disable_ops;
->> +
->> + ? ? clk_init(NULL, clk);
->> +
->> + ? ? return 0;
+>> has the i915/nouveau patches for the kernel to produce the prime interface.
 >
-> The device tree support needs to get this 'struct clk *', so we may
-> want to have all these registering functions return the 'clk'.
+> I've noticed that your implementations for get_scatterlist (at least
+> for the i915 driver) doesn't return the sg table mapped into the
+> device address space. I've checked and the documentation makes it
+> clear that this should be the case (and we really need this to support
+> certain insane hw), but the get/put_scatterlist names are a bit
+> misleading. Proposal:
+>
+> - use struct sg_table instead of scatterlist like you've already done
+> in you branch. Simply more consistent with the dma api.
 
-Thanks for the input.  Truthfully I'm very DT-ignorant so I'm happy to
-reshape any APIs for that topic.  Hope to fix that soon.
+yup
 
-Thanks for reviewing,
-Mike
+> - rename get/put_scatterlist into map/unmap for consistency with all
+> the map/unmap dma api functions. The attachement would then serve as
+> the abstract cookie to the backing storage, similar to how struct page
+> * works as an abstract cookie for dma_map/unmap_page. The only special
+> thing is that struct device * parameter because that's already part of
+> the attachment.
+
+yup
+
+> - add new wrapper functions dma_buf_map_attachment and
+> dma_buf_unmap_attachement to hide all the pointer/vtable-chasing that
+> we currently expose to users of this interface.
+
+I thought that was one of the earlier comments on the initial dmabuf
+patch, but either way: yup
+
+BR,
+-R
+
+> Comments?
+>
+> Cheers, Daniel
+> --
+> Daniel Vetter
+> daniel.vetter at ffwll.ch - +41 (0) 79 364 57 48 - http://blog.ffwll.ch
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-media" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+>
