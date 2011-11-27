@@ -1,59 +1,116 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Sun, 27 Nov 2011 13:00:16 +0000
-Subject: GIC irq_start detection breaks 3.2 boot on platforms without PPIs
-In-Reply-To: <20111126220834.GB9581@n2100.arm.linux.org.uk>
-References: <20111124163548.GC22031@mudshark.cambridge.arm.com>
- <CAL_Jsq+xZayXkOy2v7y+BittjRfC85mw-bCMrDFwDJOvnMnS8Q@mail.gmail.com>
- <20111125154157.GP12047@mudshark.cambridge.arm.com>
- <20111126220834.GB9581@n2100.arm.linux.org.uk>
-Message-ID: <20111127130016.GB26042@mudshark.cambridge.arm.com>
+From: snjw23@gmail.com (Sylwester Nawrocki)
+Date: Sun, 27 Nov 2011 17:41:27 +0100
+Subject: [PATCH 3/3] drivers/misc: introduce face detection module
+ driver(fdif)
+In-Reply-To: <CACVXFVOh=_wAmQB1fm88RTbwoJxCo5w57-TpiH8zx5V-CC_TqA@mail.gmail.com>
+References: <1322281904-14526-1-git-send-email-tom.leiming@gmail.com>	<1322281904-14526-4-git-send-email-tom.leiming@gmail.com>	<4ED1652A.8080701@gmail.com>
+ <CACVXFVOh=_wAmQB1fm88RTbwoJxCo5w57-TpiH8zx5V-CC_TqA@mail.gmail.com>
+Message-ID: <4ED26837.7070003@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+Hi Ming,
 
-On Sat, Nov 26, 2011 at 10:08:34PM +0000, Russell King - ARM Linux wrote:
-> On Fri, Nov 25, 2011 at 03:41:57PM +0000, Will Deacon wrote:
-> > Ok, if you're happy with my logic then I can put the patch into Russell's
-> > patch system.
+On 11/27/2011 04:40 AM, Ming Lei wrote:
+> Hi guys,
 > 
-> I've merged this into my fixes branch, but when I re-merge this with
-> Marc's irqchip consolidation, I get conflicts.  I think I've fixed it
-> correctly, but please check the result, which you'll find in my for-next
-> branch.
+> Thanks for your comment.
+> 
+> On Sun, Nov 27, 2011 at 6:16 AM, Sylwester Nawrocki <snjw23@gmail.com> wrote:
+>> Cc: LMML
+>>
+>> On 11/26/2011 05:31 AM, tom.leiming at gmail.com wrote:
+>>> From: Ming Lei <ming.lei@canonical.com>
+>>>
+>>> One face detection IP[1] is integared inside OMAP4 SoC, so
+>>> introduce this driver to make face detection function work
+>>> on OMAP4 SoC.
+>>
+>> Face detection IP is of course not specific to OMAP, I've seen it in 
+>> other SoCs already and integrated with the video capture pipeline.
+> 
+> Yes, the driver is platform independent, so at least it can support
+> the same IP on different platforms.
 
-Thanks for merging this. I've just had a quick look and the resolution looks
-functionally correct to me (I'll try booting your for-next branch tomorrow).
-I think that Marc's patches allow that bit of code to be rewritten in a
-cleaner way, but I guess that can always be handled later on:
+It's all good, however we need to ensure interoperability with existing
+drivers. I mean it shouldn't be difficult to setup data processing
+pipelines containing  various types of devices, like video capture,
+resizers, filters, etc. The situation where each type of device makes up
+their own interface is rather far from ideal.
 
+>>
+>> And it clearly belongs to the media subsystem, there is already an 
+>> infrastructure there that don't need to be re-invented, like buffer 
+>> management and various IO method support.
+>>
+>> I think there is not much needed on top of that to support FD. We have 
+>> already various mem-to-mem devices in V4L2, like video or image encoders
+>> or video post-processors.
+> 
+> I have thought about the FD implementation on v4l2 core, but still not
+> very clear
+> how to do it. I will study v4l2 further to figure out how to do it.
 
-diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
-index b2dc2dd..a3bc86f 100644
---- a/arch/arm/common/gic.c
-+++ b/arch/arm/common/gic.c
-@@ -697,13 +697,12 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
-         * For primary GICs, skip over SGIs.
-         * For secondary GICs, skip over PPIs, too.
-         */
--       domain->hwirq_base = 32;
--       if (gic_nr == 0) {
--               if ((irq_start & 31) > 0) {
--                       domain->hwirq_base = 16;
--                       if (irq_start != -1)
--                               irq_start = (irq_start & ~31) + 16;
--               }
-+       if (gic_nr == 0 && (irq_start & 31) > 0) {
-+               domain->hwirq_base = 16;
-+               if (irq_start != -1)
-+                       irq_start = (irq_start & ~31) + 16;
-+       } else {
-+               domain->hwirq_base = 32;
-        }
- 
-        /*
+I think we need a new user interface for that, the closest match would be
+the Video Output Interface [1], IMHO this could be used as a base. I got
+a bit confused by the additional working memory requirement and thought
+the FDIF needs input and output memory buffers to process single image
+frame. But that's not the case so there is no reason to bother with
+the mem-to-mem interface.
 
+Unfortunately there is no example of virtual output device driver in v4l2
+yet. There is only one for the capture devices - drivers/media/video/vivi.c
 
-Cheers,
+For video output one uses V4L2_BUF_TYPE_VIDEO_OUTPUT buffer type instead of
+V4L2_BUF_TYPE_VIDEO_CAPTURE and at the kernel side .vidioc_*_out operations
+of struct v4l2_ioctl_ops should be implemented, rather than .vidioc_*_cap.
 
-Will
+> 
+> Now below are the basic requirements from FD:
+> 
+> - FD on video stream or pictures from external files
+> - FD on video stream or pictures from video device
+> (such as camera)
+
+It's up to the applications in what way the image data is loaded into
+memory buffer, if it comes from a file or from other device. Once it is in
+standard v4l2 buffer object it can be shared between v4l2 drivers,
+still user space needs to queue/de-queue buffers. See QBUF/DQBUF ioctls
+[4] for more information.
+
+> - the input video format may be different for different FD IP
+
+That's normally handled by each v4l2 device, see [2] for details at the
+user side, and vidioc_s_fmt_vid_cap() in vivi for example.
+
+> - one method is required to start or stop FD
+
+I suppose VIDIOC_STREAMON/VIDIOC_STREAMOFF would do the job, see [3] and
+start/stop_streaming functions in vivi.
+
+> - one method is required to report the detection results to user space
+
+Perhaps we need new ioctl(s) for that. And possibly some new controls,
+or even new control class [5], [6].
+
+It would also be good to get requirements for other hardware implementations
+existing out there. I might be able to look at the Samsung ones eventually,
+but cannot guarantee this.
+
+> 
+> Any suggestions on how to implement FD on v4l2?
+> 
+> thanks,
+> --
+> Ming Lei
+
+-- 
+Regards,
+Sylwester
+
+[1] http://linuxtv.org/downloads/v4l-dvb-apis/devices.html
+[2] http://linuxtv.org/downloads/v4l-dvb-apis/vidioc-g-fmt.html
+[3] http://linuxtv.org/downloads/v4l-dvb-apis/vidioc-streamon.html
+[4] http://linuxtv.org/downloads/v4l-dvb-apis/vidioc-qbuf.html
+[5] http://linuxtv.org/downloads/v4l-dvb-apis/control.html
+[6] http://linuxtv.org/downloads/v4l-dvb-apis/extended-controls.html
