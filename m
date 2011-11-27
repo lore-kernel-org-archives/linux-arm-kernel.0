@@ -1,479 +1,500 @@
 From: jochen@scram.de (Jochen Friedrich)
-Date: Sun, 27 Nov 2011 22:00:55 +0100
-Subject: [PATCH 2/2] ARM: sa1100: Refactor mcp-sa11x0 to use platform
- resources.
-In-Reply-To: <1322427655-914-1-git-send-email-jochen@scram.de>
-References: <1322427655-914-1-git-send-email-jochen@scram.de>
-Message-ID: <1322427655-914-2-git-send-email-jochen@scram.de>
+Date: Sun, 27 Nov 2011 22:00:54 +0100
+Subject: [PATCH 1/2] ARM: sa11x0: Implement autoloading of codec and codec
+ pdata for mcp bus.
+Message-ID: <1322427655-914-1-git-send-email-jochen@scram.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make use of memory resources rather than hardcoded IO adresses.
-This is a first step towards DT support.
-
 Signed-off-by: Jochen Friedrich <jochen@scram.de>
 ---
- arch/arm/mach-sa1100/assabet.c |   11 +++
- arch/arm/mach-sa1100/cerf.c    |   10 +++
- arch/arm/mach-sa1100/collie.c  |   10 +++
- arch/arm/mach-sa1100/generic.c |    7 ++-
- arch/arm/mach-sa1100/lart.c    |    9 ++
- arch/arm/mach-sa1100/shannon.c |   10 +++
- arch/arm/mach-sa1100/simpad.c  |   10 +++
- drivers/mfd/mcp-sa11x0.c       |  162 +++++++++++++++++++++++++++-------------
- 8 files changed, 176 insertions(+), 53 deletions(-)
+ arch/arm/mach-sa1100/assabet.c          |    1 +
+ arch/arm/mach-sa1100/cerf.c             |    1 +
+ arch/arm/mach-sa1100/collie.c           |    8 ++++-
+ arch/arm/mach-sa1100/include/mach/mcp.h |    2 +
+ arch/arm/mach-sa1100/lart.c             |    1 +
+ arch/arm/mach-sa1100/shannon.c          |    1 +
+ arch/arm/mach-sa1100/simpad.c           |    8 ++++-
+ drivers/mfd/mcp-core.c                  |   44 +++++++++++++++++++++++++++-
+ drivers/mfd/mcp-sa11x0.c                |    7 +++-
+ drivers/mfd/ucb1x00-core.c              |   48 +++++++++++++++++++++++-------
+ drivers/mfd/ucb1x00-ts.c                |    2 +-
+ include/linux/mfd/mcp.h                 |    7 +++-
+ include/linux/mfd/ucb1x00.h             |    5 ++-
+ include/linux/mod_devicetable.h         |   11 +++++++
+ scripts/mod/file2alias.c                |   13 ++++++++
+ 15 files changed, 138 insertions(+), 21 deletions(-)
 
 diff --git a/arch/arm/mach-sa1100/assabet.c b/arch/arm/mach-sa1100/assabet.c
-index 14b31f1..96a162c 100644
+index 3dd133f..14b31f1 100644
 --- a/arch/arm/mach-sa1100/assabet.c
 +++ b/arch/arm/mach-sa1100/assabet.c
-@@ -253,6 +253,17 @@ static void __init assabet_init(void)
- 	sa11x0_register_mtd(&assabet_flash_data, assabet_flash_resources,
- 			    ARRAY_SIZE(assabet_flash_resources));
- 	sa11x0_register_irda(&assabet_irda_data);
-+
-+	/*
-+	 * Setup the PPC unit correctly.
-+	 */
-+	PPDR &= ~PPC_RXD4;
-+	PPDR |= PPC_TXD4 | PPC_SCLK | PPC_SFRM;
-+	PSDR |= PPC_RXD4;
-+	PSDR &= ~(PPC_TXD4 | PPC_SCLK | PPC_SFRM);
-+	PPSR &= ~(PPC_TXD4 | PPC_SCLK | PPC_SFRM);
-+
-+	ASSABET_BCR_set(ASSABET_BCR_CODEC_RST);
- 	sa11x0_register_mcp(&assabet_mcp_data);
- }
- 
-diff --git a/arch/arm/mach-sa1100/cerf.c b/arch/arm/mach-sa1100/cerf.c
-index 73d4f1d..3e025df2a 100644
---- a/arch/arm/mach-sa1100/cerf.c
-+++ b/arch/arm/mach-sa1100/cerf.c
-@@ -134,6 +134,16 @@ static void __init cerf_init(void)
- {
- 	platform_add_devices(cerf_devices, ARRAY_SIZE(cerf_devices));
- 	sa11x0_register_mtd(&cerf_flash_data, &cerf_flash_resource, 1);
-+
-+	/*
-+	 * Setup the PPC unit correctly.
-+	 */
-+	PPDR &= ~PPC_RXD4;
-+	PPDR |= PPC_TXD4 | PPC_SCLK | PPC_SFRM;
-+	PSDR |= PPC_RXD4;
-+	PSDR &= ~(PPC_TXD4 | PPC_SCLK | PPC_SFRM);
-+	PPSR &= ~(PPC_TXD4 | PPC_SCLK | PPC_SFRM);
-+
- 	sa11x0_register_mcp(&cerf_mcp_data);
- }
- 
-diff --git a/arch/arm/mach-sa1100/collie.c b/arch/arm/mach-sa1100/collie.c
-index 65165f1..326e44b 100644
---- a/arch/arm/mach-sa1100/collie.c
-+++ b/arch/arm/mach-sa1100/collie.c
-@@ -359,6 +359,16 @@ static void __init collie_init(void)
- 
- 	sa11x0_register_mtd(&collie_flash_data, collie_flash_resources,
- 			    ARRAY_SIZE(collie_flash_resources));
-+
-+	/*
-+	 * Setup the PPC unit correctly.
-+	 */
-+	PPDR &= ~PPC_RXD4;
-+	PPDR |= PPC_TXD4 | PPC_SCLK | PPC_SFRM;
-+	PSDR |= PPC_RXD4;
-+	PSDR &= ~(PPC_TXD4 | PPC_SCLK | PPC_SFRM);
-+	PPSR &= ~(PPC_TXD4 | PPC_SCLK | PPC_SFRM);
-+
- 	sa11x0_register_mcp(&collie_mcp_data);
- 
- 	sharpsl_save_param();
-diff --git a/arch/arm/mach-sa1100/generic.c b/arch/arm/mach-sa1100/generic.c
-index 465bcfc..83717b2 100644
---- a/arch/arm/mach-sa1100/generic.c
-+++ b/arch/arm/mach-sa1100/generic.c
-@@ -226,10 +226,15 @@ static struct platform_device sa11x0uart3_device = {
- static struct resource sa11x0mcp_resources[] = {
- 	[0] = {
- 		.start	= __PREG(Ser4MCCR0),
--		.end	= __PREG(Ser4MCCR0) + 0xffff,
-+		.end	= __PREG(Ser4MCCR0) + 0x1C - 1,
- 		.flags	= IORESOURCE_MEM,
- 	},
- 	[1] = {
-+		.start	= __PREG(Ser4MCCR1),
-+		.end	= __PREG(Ser4MCCR1) + 0x4 - 1,
-+		.flags	= IORESOURCE_MEM,
-+	},
-+	[2] = {
- 		.start	= IRQ_Ser4MCP,
- 		.end	= IRQ_Ser4MCP,
- 		.flags	= IORESOURCE_IRQ,
-diff --git a/arch/arm/mach-sa1100/lart.c b/arch/arm/mach-sa1100/lart.c
-index 6235f39..c4c3018 100644
---- a/arch/arm/mach-sa1100/lart.c
-+++ b/arch/arm/mach-sa1100/lart.c
-@@ -29,6 +29,15 @@ static struct mcp_plat_data lart_mcp_data = {
- 
- static void __init lart_init(void)
- {
-+	/*
-+	 * Setup the PPC unit correctly.
-+	 */
-+	PPDR &= ~PPC_RXD4;
-+	PPDR |= PPC_TXD4 | PPC_SCLK | PPC_SFRM;
-+	PSDR |= PPC_RXD4;
-+	PSDR &= ~(PPC_TXD4 | PPC_SCLK | PPC_SFRM);
-+	PPSR &= ~(PPC_TXD4 | PPC_SCLK | PPC_SFRM);
-+
- 	sa11x0_register_mcp(&lart_mcp_data);
- }
- 
-diff --git a/arch/arm/mach-sa1100/shannon.c b/arch/arm/mach-sa1100/shannon.c
-index b227368..9f36335 100644
---- a/arch/arm/mach-sa1100/shannon.c
-+++ b/arch/arm/mach-sa1100/shannon.c
-@@ -61,6 +61,16 @@ static struct mcp_plat_data shannon_mcp_data = {
- static void __init shannon_init(void)
- {
- 	sa11x0_register_mtd(&shannon_flash_data, &shannon_flash_resource, 1);
-+
-+	/*
-+	 * Setup the PPC unit correctly.
-+	 */
-+	PPDR &= ~PPC_RXD4;
-+	PPDR |= PPC_TXD4 | PPC_SCLK | PPC_SFRM;
-+	PSDR |= PPC_RXD4;
-+	PSDR &= ~(PPC_TXD4 | PPC_SCLK | PPC_SFRM);
-+	PPSR &= ~(PPC_TXD4 | PPC_SCLK | PPC_SFRM);
-+
- 	sa11x0_register_mcp(&shannon_mcp_data);
- }
- 
-diff --git a/arch/arm/mach-sa1100/simpad.c b/arch/arm/mach-sa1100/simpad.c
-index c05b2e9..c9f2f41 100644
---- a/arch/arm/mach-sa1100/simpad.c
-+++ b/arch/arm/mach-sa1100/simpad.c
-@@ -387,6 +387,16 @@ static int __init simpad_init(void)
- 
- 	sa11x0_register_mtd(&simpad_flash_data, simpad_flash_resources,
- 			      ARRAY_SIZE(simpad_flash_resources));
-+
-+	/*
-+	 * Setup the PPC unit correctly.
-+	 */
-+	PPDR &= ~PPC_RXD4;
-+	PPDR |= PPC_TXD4 | PPC_SCLK | PPC_SFRM;
-+	PSDR |= PPC_RXD4;
-+	PSDR &= ~(PPC_TXD4 | PPC_SCLK | PPC_SFRM);
-+	PPSR &= ~(PPC_TXD4 | PPC_SCLK | PPC_SFRM);
-+
- 	sa11x0_register_mcp(&simpad_mcp_data);
- 
- 	ret = platform_add_devices(devices, ARRAY_SIZE(devices));
-diff --git a/drivers/mfd/mcp-sa11x0.c b/drivers/mfd/mcp-sa11x0.c
-index 9cd38f1..965b2f7 100644
---- a/drivers/mfd/mcp-sa11x0.c
-+++ b/drivers/mfd/mcp-sa11x0.c
-@@ -19,6 +19,7 @@
- #include <linux/spinlock.h>
- #include <linux/platform_device.h>
- #include <linux/mfd/mcp.h>
-+#include <linux/io.h>
- 
- #include <mach/dma.h>
- #include <mach/hardware.h>
-@@ -26,12 +27,19 @@
- #include <asm/system.h>
- #include <mach/mcp.h>
- 
--#include <mach/assabet.h>
--
-+/* Register offsets */
-+#define MCCR0	0x00
-+#define MCDR0	0x08
-+#define MCDR1	0x0C
-+#define MCDR2	0x10
-+#define MCSR	0x18
-+#define MCCR1	0x00
- 
- struct mcp_sa11x0 {
--	u32	mccr0;
--	u32	mccr1;
-+	u32		mccr0;
-+	u32		mccr1;
-+	unsigned char	*mccr0_base;
-+	unsigned char	*mccr1_base;
+@@ -202,6 +202,7 @@ static struct irda_platform_data assabet_irda_data = {
+ static struct mcp_plat_data assabet_mcp_data = {
+ 	.mccr0		= MCCR0_ADM,
+ 	.sclk_rate	= 11981000,
++	.codec		= "ucb1x00",
  };
  
- #define priv(mcp)	((struct mcp_sa11x0 *)mcp_priv(mcp))
-@@ -39,25 +47,25 @@ struct mcp_sa11x0 {
- static void
- mcp_sa11x0_set_telecom_divisor(struct mcp *mcp, unsigned int divisor)
- {
--	unsigned int mccr0;
-+	struct mcp_sa11x0 *priv = priv(mcp);
+ static void __init assabet_init(void)
+diff --git a/arch/arm/mach-sa1100/cerf.c b/arch/arm/mach-sa1100/cerf.c
+index a626790..73d4f1d 100644
+--- a/arch/arm/mach-sa1100/cerf.c
++++ b/arch/arm/mach-sa1100/cerf.c
+@@ -127,6 +127,7 @@ static void __init cerf_map_io(void)
+ static struct mcp_plat_data cerf_mcp_data = {
+ 	.mccr0		= MCCR0_ADM,
+ 	.sclk_rate	= 11981000,
++	.codec		= "ucb1x00",
+ };
  
- 	divisor /= 32;
+ static void __init cerf_init(void)
+diff --git a/arch/arm/mach-sa1100/collie.c b/arch/arm/mach-sa1100/collie.c
+index 7a17703..65165f1 100644
+--- a/arch/arm/mach-sa1100/collie.c
++++ b/arch/arm/mach-sa1100/collie.c
+@@ -27,6 +27,7 @@
+ #include <linux/timer.h>
+ #include <linux/gpio.h>
+ #include <linux/pda_power.h>
++#include <linux/mfd/ucb1x00.h>
  
--	mccr0 = Ser4MCCR0 & ~0x00007f00;
--	mccr0 |= divisor << 8;
--	Ser4MCCR0 = mccr0;
-+	priv->mccr0 &= ~0x00007f00;
-+	priv->mccr0 |= divisor << 8;
-+	__raw_writel(priv->mccr0, priv->mccr0_base + MCCR0);
- }
+ #include <mach/hardware.h>
+ #include <asm/mach-types.h>
+@@ -85,10 +86,15 @@ static struct scoop_pcmcia_config collie_pcmcia_config = {
+ 	.num_devs	= 1,
+ };
  
- static void
- mcp_sa11x0_set_audio_divisor(struct mcp *mcp, unsigned int divisor)
- {
--	unsigned int mccr0;
-+	struct mcp_sa11x0 *priv = priv(mcp);
- 
- 	divisor /= 32;
- 
--	mccr0 = Ser4MCCR0 & ~0x0000007f;
--	mccr0 |= divisor;
--	Ser4MCCR0 = mccr0;
-+	priv->mccr0 &= ~0x0000007f;
-+	priv->mccr0 |= divisor;
-+	__raw_writel(priv->mccr0, priv->mccr0_base + MCCR0);
- }
++static struct ucb1x00_plat_data collie_ucb1x00_data = {
++	.gpio_base	= COLLIE_TC35143_GPIO_BASE,
++};
++
+ static struct mcp_plat_data collie_mcp_data = {
+ 	.mccr0		= MCCR0_ADM | MCCR0_ExtClk,
+ 	.sclk_rate	= 9216000,
+-	.gpio_base	= COLLIE_TC35143_GPIO_BASE,
++	.codec		= "ucb1x00",
++	.codec_pdata	= &collie_ucb1x00_data,
+ };
  
  /*
-@@ -71,12 +79,16 @@ mcp_sa11x0_write(struct mcp *mcp, unsigned int reg, unsigned int val)
- {
- 	int ret = -ETIME;
- 	int i;
-+	u32 mcpreg;
-+	struct mcp_sa11x0 *priv = priv(mcp);
+diff --git a/arch/arm/mach-sa1100/include/mach/mcp.h b/arch/arm/mach-sa1100/include/mach/mcp.h
+index ed1a331..586cec8 100644
+--- a/arch/arm/mach-sa1100/include/mach/mcp.h
++++ b/arch/arm/mach-sa1100/include/mach/mcp.h
+@@ -17,6 +17,8 @@ struct mcp_plat_data {
+ 	u32 mccr1;
+ 	unsigned int sclk_rate;
+ 	int gpio_base;
++	const char *codec;
++	void *codec_pdata;
+ };
  
--	Ser4MCDR2 = reg << 17 | MCDR2_Wr | (val & 0xffff);
-+	mcpreg = reg << 17 | MCDR2_Wr | (val & 0xffff);
-+	__raw_writel(mcpreg, priv->mccr0_base + MCDR2);
+ #endif
+diff --git a/arch/arm/mach-sa1100/lart.c b/arch/arm/mach-sa1100/lart.c
+index a8fae5b..6235f39 100644
+--- a/arch/arm/mach-sa1100/lart.c
++++ b/arch/arm/mach-sa1100/lart.c
+@@ -24,6 +24,7 @@
+ static struct mcp_plat_data lart_mcp_data = {
+ 	.mccr0		= MCCR0_ADM,
+ 	.sclk_rate	= 11981000,
++	.codec		= "ucb1x00",
+ };
  
- 	for (i = 0; i < 2; i++) {
- 		udelay(mcp->rw_timeout);
--		if (Ser4MCSR & MCSR_CWC) {
-+		mcpreg = __raw_readl(priv->mccr0_base + MCSR);
-+		if (mcpreg & MCSR_CWC) {
- 			ret = 0;
- 			break;
- 		}
-@@ -97,13 +109,18 @@ mcp_sa11x0_read(struct mcp *mcp, unsigned int reg)
- {
- 	int ret = -ETIME;
- 	int i;
-+	u32 mcpreg;
-+	struct mcp_sa11x0 *priv = priv(mcp);
+ static void __init lart_init(void)
+diff --git a/arch/arm/mach-sa1100/shannon.c b/arch/arm/mach-sa1100/shannon.c
+index 84f5b14..b227368 100644
+--- a/arch/arm/mach-sa1100/shannon.c
++++ b/arch/arm/mach-sa1100/shannon.c
+@@ -55,6 +55,7 @@ static struct resource shannon_flash_resource = {
+ static struct mcp_plat_data shannon_mcp_data = {
+ 	.mccr0		= MCCR0_ADM,
+ 	.sclk_rate	= 11981000,
++	.codec		= "ucb1x00",
+ };
  
--	Ser4MCDR2 = reg << 17 | MCDR2_Rd;
-+	mcpreg = reg << 17 | MCDR2_Rd;
-+	__raw_writel(mcpreg, priv->mccr0_base + MCDR2);
+ static void __init shannon_init(void)
+diff --git a/arch/arm/mach-sa1100/simpad.c b/arch/arm/mach-sa1100/simpad.c
+index d3c9d2b..c05b2e9 100644
+--- a/arch/arm/mach-sa1100/simpad.c
++++ b/arch/arm/mach-sa1100/simpad.c
+@@ -14,6 +14,7 @@
+ #include <linux/mtd/partitions.h>
+ #include <linux/io.h>
+ #include <linux/gpio.h>
++#include <linux/mfd/ucb1x00.h>
  
- 	for (i = 0; i < 2; i++) {
- 		udelay(mcp->rw_timeout);
--		if (Ser4MCSR & MCSR_CRC) {
--			ret = Ser4MCDR2 & 0xffff;
-+		mcpreg = __raw_readl(priv->mccr0_base + MCSR);
-+		if (mcpreg & MCSR_CRC) {
-+			ret = __raw_readl(priv->mccr0_base + MCDR2)
-+				& 0xffff;
- 			break;
- 		}
+ #include <asm/irq.h>
+ #include <mach/hardware.h>
+@@ -187,10 +188,15 @@ static struct resource simpad_flash_resources [] = {
  	}
-@@ -116,13 +133,19 @@ mcp_sa11x0_read(struct mcp *mcp, unsigned int reg)
+ };
  
- static void mcp_sa11x0_enable(struct mcp *mcp)
- {
--	Ser4MCSR = -1;
--	Ser4MCCR0 |= MCCR0_MCE;
-+	struct mcp_sa11x0 *priv = priv(mcp);
++static struct ucb1x00_plat_data simpad_ucb1x00_data = {
++	.gpio_base	= SIMPAD_UCB1X00_GPIO_BASE,
++};
 +
-+	__raw_writel(-1, priv->mccr0_base + MCSR);
-+	priv->mccr0 |= MCCR0_MCE;
-+	__raw_writel(priv->mccr0, priv->mccr0_base + MCCR0);
- }
+ static struct mcp_plat_data simpad_mcp_data = {
+ 	.mccr0		= MCCR0_ADM,
+ 	.sclk_rate	= 11981000,
+-	.gpio_base	= SIMPAD_UCB1X00_GPIO_BASE,
++	.codec		= "ucb1300",
++	.codec_pdata	= &simpad_ucb1x00_data,
+ };
  
- static void mcp_sa11x0_disable(struct mcp *mcp)
- {
--	Ser4MCCR0 &= ~MCCR0_MCE;
-+	struct mcp_sa11x0 *priv = priv(mcp);
-+
-+	priv->mccr0 &= ~MCCR0_MCE;
-+	__raw_writel(priv->mccr0, priv->mccr0_base + MCCR0);
- }
  
- /*
-@@ -142,6 +165,9 @@ static int mcp_sa11x0_probe(struct platform_device *pdev)
- 	struct mcp_plat_data *data = pdev->dev.platform_data;
- 	struct mcp *mcp;
- 	int ret;
-+	struct mcp_sa11x0 *priv;
-+	struct resource *res_mem0, *res_mem1;
-+	u32 size0, size1;
+diff --git a/drivers/mfd/mcp-core.c b/drivers/mfd/mcp-core.c
+index 84815f9..63be60b 100644
+--- a/drivers/mfd/mcp-core.c
++++ b/drivers/mfd/mcp-core.c
+@@ -26,9 +26,35 @@
+ #define to_mcp(d)		container_of(d, struct mcp, attached_device)
+ #define to_mcp_driver(d)	container_of(d, struct mcp_driver, drv)
  
- 	if (!data)
- 		return -ENODEV;
-@@ -149,46 +175,59 @@ static int mcp_sa11x0_probe(struct platform_device *pdev)
- 	if (!data->codec)
- 		return -ENODEV;
- 
--	if (!request_mem_region(0x80060000, 0x60, "sa11x0-mcp"))
-+	res_mem0 = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	if (!res_mem0)
-+		return -ENODEV;
-+	size0 = res_mem0->end - res_mem0->start + 1;
-+
-+	res_mem1 = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-+	if (!res_mem1)
-+		return -ENODEV;
-+	size1 = res_mem1->end - res_mem1->start + 1;
-+
-+	if (!request_mem_region(res_mem0->start, size0, "sa11x0-mcp"))
- 		return -EBUSY;
- 
-+	if (!request_mem_region(res_mem1->start, size1, "sa11x0-mcp")) {
-+		ret = -EBUSY;
-+		goto release;
++static const struct mcp_device_id *mcp_match_id(const struct mcp_device_id *id,
++						const char *codec)
++{
++	while (id->name[0]) {
++		if (strcmp(codec, id->name) == 0)
++			return id;
++		id++;
 +	}
++	return NULL;
++}
 +
- 	mcp = mcp_host_alloc(&pdev->dev, sizeof(struct mcp_sa11x0));
- 	if (!mcp) {
- 		ret = -ENOMEM;
--		goto release;
-+		goto release2;
- 	}
- 
-+	priv = priv(mcp);
++const struct mcp_device_id *mcp_get_device_id(const struct mcp *mcp)
++{
++	const struct mcp_driver *driver =
++		to_mcp_driver(mcp->attached_device.driver);
 +
- 	mcp->owner		= THIS_MODULE;
- 	mcp->ops		= &mcp_sa11x0;
- 	mcp->sclk_rate		= data->sclk_rate;
--	mcp->dma_audio_rd	= DMA_Ser4MCP0Rd;
--	mcp->dma_audio_wr	= DMA_Ser4MCP0Wr;
--	mcp->dma_telco_rd	= DMA_Ser4MCP1Rd;
--	mcp->dma_telco_wr	= DMA_Ser4MCP1Wr;
-+	mcp->dma_audio_rd	= DDAR_DevAdd(res_mem0->start + MCDR0)
-+				+ DDAR_DevRd + DDAR_Brst4 + DDAR_8BitDev;
-+	mcp->dma_audio_wr	= DDAR_DevAdd(res_mem0->start + MCDR0)
-+				+ DDAR_DevWr + DDAR_Brst4 + DDAR_8BitDev;
-+	mcp->dma_telco_rd	= DDAR_DevAdd(res_mem0->start + MCDR1)
-+				+ DDAR_DevRd + DDAR_Brst4 + DDAR_8BitDev;
-+	mcp->dma_telco_wr	= DDAR_DevAdd(res_mem0->start + MCDR1)
-+				+ DDAR_DevWr + DDAR_Brst4 + DDAR_8BitDev;
- 	mcp->codec		= data->codec;
- 
- 	platform_set_drvdata(pdev, mcp);
- 
--	if (machine_is_assabet()) {
--		ASSABET_BCR_set(ASSABET_BCR_CODEC_RST);
--	}
--
--	/*
--	 * Setup the PPC unit correctly.
--	 */
--	PPDR &= ~PPC_RXD4;
--	PPDR |= PPC_TXD4 | PPC_SCLK | PPC_SFRM;
--	PSDR |= PPC_RXD4;
--	PSDR &= ~(PPC_TXD4 | PPC_SCLK | PPC_SFRM);
--	PPSR &= ~(PPC_TXD4 | PPC_SCLK | PPC_SFRM);
--
- 	/*
- 	 * Initialise device.  Note that we initially
- 	 * set the sampling rate to minimum.
- 	 */
--	Ser4MCSR = -1;
--	Ser4MCCR1 = data->mccr1;
--	Ser4MCCR0 = data->mccr0 | 0x7f7f;
-+	priv->mccr0_base = ioremap(res_mem0->start, size0);
-+	priv->mccr1_base = ioremap(res_mem1->start, size1);
++	return mcp_match_id(driver->id_table, mcp->codec);
++}
++EXPORT_SYMBOL(mcp_get_device_id);
 +
-+	__raw_writel(-1, priv->mccr0_base + MCSR);
-+	priv->mccr1 = data->mccr1;
-+	priv->mccr0 = data->mccr0 | 0x7f7f;
-+	__raw_writel(priv->mccr0, priv->mccr0_base + MCCR0);
-+	__raw_writel(priv->mccr1, priv->mccr1_base + MCCR1);
+ static int mcp_bus_match(struct device *dev, struct device_driver *drv)
+ {
+-	return 1;
++	const struct mcp *mcp = to_mcp(dev);
++	const struct mcp_driver *driver = to_mcp_driver(drv);
++
++	if (driver->id_table)
++		return !!mcp_match_id(driver->id_table, mcp->codec);
++
++	return 0;
+ }
  
- 	/*
- 	 * Calculate the read/write timeout (us) from the bit clock
-@@ -202,32 +241,49 @@ static int mcp_sa11x0_probe(struct platform_device *pdev)
- 	if (ret == 0)
- 		goto out;
- 
-+ release2:
-+	release_mem_region(res_mem1->start, size1);
-  release:
--	release_mem_region(0x80060000, 0x60);
-+	release_mem_region(res_mem0->start, size0);
- 	platform_set_drvdata(pdev, NULL);
- 
-  out:
+ static int mcp_bus_probe(struct device *dev)
+@@ -74,9 +100,18 @@ static int mcp_bus_resume(struct device *dev)
  	return ret;
  }
  
--static int mcp_sa11x0_remove(struct platform_device *dev)
-+static int mcp_sa11x0_remove(struct platform_device *pdev)
- {
--	struct mcp *mcp = platform_get_drvdata(dev);
-+	struct mcp *mcp = platform_get_drvdata(pdev);
-+	struct mcp_sa11x0 *priv = priv(mcp);
-+	struct resource *res_mem;
-+	u32 size;
- 
--	platform_set_drvdata(dev, NULL);
-+	platform_set_drvdata(pdev, NULL);
- 	mcp_host_unregister(mcp);
--	release_mem_region(0x80060000, 0x60);
- 
-+	res_mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	if (res_mem) {
-+		size = res_mem->end - res_mem->start + 1;
-+		release_mem_region(res_mem->start, size);
-+	}
-+	res_mem = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-+	if (res_mem) {
-+		size = res_mem->end - res_mem->start + 1;
-+		release_mem_region(res_mem->start, size);
-+	}
-+	iounmap(priv->mccr0_base);
-+	iounmap(priv->mccr1_base);
- 	return 0;
++static int mcp_bus_uevent(struct device *dev, struct kobj_uevent_env *env)
++{
++	struct mcp *mcp = to_mcp(dev);
++
++	add_uevent_var(env, "MODALIAS=%s%s", MCP_MODULE_PREFIX, mcp->codec);
++	return 0;
++}
++
+ static struct bus_type mcp_bus_type = {
+ 	.name		= "mcp",
+ 	.match		= mcp_bus_match,
++	.uevent		= mcp_bus_uevent,
+ 	.probe		= mcp_bus_probe,
+ 	.remove		= mcp_bus_remove,
+ 	.suspend	= mcp_bus_suspend,
+@@ -212,9 +247,14 @@ struct mcp *mcp_host_alloc(struct device *parent, size_t size)
  }
+ EXPORT_SYMBOL(mcp_host_alloc);
  
- static int mcp_sa11x0_suspend(struct platform_device *dev, pm_message_t state)
+-int mcp_host_register(struct mcp *mcp)
++int mcp_host_register(struct mcp *mcp, void *pdata)
  {
- 	struct mcp *mcp = platform_get_drvdata(dev);
-+	struct mcp_sa11x0 *priv = priv(mcp);
-+	u32 mccr0;
- 
--	priv(mcp)->mccr0 = Ser4MCCR0;
--	priv(mcp)->mccr1 = Ser4MCCR1;
--	Ser4MCCR0 &= ~MCCR0_MCE;
-+	mccr0 = priv->mccr0 & ~MCCR0_MCE;
-+	__raw_writel(mccr0, priv->mccr0_base + MCCR0);
- 
- 	return 0;
++	if (!mcp->codec)
++		return -EINVAL;
++
++	mcp->attached_device.platform_data = pdata;
+ 	dev_set_name(&mcp->attached_device, "mcp0");
++	request_module("%s%s", MCP_MODULE_PREFIX, mcp->codec);
+ 	return device_register(&mcp->attached_device);
  }
-@@ -235,9 +291,10 @@ static int mcp_sa11x0_suspend(struct platform_device *dev, pm_message_t state)
- static int mcp_sa11x0_resume(struct platform_device *dev)
+ EXPORT_SYMBOL(mcp_host_register);
+diff --git a/drivers/mfd/mcp-sa11x0.c b/drivers/mfd/mcp-sa11x0.c
+index 2dab02d..9cd38f1 100644
+--- a/drivers/mfd/mcp-sa11x0.c
++++ b/drivers/mfd/mcp-sa11x0.c
+@@ -146,6 +146,9 @@ static int mcp_sa11x0_probe(struct platform_device *pdev)
+ 	if (!data)
+ 		return -ENODEV;
+ 
++	if (!data->codec)
++		return -ENODEV;
++
+ 	if (!request_mem_region(0x80060000, 0x60, "sa11x0-mcp"))
+ 		return -EBUSY;
+ 
+@@ -162,7 +165,7 @@ static int mcp_sa11x0_probe(struct platform_device *pdev)
+ 	mcp->dma_audio_wr	= DMA_Ser4MCP0Wr;
+ 	mcp->dma_telco_rd	= DMA_Ser4MCP1Rd;
+ 	mcp->dma_telco_wr	= DMA_Ser4MCP1Wr;
+-	mcp->gpio_base		= data->gpio_base;
++	mcp->codec		= data->codec;
+ 
+ 	platform_set_drvdata(pdev, mcp);
+ 
+@@ -195,7 +198,7 @@ static int mcp_sa11x0_probe(struct platform_device *pdev)
+ 	mcp->rw_timeout = (64 * 3 * 1000000 + mcp->sclk_rate - 1) /
+ 			  mcp->sclk_rate;
+ 
+-	ret = mcp_host_register(mcp);
++	ret = mcp_host_register(mcp, data->codec_pdata);
+ 	if (ret == 0)
+ 		goto out;
+ 
+diff --git a/drivers/mfd/ucb1x00-core.c b/drivers/mfd/ucb1x00-core.c
+index b281217..91c4f25 100644
+--- a/drivers/mfd/ucb1x00-core.c
++++ b/drivers/mfd/ucb1x00-core.c
+@@ -36,6 +36,15 @@ static DEFINE_MUTEX(ucb1x00_mutex);
+ static LIST_HEAD(ucb1x00_drivers);
+ static LIST_HEAD(ucb1x00_devices);
+ 
++static struct mcp_device_id ucb1x00_id[] = {
++	{ "ucb1x00", 0 },  /* auto-detection */
++	{ "ucb1200", UCB_ID_1200 },
++	{ "ucb1300", UCB_ID_1300 },
++	{ "tc35143", UCB_ID_TC35143 },
++	{ }
++};
++MODULE_DEVICE_TABLE(mcp, ucb1x00_id);
++
+ /**
+  *	ucb1x00_io_set_dir - set IO direction
+  *	@ucb: UCB1x00 structure describing chip
+@@ -527,17 +536,33 @@ static struct class ucb1x00_class = {
+ 
+ static int ucb1x00_probe(struct mcp *mcp)
  {
- 	struct mcp *mcp = platform_get_drvdata(dev);
-+	struct mcp_sa11x0 *priv = priv(mcp);
++	const struct mcp_device_id *mid;
+ 	struct ucb1x00 *ucb;
+ 	struct ucb1x00_driver *drv;
++	struct ucb1x00_plat_data *pdata;
+ 	unsigned int id;
+ 	int ret = -ENODEV;
+ 	int temp;
  
--	Ser4MCCR1 = priv(mcp)->mccr1;
--	Ser4MCCR0 = priv(mcp)->mccr0;
-+	__raw_writel(priv->mccr0, priv->mccr0_base + MCCR0);
-+	__raw_writel(priv->mccr1, priv->mccr1_base + MCCR1);
+ 	mcp_enable(mcp);
+ 	id = mcp_reg_read(mcp, UCB_ID);
++	mid = mcp_get_device_id(mcp);
  
- 	return 0;
- }
-@@ -254,6 +311,7 @@ static struct platform_driver mcp_sa11x0_driver = {
- 	.resume		= mcp_sa11x0_resume,
- 	.driver		= {
- 		.name	= "sa11x0-mcp",
-+		.owner  = THIS_MODULE,
- 	},
+-	if (id != UCB_ID_1200 && id != UCB_ID_1300 && id != UCB_ID_TC35143) {
+-		printk(KERN_WARNING "UCB1x00 ID not found: %04x\n", id);
++	if (mid && mid->driver_data) {
++		if (id != mid->driver_data) {
++			printk(KERN_WARNING "%s wrong ID %04x found: %04x\n",
++				mid->name, (unsigned int) mid->driver_data, id);
++			goto err_disable;
++		}
++	} else {
++		mid = &ucb1x00_id[1];
++		while (mid->driver_data) {
++			if (id == mid->driver_data)
++				break;
++			mid++;
++		}
++		printk(KERN_WARNING "%s ID not found: %04x\n",
++			ucb1x00_id[0].name, id);
+ 		goto err_disable;
+ 	}
+ 
+@@ -546,28 +571,28 @@ static int ucb1x00_probe(struct mcp *mcp)
+ 	if (!ucb)
+ 		goto err_disable;
+ 
+-
++	pdata = mcp->attached_device.platform_data;
+ 	ucb->dev.class = &ucb1x00_class;
+ 	ucb->dev.parent = &mcp->attached_device;
+-	dev_set_name(&ucb->dev, "ucb1x00");
++	dev_set_name(&ucb->dev, mid->name);
+ 
+ 	spin_lock_init(&ucb->lock);
+ 	spin_lock_init(&ucb->io_lock);
+ 	sema_init(&ucb->adc_sem, 1);
+ 
+-	ucb->id  = id;
++	ucb->id  = mid;
+ 	ucb->mcp = mcp;
+ 	ucb->irq = ucb1x00_detect_irq(ucb);
+ 	if (ucb->irq == NO_IRQ) {
+-		printk(KERN_ERR "UCB1x00: IRQ probe failed\n");
++		printk(KERN_ERR "%s: IRQ probe failed\n", mid->name);
+ 		ret = -ENODEV;
+ 		goto err_free;
+ 	}
+ 
+ 	ucb->gpio.base = -1;
+-	if (mcp->gpio_base != 0) {
++	if (pdata && (pdata->gpio_base >= 0)) {
+ 		ucb->gpio.label = dev_name(&ucb->dev);
+-		ucb->gpio.base = mcp->gpio_base;
++		ucb->gpio.base = pdata->gpio_base;
+ 		ucb->gpio.ngpio = 10;
+ 		ucb->gpio.set = ucb1x00_gpio_set;
+ 		ucb->gpio.get = ucb1x00_gpio_get;
+@@ -580,10 +605,10 @@ static int ucb1x00_probe(struct mcp *mcp)
+ 		dev_info(&ucb->dev, "gpio_base not set so no gpiolib support");
+ 
+ 	ret = request_irq(ucb->irq, ucb1x00_irq, IRQF_TRIGGER_RISING,
+-			  "UCB1x00", ucb);
++			  mid->name, ucb);
+ 	if (ret) {
+-		printk(KERN_ERR "ucb1x00: unable to grab irq%d: %d\n",
+-			ucb->irq, ret);
++		printk(KERN_ERR "%s: unable to grab irq%d: %d\n",
++			mid->name, ucb->irq, ret);
+ 		goto err_gpio;
+ 	}
+ 
+@@ -705,6 +730,7 @@ static struct mcp_driver ucb1x00_driver = {
+ 	.remove		= ucb1x00_remove,
+ 	.suspend	= ucb1x00_suspend,
+ 	.resume		= ucb1x00_resume,
++	.id_table	= ucb1x00_id,
  };
  
+ static int __init ucb1x00_init(void)
+diff --git a/drivers/mfd/ucb1x00-ts.c b/drivers/mfd/ucb1x00-ts.c
+index 38ffbd5..40ec3c1 100644
+--- a/drivers/mfd/ucb1x00-ts.c
++++ b/drivers/mfd/ucb1x00-ts.c
+@@ -382,7 +382,7 @@ static int ucb1x00_ts_add(struct ucb1x00_dev *dev)
+ 	ts->adcsync = adcsync ? UCB_SYNC : UCB_NOSYNC;
+ 
+ 	idev->name       = "Touchscreen panel";
+-	idev->id.product = ts->ucb->id;
++	idev->id.product = ts->ucb->id->driver_data;
+ 	idev->open       = ucb1x00_ts_open;
+ 	idev->close      = ucb1x00_ts_close;
+ 
+diff --git a/include/linux/mfd/mcp.h b/include/linux/mfd/mcp.h
+index ee496708..1515e64 100644
+--- a/include/linux/mfd/mcp.h
++++ b/include/linux/mfd/mcp.h
+@@ -10,6 +10,7 @@
+ #ifndef MCP_H
+ #define MCP_H
+ 
++#include <linux/mod_devicetable.h>
+ #include <mach/dma.h>
+ 
+ struct mcp_ops;
+@@ -26,7 +27,7 @@ struct mcp {
+ 	dma_device_t	dma_telco_rd;
+ 	dma_device_t	dma_telco_wr;
+ 	struct device	attached_device;
+-	int		gpio_base;
++	const char	*codec;
+ };
+ 
+ struct mcp_ops {
+@@ -44,10 +45,11 @@ void mcp_reg_write(struct mcp *, unsigned int, unsigned int);
+ unsigned int mcp_reg_read(struct mcp *, unsigned int);
+ void mcp_enable(struct mcp *);
+ void mcp_disable(struct mcp *);
++const struct mcp_device_id *mcp_get_device_id(const struct mcp *mcp);
+ #define mcp_get_sclk_rate(mcp)	((mcp)->sclk_rate)
+ 
+ struct mcp *mcp_host_alloc(struct device *, size_t);
+-int mcp_host_register(struct mcp *);
++int mcp_host_register(struct mcp *, void *);
+ void mcp_host_unregister(struct mcp *);
+ 
+ struct mcp_driver {
+@@ -56,6 +58,7 @@ struct mcp_driver {
+ 	void (*remove)(struct mcp *);
+ 	int (*suspend)(struct mcp *, pm_message_t);
+ 	int (*resume)(struct mcp *);
++	const struct mcp_device_id *id_table;
+ };
+ 
+ int mcp_driver_register(struct mcp_driver *);
+diff --git a/include/linux/mfd/ucb1x00.h b/include/linux/mfd/ucb1x00.h
+index 4321f04..bc19e5f 100644
+--- a/include/linux/mfd/ucb1x00.h
++++ b/include/linux/mfd/ucb1x00.h
+@@ -104,6 +104,9 @@
+ #define UCB_MODE_DYN_VFLAG_ENA	(1 << 12)
+ #define UCB_MODE_AUD_OFF_CAN	(1 << 13)
+ 
++struct ucb1x00_plat_data {
++	int		gpio_base;
++};
+ 
+ struct ucb1x00_irq {
+ 	void *devid;
+@@ -116,7 +119,7 @@ struct ucb1x00 {
+ 	unsigned int		irq;
+ 	struct semaphore	adc_sem;
+ 	spinlock_t		io_lock;
+-	u16			id;
++	const struct mcp_device_id *id;
+ 	u16			io_dir;
+ 	u16			io_out;
+ 	u16			adc_cr;
+diff --git a/include/linux/mod_devicetable.h b/include/linux/mod_devicetable.h
+index 468819c..bc50d9a 100644
+--- a/include/linux/mod_devicetable.h
++++ b/include/linux/mod_devicetable.h
+@@ -436,6 +436,17 @@ struct spi_device_id {
+ 			__attribute__((aligned(sizeof(kernel_ulong_t))));
+ };
+ 
++/* mcp */
++
++#define MCP_NAME_SIZE	20
++#define MCP_MODULE_PREFIX "mcp:"
++
++struct mcp_device_id {
++	char name[MCP_NAME_SIZE];
++	kernel_ulong_t driver_data	/* Data private to the driver */
++			__attribute__((aligned(sizeof(kernel_ulong_t))));
++};
++
+ /* dmi */
+ enum dmi_field {
+ 	DMI_NONE,
+diff --git a/scripts/mod/file2alias.c b/scripts/mod/file2alias.c
+index f936d1f..e8c7eb1 100644
+--- a/scripts/mod/file2alias.c
++++ b/scripts/mod/file2alias.c
+@@ -774,6 +774,15 @@ static int do_spi_entry(const char *filename, struct spi_device_id *id,
+ 	return 1;
+ }
+ 
++/* Looks like: mcp:S */
++static int do_mcp_entry(const char *filename, struct mcp_device_id *id,
++			char *alias)
++{
++	sprintf(alias, MCP_MODULE_PREFIX "%s", id->name);
++
++	return 1;
++}
++
+ static const struct dmifield {
+ 	const char *prefix;
+ 	int field;
+@@ -1027,6 +1036,10 @@ void handle_moddevtable(struct module *mod, struct elf_info *info,
+ 		do_table(symval, sym->st_size,
+ 			 sizeof(struct spi_device_id), "spi",
+ 			 do_spi_entry, mod);
++	else if (sym_is(symname, "__mod_mcp_device_table"))
++		do_table(symval, sym->st_size,
++			 sizeof(struct mcp_device_id), "mcp",
++			 do_mcp_entry, mod);
+ 	else if (sym_is(symname, "__mod_dmi_device_table"))
+ 		do_table(symval, sym->st_size,
+ 			 sizeof(struct dmi_system_id), "dmi",
 -- 
 1.7.7.3
