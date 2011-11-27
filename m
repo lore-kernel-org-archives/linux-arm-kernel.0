@@ -1,195 +1,296 @@
 From: amwang@redhat.com (Cong Wang)
-Date: Sun, 27 Nov 2011 13:27:00 +0800
-Subject: [PATCH 20/62] mmc: remove the second argument of k[un]map_atomic()
+Date: Sun, 27 Nov 2011 13:27:41 +0800
+Subject: [PATCH 61/62] highmem: kill all __kmap_atomic()
 In-Reply-To: <1322371662-26166-1-git-send-email-amwang@redhat.com>
 References: <1322371662-26166-1-git-send-email-amwang@redhat.com>
-Message-ID: <1322371662-26166-21-git-send-email-amwang@redhat.com>
+Message-ID: <1322371662-26166-62-git-send-email-amwang@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 Signed-off-by: Cong Wang <amwang@redhat.com>
 ---
- drivers/mmc/host/at91_mci.c |    8 ++++----
- drivers/mmc/host/msm_sdcc.c |    6 +++---
- drivers/mmc/host/sdhci.c    |    4 ++--
- drivers/mmc/host/tifm_sd.c  |   16 ++++++++--------
- drivers/mmc/host/tmio_mmc.c |    1 -
- drivers/mmc/host/tmio_mmc.h |    4 ++--
- 6 files changed, 19 insertions(+), 20 deletions(-)
+ arch/arm/mm/highmem.c                |    4 ++--
+ arch/frv/include/asm/highmem.h       |    2 +-
+ arch/frv/mm/highmem.c                |    4 ++--
+ arch/mips/include/asm/highmem.h      |    2 +-
+ arch/mips/mm/highmem.c               |    4 ++--
+ arch/mn10300/include/asm/highmem.h   |    2 +-
+ arch/parisc/include/asm/cacheflush.h |    2 +-
+ arch/powerpc/include/asm/highmem.h   |    2 +-
+ arch/sparc/include/asm/highmem.h     |    2 +-
+ arch/sparc/mm/highmem.c              |    4 ++--
+ arch/tile/include/asm/highmem.h      |    2 +-
+ arch/tile/mm/highmem.c               |    4 ++--
+ arch/x86/include/asm/highmem.h       |    2 +-
+ arch/x86/mm/highmem_32.c             |    4 ++--
+ include/linux/highmem.h              |   11 +++--------
+ 15 files changed, 23 insertions(+), 28 deletions(-)
 
-diff --git a/drivers/mmc/host/at91_mci.c b/drivers/mmc/host/at91_mci.c
-index a8b4d2a..9a32922 100644
---- a/drivers/mmc/host/at91_mci.c
-+++ b/drivers/mmc/host/at91_mci.c
-@@ -236,7 +236,7 @@ static inline void at91_mci_sg_to_dma(struct at91mci_host *host, struct mmc_data
+diff --git a/arch/arm/mm/highmem.c b/arch/arm/mm/highmem.c
+index 807c057..5a21505 100644
+--- a/arch/arm/mm/highmem.c
++++ b/arch/arm/mm/highmem.c
+@@ -36,7 +36,7 @@ void kunmap(struct page *page)
+ }
+ EXPORT_SYMBOL(kunmap);
  
- 		sg = &data->sg[i];
- 
--		sgbuffer = kmap_atomic(sg_page(sg), KM_BIO_SRC_IRQ) + sg->offset;
-+		sgbuffer = kmap_atomic(sg_page(sg)) + sg->offset;
- 		amount = min(size, sg->length);
- 		size -= amount;
- 
-@@ -252,7 +252,7 @@ static inline void at91_mci_sg_to_dma(struct at91mci_host *host, struct mmc_data
- 			dmabuf = (unsigned *)tmpv;
- 		}
- 
--		kunmap_atomic(sgbuffer, KM_BIO_SRC_IRQ);
-+		kunmap_atomic(sgbuffer);
- 
- 		if (size == 0)
- 			break;
-@@ -302,7 +302,7 @@ static void at91_mci_post_dma_read(struct at91mci_host *host)
- 
- 		sg = &data->sg[i];
- 
--		sgbuffer = kmap_atomic(sg_page(sg), KM_BIO_SRC_IRQ) + sg->offset;
-+		sgbuffer = kmap_atomic(sg_page(sg)) + sg->offset;
- 		amount = min(size, sg->length);
- 		size -= amount;
- 
-@@ -318,7 +318,7 @@ static void at91_mci_post_dma_read(struct at91mci_host *host)
- 		}
- 
- 		flush_kernel_dcache_page(sg_page(sg));
--		kunmap_atomic(sgbuffer, KM_BIO_SRC_IRQ);
-+		kunmap_atomic(sgbuffer);
- 		data->bytes_xfered += amount;
- 		if (size == 0)
- 			break;
-diff --git a/drivers/mmc/host/msm_sdcc.c b/drivers/mmc/host/msm_sdcc.c
-index 80d8eb1..62faa4a 100644
---- a/drivers/mmc/host/msm_sdcc.c
-+++ b/drivers/mmc/host/msm_sdcc.c
-@@ -689,8 +689,8 @@ msmsdcc_pio_irq(int irq, void *dev_id)
- 
- 		/* Map the current scatter buffer */
- 		local_irq_save(flags);
--		buffer = kmap_atomic(sg_page(host->pio.sg),
--				     KM_BIO_SRC_IRQ) + host->pio.sg->offset;
-+		buffer = kmap_atomic(sg_page(host->pio.sg))
-+				     + host->pio.sg->offset;
- 		buffer += host->pio.sg_off;
- 		remain = host->pio.sg->length - host->pio.sg_off;
- 		len = 0;
-@@ -700,7 +700,7 @@ msmsdcc_pio_irq(int irq, void *dev_id)
- 			len = msmsdcc_pio_write(host, buffer, remain, status);
- 
- 		/* Unmap the buffer */
--		kunmap_atomic(buffer, KM_BIO_SRC_IRQ);
-+		kunmap_atomic(buffer);
- 		local_irq_restore(flags);
- 
- 		host->pio.sg_off += len;
-diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
-index 6d8eea3..2cc9e29 100644
---- a/drivers/mmc/host/sdhci.c
-+++ b/drivers/mmc/host/sdhci.c
-@@ -423,12 +423,12 @@ static void sdhci_transfer_pio(struct sdhci_host *host)
- static char *sdhci_kmap_atomic(struct scatterlist *sg, unsigned long *flags)
+-void *__kmap_atomic(struct page *page)
++void *kmap_atomic(struct page *page)
  {
- 	local_irq_save(*flags);
--	return kmap_atomic(sg_page(sg), KM_BIO_SRC_IRQ) + sg->offset;
-+	return kmap_atomic(sg_page(sg)) + sg->offset;
+ 	unsigned int idx;
+ 	unsigned long vaddr;
+@@ -81,7 +81,7 @@ void *__kmap_atomic(struct page *page)
+ 
+ 	return (void *)vaddr;
+ }
+-EXPORT_SYMBOL(__kmap_atomic);
++EXPORT_SYMBOL(kmap_atomic);
+ 
+ void __kunmap_atomic(void *kvaddr)
+ {
+diff --git a/arch/frv/include/asm/highmem.h b/arch/frv/include/asm/highmem.h
+index a8d6565..716956a 100644
+--- a/arch/frv/include/asm/highmem.h
++++ b/arch/frv/include/asm/highmem.h
+@@ -157,7 +157,7 @@ static inline void kunmap_atomic_primary(void *kvaddr, enum km_type type)
+ 	pagefault_enable();
  }
  
- static void sdhci_kunmap_atomic(void *buffer, unsigned long *flags)
- {
--	kunmap_atomic(buffer, KM_BIO_SRC_IRQ);
-+	kunmap_atomic(buffer);
- 	local_irq_restore(*flags);
+-void *__kmap_atomic(struct page *page);
++void *kmap_atomic(struct page *page);
+ void __kunmap_atomic(void *kvaddr);
+ 
+ #endif /* !__ASSEMBLY__ */
+diff --git a/arch/frv/mm/highmem.c b/arch/frv/mm/highmem.c
+index fd7fcd4..31902c9 100644
+--- a/arch/frv/mm/highmem.c
++++ b/arch/frv/mm/highmem.c
+@@ -37,7 +37,7 @@ struct page *kmap_atomic_to_page(void *ptr)
+ 	return virt_to_page(ptr);
  }
  
-diff --git a/drivers/mmc/host/tifm_sd.c b/drivers/mmc/host/tifm_sd.c
-index f70d046..fc00081 100644
---- a/drivers/mmc/host/tifm_sd.c
-+++ b/drivers/mmc/host/tifm_sd.c
-@@ -118,7 +118,7 @@ static void tifm_sd_read_fifo(struct tifm_sd *host, struct page *pg,
- 	unsigned char *buf;
- 	unsigned int pos = 0, val;
- 
--	buf = kmap_atomic(pg, KM_BIO_DST_IRQ) + off;
-+	buf = kmap_atomic(pg) + off;
- 	if (host->cmd_flags & DATA_CARRY) {
- 		buf[pos++] = host->bounce_buf_data[0];
- 		host->cmd_flags &= ~DATA_CARRY;
-@@ -134,7 +134,7 @@ static void tifm_sd_read_fifo(struct tifm_sd *host, struct page *pg,
- 		}
- 		buf[pos++] = (val >> 8) & 0xff;
+-void *__kmap_atomic(struct page *page)
++void *kmap_atomic(struct page *page)
+ {
+ 	unsigned long paddr;
+ 	int type;
+@@ -64,7 +64,7 @@ void *__kmap_atomic(struct page *page)
+ 		return NULL;
  	}
--	kunmap_atomic(buf - off, KM_BIO_DST_IRQ);
-+	kunmap_atomic(buf - off);
  }
+-EXPORT_SYMBOL(__kmap_atomic);
++EXPORT_SYMBOL(kmap_atomic);
  
- static void tifm_sd_write_fifo(struct tifm_sd *host, struct page *pg,
-@@ -144,7 +144,7 @@ static void tifm_sd_write_fifo(struct tifm_sd *host, struct page *pg,
- 	unsigned char *buf;
- 	unsigned int pos = 0, val;
- 
--	buf = kmap_atomic(pg, KM_BIO_SRC_IRQ) + off;
-+	buf = kmap_atomic(pg) + off;
- 	if (host->cmd_flags & DATA_CARRY) {
- 		val = host->bounce_buf_data[0] | ((buf[pos++] << 8) & 0xff00);
- 		writel(val, sock->addr + SOCK_MMCSD_DATA);
-@@ -161,7 +161,7 @@ static void tifm_sd_write_fifo(struct tifm_sd *host, struct page *pg,
- 		val |= (buf[pos++] << 8) & 0xff00;
- 		writel(val, sock->addr + SOCK_MMCSD_DATA);
- 	}
--	kunmap_atomic(buf - off, KM_BIO_SRC_IRQ);
-+	kunmap_atomic(buf - off);
- }
- 
- static void tifm_sd_transfer_data(struct tifm_sd *host)
-@@ -212,13 +212,13 @@ static void tifm_sd_copy_page(struct page *dst, unsigned int dst_off,
- 			      struct page *src, unsigned int src_off,
- 			      unsigned int count)
+ void __kunmap_atomic(void *kvaddr)
  {
--	unsigned char *src_buf = kmap_atomic(src, KM_BIO_SRC_IRQ) + src_off;
--	unsigned char *dst_buf = kmap_atomic(dst, KM_BIO_DST_IRQ) + dst_off;
-+	unsigned char *src_buf = kmap_atomic(src) + src_off;
-+	unsigned char *dst_buf = kmap_atomic(dst) + dst_off;
+diff --git a/arch/mips/include/asm/highmem.h b/arch/mips/include/asm/highmem.h
+index 77e6440..2d91888 100644
+--- a/arch/mips/include/asm/highmem.h
++++ b/arch/mips/include/asm/highmem.h
+@@ -47,7 +47,7 @@ extern void kunmap_high(struct page *page);
  
- 	memcpy(dst_buf, src_buf, count);
+ extern void *kmap(struct page *page);
+ extern void kunmap(struct page *page);
+-extern void *__kmap_atomic(struct page *page);
++extern void *kmap_atomic(struct page *page);
+ extern void __kunmap_atomic(void *kvaddr);
+ extern void *kmap_atomic_pfn(unsigned long pfn);
+ extern struct page *kmap_atomic_to_page(void *ptr);
+diff --git a/arch/mips/mm/highmem.c b/arch/mips/mm/highmem.c
+index 3634c7e..aff5705 100644
+--- a/arch/mips/mm/highmem.c
++++ b/arch/mips/mm/highmem.c
+@@ -41,7 +41,7 @@ EXPORT_SYMBOL(kunmap);
+  * kmaps are appropriate for short, tight code paths only.
+  */
  
--	kunmap_atomic(dst_buf - dst_off, KM_BIO_DST_IRQ);
--	kunmap_atomic(src_buf - src_off, KM_BIO_SRC_IRQ);
-+	kunmap_atomic(dst_buf - dst_off);
-+	kunmap_atomic(src_buf - src_off);
+-void *__kmap_atomic(struct page *page)
++void *kmap_atomic(struct page *page)
+ {
+ 	unsigned long vaddr;
+ 	int idx, type;
+@@ -62,7 +62,7 @@ void *__kmap_atomic(struct page *page)
+ 
+ 	return (void*) vaddr;
+ }
+-EXPORT_SYMBOL(__kmap_atomic);
++EXPORT_SYMBOL(kmap_atomic);
+ 
+ void __kunmap_atomic(void *kvaddr)
+ {
+diff --git a/arch/mn10300/include/asm/highmem.h b/arch/mn10300/include/asm/highmem.h
+index bfe2d88..7c137cd 100644
+--- a/arch/mn10300/include/asm/highmem.h
++++ b/arch/mn10300/include/asm/highmem.h
+@@ -70,7 +70,7 @@ static inline void kunmap(struct page *page)
+  * be used in IRQ contexts, so in some (very limited) cases we need
+  * it.
+  */
+-static inline unsigned long __kmap_atomic(struct page *page)
++static inline unsigned long kmap_atomic(struct page *page)
+ {
+ 	unsigned long vaddr;
+ 	int idx, type;
+diff --git a/arch/parisc/include/asm/cacheflush.h b/arch/parisc/include/asm/cacheflush.h
+index da601dd..9f21ab0 100644
+--- a/arch/parisc/include/asm/cacheflush.h
++++ b/arch/parisc/include/asm/cacheflush.h
+@@ -140,7 +140,7 @@ static inline void *kmap(struct page *page)
+ 
+ #define kunmap(page)			kunmap_parisc(page_address(page))
+ 
+-static inline void *__kmap_atomic(struct page *page)
++static inline void *kmap_atomic(struct page *page)
+ {
+ 	pagefault_disable();
+ 	return page_address(page);
+diff --git a/arch/powerpc/include/asm/highmem.h b/arch/powerpc/include/asm/highmem.h
+index dbc2640..caaf6e0 100644
+--- a/arch/powerpc/include/asm/highmem.h
++++ b/arch/powerpc/include/asm/highmem.h
+@@ -79,7 +79,7 @@ static inline void kunmap(struct page *page)
+ 	kunmap_high(page);
  }
  
- static void tifm_sd_bounce_block(struct tifm_sd *host, struct mmc_data *r_data)
-diff --git a/drivers/mmc/host/tmio_mmc.c b/drivers/mmc/host/tmio_mmc.c
-index a4ea102..4626ef2 100644
---- a/drivers/mmc/host/tmio_mmc.c
-+++ b/drivers/mmc/host/tmio_mmc.c
-@@ -20,7 +20,6 @@
- #include <linux/module.h>
- #include <linux/pagemap.h>
- #include <linux/scatterlist.h>
+-static inline void *__kmap_atomic(struct page *page)
++static inline void *kmap_atomic(struct page *page)
+ {
+ 	return kmap_atomic_prot(page, kmap_prot);
+ }
+diff --git a/arch/sparc/include/asm/highmem.h b/arch/sparc/include/asm/highmem.h
+index 3d7afbb..3b6e00d 100644
+--- a/arch/sparc/include/asm/highmem.h
++++ b/arch/sparc/include/asm/highmem.h
+@@ -70,7 +70,7 @@ static inline void kunmap(struct page *page)
+ 	kunmap_high(page);
+ }
+ 
+-extern void *__kmap_atomic(struct page *page);
++extern void *kmap_atomic(struct page *page);
+ extern void __kunmap_atomic(void *kvaddr);
+ extern struct page *kmap_atomic_to_page(void *vaddr);
+ 
+diff --git a/arch/sparc/mm/highmem.c b/arch/sparc/mm/highmem.c
+index 77140a0..055c66c 100644
+--- a/arch/sparc/mm/highmem.c
++++ b/arch/sparc/mm/highmem.c
+@@ -30,7 +30,7 @@
+ #include <asm/tlbflush.h>
+ #include <asm/fixmap.h>
+ 
+-void *__kmap_atomic(struct page *page)
++void *kmap_atomic(struct page *page)
+ {
+ 	unsigned long vaddr;
+ 	long idx, type;
+@@ -64,7 +64,7 @@ void *__kmap_atomic(struct page *page)
+ 
+ 	return (void*) vaddr;
+ }
+-EXPORT_SYMBOL(__kmap_atomic);
++EXPORT_SYMBOL(kmap_atomic);
+ 
+ void __kunmap_atomic(void *kvaddr)
+ {
+diff --git a/arch/tile/include/asm/highmem.h b/arch/tile/include/asm/highmem.h
+index b2a6c5d..fc8429a 100644
+--- a/arch/tile/include/asm/highmem.h
++++ b/arch/tile/include/asm/highmem.h
+@@ -59,7 +59,7 @@ void *kmap_fix_kpte(struct page *page, int finished);
+ /* This macro is used only in map_new_virtual() to map "page". */
+ #define kmap_prot page_to_kpgprot(page)
+ 
+-void *__kmap_atomic(struct page *page);
++void *kmap_atomic(struct page *page);
+ void __kunmap_atomic(void *kvaddr);
+ void *kmap_atomic_pfn(unsigned long pfn);
+ void *kmap_atomic_prot_pfn(unsigned long pfn, pgprot_t prot);
+diff --git a/arch/tile/mm/highmem.c b/arch/tile/mm/highmem.c
+index 31dbbd9..ef8e5a6 100644
+--- a/arch/tile/mm/highmem.c
++++ b/arch/tile/mm/highmem.c
+@@ -224,12 +224,12 @@ void *kmap_atomic_prot(struct page *page, pgprot_t prot)
+ }
+ EXPORT_SYMBOL(kmap_atomic_prot);
+ 
+-void *__kmap_atomic(struct page *page)
++void *kmap_atomic(struct page *page)
+ {
+ 	/* PAGE_NONE is a magic value that tells us to check immutability. */
+ 	return kmap_atomic_prot(page, PAGE_NONE);
+ }
+-EXPORT_SYMBOL(__kmap_atomic);
++EXPORT_SYMBOL(kmap_atomic);
+ 
+ void __kunmap_atomic(void *kvaddr)
+ {
+diff --git a/arch/x86/include/asm/highmem.h b/arch/x86/include/asm/highmem.h
+index 3bd0402..302a323 100644
+--- a/arch/x86/include/asm/highmem.h
++++ b/arch/x86/include/asm/highmem.h
+@@ -61,7 +61,7 @@ void *kmap(struct page *page);
+ void kunmap(struct page *page);
+ 
+ void *kmap_atomic_prot(struct page *page, pgprot_t prot);
+-void *__kmap_atomic(struct page *page);
++void *kmap_atomic(struct page *page);
+ void __kunmap_atomic(void *kvaddr);
+ void *kmap_atomic_pfn(unsigned long pfn);
+ void *kmap_atomic_prot_pfn(unsigned long pfn, pgprot_t prot);
+diff --git a/arch/x86/mm/highmem_32.c b/arch/x86/mm/highmem_32.c
+index b499626..9f85499 100644
+--- a/arch/x86/mm/highmem_32.c
++++ b/arch/x86/mm/highmem_32.c
+@@ -50,11 +50,11 @@ void *kmap_atomic_prot(struct page *page, pgprot_t prot)
+ }
+ EXPORT_SYMBOL(kmap_atomic_prot);
+ 
+-void *__kmap_atomic(struct page *page)
++void *kmap_atomic(struct page *page)
+ {
+ 	return kmap_atomic_prot(page, kmap_prot);
+ }
+-EXPORT_SYMBOL(__kmap_atomic);
++EXPORT_SYMBOL(kmap_atomic);
+ 
+ /*
+  * This is the same as kmap_atomic() but can map memory that doesn't
+diff --git a/include/linux/highmem.h b/include/linux/highmem.h
+index 42ac049..9c1b442 100644
+--- a/include/linux/highmem.h
++++ b/include/linux/highmem.h
+@@ -55,12 +55,12 @@ static inline void kunmap(struct page *page)
+ {
+ }
+ 
+-static inline void *__kmap_atomic(struct page *page)
++static inline void *kmap_atomic(struct page *page)
+ {
+ 	pagefault_disable();
+ 	return page_address(page);
+ }
+-#define kmap_atomic_prot(page, prot)	__kmap_atomic(page)
++#define kmap_atomic_prot(page, prot)	kmap_atomic(page)
+ 
+ static inline void __kunmap_atomic(void *addr)
+ {
+@@ -121,15 +121,10 @@ static inline void kmap_atomic_idx_pop(void)
+ #define NARG_(_2, _1, n, ...) n
+ #define NARG(...) NARG_(__VA_ARGS__, 2, 1, :)
+ 
+-static inline void *kmap_atomic(struct page *page)
+-{
+-	return __kmap_atomic(page);
+-}
 -
- #include "tmio_mmc.h"
- 
- #ifdef CONFIG_PM
-diff --git a/drivers/mmc/host/tmio_mmc.h b/drivers/mmc/host/tmio_mmc.h
-index 3020f98..a95e6d9 100644
---- a/drivers/mmc/host/tmio_mmc.h
-+++ b/drivers/mmc/host/tmio_mmc.h
-@@ -105,13 +105,13 @@ static inline char *tmio_mmc_kmap_atomic(struct scatterlist *sg,
- 					 unsigned long *flags)
+ static inline void __deprecated *kmap_atomic_deprecated(struct page *page,
+ 							enum km_type km)
  {
- 	local_irq_save(*flags);
--	return kmap_atomic(sg_page(sg), KM_BIO_SRC_IRQ) + sg->offset;
-+	return kmap_atomic(sg_page(sg)) + sg->offset;
+-	return __kmap_atomic(page);
++	return kmap_atomic(page);
  }
  
- static inline void tmio_mmc_kunmap_atomic(struct scatterlist *sg,
- 					  unsigned long *flags, void *virt)
- {
--	kunmap_atomic(virt - sg->offset, KM_BIO_SRC_IRQ);
-+	kunmap_atomic(virt - sg->offset);
- 	local_irq_restore(*flags);
- }
- 
+ #define kmap_atomic1(...) kmap_atomic(__VA_ARGS__)
 -- 
 1.7.4.4
