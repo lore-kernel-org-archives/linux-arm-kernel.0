@@ -1,120 +1,31 @@
-From: tixy@yxit.co.uk (Tixy)
-Date: Sun, 27 Nov 2011 12:24:59 +0000
-Subject: [PATCH 4/4] Use generic ARM instruction set condition code
- checks for kprobes.
-In-Reply-To: <20111125171958.14878.38094.stgit@localhost6.localdomain6>
-References: <20111125171621.14878.49918.stgit@localhost6.localdomain6>
- <20111125171958.14878.38094.stgit@localhost6.localdomain6>
-Message-ID: <1322396699.2408.7.camel@computer2>
+From: will.deacon@arm.com (Will Deacon)
+Date: Sun, 27 Nov 2011 12:56:56 +0000
+Subject: [PATCH 1/1 v5] arm: fault.c: Port OOM changes into do_page_fault
+In-Reply-To: <CAFPAmTTWVwq8H6HVzdvTcN-jcSoNQ2-TfLWT33ks8_kpGND+SA@mail.gmail.com>
+References: <1321986690-6079-1-git-send-email-consul.kautuk@gmail.com>
+ <20111126235032.GC9581@n2100.arm.linux.org.uk>
+ <CAFPAmTTWVwq8H6HVzdvTcN-jcSoNQ2-TfLWT33ks8_kpGND+SA@mail.gmail.com>
+Message-ID: <20111127125656.GA26042@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2011-11-25 at 17:20 +0000, Leif Lindholm wrote:
-> This patch changes the kprobes implementation to use the generic ARM
-> instruction set condition code checks, rather than a dedicated
-> implementation.
+On Sun, Nov 27, 2011 at 05:58:33AM +0000, Kautuk Consul wrote:
+> >
+> > Thanks. ?I think this is fine. ?Please put it in the patch system so it's
+> > not forgotten, and I'll get to it sometime during the next week. ?Thanks.
+> >
 > 
-> Cc: Tixy <tixy@yxit.co.uk>
-> Signed-off-by: Leif Lindholm <leif.lindholm@arm.com>
+> Thanks. I don't know what you mean by "put it in the patch system" as I already
+> did a "git send-email" for this patch to this mailing list.
+> 
+> So, please find the v5 patch file attached to this email for any
+> further reference.
 
-Acked-by: Jon Medhurst <tixy@yxit.co.uk>
+You should read the documentation here:
 
-> ---
->  arch/arm/kernel/kprobes-test.c |   66 ++++------------------------------------
->  1 files changed, 6 insertions(+), 60 deletions(-)
-> 
-> diff --git a/arch/arm/kernel/kprobes-test.c b/arch/arm/kernel/kprobes-test.c
-> index e17cdd6..278c275 100644
-> --- a/arch/arm/kernel/kprobes-test.c
-> +++ b/arch/arm/kernel/kprobes-test.c
-> @@ -202,6 +202,8 @@
->  #include <linux/slab.h>
->  #include <linux/kprobes.h>
->  
-> +#include <asm/opcodes.h>
-> +
->  #include "kprobes.h"
->  #include "kprobes-test.h"
->  
-> @@ -1048,67 +1050,11 @@ static int test_instance;
->   */
->  #define PSR_IGNORE_BITS (PSR_A_BIT | PSR_F_BIT)
->  
-> -static unsigned long test_check_cc(int cc, unsigned long cpsr)
-> +inline unsigned long test_check_cc(int cc, unsigned long cpsr)
->  {
-> -	unsigned long temp;
-> -
-> -	switch (cc) {
-> -	case 0x0: /* eq */
-> -		return cpsr & PSR_Z_BIT;
-> -
-> -	case 0x1: /* ne */
-> -		return (~cpsr) & PSR_Z_BIT;
-> -
-> -	case 0x2: /* cs */
-> -		return cpsr & PSR_C_BIT;
-> -
-> -	case 0x3: /* cc */
-> -		return (~cpsr) & PSR_C_BIT;
-> -
-> -	case 0x4: /* mi */
-> -		return cpsr & PSR_N_BIT;
-> -
-> -	case 0x5: /* pl */
-> -		return (~cpsr) & PSR_N_BIT;
-> -
-> -	case 0x6: /* vs */
-> -		return cpsr & PSR_V_BIT;
-> -
-> -	case 0x7: /* vc */
-> -		return (~cpsr) & PSR_V_BIT;
-> +	int ret = arm_check_condition(cc << 28, cpsr);
->  
-> -	case 0x8: /* hi */
-> -		cpsr &= ~(cpsr >> 1); /* PSR_C_BIT &= ~PSR_Z_BIT */
-> -		return cpsr & PSR_C_BIT;
-> -
-> -	case 0x9: /* ls */
-> -		cpsr &= ~(cpsr >> 1); /* PSR_C_BIT &= ~PSR_Z_BIT */
-> -		return (~cpsr) & PSR_C_BIT;
-> -
-> -	case 0xa: /* ge */
-> -		cpsr ^= (cpsr << 3); /* PSR_N_BIT ^= PSR_V_BIT */
-> -		return (~cpsr) & PSR_N_BIT;
-> -
-> -	case 0xb: /* lt */
-> -		cpsr ^= (cpsr << 3); /* PSR_N_BIT ^= PSR_V_BIT */
-> -		return cpsr & PSR_N_BIT;
-> -
-> -	case 0xc: /* gt */
-> -		temp = cpsr ^ (cpsr << 3); /* PSR_N_BIT ^= PSR_V_BIT */
-> -		temp |= (cpsr << 1);	   /* PSR_N_BIT |= PSR_Z_BIT */
-> -		return (~temp) & PSR_N_BIT;
-> -
-> -	case 0xd: /* le */
-> -		temp = cpsr ^ (cpsr << 3); /* PSR_N_BIT ^= PSR_V_BIT */
-> -		temp |= (cpsr << 1);	   /* PSR_N_BIT |= PSR_Z_BIT */
-> -		return temp & PSR_N_BIT;
-> -
-> -	case 0xe: /* al */
-> -	case 0xf: /* unconditional */
-> -		return true;
-> -	}
-> -	BUG();
-> -	return false;
-> +	return (ret != ARM_OPCODE_CONDTEST_FAIL);
->  }
->  
->  static int is_last_scenario;
-> @@ -1128,7 +1074,7 @@ static unsigned long test_context_cpsr(int scenario)
->  
->  	if (!test_case_is_thumb) {
->  		/* Testing ARM code */
-> -		probe_should_run = test_check_cc(current_instruction >> 28, cpsr) != 0;
-> +		probe_should_run = arm_check_condition(current_instruction, cpsr) != 0;
->  		if (scenario == 15)
->  			is_last_scenario = true;
->  
-> 
-> 
+http://www.arm.linux.org.uk/developer/patches/info.php
+
+and then you can use git send-email --suppress-cc=all to email your patch to
+the patch system, making sure you have the correct KernelVersion tag.
+
+Will
