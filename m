@@ -1,53 +1,38 @@
-From: jic23@cam.ac.uk (Jonathan Cameron)
-Date: Sun, 27 Nov 2011 11:26:06 +0000
-Subject: [PATCH] mx28: added LRADC and touchscreen support
-In-Reply-To: <201111251602.35227.arnd@arndb.de>
-References: <1322135394-4097-1-git-send-email-rusko.peter@prolan.hu>
- <201111251602.35227.arnd@arndb.de>
-Message-ID: <4ED21E4E.5090004@cam.ac.uk>
+From: tixy@yxit.co.uk (Tixy)
+Date: Sun, 27 Nov 2011 12:11:25 +0000
+Subject: [PATCH] ARM: kprobes: Change testcase with unpredictable STRD
+ instruction
+Message-ID: <1322395885.2408.1.camel@computer2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-...
->> diff --git a/arch/arm/mach-mxs/include/mach/lradc.h b/arch/arm/mach-mxs/include/mach/lradc.h
->> new file mode 100644
->> index 0000000..c2c0a7d
-> 
->> +
->> +int hw_lradc_use_channel(int);
->> +int hw_lradc_unuse_channel(int);
->> +extern u32 hw_lradc_vddio(void);
->> +void hw_lradc_set_delay_trigger_kick(int trigger, int value);
->> +void hw_lradc_configure_channel(int channel, int enable_div2,
->> +		int enable_acc, int samples);
->> +int hw_lradc_present(int channel);
->> +int hw_lradc_init_ladder(int channel, int trigger, unsigned sampling);
->> +int hw_lradc_stop_ladder(int channel, int trigger);
->> +void hw_lradc_set_delay_trigger(int trigger, u32 trigger_lradc,
->> +		u32 delay_triggers, u32 loops, u32 delays);
->> +void hw_lradc_clear_delay_trigger(int trigger, u32 trigger_lradc,
->> +		u32 delay_triggers);
-> 
-> As indicated by Shawn, adding a new driver specific kernel-level ADC
-> interface is not a good idea. IIRC, the result of the last discussion
-> was that all ADC drivers should be part of IIO and you should use
-> the IIO in-kernel interfaces. Not sure what the state of that code
-> is, but if it's not in mainline yet, you should work with Jonathan
-> to make sure it gets there. Having more users for that code can
-> only speed up the process, and I'm going to refuse another ADC driver
-> in drivers/misc or arch/arm/mach-*/.
+There is a kprobes testcase for the instruction "strd r2, [r3], r4".
+This has unpredictable behaviour as it uses r3 for register writeback
+addressing and also stores it to memory.
 
-Quick summary of IIO status.  Nothing is in mainline yet.  Intent is to
-get the first set of core code (including in kernel pull interfaces)
-into linux-next fairly shortly (these have had enough postive feedback
-now I think).  Doing push interfaces (as I think we would need here) is
-possible with existing patches on top of the stuff in the iio staging
-tree but there are some 'interesting' cases where both push and pull
-interfaces exist that still need addressing.
+On a cortex A9, this testcase would fail because the instruction writes
+the updated value of r3 to memory, whereas the kprobes emulation code
+writes the original value.
 
-Also, note the push interface stuff (e.g. interrupt driven) requires a
-lot more of the IIO infrastructure to be in place (buffered support and
-the demux unit) so may still be some time.  Personally my time is
-currently very restricted so all the help anyone can offer is most welcome!
+Fix this by changing testcase to used r5 instead of r3.
 
-Jonathan
+Signed-off-by: Jon Medhurst <tixy@yxit.co.uk>
+---
+ arch/arm/kernel/kprobes-test-arm.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/kernel/kprobes-test-arm.c b/arch/arm/kernel/kprobes-test-arm.c
+index fc82de8..edf9ad8 100644
+--- a/arch/arm/kernel/kprobes-test-arm.c
++++ b/arch/arm/kernel/kprobes-test-arm.c
+@@ -550,7 +550,7 @@ void kprobe_arm_test_cases(void)
+ 	TEST_RPR(  "strccd	r",8, VAL2,", [r",13,0, ", r",12,48,"]")
+ 	TEST_RPR(  "strd	r",4, VAL1,", [r",2, 24,", r",3, 48,"]!")
+ 	TEST_RPR(  "strcsd	r",12,VAL2,", [r",11,48,", -r",10,24,"]!")
+-	TEST_RPR(  "strd	r",2, VAL1,", [r",3, 24,"], r",4,48,"")
++	TEST_RPR(  "strd	r",2, VAL1,", [r",5, 24,"], r",4,48,"")
+ 	TEST_RPR(  "strd	r",10,VAL2,", [r",9, 48,"], -r",7,24,"")
+ 	TEST_UNSUPPORTED(".word 0xe1afc0fa	@ strd r12, [pc, r10]!")
+ 
+-- 
+1.7.2.5
