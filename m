@@ -1,62 +1,38 @@
 From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
-Date: Sun, 27 Nov 2011 04:32:30 +0100
-Subject: [PATCH 4/5] init/calibrate.c: allow for recalibration of loops per
- jiffy
+Date: Sun, 27 Nov 2011 04:32:29 +0100
+Subject: [PATCH 3/5] ARM: OMAP1: Fix dpll1 reprogramming not actually allowed
 In-Reply-To: <1322364751-29980-1-git-send-email-jkrzyszt@tis.icnet.pl>
 References: <1322364751-29980-1-git-send-email-jkrzyszt@tis.icnet.pl>
-Message-ID: <1322364751-29980-5-git-send-email-jkrzyszt@tis.icnet.pl>
+Message-ID: <1322364751-29980-4-git-send-email-jkrzyszt@tis.icnet.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is required on ARM OMAP1 platform, after DPLL reprogramming has
-been fixed by moving it from setup_arch() to kernel_init().
+DPLL1 reprogramming to a different rate is actually blocked inside
+omap1_select_table_rate(), resulting in the defalut rate of 60 MHz
+always used instead of the one selected in .config. Fix it.
 
-Created against linux-3.2-rc2.
+Created against linux-3.2-rc2, tested on Amstrad Delta on top of
+linux-omap/fixes.
 
 Signed-off-by: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
-Cc: Andrew Morton <akpm@linux-foundation.org>
-Cc: Sameer Nanda <snanda@chromium.org>
 ---
- include/linux/delay.h |    4 +++-
- init/calibrate.c      |    6 ++++--
- 2 files changed, 7 insertions(+), 3 deletions(-)
+ arch/arm/mach-omap1/clock.c |    4 ----
+ 1 files changed, 0 insertions(+), 4 deletions(-)
 
-diff --git a/include/linux/delay.h b/include/linux/delay.h
-index a6ecb34..ed0fbbe 100644
---- a/include/linux/delay.h
-+++ b/include/linux/delay.h
-@@ -42,7 +42,9 @@ static inline void ndelay(unsigned long x)
- #endif
+diff --git a/arch/arm/mach-omap1/clock.c b/arch/arm/mach-omap1/clock.c
+index 3899176..962adbc 100644
+--- a/arch/arm/mach-omap1/clock.c
++++ b/arch/arm/mach-omap1/clock.c
+@@ -200,10 +200,6 @@ int omap1_select_table_rate(struct clk *clk, unsigned long rate)
+ 		if (ptr->xtal != ref_rate)
+ 			continue;
  
- extern unsigned long lpj_fine;
--void calibrate_delay(void);
-+void _calibrate_delay(bool redo);
-+#define calibrate_delay() _calibrate_delay(0)
-+#define recalibrate_delay() _calibrate_delay(1)
- void msleep(unsigned int msecs);
- unsigned long msleep_interruptible(unsigned int msecs);
- void usleep_range(unsigned long min, unsigned long max);
-diff --git a/init/calibrate.c b/init/calibrate.c
-index 24df797..f7c1593 100644
---- a/init/calibrate.c
-+++ b/init/calibrate.c
-@@ -246,13 +246,15 @@ recalibrate:
- 
- static DEFINE_PER_CPU(unsigned long, cpu_loops_per_jiffy) = { 0 };
- 
--void __cpuinit calibrate_delay(void)
-+void __cpuinit _calibrate_delay(bool redo)
- {
- 	unsigned long lpj;
- 	static bool printed;
- 	int this_cpu = smp_processor_id();
- 
--	if (per_cpu(cpu_loops_per_jiffy, this_cpu)) {
-+	if (redo)
-+		printed = 0;
-+	if (!redo && per_cpu(cpu_loops_per_jiffy, this_cpu)) {
- 		lpj = per_cpu(cpu_loops_per_jiffy, this_cpu);
- 		pr_info("Calibrating delay loop (skipped) "
- 				"already calibrated this CPU");
+-		/* DPLL1 cannot be reprogrammed without risking system crash */
+-		if (likely(dpll1_rate != 0) && ptr->pll_rate != dpll1_rate)
+-			continue;
+-
+ 		/* Can check only after xtal frequency check */
+ 		if (ptr->rate <= rate)
+ 			break;
 -- 
 1.7.3.4
