@@ -1,58 +1,34 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Sat, 26 Nov 2011 19:28:51 -0500 (EST)
-Subject: -next fails to boot as of today on S3C6410
-In-Reply-To: <20111126215258.GA9581@n2100.arm.linux.org.uk>
-References: <alpine.LFD.2.02.1111231402370.17904@xanadu.home>
- <alpine.LFD.2.02.1111231929050.17904@xanadu.home>
- <20111124125615.GJ8470@opensource.wolfsonmicro.com>
- <20111124160853.GB2509@sirena.org.uk>
- <alpine.LFD.2.02.1111241254310.17904@xanadu.home>
- <20111124180228.GA32119@opensource.wolfsonmicro.com>
- <alpine.LFD.2.02.1111241316510.17904@xanadu.home>
- <20111124183153.GA3395@opensource.wolfsonmicro.com>
- <alpine.LFD.2.02.1111241336320.17904@xanadu.home>
- <20111124184946.GB3395@opensource.wolfsonmicro.com>
- <20111126215258.GA9581@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.02.1111261923370.17904@xanadu.home>
+From: mturquette@ti.com (Turquette, Mike)
+Date: Sat, 26 Nov 2011 17:12:47 -0800
+Subject: [PATCH v3 0/5] common clk framework
+In-Reply-To: <20111126070601.GA19176@S2100-06.ap.freescale.net>
+References: <1321926047-14211-1-git-send-email-mturquette@linaro.org>
+ <20111126070601.GA19176@S2100-06.ap.freescale.net>
+Message-ID: <CAJOA=zMGaXLrC=sLzrZKTqAKqQHpmn9=xx94ucaCsFAZ6EfYqw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 26 Nov 2011, Russell King - ARM Linux wrote:
+On Fri, Nov 25, 2011 at 11:06 PM, Shawn Guo <shawn.guo@freescale.com> wrote:
+> On Mon, Nov 21, 2011 at 05:40:42PM -0800, Mike Turquette wrote:
+>> ? .speaking of which, clk_set_rate has been overhauled and is now
+>> recursive. *collective groan*. ?clk_set_rate is still simple for the
+>> common case of simply setting a single clk's rate. ?But if your clk has
+>> the CLK_PARENT_SET_RATE flag and the .round_rate callback recommends
+>> changing the parent rate, then clk_set_rate will recurse upwards to the
+>> parent and try it all over again. ?In the event of a failure everything
+>> unwinds and all the clks go out for drinks.
+>>
+> I smell that this will be the part which makes the whole series risky
+> of being accepted in a desired time frame, with saying rate change
+> notifications are still missing for now.
 
-> On Thu, Nov 24, 2011 at 06:49:46PM +0000, Mark Brown wrote:
-> > s3c64xx_init_io() is:
-> > 
-> > 	/* initialise the io descriptors we need for initialisation */
-> > 	iotable_init(s3c_iodesc, ARRAY_SIZE(s3c_iodesc));
-> > 	iotable_init(mach_desc, size);
-> > 	init_consistent_dma_size(SZ_8M);
-> > 
-> > 	/* detect cpu id */
-> > 	s3c64xx_init_cpu();
-> > 
-> > 	s3c_init_cpu(samsung_cpu_id, cpu_ids, ARRAY_SIZE(cpu_ids));
-> > 
-> > where s3c64xx_init_cpu() is the function relying on the effects of the
-> > first iotable_init().  It initializes samsung_cpu_id for the call to 
-> > s3c_init_cpu() which calls the callbacks in s3c6400.c or s3c6410.c.
-> > 
-> > Simply moving the detection to init_early() fails though I only tried
-> > briefly.
-> 
-> Okay, so this looks like a regression introduced by Nicolas' patches,
-> so I'm save to move the devel-stable marker to the merge commit in my
-> devel branch between the initial restart changes and Marc's irqchip
-> consolidation effort.
-> 
-> Until this problem is resolved, I'm going to treat Nicolas' vmalloc
-> branch as volatile.
+I agree.  I'll send out V4 this coming week with the clk rate change
+notifiers rolled in.  That means that there won't be any missing
+pieces for my vision of how a complex clk tree should interact with
+drivers.  If it is not what people want then we can probably de-scope
+pieces of it, but I think the architecture is sound.
 
-I just folded Mark's fix into my branch.  So feel free to re-pull the 
-whole thing:
+Thanks for reviewing Shawn.
 
-	git://git.linaro.org/people/nico/linux vmalloc
-
-Thanks.
-
-
-Nicolas
+Regards,
+Mike
