@@ -1,116 +1,115 @@
-From: snjw23@gmail.com (Sylwester Nawrocki)
-Date: Sun, 27 Nov 2011 17:41:27 +0100
-Subject: [PATCH 3/3] drivers/misc: introduce face detection module
- driver(fdif)
-In-Reply-To: <CACVXFVOh=_wAmQB1fm88RTbwoJxCo5w57-TpiH8zx5V-CC_TqA@mail.gmail.com>
-References: <1322281904-14526-1-git-send-email-tom.leiming@gmail.com>	<1322281904-14526-4-git-send-email-tom.leiming@gmail.com>	<4ED1652A.8080701@gmail.com>
- <CACVXFVOh=_wAmQB1fm88RTbwoJxCo5w57-TpiH8zx5V-CC_TqA@mail.gmail.com>
-Message-ID: <4ED26837.7070003@gmail.com>
+From: linux@solonet.org.ua (Denis Kuzmenko)
+Date: Sun, 27 Nov 2011 22:26:11 +0200
+Subject: [PATCH] s3c24xx: cpufreq: Fix compilation error when
+ CONFIG_CPU_FREQ_S3C24XX_DEBUGFS selected.
+Message-ID: <4ED29CE3.8020201@solonet.org.ua>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ming,
+Fix compilation error when CONFIG_CPU_FREQ_S3C24XX_DEBUGFS selected.
 
-On 11/27/2011 04:40 AM, Ming Lei wrote:
-> Hi guys,
-> 
-> Thanks for your comment.
-> 
-> On Sun, Nov 27, 2011 at 6:16 AM, Sylwester Nawrocki <snjw23@gmail.com> wrote:
->> Cc: LMML
->>
->> On 11/26/2011 05:31 AM, tom.leiming at gmail.com wrote:
->>> From: Ming Lei <ming.lei@canonical.com>
->>>
->>> One face detection IP[1] is integared inside OMAP4 SoC, so
->>> introduce this driver to make face detection function work
->>> on OMAP4 SoC.
->>
->> Face detection IP is of course not specific to OMAP, I've seen it in 
->> other SoCs already and integrated with the video capture pipeline.
-> 
-> Yes, the driver is platform independent, so at least it can support
-> the same IP on different platforms.
+Signed-off-by: Denis Kuzmenko <linux@solonet.org.ua>
+---
 
-It's all good, however we need to ensure interoperability with existing
-drivers. I mean it shouldn't be difficult to setup data processing
-pipelines containing  various types of devices, like video capture,
-resizers, filters, etc. The situation where each type of device makes up
-their own interface is rather far from ideal.
+Patch is against 3.2-rc3.
+CONFIG_S3C2410_IOTIMING wasn't present in Kconfig but was referenced by
+Makefile. Because of this the file s3c2410-iotiming.c was not ever compiled
+and enabling CONFIG_CPU_FREQ_S3C24XX_DEBUGFS option caused undefined
+reference to function s3c2410_iotiming_debugfs defined in that file.
 
->>
->> And it clearly belongs to the media subsystem, there is already an 
->> infrastructure there that don't need to be re-invented, like buffer 
->> management and various IO method support.
->>
->> I think there is not much needed on top of that to support FD. We have 
->> already various mem-to-mem devices in V4L2, like video or image encoders
->> or video post-processors.
-> 
-> I have thought about the FD implementation on v4l2 core, but still not
-> very clear
-> how to do it. I will study v4l2 further to figure out how to do it.
-
-I think we need a new user interface for that, the closest match would be
-the Video Output Interface [1], IMHO this could be used as a base. I got
-a bit confused by the additional working memory requirement and thought
-the FDIF needs input and output memory buffers to process single image
-frame. But that's not the case so there is no reason to bother with
-the mem-to-mem interface.
-
-Unfortunately there is no example of virtual output device driver in v4l2
-yet. There is only one for the capture devices - drivers/media/video/vivi.c
-
-For video output one uses V4L2_BUF_TYPE_VIDEO_OUTPUT buffer type instead of
-V4L2_BUF_TYPE_VIDEO_CAPTURE and at the kernel side .vidioc_*_out operations
-of struct v4l2_ioctl_ops should be implemented, rather than .vidioc_*_cap.
-
-> 
-> Now below are the basic requirements from FD:
-> 
-> - FD on video stream or pictures from external files
-> - FD on video stream or pictures from video device
-> (such as camera)
-
-It's up to the applications in what way the image data is loaded into
-memory buffer, if it comes from a file or from other device. Once it is in
-standard v4l2 buffer object it can be shared between v4l2 drivers,
-still user space needs to queue/de-queue buffers. See QBUF/DQBUF ioctls
-[4] for more information.
-
-> - the input video format may be different for different FD IP
-
-That's normally handled by each v4l2 device, see [2] for details at the
-user side, and vidioc_s_fmt_vid_cap() in vivi for example.
-
-> - one method is required to start or stop FD
-
-I suppose VIDIOC_STREAMON/VIDIOC_STREAMOFF would do the job, see [3] and
-start/stop_streaming functions in vivi.
-
-> - one method is required to report the detection results to user space
-
-Perhaps we need new ioctl(s) for that. And possibly some new controls,
-or even new control class [5], [6].
-
-It would also be good to get requirements for other hardware implementations
-existing out there. I might be able to look at the Samsung ones eventually,
-but cannot guarantee this.
-
-> 
-> Any suggestions on how to implement FD on v4l2?
-> 
-> thanks,
-> --
-> Ming Lei
-
--- 
-Regards,
-Sylwester
-
-[1] http://linuxtv.org/downloads/v4l-dvb-apis/devices.html
-[2] http://linuxtv.org/downloads/v4l-dvb-apis/vidioc-g-fmt.html
-[3] http://linuxtv.org/downloads/v4l-dvb-apis/vidioc-streamon.html
-[4] http://linuxtv.org/downloads/v4l-dvb-apis/vidioc-qbuf.html
-[5] http://linuxtv.org/downloads/v4l-dvb-apis/control.html
-[6] http://linuxtv.org/downloads/v4l-dvb-apis/extended-controls.html
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 44789ef..81d7025 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -2104,9 +2104,31 @@ config CPU_FREQ_S3C24XX_DEBUG
+ 	help
+ 	  Enable s3c_freq_dbg for the Samsung S3C CPUfreq core
+ 
++config S3C2410_IOTIMING
++	bool "CPUfreq iotiming for Samsung S3C2410 series CPUs"
++	depends on ARCH_S3C2410 && CPU_FREQ && CPU_FREQ_S3C24XX && EXPERIMENTAL
++	help
++	  This enables the CPUfreq driver for the Samsung S3C24XX to change
++	  IO timing according to the CPU frequency.
++
++	  For details, take a look at <file:Documentation/cpu-freq>.
++
++	  If in doubt, say Y.
++
++config S3C2412_IOTIMING
++	bool "CPUfreq iotiming for Samsung S3C2412 series CPUs"
++	depends on ARCH_S3C2412 && CPU_FREQ && CPU_FREQ_S3C24XX && EXPERIMENTAL
++	help
++	  This enables the CPUfreq driver for the Samsung S3C2412 to change
++	  IO timing according to the CPU frequency.
++
++	  For details, take a look at <file:Documentation/cpu-freq>.
++
++	  If in doubt, say Y.
++
+ config CPU_FREQ_S3C24XX_IODEBUG
+ 	bool "Debug CPUfreq Samsung driver IO timing"
+-	depends on CPU_FREQ_S3C24XX
++	depends on CPU_FREQ_S3C24XX && (S3C2410_IOTIMING || S3C2412_IOTIMING)
+ 	help
+ 	  Enable s3c_freq_iodbg for the Samsung S3C CPUfreq core
+ 
+diff --git a/arch/arm/plat-samsung/include/plat/cpu-freq-core.h b/arch/arm/plat-samsung/include/plat/cpu-freq-core.h
+index dac4760..c465252 100644
+--- a/arch/arm/plat-samsung/include/plat/cpu-freq-core.h
++++ b/arch/arm/plat-samsung/include/plat/cpu-freq-core.h
+@@ -202,13 +202,23 @@ extern int s3c_plltab_register(struct cpufreq_frequency_table *plls,
+ extern struct s3c_cpufreq_config *s3c_cpufreq_getconfig(void);
+ extern struct s3c_iotimings *s3c_cpufreq_getiotimings(void);
+ 
+-extern void s3c2410_iotiming_debugfs(struct seq_file *seq,
+-				     struct s3c_cpufreq_config *cfg,
+-				     union s3c_iobank *iob);
+-
+-extern void s3c2412_iotiming_debugfs(struct seq_file *seq,
+-				     struct s3c_cpufreq_config *cfg,
+-				     union s3c_iobank *iob);
++#ifdef CONFIG_CPU_FREQ_S3C24XX_DEBUGFS
++	#ifdef CONFIG_S3C2410_IOTIMING
++	extern void s3c2410_iotiming_debugfs(struct seq_file *seq,
++					     struct s3c_cpufreq_config *cfg,
++					     union s3c_iobank *iob);
++	#else
++	#define s3c2410_iotiming_debugfs	NULL
++	#endif
++
++	#ifdef CONFIG_S3C2412_IOTIMING
++	extern void s3c2412_iotiming_debugfs(struct seq_file *seq,
++					     struct s3c_cpufreq_config *cfg,
++					     union s3c_iobank *iob);
++	#else
++	#define s3c2412_iotiming_debugfs	NULL
++	#endif
++#endif
+ 
+ #ifdef CONFIG_CPU_FREQ_S3C24XX_DEBUGFS
+ #define s3c_cpufreq_debugfs_call(x) x
+@@ -241,10 +251,7 @@ extern void s3c2410_iotiming_set(struct s3c_cpufreq_config *cfg,
+ #endif /* CONFIG_S3C2410_IOTIMING */
+ 
+ /* S3C2412 compatible routines */
+-
+-extern int s3c2412_iotiming_get(struct s3c_cpufreq_config *cfg,
+-				struct s3c_iotimings *timings);
+-
++#ifdef CONFIG_S3C2412_IOTIMING
+ extern int s3c2412_iotiming_get(struct s3c_cpufreq_config *cfg,
+ 				struct s3c_iotimings *timings);
+ 
+@@ -253,6 +260,11 @@ extern int s3c2412_iotiming_calc(struct s3c_cpufreq_config *cfg,
+ 
+ extern void s3c2412_iotiming_set(struct s3c_cpufreq_config *cfg,
+ 				 struct s3c_iotimings *iot);
++#else
++#define s3c2412_iotiming_calc NULL
++#define s3c2412_iotiming_get NULL
++#define s3c2412_iotiming_set NULL
++#endif
+ 
+ #ifdef CONFIG_CPU_FREQ_S3C24XX_DEBUG
+ #define s3c_freq_dbg(x...) printk(KERN_INFO x)
