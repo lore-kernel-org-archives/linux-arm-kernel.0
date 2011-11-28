@@ -1,87 +1,72 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 28 Nov 2011 14:19:18 +0100
-Subject: [PATCH V2] mfd: Fixed unconditional reset of the ADC reading
- enable bits
-In-Reply-To: <1322484759-17809-1-git-send-email-robin@protonic.nl>
-References: <1322484759-17809-1-git-send-email-robin@protonic.nl>
-Message-ID: <20111128131918.GK17668@pengutronix.de>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Mon, 28 Nov 2011 21:23:59 +0800
+Subject: [PATCH 1/7] pinctrl: enable pxa3xx pinmux
+In-Reply-To: <CACRpkdawJNP4h3gvZ4FfHYkYwzoKdcPRpQt94dieuU3gdZNESQ@mail.gmail.com>
+References: <1322262544-7854-1-git-send-email-haojian.zhuang@marvell.com>
+ <1322262544-7854-2-git-send-email-haojian.zhuang@marvell.com>
+ <CACRpkdYPd7a29Sj-F-Aj8vqa3v7unCKNtPH5EPWwapbYgKFLRw@mail.gmail.com>
+ <25B60CDC2F704E4E9D88FFD52780CB4C05EC95D66A@SC-VEXCH1.marvell.com>
+ <CACRpkdawJNP4h3gvZ4FfHYkYwzoKdcPRpQt94dieuU3gdZNESQ@mail.gmail.com>
+Message-ID: <CAN1soZxhZUDhyTde2=PEzzZzar7EowHd=YSfXMXXjtjGQbqO1w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 28, 2011 at 01:52:39PM +0100, Robin van der Gracht wrote:
-> When the ADC is being prepared for a single or multiple channel reading,
-> the adc0 register is reconfigured without taking the lithium cell, charge
-> current and battery current reading enable bits into account. Which results
-> in clearing the bits.
-> 
-> Signed-off-by: Robin van der Gracht <robin@protonic.nl>
-> ---
-> 
-> V2: Maskes now merged to a single mask
-> 
->  drivers/mfd/mc13xxx-core.c  |    4 ++--
->  include/linux/mfd/mc13xxx.h |   10 +++++++++-
->  2 files changed, 11 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/mfd/mc13xxx-core.c b/drivers/mfd/mc13xxx-core.c
-> index e9619ac..5315999 100644
-> --- a/drivers/mfd/mc13xxx-core.c
-> +++ b/drivers/mfd/mc13xxx-core.c
-> @@ -615,13 +615,13 @@ int mc13xxx_adc_do_conversion(struct mc13xxx *mc13xxx, unsigned int mode,
->  		break;
->  
->  	case MC13XXX_ADC_MODE_SINGLE_CHAN:
-> -		adc0 |= old_adc0 & MC13XXX_ADC0_TSMOD_MASK;
-> +		adc0 |= old_adc0 & MC13XXX_ADC0_CONFIG_MASK;
->  		adc1 |= (channel & 0x7) << MC13XXX_ADC1_CHAN0_SHIFT;
->  		adc1 |= MC13XXX_ADC1_RAND;
->  		break;
->  
->  	case MC13XXX_ADC_MODE_MULT_CHAN:
-> -		adc0 |= old_adc0 & MC13XXX_ADC0_TSMOD_MASK;
-> +		adc0 |= old_adc0 & MC13XXX_ADC0_CONFIG_MASK;
->  		adc1 |= 4 << MC13XXX_ADC1_CHAN1_SHIFT;
->  		break;
->  
-> diff --git a/include/linux/mfd/mc13xxx.h b/include/linux/mfd/mc13xxx.h
-> index 3816c2f..c5011d4 100644
-> --- a/include/linux/mfd/mc13xxx.h
-> +++ b/include/linux/mfd/mc13xxx.h
-> @@ -172,7 +172,10 @@ struct mc13xxx_platform_data {
->  #define MC13XXX_ADC_MODE_SINGLE_CHAN	2
->  #define MC13XXX_ADC_MODE_MULT_CHAN	3
->  
-> -#define MC13XXX_ADC0		43
-> +#define MC13XXX_ADC0			43
-If you keep the line as is (i.e. only two tabs) you can have my Ack.
-(The indention is then identical with the one used in
-drivers/mfd/mc13xxx-core.c, register offsets appear further to the left
-than the masks of the registers.)
+On Mon, Nov 28, 2011 at 9:17 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Mon, Nov 28, 2011 at 10:50 AM, Haojian Zhuang <hzhuang1@marvell.com> wrote:
+>
+>> The only block issue at here is that cpu_is_pxa3xx() is defined in arch-pxa and cpu_is_pxa910()
+>> is defined in arch-mmp. If I only enable arch-pxa, I would meet build error for undefined
+>> cpu_is_pxa910().
+>
+> Please #ifdef and cpu_is_* in arch/arm/mach-* then pass a flag or enumerator
+> with the platform data to the driver. This way the platform data uniformly
+> tells the driver what machine/cpu it is, and the driver need not hold any
+> knowledge of the system or use machine-specific functions.
+>
+> I don't understand where your cpu_is* functions come from anyway,
+> which of these includes:
+>
+> +#include <linux/device.h>
+> +#include <linux/module.h>
+> +#include <linux/gpio.h>
+> +#include <linux/io.h>
+> +#include <linux/pinctrl/pinctrl.h>
+> +#include <linux/pinctrl/pinmux.h>
+> +#include <linux/platform_device.h>
+>
+> Actually provides it?
+>
+> Please include that file explicitly and I'll tell you to
+> not include it :-D
+>
+> Since this driver will be used by multiple platforms, why not
+> create
+> include/linux/pinctrl/pxa3xx.h and define your platform data
+> struct there like:
+>
+> #include <linux/pinctrl/machine.h>
+>
+> /* Unless an enumerator or defines like this exist already */
+> enum pxa_cpu_type {
+> ? PXA_FOO,
+> ? PXA_BAR,
+> ? PXA_FNORD,
+> };
+>
+> struct pxa3xx_pinmux_plat {
+> ? ?enum pxa_cpu_type cputype;
+> ? ?...other interesting stuff ...
+> };
+>
+> Fill it in in your machine and pick it up in your
+> driver.
+>
+> Yours,
+> Linus Walleij
+>
 
-Best regards
-Uwe
+How about define cpu_is_pxa3xx() in both arch-pxa and arch-mmp? Maybe
+it could be simpler. Since we have similar issue in gpio driver too.
 
-> +#define MC13XXX_ADC0_LICELLCON		(1 << 0)
-> +#define MC13XXX_ADC0_CHRGICON		(1 << 1)
-> +#define MC13XXX_ADC0_BATICON		(1 << 2)
->  #define MC13XXX_ADC0_ADREFEN		(1 << 10)
->  #define MC13XXX_ADC0_TSMOD0		(1 << 12)
->  #define MC13XXX_ADC0_TSMOD1		(1 << 13)
-> @@ -184,4 +187,9 @@ struct mc13xxx_platform_data {
->  					MC13XXX_ADC0_TSMOD1 | \
->  					MC13XXX_ADC0_TSMOD2)
->  
-> +#define MC13XXX_ADC0_CONFIG_MASK	(MC13XXX_ADC0_TSMOD_MASK | \
-> +					MC13XXX_ADC0_LICELLCON | \
-> +					MC13XXX_ADC0_CHRGICON | \
-> +					MC13XXX_ADC0_BATICON)
-> +
->  #endif /* ifndef __LINUX_MFD_MC13XXX_H */
-> -- 
-> 1.7.4.1
-> 
-> 
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Thanks
+Haojian
