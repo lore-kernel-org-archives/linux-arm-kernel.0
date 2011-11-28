@@ -1,174 +1,99 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Mon, 28 Nov 2011 17:41:22 +0000
-Subject: [RFC PATCH] ARM: Add generic instruction opcode manipulation
- helpers
-In-Reply-To: <CAH+eYFBM36VqYAqZdiZnMP7AODh_SqYQWuoFDSyS3BDZDvHU5A@mail.gmail.com>
-References: <1322220493-3251-1-git-send-email-dave.martin@linaro.org>
- <CAH+eYFBM36VqYAqZdiZnMP7AODh_SqYQWuoFDSyS3BDZDvHU5A@mail.gmail.com>
-Message-ID: <20111128174122.GG2465@localhost.localdomain>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 28 Nov 2011 09:45:09 -0800
+Subject: [PATCH 1/5] ARM: OMAP1: Fix dpll1 default rate reprogramming
+ method
+In-Reply-To: <1322364751-29980-2-git-send-email-jkrzyszt@tis.icnet.pl>
+References: <1322364751-29980-1-git-send-email-jkrzyszt@tis.icnet.pl>
+ <1322364751-29980-2-git-send-email-jkrzyszt@tis.icnet.pl>
+Message-ID: <20111128174508.GO31337@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 28, 2011 at 10:29:14PM +0530, Rabin Vincent wrote:
-> On Fri, Nov 25, 2011 at 16:58, Dave Martin <dave.martin@linaro.org> wrote:
-> > +#ifdef CONFIG_CPU_ENDIAN_BE8
-> > +#define __opcode_to_mem_arm(x) swab32(x)
-> > +#define __opcode_to_mem_thumb16(x) swab16(x)
-> > +#define __opcode_to_mem_thumb32(x) swahb32(x)
-> > +#else
-> > +#define __opcode_to_mem_arm(x) (x) ((u32)(x))
-> > +#define __opcode_to_mem_thumb16(x) ((u16)(x))
-> > +#define __opcode_to_mem_thumb32(x) swahw32(x)
-> > +#endif
+* Janusz Krzysztofik <jkrzyszt@tis.icnet.pl> [111126 19:06]:
+> According to comments in omap1_select_table_rate(), reprogramming dpll1
+> is tricky, and should always be done from SRAM.
 > 
-> The current kprobes code does:
+> While being at it, move OMAP730 special case handling inside
+> omap_sram_reprogram_clock().
 > 
-> #ifndef __ARMEB__ /* Swap halfwords for little-endian */
->                 bkp = (bkp >> 16) | (bkp << 16);
-> #endif
+> Created on top of omap-fixes, not yet in mainline as of 3.2-rc3.
+> Tested on Amstrad Delta.
+
+Thanks for looking into these issues. For most of this we should plan on
+getting them done for the next merge window because we currently rely
+on Kconfig options for the supported MHz rates. This means that with
+this change omap1_defconfig will stop booting on most systems as it
+would try to change to 216MHz. To fix that issue we should allow the
+boards to set the supported rates before applying this patch.
+
+Regards,
+
+Tony
+ 
+> Signed-off-by: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
+> ---
+>  arch/arm/mach-omap1/clock.c      |    6 +-----
+>  arch/arm/mach-omap1/clock_data.c |    7 +++++--
+>  arch/arm/plat-omap/sram.c        |    3 +++
+>  3 files changed, 9 insertions(+), 7 deletions(-)
 > 
-> There seems to be a difference between your macros and that for the case
-> __ARMEB__ + !CONFIG_CPU_ENDIAN_BE8.  Or is that combination not
-> possible?
-> 
-
-For building the kernel, it is effectively impossible, since you can't
-have Thumb-2 code on BE32 platforms.  The opcode_to_mem_thumb*()
-definitions are currently "don't cares" for this configuration in
-my RFC, but we should probably clarify how things should behave in this
-case.
-
-The kprobes code does not look correct for the big-endian case, since
-the bytes are not swapped -- this will result in big-endian words or
-halfwords in memory, which would be correct for BE32 but not for BE8
-(where instructions are always little-endian).
-
-So they're both wrong, in different ways if I've understood correctly.
-
-
-I'm not exactly sure how we handle BE32, or whether we need to.  I
-believe that for BE32 it would be correct to leave the canonical
-instruction completely un-swapped, because instructions are natively
-big-endian on those platforms.  Note that BE32 is only applicable to
-older versions of the architecture, and so Thumb-2 is not applicable to
-any BE32 platform, so the only situation where we would care is if
-kprobes, ftrace or similar allows breakpoints or tracepoints to be set
-in userspace Thumb code on these platforms.
-
-I think that __ARMEB__ encompasses any big-endian target including BE8
-and BE32, so we might need to be a bit careful about how we use it.
-
-
-Rabin, did the __opcode_read stuff look useful for ftrace?  My idea
-was to factor out the logic of how to read/write a whole instruction,
-but my proposal may be overkill...
-
-
-Tixy, do you have a view on these issues?
-
-> > +
-> > +#define __mem_to_opcode_arm(x) __opcode_to_mem_arm(x)
-> > +#define __mem_to_opcode_thumb16(x) __opcode_to_mem_thumb16(x)
-> > +#define __mem_to_opcode_thumb32(x) __opcode_to_mem_thumb32(x)
-> > +
-> > +/* Operations specific to Thumb opcodes */
-> > +
-> > +/* Instruction size checks: */
-> > +#define __opcode_is_thumb32(x) ((u32)(x) >= 0xE8000000UL)
-> > +#define __opcode_is_thumb16(x) ((u32)(x) < 0xE800UL)
-> > +
-> > +/* Operations to construct or split 32-bit Thumb instructions: */
-> > +#define __opcode_thumb32_first(x) ((u16)((thumb_opcode) >> 16))
-> > +#define __opcode_thumb32_second(x) ((u16)(thumb_opcode))
-> > +#define __opcode_thumb32_compose(first, second) \
-> > + ? ? ? (((u32)(u16)(first) << 16) | (u32)(u16)(second))
-> 
-> All of these could certainly find use in the files being touched by
-> the jump label patchset:
-
-I haven't reviewed everything, but yes -- that looks like the kind
-of usage I was trying to enable.
-
-Cheers
----Dave
-
-> 
-> diff --git a/arch/arm/kernel/ftrace.c b/arch/arm/kernel/ftrace.c
-> index c46d18b..c437a9d 100644
-> --- a/arch/arm/kernel/ftrace.c
-> +++ b/arch/arm/kernel/ftrace.c
-> @@ -72,12 +72,13 @@ static int ftrace_modify_code(unsigned long pc,
-> unsigned long old,
->  {
->  	unsigned long replaced;
-> 
-> -#ifndef __ARMEB__
->  	if (IS_ENABLED(CONFIG_THUMB2_KERNEL)) {
-> -		old = (old >> 16) | (old << 16);
-> -		new = (new >> 16) | (new << 16);
-> +		old = __opcode_to_mem_thumb32(old);
-> +		new = __opcode_to_mem_thumb32(new);
-> +	} else {
-> +		old = __opcode_to_mem_arm(old);
-> +		new = __opcode_to_mem_arm(new);
+> diff --git a/arch/arm/mach-omap1/clock.c b/arch/arm/mach-omap1/clock.c
+> index 84ef704..3899176 100644
+> --- a/arch/arm/mach-omap1/clock.c
+> +++ b/arch/arm/mach-omap1/clock.c
+> @@ -215,12 +215,8 @@ int omap1_select_table_rate(struct clk *clk, unsigned long rate)
+>  	/*
+>  	 * In most cases we should not need to reprogram DPLL.
+>  	 * Reprogramming the DPLL is tricky, it must be done from SRAM.
+> -	 * (on 730, bit 13 must always be 1)
+>  	 */
+> -	if (cpu_is_omap7xx())
+> -		omap_sram_reprogram_clock(ptr->dpllctl_val, ptr->ckctl_val | 0x2000);
+> -	else
+> -		omap_sram_reprogram_clock(ptr->dpllctl_val, ptr->ckctl_val);
+> +	omap_sram_reprogram_clock(ptr->dpllctl_val, ptr->ckctl_val);
+>  
+>  	/* XXX Do we need to recalculate the tree below DPLL1 at this point? */
+>  	ck_dpll1_p->rate = ptr->pll_rate;
+> diff --git a/arch/arm/mach-omap1/clock_data.c b/arch/arm/mach-omap1/clock_data.c
+> index 1297bb5..4550415 100644
+> --- a/arch/arm/mach-omap1/clock_data.c
+> +++ b/arch/arm/mach-omap1/clock_data.c
+> @@ -23,6 +23,7 @@
+>  #include <plat/clock.h>
+>  #include <plat/cpu.h>
+>  #include <plat/clkdev_omap.h>
+> +#include <plat/sram.h>	/* for omap_sram_reprogram_clock() */
+>  #include <plat/usb.h>   /* for OTG_BASE */
+>  
+>  #include "clock.h"
+> @@ -933,8 +934,10 @@ void __init omap1_clk_late_init(void)
+>  	/* Find the highest supported frequency and enable it */
+>  	if (omap1_select_table_rate(&virtual_ck_mpu, ~0)) {
+>  		pr_err("System frequencies not set, using default. Check your config.\n");
+> -		omap_writew(0x2290, DPLL_CTL);
+> -		omap_writew(cpu_is_omap7xx() ? 0x3005 : 0x1005, ARM_CKCTL);
+> +		/*
+> +		 * Reprogramming the DPLL is tricky, it must be done from SRAM.
+> +		 */
+> +		omap_sram_reprogram_clock(0x2290, 0x1005);
+>  		ck_dpll1.rate = OMAP1_DPLL1_SANE_VALUE;
 >  	}
-> -#endif
-> 
->  	if (old) {
->  		if (probe_kernel_read(&replaced, (void *)pc, MCOUNT_INSN_SIZE))
-> diff --git a/arch/arm/kernel/insn.c b/arch/arm/kernel/insn.c
-> index f65b68c..9079997 100644
-> --- a/arch/arm/kernel/insn.c
-> +++ b/arch/arm/kernel/insn.c
-> @@ -27,7 +27,7 @@ __arm_gen_branch_thumb2(unsigned long pc, unsigned
-> long addr, bool link)
->  	if (link)
->  		second |= 1 << 14;
-> 
-> -	return (first << 16) | second;
-> +	return __opcode_thumb32_compose(first, second);
+>  	propagate_rate(&ck_dpll1);
+> diff --git a/arch/arm/plat-omap/sram.c b/arch/arm/plat-omap/sram.c
+> index 8b28664..312bee8 100644
+> --- a/arch/arm/plat-omap/sram.c
+> +++ b/arch/arm/plat-omap/sram.c
+> @@ -224,6 +224,9 @@ static void (*_omap_sram_reprogram_clock)(u32 dpllctl, u32 ckctl);
+>  void omap_sram_reprogram_clock(u32 dpllctl, u32 ckctl)
+>  {
+>  	BUG_ON(!_omap_sram_reprogram_clock);
+> +	/* On 730, bit 13 must always be 1 */
+> +	if (cpu_is_omap7xx())
+> +		ckctl |= 0x2000;
+>  	_omap_sram_reprogram_clock(dpllctl, ckctl);
 >  }
+>  
+> -- 
+> 1.7.3.4
 > 
->  static unsigned long
-> diff --git a/arch/arm/kernel/patch.c b/arch/arm/kernel/patch.c
-> index 15df8a5..5398659 100644
-> --- a/arch/arm/kernel/patch.c
-> +++ b/arch/arm/kernel/patch.c
-> @@ -17,21 +17,21 @@ void __kprobes __patch_text(void *addr, unsigned int insn)
->  	bool thumb2 = IS_ENABLED(CONFIG_THUMB2_KERNEL);
->  	int size;
-> 
-> -	if (thumb2 && !is_wide_instruction(insn)) {
-> -		*(u16 *)addr = insn;
-> +	if (thumb2 && __opcode_is_thumb16(insn)) {
-> +		*(u16 *)addr = __opcode_to_mem_thumb16(insn);
->  		size = sizeof(u16);
->  	} else if (thumb2 && ((uintptr_t)addr & 2)) {
->  		u16 *addrh = addr;
-> 
-> -		addrw[0] = insn >> 16;
-> -		addrw[1] = insn & 0xffff;
-> +		addrw[0] = __opcode_thumb32_first(insn);
-> +		addrw[1] = __opcode_thumb32_second(insn);
-> 
->  		size = sizeof(u32);
->  	} else {
-> -#ifndef __ARMEB__
->  		if (thumb2)
-> -			insn = (insn >> 16) | (insn << 16);
-> -#endif
-> +			insn = __opcode_to_mem_thumb32(insn);
-> +		else
-> +			insn = __opcode_to_mem_arm(insn);
-> 
->  		*(u32 *)addr = insn;
->  		size = sizeof(u32);
-> @@ -61,7 +61,7 @@ void __kprobes patch_text(void *addr, unsigned int insn)
->  		stop_machine(patch_text_stop_machine, &patch, cpu_online_mask);
->  	} else {
->  		bool straddles_word = IS_ENABLED(CONFIG_THUMB2_KERNEL)
-> -				      && is_wide_instruction(insn)
-> +				      && __opcode_is_thumb32(insn)
->  				      && ((uintptr_t)addr & 2);
-> 
->  		if (straddles_word)
