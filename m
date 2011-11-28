@@ -1,38 +1,23 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 28 Nov 2011 09:39:23 -0600
-Subject: [PATCH v2 0/4] Versatile Express DT support
-In-Reply-To: <1322493617.3164.56.camel@hornet.cambridge.arm.com>
-References: <1322060508-11298-1-git-send-email-pawel.moll@arm.com>
- <4ED399C8.9080908@gmail.com>
- <1322493617.3164.56.camel@hornet.cambridge.arm.com>
-Message-ID: <4ED3AB2B.7090003@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 28 Nov 2011 15:39:00 +0000
+Subject: [PATCH 4/5] init/calibrate.c: allow for recalibration of loops
+ per jiffy
+In-Reply-To: <1322364751-29980-5-git-send-email-jkrzyszt@tis.icnet.pl>
+References: <1322364751-29980-1-git-send-email-jkrzyszt@tis.icnet.pl>
+ <1322364751-29980-5-git-send-email-jkrzyszt@tis.icnet.pl>
+Message-ID: <20111128153900.GA16481@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/28/2011 09:20 AM, Pawel Moll wrote:
-> On Mon, 2011-11-28 at 14:25 +0000, Rob Herring wrote:
->> Other than Dave's comments, looks good. For the series:
->>
->> Acked-by: Rob Herring <rob.herring@calxeda.com>
+On Sun, Nov 27, 2011 at 04:32:30AM +0100, Janusz Krzysztofik wrote:
+> This is required on ARM OMAP1 platform, after DPLL reprogramming has
+> been fixed by moving it from setup_arch() to kernel_init().
 > 
-> Thanks!
-> 
->> There are a number of compatible strings for various peripherals defined
->> without documentation, but you're not really using them so I think it's
->> fine for now. BTW, I believe Dave said he was going to document some of
->> the primecell peripherals. :)
-> 
-> Yep, we agreed with Dave that the ones I'll take care of soon are MMCI
-> (PL180) and the VE sysregs, the rest is his :-)
-> 
-> On that subject - some time ago I sent a patch adding "sil" vendor
-> string, as this one the only non-documented one I used:
-> 
-> http://article.gmane.org/gmane.linux.drivers.devicetree/9362/
+> Created against linux-3.2-rc2.
 
-Okay. I'll apply.
+Why do you need this?  If you know what the original CPU clock rate and
+bogomips were, and the new CPU clock rate, then you simply scale the
+bogomips from the original accordingly.  That's what cpufreq does.
 
-But that's just a vendor. There's still binding docs needed for the
-actual sil9022 device and some others.
-
-Rob
+You don't have to waste 10s of milliseconds redoing the bogomips
+calibration.
