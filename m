@@ -1,41 +1,35 @@
-From: greg@kroah.com (Greg KH)
-Date: Mon, 28 Nov 2011 15:31:49 +0900
-Subject: [PATCH v2 0/4] OMAP serial device tree support
-In-Reply-To: <4ED32500.5060908@ti.com>
-References: <1321969456-24266-1-git-send-email-rnayak@ti.com>
- <20111127033642.GA28378@kroah.com> <4ED32500.5060908@ti.com>
-Message-ID: <20111128063149.GB15189@kroah.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Sun, 27 Nov 2011 22:35:50 -0800
+Subject: [PATCH] arm/tegra: Fix build error with tegra_assert_system_reset
+In-Reply-To: <20111124203443.GU9581@n2100.arm.linux.org.uk>
+References: <1322009631-711-1-git-send-email-swarren@nvidia.com>
+ <20111123095009.GG9581@n2100.arm.linux.org.uk>
+ <74CDBE0F657A3D45AFBB94109FB122FF174F08C6CC@HQMAIL01.nvidia.com>
+ <20111124203443.GU9581@n2100.arm.linux.org.uk>
+Message-ID: <CAOesGMh4_YRpaXgapJ9DLPH_A8ft=W1tf10kFdQF90JN=R8ziw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 28, 2011 at 11:36:56AM +0530, Rajendra Nayak wrote:
-> On Sunday 27 November 2011 09:06 AM, Greg KH wrote:
-> >On Tue, Nov 22, 2011 at 07:14:12PM +0530, Rajendra Nayak wrote:
-> >>v2 is based on the latest omap-serial runtime patches, which
-> >>can be found here[1]
-> >>
-> >>The series passes minimal data that allows serial console
-> >>boot, with UART's initialised from device tree.
-> >>However some of low power support for UART and remote
-> >>wakeup needs more work.
-> >>Boot tested on OMAP4 panda and OMAP4 sdp boards.
-> >>
-> >>Patches can be found here..
-> >>git://gitorious.org/omap-pm/linux.git for-dt/serial
-> >
-> >What tree are these going to go through, some device tree one, or do you
-> >want me to take the serial driver patches?
-> 
-> Hi Greg,
-> 
-> These patches have a dependency on the omap-serial runtime series.
-> So once that makes it in, through the serial driver tree, and once we
-> have the necessary Acks from the Device Tree maintainers on the relevant
-> patches from this series, these could go through the serial driver tree
-> as well.
+On Thu, Nov 24, 2011 at 12:34 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Wed, Nov 23, 2011 at 08:59:48AM -0800, Stephen Warren wrote:
+>> OK, I tested that and it works too.
+>
+> Great. ?Here's the final patch - could I have an ack for it please?
+>
+> Thanks.
+>
+> 8<======
+> ARM: restart: tegra: use new restart hook
+>
+> Hook these platforms restart code into the new restart hook rather
+> than using arch_reset().
+>
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
-Then all of these should probably go through the device tree tree.
+Acked-by: Olof Johansson <olof@lixom.net>
 
-thanks,
+(tested-by as well, but adding multiple entries seems silly)
 
-greg k-h
+
+-Olof
