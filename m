@@ -1,59 +1,68 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 28 Nov 2011 14:02:27 +0000
-Subject: GIC irq_start detection breaks 3.2 boot on platforms without PPIs
-In-Reply-To: <20111128115324.GH9581@n2100.arm.linux.org.uk>
-References: <20111124163548.GC22031@mudshark.cambridge.arm.com>
- <CAL_Jsq+xZayXkOy2v7y+BittjRfC85mw-bCMrDFwDJOvnMnS8Q@mail.gmail.com>
- <20111125154157.GP12047@mudshark.cambridge.arm.com>
- <20111126220834.GB9581@n2100.arm.linux.org.uk>
- <20111127130016.GB26042@mudshark.cambridge.arm.com>
- <20111128113800.GD26946@mudshark.cambridge.arm.com>
- <20111128115324.GH9581@n2100.arm.linux.org.uk>
-Message-ID: <CAHkRjk5YxCxSAvd4pjRL3Lbj8RzZrsLv304yafPxeORZoj_ZAA@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 28 Nov 2011 08:25:12 -0600
+Subject: [PATCH v2 0/4] Versatile Express DT support
+In-Reply-To: <1322060508-11298-1-git-send-email-pawel.moll@arm.com>
+References: <1322060508-11298-1-git-send-email-pawel.moll@arm.com>
+Message-ID: <4ED399C8.9080908@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28 November 2011 11:53, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Mon, Nov 28, 2011 at 11:38:00AM +0000, Will Deacon wrote:
->> On Sun, Nov 27, 2011 at 01:00:16PM +0000, Will Deacon wrote:
->> > On Sat, Nov 26, 2011 at 10:08:34PM +0000, Russell King - ARM Linux wrote:
->> > > I've merged this into my fixes branch, but when I re-merge this with
->> > > Marc's irqchip consolidation, I get conflicts. ?I think I've fixed it
->> > > correctly, but please check the result, which you'll find in my for-next
->> > > branch.
->> >
->> > Thanks for merging this. I've just had a quick look and the resolution looks
->> > functionally correct to me (I'll try booting your for-next branch tomorrow).
->>
->> I've tested on 1176, A8 and A9 platforms and your for-next branch seems to
->> be ok. I do get these compilation warnings on the UP CPUs:
->>
->> arch/arm/mm/ioremap.c: In function ?unmap_area_sections?:
->> arch/arm/mm/ioremap.c:80:3: warning: passing argument 1 of ?pmd_offset? from incompatible pointer type
->> /home/will/work/aarch32/linux/linux/arch/arm/include/asm/pgtable.h:181:22: note: expected ?struct pud_t *? but argument is of type ?pmdval_t (*)[2]?
->> arch/arm/mm/ioremap.c: In function ?remap_area_sections?:
->> arch/arm/mm/ioremap.c:130:3: warning: passing argument 1 of ?pmd_offset? from incompatible pointer type
->> /home/will/work/aarch32/linux/linux/arch/arm/include/asm/pgtable.h:181:22: note: expected ?struct pud_t *? but argument is of type ?pmdval_t (*)[2]?
->> arch/arm/mm/ioremap.c: In function ?remap_area_supersections?:
->> arch/arm/mm/ioremap.c:167:4: warning: passing argument 1 of ?pmd_offset? from incompatible pointer type
->> /home/will/work/aarch32/linux/linux/arch/arm/include/asm/pgtable.h:181:22: note: expected ?struct pud_t *? but argument is of type ?pmdval_t (*)[2]?
->
-> Welcome to those warnings.
->
-> This is something that I've been complaining about for the last year, and
-> is one of the reasons I've not been all that eager to merge the LPAE
-> patches until it's properly resolved.
->
-> The problem is caused by my "ARM: pgtable: switch to use pgtable-nopud.h"
-> commit, which fixes up everywhere we access a small page table to use
-> the standard pgd-pud-pmd-pte stuff. ?However, section support makes the
-> conversion completely awful.
+On 11/23/2011 09:01 AM, Pawel Moll wrote:
+> Hello again,
+> 
+> This version of the series (hopefully) addresses all the suggestions
+> made by Dave, Rob and Russell.
+> 
+> The compatible values are specific for the tiles now and the memory
+> map variant is defined as a custom property in the motherboard node.
+> 
+> Tested on V2P-CA9 coretile both with ATAGs and DT and V2P-CA5s with DT.
+> 
+> All comments, as always, welcomed!
+> 
+> Pawel
+> 
+> 
+> 
+> Pawel Moll (4):
+>   ARM: vexpress: Get rid of MMIO_P2V
+>   ARM: vexpress: Add DT support in v2m
+>   ARM: vexpress: Initial RS1 memory map support
+>   ARM: vexpress: DT-based support for CoreTiles Express A5x2 and A9x4
+> 
+>  Documentation/devicetree/bindings/arm/vexpress    |  101 ++++++++
+>  arch/arm/boot/dts/vexpress-v2m-rs1.dtsi           |  192 +++++++++++++++
+>  arch/arm/boot/dts/vexpress-v2m.dtsi               |  191 +++++++++++++++
+>  arch/arm/boot/dts/vexpress-v2p-ca5s.dts           |  132 ++++++++++
+>  arch/arm/boot/dts/vexpress-v2p-ca9.dts            |  146 +++++++++++
+>  arch/arm/include/asm/hardware/arm_timer.h         |    5 +
+>  arch/arm/mach-vexpress/Kconfig                    |   35 +++
+>  arch/arm/mach-vexpress/Makefile                   |    1 +
+>  arch/arm/mach-vexpress/Makefile.boot              |    6 +
+>  arch/arm/mach-vexpress/core.h                     |   21 ++-
+>  arch/arm/mach-vexpress/ct-ca9x4.c                 |   52 +---
+>  arch/arm/mach-vexpress/include/mach/ct-ca9x4.h    |   13 +-
+>  arch/arm/mach-vexpress/include/mach/debug-macro.S |   37 +++-
+>  arch/arm/mach-vexpress/include/mach/motherboard.h |   58 +++--
+>  arch/arm/mach-vexpress/include/mach/uncompress.h  |   13 +-
+>  arch/arm/mach-vexpress/platsmp.c                  |    4 +-
+>  arch/arm/mach-vexpress/v2m.c                      |  265 ++++++++++++++++++---
+>  arch/arm/mach-vexpress/v2p-ca5s_ca9.c             |  115 +++++++++
+>  18 files changed, 1272 insertions(+), 115 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/arm/vexpress
+>  create mode 100644 arch/arm/boot/dts/vexpress-v2m-rs1.dtsi
+>  create mode 100644 arch/arm/boot/dts/vexpress-v2m.dtsi
+>  create mode 100644 arch/arm/boot/dts/vexpress-v2p-ca5s.dts
+>  create mode 100644 arch/arm/boot/dts/vexpress-v2p-ca9.dts
+>  create mode 100644 arch/arm/mach-vexpress/v2p-ca5s_ca9.c
 
-I've had a fix around for a while (and I agree, there are many other
-ways to solve this but that's the least intrusive):
+Other than Dave's comments, looks good. For the series:
 
-http://git.kernel.org/?p=linux/kernel/git/cmarinas/linux-arm-arch.git;a=commitdiff;h=0473666c7954040b0f72e2ef5f8b9fa3272440e0
+Acked-by: Rob Herring <rob.herring@calxeda.com>
 
--- 
-Catalin
+There are a number of compatible strings for various peripherals defined
+without documentation, but you're not really using them so I think it's
+fine for now. BTW, I believe Dave said he was going to document some of
+the primecell peripherals. :)
+
+Rob
