@@ -1,130 +1,52 @@
-From: rabin@rab.in (Rabin Vincent)
-Date: Mon, 28 Nov 2011 22:29:14 +0530
-Subject: [RFC PATCH] ARM: Add generic instruction opcode manipulation
- helpers
-In-Reply-To: <1322220493-3251-1-git-send-email-dave.martin@linaro.org>
-References: <1322220493-3251-1-git-send-email-dave.martin@linaro.org>
-Message-ID: <CAH+eYFBM36VqYAqZdiZnMP7AODh_SqYQWuoFDSyS3BDZDvHU5A@mail.gmail.com>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Mon, 28 Nov 2011 17:00:02 +0000
+Subject: [PATCH v2 4/4] ARM: vexpress: DT-based support for CoreTiles
+ Express A5x2 and A9x4
+In-Reply-To: <20111128162925.GE2465@localhost.localdomain>
+References: <1322060508-11298-1-git-send-email-pawel.moll@arm.com>
+ <1322060508-11298-5-git-send-email-pawel.moll@arm.com>
+ <20111128162925.GE2465@localhost.localdomain>
+Message-ID: <1322499602.3164.73.camel@hornet.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 25, 2011 at 16:58, Dave Martin <dave.martin@linaro.org> wrote:
-> +#ifdef CONFIG_CPU_ENDIAN_BE8
-> +#define __opcode_to_mem_arm(x) swab32(x)
-> +#define __opcode_to_mem_thumb16(x) swab16(x)
-> +#define __opcode_to_mem_thumb32(x) swahb32(x)
-> +#else
-> +#define __opcode_to_mem_arm(x) (x) ((u32)(x))
-> +#define __opcode_to_mem_thumb16(x) ((u16)(x))
-> +#define __opcode_to_mem_thumb32(x) swahw32(x)
-> +#endif
+On Mon, 2011-11-28 at 16:29 +0000, Dave Martin wrote:
+> > +config ARCH_VEXPRESS_V2P_CA5S_CA9
+> > +	bool "CoreTile Express A5x2 and A9x4 based platform support"
+> > +	select ARCH_VEXPRESS_RS1
+> > +	select ARCH_VEXPRESS_DT
+> 
+> Shouldn't we depend on CPU_V7, ARM_GIC and CACHE_PL310 here?  I get a lot of
+> moaning from Kconfig about unmet dependencies.  I think the coretiles do have
+> a CPU etc. on them... 
 
-The current kprobes code does:
+CPU_V7 and ARM_GIC - definitely, thanks for spotting that.
 
-#ifndef __ARMEB__ /* Swap halfwords for little-endian */
-                bkp = (bkp >> 16) | (bkp << 16);
-#endif
+CACHE_PL310 - I don't think so, as it's just a special case of
+CACHE_L2X0, which is optional. The tile works fine with the L2 cache
+disabled.
 
-There seems to be a difference between your macros and that for the case
-__ARMEB__ + !CONFIG_CPU_ENDIAN_BE8.  Or is that combination not
-possible?
+> > +	select ARM_ERRATA_720789
+> > +	select ARM_ERRATA_751472
+> 
+> The workarounds for these errata both erroneously depend on CONFIG_SMP; however,
+> I don't think that's a bug in these patches -- selecting those options here
+> feels correct.
 
-> +
-> +#define __mem_to_opcode_arm(x) __opcode_to_mem_arm(x)
-> +#define __mem_to_opcode_thumb16(x) __opcode_to_mem_thumb16(x)
-> +#define __mem_to_opcode_thumb32(x) __opcode_to_mem_thumb32(x)
-> +
-> +/* Operations specific to Thumb opcodes */
-> +
-> +/* Instruction size checks: */
-> +#define __opcode_is_thumb32(x) ((u32)(x) >= 0xE8000000UL)
-> +#define __opcode_is_thumb16(x) ((u32)(x) < 0xE800UL)
-> +
-> +/* Operations to construct or split 32-bit Thumb instructions: */
-> +#define __opcode_thumb32_first(x) ((u16)((thumb_opcode) >> 16))
-> +#define __opcode_thumb32_second(x) ((u16)(thumb_opcode))
-> +#define __opcode_thumb32_compose(first, second) \
-> + ? ? ? (((u32)(u16)(first) << 16) | (u32)(u16)(second))
+Yes, I've just mirrored what the ARCH_VEXPRESS_CA9X4 selects.
 
-All of these could certainly find use in the files being touched by
-the jump label patchset:
+> > +	select ARM_ERRATA_753970
+> 
+> Will has a patch, now in Russell's fixes branch, which renames this to
+> PL310_ERRATA_753970 for compatibility with other people's patches. 
+> This erratum workaround depends on CACHE_PL310, but since the PL310 is
+> a property of the CoreTile which must be configured in, that dependency
+> seems reasonable.
 
-diff --git a/arch/arm/kernel/ftrace.c b/arch/arm/kernel/ftrace.c
-index c46d18b..c437a9d 100644
---- a/arch/arm/kernel/ftrace.c
-+++ b/arch/arm/kernel/ftrace.c
-@@ -72,12 +72,13 @@ static int ftrace_modify_code(unsigned long pc,
-unsigned long old,
- {
- 	unsigned long replaced;
+As the PL310 is optional I think I'll just do:
 
--#ifndef __ARMEB__
- 	if (IS_ENABLED(CONFIG_THUMB2_KERNEL)) {
--		old = (old >> 16) | (old << 16);
--		new = (new >> 16) | (new << 16);
-+		old = __opcode_to_mem_thumb32(old);
-+		new = __opcode_to_mem_thumb32(new);
-+	} else {
-+		old = __opcode_to_mem_arm(old);
-+		new = __opcode_to_mem_arm(new);
- 	}
--#endif
+        select PL310_ERRATA_753970 if CACHE_PL310
 
- 	if (old) {
- 		if (probe_kernel_read(&replaced, (void *)pc, MCOUNT_INSN_SIZE))
-diff --git a/arch/arm/kernel/insn.c b/arch/arm/kernel/insn.c
-index f65b68c..9079997 100644
---- a/arch/arm/kernel/insn.c
-+++ b/arch/arm/kernel/insn.c
-@@ -27,7 +27,7 @@ __arm_gen_branch_thumb2(unsigned long pc, unsigned
-long addr, bool link)
- 	if (link)
- 		second |= 1 << 14;
+Cheers!
 
--	return (first << 16) | second;
-+	return __opcode_thumb32_compose(first, second);
- }
-
- static unsigned long
-diff --git a/arch/arm/kernel/patch.c b/arch/arm/kernel/patch.c
-index 15df8a5..5398659 100644
---- a/arch/arm/kernel/patch.c
-+++ b/arch/arm/kernel/patch.c
-@@ -17,21 +17,21 @@ void __kprobes __patch_text(void *addr, unsigned int insn)
- 	bool thumb2 = IS_ENABLED(CONFIG_THUMB2_KERNEL);
- 	int size;
-
--	if (thumb2 && !is_wide_instruction(insn)) {
--		*(u16 *)addr = insn;
-+	if (thumb2 && __opcode_is_thumb16(insn)) {
-+		*(u16 *)addr = __opcode_to_mem_thumb16(insn);
- 		size = sizeof(u16);
- 	} else if (thumb2 && ((uintptr_t)addr & 2)) {
- 		u16 *addrh = addr;
-
--		addrw[0] = insn >> 16;
--		addrw[1] = insn & 0xffff;
-+		addrw[0] = __opcode_thumb32_first(insn);
-+		addrw[1] = __opcode_thumb32_second(insn);
-
- 		size = sizeof(u32);
- 	} else {
--#ifndef __ARMEB__
- 		if (thumb2)
--			insn = (insn >> 16) | (insn << 16);
--#endif
-+			insn = __opcode_to_mem_thumb32(insn);
-+		else
-+			insn = __opcode_to_mem_arm(insn);
-
- 		*(u32 *)addr = insn;
- 		size = sizeof(u32);
-@@ -61,7 +61,7 @@ void __kprobes patch_text(void *addr, unsigned int insn)
- 		stop_machine(patch_text_stop_machine, &patch, cpu_online_mask);
- 	} else {
- 		bool straddles_word = IS_ENABLED(CONFIG_THUMB2_KERNEL)
--				      && is_wide_instruction(insn)
-+				      && __opcode_is_thumb32(insn)
- 				      && ((uintptr_t)addr & 2);
-
- 		if (straddles_word)
+Pawel
