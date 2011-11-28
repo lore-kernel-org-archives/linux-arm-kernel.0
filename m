@@ -1,106 +1,81 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 28 Nov 2011 11:07:21 +0000
-Subject: [03: PATCH 0/5] The remaining stuff
-In-Reply-To: <CACRpkdb4ozt1S3CrEeWGY5zeeJ-=vi8Wh18jv9AONRAH+W1MxQ@mail.gmail.com>
-References: <20111106173113.GI12913@n2100.arm.linux.org.uk>
- <20111106173939.GJ12913@n2100.arm.linux.org.uk>
- <20111106175457.GK12913@n2100.arm.linux.org.uk>
- <20111111171650.GA4154@n2100.arm.linux.org.uk>
- <CACRpkdb4ozt1S3CrEeWGY5zeeJ-=vi8Wh18jv9AONRAH+W1MxQ@mail.gmail.com>
-Message-ID: <20111128110721.GF9581@n2100.arm.linux.org.uk>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Mon, 28 Nov 2011 12:07:29 +0100
+Subject: [PATCH v2 2/3] ARM: Exynos4: Add ioremap interceptor for
+ statically remapped regions
+In-Reply-To: <1320109289-2730-3-git-send-email-thomas.abraham@linaro.org>
+References: <1320109289-2730-1-git-send-email-thomas.abraham@linaro.org>
+ <1320109289-2730-3-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <002901ccadbd$eb7f6280$c27e2780$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 28, 2011 at 11:40:49AM +0100, Linus Walleij wrote:
-> Is this about the problem of where to place the hook
-> for restart as described in this message?
-> http://marc.info/?l=linux-arm-kernel&m=132104005724249&w=2
+Hello,
+
+On Tuesday, November 01, 2011 2:01 AM Thomas Abraham wrote:
+
+> ioremap() request for statically remapped regions are intercepted and the
+> statically assigned virtual address is returned. For requests for which
+> there are no statically remapped regions, the requests are let through.
 > 
-> If you apply that patch I think it's easy to fix that up,
-> if you have some git branch I can base off I can fix
-> it up too.
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+> ---
+>  arch/arm/mach-exynos4/cpu.c             |   16 ++++++++++++++++
+>  arch/arm/mach-exynos4/include/mach/io.h |    5 +++++
+>  2 files changed, 21 insertions(+), 0 deletions(-)
 > 
-> Or you can just throw it into -next so it breaks and I'll fix
-> from there ASAP, no big deal.
+> diff --git a/arch/arm/mach-exynos4/cpu.c b/arch/arm/mach-exynos4/cpu.c
+> index 5b1765b..358624d 100644
+> --- a/arch/arm/mach-exynos4/cpu.c
+> +++ b/arch/arm/mach-exynos4/cpu.c
+> @@ -137,6 +137,22 @@ static struct map_desc exynos4_iodesc1[] __initdata = {
+>  	},
+>  };
+> 
+> +/*
+> + * For all ioremap requests of statically mapped regions, intercept ioremap and
+> + * return virtual address from the iodesc table.
+> + */
+> +void __iomem *exynos4_ioremap(unsigned long phy, size_t size, unsigned int type)
+> +{
+> +	struct map_desc *desc = exynos4_iodesc;
+> +	unsigned int idx;
+> +
+> +	for (idx = 0; idx < ARRAY_SIZE(exynos4_iodesc); idx++, desc++)
+> +		if (desc->pfn == __phys_to_pfn(phy) && desc->type == type)
+> +			return (void __iomem *)desc->virtual;
 
-This is about as far as I got with Nomadik.  The patch you point out above
-does appear to fix the problem, and if you put it in the patch system, I'll
-apply it to the restart-cleanup branch, and fix the patch below.
+I've just noticed that this function make access to exynos4_iodesc array which is
+placed in initdata section. This might cause a lot of strange unpredictable issues,
+so this patch should probably remove __initdata annotations in iodesc arrays.
 
-8<===
-ARM: restart: nomadik: use new restart hook XXX WIP XXX WHY IS THERE NO LOCAL HEADERS XXX
+> +
+> +	return __arm_ioremap(phy, size, type);
+> +}
+> +
+>  static void exynos4_idle(void)
+>  {
+>  	if (!need_resched())
+> diff --git a/arch/arm/mach-exynos4/include/mach/io.h b/arch/arm/mach-exynos4/include/mach/io.h
+> index d5478d2..c1b21d5 100644
+> --- a/arch/arm/mach-exynos4/include/mach/io.h
+> +++ b/arch/arm/mach-exynos4/include/mach/io.h
+> @@ -22,5 +22,10 @@
+>  #define __mem_pci(a)	(a)
+> 
+>  #define IO_SPACE_LIMIT (0xFFFFFFFF)
+> +#define __arch_ioremap	exynos4_ioremap
+> +#define __arch_iounmap	__iounmap
+> +
+> +void __iomem *exynos4_ioremap(unsigned long phy, size_t size,
+> +					unsigned int type);
+> 
+>  #endif /* __ASM_ARM_ARCH_IO_H */
+> --
+> 1.7.4.4
+> 
 
-Hook the Nomadik NHK platform restart code into the new restart hook.
-
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- arch/arm/mach-nomadik/board-nhk8815.c       |    1 +
- arch/arm/mach-nomadik/cpu-8815.c            |   11 +++++++++++
- arch/arm/mach-nomadik/include/mach/system.h |    9 ---------
- 3 files changed, 12 insertions(+), 9 deletions(-)
-
-diff --git a/arch/arm/mach-nomadik/board-nhk8815.c b/arch/arm/mach-nomadik/board-nhk8815.c
-index 0cbb74c..c559ed6 100644
---- a/arch/arm/mach-nomadik/board-nhk8815.c
-+++ b/arch/arm/mach-nomadik/board-nhk8815.c
-@@ -282,4 +282,5 @@ MACHINE_START(NOMADIK, "NHK8815")
- 	.init_irq	= cpu8815_init_irq,
- 	.timer		= &nomadik_timer,
- 	.init_machine	= nhk8815_platform_init,
-+	.restart	= cpu8815_restart,
- MACHINE_END
-diff --git a/arch/arm/mach-nomadik/cpu-8815.c b/arch/arm/mach-nomadik/cpu-8815.c
-index dc67717..b4bbe51 100644
---- a/arch/arm/mach-nomadik/cpu-8815.c
-+++ b/arch/arm/mach-nomadik/cpu-8815.c
-@@ -21,6 +21,7 @@
- #include <linux/device.h>
- #include <linux/amba/bus.h>
- #include <linux/platform_device.h>
-+#include <linux/io.h>
- 
- #include <plat/gpio-nomadik.h>
- #include <mach/hardware.h>
-@@ -164,3 +165,13 @@ void __init cpu8815_init_irq(void)
- #endif
- 	 return;
- }
-+
-+void cpu8815_restart(char mode, const char *cmd)
-+{
-+	void __iomem *src_rstsr = io_p2v(NOMADIK_SRC_BASE + 0x18);
-+
-+	/* FIXME: use egpio when implemented */
-+
-+	/* Write anything to Reset status register */
-+	writel(1, src_rstsr);
-+}
-diff --git a/arch/arm/mach-nomadik/include/mach/system.h b/arch/arm/mach-nomadik/include/mach/system.h
-index 7119f68..16f59f6 100644
---- a/arch/arm/mach-nomadik/include/mach/system.h
-+++ b/arch/arm/mach-nomadik/include/mach/system.h
-@@ -20,9 +20,6 @@
- #ifndef __ASM_ARCH_SYSTEM_H
- #define __ASM_ARCH_SYSTEM_H
- 
--#include <linux/io.h>
--#include <mach/hardware.h>
--
- static inline void arch_idle(void)
- {
- 	/*
-@@ -34,12 +31,6 @@ static inline void arch_idle(void)
- 
- static inline void arch_reset(char mode, const char *cmd)
- {
--	void __iomem *src_rstsr = io_p2v(NOMADIK_SRC_BASE + 0x18);
--
--	/* FIXME: use egpio when implemented */
--
--	/* Write anything to Reset status register */
--	writel(1, src_rstsr);
- }
- 
- #endif
+Best regards
 -- 
-1.7.4.4
+Marek Szyprowski
+Samsung Poland R&D Center
