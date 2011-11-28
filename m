@@ -1,172 +1,88 @@
-From: hzhuang1@marvell.com (Haojian Zhuang)
-Date: Mon, 28 Nov 2011 01:50:50 -0800
-Subject: [PATCH 1/7] pinctrl: enable pxa3xx pinmux
-In-Reply-To: <CACRpkdYPd7a29Sj-F-Aj8vqa3v7unCKNtPH5EPWwapbYgKFLRw@mail.gmail.com>
-References: <1322262544-7854-1-git-send-email-haojian.zhuang@marvell.com>
- <1322262544-7854-2-git-send-email-haojian.zhuang@marvell.com>
- <CACRpkdYPd7a29Sj-F-Aj8vqa3v7unCKNtPH5EPWwapbYgKFLRw@mail.gmail.com>
-Message-ID: <25B60CDC2F704E4E9D88FFD52780CB4C05EC95D66A@SC-VEXCH1.marvell.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 28 Nov 2011 11:02:19 +0100
+Subject: [PATCH] ARM: fix unwinding for XIP kernels
+In-Reply-To: <20111128094502.GA1121@arm.com>
+References: <1321537200-9532-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <20111117141706.GI4748@arm.com>
+ <20111120112809.GZ30612@pengutronix.de>
+ <20111121183545.GF3272@arm.com>
+ <20111128092217.GG17668@pengutronix.de>
+ <20111128094502.GA1121@arm.com>
+Message-ID: <20111128100219.GH17668@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Nov 28, 2011 at 09:45:03AM +0000, Catalin Marinas wrote:
+> On Mon, Nov 28, 2011 at 09:22:17AM +0000, Uwe Kleine-K?nig wrote:
+> > Hello,
+> > 
+> > On Mon, Nov 21, 2011 at 06:35:45PM +0000, Catalin Marinas wrote:
+> > > On Sun, Nov 20, 2011 at 11:28:09AM +0000, Uwe Kleine-K?nig wrote:
+> > > > On Thu, Nov 17, 2011 at 02:17:06PM +0000, Catalin Marinas wrote:
+> > > > > On Thu, Nov 17, 2011 at 01:40:00PM +0000, Uwe Kleine-K?nig wrote:
+> > > > > > The linker places the unwind tables in readonly sections. So when using
+> > > > > > an XIP kernel these are located in ROM and cannot be modified.
+> > > > > > 
+> > > > > > For that reason don't convert the symbol addresses during boot (or
+> > > > > > module loading) but only when interpreting them in search_index().
+> > > > > > Moreover several consts are added to catch future writes and rename the
+> > > > > > member "addr" of struct unwind_idx to "addr_offset" to better match the
+> > > > > > new semantic.
+> > > > > > 
+> > > > > > This fixes unwinding on XIP which compared prel31 offsets to absolute
+> > > > > > addresses because the initial conversion from prel31 to absolute failed.
+> > > > > 
+> > > > > My only worry - does this increase the index search by doing the prel31
+> > > > > conversion every time? It could affect tools like lockdep that need to
+> > > > > get the backtrace regularly at run-time.
+> > > > I did a first test now using 
+> > > > 
+> > > > 	static int __init unwind_test(void)
+> > > 
+> > > With your latest patch, have you tried dropping __init from this
+> > > function? Since the .init.text section goes after the unwind_idx tables,
+> > > all the prel31 offsets are positive and the number of init functions is
+> > > smaller than the run-time ones.
+> > Yeah, it works fine. In fact unwinding unwind_test yields:
+> > 
+> > 	do_one_initcall+0x50/0x158
+> > 	kernel_init+0x78/0x120
+> > 	kernel_thread_exit+0x0/0x8
+> > 
+> > where kernel_thread_exit is not in .init.text, too.
+> > 
+> > I don't know why you asked? Did you see a bug? Or is it just to let me
+> > do enough testing before you start reviewing my patches?
+> 
+> It's not a bug, just a wondering about the performance figures you got
+> with your latest patch. When you have __init to unwind_test, the
+> .init.text functions are placed by the linker after the unwinding table,
+> with having a positive prel31 address. All the non-init functions are
+> placed before the table with a negative prel31. With your latest patch,
+> you split the set of functions in two ranges - the non-init one with a
+> negative prel31 and the init functions with a positive prel31 and the
+> binary search only happens on one of these ranges. The problem is that
+> the init range is much smaller than the non-init one, so your benchmark
+> figures may not be realistic.
+> 
+> Could you run the simple benchmark on a non-init function?
+Without __init I get with the original implementation:
 
+	34139, 34127, 34100
 
->-----Original Message-----
->From: Linus Walleij [mailto:linus.walleij at linaro.org]
->Sent: 2011?11?28? 5:08 PM
->To: Haojian Zhuang
->Cc: linux-arm-kernel at lists.infradead.org; swarren at nvidia.com;
->linux at arm.linux.org.uk; eric.y.miao at gmail.com; grant.likely at secretlab.ca;
->arnd at arndb.de
->Subject: Re: [PATCH 1/7] pinctrl: enable pxa3xx pinmux
->
->On Sat, Nov 26, 2011 at 12:08 AM, Haojian Zhuang
-><haojian.zhuang@marvell.com> wrote:
->
->> Support PXA300/PXA310/PXA320/PXA910 pinmux.
->>
->> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
->
->Cool!
->
->> +#ifdef CONFIG_ARCH_PXA
->> +static struct pinctrl_pin_desc pxa300_pads[] = {
->(...)
->
->Ick, per-arch #ifdefs in the driver/ directory is not good. Can you
->arrange
->for this to be #ifdef:ed up in your board file and passed in as platform
->data instead of being defined here?
->
->I know that the U300 driver defines all it's pins in the driver file,
->but it only supports one single board on one single chipset and
->is thus pretty fixed, nominally this kind of stuff should come from
->the board file(s) or the device tree.
->
->> +static int pxa3xx_get_gpio_func(unsigned int cpuid, unsigned int gpio)
->> +{
->> + ? ? ? int ret = 0;
->> +
->> + ? ? ? switch (cpuid) {
->> +#ifdef CONFIG_ARCH_PXA
->> + ? ? ? case PINMUX_PXA300:
->> + ? ? ? case PINMUX_PXA310:
->> + ? ? ? ? ? ? ? if (gpio == 50)
->> + ? ? ? ? ? ? ? ? ? ? ? ret = 2;
->> + ? ? ? ? ? ? ? else if (gpio == 49 || gpio == 51 || gpio == 53)
->> + ? ? ? ? ? ? ? ? ? ? ? ret = 3;
->> + ? ? ? ? ? ? ? break;
->> + ? ? ? case PINMUX_PXA320:
->> + ? ? ? ? ? ? ? if (gpio == 56 || (gpio > 58 && gpio < 63))
->> + ? ? ? ? ? ? ? ? ? ? ? goto out;
->> + ? ? ? ? ? ? ? break;
->> +#endif
->> +#ifdef CONFIG_ARCH_MMP
->> + ? ? ? case PINMUX_PXA910:
->> + ? ? ? ? ? ? ? if ((gpio > 116 && gpio < 121) || gpio == 122 || gpio
->== 123 ||
->> + ? ? ? ? ? ? ? ? ? ? ? gpio == 125 || gpio == 99 || gpio == 58 ||
->gpio == 59)
->> + ? ? ? ? ? ? ? ? ? ? ? ret = 1;
->> + ? ? ? ? ? ? ? break;
->> +#endif
->
->Do you need these #ifdef:s?
+and with my patch I get
 
-I can remove this #ifdef.
+	33456, 33425, 33407
 
->
->They need to go, one way or another.
->
->Switching on cpuid is excellent, provided it's passed in from
->the outside, the definitons of these cases should be available
->anyway should they not.
->
->#ifdef:in out for footprint or unused code paths on some platforms
->should *not* be done, it creates more trouble than it solves, see
->Documentation/SubmittingPatches section 2) #ifdefs are ugly.
->
->> +static int pxa3xx_get_mfpr(unsigned int cpuid, unsigned int pin)
->> +{
->> + ? ? ? int ret;
->> + ? ? ? switch (cpuid) {
->> +#ifdef CONFIG_ARCH_PXA
->
->Dito. Etc.
-I can remove this too.
+So the speedup here is smaller here, but still OK. Anyhow, I don't care
+much about the speedup compared to the current implementation. I like my
+patch because it's more correct as it doesn't need to modify the unwind
+tables and is searched in a nice way that doesn't look to be less
+effective by an order.
 
->
->> +#ifdef CONFIG_ARCH_MMP
->> +static struct pinctrl_desc pxa910_pctrl_desc = {
->> +       .name           = "pxa910-pinctrl",
->> +       .pins           = pxa910_pads,
->> +       .npins          = ARRAY_SIZE(pxa910_pads),
->> +       .maxpin         = 260,
->> +       .pctlops        = &pxa3xx_pctrl_ops,
->> +       .pmxops         = &pxa3xx_pmx_ops,
->> +       .owner          = THIS_MODULE,
->> +};
->
->This is not good either. Get rid of all #ifdef
-I can remove this too.
->
->> +#ifdef CONFIG_ARCH_PXA
->> + ? ? ? if (cpu_is_pxa300()) {
->> + ? ? ? ? ? ? ? info->cpuid = PINMUX_PXA300;
->> + ? ? ? ? ? ? ? info->grp = pxa300_pin_groups;
->> + ? ? ? ? ? ? ? info->func = pxa300_pmx_functions;
->> + ? ? ? ? ? ? ? info->num_grps = ARRAY_SIZE(pxa300_pin_groups);
->> + ? ? ? ? ? ? ? info->num_funcs = ARRAY_SIZE(pxa300_pmx_functions);
->> + ? ? ? ? ? ? ? info->pctl = pinctrl_register(&pxa300_pctrl_desc,
->&pdev->dev,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? info);
->> + ? ? ? ? ? ? ? range = pxa300_gpio_ranges;
->> + ? ? ? ? ? ? ? range_num = ARRAY_SIZE(pxa300_gpio_ranges);
->> + ? ? ? } else if (cpu_is_pxa310()) {
->> + ? ? ? ? ? ? ? info->cpuid = PINMUX_PXA310;
->> + ? ? ? ? ? ? ? info->grp = pxa310_pin_groups;
->> + ? ? ? ? ? ? ? info->func = pxa310_pmx_functions;
->> + ? ? ? ? ? ? ? info->num_grps = ARRAY_SIZE(pxa310_pin_groups);
->> + ? ? ? ? ? ? ? info->num_funcs = ARRAY_SIZE(pxa310_pmx_functions);
->> + ? ? ? ? ? ? ? info->pctl = pinctrl_register(&pxa310_pctrl_desc,
->&pdev->dev,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? info);
->> + ? ? ? ? ? ? ? range = pxa310_gpio_ranges;
->> + ? ? ? ? ? ? ? range_num = ARRAY_SIZE(pxa310_gpio_ranges);
->> + ? ? ? } else if (cpu_is_pxa320()) {
->> + ? ? ? ? ? ? ? info->cpuid = PINMUX_PXA320;
->> + ? ? ? ? ? ? ? info->grp = pxa320_pin_groups;
->> + ? ? ? ? ? ? ? info->func = pxa320_pmx_functions;
->> + ? ? ? ? ? ? ? info->num_grps = ARRAY_SIZE(pxa320_pin_groups);
->> + ? ? ? ? ? ? ? info->num_funcs = ARRAY_SIZE(pxa320_pmx_functions);
->> + ? ? ? ? ? ? ? info->pctl = pinctrl_register(&pxa320_pctrl_desc,
->&pdev->dev,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? info);
->> + ? ? ? ? ? ? ? range = pxa320_gpio_ranges;
->> + ? ? ? ? ? ? ? range_num = ARRAY_SIZE(pxa320_gpio_ranges);
->> + ? ? ? }
->> +#endif
->> +#ifdef CONFIG_ARCH_MMP
->> + ? ? ? if (cpu_is_pxa910()) {
->> + ? ? ? ? ? ? ? info->cpuid = PINMUX_PXA910;
->> + ? ? ? ? ? ? ? info->grp = pxa910_pin_groups;
->> + ? ? ? ? ? ? ? info->func = pxa910_pmx_functions;
->> + ? ? ? ? ? ? ? info->num_grps = ARRAY_SIZE(pxa910_pin_groups);
->> + ? ? ? ? ? ? ? info->num_funcs = ARRAY_SIZE(pxa910_pmx_functions);
->> + ? ? ? ? ? ? ? info->pctl = pinctrl_register(&pxa910_pctrl_desc,
->&pdev->dev,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? info);
->> + ? ? ? ? ? ? ? range = pxa910_gpio_ranges;
->> + ? ? ? ? ? ? ? range_num = ARRAY_SIZE(pxa910_gpio_ranges);
->> + ? ? ? }
->> +#endif
->
->Same here.
->
->But *apart* from the #ifdef stuff it looks very good!
->So if you can get rid of that, I'll be very happy!
-The only block issue at here is that cpu_is_pxa3xx() is defined in arch-pxa and cpu_is_pxa910() is defined in arch-mmp. If I only enable arch-pxa, I would meet build error for undefined cpu_is_pxa910().
+Best regards
+Uwe
 
->
->Yours,
->Linus Walleij
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
