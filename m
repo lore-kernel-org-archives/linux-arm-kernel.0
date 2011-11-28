@@ -1,43 +1,53 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Mon, 28 Nov 2011 12:39:59 +0200
-Subject: [PATCH 2/3] omap_hsmmc: add pm_caps field
-In-Reply-To: <CAB3XZEeOAznyX8Z4vpb34GqD2mpr_0_Bje=-5KVkUs3q18ao_Q@mail.gmail.com>
-References: <1321970539-7104-1-git-send-email-eliad@wizery.com>	<1321970539-7104-2-git-send-email-eliad@wizery.com>	<4ED35131.6020206@compulab.co.il>	<CAB3XZEeFSXBQZCR17bRdaG3UbhpE6JJHD_aEiq8Y2Kc3=eGRSQ@mail.gmail.com>	<4ED35BFE.9060202@compulab.co.il>
- <CAB3XZEeOAznyX8Z4vpb34GqD2mpr_0_Bje=-5KVkUs3q18ao_Q@mail.gmail.com>
-Message-ID: <4ED364FF.8000007@compulab.co.il>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Mon, 28 Nov 2011 10:40:12 +0000
+Subject: [PATCH v2 1/4] ARM: vexpress: Get rid of MMIO_P2V
+In-Reply-To: <20111125161500.GD2098@localhost.localdomain>
+References: <1322060508-11298-1-git-send-email-pawel.moll@arm.com>
+ <1322060508-11298-2-git-send-email-pawel.moll@arm.com>
+ <20111125161500.GD2098@localhost.localdomain>
+Message-ID: <1322476812.3164.13.camel@hornet.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/28/11 12:07, Eliad Peller wrote:
-> On Mon, Nov 28, 2011 at 12:01 PM, Igor Grinberg <grinberg@compulab.co.il> wrote:
->> On 11/28/11 11:23, Eliad Peller wrote:
->>> hi Igor,
->>>
->>> On Mon, Nov 28, 2011 at 11:15 AM, Igor Grinberg <grinberg@compulab.co.il> wrote:
->>>> On 11/22/11 16:02, Eliad Peller wrote:
->>>>> Add pm_caps field to omap2_hsmmc_info and omap_mmc_slot_data
->>>>> structs, so we will be able to indicate mmc pm capabilities
->>>>> in the board file.
->>>>
->>>> Shouldn't this be user space runtime controllable?
->>>> Instead of being a static per board decision?
->>>>
->>> we only declare here support for the pm capabilities.
->>> the actual configuration of these capabilities is done at a later
->>> stage, and can be controlled (implicitly) by userspace (e.g. by
->>> enabling Wakeup-On-Wireless for the wl12xx chip).
->>
->> This is good to hear, because patch 1/3 makes it look like
->> the bus power does get immediately affected depending
->> on that capability, isn't it?
->>
-> no.
-> it checks pm_flags (configured pm features) rather than pm_caps
-> (supported pm features).
+On Fri, 2011-11-25 at 16:15 +0000, Dave Martin wrote:
+> Try this (untested):
+> 
+> diff --git a/arch/arm/plat-versatile/headsmp.S b/arch/arm/plat-versatile/headsmp.S
+> index d397a1f..0be2efc 100644
+> --- a/arch/arm/plat-versatile/headsmp.S
+> +++ b/arch/arm/plat-versatile/headsmp.S
+> @@ -28,6 +28,7 @@ ENTRY(versatile_secondary_startup)
+>  pen:   ldr     r7, [r6]
+>         cmp     r7, r0
+>         bne     pen
+> +ENDPROC(versatile_secondary_startup)
+> 
+>         /*
+>          * we've been released from the holding pen: secondary_stack
+> diff --git a/arch/arm/mach-vexpress/platsmp.c b/arch/arm/mach-vexpress/platsmp.c
+> index 2b5f7ac..124ffb1 100644
+> --- a/arch/arm/mach-vexpress/platsmp.c
+> +++ b/arch/arm/mach-vexpress/platsmp.c
+> @@ -13,8 +13,6 @@
+>  #include <linux/smp.h>
+>  #include <linux/io.h>
+> 
+> -#include <asm/unified.h>
+> -
+>  #include <mach/motherboard.h>
+>  #define V2M_PA_CS7 0x10000000
+> 
+> @@ -46,6 +44,6 @@ void __init platform_smp_prepare_cpus(unsigned int max_cpus)
+>          * secondary CPU branches to this address.
+>          */
+>         writel(~0, MMIO_P2V(V2M_SYS_FLAGSCLR));
+> -       writel(BSYM(virt_to_phys(versatile_secondary_startup)),
+> +       writel(virt_to_phys(versatile_secondary_startup),
+>                 MMIO_P2V(V2M_SYS_FLAGSSET));
+>  }
 
-I see. Thanks for the explanation.
+Sure thing, will try that.
 
+Cheers!
 
--- 
-Regards,
-Igor.
+Pawe?
