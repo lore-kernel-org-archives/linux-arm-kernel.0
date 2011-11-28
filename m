@@ -1,55 +1,56 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 28 Nov 2011 14:46:12 +0100
-Subject: [PATCH 1/1] ARM: at91: fix clock conid for atmel_tcb.1 on
- 9260/9g20
-In-Reply-To: <1322481188-8839-1-git-send-email-plagnioj@jcrosoft.com>
-References: <1322481188-8839-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <4ED390A4.1020608@atmel.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 28 Nov 2011 13:46:57 +0000
+Subject: [PATCH] ARM: S3C64XX: Configure WM1250 EV1 GPIOs on Cragganmore
+Message-ID: <1322488017-548-1-git-send-email-broonie@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/28/2011 12:53 PM, Jean-Christophe PLAGNIOL-VILLARD :
-> the conid is supposed to be t0/t1/t2_clk
-> 
-> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+---
+ arch/arm/mach-s3c64xx/mach-crag6410.c |   16 +++++++++++++++-
+ 1 files changed, 15 insertions(+), 1 deletions(-)
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-
-I have queued it in branch at91-fixes of
-git://github.com/at91linux/linux-at91.git
-
-Thanks, best regards,
-
-> Cc: stable at kernel.org
-> ---
-> Hi,
-> 
-> 	could you apply this is present since 3.0
-> 
-> Best Regards,
-> J.
->  arch/arm/mach-at91/at91sam9260.c |    6 +++---
->  1 files changed, 3 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/mach-at91/at91sam9260.c b/arch/arm/mach-at91/at91sam9260.c
-> index 2e59126..8c75932 100644
-> --- a/arch/arm/mach-at91/at91sam9260.c
-> +++ b/arch/arm/mach-at91/at91sam9260.c
-> @@ -196,9 +196,9 @@ static struct clk_lookup periph_clocks_lookups[] = {
->  	CLKDEV_CON_DEV_ID("t0_clk", "atmel_tcb.0", &tc0_clk),
->  	CLKDEV_CON_DEV_ID("t1_clk", "atmel_tcb.0", &tc1_clk),
->  	CLKDEV_CON_DEV_ID("t2_clk", "atmel_tcb.0", &tc2_clk),
-> -	CLKDEV_CON_DEV_ID("t3_clk", "atmel_tcb.1", &tc3_clk),
-> -	CLKDEV_CON_DEV_ID("t4_clk", "atmel_tcb.1", &tc4_clk),
-> -	CLKDEV_CON_DEV_ID("t5_clk", "atmel_tcb.1", &tc5_clk),
-> +	CLKDEV_CON_DEV_ID("t0_clk", "atmel_tcb.1", &tc3_clk),
-> +	CLKDEV_CON_DEV_ID("t1_clk", "atmel_tcb.1", &tc4_clk),
-> +	CLKDEV_CON_DEV_ID("t2_clk", "atmel_tcb.1", &tc5_clk),
->  	CLKDEV_CON_DEV_ID("pclk", "ssc.0", &ssc_clk),
->  	/* more usart lookup table for DT entries */
->  	CLKDEV_CON_DEV_ID("usart", "fffff200.serial", &mck),
-
-
+diff --git a/arch/arm/mach-s3c64xx/mach-crag6410.c b/arch/arm/mach-s3c64xx/mach-crag6410.c
+index 9cee041..852b15f 100644
+--- a/arch/arm/mach-s3c64xx/mach-crag6410.c
++++ b/arch/arm/mach-s3c64xx/mach-crag6410.c
+@@ -37,7 +37,10 @@
+ #include <linux/mfd/wm831x/irq.h>
+ #include <linux/mfd/wm831x/gpio.h>
+ 
++#include <sound/wm1250-ev1.h>
++
+ #include <asm/hardware/vic.h>
++
+ #include <asm/mach/arch.h>
+ #include <asm/mach-types.h>
+ 
+@@ -625,6 +628,16 @@ static struct wm831x_pdata glenfarclas_pmic_pdata __initdata = {
+ 	.disable_touch = true,
+ };
+ 
++static struct wm1250_ev1_pdata wm1250_ev1_pdata = {
++	.gpios = {
++		[WM1250_EV1_GPIO_CLK_ENA] = S3C64XX_GPN(12),
++		[WM1250_EV1_GPIO_CLK_SEL0] = S3C64XX_GPL(12),
++		[WM1250_EV1_GPIO_CLK_SEL1] = S3C64XX_GPL(13),
++		[WM1250_EV1_GPIO_OSR] = S3C64XX_GPL(14),
++		[WM1250_EV1_GPIO_MASTER] = S3C64XX_GPL(8),
++	},
++};
++
+ static struct i2c_board_info i2c_devs1[] __initdata = {
+ 	{ I2C_BOARD_INFO("wm8311", 0x34),
+ 	  .irq = S3C_EINT(0),
+@@ -634,7 +647,8 @@ static struct i2c_board_info i2c_devs1[] __initdata = {
+ 	{ I2C_BOARD_INFO("wlf-gf-module", 0x25) },
+ 	{ I2C_BOARD_INFO("wlf-gf-module", 0x26) },
+ 
+-	{ I2C_BOARD_INFO("wm1250-ev1", 0x27) },
++	{ I2C_BOARD_INFO("wm1250-ev1", 0x27),
++	  .platform_data = &wm1250_ev1_pdata },
+ };
+ 
+ static struct s3c2410_platform_i2c i2c1_pdata = {
 -- 
-Nicolas Ferre
+1.7.7.3
