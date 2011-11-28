@@ -1,29 +1,29 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 28 Nov 2011 10:22:53 +0100
-Subject: [PATCH 7/7] ARM: mmp: enable pinmux on ttc dkb
-In-Reply-To: <1322262544-7854-8-git-send-email-haojian.zhuang@marvell.com>
-References: <1322262544-7854-1-git-send-email-haojian.zhuang@marvell.com>
- <1322262544-7854-8-git-send-email-haojian.zhuang@marvell.com>
-Message-ID: <CACRpkdY4ScYXVAoMGWw=ywYGot=uOySn4e0DRBmsvRCvDz76rw@mail.gmail.com>
+From: eliad@wizery.com (Eliad Peller)
+Date: Mon, 28 Nov 2011 11:23:17 +0200
+Subject: [PATCH 2/3] omap_hsmmc: add pm_caps field
+In-Reply-To: <4ED35131.6020206@compulab.co.il>
+References: <1321970539-7104-1-git-send-email-eliad@wizery.com>
+ <1321970539-7104-2-git-send-email-eliad@wizery.com>
+ <4ED35131.6020206@compulab.co.il>
+Message-ID: <CAB3XZEeFSXBQZCR17bRdaG3UbhpE6JJHD_aEiq8Y2Kc3=eGRSQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 26, 2011 at 12:09 AM, Haojian Zhuang
-<haojian.zhuang@marvell.com> wrote:
+hi Igor,
 
-> Remove MFP operation. Use pinmux mapping instead.
+On Mon, Nov 28, 2011 at 11:15 AM, Igor Grinberg <grinberg@compulab.co.il> wrote:
+> On 11/22/11 16:02, Eliad Peller wrote:
+>> Add pm_caps field to omap2_hsmmc_info and omap_mmc_slot_data
+>> structs, so we will be able to indicate mmc pm capabilities
+>> in the board file.
 >
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+> Shouldn't this be user space runtime controllable?
+> Instead of being a static per board decision?
+>
+we only declare here support for the pm capabilities.
+the actual configuration of these capabilities is done at a later
+stage, and can be controlled (implicitly) by userspace (e.g. by
+enabling Wakeup-On-Wireless for the wl12xx chip).
 
-As stated earlier, I think the new pinctrl platform data should be
-passed in from
-here, apart from that:
-
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-
-SInce you're the (co-)subarch maintainer for MMP I will merge this to pinctrl
-as soon as the core driver is OK and you tell me to merge the rest of the
-(ACK:ed) series.
-
-Thanks,
-Linus Walleij
+regards,
+Eliad.
