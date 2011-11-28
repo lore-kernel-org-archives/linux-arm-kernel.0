@@ -1,59 +1,83 @@
-From: rklein@nvidia.com (Rhyland Klein)
-Date: Mon, 28 Nov 2011 11:13:21 -0800
-Subject: [PATCH v5] power: bq20z75: devicetree init support
-In-Reply-To: <20111124184215.GA29135@oksana.dev.rtsoft.ru>
-References: <1316031547-18281-1-git-send-email-rklein@nvidia.com>
- <20111124184215.GA29135@oksana.dev.rtsoft.ru>
-Message-ID: <1322507601.3888.2.camel@rklein-linux2>
+From: tixy@yxit.co.uk (Tixy)
+Date: Mon, 28 Nov 2011 19:20:33 +0000
+Subject: [RFC PATCH] ARM: Add generic instruction opcode manipulation
+ helpers
+In-Reply-To: <20111128174122.GG2465@localhost.localdomain>
+References: <1322220493-3251-1-git-send-email-dave.martin@linaro.org>
+ <CAH+eYFBM36VqYAqZdiZnMP7AODh_SqYQWuoFDSyS3BDZDvHU5A@mail.gmail.com>
+ <20111128174122.GG2465@localhost.localdomain>
+Message-ID: <1322508033.2354.86.camel@computer2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2011-11-24 at 10:42 -0800, Anton Vorontsov wrote:
-> Hello Rhyland,
+On Mon, 2011-11-28 at 17:41 +0000, Dave Martin wrote:
+> On Mon, Nov 28, 2011 at 10:29:14PM +0530, Rabin Vincent wrote:
+> > On Fri, Nov 25, 2011 at 16:58, Dave Martin <dave.martin@linaro.org> wrote:
+> > > +#ifdef CONFIG_CPU_ENDIAN_BE8
+> > > +#define __opcode_to_mem_arm(x) swab32(x)
+> > > +#define __opcode_to_mem_thumb16(x) swab16(x)
+> > > +#define __opcode_to_mem_thumb32(x) swahb32(x)
+> > > +#else
+> > > +#define __opcode_to_mem_arm(x) (x) ((u32)(x))
+> > > +#define __opcode_to_mem_thumb16(x) ((u16)(x))
+> > > +#define __opcode_to_mem_thumb32(x) swahw32(x)
+> > > +#endif
+> > 
+> > The current kprobes code does:
+> > 
+> > #ifndef __ARMEB__ /* Swap halfwords for little-endian */
+> >                 bkp = (bkp >> 16) | (bkp << 16);
+> > #endif
+> > 
+> > There seems to be a difference between your macros and that for the case
+> > __ARMEB__ + !CONFIG_CPU_ENDIAN_BE8.  Or is that combination not
+> > possible?
+> > 
 > 
-> Got this:
+> For building the kernel, it is effectively impossible, since you can't
+> have Thumb-2 code on BE32 platforms.  The opcode_to_mem_thumb*()
+> definitions are currently "don't cares" for this configuration in
+> my RFC, but we should probably clarify how things should behave in this
+> case.
 > 
->   CC [M]  drivers/power/bq20z75.o
-> drivers/power/bq20z75.c: In function ?bq20z75_of_populate_pdata?:
-> drivers/power/bq20z75.c:630:21: error: storage size of ?gpio_flags? isn?t known
-> drivers/power/bq20z75.c:668:2: error: implicit declaration of function ?of_get_named_gpio_flags? [-Werror=implicit-function-declaration]
-> drivers/power/bq20z75.c:671:19: error: ?OF_GPIO_ACTIVE_LOW? undeclared (first use in this function)
-> drivers/power/bq20z75.c:671:19: note: each undeclared identifier is reported only once for each function it appears in
-> drivers/power/bq20z75.c:630:21: warning: unused variable ?gpio_flags? [-Wunused-variable]
-> drivers/power/bq20z75.c:627:29: warning: unused variable ?dtid? [-Wunused-variable]
+> The kprobes code does not look correct for the big-endian case, since
+> the bytes are not swapped -- this will result in big-endian words or
+> halfwords in memory, which would be correct for BE32 but not for BE8
+> (where instructions are always little-endian).
 > 
-> I fixed this by...
-> 
-> On Wed, Sep 14, 2011 at 01:19:07PM -0700, Rhyland Klein wrote:
-> 
-> > +#if defined(CONFIG_OF)
-> > +#include <linux/of_device.h>
-> 
-> Adding linux/of_gpio.h
-> 
-> > +static const struct of_device_id bq20z75_dt_ids[] = {
-> > +	{ .compatible = "ti,bq20z75" },
-> > +	{ }
-> > +};
-> > +MODULE_DEVICE_TABLE(i2c, bq20z75_dt_ids);
-> > +
-> > +static struct bq20z75_platform_data *bq20z75_of_populate_pdata(
-> > +	struct i2c_client *client)
-> > +{
-> > +	const struct of_device_id *dtid;
-> 
-> And deleting that line.
+> So they're both wrong, in different ways if I've understood correctly.
 > 
 > 
-> Applied to battery-2.6.git, but please double check if everything
-> is OK.
+> I'm not exactly sure how we handle BE32, or whether we need to.  I
+> believe that for BE32 it would be correct to leave the canonical
+> instruction completely un-swapped, because instructions are natively
+> big-endian on those platforms.  Note that BE32 is only applicable to
+> older versions of the architecture, and so Thumb-2 is not applicable to
+> any BE32 platform, so the only situation where we would care is if
+> kprobes, ftrace or similar allows breakpoints or tracepoints to be set
+> in userspace Thumb code on these platforms.
 > 
-> Thanks,
+> I think that __ARMEB__ encompasses any big-endian target including BE8
+> and BE32, so we might need to be a bit careful about how we use it.
 > 
+> 
+> Rabin, did the __opcode_read stuff look useful for ftrace?  My idea
+> was to factor out the logic of how to read/write a whole instruction,
+> but my proposal may be overkill...
+> 
+> 
+> Tixy, do you have a view on these issues?
 
-Yah, sorry about that. Seems things have changed a bit since I
-originally sent out the patch. I synced battery-2.6 and everything looks
-great.
+I had to read the ARM ARM, I wasn't aware of BE8 :-)
 
-thanks,
-rhyland
+My view is that the the current kprobes code just doesn't handle BE8.
+Anywhere where it reads the original instruction, writes a breakpoint or
+restores the instruction would need to swap the byte order. To do that,
+the proposed mem_to_opcode/opcode_to_mem helpers would be useful.
+
+However, the read/write a whole instruction functions do look a bit
+overkill. Especially if the number of places using these is small, due
+to factorisations like Rabin's __patch_text().
+
+-- 
+Tixy
