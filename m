@@ -1,100 +1,32 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 28 Nov 2011 18:36:54 +0000
-Subject: [PATCH v7 1/5] ARM: lib: add call_with_stack function for safely
- changing stack
-In-Reply-To: <1322505418-24854-1-git-send-email-will.deacon@arm.com>
-References: <1322505418-24854-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1322505418-24854-2-git-send-email-will.deacon@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 28 Nov 2011 18:46:22 +0000
+Subject: [AT91 PULL] ioremap pull request for 3.3
+In-Reply-To: <20111123171022.GB15531@game.jcrosoft.org>
+References: <20111123171022.GB15531@game.jcrosoft.org>
+Message-ID: <201111281846.22837.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When disabling the MMU, it is necessary to take out a 1:1 identity map
-of the reset code so that it can safely be executed with and without
-the MMU active. To avoid the situation where the physical address of the
-reset code aliases with the virtual address of the active stack (which
-cannot be included in the 1:1 mapping), it is desirable to change to a
-new stack at a location which is less likely to alias.
+On Wednesday 23 November 2011, Jean-Christophe PLAGNIOL-VILLARD wrote:
+>         this pull containt the first patch series that rework the base address
+>         of a lots of drivers (aic, rtc, gpio, ecc, dma, rtt, pit, smc, shutdown, watchdog, dbgu)
+>         to allow the multi soc and simplify the adding of the DT
+>         
+> The following changes since commit 8454badc89ed455990b1a060d9e4ed890b9e162c:
+> 
+>   ARM: at91: rename at91sam9260ek_defconfig to at91sam9260_defconfig (2011-11-23 02:45:57 +0800)
+> 
+> are available in the git repository at:
+>   git://github.com/at91linux/linux-at91.git for-arnd-3.3-ioremap
 
-This code adds a new lib function, call_with_stack:
+Applied into next/cleanup, thanks!
 
-	void call_with_stack(void (*fn)(void *), void *arg, void *sp);
+I noticed that you introduce a bunch of new references to __raw_writel
+when you get rid of at91_sys_write uses in drivers. This is obviously
+the safe choice since it keeps the code behavior close to what it was.
 
-which changes the stack to point at the sp parameter, before invoking
-fn(arg) with the new stack selected.
+However, I think it would be good to use writel_relaxed there,
+to make the accesses more well-defined. Maybe you can do an add-on
+patch to convert the various new accessor macros over to that.
 
-Reviewed-by: Nicolas Pitre <nicolas.pitre@linaro.org>
-Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
-Signed-off-by: Dave Martin <dave.martin@linaro.org>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/lib/Makefile          |    3 +-
- arch/arm/lib/call_with_stack.S |   44 ++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 46 insertions(+), 1 deletions(-)
- create mode 100644 arch/arm/lib/call_with_stack.S
-
-diff --git a/arch/arm/lib/Makefile b/arch/arm/lib/Makefile
-index cf73a7f..0ade0ac 100644
---- a/arch/arm/lib/Makefile
-+++ b/arch/arm/lib/Makefile
-@@ -13,7 +13,8 @@ lib-y		:= backtrace.o changebit.o csumipv6.o csumpartial.o   \
- 		   testchangebit.o testclearbit.o testsetbit.o        \
- 		   ashldi3.o ashrdi3.o lshrdi3.o muldi3.o             \
- 		   ucmpdi2.o lib1funcs.o div64.o                      \
--		   io-readsb.o io-writesb.o io-readsl.o io-writesl.o
-+		   io-readsb.o io-writesb.o io-readsl.o io-writesl.o  \
-+		   call_with_stack.o
- 
- mmu-y	:= clear_user.o copy_page.o getuser.o putuser.o
- 
-diff --git a/arch/arm/lib/call_with_stack.S b/arch/arm/lib/call_with_stack.S
-new file mode 100644
-index 0000000..916c80f
---- /dev/null
-+++ b/arch/arm/lib/call_with_stack.S
-@@ -0,0 +1,44 @@
-+/*
-+ * arch/arm/lib/call_with_stack.S
-+ *
-+ * Copyright (C) 2011 ARM Ltd.
-+ * Written by Will Deacon <will.deacon@arm.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
-+ */
-+
-+#include <linux/linkage.h>
-+#include <asm/assembler.h>
-+
-+/*
-+ * void call_with_stack(void (*fn)(void *), void *arg, void *sp)
-+ *
-+ * Change the stack to that pointed at by sp, then invoke fn(arg) with
-+ * the new stack.
-+ */
-+ENTRY(call_with_stack)
-+	str	sp, [r2, #-4]!
-+	str	lr, [r2, #-4]!
-+
-+	mov	sp, r2
-+	mov	r2, r0
-+	mov	r0, r1
-+
-+	adr	lr, BSYM(1f)
-+	mov	pc, r2
-+
-+1:	ldr	lr, [sp]
-+	ldr	sp, [sp, #4]
-+	mov	pc, lr
-+ENDPROC(call_with_stack)
--- 
-1.7.4.1
+	Arnd
