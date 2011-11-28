@@ -1,10 +1,10 @@
 From: dave.martin@linaro.org (Dave Martin)
-Date: Mon, 28 Nov 2011 14:42:45 +0000
+Date: Mon, 28 Nov 2011 14:57:00 +0000
 Subject: [PATCH v2 0/4] Versatile Express DT support
 In-Reply-To: <4ED399C8.9080908@gmail.com>
 References: <1322060508-11298-1-git-send-email-pawel.moll@arm.com>
  <4ED399C8.9080908@gmail.com>
-Message-ID: <20111128144245.GB2465@localhost.localdomain>
+Message-ID: <20111128145700.GC2465@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -67,7 +67,11 @@ On Mon, Nov 28, 2011 at 08:25:12AM -0600, Rob Herring wrote:
 > fine for now. BTW, I believe Dave said he was going to document some of
 > the primecell peripherals. :)
 
-I hadn't forgotten ... I was going to follow up on those shortly :)
+Oh, btw, git am reports a few whitespace errors on the last full post of
+the series (v2).
 
-Cheers
+Can you shove the series through checkpatch.pl and/or git am and fix any
+minor issues, now that the series is relatively stable?
+
+Thanks
 ---Dave
