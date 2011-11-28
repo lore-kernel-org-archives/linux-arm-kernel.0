@@ -1,72 +1,165 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 28 Nov 2011 11:38:00 +0000
-Subject: GIC irq_start detection breaks 3.2 boot on platforms without PPIs
-In-Reply-To: <20111127130016.GB26042@mudshark.cambridge.arm.com>
-References: <20111124163548.GC22031@mudshark.cambridge.arm.com>
- <CAL_Jsq+xZayXkOy2v7y+BittjRfC85mw-bCMrDFwDJOvnMnS8Q@mail.gmail.com>
- <20111125154157.GP12047@mudshark.cambridge.arm.com>
- <20111126220834.GB9581@n2100.arm.linux.org.uk>
- <20111127130016.GB26042@mudshark.cambridge.arm.com>
-Message-ID: <20111128113800.GD26946@mudshark.cambridge.arm.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Mon, 28 Nov 2011 11:38:28 +0000
+Subject: [PATCH v2 2/4] ARM: vexpress: Add DT support in v2m
+In-Reply-To: <1322477662.3164.30.camel@hornet.cambridge.arm.com>
+References: <1322060508-11298-1-git-send-email-pawel.moll@arm.com>
+ <1322060508-11298-3-git-send-email-pawel.moll@arm.com>
+ <20111125161808.GE2098@localhost.localdomain>
+ <1322477662.3164.30.camel@hornet.cambridge.arm.com>
+Message-ID: <20111128113828.GA2469@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 27, 2011 at 01:00:16PM +0000, Will Deacon wrote:
-> On Sat, Nov 26, 2011 at 10:08:34PM +0000, Russell King - ARM Linux wrote:
-> > I've merged this into my fixes branch, but when I re-merge this with
-> > Marc's irqchip consolidation, I get conflicts.  I think I've fixed it
-> > correctly, but please check the result, which you'll find in my for-next
-> > branch.
+On Mon, Nov 28, 2011 at 10:54:22AM +0000, Pawel Moll wrote:
+> On Fri, 2011-11-25 at 16:18 +0000, Dave Martin wrote:
+> > [Since this text is now stable enough to be proofread, I'll list minor
+> > pedantic nits along with the other comments -- they aren't vital to the
+> > meaning though, and the documentation still "works" if they aren't
+> > acted on.]
 > 
-> Thanks for merging this. I've just had a quick look and the resolution looks
-> functionally correct to me (I'll try booting your for-next branch tomorrow).
+> [snip]
+> 
+> Most appreciated! I'll "process" all your suggestions, thanks!
+> 
+> > > @@ -50,10 +55,34 @@ static void __iomem *v2m_sysreg_base;
+> > >
+> > >  static void __init v2m_timer_init(void)
+> > >  {
+> > > -     void __iomem *sysctl_base;
+> > > -     void __iomem *timer01_base;
+> > > +     void __iomem *sysctl_base = NULL;
+> > > +     void __iomem *timer01_base = NULL;
+> > > +     unsigned int timer01_irq = NO_IRQ;
+> > > +
+> > > +     if (of_have_populated_dt()) {
+> > > +#if defined(CONFIG_ARCH_VEXPRESS_DT)
+> > > +             int err;
+> > > +             const char *path;
+> > > +             struct device_node *node;
+> > > +
+> > > +             node = of_find_compatible_node(NULL, NULL, "arm,sp810");
+> > > +             if (node)
+> > > +                     sysctl_base = of_iomap(node, 0);
+> > > +
+> > > +             err = of_property_read_string(of_aliases, "timer", &path);
+> > > +             if (!err)
+> > > +                     node = of_find_node_by_path(path);
+> > > +             if (node) {
+> > > +                     timer01_base = of_iomap(node, 0);
+> > > +                     timer01_irq = irq_of_parse_and_map(node, 0);
+> > > +             }
+> > > +#endif
+> > > +     } else {
+> > > +             sysctl_base = ioremap(V2M_SYSCTL, SZ_4K);
+> > > +             timer01_base = ioremap(V2M_TIMER01, SZ_4K);
+> > > +             timer01_irq = IRQ_V2M_TIMER0;
+> > > +     }
+> > 
+> > Do we even have of_have_populated_dt() in a non-DT kernel?
+> > 
+> > Maybe change this to
+> > 
+> > #if defined(CONFIG_ARCH_VEXPRESS_DT)
+> >         if (of_have_populated_dt()) {
+> >                 /* ... */
+> >         } else
+> > #endif
+> >         /* follow on from previous else */
+> >         {
+> >                 /* ... */
+> >         }
+> > 
+> > ...or if that feels a little unclear, maybe do this:
+> > 
+> > #if defined(CONFIG_ARCH_VEXPRESS_DT)
+> >         if (of_have_populated_dt()) {
+> >                 /* ... */
+> >         } else {
+> > #else
+> >         {
+> > #endif
+> >                 /* ... */
+> >         }
+> 
+> of_have_populated_dt() is safe, see "include/linux/of.h":
 
-I've tested on 1176, A8 and A9 platforms and your for-next branch seems to
-be ok. I do get these compilation warnings on the UP CPUs:
+You're right, but this code is still making assumptions about the
+relationship between a build-time option (defined(
+CONFIG_ARCH_VEXPRESS_DT)) and a run-time condition
+(of_have_populated_dt()).  The relationship between the two is far from
+transparent.
 
-arch/arm/mm/ioremap.c: In function ?unmap_area_sections?:
-arch/arm/mm/ioremap.c:80:3: warning: passing argument 1 of ?pmd_offset? from incompatible pointer type
-/home/will/work/aarch32/linux/linux/arch/arm/include/asm/pgtable.h:181:22: note: expected ?struct pud_t *? but argument is of type ?pmdval_t (*)[2]?
-arch/arm/mm/ioremap.c: In function ?remap_area_sections?:
-arch/arm/mm/ioremap.c:130:3: warning: passing argument 1 of ?pmd_offset? from incompatible pointer type
-/home/will/work/aarch32/linux/linux/arch/arm/include/asm/pgtable.h:181:22: note: expected ?struct pud_t *? but argument is of type ?pmdval_t (*)[2]?
-arch/arm/mm/ioremap.c: In function ?remap_area_supersections?:
-arch/arm/mm/ioremap.c:167:4: warning: passing argument 1 of ?pmd_offset? from incompatible pointer type
-/home/will/work/aarch32/linux/linux/arch/arm/include/asm/pgtable.h:181:22: note: expected ?struct pud_t *? but argument is of type ?pmdval_t (*)[2]?
+The effective condition we want is if(of_have_populated_dt()
+&& defined(CONFIG_ARCH_VEXPRESS_DT)).  This is implemented in my
+versions, but in your case the code can compile as
 
-and if I cat /proc/self/net/dev_mcast, then I get an OOPs:
+if(of_have_populated_dt()) { } else {
+	sysctl_base = ioremap(V2M_SYSCTL, SZ_4K);
+	...
+}
 
-[   41.771296] Unable to handle kernel NULL pointer dereference at virtual address 00000010
-[   41.797076] pgd = c797c000
-[   41.806863] [00000010] *pgd=070e7831, *pte=00000000, *ppte=00000000
-[   41.827111] Internal error: Oops: 17 [#1] PREEMPT
-[   41.841221] Modules linked in:
-[   41.850392] CPU: 0    Tainted: G        W     (3.2.0-rc2+ #3)
-[   41.867681] PC is at dev_seq_next+0x14c/0x1dc
-[   41.880763] LR is at seq_read+0x43c/0x494
-[   41.892798] pc : [<c024d564>]    lr : [<c00cee54>]    psr: 60000013
-[   41.892826] sp : c79f3ed4  ip : 00006405  fp : 00008000
-[   41.927254] r10: 00000010  r9 : c79f3f80  r8 : 00000010
-[   41.942927] r7 : 00000000  r6 : 00000001  r5 : c041d100  r4 : 00000001
-[   41.962512] r3 : c024d418  r2 : c79f3f08  r1 : 00000001  r0 : c70e5640
-[   41.982100] Flags: nZCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment user
-[   42.003512] Control: 00c5387d  Table: 0797c008  DAC: 00000015
-[   42.020750] Process cat (pid: 764, stack limit = 0xc79f22f0)
-[   42.037728] Stack: (0xc79f3ed4 to 0xc79f4000)
-[   42.050805] 3ec0:                                              00000000 00000001 c70e5640
-[   42.075369] 3ee0: c7091b00 00000000 c79f3f80 c79f3f08 c03f07c4 0138a000 c70e5668 00000000
-[   42.099931] 3f00: 00000000 400f1000 00000001 00000000 00000025 c7862000 c00cea18 0138a000
-[   42.124493] 3f20: c79f3f80 c79f2000 c79f2000 00000000 00000000 c00f6c2c 000000c5 c7091b00
-[   42.149059] 3f40: 0138a000 0138a000 c79f3f80 c7091b00 00008000 c00b0be8 00000003 c00a8124
-[   42.173621] 3f60: 00000001 c7091b00 0138a000 00000000 00000000 00008000 00000000 c00b0cf8
-[   42.198181] 3f80: 00000000 00000000 00000025 00000000 00008000 0138a000 00000003 00000003
-[   42.222745] 3fa0: c000e344 c000e1c0 00008000 0138a000 00000003 0138a000 00008000 0138a000
-[   42.247307] 3fc0: 00008000 0138a000 00000003 00000003 0138a000 00000000 400f1000 00000000
-[   42.271869] 3fe0: 7fffe000 be951b50 0000dea0 401f8a7c 60000010 00000003 00000000 00000000
-[   42.296468] [<c024d564>] (dev_seq_next+0x14c/0x1dc) from [<c03f07c4>] (0xc03f07c4)
-[   42.319206] Code: eaffffee e590803c e59f508c e1a0a008 (e5984000) 
-[   42.343526] ---[ end trace 1b75b31a2719ed1f ]---
+I don't believe we should be writing code which can compile as
+if(condition) { } else { do something useful; } unless there are
+scenarios under which executing that empty block (and skipping the else)
+would be the correct thing to do.  In this code, that's never the
+right thing.  
 
-but I don't think that's your fault (excuse the pun)!
+I don't know how likely this is to be an issue, but we should avoid 
+putting too many booby-traps in the code for future maintainers.
 
-Will
+Since you have the #ifdef anyway, I don't see a strong argument against
+moving it into the correct place.
+
+> #ifdef CONFIG_OF 
+> static inline bool of_have_populated_dt(void)
+> {       
+>         return allnodes != NULL;
+> }       
+> #else /* CONFIG_OF */
+> static inline bool of_have_populated_dt(void)
+> {       
+>         return false;
+> }       
+> #endif /* CONFIG_OF */
+> 
+> > > @@ -63,20 +92,20 @@ static void __init v2m_timer_init(void)
+> > >               writel(scctrl, sysctl_base + SCCTRL);
+> > >       }
+> > >
+> > > -     timer01_base = ioremap(V2M_TIMER01, SZ_4K);
+> > > -     WARN_ON(!timer01_base);
+> > > -     if (timer01_base) {
+> > > +     WARN_ON(!timer01_base || timer01_irq != NO_IRQ);
+> > 
+> > Is that supposed to be !timer01_base || timer01_irq == NO_IRQ ?
+> 
+> Yes, I spotted and fixed this in the mean time.
+> 
+> > If so, is might be better to write
+> > 
+> > WARN_ON(!(expr));
+> > if (expr) {
+> >         ...
+> > 
+> > so that the conditions are clear inverses.
+> 
+> Good point, will do.
+> 
+> > > @@ -470,3 +499,99 @@ MACHINE_START(VEXPRESS, "ARM-Versatile Express")
+> > >       .timer          = &v2m_timer,
+> > >       .init_machine   = v2m_init,
+> > >  MACHINE_END
+> > 
+> > It would be useful to have a comment somewhere indicating that the
+> > DT_MACHINE_START() entries live in the corresponding ct-*.c files for
+> > DT-enabled coretiles.
+> > 
+> > Not essential, though ... most people do know how to use grep.
+> 
+> Where exactly would you see that comment?
+
+Next to the MACHINE_START() probably makes sense.  That was the point at
+which I wondered where the DT equivalent(s) were.
+
+Cheers
+---Dave
