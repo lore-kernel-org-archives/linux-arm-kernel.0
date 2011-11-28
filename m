@@ -1,81 +1,71 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 28 Nov 2011 12:07:29 +0100
-Subject: [PATCH v2 2/3] ARM: Exynos4: Add ioremap interceptor for
- statically remapped regions
-In-Reply-To: <1320109289-2730-3-git-send-email-thomas.abraham@linaro.org>
-References: <1320109289-2730-1-git-send-email-thomas.abraham@linaro.org>
- <1320109289-2730-3-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <002901ccadbd$eb7f6280$c27e2780$%szyprowski@samsung.com>
+From: robin@protonic.nl (Robin van der Gracht)
+Date: Mon, 28 Nov 2011 12:20:47 +0100
+Subject: [PATCH V2] mfd: Fixed mixed up ADC single channel readout
+Message-ID: <1322479247-13318-1-git-send-email-robin@protonic.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+In single channel mode, when reading the ADC result, the index value
+is still set to the channel selected for this reading.
+This mixes up the order of the values returned. This causes problems when
+the converted results are made available in pairs (i.e. battery current reading)
+To straighten this up, the index value needs to be reset, so that the
+converted values are read at the assigned channel.
 
-On Tuesday, November 01, 2011 2:01 AM Thomas Abraham wrote:
+Signed-off-by: Robin van der Gracht <robin@protonic.nl>
+---
 
-> ioremap() request for statically remapped regions are intercepted and the
-> statically assigned virtual address is returned. For requests for which
-> there are no statically remapped regions, the requests are let through.
-> 
-> Cc: Kukjin Kim <kgene.kim@samsung.com>
-> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
-> ---
->  arch/arm/mach-exynos4/cpu.c             |   16 ++++++++++++++++
->  arch/arm/mach-exynos4/include/mach/io.h |    5 +++++
->  2 files changed, 21 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-exynos4/cpu.c b/arch/arm/mach-exynos4/cpu.c
-> index 5b1765b..358624d 100644
-> --- a/arch/arm/mach-exynos4/cpu.c
-> +++ b/arch/arm/mach-exynos4/cpu.c
-> @@ -137,6 +137,22 @@ static struct map_desc exynos4_iodesc1[] __initdata = {
->  	},
->  };
-> 
-> +/*
-> + * For all ioremap requests of statically mapped regions, intercept ioremap and
-> + * return virtual address from the iodesc table.
-> + */
-> +void __iomem *exynos4_ioremap(unsigned long phy, size_t size, unsigned int type)
-> +{
-> +	struct map_desc *desc = exynos4_iodesc;
-> +	unsigned int idx;
-> +
-> +	for (idx = 0; idx < ARRAY_SIZE(exynos4_iodesc); idx++, desc++)
-> +		if (desc->pfn == __phys_to_pfn(phy) && desc->type == type)
-> +			return (void __iomem *)desc->virtual;
+V2: Resetting the index value at ADA1[2:0] to 0 after the conversion, will ensure that
+ADD1[9:0] contains the adc result of channel 0 at first readout. 
+We also need to set ADA2[2:0] to 4 before the first readout occures,
+so ADD2[9:0] contain the adc result of channel 4. They boath auto increment after each readout.
+I removed it from the switch statement becouse ADA2[2:0] is now set to 4 in all modes.
 
-I've just noticed that this function make access to exynos4_iodesc array which is
-placed in initdata section. This might cause a lot of strange unpredictable issues,
-so this patch should probably remove __initdata annotations in iodesc arrays.
+ drivers/mfd/mc13xxx-core.c |   11 +++++++----
+ 1 files changed, 7 insertions(+), 4 deletions(-)
 
-> +
-> +	return __arm_ioremap(phy, size, type);
-> +}
-> +
->  static void exynos4_idle(void)
->  {
->  	if (!need_resched())
-> diff --git a/arch/arm/mach-exynos4/include/mach/io.h b/arch/arm/mach-exynos4/include/mach/io.h
-> index d5478d2..c1b21d5 100644
-> --- a/arch/arm/mach-exynos4/include/mach/io.h
-> +++ b/arch/arm/mach-exynos4/include/mach/io.h
-> @@ -22,5 +22,10 @@
->  #define __mem_pci(a)	(a)
-> 
->  #define IO_SPACE_LIMIT (0xFFFFFFFF)
-> +#define __arch_ioremap	exynos4_ioremap
-> +#define __arch_iounmap	__iounmap
-> +
-> +void __iomem *exynos4_ioremap(unsigned long phy, size_t size,
-> +					unsigned int type);
-> 
->  #endif /* __ASM_ARM_ARCH_IO_H */
-> --
-> 1.7.4.4
-> 
-
-Best regards
+diff --git a/drivers/mfd/mc13xxx-core.c b/drivers/mfd/mc13xxx-core.c
+index e6bb4b3..2e99e83 100644
+--- a/drivers/mfd/mc13xxx-core.c
++++ b/drivers/mfd/mc13xxx-core.c
+@@ -604,7 +604,8 @@ int mc13xxx_adc_do_conversion(struct mc13xxx *mc13xxx, unsigned int mode,
+ 	mc13xxx_reg_read(mc13xxx, MC13XXX_ADC0, &old_adc0);
+ 
+ 	adc0 = MC13XXX_ADC0_ADINC1 | MC13XXX_ADC0_ADINC2;
+-	adc1 = MC13XXX_ADC1_ADEN | MC13XXX_ADC1_ADTRIGIGN | MC13XXX_ADC1_ASC;
++	adc1 = MC13XXX_ADC1_ADEN | MC13XXX_ADC1_ADTRIGIGN |
++		MC13XXX_ADC1_ASC | (4 << MC13XXX_ADC1_CHAN1_SHIFT);
+ 
+ 	if (channel > 7)
+ 		adc1 |= MC13XXX_ADC1_ADSEL;
+@@ -613,8 +614,7 @@ int mc13xxx_adc_do_conversion(struct mc13xxx *mc13xxx, unsigned int mode,
+ 	case MC13XXX_ADC_MODE_TS:
+ 		adc0 |= MC13XXX_ADC0_ADREFEN | MC13XXX_ADC0_TSMOD0 |
+ 			MC13XXX_ADC0_TSMOD1;
+-		adc1 |= 4 << MC13XXX_ADC1_CHAN1_SHIFT | MC13XXX_ADC1_ATOX |
+-			(4 << MC13XXX_ADC1_ATO_SHIFT);
++		adc1 |= MC13XXX_ADC1_ATOX | (4 << MC13XXX_ADC1_ATO_SHIFT);
+ 		break;
+ 
+ 	case MC13XXX_ADC_MODE_SINGLE_CHAN:
+@@ -625,7 +625,6 @@ int mc13xxx_adc_do_conversion(struct mc13xxx *mc13xxx, unsigned int mode,
+ 
+ 	case MC13XXX_ADC_MODE_MULT_CHAN:
+ 		adc0 |= old_adc0 & MC13XXX_ADC0_TSMOD_MASK;
+-		adc1 |= 4 << MC13XXX_ADC1_CHAN1_SHIFT;
+ 		break;
+ 
+ 	default:
+@@ -650,6 +649,10 @@ int mc13xxx_adc_do_conversion(struct mc13xxx *mc13xxx, unsigned int mode,
+ 
+ 	mc13xxx_lock(mc13xxx);
+ 
++	mc13xxx_reg_read(mc13xxx, MC13XXX_ADC1, &adc1);
++	adc1 &= ~(0x7 << MC13XXX_ADC1_CHAN0_SHIFT);
++	mc13xxx_reg_write(mc13xxx, MC13XXX_ADC1, adc1);
++
+ 	mc13xxx_irq_free(mc13xxx, MC13XXX_IRQ_ADCDONE, &adcdone_data);
+ 
+ 	if (ret > 0)
 -- 
-Marek Szyprowski
-Samsung Poland R&D Center
+1.7.4.1
