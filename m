@@ -1,70 +1,63 @@
-From: robin@protonic.nl (Robin van der Gracht)
-Date: Mon, 28 Nov 2011 13:52:39 +0100
-Subject: [PATCH V2] mfd: Fixed unconditional reset of the ADC reading enable
- bits
-Message-ID: <1322484759-17809-1-git-send-email-robin@protonic.nl>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 28 Nov 2011 14:17:14 +0100
+Subject: [PATCH 1/7] pinctrl: enable pxa3xx pinmux
+In-Reply-To: <25B60CDC2F704E4E9D88FFD52780CB4C05EC95D66A@SC-VEXCH1.marvell.com>
+References: <1322262544-7854-1-git-send-email-haojian.zhuang@marvell.com>
+ <1322262544-7854-2-git-send-email-haojian.zhuang@marvell.com>
+ <CACRpkdYPd7a29Sj-F-Aj8vqa3v7unCKNtPH5EPWwapbYgKFLRw@mail.gmail.com>
+ <25B60CDC2F704E4E9D88FFD52780CB4C05EC95D66A@SC-VEXCH1.marvell.com>
+Message-ID: <CACRpkdawJNP4h3gvZ4FfHYkYwzoKdcPRpQt94dieuU3gdZNESQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the ADC is being prepared for a single or multiple channel reading,
-the adc0 register is reconfigured without taking the lithium cell, charge
-current and battery current reading enable bits into account. Which results
-in clearing the bits.
+On Mon, Nov 28, 2011 at 10:50 AM, Haojian Zhuang <hzhuang1@marvell.com> wrote:
 
-Signed-off-by: Robin van der Gracht <robin@protonic.nl>
----
+> The only block issue at here is that cpu_is_pxa3xx() is defined in arch-pxa and cpu_is_pxa910()
+> is defined in arch-mmp. If I only enable arch-pxa, I would meet build error for undefined
+> cpu_is_pxa910().
 
-V2: Maskes now merged to a single mask
+Please #ifdef and cpu_is_* in arch/arm/mach-* then pass a flag or enumerator
+with the platform data to the driver. This way the platform data uniformly
+tells the driver what machine/cpu it is, and the driver need not hold any
+knowledge of the system or use machine-specific functions.
 
- drivers/mfd/mc13xxx-core.c  |    4 ++--
- include/linux/mfd/mc13xxx.h |   10 +++++++++-
- 2 files changed, 11 insertions(+), 3 deletions(-)
+I don't understand where your cpu_is* functions come from anyway,
+which of these includes:
 
-diff --git a/drivers/mfd/mc13xxx-core.c b/drivers/mfd/mc13xxx-core.c
-index e9619ac..5315999 100644
---- a/drivers/mfd/mc13xxx-core.c
-+++ b/drivers/mfd/mc13xxx-core.c
-@@ -615,13 +615,13 @@ int mc13xxx_adc_do_conversion(struct mc13xxx *mc13xxx, unsigned int mode,
- 		break;
- 
- 	case MC13XXX_ADC_MODE_SINGLE_CHAN:
--		adc0 |= old_adc0 & MC13XXX_ADC0_TSMOD_MASK;
-+		adc0 |= old_adc0 & MC13XXX_ADC0_CONFIG_MASK;
- 		adc1 |= (channel & 0x7) << MC13XXX_ADC1_CHAN0_SHIFT;
- 		adc1 |= MC13XXX_ADC1_RAND;
- 		break;
- 
- 	case MC13XXX_ADC_MODE_MULT_CHAN:
--		adc0 |= old_adc0 & MC13XXX_ADC0_TSMOD_MASK;
-+		adc0 |= old_adc0 & MC13XXX_ADC0_CONFIG_MASK;
- 		adc1 |= 4 << MC13XXX_ADC1_CHAN1_SHIFT;
- 		break;
- 
-diff --git a/include/linux/mfd/mc13xxx.h b/include/linux/mfd/mc13xxx.h
-index 3816c2f..c5011d4 100644
---- a/include/linux/mfd/mc13xxx.h
-+++ b/include/linux/mfd/mc13xxx.h
-@@ -172,7 +172,10 @@ struct mc13xxx_platform_data {
- #define MC13XXX_ADC_MODE_SINGLE_CHAN	2
- #define MC13XXX_ADC_MODE_MULT_CHAN	3
- 
--#define MC13XXX_ADC0		43
-+#define MC13XXX_ADC0			43
-+#define MC13XXX_ADC0_LICELLCON		(1 << 0)
-+#define MC13XXX_ADC0_CHRGICON		(1 << 1)
-+#define MC13XXX_ADC0_BATICON		(1 << 2)
- #define MC13XXX_ADC0_ADREFEN		(1 << 10)
- #define MC13XXX_ADC0_TSMOD0		(1 << 12)
- #define MC13XXX_ADC0_TSMOD1		(1 << 13)
-@@ -184,4 +187,9 @@ struct mc13xxx_platform_data {
- 					MC13XXX_ADC0_TSMOD1 | \
- 					MC13XXX_ADC0_TSMOD2)
- 
-+#define MC13XXX_ADC0_CONFIG_MASK	(MC13XXX_ADC0_TSMOD_MASK | \
-+					MC13XXX_ADC0_LICELLCON | \
-+					MC13XXX_ADC0_CHRGICON | \
-+					MC13XXX_ADC0_BATICON)
-+
- #endif /* ifndef __LINUX_MFD_MC13XXX_H */
--- 
-1.7.4.1
++#include <linux/device.h>
++#include <linux/module.h>
++#include <linux/gpio.h>
++#include <linux/io.h>
++#include <linux/pinctrl/pinctrl.h>
++#include <linux/pinctrl/pinmux.h>
++#include <linux/platform_device.h>
+
+Actually provides it?
+
+Please include that file explicitly and I'll tell you to
+not include it :-D
+
+Since this driver will be used by multiple platforms, why not
+create
+include/linux/pinctrl/pxa3xx.h and define your platform data
+struct there like:
+
+#include <linux/pinctrl/machine.h>
+
+/* Unless an enumerator or defines like this exist already */
+enum pxa_cpu_type {
+   PXA_FOO,
+   PXA_BAR,
+   PXA_FNORD,
+};
+
+struct pxa3xx_pinmux_plat {
+    enum pxa_cpu_type cputype;
+    ...other interesting stuff ...
+};
+
+Fill it in in your machine and pick it up in your
+driver.
+
+Yours,
+Linus Walleij
