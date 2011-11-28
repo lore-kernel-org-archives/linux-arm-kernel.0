@@ -1,23 +1,37 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 28 Nov 2011 15:39:00 +0000
-Subject: [PATCH 4/5] init/calibrate.c: allow for recalibration of loops
- per jiffy
-In-Reply-To: <1322364751-29980-5-git-send-email-jkrzyszt@tis.icnet.pl>
-References: <1322364751-29980-1-git-send-email-jkrzyszt@tis.icnet.pl>
- <1322364751-29980-5-git-send-email-jkrzyszt@tis.icnet.pl>
-Message-ID: <20111128153900.GA16481@n2100.arm.linux.org.uk>
+Date: Mon, 28 Nov 2011 16:00:55 +0000
+Subject: [PATCH] [media] V4L: atmel-isi: add code to enable/disable
+ ISI_MCK clock
+In-Reply-To: <1322487284-3381-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1322487284-3381-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <20111128160055.GD11432@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 27, 2011 at 04:32:30AM +0100, Janusz Krzysztofik wrote:
-> This is required on ARM OMAP1 platform, after DPLL reprogramming has
-> been fixed by moving it from setup_arch() to kernel_init().
+On Mon, Nov 28, 2011 at 02:34:44PM +0100, Nicolas Ferre wrote:
+> From: Josh Wu <josh.wu@atmel.com>
 > 
-> Created against linux-3.2-rc2.
+> This patch
+> - add ISI_MCK clock enable/disable code.
+> - change field name in isi_platform_data structure
+> 
+> Signed-off-by: Josh Wu <josh.wu@atmel.com>
+> [g.liakhovetski at gmx.de: fix label names]
+> Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> ---
+> Guennadi,
+> 
+> Here is the pach form Josh and yourself about the Atmel ISI driver
+> modifications. I have rebased it on top of 3.2-rc3 (and tested it on
+> linux-next also).
+> I plan to submit the board/device related patches (2-3/3 of this series) to
+> the arm-soc tree real soon. Do you whant me to include this one or can you
+> schedulle an inclusion in mainline for 3.3?
 
-Why do you need this?  If you know what the original CPU clock rate and
-bogomips were, and the new CPU clock rate, then you simply scale the
-bogomips from the original accordingly.  That's what cpufreq does.
+While you're doing this, why not also prepare for the common clk API by
+adding support for clk_prepare()/clk_unprepare() to these drivers?
 
-You don't have to waste 10s of milliseconds redoing the bogomips
-calibration.
+We are actually now at the point where we should be saying a firm no to
+any new introductions of clk_enable()/clk_disable() without there being
+corresponding clk_prepare()/clk_unprepare() calls for that clk.
