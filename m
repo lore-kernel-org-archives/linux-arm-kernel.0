@@ -1,36 +1,49 @@
-From: tarun.kanti@ti.com (DebBarma, Tarun Kanti)
-Date: Mon, 28 Nov 2011 13:53:11 +0530
-Subject: [PATCH v8 00/24] gpio/omap: driver cleanup and fixes
-In-Reply-To: <87obwsg9ua.fsf@ti.com>
-References: <1317803593-12259-1-git-send-email-tarun.kanti@ti.com>
- <87obwsg9ua.fsf@ti.com>
-Message-ID: <CAC83ZvKJRxGK-j16Yj9A60rSPNNV-4MMxUd9f7w7n-KJr2R+VQ@mail.gmail.com>
+From: boojin.kim@samsung.com (Boojin Kim)
+Date: Mon, 28 Nov 2011 17:23:12 +0900
+Subject: [PATCH v2] ARM: pl330: Fix a race condition
+In-Reply-To: <4EB7B79A.2020004@arm.com>
+References: <4E8C5425.80303@arm.com>
+ <1317892206-3600-1-git-send-email-javi.merino@arm.com>
+ <CAJuYYwTXf-XU0fdGT0+sggN-MEY3v7UHkfjNkM4+QUW464J9Ew@mail.gmail.com>
+ <4EB7B79A.2020004@arm.com>
+Message-ID: <000c01ccada6$f83f5be0$e8be13a0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 4, 2011 at 3:14 AM, Kevin Hilman <khilman@ti.com> wrote:
-> Tarun Kanti DebBarma <tarun.kanti@ti.com> writes:
+Javi Merino wrote:
+
+> > On Samsung's Exynos4 platform, while testing audio playback with i2s
+> > interface, the above change causes the playback to freeze. The
+> > _thrd_active(thrd) call always returns '1' and hence _start(thrd) is
+> > not getting called.
 >
->> This series is continuation of cleanup of OMAP GPIO driver and fixes.
+> If _thrd_active(thrd) returns '1', that means there is an active
+> transfer still running or, if it has finished, you haven't called
+> pl330_update() to acknowledge that.  pl330_update() calls _start() as
+> soon as it can.
 >
-> Using this series on 3630/Zoom3, UART wakeups no longer work from
-> suspend. ?That suggests that GPIO wakeups from retention/off are not
-> working.
+> drivers/dma/pl330.c registers the irq handler in pl330_probe(), so
+> when
+> the transaction finishes, pl330_update() should clear it and call
+> _start().  If there is any outstanding transaction, it should start
+> straight away. If there isn't, it would mark the channel as free, so
+> _thrd_active() should return '0'.  If _thrd_active() is still '1', then
+> something has gone wrong in the way.
 >
-> Please test GPIO wakeups from retention/off. ?One way is to use Zoom3
-> UART wakeup from suspend using by enabling UART wakeups and suspending:
+> Does this shed some light?
 >
-> ? # echo enabled > /sys/devices/platform/serial8250.0/tty/ttyS0/power/wakeup
-> ? # echo mem > /sys/power/state
+
+Your patch makes the memcpy operation on dmatest.c and net DMA be frozen too
+as well as Samsung audio playback.
+With our patch, common DMA memcpy sequence may be changed.
+I think..
+it's needed to find the other way not to bring these side effects.
+
+> Cheers,
+> Javi
 >
-> Also, this series now has a handful of minor conflicts with stuff that
-> is queued or merged for v3.2. ?Please rebase onto
->
-> ? git://github.com/khilman/linux-omap-pm.git for_3.3/gpio-base
-I am not seeing for_3.3/gpio-base branch anymore.
-Is there an alternate branch where I can post the patch?
---
-Tarun
->
-> Kevin
->
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-
+> samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
