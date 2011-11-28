@@ -1,88 +1,40 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 28 Nov 2011 11:02:19 +0100
-Subject: [PATCH] ARM: fix unwinding for XIP kernels
-In-Reply-To: <20111128094502.GA1121@arm.com>
-References: <1321537200-9532-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <20111117141706.GI4748@arm.com>
- <20111120112809.GZ30612@pengutronix.de>
- <20111121183545.GF3272@arm.com>
- <20111128092217.GG17668@pengutronix.de>
- <20111128094502.GA1121@arm.com>
-Message-ID: <20111128100219.GH17668@pengutronix.de>
+From: eliad@wizery.com (Eliad Peller)
+Date: Mon, 28 Nov 2011 12:07:21 +0200
+Subject: [PATCH 2/3] omap_hsmmc: add pm_caps field
+In-Reply-To: <4ED35BFE.9060202@compulab.co.il>
+References: <1321970539-7104-1-git-send-email-eliad@wizery.com>
+ <1321970539-7104-2-git-send-email-eliad@wizery.com>
+ <4ED35131.6020206@compulab.co.il>
+ <CAB3XZEeFSXBQZCR17bRdaG3UbhpE6JJHD_aEiq8Y2Kc3=eGRSQ@mail.gmail.com>
+ <4ED35BFE.9060202@compulab.co.il>
+Message-ID: <CAB3XZEeOAznyX8Z4vpb34GqD2mpr_0_Bje=-5KVkUs3q18ao_Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 28, 2011 at 09:45:03AM +0000, Catalin Marinas wrote:
-> On Mon, Nov 28, 2011 at 09:22:17AM +0000, Uwe Kleine-K?nig wrote:
-> > Hello,
-> > 
-> > On Mon, Nov 21, 2011 at 06:35:45PM +0000, Catalin Marinas wrote:
-> > > On Sun, Nov 20, 2011 at 11:28:09AM +0000, Uwe Kleine-K?nig wrote:
-> > > > On Thu, Nov 17, 2011 at 02:17:06PM +0000, Catalin Marinas wrote:
-> > > > > On Thu, Nov 17, 2011 at 01:40:00PM +0000, Uwe Kleine-K?nig wrote:
-> > > > > > The linker places the unwind tables in readonly sections. So when using
-> > > > > > an XIP kernel these are located in ROM and cannot be modified.
-> > > > > > 
-> > > > > > For that reason don't convert the symbol addresses during boot (or
-> > > > > > module loading) but only when interpreting them in search_index().
-> > > > > > Moreover several consts are added to catch future writes and rename the
-> > > > > > member "addr" of struct unwind_idx to "addr_offset" to better match the
-> > > > > > new semantic.
-> > > > > > 
-> > > > > > This fixes unwinding on XIP which compared prel31 offsets to absolute
-> > > > > > addresses because the initial conversion from prel31 to absolute failed.
-> > > > > 
-> > > > > My only worry - does this increase the index search by doing the prel31
-> > > > > conversion every time? It could affect tools like lockdep that need to
-> > > > > get the backtrace regularly at run-time.
-> > > > I did a first test now using 
-> > > > 
-> > > > 	static int __init unwind_test(void)
-> > > 
-> > > With your latest patch, have you tried dropping __init from this
-> > > function? Since the .init.text section goes after the unwind_idx tables,
-> > > all the prel31 offsets are positive and the number of init functions is
-> > > smaller than the run-time ones.
-> > Yeah, it works fine. In fact unwinding unwind_test yields:
-> > 
-> > 	do_one_initcall+0x50/0x158
-> > 	kernel_init+0x78/0x120
-> > 	kernel_thread_exit+0x0/0x8
-> > 
-> > where kernel_thread_exit is not in .init.text, too.
-> > 
-> > I don't know why you asked? Did you see a bug? Or is it just to let me
-> > do enough testing before you start reviewing my patches?
-> 
-> It's not a bug, just a wondering about the performance figures you got
-> with your latest patch. When you have __init to unwind_test, the
-> .init.text functions are placed by the linker after the unwinding table,
-> with having a positive prel31 address. All the non-init functions are
-> placed before the table with a negative prel31. With your latest patch,
-> you split the set of functions in two ranges - the non-init one with a
-> negative prel31 and the init functions with a positive prel31 and the
-> binary search only happens on one of these ranges. The problem is that
-> the init range is much smaller than the non-init one, so your benchmark
-> figures may not be realistic.
-> 
-> Could you run the simple benchmark on a non-init function?
-Without __init I get with the original implementation:
+On Mon, Nov 28, 2011 at 12:01 PM, Igor Grinberg <grinberg@compulab.co.il> wrote:
+> On 11/28/11 11:23, Eliad Peller wrote:
+>> hi Igor,
+>>
+>> On Mon, Nov 28, 2011 at 11:15 AM, Igor Grinberg <grinberg@compulab.co.il> wrote:
+>>> On 11/22/11 16:02, Eliad Peller wrote:
+>>>> Add pm_caps field to omap2_hsmmc_info and omap_mmc_slot_data
+>>>> structs, so we will be able to indicate mmc pm capabilities
+>>>> in the board file.
+>>>
+>>> Shouldn't this be user space runtime controllable?
+>>> Instead of being a static per board decision?
+>>>
+>> we only declare here support for the pm capabilities.
+>> the actual configuration of these capabilities is done at a later
+>> stage, and can be controlled (implicitly) by userspace (e.g. by
+>> enabling Wakeup-On-Wireless for the wl12xx chip).
+>
+> This is good to hear, because patch 1/3 makes it look like
+> the bus power does get immediately affected depending
+> on that capability, isn't it?
+>
+no.
+it checks pm_flags (configured pm features) rather than pm_caps
+(supported pm features).
 
-	34139, 34127, 34100
-
-and with my patch I get
-
-	33456, 33425, 33407
-
-So the speedup here is smaller here, but still OK. Anyhow, I don't care
-much about the speedup compared to the current implementation. I like my
-patch because it's more correct as it doesn't need to modify the unwind
-tables and is searched in a nice way that doesn't look to be less
-effective by an order.
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Eliad.
