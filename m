@@ -1,28 +1,26 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Mon, 28 Nov 2011 22:03:40 +0800
-Subject: [PATCH 3/5] regulator: pass device_node to
- of_get_regulator_init_data()
-In-Reply-To: <20111128133425.GE8275@opensource.wolfsonmicro.com>
+Date: Mon, 28 Nov 2011 22:08:06 +0800
+Subject: [PATCH 4/5] regulator: mc13892: add device tree probe support
+In-Reply-To: <20111128133545.GF8275@opensource.wolfsonmicro.com>
 References: <1322487439-27254-1-git-send-email-shawn.guo@linaro.org>
- <1322487439-27254-4-git-send-email-shawn.guo@linaro.org>
- <20111128133425.GE8275@opensource.wolfsonmicro.com>
-Message-ID: <20111128140339.GA19754@S2100-06.ap.freescale.net>
+ <1322487439-27254-5-git-send-email-shawn.guo@linaro.org>
+ <20111128133545.GF8275@opensource.wolfsonmicro.com>
+Message-ID: <20111128140805.GB19754@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 28, 2011 at 01:34:26PM +0000, Mark Brown wrote:
-> On Mon, Nov 28, 2011 at 09:37:17PM +0800, Shawn Guo wrote:
+On Mon, Nov 28, 2011 at 01:35:45PM +0000, Mark Brown wrote:
+> On Mon, Nov 28, 2011 at 09:37:18PM +0800, Shawn Guo wrote:
+> > It adds device tree probe support for mc13892-regulator driver.
 > 
-> > ---
-> >  drivers/regulator/of_regulator.c       |    7 ++++---
-> >  include/linux/regulator/of_regulator.h |    6 ++++--
-> >  2 files changed, 8 insertions(+), 5 deletions(-)
-> 
-> Clearly this is going to break the build as you've not updated the
-> users.
+> You haven't documented the binding here at all.  Documentation is
+> mandatory for all device tree bindings.
 
-Sorry, I missed that regulator/fixed.c is already using the api.
-Will fix it in v2.
+It reminds me that I should add binding document for mc13xxx mfd
+driver.  However, there is basically nothing to add for
+mc13892-regulator binding, as it has nothing specific but all that
+have already documented in
+Documentation/devicetree/bindings/regulator/regulator.txt.
 
 -- 
 Regards,
