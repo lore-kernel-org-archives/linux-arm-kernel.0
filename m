@@ -1,54 +1,145 @@
-From: B29397@freescale.com (Chen Peter-B29397)
-Date: Mon, 28 Nov 2011 09:02:57 +0000
-Subject: Want to Get Suggestion for MX28 USB Submisson
-In-Reply-To: <20111128081741.GH3869@pengutronix.de>
-References: <35AB98346D25394A9354ED89C4D76587225CFF@039-SN1MPN1-002.039d.mgd.msft.net>
- <20111128070821.GD3869@pengutronix.de>
- <35AB98346D25394A9354ED89C4D76587225E7D@039-SN1MPN1-002.039d.mgd.msft.net>
- <20111128081741.GH3869@pengutronix.de>
-Message-ID: <35AB98346D25394A9354ED89C4D76587225ED6@039-SN1MPN1-002.039d.mgd.msft.net>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 28 Nov 2011 10:08:16 +0100
+Subject: [PATCH 1/7] pinctrl: enable pxa3xx pinmux
+In-Reply-To: <1322262544-7854-2-git-send-email-haojian.zhuang@marvell.com>
+References: <1322262544-7854-1-git-send-email-haojian.zhuang@marvell.com>
+ <1322262544-7854-2-git-send-email-haojian.zhuang@marvell.com>
+Message-ID: <CACRpkdYPd7a29Sj-F-Aj8vqa3v7unCKNtPH5EPWwapbYgKFLRw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- 
-> -----Original Message-----
-> From: linux-usb-owner at vger.kernel.org [mailto:linux-usb-
-> owner at vger.kernel.org] On Behalf Of Robert Schwebel
-> Sent: Monday, November 28, 2011 4:18 PM
-> To: Chen Peter-B29397
-> Cc: linux-usb at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> gregkh at suse.de; stern at rowland.harvard.edu; kernel at pengutronix.de;
-> shawn.guo at linaro.org; eric.y.miao at gmail.com; Li Frank-B20596; Lin Tony-
-> B19295
-> Subject: Re: Want to Get Suggestion for MX28 USB Submisson
-> 
-> On Mon, Nov 28, 2011 at 08:10:14AM +0000, Chen Peter-B29397 wrote:
-> > > - help to mainline Heikki's patches (port your platform, help testing)
-> > > - let's improve the ci13xxx driver for i.MX.
-> >
-> > Robert, thanks for your suggestion, I just wonder if it will cause
-> > mx28 usb upstream a little later?
-> 
-> Well, if the quality of the code improves, it will be worth it. Note
-> that this is already unmaintainable: if you don't believe it, look at
-> the git log for the four different drivers and you'll notice that a lot
-> of bugs and improvements do not make their way into all of the drivers.
-> 
+On Sat, Nov 26, 2011 at 12:08 AM, Haojian Zhuang
+<haojian.zhuang@marvell.com> wrote:
 
-Submit a new driver with new platform may not an easy life. 
-Anyway, I will mostly follow your suggestion if others have no better suggestion. 
+> Support PXA300/PXA310/PXA320/PXA910 pinmux.
+>
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
 
-> rsc
-> --
-> Pengutronix e.K.                           |
-> |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/
-> |
-> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0
-> |
-> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555
-> |
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-usb" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Cool!
+
+> +#ifdef CONFIG_ARCH_PXA
+> +static struct pinctrl_pin_desc pxa300_pads[] = {
+(...)
+
+Ick, per-arch #ifdefs in the driver/ directory is not good. Can you arrange
+for this to be #ifdef:ed up in your board file and passed in as platform
+data instead of being defined here?
+
+I know that the U300 driver defines all it's pins in the driver file,
+but it only supports one single board on one single chipset and
+is thus pretty fixed, nominally this kind of stuff should come from
+the board file(s) or the device tree.
+
+> +static int pxa3xx_get_gpio_func(unsigned int cpuid, unsigned int gpio)
+> +{
+> + ? ? ? int ret = 0;
+> +
+> + ? ? ? switch (cpuid) {
+> +#ifdef CONFIG_ARCH_PXA
+> + ? ? ? case PINMUX_PXA300:
+> + ? ? ? case PINMUX_PXA310:
+> + ? ? ? ? ? ? ? if (gpio == 50)
+> + ? ? ? ? ? ? ? ? ? ? ? ret = 2;
+> + ? ? ? ? ? ? ? else if (gpio == 49 || gpio == 51 || gpio == 53)
+> + ? ? ? ? ? ? ? ? ? ? ? ret = 3;
+> + ? ? ? ? ? ? ? break;
+> + ? ? ? case PINMUX_PXA320:
+> + ? ? ? ? ? ? ? if (gpio == 56 || (gpio > 58 && gpio < 63))
+> + ? ? ? ? ? ? ? ? ? ? ? goto out;
+> + ? ? ? ? ? ? ? break;
+> +#endif
+> +#ifdef CONFIG_ARCH_MMP
+> + ? ? ? case PINMUX_PXA910:
+> + ? ? ? ? ? ? ? if ((gpio > 116 && gpio < 121) || gpio == 122 || gpio == 123 ||
+> + ? ? ? ? ? ? ? ? ? ? ? gpio == 125 || gpio == 99 || gpio == 58 || gpio == 59)
+> + ? ? ? ? ? ? ? ? ? ? ? ret = 1;
+> + ? ? ? ? ? ? ? break;
+> +#endif
+
+Do you need these #ifdef:s?
+
+They need to go, one way or another.
+
+Switching on cpuid is excellent, provided it's passed in from
+the outside, the definitons of these cases should be available
+anyway should they not.
+
+#ifdef:in out for footprint or unused code paths on some platforms
+should *not* be done, it creates more trouble than it solves, see
+Documentation/SubmittingPatches section 2) #ifdefs are ugly.
+
+> +static int pxa3xx_get_mfpr(unsigned int cpuid, unsigned int pin)
+> +{
+> + ? ? ? int ret;
+> + ? ? ? switch (cpuid) {
+> +#ifdef CONFIG_ARCH_PXA
+
+Dito. Etc.
+
+> +#ifdef CONFIG_ARCH_MMP
+> +static struct pinctrl_desc pxa910_pctrl_desc = {
+> +       .name           = "pxa910-pinctrl",
+> +       .pins           = pxa910_pads,
+> +       .npins          = ARRAY_SIZE(pxa910_pads),
+> +       .maxpin         = 260,
+> +       .pctlops        = &pxa3xx_pctrl_ops,
+> +       .pmxops         = &pxa3xx_pmx_ops,
+> +       .owner          = THIS_MODULE,
+> +};
+
+This is not good either. Get rid of all #ifdef
+
+> +#ifdef CONFIG_ARCH_PXA
+> + ? ? ? if (cpu_is_pxa300()) {
+> + ? ? ? ? ? ? ? info->cpuid = PINMUX_PXA300;
+> + ? ? ? ? ? ? ? info->grp = pxa300_pin_groups;
+> + ? ? ? ? ? ? ? info->func = pxa300_pmx_functions;
+> + ? ? ? ? ? ? ? info->num_grps = ARRAY_SIZE(pxa300_pin_groups);
+> + ? ? ? ? ? ? ? info->num_funcs = ARRAY_SIZE(pxa300_pmx_functions);
+> + ? ? ? ? ? ? ? info->pctl = pinctrl_register(&pxa300_pctrl_desc, &pdev->dev,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? info);
+> + ? ? ? ? ? ? ? range = pxa300_gpio_ranges;
+> + ? ? ? ? ? ? ? range_num = ARRAY_SIZE(pxa300_gpio_ranges);
+> + ? ? ? } else if (cpu_is_pxa310()) {
+> + ? ? ? ? ? ? ? info->cpuid = PINMUX_PXA310;
+> + ? ? ? ? ? ? ? info->grp = pxa310_pin_groups;
+> + ? ? ? ? ? ? ? info->func = pxa310_pmx_functions;
+> + ? ? ? ? ? ? ? info->num_grps = ARRAY_SIZE(pxa310_pin_groups);
+> + ? ? ? ? ? ? ? info->num_funcs = ARRAY_SIZE(pxa310_pmx_functions);
+> + ? ? ? ? ? ? ? info->pctl = pinctrl_register(&pxa310_pctrl_desc, &pdev->dev,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? info);
+> + ? ? ? ? ? ? ? range = pxa310_gpio_ranges;
+> + ? ? ? ? ? ? ? range_num = ARRAY_SIZE(pxa310_gpio_ranges);
+> + ? ? ? } else if (cpu_is_pxa320()) {
+> + ? ? ? ? ? ? ? info->cpuid = PINMUX_PXA320;
+> + ? ? ? ? ? ? ? info->grp = pxa320_pin_groups;
+> + ? ? ? ? ? ? ? info->func = pxa320_pmx_functions;
+> + ? ? ? ? ? ? ? info->num_grps = ARRAY_SIZE(pxa320_pin_groups);
+> + ? ? ? ? ? ? ? info->num_funcs = ARRAY_SIZE(pxa320_pmx_functions);
+> + ? ? ? ? ? ? ? info->pctl = pinctrl_register(&pxa320_pctrl_desc, &pdev->dev,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? info);
+> + ? ? ? ? ? ? ? range = pxa320_gpio_ranges;
+> + ? ? ? ? ? ? ? range_num = ARRAY_SIZE(pxa320_gpio_ranges);
+> + ? ? ? }
+> +#endif
+> +#ifdef CONFIG_ARCH_MMP
+> + ? ? ? if (cpu_is_pxa910()) {
+> + ? ? ? ? ? ? ? info->cpuid = PINMUX_PXA910;
+> + ? ? ? ? ? ? ? info->grp = pxa910_pin_groups;
+> + ? ? ? ? ? ? ? info->func = pxa910_pmx_functions;
+> + ? ? ? ? ? ? ? info->num_grps = ARRAY_SIZE(pxa910_pin_groups);
+> + ? ? ? ? ? ? ? info->num_funcs = ARRAY_SIZE(pxa910_pmx_functions);
+> + ? ? ? ? ? ? ? info->pctl = pinctrl_register(&pxa910_pctrl_desc, &pdev->dev,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? info);
+> + ? ? ? ? ? ? ? range = pxa910_gpio_ranges;
+> + ? ? ? ? ? ? ? range_num = ARRAY_SIZE(pxa910_gpio_ranges);
+> + ? ? ? }
+> +#endif
+
+Same here.
+
+But *apart* from the #ifdef stuff it looks very good!
+So if you can get rid of that, I'll be very happy!
+
+Yours,
+Linus Walleij
