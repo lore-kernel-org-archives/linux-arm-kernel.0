@@ -1,29 +1,30 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 28 Nov 2011 10:32:09 +0100
-Subject: [PATCH] dma i.MX: remove individual SOC dependency
-In-Reply-To: <1322451777.1516.979.camel@vkoul-udesk3>
-References: <1321958598-27260-1-git-send-email-s.hauer@pengutronix.de>
- <1322451777.1516.979.camel@vkoul-udesk3>
-Message-ID: <20111128093209.GT27267@pengutronix.de>
+From: wayne.tams@gmail.com (Wayne Tams)
+Date: Mon, 28 Nov 2011 09:38:00 +0000
+Subject: 2.6.38 port not booting on i.MX53 SoM
+Message-ID: <CAN=k24ncTxDMXZzO1ef_+ETFiiqJZxtYSEOAKz3DiwCO8UKwcw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vinod,
+Hi,
 
-On Mon, Nov 28, 2011 at 09:12:57AM +0530, Vinod Koul wrote:
-> On Tue, 2011-11-22 at 11:43 +0100, Sascha Hauer wrote:
-> > The individual SoC dependency in Kconfig hardly scales anymore.
-> > Instead of having such a fine grained dependency just depend
-> > on ARCH_MXC and risk that the uninformed user has to look in
-> > the help text to figure out which driver is the correct one.
-> Not sure why it was resent but this already in my tree
+I have a feeling that this might be a very common question and with
+multiple answers, but I am running out of options, so here it goes.
 
-I thought you missed it. If you already have it everything is fine.
+I have been working with i.MX53 SoM with a 2.6.35 BSP, I am trying to
+dump the SoMs BSP in  favour for Freescale's latest kernel 2.6.38
+(http://opensource.freescale.com/git?p=imx/linux-2.6-imx.git;a=summary).
 
-Sascha
+Using the 2.6.35 kernel as reference I have been trying to configure
+the 2.6.38 kernel to match as well as modifying and adding board and
+platform information.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+The kernel compiles fine but when I come to load the image the kernel
+gets stuck at "Uncompressing Linux... done, booting the kernel."
+
+Are there any obvious causes for this freeze?
+Have I overlooked a source tree modification?
+Have I maybe gone about this all wrong?
+
+Best regards
+
+Wayne
