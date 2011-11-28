@@ -1,37 +1,29 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 28 Nov 2011 16:00:55 +0000
-Subject: [PATCH] [media] V4L: atmel-isi: add code to enable/disable
- ISI_MCK clock
-In-Reply-To: <1322487284-3381-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1322487284-3381-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <20111128160055.GD11432@n2100.arm.linux.org.uk>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Mon, 28 Nov 2011 16:02:23 +0000
+Subject: [PATCH v2 0/4] Versatile Express DT support
+In-Reply-To: <4ED3AB2B.7090003@gmail.com>
+References: <1322060508-11298-1-git-send-email-pawel.moll@arm.com>
+ <4ED399C8.9080908@gmail.com>
+ <1322493617.3164.56.camel@hornet.cambridge.arm.com>
+ <4ED3AB2B.7090003@gmail.com>
+Message-ID: <1322496143.3164.64.camel@hornet.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 28, 2011 at 02:34:44PM +0100, Nicolas Ferre wrote:
-> From: Josh Wu <josh.wu@atmel.com>
+On Mon, 2011-11-28 at 15:39 +0000, Rob Herring wrote:
+> Okay. I'll apply.
 > 
-> This patch
-> - add ISI_MCK clock enable/disable code.
-> - change field name in isi_platform_data structure
-> 
-> Signed-off-by: Josh Wu <josh.wu@atmel.com>
-> [g.liakhovetski at gmx.de: fix label names]
-> Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
-> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> ---
-> Guennadi,
-> 
-> Here is the pach form Josh and yourself about the Atmel ISI driver
-> modifications. I have rebased it on top of 3.2-rc3 (and tested it on
-> linux-next also).
-> I plan to submit the board/device related patches (2-3/3 of this series) to
-> the arm-soc tree real soon. Do you whant me to include this one or can you
-> schedulle an inclusion in mainline for 3.3?
+> But that's just a vendor. There's still binding docs needed for the
+> actual sil9022 device and some others.
 
-While you're doing this, why not also prepare for the common clk API by
-adding support for clk_prepare()/clk_unprepare() to these drivers?
+I think the sil one is the only undocumented device we use now, except
+for the primecells that Dave and I will take care of?
 
-We are actually now at the point where we should be saying a firm no to
-any new introductions of clk_enable()/clk_disable() without there being
-corresponding clk_prepare()/clk_unprepare() calls for that clk.
+I will also cover the sii9022, if only I get clearance from our legals
+(the datasheet we got is under NDA) to write a driver for it (the device
+is quite complex, so I wouldn't like to define bindings without testing
+them first).
+
+Cheers!
+
+Pawe?
