@@ -1,35 +1,42 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sun, 27 Nov 2011 22:35:50 -0800
-Subject: [PATCH] arm/tegra: Fix build error with tegra_assert_system_reset
-In-Reply-To: <20111124203443.GU9581@n2100.arm.linux.org.uk>
-References: <1322009631-711-1-git-send-email-swarren@nvidia.com>
- <20111123095009.GG9581@n2100.arm.linux.org.uk>
- <74CDBE0F657A3D45AFBB94109FB122FF174F08C6CC@HQMAIL01.nvidia.com>
- <20111124203443.GU9581@n2100.arm.linux.org.uk>
-Message-ID: <CAOesGMh4_YRpaXgapJ9DLPH_A8ft=W1tf10kFdQF90JN=R8ziw@mail.gmail.com>
+From: r.schwebel@pengutronix.de (Robert Schwebel)
+Date: Mon, 28 Nov 2011 08:08:21 +0100
+Subject: Want to Get Suggestion for MX28 USB Submisson
+In-Reply-To: <35AB98346D25394A9354ED89C4D76587225CFF@039-SN1MPN1-002.039d.mgd.msft.net>
+References: <35AB98346D25394A9354ED89C4D76587225CFF@039-SN1MPN1-002.039d.mgd.msft.net>
+Message-ID: <20111128070821.GD3869@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 24, 2011 at 12:34 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Wed, Nov 23, 2011 at 08:59:48AM -0800, Stephen Warren wrote:
->> OK, I tested that and it works too.
->
-> Great. ?Here's the final patch - could I have an ack for it please?
->
-> Thanks.
->
-> 8<======
-> ARM: restart: tegra: use new restart hook
->
-> Hook these platforms restart code into the new restart hook rather
-> than using arch_reset().
->
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Peter,
 
-Acked-by: Olof Johansson <olof@lixom.net>
+On Mon, Nov 28, 2011 at 03:06:48AM +0000, Chen Peter-B29397 wrote:
+> Tony Lin has submitted Freescale mx28 USB Patch at August (See:
+> http://www.spinics.net/lists/linux-usb/msg50201.html), but it hasn't
+> been accepted. I would like to re-submit mx28 usb patches, before
+> that, I would like get some suggestion from you. I think your
+> suggestion will also be benefit for coming mx53, mx50 and mx6q's
+> submission.
+>
+> All Recently Freescale SoC's USB controller are the same, they are
+> mx23, mx25, mx28, mx31, mx35, mx37, mx50, mx51, mx53, and mx6.
 
-(tested-by as well, but adding multiple entries seems silly)
+We have recently worked on the USB device part of the MX28, and it
+turned out that it is an Synopsys IP core and the driver for that is
+ci13xxx_udc.c. Marc Kleine-Budde has sent patches to make it more
+generic and fix several locking issues, so it currently works up to a
+certain degree on MX28.
 
+The whole ci13xxx issue is a huge mess: there are 4 different drivers
+for this IP core in the kernel, all in different states.
 
--Olof
+So my suggestion is:
+
+- help to mainline Heikki's patches (port your platform, help testing)
+- let's improve the ci13xxx driver for i.MX.
+
+rsc
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
