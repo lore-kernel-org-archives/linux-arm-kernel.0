@@ -1,66 +1,29 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 28 Nov 2011 14:25:07 +0000
-Subject: GIC irq_start detection breaks 3.2 boot on platforms without PPIs
-In-Reply-To: <20111128115324.GH9581@n2100.arm.linux.org.uk>
-References: <20111124163548.GC22031@mudshark.cambridge.arm.com>
- <CAL_Jsq+xZayXkOy2v7y+BittjRfC85mw-bCMrDFwDJOvnMnS8Q@mail.gmail.com>
- <20111125154157.GP12047@mudshark.cambridge.arm.com>
- <20111126220834.GB9581@n2100.arm.linux.org.uk>
- <20111127130016.GB26042@mudshark.cambridge.arm.com>
- <20111128113800.GD26946@mudshark.cambridge.arm.com>
- <20111128115324.GH9581@n2100.arm.linux.org.uk>
-Message-ID: <20111128142507.GB2911@mudshark.cambridge.arm.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 28 Nov 2011 14:33:39 +0000
+Subject: [PATCH] ARM: S3C64XX: Add linux/export.h to dev-spi.c
+Message-ID: <1322490819-18971-1-git-send-email-broonie@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 28, 2011 at 11:53:24AM +0000, Russell King - ARM Linux wrote:
-> On Mon, Nov 28, 2011 at 11:38:00AM +0000, Will Deacon wrote:
-> > and if I cat /proc/self/net/dev_mcast, then I get an OOPs:
-> > 
-> > [   41.771296] Unable to handle kernel NULL pointer dereference at virtual address 00000010
-> > [   41.797076] pgd = c797c000
-> > [   41.806863] [00000010] *pgd=070e7831, *pte=00000000, *ppte=00000000
-> > [   41.827111] Internal error: Oops: 17 [#1] PREEMPT
-> > [   41.841221] Modules linked in:
-> > [   41.850392] CPU: 0    Tainted: G        W     (3.2.0-rc2+ #3)
-> > [   41.867681] PC is at dev_seq_next+0x14c/0x1dc
-> > [   41.880763] LR is at seq_read+0x43c/0x494
-> > [   41.892798] pc : [<c024d564>]    lr : [<c00cee54>]    psr: 60000013
-> > [   41.892826] sp : c79f3ed4  ip : 00006405  fp : 00008000
-> > [   41.927254] r10: 00000010  r9 : c79f3f80  r8 : 00000010
-> > [   41.942927] r7 : 00000000  r6 : 00000001  r5 : c041d100  r4 : 00000001
-> > [   41.962512] r3 : c024d418  r2 : c79f3f08  r1 : 00000001  r0 : c70e5640
-> > [   41.982100] Flags: nZCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment user
-> > [   42.003512] Control: 00c5387d  Table: 0797c008  DAC: 00000015
-> > [   42.020750] Process cat (pid: 764, stack limit = 0xc79f22f0)
-> > [   42.037728] Stack: (0xc79f3ed4 to 0xc79f4000)
-> > [   42.050805] 3ec0:                                              00000000 00000001 c70e5640
-> > [   42.075369] 3ee0: c7091b00 00000000 c79f3f80 c79f3f08 c03f07c4 0138a000 c70e5668 00000000
-> > [   42.099931] 3f00: 00000000 400f1000 00000001 00000000 00000025 c7862000 c00cea18 0138a000
-> > [   42.124493] 3f20: c79f3f80 c79f2000 c79f2000 00000000 00000000 c00f6c2c 000000c5 c7091b00
-> > [   42.149059] 3f40: 0138a000 0138a000 c79f3f80 c7091b00 00008000 c00b0be8 00000003 c00a8124
-> > [   42.173621] 3f60: 00000001 c7091b00 0138a000 00000000 00000000 00008000 00000000 c00b0cf8
-> > [   42.198181] 3f80: 00000000 00000000 00000025 00000000 00008000 0138a000 00000003 00000003
-> > [   42.222745] 3fa0: c000e344 c000e1c0 00008000 0138a000 00000003 0138a000 00008000 0138a000
-> > [   42.247307] 3fc0: 00008000 0138a000 00000003 00000003 0138a000 00000000 400f1000 00000000
-> > [   42.271869] 3fe0: 7fffe000 be951b50 0000dea0 401f8a7c 60000010 00000003 00000000 00000000
-> > [   42.296468] [<c024d564>] (dev_seq_next+0x14c/0x1dc) from [<c03f07c4>] (0xc03f07c4)
-> > [   42.319206] Code: eaffffee e590803c e59f508c e1a0a008 (e5984000) 
-> > [   42.343526] ---[ end trace 1b75b31a2719ed1f ]---
-> > 
-> > but I don't think that's your fault (excuse the pun)!
-> 
-> It is showing another problem - that's an incomplete backtrace,
-> presumably because c03f07c4 is not within the kernel text.  Either
-> the stack has been corrupted or some other badness has happened,
-> or maybe the unwinder isn't working properly.
+This is required for the EXPORT_SYMBOL()s the code uses, previously the
+header was being included implicitly by another header.
 
-I've debugged this down to a problem with the net dev name hashing
-introduced in f04565dd ("dev: use name hash for dev_seq_ops"). I've also
-posted a fix to LKML so I think we can safely ignore it for now.
+Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+---
+ arch/arm/mach-s3c64xx/dev-spi.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-As for the backtrace, I guess the unwinder had gone wrong since removing the
-static inline from the hashing functions suddenly gave me a full backtrace
-back to the syscall entry.
-
-Will
+diff --git a/arch/arm/mach-s3c64xx/dev-spi.c b/arch/arm/mach-s3c64xx/dev-spi.c
+index 86fb130..3f437e7 100644
+--- a/arch/arm/mach-s3c64xx/dev-spi.c
++++ b/arch/arm/mach-s3c64xx/dev-spi.c
+@@ -10,6 +10,7 @@
+ 
+ #include <linux/kernel.h>
+ #include <linux/string.h>
++#include <linux/export.h>
+ #include <linux/platform_device.h>
+ #include <linux/dma-mapping.h>
+ #include <linux/gpio.h>
+-- 
+1.7.7.3
