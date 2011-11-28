@@ -1,19 +1,19 @@
 From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Mon, 28 Nov 2011 17:57:29 +0800
-Subject: [V1 1/3] RTC: sa1100: Clean out ost register
-In-Reply-To: <1322219170-1774-1-git-send-email-jtzhou@marvell.com>
-References: <1322219170-1774-1-git-send-email-jtzhou@marvell.com>
-Message-ID: <CAN1soZy+Es_wf7-wzTbmE7OKwpRXjaWDW7foYCNbmqLE9x7Qxw@mail.gmail.com>
+Date: Mon, 28 Nov 2011 17:58:14 +0800
+Subject: [V1 2/3] RTC: sa1100: remove redundant code of setting alarm
+In-Reply-To: <1322219199-1825-1-git-send-email-jtzhou@marvell.com>
+References: <1322219199-1825-1-git-send-email-jtzhou@marvell.com>
+Message-ID: <CAN1soZx8x9gkVzwS+rW6XivfnZtLqOrTDuW04wYdMwMaFfYC+Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Fri, Nov 25, 2011 at 7:06 PM, Jett.Zhou <jtzhou@marvell.com> wrote:
-> These registers are used in old ioctl of UIE and PIE, now they are
-> emulated by rtc generic code of hrtimer, so it can be removed.
+> In rtc generic interface of setting alarm, it will check the alarm time
+> value valid or not, so rtc_periodic_alarm is redundant, remove it.
 >
 > Signed-off-by: Jett.Zhou <jtzhou@marvell.com>
 > ---
-> ?drivers/rtc/rtc-sa1100.c | ? ?3 ---
-> ?1 files changed, 0 insertions(+), 3 deletions(-)
+> ?drivers/rtc/rtc-sa1100.c | ? 53 ++++++++++-----------------------------------
+> ?1 files changed, 12 insertions(+), 41 deletions(-)
 >
 Acked-by: Haojian Zhuang <haojian.zhuang@gmail.com>
