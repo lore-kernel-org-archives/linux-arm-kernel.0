@@ -1,44 +1,55 @@
-From: rabin@rab.in (Rabin Vincent)
-Date: Mon, 28 Nov 2011 22:34:15 +0530
-Subject: [PATCH 4/4] ARM: add jump label support
-In-Reply-To: <20111123175321.GI9581@n2100.arm.linux.org.uk>
-References: <1321888429-3519-1-git-send-email-rabin@rab.in>
- <1321888429-3519-4-git-send-email-rabin@rab.in>
- <20111122194213.GC9581@n2100.arm.linux.org.uk>
- <4ECC2A07.8050701@codeaurora.org> <20111122233949.GA24453@redhat.com>
- <20111122235041.GB24453@redhat.com> <20111123145509.GA4973@debian>
- <20111123175321.GI9581@n2100.arm.linux.org.uk>
-Message-ID: <CAH+eYFC6A7EeYV-C7fOnJcbMpQ009TNsmY+-QVK+n9zHn0PVkg@mail.gmail.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Mon, 28 Nov 2011 17:08:13 +0000
+Subject: [PATCH v2 4/4] ARM: vexpress: DT-based support for CoreTiles
+ Express A5x2 and A9x4
+In-Reply-To: <1322499602.3164.73.camel@hornet.cambridge.arm.com>
+References: <1322060508-11298-1-git-send-email-pawel.moll@arm.com>
+ <1322060508-11298-5-git-send-email-pawel.moll@arm.com>
+ <20111128162925.GE2465@localhost.localdomain>
+ <1322499602.3164.73.camel@hornet.cambridge.arm.com>
+Message-ID: <20111128170813.GF2465@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 23, 2011 at 23:23, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Wed, Nov 23, 2011 at 08:25:09PM +0530, Rabin Vincent wrote:
->> +cat << "END" | $@ -x c - -c -o /dev/null >/dev/null 2>&1 && echo "y"
->> +int main(void)
->> +{
->> +#ifdef __arm__
->> + ? ? /*
->> + ? ? ?* Not related to asm goto, but used by jump label
->> + ? ? ?* and broken on some ARM GCC versions (see GCC Bug 48637).
->> + ? ? ?*/
->> + ? ? static struct { int dummy; int state; } tp;
->> + ? ? asm ("@ %c0" :: "i" (&tp.state));
->> +#endif
->> +
->> +entry:
->> + ? ? asm goto ("" :::: entry);
->> + ? ? return 0;
->> +}
->> +END
->
-> Is the presence of asm goto and %c something we want to test together or
-> separately? ?I suspect it's something we want to do separately.
+On Mon, Nov 28, 2011 at 05:00:02PM +0000, Pawel Moll wrote:
+> On Mon, 2011-11-28 at 16:29 +0000, Dave Martin wrote:
+> > > +config ARCH_VEXPRESS_V2P_CA5S_CA9
+> > > +	bool "CoreTile Express A5x2 and A9x4 based platform support"
+> > > +	select ARCH_VEXPRESS_RS1
+> > > +	select ARCH_VEXPRESS_DT
+> > 
+> > Shouldn't we depend on CPU_V7, ARM_GIC and CACHE_PL310 here?  I get a lot of
+> > moaning from Kconfig about unmet dependencies.  I think the coretiles do have
+> > a CPU etc. on them... 
+> 
+> CPU_V7 and ARM_GIC - definitely, thanks for spotting that.
+> 
+> CACHE_PL310 - I don't think so, as it's just a special case of
+> CACHE_L2X0, which is optional. The tile works fine with the L2 cache
+> disabled.
+> 
+> > > +	select ARM_ERRATA_720789
+> > > +	select ARM_ERRATA_751472
+> > 
+> > The workarounds for these errata both erroneously depend on CONFIG_SMP; however,
+> > I don't think that's a bug in these patches -- selecting those options here
+> > feels correct.
+> 
+> Yes, I've just mirrored what the ARCH_VEXPRESS_CA9X4 selects.
+> 
+> > > +	select ARM_ERRATA_753970
+> > 
+> > Will has a patch, now in Russell's fixes branch, which renames this to
+> > PL310_ERRATA_753970 for compatibility with other people's patches. 
+> > This erratum workaround depends on CACHE_PL310, but since the PL310 is
+> > a property of the CoreTile which must be configured in, that dependency
+> > seems reasonable.
+> 
+> As the PL310 is optional I think I'll just do:
+> 
+>         select PL310_ERRATA_753970 if CACHE_PL310
 
-Why would we want to do it separately?
+OK, I think that's appropriate in this case.
 
-The only reason I see is because the results of this test are assigned
-to a variable called CC_HAVE_ASM_GOTO and that is not an entirely
-accurate name (on ARM) after the addition of this test.  If that's the
-concern, perhaps this variable could just be renamed?
+Cheers
+---Dave
