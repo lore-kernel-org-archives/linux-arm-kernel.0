@@ -1,134 +1,106 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Mon, 28 Nov 2011 10:54:22 +0000
-Subject: [PATCH v2 2/4] ARM: vexpress: Add DT support in v2m
-In-Reply-To: <20111125161808.GE2098@localhost.localdomain>
-References: <1322060508-11298-1-git-send-email-pawel.moll@arm.com>
- <1322060508-11298-3-git-send-email-pawel.moll@arm.com>
- <20111125161808.GE2098@localhost.localdomain>
-Message-ID: <1322477662.3164.30.camel@hornet.cambridge.arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 28 Nov 2011 11:07:21 +0000
+Subject: [03: PATCH 0/5] The remaining stuff
+In-Reply-To: <CACRpkdb4ozt1S3CrEeWGY5zeeJ-=vi8Wh18jv9AONRAH+W1MxQ@mail.gmail.com>
+References: <20111106173113.GI12913@n2100.arm.linux.org.uk>
+ <20111106173939.GJ12913@n2100.arm.linux.org.uk>
+ <20111106175457.GK12913@n2100.arm.linux.org.uk>
+ <20111111171650.GA4154@n2100.arm.linux.org.uk>
+ <CACRpkdb4ozt1S3CrEeWGY5zeeJ-=vi8Wh18jv9AONRAH+W1MxQ@mail.gmail.com>
+Message-ID: <20111128110721.GF9581@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2011-11-25 at 16:18 +0000, Dave Martin wrote:
-> [Since this text is now stable enough to be proofread, I'll list minor
-> pedantic nits along with the other comments -- they aren't vital to the
-> meaning though, and the documentation still "works" if they aren't
-> acted on.]
-
-[snip]
-
-Most appreciated! I'll "process" all your suggestions, thanks!
-
-> > @@ -50,10 +55,34 @@ static void __iomem *v2m_sysreg_base;
-> >
-> >  static void __init v2m_timer_init(void)
-> >  {
-> > -     void __iomem *sysctl_base;
-> > -     void __iomem *timer01_base;
-> > +     void __iomem *sysctl_base = NULL;
-> > +     void __iomem *timer01_base = NULL;
-> > +     unsigned int timer01_irq = NO_IRQ;
-> > +
-> > +     if (of_have_populated_dt()) {
-> > +#if defined(CONFIG_ARCH_VEXPRESS_DT)
-> > +             int err;
-> > +             const char *path;
-> > +             struct device_node *node;
-> > +
-> > +             node = of_find_compatible_node(NULL, NULL, "arm,sp810");
-> > +             if (node)
-> > +                     sysctl_base = of_iomap(node, 0);
-> > +
-> > +             err = of_property_read_string(of_aliases, "timer", &path);
-> > +             if (!err)
-> > +                     node = of_find_node_by_path(path);
-> > +             if (node) {
-> > +                     timer01_base = of_iomap(node, 0);
-> > +                     timer01_irq = irq_of_parse_and_map(node, 0);
-> > +             }
-> > +#endif
-> > +     } else {
-> > +             sysctl_base = ioremap(V2M_SYSCTL, SZ_4K);
-> > +             timer01_base = ioremap(V2M_TIMER01, SZ_4K);
-> > +             timer01_irq = IRQ_V2M_TIMER0;
-> > +     }
+On Mon, Nov 28, 2011 at 11:40:49AM +0100, Linus Walleij wrote:
+> Is this about the problem of where to place the hook
+> for restart as described in this message?
+> http://marc.info/?l=linux-arm-kernel&m=132104005724249&w=2
 > 
-> Do we even have of_have_populated_dt() in a non-DT kernel?
+> If you apply that patch I think it's easy to fix that up,
+> if you have some git branch I can base off I can fix
+> it up too.
 > 
-> Maybe change this to
-> 
-> #if defined(CONFIG_ARCH_VEXPRESS_DT)
->         if (of_have_populated_dt()) {
->                 /* ... */
->         } else
-> #endif
->         /* follow on from previous else */
->         {
->                 /* ... */
->         }
-> 
-> ...or if that feels a little unclear, maybe do this:
-> 
-> #if defined(CONFIG_ARCH_VEXPRESS_DT)
->         if (of_have_populated_dt()) {
->                 /* ... */
->         } else {
-> #else
->         {
-> #endif
->                 /* ... */
->         }
+> Or you can just throw it into -next so it breaks and I'll fix
+> from there ASAP, no big deal.
 
-of_have_populated_dt() is safe, see "include/linux/of.h":
+This is about as far as I got with Nomadik.  The patch you point out above
+does appear to fix the problem, and if you put it in the patch system, I'll
+apply it to the restart-cleanup branch, and fix the patch below.
 
-#ifdef CONFIG_OF 
-static inline bool of_have_populated_dt(void)
-{       
-        return allnodes != NULL;
-}       
-#else /* CONFIG_OF */
-static inline bool of_have_populated_dt(void)
-{       
-        return false;
-}       
-#endif /* CONFIG_OF */
+8<===
+ARM: restart: nomadik: use new restart hook XXX WIP XXX WHY IS THERE NO LOCAL HEADERS XXX
 
-> > @@ -63,20 +92,20 @@ static void __init v2m_timer_init(void)
-> >               writel(scctrl, sysctl_base + SCCTRL);
-> >       }
-> >
-> > -     timer01_base = ioremap(V2M_TIMER01, SZ_4K);
-> > -     WARN_ON(!timer01_base);
-> > -     if (timer01_base) {
-> > +     WARN_ON(!timer01_base || timer01_irq != NO_IRQ);
-> 
-> Is that supposed to be !timer01_base || timer01_irq == NO_IRQ ?
+Hook the Nomadik NHK platform restart code into the new restart hook.
 
-Yes, I spotted and fixed this in the mean time.
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ arch/arm/mach-nomadik/board-nhk8815.c       |    1 +
+ arch/arm/mach-nomadik/cpu-8815.c            |   11 +++++++++++
+ arch/arm/mach-nomadik/include/mach/system.h |    9 ---------
+ 3 files changed, 12 insertions(+), 9 deletions(-)
 
-> If so, is might be better to write
-> 
-> WARN_ON(!(expr));
-> if (expr) {
->         ...
-> 
-> so that the conditions are clear inverses.
-
-Good point, will do.
-
-> > @@ -470,3 +499,99 @@ MACHINE_START(VEXPRESS, "ARM-Versatile Express")
-> >       .timer          = &v2m_timer,
-> >       .init_machine   = v2m_init,
-> >  MACHINE_END
-> 
-> It would be useful to have a comment somewhere indicating that the
-> DT_MACHINE_START() entries live in the corresponding ct-*.c files for
-> DT-enabled coretiles.
-> 
-> Not essential, though ... most people do know how to use grep.
-
-Where exactly would you see that comment?
-
-Thanks for the review!
-
-Pawe?
+diff --git a/arch/arm/mach-nomadik/board-nhk8815.c b/arch/arm/mach-nomadik/board-nhk8815.c
+index 0cbb74c..c559ed6 100644
+--- a/arch/arm/mach-nomadik/board-nhk8815.c
++++ b/arch/arm/mach-nomadik/board-nhk8815.c
+@@ -282,4 +282,5 @@ MACHINE_START(NOMADIK, "NHK8815")
+ 	.init_irq	= cpu8815_init_irq,
+ 	.timer		= &nomadik_timer,
+ 	.init_machine	= nhk8815_platform_init,
++	.restart	= cpu8815_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-nomadik/cpu-8815.c b/arch/arm/mach-nomadik/cpu-8815.c
+index dc67717..b4bbe51 100644
+--- a/arch/arm/mach-nomadik/cpu-8815.c
++++ b/arch/arm/mach-nomadik/cpu-8815.c
+@@ -21,6 +21,7 @@
+ #include <linux/device.h>
+ #include <linux/amba/bus.h>
+ #include <linux/platform_device.h>
++#include <linux/io.h>
+ 
+ #include <plat/gpio-nomadik.h>
+ #include <mach/hardware.h>
+@@ -164,3 +165,13 @@ void __init cpu8815_init_irq(void)
+ #endif
+ 	 return;
+ }
++
++void cpu8815_restart(char mode, const char *cmd)
++{
++	void __iomem *src_rstsr = io_p2v(NOMADIK_SRC_BASE + 0x18);
++
++	/* FIXME: use egpio when implemented */
++
++	/* Write anything to Reset status register */
++	writel(1, src_rstsr);
++}
+diff --git a/arch/arm/mach-nomadik/include/mach/system.h b/arch/arm/mach-nomadik/include/mach/system.h
+index 7119f68..16f59f6 100644
+--- a/arch/arm/mach-nomadik/include/mach/system.h
++++ b/arch/arm/mach-nomadik/include/mach/system.h
+@@ -20,9 +20,6 @@
+ #ifndef __ASM_ARCH_SYSTEM_H
+ #define __ASM_ARCH_SYSTEM_H
+ 
+-#include <linux/io.h>
+-#include <mach/hardware.h>
+-
+ static inline void arch_idle(void)
+ {
+ 	/*
+@@ -34,12 +31,6 @@ static inline void arch_idle(void)
+ 
+ static inline void arch_reset(char mode, const char *cmd)
+ {
+-	void __iomem *src_rstsr = io_p2v(NOMADIK_SRC_BASE + 0x18);
+-
+-	/* FIXME: use egpio when implemented */
+-
+-	/* Write anything to Reset status register */
+-	writel(1, src_rstsr);
+ }
+ 
+ #endif
+-- 
+1.7.4.4
