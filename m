@@ -1,43 +1,82 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 28 Nov 2011 10:15:34 +0100
-Subject: [PATCH 4/7] tty: serial: support pinmux in pxa serial
-In-Reply-To: <1322262544-7854-5-git-send-email-haojian.zhuang@marvell.com>
-References: <1322262544-7854-1-git-send-email-haojian.zhuang@marvell.com>
- <1322262544-7854-5-git-send-email-haojian.zhuang@marvell.com>
-Message-ID: <CACRpkdbo7W9FATvygH234KRm68feRnNyCzDSTQZkt-oOzMPaZQ@mail.gmail.com>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Mon, 28 Nov 2011 11:15:29 +0200
+Subject: [PATCH 2/3] omap_hsmmc: add pm_caps field
+In-Reply-To: <1321970539-7104-2-git-send-email-eliad@wizery.com>
+References: <1321970539-7104-1-git-send-email-eliad@wizery.com>
+ <1321970539-7104-2-git-send-email-eliad@wizery.com>
+Message-ID: <4ED35131.6020206@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 26, 2011 at 12:09 AM, Haojian Zhuang
-<haojian.zhuang@marvell.com> wrote:
+Hi Eliad,
 
-> From: Haojian Zhuang <hzhuang1@hexinfolabs.org>
->
-> PXA serial driver can configure pin directly.
->
-> Signed-off-by: Haojian Zhuang <hzhuang1@hexinfolabs.org>
-(...)
-> + err_pmx:
-> + ? ? ? pinmux_disable(sport->pmx);
-> + ? ? ? pinmux_put(sport->pmx);
+On 11/22/11 16:02, Eliad Peller wrote:
+> Add pm_caps field to omap2_hsmmc_info and omap_mmc_slot_data
+> structs, so we will be able to indicate mmc pm capabilities
+> in the board file.
 
-There is this little discussion whether each individual driver should access
-it's pins or whether it should be done all centrally.
+Shouldn't this be user space runtime controllable?
+Instead of being a static per board decision?
 
-After some thinking and resoning I actually think this may be best
-to have in each driver in most cases. The reason is that while it is
-possible to standardize for simple usecases (like this one, just activate
-it at probe() and deactivate it at remove()) it gets really complicated
-and hairy to have it in central places when we come to things like
-suspend()/resume(), idling and sometimes even
-runtime_[suspend|resume].
+> 
+> Signed-off-by: Eliad Peller <eliad@wizery.com>
+> ---
+>  arch/arm/mach-omap2/hsmmc.c           |    1 +
+>  arch/arm/mach-omap2/hsmmc.h           |    1 +
+>  arch/arm/plat-omap/include/plat/mmc.h |    1 +
+>  drivers/mmc/host/omap_hsmmc.c         |    2 ++
+>  4 files changed, 5 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/hsmmc.c b/arch/arm/mach-omap2/hsmmc.c
+> index 097a42d..d00a54a 100644
+> --- a/arch/arm/mach-omap2/hsmmc.c
+> +++ b/arch/arm/mach-omap2/hsmmc.c
+> @@ -306,6 +306,7 @@ static int __init omap_hsmmc_pdata_init(struct omap2_hsmmc_info *c,
+>  	mmc->slots[0].name = hc_name;
+>  	mmc->nr_slots = 1;
+>  	mmc->slots[0].caps = c->caps;
+> +	mmc->slots[0].pm_caps = c->pm_caps;
+>  	mmc->slots[0].internal_clock = !c->ext_clock;
+>  	mmc->dma_mask = 0xffffffff;
+>  	if (cpu_is_omap44xx())
+> diff --git a/arch/arm/mach-omap2/hsmmc.h b/arch/arm/mach-omap2/hsmmc.h
+> index f757e78..c440973 100644
+> --- a/arch/arm/mach-omap2/hsmmc.h
+> +++ b/arch/arm/mach-omap2/hsmmc.h
+> @@ -12,6 +12,7 @@ struct omap2_hsmmc_info {
+>  	u8	mmc;		/* controller 1/2/3 */
+>  	u32	caps;		/* 4/8 wires and any additional host
+>  				 * capabilities OR'd (ref. linux/mmc/host.h) */
+> +	u32	pm_caps;	/* PM capabilities */
+>  	bool	transceiver;	/* MMC-2 option */
+>  	bool	ext_clock;	/* use external pin for input clock */
+>  	bool	cover_only;	/* No card detect - just cover switch */
+> diff --git a/arch/arm/plat-omap/include/plat/mmc.h b/arch/arm/plat-omap/include/plat/mmc.h
+> index c7b8741..d3263ac 100644
+> --- a/arch/arm/plat-omap/include/plat/mmc.h
+> +++ b/arch/arm/plat-omap/include/plat/mmc.h
+> @@ -79,6 +79,7 @@ struct omap_mmc_platform_data {
+>  		 */
+>  		u8  wires;	/* Used for the MMC driver on omap1 and 2420 */
+>  		u32 caps;	/* Used for the MMC driver on 2430 and later */
+> +		u32 pm_caps;	/* PM capabilities of the mmc */
+>  
+>  		/*
+>  		 * nomux means "standard" muxing is wrong on this board, and
+> diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
+> index ec7c83c..2bc964a6 100644
+> --- a/drivers/mmc/host/omap_hsmmc.c
+> +++ b/drivers/mmc/host/omap_hsmmc.c
+> @@ -1985,6 +1985,8 @@ static int __init omap_hsmmc_probe(struct platform_device *pdev)
+>  	if (mmc_slot(host).nonremovable)
+>  		mmc->caps |= MMC_CAP_NONREMOVABLE;
+>  
+> +	mmc->pm_caps = mmc_slot(host).pm_caps;
+> +
+>  	omap_hsmmc_conf_bus_power(host);
+>  
+>  	/* Select DMA lines */
 
-So unless someone else disagrees or talks agains me, and
-provided this is how you want to do it for all PXA drivers:
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-
-I need Gregs ACK if you want it to go iin through the pinctrl
-tree.
-
-Thanks,
-Linus Walleij
+-- 
+Regards,
+Igor.
