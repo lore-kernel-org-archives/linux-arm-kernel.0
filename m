@@ -1,60 +1,71 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Mon, 28 Nov 2011 10:44:05 +0100
-Subject: Want to Get Suggestion for MX28 USB Submisson
-In-Reply-To: <35AB98346D25394A9354ED89C4D76587225CFF@039-SN1MPN1-002.039d.mgd.msft.net>
-References: <35AB98346D25394A9354ED89C4D76587225CFF@039-SN1MPN1-002.039d.mgd.msft.net>
-Message-ID: <4ED357E5.7020902@pengutronix.de>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 28 Nov 2011 09:45:03 +0000
+Subject: [PATCH] ARM: fix unwinding for XIP kernels
+In-Reply-To: <20111128092217.GG17668@pengutronix.de>
+References: <1321537200-9532-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <20111117141706.GI4748@arm.com>
+ <20111120112809.GZ30612@pengutronix.de>
+ <20111121183545.GF3272@arm.com>
+ <20111128092217.GG17668@pengutronix.de>
+Message-ID: <20111128094502.GA1121@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/28/2011 04:06 AM, Chen Peter-B29397 wrote:
-> Hi lists:
+On Mon, Nov 28, 2011 at 09:22:17AM +0000, Uwe Kleine-K?nig wrote:
+> Hello,
 > 
-> Tony Lin has submitted Freescale mx28 USB Patch at August 
-> (See: http://www.spinics.net/lists/linux-usb/msg50201.html), but it hasn't been accepted.
-> I would like to re-submit mx28 usb patches, before that, I would like get some suggestion 
-> from you. I think your suggestion will also be benefit for coming mx53, mx50 and mx6q's submission.
+> On Mon, Nov 21, 2011 at 06:35:45PM +0000, Catalin Marinas wrote:
+> > On Sun, Nov 20, 2011 at 11:28:09AM +0000, Uwe Kleine-K?nig wrote:
+> > > On Thu, Nov 17, 2011 at 02:17:06PM +0000, Catalin Marinas wrote:
+> > > > On Thu, Nov 17, 2011 at 01:40:00PM +0000, Uwe Kleine-K?nig wrote:
+> > > > > The linker places the unwind tables in readonly sections. So when using
+> > > > > an XIP kernel these are located in ROM and cannot be modified.
+> > > > > 
+> > > > > For that reason don't convert the symbol addresses during boot (or
+> > > > > module loading) but only when interpreting them in search_index().
+> > > > > Moreover several consts are added to catch future writes and rename the
+> > > > > member "addr" of struct unwind_idx to "addr_offset" to better match the
+> > > > > new semantic.
+> > > > > 
+> > > > > This fixes unwinding on XIP which compared prel31 offsets to absolute
+> > > > > addresses because the initial conversion from prel31 to absolute failed.
+> > > > 
+> > > > My only worry - does this increase the index search by doing the prel31
+> > > > conversion every time? It could affect tools like lockdep that need to
+> > > > get the backtrace regularly at run-time.
+> > > I did a first test now using 
+> > > 
+> > > 	static int __init unwind_test(void)
+> > 
+> > With your latest patch, have you tried dropping __init from this
+> > function? Since the .init.text section goes after the unwind_idx tables,
+> > all the prel31 offsets are positive and the number of init functions is
+> > smaller than the run-time ones.
+> Yeah, it works fine. In fact unwinding unwind_test yields:
 > 
-> All Recently Freescale SoC's USB controller are the same, they are mx23, mx25, mx28, mx31, mx35,
-> mx37, mx50, mx51, mx53, and mx6.
-> But, the transceiver is different between them
-> mx23, mx28, mx6 (Transceiver A)
-> mx25 mx31, mx35,mx37, mx50, mx51, mx53 (Transceiver B)
+> 	do_one_initcall+0x50/0x158
+> 	kernel_init+0x78/0x120
+> 	kernel_thread_exit+0x0/0x8
 > 
-> Current upstream platform information:
-> mx23 mx28 ==> mxs platfrom
-> others (including mx6) ==> mxc platform
+> where kernel_thread_exit is not in .init.text, too.
 > 
-> Current upstream USB information:
-> mx25, mx3x, mx51: ehci-mxc.c (host), fsl_mxc_udc.c(device, main functions are at fsl_udc_core.c)
-> 
-> My plan of submitting mx28 (mx53,mx50, mx6 later if possible):
-> 1. Replace cpu_is_mxxx() with struct platform_device_id for ehci-mxc.c and fsl_mxc_udc.c
+> I don't know why you asked? Did you see a bug? Or is it just to let me
+> do enough testing before you start reviewing my patches?
 
-The cpu_is_mxxx() code in the clock handling code can be removed by
-introducing the missing clocks as no-op clocks on the other cores.
+It's not a bug, just a wondering about the performance figures you got
+with your latest patch. When you have __init to unwind_test, the
+.init.text functions are placed by the linker after the unwinding table,
+with having a positive prel31 address. All the non-init functions are
+placed before the table with a negative prel31. With your latest patch,
+you split the set of functions in two ranges - the non-init one with a
+negative prel31 and the init functions with a positive prel31 and the
+binary search only happens on one of these ranges. The problem is that
+the init range is much smaller than the non-init one, so your benchmark
+figures may not be realistic.
 
-> 2. Using ehci-mxc.c and fsl_mxc_udc.c for mx28 upstreaming.
-> For Step 2, I have concern that whether mxs platform users will be confused of their
-> usb driver named xxx_mxc, not xxx_mxs?
-> If mxs maintainers think it will cause confusion, I would like to change names to ehci-imx.c
-> and fsl_imx_udc.c for all recent Freescale SoC's (from mx23 to mx6), is it suitable?
-> 3. Create transceiver driver for mx28, and it will also be used for mx6.  
+Could you run the simple benchmark on a non-init function?
 
-For the usb device part, I'm supporting with Robert's suggesting, first
-mainline Heikki's otg patches, improve the ci13xxx driver.
+Thanks.
 
-cheers, Marc
 -- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 262 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111128/4b215681/attachment.sig>
+Catalin
