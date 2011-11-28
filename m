@@ -1,49 +1,35 @@
-From: boojin.kim@samsung.com (Boojin Kim)
-Date: Mon, 28 Nov 2011 17:23:12 +0900
-Subject: [PATCH v2] ARM: pl330: Fix a race condition
-In-Reply-To: <4EB7B79A.2020004@arm.com>
-References: <4E8C5425.80303@arm.com>
- <1317892206-3600-1-git-send-email-javi.merino@arm.com>
- <CAJuYYwTXf-XU0fdGT0+sggN-MEY3v7UHkfjNkM4+QUW464J9Ew@mail.gmail.com>
- <4EB7B79A.2020004@arm.com>
-Message-ID: <000c01ccada6$f83f5be0$e8be13a0$%kim@samsung.com>
+From: eliad@wizery.com (Eliad Peller)
+Date: Mon, 28 Nov 2011 10:26:42 +0200
+Subject: [PATCH 3/3] omap: board-sdp4430: declare support for
+ MMC_PM_KEEP_POWER
+In-Reply-To: <CAKd1q9pv5hMSpazYiZpmoowV52GvE7gFK5zUJSGpKhNkDZGuVg@mail.gmail.com>
+References: <1321970539-7104-1-git-send-email-eliad@wizery.com>
+ <1321970539-7104-3-git-send-email-eliad@wizery.com>
+ <CAKd1q9pv5hMSpazYiZpmoowV52GvE7gFK5zUJSGpKhNkDZGuVg@mail.gmail.com>
+Message-ID: <CAB3XZEenx7L07BYmrHGt0h9ZAY-LOpWXL+in0vs7XOoeBf_LUw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Javi Merino wrote:
+On Mon, Nov 28, 2011 at 9:50 AM, Coelho, Luciano <coelho@ti.com> wrote:
+> On Tue, Nov 22, 2011 at 4:02 PM, Eliad Peller <eliad@wizery.com> wrote:
+>> Declare support for keeping the power of the wlan chip
+>> while suspended. this is needed for Wakeup-On-Wireless.
+>>
+>> Signed-off-by: Eliad Peller <eliad@wizery.com>
+>> ---
+>> ?arch/arm/mach-omap2/board-4430sdp.c | ? ?1 +
+>> ?1 files changed, 1 insertions(+), 0 deletions(-)
+>
+> What about all the other board files that also have this structure?
+> For example board-omap4panda.c? I think they should all be changed and
+> the change should also be communicated more broadly for those board
+> files which (unfortunately) are not upstream (or which are upstream
+> but without the wl12xx-specific definitions on it, such as Beagle).
+>
+i preferred adding this capability only for boards i can test.
+unfortunately, i don't a panda/beagle setup.
+anyway, i don't think we have to add it all at once.
+let's just do it one board at a time... i'll add support for zoom as
+well. any volunteers for panda/beagle? ;)
 
-> > On Samsung's Exynos4 platform, while testing audio playback with i2s
-> > interface, the above change causes the playback to freeze. The
-> > _thrd_active(thrd) call always returns '1' and hence _start(thrd) is
-> > not getting called.
->
-> If _thrd_active(thrd) returns '1', that means there is an active
-> transfer still running or, if it has finished, you haven't called
-> pl330_update() to acknowledge that.  pl330_update() calls _start() as
-> soon as it can.
->
-> drivers/dma/pl330.c registers the irq handler in pl330_probe(), so
-> when
-> the transaction finishes, pl330_update() should clear it and call
-> _start().  If there is any outstanding transaction, it should start
-> straight away. If there isn't, it would mark the channel as free, so
-> _thrd_active() should return '0'.  If _thrd_active() is still '1', then
-> something has gone wrong in the way.
->
-> Does this shed some light?
->
-
-Your patch makes the memcpy operation on dmatest.c and net DMA be frozen too
-as well as Samsung audio playback.
-With our patch, common DMA memcpy sequence may be changed.
-I think..
-it's needed to find the other way not to bring these side effects.
-
-> Cheers,
-> Javi
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-
-> samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Eliad.
