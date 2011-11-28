@@ -1,39 +1,38 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 28 Nov 2011 11:07:55 +0100
-Subject: 2.6.38 port not booting on i.MX53 SoM
-In-Reply-To: <CAN=k24ncTxDMXZzO1ef_+ETFiiqJZxtYSEOAKz3DiwCO8UKwcw@mail.gmail.com>
-References: <CAN=k24ncTxDMXZzO1ef_+ETFiiqJZxtYSEOAKz3DiwCO8UKwcw@mail.gmail.com>
-Message-ID: <20111128100755.GI17668@pengutronix.de>
+From: eliad@wizery.com (Eliad Peller)
+Date: Mon, 28 Nov 2011 12:12:35 +0200
+Subject: [PATCH 3/3] omap: board-sdp4430: declare support for
+ MMC_PM_KEEP_POWER
+In-Reply-To: <1322474290.6502.53.camel@cumari>
+References: <1321970539-7104-1-git-send-email-eliad@wizery.com>
+ <1321970539-7104-3-git-send-email-eliad@wizery.com>
+ <CAKd1q9pv5hMSpazYiZpmoowV52GvE7gFK5zUJSGpKhNkDZGuVg@mail.gmail.com>
+ <CAB3XZEenx7L07BYmrHGt0h9ZAY-LOpWXL+in0vs7XOoeBf_LUw@mail.gmail.com>
+ <1322471324.6502.32.camel@cumari> <4ED353C5.7030704@compulab.co.il>
+ <1322474290.6502.53.camel@cumari>
+Message-ID: <CAB3XZEfS4XN8sXf=r6s2cqOMnsSwLBsRLva61bQK4R-ZZnHPsA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Mon, Nov 28, 2011 at 11:58 AM, Luciano Coelho <coelho@ti.com> wrote:
+> On Mon, 2011-11-28 at 11:26 +0200, Igor Grinberg wrote:
+>> On 11/28/11 11:08, Luciano Coelho wrote:
+>> > I may do it for panda later on, if I get the time to test it. ?For
+>> > beagle, it doesn't really apply, because the wl12xx support is
+>> > out-of-tree, unfortunately. :(
+>>
+>> If I understood correctly, you want to change all the
+>> board files supporting the wl12xx wifi chip to have this
+>> capability set, right?
+>> Isn't this immediately affects the power consumption in
+>> sleep state?
+>> Shouldn't this be runtime controllable?
+>> I bet there are many applications that do not care about WoW,
+>> but do care about the power consumption.
+>> How does this change affect them?
+>
+> Good point, I don't know. :) Probably Eliad has the answer for that.
+>
+see the discussion regarding patch [2/3] - we only declare here
+support for this capability, but it's disabled by default.
 
-On Mon, Nov 28, 2011 at 09:38:00AM +0000, Wayne Tams wrote:
-> I have a feeling that this might be a very common question and with
-> multiple answers, but I am running out of options, so here it goes.
-> 
-> I have been working with i.MX53 SoM with a 2.6.35 BSP, I am trying to
-> dump the SoMs BSP in  favour for Freescale's latest kernel 2.6.38
-> (http://opensource.freescale.com/git?p=imx/linux-2.6-imx.git;a=summary).
-Better use mainline, that's way less ugly. (And note that the Freescale
-kernel is out of scope for this mailing list.)
- 
-> Using the 2.6.35 kernel as reference I have been trying to configure
-> the 2.6.38 kernel to match as well as modifying and adding board and
-> platform information.
-> 
-> The kernel compiles fine but when I come to load the image the kernel
-> gets stuck at "Uncompressing Linux... done, booting the kernel."
-> 
-> Are there any obvious causes for this freeze?
-An exception before console output is setup, or a wrong setup.
-
-Enable DEBUG_LL, EARLY_PRINTK and add "earlyprintk" to the commandline.
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Eliad.
