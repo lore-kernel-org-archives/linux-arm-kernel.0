@@ -1,60 +1,52 @@
-From: chaos.youn@samsung.com (Changhwan Youn)
-Date: Mon, 28 Nov 2011 17:00:24 +0900
-Subject: [PATCH] ARM: Add TLB flushing for both entries in a PMD
-In-Reply-To: <20111125101746.GB30157@arm.com>
-References: <20111116103810.12733.23637.stgit@e102109-lin.cambridge.arm.com>
- <004d01cca9c9$aeeb0420$0cc10c60$%youn@samsung.com>
- <20111123104531.GC29609@arm.com>
- <003401ccab4f$57882cd0$06988670$%youn@samsung.com>
- <20111125101746.GB30157@arm.com>
-Message-ID: <001c01ccada3$c904ef00$5b0ecd00$%youn@samsung.com>
+From: B29397@freescale.com (Chen Peter-B29397)
+Date: Mon, 28 Nov 2011 08:10:14 +0000
+Subject: Want to Get Suggestion for MX28 USB Submisson
+In-Reply-To: <20111128070821.GD3869@pengutronix.de>
+References: <35AB98346D25394A9354ED89C4D76587225CFF@039-SN1MPN1-002.039d.mgd.msft.net>
+ <20111128070821.GD3869@pengutronix.de>
+Message-ID: <35AB98346D25394A9354ED89C4D76587225E7D@039-SN1MPN1-002.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-So practically Cortex A9 doesn't need tlb_add_flush() in pte_free_tlb().
-I was a little confused because of the address of tlb_add_flush().
 
-I really appreciate your answering.
-
-On Friday, November 25, 2011 7:18 PM, Catalin Marinas wrote
-> On Fri, Nov 25, 2011 at 08:50:48AM +0000, Changhwan Youn wrote:
-> > On Wednesday, November 23, 2011 7:46 PM, Catalin Marinas wrote:
-> > > To: Changhwan Youn
-> > > Cc: linux-arm-kernel at lists.infradead.org
-> > > Subject: Re: [PATCH] ARM: Add TLB flushing for both entries in a PMD
-> > >
-> > > On Wed, Nov 23, 2011 at 10:21:37AM +0000, Changhwan Youn wrote:
-> > > > I have tested this patch on several exynos machines which
-> > > > have a9 cores and it worked fine.
-> > > > Though I'm not sure that android boot and running simple applications
-> > > > are enough test for this patch.
-> > >
-> > > Thanks for testing but the A9 would work fine without this patch. The
-> > > problem is on A15 where level 1 page table entries (pgd) are cached by
-> > > the TLB independently of level 2 entries (pte). The original code is
-> > > only flushing one entry in level 1 rather than 2.
+ 
+> Peter,
+> 
+> On Mon, Nov 28, 2011 at 03:06:48AM +0000, Chen Peter-B29397 wrote:
+> > Tony Lin has submitted Freescale mx28 USB Patch at August (See:
+> > http://www.spinics.net/lists/linux-usb/msg50201.html), but it hasn't
+> > been accepted. I would like to re-submit mx28 usb patches, before
+> > that, I would like get some suggestion from you. I think your
+> > suggestion will also be benefit for coming mx53, mx50 and mx6q's
+> > submission.
 > >
-> > Thank you for the answer.
-> > The one thing I don't understand is why A9 works fine without this
-> > patch. I know that A9 has worked fine without this patch.
-> > It seems that without this patch, invalid VA->PA mapping can remains in TLB
-> > and this can cause wrong PA access by user process.
-> > Can you explain why there's no wrong PA access in A9?
+> > All Recently Freescale SoC's USB controller are the same, they are
+> > mx23, mx25, mx28, mx31, mx35, mx37, mx50, mx51, mx53, and mx6.
 > 
-> This patch only fixes a bug in the pte_free_tlb() function, used when
-> freeing the page tables and its goal is to make sure pmd level entries
-> to not point to an already freed pte. Unmapping user VA->PA mappings
-> happens at the pte level and page TLBs are flushed separately. If you
-> look at the original code, it only adds a TLB flush for a single address
-> while a pte table covers 2MB.
+> We have recently worked on the USB device part of the MX28, and it
+> turned out that it is an Synopsys IP core and the driver for that is
+> ci13xxx_udc.c. Marc Kleine-Budde has sent patches to make it more
+> generic and fix several locking issues, so it currently works up to a
+> certain degree on MX28.
 > 
-> In theory, on A9 SMP there could also be an issue but given the timing
-> and memory ordering conditions that's impossible in practice. Basically,
-> the requirement is that clearing of the pmd entry on one CPU does not
-> become visible to another CPU before the corresponding pte page has been
-> re-used. The A9 only caches a page table walk in the TLB if there is a
-> complete VA->PA translation.
+> The whole ci13xxx issue is a huge mess: there are 4 different drivers
+> for this IP core in the kernel, all in different states.
+> 
+> So my suggestion is:
+> 
+> - help to mainline Heikki's patches (port your platform, help testing)
+> - let's improve the ci13xxx driver for i.MX.
+> 
+Robert, thanks for your suggestion, I just wonder if it will cause mx28
+usb upstream a little later?
 
-Regards,
-
-Changhwan
+> rsc
+> --
+> Pengutronix e.K.                           |
+> |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/
+> |
+> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0
+> |
+> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555
+> |
