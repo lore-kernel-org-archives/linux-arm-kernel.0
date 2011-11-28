@@ -1,82 +1,29 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 28 Nov 2011 10:32:06 +0100
-Subject: [PATCH 6/7] ARM: pxa: enable pinmux mapping in zylonite
-In-Reply-To: <201111260353.36899.arnd@arndb.de>
-References: <1322262544-7854-1-git-send-email-haojian.zhuang@marvell.com>
- <1322262544-7854-7-git-send-email-haojian.zhuang@marvell.com>
- <201111260353.36899.arnd@arndb.de>
-Message-ID: <CACRpkdayK7UUabNn6s-i0ATUeR0Bj7ojWb-2EJAES6HT0i-aLg@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 28 Nov 2011 10:32:09 +0100
+Subject: [PATCH] dma i.MX: remove individual SOC dependency
+In-Reply-To: <1322451777.1516.979.camel@vkoul-udesk3>
+References: <1321958598-27260-1-git-send-email-s.hauer@pengutronix.de>
+ <1322451777.1516.979.camel@vkoul-udesk3>
+Message-ID: <20111128093209.GT27267@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 26, 2011 at 4:53 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Friday 25 November 2011, Haojian Zhuang wrote:
->> Remove MFP operation in zylonite. Use pinmux mapping instead.
->>
->> +#define COMMON_PINMUX_MAP() ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
->> + ? ? { ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
->> + ? ? ? ? ? ? .name = "uart2", ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
->> + ? ? ? ? ? ? .ctrl_dev_name = "pinctrl.0", ? ? ? ? ? ? ? ? ? \
->> + ? ? ? ? ? ? .function = "uart2", ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
->> + ? ? ? ? ? ? .dev_name = "pxa2xx-uart.2", ? ? ? ? ? ? ? ? ? ?\
->> + ? ? ? ? ? ? .group = "stuart1", ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
->> + ? ? ? ? ? ? .hog_on_boot = true, ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
->> + ? ? }, { ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
->> + ? ? ? ? ? ? .name = "key", ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
->> + ? ? ? ? ? ? .ctrl_dev_name = "pinctrl.0", ? ? ? ? ? ? ? ? ? \
->> + ? ? ? ? ? ? .function = "key", ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
->> + ? ? ? ? ? ? .dev_name = "pxa27x-keyboard", ? ? ? ? ? ? ? ? ?\
->> + ? ? ? ? ? ? .group = "key0", ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
->> + ? ? ? ? ? ? .hog_on_boot = true, ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
->> + ? ? }, { ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
->> + ? ? ? ? ? ? .name = "mmc1", ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
->> + ? ? ? ? ? ? .ctrl_dev_name = "pinctrl.0", ? ? ? ? ? ? ? ? ? \
->> + ? ? ? ? ? ? .function = "mmc1", ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
->> + ? ? ? ? ? ? .group = "mmc1_0", ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
->> + ? ? ? ? ? ? .hog_on_boot = true, ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
->> + ? ? }, ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
->> + ? ? PINMUX_MAP_PRIMARY_SYS_HOG("mmc2", "mmc2"), ? ? ? ? ? ? \
->> + ? ? PINMUX_MAP_PRIMARY_SYS_HOG("usbh", "usbh"), ? ? ? ? ? ? \
->> + ? ? PINMUX_MAP_PRIMARY_SYS_HOG("ac97", "ac97"), ? ? ? ? ? ? \
->> + ? ? PINMUX_MAP_PRIMARY_SYS_HOG("smc", "smc"), ? ? ? ? ? ? ? \
->> + ? ? PINMUX_MAP_PRIMARY("pwm3", "pwm3", "pxa27x-pwm.1"), ? ? \
->> + ? ? PINMUX_MAP_PRIMARY("uart1", "uart1", "pxa2xx-uart.1"), ?\
->> + ? ? PINMUX_MAP_PRIMARY("ssp3", "ssp3", "pxa27x-ssp.2"), ? ? \
->> + ? ? PINMUX_MAP_PRIMARY("lcd", "lcd", "pxa2xx-fb"), ? ? ? ? ?\
->> + ? ? PINMUX_MAP_PRIMARY("i2c", "i2c", "pxa2xx-i2c.0")
->> +
->> +static struct pinmux_map pxa300_pmx_map[] = {
->> + ? ? COMMON_PINMUX_MAP(),
->> + ? ? {
->> + ? ? ? ? ? ? .name = "uart0",
->> + ? ? ? ? ? ? .ctrl_dev_name = "pinctrl.0",
->> + ? ? ? ? ? ? .function = "uart0",
->> + ? ? ? ? ? ? .dev_name = "pxa2xx-uart.0",
->> + ? ? ? ? ? ? .group = "ffuart0",
->> + ? ? },
->> ?};
->
-> I think we should not be forced to use macros like this in order to extend a common
-> pinmux mapping. Unfortunately, I can't see an easy way to do it differently
-> with the pinmux core, but it might not be too late to extend the interfaces now.
+Hi Vinod,
 
-No problem at all, if I just get a patch to extend the mapping with whatever
-is needed to use large common subsets I'll review/merge, it looks pretty
-useful for PXA.
+On Mon, Nov 28, 2011 at 09:12:57AM +0530, Vinod Koul wrote:
+> On Tue, 2011-11-22 at 11:43 +0100, Sascha Hauer wrote:
+> > The individual SoC dependency in Kconfig hardly scales anymore.
+> > Instead of having such a fine grained dependency just depend
+> > on ARCH_MXC and risk that the uninformed user has to look in
+> > the help text to figure out which driver is the correct one.
+> Not sure why it was resent but this already in my tree
 
-> I also noticed that the pinmux_map arrays are not marked __initdata, because
-> it gets referenced later. This means that in a kernel that supports many machines,
-> we also have to keep all pinmux configurations around at runtime.
->
-> Linus, what do you think about changing the pinmux_register_mappings function
-> to make a copy of the data in order to let the platform code mark the data as
-> __initdata, and to allow appending the maps at boot time so that the above
-> can become two arrays that are registered individually?
+I thought you missed it. If you already have it everything is fine.
 
-It's a bit costly since it involves making deep copies of structs
-that in turn contain a few strings each, leading to a lot of kstrdup()
-happening for a large map, but I'll propose something for the single
-in-kernel user so we can see how it looks.
+Sascha
 
-Yours,
-Linus Walleij
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
