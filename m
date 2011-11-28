@@ -1,28 +1,70 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 28 Nov 2011 12:49:19 +0000
-Subject: [PATCH 3/7] ARM: pxa: enable pinmux in pxa pwm
-In-Reply-To: <CACRpkdbQEHjwF0mAJf3hCX7VdW0YBcHH0z6dFus-rC09_e08vw@mail.gmail.com>
-References: <1322262544-7854-1-git-send-email-haojian.zhuang@marvell.com>
- <1322262544-7854-4-git-send-email-haojian.zhuang@marvell.com>
- <CACRpkdbQEHjwF0mAJf3hCX7VdW0YBcHH0z6dFus-rC09_e08vw@mail.gmail.com>
-Message-ID: <20111128124919.GC11432@n2100.arm.linux.org.uk>
+From: robin@protonic.nl (Robin van der Gracht)
+Date: Mon, 28 Nov 2011 13:52:39 +0100
+Subject: [PATCH V2] mfd: Fixed unconditional reset of the ADC reading enable
+ bits
+Message-ID: <1322484759-17809-1-git-send-email-robin@protonic.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 28, 2011 at 10:18:25AM +0100, Linus Walleij wrote:
-> On Sat, Nov 26, 2011 at 12:09 AM, Haojian Zhuang
-> <haojian.zhuang@marvell.com> wrote:
-> 
-> > From: Haojian Zhuang <hzhuang1@hexinfolabs.org>
-> >
-> > Add pinmux operations in pxa pwm driver.
-> >
-> > Signed-off-by: Haojian Zhuang <hzhuang1@hexinfolabs.org>
-> 
-> Same comment as for the serial driver,
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> 
-> I need one of the PXA maintainers (Eric, Russell) ACK to merge
-> it through the pinctrl tree.
+When the ADC is being prepared for a single or multiple channel reading,
+the adc0 register is reconfigured without taking the lithium cell, charge
+current and battery current reading enable bits into account. Which results
+in clearing the bits.
 
-Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Signed-off-by: Robin van der Gracht <robin@protonic.nl>
+---
+
+V2: Maskes now merged to a single mask
+
+ drivers/mfd/mc13xxx-core.c  |    4 ++--
+ include/linux/mfd/mc13xxx.h |   10 +++++++++-
+ 2 files changed, 11 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/mfd/mc13xxx-core.c b/drivers/mfd/mc13xxx-core.c
+index e9619ac..5315999 100644
+--- a/drivers/mfd/mc13xxx-core.c
++++ b/drivers/mfd/mc13xxx-core.c
+@@ -615,13 +615,13 @@ int mc13xxx_adc_do_conversion(struct mc13xxx *mc13xxx, unsigned int mode,
+ 		break;
+ 
+ 	case MC13XXX_ADC_MODE_SINGLE_CHAN:
+-		adc0 |= old_adc0 & MC13XXX_ADC0_TSMOD_MASK;
++		adc0 |= old_adc0 & MC13XXX_ADC0_CONFIG_MASK;
+ 		adc1 |= (channel & 0x7) << MC13XXX_ADC1_CHAN0_SHIFT;
+ 		adc1 |= MC13XXX_ADC1_RAND;
+ 		break;
+ 
+ 	case MC13XXX_ADC_MODE_MULT_CHAN:
+-		adc0 |= old_adc0 & MC13XXX_ADC0_TSMOD_MASK;
++		adc0 |= old_adc0 & MC13XXX_ADC0_CONFIG_MASK;
+ 		adc1 |= 4 << MC13XXX_ADC1_CHAN1_SHIFT;
+ 		break;
+ 
+diff --git a/include/linux/mfd/mc13xxx.h b/include/linux/mfd/mc13xxx.h
+index 3816c2f..c5011d4 100644
+--- a/include/linux/mfd/mc13xxx.h
++++ b/include/linux/mfd/mc13xxx.h
+@@ -172,7 +172,10 @@ struct mc13xxx_platform_data {
+ #define MC13XXX_ADC_MODE_SINGLE_CHAN	2
+ #define MC13XXX_ADC_MODE_MULT_CHAN	3
+ 
+-#define MC13XXX_ADC0		43
++#define MC13XXX_ADC0			43
++#define MC13XXX_ADC0_LICELLCON		(1 << 0)
++#define MC13XXX_ADC0_CHRGICON		(1 << 1)
++#define MC13XXX_ADC0_BATICON		(1 << 2)
+ #define MC13XXX_ADC0_ADREFEN		(1 << 10)
+ #define MC13XXX_ADC0_TSMOD0		(1 << 12)
+ #define MC13XXX_ADC0_TSMOD1		(1 << 13)
+@@ -184,4 +187,9 @@ struct mc13xxx_platform_data {
+ 					MC13XXX_ADC0_TSMOD1 | \
+ 					MC13XXX_ADC0_TSMOD2)
+ 
++#define MC13XXX_ADC0_CONFIG_MASK	(MC13XXX_ADC0_TSMOD_MASK | \
++					MC13XXX_ADC0_LICELLCON | \
++					MC13XXX_ADC0_CHRGICON | \
++					MC13XXX_ADC0_BATICON)
++
+ #endif /* ifndef __LINUX_MFD_MC13XXX_H */
+-- 
+1.7.4.1
