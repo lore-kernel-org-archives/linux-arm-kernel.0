@@ -1,32 +1,42 @@
-From: gregkh@suse.de (Greg KH)
-Date: Mon, 28 Nov 2011 14:32:25 +0900
-Subject: Want to Get Suggestion for MX28 USB Submisson
-In-Reply-To: <35AB98346D25394A9354ED89C4D76587225D7E@039-SN1MPN1-002.039d.mgd.msft.net>
-References: <35AB98346D25394A9354ED89C4D76587225CFF@039-SN1MPN1-002.039d.mgd.msft.net>
- <20111128045733.GA9194@suse.de>
- <35AB98346D25394A9354ED89C4D76587225D7E@039-SN1MPN1-002.039d.mgd.msft.net>
-Message-ID: <20111128053225.GA12779@suse.de>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Mon, 28 Nov 2011 11:36:56 +0530
+Subject: [PATCH v2 0/4] OMAP serial device tree support
+In-Reply-To: <20111127033642.GA28378@kroah.com>
+References: <1321969456-24266-1-git-send-email-rnayak@ti.com>
+ <20111127033642.GA28378@kroah.com>
+Message-ID: <4ED32500.5060908@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 28, 2011 at 05:24:00AM +0000, Chen Peter-B29397 wrote:
->  
-> > >
-> > > Tony Lin has submitted Freescale mx28 USB Patch at August
-> > > (See: http://www.spinics.net/lists/linux-usb/msg50201.html), but it
-> > hasn't been accepted.
-> > 
-> > Why wasn't it accepted?  Have the issues raised from that last posting
-> > of the driver now been addressed?  If not, why not?  If so, great.
-> > 
-> Sascha suggested that use another platform device driver for transceiver,
-> and follow heikki's suggested otg structure. Since heikki's otg structure is
-> still not accepted, I will write a device driver for this freescale 
-> transceiver at coming submission. 
+On Sunday 27 November 2011 09:06 AM, Greg KH wrote:
+> On Tue, Nov 22, 2011 at 07:14:12PM +0530, Rajendra Nayak wrote:
+>> v2 is based on the latest omap-serial runtime patches, which
+>> can be found here[1]
+>>
+>> The series passes minimal data that allows serial console
+>> boot, with UART's initialised from device tree.
+>> However some of low power support for UART and remote
+>> wakeup needs more work.
+>> Boot tested on OMAP4 panda and OMAP4 sdp boards.
+>>
+>> Patches can be found here..
+>> git://gitorious.org/omap-pm/linux.git for-dt/serial
+>
+> What tree are these going to go through, some device tree one, or do you
+> want me to take the serial driver patches?
 
-Why not work to get the OTG stuff accepted, that should make your life
-easier, right?
+Hi Greg,
+
+These patches have a dependency on the omap-serial runtime series.
+So once that makes it in, through the serial driver tree, and once we
+have the necessary Acks from the Device Tree maintainers on the relevant
+patches from this series, these could go through the serial driver tree
+as well.
 
 thanks,
+Rajendra
 
-greg k-h
+>
+> thanks,
+>
+> greg k-h
