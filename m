@@ -1,72 +1,35 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Mon, 28 Nov 2011 21:23:59 +0800
-Subject: [PATCH 1/7] pinctrl: enable pxa3xx pinmux
-In-Reply-To: <CACRpkdawJNP4h3gvZ4FfHYkYwzoKdcPRpQt94dieuU3gdZNESQ@mail.gmail.com>
-References: <1322262544-7854-1-git-send-email-haojian.zhuang@marvell.com>
- <1322262544-7854-2-git-send-email-haojian.zhuang@marvell.com>
- <CACRpkdYPd7a29Sj-F-Aj8vqa3v7unCKNtPH5EPWwapbYgKFLRw@mail.gmail.com>
- <25B60CDC2F704E4E9D88FFD52780CB4C05EC95D66A@SC-VEXCH1.marvell.com>
- <CACRpkdawJNP4h3gvZ4FfHYkYwzoKdcPRpQt94dieuU3gdZNESQ@mail.gmail.com>
-Message-ID: <CAN1soZxhZUDhyTde2=PEzzZzar7EowHd=YSfXMXXjtjGQbqO1w@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 28 Nov 2011 21:37:14 +0800
+Subject: [PATCH 0/5] Add device tree support for mc13892 regulator driver
+Message-ID: <1322487439-27254-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 28, 2011 at 9:17 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Mon, Nov 28, 2011 at 10:50 AM, Haojian Zhuang <hzhuang1@marvell.com> wrote:
->
->> The only block issue at here is that cpu_is_pxa3xx() is defined in arch-pxa and cpu_is_pxa910()
->> is defined in arch-mmp. If I only enable arch-pxa, I would meet build error for undefined
->> cpu_is_pxa910().
->
-> Please #ifdef and cpu_is_* in arch/arm/mach-* then pass a flag or enumerator
-> with the platform data to the driver. This way the platform data uniformly
-> tells the driver what machine/cpu it is, and the driver need not hold any
-> knowledge of the system or use machine-specific functions.
->
-> I don't understand where your cpu_is* functions come from anyway,
-> which of these includes:
->
-> +#include <linux/device.h>
-> +#include <linux/module.h>
-> +#include <linux/gpio.h>
-> +#include <linux/io.h>
-> +#include <linux/pinctrl/pinctrl.h>
-> +#include <linux/pinctrl/pinmux.h>
-> +#include <linux/platform_device.h>
->
-> Actually provides it?
->
-> Please include that file explicitly and I'll tell you to
-> not include it :-D
->
-> Since this driver will be used by multiple platforms, why not
-> create
-> include/linux/pinctrl/pxa3xx.h and define your platform data
-> struct there like:
->
-> #include <linux/pinctrl/machine.h>
->
-> /* Unless an enumerator or defines like this exist already */
-> enum pxa_cpu_type {
-> ? PXA_FOO,
-> ? PXA_BAR,
-> ? PXA_FNORD,
-> };
->
-> struct pxa3xx_pinmux_plat {
-> ? ?enum pxa_cpu_type cputype;
-> ? ?...other interesting stuff ...
-> };
->
-> Fill it in in your machine and pick it up in your
-> driver.
->
-> Yours,
-> Linus Walleij
->
+The first patch adds device tree probe support for mc13xxx mfd driver.
 
-How about define cpu_is_pxa3xx() in both arch-pxa and arch-mmp? Maybe
-it could be simpler. Since we have similar issue in gpio driver too.
+The patches #2 and #3 make small changes to regulator OF function for
+supporting the case like mc13892 regulator driver, where device_node
+does not have a struct device behind it.  I'm sorry for that I did not
+notice them until I start porting mc13892 to the support
 
-Thanks
-Haojian
+The patch #4 adds the actual device tree support for mc13892 regulator
+driver, and the last patch add mc13892 support into imx51-babbage
+device tree source.
+
+Shawn Guo (5):
+      mfd: mc13xxx: add device tree probe support
+      regulator: fix label names used in device tree bindings
+      regulator: pass device_node to of_get_regulator_init_data()
+      regulator: mc13892: add device tree probe support
+      arm/imx: add mc13892 support into imx51-babbage.dts
+
+ .../devicetree/bindings/regulator/regulator.txt    |   10 +-
+ arch/arm/boot/dts/imx51-babbage.dts                |  100 ++++++++++++++++-
+ drivers/mfd/mc13xxx-core.c                         |  121 ++++++++++++++-----
+ drivers/regulator/mc13892-regulator.c              |   43 +++++--
+ drivers/regulator/mc13xxx-regulator-core.c         |   57 +++++++++
+ drivers/regulator/mc13xxx.h                        |   20 ++++
+ drivers/regulator/of_regulator.c                   |    7 +-
+ include/linux/mfd/mc13xxx.h                        |    1 +
+ include/linux/regulator/of_regulator.h             |    6 +-
+ 9 files changed, 311 insertions(+), 54 deletions(-)
