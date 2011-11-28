@@ -1,49 +1,25 @@
-From: coelho@ti.com (Luciano Coelho)
-Date: Mon, 28 Nov 2011 11:08:44 +0200
-Subject: [PATCH 3/3] omap: board-sdp4430: declare support for
- MMC_PM_KEEP_POWER
-In-Reply-To: <CAB3XZEenx7L07BYmrHGt0h9ZAY-LOpWXL+in0vs7XOoeBf_LUw@mail.gmail.com>
-References: <1321970539-7104-1-git-send-email-eliad@wizery.com>
- <1321970539-7104-3-git-send-email-eliad@wizery.com>
- <CAKd1q9pv5hMSpazYiZpmoowV52GvE7gFK5zUJSGpKhNkDZGuVg@mail.gmail.com>
- <CAB3XZEenx7L07BYmrHGt0h9ZAY-LOpWXL+in0vs7XOoeBf_LUw@mail.gmail.com>
-Message-ID: <1322471324.6502.32.camel@cumari>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 28 Nov 2011 10:09:08 +0100
+Subject: [PATCH 2/7] gpio: make pxa gpio depend on pinmux
+In-Reply-To: <1322262544-7854-3-git-send-email-haojian.zhuang@marvell.com>
+References: <1322262544-7854-1-git-send-email-haojian.zhuang@marvell.com>
+ <1322262544-7854-3-git-send-email-haojian.zhuang@marvell.com>
+Message-ID: <CACRpkdag=P19j1QHGXqbFsKGS7Q9cDPgZP8QaGeF9R08Qm4gNw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2011-11-28 at 10:26 +0200, Eliad Peller wrote: 
-> On Mon, Nov 28, 2011 at 9:50 AM, Coelho, Luciano <coelho@ti.com> wrote:
-> > On Tue, Nov 22, 2011 at 4:02 PM, Eliad Peller <eliad@wizery.com> wrote:
-> >> Declare support for keeping the power of the wlan chip
-> >> while suspended. this is needed for Wakeup-On-Wireless.
-> >>
-> >> Signed-off-by: Eliad Peller <eliad@wizery.com>
-> >> ---
-> >>  arch/arm/mach-omap2/board-4430sdp.c |    1 +
-> >>  1 files changed, 1 insertions(+), 0 deletions(-)
-> >
-> > What about all the other board files that also have this structure?
-> > For example board-omap4panda.c? I think they should all be changed and
-> > the change should also be communicated more broadly for those board
-> > files which (unfortunately) are not upstream (or which are upstream
-> > but without the wl12xx-specific definitions on it, such as Beagle).
-> >
-> i preferred adding this capability only for boards i can test.
-> unfortunately, i don't a panda/beagle setup.
-> anyway, i don't think we have to add it all at once.
-> let's just do it one board at a time... i'll add support for zoom as
-> well. any volunteers for panda/beagle? ;)
+On Sat, Nov 26, 2011 at 12:08 AM, Haojian Zhuang
+<haojian.zhuang@marvell.com> wrote:
 
-Hmmm, okay, there is logic in that for the pragmatic, but this seems to
-be so clearly what is needed to solve the same problem with other boards
-that it could deserve changing all the board files.  In practice, your
-changes may affect all the other boards too, regardless of whether you
-set the new flag or not.  In any case, not my call here.
+> From: Haojian Zhuang <hzhuang1@hexinfolabs.org>
+>
+> While gpio_request() is called, pinmux_request_gpio() would be called
+> too. Then alternate function of pin can be changed to gpio directly.
+>
+> Signed-off-by: Haojian Zhuang <hzhuang1@hexinfolabs.org>
 
-I may do it for panda later on, if I get the time to test it.  For
-beagle, it doesn't really apply, because the wl12xx support is
-out-of-tree, unfortunately. :(
+Looks good,
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
--- 
-Cheers,
-Luca.
+Thanks,
+Linus Walleij
