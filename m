@@ -1,43 +1,55 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 28 Nov 2011 07:44:15 -0600
-Subject: [PATCH v2 0/4] OMAP serial device tree support
-In-Reply-To: <20111128063149.GB15189@kroah.com>
-References: <1321969456-24266-1-git-send-email-rnayak@ti.com>
- <20111127033642.GA28378@kroah.com> <4ED32500.5060908@ti.com>
- <20111128063149.GB15189@kroah.com>
-Message-ID: <4ED3902F.7080801@gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 28 Nov 2011 14:46:12 +0100
+Subject: [PATCH 1/1] ARM: at91: fix clock conid for atmel_tcb.1 on
+ 9260/9g20
+In-Reply-To: <1322481188-8839-1-git-send-email-plagnioj@jcrosoft.com>
+References: <1322481188-8839-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <4ED390A4.1020608@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/28/2011 12:31 AM, Greg KH wrote:
-> On Mon, Nov 28, 2011 at 11:36:56AM +0530, Rajendra Nayak wrote:
->> On Sunday 27 November 2011 09:06 AM, Greg KH wrote:
->>> On Tue, Nov 22, 2011 at 07:14:12PM +0530, Rajendra Nayak wrote:
->>>> v2 is based on the latest omap-serial runtime patches, which
->>>> can be found here[1]
->>>>
->>>> The series passes minimal data that allows serial console
->>>> boot, with UART's initialised from device tree.
->>>> However some of low power support for UART and remote
->>>> wakeup needs more work.
->>>> Boot tested on OMAP4 panda and OMAP4 sdp boards.
->>>>
->>>> Patches can be found here..
->>>> git://gitorious.org/omap-pm/linux.git for-dt/serial
->>>
->>> What tree are these going to go through, some device tree one, or do you
->>> want me to take the serial driver patches?
->>
->> Hi Greg,
->>
->> These patches have a dependency on the omap-serial runtime series.
->> So once that makes it in, through the serial driver tree, and once we
->> have the necessary Acks from the Device Tree maintainers on the relevant
->> patches from this series, these could go through the serial driver tree
->> as well.
+On 11/28/2011 12:53 PM, Jean-Christophe PLAGNIOL-VILLARD :
+> the conid is supposed to be t0/t1/t2_clk
 > 
-> Then all of these should probably go through the device tree tree.
+> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-Generally, DT related driver changes go in thru the respective driver trees.
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-Rob
+I have queued it in branch at91-fixes of
+git://github.com/at91linux/linux-at91.git
+
+Thanks, best regards,
+
+> Cc: stable at kernel.org
+> ---
+> Hi,
+> 
+> 	could you apply this is present since 3.0
+> 
+> Best Regards,
+> J.
+>  arch/arm/mach-at91/at91sam9260.c |    6 +++---
+>  1 files changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/mach-at91/at91sam9260.c b/arch/arm/mach-at91/at91sam9260.c
+> index 2e59126..8c75932 100644
+> --- a/arch/arm/mach-at91/at91sam9260.c
+> +++ b/arch/arm/mach-at91/at91sam9260.c
+> @@ -196,9 +196,9 @@ static struct clk_lookup periph_clocks_lookups[] = {
+>  	CLKDEV_CON_DEV_ID("t0_clk", "atmel_tcb.0", &tc0_clk),
+>  	CLKDEV_CON_DEV_ID("t1_clk", "atmel_tcb.0", &tc1_clk),
+>  	CLKDEV_CON_DEV_ID("t2_clk", "atmel_tcb.0", &tc2_clk),
+> -	CLKDEV_CON_DEV_ID("t3_clk", "atmel_tcb.1", &tc3_clk),
+> -	CLKDEV_CON_DEV_ID("t4_clk", "atmel_tcb.1", &tc4_clk),
+> -	CLKDEV_CON_DEV_ID("t5_clk", "atmel_tcb.1", &tc5_clk),
+> +	CLKDEV_CON_DEV_ID("t0_clk", "atmel_tcb.1", &tc3_clk),
+> +	CLKDEV_CON_DEV_ID("t1_clk", "atmel_tcb.1", &tc4_clk),
+> +	CLKDEV_CON_DEV_ID("t2_clk", "atmel_tcb.1", &tc5_clk),
+>  	CLKDEV_CON_DEV_ID("pclk", "ssc.0", &ssc_clk),
+>  	/* more usart lookup table for DT entries */
+>  	CLKDEV_CON_DEV_ID("usart", "fffff200.serial", &mck),
+
+
+-- 
+Nicolas Ferre
