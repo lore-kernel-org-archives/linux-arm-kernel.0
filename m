@@ -1,7 +1,7 @@
 From: jtzhou@marvell.com (Jett.Zhou)
-Date: Mon, 28 Nov 2011 10:00:08 +0800
+Date: Mon, 28 Nov 2011 10:04:52 +0800
 Subject: [V2 3/3] RTC: sa1100: support sa1100, pxa and mmp soc families
-Message-ID: <1322445608-22520-1-git-send-email-jtzhou@marvell.com>
+Message-ID: <1322445892-22620-1-git-send-email-jtzhou@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
