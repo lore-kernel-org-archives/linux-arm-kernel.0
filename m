@@ -1,100 +1,30 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Tue, 29 Nov 2011 11:37:48 +0200
-Subject: [PATCH] ARM: OMAP3: hsmmc: fix MMC 2 setup for AM35x
-Message-ID: <1322559468-5883-1-git-send-email-grinberg@compulab.co.il>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 29 Nov 2011 10:41:23 +0100
+Subject: [GIT PULL] U300 and Ux500 defconfigs
+Message-ID: <CACRpkdbNOucfZdfENJ44Q8dB73=nupt9913O+Zp4PCFUn5Ec3w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-AM35x MMC 2 controller has internal clock loopback setting which cannot
-be utilized without this patch and thus SDIO devices connected to this
-controller and depend on this setting will fail to initialize.
+Hi Arnd,
 
-Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
----
- arch/arm/mach-omap2/hsmmc.c |   42 ++++++++++++++++++++++++++++++------------
- 1 files changed, 30 insertions(+), 12 deletions(-)
+could you please pull these defconfig patches into arm-soc,
+they are mainly adjusting these defconfigs for stuff merged
+during the 3.2 merge window or earlier. You can push for
+the -rc:s or next merge window at your choice, no big deal
+for me. Both have been reviewed on the mailing list and
+of course use the minimal format from saveconfig.
 
-diff --git a/arch/arm/mach-omap2/hsmmc.c b/arch/arm/mach-omap2/hsmmc.c
-index ecde558..c80859e 100644
---- a/arch/arm/mach-omap2/hsmmc.c
-+++ b/arch/arm/mach-omap2/hsmmc.c
-@@ -171,6 +171,17 @@ static void omap4_hsmmc1_after_set_reg(struct device *dev, int slot,
- 	}
- }
- 
-+static void hsmmc2_select_input_clk_src(struct omap_mmc_platform_data *mmc)
-+{
-+	u32 reg;
-+
-+	if (mmc->slots[0].internal_clock) {
-+		reg = omap_ctrl_readl(control_devconf1_offset);
-+		reg |= OMAP2_MMCSDIO2ADPCLKISEL;
-+		omap_ctrl_writel(reg, control_devconf1_offset);
-+	}
-+}
-+
- static void hsmmc23_before_set_reg(struct device *dev, int slot,
- 				   int power_on, int vdd)
- {
-@@ -179,16 +190,19 @@ static void hsmmc23_before_set_reg(struct device *dev, int slot,
- 	if (mmc->slots[0].remux)
- 		mmc->slots[0].remux(dev, slot, power_on);
- 
--	if (power_on) {
--		/* Only MMC2 supports a CLKIN */
--		if (mmc->slots[0].internal_clock) {
--			u32 reg;
-+	if (power_on)
-+		hsmmc2_select_input_clk_src(mmc);
-+}
- 
--			reg = omap_ctrl_readl(control_devconf1_offset);
--			reg |= OMAP2_MMCSDIO2ADPCLKISEL;
--			omap_ctrl_writel(reg, control_devconf1_offset);
--		}
--	}
-+static int am35x_hsmmc2_set_power(struct device *dev, int slot,
-+				  int power_on, int vdd)
-+{
-+	struct omap_mmc_platform_data *mmc = dev->platform_data;
-+
-+	if (power_on)
-+		hsmmc2_select_input_clk_src(mmc);
-+
-+	return 0;
- }
- 
- static int nop_mmc_set_power(struct device *dev, int slot, int power_on,
-@@ -346,9 +360,7 @@ static int __init omap_hsmmc_pdata_init(struct omap2_hsmmc_info *c,
- 	else
- 		mmc->slots[0].ocr_mask = c->ocr_mask;
- 
--	if (cpu_is_omap3517() || cpu_is_omap3505())
--		mmc->slots[0].set_power = nop_mmc_set_power;
--	else
-+	if (!cpu_is_omap3517() && !cpu_is_omap3505())
- 		mmc->slots[0].features |= HSMMC_HAS_PBIAS;
- 
- 	if (cpu_is_omap44xx() && (omap_rev() > OMAP4430_REV_ES1_0))
-@@ -371,6 +383,9 @@ static int __init omap_hsmmc_pdata_init(struct omap2_hsmmc_info *c,
- 			}
- 		}
- 
-+		if (cpu_is_omap3517() || cpu_is_omap3505())
-+			mmc->slots[0].set_power = nop_mmc_set_power;
-+
- 		/* OMAP3630 HSMMC1 supports only 4-bit */
- 		if (cpu_is_omap3630() &&
- 				(c->caps & MMC_CAP_8_BIT_DATA)) {
-@@ -380,6 +395,9 @@ static int __init omap_hsmmc_pdata_init(struct omap2_hsmmc_info *c,
- 		}
- 		break;
- 	case 2:
-+		if (cpu_is_omap3517() || cpu_is_omap3505())
-+			mmc->slots[0].set_power = am35x_hsmmc2_set_power;
-+
- 		if (c->ext_clock)
- 			c->transceiver = 1;
- 		if (c->transceiver && (c->caps & MMC_CAP_8_BIT_DATA)) {
--- 
-1.7.3.4
+The following changes since commit caca6a03d365883564885f2c1da3e88dcf65d139:
+
+  Linux 3.2-rc3 (2011-11-23 20:20:28 -0800)
+
+are available in the git repository at:
+ git://git.linaro.org/people/triad/linux-stericsson.git defconfigs-for-arnd
+
+Linus Walleij (2):
+      ARM: u300: update defconfig
+      ARM: ux500: update defconfig
+
+ arch/arm/configs/u300_defconfig  |   13 ++++++-------
+ arch/arm/configs/u8500_defconfig |   14 +++++---------
+ 2 files changed, 11 insertions(+), 16 deletions(-)
