@@ -1,55 +1,66 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 29 Nov 2011 11:11:57 -0700 (MST)
-Subject: [PATCH v5 4/7] arm: omap4: hwmod: introduce emu hwmod
-In-Reply-To: <4ED50600.8070607@ti.com>
-References: <1319467559-5518-1-git-send-email-ming.lei@canonical.com>
- <1319467559-5518-5-git-send-email-ming.lei@canonical.com>
- <alpine.DEB.2.00.1111080750130.10451@utopia.booyaka.com>
- <CACVXFVMSJUT2Ac+bWetrLpbyOs6PqY+npNHsbvHipEVZ0gWdgQ@mail.gmail.com>
- <alpine.DEB.2.00.1111100152430.4195@utopia.booyaka.com>
- <4EC6566C.70202@ti.com>
- <alpine.DEB.2.00.1111261854340.6289@utopia.booyaka.com>
- <alpine.DEB.2.00.1111261906010.6289@utopia.booyaka.com>
- <4ED50600.8070607@ti.com>
-Message-ID: <alpine.DEB.2.00.1111291053250.6289@utopia.booyaka.com>
+From: stevenrwalter@gmail.com (Steven Walter)
+Date: Tue, 29 Nov 2011 13:12:50 -0500
+Subject: [PATCH 3/3] ARM: support syscall tracing
+In-Reply-To: <20111129174604.GL9581@n2100.arm.linux.org.uk>
+References: <1322584095-30439-1-git-send-email-stevenrwalter@gmail.com>
+ <1322584095-30439-4-git-send-email-stevenrwalter@gmail.com>
+ <20111129174604.GL9581@n2100.arm.linux.org.uk>
+Message-ID: <CAK8d-a+o6A+E537o3i4JdzsXei2fbvqNcCLx_U8WyEMK-vL8Fg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 29 Nov 2011, Cousson, Benoit wrote:
+Thanks for your comments, responses below
 
-> On 11/27/2011 3:07 AM, Paul Walmsley wrote:
-> 
-> > So just out of curiosity, do those SYSCONFIG registers in the STM address
-> > space apply to the entire DEBUGSS, or just the STM IP block?
-> 
-> The STM IP is the only one to have the TI generic wrapper to be compliant with
-> TI standards.
-> But in term of PRCM, there is only one IP, the DEBUGSS.
-> There are probably a bunch of internal clock management inside it that are not
-> exposed to PRCM.
-> 
-> The confusing part is that in theory all these entries can be accessed by the
-> same OCP port, and should potentially have this flags.
-> The point is that for the moment, we are mainly using that flag to get the
-> SYSCONFIG.
-> We already discussed that, but I think we should modify this flag to highlight
-> the SYSCONFIG / SYSSTATUS availability.
-> Maybe with something like ADDR_SYSCONFIG?
-> 
-> Any thought?
+On Tue, Nov 29, 2011 at 12:46 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Tue, Nov 29, 2011 at 11:28:15AM -0500, Steven Walter wrote:
+>> diff --git a/arch/arm/include/asm/unistd.h b/arch/arm/include/asm/unistd.h
+>> index 2c04ed5..1f23923 100644
+>> --- a/arch/arm/include/asm/unistd.h
+>> +++ b/arch/arm/include/asm/unistd.h
+>> @@ -403,6 +403,8 @@
+>> ?#define __NR_sendmmsg ? ? ? ? ? ? ? ? ? ? ? ?(__NR_SYSCALL_BASE+374)
+>> ?#define __NR_setns ? ? ? ? ? ? ? ? ? (__NR_SYSCALL_BASE+375)
+>>
+>> +#define NR_syscalls (__NR_setns+1)
+>
+> NAK. ?This is a recipe for it being forgotten to be updated, and for it
+> to become unsynchronized with what is the _real_ number of syscalls,
+> which is what is in the assembly code.
 
-Well, the ADDR_TYPE_RT flag in this hwmod would indicate the address space 
-of the DEBUGSS's OCP header registers, not the MIPI STM's OCP header 
-registers.
+Yes, I like how the assembler counts the number of syscalls for you.
+However, every other architecture uses either a bare number or
+__NR_last_syscall+1 for defining NR_syscalls.
 
-So if the MIPI STM's OCP header registers also control the entire DEBUGSS 
-power management, then the current layout makes sense.  Otherwise, the 
-MIPI STM should be created as a separate hwmod.
+> You're also exporting it to userspace. ?It has no business being in
+> userspace.
 
-It appears to me that the DEBUGSS has no OCP header registers of its own.  
-Upon reflection, rather than creating a macro hwmod for the DEBUGSS, it 
-seems to make more sense to add hwmods for its two internal interconnects, 
-then to create another hwmod for the MIPI STM device.
+That was unintentional, I'll fix.
 
+> Lastly, it's wrong. ?__NR_SYSCALL_BASE may be 0 or 0x90000 depending on
+> the ABI selected. ?If it's 0x90000, will tracepoint stuff work or will it
+> explode because of a stupidly large table somewhere?
 
-- Paul
+Right you are.  Didn't consider that.  Does that mean that
+syscall_get_nr() should return the offset from __NR_SYSCALL_BASE, so
+that it will be strictly less than NR_syscalls?
+
+> kernel/trace/trace_syscalls.c: ? ? ?for (i = 0; i < NR_syscalls; i++) {
+>
+> and
+>
+> kernel/trace/trace_syscalls.c:static DECLARE_BITMAP(enabled_perf_enter_syscalls, NR_syscalls);
+> kernel/trace/trace_syscalls.c:static DECLARE_BITMAP(enabled_perf_exit_syscalls,NR_syscalls);
+>
+> all point at this being very wrong.
+
+Initially I was going to assign the assembler version of NR_syscalls
+to a symbol which could be referenced from C.  However, putting the C
+declaration for the variable in unistd.h made the assembler unhappy.
+Is it kosher to have C stuff in unistd.h?  Since there was no prior
+example of it, I assumed not.  However, perhaps I could just hide it
+from the assembler with some kind of #ifdef?
+
+Thanks again
+-- 
+-Steven Walter <stevenrwalter@gmail.com>
