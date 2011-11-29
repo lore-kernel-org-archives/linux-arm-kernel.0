@@ -1,61 +1,67 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 29 Nov 2011 18:17:27 +0100
-Subject: [PATCH V2] arm/tegra: convert tegra20 to GIC devicetree binding
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF174FDAFADC@HQMAIL01.nvidia.com>
-References: <1322528052-6516-1-git-send-email-swarren@nvidia.com>
- <4ED4D78A.6000400@ti.com>
- <74CDBE0F657A3D45AFBB94109FB122FF174FDAFADC@HQMAIL01.nvidia.com>
-Message-ID: <4ED513A7.4060102@atmel.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 29 Nov 2011 17:24:29 +0000
+Subject: [PATCH 3/3] ARM: support syscall tracing
+In-Reply-To: <1322584095-30439-4-git-send-email-stevenrwalter@gmail.com>
+References: <1322584095-30439-1-git-send-email-stevenrwalter@gmail.com>
+ <1322584095-30439-4-git-send-email-stevenrwalter@gmail.com>
+Message-ID: <20111129172429.GB1104@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/29/2011 06:13 PM, Stephen Warren :
-> Cousson, Benoit wrote at Tuesday, November 29, 2011 6:01 AM:
->> Hi Stephen&  Peter,
->>
->> On 11/29/2011 1:54 AM, Stephen Warren wrote:
->>> From: pdeschrijver at nvidia.com<pdeschrijver@nvidia.com>
->>
->> [...]
->>
->>> @@ -125,6 +131,14 @@ void __init tegra_init_irq(void)
->>>    	gic_arch_extn.irq_unmask = tegra_unmask;
->>>    	gic_arch_extn.irq_retrigger = tegra_retrigger;
->>>
->>> -	gic_init(0, 29, IO_ADDRESS(TEGRA_ARM_INT_DIST_BASE),
->>> -		 IO_ADDRESS(TEGRA_ARM_PERIF_BASE + 0x100));
->>> +#ifdef CONFIG_OF
->>> +	/* Check if there is a devicetree present as of_irq_init doesn't
->>> +	 * indicate if an interrupt controller node was found.
->>> +	 */
->>> +	if (of_find_node_by_path("/"))
->>> +		of_irq_init(tegra_irq_match);
->>> +	else
->>> +#endif
->>
->> For the same kind of need, I found the following API:
->>
->> of_have_populated_dt()
->>
->> Moreover, it returns false if !CONFIG_OF, so it will avoid the #ifdef.
->
-> That sounds like a great idea. Unfortunately, of_irq_init() is a DT-only
-> function. Exynos has the following in mainline to solve this:
->
->          if (!of_have_populated_dt())
->                  gic_init_bases(...);
-> #ifdef CONFIG_OF
->          else
->                  of_irq_init(exynos4_dt_irq_match);
-> #endif
->
-> Perhaps we should add a dummy of_irq_init() too, so that we can remove
-> this ifdef.
+On Tue, Nov 29, 2011 at 04:28:15PM +0000, Steven Walter wrote:
+> diff --git a/arch/arm/include/asm/unistd.h b/arch/arm/include/asm/unistd.h
+> index 2c04ed5..1f23923 100644
+> --- a/arch/arm/include/asm/unistd.h
+> +++ b/arch/arm/include/asm/unistd.h
+> @@ -403,6 +403,8 @@
+>  #define __NR_sendmmsg			(__NR_SYSCALL_BASE+374)
+>  #define __NR_setns			(__NR_SYSCALL_BASE+375)
+>  
+> +#define NR_syscalls (__NR_setns+1)
 
-+1 for this idea: I have the same issue with at91.
-I think that a macro is preferred instead a function: it will also 
-remove the need for a protection for the matching table.
+[...]
 
-Best regards,
--- 
-Nicolas Ferre
+> -	.equ NR_syscalls,0
+> -#define CALL(x) .equ NR_syscalls,NR_syscalls+1
+> +	.equ NR_syscalls_asm,0
+> +#define CALL(x) .equ NR_syscalls_asm,NR_syscalls_asm+1
+
+If we need to have two definitions of NR_syscalls, then it's probably best
+to define one in terms of the other to ensure they are consistent.
+Unfortunately, it looks like we calculate NR_syscalls recursively from the
+syscall table. Perhaps you'd be better off with just the #define and have a
+sanity check on the table size using that.
+
+> -	tst	r10, #_TIF_SYSCALL_TRACE		@ are we tracing syscalls?
+> +	tst	r10, #_TIF_SYSCALL_TRACE	@ are we tracing syscalls?
+> +	tsteq	r10, #_TIF_SYSCALL_TRACEPOINT
+>  	bne	__sys_trace
+
+Maybe you could macroise this pattern.
+
+> diff --git a/arch/arm/kernel/ptrace.c b/arch/arm/kernel/ptrace.c
+> index 1411848..0e2699a 100644
+> --- a/arch/arm/kernel/ptrace.c
+> +++ b/arch/arm/kernel/ptrace.c
+> @@ -28,6 +28,9 @@
+>  #include <asm/system.h>
+>  #include <asm/traps.h>
+>  
+> +#define CREATE_TRACE_POINTS
+> +#include <trace/events/syscalls.h>
+
+[...]
+
+> @@ -939,11 +942,20 @@ asmlinkage int syscall_trace(int why, struct pt_regs *regs, int scno)
+>  
+>  	current_thread_info()->syscall = scno;
+>  
+> -	if (why == 0) {
+> -		if (tracehook_report_syscall_entry(regs))
+> -			current_thread_info()->syscall = -1;
+> -	} else {
+> -		tracehook_report_syscall_exit(regs, 0);
+
+Wait - didn't you just add this code?
+
+Will
