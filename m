@@ -1,40 +1,45 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 29 Nov 2011 13:30:26 +0000
-Subject: [PATCH 2/7] ARM: S3C64XX: Use software initiated powerdown for
- Cragganmore
-In-Reply-To: <1322573431-8923-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+Date: Tue, 29 Nov 2011 13:30:25 +0000
+Subject: [PATCH 1/7] ARM: S3C64XX: Raise the frequency of the second I2C bus
+ on Cragganmore
+In-Reply-To: <20111129133006.GA26800@opensource.wolfsonmicro.com>
 References: <20111129133006.GA26800@opensource.wolfsonmicro.com>
- <1322573431-8923-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-Message-ID: <1322573431-8923-2-git-send-email-broonie@opensource.wolfsonmicro.com>
+Message-ID: <1322573431-8923-1-git-send-email-broonie@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since the two PMICs are independent we initiate a shutdown on each.
+The S3C I2C driver defaults to a rather low 66kHz, ask for 400kHz for
+a bit of a speed boost.
 
 Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
 ---
- arch/arm/mach-s3c64xx/mach-crag6410.c |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+ arch/arm/mach-s3c64xx/mach-crag6410.c |    7 ++++++-
+ 1 files changed, 6 insertions(+), 1 deletions(-)
 
 diff --git a/arch/arm/mach-s3c64xx/mach-crag6410.c b/arch/arm/mach-s3c64xx/mach-crag6410.c
-index b9a052a..3882c2f 100644
+index d04b654..b9a052a 100644
 --- a/arch/arm/mach-s3c64xx/mach-crag6410.c
 +++ b/arch/arm/mach-s3c64xx/mach-crag6410.c
-@@ -501,6 +501,7 @@ static struct wm831x_pdata crag_pmic_pdata __initdata = {
- 	.wm831x_num = 1,
- 	.irq_base = BANFF_PMIC_IRQ_BASE,
- 	.gpio_base = GPIO_BOARD_START + 8,
-+	.soft_shutdown = true,
+@@ -634,6 +634,11 @@ static struct i2c_board_info i2c_devs1[] __initdata = {
+ 	{ I2C_BOARD_INFO("wm1250-ev1", 0x27) },
+ };
  
- 	.backup = &banff_backup_pdata,
++static struct s3c2410_platform_i2c i2c1_pdata = {
++	.frequency = 400000,
++	.bus_num = 1,
++};
++
+ static void __init crag6410_map_io(void)
+ {
+ 	s3c64xx_init_io(NULL, 0);
+@@ -692,7 +697,7 @@ static void __init crag6410_machine_init(void)
+ 	s3c_sdhci2_set_platdata(&crag6410_hsmmc2_pdata);
  
-@@ -605,6 +606,7 @@ static struct wm831x_pdata glenfarclas_pmic_pdata __initdata = {
- 	.wm831x_num = 2,
- 	.irq_base = GLENFARCLAS_PMIC_IRQ_BASE,
- 	.gpio_base = GLENFARCLAS_PMIC_GPIO_BASE,
-+	.soft_shutdown = true,
+ 	s3c_i2c0_set_platdata(&i2c0_pdata);
+-	s3c_i2c1_set_platdata(NULL);
++	s3c_i2c1_set_platdata(&i2c1_pdata);
+ 	s3c_fb_set_platdata(&crag6410_lcd_pdata);
  
- 	.gpio_defaults = {
- 		/* GPIO1-3: IRQ inputs, rising edge triggered, CMOS */
+ 	i2c_register_board_info(0, i2c_devs0, ARRAY_SIZE(i2c_devs0));
 -- 
 1.7.7.3
