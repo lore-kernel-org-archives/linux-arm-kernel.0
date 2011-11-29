@@ -1,105 +1,40 @@
-From: stevenrwalter@gmail.com (Steven Walter)
-Date: Tue, 29 Nov 2011 12:51:43 -0500
-Subject: [PATCH 2/3] ARM: add TRACEHOOK support
-In-Reply-To: <20111129170435.GA1104@mudshark.cambridge.arm.com>
-References: <1322584095-30439-1-git-send-email-stevenrwalter@gmail.com>
- <1322584095-30439-3-git-send-email-stevenrwalter@gmail.com>
- <20111129170435.GA1104@mudshark.cambridge.arm.com>
-Message-ID: <CAK8d-a+4PH3Rr3ANQ9UXqzKy4v89_YmNCN9tp5qum1bs=ed+YQ@mail.gmail.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Tue, 29 Nov 2011 18:49:06 +0100
+Subject: [PATCH 0/6] AT91 Reset cleanup
+In-Reply-To: <20111129174206.GK9581@n2100.arm.linux.org.uk>
+References: <20111129173514.GW15008@game.jcrosoft.org>
+ <20111129174206.GK9581@n2100.arm.linux.org.uk>
+Message-ID: <20111129174906.GX15008@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 29, 2011 at 12:04 PM, Will Deacon <will.deacon@arm.com> wrote:
-> Hi Steven,
->
-> On Tue, Nov 29, 2011 at 04:28:14PM +0000, Steven Walter wrote:
->> diff --git a/arch/arm/kernel/ptrace.c b/arch/arm/kernel/ptrace.c
->> index 9726006..1411848 100644
->> --- a/arch/arm/kernel/ptrace.c
->> +++ b/arch/arm/kernel/ptrace.c
->> @@ -22,6 +22,7 @@
->> ?#include <linux/perf_event.h>
->> ?#include <linux/hw_breakpoint.h>
->> ?#include <linux/regset.h>
->> +#include <linux/tracehook.h>
->>
->> ?#include <asm/pgtable.h>
->> ?#include <asm/system.h>
->> @@ -928,8 +929,6 @@ asmlinkage int syscall_trace(int why, struct pt_regs *regs, int scno)
->>
->> ? ? ? if (!test_thread_flag(TIF_SYSCALL_TRACE))
->> ? ? ? ? ? ? ? return scno;
->> - ? ? if (!(current->ptrace & PT_PTRACED))
->> - ? ? ? ? ? ? return scno;
->
-> This means that we can potentially corrupt current_thread_info()->syscall
-> for tasks that aren't being traced. I don't think that matters as it's only
-> used by ptrace, but worth bearing in mind.
+On 17:42 Tue 29 Nov     , Russell King - ARM Linux wrote:
+> On Tue, Nov 29, 2011 at 06:35:14PM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > Hi,
+> > 
+> > 	the following patch series will merge the ddr controler header file
+> > 	for sam9 and cap9 and cleanup the reset by
+> > 
+> > 	swtich to arm_pm_restart
+> > 	fix the sam9g45 and cap9 reset
+> > 	make rstc soc independent
+> > 
+> > The following changes since commit 15327570807209b5c088382af23ed3fc47558d87:
+> > 
+> >   ARM: at91/gpio: fix display of number of irq setuped (2011-11-28 22:53:09 +0800)
+> > 
+> > are available in the git repository at:
+> >   git://github.com/at91linux/linux-at91.git for-arnd-3.3-reset
+> > 
+> > Jean-Christophe PLAGNIOL-VILLARD (6):
+> >       ARM: at91: fix cap9 ddrsdr register
+> >       ARM: at91: merge at91cap9_ddrsdr.h in at91sam9_ddrsdr.h
+> >       ARM: at91: introduce AT91_SAM9_ALT_RESET to select the at91sam9 alternative reset
+> >       ARM: restart: at91: use new restart hook
+> 
+> Well, it looks like you've taken my work here and committed it as yourself.
+> That's plagerism.  Don't do it - and fix it before someone pulls your crap.
+sorry I didn't take your work as mine
 
-Is it valid for a process to have TIF_SYSCALL_TRACE set but not
-PT_PTRACED?  Given that they were checking both before, one might
-assume so, but I don't really know what that would mean.
-
->> ? ? ? /*
->> ? ? ? ?* Save IP. ?IP is used to denote syscall entry/exit:
->> @@ -940,19 +939,13 @@ asmlinkage int syscall_trace(int why, struct pt_regs *regs, int scno)
->>
->> ? ? ? current_thread_info()->syscall = scno;
->>
->> - ? ? /* the 0x80 provides a way for the tracing parent to distinguish
->> - ? ? ? ?between a syscall stop and SIGTRAP delivery */
->> - ? ? ptrace_notify(SIGTRAP | ((current->ptrace & PT_TRACESYSGOOD)
->> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?? 0x80 : 0));
->> - ? ? /*
->> - ? ? ?* this isn't the same as continuing with a signal, but it will do
->> - ? ? ?* for normal use. ?strace only continues with a signal if the
->> - ? ? ?* stopping signal is not SIGTRAP. ?-brl
->> - ? ? ?*/
->> - ? ? if (current->exit_code) {
->> - ? ? ? ? ? ? send_sig(current->exit_code, current, 1);
->> - ? ? ? ? ? ? current->exit_code = 0;
->> + ? ? if (why == 0) {
->> + ? ? ? ? ? ? if (tracehook_report_syscall_entry(regs))
->> + ? ? ? ? ? ? ? ? ? ? current_thread_info()->syscall = -1;
->
-> Why do you set syscall to -1 here? It looks like
-> tracehook_report_syscall_entry always returns 0, but even so, I'm not sure
-> what this -1 represents. You could also rewrite this a bit more neatly:
-
-tracehook_report_syscall_entry is marked __must_check, and the comment
-says that if it returns non-zero the arch could should abort the
-system call.  x86 just returns -1 from its trace function in that
-case, so I took the same approach.  In particular, if we treat -1 as
-the system call number, the system call should fail with ENOSYS, which
-include/linux/tracehook.h says is acceptable.
-
-> if (why)
-> ? ? ? ?tracehook_report_syscall_exit(...);
-> else
-> ? ? ? ?tracehook_report_syscall_entry(...);
-
-Agreed, will fix
-
->> + ? ? } else {
->> + ? ? ? ? ? ? tracehook_report_syscall_exit(regs, 0);
->> ? ? ? }
->> +
->> ? ? ? regs->ARM_ip = ip;
->>
->> ? ? ? return current_thread_info()->syscall;
->> diff --git a/arch/arm/kernel/signal.c b/arch/arm/kernel/signal.c
->> index 0340224..26c26f5 100644
->> --- a/arch/arm/kernel/signal.c
->> +++ b/arch/arm/kernel/signal.c
->> @@ -645,6 +645,8 @@ handle_signal(unsigned long sig, struct k_sigaction *ka,
->> ? ? ? recalc_sigpending();
->> ? ? ? spin_unlock_irq(&tsk->sighand->siglock);
->>
->> + ? ? tracehook_signal_handler(sig, info, ka, regs, 0);
->> +
->
-> This doesn't appear to do anything but I guess that's where it should live.
-
-Right, I just added it because arch/Kconfig said to :-)
--- 
--Steven Walter <stevenrwalter@gmail.com>
+Best Regards,
+J.
