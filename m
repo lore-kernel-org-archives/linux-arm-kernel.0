@@ -1,45 +1,72 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 29 Nov 2011 14:06:07 +0800
-Subject: [PATCH] arm: mx23: recognise stmp378x as mx23
-In-Reply-To: <1322303955-9225-1-git-send-email-w.sang@pengutronix.de>
-References: <1322303955-9225-1-git-send-email-w.sang@pengutronix.de>
-Message-ID: <20111129060606.GD19754@S2100-06.ap.freescale.net>
+From: richard.zhao@linaro.org (Richard Zhao)
+Date: Tue, 29 Nov 2011 14:00:53 +0800
+Subject: [RFC V1 7/8] ARM i.MX: prepare common clk support
+In-Reply-To: <CAPtuhTgSB8Af4Xtux93-VLXSrK5KkzFOez9V5tcmbkKwbZ_8Rw@mail.gmail.com>
+References: <1322046755-13511-1-git-send-email-richard.zhao@linaro.org>
+ <1322046755-13511-8-git-send-email-richard.zhao@linaro.org>
+ <CAPtuhTgSB8Af4Xtux93-VLXSrK5KkzFOez9V5tcmbkKwbZ_8Rw@mail.gmail.com>
+Message-ID: <20111129060052.GC19236@b20223-02.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 26, 2011 at 11:39:14AM +0100, Wolfram Sang wrote:
-> Adding the machine_is_* line was forgotten when converting mach-stmp378x to
-> mach-mxs.
+On Mon, Nov 28, 2011 at 06:36:33PM -0800, Mike Turquette wrote:
+> On Wed, Nov 23, 2011 at 3:12 AM, Richard Zhao <richard.zhao@linaro.org> wrote:
+> > +#define DEFINE_CLK_DIVIDER(_name, _parent, _flags, _reg, _shift, _width) \
+> > + ? ? ? struct clk_divider _name = { \
+> > + ? ? ? ? ? ? ? .clk = { \
+> > + ? ? ? ? ? ? ? ? ? ? ? .name = #_name, \
+> > + ? ? ? ? ? ? ? ? ? ? ? .ops = &clk_divider_ops, \
+> > + ? ? ? ? ? ? ? ? ? ? ? .parent = _parent, \
+> > + ? ? ? ? ? ? ? ? ? ? ? .flags = _flags, \
+> > + ? ? ? ? ? ? ? }, \
+> > + ? ? ? ? ? ? ? .reg = (_reg), \
+> > + ? ? ? ? ? ? ? .shift = (_shift), \
+> > + ? ? ? ? ? ? ? .width = (_width), \
+> > + ? ? ? ? ? ? ? .lock = &imx_ccm_lock, \
+> > + ? ? ? }
+> > +
+> > +#define DEFINE_CLK_MUX(_name, _reg, _shift, _width, _clks) \
+> > + ? ? ? struct clk_mux _name = { \
+> > + ? ? ? ? ? ? ? .clk = { \
+> > + ? ? ? ? ? ? ? ? ? ? ? .name = #_name, \
+> > + ? ? ? ? ? ? ? ? ? ? ? .ops = &clk_mux_ops, \
+> > + ? ? ? ? ? ? ? }, \
+> > + ? ? ? ? ? ? ? .reg = (_reg), \
+> > + ? ? ? ? ? ? ? .shift = (_shift), \
+> > + ? ? ? ? ? ? ? .width = (_width), \
+> > + ? ? ? ? ? ? ? .clks = (_clks), \
+> > + ? ? ? ? ? ? ? .num_clks = ARRAY_SIZE(_clks), \
+> > + ? ? ? ? ? ? ? .lock = &imx_ccm_lock, \
+> > + ? ? ? }
+> > +
+> > +#define DEFINE_CLK_FIXED(_name, _rate) \
+> > + ? ? ? struct clk_hw_fixed _name = { \
+> > + ? ? ? ? ? ? ? .clk = { \
+> > + ? ? ? ? ? ? ? ? ? ? ? .name = #_name, \
+> > + ? ? ? ? ? ? ? ? ? ? ? .ops = &clk_hw_fixed_ops, \
+> > + ? ? ? ? ? ? ? }, \
+> > + ? ? ? ? ? ? ? .fixed_rate = (_rate), \
+> > + ? ? ? }
+> > +
+> > ?#endif /* CONFIG_GENERIC_CLK */
+> > ?#endif /* __ASSEMBLY__ */
+> > ?#endif /* __ASM_ARCH_MXC_CLOCK_H__ */
+> > --
+> > 1.7.5.4
+> >
+> >
+> >
 > 
-> Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
-> ---
+> Can you move these into clk.h/approriate header?  Just add _lock to it
+> and it'll work fine for your code.
+Yes, I can add _lock and share the macros in common header. But I still
+need a wraper for imx to eliminate _lock, right?
 
-Applied, thanks.
-
-I added 'Cc: stable at kernel.org'.  Please let me know if you do not
-think it's necessary.
-
-Regards,
-Shawn
-
->  arch/arm/mach-mxs/include/mach/mxs.h |    1 +
->  1 files changed, 1 insertions(+), 0 deletions(-)
+Thanks for review
+Richard
 > 
-> diff --git a/arch/arm/mach-mxs/include/mach/mxs.h b/arch/arm/mach-mxs/include/mach/mxs.h
-> index 0d2d2b4..bde5f66 100644
-> --- a/arch/arm/mach-mxs/include/mach/mxs.h
-> +++ b/arch/arm/mach-mxs/include/mach/mxs.h
-> @@ -30,6 +30,7 @@
->   */
->  #define cpu_is_mx23()		(					\
->  		machine_is_mx23evk() ||					\
-> +		machine_is_stmp378x() ||				\
->  		0)
->  #define cpu_is_mx28()		(					\
->  		machine_is_mx28evk() ||					\
-> -- 
-> 1.7.7.2
-> 
+> Thanks,
+> Mike
 > 
 > _______________________________________________
 > linux-arm-kernel mailing list
