@@ -1,22 +1,37 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 29 Nov 2011 14:51:18 +0000
-Subject: [GIT PULL] DSS fixes for v3.2-rc2
-In-Reply-To: <1322554347.1869.6.camel@deskari>
-References: <20111123235542.GL31337@atomide.com>
- <201111241606.54879.arnd@arndb.de> <1322554347.1869.6.camel@deskari>
-Message-ID: <201111291451.19081.arnd@arndb.de>
+From: ulf.hansson@stericsson.com (Ulf Hansson)
+Date: Tue, 29 Nov 2011 15:51:26 +0100
+Subject: [PATCH] mmc: mmci: Fixup error handling for dma
+Message-ID: <1322578286-18727-1-git-send-email-ulf.hansson@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 29 November 2011, Tomi Valkeinen wrote:
-> I don't think we need these in 3.1 stable. The omapdss driver in 3.1
-> contains hacks to circumvent the HWMOD issues the patches below fix.
-> These hacks were removed for 3.2.
-> 
-> Well, the "ARM: OMAP2PLUS: DSS: Ensure DSS works correctly..." patch
-> could be used for 3.1 also, but I fear it depends on HWMOD and DSS
-> patches missing from 3.1. I'll check it out.
+When getting a cmd irq during an ongoing data transfer
+with dma, the dma job were never terminated. This is now
+corrected.
 
-Ok, thanks for taking a look,
+Signed-off-by: Ulf Hansson <ulf.hansson@stericsson.com>
+Signed-off-by: Per Forlin <per.forlin@stericsson.com>
+---
+ drivers/mmc/host/mmci.c |    6 +++++-
+ 1 files changed, 5 insertions(+), 1 deletions(-)
 
-	Arnd
+diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+index e900f51..62ad649 100644
+--- a/drivers/mmc/host/mmci.c
++++ b/drivers/mmc/host/mmci.c
+@@ -761,8 +761,12 @@ mmci_cmd_irq(struct mmci_host *host, struct mmc_command *cmd,
+ 	}
+ 
+ 	if (!cmd->data || cmd->error) {
+-		if (host->data)
++		if (host->data) {
++			/* Terminate the DMA transfer */
++			if (dma_inprogress(host))
++				mmci_dma_data_error(host);
+ 			mmci_stop_data(host);
++		}
+ 		mmci_request_end(host, cmd->mrq);
+ 	} else if (!(cmd->data->flags & MMC_DATA_READ)) {
+ 		mmci_start_data(host, cmd->data);
+-- 
+1.7.5.4
