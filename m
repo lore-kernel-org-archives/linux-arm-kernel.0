@@ -1,98 +1,47 @@
 From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Tue, 29 Nov 2011 13:33:56 +0800
-Subject: [RFC PATCH 1/2] power: Charger-Manager: add initial
- Charger-Manager driver
-In-Reply-To: <CAJ0PZbSq3a2vPNkbErW1j+9DE130D5gkrEgtfjT2ShhnuZ3aJA@mail.gmail.com>
-References: <1321524793-25117-1-git-send-email-dg77.kim@samsung.com>
- <1321524793-25117-2-git-send-email-dg77.kim@samsung.com>
- <CAN1soZzeZ9HwD66_X0Yzp+6MpRBGnzpePuCu07mkBWPUCJbkPg@mail.gmail.com>
- <CAJ0PZbSq3a2vPNkbErW1j+9DE130D5gkrEgtfjT2ShhnuZ3aJA@mail.gmail.com>
-Message-ID: <CAN1soZwn5K3997fwh4b3HHcc9B6q32hm-q9M-X79vK_CatTAHA@mail.gmail.com>
+Date: Tue, 29 Nov 2011 13:37:31 +0800
+Subject: [V2 3/3] RTC: sa1100: support sa1100, pxa and mmp soc families
+In-Reply-To: <20111129045550.GQ15008@game.jcrosoft.org>
+References: <1322445892-22620-1-git-send-email-jtzhou@marvell.com>
+ <20111129045550.GQ15008@game.jcrosoft.org>
+Message-ID: <CAN1soZx=9DeyGT_n7+LWwWKVh91wZ4E=9stqSo+5rupR7-wAAQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 29, 2011 at 1:00 PM, MyungJoo Ham <myungjoo.ham@samsung.com> wrote:
-> On Tue, Nov 29, 2011 at 1:41 PM, Haojian Zhuang
-> <haojian.zhuang@gmail.com> wrote:
->> On Thu, Nov 17, 2011 at 6:13 PM, Donggeun Kim <dg77.kim@samsung.com> wrote:
->>> Because battery health monitoring should be done even when suspended,
->>> it needs to wake up and suspend periodically. Thus, userspace battery
->>> monitoring may incur too much overhead; every device and task is woken
->>> up periodically. Charger Manager uses suspend-again to provide
->>> in-suspend monitoring.
->>>
->>> This patch allows to monitor battery health in-suspend state.
->>>
+On Tue, Nov 29, 2011 at 12:55 PM, Jean-Christophe PLAGNIOL-VILLARD
+<plagnioj@jcrosoft.com> wrote:
+> On 10:04 Mon 28 Nov ? ? , Jett.Zhou wrote:
+>> Since the regmap of rtc on sa1100, pxa and mmp Marvell soc families are
+>> almost the same, so re-arch the rtc-sa1100 to support them.
+>>
+>> Change-Id: I006271045a21d0e42a8e52c1e43c98c559d76909
+>> Signed-off-by: Jett.Zhou <jtzhou@marvell.com>
+>> ---
+>> ?arch/arm/mach-pxa/devices.c ? ?| ? 20 +++
+>> ?arch/arm/mach-sa1100/generic.c | ? 20 +++
+>> ?drivers/rtc/Kconfig ? ? ? ? ? ?| ? ?2 +-
+>> ?drivers/rtc/rtc-sa1100.c ? ? ? | ?273 ++++++++++++++++++++++++++++------------
+>> ?4 files changed, 236 insertions(+), 79 deletions(-)
+>>
+>> + ? ? if (sa1100_rtc->id == RTC_MMP) {
+>> + ? ? ? ? ? ? sa1100_rtc->clk = clk_get(&pdev->dev, "MMP-RTC");
+>> + ? ? ? ? ? ? if (IS_ERR(sa1100_rtc->clk)) {
+>> + ? ? ? ? ? ? ? ? ? ? dev_err(&pdev->dev, "failed to find rtc clock source\n");
+>> + ? ? ? ? ? ? ? ? ? ? ret = PTR_ERR(sa1100_rtc->clk);
+>> + ? ? ? ? ? ? ? ? ? ? goto err_clk;
+>> + ? ? ? ? ? ? }
+>> + ? ? ? ? ? ? clk_prepare(sa1100_rtc->clk);
+>> + ? ? ? ? ? ? clk_enable(sa1100_rtc->clk);
+> provide the clk in both case as done macb or arm timer
+> so you can drop the RTC_MMP
 >
->> Donggeun,
->>
->> I think that this patch is good for saving energy for charging while
->> suspend. I think that this driver also works under android. I have
->> some concerns on rtc wakeup.
->>
->> As we know, RTC event doesn't link to timer events in kernel. But
->> Android did. Android transfered timer event to rtc event while it
->> suspend. So it will occupy one rtc device.
->>
->> Whatever the device is phone or tablet, it may cost another rtc device
->> if it wants to implement power-up alarm feature. If we want to support
->> the charger manager feature, we have to add another rtc device. I
->> think that it's very hard to find any current platform with three rtc
->> devices. How about implement the similar mechanism like android?
->> Charger manager can register wakeup event into alarm mechanism like
->> android. And we only need two rtc devices.
->>
->> Loop more guys: list-arm-kernel & linaro.
->>
->> Thanks
->> Haojianbelow patch and comment whether
->
-> Hello Haojian,
->
-> No, we do not need to add another RTC device due to the usage of RTC
-> alarm from another device drivers or processes.
-> We can share an RTC device with others as long as others do not set
-> RTC alarm in the suspend-to-RAM context (specifically from prepare ops
-> to complete ops).
-> The reason why we have created cm_setup_timer() looking that awfully
-> complex is to let it coexist with other RTC alarm events and share the
-> precious RTC device.
-> Anyway, why do we even need two RTC devices in general?
->
-If we want the device to implement power-up alarm, we need two rtc devices.
+Hi Jean,
 
-Let me use an example in Android system.
-1. Application set time interval to receive mail after 10 minutes.
-2. Android suspend and it convert the timer event into RTC event.
-3. Battery is removed. After a while, we put the battery back. The
-battery insertion won't trigger phone up since it's depend on custom
-scenario.
-4. 10 minutes interval past and phone will be powered up since rtc
-wakeup. Absolutely it's incorrect. We only need a resume event, not a
-power up event.
+It's a good advice. Our current changes doesn't touch the key logic of
+sa1100, and we verify the change in MMP device. But sa1100 doesn't
+support clk since it's too old, and we're lack of sa1100 device to
+verify. So we didn't implement clk in sa1100. If there's a volunteer
+to test, we can implement clk in sa1100. What's your opinion?
 
-If we have two rtc devices, one is external rtc and the other is
-contained in SoC. While battery removed, only SoC rtc will lost power
-and external rtc can keep status for a long time. So let's check the
-item #4.
-4. Since status is lost in SoC rtc, system won't wakeup while 10
-minutes interval past.
-
-> If the RTC subsystem supports registering multiple alarm events,
-> that'd be nice and will make this one simpler as well; however, we do
-> not have it here for now.
->
-> We save previous RTC alarm if the configuration data says so
-> (rtc_wkalarm_save.enabled) and previously set alarm is later than the
-> current alarm and restore the RTC alarm value at wakeup.
->
-> If the previously set RTC alarm is earlier than the timer setup of
-> Charger Manager, we do not load the alarm value of Charger Manager and
-> let the previously set RTC alarm be active for a wakeup.
->
-But it's a little complex, isn't it?
-
->
-> Cheers!
-> MyungJoo
->
+Thanks
+Haojian
