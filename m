@@ -1,91 +1,86 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Tue, 29 Nov 2011 10:12:27 +0200
-Subject: [GIT PULL] DSS fixes for v3.2-rc2
-In-Reply-To: <201111241606.54879.arnd@arndb.de>
-References: <20111123235542.GL31337@atomide.com>
- <201111241606.54879.arnd@arndb.de>
-Message-ID: <1322554347.1869.6.camel@deskari>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 29 Nov 2011 09:12:51 +0100
+Subject: [PATCH] USB: ehci-mxc: get rid of the uses of cpu_is_mx()
+In-Reply-To: <35AB98346D25394A9354ED89C4D76587226AE3@039-SN1MPN1-002.039d.mgd.msft.net>
+References: <1322550565-29162-1-git-send-email-peter.chen@freescale.com>
+ <20180.36084.962507.946237@ipc1.ka-ro>
+ <35AB98346D25394A9354ED89C4D76587226AE3@039-SN1MPN1-002.039d.mgd.msft.net>
+Message-ID: <20111129081251.GN17668@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2011-11-24 at 16:06 +0000, Arnd Bergmann wrote:
-> On Wednesday 23 November 2011, Tony Lindgren wrote:
-> > Hi Arnd,
-> > 
-> > This one has been separated out from the rest of the fixes.
-> 
-> Pulled into the fixes branch now. I'll send out the branch
-> after testing it on tomorrow's linux-next.
-> 
-> > If some of these need to go to stable, then Tomi should
-> > do the rebasing and send them to stable at vger.kernel.org
-> > as they don't apply cleanly on v3.1.
-> 
-> Ok. I've taken Tomi on Cc as a reminder for him, although I guess
-> you already discussed it with him.
+Hello,
 
-I don't think we need these in 3.1 stable. The omapdss driver in 3.1
-contains hacks to circumvent the HWMOD issues the patches below fix.
-These hacks were removed for 3.2.
+On Tue, Nov 29, 2011 at 08:02:53AM +0000, Chen Peter-B29397 wrote:
+>  
+> > Peter Chen writes:
+> > > The patch removes all the uses of cpu_is_mx().  Instead, it utilizes
+> > > platform_device_id to distinguish the ehci differences among SoCs.
+> > > It can be useful to imx ehci submission and device tree support later.
+> > >
+> > >
+> > As the EHCI core is equivalent on all SoCs but only require different
+> > clocks on each platform I think it's overkill to use platform_ids to
+> > distinguish the SoCs. Indeed there is actually no need to make any
+> > distinction in the driver, as you could simply provide the same set of
+> > clocks on all platforms with some of them being dummy clocks on
+> > certain platforms:
+> > clock-imx25.c and clock-imx35.c:
+> > 	_REGISTER_CLOCK("mxc-ehci.0", "usb", usbotg_clk)
+> > 	_REGISTER_CLOCK("mxc-ehci.0", "system_bus", dummy_clk)
+> > 	_REGISTER_CLOCK("mxc-ehci.0", "usb_phy", dummy_clk)
+> > 	_REGISTER_CLOCK("mxc-ehci.1", "usb", usbotg_clk)
+> > 	_REGISTER_CLOCK("mxc-ehci.1", "system_bus", dummy_clk)
+> > 	_REGISTER_CLOCK("mxc-ehci.1", "usb_phy", dummy_clk)
+> > 	_REGISTER_CLOCK("mxc-ehci.2", "usb", usbotg_clk)
+> > 	_REGISTER_CLOCK("mxc-ehci.2", "system_bus", dummy_clk)
+> > 	_REGISTER_CLOCK("mxc-ehci.2", "usb_phy", dummy_clk)
+> > clock-imx27.c:
+> > 	_REGISTER_CLOCK("mxc-ehci.0", "usb", usb_clk)
+> > 	_REGISTER_CLOCK("mxc-ehci.0", "system_bus", usb_clk1)
+> > 	_REGISTER_CLOCK("mxc-ehci.0", "usb_phy", dummy_clk)
+> > 	_REGISTER_CLOCK("mxc-ehci.1", "usb", usb_clk)
+> > 	_REGISTER_CLOCK("mxc-ehci.1", "system_bus", usb_clk1)
+> > 	_REGISTER_CLOCK("mxc-ehci.1", "usb_phy", dummy_clk)
+> > 	_REGISTER_CLOCK("mxc-ehci.2", "usb", usb_clk)
+> > 	_REGISTER_CLOCK("mxc-ehci.2", "system_bus", usb_clk1)
+> > 	_REGISTER_CLOCK("mxc-ehci.2", "usb_phy", dummy_clk)
+> > clock-imx31.c:
+> > 	_REGISTER_CLOCK("mxc-ehci.0", "usb", usb_clk1)
+> > 	_REGISTER_CLOCK("mxc-ehci.0", "system_bus", usb_clk2)
+> > 	_REGISTER_CLOCK("mxc-ehci.0", "usb_phy", dummy_clk)
+> > 	_REGISTER_CLOCK("mxc-ehci.1", "usb", usb_clk1)
+> > 	_REGISTER_CLOCK("mxc-ehci.1", "system_bus", usb_clk2)
+> > 	_REGISTER_CLOCK("mxc-ehci.1", "usb_phy", dummy_clk)
+> > 	_REGISTER_CLOCK("mxc-ehci.2", "usb", usb_clk1)
+> > 	_REGISTER_CLOCK("mxc-ehci.2", "system_bus", usb_clk2)
+> > 	_REGISTER_CLOCK("mxc-ehci.2", "usb_phy", dummy_clk)
+> > clock-mx51-mx53.c:
+> > 	_REGISTER_CLOCK("mxc-ehci.0", "usb", usboh3_clk)
+> > 	_REGISTER_CLOCK("mxc-ehci.0", "system_bus", usb_ahb_clk)
+> > 	_REGISTER_CLOCK("mxc-ehci.0", "usb_phy", usb_phy1_clk)
+> > 	_REGISTER_CLOCK("mxc-ehci.1", "usb", usboh3_clk)
+> > 	_REGISTER_CLOCK("mxc-ehci.1", "system_bus", usb_ahb_clk)
+> > 	_REGISTER_CLOCK("mxc-ehci.1", "usb_phy", dummy_clk)
+> > 	_REGISTER_CLOCK("mxc-ehci.2", "usb", usboh3_clk)
+> > 	_REGISTER_CLOCK("mxc-ehci.2", "system_bus", usb_ahb_clk)
+> > 	_REGISTER_CLOCK("mxc-ehci.2", "usb_phy", dummy_clk)
+> > 
+> > 
+> > In the driver you would then do a clk_get() for those three clocks
+> > independent of the platform.
+> > 
+> The reason why I add this patch is not for clk things, it is for:
+> 1. Coming device driver
+> 2. Handle things difference between SoC's. not only clk, others
+> like low power, wakeup, hsic, or other will comes in future.
+Then are they really different per SoC (in a way not yet handled in the
+driver)? If not, up to now these devices were named after the first SoC
+introducing them, so i.MX25 has imx21-uart.0 and imx35-cspi.0.
 
-Well, the "ARM: OMAP2PLUS: DSS: Ensure DSS works correctly..." patch
-could be used for 3.1 also, but I fear it depends on HWMOD and DSS
-patches missing from 3.1. I'll check it out.
+Best regards
+Uwe
 
- Tomi
-
-> 
-> Kiitoksia paljon,
-> 
-> 	Arnd
-> 
-> > 
-> > The following changes since commit cfcfc9eca2bcbd26a8e206baeb005b055dbf8e37:
-> >   Linus Torvalds (1):
-> >         Linux 3.2-rc2
-> > 
-> > are available in the git repository at:
-> > 
-> >   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap fixes-dss
-> > 
-> > Archit Taneja (1):
-> >       ARM: OMAP2PLUS: DSS: Ensure DSS works correctly if display is enabled in bootloader
-> > 
-> > Tomi Valkeinen (9):
-> >       ARM: OMAP2xxx: HWMOD: Fix DSS reset
-> >       ARM: OMAP2xxx: HWMOD: fix DSS clock data
-> >       ARM: OMAP3: HWMOD: Fix DSS reset
-> >       ARM: OMAP3: HWMOD: fix DSS clock data
-> >       ARM: OMAP4: HWMOD: remove extra clocks
-> >       ARM: OMAP4: HWMOD: Add HWMOD_CONTROL_OPT_CLKS_IN_RESET for dss_core
-> >       ARM: OMAP4: HWMOD: fix DSS clock data
-> >       ARM: OMAP2/3: HWMOD: Add SYSS_HAS_RESET_STATUS for dss
-> >       ARM: OMAP: HWMOD: Unify DSS resets for OMAPs
-> > 
-> > Tony Lindgren (1):
-> >       Merge branch 'hwmod_dss_fixes_3.2rc' of git://git.pwsan.com/linux-2.6 into fixes-dss
-> > 
-> >  arch/arm/mach-omap2/Makefile                       |    5 +-
-> >  arch/arm/mach-omap2/display.c                      |  159 ++++++++++++++++++++
-> >  arch/arm/mach-omap2/display.h                      |   29 ++++
-> >  arch/arm/mach-omap2/omap_hwmod_2420_data.c         |   17 ++-
-> >  arch/arm/mach-omap2/omap_hwmod_2430_data.c         |   17 ++-
-> >  .../mach-omap2/omap_hwmod_2xxx_3xxx_ipblock_data.c |    5 +-
-> >  arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         |   37 ++++-
-> >  arch/arm/mach-omap2/omap_hwmod_44xx_data.c         |   24 ++--
-> >  arch/arm/mach-omap2/omap_hwmod_common_data.c       |    4 +
-> >  arch/arm/mach-omap2/omap_hwmod_common_data.h       |    4 +
-> >  arch/arm/plat-omap/include/plat/common.h           |    3 +
-> >  include/video/omapdss.h                            |    7 -
-> >  12 files changed, 276 insertions(+), 35 deletions(-)
-> >  create mode 100644 arch/arm/mach-omap2/display.h
-> > 
-> 
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111129/0abe1735/attachment.sig>
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
