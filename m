@@ -1,132 +1,255 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 29 Nov 2011 14:04:24 +0100
-Subject: [PATCH 1/3] ARM: at91/aic: add device tree support for AIC
-In-Reply-To: <20111125152817.GA8866@totoro>
-References: <167b5ccfc31d9637186c5201cd83cb62df81fc0f.1322171620.git.nicolas.ferre@atmel.com>
- <20111124222601.GA28582@gallagher> <20111125135106.GN15531@game.jcrosoft.org>
- <20111125152817.GA8866@totoro>
-Message-ID: <4ED4D858.40506@atmel.com>
+From: mst@redhat.com (Michael S. Tsirkin)
+Date: Tue, 29 Nov 2011 15:11:10 +0200
+Subject: [RFC] virtio: use mandatory barriers for remote processor vdevs
+In-Reply-To: <1322569886-13055-1-git-send-email-ohad@wizery.com>
+References: <1322569886-13055-1-git-send-email-ohad@wizery.com>
+Message-ID: <20111129131110.GC19157@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/25/2011 04:28 PM, Jamie Iles :
-> On Fri, Nov 25, 2011 at 02:51:06PM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
->> On 22:26 Thu 24 Nov     , Jamie Iles wrote:
->>> Hi Nicolas,
->>> On Thu, Nov 24, 2011 at 10:56:27PM +0100, Nicolas Ferre wrote:
-> [...]
->>>> +#if defined(CONFIG_OF)
->>>> +static struct of_device_id aic_ids[]  = {
->>>> +	{ .compatible = "atmel,at91rm9200-aic" },
->>>> +	{ /*sentinel*/ }
->>>> +};
->>>> +
->>>> +static int __init at91_aic_of_init(void)
->>>> +{
->>>> +	struct device_node *np;
->>>> +
->>>> +	np = of_find_matching_node(NULL, aic_ids);
->>>> +	if (np == NULL)
->>>> +		return -ENODEV;
->>>> +
->>>> +	at91_aic_base = of_iomap(np, 0);
->>>> +	at91_aic_domain.of_node = np;
->>>
->>> I think this needs to be:
->>>
->>> 	at91_aic_domain.of_node = of_node_get(np);
->>>
->>> to keep the reference count.
+On Tue, Nov 29, 2011 at 02:31:26PM +0200, Ohad Ben-Cohen wrote:
+> Virtio is using memory barriers to control the ordering of
+> references to the vrings on SMP systems. When the guest is compiled
+> with SMP support, virtio is only using SMP barriers in order to
+> avoid incurring the overhead involved with mandatory barriers.
+> 
+> Lately, though, virtio is being increasingly used with inter-processor
+> communication scenarios too, which involve running two (separate)
+> instances of operating systems on two (separate) processors, each of
+> which might either be UP or SMP.
 
-Well, in fact the of_find_matching_node() function already indent the 
-ref. count...
+Is that using virtio-mmio? If yes, would the extra serialization belongs
+at that layer?
 
->>>> +	/* Keep refcount of the node */
+> To control the ordering of memory references when the vrings are shared
+> between two external processors, we must always use mandatory barriers.
 
-... That is why I added this comment ^^
+Sorry, could you pls explain what are 'two external processors'?
+I think I know that if two x86 CPUs in an SMP system run kernels built
+in an SMP configuration, smp_*mb barriers are enough.
 
-But maybe for sake of clarity, I may have used what you propose anyway. 
-What it your opinion?
+Documentation/memory-barriers.txt says:
+	Mandatory barriers should not be used to control SMP effects ...
+	They may, however, be used to control MMIO effects on accesses through
+	relaxed memory I/O windows.
 
->>>> +
->>>> +	return 0;
->>>> +}
->>>> +#else
->>>> +static int __init at91_aic_of_init(void)
->>>> +{
->>>> +	return -ENOSYS;
->>>> +}
->>>> +#endif
->>>
->>> I think it's preferred if you use of_irq_init() here as it can handle
->>> the ordering of IRQ controllers.  There are GIC and VIC bindings in
->>> -next that use this and provide a way for non-DT platforms to still use
->>> the drivers.
->> which is the case here as if the of_init fail we failback to the non-dt init
->>
->> and this IP is AT91 only
->
-> Right, but it's not using the of_irq_init() interface which is the
-> standard way of registering interrupt controllers and will correctly
-> dependencies for you.
->
-> So if you could have something like:
->
-> void __init __at91_aic_init(unsigned int priority[NR_AIC_IRQS],
-> 			    void __iomem *regs,
-> 			    struct device_node *np)
-> {
-> 	/*
-> 	 * Do all of the writes to the AIC itself and configure
-> 	 * the IRQ domain.
-> 	 */
-> }
->
-> void __init at91_aic_init(unsigned int priority[NR_AIC_IRQS])
-> {
-> 	void __iomem *base = ioremap(AT91_AIC, 512);
->
-> 	__at91_aic_init(priority, base, NULL);
-> }
->
-> int __init at91_aic_of_init(struct device_node *node,
-> 			    struct device_node *parent)
-> {
-> 	void __iomem *regs = of_iomap(node, 0);
->
-> 	/*
-> 	 * Get priorities from the DT.  If this was an array of cells
-> 	 * then that should be okay.
-> 	 */
-> 	__at91_aic_init(dt_priorities, regs, node);
-> }
->
-> Then the DT based board initialisation can do:
->
-> static const struct of_device_id at91_irq_of_match[] __initconst = {
-> 	{ .compatible = "atmel,at91-aic", .data = at91_aic_of_init },
-> 	{}
-> };
->
-> static void __init at91_of_irq_init(void)
-> {
-> 	of_irq_init(at91_of_irq_init);
-> }
+We don't control MMIO/relaxed memory I/O windows here, so what exactly
+is the issue?
 
-That looks nice. I will try to implement this. I will try to figure out 
-when of_irq_init() is called compared to the other init_IRQ() function.
+Could you please give an example of a setup that is currently broken?
 
-> Which is consistent with other platforms.  However this does require
-> that the priorities are encoded in the device-tree, but I guess that's a
-> good thing anyway isn't it?
+> 
+> A trivial, albeit sub-optimal, solution would be to simply revert
+> commit d57ed95 "virtio: use smp_XX barriers on SMP". Obviously, though,
+> that's going to have a negative impact on performance of SMP-based
+> virtualization use cases.
+> 
+> A different approach, as demonstrated by this patch, would pick the type
+> of memory barriers, in run time, according to the requirements of the
+> virtio device. This way, both SMP virtualization scenarios and inter-
+> processor communication use cases would run correctly, without making
+> any performance compromises (except for those incurred by an additional
+> branch or level of indirection).
 
-That is a annoying point: I do not want to add all this "default" 
-priority stuff in the DT. It is kind of useless until we use the 
-threaded interrupts everywhere and may bloat the DT...
+Is an extra branch faster or slower than reverting d57ed95?
 
-I will try to find a way to pass the default priority table to the DT 
-called function.
+> 
+> This patch introduces VIRTIO_RING_F_REMOTEPROC, a new virtio transport
+> feature, which should be used by virtio devices that run on remote
+> processors. The CONFIG_SMP variant of virtio_{mb, rmb, wmb} is then changed
+> to use SMP barriers only if VIRTIO_RING_F_REMOTEPROC was absent.
 
-Thanks for your review,
--- 
-Nicolas Ferre
+One wonders how the remote side knows enough to set this flag?
+
+> 
+> Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
+> ---
+> Alternatively, we can also introduce some kind of virtio_mb_ops and set it
+> according to the nature of the vdev with handlers that just do the right
+> thing, instead of introducting that branch.
+> 
+> Though I also wonder how big really is the perforamnce gain of d57ed95 ?
+
+Want to check and tell us?
+
+>  drivers/virtio/virtio_ring.c |   78 +++++++++++++++++++++++++++++-------------
+>  include/linux/virtio_ring.h  |    6 +++
+>  2 files changed, 60 insertions(+), 24 deletions(-)
+> 
+> diff --git a/drivers/virtio/virtio_ring.c b/drivers/virtio/virtio_ring.c
+> index c7a2c20..cf66a2d 100644
+> --- a/drivers/virtio/virtio_ring.c
+> +++ b/drivers/virtio/virtio_ring.c
+> @@ -23,24 +23,6 @@
+>  #include <linux/slab.h>
+>  #include <linux/module.h>
+>  
+> -/* virtio guest is communicating with a virtual "device" that actually runs on
+> - * a host processor.  Memory barriers are used to control SMP effects. */
+> -#ifdef CONFIG_SMP
+> -/* Where possible, use SMP barriers which are more lightweight than mandatory
+> - * barriers, because mandatory barriers control MMIO effects on accesses
+> - * through relaxed memory I/O windows (which virtio does not use). */
+> -#define virtio_mb() smp_mb()
+> -#define virtio_rmb() smp_rmb()
+> -#define virtio_wmb() smp_wmb()
+> -#else
+> -/* We must force memory ordering even if guest is UP since host could be
+> - * running on another CPU, but SMP barriers are defined to barrier() in that
+> - * configuration. So fall back to mandatory barriers instead. */
+> -#define virtio_mb() mb()
+> -#define virtio_rmb() rmb()
+> -#define virtio_wmb() wmb()
+> -#endif
+> -
+>  #ifdef DEBUG
+>  /* For development, we want to crash whenever the ring is screwed. */
+>  #define BAD_RING(_vq, fmt, args...)				\
+> @@ -86,6 +68,9 @@ struct vring_virtqueue
+>  	/* Host publishes avail event idx */
+>  	bool event;
+>  
+> +	/* Host runs on a remote processor */
+> +	bool rproc;
+> +
+>  	/* Number of free buffers */
+>  	unsigned int num_free;
+>  	/* Head of free buffer list. */
+> @@ -108,6 +93,48 @@ struct vring_virtqueue
+>  	void *data[];
+>  };
+>  
+> +/*
+> + * virtio guest is communicating with a virtual "device" that may either run
+> + * on the host processor, or on an external processor. The former requires
+> + * memory barriers in order to control SMP effects, but the latter must
+> + * use mandatory barriers.
+> + */
+> +#ifdef CONFIG_SMP
+> +/* Where possible, use SMP barriers which are more lightweight than mandatory
+> + * barriers, because mandatory barriers control MMIO effects on accesses
+> + * through relaxed memory I/O windows. */
+> +static inline void virtio_mb(struct vring_virtqueue *vq)
+> +{
+> +	if (vq->rproc)
+> +		mb();
+> +	else
+> +		smp_mb();
+> +}
+> +
+> +static inline void virtio_rmb(struct vring_virtqueue *vq)
+> +{
+> +	if (vq->rproc)
+> +		rmb();
+> +	else
+> +		smp_rmb();
+> +}
+> +
+> +static inline void virtio_wmb(struct vring_virtqueue *vq)
+> +{
+> +	if (vq->rproc)
+> +		wmb();
+> +	else
+> +		smp_wmb();
+> +}
+> +#else
+> +/* We must force memory ordering even if guest is UP since host could be
+> + * running on another CPU, but SMP barriers are defined to barrier() in that
+> + * configuration. So fall back to mandatory barriers instead. */
+> +static inline void virtio_mb(struct vring_virtqueue *vq) { mb(); }
+> +static inline void virtio_rmb(struct vring_virtqueue *vq) { rmb(); }
+> +static inline void virtio_wmb(struct vring_virtqueue *vq) { wmb(); }
+> +#endif
+> +
+>  #define to_vvq(_vq) container_of(_vq, struct vring_virtqueue, vq)
+>  
+>  /* Set up an indirect table of descriptors and add it to the queue. */
+> @@ -245,14 +272,14 @@ void virtqueue_kick(struct virtqueue *_vq)
+>  	START_USE(vq);
+>  	/* Descriptors and available array need to be set before we expose the
+>  	 * new available array entries. */
+> -	virtio_wmb();
+> +	virtio_wmb(vq);
+>  
+>  	old = vq->vring.avail->idx;
+>  	new = vq->vring.avail->idx = old + vq->num_added;
+>  	vq->num_added = 0;
+>  
+>  	/* Need to update avail index before checking if we should notify */
+> -	virtio_mb();
+> +	virtio_mb(vq);
+>  
+>  	if (vq->event ?
+>  	    vring_need_event(vring_avail_event(&vq->vring), new, old) :
+> @@ -314,7 +341,7 @@ void *virtqueue_get_buf(struct virtqueue *_vq, unsigned int *len)
+>  	}
+>  
+>  	/* Only get used array entries after they have been exposed by host. */
+> -	virtio_rmb();
+> +	virtio_rmb(vq);
+>  
+>  	i = vq->vring.used->ring[vq->last_used_idx%vq->vring.num].id;
+>  	*len = vq->vring.used->ring[vq->last_used_idx%vq->vring.num].len;
+> @@ -337,7 +364,7 @@ void *virtqueue_get_buf(struct virtqueue *_vq, unsigned int *len)
+>  	 * the read in the next get_buf call. */
+>  	if (!(vq->vring.avail->flags & VRING_AVAIL_F_NO_INTERRUPT)) {
+>  		vring_used_event(&vq->vring) = vq->last_used_idx;
+> -		virtio_mb();
+> +		virtio_mb(vq);
+>  	}
+>  
+>  	END_USE(vq);
+> @@ -366,7 +393,7 @@ bool virtqueue_enable_cb(struct virtqueue *_vq)
+>  	 * entry. Always do both to keep code simple. */
+>  	vq->vring.avail->flags &= ~VRING_AVAIL_F_NO_INTERRUPT;
+>  	vring_used_event(&vq->vring) = vq->last_used_idx;
+> -	virtio_mb();
+> +	virtio_mb(vq);
+>  	if (unlikely(more_used(vq))) {
+>  		END_USE(vq);
+>  		return false;
+> @@ -393,7 +420,7 @@ bool virtqueue_enable_cb_delayed(struct virtqueue *_vq)
+>  	/* TODO: tune this threshold */
+>  	bufs = (u16)(vq->vring.avail->idx - vq->last_used_idx) * 3 / 4;
+>  	vring_used_event(&vq->vring) = vq->last_used_idx + bufs;
+> -	virtio_mb();
+> +	virtio_mb(vq);
+>  	if (unlikely((u16)(vq->vring.used->idx - vq->last_used_idx) > bufs)) {
+>  		END_USE(vq);
+>  		return false;
+> @@ -486,6 +513,7 @@ struct virtqueue *vring_new_virtqueue(unsigned int num,
+>  
+>  	vq->indirect = virtio_has_feature(vdev, VIRTIO_RING_F_INDIRECT_DESC);
+>  	vq->event = virtio_has_feature(vdev, VIRTIO_RING_F_EVENT_IDX);
+> +	vq->rproc = virtio_has_feature(vdev, VIRTIO_RING_F_REMOTEPROC);
+>  
+>  	/* No callback?  Tell other side not to bother us. */
+>  	if (!callback)
+> @@ -522,6 +550,8 @@ void vring_transport_features(struct virtio_device *vdev)
+>  			break;
+>  		case VIRTIO_RING_F_EVENT_IDX:
+>  			break;
+> +		case VIRTIO_RING_F_REMOTEPROC:
+> +			break;
+>  		default:
+>  			/* We don't understand this bit. */
+>  			clear_bit(i, vdev->features);
+> diff --git a/include/linux/virtio_ring.h b/include/linux/virtio_ring.h
+> index 36be0f6..9839593 100644
+> --- a/include/linux/virtio_ring.h
+> +++ b/include/linux/virtio_ring.h
+> @@ -58,6 +58,12 @@
+>   * at the end of the used ring. Guest should ignore the used->flags field. */
+>  #define VIRTIO_RING_F_EVENT_IDX		29
+>  
+> +/*
+> + * The device we're talking to resides on a remote processor, so we must always
+> + * use mandatory memory barriers.
+> + */
+> +#define VIRTIO_RING_F_REMOTEPROC	30
+> +
+>  /* Virtio ring descriptors: 16 bytes.  These can chain together via "next". */
+>  struct vring_desc {
+>  	/* Address (guest-physical). */
+> -- 
+> 1.7.5.4
