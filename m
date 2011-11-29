@@ -1,26 +1,62 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Tue, 29 Nov 2011 10:31:35 +0800
-Subject: [PATCH 1/7] pinctrl: enable pxa3xx pinmux
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF174FDAF8C5@HQMAIL01.nvidia.com>
-References: <1322262544-7854-1-git-send-email-haojian.zhuang@marvell.com>
- <1322262544-7854-2-git-send-email-haojian.zhuang@marvell.com>
- <74CDBE0F657A3D45AFBB94109FB122FF174FDAF8C5@HQMAIL01.nvidia.com>
-Message-ID: <CAMPhdO-K3=4errP2c9YmiPq5ebUSs284DDsBwLqrqa4R=k6Pmw@mail.gmail.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Mon, 28 Nov 2011 18:36:33 -0800
+Subject: [RFC V1 7/8] ARM i.MX: prepare common clk support
+In-Reply-To: <1322046755-13511-8-git-send-email-richard.zhao@linaro.org>
+References: <1322046755-13511-1-git-send-email-richard.zhao@linaro.org>
+ <1322046755-13511-8-git-send-email-richard.zhao@linaro.org>
+Message-ID: <CAPtuhTgSB8Af4Xtux93-VLXSrK5KkzFOez9V5tcmbkKwbZ_8Rw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 29, 2011 at 4:21 AM, Stephen Warren <swarren@nvidia.com> wrote:
-> Haojian Zhuang wrote at Friday, November 25, 2011 4:09 PM:
-> ...
->> diff --git a/drivers/pinctrl/Kconfig b/drivers/pinctrl/Kconfig
-> ...
->> +config PINMUX_PXA3xx
->> + ? ? bool "PXA pinmux driver"
->> + ? ? default y if ARCH_PXA || ARCH_MMP
->> + ? ? select PINMUX
->> +
+On Wed, Nov 23, 2011 at 3:12 AM, Richard Zhao <richard.zhao@linaro.org> wrote:
+> +#define DEFINE_CLK_DIVIDER(_name, _parent, _flags, _reg, _shift, _width) \
+> + ? ? ? struct clk_divider _name = { \
+> + ? ? ? ? ? ? ? .clk = { \
+> + ? ? ? ? ? ? ? ? ? ? ? .name = #_name, \
+> + ? ? ? ? ? ? ? ? ? ? ? .ops = &clk_divider_ops, \
+> + ? ? ? ? ? ? ? ? ? ? ? .parent = _parent, \
+> + ? ? ? ? ? ? ? ? ? ? ? .flags = _flags, \
+> + ? ? ? ? ? ? ? }, \
+> + ? ? ? ? ? ? ? .reg = (_reg), \
+> + ? ? ? ? ? ? ? .shift = (_shift), \
+> + ? ? ? ? ? ? ? .width = (_width), \
+> + ? ? ? ? ? ? ? .lock = &imx_ccm_lock, \
+> + ? ? ? }
+> +
+> +#define DEFINE_CLK_MUX(_name, _reg, _shift, _width, _clks) \
+> + ? ? ? struct clk_mux _name = { \
+> + ? ? ? ? ? ? ? .clk = { \
+> + ? ? ? ? ? ? ? ? ? ? ? .name = #_name, \
+> + ? ? ? ? ? ? ? ? ? ? ? .ops = &clk_mux_ops, \
+> + ? ? ? ? ? ? ? }, \
+> + ? ? ? ? ? ? ? .reg = (_reg), \
+> + ? ? ? ? ? ? ? .shift = (_shift), \
+> + ? ? ? ? ? ? ? .width = (_width), \
+> + ? ? ? ? ? ? ? .clks = (_clks), \
+> + ? ? ? ? ? ? ? .num_clks = ARRAY_SIZE(_clks), \
+> + ? ? ? ? ? ? ? .lock = &imx_ccm_lock, \
+> + ? ? ? }
+> +
+> +#define DEFINE_CLK_FIXED(_name, _rate) \
+> + ? ? ? struct clk_hw_fixed _name = { \
+> + ? ? ? ? ? ? ? .clk = { \
+> + ? ? ? ? ? ? ? ? ? ? ? .name = #_name, \
+> + ? ? ? ? ? ? ? ? ? ? ? .ops = &clk_hw_fixed_ops, \
+> + ? ? ? ? ? ? ? }, \
+> + ? ? ? ? ? ? ? .fixed_rate = (_rate), \
+> + ? ? ? }
+> +
+> ?#endif /* CONFIG_GENERIC_CLK */
+> ?#endif /* __ASSEMBLY__ */
+> ?#endif /* __ASM_ARCH_MXC_CLOCK_H__ */
+> --
+> 1.7.5.4
 >
-> I thought the plan here was for e.g. ARCH_PXA to "select PINMUX_PXA3xxx",
-> since it's presumably mandatory?
+>
+>
 
-Can we pass the SoC type by platform data, instead of calling cpu_is_*()?
+Can you move these into clk.h/approriate header?  Just add _lock to it
+and it'll work fine for your code.
+
+Thanks,
+Mike
