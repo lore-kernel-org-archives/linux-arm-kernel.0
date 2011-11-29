@@ -1,50 +1,50 @@
-From: jtzhou@marvell.com (Jett Zhou)
-Date: Wed, 30 Nov 2011 20:54:44 -0800
-Subject: [V3 0/6] rtc-sa1100 clean up
-In-Reply-To: <201111301745.00327.arnd@arndb.de>
-References: <1322634843-4733-1-git-send-email-jtzhou@marvell.com>
- <201111301745.00327.arnd@arndb.de>
-Message-ID: <78895A20B3CF7D49B5589B604D36692B1A00D0B19A@SC-VEXCH4.marvell.com>
+From: jhbird.choi@samsung.com (jhbird.choi at samsung.com)
+Date: Tue, 29 Nov 2011 17:17:51 +0900
+Subject: [PATCH] mfd: max8998: Use standard device wakeup for handling wakeup
+ device
+Message-ID: <1322554671-16312-1-git-send-email-jhbird.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd
+From: Jonghwan Choi <jhbird.choi@samsung.com>
 
-Thanks for your reminder. I will pay attention to it later.
+Use device_init_wakeup & device_may_wakeup to init wakeup
 
-Best Regards
-Jett
+Signed-off-by: Jonghwan Choi <jhbird.choi@samsung.com>
+---
+ drivers/mfd/max8998.c |    6 ++++--
+ 1 files changed, 4 insertions(+), 2 deletions(-)
 
------Original Message-----
-From: Arnd Bergmann [mailto:arnd at arndb.de] 
-Sent: Thursday, December 01, 2011 1:45 AM
-To: linux-arm-kernel at lists.infradead.org
-Cc: Jett Zhou; robert.jarzmik at free.fr; a.zummo at towertech.it; haojian.zhuang at gmail.com; plagnioj at jcrosoft.com; rtc-linux at googlegroups.com
-Subject: Re: [V3 0/6] rtc-sa1100 clean up
-
-On Wednesday 30 November 2011, Jett.Zhou wrote:
-> This patch set do the following things:
->   1) clean up sa1100-rtc for support sa1100/pxa/mmp series
->   2) add dummy clock for pxa arch
->   3) clean up clock dev for sa1100 arch and add dummy clock for sa1100
->   4) fix build error for sa1100 arch
-> 
-> Jett.Zhou (6):
->   RTC: sa1100: Clean out ost register
->   RTC: sa1100: remove redundant code of setting alarm
->   RTC: sa1100: support sa1100, pxa and mmp soc families
->   ARM: pxa: add dummy clock for sa1100-rtc
->   ARM: sa1100: clean up of the clock support
->   ARM: sa1100: fix build error
-
-Looks good to me, but a small note on the submission:
-
-Please always use the --thread option to git-send-email
-(with --no-chain-reply). I think this is now the default
-for recent versions, and it makes it easier to see which
-patches belong together.
-
-The build fix should be submitted separately so it can
-go into 3.2, while the rest ends up in 3.3.
-
-	Arnd
+diff --git a/drivers/mfd/max8998.c b/drivers/mfd/max8998.c
+index de4096a..6ef56d2 100644
+--- a/drivers/mfd/max8998.c
++++ b/drivers/mfd/max8998.c
+@@ -176,6 +176,8 @@ static int max8998_i2c_probe(struct i2c_client *i2c,
+ 	if (ret < 0)
+ 		goto err;
+ 
++	device_init_wakeup(max8998->dev, max8998->wakeup);
++
+ 	return ret;
+ 
+ err:
+@@ -210,7 +212,7 @@ static int max8998_suspend(struct device *dev)
+ 	struct i2c_client *i2c = container_of(dev, struct i2c_client, dev);
+ 	struct max8998_dev *max8998 = i2c_get_clientdata(i2c);
+ 
+-	if (max8998->wakeup)
++	if (device_may_wakeup(dev))
+ 		irq_set_irq_wake(max8998->irq, 1);
+ 	return 0;
+ }
+@@ -220,7 +222,7 @@ static int max8998_resume(struct device *dev)
+ 	struct i2c_client *i2c = container_of(dev, struct i2c_client, dev);
+ 	struct max8998_dev *max8998 = i2c_get_clientdata(i2c);
+ 
+-	if (max8998->wakeup)
++	if (device_may_wakeup(dev))
+ 		irq_set_irq_wake(max8998->irq, 0);
+ 	/*
+ 	 * In LP3974, if IRQ registers are not "read & clear"
+-- 
+1.7.1
