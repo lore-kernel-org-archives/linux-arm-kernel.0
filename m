@@ -1,48 +1,30 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 29 Nov 2011 20:33:04 +0100
-Subject: [PATCH] ARM: mxs: Select FEC driver
-In-Reply-To: <1322592607-22834-1-git-send-email-fabio.estevam@freescale.com>
-References: <1322592607-22834-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <20111129193304.GP17668@pengutronix.de>
+From: davidb@codeaurora.org (David Brown)
+Date: Tue, 29 Nov 2011 11:39:08 -0800
+Subject: [GIT PULL] msm: timer updates for 3.3
+Message-ID: <20111129193908.GA1760@huya.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 29, 2011 at 04:50:07PM -0200, Fabio Estevam wrote:
-> Let the FEC driver be built by default.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
->  arch/arm/configs/mxs_defconfig |    2 ++
->  1 files changed, 2 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/configs/mxs_defconfig b/arch/arm/configs/mxs_defconfig
-> index 6ee781b..f99bcfc 100644
-> --- a/arch/arm/configs/mxs_defconfig
-> +++ b/arch/arm/configs/mxs_defconfig
-> @@ -59,6 +59,8 @@ CONFIG_DEVTMPFS=y
->  # CONFIG_BLK_DEV is not set
->  CONFIG_NETDEVICES=y
->  CONFIG_NET_ETHERNET=y
-> +CONFIG_NET_VENDOR_FREESCALE=y
-> +CONFIG_FEC=y
-I'd prefer to add
+The following changes since commit 1ea6b8f48918282bdca0b32a34095504ee65bab5:
 
-	default y
+  Linux 3.2-rc1 (2011-11-07 16:16:02 -0800)
 
-or maybe
+are available in the git repository at:
+  git://codeaurora.org/quic/kernel/davidb/linux-msm.git msm-timer
 
-	default y if SOME_SENSIBLE_OPTION
+Stephen Boyd (8):
+      msm: timer: Tighten #ifdef for local timer support
+      msm: timer: Cleanup #includes and #defines
+      msm: timer: Use GPT for clockevents and DGT for clocksource
+      msm: timer: Fix ONESHOT mode interrupts
+      msm: timer: Remove msm_clocks[] and simplify code
+      msm: timer: Remove SoC specific #ifdefs
+      msm: timer: Setup interrupt after registering clockevent
+      msm: timer: Use clockevents_config_and_register()
 
-to NET_VENDOR_FREESCALE and FEC instead. We already had that, but Shawn
-removed it in
-
-	230dec6 (net/fec: add imx6q enet support)
-
-(by mistake if I remember an earlier thread here correctly).
-
-Best regards
-Uwe
+ arch/arm/mach-msm/timer.c |  347 ++++++++++++++++-----------------------------
+ 1 files changed, 124 insertions(+), 223 deletions(-)
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
