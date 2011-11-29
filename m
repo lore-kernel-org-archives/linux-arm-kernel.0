@@ -1,61 +1,54 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Tue, 29 Nov 2011 17:12:43 +0000
-Subject: [PATCH] ARM: errata: Remove SMP dependency for erratum 751472
-Message-ID: <1322586763-12791-1-git-send-email-dave.martin@linaro.org>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Tue, 29 Nov 2011 09:13:37 -0800
+Subject: [PATCH V2] arm/tegra: convert tegra20 to GIC devicetree binding
+In-Reply-To: <4ED4D78A.6000400@ti.com>
+References: <1322528052-6516-1-git-send-email-swarren@nvidia.com>
+ <4ED4D78A.6000400@ti.com>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF174FDAFADC@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Activation conditions for a workaround should not be encoded in the
-workaround's direct dependencies if this makes otherwise reasonable
-configuration choices impossible.
+Cousson, Benoit wrote at Tuesday, November 29, 2011 6:01 AM:
+> Hi Stephen & Peter,
+> 
+> On 11/29/2011 1:54 AM, Stephen Warren wrote:
+> > From: pdeschrijver at nvidia.com<pdeschrijver@nvidia.com>
+> 
+> [...]
+> 
+> > @@ -125,6 +131,14 @@ void __init tegra_init_irq(void)
+> >   	gic_arch_extn.irq_unmask = tegra_unmask;
+> >   	gic_arch_extn.irq_retrigger = tegra_retrigger;
+> >
+> > -	gic_init(0, 29, IO_ADDRESS(TEGRA_ARM_INT_DIST_BASE),
+> > -		 IO_ADDRESS(TEGRA_ARM_PERIF_BASE + 0x100));
+> > +#ifdef CONFIG_OF
+> > +	/* Check if there is a devicetree present as of_irq_init doesn't
+> > +	 * indicate if an interrupt controller node was found.
+> > +	 */
+> > +	if (of_find_node_by_path("/"))
+> > +		of_irq_init(tegra_irq_match);
+> > +	else
+> > +#endif
+> 
+> For the same kind of need, I found the following API:
+> 
+> of_have_populated_dt()
+> 
+> Moreover, it returns false if !CONFIG_OF, so it will avoid the #ifdef.
 
-This patches uses the SMP/UP patching facilities instead to compile
-out the workaround if the configuration means that it is definitely
-not needed.
+That sounds like a great idea. Unfortunately, of_irq_init() is a DT-only
+function. Exynos has the following in mainline to solve this:
 
-This means that configs for buggy silicon can simply select
-ARM_ERRATA_751472, without preventing a UP kernel from being built
-or duplicatiing knowledge about when to activate the workaround.
-This seems the correct why to do things, because the erratum is a
-property of the silicon, irrespective of what the kernel config
-happens to be.
+        if (!of_have_populated_dt())
+                gic_init_bases(...);
+#ifdef CONFIG_OF
+        else
+                of_irq_init(exynos4_dt_irq_match);
+#endif
 
-Signed-off-by: Dave Martin <dave.martin@linaro.org>
----
- arch/arm/Kconfig      |    2 +-
- arch/arm/mm/proc-v7.S |    4 +++-
- 2 files changed, 4 insertions(+), 2 deletions(-)
+Perhaps we should add a dummy of_irq_init() too, so that we can remove
+this ifdef.
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 44789ef..e5bbb2f 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1281,7 +1281,7 @@ config ARM_ERRATA_743622
- 
- config ARM_ERRATA_751472
- 	bool "ARM errata: Interrupted ICIALLUIS may prevent completion of broadcasted operation"
--	depends on CPU_V7 && SMP
-+	depends on CPU_V7
- 	help
- 	  This option enables the workaround for the 751472 Cortex-A9 (prior
- 	  to r3p0) erratum. An interrupted ICIALLUIS operation may prevent the
-diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-index 2c559ac..9b06d0b 100644
---- a/arch/arm/mm/proc-v7.S
-+++ b/arch/arm/mm/proc-v7.S
-@@ -364,10 +364,12 @@ __v7_setup:
- 	mcreq	p15, 0, r10, c15, c0, 1		@ write diagnostic register
- #endif
- #ifdef CONFIG_ARM_ERRATA_751472
--	cmp	r6, #0x30			@ present prior to r3p0
-+	ALT_UP_B(1f)
-+	ALT_SMP(cmp r6, #0x30)			@ present prior to r3p0
- 	mrclt	p15, 0, r10, c15, c0, 1		@ read diagnostic register
- 	orrlt	r10, r10, #1 << 11		@ set bit #11
- 	mcrlt	p15, 0, r10, c15, c0, 1		@ write diagnostic register
-+1:
- #endif
- 
- 3:	mov	r10, #0
 -- 
-1.7.4.1
+nvpublic
