@@ -1,30 +1,66 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 29 Nov 2011 10:41:23 +0100
-Subject: [GIT PULL] U300 and Ux500 defconfigs
-Message-ID: <CACRpkdbNOucfZdfENJ44Q8dB73=nupt9913O+Zp4PCFUn5Ec3w@mail.gmail.com>
+From: javi.merino@arm.com (Javi Merino)
+Date: Tue, 29 Nov 2011 09:53:30 +0000
+Subject: [PATCH v2] ARM: pl330: Fix a race condition
+In-Reply-To: <000e01ccae48$d76a7ba0$863f72e0$%kim@samsung.com>
+References: <4E8C5425.80303@arm.com>
+ <1317892206-3600-1-git-send-email-javi.merino@arm.com>
+ <CAJuYYwTXf-XU0fdGT0+sggN-MEY3v7UHkfjNkM4+QUW464J9Ew@mail.gmail.com>
+ <4EB7B79A.2020004@arm.com> <000c01ccada6$f83f5be0$e8be13a0$%kim@samsung.com>
+ <4ED3B89E.7070903@arm.com> <000e01ccae48$d76a7ba0$863f72e0$%kim@samsung.com>
+Message-ID: <4ED4AB9A.3060807@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On 29/11/11 03:41, Boojin Kim wrote:
+> Javi Merino wrote:
+> 
+> 
+>>>
+>>>>> On Samsung's Exynos4 platform, while testing audio playback with
+>> i2s
+>>>>> interface, the above change causes the playback to freeze. The
+>>>>> _thrd_active(thrd) call always returns '1' and hence _start(thrd)
+>> is
+>>>>> not getting called.
+>>>>
+>>>> If _thrd_active(thrd) returns '1', that means there is an active
+>>>> transfer still running or, if it has finished, you haven't called
+>>>> pl330_update() to acknowledge that.  pl330_update() calls _start()
+>> as
+>>>> soon as it can.
+>>>>
+>>>> drivers/dma/pl330.c registers the irq handler in pl330_probe(), so
+>>>> when
+>>>> the transaction finishes, pl330_update() should clear it and call
+>>>> _start().  If there is any outstanding transaction, it should start
+>>>> straight away. If there isn't, it would mark the channel as free,
+>> so
+>>>> _thrd_active() should return '0'.  If _thrd_active() is still '1',
+>> then
+>>>> something has gone wrong in the way.
+>>>>
+>>>> Does this shed some light?
+>>>>
+>>>
+>>> Your patch makes the memcpy operation on dmatest.c and net DMA be
+>> frozen too
+>>> as well as Samsung audio playback.
+>>
+>> Is the IRQ correctly registered in drivers/dma/pl330.c:pl330_probe()?
+>> Do you get interrupts when the transfer finish?
+> Sure. IRQ works well.
 
-could you please pull these defconfig patches into arm-soc,
-they are mainly adjusting these defconfigs for stuff merged
-during the 3.2 merge window or earlier. You can push for
-the -rc:s or next merge window at your choice, no big deal
-for me. Both have been reviewed on the mailing list and
-of course use the minimal format from saveconfig.
+Ok, so can you check if pl330_update() is correctly marking the request
+as free?  Do you know if there is another request in the queue when that
+happens?
 
-The following changes since commit caca6a03d365883564885f2c1da3e88dcf65d139:
+Thomas, you said in a previous email that _thrd_active() always returned
+'1'.  Was that after a request in req[0] finished?
+  - If so, can you check that MARK_FREE was actually called for that
+    request in pl330_update()?
+  - If it was after a request in req[1] finished and there was a
+    request already waiting in req[0], can you debug why _start()
+    didn't activate it.
 
-  Linux 3.2-rc3 (2011-11-23 20:20:28 -0800)
-
-are available in the git repository at:
- git://git.linaro.org/people/triad/linux-stericsson.git defconfigs-for-arnd
-
-Linus Walleij (2):
-      ARM: u300: update defconfig
-      ARM: ux500: update defconfig
-
- arch/arm/configs/u300_defconfig  |   13 ++++++-------
- arch/arm/configs/u8500_defconfig |   14 +++++---------
- 2 files changed, 11 insertions(+), 16 deletions(-)
+Cheers,
+Javi
