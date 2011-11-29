@@ -1,60 +1,105 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Tue, 29 Nov 2011 18:47:48 +0100
-Subject: [PATCH V2] arm/tegra: convert tegra20 to GIC devicetree binding
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF174FDAFADC@HQMAIL01.nvidia.com>
-References: <1322528052-6516-1-git-send-email-swarren@nvidia.com>
- <4ED4D78A.6000400@ti.com>
- <74CDBE0F657A3D45AFBB94109FB122FF174FDAFADC@HQMAIL01.nvidia.com>
-Message-ID: <4ED51AC4.50303@ti.com>
+From: stevenrwalter@gmail.com (Steven Walter)
+Date: Tue, 29 Nov 2011 12:51:43 -0500
+Subject: [PATCH 2/3] ARM: add TRACEHOOK support
+In-Reply-To: <20111129170435.GA1104@mudshark.cambridge.arm.com>
+References: <1322584095-30439-1-git-send-email-stevenrwalter@gmail.com>
+ <1322584095-30439-3-git-send-email-stevenrwalter@gmail.com>
+ <20111129170435.GA1104@mudshark.cambridge.arm.com>
+Message-ID: <CAK8d-a+4PH3Rr3ANQ9UXqzKy4v89_YmNCN9tp5qum1bs=ed+YQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/29/2011 6:13 PM, Stephen Warren wrote:
-> Cousson, Benoit wrote at Tuesday, November 29, 2011 6:01 AM:
->> Hi Stephen&  Peter,
->>
->> On 11/29/2011 1:54 AM, Stephen Warren wrote:
->>> From: pdeschrijver at nvidia.com<pdeschrijver@nvidia.com>
->>
->> [...]
->>
->>> @@ -125,6 +131,14 @@ void __init tegra_init_irq(void)
->>>    	gic_arch_extn.irq_unmask = tegra_unmask;
->>>    	gic_arch_extn.irq_retrigger = tegra_retrigger;
->>>
->>> -	gic_init(0, 29, IO_ADDRESS(TEGRA_ARM_INT_DIST_BASE),
->>> -		 IO_ADDRESS(TEGRA_ARM_PERIF_BASE + 0x100));
->>> +#ifdef CONFIG_OF
->>> +	/* Check if there is a devicetree present as of_irq_init doesn't
->>> +	 * indicate if an interrupt controller node was found.
->>> +	 */
->>> +	if (of_find_node_by_path("/"))
->>> +		of_irq_init(tegra_irq_match);
->>> +	else
->>> +#endif
->>
->> For the same kind of need, I found the following API:
->>
->> of_have_populated_dt()
->>
->> Moreover, it returns false if !CONFIG_OF, so it will avoid the #ifdef.
+On Tue, Nov 29, 2011 at 12:04 PM, Will Deacon <will.deacon@arm.com> wrote:
+> Hi Steven,
 >
-> That sounds like a great idea. Unfortunately, of_irq_init() is a DT-only
-> function. Exynos has the following in mainline to solve this:
+> On Tue, Nov 29, 2011 at 04:28:14PM +0000, Steven Walter wrote:
+>> diff --git a/arch/arm/kernel/ptrace.c b/arch/arm/kernel/ptrace.c
+>> index 9726006..1411848 100644
+>> --- a/arch/arm/kernel/ptrace.c
+>> +++ b/arch/arm/kernel/ptrace.c
+>> @@ -22,6 +22,7 @@
+>> ?#include <linux/perf_event.h>
+>> ?#include <linux/hw_breakpoint.h>
+>> ?#include <linux/regset.h>
+>> +#include <linux/tracehook.h>
+>>
+>> ?#include <asm/pgtable.h>
+>> ?#include <asm/system.h>
+>> @@ -928,8 +929,6 @@ asmlinkage int syscall_trace(int why, struct pt_regs *regs, int scno)
+>>
+>> ? ? ? if (!test_thread_flag(TIF_SYSCALL_TRACE))
+>> ? ? ? ? ? ? ? return scno;
+>> - ? ? if (!(current->ptrace & PT_PTRACED))
+>> - ? ? ? ? ? ? return scno;
 >
->          if (!of_have_populated_dt())
->                  gic_init_bases(...);
-> #ifdef CONFIG_OF
->          else
->                  of_irq_init(exynos4_dt_irq_match);
-> #endif
->
-> Perhaps we should add a dummy of_irq_init() too, so that we can remove
-> this ifdef.
+> This means that we can potentially corrupt current_thread_info()->syscall
+> for tasks that aren't being traced. I don't think that matters as it's only
+> used by ptrace, but worth bearing in mind.
 
-Yes, indeed, I think that's much better. Most of_XXX APIs do have a 
-dummy version, but for some reason some of them do not.
-That one clearly deserve a dummy version.
+Is it valid for a process to have TIF_SYSCALL_TRACE set but not
+PT_PTRACED?  Given that they were checking both before, one might
+assume so, but I don't really know what that would mean.
 
-Regards,
-Benoit
+>> ? ? ? /*
+>> ? ? ? ?* Save IP. ?IP is used to denote syscall entry/exit:
+>> @@ -940,19 +939,13 @@ asmlinkage int syscall_trace(int why, struct pt_regs *regs, int scno)
+>>
+>> ? ? ? current_thread_info()->syscall = scno;
+>>
+>> - ? ? /* the 0x80 provides a way for the tracing parent to distinguish
+>> - ? ? ? ?between a syscall stop and SIGTRAP delivery */
+>> - ? ? ptrace_notify(SIGTRAP | ((current->ptrace & PT_TRACESYSGOOD)
+>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?? 0x80 : 0));
+>> - ? ? /*
+>> - ? ? ?* this isn't the same as continuing with a signal, but it will do
+>> - ? ? ?* for normal use. ?strace only continues with a signal if the
+>> - ? ? ?* stopping signal is not SIGTRAP. ?-brl
+>> - ? ? ?*/
+>> - ? ? if (current->exit_code) {
+>> - ? ? ? ? ? ? send_sig(current->exit_code, current, 1);
+>> - ? ? ? ? ? ? current->exit_code = 0;
+>> + ? ? if (why == 0) {
+>> + ? ? ? ? ? ? if (tracehook_report_syscall_entry(regs))
+>> + ? ? ? ? ? ? ? ? ? ? current_thread_info()->syscall = -1;
+>
+> Why do you set syscall to -1 here? It looks like
+> tracehook_report_syscall_entry always returns 0, but even so, I'm not sure
+> what this -1 represents. You could also rewrite this a bit more neatly:
+
+tracehook_report_syscall_entry is marked __must_check, and the comment
+says that if it returns non-zero the arch could should abort the
+system call.  x86 just returns -1 from its trace function in that
+case, so I took the same approach.  In particular, if we treat -1 as
+the system call number, the system call should fail with ENOSYS, which
+include/linux/tracehook.h says is acceptable.
+
+> if (why)
+> ? ? ? ?tracehook_report_syscall_exit(...);
+> else
+> ? ? ? ?tracehook_report_syscall_entry(...);
+
+Agreed, will fix
+
+>> + ? ? } else {
+>> + ? ? ? ? ? ? tracehook_report_syscall_exit(regs, 0);
+>> ? ? ? }
+>> +
+>> ? ? ? regs->ARM_ip = ip;
+>>
+>> ? ? ? return current_thread_info()->syscall;
+>> diff --git a/arch/arm/kernel/signal.c b/arch/arm/kernel/signal.c
+>> index 0340224..26c26f5 100644
+>> --- a/arch/arm/kernel/signal.c
+>> +++ b/arch/arm/kernel/signal.c
+>> @@ -645,6 +645,8 @@ handle_signal(unsigned long sig, struct k_sigaction *ka,
+>> ? ? ? recalc_sigpending();
+>> ? ? ? spin_unlock_irq(&tsk->sighand->siglock);
+>>
+>> + ? ? tracehook_signal_handler(sig, info, ka, regs, 0);
+>> +
+>
+> This doesn't appear to do anything but I guess that's where it should live.
+
+Right, I just added it because arch/Kconfig said to :-)
+-- 
+-Steven Walter <stevenrwalter@gmail.com>
