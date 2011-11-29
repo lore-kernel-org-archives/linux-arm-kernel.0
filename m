@@ -1,215 +1,352 @@
 From: dave.martin@linaro.org (Dave Martin)
-Date: Tue, 29 Nov 2011 16:32:25 +0000
-Subject: [PATCH] ARM: pl2x0/pl310: Refactor Kconfig to be more maintainable
-Message-ID: <1322584345-19193-1-git-send-email-dave.martin@linaro.org>
+Date: Tue, 29 Nov 2011 16:40:50 +0000
+Subject: [PATCH v3 5/5] ARM: vexpress: DT-based support for CoreTiles
+ Express A5x2 and A9x4
+In-Reply-To: <1322579473-8804-6-git-send-email-pawel.moll@arm.com>
+References: <1322579473-8804-1-git-send-email-pawel.moll@arm.com>
+ <1322579473-8804-6-git-send-email-pawel.moll@arm.com>
+Message-ID: <20111129164050.GC2829@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Making CACHE_L2X0 depends on (huge list of MACH_ and ARCH_ configs)
-is bothersome to maintain and likely to lead to merge conflicts.
+On Tue, Nov 29, 2011 at 03:11:13PM +0000, Pawel Moll wrote:
+> This patch adds Device Trees for ARM Ltd. CoreTile Express A5x2
+> and CoreTile Express A9x4 used with V2M motherboard and an initial
+> implementation of the DT machine support (this code is separate
+> from the current core tile code).
+> 
+> Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+> ---
+>  arch/arm/boot/dts/vexpress-v2p-ca5s.dts |  131 ++++++++++++++++++++++++++++
+>  arch/arm/boot/dts/vexpress-v2p-ca9.dts  |  145 +++++++++++++++++++++++++++++++
+>  arch/arm/mach-vexpress/Kconfig          |   23 +++++
+>  arch/arm/mach-vexpress/Makefile         |    1 +
+>  arch/arm/mach-vexpress/v2p-ca5s_ca9.c   |  115 ++++++++++++++++++++++++
+>  5 files changed, 415 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/boot/dts/vexpress-v2p-ca5s.dts
+>  create mode 100644 arch/arm/boot/dts/vexpress-v2p-ca9.dts
+>  create mode 100644 arch/arm/mach-vexpress/v2p-ca5s_ca9.c
+> 
+> diff --git a/arch/arm/boot/dts/vexpress-v2p-ca5s.dts b/arch/arm/boot/dts/vexpress-v2p-ca5s.dts
+> new file mode 100644
+> index 0000000..e63c251
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/vexpress-v2p-ca5s.dts
+> @@ -0,0 +1,131 @@
+> +/*
+> + * ARM Ltd. Versatile Express
+> + *
+> + * CoreTile Express A5x2
+> + * Cortex-A5 MPCore (V2P-CA5s)
+> + *
+> + * HBI-0225B
+> + */
+> +
+> +/dts-v1/;
+> +
+> +/include/ "skeleton.dtsi"
+> +
+> +/ {
+> +	model = "V2P-CA5s";
+> +	arm,hbi = <0x225>;
+> +	compatible = "arm,vexpress-v2p-ca5s";
+> +	interrupt-parent = <&gic>;
+> +
+> +	aliases {
+> +		serial0 = &v2m_serial0;
+> +		serial1 = &v2m_serial1;
+> +		serial2 = &v2m_serial2;
+> +		serial3 = &v2m_serial3;
+> +		i2c0 = &v2m_i2c_dvi;
+> +		i2c1 = &v2m_i2c_pcie;
+> +	};
+> +
+> +	memory at 80000000 {
+> +		device_type = "memory";
+> +		reg = <0x80000000 0x40000000>;
+> +	};
+> +
+> +	hdlcd at 2a110000 {
+> +		compatible = "arm,hdlcd";
+> +		reg = <0x2a110000 0x1000>;
+> +		interrupts = <0 85 4>;
+> +	};
+> +
+> +	memory-controller at 2a150000 {
+> +		compatible = "arm,pl341", "arm,primecell";
+> +		reg = <0x2a150000 0x1000>;
+> +	};
+> +
+> +	memory-controller at 2a190000 {
+> +		compatible = "arm,pl354", "arm,primecell";
+> +		reg = <0x2a190000 0x1000>;
+> +		interrupts = <0 86 4>,
+> +			     <0 87 4>;
+> +	};
+> +
+> +	gic: interrupt-controller at 2c001000 {
+> +		compatible = "arm,cortex-a9-gic";
+> +		#interrupt-cells = <3>;
+> +		#address-cells = <0>;
+> +		interrupt-controller;
+> +		reg = <0x2c001000 0x1000>,
+> +		      <0x2c000100 0x100>;
+> +	};
+> +
+> +	L2: cache-controller at 2c0f0000 {
+> +		compatible = "arm,pl310-cache";
+> +		reg = <0x2c0f0000 0x1000>;
+> +		interrupts = <0 84 4>;
+> +		cache-level = <2>;
+> +		arm,data-latency = <0>;
+> +		arm,tag-latency = <0>;
+> +	};
+> +
+> +	pmu {
+> +		compatible = "arm,cortex-a9-pmu";
+> +		interrupts = <0 68 4>,
+> +			     <0 69 4>;
+> +	};
+> +
+> +	motherboard {
+> +		ranges = <0 0 0x08000000 0x04000000>,
+> +			 <1 0 0x14000000 0x04000000>,
+> +			 <2 0 0x18000000 0x04000000>,
+> +			 <3 0 0x1c000000 0x04000000>,
+> +			 <4 0 0x0c000000 0x04000000>,
+> +			 <5 0 0x10000000 0x04000000>;
+> +
+> +		interrupt-map-mask = <0 0 63>;
+> +		interrupt-map = <0 0  0 &gic 0  0 4>,
+> +				<0 0  1 &gic 0  1 4>,
+> +				<0 0  2 &gic 0  2 4>,
+> +				<0 0  3 &gic 0  3 4>,
+> +				<0 0  4 &gic 0  4 4>,
+> +				<0 0  5 &gic 0  5 4>,
+> +				<0 0  6 &gic 0  6 4>,
+> +				<0 0  7 &gic 0  7 4>,
+> +				<0 0  8 &gic 0  8 4>,
+> +				<0 0  9 &gic 0  9 4>,
+> +				<0 0 10 &gic 0 10 4>,
+> +				<0 0 11 &gic 0 11 4>,
+> +				<0 0 12 &gic 0 12 4>,
+> +				<0 0 13 &gic 0 13 4>,
+> +				<0 0 14 &gic 0 14 4>,
+> +				<0 0 15 &gic 0 15 4>,
+> +				<0 0 16 &gic 0 16 4>,
+> +				<0 0 17 &gic 0 17 4>,
+> +				<0 0 18 &gic 0 18 4>,
+> +				<0 0 19 &gic 0 19 4>,
+> +				<0 0 20 &gic 0 20 4>,
+> +				<0 0 21 &gic 0 21 4>,
+> +				<0 0 22 &gic 0 22 4>,
+> +				<0 0 23 &gic 0 23 4>,
+> +				<0 0 24 &gic 0 24 4>,
+> +				<0 0 25 &gic 0 25 4>,
+> +				<0 0 26 &gic 0 26 4>,
+> +				<0 0 27 &gic 0 27 4>,
+> +				<0 0 28 &gic 0 28 4>,
+> +				<0 0 29 &gic 0 29 4>,
+> +				<0 0 30 &gic 0 30 4>,
+> +				<0 0 31 &gic 0 31 4>,
+> +				<0 0 32 &gic 0 32 4>,
+> +				<0 0 33 &gic 0 33 4>,
+> +				<0 0 34 &gic 0 34 4>,
+> +				<0 0 35 &gic 0 35 4>,
+> +				<0 0 36 &gic 0 36 4>,
+> +				<0 0 37 &gic 0 37 4>,
+> +				<0 0 38 &gic 0 38 4>,
+> +				<0 0 39 &gic 0 39 4>,
+> +				<0 0 40 &gic 0 40 4>,
+> +				<0 0 41 &gic 0 41 4>,
+> +				<0 0 42 &gic 0 42 4>;
+> +	};
+> +};
+> +
+> +/include/ "vexpress-v2m-rs1.dtsi"
+> diff --git a/arch/arm/boot/dts/vexpress-v2p-ca9.dts b/arch/arm/boot/dts/vexpress-v2p-ca9.dts
+> new file mode 100644
+> index 0000000..c51fe09
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/vexpress-v2p-ca9.dts
+> @@ -0,0 +1,145 @@
+> +/*
+> + * ARM Ltd. Versatile Express
+> + *
+> + * CoreTile Express A9x4
+> + * Cortex-A9 MPCore (V2P-CA9)
+> + *
+> + * HBI-0191B
+> + */
+> +
+> +/dts-v1/;
+> +
+> +/include/ "skeleton.dtsi"
+> +
+> +/ {
+> +	model = "V2P-CA9";
+> +	arm,hbi = <0x191>;
+> +	compatible = "arm,vexpress-v2p-ca9";
+> +	interrupt-parent = <&gic>;
+> +
+> +	aliases {
+> +		serial0 = &v2m_serial0;
+> +		serial1 = &v2m_serial1;
+> +		serial2 = &v2m_serial2;
+> +		serial3 = &v2m_serial3;
+> +		i2c0 = &v2m_i2c_dvi;
+> +		i2c1 = &v2m_i2c_pcie;
+> +	};
+> +
+> +	memory at 60000000 {
+> +		device_type = "memory";
+> +		reg = <0x60000000 0x40000000>;
+> +	};
+> +
+> +	clcd at 10020000 {
+> +		compatible = "arm,pl111", "arm,primecell";
+> +		reg = <0x10020000 0x1000>;
+> +		interrupts = <0 44 4>;
+> +	};
+> +
+> +	memory-controller at 100e0000 {
+> +		compatible = "arm,pl341", "arm,primecell";
+> +		reg = <0x100e0000 0x1000>;
+> +	};
+> +
+> +	memory-controller at 100e1000 {
+> +		compatible = "arm,pl354", "arm,primecell";
+> +		reg = <0x100e1000 0x1000>;
+> +		interrupts = <0 45 4>,
+> +			     <0 46 4>;
+> +	};
+> +
+> +	timer at 100e4000 {
+> +		compatible = "arm,sp804", "arm,primecell";
+> +		reg = <0x100e4000 0x1000>;
+> +		interrupts = <0 48 4>,
+> +			     <0 49 4>;
+> +	};
+> +
+> +	watchdog at 100e5000 {
+> +		compatible = "arm,sp805", "arm,primecell";
+> +		reg = <0x100e5000 0x1000>;
+> +		interrupts = <0 51 4>;
+> +	};
+> +
+> +	gic: interrupt-controller at 1e001000 {
+> +		compatible = "arm,cortex-a9-gic";
+> +		#interrupt-cells = <3>;
+> +		#address-cells = <0>;
+> +		interrupt-controller;
+> +		reg = <0x1e001000 0x1000>,
+> +		      <0x1e000100 0x100>;
+> +	};
+> +
+> +	L2: cache-controller at 1e00a000 {
+> +		compatible = "arm,pl310-cache";
+> +		reg = <0x1e00a000 0x1000>;
+> +		interrupts = <0 43 4>;
+> +		cache-level = <2>;
+> +		arm,data-latency = <0>;
+> +		arm,tag-latency = <0>;
+> +	};
+> +
+> +	pmu {
+> +		compatible = "arm,cortex-a9-pmu";
+> +		interrupts = <0 60 4>,
+> +			     <0 61 4>,
+> +			     <0 62 4>,
+> +			     <0 63 4>;
+> +	};
+> +
+> +	motherboard {
+> +		ranges = <0 0 0x40000000 0x04000000>,
+> +			 <1 0 0x44000000 0x04000000>,
+> +			 <2 0 0x48000000 0x04000000>,
+> +			 <3 0 0x4c000000 0x04000000>,
+> +			 <7 0 0x10000000 0x00020000>;
+> +
+> +		interrupt-map-mask = <0 0 63>;
+> +		interrupt-map = <0 0  0 &gic 0  0 4>,
+> +				<0 0  1 &gic 0  1 4>,
+> +				<0 0  2 &gic 0  2 4>,
+> +				<0 0  3 &gic 0  3 4>,
+> +				<0 0  4 &gic 0  4 4>,
+> +				<0 0  5 &gic 0  5 4>,
+> +				<0 0  6 &gic 0  6 4>,
+> +				<0 0  7 &gic 0  7 4>,
+> +				<0 0  8 &gic 0  8 4>,
+> +				<0 0  9 &gic 0  9 4>,
+> +				<0 0 10 &gic 0 10 4>,
+> +				<0 0 11 &gic 0 11 4>,
+> +				<0 0 12 &gic 0 12 4>,
+> +				<0 0 13 &gic 0 13 4>,
+> +				<0 0 14 &gic 0 14 4>,
+> +				<0 0 15 &gic 0 15 4>,
+> +				<0 0 16 &gic 0 16 4>,
+> +				<0 0 17 &gic 0 17 4>,
+> +				<0 0 18 &gic 0 18 4>,
+> +				<0 0 19 &gic 0 19 4>,
+> +				<0 0 20 &gic 0 20 4>,
+> +				<0 0 21 &gic 0 21 4>,
+> +				<0 0 22 &gic 0 22 4>,
+> +				<0 0 23 &gic 0 23 4>,
+> +				<0 0 24 &gic 0 24 4>,
+> +				<0 0 25 &gic 0 25 4>,
+> +				<0 0 26 &gic 0 26 4>,
+> +				<0 0 27 &gic 0 27 4>,
+> +				<0 0 28 &gic 0 28 4>,
+> +				<0 0 29 &gic 0 29 4>,
+> +				<0 0 30 &gic 0 30 4>,
+> +				<0 0 31 &gic 0 31 4>,
+> +				<0 0 32 &gic 0 32 4>,
+> +				<0 0 33 &gic 0 33 4>,
+> +				<0 0 34 &gic 0 34 4>,
+> +				<0 0 35 &gic 0 35 4>,
+> +				<0 0 36 &gic 0 36 4>,
+> +				<0 0 37 &gic 0 37 4>,
+> +				<0 0 38 &gic 0 38 4>,
+> +				<0 0 39 &gic 0 39 4>,
+> +				<0 0 40 &gic 0 40 4>,
+> +				<0 0 41 &gic 0 41 4>,
+> +				<0 0 42 &gic 0 42 4>;
+> +	};
+> +};
+> +
+> +/include/ "vexpress-v2m.dtsi"
+> diff --git a/arch/arm/mach-vexpress/Kconfig b/arch/arm/mach-vexpress/Kconfig
+> index 2180888..9eb8161 100644
+> --- a/arch/arm/mach-vexpress/Kconfig
+> +++ b/arch/arm/mach-vexpress/Kconfig
+> @@ -23,4 +23,27 @@ config ARCH_VEXPRESS_RS1
+>  	  RS1 VE memory map (i.a. motherboard peripherals at
+>  	  0x1c000000, RAM at 0x80000000).
+>  
+> +config ARCH_VEXPRESS_V2P_CA5S_CA9
+> +	bool "CoreTile Express A5x2 and A9x4 based platform support"
+> +	select CPU_V7
+> +	select ARM_GIC
+> +	select ARCH_VEXPRESS_RS1
+> +	select ARCH_VEXPRESS_DT
+> +	select ARM_ERRATA_720789
+> +	select ARM_ERRATA_751472
+> +	select PL310_ERRATA_753970 if CACHE_PL310
 
-This patch moves the knowledge of which platforms have a L2x0 or
-PL310 cache controller to the individual machines.  To enable this,
-a new HAVE_L2X0_L2CC config option is introduced to allow machines
-to indicate that they have such a cache controller independently of
-each other.
+The config option for L2x0/PL310 doesn't get selected for this platform.
+Rather than bloat the list in arch/arm/mm/Kconfig each time we add a
+coretile (and get a merge conflict with anyone else adding a platform
+with an L2CC) I've posted a patch to attempt to factorise that:
 
-Signed-off-by: Dave Martin <dave.martin@linaro.org>
----
- arch/arm/Kconfig               |    8 ++++++++
- arch/arm/mach-exynos/Kconfig   |    1 +
- arch/arm/mach-omap2/Kconfig    |    1 +
- arch/arm/mach-realview/Kconfig |    5 +++++
- arch/arm/mach-vexpress/Kconfig |    1 +
- arch/arm/mm/Kconfig            |   13 ++++++++-----
- arch/arm/plat-mxc/Kconfig      |    1 +
- 7 files changed, 25 insertions(+), 5 deletions(-)
+ARM: pl2x0/pl310: Refactor Kconfig to be more maintainable
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 44789ef..4068fe5 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -339,6 +339,7 @@ config ARCH_HIGHBANK
- 	select ARCH_WANT_OPTIONAL_GPIOLIB
- 	select ARM_AMBA
- 	select ARM_GIC
-+	select HAVE_L2X0_L2CC
- 	select ARM_TIMER_SP804
- 	select CLKDEV_LOOKUP
- 	select CPU_V7
-@@ -359,6 +360,7 @@ config ARCH_CLPS711X
- config ARCH_CNS3XXX
- 	bool "Cavium Networks CNS3XXX family"
- 	select CPU_V6K
-+	select HAVE_L2X0_L2CC
- 	select GENERIC_CLOCKEVENTS
- 	select ARM_GIC
- 	select MIGHT_HAVE_PCI
-@@ -377,6 +379,7 @@ config ARCH_GEMINI
- config ARCH_PRIMA2
- 	bool "CSR SiRFSoC PRIMA2 ARM Cortex A9 Platform"
- 	select CPU_V7
-+	select HAVE_L2X0_L2CC
- 	select NO_IOPORT
- 	select GENERIC_CLOCKEVENTS
- 	select CLKDEV_LOOKUP
-@@ -627,6 +630,7 @@ config ARCH_W90X900
- 
- config ARCH_TEGRA
- 	bool "NVIDIA Tegra"
-+	select HAVE_L2X0_L2CC
- 	select CLKDEV_LOOKUP
- 	select CLKSRC_MMIO
- 	select GENERIC_CLOCKEVENTS
-@@ -699,6 +703,7 @@ config ARCH_MSM
- 
- config ARCH_SHMOBILE
- 	bool "Renesas SH-Mobile / R-Mobile"
-+	select HAVE_L2X0_L2CC
- 	select HAVE_CLK
- 	select CLKDEV_LOOKUP
- 	select HAVE_MACH_CLKDEV
-@@ -900,6 +905,7 @@ config ARCH_U8500
- 	bool "ST-Ericsson U8500 Series"
- 	select CPU_V7
- 	select ARM_AMBA
-+	select HAVE_L2X0_L2CC
- 	select GENERIC_CLOCKEVENTS
- 	select CLKDEV_LOOKUP
- 	select ARCH_REQUIRE_GPIOLIB
-@@ -912,6 +918,7 @@ config ARCH_NOMADIK
- 	select ARM_AMBA
- 	select ARM_VIC
- 	select CPU_ARM926T
-+	select HAVE_L2X0_L2CC
- 	select CLKDEV_LOOKUP
- 	select GENERIC_CLOCKEVENTS
- 	select ARCH_REQUIRE_GPIOLIB
-@@ -968,6 +975,7 @@ config ARCH_VT8500
- config ARCH_ZYNQ
- 	bool "Xilinx Zynq ARM Cortex A9 Platform"
- 	select CPU_V7
-+	select HAVE_L2X0_L2CC
- 	select GENERIC_CLOCKEVENTS
- 	select CLKDEV_LOOKUP
- 	select ARM_GIC
-diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
-index 724ec0f..b3eb318 100644
---- a/arch/arm/mach-exynos/Kconfig
-+++ b/arch/arm/mach-exynos/Kconfig
-@@ -17,6 +17,7 @@ choice
- 
- config ARCH_EXYNOS4
- 	bool "SAMSUNG EXYNOS4"
-+	select HAVE_L2X0_L2CC
- 	help
- 	  Samsung EXYNOS4 SoCs based systems
- 
-diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-index 5034147..f4e7e6a 100644
---- a/arch/arm/mach-omap2/Kconfig
-+++ b/arch/arm/mach-omap2/Kconfig
-@@ -44,6 +44,7 @@ config ARCH_OMAP4
- 	select CPU_V7
- 	select ARM_GIC
- 	select LOCAL_TIMERS if SMP
-+	select HAVE_L2X0_L2CC
- 	select PL310_ERRATA_588369
- 	select PL310_ERRATA_727915
- 	select ARM_ERRATA_720789
-diff --git a/arch/arm/mach-realview/Kconfig b/arch/arm/mach-realview/Kconfig
-index dba6d0c..3dfd6b8 100644
---- a/arch/arm/mach-realview/Kconfig
-+++ b/arch/arm/mach-realview/Kconfig
-@@ -12,6 +12,7 @@ config REALVIEW_EB_A9MP
- 	bool "Support Multicore Cortex-A9 Tile"
- 	depends on MACH_REALVIEW_EB
- 	select CPU_V7
-+	select HAVE_L2X0_L2CC
- 	help
- 	  Enable support for the Cortex-A9MPCore tile fitted to the
- 	  Realview(R) Emulation Baseboard platform.
-@@ -20,6 +21,7 @@ config REALVIEW_EB_ARM11MP
- 	bool "Support ARM11MPCore Tile"
- 	depends on MACH_REALVIEW_EB
- 	select CPU_V6K
-+	select HAVE_L2X0_L2CC
- 	select ARCH_HAS_BARRIERS if SMP
- 	help
- 	  Enable support for the ARM11MPCore tile fitted to the Realview(R)
-@@ -38,6 +40,7 @@ config MACH_REALVIEW_PB11MP
- 	bool "Support RealView(R) Platform Baseboard for ARM11MPCore"
- 	select CPU_V6K
- 	select ARM_GIC
-+	select HAVE_L2X0_L2CC
- 	select HAVE_PATA_PLATFORM
- 	select ARCH_HAS_BARRIERS if SMP
- 	help
-@@ -50,6 +53,7 @@ config MACH_REALVIEW_PB1176
- 	bool "Support RealView(R) Platform Baseboard for ARM1176JZF-S"
- 	select CPU_V6
- 	select ARM_GIC
-+	select HAVE_L2X0_L2CC
- 	select HAVE_TCM
- 	help
- 	  Include support for the ARM(R) RealView(R) Platform Baseboard for
-@@ -77,6 +81,7 @@ config MACH_REALVIEW_PBA8
- config MACH_REALVIEW_PBX
- 	bool "Support RealView(R) Platform Baseboard Explore"
- 	select ARM_GIC
-+	select HAVE_L2X0_L2CC
- 	select HAVE_PATA_PLATFORM
- 	select ARCH_SPARSEMEM_ENABLE if CPU_V7 && !REALVIEW_HIGH_PHYS_OFFSET
- 	select ZONE_DMA if SPARSEMEM
-diff --git a/arch/arm/mach-vexpress/Kconfig b/arch/arm/mach-vexpress/Kconfig
-index 9311484..78d4f28 100644
---- a/arch/arm/mach-vexpress/Kconfig
-+++ b/arch/arm/mach-vexpress/Kconfig
-@@ -5,6 +5,7 @@ config ARCH_VEXPRESS_CA9X4
- 	bool "Versatile Express Cortex-A9x4 tile"
- 	select CPU_V7
- 	select ARM_GIC
-+	select HAVE_L2X0_L2CC
- 	select ARM_ERRATA_720789
- 	select ARM_ERRATA_751472
- 	select ARM_ERRATA_753970
-diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-index 67f75a0..bb743df 100644
---- a/arch/arm/mm/Kconfig
-+++ b/arch/arm/mm/Kconfig
-@@ -816,13 +816,16 @@ config CACHE_FEROCEON_L2_WRITETHROUGH
- 	  Say Y here to use the Feroceon L2 cache in writethrough mode.
- 	  Unless you specifically require this, say N for writeback mode.
- 
-+config HAVE_L2X0_L2CC
-+	bool
-+	default n
-+	help
-+	  This option should be selected by machines which have a L2x0
-+	  or PL310 cache controller.
-+
- config CACHE_L2X0
- 	bool "Enable the L2x0 outer cache controller"
--	depends on REALVIEW_EB_ARM11MP || MACH_REALVIEW_PB11MP || MACH_REALVIEW_PB1176 || \
--		   REALVIEW_EB_A9MP || ARCH_IMX_V6_V7 || MACH_REALVIEW_PBX || \
--		   ARCH_NOMADIK || ARCH_OMAP4 || ARCH_EXYNOS4 || ARCH_TEGRA || \
--		   ARCH_U8500 || ARCH_VEXPRESS_CA9X4 || ARCH_SHMOBILE || \
--		   ARCH_PRIMA2 || ARCH_ZYNQ || ARCH_CNS3XXX || ARCH_HIGHBANK
-+	depends on HAVE_L2X0_L2CC
- 	default y
- 	select OUTER_CACHE
- 	select OUTER_CACHE_SYNC
-diff --git a/arch/arm/plat-mxc/Kconfig b/arch/arm/plat-mxc/Kconfig
-index b3a1f2b..6871ed7 100644
---- a/arch/arm/plat-mxc/Kconfig
-+++ b/arch/arm/plat-mxc/Kconfig
-@@ -20,6 +20,7 @@ config ARCH_IMX_V6_V7
- 	bool "i.MX3, i.MX6"
- 	select AUTO_ZRELADDR if !ZBOOT_ROM
- 	select ARM_PATCH_PHYS_VIRT
-+	select HAVE_L2X0_L2CC
- 	help
- 	  This enables support for systems based on the Freescale i.MX3 and i.MX6
- 	  family.
--- 
-1.7.4.1
+If this looks OK and nobody objects, I suggest to build on top of that.
+
+
+Note that select PL310_ERRATA_753970 if CACHE_PL310 also needs to be
+propagated to ARCH_VEXPRESS_CA9X4.  Maybe we should have a common symbol
+which selects/depends on the common stuff instead of duplicating it for
+every coretile -- they will tend to get out of sync.
+
+Cheers
+---Dave
