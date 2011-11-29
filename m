@@ -1,33 +1,61 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 29 Nov 2011 21:29:20 +0000
-Subject: [ANNOUNCE] Xen port to Cortex-A15 / ARMv7 with virt extensions
-In-Reply-To: <alpine.DEB.2.00.1111281009090.31179@kaball-desktop>
-References: <alpine.DEB.2.00.1111281009090.31179@kaball-desktop>
-Message-ID: <201111292129.20444.arnd@arndb.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 29 Nov 2011 21:55:22 +0000
+Subject: [PATCH 3/3] ARM: support syscall tracing
+In-Reply-To: <CAK8d-a+o6A+E537o3i4JdzsXei2fbvqNcCLx_U8WyEMK-vL8Fg@mail.gmail.com>
+References: <1322584095-30439-1-git-send-email-stevenrwalter@gmail.com>
+ <1322584095-30439-4-git-send-email-stevenrwalter@gmail.com>
+ <20111129174604.GL9581@n2100.arm.linux.org.uk>
+ <CAK8d-a+o6A+E537o3i4JdzsXei2fbvqNcCLx_U8WyEMK-vL8Fg@mail.gmail.com>
+Message-ID: <20111129215522.GN9581@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 29 November 2011, Stefano Stabellini wrote:
-> Hi all,
-> a few weeks ago I (and a few others) started hacking on a
-> proof-of-concept hypervisor port to Cortex-A15 which uses and requires
-> ARMv7 virtualization extensions. The intention of this work was to find
-> out how to best support ARM v7+ on Xen. See
-> http://old-list-archives.xen.org/archives/html/xen-arm/2011-09/msg00013.html
-> for more details. 
+On Tue, Nov 29, 2011 at 01:12:50PM -0500, Steven Walter wrote:
+> Yes, I like how the assembler counts the number of syscalls for you.
+> However, every other architecture uses either a bare number or
+> __NR_last_syscall+1 for defining NR_syscalls.
 > 
-> I am pleased to announce that significant progress has been made, and
-> that we now have a nascent Xen port for Cortex-A15. The port is based on
-> xen-unstable (HG CS 8d6edc3d26d2) and written from scratch exploiting
-> the latest virtualization, LPAE, GIC and generic timer support in
-> hardware.
+> > You're also exporting it to userspace. ?It has no business being in
+> > userspace.
+> 
+> That was unintentional, I'll fix.
+> 
+> > Lastly, it's wrong. ?__NR_SYSCALL_BASE may be 0 or 0x90000 depending on
+> > the ABI selected. ?If it's 0x90000, will tracepoint stuff work or will it
+> > explode because of a stupidly large table somewhere?
+> 
+> Right you are.  Didn't consider that.  Does that mean that
+> syscall_get_nr() should return the offset from __NR_SYSCALL_BASE, so
+> that it will be strictly less than NR_syscalls?
 
-Very nice!
+strace sees the 0x90000 offset today, so tracehook is going to be
+compatible with our existing APIs, tracehook needs to keep seeing
+that offset.
 
-Do you have a pointer to the kernel sources for the Linux guest?
-Since Xen and KVM are both in an early working state right now,
-it would be very nice if we could agree on the guest model to make
-sure that it's always possible to run the same kernel in both
-(and potentially other future) hypervisors without modifications.
+However, I suspect that's incompatible with tracehook as it stands
+today - especially when we might be running a kernel with OABI compat
+support enabled (which means you'll get 0x90000+ syscalls for OABI and
+0+ syscalls for EABI.)
 
-	Arnd
+> > kernel/trace/trace_syscalls.c: ? ? ?for (i = 0; i < NR_syscalls; i++) {
+> >
+> > and
+> >
+> > kernel/trace/trace_syscalls.c:static DECLARE_BITMAP(enabled_perf_enter_syscalls, NR_syscalls);
+> > kernel/trace/trace_syscalls.c:static DECLARE_BITMAP(enabled_perf_exit_syscalls,NR_syscalls);
+> >
+> > all point at this being very wrong.
+> 
+> Initially I was going to assign the assembler version of NR_syscalls
+> to a symbol which could be referenced from C.  However, putting the C
+> declaration for the variable in unistd.h made the assembler unhappy.
+> Is it kosher to have C stuff in unistd.h?  Since there was no prior
+> example of it, I assumed not.  However, perhaps I could just hide it
+> from the assembler with some kind of #ifdef?
+
+#ifndef __ASSEMBLY__
+
+but, as I say, the number of syscalls which the kernel implements is
+defined by the size of the table in calls.S, not by the list in
+unistd.h.  We may allocate a number and put it in unistd.h to reserve
+it before we have a final implementation.
