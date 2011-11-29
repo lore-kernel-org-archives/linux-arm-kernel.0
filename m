@@ -1,105 +1,72 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Tue, 29 Nov 2011 11:22:23 -0800
-Subject: [RFC V1 7/8] ARM i.MX: prepare common clk support
-In-Reply-To: <20111129030944.GB19236@b20223-02.ap.freescale.net>
-References: <1322046755-13511-1-git-send-email-richard.zhao@linaro.org>
- <1322046755-13511-8-git-send-email-richard.zhao@linaro.org>
- <CAPtuhTgSB8Af4Xtux93-VLXSrK5KkzFOez9V5tcmbkKwbZ_8Rw@mail.gmail.com>
- <20111129030944.GB19236@b20223-02.ap.freescale.net>
-Message-ID: <CAPtuhThNZA707gQhjt9-V_B8=5UN9o1JgNTm_Dj8eLO-WNmJQA@mail.gmail.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Tue, 29 Nov 2011 20:23:19 +0100
+Subject: [PATCH 0/6] AT91 Reset cleanup
+In-Reply-To: <20111129190726.GM9581@n2100.arm.linux.org.uk>
+References: <20111129173514.GW15008@game.jcrosoft.org>
+ <201111291946.13719.marek.vasut@gmail.com>
+ <20111129190726.GM9581@n2100.arm.linux.org.uk>
+Message-ID: <201111292023.19202.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 28, 2011 at 7:09 PM, Richard Zhao <richard.zhao@linaro.org> wrote:
-> On Mon, Nov 28, 2011 at 06:36:33PM -0800, Mike Turquette wrote:
->> On Wed, Nov 23, 2011 at 3:12 AM, Richard Zhao <richard.zhao@linaro.org> wrote:
->> > +#define DEFINE_CLK_DIVIDER(_name, _parent, _flags, _reg, _shift, _width) \
->> > + ? ? ? struct clk_divider _name = { \
->> > + ? ? ? ? ? ? ? .clk = { \
->> > + ? ? ? ? ? ? ? ? ? ? ? .name = #_name, \
->> > + ? ? ? ? ? ? ? ? ? ? ? .ops = &clk_divider_ops, \
->> > + ? ? ? ? ? ? ? ? ? ? ? .parent = _parent, \
->> > + ? ? ? ? ? ? ? ? ? ? ? .flags = _flags, \
->> > + ? ? ? ? ? ? ? }, \
->> > + ? ? ? ? ? ? ? .reg = (_reg), \
->> > + ? ? ? ? ? ? ? .shift = (_shift), \
->> > + ? ? ? ? ? ? ? .width = (_width), \
->> > + ? ? ? ? ? ? ? .lock = &imx_ccm_lock, \
->> > + ? ? ? }
->> > +
->> > +#define DEFINE_CLK_MUX(_name, _reg, _shift, _width, _clks) \
->> > + ? ? ? struct clk_mux _name = { \
->> > + ? ? ? ? ? ? ? .clk = { \
->> > + ? ? ? ? ? ? ? ? ? ? ? .name = #_name, \
->> > + ? ? ? ? ? ? ? ? ? ? ? .ops = &clk_mux_ops, \
->> > + ? ? ? ? ? ? ? }, \
->> > + ? ? ? ? ? ? ? .reg = (_reg), \
->> > + ? ? ? ? ? ? ? .shift = (_shift), \
->> > + ? ? ? ? ? ? ? .width = (_width), \
->> > + ? ? ? ? ? ? ? .clks = (_clks), \
->> > + ? ? ? ? ? ? ? .num_clks = ARRAY_SIZE(_clks), \
->> > + ? ? ? ? ? ? ? .lock = &imx_ccm_lock, \
->> > + ? ? ? }
->> > +
->> > +#define DEFINE_CLK_FIXED(_name, _rate) \
->> > + ? ? ? struct clk_hw_fixed _name = { \
->> > + ? ? ? ? ? ? ? .clk = { \
->> > + ? ? ? ? ? ? ? ? ? ? ? .name = #_name, \
->> > + ? ? ? ? ? ? ? ? ? ? ? .ops = &clk_hw_fixed_ops, \
->> > + ? ? ? ? ? ? ? }, \
->> > + ? ? ? ? ? ? ? .fixed_rate = (_rate), \
->> > + ? ? ? }
->> > +
->> > ?#endif /* CONFIG_GENERIC_CLK */
->> > ?#endif /* __ASSEMBLY__ */
->> > ?#endif /* __ASM_ARCH_MXC_CLOCK_H__ */
->> > --
->> > 1.7.5.4
->> >
->> >
->> >
->>
->> Can you move these into clk.h/approriate header? ?Just add _lock to it
->> and it'll work fine for your code.
-> Yes, I can add _lock and share the macros in common header. But I still
+> On Tue, Nov 29, 2011 at 07:46:13PM +0100, Marek Vasut wrote:
+> > > On Tue, Nov 29, 2011 at 06:35:14PM +0100, Jean-Christophe
+> > > PLAGNIOL-VILLARD
+> > 
+> > wrote:
+> > > > Hi,
+> > > > 
+> > > > 	the following patch series will merge the ddr controler header 
+file
+> > > > 	for sam9 and cap9 and cleanup the reset by
+> > > > 	
+> > > > 	swtich to arm_pm_restart
+> > > > 	fix the sam9g45 and cap9 reset
+> > > > 	make rstc soc independent
+> > > > 
+> > > > The following changes since commit 
+15327570807209b5c088382af23ed3fc47558d87:
+> > > >   ARM: at91/gpio: fix display of number of irq setuped (2011-11-28
+> > > >   22:53:09 +0800)
+> > > > 
+> > > > are available in the git repository at:
+> > > >   git://github.com/at91linux/linux-at91.git for-arnd-3.3-reset
+> > > > 
+> > > > Jean-Christophe PLAGNIOL-VILLARD (6):
+> > > >       ARM: at91: fix cap9 ddrsdr register
+> > > >       ARM: at91: merge at91cap9_ddrsdr.h in at91sam9_ddrsdr.h
+> > > >       ARM: at91: introduce AT91_SAM9_ALT_RESET to select the at91sam9
+> > > >       alternative reset ARM: restart: at91: use new restart hook
+> > > 
+> > > Well, it looks like you've taken my work here and committed it as
+> > > yourself. That's plagerism.  Don't do it - and fix it before someone
+> > > pulls your crap.
+> > 
+> > Hey,
+> > 
+> > looking at the patch in question, it looks so trivial the clash is just
+> > possible. Why not just put two SoB lines there and maybe From: and be
+> > done with it?
+> 
+> Look closer.  The patch which was posted has my sign-off on it, it says
+> it's from me, but according to the commit summary, it's author is Jean-
+> Christophe.
+> 
+> So, it _is_ my patch which Jean has decided to _recommit_ into his tree
+> taking it from my tree _without_ _asking_ _me_ whether it was either a
+> good idea to do that, whether it was a finished patch, etc.
 
-On second thought you don't need to resubmit with these in clk.h; I'll
-absorb them into clk.h with my next common clk patchset.
+Ah ok, I see.
+> 
+> So all in all I'm pretty disgusted with Jean-Christophe over this.
 
-> need a wraper for imx to eliminate _lock, right?
+Oh come on, calm down. Just keep an eye on him so he won't do it again and be 
+done with it ;-) And Jean should certainly drop the patch if it's unfinished 
+stuff.
+> 
+> I would like to see my patch updated at some point not to use
+> arm_pm_restart, but to use the .restart method directly, like I've been
+> doing for everyone else.  In other words, this patch is NOT STABLE at
+> the present time.
 
-No.  Taking code from your patch 8/8:
-
-+static DEFINE_CLK_DIVIDER(perclk_pred1, &perclk_lp_apm.clk, 0,
-MXC_CCM_CBCDR, 6, 2);
-+static DEFINE_CLK_DIVIDER(perclk_pred2, &perclk_pred1.clk, 0,
-MXC_CCM_CBCDR, 3, 3);
-+static DEFINE_CLK_DIVIDER(perclk_podf, &perclk_pred2.clk,
-CLK_PARENT_SET_RATE, MXC_CCM_CBCDR, 0, 3);
-
-becomes,
-
-+static DEFINE_CLK_DIVIDER(perclk_pred1, &perclk_lp_apm.clk, 0,
-MXC_CCM_CBCDR, 6, 2, &imx_ccm_lock);
-+static DEFINE_CLK_DIVIDER(perclk_pred2, &perclk_pred1.clk, 0,
-MXC_CCM_CBCDR, 3, 3, &imx_ccm_lock);
-+static DEFINE_CLK_DIVIDER(perclk_podf, &perclk_pred2.clk,
-CLK_PARENT_SET_RATE, MXC_CCM_CBCDR, 0, 3, &imx_ccm_lock);
-
-Regards,
-Mike
-
->
-> Thanks for review
-> Richard
->>
->> Thanks,
->> Mike
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>
->
->
+OK
