@@ -1,47 +1,48 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Tue, 29 Nov 2011 13:37:31 +0800
-Subject: [V2 3/3] RTC: sa1100: support sa1100, pxa and mmp soc families
-In-Reply-To: <20111129045550.GQ15008@game.jcrosoft.org>
-References: <1322445892-22620-1-git-send-email-jtzhou@marvell.com>
- <20111129045550.GQ15008@game.jcrosoft.org>
-Message-ID: <CAN1soZx=9DeyGT_n7+LWwWKVh91wZ4E=9stqSo+5rupR7-wAAQ@mail.gmail.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Tue, 29 Nov 2011 14:06:07 +0800
+Subject: [PATCH] arm: mx23: recognise stmp378x as mx23
+In-Reply-To: <1322303955-9225-1-git-send-email-w.sang@pengutronix.de>
+References: <1322303955-9225-1-git-send-email-w.sang@pengutronix.de>
+Message-ID: <20111129060606.GD19754@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 29, 2011 at 12:55 PM, Jean-Christophe PLAGNIOL-VILLARD
-<plagnioj@jcrosoft.com> wrote:
-> On 10:04 Mon 28 Nov ? ? , Jett.Zhou wrote:
->> Since the regmap of rtc on sa1100, pxa and mmp Marvell soc families are
->> almost the same, so re-arch the rtc-sa1100 to support them.
->>
->> Change-Id: I006271045a21d0e42a8e52c1e43c98c559d76909
->> Signed-off-by: Jett.Zhou <jtzhou@marvell.com>
->> ---
->> ?arch/arm/mach-pxa/devices.c ? ?| ? 20 +++
->> ?arch/arm/mach-sa1100/generic.c | ? 20 +++
->> ?drivers/rtc/Kconfig ? ? ? ? ? ?| ? ?2 +-
->> ?drivers/rtc/rtc-sa1100.c ? ? ? | ?273 ++++++++++++++++++++++++++++------------
->> ?4 files changed, 236 insertions(+), 79 deletions(-)
->>
->> + ? ? if (sa1100_rtc->id == RTC_MMP) {
->> + ? ? ? ? ? ? sa1100_rtc->clk = clk_get(&pdev->dev, "MMP-RTC");
->> + ? ? ? ? ? ? if (IS_ERR(sa1100_rtc->clk)) {
->> + ? ? ? ? ? ? ? ? ? ? dev_err(&pdev->dev, "failed to find rtc clock source\n");
->> + ? ? ? ? ? ? ? ? ? ? ret = PTR_ERR(sa1100_rtc->clk);
->> + ? ? ? ? ? ? ? ? ? ? goto err_clk;
->> + ? ? ? ? ? ? }
->> + ? ? ? ? ? ? clk_prepare(sa1100_rtc->clk);
->> + ? ? ? ? ? ? clk_enable(sa1100_rtc->clk);
-> provide the clk in both case as done macb or arm timer
-> so you can drop the RTC_MMP
->
-Hi Jean,
+On Sat, Nov 26, 2011 at 11:39:14AM +0100, Wolfram Sang wrote:
+> Adding the machine_is_* line was forgotten when converting mach-stmp378x to
+> mach-mxs.
+> 
+> Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
+> ---
 
-It's a good advice. Our current changes doesn't touch the key logic of
-sa1100, and we verify the change in MMP device. But sa1100 doesn't
-support clk since it's too old, and we're lack of sa1100 device to
-verify. So we didn't implement clk in sa1100. If there's a volunteer
-to test, we can implement clk in sa1100. What's your opinion?
+Applied, thanks.
 
-Thanks
-Haojian
+I added 'Cc: stable at kernel.org'.  Please let me know if you do not
+think it's necessary.
+
+Regards,
+Shawn
+
+>  arch/arm/mach-mxs/include/mach/mxs.h |    1 +
+>  1 files changed, 1 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-mxs/include/mach/mxs.h b/arch/arm/mach-mxs/include/mach/mxs.h
+> index 0d2d2b4..bde5f66 100644
+> --- a/arch/arm/mach-mxs/include/mach/mxs.h
+> +++ b/arch/arm/mach-mxs/include/mach/mxs.h
+> @@ -30,6 +30,7 @@
+>   */
+>  #define cpu_is_mx23()		(					\
+>  		machine_is_mx23evk() ||					\
+> +		machine_is_stmp378x() ||				\
+>  		0)
+>  #define cpu_is_mx28()		(					\
+>  		machine_is_mx28evk() ||					\
+> -- 
+> 1.7.7.2
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
