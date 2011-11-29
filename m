@@ -1,58 +1,89 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Tue, 29 Nov 2011 17:00:13 +0000
-Subject: [PATCH v3 0/5] Versatile Express DT support
-In-Reply-To: <1322579473-8804-1-git-send-email-pawel.moll@arm.com>
-References: <1322579473-8804-1-git-send-email-pawel.moll@arm.com>
-Message-ID: <20111129170013.GD2829@localhost.localdomain>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 29 Nov 2011 17:04:35 +0000
+Subject: [PATCH 2/3] ARM: add TRACEHOOK support
+In-Reply-To: <1322584095-30439-3-git-send-email-stevenrwalter@gmail.com>
+References: <1322584095-30439-1-git-send-email-stevenrwalter@gmail.com>
+ <1322584095-30439-3-git-send-email-stevenrwalter@gmail.com>
+Message-ID: <20111129170435.GA1104@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 29, 2011 at 03:11:08PM +0000, Pawel Moll wrote:
-> Hi All,
-> 
-> Another, hopefully close to the final, version of the series...
-> 
-> Changes from v2:
-> 
-> * new patch adding ENDPROC at the end of arch/arm/plat-versatile/headsmp.S
->   and removing use of BSYM() realview and vexpress platform SMP calls
-> 
-> * updated binding documentation according to Dave's comments
-> 
-> * changed motherboard labels prefix from mb_ to v2m_ (to be
->   consistent across code and DT files)
-> 
-> * reworked v2m timer initialization (again) so no #ifdefs are required
->   in non-DT code
-> 
-> * renamed (to vendor- and platform-specific "arm,v2m-timer") and moved
->   (to vexpress-v2m*.dtsi files) timer DT alias, as it is actually
->   motherboard specific and the tile DTS shouldn't have to care;
->   documentation updated accordingly
-> 
-> Tested on V2P-CA9 with ATAGs and DT and on V2P-CA5s with DT.
-> 
-> Previous version has been also tested by Ryan Harkin and
-> provisionally acked by Rob Herring.
-> 
-> Thanks for all your help, especially to Dave for his continuous support!
+Hi Steven,
 
-I'm trying to build... what tree are you basing on?
+On Tue, Nov 29, 2011 at 04:28:14PM +0000, Steven Walter wrote:
+> diff --git a/arch/arm/kernel/ptrace.c b/arch/arm/kernel/ptrace.c
+> index 9726006..1411848 100644
+> --- a/arch/arm/kernel/ptrace.c
+> +++ b/arch/arm/kernel/ptrace.c
+> @@ -22,6 +22,7 @@
+>  #include <linux/perf_event.h>
+>  #include <linux/hw_breakpoint.h>
+>  #include <linux/regset.h>
+> +#include <linux/tracehook.h>
+>  
+>  #include <asm/pgtable.h>
+>  #include <asm/system.h>
+> @@ -928,8 +929,6 @@ asmlinkage int syscall_trace(int why, struct pt_regs *regs, int scno)
+>  
+>  	if (!test_thread_flag(TIF_SYSCALL_TRACE))
+>  		return scno;
+> -	if (!(current->ptrace & PT_PTRACED))
+> -		return scno;
 
-With v3.2-rc3 or next, I get OF header failures like the following:
+This means that we can potentially corrupt current_thread_info()->syscall
+for tasks that aren't being traced. I don't think that matters as it's only
+used by ptrace, but worth bearing in mind.
 
-arch/arm/kernel/devtree.c: In function ?arm_dt_memblock_reserve?:
-arch/arm/kernel/devtree.c:41:7: error: ?initial_boot_params? undeclared (first use in this function)
-arch/arm/kernel/devtree.c:41:7: note: each undeclared identifier is reported only once for each function it appears in
+>  	/*
+>  	 * Save IP.  IP is used to denote syscall entry/exit:
+> @@ -940,19 +939,13 @@ asmlinkage int syscall_trace(int why, struct pt_regs *regs, int scno)
+>  
+>  	current_thread_info()->syscall = scno;
+>  
+> -	/* the 0x80 provides a way for the tracing parent to distinguish
+> -	   between a syscall stop and SIGTRAP delivery */
+> -	ptrace_notify(SIGTRAP | ((current->ptrace & PT_TRACESYSGOOD)
+> -				 ? 0x80 : 0));
+> -	/*
+> -	 * this isn't the same as continuing with a signal, but it will do
+> -	 * for normal use.  strace only continues with a signal if the
+> -	 * stopping signal is not SIGTRAP.  -brl
+> -	 */
+> -	if (current->exit_code) {
+> -		send_sig(current->exit_code, current, 1);
+> -		current->exit_code = 0;
+> +	if (why == 0) {
+> +		if (tracehook_report_syscall_entry(regs))
+> +			current_thread_info()->syscall = -1;
 
-[...]
+Why do you set syscall to -1 here? It looks like
+tracehook_report_syscall_entry always returns 0, but even so, I'm not sure
+what this -1 represents. You could also rewrite this a bit more neatly:
 
-arch/arm/mach-vexpress/v2m.c: In function ?v2m_dt_scan_memory_map?:
-arch/arm/mach-vexpress/v2m.c:529:2: error: implicit declaration of function ?of_get_flat_dt_prop?
-arch/arm/mach-vexpress/v2m.c:529:7: warning: assignment makes pointer from integer without a cast
+if (why)
+	tracehook_report_syscall_exit(...);
+else
+	tracehook_report_syscall_entry(...);
 
-arch/arm/mach-vexpress/v2m.c: In function ?v2m_dt_map_io?:
-arch/arm/mach-vexpress/v2m.c:538:2: error: implicit declaration of function ?of_scan_flat_dt?
 
-Cheers
----Dave
+> +	} else {
+> +		tracehook_report_syscall_exit(regs, 0);
+>  	}
+> +
+>  	regs->ARM_ip = ip;
+>  
+>  	return current_thread_info()->syscall;
+> diff --git a/arch/arm/kernel/signal.c b/arch/arm/kernel/signal.c
+> index 0340224..26c26f5 100644
+> --- a/arch/arm/kernel/signal.c
+> +++ b/arch/arm/kernel/signal.c
+> @@ -645,6 +645,8 @@ handle_signal(unsigned long sig, struct k_sigaction *ka,
+>  	recalc_sigpending();
+>  	spin_unlock_irq(&tsk->sighand->siglock);
+>  
+> +	tracehook_signal_handler(sig, info, ka, regs, 0);
+> +
+
+This doesn't appear to do anything but I guess that's where it should live.
+
+Will
