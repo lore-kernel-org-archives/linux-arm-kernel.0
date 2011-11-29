@@ -1,28 +1,21 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 29 Nov 2011 21:30:10 +0100
-Subject: does non-continuous RAM means I need to select the sparse memory
- model?
-Message-ID: <20111129203010.GA26618@pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 29 Nov 2011 20:58:41 +0000
+Subject: [GIT PULL] msm: timer updates for 3.3
+In-Reply-To: <20111129193908.GA1760@huya.qualcomm.com>
+References: <20111129193908.GA1760@huya.qualcomm.com>
+Message-ID: <201111292058.41604.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Tuesday 29 November 2011, David Brown wrote:
+> The following changes since commit 1ea6b8f48918282bdca0b32a34095504ee65bab5:
+> 
+>   Linux 3.2-rc1 (2011-11-07 16:16:02 -0800)
+> 
+> are available in the git repository at:
+>   git://codeaurora.org/quic/kernel/davidb/linux-msm.git msm-timer
+> 
 
-I'm currently working on a new arch port and my current machine has RAM
-at 0x10000000 and 0x80000000. So there is a big hole between the two
-banks. When selecting the sparse memory model it works, but when
-selecting flat the machine runs into a BUG in mark_bootmem() called by
-free_unused_memmap() to free the space between the two banks.
+Pulled, thanks!
 
-Is that expected (meaning I cannot use the flat model)? I currently
-don't have another machine handy that has >1 memory back to test that.
-
-This happens on 3.2-rc2 and with a port on 2.6.33 I don't need to select
-sparse.
-
-Best regards and thanks for any insight,
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+	Arnd
