@@ -1,69 +1,48 @@
-From: B29397@freescale.com (Chen Peter-B29397)
-Date: Tue, 29 Nov 2011 10:57:37 +0000
-Subject: [PATCH] USB: ehci-mxc: get rid of the uses of cpu_is_mx()
-In-Reply-To: <20111129082139.GG27267@pengutronix.de>
-References: <1322550565-29162-1-git-send-email-peter.chen@freescale.com>
- <20180.36084.962507.946237@ipc1.ka-ro>
- <35AB98346D25394A9354ED89C4D76587226AE3@039-SN1MPN1-002.039d.mgd.msft.net>
- <20111129082139.GG27267@pengutronix.de>
-Message-ID: <35AB98346D25394A9354ED89C4D76587226BD8@039-SN1MPN1-002.039d.mgd.msft.net>
+From: wayne.tams@gmail.com (Wayne Tams)
+Date: Tue, 29 Nov 2011 10:58:03 +0000
+Subject: 2.6.38 port not booting on i.MX53 SoM
+In-Reply-To: <20111128100755.GI17668@pengutronix.de>
+References: <CAN=k24ncTxDMXZzO1ef_+ETFiiqJZxtYSEOAKz3DiwCO8UKwcw@mail.gmail.com>
+ <20111128100755.GI17668@pengutronix.de>
+Message-ID: <CAN=k24=fjYjz9ygUbwDFvCg6jNAvt4wPUZOufdytpDEx1bLqog@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+2011/11/28 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+> Hello,
+>
+> On Mon, Nov 28, 2011 at 09:38:00AM +0000, Wayne Tams wrote:
+>> I have a feeling that this might be a very common question and with
+>> multiple answers, but I am running out of options, so here it goes.
+>>
+>> I have been working with i.MX53 SoM with a 2.6.35 BSP, I am trying to
+>> dump the SoMs BSP in ?favour for Freescale's latest kernel 2.6.38
+>> (http://opensource.freescale.com/git?p=imx/linux-2.6-imx.git;a=summary).
+> Better use mainline, that's way less ugly. (And note that the Freescale
+> kernel is out of scope for this mailing list.)
+>
+>> Using the 2.6.35 kernel as reference I have been trying to configure
+>> the 2.6.38 kernel to match as well as modifying and adding board and
+>> platform information.
+>>
+>> The kernel compiles fine but when I come to load the image the kernel
+>> gets stuck at "Uncompressing Linux... done, booting the kernel."
+>>
+>> Are there any obvious causes for this freeze?
+> An exception before console output is setup, or a wrong setup.
+>
+> Enable DEBUG_LL, EARLY_PRINTK and add "earlyprintk" to the commandline.
 
-> -----Original Message-----
-> From: s.hauer at pengutronix.de [mailto:s.hauer at pengutronix.de]
-> Sent: Tuesday, November 29, 2011 4:22 PM
-> To: Chen Peter-B29397
-> Cc: Lothar Wa?mann; stern at rowland.harvard.edu; gregkh at suse.de;
-> amit.kucheria at canonical.com; linux-usb at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org; u.kleine-koenig at pengutronix.de
-> Subject: Re: [PATCH] USB: ehci-mxc: get rid of the uses of cpu_is_mx()
-> 
-> On Tue, Nov 29, 2011 at 08:02:53AM +0000, Chen Peter-B29397 wrote:
-> > >
-> > > In the driver you would then do a clk_get() for those three clocks
-> > > independent of the platform.
-> > >
-> > The reason why I add this patch is not for clk things, it is for:
-> > 1. Coming device driver
-> > 2. Handle things difference between SoC's. not only clk, others
-> > like low power, wakeup, hsic, or other will comes in future.
-> 
-> The ehci is a standardized core. Please be *very* careful with what you
-> add to this driver. As said in my other mail, the real differences are
-> in the phys and the phy handling code should not be in the ehci-mxc
-> driver at all.
-> Rather than adding random phy code to the driver you should write phy
-> drivers. If you still think that there is code missing in this driver
-> please explain further.
-> 
-> Sascha
-> 
-Sascha, thanks for your comments.
+I have followed your instructions and double checked serial bootargs
+by loading the 2.6.35 kernel; 2.6.35 loads ok displaying printks as it
+executes.
 
-In fact, this patch does not change any ehci logics. The changes for clock.c
-are just let probe not return error with clk_get(dev, "usb"), as dev_id is changed.
-
-Yes, this patch is not meaningful for current ehci-mxc, I do this patch just for
-preparing submit further i.mx usb ehci driver.
-- If I am going to submit mx28 usb ehci driver, the things like cpu_is_mx51 is not defined
-for mxs platform
-- So, refer to i.mx spi and sdhci-esdhc changing for platform_device_id, I made this patch.
-
-If you think this patch is not meaningful at current stage, I will not go on.
-
-For USB PHY's driver, I will discuss with linux-usb list first, then discuss with you how
-to do it at i.mx platform. My current plan is refine phy.c which is from heikki's RFC, and
-implement at i.mx51 bbg first, which has two phys (UTMI for OTG, and ULPI for host1). What do you
-think?
-
+However using the new 2.6.38 kernel, there are not any additional
+messages after enabling the debug settings you mentioned.
+>
+> Best regards
+> Uwe
+>
 > --
-> Pengutronix e.K.                           |
-> |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/
-> |
-> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0
-> |
-> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555
-> |
+> Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? | Uwe Kleine-K?nig ? ? ? ? ? ?|
+> Industrial Linux Solutions ? ? ? ? ? ? ? ? | http://www.pengutronix.de/ ?|
