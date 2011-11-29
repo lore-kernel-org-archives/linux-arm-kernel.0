@@ -1,48 +1,70 @@
-From: wayne.tams@gmail.com (Wayne Tams)
-Date: Tue, 29 Nov 2011 10:58:03 +0000
-Subject: 2.6.38 port not booting on i.MX53 SoM
-In-Reply-To: <20111128100755.GI17668@pengutronix.de>
-References: <CAN=k24ncTxDMXZzO1ef_+ETFiiqJZxtYSEOAKz3DiwCO8UKwcw@mail.gmail.com>
- <20111128100755.GI17668@pengutronix.de>
-Message-ID: <CAN=k24=fjYjz9ygUbwDFvCg6jNAvt4wPUZOufdytpDEx1bLqog@mail.gmail.com>
+From: robin@protonic.nl (Robin van der Gracht)
+Date: Tue, 29 Nov 2011 12:09:03 +0100
+Subject: [PATCH V3] mfd: Fixed unconditional reset of the ADC reading enable
+ bits
+Message-ID: <1322564943-17872-1-git-send-email-robin@protonic.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/11/28 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-> Hello,
->
-> On Mon, Nov 28, 2011 at 09:38:00AM +0000, Wayne Tams wrote:
->> I have a feeling that this might be a very common question and with
->> multiple answers, but I am running out of options, so here it goes.
->>
->> I have been working with i.MX53 SoM with a 2.6.35 BSP, I am trying to
->> dump the SoMs BSP in ?favour for Freescale's latest kernel 2.6.38
->> (http://opensource.freescale.com/git?p=imx/linux-2.6-imx.git;a=summary).
-> Better use mainline, that's way less ugly. (And note that the Freescale
-> kernel is out of scope for this mailing list.)
->
->> Using the 2.6.35 kernel as reference I have been trying to configure
->> the 2.6.38 kernel to match as well as modifying and adding board and
->> platform information.
->>
->> The kernel compiles fine but when I come to load the image the kernel
->> gets stuck at "Uncompressing Linux... done, booting the kernel."
->>
->> Are there any obvious causes for this freeze?
-> An exception before console output is setup, or a wrong setup.
->
-> Enable DEBUG_LL, EARLY_PRINTK and add "earlyprintk" to the commandline.
+When the ADC is being prepared for a single or multiple channel reading,
+the adc0 register is reconfigured without taking the lithium cell, charge
+current and battery current reading enable bits into account. Which results
+in clearing the bits.
 
-I have followed your instructions and double checked serial bootargs
-by loading the 2.6.35 kernel; 2.6.35 loads ok displaying printks as it
-executes.
+Signed-off-by: Robin van der Gracht <robin@protonic.nl>
+---
 
-However using the new 2.6.38 kernel, there are not any additional
-messages after enabling the debug settings you mentioned.
->
-> Best regards
-> Uwe
->
-> --
-> Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? | Uwe Kleine-K?nig ? ? ? ? ? ?|
-> Industrial Linux Solutions ? ? ? ? ? ? ? ? | http://www.pengutronix.de/ ?|
+V3: Removed the added tabular at the definition of MC13XXX_ADC0,
+so the offset equals the idention used in 'drivers/mfd/mc13xxx-core.c'
+
+
+ drivers/mfd/mc13xxx-core.c  |    4 ++--
+ include/linux/mfd/mc13xxx.h |    8 ++++++++
+ 2 files changed, 10 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/mfd/mc13xxx-core.c b/drivers/mfd/mc13xxx-core.c
+index e9619ac..5315999 100644
+--- a/drivers/mfd/mc13xxx-core.c
++++ b/drivers/mfd/mc13xxx-core.c
+@@ -615,13 +615,13 @@ int mc13xxx_adc_do_conversion(struct mc13xxx *mc13xxx, unsigned int mode,
+ 		break;
+ 
+ 	case MC13XXX_ADC_MODE_SINGLE_CHAN:
+-		adc0 |= old_adc0 & MC13XXX_ADC0_TSMOD_MASK;
++		adc0 |= old_adc0 & MC13XXX_ADC0_CONFIG_MASK;
+ 		adc1 |= (channel & 0x7) << MC13XXX_ADC1_CHAN0_SHIFT;
+ 		adc1 |= MC13XXX_ADC1_RAND;
+ 		break;
+ 
+ 	case MC13XXX_ADC_MODE_MULT_CHAN:
+-		adc0 |= old_adc0 & MC13XXX_ADC0_TSMOD_MASK;
++		adc0 |= old_adc0 & MC13XXX_ADC0_CONFIG_MASK;
+ 		adc1 |= 4 << MC13XXX_ADC1_CHAN1_SHIFT;
+ 		break;
+ 
+diff --git a/include/linux/mfd/mc13xxx.h b/include/linux/mfd/mc13xxx.h
+index 3816c2f..261fc11 100644
+--- a/include/linux/mfd/mc13xxx.h
++++ b/include/linux/mfd/mc13xxx.h
+@@ -173,6 +173,9 @@ struct mc13xxx_platform_data {
+ #define MC13XXX_ADC_MODE_MULT_CHAN	3
+ 
+ #define MC13XXX_ADC0		43
++#define MC13XXX_ADC0_LICELLCON		(1 << 0)
++#define MC13XXX_ADC0_CHRGICON		(1 << 1)
++#define MC13XXX_ADC0_BATICON		(1 << 2)
+ #define MC13XXX_ADC0_ADREFEN		(1 << 10)
+ #define MC13XXX_ADC0_TSMOD0		(1 << 12)
+ #define MC13XXX_ADC0_TSMOD1		(1 << 13)
+@@ -184,4 +187,9 @@ struct mc13xxx_platform_data {
+ 					MC13XXX_ADC0_TSMOD1 | \
+ 					MC13XXX_ADC0_TSMOD2)
+ 
++#define MC13XXX_ADC0_CONFIG_MASK	(MC13XXX_ADC0_TSMOD_MASK | \
++					MC13XXX_ADC0_LICELLCON | \
++					MC13XXX_ADC0_CHRGICON | \
++					MC13XXX_ADC0_BATICON)
++
+ #endif /* ifndef __LINUX_MFD_MC13XXX_H */
+-- 
+1.7.4.1
