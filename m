@@ -1,26 +1,22 @@
-From: arnd.bergmann@linaro.org (Arnd Bergmann)
-Date: Tue, 29 Nov 2011 14:50:41 +0000
-Subject: [GIT PULL] U300 and Ux500 defconfigs
-In-Reply-To: <CACRpkdbNOucfZdfENJ44Q8dB73=nupt9913O+Zp4PCFUn5Ec3w@mail.gmail.com>
-References: <CACRpkdbNOucfZdfENJ44Q8dB73=nupt9913O+Zp4PCFUn5Ec3w@mail.gmail.com>
-Message-ID: <201111291450.41684.arnd.bergmann@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 29 Nov 2011 14:51:18 +0000
+Subject: [GIT PULL] DSS fixes for v3.2-rc2
+In-Reply-To: <1322554347.1869.6.camel@deskari>
+References: <20111123235542.GL31337@atomide.com>
+ <201111241606.54879.arnd@arndb.de> <1322554347.1869.6.camel@deskari>
+Message-ID: <201111291451.19081.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 29 November 2011, Linus Walleij wrote:
-> could you please pull these defconfig patches into arm-soc,
-> they are mainly adjusting these defconfigs for stuff merged
-> during the 3.2 merge window or earlier. You can push for
-> the -rc:s or next merge window at your choice, no big deal
-> for me. Both have been reviewed on the mailing list and
-> of course use the minimal format from saveconfig.
+On Tuesday 29 November 2011, Tomi Valkeinen wrote:
+> I don't think we need these in 3.1 stable. The omapdss driver in 3.1
+> contains hacks to circumvent the HWMOD issues the patches below fix.
+> These hacks were removed for 3.2.
 > 
-> The following changes since commit caca6a03d365883564885f2c1da3e88dcf65d139:
-> 
->   Linux 3.2-rc3 (2011-11-23 20:20:28 -0800)
+> Well, the "ARM: OMAP2PLUS: DSS: Ensure DSS works correctly..." patch
+> could be used for 3.1 also, but I fear it depends on HWMOD and DSS
+> patches missing from 3.1. I'll check it out.
 
-Pulled into the fixes branch for 3.2.
-
-Thanks,
+Ok, thanks for taking a look,
 
 	Arnd
