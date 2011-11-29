@@ -1,61 +1,55 @@
-From: rachna@ti.com (Patil, Rachna)
-Date: Tue, 29 Nov 2011 11:20:39 +0530
-Subject: [PATCH] ARM: davinci: fix mach/gpio.h includes
-Message-ID: <1322545839-30405-1-git-send-email-rachna@ti.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Tue, 29 Nov 2011 07:11:03 +0100
+Subject: [V2 3/3] RTC: sa1100: support sa1100, pxa and mmp soc families
+In-Reply-To: <CAN1soZx=9DeyGT_n7+LWwWKVh91wZ4E=9stqSo+5rupR7-wAAQ@mail.gmail.com>
+References: <1322445892-22620-1-git-send-email-jtzhou@marvell.com>
+ <20111129045550.GQ15008@game.jcrosoft.org>
+ <CAN1soZx=9DeyGT_n7+LWwWKVh91wZ4E=9stqSo+5rupR7-wAAQ@mail.gmail.com>
+Message-ID: <20111129061103.GS15008@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch addresses Russell's comments at [1] by replacing the
-mach/gpio.h includes to linux/gpio.h for TI's DA830/OMAP-L137/AM17x and
-DA850/OMAP-L138/AM18x platforms.
+On 13:37 Tue 29 Nov     , Haojian Zhuang wrote:
+> On Tue, Nov 29, 2011 at 12:55 PM, Jean-Christophe PLAGNIOL-VILLARD
+> <plagnioj@jcrosoft.com> wrote:
+> > On 10:04 Mon 28 Nov ? ? , Jett.Zhou wrote:
+> >> Since the regmap of rtc on sa1100, pxa and mmp Marvell soc families are
+> >> almost the same, so re-arch the rtc-sa1100 to support them.
+> >>
+> >> Change-Id: I006271045a21d0e42a8e52c1e43c98c559d76909
+> >> Signed-off-by: Jett.Zhou <jtzhou@marvell.com>
+> >> ---
+> >> ?arch/arm/mach-pxa/devices.c ? ?| ? 20 +++
+> >> ?arch/arm/mach-sa1100/generic.c | ? 20 +++
+> >> ?drivers/rtc/Kconfig ? ? ? ? ? ?| ? ?2 +-
+> >> ?drivers/rtc/rtc-sa1100.c ? ? ? | ?273 ++++++++++++++++++++++++++++------------
+> >> ?4 files changed, 236 insertions(+), 79 deletions(-)
+> >>
+> >> + ? ? if (sa1100_rtc->id == RTC_MMP) {
+> >> + ? ? ? ? ? ? sa1100_rtc->clk = clk_get(&pdev->dev, "MMP-RTC");
+> >> + ? ? ? ? ? ? if (IS_ERR(sa1100_rtc->clk)) {
+> >> + ? ? ? ? ? ? ? ? ? ? dev_err(&pdev->dev, "failed to find rtc clock source\n");
+> >> + ? ? ? ? ? ? ? ? ? ? ret = PTR_ERR(sa1100_rtc->clk);
+> >> + ? ? ? ? ? ? ? ? ? ? goto err_clk;
+> >> + ? ? ? ? ? ? }
+> >> + ? ? ? ? ? ? clk_prepare(sa1100_rtc->clk);
+> >> + ? ? ? ? ? ? clk_enable(sa1100_rtc->clk);
+> > provide the clk in both case as done macb or arm timer
+> > so you can drop the RTC_MMP
+> >
+> Hi Jean,
+> 
+> It's a good advice. Our current changes doesn't touch the key logic of
+> sa1100, and we verify the change in MMP device. But sa1100 doesn't
+> support clk since it's too old, and we're lack of sa1100 device to
+> verify. So we didn't implement clk in sa1100. If there's a volunteer
+> to test, we can implement clk in sa1100. What's your opinion?
+sa1100 do support clock
+and switch is to clkdev will no too difficult
 
-[1] http://permalink.gmane.org/gmane.linux.ports.arm.kernel/126553
+just provide a fake one
 
-Signed-off-by: Patil, Rachna <rachna@ti.com>
----
- arch/arm/mach-davinci/da830.c |    2 +-
- arch/arm/mach-davinci/da850.c |    2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+and maybe Russell or Nicolas still have a sa11xx
 
-diff --git a/arch/arm/mach-davinci/da830.c b/arch/arm/mach-davinci/da830.c
-index 2ed2f82..ba15acf 100644
---- a/arch/arm/mach-davinci/da830.c
-+++ b/arch/arm/mach-davinci/da830.c
-@@ -10,6 +10,7 @@
-  */
- #include <linux/init.h>
- #include <linux/clk.h>
-+#include <linux/gpio.h>
- 
- #include <asm/mach/map.h>
- 
-@@ -19,7 +20,6 @@
- #include <mach/common.h>
- #include <mach/time.h>
- #include <mach/da8xx.h>
--#include <mach/gpio.h>
- 
- #include "clock.h"
- #include "mux.h"
-diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
-index 0cf0d88..5d5dd6b 100644
---- a/arch/arm/mach-davinci/da850.c
-+++ b/arch/arm/mach-davinci/da850.c
-@@ -15,6 +15,7 @@
- #include <linux/clk.h>
- #include <linux/platform_device.h>
- #include <linux/cpufreq.h>
-+#include <linux/gpio.h>
- #include <linux/regulator/consumer.h>
- 
- #include <asm/mach/map.h>
-@@ -27,7 +28,6 @@
- #include <mach/da8xx.h>
- #include <mach/cpufreq.h>
- #include <mach/pm.h>
--#include <mach/gpio.h>
- 
- #include "clock.h"
- #include "mux.h"
--- 
-1.7.1
+Best Regards,
+J.
