@@ -1,64 +1,45 @@
-From: mst@redhat.com (Michael S. Tsirkin)
-Date: Tue, 29 Nov 2011 17:16:07 +0200
-Subject: [RFC] virtio: use mandatory barriers for remote processor vdevs
-In-Reply-To: <CAK=WgbZoGYVyKt=XXvnPVdh0koSBJC0zcgkLaYRkmjwBLOFA-A@mail.gmail.com>
-References: <1322569886-13055-1-git-send-email-ohad@wizery.com>
- <20111129131110.GC19157@redhat.com>
- <CAK=WgbZoGYVyKt=XXvnPVdh0koSBJC0zcgkLaYRkmjwBLOFA-A@mail.gmail.com>
-Message-ID: <20111129151607.GE30966@redhat.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Tue, 29 Nov 2011 07:15:00 -0800
+Subject: [PATCH v8 00/24] gpio/omap: driver cleanup and fixes
+In-Reply-To: <CAC83Zv++T96AZRHbEiS_UaGp=Dmu+zQ8se97oaBLhg_+eW-smA@mail.gmail.com>
+ (Tarun Kanti DebBarma's message of "Fri, 25 Nov 2011 16:00:27 +0530")
+References: <1317803593-12259-1-git-send-email-tarun.kanti@ti.com>
+ <87obwsg9ua.fsf@ti.com>
+ <CAC83ZvKd3iBrQS5wESnAok8W_a4z-3jZYz17wy376sZJw6sCWg@mail.gmail.com>
+ <CAC83Zv++T96AZRHbEiS_UaGp=Dmu+zQ8se97oaBLhg_+eW-smA@mail.gmail.com>
+Message-ID: <87y5uz6juz.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 29, 2011 at 03:57:19PM +0200, Ohad Ben-Cohen wrote:
-> On Tue, Nov 29, 2011 at 3:11 PM, Michael S. Tsirkin <mst@redhat.com> wrote:
-> > On Tue, Nov 29, 2011 at 02:31:26PM +0200, Ohad Ben-Cohen wrote:
-> >> Virtio is using memory barriers to control the ordering of
-> >> references to the vrings on SMP systems. When the guest is compiled
-> >> with SMP support, virtio is only using SMP barriers in order to
-> >> avoid incurring the overhead involved with mandatory barriers.
-> >>
-> >> Lately, though, virtio is being increasingly used with inter-processor
-> >> communication scenarios too, which involve running two (separate)
-> >> instances of operating systems on two (separate) processors, each of
-> >> which might either be UP or SMP.
-> >
-> > Is that using virtio-mmio?
-> 
-> No, I'm using this:
-> 
-> https://lkml.org/lkml/2011/10/25/139
+"DebBarma, Tarun Kanti" <tarun.kanti@ti.com> writes:
 
-This mentions iommu - is there a need to use dma api to let
-the firmware acess the rings? Or does it have access to all
-of memory?
+> On Fri, Nov 4, 2011 at 2:57 PM, DebBarma, Tarun Kanti
+> <tarun.kanti@ti.com> wrote:
+>> On Fri, Nov 4, 2011 at 3:14 AM, Kevin Hilman <khilman@ti.com> wrote:
+>>> Tarun Kanti DebBarma <tarun.kanti@ti.com> writes:
+>>>
+>>>> This series is continuation of cleanup of OMAP GPIO driver and fixes.
+>>>
+>>> Using this series on 3630/Zoom3, UART wakeups no longer work from
+>>> suspend. ?That suggests that GPIO wakeups from retention/off are not
+>>> working.
+>>>
+>>> Please test GPIO wakeups from retention/off. ?One way is to use Zoom3
+>>> UART wakeup from suspend using by enabling UART wakeups and suspending:
+>>>
+>>> ? # echo enabled > /sys/devices/platform/serial8250.0/tty/ttyS0/power/wakeup
+>>> ? # echo mem > /sys/power/state
+>> Ok, I will test and make necessary fix.
+> I have done retention test of the latest series on Zoom3. When I try
+> running off mode
+> test it says support is not present because of an errata. 
 
-> > Sorry, could you pls explain what are 'two external processors'?
-> > I think I know that if two x86 CPUs in an SMP system run kernels built
-> > in an SMP configuration, smp_*mb barriers are enough.
-> 
-> Sure:
-> 
-> My setup is not SMP-based; it's two separate processors running in AMP
-> configuration. The processors have completely different architectures,
-> are not cache coherent, and only simply share some memory, which is
-> used for communications using virtio as the shared memory "wire"
-> protocol (i.e. we're not even doing virtualization: we have Linux on
-> one processor, and some RTOS on another processor, and they use virtio
-> to send and receive buffers).
+Specifically, CORE off is not supported on that rev of 36xx due to an
+errata.  Can you try on a newer 36xx?
 
-I'd like to make sure I understand the memory model some more.
-Is there cache snooping? If yes access from an external device
-typically works mostly in the same way as smp ...
+> Here is the overall log:
 
+The rest of the dump seems to point to an MMC driver problem.  Please
+take this with the MMC driver folks.
 
-> So it's not SMP effects we're controlling; we're pretty much doing
-> MMIO and must use mandatory barriers
-
-So you put virtio rings in MMIO memory?
-
-> (otherwise we see breakage).
-
-Could you please give a couple of examples of breakage?
-
--- 
-MST
+Kevin
