@@ -1,40 +1,60 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 29 Nov 2011 17:46:04 +0000
-Subject: [PATCH 3/3] ARM: support syscall tracing
-In-Reply-To: <1322584095-30439-4-git-send-email-stevenrwalter@gmail.com>
-References: <1322584095-30439-1-git-send-email-stevenrwalter@gmail.com>
- <1322584095-30439-4-git-send-email-stevenrwalter@gmail.com>
-Message-ID: <20111129174604.GL9581@n2100.arm.linux.org.uk>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Tue, 29 Nov 2011 18:47:48 +0100
+Subject: [PATCH V2] arm/tegra: convert tegra20 to GIC devicetree binding
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF174FDAFADC@HQMAIL01.nvidia.com>
+References: <1322528052-6516-1-git-send-email-swarren@nvidia.com>
+ <4ED4D78A.6000400@ti.com>
+ <74CDBE0F657A3D45AFBB94109FB122FF174FDAFADC@HQMAIL01.nvidia.com>
+Message-ID: <4ED51AC4.50303@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 29, 2011 at 11:28:15AM -0500, Steven Walter wrote:
-> diff --git a/arch/arm/include/asm/unistd.h b/arch/arm/include/asm/unistd.h
-> index 2c04ed5..1f23923 100644
-> --- a/arch/arm/include/asm/unistd.h
-> +++ b/arch/arm/include/asm/unistd.h
-> @@ -403,6 +403,8 @@
->  #define __NR_sendmmsg			(__NR_SYSCALL_BASE+374)
->  #define __NR_setns			(__NR_SYSCALL_BASE+375)
->  
-> +#define NR_syscalls (__NR_setns+1)
+On 11/29/2011 6:13 PM, Stephen Warren wrote:
+> Cousson, Benoit wrote at Tuesday, November 29, 2011 6:01 AM:
+>> Hi Stephen&  Peter,
+>>
+>> On 11/29/2011 1:54 AM, Stephen Warren wrote:
+>>> From: pdeschrijver at nvidia.com<pdeschrijver@nvidia.com>
+>>
+>> [...]
+>>
+>>> @@ -125,6 +131,14 @@ void __init tegra_init_irq(void)
+>>>    	gic_arch_extn.irq_unmask = tegra_unmask;
+>>>    	gic_arch_extn.irq_retrigger = tegra_retrigger;
+>>>
+>>> -	gic_init(0, 29, IO_ADDRESS(TEGRA_ARM_INT_DIST_BASE),
+>>> -		 IO_ADDRESS(TEGRA_ARM_PERIF_BASE + 0x100));
+>>> +#ifdef CONFIG_OF
+>>> +	/* Check if there is a devicetree present as of_irq_init doesn't
+>>> +	 * indicate if an interrupt controller node was found.
+>>> +	 */
+>>> +	if (of_find_node_by_path("/"))
+>>> +		of_irq_init(tegra_irq_match);
+>>> +	else
+>>> +#endif
+>>
+>> For the same kind of need, I found the following API:
+>>
+>> of_have_populated_dt()
+>>
+>> Moreover, it returns false if !CONFIG_OF, so it will avoid the #ifdef.
+>
+> That sounds like a great idea. Unfortunately, of_irq_init() is a DT-only
+> function. Exynos has the following in mainline to solve this:
+>
+>          if (!of_have_populated_dt())
+>                  gic_init_bases(...);
+> #ifdef CONFIG_OF
+>          else
+>                  of_irq_init(exynos4_dt_irq_match);
+> #endif
+>
+> Perhaps we should add a dummy of_irq_init() too, so that we can remove
+> this ifdef.
 
-NAK.  This is a recipe for it being forgotten to be updated, and for it
-to become unsynchronized with what is the _real_ number of syscalls,
-which is what is in the assembly code.
+Yes, indeed, I think that's much better. Most of_XXX APIs do have a 
+dummy version, but for some reason some of them do not.
+That one clearly deserve a dummy version.
 
-You're also exporting it to userspace.  It has no business being in
-userspace.
-
-Lastly, it's wrong.  __NR_SYSCALL_BASE may be 0 or 0x90000 depending on
-the ABI selected.  If it's 0x90000, will tracepoint stuff work or will it
-explode because of a stupidly large table somewhere?
-
-kernel/trace/trace_syscalls.c:      for (i = 0; i < NR_syscalls; i++) {
-
-and
-
-kernel/trace/trace_syscalls.c:static DECLARE_BITMAP(enabled_perf_enter_syscalls, NR_syscalls);
-kernel/trace/trace_syscalls.c:static DECLARE_BITMAP(enabled_perf_exit_syscalls,NR_syscalls);
-
-all point@this being very wrong.
+Regards,
+Benoit
