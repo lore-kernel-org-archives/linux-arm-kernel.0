@@ -1,61 +1,44 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 29 Nov 2011 21:55:22 +0000
-Subject: [PATCH 3/3] ARM: support syscall tracing
-In-Reply-To: <CAK8d-a+o6A+E537o3i4JdzsXei2fbvqNcCLx_U8WyEMK-vL8Fg@mail.gmail.com>
-References: <1322584095-30439-1-git-send-email-stevenrwalter@gmail.com>
- <1322584095-30439-4-git-send-email-stevenrwalter@gmail.com>
- <20111129174604.GL9581@n2100.arm.linux.org.uk>
- <CAK8d-a+o6A+E537o3i4JdzsXei2fbvqNcCLx_U8WyEMK-vL8Fg@mail.gmail.com>
-Message-ID: <20111129215522.GN9581@n2100.arm.linux.org.uk>
+Date: Tue, 29 Nov 2011 22:00:48 +0000
+Subject: [PATCH] ARM: errata: Remove SMP dependency for erratum 751472
+In-Reply-To: <20111129180618.GB2872@localhost.localdomain>
+References: <1322586763-12791-1-git-send-email-dave.martin@linaro.org>
+ <20111129173537.GJ9581@n2100.arm.linux.org.uk>
+ <20111129180618.GB2872@localhost.localdomain>
+Message-ID: <20111129220048.GO9581@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 29, 2011 at 01:12:50PM -0500, Steven Walter wrote:
-> Yes, I like how the assembler counts the number of syscalls for you.
-> However, every other architecture uses either a bare number or
-> __NR_last_syscall+1 for defining NR_syscalls.
-> 
-> > You're also exporting it to userspace. ?It has no business being in
-> > userspace.
-> 
-> That was unintentional, I'll fix.
-> 
-> > Lastly, it's wrong. ?__NR_SYSCALL_BASE may be 0 or 0x90000 depending on
-> > the ABI selected. ?If it's 0x90000, will tracepoint stuff work or will it
-> > explode because of a stupidly large table somewhere?
-> 
-> Right you are.  Didn't consider that.  Does that mean that
-> syscall_get_nr() should return the offset from __NR_SYSCALL_BASE, so
-> that it will be strictly less than NR_syscalls?
+On Tue, Nov 29, 2011 at 06:06:18PM +0000, Dave Martin wrote:
+> One thing which strikes me about ALT_UP_B() is that the likely use is
+> to skip over the SMP case code (which may consist of many instructions).
+> This means that if the SMP code is not there at all (as in a UP kernel)
+> no branch is necessary.
 
-strace sees the 0x90000 offset today, so tracehook is going to be
-compatible with our existing APIs, tracehook needs to keep seeing
-that offset.
+It's there to solve the case in the IRQ entry code, where it's use is
+already bounded by a #ifdef CONFIG_SMP.
 
-However, I suspect that's incompatible with tracehook as it stands
-today - especially when we might be running a kernel with OABI compat
-support enabled (which means you'll get 0x90000+ syscalls for OABI and
-0+ syscalls for EABI.)
+> An alternative would be for the ALT_UP_B() actually to disappear in a
+> UP kernel.  So far as I can see, such an implementation would be
+> compatible with all existing uses of this macro.  What do you think?
 
-> > kernel/trace/trace_syscalls.c: ? ? ?for (i = 0; i < NR_syscalls; i++) {
-> >
-> > and
-> >
-> > kernel/trace/trace_syscalls.c:static DECLARE_BITMAP(enabled_perf_enter_syscalls, NR_syscalls);
-> > kernel/trace/trace_syscalls.c:static DECLARE_BITMAP(enabled_perf_exit_syscalls,NR_syscalls);
-> >
-> > all point at this being very wrong.
-> 
-> Initially I was going to assign the assembler version of NR_syscalls
-> to a symbol which could be referenced from C.  However, putting the C
-> declaration for the variable in unistd.h made the assembler unhappy.
-> Is it kosher to have C stuff in unistd.h?  Since there was no prior
-> example of it, I assumed not.  However, perhaps I could just hide it
-> from the assembler with some kind of #ifdef?
+That sounds dangerous, adding unexpected behaviour to the code.  For
+example:
 
-#ifndef __ASSEMBLY__
+#ifdef CONFIG_SMP
+        /*
+         * XXX
+         *
+         * this macro assumes that irqstat (r2) and base (r6) are
+         * preserved from get_irqnr_and_base above
+         */
+        ALT_SMP(test_for_ipi r0, r2, r6, lr)
+        ALT_UP_B(9997f)
+        movne   r1, sp
+        adrne   lr, BSYM(1b)
+        bne     do_IPI
+#endif
 
-but, as I say, the number of syscalls which the kernel implements is
-defined by the size of the table in calls.S, not by the list in
-unistd.h.  We may allocate a number and put it in unistd.h to reserve
-it before we have a final implementation.
+If the surrounding ifdef goes away, and the ALT_UP_B() ends up being
+optimized to nothing, then we no longer skip over this code.  So no,
+it's not compatible with existing uses.
