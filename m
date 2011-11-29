@@ -1,70 +1,29 @@
-From: robin@protonic.nl (Robin van der Gracht)
-Date: Tue, 29 Nov 2011 12:09:03 +0100
-Subject: [PATCH V3] mfd: Fixed unconditional reset of the ADC reading enable
- bits
-Message-ID: <1322564943-17872-1-git-send-email-robin@protonic.nl>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 29 Nov 2011 09:12:41 -0200
+Subject: 2.6.38 port not booting on i.MX53 SoM
+In-Reply-To: <CAN=k24=fjYjz9ygUbwDFvCg6jNAvt4wPUZOufdytpDEx1bLqog@mail.gmail.com>
+References: <CAN=k24ncTxDMXZzO1ef_+ETFiiqJZxtYSEOAKz3DiwCO8UKwcw@mail.gmail.com>
+ <20111128100755.GI17668@pengutronix.de>
+ <CAN=k24=fjYjz9ygUbwDFvCg6jNAvt4wPUZOufdytpDEx1bLqog@mail.gmail.com>
+Message-ID: <CAOMZO5CSBds93wFiyTeTcbEZa_PzVuNtFfvcziRsh7p-Mu9=dQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the ADC is being prepared for a single or multiple channel reading,
-the adc0 register is reconfigured without taking the lithium cell, charge
-current and battery current reading enable bits into account. Which results
-in clearing the bits.
+2011/11/29 Wayne Tams <wayne.tams@gmail.com>:
 
-Signed-off-by: Robin van der Gracht <robin@protonic.nl>
----
+> I have followed your instructions and double checked serial bootargs
+> by loading the 2.6.35 kernel; 2.6.35 loads ok displaying printks as it
+> executes.
+>
+> However using the new 2.6.38 kernel, there are not any additional
+> messages after enabling the debug settings you mentioned.
 
-V3: Removed the added tabular at the definition of MC13XXX_ADC0,
-so the offset equals the idention used in 'drivers/mfd/mc13xxx-core.c'
+As Uwe explained this list is about mainline kernel.
 
+I have a suggestion for you though: if you use FSL 2.6.38 you should
+update your FSL U-boot also because there were some UART clock changes
+from 2.6.35 to 2.6.38. Or use the mainline kernel instead ;-)
 
- drivers/mfd/mc13xxx-core.c  |    4 ++--
- include/linux/mfd/mc13xxx.h |    8 ++++++++
- 2 files changed, 10 insertions(+), 2 deletions(-)
+Regards,
 
-diff --git a/drivers/mfd/mc13xxx-core.c b/drivers/mfd/mc13xxx-core.c
-index e9619ac..5315999 100644
---- a/drivers/mfd/mc13xxx-core.c
-+++ b/drivers/mfd/mc13xxx-core.c
-@@ -615,13 +615,13 @@ int mc13xxx_adc_do_conversion(struct mc13xxx *mc13xxx, unsigned int mode,
- 		break;
- 
- 	case MC13XXX_ADC_MODE_SINGLE_CHAN:
--		adc0 |= old_adc0 & MC13XXX_ADC0_TSMOD_MASK;
-+		adc0 |= old_adc0 & MC13XXX_ADC0_CONFIG_MASK;
- 		adc1 |= (channel & 0x7) << MC13XXX_ADC1_CHAN0_SHIFT;
- 		adc1 |= MC13XXX_ADC1_RAND;
- 		break;
- 
- 	case MC13XXX_ADC_MODE_MULT_CHAN:
--		adc0 |= old_adc0 & MC13XXX_ADC0_TSMOD_MASK;
-+		adc0 |= old_adc0 & MC13XXX_ADC0_CONFIG_MASK;
- 		adc1 |= 4 << MC13XXX_ADC1_CHAN1_SHIFT;
- 		break;
- 
-diff --git a/include/linux/mfd/mc13xxx.h b/include/linux/mfd/mc13xxx.h
-index 3816c2f..261fc11 100644
---- a/include/linux/mfd/mc13xxx.h
-+++ b/include/linux/mfd/mc13xxx.h
-@@ -173,6 +173,9 @@ struct mc13xxx_platform_data {
- #define MC13XXX_ADC_MODE_MULT_CHAN	3
- 
- #define MC13XXX_ADC0		43
-+#define MC13XXX_ADC0_LICELLCON		(1 << 0)
-+#define MC13XXX_ADC0_CHRGICON		(1 << 1)
-+#define MC13XXX_ADC0_BATICON		(1 << 2)
- #define MC13XXX_ADC0_ADREFEN		(1 << 10)
- #define MC13XXX_ADC0_TSMOD0		(1 << 12)
- #define MC13XXX_ADC0_TSMOD1		(1 << 13)
-@@ -184,4 +187,9 @@ struct mc13xxx_platform_data {
- 					MC13XXX_ADC0_TSMOD1 | \
- 					MC13XXX_ADC0_TSMOD2)
- 
-+#define MC13XXX_ADC0_CONFIG_MASK	(MC13XXX_ADC0_TSMOD_MASK | \
-+					MC13XXX_ADC0_LICELLCON | \
-+					MC13XXX_ADC0_CHRGICON | \
-+					MC13XXX_ADC0_BATICON)
-+
- #endif /* ifndef __LINUX_MFD_MC13XXX_H */
--- 
-1.7.4.1
+Fabio Estevam
