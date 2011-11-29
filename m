@@ -1,75 +1,61 @@
-From: richard.zhao@linaro.org (Richard Zhao)
-Date: Tue, 29 Nov 2011 14:00:53 +0800
-Subject: [RFC V1 7/8] ARM i.MX: prepare common clk support
-In-Reply-To: <CAPtuhTgSB8Af4Xtux93-VLXSrK5KkzFOez9V5tcmbkKwbZ_8Rw@mail.gmail.com>
-References: <1322046755-13511-1-git-send-email-richard.zhao@linaro.org>
- <1322046755-13511-8-git-send-email-richard.zhao@linaro.org>
- <CAPtuhTgSB8Af4Xtux93-VLXSrK5KkzFOez9V5tcmbkKwbZ_8Rw@mail.gmail.com>
-Message-ID: <20111129060052.GC19236@b20223-02.ap.freescale.net>
+From: rachna@ti.com (Patil, Rachna)
+Date: Tue, 29 Nov 2011 11:20:39 +0530
+Subject: [PATCH] ARM: davinci: fix mach/gpio.h includes
+Message-ID: <1322545839-30405-1-git-send-email-rachna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 28, 2011 at 06:36:33PM -0800, Mike Turquette wrote:
-> On Wed, Nov 23, 2011 at 3:12 AM, Richard Zhao <richard.zhao@linaro.org> wrote:
-> > +#define DEFINE_CLK_DIVIDER(_name, _parent, _flags, _reg, _shift, _width) \
-> > + ? ? ? struct clk_divider _name = { \
-> > + ? ? ? ? ? ? ? .clk = { \
-> > + ? ? ? ? ? ? ? ? ? ? ? .name = #_name, \
-> > + ? ? ? ? ? ? ? ? ? ? ? .ops = &clk_divider_ops, \
-> > + ? ? ? ? ? ? ? ? ? ? ? .parent = _parent, \
-> > + ? ? ? ? ? ? ? ? ? ? ? .flags = _flags, \
-> > + ? ? ? ? ? ? ? }, \
-> > + ? ? ? ? ? ? ? .reg = (_reg), \
-> > + ? ? ? ? ? ? ? .shift = (_shift), \
-> > + ? ? ? ? ? ? ? .width = (_width), \
-> > + ? ? ? ? ? ? ? .lock = &imx_ccm_lock, \
-> > + ? ? ? }
-> > +
-> > +#define DEFINE_CLK_MUX(_name, _reg, _shift, _width, _clks) \
-> > + ? ? ? struct clk_mux _name = { \
-> > + ? ? ? ? ? ? ? .clk = { \
-> > + ? ? ? ? ? ? ? ? ? ? ? .name = #_name, \
-> > + ? ? ? ? ? ? ? ? ? ? ? .ops = &clk_mux_ops, \
-> > + ? ? ? ? ? ? ? }, \
-> > + ? ? ? ? ? ? ? .reg = (_reg), \
-> > + ? ? ? ? ? ? ? .shift = (_shift), \
-> > + ? ? ? ? ? ? ? .width = (_width), \
-> > + ? ? ? ? ? ? ? .clks = (_clks), \
-> > + ? ? ? ? ? ? ? .num_clks = ARRAY_SIZE(_clks), \
-> > + ? ? ? ? ? ? ? .lock = &imx_ccm_lock, \
-> > + ? ? ? }
-> > +
-> > +#define DEFINE_CLK_FIXED(_name, _rate) \
-> > + ? ? ? struct clk_hw_fixed _name = { \
-> > + ? ? ? ? ? ? ? .clk = { \
-> > + ? ? ? ? ? ? ? ? ? ? ? .name = #_name, \
-> > + ? ? ? ? ? ? ? ? ? ? ? .ops = &clk_hw_fixed_ops, \
-> > + ? ? ? ? ? ? ? }, \
-> > + ? ? ? ? ? ? ? .fixed_rate = (_rate), \
-> > + ? ? ? }
-> > +
-> > ?#endif /* CONFIG_GENERIC_CLK */
-> > ?#endif /* __ASSEMBLY__ */
-> > ?#endif /* __ASM_ARCH_MXC_CLOCK_H__ */
-> > --
-> > 1.7.5.4
-> >
-> >
-> >
-> 
-> Can you move these into clk.h/approriate header?  Just add _lock to it
-> and it'll work fine for your code.
-Yes, I can add _lock and share the macros in common header. But I still
-need a wraper for imx to eliminate _lock, right?
+This patch addresses Russell's comments at [1] by replacing the
+mach/gpio.h includes to linux/gpio.h for TI's DA830/OMAP-L137/AM17x and
+DA850/OMAP-L138/AM18x platforms.
 
-Thanks for review
-Richard
-> 
-> Thanks,
-> Mike
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+[1] http://permalink.gmane.org/gmane.linux.ports.arm.kernel/126553
+
+Signed-off-by: Patil, Rachna <rachna@ti.com>
+---
+ arch/arm/mach-davinci/da830.c |    2 +-
+ arch/arm/mach-davinci/da850.c |    2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/mach-davinci/da830.c b/arch/arm/mach-davinci/da830.c
+index 2ed2f82..ba15acf 100644
+--- a/arch/arm/mach-davinci/da830.c
++++ b/arch/arm/mach-davinci/da830.c
+@@ -10,6 +10,7 @@
+  */
+ #include <linux/init.h>
+ #include <linux/clk.h>
++#include <linux/gpio.h>
+ 
+ #include <asm/mach/map.h>
+ 
+@@ -19,7 +20,6 @@
+ #include <mach/common.h>
+ #include <mach/time.h>
+ #include <mach/da8xx.h>
+-#include <mach/gpio.h>
+ 
+ #include "clock.h"
+ #include "mux.h"
+diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
+index 0cf0d88..5d5dd6b 100644
+--- a/arch/arm/mach-davinci/da850.c
++++ b/arch/arm/mach-davinci/da850.c
+@@ -15,6 +15,7 @@
+ #include <linux/clk.h>
+ #include <linux/platform_device.h>
+ #include <linux/cpufreq.h>
++#include <linux/gpio.h>
+ #include <linux/regulator/consumer.h>
+ 
+ #include <asm/mach/map.h>
+@@ -27,7 +28,6 @@
+ #include <mach/da8xx.h>
+ #include <mach/cpufreq.h>
+ #include <mach/pm.h>
+-#include <mach/gpio.h>
+ 
+ #include "clock.h"
+ #include "mux.h"
+-- 
+1.7.1
