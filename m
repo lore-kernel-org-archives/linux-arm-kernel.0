@@ -1,30 +1,100 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 29 Nov 2011 09:15:52 +0000
-Subject: [PATCH 0/3] Change ARCH_NR_GPIO into a Kconfig variable
-In-Reply-To: <CACRpkdY-YL0RSY4+nL36sM9WwX+VbMkJP54djrCwYCQmw9AFEw@mail.gmail.com>
-References: <1320339647-30255-1-git-send-email-pdeschrijver@nvidia.com>
- <20111129064630.GW19069@tbergstrom-lnx.Nvidia.com>
- <CACRpkdY-YL0RSY4+nL36sM9WwX+VbMkJP54djrCwYCQmw9AFEw@mail.gmail.com>
-Message-ID: <20111129091552.GI9581@n2100.arm.linux.org.uk>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Tue, 29 Nov 2011 11:37:48 +0200
+Subject: [PATCH] ARM: OMAP3: hsmmc: fix MMC 2 setup for AM35x
+Message-ID: <1322559468-5883-1-git-send-email-grinberg@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 29, 2011 at 09:40:27AM +0100, Linus Walleij wrote:
-> On Tue, Nov 29, 2011 at 7:46 AM, Peter De Schrijver
-> <pdeschrijver@nvidia.com> wrote:
-> > On Thu, Nov 03, 2011 at 06:00:44PM +0100, Peter De Schrijver wrote:
-> >> This patchset converts ARCH_NR_GPIO to a Kconfig variable as suggested by
-> >> Russel King. It also converts some platforms to the new model.
-> >>
-> >> Peter De Schrijver (3):
-> >> ? ARM: ARCH_NR_GPIO: Make ARCH_NR_GPIO a Kconfig variable
-> >> ? ARM: mach-shmobile: Use CONFIG_ARCH_NR_GPIO
-> >> ? ARM: mach-ux500 Use CONFIG_ARCH_NR_GPIO
-> >
-> > Ping? What should we do with this?
-> 
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> 
-> Put it into Russell's patch tracker.
+AM35x MMC 2 controller has internal clock loopback setting which cannot
+be utilized without this patch and thus SDIO devices connected to this
+controller and depend on this setting will fail to initialize.
 
-Or we could wait for Grant to reappear and take it.
+Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
+---
+ arch/arm/mach-omap2/hsmmc.c |   42 ++++++++++++++++++++++++++++++------------
+ 1 files changed, 30 insertions(+), 12 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/hsmmc.c b/arch/arm/mach-omap2/hsmmc.c
+index ecde558..c80859e 100644
+--- a/arch/arm/mach-omap2/hsmmc.c
++++ b/arch/arm/mach-omap2/hsmmc.c
+@@ -171,6 +171,17 @@ static void omap4_hsmmc1_after_set_reg(struct device *dev, int slot,
+ 	}
+ }
+ 
++static void hsmmc2_select_input_clk_src(struct omap_mmc_platform_data *mmc)
++{
++	u32 reg;
++
++	if (mmc->slots[0].internal_clock) {
++		reg = omap_ctrl_readl(control_devconf1_offset);
++		reg |= OMAP2_MMCSDIO2ADPCLKISEL;
++		omap_ctrl_writel(reg, control_devconf1_offset);
++	}
++}
++
+ static void hsmmc23_before_set_reg(struct device *dev, int slot,
+ 				   int power_on, int vdd)
+ {
+@@ -179,16 +190,19 @@ static void hsmmc23_before_set_reg(struct device *dev, int slot,
+ 	if (mmc->slots[0].remux)
+ 		mmc->slots[0].remux(dev, slot, power_on);
+ 
+-	if (power_on) {
+-		/* Only MMC2 supports a CLKIN */
+-		if (mmc->slots[0].internal_clock) {
+-			u32 reg;
++	if (power_on)
++		hsmmc2_select_input_clk_src(mmc);
++}
+ 
+-			reg = omap_ctrl_readl(control_devconf1_offset);
+-			reg |= OMAP2_MMCSDIO2ADPCLKISEL;
+-			omap_ctrl_writel(reg, control_devconf1_offset);
+-		}
+-	}
++static int am35x_hsmmc2_set_power(struct device *dev, int slot,
++				  int power_on, int vdd)
++{
++	struct omap_mmc_platform_data *mmc = dev->platform_data;
++
++	if (power_on)
++		hsmmc2_select_input_clk_src(mmc);
++
++	return 0;
+ }
+ 
+ static int nop_mmc_set_power(struct device *dev, int slot, int power_on,
+@@ -346,9 +360,7 @@ static int __init omap_hsmmc_pdata_init(struct omap2_hsmmc_info *c,
+ 	else
+ 		mmc->slots[0].ocr_mask = c->ocr_mask;
+ 
+-	if (cpu_is_omap3517() || cpu_is_omap3505())
+-		mmc->slots[0].set_power = nop_mmc_set_power;
+-	else
++	if (!cpu_is_omap3517() && !cpu_is_omap3505())
+ 		mmc->slots[0].features |= HSMMC_HAS_PBIAS;
+ 
+ 	if (cpu_is_omap44xx() && (omap_rev() > OMAP4430_REV_ES1_0))
+@@ -371,6 +383,9 @@ static int __init omap_hsmmc_pdata_init(struct omap2_hsmmc_info *c,
+ 			}
+ 		}
+ 
++		if (cpu_is_omap3517() || cpu_is_omap3505())
++			mmc->slots[0].set_power = nop_mmc_set_power;
++
+ 		/* OMAP3630 HSMMC1 supports only 4-bit */
+ 		if (cpu_is_omap3630() &&
+ 				(c->caps & MMC_CAP_8_BIT_DATA)) {
+@@ -380,6 +395,9 @@ static int __init omap_hsmmc_pdata_init(struct omap2_hsmmc_info *c,
+ 		}
+ 		break;
+ 	case 2:
++		if (cpu_is_omap3517() || cpu_is_omap3505())
++			mmc->slots[0].set_power = am35x_hsmmc2_set_power;
++
+ 		if (c->ext_clock)
+ 			c->transceiver = 1;
+ 		if (c->transceiver && (c->caps & MMC_CAP_8_BIT_DATA)) {
+-- 
+1.7.3.4
