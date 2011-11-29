@@ -1,59 +1,48 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 29 Nov 2011 19:07:26 +0000
-Subject: [PATCH 0/6] AT91 Reset cleanup
-In-Reply-To: <201111291946.13719.marek.vasut@gmail.com>
-References: <20111129173514.GW15008@game.jcrosoft.org>
- <20111129174206.GK9581@n2100.arm.linux.org.uk>
- <201111291946.13719.marek.vasut@gmail.com>
-Message-ID: <20111129190726.GM9581@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 29 Nov 2011 19:09:43 +0000
+Subject: [PATCH] mx28: added LRADC and touchscreen support
+In-Reply-To: <4ED21E4E.5090004@cam.ac.uk>
+References: <1322135394-4097-1-git-send-email-rusko.peter@prolan.hu>
+ <201111251602.35227.arnd@arndb.de> <4ED21E4E.5090004@cam.ac.uk>
+Message-ID: <201111291909.43833.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 29, 2011 at 07:46:13PM +0100, Marek Vasut wrote:
-> > On Tue, Nov 29, 2011 at 06:35:14PM +0100, Jean-Christophe PLAGNIOL-VILLARD 
-> wrote:
-> > > Hi,
-> > > 
-> > > 	the following patch series will merge the ddr controler header file
-> > > 	for sam9 and cap9 and cleanup the reset by
-> > > 	
-> > > 	swtich to arm_pm_restart
-> > > 	fix the sam9g45 and cap9 reset
-> > > 	make rstc soc independent
-> > > 
-> > > The following changes since commit 15327570807209b5c088382af23ed3fc47558d87:
-> > >   ARM: at91/gpio: fix display of number of irq setuped (2011-11-28
-> > >   22:53:09 +0800)
-> > > 
-> > > are available in the git repository at:
-> > >   git://github.com/at91linux/linux-at91.git for-arnd-3.3-reset
-> > > 
-> > > Jean-Christophe PLAGNIOL-VILLARD (6):
-> > >       ARM: at91: fix cap9 ddrsdr register
-> > >       ARM: at91: merge at91cap9_ddrsdr.h in at91sam9_ddrsdr.h
-> > >       ARM: at91: introduce AT91_SAM9_ALT_RESET to select the at91sam9
-> > >       alternative reset ARM: restart: at91: use new restart hook
-> > 
-> > Well, it looks like you've taken my work here and committed it as yourself.
-> > That's plagerism.  Don't do it - and fix it before someone pulls your crap.
+On Sunday 27 November 2011, Jonathan Cameron wrote:
+
+> > As indicated by Shawn, adding a new driver specific kernel-level ADC
+> > interface is not a good idea. IIRC, the result of the last discussion
+> > was that all ADC drivers should be part of IIO and you should use
+> > the IIO in-kernel interfaces. Not sure what the state of that code
+> > is, but if it's not in mainline yet, you should work with Jonathan
+> > to make sure it gets there. Having more users for that code can
+> > only speed up the process, and I'm going to refuse another ADC driver
+> > in drivers/misc or arch/arm/mach-*/.
 > 
-> Hey,
+> Quick summary of IIO status.  Nothing is in mainline yet.  Intent is to
+> get the first set of core code (including in kernel pull interfaces)
+> into linux-next fairly shortly (these have had enough postive feedback
+> now I think).  Doing push interfaces (as I think we would need here) is
+> possible with existing patches on top of the stuff in the iio staging
+> tree but there are some 'interesting' cases where both push and pull
+> interfaces exist that still need addressing.
 > 
-> looking at the patch in question, it looks so trivial the clash is just 
-> possible. Why not just put two SoB lines there and maybe From: and be done with 
-> it?
+> Also, note the push interface stuff (e.g. interrupt driven) requires a
+> lot more of the IIO infrastructure to be in place (buffered support and
+> the demux unit) so may still be some time.  Personally my time is
+> currently very restricted so all the help anyone can offer is most welcome!
 
-Look closer.  The patch which was posted has my sign-off on it, it says
-it's from me, but according to the commit summary, it's author is Jean-
-Christophe.
+Ok, thanks for the summary!
 
-So, it _is_ my patch which Jean has decided to _recommit_ into his tree
-taking it from my tree _without_ _asking_ _me_ whether it was either a
-good idea to do that, whether it was a finished patch, etc.
+Peter, I guess what this means for you is that it's best to first
+get your code working with the IIO/ADC stuff that is in staging,
+and get the touchscreen driver ready for merging, on top of that.
 
-So all in all I'm pretty disgusted with Jean-Christophe over this.
+Ideally, you would also help out a bit on getting the IIO parts
+you need graduated from staging. Given Jonathan's explanation,
+I think my initial reaction was valid: we shouldn't take the
+ADC driver outside of IIO, because that ends up being more painful
+than getting the driver ready for inclusion now, and then rewriting
+it shortly after.
 
-I would like to see my patch updated at some point not to use
-arm_pm_restart, but to use the .restart method directly, like I've been
-doing for everyone else.  In other words, this patch is NOT STABLE at
-the present time.
+	Arnd
