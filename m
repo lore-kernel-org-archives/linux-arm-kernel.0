@@ -1,39 +1,23 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Tue, 29 Nov 2011 07:17:52 -0800
-Subject: [PATCH v8 00/24] gpio/omap: driver cleanup and fixes
-In-Reply-To: <CAC83ZvKJRxGK-j16Yj9A60rSPNNV-4MMxUd9f7w7n-KJr2R+VQ@mail.gmail.com>
- (Tarun Kanti DebBarma's message of "Mon, 28 Nov 2011 13:53:11 +0530")
-References: <1317803593-12259-1-git-send-email-tarun.kanti@ti.com>
- <87obwsg9ua.fsf@ti.com>
- <CAC83ZvKJRxGK-j16Yj9A60rSPNNV-4MMxUd9f7w7n-KJr2R+VQ@mail.gmail.com>
-Message-ID: <87ty5n6jq7.fsf@ti.com>
+From: mst@redhat.com (Michael S. Tsirkin)
+Date: Tue, 29 Nov 2011 17:19:59 +0200
+Subject: [RFC] virtio: use mandatory barriers for remote processor vdevs
+In-Reply-To: <CAK=WgbZoGYVyKt=XXvnPVdh0koSBJC0zcgkLaYRkmjwBLOFA-A@mail.gmail.com>
+References: <1322569886-13055-1-git-send-email-ohad@wizery.com>
+ <20111129131110.GC19157@redhat.com>
+ <CAK=WgbZoGYVyKt=XXvnPVdh0koSBJC0zcgkLaYRkmjwBLOFA-A@mail.gmail.com>
+Message-ID: <20111129151958.GA31789@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"DebBarma, Tarun Kanti" <tarun.kanti@ti.com> writes:
+On Tue, Nov 29, 2011 at 03:57:19PM +0200, Ohad Ben-Cohen wrote:
+> > Is an extra branch faster or slower than reverting d57ed95?
+> 
+> Sorry, unfortunately I have no way to measure this, as I don't have
+> any virtualization/x86 setup. I'm developing on ARM SoCs, where
+> virtualization hardware is coming, but not here yet.
 
-> On Fri, Nov 4, 2011 at 3:14 AM, Kevin Hilman <khilman@ti.com> wrote:
->> Tarun Kanti DebBarma <tarun.kanti@ti.com> writes:
->>
->>> This series is continuation of cleanup of OMAP GPIO driver and fixes.
->>
->> Using this series on 3630/Zoom3, UART wakeups no longer work from
->> suspend. ?That suggests that GPIO wakeups from retention/off are not
->> working.
->>
->> Please test GPIO wakeups from retention/off. ?One way is to use Zoom3
->> UART wakeup from suspend using by enabling UART wakeups and suspending:
->>
->> ? # echo enabled > /sys/devices/platform/serial8250.0/tty/ttyS0/power/wakeup
->> ? # echo mem > /sys/power/state
->>
->> Also, this series now has a handful of minor conflicts with stuff that
->> is queued or merged for v3.2. ?Please rebase onto
->>
->> ? git://github.com/khilman/linux-omap-pm.git for_3.3/gpio-base
-> I am not seeing for_3.3/gpio-base branch anymore.
-> Is there an alternate branch where I can post the patch?
+You can try using the micro-benchmark in tools/virtio/.
+That does not need virtualization.
 
-v3.2-rc3
-
-Kevin
+-- 
+MST
