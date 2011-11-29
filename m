@@ -1,40 +1,52 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Tue, 29 Nov 2011 18:49:06 +0100
-Subject: [PATCH 0/6] AT91 Reset cleanup
-In-Reply-To: <20111129174206.GK9581@n2100.arm.linux.org.uk>
+Date: Tue, 29 Nov 2011 18:52:37 +0100
+Subject: [PATCH 1/6] ARM: at91: fix cap9 ddrsdr register
+In-Reply-To: <20111129173514.GW15008@game.jcrosoft.org>
 References: <20111129173514.GW15008@game.jcrosoft.org>
- <20111129174206.GK9581@n2100.arm.linux.org.uk>
-Message-ID: <20111129174906.GX15008@game.jcrosoft.org>
+Message-ID: <1322589162-5212-1-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17:42 Tue 29 Nov     , Russell King - ARM Linux wrote:
-> On Tue, Nov 29, 2011 at 06:35:14PM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > Hi,
-> > 
-> > 	the following patch series will merge the ddr controler header file
-> > 	for sam9 and cap9 and cleanup the reset by
-> > 
-> > 	swtich to arm_pm_restart
-> > 	fix the sam9g45 and cap9 reset
-> > 	make rstc soc independent
-> > 
-> > The following changes since commit 15327570807209b5c088382af23ed3fc47558d87:
-> > 
-> >   ARM: at91/gpio: fix display of number of irq setuped (2011-11-28 22:53:09 +0800)
-> > 
-> > are available in the git repository at:
-> >   git://github.com/at91linux/linux-at91.git for-arnd-3.3-reset
-> > 
-> > Jean-Christophe PLAGNIOL-VILLARD (6):
-> >       ARM: at91: fix cap9 ddrsdr register
-> >       ARM: at91: merge at91cap9_ddrsdr.h in at91sam9_ddrsdr.h
-> >       ARM: at91: introduce AT91_SAM9_ALT_RESET to select the at91sam9 alternative reset
-> >       ARM: restart: at91: use new restart hook
-> 
-> Well, it looks like you've taken my work here and committed it as yourself.
-> That's plagerism.  Don't do it - and fix it before someone pulls your crap.
-sorry I didn't take your work as mine
+fix AT91_DDRSDRC_MODE it's 3bit
 
-Best Regards,
-J.
+add missing AT91_DDRSDRC_NR_14, AT91_DDRSDRC_DBW (16 and 32 bits support)
+
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ arch/arm/mach-at91/include/mach/at91cap9_ddrsdr.h |    6 +++++-
+ 1 files changed, 5 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/mach-at91/include/mach/at91cap9_ddrsdr.h b/arch/arm/mach-at91/include/mach/at91cap9_ddrsdr.h
+index 976f4a6..d21932d 100644
+--- a/arch/arm/mach-at91/include/mach/at91cap9_ddrsdr.h
++++ b/arch/arm/mach-at91/include/mach/at91cap9_ddrsdr.h
+@@ -16,7 +16,7 @@
+ #define AT91CAP9_DDRSDR_H
+ 
+ #define AT91_DDRSDRC_MR		0x00	/* Mode Register */
+-#define		AT91_DDRSDRC_MODE	(0xf << 0)		/* Command Mode */
++#define		AT91_DDRSDRC_MODE	(0x7 << 0)		/* Command Mode */
+ #define			AT91_DDRSDRC_MODE_NORMAL		0
+ #define			AT91_DDRSDRC_MODE_NOP		1
+ #define			AT91_DDRSDRC_MODE_PRECHARGE	2
+@@ -42,6 +42,7 @@
+ #define			AT91_DDRSDRC_NR_11	(0 << 2)
+ #define			AT91_DDRSDRC_NR_12	(1 << 2)
+ #define			AT91_DDRSDRC_NR_13	(2 << 2)
++#define			AT91_DDRSDRC_NR_14	(3 << 2)
+ #define		AT91_DDRSDRC_CAS	(7 << 4)		/* CAS Latency */
+ #define			AT91_DDRSDRC_CAS_2	(2 << 4)
+ #define			AT91_DDRSDRC_CAS_3	(3 << 4)
+@@ -86,6 +87,9 @@
+ #define			AT91_DDRSDRC_MD_LOW_POWER_SDR	1
+ #define			AT91_DDRSDRC_MD_DDR		2
+ #define			AT91_DDRSDRC_MD_LOW_POWER_DDR	3
++#define		AT91_DDRSDRC_DBW	(1 << 4)		/* Data Bus Width */
++#define			AT91_DDRSDRC_DBW_32BITS		(0 <<  4)
++#define			AT91_DDRSDRC_DBW_16BITS		(1 <<  4)
+ 
+ #define AT91_DDRSDRC_DLLR	0x20	/* DLL Information Register */
+ #define		AT91_DDRSDRC_MDINC	(1 << 0)		/* Master Delay increment */
+-- 
+1.7.7
