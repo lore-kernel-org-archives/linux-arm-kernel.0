@@ -1,41 +1,65 @@
-From: wg@grandegger.com (Wolfgang Grandegger)
-Date: Tue, 29 Nov 2011 12:44:22 +0100
-Subject: 2.6.38 port not booting on i.MX53 SoM
-In-Reply-To: <CAN=k24nyYoajitAAjHUjuy9ZnXDm5As7pJ0un0x_uTibzJfkrw@mail.gmail.com>
-References: <CAN=k24ncTxDMXZzO1ef_+ETFiiqJZxtYSEOAKz3DiwCO8UKwcw@mail.gmail.com>
- <20111128100755.GI17668@pengutronix.de>
- <CAN=k24=fjYjz9ygUbwDFvCg6jNAvt4wPUZOufdytpDEx1bLqog@mail.gmail.com>
- <CAOMZO5CSBds93wFiyTeTcbEZa_PzVuNtFfvcziRsh7p-Mu9=dQ@mail.gmail.com>
- <CAN=k24nyYoajitAAjHUjuy9ZnXDm5As7pJ0un0x_uTibzJfkrw@mail.gmail.com>
-Message-ID: <4ED4C596.6040700@grandegger.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 29 Nov 2011 12:22:26 +0000
+Subject: [RFC PATCH 0/6] ARM: Remove the __ARCH_WANT_INTERRUPTS_ON_CTXSW
+ definition
+Message-ID: <1322569352-23584-1-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/29/2011 12:20 PM, Wayne Tams wrote:
-> On Tue, Nov 29, 2011 at 11:12 AM, Fabio Estevam <festevam@gmail.com> wrote:
->> 2011/11/29 Wayne Tams <wayne.tams@gmail.com>:
->>
->>> I have followed your instructions and double checked serial bootargs
->>> by loading the 2.6.35 kernel; 2.6.35 loads ok displaying printks as it
->>> executes.
->>>
->>> However using the new 2.6.38 kernel, there are not any additional
->>> messages after enabling the debug settings you mentioned.
->>
->> As Uwe explained this list is about mainline kernel.
->>
->> I have a suggestion for you though: if you use FSL 2.6.38 you should
->> update your FSL U-boot also because there were some UART clock changes
->> from 2.6.35 to 2.6.38. Or use the mainline kernel instead ;-)
->>
->> Regards,
->>
->> Fabio Estevam
-> 
-> Understood, thanks for the help all the same. :)
+Hi,
 
-Try the following patch:
+This set of patches removes the use of __ARCH_WANT_INTERRUPTS_ON_CTXSW
+on ARM.
 
-http://git.linaro.org/gitweb?p=bsp/freescale/linux-linaro-natty.git;a=commit;h=c00c6cd2b83e88292f82387dacf489b2821d2ce2
+As a background, the ARM architecture versions consist of two main sets
+with regards to the MMU switching needs:
 
-Wolfgang.
+1. ARMv5 and earlier have VIVT caches and they require a full cache and
+   TLB flush at every context switch.
+2. ARMv6 and later have VIPT caches and the TLBs are tagged with an ASID
+   (application specific ID). The number of ASIDs is limited to 256 and
+   the allocation algorithm requires IPIs when all the ASIDs have been
+   used.
+
+Both cases above require interrupts enabled during context switch for
+latency reasons (1) or deadlock avoidance (2).
+
+The first patch in the series introduces a new scheduler hook invoked
+after the rq->lock is released and interrupts enabled. The subsequent
+two patches change the ARM context switching code (for processors in
+category 2 above) to use a reserved TTBR value instead of a reserved
+ASID. The 4th patch removes the __ARCH_WANT_INTERRUPTS_ON_CTXSW
+definition for ASID-capable processors by deferring the new ASID
+allocation to the post-lock switch hook.
+
+The last patch also removes __ARCH_WANT_INTERRUPTS_ON_CTXSW for ARMv5
+and earlier processors. It defers the cpu_switch_mm call to the
+post-lock switch hook. Since this is only running on UP systems and the
+preemption is disabled during context switching, it assumes that the old
+mm is still valid until the post-lock switch hook.
+
+The series has been tested on Cortex-A9 (vexpress) and ARM926
+(versatile). Comments are welcome.
+
+Thanks,
+
+Catalin
+
+
+Catalin Marinas (4):
+  sched: Introduce the finish_arch_post_lock_switch() scheduler hook
+  ARM: Remove __ARCH_WANT_INTERRUPTS_ON_CTXSW on ASID-capable CPUs
+  ARM: Remove current_mm per-cpu variable
+  ARM: Remove __ARCH_WANT_INTERRUPTS_ON_CTXSW on pre-ARMv6 CPUs
+
+Will Deacon (2):
+  ARM: Use TTBR1 instead of reserved context ID
+  ARM: Allow ASID 0 to be allocated to tasks
+
+ arch/arm/include/asm/mmu_context.h |  106 +++++++++++++++++++++++++++---------
+ arch/arm/include/asm/system.h      |    7 ---
+ arch/arm/include/asm/thread_info.h |    1 +
+ arch/arm/mm/context.c              |   42 +++++++--------
+ arch/arm/mm/proc-v7.S              |    9 +---
+ kernel/sched.c                     |    4 ++
+ 6 files changed, 107 insertions(+), 62 deletions(-)
