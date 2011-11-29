@@ -1,39 +1,71 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Tue, 29 Nov 2011 14:00:58 +0100
-Subject: [PATCH V2] arm/tegra: convert tegra20 to GIC devicetree binding
-In-Reply-To: <1322528052-6516-1-git-send-email-swarren@nvidia.com>
-References: <1322528052-6516-1-git-send-email-swarren@nvidia.com>
-Message-ID: <4ED4D78A.6000400@ti.com>
+From: peter.ujfalusi@ti.com (=?ISO-8859-1?Q?P=E9ter?= Ujfalusi)
+Date: Tue, 29 Nov 2011 15:01:57 +0200
+Subject: [PATCH v2 1/2] OMAP2+: DMA: Workaround for invalid source
+ position
+In-Reply-To: <4EBBCB4C.9030202@bitmer.com>
+References: <1320658387-21067-1-git-send-email-peter.ujfalusi@ti.com>
+ <4EBBC79E.30701@bitmer.com> <4EBBCB4C.9030202@bitmer.com>
+Message-ID: <1857964.6c1BL8cmCX@barack>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen & Peter,
+On Thursday 10 November 2011 15:02:04 Jarkko Nikula wrote:
+> On 11/10/2011 02:46 PM, Jarkko Nikula wrote:
+> > On 11/07/2011 11:33 AM, Peter Ujfalusi wrote:
+> >> If the DMA source position has been asked before the
+> >> first actual data transfer has been done, the CSAC
+> >> register does not contain valid information.
+> >> We can identify this situation by checking the CDAC
+> >> register:
+> >> CDAC != 0 indicates that the DMA transfer on the channel has
+> >> been started already.
+> >> When CDAC == 0 we can not trust the CSAC value since it has
+> >> not been updated, and can contain random number.
+> >> Return the start address in case the DMA has not jet started.
+> >> 
+> >> Note: The CDAC register has been initialized to 0 at dma_start
+> >> time.
+> >> 
+> >> Signed-off-by: Peter Ujfalusi<peter.ujfalusi@ti.com>
+> >> ---
+> >> arch/arm/plat-omap/dma.c | 12 ++++++++++++
+> >> 1 files changed, 12 insertions(+), 0 deletions(-)
+> >> 
+> >> diff --git a/arch/arm/plat-omap/dma.c b/arch/arm/plat-omap/dma.c
+> >> index c22217c..a9983b6 100644
+> >> --- a/arch/arm/plat-omap/dma.c
+> >> +++ b/arch/arm/plat-omap/dma.c
+> >> @@ -1034,6 +1034,18 @@ dma_addr_t omap_get_dma_src_pos(int lch)
+> >> if (IS_DMA_ERRATA(DMA_ERRATA_3_3)&& offset == 0)
+> >> offset = p->dma_read(CSAC, lch);
+> >> 
+> >> + if (!cpu_is_omap15xx()) {
+> >> + /*
+> >> + * CDAC == 0 indicates that the DMA transfer on the channel has
+> >> + * not been started (no data has been transferred so far).
+> >> + * Return the programmed source start address in this case.
+> >> + */
+> >> + if (likely(p->dma_read(CDAC, lch)))
+> >> + offset = p->dma_read(CSAC, lch);
+> >> + else
+> >> + offset = p->dma_read(CSSA, lch);
+> >> + }
+> >> +
+> > 
+> > I think this is enough:
+> > 
+> > if (unlikely(p->dma_read(CDAC, lch) == 0))
+> > offset = p->dma_read(CSSA, lch);
+> > 
+> > I suppose offset is ok for normal case as it is already read (twise)
+> > above.
+> Or actually my proposal could have a race if CDAC changes between CSAC
+> read and CDAC read. In that case it's better to re-read CSAC as your
+> patch does after CDAC test and give to both:
+> 
+> Reviewed-by: Jarkko Nikula <jarkko.nikula@bitmer.com>
 
-On 11/29/2011 1:54 AM, Stephen Warren wrote:
-> From: pdeschrijver at nvidia.com<pdeschrijver@nvidia.com>
+Tony, have you taken this patch? I failed to find it in the l-o tree...
 
-[...]
-
-> @@ -125,6 +131,14 @@ void __init tegra_init_irq(void)
->   	gic_arch_extn.irq_unmask = tegra_unmask;
->   	gic_arch_extn.irq_retrigger = tegra_retrigger;
->
-> -	gic_init(0, 29, IO_ADDRESS(TEGRA_ARM_INT_DIST_BASE),
-> -		 IO_ADDRESS(TEGRA_ARM_PERIF_BASE + 0x100));
-> +#ifdef CONFIG_OF
-> +	/* Check if there is a devicetree present as of_irq_init doesn't
-> +	 * indicate if an interrupt controller node was found.
-> +	 */
-> +	if (of_find_node_by_path("/"))
-> +		of_irq_init(tegra_irq_match);
-> +	else
-> +#endif
-
-For the same kind of need, I found the following API:
-
-of_have_populated_dt()
-
-Moreover, it returns false if !CONFIG_OF, so it will avoid the #ifdef.
-
-Regards,
-Benoit
+--
+P?ter
