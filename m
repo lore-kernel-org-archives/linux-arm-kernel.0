@@ -1,23 +1,23 @@
-From: davem@davemloft.net (David Miller)
-Date: Tue, 29 Nov 2011 18:53:42 -0500 (EST)
-Subject: [PATCH] at91_ether: use gpio_is_valid for phy IRQ line
-In-Reply-To: <1322169674-4109-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1322128098-17724-1-git-send-email-jamie@jamieiles.com>
- <1322169674-4109-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <20111129.185342.105454076866922618.davem@davemloft.net>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Tue, 29 Nov 2011 18:16:09 -0500 (EST)
+Subject: [patch 1/1] kirkwood: Add configuration for MPP12 as GPIO
+In-Reply-To: <20111129220507.911608090@rtp-net.org>
+References: <20111129220507.911608090@rtp-net.org>
+Message-ID: <alpine.LFD.2.02.1111291809030.2357@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nicolas Ferre <nicolas.ferre@atmel.com>
-Date: Thu, 24 Nov 2011 22:21:14 +0100
+On Tue, 29 Nov 2011, Arnaud Patard wrote:
 
-> Use the generic gpiolib gpio_is_valid() function to test
-> if the phy IRQ line GPIO is actually provided.
-> 
-> For non-connected or non-existing phy IRQ lines, -EINVAL
-> value is used for phy_irq_pin field of struct at91_eth_data.
-> 
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> The MPP12 is listed in the 6281 HW manual as output only but the iconnect
+> board from iomega is using it as GPIO (there's a button connected on it). So,
+> I'm adding a definition for the MPP12 as GPIO. As I've no informations about
+> this and which kirkwood are "affected", I'm adding a new #define instead of
+> modifying the current one for MPP12.
 
-I'm assuming this goes through the ARM tree, because in both of my networking
-trees there is no ARM at91 implementation of gpio_is_valid().
+In that case, please adjust the bitfield  in your definition so it is 
+valid only for 
+the 6281.
+
+
+Nicolas
