@@ -1,109 +1,104 @@
 From: stevenrwalter@gmail.com (Steven Walter)
-Date: Tue, 29 Nov 2011 11:28:14 -0500
-Subject: [PATCH 2/3] ARM: add TRACEHOOK support
+Date: Tue, 29 Nov 2011 11:28:13 -0500
+Subject: [PATCH 1/3] ARM: add support for the generic syscall.h interface
 In-Reply-To: <1322584095-30439-1-git-send-email-stevenrwalter@gmail.com>
 References: <1322584095-30439-1-git-send-email-stevenrwalter@gmail.com>
-Message-ID: <1322584095-30439-3-git-send-email-stevenrwalter@gmail.com>
+Message-ID: <1322584095-30439-2-git-send-email-stevenrwalter@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add calls to tracehook_report_syscall_{entry,exit} and tracehook_signal_handler
+Supplying the asm-generic/syscall.h interface is a pre-requisite for
+HAVE_ARCH_TRACEHOOK
 
 Signed-off-by: Steven Walter <stevenrwalter@gmail.com>
 ---
- arch/arm/Kconfig              |    1 +
- arch/arm/include/asm/ptrace.h |    5 +++++
- arch/arm/kernel/ptrace.c      |   21 +++++++--------------
- arch/arm/kernel/signal.c      |    2 ++
- 4 files changed, 15 insertions(+), 14 deletions(-)
+ arch/arm/include/asm/syscall.h |   78 ++++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 78 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/include/asm/syscall.h
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index b65b910..0a93d76 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -10,6 +10,7 @@ config ARM
- 	select GENERIC_ATOMIC64 if (CPU_V6 || !CPU_32v6K || !AEABI)
- 	select HAVE_OPROFILE if (HAVE_PERF_EVENTS)
- 	select HAVE_ARCH_KGDB
-+	select HAVE_ARCH_TRACEHOOK
- 	select HAVE_KPROBES if (!XIP_KERNEL && !THUMB2_KERNEL)
- 	select HAVE_KRETPROBES if (HAVE_KPROBES)
- 	select HAVE_FUNCTION_TRACER if (!XIP_KERNEL)
-diff --git a/arch/arm/include/asm/ptrace.h b/arch/arm/include/asm/ptrace.h
-index 312d108..98ea76d 100644
---- a/arch/arm/include/asm/ptrace.h
-+++ b/arch/arm/include/asm/ptrace.h
-@@ -235,6 +235,11 @@ static inline unsigned long kernel_stack_pointer(struct pt_regs *regs)
- 	return regs->ARM_sp;
- }
- 
-+static inline unsigned long user_stack_pointer(struct pt_regs *regs)
+diff --git a/arch/arm/include/asm/syscall.h b/arch/arm/include/asm/syscall.h
+new file mode 100644
+index 0000000..f104339
+--- /dev/null
++++ b/arch/arm/include/asm/syscall.h
+@@ -0,0 +1,78 @@
++/*
++ * Access to user system call parameters and results
++ *
++ * See asm-generic/syscall.h for descriptions of what we must do here.
++ */
++
++#ifndef _ASM_ARM_SYSCALL_H
++#define _ASM_ARM_SYSCALL_H
++
++#include <linux/err.h>
++
++extern const unsigned long sys_call_table[];
++
++static inline int syscall_get_nr(struct task_struct *task,
++				 struct pt_regs *regs)
 +{
-+	return regs->ARM_sp;
++	return task_thread_info(task)->syscall;
 +}
 +
- #endif /* __KERNEL__ */
- 
- #endif /* __ASSEMBLY__ */
-diff --git a/arch/arm/kernel/ptrace.c b/arch/arm/kernel/ptrace.c
-index 9726006..1411848 100644
---- a/arch/arm/kernel/ptrace.c
-+++ b/arch/arm/kernel/ptrace.c
-@@ -22,6 +22,7 @@
- #include <linux/perf_event.h>
- #include <linux/hw_breakpoint.h>
- #include <linux/regset.h>
-+#include <linux/tracehook.h>
- 
- #include <asm/pgtable.h>
- #include <asm/system.h>
-@@ -928,8 +929,6 @@ asmlinkage int syscall_trace(int why, struct pt_regs *regs, int scno)
- 
- 	if (!test_thread_flag(TIF_SYSCALL_TRACE))
- 		return scno;
--	if (!(current->ptrace & PT_PTRACED))
--		return scno;
- 
- 	/*
- 	 * Save IP.  IP is used to denote syscall entry/exit:
-@@ -940,19 +939,13 @@ asmlinkage int syscall_trace(int why, struct pt_regs *regs, int scno)
- 
- 	current_thread_info()->syscall = scno;
- 
--	/* the 0x80 provides a way for the tracing parent to distinguish
--	   between a syscall stop and SIGTRAP delivery */
--	ptrace_notify(SIGTRAP | ((current->ptrace & PT_TRACESYSGOOD)
--				 ? 0x80 : 0));
--	/*
--	 * this isn't the same as continuing with a signal, but it will do
--	 * for normal use.  strace only continues with a signal if the
--	 * stopping signal is not SIGTRAP.  -brl
--	 */
--	if (current->exit_code) {
--		send_sig(current->exit_code, current, 1);
--		current->exit_code = 0;
-+	if (why == 0) {
-+		if (tracehook_report_syscall_entry(regs))
-+			current_thread_info()->syscall = -1;
-+	} else {
-+		tracehook_report_syscall_exit(regs, 0);
- 	}
++static inline void syscall_rollback(struct task_struct *task,
++				    struct pt_regs *regs)
++{
++	regs->ARM_r0 = regs->ARM_ORIG_r0;
++}
 +
- 	regs->ARM_ip = ip;
- 
- 	return current_thread_info()->syscall;
-diff --git a/arch/arm/kernel/signal.c b/arch/arm/kernel/signal.c
-index 0340224..26c26f5 100644
---- a/arch/arm/kernel/signal.c
-+++ b/arch/arm/kernel/signal.c
-@@ -645,6 +645,8 @@ handle_signal(unsigned long sig, struct k_sigaction *ka,
- 	recalc_sigpending();
- 	spin_unlock_irq(&tsk->sighand->siglock);
- 
-+	tracehook_signal_handler(sig, info, ka, regs, 0);
++static inline long syscall_get_error(struct task_struct *task,
++				     struct pt_regs *regs)
++{
++	unsigned long error = regs->ARM_r0;
++	return IS_ERR_VALUE(error) ? error : 0;
++}
 +
- 	return 0;
- }
- 
++static inline long syscall_get_return_value(struct task_struct *task,
++					    struct pt_regs *regs)
++{
++	return regs->ARM_r0;
++}
++
++static inline void syscall_set_return_value(struct task_struct *task,
++					    struct pt_regs *regs,
++					    int error, long val)
++{
++	regs->ARM_r0 = (long) error ?: val;
++}
++
++static inline void syscall_get_arguments(struct task_struct *task,
++					 struct pt_regs *regs,
++					 unsigned int i, unsigned int n,
++					 unsigned long *args)
++{
++	BUG_ON(i + n > 6);
++	if (i == 0) {
++		args[0] = regs->ARM_ORIG_r0;
++		args++;
++		i++;
++		n--;
++	}
++
++	memcpy(args, &regs->ARM_r1 + (i - 1), n * sizeof(args[0]));
++}
++
++static inline void syscall_set_arguments(struct task_struct *task,
++					 struct pt_regs *regs,
++					 unsigned int i, unsigned int n,
++					 const unsigned long *args)
++{
++	BUG_ON(i + n > 6);
++	if (i == 0) {
++		regs->ARM_ORIG_r0 = args[0];
++		args++;
++		i++;
++		n--;
++	}
++
++	memcpy(&regs->ARM_r1 + (i - 1), args, n * sizeof(args[0]));
++}
++
++#endif	/* _ASM_ARM_SYSCALL_H */
 -- 
 1.7.5.4.2.g81f75
