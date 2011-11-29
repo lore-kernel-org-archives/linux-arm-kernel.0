@@ -1,43 +1,29 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 29 Nov 2011 09:39:06 +0100
-Subject: [PATCH 1/7] pinctrl: enable pxa3xx pinmux
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF174FDAF8C5@HQMAIL01.nvidia.com>
-References: <1322262544-7854-1-git-send-email-haojian.zhuang@marvell.com>
- <1322262544-7854-2-git-send-email-haojian.zhuang@marvell.com>
- <74CDBE0F657A3D45AFBB94109FB122FF174FDAF8C5@HQMAIL01.nvidia.com>
-Message-ID: <CACRpkdY0N+hC5BfKP2J=nxM44O-evv1-vU3hnyomboAp7CQa=A@mail.gmail.com>
+Date: Tue, 29 Nov 2011 09:40:27 +0100
+Subject: [PATCH 0/3] Change ARCH_NR_GPIO into a Kconfig variable
+In-Reply-To: <20111129064630.GW19069@tbergstrom-lnx.Nvidia.com>
+References: <1320339647-30255-1-git-send-email-pdeschrijver@nvidia.com>
+ <20111129064630.GW19069@tbergstrom-lnx.Nvidia.com>
+Message-ID: <CACRpkdY-YL0RSY4+nL36sM9WwX+VbMkJP54djrCwYCQmw9AFEw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 28, 2011 at 9:21 PM, Stephen Warren <swarren@nvidia.com> wrote:
-> Haojian Zhuang wrote at Friday, November 25, 2011 4:09 PM:
-> ...
->> diff --git a/drivers/pinctrl/Kconfig b/drivers/pinctrl/Kconfig
-> ...
->> +config PINMUX_PXA3xx
->> + ? ? bool "PXA pinmux driver"
->> + ? ? default y if ARCH_PXA || ARCH_MMP
-
-So drop that line.
-
-The rest is correct.
-
->> + ? ? select PINMUX
->> +
+On Tue, Nov 29, 2011 at 7:46 AM, Peter De Schrijver
+<pdeschrijver@nvidia.com> wrote:
+> On Thu, Nov 03, 2011 at 06:00:44PM +0100, Peter De Schrijver wrote:
+>> This patchset converts ARCH_NR_GPIO to a Kconfig variable as suggested by
+>> Russel King. It also converts some platforms to the new model.
+>>
+>> Peter De Schrijver (3):
+>> ? ARM: ARCH_NR_GPIO: Make ARCH_NR_GPIO a Kconfig variable
+>> ? ARM: mach-shmobile: Use CONFIG_ARCH_NR_GPIO
+>> ? ARM: mach-ux500 Use CONFIG_ARCH_NR_GPIO
 >
-> I thought the plan here was for e.g. ARCH_PXA to "select PINMUX_PXA3xxx",
-> since it's presumably mandatory?
+> Ping? What should we do with this?
 
-Yes that is correct.
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-Haojian can you alter the patch so that arch/arm/mach*/Kconfig does
-
-select PINCTRL
-select PINMUX_PXA3XX
-
-(Both are needed.)
-
-And
+Put it into Russell's patch tracker.
 
 Yours,
 Linus Walleij
