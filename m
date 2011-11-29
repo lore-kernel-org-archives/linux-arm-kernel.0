@@ -1,71 +1,79 @@
-From: vishwanath.bs@ti.com (Vishwanath Sripathy)
-Date: Tue, 29 Nov 2011 20:29:38 +0530
-Subject: [PATCHv2 0/7]ARM: OMAP3PLUS PM: Add IO DaisyChain support via
- hwmod mux
-In-Reply-To: <1e686270c099fa4a270b6b01e6ac585c@mail.gmail.com>
-References: <1318009671-12813-1-git-send-email-vishwanath.bs@ti.com>
- <87pqh3qvkt.fsf@ti.com> <1e686270c099fa4a270b6b01e6ac585c@mail.gmail.com>
-Message-ID: <a480ee86d60a9db484d3baa0faf2477f@mail.gmail.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Tue, 29 Nov 2011 14:53:34 +0000
+Subject: [ANNOUNCE] Xen port to Cortex-A15 / ARMv7 with virt extensions
+Message-ID: <alpine.DEB.2.00.1111281009090.31179@kaball-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin,
+Hi all,
+a few weeks ago I (and a few others) started hacking on a
+proof-of-concept hypervisor port to Cortex-A15 which uses and requires
+ARMv7 virtualization extensions. The intention of this work was to find
+out how to best support ARM v7+ on Xen. See
+http://old-list-archives.xen.org/archives/html/xen-arm/2011-09/msg00013.html
+for more details. 
 
-> -----Original Message-----
-> From: Vishwanath Sripathy [mailto:vishwanath.bs at ti.com]
-> Sent: Tuesday, November 29, 2011 4:53 PM
-> To: Kevin Hilman
-> Cc: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-> Subject: RE: [PATCHv2 0/7]ARM: OMAP3PLUS PM: Add IO DaisyChain
-> support via hwmod mux
->
-> > -----Original Message-----
-> > From: Kevin Hilman [mailto:khilman at ti.com]
-> > Sent: Tuesday, November 08, 2011 6:28 AM
-> > To: Vishwanath BS
-> > Cc: linux-omap at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org
-> > Subject: Re: [PATCHv2 0/7]ARM: OMAP3PLUS PM: Add IO DaisyChain
-> > support via hwmod mux
-> >
-> > Hi Vishwa,
-> >
-> > Vishwanath BS <vishwanath.bs@ti.com> writes:
-> >
-> > > The folowing patch series provides IO Daisychain feature via
-> omap
-> > hwmod mux
-> > > framework.
-> >
-> > The series looks OK at first glance, but needs a refresh against
-> > current
-> > mainline.
-> OK.
-> >
-> > Can you refresh this against Tony's 'fixes' branch and re-test.
-> >
-> > I tested this on OMAP3430/n900 and noticed that it no longer hit
-> off
-> > mode from idle.
-> >
-> > IOW, If I enable UART timeouts and then enable off mode, I don't
-> > actually ever hit off during idle.  However, if I do a
-> > suspend/resume I
-> > see it hits off mode, then subsequent attempts to hit off during
-> > idle work.
-> >
-> > Can you investigate this?
-> OK. Let me check that.
-I rebased these patches against latest Tony's fixes branch and tested it
-on OMAP3430 SDP. I see that Core enters off mode in idle path after
-setting UART timeout w/o having to suspend the system.
+I am pleased to announce that significant progress has been made, and
+that we now have a nascent Xen port for Cortex-A15. The port is based on
+xen-unstable (HG CS 8d6edc3d26d2) and written from scratch exploiting
+the latest virtualization, LPAE, GIC and generic timer support in
+hardware.
 
-Is there anything else I need to do to see the issue mentioned by you?
+We started the work less than three months ago, but the port is already
+capable of booting a Linux 3.0 based virtual machine (dom0) up to a
+shell prompt on an ARM Architecture Envelope Model, configured to emulate
+an A15-based Versatile Express. In this context, we wanted to thank ARM
+for making the model available to us.
+Now we are looking forward to porting the tools and running multiple
+guests.
 
-Regards
-Vishwa
->
-> Regards
-> Vishwa
-> >
-> > Kevin
+The code requires virtualization, LPAE and GIC support and therefore it
+won't be able to run on anything older than a Cortex-A15.
+On the other hand, thanks to this, it is very small and easy to read,
+write and understand.
+The implementation does not distinguish between PV and HVM guests: there
+is just one type of guests that would be comparable to Linux PV on HVM
+in the Xen X86 world, but with no need for Qemu emulation.
+The code only requires minimal changes to the Linux kernel: just enough
+to support PV drivers.
+
+Even though we are currently targeting Versatile Express and Cortex-A15
+we do intend to support other machines and other ARMv7 with
+virtualization extensions CPUs.
+We are also looking forward to ARMv8 and 64 bits support.
+
+Given that porting Xen to Cortex-A15 could be done with so little code,
+we believe that the best course of action is to merge it into
+xen-unstable as quickly as possible. There are still few rough edges to
+sort out but we should be able to produce a clean and digestible patch
+series for submission to xen-devel within the next couple of months. I
+hope to see the first patches going to the list as soon as possible.
+We would very welcome any contributions, in the form of testing, code
+reviews and, of course, patches! 
+
+
+A git tree is available here:
+
+git://xenbits.xen.org/people/sstabellini/xen-unstable.git arm
+
+the gitweb url is the following:
+
+http://xenbits.xen.org/gitweb/?p=people/sstabellini/xen-unstable.git/.git;a=shortlog;h=refs/heads/arm
+
+And here is the full diff:
+
+http://xenbits.xen.org/people/sstabellini/diff
+
+
+We want to point out that this effort is in addition to Samsung's
+ongoing efforts to upstream Xen ARM to xen-unstable. Samsung's XenARM
+port allows virtualization of Xen on ARM CPUs prior to virtualization
+extensions and supports traditional PV guests.
+
+I would like to thank Tim Deegan and Ian Campbell: if you spend some
+time reading the history, you'll see that this project wouldn't have
+been possible in such a short time without great contributions from
+them.
+
+Cheers,
+Stefano
