@@ -1,64 +1,59 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 29 Nov 2011 16:04:55 +0000
-Subject: [PATCH 1/7] pinctrl: enable pxa3xx pinmux
-In-Reply-To: <CAN1soZwe03c485uYTps5ixBrx_4q=JrcTA7VwkcqrT99hZCJzA@mail.gmail.com>
-References: <1322262544-7854-1-git-send-email-haojian.zhuang@marvell.com>
- <201111291446.41815.arnd@arndb.de>
- <CAN1soZwe03c485uYTps5ixBrx_4q=JrcTA7VwkcqrT99hZCJzA@mail.gmail.com>
-Message-ID: <201111291604.55273.arnd@arndb.de>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Tue, 29 Nov 2011 17:19:12 +0100
+Subject: [PATCH v5 4/7] arm: omap4: hwmod: introduce emu hwmod
+In-Reply-To: <alpine.DEB.2.00.1111261906010.6289@utopia.booyaka.com>
+References: <1319467559-5518-1-git-send-email-ming.lei@canonical.com>
+ <1319467559-5518-5-git-send-email-ming.lei@canonical.com>
+ <alpine.DEB.2.00.1111080750130.10451@utopia.booyaka.com>
+ <CACVXFVMSJUT2Ac+bWetrLpbyOs6PqY+npNHsbvHipEVZ0gWdgQ@mail.gmail.com>
+ <alpine.DEB.2.00.1111100152430.4195@utopia.booyaka.com>
+ <4EC6566C.70202@ti.com>
+ <alpine.DEB.2.00.1111261854340.6289@utopia.booyaka.com>
+ <alpine.DEB.2.00.1111261906010.6289@utopia.booyaka.com>
+Message-ID: <4ED50600.8070607@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 29 November 2011, Haojian Zhuang wrote:
-> > static struct platform_device_id pxa3xx_pinmux_ids = {
-> >        { .name = "pxa300-pinmux", .id = (unsigned long)&pxa300_pinmux, },
-> >        { .name = "pxa310-pinmux", .id = (unsigned long)&pxa310_pinmux, },
-> >        { .name = "pxa320-pinmux", .id = (unsigned long)&pxa320_pinmux, },
-> >        { .name = "pxa910-pinmux", .id = (unsigned long)&pxa910_pinmux, },
-> > };
-> It's cleaner. And I'm considering to extend pxa3xx_pinmux_info. I'll
-> also add pointers to pads[] and mfpr[]. Since pads[] and mfpr[] are
-> large, more silicons are supported and more memory space is occupied.
-> So I'll define pads[] and mfpr[] as __initdata and copy them into
-> pxa3xx_pinmux_info structure. So I'll use both your solution and
-> memcopy in probe().
+Hi Paul,
 
-Ok. However, I think it needs to be __devinitdata if the platform
-device might be added after the pinmux driver is added.
+On 11/27/2011 3:07 AM, Paul Walmsley wrote:
+> On Sat, 26 Nov 2011, Paul Walmsley wrote:
+>
+>> Hi Beno?t,
+>>
+>> a question about this patch.
+>
+> ...
+>
+>>> +		.name		= "mipi_stm",
+>>> +		.pa_start	= 0x54161000,
+>>> +		.pa_end		= 0x54161fff,
+>>> +		.flags		= ADDR_TYPE_RT
+>
+>> ... none of the address spaces above have the ADDR_TYPE_RT flag set.
+>> Without this flag set, the hwmod code won't know where to access the OCP
+>> registers.
+>
+> Ugh, it's above; I just missed it.  Sorry about that.
+>
+> So just out of curiosity, do those SYSCONFIG registers in the STM address
+> space apply to the entire DEBUGSS, or just the STM IP block?
 
-> > static struct platform_driver pxa3xx_pinmux_driver = {
-> >       .driver = {
-> >               .owner = THIS_MODULE,
-> >       },
-> >       .id_entry = pxa3xx_pinmux_ids,
-> >       .probe = pxa3xx_pinmux_probe,
-> >       .remove = __devexit_p(pxa3xx_pinmux_remove),
-> > };
-> >
-> > Then you can look at the pxa3xx_pinmux_info pointer in the probe function
-> > and do whatever else is necessary.
-> >
-> > Another entirely different approach would be to split the driver into
-> > multiple files, one for each soc plus one for the common parts, so you
-> > just build the parts you need for the configuration.
-> >
-> Is it OK to define pinmux-pxa3xx.c, pinmux-pxa300.c, ...? I'll append
-> 8 files since I have 7 silicons.
+The STM IP is the only one to have the TI generic wrapper to be 
+compliant with TI standards.
+But in term of PRCM, there is only one IP, the DEBUGSS.
+There are probably a bunch of internal clock management inside it that 
+are not exposed to PRCM.
 
-I think it's ok, but it's your decision if you think it's too much.
-You could also end up with fewer than 8 files if you group a few
-socs together in case they are almost identical, but keep them
-apart from the somewhat more different ones.
+The confusing part is that in theory all these entries can be accessed 
+by the same OCP port, and should potentially have this flags.
+The point is that for the moment, we are mainly using that flag to get 
+the SYSCONFIG.
+We already discussed that, but I think we should modify this flag to 
+highlight the SYSCONFIG / SYSSTATUS availability.
+Maybe with something like ADDR_SYSCONFIG?
 
-I would not recommend having one file per soc if that ends up duplicating
-a lot of code that would otherwise be shared, but I think separate
-modules would be preferred if you can make all the shared code end
-up in the shared file and each individual driver get linked in only
-when the configuration for that soc is enabled.
+Any thought?
 
-One more clarification: The idea here was to have each file as a separate
-module with its own platform driver registration and one private
-pinmux_info structure calling functions from the common module, but
-never have common code call out to the individual drivers.
-
-	Arnd
+Regards,
+Benoit
