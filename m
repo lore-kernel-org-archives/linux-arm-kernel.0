@@ -1,57 +1,75 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 29 Nov 2011 13:30:27 +0000
-Subject: [PATCH 3/7] ARM: S3C64XX: Configure WM1250 EV1 GPIOs on Cragganmore
+Date: Tue, 29 Nov 2011 13:30:30 +0000
+Subject: [PATCH 6/7] ARM: S3C64XX: Hook up platform data for Kilchomin module
+ on Cragganmore
 In-Reply-To: <1322573431-8923-1-git-send-email-broonie@opensource.wolfsonmicro.com>
 References: <20111129133006.GA26800@opensource.wolfsonmicro.com>
  <1322573431-8923-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-Message-ID: <1322573431-8923-3-git-send-email-broonie@opensource.wolfsonmicro.com>
+Message-ID: <1322573431-8923-6-git-send-email-broonie@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Now that the WM5100 driver is merged add some initial platform data for
+the WM5100 on Kilchomin.
+
 Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
 ---
- arch/arm/mach-s3c64xx/mach-crag6410.c |   15 ++++++++++++++-
- 1 files changed, 14 insertions(+), 1 deletions(-)
+ arch/arm/mach-s3c64xx/mach-crag6410-module.c |   30 ++++++++++++++++++++++++++
+ 1 files changed, 30 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-s3c64xx/mach-crag6410.c b/arch/arm/mach-s3c64xx/mach-crag6410.c
-index 3882c2f..05f598f 100644
---- a/arch/arm/mach-s3c64xx/mach-crag6410.c
-+++ b/arch/arm/mach-s3c64xx/mach-crag6410.c
-@@ -37,6 +37,8 @@
+diff --git a/arch/arm/mach-s3c64xx/mach-crag6410-module.c b/arch/arm/mach-s3c64xx/mach-crag6410-module.c
+index 6387ced..c492f75 100644
+--- a/arch/arm/mach-s3c64xx/mach-crag6410-module.c
++++ b/arch/arm/mach-s3c64xx/mach-crag6410-module.c
+@@ -15,12 +15,41 @@
  #include <linux/mfd/wm831x/irq.h>
  #include <linux/mfd/wm831x/gpio.h>
  
-+#include <sound/wm1250-ev1.h>
++#include <sound/wm5100.h>
+ #include <sound/wm8996.h>
+ #include <sound/wm8962.h>
+ #include <sound/wm9081.h>
+ 
+ #include <mach/crag6410.h>
+ 
++static struct wm5100_pdata wm5100_pdata = {
++	.ldo_ena = S3C64XX_GPN(7),
++	.irq_flags = IRQF_TRIGGER_HIGH,
++	.gpio_base = CODEC_GPIO_BASE,
 +
- #include <asm/mach/arch.h>
- #include <asm/mach-types.h>
- 
-@@ -624,6 +626,16 @@ static struct wm831x_pdata glenfarclas_pmic_pdata __initdata = {
- 	.disable_touch = true,
- };
- 
-+static struct wm1250_ev1_pdata wm1250_ev1_pdata = {
-+	.gpios = {
-+		[WM1250_EV1_GPIO_CLK_ENA] = S3C64XX_GPN(12),
-+		[WM1250_EV1_GPIO_CLK_SEL0] = S3C64XX_GPL(12),
-+		[WM1250_EV1_GPIO_CLK_SEL1] = S3C64XX_GPL(13),
-+		[WM1250_EV1_GPIO_OSR] = S3C64XX_GPL(14),
-+		[WM1250_EV1_GPIO_MASTER] = S3C64XX_GPL(8),
++	.in_mode = {
++		WM5100_IN_DIFF,
++		WM5100_IN_DIFF,
++		WM5100_IN_DIFF,
++		WM5100_IN_SE,
++	},
++
++	.hp_pol = CODEC_GPIO_BASE + 3,
++	.jack_modes = {
++		{ WM5100_MICDET_MICBIAS3, 0, 0 },
++		{ WM5100_MICDET_MICBIAS2, 1, 1 },
++	},
++
++	.gpio_defaults = {
++		0,
++		0,
++		0,
++		0,
++		0x2, /* IRQ: CMOS output */
++		0x3, /* CLKOUT: CMOS output */
 +	},
 +};
 +
- static struct i2c_board_info i2c_devs1[] __initdata = {
- 	{ I2C_BOARD_INFO("wm8311", 0x34),
- 	  .irq = S3C_EINT(0),
-@@ -633,7 +645,8 @@ static struct i2c_board_info i2c_devs1[] __initdata = {
- 	{ I2C_BOARD_INFO("wlf-gf-module", 0x25) },
- 	{ I2C_BOARD_INFO("wlf-gf-module", 0x26) },
+ static struct wm8996_retune_mobile_config wm8996_retune[] = {
+ 	{
+ 		.name = "Sub LPF",
+@@ -90,6 +119,7 @@ static const struct i2c_board_info wm1254_devs[] = {
  
--	{ I2C_BOARD_INFO("wm1250-ev1", 0x27) },
-+	{ I2C_BOARD_INFO("wm1250-ev1", 0x27),
-+	  .platform_data = &wm1250_ev1_pdata },
- };
- 
- static struct s3c2410_platform_i2c i2c1_pdata = {
+ static const struct i2c_board_info wm1255_devs[] = {
+ 	{ I2C_BOARD_INFO("wm5100", 0x1a),
++	  .platform_data = &wm5100_pdata,
+ 	  .irq = GLENFARCLAS_PMIC_IRQ_BASE + WM831X_IRQ_GPIO_2,
+ 	},
+ 	{ I2C_BOARD_INFO("wm9081", 0x6c),
 -- 
 1.7.7.3
