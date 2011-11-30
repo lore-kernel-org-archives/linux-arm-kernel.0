@@ -1,80 +1,95 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Wed, 30 Nov 2011 17:20:04 +0100
-Subject: [PATCH v5 4/7] arm: omap4: hwmod: introduce emu hwmod
-In-Reply-To: <alpine.DEB.2.00.1111291053250.6289@utopia.booyaka.com>
-References: <1319467559-5518-1-git-send-email-ming.lei@canonical.com>
- <1319467559-5518-5-git-send-email-ming.lei@canonical.com>
- <alpine.DEB.2.00.1111080750130.10451@utopia.booyaka.com>
- <CACVXFVMSJUT2Ac+bWetrLpbyOs6PqY+npNHsbvHipEVZ0gWdgQ@mail.gmail.com>
- <alpine.DEB.2.00.1111100152430.4195@utopia.booyaka.com>
- <4EC6566C.70202@ti.com>
- <alpine.DEB.2.00.1111261854340.6289@utopia.booyaka.com>
- <alpine.DEB.2.00.1111261906010.6289@utopia.booyaka.com>
- <4ED50600.8070607@ti.com>
- <alpine.DEB.2.00.1111291053250.6289@utopia.booyaka.com>
-Message-ID: <4ED657B4.9020806@ti.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 30 Nov 2011 17:20:30 +0100
+Subject: [PATCH] ARM: at91: Fix USB AT91 gadget registration
+In-Reply-To: <1322639264-24333-1-git-send-email-anders@chargestorm.se>
+References: <1322639264-24333-1-git-send-email-anders@chargestorm.se>
+Message-ID: <4ED657CE.8000905@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
-
-On 11/29/2011 7:11 PM, Paul Walmsley wrote:
-> On Tue, 29 Nov 2011, Cousson, Benoit wrote:
+On 11/30/2011 08:47 AM, Anders Darander :
+> Since 193ab2a6070039e7ee2b9b9bebea754a7c52fd1b, various AT91 boards don't
+> register at91_udc anymore due to depending on a now non-existing symbol.
+> Fix the symbol name.
 >
->> On 11/27/2011 3:07 AM, Paul Walmsley wrote:
->>
->>> So just out of curiosity, do those SYSCONFIG registers in the STM address
->>> space apply to the entire DEBUGSS, or just the STM IP block?
->>
->> The STM IP is the only one to have the TI generic wrapper to be compliant with
->> TI standards.
->> But in term of PRCM, there is only one IP, the DEBUGSS.
->> There are probably a bunch of internal clock management inside it that are not
->> exposed to PRCM.
->>
->> The confusing part is that in theory all these entries can be accessed by the
->> same OCP port, and should potentially have this flags.
->> The point is that for the moment, we are mainly using that flag to get the
->> SYSCONFIG.
->> We already discussed that, but I think we should modify this flag to highlight
->> the SYSCONFIG / SYSSTATUS availability.
->> Maybe with something like ADDR_SYSCONFIG?
->>
->> Any thought?
+> Signed-off-by: Anders Darander<anders@chargestorm.se>
+
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+I integrate this patch in an at91 "fixes" branch on:
+https://github.com/at91linux/linux-at91/commits/at91-fixes
+
+BTW, I changed the subject of your patch because it was close to another 
+one the we had written for the high speed USB gadget controller...
+
+Thanks, best regards,
+
+> ---
 >
-> Well, the ADDR_TYPE_RT flag in this hwmod would indicate the address space
-> of the DEBUGSS's OCP header registers, not the MIPI STM's OCP header
-> registers.
+> Patched based on 3.2-rc3, but should apply to older and newer trees as well.
 >
-> So if the MIPI STM's OCP header registers also control the entire DEBUGSS
-> power management, then the current layout makes sense.  Otherwise, the
-> MIPI STM should be created as a separate hwmod.
+> Verified on a custom, at91sam9g20 based board.
+>
+> ---
+>   arch/arm/mach-at91/at91rm9200_devices.c  |    2 +-
+>   arch/arm/mach-at91/at91sam9260_devices.c |    2 +-
+>   arch/arm/mach-at91/at91sam9261_devices.c |    2 +-
+>   arch/arm/mach-at91/at91sam9263_devices.c |    2 +-
+>   4 files changed, 4 insertions(+), 4 deletions(-)
+>
+> diff --git a/arch/arm/mach-at91/at91rm9200_devices.c b/arch/arm/mach-at91/at91rm9200_devices.c
+> index 66591fa..ad93068 100644
+> --- a/arch/arm/mach-at91/at91rm9200_devices.c
+> +++ b/arch/arm/mach-at91/at91rm9200_devices.c
+> @@ -83,7 +83,7 @@ void __init at91_add_device_usbh(struct at91_usbh_data *data) {}
+>    *  USB Device (Gadget)
+>    * -------------------------------------------------------------------- */
+>
+> -#ifdef CONFIG_USB_GADGET_AT91
+> +#ifdef CONFIG_USB_AT91
+>   static struct at91_udc_data udc_data;
+>
+>   static struct resource udc_resources[] = {
+> diff --git a/arch/arm/mach-at91/at91sam9260_devices.c b/arch/arm/mach-at91/at91sam9260_devices.c
+> index 25e3464..629fa97 100644
+> --- a/arch/arm/mach-at91/at91sam9260_devices.c
+> +++ b/arch/arm/mach-at91/at91sam9260_devices.c
+> @@ -84,7 +84,7 @@ void __init at91_add_device_usbh(struct at91_usbh_data *data) {}
+>    *  USB Device (Gadget)
+>    * -------------------------------------------------------------------- */
+>
+> -#ifdef CONFIG_USB_GADGET_AT91
+> +#ifdef CONFIG_USB_AT91
+>   static struct at91_udc_data udc_data;
+>
+>   static struct resource udc_resources[] = {
+> diff --git a/arch/arm/mach-at91/at91sam9261_devices.c b/arch/arm/mach-at91/at91sam9261_devices.c
+> index ae78f4d..a178b58 100644
+> --- a/arch/arm/mach-at91/at91sam9261_devices.c
+> +++ b/arch/arm/mach-at91/at91sam9261_devices.c
+> @@ -87,7 +87,7 @@ void __init at91_add_device_usbh(struct at91_usbh_data *data) {}
+>    *  USB Device (Gadget)
+>    * -------------------------------------------------------------------- */
+>
+> -#ifdef CONFIG_USB_GADGET_AT91
+> +#ifdef CONFIG_USB_AT91
+>   static struct at91_udc_data udc_data;
+>
+>   static struct resource udc_resources[] = {
+> diff --git a/arch/arm/mach-at91/at91sam9263_devices.c b/arch/arm/mach-at91/at91sam9263_devices.c
+> index ad017eb..d5fbac9 100644
+> --- a/arch/arm/mach-at91/at91sam9263_devices.c
+> +++ b/arch/arm/mach-at91/at91sam9263_devices.c
+> @@ -92,7 +92,7 @@ void __init at91_add_device_usbh(struct at91_usbh_data *data) {}
+>    *  USB Device (Gadget)
+>    * -------------------------------------------------------------------- */
+>
+> -#ifdef CONFIG_USB_GADGET_AT91
+> +#ifdef CONFIG_USB_AT91
+>   static struct at91_udc_data udc_data;
+>
+>   static struct resource udc_resources[] = {
 
-There is no OCP TA registers in this case, so finding the SYSCONFIG is 
-the only important thing to do to set them properly at boot time.
 
-> It appears to me that the DEBUGSS has no OCP header registers of its own.
-
-Yes, indeed.
-
-> Upon reflection, rather than creating a macro hwmod for the DEBUGSS, it
-> seems to make more sense to add hwmods for its two internal interconnects,
-> then to create another hwmod for the MIPI STM device.
-
-Mmm, I'm not sure it makes sense to do that. There is only one PRCM 
-control entry for all these IPs inside the debugss "module". The diagram 
-28.9 seems to indicate that the STM is accessed through L3_INSTR using 
-some internals L4_CFG_EMU and L3_INSTR_EMU buses.
-
-So for the hwmod / driver point of view having only one node for the 
-debugss IPs connected to L3_INSTR is accurate enough. This is as well 
-how the memory mapping is represented in the 28-42 table (28.11$).
-
-Moreover, having two different nodes controlled by a single PRCM entry 
-will raise some dependency issue with STM and DEBUGSS.
-
-Splitting them will add some extra complexity that is not necessary in 
-our case.
-
-Regards,
-Benoit
+-- 
+Nicolas Ferre
