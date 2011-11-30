@@ -1,40 +1,79 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 30 Nov 2011 08:32:27 +0100
-Subject: does non-continuous RAM means I need to select the sparse memory
- model?
-In-Reply-To: <CAOMZO5DX_ZvCOu+pqZpJ7Ni2B=qmSFCZTHnuzKt==OsBsJZH=Q@mail.gmail.com>
-References: <20111129203010.GA26618@pengutronix.de>
- <CAOMZO5DX_ZvCOu+pqZpJ7Ni2B=qmSFCZTHnuzKt==OsBsJZH=Q@mail.gmail.com>
-Message-ID: <20111130073227.GB26618@pengutronix.de>
+From: anders@chargestorm.se (Anders Darander)
+Date: Wed, 30 Nov 2011 08:47:44 +0100
+Subject: [PATCH] ARM: at91: Fix USB gadget registration
+Message-ID: <1322639264-24333-1-git-send-email-anders@chargestorm.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Fabio,
+Since 193ab2a6070039e7ee2b9b9bebea754a7c52fd1b, various AT91 boards don't
+register at91_udc anymore due to depending on a now non-existing symbol.
+Fix the symbol name.
 
-On Tue, Nov 29, 2011 at 10:39:10PM -0200, Fabio Estevam wrote:
-> 2011/11/29 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-> > Hello,
-> >
-> > I'm currently working on a new arch port and my current machine has RAM
-> > at 0x10000000 and 0x80000000. So there is a big hole between the two
-> > banks. When selecting the sparse memory model it works, but when
-> > selecting flat the machine runs into a BUG in mark_bootmem() called by
-> > free_unused_memmap() to free the space between the two banks.
-> 
-> My understanding is that you have to select ARCH_HAS_HOLES_MEMORYMODEL.
-I tried that, but it didn't help.
+Signed-off-by: Anders Darander <anders@chargestorm.se>
+---
+
+Patched based on 3.2-rc3, but should apply to older and newer trees as well.
+
+Verified on a custom, at91sam9g20 based board.
+
+---
+ arch/arm/mach-at91/at91rm9200_devices.c  |    2 +-
+ arch/arm/mach-at91/at91sam9260_devices.c |    2 +-
+ arch/arm/mach-at91/at91sam9261_devices.c |    2 +-
+ arch/arm/mach-at91/at91sam9263_devices.c |    2 +-
+ 4 files changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/mach-at91/at91rm9200_devices.c b/arch/arm/mach-at91/at91rm9200_devices.c
+index 66591fa..ad93068 100644
+--- a/arch/arm/mach-at91/at91rm9200_devices.c
++++ b/arch/arm/mach-at91/at91rm9200_devices.c
+@@ -83,7 +83,7 @@ void __init at91_add_device_usbh(struct at91_usbh_data *data) {}
+  *  USB Device (Gadget)
+  * -------------------------------------------------------------------- */
  
-> > Is that expected (meaning I cannot use the flat model)? I currently
-> > don't have another machine handy that has >1 memory back to test that.
-> 
-> In case you have access to a MX35PDK you can try on this board as it does have
-> the memory hole.
-I will ask in the office later today if we have such a machine ready for
-me to test.
-
-Thanks
-Uwe
-
+-#ifdef CONFIG_USB_GADGET_AT91
++#ifdef CONFIG_USB_AT91
+ static struct at91_udc_data udc_data;
+ 
+ static struct resource udc_resources[] = {
+diff --git a/arch/arm/mach-at91/at91sam9260_devices.c b/arch/arm/mach-at91/at91sam9260_devices.c
+index 25e3464..629fa97 100644
+--- a/arch/arm/mach-at91/at91sam9260_devices.c
++++ b/arch/arm/mach-at91/at91sam9260_devices.c
+@@ -84,7 +84,7 @@ void __init at91_add_device_usbh(struct at91_usbh_data *data) {}
+  *  USB Device (Gadget)
+  * -------------------------------------------------------------------- */
+ 
+-#ifdef CONFIG_USB_GADGET_AT91
++#ifdef CONFIG_USB_AT91
+ static struct at91_udc_data udc_data;
+ 
+ static struct resource udc_resources[] = {
+diff --git a/arch/arm/mach-at91/at91sam9261_devices.c b/arch/arm/mach-at91/at91sam9261_devices.c
+index ae78f4d..a178b58 100644
+--- a/arch/arm/mach-at91/at91sam9261_devices.c
++++ b/arch/arm/mach-at91/at91sam9261_devices.c
+@@ -87,7 +87,7 @@ void __init at91_add_device_usbh(struct at91_usbh_data *data) {}
+  *  USB Device (Gadget)
+  * -------------------------------------------------------------------- */
+ 
+-#ifdef CONFIG_USB_GADGET_AT91
++#ifdef CONFIG_USB_AT91
+ static struct at91_udc_data udc_data;
+ 
+ static struct resource udc_resources[] = {
+diff --git a/arch/arm/mach-at91/at91sam9263_devices.c b/arch/arm/mach-at91/at91sam9263_devices.c
+index ad017eb..d5fbac9 100644
+--- a/arch/arm/mach-at91/at91sam9263_devices.c
++++ b/arch/arm/mach-at91/at91sam9263_devices.c
+@@ -92,7 +92,7 @@ void __init at91_add_device_usbh(struct at91_usbh_data *data) {}
+  *  USB Device (Gadget)
+  * -------------------------------------------------------------------- */
+ 
+-#ifdef CONFIG_USB_GADGET_AT91
++#ifdef CONFIG_USB_AT91
+ static struct at91_udc_data udc_data;
+ 
+ static struct resource udc_resources[] = {
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+1.7.7.3
