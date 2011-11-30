@@ -1,28 +1,42 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 30 Nov 2011 14:26:22 +0100
-Subject: [PATCH v2] net: fec: Select the FEC driver by default for i.MX
- SoCs
-In-Reply-To: <20111130132536.GD26618@pengutronix.de>
-References: <1322652717-2685-1-git-send-email-fabio.estevam@freescale.com>
- <20111130132536.GD26618@pengutronix.de>
-Message-ID: <20111130132622.GE26618@pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 30 Nov 2011 13:34:40 +0000
+Subject: [PATCH v3 3/5] ARM: vexpress: Add DT support in v2m
+In-Reply-To: <1322653600.3164.153.camel@hornet.cambridge.arm.com>
+References: <1322579473-8804-1-git-send-email-pawel.moll@arm.com>
+ <201111292119.11554.arnd@arndb.de>
+ <1322653600.3164.153.camel@hornet.cambridge.arm.com>
+Message-ID: <201111301334.40372.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 30, 2011 at 02:25:36PM +0100, Uwe Kleine-K?nig wrote:
-> On Wed, Nov 30, 2011 at 09:31:57AM -0200, Fabio Estevam wrote:
-> > Let the FEC driver be built by default.
-> > 
-> > Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> Just one small nitpick below. Other than that:
+On Wednesday 30 November 2011, Pawel Moll wrote:
 > 
-> Suggested-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> On Tue, 2011-11-29 at 21:19 +0000, Arnd Bergmann wrote:
+> > On Tuesday 29 November 2011, Pawel Moll wrote:
+> > > +                       compact-flash at 1a000 {
+> > > +                               compatible = "ata-generic";
+> > > +                               reg = <0x1a000 0x100
+> > > +                                      0x1a100 0xf00>;
+> > > +                               reg-shift = <2>;
+> > > +                       };
+> > 
+> > Shouldn't there also be a more specific "compatible" value, in case we have
+> > to detect this CF slot for some reason?
+> 
+> It was the compatible-value-of-choice in
+> "drivers/ata/pata_of_platform.c", unfortunately undocumented - as I have
+> just realized - in the "Documentation/devicetree/bindings"...
 
-ah, and maybe point out the breaking commit in the log.
+You should certainly *also* have "ata-generic" in there as the value
+that is used by the existing driver, but it usually makes sense to have
+a more specific value in addition, just as a precaution for the future,
+in case that the specific hardware is not entirely identical to all others
+and we have to do a separate workaround.
 
-Uwe
+> > Is there actually no interrupt?
+> 
+> No, polling mode only. And yes, it works ;-)
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Fascinating
+
+	Arnd
