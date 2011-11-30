@@ -1,100 +1,40 @@
-From: Ian.Campbell@citrix.com (Ian Campbell)
-Date: Wed, 30 Nov 2011 16:27:53 +0000
-Subject: [Xen-devel] [ANNOUNCE] Xen port to Cortex-A15 / ARMv7 with virt
- extensions
-In-Reply-To: <201111301432.54463.arnd@arndb.de>
-References: <alpine.DEB.2.00.1111281009090.31179@kaball-desktop>
- <201111301303.23851.arnd@arndb.de>
- <1322659535.31810.97.camel@zakaz.uk.xensource.com>
- <201111301432.54463.arnd@arndb.de>
-Message-ID: <1322670473.31810.129.camel@zakaz.uk.xensource.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 30 Nov 2011 17:53:01 +0100
+Subject: [GIT PULL] at91 fixes for 3.2-rc4
+Message-ID: <4ED65F6D.4020402@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2011-11-30 at 14:32 +0000, Arnd Bergmann wrote:
-> On Wednesday 30 November 2011, Ian Campbell wrote:
-> > On Wed, 2011-11-30 at 13:03 +0000, Arnd Bergmann wrote:
-> > For domU the DT would presumably be constructed by the toolstack (in
-> > dom0 userspace) as appropriate for the guest configuration. I guess this
-> > needn't correspond to any particular "real" hardware platform.
-> 
-> Correct, but it needs to correspond to some platform that is supported
-> by the guest OS, which leaves the choice between emulating a real
-> hardware platform, adding a completely new platform specifically for
-> virtual machines, or something in between the two.
-> 
-> What I suggested to the KVM developers is to start out with the
-> vexpress platform, but then generalize it to the point where it fits
-> your needs. All hardware that one expects a guest to have (GIC, timer,
-> ...) will still show up in the same location as on a real vexpress,
-> while anything that makes no sense or is better paravirtualized (LCD,
-> storage, ...) just becomes optional and has to be described in the
-> device tree if it's actually there.
+Hi Arnd,
 
-That's along the lines of what I was thinking as well.
+Here are a few fixes for AT91. I have noted 3.2-rc4 in the subject but it
+is true that it can go in another -rc revision as I have seen your recent
+pull request to Linus...
 
-The DT contains the address of GIC, timer etc as well right? So at least
-in principal we needn't provide e.g. the GIC at the same address as any
-real platform but in practice I expect we will.
+The following changes since commit caca6a03d365883564885f2c1da3e88dcf65d139:
 
-In principal we could also offer the user options as to which particular
-platform a guest looks like.
+  Linux 3.2-rc3 (2011-11-23 20:20:28 -0800)
 
-> > > This would also be the place where you tell the guest that it should
-> > > look for PV devices. I'm not familiar with how Xen announces PV
-> > > devices to the guest on other architectures, but you have the
-> > > choice between providing a full "binding", i.e. a formal specification
-> > > in device tree format for the guest to detect PV devices in the
-> > > same way as physical or emulated devices, or just providing a single
-> > > place in the device tree in which the guest detects the presence
-> > > of a xen device bus and then uses hcalls to find the devices on that
-> > > bus.
-> > 
-> > On x86 there is an emulated PCI device which serves as the hooking point
-> > for the PV drivers. For ARM I don't think it would be unreasonable to
-> > have a DT entry instead. I think it would be fine just represent the
-> > root of the "xenbus" and further discovery would occur using the normal
-> > xenbus mechanisms (so not a full binding). AIUI for buses which are
-> > enumerable this is the preferred DT scheme to use.
-> 
-> In general that is the case, yes. One could argue that any software
-> protocol between Xen and the guest is as good as any other, so it
-> makes sense to use the device tree to describe all devices here.
-> The counterargument to that is that Linux and other OSs already
-> support Xenbus, so there is no need to come up with a new binding.
+are available in the git repository at:
+  git://github.com/at91linux/linux-at91.git at91-fixes
 
-Right.
+Anders Darander (1):
+      ARM: at91: Fix USB AT91 gadget registration
 
-> I don't care much either way, but I think it would be good to
-> use similar solutions across all hypervisors. The two options
-> that I've seen discussed for KVM were to use either a virtual PCI
-> bus with individual virtio-pci devices as on the PC, or to
-> use the new virtio-mmio driver and individually put virtio devices
-> into the device tree.
-> 
-> > > Another topic is the question whether there are any hcalls that
-> > > we should try to standardize before we get another architecture
-> > > with multiple conflicting hcall APIs as we have on x86 and powerpc.
-> > 
-> > The hcall API we are currently targeting is the existing Xen API (at
-> > least the generic parts of it). These generally deal with fairly Xen
-> > specific concepts like grant tables etc.
-> 
-> Ok. It would of course still be possible to agree on an argument passing
-> convention so that we can share the macros used to issue the hcalls,
-> even if the individual commands are all different.
+Christian Hitz (1):
+      ARM: at91: fix NAND bus width decoding from system_rev
 
-I think it likely that we can all agree on a common calling convention
-for N-argument hypercalls. It doubt there are that many useful choices
-with conflicting requirements yet strongly compelling advantages.
+Jean-Christophe PLAGNIOL-VILLARD (1):
+      ARM: at91: fix clock conid for atmel_tcb.1 on 9260/9g20
 
->  I think I also
-> remember talk about the need for a set of hypervisor independent calls
-> that everyone should implement, but I can't remember what those were.
+ arch/arm/mach-at91/at91rm9200_devices.c      |    2 +-
+ arch/arm/mach-at91/at91sam9260.c             |    6 +++---
+ arch/arm/mach-at91/at91sam9260_devices.c     |    2 +-
+ arch/arm/mach-at91/at91sam9261_devices.c     |    2 +-
+ arch/arm/mach-at91/at91sam9263_devices.c     |    2 +-
+ arch/arm/mach-at91/include/mach/system_rev.h |    2 +-
+ 6 files changed, 8 insertions(+), 8 deletions(-)
 
-I'd not heard of this, maybe I just wasn't looking the right way though.
-
-> Maybe we can split the number space into a range of some generic and
-> some vendor specific hcalls?
-
-Ian.
+Thanks, best regards,
+-- 
+Nicolas Ferre
