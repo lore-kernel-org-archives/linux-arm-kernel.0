@@ -1,63 +1,69 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Wed, 30 Nov 2011 11:34:51 +0000
-Subject: [PATCH v3 2/5] ARM: vexpress: Get rid of MMIO_P2V
-In-Reply-To: <201111292115.10833.arnd@arndb.de>
-References: <1322579473-8804-1-git-send-email-pawel.moll@arm.com>
- <1322579473-8804-3-git-send-email-pawel.moll@arm.com>
- <201111292115.10833.arnd@arndb.de>
-Message-ID: <1322652891.3164.144.camel@hornet.cambridge.arm.com>
+From: nsekhar@ti.com (Nori, Sekhar)
+Date: Wed, 30 Nov 2011 11:37:21 +0000
+Subject: [PATCH v3 0/5] ARM: davinci: re-arrange definitions to have a
+ common	davinci header
+In-Reply-To: <1321525138-3928-1-git-send-email-manjunath.hadli@ti.com>
+References: <1321525138-3928-1-git-send-email-manjunath.hadli@ti.com>
+Message-ID: <DF0F476B391FA8409C78302C7BA518B60354BC@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2011-11-29 at 21:15 +0000, Arnd Bergmann wrote:
-> On Tuesday 29 November 2011, Pawel Moll wrote:
-> > @@ -1,6 +1,3 @@
-> > -#define __MMIO_P2V(x)  (((x) & 0xfffff) | (((x) & 0x0f000000) >> 4) | 0xf8000000)
-> > -#define MMIO_P2V(x)    ((void __iomem *)__MMIO_P2V(x))
-> > -
-> ...
-> > +
-> > +/* 2MB large area for motherboard's peripherals static mapping */
-> > +#define V2M_PERIPH 0xf8000000
-> > +#define V2M_PERIPH_P2V(offset) ((void __iomem *)(V2M_PERIPH | (offset)))
-> > +
-> > +/* Tile's peripherals static mappings should start here */
-> > +#define V2T_PERIPH 0xf8200000
-> > +#define V2T_PERIPH_P2V(offset) ((void __iomem *)(V2T_PERIPH | (offset)))
-> 
-> I think it would be even better if you could express the same with
-> pointer arithmetic instead of the macro, like:
-> 
-> #define V2M_PERIPH ((void __iomem *)0xf8000000)
-> #define V2T_PERIPH ((void __iomem *)0xf8200000)
-> 
-> and then instead of 
-> 
-> +       gic_init(0, 29, V2T_PERIPH_P2V(A9_MPCORE_GIC_DIST),
-> +                V2T_PERIPH_P2V(A9_MPCORE_GIC_CPU));
-> 
-> do 
-> 
-> +       gic_init(0, 29, V2T_PERIPH + A9_MPCORE_GIC_DIST,
-> +                V2T_PERIPH + A9_MPCORE_GIC_CPU);
-> 
-> and so on. This ends up being more readable IMHO because it
-> means you don't have to know what the macro does.
+Hi Manju,
 
-I wouldn't mind that, it's just that the V2M_PERIPH is also used in the
-map_desc:
+On Thu, Nov 17, 2011 at 15:48:53, Hadli, Manjunath wrote:
+> Re-arrange definitions and remove unnecessary code so that we canx
 
-static struct map_desc v2m_io_desc[] __initdata = {
-        {
-                .virtual        = V2M_PERIPH,
+These are two different things and should be done in separate
+patches. Sergei has already pointed out couple of instances.
 
-and as the .virtual is unsigned long I'd need a cast in one place or the
-other.
+> have a common header for all davinci platforms. This will enable
 
-My best hope is that once Nico's "ioremap optimization" is pulled
-(http://thread.gmane.org/gmane.linux.ports.arm.kernel/140974), I'll be
-able to replace the _P2V macros with ioremap()s.
+You mean all DMx platforms? DA8x and TNETVx will still have
+their own header files after this patch set.
 
-Cheers!
+> us to share defines and enable common routines to be used without
+> polluting hardware.h.
+>  This patch set forms the base for a later set of patches for having
+> a common system module base address (DAVINCI_SYSTEM_MODULE_BASE).
+> 
+> Changes from previous version(As per Sergei's comments):
+> 1. Renamed davinci_common.h to davinci.h.
+> 2. Added extra line whereever appropriate.
+> 3. removed unnecessary header inclusion.
+> 
+> Manjunath Hadli (5):
+>   ARM: davinci: dm644x: remove the macros from the header to move to c
+>     file
+>   ARM: davinci: dm365: remove the macros from the header to move to c
+>     file
+>   ARM: davinci: dm646x: remove the macros from the header to move to c
+>     file
 
-Pawe?
+These headlines should describe the changes better. You are moving
+_private_ defines to C file (to reduce header file pollution). That
+should be clear from the headline.
+
+>   ARM: davinci: create new common platform header for davinci
+>   ARM: davinci: delete individual platform header files and use a
+>     common header
+> 
+>  arch/arm/mach-davinci/board-dm355-evm.c      |    2 +-
+>  arch/arm/mach-davinci/board-dm355-leopard.c  |    2 +-
+>  arch/arm/mach-davinci/board-dm365-evm.c      |    2 +-
+>  arch/arm/mach-davinci/board-dm644x-evm.c     |    2 +-
+>  arch/arm/mach-davinci/board-dm646x-evm.c     |    2 +-
+>  arch/arm/mach-davinci/board-neuros-osd2.c    |    2 +-
+>  arch/arm/mach-davinci/board-sffsdr.c         |    2 +-
+>  arch/arm/mach-davinci/dm355.c                |    2 +-
+>  arch/arm/mach-davinci/dm365.c                |   18 +++++-
+>  arch/arm/mach-davinci/dm644x.c               |    9 +++-
+>  arch/arm/mach-davinci/dm646x.c               |    9 +++-
+>  arch/arm/mach-davinci/include/mach/davinci.h |   88 ++++++++++++++++++++++++++
+
+This file should be placed in arch/arm/mach-davinci itself
+since the definitions are private to arch/arm/mach-davinci.
+Russell has been complaining about placing unnecessary files
+in include/mach.
+
+Thanks,
+Sekhar
