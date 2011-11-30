@@ -1,102 +1,47 @@
-From: Ian.Campbell@citrix.com (Ian Campbell)
-Date: Wed, 30 Nov 2011 13:25:34 +0000
-Subject: [Xen-devel] [ANNOUNCE] Xen port to Cortex-A15 / ARMv7 with virt
- extensions
-In-Reply-To: <201111301303.23851.arnd@arndb.de>
-References: <alpine.DEB.2.00.1111281009090.31179@kaball-desktop>
- <201111292129.20444.arnd@arndb.de>
- <alpine.DEB.2.00.1111301053300.31179@kaball-desktop>
- <201111301303.23851.arnd@arndb.de>
-Message-ID: <1322659535.31810.97.camel@zakaz.uk.xensource.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 30 Nov 2011 14:25:36 +0100
+Subject: [PATCH v2] net: fec: Select the FEC driver by default for i.MX
+ SoCs
+In-Reply-To: <1322652717-2685-1-git-send-email-fabio.estevam@freescale.com>
+References: <1322652717-2685-1-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <20111130132536.GD26618@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2011-11-30 at 13:03 +0000, Arnd Bergmann wrote:
-> On Wednesday 30 November 2011, Stefano Stabellini wrote:
-> > On Tue, 29 Nov 2011, Arnd Bergmann wrote:
-> > > On Tuesday 29 November 2011, Stefano Stabellini wrote:
-> > > 
-> > > Do you have a pointer to the kernel sources for the Linux guest?
-> > 
-> > We have very few changes to the Linux kernel at the moment (only 3
-> > commits!), just enough to be able to issue hypercalls and start a PV
-> > console.
-> > 
-> > A git branch is available here (not ready for submission):
-> > 
-> > git://xenbits.xen.org/people/sstabellini/linux-pvhvm.git arm
+On Wed, Nov 30, 2011 at 09:31:57AM -0200, Fabio Estevam wrote:
+> Let the FEC driver be built by default.
 > 
-> Ok, interesting. There really isn't much of the platform support
-> that I was expecting there. I finally found the information
-> I was looking for in the xen construct_dom0() function:
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+Just one small nitpick below. Other than that:
+
+Suggested-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+
+> ---
+> Changes since v1: 
+> Move the FEC selection into Kconfig instead of .config file
 > 
->  167     regs->r0 = 0; /* SBZ */
->  168     regs->r1 = 2272; /* Machine NR: Versatile Express */
->  169     regs->r2 = 0xc0000100; /* ATAGS */
+>  drivers/net/ethernet/freescale/Kconfig |    1 +
+>  1 files changed, 1 insertions(+), 0 deletions(-)
 > 
-> What this means is that you are emulating the current ARM/Keil reference
-> board, at least to the degree that is necessary to get the guest started.
-> 
-> This is the same choice people have made for KVM, but it's not
-> necessarily the best option in the long run. In particular, this
-> board has a lot of hardware that you claim to have by putting the
-> machine number there, when you don't really want to emulate it.
+> diff --git a/drivers/net/ethernet/freescale/Kconfig b/drivers/net/ethernet/freescale/Kconfig
+> index c520cfd..ae269ad 100644
+> --- a/drivers/net/ethernet/freescale/Kconfig
+> +++ b/drivers/net/ethernet/freescale/Kconfig
+> @@ -22,6 +22,7 @@ if NET_VENDOR_FREESCALE
+>  
+>  config FEC
+>  	bool "FEC ethernet controller (of ColdFire and some i.MX CPUs)"
+> +	default ARCH_MXC || ARCH_MXS if ARM
+>  	depends on (M523x || M527x || M5272 || M528x || M520x || M532x || \
+>  		   ARCH_MXC || ARCH_MXS)
+I'd write the depends line first, then default and then select.
 
-This code is actually setting up dom0 which (for the most part) sees the
-real hardware.
+Best regards
+Uwe
 
-The hardcoding of the platform is just a short term hack.
+>  	select PHYLIB
 
-> Pawell Moll is working on a variant of the vexpress code that uses
-> the flattened device tree to describe the present hardware [1], and
-> I think that would be a much better target for an official release.
-> Ideally, the hypervisor should provide the device tree binary (dtb)
-> to the guest OS describing the hardware that is actually there.
-
-Agreed. Our intention was to use DT so this fits perfectly with our
-plans.
-
-For dom0 we would expose a (possibly filtered) version of the DT given
-to us by the firmware (e.g. we might hide a serial port to reserve it
-for Xen's use, we'd likely fiddle with the memory map etc).
-
-For domU the DT would presumably be constructed by the toolstack (in
-dom0 userspace) as appropriate for the guest configuration. I guess this
-needn't correspond to any particular "real" hardware platform.
-
-> This would also be the place where you tell the guest that it should
-> look for PV devices. I'm not familiar with how Xen announces PV
-> devices to the guest on other architectures, but you have the
-> choice between providing a full "binding", i.e. a formal specification
-> in device tree format for the guest to detect PV devices in the
-> same way as physical or emulated devices, or just providing a single
-> place in the device tree in which the guest detects the presence
-> of a xen device bus and then uses hcalls to find the devices on that
-> bus.
-
-On x86 there is an emulated PCI device which serves as the hooking point
-for the PV drivers. For ARM I don't think it would be unreasonable to
-have a DT entry instead. I think it would be fine just represent the
-root of the "xenbus" and further discovery would occur using the normal
-xenbus mechanisms (so not a full binding). AIUI for buses which are
-enumerable this is the preferred DT scheme to use.
-
-> Another topic is the question whether there are any hcalls that
-> we should try to standardize before we get another architecture
-> with multiple conflicting hcall APIs as we have on x86 and powerpc.
-
-The hcall API we are currently targeting is the existing Xen API (at
-least the generic parts of it). These generally deal with fairly Xen
-specific concepts like grant tables etc.
-
-Ian.
-
-> 
-> 	Arnd
-> 
-> [1] http://www.spinics.net/lists/arm-kernel/msg149604.html
-> 
-> _______________________________________________
-> Xen-devel mailing list
-> Xen-devel at lists.xensource.com
-> http://lists.xensource.com/xen-devel
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
