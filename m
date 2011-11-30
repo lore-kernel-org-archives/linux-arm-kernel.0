@@ -1,30 +1,48 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Wed, 30 Nov 2011 13:55:53 +0200
-Subject: [RFC] virtio: use mandatory barriers for remote processor vdevs
-In-Reply-To: <20111129151958.GA31789@redhat.com>
-References: <1322569886-13055-1-git-send-email-ohad@wizery.com>
- <20111129131110.GC19157@redhat.com>
- <CAK=WgbZoGYVyKt=XXvnPVdh0koSBJC0zcgkLaYRkmjwBLOFA-A@mail.gmail.com>
- <20111129151958.GA31789@redhat.com>
-Message-ID: <CAK=WgbZ5aBFNro3XC0cN+Ao4ZWrBHwwd3d__CSHA=n56gKmKXw@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 30 Nov 2011 13:00:43 +0100
+Subject: [PATCH 1/7] pinctrl: enable pxa3xx pinmux
+In-Reply-To: <1322262544-7854-2-git-send-email-haojian.zhuang@marvell.com>
+References: <1322262544-7854-1-git-send-email-haojian.zhuang@marvell.com>
+ <1322262544-7854-2-git-send-email-haojian.zhuang@marvell.com>
+Message-ID: <CACRpkdY=zvObTkLkzVRWVoh3YVVkV5g78sTWGH0VygUdmmCTLg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 29, 2011 at 5:19 PM, Michael S. Tsirkin <mst@redhat.com> wrote:
-> On Tue, Nov 29, 2011 at 03:57:19PM +0200, Ohad Ben-Cohen wrote:
->> > Is an extra branch faster or slower than reverting d57ed95?
->>
->> Sorry, unfortunately I have no way to measure this, as I don't have
->> any virtualization/x86 setup. I'm developing on ARM SoCs, where
->> virtualization hardware is coming, but not here yet.
->
-> You can try using the micro-benchmark in tools/virtio/.
+Hi Haojian,
 
-Hmm, care to show me exactly what do you mean ?
+I thought about this last night:
 
-Though I somewhat suspect that any micro-benchmarking I'll do with my
-random ARM SoC will not have much value to real virtualization/x86
-workloads.
+On Sat, Nov 26, 2011 at 12:08 AM, Haojian Zhuang
+<haojian.zhuang@marvell.com> wrote:
 
-Thanks,
-Ohad.
+> +/* These 135 pins exists in PXA300, PXA310 & PXA320 */
+> +#define PXA3XX_COMMON_PINS() ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
+> + ? ? ? PINCTRL_PIN(0, "GPIO0"), ? ? ? ?PINCTRL_PIN(1, "GPIO1"), ? ? ? ?\
+(...)
++#ifdef CONFIG_ARCH_PXA
++static struct pinctrl_pin_desc pxa300_pads[] = {
++       PXA3XX_COMMON_PINS(),
++       PINCTRL_PIN(128, "GPIO0_2"),    PINCTRL_PIN(129, "GPIO1_2"),
+
+Defining a huge macro like PXA3XX_COMMON_PINS() and reusing
+all over the place doesn't scale.
+
+The real fix is that I fix so that you can call
+pinmux_register_mappings() more than one time.
+
+So it will look like this or similar:
+
+pinmux_register_mappings(common_pins);
+if (plat->is_pxa)
+  pinmux_register_mappings(pxa_pins);
+if (plat->is_mmp)
+  pinmux_register_mappings(mmp_pins);
+
+etc.
+
+Since I'm anyway fixing up this function I'll see if
+I can simply fit this in as patch 2/2 and send out
+ASAP.
+
+Yours,
+Linus Walleij
