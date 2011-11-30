@@ -1,31 +1,52 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 30 Nov 2011 14:40:39 -0600
-Subject: [PATCH v2] ARM: pl2x0/pl310: Refactor Kconfig to be more
- maintainable
-In-Reply-To: <1322675975-4471-1-git-send-email-dave.martin@linaro.org>
-References: <1322675975-4471-1-git-send-email-dave.martin@linaro.org>
-Message-ID: <4ED694C7.6020502@gmail.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Wed, 30 Nov 2011 12:41:05 -0800
+Subject: [RFC V1 1/8] clk: support static parent
+In-Reply-To: <20111124003044.GA15876@b20223-02.ap.freescale.net>
+References: <1322046755-13511-1-git-send-email-richard.zhao@linaro.org>
+ <1322046755-13511-2-git-send-email-richard.zhao@linaro.org>
+ <CAPtuhThVr8si2wRpx0i32=PQCC=4h1GZr6HkRsCLHbfXBef4XA@mail.gmail.com>
+ <20111124003044.GA15876@b20223-02.ap.freescale.net>
+Message-ID: <CAPtuhTg4a5gK96xd_jrFfYqqcdCLEFfT18_zTnufoSa4DCN2Ww@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/30/2011 11:59 AM, Dave Martin wrote:
-> Making CACHE_L2X0 depends on (huge list of MACH_ and ARCH_ configs)
-> is bothersome to maintain and likely to lead to merge conflicts.
-> 
-> This patch moves the knowledge of which platforms have a L2x0 or
-> PL310 cache controller to the individual machines.  To enable this,
-> a new HAVE_L2X0_L2CC config option is introduced to allow machines
-> to indicate that they have such a cache controller independently of
-> each other.
-> 
-> Signed-off-by: Dave Martin <dave.martin@linaro.org>
-> ---
-> Changes since v1:
-> 
-> v2: Add HAVE_L2X0_L2CC instead of CACHE_L2X0 for SOC_IMX6Q.
->     (Thanks to Shawn Guo for suggesting this.)
-> 
+On Wed, Nov 23, 2011 at 4:30 PM, Richard Zhao <richard.zhao@linaro.org> wrote:
+> On Wed, Nov 23, 2011 at 02:11:40PM -0800, Mike Turquette wrote:
+>> On Wed, Nov 23, 2011 at 3:12 AM, Richard Zhao <richard.zhao@linaro.org> wrote:
+> This patch didn't remove .get_parent call. We trust .get_parent most.
+> If .get_parent must not be NULL, clocks without mux have to duplicate
+> the redundant get_parent function.
 
-Did you not see my comments on v1?
+I've taken this in for V4 to accommodate DT clk binding support.  I've
+put a comment in clk_init concerning use of .get_parent versus
+statically initializing .parent.
 
-Rob
+Thanks,
+Mike
+
+>
+> Thanks
+> Richard
+>>
+>> Check out the way that the simple fixed-rate clk and simple gateable
+>> clk does this in drivers/clk/clk-basic.c
+>>
+>> Regards,
+>> Mike
+>>
+>> >
+>> > ? ? ? ?if (clk->ops->recalc_rate)
+>> > ? ? ? ? ? ? ? ?clk->rate = clk->ops->recalc_rate(clk);
+>> > --
+>> > 1.7.5.4
+>> >
+>> >
+>> >
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>
+>
+>
