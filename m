@@ -1,44 +1,31 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Wed, 30 Nov 2011 11:14:00 +0000
-Subject: [PATCH v3 0/5] Versatile Express DT support
-In-Reply-To: <20111130104842.GA2045@localhost.localdomain>
-References: <1322579473-8804-1-git-send-email-pawel.moll@arm.com>
- <20111129170013.GD2829@localhost.localdomain>
- <1322587019.3164.111.camel@hornet.cambridge.arm.com>
- <20111130104842.GA2045@localhost.localdomain>
-Message-ID: <1322651640.3164.135.camel@hornet.cambridge.arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 30 Nov 2011 11:29:32 +0000
+Subject: [PATCH v2 1/6] ARM: idmap: populate identity map pgd at init time
+ using .init.text
+In-Reply-To: <1322504937-24718-2-git-send-email-will.deacon@arm.com>
+References: <1322504937-24718-1-git-send-email-will.deacon@arm.com>
+ <1322504937-24718-2-git-send-email-will.deacon@arm.com>
+Message-ID: <CAHkRjk56ep218vXC=Qvh+HRJrOGi+Dt2+7ErPieyn3=2j7SJAA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2011-11-30 at 10:48 +0000, Dave Martin wrote:
-> Attached.  It's just vexpress_defconfig, plus ARCH_VEXPRESS_V2P_CA5S_CA9=y
+On 28 November 2011 18:28, Will Deacon <will.deacon@arm.com> wrote:
+> When disabling and re-enabling the MMU, it is necessary to take out an
+> identity mapping for the code that manipulates the SCTLR in order to
+> avoid it disappearing from under our feet. This is useful when soft
+> rebooting and returning from CPU suspend.
+>
+> This patch allocates a set of page tables during boot and populates them
+> with an identity mapping for the .idmap.text section. This means that
+> users of the identity map do not need to manage their own pgd and can
+> instead annotate their functions with __idmap or, in the case of assembly
+> code, place them in the correct section.
+>
+> Acked-by: Dave Martin <dave.martin@linaro.org>
+> Tested-by: Lorenzo Pieralisi <Lorenzo.Pieralisi@arm.com>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
 
-Could you try that?
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
 
-8<----------------------------------------------
-diff --git a/arch/arm/mach-vexpress/Kconfig
-b/arch/arm/mach-vexpress/Kconfig
-index 9eb8161..ded66d0 100644
---- a/arch/arm/mach-vexpress/Kconfig
-+++ b/arch/arm/mach-vexpress/Kconfig
-@@ -11,7 +11,7 @@ config ARCH_VEXPRESS_CA9X4
- 
- config ARCH_VEXPRESS_DT
-        bool
--       select OF
-+       select USE_OF
-        help
-          VE platform *requiring* Flattened Device Tree to boot.
-8<----------------------------------------------
-
-The OF is an effect of the USE_OF, not the other way round, sorry about
-the mistake.
-
-Of course I could go the "classic way" and make the
-ARCH_VEXPRESS_V2P_CA5S_CA9 dependant on the OF, but this means that the
-DT-powered tile would be invisible till one enables USE_OF. Any
-opinions?
-
-Cheers!
-
-Pawe?
+-- 
+Catalin
