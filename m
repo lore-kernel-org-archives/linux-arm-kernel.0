@@ -1,37 +1,32 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 30 Nov 2011 13:48:54 +0000
-Subject: [PATCH v3 2/5] ARM: vexpress: Get rid of MMIO_P2V
-In-Reply-To: <1322652891.3164.144.camel@hornet.cambridge.arm.com>
-References: <1322579473-8804-1-git-send-email-pawel.moll@arm.com>
- <201111292115.10833.arnd@arndb.de>
- <1322652891.3164.144.camel@hornet.cambridge.arm.com>
-Message-ID: <201111301348.54350.arnd@arndb.de>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Wed, 30 Nov 2011 14:46:24 +0100
+Subject: [V3 1/6] RTC: sa1100: Clean out ost register
+In-Reply-To: <1322634584-4347-1-git-send-email-jtzhou@marvell.com>
+References: <1322634584-4347-1-git-send-email-jtzhou@marvell.com>
+Message-ID: <20111130134624.GA18533@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 30 November 2011, Pawel Moll wrote:
-> > and so on. This ends up being more readable IMHO because it
-> > means you don't have to know what the macro does.
+On 14:29 Wed 30 Nov     , Jett.Zhou wrote:
+> These registers are used in old ioctl of UIE and PIE, now they are
+> emulated by rtc generic code of hrtimer, so it can be removed.
 > 
-> I wouldn't mind that, it's just that the V2M_PERIPH is also used in the
-> map_desc:
+> Signed-off-by: Jett.Zhou <jtzhou@marvell.com>
+> Acked-by: Haojian Zhuang <haojian.zhuang@gmail.com>
+> ---
+>  drivers/rtc/rtc-sa1100.c |    3 ---
+>  1 files changed, 0 insertions(+), 3 deletions(-)
 > 
-> static struct map_desc v2m_io_desc[] __initdata = {
->         {
->                 .virtual        = V2M_PERIPH,
-> 
-> and as the .virtual is unsigned long I'd need a cast in one place or the
-> other.
+> diff --git a/drivers/rtc/rtc-sa1100.c b/drivers/rtc/rtc-sa1100.c
+> index 0b40bb8..6f22c1f 100644
+> --- a/drivers/rtc/rtc-sa1100.c
+> +++ b/drivers/rtc/rtc-sa1100.c
+> @@ -36,7 +36,6 @@
+>  
+>  #ifdef CONFIG_ARCH_PXA
+>  #include <mach/regs-rtc.h>
+please move this to include/linux too
+to allow  the simgle zImage
 
-I have patches for other platforms to do the same conversion and
-add the cast here, but also plan to change the way that I/O mappings
-are done in the long run, you have to specify the virtual address
-as __iomem* instead of an integer anyway.
-
-> My best hope is that once Nico's "ioremap optimization" is pulled
-> (http://thread.gmane.org/gmane.linux.ports.arm.kernel/140974), I'll be
-> able to replace the _P2V macros with ioremap()s.
-
-Yes.
-
-	Arnd
+Best Regards,
+J.
