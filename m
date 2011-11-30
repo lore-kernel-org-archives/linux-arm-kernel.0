@@ -1,169 +1,127 @@
 From: dave.martin@linaro.org (Dave Martin)
-Date: Wed, 30 Nov 2011 16:59:11 +0000
-Subject: [PATCH 1/4] Add generic ARM instruction set condition code checks.
-In-Reply-To: <20111125171918.14878.54205.stgit@localhost6.localdomain6>
+Date: Wed, 30 Nov 2011 17:02:06 +0000
+Subject: [PATCH 4/4] Use generic ARM instruction set condition code
+ checks for kprobes.
+In-Reply-To: <20111125171958.14878.38094.stgit@localhost6.localdomain6>
 References: <20111125171621.14878.49918.stgit@localhost6.localdomain6>
- <20111125171918.14878.54205.stgit@localhost6.localdomain6>
-Message-ID: <20111130165911.GG2045@localhost.localdomain>
+ <20111125171958.14878.38094.stgit@localhost6.localdomain6>
+Message-ID: <20111130170206.GI2045@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 25, 2011 at 05:19:23PM +0000, Leif Lindholm wrote:
-> This patch breaks the ARM condition checking code out of nwfpe/fpopcode.{ch}
-> into a standalone file for opcode operations. It also modifies the code
-> somewhat for coding style adherence, and adds some temporary variables for
-> increased readability.
+On Fri, Nov 25, 2011 at 05:20:05PM +0000, Leif Lindholm wrote:
+> This patch changes the kprobes implementation to use the generic ARM
+> instruction set condition code checks, rather than a dedicated
+> implementation.
 > 
+> Cc: Tixy <tixy@yxit.co.uk>
 > Signed-off-by: Leif Lindholm <leif.lindholm@arm.com>
 > ---
->  arch/arm/include/asm/opcodes.h |   20 ++++++++++++
->  arch/arm/kernel/Makefile       |    2 +
->  arch/arm/kernel/opcodes.c      |   68 ++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 89 insertions(+), 1 deletions(-)
->  create mode 100644 arch/arm/include/asm/opcodes.h
->  create mode 100644 arch/arm/kernel/opcodes.c
+>  arch/arm/kernel/kprobes-test.c |   66 ++++------------------------------------
+>  1 files changed, 6 insertions(+), 60 deletions(-)
 > 
-> diff --git a/arch/arm/include/asm/opcodes.h b/arch/arm/include/asm/opcodes.h
-> new file mode 100644
-> index 0000000..aea97bf
-> --- /dev/null
-> +++ b/arch/arm/include/asm/opcodes.h
-> @@ -0,0 +1,20 @@
-> +/*
-> + *  arch/arm/include/asm/opcodes.h
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#ifndef __ASM_ARM_OPCODES_H
-> +#define __ASM_ARM_OPCODES_H
-> +
-> +#ifndef __ASSEMBLY__
-> +extern unsigned int arm_check_condition(unsigned int opcode, unsigned int psr);
-> +#endif
-> +
-> +#define ARM_OPCODE_CONDTEST_FAIL   0
-> +#define ARM_OPCODE_CONDTEST_PASS   1
-> +#define ARM_OPCODE_CONDTEST_UNCOND 2
-> +
-> +#endif /* __ASM_ARM_OPCODES_H */
-> diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
-> index 16eed6a..43b740d 100644
-> --- a/arch/arm/kernel/Makefile
-> +++ b/arch/arm/kernel/Makefile
-> @@ -13,7 +13,7 @@ CFLAGS_REMOVE_return_address.o = -pg
+> diff --git a/arch/arm/kernel/kprobes-test.c b/arch/arm/kernel/kprobes-test.c
+> index e17cdd6..278c275 100644
+> --- a/arch/arm/kernel/kprobes-test.c
+> +++ b/arch/arm/kernel/kprobes-test.c
+> @@ -202,6 +202,8 @@
+>  #include <linux/slab.h>
+>  #include <linux/kprobes.h>
 >  
->  # Object file lists.
->  
-> -obj-y		:= elf.o entry-armv.o entry-common.o irq.o \
-> +obj-y		:= elf.o entry-armv.o entry-common.o irq.o opcodes.o \
->  		   process.o ptrace.o return_address.o setup.o signal.o \
->  		   sys_arm.o stacktrace.o time.o traps.o
->  
-> diff --git a/arch/arm/kernel/opcodes.c b/arch/arm/kernel/opcodes.c
-> new file mode 100644
-> index 0000000..c3171cc
-> --- /dev/null
-> +++ b/arch/arm/kernel/opcodes.c
-> @@ -0,0 +1,68 @@
-> +/*
-> + *  linux/arch/arm/kernel/opcodes.c
-> + *
-> + *  A32 condition code lookup feature moved from nwfpe/fpopcode.c
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#include <linux/module.h>
 > +#include <asm/opcodes.h>
 > +
-> +#define ARM_OPCODE_CONDITION_UNCOND 0xf
-> +
-> +/*
-> + * condition code lookup table
-> + * index into the table is test code: EQ, NE, ... LT, GT, AL, NV
-> + *
-> + * bit position in short is condition code: NZCV
-> + */
-> +static const unsigned short cc_map[16] = {
-> +	0xF0F0,			/* EQ == Z set            */
-> +	0x0F0F,			/* NE                     */
-> +	0xCCCC,			/* CS == C set            */
-> +	0x3333,			/* CC                     */
-> +	0xFF00,			/* MI == N set            */
-> +	0x00FF,			/* PL                     */
-> +	0xAAAA,			/* VS == V set            */
-> +	0x5555,			/* VC                     */
-> +	0x0C0C,			/* HI == C set && Z clear */
-> +	0xF3F3,			/* LS == C clear || Z set */
-> +	0xAA55,			/* GE == (N==V)           */
-> +	0x55AA,			/* LT == (N!=V)           */
-> +	0x0A05,			/* GT == (!Z && (N==V))   */
-> +	0xF5FA,			/* LE == (Z || (N!=V))    */
-> +	0xFFFF,			/* AL always              */
-> +	0			/* NV                     */
-> +};
-> +
-> +/*
-> + * Returns:
-> + * ARM_OPCODE_CONDTEST_FAIL   - if condition fails
-> + * ARM_OPCODE_CONDTEST_PASS   - if condition passes (including AL)
-> + * ARM_OPCODE_CONDTEST_UNCOND - if NV condition, or separate unconditional
-> + *                              opcode space from v5 onwards
-> + *
-> + * Code that needs to check whether a condition has explicitly passed,
-> + * should compare the return value to 1.
+>  #include "kprobes.h"
+>  #include "kprobes-test.h"
+>  
+> @@ -1048,67 +1050,11 @@ static int test_instance;
+>   */
+>  #define PSR_IGNORE_BITS (PSR_A_BIT | PSR_F_BIT)
+>  
+> -static unsigned long test_check_cc(int cc, unsigned long cpsr)
+> +inline unsigned long test_check_cc(int cc, unsigned long cpsr)
+>  {
+> -	unsigned long temp;
+> -
+> -	switch (cc) {
+> -	case 0x0: /* eq */
+> -		return cpsr & PSR_Z_BIT;
+> -
+> -	case 0x1: /* ne */
+> -		return (~cpsr) & PSR_Z_BIT;
+> -
+> -	case 0x2: /* cs */
+> -		return cpsr & PSR_C_BIT;
+> -
+> -	case 0x3: /* cc */
+> -		return (~cpsr) & PSR_C_BIT;
+> -
+> -	case 0x4: /* mi */
+> -		return cpsr & PSR_N_BIT;
+> -
+> -	case 0x5: /* pl */
+> -		return (~cpsr) & PSR_N_BIT;
+> -
+> -	case 0x6: /* vs */
+> -		return cpsr & PSR_V_BIT;
+> -
+> -	case 0x7: /* vc */
+> -		return (~cpsr) & PSR_V_BIT;
+> +	int ret = arm_check_condition(cc << 28, cpsr);
+>  
+> -	case 0x8: /* hi */
+> -		cpsr &= ~(cpsr >> 1); /* PSR_C_BIT &= ~PSR_Z_BIT */
+> -		return cpsr & PSR_C_BIT;
+> -
+> -	case 0x9: /* ls */
+> -		cpsr &= ~(cpsr >> 1); /* PSR_C_BIT &= ~PSR_Z_BIT */
+> -		return (~cpsr) & PSR_C_BIT;
+> -
+> -	case 0xa: /* ge */
+> -		cpsr ^= (cpsr << 3); /* PSR_N_BIT ^= PSR_V_BIT */
+> -		return (~cpsr) & PSR_N_BIT;
+> -
+> -	case 0xb: /* lt */
+> -		cpsr ^= (cpsr << 3); /* PSR_N_BIT ^= PSR_V_BIT */
+> -		return cpsr & PSR_N_BIT;
+> -
+> -	case 0xc: /* gt */
+> -		temp = cpsr ^ (cpsr << 3); /* PSR_N_BIT ^= PSR_V_BIT */
+> -		temp |= (cpsr << 1);	   /* PSR_N_BIT |= PSR_Z_BIT */
+> -		return (~temp) & PSR_N_BIT;
+> -
+> -	case 0xd: /* le */
+> -		temp = cpsr ^ (cpsr << 3); /* PSR_N_BIT ^= PSR_V_BIT */
+> -		temp |= (cpsr << 1);	   /* PSR_N_BIT |= PSR_Z_BIT */
+> -		return temp & PSR_N_BIT;
+> -
+> -	case 0xe: /* al */
+> -	case 0xf: /* unconditional */
+> -		return true;
+> -	}
+> -	BUG();
+> -	return false;
+> +	return (ret != ARM_OPCODE_CONDTEST_FAIL);
 
-This paragraph should refer to the symbolic constants -- there's not so
-much point having them if people hard-code integer comparisons into all
-the calling code.
+Redundant ().
 
-The wording feels a bit confusing too.  Maybe something like:
+I also don't see a reason not to do the following:
 
-"Code that needs to check when an instruction is conditional and would
-pass its condition check should check whether the return value ==
-ARM_OPCODE_CONDTEST_PASS."
+	return arm_check_condition(cc << 28, cpsr) != ARM_OPCODE_CONDTEST_FAIL;
 
+Up to you, though.  The presence of "ret" is harmless; the compiler
+ought to generate the exact same code in any case.
 
-> + * Code that wants to check if a condition means that the instruction
-> + * should be executed, should compare the return value to !0.
+>  }
+>  
+>  static int is_last_scenario;
+> @@ -1128,7 +1074,7 @@ static unsigned long test_context_cpsr(int scenario)
+>  
+>  	if (!test_case_is_thumb) {
+>  		/* Testing ARM code */
+> -		probe_should_run = test_check_cc(current_instruction >> 28, cpsr) != 0;
+> +		probe_should_run = arm_check_condition(current_instruction, cpsr) != 0;
 
-!0 == 1.  I guess this is not what you mean.
-
-Maybe:
-
-"Code that needs to check when an instruction would architecturally
-execute (including some instructions on ARMv5 and later which cannot be
-conditional) should check whether the return value !=
-ARM_OPCODE_CONDTEST_FAIL."
-
-This documentation should perhaps move to opcodes.h, but I don't have a
-strong opinion.
-
-> + */
-> +unsigned int arm_check_condition(unsigned int opcode, unsigned int psr)
-> +{
-> +	unsigned int cc_bits  = opcode >> 28;
-> +	unsigned int psr_cond = psr >> 28;
-> +
-> +	if (cc_bits != ARM_OPCODE_CONDITION_UNCOND) {
-> +		if ((cc_map[cc_bits] >> (psr_cond)) & 1)
-> +			return ARM_OPCODE_CONDTEST_PASS;
-> +		else
-> +			return ARM_OPCODE_CONDTEST_FAIL;
-> +	 } else {
-
-Remove the space before } (checkpatch.pl ought to pick this up)
-
-> +		return ARM_OPCODE_CONDTEST_UNCOND;
-> +	}
-> +}
-> +
-> +EXPORT_SYMBOL(arm_check_condition);
+Use the appropriate symbolic constant for this comparison.
 
 Cheers
 ---Dave
