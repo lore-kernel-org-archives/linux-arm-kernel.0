@@ -1,39 +1,45 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Wed, 30 Nov 2011 22:47:33 +0800
-Subject: [V3 1/6] RTC: sa1100: Clean out ost register
-In-Reply-To: <20111130134624.GA18533@game.jcrosoft.org>
-References: <1322634584-4347-1-git-send-email-jtzhou@marvell.com>
- <20111130134624.GA18533@game.jcrosoft.org>
-Message-ID: <CAN1soZx_-mXYTr94T9dWLaiEb=tnS8HOyY3mXq6ugcArDMrF-g@mail.gmail.com>
+From: mst@redhat.com (Michael S. Tsirkin)
+Date: Wed, 30 Nov 2011 16:50:04 +0200
+Subject: [RFC] virtio: use mandatory barriers for remote processor vdevs
+In-Reply-To: <CAK=WgbZ5aBFNro3XC0cN+Ao4ZWrBHwwd3d__CSHA=n56gKmKXw@mail.gmail.com>
+References: <1322569886-13055-1-git-send-email-ohad@wizery.com>
+ <20111129131110.GC19157@redhat.com>
+ <CAK=WgbZoGYVyKt=XXvnPVdh0koSBJC0zcgkLaYRkmjwBLOFA-A@mail.gmail.com>
+ <20111129151958.GA31789@redhat.com>
+ <CAK=WgbZ5aBFNro3XC0cN+Ao4ZWrBHwwd3d__CSHA=n56gKmKXw@mail.gmail.com>
+Message-ID: <20111130145004.GD21413@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 30, 2011 at 9:46 PM, Jean-Christophe PLAGNIOL-VILLARD
-<plagnioj@jcrosoft.com> wrote:
-> On 14:29 Wed 30 Nov ? ? , Jett.Zhou wrote:
->> These registers are used in old ioctl of UIE and PIE, now they are
->> emulated by rtc generic code of hrtimer, so it can be removed.
->>
->> Signed-off-by: Jett.Zhou <jtzhou@marvell.com>
->> Acked-by: Haojian Zhuang <haojian.zhuang@gmail.com>
->> ---
->> ?drivers/rtc/rtc-sa1100.c | ? ?3 ---
->> ?1 files changed, 0 insertions(+), 3 deletions(-)
->>
->> diff --git a/drivers/rtc/rtc-sa1100.c b/drivers/rtc/rtc-sa1100.c
->> index 0b40bb8..6f22c1f 100644
->> --- a/drivers/rtc/rtc-sa1100.c
->> +++ b/drivers/rtc/rtc-sa1100.c
->> @@ -36,7 +36,6 @@
->>
->> ?#ifdef CONFIG_ARCH_PXA
->> ?#include <mach/regs-rtc.h>
-> please move this to include/linux too
-> to allow ?the simgle zImage
->
-> Best Regards,
-> J.
+On Wed, Nov 30, 2011 at 01:55:53PM +0200, Ohad Ben-Cohen wrote:
+> On Tue, Nov 29, 2011 at 5:19 PM, Michael S. Tsirkin <mst@redhat.com> wrote:
+> > On Tue, Nov 29, 2011 at 03:57:19PM +0200, Ohad Ben-Cohen wrote:
+> >> > Is an extra branch faster or slower than reverting d57ed95?
+> >>
+> >> Sorry, unfortunately I have no way to measure this, as I don't have
+> >> any virtualization/x86 setup. I'm developing on ARM SoCs, where
+> >> virtualization hardware is coming, but not here yet.
+> >
+> > You can try using the micro-benchmark in tools/virtio/.
+> 
+> Hmm, care to show me exactly what do you mean ?
 
-This patch is used to remove <mach/regs-ost.h>. <regs-rtc.h> will be
-removed in the rest of this patch series. Please check the third
-patch.
+make headers_install
+make -C tools/virtio/
+(you'll need an empty stub for tools/virtio/linux/module.h,
+ I just sent a patch to add that)
+sudo insmod tools/virtio/vhost_test/vhost_test.ko
+./tools/virtio/virtio_test
+
+> Though I somewhat suspect that any micro-benchmarking I'll do with my
+> random ARM SoC will not have much value to real virtualization/x86
+> workloads.
+> 
+> Thanks,
+> Ohad.
+
+Real virtualization/x86 can keep using current smp_XX barriers, right?
+We can have some config for your kind of setup.
+
+-- 
+MST
