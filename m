@@ -1,86 +1,158 @@
-From: B29397@freescale.com (Chen Peter-B29397)
-Date: Wed, 30 Nov 2011 03:24:32 +0000
-Subject: [PATCH] USB: ehci-mxc: get rid of the uses of cpu_is_mx()
-In-Reply-To: <20111129192114.GI27267@pengutronix.de>
-References: <1322550565-29162-1-git-send-email-peter.chen@freescale.com>
- <20180.36084.962507.946237@ipc1.ka-ro>
- <35AB98346D25394A9354ED89C4D76587226AE3@039-SN1MPN1-002.039d.mgd.msft.net>
- <20111129082139.GG27267@pengutronix.de>
- <35AB98346D25394A9354ED89C4D76587226BD8@039-SN1MPN1-002.039d.mgd.msft.net>
- <20111129192114.GI27267@pengutronix.de>
-Message-ID: <35AB98346D25394A9354ED89C4D7658722716D@039-SN1MPN1-002.039d.mgd.msft.net>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 29 Nov 2011 21:28:11 -0600
+Subject: [PATCH 2/2] gpio/tegra: Make it a DT interrupt controller
+In-Reply-To: <1322616743-31985-2-git-send-email-swarren@nvidia.com>
+References: <1322616743-31985-1-git-send-email-swarren@nvidia.com>
+ <1322616743-31985-2-git-send-email-swarren@nvidia.com>
+Message-ID: <4ED5A2CB.8020905@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- 
- 
-> 
-> We have to deal with a historically grown wrong hardware abstraction
-> here. What we have from a hardware point of view is a device consisting
-> of:
-> 
-> - A ehci core (theoretically optional, but seems to be always present)
-> - A Synopsys USB device core (optional), the one we currently have four
->   different drivers for.
-> - A USB phy (mandatory, but may be nearly invisible from software). The
->   phy may be an external ULPI phy, an internal phy in the SoC, or even
->   selectable between both.
-> 
-> Currently we have a ehci-mxc driver which claims resources like mem
-> regions, interrupts and clocks. We also have the gadget driver
-> (currently the fsl_mxc_udc driver) which also claims the same resources.
-> Instead we should have a glue driver which claims the resources and
-> passes control over to either the host or the gadget driver. This glue
-> code should also connect the phy.
-> 
-> Looking at the code in mainline the msm driver is closest to what we
-> want to have. It claims the resources in msm_otg.c and passes control
-> over to the ehci or ci13xxx gadget driver depending on the USB id pin or
-> a platform decision. What's missing here is some plugin mechanism for
-> different phys. That's another historically grown thing that there is
-> only a single phy in the Kernel because there can be only one otg
-> instance and phys were thought to be present only in otg cores. Heikkis
-> patches work in the right direction here.
 
-msm_otg.c is really good code which mainlined this year, it considers
-many user situations, like low power, charger, usb wakeup, id/vbus changes
-from different hardware/user choice, etc.
 
-In fact, the most difficulties for otg driver (host/device share the same registers controller)
-are clock management, power management, usb wakeup, register access among the three
-drivers (otg, host and device driver)
+On 11/29/2011 07:32 PM, Stephen Warren wrote:
+> Fix the DT binding documentation to describe interrupt-related properties,
+> and the contents of "child" node interrupts property.
 > 
-> As a conclusion I think that there should be no platform or SoC specific
-> code in neither the ehci nor in the gadget driver. Also there shouldn't
-> be all these ehci-$SoC.c files in the tree. The way to get there could
-> be:
+> Update tegra20.dtsi to specify the required interrupt-related properties.
 > 
-> - Work on Heikkis patches so that we can register usb phys
-> - move the USB phy setup code from arch-imx to drivers/usb/phy
-> - factor out the common code from the msm_otg driver.
-> - create a imx-otg.c which only claims the resources and passes
->   them to the otg common code. Sooner or later not even an imx-otg.c is
->   necessary because we can use a devicetree based driver and then only
->   the phy code will be SoC specific.
+> Fix the driver to creating an IRQ domain for itself, so that child node
+> interrupts properties are correctly parsed.
+> 
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> ---
+> This patch depends on "arm/tegra: convert tegra20 to GIC devicetree binding",
+> at least for context, and probably functionally (and of course patch 1 in
+> this series).
+> 
+> I've tested that this patch causes the WM8903 to receive a valid IRQ when
+> instantiated from device-tree (although the patches to instantiate the
+> WM8903 from DT are local to me for now).
+> 
+>  .../devicetree/bindings/gpio/gpio_nvidia.txt       |   10 ++++++++++
+>  arch/arm/boot/dts/tegra20.dtsi                     |    2 ++
+>  drivers/gpio/gpio-tegra.c                          |    4 ++++
+>  3 files changed, 16 insertions(+), 0 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/gpio/gpio_nvidia.txt b/Documentation/devicetree/bindings/gpio/gpio_nvidia.txt
+> index eb4b530..ecdf19c 100644
+> --- a/Documentation/devicetree/bindings/gpio/gpio_nvidia.txt
+> +++ b/Documentation/devicetree/bindings/gpio/gpio_nvidia.txt
+> @@ -6,3 +6,13 @@ Required properties:
+>    second cell is used to specify optional parameters:
+>    - bit 0 specifies polarity (0 for normal, 1 for inverted)
+>  - gpio-controller : Marks the device node as a GPIO controller.
+> +- #interrupt-cells : Should be 3.
 
-I agree with these tasks for refine i.mx usb structure. 
-I will try Heikki's patch first.
+Should be 2??
 
-> 
-> I'm sorry that there is no easy way to get proper USB support, but we
-> are way beyond the point where the current infrastructure scales.
-> In any way, there is no place for more SoC specific code in ehci-mxc.c.
-> Instead you should work on moving SoC code out of there.
-> 
-> Sascha
-> 
-> 
-> --
-> Pengutronix e.K.                           |
-> |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/
-> |
-> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0
-> |
-> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555
-> |
+> +  The first cell is the GPIO number.
+> +  The second cell is used to specify flags:
+> +    bits[3:0] trigger type and level flags:
+> +      1 = low-to-high edge triggered.
+> +      2 = high-to-low edge triggered.
+> +      4 = active high level-sensitive.
+> +      8 = active low level-sensitive.
+> +      Valid combinations are 1, 2, 3, 4, 8.
+> +- interrupt-controller : Marks the device node as an interrupt controller.
+> diff --git a/arch/arm/boot/dts/tegra20.dtsi b/arch/arm/boot/dts/tegra20.dtsi
+> index db6f562..e25f4a6 100644
+> --- a/arch/arm/boot/dts/tegra20.dtsi
+> +++ b/arch/arm/boot/dts/tegra20.dtsi
+> @@ -79,6 +79,8 @@
+>  			       0 55 0x04
+>  			       0 87 0x04
+>  			       0 89 0x04 >;
+> +		interrupt-controller;
+> +		#interrupt-cells = <2>;
+>  		#gpio-cells = <2>;
+>  		gpio-controller;
+>  	};
+> diff --git a/drivers/gpio/gpio-tegra.c b/drivers/gpio/gpio-tegra.c
+> index 61044c8..26b0c85 100644
+> --- a/drivers/gpio/gpio-tegra.c
+> +++ b/drivers/gpio/gpio-tegra.c
+> @@ -25,6 +25,7 @@
+>  #include <linux/of.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/module.h>
+> +#include <linux/irqdomain.h>
+>  
+>  #include <asm/mach/irq.h>
+>  
+> @@ -410,6 +411,9 @@ static int __devinit tegra_gpio_probe(struct platform_device *pdev)
+>  			spin_lock_init(&bank->lvl_lock[j]);
+>  	}
+>  
+> +	if (pdev->dev.of_node)
+> +		irq_domain_add_simple(pdev->dev.of_node, TEGRA_GPIO_TO_IRQ(0));
+> +
+
+This is a bit of a temporary solution. Really, you want to end up with
+something like this to eliminate INT_GPIO_BASE and dynamically assign
+the irqbase:
+
+diff --git a/drivers/gpio/gpio-tegra.c b/drivers/gpio/gpio-tegra.c
+index 61044c8..a146a20 100644
+--- a/drivers/gpio/gpio-tegra.c
++++ b/drivers/gpio/gpio-tegra.c
+@@ -139,7 +139,7 @@ static int tegra_gpio_direction_output(struct
+gpio_chip *chip, unsigned offset,
+
+ static int tegra_gpio_to_irq(struct gpio_chip *chip, unsigned offset)
+ {
+-       return TEGRA_GPIO_TO_IRQ(offset);
++       return irq_domain_to_irq(chip->domain, offset);
+
+>>> This is a bit wrong. You need a tegra_gpio_chip containing a domain
+and gpio_chip.
+
+ }
+
+ static struct gpio_chip tegra_gpio_chip = {
+@@ -155,28 +155,28 @@ static struct gpio_chip tegra_gpio_chip = {
+
+ static void tegra_gpio_irq_ack(struct irq_data *d)
+ {
+-       int gpio = d->irq - INT_GPIO_BASE;
++       int gpio = d->hwirq;
+
+        tegra_gpio_writel(1 << GPIO_BIT(gpio), GPIO_INT_CLR(gpio));
+ }
+
+ static void tegra_gpio_irq_mask(struct irq_data *d)
+ {
+-       int gpio = d->irq - INT_GPIO_BASE;
++       int gpio = d->hwirq;
+
+        tegra_gpio_mask_write(GPIO_MSK_INT_ENB(gpio), gpio, 0);
+ }
+
+ static void tegra_gpio_irq_unmask(struct irq_data *d)
+ {
+-       int gpio = d->irq - INT_GPIO_BASE;
++       int gpio = d->hwirq;
+
+        tegra_gpio_mask_write(GPIO_MSK_INT_ENB(gpio), gpio, 1);
+ }
+
+ static int tegra_gpio_irq_set_type(struct irq_data *d, unsigned int type)
+ {
+-       int gpio = d->irq - INT_GPIO_BASE;
++       int gpio = d->hwirq;
+        struct tegra_gpio_bank *bank = irq_data_get_irq_chip_data(d);
+        int port = GPIO_PORT(gpio);
+        int lvl_type;
+@@ -385,6 +385,7 @@ static int __devinit tegra_gpio_probe(struct
+platform_device *pdev)
+        tegra_gpio_chip.of_node = pdev->dev.of_node;
+ #endif
+
++       domain.irq_base = irq_alloc_descs(...)
+
+        gpiochip_add(&tegra_gpio_chip);
+
+        for (gpio = 0; gpio < TEGRA_NR_GPIOS; gpio++) {
+
+
+Rob
