@@ -1,35 +1,20 @@
-From: rachna@ti.com (Patil, Rachna)
-Date: Wed, 30 Nov 2011 09:29:42 +0000
-Subject: [PATCH] ARM: davinci: fix mach/gpio.h includes
-In-Reply-To: <DF0F476B391FA8409C78302C7BA518B603514F@DBDE01.ent.ti.com>
-References: <1322545839-30405-1-git-send-email-rachna@ti.com>
- <DF0F476B391FA8409C78302C7BA518B603514F@DBDE01.ent.ti.com>
-Message-ID: <4CE347531D4CA947960AF71FF095B93201799B@DBDE01.ent.ti.com>
+From: jszhang3@gmail.com (JiSheng Zhang)
+Date: Wed, 30 Nov 2011 17:30:34 +0800
+Subject: help for BogoMIPS issue on linux kernel 3.0
+Message-ID: <CADyp2PdNKspTWJmPrOecY=JtzbG74k-3RcV-3GWXLuBTuSOzNg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sekhar,
+Hi List,
 
-On Wed, Nov 30, 2011 at 14:13:09, Nori, Sekhar wrote:
-> Hi Rachna,
-> 
-> On Tue, Nov 29, 2011 at 11:20:39, Patil, Rachna wrote:
-> > This patch addresses Russell's comments at [1] by replacing the 
-> > mach/gpio.h includes to linux/gpio.h for TI's DA830/OMAP-L137/AM17x 
-> > and DA850/OMAP-L138/AM18x platforms.
-> > 
-> > [1] http://permalink.gmane.org/gmane.linux.ports.arm.kernel/126553
-> > 
-> > Signed-off-by: Patil, Rachna <rachna@ti.com>
-> 
-> To which baseline does this patch apply? It doesn't apply to the master of the davinci tree. These mach/gpio.h includes have been changed to mach/gpio-davinci.h in the v3.2 merge.
+I need your help. Currently, I'm porting Linux kernel to one arm SoC.
+I came across one strange problem: the BogoMIPS isn't correct under
+SMP, but it's correct under UP.
 
-My mistake. This patch applies on v3.1-davinci1 tag. I'll rework on the patch and repost.
+I tried give maxcpus=1, or disable L1/2 cache, both didn't help. Since
+the any secondary cpu isn't booted up when bootcpu calls
+calibrate_delay(), all the code should be the same, why the
+calibrate_delay gives wrong BogoMIPS under SMP?
 
-> 
-> Thanks,
-> Sekhar
-> 
-> 
-Regards,
-Rachna
+Thanks in advance,
+Jisheng
