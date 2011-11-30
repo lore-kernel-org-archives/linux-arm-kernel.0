@@ -1,45 +1,64 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Wed, 30 Nov 2011 12:15:08 +0000
-Subject: [PATCH v3 0/5] Versatile Express DT support
-In-Reply-To: <20111130120818.GB2045@localhost.localdomain>
-References: <1322579473-8804-1-git-send-email-pawel.moll@arm.com>
- <20111129170013.GD2829@localhost.localdomain>
- <1322587019.3164.111.camel@hornet.cambridge.arm.com>
- <20111130104842.GA2045@localhost.localdomain>
- <1322651640.3164.135.camel@hornet.cambridge.arm.com>
- <20111130120818.GB2045@localhost.localdomain>
-Message-ID: <1322655308.3164.177.camel@hornet.cambridge.arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 30 Nov 2011 13:03:23 +0000
+Subject: [ANNOUNCE] Xen port to Cortex-A15 / ARMv7 with virt extensions
+In-Reply-To: <alpine.DEB.2.00.1111301053300.31179@kaball-desktop>
+References: <alpine.DEB.2.00.1111281009090.31179@kaball-desktop>
+ <201111292129.20444.arnd@arndb.de>
+ <alpine.DEB.2.00.1111301053300.31179@kaball-desktop>
+Message-ID: <201111301303.23851.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2011-11-30 at 12:08 +0000, Dave Martin wrote:
-> Your suggestion fixes it -- I suggest we keep the config this way round;
-> this means that OF gets turned on when enabling a coretile which requires
-> it, and those coretiles are offered as choices even before OF is turned
-> on.  That feels like a sensible behaviour for the config.
-
-Ok.
-
-> While we're about this, building of the applicable dtbs is not currently
-> enabled.
+On Wednesday 30 November 2011, Stefano Stabellini wrote:
+> On Tue, 29 Nov 2011, Arnd Bergmann wrote:
+> > On Tuesday 29 November 2011, Stefano Stabellini wrote:
+> > 
+> > Do you have a pointer to the kernel sources for the Linux guest?
 > 
-> Can we add this, so that "make dtbs" works?
+> We have very few changes to the Linux kernel at the moment (only 3
+> commits!), just enough to be able to issue hypercalls and start a PV
+> console.
 > 
-> diff --git a/arch/arm/mach-vexpress/Makefile.boot b/arch/arm/mach-vexpress/Makefile.boot
-> index 05b77a5..b89ffde 100644
-> --- a/arch/arm/mach-vexpress/Makefile.boot
-> +++ b/arch/arm/mach-vexpress/Makefile.boot
-> @@ -7,3 +7,7 @@ else
->  params_phys-y	:= 0x60000100
->  initrd_phys-y	:= 0x60800000
->  endif
-> +
-> +dtb-$(CONFIG_ARCH_VEXPRESS_V2P_CA5S_CA9) += \
-> +					vexpress-v2p-ca5s.dtb \
-> +					vexpress-v2p-ca9.dtb
+> A git branch is available here (not ready for submission):
+> 
+> git://xenbits.xen.org/people/sstabellini/linux-pvhvm.git arm
 
-Yes, I already have more-or-less the same thing.
+Ok, interesting. There really isn't much of the platform support
+that I was expecting there. I finally found the information
+I was looking for in the xen construct_dom0() function:
 
-Cheers!
+ 167     regs->r0 = 0; /* SBZ */
+ 168     regs->r1 = 2272; /* Machine NR: Versatile Express */
+ 169     regs->r2 = 0xc0000100; /* ATAGS */
 
-Pawe?
+What this means is that you are emulating the current ARM/Keil reference
+board, at least to the degree that is necessary to get the guest started.
+
+This is the same choice people have made for KVM, but it's not
+necessarily the best option in the long run. In particular, this
+board has a lot of hardware that you claim to have by putting the
+machine number there, when you don't really want to emulate it.
+
+Pawell Moll is working on a variant of the vexpress code that uses
+the flattened device tree to describe the present hardware [1], and
+I think that would be a much better target for an official release.
+Ideally, the hypervisor should provide the device tree binary (dtb)
+to the guest OS describing the hardware that is actually there.
+
+This would also be the place where you tell the guest that it should
+look for PV devices. I'm not familiar with how Xen announces PV
+devices to the guest on other architectures, but you have the
+choice between providing a full "binding", i.e. a formal specification
+in device tree format for the guest to detect PV devices in the
+same way as physical or emulated devices, or just providing a single
+place in the device tree in which the guest detects the presence
+of a xen device bus and then uses hcalls to find the devices on that
+bus.
+
+Another topic is the question whether there are any hcalls that
+we should try to standardize before we get another architecture
+with multiple conflicting hcall APIs as we have on x86 and powerpc.
+
+	Arnd
+
+[1] http://www.spinics.net/lists/arm-kernel/msg149604.html
