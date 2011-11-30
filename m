@@ -1,21 +1,39 @@
-From: stevenrwalter@gmail.com (Steven Walter)
-Date: Wed, 30 Nov 2011 09:46:19 -0500
-Subject: ARM support for syscall tracing
-Message-ID: <1322664382-21793-1-git-send-email-stevenrwalter@gmail.com>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Wed, 30 Nov 2011 22:47:33 +0800
+Subject: [V3 1/6] RTC: sa1100: Clean out ost register
+In-Reply-To: <20111130134624.GA18533@game.jcrosoft.org>
+References: <1322634584-4347-1-git-send-email-jtzhou@marvell.com>
+ <20111130134624.GA18533@game.jcrosoft.org>
+Message-ID: <CAN1soZx_-mXYTr94T9dWLaiEb=tnS8HOyY3mXq6ugcArDMrF-g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I believe I have incorporated all of the suggestions given on the
-previous patches.  Unfortunately, NR_syscalls is still a hard-coded
-number.  I implemented making it a variable that was exported from
-entry-common.o, but there are places that assume that NR_syscalls is a
-constant known at compile time:
+On Wed, Nov 30, 2011 at 9:46 PM, Jean-Christophe PLAGNIOL-VILLARD
+<plagnioj@jcrosoft.com> wrote:
+> On 14:29 Wed 30 Nov ? ? , Jett.Zhou wrote:
+>> These registers are used in old ioctl of UIE and PIE, now they are
+>> emulated by rtc generic code of hrtimer, so it can be removed.
+>>
+>> Signed-off-by: Jett.Zhou <jtzhou@marvell.com>
+>> Acked-by: Haojian Zhuang <haojian.zhuang@gmail.com>
+>> ---
+>> ?drivers/rtc/rtc-sa1100.c | ? ?3 ---
+>> ?1 files changed, 0 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/drivers/rtc/rtc-sa1100.c b/drivers/rtc/rtc-sa1100.c
+>> index 0b40bb8..6f22c1f 100644
+>> --- a/drivers/rtc/rtc-sa1100.c
+>> +++ b/drivers/rtc/rtc-sa1100.c
+>> @@ -36,7 +36,6 @@
+>>
+>> ?#ifdef CONFIG_ARCH_PXA
+>> ?#include <mach/regs-rtc.h>
+> please move this to include/linux too
+> to allow ?the simgle zImage
+>
+> Best Regards,
+> J.
 
-kernel/trace/trace_syscalls.c:15:
-    static DECLARE_BITMAP(enabled_enter_syscalls, NR_syscalls);
-
-However, entry-common.S will check to ensure that a call doesn't get
-added to the table without bumping NR_syscalls when needed.  I'm not
-sure this can be improved upon without tearing up core kernel code.
-
-Suggestions welcome!
+This patch is used to remove <mach/regs-ost.h>. <regs-rtc.h> will be
+removed in the rest of this patch series. Please check the third
+patch.
