@@ -1,22 +1,36 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 30 Nov 2011 08:22:42 -0800
-Subject: [RFC V1 7/8] ARM i.MX: prepare common clk support
-In-Reply-To: <20111130061815.GA8684@b20223-02.ap.freescale.net>
-References: <1322046755-13511-1-git-send-email-richard.zhao@linaro.org>
- <1322046755-13511-8-git-send-email-richard.zhao@linaro.org>
- <CAPtuhTgSB8Af4Xtux93-VLXSrK5KkzFOez9V5tcmbkKwbZ_8Rw@mail.gmail.com>
- <20111129030944.GB19236@b20223-02.ap.freescale.net>
- <CAPtuhThNZA707gQhjt9-V_B8=5UN9o1JgNTm_Dj8eLO-WNmJQA@mail.gmail.com>
- <20111130061815.GA8684@b20223-02.ap.freescale.net>
-Message-ID: <CAPtuhTij8rATJsbVxnxB-zey5Jj2nycNnM2iqBPKJFa8fnypAw@mail.gmail.com>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Wed, 30 Nov 2011 18:24:16 +0200
+Subject: [RFC] virtio: use mandatory barriers for remote processor vdevs
+In-Reply-To: <20111130161555.GB25812@redhat.com>
+References: <1322569886-13055-1-git-send-email-ohad@wizery.com>
+ <20111129131110.GC19157@redhat.com>
+ <CAK=WgbZoGYVyKt=XXvnPVdh0koSBJC0zcgkLaYRkmjwBLOFA-A@mail.gmail.com>
+ <20111129151607.GE30966@redhat.com>
+ <CAK=WgbZK+k4uuyMPHUfr_PMyrR5ceRTvuDRpmhXfgwpSUOPw0g@mail.gmail.com>
+ <20111130145958.GE21413@redhat.com>
+ <CAK=WgbYyFdLftE_kp2_JOThVhn-FzGsDqVqKn0Jwm2teQyZBNA@mail.gmail.com>
+ <20111130161555.GB25812@redhat.com>
+Message-ID: <CAK=WgbazBq4GVo16sZsrZirgMYbwMcWtPaqn90c6d9Phr0gh3A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 29, 2011 at 10:18 PM, Richard Zhao <richard.zhao@linaro.org> wrote:
-> Do you mean you also adopt divider and mux clock patch?
+On Wed, Nov 30, 2011 at 6:15 PM, Michael S. Tsirkin <mst@redhat.com> wrote:
+> How are the rings mapped? normal memory, right?
 
-I'd like to do that and roll them into the existing clk-basic.c.  Are
-you OK with this approach?
+No, device memory.
 
-Regards,
-Mike
+> We allocate them with plan alloc_pages_exact in virtio_pci.c ...
+
+I'm not using virtio_pci.c; remoteproc is allocating the rings using
+the DMA API.
+
+> Yes wmb() is required to ensure ordering for MMIO.
+> But here both accesses: index and ring - are for
+> memory, not MMIO.
+
+I'm doing IO with a device over shared memory. It does require
+mandatory barriers as I explained.
+
+> Is this something you see in practice?
+
+Yes. These bugs are very real.
