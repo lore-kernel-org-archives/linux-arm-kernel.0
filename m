@@ -1,56 +1,33 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Wed, 30 Nov 2011 22:26:20 +0800
-Subject: [PATCH] ARM: pl2x0/pl310: Refactor Kconfig to be more maintainable
-In-Reply-To: <20111130140335.GC2045@localhost.localdomain>
-References: <1322584345-19193-1-git-send-email-dave.martin@linaro.org>
- <20111130140150.GC711@S2100-06.ap.freescale.net>
- <20111130140335.GC2045@localhost.localdomain>
-Message-ID: <20111130142619.GD711@S2100-06.ap.freescale.net>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Wed, 30 Nov 2011 14:20:51 +0000
+Subject: [ANNOUNCE] Xen port to Cortex-A15 / ARMv7 with virt extensions
+In-Reply-To: <CAHkRjk48jHO19H04rf8252+v04hk9qSdKBrfYCqJsZyamVhMEw@mail.gmail.com>
+References: <alpine.DEB.2.00.1111281009090.31179@kaball-desktop>
+ <201111292129.20444.arnd@arndb.de>
+ <alpine.DEB.2.00.1111301053300.31179@kaball-desktop>
+ <CAHkRjk48jHO19H04rf8252+v04hk9qSdKBrfYCqJsZyamVhMEw@mail.gmail.com>
+Message-ID: <alpine.DEB.2.00.1111301420000.31179@kaball-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 30, 2011 at 02:03:35PM +0000, Dave Martin wrote:
-> On Wed, Nov 30, 2011 at 10:01:51PM +0800, Shawn Guo wrote:
-> > On Tue, Nov 29, 2011 at 04:32:25PM +0000, Dave Martin wrote:
-> > [...]
-> > > diff --git a/arch/arm/plat-mxc/Kconfig b/arch/arm/plat-mxc/Kconfig
-> > > index b3a1f2b..6871ed7 100644
-> > > --- a/arch/arm/plat-mxc/Kconfig
-> > > +++ b/arch/arm/plat-mxc/Kconfig
-> > > @@ -20,6 +20,7 @@ config ARCH_IMX_V6_V7
-> > >  	bool "i.MX3, i.MX6"
-> > >  	select AUTO_ZRELADDR if !ZBOOT_ROM
-> > >  	select ARM_PATCH_PHYS_VIRT
-> > > +	select HAVE_L2X0_L2CC
-> > >  	help
-> > >  	  This enables support for systems based on the Freescale i.MX3 and i.MX6
-> > >  	  family.
-> > > -- 
-> > 
-> > You may want to amend the following for above change.
-> > 
-> > diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-> > index 5f7f9c2..a134819 100644
-> > --- a/arch/arm/mach-imx/Kconfig
-> > +++ b/arch/arm/mach-imx/Kconfig
-> > @@ -609,7 +609,6 @@ comment "i.MX6 family:"
-> >  config SOC_IMX6Q
-> >         bool "i.MX6 Quad support"
-> >         select ARM_GIC
-> > -       select CACHE_L2X0
-> >         select CPU_V7
-> >         select HAVE_ARM_SCU
-> >         select HAVE_IMX_GPC
+On Wed, 30 Nov 2011, Catalin Marinas wrote:
+> On 30 November 2011 11:39, Stefano Stabellini
+> <stefano.stabellini@eu.citrix.com> wrote:
+> > A git branch is available here (not ready for submission):
+> >
+> > git://xenbits.xen.org/people/sstabellini/linux-pvhvm.git arm
+> >
+> > the branch above is based on git://linux-arm.org/linux-2.6.git arm-lpae,
+> > even though guests don't really need lpae support to run on Xen.
 > 
-> Platforms where the L2x0 is considered compulsory should still select it
-> directly like this, instead of selecting HAVE_L2X0_L2CC.
+> Indeed, you don't really need LPAE. What you may need though is
+> generic timers support for A15, it would allow less Hypervisor traps.
+> For up-to-date architecture patches (well, development tree, not
+> guaranteed to be stable), I would recommend this (they get into
+> mainline at some point):
 > 
-> Do you know whether it is OK to run mx6 with the L2 cache turned off?
-> (I would hope that it is OK... in which case we could make the change)
+> http://git.kernel.org/?p=linux/kernel/git/cmarinas/linux-arm-arch.git;a=summary
 > 
-We selected it not for it's compulsory but we want it anyway.  It's
-actually OK to run imx6 with L2 cache turned off.
+> Either use master or just cherry-pick the branches that you are interested in.
 
--- 
-Regards,
-Shawn
+Thanks, I'll rebase on that.
