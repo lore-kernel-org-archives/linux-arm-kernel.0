@@ -1,73 +1,44 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 30 Nov 2011 18:15:01 +0000
-Subject: [Xen-devel] [ANNOUNCE] Xen port to Cortex-A15 / ARMv7 with virt
- extensions
-In-Reply-To: <1322670473.31810.129.camel@zakaz.uk.xensource.com>
-References: <alpine.DEB.2.00.1111281009090.31179@kaball-desktop>
- <201111301432.54463.arnd@arndb.de>
- <1322670473.31810.129.camel@zakaz.uk.xensource.com>
-Message-ID: <201111301815.01297.arnd@arndb.de>
+From: greg@kroah.com (Greg KH)
+Date: Wed, 30 Nov 2011 20:04:09 +0900
+Subject: [PATCH 4/7] tty: serial: support pinmux in pxa serial
+In-Reply-To: <CACRpkdbo7W9FATvygH234KRm68feRnNyCzDSTQZkt-oOzMPaZQ@mail.gmail.com>
+References: <1322262544-7854-1-git-send-email-haojian.zhuang@marvell.com>
+ <1322262544-7854-5-git-send-email-haojian.zhuang@marvell.com>
+ <CACRpkdbo7W9FATvygH234KRm68feRnNyCzDSTQZkt-oOzMPaZQ@mail.gmail.com>
+Message-ID: <20111130110409.GA15460@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 30 November 2011, Ian Campbell wrote:
-> On Wed, 2011-11-30 at 14:32 +0000, Arnd Bergmann wrote:
-> > On Wednesday 30 November 2011, Ian Campbell wrote:
-> > What I suggested to the KVM developers is to start out with the
-> > vexpress platform, but then generalize it to the point where it fits
-> > your needs. All hardware that one expects a guest to have (GIC, timer,
-> > ...) will still show up in the same location as on a real vexpress,
-> > while anything that makes no sense or is better paravirtualized (LCD,
-> > storage, ...) just becomes optional and has to be described in the
-> > device tree if it's actually there.
+On Mon, Nov 28, 2011 at 10:15:34AM +0100, Linus Walleij wrote:
+> On Sat, Nov 26, 2011 at 12:09 AM, Haojian Zhuang
+> <haojian.zhuang@marvell.com> wrote:
 > 
-> That's along the lines of what I was thinking as well.
+> > From: Haojian Zhuang <hzhuang1@hexinfolabs.org>
+> >
+> > PXA serial driver can configure pin directly.
+> >
+> > Signed-off-by: Haojian Zhuang <hzhuang1@hexinfolabs.org>
+> (...)
+> > + err_pmx:
+> > + ? ? ? pinmux_disable(sport->pmx);
+> > + ? ? ? pinmux_put(sport->pmx);
 > 
-> The DT contains the address of GIC, timer etc as well right? So at least
-> in principal we needn't provide e.g. the GIC at the same address as any
-> real platform but in practice I expect we will.
-
-Yes.
-
-> In principal we could also offer the user options as to which particular
-> platform a guest looks like.
-
-At least when using a qemu based simulation. Most platforms have some
-characteristics that are not meaningful in a classic virtualization
-scenario, but it would certainly be helpful to use the virtualization
-extensions to run a kernel that was built for a particular platform
-faster than with pure qemu, when you want to test that kernel image.
-
-It has been suggested in the past that it would be nice to run the
-guest kernel built for the same platform as the host kernel by
-default, but I think it would be much better to have just one
-platform that we end up using for guests on any host platform,
-unless there is a strong reason to do otherwise.
-
-There is also ongoing restructuring in the ARM Linux kernel to
-allow running the same kernel binary on multiple platforms. While
-there is still a lot of work to be done, you should assume that
-we will finish it before you see lots of users in production, there
-is no need to plan for the current one-kernel-per-board case.
-
-> > Ok. It would of course still be possible to agree on an argument passing
-> > convention so that we can share the macros used to issue the hcalls,
-> > even if the individual commands are all different.
+> There is this little discussion whether each individual driver should access
+> it's pins or whether it should be done all centrally.
 > 
-> I think it likely that we can all agree on a common calling convention
-> for N-argument hypercalls. It doubt there are that many useful choices
-> with conflicting requirements yet strongly compelling advantages.
+> After some thinking and resoning I actually think this may be best
+> to have in each driver in most cases. The reason is that while it is
+> possible to standardize for simple usecases (like this one, just activate
+> it at probe() and deactivate it at remove()) it gets really complicated
+> and hairy to have it in central places when we come to things like
+> suspend()/resume(), idling and sometimes even
+> runtime_[suspend|resume].
+> 
+> So unless someone else disagrees or talks agains me, and
+> provided this is how you want to do it for all PXA drivers:
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> 
+> I need Gregs ACK if you want it to go iin through the pinctrl
+> tree.
 
-Exactly. I think it's only lack of communication that has resulted in
-different interfaces for each hypervisor on the other architectures.
-
-KVM and Xen at least both fall into the single-return-value category,
-so we should be able to agree on a calling conventions. KVM does not
-have an hcall API on ARM yet, and I see no reason not to use the
-same implementation that you have in the Xen guest.
-
-Stefano, can you split out the generic parts of your asm/xen/hypercall.h
-file into a common asm/hypercall.h and submit it for review to the
-arm kernel list?
-
-	Arnd
+Acked-by: Greg Kroah-Hartman <gregkh@suse.de>
