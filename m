@@ -1,53 +1,42 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Wed, 30 Nov 2011 15:58:00 +0000
-Subject: [PATCH v3 3/5] ARM: vexpress: Add DT support in v2m
-In-Reply-To: <1322579473-8804-4-git-send-email-pawel.moll@arm.com>
-References: <1322579473-8804-1-git-send-email-pawel.moll@arm.com>
- <1322579473-8804-4-git-send-email-pawel.moll@arm.com>
-Message-ID: <20111130155800.GF2045@localhost.localdomain>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Wed, 30 Nov 2011 18:04:56 +0200
+Subject: [RFC] virtio: use mandatory barriers for remote processor vdevs
+In-Reply-To: <20111130145958.GE21413@redhat.com>
+References: <1322569886-13055-1-git-send-email-ohad@wizery.com>
+ <20111129131110.GC19157@redhat.com>
+ <CAK=WgbZoGYVyKt=XXvnPVdh0koSBJC0zcgkLaYRkmjwBLOFA-A@mail.gmail.com>
+ <20111129151607.GE30966@redhat.com>
+ <CAK=WgbZK+k4uuyMPHUfr_PMyrR5ceRTvuDRpmhXfgwpSUOPw0g@mail.gmail.com>
+ <20111130145958.GE21413@redhat.com>
+Message-ID: <CAK=WgbYyFdLftE_kp2_JOThVhn-FzGsDqVqKn0Jwm2teQyZBNA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 29, 2011 at 03:11:11PM +0000, Pawel Moll wrote:
-> This patch provides hooks for DT-based tile machine implementations
-> and adds Device Tree description for the motherboard.
+On Wed, Nov 30, 2011 at 4:59 PM, Michael S. Tsirkin <mst@redhat.com> wrote:
+> I see. And this happens because the ARM processor reorders
+> memory writes
 
-[...]
+Yes.
 
-> +config ARCH_VEXPRESS_DT
-> +	bool
-> +	select OF
-> +	help
-> +	  VE platform *requiring* Flattened Device Tree to boot.
-> +
+> And in an SMP configuration, writes are somehow not reordered?
 
-Now that a person may fail to boot on a supported board simply due to
-failing to supply a device tree, it may be a good idea to have a more
-helpful panic message for that situation, perhaps something like the
-following.
+They are, but then the smp memory barriers are enough to control these
+effects. It's not enough to control reordering as seen by a device
+(which is what our AMP processors are) though.
 
-If you don't think this fits in this series, I can always follow up 
-later.
+(btw, the difference between an SMP processor and a device here lies
+in how the memory is mapped: normal memory vs. device memory
+attributes. it's an ARM thingy).
 
-Cheers
----Dave
+> Just checking that this is not a bug in the smp_wmb implementation
+> for the specific platform.
 
+No, it's not.
 
-diff --git a/arch/arm/mach-vexpress/v2m.c b/arch/arm/mach-vexpress/v2m.c
-index 6965f64..9dda482 100644
---- a/arch/arm/mach-vexpress/v2m.c
-+++ b/arch/arm/mach-vexpress/v2m.c
-@@ -434,8 +434,11 @@ static void __init v2m_populate_ct_desc(void)
- 			ct_desc = ct_descs[i];
- 
- 	if (!ct_desc)
--		panic("vexpress: failed to populate core tile description "
--		      "for tile ID 0x%8x\n", current_tile_id);
-+		panic("vexpress: this kernel does not support core tile ID "
-+		      "0x%08x when booting via ATAGs.\n"
-+		      "You may need a device tree blob or a different kernel "
-+		      "to boot on this board.\n",
-+		      current_tile_id);
- }
- 
- static void __init v2m_map_io(void)
+ARM's smp memory barriers use ARM's DMB instruction, which is enough
+to control SMP effects, whereas ARM's mandatory memory barriers use
+ARM's DSB instruction, which is required to ensure the ordering
+between Device and Normal memory accesses.
+
+Thanks,
+Ohad.
