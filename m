@@ -1,48 +1,56 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 30 Nov 2011 13:00:43 +0100
-Subject: [PATCH 1/7] pinctrl: enable pxa3xx pinmux
-In-Reply-To: <1322262544-7854-2-git-send-email-haojian.zhuang@marvell.com>
-References: <1322262544-7854-1-git-send-email-haojian.zhuang@marvell.com>
- <1322262544-7854-2-git-send-email-haojian.zhuang@marvell.com>
-Message-ID: <CACRpkdY=zvObTkLkzVRWVoh3YVVkV5g78sTWGH0VygUdmmCTLg@mail.gmail.com>
+From: axel.lin@gmail.com (Axel Lin)
+Date: Wed, 30 Nov 2011 20:01:21 +0800
+Subject: [PATCH] OMAP2, 3: DSS2: Include linux/delay.h and common.h to fix
+ build errors
+Message-ID: <1322654481.11191.1.camel@phoenix>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Haojian,
+Include linux/delay.h to fix below build error:
 
-I thought about this last night:
+  CC      arch/arm/mach-omap2/display.o
+arch/arm/mach-omap2/display.c: In function 'dispc_disable_outputs':
+arch/arm/mach-omap2/display.c:283: error: implicit declaration of function 'mdelay'
+arch/arm/mach-omap2/display.c: In function 'omap_dss_reset':
+arch/arm/mach-omap2/display.c:317: error: implicit declaration of function 'omap_test_timeout'
+make[1]: *** [arch/arm/mach-omap2/display.o] Error 1
+make: *** [arch/arm/mach-omap2] Error 2
 
-On Sat, Nov 26, 2011 at 12:08 AM, Haojian Zhuang
-<haojian.zhuang@marvell.com> wrote:
+Include common.h to fix below build error:
 
-> +/* These 135 pins exists in PXA300, PXA310 & PXA320 */
-> +#define PXA3XX_COMMON_PINS() ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
-> + ? ? ? PINCTRL_PIN(0, "GPIO0"), ? ? ? ?PINCTRL_PIN(1, "GPIO1"), ? ? ? ?\
-(...)
-+#ifdef CONFIG_ARCH_PXA
-+static struct pinctrl_pin_desc pxa300_pads[] = {
-+       PXA3XX_COMMON_PINS(),
-+       PINCTRL_PIN(128, "GPIO0_2"),    PINCTRL_PIN(129, "GPIO1_2"),
+  CC      arch/arm/mach-omap2/display.o
+arch/arm/mach-omap2/display.c: In function 'omap_dss_reset':
+arch/arm/mach-omap2/display.c:318: error: implicit declaration of function 'omap_test_timeout'
+make[1]: *** [arch/arm/mach-omap2/display.o] Error 1
+make: *** [arch/arm/mach-omap2] Error 2
 
-Defining a huge macro like PXA3XX_COMMON_PINS() and reusing
-all over the place doesn't scale.
+Signed-off-by: Axel Lin <axel.lin@gmail.com>
+---
+I got the build error on linux-next 20111130.
+This patch is against linux-next 20111130.
+Axel
+ arch/arm/mach-omap2/display.c |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
 
-The real fix is that I fix so that you can call
-pinmux_register_mappings() more than one time.
-
-So it will look like this or similar:
-
-pinmux_register_mappings(common_pins);
-if (plat->is_pxa)
-  pinmux_register_mappings(pxa_pins);
-if (plat->is_mmp)
-  pinmux_register_mappings(mmp_pins);
-
-etc.
-
-Since I'm anyway fixing up this function I'll see if
-I can simply fit this in as patch 2/2 and send out
-ASAP.
-
-Yours,
-Linus Walleij
+diff --git a/arch/arm/mach-omap2/display.c b/arch/arm/mach-omap2/display.c
+index dce9905..fe44cc2 100644
+--- a/arch/arm/mach-omap2/display.c
++++ b/arch/arm/mach-omap2/display.c
+@@ -21,6 +21,7 @@
+ #include <linux/platform_device.h>
+ #include <linux/io.h>
+ #include <linux/clk.h>
++#include <linux/delay.h>
+ #include <linux/err.h>
+ 
+ #include <video/omapdss.h>
+@@ -30,6 +31,7 @@
+ #include <plat/common.h>
+ 
+ #include "control.h"
++#include "common.h"
+ #include "display.h"
+ 
+ #define DISPC_CONTROL		0x0040
+-- 
+1.7.5.4
