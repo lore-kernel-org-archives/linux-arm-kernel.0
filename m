@@ -1,51 +1,48 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 30 Nov 2011 11:43:30 +0000
-Subject: [PATCH] ARM: errata: Remove SMP dependency for erratum 720789
-In-Reply-To: <1322586755-12740-1-git-send-email-dave.martin@linaro.org>
-References: <1322586755-12740-1-git-send-email-dave.martin@linaro.org>
-Message-ID: <20111130114330.GB13025@mudshark.cambridge.arm.com>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Wed, 30 Nov 2011 13:45:05 +0200
+Subject: [RFC] virtio: use mandatory barriers for remote processor vdevs
+In-Reply-To: <20111129151607.GE30966@redhat.com>
+References: <1322569886-13055-1-git-send-email-ohad@wizery.com>
+ <20111129131110.GC19157@redhat.com>
+ <CAK=WgbZoGYVyKt=XXvnPVdh0koSBJC0zcgkLaYRkmjwBLOFA-A@mail.gmail.com>
+ <20111129151607.GE30966@redhat.com>
+Message-ID: <CAK=WgbZK+k4uuyMPHUfr_PMyrR5ceRTvuDRpmhXfgwpSUOPw0g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 29, 2011 at 05:12:35PM +0000, Dave Martin wrote:
-> Activation conditions for a workaround should not be encoded in the
-> workaround's direct dependencies if this makes otherwise reasonable
-> configuration choices impossible.
-> 
-> The workaround for erratum 720789 only affects a code path which is
-> not active in UP kernels; hence it should be safe to turn on in UP
-> kernels, without penalty.
-> 
-> This patch simply removes the extra dependency on SMP from Kconfig.
-> 
-> This means that configs for buggy silicon can simply select
-> ARM_ERRATA_720789, without preventing a UP kernel from being built
-> or duplicatiing knowledge about when to activate the workaround.
-> 
-> Signed-off-by: Dave Martin <dave.martin@linaro.org>
-> ---
->  arch/arm/Kconfig |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 44789ef..31bbad3 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -1245,7 +1245,7 @@ config PL310_ERRATA_588369
->  
->  config ARM_ERRATA_720789
->  	bool "ARM errata: TLBIASIDIS and TLBIMVAIS operations can broadcast a faulty ASID"
-> -	depends on CPU_V7 && SMP
-> +	depends on CPU_V7
->  	help
->  	  This option enables the workaround for the 720789 Cortex-A9 (prior to
->  	  r2p0) erratum. A faulty ASID can be sent to the other CPUs for the
+On Tue, Nov 29, 2011 at 5:16 PM, Michael S. Tsirkin <mst@redhat.com> wrote:
+> This mentions iommu - is there a need to use dma api to let
+> the firmware acess the rings? Or does it have access to all
+> of memory?
 
-Having this applied on a UP kernel should have no effect given that it only
-affects the UIS TLB flags. So:
+IOMMU may or may not be used, it really depends on the hardware (my
+personal SoC does employ one, while others don't).
 
-Acked-by: Will Deacon <will.deacon@arm.com>
+The vrings are created in non-cacheable memory, which is allocated
+using dma_alloc_coherent, but that isn't necessarily controlling the
+remote processor access to the memory (a notable example is an
+iommu-less remote processor which can directly access the physical
+memory).
 
-Cheers,
+> Is there cache snooping? If yes access from an external device
+> typically works mostly in the same way as smp ...
 
-Will
+No, nothing fancy like that. Every processor has its own cache, with
+no coherency protocol. The remote processor should really be treated
+as a device, and not as a processor that is part of an SMP
+configuration, and we must prohibit both the compiler and the CPU from
+reordering memory operations.
+
+> So you put virtio rings in MMIO memory?
+
+I'll be precise: the vrings are created in non-cacheable memory, which
+both processors have access to.
+
+> Could you please give a couple of examples of breakage?
+
+Sure. Basically, the order of the vring memory operations appear
+differently to the observing processor. For example, avail->idx gets
+updated before the new entry is put in the available array...
+
+Thanks,
+Ohad.
