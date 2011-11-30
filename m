@@ -1,39 +1,35 @@
-From: jason.chen@linaro.org (Jason Chen)
-Date: Wed, 30 Nov 2011 11:34:27 +0800
-Subject: [PATCH] MXC PWM: should active during DOZE/WAIT/DBG mode
-Message-ID: <1322624067-3591-1-git-send-email-jason.chen@linaro.org>
+From: jtzhou@marvell.com (Jett.Zhou)
+Date: Wed, 30 Nov 2011 12:26:20 +0800
+Subject: [V3 0/6] rtc-sa1100 clean up 
+Message-ID: <1322627186-32345-1-git-send-email-jtzhou@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Jason Chen <jason.chen@linaro.org>
----
- arch/arm/plat-mxc/pwm.c |    7 ++++++-
- 1 files changed, 6 insertions(+), 1 deletions(-)
+This patch set do the following things:
+  1) clean up sa1100-rtc for support sa1100/pxa/mmp series
+  2) add dummy clock for pxa arch
+  3) clean up clock dev for sa1100 arch and add dummy clock for sa1100
+  4) fix build error for sa1100 arch
 
-diff --git a/arch/arm/plat-mxc/pwm.c b/arch/arm/plat-mxc/pwm.c
-index 5dda436..9ba9c2c 100644
---- a/arch/arm/plat-mxc/pwm.c
-+++ b/arch/arm/plat-mxc/pwm.c
-@@ -32,6 +32,9 @@
- #define MX3_PWMSAR                0x0C    /* PWM Sample Register */
- #define MX3_PWMPR                 0x10    /* PWM Period Register */
- #define MX3_PWMCR_PRESCALER(x)    (((x - 1) & 0xFFF) << 4)
-+#define MX3_PWMCR_DOZEEN                (1 << 24)
-+#define MX3_PWMCR_WAITEN                (1 << 23)
-+#define MX3_PWMCR_DBGEN			(1 << 22)
- #define MX3_PWMCR_CLKSRC_IPG_HIGH (2 << 16)
- #define MX3_PWMCR_CLKSRC_IPG      (1 << 16)
- #define MX3_PWMCR_EN              (1 << 0)
-@@ -78,7 +81,9 @@ int pwm_config(struct pwm_device *pwm, int duty_ns, int period_ns)
- 		writel(duty_cycles, pwm->mmio_base + MX3_PWMSAR);
- 		writel(period_cycles, pwm->mmio_base + MX3_PWMPR);
- 
--		cr = MX3_PWMCR_PRESCALER(prescale) | MX3_PWMCR_EN;
-+		cr = MX3_PWMCR_PRESCALER(prescale) |
-+			MX3_PWMCR_DOZEEN | MX3_PWMCR_WAITEN |
-+			MX3_PWMCR_DBGEN | MX3_PWMCR_EN;
- 
- 		if (cpu_is_mx25())
- 			cr |= MX3_PWMCR_CLKSRC_IPG;
--- 
-1.7.4.1
+Jett.Zhou (6):
+  RTC: sa1100: Clean out ost register
+  RTC: sa1100: remove redundant code of setting alarm
+  RTC: sa1100: support sa1100, pxa and mmp soc families
+  ARM: pxa: add dummy clock for sa1100-rtc
+  ARM: sa1100: clean up of the clock support
+  ARM: sa1100: fix build error
+
+ arch/arm/Kconfig                   |    2 +-
+ arch/arm/mach-pxa/devices.c        |   20 +++
+ arch/arm/mach-pxa/pxa25x.c         |    1 +
+ arch/arm/mach-pxa/pxa27x.c         |    1 +
+ arch/arm/mach-pxa/pxa300.c         |    1 +
+ arch/arm/mach-pxa/pxa320.c         |    1 +
+ arch/arm/mach-pxa/pxa3xx.c         |    1 +
+ arch/arm/mach-pxa/pxa95x.c         |    1 +
+ arch/arm/mach-sa1100/Makefile.boot |    4 +-
+ arch/arm/mach-sa1100/clock.c       |   91 ++++++++---
+ arch/arm/mach-sa1100/generic.c     |   20 +++
+ drivers/rtc/Kconfig                |    2 +-
+ drivers/rtc/rtc-sa1100.c           |  300 ++++++++++++++++++++++--------------
+ 13 files changed, 299 insertions(+), 146 deletions(-)
