@@ -1,66 +1,47 @@
-From: nsekhar@ti.com (Nori, Sekhar)
-Date: Wed, 30 Nov 2011 10:47:04 +0000
-Subject: [PATCH RESEND] davinci: dm646x: move vpif related code to
- driver core header from platform
-In-Reply-To: <4ECEA3A9.1080506@redhat.com>
-References: <1321110362-6699-1-git-send-email-manjunath.hadli@ti.com>
- <4ECE8764.60800@redhat.com>
- <DF0F476B391FA8409C78302C7BA518B602DDD6@DBDE01.ent.ti.com>
- <4ECEA3A9.1080506@redhat.com>
-Message-ID: <DF0F476B391FA8409C78302C7BA518B60353C8@DBDE01.ent.ti.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Wed, 30 Nov 2011 10:48:43 +0000
+Subject: [PATCH v3 0/5] Versatile Express DT support
+In-Reply-To: <1322587019.3164.111.camel@hornet.cambridge.arm.com>
+References: <1322579473-8804-1-git-send-email-pawel.moll@arm.com>
+ <20111129170013.GD2829@localhost.localdomain>
+ <1322587019.3164.111.camel@hornet.cambridge.arm.com>
+Message-ID: <20111130104842.GA2045@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 25, 2011 at 01:36:01, Mauro Carvalho Chehab wrote:
-> Em 24-11-2011 16:22, Nori, Sekhar escreveu:
-> > Hi Mauro,
-> > 
-> > On Thu, Nov 24, 2011 at 23:35:24, Mauro Carvalho Chehab wrote:
-> >> Em 12-11-2011 13:06, Manjunath Hadli escreveu:
-> >>> move vpif related code for capture and display drivers
-> >>> from dm646x platform header file to vpif_types.h as these definitions
-> >>> are related to driver code more than the platform or board.
-> >>>
-> >>> Signed-off-by: Manjunath Hadli <manjunath.hadli@ti.com>
-> >>
-> >> Manju,
-> >>
-> >> Why are you re-sending a patch?
-> >>
-> >> My understanding is that you're maintaining the davinci patches, so it is
-> >> up to you to put those patches on your tree and send me a pull request when
-> >> they're done. So, please, don't pollute the ML re-sending emails that
-> >> are for yourself to handle.
-> > 
-> > Since this particular patch touches arch/arm/mach-davinci
-> > as well as drivers/media/video, the plan was to queue the
-> > patch through ARM tree with your Ack. We did not get your
-> > ack the last time around[1] so it was resent.
-> > 
-> > Do let me know if your ack is not needed.
-> > 
-> > Thanks,
-> > Sekhar
-> > 
-> > [1] http://www.mail-archive.com/davinci-linux-open-source at linux.davincidsp.com/msg21840.html
+On Tue, Nov 29, 2011 at 05:16:59PM +0000, Pawel Moll wrote:
+> On Tue, 2011-11-29 at 17:00 +0000, Dave Martin wrote:
+> > I'm trying to build... what tree are you basing on?
 > 
-> Hmm.. I missed this email, but just re-sending it without request my ACK doesn't help
-> much ;)
+> v3.2-rc3:
 > 
-> If this ever happens again, next time the better is to forward me the patch again, on
-> an email asking for my ack.
+> $ git log --oneline HEAD...v3.2-rc3~
+> 3b9df1e ARM: vexpress: DT-based support for CoreTiles Express A5x2 and A9x4
+> 5a1c565 ARM: vexpress: Initial RS1 memory map support
+> 9355e8a ARM: vexpress: Add DT support in v2m
+> 0529bd6 ARM: vexpress: Get rid of MMIO_P2V
+> 68118cc ARM: versatile: Add missing ENDPROC to headsmp.S
+> caca6a0 Linux 3.2-rc3
 > 
-> With regards to the patch:
+> > With v3.2-rc3 or next, I get OF header failures like the following:
+> > 
+> > arch/arm/kernel/devtree.c: In function ?arm_dt_memblock_reserve?:
+> > arch/arm/kernel/devtree.c:41:7: error: ?initial_boot_params? undeclared (first use in this function)
+> > arch/arm/kernel/devtree.c:41:7: note: each undeclared identifier is reported only once for each function it appears in
+> [...]
 > 
-> Acked-by: Mauro Carvalho Chehab <mchehab@redhat.com>
+> Can you send me your config, please?
 
-Thanks Mauro. Queuing this for v3.3 submission.
+Attached.  It's just vexpress_defconfig, plus ARCH_VEXPRESS_V2P_CA5S_CA9=y
 
-Manju, while committing I changed the subject line to:
+OK, I'll pull that in too.
 
-"ARM: davinci: vpif: move code to driver core header from platform"
-
-to better match the current subject line conventions.
-
-Regards,
-Sekhar
+Cheers
+---Dave
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: defconfig.gz
+Type: application/octet-stream
+Size: 1072 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111130/3b99608b/attachment-0001.obj>
