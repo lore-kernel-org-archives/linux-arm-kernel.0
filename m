@@ -1,76 +1,66 @@
-From: josh.wu@atmel.com (Josh Wu)
-Date: Wed, 30 Nov 2011 18:06:44 +0800
-Subject: [PATCH 2/2] [media] V4L: atmel-isi: add clk_prepare()/clk_unprepare()
- functions
-In-Reply-To: <1322647604-30662-1-git-send-email-josh.wu@atmel.com>
-References: <1322647604-30662-1-git-send-email-josh.wu@atmel.com>
-Message-ID: <1322647604-30662-2-git-send-email-josh.wu@atmel.com>
+From: nsekhar@ti.com (Nori, Sekhar)
+Date: Wed, 30 Nov 2011 10:47:04 +0000
+Subject: [PATCH RESEND] davinci: dm646x: move vpif related code to
+ driver core header from platform
+In-Reply-To: <4ECEA3A9.1080506@redhat.com>
+References: <1321110362-6699-1-git-send-email-manjunath.hadli@ti.com>
+ <4ECE8764.60800@redhat.com>
+ <DF0F476B391FA8409C78302C7BA518B602DDD6@DBDE01.ent.ti.com>
+ <4ECEA3A9.1080506@redhat.com>
+Message-ID: <DF0F476B391FA8409C78302C7BA518B60353C8@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Nov 25, 2011 at 01:36:01, Mauro Carvalho Chehab wrote:
+> Em 24-11-2011 16:22, Nori, Sekhar escreveu:
+> > Hi Mauro,
+> > 
+> > On Thu, Nov 24, 2011 at 23:35:24, Mauro Carvalho Chehab wrote:
+> >> Em 12-11-2011 13:06, Manjunath Hadli escreveu:
+> >>> move vpif related code for capture and display drivers
+> >>> from dm646x platform header file to vpif_types.h as these definitions
+> >>> are related to driver code more than the platform or board.
+> >>>
+> >>> Signed-off-by: Manjunath Hadli <manjunath.hadli@ti.com>
+> >>
+> >> Manju,
+> >>
+> >> Why are you re-sending a patch?
+> >>
+> >> My understanding is that you're maintaining the davinci patches, so it is
+> >> up to you to put those patches on your tree and send me a pull request when
+> >> they're done. So, please, don't pollute the ML re-sending emails that
+> >> are for yourself to handle.
+> > 
+> > Since this particular patch touches arch/arm/mach-davinci
+> > as well as drivers/media/video, the plan was to queue the
+> > patch through ARM tree with your Ack. We did not get your
+> > ack the last time around[1] so it was resent.
+> > 
+> > Do let me know if your ack is not needed.
+> > 
+> > Thanks,
+> > Sekhar
+> > 
+> > [1] http://www.mail-archive.com/davinci-linux-open-source at linux.davincidsp.com/msg21840.html
+> 
+> Hmm.. I missed this email, but just re-sending it without request my ACK doesn't help
+> much ;)
+> 
+> If this ever happens again, next time the better is to forward me the patch again, on
+> an email asking for my ack.
+> 
+> With regards to the patch:
+> 
+> Acked-by: Mauro Carvalho Chehab <mchehab@redhat.com>
 
-Signed-off-by: Josh Wu <josh.wu@atmel.com>
----
- drivers/media/video/atmel-isi.c |   17 ++++++++++++++++-
- 1 files changed, 16 insertions(+), 1 deletions(-)
+Thanks Mauro. Queuing this for v3.3 submission.
 
-diff --git a/drivers/media/video/atmel-isi.c b/drivers/media/video/atmel-isi.c
-index ea4eef4..5da4381 100644
---- a/drivers/media/video/atmel-isi.c
-+++ b/drivers/media/video/atmel-isi.c
-@@ -922,7 +922,9 @@ static int __devexit atmel_isi_remove(struct platform_device *pdev)
- 			isi->fb_descriptors_phys);
- 
- 	iounmap(isi->regs);
-+	clk_unprepare(isi->mck);
- 	clk_put(isi->mck);
-+	clk_unprepare(isi->pclk);
- 	clk_put(isi->pclk);
- 	kfree(isi);
- 
-@@ -955,6 +957,12 @@ static int __devinit atmel_isi_probe(struct platform_device *pdev)
- 	if (IS_ERR(pclk))
- 		return PTR_ERR(pclk);
- 
-+	ret = clk_prepare(pclk);
-+	if (ret) {
-+		clk_put(pclk);
-+		return ret;
-+	}
-+
- 	isi = kzalloc(sizeof(struct atmel_isi), GFP_KERNEL);
- 	if (!isi) {
- 		ret = -ENOMEM;
-@@ -978,10 +986,14 @@ static int __devinit atmel_isi_probe(struct platform_device *pdev)
- 		goto err_clk_get;
- 	}
- 
-+	ret = clk_prepare(isi->mck);
-+	if (ret)
-+		goto err_set_mck_rate;
-+
- 	/* Set ISI_MCK's frequency, it should be faster than pixel clock */
- 	ret = clk_set_rate(isi->mck, pdata->mck_hz);
- 	if (ret < 0)
--		goto err_set_mck_rate;
-+		goto err_unprepare_mck;
- 
- 	isi->p_fb_descriptors = dma_alloc_coherent(&pdev->dev,
- 				sizeof(struct fbd) * MAX_BUFFER_NUM,
-@@ -1058,11 +1070,14 @@ err_alloc_ctx:
- 			isi->p_fb_descriptors,
- 			isi->fb_descriptors_phys);
- err_alloc_descriptors:
-+err_unprepare_mck:
-+	clk_unprepare(isi->mck);
- err_set_mck_rate:
- 	clk_put(isi->mck);
- err_clk_get:
- 	kfree(isi);
- err_alloc_isi:
-+	clk_unprepare(pclk);
- 	clk_put(pclk);
- 
- 	return ret;
--- 
-1.6.3.3
+Manju, while committing I changed the subject line to:
+
+"ARM: davinci: vpif: move code to driver core header from platform"
+
+to better match the current subject line conventions.
+
+Regards,
+Sekhar
