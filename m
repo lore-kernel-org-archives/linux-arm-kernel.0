@@ -1,86 +1,78 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Wed, 30 Nov 2011 17:15:02 +0000
-Subject: [PATCH v3 4/5] ARM: vexpress: Initial RS1 memory map support
-In-Reply-To: <20111130153749.GE2045@localhost.localdomain>
-References: <1322579473-8804-1-git-send-email-pawel.moll@arm.com>
- <1322579473-8804-5-git-send-email-pawel.moll@arm.com>
- <20111130153749.GE2045@localhost.localdomain>
-Message-ID: <1322673302.3180.25.camel@hornet.cambridge.arm.com>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Wed, 30 Nov 2011 09:19:42 -0800
+Subject: [PATCH 2/2] gpio/tegra: Make it a DT interrupt controller
+In-Reply-To: <4ED5A2CB.8020905@gmail.com>
+References: <1322616743-31985-1-git-send-email-swarren@nvidia.com>
+ <1322616743-31985-2-git-send-email-swarren@nvidia.com>
+ <4ED5A2CB.8020905@gmail.com>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF174FDAFE4D@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2011-11-30 at 15:37 +0000, Dave Martin wrote:
->
-> This results in a uImage which is a bit broken if using a normal u-Boot
-> configured for vexpress-v2p-ca9, because the bootloader makes some
-> memory map assumptions, and anyway we don't expect the kernel to work
-> unless it's loaded at the start of RAM:
-> 
-> 
-> ## Booting kernel from Legacy Image at 62000400 ...
->    Image Name:   Linux-3.2.0-rc3+
->    Image Type:   ARM Linux Kernel Image (uncompressed)
->    Data Size:    2464984 Bytes = 2.4 MiB
->    Load Address: 80008000
->    Entry Point:  80008000
->    Verifying Checksum ... OK
-> ## Loading init Ramdisk from Legacy Image at 80ffffc0 ...
->    Image Name:
->    Image Type:   ARM Linux RAMDisk Image (uncompressed)
->    Data Size:    2216523 Bytes = 2.1 MiB
->    Load Address: 81000000
->    Entry Point:  81000000
->    Verifying Checksum ... OK
-> ## Flattened Device Tree blob at 80ffc000
->    Booting using the fdt blob at 0x80ffc000
->    Loading Kernel Image ... OK
-> OK
->    Loading Ramdisk to 7fcd3000, end 7fef024b ... OK
->    Loading Device Tree to 7fcce000, end 7fcd2779 ... OK
-> 
-> Starting kernel ...
-> 
-> Uncompressing Linux... done, booting the kernel.
-> Booting Linux on physical CPU 0
-> Initializing cgroup subsys cpuset
-> Linux version 3.2.0-rc3+ (davem at e103592) (gcc version 4.5.2 (Ubuntu/Linaro 4.5.2-8ubuntu3) ) #12 SMP Wed Nov 30 15:10:19 GMT 2011
-> CPU: ARMv7 Processor [410fc091] revision 1 (ARMv7), cr=10c53c7d
-> CPU: PIPT / VIPT nonaliasing data cache, VIPT aliasing instruction cache
-> Machine: ARM Versatile Express, model: V2P-CA9
-> bootconsole [earlycon0] enabled
-> Ignoring RAM at 60000000-7fffffff (vmalloc region overlap).
-> Ignoring RAM at 60000000-9fffffff (vmalloc region overlap).
-> INITRD: 0x7fcd3000+0x0021d24b is not a memory region - disabling initrd
-> Memory policy: ECC disabled, Data cache writeall
-> Cheers
-> ---Dave
-> 
-> 
-> oc
-> 
-> <HANG>
+Rob Herring wrote at Tuesday, November 29, 2011 8:28 PM:
+> On 11/29/2011 07:32 PM, Stephen Warren wrote:
+> > Fix the DT binding documentation to describe interrupt-related properties,
+> > and the contents of "child" node interrupts property.
+> >
+> > Update tegra20.dtsi to specify the required interrupt-related properties.
+> >
+> > Fix the driver to creating an IRQ domain for itself, so that child node
+> > interrupts properties are correctly parsed.
 
-Yes, this is known problem with U-boot. Could you try again with
-"mem=512M" parameter?
-
-> If I strip the uImage and rebuild it with -a 0x60008000 -e 0x60008000
-> and no other changes, that's sufficient to give me a fully booting
-> kernel.  I can also boot a single image on v2p-ca9 both with and without
-> a dtb in this configuration.
+> > diff --git a/Documentation/devicetree/bindings/gpio/gpio_nvidia.txt b/Documentation/devicetree/bindings/gpio/gpio_nvidia.txt
+...
+> > +- #interrupt-cells : Should be 3.
 > 
-> I'm using a Linaro u-Boot from a couple of releses ago; it's possible
-> things have changed since.
+> Should be 2??
+
+Yes, typo.
+
+> > diff --git a/drivers/gpio/gpio-tegra.c b/drivers/gpio/gpio-tegra.c
+
+> > +	if (pdev->dev.of_node)
+> > +		irq_domain_add_simple(pdev->dev.of_node, TEGRA_GPIO_TO_IRQ(0));
+> > +
 > 
-> Do you know of any specific u-Boot version which shouldn't have these
-> problems?
+> This is a bit of a temporary solution. Really, you want to end up with
+> something like this to eliminate INT_GPIO_BASE and dynamically assign
+> the irqbase:
+
+>  static int tegra_gpio_to_irq(struct gpio_chip *chip, unsigned offset)
+>  {
+> -       return TEGRA_GPIO_TO_IRQ(offset);
+> +       return irq_domain_to_irq(chip->domain, offset);
 > 
-> Was the hard-coded uImage load address/entry point problem ever fixed?
-> (It totally defeats loading a single uImage on multiple board variants.)
+> >>> This is a bit wrong. You need a tegra_gpio_chip containing a domain
+> and gpio_chip.
 
-I simply don't use U-boot at all, what solves the problem
-"systematically" ;-) I wonder if it was possible to override the
-load/entry address in the runtime?
+That implies there's always an IRQ domain for this chip. Right now, my
+patch only creates an IRQ domain when the GPIO controller is instantiated
+from DT; there is no domain when instantiated as a platform device from a
+board file. I suppose that really should change, but:
 
-Cheers!
+Some board files initialize platform devices as follows:
 
-Pawe?
+./arch/arm/mach-tegra/board-seaboard.c:162:	.irq = TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_ISL29018_IRQ),
+./arch/arm/mach-tegra/board-seaboard.c:186:	.irq = TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_CDC_IRQ),
+./arch/arm/mach-tegra/board-harmony.c:104:	.irq = TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_CDC_IRQ),
+
+Is there a way to make that work if there is no static IRQ numbering and
+hence the compile-time macro TEGRA_GPIO_TO_IRQ() doesn't exist?
+
+For Tegra, IRQ domain support (CONFIG_IRQ_DOMAIN) is only enabled via
+CONFIG_USE_OF, so for non-DT builds isn't enabled. I guess we could
+easily make CONFIG_ARCH_TEGRA select CONFIG_IRQ_DOMAIN though.
+
+The sooner we switch to DT-only the better!
+
+>  static void tegra_gpio_irq_ack(struct irq_data *d)
+>  {
+> -       int gpio = d->irq - INT_GPIO_BASE;
+> +       int gpio = d->hwirq;
+
+Is the hwirq field valid when there isn't an IRQ domain?
+
+Thanks for the feedback.
+
+-- 
+nvpublic
