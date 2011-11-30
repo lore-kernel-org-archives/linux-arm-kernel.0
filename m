@@ -1,33 +1,118 @@
-From: davem@davemloft.net (David Miller)
-Date: Wed, 30 Nov 2011 00:40:44 -0500 (EST)
-Subject: [PATCH] at91_ether: use gpio_is_valid for phy IRQ line
-In-Reply-To: <20111130044403.GY15008@game.jcrosoft.org>
-References: <1322169674-4109-1-git-send-email-nicolas.ferre@atmel.com>
- <20111129.185342.105454076866922618.davem@davemloft.net>
- <20111130044403.GY15008@game.jcrosoft.org>
-Message-ID: <20111130.004044.1357362466737795134.davem@davemloft.net>
+From: richard.zhao@linaro.org (Richard Zhao)
+Date: Wed, 30 Nov 2011 14:18:16 +0800
+Subject: [RFC V1 7/8] ARM i.MX: prepare common clk support
+In-Reply-To: <CAPtuhThNZA707gQhjt9-V_B8=5UN9o1JgNTm_Dj8eLO-WNmJQA@mail.gmail.com>
+References: <1322046755-13511-1-git-send-email-richard.zhao@linaro.org>
+ <1322046755-13511-8-git-send-email-richard.zhao@linaro.org>
+ <CAPtuhTgSB8Af4Xtux93-VLXSrK5KkzFOez9V5tcmbkKwbZ_8Rw@mail.gmail.com>
+ <20111129030944.GB19236@b20223-02.ap.freescale.net>
+ <CAPtuhThNZA707gQhjt9-V_B8=5UN9o1JgNTm_Dj8eLO-WNmJQA@mail.gmail.com>
+Message-ID: <20111130061815.GA8684@b20223-02.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-Date: Wed, 30 Nov 2011 05:44:03 +0100
-
-> On 18:53 Tue 29 Nov     , David Miller wrote:
->> From: Nicolas Ferre <nicolas.ferre@atmel.com>
->> Date: Thu, 24 Nov 2011 22:21:14 +0100
->> 
->> > Use the generic gpiolib gpio_is_valid() function to test
->> > if the phy IRQ line GPIO is actually provided.
->> > 
->> > For non-connected or non-existing phy IRQ lines, -EINVAL
->> > value is used for phy_irq_pin field of struct at91_eth_data.
->> > 
->> > Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
->> 
->> I'm assuming this goes through the ARM tree, because in both of my networking
->> trees there is no ARM at91 implementation of gpio_is_valid().
-> yes the depending patch series is in the arm-soc
+On Tue, Nov 29, 2011 at 11:22:23AM -0800, Mike Turquette wrote:
+> On Mon, Nov 28, 2011 at 7:09 PM, Richard Zhao <richard.zhao@linaro.org> wrote:
+> > On Mon, Nov 28, 2011 at 06:36:33PM -0800, Mike Turquette wrote:
+> >> On Wed, Nov 23, 2011 at 3:12 AM, Richard Zhao <richard.zhao@linaro.org> wrote:
+> >> > +#define DEFINE_CLK_DIVIDER(_name, _parent, _flags, _reg, _shift, _width) \
+> >> > + ? ? ? struct clk_divider _name = { \
+> >> > + ? ? ? ? ? ? ? .clk = { \
+> >> > + ? ? ? ? ? ? ? ? ? ? ? .name = #_name, \
+> >> > + ? ? ? ? ? ? ? ? ? ? ? .ops = &clk_divider_ops, \
+> >> > + ? ? ? ? ? ? ? ? ? ? ? .parent = _parent, \
+> >> > + ? ? ? ? ? ? ? ? ? ? ? .flags = _flags, \
+> >> > + ? ? ? ? ? ? ? }, \
+> >> > + ? ? ? ? ? ? ? .reg = (_reg), \
+> >> > + ? ? ? ? ? ? ? .shift = (_shift), \
+> >> > + ? ? ? ? ? ? ? .width = (_width), \
+> >> > + ? ? ? ? ? ? ? .lock = &imx_ccm_lock, \
+> >> > + ? ? ? }
+> >> > +
+> >> > +#define DEFINE_CLK_MUX(_name, _reg, _shift, _width, _clks) \
+> >> > + ? ? ? struct clk_mux _name = { \
+> >> > + ? ? ? ? ? ? ? .clk = { \
+> >> > + ? ? ? ? ? ? ? ? ? ? ? .name = #_name, \
+> >> > + ? ? ? ? ? ? ? ? ? ? ? .ops = &clk_mux_ops, \
+> >> > + ? ? ? ? ? ? ? }, \
+> >> > + ? ? ? ? ? ? ? .reg = (_reg), \
+> >> > + ? ? ? ? ? ? ? .shift = (_shift), \
+> >> > + ? ? ? ? ? ? ? .width = (_width), \
+> >> > + ? ? ? ? ? ? ? .clks = (_clks), \
+> >> > + ? ? ? ? ? ? ? .num_clks = ARRAY_SIZE(_clks), \
+> >> > + ? ? ? ? ? ? ? .lock = &imx_ccm_lock, \
+> >> > + ? ? ? }
+> >> > +
+> >> > +#define DEFINE_CLK_FIXED(_name, _rate) \
+> >> > + ? ? ? struct clk_hw_fixed _name = { \
+> >> > + ? ? ? ? ? ? ? .clk = { \
+> >> > + ? ? ? ? ? ? ? ? ? ? ? .name = #_name, \
+> >> > + ? ? ? ? ? ? ? ? ? ? ? .ops = &clk_hw_fixed_ops, \
+> >> > + ? ? ? ? ? ? ? }, \
+> >> > + ? ? ? ? ? ? ? .fixed_rate = (_rate), \
+> >> > + ? ? ? }
+> >> > +
+> >> > ?#endif /* CONFIG_GENERIC_CLK */
+> >> > ?#endif /* __ASSEMBLY__ */
+> >> > ?#endif /* __ASM_ARCH_MXC_CLOCK_H__ */
+> >> > --
+> >> > 1.7.5.4
+> >> >
+> >> >
+> >> >
+> >>
+> >> Can you move these into clk.h/approriate header? ?Just add _lock to it
+> >> and it'll work fine for your code.
+> > Yes, I can add _lock and share the macros in common header. But I still
 > 
-> can we have your ack or sob?
+> On second thought you don't need to resubmit with these in clk.h; I'll
+> absorb them into clk.h with my next common clk patchset.
+Do you mean you also adopt divider and mux clock patch?
+> 
+> > need a wraper for imx to eliminate _lock, right?
+> 
+> No.  Taking code from your patch 8/8:
+> 
+> +static DEFINE_CLK_DIVIDER(perclk_pred1, &perclk_lp_apm.clk, 0,
+> MXC_CCM_CBCDR, 6, 2);
+> +static DEFINE_CLK_DIVIDER(perclk_pred2, &perclk_pred1.clk, 0,
+> MXC_CCM_CBCDR, 3, 3);
+> +static DEFINE_CLK_DIVIDER(perclk_podf, &perclk_pred2.clk,
+> CLK_PARENT_SET_RATE, MXC_CCM_CBCDR, 0, 3);
+> 
+> becomes,
+> 
+> +static DEFINE_CLK_DIVIDER(perclk_pred1, &perclk_lp_apm.clk, 0,
+> MXC_CCM_CBCDR, 6, 2, &imx_ccm_lock);
+> +static DEFINE_CLK_DIVIDER(perclk_pred2, &perclk_pred1.clk, 0,
+> MXC_CCM_CBCDR, 3, 3, &imx_ccm_lock);
+> +static DEFINE_CLK_DIVIDER(perclk_podf, &perclk_pred2.clk,
+> CLK_PARENT_SET_RATE, MXC_CCM_CBCDR, 0, 3, &imx_ccm_lock);
+understood.
 
-Acked-by: David S. Miller <davem@davemloft.net>
+Thanks
+Richard
+> 
+> Regards,
+> Mike
+> 
+> >
+> > Thanks for review
+> > Richard
+> >>
+> >> Thanks,
+> >> Mike
+> >>
+> >> _______________________________________________
+> >> linux-arm-kernel mailing list
+> >> linux-arm-kernel at lists.infradead.org
+> >> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> >>
+> >
+> >
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
