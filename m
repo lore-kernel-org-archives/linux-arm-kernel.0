@@ -1,40 +1,169 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 30 Nov 2011 17:53:01 +0100
-Subject: [GIT PULL] at91 fixes for 3.2-rc4
-Message-ID: <4ED65F6D.4020402@atmel.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Wed, 30 Nov 2011 16:59:11 +0000
+Subject: [PATCH 1/4] Add generic ARM instruction set condition code checks.
+In-Reply-To: <20111125171918.14878.54205.stgit@localhost6.localdomain6>
+References: <20111125171621.14878.49918.stgit@localhost6.localdomain6>
+ <20111125171918.14878.54205.stgit@localhost6.localdomain6>
+Message-ID: <20111130165911.GG2045@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On Fri, Nov 25, 2011 at 05:19:23PM +0000, Leif Lindholm wrote:
+> This patch breaks the ARM condition checking code out of nwfpe/fpopcode.{ch}
+> into a standalone file for opcode operations. It also modifies the code
+> somewhat for coding style adherence, and adds some temporary variables for
+> increased readability.
+> 
+> Signed-off-by: Leif Lindholm <leif.lindholm@arm.com>
+> ---
+>  arch/arm/include/asm/opcodes.h |   20 ++++++++++++
+>  arch/arm/kernel/Makefile       |    2 +
+>  arch/arm/kernel/opcodes.c      |   68 ++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 89 insertions(+), 1 deletions(-)
+>  create mode 100644 arch/arm/include/asm/opcodes.h
+>  create mode 100644 arch/arm/kernel/opcodes.c
+> 
+> diff --git a/arch/arm/include/asm/opcodes.h b/arch/arm/include/asm/opcodes.h
+> new file mode 100644
+> index 0000000..aea97bf
+> --- /dev/null
+> +++ b/arch/arm/include/asm/opcodes.h
+> @@ -0,0 +1,20 @@
+> +/*
+> + *  arch/arm/include/asm/opcodes.h
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#ifndef __ASM_ARM_OPCODES_H
+> +#define __ASM_ARM_OPCODES_H
+> +
+> +#ifndef __ASSEMBLY__
+> +extern unsigned int arm_check_condition(unsigned int opcode, unsigned int psr);
+> +#endif
+> +
+> +#define ARM_OPCODE_CONDTEST_FAIL   0
+> +#define ARM_OPCODE_CONDTEST_PASS   1
+> +#define ARM_OPCODE_CONDTEST_UNCOND 2
+> +
+> +#endif /* __ASM_ARM_OPCODES_H */
+> diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
+> index 16eed6a..43b740d 100644
+> --- a/arch/arm/kernel/Makefile
+> +++ b/arch/arm/kernel/Makefile
+> @@ -13,7 +13,7 @@ CFLAGS_REMOVE_return_address.o = -pg
+>  
+>  # Object file lists.
+>  
+> -obj-y		:= elf.o entry-armv.o entry-common.o irq.o \
+> +obj-y		:= elf.o entry-armv.o entry-common.o irq.o opcodes.o \
+>  		   process.o ptrace.o return_address.o setup.o signal.o \
+>  		   sys_arm.o stacktrace.o time.o traps.o
+>  
+> diff --git a/arch/arm/kernel/opcodes.c b/arch/arm/kernel/opcodes.c
+> new file mode 100644
+> index 0000000..c3171cc
+> --- /dev/null
+> +++ b/arch/arm/kernel/opcodes.c
+> @@ -0,0 +1,68 @@
+> +/*
+> + *  linux/arch/arm/kernel/opcodes.c
+> + *
+> + *  A32 condition code lookup feature moved from nwfpe/fpopcode.c
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#include <linux/module.h>
+> +#include <asm/opcodes.h>
+> +
+> +#define ARM_OPCODE_CONDITION_UNCOND 0xf
+> +
+> +/*
+> + * condition code lookup table
+> + * index into the table is test code: EQ, NE, ... LT, GT, AL, NV
+> + *
+> + * bit position in short is condition code: NZCV
+> + */
+> +static const unsigned short cc_map[16] = {
+> +	0xF0F0,			/* EQ == Z set            */
+> +	0x0F0F,			/* NE                     */
+> +	0xCCCC,			/* CS == C set            */
+> +	0x3333,			/* CC                     */
+> +	0xFF00,			/* MI == N set            */
+> +	0x00FF,			/* PL                     */
+> +	0xAAAA,			/* VS == V set            */
+> +	0x5555,			/* VC                     */
+> +	0x0C0C,			/* HI == C set && Z clear */
+> +	0xF3F3,			/* LS == C clear || Z set */
+> +	0xAA55,			/* GE == (N==V)           */
+> +	0x55AA,			/* LT == (N!=V)           */
+> +	0x0A05,			/* GT == (!Z && (N==V))   */
+> +	0xF5FA,			/* LE == (Z || (N!=V))    */
+> +	0xFFFF,			/* AL always              */
+> +	0			/* NV                     */
+> +};
+> +
+> +/*
+> + * Returns:
+> + * ARM_OPCODE_CONDTEST_FAIL   - if condition fails
+> + * ARM_OPCODE_CONDTEST_PASS   - if condition passes (including AL)
+> + * ARM_OPCODE_CONDTEST_UNCOND - if NV condition, or separate unconditional
+> + *                              opcode space from v5 onwards
+> + *
+> + * Code that needs to check whether a condition has explicitly passed,
+> + * should compare the return value to 1.
 
-Here are a few fixes for AT91. I have noted 3.2-rc4 in the subject but it
-is true that it can go in another -rc revision as I have seen your recent
-pull request to Linus...
+This paragraph should refer to the symbolic constants -- there's not so
+much point having them if people hard-code integer comparisons into all
+the calling code.
 
-The following changes since commit caca6a03d365883564885f2c1da3e88dcf65d139:
+The wording feels a bit confusing too.  Maybe something like:
 
-  Linux 3.2-rc3 (2011-11-23 20:20:28 -0800)
+"Code that needs to check when an instruction is conditional and would
+pass its condition check should check whether the return value ==
+ARM_OPCODE_CONDTEST_PASS."
 
-are available in the git repository at:
-  git://github.com/at91linux/linux-at91.git at91-fixes
 
-Anders Darander (1):
-      ARM: at91: Fix USB AT91 gadget registration
+> + * Code that wants to check if a condition means that the instruction
+> + * should be executed, should compare the return value to !0.
 
-Christian Hitz (1):
-      ARM: at91: fix NAND bus width decoding from system_rev
+!0 == 1.  I guess this is not what you mean.
 
-Jean-Christophe PLAGNIOL-VILLARD (1):
-      ARM: at91: fix clock conid for atmel_tcb.1 on 9260/9g20
+Maybe:
 
- arch/arm/mach-at91/at91rm9200_devices.c      |    2 +-
- arch/arm/mach-at91/at91sam9260.c             |    6 +++---
- arch/arm/mach-at91/at91sam9260_devices.c     |    2 +-
- arch/arm/mach-at91/at91sam9261_devices.c     |    2 +-
- arch/arm/mach-at91/at91sam9263_devices.c     |    2 +-
- arch/arm/mach-at91/include/mach/system_rev.h |    2 +-
- 6 files changed, 8 insertions(+), 8 deletions(-)
+"Code that needs to check when an instruction would architecturally
+execute (including some instructions on ARMv5 and later which cannot be
+conditional) should check whether the return value !=
+ARM_OPCODE_CONDTEST_FAIL."
 
-Thanks, best regards,
--- 
-Nicolas Ferre
+This documentation should perhaps move to opcodes.h, but I don't have a
+strong opinion.
+
+> + */
+> +unsigned int arm_check_condition(unsigned int opcode, unsigned int psr)
+> +{
+> +	unsigned int cc_bits  = opcode >> 28;
+> +	unsigned int psr_cond = psr >> 28;
+> +
+> +	if (cc_bits != ARM_OPCODE_CONDITION_UNCOND) {
+> +		if ((cc_map[cc_bits] >> (psr_cond)) & 1)
+> +			return ARM_OPCODE_CONDTEST_PASS;
+> +		else
+> +			return ARM_OPCODE_CONDTEST_FAIL;
+> +	 } else {
+
+Remove the space before } (checkpatch.pl ought to pick this up)
+
+> +		return ARM_OPCODE_CONDTEST_UNCOND;
+> +	}
+> +}
+> +
+> +EXPORT_SYMBOL(arm_check_condition);
+
+Cheers
+---Dave
