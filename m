@@ -1,48 +1,34 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Wed, 30 Nov 2011 13:45:05 +0200
-Subject: [RFC] virtio: use mandatory barriers for remote processor vdevs
-In-Reply-To: <20111129151607.GE30966@redhat.com>
-References: <1322569886-13055-1-git-send-email-ohad@wizery.com>
- <20111129131110.GC19157@redhat.com>
- <CAK=WgbZoGYVyKt=XXvnPVdh0koSBJC0zcgkLaYRkmjwBLOFA-A@mail.gmail.com>
- <20111129151607.GE30966@redhat.com>
-Message-ID: <CAK=WgbZK+k4uuyMPHUfr_PMyrR5ceRTvuDRpmhXfgwpSUOPw0g@mail.gmail.com>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Wed, 30 Nov 2011 11:46:40 +0000
+Subject: [PATCH v3 3/5] ARM: vexpress: Add DT support in v2m
+In-Reply-To: <201111292119.11554.arnd@arndb.de>
+References: <1322579473-8804-1-git-send-email-pawel.moll@arm.com>
+ <1322579473-8804-4-git-send-email-pawel.moll@arm.com>
+ <201111292119.11554.arnd@arndb.de>
+Message-ID: <1322653600.3164.153.camel@hornet.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 29, 2011 at 5:16 PM, Michael S. Tsirkin <mst@redhat.com> wrote:
-> This mentions iommu - is there a need to use dma api to let
-> the firmware acess the rings? Or does it have access to all
-> of memory?
+On Tue, 2011-11-29 at 21:19 +0000, Arnd Bergmann wrote:
+> On Tuesday 29 November 2011, Pawel Moll wrote:
+> > +                       compact-flash at 1a000 {
+> > +                               compatible = "ata-generic";
+> > +                               reg = <0x1a000 0x100
+> > +                                      0x1a100 0xf00>;
+> > +                               reg-shift = <2>;
+> > +                       };
+> 
+> Shouldn't there also be a more specific "compatible" value, in case we have
+> to detect this CF slot for some reason?
 
-IOMMU may or may not be used, it really depends on the hardware (my
-personal SoC does employ one, while others don't).
+It was the compatible-value-of-choice in
+"drivers/ata/pata_of_platform.c", unfortunately undocumented - as I have
+just realized - in the "Documentation/devicetree/bindings"...
 
-The vrings are created in non-cacheable memory, which is allocated
-using dma_alloc_coherent, but that isn't necessarily controlling the
-remote processor access to the memory (a notable example is an
-iommu-less remote processor which can directly access the physical
-memory).
+> Is there actually no interrupt?
 
-> Is there cache snooping? If yes access from an external device
-> typically works mostly in the same way as smp ...
+No, polling mode only. And yes, it works ;-)
 
-No, nothing fancy like that. Every processor has its own cache, with
-no coherency protocol. The remote processor should really be treated
-as a device, and not as a processor that is part of an SMP
-configuration, and we must prohibit both the compiler and the CPU from
-reordering memory operations.
+Cheers!
 
-> So you put virtio rings in MMIO memory?
-
-I'll be precise: the vrings are created in non-cacheable memory, which
-both processors have access to.
-
-> Could you please give a couple of examples of breakage?
-
-Sure. Basically, the order of the vring memory operations appear
-differently to the observing processor. For example, avail->idx gets
-updated before the new entry is put in the available array...
-
-Thanks,
-Ohad.
+Pawe?
