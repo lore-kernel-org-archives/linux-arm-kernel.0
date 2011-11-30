@@ -1,34 +1,31 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 30 Nov 2011 11:31:13 +0000
-Subject: [PATCH v2 4/6] ARM: idmap: use idmap_pgd when setting up mm for
- reboot
-In-Reply-To: <1322504937-24718-5-git-send-email-will.deacon@arm.com>
-References: <1322504937-24718-1-git-send-email-will.deacon@arm.com>
- <1322504937-24718-5-git-send-email-will.deacon@arm.com>
-Message-ID: <CAHkRjk7gCk-cuadAYLBrxwUu0TQkXSOh3iaDa3kLJsHnT=h_4A@mail.gmail.com>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Wed, 30 Nov 2011 09:31:57 -0200
+Subject: [PATCH v2] net: fec: Select the FEC driver by default for i.MX SoCs
+Message-ID: <1322652717-2685-1-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28 November 2011 18:28, Will Deacon <will.deacon@arm.com> wrote:
-> For soft-rebooting a system, it is necessary to map the MMU-off code
-> with an identity mapping so that execution can continue safely once the
-> MMU has been switched off.
->
-> Currently, switch_mm_for_reboot takes out a 1:1 mapping from 0x0 to
-> TASK_SIZE during reboot in the hope that the reset code lives at a
-> physical address corresponding to a userspace virtual address.
->
-> This patch modifies the code so that we switch to the idmap_pgd tables,
-> which contain a 1:1 mapping of the cpu_reset code. This has the
-> advantage of only remapping the code that we need and also means we
-> don't need to worry about allocating a pgd from an atomic context in the
-> case that the physical address of the cpu_reset code aliases with the
-> virtual space used by the kernel.
->
-> Acked-by: Dave Martin <dave.martin@linaro.org>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
+Let the FEC driver be built by default.
 
-Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+Changes since v1: 
+Move the FEC selection into Kconfig instead of .config file
 
+ drivers/net/ethernet/freescale/Kconfig |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
+
+diff --git a/drivers/net/ethernet/freescale/Kconfig b/drivers/net/ethernet/freescale/Kconfig
+index c520cfd..ae269ad 100644
+--- a/drivers/net/ethernet/freescale/Kconfig
++++ b/drivers/net/ethernet/freescale/Kconfig
+@@ -22,6 +22,7 @@ if NET_VENDOR_FREESCALE
+ 
+ config FEC
+ 	bool "FEC ethernet controller (of ColdFire and some i.MX CPUs)"
++	default ARCH_MXC || ARCH_MXS if ARM
+ 	depends on (M523x || M527x || M5272 || M528x || M520x || M532x || \
+ 		   ARCH_MXC || ARCH_MXS)
+ 	select PHYLIB
 -- 
-Catalin
+1.7.1
