@@ -1,104 +1,42 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 30 Nov 2011 14:32:54 +0000
-Subject: [Xen-devel] [ANNOUNCE] Xen port to Cortex-A15 / ARMv7 with virt
- extensions
-In-Reply-To: <1322659535.31810.97.camel@zakaz.uk.xensource.com>
-References: <alpine.DEB.2.00.1111281009090.31179@kaball-desktop>
- <201111301303.23851.arnd@arndb.de>
- <1322659535.31810.97.camel@zakaz.uk.xensource.com>
-Message-ID: <201111301432.54463.arnd@arndb.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 30 Nov 2011 14:37:36 +0000
+Subject: [PATCH v2 4/6] ARM: idmap: use idmap_pgd when setting up mm for
+ reboot
+In-Reply-To: <CAHkRjk7gCk-cuadAYLBrxwUu0TQkXSOh3iaDa3kLJsHnT=h_4A@mail.gmail.com>
+References: <1322504937-24718-1-git-send-email-will.deacon@arm.com>
+ <1322504937-24718-5-git-send-email-will.deacon@arm.com>
+ <CAHkRjk7gCk-cuadAYLBrxwUu0TQkXSOh3iaDa3kLJsHnT=h_4A@mail.gmail.com>
+Message-ID: <20111130143735.GC13025@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 30 November 2011, Ian Campbell wrote:
-> On Wed, 2011-11-30 at 13:03 +0000, Arnd Bergmann wrote:
-> > On Wednesday 30 November 2011, Stefano Stabellini wrote:
-> > This is the same choice people have made for KVM, but it's not
-> > necessarily the best option in the long run. In particular, this
-> > board has a lot of hardware that you claim to have by putting the
-> > machine number there, when you don't really want to emulate it.
+On Wed, Nov 30, 2011 at 11:31:13AM +0000, Catalin Marinas wrote:
+> On 28 November 2011 18:28, Will Deacon <will.deacon@arm.com> wrote:
+> > For soft-rebooting a system, it is necessary to map the MMU-off code
+> > with an identity mapping so that execution can continue safely once the
+> > MMU has been switched off.
+> >
+> > Currently, switch_mm_for_reboot takes out a 1:1 mapping from 0x0 to
+> > TASK_SIZE during reboot in the hope that the reset code lives at a
+> > physical address corresponding to a userspace virtual address.
+> >
+> > This patch modifies the code so that we switch to the idmap_pgd tables,
+> > which contain a 1:1 mapping of the cpu_reset code. This has the
+> > advantage of only remapping the code that we need and also means we
+> > don't need to worry about allocating a pgd from an atomic context in the
+> > case that the physical address of the cpu_reset code aliases with the
+> > virtual space used by the kernel.
+> >
+> > Acked-by: Dave Martin <dave.martin@linaro.org>
+> > Signed-off-by: Will Deacon <will.deacon@arm.com>
 > 
-> This code is actually setting up dom0 which (for the most part) sees the
-> real hardware.
+> Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
 
-Ok, I see.
+Thanks Catalin.
 
-> > Pawell Moll is working on a variant of the vexpress code that uses
-> > the flattened device tree to describe the present hardware [1], and
-> > I think that would be a much better target for an official release.
-> > Ideally, the hypervisor should provide the device tree binary (dtb)
-> > to the guest OS describing the hardware that is actually there.
-> 
-> Agreed. Our intention was to use DT so this fits perfectly with our
-> plans.
-> 
-> For dom0 we would expose a (possibly filtered) version of the DT given
-> to us by the firmware (e.g. we might hide a serial port to reserve it
-> for Xen's use, we'd likely fiddle with the memory map etc).
+Russell - could you have a quick look at these please as the changes to
+setup_mm_for_reboot are required for the LPAE stuff?
 
-Ah, very good.
+Cheers,
 
-> For domU the DT would presumably be constructed by the toolstack (in
-> dom0 userspace) as appropriate for the guest configuration. I guess this
-> needn't correspond to any particular "real" hardware platform.
-
-Correct, but it needs to correspond to some platform that is supported
-by the guest OS, which leaves the choice between emulating a real
-hardware platform, adding a completely new platform specifically for
-virtual machines, or something in between the two.
-
-What I suggested to the KVM developers is to start out with the
-vexpress platform, but then generalize it to the point where it fits
-your needs. All hardware that one expects a guest to have (GIC, timer,
-...) will still show up in the same location as on a real vexpress,
-while anything that makes no sense or is better paravirtualized (LCD,
-storage, ...) just becomes optional and has to be described in the
-device tree if it's actually there.
-
-> > This would also be the place where you tell the guest that it should
-> > look for PV devices. I'm not familiar with how Xen announces PV
-> > devices to the guest on other architectures, but you have the
-> > choice between providing a full "binding", i.e. a formal specification
-> > in device tree format for the guest to detect PV devices in the
-> > same way as physical or emulated devices, or just providing a single
-> > place in the device tree in which the guest detects the presence
-> > of a xen device bus and then uses hcalls to find the devices on that
-> > bus.
-> 
-> On x86 there is an emulated PCI device which serves as the hooking point
-> for the PV drivers. For ARM I don't think it would be unreasonable to
-> have a DT entry instead. I think it would be fine just represent the
-> root of the "xenbus" and further discovery would occur using the normal
-> xenbus mechanisms (so not a full binding). AIUI for buses which are
-> enumerable this is the preferred DT scheme to use.
-
-In general that is the case, yes. One could argue that any software
-protocol between Xen and the guest is as good as any other, so it
-makes sense to use the device tree to describe all devices here.
-The counterargument to that is that Linux and other OSs already
-support Xenbus, so there is no need to come up with a new binding.
-
-I don't care much either way, but I think it would be good to
-use similar solutions across all hypervisors. The two options
-that I've seen discussed for KVM were to use either a virtual PCI
-bus with individual virtio-pci devices as on the PC, or to
-use the new virtio-mmio driver and individually put virtio devices
-into the device tree.
-
-> > Another topic is the question whether there are any hcalls that
-> > we should try to standardize before we get another architecture
-> > with multiple conflicting hcall APIs as we have on x86 and powerpc.
-> 
-> The hcall API we are currently targeting is the existing Xen API (at
-> least the generic parts of it). These generally deal with fairly Xen
-> specific concepts like grant tables etc.
-
-Ok. It would of course still be possible to agree on an argument passing
-convention so that we can share the macros used to issue the hcalls,
-even if the individual commands are all different. I think I also
-remember talk about the need for a set of hypervisor independent calls
-that everyone should implement, but I can't remember what those were.
-Maybe we can split the number space into a range of some generic and
-some vendor specific hcalls?
-
-	Arnd
+Will
