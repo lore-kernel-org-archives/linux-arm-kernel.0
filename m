@@ -1,59 +1,80 @@
-From: mst@redhat.com (Michael S. Tsirkin)
-Date: Wed, 30 Nov 2011 18:15:56 +0200
-Subject: [RFC] virtio: use mandatory barriers for remote processor vdevs
-In-Reply-To: <CAK=WgbYyFdLftE_kp2_JOThVhn-FzGsDqVqKn0Jwm2teQyZBNA@mail.gmail.com>
-References: <1322569886-13055-1-git-send-email-ohad@wizery.com>
- <20111129131110.GC19157@redhat.com>
- <CAK=WgbZoGYVyKt=XXvnPVdh0koSBJC0zcgkLaYRkmjwBLOFA-A@mail.gmail.com>
- <20111129151607.GE30966@redhat.com>
- <CAK=WgbZK+k4uuyMPHUfr_PMyrR5ceRTvuDRpmhXfgwpSUOPw0g@mail.gmail.com>
- <20111130145958.GE21413@redhat.com>
- <CAK=WgbYyFdLftE_kp2_JOThVhn-FzGsDqVqKn0Jwm2teQyZBNA@mail.gmail.com>
-Message-ID: <20111130161555.GB25812@redhat.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Wed, 30 Nov 2011 17:20:04 +0100
+Subject: [PATCH v5 4/7] arm: omap4: hwmod: introduce emu hwmod
+In-Reply-To: <alpine.DEB.2.00.1111291053250.6289@utopia.booyaka.com>
+References: <1319467559-5518-1-git-send-email-ming.lei@canonical.com>
+ <1319467559-5518-5-git-send-email-ming.lei@canonical.com>
+ <alpine.DEB.2.00.1111080750130.10451@utopia.booyaka.com>
+ <CACVXFVMSJUT2Ac+bWetrLpbyOs6PqY+npNHsbvHipEVZ0gWdgQ@mail.gmail.com>
+ <alpine.DEB.2.00.1111100152430.4195@utopia.booyaka.com>
+ <4EC6566C.70202@ti.com>
+ <alpine.DEB.2.00.1111261854340.6289@utopia.booyaka.com>
+ <alpine.DEB.2.00.1111261906010.6289@utopia.booyaka.com>
+ <4ED50600.8070607@ti.com>
+ <alpine.DEB.2.00.1111291053250.6289@utopia.booyaka.com>
+Message-ID: <4ED657B4.9020806@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 30, 2011 at 06:04:56PM +0200, Ohad Ben-Cohen wrote:
-> On Wed, Nov 30, 2011 at 4:59 PM, Michael S. Tsirkin <mst@redhat.com> wrote:
-> > I see. And this happens because the ARM processor reorders
-> > memory writes
-> 
-> Yes.
-> 
-> > And in an SMP configuration, writes are somehow not reordered?
-> 
-> They are, but then the smp memory barriers are enough to control these
-> effects. It's not enough to control reordering as seen by a device
-> (which is what our AMP processors are) though.
-> 
-> (btw, the difference between an SMP processor and a device here lies
-> in how the memory is mapped: normal memory vs. device memory
-> attributes. it's an ARM thingy).
+Hi Paul,
 
-How are the rings mapped? normal memory, right?
-We allocate them with plan alloc_pages_exact in virtio_pci.c ...
+On 11/29/2011 7:11 PM, Paul Walmsley wrote:
+> On Tue, 29 Nov 2011, Cousson, Benoit wrote:
+>
+>> On 11/27/2011 3:07 AM, Paul Walmsley wrote:
+>>
+>>> So just out of curiosity, do those SYSCONFIG registers in the STM address
+>>> space apply to the entire DEBUGSS, or just the STM IP block?
+>>
+>> The STM IP is the only one to have the TI generic wrapper to be compliant with
+>> TI standards.
+>> But in term of PRCM, there is only one IP, the DEBUGSS.
+>> There are probably a bunch of internal clock management inside it that are not
+>> exposed to PRCM.
+>>
+>> The confusing part is that in theory all these entries can be accessed by the
+>> same OCP port, and should potentially have this flags.
+>> The point is that for the moment, we are mainly using that flag to get the
+>> SYSCONFIG.
+>> We already discussed that, but I think we should modify this flag to highlight
+>> the SYSCONFIG / SYSSTATUS availability.
+>> Maybe with something like ADDR_SYSCONFIG?
+>>
+>> Any thought?
+>
+> Well, the ADDR_TYPE_RT flag in this hwmod would indicate the address space
+> of the DEBUGSS's OCP header registers, not the MIPI STM's OCP header
+> registers.
+>
+> So if the MIPI STM's OCP header registers also control the entire DEBUGSS
+> power management, then the current layout makes sense.  Otherwise, the
+> MIPI STM should be created as a separate hwmod.
 
-> > Just checking that this is not a bug in the smp_wmb implementation
-> > for the specific platform.
-> 
-> No, it's not.
-> 
-> ARM's smp memory barriers use ARM's DMB instruction, which is enough
-> to control SMP effects, whereas ARM's mandatory memory barriers use
-> ARM's DSB instruction, which is required to ensure the ordering
-> between Device and Normal memory accesses.
-> 
-> Thanks,
-> Ohad.
+There is no OCP TA registers in this case, so finding the SYSCONFIG is 
+the only important thing to do to set them properly at boot time.
 
-Yes wmb() is required to ensure ordering for MMIO.
-But here both accesses: index and ring - are for
-memory, not MMIO.
+> It appears to me that the DEBUGSS has no OCP header registers of its own.
 
-I could understand ring kick bypassing index write, maybe ...
-But you described an index write bypassing descriptor write.
-Is this something you see in practice?
+Yes, indeed.
 
+> Upon reflection, rather than creating a macro hwmod for the DEBUGSS, it
+> seems to make more sense to add hwmods for its two internal interconnects,
+> then to create another hwmod for the MIPI STM device.
 
--- 
-MST
+Mmm, I'm not sure it makes sense to do that. There is only one PRCM 
+control entry for all these IPs inside the debugss "module". The diagram 
+28.9 seems to indicate that the STM is accessed through L3_INSTR using 
+some internals L4_CFG_EMU and L3_INSTR_EMU buses.
+
+So for the hwmod / driver point of view having only one node for the 
+debugss IPs connected to L3_INSTR is accurate enough. This is as well 
+how the memory mapping is represented in the 28-42 table (28.11$).
+
+Moreover, having two different nodes controlled by a single PRCM entry 
+will raise some dependency issue with STM and DEBUGSS.
+
+Splitting them will add some extra complexity that is not necessary in 
+our case.
+
+Regards,
+Benoit
