@@ -1,52 +1,35 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Wed, 30 Nov 2011 22:50:24 +0800
-Subject: [V3 2/6] RTC: sa1100: remove redundant code of setting alarm
-In-Reply-To: <20111130135010.GB18533@game.jcrosoft.org>
-References: <1322634629-4411-1-git-send-email-jtzhou@marvell.com>
- <20111130135010.GB18533@game.jcrosoft.org>
-Message-ID: <CAN1soZzkcP=Xc_xh9bFmzFwGoviGOBaX46vT+xEwg7uAVuAhzw@mail.gmail.com>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Wed, 30 Nov 2011 14:51:28 +0000
+Subject: [Xen-devel] [ANNOUNCE] Xen port to Cortex-A15 / ARMv7 with
+ virt extensions
+In-Reply-To: <201111301432.54463.arnd@arndb.de>
+References: <alpine.DEB.2.00.1111281009090.31179@kaball-desktop>
+ <201111301303.23851.arnd@arndb.de>
+ <1322659535.31810.97.camel@zakaz.uk.xensource.com>
+ <201111301432.54463.arnd@arndb.de>
+Message-ID: <1322664688.3180.6.camel@hornet.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 30, 2011 at 9:50 PM, Jean-Christophe PLAGNIOL-VILLARD
-<plagnioj@jcrosoft.com> wrote:
-> On 14:30 Wed 30 Nov ? ? , Jett.Zhou wrote:
->> In rtc generic interface of setting alarm, it will check the alarm time
->> value valid or not, so rtc_periodic_alarm is redundant, remove it.
->>
->> Signed-off-by: Jett.Zhou <jtzhou@marvell.com>
->> Acked-by: Haojian Zhuang <haojian.zhuang@gmail.com>
->> ---
->> ?drivers/rtc/rtc-sa1100.c | ? 53 ++++++++++-----------------------------------
->> ?1 files changed, 12 insertions(+), 41 deletions(-)
->>
->> diff --git a/drivers/rtc/rtc-sa1100.c b/drivers/rtc/rtc-sa1100.c
->> index 6f22c1f..d268cf1 100644
->> --- a/drivers/rtc/rtc-sa1100.c
->> +++ b/drivers/rtc/rtc-sa1100.c
->> @@ -45,16 +45,6 @@ static const unsigned long RTC_FREQ = 1024;
->> ?static struct rtc_time rtc_alarm;
->> ?static DEFINE_SPINLOCK(sa1100_rtc_lock);
->>
->> -static inline int rtc_periodic_alarm(struct rtc_time *tm)
->> -{
->> - ? ? return ?(tm->tm_year == -1) ||
->> - ? ? ? ? ? ? ((unsigned)tm->tm_mon >= 12) ||
->> - ? ? ? ? ? ? ((unsigned)(tm->tm_mday - 1) >= 31) ||
->> - ? ? ? ? ? ? ((unsigned)tm->tm_hour > 23) ||
->> - ? ? ? ? ? ? ((unsigned)tm->tm_min > 59) ||
->> - ? ? ? ? ? ? ((unsigned)tm->tm_sec > 59);
->> -}
->> -
->> ?/*
->> ? * Calculate the next alarm time given the requested alarm time mask
->> ? * and the current time.
->> @@ -82,27 +72,6 @@ static void rtc_next_alarm_time(struct rtc_time *next, struct rtc_time *now,
->> ? ? ? }
->> ?}
-> please use read/write relaxed too
->
-> Best Regards,
-> J.
+On Wed, 2011-11-30 at 14:32 +0000, Arnd Bergmann wrote:
+> I don't care much either way, but I think it would be good to
+> use similar solutions across all hypervisors. The two options
+> that I've seen discussed for KVM were to use either a virtual PCI
+> bus with individual virtio-pci devices as on the PC, or to
+> use the new virtio-mmio driver and individually put virtio devices
+> into the device tree.
 
-This will be replaced with read/write in the third patch.
+Let me just add that the virtio-mmio devices can already be instantiated
+from DT (see Documentation/devicetree/bindings/virtio/mmio.txt).
+
+For A9-based VE I'd suggest placing them around 0x1001e000, eg.:
+
+        virtio_block at 1001e000 {
+                compatible = "virtio,mmio";
+                reg = <0x1001e000 0x100>;
+                interrupts = <41>;
+        }
+
+Cheers!
+
+Pawe?
