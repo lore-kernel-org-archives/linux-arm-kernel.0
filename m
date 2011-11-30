@@ -1,69 +1,86 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Wed, 30 Nov 2011 17:01:48 +0000
-Subject: [PATCH 3/4] Add condition code checking to SWP emulation handler.
-In-Reply-To: <20111125171947.14878.76518.stgit@localhost6.localdomain6>
-References: <20111125171621.14878.49918.stgit@localhost6.localdomain6>
- <20111125171947.14878.76518.stgit@localhost6.localdomain6>
-Message-ID: <20111130170148.GH2045@localhost.localdomain>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Wed, 30 Nov 2011 17:15:02 +0000
+Subject: [PATCH v3 4/5] ARM: vexpress: Initial RS1 memory map support
+In-Reply-To: <20111130153749.GE2045@localhost.localdomain>
+References: <1322579473-8804-1-git-send-email-pawel.moll@arm.com>
+ <1322579473-8804-5-git-send-email-pawel.moll@arm.com>
+ <20111130153749.GE2045@localhost.localdomain>
+Message-ID: <1322673302.3180.25.camel@hornet.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 25, 2011 at 05:19:53PM +0000, Leif Lindholm wrote:
-> This patch fixes two separate issues with the SWP emulation handler:
-> 1: Certain processors implementing ARMv7-A can (legally) take an
->    undef exception even when the condition code would have meant that
->    the instruction should not have been executed.
-> 2: Opcodes with all flags set (condition code = 0xf) have been reused
->    in recent, and not-so-recent, versions of the ARM architecture to
->    implement unconditional extensions to the instruction set. The
->    existing code would still have processed any undefs triggered by
->    executing an opcode with such a value.
+On Wed, 2011-11-30 at 15:37 +0000, Dave Martin wrote:
+>
+> This results in a uImage which is a bit broken if using a normal u-Boot
+> configured for vexpress-v2p-ca9, because the bootloader makes some
+> memory map assumptions, and anyway we don't expect the kernel to work
+> unless it's loaded at the start of RAM:
 > 
-> This patch uses the new generic ARM instruction set condition code
-> checks to implement proper handling of these situations.
 > 
-> Signed-off-by: Leif Lindholm <leif.lindholm@arm.com>
-> ---
->  arch/arm/kernel/swp_emulate.c |   14 ++++++++++++++
->  1 files changed, 14 insertions(+), 0 deletions(-)
+> ## Booting kernel from Legacy Image at 62000400 ...
+>    Image Name:   Linux-3.2.0-rc3+
+>    Image Type:   ARM Linux Kernel Image (uncompressed)
+>    Data Size:    2464984 Bytes = 2.4 MiB
+>    Load Address: 80008000
+>    Entry Point:  80008000
+>    Verifying Checksum ... OK
+> ## Loading init Ramdisk from Legacy Image at 80ffffc0 ...
+>    Image Name:
+>    Image Type:   ARM Linux RAMDisk Image (uncompressed)
+>    Data Size:    2216523 Bytes = 2.1 MiB
+>    Load Address: 81000000
+>    Entry Point:  81000000
+>    Verifying Checksum ... OK
+> ## Flattened Device Tree blob at 80ffc000
+>    Booting using the fdt blob at 0x80ffc000
+>    Loading Kernel Image ... OK
+> OK
+>    Loading Ramdisk to 7fcd3000, end 7fef024b ... OK
+>    Loading Device Tree to 7fcce000, end 7fcd2779 ... OK
 > 
-> diff --git a/arch/arm/kernel/swp_emulate.c b/arch/arm/kernel/swp_emulate.c
-> index 5f452f8..8629bf7 100644
-> --- a/arch/arm/kernel/swp_emulate.c
-> +++ b/arch/arm/kernel/swp_emulate.c
-> @@ -25,6 +25,7 @@
->  #include <linux/syscalls.h>
->  #include <linux/perf_event.h>
->  
-> +#include <asm/opcodes.h>
->  #include <asm/traps.h>
->  #include <asm/uaccess.h>
->  
-> @@ -185,6 +186,19 @@ static int swp_handler(struct pt_regs *regs, unsigned int instr)
->  
->  	perf_sw_event(PERF_COUNT_SW_EMULATION_FAULTS, 1, regs, regs->ARM_pc);
->  
-> +	res = arm_check_condition(instr, regs->ARM_cpsr);
-> +	switch (res) {
-> +	case ARM_OPCODE_CONDTEST_FAIL: {
-> +		/* Condition failed - return to next instruction */
-> +		regs->ARM_pc += 4;
-> +		return 0;
-> +	} break;
-> +	case ARM_OPCODE_CONDTEST_UNCOND: {
-> +		/* If unconditional encoding - not a SWP, undef */
-> +		return -EFAULT;
-> +	} break;
-> +	}
-> +
+> Starting kernel ...
+> 
+> Uncompressing Linux... done, booting the kernel.
+> Booting Linux on physical CPU 0
+> Initializing cgroup subsys cpuset
+> Linux version 3.2.0-rc3+ (davem at e103592) (gcc version 4.5.2 (Ubuntu/Linaro 4.5.2-8ubuntu3) ) #12 SMP Wed Nov 30 15:10:19 GMT 2011
+> CPU: ARMv7 Processor [410fc091] revision 1 (ARMv7), cr=10c53c7d
+> CPU: PIPT / VIPT nonaliasing data cache, VIPT aliasing instruction cache
+> Machine: ARM Versatile Express, model: V2P-CA9
+> bootconsole [earlycon0] enabled
+> Ignoring RAM at 60000000-7fffffff (vmalloc region overlap).
+> Ignoring RAM at 60000000-9fffffff (vmalloc region overlap).
+> INITRD: 0x7fcd3000+0x0021d24b is not a memory region - disabling initrd
+> Memory policy: ECC disabled, Data cache writeall
+> Cheers
+> ---Dave
+> 
+> 
+> oc
+> 
+> <HANG>
 
-Can we lose the extra { } inside the switch here?
+Yes, this is known problem with U-boot. Could you try again with
+"mem=512M" parameter?
 
-Those cases contain no declarations, so there's no need for a nested
-block in either case.  This also solves the indentation problem.
+> If I strip the uImage and rebuild it with -a 0x60008000 -e 0x60008000
+> and no other changes, that's sufficient to give me a fully booting
+> kernel.  I can also boot a single image on v2p-ca9 both with and without
+> a dtb in this configuration.
+> 
+> I'm using a Linaro u-Boot from a couple of releses ago; it's possible
+> things have changed since.
+> 
+> Do you know of any specific u-Boot version which shouldn't have these
+> problems?
+> 
+> Was the hard-coded uImage load address/entry point problem ever fixed?
+> (It totally defeats loading a single uImage on multiple board variants.)
 
-Documentation/CodingStyle appears to prefer an unconditional break; to
-be indented flush with the contents of the case block that it ends.
+I simply don't use U-boot at all, what solves the problem
+"systematically" ;-) I wonder if it was possible to override the
+load/entry address in the runtime?
 
-Cheers
----Dave
+Cheers!
+
+Pawe?
