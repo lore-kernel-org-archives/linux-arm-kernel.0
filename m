@@ -1,21 +1,29 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 30 Nov 2011 12:39:42 +0100
-Subject: [PATCH] ARM: mmci: add capabilities2 for MMC_CAP2
-In-Reply-To: <1321268548-21933-1-git-send-email-per.forlin@stericsson.com>
-References: <1321268548-21933-1-git-send-email-per.forlin@stericsson.com>
-Message-ID: <CACRpkdYFVfwRxW+XL6GQtE+NxJvM_3gvCn5a9A+pDL4S77BXqA@mail.gmail.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Wed, 30 Nov 2011 11:41:58 +0000
+Subject: [ANNOUNCE] Xen port to Cortex-A15 / ARMv7 with virt extensions
+In-Reply-To: <CAAhSdy3F1oUQP=f_Tig4_MnufwPRpNooZYW8_cSTAse7aOaDoA@mail.gmail.com>
+References: <alpine.DEB.2.00.1111281009090.31179@kaball-desktop>
+ <201111292129.20444.arnd@arndb.de>
+ <CAAhSdy3F1oUQP=f_Tig4_MnufwPRpNooZYW8_cSTAse7aOaDoA@mail.gmail.com>
+Message-ID: <alpine.DEB.2.00.1111301112400.31179@kaball-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 14, 2011 at 12:02 PM, Per Forlin <per.forlin@stericsson.com> wrote:
+On Wed, 30 Nov 2011, Anup Patel wrote:
+> Hi all,
+> 
+> I wanted to know how Xen-ARM for A15 will address following concerns:
+> 
+> - How will Xen-ARM for A15 support legacy guest environment like ARMv5 or ARMv6 ?
 
-> Signed-off-by: Per Forlin <per.forlin@stericsson.com>
-> ---
-> This patch depends on patches adding CAP2 available on mmc-next.
-> Chris, would you mind merging this through your tree when it
-> has been accepted.
+It is not our focus at the moment; we are targeting operating systems
+that support a modern ARMv7 machine with GIC support. 
+That said, it might be possible to run legacy guests in the future,
+introducing more emulation to the hypervisor.
 
-Chris are you taking this into your tree?
 
-Thanks,
-Linus Walleij
+> - What if my Cortex-A15 board does not have a GIC with virtualization support ?
+
+We expect most hardware vendors to provide a GIC with virtualization
+support. However if they do not, in order to support their boards we'll
+have to do more emulation in the hypervisor.
