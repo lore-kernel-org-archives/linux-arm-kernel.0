@@ -1,41 +1,59 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Wed, 30 Nov 2011 12:42:18 -0200
-Subject: [PATCH v3] net: fec: Select the FEC driver by default for i.MX SoCs
-In-Reply-To: <1322652717-2685-1-git-send-email-fabio.estevam@freescale.com>
-References: <1322652717-2685-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <1322664138-3245-1-git-send-email-fabio.estevam@freescale.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Wed, 30 Nov 2011 14:45:46 +0000
+Subject: [PATCH] ARM: pl2x0/pl310: Refactor Kconfig to be more maintainable
+In-Reply-To: <20111130142619.GD711@S2100-06.ap.freescale.net>
+References: <1322584345-19193-1-git-send-email-dave.martin@linaro.org>
+ <20111130140150.GC711@S2100-06.ap.freescale.net>
+ <20111130140335.GC2045@localhost.localdomain>
+ <20111130142619.GD711@S2100-06.ap.freescale.net>
+Message-ID: <20111130144546.GD2045@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since commit 230dec6 (net/fec: add imx6q enet support) the FEC driver is no 
-longer built by default for i.MX SoCs.
+On Wed, Nov 30, 2011 at 10:26:20PM +0800, Shawn Guo wrote:
+> On Wed, Nov 30, 2011 at 02:03:35PM +0000, Dave Martin wrote:
+> > On Wed, Nov 30, 2011 at 10:01:51PM +0800, Shawn Guo wrote:
+> > > On Tue, Nov 29, 2011 at 04:32:25PM +0000, Dave Martin wrote:
+> > > [...]
+> > > > diff --git a/arch/arm/plat-mxc/Kconfig b/arch/arm/plat-mxc/Kconfig
+> > > > index b3a1f2b..6871ed7 100644
+> > > > --- a/arch/arm/plat-mxc/Kconfig
+> > > > +++ b/arch/arm/plat-mxc/Kconfig
+> > > > @@ -20,6 +20,7 @@ config ARCH_IMX_V6_V7
+> > > >  	bool "i.MX3, i.MX6"
+> > > >  	select AUTO_ZRELADDR if !ZBOOT_ROM
+> > > >  	select ARM_PATCH_PHYS_VIRT
+> > > > +	select HAVE_L2X0_L2CC
+> > > >  	help
+> > > >  	  This enables support for systems based on the Freescale i.MX3 and i.MX6
+> > > >  	  family.
+> > > > -- 
+> > > 
+> > > You may want to amend the following for above change.
+> > > 
+> > > diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+> > > index 5f7f9c2..a134819 100644
+> > > --- a/arch/arm/mach-imx/Kconfig
+> > > +++ b/arch/arm/mach-imx/Kconfig
+> > > @@ -609,7 +609,6 @@ comment "i.MX6 family:"
+> > >  config SOC_IMX6Q
+> > >         bool "i.MX6 Quad support"
+> > >         select ARM_GIC
+> > > -       select CACHE_L2X0
+> > >         select CPU_V7
+> > >         select HAVE_ARM_SCU
+> > >         select HAVE_IMX_GPC
+> > 
+> > Platforms where the L2x0 is considered compulsory should still select it
+> > directly like this, instead of selecting HAVE_L2X0_L2CC.
+> > 
+> > Do you know whether it is OK to run mx6 with the L2 cache turned off?
+> > (I would hope that it is OK... in which case we could make the change)
+> > 
+> We selected it not for it's compulsory but we want it anyway.  It's
+> actually OK to run imx6 with L2 cache turned off.
 
-Let the FEC driver be built by default again.
+OK, I'll change that in my patch to use the new option.
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-Suggested-by: Uwe Kleine-K??nig <u.kleine-koenig@pengutronix.de>
-Acked-by: Uwe Kleine-K??nig <u.kleine-koenig at pengutronix.de
-Acked-by: Shawn Guo <shawn.guo@linaro.org>
----
-Changes since v2:
-- Improve commit message
-- Reorder the placement of the "default" line
-Changes since v1: 
-Move the FEC selection into Kconfig instead of .config file
- drivers/net/ethernet/freescale/Kconfig |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
-
-diff --git a/drivers/net/ethernet/freescale/Kconfig b/drivers/net/ethernet/freescale/Kconfig
-index c520cfd..5272f9d 100644
---- a/drivers/net/ethernet/freescale/Kconfig
-+++ b/drivers/net/ethernet/freescale/Kconfig
-@@ -24,6 +24,7 @@ config FEC
- 	bool "FEC ethernet controller (of ColdFire and some i.MX CPUs)"
- 	depends on (M523x || M527x || M5272 || M528x || M520x || M532x || \
- 		   ARCH_MXC || ARCH_MXS)
-+	default ARCH_MXC || ARCH_MXS if ARM
- 	select PHYLIB
- 	---help---
- 	  Say Y here if you want to use the built-in 10/100 Fast ethernet
--- 
-1.7.1
+Cheers
+---Dave
