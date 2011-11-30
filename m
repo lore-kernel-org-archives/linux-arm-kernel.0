@@ -1,62 +1,86 @@
 From: B29397@freescale.com (Chen Peter-B29397)
-Date: Wed, 30 Nov 2011 03:08:47 +0000
-Subject: Want to Get Suggestion for MX28 USB Submisson
-In-Reply-To: <20111130030401.GA2506@S2100-06.ap.freescale.net>
-References: <35AB98346D25394A9354ED89C4D76587225CFF@039-SN1MPN1-002.039d.mgd.msft.net>
- <20111128045733.GA9194@suse.de>
- <20111130030401.GA2506@S2100-06.ap.freescale.net>
-Message-ID: <35AB98346D25394A9354ED89C4D7658722713D@039-SN1MPN1-002.039d.mgd.msft.net>
+Date: Wed, 30 Nov 2011 03:24:32 +0000
+Subject: [PATCH] USB: ehci-mxc: get rid of the uses of cpu_is_mx()
+In-Reply-To: <20111129192114.GI27267@pengutronix.de>
+References: <1322550565-29162-1-git-send-email-peter.chen@freescale.com>
+ <20180.36084.962507.946237@ipc1.ka-ro>
+ <35AB98346D25394A9354ED89C4D76587226AE3@039-SN1MPN1-002.039d.mgd.msft.net>
+ <20111129082139.GG27267@pengutronix.de>
+ <35AB98346D25394A9354ED89C4D76587226BD8@039-SN1MPN1-002.039d.mgd.msft.net>
+ <20111129192114.GI27267@pengutronix.de>
+Message-ID: <35AB98346D25394A9354ED89C4D7658722716D@039-SN1MPN1-002.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+ 
+ 
 > 
-> On Mon, Nov 28, 2011 at 01:57:33PM +0900, Greg KH wrote:
-> > On Mon, Nov 28, 2011 at 03:06:48AM +0000, Chen Peter-B29397 wrote:
-> > > Hi lists:
-> > >
-> > > Tony Lin has submitted Freescale mx28 USB Patch at August
-> > > (See: http://www.spinics.net/lists/linux-usb/msg50201.html), but it
-> hasn't been accepted.
-> >
-> > Why wasn't it accepted?  Have the issues raised from that last posting
-> > of the driver now been addressed?  If not, why not?  If so, great.
-> >
-> > > I would like to re-submit mx28 usb patches, before that, I would like
-> get some suggestion
-> > > from you. I think your suggestion will also be benefit for coming
-> mx53, mx50 and mx6q's submission.
-> > >
-> > > All Recently Freescale SoC's USB controller are the same, they are
-> mx23, mx25, mx28, mx31, mx35,
-> > > mx37, mx50, mx51, mx53, and mx6.
-> > > But, the transceiver is different between them
-> > > mx23, mx28, mx6 (Transceiver A)
-> > > mx25 mx31, mx35,mx37, mx50, mx51, mx53 (Transceiver B)
-> > >
-> > > Current upstream platform information:
-> > > mx23 mx28 ==> mxs platfrom
-> > > others (including mx6) ==> mxc platform
-> > >
-> > > Current upstream USB information:
-> > > mx25, mx3x, mx51: ehci-mxc.c (host), fsl_mxc_udc.c(device, main
-> functions are at fsl_udc_core.c)
-> > >
-> > > My plan of submitting mx28 (mx53,mx50, mx6 later if possible):
-> > > 1. Replace cpu_is_mxxx() with struct platform_device_id for ehci-
-> mxc.c and fsl_mxc_udc.c
-> > > 2. Using ehci-mxc.c and fsl_mxc_udc.c for mx28 upstreaming.
-> > > For Step 2, I have concern that whether mxs platform users will be
-> confused of their
-> > > usb driver named xxx_mxc, not xxx_mxs?
-> >
-> > Do they even care?
-> >
-> If the renaming will not cause any trouble, I prefer to name them with
-> 'imx' which could reasonably cover both mxs and mxc.
+> We have to deal with a historically grown wrong hardware abstraction
+> here. What we have from a hardware point of view is a device consisting
+> of:
 > 
-Shawn, since current i.mx usb framework and otg/phy structure may not suitable
-for mx28's mainline, I will postpone mx28 usb's mainline, and do i.mx usb framework
-refine first.
+> - A ehci core (theoretically optional, but seems to be always present)
+> - A Synopsys USB device core (optional), the one we currently have four
+>   different drivers for.
+> - A USB phy (mandatory, but may be nearly invisible from software). The
+>   phy may be an external ULPI phy, an internal phy in the SoC, or even
+>   selectable between both.
+> 
+> Currently we have a ehci-mxc driver which claims resources like mem
+> regions, interrupts and clocks. We also have the gadget driver
+> (currently the fsl_mxc_udc driver) which also claims the same resources.
+> Instead we should have a glue driver which claims the resources and
+> passes control over to either the host or the gadget driver. This glue
+> code should also connect the phy.
+> 
+> Looking at the code in mainline the msm driver is closest to what we
+> want to have. It claims the resources in msm_otg.c and passes control
+> over to the ehci or ci13xxx gadget driver depending on the USB id pin or
+> a platform decision. What's missing here is some plugin mechanism for
+> different phys. That's another historically grown thing that there is
+> only a single phy in the Kernel because there can be only one otg
+> instance and phys were thought to be present only in otg cores. Heikkis
+> patches work in the right direction here.
+
+msm_otg.c is really good code which mainlined this year, it considers
+many user situations, like low power, charger, usb wakeup, id/vbus changes
+from different hardware/user choice, etc.
+
+In fact, the most difficulties for otg driver (host/device share the same registers controller)
+are clock management, power management, usb wakeup, register access among the three
+drivers (otg, host and device driver)
+> 
+> As a conclusion I think that there should be no platform or SoC specific
+> code in neither the ehci nor in the gadget driver. Also there shouldn't
+> be all these ehci-$SoC.c files in the tree. The way to get there could
+> be:
+> 
+> - Work on Heikkis patches so that we can register usb phys
+> - move the USB phy setup code from arch-imx to drivers/usb/phy
+> - factor out the common code from the msm_otg driver.
+> - create a imx-otg.c which only claims the resources and passes
+>   them to the otg common code. Sooner or later not even an imx-otg.c is
+>   necessary because we can use a devicetree based driver and then only
+>   the phy code will be SoC specific.
+
+I agree with these tasks for refine i.mx usb structure. 
+I will try Heikki's patch first.
+
+> 
+> I'm sorry that there is no easy way to get proper USB support, but we
+> are way beyond the point where the current infrastructure scales.
+> In any way, there is no place for more SoC specific code in ehci-mxc.c.
+> Instead you should work on moving SoC code out of there.
+> 
+> Sascha
+> 
+> 
 > --
-> Regards,
-> Shawn
+> Pengutronix e.K.                           |
+> |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/
+> |
+> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0
+> |
+> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555
+> |
