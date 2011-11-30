@@ -1,25 +1,27 @@
-From: davem@davemloft.net (David Miller)
-Date: Wed, 30 Nov 2011 17:08:10 -0500 (EST)
-Subject: [PATCH v3] net: fec: Select the FEC driver by default for i.MX
- SoCs
-In-Reply-To: <1322664138-3245-1-git-send-email-fabio.estevam@freescale.com>
-References: <1322652717-2685-1-git-send-email-fabio.estevam@freescale.com>
- <1322664138-3245-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <20111130.170810.1453588817649945163.davem@davemloft.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 30 Nov 2011 22:18:00 +0000
+Subject: [PATCH v2 0/6] Consolidate identity mapping code in idmap.c
+In-Reply-To: <1322504937-24718-1-git-send-email-will.deacon@arm.com>
+References: <1322504937-24718-1-git-send-email-will.deacon@arm.com>
+Message-ID: <20111130221800.GV9581@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
-Date: Wed, 30 Nov 2011 12:42:18 -0200
-
-> Since commit 230dec6 (net/fec: add imx6q enet support) the FEC driver is no 
-> longer built by default for i.MX SoCs.
+On Mon, Nov 28, 2011 at 06:28:51PM +0000, Will Deacon wrote:
+> Hello,
 > 
-> Let the FEC driver be built by default again.
+> This is version 2 of the patch series originally posted here:
 > 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> Suggested-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de
-> Acked-by: Shawn Guo <shawn.guo@linaro.org>
+>  http://lists.infradead.org/pipermail/linux-arm-kernel/2011-November/073033.html
+> 
+> Changes from v1 include:
+> 	* Updated following Catalin's comments
+> 	* Rebased onto rmk/devel-stable
+> 	* Includes update to SMP booting so that the idmap_pgd can be
+> 	  used there too
+> 
+> This is a pre-requisite for my kexec patches, which I will post separately.
+> 
+> All feedback welcome.
 
-Applied.
+This patch set looks fine.
