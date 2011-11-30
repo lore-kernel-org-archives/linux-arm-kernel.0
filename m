@@ -1,118 +1,35 @@
-From: richard.zhao@linaro.org (Richard Zhao)
-Date: Wed, 30 Nov 2011 14:18:16 +0800
-Subject: [RFC V1 7/8] ARM i.MX: prepare common clk support
-In-Reply-To: <CAPtuhThNZA707gQhjt9-V_B8=5UN9o1JgNTm_Dj8eLO-WNmJQA@mail.gmail.com>
-References: <1322046755-13511-1-git-send-email-richard.zhao@linaro.org>
- <1322046755-13511-8-git-send-email-richard.zhao@linaro.org>
- <CAPtuhTgSB8Af4Xtux93-VLXSrK5KkzFOez9V5tcmbkKwbZ_8Rw@mail.gmail.com>
- <20111129030944.GB19236@b20223-02.ap.freescale.net>
- <CAPtuhThNZA707gQhjt9-V_B8=5UN9o1JgNTm_Dj8eLO-WNmJQA@mail.gmail.com>
-Message-ID: <20111130061815.GA8684@b20223-02.ap.freescale.net>
+From: jtzhou@marvell.com (Jett.Zhou)
+Date: Wed, 30 Nov 2011 14:26:42 +0800
+Subject: [V3 0/6] rtc-sa1100 clean up 
+Message-ID: <1322634402-3757-1-git-send-email-jtzhou@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 29, 2011 at 11:22:23AM -0800, Mike Turquette wrote:
-> On Mon, Nov 28, 2011 at 7:09 PM, Richard Zhao <richard.zhao@linaro.org> wrote:
-> > On Mon, Nov 28, 2011 at 06:36:33PM -0800, Mike Turquette wrote:
-> >> On Wed, Nov 23, 2011 at 3:12 AM, Richard Zhao <richard.zhao@linaro.org> wrote:
-> >> > +#define DEFINE_CLK_DIVIDER(_name, _parent, _flags, _reg, _shift, _width) \
-> >> > + ? ? ? struct clk_divider _name = { \
-> >> > + ? ? ? ? ? ? ? .clk = { \
-> >> > + ? ? ? ? ? ? ? ? ? ? ? .name = #_name, \
-> >> > + ? ? ? ? ? ? ? ? ? ? ? .ops = &clk_divider_ops, \
-> >> > + ? ? ? ? ? ? ? ? ? ? ? .parent = _parent, \
-> >> > + ? ? ? ? ? ? ? ? ? ? ? .flags = _flags, \
-> >> > + ? ? ? ? ? ? ? }, \
-> >> > + ? ? ? ? ? ? ? .reg = (_reg), \
-> >> > + ? ? ? ? ? ? ? .shift = (_shift), \
-> >> > + ? ? ? ? ? ? ? .width = (_width), \
-> >> > + ? ? ? ? ? ? ? .lock = &imx_ccm_lock, \
-> >> > + ? ? ? }
-> >> > +
-> >> > +#define DEFINE_CLK_MUX(_name, _reg, _shift, _width, _clks) \
-> >> > + ? ? ? struct clk_mux _name = { \
-> >> > + ? ? ? ? ? ? ? .clk = { \
-> >> > + ? ? ? ? ? ? ? ? ? ? ? .name = #_name, \
-> >> > + ? ? ? ? ? ? ? ? ? ? ? .ops = &clk_mux_ops, \
-> >> > + ? ? ? ? ? ? ? }, \
-> >> > + ? ? ? ? ? ? ? .reg = (_reg), \
-> >> > + ? ? ? ? ? ? ? .shift = (_shift), \
-> >> > + ? ? ? ? ? ? ? .width = (_width), \
-> >> > + ? ? ? ? ? ? ? .clks = (_clks), \
-> >> > + ? ? ? ? ? ? ? .num_clks = ARRAY_SIZE(_clks), \
-> >> > + ? ? ? ? ? ? ? .lock = &imx_ccm_lock, \
-> >> > + ? ? ? }
-> >> > +
-> >> > +#define DEFINE_CLK_FIXED(_name, _rate) \
-> >> > + ? ? ? struct clk_hw_fixed _name = { \
-> >> > + ? ? ? ? ? ? ? .clk = { \
-> >> > + ? ? ? ? ? ? ? ? ? ? ? .name = #_name, \
-> >> > + ? ? ? ? ? ? ? ? ? ? ? .ops = &clk_hw_fixed_ops, \
-> >> > + ? ? ? ? ? ? ? }, \
-> >> > + ? ? ? ? ? ? ? .fixed_rate = (_rate), \
-> >> > + ? ? ? }
-> >> > +
-> >> > ?#endif /* CONFIG_GENERIC_CLK */
-> >> > ?#endif /* __ASSEMBLY__ */
-> >> > ?#endif /* __ASM_ARCH_MXC_CLOCK_H__ */
-> >> > --
-> >> > 1.7.5.4
-> >> >
-> >> >
-> >> >
-> >>
-> >> Can you move these into clk.h/approriate header? ?Just add _lock to it
-> >> and it'll work fine for your code.
-> > Yes, I can add _lock and share the macros in common header. But I still
-> 
-> On second thought you don't need to resubmit with these in clk.h; I'll
-> absorb them into clk.h with my next common clk patchset.
-Do you mean you also adopt divider and mux clock patch?
-> 
-> > need a wraper for imx to eliminate _lock, right?
-> 
-> No.  Taking code from your patch 8/8:
-> 
-> +static DEFINE_CLK_DIVIDER(perclk_pred1, &perclk_lp_apm.clk, 0,
-> MXC_CCM_CBCDR, 6, 2);
-> +static DEFINE_CLK_DIVIDER(perclk_pred2, &perclk_pred1.clk, 0,
-> MXC_CCM_CBCDR, 3, 3);
-> +static DEFINE_CLK_DIVIDER(perclk_podf, &perclk_pred2.clk,
-> CLK_PARENT_SET_RATE, MXC_CCM_CBCDR, 0, 3);
-> 
-> becomes,
-> 
-> +static DEFINE_CLK_DIVIDER(perclk_pred1, &perclk_lp_apm.clk, 0,
-> MXC_CCM_CBCDR, 6, 2, &imx_ccm_lock);
-> +static DEFINE_CLK_DIVIDER(perclk_pred2, &perclk_pred1.clk, 0,
-> MXC_CCM_CBCDR, 3, 3, &imx_ccm_lock);
-> +static DEFINE_CLK_DIVIDER(perclk_podf, &perclk_pred2.clk,
-> CLK_PARENT_SET_RATE, MXC_CCM_CBCDR, 0, 3, &imx_ccm_lock);
-understood.
+This patch set do the following things:
+  1) clean up sa1100-rtc for support sa1100/pxa/mmp series
+  2) add dummy clock for pxa arch
+  3) clean up clock dev for sa1100 arch and add dummy clock for sa1100
+  4) fix build error for sa1100 arch
 
-Thanks
-Richard
-> 
-> Regards,
-> Mike
-> 
-> >
-> > Thanks for review
-> > Richard
-> >>
-> >> Thanks,
-> >> Mike
-> >>
-> >> _______________________________________________
-> >> linux-arm-kernel mailing list
-> >> linux-arm-kernel at lists.infradead.org
-> >> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> >>
-> >
-> >
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+Jett.Zhou (6):
+  RTC: sa1100: Clean out ost register
+  RTC: sa1100: remove redundant code of setting alarm
+  RTC: sa1100: support sa1100, pxa and mmp soc families
+  ARM: pxa: add dummy clock for sa1100-rtc
+  ARM: sa1100: clean up of the clock support
+  ARM: sa1100: fix build error
+
+ arch/arm/Kconfig                   |    2 +-
+ arch/arm/mach-pxa/devices.c        |   20 +++
+ arch/arm/mach-pxa/pxa25x.c         |    1 +
+ arch/arm/mach-pxa/pxa27x.c         |    1 +
+ arch/arm/mach-pxa/pxa300.c         |    1 +
+ arch/arm/mach-pxa/pxa320.c         |    1 +
+ arch/arm/mach-pxa/pxa3xx.c         |    1 +
+ arch/arm/mach-pxa/pxa95x.c         |    1 +
+ arch/arm/mach-sa1100/Makefile.boot |    4 +-
+ arch/arm/mach-sa1100/clock.c       |   91 ++++++++---
+ arch/arm/mach-sa1100/generic.c     |   20 +++
+ drivers/rtc/Kconfig                |    2 +-
+ drivers/rtc/rtc-sa1100.c           |  300 ++++++++++++++++++++++--------------
+ 13 files changed, 299 insertions(+), 146 deletions(-)
