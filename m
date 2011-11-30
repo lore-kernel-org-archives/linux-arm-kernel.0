@@ -1,69 +1,51 @@
-From: nsekhar@ti.com (Nori, Sekhar)
-Date: Wed, 30 Nov 2011 11:37:21 +0000
-Subject: [PATCH v3 0/5] ARM: davinci: re-arrange definitions to have a
- common	davinci header
-In-Reply-To: <1321525138-3928-1-git-send-email-manjunath.hadli@ti.com>
-References: <1321525138-3928-1-git-send-email-manjunath.hadli@ti.com>
-Message-ID: <DF0F476B391FA8409C78302C7BA518B60354BC@DBDE01.ent.ti.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Wed, 30 Nov 2011 11:39:11 +0000
+Subject: [ANNOUNCE] Xen port to Cortex-A15 / ARMv7 with virt extensions
+In-Reply-To: <201111292129.20444.arnd@arndb.de>
+References: <alpine.DEB.2.00.1111281009090.31179@kaball-desktop>
+ <201111292129.20444.arnd@arndb.de>
+Message-ID: <alpine.DEB.2.00.1111301053300.31179@kaball-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Manju,
-
-On Thu, Nov 17, 2011 at 15:48:53, Hadli, Manjunath wrote:
-> Re-arrange definitions and remove unnecessary code so that we canx
-
-These are two different things and should be done in separate
-patches. Sergei has already pointed out couple of instances.
-
-> have a common header for all davinci platforms. This will enable
-
-You mean all DMx platforms? DA8x and TNETVx will still have
-their own header files after this patch set.
-
-> us to share defines and enable common routines to be used without
-> polluting hardware.h.
->  This patch set forms the base for a later set of patches for having
-> a common system module base address (DAVINCI_SYSTEM_MODULE_BASE).
+On Tue, 29 Nov 2011, Arnd Bergmann wrote:
+> On Tuesday 29 November 2011, Stefano Stabellini wrote:
+> > Hi all,
+> > a few weeks ago I (and a few others) started hacking on a
+> > proof-of-concept hypervisor port to Cortex-A15 which uses and requires
+> > ARMv7 virtualization extensions. The intention of this work was to find
+> > out how to best support ARM v7+ on Xen. See
+> > http://old-list-archives.xen.org/archives/html/xen-arm/2011-09/msg00013.html
+> > for more details. 
+> > 
+> > I am pleased to announce that significant progress has been made, and
+> > that we now have a nascent Xen port for Cortex-A15. The port is based on
+> > xen-unstable (HG CS 8d6edc3d26d2) and written from scratch exploiting
+> > the latest virtualization, LPAE, GIC and generic timer support in
+> > hardware.
 > 
-> Changes from previous version(As per Sergei's comments):
-> 1. Renamed davinci_common.h to davinci.h.
-> 2. Added extra line whereever appropriate.
-> 3. removed unnecessary header inclusion.
+> Very nice!
 > 
-> Manjunath Hadli (5):
->   ARM: davinci: dm644x: remove the macros from the header to move to c
->     file
->   ARM: davinci: dm365: remove the macros from the header to move to c
->     file
->   ARM: davinci: dm646x: remove the macros from the header to move to c
->     file
+> Do you have a pointer to the kernel sources for the Linux guest?
 
-These headlines should describe the changes better. You are moving
-_private_ defines to C file (to reduce header file pollution). That
-should be clear from the headline.
+We have very few changes to the Linux kernel at the moment (only 3
+commits!), just enough to be able to issue hypercalls and start a PV
+console.
 
->   ARM: davinci: create new common platform header for davinci
->   ARM: davinci: delete individual platform header files and use a
->     common header
-> 
->  arch/arm/mach-davinci/board-dm355-evm.c      |    2 +-
->  arch/arm/mach-davinci/board-dm355-leopard.c  |    2 +-
->  arch/arm/mach-davinci/board-dm365-evm.c      |    2 +-
->  arch/arm/mach-davinci/board-dm644x-evm.c     |    2 +-
->  arch/arm/mach-davinci/board-dm646x-evm.c     |    2 +-
->  arch/arm/mach-davinci/board-neuros-osd2.c    |    2 +-
->  arch/arm/mach-davinci/board-sffsdr.c         |    2 +-
->  arch/arm/mach-davinci/dm355.c                |    2 +-
->  arch/arm/mach-davinci/dm365.c                |   18 +++++-
->  arch/arm/mach-davinci/dm644x.c               |    9 +++-
->  arch/arm/mach-davinci/dm646x.c               |    9 +++-
->  arch/arm/mach-davinci/include/mach/davinci.h |   88 ++++++++++++++++++++++++++
 
-This file should be placed in arch/arm/mach-davinci itself
-since the definitions are private to arch/arm/mach-davinci.
-Russell has been complaining about placing unnecessary files
-in include/mach.
+A git branch is available here (not ready for submission):
 
-Thanks,
-Sekhar
+git://xenbits.xen.org/people/sstabellini/linux-pvhvm.git arm
+
+the branch above is based on git://linux-arm.org/linux-2.6.git arm-lpae,
+even though guests don't really need lpae support to run on Xen.
+
+
+> Since Xen and KVM are both in an early working state right now,
+> it would be very nice if we could agree on the guest model to make
+> sure that it's always possible to run the same kernel in both
+> (and potentially other future) hypervisors without modifications.
+
+Yes, that would be ideal.
+We don't plan on making many changes other than enabling PV frontends
+and backends. 
