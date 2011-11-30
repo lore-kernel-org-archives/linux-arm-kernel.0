@@ -1,25 +1,34 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 30 Nov 2011 22:21:39 +0000
-Subject: [PATCH] mmc: mmci: Fixup error handling for dma
-In-Reply-To: <1322578286-18727-1-git-send-email-ulf.hansson@stericsson.com>
-References: <1322578286-18727-1-git-send-email-ulf.hansson@stericsson.com>
-Message-ID: <20111130222139.GW9581@n2100.arm.linux.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 30 Nov 2011 14:32:42 -0800
+Subject: [PATCH 2a/5] Remove unsafe clock values from omap1_defconfig
+In-Reply-To: <1322517644-5066-1-git-send-email-jkrzyszt@tis.icnet.pl>
+References: <20111128174508.GO31337@atomide.com>
+ <1322517644-5066-1-git-send-email-jkrzyszt@tis.icnet.pl>
+Message-ID: <20111130223242.GS31337@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 29, 2011 at 03:51:26PM +0100, Ulf Hansson wrote:
-> diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-> index e900f51..62ad649 100644
-> --- a/drivers/mmc/host/mmci.c
-> +++ b/drivers/mmc/host/mmci.c
-> @@ -761,8 +761,12 @@ mmci_cmd_irq(struct mmci_host *host, struct mmc_command *cmd,
->  	}
->  
->  	if (!cmd->data || cmd->error) {
-> -		if (host->data)
-> +		if (host->data) {
-> +			/* Terminate the DMA transfer */
-> +			if (dma_inprogress(host))
-> +				mmci_dma_data_error(host);
+* Janusz Krzysztofik <jkrzyszt@tis.icnet.pl> [111128 13:26]:
+>
+> I'm not sure which of the patches you meant not ready for 3.2-rc. From
+> your comment I would conclude that only patch 3/5, which would really
+> break omap1_defconfig booting on some boards, is questionable, while you
+> posted this comment against patch 1/5, which I don't see how it could
+> break booting, including omap1_defconfig.
 
-Doesn't this leave the DMA buffers mapped?
+Sorry for the delay in replying, yes you're right looks like it's allowing
+the rate changes currently that would break things in 3/5.
+ 
+> Anyway, I hope that the additional patch below is addressing all your
+> concerns.
+
+I'd rather not modify omap1_defconfig as a fix assuming that we'll be
+removing all those options anyways the next merge window together with
+your new patch.
+ 
+Can you please split your series into two: Fix(es) for the -rc cycle,
+then patches that can be left for the next merge window.
+
+Cheers,
+
+Tony
