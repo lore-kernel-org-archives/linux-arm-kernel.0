@@ -1,164 +1,45 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu,  1 Dec 2011 00:01:12 +0800
-Subject: [PATCH] arm/imx6: add restart support for imx6q
-Message-ID: <1322668872-13011-1-git-send-email-shawn.guo@linaro.org>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Thu, 1 Dec 2011 00:43:08 +0200
+Subject: [RFC] virtio: use mandatory barriers for remote processor vdevs
+In-Reply-To: <20111130145004.GD21413@redhat.com>
+References: <1322569886-13055-1-git-send-email-ohad@wizery.com>
+ <20111129131110.GC19157@redhat.com>
+ <CAK=WgbZoGYVyKt=XXvnPVdh0koSBJC0zcgkLaYRkmjwBLOFA-A@mail.gmail.com>
+ <20111129151958.GA31789@redhat.com>
+ <CAK=WgbZ5aBFNro3XC0cN+Ao4ZWrBHwwd3d__CSHA=n56gKmKXw@mail.gmail.com>
+ <20111130145004.GD21413@redhat.com>
+Message-ID: <CAK=WgbY59n9N_-2_TZ9wNBNcTMV1DCrz65e-Ae=xamcg6A0dOA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The restart support was missed from the initial imx6q submission.
-The mxc_restart() does not work for imx6q.  Instead, this patch adds
-the restart for imx6q.
+On Wed, Nov 30, 2011 at 4:50 PM, Michael S. Tsirkin <mst@redhat.com> wrote:
+> make headers_install
+> make -C tools/virtio/
+> (you'll need an empty stub for tools/virtio/linux/module.h,
+> ?I just sent a patch to add that)
+> sudo insmod tools/virtio/vhost_test/vhost_test.ko
+> ./tools/virtio/virtio_test
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
-Hi Russell,
+Ok, I gave this a spin.
 
-This patch is to support restart support for imx6q based on your
-'reset' branch.  Is it possible for you to take this patch through
-your 'reset' branch?
+I've tried to see if reverting d57ed95 has any measurable effect on
+the execution time of virtio_test's run_test(), but I couldn't see any
+(several attempts with and without d57ed95 yielded very similar range
+of execution times).
 
- arch/arm/mach-imx/clock-imx6q.c         |    2 -
- arch/arm/mach-imx/mach-imx6q.c          |   33 ++++++++++++++++++++++++++++++-
- arch/arm/mach-imx/src.c                 |   23 +++++++++++++++++++++
- arch/arm/plat-mxc/include/mach/common.h |    1 +
- 4 files changed, 56 insertions(+), 3 deletions(-)
+YMMV though, especially with real workloads.
 
-diff --git a/arch/arm/mach-imx/clock-imx6q.c b/arch/arm/mach-imx/clock-imx6q.c
-index 613a1b9..2234031 100644
---- a/arch/arm/mach-imx/clock-imx6q.c
-+++ b/arch/arm/mach-imx/clock-imx6q.c
-@@ -1931,14 +1931,12 @@ int imx6q_set_lpm(enum mxc_cpu_pwr_mode mode)
- 		val |= 0x1 << BP_CLPCR_LPM;
- 		val &= ~BM_CLPCR_VSTBY;
- 		val &= ~BM_CLPCR_SBYOS;
--		val |= BM_CLPCR_BYP_MMDC_CH1_LPM_HS;
- 		break;
- 	case STOP_POWER_OFF:
- 		val |= 0x2 << BP_CLPCR_LPM;
- 		val |= 0x3 << BP_CLPCR_STBY_COUNT;
- 		val |= BM_CLPCR_VSTBY;
- 		val |= BM_CLPCR_SBYOS;
--		val |= BM_CLPCR_BYP_MMDC_CH1_LPM_HS;
- 		break;
- 	default:
- 		return -EINVAL;
-diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
-index dc8b6e2..54ce8ec 100644
---- a/arch/arm/mach-imx/mach-imx6q.c
-+++ b/arch/arm/mach-imx/mach-imx6q.c
-@@ -10,10 +10,13 @@
-  * http://www.gnu.org/copyleft/gpl.html
-  */
- 
-+#include <linux/delay.h>
- #include <linux/init.h>
-+#include <linux/io.h>
- #include <linux/irq.h>
- #include <linux/irqdomain.h>
- #include <linux/of.h>
-+#include <linux/of_address.h>
- #include <linux/of_irq.h>
- #include <linux/of_platform.h>
- #include <asm/hardware/cache-l2x0.h>
-@@ -23,6 +26,34 @@
- #include <mach/common.h>
- #include <mach/hardware.h>
- 
-+void imx6q_restart(char mode, const char *cmd)
-+{
-+	struct device_node *np;
-+	void __iomem *wdog_base;
-+
-+	np = of_find_compatible_node(NULL, NULL, "fsl,imx6q-wdt");
-+	wdog_base = of_iomap(np, 0);
-+	WARN_ON(!wdog_base);
-+
-+	imx_src_prepare_restart();
-+
-+	/* enable wdog */
-+	writew_relaxed(1 << 2, wdog_base);
-+	/* write twice to ensure the request will not get ignored */
-+	writew_relaxed(1 << 2, wdog_base);
-+
-+	/* wait for reset to assert ... */
-+	mdelay(500);
-+
-+	pr_err("Watchdog reset failed to assert reset\n");
-+
-+	/* delay to allow the serial port to show the message */
-+	mdelay(50);
-+
-+	/* we'll take a jump through zero as a poor second */
-+	soft_restart(0);
-+}
-+
- static void __init imx6q_init_machine(void)
- {
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-@@ -81,5 +112,5 @@ DT_MACHINE_START(IMX6Q, "Freescale i.MX6 Quad (Device Tree)")
- 	.timer		= &imx6q_timer,
- 	.init_machine	= imx6q_init_machine,
- 	.dt_compat	= imx6q_dt_compat,
--	.restart	= mxc_restart,
-+	.restart	= imx6q_restart,
- MACHINE_END
-diff --git a/arch/arm/mach-imx/src.c b/arch/arm/mach-imx/src.c
-index 36cacbd..117538c 100644
---- a/arch/arm/mach-imx/src.c
-+++ b/arch/arm/mach-imx/src.c
-@@ -18,6 +18,7 @@
- 
- #define SRC_SCR				0x000
- #define SRC_GPR1			0x020
-+#define BP_SRC_SCR_WARM_RESET_ENABLE	0
- #define BP_SRC_SCR_CORE1_RST		14
- #define BP_SRC_SCR_CORE1_ENABLE		22
- 
-@@ -39,11 +40,33 @@ void imx_set_cpu_jump(int cpu, void *jump_addr)
- 		       src_base + SRC_GPR1 + cpu * 8);
- }
- 
-+void imx_src_prepare_restart(void)
-+{
-+	u32 val;
-+
-+	/* clear enable bits of secondary cores */
-+	val = readl_relaxed(src_base + SRC_SCR);
-+	val &= ~(0x7 << BP_SRC_SCR_CORE1_ENABLE);
-+	writel_relaxed(val, src_base + SRC_SCR);
-+
-+	/* clear persistent entry register of primary core */
-+	writel_relaxed(0, src_base + SRC_GPR1);
-+}
-+
- void __init imx_src_init(void)
- {
- 	struct device_node *np;
-+	u32 val;
- 
- 	np = of_find_compatible_node(NULL, NULL, "fsl,imx6q-src");
- 	src_base = of_iomap(np, 0);
- 	WARN_ON(!src_base);
-+
-+	/*
-+	 * force warm reset sources to generate cold reset
-+	 * for a more reliable restart
-+	 */
-+	val = readl_relaxed(src_base + SRC_SCR);
-+	val &= ~(1 << BP_SRC_SCR_WARM_RESET_ENABLE);
-+	writel_relaxed(val, src_base + SRC_SCR);
- }
-diff --git a/arch/arm/plat-mxc/include/mach/common.h b/arch/arm/plat-mxc/include/mach/common.h
-index 4ee98d5..5ad0497 100644
---- a/arch/arm/plat-mxc/include/mach/common.h
-+++ b/arch/arm/plat-mxc/include/mach/common.h
-@@ -123,6 +123,7 @@ static inline void imx_smp_prepare(void) {}
- extern void imx_enable_cpu(int cpu, bool enable);
- extern void imx_set_cpu_jump(int cpu, void *jump_addr);
- extern void imx_src_init(void);
-+extern void imx_src_prepare_restart(void);
- extern void imx_gpc_init(void);
- extern void imx_gpc_pre_suspend(void);
- extern void imx_gpc_post_resume(void);
--- 
-1.7.4.1
+> Real virtualization/x86 can keep using current smp_XX barriers, right?
+
+Yes, sure. ARM virtualization can too, since smp_XX barriers are
+enough for that scenario.
+
+> We can have some config for your kind of setup.
+
+Please note that it can't be a compile-time decision though (unless
+we're willing to effectively revert d57ed95 when this config kicks
+in): it's not unlikely that one would want to have both use cases
+running on the same time.
+
+Thanks,
+Ohad.
