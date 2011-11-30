@@ -1,42 +1,48 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 30 Nov 2011 14:37:36 +0000
-Subject: [PATCH v2 4/6] ARM: idmap: use idmap_pgd when setting up mm for
- reboot
-In-Reply-To: <CAHkRjk7gCk-cuadAYLBrxwUu0TQkXSOh3iaDa3kLJsHnT=h_4A@mail.gmail.com>
-References: <1322504937-24718-1-git-send-email-will.deacon@arm.com>
- <1322504937-24718-5-git-send-email-will.deacon@arm.com>
- <CAHkRjk7gCk-cuadAYLBrxwUu0TQkXSOh3iaDa3kLJsHnT=h_4A@mail.gmail.com>
-Message-ID: <20111130143735.GC13025@mudshark.cambridge.arm.com>
+From: balajitk@ti.com (T Krishnamoorthy, Balaji)
+Date: Wed, 30 Nov 2011 20:09:18 +0530
+Subject: [PATCH v8 00/24] gpio/omap: driver cleanup and fixes
+In-Reply-To: <87y5uz6juz.fsf@ti.com>
+References: <1317803593-12259-1-git-send-email-tarun.kanti@ti.com>
+ <87obwsg9ua.fsf@ti.com>
+ <CAC83ZvKd3iBrQS5wESnAok8W_a4z-3jZYz17wy376sZJw6sCWg@mail.gmail.com>
+ <CAC83Zv++T96AZRHbEiS_UaGp=Dmu+zQ8se97oaBLhg_+eW-smA@mail.gmail.com>
+ <87y5uz6juz.fsf@ti.com>
+Message-ID: <CANrkHUYb1kM03yfp4ak=5biAMJGuXpkRMhg0TU2H6_0GAiZTTQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 30, 2011 at 11:31:13AM +0000, Catalin Marinas wrote:
-> On 28 November 2011 18:28, Will Deacon <will.deacon@arm.com> wrote:
-> > For soft-rebooting a system, it is necessary to map the MMU-off code
-> > with an identity mapping so that execution can continue safely once the
-> > MMU has been switched off.
-> >
-> > Currently, switch_mm_for_reboot takes out a 1:1 mapping from 0x0 to
-> > TASK_SIZE during reboot in the hope that the reset code lives at a
-> > physical address corresponding to a userspace virtual address.
-> >
-> > This patch modifies the code so that we switch to the idmap_pgd tables,
-> > which contain a 1:1 mapping of the cpu_reset code. This has the
-> > advantage of only remapping the code that we need and also means we
-> > don't need to worry about allocating a pgd from an atomic context in the
-> > case that the physical address of the cpu_reset code aliases with the
-> > virtual space used by the kernel.
-> >
-> > Acked-by: Dave Martin <dave.martin@linaro.org>
-> > Signed-off-by: Will Deacon <will.deacon@arm.com>
-> 
-> Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+On Tue, Nov 29, 2011 at 8:45 PM, Kevin Hilman <khilman@ti.com> wrote:
+> "DebBarma, Tarun Kanti" <tarun.kanti@ti.com> writes:
+>
+>> On Fri, Nov 4, 2011 at 2:57 PM, DebBarma, Tarun Kanti
+>> <tarun.kanti@ti.com> wrote:
+>>> On Fri, Nov 4, 2011 at 3:14 AM, Kevin Hilman <khilman@ti.com> wrote:
+>>>> Tarun Kanti DebBarma <tarun.kanti@ti.com> writes:
+>>>>
+>>>>> This series is continuation of cleanup of OMAP GPIO driver and fixes.
+>>>>
+>>>> Using this series on 3630/Zoom3, UART wakeups no longer work from
+>>>> suspend. ?That suggests that GPIO wakeups from retention/off are not
+>>>> working.
+>>>>
+>>>> Please test GPIO wakeups from retention/off. ?One way is to use Zoom3
+>>>> UART wakeup from suspend using by enabling UART wakeups and suspending:
+>>>>
+>>>> ? # echo enabled > /sys/devices/platform/serial8250.0/tty/ttyS0/power/wakeup
+>>>> ? # echo mem > /sys/power/state
+>>> Ok, I will test and make necessary fix.
+>> I have done retention test of the latest series on Zoom3. When I try
+>> running off mode
+>> test it says support is not present because of an errata.
+>
+> Specifically, CORE off is not supported on that rev of 36xx due to an
+> errata. ?Can you try on a newer 36xx?
+>
+>> Here is the overall log:
+>
+> The rest of the dump seems to point to an MMC driver problem. ?Please
+> take this with the MMC driver folks.
+Hi Tarun,
 
-Thanks Catalin.
-
-Russell - could you have a quick look at these please as the changes to
-setup_mm_for_reboot are required for the LPAE stuff?
-
-Cheers,
-
-Will
+Can you try with this patch queued in mmc-next for MMC warning
+http://article.gmane.org/gmane.linux.kernel.mmc/10961
