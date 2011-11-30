@@ -1,234 +1,73 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Wed, 30 Nov 2011 17:59:35 +0000
-Subject: [PATCH v2] ARM: pl2x0/pl310: Refactor Kconfig to be more maintainable
-Message-ID: <1322675975-4471-1-git-send-email-dave.martin@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 30 Nov 2011 18:15:01 +0000
+Subject: [Xen-devel] [ANNOUNCE] Xen port to Cortex-A15 / ARMv7 with virt
+ extensions
+In-Reply-To: <1322670473.31810.129.camel@zakaz.uk.xensource.com>
+References: <alpine.DEB.2.00.1111281009090.31179@kaball-desktop>
+ <201111301432.54463.arnd@arndb.de>
+ <1322670473.31810.129.camel@zakaz.uk.xensource.com>
+Message-ID: <201111301815.01297.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Making CACHE_L2X0 depends on (huge list of MACH_ and ARCH_ configs)
-is bothersome to maintain and likely to lead to merge conflicts.
+On Wednesday 30 November 2011, Ian Campbell wrote:
+> On Wed, 2011-11-30 at 14:32 +0000, Arnd Bergmann wrote:
+> > On Wednesday 30 November 2011, Ian Campbell wrote:
+> > What I suggested to the KVM developers is to start out with the
+> > vexpress platform, but then generalize it to the point where it fits
+> > your needs. All hardware that one expects a guest to have (GIC, timer,
+> > ...) will still show up in the same location as on a real vexpress,
+> > while anything that makes no sense or is better paravirtualized (LCD,
+> > storage, ...) just becomes optional and has to be described in the
+> > device tree if it's actually there.
+> 
+> That's along the lines of what I was thinking as well.
+> 
+> The DT contains the address of GIC, timer etc as well right? So at least
+> in principal we needn't provide e.g. the GIC at the same address as any
+> real platform but in practice I expect we will.
 
-This patch moves the knowledge of which platforms have a L2x0 or
-PL310 cache controller to the individual machines.  To enable this,
-a new HAVE_L2X0_L2CC config option is introduced to allow machines
-to indicate that they have such a cache controller independently of
-each other.
+Yes.
 
-Signed-off-by: Dave Martin <dave.martin@linaro.org>
----
-Changes since v1:
+> In principal we could also offer the user options as to which particular
+> platform a guest looks like.
 
-v2: Add HAVE_L2X0_L2CC instead of CACHE_L2X0 for SOC_IMX6Q.
-    (Thanks to Shawn Guo for suggesting this.)
+At least when using a qemu based simulation. Most platforms have some
+characteristics that are not meaningful in a classic virtualization
+scenario, but it would certainly be helpful to use the virtualization
+extensions to run a kernel that was built for a particular platform
+faster than with pure qemu, when you want to test that kernel image.
 
- arch/arm/Kconfig               |    8 ++++++++
- arch/arm/mach-exynos/Kconfig   |    1 +
- arch/arm/mach-imx/Kconfig      |    2 +-
- arch/arm/mach-omap2/Kconfig    |    1 +
- arch/arm/mach-realview/Kconfig |    5 +++++
- arch/arm/mach-vexpress/Kconfig |    1 +
- arch/arm/mm/Kconfig            |   13 ++++++++-----
- arch/arm/plat-mxc/Kconfig      |    1 +
- 8 files changed, 26 insertions(+), 6 deletions(-)
+It has been suggested in the past that it would be nice to run the
+guest kernel built for the same platform as the host kernel by
+default, but I think it would be much better to have just one
+platform that we end up using for guests on any host platform,
+unless there is a strong reason to do otherwise.
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 44789ef..4068fe5 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -339,6 +339,7 @@ config ARCH_HIGHBANK
- 	select ARCH_WANT_OPTIONAL_GPIOLIB
- 	select ARM_AMBA
- 	select ARM_GIC
-+	select HAVE_L2X0_L2CC
- 	select ARM_TIMER_SP804
- 	select CLKDEV_LOOKUP
- 	select CPU_V7
-@@ -359,6 +360,7 @@ config ARCH_CLPS711X
- config ARCH_CNS3XXX
- 	bool "Cavium Networks CNS3XXX family"
- 	select CPU_V6K
-+	select HAVE_L2X0_L2CC
- 	select GENERIC_CLOCKEVENTS
- 	select ARM_GIC
- 	select MIGHT_HAVE_PCI
-@@ -377,6 +379,7 @@ config ARCH_GEMINI
- config ARCH_PRIMA2
- 	bool "CSR SiRFSoC PRIMA2 ARM Cortex A9 Platform"
- 	select CPU_V7
-+	select HAVE_L2X0_L2CC
- 	select NO_IOPORT
- 	select GENERIC_CLOCKEVENTS
- 	select CLKDEV_LOOKUP
-@@ -627,6 +630,7 @@ config ARCH_W90X900
- 
- config ARCH_TEGRA
- 	bool "NVIDIA Tegra"
-+	select HAVE_L2X0_L2CC
- 	select CLKDEV_LOOKUP
- 	select CLKSRC_MMIO
- 	select GENERIC_CLOCKEVENTS
-@@ -699,6 +703,7 @@ config ARCH_MSM
- 
- config ARCH_SHMOBILE
- 	bool "Renesas SH-Mobile / R-Mobile"
-+	select HAVE_L2X0_L2CC
- 	select HAVE_CLK
- 	select CLKDEV_LOOKUP
- 	select HAVE_MACH_CLKDEV
-@@ -900,6 +905,7 @@ config ARCH_U8500
- 	bool "ST-Ericsson U8500 Series"
- 	select CPU_V7
- 	select ARM_AMBA
-+	select HAVE_L2X0_L2CC
- 	select GENERIC_CLOCKEVENTS
- 	select CLKDEV_LOOKUP
- 	select ARCH_REQUIRE_GPIOLIB
-@@ -912,6 +918,7 @@ config ARCH_NOMADIK
- 	select ARM_AMBA
- 	select ARM_VIC
- 	select CPU_ARM926T
-+	select HAVE_L2X0_L2CC
- 	select CLKDEV_LOOKUP
- 	select GENERIC_CLOCKEVENTS
- 	select ARCH_REQUIRE_GPIOLIB
-@@ -968,6 +975,7 @@ config ARCH_VT8500
- config ARCH_ZYNQ
- 	bool "Xilinx Zynq ARM Cortex A9 Platform"
- 	select CPU_V7
-+	select HAVE_L2X0_L2CC
- 	select GENERIC_CLOCKEVENTS
- 	select CLKDEV_LOOKUP
- 	select ARM_GIC
-diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
-index 724ec0f..b3eb318 100644
---- a/arch/arm/mach-exynos/Kconfig
-+++ b/arch/arm/mach-exynos/Kconfig
-@@ -17,6 +17,7 @@ choice
- 
- config ARCH_EXYNOS4
- 	bool "SAMSUNG EXYNOS4"
-+	select HAVE_L2X0_L2CC
- 	help
- 	  Samsung EXYNOS4 SoCs based systems
- 
-diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-index 5f7f9c2..0337a30 100644
---- a/arch/arm/mach-imx/Kconfig
-+++ b/arch/arm/mach-imx/Kconfig
-@@ -609,7 +609,7 @@ comment "i.MX6 family:"
- config SOC_IMX6Q
- 	bool "i.MX6 Quad support"
- 	select ARM_GIC
--	select CACHE_L2X0
-+	select HAVE_L2X0_L2CC
- 	select CPU_V7
- 	select HAVE_ARM_SCU
- 	select HAVE_IMX_GPC
-diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-index 5034147..f4e7e6a 100644
---- a/arch/arm/mach-omap2/Kconfig
-+++ b/arch/arm/mach-omap2/Kconfig
-@@ -44,6 +44,7 @@ config ARCH_OMAP4
- 	select CPU_V7
- 	select ARM_GIC
- 	select LOCAL_TIMERS if SMP
-+	select HAVE_L2X0_L2CC
- 	select PL310_ERRATA_588369
- 	select PL310_ERRATA_727915
- 	select ARM_ERRATA_720789
-diff --git a/arch/arm/mach-realview/Kconfig b/arch/arm/mach-realview/Kconfig
-index dba6d0c..3dfd6b8 100644
---- a/arch/arm/mach-realview/Kconfig
-+++ b/arch/arm/mach-realview/Kconfig
-@@ -12,6 +12,7 @@ config REALVIEW_EB_A9MP
- 	bool "Support Multicore Cortex-A9 Tile"
- 	depends on MACH_REALVIEW_EB
- 	select CPU_V7
-+	select HAVE_L2X0_L2CC
- 	help
- 	  Enable support for the Cortex-A9MPCore tile fitted to the
- 	  Realview(R) Emulation Baseboard platform.
-@@ -20,6 +21,7 @@ config REALVIEW_EB_ARM11MP
- 	bool "Support ARM11MPCore Tile"
- 	depends on MACH_REALVIEW_EB
- 	select CPU_V6K
-+	select HAVE_L2X0_L2CC
- 	select ARCH_HAS_BARRIERS if SMP
- 	help
- 	  Enable support for the ARM11MPCore tile fitted to the Realview(R)
-@@ -38,6 +40,7 @@ config MACH_REALVIEW_PB11MP
- 	bool "Support RealView(R) Platform Baseboard for ARM11MPCore"
- 	select CPU_V6K
- 	select ARM_GIC
-+	select HAVE_L2X0_L2CC
- 	select HAVE_PATA_PLATFORM
- 	select ARCH_HAS_BARRIERS if SMP
- 	help
-@@ -50,6 +53,7 @@ config MACH_REALVIEW_PB1176
- 	bool "Support RealView(R) Platform Baseboard for ARM1176JZF-S"
- 	select CPU_V6
- 	select ARM_GIC
-+	select HAVE_L2X0_L2CC
- 	select HAVE_TCM
- 	help
- 	  Include support for the ARM(R) RealView(R) Platform Baseboard for
-@@ -77,6 +81,7 @@ config MACH_REALVIEW_PBA8
- config MACH_REALVIEW_PBX
- 	bool "Support RealView(R) Platform Baseboard Explore"
- 	select ARM_GIC
-+	select HAVE_L2X0_L2CC
- 	select HAVE_PATA_PLATFORM
- 	select ARCH_SPARSEMEM_ENABLE if CPU_V7 && !REALVIEW_HIGH_PHYS_OFFSET
- 	select ZONE_DMA if SPARSEMEM
-diff --git a/arch/arm/mach-vexpress/Kconfig b/arch/arm/mach-vexpress/Kconfig
-index 9311484..78d4f28 100644
---- a/arch/arm/mach-vexpress/Kconfig
-+++ b/arch/arm/mach-vexpress/Kconfig
-@@ -5,6 +5,7 @@ config ARCH_VEXPRESS_CA9X4
- 	bool "Versatile Express Cortex-A9x4 tile"
- 	select CPU_V7
- 	select ARM_GIC
-+	select HAVE_L2X0_L2CC
- 	select ARM_ERRATA_720789
- 	select ARM_ERRATA_751472
- 	select ARM_ERRATA_753970
-diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-index 67f75a0..bb743df 100644
---- a/arch/arm/mm/Kconfig
-+++ b/arch/arm/mm/Kconfig
-@@ -816,13 +816,16 @@ config CACHE_FEROCEON_L2_WRITETHROUGH
- 	  Say Y here to use the Feroceon L2 cache in writethrough mode.
- 	  Unless you specifically require this, say N for writeback mode.
- 
-+config HAVE_L2X0_L2CC
-+	bool
-+	default n
-+	help
-+	  This option should be selected by machines which have a L2x0
-+	  or PL310 cache controller.
-+
- config CACHE_L2X0
- 	bool "Enable the L2x0 outer cache controller"
--	depends on REALVIEW_EB_ARM11MP || MACH_REALVIEW_PB11MP || MACH_REALVIEW_PB1176 || \
--		   REALVIEW_EB_A9MP || ARCH_IMX_V6_V7 || MACH_REALVIEW_PBX || \
--		   ARCH_NOMADIK || ARCH_OMAP4 || ARCH_EXYNOS4 || ARCH_TEGRA || \
--		   ARCH_U8500 || ARCH_VEXPRESS_CA9X4 || ARCH_SHMOBILE || \
--		   ARCH_PRIMA2 || ARCH_ZYNQ || ARCH_CNS3XXX || ARCH_HIGHBANK
-+	depends on HAVE_L2X0_L2CC
- 	default y
- 	select OUTER_CACHE
- 	select OUTER_CACHE_SYNC
-diff --git a/arch/arm/plat-mxc/Kconfig b/arch/arm/plat-mxc/Kconfig
-index b3a1f2b..6871ed7 100644
---- a/arch/arm/plat-mxc/Kconfig
-+++ b/arch/arm/plat-mxc/Kconfig
-@@ -20,6 +20,7 @@ config ARCH_IMX_V6_V7
- 	bool "i.MX3, i.MX6"
- 	select AUTO_ZRELADDR if !ZBOOT_ROM
- 	select ARM_PATCH_PHYS_VIRT
-+	select HAVE_L2X0_L2CC
- 	help
- 	  This enables support for systems based on the Freescale i.MX3 and i.MX6
- 	  family.
--- 
-1.7.4.1
+There is also ongoing restructuring in the ARM Linux kernel to
+allow running the same kernel binary on multiple platforms. While
+there is still a lot of work to be done, you should assume that
+we will finish it before you see lots of users in production, there
+is no need to plan for the current one-kernel-per-board case.
+
+> > Ok. It would of course still be possible to agree on an argument passing
+> > convention so that we can share the macros used to issue the hcalls,
+> > even if the individual commands are all different.
+> 
+> I think it likely that we can all agree on a common calling convention
+> for N-argument hypercalls. It doubt there are that many useful choices
+> with conflicting requirements yet strongly compelling advantages.
+
+Exactly. I think it's only lack of communication that has resulted in
+different interfaces for each hypervisor on the other architectures.
+
+KVM and Xen at least both fall into the single-return-value category,
+so we should be able to agree on a calling conventions. KVM does not
+have an hcall API on ARM yet, and I see no reason not to use the
+same implementation that you have in the Xen guest.
+
+Stefano, can you split out the generic parts of your asm/xen/hypercall.h
+file into a common asm/hypercall.h and submit it for review to the
+arm kernel list?
+
+	Arnd
