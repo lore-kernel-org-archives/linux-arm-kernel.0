@@ -1,29 +1,51 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Wed, 30 Nov 2011 11:41:58 +0000
-Subject: [ANNOUNCE] Xen port to Cortex-A15 / ARMv7 with virt extensions
-In-Reply-To: <CAAhSdy3F1oUQP=f_Tig4_MnufwPRpNooZYW8_cSTAse7aOaDoA@mail.gmail.com>
-References: <alpine.DEB.2.00.1111281009090.31179@kaball-desktop>
- <201111292129.20444.arnd@arndb.de>
- <CAAhSdy3F1oUQP=f_Tig4_MnufwPRpNooZYW8_cSTAse7aOaDoA@mail.gmail.com>
-Message-ID: <alpine.DEB.2.00.1111301112400.31179@kaball-desktop>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 30 Nov 2011 11:43:30 +0000
+Subject: [PATCH] ARM: errata: Remove SMP dependency for erratum 720789
+In-Reply-To: <1322586755-12740-1-git-send-email-dave.martin@linaro.org>
+References: <1322586755-12740-1-git-send-email-dave.martin@linaro.org>
+Message-ID: <20111130114330.GB13025@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 30 Nov 2011, Anup Patel wrote:
-> Hi all,
+On Tue, Nov 29, 2011 at 05:12:35PM +0000, Dave Martin wrote:
+> Activation conditions for a workaround should not be encoded in the
+> workaround's direct dependencies if this makes otherwise reasonable
+> configuration choices impossible.
 > 
-> I wanted to know how Xen-ARM for A15 will address following concerns:
+> The workaround for erratum 720789 only affects a code path which is
+> not active in UP kernels; hence it should be safe to turn on in UP
+> kernels, without penalty.
 > 
-> - How will Xen-ARM for A15 support legacy guest environment like ARMv5 or ARMv6 ?
+> This patch simply removes the extra dependency on SMP from Kconfig.
+> 
+> This means that configs for buggy silicon can simply select
+> ARM_ERRATA_720789, without preventing a UP kernel from being built
+> or duplicatiing knowledge about when to activate the workaround.
+> 
+> Signed-off-by: Dave Martin <dave.martin@linaro.org>
+> ---
+>  arch/arm/Kconfig |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 44789ef..31bbad3 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -1245,7 +1245,7 @@ config PL310_ERRATA_588369
+>  
+>  config ARM_ERRATA_720789
+>  	bool "ARM errata: TLBIASIDIS and TLBIMVAIS operations can broadcast a faulty ASID"
+> -	depends on CPU_V7 && SMP
+> +	depends on CPU_V7
+>  	help
+>  	  This option enables the workaround for the 720789 Cortex-A9 (prior to
+>  	  r2p0) erratum. A faulty ASID can be sent to the other CPUs for the
 
-It is not our focus at the moment; we are targeting operating systems
-that support a modern ARMv7 machine with GIC support. 
-That said, it might be possible to run legacy guests in the future,
-introducing more emulation to the hypervisor.
+Having this applied on a UP kernel should have no effect given that it only
+affects the UIS TLB flags. So:
 
+Acked-by: Will Deacon <will.deacon@arm.com>
 
-> - What if my Cortex-A15 board does not have a GIC with virtualization support ?
+Cheers,
 
-We expect most hardware vendors to provide a GIC with virtualization
-support. However if they do not, in order to support their boards we'll
-have to do more emulation in the hypervisor.
+Will
