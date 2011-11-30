@@ -1,47 +1,56 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Wed, 30 Nov 2011 14:50:10 +0100
-Subject: [V3 2/6] RTC: sa1100: remove redundant code of setting alarm
-In-Reply-To: <1322634629-4411-1-git-send-email-jtzhou@marvell.com>
-References: <1322634629-4411-1-git-send-email-jtzhou@marvell.com>
-Message-ID: <20111130135010.GB18533@game.jcrosoft.org>
+Date: Wed, 30 Nov 2011 14:57:10 +0100
+Subject: [V3 3/6] RTC: sa1100: support sa1100, pxa and mmp soc families
+In-Reply-To: <1322634646-4460-1-git-send-email-jtzhou@marvell.com>
+References: <1322634646-4460-1-git-send-email-jtzhou@marvell.com>
+Message-ID: <20111130135710.GC18533@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 14:30 Wed 30 Nov     , Jett.Zhou wrote:
-> In rtc generic interface of setting alarm, it will check the alarm time
-> value valid or not, so rtc_periodic_alarm is redundant, remove it.
+> Since the regmap of rtc on sa1100, pxa and mmp Marvell soc families are
+> almost the same, so re-arch the rtc-sa1100 to support them.
 > 
 > Signed-off-by: Jett.Zhou <jtzhou@marvell.com>
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
 > Acked-by: Haojian Zhuang <haojian.zhuang@gmail.com>
+> Acked-by: Robert Jarzmik <robert.jarzmik@free.fr>
+Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+
+just one comment
+
 > ---
->  drivers/rtc/rtc-sa1100.c |   53 ++++++++++-----------------------------------
->  1 files changed, 12 insertions(+), 41 deletions(-)
+>  arch/arm/mach-pxa/devices.c    |   20 +++
+>  arch/arm/mach-sa1100/generic.c |   20 +++
+>  drivers/rtc/Kconfig            |    2 +-
+>  drivers/rtc/rtc-sa1100.c       |  256 +++++++++++++++++++++++++++------------
+>  4 files changed, 218 insertions(+), 80 deletions(-)
 > 
-> diff --git a/drivers/rtc/rtc-sa1100.c b/drivers/rtc/rtc-sa1100.c
-> index 6f22c1f..d268cf1 100644
-> --- a/drivers/rtc/rtc-sa1100.c
-> +++ b/drivers/rtc/rtc-sa1100.c
-> @@ -45,16 +45,6 @@ static const unsigned long RTC_FREQ = 1024;
->  static struct rtc_time rtc_alarm;
->  static DEFINE_SPINLOCK(sa1100_rtc_lock);
+> diff --git a/arch/arm/mach-pxa/devices.c b/arch/arm/mach-pxa/devices.c
+> index 2e04254..8b134c3 100644
+> --- a/arch/arm/mach-pxa/devices.c
+> +++ b/arch/arm/mach-pxa/devices.c
+> @@ -415,9 +415,29 @@ static struct resource pxa_rtc_resources[] = {
+>  	},
+>  };
 >  
-> -static inline int rtc_periodic_alarm(struct rtc_time *tm)
-> -{
-> -	return  (tm->tm_year == -1) ||
-> -		((unsigned)tm->tm_mon >= 12) ||
-> -		((unsigned)(tm->tm_mday - 1) >= 31) ||
-> -		((unsigned)tm->tm_hour > 23) ||
-> -		((unsigned)tm->tm_min > 59) ||
-> -		((unsigned)tm->tm_sec > 59);
-> -}
-> -
->  /*
->   * Calculate the next alarm time given the requested alarm time mask
->   * and the current time.
-> @@ -82,27 +72,6 @@ static void rtc_next_alarm_time(struct rtc_time *next, struct rtc_time *now,
->  	}
->  }
-please use read/write relaxed too
+> +static struct resource sa1100_rtc_resources[] = {
+> +	[0] = {
+> +		.start  = 0x40900000,
+> +		.end	= 0x409000ff,
+> +		.flags  = IORESOURCE_MEM,
+> +	},
+> +	[1] = {
+> +		.start  = IRQ_RTC1Hz,
+> +		.end    = IRQ_RTC1Hz,
+> +		.flags  = IORESOURCE_IRQ,
+> +	},
+> +	[2] = {
+> +		.start  = IRQ_RTCAlrm,
+> +		.end    = IRQ_RTCAlrm,
+> +		.flags  = IORESOURCE_IRQ,
+> +	},
+please the MACRO
 
 Best Regards,
-J.
+J
