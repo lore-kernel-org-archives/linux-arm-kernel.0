@@ -1,62 +1,30 @@
-From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
-Date: Thu, 1 Dec 2011 19:38:32 +0100
-Subject: [PATCH 2a/5] Remove unsafe clock values from omap1_defconfig
-In-Reply-To: <20111201171758.GT31337@atomide.com>
-References: <20111128174508.GO31337@atomide.com>
- <201112011054.09878.jkrzyszt@tis.icnet.pl>
- <20111201171758.GT31337@atomide.com>
-Message-ID: <201112011938.36706.jkrzyszt@tis.icnet.pl>
+From: cjb@laptop.org (Chris Ball)
+Date: Thu, 01 Dec 2011 13:47:12 -0500
+Subject: [PATCH 20/62] mmc: remove the second argument of k[un]map_atomic()
+In-Reply-To: <1322371662-26166-21-git-send-email-amwang@redhat.com> (Cong
+ Wang's message of "Sun, 27 Nov 2011 13:27:00 +0800")
+References: <1322371662-26166-1-git-send-email-amwang@redhat.com>
+ <1322371662-26166-21-git-send-email-amwang@redhat.com>
+Message-ID: <87vcq0jfin.fsf@laptop.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 01 of December 2011 at 18:17:58, Tony Lindgren wrote:
-> * Janusz Krzysztofik <jkrzyszt@tis.icnet.pl> [111201 01:20]:
-[snip]
-> > Perhaps 
-> > we should rather think of reverting a few commits which caused all these 
-> > problems if fixing them all during rc cycle seems not possible? I 
-> > haven't bisected them yet, rather concentrated on providing fixes, but I 
-> > can still try to do it, starting back from the original issue 
-> > (http://www.spinics.net/lists/linux-omap/msg60052.html), if so decided.
-> 
-> We can't revert that because the SRAM init has been moved to later for
-> map_io. 
+Hi,
 
-Yes, I know that. What I don't know yet is what else should be reverted 
-to fix the original issue other than applying  
-e9b7086b80c4d9e354f4edc9e280ae85a60df408, which seems to introduce (or 
-maybe 'exhibit' is a better word here) more bugs than it fixes.
+On Sun, Nov 27 2011, Cong Wang wrote:
+> Signed-off-by: Cong Wang <amwang@redhat.com>
+> ---
+>  drivers/mmc/host/at91_mci.c |    8 ++++----
+>  drivers/mmc/host/msm_sdcc.c |    6 +++---
+>  drivers/mmc/host/sdhci.c    |    4 ++--
+>  drivers/mmc/host/tifm_sd.c  |   16 ++++++++--------
+>  drivers/mmc/host/tmio_mmc.c |    1 -
+>  drivers/mmc/host/tmio_mmc.h |    4 ++--
+>  6 files changed, 19 insertions(+), 20 deletions(-)
 
-> But if that patch changed the behaviour on your board, then that's
-> the problem we should fix.
-> 
-> If you're now stuck at 60MHz rate, care to see if the following patch
-> makes the kernel behave the same way as before for you?
-[snip]
-> 
-> --- a/arch/arm/mach-omap1/clock_data.c
-> +++ b/arch/arm/mach-omap1/clock_data.c
-> @@ -927,7 +927,7 @@ int __init omap1_clk_init(void)
->  
->  void __init omap1_clk_late_init(void)
->  {
-> -	if (ck_dpll1.rate >= OMAP1_DPLL1_SANE_VALUE)
-> +	if (ck_dpll1.rate > OMAP1_DPLL1_SANE_VALUE)
->  		return;
->  
->  	/* Find the highest supported frequency and enable it */
+Looks good, thanks, pushed to mmc-next for 3.3.
 
-This change really makes sense to me, however, knowing the initial 
-(bootloader selected) clock rate my board boots at, which is 
-unfortunately raw 12 MHz, I would be surprised if that helped.
-
-Before e9b7086b80c4d9e354f4edc9e280ae85a60df408, 
-omap1_select_table_rate() was returning the rate selected with .config 
-because it was called early, with ck_dpll1_p->rate uninitialized. Now it 
-is not, and returns nothing, resulting in 60 MHz default. Then, the only 
-way I can see to correct the problem is something like patch 3/5, which 
-you are justifiably affraid of of always switching to 216 MHz with 
-omap1_defconfig.
-
-Thanks,
-Janusz
+- Chris.
+-- 
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+One Laptop Per Child
