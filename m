@@ -1,54 +1,70 @@
-From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
-Date: Thu,  1 Dec 2011 21:30:39 +0100
-Subject: [PATCH] ARM: OMAP1: Remove unsafe clock values from omap1_defconfig
-In-Reply-To: <20111201194609.GX31337@atomide.com>
-References: <20111201194609.GX31337@atomide.com>
-Message-ID: <1322771439-31031-1-git-send-email-jkrzyszt@tis.icnet.pl>
+From: dwalker@fifo99.com (Daniel Walker)
+Date: Thu, 01 Dec 2011 12:32:56 -0800
+Subject: [PATCH 1/3] ARM: msm: Remove MSM7x00 support
+In-Reply-To: <20111201202632.GA25247@huya.qualcomm.com>
+References: <1322699344-28422-1-git-send-email-davidb@codeaurora.org>
+ <1322752657.3704.2.camel@m0nster>
+ <20111201181736.GA13182@huya.qualcomm.com>
+ <1322764745.3704.9.camel@m0nster>
+ <20111201192705.GA23641@huya.qualcomm.com>
+ <1322767992.3704.13.camel@m0nster>
+ <20111201194353.GA24293@huya.qualcomm.com>
+ <20111201201950.GE9581@n2100.arm.linux.org.uk>
+ <20111201202632.GA25247@huya.qualcomm.com>
+Message-ID: <1322771576.3704.24.camel@m0nster>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DPLL1 reprogramming to a different rate is actually blocked inside
-omap1_select_table_rate(), resulting in the defalut rate of 60 MHz
-always used instead of the one selected in .config. OTOH, in
-omap1_defconfig we currently rely on Kconfig options for the supported
-MHz rates in case of boards which boot with dpll1 not set correctly by
-their boot loaders.
+On Thu, 2011-12-01 at 12:26 -0800, David Brown wrote:
+> On Thu, Dec 01, 2011 at 08:19:50PM +0000, Russell King - ARM Linux wrote:
+> > On Thu, Dec 01, 2011 at 11:43:53AM -0800, David Brown wrote:
+> > > On Thu, Dec 01, 2011 at 11:33:12AM -0800, Daniel Walker wrote:
+> > > > On Thu, 2011-12-01 at 11:27 -0800, David Brown wrote:
+> > > > > On Thu, Dec 01, 2011 at 10:39:05AM -0800, Daniel Walker wrote:
+> > > > > 
+> > > > > > > If someone is willing to step up and make it work, then we can keep it
+> > > > > > > around.  My only G1 is fried, so I have no way to do anything other
+> > > > > > > than keep it compiling.
+> > > > > > 
+> > > > > > Unfortunately, You can't remove it regardless of whether or not you have
+> > > > > > one to test on.. Your job is to do the best you can to keep it working
+> > > > > > and maintained. If you don't have one then you can't boot test but you
+> > > > > > still have to your best to keep it as close to working as possible.
+> > > > > 
+> > > > > I was trying to get an idea if anyone uses the target.  If people
+> > > > > want the target around, we can just ignore my patches to remove it.
+> > > > 
+> > > > Please don't ever do this again.
+> > > 
+> > > That's awfully harsh.  I sent an email a few weeks back asking about
+> > > removing the target, and I only got one positive response.  Sometimes
+> > > sending a patch is the best way to get a reaction.
+> > 
+> > That's pretty normal for just 'asking' about doing something.
+> > 
+> > You've done the right thing - if you ask, people treat your message as
+> > low priority and don't bother replying in the hope that nothing will
+> > happen.
+> > 
+> > However, if you send a patch to delete a platform, people treat it as
+> > most urgent because if they care they need to speak up to actually stop
+> > it happening.  (Even if you intend to only actually submit it in 6
+> > months time or so - but don't mention that in the initial posting!)
+> > 
+> > Now, the obvious question to ask now is this: as you sent your question,
+> > and Daniel obviously objects, was Daniel one of your respondants?  If
+> > not, then he carries some of the blame for this patch being created
+> > in the first place by having missed the email/not replied/etc.
+> 
+> Yeah, my mistake was forgetting to CC Daniel on the original question
+> about removing the target.
+> 
+> And I've learned what I needed to now: someone does still care about
+> the target.
 
-This means that before we allow for reprogramming of dpll1 rate, we
-should remove all unsafe clock selections from omap1_defconfig,
-otherwise it will stop booting on boards with imperfect boot loaders,
-as it would always try to change to 216MHz.
+I just went on cragslist and found 7 of these phones for sell used .. If
+you can still buy the things clearly we want it supported .. My point is
+that this patch and even you asking to remove the code was pointless..
+You should know that code can't be removed.
 
-Keep only one safe clock rate per each supported xtal frequency, i.e.
-60MHZ dpll1 for 12MHz xtal and 182MHz dpll1 for 13MHz xtal.
-
-BTW, this change goes into the direction of removing all OMAP1 clock
-rate options, planned for next merge window.
-
-Signed-off-by: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
----
-Resending with commit summary tagged correctly and commit message
-updated with info about next merge window planned direction.
-
- arch/arm/configs/omap1_defconfig |    5 -----
- 1 files changed, 0 insertions(+), 5 deletions(-)
-
-diff --git a/arch/arm/configs/omap1_defconfig b/arch/arm/configs/omap1_defconfig
-index a7e7775..945a34f 100644
---- a/arch/arm/configs/omap1_defconfig
-+++ b/arch/arm/configs/omap1_defconfig
-@@ -48,12 +48,7 @@ CONFIG_MACH_SX1=y
- CONFIG_MACH_NOKIA770=y
- CONFIG_MACH_AMS_DELTA=y
- CONFIG_MACH_OMAP_GENERIC=y
--CONFIG_OMAP_ARM_216MHZ=y
--CONFIG_OMAP_ARM_195MHZ=y
--CONFIG_OMAP_ARM_192MHZ=y
- CONFIG_OMAP_ARM_182MHZ=y
--CONFIG_OMAP_ARM_168MHZ=y
--# CONFIG_OMAP_ARM_60MHZ is not set
- # CONFIG_ARM_THUMB is not set
- CONFIG_PCCARD=y
- CONFIG_OMAP_CF=y
--- 
-1.7.3.4
+Daniel
