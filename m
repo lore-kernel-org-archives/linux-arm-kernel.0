@@ -1,77 +1,73 @@
-From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
-Date: Thu, 1 Dec 2011 10:54:09 +0100
-Subject: [PATCH 2a/5] Remove unsafe clock values from omap1_defconfig
-In-Reply-To: <20111201022750.GY13928@atomide.com>
-References: <20111128174508.GO31337@atomide.com>
- <201112010310.43890.jkrzyszt@tis.icnet.pl>
- <20111201022750.GY13928@atomide.com>
-Message-ID: <201112011054.09878.jkrzyszt@tis.icnet.pl>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 01 Dec 2011 19:03:15 +0900
+Subject: [PATCH 3/3] USB: Add S5P OHCI diver
+In-Reply-To: <1321338716-15593-1-git-send-email-jg1.han@samsung.com>
+References: <1321338716-15593-1-git-send-email-jg1.han@samsung.com>
+Message-ID: <046e01ccb010$7175e9a0$5461bce0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I've unintentionally answered off-line, sorry, re-adding all Cc:'s.
-
-On Thursday 01 of December 2011 at 03:27:51, Tony Lindgren wrote:
-> * Janusz Krzysztofik <jkrzyszt@tis.icnet.pl> [111130 17:40]:
-> > On Wednesday 30 of November 2011 at 23:32:42, Tony Lindgren wrote:
-> > >  
-> > > Can you please split your series into two: Fix(es) for the -rc cycle,
-> > > then patches that can be left for the next merge window.
-> > 
-> > From my point of view, all 5 are important fixes. Please decide 
-> > yourself, having the following information provided:
-> > 
-> > 1/5: inspired by in-line comments about running from sram requirement
-> > 	(works without this one for me),
-> > 
-> > 2/5: without this one, system clock runs way too fast if dpll1 is 
-> > 	reprogrammed to default rate,
-> > 
-> > 3/5: without this one, all boards with bootloaders not setting rate 
-> > 	correctly, like Amstrad Delta, will run at default rate, despite 
-> > 	any .config selections, no matter if omap1_defconfig or custom,
-> > 
-> > 2a/5: required by 3/5,
-> > 
-> > 5/5: without this one, BogoMIPS is not updated after dpll1 reprogramme, 
-> > 	breaking omap_keypad at least.
-> > 
-> > and please let me know which I should resend as fixes and which not.
+Jingoo Han wrote:
 > 
-> How about 2 and 5 as fixes during the -rc, then the rest for the
-> merge window? That is assuming that those are enough for you to have
-> things mostly working.
-
-If you still ask me for my opinion: with patch 3/5 omitted, then not 
-being able to run at any other frequency than 60 MHz instead of usual 
-150 since the board support was introduced first, isn't this a 
-regression? Having a choice of upgrading to 3.2 and running my 
-application on not very powerfull board at 60 MHz, or keep running 3.1 
-at 150, guess what I chose? If I were a distro kernel package 
-maintainer, guess what I would chose?
-
-> It seems that we've had the issue of not actually changing the rate
-> for a while, right?
-
-This was not an issue before dpll1 reprogramming has been moved out from 
-omap1_clk_init(), as an rc fix to another bug introduced in 3.2. Perhaps 
-we should rather think of reverting a few commits which caused all these 
-problems if fixing them all during rc cycle seems not possible? I 
-haven't bisected them yet, rather concentrated on providing fixes, but I 
-can still try to do it, starting back from the original issue 
-(http://www.spinics.net/lists/linux-omap/msg60052.html), if so decided.
-
-> If that's the case, I'd rather not start messing
-> with that during the -rc cycle.
+> This patch adds USB OHCI driver for Samsung S5P SoCs.
 > 
-> Regards,
+> Signed-off-by: Jingoo Han <jg1.han@samsung.com>
+> ---
+>  drivers/usb/Kconfig         |    1 +
+>  drivers/usb/host/Kconfig    |    6 +
+>  drivers/usb/host/ohci-hcd.c |    5 +
+>  drivers/usb/host/ohci-s5p.c |  273
+> +++++++++++++++++++++++++++++++++++++++++++
+>  4 files changed, 285 insertions(+), 0 deletions(-)
+>  create mode 100644 drivers/usb/host/ohci-s5p.c
 > 
-> Tony
 
-I don't feel like a person who makes the final decision.
+(snip)
 
-Anyway, did you mean resending those 2/5 and 5/5 without any changes, 
-only renumbered as 1/2 and 2/2?
+> +#ifdef CONFIG_PM
+> +static int s5p_ohci_suspend(struct device *dev)
+> +{
+> +	struct s5p_ohci_hcd *s5p_ohci = dev_get_drvdata(dev);
+> +	struct usb_hcd *hcd = s5p_ohci->hcd;
+> +	struct ohci_hcd *ohci = hcd_to_ohci(hcd);
+> +	struct platform_device *pdev = to_platform_device(dev);
+> +	struct s5p_ohci_platdata *pdata = pdev->dev.platform_data;
+> +	unsigned long flags;
+> +	int rc = 0;
+> +
+> +	/* Root hub was already suspended. Disable irq emission and
+> +	 * mark HW unaccessible, bail out if RH has been resumed. Use
+> +	 * the spinlock to properly synchronize with possible pending
+> +	 * RH suspend or resume activity.
+> +	 *
+> +	 * This is still racy as hcd->state is manipulated outside of
+> +	 * any locks =P But that will be a different fix.
+> +	 */
+> +	spin_lock_irqsave(&ohci->lock, flags);
+> +	if (hcd->state != HC_STATE_SUSPENDED && hcd->state != HC_STATE_HALT)
+> {
+> +		rc = -EINVAL;
+> +		goto fail;
+> +	}
+> +
+> +	clear_bit(HCD_FLAG_HW_ACCESSIBLE, &hcd->flags);
+> +
+> +	if (pdata && pdata->phy_exit)
+> +		pdata->phy_exit(pdev, S5P_USB_PHY_HOST);
 
-Thanks,
-Janusz
+Since ohci and echi share the code for control of phy, this can make a
+problem when this is used by module or doing suspend-to-resume. So need to
+sort it out.
+
+And how about to use ohci-exynos instead of ohci-s5p? As you know, this
+can/will be used on EXYNOS SoCs.
+
+Others, ok to me. If you address comments from me, you can add my ack.
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
