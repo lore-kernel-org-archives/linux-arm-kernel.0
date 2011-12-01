@@ -1,50 +1,43 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 01 Dec 2011 19:29:49 +0900
-Subject: [PATCH 0/7] Cragganmore updates for 3.3
-In-Reply-To: <20111129133006.GA26800@opensource.wolfsonmicro.com>
-References: <20111129133006.GA26800@opensource.wolfsonmicro.com>
-Message-ID: <047301ccb014$273745b0$75a5d110$%kim@samsung.com>
+Date: Thu, 01 Dec 2011 19:30:13 +0900
+Subject: [PATCH] ARM: S3C64XX: Add linux/export.h to dev-spi.c
+In-Reply-To: <1322490819-18971-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+References: <1322490819-18971-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+Message-ID: <047401ccb014$358b7c30$a0a27490$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Mark Brown wrote:
 > 
-> This patch series is all the pending updates for Cragganmore for 3.3.
-> With the exception of the final patch for Littlemill they've all been
-> posted before, some a while ago now, but I've not seen any feedback yet.
-> They're all available on a git branch in case it's helpful to pull them:
+> This is required for the EXPORT_SYMBOL()s the code uses, previously the
+> header was being included implicitly by another header.
 > 
-> The following changes since commit
-> caca6a03d365883564885f2c1da3e88dcf65d139:
+> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> ---
+>  arch/arm/mach-s3c64xx/dev-spi.c |    1 +
+>  1 files changed, 1 insertions(+), 0 deletions(-)
 > 
->   Linux 3.2-rc3 (2011-11-23 20:20:28 -0800)
+> diff --git a/arch/arm/mach-s3c64xx/dev-spi.c b/arch/arm/mach-s3c64xx/dev-
+> spi.c
+> index 86fb130..3f437e7 100644
+> --- a/arch/arm/mach-s3c64xx/dev-spi.c
+> +++ b/arch/arm/mach-s3c64xx/dev-spi.c
+> @@ -10,6 +10,7 @@
 > 
-> are available in the git repository at:
->   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/misc.git
-> updates/cragganmore
-> 
-> Mark Brown (7):
->       ARM: S3C64XX: Raise the frequency of the second I2C bus on
-> Cragganmore
->       ARM: S3C64XX: Use software initiated powerdown for Cragganmore
->       ARM: S3C64XX: Configure WM1250 EV1 GPIOs on Cragganmore
->       ARM: S3C64XX: Improve logging of unknown Cragganmore module types
->       ARM: S3C64XX: Run Tobermory interrupts in the default mode
->       ARM: S3C64XX: Hook up platform data for Kilchomin module on
-> Cragganmore
->       ARM: S3C64XX: Hook up Littlemill audio card on Cragganmore
-> 
->  arch/arm/mach-s3c64xx/include/mach/crag6410.h |    6 ++-
->  arch/arm/mach-s3c64xx/include/mach/irqs.h     |    2 +-
->  arch/arm/mach-s3c64xx/mach-crag6410-module.c  |   56
-> +++++++++++++++++++++++-
->  arch/arm/mach-s3c64xx/mach-crag6410.c         |   30 ++++++++++++-
->  4 files changed, 86 insertions(+), 8 deletions(-)
+>  #include <linux/kernel.h>
+>  #include <linux/string.h>
+> +#include <linux/export.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/dma-mapping.h>
+>  #include <linux/gpio.h>
+> --
+> 1.7.7.3
 
-Looks ok, will apply this series.
+Right, will apply for v3.2.
 
-And as a note, I'm thinking about the handling of different
-IRQ_BOARD_NR...but I'm not sure it is really needed or not :)
+But since Padmavathi's SPI consolidation patches removes dev-spi.c files so
+this can be dropped for v3.3, and as a note, I will look at other patches
+tomorrow :)
 
 Thanks.
 
