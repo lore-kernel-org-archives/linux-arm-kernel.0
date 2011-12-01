@@ -1,87 +1,91 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Thu, 1 Dec 2011 10:02:54 +0800
-Subject: [PATCH] backlight: pwm_bl: move suspend/resume entries from
- platform_driver to driver.pm
-In-Reply-To: <1322704427-11876-1-git-send-email-Barry.Song@csr.com>
-References: <1322704427-11876-1-git-send-email-Barry.Song@csr.com>
-Message-ID: <CAMPhdO-BEgNkHERx-0mE5B4kTZ90wjAgWbWMBNdfTioyWFP5zA@mail.gmail.com>
+From: b32955@freescale.com (Huang Shijie)
+Date: Thu, 1 Dec 2011 10:13:03 +0800
+Subject: [PATCH v2] IMX/SDMA : save the real count for one DMA transaction.
+Message-ID: <1322705583-18621-1-git-send-email-b32955@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 1, 2011 at 9:53 AM, Barry Song <Barry.Song@csr.com> wrote:
-> From: Xiangzhen Ye <Xiangzhen.Ye@csr.com>
->
-> At first, people are moving suspend/resume entries from platform_driver
-> to driver.pm for many drivers.
-> On the other hand, if we use swsusp to do hibernation for an embedded
-> system using pwm_bl, in the process of preparing snapshot, backlight
-> will be off and make lcd black screen. This gives bad user experiences.
-> This patch will fix this issue as swsusp will go to call pm.freeze()
-> but not platform_driver.suspend. we have no pm.freeze() for pwm_bl, so
-> the lcd black screen will disappear.
->
-> Signed-off-by: Xiangzhen Ye <Xiangzhen.Ye@csr.com>
-> Signed-off-by: Barry Song <Baohua.Song@csr.com>
+When we use the SDMA in the UART driver(such as imx6q), we will
+meet one situation:
+  Assume we set 64 bytes for the RX DMA buffer.
+  The receiving DMA buffer has received some data, but not full.
+  An Aging DMA request will be received by the SDMA controller if we enable the
+  IDDMAEN(UCR4[6]) in this case.
 
-Acked-by: Eric Miao <eric.y.miao@gmail.com>
+So the UART driver needs to know the count of the real received bytes,
+and push them to upper layer.
 
-> ---
-> ?drivers/video/backlight/pwm_bl.c | ? 15 ++++++++++-----
-> ?1 files changed, 10 insertions(+), 5 deletions(-)
->
-> diff --git a/drivers/video/backlight/pwm_bl.c b/drivers/video/backlight/pwm_bl.c
-> index 8b5b2a4..50f3134 100644
-> --- a/drivers/video/backlight/pwm_bl.c
-> +++ b/drivers/video/backlight/pwm_bl.c
-> @@ -169,9 +169,9 @@ static int pwm_backlight_remove(struct platform_device *pdev)
-> ?}
->
-> ?#ifdef CONFIG_PM
-> -static int pwm_backlight_suspend(struct platform_device *pdev,
-> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?pm_message_t state)
-> +static int pwm_backlight_suspend(struct device *dev)
-> ?{
-> + ? ? ? struct platform_device *pdev = to_platform_device(dev);
-> ? ? ? ?struct backlight_device *bl = platform_get_drvdata(pdev);
-> ? ? ? ?struct pwm_bl_data *pb = dev_get_drvdata(&bl->dev);
->
-> @@ -184,8 +184,9 @@ static int pwm_backlight_suspend(struct platform_device *pdev,
-> ? ? ? ?return 0;
-> ?}
->
-> -static int pwm_backlight_resume(struct platform_device *pdev)
-> +static int pwm_backlight_resume(struct device *dev)
-> ?{
-> + ? ? ? struct platform_device *pdev = to_platform_device(dev);
-> ? ? ? ?struct backlight_device *bl = platform_get_drvdata(pdev);
->
-> ? ? ? ?backlight_update_status(bl);
-> @@ -196,15 +197,19 @@ static int pwm_backlight_resume(struct platform_device *pdev)
-> ?#define pwm_backlight_resume ? NULL
-> ?#endif
->
-> +static const struct dev_pm_ops pwm_backlight_pm_ops = {
-> + ? ? ? .suspend = pwm_backlight_suspend,
-> + ? ? ? .resume = pwm_backlight_resume,
-> +};
-> +
-> ?static struct platform_driver pwm_backlight_driver = {
-> ? ? ? ?.driver ? ? ? ? = {
-> ? ? ? ? ? ? ? ?.name ? = "pwm-backlight",
-> ? ? ? ? ? ? ? ?.owner ?= THIS_MODULE,
-> + ? ? ? ? ? ? ? .pm ? ? = &pwm_backlight_pm_ops,
-> ? ? ? ?},
-> ? ? ? ?.probe ? ? ? ? ?= pwm_backlight_probe,
-> ? ? ? ?.remove ? ? ? ? = pwm_backlight_remove,
-> - ? ? ? .suspend ? ? ? ?= pwm_backlight_suspend,
-> - ? ? ? .resume ? ? ? ? = pwm_backlight_resume,
-> ?};
->
-> ?static int __init pwm_backlight_init(void)
-> --
-> 1.7.1
->
->
->
-> Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
-> More information can be found at www.csr.com. Follow CSR on Twitter at http://twitter.com/CSR_PLC and read our blog at www.csr.com/blog
+Add two new fields to sdmac, and update the `residue` in sdma_tx_status().
+
+Signed-off-by: Huang Shijie <b32955@freescale.com>
+---
+ drivers/dma/imx-sdma.c |   10 ++++++++--
+ 1 files changed, 8 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
+index f993955..05ba3a8 100644
+--- a/drivers/dma/imx-sdma.c
++++ b/drivers/dma/imx-sdma.c
+@@ -268,6 +268,7 @@ struct sdma_channel {
+ 	struct dma_async_tx_descriptor	desc;
+ 	dma_cookie_t			last_completed;
+ 	enum dma_status			status;
++	unsigned int			chn_count, chn_real_count;
+ };
+ 
+ #define IMX_DMA_SG_LOOP		(1 << 0)
+@@ -503,6 +504,7 @@ static void mxc_sdma_handle_channel_normal(struct sdma_channel *sdmac)
+ 	struct sdma_buffer_descriptor *bd;
+ 	int i, error = 0;
+ 
++	sdmac->chn_real_count = 0;
+ 	/*
+ 	 * non loop mode. Iterate over all descriptors, collect
+ 	 * errors and call callback function
+@@ -512,6 +514,7 @@ static void mxc_sdma_handle_channel_normal(struct sdma_channel *sdmac)
+ 
+ 		 if (bd->mode.status & (BD_DONE | BD_RROR))
+ 			error = -EIO;
++		 sdmac->chn_real_count += bd->mode.count;
+ 	}
+ 
+ 	if (error)
+@@ -519,9 +522,9 @@ static void mxc_sdma_handle_channel_normal(struct sdma_channel *sdmac)
+ 	else
+ 		sdmac->status = DMA_SUCCESS;
+ 
++	sdmac->last_completed = sdmac->desc.cookie;
+ 	if (sdmac->desc.callback)
+ 		sdmac->desc.callback(sdmac->desc.callback_param);
+-	sdmac->last_completed = sdmac->desc.cookie;
+ }
+ 
+ static void mxc_sdma_handle_channel(struct sdma_channel *sdmac)
+@@ -941,6 +944,7 @@ static struct dma_async_tx_descriptor *sdma_prep_slave_sg(
+ 		goto err_out;
+ 	}
+ 
++	sdmac->chn_count = 0;
+ 	for_each_sg(sgl, sg, sg_len, i) {
+ 		struct sdma_buffer_descriptor *bd = &sdmac->bd[i];
+ 		int param;
+@@ -957,6 +961,7 @@ static struct dma_async_tx_descriptor *sdma_prep_slave_sg(
+ 		}
+ 
+ 		bd->mode.count = count;
++		sdmac->chn_count += count;
+ 
+ 		if (sdmac->word_size > DMA_SLAVE_BUSWIDTH_4_BYTES) {
+ 			ret =  -EINVAL;
+@@ -1119,7 +1124,8 @@ static enum dma_status sdma_tx_status(struct dma_chan *chan,
+ 
+ 	last_used = chan->cookie;
+ 
+-	dma_set_tx_state(txstate, sdmac->last_completed, last_used, 0);
++	dma_set_tx_state(txstate, sdmac->last_completed, last_used,
++			sdmac->chn_count - sdmac->chn_real_count);
+ 
+ 	return sdmac->status;
+ }
+-- 
+1.7.3.2
