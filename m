@@ -1,25 +1,61 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Wed, 30 Nov 2011 17:46:17 -0800
-Subject: [RFC PATCH 07/11] arm:omap:am33xx: Add irq,
- dma and module base addr to SoC header files
-In-Reply-To: <1321809555-13833-8-git-send-email-hvaibhav@ti.com> (Vaibhav
- Hiremath's message of "Sun, 20 Nov 2011 22:49:11 +0530")
-References: <1321809555-13833-1-git-send-email-hvaibhav@ti.com>
- <1321809555-13833-8-git-send-email-hvaibhav@ti.com>
-Message-ID: <87obvtt66u.fsf@ti.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 30 Nov 2011 19:13:53 -0700 (MST)
+Subject: [PATCH v3 3/5] clk: introduce the common clock framework
+In-Reply-To: <1321926047-14211-4-git-send-email-mturquette@linaro.org>
+References: <1321926047-14211-1-git-send-email-mturquette@linaro.org>
+ <1321926047-14211-4-git-send-email-mturquette@linaro.org>
+Message-ID: <alpine.DEB.2.00.1111301831430.6289@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Vaibhav Hiremath <hvaibhav@ti.com> writes:
+Hi
 
-> This patch creats seperate irq and dma defination header file
-> and updates the module base addresses required for HWMOD data.
->
-> Signed-off-by: Afzal Mohammed <afzal@ti.com>
-> Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
+a few initial comments on clk_get_parent().
 
-These headers/defines should no longer be needed.  Instead, as with
-OMAP4, the raw values are used in the hwmod data (and we'll be moving
-device tree for these values.)
+On Mon, 21 Nov 2011, Mike Turquette wrote:
 
-Kevin
+> +/**
+> + * clk_get_parent - return the parent of a clk
+> + * @clk: the clk whose parent gets returned
+> + *
+> + * Simply returns clk->parent.  It is up to the caller to hold the
+> + * prepare_lock, if desired.  Returns NULL if clk is NULL.
+> + */
+> +struct clk *clk_get_parent(struct clk *clk)
+> +{
+> +	if (!clk)
+> +		return NULL;
+> +
+> +	return clk->parent;
+> +}
+> +EXPORT_SYMBOL_GPL(clk_get_parent);
+
+This implementation of clk_get_parent() has similar problems to the 
+clk_get_rate() implementation:
+
+    http://lkml.org/lkml/2011/11/30/403
+
+clk_get_parent() should return an error if some other entity can change 
+the clock's parent between the time that clk_get_parent() returns, and the 
+time that the returned struct clk * is used.
+
+For this to work, we need to define when clk_get_parent() should succeed. 
+If we follow the protocol outlined in the above URL about clk_get_rate(), 
+and we stipulate that when we block rate changes, we also block parent 
+changes, then this should be fairly straightforward.  clk_get_parent() can 
+succeed:
+
+1. between a clk_enable() and a clk_disable() or clk_allow_rate_changes(),
+
+2. between a clk_block_rate_changes() and a clk_enable(), clk_disable(), 
+   or clk_allow_rate_changes()
+
+As with clk_get_rate(), include/linux/clk.h is missing documentation of 
+what the error return value should be.  This should be a little easier to 
+define than with clk_get_rate(), but I don't think the error value should 
+be NULL.  This is because NULL is a valid return value when 
+clk_get_parent() is called on root clocks.  Better to use 
+ERR_PTR(-EINVAL/-EBUSY/etc.).
+
+
+- Paul
