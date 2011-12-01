@@ -1,36 +1,41 @@
 From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Wed, 30 Nov 2011 22:52:37 -0500
-Subject: [PATCH] arm: add default value for PHYS_OFFSET Kconfig setting
-Message-ID: <1322711557-8279-1-git-send-email-paul.gortmaker@windriver.com>
+Date: Wed, 30 Nov 2011 23:26:51 -0500
+Subject: [PATCH] arm: prevent inlining in arxescsi.c causing build failures
+Message-ID: <1322713611-30003-1-git-send-email-paul.gortmaker@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 1b9f95f8ade9efc2bd49f0e7b9dc61a038ac3eef introduced the new
-Kconfig for PHYS_OFFSET but it did not specify a default value.
+The following failure is seen in routine coverage builds:
 
-This has the undesired side effect of breaking an implictly used
-trick for updating defconfigs on the fly for routine buildtesting
-across all arch and all platforms, i.e.
+  CC [M]  drivers/scsi/arm/arxescsi.o
+/tmp/cccEyiO7.s: Assembler messages:
+/tmp/cccEyiO7.s:334: Error: symbol `.loop_1' is already defined
+/tmp/cccEyiO7.s:337: Error: symbol `.loop_2' is already defined
+/tmp/cccEyiO7.s:343: Error: symbol `.loop_3' is already defined
+/tmp/cccEyiO7.s:365: Error: symbol `.loop_1' is already defined
+/tmp/cccEyiO7.s:368: Error: symbol `.loop_2' is already defined
+/tmp/cccEyiO7.s:374: Error: symbol `.loop_3' is already defined
+make[4]: *** [drivers/scsi/arm/arxescsi.o] Error 1
 
-  cp /path/to/somedefconfig .config ; yes "" | make oldconfig
-
-In particular, the at91x40_defconfig will enter an infinite loop
-with the above, since there is no default value, and conf will just
-keep asking for one, and "yes" will keep feeding in a line return.
+It is caused by multiple inline of arxescsi_pseudo_dma_write()
+which is responsible for the above labels.  Marking the fcn
+as non-inline fixes the issue.
 
 Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 44789ef..90a475e 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -221,6 +221,7 @@ config NEED_MACH_MEMORY_H
+diff --git a/drivers/scsi/arm/arxescsi.c b/drivers/scsi/arm/arxescsi.c
+index a750aa7..2608a9e 100644
+--- a/drivers/scsi/arm/arxescsi.c
++++ b/drivers/scsi/arm/arxescsi.c
+@@ -72,7 +72,8 @@ arxescsi_dma_setup(struct Scsi_Host *host, struct scsi_pointer *SCp,
+ 	return fasdma_pseudo;
+ }
  
- config PHYS_OFFSET
- 	hex "Physical address of main memory"
-+	default 0x00000000
- 	depends on !ARM_PATCH_PHYS_VIRT && !NEED_MACH_MEMORY_H
- 	help
- 	  Please provide the physical address corresponding to the
+-static void arxescsi_pseudo_dma_write(unsigned char *addr, void __iomem *base)
++static noinline void
++arxescsi_pseudo_dma_write(unsigned char *addr, void __iomem *base)
+ {
+        __asm__ __volatile__(
+        "               stmdb   sp!, {r0-r12}\n"
 -- 
 1.7.7.2
