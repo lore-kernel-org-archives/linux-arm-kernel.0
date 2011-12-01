@@ -1,61 +1,57 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 30 Nov 2011 19:13:53 -0700 (MST)
-Subject: [PATCH v3 3/5] clk: introduce the common clock framework
-In-Reply-To: <1321926047-14211-4-git-send-email-mturquette@linaro.org>
-References: <1321926047-14211-1-git-send-email-mturquette@linaro.org>
- <1321926047-14211-4-git-send-email-mturquette@linaro.org>
-Message-ID: <alpine.DEB.2.00.1111301831430.6289@utopia.booyaka.com>
+From: frank.rowand@am.sony.com (Frank Rowand)
+Date: Wed, 30 Nov 2011 18:57:07 -0800
+Subject: [RFC PATCH 4/6] ARM: Remove __ARCH_WANT_INTERRUPTS_ON_CTXSW on
+ ASID-capable CPUs
+In-Reply-To: <1322569352-23584-5-git-send-email-catalin.marinas@arm.com>
+References: <1322569352-23584-1-git-send-email-catalin.marinas@arm.com>
+ <1322569352-23584-5-git-send-email-catalin.marinas@arm.com>
+Message-ID: <4ED6ED03.9080408@am.sony.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+On 11/29/11 04:22, Catalin Marinas wrote:
+> Since the ASIDs must be unique to an mm across all the CPUs in a system,
+> the __new_context() function needs to broadcast a context reset event to
+> all the CPUs during ASID allocation if a roll-over occurred. Such IPIs
+> cannot be issued with interrupts disabled and ARM had to define
+> __ARCH_WANT_INTERRUPTS_ON_CTXSW.
+> 
+> This patch changes the check_context() function to
+> check_and_switch_context() called from switch_mm(). In case of
+> ASID-capable CPUs (ARMv6 onwards), if a new ASID is needed, it defers
+> the __new_context() and cpu_switch_mm() calls to the post-lock switch
+> hook where the interrupts are enabled. Setting the reserved TTBR0 was
+> also moved to check_and_switch_context() from cpu_v7_switch_mm().
+> 
+> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> ---
+>  arch/arm/include/asm/mmu_context.h |   81 ++++++++++++++++++++++++++++--------
+>  arch/arm/include/asm/system.h      |    2 +
+>  arch/arm/include/asm/thread_info.h |    1 +
+>  arch/arm/mm/context.c              |    4 +-
+>  arch/arm/mm/proc-v7.S              |    3 -
+>  5 files changed, 69 insertions(+), 22 deletions(-)
+> 
 
-a few initial comments on clk_get_parent().
+< snip >
 
-On Mon, 21 Nov 2011, Mike Turquette wrote:
+> diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+> index 2faff3b..d5334d9 100644
+> --- a/arch/arm/mm/proc-v7.S
+> +++ b/arch/arm/mm/proc-v7.S
+> @@ -116,9 +116,6 @@ ENTRY(cpu_v7_switch_mm)
+>  #ifdef CONFIG_ARM_ERRATA_430973
+>  	mcr	p15, 0, r2, c7, c5, 6		@ flush BTAC/BTB
+>  #endif
+> -	mrc	p15, 0, r2, c2, c0, 1		@ load TTB 1
+> -	mcr	p15, 0, r2, c2, c0, 0		@ into TTB 0
+> -	isb
+>  #ifdef CONFIG_ARM_ERRATA_754322
+>  	dsb
+>  #endif
 
-> +/**
-> + * clk_get_parent - return the parent of a clk
-> + * @clk: the clk whose parent gets returned
-> + *
-> + * Simply returns clk->parent.  It is up to the caller to hold the
-> + * prepare_lock, if desired.  Returns NULL if clk is NULL.
-> + */
-> +struct clk *clk_get_parent(struct clk *clk)
-> +{
-> +	if (!clk)
-> +		return NULL;
-> +
-> +	return clk->parent;
-> +}
-> +EXPORT_SYMBOL_GPL(clk_get_parent);
+I do not have a tree that matches this version of cpu_v7_switch_mm().
+Can you point me at a tree that I can see this in?
 
-This implementation of clk_get_parent() has similar problems to the 
-clk_get_rate() implementation:
-
-    http://lkml.org/lkml/2011/11/30/403
-
-clk_get_parent() should return an error if some other entity can change 
-the clock's parent between the time that clk_get_parent() returns, and the 
-time that the returned struct clk * is used.
-
-For this to work, we need to define when clk_get_parent() should succeed. 
-If we follow the protocol outlined in the above URL about clk_get_rate(), 
-and we stipulate that when we block rate changes, we also block parent 
-changes, then this should be fairly straightforward.  clk_get_parent() can 
-succeed:
-
-1. between a clk_enable() and a clk_disable() or clk_allow_rate_changes(),
-
-2. between a clk_block_rate_changes() and a clk_enable(), clk_disable(), 
-   or clk_allow_rate_changes()
-
-As with clk_get_rate(), include/linux/clk.h is missing documentation of 
-what the error return value should be.  This should be a little easier to 
-define than with clk_get_rate(), but I don't think the error value should 
-be NULL.  This is because NULL is a valid return value when 
-clk_get_parent() is called on root clocks.  Better to use 
-ERR_PTR(-EINVAL/-EBUSY/etc.).
-
-
-- Paul
+-Frank
