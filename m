@@ -1,78 +1,31 @@
-From: mst@redhat.com (Michael S. Tsirkin)
-Date: Thu, 1 Dec 2011 01:43:18 +0200
-Subject: [RFC] virtio: use mandatory barriers for remote processor vdevs
-In-Reply-To: <CAK=WgbbZH3ZFzbwwyVBGEvwHPbogDW6+Kb_1pRam2jj5oJHuDA@mail.gmail.com>
-References: <1322569886-13055-1-git-send-email-ohad@wizery.com>
- <20111129131110.GC19157@redhat.com>
- <CAK=WgbZoGYVyKt=XXvnPVdh0koSBJC0zcgkLaYRkmjwBLOFA-A@mail.gmail.com>
- <20111129151607.GE30966@redhat.com>
- <CAK=WgbZK+k4uuyMPHUfr_PMyrR5ceRTvuDRpmhXfgwpSUOPw0g@mail.gmail.com>
- <20111130145958.GE21413@redhat.com>
- <CAK=WgbYyFdLftE_kp2_JOThVhn-FzGsDqVqKn0Jwm2teQyZBNA@mail.gmail.com>
- <20111130161555.GB25812@redhat.com>
- <CAK=WgbazBq4GVo16sZsrZirgMYbwMcWtPaqn90c6d9Phr0gh3A@mail.gmail.com>
- <CAK=WgbbZH3ZFzbwwyVBGEvwHPbogDW6+Kb_1pRam2jj5oJHuDA@mail.gmail.com>
-Message-ID: <20111130234318.GC31069@redhat.com>
+From: richard.zhao@linaro.org (Richard Zhao)
+Date: Thu, 1 Dec 2011 09:47:41 +0800
+Subject: [RFC V1 7/8] ARM i.MX: prepare common clk support
+In-Reply-To: <CAPtuhTij8rATJsbVxnxB-zey5Jj2nycNnM2iqBPKJFa8fnypAw@mail.gmail.com>
+References: <1322046755-13511-1-git-send-email-richard.zhao@linaro.org>
+ <1322046755-13511-8-git-send-email-richard.zhao@linaro.org>
+ <CAPtuhTgSB8Af4Xtux93-VLXSrK5KkzFOez9V5tcmbkKwbZ_8Rw@mail.gmail.com>
+ <20111129030944.GB19236@b20223-02.ap.freescale.net>
+ <CAPtuhThNZA707gQhjt9-V_B8=5UN9o1JgNTm_Dj8eLO-WNmJQA@mail.gmail.com>
+ <20111130061815.GA8684@b20223-02.ap.freescale.net>
+ <CAPtuhTij8rATJsbVxnxB-zey5Jj2nycNnM2iqBPKJFa8fnypAw@mail.gmail.com>
+Message-ID: <20111201014740.GB8684@b20223-02.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 01, 2011 at 01:27:10AM +0200, Ohad Ben-Cohen wrote:
-> On Wed, Nov 30, 2011 at 6:24 PM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
-> > On Wed, Nov 30, 2011 at 6:15 PM, Michael S. Tsirkin <mst@redhat.com> wrote:
-> >> How are the rings mapped? normal memory, right?
-> >
-> > No, device memory.
+On Wed, Nov 30, 2011 at 08:22:42AM -0800, Mike Turquette wrote:
+> On Tue, Nov 29, 2011 at 10:18 PM, Richard Zhao <richard.zhao@linaro.org> wrote:
+> > Do you mean you also adopt divider and mux clock patch?
 > 
-> Ok, I have more info.
+> I'd like to do that and roll them into the existing clk-basic.c.  Are
+> you OK with this approach?
+Sure, glad you take it.
 > 
-> Originally remoteproc was mapping the rings using ioremap, and that
-> meant ARM Device memory.
+> Regards,
+> Mike
 > 
-> Recently, though, we moved to CMA (allocating memory for the rings via
-> dma_alloc_coherent), and that isn't Device memory anymore: it's
-> uncacheable Normal memory (on ARM v6+).
-
-And these accesses need to be ordered with DSB? Or DMB?
-
-> We still require mandatory barriers though: one very reproducible
-> problem I personally face is that the avail index doesn't get updated
-> before the kick.
-
-Aha! The *kick* really is MMIO. So I think we do need a mandatory barrier
-before the kick.  Maybe we need it for virtio-pci as well
-(not on kvm, naturally :) Off-hand this seems to belong in the transport
-layer but need to think about it.
-
-> As a result, the remote processor misses a buffer
-> that was just added (the kick wakes it up only to find that the avail
-> index wasn't changed yet). In this case, it probably happens because
-> the mailbox, used to kick the remote processor, is mapped as Device
-> memory, and therefore the kick can be reordered before the updates to
-> the ring  can be observed.
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 > 
-> I did get two additional reports about reordering issues, on different
-> setups than my own, and which I can't personally reproduce: the one
-> I've described earlier (avail index gets updated before the avail
-> array) and one in the receive path (reading a used buffer which we
-> already read). I couldn't personally verify those, but both issues
-> were reported to be gone when mandatory barriers were used.
-
-Hmm. So it's a hint that something is wrong with memory
-but not what's wrong exactly.
-
-> I expect those reports only to increase: the diversity of platforms
-> that are now looking into adopting virtio for this kind of
-> inter-process communication is quite huge, with several different
-> architectures and even more hardware implementations on the way (not
-> only ARM).
-> 
-> Thanks,
-> Ohad.
-
-Right. We need to be very careful with memory,
-it's a tricky field. One known problem with virtio
-is its insistance on using native endian-ness
-for some fields. If power is used, we'll have to fix this.
-
--- 
-MST
