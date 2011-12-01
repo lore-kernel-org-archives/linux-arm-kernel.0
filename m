@@ -1,50 +1,52 @@
 From: myungjoo.ham@samsung.com (MyungJoo Ham)
-Date: Thu, 01 Dec 2011 18:05:13 +0900
-Subject: [PATCH 0/4] PM/Devfreq: Exynos4210 Bus/VDD_int
-Message-ID: <1322730317-8171-1-git-send-email-myungjoo.ham@samsung.com>
+Date: Thu, 01 Dec 2011 18:05:14 +0900
+Subject: [PATCH 1/4] ARM: EXYNOS4: Add DMC1, allow PPMU access for DMC.
+In-Reply-To: <1322730317-8171-1-git-send-email-myungjoo.ham@samsung.com>
+References: <1322730317-8171-1-git-send-email-myungjoo.ham@samsung.com>
+Message-ID: <1322730317-8171-2-git-send-email-myungjoo.ham@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset adds DVFS (Dynamic Voltage and Frequency Scaling)
-capability to Exynos4210 memory-bus and vdd_int of the SoC.
+- Add DMC1
+- Enlarge address space for DMC from 4k to 64k so that PPMU registers
+  may be accessed.
 
-The Exynos4210 Bus Devfreq driver uses PPMU counters of memory
-controllers (DMC0/DMC1 of Exynos4210), and adjusts OPP based on
-the current load.
-
-In other to support Exynos4210-bus devfreq driver (patch 2/4),
-we have added patches:
-1/4: Enable DMC1, Enable PPMU for DMC0/1.
-3/4: Remove compiler errors in Exynos4-Nuri board (Nuri is the
-test board for this driver)
-4/4: Add Exynos4210-bus devfreq device to Nuri board.
-
-Note that any Exynos4210 board may add this capability by adding
-the platform device "exynos4210-busfreq" and provide a regulator
-(VDD_INT) to the added device.
-
-ASV (Adaptive Supply Voltage) capability has been introduced in
-the ARM-kernel mailing list. However, it has not been merged, yet.
-Thus, the device driver (exynos4210_memorybus.c) has a symbol
-"CONFIG_EXYNOS4_ASV" to block ASV-related code.
-With support of ASV, this devfreq driver reduces power consumption
-futher; most Exynos4210 SoCs have lower voltage requirement than
-the worst case (ASV number 0) scenario.
-
-MyungJoo Ham (4):
-  ARM: EXYNOS4: Add DMC1, allow PPMU access for DMC.
-  PM/Devfreq: Add Exynos4210-bus device DVFS driver.
-  ARM Exynos4210-Nuri: remove compiler errors
-  ARM Exynos4210-Nuri: support Exynos4210-bus Devfreq driver.
-
- arch/arm/mach-exynos/cpu.c              |    7 +-
+Signed-off-by: MyungJoo Ham <myungjoo.ham@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+ arch/arm/mach-exynos/cpu.c              |    7 ++++++-
  arch/arm/mach-exynos/include/mach/map.h |    1 +
- arch/arm/mach-exynos/mach-nuri.c        |   13 +-
- drivers/devfreq/Kconfig                 |   12 +
- drivers/devfreq/Makefile                |    3 +
- drivers/devfreq/exynos4210_memorybus.c  |  636 +++++++++++++++++++++++++++++++
- 6 files changed, 668 insertions(+), 4 deletions(-)
- create mode 100644 drivers/devfreq/exynos4210_memorybus.c
+ 2 files changed, 7 insertions(+), 1 deletions(-)
 
+diff --git a/arch/arm/mach-exynos/cpu.c b/arch/arm/mach-exynos/cpu.c
+index 90ec247..8bdcba9 100644
+--- a/arch/arm/mach-exynos/cpu.c
++++ b/arch/arm/mach-exynos/cpu.c
+@@ -108,7 +108,12 @@ static struct map_desc exynos4_iodesc[] __initdata = {
+ 	}, {
+ 		.virtual	= (unsigned long)S5P_VA_DMC0,
+ 		.pfn		= __phys_to_pfn(EXYNOS4_PA_DMC0),
+-		.length		= SZ_4K,
++		.length		= SZ_64K,
++		.type		= MT_DEVICE,
++	}, {
++		.virtual	= (unsigned long)S5P_VA_DMC1,
++		.pfn		= __phys_to_pfn(EXYNOS4_PA_DMC1),
++		.length		= SZ_64K,
+ 		.type		= MT_DEVICE,
+ 	}, {
+ 		.virtual	= (unsigned long)S5P_VA_SROMC,
+diff --git a/arch/arm/mach-exynos/include/mach/map.h b/arch/arm/mach-exynos/include/mach/map.h
+index 058541d..870a980 100644
+--- a/arch/arm/mach-exynos/include/mach/map.h
++++ b/arch/arm/mach-exynos/include/mach/map.h
+@@ -57,6 +57,7 @@
+ #define EXYNOS4_PA_KEYPAD		0x100A0000
+ 
+ #define EXYNOS4_PA_DMC0			0x10400000
++#define EXYNOS4_PA_DMC1			0x10410000
+ 
+ #define EXYNOS4_PA_COMBINER		0x10440000
+ 
 -- 
 1.7.4.1
