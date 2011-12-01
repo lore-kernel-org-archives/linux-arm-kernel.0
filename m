@@ -1,36 +1,50 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 1 Dec 2011 08:45:47 +0000
-Subject: [PATCH v3 3/5] clk: introduce the common clock framework
-In-Reply-To: <alpine.DEB.2.00.1111291619110.6289@utopia.booyaka.com>
-References: <1321926047-14211-1-git-send-email-mturquette@linaro.org>
- <1321926047-14211-4-git-send-email-mturquette@linaro.org>
- <alpine.DEB.2.00.1111291619110.6289@utopia.booyaka.com>
-Message-ID: <20111201084547.GD19739@n2100.arm.linux.org.uk>
+From: myungjoo.ham@samsung.com (MyungJoo Ham)
+Date: Thu, 01 Dec 2011 18:05:13 +0900
+Subject: [PATCH 0/4] PM/Devfreq: Exynos4210 Bus/VDD_int
+Message-ID: <1322730317-8171-1-git-send-email-myungjoo.ham@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 30, 2011 at 06:20:50PM -0700, Paul Walmsley wrote:
-> 1. When a clock user calls clk_enable() on a clock, the clock framework 
-> should prevent other users of the clock from changing the clock's rate.  
-> This should persist until the clock user calls clk_disable() (but see also 
-> #2 below).  This will ensure that clock users can rely on the rate 
-> returned by clk_get_rate(), as long as it's called between clk_enable() 
-> and clk_disable().  And since the clock's rate is guaranteed to remain the 
-> same during this time, code that cannot tolerate clock rate changes 
-> without special handling (such as driver code for external I/O devices) 
-> will work safely without further modification.
+This patchset adds DVFS (Dynamic Voltage and Frequency Scaling)
+capability to Exynos4210 memory-bus and vdd_int of the SoC.
 
-So, if you have a PLL whose parent clock is not used by anything else.
-You want to program it to a certain rate.
+The Exynos4210 Bus Devfreq driver uses PPMU counters of memory
+controllers (DMC0/DMC1 of Exynos4210), and adjusts OPP based on
+the current load.
 
-You call clk_disable() on the PLL clock.  This walks up the tree and
-disables the parent.  You then try to set the rate using clk_set_rate().
-clk_set_rate() in this circumstance can't wait for the PLL to lock
-because it can't - there's no reference clock for it.
+In other to support Exynos4210-bus devfreq driver (patch 2/4),
+we have added patches:
+1/4: Enable DMC1, Enable PPMU for DMC0/1.
+3/4: Remove compiler errors in Exynos4-Nuri board (Nuri is the
+test board for this driver)
+4/4: Add Exynos4210-bus devfreq device to Nuri board.
 
-You then call clk_enable().  The PLL now takes its time to lock.  You
-can't sleep in clk_enable() because it might be called from atomic
-contexts, so you have to spin waiting for this.
+Note that any Exynos4210 board may add this capability by adding
+the platform device "exynos4210-busfreq" and provide a regulator
+(VDD_INT) to the added device.
 
-Overloading clk_disable/clk_enable in this way is a bad solution to
-this problem.
+ASV (Adaptive Supply Voltage) capability has been introduced in
+the ARM-kernel mailing list. However, it has not been merged, yet.
+Thus, the device driver (exynos4210_memorybus.c) has a symbol
+"CONFIG_EXYNOS4_ASV" to block ASV-related code.
+With support of ASV, this devfreq driver reduces power consumption
+futher; most Exynos4210 SoCs have lower voltage requirement than
+the worst case (ASV number 0) scenario.
+
+MyungJoo Ham (4):
+  ARM: EXYNOS4: Add DMC1, allow PPMU access for DMC.
+  PM/Devfreq: Add Exynos4210-bus device DVFS driver.
+  ARM Exynos4210-Nuri: remove compiler errors
+  ARM Exynos4210-Nuri: support Exynos4210-bus Devfreq driver.
+
+ arch/arm/mach-exynos/cpu.c              |    7 +-
+ arch/arm/mach-exynos/include/mach/map.h |    1 +
+ arch/arm/mach-exynos/mach-nuri.c        |   13 +-
+ drivers/devfreq/Kconfig                 |   12 +
+ drivers/devfreq/Makefile                |    3 +
+ drivers/devfreq/exynos4210_memorybus.c  |  636 +++++++++++++++++++++++++++++++
+ 6 files changed, 668 insertions(+), 4 deletions(-)
+ create mode 100644 drivers/devfreq/exynos4210_memorybus.c
+
+-- 
+1.7.4.1
