@@ -1,148 +1,105 @@
-From: amit.kachhap@gmail.com (amit kachhap)
-Date: Thu, 1 Dec 2011 20:23:10 +0530
-Subject: [PATCH] ARM: exynos4: Fix for stall in case of cpu hotplug or
- sleep
-In-Reply-To: <047501ccb014$edda8f60$c98fae20$%kim@samsung.com>
-References: <1321616752-1233-1-git-send-email-amit.kachhap@linaro.org>
- <047501ccb014$edda8f60$c98fae20$%kim@samsung.com>
-Message-ID: <CADGdYn7jfFYkuoFX9J3NtNbgLHgagWHa3q3mehJU+gY_mg5EOw@mail.gmail.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Thu, 01 Dec 2011 06:53:01 -0800
+Subject: [RFC PATCH 01/11] arm:omap:am33xx: Add voltage domain data
+In-Reply-To: <79CD15C6BA57404B839C016229A409A8047586@DBDE01.ent.ti.com>
+ (Vaibhav Hiremath's message of "Thu, 1 Dec 2011 11:25:10 +0000")
+References: <1321809555-13833-1-git-send-email-hvaibhav@ti.com>
+ <1321809555-13833-2-git-send-email-hvaibhav@ti.com>
+ <87ipm1w3pz.fsf@ti.com>
+ <79CD15C6BA57404B839C016229A409A8047586@DBDE01.ent.ti.com>
+Message-ID: <8739d4tkc2.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 1, 2011 at 4:05 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> Amit Daniel Kachhap wrote:
->>
->> This patch adds remove_irq in place of disable_irq which is
->> correct equivalent function for setup_irq used in
->> exynos4_mct_tick_init.
->>
->> Signed-off-by: Amit Daniel Kachhap <amit.kachhap@linaro.org>
->> Tested-by: Inderpal Singh <inderpal.singh@linaro.org>
->> ---
->> ?arch/arm/mach-exynos/mct.c | ? ?6 +++++-
->> ?1 files changed, 5 insertions(+), 1 deletions(-)
->>
->> diff --git a/arch/arm/mach-exynos/mct.c b/arch/arm/mach-exynos/mct.c
->> index 97343df..959f251 100644
->> --- a/arch/arm/mach-exynos/mct.c
->> +++ b/arch/arm/mach-exynos/mct.c
->> @@ -428,9 +428,13 @@ int __cpuinit local_timer_setup(struct
->> clock_event_device *evt)
->>
->> ?void local_timer_stop(struct clock_event_device *evt)
->> ?{
->> + ? ? unsigned int cpu = smp_processor_id();
->> ? ? ? evt->set_mode(CLOCK_EVT_MODE_UNUSED, evt);
->> ? ? ? if (mct_int_type == MCT_INT_SPI)
->> - ? ? ? ? ? ? disable_irq(evt->irq);
->> + ? ? ? ? ? ? if (cpu == 0)
->> + ? ? ? ? ? ? ? ? ? ? remove_irq(evt->irq, &mct_tick0_event_irq);
->> + ? ? ? ? ? ? else
->> + ? ? ? ? ? ? ? ? ? ? remove_irq(evt->irq, &mct_tick1_event_irq);
->
-> Hmm, how about the cpu number is 2 or 3 on Quad-core?
-> As you know, this should be used for all of EXYNOS SoCs.
+"Hiremath, Vaibhav" <hvaibhav@ti.com> writes:
 
-This code change is specific for EXYNOS4210 where the MCT irq is SPI
-type. Other exynos soc's (4412 etc) are not effected by this change.
-I am adding the cpu stall log currently caused during cpu1 hotplug or
-sleep/wakeup sequence. This commit fixes this.
-
-
-root at localhost:~# echo 1 > /sys/devices/system/cpu/cpu1/online
-CPU1: Booted secondary processor
-Calibrating delay loop (skipped) already calibrated this CPU
-CPU1: Unknown IPI message 0x1
-
-INFO: rcu_sched detected stalls on CPUs/tasks: { 1} (detected by 0,
-t=12002 jiffies)
-[<c0015980>] (unwind_backtrace+0x0/0xfc) from [<c0075124>]
-(__rcu_pending+0x45c/0x4d8)
-[<c0075124>] (__rcu_pending+0x45c/0x4d8) from [<c0075250>]
-(rcu_check_callbacks+0xb0/0x210)
-[<c0075250>] (rcu_check_callbacks+0xb0/0x210) from [<c003f62c>]
-(update_process_times+0x3c/0x50)
-[<c003f62c>] (update_process_times+0x3c/0x50) from [<c005ee50>]
-(tick_sched_timer+0x94/0xd0)
-[<c005ee50>] (tick_sched_timer+0x94/0xd0) from [<c00527ac>]
-(__run_hrtimer+0x44/0xd8)
-[<c00527ac>] (__run_hrtimer+0x44/0xd8) from [<c0052af0>]
-(hrtimer_interrupt+0x100/0x330)
-[<c0052af0>] (hrtimer_interrupt+0x100/0x330) from [<c001f080>]
-(exynos4_mct_tick_isr+0x50/0x68)
-[<c001f080>] (exynos4_mct_tick_isr+0x50/0x68) from [<c006d438>]
-(handle_irq_event_percpu+0x54/0x180)
-[<c006d438>] (handle_irq_event_percpu+0x54/0x180) from [<c006d5a0>]
-(handle_irq_event+0x3c/0x5c)
-[<c006d5a0>] (handle_irq_event+0x3c/0x5c) from [<c00701a8>]
-(handle_fasteoi_irq+0x9c/0x104)
-[<c00701a8>] (handle_fasteoi_irq+0x9c/0x104) from [<c006cf0c>]
-(generic_handle_irq+0x34/0x3c)
-[<c006cf0c>] (generic_handle_irq+0x34/0x3c) from [<c000fde8>]
-(handle_IRQ+0x58/0xb8)
-[<c000fde8>] (handle_IRQ+0x58/0xb8) from [<c000e8ec>] (__irq_svc+0x6c/0xe8)
-[<c000e8ec>] (__irq_svc+0x6c/0xe8) from [<c001edbc>]
-(exynos4_enter_idle+0x2c/0x60)
-[<c001edbc>] (exynos4_enter_idle+0x2c/0x60) from [<c01cfa7c>]
-(cpuidle_idle_call+0xb8/0x12c)
-[<c01cfa7c>] (cpuidle_idle_call+0xb8/0x12c) from [<c0010744>]
-(cpu_idle+0xac/0xf4)
-[<c0010744>] (cpu_idle+0xac/0xf4) from [<c02908f8>] (start_kernel+0x36c/0x378)
-INFO: rcu_preempt detected stalls on CPUs/tasks: { 1} (detected by 0,
-t=12002 jiffies)
-[<c0015980>] (unwind_backtrace+0x0/0xfc) from [<c0075124>]
-(__rcu_pending+0x45c/0x4d8)
-[<c0075124>] (__rcu_pending+0x45c/0x4d8) from [<c00752ec>]
-(rcu_check_callbacks+0x14c/0x210)
-[<c00752ec>] (rcu_check_callbacks+0x14c/0x210) from [<c003f62c>]
-(update_process_times+0x3c/0x50)
-[<c003f62c>] (update_process_times+0x3c/0x50) from [<c005ee50>]
-(tick_sched_timer+0x94/0xd0)
-[<c005ee50>] (tick_sched_timer+0x94/0xd0) from [<c00527ac>]
-(__run_hrtimer+0x44/0xd8)
-[<c00527ac>] (__run_hrtimer+0x44/0xd8) from [<c0052af0>]
-(hrtimer_interrupt+0x100/0x330)
-[<c0052af0>] (hrtimer_interrupt+0x100/0x330) from [<c001f080>]
-(exynos4_mct_tick_isr+0x50/0x68)
-[<c001f080>] (exynos4_mct_tick_isr+0x50/0x68) from [<c006d438>]
-(handle_irq_event_percpu+0x54/0x180)
-[<c006d438>] (handle_irq_event_percpu+0x54/0x180) from [<c006d5a0>]
-(handle_irq_event+0x3c/0x5c)
-[<c006d5a0>] (handle_irq_event+0x3c/0x5c) from [<c00701a8>]
-(handle_fasteoi_irq+0x9c/0x104)
-[<c00701a8>] (handle_fasteoi_irq+0x9c/0x104) from [<c006cf0c>]
-(generic_handle_irq+0x34/0x3c)
-[<c006cf0c>] (generic_handle_irq+0x34/0x3c) from [<c000fde8>]
-(handle_IRQ+0x58/0xb8)
-[<c000fde8>] (handle_IRQ+0x58/0xb8) from [<c000e8ec>] (__irq_svc+0x6c/0xe8)
-[<c000e8ec>] (__irq_svc+0x6c/0xe8) from [<c001edbc>]
-(exynos4_enter_idle+0x2c/0x60)
-[<c001edbc>] (exynos4_enter_idle+0x2c/0x60) from [<c01cfa7c>]
-(cpuidle_idle_call+0xb8/0x12c)
-[<c01cfa7c>] (cpuidle_idle_call+0xb8/0x12c) from [<c0010744>]
-(cpu_idle+0xac/0xf4)
-[<c0010744>] (cpu_idle+0xac/0xf4) from [<c02908f8>] (start_kernel+0x36c/0x378)
-
-Thanks,
-Amit Daniel
-
->
->> ? ? ? else
->> ? ? ? ? ? ? ? disable_percpu_irq(IRQ_MCT_LOCALTIMER);
->> ?}
->> --
->> 1.7.1
+>> -----Original Message-----
+>> From: Hilman, Kevin
+>> Sent: Thursday, December 01, 2011 5:41 AM
+>> To: Hiremath, Vaibhav
+>> Cc: linux-omap at vger.kernel.org; tony at atomide.com; paul at pwsan.com; linux-
+>> arm-kernel at lists.infradead.org; Cousson, Benoit; Mohammed, Afzal
+>> Subject: Re: [RFC PATCH 01/11] arm:omap:am33xx: Add voltage domain data
+>> 
+>> Vaibhav Hiremath <hvaibhav@ti.com> writes:
+>> 
+>> > From: Afzal Mohammed <afzal@ti.com>
+>> >
+>> > Currently dummy voltage domain data is being created
+>> > in order to succeed boot process.
+>> > Nothing has been done w.r.t actual hardware (voltage control).
+>> >
+>> > Signed-off-by: Afzal Mohammed <afzal@ti.com>
+>> > Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
+>> 
+>> [...]
+>> 
+>> > --- /dev/null
+>> > +++ b/arch/arm/mach-omap2/voltagedomains33xx_data.c
+>> > @@ -0,0 +1,37 @@
+>> > +/*
+>> > + * AM33XX voltage domain data
+>> > + *
+>> > + * Copyright (C) 2011 Texas Instruments, Inc.
+>> > + *
+>> > + * This program is free software; you can redistribute it and/or modify
+>> > + * it under the terms of the GNU General Public License version 2 as
+>> > + * published by the Free Software Foundation.
+>> > + */
+>> > +#include <linux/kernel.h>
+>> > +#include <linux/init.h>
+>> > +
+>> > +#include "voltage.h"
+>> > +
+>> > +static struct voltagedomain am33xx_voltdm_mpu = {
+>> > +	.name = "mpu",
+>> > +};
+>> 
+>> According to the TRM, there is no MPU voltage domain.  Only CORE and RTC
+>> exist.
+>> 
+>> However, looking at the data manual (SPRS717 Oct 2011), it seems that
+>> some packages have a separate VDD_MPU while others have a combined
+>> VDD_MPU and VDD_CORE.
+>> 
+>> This should be clarified and documented in the changelog.
+>> 
 >
 >
-> Thanks.
+> No, we do have VDD_MPU specifically documented in TRM (SPRUH73 - October2011).
 >
-> Best regards,
-> Kgene.
-> --
-> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-> SW Solution Development Team, Samsung Electronics Co., Ltd.
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+> The TRM is accessible at - http://www.ti.com/lit/ug/spruh73/spruh73.pdf
+
+That link doesn't work for me, I think you meant
+
+     http://www.ti.com/lit/ug/spruh73a/spruh73a.pdf
+
+which is the document I'm reading.  Specifically it says:
+
+8.1.1.10 Voltage and Power Domains
+
+The following table shows how the device core logic is partitioned into
+two core logic voltage domains and four power domains. The table lists
+which voltage and power domain a functional module belongs.
+
+Table 8-25. Core Logic Voltage and Power Domains
+      Logic Voltage Domain Name    |  Module
+      ---------------------------------------------
+      CORE                         |  All Core Modules
+      RTC                          |  RTC
+
+8.1.1.10.1 Voltage Domains
+
+The core logic is divided into two voltage domains: VDD_CORE and
+VDD_RTC.
+
+
+
+However, in reading other parts of the TRM, it clearly references
+VDD_MPU and the data manual also references a separate VDD_MPU.
+
+My point in this comment was that since the TRM is rather unclear on
+this, the changelog should be more verbose, and take care to clear up
+any thing that's wrong or unclear in the TRM.
+
+Kevin
