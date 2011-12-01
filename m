@@ -1,38 +1,17 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Thu, 1 Dec 2011 11:26:09 +0000
-Subject: [RFC PATCH 04/11] arm:omap:am33xx: Integrate powerdomain to
- OMAP power framework
-In-Reply-To: <874nxlumog.fsf@ti.com>
-References: <1321809555-13833-1-git-send-email-hvaibhav@ti.com>
- <1321809555-13833-5-git-send-email-hvaibhav@ti.com> <874nxlumog.fsf@ti.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A804759A@DBDE01.ent.ti.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 1 Dec 2011 11:37:23 +0000
+Subject: [PATCH 0/7] Cragganmore updates for 3.3
+In-Reply-To: <047301ccb014$273745b0$75a5d110$%kim@samsung.com>
+References: <20111129133006.GA26800@opensource.wolfsonmicro.com>
+ <047301ccb014$273745b0$75a5d110$%kim@samsung.com>
+Message-ID: <20111201113722.GE2915@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Hilman, Kevin
-> Sent: Thursday, December 01, 2011 6:35 AM
-> To: Hiremath, Vaibhav
-> Cc: linux-omap at vger.kernel.org; tony at atomide.com; paul at pwsan.com; linux-
-> arm-kernel at lists.infradead.org; Cousson, Benoit; Mohammed, Afzal
-> Subject: Re: [RFC PATCH 04/11] arm:omap:am33xx: Integrate powerdomain to
-> OMAP power framework
-> 
-> Vaibhav Hiremath <hvaibhav@ti.com> writes:
-> 
-> > From: Afzal Mohammed <afzal@ti.com>
-> >
-> > Hook up AM33XX power domain to OMAP framework.
-> >
-> > Signed-off-by: Afzal Mohammed <afzal@ti.com>
-> > Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
-> 
-> Should be combined with previous patch.
-> 
+On Thu, Dec 01, 2011 at 07:29:49PM +0900, Kukjin Kim wrote:
 
-Ok, will take care in next version.
+> And as a note, I'm thinking about the handling of different
+> IRQ_BOARD_NR...but I'm not sure it is really needed or not :)
 
-Thanks,
-Vaibhav
-
-> Kevin
+Yeah, it's annoying.  I believe that converting to sparse IRQs would
+avoid the issue.
