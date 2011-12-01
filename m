@@ -1,92 +1,47 @@
-From: troy.kisky@boundarydevices.com (Troy Kisky)
-Date: Thu, 01 Dec 2011 11:26:36 -0700
-Subject: [PATCH 2/2] arm/imx: fix irq_base for gpio
-In-Reply-To: <1322727549-10852-2-git-send-email-shawn.guo@linaro.org>
-References: <1322727549-10852-1-git-send-email-shawn.guo@linaro.org>
- <1322727549-10852-2-git-send-email-shawn.guo@linaro.org>
-Message-ID: <4ED7C6DC.2090402@boundarydevices.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 1 Dec 2011 18:28:52 +0000
+Subject: does non-continuous RAM means I need to select the sparse
+ memory model?
+In-Reply-To: <20111129203010.GA26618@pengutronix.de>
+References: <20111129203010.GA26618@pengutronix.de>
+Message-ID: <20111201182852.GC9581@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/1/2011 1:19 AM, Shawn Guo wrote:
-> When gpio core dynamically allocate gpio number for a port, it starts
-> from the end of the total range, 0 ~ ARCH_NR_GPIOS.  That said, the
-> earlier a port gets probed, the bigger gpio number it gets assigned.
-> To match this, the irq_base for gpio should be assigned from
-> 'MXC_GPIO_IRQ_START + ARCH_NR_GPIOS' decreasingly.
->
-> Signed-off-by: Shawn Guo<shawn.guo@linaro.org>
-> ---
->   arch/arm/mach-imx/mach-imx6q.c |    5 ++---
->   arch/arm/mach-mx5/imx51-dt.c   |    5 ++---
->   arch/arm/mach-mx5/imx53-dt.c   |    5 ++---
->   3 files changed, 6 insertions(+), 9 deletions(-)
+On Tue, Nov 29, 2011 at 09:30:10PM +0100, Uwe Kleine-K?nig wrote:
+> I'm currently working on a new arch port and my current machine has RAM
+> at 0x10000000 and 0x80000000. So there is a big hole between the two
+> banks. When selecting the sparse memory model it works, but when
+> selecting flat the machine runs into a BUG in mark_bootmem() called by
+> free_unused_memmap() to free the space between the two banks.
 
-I thought the rationale for GPIOLIB to start at the end was to more quickly
-find a free group. If this isn't important, then I'd rather see GPIOLIB 
-changed
-to be increasing. Although I do like that gpio_irq_base is always set 
-the same
-way with your patch. Would
+Well, it looks like you have the answer in your latest email:
 
-static int gpio_irq_base = MXC_GPIO_IRQ_START;
+> Apart from that it seems I cannot use flatmem as is on my machine. It
+> has only 128kiB at 0x10000000 + 1MiB at 0x80000000 and needs 14MiB to hold the
+> table of "struct page"s.
 
-work as well, if you kept it increasing instead ?
+Which shows that there's no possible way to use flatmem in this platform.
 
-Thanks
-Troy
+Now, to use sparsemem with this, sparsemem people will tell you that
+each sparsemem section must be fully populated.  So, as your minimum
+memory size is 128kiB, your sparsemem section size must be 128kiB.
+This makes SECTION_SIZE_BITS be 17.
 
-> diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
-> index eb7531b..22aa54a 100644
-> --- a/arch/arm/mach-imx/mach-imx6q.c
-> +++ b/arch/arm/mach-imx/mach-imx6q.c
-> @@ -39,11 +39,10 @@ static void __init imx6q_map_io(void)
->   static int __init imx6q_gpio_add_irq_domain(struct device_node *np,
->   				struct device_node *interrupt_parent)
->   {
-> -	static int gpio_irq_base = MXC_GPIO_IRQ_START + ARCH_NR_GPIOS -
-> -				   32 * 7; /* imx6q gets 7 gpio ports */
-> +	static int gpio_irq_base = MXC_GPIO_IRQ_START + ARCH_NR_GPIOS;
->
-> +	gpio_irq_base -= 32;
->   	irq_domain_add_simple(np, gpio_irq_base);
-> -	gpio_irq_base += 32;
->
->   	return 0;
->   }
-> diff --git a/arch/arm/mach-mx5/imx51-dt.c b/arch/arm/mach-mx5/imx51-dt.c
-> index 3451a46..596edd9 100644
-> --- a/arch/arm/mach-mx5/imx51-dt.c
-> +++ b/arch/arm/mach-mx5/imx51-dt.c
-> @@ -54,11 +54,10 @@ static int __init imx51_tzic_add_irq_domain(struct device_node *np,
->   static int __init imx51_gpio_add_irq_domain(struct device_node *np,
->   				struct device_node *interrupt_parent)
->   {
-> -	static int gpio_irq_base = MXC_GPIO_IRQ_START + ARCH_NR_GPIOS -
-> -				   32 * 4; /* imx51 gets 4 gpio ports */
-> +	static int gpio_irq_base = MXC_GPIO_IRQ_START + ARCH_NR_GPIOS;
->
-> +	gpio_irq_base -= 32;
->   	irq_domain_add_simple(np, gpio_irq_base);
-> -	gpio_irq_base += 32;
->
->   	return 0;
->   }
-> diff --git a/arch/arm/mach-mx5/imx53-dt.c b/arch/arm/mach-mx5/imx53-dt.c
-> index 022bc03..85bfd5f 100644
-> --- a/arch/arm/mach-mx5/imx53-dt.c
-> +++ b/arch/arm/mach-mx5/imx53-dt.c
-> @@ -58,11 +58,10 @@ static int __init imx53_tzic_add_irq_domain(struct device_node *np,
->   static int __init imx53_gpio_add_irq_domain(struct device_node *np,
->   				struct device_node *interrupt_parent)
->   {
-> -	static int gpio_irq_base = MXC_GPIO_IRQ_START + ARCH_NR_GPIOS -
-> -				   32 * 7; /* imx53 gets 7 gpio ports */
-> +	static int gpio_irq_base = MXC_GPIO_IRQ_START + ARCH_NR_GPIOS;
->
-> +	gpio_irq_base -= 32;
->   	irq_domain_add_simple(np, gpio_irq_base);
-> -	gpio_irq_base += 32;
->
->   	return 0;
->   }
+You need to span to 0x80000000+, which means you need MAX_PHYSMEM_BITS
+to be 32.
+
+These two together means you're in for having an array of 2^(32 - 17) =
+32768 pointers to struct section for starters.  That takes 128kiB.
+Now add in the struct page structures, which for 128kiB of memory will
+be 1kiB.  Now add 9 struct section's as well...
+
+What I'm pointing out is that in the scenario you appear to have, trying
+to use the small pool of memory which is soo dislocated from the rest of
+memory is a waste of effort.  Adding it to the pool means that you require
+more memory for the management data structures than you gain from adding
+it to the system.  The net benefit from trying to use it is actually
+negative.
+
+So, forget that the 128kiB chunk of memory exists - at that size and
+distance from the rest of memory its really not worth bothering with.
