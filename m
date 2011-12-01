@@ -1,58 +1,22 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 1 Dec 2011 11:06:42 -0800
-Subject: [PATCH 2a/5 v2] ARM: OMAP1: select clock rate by CPU type
-In-Reply-To: <201112011954.18258.jkrzyszt@tis.icnet.pl>
-References: <20111128174508.GO31337@atomide.com>
- <201112011110.11476.jkrzyszt@tis.icnet.pl>
- <20111201182254.GU31337@atomide.com>
- <201112011954.18258.jkrzyszt@tis.icnet.pl>
-Message-ID: <20111201190642.GW31337@atomide.com>
+From: joro@8bytes.org ('Joerg Roedel')
+Date: Thu, 1 Dec 2011 19:58:21 +0100
+Subject: [PATCH v7 0/2] iommu/exynos: Add IOMMU/System MMU driver for
+ Samsung Exynos
+In-Reply-To: <045b01ccaffa$ef48c430$cdda4c90$%kim@samsung.com>
+References: <1321609650-1329-1-git-send-email-pullip.cho@samsung.com>
+ <20111123114626.GH20535@8bytes.org>
+ <045b01ccaffa$ef48c430$cdda4c90$%kim@samsung.com>
+Message-ID: <20111201185821.GL20535@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Janusz Krzysztofik <jkrzyszt@tis.icnet.pl> [111201 10:19]:
-> On Thursday 01 of December 2011 at 19:22:54, Tony Lindgren wrote:
-> > * Janusz Krzysztofik <jkrzyszt@tis.icnet.pl> [111201 01:35]:
-> > > On Wednesday 30 of November 2011 at 23:28:38, Tony Lindgren wrote:
-> > > > 
-> > > > We should also now be able to remove all the CONFIG_OMAP_ARM_XXXMHZ options
-> > > > too, right?
-> > > 
-> > > Right, but then, perhaps the initial version of patch 2a/5, which 
-> > > already started removing them, from omap1_defconfig for now, then going 
-> > > into the right direction while unblocking another regression fix (3/5), 
-> > > _is_ a good candidate for an rc fix?
-> > 
-> > But we did not allow dpll1 reprogramming earlier either,
-> 
-> Wrong. Without OMAP_CLOCKS_SET_BY_BOOTLOADER selected, we always did, 
-> but only once, early at boot, before ck_dpll1_p->rate was set first from 
-> omap1_clk_init(), and never retried later, that's why that check which I 
-> removed with 3/5 was never in the game until e9b7086b80c4d9e354f4edc9e280ae85a60df408.
+On Thu, Dec 01, 2011 at 04:29:17PM +0900, Kukjin Kim wrote:
+> Anyway, that touches many Samsung stuff so it would be better if you could
+> create separate topic branch which can be merged into Samsung tree. And if
+> required, please add my ack on them.
 
-Yeah you're right. You found what caused the regression :)
- 
-> > so we should
-> > not need to make all these changes during the -rc cycle. I'm suspecting
-> > that we've had this same behaviour for a really long time, and we just
-> > have not seen it as omap1_defconfig had OMAP_CLOCKS_SET_BY_BOOTLOADER
-> > option set.
-> > 
-> > So I'm baffled how your board would be booting at a different rate
-> > compared to v3.1, it seems that the logic has not changed there. Or
-> > else we have some simple bug somewhere.
-> > 
-> > Care to try to verify at what point your system started booting at
-> > 60MHz rate?
-> 
-> Since e9b7086b80c4d9e354f4edc9e280ae85a60df408, I guess, and it's hard 
-> to confirm wituout bisecting the issue with too early sram call, back 
-> until things still worked like before map_io related changes. I will do 
-> that if you decide we should try to revert.
+Yes, I use topic-branches a lot :) This will end up in iommu/exynos or
+something like that.
 
-No need to bisect, I think we can just reset ck_dpll1_p->rate for
-systems booting at below 60MHz rate to force the reprogramming.
 
-Regards,
-
-Tony
+	Joerg
