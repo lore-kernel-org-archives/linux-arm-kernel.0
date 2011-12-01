@@ -1,47 +1,55 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 1 Dec 2011 18:28:52 +0000
-Subject: does non-continuous RAM means I need to select the sparse
- memory model?
-In-Reply-To: <20111129203010.GA26618@pengutronix.de>
-References: <20111129203010.GA26618@pengutronix.de>
-Message-ID: <20111201182852.GC9581@n2100.arm.linux.org.uk>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 1 Dec 2011 11:30:16 -0700 (MST)
+Subject: [PATCH v3 3/5] clk: introduce the common clock framework
+In-Reply-To: <20111201144205.GA2103@sirena.org.uk>
+References: <1321926047-14211-1-git-send-email-mturquette@linaro.org>
+ <1321926047-14211-4-git-send-email-mturquette@linaro.org>
+ <alpine.DEB.2.00.1111291619110.6289@utopia.booyaka.com>
+ <CAJOA=zM4vcyTt_RBEVm6JxmzW-Dna0gpuWda7ytq_mqFSuXw9g@mail.gmail.com>
+ <alpine.DEB.2.00.1111302308280.6289@utopia.booyaka.com>
+ <20111201144205.GA2103@sirena.org.uk>
+Message-ID: <alpine.DEB.2.00.1112011124221.6289@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 29, 2011 at 09:30:10PM +0100, Uwe Kleine-K?nig wrote:
-> I'm currently working on a new arch port and my current machine has RAM
-> at 0x10000000 and 0x80000000. So there is a big hole between the two
-> banks. When selecting the sparse memory model it works, but when
-> selecting flat the machine runs into a BUG in mark_bootmem() called by
-> free_unused_memmap() to free the space between the two banks.
+Hi Mark,
 
-Well, it looks like you have the answer in your latest email:
+On Thu, 1 Dec 2011, Mark Brown wrote:
 
-> Apart from that it seems I cannot use flatmem as is on my machine. It
-> has only 128kiB at 0x10000000 + 1MiB at 0x80000000 and needs 14MiB to hold the
-> table of "struct page"s.
+> On Wed, Nov 30, 2011 at 11:39:59PM -0700, Paul Walmsley wrote:
+> 
+> > Clock rate/parent-change notifiers are requirements for DVFS use-cases, 
+> > and they must be paired with something like the 
+> > clk_{allow,block}_rate_change() functions to work efficiently.  I intend 
+> > to comment on this later; it's not a simple problem.  It might be worth 
+> > noting that Tero and I implemented a simplified version of this for the 
+> > N900.
+> 
+> I'm thinking that if we're going to have clk_{allow,block}_rate_change()
+> we may as well make that the main interface to enable rate changes - if
+> a device wants to change the clock rate it allows rate changes using
+> that interface rather than by disabling the clocks.  I've got devices
+> which can do glitch free updates of active clocks so having to disable
+> would be a real restriction, and cpufreq would have issues with actually
+> disabling the clock too I expect.
 
-Which shows that there's no possible way to use flatmem in this platform.
+The intention behind the clk_{allow,block}_rate_change() proposal was to 
+allow the current user of the clock to change its rate without having to 
+call clk_{allow,block}_rate_change(), if that driver was the sole user of 
+the clock.
 
-Now, to use sparsemem with this, sparsemem people will tell you that
-each sparsemem section must be fully populated.  So, as your minimum
-memory size is 128kiB, your sparsemem section size must be 128kiB.
-This makes SECTION_SIZE_BITS be 17.
+So for example, if you had a driver that did:
 
-You need to span to 0x80000000+, which means you need MAX_PHYSMEM_BITS
-to be 32.
+c = clk_get(dev, clk_name);
+clk_enable(c);
+clk_set_rate(c, clk_rate);
 
-These two together means you're in for having an array of 2^(32 - 17) =
-32768 pointers to struct section for starters.  That takes 128kiB.
-Now add in the struct page structures, which for 128kiB of memory will
-be 1kiB.  Now add 9 struct section's as well...
+and c was currently not enabled by any other driver on the system, and 
+nothing else had called clk_block_rate_change(c), then the rate change 
+would be allowed to proceed.  (modulo any notifier activity, etc.)  
 
-What I'm pointing out is that in the scenario you appear to have, trying
-to use the small pool of memory which is soo dislocated from the rest of
-memory is a waste of effort.  Adding it to the pool means that you require
-more memory for the management data structures than you gain from adding
-it to the system.  The net benefit from trying to use it is actually
-negative.
+So clk_{allow,block}_rate_change() was simply intended to allow or 
+restrict other users of the same clock, not the current user.
 
-So, forget that the 128kiB chunk of memory exists - at that size and
-distance from the rest of memory its really not worth bothering with.
+
+- Paul
