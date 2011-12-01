@@ -1,48 +1,54 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 1 Dec 2011 11:57:18 +0100
-Subject: flatmem broken for nommu? [Was: Re: does non-continuous RAM
- means I need to select the sparse memory model?]
-In-Reply-To: <CAOMZO5DX_ZvCOu+pqZpJ7Ni2B=qmSFCZTHnuzKt==OsBsJZH=Q@mail.gmail.com>
-References: <20111129203010.GA26618@pengutronix.de>
- <CAOMZO5DX_ZvCOu+pqZpJ7Ni2B=qmSFCZTHnuzKt==OsBsJZH=Q@mail.gmail.com>
-Message-ID: <20111201105718.GJ26618@pengutronix.de>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Thu, 1 Dec 2011 10:57:56 +0000
+Subject: [PATCH v3 3/5] ARM: vexpress: Add DT support in v2m
+In-Reply-To: <1322678779.3180.36.camel@hornet.cambridge.arm.com>
+References: <1322579473-8804-1-git-send-email-pawel.moll@arm.com>
+ <1322579473-8804-4-git-send-email-pawel.moll@arm.com>
+ <20111130155800.GF2045@localhost.localdomain>
+ <1322678779.3180.36.camel@hornet.cambridge.arm.com>
+Message-ID: <20111201105756.GA2026@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 29, 2011 at 10:39:10PM -0200, Fabio Estevam wrote:
-> Hi Uwe,
+On Wed, Nov 30, 2011 at 06:46:19PM +0000, Pawel Moll wrote:
+> On Wed, 2011-11-30 at 15:58 +0000, Dave Martin wrote:
+> > Now that a person may fail to boot on a supported board simply due to
+> > failing to supply a device tree, it may be a good idea to have a more
+> > helpful panic message for that situation, perhaps something like the
+> > following.
+> > 
+> > If you don't think this fits in this series, I can always follow up 
+> > later.
+> > 
+> > diff --git a/arch/arm/mach-vexpress/v2m.c b/arch/arm/mach-vexpress/v2m.c
+> > index 6965f64..9dda482 100644
+> > --- a/arch/arm/mach-vexpress/v2m.c
+> > +++ b/arch/arm/mach-vexpress/v2m.c
+> > @@ -434,8 +434,11 @@ static void __init v2m_populate_ct_desc(void)
+> >  			ct_desc = ct_descs[i];
+> >  
+> >  	if (!ct_desc)
+> > -		panic("vexpress: failed to populate core tile description "
+> > -		      "for tile ID 0x%8x\n", current_tile_id);
+> > +		panic("vexpress: this kernel does not support core tile ID "
+> > +		      "0x%08x when booting via ATAGs.\n"
+> > +		      "You may need a device tree blob or a different kernel "
+> > +		      "to boot on this board.\n",
+> > +		      current_tile_id);
+> >  }
+> >  
+> >  static void __init v2m_map_io(void)
+> > 
 > 
-> 2011/11/29 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-> > Hello,
-> >
-> > I'm currently working on a new arch port and my current machine has RAM
-> > at 0x10000000 and 0x80000000. So there is a big hole between the two
-> > banks. When selecting the sparse memory model it works, but when
-> > selecting flat the machine runs into a BUG in mark_bootmem() called by
-> > free_unused_memmap() to free the space between the two banks.
-> 
-> My understanding is that you have to select ARCH_HAS_HOLES_MEMORYMODEL.
-I think that is not necessary.
- 
-> > Is that expected (meaning I cannot use the flat model)? I currently
-> > don't have another machine handy that has >1 memory back to test that.
-> 
-> In case you have access to a MX35PDK you can try on this board as it does have
-> the memory hole.
-No I havn't, but I just used a 128MB machine and changed that in the
-.fixup callback to 64MB + 32MB with a 32MB hole in between and it works
-fine without ARCH_HAS_HOLES_MEMORYMODEL.
+> No, that's cool with me, will add that. Thanks!
 
-I debugged the problem a bit further and one symptom is that
+I just discovered that Documentation/CodingStyle recommends not to split printk
+strings onto multiple lines, for easier grepping.  Sounds like sensible advice,
+so maybe just split at "\n":
 
-	struct page *mem_map
+> > +		panic("vexpress: this kernel does not support core tile ID 0x%08x when booting via ATAGs.\n" 
+> > +		      "You may need a device tree blob or a different kernel to boot on this board.\n",
+> > +		      current_tile_id);
 
-is NULL for me. That looks wrong. I guess this is just broken for nommu.
-I will dig into that later today.
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Cheers
+---Dave
