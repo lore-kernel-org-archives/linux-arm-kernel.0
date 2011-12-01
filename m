@@ -1,80 +1,51 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Thu, 01 Dec 2011 07:10:03 -0800
-Subject: [PATCH-V4 0/3] Introducing TI's New SoC/board AM335XEVM
-In-Reply-To: <79CD15C6BA57404B839C016229A409A80474FD@DBDE01.ent.ti.com>
- (Vaibhav Hiremath's message of "Thu, 1 Dec 2011 11:07:18 +0000")
-References: <1320946837-32507-1-git-send-email-hvaibhav@ti.com>
- <878vmxxjrv.fsf@ti.com>
- <79CD15C6BA57404B839C016229A409A80474FD@DBDE01.ent.ti.com>
-Message-ID: <878vmws4z8.fsf@ti.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Thu, 1 Dec 2011 15:12:06 +0000
+Subject: [Embeddedxen-devel] [Xen-devel] [ANNOUNCE] Xen port to Cortex-A15
+ / ARMv7 with virt extensions
+In-Reply-To: <1322735197.31810.191.camel@zakaz.uk.xensource.com>
+References: <alpine.DEB.2.00.1111281009090.31179@kaball-desktop>
+ <201111301432.54463.arnd@arndb.de>
+ <1322670473.31810.129.camel@zakaz.uk.xensource.com>
+ <201111301815.01297.arnd@arndb.de>
+ <alpine.DEB.2.00.1111301820290.31179@kaball-desktop>
+ <1322735197.31810.191.camel@zakaz.uk.xensource.com>
+Message-ID: <alpine.DEB.2.00.1112011441340.31179@kaball-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"Hiremath, Vaibhav" <hvaibhav@ti.com> writes:
-
->> -----Original Message-----
->> From: Hilman, Kevin
->> Sent: Thursday, December 01, 2011 5:09 AM
->> To: Hiremath, Vaibhav; Russell King
->> Cc: linux-omap at vger.kernel.org; tony at atomide.com; linux-arm-
->> kernel at lists.infradead.org; paul at pwsan.com
->> Subject: Re: [PATCH-V4 0/3] Introducing TI's New SoC/board AM335XEVM
->> 
->> Vaibhav Hiremath <hvaibhav@ti.com> writes:
->> 
->> > This patch set adds support for AM335x device having
->> > Cortex-A8 MPU.
->> >
->> > Official website - http://www.ti.com/product/am3359
->> >
->> > AM335X is treated as another OMAP3 variant, where,
->> > along with existing cpu class OMAP34XX, new cpu class AM33XX is created
->> > and the respective type is AM335X, which is newly added device in
->> > the family.
->> > This means, cpu_is_omap34xx(), cpu_is_am33xx() and
->> > cpu_is_am335x() checks return success for AM335X.
->> >
->> > Also, I have validated OMAP3 boot test with this patch-series on
->> OMAP3EVM.
->> 
->> After fixing the minor comment on patch 3/3, feel free to add:
->> 
->> Reviewed-by: Kevin Hilman <khilman@ti.com>
->> 
-> Thanks Kevin, for the review.
+On Thu, 1 Dec 2011, Ian Campbell wrote:
+> On Wed, 2011-11-30 at 18:32 +0000, Stefano Stabellini wrote:
+> > On Wed, 30 Nov 2011, Arnd Bergmann wrote:
+> > > KVM and Xen at least both fall into the single-return-value category,
+> > > so we should be able to agree on a calling conventions. KVM does not
+> > > have an hcall API on ARM yet, and I see no reason not to use the
+> > > same implementation that you have in the Xen guest.
+> > > 
+> > > Stefano, can you split out the generic parts of your asm/xen/hypercall.h
+> > > file into a common asm/hypercall.h and submit it for review to the
+> > > arm kernel list?
+> > 
+> > Sure, I can do that.
+> > Usually the hypercall calling convention is very hypervisor specific,
+> > but if it turns out that we have the same requirements I happy to design
+> > a common interface.
+> 
+> I expect the only real decision to be made is hypercall page vs. raw hvc
+> instruction.
+> 
+> The page was useful on x86 where there is a variety of instructions
+> which could be used (at least for PV there was systenter/syscall/int, I
+> think vmcall instruction differs between AMD and Intel also) and gives
+> some additional flexibility. It's hard to predict but I don't think I'd
+> expect that to be necessary on ARM.
 >
->
->> Also, I was surprised to discover that this booted on my (recently
->> arrived) BeagleBone.  It seems that u-boot (from Angstrom) is passing
->> the machine ID of the AM335x EVM[1], even though there is another
->> machine ID for the BeagleBone[2].  Is that expected?
->
-> We can detect the board using on-board EEPROM, so same mach-id
-> should work for both EVM and Beagle. 
+> Another reason for having a hypercall page instead of a raw instruction
+> might be wanting to support 32 bit guests (from ~today) on a 64 bit
+> hypervisor in the future and perhaps needing to do some shimming/arg
+> translation. It would be better to aim for having the interface just be
+> 32/64 agnostic but mistakes do happen.
 
-> And also going forward with device tree approach we may
-> not need different id's, right?
-
-Right, which is why I'm wondering why are there sevral new AM33x
-mach-types when only one of them is being used:
-
-3684    TI AM335X IA EVM        am335xiaevm     Afzal Mohammed
-3589    TI AM335X EVM           am335xevm       Vaibhav Bedia
-3808    Beaglebone Board        beaglebone      Steven Kipisz
-
-Russell has been trying to cleanup athe mach-types, so if these others
-are not going to be used, I suggest they be deleted.
-
-> But I am surprised to see that beaglebone is booting fine for you,
-> did you get Linux console?
-
-Oh, sorry for the confusion.  No, it didn't boot to console.  It just
-booted far enought to see that your this series was working and it was
-getting started, but it eventually hangs because of missing MPU hwmod:
-
-[...]
-[    0.000000] omap_hwmod: timer1: cannot setup_one: MPU initiator hwmod mpu not yet registered                                                               
-[    0.000000] ------------[ cut here ]------------                           
-[    0.000000] kernel BUG at /work/kernel/omap/dev/arch/arm/mach-omap2/timer.c: 214!
-
-Kevin
+I always like to keep things as simple as possible, so I am in favor of
+using the raw hvc instruction.
+Besides with the bulk of mmu hypercalls gone, it should not be difficult
+to design a 32/64 bit agnostic interface.
