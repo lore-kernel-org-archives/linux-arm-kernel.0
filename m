@@ -1,315 +1,68 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu,  1 Dec 2011 16:42:07 +0100
-Subject: [PATCH v3 1/3] ARM: at91/aic: add irq domain and device tree support
-In-Reply-To: <1322590066-430-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1322590066-430-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <1322754127-15206-1-git-send-email-nicolas.ferre@atmel.com>
+From: Ian.Campbell@citrix.com (Ian Campbell)
+Date: Thu, 1 Dec 2011 15:52:46 +0000
+Subject: [Android-virt] [Embeddedxen-devel] [Xen-devel] [ANNOUNCE] Xen
+ port to Cortex-A15 / ARMv7 with virt extensions
+In-Reply-To: <20111201151043.GG27394@arm.com>
+References: <alpine.DEB.2.00.1111281009090.31179@kaball-desktop>
+ <201111301432.54463.arnd@arndb.de>
+ <1322670473.31810.129.camel@zakaz.uk.xensource.com>
+ <201111301815.01297.arnd@arndb.de>
+ <alpine.DEB.2.00.1111301820290.31179@kaball-desktop>
+ <1322735197.31810.191.camel@zakaz.uk.xensource.com>
+ <20111201151043.GG27394@arm.com>
+Message-ID: <1322754766.31810.240.camel@zakaz.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add an irqdomain for the AIC interrupt controller.
-The device tree support is mapping the registers and
-is using the irq_domain_simple_ops to manage hwirq
-translation.
-The documentation is describing the meaning of the
-two cells required for using this "interrupt-controller"
-in a device tree node.
+On Thu, 2011-12-01 at 15:10 +0000, Catalin Marinas wrote:
+> On Thu, Dec 01, 2011 at 10:26:37AM +0000, Ian Campbell wrote:
+> > On Wed, 2011-11-30 at 18:32 +0000, Stefano Stabellini wrote:
+> > > On Wed, 30 Nov 2011, Arnd Bergmann wrote:
+> > > > KVM and Xen at least both fall into the single-return-value category,
+> > > > so we should be able to agree on a calling conventions. KVM does not
+> > > > have an hcall API on ARM yet, and I see no reason not to use the
+> > > > same implementation that you have in the Xen guest.
+> > > > 
+> > > > Stefano, can you split out the generic parts of your asm/xen/hypercall.h
+> > > > file into a common asm/hypercall.h and submit it for review to the
+> > > > arm kernel list?
+> > > 
+> > > Sure, I can do that.
+> > > Usually the hypercall calling convention is very hypervisor specific,
+> > > but if it turns out that we have the same requirements I happy to design
+> > > a common interface.
+> > 
+> > I expect the only real decision to be made is hypercall page vs. raw hvc
+> > instruction.
+> > 
+> > The page was useful on x86 where there is a variety of instructions
+> > which could be used (at least for PV there was systenter/syscall/int, I
+> > think vmcall instruction differs between AMD and Intel also) and gives
+> > some additional flexibility. It's hard to predict but I don't think I'd
+> > expect that to be necessary on ARM.
+> > 
+> > Another reason for having a hypercall page instead of a raw instruction
+> > might be wanting to support 32 bit guests (from ~today) on a 64 bit
+> > hypervisor in the future and perhaps needing to do some shimming/arg
+> > translation. It would be better to aim for having the interface just be
+> > 32/64 agnostic but mistakes do happen.
+> 
+> Given the way register banking is done on AArch64, issuing an HVC on a
+> 32-bit guest OS doesn't require translation on a 64-bit hypervisor.
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
-This patch should go on top of Jamie's patch:
-"irqdomain: export irq_domain_simple_ops for !CONFIG_OF"
-https://lkml.org/lkml/2011/12/1/109
+The issue I was thinking about was struct packing for arguments passed
+as pointers etc rather than the argument registers themselves. Since the
+preference appears to be for raw hvc we should just be careful that they
+are agnostic in these.
 
-v3: - change number of cells to define an AIC interrupt (irq trigger type)
-    - change current .dtsi files to match specification
-    - use irq_domain_simple_ops (for DT mapping)
+Ian.
 
-v2: - use of_irq_init() function for device tree probing
-    - add documentation
-    - use own simple struct irq_domain_ops
-
- .../devicetree/bindings/arm/atmel-aic.txt          |   38 +++++++++++++++++++
- arch/arm/Kconfig                                   |    1 +
- arch/arm/boot/dts/at91sam9g20.dtsi                 |   16 ++++----
- arch/arm/boot/dts/at91sam9g45.dtsi                 |   14 +++---
- arch/arm/mach-at91/irq.c                           |   40 +++++++++++++++++++-
- 5 files changed, 92 insertions(+), 17 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/atmel-aic.txt
-
-diff --git a/Documentation/devicetree/bindings/arm/atmel-aic.txt b/Documentation/devicetree/bindings/arm/atmel-aic.txt
-new file mode 100644
-index 0000000..ade2761
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/atmel-aic.txt
-@@ -0,0 +1,38 @@
-+* Advanced Interrupt Controller (AIC)
-+
-+Required properties:
-+- compatible: Should be "atmel,<chip>-dma"
-+- interrupt-controller: Identifies the node as an interrupt controller.
-+- interrupt-parent: For single AIC system, it is an empty property.
-+- #interrupt-cells: The number of cells to define the interrupts. It sould be 2.
-+  The first cell is the GPIO number.
-+  The second cell is used to specify flags:
-+    bits[3:0] trigger type and level flags:
-+      1 = low-to-high edge triggered.
-+      2 = high-to-low edge triggered.
-+      4 = active high level-sensitive.
-+      8 = active low level-sensitive.
-+      Valid combinations are 1, 2, 3, 4, 8.
-+      Default flag for internal sources should be set to 4 (active high).
-+- reg: Should contain AIC registers location and length
-+
-+Examples:
-+	/*
-+	 * AIC
-+	 */
-+	aic: interrupt-controller at fffff000 {
-+		compatible = "atmel,at91rm9200-aic";
-+		interrupt-controller;
-+		interrupt-parent;
-+		#interrupt-cells = <2>;
-+		reg = <0xfffff000 0x200>;
-+	};
-+
-+	/*
-+	 * An interrupt generating device that is wired to an AIC.
-+	 */
-+	dma: dma-controller at ffffec00 {
-+		compatible = "atmel,at91sam9g45-dma";
-+		reg = <0xffffec00 0x200>;
-+		interrupts = <21 4>;
-+	};
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 57e16d4..b33603a 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -318,6 +318,7 @@ config ARCH_AT91
- 	select ARCH_REQUIRE_GPIOLIB
- 	select HAVE_CLK
- 	select CLKDEV_LOOKUP
-+	select IRQ_DOMAIN
- 	help
- 	  This enables support for systems based on the Atmel AT91RM9200,
- 	  AT91SAM9 and AT91CAP9 processors.
-diff --git a/arch/arm/boot/dts/at91sam9g20.dtsi b/arch/arm/boot/dts/at91sam9g20.dtsi
-index aeef042..0782f80 100644
---- a/arch/arm/boot/dts/at91sam9g20.dtsi
-+++ b/arch/arm/boot/dts/at91sam9g20.dtsi
-@@ -47,7 +47,7 @@
- 			ranges;
- 
- 			aic: interrupt-controller at fffff000 {
--				#interrupt-cells = <1>;
-+				#interrupt-cells = <2>;
- 				compatible = "atmel,at91rm9200-aic";
- 				interrupt-controller;
- 				interrupt-parent;
-@@ -57,14 +57,14 @@
- 			dbgu: serial at fffff200 {
- 				compatible = "atmel,at91sam9260-usart";
- 				reg = <0xfffff200 0x200>;
--				interrupts = <1>;
-+				interrupts = <1 4>;
- 				status = "disabled";
- 			};
- 
- 			usart0: serial at fffb0000 {
- 				compatible = "atmel,at91sam9260-usart";
- 				reg = <0xfffb0000 0x200>;
--				interrupts = <6>;
-+				interrupts = <6 4>;
- 				atmel,use-dma-rx;
- 				atmel,use-dma-tx;
- 				status = "disabled";
-@@ -73,7 +73,7 @@
- 			usart1: serial at fffb4000 {
- 				compatible = "atmel,at91sam9260-usart";
- 				reg = <0xfffb4000 0x200>;
--				interrupts = <7>;
-+				interrupts = <7 4>;
- 				atmel,use-dma-rx;
- 				atmel,use-dma-tx;
- 				status = "disabled";
-@@ -82,7 +82,7 @@
- 			usart2: serial at fffb8000 {
- 				compatible = "atmel,at91sam9260-usart";
- 				reg = <0xfffb8000 0x200>;
--				interrupts = <8>;
-+				interrupts = <8 4>;
- 				atmel,use-dma-rx;
- 				atmel,use-dma-tx;
- 				status = "disabled";
-@@ -91,7 +91,7 @@
- 			usart3: serial at fffd0000 {
- 				compatible = "atmel,at91sam9260-usart";
- 				reg = <0xfffd0000 0x200>;
--				interrupts = <23>;
-+				interrupts = <23 4>;
- 				atmel,use-dma-rx;
- 				atmel,use-dma-tx;
- 				status = "disabled";
-@@ -100,7 +100,7 @@
- 			usart4: serial at fffd4000 {
- 				compatible = "atmel,at91sam9260-usart";
- 				reg = <0xfffd4000 0x200>;
--				interrupts = <24>;
-+				interrupts = <24 4>;
- 				atmel,use-dma-rx;
- 				atmel,use-dma-tx;
- 				status = "disabled";
-@@ -109,7 +109,7 @@
- 			usart5: serial at fffd8000 {
- 				compatible = "atmel,at91sam9260-usart";
- 				reg = <0xfffd8000 0x200>;
--				interrupts = <25>;
-+				interrupts = <25 4>;
- 				atmel,use-dma-rx;
- 				atmel,use-dma-tx;
- 				status = "disabled";
-diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
-index db6a452..e89b1d7 100644
---- a/arch/arm/boot/dts/at91sam9g45.dtsi
-+++ b/arch/arm/boot/dts/at91sam9g45.dtsi
-@@ -46,7 +46,7 @@
- 			ranges;
- 
- 			aic: interrupt-controller at fffff000 {
--				#interrupt-cells = <1>;
-+				#interrupt-cells = <2>;
- 				compatible = "atmel,at91rm9200-aic";
- 				interrupt-controller;
- 				interrupt-parent;
-@@ -56,20 +56,20 @@
- 			dma: dma-controller at ffffec00 {
- 				compatible = "atmel,at91sam9g45-dma";
- 				reg = <0xffffec00 0x200>;
--				interrupts = <21>;
-+				interrupts = <21 4>;
- 			};
- 
- 			dbgu: serial at ffffee00 {
- 				compatible = "atmel,at91sam9260-usart";
- 				reg = <0xffffee00 0x200>;
--				interrupts = <1>;
-+				interrupts = <1 4>;
- 				status = "disabled";
- 			};
- 
- 			usart0: serial at fff8c000 {
- 				compatible = "atmel,at91sam9260-usart";
- 				reg = <0xfff8c000 0x200>;
--				interrupts = <7>;
-+				interrupts = <7 4>;
- 				atmel,use-dma-rx;
- 				atmel,use-dma-tx;
- 				status = "disabled";
-@@ -78,7 +78,7 @@
- 			usart1: serial at fff90000 {
- 				compatible = "atmel,at91sam9260-usart";
- 				reg = <0xfff90000 0x200>;
--				interrupts = <8>;
-+				interrupts = <8 4>;
- 				atmel,use-dma-rx;
- 				atmel,use-dma-tx;
- 				status = "disabled";
-@@ -87,7 +87,7 @@
- 			usart2: serial at fff94000 {
- 				compatible = "atmel,at91sam9260-usart";
- 				reg = <0xfff94000 0x200>;
--				interrupts = <9>;
-+				interrupts = <9 4>;
- 				atmel,use-dma-rx;
- 				atmel,use-dma-tx;
- 				status = "disabled";
-@@ -96,7 +96,7 @@
- 			usart3: serial at fff98000 {
- 				compatible = "atmel,at91sam9260-usart";
- 				reg = <0xfff98000 0x200>;
--				interrupts = <10>;
-+				interrupts = <10 4>;
- 				atmel,use-dma-rx;
- 				atmel,use-dma-tx;
- 				status = "disabled";
-diff --git a/arch/arm/mach-at91/irq.c b/arch/arm/mach-at91/irq.c
-index be6b639..1c13a2c 100644
---- a/arch/arm/mach-at91/irq.c
-+++ b/arch/arm/mach-at91/irq.c
-@@ -24,6 +24,9 @@
- #include <linux/module.h>
- #include <linux/mm.h>
- #include <linux/types.h>
-+#include <linux/of_address.h>
-+#include <linux/of_irq.h>
-+#include <linux/irqdomain.h>
- 
- #include <mach/hardware.h>
- #include <asm/irq.h>
-@@ -34,6 +37,7 @@
- #include <asm/mach/map.h>
- 
- void __iomem *at91_aic_base;
-+static struct irq_domain at91_aic_domain;
- 
- static void at91_aic_mask_irq(struct irq_data *d)
- {
-@@ -127,6 +131,29 @@ static struct irq_chip at91_aic_chip = {
- 	.irq_set_wake	= at91_aic_set_wake,
- };
- 
-+#if defined(CONFIG_OF)
-+static int __init __at91_aic_of_init(struct device_node *node,
-+				     struct device_node *parent)
-+{
-+	at91_aic_base = of_iomap(node, 0);
-+	at91_aic_domain.of_node = of_node_get(node);
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id aic_ids[] __initconst = {
-+	{ .compatible = "atmel,at91rm9200-aic", .data = __at91_aic_of_init },
-+	{ /*sentinel*/ }
-+};
-+
-+static void __init at91_aic_of_init(void)
-+{
-+	of_irq_init(aic_ids);
-+}
-+#else
-+static void __init at91_aic_of_init(void) {}
-+#endif
-+
- /*
-  * Initialize the AIC interrupt controller.
-  */
-@@ -134,10 +161,13 @@ void __init at91_aic_init(unsigned int priority[NR_AIC_IRQS])
- {
- 	unsigned int i;
- 
--	at91_aic_base = ioremap(AT91_AIC, 512);
-+	if(of_have_populated_dt())
-+		at91_aic_of_init();
-+	else
-+		at91_aic_base = ioremap(AT91_AIC, 512);
- 
- 	if (!at91_aic_base)
--		panic("Impossible to ioremap AT91_AIC\n");
-+		panic("Unable to ioremap AIC registers\n");
- 
- 	/*
- 	 * The IVR is used by macro get_irqnr_and_base to read and verify.
-@@ -169,4 +199,10 @@ void __init at91_aic_init(unsigned int priority[NR_AIC_IRQS])
- 	/* Disable and clear all interrupts initially */
- 	at91_aic_write(AT91_AIC_IDCR, 0xFFFFFFFF);
- 	at91_aic_write(AT91_AIC_ICCR, 0xFFFFFFFF);
-+
-+	/* Add irq domain for AIC */
-+	at91_aic_domain.irq_base = at91_aic_domain.hwirq_base = 0;
-+	at91_aic_domain.nr_irq = NR_AIC_IRQS;
-+	at91_aic_domain.ops = &irq_domain_simple_ops;
-+	irq_domain_add(&at91_aic_domain);
- }
--- 
-1.7.5.4
+>  We
+> have a similar implementation at the SVC level (for 32-bit user apps on
+> a 64-bit kernel), the only modification was where a 32-bit SVC takes a
+> 64-bit parameter in two separate 32-bit registers, so packing needs to
+> be done in a syscall wrapper.
+> 
+> I'm not closely involved with any of the Xen or KVM work but I would
+> vote for using HVC than a hypercall page.
+> 
