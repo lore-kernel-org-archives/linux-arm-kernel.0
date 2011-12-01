@@ -1,129 +1,55 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Thu, 1 Dec 2011 10:52:52 +0000
-Subject: [PATCH-V4 3/3] arm:omap:am33xx: Add low level debugging support
-In-Reply-To: <87r50pxk1i.fsf@ti.com>
-References: <1320946837-32507-1-git-send-email-hvaibhav@ti.com>
- <1320946837-32507-4-git-send-email-hvaibhav@ti.com> <87r50pxk1i.fsf@ti.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A80474A5@DBDE01.ent.ti.com>
+From: sshtylyov@ru.mvista.com (Sergei Shtylyov)
+Date: Thu, 01 Dec 2011 14:46:11 +0400
+Subject: [PATCH] arm: prevent inlining in arxescsi.c causing build failures
+In-Reply-To: <20111201080613.GF26618@pengutronix.de>
+References: <1322713611-30003-1-git-send-email-paul.gortmaker@windriver.com>
+ <20111201080613.GF26618@pengutronix.de>
+Message-ID: <4ED75AF3.2090901@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Hilman, Kevin
-> Sent: Thursday, December 01, 2011 5:03 AM
-> To: Hiremath, Vaibhav
-> Cc: linux-omap at vger.kernel.org; tony at atomide.com; linux-arm-
-> kernel at lists.infradead.org; paul at pwsan.com; Mohammed, Afzal
-> Subject: Re: [PATCH-V4 3/3] arm:omap:am33xx: Add low level debugging
-> support
-> 
-> Hi Vaibhav,
-> 
-> Vaibhav Hiremath <hvaibhav@ti.com> writes:
-> 
-> > From: Afzal Mohammed <afzal@ti.com>
-> >
-> > Add support for low level debugging on AM335X EVM (AM33XX family).
-> > Currently only support for UART1 console, which is used on AM335X EVM
-> > is added.
-> >
-> > Signed-off-by: Afzal Mohammed <afzal@ti.com>
-> > Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
-> 
-> One minor comment below...
-> 
-> > ---
-> >  arch/arm/mach-omap2/include/mach/debug-macro.S |   17 ++++++++++++++++-
-> >  arch/arm/plat-omap/include/plat/serial.h       |    4 ++++
-> >  arch/arm/plat-omap/include/plat/uncompress.h   |    6 ++++++
-> >  3 files changed, 26 insertions(+), 1 deletions(-)
-> >
-> > diff --git a/arch/arm/mach-omap2/include/mach/debug-macro.S
-> b/arch/arm/mach-omap2/include/mach/debug-macro.S
-> > index 13f98e5..ce543ae 100644
-> > --- a/arch/arm/mach-omap2/include/mach/debug-macro.S
-> > +++ b/arch/arm/mach-omap2/include/mach/debug-macro.S
-> > @@ -72,6 +72,8 @@ omap_uart_lsr:	.word	0
-> >  		beq	82f			@ configure UART2
-> >  		cmp	\rp, #TI816XUART3	@ ti816x UART offsets different
-> >  		beq	83f			@ configure UART3
-> > +		cmp	\rp, #AM33XXUART1	@ AM33XX UART offsets different
-> > +		beq	84f			@ configure UART1
-> >  		cmp	\rp, #ZOOM_UART		@ only on zoom2/3
-> >  		beq	95f			@ configure ZOOM_UART
-> >
-> > @@ -100,7 +102,9 @@ omap_uart_lsr:	.word	0
-> >  		b	98f
-> >  83:		mov	\rp, #UART_OFFSET(TI816X_UART3_BASE)
-> >  		b	98f
-> > -
-> > +84:		ldr	\rp, =AM33XX_UART1_BASE
-> > +		and	\rp, \rp, #0x00ffffff
-> > +		b	97f
-> >  95:		ldr	\rp, =ZOOM_UART_BASE
-> >  		str	\rp, [\tmp, #0]		@ omap_uart_phys
-> >  		ldr	\rp, =ZOOM_UART_VIRT
-> > @@ -110,6 +114,17 @@ omap_uart_lsr:	.word	0
-> >  		b	10b
-> >
-> >  		/* Store both phys and virt address for the uart */
-> 
-> Please update this comment to clarify that this block is for AM33xx
-> only, and update the following one as the catch all.
-> 
-Ok, will update.
+Hello.
 
-> > +97:		add	\rp, \rp, #0x44000000	@ phys base
-> > +		str	\rp, [\tmp, #0]		@ omap_uart_phys
-> > +		sub	\rp, \rp, #0x44000000	@ phys base
-> > +		add	\rp, \rp, #0xf9000000	@ virt base
-> > +		str	\rp, [\tmp, #4]		@ omap_uart_virt
-> > +		mov	\rp, #(UART_LSR << OMAP_PORT_SHIFT)
-> > +		str	\rp, [\tmp, #8]		@ omap_uart_lsr
-> 
-> The last 3 lines are unnecessarily duplicated.  They can be shared with
-> the common block that follows.  IOW, only the base addresses are
-> different, the rest of the operations are shared.
-> 
-I thought about this, but then code looks complex & ugly, just to save
-duplication of 3 lines. So I added separate code for AM33xx devices.
+On 01.12.2011 12:06, Uwe Kleine-K?nig wrote:
 
-If you still think it should be done, then How about below change -
+>> The following failure is seen in routine coverage builds:
 
+>>    CC [M]  drivers/scsi/arm/arxescsi.o
+>> /tmp/cccEyiO7.s: Assembler messages:
+>> /tmp/cccEyiO7.s:334: Error: symbol `.loop_1' is already defined
+>> /tmp/cccEyiO7.s:337: Error: symbol `.loop_2' is already defined
+>> /tmp/cccEyiO7.s:343: Error: symbol `.loop_3' is already defined
+>> /tmp/cccEyiO7.s:365: Error: symbol `.loop_1' is already defined
+>> /tmp/cccEyiO7.s:368: Error: symbol `.loop_2' is already defined
+>> /tmp/cccEyiO7.s:374: Error: symbol `.loop_3' is already defined
+>> make[4]: *** [drivers/scsi/arm/arxescsi.o] Error 1
 
--               /* Store both phys and virt address for the uart */
--98:            add     \rp, \rp, #0x48000000   @ phys base
-+               /* AM33XX: Store both phys and virt address for the uart */
-+96:            add     \rp, \rp, #0x44000000   @ phys base
-                str     \rp, [\tmp, #0]         @ omap_uart_phys
--               sub     \rp, \rp, #0x48000000   @ phys base
--               add     \rp, \rp, #0xfa000000   @ virt base
--               str     \rp, [\tmp, #4]         @ omap_uart_virt
-+               sub     \rp, \rp, #0x44000000   @ phys base
-+               add     \rp, \rp, #0xf9000000   @ virt base
-+97:            str     \rp, [\tmp, #4]         @ omap_uart_virt
-                mov     \rp, #(UART_LSR << OMAP_PORT_SHIFT)
-                str     \rp, [\tmp, #8]         @ omap_uart_lsr
+>> It is caused by multiple inline of arxescsi_pseudo_dma_write()
+>> which is responsible for the above labels.  Marking the fcn
+>> as non-inline fixes the issue.
 
-                b       10b
+>> Signed-off-by: Paul Gortmaker<paul.gortmaker@windriver.com>
 
-+               /* Store both phys and virt address for the uart */
-+98:            add     \rp, \rp, #0x48000000   @ phys base
-+               str     \rp, [\tmp, #0]         @ omap_uart_phys
-+               sub     \rp, \rp, #0x48000000   @ phys base
-+               add     \rp, \rp, #0xfa000000   @ virt base
-+               b       97b
-+
+> Is that a compiler or a code issue? If it's the compiler please fix
+> that. If it's the code, then please document why you added the noinline.
 
+> Having said that, "my" compiler compiles drivers/scsi/arm/arxescsi.o
+> just fine (using rpc_defconfig on v3.2-rc2).
 
-Thanks,
-Vaibhav
+>> diff --git a/drivers/scsi/arm/arxescsi.c b/drivers/scsi/arm/arxescsi.c
+>> index a750aa7..2608a9e 100644
+>> --- a/drivers/scsi/arm/arxescsi.c
+>> +++ b/drivers/scsi/arm/arxescsi.c
+>> @@ -72,7 +72,8 @@ arxescsi_dma_setup(struct Scsi_Host *host, struct scsi_pointer *SCp,
+>>   	return fasdma_pseudo;
+>>   }
+>>
+>> -static void arxescsi_pseudo_dma_write(unsigned char *addr, void __iomem *base)
+>> +static noinline void
+>> +arxescsi_pseudo_dma_write(unsigned char *addr, void __iomem *base)
 
-> > +		b	10b
-> > +
-> > +		/* Store both phys and virt address for the uart */
-> >  98:		add	\rp, \rp, #0x48000000	@ phys base
-> >  		str	\rp, [\tmp, #0]		@ omap_uart_phys
-> >  		sub	\rp, \rp, #0x48000000	@ phys base
-> 
-> Kevin
+> Shouldn't this line get some indention?
+
+    No, usually such lines don't get indented.
+
+WBR, Sergei
