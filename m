@@ -1,34 +1,52 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 01 Dec 2011 16:29:17 +0900
-Subject: [PATCH v7 0/2] iommu/exynos: Add IOMMU/System MMU driver for
- Samsung Exynos
-In-Reply-To: <20111123114626.GH20535@8bytes.org>
-References: <1321609650-1329-1-git-send-email-pullip.cho@samsung.com>
- <20111123114626.GH20535@8bytes.org>
-Message-ID: <045b01ccaffa$ef48c430$cdda4c90$%kim@samsung.com>
+Date: Thu, 01 Dec 2011 16:29:33 +0900
+Subject: [RFC][PATCH] Consolidate Samsung MAINTAINERS
+In-Reply-To: <201111291006.49821.heiko@sntech.de>
+References: <201110230012.15273.heiko@sntech.de>
+ <201111041250.40613.heiko@sntech.de>
+ <003501cca365$bdbd0e90$39372bb0$%kim@samsung.com>
+ <201111291006.49821.heiko@sntech.de>
+Message-ID: <045c01ccaffa$f8976d20$e9c64760$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Joerg Roedel wrote:
+Heiko St?bner wrote:
 > 
-> On Fri, Nov 18, 2011 at 06:47:28PM +0900, KyongHo Cho wrote:
-> > Changes since v6:
-> > - Totally rewrite exynos_iommu_map() and exynos_iommu_unmap() according
-> >   to the change in iommu_map() and iommu_unmap().
-> > - Change special slab for Lv2 page table to kmalloc().
+> Am Dienstag, 15. November 2011, 08:11:05 schrieb Kukjin Kim:
+> > Kukjin Kim wrote:
+> > > Heiko St?bner wrote:
+> > > > Am Sonntag 23 Oktober 2011, 00:12:14 schrieb Heiko St?bner:
+> > > > > These days most Samsung stuff gets in the kernel through Kukjin
+> Kim.
+> > > > > This patch changes MAINTAINERS to reflect this.
+> > > > >
+> > > > > By adding Kukjin Kim to the maintainers for S3C2410, S3C244x and
+> > > > > S3C64xx alongside Ben Dooks the extra entries become identical to
+> the
+> > > > > base ARM/SAMSUNG entry and can move into it.
+> > > > >
+> > > > > Also the S3C2416 gets a maintainer through the s3c24* wildcard -
+> as
+> > > > > it did not have one until now.
+> > > > >
+> > > > > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> > > > > ---
+> > > >
+> > > > ping?
+> > >
+> > > Hi Heiko,
+> > >
+> > > Basically I'm ok on this but need to get the agreement from Ben Dooks.
+> >
+> > Hi Ben,
+> >
+> > How do you think about this?
+> > If you don't want this, please let me know.
+> seems ok then :-)
 > 
-> Okay, the driver looks good to me now. If there are no further
-> objections I am going to merge it for 3.3.
-> 
+Hi Heiko,
 
-Hi Joerg,
-
-Sorry for late response, I came back just now from family travelling...
-
-Anyway, that touches many Samsung stuff so it would be better if you could
-create separate topic branch which can be merged into Samsung tree. And if
-required, please add my ack on them.
-
+OK, will apply.
 Thanks.
 
 Best regards,
