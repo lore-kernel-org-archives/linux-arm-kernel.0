@@ -1,38 +1,54 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Thu, 1 Dec 2011 12:02:18 +0000
-Subject: [RFC PATCH 00/11] arm:omap:am33xx: Add basic voltage, power,
- clock & HWMOD data
-In-Reply-To: <87ty5lt6dm.fsf@ti.com>
-References: <1321809555-13833-1-git-send-email-hvaibhav@ti.com>
- <87ty5lt6dm.fsf@ti.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A804761D@DBDE01.ent.ti.com>
+From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
+Date: Thu, 1 Dec 2011 13:02:28 +0100
+Subject: [PATCH v2] IMX/SDMA : save the real count for one DMA transaction.
+In-Reply-To: <1322705583-18621-1-git-send-email-b32955@freescale.com>
+References: <1322705583-18621-1-git-send-email-b32955@freescale.com>
+Message-ID: <20183.27860.82295.661892@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Hilman, Kevin
-> Sent: Thursday, December 01, 2011 7:12 AM
-> To: Hiremath, Vaibhav
-> Cc: linux-omap at vger.kernel.org; tony at atomide.com; paul at pwsan.com; linux-
-> arm-kernel at lists.infradead.org; Cousson, Benoit
-> Subject: Re: [RFC PATCH 00/11] arm:omap:am33xx: Add basic voltage, power,
-> clock & HWMOD data
+Hi,
+
+Huang Shijie writes:
+> When we use the SDMA in the UART driver(such as imx6q), we will
+> meet one situation:
+>   Assume we set 64 bytes for the RX DMA buffer.
+>   The receiving DMA buffer has received some data, but not full.
+>   An Aging DMA request will be received by the SDMA controller if we enable the
+>   IDDMAEN(UCR4[6]) in this case.
 > 
-> Vaibhav Hiremath <hvaibhav@ti.com> writes:
+> So the UART driver needs to know the count of the real received bytes,
+> and push them to upper layer.
 > 
-> > This patch series adds support for AM335X basic voltage, power,
-> > clock and HWMOD data to existing OMAP framework.
+> Add two new fields to sdmac, and update the `residue` in sdma_tx_status().
 > 
-> This series is missing patch 05/11.
+> Signed-off-by: Huang Shijie <b32955@freescale.com>
+> ---
+>  drivers/dma/imx-sdma.c |   10 ++++++++--
+>  1 files changed, 8 insertions(+), 2 deletions(-)
 > 
-Ohhh...not sure what went bad.
+> diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
+> index f993955..05ba3a8 100644
+> --- a/drivers/dma/imx-sdma.c
+> +++ b/drivers/dma/imx-sdma.c
+> @@ -268,6 +268,7 @@ struct sdma_channel {
+>  	struct dma_async_tx_descriptor	desc;
+>  	dma_cookie_t			last_completed;
+>  	enum dma_status			status;
+> +	unsigned int			chn_count, chn_real_count;
+>
+It would be clearer and more maintenance friendly to have each struct
+member definition on a separate line.
 
-You can access it from, http://arago-project.org/git/people/?p=vaibhav/ti-psp-omap-video.git;a=commit;h=c2754eb60b65c6c574f2d6d871d8846358e40414
 
+Lothar Wa?mann
+-- 
+___________________________________________________________
 
-I had published the whole series @ Arago.
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
 
-Thanks,
-Vaibhav
-
-> Kevin
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
