@@ -1,19 +1,27 @@
-From: axel.lin@gmail.com (Axel Lin)
-Date: Thu, 01 Dec 2011 20:58:24 +0800
-Subject: [linux-next] drivers/i2c/busses/i2c-nuc900.c build error
-Message-ID: <1322744304.7477.1.camel@phoenix>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 1 Dec 2011 14:01:46 +0100
+Subject: [PATCH] mmc: mmci: Fixup error handling for dma
+In-Reply-To: <20111130222139.GW9581@n2100.arm.linux.org.uk>
+References: <1322578286-18727-1-git-send-email-ulf.hansson@stericsson.com>
+ <20111130222139.GW9581@n2100.arm.linux.org.uk>
+Message-ID: <CACRpkdacJxbFvSuXTsxtjZVbeTaJwNN4xy7-rvpa0U0Z4pDE_g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-I got below build error on linux-next 20111201.
-  CC      drivers/i2c/busses/i2c-nuc900.o
-drivers/i2c/busses/i2c-nuc900.c: In function 'nuc900_i2c_probe':
-drivers/i2c/busses/i2c-nuc900.c:600: error: request for member 'apbfreq' in something not a structure or union
-make[3]: *** [drivers/i2c/busses/i2c-nuc900.o] Error 1
-make[2]: *** [drivers/i2c/busses] Error 2
-make[1]: *** [drivers/i2c] Error 2
-make: *** [drivers] Error 2
+On Wed, Nov 30, 2011 at 11:21 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
 
-Regards,
-Axel
+>> ? ? ? if (!cmd->data || cmd->error) {
+>> - ? ? ? ? ? ? if (host->data)
+>> + ? ? ? ? ? ? if (host->data) {
+>> + ? ? ? ? ? ? ? ? ? ? /* Terminate the DMA transfer */
+>> + ? ? ? ? ? ? ? ? ? ? if (dma_inprogress(host))
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? mmci_dma_data_error(host);
+>
+> Doesn't this leave the DMA buffers mapped?
+
+Yep it needs an mmci_dma_unmap() call too AFAICT,
+Ulf will you update?
+
+Yours,
+Linus Walleij
