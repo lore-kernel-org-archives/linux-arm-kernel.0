@@ -1,53 +1,34 @@
-From: wim@iguana.be (Wim Van Sebroeck)
-Date: Thu, 1 Dec 2011 10:09:34 +0100
-Subject: [PATCH] watchdog: fix initialisation printout in s3c2410_wdt
-In-Reply-To: <045d01ccaffb$00710240$015306c0$%kim@samsung.com>
-References: <1321433173-17757-1-git-send-email-mad_soft@inbox.ru>
- <CAJuYYwTv3d9Wg8TDBEkc0r3BweUiLdqVwGdMU4iKpK0B+EM=GA@mail.gmail.com>
- <045d01ccaffb$00710240$015306c0$%kim@samsung.com>
-Message-ID: <20111201090934.GO23376@infomag.iguana.be>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu,  1 Dec 2011 17:21:04 +0800
+Subject: [PATCH 0/4] Add device tree support for mc13892 regulator driver
+Message-ID: <1322731268-12158-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kim,
+Changes since v1:
+ * Drop '[PATCH 2/5] regulator: fix label names used in device tree
+   bindings' which has been picked up
+ * Add binding document for mfd/mc13xxx-core device tree support
+ * Fix regulator/fixed.c breakage caused by interface change on
+   of_get_regulator_init_data()
+ * Reword the commit message of patch #2 a little bit to make the
+   reason for changing clear
+ * Retrieve the irq from gpio irq domain
 
-> Thomas Abraham wrote:
-> > 
-> > On 16 November 2011 14:16, Dmitry Artamonow <mad_soft@inbox.ru> wrote:
-> > > Looks like a typo creeped in, and driver prints
-> > > s3c2410-wdt s3c2410-wdt: watchdog active, reset abled, irq abled
-> > >
-> > > instead of
-> > > s3c2410-wdt s3c2410-wdt: watchdog active, reset enabled, irq enabled
-> > >
-> > > Also it may completely disinform about irq status, as it prints
-> > > "irq enabled" when S3C2410_WTCON_INTEN is in fact 0.
-> > >
-> > > Fix it.
-> > >
-> > > Signed-off-by: Dmitry Artamonow <mad_soft@inbox.ru>
-> > > ---
-> > >
-> > > It seems to be here for a long time, but I don't think it's
-> > > important enough for cc-ing stable.
-> > >
-> > > Also I haven't tested it, as I don't have a hardware, but it's
-> > > rather trivial (and yes, I checked with datasheet that 1 in
-> > > S3C2410_WTCON_*EN bits really means 'enabled')
-> > >
-> > 
-> > Tested on Exynos4210 based Origen board. This patch fixed in incorrect
-> > "irq enabled" message at bootup. Thanks for this fix.
-> > 
-> > Tested-by: Thomas Abraham <thomas.abraham@linaro.org>
-> > 
-> 
-> Acked-by: Kukjin Kim <kgene.kim@samsung.com>
-> 
-> Hi Wim,
-> Please pick this up in your tree and if any problem, let me know.
+Shawn Guo (4):
+      mfd: mc13xxx: add device tree probe support
+      regulator: pass device_node to of_get_regulator_init_data()
+      regulator: mc13892: add device tree probe support
+      arm/imx: add mc13892 support into imx51-babbage.dts
 
-See commit 20403e845f9988446c5b48024ff4d0c3a5929f7d in the linux git tree.
-
-Kind regards,
-Wim.
+ Documentation/devicetree/bindings/mfd/mc13xxx.txt |   50 ++++++++++
+ arch/arm/boot/dts/imx51-babbage.dts               |  103 ++++++++++++++++++++-
+ drivers/mfd/mc13xxx-core.c                        |  106 +++++++++++++++------
+ drivers/regulator/fixed.c                         |    2 +-
+ drivers/regulator/mc13892-regulator.c             |   43 ++++++--
+ drivers/regulator/mc13xxx-regulator-core.c        |   57 +++++++++++
+ drivers/regulator/mc13xxx.h                       |   20 ++++
+ drivers/regulator/of_regulator.c                  |    7 +-
+ include/linux/mfd/mc13xxx.h                       |    1 +
+ include/linux/regulator/of_regulator.h            |    6 +-
+ 10 files changed, 345 insertions(+), 50 deletions(-)
