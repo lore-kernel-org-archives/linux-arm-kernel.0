@@ -1,38 +1,41 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 1 Dec 2011 18:37:10 +0000
-Subject: [PATCH v3 4/5] ARM: vexpress: Initial RS1 memory map support
-In-Reply-To: <20111201111049.GB2915@opensource.wolfsonmicro.com>
-References: <1322579473-8804-1-git-send-email-pawel.moll@arm.com>
- <1322579473-8804-5-git-send-email-pawel.moll@arm.com>
- <20111130153749.GE2045@localhost.localdomain>
- <1322673302.3180.25.camel@hornet.cambridge.arm.com>
- <20111130175410.GJ2045@localhost.localdomain>
- <alpine.LFD.2.02.1111301522340.2357@xanadu.home>
- <20111130204805.GA5698@sirena.org.uk>
- <alpine.LFD.2.02.1111301604230.2357@xanadu.home>
- <20111201111049.GB2915@opensource.wolfsonmicro.com>
-Message-ID: <20111201183710.GD9581@n2100.arm.linux.org.uk>
+From: dwalker@fifo99.com (Daniel Walker)
+Date: Thu, 01 Dec 2011 10:39:05 -0800
+Subject: [PATCH 1/3] ARM: msm: Remove MSM7x00 support
+In-Reply-To: <20111201181736.GA13182@huya.qualcomm.com>
+References: <1322699344-28422-1-git-send-email-davidb@codeaurora.org>
+ <1322752657.3704.2.camel@m0nster>
+ <20111201181736.GA13182@huya.qualcomm.com>
+Message-ID: <1322764745.3704.9.camel@m0nster>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 01, 2011 at 11:10:50AM +0000, Mark Brown wrote:
-> On Wed, Nov 30, 2011 at 04:38:26PM -0500, Nicolas Pitre wrote:
-> > On Wed, 30 Nov 2011, Mark Brown wrote:
+On Thu, 2011-12-01 at 10:17 -0800, David Brown wrote:
+> On Thu, Dec 01, 2011 at 07:17:37AM -0800, Daniel Walker wrote:
+> > On Wed, 2011-11-30 at 16:29 -0800, David Brown wrote:
+> > > -       default ARCH_MSM7X00A
+> > > -
+> > > -config ARCH_MSM7X00A
+> > > -       bool "MSM7x00A / MSM7x01A"
+> > > -       select MACH_TROUT if !MACH_HALIBUT
+> > > -       select ARCH_MSM_ARM11
+> > > -       select MSM_SMD
+> > > -       select MSM_SMD_PKG3
+> > > -       select CPU_V6
+> > > -       select GPIO_MSM_V1
+> > > -       select MSM_PROC_COMM
+> > > -       select HAS_MSM_DEBUG_UART_PHYS 
+> > 
+> > 
+> > Your trying to drop G1 support ? I have a G1 sitting on my desk, and I
+> > know many other people working on the kernel have G1's .. 
 > 
-> > > Oh, dear.  Any pointers to the discussions on the u-boot side?
-> 
-> > Certainly.  Many different threads actually.  Here's a few:
-> 
-> OK, thanks - I see Stephen just followed up and Wolfgang seems
-> moderately happy so hopefully there will be some progress.  It also
-> occurs to me that there's at least Qi also using uImages, hopefully
-> other bootloaders are going to be easier to deal with (or already cope).
+> If someone is willing to step up and make it work, then we can keep it
+> around.  My only G1 is fried, so I have no way to do anything other
+> than keep it compiling.
 
-Most boot loaders on ARM prior to uboot either allow the load address
-to be specified via the command script, or they already load the kernel
-to a fixed address into system RAM - using the kernels native zImage
-binary format.
+Unfortunately, You can't remove it regardless of whether or not you have
+one to test on.. Your job is to do the best you can to keep it working
+and maintained. If you don't have one then you can't boot test but you
+still have to your best to keep it as close to working as possible.
 
-So these other boot loaders shouldn't be any problem what so ever.  In
-fact they've already been working well with relocatable zImages for
-many many years.
+Daniel
