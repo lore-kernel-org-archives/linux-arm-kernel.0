@@ -1,92 +1,80 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 1 Dec 2011 13:26:25 +0000
-Subject: [PATCH v2 0/6] Consolidate identity mapping code in idmap.c
-In-Reply-To: <20111130221800.GV9581@n2100.arm.linux.org.uk>
-References: <1322504937-24718-1-git-send-email-will.deacon@arm.com>
- <20111130221800.GV9581@n2100.arm.linux.org.uk>
-Message-ID: <20111201132625.GA27656@mudshark.cambridge.arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 1 Dec 2011 13:33:58 +0000
+Subject: [patch 1/1] ixp4xx: add io{read,write}{16,32}be functions
+In-Reply-To: <20111201110520.631683330@rtp-net.org>
+References: <20111201110520.631683330@rtp-net.org>
+Message-ID: <201112011333.59001.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
-
-On Wed, Nov 30, 2011 at 10:18:00PM +0000, Russell King - ARM Linux wrote:
-> On Mon, Nov 28, 2011 at 06:28:51PM +0000, Will Deacon wrote:
-> > This is version 2 of the patch series originally posted here:
-> > 
-> >  http://lists.infradead.org/pipermail/linux-arm-kernel/2011-November/073033.html
-> > 
-> > Changes from v1 include:
-> > 	* Updated following Catalin's comments
-> > 	* Rebased onto rmk/devel-stable
-> > 	* Includes update to SMP booting so that the idmap_pgd can be
-> > 	  used there too
-> > 
-> > This is a pre-requisite for my kexec patches, which I will post separately.
-> > 
-> > All feedback welcome.
+On Thursday 01 December 2011, Arnaud Patard wrote:
+> Some driver are now requiring some be io functions, as noted in
+> commit (06901bd83412db5a31de7526e637101ed0c2c472). Otherwise, it may lead
+> to build errors like this one :
 > 
-> This patch set looks fine.
+> drivers/net/mlx4/en_tx.c: In function ???mlx4_en_xmit???:
+> drivers/net/mlx4/en_tx.c:815: error: implicit declaration of function ???iowrite32be???
+> make[3]: *** [drivers/net/mlx4/en_tx.o] Error 1
+> make[2]: *** [drivers/net/mlx4] Error 2
+> make[1]: *** [drivers/net] Error 2
+> 
+> Signed-off-by: Arnaud Patard <arnaud.patard@rtp-net.org>
+> 
+> Index: linux-2.6/arch/arm/mach-ixp4xx/include/mach/io.h
+> ===================================================================
+> --- linux-2.6.orig/arch/arm/mach-ixp4xx/include/mach/io.h	2011-10-27 22:19:37.000000000 +0200
+> +++ linux-2.6/arch/arm/mach-ixp4xx/include/mach/io.h	2011-12-01 09:23:47.000000000 +0100
+> @@ -385,6 +385,20 @@ static inline unsigned int ioread16(cons
+>  #endif
+>  }
+>  
+> +#define	ioread16be(p)			ioread16be(p)
+> +static inline unsigned int ioread16be(const void __iomem *addr)
+> +{
+> +	unsigned long port = (unsigned long __force)addr;
+> +	if (__is_io_address(port))
+> +		return	(unsigned int)inw(port & PIO_MASK);
+> +	else
+> +#ifndef CONFIG_IXP4XX_INDIRECT_PCI
+> +		return be16_to_cpu((__force __be16)__raw_readw(addr));
+> +#else
+> +		return be16_to_cpu((__force __le16)(unsigned int)__indirect_readw(addr));
+> +#endif
+> +}
 
-Great, thanks for looking at it. Here's the pull request against
-devel-stable. I can use another commit as a base if you prefer.
+You forgot to swap bytes in case of PIO.
 
-Once you've taken this, I'll post another series of my soft reboot patch
-series to the list (not required for LPAE but I think it could be merged for
-3.3 since it fixes soft reboot along with the reset changes you've made).
+The cast to from 16 bit to 32 bit and back looks fishy.
 
-Cheers,
+I think it would be nicer to avoid the excessive #ifdef here and in the
+existing code and just express this like the generic ioread* functions:
 
-Will
+#ifndef CONFIG_IXP4XX_INDIRECT_PCI
+#define __indirect_readb  __raw_readb
+#define __indirect_readw  __raw_readw
+#define __indirect_readl  __raw_readl
+#define __indirect_writeb __raw_writeb
+#define __indirect_writew __raw_writew
+#define __indirect_writel __raw_writel
+#endif
 
+unsigned int ioread16be(void __iomem *addr)
+{
+        IO_COND(addr,
+		return swab16(inw(port)),
+		return be16_to_cpu(addr)(__force __le16)__indirect_readw(addr)));
+        return 0xffff;
+}
 
-The following changes since commit 2d13ccaa8797d7e599f3792aed4b1e44b47f94a5:
+More generally speaking, we might want to formalize the indirect PCI access
+and put it into common code eventually, at least of highbank turns out to
+need this as well.  Given the complexity of the indirect functions, it's
+probably best at that stage to just move all of it to an out-of-line
+implementation.
 
-  Merge branch 'irqchip-consolidation' of git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms into devel-stable (2011-11-21 21:56:56 +0000)
+Deepak, you are listed as the original author of this file. Do you remember
+if you did any tests back when you implemented this to determine if an
+inline implementation was actually better here than moving it all into
+extern functions?
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git kexec/idmap
-
-Will Deacon (6):
-      ARM: idmap: populate identity map pgd at init time using .init.text
-      ARM: suspend: use idmap_pgd instead of suspend_pgd
-      ARM: proc-*.S: place cpu_reset functions into .idmap.text section
-      ARM: idmap: use idmap_pgd when setting up mm for reboot
-      ARM: head.S: only include __turn_mmu_on in the initial identity mapping
-      ARM: SMP: use idmap_pgd for mapping MMU enable during secondary booting
-
- arch/arm/include/asm/idmap.h   |   14 +++++++++
- arch/arm/include/asm/pgtable.h |    3 --
- arch/arm/kernel/head.S         |   18 ++++++-----
- arch/arm/kernel/sleep.S        |    2 +
- arch/arm/kernel/smp.c          |   32 +-------------------
- arch/arm/kernel/suspend.c      |   18 ++---------
- arch/arm/kernel/vmlinux.lds.S  |    7 ++++
- arch/arm/mm/idmap.c            |   63 +++++++++++++++++++---------------------
- arch/arm/mm/proc-arm1020.S     |    3 ++
- arch/arm/mm/proc-arm1020e.S    |    3 ++
- arch/arm/mm/proc-arm1022.S     |    3 ++
- arch/arm/mm/proc-arm1026.S     |    3 ++
- arch/arm/mm/proc-arm6_7.S      |    4 ++
- arch/arm/mm/proc-arm720.S      |    3 ++
- arch/arm/mm/proc-arm740.S      |    3 ++
- arch/arm/mm/proc-arm7tdmi.S    |    3 ++
- arch/arm/mm/proc-arm920.S      |    3 ++
- arch/arm/mm/proc-arm922.S      |    3 ++
- arch/arm/mm/proc-arm925.S      |    3 ++
- arch/arm/mm/proc-arm926.S      |    3 ++
- arch/arm/mm/proc-arm940.S      |    3 ++
- arch/arm/mm/proc-arm946.S      |    3 ++
- arch/arm/mm/proc-arm9tdmi.S    |    3 ++
- arch/arm/mm/proc-fa526.S       |    3 ++
- arch/arm/mm/proc-feroceon.S    |    3 ++
- arch/arm/mm/proc-mohawk.S      |    3 ++
- arch/arm/mm/proc-sa110.S       |    3 ++
- arch/arm/mm/proc-sa1100.S      |    3 ++
- arch/arm/mm/proc-v6.S          |    3 ++
- arch/arm/mm/proc-v7.S          |    2 +
- arch/arm/mm/proc-xsc3.S        |    3 ++
- arch/arm/mm/proc-xscale.S      |    3 ++
- 32 files changed, 140 insertions(+), 89 deletions(-)
- create mode 100644 arch/arm/include/asm/idmap.h
+	Arnd
