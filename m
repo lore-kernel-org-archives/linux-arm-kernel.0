@@ -1,55 +1,48 @@
-From: sshtylyov@ru.mvista.com (Sergei Shtylyov)
-Date: Thu, 01 Dec 2011 14:46:11 +0400
-Subject: [PATCH] arm: prevent inlining in arxescsi.c causing build failures
-In-Reply-To: <20111201080613.GF26618@pengutronix.de>
-References: <1322713611-30003-1-git-send-email-paul.gortmaker@windriver.com>
- <20111201080613.GF26618@pengutronix.de>
-Message-ID: <4ED75AF3.2090901@ru.mvista.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 1 Dec 2011 11:57:18 +0100
+Subject: flatmem broken for nommu? [Was: Re: does non-continuous RAM
+ means I need to select the sparse memory model?]
+In-Reply-To: <CAOMZO5DX_ZvCOu+pqZpJ7Ni2B=qmSFCZTHnuzKt==OsBsJZH=Q@mail.gmail.com>
+References: <20111129203010.GA26618@pengutronix.de>
+ <CAOMZO5DX_ZvCOu+pqZpJ7Ni2B=qmSFCZTHnuzKt==OsBsJZH=Q@mail.gmail.com>
+Message-ID: <20111201105718.GJ26618@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Tue, Nov 29, 2011 at 10:39:10PM -0200, Fabio Estevam wrote:
+> Hi Uwe,
+> 
+> 2011/11/29 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+> > Hello,
+> >
+> > I'm currently working on a new arch port and my current machine has RAM
+> > at 0x10000000 and 0x80000000. So there is a big hole between the two
+> > banks. When selecting the sparse memory model it works, but when
+> > selecting flat the machine runs into a BUG in mark_bootmem() called by
+> > free_unused_memmap() to free the space between the two banks.
+> 
+> My understanding is that you have to select ARCH_HAS_HOLES_MEMORYMODEL.
+I think that is not necessary.
+ 
+> > Is that expected (meaning I cannot use the flat model)? I currently
+> > don't have another machine handy that has >1 memory back to test that.
+> 
+> In case you have access to a MX35PDK you can try on this board as it does have
+> the memory hole.
+No I havn't, but I just used a 128MB machine and changed that in the
+.fixup callback to 64MB + 32MB with a 32MB hole in between and it works
+fine without ARCH_HAS_HOLES_MEMORYMODEL.
 
-On 01.12.2011 12:06, Uwe Kleine-K?nig wrote:
+I debugged the problem a bit further and one symptom is that
 
->> The following failure is seen in routine coverage builds:
+	struct page *mem_map
 
->>    CC [M]  drivers/scsi/arm/arxescsi.o
->> /tmp/cccEyiO7.s: Assembler messages:
->> /tmp/cccEyiO7.s:334: Error: symbol `.loop_1' is already defined
->> /tmp/cccEyiO7.s:337: Error: symbol `.loop_2' is already defined
->> /tmp/cccEyiO7.s:343: Error: symbol `.loop_3' is already defined
->> /tmp/cccEyiO7.s:365: Error: symbol `.loop_1' is already defined
->> /tmp/cccEyiO7.s:368: Error: symbol `.loop_2' is already defined
->> /tmp/cccEyiO7.s:374: Error: symbol `.loop_3' is already defined
->> make[4]: *** [drivers/scsi/arm/arxescsi.o] Error 1
+is NULL for me. That looks wrong. I guess this is just broken for nommu.
+I will dig into that later today.
 
->> It is caused by multiple inline of arxescsi_pseudo_dma_write()
->> which is responsible for the above labels.  Marking the fcn
->> as non-inline fixes the issue.
+Best regards
+Uwe
 
->> Signed-off-by: Paul Gortmaker<paul.gortmaker@windriver.com>
-
-> Is that a compiler or a code issue? If it's the compiler please fix
-> that. If it's the code, then please document why you added the noinline.
-
-> Having said that, "my" compiler compiles drivers/scsi/arm/arxescsi.o
-> just fine (using rpc_defconfig on v3.2-rc2).
-
->> diff --git a/drivers/scsi/arm/arxescsi.c b/drivers/scsi/arm/arxescsi.c
->> index a750aa7..2608a9e 100644
->> --- a/drivers/scsi/arm/arxescsi.c
->> +++ b/drivers/scsi/arm/arxescsi.c
->> @@ -72,7 +72,8 @@ arxescsi_dma_setup(struct Scsi_Host *host, struct scsi_pointer *SCp,
->>   	return fasdma_pseudo;
->>   }
->>
->> -static void arxescsi_pseudo_dma_write(unsigned char *addr, void __iomem *base)
->> +static noinline void
->> +arxescsi_pseudo_dma_write(unsigned char *addr, void __iomem *base)
-
-> Shouldn't this line get some indention?
-
-    No, usually such lines don't get indented.
-
-WBR, Sergei
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
