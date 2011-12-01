@@ -1,58 +1,64 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 1 Dec 2011 21:55:37 +0100
-Subject: does non-continuous RAM means I need to select the sparse memory
- model?
-In-Reply-To: <20111201182852.GC9581@n2100.arm.linux.org.uk>
-References: <20111129203010.GA26618@pengutronix.de>
- <20111201182852.GC9581@n2100.arm.linux.org.uk>
-Message-ID: <20111201205537.GO26618@pengutronix.de>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Thu, 1 Dec 2011 12:57:28 -0800
+Subject: [PATCH 2/2] gpio/tegra: Dynamically allocate IRQ base, and
+ support DT
+In-Reply-To: <20111201165518.GH4556@totoro>
+References: <1322700336-26866-1-git-send-email-swarren@nvidia.com>
+ <1322700336-26866-2-git-send-email-swarren@nvidia.com>
+ <4ED78461.40006@gmail.com> <20111201141112.GG4556@totoro>
+ <74CDBE0F657A3D45AFBB94109FB122FF174FDB01DD@HQMAIL01.nvidia.com>
+ <20111201165518.GH4556@totoro>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF174FDB02BF@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 01, 2011 at 06:28:52PM +0000, Russell King - ARM Linux wrote:
-> On Tue, Nov 29, 2011 at 09:30:10PM +0100, Uwe Kleine-K?nig wrote:
-> > I'm currently working on a new arch port and my current machine has RAM
-> > at 0x10000000 and 0x80000000. So there is a big hole between the two
-> > banks. When selecting the sparse memory model it works, but when
-> > selecting flat the machine runs into a BUG in mark_bootmem() called by
-> > free_unused_memmap() to free the space between the two banks.
+Jamie Iles wrote at Thursday, December 01, 2011 9:55 AM:
+> On Thu, Dec 01, 2011 at 08:52:49AM -0800, Stephen Warren wrote:
+> > Jamie Iles wrote at Thursday, December 01, 2011 7:11 AM:
+> > > On Thu, Dec 01, 2011 at 07:42:57AM -0600, Rob Herring wrote:
+> > > > On 11/30/2011 06:45 PM, Stephen Warren wrote:
+...
+> > > > > +	irq_domain.irq_base = irq_alloc_descs(-1, 0, TEGRA_NR_GPIOS, 0);
+> > > > > +	if (irq_domain.irq_base < 0) {
+> > > > > +		dev_err(&pdev->dev, "Couldn't allocate IRQ numbers\n");
+> > > > > +		return -ENODEV;
+> > > > > +	}
+> > > > > +	irq_domain.nr_irq = TEGRA_NR_GPIOS;
+> > > > > +	irq_domain.ops = &irq_domain_ops;
+> > > >
+> > > > Why don't you just use irq_domain_simple_ops?
+> > >
+> > > This would need the patch I posted earlier
+> > > (https://lkml.org/lkml/2011/12/1/109) so they can work for the
+> > > !CONFIG_OF case ;-)
+> >
+> > Part of my reasoning was that simple_ops appeared to be intended for
+> > DT-based controllers; is it safe to use those ops for a controller that
+> > wasn't instantiated from DT? I know that right now, the only op in that
+> > structure is dt_translate, and that won't ever be called for the non-DT
+> > case, but is there a guarantee that more functions won't be added to
+> > the simple ops, and that they won't assume DT is in use, and fail if
+> > not?
+> >
+> > If these are safe to use in the non-DT case, then yet I could build off
+> > Jamie's patch, although managing the dependencies might be awkward.
 > 
-> Well, it looks like you have the answer in your latest email:
-> 
-> > Apart from that it seems I cannot use flatmem as is on my machine. It
-> > has only 128kiB at 0x10000000 + 1MiB at 0x80000000 and needs 14MiB to hold the
-> > table of "struct page"s.
-> 
-> Which shows that there's no possible way to use flatmem in this platform.
-> 
-> Now, to use sparsemem with this, sparsemem people will tell you that
-> each sparsemem section must be fully populated.  So, as your minimum
-> memory size is 128kiB, your sparsemem section size must be 128kiB.
-> This makes SECTION_SIZE_BITS be 17.
-> 
-> You need to span to 0x80000000+, which means you need MAX_PHYSMEM_BITS
-> to be 32.
-> 
-> These two together means you're in for having an array of 2^(32 - 17) =
-> 32768 pointers to struct section for starters.  That takes 128kiB.
-> Now add in the struct page structures, which for 128kiB of memory will
-> be 1kiB.  Now add 9 struct section's as well...
-> 
-> What I'm pointing out is that in the scenario you appear to have, trying
-> to use the small pool of memory which is soo dislocated from the rest of
-> memory is a waste of effort.  Adding it to the pool means that you require
-> more memory for the management data structures than you gain from adding
-> it to the system.  The net benefit from trying to use it is actually
-> negative.
-> 
-> So, forget that the 128kiB chunk of memory exists - at that size and
-> distance from the rest of memory its really not worth bothering with.
-many thanks for your description. I'll go with flatmem skipping the
-128kiB bank now.
+> Yes, it's absolutely fine to use it just that irq_simple_ops isn't
+> currently exported unless you have CONFIG_OF_IRQ set so you'd get an
+> undefined reference for !CONFIG_OF at the moment.
 
-Best regards
-Uwe
+OK, sounds good.
+
+So, I think we have a few options:
+1) Merge my change as-is, and simplify it later once your patch is in.
+2) Put your change in a branch, and merge it into both its usual place,
+and the Tegra/ARM branches, so I can rebase my patch on top of it.
+3) Have the usual maintainer ack it (I see Rob already did, but I think
+Thomas is the maintainer here right?) and just put both patches into the
+Tegra/ARM tree. This of course means non-Tegra branches have to wait for
+it rather than the other way around.
+
+(1) seems simplest, but (2) is probably doable. Thomas?
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+nvpublic
