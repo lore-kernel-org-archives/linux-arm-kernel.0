@@ -1,75 +1,129 @@
-From: dirk.behme@de.bosch.com (Dirk Behme)
-Date: Thu, 1 Dec 2011 11:32:43 +0100
-Subject: [PATCH] imx: add polled io uart methods
-In-Reply-To: <20111019035249.GA20598@lithium.compnerd.org>
-References: <CAOMZO5CdVqCu8VvaYmxhDW-anG2NQt8Hn3CnM_a48g9V0q9bmA@mail.gmail.com>	<1318821721-11965-1-git-send-email-compnerd@compnerd.org>	<1318821721-11965-2-git-send-email-compnerd@compnerd.org>	<20111018072733.GC21504@pengutronix.de>
- <20111019035249.GA20598@lithium.compnerd.org>
-Message-ID: <4ED757CB.8030000@de.bosch.com>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Thu, 1 Dec 2011 10:52:52 +0000
+Subject: [PATCH-V4 3/3] arm:omap:am33xx: Add low level debugging support
+In-Reply-To: <87r50pxk1i.fsf@ti.com>
+References: <1320946837-32507-1-git-send-email-hvaibhav@ti.com>
+ <1320946837-32507-4-git-send-email-hvaibhav@ti.com> <87r50pxk1i.fsf@ti.com>
+Message-ID: <79CD15C6BA57404B839C016229A409A80474A5@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19.10.2011 05:52, Saleem Abdulrasool wrote:
-> On Tue, 18 Oct 2011, Uwe Kleine-K?nig wrote:
+> -----Original Message-----
+> From: Hilman, Kevin
+> Sent: Thursday, December 01, 2011 5:03 AM
+> To: Hiremath, Vaibhav
+> Cc: linux-omap at vger.kernel.org; tony at atomide.com; linux-arm-
+> kernel at lists.infradead.org; paul at pwsan.com; Mohammed, Afzal
+> Subject: Re: [PATCH-V4 3/3] arm:omap:am33xx: Add low level debugging
+> support
 > 
->> On Sun, Oct 16, 2011 at 08:22:01PM -0700, Saleem Abdulrasool wrote:
->>> These methods are invoked if the iMX uart is used in conjuction with kgdb during
->>> early boot.  In order to access the UART without the interrupts, the kernel uses
->>> the basic polling methods for IO with the device.  With these methods
->>> implemented, it is now possible to enable kgdb during early boot over serial.
->>>
->>> Signed-off-by: Saleem Abdulrasool <compnerd@compnerd.org>
->>> ---
->>>  drivers/tty/serial/imx.c |   77 ++++++++++++++++++++++++++++++++++++++++++++++
->>>  1 files changed, 77 insertions(+), 0 deletions(-)
->>>
->>> diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
->>> index 7e91b3d..4fcf9ca 100644
->>> --- a/drivers/tty/serial/imx.c
->>> +++ b/drivers/tty/serial/imx.c
->>> @@ -102,6 +102,7 @@
->>>  #define  UCR2_STPB       (1<<6)	 /* Stop */
->>>  #define  UCR2_WS         (1<<5)	 /* Word size */
->>>  #define  UCR2_RTSEN      (1<<4)	 /* Request to send interrupt enable */
->>> +#define  UCR2_ATEN       (1<<3)  /* Aging Timer Enable */
->>>  #define  UCR2_TXEN       (1<<2)	 /* Transmitter enabled */
->>>  #define  UCR2_RXEN       (1<<1)	 /* Receiver enabled */
->>>  #define  UCR2_SRST 	 (1<<0)	 /* SW reset */
->>> @@ -1075,6 +1076,77 @@ imx_verify_port(struct uart_port *port, struct serial_struct *ser)
->>>  	return ret;
->>>  }
->>>  
->>> +
->> needless newline
+> Hi Vaibhav,
 > 
-> Removed.
+> Vaibhav Hiremath <hvaibhav@ti.com> writes:
 > 
->>> +#if defined(CONFIG_CONSOLE_POLL)
->>> +static int imx_poll_get_char(struct uart_port *port)
->>> +{
->>> +	volatile unsigned int status;
->> Why is that volatile?
+> > From: Afzal Mohammed <afzal@ti.com>
+> >
+> > Add support for low level debugging on AM335X EVM (AM33XX family).
+> > Currently only support for UART1 console, which is used on AM335X EVM
+> > is added.
+> >
+> > Signed-off-by: Afzal Mohammed <afzal@ti.com>
+> > Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
 > 
-> It shouldnt be, removed the volatile attribute.  Im not sure why that was there,
-> it really doesnt make any sense since there isnt any inline assembler there to
-> confuse the compiler.
+> One minor comment below...
 > 
->>> +	unsigned int cr1, cr2, cr3;
->>> +	unsigned char c;
->>> +
->>> +	/* save control registers */
->>> +	cr1 = readl(port->membase + UCR1);
->>> +	cr2 = readl(port->membase + UCR2);
->>> +	cr3 = readl(port->membase + UCR3);
->>> +
->> Best regards
->> Uwe
+> > ---
+> >  arch/arm/mach-omap2/include/mach/debug-macro.S |   17 ++++++++++++++++-
+> >  arch/arm/plat-omap/include/plat/serial.h       |    4 ++++
+> >  arch/arm/plat-omap/include/plat/uncompress.h   |    6 ++++++
+> >  3 files changed, 26 insertions(+), 1 deletions(-)
+> >
+> > diff --git a/arch/arm/mach-omap2/include/mach/debug-macro.S
+> b/arch/arm/mach-omap2/include/mach/debug-macro.S
+> > index 13f98e5..ce543ae 100644
+> > --- a/arch/arm/mach-omap2/include/mach/debug-macro.S
+> > +++ b/arch/arm/mach-omap2/include/mach/debug-macro.S
+> > @@ -72,6 +72,8 @@ omap_uart_lsr:	.word	0
+> >  		beq	82f			@ configure UART2
+> >  		cmp	\rp, #TI816XUART3	@ ti816x UART offsets different
+> >  		beq	83f			@ configure UART3
+> > +		cmp	\rp, #AM33XXUART1	@ AM33XX UART offsets different
+> > +		beq	84f			@ configure UART1
+> >  		cmp	\rp, #ZOOM_UART		@ only on zoom2/3
+> >  		beq	95f			@ configure ZOOM_UART
+> >
+> > @@ -100,7 +102,9 @@ omap_uart_lsr:	.word	0
+> >  		b	98f
+> >  83:		mov	\rp, #UART_OFFSET(TI816X_UART3_BASE)
+> >  		b	98f
+> > -
+> > +84:		ldr	\rp, =AM33XX_UART1_BASE
+> > +		and	\rp, \rp, #0x00ffffff
+> > +		b	97f
+> >  95:		ldr	\rp, =ZOOM_UART_BASE
+> >  		str	\rp, [\tmp, #0]		@ omap_uart_phys
+> >  		ldr	\rp, =ZOOM_UART_VIRT
+> > @@ -110,6 +114,17 @@ omap_uart_lsr:	.word	0
+> >  		b	10b
+> >
+> >  		/* Store both phys and virt address for the uart */
 > 
-> Thanks for the review.  Ive not attached the updated patch since Id like to make
-> the changes that Sascha suggested, and I shall post the updated patch
-> subsequently.
+> Please update this comment to clarify that this block is for AM33xx
+> only, and update the following one as the catch all.
+> 
+Ok, will update.
 
-Any update on this?
+> > +97:		add	\rp, \rp, #0x44000000	@ phys base
+> > +		str	\rp, [\tmp, #0]		@ omap_uart_phys
+> > +		sub	\rp, \rp, #0x44000000	@ phys base
+> > +		add	\rp, \rp, #0xf9000000	@ virt base
+> > +		str	\rp, [\tmp, #4]		@ omap_uart_virt
+> > +		mov	\rp, #(UART_LSR << OMAP_PORT_SHIFT)
+> > +		str	\rp, [\tmp, #8]		@ omap_uart_lsr
+> 
+> The last 3 lines are unnecessarily duplicated.  They can be shared with
+> the common block that follows.  IOW, only the base addresses are
+> different, the rest of the operations are shared.
+> 
+I thought about this, but then code looks complex & ugly, just to save
+duplication of 3 lines. So I added separate code for AM33xx devices.
 
-Many thanks
+If you still think it should be done, then How about below change -
 
-Dirk
+
+-               /* Store both phys and virt address for the uart */
+-98:            add     \rp, \rp, #0x48000000   @ phys base
++               /* AM33XX: Store both phys and virt address for the uart */
++96:            add     \rp, \rp, #0x44000000   @ phys base
+                str     \rp, [\tmp, #0]         @ omap_uart_phys
+-               sub     \rp, \rp, #0x48000000   @ phys base
+-               add     \rp, \rp, #0xfa000000   @ virt base
+-               str     \rp, [\tmp, #4]         @ omap_uart_virt
++               sub     \rp, \rp, #0x44000000   @ phys base
++               add     \rp, \rp, #0xf9000000   @ virt base
++97:            str     \rp, [\tmp, #4]         @ omap_uart_virt
+                mov     \rp, #(UART_LSR << OMAP_PORT_SHIFT)
+                str     \rp, [\tmp, #8]         @ omap_uart_lsr
+
+                b       10b
+
++               /* Store both phys and virt address for the uart */
++98:            add     \rp, \rp, #0x48000000   @ phys base
++               str     \rp, [\tmp, #0]         @ omap_uart_phys
++               sub     \rp, \rp, #0x48000000   @ phys base
++               add     \rp, \rp, #0xfa000000   @ virt base
++               b       97b
++
+
+
+Thanks,
+Vaibhav
+
+> > +		b	10b
+> > +
+> > +		/* Store both phys and virt address for the uart */
+> >  98:		add	\rp, \rp, #0x48000000	@ phys base
+> >  		str	\rp, [\tmp, #0]		@ omap_uart_phys
+> >  		sub	\rp, \rp, #0x48000000	@ phys base
+> 
+> Kevin
