@@ -1,31 +1,82 @@
-From: tixy@yxit.co.uk (Tixy)
-Date: Thu, 01 Dec 2011 07:40:55 +0000
-Subject: [PATCH] ARM: kprobes: Restrict probing SWP instructions to
- ARMv5 and below
-In-Reply-To: <20111130235618.GX9581@n2100.arm.linux.org.uk>
-References: <1322396080.2408.5.camel@computer2>
- <20111130235618.GX9581@n2100.arm.linux.org.uk>
-Message-ID: <1322725255.2352.8.camel@computer2>
+From: richard.zhao@linaro.org (Richard Zhao)
+Date: Thu, 1 Dec 2011 15:42:59 +0800
+Subject: [RFC V1 3/8] clk: Add support for simple dividers
+In-Reply-To: <CAPtuhThdt3Q63r_mP7aanXdgLH1si2pHfRr_Yg1GRhREqdDmfg@mail.gmail.com>
+References: <1322046755-13511-1-git-send-email-richard.zhao@linaro.org>
+ <1322046755-13511-4-git-send-email-richard.zhao@linaro.org>
+ <CAPtuhThdt3Q63r_mP7aanXdgLH1si2pHfRr_Yg1GRhREqdDmfg@mail.gmail.com>
+Message-ID: <20111201074253.GD8684@b20223-02.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2011-11-30 at 23:56 +0000, Russell King - ARM Linux wrote:
-> On Sun, Nov 27, 2011 at 12:14:40PM +0000, Tixy wrote:
-> > The SWP instruction is deprecated on ARMv6 and with ARMv7 it will be
-> > UNDEFINED when CONFIG_SWP_EMULATE is selected. In this case, probing a
-> > SWP instruction will cause an oops when the kprobes emulation code
-> > executes an undefined instruction.
-> > 
-> > As the SWP instruction should be rare or non-existent in kernels for
-> > ARMv6 and later, we can simply avoid these problems by not allowing
-> > probing of these.
+On Wed, Nov 30, 2011 at 12:43:10PM -0800, Mike Turquette wrote:
+> On Wed, Nov 23, 2011 at 3:12 AM, Richard Zhao <richard.zhao@linaro.org> wrote:
+> > +#define account_for_rounding_errors ? ?1
+> > +
+> > +static int clk_divider_bestdiv(struct clk *clk, unsigned long rate,
+> > + ? ? ? ? ? ? ? unsigned long *best_parent_rate)
+> > +{
+> > + ? ? ? struct clk_divider *divider = to_clk_divider(clk);
+> > + ? ? ? int i, bestdiv = 0;
+> > + ? ? ? unsigned long parent_rate, best = 0, now, maxdiv;
+> > +
+> > + ? ? ? maxdiv = (1 << divider->width);
+> > +
+> > + ? ? ? if (divider->flags & CLK_DIVIDER_FLAG_ONE_BASED)
+> > + ? ? ? ? ? ? ? maxdiv--;
+> > +
+> > + ? ? ? if (!(clk->flags & CLK_PARENT_SET_RATE)) {
+> > + ? ? ? ? ? ? ? parent_rate = clk->parent->rate;
+> > + ? ? ? ? ? ? ? bestdiv = parent_rate / rate;
+> > + ? ? ? ? ? ? ? bestdiv = bestdiv == 0 ? 1 : bestdiv;
+> > + ? ? ? ? ? ? ? bestdiv = bestdiv > maxdiv ? maxdiv : bestdiv;
+> > + ? ? ? ? ? ? ? goto out;
+> > + ? ? ? }
+The code is originally from Sascha. I think it again.
+
+Sascha, why don't we use the below code?
+
+	for (i = 1; i <= maxdiv; i++) {
+		int div;
+		parent_rate = clk_round_rate(clk->parent, rate * i);
+		div = parent_rate / rate;
+		div = div > maxdiv ? maxdiv : div;
+		div = div < 1 ? 1 : div;
+		now = parent_rate / div;
+
+		if (now <= rate && now >= best) {
+			bestdiv = div;
+			best = now;
+			best_parent_rate = parent_rate;
+		}
+	}
+
+
+> > +
+> > + ? ? ? /*
+> > + ? ? ? ?* The maximum divider we can use without overflowing
+> > + ? ? ? ?* unsigned long in rate * i below
+> > + ? ? ? ?*/
+> > + ? ? ? maxdiv = min(ULONG_MAX / rate, maxdiv);
+> > +
+> > + ? ? ? for (i = 1; i <= maxdiv; i++) {
+> > + ? ? ? ? ? ? ? parent_rate = clk_round_rate(clk->parent,
+> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? (rate + account_for_rounding_errors) * i);
 > 
-> Is this something for -stable stuff?
+> How about just ((rate + 1) * i) with a comment above explaining why?
+> This removes the awkward #define above.
+> 
+> Also, I'd like to roll this into clk-basic.c for the V4 series.  Any objections?
+Go ahead.
 
-It affects 3.1, though in practice I doubt there are any SWP
-instructions to probe in an ARMv7 kernel with CONFIG_SWP_EMULATE
-enabled. It was only the test code, added to 3.2, that tested the
-emulation of SWP instructions and showed up the problem.
-
--- 
-Tixy
+Thanks
+Richard
+> 
+> Thanks,
+> Mike
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
