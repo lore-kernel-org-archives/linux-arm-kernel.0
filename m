@@ -1,76 +1,106 @@
-From: mst@redhat.com (Michael S. Tsirkin)
-Date: Thu, 1 Dec 2011 10:12:37 +0200
-Subject: [RFC] virtio: use mandatory barriers for remote processor vdevs
-In-Reply-To: <87zkfdrpn8.fsf@rustcorp.com.au>
-References: <1322569886-13055-1-git-send-email-ohad@wizery.com>
- <20111129131110.GC19157@redhat.com>
- <CAK=WgbZoGYVyKt=XXvnPVdh0koSBJC0zcgkLaYRkmjwBLOFA-A@mail.gmail.com>
- <20111129151958.GA31789@redhat.com>
- <CAK=WgbZ5aBFNro3XC0cN+Ao4ZWrBHwwd3d__CSHA=n56gKmKXw@mail.gmail.com>
- <20111130145004.GD21413@redhat.com>
- <CAK=WgbY59n9N_-2_TZ9wNBNcTMV1DCrz65e-Ae=xamcg6A0dOA@mail.gmail.com>
- <20111130231306.GD30031@redhat.com>
- <87zkfdrpn8.fsf@rustcorp.com.au>
-Message-ID: <20111201081236.GB5479@redhat.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu,  1 Dec 2011 16:19:08 +0800
+Subject: [PATCH 1/2] arm/imx: fix return type of callback passed to
+ of_irq_init()
+Message-ID: <1322727549-10852-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 01, 2011 at 12:58:59PM +1030, Rusty Russell wrote:
-> On Thu, 1 Dec 2011 01:13:07 +0200, "Michael S. Tsirkin" <mst@redhat.com> wrote:
-> > For x86, stores into memory are ordered. So I think that yes, smp_XXX
-> > can be selected at compile time.
-> > 
-> > So let's forget the virtio strangeness for a minute,
-> 
-> Hmm, we got away with light barriers because we knew we were not
-> *really* talking to a device.  But now with virtio-mmio, turns out we
-> are :)
+The of_irq_init() expects the callback passed by .data of of_device_id
+return 'int' instead of 'void'.  This patch fixes it to have
+irq_init_cb() return the correct value, and in turn have the secondary
+interrupt controller (gpio in this case) initialized properly and also
+eliminate the error message 'of_irq_init: children remain, but no
+parents' which was overlooked before.
 
-You think virtio-mmio this issue too?  It's reported on remoteproc...
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ arch/arm/mach-imx/mach-imx6q.c |    4 +++-
+ arch/arm/mach-mx5/imx51-dt.c   |    7 +++++--
+ arch/arm/mach-mx5/imx53-dt.c   |    7 +++++--
+ 3 files changed, 13 insertions(+), 5 deletions(-)
 
-> I'm really tempted to revert d57ed95 for 3.2, and we can revisit this
-> optimization later if it proves worthwhile.
-> 
-> Thoughts?
-> Rusty. 
-
-Generally it does seem the best we can do for 3.2.
-
-Given it's rc3, I'd be a bit wary of introducing regressions - I'll try
-to find some real setups (as in - not my laptop) to run some benchmarks
-on, to verify there's no major problem.
-I hope I can report on this in about a week from now - want to hold onto this meanwhile?
-
-Further, if we do revert, need to remember to apply the following
-beforehand, to avoid breaking virtio tool:
-
-tools/virtio: implement mandatory barriers for x86
-
-Signed-off-by: Michael S. Tsirkin <mst@redhat.com>
-
-diff --git a/tools/virtio/linux/virtio.h b/tools/virtio/linux/virtio.h
-index 68b8b8d..1bf0e80 100644
---- a/tools/virtio/linux/virtio.h
-+++ b/tools/virtio/linux/virtio.h
-@@ -172,11 +172,18 @@ struct virtqueue {
- #define MODULE_LICENSE(__MODULE_LICENSE_value) \
- 	const char *__MODULE_LICENSE_name = __MODULE_LICENSE_value
+diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
+index 8bf5fa3..eb7531b 100644
+--- a/arch/arm/mach-imx/mach-imx6q.c
++++ b/arch/arm/mach-imx/mach-imx6q.c
+@@ -36,7 +36,7 @@ static void __init imx6q_map_io(void)
+ 	imx_scu_map_io();
+ }
  
- #define CONFIG_SMP
+-static void __init imx6q_gpio_add_irq_domain(struct device_node *np,
++static int __init imx6q_gpio_add_irq_domain(struct device_node *np,
+ 				struct device_node *interrupt_parent)
+ {
+ 	static int gpio_irq_base = MXC_GPIO_IRQ_START + ARCH_NR_GPIOS -
+@@ -44,6 +44,8 @@ static void __init imx6q_gpio_add_irq_domain(struct device_node *np,
  
- #if defined(__i386__) || defined(__x86_64__)
- #define barrier() asm volatile("" ::: "memory")
- #define mb() __sync_synchronize()
-+#if defined(__i386__)
-+#define wmb() mb()
-+#define rmb() mb()
-+#else
-+#define wmb() asm volatile("sfence" ::: "memory")
-+#define rmb() asm volatile("lfence" ::: "memory")
-+#endif
+ 	irq_domain_add_simple(np, gpio_irq_base);
+ 	gpio_irq_base += 32;
++
++	return 0;
+ }
  
- #define smp_mb()	mb()
- # define smp_rmb()	barrier()
-
+ static const struct of_device_id imx6q_irq_match[] __initconst = {
+diff --git a/arch/arm/mach-mx5/imx51-dt.c b/arch/arm/mach-mx5/imx51-dt.c
+index ccc6158..3451a46 100644
+--- a/arch/arm/mach-mx5/imx51-dt.c
++++ b/arch/arm/mach-mx5/imx51-dt.c
+@@ -44,13 +44,14 @@ static const struct of_dev_auxdata imx51_auxdata_lookup[] __initconst = {
+ 	{ /* sentinel */ }
+ };
+ 
+-static void __init imx51_tzic_add_irq_domain(struct device_node *np,
++static int __init imx51_tzic_add_irq_domain(struct device_node *np,
+ 				struct device_node *interrupt_parent)
+ {
+ 	irq_domain_add_simple(np, 0);
++	return 0;
+ }
+ 
+-static void __init imx51_gpio_add_irq_domain(struct device_node *np,
++static int __init imx51_gpio_add_irq_domain(struct device_node *np,
+ 				struct device_node *interrupt_parent)
+ {
+ 	static int gpio_irq_base = MXC_GPIO_IRQ_START + ARCH_NR_GPIOS -
+@@ -58,6 +59,8 @@ static void __init imx51_gpio_add_irq_domain(struct device_node *np,
+ 
+ 	irq_domain_add_simple(np, gpio_irq_base);
+ 	gpio_irq_base += 32;
++
++	return 0;
+ }
+ 
+ static const struct of_device_id imx51_irq_match[] __initconst = {
+diff --git a/arch/arm/mach-mx5/imx53-dt.c b/arch/arm/mach-mx5/imx53-dt.c
+index ccaa0b8..022bc03 100644
+--- a/arch/arm/mach-mx5/imx53-dt.c
++++ b/arch/arm/mach-mx5/imx53-dt.c
+@@ -48,13 +48,14 @@ static const struct of_dev_auxdata imx53_auxdata_lookup[] __initconst = {
+ 	{ /* sentinel */ }
+ };
+ 
+-static void __init imx53_tzic_add_irq_domain(struct device_node *np,
++static int __init imx53_tzic_add_irq_domain(struct device_node *np,
+ 				struct device_node *interrupt_parent)
+ {
+ 	irq_domain_add_simple(np, 0);
++	return 0;
+ }
+ 
+-static void __init imx53_gpio_add_irq_domain(struct device_node *np,
++static int __init imx53_gpio_add_irq_domain(struct device_node *np,
+ 				struct device_node *interrupt_parent)
+ {
+ 	static int gpio_irq_base = MXC_GPIO_IRQ_START + ARCH_NR_GPIOS -
+@@ -62,6 +63,8 @@ static void __init imx53_gpio_add_irq_domain(struct device_node *np,
+ 
+ 	irq_domain_add_simple(np, gpio_irq_base);
+ 	gpio_irq_base += 32;
++
++	return 0;
+ }
+ 
+ static const struct of_device_id imx53_irq_match[] __initconst = {
 -- 
-MST
+1.7.4.1
