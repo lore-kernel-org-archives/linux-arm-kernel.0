@@ -1,72 +1,36 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 30 Nov 2011 22:36:51 -0500 (EST)
-Subject: [PATCH v3 4/5] ARM: vexpress: Initial RS1 memory map support
-In-Reply-To: <20111130215000.GU9581@n2100.arm.linux.org.uk>
-References: <1322579473-8804-1-git-send-email-pawel.moll@arm.com>
- <1322579473-8804-5-git-send-email-pawel.moll@arm.com>
- <20111130153749.GE2045@localhost.localdomain>
- <1322673302.3180.25.camel@hornet.cambridge.arm.com>
- <20111130175410.GJ2045@localhost.localdomain>
- <alpine.LFD.2.02.1111301522340.2357@xanadu.home>
- <20111130204805.GA5698@sirena.org.uk>
- <alpine.LFD.2.02.1111301604230.2357@xanadu.home>
- <20111130215000.GU9581@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.02.1111302220450.2357@xanadu.home>
+From: paul.gortmaker@windriver.com (Paul Gortmaker)
+Date: Wed, 30 Nov 2011 22:52:37 -0500
+Subject: [PATCH] arm: add default value for PHYS_OFFSET Kconfig setting
+Message-ID: <1322711557-8279-1-git-send-email-paul.gortmaker@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 30 Nov 2011, Russell King - ARM Linux wrote:
+Commit 1b9f95f8ade9efc2bd49f0e7b9dc61a038ac3eef introduced the new
+Kconfig for PHYS_OFFSET but it did not specify a default value.
 
-> On Wed, Nov 30, 2011 at 04:38:26PM -0500, Nicolas Pitre wrote:
-> > On Wed, 30 Nov 2011, Mark Brown wrote:
-> > 
-> > > On Wed, Nov 30, 2011 at 03:43:50PM -0500, Nicolas Pitre wrote:
-> > > 
-> > > > annoying.  If nothing moves I might just go ahead with those changes and 
-> > > > simply rip the uImage make target out of the kernel as well.  Maybe the 
-> > > > inconvenience will be a sufficient incentive for people to lobby proper 
-> > > > u-Boot support.  And it is not like if the u-Boot patches didn't exist 
-> > > 
-> > > Oh, dear.  Any pointers to the discussions on the u-boot side?
-> > 
-> > Certainly.  Many different threads actually.  Here's a few:
-> > 
-> > http://news.gmane.org/group/gmane.comp.boot-loaders.u-boot/thread=114981
-> > 
-> > http://news.gmane.org/group/gmane.comp.boot-loaders.u-boot/thread=115774
-> > 
-> > And this is not the first time this issue has come up:
-> > 
-> > http://news.gmane.org/group/gmane.comp.boot-loaders.u-boot/thread=83824
-> > 
-> > http://news.gmane.org/group/gmane.linux.ports.arm.kernel/thread=81546/force_load=t/focus=84138
-> > 
-> > Yet more u-Boot woes:
-> > 
-> > http://news.gmane.org/group/gmane.linux.ports.arm.kernel/thread=53973
-> > 
-> > I'm sure there are others, but that's what I've quickly dug out.
-> 
-> So why are we still supporting uboot in the mainline kernel on ARM?
+This has the undesired side effect of breaking an implictly used
+trick for updating defconfigs on the fly for routine buildtesting
+across all arch and all platforms, i.e.
 
-As a demonstration of good will I'd say.
+  cp /path/to/somedefconfig .config ; yes "" | make oldconfig
 
-I still believe that the uImage wrapping is _not_ ARM specific, and that 
-someone should step up to be the maintainer of a generic u-Boot Kconfig 
-menu and makefile target(s) common to all architectures.
+In particular, the at91x40_defconfig will enter an infinite loop
+with the above, since there is no default value, and conf will just
+keep asking for one, and "yes" will keep feeding in a line return.
 
-But until Stephen's u-Boot patches are merged, and the corresponding 
-mkimage and u-Boot binaries are deployed, there is little point keeping 
-a uImage makefile target for a kernel which is meant to be run on 
-multiple SOCs.
+Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
 
-This is already affecting i.MX which could already have a single kernel 
-image for the whole SOC family despite different RAM addresses if this 
-wasn't for this uImage format limitation.  So at the moment the mkimage 
-step makes sense only at kernel install time when you know the exact 
-machine where the installation will take place, not at kernel build 
-time.
-
-
-
-Nicolas
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 44789ef..90a475e 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -221,6 +221,7 @@ config NEED_MACH_MEMORY_H
+ 
+ config PHYS_OFFSET
+ 	hex "Physical address of main memory"
++	default 0x00000000
+ 	depends on !ARM_PATCH_PHYS_VIRT && !NEED_MACH_MEMORY_H
+ 	help
+ 	  Please provide the physical address corresponding to the
+-- 
+1.7.7.2
