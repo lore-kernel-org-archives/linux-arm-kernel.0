@@ -1,165 +1,80 @@
-From: cjb@laptop.org (Chris Ball)
-Date: Thu, 01 Dec 2011 13:05:33 -0500
-Subject: [PATCH v3 2/4] ARM: pxa168: Add SDHCI support
-In-Reply-To: <1321849572-2944-1-git-send-email-tanmay.upadhyay@einfochips.com>
- (Tanmay Upadhyay's message of "Mon, 21 Nov 2011 09:56:12 +0530")
-References: <87r51fwxgt.fsf@laptop.org>
- <1321849572-2944-1-git-send-email-tanmay.upadhyay@einfochips.com>
-Message-ID: <874nxkmaky.fsf@laptop.org>
+From: rabin@rab.in (Rabin Vincent)
+Date: Thu,  1 Dec 2011 23:36:05 +0530
+Subject: [PATCH] ARM: ftrace: clear zero bit in reported IPs for Thumb-2
+Message-ID: <1322762765-22776-1-git-send-email-rabin@rab.in>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric, Jason,
+The dynamic ftrace ops startup test currently fails on Thumb-2 kernels:
 
-Please could you ACK this patch if you agree with it, and I'll take it
-and the rest of the series via the MMC tree?  Thanks.
+ Testing tracer function: PASSED
+ Testing dynamic ftrace: PASSED
+ Testing dynamic ftrace ops #1: (0 0 0 0 0) FAILED!
 
-On Sun, Nov 20 2011, Tanmay Upadhyay wrote:
-> v2 - clock register for SDHCI are not common across all MMP SoCs.
->      So, move PXA168 implementation to pxa168.c
->
-> v3 - sdhci-pxav1 driver code is merged with sdhci-pxav2. So, change
->      the device name accordingly
->    - start sdhci device numbering from 1 as other PXA168 devices
->      does that
->
-> Signed-off-by: Tanmay Upadhyay <tanmay.upadhyay@einfochips.com>
-> Reviewed-by: Philip Rakity <prakity@marvell.com>
-> ---
->  arch/arm/mach-mmp/include/mach/pxa168.h |   20 +++++++++++++
->  arch/arm/mach-mmp/pxa168.c              |   46 +++++++++++++++++++++++++++++++
->  2 files changed, 66 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/mach-mmp/include/mach/pxa168.h b/arch/arm/mach-mmp/include/mach/pxa168.h
-> index 7fb568d..a181608 100644
-> --- a/arch/arm/mach-mmp/include/mach/pxa168.h
-> +++ b/arch/arm/mach-mmp/include/mach/pxa168.h
-> @@ -15,6 +15,7 @@ extern void pxa168_clear_keypad_wakeup(void);
->  #include <plat/pxa27x_keypad.h>
->  #include <mach/cputype.h>
->  #include <linux/pxa168_eth.h>
-> +#include <linux/platform_data/pxa_sdhci.h>
->  
->  extern struct pxa_device_desc pxa168_device_uart1;
->  extern struct pxa_device_desc pxa168_device_uart2;
-> @@ -34,6 +35,10 @@ extern struct pxa_device_desc pxa168_device_nand;
->  extern struct pxa_device_desc pxa168_device_fb;
->  extern struct pxa_device_desc pxa168_device_keypad;
->  extern struct pxa_device_desc pxa168_device_eth;
-> +extern struct pxa_device_desc pxa168_device_sdh1;
-> +extern struct pxa_device_desc pxa168_device_sdh2;
-> +extern struct pxa_device_desc pxa168_device_sdh3;
-> +extern struct pxa_device_desc pxa168_device_sdh4;
->  
->  struct pxa168_usb_pdata {
->  	/* If NULL, default phy init routine for PXA168 would be called */
-> @@ -132,4 +137,19 @@ static inline int pxa168_add_eth(struct pxa168_eth_platform_data *data)
->  {
->  	return pxa_register_device(&pxa168_device_eth, data, sizeof(*data));
->  }
-> +
-> +static inline int pxa168_add_sdh(int id, struct sdhci_pxa_platdata *data)
-> +{
-> +	struct pxa_device_desc *d = NULL;
-> +
-> +	switch (id) {
-> +	case 1: d = &pxa168_device_sdh1; break;
-> +	case 2: d = &pxa168_device_sdh2; break;
-> +	case 3: d = &pxa168_device_sdh3; break;
-> +	case 4: d = &pxa168_device_sdh4; break;
-> +	default:
-> +		return -EINVAL;
-> +	}
-> +	return pxa_register_device(d, data, sizeof(*data));
-> +}
->  #endif /* __ASM_MACH_PXA168_H */
-> diff --git a/arch/arm/mach-mmp/pxa168.c b/arch/arm/mach-mmp/pxa168.c
-> index 76ca15c..102f65f 100644
-> --- a/arch/arm/mach-mmp/pxa168.c
-> +++ b/arch/arm/mach-mmp/pxa168.c
-> @@ -45,6 +45,14 @@ static struct mfp_addr_map pxa168_mfp_addr_map[] __initdata =
->  
->  #define APMASK(i)	(GPIO_REGS_VIRT + BANK_OFF(i) + 0x09c)
->  
-> +/* Offset defined in arch/arm/mach-mmp/include/mach/regs-apmu.h are for MMP2
-> + * PXA168 has different offset */
-> +#undef APMU_SDH2
-> +#undef APMU_SDH3
-> +
-> +#define APMU_SDH2	APMU_REG(0xe0)
-> +#define APMU_SDH3	APMU_REG(0xe4)
-> +
->  static void __init pxa168_init_gpio(void)
->  {
->  	int i;
-> @@ -65,6 +73,31 @@ void __init pxa168_init_irq(void)
->  	pxa168_init_gpio();
->  }
->  
-> +static void sdh_clk_enable(struct clk *clk)
-> +{
-> +	void __iomem *clk_reg_offset = clk->clk_rst;
-> +
-> +	/* Can't see any clean way to do this: Bits 3 & 0 in registers
-> +	 * for host 0 & 2 should be set for host 1 & 3 also */
-> +	if (clk_reg_offset == APMU_SDH0 || clk_reg_offset == APMU_SDH1)
-> +		__raw_writel(__raw_readl(APMU_SDH0) | 0x9, APMU_SDH0);
-> +	if (clk_reg_offset == APMU_SDH2 || clk_reg_offset == APMU_SDH3)
-> +		__raw_writel(__raw_readl(APMU_SDH2) | 0x9, APMU_SDH2);
-> +
-> +	__raw_writel(__raw_readl(clk->clk_rst) | clk->enable_val, clk->clk_rst);
-> +}
-> +
-> +static void sdh_clk_disable(struct clk *clk)
-> +{
-> +	__raw_writel(__raw_readl(clk->clk_rst) & ~(clk->enable_val),
-> +			clk->clk_rst);
-> +}
-> +
-> +struct clkops sdh_clk_ops = {
-> +	.enable		= sdh_clk_enable,
-> +	.disable	= sdh_clk_disable,
-> +};
-> +
->  /* APB peripheral clocks */
->  static APBC_CLK(uart1, PXA168_UART1, 1, 14745600);
->  static APBC_CLK(uart2, PXA168_UART2, 1, 14745600);
-> @@ -87,6 +120,11 @@ static APMU_CLK(lcd, LCD, 0x7f, 312000000);
->  static APMU_CLK(eth, ETH, 0x09, 0);
->  static APMU_CLK(usb, USB, 0x12, 0);
->  
-> +static APMU_CLK_OPS(sdh1, SDH0, 0x12, 48000000, &sdh_clk_ops);
-> +static APMU_CLK_OPS(sdh2, SDH1, 0x12, 48000000, &sdh_clk_ops);
-> +static APMU_CLK_OPS(sdh3, SDH2, 0x12, 48000000, &sdh_clk_ops);
-> +static APMU_CLK_OPS(sdh4, SDH3, 0x12, 48000000, &sdh_clk_ops);
-> +
->  /* device and clock bindings */
->  static struct clk_lookup pxa168_clkregs[] = {
->  	INIT_CLKREG(&clk_uart1, "pxa2xx-uart.0", NULL),
-> @@ -108,6 +146,10 @@ static struct clk_lookup pxa168_clkregs[] = {
->  	INIT_CLKREG(&clk_keypad, "pxa27x-keypad", NULL),
->  	INIT_CLKREG(&clk_eth, "pxa168-eth", "MFUCLK"),
->  	INIT_CLKREG(&clk_usb, "pxa168-ehci", "PXA168-USBCLK"),
-> +	INIT_CLKREG(&clk_sdh1, NULL, "PXA-SDHCLK"),
-> +	INIT_CLKREG(&clk_sdh2, NULL, "PXA-SDHCLK"),
-> +	INIT_CLKREG(&clk_sdh3, NULL, "PXA-SDHCLK"),
-> +	INIT_CLKREG(&clk_sdh4, NULL, "PXA-SDHCLK"),
->  };
->  
->  static int __init pxa168_init(void)
-> @@ -173,6 +215,10 @@ PXA168_DEVICE(ssp5, "pxa168-ssp", 4, SSP5, 0xd4021000, 0x40, 60, 61);
->  PXA168_DEVICE(fb, "pxa168-fb", -1, LCD, 0xd420b000, 0x1c8);
->  PXA168_DEVICE(keypad, "pxa27x-keypad", -1, KEYPAD, 0xd4012000, 0x4c);
->  PXA168_DEVICE(eth, "pxa168-eth", -1, MFU, 0xc0800000, 0x0fff);
-> +PXA168_DEVICE(sdh1, "sdhci-pxav2", 0, SDH1, 0xd4280000, 0x100);
-> +PXA168_DEVICE(sdh2, "sdhci-pxav2", 1, SDH1, 0xd4281000, 0x100);
-> +PXA168_DEVICE(sdh3, "sdhci-pxav2", 2, SDH2, 0xd427e000, 0x100);
-> +PXA168_DEVICE(sdh4, "sdhci-pxav2", 3, SDH2, 0xd427f000, 0x100);
->  
->  struct resource pxa168_usb_host_resources[] = {
->  	/* USB Host conroller register base */
+This is because while the addresses in the mcount records do not have
+the zero bit set, the IP reported by the mcount call does have it set
+(because it is copied from the LR).  This mismatch causes the ops
+filtering in ftrace_ops_list_func() to not call the relevant tracers.
 
-- Chris.
+Fix this by clearing the zero bit while adjusting the LR for the mcount
+instruction size.  Also, combine the mov+sub into a single sub
+instruction.
+
+Signed-off-by: Rabin Vincent <rabin@rab.in>
+---
+ arch/arm/kernel/entry-common.S |   16 ++++++++++------
+ 1 files changed, 10 insertions(+), 6 deletions(-)
+
+diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
+index b2a27b6..9d7ce81 100644
+--- a/arch/arm/kernel/entry-common.S
++++ b/arch/arm/kernel/entry-common.S
+@@ -149,6 +149,12 @@ ENDPROC(ret_from_fork)
+ #endif
+ #endif
+ 
++.macro mcount_size_adjust rd, rn
++	ARM(	sub	\rd, \rn, #MCOUNT_INSN_SIZE	)
++	/* The zero bit is set on Thumb LRs; clear it. */
++	THUMB(	sub	\rd, \rn, #MCOUNT_INSN_SIZE + 1	)
++.endm
++
+ .macro __mcount suffix
+ 	mcount_enter
+ 	ldr	r0, =ftrace_trace_function
+@@ -173,8 +179,7 @@ ENDPROC(ret_from_fork)
+ 	mcount_exit
+ 
+ 1: 	mcount_get_lr	r1			@ lr of instrumented func
+-	mov	r0, lr				@ instrumented function
+-	sub	r0, r0, #MCOUNT_INSN_SIZE
++	mcount_size_adjust r0, lr		@ instrumented function
+ 	adr	lr, BSYM(2f)
+ 	mov	pc, r2
+ 2:	mcount_exit
+@@ -184,8 +189,7 @@ ENDPROC(ret_from_fork)
+ 	mcount_enter
+ 
+ 	mcount_get_lr	r1			@ lr of instrumented func
+-	mov	r0, lr				@ instrumented function
+-	sub	r0, r0, #MCOUNT_INSN_SIZE
++	mcount_size_adjust	r0, lr		@ instrumented function
+ 
+ 	.globl ftrace_call\suffix
+ ftrace_call\suffix:
+@@ -205,11 +209,11 @@ ftrace_graph_call\suffix:
+ #ifdef CONFIG_DYNAMIC_FTRACE
+ 	@ called from __ftrace_caller, saved in mcount_enter
+ 	ldr	r1, [sp, #16]		@ instrumented routine (func)
++	mcount_size_adjust r1, r1
+ #else
+ 	@ called from __mcount, untouched in lr
+-	mov	r1, lr			@ instrumented routine (func)
++	mcount_size_adjust r1, lr	@ instrumented routine (func)
+ #endif
+-	sub	r1, r1, #MCOUNT_INSN_SIZE
+ 	mov	r2, fp			@ frame pointer
+ 	bl	prepare_ftrace_return
+ 	mcount_exit
 -- 
-Chris Ball   <cjb@laptop.org>   <http://printf.net/>
-One Laptop Per Child
+1.7.7.3
