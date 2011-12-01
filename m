@@ -1,82 +1,56 @@
-From: richard.zhao@linaro.org (Richard Zhao)
-Date: Thu, 1 Dec 2011 15:42:59 +0800
-Subject: [RFC V1 3/8] clk: Add support for simple dividers
-In-Reply-To: <CAPtuhThdt3Q63r_mP7aanXdgLH1si2pHfRr_Yg1GRhREqdDmfg@mail.gmail.com>
-References: <1322046755-13511-1-git-send-email-richard.zhao@linaro.org>
- <1322046755-13511-4-git-send-email-richard.zhao@linaro.org>
- <CAPtuhThdt3Q63r_mP7aanXdgLH1si2pHfRr_Yg1GRhREqdDmfg@mail.gmail.com>
-Message-ID: <20111201074253.GD8684@b20223-02.ap.freescale.net>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 1 Dec 2011 09:06:14 +0100
+Subject: [PATCH] arm: prevent inlining in arxescsi.c causing build failures
+In-Reply-To: <1322713611-30003-1-git-send-email-paul.gortmaker@windriver.com>
+References: <1322713611-30003-1-git-send-email-paul.gortmaker@windriver.com>
+Message-ID: <20111201080613.GF26618@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 30, 2011 at 12:43:10PM -0800, Mike Turquette wrote:
-> On Wed, Nov 23, 2011 at 3:12 AM, Richard Zhao <richard.zhao@linaro.org> wrote:
-> > +#define account_for_rounding_errors ? ?1
-> > +
-> > +static int clk_divider_bestdiv(struct clk *clk, unsigned long rate,
-> > + ? ? ? ? ? ? ? unsigned long *best_parent_rate)
-> > +{
-> > + ? ? ? struct clk_divider *divider = to_clk_divider(clk);
-> > + ? ? ? int i, bestdiv = 0;
-> > + ? ? ? unsigned long parent_rate, best = 0, now, maxdiv;
-> > +
-> > + ? ? ? maxdiv = (1 << divider->width);
-> > +
-> > + ? ? ? if (divider->flags & CLK_DIVIDER_FLAG_ONE_BASED)
-> > + ? ? ? ? ? ? ? maxdiv--;
-> > +
-> > + ? ? ? if (!(clk->flags & CLK_PARENT_SET_RATE)) {
-> > + ? ? ? ? ? ? ? parent_rate = clk->parent->rate;
-> > + ? ? ? ? ? ? ? bestdiv = parent_rate / rate;
-> > + ? ? ? ? ? ? ? bestdiv = bestdiv == 0 ? 1 : bestdiv;
-> > + ? ? ? ? ? ? ? bestdiv = bestdiv > maxdiv ? maxdiv : bestdiv;
-> > + ? ? ? ? ? ? ? goto out;
-> > + ? ? ? }
-The code is originally from Sascha. I think it again.
-
-Sascha, why don't we use the below code?
-
-	for (i = 1; i <= maxdiv; i++) {
-		int div;
-		parent_rate = clk_round_rate(clk->parent, rate * i);
-		div = parent_rate / rate;
-		div = div > maxdiv ? maxdiv : div;
-		div = div < 1 ? 1 : div;
-		now = parent_rate / div;
-
-		if (now <= rate && now >= best) {
-			bestdiv = div;
-			best = now;
-			best_parent_rate = parent_rate;
-		}
-	}
-
-
-> > +
-> > + ? ? ? /*
-> > + ? ? ? ?* The maximum divider we can use without overflowing
-> > + ? ? ? ?* unsigned long in rate * i below
-> > + ? ? ? ?*/
-> > + ? ? ? maxdiv = min(ULONG_MAX / rate, maxdiv);
-> > +
-> > + ? ? ? for (i = 1; i <= maxdiv; i++) {
-> > + ? ? ? ? ? ? ? parent_rate = clk_round_rate(clk->parent,
-> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? (rate + account_for_rounding_errors) * i);
+On Wed, Nov 30, 2011 at 11:26:51PM -0500, Paul Gortmaker wrote:
+> The following failure is seen in routine coverage builds:
 > 
-> How about just ((rate + 1) * i) with a comment above explaining why?
-> This removes the awkward #define above.
+>   CC [M]  drivers/scsi/arm/arxescsi.o
+> /tmp/cccEyiO7.s: Assembler messages:
+> /tmp/cccEyiO7.s:334: Error: symbol `.loop_1' is already defined
+> /tmp/cccEyiO7.s:337: Error: symbol `.loop_2' is already defined
+> /tmp/cccEyiO7.s:343: Error: symbol `.loop_3' is already defined
+> /tmp/cccEyiO7.s:365: Error: symbol `.loop_1' is already defined
+> /tmp/cccEyiO7.s:368: Error: symbol `.loop_2' is already defined
+> /tmp/cccEyiO7.s:374: Error: symbol `.loop_3' is already defined
+> make[4]: *** [drivers/scsi/arm/arxescsi.o] Error 1
 > 
-> Also, I'd like to roll this into clk-basic.c for the V4 series.  Any objections?
-Go ahead.
+> It is caused by multiple inline of arxescsi_pseudo_dma_write()
+> which is responsible for the above labels.  Marking the fcn
+> as non-inline fixes the issue.
+> 
+> Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
+Is that a compiler or a code issue? If it's the compiler please fix
+that. If it's the code, then please document why you added the noinline.
 
-Thanks
-Richard
-> 
-> Thanks,
-> Mike
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+Having said that, "my" compiler compiles drivers/scsi/arm/arxescsi.o
+just fine (using rpc_defconfig on v3.2-rc2).
+
+> diff --git a/drivers/scsi/arm/arxescsi.c b/drivers/scsi/arm/arxescsi.c
+> index a750aa7..2608a9e 100644
+> --- a/drivers/scsi/arm/arxescsi.c
+> +++ b/drivers/scsi/arm/arxescsi.c
+> @@ -72,7 +72,8 @@ arxescsi_dma_setup(struct Scsi_Host *host, struct scsi_pointer *SCp,
+>  	return fasdma_pseudo;
+>  }
+>  
+> -static void arxescsi_pseudo_dma_write(unsigned char *addr, void __iomem *base)
+> +static noinline void
+> +arxescsi_pseudo_dma_write(unsigned char *addr, void __iomem *base)
+Shouldn't this line get some indention?
+
+>  {
+>         __asm__ __volatile__(
+>         "               stmdb   sp!, {r0-r12}\n"
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
