@@ -1,56 +1,76 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 1 Dec 2011 09:06:14 +0100
-Subject: [PATCH] arm: prevent inlining in arxescsi.c causing build failures
-In-Reply-To: <1322713611-30003-1-git-send-email-paul.gortmaker@windriver.com>
-References: <1322713611-30003-1-git-send-email-paul.gortmaker@windriver.com>
-Message-ID: <20111201080613.GF26618@pengutronix.de>
+From: mst@redhat.com (Michael S. Tsirkin)
+Date: Thu, 1 Dec 2011 10:12:37 +0200
+Subject: [RFC] virtio: use mandatory barriers for remote processor vdevs
+In-Reply-To: <87zkfdrpn8.fsf@rustcorp.com.au>
+References: <1322569886-13055-1-git-send-email-ohad@wizery.com>
+ <20111129131110.GC19157@redhat.com>
+ <CAK=WgbZoGYVyKt=XXvnPVdh0koSBJC0zcgkLaYRkmjwBLOFA-A@mail.gmail.com>
+ <20111129151958.GA31789@redhat.com>
+ <CAK=WgbZ5aBFNro3XC0cN+Ao4ZWrBHwwd3d__CSHA=n56gKmKXw@mail.gmail.com>
+ <20111130145004.GD21413@redhat.com>
+ <CAK=WgbY59n9N_-2_TZ9wNBNcTMV1DCrz65e-Ae=xamcg6A0dOA@mail.gmail.com>
+ <20111130231306.GD30031@redhat.com>
+ <87zkfdrpn8.fsf@rustcorp.com.au>
+Message-ID: <20111201081236.GB5479@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 30, 2011 at 11:26:51PM -0500, Paul Gortmaker wrote:
-> The following failure is seen in routine coverage builds:
+On Thu, Dec 01, 2011 at 12:58:59PM +1030, Rusty Russell wrote:
+> On Thu, 1 Dec 2011 01:13:07 +0200, "Michael S. Tsirkin" <mst@redhat.com> wrote:
+> > For x86, stores into memory are ordered. So I think that yes, smp_XXX
+> > can be selected at compile time.
+> > 
+> > So let's forget the virtio strangeness for a minute,
 > 
->   CC [M]  drivers/scsi/arm/arxescsi.o
-> /tmp/cccEyiO7.s: Assembler messages:
-> /tmp/cccEyiO7.s:334: Error: symbol `.loop_1' is already defined
-> /tmp/cccEyiO7.s:337: Error: symbol `.loop_2' is already defined
-> /tmp/cccEyiO7.s:343: Error: symbol `.loop_3' is already defined
-> /tmp/cccEyiO7.s:365: Error: symbol `.loop_1' is already defined
-> /tmp/cccEyiO7.s:368: Error: symbol `.loop_2' is already defined
-> /tmp/cccEyiO7.s:374: Error: symbol `.loop_3' is already defined
-> make[4]: *** [drivers/scsi/arm/arxescsi.o] Error 1
+> Hmm, we got away with light barriers because we knew we were not
+> *really* talking to a device.  But now with virtio-mmio, turns out we
+> are :)
+
+You think virtio-mmio this issue too?  It's reported on remoteproc...
+
+> I'm really tempted to revert d57ed95 for 3.2, and we can revisit this
+> optimization later if it proves worthwhile.
 > 
-> It is caused by multiple inline of arxescsi_pseudo_dma_write()
-> which is responsible for the above labels.  Marking the fcn
-> as non-inline fixes the issue.
-> 
-> Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
-Is that a compiler or a code issue? If it's the compiler please fix
-that. If it's the code, then please document why you added the noinline.
+> Thoughts?
+> Rusty. 
 
-Having said that, "my" compiler compiles drivers/scsi/arm/arxescsi.o
-just fine (using rpc_defconfig on v3.2-rc2).
+Generally it does seem the best we can do for 3.2.
 
-> diff --git a/drivers/scsi/arm/arxescsi.c b/drivers/scsi/arm/arxescsi.c
-> index a750aa7..2608a9e 100644
-> --- a/drivers/scsi/arm/arxescsi.c
-> +++ b/drivers/scsi/arm/arxescsi.c
-> @@ -72,7 +72,8 @@ arxescsi_dma_setup(struct Scsi_Host *host, struct scsi_pointer *SCp,
->  	return fasdma_pseudo;
->  }
->  
-> -static void arxescsi_pseudo_dma_write(unsigned char *addr, void __iomem *base)
-> +static noinline void
-> +arxescsi_pseudo_dma_write(unsigned char *addr, void __iomem *base)
-Shouldn't this line get some indention?
+Given it's rc3, I'd be a bit wary of introducing regressions - I'll try
+to find some real setups (as in - not my laptop) to run some benchmarks
+on, to verify there's no major problem.
+I hope I can report on this in about a week from now - want to hold onto this meanwhile?
 
->  {
->         __asm__ __volatile__(
->         "               stmdb   sp!, {r0-r12}\n"
+Further, if we do revert, need to remember to apply the following
+beforehand, to avoid breaking virtio tool:
 
-Best regards
-Uwe
+tools/virtio: implement mandatory barriers for x86
+
+Signed-off-by: Michael S. Tsirkin <mst@redhat.com>
+
+diff --git a/tools/virtio/linux/virtio.h b/tools/virtio/linux/virtio.h
+index 68b8b8d..1bf0e80 100644
+--- a/tools/virtio/linux/virtio.h
++++ b/tools/virtio/linux/virtio.h
+@@ -172,11 +172,18 @@ struct virtqueue {
+ #define MODULE_LICENSE(__MODULE_LICENSE_value) \
+ 	const char *__MODULE_LICENSE_name = __MODULE_LICENSE_value
+ 
+ #define CONFIG_SMP
+ 
+ #if defined(__i386__) || defined(__x86_64__)
+ #define barrier() asm volatile("" ::: "memory")
+ #define mb() __sync_synchronize()
++#if defined(__i386__)
++#define wmb() mb()
++#define rmb() mb()
++#else
++#define wmb() asm volatile("sfence" ::: "memory")
++#define rmb() asm volatile("lfence" ::: "memory")
++#endif
+ 
+ #define smp_mb()	mb()
+ # define smp_rmb()	barrier()
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+MST
