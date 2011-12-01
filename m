@@ -1,53 +1,53 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 1 Dec 2011 09:08:12 +0000
-Subject: Fwd: Re: [03: PATCH 0/5] The remaining stuff
-In-Reply-To: <20111128104554.GA2165@local>
-References: <20111124204447.GW9581@n2100.arm.linux.org.uk>
- <20111128104554.GA2165@local>
-Message-ID: <20111201090812.GZ9581@n2100.arm.linux.org.uk>
+From: wim@iguana.be (Wim Van Sebroeck)
+Date: Thu, 1 Dec 2011 10:09:34 +0100
+Subject: [PATCH] watchdog: fix initialisation printout in s3c2410_wdt
+In-Reply-To: <045d01ccaffb$00710240$015306c0$%kim@samsung.com>
+References: <1321433173-17757-1-git-send-email-mad_soft@inbox.ru>
+ <CAJuYYwTv3d9Wg8TDBEkc0r3BweUiLdqVwGdMU4iKpK0B+EM=GA@mail.gmail.com>
+ <045d01ccaffb$00710240$015306c0$%kim@samsung.com>
+Message-ID: <20111201090934.GO23376@infomag.iguana.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 28, 2011 at 11:45:55AM +0100, Hans J. Koch wrote:
-> On Thu, Nov 24, 2011 at 08:44:47PM +0000, Russell King - ARM Linux wrote:
-> > The list of platforms which are still broken (today) by part 2 of this
-> > series are:
-> > 
-> > arch/arm/mach-davinci/include/mach/system.h
-> > arch/arm/mach-gemini/include/mach/system.h
-> > arch/arm/mach-nomadik/include/mach/system.h
-> > arch/arm/mach-s3c2410/include/mach/system-reset.h
-> > arch/arm/mach-s3c64xx/include/mach/system.h
-> > arch/arm/mach-shmobile/include/mach/system.h
-> > arch/arm/mach-vt8500/include/mach/system.h
-> > arch/arm/plat-samsung/include/plat/system-reset.h
-> > arch/arm/plat-tcc/include/mach/system.h
-> > 
-> > which require assistance to get these into shape.
-> > 
-> > As I've already implied, I'm quite prepared to break these platforms at
-> > the next merge window for the greater good if there's no sign of
-> > maintainers willing to help sort them out - which will then ultimately
-> > result in them being deleted from mainline.
-> 
-> For the past 12 months, nobody was interested in Telechips (plat-tcc).
-> No community, no customers, no support from Telechips. Under these
-> circumstances, I am not willing to maintain this forever.
-> 
-> However, Harry Sievers, European distributor of Telechips, told me
-> that there are persons at Telechips who are interested in having
-> their stuff in mainline. He will tell them it is threatened with
-> being deleted from mainline, and ask for support.
-> 
-> I am willing to wait until christmas for any news from Harry, and
-> will then send a patch. Either one that fixes the arch as requested in
-> the mail above, or one that removes the whole platform from mainline.
-> My feeling is that the latter is more likely.
-> 
-> Russell, if that is too late for you, please let us know.
+Hi Kim,
 
-I doubt that we'll see -final before Christmas, so that should be fine.
-If it's still not fixed up for these changes when -final is getting close,
-I will delete it myself.
+> Thomas Abraham wrote:
+> > 
+> > On 16 November 2011 14:16, Dmitry Artamonow <mad_soft@inbox.ru> wrote:
+> > > Looks like a typo creeped in, and driver prints
+> > > s3c2410-wdt s3c2410-wdt: watchdog active, reset abled, irq abled
+> > >
+> > > instead of
+> > > s3c2410-wdt s3c2410-wdt: watchdog active, reset enabled, irq enabled
+> > >
+> > > Also it may completely disinform about irq status, as it prints
+> > > "irq enabled" when S3C2410_WTCON_INTEN is in fact 0.
+> > >
+> > > Fix it.
+> > >
+> > > Signed-off-by: Dmitry Artamonow <mad_soft@inbox.ru>
+> > > ---
+> > >
+> > > It seems to be here for a long time, but I don't think it's
+> > > important enough for cc-ing stable.
+> > >
+> > > Also I haven't tested it, as I don't have a hardware, but it's
+> > > rather trivial (and yes, I checked with datasheet that 1 in
+> > > S3C2410_WTCON_*EN bits really means 'enabled')
+> > >
+> > 
+> > Tested on Exynos4210 based Origen board. This patch fixed in incorrect
+> > "irq enabled" message at bootup. Thanks for this fix.
+> > 
+> > Tested-by: Thomas Abraham <thomas.abraham@linaro.org>
+> > 
+> 
+> Acked-by: Kukjin Kim <kgene.kim@samsung.com>
+> 
+> Hi Wim,
+> Please pick this up in your tree and if any problem, let me know.
 
-Thanks.
+See commit 20403e845f9988446c5b48024ff4d0c3a5929f7d in the linux git tree.
+
+Kind regards,
+Wim.
