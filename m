@@ -1,26 +1,35 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Thu, 1 Dec 2011 08:20:59 +0200
-Subject: [RFC] virtio: use mandatory barriers for remote processor vdevs
-In-Reply-To: <20111130234318.GC31069@redhat.com>
-References: <1322569886-13055-1-git-send-email-ohad@wizery.com>
- <20111129131110.GC19157@redhat.com>
- <CAK=WgbZoGYVyKt=XXvnPVdh0koSBJC0zcgkLaYRkmjwBLOFA-A@mail.gmail.com>
- <20111129151607.GE30966@redhat.com>
- <CAK=WgbZK+k4uuyMPHUfr_PMyrR5ceRTvuDRpmhXfgwpSUOPw0g@mail.gmail.com>
- <20111130145958.GE21413@redhat.com>
- <CAK=WgbYyFdLftE_kp2_JOThVhn-FzGsDqVqKn0Jwm2teQyZBNA@mail.gmail.com>
- <20111130161555.GB25812@redhat.com>
- <CAK=WgbazBq4GVo16sZsrZirgMYbwMcWtPaqn90c6d9Phr0gh3A@mail.gmail.com>
- <CAK=WgbbZH3ZFzbwwyVBGEvwHPbogDW6+Kb_1pRam2jj5oJHuDA@mail.gmail.com>
- <20111130234318.GC31069@redhat.com>
-Message-ID: <CAK=WgbYysMUQjWmgZhHBQJxcyG_J8H-f8FzZwSOVuTRjPRAiUQ@mail.gmail.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Thu, 1 Dec 2011 14:34:48 +0800
+Subject: [RFC 6/8] of: add clock providers
+In-Reply-To: <CACxGe6teGPmgOiwSVQ_PebXo=9x8EVwjH2qQYi5LU813BvY3Ow@mail.gmail.com>
+References: <1320801583-12774-1-git-send-email-grant.likely@secretlab.ca>
+ <1320801583-12774-7-git-send-email-grant.likely@secretlab.ca>
+ <20111121153716.GA16417@S2100-06.ap.freescale.net>
+ <CACxGe6teGPmgOiwSVQ_PebXo=9x8EVwjH2qQYi5LU813BvY3Ow@mail.gmail.com>
+Message-ID: <20111201063447.GH711@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 1, 2011 at 1:43 AM, Michael S. Tsirkin <mst@redhat.com> wrote:
-> And these accesses need to be ordered with DSB? Or DMB?
+On Wed, Nov 30, 2011 at 12:38:19PM -0700, Grant Likely wrote:
+> On Mon, Nov 21, 2011 at 8:37 AM, Shawn Guo <shawn.guo@freescale.com> wrote:
+> > On Tue, Nov 08, 2011 at 06:19:41PM -0700, Grant Likely wrote:
+> >> +struct clk *of_clk_get_by_name(struct device_node *np, const char *name)
+> >> +{
+> >> + ? ? int index = 0;
+> >> +
+> >> + ? ? if (name)
+> >> + ? ? ? ? ? ? index = of_property_match_string(np, "clock-input-names", name);
+> >
+> > If it fails to match name, we may want to force 'index' back to 0.
+> 
+> Actually, if it fails to match, the function should fail.
 
-DMB (i.e. smp barriers) should be enough within Normal memory
-accesses, though the other issues that were reported to me are a bit
-concerning. I'm still trying to get more information about them, in
-the hopes that I can eventually reproduce them myself.
+Hmm, that will require the clock-input-name be same as the second
+parameter of clk_get() - con_id, which may have been named to some
+string not suitable for clock-input-name.  For those case, we will
+probably need to change the drivers to rename the con_id?  Or just
+force the clock-input-name to be that improper con_id string?
+
+-- 
+Regards,
+Shawn
