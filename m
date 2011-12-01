@@ -1,41 +1,62 @@
-From: dwalker@fifo99.com (Daniel Walker)
-Date: Thu, 01 Dec 2011 10:39:05 -0800
-Subject: [PATCH 1/3] ARM: msm: Remove MSM7x00 support
-In-Reply-To: <20111201181736.GA13182@huya.qualcomm.com>
-References: <1322699344-28422-1-git-send-email-davidb@codeaurora.org>
- <1322752657.3704.2.camel@m0nster>
- <20111201181736.GA13182@huya.qualcomm.com>
-Message-ID: <1322764745.3704.9.camel@m0nster>
+From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
+Date: Thu, 1 Dec 2011 19:38:32 +0100
+Subject: [PATCH 2a/5] Remove unsafe clock values from omap1_defconfig
+In-Reply-To: <20111201171758.GT31337@atomide.com>
+References: <20111128174508.GO31337@atomide.com>
+ <201112011054.09878.jkrzyszt@tis.icnet.pl>
+ <20111201171758.GT31337@atomide.com>
+Message-ID: <201112011938.36706.jkrzyszt@tis.icnet.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2011-12-01 at 10:17 -0800, David Brown wrote:
-> On Thu, Dec 01, 2011 at 07:17:37AM -0800, Daniel Walker wrote:
-> > On Wed, 2011-11-30 at 16:29 -0800, David Brown wrote:
-> > > -       default ARCH_MSM7X00A
-> > > -
-> > > -config ARCH_MSM7X00A
-> > > -       bool "MSM7x00A / MSM7x01A"
-> > > -       select MACH_TROUT if !MACH_HALIBUT
-> > > -       select ARCH_MSM_ARM11
-> > > -       select MSM_SMD
-> > > -       select MSM_SMD_PKG3
-> > > -       select CPU_V6
-> > > -       select GPIO_MSM_V1
-> > > -       select MSM_PROC_COMM
-> > > -       select HAS_MSM_DEBUG_UART_PHYS 
-> > 
-> > 
-> > Your trying to drop G1 support ? I have a G1 sitting on my desk, and I
-> > know many other people working on the kernel have G1's .. 
+On Thursday 01 of December 2011 at 18:17:58, Tony Lindgren wrote:
+> * Janusz Krzysztofik <jkrzyszt@tis.icnet.pl> [111201 01:20]:
+[snip]
+> > Perhaps 
+> > we should rather think of reverting a few commits which caused all these 
+> > problems if fixing them all during rc cycle seems not possible? I 
+> > haven't bisected them yet, rather concentrated on providing fixes, but I 
+> > can still try to do it, starting back from the original issue 
+> > (http://www.spinics.net/lists/linux-omap/msg60052.html), if so decided.
 > 
-> If someone is willing to step up and make it work, then we can keep it
-> around.  My only G1 is fried, so I have no way to do anything other
-> than keep it compiling.
+> We can't revert that because the SRAM init has been moved to later for
+> map_io. 
 
-Unfortunately, You can't remove it regardless of whether or not you have
-one to test on.. Your job is to do the best you can to keep it working
-and maintained. If you don't have one then you can't boot test but you
-still have to your best to keep it as close to working as possible.
+Yes, I know that. What I don't know yet is what else should be reverted 
+to fix the original issue other than applying  
+e9b7086b80c4d9e354f4edc9e280ae85a60df408, which seems to introduce (or 
+maybe 'exhibit' is a better word here) more bugs than it fixes.
 
-Daniel
+> But if that patch changed the behaviour on your board, then that's
+> the problem we should fix.
+> 
+> If you're now stuck at 60MHz rate, care to see if the following patch
+> makes the kernel behave the same way as before for you?
+[snip]
+> 
+> --- a/arch/arm/mach-omap1/clock_data.c
+> +++ b/arch/arm/mach-omap1/clock_data.c
+> @@ -927,7 +927,7 @@ int __init omap1_clk_init(void)
+>  
+>  void __init omap1_clk_late_init(void)
+>  {
+> -	if (ck_dpll1.rate >= OMAP1_DPLL1_SANE_VALUE)
+> +	if (ck_dpll1.rate > OMAP1_DPLL1_SANE_VALUE)
+>  		return;
+>  
+>  	/* Find the highest supported frequency and enable it */
+
+This change really makes sense to me, however, knowing the initial 
+(bootloader selected) clock rate my board boots at, which is 
+unfortunately raw 12 MHz, I would be surprised if that helped.
+
+Before e9b7086b80c4d9e354f4edc9e280ae85a60df408, 
+omap1_select_table_rate() was returning the rate selected with .config 
+because it was called early, with ck_dpll1_p->rate uninitialized. Now it 
+is not, and returns nothing, resulting in 60 MHz default. Then, the only 
+way I can see to correct the problem is something like patch 3/5, which 
+you are justifiably affraid of of always switching to 216 MHz with 
+omap1_defconfig.
+
+Thanks,
+Janusz
