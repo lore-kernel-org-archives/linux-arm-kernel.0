@@ -1,70 +1,97 @@
-From: dwalker@fifo99.com (Daniel Walker)
-Date: Thu, 01 Dec 2011 12:32:56 -0800
-Subject: [PATCH 1/3] ARM: msm: Remove MSM7x00 support
-In-Reply-To: <20111201202632.GA25247@huya.qualcomm.com>
-References: <1322699344-28422-1-git-send-email-davidb@codeaurora.org>
- <1322752657.3704.2.camel@m0nster>
- <20111201181736.GA13182@huya.qualcomm.com>
- <1322764745.3704.9.camel@m0nster>
- <20111201192705.GA23641@huya.qualcomm.com>
- <1322767992.3704.13.camel@m0nster>
- <20111201194353.GA24293@huya.qualcomm.com>
- <20111201201950.GE9581@n2100.arm.linux.org.uk>
- <20111201202632.GA25247@huya.qualcomm.com>
-Message-ID: <1322771576.3704.24.camel@m0nster>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Thu, 1 Dec 2011 21:37:07 +0100
+Subject: [PATCH 2/3] ARM: mach-shmobile: Use common always on power domain
+ governor
+In-Reply-To: <1322765339-29879-2-git-send-email-broonie@opensource.wolfsonmicro.com>
+References: <1322765339-29879-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+ <1322765339-29879-2-git-send-email-broonie@opensource.wolfsonmicro.com>
+Message-ID: <201112012137.08119.rjw@sisk.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2011-12-01 at 12:26 -0800, David Brown wrote:
-> On Thu, Dec 01, 2011 at 08:19:50PM +0000, Russell King - ARM Linux wrote:
-> > On Thu, Dec 01, 2011 at 11:43:53AM -0800, David Brown wrote:
-> > > On Thu, Dec 01, 2011 at 11:33:12AM -0800, Daniel Walker wrote:
-> > > > On Thu, 2011-12-01 at 11:27 -0800, David Brown wrote:
-> > > > > On Thu, Dec 01, 2011 at 10:39:05AM -0800, Daniel Walker wrote:
-> > > > > 
-> > > > > > > If someone is willing to step up and make it work, then we can keep it
-> > > > > > > around.  My only G1 is fried, so I have no way to do anything other
-> > > > > > > than keep it compiling.
-> > > > > > 
-> > > > > > Unfortunately, You can't remove it regardless of whether or not you have
-> > > > > > one to test on.. Your job is to do the best you can to keep it working
-> > > > > > and maintained. If you don't have one then you can't boot test but you
-> > > > > > still have to your best to keep it as close to working as possible.
-> > > > > 
-> > > > > I was trying to get an idea if anyone uses the target.  If people
-> > > > > want the target around, we can just ignore my patches to remove it.
-> > > > 
-> > > > Please don't ever do this again.
-> > > 
-> > > That's awfully harsh.  I sent an email a few weeks back asking about
-> > > removing the target, and I only got one positive response.  Sometimes
-> > > sending a patch is the best way to get a reaction.
-> > 
-> > That's pretty normal for just 'asking' about doing something.
-> > 
-> > You've done the right thing - if you ask, people treat your message as
-> > low priority and don't bother replying in the hope that nothing will
-> > happen.
-> > 
-> > However, if you send a patch to delete a platform, people treat it as
-> > most urgent because if they care they need to speak up to actually stop
-> > it happening.  (Even if you intend to only actually submit it in 6
-> > months time or so - but don't mention that in the initial posting!)
-> > 
-> > Now, the obvious question to ask now is this: as you sent your question,
-> > and Daniel obviously objects, was Daniel one of your respondants?  If
-> > not, then he carries some of the blame for this patch being created
-> > in the first place by having missed the email/not replied/etc.
-> 
-> Yeah, my mistake was forgetting to CC Daniel on the original question
-> about removing the target.
-> 
-> And I've learned what I needed to now: someone does still care about
-> the target.
+Hi,
 
-I just went on cragslist and found 7 of these phones for sell used .. If
-you can still buy the things clearly we want it supported .. My point is
-that this patch and even you asking to remove the code was pointless..
-You should know that code can't be removed.
+On Thursday, December 01, 2011, Mark Brown wrote:
+> Saves a tiny amount of code.
 
-Daniel
+How so?
+
+> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> ---
+>  arch/arm/mach-shmobile/pm-sh7372.c |   43 +----------------------------------
+>  1 files changed, 2 insertions(+), 41 deletions(-)
+> 
+> diff --git a/arch/arm/mach-shmobile/pm-sh7372.c b/arch/arm/mach-shmobile/pm-sh7372.c
+> index adf1765..5f7d575 100644
+> --- a/arch/arm/mach-shmobile/pm-sh7372.c
+> +++ b/arch/arm/mach-shmobile/pm-sh7372.c
+> @@ -162,45 +162,6 @@ static bool pd_active_wakeup(struct device *dev)
+>  	return active_wakeup ? active_wakeup(dev) : true;
+>  }
+>  
+> -static bool sh7372_power_down_forbidden(struct dev_pm_domain *domain)
+> -{
+> -	return false;
+> -}
+> -
+> -struct dev_power_governor sh7372_always_on_gov = {
+> -	.power_down_ok = sh7372_power_down_forbidden,
+> -	.stop_ok = default_stop_ok,
+> -};
+> -
+> -static int sh7372_stop_dev(struct device *dev)
+> -{
+> -	int (*stop)(struct device *dev);
+> -
+> -	stop = dev_gpd_data(dev)->ops.stop;
+> -	if (stop) {
+> -		int ret = stop(dev);
+> -		if (ret)
+> -			return ret;
+> -	}
+> -	return pm_clk_suspend(dev);
+> -}
+> -
+> -static int sh7372_start_dev(struct device *dev)
+> -{
+> -	int (*start)(struct device *dev);
+> -	int ret;
+> -
+> -	ret = pm_clk_resume(dev);
+> -	if (ret)
+> -		return ret;
+> -
+> -	start = dev_gpd_data(dev)->ops.start;
+> -	if (start)
+> -		ret = start(dev);
+> -
+> -	return ret;
+> -}
+> -
+
+The above functions are actually necessary, please don't remove them
+without introducing replacements.
+
+>  void sh7372_init_pm_domain(struct sh7372_pm_domain *sh7372_pd)
+>  {
+>  	struct generic_pm_domain *genpd = &sh7372_pd->genpd;
+> @@ -246,7 +207,7 @@ struct sh7372_pm_domain sh7372_d4 = {
+>  
+>  struct sh7372_pm_domain sh7372_a4r = {
+>  	.bit_shift = 5,
+> -	.gov = &sh7372_always_on_gov,
+> +	.gov = &pm_domain_always_on_gov,
+>  	.suspend = sh7372_a4r_suspend,
+>  	.resume = sh7372_intcs_resume,
+>  	.stay_on = true,
+> @@ -262,7 +223,7 @@ struct sh7372_pm_domain sh7372_a3ri = {
+>  
+>  struct sh7372_pm_domain sh7372_a3sp = {
+>  	.bit_shift = 11,
+> -	.gov = &sh7372_always_on_gov,
+> +	.gov = &pm_domain_always_on_gov,
+>  	.no_debug = true,
+>  };
+
+Thanks,
+Rafael
