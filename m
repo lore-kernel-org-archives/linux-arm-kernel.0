@@ -1,39 +1,51 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Thu, 1 Dec 2011 12:03:16 +0000
-Subject: [RFC PATCH 07/11] arm:omap:am33xx: Add irq, dma and module base
- addr to SoC header files
-In-Reply-To: <87obvtt66u.fsf@ti.com>
-References: <1321809555-13833-1-git-send-email-hvaibhav@ti.com>
- <1321809555-13833-8-git-send-email-hvaibhav@ti.com> <87obvtt66u.fsf@ti.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A804762B@DBDE01.ent.ti.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Thu, 1 Dec 2011 20:19:35 +0800
+Subject: [PATCH] mx28: LRADC macro rename
+In-Reply-To: <1322667807-8097-1-git-send-email-rusko.peter@prolan.hu>
+References: <1322667807-8097-1-git-send-email-rusko.peter@prolan.hu>
+Message-ID: <20111201121934.GI711@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Nov 30, 2011 at 04:43:27PM +0100, Peter Rusko wrote:
+> It's a correction of two macro names, renaming them from IRADC to LRADC.
+> 
+> Signed-off-by: Peter Rusko <rusko.peter@prolan.hu>
+> ---
 
-> -----Original Message-----
-> From: Hilman, Kevin
-> Sent: Thursday, December 01, 2011 7:16 AM
-> To: Hiremath, Vaibhav
-> Cc: linux-omap at vger.kernel.org; tony at atomide.com; paul at pwsan.com; linux-
-> arm-kernel at lists.infradead.org; Cousson, Benoit; Mohammed, Afzal
-> Subject: Re: [RFC PATCH 07/11] arm:omap:am33xx: Add irq, dma and module
-> base addr to SoC header files
-> 
-> Vaibhav Hiremath <hvaibhav@ti.com> writes:
-> 
-> > This patch creats seperate irq and dma defination header file
-> > and updates the module base addresses required for HWMOD data.
-> >
-> > Signed-off-by: Afzal Mohammed <afzal@ti.com>
-> > Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
-> 
-> These headers/defines should no longer be needed.  Instead, as with
-> OMAP4, the raw values are used in the hwmod data (and we'll be moving
-> device tree for these values.)
-> 
-Ok, will clean this up in next version.
+Applied, thanks.
 
-Thanks,
-Vaibhav
+I added the prefix 'ARM: ' to the patch subject to make it consistent
+with one of the most common pattern of ARM patch subject.
 
-> Kevin
+-- 
+Regards,
+Shawn
+
+>  arch/arm/mach-mxs/include/mach/mx28.h |    4 ++--
+>  1 files changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mach-mxs/include/mach/mx28.h b/arch/arm/mach-mxs/include/mach/mx28.h
+> index 75d8611..30c7990 100644
+> --- a/arch/arm/mach-mxs/include/mach/mx28.h
+> +++ b/arch/arm/mach-mxs/include/mach/mx28.h
+> @@ -104,8 +104,8 @@
+>  #define MX28_INT_CAN1			9
+>  #define MX28_INT_LRADC_TOUCH		10
+>  #define MX28_INT_HSADC			13
+> -#define MX28_INT_IRADC_THRESH0		14
+> -#define MX28_INT_IRADC_THRESH1		15
+> +#define MX28_INT_LRADC_THRESH0		14
+> +#define MX28_INT_LRADC_THRESH1		15
+>  #define MX28_INT_LRADC_CH0		16
+>  #define MX28_INT_LRADC_CH1		17
+>  #define MX28_INT_LRADC_CH2		18
+> -- 
+> 1.7.5.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
