@@ -1,35 +1,25 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Thu, 1 Dec 2011 14:34:48 +0800
-Subject: [RFC 6/8] of: add clock providers
-In-Reply-To: <CACxGe6teGPmgOiwSVQ_PebXo=9x8EVwjH2qQYi5LU813BvY3Ow@mail.gmail.com>
-References: <1320801583-12774-1-git-send-email-grant.likely@secretlab.ca>
- <1320801583-12774-7-git-send-email-grant.likely@secretlab.ca>
- <20111121153716.GA16417@S2100-06.ap.freescale.net>
- <CACxGe6teGPmgOiwSVQ_PebXo=9x8EVwjH2qQYi5LU813BvY3Ow@mail.gmail.com>
-Message-ID: <20111201063447.GH711@S2100-06.ap.freescale.net>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Thu, 1 Dec 2011 09:15:11 +0200
+Subject: [RFC] virtio: use mandatory barriers for remote processor vdevs
+In-Reply-To: <87zkfdrpn8.fsf@rustcorp.com.au>
+References: <1322569886-13055-1-git-send-email-ohad@wizery.com>
+ <20111129131110.GC19157@redhat.com>
+ <CAK=WgbZoGYVyKt=XXvnPVdh0koSBJC0zcgkLaYRkmjwBLOFA-A@mail.gmail.com>
+ <20111129151958.GA31789@redhat.com>
+ <CAK=WgbZ5aBFNro3XC0cN+Ao4ZWrBHwwd3d__CSHA=n56gKmKXw@mail.gmail.com>
+ <20111130145004.GD21413@redhat.com>
+ <CAK=WgbY59n9N_-2_TZ9wNBNcTMV1DCrz65e-Ae=xamcg6A0dOA@mail.gmail.com>
+ <20111130231306.GD30031@redhat.com> <87zkfdrpn8.fsf@rustcorp.com.au>
+Message-ID: <CAK=Wgbb7kJu7WgJvCGb==7Oh_xCBrj6m2s1OH-WofXe7VgLBcA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 30, 2011 at 12:38:19PM -0700, Grant Likely wrote:
-> On Mon, Nov 21, 2011 at 8:37 AM, Shawn Guo <shawn.guo@freescale.com> wrote:
-> > On Tue, Nov 08, 2011 at 06:19:41PM -0700, Grant Likely wrote:
-> >> +struct clk *of_clk_get_by_name(struct device_node *np, const char *name)
-> >> +{
-> >> + ? ? int index = 0;
-> >> +
-> >> + ? ? if (name)
-> >> + ? ? ? ? ? ? index = of_property_match_string(np, "clock-input-names", name);
-> >
-> > If it fails to match name, we may want to force 'index' back to 0.
-> 
-> Actually, if it fails to match, the function should fail.
+On Thu, Dec 1, 2011 at 4:28 AM, Rusty Russell <rusty@rustcorp.com.au> wrote:
+> Hmm, we got away with light barriers because we knew we were not
+> *really* talking to a device. ?But now with virtio-mmio, turns out we
+> are :)
+>
+> I'm really tempted to revert d57ed95 for 3.2, and we can revisit this
+> optimization later if it proves worthwhile.
 
-Hmm, that will require the clock-input-name be same as the second
-parameter of clk_get() - con_id, which may have been named to some
-string not suitable for clock-input-name.  For those case, we will
-probably need to change the drivers to rename the con_id?  Or just
-force the clock-input-name to be that improper con_id string?
-
--- 
-Regards,
-Shawn
++1
