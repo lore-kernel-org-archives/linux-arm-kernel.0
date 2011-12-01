@@ -1,52 +1,39 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 01 Dec 2011 19:29:24 +0900
-Subject: [RESEND][PATCH] ARM: EXYNOS: Fixed undefined symbol compilation
- error.
-In-Reply-To: <1321352102-10021-1-git-send-email-pankaj.dubey@samsung.com>
-References: <1321352102-10021-1-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <047101ccb014$18766ab0$49634010$%kim@samsung.com>
+Date: Thu, 01 Dec 2011 19:29:40 +0900
+Subject: [PATCH] ARM: S3C64XX: Staticise s3c6400_sysclass
+In-Reply-To: <1322501217-16770-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+References: <1322501217-16770-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+Message-ID: <047201ccb014$225f7ee0$671e7ca0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Pankaj Dubey wrote:
+Mark Brown wrote:
 > 
-> Many drivers will fail to compile if compiled as module due to
-> undefined symbol exynos4_ioremap.
-> Fix has been added by exporting the same in cpu.c file.
+> The symbol is not exported and doesn't need to be.
 > 
-> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
 > ---
->  arch/arm/mach-exynos/cpu.c |    2 ++
->  1 files changed, 2 insertions(+), 0 deletions(-)
+>  arch/arm/mach-s3c64xx/s3c6400.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
 > 
-> diff --git a/arch/arm/mach-exynos/cpu.c b/arch/arm/mach-exynos/cpu.c
-> index 8e09f34..027f65471 100644
-> --- a/arch/arm/mach-exynos/cpu.c
-> +++ b/arch/arm/mach-exynos/cpu.c
-> @@ -8,6 +8,7 @@
->   * published by the Free Software Foundation.
->  */
-> 
-> +#include <linux/module.h>
->  #include <linux/sched.h>
->  #include <linux/sysdev.h>
->  #include <linux/of.h>
-> @@ -164,6 +165,7 @@ void __iomem *exynos4_ioremap(unsigned long phy,
-> size_t size, unsigned int type)
-> 
->  	return __arm_ioremap(phy, size, type);
+> diff --git a/arch/arm/mach-s3c64xx/s3c6400.c b/arch/arm/mach-
+> s3c64xx/s3c6400.c
+> index 7a3bc32..51c00f2 100644
+> --- a/arch/arm/mach-s3c64xx/s3c6400.c
+> +++ b/arch/arm/mach-s3c64xx/s3c6400.c
+> @@ -70,7 +70,7 @@ void __init s3c6400_init_irq(void)
+>  	s3c64xx_init_irq(~0 & ~(0xf << 5), ~0);
 >  }
-> +EXPORT_SYMBOL(exynos4_ioremap);
 > 
->  static void exynos_idle(void)
->  {
+> -struct sysdev_class s3c6400_sysclass = {
+> +static struct sysdev_class s3c6400_sysclass = {
+>  	.name	= "s3c6400-core",
+>  };
+> 
 > --
-> 1.7.4.1
+> 1.7.7.3
 
-Hi Pankaj,
-
-As we discussed internally, since Nicolas Pitre's vmalloc patch series this
-can be dropped.
+Yes! Will apply :)
 
 Thanks.
 
