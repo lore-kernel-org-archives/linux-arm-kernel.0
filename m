@@ -1,34 +1,24 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 01 Dec 2011 16:30:07 +0900
-Subject: [PATCH 2/2] MAINTAINERS: Extend Samsung patterns to cover SPI and
- ASoC drivers
-In-Reply-To: <20111115111603.GC3077@opensource.wolfsonmicro.com>
-References: <1320923776-26626-1-git-send-email-broonie@opensource.wolfsonmicro.com>
- <1320923776-26626-2-git-send-email-broonie@opensource.wolfsonmicro.com>
- <005701cca376$f6abbba0$e40332e0$%kim@samsung.com>
- <20111115111603.GC3077@opensource.wolfsonmicro.com>
-Message-ID: <045e01ccaffb$0cb6cb20$26246160$%kim@samsung.com>
+Date: Thu, 01 Dec 2011 16:30:28 +0900
+Subject: [PATCH 2/2] mmc: sdhci-s3c: Add pm_caps into SD/MMC host
+In-Reply-To: <1320685522-17481-3-git-send-email-sangwook.lee@linaro.org>
+References: <1320685522-17481-1-git-send-email-sangwook.lee@linaro.org>
+ <1320685522-17481-3-git-send-email-sangwook.lee@linaro.org>
+Message-ID: <046001ccaffb$1988f580$4c9ae080$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark Brown wrote:
+Sangwook Lee wrote:
 > 
-> On Tue, Nov 15, 2011 at 06:14:22PM +0900, Kukjin Kim wrote:
-> > Mark Brown wrote:
+> sdhci-s3c updates pm_caps from platform data for SDIO PM.
 > 
-> > > +F:	drivers/spi/spi-s3c*
-> > > +F:	sound/soc/samsung/*
-> 
-> > Hmm, I'm ok on this but needs Grant's opinion :)
-> 
-> > (Cc'ed Grant Likely)
-> 
-> Note that you can have multiple entries for a single file, people are
-> supposed to use a bit of thought when working out who to mail - if you
-> use something like get_maintainers it'll return all matching entries.
+> Signed-off-by: Sangwook Lee <sangwook.lee@samsung.com>
 
-OK, I agree.
-Will apply.
+Acked-by: Kukjin Kim <kgene.kim@samsung.com>
+
+Hi Chris,
+
+Could you please pick this up in your tree for v3.3?
 
 Thanks.
 
@@ -37,3 +27,25 @@ Kgene.
 --
 Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
 SW Solution Development Team, Samsung Electronics Co., Ltd.
+
+> ---
+>  drivers/mmc/host/sdhci-s3c.c |    3 +++
+>  1 files changed, 3 insertions(+), 0 deletions(-)
+> 
+> diff --git a/drivers/mmc/host/sdhci-s3c.c b/drivers/mmc/host/sdhci-s3c.c
+> index fe886d6..f10dd52 100644
+> --- a/drivers/mmc/host/sdhci-s3c.c
+> +++ b/drivers/mmc/host/sdhci-s3c.c
+> @@ -518,6 +518,9 @@ static int __devinit sdhci_s3c_probe(struct
+> platform_device *pdev)
+>  	if (pdata->host_caps)
+>  		host->mmc->caps |= pdata->host_caps;
+> 
+> +	if (pdata->pm_caps)
+> +		host->mmc->pm_caps |= pdata->pm_caps;
+> +
+>  	host->quirks |= (SDHCI_QUIRK_32BIT_DMA_ADDR |
+>  			 SDHCI_QUIRK_32BIT_DMA_SIZE);
+> 
+> --
+> 1.7.4.1
