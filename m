@@ -1,48 +1,43 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 01 Dec 2011 16:39:42 +0000
-Subject: [PATCH 1/2] ARM: exynos4: Fix build error due to 'gic_bank_offset'
- undeclared
-In-Reply-To: <1322753070.11611.0.camel@phoenix>
-References: <1322753070.11611.0.camel@phoenix>
-Message-ID: <4ED7ADCE.8040609@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 1 Dec 2011 16:44:40 +0000
+Subject: [Android-virt] [Embeddedxen-devel] [Xen-devel] [ANNOUNCE] Xen
+ port to Cortex-A15 / ARMv7 with virt extensions
+In-Reply-To: <20111201160241.GH27394@arm.com>
+References: <alpine.DEB.2.00.1111281009090.31179@kaball-desktop>
+ <201112011542.19377.arnd@arndb.de> <20111201160241.GH27394@arm.com>
+Message-ID: <201112011644.41101.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/12/11 15:24, Axel Lin wrote:
-> Fix below build error:
->   CC      arch/arm/mach-exynos/cpu.o
-> arch/arm/mach-exynos/cpu.c: In function 'exynos4_init_irq':
-> arch/arm/mach-exynos/cpu.c:245: error: 'gic_bank_offset' undeclared (first use in this function)
-> arch/arm/mach-exynos/cpu.c:245: error: (Each undeclared identifier is reported only once
-> arch/arm/mach-exynos/cpu.c:245: error: for each function it appears in.)
-> arch/arm/mach-exynos/cpu.c:243: warning: unused variable 'bank_offset'
-> make[1]: *** [arch/arm/mach-exynos/cpu.o] Error 1
-> make: *** [arch/arm/mach-exynos] Error 2
+On Thursday 01 December 2011, Catalin Marinas wrote:
+> On Thu, Dec 01, 2011 at 03:42:19PM +0000, Arnd Bergmann wrote:
+> > On Thursday 01 December 2011, Catalin Marinas wrote:
+> > How do you deal with signed integer arguments passed into SVC or HVC from
+> > a caller? If I understand the architecture correctly, the upper
+> > halves of the argument register end up zero-padded, while the callee
+> > expects sign-extension.
 > 
-> Signed-off-by: Axel Lin <axel.lin@gmail.com>
+> If you treat it as an "int" (32-bit) and function prototype defined
+> accordingly, then the generated code only accesses it as a W (rather
+> than X) register and the top 32-bit part is ignored (no need for
+> sign-extension). If it is defined as a "long" in the 32-bit world, then
+> it indeed needs explicit conversion given the different sizes for long
+> (for example sys_lseek, the second argument is a 'long' and we do
+> explicit sign extension in the wrapper).
 
-Arghhh... My bad. Thanks for fixing that.
+Ok, so it's actually different from most other 64 bit architectures, which
+normally operate on 64-bit registers and expect the caller to do the
+correct sign-extension.
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Doing the sign-extension for long arguments then falls into the same
+category as long long and unsigned long long arguments, which also need
+a wrapper, as you mentioned. Strictly speaking, we only need to do it
+for those where the long argument has a meaning outside of the 0..2^31
+range, e.g. io_submit can only take small positive numbers although
+the type is 'long'.
 
-> ---
->  arch/arm/mach-exynos/cpu.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/mach-exynos/cpu.c b/arch/arm/mach-exynos/cpu.c
-> index fed62f4..c7cb462 100644
-> --- a/arch/arm/mach-exynos/cpu.c
-> +++ b/arch/arm/mach-exynos/cpu.c
-> @@ -240,7 +240,7 @@ static const struct of_device_id exynos4_dt_irq_match[] = {
->  void __init exynos4_init_irq(void)
->  {
->  	int irq;
-> -	unsigned int bank_offset;
-> +	unsigned int gic_bank_offset;
->  
->  	gic_bank_offset = soc_is_exynos4412() ? 0x4000 : 0x8000;
->  
+What about unsigned long and pointer? Can we always rely on the upper
+half of the register to be zero-filled when we get an exception from 32
+bit into 64 bit state, or do we also have to zero-extend those?
 
-
--- 
-Jazz is not dead. It just smells funny...
+	Arnd
