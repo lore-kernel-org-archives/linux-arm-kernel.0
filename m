@@ -1,52 +1,49 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 01 Dec 2011 16:29:33 +0900
-Subject: [RFC][PATCH] Consolidate Samsung MAINTAINERS
-In-Reply-To: <201111291006.49821.heiko@sntech.de>
-References: <201110230012.15273.heiko@sntech.de>
- <201111041250.40613.heiko@sntech.de>
- <003501cca365$bdbd0e90$39372bb0$%kim@samsung.com>
- <201111291006.49821.heiko@sntech.de>
-Message-ID: <045c01ccaffa$f8976d20$e9c64760$%kim@samsung.com>
+Date: Thu, 01 Dec 2011 16:29:46 +0900
+Subject: [PATCH] watchdog: fix initialisation printout in s3c2410_wdt
+In-Reply-To: <CAJuYYwTv3d9Wg8TDBEkc0r3BweUiLdqVwGdMU4iKpK0B+EM=GA@mail.gmail.com>
+References: <1321433173-17757-1-git-send-email-mad_soft@inbox.ru>
+ <CAJuYYwTv3d9Wg8TDBEkc0r3BweUiLdqVwGdMU4iKpK0B+EM=GA@mail.gmail.com>
+Message-ID: <045d01ccaffb$00710240$015306c0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Heiko St?bner wrote:
+Thomas Abraham wrote:
 > 
-> Am Dienstag, 15. November 2011, 08:11:05 schrieb Kukjin Kim:
-> > Kukjin Kim wrote:
-> > > Heiko St?bner wrote:
-> > > > Am Sonntag 23 Oktober 2011, 00:12:14 schrieb Heiko St?bner:
-> > > > > These days most Samsung stuff gets in the kernel through Kukjin
-> Kim.
-> > > > > This patch changes MAINTAINERS to reflect this.
-> > > > >
-> > > > > By adding Kukjin Kim to the maintainers for S3C2410, S3C244x and
-> > > > > S3C64xx alongside Ben Dooks the extra entries become identical to
-> the
-> > > > > base ARM/SAMSUNG entry and can move into it.
-> > > > >
-> > > > > Also the S3C2416 gets a maintainer through the s3c24* wildcard -
-> as
-> > > > > it did not have one until now.
-> > > > >
-> > > > > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> > > > > ---
-> > > >
-> > > > ping?
-> > >
-> > > Hi Heiko,
-> > >
-> > > Basically I'm ok on this but need to get the agreement from Ben Dooks.
+> On 16 November 2011 14:16, Dmitry Artamonow <mad_soft@inbox.ru> wrote:
+> > Looks like a typo creeped in, and driver prints
+> > s3c2410-wdt s3c2410-wdt: watchdog active, reset abled, irq abled
 > >
-> > Hi Ben,
+> > instead of
+> > s3c2410-wdt s3c2410-wdt: watchdog active, reset enabled, irq enabled
 > >
-> > How do you think about this?
-> > If you don't want this, please let me know.
-> seems ok then :-)
+> > Also it may completely disinform about irq status, as it prints
+> > "irq enabled" when S3C2410_WTCON_INTEN is in fact 0.
+> >
+> > Fix it.
+> >
+> > Signed-off-by: Dmitry Artamonow <mad_soft@inbox.ru>
+> > ---
+> >
+> > It seems to be here for a long time, but I don't think it's
+> > important enough for cc-ing stable.
+> >
+> > Also I haven't tested it, as I don't have a hardware, but it's
+> > rather trivial (and yes, I checked with datasheet that 1 in
+> > S3C2410_WTCON_*EN bits really means 'enabled')
+> >
 > 
-Hi Heiko,
+> Tested on Exynos4210 based Origen board. This patch fixed in incorrect
+> "irq enabled" message at bootup. Thanks for this fix.
+> 
+> Tested-by: Thomas Abraham <thomas.abraham@linaro.org>
+> 
 
-OK, will apply.
+Acked-by: Kukjin Kim <kgene.kim@samsung.com>
+
+Hi Wim,
+Please pick this up in your tree and if any problem, let me know.
+
 Thanks.
 
 Best regards,
@@ -54,3 +51,27 @@ Kgene.
 --
 Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
 SW Solution Development Team, Samsung Electronics Co., Ltd.
+
+
+> > ?drivers/watchdog/s3c2410_wdt.c | ? ?4 ++--
+> > ?1 files changed, 2 insertions(+), 2 deletions(-)
+> >
+> > diff --git a/drivers/watchdog/s3c2410_wdt.c
+> b/drivers/watchdog/s3c2410_wdt.c
+> > index 5de7e4f..a79e384 100644
+> > --- a/drivers/watchdog/s3c2410_wdt.c
+> > +++ b/drivers/watchdog/s3c2410_wdt.c
+> > @@ -401,8 +401,8 @@ static int __devinit s3c2410wdt_probe(struct
+> platform_device *pdev)
+> >
+> > ? ? ? ?dev_info(dev, "watchdog %sactive, reset %sabled, irq %sabled\n",
+> > ? ? ? ? ? ? ? ? (wtcon & S3C2410_WTCON_ENABLE) ? ?"" : "in",
+> > - ? ? ? ? ? ? ? ?(wtcon & S3C2410_WTCON_RSTEN) ? "" : "dis",
+> > - ? ? ? ? ? ? ? ?(wtcon & S3C2410_WTCON_INTEN) ? "" : "en");
+> > + ? ? ? ? ? ? ? ?(wtcon & S3C2410_WTCON_RSTEN) ? "en" : "dis",
+> > + ? ? ? ? ? ? ? ?(wtcon & S3C2410_WTCON_INTEN) ? "en" : "dis");
+> >
+> > ? ? ? ?return 0;
+> >
+> > --
+> > 1.7.5.1.300.gc565c
