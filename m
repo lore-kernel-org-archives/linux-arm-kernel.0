@@ -1,106 +1,78 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu,  1 Dec 2011 16:19:08 +0800
-Subject: [PATCH 1/2] arm/imx: fix return type of callback passed to
- of_irq_init()
-Message-ID: <1322727549-10852-1-git-send-email-shawn.guo@linaro.org>
+Date: Thu,  1 Dec 2011 16:19:09 +0800
+Subject: [PATCH 2/2] arm/imx: fix irq_base for gpio
+In-Reply-To: <1322727549-10852-1-git-send-email-shawn.guo@linaro.org>
+References: <1322727549-10852-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1322727549-10852-2-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The of_irq_init() expects the callback passed by .data of of_device_id
-return 'int' instead of 'void'.  This patch fixes it to have
-irq_init_cb() return the correct value, and in turn have the secondary
-interrupt controller (gpio in this case) initialized properly and also
-eliminate the error message 'of_irq_init: children remain, but no
-parents' which was overlooked before.
+When gpio core dynamically allocate gpio number for a port, it starts
+from the end of the total range, 0 ~ ARCH_NR_GPIOS.  That said, the
+earlier a port gets probed, the bigger gpio number it gets assigned.
+To match this, the irq_base for gpio should be assigned from
+'MXC_GPIO_IRQ_START + ARCH_NR_GPIOS' decreasingly.
 
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- arch/arm/mach-imx/mach-imx6q.c |    4 +++-
- arch/arm/mach-mx5/imx51-dt.c   |    7 +++++--
- arch/arm/mach-mx5/imx53-dt.c   |    7 +++++--
- 3 files changed, 13 insertions(+), 5 deletions(-)
+ arch/arm/mach-imx/mach-imx6q.c |    5 ++---
+ arch/arm/mach-mx5/imx51-dt.c   |    5 ++---
+ arch/arm/mach-mx5/imx53-dt.c   |    5 ++---
+ 3 files changed, 6 insertions(+), 9 deletions(-)
 
 diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
-index 8bf5fa3..eb7531b 100644
+index eb7531b..22aa54a 100644
 --- a/arch/arm/mach-imx/mach-imx6q.c
 +++ b/arch/arm/mach-imx/mach-imx6q.c
-@@ -36,7 +36,7 @@ static void __init imx6q_map_io(void)
- 	imx_scu_map_io();
- }
- 
--static void __init imx6q_gpio_add_irq_domain(struct device_node *np,
-+static int __init imx6q_gpio_add_irq_domain(struct device_node *np,
+@@ -39,11 +39,10 @@ static void __init imx6q_map_io(void)
+ static int __init imx6q_gpio_add_irq_domain(struct device_node *np,
  				struct device_node *interrupt_parent)
  {
- 	static int gpio_irq_base = MXC_GPIO_IRQ_START + ARCH_NR_GPIOS -
-@@ -44,6 +44,8 @@ static void __init imx6q_gpio_add_irq_domain(struct device_node *np,
+-	static int gpio_irq_base = MXC_GPIO_IRQ_START + ARCH_NR_GPIOS -
+-				   32 * 7; /* imx6q gets 7 gpio ports */
++	static int gpio_irq_base = MXC_GPIO_IRQ_START + ARCH_NR_GPIOS;
  
++	gpio_irq_base -= 32;
  	irq_domain_add_simple(np, gpio_irq_base);
- 	gpio_irq_base += 32;
-+
-+	return 0;
- }
+-	gpio_irq_base += 32;
  
- static const struct of_device_id imx6q_irq_match[] __initconst = {
+ 	return 0;
+ }
 diff --git a/arch/arm/mach-mx5/imx51-dt.c b/arch/arm/mach-mx5/imx51-dt.c
-index ccc6158..3451a46 100644
+index 3451a46..596edd9 100644
 --- a/arch/arm/mach-mx5/imx51-dt.c
 +++ b/arch/arm/mach-mx5/imx51-dt.c
-@@ -44,13 +44,14 @@ static const struct of_dev_auxdata imx51_auxdata_lookup[] __initconst = {
- 	{ /* sentinel */ }
- };
- 
--static void __init imx51_tzic_add_irq_domain(struct device_node *np,
-+static int __init imx51_tzic_add_irq_domain(struct device_node *np,
+@@ -54,11 +54,10 @@ static int __init imx51_tzic_add_irq_domain(struct device_node *np,
+ static int __init imx51_gpio_add_irq_domain(struct device_node *np,
  				struct device_node *interrupt_parent)
  {
- 	irq_domain_add_simple(np, 0);
-+	return 0;
- }
+-	static int gpio_irq_base = MXC_GPIO_IRQ_START + ARCH_NR_GPIOS -
+-				   32 * 4; /* imx51 gets 4 gpio ports */
++	static int gpio_irq_base = MXC_GPIO_IRQ_START + ARCH_NR_GPIOS;
  
--static void __init imx51_gpio_add_irq_domain(struct device_node *np,
-+static int __init imx51_gpio_add_irq_domain(struct device_node *np,
- 				struct device_node *interrupt_parent)
- {
- 	static int gpio_irq_base = MXC_GPIO_IRQ_START + ARCH_NR_GPIOS -
-@@ -58,6 +59,8 @@ static void __init imx51_gpio_add_irq_domain(struct device_node *np,
- 
++	gpio_irq_base -= 32;
  	irq_domain_add_simple(np, gpio_irq_base);
- 	gpio_irq_base += 32;
-+
-+	return 0;
- }
+-	gpio_irq_base += 32;
  
- static const struct of_device_id imx51_irq_match[] __initconst = {
+ 	return 0;
+ }
 diff --git a/arch/arm/mach-mx5/imx53-dt.c b/arch/arm/mach-mx5/imx53-dt.c
-index ccaa0b8..022bc03 100644
+index 022bc03..85bfd5f 100644
 --- a/arch/arm/mach-mx5/imx53-dt.c
 +++ b/arch/arm/mach-mx5/imx53-dt.c
-@@ -48,13 +48,14 @@ static const struct of_dev_auxdata imx53_auxdata_lookup[] __initconst = {
- 	{ /* sentinel */ }
- };
- 
--static void __init imx53_tzic_add_irq_domain(struct device_node *np,
-+static int __init imx53_tzic_add_irq_domain(struct device_node *np,
+@@ -58,11 +58,10 @@ static int __init imx53_tzic_add_irq_domain(struct device_node *np,
+ static int __init imx53_gpio_add_irq_domain(struct device_node *np,
  				struct device_node *interrupt_parent)
  {
- 	irq_domain_add_simple(np, 0);
-+	return 0;
- }
+-	static int gpio_irq_base = MXC_GPIO_IRQ_START + ARCH_NR_GPIOS -
+-				   32 * 7; /* imx53 gets 7 gpio ports */
++	static int gpio_irq_base = MXC_GPIO_IRQ_START + ARCH_NR_GPIOS;
  
--static void __init imx53_gpio_add_irq_domain(struct device_node *np,
-+static int __init imx53_gpio_add_irq_domain(struct device_node *np,
- 				struct device_node *interrupt_parent)
- {
- 	static int gpio_irq_base = MXC_GPIO_IRQ_START + ARCH_NR_GPIOS -
-@@ -62,6 +63,8 @@ static void __init imx53_gpio_add_irq_domain(struct device_node *np,
- 
++	gpio_irq_base -= 32;
  	irq_domain_add_simple(np, gpio_irq_base);
- 	gpio_irq_base += 32;
-+
-+	return 0;
- }
+-	gpio_irq_base += 32;
  
- static const struct of_device_id imx53_irq_match[] __initconst = {
+ 	return 0;
+ }
 -- 
 1.7.4.1
