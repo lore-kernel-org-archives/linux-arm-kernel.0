@@ -1,91 +1,31 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Thu, 1 Dec 2011 10:13:03 +0800
-Subject: [PATCH v2] IMX/SDMA : save the real count for one DMA transaction.
-Message-ID: <1322705583-18621-1-git-send-email-b32955@freescale.com>
+From: rusty@rustcorp.com.au (Rusty Russell)
+Date: Thu, 01 Dec 2011 12:58:59 +1030
+Subject: [RFC] virtio: use mandatory barriers for remote processor vdevs
+In-Reply-To: <20111130231306.GD30031@redhat.com>
+References: <1322569886-13055-1-git-send-email-ohad@wizery.com>
+ <20111129131110.GC19157@redhat.com>
+ <CAK=WgbZoGYVyKt=XXvnPVdh0koSBJC0zcgkLaYRkmjwBLOFA-A@mail.gmail.com>
+ <20111129151958.GA31789@redhat.com>
+ <CAK=WgbZ5aBFNro3XC0cN+Ao4ZWrBHwwd3d__CSHA=n56gKmKXw@mail.gmail.com>
+ <20111130145004.GD21413@redhat.com>
+ <CAK=WgbY59n9N_-2_TZ9wNBNcTMV1DCrz65e-Ae=xamcg6A0dOA@mail.gmail.com>
+ <20111130231306.GD30031@redhat.com>
+Message-ID: <87zkfdrpn8.fsf@rustcorp.com.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When we use the SDMA in the UART driver(such as imx6q), we will
-meet one situation:
-  Assume we set 64 bytes for the RX DMA buffer.
-  The receiving DMA buffer has received some data, but not full.
-  An Aging DMA request will be received by the SDMA controller if we enable the
-  IDDMAEN(UCR4[6]) in this case.
+On Thu, 1 Dec 2011 01:13:07 +0200, "Michael S. Tsirkin" <mst@redhat.com> wrote:
+> For x86, stores into memory are ordered. So I think that yes, smp_XXX
+> can be selected at compile time.
+> 
+> So let's forget the virtio strangeness for a minute,
 
-So the UART driver needs to know the count of the real received bytes,
-and push them to upper layer.
+Hmm, we got away with light barriers because we knew we were not
+*really* talking to a device.  But now with virtio-mmio, turns out we
+are :)
 
-Add two new fields to sdmac, and update the `residue` in sdma_tx_status().
+I'm really tempted to revert d57ed95 for 3.2, and we can revisit this
+optimization later if it proves worthwhile.
 
-Signed-off-by: Huang Shijie <b32955@freescale.com>
----
- drivers/dma/imx-sdma.c |   10 ++++++++--
- 1 files changed, 8 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
-index f993955..05ba3a8 100644
---- a/drivers/dma/imx-sdma.c
-+++ b/drivers/dma/imx-sdma.c
-@@ -268,6 +268,7 @@ struct sdma_channel {
- 	struct dma_async_tx_descriptor	desc;
- 	dma_cookie_t			last_completed;
- 	enum dma_status			status;
-+	unsigned int			chn_count, chn_real_count;
- };
- 
- #define IMX_DMA_SG_LOOP		(1 << 0)
-@@ -503,6 +504,7 @@ static void mxc_sdma_handle_channel_normal(struct sdma_channel *sdmac)
- 	struct sdma_buffer_descriptor *bd;
- 	int i, error = 0;
- 
-+	sdmac->chn_real_count = 0;
- 	/*
- 	 * non loop mode. Iterate over all descriptors, collect
- 	 * errors and call callback function
-@@ -512,6 +514,7 @@ static void mxc_sdma_handle_channel_normal(struct sdma_channel *sdmac)
- 
- 		 if (bd->mode.status & (BD_DONE | BD_RROR))
- 			error = -EIO;
-+		 sdmac->chn_real_count += bd->mode.count;
- 	}
- 
- 	if (error)
-@@ -519,9 +522,9 @@ static void mxc_sdma_handle_channel_normal(struct sdma_channel *sdmac)
- 	else
- 		sdmac->status = DMA_SUCCESS;
- 
-+	sdmac->last_completed = sdmac->desc.cookie;
- 	if (sdmac->desc.callback)
- 		sdmac->desc.callback(sdmac->desc.callback_param);
--	sdmac->last_completed = sdmac->desc.cookie;
- }
- 
- static void mxc_sdma_handle_channel(struct sdma_channel *sdmac)
-@@ -941,6 +944,7 @@ static struct dma_async_tx_descriptor *sdma_prep_slave_sg(
- 		goto err_out;
- 	}
- 
-+	sdmac->chn_count = 0;
- 	for_each_sg(sgl, sg, sg_len, i) {
- 		struct sdma_buffer_descriptor *bd = &sdmac->bd[i];
- 		int param;
-@@ -957,6 +961,7 @@ static struct dma_async_tx_descriptor *sdma_prep_slave_sg(
- 		}
- 
- 		bd->mode.count = count;
-+		sdmac->chn_count += count;
- 
- 		if (sdmac->word_size > DMA_SLAVE_BUSWIDTH_4_BYTES) {
- 			ret =  -EINVAL;
-@@ -1119,7 +1124,8 @@ static enum dma_status sdma_tx_status(struct dma_chan *chan,
- 
- 	last_used = chan->cookie;
- 
--	dma_set_tx_state(txstate, sdmac->last_completed, last_used, 0);
-+	dma_set_tx_state(txstate, sdmac->last_completed, last_used,
-+			sdmac->chn_count - sdmac->chn_real_count);
- 
- 	return sdmac->status;
- }
--- 
-1.7.3.2
+Thoughts?
+Rusty. 
