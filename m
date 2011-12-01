@@ -1,23 +1,28 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Thu, 01 Dec 2011 07:14:28 -0800
-Subject: [RFC PATCH 00/11] arm:omap:am33xx: Add basic voltage, power,
- clock & HWMOD data
-In-Reply-To: <87vcq0s5io.fsf@ti.com>
-References: <1321809555-13833-1-git-send-email-hvaibhav@ti.com>
- <87ty5lt6dm.fsf@ti.com>
- <79CD15C6BA57404B839C016229A409A804761D@DBDE01.ent.ti.com>
- <87vcq0s5io.fsf@ti.com>
-Message-ID: <4ED799D4.30509@ti.com>
+From: dwalker@fifo99.com (Daniel Walker)
+Date: Thu, 01 Dec 2011 07:17:37 -0800
+Subject: [PATCH 1/3] ARM: msm: Remove MSM7x00 support
+In-Reply-To: <1322699344-28422-1-git-send-email-davidb@codeaurora.org>
+References: <1322699344-28422-1-git-send-email-davidb@codeaurora.org>
+Message-ID: <1322752657.3704.2.camel@m0nster>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/01/2011 06:58 AM, Kevin Hilman wrote:
-> Can you create a branch for base am33x support against a recent mainline
-> (like v3.2-rc3) for easier review/testing of just the AM33x support?
+On Wed, 2011-11-30 at 16:29 -0800, David Brown wrote:
+> -       default ARCH_MSM7X00A
+> -
+> -config ARCH_MSM7X00A
+> -       bool "MSM7x00A / MSM7x01A"
+> -       select MACH_TROUT if !MACH_HALIBUT
+> -       select ARCH_MSM_ARM11
+> -       select MSM_SMD
+> -       select MSM_SMD_PKG3
+> -       select CPU_V6
+> -       select GPIO_MSM_V1
+> -       select MSM_PROC_COMM
+> -       select HAS_MSM_DEBUG_UART_PHYS 
 
-Nevermind, I now see your am335x-staging branch in the Arago tree you
-mentioned.
 
-Thanks,
+Your trying to drop G1 support ? I have a G1 sitting on my desk, and I
+know many other people working on the kernel have G1's .. 
 
-Kevin
+Daniel
