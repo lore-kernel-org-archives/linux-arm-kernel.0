@@ -1,21 +1,48 @@
-From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
-Date: Thu, 1 Dec 2011 11:21:36 +0100
-Subject: [PATCH 2a/5] Remove unsafe clock values from omap1_defconfig
-In-Reply-To: <201112011054.09878.jkrzyszt@tis.icnet.pl>
-References: <20111128174508.GO31337@atomide.com>
- <20111201022750.GY13928@atomide.com>
- <201112011054.09878.jkrzyszt@tis.icnet.pl>
-Message-ID: <201112011121.36678.jkrzyszt@tis.icnet.pl>
+From: Ian.Campbell@citrix.com (Ian Campbell)
+Date: Thu, 1 Dec 2011 10:26:37 +0000
+Subject: [Embeddedxen-devel] [Xen-devel] [ANNOUNCE] Xen port to
+ Cortex-A15 / ARMv7 with virt extensions
+In-Reply-To: <alpine.DEB.2.00.1111301820290.31179@kaball-desktop>
+References: <alpine.DEB.2.00.1111281009090.31179@kaball-desktop>
+ <201111301432.54463.arnd@arndb.de>
+ <1322670473.31810.129.camel@zakaz.uk.xensource.com>
+ <201111301815.01297.arnd@arndb.de>
+ <alpine.DEB.2.00.1111301820290.31179@kaball-desktop>
+Message-ID: <1322735197.31810.191.camel@zakaz.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 01 of December 2011 at 10:54:09, Janusz Krzysztofik wrote:
+On Wed, 2011-11-30 at 18:32 +0000, Stefano Stabellini wrote:
+> On Wed, 30 Nov 2011, Arnd Bergmann wrote:
+
 > 
-> Anyway, did you mean resending those 2/5 and 5/5 without any changes, 
-> only renumbered as 1/2 and 2/2?
+> > KVM and Xen at least both fall into the single-return-value category,
+> > so we should be able to agree on a calling conventions. KVM does not
+> > have an hcall API on ARM yet, and I see no reason not to use the
+> > same implementation that you have in the Xen guest.
+> > 
+> > Stefano, can you split out the generic parts of your asm/xen/hypercall.h
+> > file into a common asm/hypercall.h and submit it for review to the
+> > arm kernel list?
+> 
+> Sure, I can do that.
+> Usually the hypercall calling convention is very hypervisor specific,
+> but if it turns out that we have the same requirements I happy to design
+> a common interface.
 
-This was not a very clever question, sorry. Answering myself: 2/5 must 
-be refreshed if not on top of 1/5.
+I expect the only real decision to be made is hypercall page vs. raw hvc
+instruction.
 
-Thanks,
-Janusz
+The page was useful on x86 where there is a variety of instructions
+which could be used (at least for PV there was systenter/syscall/int, I
+think vmcall instruction differs between AMD and Intel also) and gives
+some additional flexibility. It's hard to predict but I don't think I'd
+expect that to be necessary on ARM.
+
+Another reason for having a hypercall page instead of a raw instruction
+might be wanting to support 32 bit guests (from ~today) on a 64 bit
+hypervisor in the future and perhaps needing to do some shimming/arg
+translation. It would be better to aim for having the interface just be
+32/64 agnostic but mistakes do happen.
+
+Ian.
