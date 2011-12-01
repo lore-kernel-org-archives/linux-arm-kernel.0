@@ -1,59 +1,25 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 1 Dec 2011 11:46:09 -0800
-Subject: [PATCH 2a/5] Remove unsafe clock values from omap1_defconfig
-In-Reply-To: <201112012023.04635.jkrzyszt@tis.icnet.pl>
-References: <20111128174508.GO31337@atomide.com>
- <201112011938.36706.jkrzyszt@tis.icnet.pl>
- <20111201190455.GV31337@atomide.com>
- <201112012023.04635.jkrzyszt@tis.icnet.pl>
-Message-ID: <20111201194609.GX31337@atomide.com>
+From: vapier@gentoo.org (Mike Frysinger)
+Date: Thu, 1 Dec 2011 14:47:29 -0500
+Subject: [PATCH] gpio: fix a build failure on KS8695 GPIO
+In-Reply-To: <CAJaTeTq-PrqiwqOjWgFDScm4QxHBX48Ld5h_ATknto=f69s0wQ@mail.gmail.com>
+References: <1319741905-11051-1-git-send-email-linus.walleij@linaro.org>
+ <CAJaTeTq-PrqiwqOjWgFDScm4QxHBX48Ld5h_ATknto=f69s0wQ@mail.gmail.com>
+Message-ID: <201112011447.31034.vapier@gentoo.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Janusz Krzysztofik <jkrzyszt@tis.icnet.pl> [111201 10:48]:
-> On Thursday 01 of December 2011 at 20:04:55, Tony Lindgren wrote:
-> > 
-> > From: Tony Lindgren <tony@atomide.com>
-> > Date: Thu, 1 Dec 2011 11:00:11 -0800
-> > Subject: [PATCH] ARM: OMAP1: Fix reprogramming of DPLL1 for systems that boot at rates below 60MHz
-> > 
-> > Commit e9b7086b80c4d9e354f4edc9e280ae85a60df408 (ARM: OMAP: Fix
-> > reprogramming of dpll1 rate) fixed a regression for systems that
-> > did not rely on bootloader set rates.
-> > 
-> > However, it also introduced a new problem where the rates selected
-> > in .config would not take affect as omap1_select_table_rate
-> > currently refuses to reprogram DPLL1 if it's already initialized.
-> > 
-> > This was not a problem earlier, as the reprogramming was done
-> > earlier with ck_dpll1_p->rate uninitialized.
-> > 
-> > Fix this by forcing the reprogramming on systems booting at rates
-> > below 60MHz. Note that the long term fix is to make the rates
-> > SoC specific later on.
-> > 
-> > Thanks for Janusz Krzysztofik <jkrzyszt@tis.icnet.pl> for figuring
-> > this one out.
-> > 
-> > Reported-by: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
-> > Signed-off-by: Tony Lindgren <tony@atomide.com>
-> 
-> Acked-by: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
-> 
-> However, this way or another, we are back to your mentioned problem of 
-> omap1_defconfig always switching to 216 MHz, I'm afraid. Then, 2a/5 v1 
-> "Remove unsafe clock values from omap1_defconfig" can still be helpful.
+On Thursday 27 October 2011 18:38:45 Mike Frysinger wrote:
+> thanks; both build for me after this change.  i don't have hardware to
+> actually test, so i'll skip Tested-by and instead go for:
+> Acked-by: Mike Frysinger <vapier@gentoo.org>
 
-OK that makes sense now also in case there are other systems that
-boot at rates below 60MHz.
- 
-> Anyway, I'm resending (refreshed) 2/5 and 5/5 as rc fixes as you 
-> suggested before, 1/5 "ARM: OMAP1: Fix dpll1 default rate reprogramming 
-> method" intended for next, and 2a/5 v2 "ARM: OMAP1: select clock rate by 
-> CPU type" also for next but as an RFC. 
-
-Great, sounds like we got the fixes needed for the -rc cycle then.
-
-Regards,
-
-Tony
+were you going to push this to mainline since you're now the GPIO maintainer 
+while Grant is out ? :)
+-mike
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111201/9931c5e3/attachment.sig>
