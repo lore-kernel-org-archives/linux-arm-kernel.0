@@ -1,38 +1,39 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Thu, 1 Dec 2011 10:17:36 -0800
-Subject: [PATCH 1/3] ARM: msm: Remove MSM7x00 support
-In-Reply-To: <1322752657.3704.2.camel@m0nster>
-References: <1322699344-28422-1-git-send-email-davidb@codeaurora.org>
- <1322752657.3704.2.camel@m0nster>
-Message-ID: <20111201181736.GA13182@huya.qualcomm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 1 Dec 2011 10:22:54 -0800
+Subject: [PATCH 2a/5 v2] ARM: OMAP1: select clock rate by CPU type
+In-Reply-To: <201112011110.11476.jkrzyszt@tis.icnet.pl>
+References: <20111128174508.GO31337@atomide.com>
+ <1322686675-26855-1-git-send-email-jkrzyszt@tis.icnet.pl>
+ <20111130222837.GR31337@atomide.com>
+ <201112011110.11476.jkrzyszt@tis.icnet.pl>
+Message-ID: <20111201182254.GU31337@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 01, 2011 at 07:17:37AM -0800, Daniel Walker wrote:
-> On Wed, 2011-11-30 at 16:29 -0800, David Brown wrote:
-> > -       default ARCH_MSM7X00A
-> > -
-> > -config ARCH_MSM7X00A
-> > -       bool "MSM7x00A / MSM7x01A"
-> > -       select MACH_TROUT if !MACH_HALIBUT
-> > -       select ARCH_MSM_ARM11
-> > -       select MSM_SMD
-> > -       select MSM_SMD_PKG3
-> > -       select CPU_V6
-> > -       select GPIO_MSM_V1
-> > -       select MSM_PROC_COMM
-> > -       select HAS_MSM_DEBUG_UART_PHYS 
+* Janusz Krzysztofik <jkrzyszt@tis.icnet.pl> [111201 01:35]:
+> On Wednesday 30 of November 2011 at 23:28:38, Tony Lindgren wrote:
+> > 
+> > We should also now be able to remove all the CONFIG_OMAP_ARM_XXXMHZ options
+> > too, right?
 > 
-> 
-> Your trying to drop G1 support ? I have a G1 sitting on my desk, and I
-> know many other people working on the kernel have G1's .. 
+> Right, but then, perhaps the initial version of patch 2a/5, which 
+> already started removing them, from omap1_defconfig for now, then going 
+> into the right direction while unblocking another regression fix (3/5), 
+> _is_ a good candidate for an rc fix?
 
-If someone is willing to step up and make it work, then we can keep it
-around.  My only G1 is fried, so I have no way to do anything other
-than keep it compiling.
+But we did not allow dpll1 reprogramming earlier either, so we should
+not need to make all these changes during the -rc cycle. I'm suspecting
+that we've had this same behaviour for a really long time, and we just
+have not seen it as omap1_defconfig had OMAP_CLOCKS_SET_BY_BOOTLOADER
+option set.
 
-David
+So I'm baffled how your board would be booting at a different rate
+compared to v3.1, it seems that the logic has not changed there. Or
+else we have some simple bug somewhere.
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Care to try to verify at what point your system started booting at
+60MHz rate?
+
+Regards,
+
+Tony
