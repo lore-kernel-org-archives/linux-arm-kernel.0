@@ -1,29 +1,54 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 1 Dec 2011 20:28:40 +0000
-Subject: [PATCH] arm/imx6: add restart support for imx6q
-In-Reply-To: <1322668872-13011-1-git-send-email-shawn.guo@linaro.org>
-References: <1322668872-13011-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20111201202840.GF9581@n2100.arm.linux.org.uk>
+From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
+Date: Thu,  1 Dec 2011 21:30:39 +0100
+Subject: [PATCH] ARM: OMAP1: Remove unsafe clock values from omap1_defconfig
+In-Reply-To: <20111201194609.GX31337@atomide.com>
+References: <20111201194609.GX31337@atomide.com>
+Message-ID: <1322771439-31031-1-git-send-email-jkrzyszt@tis.icnet.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 01, 2011 at 12:01:12AM +0800, Shawn Guo wrote:
-> This patch is to support restart support for imx6q based on your
-> 'reset' branch.  Is it possible for you to take this patch through
-> your 'reset' branch?
+DPLL1 reprogramming to a different rate is actually blocked inside
+omap1_select_table_rate(), resulting in the defalut rate of 60 MHz
+always used instead of the one selected in .config. OTOH, in
+omap1_defconfig we currently rely on Kconfig options for the supported
+MHz rates in case of boards which boot with dpll1 not set correctly by
+their boot loaders.
 
-I'm willing to append to the 'restart' branch any patch which improves
-the restart handling for any ARM platform.
+This means that before we allow for reprogramming of dpll1 rate, we
+should remove all unsafe clock selections from omap1_defconfig,
+otherwise it will stop booting on boards with imperfect boot loaders,
+as it would always try to change to 216MHz.
 
-The only thing I request is that - at the moment - they come as patches
-rather than a git pull, as I'm still trying to chase maintainers to get
-their stuff fixed for these changes next merge window.  I'll also be
-applying any such patches immediately after the commit:
+Keep only one safe clock rate per each supported xtal frequency, i.e.
+60MHZ dpll1 for 12MHz xtal and 182MHz dpll1 for 13MHz xtal.
 
-	"ARM: restart: remove the now empty arch_reset()"
+BTW, this change goes into the direction of removing all OMAP1 clock
+rate options, planned for next merge window.
 
-which is the current head of the 'restart' branch.  What follows that
-commit is the 'junk' changes (which are either broken or incomplete)
-which won't be sent upstream.
+Signed-off-by: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
+---
+Resending with commit summary tagged correctly and commit message
+updated with info about next merge window planned direction.
 
-The 'reset' branch is everything including the junk stuff.
+ arch/arm/configs/omap1_defconfig |    5 -----
+ 1 files changed, 0 insertions(+), 5 deletions(-)
+
+diff --git a/arch/arm/configs/omap1_defconfig b/arch/arm/configs/omap1_defconfig
+index a7e7775..945a34f 100644
+--- a/arch/arm/configs/omap1_defconfig
++++ b/arch/arm/configs/omap1_defconfig
+@@ -48,12 +48,7 @@ CONFIG_MACH_SX1=y
+ CONFIG_MACH_NOKIA770=y
+ CONFIG_MACH_AMS_DELTA=y
+ CONFIG_MACH_OMAP_GENERIC=y
+-CONFIG_OMAP_ARM_216MHZ=y
+-CONFIG_OMAP_ARM_195MHZ=y
+-CONFIG_OMAP_ARM_192MHZ=y
+ CONFIG_OMAP_ARM_182MHZ=y
+-CONFIG_OMAP_ARM_168MHZ=y
+-# CONFIG_OMAP_ARM_60MHZ is not set
+ # CONFIG_ARM_THUMB is not set
+ CONFIG_PCCARD=y
+ CONFIG_OMAP_CF=y
+-- 
+1.7.3.4
