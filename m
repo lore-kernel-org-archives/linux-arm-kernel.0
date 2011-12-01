@@ -1,37 +1,53 @@
-From: mst@redhat.com (Michael S. Tsirkin)
-Date: Thu, 1 Dec 2011 11:09:21 +0200
-Subject: [RFC] virtio: use mandatory barriers for remote processor vdevs
-In-Reply-To: <CAK=Wgbb5M62LgXY-sn7R6YautHxwqyDbPTeXYJxgmrS9fPXR9A@mail.gmail.com>
-References: <1322569886-13055-1-git-send-email-ohad@wizery.com>
- <20111129131110.GC19157@redhat.com>
- <CAK=WgbZoGYVyKt=XXvnPVdh0koSBJC0zcgkLaYRkmjwBLOFA-A@mail.gmail.com>
- <20111129151958.GA31789@redhat.com>
- <CAK=WgbZ5aBFNro3XC0cN+Ao4ZWrBHwwd3d__CSHA=n56gKmKXw@mail.gmail.com>
- <20111130145004.GD21413@redhat.com>
- <CAK=WgbY59n9N_-2_TZ9wNBNcTMV1DCrz65e-Ae=xamcg6A0dOA@mail.gmail.com>
- <20111130231306.GD30031@redhat.com>
- <CAK=Wgbb5M62LgXY-sn7R6YautHxwqyDbPTeXYJxgmrS9fPXR9A@mail.gmail.com>
-Message-ID: <20111201090920.GA8231@redhat.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 1 Dec 2011 09:08:12 +0000
+Subject: Fwd: Re: [03: PATCH 0/5] The remaining stuff
+In-Reply-To: <20111128104554.GA2165@local>
+References: <20111124204447.GW9581@n2100.arm.linux.org.uk>
+ <20111128104554.GA2165@local>
+Message-ID: <20111201090812.GZ9581@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 01, 2011 at 08:14:26AM +0200, Ohad Ben-Cohen wrote:
-> On Thu, Dec 1, 2011 at 1:13 AM, Michael S. Tsirkin <mst@redhat.com> wrote:
-> > For x86, stores into memory are ordered. So I think that yes, smp_XXX
-> > can be selected at compile time.
+On Mon, Nov 28, 2011 at 11:45:55AM +0100, Hans J. Koch wrote:
+> On Thu, Nov 24, 2011 at 08:44:47PM +0000, Russell King - ARM Linux wrote:
+> > The list of platforms which are still broken (today) by part 2 of this
+> > series are:
+> > 
+> > arch/arm/mach-davinci/include/mach/system.h
+> > arch/arm/mach-gemini/include/mach/system.h
+> > arch/arm/mach-nomadik/include/mach/system.h
+> > arch/arm/mach-s3c2410/include/mach/system-reset.h
+> > arch/arm/mach-s3c64xx/include/mach/system.h
+> > arch/arm/mach-shmobile/include/mach/system.h
+> > arch/arm/mach-vt8500/include/mach/system.h
+> > arch/arm/plat-samsung/include/plat/system-reset.h
+> > arch/arm/plat-tcc/include/mach/system.h
+> > 
+> > which require assistance to get these into shape.
+> > 
+> > As I've already implied, I'm quite prepared to break these platforms at
+> > the next merge window for the greater good if there's no sign of
+> > maintainers willing to help sort them out - which will then ultimately
+> > result in them being deleted from mainline.
 > 
-> But then you can't use the same kernel image for both scenarios.
+> For the past 12 months, nobody was interested in Telechips (plat-tcc).
+> No community, no customers, no support from Telechips. Under these
+> circumstances, I am not willing to maintain this forever.
+> 
+> However, Harry Sievers, European distributor of Telechips, told me
+> that there are persons at Telechips who are interested in having
+> their stuff in mainline. He will tell them it is threatened with
+> being deleted from mainline, and ask for support.
+> 
+> I am willing to wait until christmas for any news from Harry, and
+> will then send a patch. Either one that fixes the arch as requested in
+> the mail above, or one that removes the whole platform from mainline.
+> My feeling is that the latter is more likely.
+> 
+> Russell, if that is too late for you, please let us know.
 
-I was talking about virtio-pci. That always allocates the ring
-in the normal memory.
+I doubt that we'll see -final before Christmas, so that should be fine.
+If it's still not fixed up for these changes when -final is getting close,
+I will delete it myself.
 
-> It won't take long until people will use virtio on ARM for both
-> virtualization and for talking to devices, and having to rebuild the
-> kernel for different use cases is nasty.
-
-Yes, I understand that it's nasty.
-
-> _______________________________________________
-> Virtualization mailing list
-> Virtualization at lists.linux-foundation.org
-> https://lists.linuxfoundation.org/mailman/listinfo/virtualization
+Thanks.
