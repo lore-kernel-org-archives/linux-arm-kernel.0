@@ -1,89 +1,66 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Thu, 01 Dec 2011 07:29:34 -0800
-Subject: [RFC PATCH 03/11] arm:omap:am33xx: Add power domain data
-In-Reply-To: <79CD15C6BA57404B839C016229A409A8047604@DBDE01.ent.ti.com>
- (Vaibhav Hiremath's message of "Thu, 1 Dec 2011 11:58:19 +0000")
-References: <1321809555-13833-1-git-send-email-hvaibhav@ti.com>
- <1321809555-13833-4-git-send-email-hvaibhav@ti.com>
- <878vmxump8.fsf@ti.com>
- <79CD15C6BA57404B839C016229A409A8047604@DBDE01.ent.ti.com>
-Message-ID: <87vcq0qpi9.fsf@ti.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 1 Dec 2011 16:39:33 +0100
+Subject: flatmem broken for nommu? [Was: Re: does non-continuous RAM
+ means I need to select the sparse memory model?]
+In-Reply-To: <20111201105718.GJ26618@pengutronix.de>
+References: <20111129203010.GA26618@pengutronix.de>
+ <CAOMZO5DX_ZvCOu+pqZpJ7Ni2B=qmSFCZTHnuzKt==OsBsJZH=Q@mail.gmail.com>
+ <20111201105718.GJ26618@pengutronix.de>
+Message-ID: <20111201153933.GL26618@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"Hiremath, Vaibhav" <hvaibhav@ti.com> writes:
+Hello,
 
->> -----Original Message-----
->> From: Hilman, Kevin
->> Sent: Thursday, December 01, 2011 6:34 AM
->> To: Hiremath, Vaibhav
->> Cc: linux-omap at vger.kernel.org; tony at atomide.com; paul at pwsan.com; linux-
->> arm-kernel at lists.infradead.org; Cousson, Benoit; Mohammed, Afzal; Patil,
->> Rachna
->> Subject: Re: [RFC PATCH 03/11] arm:omap:am33xx: Add power domain data
->> 
->> Vaibhav Hiremath <hvaibhav@ti.com> writes:
->> 
->> > From: Afzal Mohammed <afzal@ti.com>
->> >
->> > This patch adds AM33XX power domain data,
->> > corresponding API's to access PRM module and
->> > PRM register offsets & bit fields.
->> >
->> > Signed-off-by: Rachna Patil <rachna@ti.com>
->> > Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
->> > Signed-off-by: Afzal Mohammed <afzal@ti.com>
->> 
->> First some general comments:
->> 
->> At first glance, it seems like there could be much more reuse with OMAP4
->> code here.  From what I see, AM33x has only one partition compared to
->> several on OMAP4, but that doesn't mean you couldn't reuse the OMAP4
->> functions and just use a single partition.
-> Kevin,
->
-> Indeed it looks close to OMAP4, but it becomes difficult and ugly once you
-> Start getting into implementation details, for example,
->
->  - All PRM offsets don't match, you will end up with
-> cpu_is_xxx check and handle this. Applicable to all power domains.
->
-> 	OMAP4430_PRM_MPU_INST           0x0300
-> 	Vs
-> 	AM33XX_PRM_MPU_MOD              0x0E00
->
-> 	OMAP4430_PRM_WKUP_INST          0x1700
-> 	Vs
-> 	AM33XX_PRM_WKUP_MOD             0x0D00
->
->  - Also there are some differences in logic states of domains as well.
->
-> Another important point is, we have considered AM33xx as OMAP3 family
-> of device (ARCH_OMAP3).  So you may end up with number of cpu_is_xxx
-> checks in code.
+On Thu, Dec 01, 2011 at 11:57:18AM +0100, Uwe Kleine-K?nig wrote:
+> On Tue, Nov 29, 2011 at 10:39:10PM -0200, Fabio Estevam wrote:
+> > 2011/11/29 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+> > > Hello,
+> > >
+> > > I'm currently working on a new arch port and my current machine has RAM
+> > > at 0x10000000 and 0x80000000. So there is a big hole between the two
+> > > banks. When selecting the sparse memory model it works, but when
+> > > selecting flat the machine runs into a BUG in mark_bootmem() called by
+> > > free_unused_memmap() to free the space between the two banks.
+> > 
+> > My understanding is that you have to select ARCH_HAS_HOLES_MEMORYMODEL.
+> I think that is not necessary.
+>  
+> > > Is that expected (meaning I cannot use the flat model)? I currently
+> > > don't have another machine handy that has >1 memory back to test that.
+> > 
+> > In case you have access to a MX35PDK you can try on this board as it does have
+> > the memory hole.
+> No I havn't, but I just used a 128MB machine and changed that in the
+> .fixup callback to 64MB + 32MB with a 32MB hole in between and it works
+> fine without ARCH_HAS_HOLES_MEMORYMODEL.
+> 
+> I debugged the problem a bit further and one symptom is that
+> 
+> 	struct page *mem_map
+> 
+> is NULL for me. That looks wrong. I guess this is just broken for nommu.
+> I will dig into that later today.
+The problem is that the memory for mem_map is allocated using:
 
-If we end up with cpu_is_* checks in the code, we're doing it wrong.
+	map = alloc_bootmem_node_nopanic(pgdat, size);
 
-I understand there are lots of differences with OMAP4, but from what I'm
-looking at (at least for the power domains in this patch) there most of
-those differences are handled in the data files, and the code could be
-shared.
+without any error checking. The _nopanic was introduced by commit
 
-For example, looking at powerdomain33xx.c, this looks exactly like the
-OMAP4 version except
+	8f389a99 (mm: use alloc_bootmem_node_nopanic() on really needed path)
 
-- you have 2 new AM33XX_PRM_* defines (which are the same as OMAP4 version)
-- you have a new register access functions: am33xx_prminst_read_inst_reg()...
+I don't understand the commit's log and don't really see why it should
+be allowed to not panic if the allocation failes here but use a NULL
+pointer instead.
+I put the people involved in 8f389a99 on Cc, maybe someone can comment?
 
-So, my question is: if you could update the OMAP4 code to be able to
-override the register access read/write functions, would you even need a
-new powerdomain33xx.c?
+Apart from that it seems I cannot use flatmem as is on my machine. It
+has only 128kiB at 0x10000000 + 1MiB at 0x80000000 and needs 14MiB to hold the
+table of "struct page"s. :-(
 
-Your am33xx_ version doesn't take a partition argument, but that would
-be easy to remedy, and the AM33x powerdomains could be updated to all
-declare a default partition.
+Best regards
+Uwe
 
-Anyways, I'll let Benoit/Paul/Rajendra take it from here, as they're the
-ones who know this code the best.
-
-Kevin
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
