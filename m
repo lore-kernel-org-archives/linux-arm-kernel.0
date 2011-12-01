@@ -1,29 +1,22 @@
-From: tixy@yxit.co.uk (Tixy)
-Date: Thu, 01 Dec 2011 07:33:22 +0000
-Subject: [PATCH] ARM: kprobes: Change testcase with unpredictable STRD
- instruction
-In-Reply-To: <20111130235644.GY9581@n2100.arm.linux.org.uk>
-References: <1322395885.2408.1.camel@computer2>
- <20111130235644.GY9581@n2100.arm.linux.org.uk>
-Message-ID: <1322724802.2352.0.camel@computer2>
+From: consul.kautuk@gmail.com (Kautuk Consul)
+Date: Thu, 1 Dec 2011 02:40:43 -0500
+Subject: [PATCH 1/1 v5] arm: fault.c: Port OOM changes into do_page_fault
+In-Reply-To: <20111127125656.GA26042@mudshark.cambridge.arm.com>
+References: <1321986690-6079-1-git-send-email-consul.kautuk@gmail.com>
+ <20111126235032.GC9581@n2100.arm.linux.org.uk>
+ <CAFPAmTTWVwq8H6HVzdvTcN-jcSoNQ2-TfLWT33ks8_kpGND+SA@mail.gmail.com>
+ <20111127125656.GA26042@mudshark.cambridge.arm.com>
+Message-ID: <CAFPAmTSqYQtvPWKb45xDm_2B0Rn2aaa4xo5trRrnBX9hs18pnA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2011-11-30 at 23:56 +0000, Russell King - ARM Linux wrote:
-> On Sun, Nov 27, 2011 at 12:11:25PM +0000, Tixy wrote:
-> > There is a kprobes testcase for the instruction "strd r2, [r3], r4".
-> > This has unpredictable behaviour as it uses r3 for register writeback
-> > addressing and also stores it to memory.
-> > 
-> > On a cortex A9, this testcase would fail because the instruction writes
-> > the updated value of r3 to memory, whereas the kprobes emulation code
-> > writes the original value.
-> > 
-> > Fix this by changing testcase to used r5 instead of r3.
-> 
-> Is this a -stable candidate?
+Thanks for the info, Will.
 
-No, the test code is new in 3.2
+Just FYI, I have entered the patch into the patch system and it can be
+accessed via :
+http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7178/1
 
--- 
-Tixy
+Please inform me if I need to make any more changes to this with
+respect to the status or
+any other field(s).
+Currently, the patch status is "Incoming".
