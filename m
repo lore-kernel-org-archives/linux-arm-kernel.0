@@ -1,102 +1,88 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 1 Dec 2011 15:24:14 +0100
-Subject: [RFC V1 3/8] clk: Add support for simple dividers
-In-Reply-To: <20111201074253.GD8684@b20223-02.ap.freescale.net>
-References: <1322046755-13511-1-git-send-email-richard.zhao@linaro.org>
- <1322046755-13511-4-git-send-email-richard.zhao@linaro.org>
- <CAPtuhThdt3Q63r_mP7aanXdgLH1si2pHfRr_Yg1GRhREqdDmfg@mail.gmail.com>
- <20111201074253.GD8684@b20223-02.ap.freescale.net>
-Message-ID: <20111201142414.GO27267@pengutronix.de>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Thu, 1 Dec 2011 22:41:13 +0800
+Subject: [PATCH] arm/imx6: add restart support for imx6q
+In-Reply-To: <20111201141807.GN27267@pengutronix.de>
+References: <1322668872-13011-1-git-send-email-shawn.guo@linaro.org>
+ <20111201141807.GN27267@pengutronix.de>
+Message-ID: <20111201144112.GK711@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 01, 2011 at 03:42:59PM +0800, Richard Zhao wrote:
-> On Wed, Nov 30, 2011 at 12:43:10PM -0800, Mike Turquette wrote:
-> > On Wed, Nov 23, 2011 at 3:12 AM, Richard Zhao <richard.zhao@linaro.org> wrote:
-> > > +#define account_for_rounding_errors ? ?1
-> > > +
-> > > +static int clk_divider_bestdiv(struct clk *clk, unsigned long rate,
-> > > + ? ? ? ? ? ? ? unsigned long *best_parent_rate)
-> > > +{
-> > > + ? ? ? struct clk_divider *divider = to_clk_divider(clk);
-> > > + ? ? ? int i, bestdiv = 0;
-> > > + ? ? ? unsigned long parent_rate, best = 0, now, maxdiv;
-> > > +
-> > > + ? ? ? maxdiv = (1 << divider->width);
-> > > +
-> > > + ? ? ? if (divider->flags & CLK_DIVIDER_FLAG_ONE_BASED)
-> > > + ? ? ? ? ? ? ? maxdiv--;
-> > > +
-> > > + ? ? ? if (!(clk->flags & CLK_PARENT_SET_RATE)) {
-> > > + ? ? ? ? ? ? ? parent_rate = clk->parent->rate;
-> > > + ? ? ? ? ? ? ? bestdiv = parent_rate / rate;
-> > > + ? ? ? ? ? ? ? bestdiv = bestdiv == 0 ? 1 : bestdiv;
-> > > + ? ? ? ? ? ? ? bestdiv = bestdiv > maxdiv ? maxdiv : bestdiv;
-> > > + ? ? ? ? ? ? ? goto out;
-> > > + ? ? ? }
-> The code is originally from Sascha. I think it again.
-> 
-> Sascha, why don't we use the below code?
-> 
-> 	for (i = 1; i <= maxdiv; i++) {
-> 		int div;
-> 		parent_rate = clk_round_rate(clk->parent, rate * i);
-> 		div = parent_rate / rate;
-> 		div = div > maxdiv ? maxdiv : div;
-> 		div = div < 1 ? 1 : div;
-> 		now = parent_rate / div;
-> 
-> 		if (now <= rate && now >= best) {
-> 			bestdiv = div;
-> 			best = now;
-> 			best_parent_rate = parent_rate;
-> 		}
-> 	}
-
-Yes, why not ;)
-
-I can't remember the exact problem, but it came in with cascaded
-dividers which wouldn't work without this. I've never been very
-proud of this account_for_rounding_errors, so feel free to remove
-it and see what happens. If this becomes a problem we can search
-for a better solution.
-
-
-> 
-> 
-> > > +
-> > > + ? ? ? /*
-> > > + ? ? ? ?* The maximum divider we can use without overflowing
-> > > + ? ? ? ?* unsigned long in rate * i below
-> > > + ? ? ? ?*/
-> > > + ? ? ? maxdiv = min(ULONG_MAX / rate, maxdiv);
-> > > +
-> > > + ? ? ? for (i = 1; i <= maxdiv; i++) {
-> > > + ? ? ? ? ? ? ? parent_rate = clk_round_rate(clk->parent,
-> > > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? (rate + account_for_rounding_errors) * i);
+On Thu, Dec 01, 2011 at 03:18:07PM +0100, Sascha Hauer wrote:
+> On Thu, Dec 01, 2011 at 12:01:12AM +0800, Shawn Guo wrote:
+> > The restart support was missed from the initial imx6q submission.
+> > The mxc_restart() does not work for imx6q.  Instead, this patch adds
+> > the restart for imx6q.
 > > 
-> > How about just ((rate + 1) * i) with a comment above explaining why?
-> > This removes the awkward #define above.
+> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> > ---
+> > Hi Russell,
 > > 
-> > Also, I'd like to roll this into clk-basic.c for the V4 series.  Any objections?
-> Go ahead.
+> > This patch is to support restart support for imx6q based on your
+> > 'reset' branch.  Is it possible for you to take this patch through
+> > your 'reset' branch?
+> > 
+> >  arch/arm/mach-imx/clock-imx6q.c         |    2 -
+> >  arch/arm/mach-imx/mach-imx6q.c          |   33 ++++++++++++++++++++++++++++++-
+> >  arch/arm/mach-imx/src.c                 |   23 +++++++++++++++++++++
+> >  arch/arm/plat-mxc/include/mach/common.h |    1 +
+> >  4 files changed, 56 insertions(+), 3 deletions(-)
+> > 
+> > diff --git a/arch/arm/mach-imx/clock-imx6q.c b/arch/arm/mach-imx/clock-imx6q.c
+> > index 613a1b9..2234031 100644
+> > --- a/arch/arm/mach-imx/clock-imx6q.c
+> > +++ b/arch/arm/mach-imx/clock-imx6q.c
+> > @@ -1931,14 +1931,12 @@ int imx6q_set_lpm(enum mxc_cpu_pwr_mode mode)
+> >  		val |= 0x1 << BP_CLPCR_LPM;
+> >  		val &= ~BM_CLPCR_VSTBY;
+> >  		val &= ~BM_CLPCR_SBYOS;
+> > -		val |= BM_CLPCR_BYP_MMDC_CH1_LPM_HS;
+> >  		break;
+> >  	case STOP_POWER_OFF:
+> >  		val |= 0x2 << BP_CLPCR_LPM;
+> >  		val |= 0x3 << BP_CLPCR_STBY_COUNT;
+> >  		val |= BM_CLPCR_VSTBY;
+> >  		val |= BM_CLPCR_SBYOS;
+> > -		val |= BM_CLPCR_BYP_MMDC_CH1_LPM_HS;
+> >  		break;
+> >  	default:
+> >  		return -EINVAL;
+> > diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
+> > index dc8b6e2..54ce8ec 100644
+> > --- a/arch/arm/mach-imx/mach-imx6q.c
+> > +++ b/arch/arm/mach-imx/mach-imx6q.c
+> > @@ -10,10 +10,13 @@
+> >   * http://www.gnu.org/copyleft/gpl.html
+> >   */
+> >  
+> > +#include <linux/delay.h>
+> >  #include <linux/init.h>
+> > +#include <linux/io.h>
+> >  #include <linux/irq.h>
+> >  #include <linux/irqdomain.h>
+> >  #include <linux/of.h>
+> > +#include <linux/of_address.h>
+> >  #include <linux/of_irq.h>
+> >  #include <linux/of_platform.h>
+> >  #include <asm/hardware/cache-l2x0.h>
+> > @@ -23,6 +26,34 @@
+> >  #include <mach/common.h>
+> >  #include <mach/hardware.h>
+> >  
+> > +void imx6q_restart(char mode, const char *cmd)
+> > +{
+> > +	struct device_node *np;
+> > +	void __iomem *wdog_base;
+> > +
+> > +	np = of_find_compatible_node(NULL, NULL, "fsl,imx6q-wdt");
+> > +	wdog_base = of_iomap(np, 0);
+> > +	WARN_ON(!wdog_base);
 > 
-> Thanks
-> Richard
-> > 
-> > Thanks,
-> > Mike
-> > 
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> > 
+> You don't need a WARN_ON here as you derefence the NULL pointer below...
+> Wouldn't it be better to do soft_restart() if the iomap fails?
 > 
-> 
+Indeed.
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Regards,
+Shawn
