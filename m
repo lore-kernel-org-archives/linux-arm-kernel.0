@@ -1,30 +1,40 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 1 Dec 2011 18:09:37 -0800
-Subject: [PATCH 0/2 v2] ARM: OMAP1: Fix dpll1 reprogramming related issues
-In-Reply-To: <1322770382-30718-1-git-send-email-jkrzyszt@tis.icnet.pl>
-References: <201112012023.04635.jkrzyszt@tis.icnet.pl>
- <1322770382-30718-1-git-send-email-jkrzyszt@tis.icnet.pl>
-Message-ID: <20111202020936.GY31337@atomide.com>
+From: amwang@redhat.com (Cong Wang)
+Date: Fri, 02 Dec 2011 10:10:49 +0800
+Subject: [PATCH 20/62] mmc: remove the second argument of k[un]map_atomic()
+In-Reply-To: <87vcq0jfin.fsf@laptop.org>
+References: <1322371662-26166-1-git-send-email-amwang@redhat.com>	<1322371662-26166-21-git-send-email-amwang@redhat.com>
+ <87vcq0jfin.fsf@laptop.org>
+Message-ID: <4ED833A9.8040707@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Janusz Krzysztofik <jkrzyszt@tis.icnet.pl> [111201 11:38]:
-> After dpll1 reprogramming has been moved from setup_arch() to
-> kernel_init(), I've been observing several issues, resulting in
-> undesired system behaviour on my Amstrad Delta. This series fixes
-> those most important (2/5 and 5/5 v2 previously), with a "stuck at 60MHz
-> rate" issue going to be fixed with Tony's proposed solution instead of
-> my previous 3/5.
-> 
-> Janusz Krzysztofik (2):
->   ARM: OMAP1: Fix ckctl value used for dpll1 defualt rate
->   ARM: OMAP1: recalculate loops per jiffy after dpll1 reprogram
-> 
->  arch/arm/mach-omap1/clock_data.c |    9 +++++++--
->  1 files changed, 7 insertions(+), 2 deletions(-)
+? 2011?12?02? 02:47, Chris Ball ??:
+> Hi,
+>
+> On Sun, Nov 27 2011, Cong Wang wrote:
+>> Signed-off-by: Cong Wang<amwang@redhat.com>
+>> ---
+>>   drivers/mmc/host/at91_mci.c |    8 ++++----
+>>   drivers/mmc/host/msm_sdcc.c |    6 +++---
+>>   drivers/mmc/host/sdhci.c    |    4 ++--
+>>   drivers/mmc/host/tifm_sd.c  |   16 ++++++++--------
+>>   drivers/mmc/host/tmio_mmc.c |    1 -
+>>   drivers/mmc/host/tmio_mmc.h |    4 ++--
+>>   6 files changed, 19 insertions(+), 20 deletions(-)
+>
+> Looks good, thanks, pushed to mmc-next for 3.3.
+>
 
-Thanks, got these three patches now applied into fixes on top of -rc4.
+Hello, Chris,
 
-Can you please try it out to make sure it's all working for you now?
+I am still not sure if Andrew wants to take all the patches together. :-/
 
-Tony
+But there should be no problem if you take this alone, after re-reading
+the original code, it can still compile even without 01/62.
+
+/*
+  * Make both: kmap_atomic(page, idx) and kmap_atomic(page) work.
+  */
+#define kmap_atomic(page, args...) __kmap_atomic(page)
+
+Regards.
