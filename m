@@ -1,42 +1,25 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 2 Dec 2011 09:49:16 +0100
-Subject: backlight/ld9040.c: regulator control in the lcd driver
-In-Reply-To: <000c01ccb0c6$697c2aa0$3c747fe0$%lee@samsung.com>
-References: <000c01ccb0c6$697c2aa0$3c747fe0$%lee@samsung.com>
-Message-ID: <CACRpkdbRdtsw-3FXtevuJL7G=tcE+1s11iRw=zou1G25hufBSA@mail.gmail.com>
+From: joro@8bytes.org ('Joerg Roedel')
+Date: Fri, 2 Dec 2011 09:49:22 +0100
+Subject: [PATCH v7 0/2] iommu/exynos: Add IOMMU/System MMU driver for
+ Samsung Exynos
+In-Reply-To: <04f601ccb0ce$72590550$570b0ff0$%kim@samsung.com>
+References: <1321609650-1329-1-git-send-email-pullip.cho@samsung.com>
+ <20111123114626.GH20535@8bytes.org>
+ <045b01ccaffa$ef48c430$cdda4c90$%kim@samsung.com>
+ <20111201185821.GL20535@8bytes.org>
+ <04f601ccb0ce$72590550$570b0ff0$%kim@samsung.com>
+Message-ID: <20111202084922.GM20535@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 2, 2011 at 8:45 AM, leedonghwa <dh09.lee@samsung.com> wrote:
+On Fri, Dec 02, 2011 at 05:43:21PM +0900, Kukjin Kim wrote:
+> OK, I will merge iommu/exynos into Samsung tree after your creating that.
+> 
+> I can't look at iommu/exynos branch in your tree,
+> git://git.kernel.org/pub/scm/linux/kernel/git/joro/iommu.git.
 
-[From your mail headers]
-> X-Mailer: Microsoft Office Outlook 12.0
+That's because I havn't merged any exynos patches yet :) But I will
+create it soon an merge this driver.
 
-No please. That mailer does not work, all your whitespace is screwed up.
-Consult: Documentation/email-clients.txt
 
-> This patch supports regulator power control in the driver.
-
-Always CC the regulator maintainers on patches like this please.
-
-> +???????? lcd->reg_vdd3 = regulator_get(lcd->dev, "vdd");
-> +???????? if (IS_ERR(lcd->reg_vdd3)) {
-> +?????????????????? dev_info(lcd->dev, "no %s regulator found\n", "vdd");
-> +?????????????????? lcd->reg_vdd3 = NULL;
-> +???????? }
-> +
-> +???????? lcd->reg_vci = regulator_get(lcd->dev, "vci");
-> +???????? if (IS_ERR(lcd->reg_vci)) {
-> +?????????????????? dev_info(lcd->dev, "no %s regulator found\n", "vci");
-> +?????????????????? lcd->reg_vci = NULL;
-> +???????? }
-
-As explained in earlier discussion with Mark regarding the SMSC911x
-driver regulator, treat these as errors and do not fail
-"gracefully" like this.
-
-Reference:
-http://marc.info/?l=linux-netdev&m=131914562120725&w=2
-
-Yours,
-Linus Walleij
+	Joerg
