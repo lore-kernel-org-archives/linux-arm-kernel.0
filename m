@@ -1,32 +1,60 @@
-From: torvalds@linux-foundation.org (Linus Torvalds)
-Date: Fri, 2 Dec 2011 11:28:14 -0800
-Subject: [PATCH] ata: Don't use NO_IRQ in pata_of_platform driver
-In-Reply-To: <20111202192618.GC3037@localhost.localdomain>
-References: <20111110162859.GA7088@oksana.dev.rtsoft.ru>
- <20111202192618.GC3037@localhost.localdomain>
-Message-ID: <CA+55aFwekNWz+V4440f=2iu_BfOxSg0NjVogv4cZZDFbJBNoAQ@mail.gmail.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Fri, 2 Dec 2011 19:28:52 +0000
+Subject: [PATCH v3 4/5] ARM: vexpress: Initial RS1 memory map support
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF174FDB0539@HQMAIL01.nvidia.com>
+References: <20111130153749.GE2045@localhost.localdomain>
+ <1322673302.3180.25.camel@hornet.cambridge.arm.com>
+ <20111130175410.GJ2045@localhost.localdomain>
+ <alpine.LFD.2.02.1111301522340.2357@xanadu.home>
+ <20111130204805.GA5698@sirena.org.uk>
+ <alpine.LFD.2.02.1111301604230.2357@xanadu.home>
+ <20111201111049.GB2915@opensource.wolfsonmicro.com>
+ <20111201121403.GC2026@localhost.localdomain>
+ <74CDBE0F657A3D45AFBB94109FB122FF174FDB01C6@HQMAIL01.nvidia.com>
+ <74CDBE0F657A3D45AFBB94109FB122FF174FDB0539@HQMAIL01.nvidia.com>
+Message-ID: <20111202192852.GG2892@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 2, 2011 at 11:26 AM, Dave Martin <dave.martin@linaro.org> wrote:
->
-> This is now broken on ARM where, for good or bad, NO_IRQ currently is
-> used and is -1.
->
-> How do we resolve it? ?If we are ready to eliminate NO_IRQ from
-> drivers/of/irq.c (or indeed, all code that uses it) and just use 0 for
-> that case, we should surely just do it... but I'm not confident I can
-> judge on that.
+On Fri, Dec 02, 2011 at 09:41:12AM -0800, Stephen Warren wrote:
+> Stephen Warren wrote at Thursday, December 01, 2011 9:20 AM:
+> > Dave Martin wrote at Thursday, December 01, 2011 5:14 AM:
+> > > On Thu, Dec 01, 2011 at 11:10:50AM +0000, Mark Brown wrote:
+> > > > On Wed, Nov 30, 2011 at 04:38:26PM -0500, Nicolas Pitre wrote:
+> > > > > On Wed, 30 Nov 2011, Mark Brown wrote:
+> > > >
+> > > > > > Oh, dear.  Any pointers to the discussions on the u-boot side?
+> > > >
+> > > > > Certainly.  Many different threads actually.  Here's a few:
+> > > >
+> > > > OK, thanks - I see Stephen just followed up and Wolfgang seems
+> > > > moderately happy so hopefully there will be some progress.  It also
+> > > > occurs to me that there's at least Qi also using uImages, hopefully
+> > > > other bootloaders are going to be easier to deal with (or already cope).
+> > >
+> > > If Stephen's patches are heading for merge, that's great.
+> > >
+> > > If this feature remains blocked though, could we support Wolfgang's
+> > > preference for start-of-RAM-relative load and entry address?
+> > 
+> > It looks like my change is progressing to being checked in:
+> > 
+> > http://lists.denx.de/pipermail/u-boot/2011-December/111865.html
+> 
+> For the record, the changes are now in U-Boot master:
+> 
+> d510859 image: Don't detect XIP images as overlapping.
+> b9b50e8 image: Implement IH_TYPE_KERNEL_NOLOAD
+> 
+> I should also note that Marek Vasut posted some patches to implement a
+> bootz command in U-Boot. This turned out to be much less invasive than
+> I originally thought, so once those patches are finalized, uImage might
+> be irrelevant except for initrds (U-Boot already accepts a raw FDT
+> without uImage wrapping for bootm and hence bootz).
+> 
+> http://www.mail-archive.com/u-boot at lists.denx.de/msg69287.html
 
-Just stop using NO_IRQ. First in drivers/of/irq.c, then in any drivers
-as you notice breakage.
+Great, thanks for the alert.
 
-Don't *change* NO_IRQ to zero (that whole #define is broken - leave it
-around as a marker of brokenness), just start removing it from all the
-ARM drivers that use the OF infrastructure. Which is presumably not
-all that many yet.
-
-So whenever you find breakage, the fix now is to just remove NO_IRQ
-tests, and replace them with "!irq".
-
-                       Linus
+Cheers
+---Dave
