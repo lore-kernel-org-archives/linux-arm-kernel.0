@@ -1,58 +1,191 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Fri, 2 Dec 2011 09:41:12 -0800
-Subject: [PATCH v3 4/5] ARM: vexpress: Initial RS1 memory map support
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF174FDB01C6@HQMAIL01.nvidia.com>
-References: <1322579473-8804-1-git-send-email-pawel.moll@arm.com>
- <1322579473-8804-5-git-send-email-pawel.moll@arm.com>
- <20111130153749.GE2045@localhost.localdomain>
- <1322673302.3180.25.camel@hornet.cambridge.arm.com>
- <20111130175410.GJ2045@localhost.localdomain>
- <alpine.LFD.2.02.1111301522340.2357@xanadu.home>
- <20111130204805.GA5698@sirena.org.uk>
- <alpine.LFD.2.02.1111301604230.2357@xanadu.home>
- <20111201111049.GB2915@opensource.wolfsonmicro.com>
- <20111201121403.GC2026@localhost.localdomain>
- <74CDBE0F657A3D45AFBB94109FB122FF174FDB01C6@HQMAIL01.nvidia.com>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF174FDB0539@HQMAIL01.nvidia.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri,  2 Dec 2011 18:43:02 +0100
+Subject: [PATCH v2] net/macb: add DT support
+In-Reply-To: <1322846050-4543-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1322846050-4543-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <1322847782-22650-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stephen Warren wrote at Thursday, December 01, 2011 9:20 AM:
-> Dave Martin wrote at Thursday, December 01, 2011 5:14 AM:
-> > On Thu, Dec 01, 2011 at 11:10:50AM +0000, Mark Brown wrote:
-> > > On Wed, Nov 30, 2011 at 04:38:26PM -0500, Nicolas Pitre wrote:
-> > > > On Wed, 30 Nov 2011, Mark Brown wrote:
-> > >
-> > > > > Oh, dear.  Any pointers to the discussions on the u-boot side?
-> > >
-> > > > Certainly.  Many different threads actually.  Here's a few:
-> > >
-> > > OK, thanks - I see Stephen just followed up and Wolfgang seems
-> > > moderately happy so hopefully there will be some progress.  It also
-> > > occurs to me that there's at least Qi also using uImages, hopefully
-> > > other bootloaders are going to be easier to deal with (or already cope).
-> >
-> > If Stephen's patches are heading for merge, that's great.
-> >
-> > If this feature remains blocked though, could we support Wolfgang's
-> > preference for start-of-RAM-relative load and entry address?
-> 
-> It looks like my change is progressing to being checked in:
-> 
-> http://lists.denx.de/pipermail/u-boot/2011-December/111865.html
+From: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 
-For the record, the changes are now in U-Boot master:
+Allow the device tree to provide the mac address and the phy mode.
 
-d510859 image: Don't detect XIP images as overlapping.
-b9b50e8 image: Implement IH_TYPE_KERNEL_NOLOAD
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+[nicolas.ferre at atmel.com: change "compatible" node property, doc and DT hwaddr]
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Cc: Jamie Iles <jamie@jamieiles.com>
+---
+v2: modify macb_get_hwaddr_dt() parameter
 
-I should also note that Marek Vasut posted some patches to implement a
-bootz command in U-Boot. This turned out to be much less invasive than
-I originally thought, so once those patches are finalized, uImage might
-be irrelevant except for initrds (U-Boot already accepts a raw FDT
-without uImage wrapping for bootm and hence bootz).
+ Documentation/devicetree/bindings/net/macb.txt |   22 +++++++
+ drivers/net/ethernet/cadence/macb.c            |   71 +++++++++++++++++++++---
+ drivers/net/ethernet/cadence/macb.h            |    2 +
+ 3 files changed, 87 insertions(+), 8 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/net/macb.txt
 
-http://www.mail-archive.com/u-boot at lists.denx.de/msg69287.html
-
+diff --git a/Documentation/devicetree/bindings/net/macb.txt b/Documentation/devicetree/bindings/net/macb.txt
+new file mode 100644
+index 0000000..7f0b90a
+--- /dev/null
++++ b/Documentation/devicetree/bindings/net/macb.txt
+@@ -0,0 +1,22 @@
++* Cadence MACB Ethernet controller
++
++Required properties:
++- compatible: Should be "cdns,[<chip>-]macb"
++  Use "cdns,at91sam9260-macb" Atmel at91sam9260 and at91sam9263 SoCs.
++  Use "cdns,at32ap7000-macb" for other 10/100 usage or use the generic form: "cdns,macb"
++- reg: Address and length of the register set for the device
++- interrupts: Should contain macb interrupt
++- phy-mode: String, operation mode of the PHY interface.
++  Supported values are: "mii", "rmii", "gmii", "rgmii".
++
++Optional properties:
++- local-mac-address: 6 bytes, mac address
++
++Examples:
++
++	macb0: ethernet at fffc4000 {
++		compatible = "cdns,at32ap7000-macb";
++		reg = <0xfffc4000 0x4000>;
++		interrupts = <21>;
++		phy-mode = "rmii";
++	};
+diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
+index 64d6146..5e75855 100644
+--- a/drivers/net/ethernet/cadence/macb.c
++++ b/drivers/net/ethernet/cadence/macb.c
+@@ -23,6 +23,8 @@
+ #include <linux/platform_data/macb.h>
+ #include <linux/platform_device.h>
+ #include <linux/phy.h>
++#include <linux/of_device.h>
++#include <linux/of_net.h>
+ 
+ #include "macb.h"
+ 
+@@ -191,7 +193,6 @@ static int macb_mii_probe(struct net_device *dev)
+ {
+ 	struct macb *bp = netdev_priv(dev);
+ 	struct phy_device *phydev;
+-	struct macb_platform_data *pdata;
+ 	int ret;
+ 
+ 	phydev = phy_find_first(bp->mii_bus);
+@@ -200,14 +201,11 @@ static int macb_mii_probe(struct net_device *dev)
+ 		return -1;
+ 	}
+ 
+-	pdata = bp->pdev->dev.platform_data;
+ 	/* TODO : add pin_irq */
+ 
+ 	/* attach the mac to the phy */
+ 	ret = phy_connect_direct(dev, phydev, &macb_handle_link_change, 0,
+-				 pdata && pdata->is_rmii ?
+-				 PHY_INTERFACE_MODE_RMII :
+-				 PHY_INTERFACE_MODE_MII);
++				 bp->phy_interface);
+ 	if (ret) {
+ 		netdev_err(dev, "Could not attach to PHY\n");
+ 		return ret;
+@@ -1244,6 +1242,50 @@ static const struct net_device_ops macb_netdev_ops = {
+ #endif
+ };
+ 
++#if defined(CONFIG_OF)
++static const struct of_device_id macb_dt_ids[] = {
++	{ .compatible = "cdns,at32ap7000-macb" },
++	{ .compatible = "cdns,at91sam9260-macb" },
++	{ .compatible = "cdns,macb" },
++	{ /* sentinel */ }
++};
++
++MODULE_DEVICE_TABLE(of, macb_dt_ids);
++
++static int __devinit macb_get_phy_mode_dt(struct platform_device *pdev)
++{
++	struct device_node *np = pdev->dev.of_node;
++
++	if (np)
++		return of_get_phy_mode(np);
++
++	return -ENODEV;
++}
++
++static int __devinit macb_get_hwaddr_dt(struct macb *bp)
++{
++	struct device_node *np = bp->pdev->dev.of_node;
++	if (np) {
++		const char *mac = of_get_mac_address(np);
++		if (mac) {
++			memcpy(bp->dev->dev_addr, mac, ETH_ALEN);
++			return 0;
++		}
++	}
++
++	return -ENODEV;
++}
++#else
++static int __devinit macb_get_phy_mode_dt(struct platform_device *pdev)
++{
++	return -ENODEV;
++}
++static int __devinit macb_get_hwaddr_dt(struct macb *bp)
++{
++	return -ENODEV;
++}
++#endif
++
+ static int __init macb_probe(struct platform_device *pdev)
+ {
+ 	struct macb_platform_data *pdata;
+@@ -1318,10 +1360,22 @@ static int __init macb_probe(struct platform_device *pdev)
+ 	config |= macb_dbw(bp);
+ 	macb_writel(bp, NCFGR, config);
+ 
+-	macb_get_hwaddr(bp);
+-	pdata = pdev->dev.platform_data;
++	err = macb_get_hwaddr_dt(bp);
++	if (err < 0)
++		macb_get_hwaddr(bp);
++
++	err = macb_get_phy_mode_dt(pdev);
++	if (err < 0) {
++		pdata = pdev->dev.platform_data;
++		if (pdata && pdata->is_rmii)
++			bp->phy_interface = PHY_INTERFACE_MODE_RMII;
++		else
++			bp->phy_interface = PHY_INTERFACE_MODE_MII;
++	} else {
++		bp->phy_interface = err;
++	}
+ 
+-	if (pdata && pdata->is_rmii)
++	if (bp->phy_interface == PHY_INTERFACE_MODE_RMII)
+ #if defined(CONFIG_ARCH_AT91)
+ 		macb_or_gem_writel(bp, USRIO, (MACB_BIT(RMII) |
+ 					       MACB_BIT(CLKEN)));
+@@ -1444,6 +1498,7 @@ static struct platform_driver macb_driver = {
+ 	.driver		= {
+ 		.name		= "macb",
+ 		.owner	= THIS_MODULE,
++		.of_match_table	= of_match_ptr(macb_dt_ids),
+ 	},
+ };
+ 
+diff --git a/drivers/net/ethernet/cadence/macb.h b/drivers/net/ethernet/cadence/macb.h
+index 1931078..335e288 100644
+--- a/drivers/net/ethernet/cadence/macb.h
++++ b/drivers/net/ethernet/cadence/macb.h
+@@ -532,6 +532,8 @@ struct macb {
+ 	unsigned int 		link;
+ 	unsigned int 		speed;
+ 	unsigned int 		duplex;
++
++	phy_interface_t		phy_interface;
+ };
+ 
+ static inline bool macb_is_gem(struct macb *bp)
 -- 
-nvpublic
+1.7.5.4
