@@ -1,66 +1,69 @@
-From: B19295@freescale.com (Lin Tony-B19295)
-Date: Fri, 2 Dec 2011 05:37:11 +0000
-Subject: [PATCH 1/1] mmc: sdhci-esdhc: Change delay after setting clock
- from 100ms to 1ms
-In-Reply-To: <87vcq0kvs6.fsf@laptop.org>
-References: <1321944150-12162-1-git-send-email-tony.lin@freescale.com>
- <87vcq0kvs6.fsf@laptop.org>
-Message-ID: <97D3A72708D04647A5AC84A04996E5B526EC0F@039-SN1MPN1-001.039d.mgd.msft.net>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Fri, 02 Dec 2011 11:07:35 +0530
+Subject: [RFC PATCH 03/11] arm:omap:am33xx: Add power domain data
+In-Reply-To: <79CD15C6BA57404B839C016229A409A8047604@DBDE01.ent.ti.com>
+References: <1321809555-13833-1-git-send-email-hvaibhav@ti.com>
+ <1321809555-13833-4-git-send-email-hvaibhav@ti.com> <878vmxump8.fsf@ti.com>
+ <79CD15C6BA57404B839C016229A409A8047604@DBDE01.ent.ti.com>
+Message-ID: <4ED8641F.7060008@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Okay
-Thanks
+[..]
+>> First some general comments:
+>>
+>> At first glance, it seems like there could be much more reuse with OMAP4
+>> code here.  From what I see, AM33x has only one partition compared to
+>> several on OMAP4, but that doesn't mean you couldn't reuse the OMAP4
+>> functions and just use a single partition.
+> Kevin,
+>
+> Indeed it looks close to OMAP4, but it becomes difficult and ugly once you
+> Start getting into implementation details, for example,
+>
+>   - All PRM offsets don't match, you will end up with
+> cpu_is_xxx check and handle this. Applicable to all power domains.
+>
+> 	OMAP4430_PRM_MPU_INST           0x0300
+> 	Vs
+> 	AM33XX_PRM_MPU_MOD              0x0E00
+>
+> 	OMAP4430_PRM_WKUP_INST          0x1700
+> 	Vs
+> 	AM33XX_PRM_WKUP_MOD             0x0D00
 
-> -----Original Message-----
-> From: linux-mmc-owner at vger.kernel.org [mailto:linux-mmc-
-> owner at vger.kernel.org] On Behalf Of Chris Ball
-> Sent: Friday, December 02, 2011 2:11 AM
-> To: Lin Tony-B19295
-> Cc: linux-mmc at vger.kernel.org; linux-arm-kernel at lists.infradead.org; Xie
-> Xiaobo-R63061; avorontsov at ru.mvista.com
-> Subject: Re: [PATCH 1/1] mmc: sdhci-esdhc: Change delay after setting
-> clock from 100ms to 1ms
-> 
-> Hi,
-> 
-> On Tue, Nov 22 2011, Tony Lin wrote:
-> > 1ms is enough for hardware to change the clock to stable.
-> > 100ms is too long in the tasklet.
-> >
-> > Signed-off-by: Tony Lin <tony.lin@freescale.com>
-> > CC: Xiaobo Xie <X.Xie@freescale.com>
-> > CC: Anton Vorontsov <avorontsov@ru.mvista.com>
-> > ---
-> >  drivers/mmc/host/sdhci-esdhc.h |    2 +-
-> >  1 files changed, 1 insertions(+), 1 deletions(-)
-> >
-> > diff --git a/drivers/mmc/host/sdhci-esdhc.h
-> > b/drivers/mmc/host/sdhci-esdhc.h index c3b08f1..b97b2f5 100644
-> > --- a/drivers/mmc/host/sdhci-esdhc.h
-> > +++ b/drivers/mmc/host/sdhci-esdhc.h
-> > @@ -73,7 +73,7 @@ static inline void esdhc_set_clock(struct sdhci_host
-> > *host, unsigned int clock)
-> >  		| (div << ESDHC_DIVIDER_SHIFT)
-> >  		| (pre_div << ESDHC_PREDIV_SHIFT));
-> >  	sdhci_writel(host, temp, ESDHC_SYSTEM_CONTROL);
-> > -	mdelay(100);
-> > +	mdelay(1);
-> >  out:
-> >  	host->clock = clock;
-> >  }
-> 
-> I don't know if 1ms is actually long enough for the clock to stabilize on
-> all boards, but I'll push this change to mmc-next and we can see if we
-> get any regression reports.
-> 
-> Thanks,
-> 
-> - Chris.
-> --
-> Chris Ball   <cjb@laptop.org>   <http://printf.net/>
-> One Laptop Per Child
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
-> the body of a message to majordomo at vger.kernel.org More majordomo info at
-> http://vger.kernel.org/majordomo-info.html
+The above prcm offsets being different on am33xx doesn't really
+seem to be the issue since its already part of the powerdomain
+struct. See how omap2 and omap3 have different offsets and still end
+up using common code. You won't need any cpu_is_* checks for those.
+
+The real problem however seems to be with the completely different
+PWSTCTRL and PWSTST offsets. They seem to be so messed up that they are
+not even consistent across all powerdomains in the same SoC.
+The only solution I could think of to handle these was if we had
+a provision to specify the offsets on a per powerdomain level by
+adding them to the powerdomain struct. It could be populated only
+on SoC's which have these weirdly different offsets and for the rest
+it could just get initialized with fixed values for all powerdomains
+at init.
+
+Kevin/Paul/Benoit any thoughts?
+
+>
+>   - Also there are some differences in logic states of domains as well.
+>
+> Another important point is, we have considered AM33xx as OMAP3
+> family of device (ARCH_OMAP3).
+> So you may end up with number of cpu_is_xxx checks in code.
+>
+>>
+>> IOW, it seems to me that all the pwrdm_ops could be shared with OMAP4.
+>>
+>>  From what I read (after an admittedly quick glance), the main thing you
+>> need is a way to override the PRM offsets due to the fact that some
+>> crazy person decided to make each instance different.
+>>
+> This was one of the major reason why I had chosen and implemented separately
+> for AM33xx.
+>
+>
