@@ -1,28 +1,42 @@
-From: davem@davemloft.net (David Miller)
-Date: Fri, 02 Dec 2011 12:58:32 -0500 (EST)
-Subject: [PATCH v2] net/macb: add DT support
-In-Reply-To: <1322847782-22650-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1322846050-4543-1-git-send-email-nicolas.ferre@atmel.com>
- <1322847782-22650-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <20111202.125832.1208514279272697863.davem@davemloft.net>
+From: nsekhar@ti.com (Nori, Sekhar)
+Date: Fri, 2 Dec 2011 18:14:48 +0000
+Subject: [RFC PATCH 03/11] arm:omap:am33xx: Add power domain data
+In-Reply-To: <878vmxump8.fsf@ti.com>
+References: <1321809555-13833-1-git-send-email-hvaibhav@ti.com>
+ <1321809555-13833-4-git-send-email-hvaibhav@ti.com> <878vmxump8.fsf@ti.com>
+Message-ID: <DF0F476B391FA8409C78302C7BA518B6039FFA@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nicolas Ferre <nicolas.ferre@atmel.com>
-Date: Fri,  2 Dec 2011 18:43:02 +0100
-
-> From: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+On Thu, Dec 01, 2011 at 06:34:19, Hilman, Kevin wrote:
+> Vaibhav Hiremath <hvaibhav@ti.com> writes:
 > 
-> Allow the device tree to provide the mac address and the phy mode.
+> > From: Afzal Mohammed <afzal@ti.com>
+> >
+> > This patch adds AM33XX power domain data,
+> > corresponding API's to access PRM module and
+> > PRM register offsets & bit fields.
+> >
+> > Signed-off-by: Rachna Patil <rachna@ti.com>
+> > Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
+> > Signed-off-by: Afzal Mohammed <afzal@ti.com>
 > 
-> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> [nicolas.ferre at atmel.com: change "compatible" node property, doc and DT hwaddr]
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> Cc: Jamie Iles <jamie@jamieiles.com>
-> ---
-> v2: modify macb_get_hwaddr_dt() parameter
+> First some general comments:
+> 
+> At first glance, it seems like there could be much more reuse with OMAP4
+> code here.  From what I see, AM33x has only one partition compared to
+> several on OMAP4, but that doesn't mean you couldn't reuse the OMAP4
+> functions and just use a single partition.
+> 
+> IOW, it seems to me that all the pwrdm_ops could be shared with OMAP4.
+> 
+> From what I read (after an admittedly quick glance), the main thing you
+> need is a way to override the PRM offsets due to the fact that some
+> crazy person decided to make each instance different.
 
-You'll have to respin these two macb patches, as they don't apply properly
-to the net-next tree which is where they should be targetted.
+If its any consolation, this has been fed back to the
+chip designers and is expected to be corrected for the
+next AM335x derivative.
 
-Thanks.
+Thanks,
+Sekhar
