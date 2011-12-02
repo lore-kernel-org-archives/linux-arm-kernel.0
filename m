@@ -1,54 +1,43 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Fri, 2 Dec 2011 20:06:19 +0100
-Subject: [PATCH v3 4/5] ARM: vexpress: Initial RS1 memory map support
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF174FDB0539@HQMAIL01.nvidia.com>
-References: <1322579473-8804-1-git-send-email-pawel.moll@arm.com>
- <74CDBE0F657A3D45AFBB94109FB122FF174FDB01C6@HQMAIL01.nvidia.com>
- <74CDBE0F657A3D45AFBB94109FB122FF174FDB0539@HQMAIL01.nvidia.com>
-Message-ID: <201112022006.20165.marek.vasut@gmail.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Fri, 02 Dec 2011 20:06:17 +0100
+Subject: [PATCH 3/3] ARM: S3C64XX: Implement basic power domain support
+In-Reply-To: <20111202185743.GA27227@opensource.wolfsonmicro.com>
+References: <1322765339-29879-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+ <4008DCBCB90E409AA8C5E085EB54D2DB@Flatron>
+ <20111202185743.GA27227@opensource.wolfsonmicro.com>
+Message-ID: <1540677.QKv7YOdnN3@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Stephen Warren wrote at Thursday, December 01, 2011 9:20 AM:
-> > Dave Martin wrote at Thursday, December 01, 2011 5:14 AM:
-> > > On Thu, Dec 01, 2011 at 11:10:50AM +0000, Mark Brown wrote:
-> > > > On Wed, Nov 30, 2011 at 04:38:26PM -0500, Nicolas Pitre wrote:
-> > > > > On Wed, 30 Nov 2011, Mark Brown wrote:
-> > > > > > Oh, dear.  Any pointers to the discussions on the u-boot side?
-> > > > > 
-> > > > > Certainly.  Many different threads actually.  Here's a few:
-> > > > OK, thanks - I see Stephen just followed up and Wolfgang seems
-> > > > moderately happy so hopefully there will be some progress.  It also
-> > > > occurs to me that there's at least Qi also using uImages, hopefully
-> > > > other bootloaders are going to be easier to deal with (or already
-> > > > cope).
-> > > 
-> > > If Stephen's patches are heading for merge, that's great.
-> > > 
-> > > If this feature remains blocked though, could we support Wolfgang's
-> > > preference for start-of-RAM-relative load and entry address?
+On Friday 02 of December 2011 18:57:43 Mark Brown wrote:
+> On Fri, Dec 02, 2011 at 07:25:01PM +0100, Tomasz Figa wrote:
+> > Please do not forget that there might be some drivers not yet submited
+> > to mainline and mainline should not break them with an assumption that
+> > there are no such drivers.
 > > 
-> > It looks like my change is progressing to being checked in:
-> > 
-> > http://lists.denx.de/pipermail/u-boot/2011-December/111865.html
+> > For example, there is an on-going work on an open source OpenGL
+> > implementation for the GPU in S3C6410, known as OpenFIMG. Currently it
+> > uses a little kernel module for low level hardware management
+> > (interrupts, contexts, locking, power management), involving clock
+> > gating and runtime power management, but a DRM driver is planned.
 > 
-> For the record, the changes are now in U-Boot master:
+> As I said in the commit message for the patch you're following up on
+> I don't think that's a problem as it's pretty straightforward to add the
+> requisite hooks as part of adding the actual drivers.  The power domain
+> framework is really easy to use so it's not like it should cause real
+> effort, if you can figure out how to drive a 3D graphics engine adding a
+> device to a power domain shouldn't be too hard.
 > 
-> d510859 image: Don't detect XIP images as overlapping.
-> b9b50e8 image: Implement IH_TYPE_KERNEL_NOLOAD
-> 
-> I should also note that Marek Vasut posted some patches to implement a
-> bootz command in U-Boot. This turned out to be much less invasive than
-> I originally thought, so once those patches are finalized, uImage might
-> be irrelevant except for initrds (U-Boot already accepts a raw FDT
-> without uImage wrapping for bootm and hence bootz).
-> 
-> http://www.mail-archive.com/u-boot at lists.denx.de/msg69287.html
+> There will need to be arch/arm changes to add the platform devices and
+> hook up the clocks anyway so it's not like this is creating a need for
+> modifications.  Indeed I'd suggest adding the arch/arm stuff as it gets
+> written anyway, even if the actual drivers are still a work in progress.
+> It's one less thing to carry out of tree and it means that updates like
+> this or like the clk API reworks that I'd expect to start appearing soon
+> will happen for free.
 
-Hi guys,
+Yeah, I'm okay with that, I just noted that there is more support for S3C6410 
+available than just what is present in mainline.
 
-I'm now cleaning up the PXA support in U-Boot and there's also a lot of 
-university load. It's unlikely bootz will make it to .12, but 2012.03 seems 
-real. Any help is welcome though.
-
-M
+Best regards,
+Tom
