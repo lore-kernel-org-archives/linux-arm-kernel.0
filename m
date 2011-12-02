@@ -1,134 +1,29 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri,  2 Dec 2011 15:57:48 +0000
-Subject: [PATCH] ARM: S3C64XX: Define some additional always off clocks
-Message-ID: <1322841468-28431-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+From: nsekhar@ti.com (Nori, Sekhar)
+Date: Fri, 2 Dec 2011 15:57:57 +0000
+Subject: [PATCH] ARM: mach-davinci: fixed name and parent of pll1 sysclock6
+In-Reply-To: <20111104110004.GA15331@altenpts-laptop>
+References: <20111104110004.GA15331@altenpts-laptop>
+Message-ID: <DF0F476B391FA8409C78302C7BA518B6039BBA@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add entries to clocks_off for some additional clocks which are not
-currently used by any mainline drivers. They default on at power up
-but are never actually used so
+On Fri, Nov 04, 2011 at 16:30:07, Bas van den Berg wrote:
+> The name and parent of pll1_sysclk6 should be pll1 and not pll0.
+> Checked and tested in debugfs on OmapL138.
+> 
+> Signed-off-by: Bas van den Berg <b.van.den.berg.nl@gmail.com>
+> ---
 
-If these blocks are actually supported some of these bindings would need
-to be redone properly, for example hooking up to the muxes that use them,
-but that can be done incrementally.
+Thanks for spotting this. Looking at the technical
+reference manual[1], there is a bigger issue here.
 
-Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
----
- arch/arm/mach-s3c64xx/clock.c |  101 +++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 101 insertions(+), 0 deletions(-)
+PLL1 SYSCLK6 doesn't exist in hardware! Only PLL1_SYSCLK[1-3]
+are valid. The right fix would be simply to remove these
+erroneous entries.
 
-diff --git a/arch/arm/mach-s3c64xx/clock.c b/arch/arm/mach-s3c64xx/clock.c
-index 378ccdb..d79986f 100644
---- a/arch/arm/mach-s3c64xx/clock.c
-+++ b/arch/arm/mach-s3c64xx/clock.c
-@@ -216,6 +216,107 @@ static struct clk init_clocks_off[] = {
- 		.parent		= &clk_h,
- 		.enable		= s3c64xx_hclk_ctrl,
- 		.ctrlbit	= S3C_CLKCON_HCLK_DMA1,
-+	}, {
-+		.name		= "3dse",
-+		.parent		= &clk_h,
-+		.enable		= s3c64xx_hclk_ctrl,
-+		.ctrlbit	= S3C_CLKCON_HCLK_3DSE,
-+	}, {
-+		.name		= "hclk_secur",
-+		.parent		= &clk_h,
-+		.enable		= s3c64xx_hclk_ctrl,
-+		.ctrlbit	= S3C_CLKCON_HCLK_SECUR,
-+	}, {
-+		.name		= "sdma1",
-+		.parent		= &clk_h,
-+		.enable		= s3c64xx_hclk_ctrl,
-+		.ctrlbit	= S3C_CLKCON_HCLK_SDMA1,
-+	}, {
-+		.name		= "sdma0",
-+		.parent		= &clk_h,
-+		.enable		= s3c64xx_hclk_ctrl,
-+		.ctrlbit	= S3C_CLKCON_HCLK_SDMA0,
-+	}, {
-+		.name		= "hclk_jpeg",
-+		.parent		= &clk_h,
-+		.enable		= s3c64xx_hclk_ctrl,
-+		.ctrlbit	= S3C_CLKCON_HCLK_JPEG,
-+	}, {
-+		.name		= "camif",
-+		.parent		= &clk_h,
-+		.enable		= s3c64xx_hclk_ctrl,
-+		.ctrlbit	= S3C_CLKCON_HCLK_CAMIF,
-+	}, {
-+		.name		= "hclk_scaler",
-+		.parent		= &clk_h,
-+		.enable		= s3c64xx_hclk_ctrl,
-+		.ctrlbit	= S3C_CLKCON_HCLK_SCALER,
-+	}, {
-+		.name		= "2d",
-+		.parent		= &clk_h,
-+		.enable		= s3c64xx_hclk_ctrl,
-+		.ctrlbit	= S3C_CLKCON_HCLK_2D,
-+	}, {
-+		.name		= "tv",
-+		.parent		= &clk_h,
-+		.enable		= s3c64xx_hclk_ctrl,
-+		.ctrlbit	= S3C_CLKCON_HCLK_TV,
-+	}, {
-+		.name		= "post0",
-+		.parent		= &clk_h,
-+		.enable		= s3c64xx_hclk_ctrl,
-+		.ctrlbit	= S3C_CLKCON_HCLK_POST0,
-+	}, {
-+		.name		= "rot",
-+		.parent		= &clk_h,
-+		.enable		= s3c64xx_hclk_ctrl,
-+		.ctrlbit	= S3C_CLKCON_HCLK_ROT,
-+	}, {
-+		.name		= "hclk_mfc",
-+		.parent		= &clk_h,
-+		.enable		= s3c64xx_hclk_ctrl,
-+		.ctrlbit	= S3C_CLKCON_HCLK_MFC,
-+	}, {
-+		.name		= "pclk_mfc",
-+		.parent		= &clk_p,
-+		.enable		= s3c64xx_pclk_ctrl,
-+		.ctrlbit	= S3C_CLKCON_PCLK_MFC,
-+	}, {
-+		.name		= "dac27",
-+		.enable		= s3c64xx_sclk_ctrl,
-+		.ctrlbit	= S3C_CLKCON_SCLK_DAC27,
-+	}, {
-+		.name		= "tv27",
-+		.enable		= s3c64xx_sclk_ctrl,
-+		.ctrlbit	= S3C_CLKCON_SCLK_TV27,
-+	}, {
-+		.name		= "scaler27",
-+		.enable		= s3c64xx_sclk_ctrl,
-+		.ctrlbit	= S3C_CLKCON_SCLK_SCALER27,
-+	}, {
-+		.name		= "sclk_scaler",
-+		.enable		= s3c64xx_sclk_ctrl,
-+		.ctrlbit	= S3C_CLKCON_SCLK_SCALER,
-+	}, {
-+		.name		= "post0_27",
-+		.enable		= s3c64xx_sclk_ctrl,
-+		.ctrlbit	= S3C_CLKCON_SCLK_POST0_27,
-+	}, {
-+		.name		= "secur",
-+		.enable		= s3c64xx_sclk_ctrl,
-+		.ctrlbit	= S3C_CLKCON_SCLK_SECUR,
-+	}, {
-+		.name		= "sclk_mfc",
-+		.enable		= s3c64xx_sclk_ctrl,
-+		.ctrlbit	= S3C_CLKCON_SCLK_MFC,
-+	}, {
-+		.name		= "cam",
-+		.enable		= s3c64xx_sclk_ctrl,
-+		.ctrlbit	= S3C_CLKCON_SCLK_CAM,
-+	}, {
-+		.name		= "sclk_jpeg",
-+		.enable		= s3c64xx_sclk_ctrl,
-+		.ctrlbit	= S3C_CLKCON_SCLK_JPEG,
- 	},
- };
- 
--- 
-1.7.7.3
+Would be able to respin the patch?
+
+Thanks,
+Sekhar
+
+[1] http://www.ti.com/lit/ug/spruh77a/spruh77a.pdf
