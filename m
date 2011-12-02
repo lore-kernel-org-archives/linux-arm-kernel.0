@@ -1,35 +1,51 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Fri,  2 Dec 2011 11:52:59 +0200
-Subject: [PATCH 4/5] OMAP4: devices: Do not create mcpdm device if the dtb has
- been provided
-In-Reply-To: <1322819580-7424-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1322819580-7424-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1322819580-7424-5-git-send-email-peter.ujfalusi@ti.com>
+From: eric.miao@linaro.org (Eric Miao)
+Date: Fri, 2 Dec 2011 18:01:08 +0800
+Subject: Building of arch/arm/plat-mxc/ssi-fiq.S failed w/ THUMB2 enabled?
+Message-ID: <CAMPhdO_4NQUFB14eecTb3N4oQJa86ojSk8FUveqg+Lye5_jY+A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If dtb is provided of will create the needed devices dynamically so there
-is no need to create the platform device for McPDM here.
+Hi Dave & Sascha,
 
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
----
- arch/arm/mach-omap2/devices.c |    4 ++++
- 1 files changed, 4 insertions(+), 0 deletions(-)
+I checked the log of this file, found a THUMB2 related changes, yet
+I'm still having the failure below, can you help do a quick check?
 
-diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
-index d7ca473..469f875 100644
---- a/arch/arm/mach-omap2/devices.c
-+++ b/arch/arm/mach-omap2/devices.c
-@@ -323,6 +323,10 @@ static void omap_init_mcpdm(void)
- 	struct omap_hwmod *oh;
- 	struct platform_device *pdev;
- 
-+	/* If dtb is there, the devices will be created dynamically */
-+	if (of_have_populated_dt())
-+		return;
-+
- 	oh = omap_hwmod_lookup("mcpdm");
- 	if (!oh) {
- 		printk(KERN_ERR "Could not look up mcpdm hw_mod\n");
--- 
-1.7.8.rc4
+
+AS      arch/arm/plat-mxc/ssi-fiq.o
+arch/arm/plat-mxc/ssi-fiq.S: Assembler messages:
+arch/arm/plat-mxc/ssi-fiq.S:45: Error: r13 not allowed here -- `tst r13,#(1<<0)'
+arch/arm/plat-mxc/ssi-fiq.S:50: Error: r13 not allowed here -- `tst r13,#(1<<0)'
+arch/arm/plat-mxc/ssi-fiq.S:59: Error: r13 not allowed here -- `ldrh r13,[r11]'
+arch/arm/plat-mxc/ssi-fiq.S:60: Error: r13 not allowed here -- `strh
+r13,[r12,#0x00]'
+arch/arm/plat-mxc/ssi-fiq.S:62: Error: r13 not allowed here -- `ldrh
+r13,[r11,#2]'
+arch/arm/plat-mxc/ssi-fiq.S:63: Error: r13 not allowed here -- `strh
+r13,[r12,#0x00]'
+arch/arm/plat-mxc/ssi-fiq.S:65: Error: r13 not allowed here -- `ldrh
+r13,[r11,#4]'
+arch/arm/plat-mxc/ssi-fiq.S:66: Error: r13 not allowed here -- `strh
+r13,[r12,#0x00]'
+arch/arm/plat-mxc/ssi-fiq.S:68: Error: r13 not allowed here -- `ldrh
+r13,[r11,#6]'
+arch/arm/plat-mxc/ssi-fiq.S:69: Error: r13 not allowed here -- `strh
+r13,[r12,#0x00]'
+arch/arm/plat-mxc/ssi-fiq.S:72: Error: r13 not allowed here -- `lsr r13,r8,#16'
+arch/arm/plat-mxc/ssi-fiq.S:74: Error: r13 not allowed here -- `lslgt
+r8,r13,#16'
+arch/arm/plat-mxc/ssi-fiq.S:81: Error: r13 not allowed here -- `tst r13,#(1<<2)'
+arch/arm/plat-mxc/ssi-fiq.S:86: Error: r13 not allowed here -- `tst r13,#(1<<2)'
+arch/arm/plat-mxc/ssi-fiq.S:98: Error: r13 not allowed here -- `tst r13,#(1<<0)'
+arch/arm/plat-mxc/ssi-fiq.S:101: Error: r13 not allowed here -- `strh r13,[r11]'
+arch/arm/plat-mxc/ssi-fiq.S:104: Error: r13 not allowed here -- `strh
+r13,[r11,#2]'
+arch/arm/plat-mxc/ssi-fiq.S:110: Error: r13 not allowed here -- `strh
+r13,[r11,#4]'
+arch/arm/plat-mxc/ssi-fiq.S:113: Error: r13 not allowed here -- `strh
+r13,[r11,#6]'
+arch/arm/plat-mxc/ssi-fiq.S:119: Error: r13 not allowed here -- `lsr r13,r9,#16'
+arch/arm/plat-mxc/ssi-fiq.S:121: Error: r13 not allowed here -- `lslgt
+r9,r13,#16'
+make[2]: *** [arch/arm/plat-mxc/ssi-fiq.o] Error 1
+make[1]: *** [arch/arm/plat-mxc] Error 2
+make[1]: *** Waiting for unfinished jobs....
