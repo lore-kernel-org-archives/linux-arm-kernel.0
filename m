@@ -1,62 +1,41 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 02 Dec 2011 18:01:40 +0900
-Subject: [PATCH 1/4] ARM: EXYNOS4: Add DMC1, allow PPMU access for DMC.
-In-Reply-To: <1322730317-8171-2-git-send-email-myungjoo.ham@samsung.com>
-References: <1322730317-8171-1-git-send-email-myungjoo.ham@samsung.com>
- <1322730317-8171-2-git-send-email-myungjoo.ham@samsung.com>
-Message-ID: <04fb01ccb0d1$016ebdf0$044c39d0$%kim@samsung.com>
+From: ming.lei@canonical.com (Ming Lei)
+Date: Fri,  2 Dec 2011 17:12:51 +0800
+Subject: [RFC PATCH v1 0/7] media&omap4: introduce face detection(FD) driver
+Message-ID: <1322817178-8931-1-git-send-email-ming.lei@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MyungJoo Ham wrote:
-> 
-> - Add DMC1
-> - Enlarge address space for DMC from 4k to 64k so that PPMU registers
->   may be accessed.
-> 
-> Signed-off-by: MyungJoo Ham <myungjoo.ham@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
->  arch/arm/mach-exynos/cpu.c              |    7 ++++++-
->  arch/arm/mach-exynos/include/mach/map.h |    1 +
->  2 files changed, 7 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/mach-exynos/cpu.c b/arch/arm/mach-exynos/cpu.c
-> index 90ec247..8bdcba9 100644
-> --- a/arch/arm/mach-exynos/cpu.c
-> +++ b/arch/arm/mach-exynos/cpu.c
-> @@ -108,7 +108,12 @@ static struct map_desc exynos4_iodesc[] __initdata =
-> {
->  	}, {
->  		.virtual	= (unsigned long)S5P_VA_DMC0,
->  		.pfn		= __phys_to_pfn(EXYNOS4_PA_DMC0),
-> -		.length		= SZ_4K,
-> +		.length		= SZ_64K,
-> +		.type		= MT_DEVICE,
-> +	}, {
-> +		.virtual	= (unsigned long)S5P_VA_DMC1,
-> +		.pfn		= __phys_to_pfn(EXYNOS4_PA_DMC1),
-> +		.length		= SZ_64K,
->  		.type		= MT_DEVICE,
->  	}, {
->  		.virtual	= (unsigned long)S5P_VA_SROMC,
-> diff --git a/arch/arm/mach-exynos/include/mach/map.h b/arch/arm/mach-
-> exynos/include/mach/map.h
-> index 058541d..870a980 100644
-> --- a/arch/arm/mach-exynos/include/mach/map.h
-> +++ b/arch/arm/mach-exynos/include/mach/map.h
-> @@ -57,6 +57,7 @@
->  #define EXYNOS4_PA_KEYPAD		0x100A0000
-> 
->  #define EXYNOS4_PA_DMC0			0x10400000
-> +#define EXYNOS4_PA_DMC1			0x10410000
+Hi,
 
-If required, so just '.length = SZ_128K'?...
+These v1 patches(against -next tree) introduce v4l2 based face
+detection(FD) device driver, and enable FD hardware[1] on omap4 SoC..
+The idea of implementing it on v4l2 is from from Alan Cox, Sylwester
+and Greg-Kh.
 
-Thanks.
+For verification purpose, I write one user space utility[2] to
+test the module and driver, follows its basic functions:
 
-Best regards,
-Kgene.
+	- detect faces in input grayscal picture(PGM raw, 320 by 240)
+	- detect faces in input y8 format video stream
+	- plot a rectangle to mark the detected faces, and save it as 
+	another same format picture or video stream
+
+Looks the performance of the module is not bad, see some detection
+results on the link[3][4].
+
+Face detection can be used to implement some interesting applications
+(camera, face unlock, baby monitor, ...).
+
+TODO:
+	- implement FD setting interfaces with v4l2 controls or
+	ext controls
+
+thanks,
 --
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Ming Lei
+
+[1], Ch9 of OMAP4 Technical Reference Manual
+[2], http://kernel.ubuntu.com/git?p=ming/fdif.git;a=shortlog;h=refs/heads/v4l2-fdif
+[3], http://kernel.ubuntu.com/~ming/dev/fdif/output
+[4], All pictures are taken from http://www.google.com/imghp
+and converted to pnm from jpeg format, only for test purpose.
