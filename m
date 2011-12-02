@@ -1,72 +1,101 @@
-From: kyungmin.park@samsung.com (Kyungmin Park)
-Date: Fri, 2 Dec 2011 17:57:35 +0900
-Subject: backlight/ld9040.c: regulator control in the lcd driver
-In-Reply-To: <CACRpkdbRdtsw-3FXtevuJL7G=tcE+1s11iRw=zou1G25hufBSA@mail.gmail.com>
-References: <000c01ccb0c6$697c2aa0$3c747fe0$%lee@samsung.com>
- <CACRpkdbRdtsw-3FXtevuJL7G=tcE+1s11iRw=zou1G25hufBSA@mail.gmail.com>
-Message-ID: <CAH9JG2XdDn26ziceug6-Dc8g3+z3AUuzL34-oHRy10qL2RjF2w@mail.gmail.com>
+From: sumit.semwal@ti.com (Sumit Semwal)
+Date: Fri, 2 Dec 2011 14:27:30 +0530
+Subject: [RFC v2 0/2] Introduce DMA buffer sharing mechanism
+Message-ID: <1322816252-19955-1-git-send-email-sumit.semwal@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/2/11, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Fri, Dec 2, 2011 at 8:45 AM, leedonghwa <dh09.lee@samsung.com> wrote:
->
-> [From your mail headers]
->> X-Mailer: Microsoft Office Outlook 12.0
->
-> No please. That mailer does not work, all your whitespace is screwed up.
-> Consult: Documentation/email-clients.txt
->
->> This patch supports regulator power control in the driver.
->
-> Always CC the regulator maintainers on patches like this please.
->
->> +         lcd->reg_vdd3 = regulator_get(lcd->dev, "vdd");
->> +         if (IS_ERR(lcd->reg_vdd3)) {
->> +                   dev_info(lcd->dev, "no %s regulator found\n", "vdd");
->> +                   lcd->reg_vdd3 = NULL;
->> +         }
->> +
->> +         lcd->reg_vci = regulator_get(lcd->dev, "vci");
->> +         if (IS_ERR(lcd->reg_vci)) {
->> +                   dev_info(lcd->dev, "no %s regulator found\n", "vci");
->> +                   lcd->reg_vci = NULL;
->> +         }
->
-> As explained in earlier discussion with Mark regarding the SMSC911x
-> driver regulator, treat these as errors and do not fail
-> "gracefully" like this.
->
-> Reference:
-> http://marc.info/?l=linux-netdev&m=131914562120725&w=2
+Hello Everyone,
 
-As mentioned at commit message, the lcd regulator is optional part and
-refer the mmc codes
+This is RFC v2 for DMA buffer sharing mechanism - changes from v1 are in the
+changelog below.
 
-        host->vmmc = regulator_get(mmc_dev(mmc), "vmmc");
-        if (IS_ERR(host->vmmc)) {
-                pr_info("%s: no vmmc regulator found\n", mmc_hostname(mmc));
-                host->vmmc = NULL;
-        } else {
-                regulator_enable(host->vmmc);
-        }
+Various subsystems - V4L2, GPU-accessors, DRI to name a few - have felt the 
+need to have a common mechanism to share memory buffers across different
+devices - ARM, video hardware, GPU.
 
-Previous time, these codes are located at board file, but more boards
-are used, it has same codes for all boards. so move it to drivers.
+This need comes forth from a variety of use cases including cameras, image 
+processing, video recorders, sound processing, DMA engines, GPU and display
+buffers, and others.
 
-In our case, it has the regulator but some boards don't.
+This RFC is an attempt to define such a buffer sharing mechanism- it is the
+result of discussions from a couple of memory-management mini-summits held by
+Linaro to understand and address common needs around memory management. [1]
 
-Umm then how to handle the regulator gracefully?
+A new dma_buf buffer object is added, with operations and API to allow easy
+sharing of this buffer object across devices.
 
-Thank you,
-Kyungmin Park
+The framework allows:
+- a new buffer-object to be created with fixed size.
+- different devices to 'attach' themselves to this buffer, to facilitate
+  backing storage negotiation, using dma_buf_attach() API.
+- association of a file pointer with each user-buffer and associated
+   allocator-defined operations on that buffer. This operation is called the
+   'export' operation.
+- this exported buffer-object to be shared with the other entity by asking for
+   its 'file-descriptor (fd)', and sharing the fd across.
+- a received fd to get the buffer object back, where it can be accessed using
+   the associated exporter-defined operations.
+- the exporter and user to share the scatterlist using map_dma_buf and
+   unmap_dma_buf operations.
 
->
-> Yours,
-> Linus Walleij
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+Documentation present in the patch-set gives more details.
+
+This is based on design suggestions from many people at the mini-summits,
+most notably from Arnd Bergmann <arnd@arndb.de>, Rob Clark <rob@ti.com> and
+Daniel Vetter <daniel@ffwll.ch>.
+
+The implementation is inspired from proof-of-concept patch-set from
+Tomasz Stanislawski <t.stanislaws@samsung.com>, who demonstrated buffer sharing
+between two v4l2 devices. [2]
+
+References:
+[1]: https://wiki.linaro.org/OfficeofCTO/MemoryManagement
+[2]: http://lwn.net/Articles/454389
+
+Patchset based on top of 3.2-rc3, the current version can be found at
+
+http://git.linaro.org/gitweb?p=people/sumitsemwal/linux-3.x.git
+Branch: dma-buf-upstr-v2
+
+Earlier version at: https://lkml.org/lkml/2011/10/11/92
+
+Best regards,
+~Sumit Semwal
+
+History:
+
+v2:
+- Review comments incorporated:
+   - from Tomasz Stanislawski [https://lkml.org/lkml/2011/10/14/136]
+     - kzalloc moved out of critical section
+     - corrected some in-code comments
+
+   - from Dave Airlie [https://lkml.org/lkml/2011/11/25/123]
+
+   - from Daniel Vetter and Rob Clark [https://lkml.org/lkml/2011/11/26/53]
+     - use struct sg_table in place of struct scatterlist
+     - rename {get,put}_scatterlist to {map,unmap}_dma_buf
+     - add new wrapper APIs dma_buf_{map,unmap}_attachment for ease of users
+     
+- documentation updates as per review comments from Randy Dunlap
+     [https://lkml.org/lkml/2011/10/12/439]
+
+v1: original
+
+Sumit Semwal (2):
+  dma-buf: Introduce dma buffer sharing mechanism
+  dma-buf: Documentation for buffer sharing framework
+
+ Documentation/dma-buf-sharing.txt |  223 ++++++++++++++++++++++++++++
+ drivers/base/Kconfig              |   10 ++
+ drivers/base/Makefile             |    1 +
+ drivers/base/dma-buf.c            |  290 +++++++++++++++++++++++++++++++++++++
+ include/linux/dma-buf.h           |  176 ++++++++++++++++++++++
+ 5 files changed, 700 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/dma-buf-sharing.txt
+ create mode 100644 drivers/base/dma-buf.c
+ create mode 100644 include/linux/dma-buf.h
+
+-- 
+1.7.4.1
