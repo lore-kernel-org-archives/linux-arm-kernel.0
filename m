@@ -1,129 +1,77 @@
-From: ming.lei@canonical.com (Ming Lei)
-Date: Fri,  2 Dec 2011 17:12:52 +0800
-Subject: [RFC PATCH v1 1/7] omap4: introduce fdif(face detect module) hwmod
-In-Reply-To: <1322817178-8931-1-git-send-email-ming.lei@canonical.com>
-References: <1322817178-8931-1-git-send-email-ming.lei@canonical.com>
-Message-ID: <1322817178-8931-2-git-send-email-ming.lei@canonical.com>
+From: kyungmin.park@samsung.com (Kyungmin Park)
+Date: Fri, 2 Dec 2011 18:13:42 +0900
+Subject: [PATCH 1/4] ARM: EXYNOS4: Add DMC1, allow PPMU access for DMC.
+In-Reply-To: <04fb01ccb0d1$016ebdf0$044c39d0$%kim@samsung.com>
+References: <1322730317-8171-1-git-send-email-myungjoo.ham@samsung.com>
+ <1322730317-8171-2-git-send-email-myungjoo.ham@samsung.com>
+ <04fb01ccb0d1$016ebdf0$044c39d0$%kim@samsung.com>
+Message-ID: <CAH9JG2Vkm7uuUAeUZT179=dTUdi9mWsVDvZzWGn0h_NJLrC+mA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Ming Lei <ming.lei@canonical.com>
----
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c |   81 ++++++++++++++++++++++++++++
- 1 files changed, 81 insertions(+), 0 deletions(-)
+On 12/2/11, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> MyungJoo Ham wrote:
+>>
+>> - Add DMC1
+>> - Enlarge address space for DMC from 4k to 64k so that PPMU registers
+>>   may be accessed.
+>>
+>> Signed-off-by: MyungJoo Ham <myungjoo.ham@samsung.com>
+>> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+>> ---
+>>  arch/arm/mach-exynos/cpu.c              |    7 ++++++-
+>>  arch/arm/mach-exynos/include/mach/map.h |    1 +
+>>  2 files changed, 7 insertions(+), 1 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-exynos/cpu.c b/arch/arm/mach-exynos/cpu.c
+>> index 90ec247..8bdcba9 100644
+>> --- a/arch/arm/mach-exynos/cpu.c
+>> +++ b/arch/arm/mach-exynos/cpu.c
+>> @@ -108,7 +108,12 @@ static struct map_desc exynos4_iodesc[] __initdata =
+>> {
+>>  	}, {
+>>  		.virtual	= (unsigned long)S5P_VA_DMC0,
+>>  		.pfn		= __phys_to_pfn(EXYNOS4_PA_DMC0),
+>> -		.length		= SZ_4K,
+>> +		.length		= SZ_64K,
+>> +		.type		= MT_DEVICE,
+>> +	}, {
+>> +		.virtual	= (unsigned long)S5P_VA_DMC1,
+>> +		.pfn		= __phys_to_pfn(EXYNOS4_PA_DMC1),
+>> +		.length		= SZ_64K,
+>>  		.type		= MT_DEVICE,
+>>  	}, {
+>>  		.virtual	= (unsigned long)S5P_VA_SROMC,
+>> diff --git a/arch/arm/mach-exynos/include/mach/map.h b/arch/arm/mach-
+>> exynos/include/mach/map.h
+>> index 058541d..870a980 100644
+>> --- a/arch/arm/mach-exynos/include/mach/map.h
+>> +++ b/arch/arm/mach-exynos/include/mach/map.h
+>> @@ -57,6 +57,7 @@
+>>  #define EXYNOS4_PA_KEYPAD		0x100A0000
+>>
+>>  #define EXYNOS4_PA_DMC0			0x10400000
+>> +#define EXYNOS4_PA_DMC1			0x10410000
+>
+> If required, so just '.length = SZ_128K'?...
+Doesn't it more confuse and difficult to use?
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-index 6cf21ee..30db754 100644
---- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-@@ -53,6 +53,7 @@ static struct omap_hwmod omap44xx_dmm_hwmod;
- static struct omap_hwmod omap44xx_dsp_hwmod;
- static struct omap_hwmod omap44xx_dss_hwmod;
- static struct omap_hwmod omap44xx_emif_fw_hwmod;
-+static struct omap_hwmod omap44xx_fdif_hwmod;
- static struct omap_hwmod omap44xx_hsi_hwmod;
- static struct omap_hwmod omap44xx_ipu_hwmod;
- static struct omap_hwmod omap44xx_iss_hwmod;
-@@ -354,6 +355,14 @@ static struct omap_hwmod_ocp_if omap44xx_dma_system__l3_main_2 = {
- 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
- };
- 
-+/* fdif -> l3_main_2 */
-+static struct omap_hwmod_ocp_if omap44xx_fdif__l3_main_2 = {
-+	.master		= &omap44xx_fdif_hwmod,
-+	.slave		= &omap44xx_l3_main_2_hwmod,
-+	.clk		= "l3_div_ck",
-+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-+};
-+
- /* hsi -> l3_main_2 */
- static struct omap_hwmod_ocp_if omap44xx_hsi__l3_main_2 = {
- 	.master		= &omap44xx_hsi_hwmod,
-@@ -5444,6 +5453,75 @@ static struct omap_hwmod omap44xx_wd_timer3_hwmod = {
- 	.slaves_cnt	= ARRAY_SIZE(omap44xx_wd_timer3_slaves),
- };
- 
-+/* 'fdif' class */
-+static struct omap_hwmod_class_sysconfig omap44xx_fdif_sysc = {
-+	.rev_offs	= 0x0000,
-+	.sysc_offs	= 0x0010,
-+	.sysc_flags	= (SYSC_HAS_MIDLEMODE | SYSC_HAS_RESET_STATUS |
-+			   SYSC_HAS_SIDLEMODE | SYSC_HAS_SOFTRESET),
-+	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART |
-+			   MSTANDBY_FORCE | MSTANDBY_NO |
-+			   MSTANDBY_SMART),
-+	.sysc_fields	= &omap_hwmod_sysc_type2,
-+};
-+
-+static struct omap_hwmod_class omap44xx_fdif_hwmod_class = {
-+	.name	= "fdif",
-+	.sysc	= &omap44xx_fdif_sysc,
-+};
-+
-+/*fdif*/
-+static struct omap_hwmod_addr_space omap44xx_fdif_addrs[] = {
-+	{
-+		.pa_start	= 0x4a10a000,
-+		.pa_end		= 0x4a10afff,
-+		.flags		= ADDR_TYPE_RT
-+	},
-+	{ }
-+};
-+
-+/* l4_cfg -> fdif */
-+static struct omap_hwmod_ocp_if omap44xx_l4_cfg__fdif = {
-+	.master		= &omap44xx_l4_cfg_hwmod,
-+	.slave		= &omap44xx_fdif_hwmod,
-+	.clk		= "l4_div_ck",
-+	.addr		= omap44xx_fdif_addrs,
-+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-+};
-+
-+/* fdif slave ports */
-+static struct omap_hwmod_ocp_if *omap44xx_fdif_slaves[] = {
-+	&omap44xx_l4_cfg__fdif,
-+};
-+static struct omap_hwmod_irq_info omap44xx_fdif_irqs[] = {
-+	{ .irq = 69 + OMAP44XX_IRQ_GIC_START },
-+	{ .irq = -1 }
-+};
-+
-+/* fdif master ports */
-+static struct omap_hwmod_ocp_if *omap44xx_fdif_masters[] = {
-+	&omap44xx_fdif__l3_main_2,
-+};
-+
-+static struct omap_hwmod omap44xx_fdif_hwmod = {
-+	.name		= "fdif",
-+	.class		= &omap44xx_fdif_hwmod_class,
-+	.clkdm_name	= "iss_clkdm",
-+	.mpu_irqs	= omap44xx_fdif_irqs,
-+	.main_clk	= "fdif_fck",
-+	.prcm = {
-+		.omap4 = {
-+			.clkctrl_offs = OMAP4_CM_CAM_FDIF_CLKCTRL_OFFSET,
-+			.context_offs = OMAP4_RM_CAM_FDIF_CONTEXT_OFFSET,
-+			.modulemode   = MODULEMODE_SWCTRL,
-+		},
-+	},
-+	.slaves		= omap44xx_fdif_slaves,
-+	.slaves_cnt	= ARRAY_SIZE(omap44xx_fdif_slaves),
-+	.masters	= omap44xx_fdif_masters,
-+	.masters_cnt	= ARRAY_SIZE(omap44xx_fdif_masters),
-+};
-+
- static __initdata struct omap_hwmod *omap44xx_hwmods[] = {
- 
- 	/* dmm class */
-@@ -5593,6 +5671,9 @@ static __initdata struct omap_hwmod *omap44xx_hwmods[] = {
- 	&omap44xx_wd_timer2_hwmod,
- 	&omap44xx_wd_timer3_hwmod,
- 
-+	/* fdif class */
-+	&omap44xx_fdif_hwmod,
-+
- 	NULL,
- };
- 
--- 
-1.7.5.4
+Even though there's not much definitions. it defines the offset concept.
+"arch/arm/mach-exynos/include/mach/regs-mem.h"
+
+BR,
+>
+> Thanks.
+>
+> Best regards,
+> Kgene.
+> --
+> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+> SW Solution Development Team, Samsung Electronics Co., Ltd.
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc"
+> in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
