@@ -1,76 +1,54 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 02 Dec 2011 07:51:58 -0600
-Subject: [PATCH] irqdomain: protect macro variable in domain iterators
-In-Reply-To: <20111202125932.GB2892@localhost.localdomain>
-References: <1322833997-32083-1-git-send-email-nicolas.ferre@atmel.com>
- <20111202125932.GB2892@localhost.localdomain>
-Message-ID: <4ED8D7FE.1000205@gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Fri, 2 Dec 2011 14:00:45 +0000
+Subject: [PATCH 1/5] ASoC: omap-dmic: Add device tree bindings
+In-Reply-To: <4ED8D321.7030904@ti.com>
+References: <1322819580-7424-1-git-send-email-peter.ujfalusi@ti.com>
+ <1322819580-7424-2-git-send-email-peter.ujfalusi@ti.com>
+ <20111202122558.GM8245@opensource.wolfsonmicro.com>
+ <4ED8C57B.2000503@ti.com>
+ <20111202130242.GO8245@opensource.wolfsonmicro.com>
+ <4ED8D321.7030904@ti.com>
+Message-ID: <20111202140044.GS8245@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/02/2011 06:59 AM, Dave Martin wrote:
-> On Fri, Dec 02, 2011 at 02:53:17PM +0100, Nicolas Ferre wrote:
->> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
->> ---
->> Error found while using those iterators in an irq controller
->> initialization function.
->>
->> May also need protection around irq and hwirq macro variables
->> but those values are usually plain "int" anyway... Tell me if you
->> feel that it should be done.
->>
->>  include/linux/irqdomain.h |    8 ++++----
->>  1 files changed, 4 insertions(+), 4 deletions(-)
->>
->> diff --git a/include/linux/irqdomain.h b/include/linux/irqdomain.h
->> index 99834e58..a553004 100644
->> --- a/include/linux/irqdomain.h
->> +++ b/include/linux/irqdomain.h
->> @@ -82,12 +82,12 @@ static inline unsigned int irq_domain_to_irq(struct irq_domain *d,
->>  }
->>  
->>  #define irq_domain_for_each_hwirq(d, hw) \
->> -	for (hw = d->hwirq_base; hw < d->hwirq_base + d->nr_irq; hw++)
->> +	for (hw = (d)->hwirq_base; hw < (d)->hwirq_base + (d)->nr_irq; hw++)
->>  
->>  #define irq_domain_for_each_irq(d, hw, irq) \
->> -	for (hw = d->hwirq_base, irq = irq_domain_to_irq(d, hw); \
->> -	     hw < d->hwirq_base + d->nr_irq; \
->> -	     hw++, irq = irq_domain_to_irq(d, hw))
->> +	for (hw = (d)->hwirq_base, irq = irq_domain_to_irq((d), hw); \
->> +	     hw < (d)->hwirq_base + (d)->nr_irq; \
->> +	     hw++, irq = irq_domain_to_irq((d), hw))
-> 
-> I suggest just putting all the brackets in -- if having spotted this
-> problem you only half-fix the macros, an opportunity is being missed;
-> someone have to come and fix it again later:
-> 
-> 
-> #define irq_domain_for_each_hwirq(d, hw) \
-> 	for ((hw) = (d)->hwirq_base; (hw) < (d)->hwirq_base + (d)->nr_irq; (hw)++)
-> 
-> #define irq_domain_for_each_irq(d, hw, irq) \
-> 	for ((hw) = (d)->hwirq_base, (irq) = irq_domain_to_irq(d, hw); \
-> 	     (hw) < (d)->hwirq_base + (d)->nr_irq; \
-> 	     (hw)++, (irq) = irq_domain_to_irq(d, hw))
-> 
+On Fri, Dec 02, 2011 at 02:31:13PM +0100, Cousson, Benoit wrote:
 
-Parameters on the left side of an '=' can't be a complex expression.
-Look at other iterator macros.
+> Even if the reg-names and interrupts-names are accepted, which is
+> still not obvious due to a little bit of resistance, we still do not
 
-Rob
+Yeah, it seems like there's very little traction on any of the problems
+with legacy bindings that device tree has.  
 
-> 
-> If you feel happier though, you can harmlessly add the extra brackets round
-> the arguments to irq_domain_to_irq(), without changing the behaviour.
-> Arguably the "always add brackets" rule is simpler to understand.
-> 
-> In fact, where a macro argument is not part of a larger expression, or is an
-> operand to a comma-expression, there's no need for extra brackets -- all
-> possible operators parse at higher priority than commas.  A macro argument
-> which itself is a comma-expression whould have to be explicitly bracketed
-> in the macro invocation anyway, so there is no extra risk of the macro
-> expansion being parsed in an unexpected way in that case.
-> 
-> Cheers
-> ---Dave
+> have dma request bindings, nor clock bindings, nor pin mux.
+> All these information are provided today by hwmod, so it will still
+> be there for a couple of more merge windows.
+
+At least the DMA bindings seem fairly well sorted - we just merged the
+Tegra audio bindings which define a Tegra property for the DMA request
+signal.  There's a reasonable amount of variation in how these things
+get plumbed together.
+
+> The important point for me, it to avoid having to change the driver
+> whenever these bindings will be there. This will be OK today for reg
+> and interrupts since they both go through Linux resources.
+
+This is also OK for clocks since they'll go through the clock API so
+nothing needs doing there either.
+
+> >Could we define and implement the "real" version now (it should be reasonable to
+> >code blind except possibly for the DMA channel as it's such a direct
+> >mapping) with hwmod left in there as something that's legacy for old
+> >kernels?
+
+> I think DT churn is unavoidable due to the ongoing effort to add
+> clock, regulator, dma, pin mux into DT core.
+> I don't think we should wait to have all that ready to start
+> migrating to DT.
+
+Well, it does make the whole process a bit silly.  If we're planning to
+discard hwmod it seems like we shouldn't be transitioning it into device
+tree in the first place and instead just add the new properties to the
+bindings as we go.  If hwmod must go into the device tree somehow is it
+not possible to keep the hwmod data in its own binding (referencing the
+nodes it affects rather than being in their bindings).
