@@ -1,39 +1,83 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Fri, 2 Dec 2011 14:03:53 +0800
-Subject: [GIT PULL] mxs: saif recording support
-Message-ID: <20111202060352.GO711@S2100-06.ap.freescale.net>
+From: manjunath.hadli@ti.com (Hadli, Manjunath)
+Date: Fri, 2 Dec 2011 06:29:49 +0000
+Subject: [PATCH v3 0/5] ARM: davinci: re-arrange definitions to have a
+ common	davinci header
+In-Reply-To: <DF0F476B391FA8409C78302C7BA518B60354BC@DBDE01.ent.ti.com>
+References: <1321525138-3928-1-git-send-email-manjunath.hadli@ti.com>
+ <DF0F476B391FA8409C78302C7BA518B60354BC@DBDE01.ent.ti.com>
+Message-ID: <E99FAA59F8D8D34D8A118DD37F7C8F75013C12@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Sekhar,
 
-Please pull the imx28 saif recording support below.
+On Wed, Nov 30, 2011 at 17:07:21, Nori, Sekhar wrote:
+> Hi Manju,
+> 
+> On Thu, Nov 17, 2011 at 15:48:53, Hadli, Manjunath wrote:
+> > Re-arrange definitions and remove unnecessary code so that we canx
+> 
+> These are two different things and should be done in separate patches. Sergei has already pointed out couple of instances.
+Ok,  This is only subject for the cover letter and not individual patches.
+The individual patches have separate modularized implementations. I will
+change the cover letter subject to "remove private definitions from headers and move to C files". Is that OK?
 
--- 
-Regards,
-Shawn
 
-The following changes since commit 5611cc4572e889b62a7b4c72a413536bf6a9c416:
+> 
+> > have a common header for all davinci platforms. This will enable
+> 
+> You mean all DMx platforms? DA8x and TNETVx will still have their own header files after this patch set.
 
-  Linux 3.2-rc4 (2011-12-01 14:56:01 -0800)
+Yes, DMx platforms. I will also change the common "davinci.h" to dmx.h ?
 
-are available in the git repository at:
-  git://git.linaro.org/people/shawnguo/linux-2.6.git mxs/saif-recording
+> 
+> > us to share defines and enable common routines to be used without 
+> > polluting hardware.h.
+> >  This patch set forms the base for a later set of patches for having a 
+> > common system module base address (DAVINCI_SYSTEM_MODULE_BASE).
+> > 
+> > Changes from previous version(As per Sergei's comments):
+> > 1. Renamed davinci_common.h to davinci.h.
+> > 2. Added extra line whereever appropriate.
+> > 3. removed unnecessary header inclusion.
+> > 
+> > Manjunath Hadli (5):
+> >   ARM: davinci: dm644x: remove the macros from the header to move to c
+> >     file
+> >   ARM: davinci: dm365: remove the macros from the header to move to c
+> >     file
+> >   ARM: davinci: dm646x: remove the macros from the header to move to c
+> >     file
+> 
+> These headlines should describe the changes better. You are moving _private_ defines to C file (to reduce header file pollution). That should be clear from the headline.
+> 
+> >   ARM: davinci: create new common platform header for davinci
+> >   ARM: davinci: delete individual platform header files and use a
+> >     common header
+> > 
+> >  arch/arm/mach-davinci/board-dm355-evm.c      |    2 +-
+> >  arch/arm/mach-davinci/board-dm355-leopard.c  |    2 +-
+> >  arch/arm/mach-davinci/board-dm365-evm.c      |    2 +-
+> >  arch/arm/mach-davinci/board-dm644x-evm.c     |    2 +-
+> >  arch/arm/mach-davinci/board-dm646x-evm.c     |    2 +-
+> >  arch/arm/mach-davinci/board-neuros-osd2.c    |    2 +-
+> >  arch/arm/mach-davinci/board-sffsdr.c         |    2 +-
+> >  arch/arm/mach-davinci/dm355.c                |    2 +-
+> >  arch/arm/mach-davinci/dm365.c                |   18 +++++-
+> >  arch/arm/mach-davinci/dm644x.c               |    9 +++-
+> >  arch/arm/mach-davinci/dm646x.c               |    9 +++-
+> >  arch/arm/mach-davinci/include/mach/davinci.h |   88 ++++++++++++++++++++++++++
+> 
+> This file should be placed in arch/arm/mach-davinci itself since the definitions are private to arch/arm/mach-davinci.
+> Russell has been complaining about placing unnecessary files in include/mach.
 
-Dong Aisheng (4):
-      ASoC: mxs-saif: remove function in platform_data
-      ARM: mxs: add saif clkmux functions
-      ARM: mx28evk: add platform data for saif
-      ARM: mx28evk: set a initial clock rate for saif
+I will just check if the file is needed from the main driver files.
+If not, I will move it to mach-davinci.
 
- arch/arm/mach-mxs/clock-mx28.c                  |   38 +++++++++++++++++++++++
- arch/arm/mach-mxs/devices-mx28.h                |    3 +-
- arch/arm/mach-mxs/devices/platform-mxs-saif.c   |    5 ++-
- arch/arm/mach-mxs/include/mach/common.h         |    1 +
- arch/arm/mach-mxs/include/mach/devices-common.h |    4 ++-
- arch/arm/mach-mxs/include/mach/digctl.h         |   21 ++++++++++++
- arch/arm/mach-mxs/mach-mx28evk.c                |   18 +++++++++-
- include/sound/saif.h                            |    4 +-
- sound/soc/mxs/mxs-saif.c                        |   20 +++++------
- 9 files changed, 95 insertions(+), 19 deletions(-)
- create mode 100644 arch/arm/mach-mxs/include/mach/digctl.h
+> 
+> Thanks,
+> Sekhar
+> 
+> 
+Thanks and Regards,
+-Manju
