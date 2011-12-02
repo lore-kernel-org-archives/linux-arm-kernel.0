@@ -1,64 +1,58 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Fri, 02 Dec 2011 09:39:49 -0800
-Subject: [RFC PATCH 03/11] arm:omap:am33xx: Add power domain data
-In-Reply-To: <4ED8641F.7060008@ti.com> (Rajendra Nayak's message of "Fri, 02
- Dec 2011 11:07:35 +0530")
-References: <1321809555-13833-1-git-send-email-hvaibhav@ti.com>
- <1321809555-13833-4-git-send-email-hvaibhav@ti.com>
- <878vmxump8.fsf@ti.com>
- <79CD15C6BA57404B839C016229A409A8047604@DBDE01.ent.ti.com>
- <4ED8641F.7060008@ti.com>
-Message-ID: <87zkfaj2je.fsf@ti.com>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Fri, 2 Dec 2011 09:41:12 -0800
+Subject: [PATCH v3 4/5] ARM: vexpress: Initial RS1 memory map support
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF174FDB01C6@HQMAIL01.nvidia.com>
+References: <1322579473-8804-1-git-send-email-pawel.moll@arm.com>
+ <1322579473-8804-5-git-send-email-pawel.moll@arm.com>
+ <20111130153749.GE2045@localhost.localdomain>
+ <1322673302.3180.25.camel@hornet.cambridge.arm.com>
+ <20111130175410.GJ2045@localhost.localdomain>
+ <alpine.LFD.2.02.1111301522340.2357@xanadu.home>
+ <20111130204805.GA5698@sirena.org.uk>
+ <alpine.LFD.2.02.1111301604230.2357@xanadu.home>
+ <20111201111049.GB2915@opensource.wolfsonmicro.com>
+ <20111201121403.GC2026@localhost.localdomain>
+ <74CDBE0F657A3D45AFBB94109FB122FF174FDB01C6@HQMAIL01.nvidia.com>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF174FDB0539@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rajendra Nayak <rnayak@ti.com> writes:
+Stephen Warren wrote at Thursday, December 01, 2011 9:20 AM:
+> Dave Martin wrote at Thursday, December 01, 2011 5:14 AM:
+> > On Thu, Dec 01, 2011 at 11:10:50AM +0000, Mark Brown wrote:
+> > > On Wed, Nov 30, 2011 at 04:38:26PM -0500, Nicolas Pitre wrote:
+> > > > On Wed, 30 Nov 2011, Mark Brown wrote:
+> > >
+> > > > > Oh, dear.  Any pointers to the discussions on the u-boot side?
+> > >
+> > > > Certainly.  Many different threads actually.  Here's a few:
+> > >
+> > > OK, thanks - I see Stephen just followed up and Wolfgang seems
+> > > moderately happy so hopefully there will be some progress.  It also
+> > > occurs to me that there's at least Qi also using uImages, hopefully
+> > > other bootloaders are going to be easier to deal with (or already cope).
+> >
+> > If Stephen's patches are heading for merge, that's great.
+> >
+> > If this feature remains blocked though, could we support Wolfgang's
+> > preference for start-of-RAM-relative load and entry address?
+> 
+> It looks like my change is progressing to being checked in:
+> 
+> http://lists.denx.de/pipermail/u-boot/2011-December/111865.html
 
-> [..]
->>> First some general comments:
->>>
->>> At first glance, it seems like there could be much more reuse with OMAP4
->>> code here.  From what I see, AM33x has only one partition compared to
->>> several on OMAP4, but that doesn't mean you couldn't reuse the OMAP4
->>> functions and just use a single partition.
->> Kevin,
->>
->> Indeed it looks close to OMAP4, but it becomes difficult and ugly once you
->> Start getting into implementation details, for example,
->>
->>   - All PRM offsets don't match, you will end up with
->> cpu_is_xxx check and handle this. Applicable to all power domains.
->>
->> 	OMAP4430_PRM_MPU_INST           0x0300
->> 	Vs
->> 	AM33XX_PRM_MPU_MOD              0x0E00
->>
->> 	OMAP4430_PRM_WKUP_INST          0x1700
->> 	Vs
->> 	AM33XX_PRM_WKUP_MOD             0x0D00
->
-> The above prcm offsets being different on am33xx doesn't really
-> seem to be the issue since its already part of the powerdomain
-> struct. See how omap2 and omap3 have different offsets and still end
-> up using common code. You won't need any cpu_is_* checks for those.
->
-> The real problem however seems to be with the completely different
-> PWSTCTRL and PWSTST offsets. They seem to be so messed up that they are
-> not even consistent across all powerdomains in the same SoC.
-> The only solution I could think of to handle these was if we had
-> a provision to specify the offsets on a per powerdomain level by
-> adding them to the powerdomain struct. It could be populated only
-> on SoC's which have these weirdly different offsets and for the rest
-> it could just get initialized with fixed values for all powerdomains
-> at init.
->
-> Kevin/Paul/Benoit any thoughts?
->
+For the record, the changes are now in U-Boot master:
 
-Something tells me that AM33x is not the last device we're going to see
-where there clearly wansn't a unified design around PRCM integration.
+d510859 image: Don't detect XIP images as overlapping.
+b9b50e8 image: Implement IH_TYPE_KERNEL_NOLOAD
 
-So I suspect adding this to the powerdomain struct is the best way to
-go, but Paul/Benoit should make the final call.
+I should also note that Marek Vasut posted some patches to implement a
+bootz command in U-Boot. This turned out to be much less invasive than
+I originally thought, so once those patches are finalized, uImage might
+be irrelevant except for initrds (U-Boot already accepts a raw FDT
+without uImage wrapping for bootm and hence bootz).
 
-Kevin
+http://www.mail-archive.com/u-boot at lists.denx.de/msg69287.html
+
+-- 
+nvpublic
