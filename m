@@ -1,97 +1,162 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 2 Dec 2011 10:21:24 +0100
-Subject: [PATCH] arm: add default value for PHYS_OFFSET Kconfig setting
-In-Reply-To: <alpine.LFD.2.02.1112020024370.2357@xanadu.home>
-References: <1322711557-8279-1-git-send-email-paul.gortmaker@windriver.com>
- <201112011419.46751.arnd@arndb.de>
- <CAP=VYLrp1zqyOzU-xzatF3jE3wL6wBjEDMR=sEXimP2ZvkQ0Lg@mail.gmail.com>
- <alpine.LFD.2.02.1112020005270.2357@xanadu.home>
- <alpine.LFD.2.02.1112020024370.2357@xanadu.home>
-Message-ID: <20111202092124.GR26618@pengutronix.de>
+From: shubhrajyoti@ti.com (Shubhrajyoti D)
+Date: Fri, 2 Dec 2011 14:51:13 +0530
+Subject: [PATCHv7 2/3] OMAP: I2C: Remove the reset in the init path
+In-Reply-To: <1322817674-25384-1-git-send-email-shubhrajyoti@ti.com>
+References: <1322817674-25384-1-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <1322817674-25384-3-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Nicolas,
+-  The reset in the driver at init is not needed anymore as the
+   hwmod framework takes care of reseting it.
+-  Reset is removed from omap_i2c_init, which was called
+   not only during probe, but also after time out and error handling.
+   device_reset were added in those places to effect the reset.
+-  Earlier the hwmod SYSC settings were over-written in the driver.
+   Removing the same and letting the hwmod take care of the settings.
+-  Clean up the SYSS_RESETDONE_MASK macro as it is no longer needed.
+-  Clean up the SYSCONFIG SYSC bit defination macros.
+-  Fix the typos in wakeup.
 
-On Fri, Dec 02, 2011 at 12:33:26AM -0500, Nicolas Pitre wrote:
-> On Fri, 2 Dec 2011, Nicolas Pitre wrote:
-> 
-> > On Thu, 1 Dec 2011, Paul Gortmaker wrote:
-> > 
-> > > On Thu, Dec 1, 2011 at 9:19 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > > > On Thursday 01 December 2011, Paul Gortmaker wrote:
-> > > >> Commit 1b9f95f8ade9efc2bd49f0e7b9dc61a038ac3eef introduced the new
-> > > >> Kconfig for PHYS_OFFSET but it did not specify a default value.
-> > > >>
-> > > >> This has the undesired side effect of breaking an implictly used
-> > > >> trick for updating defconfigs on the fly for routine buildtesting
-> > > >> across all arch and all platforms, i.e.
-> > > >>
-> > > >> ? cp /path/to/somedefconfig .config ; yes "" | make oldconfig
-> > > >>
-> > > >
-> > > > FWIW, a better way to achieve the above is using
-> > > >
-> > > > make KCONFIG_ALLCONFIG=/path/to/somedefconfig listnewconfig alldefconfig
-> > > >
-> > > > which does not have this problem.
-> > > >
-> > > > Your patch looks still ok, but you might want to update your scripts
-> > > > to be more robust.
-> > > 
-> > > Thanks -- but on the other hand, the above use case does actually
-> > > emulate exactly what happens when someone runs the
-> > > "make oldconfig" and simply holds down the Enter key. (yes it
-> > > happens probably way more than we want to know...)
-> > > 
-> > > So, I guess what I'm trying to say is that the above "script" is
-> > > intentionally fragile.  :)  As a use case, we shouldn't break it.
-> > 
-> > Well... I took a while before replying because I'm also modifying things 
-> > around this, but those changes are good for a merge window not a -rc 
-> > period.
-> > 
-> > Still, I don't think your patch is good, even as a temporary measure.  
-> > The fact is that we can't just pick a random default value since it is 
-> > likely to be wrong for the majority of the boards as the right answer 
-> > for this option is quite varied.  So the fact that the config system 
-> > insists on your entering a proper value is actually a good thing.
-> > 
-> > In the at91x40_defconfig case, it has CONFIG_EMBEDDED=y.  If it was not 
-> > selected then you'd get CONFIG_ARM_PATCH_PHYS_VIRT=y by default and then 
-> > no CONFIG_PHYS_OFFSET would be presented.
-> > 
-> > So the right fix here would actually consist of adding to 
-> > at91x40_defconfig either CONFIG_ARM_PATCH_PHYS_VIRT=y, or a default 
-> > value for CONFIG_PHYS_OFFSET which is the right value for that platform.
-> 
-> And it seems that at91x40 is the only defconfig with MMU=n, so the only 
-> option is really to provide a default CONFIG_PHYS_OFFSET.  So what about 
-> this:
-> 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index e084b7e981..a24672924f 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -222,6 +222,7 @@ config NEED_MACH_MEMORY_H
->  config PHYS_OFFSET
->  	hex "Physical address of main memory"
->  	depends on !ARM_PATCH_PHYS_VIRT && !NEED_MACH_MEMORY_H
-> +	default DRAM_BASE if !MMU
->  	help
->  	  Please provide the physical address corresponding to the
->  	  location of main memory in your system.
-> 
-> Eventually the DRAM_BASE config option could simply be replaced by 
-> PHYS_OFFSET directly, but that's a larger change.
-I'm working on a MMU-less machine, too and had that change already in my
-working copy. I was about to commit and it send out later today.
+Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
+---
+ drivers/i2c/busses/i2c-omap.c |   82 +++++++++++------------------------------
+ 1 files changed, 22 insertions(+), 60 deletions(-)
 
-So: Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-
-Best regards
-Uwe
-
+diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+index fa23faa..beff9f3 100644
+--- a/drivers/i2c/busses/i2c-omap.c
++++ b/drivers/i2c/busses/i2c-omap.c
+@@ -155,19 +155,6 @@ enum {
+ #define OMAP_I2C_SYSTEST_SDA_O		(1 << 0)	/* SDA line drive out */
+ #endif
+ 
+-/* OCP_SYSSTATUS bit definitions */
+-#define SYSS_RESETDONE_MASK		(1 << 0)
+-
+-/* OCP_SYSCONFIG bit definitions */
+-#define SYSC_CLOCKACTIVITY_MASK		(0x3 << 8)
+-#define SYSC_SIDLEMODE_MASK		(0x3 << 3)
+-#define SYSC_ENAWAKEUP_MASK		(1 << 2)
+-#define SYSC_SOFTRESET_MASK		(1 << 1)
+-#define SYSC_AUTOIDLE_MASK		(1 << 0)
+-
+-#define SYSC_IDLEMODE_SMART		0x2
+-#define SYSC_CLOCKACTIVITY_FCLK		0x2
+-
+ /* Errata definitions */
+ #define I2C_OMAP_ERRATA_I207		(1 << 0)
+ #define I2C_OMAP3_1P153			(1 << 1)
+@@ -182,6 +169,7 @@ struct omap_i2c_dev {
+ 	u32			latency;	/* maximum mpu wkup latency */
+ 	void			(*set_mpu_wkup_lat)(struct device *dev,
+ 						    long latency);
++	int			(*device_reset)(struct device *dev);
+ 	u32			speed;		/* Speed of bus in Khz */
+ 	u16			cmd_err;
+ 	u8			*buf;
+@@ -317,60 +305,23 @@ static int omap_i2c_init(struct omap_i2c_dev *dev)
+ 	u16 psc = 0, scll = 0, sclh = 0, buf = 0;
+ 	u16 fsscll = 0, fssclh = 0, hsscll = 0, hssclh = 0;
+ 	unsigned long fclk_rate = 12000000;
+-	unsigned long timeout;
+ 	unsigned long internal_clk = 0;
+ 	struct clk *fclk;
+ 	struct omap_i2c_bus_platform_data *pdata;
+ 
+ 	pdata = dev->dev->platform_data;
+ 
+-	if (dev->rev >= OMAP_I2C_OMAP1_REV_2) {
+-		/* Disable I2C controller before soft reset */
+-		omap_i2c_write_reg(dev, OMAP_I2C_CON_REG,
+-			omap_i2c_read_reg(dev, OMAP_I2C_CON_REG) &
+-				~(OMAP_I2C_CON_EN));
+-
+-		omap_i2c_write_reg(dev, OMAP_I2C_SYSC_REG, SYSC_SOFTRESET_MASK);
+-		/* For some reason we need to set the EN bit before the
+-		 * reset done bit gets set. */
+-		timeout = jiffies + OMAP_I2C_TIMEOUT;
+-		omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, OMAP_I2C_CON_EN);
+-		while (!(omap_i2c_read_reg(dev, OMAP_I2C_SYSS_REG) &
+-			 SYSS_RESETDONE_MASK)) {
+-			if (time_after(jiffies, timeout)) {
+-				dev_warn(dev->dev, "timeout waiting "
+-						"for controller reset\n");
+-				return -ETIMEDOUT;
+-			}
+-			msleep(1);
+-		}
+-
+-		/* SYSC register is cleared by the reset; rewrite it */
+-		if (dev->rev == OMAP_I2C_REV_ON_2430) {
+-
+-			omap_i2c_write_reg(dev, OMAP_I2C_SYSC_REG,
+-					   SYSC_AUTOIDLE_MASK);
+-
+-		} else if (dev->rev >= OMAP_I2C_REV_ON_3430) {
+-			dev->syscstate = SYSC_AUTOIDLE_MASK;
+-			dev->syscstate |= SYSC_ENAWAKEUP_MASK;
+-			dev->syscstate |= (SYSC_IDLEMODE_SMART <<
+-			      __ffs(SYSC_SIDLEMODE_MASK));
+-			dev->syscstate |= (SYSC_CLOCKACTIVITY_FCLK <<
+-			      __ffs(SYSC_CLOCKACTIVITY_MASK));
+-
+-			omap_i2c_write_reg(dev, OMAP_I2C_SYSC_REG,
+-							dev->syscstate);
+-			/*
+-			 * Enabling all wakup sources to stop I2C freezing on
+-			 * WFI instruction.
+-			 * REVISIT: Some wkup sources might not be needed.
+-			 */
+-			dev->westate = OMAP_I2C_WE_ALL;
+-			omap_i2c_write_reg(dev, OMAP_I2C_WE_REG,
+-							dev->westate);
+-		}
++	if (dev->rev >= OMAP_I2C_REV_ON_3430) {
++		/*
++		 * Enabling all wakeup sources to stop I2C freezing on
++		 * WFI instruction.
++		 * REVISIT: Some wakeup sources might not be needed.
++		 */
++		dev->westate = OMAP_I2C_WE_ALL;
++		omap_i2c_write_reg(dev, OMAP_I2C_WE_REG,
++						dev->westate);
+ 	}
++
+ 	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
+ 
+ 	if (pdata->flags & OMAP_I2C_FLAG_ALWAYS_ARMXOR_CLK) {
+@@ -594,6 +545,11 @@ static int omap_i2c_xfer_msg(struct i2c_adapter *adap,
+ 		return r;
+ 	if (r == 0) {
+ 		dev_err(dev->dev, "controller timed out\n");
++		if (dev->device_reset) {
++			r = dev->device_reset(dev->dev);
++			if (r < 0)
++				dev_err(dev->dev, "reset failed\n");
++		}
+ 		omap_i2c_init(dev);
+ 		return -ETIMEDOUT;
+ 	}
+@@ -604,6 +560,11 @@ static int omap_i2c_xfer_msg(struct i2c_adapter *adap,
+ 	/* We have an error */
+ 	if (dev->cmd_err & (OMAP_I2C_STAT_AL | OMAP_I2C_STAT_ROVR |
+ 			    OMAP_I2C_STAT_XUDF)) {
++		if (dev->device_reset) {
++			r = dev->device_reset(dev->dev);
++			if (r < 0)
++				dev_err(dev->dev, "reset failed\n");
++		}
+ 		omap_i2c_init(dev);
+ 		return -EIO;
+ 	}
+@@ -1004,6 +965,7 @@ omap_i2c_probe(struct platform_device *pdev)
+ 	if (pdata != NULL) {
+ 		speed = pdata->clkrate;
+ 		dev->set_mpu_wkup_lat = pdata->set_mpu_wkup_lat;
++		dev->device_reset = pdata->device_reset;
+ 	} else {
+ 		speed = 100;	/* Default speed */
+ 		dev->set_mpu_wkup_lat = NULL;
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+1.7.1
