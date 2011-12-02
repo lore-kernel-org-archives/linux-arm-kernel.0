@@ -1,54 +1,75 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 2 Dec 2011 14:00:45 +0000
-Subject: [PATCH 1/5] ASoC: omap-dmic: Add device tree bindings
-In-Reply-To: <4ED8D321.7030904@ti.com>
-References: <1322819580-7424-1-git-send-email-peter.ujfalusi@ti.com>
- <1322819580-7424-2-git-send-email-peter.ujfalusi@ti.com>
- <20111202122558.GM8245@opensource.wolfsonmicro.com>
- <4ED8C57B.2000503@ti.com>
- <20111202130242.GO8245@opensource.wolfsonmicro.com>
- <4ED8D321.7030904@ti.com>
-Message-ID: <20111202140044.GS8245@opensource.wolfsonmicro.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri,  2 Dec 2011 08:08:02 -0600
+Subject: [PATCH] ARM: add EDAC atomic_scrub function
+Message-ID: <1322834882-26363-1-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 02, 2011 at 02:31:13PM +0100, Cousson, Benoit wrote:
+From: Rob Herring <rob.herring@calxeda.com>
 
-> Even if the reg-names and interrupts-names are accepted, which is
-> still not obvious due to a little bit of resistance, we still do not
+Add support for architecture specific EDAC atomic_scrub to ARM. Only ARMv6+
+is implemented as ldrex/strex instructions are needed. Supporting EDAC on
+ARMv5 or earlier is unlikely at this point anyway.
 
-Yeah, it seems like there's very little traction on any of the problems
-with legacy bindings that device tree has.  
+Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+---
+ arch/arm/include/asm/edac.h |   48 +++++++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 48 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/include/asm/edac.h
 
-> have dma request bindings, nor clock bindings, nor pin mux.
-> All these information are provided today by hwmod, so it will still
-> be there for a couple of more merge windows.
-
-At least the DMA bindings seem fairly well sorted - we just merged the
-Tegra audio bindings which define a Tegra property for the DMA request
-signal.  There's a reasonable amount of variation in how these things
-get plumbed together.
-
-> The important point for me, it to avoid having to change the driver
-> whenever these bindings will be there. This will be OK today for reg
-> and interrupts since they both go through Linux resources.
-
-This is also OK for clocks since they'll go through the clock API so
-nothing needs doing there either.
-
-> >Could we define and implement the "real" version now (it should be reasonable to
-> >code blind except possibly for the DMA channel as it's such a direct
-> >mapping) with hwmod left in there as something that's legacy for old
-> >kernels?
-
-> I think DT churn is unavoidable due to the ongoing effort to add
-> clock, regulator, dma, pin mux into DT core.
-> I don't think we should wait to have all that ready to start
-> migrating to DT.
-
-Well, it does make the whole process a bit silly.  If we're planning to
-discard hwmod it seems like we shouldn't be transitioning it into device
-tree in the first place and instead just add the new properties to the
-bindings as we go.  If hwmod must go into the device tree somehow is it
-not possible to keep the hwmod data in its own binding (referencing the
-nodes it affects rather than being in their bindings).
+diff --git a/arch/arm/include/asm/edac.h b/arch/arm/include/asm/edac.h
+new file mode 100644
+index 0000000..0df7a2c
+--- /dev/null
++++ b/arch/arm/include/asm/edac.h
+@@ -0,0 +1,48 @@
++/*
++ * Copyright 2011 Calxeda, Inc.
++ * Based on PPC version Copyright 2007 MontaVista Software, Inc.
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ * You should have received a copy of the GNU General Public License along with
++ * this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++#ifndef ASM_EDAC_H
++#define ASM_EDAC_H
++/*
++ * ECC atomic, DMA, SMP and interrupt safe scrub function.
++ * Implements the per arch atomic_scrub() that EDAC use for software
++ * ECC scrubbing.  It reads memory and then writes back the original
++ * value, allowing the hardware to detect and correct memory errors.
++ */
++static inline void atomic_scrub(void *va, u32 size)
++{
++#if __LINUX_ARM_ARCH__ >= 6
++	unsigned int *virt_addr = va;
++	unsigned int temp, temp2;
++	unsigned int i;
++
++	for (i = 0; i < size / sizeof(*virt_addr); i++, virt_addr++) {
++		/* Very carefully read and write to memory atomically
++		 * so we are interrupt, DMA and SMP safe.
++		 */
++		__asm__ __volatile__("\n"
++			"1:	ldrex	%0, [%2]\n"
++			"	strex	%1, %0, [%2]\n"
++			"	teq	%1, #0\n"
++			"	bne	1b\n"
++			: "=&r"(temp), "=&r"(temp2)
++			: "r"(virt_addr)
++			: "cc");
++	}
++#endif
++}
++
++#endif
+-- 
+1.7.5.4
