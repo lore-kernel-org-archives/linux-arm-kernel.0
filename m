@@ -1,45 +1,49 @@
-From: afzal@ti.com (Mohammed, Afzal)
-Date: Fri, 2 Dec 2011 04:36:02 +0000
-Subject: [PATCH-V4 0/3] Introducing TI's New SoC/board AM335XEVM
-In-Reply-To: <878vmws4z8.fsf@ti.com>
-References: <1320946837-32507-1-git-send-email-hvaibhav@ti.com>
- <878vmxxjrv.fsf@ti.com>
- <79CD15C6BA57404B839C016229A409A80474FD@DBDE01.ent.ti.com>
- <878vmws4z8.fsf@ti.com>
-Message-ID: <C8443D0743D26F4388EA172BF4E2A7A902847B@DBDE01.ent.ti.com>
+From: paul.gortmaker@windriver.com (Paul Gortmaker)
+Date: Thu, 1 Dec 2011 23:38:57 -0500
+Subject: [PATCH] arm: add default value for PHYS_OFFSET Kconfig setting
+In-Reply-To: <201112011419.46751.arnd@arndb.de>
+References: <1322711557-8279-1-git-send-email-paul.gortmaker@windriver.com>
+ <201112011419.46751.arnd@arndb.de>
+Message-ID: <CAP=VYLrp1zqyOzU-xzatF3jE3wL6wBjEDMR=sEXimP2ZvkQ0Lg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin,
+On Thu, Dec 1, 2011 at 9:19 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Thursday 01 December 2011, Paul Gortmaker wrote:
+>> Commit 1b9f95f8ade9efc2bd49f0e7b9dc61a038ac3eef introduced the new
+>> Kconfig for PHYS_OFFSET but it did not specify a default value.
+>>
+>> This has the undesired side effect of breaking an implictly used
+>> trick for updating defconfigs on the fly for routine buildtesting
+>> across all arch and all platforms, i.e.
+>>
+>> ? cp /path/to/somedefconfig .config ; yes "" | make oldconfig
+>>
+>
+> FWIW, a better way to achieve the above is using
+>
+> make KCONFIG_ALLCONFIG=/path/to/somedefconfig listnewconfig alldefconfig
+>
+> which does not have this problem.
+>
+> Your patch looks still ok, but you might want to update your scripts
+> to be more robust.
 
-On Thu, Dec 01, 2011 at 20:40:03, Hilman, Kevin wrote:
-> "Hiremath, Vaibhav" <hvaibhav@ti.com> writes:
-:
-> > We can detect the board using on-board EEPROM, so same mach-id
-> > should work for both EVM and Beagle. 
-> 
-> > And also going forward with device tree approach we may
-> > not need different id's, right?
-> 
-> Right, which is why I'm wondering why are there sevral new AM33x
-> mach-types when only one of them is being used:
-> 
-> 3684    TI AM335X IA EVM        am335xiaevm     Afzal Mohammed
-> 3589    TI AM335X EVM           am335xevm       Vaibhav Bedia
-> 3808    Beaglebone Board        beaglebone      Steven Kipisz
-> 
-> Russell has been trying to cleanup athe mach-types, so if these others
-> are not going to be used, I suggest they be deleted.
+Thanks -- but on the other hand, the above use case does actually
+emulate exactly what happens when someone runs the
+"make oldconfig" and simply holds down the Enter key. (yes it
+happens probably way more than we want to know...)
 
-"3684-TI AM335X IA EVM" is required as IA EVM uses a different UART,
-because of which early prints can't be captured, problem mentioned
-in http://marc.info/?l=linux-omap&m=131286938723617&w=2
+So, I guess what I'm trying to say is that the above "script" is
+intentionally fragile.  :)  As a use case, we shouldn't break it.
 
+Thanks,
+Paul.
 
-Note: Paul advised to post to linux-arm-kernel at lists.infradead.org,
-but it never made to LAKML, even though I sent couple of times and got
-a reply "Is being held until the list moderator can review it for
-approval. The reason it is being held: Message has a suspicious header"
-
-Regards
-Afzal
+>
+> ? ? ? ?Arnd
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at ?http://www.tux.org/lkml/
