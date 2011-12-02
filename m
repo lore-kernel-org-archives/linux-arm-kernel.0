@@ -1,78 +1,105 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 02 Dec 2011 08:13:04 -0600
-Subject: [PATCH] ARM: add EDAC atomic_scrub function
-In-Reply-To: <1322834882-26363-1-git-send-email-robherring2@gmail.com>
-References: <1322834882-26363-1-git-send-email-robherring2@gmail.com>
-Message-ID: <4ED8DCF0.1020701@gmail.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Fri, 2 Dec 2011 14:30:42 +0000
+Subject: [PATCH] irqdomain: protect macro variable in domain iterators
+In-Reply-To: <4ED8D7FE.1000205@gmail.com>
+References: <1322833997-32083-1-git-send-email-nicolas.ferre@atmel.com>
+ <20111202125932.GB2892@localhost.localdomain>
+ <4ED8D7FE.1000205@gmail.com>
+Message-ID: <20111202143042.GE2892@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Looks like EDAC list has changed. Resending to linux-edac list.
+On Fri, Dec 02, 2011 at 07:51:58AM -0600, Rob Herring wrote:
+> On 12/02/2011 06:59 AM, Dave Martin wrote:
+> > On Fri, Dec 02, 2011 at 02:53:17PM +0100, Nicolas Ferre wrote:
+> >> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> >> ---
+> >> Error found while using those iterators in an irq controller
+> >> initialization function.
+> >>
+> >> May also need protection around irq and hwirq macro variables
+> >> but those values are usually plain "int" anyway... Tell me if you
+> >> feel that it should be done.
+> >>
+> >>  include/linux/irqdomain.h |    8 ++++----
+> >>  1 files changed, 4 insertions(+), 4 deletions(-)
+> >>
+> >> diff --git a/include/linux/irqdomain.h b/include/linux/irqdomain.h
+> >> index 99834e58..a553004 100644
+> >> --- a/include/linux/irqdomain.h
+> >> +++ b/include/linux/irqdomain.h
+> >> @@ -82,12 +82,12 @@ static inline unsigned int irq_domain_to_irq(struct irq_domain *d,
+> >>  }
+> >>  
+> >>  #define irq_domain_for_each_hwirq(d, hw) \
+> >> -	for (hw = d->hwirq_base; hw < d->hwirq_base + d->nr_irq; hw++)
+> >> +	for (hw = (d)->hwirq_base; hw < (d)->hwirq_base + (d)->nr_irq; hw++)
+> >>  
+> >>  #define irq_domain_for_each_irq(d, hw, irq) \
+> >> -	for (hw = d->hwirq_base, irq = irq_domain_to_irq(d, hw); \
+> >> -	     hw < d->hwirq_base + d->nr_irq; \
+> >> -	     hw++, irq = irq_domain_to_irq(d, hw))
+> >> +	for (hw = (d)->hwirq_base, irq = irq_domain_to_irq((d), hw); \
+> >> +	     hw < (d)->hwirq_base + (d)->nr_irq; \
+> >> +	     hw++, irq = irq_domain_to_irq((d), hw))
+> > 
+> > I suggest just putting all the brackets in -- if having spotted this
+> > problem you only half-fix the macros, an opportunity is being missed;
+> > someone have to come and fix it again later:
+> > 
+> > 
+> > #define irq_domain_for_each_hwirq(d, hw) \
+> > 	for ((hw) = (d)->hwirq_base; (hw) < (d)->hwirq_base + (d)->nr_irq; (hw)++)
+> > 
+> > #define irq_domain_for_each_irq(d, hw, irq) \
+> > 	for ((hw) = (d)->hwirq_base, (irq) = irq_domain_to_irq(d, hw); \
+> > 	     (hw) < (d)->hwirq_base + (d)->nr_irq; \
+> > 	     (hw)++, (irq) = irq_domain_to_irq(d, hw))
+> > 
+> 
+> Parameters on the left side of an '=' can't be a complex expression.
+> Look at other iterator macros.
 
-On 12/02/2011 08:08 AM, Rob Herring wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
-> 
-> Add support for architecture specific EDAC atomic_scrub to ARM. Only ARMv6+
-> is implemented as ldrex/strex instructions are needed. Supporting EDAC on
-> ARMv5 or earlier is unlikely at this point anyway.
-> 
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> ---
->  arch/arm/include/asm/edac.h |   48 +++++++++++++++++++++++++++++++++++++++++++
->  1 files changed, 48 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm/include/asm/edac.h
-> 
-> diff --git a/arch/arm/include/asm/edac.h b/arch/arm/include/asm/edac.h
-> new file mode 100644
-> index 0000000..0df7a2c
-> --- /dev/null
-> +++ b/arch/arm/include/asm/edac.h
-> @@ -0,0 +1,48 @@
-> +/*
-> + * Copyright 2011 Calxeda, Inc.
-> + * Based on PPC version Copyright 2007 MontaVista Software, Inc.
-> + *
-> + * This program is free software; you can redistribute it and/or modify it
-> + * under the terms and conditions of the GNU General Public License,
-> + * version 2, as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope it will be useful, but WITHOUT
-> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-> + * more details.
-> + *
-> + * You should have received a copy of the GNU General Public License along with
-> + * this program.  If not, see <http://www.gnu.org/licenses/>.
-> + */
-> +#ifndef ASM_EDAC_H
-> +#define ASM_EDAC_H
-> +/*
-> + * ECC atomic, DMA, SMP and interrupt safe scrub function.
-> + * Implements the per arch atomic_scrub() that EDAC use for software
-> + * ECC scrubbing.  It reads memory and then writes back the original
-> + * value, allowing the hardware to detect and correct memory errors.
-> + */
-> +static inline void atomic_scrub(void *va, u32 size)
-> +{
-> +#if __LINUX_ARM_ARCH__ >= 6
-> +	unsigned int *virt_addr = va;
-> +	unsigned int temp, temp2;
-> +	unsigned int i;
-> +
-> +	for (i = 0; i < size / sizeof(*virt_addr); i++, virt_addr++) {
-> +		/* Very carefully read and write to memory atomically
-> +		 * so we are interrupt, DMA and SMP safe.
-> +		 */
-> +		__asm__ __volatile__("\n"
-> +			"1:	ldrex	%0, [%2]\n"
-> +			"	strex	%1, %0, [%2]\n"
-> +			"	teq	%1, #0\n"
-> +			"	bne	1b\n"
-> +			: "=&r"(temp), "=&r"(temp2)
-> +			: "r"(virt_addr)
-> +			: "cc");
-> +	}
-> +#endif
-> +}
-> +
-> +#endif
+Do you mean "can't" or "shouldn't, by policy"?  I don't see a statement of
+the policy, but feel free to point me at it if it exists.
+
+An arbitrarily complex expression can appear on the left size of a C
+assignment, providing that it is an lvalue of an appropriate type; though
+if it involves things like casts or ?: we would rapidly get into ill-
+advised obfuscated code territory.
+
+
+The most plausible use I can think of it something like:
+
+int do_something(type *result, args)
+{
+	widget w;
+	/* ... */
+
+	widget_for_each_whatever(*result, w) {
+		/* do stuff */
+	}
+
+	/* ... */
+}
+
+I don't comment on whether this is a good idea, but from the language
+point of view it is perfectly reasonable.
+
+(Note that *result = something parses how we want, but *result++, if
+generated in the macro expansion, will not)
+
+
+You're right that this won't work with at least some of the existing
+macros, but my view is if that if a macro can be made trivially correct,
+without pitfalls, that you should do it.  As a general principle, this
+helps to avoid latent bugs in the code.  I don't think we should have
+a special-case rule because this is a certain special flavour of macro,
+unless implementing the macro robustly becomes impossible.
+
+
+Just my opinion, though -- if people want it the other way, then I don't
+have a serious problem with that.
+
+Cheers
+---Dave
