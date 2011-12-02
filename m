@@ -1,89 +1,27 @@
-From: kyungmin.park@samsung.com (Kyungmin Park)
-Date: Fri, 2 Dec 2011 19:14:24 +0900
-Subject: backlight/ld9040.c: regulator control in the lcd driver
-In-Reply-To: <CACRpkdan-zKk6TN15MkbEuNk5C949SL-jniK98vReFTzfvGC4w@mail.gmail.com>
-References: <000c01ccb0c6$697c2aa0$3c747fe0$%lee@samsung.com>
- <CACRpkdbRdtsw-3FXtevuJL7G=tcE+1s11iRw=zou1G25hufBSA@mail.gmail.com>
- <CAH9JG2XdDn26ziceug6-Dc8g3+z3AUuzL34-oHRy10qL2RjF2w@mail.gmail.com>
- <CACRpkdan-zKk6TN15MkbEuNk5C949SL-jniK98vReFTzfvGC4w@mail.gmail.com>
-Message-ID: <CAH9JG2VY=L2OMitpiV-Au6fYmmthEnuLSSDywa1MS2=5-ZMsCg@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 2 Dec 2011 11:24:18 +0100
+Subject: Building of arch/arm/plat-mxc/ssi-fiq.S failed w/ THUMB2 enabled?
+In-Reply-To: <CAMPhdO_4NQUFB14eecTb3N4oQJa86ojSk8FUveqg+Lye5_jY+A@mail.gmail.com>
+References: <CAMPhdO_4NQUFB14eecTb3N4oQJa86ojSk8FUveqg+Lye5_jY+A@mail.gmail.com>
+Message-ID: <20111202102418.GT26618@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/2/11, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Fri, Dec 2, 2011 at 9:57 AM, Kyungmin Park <kyungmin.park@samsung.com>
-> wrote:
->>>[leedonghwa]
->> [Me]
->>>> +         lcd->reg_vdd3 = regulator_get(lcd->dev, "vdd");
->>>> +         if (IS_ERR(lcd->reg_vdd3)) {
->>>> +                   dev_info(lcd->dev, "no %s regulator found\n",
->>>> "vdd");
->>>> +                   lcd->reg_vdd3 = NULL;
->>>> +         }
->>>> +
->>>> +         lcd->reg_vci = regulator_get(lcd->dev, "vci");
->>>> +         if (IS_ERR(lcd->reg_vci)) {
->>>> +                   dev_info(lcd->dev, "no %s regulator found\n",
->>>> "vci");
->>>> +                   lcd->reg_vci = NULL;
->>>> +         }
->>>
->>> As explained in earlier discussion with Mark regarding the SMSC911x
->>> driver regulator, treat these as errors and do not fail
->>> "gracefully" like this.
->>>
->>> Reference:
->>> http://marc.info/?l=linux-netdev&m=131914562120725&w=2
->>
->> As mentioned at commit message, the lcd regulator is optional part and
->> refer the mmc codes
->>
->>        host->vmmc = regulator_get(mmc_dev(mmc), "vmmc");
->>        if (IS_ERR(host->vmmc)) {
->>                pr_info("%s: no vmmc regulator found\n",
->> mmc_hostname(mmc));
->>                host->vmmc = NULL;
->>        } else {
->>                regulator_enable(host->vmmc);
->>        }
->>
->> Previous time, these codes are located at board file, but more boards
->> are used, it has same codes for all boards. so move it to drivers.
->
-> I know. This was brought up in the aforementioned discussion,
-> but the above is also wrong, simply. See:
-> http://marc.info/?l=linux-netdev&m=131914562120667&w=2
-> http://marc.info/?l=linux-netdev&m=131914562120690&w=2
-> http://marc.info/?l=linux-netdev&m=131914562120725&w=2
-> http://marc.info/?l=linux-netdev&m=131963332527416&w=2
->
->> In our case, it has the regulator but some boards don't.
->>
->> Umm then how to handle the regulator gracefully?
->
-> Mark suggest using a fixed-voltage regulator for boards
-> where the power is always on. The voltage level itself
-> is optional. See:
-> http://marc.info/?l=linux-netdev&m=131963332527416&w=2
+On Fri, Dec 02, 2011 at 06:01:08PM +0800, Eric Miao wrote:
+> Hi Dave & Sascha,
+> 
+> I checked the log of this file, found a THUMB2 related changes, yet
+> I'm still having the failure below, can you help do a quick check?
+the problem is that in Thumb most commands don't work with r8-r15
+because there are only three bits used to encode them. This is
+unfortunate as the other registers are not banked for FIQ.
 
-Make sense, okay send the updated patch
->
-> Other approaches is to use dummy regulators, or not
-> call regulator_has_full_constraints(), which means the
-> regulator core will provide dummy regulators anyways.
-> See:
-> http://marc.info/?l=linux-netdev&m=131973043527112&w=2
-> http://marc.info/?l=linux-netdev&m=131975178703166&w=2
->
-> Whole thread of discussion:
-> http://marc.info/?l=linux-netdev&w=2&r=1&s=smsc911x&q=b
->
-> Yours,
-> Linus Walleij
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+The best possibility I see is to save some unbanked registers to the
+banked registers on entry and restore them on exception exit.
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
