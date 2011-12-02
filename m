@@ -1,42 +1,35 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Fri, 2 Dec 2011 15:48:04 -0600
-Subject: [PATCHv7 2/3] OMAP: I2C: Remove the reset in the init path
-In-Reply-To: <4ED94536.2080307@ti.com>
-References: <1322817674-25384-1-git-send-email-shubhrajyoti@ti.com>
- <1322817674-25384-3-git-send-email-shubhrajyoti@ti.com>
- <4ED94536.2080307@ti.com>
-Message-ID: <4ED94794.2000705@ti.com>
+From: FlorianSchandinat@gmx.de (Florian Tobias Schandinat)
+Date: Fri, 02 Dec 2011 21:53:24 +0000
+Subject: [PATCH 5/7] fb: pxa: support pinmux operation
+In-Reply-To: <CACRpkdYfEkwv_zYu7Cz8hTtaXp9W8vHxo_Dc9T5CnTjyRh_wDg@mail.gmail.com>
+References: <1322262544-7854-1-git-send-email-haojian.zhuang@marvell.com>	<1322262544-7854-6-git-send-email-haojian.zhuang@marvell.com>
+ <CACRpkdYfEkwv_zYu7Cz8hTtaXp9W8vHxo_Dc9T5CnTjyRh_wDg@mail.gmail.com>
+Message-ID: <4ED948D4.8030202@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shubhrajyoti,
+Hi Linus,
 
-On 12/2/2011 15:37, Jon Hunter wrote:
+On 11/28/2011 09:19 AM, Linus Walleij wrote:
+> On Sat, Nov 26, 2011 at 12:09 AM, Haojian Zhuang
+> <haojian.zhuang@marvell.com> wrote:
+> 
+> More verbose commit log please.
+> 
+>> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+> 
+> Apart from that, same comment as for the serial driver,
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> 
+> I need the framebuffer maintainers ACK to merge this through the pinctrl
+> tree.
 
-[snip]
->> @@ -594,6 +545,11 @@ static int omap_i2c_xfer_msg(struct i2c_adapter
->> *adap,
->> return r;
->> if (r == 0) {
->> dev_err(dev->dev, "controller timed out\n");
->> + if (dev->device_reset) {
->> + r = dev->device_reset(dev->dev);
->> + if (r< 0)
->> + dev_err(dev->dev, "reset failed\n");
->> + }
->> omap_i2c_init(dev);
->
-> Why put the reset here? The function omap_i2c_init is going to perform a
-> soft reset. So why not replace the reset in that function?
->
-> Furthermore does this work for omap1 devices? I think that you would
-> need to remove the existing soft-reset from omap_i2c_init() into an omap1.
+You could have made my life easier by quoting the patch. Anyway, after I found
+it in an archive, you may add
 
-Sorry, I see you did remove the soft-reset in the omap_i2c_init(). 
-However, why not just replace the reset in the omap_i2c_init() instead 
-of moving it?
+Acked-by: Florian Tobias Schandinat <FlorianSchandinat@gmx.de>
 
-As for omap1, I see we don't perform a soft-reset so that is a don't care.
 
-Cheers
-Jon
+Best regards,
+
+Florian Tobias Schandinat
