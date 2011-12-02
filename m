@@ -1,36 +1,47 @@
-From: myungjoo.ham@samsung.com (MyungJoo Ham)
-Date: Fri, 2 Dec 2011 18:23:39 +0900
-Subject: [PATCH 3/4] ARM Exynos4210-Nuri: remove compiler errors
-In-Reply-To: <04f901ccb0d0$b94191b0$2bc4b510$%kim@samsung.com>
-References: <1322730317-8171-1-git-send-email-myungjoo.ham@samsung.com>
- <1322730317-8171-4-git-send-email-myungjoo.ham@samsung.com>
- <04f901ccb0d0$b94191b0$2bc4b510$%kim@samsung.com>
-Message-ID: <CAJ0PZbTKgqgg3SZN3KyVFzGDuSU8qjM5NjwNcM28mtmzfbS0Xw@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 02 Dec 2011 09:24:38 +0000
+Subject: [PATCH 1/2] ARM: exynos4: Fix build error due to 'gic_bank_offset'
+ undeclared
+In-Reply-To: <04f701ccb0ce$7c044d30$740ce790$%kim@samsung.com>
+References: <1322753070.11611.0.camel@phoenix> <4ED7ADCE.8040609@arm.com>
+ <04f701ccb0ce$7c044d30$740ce790$%kim@samsung.com>
+Message-ID: <4ED89956.9060908@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 2, 2011 at 5:59 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> MyungJoo Hamm wrote:
+On 02/12/11 08:43, Kukjin Kim wrote:
+> Marc Zyngier wrote:
 >>
-> What's the 'compiler errors'?
->
-> And I don't know why this patch included in this series, maybe this should
-> be separated from this series?
+>> On 01/12/11 15:24, Axel Lin wrote:
+>>> Fix below build error:
+>>>   CC      arch/arm/mach-exynos/cpu.o
+>>> arch/arm/mach-exynos/cpu.c: In function 'exynos4_init_irq':
+>>> arch/arm/mach-exynos/cpu.c:245: error: 'gic_bank_offset' undeclared
+>> (first use in this function)
+>>> arch/arm/mach-exynos/cpu.c:245: error: (Each undeclared identifier is
+>> reported only once
+>>> arch/arm/mach-exynos/cpu.c:245: error: for each function it appears in.)
+>>> arch/arm/mach-exynos/cpu.c:243: warning: unused variable 'bank_offset'
+>>> make[1]: *** [arch/arm/mach-exynos/cpu.o] Error 1
+>>> make: *** [arch/arm/mach-exynos] Error 2
+>>>
+>>> Signed-off-by: Axel Lin <axel.lin@gmail.com>
+>>
+>> Arghhh... My bad. Thanks for fixing that.
+>>
+>> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+>>
+> Hi Marc,
+> 
+> Since the commit 4e44d2cb("ARM: exynos4: convert to CONFIG_MULTI_IRQ_HANDLER") is not in my tree, this should be handled in your tree and Axel's patch, "ARM: exynos4: Fix build error" is too.
 
-The error is:
-arch/arm/mach-exynos/mach-nuri.c: In function ?nuri_power_init?:
-arch/arm/mach-exynos/mach-nuri.c:1080:2: error: implicit declaration
-of function ?irq_alloc_descs?
-It is due to the recent changes in some of the header files (they
-removed some header inclusion from header fiiles).
+Hi Kukjin,
 
-In this patchset, we are providing a test case (Exynos4210-Nuri) for
-the device driver and we had to resolve the compiler error first.
+No problem, I'll take these through my tree and send a pull request to
+Russell.
 
-Cheers!
-MyungJoo
+Cheers,
 
-
+	M.
 -- 
-MyungJoo Ham, Ph.D.
-Mobile Software Platform Lab, DMC Business, Samsung Electronics
+Jazz is not dead. It just smells funny...
