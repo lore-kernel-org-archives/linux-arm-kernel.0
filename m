@@ -1,85 +1,66 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Fri, 2 Dec 2011 00:33:26 -0500 (EST)
-Subject: [PATCH] arm: add default value for PHYS_OFFSET Kconfig setting
-In-Reply-To: <alpine.LFD.2.02.1112020005270.2357@xanadu.home>
-References: <1322711557-8279-1-git-send-email-paul.gortmaker@windriver.com>
- <201112011419.46751.arnd@arndb.de>
- <CAP=VYLrp1zqyOzU-xzatF3jE3wL6wBjEDMR=sEXimP2ZvkQ0Lg@mail.gmail.com>
- <alpine.LFD.2.02.1112020005270.2357@xanadu.home>
-Message-ID: <alpine.LFD.2.02.1112020024370.2357@xanadu.home>
+From: B19295@freescale.com (Lin Tony-B19295)
+Date: Fri, 2 Dec 2011 05:37:11 +0000
+Subject: [PATCH 1/1] mmc: sdhci-esdhc: Change delay after setting clock
+ from 100ms to 1ms
+In-Reply-To: <87vcq0kvs6.fsf@laptop.org>
+References: <1321944150-12162-1-git-send-email-tony.lin@freescale.com>
+ <87vcq0kvs6.fsf@laptop.org>
+Message-ID: <97D3A72708D04647A5AC84A04996E5B526EC0F@039-SN1MPN1-001.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2 Dec 2011, Nicolas Pitre wrote:
+Okay
+Thanks
 
-> On Thu, 1 Dec 2011, Paul Gortmaker wrote:
+> -----Original Message-----
+> From: linux-mmc-owner at vger.kernel.org [mailto:linux-mmc-
+> owner at vger.kernel.org] On Behalf Of Chris Ball
+> Sent: Friday, December 02, 2011 2:11 AM
+> To: Lin Tony-B19295
+> Cc: linux-mmc at vger.kernel.org; linux-arm-kernel at lists.infradead.org; Xie
+> Xiaobo-R63061; avorontsov at ru.mvista.com
+> Subject: Re: [PATCH 1/1] mmc: sdhci-esdhc: Change delay after setting
+> clock from 100ms to 1ms
 > 
-> > On Thu, Dec 1, 2011 at 9:19 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > > On Thursday 01 December 2011, Paul Gortmaker wrote:
-> > >> Commit 1b9f95f8ade9efc2bd49f0e7b9dc61a038ac3eef introduced the new
-> > >> Kconfig for PHYS_OFFSET but it did not specify a default value.
-> > >>
-> > >> This has the undesired side effect of breaking an implictly used
-> > >> trick for updating defconfigs on the fly for routine buildtesting
-> > >> across all arch and all platforms, i.e.
-> > >>
-> > >> ? cp /path/to/somedefconfig .config ; yes "" | make oldconfig
-> > >>
-> > >
-> > > FWIW, a better way to achieve the above is using
-> > >
-> > > make KCONFIG_ALLCONFIG=/path/to/somedefconfig listnewconfig alldefconfig
-> > >
-> > > which does not have this problem.
-> > >
-> > > Your patch looks still ok, but you might want to update your scripts
-> > > to be more robust.
-> > 
-> > Thanks -- but on the other hand, the above use case does actually
-> > emulate exactly what happens when someone runs the
-> > "make oldconfig" and simply holds down the Enter key. (yes it
-> > happens probably way more than we want to know...)
-> > 
-> > So, I guess what I'm trying to say is that the above "script" is
-> > intentionally fragile.  :)  As a use case, we shouldn't break it.
+> Hi,
 > 
-> Well... I took a while before replying because I'm also modifying things 
-> around this, but those changes are good for a merge window not a -rc 
-> period.
+> On Tue, Nov 22 2011, Tony Lin wrote:
+> > 1ms is enough for hardware to change the clock to stable.
+> > 100ms is too long in the tasklet.
+> >
+> > Signed-off-by: Tony Lin <tony.lin@freescale.com>
+> > CC: Xiaobo Xie <X.Xie@freescale.com>
+> > CC: Anton Vorontsov <avorontsov@ru.mvista.com>
+> > ---
+> >  drivers/mmc/host/sdhci-esdhc.h |    2 +-
+> >  1 files changed, 1 insertions(+), 1 deletions(-)
+> >
+> > diff --git a/drivers/mmc/host/sdhci-esdhc.h
+> > b/drivers/mmc/host/sdhci-esdhc.h index c3b08f1..b97b2f5 100644
+> > --- a/drivers/mmc/host/sdhci-esdhc.h
+> > +++ b/drivers/mmc/host/sdhci-esdhc.h
+> > @@ -73,7 +73,7 @@ static inline void esdhc_set_clock(struct sdhci_host
+> > *host, unsigned int clock)
+> >  		| (div << ESDHC_DIVIDER_SHIFT)
+> >  		| (pre_div << ESDHC_PREDIV_SHIFT));
+> >  	sdhci_writel(host, temp, ESDHC_SYSTEM_CONTROL);
+> > -	mdelay(100);
+> > +	mdelay(1);
+> >  out:
+> >  	host->clock = clock;
+> >  }
 > 
-> Still, I don't think your patch is good, even as a temporary measure.  
-> The fact is that we can't just pick a random default value since it is 
-> likely to be wrong for the majority of the boards as the right answer 
-> for this option is quite varied.  So the fact that the config system 
-> insists on your entering a proper value is actually a good thing.
+> I don't know if 1ms is actually long enough for the clock to stabilize on
+> all boards, but I'll push this change to mmc-next and we can see if we
+> get any regression reports.
 > 
-> In the at91x40_defconfig case, it has CONFIG_EMBEDDED=y.  If it was not 
-> selected then you'd get CONFIG_ARM_PATCH_PHYS_VIRT=y by default and then 
-> no CONFIG_PHYS_OFFSET would be presented.
+> Thanks,
 > 
-> So the right fix here would actually consist of adding to 
-> at91x40_defconfig either CONFIG_ARM_PATCH_PHYS_VIRT=y, or a default 
-> value for CONFIG_PHYS_OFFSET which is the right value for that platform.
-
-And it seems that at91x40 is the only defconfig with MMU=n, so the only 
-option is really to provide a default CONFIG_PHYS_OFFSET.  So what about 
-this:
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index e084b7e981..a24672924f 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -222,6 +222,7 @@ config NEED_MACH_MEMORY_H
- config PHYS_OFFSET
- 	hex "Physical address of main memory"
- 	depends on !ARM_PATCH_PHYS_VIRT && !NEED_MACH_MEMORY_H
-+	default DRAM_BASE if !MMU
- 	help
- 	  Please provide the physical address corresponding to the
- 	  location of main memory in your system.
-
-Eventually the DRAM_BASE config option could simply be replaced by 
-PHYS_OFFSET directly, but that's a larger change.
-
-
-Nicolas
+> - Chris.
+> --
+> Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+> One Laptop Per Child
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+> the body of a message to majordomo at vger.kernel.org More majordomo info at
+> http://vger.kernel.org/majordomo-info.html
