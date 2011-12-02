@@ -1,50 +1,48 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 2 Dec 2011 17:02:31 +0000
-Subject: [GIT PULL] ARM perf updates for 3.3
-Message-ID: <20111202170231.GP5540@mudshark.cambridge.arm.com>
+From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
+Date: Fri, 2 Dec 2011 18:02:24 +0100
+Subject: [PATCH 0/2 v2] ARM: OMAP1: Fix dpll1 reprogramming related issues
+In-Reply-To: <20111202020936.GY31337@atomide.com>
+References: <201112012023.04635.jkrzyszt@tis.icnet.pl>
+ <1322770382-30718-1-git-send-email-jkrzyszt@tis.icnet.pl>
+ <20111202020936.GY31337@atomide.com>
+Message-ID: <201112021802.25037.jkrzyszt@tis.icnet.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+On Friday 02 of December 2011 at 03:09:37, Tony Lindgren wrote:
+> * Janusz Krzysztofik <jkrzyszt@tis.icnet.pl> [111201 11:38]:
+> > After dpll1 reprogramming has been moved from setup_arch() to
+> > kernel_init(), I've been observing several issues, resulting in
+> > undesired system behaviour on my Amstrad Delta. This series fixes
+> > those most important (2/5 and 5/5 v2 previously), with a "stuck at 60MHz
+> > rate" issue going to be fixed with Tony's proposed solution instead of
+> > my previous 3/5.
+> > 
+> > Janusz Krzysztofik (2):
+> >   ARM: OMAP1: Fix ckctl value used for dpll1 defualt rate
+> >   ARM: OMAP1: recalculate loops per jiffy after dpll1 reprogram
+> > 
+> >  arch/arm/mach-omap1/clock_data.c |    9 +++++++--
+> >  1 files changed, 7 insertions(+), 2 deletions(-)
+> 
+> Thanks, got these three patches now applied into fixes on top of -rc4.
+> 
+> Can you please try it out to make sure it's all working for you now?
 
-Please pull these updates to the ARM perf code for 3.3. The highlights are
-probably the CTI stuff (which is in preparation for OMAP4 support coming from
-Lei Ming, Benoit and Paul) and the cleanup of the event numbers for ARMv7 so
-that they are easier to follow. I was hoping to add Cortex-A7 support but I
-haven't got my paws on an FPGA yet.
+Yes, it works as expected, re-tested with a custom 150 MHz rate only 
+.config to the extent possible without removing all rates form .config 
+/ omap1_rate_table[], i.e., without triggering the issue addressed by 
+fc92dd3a77bfc59822f869627ba81a6418eed987 "ARM: OMAP1: Fix ckctl value 
+used for dpll1 defualt rate". Can re-test other cases (omap1_defconfig, 
+no rates selected at all) if required.
 
-I've not included my contextidr patch with this pull because it conflicts
-quite badly with the LPAE patches. I can rework this for 3.4 later on (I
-already have a fixup).
+My only concern left, which I don't feel capable to justify myself, is 
+if 6% inaccuracy in BogoMIPS recalculation, compared to the BogoMIPS 
+value got either with 3.1 or as a result of recalibration, does matter 
+and should still be addressed somehow for next merge window, or can be 
+ignored. 
 
-Cheers,
+Russell, can you please share your opinion?
 
-Will
-
-
-The following changes since commit 5611cc4572e889b62a7b4c72a413536bf6a9c416:
-
-  Linux 3.2-rc4 (2011-12-01 14:56:01 -0800)
-
-are available in the git repository at:
-  git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git for-rmk
-
-Ming Lei (2):
-      arm: introduce cross trigger interface helpers
-      arm: pmu: allow platform specific irq enable/disable handling
-
-Will Deacon (4):
-      ARM: perf: clean and update ARMv7 event numbers
-      ARM: perf: add support for stalled cycle ABI events
-      ARM: perf: remove unused armpmu_get_max_events
-      Merge branches 'perf/event-nos', 'perf/updates' and 'perf/omap4' into for-rmk
-
- arch/arm/include/asm/cti.h          |  179 ++++++++++++++++
- arch/arm/include/asm/perf_event.h   |    3 -
- arch/arm/include/asm/pmu.h          |   15 +-
- arch/arm/kernel/perf_event.c        |   19 +-
- arch/arm/kernel/perf_event_v6.c     |   32 ++--
- arch/arm/kernel/perf_event_v7.c     |  401 +++++++++++++----------------------
- arch/arm/kernel/perf_event_xscale.c |   16 +-
- 7 files changed, 379 insertions(+), 286 deletions(-)
- create mode 100644 arch/arm/include/asm/cti.h
+Thanks,
+Janusz
