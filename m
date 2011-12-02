@@ -1,77 +1,67 @@
-From: kyungmin.park@samsung.com (Kyungmin Park)
-Date: Fri, 2 Dec 2011 18:13:42 +0900
-Subject: [PATCH 1/4] ARM: EXYNOS4: Add DMC1, allow PPMU access for DMC.
-In-Reply-To: <04fb01ccb0d1$016ebdf0$044c39d0$%kim@samsung.com>
-References: <1322730317-8171-1-git-send-email-myungjoo.ham@samsung.com>
- <1322730317-8171-2-git-send-email-myungjoo.ham@samsung.com>
- <04fb01ccb0d1$016ebdf0$044c39d0$%kim@samsung.com>
-Message-ID: <CAH9JG2Vkm7uuUAeUZT179=dTUdi9mWsVDvZzWGn0h_NJLrC+mA@mail.gmail.com>
+From: ming.lei@canonical.com (Ming Lei)
+Date: Fri,  2 Dec 2011 17:12:53 +0800
+Subject: [RFC PATCH v1 2/7] omap4: build fdif omap device from hwmod
+In-Reply-To: <1322817178-8931-1-git-send-email-ming.lei@canonical.com>
+References: <1322817178-8931-1-git-send-email-ming.lei@canonical.com>
+Message-ID: <1322817178-8931-3-git-send-email-ming.lei@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/2/11, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> MyungJoo Ham wrote:
->>
->> - Add DMC1
->> - Enlarge address space for DMC from 4k to 64k so that PPMU registers
->>   may be accessed.
->>
->> Signed-off-by: MyungJoo Ham <myungjoo.ham@samsung.com>
->> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
->> ---
->>  arch/arm/mach-exynos/cpu.c              |    7 ++++++-
->>  arch/arm/mach-exynos/include/mach/map.h |    1 +
->>  2 files changed, 7 insertions(+), 1 deletions(-)
->>
->> diff --git a/arch/arm/mach-exynos/cpu.c b/arch/arm/mach-exynos/cpu.c
->> index 90ec247..8bdcba9 100644
->> --- a/arch/arm/mach-exynos/cpu.c
->> +++ b/arch/arm/mach-exynos/cpu.c
->> @@ -108,7 +108,12 @@ static struct map_desc exynos4_iodesc[] __initdata =
->> {
->>  	}, {
->>  		.virtual	= (unsigned long)S5P_VA_DMC0,
->>  		.pfn		= __phys_to_pfn(EXYNOS4_PA_DMC0),
->> -		.length		= SZ_4K,
->> +		.length		= SZ_64K,
->> +		.type		= MT_DEVICE,
->> +	}, {
->> +		.virtual	= (unsigned long)S5P_VA_DMC1,
->> +		.pfn		= __phys_to_pfn(EXYNOS4_PA_DMC1),
->> +		.length		= SZ_64K,
->>  		.type		= MT_DEVICE,
->>  	}, {
->>  		.virtual	= (unsigned long)S5P_VA_SROMC,
->> diff --git a/arch/arm/mach-exynos/include/mach/map.h b/arch/arm/mach-
->> exynos/include/mach/map.h
->> index 058541d..870a980 100644
->> --- a/arch/arm/mach-exynos/include/mach/map.h
->> +++ b/arch/arm/mach-exynos/include/mach/map.h
->> @@ -57,6 +57,7 @@
->>  #define EXYNOS4_PA_KEYPAD		0x100A0000
->>
->>  #define EXYNOS4_PA_DMC0			0x10400000
->> +#define EXYNOS4_PA_DMC1			0x10410000
->
-> If required, so just '.length = SZ_128K'?...
-Doesn't it more confuse and difficult to use?
+Signed-off-by: Ming Lei <ming.lei@canonical.com>
+---
+ arch/arm/mach-omap2/devices.c |   33 +++++++++++++++++++++++++++++++++
+ 1 files changed, 33 insertions(+), 0 deletions(-)
 
-Even though there's not much definitions. it defines the offset concept.
-"arch/arm/mach-exynos/include/mach/regs-mem.h"
-
-BR,
->
-> Thanks.
->
-> Best regards,
-> Kgene.
-> --
-> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-> SW Solution Development Team, Samsung Electronics Co., Ltd.
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc"
-> in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->
+diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
+index 1166bdc..a392af5 100644
+--- a/arch/arm/mach-omap2/devices.c
++++ b/arch/arm/mach-omap2/devices.c
+@@ -728,6 +728,38 @@ void __init omap242x_init_mmc(struct omap_mmc_platform_data **mmc_data)
+ 
+ #endif
+ 
++static struct platform_device* __init omap4_init_fdif(void)
++{
++	int id = -1;
++	struct platform_device *pd;
++	struct omap_hwmod *oh;
++	const char *dev_name = "fdif";
++
++	oh = omap_hwmod_lookup("fdif");
++	if (!oh) {
++		pr_err("Could not look up fdif hwmod\n");
++		return NULL;
++	}
++
++	pd = omap_device_build(dev_name, id, oh, NULL, 0, NULL, 0, 0);
++	WARN(IS_ERR(pd), "Can't build omap_device for %s.\n",
++				dev_name);
++	return pd;
++}
++
++static void __init omap_init_fdif(void)
++{
++	if (cpu_is_omap44xx()) {
++		struct platform_device *pd;
++
++		pd = omap4_init_fdif();
++		if (!pd)
++			return;
++
++		pm_runtime_enable(&pd->dev);
++	}
++}
++
+ /*-------------------------------------------------------------------------*/
+ 
+ #if defined(CONFIG_HDQ_MASTER_OMAP) || defined(CONFIG_HDQ_MASTER_OMAP_MODULE)
+@@ -808,6 +840,7 @@ static int __init omap2_init_devices(void)
+ 	omap_init_sham();
+ 	omap_init_aes();
+ 	omap_init_vout();
++	omap_init_fdif();
+ 
+ 	return 0;
+ }
+-- 
+1.7.5.4
