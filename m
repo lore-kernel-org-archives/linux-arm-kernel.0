@@ -1,131 +1,68 @@
 From: dave.martin@linaro.org (Dave Martin)
-Date: Fri, 2 Dec 2011 12:44:17 +0000
-Subject: [PATCH] ARM: ftrace: clear zero bit in reported IPs for Thumb-2
-In-Reply-To: <1322762765-22776-1-git-send-email-rabin@rab.in>
-References: <1322762765-22776-1-git-send-email-rabin@rab.in>
-Message-ID: <20111202124417.GA2892@localhost.localdomain>
+Date: Fri, 2 Dec 2011 12:59:32 +0000
+Subject: [PATCH] irqdomain: protect macro variable in domain iterators
+In-Reply-To: <1322833997-32083-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1322833997-32083-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <20111202125932.GB2892@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 01, 2011 at 11:36:05PM +0530, Rabin Vincent wrote:
-> The dynamic ftrace ops startup test currently fails on Thumb-2 kernels:
-> 
->  Testing tracer function: PASSED
->  Testing dynamic ftrace: PASSED
->  Testing dynamic ftrace ops #1: (0 0 0 0 0) FAILED!
-> 
-> This is because while the addresses in the mcount records do not have
-> the zero bit set, the IP reported by the mcount call does have it set
-> (because it is copied from the LR).  This mismatch causes the ops
-> filtering in ftrace_ops_list_func() to not call the relevant tracers.
-> 
-> Fix this by clearing the zero bit while adjusting the LR for the mcount
-> instruction size.  Also, combine the mov+sub into a single sub
-> instruction.
-> 
-> Signed-off-by: Rabin Vincent <rabin@rab.in>
+On Fri, Dec 02, 2011 at 02:53:17PM +0100, Nicolas Ferre wrote:
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 > ---
->  arch/arm/kernel/entry-common.S |   16 ++++++++++------
->  1 files changed, 10 insertions(+), 6 deletions(-)
+> Error found while using those iterators in an irq controller
+> initialization function.
 > 
-> diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
-> index b2a27b6..9d7ce81 100644
-> --- a/arch/arm/kernel/entry-common.S
-> +++ b/arch/arm/kernel/entry-common.S
-> @@ -149,6 +149,12 @@ ENDPROC(ret_from_fork)
->  #endif
->  #endif
+> May also need protection around irq and hwirq macro variables
+> but those values are usually plain "int" anyway... Tell me if you
+> feel that it should be done.
+> 
+>  include/linux/irqdomain.h |    8 ++++----
+>  1 files changed, 4 insertions(+), 4 deletions(-)
+> 
+> diff --git a/include/linux/irqdomain.h b/include/linux/irqdomain.h
+> index 99834e58..a553004 100644
+> --- a/include/linux/irqdomain.h
+> +++ b/include/linux/irqdomain.h
+> @@ -82,12 +82,12 @@ static inline unsigned int irq_domain_to_irq(struct irq_domain *d,
+>  }
 >  
-> +.macro mcount_size_adjust rd, rn
-> +	ARM(	sub	\rd, \rn, #MCOUNT_INSN_SIZE	)
-> +	/* The zero bit is set on Thumb LRs; clear it. */
-> +	THUMB(	sub	\rd, \rn, #MCOUNT_INSN_SIZE + 1	)
-> +.endm
-> +
+>  #define irq_domain_for_each_hwirq(d, hw) \
+> -	for (hw = d->hwirq_base; hw < d->hwirq_base + d->nr_irq; hw++)
+> +	for (hw = (d)->hwirq_base; hw < (d)->hwirq_base + (d)->nr_irq; hw++)
+>  
+>  #define irq_domain_for_each_irq(d, hw, irq) \
+> -	for (hw = d->hwirq_base, irq = irq_domain_to_irq(d, hw); \
+> -	     hw < d->hwirq_base + d->nr_irq; \
+> -	     hw++, irq = irq_domain_to_irq(d, hw))
+> +	for (hw = (d)->hwirq_base, irq = irq_domain_to_irq((d), hw); \
+> +	     hw < (d)->hwirq_base + (d)->nr_irq; \
+> +	     hw++, irq = irq_domain_to_irq((d), hw))
 
-You're conflating two different things here:
-
-1) convert the branch pointer in lr into the corresponding instruction
-address in memory
-
-2) subtract MCOUNT_INSN_SIZE
-
-
-(1) Is an ARM architectural thing and not secific to ftrace in any way,
-so I suggest we make that generic and factor it out.
-
-For example, kprobes.c has:
+I suggest just putting all the brackets in -- if having spotted this
+problem you only half-fix the macros, an opportunity is being missed;
+someone have to come and fix it again later:
 
 
-121:void __kprobes arch_arm_kprobe(struct kprobe *p)
-122:{
-123:	uintptr_t addr = (uintptr_t)p->addr & ~1; /* Remove any Thumb flag */
+#define irq_domain_for_each_hwirq(d, hw) \
+	for ((hw) = (d)->hwirq_base; (hw) < (d)->hwirq_base + (d)->nr_irq; (hw)++)
 
-166:int __kprobes __arch_disarm_kprobe(void *p)
-167:{
-[...]
-169-#ifdef CONFIG_THUMB2_KERNEL
-170:	u16 *addr = (u16 *)((uintptr_t)kp->addr & ~1);
+#define irq_domain_for_each_irq(d, hw, irq) \
+	for ((hw) = (d)->hwirq_base, (irq) = irq_domain_to_irq(d, hw); \
+	     (hw) < (d)->hwirq_base + (d)->nr_irq; \
+	     (hw)++, (irq) = irq_domain_to_irq(d, hw))
 
 
-Whether is makes sense to make that all generic for assembler or not,
-you can avoid the conditionality by writing:
+If you feel happier though, you can harmlessly add the extra brackets round
+the arguments to irq_domain_to_irq(), without changing the behaviour.
+Arguably the "always add brackets" rule is simpler to understand.
 
-.macro mcount_size_adjust rd, rn
-	bic	\rd , \rn , #1			@ clear the Thumb bit if present
-	sub	\rd , \rd , #MCOUNT_INSN_SIZE
-.endm
-
-This adjustment will be correct regardless of the instruction set.
-
-
-Otherwise, this looks sensible.
+In fact, where a macro argument is not part of a larger expression, or is an
+operand to a comma-expression, there's no need for extra brackets -- all
+possible operators parse at higher priority than commas.  A macro argument
+which itself is a comma-expression whould have to be explicitly bracketed
+in the macro invocation anyway, so there is no extra risk of the macro
+expansion being parsed in an unexpected way in that case.
 
 Cheers
 ---Dave
-
->  .macro __mcount suffix
->  	mcount_enter
->  	ldr	r0, =ftrace_trace_function
-> @@ -173,8 +179,7 @@ ENDPROC(ret_from_fork)
->  	mcount_exit
->  
->  1: 	mcount_get_lr	r1			@ lr of instrumented func
-> -	mov	r0, lr				@ instrumented function
-> -	sub	r0, r0, #MCOUNT_INSN_SIZE
-> +	mcount_size_adjust r0, lr		@ instrumented function
->  	adr	lr, BSYM(2f)
->  	mov	pc, r2
->  2:	mcount_exit
-> @@ -184,8 +189,7 @@ ENDPROC(ret_from_fork)
->  	mcount_enter
->  
->  	mcount_get_lr	r1			@ lr of instrumented func
-> -	mov	r0, lr				@ instrumented function
-> -	sub	r0, r0, #MCOUNT_INSN_SIZE
-> +	mcount_size_adjust	r0, lr		@ instrumented function
->  
->  	.globl ftrace_call\suffix
->  ftrace_call\suffix:
-> @@ -205,11 +209,11 @@ ftrace_graph_call\suffix:
->  #ifdef CONFIG_DYNAMIC_FTRACE
->  	@ called from __ftrace_caller, saved in mcount_enter
->  	ldr	r1, [sp, #16]		@ instrumented routine (func)
-> +	mcount_size_adjust r1, r1
->  #else
->  	@ called from __mcount, untouched in lr
-> -	mov	r1, lr			@ instrumented routine (func)
-> +	mcount_size_adjust r1, lr	@ instrumented routine (func)
->  #endif
-> -	sub	r1, r1, #MCOUNT_INSN_SIZE
->  	mov	r2, fp			@ frame pointer
->  	bl	prepare_ftrace_return
->  	mcount_exit
-> -- 
-> 1.7.7.3
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
