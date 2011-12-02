@@ -1,40 +1,42 @@
-From: richard.zhao@linaro.org (Richard Zhao)
-Date: Fri, 2 Dec 2011 19:40:35 +0800
-Subject: [PATCH V4 00/14] add clk_prepare/clk_unprepare to imx drivers
-In-Reply-To: <20111202110713.GG8684@b20223-02.ap.freescale.net>
-References: <1321339689-25256-1-git-send-email-richard.zhao@linaro.org>
- <20111117012210.GA23392@b20223-02.ap.freescale.net>
- <20111202110713.GG8684@b20223-02.ap.freescale.net>
-Message-ID: <20111202114034.GH8684@b20223-02.ap.freescale.net>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri,  2 Dec 2011 14:53:17 +0100
+Subject: [PATCH] irqdomain: protect macro variable in domain iterators
+Message-ID: <1322833997-32083-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 02, 2011 at 07:07:14PM +0800, Richard Zhao wrote:
-> Is there any body merged this patch series?
-Thanks, Sascha! Just found it's in your imx-features branch.
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+Error found while using those iterators in an irq controller
+initialization function.
 
-Richard
-> 
-> Thanks
-> Richard
-> On Thu, Nov 17, 2011 at 09:22:11AM +0800, Richard Zhao wrote:
-> > Hi Sascha,
-> > 
-> > Would you merge this patch series?
-> > 
-> > Thanks
-> > Richard 
-> > 
-> > 
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> > 
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+May also need protection around irq and hwirq macro variables
+but those values are usually plain "int" anyway... Tell me if you
+feel that it should be done.
+
+ include/linux/irqdomain.h |    8 ++++----
+ 1 files changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/include/linux/irqdomain.h b/include/linux/irqdomain.h
+index 99834e58..a553004 100644
+--- a/include/linux/irqdomain.h
++++ b/include/linux/irqdomain.h
+@@ -82,12 +82,12 @@ static inline unsigned int irq_domain_to_irq(struct irq_domain *d,
+ }
+ 
+ #define irq_domain_for_each_hwirq(d, hw) \
+-	for (hw = d->hwirq_base; hw < d->hwirq_base + d->nr_irq; hw++)
++	for (hw = (d)->hwirq_base; hw < (d)->hwirq_base + (d)->nr_irq; hw++)
+ 
+ #define irq_domain_for_each_irq(d, hw, irq) \
+-	for (hw = d->hwirq_base, irq = irq_domain_to_irq(d, hw); \
+-	     hw < d->hwirq_base + d->nr_irq; \
+-	     hw++, irq = irq_domain_to_irq(d, hw))
++	for (hw = (d)->hwirq_base, irq = irq_domain_to_irq((d), hw); \
++	     hw < (d)->hwirq_base + (d)->nr_irq; \
++	     hw++, irq = irq_domain_to_irq((d), hw))
+ 
+ extern void irq_domain_add(struct irq_domain *domain);
+ extern void irq_domain_del(struct irq_domain *domain);
+-- 
+1.7.5.4
