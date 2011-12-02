@@ -1,32 +1,28 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 2 Dec 2011 22:25:55 +0000
-Subject: [PATCH] ARM: S3C64XX: Define some additional always off clocks
-In-Reply-To: <1908355.tlHtlhx9rP@flatron>
-References: <1322841468-28431-1-git-send-email-broonie@opensource.wolfsonmicro.com>
- <3544285.l9RTi8aUql@flatron>
- <20111202211314.GC15268@opensource.wolfsonmicro.com>
- <1908355.tlHtlhx9rP@flatron>
-Message-ID: <20111202222555.GA4986@opensource.wolfsonmicro.com>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Fri, 2 Dec 2011 23:36:19 +0100
+Subject: [PATCH 2/3] ARM: mach-shmobile: Use common always on power domain
+ governor
+In-Reply-To: <20111202003333.GC31903@opensource.wolfsonmicro.com>
+References: <1322765339-29879-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+ <201112012137.08119.rjw@sisk.pl>
+ <20111202003333.GC31903@opensource.wolfsonmicro.com>
+Message-ID: <201112022336.19993.rjw@sisk.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 02, 2011 at 10:31:26PM +0100, Tomasz Figa wrote:
+On Friday, December 02, 2011, Mark Brown wrote:
+> On Thu, Dec 01, 2011 at 09:37:07PM +0100, Rafael J. Wysocki wrote:
+> > On Thursday, December 01, 2011, Mark Brown wrote:
+> > > Saves a tiny amount of code.
+> 
+> > How so?
+> 
+> It saves source code size when we get the second user, by itself you're
+> right it doesn't achieve anything (except avoiding redundancy once 1/3
+> gets applied I guess).
 
-> OK, I will start adding sign offs from now on. I'm not experienced in 
-> submitting patches to mainline and I didn't know about importance of them.
+But the patch removed useful code without adding any replacements, as far
+as I could see it.
 
-Yeah, basically Signed-off-by is a purely legal thing - it means that
-you're saying that you know where the code came from and that there's no
-legal issue submitting it (see the full text in SubmittingPatches before
-you start doing this!) so if someone else takes your work they should
-keep your signoff.
-
-> I have much more things that I should have submitted already long time ago, 
-> it's a shame that I can't find time to do that. The whole tree is dedicated to 
-> features and fixes needed to run Linux on mobile devices with S3C6410 (Samsung 
-> Galaxy Spica GT-i5700 in particular), but I work on it in my free time, which 
-> usually is pretty limited.
-
-Hopefully other people can help you out there - it's great having the
-code at all.  I know I saw a few things that might be interesting for my
-systems.
+Thanks,
+Rafael
