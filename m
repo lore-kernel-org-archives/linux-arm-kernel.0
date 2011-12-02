@@ -1,60 +1,44 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Fri, 2 Dec 2011 17:28:54 +0000
-Subject: [PATCH] net/macb: add DT support
-In-Reply-To: <1322846050-4543-1-git-send-email-nicolas.ferre@atmel.com>
-References: <20111202153832.GA4998@totoro>
- <1322846050-4543-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <20111202172854.GB4998@totoro>
+From: khilman@ti.com (Kevin Hilman)
+Date: Fri, 02 Dec 2011 09:33:34 -0800
+Subject: [PATCH-V4 0/3] Introducing TI's New SoC/board AM335XEVM
+In-Reply-To: <C8443D0743D26F4388EA172BF4E2A7A902847B@DBDE01.ent.ti.com> (Afzal
+ Mohammed's message of "Fri, 2 Dec 2011 04:36:02 +0000")
+References: <1320946837-32507-1-git-send-email-hvaibhav@ti.com>
+ <878vmxxjrv.fsf@ti.com>
+ <79CD15C6BA57404B839C016229A409A80474FD@DBDE01.ent.ti.com>
+ <878vmws4z8.fsf@ti.com>
+ <C8443D0743D26F4388EA172BF4E2A7A902847B@DBDE01.ent.ti.com>
+Message-ID: <87aa7akhe9.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nicolas,
+"Mohammed, Afzal" <afzal@ti.com> writes:
 
-On Fri, Dec 02, 2011 at 06:14:10PM +0100, Nicolas Ferre wrote:
-> From: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> 
-> Allow the device tree to provide the mac address and the phy mode.
-> 
-> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> [nicolas.ferre at atmel.com: change "compatible" node property, doc and DT hwaddr]
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> Cc: Jamie Iles <jamie@jamieiles.com>
+> Hi Kevin,
+>
+> On Thu, Dec 01, 2011 at 20:40:03, Hilman, Kevin wrote:
+>> "Hiremath, Vaibhav" <hvaibhav@ti.com> writes:
+> :
+>> > We can detect the board using on-board EEPROM, so same mach-id
+>> > should work for both EVM and Beagle. 
+>> 
+>> > And also going forward with device tree approach we may
+>> > not need different id's, right?
+>> 
+>> Right, which is why I'm wondering why are there sevral new AM33x
+>> mach-types when only one of them is being used:
+>> 
+>> 3684    TI AM335X IA EVM        am335xiaevm     Afzal Mohammed
+>> 3589    TI AM335X EVM           am335xevm       Vaibhav Bedia
+>> 3808    Beaglebone Board        beaglebone      Steven Kipisz
+>> 
+>> Russell has been trying to cleanup athe mach-types, so if these others
+>> are not going to be used, I suggest they be deleted.
+>
+> "3684-TI AM335X IA EVM" is required as IA EVM uses a different UART,
+> because of which early prints can't be captured, problem mentioned
+> in http://marc.info/?l=linux-omap&m=131286938723617&w=2
 
-Looks nice to me.  There's a patch below to add the GEM stuff to the 
-binding too if you want to role that in.
+This problem will be solved by using the device tree.
 
-Acked-by: Jamie Iles <jamie@jamieiles.com>
-
-8<----
-
-diff --git a/Documentation/devicetree/bindings/net/macb.txt b/Documentation/devicetree/bindings/net/macb.txt
-index 7f0b90a..e09e3fb 100644
---- a/Documentation/devicetree/bindings/net/macb.txt
-+++ b/Documentation/devicetree/bindings/net/macb.txt
-@@ -1,9 +1,11 @@
--* Cadence MACB Ethernet controller
-+* Cadence MACB/GEM Ethernet controller
- 
- Required properties:
--- compatible: Should be "cdns,[<chip>-]macb"
-+- compatible: Should be "cdns,[<chip>-]{macb,gem}"
-   Use "cdns,at91sam9260-macb" Atmel at91sam9260 and at91sam9263 SoCs.
-   Use "cdns,at32ap7000-macb" for other 10/100 usage or use the generic form: "cdns,macb"
-+  Use "cnds,pc302-gem" for Picochip picoXcell pc302 and later devices based on
-+  the Cadence GEM, or the generic form "cdns,gem".
- - reg: Address and length of the register set for the device
- - interrupts: Should contain macb interrupt
- - phy-mode: String, operation mode of the PHY interface.
-diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
-index 103c6e6..89060e6 100644
---- a/drivers/net/ethernet/cadence/macb.c
-+++ b/drivers/net/ethernet/cadence/macb.c
-@@ -1247,6 +1247,8 @@ static const struct of_device_id macb_dt_ids[] = {
- 	{ .compatible = "cdns,at32ap7000-macb" },
- 	{ .compatible = "cdns,at91sam9260-macb" },
- 	{ .compatible = "cdns,macb" },
-+	{ .compatible = "cdns,pc302-gem" },
-+	{ .compatible = "cdns,gem" },
- 	{ /* sentinel */ }
- };
- 
+Kevin
