@@ -1,191 +1,74 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri,  2 Dec 2011 18:43:02 +0100
-Subject: [PATCH v2] net/macb: add DT support
-In-Reply-To: <1322846050-4543-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1322846050-4543-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <1322847782-22650-1-git-send-email-nicolas.ferre@atmel.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Fri, 02 Dec 2011 09:45:17 -0800
+Subject: [GIT PULL] cpufreq: OMAP: move to drivers/cpufreq and updates for
+ v3.3
+In-Reply-To: <871ut5w2js.fsf@ti.com> (Kevin Hilman's message of "Fri, 18 Nov
+ 2011 13:20:23 -0800")
+References: <871ut5w2js.fsf@ti.com>
+Message-ID: <87ty5ij2aa.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Dave,
 
-Allow the device tree to provide the mac address and the phy mode.
+Kevin Hilman <khilman@ti.com> writes:
 
-Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-[nicolas.ferre at atmel.com: change "compatible" node property, doc and DT hwaddr]
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-Cc: Jamie Iles <jamie@jamieiles.com>
----
-v2: modify macb_get_hwaddr_dt() parameter
+> Hi Dave,
+>
+> Here's the updated pull request after a rebase onto v3.2-rc1 and some
+> fixes to address other changes that went into v3.2.
+>
+> This is targetted for v3.3, so I'd like to get it into your tree and
+> into linux-next.
 
- Documentation/devicetree/bindings/net/macb.txt |   22 +++++++
- drivers/net/ethernet/cadence/macb.c            |   71 +++++++++++++++++++++---
- drivers/net/ethernet/cadence/macb.h            |    2 +
- 3 files changed, 87 insertions(+), 8 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/net/macb.txt
+Are there any problems with this series or pull request?  
 
-diff --git a/Documentation/devicetree/bindings/net/macb.txt b/Documentation/devicetree/bindings/net/macb.txt
-new file mode 100644
-index 0000000..7f0b90a
---- /dev/null
-+++ b/Documentation/devicetree/bindings/net/macb.txt
-@@ -0,0 +1,22 @@
-+* Cadence MACB Ethernet controller
-+
-+Required properties:
-+- compatible: Should be "cdns,[<chip>-]macb"
-+  Use "cdns,at91sam9260-macb" Atmel at91sam9260 and at91sam9263 SoCs.
-+  Use "cdns,at32ap7000-macb" for other 10/100 usage or use the generic form: "cdns,macb"
-+- reg: Address and length of the register set for the device
-+- interrupts: Should contain macb interrupt
-+- phy-mode: String, operation mode of the PHY interface.
-+  Supported values are: "mii", "rmii", "gmii", "rgmii".
-+
-+Optional properties:
-+- local-mac-address: 6 bytes, mac address
-+
-+Examples:
-+
-+	macb0: ethernet at fffc4000 {
-+		compatible = "cdns,at32ap7000-macb";
-+		reg = <0xfffc4000 0x4000>;
-+		interrupts = <21>;
-+		phy-mode = "rmii";
-+	};
-diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
-index 64d6146..5e75855 100644
---- a/drivers/net/ethernet/cadence/macb.c
-+++ b/drivers/net/ethernet/cadence/macb.c
-@@ -23,6 +23,8 @@
- #include <linux/platform_data/macb.h>
- #include <linux/platform_device.h>
- #include <linux/phy.h>
-+#include <linux/of_device.h>
-+#include <linux/of_net.h>
- 
- #include "macb.h"
- 
-@@ -191,7 +193,6 @@ static int macb_mii_probe(struct net_device *dev)
- {
- 	struct macb *bp = netdev_priv(dev);
- 	struct phy_device *phydev;
--	struct macb_platform_data *pdata;
- 	int ret;
- 
- 	phydev = phy_find_first(bp->mii_bus);
-@@ -200,14 +201,11 @@ static int macb_mii_probe(struct net_device *dev)
- 		return -1;
- 	}
- 
--	pdata = bp->pdev->dev.platform_data;
- 	/* TODO : add pin_irq */
- 
- 	/* attach the mac to the phy */
- 	ret = phy_connect_direct(dev, phydev, &macb_handle_link_change, 0,
--				 pdata && pdata->is_rmii ?
--				 PHY_INTERFACE_MODE_RMII :
--				 PHY_INTERFACE_MODE_MII);
-+				 bp->phy_interface);
- 	if (ret) {
- 		netdev_err(dev, "Could not attach to PHY\n");
- 		return ret;
-@@ -1244,6 +1242,50 @@ static const struct net_device_ops macb_netdev_ops = {
- #endif
- };
- 
-+#if defined(CONFIG_OF)
-+static const struct of_device_id macb_dt_ids[] = {
-+	{ .compatible = "cdns,at32ap7000-macb" },
-+	{ .compatible = "cdns,at91sam9260-macb" },
-+	{ .compatible = "cdns,macb" },
-+	{ /* sentinel */ }
-+};
-+
-+MODULE_DEVICE_TABLE(of, macb_dt_ids);
-+
-+static int __devinit macb_get_phy_mode_dt(struct platform_device *pdev)
-+{
-+	struct device_node *np = pdev->dev.of_node;
-+
-+	if (np)
-+		return of_get_phy_mode(np);
-+
-+	return -ENODEV;
-+}
-+
-+static int __devinit macb_get_hwaddr_dt(struct macb *bp)
-+{
-+	struct device_node *np = bp->pdev->dev.of_node;
-+	if (np) {
-+		const char *mac = of_get_mac_address(np);
-+		if (mac) {
-+			memcpy(bp->dev->dev_addr, mac, ETH_ALEN);
-+			return 0;
-+		}
-+	}
-+
-+	return -ENODEV;
-+}
-+#else
-+static int __devinit macb_get_phy_mode_dt(struct platform_device *pdev)
-+{
-+	return -ENODEV;
-+}
-+static int __devinit macb_get_hwaddr_dt(struct macb *bp)
-+{
-+	return -ENODEV;
-+}
-+#endif
-+
- static int __init macb_probe(struct platform_device *pdev)
- {
- 	struct macb_platform_data *pdata;
-@@ -1318,10 +1360,22 @@ static int __init macb_probe(struct platform_device *pdev)
- 	config |= macb_dbw(bp);
- 	macb_writel(bp, NCFGR, config);
- 
--	macb_get_hwaddr(bp);
--	pdata = pdev->dev.platform_data;
-+	err = macb_get_hwaddr_dt(bp);
-+	if (err < 0)
-+		macb_get_hwaddr(bp);
-+
-+	err = macb_get_phy_mode_dt(pdev);
-+	if (err < 0) {
-+		pdata = pdev->dev.platform_data;
-+		if (pdata && pdata->is_rmii)
-+			bp->phy_interface = PHY_INTERFACE_MODE_RMII;
-+		else
-+			bp->phy_interface = PHY_INTERFACE_MODE_MII;
-+	} else {
-+		bp->phy_interface = err;
-+	}
- 
--	if (pdata && pdata->is_rmii)
-+	if (bp->phy_interface == PHY_INTERFACE_MODE_RMII)
- #if defined(CONFIG_ARCH_AT91)
- 		macb_or_gem_writel(bp, USRIO, (MACB_BIT(RMII) |
- 					       MACB_BIT(CLKEN)));
-@@ -1444,6 +1498,7 @@ static struct platform_driver macb_driver = {
- 	.driver		= {
- 		.name		= "macb",
- 		.owner	= THIS_MODULE,
-+		.of_match_table	= of_match_ptr(macb_dt_ids),
- 	},
- };
- 
-diff --git a/drivers/net/ethernet/cadence/macb.h b/drivers/net/ethernet/cadence/macb.h
-index 1931078..335e288 100644
---- a/drivers/net/ethernet/cadence/macb.h
-+++ b/drivers/net/ethernet/cadence/macb.h
-@@ -532,6 +532,8 @@ struct macb {
- 	unsigned int 		link;
- 	unsigned int 		speed;
- 	unsigned int 		duplex;
-+
-+	phy_interface_t		phy_interface;
- };
- 
- static inline bool macb_is_gem(struct macb *bp)
--- 
-1.7.5.4
+Kevin
+
+> Also, let me know if you want a MAINTAINERS entry for this file, as I'm
+> happy to maintain it.
+>
+> Kevin
+>
+>
+> The following changes since commit 1ea6b8f48918282bdca0b32a34095504ee65bab5:
+>
+>   Linux 3.2-rc1 (2011-11-07 16:16:02 -0800)
+>
+> are available in the git repository at:
+>   git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git for_3.3/omap-cpufreq
+>
+> Colin Cross (1):
+>       cpufreq: OMAP: notify even with bad boot frequency
+>
+> Kevin Hilman (1):
+>       cpufreq: OMAP: fixup for omap_device changes, include <linux/module.h>
+>
+> Nishanth Menon (6):
+>       cpufreq: OMAP: move clk name decision to init
+>       cpufreq: OMAP: deny initialization if no mpudev
+>       cpufreq: OMAP: dont support !freq_table
+>       cpufreq: OMAP: only supports OPP library
+>       cpufreq: OMAP: put clk if cpu_init failed
+>       cpufreq: OMAP: fix freq_table leak
+>
+> Russell King (1):
+>       cpufreq: OMAP: Add SMP support for OMAP4+
+>
+> Santosh Shilimkar (1):
+>       cpufreq: OMAP: cleanup for multi-SoC support, move into drivers/cpufreq
+>
+> Todd Poynor (1):
+>       cpufreq: OMAP: Enable all CPUs in shared policy mask
+>
+>  arch/arm/plat-omap/Makefile    |    1 -
+>  arch/arm/plat-omap/cpu-omap.c  |  171 -------------------------
+>  drivers/cpufreq/Makefile       |    1 +
+>  drivers/cpufreq/omap-cpufreq.c |  274 ++++++++++++++++++++++++++++++++++++++++
+>  4 files changed, 275 insertions(+), 172 deletions(-)
+>  delete mode 100644 arch/arm/plat-omap/cpu-omap.c
+>  create mode 100644 drivers/cpufreq/omap-cpufreq.c
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
