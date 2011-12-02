@@ -1,35 +1,41 @@
 From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Sat, 03 Dec 2011 10:09:44 +1100
-Subject: [RFC] virtio: use mandatory barriers for remote processor vdevs
-In-Reply-To: <1322569886-13055-1-git-send-email-ohad@wizery.com>
-References: <1322569886-13055-1-git-send-email-ohad@wizery.com>
-Message-ID: <1322867384.11728.20.camel@pasglop>
+Date: Sat, 03 Dec 2011 10:12:53 +1100
+Subject: [PATCH] ata: Don't use NO_IRQ in pata_of_platform driver
+In-Reply-To: <CA+55aFwekNWz+V4440f=2iu_BfOxSg0NjVogv4cZZDFbJBNoAQ@mail.gmail.com>
+References: <20111110162859.GA7088@oksana.dev.rtsoft.ru>
+ <20111202192618.GC3037@localhost.localdomain>
+ <CA+55aFwekNWz+V4440f=2iu_BfOxSg0NjVogv4cZZDFbJBNoAQ@mail.gmail.com>
+Message-ID: <1322867573.11728.22.camel@pasglop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2011-11-29 at 14:31 +0200, Ohad Ben-Cohen wrote:
-> Virtio is using memory barriers to control the ordering of
-> references to the vrings on SMP systems. When the guest is compiled
-> with SMP support, virtio is only using SMP barriers in order to
-> avoid incurring the overhead involved with mandatory barriers.
+On Fri, 2011-12-02 at 11:28 -0800, Linus Torvalds wrote:
+> On Fri, Dec 2, 2011 at 11:26 AM, Dave Martin <dave.martin@linaro.org> wrote:
+> >
+> > This is now broken on ARM where, for good or bad, NO_IRQ currently is
+> > used and is -1.
+> >
+> > How do we resolve it?  If we are ready to eliminate NO_IRQ from
+> > drivers/of/irq.c (or indeed, all code that uses it) and just use 0 for
+> > that case, we should surely just do it... but I'm not confident I can
+> > judge on that.
 > 
-> Lately, though, virtio is being increasingly used with inter-processor
-> communication scenarios too, which involve running two (separate)
-> instances of operating systems on two (separate) processors, each of
-> which might either be UP or SMP.
+> Just stop using NO_IRQ. First in drivers/of/irq.c, then in any drivers
+> as you notice breakage.
+
+Agreed. In fact the whole hack in drivers/of/irq.c was to accomodate ARM
+which still uses -1, powerpc changed to 0 a long time ago.
+
+Now that we have a generic remapper between HW and "linux" IRQ numbers,
+there is no reason to stick to -1 even on ARM.
+
+> Don't *change* NO_IRQ to zero (that whole #define is broken - leave it
+> around as a marker of brokenness), just start removing it from all the
+> ARM drivers that use the OF infrastructure. Which is presumably not
+> all that many yet.
 > 
-> To control the ordering of memory references when the vrings are shared
-> between two external processors, we must always use mandatory barriers.
-> 
-> A trivial, albeit sub-optimal, solution would be to simply revert
-> commit d57ed95 "virtio: use smp_XX barriers on SMP". Obviously, though,
-> that's going to have a negative impact on performance of SMP-based
-> virtualization use cases.
+> So whenever you find breakage, the fix now is to just remove NO_IRQ
+> tests, and replace them with "!irq".
 
-Have you measured the impact of using normal barriers (non-SMP ones)
-like we use on normal HW drivers unconditionally ?
-
-IE. If the difference is small enough I'd say just go for it and avoid
-the bloat.
-
+Cheers,
 Ben.
