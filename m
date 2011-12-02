@@ -1,47 +1,35 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Sat, 3 Dec 2011 00:03:19 +0100
-Subject: [PATCH v3 4/5] ARM: vexpress: Initial RS1 memory map support
-In-Reply-To: <alpine.LFD.2.02.1112021739420.2357@xanadu.home>
-References: <1322579473-8804-1-git-send-email-pawel.moll@arm.com>
- <74CDBE0F657A3D45AFBB94109FB122FF174FDB0539@HQMAIL01.nvidia.com>
- <alpine.LFD.2.02.1112021739420.2357@xanadu.home>
-Message-ID: <201112030003.20003.marek.vasut@gmail.com>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Sat, 03 Dec 2011 10:09:44 +1100
+Subject: [RFC] virtio: use mandatory barriers for remote processor vdevs
+In-Reply-To: <1322569886-13055-1-git-send-email-ohad@wizery.com>
+References: <1322569886-13055-1-git-send-email-ohad@wizery.com>
+Message-ID: <1322867384.11728.20.camel@pasglop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On Fri, 2 Dec 2011, Stephen Warren wrote:
-> > For the record, the changes are now in U-Boot master:
-> > 
-> > d510859 image: Don't detect XIP images as overlapping.
-> > b9b50e8 image: Implement IH_TYPE_KERNEL_NOLOAD
+On Tue, 2011-11-29 at 14:31 +0200, Ohad Ben-Cohen wrote:
+> Virtio is using memory barriers to control the ordering of
+> references to the vrings on SMP systems. When the guest is compiled
+> with SMP support, virtio is only using SMP barriers in order to
+> avoid incurring the overhead involved with mandatory barriers.
 > 
-> Yay!  Thank you Stephen for driving this to a successful resolution.
+> Lately, though, virtio is being increasingly used with inter-processor
+> communication scenarios too, which involve running two (separate)
+> instances of operating systems on two (separate) processors, each of
+> which might either be UP or SMP.
 > 
-> Of course, boards won't be updated to the latest u-boot right away
-
-Though we should demand it on the new boards at least.
-
-> , nor
-> will the enhanced mkimage tool be commonly available.
-
-Why not, just tell people to use up-to-date tools, otherwise you can't support 
-them. It's really easy.
-
+> To control the ordering of memory references when the vrings are shared
+> between two external processors, we must always use mandatory barriers.
 > 
-> > I should also note that Marek Vasut posted some patches to implement a
-> > bootz command in U-Boot. This turned out to be much less invasive than
-> > I originally thought, so once those patches are finalized, uImage might
-> > be irrelevant except for initrds (U-Boot already accepts a raw FDT
-> > without uImage wrapping for bootm and hence bootz).
-> > 
-> > http://www.mail-archive.com/u-boot at lists.denx.de/msg69287.html
-> 
-> Excellent!
-> 
-Nico, please see my other mail. This is really going to 2012.03 release 
-earliest. 2011.12 release is definitelly missed, sorry.
+> A trivial, albeit sub-optimal, solution would be to simply revert
+> commit d57ed95 "virtio: use smp_XX barriers on SMP". Obviously, though,
+> that's going to have a negative impact on performance of SMP-based
+> virtualization use cases.
 
-> 
-> Nicolas
+Have you measured the impact of using normal barriers (non-SMP ones)
+like we use on normal HW drivers unconditionally ?
 
-M
+IE. If the difference is small enough I'd say just go for it and avoid
+the bloat.
+
+Ben.
