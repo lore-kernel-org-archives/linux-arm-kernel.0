@@ -1,42 +1,41 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri,  2 Dec 2011 14:53:17 +0100
-Subject: [PATCH] irqdomain: protect macro variable in domain iterators
-Message-ID: <1322833997-32083-1-git-send-email-nicolas.ferre@atmel.com>
+From: sshtylyov@ru.mvista.com (Sergei Shtylyov)
+Date: Fri, 02 Dec 2011 16:10:17 +0400
+Subject: [RFC PATCH v1 2/7] omap4: build fdif omap device from hwmod
+In-Reply-To: <1322817178-8931-3-git-send-email-ming.lei@canonical.com>
+References: <1322817178-8931-1-git-send-email-ming.lei@canonical.com>
+ <1322817178-8931-3-git-send-email-ming.lei@canonical.com>
+Message-ID: <4ED8C029.7000004@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
-Error found while using those iterators in an irq controller
-initialization function.
+Hello.
 
-May also need protection around irq and hwirq macro variables
-but those values are usually plain "int" anyway... Tell me if you
-feel that it should be done.
+On 02-12-2011 13:12, Ming Lei wrote:
 
- include/linux/irqdomain.h |    8 ++++----
- 1 files changed, 4 insertions(+), 4 deletions(-)
+> Signed-off-by: Ming Lei<ming.lei@canonical.com>
+> ---
+>   arch/arm/mach-omap2/devices.c |   33 +++++++++++++++++++++++++++++++++
+>   1 files changed, 33 insertions(+), 0 deletions(-)
 
-diff --git a/include/linux/irqdomain.h b/include/linux/irqdomain.h
-index 99834e58..a553004 100644
---- a/include/linux/irqdomain.h
-+++ b/include/linux/irqdomain.h
-@@ -82,12 +82,12 @@ static inline unsigned int irq_domain_to_irq(struct irq_domain *d,
- }
- 
- #define irq_domain_for_each_hwirq(d, hw) \
--	for (hw = d->hwirq_base; hw < d->hwirq_base + d->nr_irq; hw++)
-+	for (hw = (d)->hwirq_base; hw < (d)->hwirq_base + (d)->nr_irq; hw++)
- 
- #define irq_domain_for_each_irq(d, hw, irq) \
--	for (hw = d->hwirq_base, irq = irq_domain_to_irq(d, hw); \
--	     hw < d->hwirq_base + d->nr_irq; \
--	     hw++, irq = irq_domain_to_irq(d, hw))
-+	for (hw = (d)->hwirq_base, irq = irq_domain_to_irq((d), hw); \
-+	     hw < (d)->hwirq_base + (d)->nr_irq; \
-+	     hw++, irq = irq_domain_to_irq((d), hw))
- 
- extern void irq_domain_add(struct irq_domain *domain);
- extern void irq_domain_del(struct irq_domain *domain);
--- 
-1.7.5.4
+> diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
+> index 1166bdc..a392af5 100644
+> --- a/arch/arm/mach-omap2/devices.c
+> +++ b/arch/arm/mach-omap2/devices.c
+> @@ -728,6 +728,38 @@ void __init omap242x_init_mmc(struct omap_mmc_platform_data **mmc_data)
+>
+>   #endif
+>
+> +static struct platform_device* __init omap4_init_fdif(void)
+
+    Shouldn't there be space before *? checkpatch.pl is silent about it?
+ALso, I'd have placed '__init' after 'static'...
+
+> +{
+> +	int id = -1;
+> +	struct platform_device *pd;
+> +	struct omap_hwmod *oh;
+> +	const char *dev_name = "fdif";
+
+    Why you need this variable at all?
+
+WBR, Sergei
