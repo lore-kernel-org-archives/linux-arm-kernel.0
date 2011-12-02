@@ -1,28 +1,44 @@
-From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Fri, 2 Dec 2011 23:36:19 +0100
-Subject: [PATCH 2/3] ARM: mach-shmobile: Use common always on power domain
- governor
-In-Reply-To: <20111202003333.GC31903@opensource.wolfsonmicro.com>
-References: <1322765339-29879-1-git-send-email-broonie@opensource.wolfsonmicro.com>
- <201112012137.08119.rjw@sisk.pl>
- <20111202003333.GC31903@opensource.wolfsonmicro.com>
-Message-ID: <201112022336.19993.rjw@sisk.pl>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Fri, 2 Dec 2011 17:52:51 -0500 (EST)
+Subject: [PATCH v3 4/5] ARM: vexpress: Initial RS1 memory map support
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF174FDB0539@HQMAIL01.nvidia.com>
+References: <1322579473-8804-1-git-send-email-pawel.moll@arm.com>
+ <1322579473-8804-5-git-send-email-pawel.moll@arm.com>
+ <20111130153749.GE2045@localhost.localdomain>
+ <1322673302.3180.25.camel@hornet.cambridge.arm.com>
+ <20111130175410.GJ2045@localhost.localdomain>
+ <alpine.LFD.2.02.1111301522340.2357@xanadu.home>
+ <20111130204805.GA5698@sirena.org.uk>
+ <alpine.LFD.2.02.1111301604230.2357@xanadu.home>
+ <20111201111049.GB2915@opensource.wolfsonmicro.com>
+ <20111201121403.GC2026@localhost.localdomain>
+ <74CDBE0F657A3D45AFBB94109FB122FF174FDB01C6@HQMAIL01.nvidia.com>
+ <74CDBE0F657A3D45AFBB94109FB122FF174FDB0539@HQMAIL01.nvidia.com>
+Message-ID: <alpine.LFD.2.02.1112021739420.2357@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, December 02, 2011, Mark Brown wrote:
-> On Thu, Dec 01, 2011 at 09:37:07PM +0100, Rafael J. Wysocki wrote:
-> > On Thursday, December 01, 2011, Mark Brown wrote:
-> > > Saves a tiny amount of code.
-> 
-> > How so?
-> 
-> It saves source code size when we get the second user, by itself you're
-> right it doesn't achieve anything (except avoiding redundancy once 1/3
-> gets applied I guess).
+On Fri, 2 Dec 2011, Stephen Warren wrote:
 
-But the patch removed useful code without adding any replacements, as far
-as I could see it.
+> For the record, the changes are now in U-Boot master:
+> 
+> d510859 image: Don't detect XIP images as overlapping.
+> b9b50e8 image: Implement IH_TYPE_KERNEL_NOLOAD
 
-Thanks,
-Rafael
+Yay!  Thank you Stephen for driving this to a successful resolution.
+
+Of course, boards won't be updated to the latest u-boot right away, nor 
+will the enhanced mkimage tool be commonly available.
+
+> I should also note that Marek Vasut posted some patches to implement a
+> bootz command in U-Boot. This turned out to be much less invasive than
+> I originally thought, so once those patches are finalized, uImage might
+> be irrelevant except for initrds (U-Boot already accepts a raw FDT
+> without uImage wrapping for bootm and hence bootz).
+> 
+> http://www.mail-archive.com/u-boot at lists.denx.de/msg69287.html
+
+Excellent!
+
+
+Nicolas
