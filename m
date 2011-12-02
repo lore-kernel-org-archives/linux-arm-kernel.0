@@ -1,68 +1,27 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Fri, 2 Dec 2011 12:59:32 +0000
-Subject: [PATCH] irqdomain: protect macro variable in domain iterators
-In-Reply-To: <1322833997-32083-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1322833997-32083-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <20111202125932.GB2892@localhost.localdomain>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Fri, 2 Dec 2011 13:02:42 +0000
+Subject: [PATCH 1/5] ASoC: omap-dmic: Add device tree bindings
+In-Reply-To: <4ED8C57B.2000503@ti.com>
+References: <1322819580-7424-1-git-send-email-peter.ujfalusi@ti.com>
+ <1322819580-7424-2-git-send-email-peter.ujfalusi@ti.com>
+ <20111202122558.GM8245@opensource.wolfsonmicro.com>
+ <4ED8C57B.2000503@ti.com>
+Message-ID: <20111202130242.GO8245@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 02, 2011 at 02:53:17PM +0100, Nicolas Ferre wrote:
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> ---
-> Error found while using those iterators in an irq controller
-> initialization function.
-> 
-> May also need protection around irq and hwirq macro variables
-> but those values are usually plain "int" anyway... Tell me if you
-> feel that it should be done.
-> 
->  include/linux/irqdomain.h |    8 ++++----
->  1 files changed, 4 insertions(+), 4 deletions(-)
-> 
-> diff --git a/include/linux/irqdomain.h b/include/linux/irqdomain.h
-> index 99834e58..a553004 100644
-> --- a/include/linux/irqdomain.h
-> +++ b/include/linux/irqdomain.h
-> @@ -82,12 +82,12 @@ static inline unsigned int irq_domain_to_irq(struct irq_domain *d,
->  }
->  
->  #define irq_domain_for_each_hwirq(d, hw) \
-> -	for (hw = d->hwirq_base; hw < d->hwirq_base + d->nr_irq; hw++)
-> +	for (hw = (d)->hwirq_base; hw < (d)->hwirq_base + (d)->nr_irq; hw++)
->  
->  #define irq_domain_for_each_irq(d, hw, irq) \
-> -	for (hw = d->hwirq_base, irq = irq_domain_to_irq(d, hw); \
-> -	     hw < d->hwirq_base + d->nr_irq; \
-> -	     hw++, irq = irq_domain_to_irq(d, hw))
-> +	for (hw = (d)->hwirq_base, irq = irq_domain_to_irq((d), hw); \
-> +	     hw < (d)->hwirq_base + (d)->nr_irq; \
-> +	     hw++, irq = irq_domain_to_irq((d), hw))
+On Fri, Dec 02, 2011 at 02:32:59PM +0200, Peter Ujfalusi wrote:
 
-I suggest just putting all the brackets in -- if having spotted this
-problem you only half-fix the macros, an opportunity is being missed;
-someone have to come and fix it again later:
+> As of now we receive all these information via OMAP hwmod.
+> All the properties (addresses, irq, etc) of the HW IP will be coming
+> from DT as soon as I can remove the ti,hwmod property.
 
-
-#define irq_domain_for_each_hwirq(d, hw) \
-	for ((hw) = (d)->hwirq_base; (hw) < (d)->hwirq_base + (d)->nr_irq; (hw)++)
-
-#define irq_domain_for_each_irq(d, hw, irq) \
-	for ((hw) = (d)->hwirq_base, (irq) = irq_domain_to_irq(d, hw); \
-	     (hw) < (d)->hwirq_base + (d)->nr_irq; \
-	     (hw)++, (irq) = irq_domain_to_irq(d, hw))
-
-
-If you feel happier though, you can harmlessly add the extra brackets round
-the arguments to irq_domain_to_irq(), without changing the behaviour.
-Arguably the "always add brackets" rule is simpler to understand.
-
-In fact, where a macro argument is not part of a larger expression, or is an
-operand to a comma-expression, there's no need for extra brackets -- all
-possible operators parse at higher priority than commas.  A macro argument
-which itself is a comma-expression whould have to be explicitly bracketed
-in the macro invocation anyway, so there is no extra risk of the macro
-expansion being parsed in an unexpected way in that case.
-
-Cheers
----Dave
+Oh, right.  We should really be churning the device tree like this - the
+idea is that the device tree should be stable and independant of kernel
+versions.  It would be better if we were able to go straight to the one
+without hwmod, especially if Benoit is able to get the underlying
+changes done soon (which sounded like it might be the case).  Could we
+define and implement the "real" version now (it should be reasonable to
+code blind except possibly for the DMA channel as it's such a direct
+mapping) with hwmod left in there as something that's legacy for old
+kernels?
