@@ -1,74 +1,55 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Fri, 02 Dec 2011 09:45:17 -0800
-Subject: [GIT PULL] cpufreq: OMAP: move to drivers/cpufreq and updates for
- v3.3
-In-Reply-To: <871ut5w2js.fsf@ti.com> (Kevin Hilman's message of "Fri, 18 Nov
- 2011 13:20:23 -0800")
-References: <871ut5w2js.fsf@ti.com>
-Message-ID: <87ty5ij2aa.fsf@ti.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri,  2 Dec 2011 18:50:37 +0100
+Subject: [PATCH] ARM: at91/net: add macb ethernet controller in 9g45 DT
+In-Reply-To: <1322847782-22650-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1322847782-22650-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <1322848237-23154-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dave,
+Add the Cadence macb ethernet controller in at91sam9g45 .dtsi and
+enable it in at91sam9m10g45ek board device tree file.
 
-Kevin Hilman <khilman@ti.com> writes:
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ arch/arm/boot/dts/at91sam9g45.dtsi     |    7 +++++++
+ arch/arm/boot/dts/at91sam9m10g45ek.dts |    6 ++++++
+ 2 files changed, 13 insertions(+), 0 deletions(-)
 
-> Hi Dave,
->
-> Here's the updated pull request after a rebase onto v3.2-rc1 and some
-> fixes to address other changes that went into v3.2.
->
-> This is targetted for v3.3, so I'd like to get it into your tree and
-> into linux-next.
-
-Are there any problems with this series or pull request?  
-
-Kevin
-
-> Also, let me know if you want a MAINTAINERS entry for this file, as I'm
-> happy to maintain it.
->
-> Kevin
->
->
-> The following changes since commit 1ea6b8f48918282bdca0b32a34095504ee65bab5:
->
->   Linux 3.2-rc1 (2011-11-07 16:16:02 -0800)
->
-> are available in the git repository at:
->   git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git for_3.3/omap-cpufreq
->
-> Colin Cross (1):
->       cpufreq: OMAP: notify even with bad boot frequency
->
-> Kevin Hilman (1):
->       cpufreq: OMAP: fixup for omap_device changes, include <linux/module.h>
->
-> Nishanth Menon (6):
->       cpufreq: OMAP: move clk name decision to init
->       cpufreq: OMAP: deny initialization if no mpudev
->       cpufreq: OMAP: dont support !freq_table
->       cpufreq: OMAP: only supports OPP library
->       cpufreq: OMAP: put clk if cpu_init failed
->       cpufreq: OMAP: fix freq_table leak
->
-> Russell King (1):
->       cpufreq: OMAP: Add SMP support for OMAP4+
->
-> Santosh Shilimkar (1):
->       cpufreq: OMAP: cleanup for multi-SoC support, move into drivers/cpufreq
->
-> Todd Poynor (1):
->       cpufreq: OMAP: Enable all CPUs in shared policy mask
->
->  arch/arm/plat-omap/Makefile    |    1 -
->  arch/arm/plat-omap/cpu-omap.c  |  171 -------------------------
->  drivers/cpufreq/Makefile       |    1 +
->  drivers/cpufreq/omap-cpufreq.c |  274 ++++++++++++++++++++++++++++++++++++++++
->  4 files changed, 275 insertions(+), 172 deletions(-)
->  delete mode 100644 arch/arm/plat-omap/cpu-omap.c
->  create mode 100644 drivers/cpufreq/omap-cpufreq.c
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
+index e89b1d7..67f94d3 100644
+--- a/arch/arm/boot/dts/at91sam9g45.dtsi
++++ b/arch/arm/boot/dts/at91sam9g45.dtsi
+@@ -101,6 +101,13 @@
+ 				atmel,use-dma-tx;
+ 				status = "disabled";
+ 			};
++
++			macb0: ethernet at fffbc000 {
++				compatible = "cdns,at32ap7000-macb", "cdns,macb";
++				reg = <0xfffbc000 0x100>;
++				interrupts = <25 4>;
++				status = "disabled";
++			};
+ 		};
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/at91sam9m10g45ek.dts b/arch/arm/boot/dts/at91sam9m10g45ek.dts
+index 85b34f5..17377a2 100644
+--- a/arch/arm/boot/dts/at91sam9m10g45ek.dts
++++ b/arch/arm/boot/dts/at91sam9m10g45ek.dts
+@@ -30,6 +30,12 @@
+ 			usart1: serial at fff90000 {
+ 				status = "okay";
+ 			};
++
++			macb0: ethernet at fffbc000 {
++				local-mac-address = [3a 0e 03 04 05 06];
++				phy-mode = "rmii";
++				status = "okay";
++			};
+ 		};
+ 	};
+ };
+-- 
+1.7.5.4
