@@ -1,114 +1,81 @@
-From: hvaibhav@ti.com (hvaibhav at ti.com)
-Date: Fri, 2 Dec 2011 12:13:24 +0530
-Subject: [PATCH-V5 3/3] arm:omap:am33xx: Add low level debugging support
-In-Reply-To: <hvaibhav@ti.com>
-References: <hvaibhav@ti.com>
-Message-ID: <1322808204-12878-4-git-send-email-hvaibhav@ti.com>
+From: r66093@freescale.com (Huang Changming-R66093)
+Date: Fri, 2 Dec 2011 07:13:31 +0000
+Subject: [PATCH 1/1] mmc: sdhci-esdhc: Change delay after setting clock
+ from 100ms to 1ms
+In-Reply-To: <97D3A72708D04647A5AC84A04996E5B526EC0F@039-SN1MPN1-001.039d.mgd.msft.net>
+References: <1321944150-12162-1-git-send-email-tony.lin@freescale.com>
+ <87vcq0kvs6.fsf@laptop.org>
+ <97D3A72708D04647A5AC84A04996E5B526EC0F@039-SN1MPN1-001.039d.mgd.msft.net>
+Message-ID: <8A2FC72B45BB5A4C9F801431E06AE48F1162FCA2@039-SN1MPN1-005.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Afzal Mohammed <afzal@ti.com>
+I don't think it make sense to change the delay time.
+Which will affect all PowerPC eSDHC controller, could you confirm which can work on all PowerPC platform?
 
-Add support for low level debugging on AM335X EVM (AM33XX family).
-Currently only support for UART1 console, which is used on AM335X EVM
-is added.
+-----Original Message-----
+From: linux-mmc-owner@vger.kernel.org [mailto:linux-mmc-owner at vger.kernel.org] On Behalf Of Lin Tony-B19295
+Sent: Friday, December 02, 2011 1:37 PM
+To: Chris Ball
+Cc: linux-mmc at vger.kernel.org; linux-arm-kernel at lists.infradead.org; Xie Xiaobo-R63061; avorontsov at ru.mvista.com
+Subject: RE: [PATCH 1/1] mmc: sdhci-esdhc: Change delay after setting clock from 100ms to 1ms
 
-Signed-off-by: Afzal Mohammed <afzal@ti.com>
-Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
-Reviewed-by: Kevin Hilman <khilman@ti.com>
----
- arch/arm/mach-omap2/include/mach/debug-macro.S |   17 ++++++++++++++++-
- arch/arm/plat-omap/include/plat/serial.h       |    4 ++++
- arch/arm/plat-omap/include/plat/uncompress.h   |    6 ++++++
- 3 files changed, 26 insertions(+), 1 deletions(-)
+Okay
+Thanks
 
-diff --git a/arch/arm/mach-omap2/include/mach/debug-macro.S b/arch/arm/mach-omap2/include/mach/debug-macro.S
-index 13f98e5..7da7126 100644
---- a/arch/arm/mach-omap2/include/mach/debug-macro.S
-+++ b/arch/arm/mach-omap2/include/mach/debug-macro.S
-@@ -72,6 +72,8 @@ omap_uart_lsr:	.word	0
- 		beq	82f			@ configure UART2
- 		cmp	\rp, #TI816XUART3	@ ti816x UART offsets different
- 		beq	83f			@ configure UART3
-+		cmp	\rp, #AM33XXUART1	@ AM33XX UART offsets different
-+		beq	84f			@ configure UART1
- 		cmp	\rp, #ZOOM_UART		@ only on zoom2/3
- 		beq	95f			@ configure ZOOM_UART
+> -----Original Message-----
+> From: linux-mmc-owner at vger.kernel.org [mailto:linux-mmc- 
+> owner at vger.kernel.org] On Behalf Of Chris Ball
+> Sent: Friday, December 02, 2011 2:11 AM
+> To: Lin Tony-B19295
+> Cc: linux-mmc at vger.kernel.org; linux-arm-kernel at lists.infradead.org; 
+> Xie Xiaobo-R63061; avorontsov at ru.mvista.com
+> Subject: Re: [PATCH 1/1] mmc: sdhci-esdhc: Change delay after setting 
+> clock from 100ms to 1ms
+> 
+> Hi,
+> 
+> On Tue, Nov 22 2011, Tony Lin wrote:
+> > 1ms is enough for hardware to change the clock to stable.
+> > 100ms is too long in the tasklet.
+> >
+> > Signed-off-by: Tony Lin <tony.lin@freescale.com>
+> > CC: Xiaobo Xie <X.Xie@freescale.com>
+> > CC: Anton Vorontsov <avorontsov@ru.mvista.com>
+> > ---
+> >  drivers/mmc/host/sdhci-esdhc.h |    2 +-
+> >  1 files changed, 1 insertions(+), 1 deletions(-)
+> >
+> > diff --git a/drivers/mmc/host/sdhci-esdhc.h 
+> > b/drivers/mmc/host/sdhci-esdhc.h index c3b08f1..b97b2f5 100644
+> > --- a/drivers/mmc/host/sdhci-esdhc.h
+> > +++ b/drivers/mmc/host/sdhci-esdhc.h
+> > @@ -73,7 +73,7 @@ static inline void esdhc_set_clock(struct 
+> > sdhci_host *host, unsigned int clock)
+> >  		| (div << ESDHC_DIVIDER_SHIFT)
+> >  		| (pre_div << ESDHC_PREDIV_SHIFT));
+> >  	sdhci_writel(host, temp, ESDHC_SYSTEM_CONTROL);
+> > -	mdelay(100);
+> > +	mdelay(1);
+> >  out:
+> >  	host->clock = clock;
+> >  }
+> 
+> I don't know if 1ms is actually long enough for the clock to stabilize 
+> on all boards, but I'll push this change to mmc-next and we can see if 
+> we get any regression reports.
+> 
+> Thanks,
+> 
+> - Chris.
+> --
+> Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+> One Laptop Per Child
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-mmc" 
+> in the body of a message to majordomo at vger.kernel.org More majordomo 
+> info at http://vger.kernel.org/majordomo-info.html
 
-@@ -100,7 +102,9 @@ omap_uart_lsr:	.word	0
- 		b	98f
- 83:		mov	\rp, #UART_OFFSET(TI816X_UART3_BASE)
- 		b	98f
--
-+84:		ldr	\rp, =AM33XX_UART1_BASE
-+		and	\rp, \rp, #0x00ffffff
-+		b	97f
- 95:		ldr	\rp, =ZOOM_UART_BASE
- 		str	\rp, [\tmp, #0]		@ omap_uart_phys
- 		ldr	\rp, =ZOOM_UART_VIRT
-@@ -109,6 +113,17 @@ omap_uart_lsr:	.word	0
- 		str	\rp, [\tmp, #8]		@ omap_uart_lsr
- 		b	10b
-
-+		/* AM33XX: Store both phys and virt address for the uart */
-+97:		add	\rp, \rp, #0x44000000	@ phys base
-+		str	\rp, [\tmp, #0]		@ omap_uart_phys
-+		sub	\rp, \rp, #0x44000000	@ phys base
-+		add	\rp, \rp, #0xf9000000	@ virt base
-+		str	\rp, [\tmp, #4]		@ omap_uart_virt
-+		mov	\rp, #(UART_LSR << OMAP_PORT_SHIFT)
-+		str	\rp, [\tmp, #8]		@ omap_uart_lsr
-+
-+		b	10b
-+
- 		/* Store both phys and virt address for the uart */
- 98:		add	\rp, \rp, #0x48000000	@ phys base
- 		str	\rp, [\tmp, #0]		@ omap_uart_phys
-diff --git a/arch/arm/plat-omap/include/plat/serial.h b/arch/arm/plat-omap/include/plat/serial.h
-index 1ab9fd6..e988c92 100644
---- a/arch/arm/plat-omap/include/plat/serial.h
-+++ b/arch/arm/plat-omap/include/plat/serial.h
-@@ -59,6 +59,9 @@
- /* AM3505/3517 UART4 */
- #define AM35XX_UART4_BASE	0x4809E000	/* Only on AM3505/3517 */
-
-+/* AM33XX serial port */
-+#define AM33XX_UART1_BASE	0x44E09000
-+
- /* External port on Zoom2/3 */
- #define ZOOM_UART_BASE		0x10000000
- #define ZOOM_UART_VIRT		0xfa400000
-@@ -92,6 +95,7 @@
- #define TI816XUART1		81
- #define TI816XUART2		82
- #define TI816XUART3		83
-+#define AM33XXUART1		84
- #define ZOOM_UART		95		/* Only on zoom2/3 */
-
- /* This is only used by 8250.c for omap1510 */
-diff --git a/arch/arm/plat-omap/include/plat/uncompress.h b/arch/arm/plat-omap/include/plat/uncompress.h
-index 2d45ea3..ff59570 100644
---- a/arch/arm/plat-omap/include/plat/uncompress.h
-+++ b/arch/arm/plat-omap/include/plat/uncompress.h
-@@ -103,6 +103,10 @@ static inline void flush(void)
- 	_DEBUG_LL_ENTRY(mach, TI816X_UART##p##_BASE, OMAP_PORT_SHIFT,	\
- 		TI816XUART##p)
-
-+#define DEBUG_LL_AM33XX(p, mach)					\
-+	_DEBUG_LL_ENTRY(mach, AM33XX_UART##p##_BASE, OMAP_PORT_SHIFT,	\
-+		AM33XXUART##p)
-+
- static inline void __arch_decomp_setup(unsigned long arch_id)
- {
- 	int port = 0;
-@@ -181,6 +185,8 @@ static inline void __arch_decomp_setup(unsigned long arch_id)
- 		/* TI8168 base boards using UART3 */
- 		DEBUG_LL_TI816X(3, ti8168evm);
-
-+		/* AM33XX base boards using UART1 */
-+		DEBUG_LL_AM33XX(1, am335xevm);
- 	} while (0);
- }
 
 --
-1.7.0.4
+To unsubscribe from this list: send the line "unsubscribe linux-mmc" in the body of a message to majordomo at vger.kernel.org More majordomo info at  http://vger.kernel.org/majordomo-info.html
