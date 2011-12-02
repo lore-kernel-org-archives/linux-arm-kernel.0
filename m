@@ -1,106 +1,56 @@
-From: saaguirre@ti.com (Aguirre, Sergio)
-Date: Fri, 2 Dec 2011 10:28:42 -0600
-Subject: [RFC PATCH v1 2/7] omap4: build fdif omap device from hwmod
-In-Reply-To: <1322838172-11149-3-git-send-email-ming.lei@canonical.com>
-References: <1322838172-11149-1-git-send-email-ming.lei@canonical.com>
- <1322838172-11149-3-git-send-email-ming.lei@canonical.com>
-Message-ID: <CAKnK67T9S6Z=f9qmn9ov7YNyTKjdDbOZHJDRO-7_fqkJGZzXbA@mail.gmail.com>
+From: paul.gortmaker@windriver.com (Paul Gortmaker)
+Date: Fri, 2 Dec 2011 11:31:50 -0500
+Subject: [PATCH] arm: add default value for PHYS_OFFSET Kconfig setting
+In-Reply-To: <20111202092124.GR26618@pengutronix.de>
+References: <1322711557-8279-1-git-send-email-paul.gortmaker@windriver.com>
+ <201112011419.46751.arnd@arndb.de>
+ <CAP=VYLrp1zqyOzU-xzatF3jE3wL6wBjEDMR=sEXimP2ZvkQ0Lg@mail.gmail.com>
+ <alpine.LFD.2.02.1112020005270.2357@xanadu.home>
+ <alpine.LFD.2.02.1112020024370.2357@xanadu.home>
+ <20111202092124.GR26618@pengutronix.de>
+Message-ID: <4ED8FD76.3000802@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ming,
+On 11-12-02 04:21 AM, Uwe Kleine-K?nig wrote:
+> Hello Nicolas,
+> 
+> On Fri, Dec 02, 2011 at 12:33:26AM -0500, Nicolas Pitre wrote:
 
-Thanks for the patches.
+[...]
 
-On Fri, Dec 2, 2011 at 9:02 AM, Ming Lei <ming.lei@canonical.com> wrote:
-> Signed-off-by: Ming Lei <ming.lei@canonical.com>
-> ---
-> ?arch/arm/mach-omap2/devices.c | ? 33 +++++++++++++++++++++++++++++++++
-> ?1 files changed, 33 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
-> index 1166bdc..a392af5 100644
-> --- a/arch/arm/mach-omap2/devices.c
-> +++ b/arch/arm/mach-omap2/devices.c
-> @@ -728,6 +728,38 @@ void __init omap242x_init_mmc(struct omap_mmc_platform_data **mmc_data)
->
-> ?#endif
->
-> +static struct platform_device* __init omap4_init_fdif(void)
-> +{
-> + ? ? ? int id = -1;
+>> And it seems that at91x40 is the only defconfig with MMU=n, so the only 
+>> option is really to provide a default CONFIG_PHYS_OFFSET.  So what about 
+>> this:
+>>
+>> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+>> index e084b7e981..a24672924f 100644
+>> --- a/arch/arm/Kconfig
+>> +++ b/arch/arm/Kconfig
+>> @@ -222,6 +222,7 @@ config NEED_MACH_MEMORY_H
+>>  config PHYS_OFFSET
+>>  	hex "Physical address of main memory"
+>>  	depends on !ARM_PATCH_PHYS_VIRT && !NEED_MACH_MEMORY_H
+>> +	default DRAM_BASE if !MMU
+>>  	help
+>>  	  Please provide the physical address corresponding to the
+>>  	  location of main memory in your system.
+>>
+>> Eventually the DRAM_BASE config option could simply be replaced by 
+>> PHYS_OFFSET directly, but that's a larger change.
+> I'm working on a MMU-less machine, too and had that change already in my
+> working copy. I was about to commit and it send out later today.
+> 
+> So: Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 
-You could remove this , as it is being used only once, and never changed.
+Looks fine to me as well; I had no particular attachment to the
+original patch, and you guys have a much better understanding of
+the specifics of the system.
 
-> + ? ? ? struct platform_device *pd;
-> + ? ? ? struct omap_hwmod *oh;
-> + ? ? ? const char *dev_name = "fdif";
-> +
-> + ? ? ? oh = omap_hwmod_lookup("fdif");
-> + ? ? ? if (!oh) {
-> + ? ? ? ? ? ? ? pr_err("Could not look up fdif hwmod\n");
-> + ? ? ? ? ? ? ? return NULL;
-> + ? ? ? }
-> +
-> + ? ? ? pd = omap_device_build(dev_name, id, oh, NULL, 0, NULL, 0, 0);
+Thanks,
+Paul.
 
-Just do:
-
-pd = omap_device_build(dev_name, -1, oh, NULL, 0, NULL, 0, 0);
-
-> + ? ? ? WARN(IS_ERR(pd), "Can't build omap_device for %s.\n",
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? dev_name);
-> + ? ? ? return pd;
-> +}
-> +
-> +static void __init omap_init_fdif(void)
-> +{
-> + ? ? ? if (cpu_is_omap44xx()) {
-> + ? ? ? ? ? ? ? struct platform_device *pd;
-> +
-> + ? ? ? ? ? ? ? pd = omap4_init_fdif();
-> + ? ? ? ? ? ? ? if (!pd)
-> + ? ? ? ? ? ? ? ? ? ? ? return;
-> +
-> + ? ? ? ? ? ? ? pm_runtime_enable(&pd->dev);
-> + ? ? ? }
-> +}
-
-IMHO, you could reduce 1 level of indentation here, like this:
-
-static void __init omap_init_fdif(void)
-{
-	struct platform_device *pd;
-
-	if (!cpu_is_omap44xx())
-		return;
-
-	pd = omap4_init_fdif();
-	if (!pd)
-		return;
-
-	pm_runtime_enable(&pd->dev);
-}
-
-Regards,
-Sergio
-
-> +
-> ?/*-------------------------------------------------------------------------*/
->
-> ?#if defined(CONFIG_HDQ_MASTER_OMAP) || defined(CONFIG_HDQ_MASTER_OMAP_MODULE)
-> @@ -808,6 +840,7 @@ static int __init omap2_init_devices(void)
-> ? ? ? ?omap_init_sham();
-> ? ? ? ?omap_init_aes();
-> ? ? ? ?omap_init_vout();
-> + ? ? ? omap_init_fdif();
->
-> ? ? ? ?return 0;
-> ?}
-> --
-> 1.7.5.4
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-media" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+> 
+> Best regards
+> Uwe
+> 
