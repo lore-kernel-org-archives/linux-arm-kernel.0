@@ -1,43 +1,66 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Fri, 02 Dec 2011 20:06:17 +0100
-Subject: [PATCH 3/3] ARM: S3C64XX: Implement basic power domain support
-In-Reply-To: <20111202185743.GA27227@opensource.wolfsonmicro.com>
-References: <1322765339-29879-1-git-send-email-broonie@opensource.wolfsonmicro.com>
- <4008DCBCB90E409AA8C5E085EB54D2DB@Flatron>
- <20111202185743.GA27227@opensource.wolfsonmicro.com>
-Message-ID: <1540677.QKv7YOdnN3@flatron>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 2 Dec 2011 20:07:16 +0100
+Subject: [PATCH] arm: add default value for PHYS_OFFSET Kconfig setting
+In-Reply-To: <4ED8FD76.3000802@windriver.com>
+References: <1322711557-8279-1-git-send-email-paul.gortmaker@windriver.com>
+ <201112011419.46751.arnd@arndb.de>
+ <CAP=VYLrp1zqyOzU-xzatF3jE3wL6wBjEDMR=sEXimP2ZvkQ0Lg@mail.gmail.com>
+ <alpine.LFD.2.02.1112020005270.2357@xanadu.home>
+ <alpine.LFD.2.02.1112020024370.2357@xanadu.home>
+ <20111202092124.GR26618@pengutronix.de>
+ <4ED8FD76.3000802@windriver.com>
+Message-ID: <20111202190716.GA4585@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 02 of December 2011 18:57:43 Mark Brown wrote:
-> On Fri, Dec 02, 2011 at 07:25:01PM +0100, Tomasz Figa wrote:
-> > Please do not forget that there might be some drivers not yet submited
-> > to mainline and mainline should not break them with an assumption that
-> > there are no such drivers.
+Hello,
+
+On Fri, Dec 02, 2011 at 11:31:50AM -0500, Paul Gortmaker wrote:
+> On 11-12-02 04:21 AM, Uwe Kleine-K?nig wrote:
+> > Hello Nicolas,
 > > 
-> > For example, there is an on-going work on an open source OpenGL
-> > implementation for the GPU in S3C6410, known as OpenFIMG. Currently it
-> > uses a little kernel module for low level hardware management
-> > (interrupts, contexts, locking, power management), involving clock
-> > gating and runtime power management, but a DRM driver is planned.
+> > On Fri, Dec 02, 2011 at 12:33:26AM -0500, Nicolas Pitre wrote:
 > 
-> As I said in the commit message for the patch you're following up on
-> I don't think that's a problem as it's pretty straightforward to add the
-> requisite hooks as part of adding the actual drivers.  The power domain
-> framework is really easy to use so it's not like it should cause real
-> effort, if you can figure out how to drive a 3D graphics engine adding a
-> device to a power domain shouldn't be too hard.
+> [...]
 > 
-> There will need to be arch/arm changes to add the platform devices and
-> hook up the clocks anyway so it's not like this is creating a need for
-> modifications.  Indeed I'd suggest adding the arch/arm stuff as it gets
-> written anyway, even if the actual drivers are still a work in progress.
-> It's one less thing to carry out of tree and it means that updates like
-> this or like the clk API reworks that I'd expect to start appearing soon
-> will happen for free.
+> >> And it seems that at91x40 is the only defconfig with MMU=n, so the only 
+> >> option is really to provide a default CONFIG_PHYS_OFFSET.  So what about 
+> >> this:
+> >>
+> >> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> >> index e084b7e981..a24672924f 100644
+> >> --- a/arch/arm/Kconfig
+> >> +++ b/arch/arm/Kconfig
+> >> @@ -222,6 +222,7 @@ config NEED_MACH_MEMORY_H
+> >>  config PHYS_OFFSET
+> >>  	hex "Physical address of main memory"
+> >>  	depends on !ARM_PATCH_PHYS_VIRT && !NEED_MACH_MEMORY_H
+> >> +	default DRAM_BASE if !MMU
+> >>  	help
+> >>  	  Please provide the physical address corresponding to the
+> >>  	  location of main memory in your system.
+> >>
+> >> Eventually the DRAM_BASE config option could simply be replaced by 
+> >> PHYS_OFFSET directly, but that's a larger change.
+> > I'm working on a MMU-less machine, too and had that change already in my
+> > working copy. I was about to commit and it send out later today.
+> > 
+> > So: Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> 
+> Looks fine to me as well; I had no particular attachment to the
+> original patch, and you guys have a much better understanding of
+> the specifics of the system.
+A post-ack comment: would it make sense to make this:
 
-Yeah, I'm okay with that, I just noted that there is more support for S3C6410 
-available than just what is present in mainline.
+	config PHYS_OFFSET
+		hex "Physical address of main memory" if MMU
+	...
 
-Best regards,
-Tom
+such that !MMU build don't get a chance to misconfigure it?
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
