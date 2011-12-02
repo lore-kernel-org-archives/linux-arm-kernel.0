@@ -1,34 +1,51 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 2 Dec 2011 00:56:05 +0000
-Subject: [PATCH 3/3] ARM: S3C64XX: Implement basic power domain support
-In-Reply-To: <CAH9JG2WLO-wFT_QEv4qBeCcz-pE2CNoMqV8f8u3BKF8r+GSBvA@mail.gmail.com>
-References: <1322765339-29879-1-git-send-email-broonie@opensource.wolfsonmicro.com>
- <1322765339-29879-3-git-send-email-broonie@opensource.wolfsonmicro.com>
- <CAH9JG2WLO-wFT_QEv4qBeCcz-pE2CNoMqV8f8u3BKF8r+GSBvA@mail.gmail.com>
-Message-ID: <20111202005604.GA31948@opensource.wolfsonmicro.com>
+From: rusty@rustcorp.com.au (Rusty Russell)
+Date: Fri, 02 Dec 2011 10:56:33 +1030
+Subject: [RFC] virtio: use mandatory barriers for remote processor vdevs
+In-Reply-To: <20111201081236.GB5479@redhat.com>
+References: <1322569886-13055-1-git-send-email-ohad@wizery.com>
+ <20111129131110.GC19157@redhat.com>
+ <CAK=WgbZoGYVyKt=XXvnPVdh0koSBJC0zcgkLaYRkmjwBLOFA-A@mail.gmail.com>
+ <20111129151958.GA31789@redhat.com>
+ <CAK=WgbZ5aBFNro3XC0cN+Ao4ZWrBHwwd3d__CSHA=n56gKmKXw@mail.gmail.com>
+ <20111130145004.GD21413@redhat.com>
+ <CAK=WgbY59n9N_-2_TZ9wNBNcTMV1DCrz65e-Ae=xamcg6A0dOA@mail.gmail.com>
+ <20111130231306.GD30031@redhat.com> <87zkfdrpn8.fsf@rustcorp.com.au>
+ <20111201081236.GB5479@redhat.com>
+Message-ID: <8762hzsts6.fsf@rustcorp.com.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 02, 2011 at 09:35:44AM +0900, Kyungmin Park wrote:
+On Thu, 1 Dec 2011 10:12:37 +0200, "Michael S. Tsirkin" <mst@redhat.com> wrote:
+> On Thu, Dec 01, 2011 at 12:58:59PM +1030, Rusty Russell wrote:
+> > On Thu, 1 Dec 2011 01:13:07 +0200, "Michael S. Tsirkin" <mst@redhat.com> wrote:
+> > > For x86, stores into memory are ordered. So I think that yes, smp_XXX
+> > > can be selected at compile time.
+> > > 
+> > > So let's forget the virtio strangeness for a minute,
+> > 
+> > Hmm, we got away with light barriers because we knew we were not
+> > *really* talking to a device.  But now with virtio-mmio, turns out we
+> > are :)
+> 
+> You think virtio-mmio this issue too?  It's reported on remoteproc...
 
-> I'm not sure what's the next step at s3c64xx for generic power domain.
-> Related with exysno4 series, it's helpful to read following threads.
-> http://68.183.106.108/lists/linux-pm/msg26291.html
+I think any non-virtual, non-PCI device has to worry about it.  Perhaps
+all virtio-mmio are virtual (at this point).
 
-> "I don't think we should control/gate the clocks with regarding power
-> domain" from Mr. Kim
+I'm tempted to say we want permission from the device to do relaxed
+barriers (so I don't have to worry about it!)
 
-I tend to agree with him that gating the clocks automatically using
-runtime PM would be nice as if nothing else it saves code in drivers.
-I'm not sure how easy it's going to be to transition to doing that in
-one jump, though - there's a lot of SoCs sharing IP right back to
-S3C24xx.
+> > I'm really tempted to revert d57ed95 for 3.2, and we can revisit this
+> > optimization later if it proves worthwhile.
+> 
+> Generally it does seem the best we can do for 3.2.
+> 
+> Given it's rc3, I'd be a bit wary of introducing regressions - I'll try
+> to find some real setups (as in - not my laptop) to run some benchmarks
+> on, to verify there's no major problem.
+> I hope I can report on this in about a week from now - want to hold onto this meanwhile?
 
-Of course it should be fairly easy for most of the domains on s3c64xx
-right now as there's only one actual driver involved in mainline, we
-should just be gating almost all of the clocks concerned immediately
-after we boot (assuming they aren't gated by default, I'd need to check)
-and never touching them again anyway.  It'd only be the framebuffer
-clocks that'd need some work and for a first pass we could just mark the
-framebuffer domain as always on and get most of the win.  Sometimes lack
-of driver support is a good thing :)
+Yep, no huge hurry.  Thanks!
+
+Cheers,
+Rusty.
