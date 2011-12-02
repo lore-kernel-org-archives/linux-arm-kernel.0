@@ -1,34 +1,37 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 02 Dec 2011 17:43:21 +0900
-Subject: [PATCH v7 0/2] iommu/exynos: Add IOMMU/System MMU driver for
- Samsung Exynos
-In-Reply-To: <20111201185821.GL20535@8bytes.org>
-References: <1321609650-1329-1-git-send-email-pullip.cho@samsung.com>
- <20111123114626.GH20535@8bytes.org>
- <045b01ccaffa$ef48c430$cdda4c90$%kim@samsung.com>
- <20111201185821.GL20535@8bytes.org>
-Message-ID: <04f601ccb0ce$72590550$570b0ff0$%kim@samsung.com>
+Date: Fri, 02 Dec 2011 17:43:37 +0900
+Subject: [PATCH 1/2] ARM: exynos4: Fix build error due to 'gic_bank_offset'
+ undeclared
+In-Reply-To: <4ED7ADCE.8040609@arm.com>
+References: <1322753070.11611.0.camel@phoenix> <4ED7ADCE.8040609@arm.com>
+Message-ID: <04f701ccb0ce$7c044d30$740ce790$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Joerg Roedel wrote:
+Marc Zyngier wrote:
 > 
-> On Thu, Dec 01, 2011 at 04:29:17PM +0900, Kukjin Kim wrote:
-> > Anyway, that touches many Samsung stuff so it would be better if you
-> could
-> > create separate topic branch which can be merged into Samsung tree. And
-> if
-> > required, please add my ack on them.
+> On 01/12/11 15:24, Axel Lin wrote:
+> > Fix below build error:
+> >   CC      arch/arm/mach-exynos/cpu.o
+> > arch/arm/mach-exynos/cpu.c: In function 'exynos4_init_irq':
+> > arch/arm/mach-exynos/cpu.c:245: error: 'gic_bank_offset' undeclared
+> (first use in this function)
+> > arch/arm/mach-exynos/cpu.c:245: error: (Each undeclared identifier is
+> reported only once
+> > arch/arm/mach-exynos/cpu.c:245: error: for each function it appears in.)
+> > arch/arm/mach-exynos/cpu.c:243: warning: unused variable 'bank_offset'
+> > make[1]: *** [arch/arm/mach-exynos/cpu.o] Error 1
+> > make: *** [arch/arm/mach-exynos] Error 2
+> >
+> > Signed-off-by: Axel Lin <axel.lin@gmail.com>
 > 
-> Yes, I use topic-branches a lot :) This will end up in iommu/exynos or
-> something like that.
+> Arghhh... My bad. Thanks for fixing that.
 > 
-Hi Joerg,
+> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+> 
+Hi Marc,
 
-OK, I will merge iommu/exynos into Samsung tree after your creating that.
-
-I can't look at iommu/exynos branch in your tree,
-git://git.kernel.org/pub/scm/linux/kernel/git/joro/iommu.git.
+Since the commit 4e44d2cb("ARM: exynos4: convert to CONFIG_MULTI_IRQ_HANDLER") is not in my tree, this should be handled in your tree and Axel's patch, "ARM: exynos4: Fix build error" is too.
 
 Thanks.
 
@@ -37,3 +40,26 @@ Kgene.
 --
 Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
 SW Solution Development Team, Samsung Electronics Co., Ltd.
+
+> > ---
+> >  arch/arm/mach-exynos/cpu.c |    2 +-
+> >  1 files changed, 1 insertions(+), 1 deletions(-)
+> >
+> > diff --git a/arch/arm/mach-exynos/cpu.c b/arch/arm/mach-exynos/cpu.c
+> > index fed62f4..c7cb462 100644
+> > --- a/arch/arm/mach-exynos/cpu.c
+> > +++ b/arch/arm/mach-exynos/cpu.c
+> > @@ -240,7 +240,7 @@ static const struct of_device_id
+> exynos4_dt_irq_match[] = {
+> >  void __init exynos4_init_irq(void)
+> >  {
+> >  	int irq;
+> > -	unsigned int bank_offset;
+> > +	unsigned int gic_bank_offset;
+> >
+> >  	gic_bank_offset = soc_is_exynos4412() ? 0x4000 : 0x8000;
+> >
+> 
+> 
+> --
+> Jazz is not dead. It just smells funny...
