@@ -1,69 +1,43 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Fri, 02 Dec 2011 11:07:35 +0530
-Subject: [RFC PATCH 03/11] arm:omap:am33xx: Add power domain data
-In-Reply-To: <79CD15C6BA57404B839C016229A409A8047604@DBDE01.ent.ti.com>
-References: <1321809555-13833-1-git-send-email-hvaibhav@ti.com>
- <1321809555-13833-4-git-send-email-hvaibhav@ti.com> <878vmxump8.fsf@ti.com>
- <79CD15C6BA57404B839C016229A409A8047604@DBDE01.ent.ti.com>
-Message-ID: <4ED8641F.7060008@ti.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Fri, 2 Dec 2011 13:57:57 +0800
+Subject: [GIT PULL] mxs: fixes (round 2)
+Message-ID: <20111202055756.GN711@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[..]
->> First some general comments:
->>
->> At first glance, it seems like there could be much more reuse with OMAP4
->> code here.  From what I see, AM33x has only one partition compared to
->> several on OMAP4, but that doesn't mean you couldn't reuse the OMAP4
->> functions and just use a single partition.
-> Kevin,
->
-> Indeed it looks close to OMAP4, but it becomes difficult and ugly once you
-> Start getting into implementation details, for example,
->
->   - All PRM offsets don't match, you will end up with
-> cpu_is_xxx check and handle this. Applicable to all power domains.
->
-> 	OMAP4430_PRM_MPU_INST           0x0300
-> 	Vs
-> 	AM33XX_PRM_MPU_MOD              0x0E00
->
-> 	OMAP4430_PRM_WKUP_INST          0x1700
-> 	Vs
-> 	AM33XX_PRM_WKUP_MOD             0x0D00
+Hi Arnd,
 
-The above prcm offsets being different on am33xx doesn't really
-seem to be the issue since its already part of the powerdomain
-struct. See how omap2 and omap3 have different offsets and still end
-up using common code. You won't need any cpu_is_* checks for those.
+Please pull the fixes for mxs below.
 
-The real problem however seems to be with the completely different
-PWSTCTRL and PWSTST offsets. They seem to be so messed up that they are
-not even consistent across all powerdomains in the same SoC.
-The only solution I could think of to handle these was if we had
-a provision to specify the offsets on a per powerdomain level by
-adding them to the powerdomain struct. It could be populated only
-on SoC's which have these weirdly different offsets and for the rest
-it could just get initialized with fixed values for all powerdomains
-at init.
+Only patch 'arm: mx23: recognise stmp378x as mx23' has the tag
+'Cc: stable at kernel.org', as all other 3 patches are cosmetic fixes.
 
-Kevin/Paul/Benoit any thoughts?
+-- 
+Regards,
+Shawn
 
->
->   - Also there are some differences in logic states of domains as well.
->
-> Another important point is, we have considered AM33xx as OMAP3
-> family of device (ARCH_OMAP3).
-> So you may end up with number of cpu_is_xxx checks in code.
->
->>
->> IOW, it seems to me that all the pwrdm_ops could be shared with OMAP4.
->>
->>  From what I read (after an admittedly quick glance), the main thing you
->> need is a way to override the PRM offsets due to the fact that some
->> crazy person decided to make each instance different.
->>
-> This was one of the major reason why I had chosen and implemented separately
-> for AM33xx.
->
->
+The following changes since commit 5611cc4572e889b62a7b4c72a413536bf6a9c416:
+
+  Linux 3.2-rc4 (2011-12-01 14:56:01 -0800)
+
+are available in the git repository at:
+  git://git.linaro.org/people/shawnguo/linux-2.6.git mxs/fixes
+
+Dong Aisheng (1):
+      ARM: mxs/tx28: add __initconst for fec pdata
+
+Lauri Hintsala (1):
+      ARM: mxs: fix machines' initializers order
+
+Peter Rusko (1):
+      ARM: mx28: LRADC macro rename
+
+Wolfram Sang (1):
+      arm: mx23: recognise stmp378x as mx23
+
+ arch/arm/mach-mxs/include/mach/mx28.h  |    4 ++--
+ arch/arm/mach-mxs/include/mach/mxs.h   |    1 +
+ arch/arm/mach-mxs/mach-m28evk.c        |    2 +-
+ arch/arm/mach-mxs/mach-stmp378x_devb.c |    2 +-
+ arch/arm/mach-mxs/module-tx28.c        |    4 ++--
+ 5 files changed, 7 insertions(+), 6 deletions(-)
