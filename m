@@ -1,65 +1,42 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 02 Dec 2011 17:43:37 +0900
-Subject: [PATCH 1/2] ARM: exynos4: Fix build error due to 'gic_bank_offset'
- undeclared
-In-Reply-To: <4ED7ADCE.8040609@arm.com>
-References: <1322753070.11611.0.camel@phoenix> <4ED7ADCE.8040609@arm.com>
-Message-ID: <04f701ccb0ce$7c044d30$740ce790$%kim@samsung.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 2 Dec 2011 09:49:16 +0100
+Subject: backlight/ld9040.c: regulator control in the lcd driver
+In-Reply-To: <000c01ccb0c6$697c2aa0$3c747fe0$%lee@samsung.com>
+References: <000c01ccb0c6$697c2aa0$3c747fe0$%lee@samsung.com>
+Message-ID: <CACRpkdbRdtsw-3FXtevuJL7G=tcE+1s11iRw=zou1G25hufBSA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marc Zyngier wrote:
-> 
-> On 01/12/11 15:24, Axel Lin wrote:
-> > Fix below build error:
-> >   CC      arch/arm/mach-exynos/cpu.o
-> > arch/arm/mach-exynos/cpu.c: In function 'exynos4_init_irq':
-> > arch/arm/mach-exynos/cpu.c:245: error: 'gic_bank_offset' undeclared
-> (first use in this function)
-> > arch/arm/mach-exynos/cpu.c:245: error: (Each undeclared identifier is
-> reported only once
-> > arch/arm/mach-exynos/cpu.c:245: error: for each function it appears in.)
-> > arch/arm/mach-exynos/cpu.c:243: warning: unused variable 'bank_offset'
-> > make[1]: *** [arch/arm/mach-exynos/cpu.o] Error 1
-> > make: *** [arch/arm/mach-exynos] Error 2
-> >
-> > Signed-off-by: Axel Lin <axel.lin@gmail.com>
-> 
-> Arghhh... My bad. Thanks for fixing that.
-> 
-> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-> 
-Hi Marc,
+On Fri, Dec 2, 2011 at 8:45 AM, leedonghwa <dh09.lee@samsung.com> wrote:
 
-Since the commit 4e44d2cb("ARM: exynos4: convert to CONFIG_MULTI_IRQ_HANDLER") is not in my tree, this should be handled in your tree and Axel's patch, "ARM: exynos4: Fix build error" is too.
+[From your mail headers]
+> X-Mailer: Microsoft Office Outlook 12.0
 
-Thanks.
+No please. That mailer does not work, all your whitespace is screwed up.
+Consult: Documentation/email-clients.txt
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+> This patch supports regulator power control in the driver.
 
-> > ---
-> >  arch/arm/mach-exynos/cpu.c |    2 +-
-> >  1 files changed, 1 insertions(+), 1 deletions(-)
-> >
-> > diff --git a/arch/arm/mach-exynos/cpu.c b/arch/arm/mach-exynos/cpu.c
-> > index fed62f4..c7cb462 100644
-> > --- a/arch/arm/mach-exynos/cpu.c
-> > +++ b/arch/arm/mach-exynos/cpu.c
-> > @@ -240,7 +240,7 @@ static const struct of_device_id
-> exynos4_dt_irq_match[] = {
-> >  void __init exynos4_init_irq(void)
-> >  {
-> >  	int irq;
-> > -	unsigned int bank_offset;
-> > +	unsigned int gic_bank_offset;
-> >
-> >  	gic_bank_offset = soc_is_exynos4412() ? 0x4000 : 0x8000;
-> >
-> 
-> 
-> --
-> Jazz is not dead. It just smells funny...
+Always CC the regulator maintainers on patches like this please.
+
+> +???????? lcd->reg_vdd3 = regulator_get(lcd->dev, "vdd");
+> +???????? if (IS_ERR(lcd->reg_vdd3)) {
+> +?????????????????? dev_info(lcd->dev, "no %s regulator found\n", "vdd");
+> +?????????????????? lcd->reg_vdd3 = NULL;
+> +???????? }
+> +
+> +???????? lcd->reg_vci = regulator_get(lcd->dev, "vci");
+> +???????? if (IS_ERR(lcd->reg_vci)) {
+> +?????????????????? dev_info(lcd->dev, "no %s regulator found\n", "vci");
+> +?????????????????? lcd->reg_vci = NULL;
+> +???????? }
+
+As explained in earlier discussion with Mark regarding the SMSC911x
+driver regulator, treat these as errors and do not fail
+"gracefully" like this.
+
+Reference:
+http://marc.info/?l=linux-netdev&m=131914562120725&w=2
+
+Yours,
+Linus Walleij
