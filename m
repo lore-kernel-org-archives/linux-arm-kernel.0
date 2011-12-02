@@ -1,65 +1,62 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Fri, 02 Dec 2011 10:16:45 +0530
-Subject: [PATCH 3/3] ARM: OMAP: hwmod: Look for hwmod/module level context
- lost count if supported
-In-Reply-To: <4ED52007.8010804@ti.com>
-References: <1320317665-6381-1-git-send-email-rnayak@ti.com>
- <1320317665-6381-4-git-send-email-rnayak@ti.com> <4ED52007.8010804@ti.com>
-Message-ID: <4ED85835.7080108@ti.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Fri, 2 Dec 2011 00:19:51 -0500 (EST)
+Subject: [PATCH] arm: add default value for PHYS_OFFSET Kconfig setting
+In-Reply-To: <CAP=VYLrp1zqyOzU-xzatF3jE3wL6wBjEDMR=sEXimP2ZvkQ0Lg@mail.gmail.com>
+References: <1322711557-8279-1-git-send-email-paul.gortmaker@windriver.com>
+ <201112011419.46751.arnd@arndb.de>
+ <CAP=VYLrp1zqyOzU-xzatF3jE3wL6wBjEDMR=sEXimP2ZvkQ0Lg@mail.gmail.com>
+Message-ID: <alpine.LFD.2.02.1112020005270.2357@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 29 November 2011 11:40 PM, Cousson, Benoit wrote:
-> Hi Rajendra,
->
-> Sorry for the delay, I kind of forgot your series :-(
->
-> On 11/3/2011 11:54 AM, Nayak, Rajendra wrote:
->> Now that OMAP4 has hwmod/module level context lost counters, make
->> omap_hwmod_get_context_loss_count() return them on platforms where they
->> exist, else fall back on the pwrdm level counters for older platforms.
->>
->> Signed-off-by: Rajendra Nayak<rnayak@ti.com>
->> ---
->> arch/arm/mach-omap2/omap_hwmod.c | 11 ++++++++---
->> 1 files changed, 8 insertions(+), 3 deletions(-)
->>
->> diff --git a/arch/arm/mach-omap2/omap_hwmod.c
->> b/arch/arm/mach-omap2/omap_hwmod.c
->> index ac17748..9d140c4 100644
->> --- a/arch/arm/mach-omap2/omap_hwmod.c
->> +++ b/arch/arm/mach-omap2/omap_hwmod.c
->> @@ -2658,9 +2658,14 @@ u32 omap_hwmod_get_context_loss_count(struct
->> omap_hwmod *oh)
->> struct powerdomain *pwrdm;
->> int ret = 0;
->>
->> - pwrdm = omap_hwmod_get_pwrdm(oh);
->> - if (pwrdm)
->> - ret = pwrdm_get_context_loss_count(pwrdm);
->> + if (oh->prcm.omap4.context_offs) {
->
-> I don't think it is safe to use that, since this is an union.
-> You do know what OMAP2 & 3 will put in that location.
-> It might be zero, but who knows?
+On Thu, 1 Dec 2011, Paul Gortmaker wrote:
 
-Thats true, I need to figure out a better way to identify
-when a module level context count is supported and when its
-at the pwrdm level. Will repost with a fix.
+> On Thu, Dec 1, 2011 at 9:19 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Thursday 01 December 2011, Paul Gortmaker wrote:
+> >> Commit 1b9f95f8ade9efc2bd49f0e7b9dc61a038ac3eef introduced the new
+> >> Kconfig for PHYS_OFFSET but it did not specify a default value.
+> >>
+> >> This has the undesired side effect of breaking an implictly used
+> >> trick for updating defconfigs on the fly for routine buildtesting
+> >> across all arch and all platforms, i.e.
+> >>
+> >> ? cp /path/to/somedefconfig .config ; yes "" | make oldconfig
+> >>
+> >
+> > FWIW, a better way to achieve the above is using
+> >
+> > make KCONFIG_ALLCONFIG=/path/to/somedefconfig listnewconfig alldefconfig
+> >
+> > which does not have this problem.
+> >
+> > Your patch looks still ok, but you might want to update your scripts
+> > to be more robust.
+> 
+> Thanks -- but on the other hand, the above use case does actually
+> emulate exactly what happens when someone runs the
+> "make oldconfig" and simply holds down the Enter key. (yes it
+> happens probably way more than we want to know...)
+> 
+> So, I guess what I'm trying to say is that the above "script" is
+> intentionally fragile.  :)  As a use case, we shouldn't break it.
 
-Thanks for the review.
+Well... I took a while before replying because I'm also modifying things 
+around this, but those changes are good for a merge window not a -rc 
+period.
 
->
->> + /* Support for per-hwmod context register */
->> + ret = oh->prcm.omap4.context_lost_counter;
->> + } else {
->> + pwrdm = omap_hwmod_get_pwrdm(oh);
->> + if (pwrdm)
->> + ret = pwrdm_get_context_loss_count(pwrdm);
->> + }
->>
->> return ret;
->> }
->
-> Regards,
-> Benoit
+Still, I don't think your patch is good, even as a temporary measure.  
+The fact is that we can't just pick a random default value since it is 
+likely to be wrong for the majority of the boards as the right answer 
+for this option is quite varied.  So the fact that the config system 
+insists on your entering a proper value is actually a good thing.
+
+In the at91x40_defconfig case, it has CONFIG_EMBEDDED=y.  If it was not 
+selected then you'd get CONFIG_ARM_PATCH_PHYS_VIRT=y by default and then 
+no CONFIG_PHYS_OFFSET would be presented.
+
+So the right fix here would actually consist of adding to 
+at91x40_defconfig either CONFIG_ARM_PATCH_PHYS_VIRT=y, or a default 
+value for CONFIG_PHYS_OFFSET which is the right value for that platform.
+
+
+Nicolas
