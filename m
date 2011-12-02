@@ -1,53 +1,30 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Fri, 02 Dec 2011 13:25:08 -0800
-Subject: [RFC PATCH 03/11] arm:omap:am33xx: Add power domain data
-In-Reply-To: <DF0F476B391FA8409C78302C7BA518B6039FFA@DBDE01.ent.ti.com>
- (Sekhar Nori's message of "Fri, 2 Dec 2011 18:14:48 +0000")
-References: <1321809555-13833-1-git-send-email-hvaibhav@ti.com>
- <1321809555-13833-4-git-send-email-hvaibhav@ti.com>
- <878vmxump8.fsf@ti.com>
- <DF0F476B391FA8409C78302C7BA518B6039FFA@DBDE01.ent.ti.com>
-Message-ID: <874nxiis3v.fsf@ti.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Fri, 02 Dec 2011 22:31:26 +0100
+Subject: [PATCH] ARM: S3C64XX: Define some additional always off clocks
+In-Reply-To: <20111202211314.GC15268@opensource.wolfsonmicro.com>
+References: <1322841468-28431-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+ <3544285.l9RTi8aUql@flatron>
+ <20111202211314.GC15268@opensource.wolfsonmicro.com>
+Message-ID: <1908355.tlHtlhx9rP@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"Nori, Sekhar" <nsekhar@ti.com> writes:
+On Friday 02 of December 2011 21:13:15 Mark Brown wrote:
+> On Fri, Dec 02, 2011 at 08:45:24PM +0100, Tomasz Figa wrote:
+> > Well, it's just an internal tree, not to be submitted right away. Some
+> > changes would need to be splitted into smaller ones, some joined.
+> > Probably some cleaning and rebasing would be also needed.
+> 
+> Yeah, I appreciate that you don't actually want to submit some of that
+> stuff right away but it makes it much easier for people to cherry pick
+> the work over into mainline if they need it and are inspired to do the
+> required cleanup.
 
-> On Thu, Dec 01, 2011 at 06:34:19, Hilman, Kevin wrote:
->> Vaibhav Hiremath <hvaibhav@ti.com> writes:
->> 
->> > From: Afzal Mohammed <afzal@ti.com>
->> >
->> > This patch adds AM33XX power domain data,
->> > corresponding API's to access PRM module and
->> > PRM register offsets & bit fields.
->> >
->> > Signed-off-by: Rachna Patil <rachna@ti.com>
->> > Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
->> > Signed-off-by: Afzal Mohammed <afzal@ti.com>
->> 
->> First some general comments:
->> 
->> At first glance, it seems like there could be much more reuse with OMAP4
->> code here.  From what I see, AM33x has only one partition compared to
->> several on OMAP4, but that doesn't mean you couldn't reuse the OMAP4
->> functions and just use a single partition.
->> 
->> IOW, it seems to me that all the pwrdm_ops could be shared with OMAP4.
->> 
->> From what I read (after an admittedly quick glance), the main thing you
->> need is a way to override the PRM offsets due to the fact that some
->> crazy person decided to make each instance different.
->
-> If its any consolation, this has been fed back to the chip designers
-> and is expected to be corrected for the next AM335x derivative.
+OK, I will start adding sign offs from now on. I'm not experienced in 
+submitting patches to mainline and I didn't know about importance of them.
 
-Great, Thanks!   
-
-Assuming mainline kernel support is a priority for the other SoCs in
-this family, keeping SW compatibility with other existing SoCs in the
-OMAP family should be a high priority.  This is especially true when
-large portions of the IP are reused from existing SoCs, as is clearly
-the case in AM33x.
-
-Kevin
+I have much more things that I should have submitted already long time ago, 
+it's a shame that I can't find time to do that. The whole tree is dedicated to 
+features and fixes needed to run Linux on mobile devices with S3C6410 (Samsung 
+Galaxy Spica GT-i5700 in particular), but I work on it in my free time, which 
+usually is pretty limited.
