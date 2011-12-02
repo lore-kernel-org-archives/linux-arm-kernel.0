@@ -1,75 +1,56 @@
-From: snjw23@gmail.com (Sylwester Nawrocki)
-Date: Fri, 02 Dec 2011 21:10:27 +0100
-Subject: [PATCH 3/3] ARM: S3C64XX: Implement basic power domain support
-In-Reply-To: <1322765339-29879-3-git-send-email-broonie@opensource.wolfsonmicro.com>
-References: <1322765339-29879-1-git-send-email-broonie@opensource.wolfsonmicro.com>
- <1322765339-29879-3-git-send-email-broonie@opensource.wolfsonmicro.com>
-Message-ID: <4ED930B3.3020200@gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 2 Dec 2011 12:21:25 -0800
+Subject: [PATCH 07/23] ARM: plat-omap: remove arch specific special
+ handling for ioremap
+In-Reply-To: <1321422521-1138-8-git-send-email-nico@fluxnic.net>
+References: <1321422521-1138-1-git-send-email-nico@fluxnic.net>
+ <1321422521-1138-8-git-send-email-nico@fluxnic.net>
+Message-ID: <20111202202125.GZ31337@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+Hi Nico,
 
-good to see someone adding a proper power domain support for s3c64xx.
-
-On 12/01/2011 07:48 PM, Mark Brown wrote:
-> The S3C64xx SoCs contain a set of gateable power domains which can be
-> enabled and disabled at runtime in order to save power.  Use the generic
-> power domain code to implement support for these in software, enabling
-> runtime control of most domains:
+* Nicolas Pitre <nico@fluxnic.net> [111115 21:21]:
+> From: Nicolas Pitre <nicolas.pitre@linaro.org>
 > 
->  - ETM (not supported in mainline).
->  - Domain G: 3D acceleration (no mainline support).
->  - Domain V: MFC (no mainline support).
->  - Domain I: JPEG and camera interface (no mainline support).
->  - Domain P: 2D acceleration, TV encoder and scaler (no mainline support)
->  - Domain S: Security (no mainline support).
->  - Domain F: LCD (driver already uses runtime PM), post processing and
->    rotation (no mainline support).
+> A generic version should replace this later.
 > 
-> The IROM domain is marked as always enabled as we should arrange for it
-> to be enabled when we suspend which will need a bit more work.
-> 
-> Due to all the conditional device registration that the platform does
-> wrap s3c_pm_init() with s3c64xx_pm_init() which actually puts the device
-> into the power domain after the machines have registered, looking for
-> platform data to tell if the device was registered. Since currently only
-> Cragganmore actually sets up PM that is the only machine updated.
-> 
-> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
-> ---
-...
-> +
-> +static int s3c64xx_pd_on(struct generic_pm_domain *domain)
-> +{
-> +	struct s3c64xx_pm_domain *pd;
-> +	u32 val;
-> +	long retry = 1000000L;
-> +
-> +	pd = container_of(domain, struct s3c64xx_pm_domain, pd);
-> +
-> +	val = __raw_readl(S3C64XX_NORMAL_CFG);
-> +	val |= pd->ena;
-> +	__raw_writel(val, S3C64XX_NORMAL_CFG);
-> +
-> +	/* Not all domains provide power status readback */
-> +	if (pd->pwr_stat) {
-> +		while (retry--)
-> +			if (__raw_readl(S3C64XX_BLK_PWR_STAT) & pd->pwr_stat)
-> +				break;
+> As io.c has become nearly empty, omap_init_consistent_dma_size() is moved
+> into common.c so that io.c can be removed entirely.
 
-How about adding cpu_relax() in this busy wait loop ?
+Sorry for the delay on trying this series out. It boots fine
+on omap2/3/4 as Kevin already noted. However, the following
+fix is needed for this patch to keep things building for
+omap1_defconfig.
+ 
+> Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
 
-> +		if (!retry) {
-> +			pr_err("Failed to start domain %s\n", pd->name);
-> +			return -EBUSY;
-> +		}
-> +	}
-> +
-> +	return 0;
-> +}
+With the following fix it works on what I tested. That's
+osk5912 n800 2430sdp n900 zoom3 and blaze. If you're still
+taking acks for this series:
 
---
+Tested-by: Tony Lindgren <tony@atomide.com>
 
-Regards,
-Sylwester
+
+From: Tony Lindgren <tony@atomide.com>
+Date: Fri, 2 Dec 2011 12:14:28 -0800
+Subject: [PATCH] ARM: OMAP: Fix build error for omap1_defconfig
+
+Otherwise we get the following error:
+
+In function 'omap_init_consistent_dma_size':
+error: implicit declaration of function 'init_consistent_dma_size'
+
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+
+--- a/arch/arm/plat-omap/common.c
++++ b/arch/arm/plat-omap/common.c
+@@ -14,6 +14,7 @@
+ #include <linux/kernel.h>
+ #include <linux/init.h>
+ #include <linux/io.h>
++#include <linux/dma-mapping.h>
+ #include <linux/omapfb.h>
+ 
+ #include <plat/common.h>
