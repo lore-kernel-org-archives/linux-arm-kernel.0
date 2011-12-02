@@ -1,28 +1,66 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Fri, 02 Dec 2011 20:16:53 +0100
-Subject: [PATCH] ARM: S3C64XX: Define some additional always off clocks
-In-Reply-To: <1322841468-28431-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-References: <1322841468-28431-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-Message-ID: <29404566.LHT7QYyV2R@flatron>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Fri, 2 Dec 2011 14:27:04 -0500 (EST)
+Subject: [PATCH] arm: add default value for PHYS_OFFSET Kconfig setting
+In-Reply-To: <20111202190716.GA4585@pengutronix.de>
+References: <1322711557-8279-1-git-send-email-paul.gortmaker@windriver.com>
+ <201112011419.46751.arnd@arndb.de>
+ <CAP=VYLrp1zqyOzU-xzatF3jE3wL6wBjEDMR=sEXimP2ZvkQ0Lg@mail.gmail.com>
+ <alpine.LFD.2.02.1112020005270.2357@xanadu.home>
+ <alpine.LFD.2.02.1112020024370.2357@xanadu.home>
+ <20111202092124.GR26618@pengutronix.de> <4ED8FD76.3000802@windriver.com>
+ <20111202190716.GA4585@pengutronix.de>
+Message-ID: <alpine.LFD.2.02.1112021426420.2357@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+On Fri, 2 Dec 2011, Uwe Kleine-K?nig wrote:
 
-On Friday 02 of December 2011 15:57:48 Mark Brown wrote:
-> Add entries to clocks_off for some additional clocks which are not
-> currently used by any mainline drivers. They default on at power up
-> but are never actually used so
+> Hello,
 > 
-> If these blocks are actually supported some of these bindings would need
-> to be redone properly, for example hooking up to the muxes that use them,
-> but that can be done incrementally.
+> On Fri, Dec 02, 2011 at 11:31:50AM -0500, Paul Gortmaker wrote:
+> > On 11-12-02 04:21 AM, Uwe Kleine-K?nig wrote:
+> > > Hello Nicolas,
+> > > 
+> > > On Fri, Dec 02, 2011 at 12:33:26AM -0500, Nicolas Pitre wrote:
+> > 
+> > [...]
+> > 
+> > >> And it seems that at91x40 is the only defconfig with MMU=n, so the only 
+> > >> option is really to provide a default CONFIG_PHYS_OFFSET.  So what about 
+> > >> this:
+> > >>
+> > >> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> > >> index e084b7e981..a24672924f 100644
+> > >> --- a/arch/arm/Kconfig
+> > >> +++ b/arch/arm/Kconfig
+> > >> @@ -222,6 +222,7 @@ config NEED_MACH_MEMORY_H
+> > >>  config PHYS_OFFSET
+> > >>  	hex "Physical address of main memory"
+> > >>  	depends on !ARM_PATCH_PHYS_VIRT && !NEED_MACH_MEMORY_H
+> > >> +	default DRAM_BASE if !MMU
+> > >>  	help
+> > >>  	  Please provide the physical address corresponding to the
+> > >>  	  location of main memory in your system.
+> > >>
+> > >> Eventually the DRAM_BASE config option could simply be replaced by 
+> > >> PHYS_OFFSET directly, but that's a larger change.
+> > > I'm working on a MMU-less machine, too and had that change already in my
+> > > working copy. I was about to commit and it send out later today.
+> > > 
+> > > So: Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> > 
+> > Looks fine to me as well; I had no particular attachment to the
+> > original patch, and you guys have a much better understanding of
+> > the specifics of the system.
+> A post-ack comment: would it make sense to make this:
+> 
+> 	config PHYS_OFFSET
+> 		hex "Physical address of main memory" if MMU
+> 	...
+> 
+> such that !MMU build don't get a chance to misconfigure it?
 
-I have already done all the work needed to support the whole range of clocks 
-on S3C6410, but I can't find time to create and submit all the patches.
+Sure.
 
-(See: https://github.com/tom3q/spica-3.0/commits/android-
-s3c64xx/arch/arm/mach-s3c64xx/clock.c if you are interested.)
 
-Best regards,
-Tom
+Nicolas
