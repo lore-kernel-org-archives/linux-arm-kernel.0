@@ -1,50 +1,189 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 2 Dec 2011 10:13:10 -0700 (MST)
-Subject: [PATCH v3 3/5] clk: introduce the common clock framework
-In-Reply-To: <20111201084547.GD19739@n2100.arm.linux.org.uk>
-References: <1321926047-14211-1-git-send-email-mturquette@linaro.org>
- <1321926047-14211-4-git-send-email-mturquette@linaro.org>
- <alpine.DEB.2.00.1111291619110.6289@utopia.booyaka.com>
- <20111201084547.GD19739@n2100.arm.linux.org.uk>
-Message-ID: <alpine.DEB.2.00.1112012352000.6289@utopia.booyaka.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri,  2 Dec 2011 18:14:10 +0100
+Subject: [PATCH] net/macb: add DT support
+In-Reply-To: <20111202153832.GA4998@totoro>
+References: <20111202153832.GA4998@totoro>
+Message-ID: <1322846050-4543-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+From: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 
-On Thu, 1 Dec 2011, Russell King - ARM Linux wrote:
+Allow the device tree to provide the mac address and the phy mode.
 
-> On Wed, Nov 30, 2011 at 06:20:50PM -0700, Paul Walmsley wrote:
-> > 1. When a clock user calls clk_enable() on a clock, the clock framework 
-> > should prevent other users of the clock from changing the clock's rate.  
-> > This should persist until the clock user calls clk_disable() (but see also 
-> > #2 below).  This will ensure that clock users can rely on the rate 
-> > returned by clk_get_rate(), as long as it's called between clk_enable() 
-> > and clk_disable().  And since the clock's rate is guaranteed to remain the 
-> > same during this time, code that cannot tolerate clock rate changes 
-> > without special handling (such as driver code for external I/O devices) 
-> > will work safely without further modification.
-> 
-> So, if you have a PLL whose parent clock is not used by anything else.
-> You want to program it to a certain rate.
-> 
-> You call clk_disable() on the PLL clock.
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+[nicolas.ferre at atmel.com: change "compatible" node property, doc and DT hwaddr]
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Cc: Jamie Iles <jamie@jamieiles.com>
+---
+ Documentation/devicetree/bindings/net/macb.txt |   22 +++++++
+ drivers/net/ethernet/cadence/macb.c            |   71 +++++++++++++++++++++---
+ drivers/net/ethernet/cadence/macb.h            |    2 +
+ 3 files changed, 87 insertions(+), 8 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/net/macb.txt
 
-The approach described wouldn't require the PLL to be disabled before 
-changing its rate.  If there are no other users of the PLL, or if the 
-other users of the PLL have indicated that it's safe for others to change 
-the PLL's rate, the clock framework would allow the PLL rate change, even 
-if the PLL is enabled.  (modulo any notifier activity, and assuming that 
-the underlying PLL hardware allows its frequency to be reprogrammed while 
-the PLL is enabled)
-
-> This walks up the tree and disables the parent.  You then try to set the 
-> rate using clk_set_rate(). clk_set_rate() in this circumstance can't 
-> wait for the PLL to lock because it can't - there's no reference clock 
-> for it.
-
-As an aside, this seems like a good time to mention that the behavior of 
-clk_set_rate() on a disabled clock needs to be clarified.
-
-
-- Paul
+diff --git a/Documentation/devicetree/bindings/net/macb.txt b/Documentation/devicetree/bindings/net/macb.txt
+new file mode 100644
+index 0000000..7f0b90a
+--- /dev/null
++++ b/Documentation/devicetree/bindings/net/macb.txt
+@@ -0,0 +1,22 @@
++* Cadence MACB Ethernet controller
++
++Required properties:
++- compatible: Should be "cdns,[<chip>-]macb"
++  Use "cdns,at91sam9260-macb" Atmel at91sam9260 and at91sam9263 SoCs.
++  Use "cdns,at32ap7000-macb" for other 10/100 usage or use the generic form: "cdns,macb"
++- reg: Address and length of the register set for the device
++- interrupts: Should contain macb interrupt
++- phy-mode: String, operation mode of the PHY interface.
++  Supported values are: "mii", "rmii", "gmii", "rgmii".
++
++Optional properties:
++- local-mac-address: 6 bytes, mac address
++
++Examples:
++
++	macb0: ethernet at fffc4000 {
++		compatible = "cdns,at32ap7000-macb";
++		reg = <0xfffc4000 0x4000>;
++		interrupts = <21>;
++		phy-mode = "rmii";
++	};
+diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
+index 64d6146..103c6e6 100644
+--- a/drivers/net/ethernet/cadence/macb.c
++++ b/drivers/net/ethernet/cadence/macb.c
+@@ -23,6 +23,8 @@
+ #include <linux/platform_data/macb.h>
+ #include <linux/platform_device.h>
+ #include <linux/phy.h>
++#include <linux/of_device.h>
++#include <linux/of_net.h>
+ 
+ #include "macb.h"
+ 
+@@ -191,7 +193,6 @@ static int macb_mii_probe(struct net_device *dev)
+ {
+ 	struct macb *bp = netdev_priv(dev);
+ 	struct phy_device *phydev;
+-	struct macb_platform_data *pdata;
+ 	int ret;
+ 
+ 	phydev = phy_find_first(bp->mii_bus);
+@@ -200,14 +201,11 @@ static int macb_mii_probe(struct net_device *dev)
+ 		return -1;
+ 	}
+ 
+-	pdata = bp->pdev->dev.platform_data;
+ 	/* TODO : add pin_irq */
+ 
+ 	/* attach the mac to the phy */
+ 	ret = phy_connect_direct(dev, phydev, &macb_handle_link_change, 0,
+-				 pdata && pdata->is_rmii ?
+-				 PHY_INTERFACE_MODE_RMII :
+-				 PHY_INTERFACE_MODE_MII);
++				 bp->phy_interface);
+ 	if (ret) {
+ 		netdev_err(dev, "Could not attach to PHY\n");
+ 		return ret;
+@@ -1244,6 +1242,50 @@ static const struct net_device_ops macb_netdev_ops = {
+ #endif
+ };
+ 
++#if defined(CONFIG_OF)
++static const struct of_device_id macb_dt_ids[] = {
++	{ .compatible = "cdns,at32ap7000-macb" },
++	{ .compatible = "cdns,at91sam9260-macb" },
++	{ .compatible = "cdns,macb" },
++	{ /* sentinel */ }
++};
++
++MODULE_DEVICE_TABLE(of, macb_dt_ids);
++
++static int __devinit macb_get_phy_mode_dt(struct platform_device *pdev)
++{
++	struct device_node *np = pdev->dev.of_node;
++
++	if (np)
++		return of_get_phy_mode(np);
++
++	return -ENODEV;
++}
++
++static int __devinit macb_get_hwaddr_dt(struct platform_device *pdev)
++{
++	struct device_node *np = pdev->dev.of_node;
++	if (np) {
++		const char *mac = of_get_mac_address(np);
++		if (mac) {
++			memcpy(pdev->dev->dev_addr, mac, ETH_ALEN);
++			return 0;
++		}
++	}
++
++	return -ENODEV;
++}
++#else
++static int __devinit macb_get_phy_mode_dt(struct platform_device *pdev)
++{
++	return -ENODEV;
++}
++static int __devinit macb_get_hwaddr_dt(struct platform_device *pdev)
++{
++	return -ENODEV;
++}
++#endif
++
+ static int __init macb_probe(struct platform_device *pdev)
+ {
+ 	struct macb_platform_data *pdata;
+@@ -1318,10 +1360,22 @@ static int __init macb_probe(struct platform_device *pdev)
+ 	config |= macb_dbw(bp);
+ 	macb_writel(bp, NCFGR, config);
+ 
+-	macb_get_hwaddr(bp);
+-	pdata = pdev->dev.platform_data;
++	err = macb_get_hwaddr_dt(pdev);
++	if (err < 0)
++		macb_get_hwaddr(bp);
++
++	err = macb_get_phy_mode_dt(pdev);
++	if (err < 0) {
++		pdata = pdev->dev.platform_data;
++		if (pdata && pdata->is_rmii)
++			bp->phy_interface = PHY_INTERFACE_MODE_RMII;
++		else
++			bp->phy_interface = PHY_INTERFACE_MODE_MII;
++	} else {
++		bp->phy_interface = err;
++	}
+ 
+-	if (pdata && pdata->is_rmii)
++	if (bp->phy_interface == PHY_INTERFACE_MODE_RMII)
+ #if defined(CONFIG_ARCH_AT91)
+ 		macb_or_gem_writel(bp, USRIO, (MACB_BIT(RMII) |
+ 					       MACB_BIT(CLKEN)));
+@@ -1444,6 +1498,7 @@ static struct platform_driver macb_driver = {
+ 	.driver		= {
+ 		.name		= "macb",
+ 		.owner	= THIS_MODULE,
++		.of_match_table	= of_match_ptr(macb_dt_ids),
+ 	},
+ };
+ 
+diff --git a/drivers/net/ethernet/cadence/macb.h b/drivers/net/ethernet/cadence/macb.h
+index 1931078..335e288 100644
+--- a/drivers/net/ethernet/cadence/macb.h
++++ b/drivers/net/ethernet/cadence/macb.h
+@@ -532,6 +532,8 @@ struct macb {
+ 	unsigned int 		link;
+ 	unsigned int 		speed;
+ 	unsigned int 		duplex;
++
++	phy_interface_t		phy_interface;
+ };
+ 
+ static inline bool macb_is_gem(struct macb *bp)
+-- 
+1.7.5.4
