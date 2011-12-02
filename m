@@ -1,96 +1,131 @@
-From: nsekhar@ti.com (Nori, Sekhar)
-Date: Fri, 2 Dec 2011 12:42:11 +0000
-Subject: [PATCH v3 0/5] ARM: davinci: re-arrange definitions to have a
- common	davinci header
-In-Reply-To: <E99FAA59F8D8D34D8A118DD37F7C8F75013C12@DBDE01.ent.ti.com>
-References: <1321525138-3928-1-git-send-email-manjunath.hadli@ti.com>
- <DF0F476B391FA8409C78302C7BA518B60354BC@DBDE01.ent.ti.com>
- <E99FAA59F8D8D34D8A118DD37F7C8F75013C12@DBDE01.ent.ti.com>
-Message-ID: <DF0F476B391FA8409C78302C7BA518B60387BD@DBDE01.ent.ti.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Fri, 2 Dec 2011 12:44:17 +0000
+Subject: [PATCH] ARM: ftrace: clear zero bit in reported IPs for Thumb-2
+In-Reply-To: <1322762765-22776-1-git-send-email-rabin@rab.in>
+References: <1322762765-22776-1-git-send-email-rabin@rab.in>
+Message-ID: <20111202124417.GA2892@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 02, 2011 at 11:59:49, Hadli, Manjunath wrote:
-> Sekhar,
+On Thu, Dec 01, 2011 at 11:36:05PM +0530, Rabin Vincent wrote:
+> The dynamic ftrace ops startup test currently fails on Thumb-2 kernels:
 > 
-> On Wed, Nov 30, 2011 at 17:07:21, Nori, Sekhar wrote:
-> > Hi Manju,
-> > 
-> > On Thu, Nov 17, 2011 at 15:48:53, Hadli, Manjunath wrote:
-> > > Re-arrange definitions and remove unnecessary code so that we canx
-> > 
-> > These are two different things and should be done in separate patches. Sergei has already pointed out couple of instances.
-> Ok,  This is only subject for the cover letter and not individual patches.
-> The individual patches have separate modularized implementations. I will
-
-I am referring to the kind of issues Sergei pointed to here:
-
-http://linux.omap.com/pipermail/davinci-linux-open-source/2011-November/023524.html
-
-
-> change the cover letter subject to "remove private definitions from headers and move to C files". Is that OK?
+>  Testing tracer function: PASSED
+>  Testing dynamic ftrace: PASSED
+>  Testing dynamic ftrace ops #1: (0 0 0 0 0) FAILED!
 > 
-
-Current headline is fine by me. It doesn't become part of commit history
-anyway.
-
+> This is because while the addresses in the mcount records do not have
+> the zero bit set, the IP reported by the mcount call does have it set
+> (because it is copied from the LR).  This mismatch causes the ops
+> filtering in ftrace_ops_list_func() to not call the relevant tracers.
 > 
-> > 
-> > > have a common header for all davinci platforms. This will enable
-> > 
-> > You mean all DMx platforms? DA8x and TNETVx will still have their own header files after this patch set.
+> Fix this by clearing the zero bit while adjusting the LR for the mcount
+> instruction size.  Also, combine the mov+sub into a single sub
+> instruction.
 > 
-> Yes, DMx platforms. I will also change the common "davinci.h" to dmx.h ?
-
-No, davinci.h is fine.
-
+> Signed-off-by: Rabin Vincent <rabin@rab.in>
+> ---
+>  arch/arm/kernel/entry-common.S |   16 ++++++++++------
+>  1 files changed, 10 insertions(+), 6 deletions(-)
 > 
-> > 
-> > > us to share defines and enable common routines to be used without 
-> > > polluting hardware.h.
-> > >  This patch set forms the base for a later set of patches for having a 
-> > > common system module base address (DAVINCI_SYSTEM_MODULE_BASE).
-> > > 
-> > > Changes from previous version(As per Sergei's comments):
-> > > 1. Renamed davinci_common.h to davinci.h.
-> > > 2. Added extra line whereever appropriate.
-> > > 3. removed unnecessary header inclusion.
-> > > 
-> > > Manjunath Hadli (5):
-> > >   ARM: davinci: dm644x: remove the macros from the header to move to c
-> > >     file
-> > >   ARM: davinci: dm365: remove the macros from the header to move to c
-> > >     file
-> > >   ARM: davinci: dm646x: remove the macros from the header to move to c
-> > >     file
-> > 
-> > These headlines should describe the changes better. You are moving _private_ defines to C file (to reduce header file pollution). That should be clear from the headline.
-> > 
-> > >   ARM: davinci: create new common platform header for davinci
-> > >   ARM: davinci: delete individual platform header files and use a
-> > >     common header
-> > > 
-> > >  arch/arm/mach-davinci/board-dm355-evm.c      |    2 +-
-> > >  arch/arm/mach-davinci/board-dm355-leopard.c  |    2 +-
-> > >  arch/arm/mach-davinci/board-dm365-evm.c      |    2 +-
-> > >  arch/arm/mach-davinci/board-dm644x-evm.c     |    2 +-
-> > >  arch/arm/mach-davinci/board-dm646x-evm.c     |    2 +-
-> > >  arch/arm/mach-davinci/board-neuros-osd2.c    |    2 +-
-> > >  arch/arm/mach-davinci/board-sffsdr.c         |    2 +-
-> > >  arch/arm/mach-davinci/dm355.c                |    2 +-
-> > >  arch/arm/mach-davinci/dm365.c                |   18 +++++-
-> > >  arch/arm/mach-davinci/dm644x.c               |    9 +++-
-> > >  arch/arm/mach-davinci/dm646x.c               |    9 +++-
-> > >  arch/arm/mach-davinci/include/mach/davinci.h |   88 ++++++++++++++++++++++++++
-> > 
-> > This file should be placed in arch/arm/mach-davinci itself since the definitions are private to arch/arm/mach-davinci.
-> > Russell has been complaining about placing unnecessary files in include/mach.
+> diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
+> index b2a27b6..9d7ce81 100644
+> --- a/arch/arm/kernel/entry-common.S
+> +++ b/arch/arm/kernel/entry-common.S
+> @@ -149,6 +149,12 @@ ENDPROC(ret_from_fork)
+>  #endif
+>  #endif
+>  
+> +.macro mcount_size_adjust rd, rn
+> +	ARM(	sub	\rd, \rn, #MCOUNT_INSN_SIZE	)
+> +	/* The zero bit is set on Thumb LRs; clear it. */
+> +	THUMB(	sub	\rd, \rn, #MCOUNT_INSN_SIZE + 1	)
+> +.endm
+> +
+
+You're conflating two different things here:
+
+1) convert the branch pointer in lr into the corresponding instruction
+address in memory
+
+2) subtract MCOUNT_INSN_SIZE
+
+
+(1) Is an ARM architectural thing and not secific to ftrace in any way,
+so I suggest we make that generic and factor it out.
+
+For example, kprobes.c has:
+
+
+121:void __kprobes arch_arm_kprobe(struct kprobe *p)
+122:{
+123:	uintptr_t addr = (uintptr_t)p->addr & ~1; /* Remove any Thumb flag */
+
+166:int __kprobes __arch_disarm_kprobe(void *p)
+167:{
+[...]
+169-#ifdef CONFIG_THUMB2_KERNEL
+170:	u16 *addr = (u16 *)((uintptr_t)kp->addr & ~1);
+
+
+Whether is makes sense to make that all generic for assembler or not,
+you can avoid the conditionality by writing:
+
+.macro mcount_size_adjust rd, rn
+	bic	\rd , \rn , #1			@ clear the Thumb bit if present
+	sub	\rd , \rd , #MCOUNT_INSN_SIZE
+.endm
+
+This adjustment will be correct regardless of the instruction set.
+
+
+Otherwise, this looks sensible.
+
+Cheers
+---Dave
+
+>  .macro __mcount suffix
+>  	mcount_enter
+>  	ldr	r0, =ftrace_trace_function
+> @@ -173,8 +179,7 @@ ENDPROC(ret_from_fork)
+>  	mcount_exit
+>  
+>  1: 	mcount_get_lr	r1			@ lr of instrumented func
+> -	mov	r0, lr				@ instrumented function
+> -	sub	r0, r0, #MCOUNT_INSN_SIZE
+> +	mcount_size_adjust r0, lr		@ instrumented function
+>  	adr	lr, BSYM(2f)
+>  	mov	pc, r2
+>  2:	mcount_exit
+> @@ -184,8 +189,7 @@ ENDPROC(ret_from_fork)
+>  	mcount_enter
+>  
+>  	mcount_get_lr	r1			@ lr of instrumented func
+> -	mov	r0, lr				@ instrumented function
+> -	sub	r0, r0, #MCOUNT_INSN_SIZE
+> +	mcount_size_adjust	r0, lr		@ instrumented function
+>  
+>  	.globl ftrace_call\suffix
+>  ftrace_call\suffix:
+> @@ -205,11 +209,11 @@ ftrace_graph_call\suffix:
+>  #ifdef CONFIG_DYNAMIC_FTRACE
+>  	@ called from __ftrace_caller, saved in mcount_enter
+>  	ldr	r1, [sp, #16]		@ instrumented routine (func)
+> +	mcount_size_adjust r1, r1
+>  #else
+>  	@ called from __mcount, untouched in lr
+> -	mov	r1, lr			@ instrumented routine (func)
+> +	mcount_size_adjust r1, lr	@ instrumented routine (func)
+>  #endif
+> -	sub	r1, r1, #MCOUNT_INSN_SIZE
+>  	mov	r2, fp			@ frame pointer
+>  	bl	prepare_ftrace_return
+>  	mcount_exit
+> -- 
+> 1.7.7.3
 > 
-> I will just check if the file is needed from the main driver files.
-> If not, I will move it to mach-davinci.
-
-Driver files should not need to see machine private stuff.
-If that's the case, drivers will probably need some clean-up too.
-
-Thanks,
-Sekhar
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
