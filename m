@@ -1,66 +1,32 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Fri, 2 Dec 2011 14:27:04 -0500 (EST)
-Subject: [PATCH] arm: add default value for PHYS_OFFSET Kconfig setting
-In-Reply-To: <20111202190716.GA4585@pengutronix.de>
-References: <1322711557-8279-1-git-send-email-paul.gortmaker@windriver.com>
- <201112011419.46751.arnd@arndb.de>
- <CAP=VYLrp1zqyOzU-xzatF3jE3wL6wBjEDMR=sEXimP2ZvkQ0Lg@mail.gmail.com>
- <alpine.LFD.2.02.1112020005270.2357@xanadu.home>
- <alpine.LFD.2.02.1112020024370.2357@xanadu.home>
- <20111202092124.GR26618@pengutronix.de> <4ED8FD76.3000802@windriver.com>
- <20111202190716.GA4585@pengutronix.de>
-Message-ID: <alpine.LFD.2.02.1112021426420.2357@xanadu.home>
+From: torvalds@linux-foundation.org (Linus Torvalds)
+Date: Fri, 2 Dec 2011 11:28:14 -0800
+Subject: [PATCH] ata: Don't use NO_IRQ in pata_of_platform driver
+In-Reply-To: <20111202192618.GC3037@localhost.localdomain>
+References: <20111110162859.GA7088@oksana.dev.rtsoft.ru>
+ <20111202192618.GC3037@localhost.localdomain>
+Message-ID: <CA+55aFwekNWz+V4440f=2iu_BfOxSg0NjVogv4cZZDFbJBNoAQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2 Dec 2011, Uwe Kleine-K?nig wrote:
+On Fri, Dec 2, 2011 at 11:26 AM, Dave Martin <dave.martin@linaro.org> wrote:
+>
+> This is now broken on ARM where, for good or bad, NO_IRQ currently is
+> used and is -1.
+>
+> How do we resolve it? ?If we are ready to eliminate NO_IRQ from
+> drivers/of/irq.c (or indeed, all code that uses it) and just use 0 for
+> that case, we should surely just do it... but I'm not confident I can
+> judge on that.
 
-> Hello,
-> 
-> On Fri, Dec 02, 2011 at 11:31:50AM -0500, Paul Gortmaker wrote:
-> > On 11-12-02 04:21 AM, Uwe Kleine-K?nig wrote:
-> > > Hello Nicolas,
-> > > 
-> > > On Fri, Dec 02, 2011 at 12:33:26AM -0500, Nicolas Pitre wrote:
-> > 
-> > [...]
-> > 
-> > >> And it seems that at91x40 is the only defconfig with MMU=n, so the only 
-> > >> option is really to provide a default CONFIG_PHYS_OFFSET.  So what about 
-> > >> this:
-> > >>
-> > >> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> > >> index e084b7e981..a24672924f 100644
-> > >> --- a/arch/arm/Kconfig
-> > >> +++ b/arch/arm/Kconfig
-> > >> @@ -222,6 +222,7 @@ config NEED_MACH_MEMORY_H
-> > >>  config PHYS_OFFSET
-> > >>  	hex "Physical address of main memory"
-> > >>  	depends on !ARM_PATCH_PHYS_VIRT && !NEED_MACH_MEMORY_H
-> > >> +	default DRAM_BASE if !MMU
-> > >>  	help
-> > >>  	  Please provide the physical address corresponding to the
-> > >>  	  location of main memory in your system.
-> > >>
-> > >> Eventually the DRAM_BASE config option could simply be replaced by 
-> > >> PHYS_OFFSET directly, but that's a larger change.
-> > > I'm working on a MMU-less machine, too and had that change already in my
-> > > working copy. I was about to commit and it send out later today.
-> > > 
-> > > So: Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> > 
-> > Looks fine to me as well; I had no particular attachment to the
-> > original patch, and you guys have a much better understanding of
-> > the specifics of the system.
-> A post-ack comment: would it make sense to make this:
-> 
-> 	config PHYS_OFFSET
-> 		hex "Physical address of main memory" if MMU
-> 	...
-> 
-> such that !MMU build don't get a chance to misconfigure it?
+Just stop using NO_IRQ. First in drivers/of/irq.c, then in any drivers
+as you notice breakage.
 
-Sure.
+Don't *change* NO_IRQ to zero (that whole #define is broken - leave it
+around as a marker of brokenness), just start removing it from all the
+ARM drivers that use the OF infrastructure. Which is presumably not
+all that many yet.
 
+So whenever you find breakage, the fix now is to just remove NO_IRQ
+tests, and replace them with "!irq".
 
-Nicolas
+                       Linus
