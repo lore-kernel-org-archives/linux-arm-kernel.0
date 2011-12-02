@@ -1,42 +1,83 @@
-From: nsekhar@ti.com (Nori, Sekhar)
-Date: Fri, 2 Dec 2011 18:14:48 +0000
-Subject: [RFC PATCH 03/11] arm:omap:am33xx: Add power domain data
-In-Reply-To: <878vmxump8.fsf@ti.com>
-References: <1321809555-13833-1-git-send-email-hvaibhav@ti.com>
- <1321809555-13833-4-git-send-email-hvaibhav@ti.com> <878vmxump8.fsf@ti.com>
-Message-ID: <DF0F476B391FA8409C78302C7BA518B6039FFA@DBDE01.ent.ti.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 2 Dec 2011 18:20:54 +0000
+Subject: [GIT PULL] Linux support for ARM LPAE
+Message-ID: <20111202182054.GA3250@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 01, 2011 at 06:34:19, Hilman, Kevin wrote:
-> Vaibhav Hiremath <hvaibhav@ti.com> writes:
-> 
-> > From: Afzal Mohammed <afzal@ti.com>
-> >
-> > This patch adds AM33XX power domain data,
-> > corresponding API's to access PRM module and
-> > PRM register offsets & bit fields.
-> >
-> > Signed-off-by: Rachna Patil <rachna@ti.com>
-> > Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
-> > Signed-off-by: Afzal Mohammed <afzal@ti.com>
-> 
-> First some general comments:
-> 
-> At first glance, it seems like there could be much more reuse with OMAP4
-> code here.  From what I see, AM33x has only one partition compared to
-> several on OMAP4, but that doesn't mean you couldn't reuse the OMAP4
-> functions and just use a single partition.
-> 
-> IOW, it seems to me that all the pwrdm_ops could be shared with OMAP4.
-> 
-> From what I read (after an admittedly quick glance), the main thing you
-> need is a way to override the PRM offsets due to the fact that some
-> crazy person decided to make each instance different.
+Hi Russell,
 
-If its any consolation, this has been fed back to the
-chip designers and is expected to be corrected for the
-next AM335x derivative.
+If there are no further comments, could you please pull the ARM LPAE
+branch below? They should be merged after Will's idmap patches (no real
+conflict, just correctly functioning setup_mm_for_reboot).
 
-Thanks,
-Sekhar
+Thanks.
+
+The following changes since commit 5611cc4572e889b62a7b4c72a413536bf6a9c416:
+
+  Linux 3.2-rc4 (2011-12-01 14:56:01 -0800)
+
+are available in the git repository at:
+  git://git.kernel.org/pub/scm/linux/kernel/git/cmarinas/linux.git for-next
+
+Catalin Marinas (12):
+      ARM: pgtable: Fix compiler warning in ioremap.c introduced by nopud
+      ARM: LPAE: Move page table maintenance macros to pgtable-2level.h
+      ARM: LPAE: Move the FSR definitions to separate files
+      ARM: LPAE: Factor out classic-MMU specific code into proc-v7-2level.S
+      ARM: LPAE: Introduce the 3-level page table format definitions
+      ARM: LPAE: Page table maintenance for the 3-level format
+      ARM: LPAE: MMU setup for the 3-level page table format
+      ARM: LPAE: Invalidate the TLB before freeing the PMD
+      ARM: LPAE: Add fault handling support
+      ARM: LPAE: Add context switching support
+      ARM: LPAE: Add identity mapping support for the 3-level page table format
+      ARM: LPAE: Add the Kconfig entries
+
+Russell King (1):
+      ARM: pgtable: switch to use pgtable-nopud.h
+
+Will Deacon (2):
+      ARM: LPAE: add ISBs around MMU enabling code
+      ARM: LPAE: mark memory banks with start > ULONG_MAX as highmem
+
+ arch/arm/Kconfig                            |    2 +-
+ arch/arm/boot/compressed/head.S             |    1 +
+ arch/arm/include/asm/assembler.h            |   11 ++
+ arch/arm/include/asm/page.h                 |    4 +
+ arch/arm/include/asm/pgalloc.h              |   26 ++++-
+ arch/arm/include/asm/pgtable-2level.h       |   41 ++++++
+ arch/arm/include/asm/pgtable-3level-hwdef.h |   77 ++++++++++++
+ arch/arm/include/asm/pgtable-3level-types.h |   70 +++++++++++
+ arch/arm/include/asm/pgtable-3level.h       |  155 +++++++++++++++++++++++
+ arch/arm/include/asm/pgtable-hwdef.h        |    4 +
+ arch/arm/include/asm/pgtable.h              |   43 +------
+ arch/arm/include/asm/proc-fns.h             |   21 +++
+ arch/arm/include/asm/system.h               |    8 ++
+ arch/arm/include/asm/tlb.h                  |   12 ++-
+ arch/arm/kernel/head.S                      |   47 +++++++-
+ arch/arm/kernel/hw_breakpoint.c             |    8 +-
+ arch/arm/kernel/sleep.S                     |    2 +
+ arch/arm/mm/Kconfig                         |   17 +++
+ arch/arm/mm/alignment.c                     |    2 +-
+ arch/arm/mm/context.c                       |   19 +++-
+ arch/arm/mm/fault.c                         |  111 +++--------------
+ arch/arm/mm/fault.h                         |   27 ++++-
+ arch/arm/mm/fsr-2level.c                    |   78 ++++++++++++
+ arch/arm/mm/fsr-3level.c                    |   68 ++++++++++
+ arch/arm/mm/idmap.c                         |   34 +++++-
+ arch/arm/mm/ioremap.c                       |   39 ++++---
+ arch/arm/mm/mmu.c                           |   46 +++++++-
+ arch/arm/mm/pgd.c                           |   51 +++++++-
+ arch/arm/mm/proc-macros.S                   |    5 +-
+ arch/arm/mm/proc-v7-2level.S                |  171 ++++++++++++++++++++++++++
+ arch/arm/mm/proc-v7-3level.S                |  150 +++++++++++++++++++++++
+ arch/arm/mm/proc-v7.S                       |  177 +++------------------------
+ 32 files changed, 1204 insertions(+), 323 deletions(-)
+ create mode 100644 arch/arm/include/asm/pgtable-3level-hwdef.h
+ create mode 100644 arch/arm/include/asm/pgtable-3level-types.h
+ create mode 100644 arch/arm/include/asm/pgtable-3level.h
+ create mode 100644 arch/arm/mm/fsr-2level.c
+ create mode 100644 arch/arm/mm/fsr-3level.c
+ create mode 100644 arch/arm/mm/proc-v7-2level.S
+ create mode 100644 arch/arm/mm/proc-v7-3level.S
