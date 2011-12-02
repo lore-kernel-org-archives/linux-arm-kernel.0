@@ -1,48 +1,50 @@
-From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
-Date: Fri, 2 Dec 2011 18:02:24 +0100
-Subject: [PATCH 0/2 v2] ARM: OMAP1: Fix dpll1 reprogramming related issues
-In-Reply-To: <20111202020936.GY31337@atomide.com>
-References: <201112012023.04635.jkrzyszt@tis.icnet.pl>
- <1322770382-30718-1-git-send-email-jkrzyszt@tis.icnet.pl>
- <20111202020936.GY31337@atomide.com>
-Message-ID: <201112021802.25037.jkrzyszt@tis.icnet.pl>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Fri, 2 Dec 2011 10:13:10 -0700 (MST)
+Subject: [PATCH v3 3/5] clk: introduce the common clock framework
+In-Reply-To: <20111201084547.GD19739@n2100.arm.linux.org.uk>
+References: <1321926047-14211-1-git-send-email-mturquette@linaro.org>
+ <1321926047-14211-4-git-send-email-mturquette@linaro.org>
+ <alpine.DEB.2.00.1111291619110.6289@utopia.booyaka.com>
+ <20111201084547.GD19739@n2100.arm.linux.org.uk>
+Message-ID: <alpine.DEB.2.00.1112012352000.6289@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 02 of December 2011 at 03:09:37, Tony Lindgren wrote:
-> * Janusz Krzysztofik <jkrzyszt@tis.icnet.pl> [111201 11:38]:
-> > After dpll1 reprogramming has been moved from setup_arch() to
-> > kernel_init(), I've been observing several issues, resulting in
-> > undesired system behaviour on my Amstrad Delta. This series fixes
-> > those most important (2/5 and 5/5 v2 previously), with a "stuck at 60MHz
-> > rate" issue going to be fixed with Tony's proposed solution instead of
-> > my previous 3/5.
-> > 
-> > Janusz Krzysztofik (2):
-> >   ARM: OMAP1: Fix ckctl value used for dpll1 defualt rate
-> >   ARM: OMAP1: recalculate loops per jiffy after dpll1 reprogram
-> > 
-> >  arch/arm/mach-omap1/clock_data.c |    9 +++++++--
-> >  1 files changed, 7 insertions(+), 2 deletions(-)
+Hi Russell,
+
+On Thu, 1 Dec 2011, Russell King - ARM Linux wrote:
+
+> On Wed, Nov 30, 2011 at 06:20:50PM -0700, Paul Walmsley wrote:
+> > 1. When a clock user calls clk_enable() on a clock, the clock framework 
+> > should prevent other users of the clock from changing the clock's rate.  
+> > This should persist until the clock user calls clk_disable() (but see also 
+> > #2 below).  This will ensure that clock users can rely on the rate 
+> > returned by clk_get_rate(), as long as it's called between clk_enable() 
+> > and clk_disable().  And since the clock's rate is guaranteed to remain the 
+> > same during this time, code that cannot tolerate clock rate changes 
+> > without special handling (such as driver code for external I/O devices) 
+> > will work safely without further modification.
 > 
-> Thanks, got these three patches now applied into fixes on top of -rc4.
+> So, if you have a PLL whose parent clock is not used by anything else.
+> You want to program it to a certain rate.
 > 
-> Can you please try it out to make sure it's all working for you now?
+> You call clk_disable() on the PLL clock.
 
-Yes, it works as expected, re-tested with a custom 150 MHz rate only 
-.config to the extent possible without removing all rates form .config 
-/ omap1_rate_table[], i.e., without triggering the issue addressed by 
-fc92dd3a77bfc59822f869627ba81a6418eed987 "ARM: OMAP1: Fix ckctl value 
-used for dpll1 defualt rate". Can re-test other cases (omap1_defconfig, 
-no rates selected at all) if required.
+The approach described wouldn't require the PLL to be disabled before 
+changing its rate.  If there are no other users of the PLL, or if the 
+other users of the PLL have indicated that it's safe for others to change 
+the PLL's rate, the clock framework would allow the PLL rate change, even 
+if the PLL is enabled.  (modulo any notifier activity, and assuming that 
+the underlying PLL hardware allows its frequency to be reprogrammed while 
+the PLL is enabled)
 
-My only concern left, which I don't feel capable to justify myself, is 
-if 6% inaccuracy in BogoMIPS recalculation, compared to the BogoMIPS 
-value got either with 3.1 or as a result of recalibration, does matter 
-and should still be addressed somehow for next merge window, or can be 
-ignored. 
+> This walks up the tree and disables the parent.  You then try to set the 
+> rate using clk_set_rate(). clk_set_rate() in this circumstance can't 
+> wait for the PLL to lock because it can't - there's no reference clock 
+> for it.
 
-Russell, can you please share your opinion?
+As an aside, this seems like a good time to mention that the behavior of 
+clk_set_rate() on a disabled clock needs to be clarified.
 
-Thanks,
-Janusz
+
+- Paul
