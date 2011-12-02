@@ -1,40 +1,35 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 02 Dec 2011 17:43:11 +0900
-Subject: [PATCH] ARM: S3C64XX: Remove extern from definition of framebuffer
- setup call
-In-Reply-To: <1322431498-6555-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-References: <1322431498-6555-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-Message-ID: <04f501ccb0ce$6cb981b0$462c8510$%kim@samsung.com>
+Date: Fri, 02 Dec 2011 17:43:21 +0900
+Subject: [PATCH v7 0/2] iommu/exynos: Add IOMMU/System MMU driver for
+ Samsung Exynos
+In-Reply-To: <20111201185821.GL20535@8bytes.org>
+References: <1321609650-1329-1-git-send-email-pullip.cho@samsung.com>
+ <20111123114626.GH20535@8bytes.org>
+ <045b01ccaffa$ef48c430$cdda4c90$%kim@samsung.com>
+ <20111201185821.GL20535@8bytes.org>
+Message-ID: <04f601ccb0ce$72590550$570b0ff0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark Brown wrote:
+Joerg Roedel wrote:
 > 
-> The extern is only useful on prototypes.
+> On Thu, Dec 01, 2011 at 04:29:17PM +0900, Kukjin Kim wrote:
+> > Anyway, that touches many Samsung stuff so it would be better if you
+> could
+> > create separate topic branch which can be merged into Samsung tree. And
+> if
+> > required, please add my ack on them.
 > 
-> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
-> ---
->  arch/arm/mach-s3c64xx/setup-fb-24bpp.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
+> Yes, I use topic-branches a lot :) This will end up in iommu/exynos or
+> something like that.
 > 
-> diff --git a/arch/arm/mach-s3c64xx/setup-fb-24bpp.c b/arch/arm/mach-
-> s3c64xx/setup-fb-24bpp.c
-> index 83d2afb..2cf8002 100644
-> --- a/arch/arm/mach-s3c64xx/setup-fb-24bpp.c
-> +++ b/arch/arm/mach-s3c64xx/setup-fb-24bpp.c
-> @@ -20,7 +20,7 @@
->  #include <plat/fb.h>
->  #include <plat/gpio-cfg.h>
-> 
-> -extern void s3c64xx_fb_gpio_setup_24bpp(void)
-> +void s3c64xx_fb_gpio_setup_24bpp(void)
->  {
->  	s3c_gpio_cfgrange_nopull(S3C64XX_GPI(0), 16, S3C_GPIO_SFN(2));
->  	s3c_gpio_cfgrange_nopull(S3C64XX_GPJ(0), 12, S3C_GPIO_SFN(2));
-> --
-> 1.7.7.3
+Hi Joerg,
 
-OK, will apply.
+OK, I will merge iommu/exynos into Samsung tree after your creating that.
+
+I can't look at iommu/exynos branch in your tree,
+git://git.kernel.org/pub/scm/linux/kernel/git/joro/iommu.git.
+
 Thanks.
 
 Best regards,
