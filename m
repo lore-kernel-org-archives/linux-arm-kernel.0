@@ -1,41 +1,77 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Sat, 03 Dec 2011 10:12:53 +1100
-Subject: [PATCH] ata: Don't use NO_IRQ in pata_of_platform driver
-In-Reply-To: <CA+55aFwekNWz+V4440f=2iu_BfOxSg0NjVogv4cZZDFbJBNoAQ@mail.gmail.com>
-References: <20111110162859.GA7088@oksana.dev.rtsoft.ru>
- <20111202192618.GC3037@localhost.localdomain>
- <CA+55aFwekNWz+V4440f=2iu_BfOxSg0NjVogv4cZZDFbJBNoAQ@mail.gmail.com>
-Message-ID: <1322867573.11728.22.camel@pasglop>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Fri, 2 Dec 2011 18:04:43 -0700 (MST)
+Subject: [PATCH v3 3/5] clk: introduce the common clock framework
+In-Reply-To: <20111201220337.GE19739@n2100.arm.linux.org.uk>
+References: <1321926047-14211-1-git-send-email-mturquette@linaro.org>
+ <1321926047-14211-4-git-send-email-mturquette@linaro.org>
+ <alpine.DEB.2.00.1111291619110.6289@utopia.booyaka.com>
+ <CAJOA=zM4vcyTt_RBEVm6JxmzW-Dna0gpuWda7ytq_mqFSuXw9g@mail.gmail.com>
+ <alpine.DEB.2.00.1111302308280.6289@utopia.booyaka.com>
+ <20111201144205.GA2103@sirena.org.uk>
+ <alpine.DEB.2.00.1112011124221.6289@utopia.booyaka.com>
+ <20111201220337.GE19739@n2100.arm.linux.org.uk>
+Message-ID: <alpine.DEB.2.00.1112021440270.6289@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2011-12-02 at 11:28 -0800, Linus Torvalds wrote:
-> On Fri, Dec 2, 2011 at 11:26 AM, Dave Martin <dave.martin@linaro.org> wrote:
-> >
-> > This is now broken on ARM where, for good or bad, NO_IRQ currently is
-> > used and is -1.
-> >
-> > How do we resolve it?  If we are ready to eliminate NO_IRQ from
-> > drivers/of/irq.c (or indeed, all code that uses it) and just use 0 for
-> > that case, we should surely just do it... but I'm not confident I can
-> > judge on that.
+On Thu, 1 Dec 2011, Russell King - ARM Linux wrote:
+
+> On Thu, Dec 01, 2011 at 11:30:16AM -0700, Paul Walmsley wrote:
+> > The intention behind the clk_{allow,block}_rate_change() proposal was to 
+> > allow the current user of the clock to change its rate without having to 
+> > call clk_{allow,block}_rate_change(), if that driver was the sole user of 
+> > the clock.
 > 
-> Just stop using NO_IRQ. First in drivers/of/irq.c, then in any drivers
-> as you notice breakage.
+> And how does a driver know that?
 
-Agreed. In fact the whole hack in drivers/of/irq.c was to accomodate ARM
-which still uses -1, powerpc changed to 0 a long time ago.
+The driver author might make this assumption when the device's upstream 
+clock tree is simple.  This assumption simplifies the driver's clock code, 
+since no clock rate change notifier callback would be needed.
 
-Now that we have a generic remapper between HW and "linux" IRQ numbers,
-there is no reason to stick to -1 even on ARM.
+This should be possible:
 
-> Don't *change* NO_IRQ to zero (that whole #define is broken - leave it
-> around as a marker of brokenness), just start removing it from all the
-> ARM drivers that use the OF infrastructure. Which is presumably not
-> all that many yet.
-> 
-> So whenever you find breakage, the fix now is to just remove NO_IRQ
-> tests, and replace them with "!irq".
+1. when there are no other users of the device's upstream clocks; or,
 
-Cheers,
-Ben.
+2. when a subset of the device's upstream clock tree can be used by
+   other devices, but the rates or source clocks of that subset either 
+   cannot be changed, or should never change.
+
+For example, consider an external audio codec device, such as the 
+TLV320AIC23.  The input clock source rate for this chip is likely to be 
+fixed for a given board design[1].  So the driver wouldn't need a clock 
+rate change notifier callback for its input clock source, since it would 
+never be called.  The clock dividers inside the codec may be represented 
+by clock nodes, but since they are handled by the same driver, the 
+coordination between them doesn't require any notifier callbacks.
+
+Another example would be a device that shares a portion of its upstream 
+clock tree with other devices, where the upstream clock tree is designed 
+to run at the same rate for all of the devices, such as the USIM IP block 
+on OMAP3430/3630[2].  The USIM shares a dedicated DPLL with the USBHOST 
+and USBTLL devices, but the DPLL is only intended to be programmed at a 
+single rate.  When the USIM is using this DPLL as a clock source, a 
+dedicated downstream clock divider is available that can be used to reduce 
+the USIM's input clock rate.  So the USIM driver would also not require 
+any clock rate change notifier callbacks, since the shared portions of its 
+parent clock tree should never change.
+
+Of course, it is possible that a new chip could appear with an identical 
+IP block inside it, but where cases 1 and 2 above are no longer true.  
+The worst outcome is that the driver's clk_set_rate() may no longer 
+succeed, returning -EBUSY, since another device may be blocking the rate 
+change.  The remedy is to update the driver to add the rate change 
+callback, and the associated internal logic to deal with it.
+
+
+- Paul
+
+1. Texas Instruments, _TLV320AIC23 Stereo Audio CODEC, 8- to 96-kHz, With 
+   Integrated Headphone Amplifier Data Manual_ (SLWS106D), May 2002, 
+   Section 3.3.2 "Audio Sampling Rates" and section 1.2 "Functional Block 
+   Diagram".   Available from http://www.ti.com/lit/gpn/tlv320aic23
+   (among others)
+
+2. Linux kernel v3.1-rc4, arch/arm/mach-omap2/clock3xxx_data.c, 
+   usim_clksel (line 2300).  Available from 
+   http://git.kernel.org/gitweb.cgi?p=linux/kernel/git/torvalds/linux.git;a=blob;f=arch/arm/mach-omap2/clock3xxx_data.c;h=5d0064a4fb5a638bb1141489354244e95899c1a1;hb=HEAD#l2300
+   (among others)
