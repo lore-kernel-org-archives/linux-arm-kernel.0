@@ -1,74 +1,154 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Sat, 03 Dec 2011 18:27:09 +0900
-Subject: [PATCH 1/4] ARM: EXYNOS4: Add DMC1, allow PPMU access for DMC.
-In-Reply-To: <CAH9JG2Vkm7uuUAeUZT179=dTUdi9mWsVDvZzWGn0h_NJLrC+mA@mail.gmail.com>
-References: <1322730317-8171-1-git-send-email-myungjoo.ham@samsung.com>
- <1322730317-8171-2-git-send-email-myungjoo.ham@samsung.com>
- <04fb01ccb0d1$016ebdf0$044c39d0$%kim@samsung.com>
- <CAH9JG2Vkm7uuUAeUZT179=dTUdi9mWsVDvZzWGn0h_NJLrC+mA@mail.gmail.com>
-Message-ID: <000301ccb19d$bb05e7d0$3111b770$%kim@samsung.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 3 Dec 2011 09:26:59 +0000
+Subject: [GIT PULL] ARM perf updates for 3.3
+In-Reply-To: <20111202170231.GP5540@mudshark.cambridge.arm.com>
+References: <20111202170231.GP5540@mudshark.cambridge.arm.com>
+Message-ID: <20111203092659.GL9581@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kyungmin Park wrote:
+On Fri, Dec 02, 2011 at 05:02:31PM +0000, Will Deacon wrote:
+> Hi Russell,
 > 
-> On 12/2/11, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> > MyungJoo Ham wrote:
-> >>
-> >> - Add DMC1
-> >> - Enlarge address space for DMC from 4k to 64k so that PPMU registers
-> >>   may be accessed.
-> >>
-> >> Signed-off-by: MyungJoo Ham <myungjoo.ham@samsung.com>
-> >> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> >> ---
-> >>  arch/arm/mach-exynos/cpu.c              |    7 ++++++-
-> >>  arch/arm/mach-exynos/include/mach/map.h |    1 +
-> >>  2 files changed, 7 insertions(+), 1 deletions(-)
-> >>
-> >> diff --git a/arch/arm/mach-exynos/cpu.c b/arch/arm/mach-exynos/cpu.c
-> >> index 90ec247..8bdcba9 100644
-> >> --- a/arch/arm/mach-exynos/cpu.c
-> >> +++ b/arch/arm/mach-exynos/cpu.c
-> >> @@ -108,7 +108,12 @@ static struct map_desc exynos4_iodesc[] __initdata
-> =
-> >> {
-> >>  	}, {
-> >>  		.virtual	= (unsigned long)S5P_VA_DMC0,
-> >>  		.pfn		= __phys_to_pfn(EXYNOS4_PA_DMC0),
-> >> -		.length		= SZ_4K,
-> >> +		.length		= SZ_64K,
-> >> +		.type		= MT_DEVICE,
-> >> +	}, {
-> >> +		.virtual	= (unsigned long)S5P_VA_DMC1,
-> >> +		.pfn		= __phys_to_pfn(EXYNOS4_PA_DMC1),
-> >> +		.length		= SZ_64K,
-> >>  		.type		= MT_DEVICE,
-> >>  	}, {
-> >>  		.virtual	= (unsigned long)S5P_VA_SROMC,
-> >> diff --git a/arch/arm/mach-exynos/include/mach/map.h b/arch/arm/mach-
-> >> exynos/include/mach/map.h
-> >> index 058541d..870a980 100644
-> >> --- a/arch/arm/mach-exynos/include/mach/map.h
-> >> +++ b/arch/arm/mach-exynos/include/mach/map.h
-> >> @@ -57,6 +57,7 @@
-> >>  #define EXYNOS4_PA_KEYPAD		0x100A0000
-> >>
-> >>  #define EXYNOS4_PA_DMC0			0x10400000
-> >> +#define EXYNOS4_PA_DMC1			0x10410000
-> >
-> > If required, so just '.length = SZ_128K'?...
-> Doesn't it more confuse and difficult to use?
+> Please pull these updates to the ARM perf code for 3.3. The highlights are
+> probably the CTI stuff (which is in preparation for OMAP4 support coming from
+> Lei Ming, Benoit and Paul) and the cleanup of the event numbers for ARMv7 so
+> that they are easier to follow. I was hoping to add Cortex-A7 support but I
+> haven't got my paws on an FPGA yet.
 > 
-> Even though there's not much definitions. it defines the offset concept.
-> "arch/arm/mach-exynos/include/mach/regs-mem.h"
-> 
-OK.
+> I've not included my contextidr patch with this pull because it conflicts
+> quite badly with the LPAE patches. I can rework this for 3.4 later on (I
+> already have a fixup).
 
-Thanks.
+While merging this, I get conflicts in gic.c and omap's common.h.  I'm
+intending to resolve them as below - please check this _before_ I commit
+it (which means my tree is frozen until this is resolved.)
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+diff --cc arch/arm/common/gic.c
+index a1feb6b,410a546..0000000
+--- a/arch/arm/common/gic.c
++++ b/arch/arm/common/gic.c
+@@@ -696,12 -582,16 +697,14 @@@ void __init gic_init_bases(unsigned in
+  	 * For primary GICs, skip over SGIs.
+  	 * For secondary GICs, skip over PPIs, too.
+  	 */
++ 	domain->hwirq_base = 32;
+  	if (gic_nr == 0) {
+- 		domain->hwirq_base = 16;
+- 		if (irq_start > 0)
+- 			irq_start = (irq_start & ~31) + 16;
+- 	} else
+- 		domain->hwirq_base = 32;
+ -		gic_cpu_base_addr = cpu_base;
+ -
++ 		if ((irq_start & 31) > 0) {
++ 			domain->hwirq_base = 16;
++ 			if (irq_start != -1)
++ 				irq_start = (irq_start & ~31) + 16;
++ 		}
++ 	}
+  
+  	/*
+  	 * Find out how many interrupts are supported.
+diff --cc arch/arm/plat-omap/include/plat/common.h
+index 346098f,3ff3e36..0000000
+--- a/arch/arm/plat-omap/include/plat/common.h
++++ b/arch/arm/plat-omap/include/plat/common.h
+@@@ -27,12 -27,97 +27,15 @@@
+  #ifndef __ARCH_ARM_MACH_OMAP_COMMON_H
+  #define __ARCH_ARM_MACH_OMAP_COMMON_H
+  
+ -#include <linux/delay.h>
+ -
+  #include <plat/i2c.h>
++ #include <plat/omap_hwmod.h>
+  
+ -struct sys_timer;
+ -
+ -extern void omap_map_common_io(void);
+ -extern struct sys_timer omap1_timer;
+ -extern struct sys_timer omap2_timer;
+ -extern struct sys_timer omap3_timer;
+ -extern struct sys_timer omap3_secure_timer;
+ -extern struct sys_timer omap4_timer;
+ -extern bool omap_32k_timer_init(void);
+  extern int __init omap_init_clocksource_32k(void);
+  extern unsigned long long notrace omap_32k_sched_clock(void);
+  
+  extern void omap_reserve(void);
+ -
+ -void omap2420_init_early(void);
+ -void omap2430_init_early(void);
+ -void omap3430_init_early(void);
+ -void omap35xx_init_early(void);
+ -void omap3630_init_early(void);
+ -void omap3_init_early(void);	/* Do not use this one */
+ -void am35xx_init_early(void);
+ -void ti816x_init_early(void);
+ -void omap4430_init_early(void);
+ -
++ extern int omap_dss_reset(struct omap_hwmod *);
++ 
+  void omap_sram_init(void);
+  
+ -/*
+ - * IO bases for various OMAP processors
+ - * Except the tap base, rest all the io bases
+ - * listed are physical addresses.
+ - */
+ -struct omap_globals {
+ -	u32		class;		/* OMAP class to detect */
+ -	void __iomem	*tap;		/* Control module ID code */
+ -	void __iomem	*sdrc;           /* SDRAM Controller */
+ -	void __iomem	*sms;            /* SDRAM Memory Scheduler */
+ -	void __iomem	*ctrl;           /* System Control Module */
+ -	void __iomem	*ctrl_pad;	/* PAD Control Module */
+ -	void __iomem	*prm;            /* Power and Reset Management */
+ -	void __iomem	*cm;             /* Clock Management */
+ -	void __iomem	*cm2;
+ -};
+ -
+ -void omap2_set_globals_242x(void);
+ -void omap2_set_globals_243x(void);
+ -void omap2_set_globals_3xxx(void);
+ -void omap2_set_globals_443x(void);
+ -void omap2_set_globals_ti816x(void);
+ -
+ -/* These get called from omap2_set_globals_xxxx(), do not call these */
+ -void omap2_set_globals_tap(struct omap_globals *);
+ -void omap2_set_globals_sdrc(struct omap_globals *);
+ -void omap2_set_globals_control(struct omap_globals *);
+ -void omap2_set_globals_prcm(struct omap_globals *);
+ -
+ -void omap242x_map_io(void);
+ -void omap243x_map_io(void);
+ -void omap3_map_io(void);
+ -void omap4_map_io(void);
+ -
+ -
+ -/**
+ - * omap_test_timeout - busy-loop, testing a condition
+ - * @cond: condition to test until it evaluates to true
+ - * @timeout: maximum number of microseconds in the timeout
+ - * @index: loop index (integer)
+ - *
+ - * Loop waiting for @cond to become true or until at least @timeout
+ - * microseconds have passed.  To use, define some integer @index in the
+ - * calling code.  After running, if @index == @timeout, then the loop has
+ - * timed out.
+ - */
+ -#define omap_test_timeout(cond, timeout, index)			\
+ -({								\
+ -	for (index = 0; index < timeout; index++) {		\
+ -		if (cond)					\
+ -			break;					\
+ -		udelay(1);					\
+ -	}							\
+ -})
+ -
+ -extern struct device *omap2_get_mpuss_device(void);
+ -extern struct device *omap2_get_iva_device(void);
+ -extern struct device *omap2_get_l3_device(void);
+ -extern struct device *omap4_get_dsp_device(void);
+ -
+  #endif /* __ARCH_ARM_MACH_OMAP_COMMON_H */
