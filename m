@@ -1,636 +1,131 @@
-From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
-Date: Fri, 2 Dec 2011 12:11:17 -0500
-Subject: [RFC v2 1/2] dma-buf: Introduce dma buffer sharing mechanism
-In-Reply-To: <1322816252-19955-2-git-send-email-sumit.semwal@ti.com>
-References: <1322816252-19955-1-git-send-email-sumit.semwal@ti.com>
- <1322816252-19955-2-git-send-email-sumit.semwal@ti.com>
-Message-ID: <20111202171117.GA27322@phenom.dumpdata.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Sat, 03 Dec 2011 13:00:43 -0500 (EST)
+Subject: [RFC][PATCH] ARM: kirkwood: Remove eSATA SheevaPlug board support
+In-Reply-To: <1322912383.2378.79.camel@computer2>
+References: <1322737480.9622.5.camel@phoenix>
+ <1322912383.2378.79.camel@computer2>
+Message-ID: <alpine.LFD.2.02.1112031247230.2357@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 02, 2011 at 02:27:31PM +0530, Sumit Semwal wrote:
-> This is the first step in defining a dma buffer sharing mechanism.
-> 
-> A new buffer object dma_buf is added, with operations and API to allow easy
-> sharing of this buffer object across devices.
-> 
-> The framework allows:
-> - different devices to 'attach' themselves to this buffer, to facilitate
->   backing storage negotiation, using dma_buf_attach() API.
-> - association of a file pointer with each user-buffer and associated
->    allocator-defined operations on that buffer. This operation is called the
->    'export' operation.
-> - this exported buffer-object to be shared with the other entity by asking for
->    its 'file-descriptor (fd)', and sharing the fd across.
-> - a received fd to get the buffer object back, where it can be accessed using
->    the associated exporter-defined operations.
-> - the exporter and user to share the scatterlist using map_dma_buf and
->    unmap_dma_buf operations.
-> 
-> Atleast one 'attach()' call is required to be made prior to calling the
-> map_dma_buf() operation.
-> 
-> Couple of building blocks in map_dma_buf() are added to ease introduction
-> of sync'ing across exporter and users, and late allocation by the exporter.
-> 
-> *OPTIONALLY*: mmap() file operation is provided for the associated 'fd', as
-> wrapper over the optional allocator defined mmap(), to be used by devices
-> that might need one.
-> 
-> More details are there in the documentation patch.
-> 
-> This is based on design suggestions from many people at the mini-summits[1],
-> most notably from Arnd Bergmann <arnd@arndb.de>, Rob Clark <rob@ti.com> and
-> Daniel Vetter <daniel@ffwll.ch>.
-> 
-> The implementation is inspired from proof-of-concept patch-set from
-> Tomasz Stanislawski <t.stanislaws@samsung.com>, who demonstrated buffer sharing
-> between two v4l2 devices. [2]
-> 
-> [1]: https://wiki.linaro.org/OfficeofCTO/MemoryManagement
-> [2]: http://lwn.net/Articles/454389
-> 
-> Signed-off-by: Sumit Semwal <sumit.semwal@linaro.org>
-> Signed-off-by: Sumit Semwal <sumit.semwal@ti.com>
+On Sat, 3 Dec 2011, Tixy wrote:
 
-You have a clone? You only need one SOB.
+> On Thu, 2011-12-01 at 19:04 +0800, Axel Lin wrote: 
+> > commit bb9b25f923 "ARM: Update mach-types" removes sheeva_esata entry
+> > from mach-types, so current code in arch/arm/mach-kirkwood/sheevaplug-setup.c
+> > always compile fail.
+> > 
+> > This patch removes sheeva_esata related code.
+> 
+> As I use this device I would rather not see support for it dropped.
 
+Sorry to catch up late.
+
+I really don't see why this support has to be dropped.  The removal of 
+the eSata SheevaPlug entry from the machine registry was a mistake and 
+that's where a fix should be directed to.
+
+> After doing some digging in the mail archives I believe the eSata
+> SheevaPlug entry has been deleted due to the machine_is_xxx() name not
+> matching the CONFIG_XXX name. A fix for this was proposed a while back
+> by Nicolas Pitre: http://www.spinics.net/lists/arm-kernel/msg140555.html
+> 
+> Is it now too late to fix this now?
+
+It is never too late to fix mistakes.
+
+> Below is a respin of Nicolas's original patch based on yesterdays
+> linux-next...
+> 
+> 8<---------------------------------------------------------------------->8
+> 
+> [PATCH] Fix machine_is_xxx() naming for eSata SheevaPlug and QNAP TS-209
+> 
+> The eSata SheevaPlug and QNAP TS-209 devices were removed from
+> mach-types due to naming mismatches between machine_is_xxx(), CONFIG_XXX
+> and MACH_TYPE_XXX.
+> 
+> This patch fixes those mismatches and adds the devices back into
+> mach-types.
+> 
+> Cc: Nicolas Pitre <nico@fluxnic.net>
+> Cc: Lennert Buytenhek <kernel@wantstofly.org>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Signed-off-by: Jon Medhurst <tixy@yxit.co.uk>
+
+Acked-by: Nicolas Pitre <nico@linaro.org>
+
+Obviously, the change to mach-types should be done in the machine 
+registry database as well by RMK.
 
 > ---
->  drivers/base/Kconfig    |   10 ++
->  drivers/base/Makefile   |    1 +
->  drivers/base/dma-buf.c  |  290 +++++++++++++++++++++++++++++++++++++++++++++++
->  include/linux/dma-buf.h |  176 ++++++++++++++++++++++++++++
->  4 files changed, 477 insertions(+), 0 deletions(-)
->  create mode 100644 drivers/base/dma-buf.c
->  create mode 100644 include/linux/dma-buf.h
+>  arch/arm/mach-kirkwood/sheevaplug-setup.c |    6 +++---
+>  arch/arm/mach-orion5x/ts209-setup.c       |    2 +-
+>  arch/arm/tools/mach-types                 |    2 ++
+>  3 files changed, 6 insertions(+), 4 deletions(-)
 > 
-> diff --git a/drivers/base/Kconfig b/drivers/base/Kconfig
-> index 21cf46f..07d8095 100644
-> --- a/drivers/base/Kconfig
-> +++ b/drivers/base/Kconfig
-> @@ -174,4 +174,14 @@ config SYS_HYPERVISOR
+> diff --git a/arch/arm/mach-kirkwood/sheevaplug-setup.c b/arch/arm/mach-kirkwood/sheevaplug-setup.c
+> index 85bff6b..4ea70e5 100644
+> --- a/arch/arm/mach-kirkwood/sheevaplug-setup.c
+> +++ b/arch/arm/mach-kirkwood/sheevaplug-setup.c
+> @@ -107,7 +107,7 @@ static void __init sheevaplug_init(void)
+>  	kirkwood_init();
 >  
->  source "drivers/base/regmap/Kconfig"
+>  	/* setup gpio pin select */
+> -	if (machine_is_sheeva_esata())
+> +	if (machine_is_esata_sheevaplug())
+>  		kirkwood_mpp_conf(sheeva_esata_mpp_config);
+>  	else
+>  		kirkwood_mpp_conf(sheevaplug_mpp_config);
+> @@ -123,11 +123,11 @@ static void __init sheevaplug_init(void)
+>  	kirkwood_ge00_init(&sheevaplug_ge00_data);
 >  
-> +config DMA_SHARED_BUFFER
-> +	bool "Buffer framework to be shared between drivers"
-> +	default n
-> +	depends on ANON_INODES
-> +	help
-> +	  This option enables the framework for buffer-sharing between
-> +	  multiple drivers. A buffer is associated with a file using driver
-> +	  APIs extension; the file's descriptor can then be passed on to other
-> +	  driver.
-> +
->  endmenu
-> diff --git a/drivers/base/Makefile b/drivers/base/Makefile
-> index 99a375a..d0df046 100644
-> --- a/drivers/base/Makefile
-> +++ b/drivers/base/Makefile
-> @@ -8,6 +8,7 @@ obj-$(CONFIG_DEVTMPFS)	+= devtmpfs.o
->  obj-y			+= power/
->  obj-$(CONFIG_HAS_DMA)	+= dma-mapping.o
->  obj-$(CONFIG_HAVE_GENERIC_DMA_COHERENT) += dma-coherent.o
-> +obj-$(CONFIG_DMA_SHARED_BUFFER) += dma-buf.o
->  obj-$(CONFIG_ISA)	+= isa.o
->  obj-$(CONFIG_FW_LOADER)	+= firmware_class.o
->  obj-$(CONFIG_NUMA)	+= node.o
-> diff --git a/drivers/base/dma-buf.c b/drivers/base/dma-buf.c
-> new file mode 100644
-> index 0000000..4b9005e
-> --- /dev/null
-> +++ b/drivers/base/dma-buf.c
-> @@ -0,0 +1,290 @@
-> +/*
-> + * Framework for buffer objects that can be shared across devices/subsystems.
-> + *
-> + * Copyright(C) 2011 Linaro Limited. All rights reserved.
-> + * Author: Sumit Semwal <sumit.semwal@ti.com>
-
-OK, so the SOB should be from @ti.com then.
-
-> + *
-> + * Many thanks to linaro-mm-sig list, and specially
-> + * Arnd Bergmann <arnd@arndb.de>, Rob Clark <rob@ti.com> and
-> + * Daniel Vetter <daniel@ffwll.ch> for their support in creation and
-> + * refining of this idea.
-> + *
-> + * This program is free software; you can redistribute it and/or modify it
-> + * under the terms of the GNU General Public License version 2 as published by
-> + * the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful, but WITHOUT
-> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-> + * more details.
-> + *
-> + * You should have received a copy of the GNU General Public License along with
-> + * this program.  If not, see <http://www.gnu.org/licenses/>.
-> + */
-> +
-> +#include <linux/fs.h>
-> +#include <linux/slab.h>
-> +#include <linux/dma-buf.h>
-> +#include <linux/anon_inodes.h>
-> +#include <linux/export.h>
-> +
-> +static inline int is_dma_buf_file(struct file *);
-> +
-> +static int dma_buf_mmap(struct file *file, struct vm_area_struct *vma)
-> +{
-> +	struct dma_buf *dmabuf;
-> +
-> +	if (!is_dma_buf_file(file))
-> +		return -EINVAL;
-> +
-> +	dmabuf = file->private_data;
-> +
-
-Should you check if dmabuf is NULL and or dmabuf->ops is NULL too?
-
-Hm, you probably don't need to check for dmabuf, but from
-looking at  dma_buf_export one could pass  a NULL for the ops.
-
-> +	if (!dmabuf->ops->mmap)
-> +		return -EINVAL;
-> +
-> +	return dmabuf->ops->mmap(dmabuf, vma);
-> +}
-> +
-> +static int dma_buf_release(struct inode *inode, struct file *file)
-> +{
-> +	struct dma_buf *dmabuf;
-> +
-> +	if (!is_dma_buf_file(file))
-> +		return -EINVAL;
-> +
-> +	dmabuf = file->private_data;
-> +
-
-No checking here for ops or ops->release?
-
-> +	dmabuf->ops->release(dmabuf);
-> +	kfree(dmabuf);
-> +	return 0;
-> +}
-> +
-> +static const struct file_operations dma_buf_fops = {
-> +	.mmap		= dma_buf_mmap,
-> +	.release	= dma_buf_release,
-> +};
-> +
-> +/*
-> + * is_dma_buf_file - Check if struct file* is associated with dma_buf
-> + */
-> +static inline int is_dma_buf_file(struct file *file)
-> +{
-> +	return file->f_op == &dma_buf_fops;
-> +}
-> +
-> +/**
-
-I don't think the ** is anymore the current kernel doc format.
-
-> + * dma_buf_export - Creates a new dma_buf, and associates an anon file
-> + * with this buffer,so it can be exported.
-
-Put a space there.
-
-> + * Also connect the allocator specific data and ops to the buffer.
-> + *
-> + * @priv:	[in]	Attach private data of allocator to this buffer
-> + * @ops:	[in]	Attach allocator-defined dma buf ops to the new buffer.
-> + * @flags:	[in]	mode flags for the file.
-> + *
-> + * Returns, on success, a newly created dma_buf object, which wraps the
-> + * supplied private data and operations for dma_buf_ops. On failure to
-> + * allocate the dma_buf object, it can return NULL.
-
-"it can" I think the right word is "it will".
-
-> + *
-> + */
-> +struct dma_buf *dma_buf_export(void *priv, struct dma_buf_ops *ops,
-> +				int flags)
-> +{
-> +	struct dma_buf *dmabuf;
-> +	struct file *file;
-> +
-> +	BUG_ON(!priv || !ops);
-
-Whoa. Crash the whole kernel b/c of this? No no. You should
-use WARN_ON and just return NULL.
-
-> +
-> +	dmabuf = kzalloc(sizeof(struct dma_buf), GFP_KERNEL);
-> +	if (dmabuf == NULL)
-> +		return dmabuf;
-
-Hmm, why not return ERR_PTR(-ENOMEM); ?
-
-> +
-> +	dmabuf->priv = priv;
-> +	dmabuf->ops = ops;
-> +
-> +	file = anon_inode_getfile("dmabuf", &dma_buf_fops, dmabuf, flags);
-> +
-> +	dmabuf->file = file;
-> +
-> +	mutex_init(&dmabuf->lock);
-> +	INIT_LIST_HEAD(&dmabuf->attachments);
-> +
-> +	return dmabuf;
-> +}
-> +EXPORT_SYMBOL(dma_buf_export);
-
-_GPL ?
-
-> +
-> +
-> +/**
-> + * dma_buf_fd - returns a file descriptor for the given dma_buf
-> + * @dmabuf:	[in]	pointer to dma_buf for which fd is required.
-> + *
-> + * On success, returns an associated 'fd'. Else, returns error.
-> + */
-> +int dma_buf_fd(struct dma_buf *dmabuf)
-> +{
-> +	int error, fd;
-> +
-
-Should you check if dmabuf is NULL first?
-
-> +	if (!dmabuf->file)
-> +		return -EINVAL;
-> +
-> +	error = get_unused_fd_flags(0);
-> +	if (error < 0)
-> +		return error;
-> +	fd = error;
-> +
-> +	fd_install(fd, dmabuf->file);
-> +
-> +	return fd;
-> +}
-> +EXPORT_SYMBOL(dma_buf_fd);
-
-GPL?
-> +
-> +/**
-> + * dma_buf_get - returns the dma_buf structure related to an fd
-> + * @fd:	[in]	fd associated with the dma_buf to be returned
-> + *
-> + * On success, returns the dma_buf structure associated with an fd; uses
-> + * file's refcounting done by fget to increase refcount. returns ERR_PTR
-> + * otherwise.
-> + */
-> +struct dma_buf *dma_buf_get(int fd)
-> +{
-> +	struct file *file;
-> +
-> +	file = fget(fd);
-> +
-> +	if (!file)
-> +		return ERR_PTR(-EBADF);
-> +
-> +	if (!is_dma_buf_file(file)) {
-> +		fput(file);
-> +		return ERR_PTR(-EINVAL);
-> +	}
-> +
-> +	return file->private_data;
-> +}
-> +EXPORT_SYMBOL(dma_buf_get);
-
-GPL
-> +
-> +/**
-> + * dma_buf_put - decreases refcount of the buffer
-> + * @dmabuf:	[in]	buffer to reduce refcount of
-> + *
-> + * Uses file's refcounting done implicitly by fput()
-> + */
-> +void dma_buf_put(struct dma_buf *dmabuf)
-> +{
-> +	BUG_ON(!dmabuf->file);
-
-Yikes. BUG_ON? Can't you do WARN_ON and continue on without
-doing the refcounting?
-
-> +
-> +	fput(dmabuf->file);
-> +}
-> +EXPORT_SYMBOL(dma_buf_put);
-> +
-> +/**
-> + * dma_buf_attach - Add the device to dma_buf's attachments list; optionally,
-> + * calls attach() of dma_buf_ops to allow device-specific attach functionality
-> + * @dmabuf:	[in]	buffer to attach device to.
-> + * @dev:	[in]	device to be attached.
-> + *
-> + * Returns struct dma_buf_attachment * for this attachment; may return NULL.
-> + *
-> + */
-> +struct dma_buf_attachment *dma_buf_attach(struct dma_buf *dmabuf,
-> +						struct device *dev)
-
-'struct device' should be at the same column as 'struct dma_buf' ..
-
-> +{
-> +	struct dma_buf_attachment *attach;
-> +	int ret;
-> +
-> +	BUG_ON(!dmabuf || !dev);
-
-Again, BUG_ON...
-
-> +
-> +	attach = kzalloc(sizeof(struct dma_buf_attachment), GFP_KERNEL);
-> +	if (attach == NULL)
-> +		goto err_alloc;
-> +
-> +	mutex_lock(&dmabuf->lock);
-> +
-> +	attach->dev = dev;
-> +	attach->dmabuf = dmabuf;
-> +	if (dmabuf->ops->attach) {
-
-No checking first of dmabuf->ops?
-
-> +		ret = dmabuf->ops->attach(dmabuf, dev, attach);
-> +		if (!ret)
-> +			goto err_attach;
-> +	}
-> +	list_add(&attach->node, &dmabuf->attachments);
-> +
-> +	mutex_unlock(&dmabuf->lock);
-> +
-> +err_alloc:
-> +	return attach;
-> +err_attach:
-> +	kfree(attach);
-> +	mutex_unlock(&dmabuf->lock);
-> +	return ERR_PTR(ret);
-> +}
-> +EXPORT_SYMBOL(dma_buf_attach);
-
-GPL
-> +
-> +/**
-> + * dma_buf_detach - Remove the given attachment from dmabuf's attachments list;
-> + * optionally calls detach() of dma_buf_ops for device-specific detach
-> + * @dmabuf:	[in]	buffer to detach from.
-> + * @attach:	[in]	attachment to be detached; is free'd after this call.
-> + *
-> + */
-> +void dma_buf_detach(struct dma_buf *dmabuf, struct dma_buf_attachment *attach)
-> +{
-> +	BUG_ON(!dmabuf || !attach);
-> +
-> +	mutex_lock(&dmabuf->lock);
-> +	list_del(&attach->node);
-> +	if (dmabuf->ops->detach)
-> +		dmabuf->ops->detach(dmabuf, attach);
-> +
-> +	mutex_unlock(&dmabuf->lock);
-> +	kfree(attach);
-> +}
-> +EXPORT_SYMBOL(dma_buf_detach);
-> +
-> +/**
-> + * dma_buf_map_attachment - Returns the scatterlist table of the attachment;
-> + * mapped into _device_ address space. Is a wrapper for map_dma_buf() of the
-> + * dma_buf_ops.
-> + * @attach:	[in]	attachment whose scatterlist is to be returned
-> + * @direction:	[in]	direction of DMA transfer
-> + *
-> + * Returns sg_table containing the scatterlist to be returned; may return NULL
-> + * or ERR_PTR.
-> + *
-> + */
-> +struct sg_table * dma_buf_map_attachment(struct dma_buf_attachment *attach,
-> +                                         enum dma_data_direction direction)
-> +{
-> +	struct sg_table *sg_table = ERR_PTR(-EINVAL);
-> +
-> +	BUG_ON(!attach || !attach->dmabuf);
-> +
-> +	mutex_lock(&attach->dmabuf->lock);
-> +	if (attach->dmabuf->ops->map_dma_buf)
-> +		sg_table = attach->dmabuf->ops->map_dma_buf(attach, direction);
-> +	mutex_unlock(&attach->dmabuf->lock);
-> +
-> +	return sg_table;
-> +}
-> +EXPORT_SYMBOL(dma_buf_map_attachment);
-> +
-> +/**
-> + * dma_buf_unmap_attachment - unmaps and decreases usecount of the buffer;might
-> + * deallocate the scatterlist associated. Is a wrapper for unmap_dma_buf() of
-> + * dma_buf_ops.
-> + * @attach:	[in]	attachment to unmap buffer from
-> + * @sg_table:	[in]	scatterlist info of the buffer to unmap
-> + *
-> + */
-> +void dma_buf_unmap_attachment(struct dma_buf_attachment *attach,
-> +				struct sg_table *sg_table)
-> +{
-> +	BUG_ON(!attach || !attach->dmabuf || !sg_table);
-> +
-> +	mutex_lock(&attach->dmabuf->lock);
-> +	if (attach->dmabuf->ops->unmap_dma_buf)
-> +		attach->dmabuf->ops->unmap_dma_buf(attach, sg_table);
-> +	mutex_unlock(&attach->dmabuf->lock);
-> +
-> +}
-> +EXPORT_SYMBOL(dma_buf_unmap_attachment);
-> diff --git a/include/linux/dma-buf.h b/include/linux/dma-buf.h
-> new file mode 100644
-> index 0000000..db4b384
-> --- /dev/null
-> +++ b/include/linux/dma-buf.h
-> @@ -0,0 +1,176 @@
-> +/*
-> + * Header file for dma buffer sharing framework.
-> + *
-> + * Copyright(C) 2011 Linaro Limited. All rights reserved.
-> + * Author: Sumit Semwal <sumit.semwal@ti.com>
-> + *
-> + * Many thanks to linaro-mm-sig list, and specially
-> + * Arnd Bergmann <arnd@arndb.de>, Rob Clark <rob@ti.com> and
-> + * Daniel Vetter <daniel@ffwll.ch> for their support in creation and
-> + * refining of this idea.
-> + *
-> + * This program is free software; you can redistribute it and/or modify it
-> + * under the terms of the GNU General Public License version 2 as published by
-> + * the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful, but WITHOUT
-> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-> + * more details.
-> + *
-> + * You should have received a copy of the GNU General Public License along with
-> + * this program.  If not, see <http://www.gnu.org/licenses/>.
-> + */
-> +#ifndef __DMA_BUF_H__
-> +#define __DMA_BUF_H__
-> +
-> +#include <linux/file.h>
-> +#include <linux/err.h>
-> +#include <linux/device.h>
-> +#include <linux/scatterlist.h>
-> +#include <linux/list.h>
-> +#include <linux/dma-mapping.h>
-> +
-> +struct dma_buf;
-> +
-> +/**
-> + * struct dma_buf_attachment - holds device-buffer attachment data
-> + * @dmabuf: buffer for this attachment.
-> + * @dev: device attached to the buffer.
-> + * @node: list_head to allow manipulation of list of dma_buf_attachment.
-> + * @priv: exporter-specific attachment data.
-> + */
-> +struct dma_buf_attachment {
-> +	struct dma_buf *dmabuf;
-> +	struct device *dev;
-> +	struct list_head node;
-> +	void *priv;
-> +};
-> +
-> +/**
-> + * struct dma_buf_ops - operations possible on struct dma_buf
-> + * @attach: allows different devices to 'attach' themselves to the given
-> + *	    buffer. It might return -EBUSY to signal that backing storage
-> + *	    is already allocated and incompatible with the requirements
-> + *	    of requesting device. [optional]
-> + * @detach: detach a given device from this buffer. [optional]
-> + * @map_dma_buf: returns list of scatter pages allocated, increases usecount
-> + *		 of the buffer. Requires atleast one attach to be called
-> + *		 before. Returned sg list should already be mapped into
-> + *		 _device_ address space. This call may sleep.
-> + * @unmap_dma_buf: decreases usecount of buffer, might deallocate scatter
-> + *		   pages.
-> + * @mmap: memory map this buffer - optional.
-> + * @release: release this buffer; to be called after the last dma_buf_put.
-> + * @sync_sg_for_cpu: sync the sg list for cpu.
-> + * @sync_sg_for_device: synch the sg list for device.
-> + */
-> +struct dma_buf_ops {
-> +	int (*attach)(struct dma_buf *, struct device *,
-> +			struct dma_buf_attachment *);
-> +
-> +	void (*detach)(struct dma_buf *, struct dma_buf_attachment *);
-> +
-> +	/* For {map,unmap}_dma_buf below, any specific buffer attributes
-> +	 * required should get added to device_dma_parameters accessible
-> +	 * via dev->dma_params.
-> +	 */
-> +	struct sg_table * (*map_dma_buf)(struct dma_buf_attachment *,
-> +						enum dma_data_direction);
-> +	void (*unmap_dma_buf)(struct dma_buf_attachment *,
-> +						struct sg_table *);
-> +	/* TODO: Add try_map_dma_buf version, to return immed with -EBUSY
-> +	 * if the call would block.
-> +	 */
-> +
-> +	/* allow mmap optionally for devices that need it */
-> +	int (*mmap)(struct dma_buf *, struct vm_area_struct *);
-> +	/* after final dma_buf_put() */
-> +	void (*release)(struct dma_buf *);
-> +
-> +	/* allow allocator to take care of cache ops */
-> +	void (*sync_sg_for_cpu) (struct dma_buf *, struct device *);
-> +	void (*sync_sg_for_device)(struct dma_buf *, struct device *);
-> +};
-> +
-> +/**
-> + * struct dma_buf - shared buffer object
-> + * @file: file pointer used for sharing buffers across, and for refcounting.
-> + * @attachments: list of dma_buf_attachment that denotes all devices attached.
-> + * @ops: dma_buf_ops associated with this buffer object
-> + * @priv: user specific private data
-> + */
-> +struct dma_buf {
-> +	size_t size;
-> +	struct file *file;
-> +	struct list_head attachments;
-> +	const struct dma_buf_ops *ops;
-> +	/* mutex to serialize list manipulation and other ops */
-> +	struct mutex lock;
-> +	void *priv;
-> +};
-> +
-> +#ifdef CONFIG_DMA_SHARED_BUFFER
-> +struct dma_buf_attachment *dma_buf_attach(struct dma_buf *dmabuf,
-> +							struct device *dev);
-> +void dma_buf_detach(struct dma_buf *dmabuf,
-> +				struct dma_buf_attachment *dmabuf_attach);
-> +struct dma_buf *dma_buf_export(void *priv, struct dma_buf_ops *ops, int flags);
-> +int dma_buf_fd(struct dma_buf *dmabuf);
-> +struct dma_buf *dma_buf_get(int fd);
-> +void dma_buf_put(struct dma_buf *dmabuf);
-> +
-> +struct sg_table * dma_buf_map_attachment(struct dma_buf_attachment *,
-> +					 enum dma_data_direction);
-> +void dma_buf_unmap_attachment(struct dma_buf_attachment *, struct sg_table *);
-> +#else
-> +
-> +static inline struct dma_buf_attachment *dma_buf_attach(struct dma_buf *dmabuf,
-> +							struct device *dev)
-> +{
-> +	return ERR_PTR(-ENODEV);
-> +}
-> +
-> +static inline void dma_buf_detach(struct dma_buf *dmabuf,
-> +				  struct dma_buf_attachment *dmabuf_attach)
-> +{
-> +	return;
-> +}
-> +
-> +static inline struct dma_buf *dma_buf_export(void *priv,
-> +						struct dma_buf_ops *ops,
-> +						int flags)
-> +{
-> +	return ERR_PTR(-ENODEV);
-> +}
-> +
-> +static inline int dma_buf_fd(struct dma_buf *dmabuf)
-> +{
-> +	return -ENODEV;
-> +}
-> +
-> +static inline struct dma_buf *dma_buf_get(int fd)
-> +{
-> +	return ERR_PTR(-ENODEV);
-> +}
-> +
-> +static inline void dma_buf_put(struct dma_buf *dmabuf)
-> +{
-> +	return;
-> +}
-> +
-> +static inline struct sg_table * dma_buf_map_attachment(
-> +	struct dma_buf_attachment *, enum dma_data_direction)
-> +{
-> +	return ERR_PTR(-ENODEV);
-> +}
-> +
-> +static inline void dma_buf_unmap_attachment(struct dma_buf_attachment *,
-> +						struct sg_table *)
-> +{
-> +	return;
-> +}
-> +
-> +#endif /* CONFIG_DMA_SHARED_BUFFER */
-> +
-> +#endif /* __DMA_BUF_H__ */
+>  	/* honor lower power consumption for plugs with out eSATA */
+> -	if (machine_is_sheeva_esata())
+> +	if (machine_is_esata_sheevaplug())
+>  		kirkwood_sata_init(&sheeva_esata_sata_data);
+>  
+>  	/* enable sd wp and sd cd on plugs with esata */
+> -	if (machine_is_sheeva_esata())
+> +	if (machine_is_esata_sheevaplug())
+>  		kirkwood_sdio_init(&sheeva_esata_mvsdio_data);
+>  	else
+>  		kirkwood_sdio_init(&sheevaplug_mvsdio_data);
+> diff --git a/arch/arm/mach-orion5x/ts209-setup.c b/arch/arm/mach-orion5x/ts209-setup.c
+> index 62c156b..5d64087 100644
+> --- a/arch/arm/mach-orion5x/ts209-setup.c
+> +++ b/arch/arm/mach-orion5x/ts209-setup.c
+> @@ -178,7 +178,7 @@ static struct hw_pci qnap_ts209_pci __initdata = {
+>  
+>  static int __init qnap_ts209_pci_init(void)
+>  {
+> -	if (machine_is_ts_x09())
+> +	if (machine_is_ts209())
+>  		pci_common_init(&qnap_ts209_pci);
+>  
+>  	return 0;
+> diff --git a/arch/arm/tools/mach-types b/arch/arm/tools/mach-types
+> index 459d114..7f9809a 100644
+> --- a/arch/arm/tools/mach-types
+> +++ b/arch/arm/tools/mach-types
+> @@ -269,6 +269,7 @@ dns323			MACH_DNS323		DNS323			1542
+>  omap3_beagle		MACH_OMAP3_BEAGLE	OMAP3_BEAGLE		1546
+>  nokia_n810		MACH_NOKIA_N810		NOKIA_N810		1548
+>  pcm038			MACH_PCM038		PCM038			1551
+> +ts209			MACH_TS209		TS209			1565
+>  at91cap9adk		MACH_AT91CAP9ADK	AT91CAP9ADK		1566
+>  mx31moboard		MACH_MX31MOBOARD	MX31MOBOARD		1574
+>  vision_ep9307		MACH_VISION_EP9307	VISION_EP9307		1578
+> @@ -457,6 +458,7 @@ guruplug		MACH_GURUPLUG		GURUPLUG		2659
+>  spear310		MACH_SPEAR310		SPEAR310		2660
+>  spear320		MACH_SPEAR320		SPEAR320		2661
+>  aquila			MACH_AQUILA		AQUILA			2676
+> +esata_sheevaplug	MACH_ESATA_SHEEVAPLUG	ESATA_SHEEVAPLUG	2678
+>  msm7x30_surf		MACH_MSM7X30_SURF	MSM7X30_SURF		2679
+>  ea2478devkit		MACH_EA2478DEVKIT	EA2478DEVKIT		2683
+>  terastation_wxl		MACH_TERASTATION_WXL	TERASTATION_WXL		2697
 > -- 
-> 1.7.4.1
+> 1.7.2.5
 > 
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> http://lists.freedesktop.org/mailman/listinfo/dri-devel
+> 
+> 
