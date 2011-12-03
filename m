@@ -1,26 +1,81 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Sat, 3 Dec 2011 11:03:09 +0000
-Subject: [PATCH 2/3] ARM: mach-shmobile: Use common always on power
- domain governor
-In-Reply-To: <201112022336.19993.rjw@sisk.pl>
-References: <1322765339-29879-1-git-send-email-broonie@opensource.wolfsonmicro.com>
- <201112012137.08119.rjw@sisk.pl>
- <20111202003333.GC31903@opensource.wolfsonmicro.com>
- <201112022336.19993.rjw@sisk.pl>
-Message-ID: <20111203110309.GA6043@opensource.wolfsonmicro.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Sat, 03 Dec 2011 20:08:10 +0900
+Subject: [PATCH] ARM: S3C64xx: Power gate unused domains
+In-Reply-To: <1322243785-849-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+References: <1322243785-849-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+Message-ID: <000b01ccb1ab$d81fd2f0$885f78d0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 02, 2011 at 11:36:19PM +0100, Rafael J. Wysocki wrote:
-> On Friday, December 02, 2011, Mark Brown wrote:
+Mark Brown wrote:
+> 
+> The S3C64xx CPUs have power gating support with a series of software
+> controllable power domains in the SoC. To take full advantage of these
+> we should implement runtime PM support but since several of the IP blocks
+> have no in tree drivers (and at this point aren't likely to acquire such
+> drivers) we can get some benefit from the hardware much more easily if
+> we just turn those blocks off unconditionally. This will cut down on the
+> leakage these domains generate without interfering with active usage.
+> 
+> Do this for:
+>  - Domain G: 3D acceleration
+>  - Domain V: MFC
+>  - Domain I: JPEG and camera interface
+>  - Domain P: 2D acceleration, TV encoder and scaler
+> 
+> This is easy to reverse if any of these devices do acquire drivers in the
+> future or as part of out of tree patches for them.
+> 
+> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> ---
+>  arch/arm/mach-s3c64xx/pm.c |   15 +++++++++++++++
+>  1 files changed, 15 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-s3c64xx/pm.c b/arch/arm/mach-s3c64xx/pm.c
+> index b375cd5..0868d13 100644
+> --- a/arch/arm/mach-s3c64xx/pm.c
+> +++ b/arch/arm/mach-s3c64xx/pm.c
+> @@ -89,6 +89,8 @@ static struct sleep_save misc_save[] = {
+> 
+>  	SAVE_ITEM(S3C64XX_SDMA_SEL),
+>  	SAVE_ITEM(S3C64XX_MODEM_MIFPCON),
+> +
+> +	SAVE_ITEM(S3C64XX_NORMAL_CFG),
+>  };
+> 
+>  void s3c_pm_configure_extint(void)
+> @@ -181,10 +183,23 @@ static void s3c64xx_pm_prepare(void)
+> 
+>  static int s3c64xx_pm_init(void)
+>  {
+> +	u32 val;
+> +
+>  	pm_cpu_prep = s3c64xx_pm_prepare;
+>  	pm_cpu_sleep = s3c64xx_cpu_suspend;
+>  	pm_uart_udivslot = 1;
+> 
+> +	/*
+> +	 * Unconditionally disable power domains that contain only
+> +	 * blocks which have no mainline driver support.
+> +	 */
+> +	val = __raw_readl(S3C64XX_NORMAL_CFG);
+> +	val &= ~(S3C64XX_NORMALCFG_DOMAIN_G_ON |
+> +		 S3C64XX_NORMALCFG_DOMAIN_V_ON |
+> +		 S3C64XX_NORMALCFG_DOMAIN_I_ON |
+> +		 S3C64XX_NORMALCFG_DOMAIN_P_ON);
+> +	__raw_writel(val, S3C64XX_NORMAL_CFG);
+> +
+>  #ifdef CONFIG_S3C_PM_DEBUG_LED_SMDK
+>  	gpio_request(S3C64XX_GPN(12), "DEBUG_LED0");
+>  	gpio_request(S3C64XX_GPN(13), "DEBUG_LED1");
+> --
+> 1.7.7.3
 
-> > It saves source code size when we get the second user, by itself you're
-> > right it doesn't achieve anything (except avoiding redundancy once 1/3
-> > gets applied I guess).
+Looks ok to me, will apply.
+Thanks.
 
-> But the patch removed useful code without adding any replacements, as far
-> as I could see it.
-
-The first patch in the series added the replacement as generic code,
-this patch is deleting the shmobile specific implementation and using
-the generic code instead.
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
