@@ -1,77 +1,170 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 2 Dec 2011 18:04:43 -0700 (MST)
-Subject: [PATCH v3 3/5] clk: introduce the common clock framework
-In-Reply-To: <20111201220337.GE19739@n2100.arm.linux.org.uk>
-References: <1321926047-14211-1-git-send-email-mturquette@linaro.org>
- <1321926047-14211-4-git-send-email-mturquette@linaro.org>
- <alpine.DEB.2.00.1111291619110.6289@utopia.booyaka.com>
- <CAJOA=zM4vcyTt_RBEVm6JxmzW-Dna0gpuWda7ytq_mqFSuXw9g@mail.gmail.com>
- <alpine.DEB.2.00.1111302308280.6289@utopia.booyaka.com>
- <20111201144205.GA2103@sirena.org.uk>
- <alpine.DEB.2.00.1112011124221.6289@utopia.booyaka.com>
- <20111201220337.GE19739@n2100.arm.linux.org.uk>
-Message-ID: <alpine.DEB.2.00.1112021440270.6289@utopia.booyaka.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Sat,  3 Dec 2011 06:42:02 +0100
+Subject: [PATCH v2] sanbox: add linux_execve and linux_exec command
+Message-ID: <1322890922-32341-1-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 1 Dec 2011, Russell King - ARM Linux wrote:
+this will allow to execute a program of the host from barebox
 
-> On Thu, Dec 01, 2011 at 11:30:16AM -0700, Paul Walmsley wrote:
-> > The intention behind the clk_{allow,block}_rate_change() proposal was to 
-> > allow the current user of the clock to change its rate without having to 
-> > call clk_{allow,block}_rate_change(), if that driver was the sole user of 
-> > the clock.
-> 
-> And how does a driver know that?
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+---
+v2:
 
-The driver author might make this assumption when the device's upstream 
-clock tree is simple.  This assumption simplifies the driver's clock code, 
-since no clock rate change notifier callback would be needed.
+	fix missing free
 
-This should be possible:
+Best Regards,
+J.
+ arch/sandbox/mach-sandbox/include/mach/linux.h |    2 +
+ arch/sandbox/os/common.c                       |   22 +++++++++
+ commands/Kconfig                               |    4 ++
+ commands/Makefile                              |    1 +
+ commands/linux_exec.c                          |   60 ++++++++++++++++++++++++
+ 5 files changed, 89 insertions(+), 0 deletions(-)
+ create mode 100644 commands/linux_exec.c
 
-1. when there are no other users of the device's upstream clocks; or,
-
-2. when a subset of the device's upstream clock tree can be used by
-   other devices, but the rates or source clocks of that subset either 
-   cannot be changed, or should never change.
-
-For example, consider an external audio codec device, such as the 
-TLV320AIC23.  The input clock source rate for this chip is likely to be 
-fixed for a given board design[1].  So the driver wouldn't need a clock 
-rate change notifier callback for its input clock source, since it would 
-never be called.  The clock dividers inside the codec may be represented 
-by clock nodes, but since they are handled by the same driver, the 
-coordination between them doesn't require any notifier callbacks.
-
-Another example would be a device that shares a portion of its upstream 
-clock tree with other devices, where the upstream clock tree is designed 
-to run at the same rate for all of the devices, such as the USIM IP block 
-on OMAP3430/3630[2].  The USIM shares a dedicated DPLL with the USBHOST 
-and USBTLL devices, but the DPLL is only intended to be programmed at a 
-single rate.  When the USIM is using this DPLL as a clock source, a 
-dedicated downstream clock divider is available that can be used to reduce 
-the USIM's input clock rate.  So the USIM driver would also not require 
-any clock rate change notifier callbacks, since the shared portions of its 
-parent clock tree should never change.
-
-Of course, it is possible that a new chip could appear with an identical 
-IP block inside it, but where cases 1 and 2 above are no longer true.  
-The worst outcome is that the driver's clk_set_rate() may no longer 
-succeed, returning -EBUSY, since another device may be blocking the rate 
-change.  The remedy is to update the driver to add the rate change 
-callback, and the associated internal logic to deal with it.
-
-
-- Paul
-
-1. Texas Instruments, _TLV320AIC23 Stereo Audio CODEC, 8- to 96-kHz, With 
-   Integrated Headphone Amplifier Data Manual_ (SLWS106D), May 2002, 
-   Section 3.3.2 "Audio Sampling Rates" and section 1.2 "Functional Block 
-   Diagram".   Available from http://www.ti.com/lit/gpn/tlv320aic23
-   (among others)
-
-2. Linux kernel v3.1-rc4, arch/arm/mach-omap2/clock3xxx_data.c, 
-   usim_clksel (line 2300).  Available from 
-   http://git.kernel.org/gitweb.cgi?p=linux/kernel/git/torvalds/linux.git;a=blob;f=arch/arm/mach-omap2/clock3xxx_data.c;h=5d0064a4fb5a638bb1141489354244e95899c1a1;hb=HEAD#l2300
-   (among others)
+diff --git a/arch/sandbox/mach-sandbox/include/mach/linux.h b/arch/sandbox/mach-sandbox/include/mach/linux.h
+index 7c2386d..5917fe9 100644
+--- a/arch/sandbox/mach-sandbox/include/mach/linux.h
++++ b/arch/sandbox/mach-sandbox/include/mach/linux.h
+@@ -10,6 +10,8 @@ ssize_t linux_write(int fd, const void *buf, size_t count);
+ off_t linux_lseek(int fildes, off_t offset);
+ int linux_tstc(int fd);
+ 
++int linux_execve(const char * filename, char *const argv[], char *const envp[]);
++
+ int barebox_register_console(char *name_template, int stdinfd, int stdoutfd);
+ 
+ struct linux_console_data {
+diff --git a/arch/sandbox/os/common.c b/arch/sandbox/os/common.c
+index 1c5ae5d..34db022 100644
+--- a/arch/sandbox/os/common.c
++++ b/arch/sandbox/os/common.c
+@@ -45,6 +45,7 @@
+ #include <errno.h>
+ #include <signal.h>
+ #include <sys/select.h>
++#include <sys/wait.h>
+ /*
+  * ...except the ones needed to connect with barebox
+  */
+@@ -185,6 +186,27 @@ off_t linux_lseek(int fd, off_t offset)
+ 	return lseek(fd, offset, SEEK_SET);
+ }
+ 
++int linux_execve(const char * filename, char *const argv[], char *const envp[])
++{
++	pid_t pid, tpid;
++	int execve_status;
++
++	pid = fork();
++
++	if (pid == -1) {
++		perror("linux_execve");
++		return pid;
++	} else if (pid == 0) {
++		exit(execve(filename, argv, envp));
++	} else {
++		do {
++			tpid = wait(&execve_status);
++		} while(tpid != pid);
++
++		return execve_status;
++	}
++}
++
+ extern void start_barebox(void);
+ extern void mem_malloc_init(void *start, void *end);
+ 
+diff --git a/commands/Kconfig b/commands/Kconfig
+index c2492fa..978cc67 100644
+--- a/commands/Kconfig
++++ b/commands/Kconfig
+@@ -107,6 +107,10 @@ config CMD_TIME
+ 	  checking for ctrl-c, so the time command can be used with commands
+ 	  which are interruptible with ctrl-c.
+ 
++config CMD_LINUX_EXEC
++	bool "linux exec"
++	depends on LINUX
++
+ endmenu
+ 
+ menu "file commands                 "
+diff --git a/commands/Makefile b/commands/Makefile
+index f82dcfa..e4e94fb 100644
+--- a/commands/Makefile
++++ b/commands/Makefile
+@@ -60,3 +60,4 @@ obj-$(CONFIG_CMD_USB)		+= usb.o
+ obj-$(CONFIG_CMD_TIME)		+= time.o
+ obj-$(CONFIG_CMD_OFTREE)	+= oftree.o
+ obj-$(CONFIG_CMD_MAGICVAR)	+= magicvar.o
++obj-$(CONFIG_CMD_LINUX_EXEC)	+= linux_exec.o
+diff --git a/commands/linux_exec.c b/commands/linux_exec.c
+new file mode 100644
+index 0000000..00c7e80
+--- /dev/null
++++ b/commands/linux_exec.c
+@@ -0,0 +1,60 @@
++/*
++ * Copyright (c) 2011 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
++ *
++ * See file CREDITS for list of people who contributed to this
++ * project.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2
++ * as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
++ */
++
++#include <common.h>
++#include <command.h>
++#include <mach/linux.h>
++
++static int do_linux_exec(struct command *cmdtp, int argc, char *argv[])
++{
++	int ret;
++	char **newargv;
++	char *newenv[] = { NULL };
++	int i, j;
++
++	if (argc < 2)
++		return 1;
++
++	newargv = xzalloc(sizeof(char*) * argc);
++
++	for (j = 0, i = 1; i < argc; i++, j++)
++		newargv[j] = argv[i];
++
++	newargv[j] = NULL;
++	ret = linux_execve(argv[1], newargv, newenv);
++
++	free(newargv);
++
++	if (ret)
++		return 1;
++
++	return 0;
++}
++
++BAREBOX_CMD_HELP_START(linux_exec)
++BAREBOX_CMD_HELP_USAGE("linux_exec ...\n")
++BAREBOX_CMD_HELP_SHORT("Execute a command on the host\n")
++BAREBOX_CMD_HELP_END
++
++BAREBOX_CMD_START(linux_exec)
++	.cmd		= do_linux_exec,
++	.usage		= "Execute a command on the host",
++	BAREBOX_CMD_HELP(cmd_linux_exec_help)
++BAREBOX_CMD_END
+-- 
+1.7.7
