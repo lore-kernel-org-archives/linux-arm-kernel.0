@@ -1,71 +1,85 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Sun, 04 Dec 2011 16:33:59 +0400
-Subject: [PATCH] arm, davinci: configure davinci aemif chipselects through
- OF
-In-Reply-To: <1322991679-20947-1-git-send-email-hs@denx.de>
-References: <1322991679-20947-1-git-send-email-hs@denx.de>
-Message-ID: <4EDB68B7.8080609@mvista.com>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Sun, 4 Dec 2011 18:51:23 +0530
+Subject: [PATCH v5 1/4] regulator: helper routine to extract
+ regulator_init_data
+In-Reply-To: <1321615040-13257-2-git-send-email-rnayak@ti.com>
+References: <1321615040-13257-1-git-send-email-rnayak@ti.com>
+ <1321615040-13257-2-git-send-email-rnayak@ti.com>
+Message-ID: <CAJuYYwRO+AS=WmQfNAe8L6Gi5Dm4VsCuVqk3X5Nb8uUYAdLnJQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
-
-On 04-12-2011 13:41, Heiko Schocher wrote:
-
-> Signed-off-by: Heiko Schocher <hs@denx.de>
-> Cc: davinci-linux-open-source at linux.davincidsp.com
-> Cc: devicetree-discuss at lists.ozlabs.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: grant.likely at secretlab.ca
-> Cc: Sekhar Nori <nsekhar@ti.com>
-> Cc: Kevin Hilman <khilman@ti.com>
-> Cc: Wolfgang Denk <wd@denx.de>
-[...]
-
-> diff --git a/Documentation/devicetree/bindings/arm/davinci/aemif.txt b/Documentation/devicetree/bindings/arm/davinci/aemif.txt
+On 18 November 2011 16:47, Rajendra Nayak <rnayak@ti.com> wrote:
+> The helper routine is meant to be used by the regulator drivers
+> to extract the regulator_init_data structure from the data
+> that is passed from device tree.
+> 'consumer_supplies' which is part of regulator_init_data is not extracted
+> as the regulator consumer mappings are passed through DT differently,
+> implemented in subsequent patches.
+> Similarly the regulator<-->parent/supply mapping is handled in
+> subsequent patches.
+>
+> Also add documentation for regulator bindings to be used to pass
+> regulator_init_data struct information from device tree.
+>
+> Some of the regulator properties which are linux and board specific,
+> are left out since its not clear if they can
+> be in someway embedded into the kernel or passed in from DT.
+> They will be revisited later.
+>
+> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+> ---
+> ?.../devicetree/bindings/regulator/regulator.txt ? ?| ? 54 +++++++++++++
+> ?drivers/regulator/Makefile ? ? ? ? ? ? ? ? ? ? ? ? | ? ?1 +
+> ?drivers/regulator/of_regulator.c ? ? ? ? ? ? ? ? ? | ? 81 ++++++++++++++++++++
+> ?include/linux/regulator/of_regulator.h ? ? ? ? ? ? | ? 20 +++++
+> ?4 files changed, 156 insertions(+), 0 deletions(-)
+> ?create mode 100644 Documentation/devicetree/bindings/regulator/regulator.txt
+> ?create mode 100644 drivers/regulator/of_regulator.c
+> ?create mode 100644 include/linux/regulator/of_regulator.h
+>
+> diff --git a/Documentation/devicetree/bindings/regulator/regulator.txt b/Documentation/devicetree/bindings/regulator/regulator.txt
 > new file mode 100644
-> index 0000000..c9ed551
+> index 0000000..82bef20
 > --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/davinci/aemif.txt
-> @@ -0,0 +1,85 @@
-> +* Texas Instruments Davinci AEMIF
+> +++ b/Documentation/devicetree/bindings/regulator/regulator.txt
+> @@ -0,0 +1,54 @@
+> +Voltage/Current Regulators
 > +
-> +This file provides information, what the device node for the
-> +davinci aemifa interface contain.
-[...]
-> +Example (enbw_cmc board):
-> +	aemif at 60000000 {
-> +		compatible = "ti,davinci-emifa";
-> +		#address-cells = <2>;
-> +		#size-cells = <1>;
-> +		reg = <0x68000000 0x80000>;
-> +		ranges = <2 0 0x60000000 0x02000000
-> +			  3 0 0x62000000 0x02000000
-> +			  4 0 0x64000000 0x02000000
-> +			  5 0 0x66000000 0x02000000>;
-> +		cs2 at 0x60000000 {
+> +Optional properties:
+> +- regulator-name: A string used as a descriptive name for regulator outputs
+> +- regulator-min-microvolt: smallest voltage consumers may set
+> +- regulator-max-microvolt: largest voltage consumers may set
+> +- regulator-microvolt-offset: Offset applied to voltages to compensate for voltage drops
+> +- regulator-min-microamp: smallest current consumers may set
+> +- regulator-max-microamp: largest current consumers may set
+> +- regulator-always-on: boolean, regulator should never be disabled
+> +- regulator-boot-on: bootloader/firmware enabled regulator
+> +- <name>-supply: phandle to the parent supply/regulator node
 
-    0x shouldn't be included.
+For regulators that are not turned on by bootloader, and which require
+'apply_uV' constraint, is there any alternative for turning on the
+regulator when using dt?
 
-> +			compatible = "ti,davinci-cs";
-> +			#address-cells = <1>;
-> +			#size-cells = <1>;
-> +			/* all timings in nanoseconds */
-> +			cs = <2>;
-> +			asize = <1>;
-> +			ta = <0>;
-> +			rhold = <7>;
-> +			rstrobe = <42>;
-> +			rsetup = <14>;
-> +			whold = <7>;
-> +			wstrobe = <42>;
-> +			wsetup = <14>;
-> +			ew = <0>;
-> +			ss = <0>;
-> +		};
-> +		flash at 2,0 {
+Or, how about adding a additional check as below.
 
-   Why you have one kind of address for cs2 at 60000000 node and other kind for 
-this node?
+diff --git a/drivers/regulator/core.c b/drivers/regulator/core.c
+index 5baa196..25a6781 100644
+--- a/drivers/regulator/core.c
++++ b/drivers/regulator/core.c
+@@ -816,8 +816,9 @@ static int machine_constraints_voltage(struct
+regulator_dev *rdev,
+ 	int ret;
 
-WBR, Sergei
+ 	/* do we need to apply the constraint voltage */
+-	if (rdev->constraints->apply_uV &&
+-	    rdev->constraints->min_uV == rdev->constraints->max_uV) {
++	if ((rdev->constraints->apply_uV &&
++	    rdev->constraints->min_uV == rdev->constraints->max_uV) ||
++		(!rdev->constraints->boot_on && rdev->constraints->always_on)) {
+ 		ret = _regulator_do_set_voltage(rdev,
+ 						rdev->constraints->min_uV,
+ 						rdev->constraints->max_uV);
+
+Thanks,
+Thomas.
