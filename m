@@ -1,32 +1,55 @@
-From: rusty@rustcorp.com.au (Rusty Russell)
-Date: Sat, 03 Dec 2011 15:44:36 +1030
-Subject: [RFC] virtio: use mandatory barriers for remote processor vdevs
-In-Reply-To: <1322867384.11728.20.camel@pasglop>
-References: <1322569886-13055-1-git-send-email-ohad@wizery.com>
- <1322867384.11728.20.camel@pasglop>
-Message-ID: <87hb1iqls3.fsf@rustcorp.com.au>
+From: ming.lei@canonical.com (Ming Lei)
+Date: Sun, 4 Dec 2011 19:18:37 +0800
+Subject: [RFC PATCH v1 5/7] media: v4l2: introduce two IOCTLs for face
+ detection
+In-Reply-To: <42689146.OPtqLboC2m@wuerfel>
+References: <1322817178-8931-1-git-send-email-ming.lei@canonical.com>
+ <1322817178-8931-6-git-send-email-ming.lei@canonical.com>
+ <42689146.OPtqLboC2m@wuerfel>
+Message-ID: <CACVXFVO5Bu8vTfLN_WFsEkHW6JhQFmWPmEyNnrvTsDhoF-WVeA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 03 Dec 2011 10:09:44 +1100, Benjamin Herrenschmidt <benh@kernel.crashing.org> wrote:
-> On Tue, 2011-11-29 at 14:31 +0200, Ohad Ben-Cohen wrote:
-> > A trivial, albeit sub-optimal, solution would be to simply revert
-> > commit d57ed95 "virtio: use smp_XX barriers on SMP". Obviously, though,
-> > that's going to have a negative impact on performance of SMP-based
-> > virtualization use cases.
-> 
-> Have you measured the impact of using normal barriers (non-SMP ones)
-> like we use on normal HW drivers unconditionally ?
-> 
-> IE. If the difference is small enough I'd say just go for it and avoid
-> the bloat.
+Hi,
 
-Yep.  Plan is:
-1) Measure the difference.
-2) Difference unmeassurable?  Use normal barriers (ie. revert d57ed95).
-3) Difference small?  Revert d57ed95 for 3.2, revisit for 3.3.
-4) Difference large?  Runtime switch based on "if you're PCI" for 3.2,
-   revisit for 3.3.
+On Fri, Dec 2, 2011 at 8:33 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Friday 02 December 2011 17:12:56 Ming Lei wrote:
+>> +/**
+>> + * struct v4l2_fd_result - VIDIOC_G_FD_RESULT argument
+>> + * @buf_index: entry, index of v4l2_buffer for face detection
+>> + * @face_cnt: ?return, how many faces detected from the @buf_index
+>> + * @fd: ? ? ? ? ? ? ? ?return, result of faces' detection
+>> + */
+>> +struct v4l2_fd_result {
+>> + ? ? ? __u32 ? buf_index;
+>> + ? ? ? __u32 ? face_cnt;
+>> + ? ? ? __u32 ? reserved[6];
+>> + ? ? ? struct v4l2_fd_detection *fd;
+>> +};
+>
+>
+> This data structure is not 32/64 bit safe: running a 64 bit kernel with 32 bit
+> user space will see an incompatible layout.
 
-Cheers,
-Rusty.
+I agree that this is not 32/64 bit safe, but I understand lib32 can handle
+this correctly, otherwise many 32bit applications can't run on current
+64bit kernel
+since many kernel structures used by user space contained pointer,
+such as struct v4l2_buffer, struct v4l2_ext_controls in v4l2 ABI.
+
+> One way to solve this is to remove the pointer and just start the array
+> directly after the __u32 members. Alternatively, you can use a __u64
+> to pass the pointer in an integer representation.
+
+So I think this need not to be solved.
+
+>
+> A nicer interface from the data structure perspective would be to
+> get rid of the array altogether and always return exactly one face.
+
+I choose to return array to user space since v4l2 ioctl has provided
+this kind of support, see video_usercopy().
+
+thanks,
+--
+Ming Lei
