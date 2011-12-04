@@ -1,65 +1,31 @@
 From: b29396@freescale.com (Dong Aisheng)
-Date: Sun, 4 Dec 2011 19:49:42 +0800
-Subject: [RFC PATCH 1/3] pinctrl: imx: add pinmux imx core driver
-Message-ID: <1322999384-7886-1-git-send-email-b29396@freescale.com>
+Date: Sun, 4 Dec 2011 19:49:43 +0800
+Subject: [RFC PATCH 2/3] pinctrl: imx: add pinmux-imx53 support
+In-Reply-To: <1322999384-7886-1-git-send-email-b29396@freescale.com>
+References: <1322999384-7886-1-git-send-email-b29396@freescale.com>
+Message-ID: <1322999384-7886-2-git-send-email-b29396@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
----
-This patch series shows the basic idea of driver design. There're still
-some TODOes like adding more pinmux functions and gpio support.
-The patch is here for request for comments on the driver design
-and other might exist issues.
-
-Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
+Signed-off-by: Dong Aisheng <b29396@freescale.com>
 Cc: Linus Walleij <linus.walleij@linaro.org>
 Cc: Sascha Hauer <s.hauer@pengutronix.de>
 Cc: Shawn Guo <shanw.guo@freescale.com>
 ---
- drivers/pinctrl/Kconfig           |    6 +
- drivers/pinctrl/Makefile          |    2 +
- drivers/pinctrl/pinmux-imx-core.c |  284 +++++++++++++++++++++++++++++++++++++
- drivers/pinctrl/pinmux-imx-core.h |   83 +++++++++++
- 4 files changed, 375 insertions(+), 0 deletions(-)
+ drivers/pinctrl/pinmux-imx53.c |  514 ++++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 514 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/pinctrl/Kconfig b/drivers/pinctrl/Kconfig
-index ef56644..214d072 100644
---- a/drivers/pinctrl/Kconfig
-+++ b/drivers/pinctrl/Kconfig
-@@ -40,4 +40,10 @@ config PINMUX_U300
- 	help
- 	  Say Y here to enable the U300 pinmux driver
- 
-+config PINMUX_IMX
-+	bool "IMX pinmux driver"
-+	depends on ARCH_MXC
-+	select PINMUX
-+	help
-+	  Say Y here to enable the IMX pinmux driver
- endif
-diff --git a/drivers/pinctrl/Makefile b/drivers/pinctrl/Makefile
-index bdc548a..764657b 100644
---- a/drivers/pinctrl/Makefile
-+++ b/drivers/pinctrl/Makefile
-@@ -4,5 +4,7 @@ ccflags-$(CONFIG_DEBUG_PINMUX)	+= -DDEBUG
- 
- obj-$(CONFIG_PINCTRL)		+= core.o
- obj-$(CONFIG_PINMUX)		+= pinmux.o
-+obj-$(CONFIG_PINMUX_IMX)	+= pinmux-imx-core.o \
-+				   pinmux-imx53.o pinmux-imx6q.o
- obj-$(CONFIG_PINMUX_SIRF)	+= pinmux-sirf.o
- obj-$(CONFIG_PINMUX_U300)	+= pinmux-u300.o
-diff --git a/drivers/pinctrl/pinmux-imx-core.c b/drivers/pinctrl/pinmux-imx-core.c
+diff --git a/drivers/pinctrl/pinmux-imx53.c b/drivers/pinctrl/pinmux-imx53.c
 new file mode 100644
-index 0000000..1e60932
+index 0000000..126e2a8
 --- /dev/null
-+++ b/drivers/pinctrl/pinmux-imx-core.c
-@@ -0,0 +1,284 @@
++++ b/drivers/pinctrl/pinmux-imx53.c
+@@ -0,0 +1,514 @@
 +/*
-+ * Core driver for the imx pin controller
++ * imx53 pinmux driver based on imx pinmux core
 + *
 + * Copyright (C) 2011 Freescale Semiconductor, Inc.
-+ * Copyright (C) 2011 Linaro Ltd.
++ * Copyright (C) 2011 Linaro, Inc.
 + *
 + * Author: Dong Aisheng <dong.aisheng@linaro.org>
 + *
@@ -70,8 +36,6 @@ index 0000000..1e60932
 + */
 +
 +#include <linux/init.h>
-+#include <linux/module.h>
-+#include <linux/platform_device.h>
 +#include <linux/io.h>
 +#include <linux/err.h>
 +#include <linux/pinctrl/pinctrl.h>
@@ -79,354 +43,497 @@ index 0000000..1e60932
 +
 +#include "pinmux-imx-core.h"
 +
-+#define DRIVER_NAME "pinmux-imx"
++#define MX53_IOMUXC_MUX_OFFSET 0x20
++#define MX53_IOMUXC_MAXPIN	(23*23)
 +
-+/**
-+ * @dev: a pointer back to containing device
-+ * @virtbase: the offset to the controller in virtual memory
-+ */
-+struct imx_pmx {
-+	struct device *dev;
-+	struct pinctrl_dev *pctl;
-+	void __iomem *virtbase;
-+	struct imx_pinctrl_info *info;
++enum imx_mx53_pads {
++	MX53_GPIO_19 = 0,
++	MX53_KEY_COL0 = 1,
++	MX53_KEY_ROW0 = 2,
++	MX53_KEY_COL1 = 3,
++	MX53_KEY_ROW1 = 4,
++	MX53_KEY_COL2 = 5,
++	MX53_KEY_ROW2 = 6,
++	MX53_KEY_COL3 = 7,
++	MX53_KEY_ROW3 = 8,
++	MX53_KEY_COL4 = 9,
++	MX53_KEY_ROW4 = 10,
++	MX53_DI0_DISP_CLK = 11,
++	MX53_DI0_PIN15 = 12,
++	MX53_DI0_PIN2 = 13,
++	MX53_DI0_PIN3 = 14,
++	MX53_DI0_PIN4 = 15,
++	MX53_DISP0_DAT0 = 16,
++	MX53_DISP0_DAT1 = 17,
++	MX53_DISP0_DAT2 = 18,
++	MX53_DISP0_DAT3 = 19,
++	MX53_DISP0_DAT4 = 20,
++	MX53_DISP0_DAT5 = 21,
++	MX53_DISP0_DAT6 = 22,
++	MX53_DISP0_DAT7 = 23,
++	MX53_DISP0_DAT8 = 24,
++	MX53_DISP0_DAT9 = 25,
++	MX53_DISP0_DAT10 = 26,
++	MX53_DISP0_DAT11 = 27,
++	MX53_DISP0_DAT12 = 28,
++	MX53_DISP0_DAT13 = 29,
++	MX53_DISP0_DAT14 = 30,
++	MX53_DISP0_DAT15 = 31,
++	MX53_DISP0_DAT16 = 32,
++	MX53_DISP0_DAT17 = 33,
++	MX53_DISP0_DAT18 = 34,
++	MX53_DISP0_DAT19 = 35,
++	MX53_DISP0_DAT20 = 36,
++	MX53_DISP0_DAT21 = 37,
++	MX53_DISP0_DAT22 = 38,
++	MX53_DISP0_DAT23 = 39,
++	MX53_CSI0_PIXCLK = 40,
++	MX53_CSI0_MCLK = 41,
++	MX53_CSI0_DATA_EN = 42,
++	MX53_CSI0_VSYNC = 43,
++	MX53_CSI0_DAT4 = 44,
++	MX53_CSI0_DAT5 = 45,
++	MX53_CSI0_DAT6 = 46,
++	MX53_CSI0_DAT7 = 47,
++	MX53_CSI0_DAT8 = 48,
++	MX53_CSI0_DAT9 = 49,
++	MX53_CSI0_DAT10 = 50,
++	MX53_CSI0_DAT11 = 51,
++	MX53_CSI0_DAT12 = 52,
++	MX53_CSI0_DAT13 = 53,
++	MX53_CSI0_DAT14 = 54,
++	MX53_CSI0_DAT15 = 55,
++	MX53_CSI0_DAT16 = 56,
++	MX53_CSI0_DAT17 = 57,
++	MX53_CSI0_DAT18 = 58,
++	MX53_CSI0_DAT19 = 59,
++	MX53_EIM_A25 = 60,
++	MX53_EIM_EB2 = 61,
++	MX53_EIM_D16 = 62,
++	MX53_EIM_D17 = 63,
++	MX53_EIM_D18 = 64,
++	MX53_EIM_D19 = 65,
++	MX53_EIM_D20 = 66,
++	MX53_EIM_D21 = 67,
++	MX53_EIM_D22 = 68,
++	MX53_EIM_D23 = 69,
++	MX53_EIM_EB3 = 70,
++	MX53_EIM_D24 = 71,
++	MX53_EIM_D25 = 72,
++	MX53_EIM_D26 = 73,
++	MX53_EIM_D27 = 74,
++	MX53_EIM_D28 = 75,
++	MX53_EIM_D29 = 76,
++	MX53_EIM_D30 = 77,
++	MX53_EIM_D31 = 78,
++	MX53_EIM_A24 = 79,
++	MX53_EIM_A23 = 80,
++	MX53_EIM_A22 = 81,
++	MX53_EIM_A21 = 82,
++	MX53_EIM_A20 = 83,
++	MX53_EIM_A19 = 84,
++	MX53_EIM_A18 = 85,
++	MX53_EIM_A17 = 86,
++	MX53_EIM_A16 = 87,
++	MX53_EIM_CS0 = 88,
++	MX53_EIM_CS1 = 89,
++	MX53_EIM_OE = 90,
++	MX53_EIM_RW = 91,
++	MX53_EIM_LBA = 92,
++	MX53_EIM_EB0 = 93,
++	MX53_EIM_EB1 = 94,
++	MX53_EIM_DA0 = 95,
++	MX53_EIM_DA1 = 96,
++	MX53_EIM_DA2 = 97,
++	MX53_EIM_DA3 = 98,
++	MX53_EIM_DA4 = 99,
++	MX53_EIM_DA5 = 100,
++	MX53_EIM_DA6 = 101,
++	MX53_EIM_DA7 = 102,
++	MX53_EIM_DA8 = 103,
++	MX53_EIM_DA9 = 104,
++	MX53_EIM_DA10 = 105,
++	MX53_EIM_DA11 = 106,
++	MX53_EIM_DA12 = 107,
++	MX53_EIM_DA13 = 108,
++	MX53_EIM_DA14 = 109,
++	MX53_EIM_DA15 = 110,
++	MX53_NANDF_WE_B = 111,
++	MX53_NANDF_RE_B = 112,
++	MX53_EIM_WAIT = 113,
++	MX53_EIM_BCLK = 114,
++	MX53_LVDS1_TX3_P = 115,
++	MX53_LVDS1_TX2_P = 116,
++	MX53_LVDS1_CLK_P = 117,
++	MX53_LVDS1_TX1_P = 118,
++	MX53_LVDS1_TX0_P = 119,
++	MX53_LVDS0_TX3_P = 120,
++	MX53_LVDS0_CLK_P = 121,
++	MX53_LVDS0_TX2_P = 122,
++	MX53_LVDS0_TX1_P = 123,
++	MX53_LVDS0_TX0_P = 124,
++	MX53_GPIO_10 = 125,
++	MX53_GPIO_11 = 126,
++	MX53_GPIO_12 = 127,
++	MX53_GPIO_13 = 128,
++	MX53_GPIO_14 = 129,
++	MX53_NANDF_CLE = 130,
++	MX53_NANDF_ALE = 131,
++	MX53_NANDF_WP_B = 132,
++	MX53_NANDF_RB0 = 133,
++	MX53_NANDF_CS0 = 134,
++	MX53_NANDF_CS1 = 135,
++	MX53_NANDF_CS2 = 136,
++	MX53_NANDF_CS3 = 137,
++	MX53_FEC_MDIO = 138,
++	MX53_FEC_REF_CLK = 139,
++	MX53_FEC_RX_ER = 140,
++	MX53_FEC_CRS_DV = 141,
++	MX53_FEC_RXD1 = 142,
++	MX53_FEC_RXD0 = 143,
++	MX53_FEC_TX_EN = 144,
++	MX53_FEC_TXD1 = 145,
++	MX53_FEC_TXD0 = 146,
++	MX53_FEC_MDC = 147,
++	MX53_PATA_DIOW = 148,
++	MX53_PATA_DMACK = 149,
++	MX53_PATA_DMARQ = 150,
++	MX53_PATA_BUFFER_EN = 151,
++	MX53_PATA_INTRQ = 152,
++	MX53_PATA_DIOR = 153,
++	MX53_PATA_RESET_B = 154,
++	MX53_PATA_IORDY = 155,
++	MX53_PATA_DA_0 = 156,
++	MX53_PATA_DA_1 = 157,
++	MX53_PATA_DA_2 = 158,
++	MX53_PATA_CS_0 = 159,
++	MX53_PATA_CS_1 = 160,
++	MX53_PATA_DATA0 = 161,
++	MX53_PATA_DATA1 = 162,
++	MX53_PATA_DATA2 = 163,
++	MX53_PATA_DATA3 = 164,
++	MX53_PATA_DATA4 = 165,
++	MX53_PATA_DATA5 = 166,
++	MX53_PATA_DATA6 = 167,
++	MX53_PATA_DATA7 = 168,
++	MX53_PATA_DATA8 = 169,
++	MX53_PATA_DATA9 = 170,
++	MX53_PATA_DATA10 = 171,
++	MX53_PATA_DATA11 = 172,
++	MX53_PATA_DATA12 = 173,
++	MX53_PATA_DATA13 = 174,
++	MX53_PATA_DATA14 = 175,
++	MX53_PATA_DATA15 = 176,
++	MX53_SD1_DATA0 = 177,
++	MX53_SD1_DATA1 = 178,
++	MX53_SD1_CMD = 179,
++	MX53_SD1_DATA2 = 180,
++	MX53_SD1_CLK = 181,
++	MX53_SD1_DATA3 = 182,
++	MX53_SD2_CLK = 183,
++	MX53_SD2_CMD = 184,
++	MX53_SD2_DATA3 = 185,
++	MX53_SD2_DATA2 = 186,
++	MX53_SD2_DATA1 = 187,
++	MX53_SD2_DATA0 = 188,
++	MX53_GPIO_0 = 189,
++	MX53_GPIO_1 = 190,
++	MX53_GPIO_9 = 191,
++	MX53_GPIO_3 = 192,
++	MX53_GPIO_6 = 193,
++	MX53_GPIO_2 = 194,
++	MX53_GPIO_4 = 195,
++	MX53_GPIO_5 = 196,
++	MX53_GPIO_7 = 197,
++	MX53_GPIO_8 = 198,
++	MX53_GPIO_16 = 199,
++	MX53_GPIO_17 = 200,
++	MX53_GPIO_18 = 201,
 +};
 +
-+#define IMX_PINCTRL_REG_SIZE 4
-+#define IMX_PINCTRL_MAX_FUNC 7
-+
-+extern struct imx_pinctrl_info mx53_pinctrl_info;
-+extern struct imx_pinctrl_info mx6q_pinctrl_info;
-+
-+static struct platform_device_id imx_pinctrl_devtype[] = {
-+	{
-+		.name = "sdhci-pinctrl-imx53",
-+		.driver_data = (kernel_ulong_t)&mx53_pinctrl_info,
-+	}, {
-+		.name = "sdhci-pinctrl-imx6q",
-+		.driver_data = (kernel_ulong_t)&mx6q_pinctrl_info,
-+	},
++/* Pad names for the pinmux subsystem */
++static const struct pinctrl_pin_desc mx53_pads[] = {
++	IMX_PINCTRL_PIN(MX53_GPIO_19),
++	IMX_PINCTRL_PIN(MX53_KEY_COL0),
++	IMX_PINCTRL_PIN(MX53_KEY_ROW0),
++	IMX_PINCTRL_PIN(MX53_KEY_COL1),
++	IMX_PINCTRL_PIN(MX53_KEY_ROW1),
++	IMX_PINCTRL_PIN(MX53_KEY_COL2),
++	IMX_PINCTRL_PIN(MX53_KEY_ROW2),
++	IMX_PINCTRL_PIN(MX53_KEY_COL3),
++	IMX_PINCTRL_PIN(MX53_KEY_ROW3),
++	IMX_PINCTRL_PIN(MX53_KEY_COL4),
++	IMX_PINCTRL_PIN(MX53_KEY_ROW4),
++	IMX_PINCTRL_PIN(MX53_DI0_DISP_CLK),
++	IMX_PINCTRL_PIN(MX53_DI0_PIN15),
++	IMX_PINCTRL_PIN(MX53_DI0_PIN2),
++	IMX_PINCTRL_PIN(MX53_DI0_PIN3),
++	IMX_PINCTRL_PIN(MX53_DI0_PIN4),
++	IMX_PINCTRL_PIN(MX53_DISP0_DAT0),
++	IMX_PINCTRL_PIN(MX53_DISP0_DAT1),
++	IMX_PINCTRL_PIN(MX53_DISP0_DAT2),
++	IMX_PINCTRL_PIN(MX53_DISP0_DAT3),
++	IMX_PINCTRL_PIN(MX53_DISP0_DAT4),
++	IMX_PINCTRL_PIN(MX53_DISP0_DAT5),
++	IMX_PINCTRL_PIN(MX53_DISP0_DAT6),
++	IMX_PINCTRL_PIN(MX53_DISP0_DAT7),
++	IMX_PINCTRL_PIN(MX53_DISP0_DAT8),
++	IMX_PINCTRL_PIN(MX53_DISP0_DAT9),
++	IMX_PINCTRL_PIN(MX53_DISP0_DAT10),
++	IMX_PINCTRL_PIN(MX53_DISP0_DAT11),
++	IMX_PINCTRL_PIN(MX53_DISP0_DAT12),
++	IMX_PINCTRL_PIN(MX53_DISP0_DAT13),
++	IMX_PINCTRL_PIN(MX53_DISP0_DAT14),
++	IMX_PINCTRL_PIN(MX53_DISP0_DAT15),
++	IMX_PINCTRL_PIN(MX53_DISP0_DAT16),
++	IMX_PINCTRL_PIN(MX53_DISP0_DAT17),
++	IMX_PINCTRL_PIN(MX53_DISP0_DAT18),
++	IMX_PINCTRL_PIN(MX53_DISP0_DAT19),
++	IMX_PINCTRL_PIN(MX53_DISP0_DAT20),
++	IMX_PINCTRL_PIN(MX53_DISP0_DAT21),
++	IMX_PINCTRL_PIN(MX53_DISP0_DAT22),
++	IMX_PINCTRL_PIN(MX53_DISP0_DAT23),
++	IMX_PINCTRL_PIN(MX53_CSI0_PIXCLK),
++	IMX_PINCTRL_PIN(MX53_CSI0_MCLK),
++	IMX_PINCTRL_PIN(MX53_CSI0_DATA_EN),
++	IMX_PINCTRL_PIN(MX53_CSI0_VSYNC),
++	IMX_PINCTRL_PIN(MX53_CSI0_DAT4),
++	IMX_PINCTRL_PIN(MX53_CSI0_DAT5),
++	IMX_PINCTRL_PIN(MX53_CSI0_DAT6),
++	IMX_PINCTRL_PIN(MX53_CSI0_DAT7),
++	IMX_PINCTRL_PIN(MX53_CSI0_DAT8),
++	IMX_PINCTRL_PIN(MX53_CSI0_DAT9),
++	IMX_PINCTRL_PIN(MX53_CSI0_DAT10),
++	IMX_PINCTRL_PIN(MX53_CSI0_DAT11),
++	IMX_PINCTRL_PIN(MX53_CSI0_DAT12),
++	IMX_PINCTRL_PIN(MX53_CSI0_DAT13),
++	IMX_PINCTRL_PIN(MX53_CSI0_DAT14),
++	IMX_PINCTRL_PIN(MX53_CSI0_DAT15),
++	IMX_PINCTRL_PIN(MX53_CSI0_DAT16),
++	IMX_PINCTRL_PIN(MX53_CSI0_DAT17),
++	IMX_PINCTRL_PIN(MX53_CSI0_DAT18),
++	IMX_PINCTRL_PIN(MX53_CSI0_DAT19),
++	IMX_PINCTRL_PIN(MX53_EIM_A25),
++	IMX_PINCTRL_PIN(MX53_EIM_EB2),
++	IMX_PINCTRL_PIN(MX53_EIM_D16),
++	IMX_PINCTRL_PIN(MX53_EIM_D17),
++	IMX_PINCTRL_PIN(MX53_EIM_D18),
++	IMX_PINCTRL_PIN(MX53_EIM_D19),
++	IMX_PINCTRL_PIN(MX53_EIM_D20),
++	IMX_PINCTRL_PIN(MX53_EIM_D21),
++	IMX_PINCTRL_PIN(MX53_EIM_D22),
++	IMX_PINCTRL_PIN(MX53_EIM_D23),
++	IMX_PINCTRL_PIN(MX53_EIM_EB3),
++	IMX_PINCTRL_PIN(MX53_EIM_D24),
++	IMX_PINCTRL_PIN(MX53_EIM_D25),
++	IMX_PINCTRL_PIN(MX53_EIM_D26),
++	IMX_PINCTRL_PIN(MX53_EIM_D27),
++	IMX_PINCTRL_PIN(MX53_EIM_D28),
++	IMX_PINCTRL_PIN(MX53_EIM_D29),
++	IMX_PINCTRL_PIN(MX53_EIM_D30),
++	IMX_PINCTRL_PIN(MX53_EIM_D31),
++	IMX_PINCTRL_PIN(MX53_EIM_A24),
++	IMX_PINCTRL_PIN(MX53_EIM_A23),
++	IMX_PINCTRL_PIN(MX53_EIM_A22),
++	IMX_PINCTRL_PIN(MX53_EIM_A21),
++	IMX_PINCTRL_PIN(MX53_EIM_A20),
++	IMX_PINCTRL_PIN(MX53_EIM_A19),
++	IMX_PINCTRL_PIN(MX53_EIM_A18),
++	IMX_PINCTRL_PIN(MX53_EIM_A17),
++	IMX_PINCTRL_PIN(MX53_EIM_A16),
++	IMX_PINCTRL_PIN(MX53_EIM_CS0),
++	IMX_PINCTRL_PIN(MX53_EIM_CS1),
++	IMX_PINCTRL_PIN(MX53_EIM_OE),
++	IMX_PINCTRL_PIN(MX53_EIM_RW),
++	IMX_PINCTRL_PIN(MX53_EIM_LBA),
++	IMX_PINCTRL_PIN(MX53_EIM_EB0),
++	IMX_PINCTRL_PIN(MX53_EIM_EB1),
++	IMX_PINCTRL_PIN(MX53_EIM_DA0),
++	IMX_PINCTRL_PIN(MX53_EIM_DA1),
++	IMX_PINCTRL_PIN(MX53_EIM_DA2),
++	IMX_PINCTRL_PIN(MX53_EIM_DA3),
++	IMX_PINCTRL_PIN(MX53_EIM_DA4),
++	IMX_PINCTRL_PIN(MX53_EIM_DA5),
++	IMX_PINCTRL_PIN(MX53_EIM_DA6),
++	IMX_PINCTRL_PIN(MX53_EIM_DA7),
++	IMX_PINCTRL_PIN(MX53_EIM_DA8),
++	IMX_PINCTRL_PIN(MX53_EIM_DA9),
++	IMX_PINCTRL_PIN(MX53_EIM_DA10),
++	IMX_PINCTRL_PIN(MX53_EIM_DA11),
++	IMX_PINCTRL_PIN(MX53_EIM_DA12),
++	IMX_PINCTRL_PIN(MX53_EIM_DA13),
++	IMX_PINCTRL_PIN(MX53_EIM_DA14),
++	IMX_PINCTRL_PIN(MX53_EIM_DA15),
++	IMX_PINCTRL_PIN(MX53_NANDF_WE_B),
++	IMX_PINCTRL_PIN(MX53_NANDF_RE_B),
++	IMX_PINCTRL_PIN(MX53_EIM_WAIT),
++	IMX_PINCTRL_PIN(MX53_EIM_BCLK),
++	IMX_PINCTRL_PIN(MX53_LVDS1_TX3_P),
++	IMX_PINCTRL_PIN(MX53_LVDS1_TX2_P),
++	IMX_PINCTRL_PIN(MX53_LVDS1_CLK_P),
++	IMX_PINCTRL_PIN(MX53_LVDS1_TX1_P),
++	IMX_PINCTRL_PIN(MX53_LVDS1_TX0_P),
++	IMX_PINCTRL_PIN(MX53_LVDS0_TX3_P),
++	IMX_PINCTRL_PIN(MX53_LVDS0_CLK_P),
++	IMX_PINCTRL_PIN(MX53_LVDS0_TX2_P),
++	IMX_PINCTRL_PIN(MX53_LVDS0_TX1_P),
++	IMX_PINCTRL_PIN(MX53_LVDS0_TX0_P),
++	IMX_PINCTRL_PIN(MX53_GPIO_10),
++	IMX_PINCTRL_PIN(MX53_GPIO_11),
++	IMX_PINCTRL_PIN(MX53_GPIO_12),
++	IMX_PINCTRL_PIN(MX53_GPIO_13),
++	IMX_PINCTRL_PIN(MX53_GPIO_14),
++	IMX_PINCTRL_PIN(MX53_NANDF_CLE),
++	IMX_PINCTRL_PIN(MX53_NANDF_ALE),
++	IMX_PINCTRL_PIN(MX53_NANDF_WP_B),
++	IMX_PINCTRL_PIN(MX53_NANDF_RB0),
++	IMX_PINCTRL_PIN(MX53_NANDF_CS0),
++	IMX_PINCTRL_PIN(MX53_NANDF_CS1),
++	IMX_PINCTRL_PIN(MX53_NANDF_CS2),
++	IMX_PINCTRL_PIN(MX53_NANDF_CS3),
++	IMX_PINCTRL_PIN(MX53_FEC_MDIO),
++	IMX_PINCTRL_PIN(MX53_FEC_REF_CLK),
++	IMX_PINCTRL_PIN(MX53_FEC_RX_ER),
++	IMX_PINCTRL_PIN(MX53_FEC_CRS_DV),
++	IMX_PINCTRL_PIN(MX53_FEC_RXD1),
++	IMX_PINCTRL_PIN(MX53_FEC_RXD0),
++	IMX_PINCTRL_PIN(MX53_FEC_TX_EN),
++	IMX_PINCTRL_PIN(MX53_FEC_TXD1),
++	IMX_PINCTRL_PIN(MX53_FEC_TXD0),
++	IMX_PINCTRL_PIN(MX53_FEC_MDC),
++	IMX_PINCTRL_PIN(MX53_PATA_DIOW),
++	IMX_PINCTRL_PIN(MX53_PATA_DMACK),
++	IMX_PINCTRL_PIN(MX53_PATA_DMARQ),
++	IMX_PINCTRL_PIN(MX53_PATA_BUFFER_EN),
++	IMX_PINCTRL_PIN(MX53_PATA_INTRQ),
++	IMX_PINCTRL_PIN(MX53_PATA_DIOR),
++	IMX_PINCTRL_PIN(MX53_PATA_RESET_B),
++	IMX_PINCTRL_PIN(MX53_PATA_IORDY),
++	IMX_PINCTRL_PIN(MX53_PATA_DA_0),
++	IMX_PINCTRL_PIN(MX53_PATA_DA_1),
++	IMX_PINCTRL_PIN(MX53_PATA_DA_2),
++	IMX_PINCTRL_PIN(MX53_PATA_CS_0),
++	IMX_PINCTRL_PIN(MX53_PATA_CS_1),
++	IMX_PINCTRL_PIN(MX53_PATA_DATA0),
++	IMX_PINCTRL_PIN(MX53_PATA_DATA1),
++	IMX_PINCTRL_PIN(MX53_PATA_DATA2),
++	IMX_PINCTRL_PIN(MX53_PATA_DATA3),
++	IMX_PINCTRL_PIN(MX53_PATA_DATA4),
++	IMX_PINCTRL_PIN(MX53_PATA_DATA5),
++	IMX_PINCTRL_PIN(MX53_PATA_DATA6),
++	IMX_PINCTRL_PIN(MX53_PATA_DATA7),
++	IMX_PINCTRL_PIN(MX53_PATA_DATA8),
++	IMX_PINCTRL_PIN(MX53_PATA_DATA9),
++	IMX_PINCTRL_PIN(MX53_PATA_DATA10),
++	IMX_PINCTRL_PIN(MX53_PATA_DATA11),
++	IMX_PINCTRL_PIN(MX53_PATA_DATA12),
++	IMX_PINCTRL_PIN(MX53_PATA_DATA13),
++	IMX_PINCTRL_PIN(MX53_PATA_DATA14),
++	IMX_PINCTRL_PIN(MX53_PATA_DATA15),
++	IMX_PINCTRL_PIN(MX53_SD1_DATA0),
++	IMX_PINCTRL_PIN(MX53_SD1_DATA1),
++	IMX_PINCTRL_PIN(MX53_SD1_CMD),
++	IMX_PINCTRL_PIN(MX53_SD1_DATA2),
++	IMX_PINCTRL_PIN(MX53_SD1_CLK),
++	IMX_PINCTRL_PIN(MX53_SD1_DATA3),
++	IMX_PINCTRL_PIN(MX53_SD2_CLK),
++	IMX_PINCTRL_PIN(MX53_SD2_CMD),
++	IMX_PINCTRL_PIN(MX53_SD2_DATA3),
++	IMX_PINCTRL_PIN(MX53_SD2_DATA2),
++	IMX_PINCTRL_PIN(MX53_SD2_DATA1),
++	IMX_PINCTRL_PIN(MX53_SD2_DATA0),
++	IMX_PINCTRL_PIN(MX53_GPIO_0),
++	IMX_PINCTRL_PIN(MX53_GPIO_1),
++	IMX_PINCTRL_PIN(MX53_GPIO_9),
++	IMX_PINCTRL_PIN(MX53_GPIO_3),
++	IMX_PINCTRL_PIN(MX53_GPIO_6),
++	IMX_PINCTRL_PIN(MX53_GPIO_2),
++	IMX_PINCTRL_PIN(MX53_GPIO_4),
++	IMX_PINCTRL_PIN(MX53_GPIO_5),
++	IMX_PINCTRL_PIN(MX53_GPIO_7),
++	IMX_PINCTRL_PIN(MX53_GPIO_8),
++	IMX_PINCTRL_PIN(MX53_GPIO_16),
++	IMX_PINCTRL_PIN(MX53_GPIO_17),
++	IMX_PINCTRL_PIN(MX53_GPIO_18),
 +};
 +
-+static int imx_list_groups(struct pinctrl_dev *pctldev, unsigned selector)
-+{
-+	struct imx_pmx *ipmx = pinctrl_dev_get_drvdata(pctldev);
-+	struct imx_pinctrl_info *info = ipmx->info;
++/* mx53 pin groups and mux mode */
++static const unsigned mx53_fec_pins[] = {
++	MX53_FEC_MDC,
++	MX53_FEC_MDIO,
++	MX53_FEC_REF_CLK,
++	MX53_FEC_RX_ER,
++	MX53_FEC_CRS_DV,
++	MX53_FEC_RXD1,
++	MX53_FEC_RXD0,
++	MX53_FEC_TX_EN,
++	MX53_FEC_TXD1,
++	MX53_FEC_TXD0,
++};
++static const unsigned mx53_fec_mux[] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 +
-+	if (selector >= info->ngroups)
-+		return -EINVAL;
++static const unsigned mx53_sd1_pins[] = {
++	MX53_SD1_CMD,
++	MX53_SD1_CLK,
++	MX53_SD1_DATA0,
++	MX53_SD1_DATA1,
++	MX53_SD1_DATA2,
++	MX53_SD1_DATA3,
 +
-+	return 0;
-+}
++};
++static const unsigned mx53_sd1_mux[] = { 0, 0, 0, 0, 0, 0 };
 +
-+static const char *imx_get_group_name(struct pinctrl_dev *pctldev,
-+				       unsigned selector)
-+{
-+	struct imx_pmx *ipmx = pinctrl_dev_get_drvdata(pctldev);
-+	struct imx_pinctrl_info *info = ipmx->info;
++static const unsigned mx53_sd3_pins[] = {
++	MX53_PATA_DATA8,
++	MX53_PATA_DATA9,
++	MX53_PATA_DATA10,
++	MX53_PATA_DATA11,
++	MX53_PATA_DATA0,
++	MX53_PATA_DATA1,
++	MX53_PATA_DATA2,
++	MX53_PATA_DATA3,
++	MX53_PATA_IORDY,
++	MX53_PATA_RESET_B,
 +
-+	if (selector >= info->ngroups)
-+		return NULL;
++};
++static const unsigned mx53_sd3_mux[] = { 4, 4, 4, 4, 4, 4, 4, 4, 2, 2 };
 +
-+	return info->groups[selector].name;
-+}
++static const unsigned mx53_uart1_pins[] = {
++	MX53_CSI0_DAT10,
++	MX53_CSI0_DAT11,
++};
++static const unsigned mx53_uart1_mux[] = { 2, 2 };
 +
-+static int imx_get_group_pins(struct pinctrl_dev *pctldev, unsigned selector,
-+			       const unsigned **pins,
-+			       unsigned *num_pins)
-+{
-+	struct imx_pmx *ipmx = pinctrl_dev_get_drvdata(pctldev);
-+	struct imx_pinctrl_info *info = ipmx->info;
-+
-+	if (selector >= info->ngroups)
-+		return -EINVAL;
-+
-+	*pins = info->groups[selector].pins;
-+	*num_pins = info->groups[selector].num_pins;
-+
-+	return 0;
-+}
-+
-+static void imx_pin_dbg_show(struct pinctrl_dev *pctldev, struct seq_file *s,
-+		   unsigned offset)
-+{
-+	seq_printf(s, " " DRIVER_NAME);
-+}
-+
-+static struct pinctrl_ops imx_pctrl_ops = {
-+	.list_groups = imx_list_groups,
-+	.get_group_name = imx_get_group_name,
-+	.get_group_pins = imx_get_group_pins,
-+	.pin_dbg_show = imx_pin_dbg_show,
++static const struct imx_pin_group mx53_pin_groups[] = {
++	IMX_PIN_GROUP("fecgrp", mx53_fec_pins, mx53_fec_mux),
++	IMX_PIN_GROUP("sd1grp", mx53_sd1_pins, mx53_sd1_mux),
++	IMX_PIN_GROUP("sd3grp", mx53_sd3_pins, mx53_sd3_mux),
++	IMX_PIN_GROUP("uart1grp", mx53_uart1_pins, mx53_uart1_mux),
 +};
 +
-+static int imx_pmx_enable(struct pinctrl_dev *pctldev, unsigned selector,
-+			   unsigned group)
-+{
-+	struct imx_pmx *ipmx = pinctrl_dev_get_drvdata(pctldev);
-+	struct imx_pinctrl_info *info = ipmx->info;
-+	const unsigned *pins, *mux;
-+	unsigned int num_pins, num_mux;
-+	u32 regval, offset;
-+	int i;
++/* mx53 funcs and groups */
++static const char * const fecgrps[] = { "fecgrp" };
++static const char * const sd1grps[] = { "sd1grp" };
++static const char * const sd3grps[] = { "sd3grp" };
++static const char * const uart1grps[] = { "uart1grp" };
 +
-+	/*
-+	 * Configure the mux mode for each pin in the group for a specific
-+	 * function.
-+	 */
-+	pins = info->groups[group].pins;
-+	num_pins = info->groups[group].num_pins;
-+	mux = info->groups[group].mux_mode;
-+	num_mux = info->groups[group].num_mux;
-+
-+	dev_dbg(ipmx->dev, "function %s group %s\n",
-+		info->functions[selector].name, info->groups[group].name);
-+
-+	if (num_pins != num_mux) {
-+		dev_err(ipmx->dev, "num_mux is not equal to num_pins\n");
-+		return -EINVAL;
-+	}
-+
-+	for (i = 0; i < num_pins; i++) {
-+		if (mux[i] > IMX_PINCTRL_MAX_FUNC)
-+			dev_err(ipmx->dev, "exceeds the maximum mux mode(0x7)\n");
-+		offset = info->mux_offset + pins[i] * IMX_PINCTRL_REG_SIZE;
-+		regval = readl(ipmx->virtbase + offset);
-+		regval &= ~IMX_PINCTRL_MAX_FUNC;
-+		writel(mux[i] | regval, ipmx->virtbase + offset);
-+		dev_dbg(ipmx->dev, "write: offset 0x%x val 0x%x\n",
-+			offset, regval);
-+	}
-+
-+	return 0;
-+}
-+
-+static int imx_pmx_list_funcs(struct pinctrl_dev *pctldev, unsigned selector)
-+{
-+	struct imx_pmx *ipmx = pinctrl_dev_get_drvdata(pctldev);
-+	struct imx_pinctrl_info *info = ipmx->info;
-+
-+	if (selector >= info->nfunctions)
-+		return -EINVAL;
-+
-+	return 0;
-+}
-+
-+static const char *imx_pmx_get_func_name(struct pinctrl_dev *pctldev,
-+					  unsigned selector)
-+{
-+	struct imx_pmx *ipmx = pinctrl_dev_get_drvdata(pctldev);
-+	struct imx_pinctrl_info *info = ipmx->info;
-+
-+	return info->functions[selector].name;
-+}
-+
-+static int imx_pmx_get_groups(struct pinctrl_dev *pctldev, unsigned selector,
-+			       const char * const **groups,
-+			       unsigned * const num_groups)
-+{
-+	struct imx_pmx *ipmx = pinctrl_dev_get_drvdata(pctldev);
-+	struct imx_pinctrl_info *info = ipmx->info;
-+
-+	*groups = info->functions[selector].groups;
-+	*num_groups = info->functions[selector].num_groups;
-+
-+	return 0;
-+}
-+
-+static struct pinmux_ops imx_pmx_ops = {
-+	.list_functions = imx_pmx_list_funcs,
-+	.get_function_name = imx_pmx_get_func_name,
-+	.get_function_groups = imx_pmx_get_groups,
-+	.enable = imx_pmx_enable,
++static const struct imx_pmx_func mx53_pmx_functions[] = {
++	IMX_PMX_FUNC("fec", fecgrps),
++	IMX_PMX_FUNC("sd1", sd1grps),
++	IMX_PMX_FUNC("sd3", sd3grps),
++	IMX_PMX_FUNC("uart1", uart1grps),
 +};
 +
-+static struct pinctrl_desc imx_pmx_desc = {
-+	.name = DRIVER_NAME,
-+	.pctlops = &imx_pctrl_ops,
-+	.pmxops = &imx_pmx_ops,
-+	.owner = THIS_MODULE,
++const struct imx_pinctrl_info mx53_pinctrl_info = {
++	.type = MX53_PINCTRL,
++	.pins = mx53_pads,
++	.npins = ARRAY_SIZE(mx53_pads),
++	.maxpin = MX53_IOMUXC_MAXPIN,
++	.groups = mx53_pin_groups,
++	.ngroups = ARRAY_SIZE(mx53_pin_groups),
++	.functions = mx53_pmx_functions,
++	.nfunctions = ARRAY_SIZE(mx53_pmx_functions),
++	.mux_offset = MX53_IOMUXC_MUX_OFFSET,
 +};
-+
-+static inline void imx_pmx_desc_init(struct pinctrl_desc *pmx_desc,
-+				const struct imx_pinctrl_info *info)
-+{
-+	pmx_desc->pins = info->pins;
-+	pmx_desc->npins = info->npins;
-+	pmx_desc->maxpin = info->maxpin;
-+}
-+
-+static int __init imx_pmx_probe(struct platform_device *pdev)
-+{
-+	struct device *dev = &pdev->dev;
-+	struct imx_pmx *ipmx;
-+	struct resource *res;
-+	struct imx_pinctrl_info *info;
-+	resource_size_t res_size;
-+
-+	info = (struct imx_pinctrl_info *)pdev->id_entry->driver_data;
-+	if (!info || !info->pins || !info->groups || !info->functions
-+		|| (info->maxpin > info->npins)) {
-+		dev_err(&pdev->dev, "wrong pinctrl info\n");
-+		return -EINVAL;
-+	}
-+
-+	/* Create state holders etc for this driver */
-+	ipmx = devm_kzalloc(&pdev->dev, sizeof(*ipmx), GFP_KERNEL);
-+	if (!ipmx)
-+		return -ENOMEM;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	if (!res)
-+		return -ENOENT;
-+
-+	res_size = resource_size(res);
-+	if (!devm_request_mem_region(dev, res->start, res_size, res->name))
-+		return -EBUSY;
-+
-+	ipmx->virtbase = devm_ioremap_nocache(dev, res->start, res_size);
-+	if (!ipmx->virtbase)
-+		return -EBUSY;
-+
-+	imx_pmx_desc_init(&imx_pmx_desc, info);
-+
-+	ipmx->pctl = pinctrl_register(&imx_pmx_desc, &pdev->dev, ipmx);
-+	if (!ipmx->pctl) {
-+		dev_err(&pdev->dev, "could not register IMX pinmux driver\n");
-+		return -EINVAL;
-+	}
-+
-+	ipmx->info = info;
-+	ipmx->dev = &pdev->dev;
-+	platform_set_drvdata(pdev, ipmx);
-+
-+	dev_info(&pdev->dev, "initialized IMX pinmux driver\n");
-+
-+	return 0;
-+}
-+
-+static int __exit imx_pmx_remove(struct platform_device *pdev)
-+{
-+	struct imx_pmx *ipmx = platform_get_drvdata(pdev);
-+
-+	pinctrl_unregister(ipmx->pctl);
-+	platform_set_drvdata(pdev, NULL);
-+
-+	return 0;
-+}
-+
-+static struct platform_driver imx_pmx_driver = {
-+	.driver = {
-+		.name = DRIVER_NAME,
-+		.owner = THIS_MODULE,
-+	},
-+	.id_table = imx_pinctrl_devtype,
-+	.remove = __exit_p(imx_pmx_remove),
-+};
-+
-+static int __init imx_pmx_init(void)
-+{
-+	return platform_driver_probe(&imx_pmx_driver, imx_pmx_probe);
-+}
-+arch_initcall(imx_pmx_init);
-+
-+static void __exit imx_pmx_exit(void)
-+{
-+	platform_driver_unregister(&imx_pmx_driver);
-+}
-+module_exit(imx_pmx_exit);
-+
-+MODULE_AUTHOR("Dong Aisheng <dong.aisheng@linaro.org>");
-+MODULE_DESCRIPTION("IMX Pin Control Driver");
-+MODULE_LICENSE("GPL v2");
-diff --git a/drivers/pinctrl/pinmux-imx-core.h b/drivers/pinctrl/pinmux-imx-core.h
-new file mode 100644
-index 0000000..8ccc0c6
---- /dev/null
-+++ b/drivers/pinctrl/pinmux-imx-core.h
-@@ -0,0 +1,83 @@
-+/*
-+ * IMX pinmux core definitions
-+ *
-+ * Copyright (C) 2011 Freescale Semiconductor, Inc.
-+ * Copyright (C) 2011 Linaro Ltd.
-+ *
-+ * Author: Dong Aisheng <dong.aisheng@linaro.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ */
-+
-+#ifndef __DRIVERS_PINCTRL_PINMUX_IMX_H
-+#define __DRIVERS_PINCTRL_PINMUX_IMX_H
-+
-+/* Supported Pinctrl type */
-+enum imx_pinctrl_type {
-+	MX53_PINCTRL,
-+	MX6Q_PINCTRL,
-+};
-+
-+/**
-+ * struct imx_pin_group - describes an IMX pin group
-+ * @name: the name of this specific pin group
-+ * @pins: an array of discrete physical pins used in this group, taken
-+ *	from the driver-local pin enumeration space
-+ * @num_pins: the number of pins in this group array, i.e. the number of
-+ *	elements in .pins so we can iterate over that array
-+ * @mux_mode: the mux mode for each pins in this group. The size of this
-+ *	array is the same as pins.
-+ */
-+struct imx_pin_group {
-+	const char *name;
-+	const unsigned int *pins;
-+	const unsigned num_pins;
-+	const unsigned int *mux_mode;
-+	const unsigned num_mux;
-+};
-+
-+/**
-+ * struct imx_pmx_func - describes IMX pinmux functions
-+ * @name: the name of this specific function
-+ * @groups: corresponding pin groups
-+ */
-+struct imx_pmx_func {
-+	const char *name;
-+	const char * const *groups;
-+	const unsigned num_groups;
-+};
-+
-+struct imx_pinctrl_info {
-+	u32 type;
-+	const struct pinctrl_pin_desc *pins;
-+	unsigned int npins;
-+	unsigned int maxpin;
-+	const struct imx_pin_group *groups;
-+	unsigned int ngroups;
-+	const struct imx_pmx_func *functions;
-+	unsigned int nfunctions;
-+	u32 mux_offset;
-+};
-+
-+#define IMX_PINCTRL_PIN(pin) PINCTRL_PIN(pin, #pin)
-+
-+#define IMX_PIN_GROUP(n, p, m)  \
-+	{			\
-+		.name = n,	\
-+		.pins = p,	\
-+		.num_pins = ARRAY_SIZE(p),	\
-+		.mux_mode = m,	\
-+		.num_mux = ARRAY_SIZE(m),	\
-+	}
-+
-+#define IMX_PMX_FUNC(n, g)  \
-+	{			\
-+		.name = n,	\
-+		.groups = g,	\
-+		.num_groups = ARRAY_SIZE(g),	\
-+	}
-+
-+#endif /* __DRIVERS_PINCTRL_PINMUX_IMX_H */
 -- 
 1.7.0.4
