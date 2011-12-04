@@ -1,34 +1,30 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 3 Dec 2011 22:46:54 +0000
-Subject: [GIT PULL] ARM perf updates for 3.3
-In-Reply-To: <20111203102154.GB3860@mudshark.cambridge.arm.com>
-References: <20111202170231.GP5540@mudshark.cambridge.arm.com>
- <20111203092659.GL9581@n2100.arm.linux.org.uk>
- <20111203102154.GB3860@mudshark.cambridge.arm.com>
-Message-ID: <20111203224654.GN9581@n2100.arm.linux.org.uk>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Sun, 4 Dec 2011 01:22:40 +0000
+Subject: [PATCH 2/3] ARM: mach-shmobile: Use common always on power
+ domain governor
+In-Reply-To: <201112032331.07336.rjw@sisk.pl>
+References: <1322765339-29879-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+ <201112022336.19993.rjw@sisk.pl>
+ <20111203110309.GA6043@opensource.wolfsonmicro.com>
+ <201112032331.07336.rjw@sisk.pl>
+Message-ID: <20111204012239.GA31215@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Dec 03, 2011 at 10:21:54AM +0000, Will Deacon wrote:
-> On Sat, Dec 03, 2011 at 09:26:59AM +0000, Russell King - ARM Linux wrote:
-> > While merging this, I get conflicts in gic.c and omap's common.h.  I'm
-> > intending to resolve them as below - please check this _before_ I commit
-> > it (which means my tree is frozen until this is resolved.)
-> 
-> This doesn't sound quite right since I don't touch either of these files in
-> my perf changes. I suspect that you're getting changes from your recently
-> merged fixes branch back from my tree, which is based on -rc4.
+On Sat, Dec 03, 2011 at 11:31:07PM +0100, Rafael J. Wysocki wrote:
+> On Saturday, December 03, 2011, Mark Brown wrote:
 
-Yes, that'll be why.  I sent my previous message to Tony so he can
-confirm the resolution himself.
+> > The first patch in the series added the replacement as generic code,
+> > this patch is deleting the shmobile specific implementation and using
+> > the generic code instead.
 
-The unfortunate thing about that is I can't complete the merge at the
-moment, so I can't do anything with my git tree until Tony replies.
-(I could abort the merge, but then I'd have to recreate the resolutions
-which could be error prone.)
+> No, the first patch didn't add any replacements for the functions that the
+> second patch removed.  At least I don't see the replacements in the first
+> patch.
 
-> As it happens, I worked on this with Marc and that resolution looks ok to
-> me, although I don't have a board at hand to test it.
-
-Well, I guess Tony won't reply until Monday afternoon, so there's no
-immediate rush this weekend.
+Oh, right.  It'd really help if you were more specific.  I'd probably
+have realised earlier that you are probably talking about the stop_dev
+and start_dev functions which appear to have got caught up in the mess
+of a rebase somehow - I didn't intentionally remove them as their
+absence from the patch description and the lack of any removal of
+references to them should suggest.
