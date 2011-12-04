@@ -1,50 +1,70 @@
-From: sudhakar.raj@ti.com (Rajashekhara, Sudhakar)
-Date: Sun, 4 Dec 2011 13:25:35 +0000
-Subject: [PATCH] arm, da8xx, mmc: set second MMC controllers default queue
-In-Reply-To: <1322991210-20486-1-git-send-email-hs@denx.de>
-References: <1322991210-20486-1-git-send-email-hs@denx.de>
-Message-ID: <B6A220404B6BFC4BBD2AB91C54D39DF4029FE5@DBDE01.ent.ti.com>
+From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
+Date: Sun,  4 Dec 2011 16:07:47 +0100
+Subject: [PATCH] ARM: OMAP1: Always reprogramme dpll1 rate at boot.
+In-Reply-To: <20111201190455.GV31337@atomide.com>
+References: <1322364751-29980-1-git-send-email-jkrzyszt@tis.icnet.pl>
+ <1322364751-29980-4-git-send-email-jkrzyszt@tis.icnet.pl>
+ <20111128174616.GP31337@atomide.com> <20111201190455.GV31337@atomide.com>
+Message-ID: <1323011267-22190-1-git-send-email-jkrzyszt@tis.icnet.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+DPLL1 reprogramming to a different rate is actually blocked inside
+omap1_select_table_rate(). However, it is already forced at boot, for
+boards which boot at unusable clock rates, and this seems to work
+correctly.
 
-On Sun, Dec 04, 2011 at 15:03:30, Heiko Schocher wrote:
-> The MMC driver allocates channels with EVENTQ_DEFAULT they
-> get put into EVENTQ_1 which the second EDMA controller does
-> not have and hence transfers stall. This is tried to fix
-> in commit f23fe857bbea393b4b94fe2218c98d934bd3d4cf
-> from Ido Yariv, but missed a fix for the second MMC
-> controller on da850.
-> 
-> Signed-off-by: Heiko Schocher <hs@denx.de>
-> Signed-off-by: juha.kuikka at gmail.com
-> Reported-by: juha.kuikka at gmail.com
-> Cc: linux-mmc at vger.kernel.org
-> Cc: davinci-linux-open-source at linux.davincidsp.com
-> Cc: Rajashekhara, Sudhakar <sudhakar.raj@ti.com>
-> Cc: Ido Yariv <ido@wizery.com>
-> Cc: Sekhar Nori <nsekhar@ti.com>
-> Cc: Wolfgang Denk <wd@denx.de>
-> ---
->  arch/arm/mach-davinci/dma.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/mach-davinci/dma.c b/arch/arm/mach-davinci/dma.c
-> index da90103..e10a251 100644
-> --- a/arch/arm/mach-davinci/dma.c
-> +++ b/arch/arm/mach-davinci/dma.c
-> @@ -1513,7 +1513,7 @@ static int __init edma_probe(struct platform_device *pdev)
->  		 * started by the codec engine will not cause audio defects.
->  		 */
->  		for (i = 0; i < edma_cc[j]->num_channels; i++)
-> -			map_dmach_queue(j, i, EVENTQ_1);
-> +			map_dmach_queue(j, i, info[j]->default_queue);
->  
->  		queue_tc_mapping = info[j]->queue_tc_mapping;
->  		queue_priority_mapping = info[j]->queue_priority_mapping;
+OTOH, we now have a fine, run time performed clock selection algorithm
+implemented, which prevents less powerfull SoCs from being overclocked
+unintentionally.
 
-Acked-by: Rajashekhara, Sudhakar <sudhakar.raj@ti.com>
+Allow reprogramming of dpll1 by default, and use it for switching to the
+higest supported clock rate with all boards, including those already
+booting at a usable rate of 60 MHz or above.
 
-Regards,
-Sudhakar
+Created against linux-omap/master tip as of Thu Dec 1,
+commit f83c2a8cbb59981722d1ab610c79adfd034a2667. Requires the just
+submitted patch "ARM: OMAP1: Move dpll1 rates selection from config to
+runtime" to prevent from unintentional overclocking. Tested on Amstrad
+Delta.
+
+Signed-off-by: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
+---
+ arch/arm/mach-omap1/clock.c      |    4 ----
+ arch/arm/mach-omap1/clock_data.c |    6 ------
+ 2 files changed, 0 insertions(+), 10 deletions(-)
+
+diff --git a/arch/arm/mach-omap1/clock.c b/arch/arm/mach-omap1/clock.c
+index 84ef704..6993cd0 100644
+--- a/arch/arm/mach-omap1/clock.c
++++ b/arch/arm/mach-omap1/clock.c
+@@ -200,10 +200,6 @@ int omap1_select_table_rate(struct clk *clk, unsigned long rate)
+ 		if (ptr->xtal != ref_rate)
+ 			continue;
+ 
+-		/* DPLL1 cannot be reprogrammed without risking system crash */
+-		if (likely(dpll1_rate != 0) && ptr->pll_rate != dpll1_rate)
+-			continue;
+-
+ 		/* Can check only after xtal frequency check */
+ 		if (ptr->rate <= rate)
+ 			break;
+diff --git a/arch/arm/mach-omap1/clock_data.c b/arch/arm/mach-omap1/clock_data.c
+index 9ff90a7..8629178 100644
+--- a/arch/arm/mach-omap1/clock_data.c
++++ b/arch/arm/mach-omap1/clock_data.c
+@@ -931,12 +931,6 @@ void __init omap1_clk_late_init(void)
+ {
+ 	unsigned long rate = ck_dpll1.rate;
+ 
+-	if (rate >= OMAP1_DPLL1_SANE_VALUE)
+-		return;
+-
+-	/* System booting at unusable rate, force reprogramming of DPLL1 */
+-	ck_dpll1_p->rate = 0;
+-
+ 	/* Find the highest supported frequency and enable it */
+ 	if (omap1_select_table_rate(&virtual_ck_mpu, ~0)) {
+ 		pr_err("System frequencies not set, using default. Check your config.\n");
+-- 
+1.7.3.4
