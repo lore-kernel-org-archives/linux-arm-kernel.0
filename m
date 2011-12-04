@@ -1,85 +1,50 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Sun, 4 Dec 2011 18:51:23 +0530
-Subject: [PATCH v5 1/4] regulator: helper routine to extract
- regulator_init_data
-In-Reply-To: <1321615040-13257-2-git-send-email-rnayak@ti.com>
-References: <1321615040-13257-1-git-send-email-rnayak@ti.com>
- <1321615040-13257-2-git-send-email-rnayak@ti.com>
-Message-ID: <CAJuYYwRO+AS=WmQfNAe8L6Gi5Dm4VsCuVqk3X5Nb8uUYAdLnJQ@mail.gmail.com>
+From: sudhakar.raj@ti.com (Rajashekhara, Sudhakar)
+Date: Sun, 4 Dec 2011 13:25:35 +0000
+Subject: [PATCH] arm, da8xx, mmc: set second MMC controllers default queue
+In-Reply-To: <1322991210-20486-1-git-send-email-hs@denx.de>
+References: <1322991210-20486-1-git-send-email-hs@denx.de>
+Message-ID: <B6A220404B6BFC4BBD2AB91C54D39DF4029FE5@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18 November 2011 16:47, Rajendra Nayak <rnayak@ti.com> wrote:
-> The helper routine is meant to be used by the regulator drivers
-> to extract the regulator_init_data structure from the data
-> that is passed from device tree.
-> 'consumer_supplies' which is part of regulator_init_data is not extracted
-> as the regulator consumer mappings are passed through DT differently,
-> implemented in subsequent patches.
-> Similarly the regulator<-->parent/supply mapping is handled in
-> subsequent patches.
->
-> Also add documentation for regulator bindings to be used to pass
-> regulator_init_data struct information from device tree.
->
-> Some of the regulator properties which are linux and board specific,
-> are left out since its not clear if they can
-> be in someway embedded into the kernel or passed in from DT.
-> They will be revisited later.
->
-> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+Hi,
+
+On Sun, Dec 04, 2011 at 15:03:30, Heiko Schocher wrote:
+> The MMC driver allocates channels with EVENTQ_DEFAULT they
+> get put into EVENTQ_1 which the second EDMA controller does
+> not have and hence transfers stall. This is tried to fix
+> in commit f23fe857bbea393b4b94fe2218c98d934bd3d4cf
+> from Ido Yariv, but missed a fix for the second MMC
+> controller on da850.
+> 
+> Signed-off-by: Heiko Schocher <hs@denx.de>
+> Signed-off-by: juha.kuikka at gmail.com
+> Reported-by: juha.kuikka at gmail.com
+> Cc: linux-mmc at vger.kernel.org
+> Cc: davinci-linux-open-source at linux.davincidsp.com
+> Cc: Rajashekhara, Sudhakar <sudhakar.raj@ti.com>
+> Cc: Ido Yariv <ido@wizery.com>
+> Cc: Sekhar Nori <nsekhar@ti.com>
+> Cc: Wolfgang Denk <wd@denx.de>
 > ---
-> ?.../devicetree/bindings/regulator/regulator.txt ? ?| ? 54 +++++++++++++
-> ?drivers/regulator/Makefile ? ? ? ? ? ? ? ? ? ? ? ? | ? ?1 +
-> ?drivers/regulator/of_regulator.c ? ? ? ? ? ? ? ? ? | ? 81 ++++++++++++++++++++
-> ?include/linux/regulator/of_regulator.h ? ? ? ? ? ? | ? 20 +++++
-> ?4 files changed, 156 insertions(+), 0 deletions(-)
-> ?create mode 100644 Documentation/devicetree/bindings/regulator/regulator.txt
-> ?create mode 100644 drivers/regulator/of_regulator.c
-> ?create mode 100644 include/linux/regulator/of_regulator.h
->
-> diff --git a/Documentation/devicetree/bindings/regulator/regulator.txt b/Documentation/devicetree/bindings/regulator/regulator.txt
-> new file mode 100644
-> index 0000000..82bef20
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/regulator/regulator.txt
-> @@ -0,0 +1,54 @@
-> +Voltage/Current Regulators
-> +
-> +Optional properties:
-> +- regulator-name: A string used as a descriptive name for regulator outputs
-> +- regulator-min-microvolt: smallest voltage consumers may set
-> +- regulator-max-microvolt: largest voltage consumers may set
-> +- regulator-microvolt-offset: Offset applied to voltages to compensate for voltage drops
-> +- regulator-min-microamp: smallest current consumers may set
-> +- regulator-max-microamp: largest current consumers may set
-> +- regulator-always-on: boolean, regulator should never be disabled
-> +- regulator-boot-on: bootloader/firmware enabled regulator
-> +- <name>-supply: phandle to the parent supply/regulator node
+>  arch/arm/mach-davinci/dma.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/mach-davinci/dma.c b/arch/arm/mach-davinci/dma.c
+> index da90103..e10a251 100644
+> --- a/arch/arm/mach-davinci/dma.c
+> +++ b/arch/arm/mach-davinci/dma.c
+> @@ -1513,7 +1513,7 @@ static int __init edma_probe(struct platform_device *pdev)
+>  		 * started by the codec engine will not cause audio defects.
+>  		 */
+>  		for (i = 0; i < edma_cc[j]->num_channels; i++)
+> -			map_dmach_queue(j, i, EVENTQ_1);
+> +			map_dmach_queue(j, i, info[j]->default_queue);
+>  
+>  		queue_tc_mapping = info[j]->queue_tc_mapping;
+>  		queue_priority_mapping = info[j]->queue_priority_mapping;
 
-For regulators that are not turned on by bootloader, and which require
-'apply_uV' constraint, is there any alternative for turning on the
-regulator when using dt?
+Acked-by: Rajashekhara, Sudhakar <sudhakar.raj@ti.com>
 
-Or, how about adding a additional check as below.
-
-diff --git a/drivers/regulator/core.c b/drivers/regulator/core.c
-index 5baa196..25a6781 100644
---- a/drivers/regulator/core.c
-+++ b/drivers/regulator/core.c
-@@ -816,8 +816,9 @@ static int machine_constraints_voltage(struct
-regulator_dev *rdev,
- 	int ret;
-
- 	/* do we need to apply the constraint voltage */
--	if (rdev->constraints->apply_uV &&
--	    rdev->constraints->min_uV == rdev->constraints->max_uV) {
-+	if ((rdev->constraints->apply_uV &&
-+	    rdev->constraints->min_uV == rdev->constraints->max_uV) ||
-+		(!rdev->constraints->boot_on && rdev->constraints->always_on)) {
- 		ret = _regulator_do_set_voltage(rdev,
- 						rdev->constraints->min_uV,
- 						rdev->constraints->max_uV);
-
-Thanks,
-Thomas.
+Regards,
+Sudhakar
