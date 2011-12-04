@@ -1,28 +1,51 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 4 Dec 2011 21:25:21 +0000
-Subject: [PATCH-RFC 04/10] arm: switch to GENERIC_PCI_IOMAP
-In-Reply-To: <20111204104709.GF15464@redhat.com>
-References: <cover.1322163031.git.mst@redhat.com>
- <1415bf8cf7d98d05b7d189e913efb7f9668846ac.1322163031.git.mst@redhat.com>
- <20111204104709.GF15464@redhat.com>
-Message-ID: <20111204212521.GA14542@n2100.arm.linux.org.uk>
+Date: Sun, 4 Dec 2011 21:33:16 +0000
+Subject: [PATCHv5] atomic: add *_dec_not_zero
+In-Reply-To: <1323013369-29691-1-git-send-email-sven@narfation.org>
+References: <1323013369-29691-1-git-send-email-sven@narfation.org>
+Message-ID: <20111204213316.GB14542@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Dec 04, 2011 at 12:47:09PM +0200, Michael S. Tsirkin wrote:
-> On Thu, Nov 24, 2011 at 10:17:42PM +0200, Michael S. Tsirkin wrote:
-> > arm copied pci_iomap from generic code, probably to avoid
-> > pulling the rest of iomap.c in.  Since that's in
-> > a separate file now, we can reuse the common implementation.
-> > 
-> > Signed-off-by: Michael S. Tsirkin <mst@redhat.com>
-> > ---
-> 
-> Sorry to nag, any ACKs/NACKs on the arm part?
-> I intend to send this to Linus if there are no
-> objections. Thanks!
+On Sun, Dec 04, 2011 at 04:42:49PM +0100, Sven Eckelmann wrote:
+> diff --git a/arch/alpha/include/asm/atomic.h b/arch/alpha/include/asm/atomic.h
+> +#define atomic64_dec_not_zero(v) atomic64_add_unless((v), -1, 0)
+> diff --git a/arch/arm/include/asm/atomic.h b/arch/arm/include/asm/atomic.h
+> +#define atomic64_dec_not_zero(v)	atomic64_add_unless((v), -1LL, 0LL)
+> diff --git a/arch/ia64/include/asm/atomic.h b/arch/ia64/include/asm/atomic.h
+> +#define atomic64_dec_not_zero(v) atomic64_add_unless((v), -1, 0)
+> diff --git a/arch/mips/include/asm/atomic.h b/arch/mips/include/asm/atomic.h
+> +#define atomic64_dec_not_zero(v) atomic64_add_unless((v), -1, 0)
+> diff --git a/arch/parisc/include/asm/atomic.h b/arch/parisc/include/asm/atomic.h
+> +#define atomic64_dec_not_zero(v) atomic64_add_unless((v), -1, 0)
+> diff --git a/arch/powerpc/include/asm/atomic.h b/arch/powerpc/include/asm/atomic.h
+> +#define atomic64_dec_not_zero(v) atomic64_add_unless((v), -1, 0)
+> diff --git a/arch/s390/include/asm/atomic.h b/arch/s390/include/asm/atomic.h
+> +#define atomic64_dec_not_zero(v)	atomic64_add_unless((v), -1, 0)
+> diff --git a/arch/sparc/include/asm/atomic_64.h b/arch/sparc/include/asm/atomic_64.h
+> +#define atomic64_dec_not_zero(v) atomic64_add_unless((v), -1, 0)
+> diff --git a/arch/tile/include/asm/atomic_32.h b/arch/tile/include/asm/atomic_32.h
+> +#define atomic64_dec_not_zero(v)	atomic64_add_unless((v), -1LL, 0LL)
+> diff --git a/arch/tile/include/asm/atomic_64.h b/arch/tile/include/asm/atomic_64.h
+> +#define atomic64_dec_not_zero(v)	atomic64_add_unless((v), -1, 0)
+> diff --git a/arch/x86/include/asm/atomic64_64.h b/arch/x86/include/asm/atomic64_64.h
+> +#define atomic64_dec_not_zero(v) atomic64_add_unless((v), -1, 0)
+> diff --git a/include/asm-generic/atomic64.h b/include/asm-generic/atomic64.h
+> +#define atomic64_dec_not_zero(v)	atomic64_add_unless((v), -1LL, 0LL)
 
-As there's no difference between the generic version and this version
-you're removing...
+I think this is rather silly - all these definitions are very similar to
+each other.  Is there really no way to put this into include/linux/atomic.h,
+maybe as something like:
 
-Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
+#ifndef atomic64_dec_not_zero
+#define atomic64_dec_not_zero(v)	atomic64_add_unless((v), -1, 0)
+#endif
+
+and avoid having to add essentially the same definition to 12 individual
+files?
+
+Architectures which want to override it can do by the following:
+
+#define atomic64_dec_not_zero		atomic64_dec_not_zero
+
+which won't have any effect on C nor asm code.
