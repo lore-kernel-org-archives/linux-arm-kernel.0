@@ -1,58 +1,42 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Sun,  4 Dec 2011 01:24:41 +0000
-Subject: [PATCH v2] ARM: mach-shmobile: Use common always on power domain
- governor
-In-Reply-To: <20111203110309.GA6043@opensource.wolfsonmicro.com>
-References: <20111203110309.GA6043@opensource.wolfsonmicro.com>
-Message-ID: <1322961881-31945-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+From: hs@denx.de (Heiko Schocher)
+Date: Sun,  4 Dec 2011 10:33:30 +0100
+Subject: [PATCH] arm, da8xx, mmc: set second MMC controllers default queue
+Message-ID: <1322991210-20486-1-git-send-email-hs@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Saves a tiny amount of code.
+The MMC driver allocates channels with EVENTQ_DEFAULT they
+get put into EVENTQ_1 which the second EDMA controller does
+not have and hence transfers stall. This is tried to fix
+in commit f23fe857bbea393b4b94fe2218c98d934bd3d4cf
+from Ido Yariv, but missed a fix for the second MMC
+controller on da850.
 
-Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+Signed-off-by: Heiko Schocher <hs@denx.de>
+Signed-off-by: juha.kuikka at gmail.com
+Reported-by: juha.kuikka at gmail.com
+Cc: linux-mmc at vger.kernel.org
+Cc: davinci-linux-open-source at linux.davincidsp.com
+Cc: Rajashekhara, Sudhakar <sudhakar.raj@ti.com>
+Cc: Ido Yariv <ido@wizery.com>
+Cc: Sekhar Nori <nsekhar@ti.com>
+Cc: Wolfgang Denk <wd@denx.de>
 ---
- arch/arm/mach-shmobile/pm-sh7372.c |   14 ++------------
- 1 files changed, 2 insertions(+), 12 deletions(-)
+ arch/arm/mach-davinci/dma.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/pm-sh7372.c b/arch/arm/mach-shmobile/pm-sh7372.c
-index adf1765..7d7cdfc 100644
---- a/arch/arm/mach-shmobile/pm-sh7372.c
-+++ b/arch/arm/mach-shmobile/pm-sh7372.c
-@@ -162,16 +162,6 @@ static bool pd_active_wakeup(struct device *dev)
- 	return active_wakeup ? active_wakeup(dev) : true;
- }
+diff --git a/arch/arm/mach-davinci/dma.c b/arch/arm/mach-davinci/dma.c
+index da90103..e10a251 100644
+--- a/arch/arm/mach-davinci/dma.c
++++ b/arch/arm/mach-davinci/dma.c
+@@ -1513,7 +1513,7 @@ static int __init edma_probe(struct platform_device *pdev)
+ 		 * started by the codec engine will not cause audio defects.
+ 		 */
+ 		for (i = 0; i < edma_cc[j]->num_channels; i++)
+-			map_dmach_queue(j, i, EVENTQ_1);
++			map_dmach_queue(j, i, info[j]->default_queue);
  
--static bool sh7372_power_down_forbidden(struct dev_pm_domain *domain)
--{
--	return false;
--}
--
--struct dev_power_governor sh7372_always_on_gov = {
--	.power_down_ok = sh7372_power_down_forbidden,
--	.stop_ok = default_stop_ok,
--};
--
- static int sh7372_stop_dev(struct device *dev)
- {
- 	int (*stop)(struct device *dev);
-@@ -246,7 +236,7 @@ struct sh7372_pm_domain sh7372_d4 = {
- 
- struct sh7372_pm_domain sh7372_a4r = {
- 	.bit_shift = 5,
--	.gov = &sh7372_always_on_gov,
-+	.gov = &pm_domain_always_on_gov,
- 	.suspend = sh7372_a4r_suspend,
- 	.resume = sh7372_intcs_resume,
- 	.stay_on = true,
-@@ -262,7 +252,7 @@ struct sh7372_pm_domain sh7372_a3ri = {
- 
- struct sh7372_pm_domain sh7372_a3sp = {
- 	.bit_shift = 11,
--	.gov = &sh7372_always_on_gov,
-+	.gov = &pm_domain_always_on_gov,
- 	.no_debug = true,
- };
- 
+ 		queue_tc_mapping = info[j]->queue_tc_mapping;
+ 		queue_priority_mapping = info[j]->queue_priority_mapping;
 -- 
-1.7.7.3
+1.7.6.4
