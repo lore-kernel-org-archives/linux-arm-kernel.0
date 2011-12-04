@@ -1,36 +1,22 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Mon, 05 Dec 2011 09:41:55 +1100
-Subject: [PATCHv5] atomic: add *_dec_not_zero
-In-Reply-To: <20111204221850.GC14542@n2100.arm.linux.org.uk>
-References: <1323013369-29691-1-git-send-email-sven@narfation.org>
- <20111204213316.GB14542@n2100.arm.linux.org.uk>
- <1699880.NTdz2k3W9O@sven-laptop.home.narfation.org>
- <20111204221850.GC14542@n2100.arm.linux.org.uk>
-Message-ID: <1323038515.11728.26.camel@pasglop>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Sun, 4 Dec 2011 23:10:05 +0000
+Subject: [PATCH 1/3] PM: Provide an always on power domain governor
+In-Reply-To: <201112042156.59990.rjw@sisk.pl>
+References: <1322765339-29879-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+ <201112042156.59990.rjw@sisk.pl>
+Message-ID: <20111204231005.GA4255@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 2011-12-04 at 22:18 +0000, Russell King - ARM Linux wrote:
+On Sun, Dec 04, 2011 at 09:56:59PM +0100, Rafael J. Wysocki wrote:
+> On Thursday, December 01, 2011, Mark Brown wrote:
 
- .../...
+> > Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
 
-> And really, I believe it would be a good cleanup if all the standard
-> definitions for atomic64 ops (like atomic64_add_negative) were also
-> defined in include/linux/atomic.h rather than individually in every
-> atomic*.h header throughout the kernel source, except where an arch
-> wants to explicitly override it.  Yet again, virtually all architectures
-> define these in exactly the same way.
-> 
-> We have more than enough code in arch/ for any architecture to worry
-> about, we don't need schemes to add more when there's simple and
-> practical solutions to avoiding doing so if the right design were
-> chosen (preferably from the outset.)
-> 
-> So, I'm not going to offer my ack for a change which I don't believe
-> is the correct approach.
+> Looks good with the new version of [2/3].
 
-I agree with Russell, his approach is a lot easier to maintain long run,
-we should even consider converting existing definitions.
+> Do you want me to takt it?
 
-Cheers,
-Ben.
+It might make sense for it to go via the Samsung tree - the third patch
+depends on it and there's some other stuff going on with the s3c64xx
+power management - so let's see what Kukjin thinks is best.
