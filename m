@@ -1,25 +1,36 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 5 Dec 2011 11:23:57 +0000
-Subject: [GIT PULL] ARM perf updates for 3.3
-In-Reply-To: <20111203224654.GN9581@n2100.arm.linux.org.uk>
-References: <20111202170231.GP5540@mudshark.cambridge.arm.com>
- <20111203092659.GL9581@n2100.arm.linux.org.uk>
- <20111203102154.GB3860@mudshark.cambridge.arm.com>
- <20111203224654.GN9581@n2100.arm.linux.org.uk>
-Message-ID: <20111205112357.GC6312@mudshark.cambridge.arm.com>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Mon, 5 Dec 2011 19:29:51 +0800
+Subject: [PATCH v2] pcmcia: pxa: replace IRQ_GPIO() with gpio_to_irq()
+In-Reply-To: <1323083166.6763.3.camel@phoenix>
+References: <1323083166.6763.3.camel@phoenix>
+Message-ID: <CAN1soZyMxP4qKow+XKk09KAdzdctdzz=aiYbiTqek923xirK0A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Dec 03, 2011 at 10:46:54PM +0000, Russell King - ARM Linux wrote:
-> On Sat, Dec 03, 2011 at 10:21:54AM +0000, Will Deacon wrote:
-> > As it happens, I worked on this with Marc and that resolution looks ok to
-> > me, although I don't have a board at hand to test it.
-> 
-> Well, I guess Tony won't reply until Monday afternoon, so there's no
-> immediate rush this weekend.
-
-Right. I did the merge of my for-rmk branch with your devel branch and can
-confirm that everything seems fine on my Versatile Express, so the GIC
-resolution is ok.
-
-Will
+On Mon, Dec 5, 2011 at 7:06 PM, Axel Lin <axel.lin@gmail.com> wrote:
+> Since commit 6384fd "ARM: pxa: rename IRQ_GPIO to PXA_GPIO_TO_IRQ",
+> I got buid errors due to implicit declaration of function 'IRQ_GPIO'.
+>
+> Use common gpio_to_irq() to replace machine dependant macro IRQ_GPIO().
+>
+> Cc: Marek Vasut <marek.vasut@gmail.com>
+> Cc: Ian Molton <spyro@f2s.com>
+> Cc: Jonathan Cameron <jic23@cam.ac.uk>
+> Cc: Zhuang <haojian.zhuang@marvell.com>
+> Cc: Eric Miao <eric.y.miao@gmail.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Signed-off-by: Axel Lin <axel.lin@gmail.com>
+> ---
+> v2:
+> I just found pxa2xx_trizeps4.c also needs to be converted to gpio_to_irq.
+> Thus include the fix for pxa2xx_trizeps4.c in v2.
+>
+> ?drivers/pcmcia/pxa2xx_e740.c ? ? ?| ? 11 +++++++----
+> ?drivers/pcmcia/pxa2xx_palmld.c ? ?| ? ?2 +-
+> ?drivers/pcmcia/pxa2xx_palmtc.c ? ?| ? ?2 +-
+> ?drivers/pcmcia/pxa2xx_stargate2.c | ? ?6 ++++--
+> ?drivers/pcmcia/pxa2xx_trizeps4.c ?| ? ?5 +++--
+> ?drivers/pcmcia/pxa2xx_vpac270.c ? | ? ?4 ++--
+> ?6 files changed, 18 insertions(+), 12 deletions(-)
+>
+Acked-by: Haojian Zhuang <haojian.zhuang@gmail.com>
