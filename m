@@ -1,71 +1,163 @@
-From: myungjoo.ham@gmail.com (MyungJoo Ham)
-Date: Mon, 5 Dec 2011 13:55:28 +0900
-Subject: [PATCH 3/4] ARM Exynos4210-Nuri: remove compiler errors
-In-Reply-To: <000201ccb19d$9ab31070$d0193150$%kim@samsung.com>
-References: <1322730317-8171-1-git-send-email-myungjoo.ham@samsung.com>
- <1322730317-8171-4-git-send-email-myungjoo.ham@samsung.com>
- <04f901ccb0d0$b94191b0$2bc4b510$%kim@samsung.com>
- <CAJ0PZbTKgqgg3SZN3KyVFzGDuSU8qjM5NjwNcM28mtmzfbS0Xw@mail.gmail.com>
- <000201ccb19d$9ab31070$d0193150$%kim@samsung.com>
-Message-ID: <CAJ0PZbS2iarzcS1LZq9TK0GbKWgCXKPba00sSLkYe8YY_3EA9w@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon,  5 Dec 2011 14:32:14 +0800
+Subject: [PATCH v2] arm/imx6: add restart support for imx6q
+Message-ID: <1323066734-29994-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Dec 3, 2011 at 6:26 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> MyungJoo Ham wrote:
->>
->> On Fri, Dec 2, 2011 at 5:59 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
->> > MyungJoo Hamm wrote:
->> >>
->> > What's the 'compiler errors'?
->> >
->> > And I don't know why this patch included in this series, maybe this
->> should
->> > be separated from this series?
->>
->> The error is:
->> arch/arm/mach-exynos/mach-nuri.c: In function 'nuri_power_init':
->> arch/arm/mach-exynos/mach-nuri.c:1080:2: error: implicit declaration
->> of function 'irq_alloc_descs'
->
-> Well, I couldn't find the 'irq_alloc_descs' at the
-> arch/arm/mach-exynos/mach-nuri.c file in my tree and linux-next. Maybe you
-> missed submitting some patches?
->
-> And I don't know why inclusion of <linux/export.h> is needed for
-> 'irq_alloc_descs'...
->
->> It is due to the recent changes in some of the header files (they
->> removed some header inclusion from header fiiles).
->>
-> I think, if this is required, this fix should be separated because the build
-> error what you said will be happened without this series...
->
->> In this patchset, we are providing a test case (Exynos4210-Nuri) for
->> the device driver and we had to resolve the compiler error first.
->>
-> If so, yes, firstly that should be fixed...but now don't we need this?
->
-> Thanks.
->
-> Best regards,
-> Kgene.
-> --
-> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-> SW Solution Development Team, Samsung Electronics Co., Ltd.
->
+The restart support was missed from the initial imx6q submission.
+The mxc_restart() does not work for imx6q.  Instead, this patch adds
+the restart for imx6q.
 
-Ah.. as you've mentioned, the compiler error is found to be related
-with other unmerged patches (sparse IRQ). Please never mind this
-patch. This (patch 3/4) should be dropped from this patchset.
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+Changes since v1:
+ * Fall into soft_restart in case that iomap for wdog_base fails
 
-Thank you.
+ arch/arm/mach-imx/clock-imx6q.c         |    2 -
+ arch/arm/mach-imx/mach-imx6q.c          |   35 ++++++++++++++++++++++++++++++-
+ arch/arm/mach-imx/src.c                 |   23 ++++++++++++++++++++
+ arch/arm/plat-mxc/include/mach/common.h |    1 +
+ 4 files changed, 58 insertions(+), 3 deletions(-)
 
-
-
-Cheers!
-MyungJoo
-
+diff --git a/arch/arm/mach-imx/clock-imx6q.c b/arch/arm/mach-imx/clock-imx6q.c
+index 613a1b9..2234031 100644
+--- a/arch/arm/mach-imx/clock-imx6q.c
++++ b/arch/arm/mach-imx/clock-imx6q.c
+@@ -1931,14 +1931,12 @@ int imx6q_set_lpm(enum mxc_cpu_pwr_mode mode)
+ 		val |= 0x1 << BP_CLPCR_LPM;
+ 		val &= ~BM_CLPCR_VSTBY;
+ 		val &= ~BM_CLPCR_SBYOS;
+-		val |= BM_CLPCR_BYP_MMDC_CH1_LPM_HS;
+ 		break;
+ 	case STOP_POWER_OFF:
+ 		val |= 0x2 << BP_CLPCR_LPM;
+ 		val |= 0x3 << BP_CLPCR_STBY_COUNT;
+ 		val |= BM_CLPCR_VSTBY;
+ 		val |= BM_CLPCR_SBYOS;
+-		val |= BM_CLPCR_BYP_MMDC_CH1_LPM_HS;
+ 		break;
+ 	default:
+ 		return -EINVAL;
+diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
+index dc8b6e2..b8236f3 100644
+--- a/arch/arm/mach-imx/mach-imx6q.c
++++ b/arch/arm/mach-imx/mach-imx6q.c
+@@ -10,10 +10,13 @@
+  * http://www.gnu.org/copyleft/gpl.html
+  */
+ 
++#include <linux/delay.h>
+ #include <linux/init.h>
++#include <linux/io.h>
+ #include <linux/irq.h>
+ #include <linux/irqdomain.h>
+ #include <linux/of.h>
++#include <linux/of_address.h>
+ #include <linux/of_irq.h>
+ #include <linux/of_platform.h>
+ #include <asm/hardware/cache-l2x0.h>
+@@ -23,6 +26,36 @@
+ #include <mach/common.h>
+ #include <mach/hardware.h>
+ 
++void imx6q_restart(char mode, const char *cmd)
++{
++	struct device_node *np;
++	void __iomem *wdog_base;
++
++	np = of_find_compatible_node(NULL, NULL, "fsl,imx6q-wdt");
++	wdog_base = of_iomap(np, 0);
++	if (!wdog_base)
++		goto soft;
++
++	imx_src_prepare_restart();
++
++	/* enable wdog */
++	writew_relaxed(1 << 2, wdog_base);
++	/* write twice to ensure the request will not get ignored */
++	writew_relaxed(1 << 2, wdog_base);
++
++	/* wait for reset to assert ... */
++	mdelay(500);
++
++	pr_err("Watchdog reset failed to assert reset\n");
++
++	/* delay to allow the serial port to show the message */
++	mdelay(50);
++
++soft:
++	/* we'll take a jump through zero as a poor second */
++	soft_restart(0);
++}
++
+ static void __init imx6q_init_machine(void)
+ {
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+@@ -81,5 +114,5 @@ DT_MACHINE_START(IMX6Q, "Freescale i.MX6 Quad (Device Tree)")
+ 	.timer		= &imx6q_timer,
+ 	.init_machine	= imx6q_init_machine,
+ 	.dt_compat	= imx6q_dt_compat,
+-	.restart	= mxc_restart,
++	.restart	= imx6q_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-imx/src.c b/arch/arm/mach-imx/src.c
+index 36cacbd..117538c 100644
+--- a/arch/arm/mach-imx/src.c
++++ b/arch/arm/mach-imx/src.c
+@@ -18,6 +18,7 @@
+ 
+ #define SRC_SCR				0x000
+ #define SRC_GPR1			0x020
++#define BP_SRC_SCR_WARM_RESET_ENABLE	0
+ #define BP_SRC_SCR_CORE1_RST		14
+ #define BP_SRC_SCR_CORE1_ENABLE		22
+ 
+@@ -39,11 +40,33 @@ void imx_set_cpu_jump(int cpu, void *jump_addr)
+ 		       src_base + SRC_GPR1 + cpu * 8);
+ }
+ 
++void imx_src_prepare_restart(void)
++{
++	u32 val;
++
++	/* clear enable bits of secondary cores */
++	val = readl_relaxed(src_base + SRC_SCR);
++	val &= ~(0x7 << BP_SRC_SCR_CORE1_ENABLE);
++	writel_relaxed(val, src_base + SRC_SCR);
++
++	/* clear persistent entry register of primary core */
++	writel_relaxed(0, src_base + SRC_GPR1);
++}
++
+ void __init imx_src_init(void)
+ {
+ 	struct device_node *np;
++	u32 val;
+ 
+ 	np = of_find_compatible_node(NULL, NULL, "fsl,imx6q-src");
+ 	src_base = of_iomap(np, 0);
+ 	WARN_ON(!src_base);
++
++	/*
++	 * force warm reset sources to generate cold reset
++	 * for a more reliable restart
++	 */
++	val = readl_relaxed(src_base + SRC_SCR);
++	val &= ~(1 << BP_SRC_SCR_WARM_RESET_ENABLE);
++	writel_relaxed(val, src_base + SRC_SCR);
+ }
+diff --git a/arch/arm/plat-mxc/include/mach/common.h b/arch/arm/plat-mxc/include/mach/common.h
+index 4ee98d5..5ad0497 100644
+--- a/arch/arm/plat-mxc/include/mach/common.h
++++ b/arch/arm/plat-mxc/include/mach/common.h
+@@ -123,6 +123,7 @@ static inline void imx_smp_prepare(void) {}
+ extern void imx_enable_cpu(int cpu, bool enable);
+ extern void imx_set_cpu_jump(int cpu, void *jump_addr);
+ extern void imx_src_init(void);
++extern void imx_src_prepare_restart(void);
+ extern void imx_gpc_init(void);
+ extern void imx_gpc_pre_suspend(void);
+ extern void imx_gpc_post_resume(void);
 -- 
-MyungJoo Ham, Ph.D.
-Mobile Software Platform Lab, DMC Business, Samsung Electronics
+1.7.4.1
