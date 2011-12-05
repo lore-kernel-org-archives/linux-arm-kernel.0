@@ -1,50 +1,60 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Tue, 6 Dec 2011 08:24:30 +0900
-Subject: [PATCH v7 0/2] iommu/exynos: Add IOMMU/System MMU driver for
- Samsung Exynos
-In-Reply-To: <20111205154715.GE25178@amd.com>
-References: <1321609650-1329-1-git-send-email-pullip.cho@samsung.com>
- <20111205154715.GE25178@amd.com>
-Message-ID: <CAH9JG2VALcm-PreS7S2SZPPgEbid_6_VWJA0PHBEtY5KvaA3Og@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 5 Dec 2011 23:36:21 +0000
+Subject: realview compulsory enables CONFIG_ARM_PATCH_PHYS_VIRT on me
+In-Reply-To: <alpine.LFD.2.02.1112051707520.2357@xanadu.home>
+References: <CACRpkdZ8jpz7WTP3gpfcTykQZaCjQLN9PZCAS+UJOWrzZo1bjQ@mail.gmail.com>
+ <4EDD3E5E.6050106@gmail.com> <alpine.LFD.2.02.1112051707520.2357@xanadu.home>
+Message-ID: <20111205233621.GH14542@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/6/11, Joerg Roedel <joerg.roedel@amd.com> wrote:
-> On Fri, Nov 18, 2011 at 06:47:28PM +0900, KyongHo Cho wrote:
->> Patch Summary:
->> [PATCH v7 1/2] ARM: EXYNOS: Change System MMU platform device definitions
->> [PATCH v7 2/2] iommu/exynos: Add iommu driver for Exynos Platforms
->
-> Okay, I merged it into arm/exynos, but it is not pushed yet. Actually
-> there were conflicts while merging, which I resolved. What I failed
-> to find is a config for Exynos that actually builds for upstream Linux.
-> Probably I havn't tried hard enough to find one... Can you provide a
-> kernel config that I can use for my testing and that builds a current
-> 3.2-rc4 kernel for Exynos?
-and I hope to see the real example how to use it with exynos platform.
+On Mon, Dec 05, 2011 at 05:08:12PM -0500, Nicolas Pitre wrote:
+> On Mon, 5 Dec 2011, Rob Herring wrote:
+> 
+> > On 12/05/2011 03:22 PM, Linus Walleij wrote:
+> > > Hi Nico,
+> > > 
+> > > now I'm lost, I discussed by boot problems on ARM PB1176
+> > > with Marc and after some investigation I found this strange thing on
+> > > the lastest rc:s since -rc1:
+> > > 
+> > > In arch/arm/Kconfig ARM_PATCH_PHYS_VIRT is forcibly
+> > > disabled like so:
+> > > 
+> > > depends on !ARCH_REALVIEW || !SPARSEMEM
+> > 
+> > should be !ARCH_REALVIEW && !SPARSEMEM ?
+> 
+> Indeed.
 
-Now I can't find the interface between exynos platform and generic exynos iommu.
-BTW, how do you test it at mainline kernel?
+No, it's correct.  None of you are understanding the logic.
 
-Thank you,
-Kyungmin Park
+If you don't understand it, draw up a truth table:
 
->
-> Thanks,
->
-> 	Joerg
->
-> --
-> AMD Operating System Research Center
->
-> Advanced Micro Devices GmbH Einsteinring 24 85609 Dornach
-> General Managers: Alberto Bozzo, Andrew Bowd
-> Registration: Dornach, Landkr. Muenchen; Registerger. Muenchen, HRB Nr.
-> 43632
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc"
-> in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->
+ARCH_REALVIEW	SPARSEMEM	result
+n		n		y
+n		y		y
+y		n		y
+y		y		n
+
+And this clearly shows that if we have realview _and_ sparsemem enabled,
+then we don't want P2V patching in place.  The reason for this is quite
+simple - here's Realview's memory.h:
+
+#ifdef CONFIG_SPARSEMEM
+
+#define __phys_to_virt(phys)                                            \
+        ((phys) >= 0x80000000 ? (phys) - 0x80000000 + PAGE_OFFSET2 :    \
+         (phys) >= 0x20000000 ? (phys) - 0x20000000 + PAGE_OFFSET1 :    \
+         (phys) + PAGE_OFFSET)
+
+#define __virt_to_phys(virt)                                            \
+         ((virt) >= PAGE_OFFSET2 ? (virt) - PAGE_OFFSET2 + 0x80000000 : \
+          (virt) >= PAGE_OFFSET1 ? (virt) - PAGE_OFFSET1 + 0x20000000 : \
+          (virt) - PAGE_OFFSET)
+
+#endif  /* CONFIG_SPARSEMEM */
+
+Or to put it another way: on Realview if sparsemem is enabled, then we
+are incompatible with P2V (due to the non-linear translation) so we have
+a dependency there to disable it.
