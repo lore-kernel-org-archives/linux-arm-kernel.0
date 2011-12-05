@@ -1,17 +1,50 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 5 Dec 2011 23:23:42 +0000
-Subject: [GIT PULL] Identity mapping changes for 3.3
-In-Reply-To: <20111202160833.GK5540@mudshark.cambridge.arm.com>
-References: <20111202160833.GK5540@mudshark.cambridge.arm.com>
-Message-ID: <20111205232342.GG14542@n2100.arm.linux.org.uk>
+From: kmpark@infradead.org (Kyungmin Park)
+Date: Tue, 6 Dec 2011 08:24:30 +0900
+Subject: [PATCH v7 0/2] iommu/exynos: Add IOMMU/System MMU driver for
+ Samsung Exynos
+In-Reply-To: <20111205154715.GE25178@amd.com>
+References: <1321609650-1329-1-git-send-email-pullip.cho@samsung.com>
+ <20111205154715.GE25178@amd.com>
+Message-ID: <CAH9JG2VALcm-PreS7S2SZPPgEbid_6_VWJA0PHBEtY5KvaA3Og@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 02, 2011 at 04:08:33PM +0000, Will Deacon wrote:
-> The following changes since commit 2d13ccaa8797d7e599f3792aed4b1e44b47f94a5:
-> 
->   Merge branch 'irqchip-consolidation' of git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms into devel-stable (2011-11-21 21:56:56 +0000)
+On 12/6/11, Joerg Roedel <joerg.roedel@amd.com> wrote:
+> On Fri, Nov 18, 2011 at 06:47:28PM +0900, KyongHo Cho wrote:
+>> Patch Summary:
+>> [PATCH v7 1/2] ARM: EXYNOS: Change System MMU platform device definitions
+>> [PATCH v7 2/2] iommu/exynos: Add iommu driver for Exynos Platforms
+>
+> Okay, I merged it into arm/exynos, but it is not pushed yet. Actually
+> there were conflicts while merging, which I resolved. What I failed
+> to find is a config for Exynos that actually builds for upstream Linux.
+> Probably I havn't tried hard enough to find one... Can you provide a
+> kernel config that I can use for my testing and that builds a current
+> 3.2-rc4 kernel for Exynos?
+and I hope to see the real example how to use it with exynos platform.
 
-As this is known to be broken on OMAP, could I have this based upon
-some other commit - maybe ba8bb18a03f which I've just committed into
-devel-stable (which is the second 'fix' patch for OMAP) please.
+Now I can't find the interface between exynos platform and generic exynos iommu.
+BTW, how do you test it at mainline kernel?
+
+Thank you,
+Kyungmin Park
+
+>
+> Thanks,
+>
+> 	Joerg
+>
+> --
+> AMD Operating System Research Center
+>
+> Advanced Micro Devices GmbH Einsteinring 24 85609 Dornach
+> General Managers: Alberto Bozzo, Andrew Bowd
+> Registration: Dornach, Landkr. Muenchen; Registerger. Muenchen, HRB Nr.
+> 43632
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc"
+> in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
