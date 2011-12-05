@@ -1,36 +1,43 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Mon, 5 Dec 2011 19:29:51 +0800
-Subject: [PATCH v2] pcmcia: pxa: replace IRQ_GPIO() with gpio_to_irq()
-In-Reply-To: <1323083166.6763.3.camel@phoenix>
-References: <1323083166.6763.3.camel@phoenix>
-Message-ID: <CAN1soZyMxP4qKow+XKk09KAdzdctdzz=aiYbiTqek923xirK0A@mail.gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 05 Dec 2011 12:36:43 +0100
+Subject: [PATCH v2] net/macb: add DT support
+In-Reply-To: <20111202.125832.1208514279272697863.davem@davemloft.net>
+References: <1322846050-4543-1-git-send-email-nicolas.ferre@atmel.com>
+ <1322847782-22650-1-git-send-email-nicolas.ferre@atmel.com>
+ <20111202.125832.1208514279272697863.davem@davemloft.net>
+Message-ID: <4EDCACCB.4010608@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 5, 2011 at 7:06 PM, Axel Lin <axel.lin@gmail.com> wrote:
-> Since commit 6384fd "ARM: pxa: rename IRQ_GPIO to PXA_GPIO_TO_IRQ",
-> I got buid errors due to implicit declaration of function 'IRQ_GPIO'.
+On 12/02/2011 06:58 PM, David Miller :
+> From: Nicolas Ferre<nicolas.ferre@atmel.com>
+> Date: Fri,  2 Dec 2011 18:43:02 +0100
 >
-> Use common gpio_to_irq() to replace machine dependant macro IRQ_GPIO().
+>> From: Jean-Christophe PLAGNIOL-VILLARD<plagnioj@jcrosoft.com>
+>>
+>> Allow the device tree to provide the mac address and the phy mode.
+>>
+>> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD<plagnioj@jcrosoft.com>
+>> [nicolas.ferre at atmel.com: change "compatible" node property, doc and DT hwaddr]
+>> Signed-off-by: Nicolas Ferre<nicolas.ferre@atmel.com>
+>> Cc: Jamie Iles<jamie@jamieiles.com>
+>> ---
+>> v2: modify macb_get_hwaddr_dt() parameter
 >
-> Cc: Marek Vasut <marek.vasut@gmail.com>
-> Cc: Ian Molton <spyro@f2s.com>
-> Cc: Jonathan Cameron <jic23@cam.ac.uk>
-> Cc: Zhuang <haojian.zhuang@marvell.com>
-> Cc: Eric Miao <eric.y.miao@gmail.com>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Signed-off-by: Axel Lin <axel.lin@gmail.com>
-> ---
-> v2:
-> I just found pxa2xx_trizeps4.c also needs to be converted to gpio_to_irq.
-> Thus include the fix for pxa2xx_trizeps4.c in v2.
->
-> ?drivers/pcmcia/pxa2xx_e740.c ? ? ?| ? 11 +++++++----
-> ?drivers/pcmcia/pxa2xx_palmld.c ? ?| ? ?2 +-
-> ?drivers/pcmcia/pxa2xx_palmtc.c ? ?| ? ?2 +-
-> ?drivers/pcmcia/pxa2xx_stargate2.c | ? ?6 ++++--
-> ?drivers/pcmcia/pxa2xx_trizeps4.c ?| ? ?5 +++--
-> ?drivers/pcmcia/pxa2xx_vpac270.c ? | ? ?4 ++--
-> ?6 files changed, 18 insertions(+), 12 deletions(-)
->
-Acked-by: Haojian Zhuang <haojian.zhuang@gmail.com>
+> You'll have to respin these two macb patches, as they don't apply properly
+> to the net-next tree which is where they should be targetted.
+
+David,
+
+In fact, the patches are designed to be added on top of Jamie's rework 
+of the macb driver that is now in Arnd's "arm-soc" git tree (for-next 
+branch). You discussed with him here:
+
+http://www.spinics.net/lists/arm-kernel/msg118717.html
+
+Should I go this path also or wait for this material to be merged and 
+update on net-next at this time (after 3.3 merge window...)?
+
+Best regards,
+-- 
+Nicolas Ferre
