@@ -1,24 +1,27 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 5 Dec 2011 00:15:00 +0000
-Subject: [PATCH 1/3] PM: Provide an always on power domain governor
-In-Reply-To: <201112050115.18489.rjw@sisk.pl>
-References: <1322765339-29879-1-git-send-email-broonie@opensource.wolfsonmicro.com>
- <201112042156.59990.rjw@sisk.pl>
- <20111204231005.GA4255@opensource.wolfsonmicro.com>
- <201112050115.18489.rjw@sisk.pl>
-Message-ID: <20111205001500.GA10173@opensource.wolfsonmicro.com>
+From: hpa@zytor.com (H. Peter Anvin)
+Date: Sun, 04 Dec 2011 16:14:13 -0800
+Subject: [PATCHv5] atomic: add *_dec_not_zero
+In-Reply-To: <1323038515.11728.26.camel@pasglop>
+References: <1323013369-29691-1-git-send-email-sven@narfation.org>
+ <20111204213316.GB14542@n2100.arm.linux.org.uk>
+ <1699880.NTdz2k3W9O@sven-laptop.home.narfation.org>
+ <20111204221850.GC14542@n2100.arm.linux.org.uk>
+ <1323038515.11728.26.camel@pasglop>
+Message-ID: <4EDC0CD5.2090601@zytor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 05, 2011 at 01:15:18AM +0100, Rafael J. Wysocki wrote:
-> On Monday, December 05, 2011, Mark Brown wrote:
+On 12/04/2011 02:41 PM, Benjamin Herrenschmidt wrote:
+> 
+> I agree with Russell, his approach is a lot easier to maintain long run,
+> we should even consider converting existing definitions.
+> 
 
-> > It might make sense for it to go via the Samsung tree - the third patch
-> > depends on it and there's some other stuff going on with the s3c64xx
-> > power management - so let's see what Kukjin thinks is best.
+Thirded.
 
-> OTOH, it will conflict with some patches I have in the works.
+	-hpa
 
-Ah, OK - in that case I guess it's sensible if you apply it.  Ideally it
-could be on a separate branch so it could be cross-merged with other
-trees if there's a need later.
+
+-- 
+H. Peter Anvin, Intel Open Source Technology Center
+I work for Intel.  I don't speak on their behalf.
