@@ -1,130 +1,116 @@
 From: ulf.hansson@stericsson.com (Ulf Hansson)
-Date: Mon, 5 Dec 2011 18:35:59 +0100
-Subject: [PATCH 13/14] mmc: mmci: Implement PM runtime callbacks to save power
+Date: Mon, 5 Dec 2011 18:35:58 +0100
+Subject: [PATCH 12/14] mmc: mmci: Decrease current consumption in suspend
 In-Reply-To: <1323106560-5218-1-git-send-email-ulf.hansson@stericsson.com>
 References: <1323106560-5218-1-git-send-email-ulf.hansson@stericsson.com>
-Message-ID: <1323106560-5218-14-git-send-email-ulf.hansson@stericsson.com>
+Message-ID: <1323106560-5218-13-git-send-email-ulf.hansson@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the runtime_suspend callback we make use of mmci_save
-to disable the VCORE regulator and the MCLK to decrease
-current consumption. At runtime resume, we use mmci_restore
-to re-enable the resourses again.
+To decrease current consumption in suspend state the
+VCORE regulator, the MCLK and PCLK for the ARM PL18x
+are now disabled.
 
->From now on this will mean that especially the mmci_restore
-function must be fast to execute since otherwise request
-latency will be introduced.
-
-For the ARM Primcell PL180, the MMCIPOWER register is used
-to control an external power supply to the card. Thus we
-need to prevent the runtime callbacks from doing save and
-restore, otherwise the power to card will be cut. This is
-done by adding a new flag to the variant data.
+When resuming the resourses are re-enabled and
+register values for MMCICLOCK, MMCIPOWER and MMCIMASK0
+are restored.
 
 Signed-off-by: Ulf Hansson <ulf.hansson@stericsson.com>
 ---
- drivers/mmc/host/mmci.c |   43 ++++++++++++++++++++++++++++++++++++++++++-
- 1 files changed, 42 insertions(+), 1 deletions(-)
+ drivers/mmc/host/mmci.c |   64 ++++++++++++++++++++++++++++++++++++++++++----
+ 1 files changed, 58 insertions(+), 6 deletions(-)
 
 diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-index d29b7dc..c0d6026 100644
+index 8971157..d29b7dc 100644
 --- a/drivers/mmc/host/mmci.c
 +++ b/drivers/mmc/host/mmci.c
-@@ -55,6 +55,7 @@ static unsigned int fmax = 515633;
-  * @blksz_datactrl16: true if Block size is at b16..b30 position in datactrl register
-  * @pwrreg_powerup: power up value for MMCIPOWER register
-  * @signal_direction: input/out direction of bus signals can be indicated
-+ * @pwrreg_ctrl_power: bits in MMCIPOWER register controls ext. power supply
-  */
- struct variant_data {
- 	unsigned int		clkreg;
-@@ -67,6 +68,7 @@ struct variant_data {
- 	bool			blksz_datactrl16;
- 	u32			pwrreg_powerup;
- 	bool			signal_direction;
-+	bool			pwrreg_ctrl_power;
- };
- 
- static struct variant_data variant_arm = {
-@@ -74,6 +76,7 @@ static struct variant_data variant_arm = {
- 	.fifohalfsize		= 8 * 4,
- 	.datalength_bits	= 16,
- 	.pwrreg_powerup		= MCI_PWR_UP,
-+	.pwrreg_ctrl_power	= true,
- };
- 
- static struct variant_data variant_arm_extended_fifo = {
-@@ -81,6 +84,7 @@ static struct variant_data variant_arm_extended_fifo = {
- 	.fifohalfsize		= 64 * 4,
- 	.datalength_bits	= 16,
- 	.pwrreg_powerup		= MCI_PWR_UP,
-+	.pwrreg_ctrl_power	= true,
- };
- 
- static struct variant_data variant_u300 = {
-@@ -1482,7 +1486,7 @@ static int __devexit mmci_remove(struct amba_device *dev)
- 	return 0;
+@@ -1483,6 +1483,60 @@ static int __devexit mmci_remove(struct amba_device *dev)
  }
  
--#ifdef CONFIG_SUSPEND
-+#if defined(CONFIG_SUSPEND) || defined(CONFIG_PM_RUNTIME)
- static int mmci_save(struct amba_device *dev)
- {
- 	struct mmc_host *mmc = amba_get_drvdata(dev);
-@@ -1536,7 +1540,9 @@ static int mmci_restore(struct amba_device *dev)
- 
- 	return 0;
- }
-+#endif
- 
-+#ifdef CONFIG_SUSPEND
+ #ifdef CONFIG_SUSPEND
++static int mmci_save(struct amba_device *dev)
++{
++	struct mmc_host *mmc = amba_get_drvdata(dev);
++	unsigned long flags;
++
++	if (mmc) {
++		struct mmci_host *host = mmc_priv(mmc);
++
++		spin_lock_irqsave(&host->lock, flags);
++
++		/*
++		 * Make sure we do not get any interrupts when we disabled the
++		 * clock and the regulator and as well make sure to clear the
++		 * registers for clock and power.
++		 */
++		writel(0, host->base + MMCIMASK0);
++		writel(0, host->base + MMCIPOWER);
++		writel(0, host->base + MMCICLOCK);
++
++		spin_unlock_irqrestore(&host->lock, flags);
++
++		clk_unprepare(host->clk);
++		clk_disable(host->clk);
++		amba_vcore_disable(dev);
++	}
++
++	return 0;
++}
++
++static int mmci_restore(struct amba_device *dev)
++{
++	struct mmc_host *mmc = amba_get_drvdata(dev);
++	unsigned long flags;
++
++	if (mmc) {
++		struct mmci_host *host = mmc_priv(mmc);
++
++		amba_vcore_enable(dev);
++		clk_prepare(host->clk);
++		clk_enable(host->clk);
++
++		spin_lock_irqsave(&host->lock, flags);
++
++		/* Restore registers and re-enable interrupts. */
++		writel(host->clk_reg, host->base + MMCICLOCK);
++		writel(host->pwr_reg, host->base + MMCIPOWER);
++		writel(MCI_IRQENABLE, host->base + MMCIMASK0);
++
++		spin_unlock_irqrestore(&host->lock, flags);
++	}
++
++	return 0;
++}
++
  static int mmci_suspend(struct device *dev)
  {
  	struct amba_device *adev = to_amba_device(dev);
-@@ -1573,8 +1579,43 @@ static int mmci_resume(struct device *dev)
- }
- #endif
+@@ -1490,12 +1544,11 @@ static int mmci_suspend(struct device *dev)
+ 	int ret = 0;
  
-+#ifdef CONFIG_PM_RUNTIME
-+static int mmci_runtime_suspend(struct device *dev)
-+{
-+	struct amba_device *adev = to_amba_device(dev);
-+	struct mmc_host *mmc = amba_get_drvdata(adev);
-+	int ret = 0;
-+
-+	if (mmc) {
-+		struct mmci_host *host = mmc_priv(mmc);
-+		struct variant_data *variant = host->variant;
-+		if (!variant->pwrreg_ctrl_power)
-+			ret = mmci_save(adev);
-+	}
-+
-+	return ret;
-+}
-+
-+static int mmci_runtime_resume(struct device *dev)
-+{
-+	struct amba_device *adev = to_amba_device(dev);
-+	struct mmc_host *mmc = amba_get_drvdata(adev);
-+	int ret = 0;
-+
-+	if (mmc) {
-+		struct mmci_host *host = mmc_priv(mmc);
-+		struct variant_data *variant = host->variant;
-+		if (!variant->pwrreg_ctrl_power)
-+			ret = mmci_restore(adev);
-+	}
-+
-+	return ret;
-+}
-+#endif
-+
- static const struct dev_pm_ops mmci_dev_pm_ops = {
- 	SET_SYSTEM_SLEEP_PM_OPS(mmci_suspend, mmci_resume)
-+	SET_RUNTIME_PM_OPS(mmci_runtime_suspend, mmci_runtime_resume, NULL)
- };
+ 	if (mmc) {
+-		struct mmci_host *host = mmc_priv(mmc);
+-
+ 		ret = mmc_suspend_host(mmc);
+ 		if (ret == 0) {
+ 			pm_runtime_get_sync(dev);
+-			writel(0, host->base + MMCIMASK0);
++			mmci_save(adev);
++			amba_pclk_disable(adev);
+ 		}
+ 	}
  
- static struct amba_id mmci_ids[] = {
+@@ -1509,9 +1562,8 @@ static int mmci_resume(struct device *dev)
+ 	int ret = 0;
+ 
+ 	if (mmc) {
+-		struct mmci_host *host = mmc_priv(mmc);
+-
+-		writel(MCI_IRQENABLE, host->base + MMCIMASK0);
++		amba_pclk_enable(adev);
++		mmci_restore(adev);
+ 		pm_runtime_put(dev);
+ 
+ 		ret = mmc_resume_host(mmc);
 -- 
 1.7.5.4
