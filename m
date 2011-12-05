@@ -1,42 +1,27 @@
-From: ulf.hansson@stericsson.com (Ulf Hansson)
-Date: Mon, 5 Dec 2011 18:00:08 +0100
-Subject: [PATCH] mmc: mmci: Fixup error handling for dma
-In-Reply-To: <CACRpkdacJxbFvSuXTsxtjZVbeTaJwNN4xy7-rvpa0U0Z4pDE_g@mail.gmail.com>
-References: <1322578286-18727-1-git-send-email-ulf.hansson@stericsson.com>	<20111130222139.GW9581@n2100.arm.linux.org.uk>
- <CACRpkdacJxbFvSuXTsxtjZVbeTaJwNN4xy7-rvpa0U0Z4pDE_g@mail.gmail.com>
-Message-ID: <4EDCF898.7080604@stericsson.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 5 Dec 2011 18:01:12 +0100
+Subject: [RFC PATCH 2/3] pinctrl: imx: add pinmux-imx53 support
+In-Reply-To: <20111204161123.GS27267@pengutronix.de>
+References: <1322999384-7886-1-git-send-email-b29396@freescale.com>
+ <1322999384-7886-2-git-send-email-b29396@freescale.com>
+ <20111204161123.GS27267@pengutronix.de>
+Message-ID: <CACRpkdZ0aNj-BsdtD2R-bEWQfMzsOMNbdh6ryVtgwET3Ry7xXA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus Walleij wrote:
-> On Wed, Nov 30, 2011 at 11:21 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> 
->>>       if (!cmd->data || cmd->error) {
->>> -             if (host->data)
->>> +             if (host->data) {
->>> +                     /* Terminate the DMA transfer */
->>> +                     if (dma_inprogress(host))
->>> +                             mmci_dma_data_error(host);
->> Doesn't this leave the DMA buffers mapped?
+On Sun, Dec 4, 2011 at 5:11 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
 
-Correct, but it will be handled in post_request function.
+> I don't think that this grouping of pads to their functions makes
+> sense. On i.MX every pad is muxed independently and not in groups.
+> Which pins belong to which function is board specific and not SoC
+> specific.
 
-> 
-> Yep it needs an mmci_dma_unmap() call too AFAICT,
-> Ulf will you update?
+True, Dong can this be moved to the imx pinctrl platform data
+and passed in from arch/arm/[plat|mach]-* board files instead?
+That is probably where it belongs today.
 
-Actually it's needs only dma_unmap_sg, but as stated this should be 
-handled in mmci_post_request.
+I know that this data is in drivers/pinctrl for the U300 and SIRF,
+but that is because they only have one single board variant.
 
-By, the way - I spoke to Per F?rlin who implemented the pre_request and 
-post_request functions; we will soon push some clean-up patches for 
-improved error handling and how to manage the cookie better. Right now 
-it is kind of hard to follow the error path, I think. We hope this shall 
-be improved then.
-
-Although it should have nothing to do with this patch directly, since 
-this is a bugfix only.
-
-BR
-Ulf Hansson
+Yours,
+Linus Walleij
