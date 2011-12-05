@@ -1,111 +1,203 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Mon, 5 Dec 2011 22:23:51 +0100
-Subject: [RFC v2 1/2] dma-buf: Introduce dma buffer sharing mechanism
-In-Reply-To: <CAF6AEGvyWV0DM2fjBbh-TNHiMmiLF4EQDJ6Uu0=NkopM6SXS6g@mail.gmail.com>
-References: <1322816252-19955-1-git-send-email-sumit.semwal@ti.com>
- <1322816252-19955-2-git-send-email-sumit.semwal@ti.com>
- <201112051718.48324.arnd@arndb.de>
- <CAF6AEGvyWV0DM2fjBbh-TNHiMmiLF4EQDJ6Uu0=NkopM6SXS6g@mail.gmail.com>
-Message-ID: <CAKMK7uHw3OpMAtVib=e=s_us9Tx9TebzehGg59d4-g9dUXr+pQ@mail.gmail.com>
+From: snjw23@gmail.com (Sylwester Nawrocki)
+Date: Mon, 05 Dec 2011 22:55:58 +0100
+Subject: [RFC PATCH v1 6/7] media: video: introduce face detection driver
+ module
+In-Reply-To: <1322838172-11149-7-git-send-email-ming.lei@canonical.com>
+References: <1322838172-11149-1-git-send-email-ming.lei@canonical.com>
+ <1322838172-11149-7-git-send-email-ming.lei@canonical.com>
+Message-ID: <4EDD3DEE.6060506@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 05, 2011 at 02:46:47PM -0600, Rob Clark wrote:
-> On Mon, Dec 5, 2011 at 11:18 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > In the patch 2, you have a section about migration that mentions that
-> > it is possible to export a buffer that can be migrated after it
-> > is already mapped into one user driver. How does that work when
-> > the physical addresses are mapped into a consumer device already?
->
-> I think you can do physical migration if you are attached, but
-> probably not if you are mapped.
+Hi Ming,
 
-Yeah, that's very much how I see this, and also why map/unmap (at least
-for simple users like v4l) should only bracket actual usage. GPU memory
-managers need to be able to move around buffers while no one is using
-them.
+(I've pruned the Cc list, leaving just the mailing lists)
 
-[snip]
+On 12/02/2011 04:02 PM, Ming Lei wrote:
+> This patch introduces one driver for face detection purpose.
+> 
+> The driver is responsible for all v4l2 stuff, buffer management
+> and other general things, and doesn't touch face detection hardware
+> directly. Several interfaces are exported to low level drivers
+> (such as the coming omap4 FD driver)which will communicate with
+> face detection hw module.
+> 
+> So the driver will make driving face detection hw modules more
+> easy.
 
-> >> + ? ? /* allow allocator to take care of cache ops */
-> >> + ? ? void (*sync_sg_for_cpu) (struct dma_buf *, struct device *);
-> >> + ? ? void (*sync_sg_for_device)(struct dma_buf *, struct device *);
-> >
-> > I don't see how this works with multiple consumers: For the streaming
-> > DMA mapping, there must be exactly one owner, either the device or
-> > the CPU. Obviously, this rule needs to be extended when you get to
-> > multiple devices and multiple device drivers, plus possibly user
-> > mappings. Simply assigning the buffer to "the device" from one
-> > driver does not block other drivers from touching the buffer, and
-> > assigning it to "the cpu" does not stop other hardware that the
-> > code calling sync_sg_for_cpu is not aware of.
-> >
-> > The only way to solve this that I can think of right now is to
-> > mandate that the mappings are all coherent (i.e. noncachable
-> > on noncoherent architectures like ARM). If you do that, you no
-> > longer need the sync_sg_for_* calls.
->
-> My original thinking was that you either need DMABUF_CPU_{PREP,FINI}
-> ioctls and corresponding dmabuf ops, which userspace is required to
-> call before / after CPU access.  Or just remove mmap() and do the
-> mmap() via allocating device and use that device's equivalent
-> DRM_XYZ_GEM_CPU_{PREP,FINI} or DRM_XYZ_GEM_SET_DOMAIN ioctls.  That
-> would give you a way to (a) synchronize with gpu/asynchronous
-> pipeline, (b) synchronize w/ multiple hw devices vs cpu accessing
-> buffer (ie. wait all devices have dma_buf_unmap_attachment'd).  And
-> that gives you a convenient place to do cache operations on
-> noncoherent architecture.
->
-> I sort of preferred having the DMABUF shim because that lets you pass
-> a buffer around userspace without the receiving code knowing about a
-> device specific API.  But the problem I eventually came around to: if
-> your GL stack (or some other userspace component) is batching up
-> commands before submission to kernel, the buffers you need to wait for
-> completion might not even be submitted yet.  So from kernel
-> perspective they are "ready" for cpu access.  Even though in fact they
-> are not in a consistent state from rendering perspective.  I don't
-> really know a sane way to deal with that.  Maybe the approach instead
-> should be a userspace level API (in libkms/libdrm?) to provide
-> abstraction for userspace access to buffers rather than dealing with
-> this at the kernel level.
 
-Well, there's a reason GL has an explicit flush and extensions for sync
-objects. It's to support such scenarios where the driver batches up gpu
-commands before actually submitting them. Also, recent gpus have all (or
-shortly will grow) multiple execution pipelines, so it's also important
-that you sync up with the right command stream. Syncing up with all of
-them is generally frowned upon for obvious reasons ;-)
+I would hold on for a moment on implementing generic face detection
+module which is based on the V4L2 video device interface. We need to
+first define an API that would be also usable at sub-device interface
+level (http://linuxtv.org/downloads/v4l-dvb-apis/subdev.html).
+AFAICS OMAP4 FDIF processes only data stored in memory, thus it seems
+reasonable to use the videodev interface for passing data to the kernel
+from user space.
 
-So any userspace that interacts with an OpenGL driver needs to take care
-of this anyway. But I think for simpler stuff (v4l) kernel only coherency
-should work and userspace just needs to take care of gl interactions and
-call glflush and friends at the right points. I think we can flesh this
-out precisely when we spec the dmabuf EGL extension ... (or implement one
-of the preexisting ones already around).
+But there might be face detection devices that accept data from other
+H/W modules, e.g. transferred through SoC internal data buses between
+image processing pipeline blocks. Thus any new interfaces need to be
+designed with such devices in mind.
 
-On the topic of a coherency model for dmabuf, I think we need to look at
-dma_buf_attachment_map/unmap (and also the mmap variants cpu_start and
-cpu_finish or whatever they might get called) as barriers:
+Also the face detection hardware block might now have an input DMA
+engine in it, the data could be fed from memory through some other
+subsystem (e.g. resize/colour converter). Then the driver for that
+subsystem would implement a video node.
 
-So after a dma_buf_map, all previsously completed dma operations (i.e.
-unmap already called) and any cpu writes (i.e. cpu_finish called) will be
-coherent. Similar rule holds for cpu access through the userspace mmap,
-only writes completed before the cpu_start will show up.
+I'm for leaving the buffer handling details for individual drivers
+and focusing on a standard interface for applications, i.e. new
+ioctl(s) and controls.
 
-Similar, writes done by the device are only guaranteed to show up after
-the _unmap. Dito for cpu writes and cpu_finish.
+> 
+> TODO:
+> 	- implement FD setting interfaces with v4l2 controls or
+> 	ext controls
+> 
+> Signed-off-by: Ming Lei <ming.lei@canonical.com>
+> ---
+>  drivers/media/video/Kconfig       |    2 +
+>  drivers/media/video/Makefile      |    1 +
+>  drivers/media/video/fdif/Kconfig  |    7 +
+>  drivers/media/video/fdif/Makefile |    1 +
+>  drivers/media/video/fdif/fdif.c   |  645 +++++++++++++++++++++++++++++++++++++
+>  drivers/media/video/fdif/fdif.h   |  114 +++++++
+>  6 files changed, 770 insertions(+), 0 deletions(-)
+>  create mode 100644 drivers/media/video/fdif/Kconfig
+>  create mode 100644 drivers/media/video/fdif/Makefile
+>  create mode 100644 drivers/media/video/fdif/fdif.c
+>  create mode 100644 drivers/media/video/fdif/fdif.h
 
-In short we always need two function calls to denote the start/end of the
-"critical section".
+[...]
 
-Any concurrent operations are allowed to yield garbage, meaning any
-combination of the old or either of the newly written contents (i.e.
-non-overlapping writes might not actually all end up in the buffer,
-but instead some old contents). Maybe we even need to loosen that to
-the real "undefined behaviour", but atm I can't think of an example.
+> diff --git a/drivers/media/video/fdif/fdif.h b/drivers/media/video/fdif/fdif.h
+> new file mode 100644
+> index 0000000..ae37ab8
+> --- /dev/null
+> +++ b/drivers/media/video/fdif/fdif.h
+> @@ -0,0 +1,114 @@
+> +#ifndef _LINUX_FDIF_H
+> +#define _LINUX_FDIF_H
+> +
+> +#include <linux/types.h>
+> +#include <linux/magic.h>
+> +#include <linux/errno.h>
+> +#include <linux/kref.h>
+> +#include <linux/kernel.h>
+> +#include <linux/videodev2.h>
+> +#include <media/videobuf2-page.h>
+> +#include <media/v4l2-device.h>
+> +#include <media/v4l2-ioctl.h>
+> +#include <media/v4l2-ctrls.h>
+> +#include <media/v4l2-fh.h>
+> +#include <media/v4l2-event.h>
+> +#include <media/v4l2-common.h>
+> +
+> +#define MAX_FACE_COUNT		40
+> +
+> +#define	FACE_SIZE_20_PIXELS	0
+> +#define	FACE_SIZE_25_PIXELS	1
+> +#define	FACE_SIZE_32_PIXELS	2
+> +#define	FACE_SIZE_40_PIXELS	3
 
--Daniel
--- 
-Daniel Vetter
-Mail: daniel at ffwll.ch
-Mobile: +41 (0)79 365 57 48
+This is still OMAP4 FDIF specific, we need to think about v4l2 controls
+for this. An ideal would be a menu control type that supports pixel size
+(width/height), but unfortunately something like this isn't available
+in v4l2 yet.
+
+> +
+> +#define FACE_DIR_UP		0
+> +#define FACE_DIR_RIGHT		1
+> +#define FACE_DIR_LIFT		2
+> +
+> +struct fdif_fmt {
+> +	char  *name;
+> +	u32   fourcc;          /* v4l2 format id */
+> +	int   depth;
+> +	int   width, height;
+
+Could width/height be negative ? I don't think it's the case for pixel
+resolution. The more proper data type would be u32.
+
+Please refer to struct v4l2_pix_format or struct v4l2_rect.
+
+> +};
+> +
+> +struct fdif_setting {
+> +	struct fdif_fmt            *fmt;
+> +	enum v4l2_field            field;
+> +
+> +	int 			min_face_size;
+> +	int			face_dir;
+> +
+> +	int			startx, starty;
+
+s32
+
+> +	int			sizex, sizey;
+
+u32
+
+> +	int			lhit;
+> +
+> +	int			width, height;
+
+u32
+
+> +};
+> +
+> +/* buffer for one video frame */
+> +struct fdif_buffer {
+> +	/* common v4l buffer stuff -- must be first */
+> +	struct vb2_buffer	vb;
+> +	struct list_head	list;
+> +};
+> +
+> +
+> +struct v4l2_fdif_result {
+> +	struct list_head		list;
+> +	unsigned int			face_cnt;
+> +	struct v4l2_fd_detection	*faces;
+> +
+> +	/*v4l2 buffer index*/
+> +	__u32				index;
+> +};
+> +
+> +struct fdif_dmaqueue {
+> +	struct list_head	complete;
+> +	struct list_head	active;
+> +	wait_queue_head_t	wq;
+> +};
+> +
+> +
+> +struct fdif_dev {
+> +	struct kref		ref;
+> +	struct device		*dev;
+> +
+> +	struct list_head        fdif_devlist;
+> +	struct v4l2_device	v4l2_dev;
+> +	struct vb2_queue        vbq;
+> +	struct mutex            mutex;
+> +	spinlock_t		lock;
+> +
+> +	struct video_device        *vfd;
+> +	struct fdif_dmaqueue	fdif_dq;
+> +
+> +	/*setting*/
+> +	struct fdif_setting	s;
+
+yy, please make it more descriptive. e.g.
+
+	struct fdif_config	config;
+
+> +
+> +	struct fdif_ops	*ops;
+> +
+> +	unsigned long	priv[0];
+> +};
+> +
+[...]
+
+--
+
+Regards,
+Sylwester
