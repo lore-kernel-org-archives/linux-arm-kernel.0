@@ -1,34 +1,27 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 5 Dec 2011 10:52:02 +0000
-Subject: [PATCH] backlight: add regulator support for platform_lcd driver
-In-Reply-To: <CAJuYYwTT2jbbquZM=ZwK=Gh39ss=iG0WDCc3TYjzHLEgfeC1gA@mail.gmail.com>
-References: <1323074921-29291-1-git-send-email-thomas.abraham@linaro.org>
- <CAH9JG2XJ4TCEaN1rMRjMZNRn5Wx6jcTRC_DmyN4Qyf2zztWSsg@mail.gmail.com>
- <CAJuYYwTT2jbbquZM=ZwK=Gh39ss=iG0WDCc3TYjzHLEgfeC1gA@mail.gmail.com>
-Message-ID: <20111205105201.GD11150@opensource.wolfsonmicro.com>
+Date: Mon, 5 Dec 2011 10:57:33 +0000
+Subject: [PATCH v5 1/4] regulator: helper routine to extract
+ regulator_init_data
+In-Reply-To: <CAJuYYwSRW-=XufvHS1miO2xNANwQMZqPbt=VyPEonywnAsvVUQ@mail.gmail.com>
+References: <1321615040-13257-1-git-send-email-rnayak@ti.com>
+ <1321615040-13257-2-git-send-email-rnayak@ti.com>
+ <CAJuYYwRO+AS=WmQfNAe8L6Gi5Dm4VsCuVqk3X5Nb8uUYAdLnJQ@mail.gmail.com>
+ <20111204155433.GA16287@opensource.wolfsonmicro.com>
+ <CAJuYYwQ-9wCu-+q0S2YYeFYemq74ULdZ-EwPGLWKHA4+0VZcsA@mail.gmail.com>
+ <20111205103447.GC11150@opensource.wolfsonmicro.com>
+ <CAJuYYwSRW-=XufvHS1miO2xNANwQMZqPbt=VyPEonywnAsvVUQ@mail.gmail.com>
+Message-ID: <20111205105733.GE11150@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 05, 2011 at 04:06:17PM +0530, Thomas Abraham wrote:
-> On 5 December 2011 15:40, Kyungmin Park <kmpark@infradead.org> wrote:
+On Mon, Dec 05, 2011 at 04:14:40PM +0530, Thomas Abraham wrote:
+> On 5 December 2011 16:04, Mark Brown
 
-> > Recent regulator discussion. it should be failed instead fall through
-> > gracefully.
+> > With the regulator device tree bindings if the regulator is configured
+> > to run a single voltage the bindings will set apply_uV unconditionally
+> > so there's no need for a separate constraint.
 
-> Ok. But in this case, there could be boards that do not use a
-> regulator for the lcd/display interface. Is it mandatory for fail if
-> regulator is not found. Sorry, I have not read through the regulator
-> discussion.
+> Sorry if I have missed this, but I could not find 'apply_uV' being set
+> as you described in the v5 of the regulator-dt patchset.
 
-The boards should supply a fixed voltage regulator representing the
-supply (or use CONFIG_REGULATOR_DUMMY to substitute in a dummy regulator
-when not needed).  Sascha Hauer had some patches to add a flag that
-could be set to enable this mode on init rather than through Kconfig but
-they needed a bit of cleanup, not sure what the status is there.
-
-> The constraint 'apply_uV' cannot be expressed with a device tree. So
-> there has be a mechanism to set the required output voltage for a
-> regulator.
-
-It's not an option to not have it with device tree - if there's a single
-voltage specified apply_uV is assumed.
+Yes, looks like Rajendra missed that - just fixed it.
