@@ -1,45 +1,29 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Mon, 5 Dec 2011 22:44:05 +0800
-Subject: [PATCH 2/2] gpio/tegra: Dynamically allocate IRQ base, and
- support DT
-In-Reply-To: <4EDCC894.7060200@gmail.com>
-References: <1322700336-26866-1-git-send-email-swarren@nvidia.com>
- <1322700336-26866-2-git-send-email-swarren@nvidia.com>
- <20111205065527.GD2980@S2100-06.ap.freescale.net>
- <4EDCC894.7060200@gmail.com>
-Message-ID: <20111205144404.GE2980@S2100-06.ap.freescale.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 5 Dec 2011 14:37:27 +0000
+Subject: [RFC PATCH v1 5/7] media: v4l2: introduce two IOCTLs for face
+ detection
+In-Reply-To: <CACVXFVO5Bu8vTfLN_WFsEkHW6JhQFmWPmEyNnrvTsDhoF-WVeA@mail.gmail.com>
+References: <1322817178-8931-1-git-send-email-ming.lei@canonical.com>
+ <42689146.OPtqLboC2m@wuerfel>
+ <CACVXFVO5Bu8vTfLN_WFsEkHW6JhQFmWPmEyNnrvTsDhoF-WVeA@mail.gmail.com>
+Message-ID: <201112051437.27538.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 05, 2011 at 07:35:16AM -0600, Rob Herring wrote:
-> Shawn,
+On Sunday 04 December 2011, Ming Lei wrote:
+> >
+> > This data structure is not 32/64 bit safe: running a 64 bit kernel with 32 bit
+> > user space will see an incompatible layout.
 > 
-> On 12/05/2011 12:55 AM, Shawn Guo wrote:
-> > On Wed, Nov 30, 2011 at 05:45:36PM -0700, Stephen Warren wrote:
-> > [...]
-> >>  static void tegra_gpio_irq_ack(struct irq_data *d)
-> >>  {
-> >> -	int gpio = d->irq - INT_GPIO_BASE;
-> >> +	int gpio = d->hwirq;
-> >>  
-> > Though it's working right now, I'm not sure it's safe enough.  This
-> > only works when d->hwirq_base is 0, which is true for now.  But I doubt
-> > it will be always true.  I guess hwirq_base was introduced there for
-> > some reason.  When some day irqdomain starts using this field, the
-> > above code starts being broken.  IMO, the way that generic-chip.c is
-> > using to calculate the number, d->irq - gc->irq_base, is much more
-> > safer.
-> 
-> It does work as the GIC hwirq_base is non-zero. It was introduced
-> exactly so that no conversion of hwirq is needed for functions like
-> this. hwirq_base is the starting point local to the controller
-> numbering. Say you have gpio controller with 16 lines, but only the
-> upper 8 lines have interrupt capability. Then you would set hwirq_base
-> to 8 and nr_irq to 8. Then hwirq will always be set to 8-15.
-> 
-Ah, ok.  In that case, it's safe to use.  Thanks for help understand
-it.  I will use hwirq for my gpio-mxc patch then.
+> I agree that this is not 32/64 bit safe, but I understand lib32 can handle
+> this correctly, otherwise many 32bit applications can't run on current
+> 64bit kernel
+> since many kernel structures used by user space contained pointer,
+> such as struct v4l2_buffer, struct v4l2_ext_controls in v4l2 ABI.
 
--- 
-Regards,
-Shawn
+The other ones you mentioned are handled in the kernel in
+drivers/media/video/v4l2-compat-ioctl32.c. For new ioctl commands,
+it's better to define the data structure in a compatible way
+so you do not need a wrapper like that.
+
+	Arnd
