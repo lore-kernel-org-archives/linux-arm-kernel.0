@@ -1,36 +1,32 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 5 Dec 2011 15:46:11 +0000
-Subject: [PATCH 1/5] ASoC: omap-dmic: Add device tree bindings
-In-Reply-To: <4EDCCAE0.2000009@ti.com>
-References: <1322819580-7424-1-git-send-email-peter.ujfalusi@ti.com>
- <1322819580-7424-2-git-send-email-peter.ujfalusi@ti.com>
- <20111203112206.GE6043@opensource.wolfsonmicro.com>
- <4EDCCAE0.2000009@ti.com>
-Message-ID: <20111205154611.GV11150@opensource.wolfsonmicro.com>
+From: joerg.roedel@amd.com (Joerg Roedel)
+Date: Mon, 5 Dec 2011 16:47:15 +0100
+Subject: [PATCH v7 0/2] iommu/exynos: Add IOMMU/System MMU driver for
+ Samsung Exynos
+In-Reply-To: <1321609650-1329-1-git-send-email-pullip.cho@samsung.com>
+References: <1321609650-1329-1-git-send-email-pullip.cho@samsung.com>
+Message-ID: <20111205154715.GE25178@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 05, 2011 at 03:45:04PM +0200, Peter Ujfalusi wrote:
-> On 12/03/2011 01:22 PM, Mark Brown wrote:
+On Fri, Nov 18, 2011 at 06:47:28PM +0900, KyongHo Cho wrote:
+> Patch Summary:
+> [PATCH v7 1/2] ARM: EXYNOS: Change System MMU platform device definitions
+> [PATCH v7 2/2] iommu/exynos: Add iommu driver for Exynos Platforms
 
-> > Actually thinking about this some more I think what's concerning me is
-> > the documentation as much as anything else - if it was just an internal,
-> > unpublished interface of the OMAP core code which happened to use device
-> > tree I probably wouldn't have worried about it churning.
+Okay, I merged it into arm/exynos, but it is not pushed yet. Actually
+there were conflicts while merging, which I resolved. What I failed
+to find is a config for Exynos that actually builds for upstream Linux.
+Probably I havn't tried hard enough to find one... Can you provide a
+kernel config that I can use for my testing and that builds a current
+3.2-rc4 kernel for Exynos?
 
-> Actually it is documented here:
-> Documentation/devicetree/bindings/arm/omap/omap.txt
+Thanks,
 
-That's not exactly the point...
+	Joerg
 
-> In order to move all OMAP drivers to DT - as Benoit already mentioned -
-> we need additional work in DT.
-> At this point of time if we add the DT representation we anyways need to
-> change it as the core will receive the features, and we still need to
-> fall back to hwmod to get the drivers working.
-> As soon as we can migrate away from the hwmod we will do, but having
-> this in place helps us to migrate other parts to DT.
+-- 
+AMD Operating System Research Center
 
-And what I'm saying is that my main concern is that you're publishing
-documenting a binding which isn't intended to be the the final binding
-and which there's no intention that anyone should use directly anyway.
+Advanced Micro Devices GmbH Einsteinring 24 85609 Dornach
+General Managers: Alberto Bozzo, Andrew Bowd
+Registration: Dornach, Landkr. Muenchen; Registerger. Muenchen, HRB Nr. 43632
