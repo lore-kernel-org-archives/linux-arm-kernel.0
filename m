@@ -1,45 +1,66 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Mon, 5 Dec 2011 16:17:16 +0530
-Subject: [PATCH 2/2] arm: exynos: allow platform-lcd driver to control lcd
- regulator source on origen
-In-Reply-To: <CAH9JG2XfNqCtxhfqiikuZKbvZnc2tZ2vGJ0FZuL=JcQirYJXTA@mail.gmail.com>
-References: <1323075148-29356-1-git-send-email-thomas.abraham@linaro.org>
- <CAH9JG2XfNqCtxhfqiikuZKbvZnc2tZ2vGJ0FZuL=JcQirYJXTA@mail.gmail.com>
-Message-ID: <CAJuYYwRD9iop3k1ApcELgpk1R2rw0PX-nVLcstj35cVq9VKy7A@mail.gmail.com>
+From: hs@denx.de (Heiko Schocher)
+Date: Mon, 05 Dec 2011 11:50:41 +0100
+Subject: [PATCH] arm,
+ davinci: configure davinci aemif chipselects through OF
+In-Reply-To: <4EDB66C9.9050302@mvista.com>
+References: <1322991679-20947-1-git-send-email-hs@denx.de>
+ <4EDB66C9.9050302@mvista.com>
+Message-ID: <4EDCA201.4080505@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Mr. Park,
+Hello Sergei,
 
-On 5 December 2011 15:44, Kyungmin Park <kmpark@infradead.org> wrote:
+Sergei Shtylyov wrote:
+> Hello.
+> 
+> On 04-12-2011 13:41, Heiko Schocher wrote:
+> 
+>> Signed-off-by: Heiko Schocher<hs@denx.de>
+>> Cc: davinci-linux-open-source at linux.davincidsp.com
+>> Cc: devicetree-discuss at lists.ozlabs.org
+>> Cc: linux-arm-kernel at lists.infradead.org
+>> Cc: grant.likely at secretlab.ca
+>> Cc: Sekhar Nori<nsekhar@ti.com>
+>> Cc: Kevin Hilman<khilman@ti.com>
+>> Cc: Wolfgang Denk<wd@denx.de>
+> 
+>> diff --git a/arch/arm/mach-davinci/aemif.c
+>> b/arch/arm/mach-davinci/aemif.c
+>> index 1ce70a9..12c559f 100644
+>> --- a/arch/arm/mach-davinci/aemif.c
+>> +++ b/arch/arm/mach-davinci/aemif.c
+> [...]
+>> @@ -131,3 +138,99 @@ int davinci_aemif_setup_timing(struct
+>> davinci_aemif_timing *t,
+>>       return 0;
+>>   }
+>>   EXPORT_SYMBOL(davinci_aemif_setup_timing);
+>> +
+>> +#if defined(CONFIG_OF)
+>> +static int dv_get_value(struct device_node *np, const char *name)
+>> +{
+>> +    const u32 *data;
+>> +    int len;
+>> +
+>> +    data = of_get_property(np, name,&len);
+>> +    if (data)
+>> +        return be32_to_cpu(readl(data));
+> 
+>    Why readl() here?! Device tree is not a peripheral device...
+> 
+>> +
+>> +    return -EINVAL;
+>> +}
+> 
+>    Isn't there already a standard helper for that, of_property_read_u32()?
 
-[...]
+Yep, fixed that.
 
->> ?static struct regulator_init_data __initdata max8997_ldo1_data = {
->> @@ -379,11 +379,11 @@ static struct regulator_init_data __initdata
->> max8997_buck5_data = {
->> ?static struct regulator_init_data __initdata max8997_buck7_data = {
->> ? ? ? .constraints ? ?= {
->> ? ? ? ? ? ? ? .name ? ? ? ? ? = "VDD_LCD_3.3V",
->> - ? ? ? ? ? ? .min_uV ? ? ? ? = 3300000,
->> - ? ? ? ? ? ? .max_uV ? ? ? ? = 3300000,
->> + ? ? ? ? ? ? .min_uV ? ? ? ? = 750000,
->> + ? ? ? ? ? ? .max_uV ? ? ? ? = 3900000,
-> It can support the voltage change at buck itself, but in board it's
-> fixed. I'm not sure it's correct usage at board file.
->
-> I think original code is better to understand and use it as name, it's
-> fixed v3.3 voltage.
+Thanks!
 
-Yes, that is true. If the board cannot support any other voltage for
-buck7, there is no need to change min_uV and max_uV. I will revert it
-to the original values.
-
-Thanks,
-Thomas.
-
->
-> Thank you,
-> Kyungmin Park
-
-[...]
+bye,
+Heiko
+-- 
+DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
+HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
