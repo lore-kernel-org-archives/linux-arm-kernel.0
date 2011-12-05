@@ -1,27 +1,27 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 5 Dec 2011 18:01:12 +0100
+Date: Mon, 5 Dec 2011 18:03:10 +0100
 Subject: [RFC PATCH 2/3] pinctrl: imx: add pinmux-imx53 support
-In-Reply-To: <20111204161123.GS27267@pengutronix.de>
+In-Reply-To: <CAA+hA=RM77XORR-cUrFSW_rfn=KG9B1gr-Ny0jcDsU1_NiTT7A@mail.gmail.com>
 References: <1322999384-7886-1-git-send-email-b29396@freescale.com>
  <1322999384-7886-2-git-send-email-b29396@freescale.com>
  <20111204161123.GS27267@pengutronix.de>
-Message-ID: <CACRpkdZ0aNj-BsdtD2R-bEWQfMzsOMNbdh6ryVtgwET3Ry7xXA@mail.gmail.com>
+ <CAA+hA=RM77XORR-cUrFSW_rfn=KG9B1gr-Ny0jcDsU1_NiTT7A@mail.gmail.com>
+Message-ID: <CACRpkdZiyrkezn16ihmB_jQvM2QmG375_8jYykkQNAGCHMZZEA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Dec 4, 2011 at 5:11 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+On Mon, Dec 5, 2011 at 3:43 AM, Dong Aisheng <dongas86@gmail.com> wrote:
 
-> I don't think that this grouping of pads to their functions makes
-> sense. On i.MX every pad is muxed independently and not in groups.
-> Which pins belong to which function is board specific and not SoC
-> specific.
+> My current plan is to define all (might be frequently) used functoin
+> and groups for the exist upstreamed board like 53 Loco and etc, is
+> that ok?
 
-True, Dong can this be moved to the imx pinctrl platform data
-and passed in from arch/arm/[plat|mach]-* board files instead?
-That is probably where it belongs today.
+Yes, but do it in respective board file, so if we say, one day
+stops to support a certain board we can just delete that board
+file and be done with it.
 
-I know that this data is in drivers/pinctrl for the U300 and SIRF,
-but that is because they only have one single board variant.
+Plus this gives us a nice separation as we move toward
+device trees. (I think.)
 
 Yours,
 Linus Walleij
