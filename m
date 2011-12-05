@@ -1,64 +1,28 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 05 Dec 2011 12:39:46 +0100
-Subject: [PATCH] ARM: at91/net: add macb ethernet controller in 9g45 DT
-In-Reply-To: <20111203055659.GL18533@game.jcrosoft.org>
-References: <1322847782-22650-1-git-send-email-nicolas.ferre@atmel.com>
- <1322848237-23154-1-git-send-email-nicolas.ferre@atmel.com>
- <20111203055659.GL18533@game.jcrosoft.org>
-Message-ID: <4EDCAD82.5050006@atmel.com>
+From: David.Laight@ACULAB.COM (David Laight)
+Date: Mon, 5 Dec 2011 11:44:10 -0000
+Subject: [PATCHv5] atomic: add *_dec_not_zero
+In-Reply-To: <20111204221850.GC14542@n2100.arm.linux.org.uk>
+Message-ID: <AE90C24D6B3A694183C094C60CF0A2F6D8AEFE@saturn3.aculab.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/03/2011 06:56 AM, Jean-Christophe PLAGNIOL-VILLARD :
-> On 18:50 Fri 02 Dec     , Nicolas Ferre wrote:
->> Add the Cadence macb ethernet controller in at91sam9g45 .dtsi and
->> enable it in at91sam9m10g45ek board device tree file.
->>
->> Signed-off-by: Nicolas Ferre<nicolas.ferre@atmel.com>
->> ---
->>   arch/arm/boot/dts/at91sam9g45.dtsi     |    7 +++++++
->>   arch/arm/boot/dts/at91sam9m10g45ek.dts |    6 ++++++
->>   2 files changed, 13 insertions(+), 0 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
->> index e89b1d7..67f94d3 100644
->> --- a/arch/arm/boot/dts/at91sam9g45.dtsi
->> +++ b/arch/arm/boot/dts/at91sam9g45.dtsi
->> @@ -101,6 +101,13 @@
->>   				atmel,use-dma-tx;
->>   				status = "disabled";
->>   			};
->> +
->> +			macb0: ethernet at fffbc000 {
->> +				compatible = "cdns,at32ap7000-macb", "cdns,macb";
->> +				reg =<0xfffbc000 0x100>;
->> +				interrupts =<25 4>;
-> why?
+Looking at this:
 
-It is the new AIC specification that was reworked in this patch:
-https://lkml.org/lkml/2011/12/1/238
+> #ifndef atomic_inc_unless_negative
+> static inline int atomic_inc_unless_negative(atomic_t *p)
+> {
+>         int v, v1;
+>         for (v = 0; v >= 0; v = v1) {
+>                 v1 = atomic_cmpxchg(p, v, v + 1);
+>                 if (likely(v1 == v))
+>                         return 1;
+>         }
+>         return 0;
+> }
+> #endif
 
->> +				status = "disabled";
->> +			};
->>   		};
->>   	};
->>   };
->> diff --git a/arch/arm/boot/dts/at91sam9m10g45ek.dts b/arch/arm/boot/dts/at91sam9m10g45ek.dts
->> index 85b34f5..17377a2 100644
->> --- a/arch/arm/boot/dts/at91sam9m10g45ek.dts
->> +++ b/arch/arm/boot/dts/at91sam9m10g45ek.dts
->> @@ -30,6 +30,12 @@
->>   			usart1: serial at fff90000 {
->>   				status = "okay";
->>   			};
->> +
->> +			macb0: ethernet at fffbc000 {
->> +				local-mac-address = [3a 0e 03 04 05 06];
-> please drop this is not supposed to be in the dts but updated for each board
+why is it optimised for '*p' being zero??
+I'd have though the initial assignment to 'v' should
+be made by reading '*p' without any memory barriers (etc).
 
-Yes, sure: I kept in because it was allowing me to test. But for sure, 
-this should go away...
-
-Bye,
--- 
-Nicolas Ferre
+	David
