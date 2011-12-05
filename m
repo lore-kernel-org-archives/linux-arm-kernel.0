@@ -1,62 +1,45 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Tue, 6 Dec 2011 08:21:30 +0900
-Subject: [PATCH] ARM: S3C64XX: Hook up VDDINT on Cragganmore
-In-Reply-To: <1323105817-5638-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-References: <1323105817-5638-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-Message-ID: <CAH9JG2V8jJGeTDUZjcXa4hs67SaivocO4g-+wB=2+zv2FwsGyQ@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 5 Dec 2011 15:21:45 -0800
+Subject: [PATCH 07/23] ARM: plat-omap: remove arch specific special
+ handling for ioremap
+In-Reply-To: <alpine.LFD.2.02.1112021637200.2357@xanadu.home>
+References: <1321422521-1138-1-git-send-email-nico@fluxnic.net>
+ <1321422521-1138-8-git-send-email-nico@fluxnic.net>
+ <20111202202125.GZ31337@atomide.com>
+ <alpine.LFD.2.02.1112021637200.2357@xanadu.home>
+Message-ID: <20111205232144.GB31337@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/6/11, Mark Brown <broonie@opensource.wolfsonmicro.com> wrote:
-> Basic hookup, we do have a GPIO to use to control the voltage but we don't
-> currently use it.
->
-> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
-> ---
->  arch/arm/mach-s3c64xx/mach-crag6410.c |    7 +++++++
->  1 files changed, 7 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/mach-s3c64xx/mach-crag6410.c
-> b/arch/arm/mach-s3c64xx/mach-crag6410.c
-> index 47a36c4..879d949 100644
-> --- a/arch/arm/mach-s3c64xx/mach-crag6410.c
-> +++ b/arch/arm/mach-s3c64xx/mach-crag6410.c
-> @@ -381,6 +381,10 @@ static struct regulator_init_data vddarm __initdata = {
->  	.driver_data = &vddarm_pdata,
->  };
->
-> +static struct regulator_consumer_supply vddint_consumers[] __initdata = {
-> +	REGULATOR_SUPPLY("vddint", NULL),
+* Nicolas Pitre <nico@fluxnic.net> [111202 13:04]:
+> On Fri, 2 Dec 2011, Tony Lindgren wrote:
+> 
+> > Hi Nico,
+> > 
+> > * Nicolas Pitre <nico@fluxnic.net> [111115 21:21]:
+> > > From: Nicolas Pitre <nicolas.pitre@linaro.org>
+> > > 
+> > > A generic version should replace this later.
+> > > 
+> > > As io.c has become nearly empty, omap_init_consistent_dma_size() is moved
+> > > into common.c so that io.c can be removed entirely.
+> > 
+> > Sorry for the delay on trying this series out. It boots fine
+> > on omap2/3/4 as Kevin already noted. However, the following
+> > fix is needed for this patch to keep things building for
+> > omap1_defconfig.
+> >  
+> > > Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+> > 
+> > With the following fix it works on what I tested. That's
+> > osk5912 n800 2430sdp n900 zoom3 and blaze. If you're still
+> > taking acks for this series:
+> > 
+> > Tested-by: Tony Lindgren <tony@atomide.com>
+> 
+> OK, thanks for testing.  Since Russell didn't commit this to his stable 
+> branch yet I simply folded in your fix and added your tested-by tag.
 
-Now there's mixed usage for vddint. until s5pc110 it uses the 'vddint'
-but after exynos it uses the 'vdd_int'. either is okay but need to use
-the same name for consistency?
+OK thanks.
 
-How do you think?
-
-Thank you,
-Kyungmin Park
-> +};
-> +
->  static struct regulator_init_data vddint __initdata = {
->  	.constraints = {
->  		.name = "VDDINT",
-> @@ -389,6 +393,9 @@ static struct regulator_init_data vddint __initdata = {
->  		.always_on = 1,
->  		.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE,
->  	},
-> +	.num_consumer_supplies = ARRAY_SIZE(vddint_consumers),
-> +	.consumer_supplies = vddint_consumers,
-> +	.supply_regulator = "WALLVDD",
->  };
->
->  static struct regulator_init_data vddmem __initdata = {
-> --
-> 1.7.7.3
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+Tony
