@@ -1,38 +1,40 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 05 Dec 2011 07:35:16 -0600
-Subject: [PATCH 2/2] gpio/tegra: Dynamically allocate IRQ base, and support
- DT
-In-Reply-To: <20111205065527.GD2980@S2100-06.ap.freescale.net>
-References: <1322700336-26866-1-git-send-email-swarren@nvidia.com>
- <1322700336-26866-2-git-send-email-swarren@nvidia.com>
- <20111205065527.GD2980@S2100-06.ap.freescale.net>
-Message-ID: <4EDCC894.7060200@gmail.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Mon, 05 Dec 2011 15:45:04 +0200
+Subject: [PATCH 1/5] ASoC: omap-dmic: Add device tree bindings
+In-Reply-To: <20111203112206.GE6043@opensource.wolfsonmicro.com>
+References: <1322819580-7424-1-git-send-email-peter.ujfalusi@ti.com>
+ <1322819580-7424-2-git-send-email-peter.ujfalusi@ti.com>
+ <20111203112206.GE6043@opensource.wolfsonmicro.com>
+Message-ID: <4EDCCAE0.2000009@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Shawn,
+On 12/03/2011 01:22 PM, Mark Brown wrote:
+> On Fri, Dec 02, 2011 at 11:52:56AM +0200, Peter Ujfalusi wrote:
+> 
+>> @@ -0,0 +1,13 @@
+>> +* Texas Instruments OMAP4 Digital Microphone Module
+>> +
+>> +Required properties:
+>> +  - compatible : "ti,omap4-dmic"
+>> +  - ti,hwmods  : List of hwmod names associated with DMIC, in most case
+>> +		 it is "dmic".
+> 
+> Actually thinking about this some more I think what's concerning me is
+> the documentation as much as anything else - if it was just an internal,
+> unpublished interface of the OMAP core code which happened to use device
+> tree I probably wouldn't have worried about it churning.
 
-On 12/05/2011 12:55 AM, Shawn Guo wrote:
-> On Wed, Nov 30, 2011 at 05:45:36PM -0700, Stephen Warren wrote:
-> [...]
->>  static void tegra_gpio_irq_ack(struct irq_data *d)
->>  {
->> -	int gpio = d->irq - INT_GPIO_BASE;
->> +	int gpio = d->hwirq;
->>  
-> Though it's working right now, I'm not sure it's safe enough.  This
-> only works when d->hwirq_base is 0, which is true for now.  But I doubt
-> it will be always true.  I guess hwirq_base was introduced there for
-> some reason.  When some day irqdomain starts using this field, the
-> above code starts being broken.  IMO, the way that generic-chip.c is
-> using to calculate the number, d->irq - gc->irq_base, is much more
-> safer.
+Actually it is documented here:
+Documentation/devicetree/bindings/arm/omap/omap.txt
 
-It does work as the GIC hwirq_base is non-zero. It was introduced
-exactly so that no conversion of hwirq is needed for functions like
-this. hwirq_base is the starting point local to the controller
-numbering. Say you have gpio controller with 16 lines, but only the
-upper 8 lines have interrupt capability. Then you would set hwirq_base
-to 8 and nr_irq to 8. Then hwirq will always be set to 8-15.
+In order to move all OMAP drivers to DT - as Benoit already mentioned -
+we need additional work in DT.
+At this point of time if we add the DT representation we anyways need to
+change it as the core will receive the features, and we still need to
+fall back to hwmod to get the drivers working.
+As soon as we can migrate away from the hwmod we will do, but having
+this in place helps us to migrate other parts to DT.
 
-Rob
+-- 
+P?ter
