@@ -1,40 +1,25 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Mon, 05 Dec 2011 15:45:04 +0200
-Subject: [PATCH 1/5] ASoC: omap-dmic: Add device tree bindings
-In-Reply-To: <20111203112206.GE6043@opensource.wolfsonmicro.com>
-References: <1322819580-7424-1-git-send-email-peter.ujfalusi@ti.com>
- <1322819580-7424-2-git-send-email-peter.ujfalusi@ti.com>
- <20111203112206.GE6043@opensource.wolfsonmicro.com>
-Message-ID: <4EDCCAE0.2000009@ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 5 Dec 2011 14:48:48 +0100
+Subject: [PATCH] gpio: fix a build failure on KS8695 GPIO
+In-Reply-To: <201112011447.31034.vapier@gentoo.org>
+References: <1319741905-11051-1-git-send-email-linus.walleij@linaro.org>
+ <CAJaTeTq-PrqiwqOjWgFDScm4QxHBX48Ld5h_ATknto=f69s0wQ@mail.gmail.com>
+ <201112011447.31034.vapier@gentoo.org>
+Message-ID: <CACRpkdbU=7=WbcjUk9o2J_nY6_atgKp8btyMytjdCbuwBXLGEw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/03/2011 01:22 PM, Mark Brown wrote:
-> On Fri, Dec 02, 2011 at 11:52:56AM +0200, Peter Ujfalusi wrote:
-> 
->> @@ -0,0 +1,13 @@
->> +* Texas Instruments OMAP4 Digital Microphone Module
->> +
->> +Required properties:
->> +  - compatible : "ti,omap4-dmic"
->> +  - ti,hwmods  : List of hwmod names associated with DMIC, in most case
->> +		 it is "dmic".
-> 
-> Actually thinking about this some more I think what's concerning me is
-> the documentation as much as anything else - if it was just an internal,
-> unpublished interface of the OMAP core code which happened to use device
-> tree I probably wouldn't have worried about it churning.
+On Thu, Dec 1, 2011 at 8:47 PM, Mike Frysinger <vapier@gentoo.org> wrote:
+> On Thursday 27 October 2011 18:38:45 Mike Frysinger wrote:
+>> thanks; both build for me after this change. ?i don't have hardware to
+>> actually test, so i'll skip Tested-by and instead go for:
+>> Acked-by: Mike Frysinger <vapier@gentoo.org>
+>
+> were you going to push this to mainline since you're now the GPIO maintainer
+> while Grant is out ? :)
 
-Actually it is documented here:
-Documentation/devicetree/bindings/arm/omap/omap.txt
+Yeah I missed this since it was mailed out before Grant left,
+but I compensated today by sending it of directly to Torvalds.
 
-In order to move all OMAP drivers to DT - as Benoit already mentioned -
-we need additional work in DT.
-At this point of time if we add the DT representation we anyways need to
-change it as the core will receive the features, and we still need to
-fall back to hwmod to get the drivers working.
-As soon as we can migrate away from the hwmod we will do, but having
-this in place helps us to migrate other parts to DT.
-
--- 
-P?ter
+Yours,
+Linus Walleij
