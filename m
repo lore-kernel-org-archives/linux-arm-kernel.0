@@ -1,50 +1,58 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Mon, 5 Dec 2011 19:55:44 +0100
-Subject: [RFC v2 1/2] dma-buf: Introduce dma buffer sharing mechanism
-In-Reply-To: <201112051718.48324.arnd@arndb.de>
-References: <1322816252-19955-1-git-send-email-sumit.semwal@ti.com>
- <1322816252-19955-2-git-send-email-sumit.semwal@ti.com>
- <201112051718.48324.arnd@arndb.de>
-Message-ID: <CAKMK7uE-ZJ-VQRWy+zJJWsvr9nARWuf-4nupXhTJ0CLqC88CEw@mail.gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 5 Dec 2011 18:57:58 +0000
+Subject: [PATCH 2/2] [CPUFREQ] s3c64xx: Add VDDINT voltage scaling
+In-Reply-To: <2739091.DkZC0oOhCv@flatron>
+References: <1323109322-24130-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+ <1323109322-24130-2-git-send-email-broonie@opensource.wolfsonmicro.com>
+ <2739091.DkZC0oOhCv@flatron>
+Message-ID: <20111205185758.GC7467@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 05, 2011 at 05:18:48PM +0000, Arnd Bergmann wrote:
-> On Friday 02 December 2011, Sumit Semwal wrote:
-> > +	/* allow allocator to take care of cache ops */
-> > +	void (*sync_sg_for_cpu) (struct dma_buf *, struct device *);
-> > +	void (*sync_sg_for_device)(struct dma_buf *, struct device *);
->
-> I don't see how this works with multiple consumers: For the streaming
-> DMA mapping, there must be exactly one owner, either the device or
-> the CPU. Obviously, this rule needs to be extended when you get to
-> multiple devices and multiple device drivers, plus possibly user
-> mappings. Simply assigning the buffer to "the device" from one
-> driver does not block other drivers from touching the buffer, and
-> assigning it to "the cpu" does not stop other hardware that the
-> code calling sync_sg_for_cpu is not aware of.
->
-> The only way to solve this that I can think of right now is to
-> mandate that the mappings are all coherent (i.e. noncachable
-> on noncoherent architectures like ARM). If you do that, you no
-> longer need the sync_sg_for_* calls.
+On Mon, Dec 05, 2011 at 07:45:43PM +0100, Tomasz Figa wrote:
 
-Woops, totally missed the addition of these. Can somebody explain to used
-to rather coherent x86 what we need these for and the code-flow would look
-like in a typical example. I was kinda assuming that devices would bracket
-their use of a buffer with the attachment_map/unmap calls and any cache
-coherency magic that might be needed would be somewhat transparent to
-users of the interface?
+Please fix your mailer to word wrap at less than 80 columns, I've
+reflowed your text for legibility.
 
-The map call gets the dma_data_direction parameter, so it should be able
-to do the right thing. And because we keep the attachement around, any
-caching of mappings should be possible, too.
+> I would oppose here. According to my information, VDDint depends on
+> peripheral clock frequencies not ARM frequency and it should be 1.25V
 
-Yours, Daniel
+That's quite frankly what my electrical engineering knowledge would
+suggest but looking at both the extant drivers implementing this (Google
+should turn some up) and the documentation I have that doesn't seem to
+be the case.  The 1.25V number certainly looks off.
 
-PS: Slightly related, because it will make the coherency nightmare worse,
-afaict: Can we kill mmap support?
--- 
-Daniel Vetter
-Mail: daniel at ffwll.ch
-Mobile: +41 (0)79 365 57 48
+> (min 1.15, max 1.3) for HCLK at 133 MHz and 1.05V (min 0.95, max 1.3)
+> for HCLK running at 66 MHz.
+
+I've certainly got documentation that contradicts this, and for some
+reason synchronous clocks seem to require a higher VDDINT supply which
+baffles me rather.
+
+> Anyway, the behavior will probably vary from board to board, so I would rather 
+> think about extending s3c64xx-cpufreq driver to allow per board 
+> frequency/voltage configuration., which would also include settings optimized 
+> for your boards in their board-specific code.
+
+That seems quite tasteless frankly - the behaviour of the silicon is
+not board specific, and we do already have a facility in the regulator
+API to compensate for voltage drops in the board if that's an issue.
+Anything beyond that is policy and is in the domain of the governors.
+
+The ideal thing would be to be able to scale the HCLK independently of
+the ARM clock based on bus loading (taking into account the restrictions
+on the relationship between the two clocks) that's very much a long term
+goal at this point.
+
+> This would also solve a major problem of current s3c64xx-cpufreq 
+> implementation, namely crashing boards running in synchronous mode, because of 
+> odd frequencies specified, like 200 MHz (achievable with PLL set to 800 MHz), 
+> while the requirement is to keep the ARM frequency a multiple of HCLK when 
+> running synchronously.
+
+> I have two boards running in synchronous mode (Samsung Galaxy GT-i5700 phone 
+> and FriendlyARM Tiny6410 board), I might be able to test things related to 
+> synchronous mode.
+
+The clock code should just be adjusted to refuse to set invalid ARM
+clock ratios.
