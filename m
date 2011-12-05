@@ -1,88 +1,71 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon,  5 Dec 2011 23:01:15 +0800
-Subject: [PATCH] net/fec: fix the use of pdev->id
-Message-ID: <1323097275-7846-1-git-send-email-shawn.guo@linaro.org>
+From: Joerg.Roedel@amd.com (Roedel, Joerg)
+Date: Mon, 5 Dec 2011 16:18:00 +0100
+Subject: [RFC 0/5] OMAP groundwork for IOMMU-based DMA API
+In-Reply-To: <CAK=WgbY18K00DRcmP56+UJrmMu5h_O=GaO+i_GzbC5SzCvrnRA@mail.gmail.com>
+References: <1316948337-7924-1-git-send-email-ohad@wizery.com>
+ <20111115103926.GA5627@amd.com>
+ <CAK=WgbY18K00DRcmP56+UJrmMu5h_O=GaO+i_GzbC5SzCvrnRA@mail.gmail.com>
+Message-ID: <20111205151800.GD25178@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The pdev->id is used in several places for different purpose.  All
-these uses assume it's always the id of fec device which is >= 0.
-However this is only true for non-DT case.  When DT plays, pdev->id
-is always -1, which will break these pdev->id users.
+On Mon, Dec 05, 2011 at 04:21:21PM +0200, Ohad Ben-Cohen wrote:
+> Hi Joerg,
+> 
+> On Tue, Nov 15, 2011 at 12:39 PM, Roedel, Joerg <Joerg.Roedel@amd.com> wrote:
+> > On Sun, Sep 25, 2011 at 06:58:52AM -0400, Ohad Ben-Cohen wrote:
+> >> Ohad Ben-Cohen (5):
+> >> ? ARM: dev_archdata: add private iommu extension
+> >> ? ARM: OMAP: omap_device: add a method to set iommu private archdata
+> >> ? ARM: OMAP: iommu: declare a private iommu binding struct
+> >> ? ARM: OMAP3: bind omap3isp_device to its iommu device
+> >> ? iommu/omap: eliminate the public omap_find_iommu_device() method
+> >
+> > It doesn't apply cleanly, can you please rebase the code, collect the
+> > Acked-by's and resend?
+> 
+> I have collected Tony's and Laurent's Acked-by's and amended them to
+> the commit logs.
+> 
+> I have also made sure it applies cleanly to a recent 3.2, and tested
+> it with OMAP4/remoteproc. I couldn't test it with omap3isp though,
+> because I'm gated by (what looks like a) 3.2 omap3isp regression (see
+> http://www.spinics.net/lists/linux-omap/msg60510.html). I did test it
+> of course with omap3isp and 3.1, so I don't expect any omap3isp/iommu
+> issues with these patches. Anyway, when the omap3isp issue will be
+> resolved I'll make sure there isn't any iommu regression.
+> 
+> Please pull, thanks a lot!
+> 
+> The following changes since commit cfcfc9eca2bcbd26a8e206baeb005b055dbf8e37:
+> 
+>   Linux 3.2-rc2 (2011-11-15 15:02:59 -0200)
+> 
+> are available in the git repository at:
+>   git://git.kernel.org/pub/scm/linux/kernel/git/ohad/linux.git for-joerg
+> 
+> Ohad Ben-Cohen (3):
+>       ARM: OMAP: iommu: declare a private iommu binding struct
+>       ARM: OMAP3: bind omap3isp_device to its iommu device
+>       iommu/omap: eliminate the public omap_find_iommu_device() method
+> 
+>  arch/arm/mach-omap2/devices.c           |    7 ++++
+>  arch/arm/plat-omap/include/plat/iommu.h |   31 +++++++++++++++--
+>  arch/arm/plat-omap/include/plat/iovmm.h |   12 +++---
+>  drivers/iommu/omap-iommu.c              |   58 ++++++++++++++-----------------
+>  drivers/iommu/omap-iovmm.c              |   31 +++++++++++------
+>  drivers/media/video/omap3isp/isp.c      |   30 +++-------------
+>  drivers/media/video/omap3isp/isp.h      |    2 -
+>  drivers/media/video/omap3isp/ispccdc.c  |   18 +++++-----
+>  drivers/media/video/omap3isp/ispstat.c  |    8 ++--
+>  drivers/media/video/omap3isp/ispvideo.c |    4 +-
+>  10 files changed, 107 insertions(+), 94 deletions(-)
 
-Instead of fixing all these users one by one, this patch introduces
-a new member 'dev_id' to 'struct fec_enet_private' for holding the
-correct fec device id, and replaces all the existing uses of pdev->id
-with this dev_id.
+Pulled into arm/omap, thanks Ohad.
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- drivers/net/ethernet/freescale/fec.c |   11 +++++++----
- 1 files changed, 7 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/net/ethernet/freescale/fec.c b/drivers/net/ethernet/freescale/fec.c
-index 1124ce0..c136230 100644
---- a/drivers/net/ethernet/freescale/fec.c
-+++ b/drivers/net/ethernet/freescale/fec.c
-@@ -232,6 +232,7 @@ struct fec_enet_private {
- 	struct	platform_device *pdev;
- 
- 	int	opened;
-+	int	dev_id;
- 
- 	/* Phylib and MDIO interface */
- 	struct	mii_bus *mii_bus;
-@@ -837,7 +838,7 @@ static void __inline__ fec_get_mac(struct net_device *ndev)
- 
- 	/* Adjust MAC if using macaddr */
- 	if (iap == macaddr)
--		 ndev->dev_addr[ETH_ALEN-1] = macaddr[ETH_ALEN-1] + fep->pdev->id;
-+		 ndev->dev_addr[ETH_ALEN-1] = macaddr[ETH_ALEN-1] + fep->dev_id;
- }
- 
- /* ------------------------------------------------------------------------- */
-@@ -953,7 +954,7 @@ static int fec_enet_mii_probe(struct net_device *ndev)
- 	char mdio_bus_id[MII_BUS_ID_SIZE];
- 	char phy_name[MII_BUS_ID_SIZE + 3];
- 	int phy_id;
--	int dev_id = fep->pdev->id;
-+	int dev_id = fep->dev_id;
- 
- 	fep->phy_dev = NULL;
- 
-@@ -1031,7 +1032,7 @@ static int fec_enet_mii_init(struct platform_device *pdev)
- 	 * mdio interface in board design, and need to be configured by
- 	 * fec0 mii_bus.
- 	 */
--	if ((id_entry->driver_data & FEC_QUIRK_ENET_MAC) && pdev->id > 0) {
-+	if ((id_entry->driver_data & FEC_QUIRK_ENET_MAC) && fep->dev_id > 0) {
- 		/* fec1 uses fec0 mii_bus */
- 		fep->mii_bus = fec0_mii_bus;
- 		return 0;
-@@ -1063,7 +1064,7 @@ static int fec_enet_mii_init(struct platform_device *pdev)
- 	fep->mii_bus->read = fec_enet_mdio_read;
- 	fep->mii_bus->write = fec_enet_mdio_write;
- 	fep->mii_bus->reset = fec_enet_mdio_reset;
--	snprintf(fep->mii_bus->id, MII_BUS_ID_SIZE, "%x", pdev->id + 1);
-+	snprintf(fep->mii_bus->id, MII_BUS_ID_SIZE, "%x", fep->dev_id + 1);
- 	fep->mii_bus->priv = fep;
- 	fep->mii_bus->parent = &pdev->dev;
- 
-@@ -1521,6 +1522,7 @@ fec_probe(struct platform_device *pdev)
- 	int i, irq, ret = 0;
- 	struct resource *r;
- 	const struct of_device_id *of_id;
-+	static int dev_id;
- 
- 	of_id = of_match_device(fec_dt_ids, &pdev->dev);
- 	if (of_id)
-@@ -1548,6 +1550,7 @@ fec_probe(struct platform_device *pdev)
- 
- 	fep->hwp = ioremap(r->start, resource_size(r));
- 	fep->pdev = pdev;
-+	fep->dev_id = dev_id++;
- 
- 	if (!fep->hwp) {
- 		ret = -ENOMEM;
 -- 
-1.7.4.1
+AMD Operating System Research Center
+
+Advanced Micro Devices GmbH Einsteinring 24 85609 Dornach
+General Managers: Alberto Bozzo, Andrew Bowd
+Registration: Dornach, Landkr. Muenchen; Registerger. Muenchen, HRB Nr. 43632
