@@ -1,59 +1,34 @@
 From: dave.martin@linaro.org (Dave Martin)
-Date: Mon, 5 Dec 2011 16:11:57 +0000
-Subject: [PATCH] ata: Don't use NO_IRQ in pata_of_platform driver
-In-Reply-To: <1322867573.11728.22.camel@pasglop>
-References: <20111110162859.GA7088@oksana.dev.rtsoft.ru>
- <20111202192618.GC3037@localhost.localdomain>
- <CA+55aFwekNWz+V4440f=2iu_BfOxSg0NjVogv4cZZDFbJBNoAQ@mail.gmail.com>
- <1322867573.11728.22.camel@pasglop>
-Message-ID: <20111205161157.GA27550@localhost.localdomain>
+Date: Mon, 5 Dec 2011 16:25:31 +0000
+Subject: [PATCH v3 3/5] ARM: vexpress: Add DT support in v2m
+In-Reply-To: <1322579473-8804-4-git-send-email-pawel.moll@arm.com>
+References: <1322579473-8804-1-git-send-email-pawel.moll@arm.com>
+ <1322579473-8804-4-git-send-email-pawel.moll@arm.com>
+Message-ID: <20111205162520.GA27547@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Dec 03, 2011 at 10:12:53AM +1100, Benjamin Herrenschmidt wrote:
-> On Fri, 2011-12-02 at 11:28 -0800, Linus Torvalds wrote:
-> > On Fri, Dec 2, 2011 at 11:26 AM, Dave Martin <dave.martin@linaro.org> wrote:
-> > >
-> > > This is now broken on ARM where, for good or bad, NO_IRQ currently is
-> > > used and is -1.
-> > >
-> > > How do we resolve it?  If we are ready to eliminate NO_IRQ from
-> > > drivers/of/irq.c (or indeed, all code that uses it) and just use 0 for
-> > > that case, we should surely just do it... but I'm not confident I can
-> > > judge on that.
-> > 
-> > Just stop using NO_IRQ. First in drivers/of/irq.c, then in any drivers
-> > as you notice breakage.
-> 
-> Agreed. In fact the whole hack in drivers/of/irq.c was to accomodate ARM
-> which still uses -1, powerpc changed to 0 a long time ago.
-> 
-> Now that we have a generic remapper between HW and "linux" IRQ numbers,
-> there is no reason to stick to -1 even on ARM.
-> 
-> > Don't *change* NO_IRQ to zero (that whole #define is broken - leave it
-> > around as a marker of brokenness), just start removing it from all the
-> > ARM drivers that use the OF infrastructure. Which is presumably not
-> > all that many yet.
-> > 
-> > So whenever you find breakage, the fix now is to just remove NO_IRQ
-> > tests, and replace them with "!irq".
-> 
+On Tue, Nov 29, 2011 at 03:11:11PM +0000, Pawel Moll wrote:
+> This patch provides hooks for DT-based tile machine implementations
+> and adds Device Tree description for the motherboard.
 
-Russell, do you know whether it would make sense to set a timeline for 
-removing NO_IRQ from ARM platforms and migrating to 0 for the no-interrupt
-case?  I'm assuming that this mainly involves migrating existing hard-wired
-code that deals with interrupt numbers to use irq domains.
+[...]
 
-I worry that if we just change the convention for the OF case, we'll end
-up with OF-ised platform drivers which have to deal with a different no-
-irq convention depending on whether they are probed as platform drivers
-or through the OF framework ... and these ported or semi-ported drivers
-will be intermixed with unported drivers, confusing maintainers.
- 
-If board code starts initialising platform data for non-OF-ised platform
-drivers based on IRQ numbers fetched via the OF code, things will get
-even more confused...
+> +static struct of_dev_auxdata v2m_dt_auxdata_lookup[] __initdata = {
+> +	OF_DEV_AUXDATA("arm,vexpress-flash", V2M_NOR0, "physmap-flash",
+> +			&v2m_flash_data),
+> +	OF_DEV_AUXDATA("arm,primecell", V2M_MMCI, "mb:mmci", &v2m_mmci_data),
+> +	{}
+
+Are we missing some AUXDATA here?  I thought we had a lot more drivers
+which are not converted to OF, such as ambakmi and many more.
+
+I notice some things explicitly failing, e.g.:
+
+clcd-pl11x: probe of 10020000.clcd failed with error -22
+clcd-pl11x: probe of 1001f000.clcd failed with error -22
+
+...I haven't tracked down exactly what is going on here, yet.
 
 Cheers
 ---Dave
