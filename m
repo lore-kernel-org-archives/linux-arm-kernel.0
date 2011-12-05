@@ -1,32 +1,44 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 5 Dec 2011 19:50:59 +0000
-Subject: [PATCH 2/2] [CPUFREQ] s3c64xx: Add VDDINT voltage scaling
-In-Reply-To: <1968469.lEDYUZcgoo@flatron>
-References: <1323109322-24130-1-git-send-email-broonie@opensource.wolfsonmicro.com>
- <11611639.9NBo3p2F8o@flatron>
- <20111205192506.GE7467@opensource.wolfsonmicro.com>
- <1968469.lEDYUZcgoo@flatron>
-Message-ID: <20111205195059.GI7467@opensource.wolfsonmicro.com>
+From: cbouatmailru@gmail.com (Anton Vorontsov)
+Date: Tue, 6 Dec 2011 00:21:25 +0400
+Subject: [PATCH] ata: Don't use NO_IRQ in pata_of_platform driver
+In-Reply-To: <4EDD1897.4030208@gmail.com>
+References: <20111110162859.GA7088@oksana.dev.rtsoft.ru>
+ <20111202192618.GC3037@localhost.localdomain>
+ <CA+55aFwekNWz+V4440f=2iu_BfOxSg0NjVogv4cZZDFbJBNoAQ@mail.gmail.com>
+ <1322867573.11728.22.camel@pasglop>
+ <20111205161157.GA27550@localhost.localdomain>
+ <alpine.LFD.2.02.1112051236350.2357@xanadu.home>
+ <20111205180253.GB29812@localhost.localdomain>
+ <alpine.LFD.2.02.1112051310150.2357@xanadu.home>
+ <4EDD1897.4030208@gmail.com>
+Message-ID: <20111205202125.GA32592@oksana.dev.rtsoft.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 05, 2011 at 08:45:47PM +0100, Tomasz Figa wrote:
-> On Monday 05 of December 2011 19:25:06 Mark Brown wrote:
+On Mon, Dec 05, 2011 at 01:16:39PM -0600, Rob Herring wrote:
+[...]
+> At least for DT enabled platforms, we could force "no irq" to be 0 in
+> the DT irq code. Searching the dts files, I found 2 occurrences of IRQ0.
 
-> > 133MHz and VDDINT at 1.05V.  And driver code showing some variation from
-> > the power design guide :/
+Please note that there are HW IRQ numbers and "Virtual" IRQ numbers.
+dev->irq and thus the thing that we pass into request_irq() is a
+virtual IRQ thing, a "cookie".
 
-> I think that people from Samsung should be able to say something a bit more 
-> precise on this. Am I right?
+While in device tree you see real HW IRQ numbers.
 
-Here's hoping :)
+Legal VIRQ is always > 0, while HW IRQ could be >= 0.
 
-> > If it's a question of regulator quality the board should just be adding
-> > an offset in the constraints without the SoC drivers having to worry
-> > their pretty little heads about it.  Like I say it's not an unknown
+> Prima2 has timer on IRQ0, and VersatileAB has watchdog on IRQ0. Prima2
+> should be fine currently as it doesn't use the of_irq_* functions to get
+> the timer irq, but that is an issue as it skips any translation.
+> VersatileAB should be okay with the VIC irqdomain support.
 
-> Right, there is a field for regulator offset in regulation_constraints 
-> struct indeed. Somehow I missed it, sorry.
+It shouldn't be an issue to use of_irq_*() functions for these IRQs.
+of_irq_*() will remap HW IRQ 0 to some other VIRQ. If it does not do
+this currently, then it's a bug and should be fixed.
 
-It's possible you first looked at this with a kernel that didn't have
-that feature - I added it sometime this year.
+Thanks,
+
+-- 
+Anton Vorontsov
+Email: cbouatmailru at gmail.com
