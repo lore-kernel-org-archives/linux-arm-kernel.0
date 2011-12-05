@@ -1,28 +1,35 @@
-From: David.Laight@ACULAB.COM (David Laight)
-Date: Mon, 5 Dec 2011 11:44:10 -0000
-Subject: [PATCHv5] atomic: add *_dec_not_zero
-In-Reply-To: <20111204221850.GC14542@n2100.arm.linux.org.uk>
-Message-ID: <AE90C24D6B3A694183C094C60CF0A2F6D8AEFE@saturn3.aculab.com>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Mon, 5 Dec 2011 11:48:38 +0000
+Subject: [PATCH] net/macb: add DT support
+In-Reply-To: <4ED910B6.7080000@atmel.com>
+References: <20111202153832.GA4998@totoro>
+ <1322846050-4543-1-git-send-email-nicolas.ferre@atmel.com>
+ <20111202172854.GB4998@totoro> <4ED910B6.7080000@atmel.com>
+Message-ID: <20111205114838.GC21006@totoro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Looking at this:
+On Fri, Dec 02, 2011 at 06:53:58PM +0100, Nicolas Ferre wrote:
+> On 12/02/2011 06:28 PM, Jamie Iles :
+[...]
+> >diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
+> >index 103c6e6..89060e6 100644
+> >--- a/drivers/net/ethernet/cadence/macb.c
+> >+++ b/drivers/net/ethernet/cadence/macb.c
+> >@@ -1247,6 +1247,8 @@ static const struct of_device_id macb_dt_ids[] = {
+> >  	{ .compatible = "cdns,at32ap7000-macb" },
+> >  	{ .compatible = "cdns,at91sam9260-macb" },
+> >  	{ .compatible = "cdns,macb" },
+> >+	{ .compatible = "cdns,pc302-gem" },
+> >+	{ .compatible = "cdns,gem" },
+> >  	{ /* sentinel */ }
+> >  };
+> 
+> BTW, I think we may also modify the MII/RMII selection code for
+> adding gigabit selection... but maybe you already have the patches?
 
-> #ifndef atomic_inc_unless_negative
-> static inline int atomic_inc_unless_negative(atomic_t *p)
-> {
->         int v, v1;
->         for (v = 0; v >= 0; v = v1) {
->                 v1 = atomic_cmpxchg(p, v, v + 1);
->                 if (likely(v1 == v))
->                         return 1;
->         }
->         return 0;
-> }
-> #endif
+No, I don't have access to a version of the GEM with gigabit support.  
+The platforms I was working on used it as a 10/100 controller, but had 
+to use the GEM to get hardware timestamping support.
 
-why is it optimised for '*p' being zero??
-I'd have though the initial assignment to 'v' should
-be made by reading '*p' without any memory barriers (etc).
-
-	David
+Jamie
