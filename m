@@ -1,60 +1,107 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 5 Dec 2011 23:36:21 +0000
-Subject: realview compulsory enables CONFIG_ARM_PATCH_PHYS_VIRT on me
-In-Reply-To: <alpine.LFD.2.02.1112051707520.2357@xanadu.home>
-References: <CACRpkdZ8jpz7WTP3gpfcTykQZaCjQLN9PZCAS+UJOWrzZo1bjQ@mail.gmail.com>
- <4EDD3E5E.6050106@gmail.com> <alpine.LFD.2.02.1112051707520.2357@xanadu.home>
-Message-ID: <20111205233621.GH14542@n2100.arm.linux.org.uk>
+From: mturquette@ti.com (Turquette, Mike)
+Date: Mon, 5 Dec 2011 15:40:03 -0800
+Subject: [PATCH v3 3/5] clk: introduce the common clock framework
+In-Reply-To: <1321926047-14211-4-git-send-email-mturquette@linaro.org>
+References: <1321926047-14211-1-git-send-email-mturquette@linaro.org>
+ <1321926047-14211-4-git-send-email-mturquette@linaro.org>
+Message-ID: <CAJOA=zPv6wUEEmPafY4AEtHkuSAv9CpSwa-YLfq9gjFbHGyqoA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 05, 2011 at 05:08:12PM -0500, Nicolas Pitre wrote:
-> On Mon, 5 Dec 2011, Rob Herring wrote:
-> 
-> > On 12/05/2011 03:22 PM, Linus Walleij wrote:
-> > > Hi Nico,
-> > > 
-> > > now I'm lost, I discussed by boot problems on ARM PB1176
-> > > with Marc and after some investigation I found this strange thing on
-> > > the lastest rc:s since -rc1:
-> > > 
-> > > In arch/arm/Kconfig ARM_PATCH_PHYS_VIRT is forcibly
-> > > disabled like so:
-> > > 
-> > > depends on !ARCH_REALVIEW || !SPARSEMEM
-> > 
-> > should be !ARCH_REALVIEW && !SPARSEMEM ?
-> 
-> Indeed.
+On Mon, Nov 21, 2011 at 5:40 PM, Mike Turquette <mturquette@ti.com> wrote:
+> +/**
+> + * clk_get_parent - return the parent of a clk
+> + * @clk: the clk whose parent gets returned
+> + *
+> + * Simply returns clk->parent. ?It is up to the caller to hold the
+> + * prepare_lock, if desired. ?Returns NULL if clk is NULL.
+> + */
+> +struct clk *clk_get_parent(struct clk *clk)
+> +{
+> + ? ? ? if (!clk)
+> + ? ? ? ? ? ? ? return NULL;
+> +
+> + ? ? ? return clk->parent;
+> +}
+> +EXPORT_SYMBOL_GPL(clk_get_parent);
 
-No, it's correct.  None of you are understanding the logic.
+While auditing the uses/expectations of the current clk API users, I
+see that clk_get_parent is rarely used; it is in fact only called in
+11 files throughout the kernel.
 
-If you don't understand it, draw up a truth table:
+I decided to have a little audit and here is what I found:
 
-ARCH_REALVIEW	SPARSEMEM	result
-n		n		y
-n		y		y
-y		n		y
-y		y		n
+arch/arm/mach-shmobile/board-ap4evb.c: fsi_ak4642_set_rate
+Used within clk_set_rate.  Can dereference clk->parent directly and
+ideally should propagate up the clk tree using the new recursive
+clk_set_rate.
 
-And this clearly shows that if we have realview _and_ sparsemem enabled,
-then we don't want P2V patching in place.  The reason for this is quite
-simple - here's Realview's memory.h:
+arch/arm/mach-tegra/usb_phy.c: tegra_usb_phy_open
+Used within a clk_get_rate.  pll_u should ideally have it's own
+clk->rate populated, reducing the need for tegra_usb_phy_open to know
+details of the clk tree.  The logic to pull pll_u's rate from it's
+parent belongs to pll_u's .recalc_rate callback.
 
-#ifdef CONFIG_SPARSEMEM
+arch/arm/plat-s5p/clock.c: s5p_spdif_set_rate
+Another clk_get_parent call from within a .set_rate callback.  Again:
+use clk->parent directly and better yet, propagate the rate change up
+via the recursive clk_set_rate.
 
-#define __phys_to_virt(phys)                                            \
-        ((phys) >= 0x80000000 ? (phys) - 0x80000000 + PAGE_OFFSET2 :    \
-         (phys) >= 0x20000000 ? (phys) - 0x20000000 + PAGE_OFFSET1 :    \
-         (phys) + PAGE_OFFSET)
+arch/arm/plat-s5p/clock.c: s5p_spdif_get_rate
+Another clk_get_parent call from within a .recalc_rate callback.
+Again, clk->rate should be populated with parent's rate correctly,
+otherwise dereference clk->parent directly without use of
+clk_get_parent.
 
-#define __virt_to_phys(virt)                                            \
-         ((virt) >= PAGE_OFFSET2 ? (virt) - PAGE_OFFSET2 + 0x80000000 : \
-          (virt) >= PAGE_OFFSET1 ? (virt) - PAGE_OFFSET1 + 0x20000000 : \
-          (virt) - PAGE_OFFSET)
+arch/arm/plat-s5p/s5p-time.c: s5p_clockevent_init
+This problem would be solved by propagating rate_change requests up
+two-levels of parents via the new recursive clk_set_rate.  There is
+also a clk_set_parent call in here, which has nothing to do with the
+clk_get_parent call, but it makes me wonder if we should revisit the
+issue of switching parents as part of clk_set_rate:
+clk_set_rate(tin_event, pclk->rate / 2);
 
-#endif  /* CONFIG_SPARSEMEM */
+arch/arm/plat-samsung/pwm.c: pwm_is_tdiv
+Used in only two places: as part of pwm_calc_tin which could be
+replaced wholesale by a better .round_rate implementation and for a
+debug print (who cares).
 
-Or to put it another way: on Realview if sparsemem is enabled, then we
-are incompatible with P2V (due to the non-linear translation) so we have
-a dependency there to disable it.
+arch/arm/plat-samsung/pwm.c: pwm_calc_tin
+Just a .round_rate implementation.  Can dereference clk->parent directly.
+
+arch/arm/plat-samsung/time.c: s3c2410_timer_setup
+Same as s5p_clockevent_init above.
+
+drivers/sh/clk/core.c: clk_round_parent
+An elaborate .round_rate that should have resulted from recursive
+propagation up to clk->parent.
+
+drivers/video/omap2/dss/dss.c:
+Every call to clk_get_parent in here is wrapped in clk_get_rate.  The
+functions that use this are effectively .set_rate, .get_rate and
+.recalc_rate doppelgangers.  Also a debug print calls clk_get_parent
+but who cares.
+
+drivers/video/sh_mobile_hdmi.c:
+Used in a .set_rate and .round_rate implementation.  No reason not to
+deref clk->parent directly.
+
+The above explanations take a little liberty listing certain functions
+as .round_rate, .set_rate and .recalc_rate callbacks, but that is
+because a lot of the code mentioned could be neatly wrapped up that
+way.
+
+Do we really need clk_get_parent?  The primary problem with it is
+ambiguity in the API: should the caller hold a lock?  Is the rate
+guaranteed not the change after being called?  A top-level clk API
+function that can be called within other top-level clk API functions
+is inconsitent: most of the time this would incur nested locking.
+Also having a top-level API expose the tree structure encourages
+platform and driver developers to put clk tree details into their code
+as opposed to having clever .round_rate and .set_rate callbacks hide
+these details from them with the new recursive clk_set_rate.
+
+Thoughts?
+
+Thanks,
+Mike
