@@ -1,64 +1,148 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Mon, 5 Dec 2011 13:18:30 -0500 (EST)
-Subject: [PATCH] ata: Don't use NO_IRQ in pata_of_platform driver
-In-Reply-To: <20111205180253.GB29812@localhost.localdomain>
-References: <20111110162859.GA7088@oksana.dev.rtsoft.ru>
- <20111202192618.GC3037@localhost.localdomain>
- <CA+55aFwekNWz+V4440f=2iu_BfOxSg0NjVogv4cZZDFbJBNoAQ@mail.gmail.com>
- <1322867573.11728.22.camel@pasglop>
- <20111205161157.GA27550@localhost.localdomain>
- <alpine.LFD.2.02.1112051236350.2357@xanadu.home>
- <20111205180253.GB29812@localhost.localdomain>
-Message-ID: <alpine.LFD.2.02.1112051310150.2357@xanadu.home>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon,  5 Dec 2011 18:22:01 +0000
+Subject: [PATCH 1/2] [CPUFREQ] s3c64xx: Use pr_fmt() for consistent log
+ messages
+Message-ID: <1323109322-24130-1-git-send-email-broonie@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 5 Dec 2011, Dave Martin wrote:
+They're already consistent but it saves remembering to do so.
 
-> On Mon, Dec 05, 2011 at 12:40:16PM -0500, Nicolas Pitre wrote:
-> > On Mon, 5 Dec 2011, Dave Martin wrote:
-> > > On Sat, Dec 03, 2011 at 10:12:53AM +1100, Benjamin Herrenschmidt wrote:
-> > > > On Fri, 2011-12-02 at 11:28 -0800, Linus Torvalds wrote:
-> > > > > Don't *change* NO_IRQ to zero (that whole #define is broken - leave it
-> > > > > around as a marker of brokenness), just start removing it from all the
-> > > > > ARM drivers that use the OF infrastructure. Which is presumably not
-> > > > > all that many yet.
-> > > > > 
-> > > > > So whenever you find breakage, the fix now is to just remove NO_IRQ
-> > > > > tests, and replace them with "!irq".
-> > > > 
-> > > 
-> > > Russell, do you know whether it would make sense to set a timeline for 
-> > > removing NO_IRQ from ARM platforms and migrating to 0 for the no-interrupt
-> > > case?  I'm assuming that this mainly involves migrating existing hard-wired
-> > > code that deals with interrupt numbers to use irq domains.
-> > 
-> > How many drivers do use IRQ #0 to start with?  We might discover that in 
-> > practice there is only a very few cases where this is an issue if 0 
-> > would mean no IRQ.
-> 
-> The total number of files referring to NO_IRQ is not that huge:
-> 
-> arch/arm/	188 matches in 39 files
-> drivers/	174 matches in 84 files
-> 
-> Unfortunately, NO_IRQ is often not spelled "NO_IRQ".  It looks like the assumption
-> "irq < 0 === no irq" may be quite a lot more widespread than "NO_IRQ === no irq".
-> Since there's no specific thing we can grep for (and simply due to volume)
-> finding all such instances may be quite a bit harder.
-[...]
+Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+---
+ drivers/cpufreq/s3c64xx-cpufreq.c |   35 ++++++++++++++++++++++-------------
+ 1 files changed, 22 insertions(+), 13 deletions(-)
 
-ARgh.
-
-My point was about current actual usage of the IRQ numbered 0 which 
-probably prompted the introduction of NO_IRQ in the first place.  What I 
-was saying is that the number of occurrences where IRQ #0 is currently 
-used into drivers that would get confused if 0 would mean no IRQ is 
-probably quite small.
-
-But as you illustrated, there is a large number of drivers that already 
-assume no IRQ is < 0, even if they don't use any IRQ #0 themselves.  
-That is a much bigger problem to fix.
-
-
-Nicolas
+diff --git a/drivers/cpufreq/s3c64xx-cpufreq.c b/drivers/cpufreq/s3c64xx-cpufreq.c
+index 3475f65..a5e72cb 100644
+--- a/drivers/cpufreq/s3c64xx-cpufreq.c
++++ b/drivers/cpufreq/s3c64xx-cpufreq.c
+@@ -8,6 +8,8 @@
+  * published by the Free Software Foundation.
+  */
+ 
++#define pr_fmt(fmt) "cpufreq: " fmt
++
+ #include <linux/kernel.h>
+ #include <linux/types.h>
+ #include <linux/init.h>
+@@ -91,7 +93,7 @@ static int s3c64xx_cpufreq_set_target(struct cpufreq_policy *policy,
+ 	if (freqs.old == freqs.new)
+ 		return 0;
+ 
+-	pr_debug("cpufreq: Transition %d-%dkHz\n", freqs.old, freqs.new);
++	pr_debug("Transition %d-%dkHz\n", freqs.old, freqs.new);
+ 
+ 	cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
+ 
+@@ -101,7 +103,7 @@ static int s3c64xx_cpufreq_set_target(struct cpufreq_policy *policy,
+ 					    dvfs->vddarm_min,
+ 					    dvfs->vddarm_max);
+ 		if (ret != 0) {
+-			pr_err("cpufreq: Failed to set VDDARM for %dkHz: %d\n",
++			pr_err("Failed to set VDDARM for %dkHz: %d\n",
+ 			       freqs.new, ret);
+ 			goto err;
+ 		}
+@@ -110,7 +112,7 @@ static int s3c64xx_cpufreq_set_target(struct cpufreq_policy *policy,
+ 
+ 	ret = clk_set_rate(armclk, freqs.new * 1000);
+ 	if (ret < 0) {
+-		pr_err("cpufreq: Failed to set rate %dkHz: %d\n",
++		pr_err("Failed to set rate %dkHz: %d\n",
+ 		       freqs.new, ret);
+ 		goto err;
+ 	}
+@@ -123,14 +125,14 @@ static int s3c64xx_cpufreq_set_target(struct cpufreq_policy *policy,
+ 					    dvfs->vddarm_min,
+ 					    dvfs->vddarm_max);
+ 		if (ret != 0) {
+-			pr_err("cpufreq: Failed to set VDDARM for %dkHz: %d\n",
++			pr_err("Failed to set VDDARM for %dkHz: %d\n",
+ 			       freqs.new, ret);
+ 			goto err_clk;
+ 		}
+ 	}
+ #endif
+ 
+-	pr_debug("cpufreq: Set actual frequency %lukHz\n",
++	pr_debug("Set actual frequency %lukHz\n",
+ 		 clk_get_rate(armclk) / 1000);
+ 
+ 	return 0;
+@@ -153,7 +155,7 @@ static void __init s3c64xx_cpufreq_config_regulator(void)
+ 
+ 	count = regulator_count_voltages(vddarm);
+ 	if (count < 0) {
+-		pr_err("cpufreq: Unable to check supported voltages\n");
++		pr_err("Unable to check supported voltages\n");
+ 	}
+ 
+ 	freq = s3c64xx_freq_table;
+@@ -171,7 +173,7 @@ static void __init s3c64xx_cpufreq_config_regulator(void)
+ 		}
+ 
+ 		if (!found) {
+-			pr_debug("cpufreq: %dkHz unsupported by regulator\n",
++			pr_debug("%dkHz unsupported by regulator\n",
+ 				 freq->frequency);
+ 			freq->frequency = CPUFREQ_ENTRY_INVALID;
+ 		}
+@@ -194,13 +196,13 @@ static int s3c64xx_cpufreq_driver_init(struct cpufreq_policy *policy)
+ 		return -EINVAL;
+ 
+ 	if (s3c64xx_freq_table == NULL) {
+-		pr_err("cpufreq: No frequency information for this CPU\n");
++		pr_err("No frequency information for this CPU\n");
+ 		return -ENODEV;
+ 	}
+ 
+ 	armclk = clk_get(NULL, "armclk");
+ 	if (IS_ERR(armclk)) {
+-		pr_err("cpufreq: Unable to obtain ARMCLK: %ld\n",
++		pr_err("Unable to obtain ARMCLK: %ld\n",
+ 		       PTR_ERR(armclk));
+ 		return PTR_ERR(armclk);
+ 	}
+@@ -209,12 +211,19 @@ static int s3c64xx_cpufreq_driver_init(struct cpufreq_policy *policy)
+ 	vddarm = regulator_get(NULL, "vddarm");
+ 	if (IS_ERR(vddarm)) {
+ 		ret = PTR_ERR(vddarm);
+-		pr_err("cpufreq: Failed to obtain VDDARM: %d\n", ret);
+-		pr_err("cpufreq: Only frequency scaling available\n");
++		pr_err("Failed to obtain VDDARM: %d\n", ret);
++		pr_err("Only frequency scaling available\n");
+ 		vddarm = NULL;
+ 	} else {
+ 		s3c64xx_cpufreq_config_regulator();
+ 	}
++
++	vddint = regulator_get(NULL, "vddint");
++	if (IS_ERR(vddint)) {
++		ret = PTR_ERR(vddint);
++		pr_err("Failed to obtain VDDINT: %d\n", ret);
++		vddint = NULL;
++	}
+ #endif
+ 
+ 	freq = s3c64xx_freq_table;
+@@ -225,7 +234,7 @@ static int s3c64xx_cpufreq_driver_init(struct cpufreq_policy *policy)
+ 		r = clk_round_rate(armclk, freq->frequency * 1000);
+ 		r /= 1000;
+ 		if (r != freq->frequency) {
+-			pr_debug("cpufreq: %dkHz unsupported by clock\n",
++			pr_debug("%dkHz unsupported by clock\n",
+ 				 freq->frequency);
+ 			freq->frequency = CPUFREQ_ENTRY_INVALID;
+ 		}
+@@ -248,7 +257,7 @@ static int s3c64xx_cpufreq_driver_init(struct cpufreq_policy *policy)
+ 
+ 	ret = cpufreq_frequency_table_cpuinfo(policy, s3c64xx_freq_table);
+ 	if (ret != 0) {
+-		pr_err("cpufreq: Failed to configure frequency table: %d\n",
++		pr_err("Failed to configure frequency table: %d\n",
+ 		       ret);
+ 		regulator_put(vddarm);
+ 		clk_put(armclk);
+-- 
+1.7.7.3
