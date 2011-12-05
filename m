@@ -1,5 +1,5 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 5 Dec 2011 19:15:46 +0100
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Mon, 5 Dec 2011 13:18:30 -0500 (EST)
 Subject: [PATCH] ata: Don't use NO_IRQ in pata_of_platform driver
 In-Reply-To: <20111205180253.GB29812@localhost.localdomain>
 References: <20111110162859.GA7088@oksana.dev.rtsoft.ru>
@@ -9,25 +9,56 @@ References: <20111110162859.GA7088@oksana.dev.rtsoft.ru>
  <20111205161157.GA27550@localhost.localdomain>
  <alpine.LFD.2.02.1112051236350.2357@xanadu.home>
  <20111205180253.GB29812@localhost.localdomain>
-Message-ID: <CAMuHMdXQ0TahPcwDiLsN5s0rLRny3WcFLnCw-R_ZFkuO0T1RrQ@mail.gmail.com>
+Message-ID: <alpine.LFD.2.02.1112051310150.2357@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 5, 2011 at 19:02, Dave Martin <dave.martin@linaro.org> wrote:
-> Unfortunately, NO_IRQ is often not spelled "NO_IRQ". ?It looks like the assumption
+On Mon, 5 Dec 2011, Dave Martin wrote:
+
+> On Mon, Dec 05, 2011 at 12:40:16PM -0500, Nicolas Pitre wrote:
+> > On Mon, 5 Dec 2011, Dave Martin wrote:
+> > > On Sat, Dec 03, 2011 at 10:12:53AM +1100, Benjamin Herrenschmidt wrote:
+> > > > On Fri, 2011-12-02 at 11:28 -0800, Linus Torvalds wrote:
+> > > > > Don't *change* NO_IRQ to zero (that whole #define is broken - leave it
+> > > > > around as a marker of brokenness), just start removing it from all the
+> > > > > ARM drivers that use the OF infrastructure. Which is presumably not
+> > > > > all that many yet.
+> > > > > 
+> > > > > So whenever you find breakage, the fix now is to just remove NO_IRQ
+> > > > > tests, and replace them with "!irq".
+> > > > 
+> > > 
+> > > Russell, do you know whether it would make sense to set a timeline for 
+> > > removing NO_IRQ from ARM platforms and migrating to 0 for the no-interrupt
+> > > case?  I'm assuming that this mainly involves migrating existing hard-wired
+> > > code that deals with interrupt numbers to use irq domains.
+> > 
+> > How many drivers do use IRQ #0 to start with?  We might discover that in 
+> > practice there is only a very few cases where this is an issue if 0 
+> > would mean no IRQ.
+> 
+> The total number of files referring to NO_IRQ is not that huge:
+> 
+> arch/arm/	188 matches in 39 files
+> drivers/	174 matches in 84 files
+> 
+> Unfortunately, NO_IRQ is often not spelled "NO_IRQ".  It looks like the assumption
 > "irq < 0 === no irq" may be quite a lot more widespread than "NO_IRQ === no irq".
+> Since there's no specific thing we can grep for (and simply due to volume)
+> finding all such instances may be quite a bit harder.
+[...]
 
-Can we make irq unsigned, and hope the compiler catches all of them
-(comparison always
-false blah blah blah)?
+ARgh.
 
-Gr{oetje,eeting}s,
+My point was about current actual usage of the IRQ numbered 0 which 
+probably prompted the introduction of NO_IRQ in the first place.  What I 
+was saying is that the number of occurrences where IRQ #0 is currently 
+used into drivers that would get confused if 0 would mean no IRQ is 
+probably quite small.
 
-? ? ? ? ? ? ? ? ? ? ? ? Geert
+But as you illustrated, there is a large number of drivers that already 
+assume no IRQ is < 0, even if they don't use any IRQ #0 themselves.  
+That is a much bigger problem to fix.
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert@linux-m68k.org
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-? ? ? ? ? ? ? ? ? ? ? ? ? ?? ?? -- Linus Torvalds
+Nicolas
