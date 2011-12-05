@@ -1,78 +1,19 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Mon, 5 Dec 2011 19:26:05 +0000
-Subject: [PATCH] ata: Don't use NO_IRQ in pata_of_platform driver
-In-Reply-To: <alpine.LFD.2.02.1112051310150.2357@xanadu.home>
-References: <20111110162859.GA7088@oksana.dev.rtsoft.ru>
- <20111202192618.GC3037@localhost.localdomain>
- <CA+55aFwekNWz+V4440f=2iu_BfOxSg0NjVogv4cZZDFbJBNoAQ@mail.gmail.com>
- <1322867573.11728.22.camel@pasglop>
- <20111205161157.GA27550@localhost.localdomain>
- <alpine.LFD.2.02.1112051236350.2357@xanadu.home>
- <20111205180253.GB29812@localhost.localdomain>
- <alpine.LFD.2.02.1112051310150.2357@xanadu.home>
-Message-ID: <20111205192605.GD29812@localhost.localdomain>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 5 Dec 2011 19:28:41 +0000
+Subject: [PATCH v2 2/4] regulator: pass device_node to
+ of_get_regulator_init_data()
+In-Reply-To: <1322731268-12158-3-git-send-email-shawn.guo@linaro.org>
+References: <1322731268-12158-1-git-send-email-shawn.guo@linaro.org>
+ <1322731268-12158-3-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20111205192841.GF7467@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 05, 2011 at 01:18:30PM -0500, Nicolas Pitre wrote:
-> On Mon, 5 Dec 2011, Dave Martin wrote:
-> 
-> > On Mon, Dec 05, 2011 at 12:40:16PM -0500, Nicolas Pitre wrote:
-> > > On Mon, 5 Dec 2011, Dave Martin wrote:
-> > > > On Sat, Dec 03, 2011 at 10:12:53AM +1100, Benjamin Herrenschmidt wrote:
-> > > > > On Fri, 2011-12-02 at 11:28 -0800, Linus Torvalds wrote:
-> > > > > > Don't *change* NO_IRQ to zero (that whole #define is broken - leave it
-> > > > > > around as a marker of brokenness), just start removing it from all the
-> > > > > > ARM drivers that use the OF infrastructure. Which is presumably not
-> > > > > > all that many yet.
-> > > > > > 
-> > > > > > So whenever you find breakage, the fix now is to just remove NO_IRQ
-> > > > > > tests, and replace them with "!irq".
-> > > > > 
-> > > > 
-> > > > Russell, do you know whether it would make sense to set a timeline for 
-> > > > removing NO_IRQ from ARM platforms and migrating to 0 for the no-interrupt
-> > > > case?  I'm assuming that this mainly involves migrating existing hard-wired
-> > > > code that deals with interrupt numbers to use irq domains.
-> > > 
-> > > How many drivers do use IRQ #0 to start with?  We might discover that in 
-> > > practice there is only a very few cases where this is an issue if 0 
-> > > would mean no IRQ.
-> > 
-> > The total number of files referring to NO_IRQ is not that huge:
-> > 
-> > arch/arm/	188 matches in 39 files
-> > drivers/	174 matches in 84 files
-> > 
-> > Unfortunately, NO_IRQ is often not spelled "NO_IRQ".  It looks like the assumption
-> > "irq < 0 === no irq" may be quite a lot more widespread than "NO_IRQ === no irq".
-> > Since there's no specific thing we can grep for (and simply due to volume)
-> > finding all such instances may be quite a bit harder.
-> [...]
-> 
-> ARgh.
-> 
-> My point was about current actual usage of the IRQ numbered 0 which 
-> probably prompted the introduction of NO_IRQ in the first place.  What I 
-> was saying is that the number of occurrences where IRQ #0 is currently 
-> used into drivers that would get confused if 0 would mean no IRQ is 
-> probably quite small.
+On Thu, Dec 01, 2011 at 05:21:06PM +0800, Shawn Guo wrote:
+> It's not always true that the device_node of regulator can be found
+> at dev->of_node at the time when of_get_regulator_init_data() is being
+> called, because in some cases the regulator nodes in device tree do
+> not have 'struct device' behind them until regulator_dev gets created
+> for it by core function regulator_register().
 
-Ah, I misunderstood -- that's a separate issue, but also an important one.
-I guess this applies to a fair number of older boards.  One way of fixing
-this would be to migrate those boards to use irq domains -- but those boards
-may be sporadically maintained.
- 
-> But as you illustrated, there is a large number of drivers that already 
-> assume no IRQ is < 0, even if they don't use any IRQ #0 themselves.  
-> That is a much bigger problem to fix.
-
-My concern is that as soon as we start to change this in significant
-volume, a _lot_ of stuff is going to break.  Everywhere that an irq value
-is passed from one piece of code to another, there is a potential
-interface mismatch -- there seems to be no single place where we can
-apply a conversion and fix everything.
-
-
-Cheers
----Dave
+Applied, thanks.
