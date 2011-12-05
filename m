@@ -1,55 +1,33 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon,  5 Dec 2011 17:27:28 +0000
-Subject: [PATCH] ARM: S3C64XX: Gate some more clocks by default
-Message-ID: <1323106048-7342-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+From: ulf.hansson@stericsson.com (Ulf Hansson)
+Date: Mon, 5 Dec 2011 18:35:47 +0100
+Subject: [PATCH 01/14] mmc: mmci: Support MMC_PM_KEEP_POWER
+In-Reply-To: <1323106560-5218-1-git-send-email-ulf.hansson@stericsson.com>
+References: <1323106560-5218-1-git-send-email-ulf.hansson@stericsson.com>
+Message-ID: <1323106560-5218-2-git-send-email-ulf.hansson@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Gate the AC'97 and CF clocks by default. The drivers will enable them
-required.
+Add MMC_PM_KEEP_POWER to pm_caps so SDIO clients are able
+to use this option to prevent power off in suspend.
 
-Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+Signed-off-by: Ulf Hansson <ulf.hansson@stericsson.com>
 ---
- arch/arm/mach-s3c64xx/clock.c |   20 ++++++++++----------
- 1 files changed, 10 insertions(+), 10 deletions(-)
+ drivers/mmc/host/mmci.c |    3 +++
+ 1 files changed, 3 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-s3c64xx/clock.c b/arch/arm/mach-s3c64xx/clock.c
-index d79986f..ff01112 100644
---- a/arch/arm/mach-s3c64xx/clock.c
-+++ b/arch/arm/mach-s3c64xx/clock.c
-@@ -207,6 +207,15 @@ static struct clk init_clocks_off[] = {
- 		.enable		= s3c64xx_sclk_ctrl,
- 		.ctrlbit	= S3C_CLKCON_SCLK_MMC2_48,
- 	}, {
-+		.name		= "ac97",
-+		.parent		= &clk_p,
-+		.ctrlbit	= S3C_CLKCON_PCLK_AC97,
-+	}, {
-+		.name		= "cfcon",
-+		.parent		= &clk_h,
-+		.enable		= s3c64xx_hclk_ctrl,
-+		.ctrlbit	= S3C_CLKCON_HCLK_IHOST,
-+	}, {
- 		.name		= "dma0",
- 		.parent		= &clk_h,
- 		.enable		= s3c64xx_hclk_ctrl,
-@@ -390,16 +399,7 @@ static struct clk init_clocks[] = {
- 		.name		= "watchdog",
- 		.parent		= &clk_p,
- 		.ctrlbit	= S3C_CLKCON_PCLK_WDT,
--	}, {
--		.name		= "ac97",
--		.parent		= &clk_p,
--		.ctrlbit	= S3C_CLKCON_PCLK_AC97,
--	}, {
--		.name		= "cfcon",
--		.parent		= &clk_h,
--		.enable		= s3c64xx_hclk_ctrl,
--		.ctrlbit	= S3C_CLKCON_HCLK_IHOST,
--	}
-+	},
- };
+diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+index 50b5f99..1ac04a2 100644
+--- a/drivers/mmc/host/mmci.c
++++ b/drivers/mmc/host/mmci.c
+@@ -1240,6 +1240,9 @@ static int __devinit mmci_probe(struct amba_device *dev,
+ 		mmc->ocr_avail = plat->ocr_mask;
+ 	mmc->caps = plat->capabilities;
  
- static struct clk clk_hsmmc0 = {
++	/* We support these PM capabilities. */
++	mmc->pm_caps = MMC_PM_KEEP_POWER;
++
+ 	/*
+ 	 * We can do SGIO
+ 	 */
 -- 
-1.7.7.3
+1.7.5.4
