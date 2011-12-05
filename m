@@ -1,115 +1,99 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Mon, 05 Dec 2011 20:45:47 +0100
-Subject: [PATCH 2/2] [CPUFREQ] s3c64xx: Add VDDINT voltage scaling
-In-Reply-To: <20111205192506.GE7467@opensource.wolfsonmicro.com>
-References: <1323109322-24130-1-git-send-email-broonie@opensource.wolfsonmicro.com>
- <11611639.9NBo3p2F8o@flatron>
- <20111205192506.GE7467@opensource.wolfsonmicro.com>
-Message-ID: <1968469.lEDYUZcgoo@flatron>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Mon, 5 Dec 2011 14:49:01 -0500 (EST)
+Subject: [PATCH] ata: Don't use NO_IRQ in pata_of_platform driver
+In-Reply-To: <20111205192605.GD29812@localhost.localdomain>
+References: <20111110162859.GA7088@oksana.dev.rtsoft.ru>
+ <20111202192618.GC3037@localhost.localdomain>
+ <CA+55aFwekNWz+V4440f=2iu_BfOxSg0NjVogv4cZZDFbJBNoAQ@mail.gmail.com>
+ <1322867573.11728.22.camel@pasglop>
+ <20111205161157.GA27550@localhost.localdomain>
+ <alpine.LFD.2.02.1112051236350.2357@xanadu.home>
+ <20111205180253.GB29812@localhost.localdomain>
+ <alpine.LFD.2.02.1112051310150.2357@xanadu.home>
+ <20111205192605.GD29812@localhost.localdomain>
+Message-ID: <alpine.LFD.2.02.1112051443190.2357@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 05 of December 2011 19:25:06 Mark Brown wrote:
-> On Mon, Dec 05, 2011 at 08:11:03PM +0100, Tomasz Figa wrote:
-> > On Monday 05 of December 2011 18:57:58 Mark Brown wrote:
-> > > > (min 1.15, max 1.3) for HCLK at 133 MHz and 1.05V (min 0.95,
-> > > > max 1.3) for HCLK running at 66 MHz.
-> > > 
-> > > I've certainly got documentation that contradicts this, and for
-> > > some
-> > > reason synchronous clocks seem to require a higher VDDINT supply
-> > > which baffles me rather.
+On Mon, 5 Dec 2011, Dave Martin wrote:
+
+> On Mon, Dec 05, 2011 at 01:18:30PM -0500, Nicolas Pitre wrote:
+> > On Mon, 5 Dec 2011, Dave Martin wrote:
 > > 
-> > I'm basing my statements on S3C6410 power design guide and source
-> > code of original kernel for Samsung Galaxy GT-i5700 released by
-> > Samsung on their open source portal.
-> 
-> So, if you look at the power design guide (or at least the version I
-> have) that doesn't quite match that - for example, the recommended
-> operating conditions section quotes 133MHz as 1.2V typical for async
-> operation and 1.3V typical for sync operation.  There's also some
-> examples in the power guide showing periods of operation with HCLK at
-> 133MHz and VDDINT at 1.05V.  And driver code showing some variation from
-> the power design guide :/
-
-I think that people from Samsung should be able to say something a bit more 
-precise on this. Am I right?
-
-> > > > Anyway, the behavior will probably vary from board to board,
-> > > > so I
-> > > > would rather think about extending s3c64xx-cpufreq driver to
-> > > > allow
-> > > > per board frequency/voltage configuration., which would also
-> > > > include settings optimized for your boards in their
-> > > > board-specific code.> > 
-> > > That seems quite tasteless frankly - the behaviour of the silicon
-> > > is
-> > > not board specific, and we do already have a facility in the
-> > > regulator API to compensate for voltage drops in the board if
-> > > that's an issue. Anything beyond that is policy and is in the
-> > > domain of the governors.> 
-> > Well, you are mostly right, but there is one aspect that varies
-> > between boards, configuration. Boards can have different PLL
-> > settings, run in synchronous or asynchronous mode and might have
-> > power regulators of different qualities which will vary in voltage
-> > ripple.
-> 
-> The regulators we should be able to take care of through the framework;
-> it's a moderately common issue on brass board designs due to the
-> physically larger form factors.  The PLL settings we'd ideally be able
-> to change at runtime (especially the ARM one which would give us a lot
-> more flexibility) and at worst should be able to figure out what to do
-> with based on readback.
-
-OK.
-
-> > For example, in case of your boards, the regulator is nice and allow
-> > reduction of VDDint voltage to minimal value (1.15V), but in general
-> > Power Design Guide it is recommended to use the typical value
-> > (1.25V).
-> If it's a question of regulator quality the board should just be adding
-> an offset in the constraints without the SoC drivers having to worry
-> their pretty little heads about it.  Like I say it's not an unknown
-> problem.  Often it's not actually the regulator but rather the board
-> design that causes the issue, for example if you've got very long traces
-> from the regulator to the device then you may experience voltage drops
-> or other effects which impair the accuracy of the supply seen by the
-> device.
-
-Right, there is a field for regulator offset in regulation_constraints 
-struct indeed. Somehow I missed it, sorry.
-
-> > As far as I know, there are also different revisions of S3C6410,
-> > capable of running at different maximal frequencies, at least 667
-> > MHz and 800 MHz versions.
-> 
-> Yes, there are - I've got boards with both variants.  At the minute
-> we're managing to cope with them by virtue of the different PLL settings
-> constraining the frequencies we can set, if we ever get control of the
-> ARM PLL the drivers will need to get a bit smarter.
-
-OK.
-
-> > > > This would also solve a major problem of current
-> > > > s3c64xx-cpufreq
-> > > > implementation, namely crashing boards running in synchronous
-> > > > mode, because of odd frequencies specified, like 200 MHz
-> > > > (achievable with PLL set to 800 MHz), while the requirement
-> > > > is to keep the ARM frequency a multiple of HCLK when running
-> > > > synchronously.
+> > > On Mon, Dec 05, 2011 at 12:40:16PM -0500, Nicolas Pitre wrote:
+> > > > On Mon, 5 Dec 2011, Dave Martin wrote:
+> > > > > On Sat, Dec 03, 2011 at 10:12:53AM +1100, Benjamin Herrenschmidt wrote:
+> > > > > > On Fri, 2011-12-02 at 11:28 -0800, Linus Torvalds wrote:
+> > > > > > > Don't *change* NO_IRQ to zero (that whole #define is broken - leave it
+> > > > > > > around as a marker of brokenness), just start removing it from all the
+> > > > > > > ARM drivers that use the OF infrastructure. Which is presumably not
+> > > > > > > all that many yet.
+> > > > > > > 
+> > > > > > > So whenever you find breakage, the fix now is to just remove NO_IRQ
+> > > > > > > tests, and replace them with "!irq".
+> > > > > > 
+> > > > > 
+> > > > > Russell, do you know whether it would make sense to set a timeline for 
+> > > > > removing NO_IRQ from ARM platforms and migrating to 0 for the no-interrupt
+> > > > > case?  I'm assuming that this mainly involves migrating existing hard-wired
+> > > > > code that deals with interrupt numbers to use irq domains.
+> > > > 
+> > > > How many drivers do use IRQ #0 to start with?  We might discover that in 
+> > > > practice there is only a very few cases where this is an issue if 0 
+> > > > would mean no IRQ.
 > > > 
-> > > The clock code should just be adjusted to refuse to set invalid
-> > > ARM
-> > > clock ratios.
+> > > The total number of files referring to NO_IRQ is not that huge:
+> > > 
+> > > arch/arm/	188 matches in 39 files
+> > > drivers/	174 matches in 84 files
+> > > 
+> > > Unfortunately, NO_IRQ is often not spelled "NO_IRQ".  It looks like the assumption
+> > > "irq < 0 === no irq" may be quite a lot more widespread than "NO_IRQ === no irq".
+> > > Since there's no specific thing we can grep for (and simply due to volume)
+> > > finding all such instances may be quite a bit harder.
+> > [...]
 > > 
-> > This might be some solution as well. I'm not yet sure if it solves
-> > all the problems, but I will think about it.
+> > ARgh.
+> > 
+> > My point was about current actual usage of the IRQ numbered 0 which 
+> > probably prompted the introduction of NO_IRQ in the first place.  What I 
+> > was saying is that the number of occurrences where IRQ #0 is currently 
+> > used into drivers that would get confused if 0 would mean no IRQ is 
+> > probably quite small.
 > 
-> It'd at least stop the system falling over in a big fat heap which seems
-> like an improvement :)
+> Ah, I misunderstood -- that's a separate issue, but also an important one.
+> I guess this applies to a fair number of older boards.  One way of fixing
+> this would be to migrate those boards to use irq domains -- but those boards
+> may be sporadically maintained.
+>  
+> > But as you illustrated, there is a large number of drivers that already 
+> > assume no IRQ is < 0, even if they don't use any IRQ #0 themselves.  
+> > That is a much bigger problem to fix.
+> 
+> My concern is that as soon as we start to change this in significant
+> volume, a _lot_ of stuff is going to break.  Everywhere that an irq value
+> is passed from one piece of code to another, there is a potential
+> interface mismatch -- there seems to be no single place where we can
+> apply a conversion and fix everything.
 
-OK. :)
+No need to convert everything.
 
-The problem with voltages would be solved by offset given in constraints 
-and the problem of incorrect frequencies should be fixable in s3c64xx-
-cpufreq, so no more problems left. I think.
+First move is to make irq=0 meaning no IRQ.  That means making things 
+like:
+
+	if (irq < 0)
+	if (irq >= 0)
+
+into
+
+	if (irq <= 0)
+	if (irq > 0)
+
+And replace NO_IRQ with 0.
+
+That change shouldn't break anything, except those drivers which are 1) 
+being passed an actual IRQ #0 and 2) testing for no IRQ.  I suspect that 
+those conditions aren't very common together.
+
+
+Nicolas
