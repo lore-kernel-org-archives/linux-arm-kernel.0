@@ -1,98 +1,71 @@
-From: ming.lei@canonical.com (Ming Lei)
-Date: Mon, 5 Dec 2011 12:27:11 +0800
-Subject: [RFC PATCH v1 2/7] omap4: build fdif omap device from hwmod
-In-Reply-To: <CAKnK67T9S6Z=f9qmn9ov7YNyTKjdDbOZHJDRO-7_fqkJGZzXbA@mail.gmail.com>
-References: <1322838172-11149-1-git-send-email-ming.lei@canonical.com>
- <1322838172-11149-3-git-send-email-ming.lei@canonical.com>
- <CAKnK67T9S6Z=f9qmn9ov7YNyTKjdDbOZHJDRO-7_fqkJGZzXbA@mail.gmail.com>
-Message-ID: <CACVXFVNxX9tHZrdsRw6Wm14g59x44dR1Rm5jLeqxx4m6Jxe5-Q@mail.gmail.com>
+From: myungjoo.ham@gmail.com (MyungJoo Ham)
+Date: Mon, 5 Dec 2011 13:55:28 +0900
+Subject: [PATCH 3/4] ARM Exynos4210-Nuri: remove compiler errors
+In-Reply-To: <000201ccb19d$9ab31070$d0193150$%kim@samsung.com>
+References: <1322730317-8171-1-git-send-email-myungjoo.ham@samsung.com>
+ <1322730317-8171-4-git-send-email-myungjoo.ham@samsung.com>
+ <04f901ccb0d0$b94191b0$2bc4b510$%kim@samsung.com>
+ <CAJ0PZbTKgqgg3SZN3KyVFzGDuSU8qjM5NjwNcM28mtmzfbS0Xw@mail.gmail.com>
+ <000201ccb19d$9ab31070$d0193150$%kim@samsung.com>
+Message-ID: <CAJ0PZbS2iarzcS1LZq9TK0GbKWgCXKPba00sSLkYe8YY_3EA9w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Sat, Dec 3, 2011 at 12:28 AM, Aguirre, Sergio <saaguirre@ti.com> wrote:
-> Hi Ming,
->
-> Thanks for the patches.
-
-Thanks for your review.
-
-> On Fri, Dec 2, 2011 at 9:02 AM, Ming Lei <ming.lei@canonical.com> wrote:
->> Signed-off-by: Ming Lei <ming.lei@canonical.com>
->> ---
->> ?arch/arm/mach-omap2/devices.c | ? 33 +++++++++++++++++++++++++++++++++
->> ?1 files changed, 33 insertions(+), 0 deletions(-)
+On Sat, Dec 3, 2011 at 6:26 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> MyungJoo Ham wrote:
 >>
->> diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
->> index 1166bdc..a392af5 100644
->> --- a/arch/arm/mach-omap2/devices.c
->> +++ b/arch/arm/mach-omap2/devices.c
->> @@ -728,6 +728,38 @@ void __init omap242x_init_mmc(struct omap_mmc_platform_data **mmc_data)
+>> On Fri, Dec 2, 2011 at 5:59 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+>> > MyungJoo Hamm wrote:
+>> >>
+>> > What's the 'compiler errors'?
+>> >
+>> > And I don't know why this patch included in this series, maybe this
+>> should
+>> > be separated from this series?
 >>
->> ?#endif
+>> The error is:
+>> arch/arm/mach-exynos/mach-nuri.c: In function 'nuri_power_init':
+>> arch/arm/mach-exynos/mach-nuri.c:1080:2: error: implicit declaration
+>> of function 'irq_alloc_descs'
+>
+> Well, I couldn't find the 'irq_alloc_descs' at the
+> arch/arm/mach-exynos/mach-nuri.c file in my tree and linux-next. Maybe you
+> missed submitting some patches?
+>
+> And I don't know why inclusion of <linux/export.h> is needed for
+> 'irq_alloc_descs'...
+>
+>> It is due to the recent changes in some of the header files (they
+>> removed some header inclusion from header fiiles).
 >>
->> +static struct platform_device* __init omap4_init_fdif(void)
->> +{
->> + ? ? ? int id = -1;
+> I think, if this is required, this fix should be separated because the build
+> error what you said will be happened without this series...
 >
-> You could remove this , as it is being used only once, and never changed.
+>> In this patchset, we are providing a test case (Exynos4210-Nuri) for
+>> the device driver and we had to resolve the compiler error first.
+>>
+> If so, yes, firstly that should be fixed...but now don't we need this?
+>
+> Thanks.
+>
+> Best regards,
+> Kgene.
+> --
+> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+> SW Solution Development Team, Samsung Electronics Co., Ltd.
+>
 
-Yes.
+Ah.. as you've mentioned, the compiler error is found to be related
+with other unmerged patches (sparse IRQ). Please never mind this
+patch. This (patch 3/4) should be dropped from this patchset.
 
->
->> + ? ? ? struct platform_device *pd;
->> + ? ? ? struct omap_hwmod *oh;
->> + ? ? ? const char *dev_name = "fdif";
->> +
->> + ? ? ? oh = omap_hwmod_lookup("fdif");
->> + ? ? ? if (!oh) {
->> + ? ? ? ? ? ? ? pr_err("Could not look up fdif hwmod\n");
->> + ? ? ? ? ? ? ? return NULL;
->> + ? ? ? }
->> +
->> + ? ? ? pd = omap_device_build(dev_name, id, oh, NULL, 0, NULL, 0, 0);
->
-> Just do:
->
-> pd = omap_device_build(dev_name, -1, oh, NULL, 0, NULL, 0, 0);
->
->> + ? ? ? WARN(IS_ERR(pd), "Can't build omap_device for %s.\n",
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? dev_name);
->> + ? ? ? return pd;
->> +}
->> +
->> +static void __init omap_init_fdif(void)
->> +{
->> + ? ? ? if (cpu_is_omap44xx()) {
->> + ? ? ? ? ? ? ? struct platform_device *pd;
->> +
->> + ? ? ? ? ? ? ? pd = omap4_init_fdif();
->> + ? ? ? ? ? ? ? if (!pd)
->> + ? ? ? ? ? ? ? ? ? ? ? return;
->> +
->> + ? ? ? ? ? ? ? pm_runtime_enable(&pd->dev);
->> + ? ? ? }
->> +}
->
-> IMHO, you could reduce 1 level of indentation here, like this:
->
-> static void __init omap_init_fdif(void)
-> {
-> ? ? ? ?struct platform_device *pd;
->
-> ? ? ? ?if (!cpu_is_omap44xx())
-> ? ? ? ? ? ? ? ?return;
->
-> ? ? ? ?pd = omap4_init_fdif();
-> ? ? ? ?if (!pd)
-> ? ? ? ? ? ? ? ?return;
->
-> ? ? ? ?pm_runtime_enable(&pd->dev);
-> }
+Thank you.
 
-OK, will take this.
 
-thanks,
---
-Ming Lei
+
+Cheers!
+MyungJoo
+
+-- 
+MyungJoo Ham, Ph.D.
+Mobile Software Platform Lab, DMC Business, Samsung Electronics
