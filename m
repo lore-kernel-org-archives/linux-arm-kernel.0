@@ -1,129 +1,38 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 5 Dec 2011 17:18:48 +0000
-Subject: [RFC v2 1/2] dma-buf: Introduce dma buffer sharing mechanism
-In-Reply-To: <1322816252-19955-2-git-send-email-sumit.semwal@ti.com>
-References: <1322816252-19955-1-git-send-email-sumit.semwal@ti.com>
- <1322816252-19955-2-git-send-email-sumit.semwal@ti.com>
-Message-ID: <201112051718.48324.arnd@arndb.de>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Mon, 5 Dec 2011 09:19:00 -0800
+Subject: [PATCH 2/2] gpio/tegra: Dynamically allocate IRQ base, and
+ support DT
+In-Reply-To: <20111205065527.GD2980@S2100-06.ap.freescale.net>
+References: <1322700336-26866-1-git-send-email-swarren@nvidia.com>
+ <1322700336-26866-2-git-send-email-swarren@nvidia.com>
+ <20111205065527.GD2980@S2100-06.ap.freescale.net>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF1750B7702E@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 02 December 2011, Sumit Semwal wrote:
-> This is the first step in defining a dma buffer sharing mechanism.
+Shawn Guo wrote at Sunday, December 04, 2011 11:55 PM:
+> On Wed, Nov 30, 2011 at 05:45:36PM -0700, Stephen Warren wrote:
+> [...]
+> >  static void tegra_gpio_irq_ack(struct irq_data *d)
+> >  {
+> > -	int gpio = d->irq - INT_GPIO_BASE;
+> > +	int gpio = d->hwirq;
+> >
+> Though it's working right now, I'm not sure it's safe enough.  This
+> only works when d->hwirq_base is 0, which is true for now.  But I doubt
+> it will be always true.  I guess hwirq_base was introduced there for
+> some reason.  When some day irqdomain starts using this field, the
+> above code starts being broken.  IMO, the way that generic-chip.c is
+> using to calculate the number, d->irq - gc->irq_base, is much more
+> safer.
 
-This looks very nice, but there are a few things I don't understand yet
-and a bunch of trivial comments I have about things I spotted.
+If I'm understanding IRQ domains correctly, the hwirq_base value is
+picked by the driver when registering the IRQ domain. Hence, there's
+no way for hwirq_base to not be zero without someone editing gpio-tegra.c,
+and as part of doing that, the quoted code could be adjusted if required.
+Does that seem reasonable?
 
-Do you have prototype exporter and consumer drivers that you can post
-for clarification?
+Rob, you suggested the code above - what's your take?
 
-In the patch 2, you have a section about migration that mentions that
-it is possible to export a buffer that can be migrated after it
-is already mapped into one user driver. How does that work when
-the physical addresses are mapped into a consumer device already?
-
-> diff --git a/drivers/base/Kconfig b/drivers/base/Kconfig
-> index 21cf46f..07d8095 100644
-> --- a/drivers/base/Kconfig
-> +++ b/drivers/base/Kconfig
-> @@ -174,4 +174,14 @@ config SYS_HYPERVISOR
->  
->  source "drivers/base/regmap/Kconfig"
->  
-> +config DMA_SHARED_BUFFER
-> +	bool "Buffer framework to be shared between drivers"
-> +	default n
-> +	depends on ANON_INODES
-
-I would make this 'select ANON_INODES', like the other users of this
-feature.
-
-> +	return dmabuf;
-> +}
-> +EXPORT_SYMBOL(dma_buf_export);
-
-I agree with Konrad, this should definitely be EXPORT_SYMBOL_GPL,
-because it's really a low-level function that I would expect
-to get used by in-kernel subsystems providing the feature to
-users and having back-end drivers, but it's not the kind of thing
-we want out-of-tree drivers to mess with.
-
-> +/**
-> + * dma_buf_fd - returns a file descriptor for the given dma_buf
-> + * @dmabuf:	[in]	pointer to dma_buf for which fd is required.
-> + *
-> + * On success, returns an associated 'fd'. Else, returns error.
-> + */
-> +int dma_buf_fd(struct dma_buf *dmabuf)
-> +{
-> +	int error, fd;
-> +
-> +	if (!dmabuf->file)
-> +		return -EINVAL;
-> +
-> +	error = get_unused_fd_flags(0);
-
-Why not simply get_unused_fd()?
-
-> +/**
-> + * dma_buf_attach - Add the device to dma_buf's attachments list; optionally,
-> + * calls attach() of dma_buf_ops to allow device-specific attach functionality
-> + * @dmabuf:	[in]	buffer to attach device to.
-> + * @dev:	[in]	device to be attached.
-> + *
-> + * Returns struct dma_buf_attachment * for this attachment; may return NULL.
-> + *
-
-Or may return a negative error code. It's better to be consistent here:
-either always return NULL on error, or change the allocation error to
-ERR_PTR(-ENOMEM).
-
-> + */
-> +struct dma_buf_attachment *dma_buf_attach(struct dma_buf *dmabuf,
-> +						struct device *dev)
-> +{
-> +	struct dma_buf_attachment *attach;
-> +	int ret;
-> +
-> +	BUG_ON(!dmabuf || !dev);
-> +
-> +	attach = kzalloc(sizeof(struct dma_buf_attachment), GFP_KERNEL);
-> +	if (attach == NULL)
-> +		goto err_alloc;
-> +
-> +	mutex_lock(&dmabuf->lock);
-> +
-> +	attach->dev = dev;
-> +	attach->dmabuf = dmabuf;
-> +	if (dmabuf->ops->attach) {
-> +		ret = dmabuf->ops->attach(dmabuf, dev, attach);
-> +		if (!ret)
-> +			goto err_attach;
-
-You probably mean "if (ret)" here instead of "if (!ret)", right?
-
-> +	/* allow allocator to take care of cache ops */
-> +	void (*sync_sg_for_cpu) (struct dma_buf *, struct device *);
-> +	void (*sync_sg_for_device)(struct dma_buf *, struct device *);
-
-I don't see how this works with multiple consumers: For the streaming
-DMA mapping, there must be exactly one owner, either the device or
-the CPU. Obviously, this rule needs to be extended when you get to
-multiple devices and multiple device drivers, plus possibly user
-mappings. Simply assigning the buffer to "the device" from one
-driver does not block other drivers from touching the buffer, and
-assigning it to "the cpu" does not stop other hardware that the
-code calling sync_sg_for_cpu is not aware of.
-
-The only way to solve this that I can think of right now is to
-mandate that the mappings are all coherent (i.e. noncachable
-on noncoherent architectures like ARM). If you do that, you no
-longer need the sync_sg_for_* calls.
-
-> +#ifdef CONFIG_DMA_SHARED_BUFFER
-
-Do you have a use case for making the interface compile-time disabled?
-I had assumed that any code using it would make no sense if it's not
-available so you don't actually need this.
-
-	Arnd
+-- 
+nvpublic
