@@ -1,49 +1,125 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Mon, 05 Dec 2011 16:30:57 +0000
-Subject: [PATCH v3 3/5] ARM: vexpress: Add DT support in v2m
-In-Reply-To: <20111205162520.GA27547@localhost.localdomain>
-References: <1322579473-8804-1-git-send-email-pawel.moll@arm.com>
- <1322579473-8804-4-git-send-email-pawel.moll@arm.com>
- <20111205162520.GA27547@localhost.localdomain>
-Message-ID: <1323102657.3147.39.camel@hornet.cambridge.arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 5 Dec 2011 17:57:42 +0100
+Subject: [RFC PATCH 2/3] pinctrl: imx: add pinmux-imx53 support
+In-Reply-To: <1322999384-7886-2-git-send-email-b29396@freescale.com>
+References: <1322999384-7886-1-git-send-email-b29396@freescale.com>
+ <1322999384-7886-2-git-send-email-b29396@freescale.com>
+Message-ID: <CACRpkdaYz+-nZA6atxA+5kvWOO84YeSHQPNiojq_R4zkHUGz3Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2011-12-05 at 16:25 +0000, Dave Martin wrote:
-> On Tue, Nov 29, 2011 at 03:11:11PM +0000, Pawel Moll wrote:
-> > This patch provides hooks for DT-based tile machine implementations
-> > and adds Device Tree description for the motherboard.
-> 
-> [...]
-> 
-> > +static struct of_dev_auxdata v2m_dt_auxdata_lookup[] __initdata = {
-> > +	OF_DEV_AUXDATA("arm,vexpress-flash", V2M_NOR0, "physmap-flash",
-> > +			&v2m_flash_data),
-> > +	OF_DEV_AUXDATA("arm,primecell", V2M_MMCI, "mb:mmci", &v2m_mmci_data),
-> > +	{}
-> 
-> Are we missing some AUXDATA here?  I thought we had a lot more drivers
-> which are not converted to OF, such as ambakmi and many more.
+On Sun, Dec 4, 2011 at 12:49 PM, Dong Aisheng <b29396@freescale.com> wrote:
 
-No, as Rob suggested I removed all the devices that don't need platform
-data and were there only for the clocks sake and created explicit lookup
-tables for them. The ambakmi you have mentioned doesn't take any
-platform data, just the resources and clock, so it works fine.
+> +enum imx_mx53_pads {
+> + ? ? ? MX53_GPIO_19 = 0,
+> + ? ? ? MX53_KEY_COL0 = 1,
+(...)
 
-> I notice some things explicitly failing, e.g.:
-> 
-> clcd-pl11x: probe of 10020000.clcd failed with error -22
-> clcd-pl11x: probe of 1001f000.clcd failed with error -22
-> 
-> ...I haven't tracked down exactly what is going on here, yet.
+First I thought it looked a bit strange since you needed enums for all pads
+but then I realized that your macros use the same enumerator name to
+name the pad and then it looks sort of clever.
 
-CLCD is the only device that doesn't work right now. I've skipped it
-intentionally as it was configured in a non-trivial way on a per-tile
-basis (and passing two separate sets of auxdata is tricky) and the work
-on bindings for the driver is ongoing.
+But maybe put in a comment about that here:
 
-Probably this should be mentioned in the patch description. Will do.
+> +/* Pad names for the pinmux subsystem */
 
-Cheers!
+Like this:
 
-Pawe?
+/*
+ * Pad names for the pinmux subsystem.
+ * These pad names are constructed from the pin enumerator names
+ * in the IMX_PINCTRL_PIN() macro.
+ */
+
+> +static const struct pinctrl_pin_desc mx53_pads[] = {
+> + ? ? ? IMX_PINCTRL_PIN(MX53_GPIO_19),
+> + ? ? ? IMX_PINCTRL_PIN(MX53_KEY_COL0),
+(...)
+
+> +/* mx53 pin groups and mux mode */
+> +static const unsigned mx53_fec_pins[] = {
+> + ? ? ? MX53_FEC_MDC,
+> + ? ? ? MX53_FEC_MDIO,
+> + ? ? ? MX53_FEC_REF_CLK,
+> + ? ? ? MX53_FEC_RX_ER,
+> + ? ? ? MX53_FEC_CRS_DV,
+> + ? ? ? MX53_FEC_RXD1,
+> + ? ? ? MX53_FEC_RXD0,
+> + ? ? ? MX53_FEC_TX_EN,
+> + ? ? ? MX53_FEC_TXD1,
+> + ? ? ? MX53_FEC_TXD0,
+> +};
+
+I understand this.
+
+> +static const unsigned mx53_fec_mux[] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+
+But what is this? Just zeroes? Why?
+Especially with a const so they really cannot be anything
+else. The same pin (0) can only be enumerated once.
+
+> +static const unsigned mx53_sd1_pins[] = {
+> + ? ? ? MX53_SD1_CMD,
+> + ? ? ? MX53_SD1_CLK,
+> + ? ? ? MX53_SD1_DATA0,
+> + ? ? ? MX53_SD1_DATA1,
+> + ? ? ? MX53_SD1_DATA2,
+> + ? ? ? MX53_SD1_DATA3,
+> +
+> +};
+> +static const unsigned mx53_sd1_mux[] = { 0, 0, 0, 0, 0, 0 };
+
+And here again.
+
+> +static const unsigned mx53_sd3_pins[] = {
+> + ? ? ? MX53_PATA_DATA8,
+> + ? ? ? MX53_PATA_DATA9,
+> + ? ? ? MX53_PATA_DATA10,
+> + ? ? ? MX53_PATA_DATA11,
+> + ? ? ? MX53_PATA_DATA0,
+> + ? ? ? MX53_PATA_DATA1,
+> + ? ? ? MX53_PATA_DATA2,
+> + ? ? ? MX53_PATA_DATA3,
+> + ? ? ? MX53_PATA_IORDY,
+> + ? ? ? MX53_PATA_RESET_B,
+> +
+> +};
+> +static const unsigned mx53_sd3_mux[] = { 4, 4, 4, 4, 4, 4, 4, 4, 2, 2 };
+
+This also looks strange. Can you explain what these muxes are?
+
+> +static const unsigned mx53_uart1_pins[] = {
+> + ? ? ? MX53_CSI0_DAT10,
+> + ? ? ? MX53_CSI0_DAT11,
+> +};
+> +static const unsigned mx53_uart1_mux[] = { 2, 2 };
+
+And here again?
+
+> +static const struct imx_pin_group mx53_pin_groups[] = {
+> + ? ? ? IMX_PIN_GROUP("fecgrp", mx53_fec_pins, mx53_fec_mux),
+> + ? ? ? IMX_PIN_GROUP("sd1grp", mx53_sd1_pins, mx53_sd1_mux),
+> + ? ? ? IMX_PIN_GROUP("sd3grp", mx53_sd3_pins, mx53_sd3_mux),
+> + ? ? ? IMX_PIN_GROUP("uart1grp", mx53_uart1_pins, mx53_uart1_mux),
+> +};
+
+So I understand the first and second argument to IMX_PIN_GROUP()
+but not the third.
+
+> +/* mx53 funcs and groups */
+> +static const char * const fecgrps[] = { "fecgrp" };
+> +static const char * const sd1grps[] = { "sd1grp" };
+> +static const char * const sd3grps[] = { "sd3grp" };
+> +static const char * const uart1grps[] = { "uart1grp" };
+> +
+> +static const struct imx_pmx_func mx53_pmx_functions[] = {
+> + ? ? ? IMX_PMX_FUNC("fec", fecgrps),
+> + ? ? ? IMX_PMX_FUNC("sd1", sd1grps),
+> + ? ? ? IMX_PMX_FUNC("sd3", sd3grps),
+> + ? ? ? IMX_PMX_FUNC("uart1", uart1grps),
+> +};
+
+This looks good.
+
+Yours,
+Linus Walleij
