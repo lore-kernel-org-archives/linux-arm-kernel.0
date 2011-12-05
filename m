@@ -1,32 +1,59 @@
-From: joerg.roedel@amd.com (Joerg Roedel)
-Date: Mon, 5 Dec 2011 16:47:15 +0100
-Subject: [PATCH v7 0/2] iommu/exynos: Add IOMMU/System MMU driver for
- Samsung Exynos
-In-Reply-To: <1321609650-1329-1-git-send-email-pullip.cho@samsung.com>
-References: <1321609650-1329-1-git-send-email-pullip.cho@samsung.com>
-Message-ID: <20111205154715.GE25178@amd.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Mon, 5 Dec 2011 16:11:57 +0000
+Subject: [PATCH] ata: Don't use NO_IRQ in pata_of_platform driver
+In-Reply-To: <1322867573.11728.22.camel@pasglop>
+References: <20111110162859.GA7088@oksana.dev.rtsoft.ru>
+ <20111202192618.GC3037@localhost.localdomain>
+ <CA+55aFwekNWz+V4440f=2iu_BfOxSg0NjVogv4cZZDFbJBNoAQ@mail.gmail.com>
+ <1322867573.11728.22.camel@pasglop>
+Message-ID: <20111205161157.GA27550@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 18, 2011 at 06:47:28PM +0900, KyongHo Cho wrote:
-> Patch Summary:
-> [PATCH v7 1/2] ARM: EXYNOS: Change System MMU platform device definitions
-> [PATCH v7 2/2] iommu/exynos: Add iommu driver for Exynos Platforms
+On Sat, Dec 03, 2011 at 10:12:53AM +1100, Benjamin Herrenschmidt wrote:
+> On Fri, 2011-12-02 at 11:28 -0800, Linus Torvalds wrote:
+> > On Fri, Dec 2, 2011 at 11:26 AM, Dave Martin <dave.martin@linaro.org> wrote:
+> > >
+> > > This is now broken on ARM where, for good or bad, NO_IRQ currently is
+> > > used and is -1.
+> > >
+> > > How do we resolve it?  If we are ready to eliminate NO_IRQ from
+> > > drivers/of/irq.c (or indeed, all code that uses it) and just use 0 for
+> > > that case, we should surely just do it... but I'm not confident I can
+> > > judge on that.
+> > 
+> > Just stop using NO_IRQ. First in drivers/of/irq.c, then in any drivers
+> > as you notice breakage.
+> 
+> Agreed. In fact the whole hack in drivers/of/irq.c was to accomodate ARM
+> which still uses -1, powerpc changed to 0 a long time ago.
+> 
+> Now that we have a generic remapper between HW and "linux" IRQ numbers,
+> there is no reason to stick to -1 even on ARM.
+> 
+> > Don't *change* NO_IRQ to zero (that whole #define is broken - leave it
+> > around as a marker of brokenness), just start removing it from all the
+> > ARM drivers that use the OF infrastructure. Which is presumably not
+> > all that many yet.
+> > 
+> > So whenever you find breakage, the fix now is to just remove NO_IRQ
+> > tests, and replace them with "!irq".
+> 
 
-Okay, I merged it into arm/exynos, but it is not pushed yet. Actually
-there were conflicts while merging, which I resolved. What I failed
-to find is a config for Exynos that actually builds for upstream Linux.
-Probably I havn't tried hard enough to find one... Can you provide a
-kernel config that I can use for my testing and that builds a current
-3.2-rc4 kernel for Exynos?
+Russell, do you know whether it would make sense to set a timeline for 
+removing NO_IRQ from ARM platforms and migrating to 0 for the no-interrupt
+case?  I'm assuming that this mainly involves migrating existing hard-wired
+code that deals with interrupt numbers to use irq domains.
 
-Thanks,
+I worry that if we just change the convention for the OF case, we'll end
+up with OF-ised platform drivers which have to deal with a different no-
+irq convention depending on whether they are probed as platform drivers
+or through the OF framework ... and these ported or semi-ported drivers
+will be intermixed with unported drivers, confusing maintainers.
+ 
+If board code starts initialising platform data for non-OF-ised platform
+drivers based on IRQ numbers fetched via the OF code, things will get
+even more confused...
 
-	Joerg
-
--- 
-AMD Operating System Research Center
-
-Advanced Micro Devices GmbH Einsteinring 24 85609 Dornach
-General Managers: Alberto Bozzo, Andrew Bowd
-Registration: Dornach, Landkr. Muenchen; Registerger. Muenchen, HRB Nr. 43632
+Cheers
+---Dave
