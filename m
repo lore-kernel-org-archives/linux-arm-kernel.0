@@ -1,27 +1,47 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 5 Dec 2011 10:57:33 +0000
-Subject: [PATCH v5 1/4] regulator: helper routine to extract
- regulator_init_data
-In-Reply-To: <CAJuYYwSRW-=XufvHS1miO2xNANwQMZqPbt=VyPEonywnAsvVUQ@mail.gmail.com>
-References: <1321615040-13257-1-git-send-email-rnayak@ti.com>
- <1321615040-13257-2-git-send-email-rnayak@ti.com>
- <CAJuYYwRO+AS=WmQfNAe8L6Gi5Dm4VsCuVqk3X5Nb8uUYAdLnJQ@mail.gmail.com>
- <20111204155433.GA16287@opensource.wolfsonmicro.com>
- <CAJuYYwQ-9wCu-+q0S2YYeFYemq74ULdZ-EwPGLWKHA4+0VZcsA@mail.gmail.com>
- <20111205103447.GC11150@opensource.wolfsonmicro.com>
- <CAJuYYwSRW-=XufvHS1miO2xNANwQMZqPbt=VyPEonywnAsvVUQ@mail.gmail.com>
-Message-ID: <20111205105733.GE11150@opensource.wolfsonmicro.com>
+From: amit.kachhap@linaro.org (Amit Daniel Kachhap)
+Date: Mon,  5 Dec 2011 16:36:07 +0530
+Subject: [PATCH V4 0/5] ARM: exynos: Add l2 retention mode cpuidle state
+Message-ID: <1323083172-14096-1-git-send-email-amit.kachhap@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 05, 2011 at 04:14:40PM +0530, Thomas Abraham wrote:
-> On 5 December 2011 16:04, Mark Brown
+Changes since V3:
+*Implemented Russell feedback and moved sleep magic 4byte memory before 
+s3c_cpu_resume to data section.
 
-> > With the regulator device tree bindings if the regulator is configured
-> > to run a single voltage the bindings will set apply_uV unconditionally
-> > so there's no need for a separate constraint.
+Changes since V2:
+*Implemented the suggestion of MyungJoo Ham and used INFORM0/1
+registers for resume for some board versions.
+*Added back save/restore through CPU PM notifiers as suggested by 
+Lorenzo Pieralisi. This is useful to restore vfp state.
+*some patch modularization (s5p/exynos) and proper commit logs.  
 
-> Sorry if I have missed this, but I could not find 'apply_uV' being set
-> as you described in the v5 of the regulator-dt patchset.
+Changes since V1:
+*rebased the whole patch against 3.2-rc1 tree
+*removed GIC save/restore in AFTR cpuidle state as it is external
+to cpu powerdomain
+*Added L2 setup code through device tree
+*Removed only l2 save/restore registers in sleep
 
-Yes, looks like Rajendra missed that - just fixed it.
+This Patch series adds support for AFTR mode cpuidle state based on
+patch (http://www.spinics.net/lists/arm-kernel/msg132243.html) earlier
+submitted by Jaecheol Lee <jc.lee@samsung.com>.
+
+This patch uses CPU PM notifiers , common l2 save/restore and
+new cpu_suspend/resume interfaces and is based on the tip of
+for-next branch of samsung tree.
+(git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git for-next).
+
+Amit Daniel Kachhap (5):
+  ARM: exynos: Add support AFTR mode on EXYNOS4210
+  ARM: exynos: save L2 settings during bootup
+  ARM: s5p: add L2 early resume code
+  ARM: exynos: remove useless code to save/restore L2
+  ARM: exynos: Enable l2 configuration through device tree
+
+ arch/arm/mach-exynos/cpu.c              |   60 +++++++++---
+ arch/arm/mach-exynos/cpuidle.c          |  152 ++++++++++++++++++++++++++++++-
+ arch/arm/mach-exynos/include/mach/pmu.h |    2 +
+ arch/arm/mach-exynos/pm.c               |   15 ---
+ arch/arm/plat-s5p/sleep.S               |   44 ++++++++-
+ 5 files changed, 233 insertions(+), 40 deletions(-)
