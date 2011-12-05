@@ -1,28 +1,22 @@
 From: vinod.koul@intel.com (Vinod Koul)
-Date: Mon, 05 Dec 2011 08:24:19 +0530
-Subject: [PATCH v3] IMX/SDMA : save the real count for one DMA transaction.
-In-Reply-To: <1322792185-4704-1-git-send-email-b32955@freescale.com>
-References: <1322792185-4704-1-git-send-email-b32955@freescale.com>
-Message-ID: <1323053659.30390.45.camel@vkoul-udesk3>
+Date: Mon, 05 Dec 2011 08:37:20 +0530
+Subject: [PATCH] dmaengine/amba-pl08x: Config ccfg and increment
+ phychan_hold if phychan is true
+In-Reply-To: <fc4d77e6355cc462cfc2e700415cd56b9db816cb.1322551469.git.viresh.kumar@st.com>
+References: <fc4d77e6355cc462cfc2e700415cd56b9db816cb.1322551469.git.viresh.kumar@st.com>
+Message-ID: <1323054440.30390.53.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2011-12-02 at 10:16 +0800, Huang Shijie wrote:
-> When we use the SDMA in the UART driver(such as imx6q), we will
-> meet one situation:
->   Assume we set 64 bytes for the RX DMA buffer.
->   The RX DMA buffer has received some data, but not full.
->   An Aging DMA request will be received by the SDMA controller if we enable the
->   IDDMAEN(UCR4[6]) in this case.
+On Tue, 2011-11-29 at 12:56 +0530, Viresh Kumar wrote:
+> Currently, if plchan->phychan is true, we return immediately from
+> prep_phy_chan(). We must configure txd->ccfg and increment phychan_hold before
+> returning. Otherwise, request line number wouldn't be configured in this txd.
 > 
-> So the UART driver needs to know the count of the real received bytes,
-> and push them to upper layer.
-> 
-> Add two new fields to sdmac, and update the `residue` in sdma_tx_status().
-> 
-> Signed-off-by: Huang Shijie <b32955@freescale.com>
-Applied thanks
+> Reported-by: Rajeev Kumar <rajeev-dlh.kumar@st.com>
+> Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
 
+Applied, Thanks
 
 -- 
 ~Vinod
