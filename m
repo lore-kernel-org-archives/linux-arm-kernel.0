@@ -1,117 +1,35 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 5 Dec 2011 22:18:38 +0100
-Subject: [RFC PATCH 2/3] pinctrl: imx: add pinmux-imx53 support
-In-Reply-To: <CACRpkdaYz+-nZA6atxA+5kvWOO84YeSHQPNiojq_R4zkHUGz3Q@mail.gmail.com>
-References: <1322999384-7886-1-git-send-email-b29396@freescale.com>
- <1322999384-7886-2-git-send-email-b29396@freescale.com>
- <CACRpkdaYz+-nZA6atxA+5kvWOO84YeSHQPNiojq_R4zkHUGz3Q@mail.gmail.com>
-Message-ID: <20111205211838.GG27267@pengutronix.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 5 Dec 2011 22:22:05 +0100
+Subject: realview compulsory enables CONFIG_ARM_PATCH_PHYS_VIRT on me
+Message-ID: <CACRpkdZ8jpz7WTP3gpfcTykQZaCjQLN9PZCAS+UJOWrzZo1bjQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 05, 2011 at 05:57:42PM +0100, Linus Walleij wrote:
-> On Sun, Dec 4, 2011 at 12:49 PM, Dong Aisheng <b29396@freescale.com> wrote:
-> 
-> > +enum imx_mx53_pads {
-> > + ? ? ? MX53_GPIO_19 = 0,
-> > + ? ? ? MX53_KEY_COL0 = 1,
-> (...)
-> 
-> First I thought it looked a bit strange since you needed enums for all pads
-> but then I realized that your macros use the same enumerator name to
-> name the pad and then it looks sort of clever.
-> 
-> But maybe put in a comment about that here:
-> 
-> > +/* Pad names for the pinmux subsystem */
-> 
-> Like this:
-> 
-> /*
->  * Pad names for the pinmux subsystem.
->  * These pad names are constructed from the pin enumerator names
->  * in the IMX_PINCTRL_PIN() macro.
->  */
-> 
-> > +static const struct pinctrl_pin_desc mx53_pads[] = {
-> > + ? ? ? IMX_PINCTRL_PIN(MX53_GPIO_19),
-> > + ? ? ? IMX_PINCTRL_PIN(MX53_KEY_COL0),
-> (...)
-> 
-> > +/* mx53 pin groups and mux mode */
-> > +static const unsigned mx53_fec_pins[] = {
-> > + ? ? ? MX53_FEC_MDC,
-> > + ? ? ? MX53_FEC_MDIO,
-> > + ? ? ? MX53_FEC_REF_CLK,
-> > + ? ? ? MX53_FEC_RX_ER,
-> > + ? ? ? MX53_FEC_CRS_DV,
-> > + ? ? ? MX53_FEC_RXD1,
-> > + ? ? ? MX53_FEC_RXD0,
-> > + ? ? ? MX53_FEC_TX_EN,
-> > + ? ? ? MX53_FEC_TXD1,
-> > + ? ? ? MX53_FEC_TXD0,
-> > +};
-> 
-> I understand this.
-> 
-> > +static const unsigned mx53_fec_mux[] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-> 
-> But what is this? Just zeroes? Why?
-> Especially with a const so they really cannot be anything
-> else. The same pin (0) can only be enumerated once.
-> 
-> > +static const unsigned mx53_sd1_pins[] = {
-> > + ? ? ? MX53_SD1_CMD,
-> > + ? ? ? MX53_SD1_CLK,
-> > + ? ? ? MX53_SD1_DATA0,
-> > + ? ? ? MX53_SD1_DATA1,
-> > + ? ? ? MX53_SD1_DATA2,
-> > + ? ? ? MX53_SD1_DATA3,
-> > +
-> > +};
-> > +static const unsigned mx53_sd1_mux[] = { 0, 0, 0, 0, 0, 0 };
-> 
-> And here again.
-> 
-> > +static const unsigned mx53_sd3_pins[] = {
-> > + ? ? ? MX53_PATA_DATA8,
-> > + ? ? ? MX53_PATA_DATA9,
-> > + ? ? ? MX53_PATA_DATA10,
-> > + ? ? ? MX53_PATA_DATA11,
-> > + ? ? ? MX53_PATA_DATA0,
-> > + ? ? ? MX53_PATA_DATA1,
-> > + ? ? ? MX53_PATA_DATA2,
-> > + ? ? ? MX53_PATA_DATA3,
-> > + ? ? ? MX53_PATA_IORDY,
-> > + ? ? ? MX53_PATA_RESET_B,
-> > +
-> > +};
-> > +static const unsigned mx53_sd3_mux[] = { 4, 4, 4, 4, 4, 4, 4, 4, 2, 2 };
-> 
-> This also looks strange. Can you explain what these muxes are?
+Hi Nico,
 
-Freescale has named the pins after their primary function which is quite
-confusing.
+now I'm lost, I discussed by boot problems on ARM PB1176
+with Marc and after some investigation I found this strange thing on
+the lastest rc:s since -rc1:
 
-The above means:
+In arch/arm/Kconfig ARM_PATCH_PHYS_VIRT is forcibly
+disabled like so:
 
-MX53_PATA_DATA8 -> mux mode 4
-MX53_PATA_DATA9 -> mux mode 4
-...
+depends on !ARCH_REALVIEW || !SPARSEMEM
 
-This brings me to the point that currently we have the pins described as
+However if I just configure it for the realview_defconfig:
 
-#define MX53_PAD_<name>__<function>
+mkdir foo
+make -f Makefile ARCH=arm CROSS_COMPILE=arm-none-eabi-
+KBUILD_OUTPUT=foo realview_defconfig
 
-which means that you don't have to look into the datasheet to get the
-different options for a pin (and don't have a chance to get it wrong).
-I don't really want to lose this.
+It strangely selects this anyway, because now foo/.config has:
+CONFIG_ARM_PATCH_PHYS_VIRT=y
 
-Sascha
+Kconfig is a djungle to me, but I simply cannot find out
+what is setting this anyway. The problem is not there on
+v3.1, it does not get selected.
 
+Any hints?
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Yours,
+Linus Walleij
