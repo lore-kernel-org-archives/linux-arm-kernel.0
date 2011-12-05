@@ -1,32 +1,25 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Mon, 5 Dec 2011 14:55:28 +0800
-Subject: [PATCH 2/2] gpio/tegra: Dynamically allocate IRQ base, and
- support DT
-In-Reply-To: <1322700336-26866-2-git-send-email-swarren@nvidia.com>
-References: <1322700336-26866-1-git-send-email-swarren@nvidia.com>
- <1322700336-26866-2-git-send-email-swarren@nvidia.com>
-Message-ID: <20111205065527.GD2980@S2100-06.ap.freescale.net>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Mon, 05 Dec 2011 12:49:55 +0530
+Subject: [PATCH v5 3/4] regulator: pass additional of_node to
+ regulator_register()
+In-Reply-To: <CAJuYYwRa=AGZ+Chuj+v49EHE+bOuoCWxhmDUO35BoZK2g97FQg@mail.gmail.com>
+References: <1321615040-13257-1-git-send-email-rnayak@ti.com>	<1321615040-13257-4-git-send-email-rnayak@ti.com>
+ <CAJuYYwRa=AGZ+Chuj+v49EHE+bOuoCWxhmDUO35BoZK2g97FQg@mail.gmail.com>
+Message-ID: <4EDC709B.1050709@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 30, 2011 at 05:45:36PM -0700, Stephen Warren wrote:
-[...]
->  static void tegra_gpio_irq_ack(struct irq_data *d)
->  {
-> -	int gpio = d->irq - INT_GPIO_BASE;
-> +	int gpio = d->hwirq;
->  
-Though it's working right now, I'm not sure it's safe enough.  This
-only works when d->hwirq_base is 0, which is true for now.  But I doubt
-it will be always true.  I guess hwirq_base was introduced there for
-some reason.  When some day irqdomain starts using this field, the
-above code starts being broken.  IMO, the way that generic-chip.c is
-using to calculate the number, d->irq - gc->irq_base, is much more
-safer.
+>
+> Documentation/power/regulator/regulator.txt would also require an
+> update the reflect the change in api.
 
--- 
-Regards,
-Shawn
+Thanks Thomas, I just sent a patch to fix this up.
 
->  	tegra_gpio_writel(1 << GPIO_BIT(gpio), GPIO_INT_CLR(gpio));
->  }
+regards,
+Rajendra
+
+>
+> Thanks,
+> Thomas.
+>
+> [...]
