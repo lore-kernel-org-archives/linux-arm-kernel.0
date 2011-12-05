@@ -1,55 +1,78 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Mon, 05 Dec 2011 17:47:36 +0000
-Subject: [PATCH v3 5/5] ARM: vexpress: DT-based support for CoreTiles
- Express A5x2 and A9x4
-In-Reply-To: <20111205173709.GA29812@localhost.localdomain>
-References: <1322579473-8804-1-git-send-email-pawel.moll@arm.com>
- <1322579473-8804-6-git-send-email-pawel.moll@arm.com>
- <20111129164050.GC2829@localhost.localdomain>
- <1322678364.3180.34.camel@hornet.cambridge.arm.com>
- <20111201122144.GD2026@localhost.localdomain>
- <1323105880.3147.55.camel@hornet.cambridge.arm.com>
- <20111205173709.GA29812@localhost.localdomain>
-Message-ID: <1323107256.3147.63.camel@hornet.cambridge.arm.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Mon, 5 Dec 2011 18:02:53 +0000
+Subject: [PATCH] ata: Don't use NO_IRQ in pata_of_platform driver
+In-Reply-To: <alpine.LFD.2.02.1112051236350.2357@xanadu.home>
+References: <20111110162859.GA7088@oksana.dev.rtsoft.ru>
+ <20111202192618.GC3037@localhost.localdomain>
+ <CA+55aFwekNWz+V4440f=2iu_BfOxSg0NjVogv4cZZDFbJBNoAQ@mail.gmail.com>
+ <1322867573.11728.22.camel@pasglop>
+ <20111205161157.GA27550@localhost.localdomain>
+ <alpine.LFD.2.02.1112051236350.2357@xanadu.home>
+Message-ID: <20111205180253.GB29812@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2011-12-05 at 17:37 +0000, Dave Martin wrote:
-> > I have an idea of spinning the compatible values again to get something
-> > like that:
+On Mon, Dec 05, 2011 at 12:40:16PM -0500, Nicolas Pitre wrote:
+> On Mon, 5 Dec 2011, Dave Martin wrote:
+> > On Sat, Dec 03, 2011 at 10:12:53AM +1100, Benjamin Herrenschmidt wrote:
+> > > On Fri, 2011-12-02 at 11:28 -0800, Linus Torvalds wrote:
+> > > > Don't *change* NO_IRQ to zero (that whole #define is broken - leave it
+> > > > around as a marker of brokenness), just start removing it from all the
+> > > > ARM drivers that use the OF infrastructure. Which is presumably not
+> > > > all that many yet.
+> > > > 
+> > > > So whenever you find breakage, the fix now is to just remove NO_IRQ
+> > > > tests, and replace them with "!irq".
+> > > 
 > > 
-> > compatible = "arm,vexpress-v2p-ca5s", "arm,vexpress-cortex_a5";
-> > compatible = "arm,vexpress-v2p-ca9", "arm,vexpress-cortex_a9";
-> > compatible = "arm,vexpress-v2p-ca15", "arm,vexpress-cortex_a15";
+> > Russell, do you know whether it would make sense to set a timeline for 
+> > removing NO_IRQ from ARM platforms and migrating to 0 for the no-interrupt
+> > case?  I'm assuming that this mainly involves migrating existing hard-wired
+> > code that deals with interrupt numbers to use irq domains.
 > 
-> The trouble is, node { compatible = x } means "node is an x", not "node
-> has an x".
+> How many drivers do use IRQ #0 to start with?  We might discover that in 
+> practice there is only a very few cases where this is an issue if 0 
+> would mean no IRQ.
 
-Yes...
+The total number of files referring to NO_IRQ is not that huge:
 
-> So, we should be careful do document what e.g. arm,vexpress-cortex_a5
-> actually means.  It doesn't mean Cortex-A5, but instead it represents
-> a whole jumble of characteristics which we expect to be common to all
-> vexpress-based A5 platforms.
+arch/arm/	188 matches in 39 files
+drivers/	174 matches in 84 files
 
-... so I'd translate it as "is a Versatile Express platform based on
-Cortex-A5 processor" and document it as such. As I said - patches
-tomorrow.
+Unfortunately, NO_IRQ is often not spelled "NO_IRQ".  It looks like the assumption
+"irq < 0 === no irq" may be quite a lot more widespread than "NO_IRQ === no irq".
+Since there's no specific thing we can grep for (and simply due to volume)
+finding all such instances may be quite a bit harder.
 
-> It feels that in practice arm,vexpress-cortex_a5 actually means 
-> exactly the same thing as arm,vexpress-v2p-ca5s.  Are you sure these
-> two are really independent?  (In other words, do we expect multiple
-> different vexpress variants based on A5, and so on?)
+For example, git grep 'irq.*\(>=\|<[^=]\) *0' gives
 
-The examples for A5 I can quota are two different SMMs I used (one on a
-"small", second one on a "large" FPGA board), but they were very similar
-to the A5 core tile - so similar that you could (probably) use the core
-tile DTB to drive them. The A9 SMM with RS1 memory map I've mentioned is
-much more interesting case - A9 platform but nothing like original A9
-core tile... Also the A15 looks interesting as we will most likely get
-the same tiles (as in: PCB) with different processors (as in: different
-silicon). This will be fun :-)
+drivers/	435 matches in 314 files
+arch/arm/	18 matches in 15 files
 
-Cheers!
+A few examples:
+drivers/input/mouse/pxa930_trkball.c:   if (irq < 0) {
+drivers/input/keyboard/tegra-kbc.c:     if (irq < 0) {
+drivers/crypto/omap-sham.c:     if (dd->irq >= 0)
 
-Pawe?
+...etc., etc., although there are probably a fair number of false positives here.
+
+
+whereas git grep 'irq.*\(<\|>\|<=\|>=\|==\|!=\) \+-1' gives
+
+drivers/	68 matches in 28 files
+arch/arm/	18 matches in 15 files
+
+Examples: 
+
+
+...and that's just the code which is C and is also kind enough to put
+irq numbers in variables with names containing "irq".
+
+It also doesn't catch people initialising variables or struct/array
+members to -1, unadorned "-1" arguments to functions and so on... though
+those are likely to appear in mostly the same files matching the above
+expressions, it won't be an exact 1:1 correspondence.
+
+
+Cheers
+---Dave
