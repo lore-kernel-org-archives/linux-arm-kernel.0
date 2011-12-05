@@ -1,177 +1,46 @@
-From: snjw23@gmail.com (Sylwester Nawrocki)
-Date: Mon, 05 Dec 2011 23:15:39 +0100
-Subject: [RFC PATCH v1 5/7] media: v4l2: introduce two IOCTLs for face
- detection
-In-Reply-To: <1322838172-11149-6-git-send-email-ming.lei@canonical.com>
-References: <1322838172-11149-1-git-send-email-ming.lei@canonical.com>
- <1322838172-11149-6-git-send-email-ming.lei@canonical.com>
-Message-ID: <4EDD428B.9010800@gmail.com>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Mon, 5 Dec 2011 23:33:36 +0100
+Subject: [RFC v2 1/2] dma-buf: Introduce dma buffer sharing mechanism
+In-Reply-To: <CAF6AEGto-+oSqguuWyPunUbtE65GpNiXh21srQzrChiBQMb1Nw@mail.gmail.com>
+References: <1322816252-19955-1-git-send-email-sumit.semwal@ti.com>
+ <1322816252-19955-2-git-send-email-sumit.semwal@ti.com>
+ <201112051718.48324.arnd@arndb.de>
+ <CAF6AEGvyWV0DM2fjBbh-TNHiMmiLF4EQDJ6Uu0=NkopM6SXS6g@mail.gmail.com>
+ <CAKMK7uHw3OpMAtVib=e=s_us9Tx9TebzehGg59d4-g9dUXr+pQ@mail.gmail.com>
+ <CAF6AEGto-+oSqguuWyPunUbtE65GpNiXh21srQzrChiBQMb1Nw@mail.gmail.com>
+Message-ID: <CAKMK7uFpQfAkoEqAJc8hX6k_kOsXR=u5O=fgyaNfaDM89cciSw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/02/2011 04:02 PM, Ming Lei wrote:
-> This patch introduces two new IOCTLs and related data
-> structure defination which will be used by the coming
-> face detection video device.
-> 
-> The two IOCTLs and related data structure are used by
-> user space application to retrieve the results of face
-> detection. They can be called after one v4l2_buffer
-> has been ioctl(VIDIOC_DQBUF) and before it will be
-> ioctl(VIDIOC_QBUF).
-> 
-> The utility fdif[1] is useing the two IOCTLs to find
-> faces deteced in raw images or video streams.
-> 
-> [1],http://kernel.ubuntu.com/git?p=ming/fdif.git;a=shortlog;h=refs/heads/v4l2-fdif
-> 
-> Signed-off-by: Ming Lei <ming.lei@canonical.com>
-> ---
->  drivers/media/video/v4l2-ioctl.c |   38 ++++++++++++++++++++
->  include/linux/videodev2.h        |   70 ++++++++++++++++++++++++++++++++++++++
->  include/media/v4l2-ioctl.h       |    6 +++
->  3 files changed, 114 insertions(+), 0 deletions(-)
-> 
-> diff --git a/drivers/media/video/v4l2-ioctl.c b/drivers/media/video/v4l2-ioctl.c
-> index e1da8fc..fc6266f 100644
-> --- a/drivers/media/video/v4l2-ioctl.c
-> +++ b/drivers/media/video/v4l2-ioctl.c
-> @@ -2140,6 +2140,30 @@ static long __video_do_ioctl(struct file *file,
->  		dbgarg(cmd, "index=%d", b->index);
->  		break;
->  	}
-> +	case VIDIOC_G_FD_RESULT:
-> +	{
-> +		struct v4l2_fd_result *fr = arg;
-> +
-> +		if (!ops->vidioc_g_fd_result)
-> +			break;
-> +
-> +		ret = ops->vidioc_g_fd_result(file, fh, fr);
-> +
-> +		dbgarg(cmd, "index=%d", fr->buf_index);
-> +		break;
-> +	}
-> +	case VIDIOC_G_FD_COUNT:
-> +	{
-> +		struct v4l2_fd_count *fc = arg;
-> +
-> +		if (!ops->vidioc_g_fd_count)
-> +			break;
-> +
-> +		ret = ops->vidioc_g_fd_count(file, fh, fc);
-> +
-> +		dbgarg(cmd, "index=%d", fc->buf_index);
-> +		break;
-> +	}
->  	default:
->  		if (!ops->vidioc_default)
->  			break;
-> @@ -2234,6 +2258,20 @@ static int check_array_args(unsigned int cmd, void *parg, size_t *array_size,
->  		}
->  		break;
->  	}
-> +
-> +	case VIDIOC_G_FD_RESULT: {
-> +		struct v4l2_fd_result *fr = parg;
-> +
-> +		if (fr->face_cnt != 0) {
-> +			*user_ptr = (void __user *)fr->fd;
-> +			*kernel_ptr = (void *)&fr->fd;
-> +			*array_size = sizeof(struct v4l2_fd_detection)
-> +				    * fr->face_cnt;
-> +			ret = 1;
-> +		}
-> +		break;
-> +
-> +	}
->  	}
->  
->  	return ret;
-> diff --git a/include/linux/videodev2.h b/include/linux/videodev2.h
-> index 4b752d5..073eb4d 100644
-> --- a/include/linux/videodev2.h
-> +++ b/include/linux/videodev2.h
-> @@ -2160,6 +2160,74 @@ struct v4l2_create_buffers {
->  	__u32			reserved[8];
->  };
->  
-> +/**
-> + * struct v4l2_obj_detection
-> + * @buf_index:	entry, index of v4l2_buffer for face detection
-> + * @centerx:	return, position in x direction of detected object
-> + * @centery:	return, position in y direction of detected object
-> + * @angle:	return, angle of detected object
-> + * 		0 deg ~ 359 deg, vertical is 0 deg, clockwise
-> + * @sizex:	return, size in x direction of detected object
-> + * @sizey:	return, size in y direction of detected object
-> + * @confidence:	return, confidence level of detection result
-> + * 		0: the heighest level, 9: the lowest level
+On Mon, Dec 05, 2011 at 04:11:46PM -0600, Rob Clark wrote:
+> On Mon, Dec 5, 2011 at 3:23 PM, Daniel Vetter <daniel@ffwll.ch> wrote:
+> > On Mon, Dec 05, 2011 at 02:46:47PM -0600, Rob Clark wrote:
+> >> I sort of preferred having the DMABUF shim because that lets you pass
+> >> a buffer around userspace without the receiving code knowing about a
+> >> device specific API. ?But the problem I eventually came around to: if
+> >> your GL stack (or some other userspace component) is batching up
+> >> commands before submission to kernel, the buffers you need to wait for
+> >> completion might not even be submitted yet. ?So from kernel
+> >> perspective they are "ready" for cpu access. ?Even though in fact they
+> >> are not in a consistent state from rendering perspective. ?I don't
+> >> really know a sane way to deal with that. ?Maybe the approach instead
+> >> should be a userspace level API (in libkms/libdrm?) to provide
+> >> abstraction for userspace access to buffers rather than dealing with
+> >> this at the kernel level.
+> >
+> > Well, there's a reason GL has an explicit flush and extensions for sync
+> > objects. It's to support such scenarios where the driver batches up gpu
+> > commands before actually submitting them.
+>
+> Hmm.. what about other non-GL APIs..  maybe vaapi/vdpau or similar?
+> (Or something that I haven't thought of.)
 
-Hmm, not a good idea to align a public interface to the capabilities
-of a single hardware implementation. min/max confidence could be queried with
-relevant controls and here we could remove the line implying range.
-
-> + * @reserved:	future extensions
-> + */
-> +struct v4l2_obj_detection {
-> +	__u16		centerx;
-> +	__u16		centery;
-> +	__u16		angle;
-> +	__u16		sizex;
-> +	__u16		sizey;
-
-How about using struct v4l2_rect in place of centerx/centery, sizex/sizey ?
-After all it describes a rectangle. We could also use struct v4l2_frmsize_discrete
-for size but there seems to be missing en equivalent for position, e.g.
-
-struct v4l2_position {
-	__s32 x;
-	__s32 y;
-};
-
-> +	__u16		confidence;
-> +	__u32		reserved[4];
-> +};
-> +
-> +#define V4L2_FD_HAS_LEFT_EYE	0x1
-> +#define V4L2_FD_HAS_RIGHT_EYE	0x2
-> +#define V4L2_FD_HAS_MOUTH	0x4
-> +#define V4L2_FD_HAS_FACE	0x8
-> +
-> +/**
-> + * struct v4l2_fd_detection - VIDIOC_G_FD_RESULT argument
-> + * @flag:	return, describe which objects are detected
-> + * @left_eye:	return, left_eye position if detected
-> + * @right_eye:	return, right_eye position if detected
-> + * @mouth_eye:	return, mouth_eye position if detected
-
-mouth_eye ? ;)
-
-> + * @face:	return, face position if detected
-> + */
-> +struct v4l2_fd_detection {
-> +	__u32	flag;
-> +	struct v4l2_obj_detection	left_eye;
-> +	struct v4l2_obj_detection	right_eye;
-> +	struct v4l2_obj_detection	mouth;
-> +	struct v4l2_obj_detection	face;
-
-I would do this differently, i.e. put "flag" inside struct v4l2_obj_detection
-and then struct v4l2_fd_detection would be simply an array of
-struct v4l2_obj_detection, i.e.
-
-struct v4l2_fd_detection {
-	unsigned int count;
-	struct v4l2_obj_detection [V4L2_MAX_FD_OBJECT_NUM];
-};
-
-This might be more flexible, e.g. if in the future some hardware supports
-detecting wrinkles, we could easily add that by just defining a new flag:
-V4L2_FD_HAS_WRINKLES, etc.
-
-
---
-
-Regards,
-Sylwester
+They generally all have a concept of when they've actually commited the
+rendering to an X pixmap or egl image. Usually it's rather implicit, e.g.
+the driver will submit any outstanding batches before returning from any
+calls.
+-Daniel
+-- 
+Daniel Vetter
+Mail: daniel at ffwll.ch
+Mobile: +41 (0)79 365 57 48
