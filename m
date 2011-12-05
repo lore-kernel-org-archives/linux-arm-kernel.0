@@ -1,41 +1,70 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 05 Dec 2011 12:51:28 +0100
-Subject: [PATCH] net/macb: add DT support
-In-Reply-To: <20111205114838.GC21006@totoro>
-References: <20111202153832.GA4998@totoro>
- <1322846050-4543-1-git-send-email-nicolas.ferre@atmel.com>
- <20111202172854.GB4998@totoro> <4ED910B6.7080000@atmel.com>
- <20111205114838.GC21006@totoro>
-Message-ID: <4EDCB040.1050305@atmel.com>
+Date: Mon,  5 Dec 2011 12:59:53 +0100
+Subject: [PATCH v3 2/2] ARM: at91/net: add macb ethernet controller in 9g45 DT
+In-Reply-To: <714ca7492d8d45b50eab34448c4b70933ce5701c.1323086095.git.nicolas.ferre@atmel.com>
+References: <1322847782-22650-1-git-send-email-nicolas.ferre@atmel.com>
+ <714ca7492d8d45b50eab34448c4b70933ce5701c.1323086095.git.nicolas.ferre@atmel.com>
+Message-ID: <1ec7a786c94564a9b15a61239f41a2a3fba8578a.1323086095.git.nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/05/2011 12:48 PM, Jamie Iles :
-> On Fri, Dec 02, 2011 at 06:53:58PM +0100, Nicolas Ferre wrote:
->> On 12/02/2011 06:28 PM, Jamie Iles :
-> [...]
->>> diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
->>> index 103c6e6..89060e6 100644
->>> --- a/drivers/net/ethernet/cadence/macb.c
->>> +++ b/drivers/net/ethernet/cadence/macb.c
->>> @@ -1247,6 +1247,8 @@ static const struct of_device_id macb_dt_ids[] = {
->>>   	{ .compatible = "cdns,at32ap7000-macb" },
->>>   	{ .compatible = "cdns,at91sam9260-macb" },
->>>   	{ .compatible = "cdns,macb" },
->>> +	{ .compatible = "cdns,pc302-gem" },
->>> +	{ .compatible = "cdns,gem" },
->>>   	{ /* sentinel */ }
->>>   };
->>
->> BTW, I think we may also modify the MII/RMII selection code for
->> adding gigabit selection... but maybe you already have the patches?
->
-> No, I don't have access to a version of the GEM with gigabit support.
-> The platforms I was working on used it as a 10/100 controller, but had
-> to use the GEM to get hardware timestamping support.
+Add the Cadence macb ethernet controller in at91sam9g45 .dtsi and
+enable it in at91sam9m10g45ek board device tree file.
 
-Ok, Thanks for your feedback. I send a v3 patch now.
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+v3: - form a thread with "macb DT support" patch
+    - remove "local-mac-address" from 9m10g45ek.dts file but use it in
+      documentation example.
 
-Best regards,
+ Documentation/devicetree/bindings/net/macb.txt |    1 +
+ arch/arm/boot/dts/at91sam9g45.dtsi             |    7 +++++++
+ arch/arm/boot/dts/at91sam9m10g45ek.dts         |    5 +++++
+ 3 files changed, 13 insertions(+), 0 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/net/macb.txt b/Documentation/devicetree/bindings/net/macb.txt
+index 2e24f05..44afa0e 100644
+--- a/Documentation/devicetree/bindings/net/macb.txt
++++ b/Documentation/devicetree/bindings/net/macb.txt
+@@ -21,4 +21,5 @@ Examples:
+ 		reg = <0xfffc4000 0x4000>;
+ 		interrupts = <21>;
+ 		phy-mode = "rmii";
++		local-mac-address = [3a 0e 03 04 05 06];
+ 	};
+diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
+index e89b1d7..67f94d3 100644
+--- a/arch/arm/boot/dts/at91sam9g45.dtsi
++++ b/arch/arm/boot/dts/at91sam9g45.dtsi
+@@ -101,6 +101,13 @@
+ 				atmel,use-dma-tx;
+ 				status = "disabled";
+ 			};
++
++			macb0: ethernet at fffbc000 {
++				compatible = "cdns,at32ap7000-macb", "cdns,macb";
++				reg = <0xfffbc000 0x100>;
++				interrupts = <25 4>;
++				status = "disabled";
++			};
+ 		};
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/at91sam9m10g45ek.dts b/arch/arm/boot/dts/at91sam9m10g45ek.dts
+index 85b34f5..a387e77 100644
+--- a/arch/arm/boot/dts/at91sam9m10g45ek.dts
++++ b/arch/arm/boot/dts/at91sam9m10g45ek.dts
+@@ -30,6 +30,11 @@
+ 			usart1: serial at fff90000 {
+ 				status = "okay";
+ 			};
++
++			macb0: ethernet at fffbc000 {
++				phy-mode = "rmii";
++				status = "okay";
++			};
+ 		};
+ 	};
+ };
 -- 
-Nicolas Ferre
+1.7.5.4
