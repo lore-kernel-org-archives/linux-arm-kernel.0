@@ -1,98 +1,55 @@
-From: alan@lxorguk.ukuu.org.uk (Alan Cox)
-Date: Mon, 5 Dec 2011 17:41:32 +0000
-Subject: [PATCH] ata: Don't use NO_IRQ in pata_of_platform driver
-In-Reply-To: <20111205161157.GA27550@localhost.localdomain>
-References: <20111110162859.GA7088@oksana.dev.rtsoft.ru>
- <20111202192618.GC3037@localhost.localdomain>
- <CA+55aFwekNWz+V4440f=2iu_BfOxSg0NjVogv4cZZDFbJBNoAQ@mail.gmail.com>
- <1322867573.11728.22.camel@pasglop>
- <20111205161157.GA27550@localhost.localdomain>
-Message-ID: <20111205174132.564e0bb0@lxorguk.ukuu.org.uk>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Mon, 05 Dec 2011 17:47:36 +0000
+Subject: [PATCH v3 5/5] ARM: vexpress: DT-based support for CoreTiles
+ Express A5x2 and A9x4
+In-Reply-To: <20111205173709.GA29812@localhost.localdomain>
+References: <1322579473-8804-1-git-send-email-pawel.moll@arm.com>
+ <1322579473-8804-6-git-send-email-pawel.moll@arm.com>
+ <20111129164050.GC2829@localhost.localdomain>
+ <1322678364.3180.34.camel@hornet.cambridge.arm.com>
+ <20111201122144.GD2026@localhost.localdomain>
+ <1323105880.3147.55.camel@hornet.cambridge.arm.com>
+ <20111205173709.GA29812@localhost.localdomain>
+Message-ID: <1323107256.3147.63.camel@hornet.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Russell, do you know whether it would make sense to set a timeline for 
-> removing NO_IRQ from ARM platforms and migrating to 0 for the no-interrupt
-> case?  I'm assuming that this mainly involves migrating existing hard-wired
-> code that deals with interrupt numbers to use irq domains.
-
-The timelime was several years ago. Several years of complete inaction
-later the chickens have come home to roost.
-
-I refer you to Linus mail of 26 Sept 2006 to linux-kernel ('restore
-libata build on frv')
-
-Quoting Linus email:
-
->> That's fine -- but don't use zero to mean none. We have NO_IRQ for
->> that, and zero isn't an appropriate choice.
->
-> Zero _is_ an appropriate choice, dammit!
->
-> That NO_IRQ thing should be zero, and any architecture that thinks that
->zero is a valid IRQ just needs to fix its own irq mapping so that the
-> "cookie" doesn't work.
->
-> The thing is, it's zero. Get over it. It can't be "-1" or some other
-> random value like people have indicated, because that thing is often read
-> from places where "-1" simply isn't a possible value (eg it gets its
-> default value initialized from a "unsigned char" in MMIO space on x86).
->
-> So instead of making everybody and their dog to silly things with some
-> NO_IRQ define that they haven't historically done, the rule is simple: "0"
-> means "no irq", so that you can test for it with obvious code like
->
->	if (!dev->irq)
->		..
->
-> and then, if your actual _hardware_ things that the bit-pattern with all
-> bits clear is a valid irq that can be used for normal devices, then what
-> you do is you add a irq number translation layer (WHICH WE NEED AND HAVE
-> _ANYWAY_) and make sure that nobody sees that on a _software_ level.
-
-----------
-
-On 15th October 2008 Linus said the following to linux-next
-
-> Grr. Can we please just get rid of that IDIOTIC thing instead?
+On Mon, 2011-12-05 at 17:37 +0000, Dave Martin wrote:
+> > I have an idea of spinning the compatible values again to get something
+> > like that:
+> > 
+> > compatible = "arm,vexpress-v2p-ca5s", "arm,vexpress-cortex_a5";
+> > compatible = "arm,vexpress-v2p-ca9", "arm,vexpress-cortex_a9";
+> > compatible = "arm,vexpress-v2p-ca15", "arm,vexpress-cortex_a15";
 > 
-> NO_IRQ was a bad idea to begin with. Let's not add more.
-> 
-> I assume that broken driver is some ARM-specific thing. I certainly don't 
-> want to see NO_IRQ in any general drivers. So instead of having that 
-> NO_IRQ insanity spread any more, I'd much rather see the driver either 
-> fixed to not use it, or just marked ARM-only.
->
-> The proper way to test for whether an interrupt is valid or not is to do
->
-> 	if (dev->irq) {
->		...
-> and no other. There is no spoon. That NO_IRQ was insane. And
-> architectures or drivers that still think otherwise should fix themselves.
+> The trouble is, node { compatible = x } means "node is an x", not "node
+> has an x".
 
-------------
+Yes...
 
-So there we are.. ARM spent years ignoring clear direction. If ARM breaks
-for a release now so be it. You've had *YEARS* to get off your collective
-backsides and sort it out.
+> So, we should be careful do document what e.g. arm,vexpress-cortex_a5
+> actually means.  It doesn't mean Cortex-A5, but instead it represents
+> a whole jumble of characteristics which we expect to be common to all
+> vexpress-based A5 platforms.
 
-> I worry that if we just change the convention for the OF case, we'll end
-> up with OF-ised platform drivers which have to deal with a different no-
-> irq convention depending on whether they are probed as platform drivers
-> or through the OF framework ... and these ported or semi-ported drivers
-> will be intermixed with unported drivers, confusing maintainers
+... so I'd translate it as "is a Versatile Express platform based on
+Cortex-A5 processor" and document it as such. As I said - patches
+tomorrow.
 
-All drivers should assume that  if (!dev->irq) works. Zero is not an IRQ
-except in certain buried internal invisible cases in arch code (legacy PC
-timer being the obvious one).
+> It feels that in practice arm,vexpress-cortex_a5 actually means 
+> exactly the same thing as arm,vexpress-v2p-ca5s.  Are you sure these
+> two are really independent?  (In other words, do we expect multiple
+> different vexpress variants based on A5, and so on?)
 
-Come to think about it we had a prior discussion about NO_IRQ in 2005
-even!
+The examples for A5 I can quota are two different SMMs I used (one on a
+"small", second one on a "large" FPGA board), but they were very similar
+to the A5 core tile - so similar that you could (probably) use the core
+tile DTB to drive them. The A9 SMM with RS1 memory map I've mentioned is
+much more interesting case - A9 platform but nothing like original A9
+core tile... Also the A15 looks interesting as we will most likely get
+the same tiles (as in: PCB) with different processors (as in: different
+silicon). This will be fun :-)
 
-The core kernel generic IRQ code knows about zero being special, many
-common driver layer components such as serial and network phylib do, so
-if anything it's going to fix bugs sorting the mess out on ARM.
+Cheers!
 
-Jut fix it. Other platforms have done so without problem.
-
-Alan
+Pawe?
