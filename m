@@ -1,80 +1,115 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 05 Dec 2011 20:29:49 +0100
-Subject: [RFC v2 1/2] dma-buf: Introduce dma buffer sharing mechanism
-In-Reply-To: <CAKMK7uE-ZJ-VQRWy+zJJWsvr9nARWuf-4nupXhTJ0CLqC88CEw@mail.gmail.com>
-References: <1322816252-19955-1-git-send-email-sumit.semwal@ti.com>
- <201112051718.48324.arnd@arndb.de>
- <CAKMK7uE-ZJ-VQRWy+zJJWsvr9nARWuf-4nupXhTJ0CLqC88CEw@mail.gmail.com>
-Message-ID: <1426302.asOzFeeJzz@wuerfel>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Mon, 05 Dec 2011 20:45:47 +0100
+Subject: [PATCH 2/2] [CPUFREQ] s3c64xx: Add VDDINT voltage scaling
+In-Reply-To: <20111205192506.GE7467@opensource.wolfsonmicro.com>
+References: <1323109322-24130-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+ <11611639.9NBo3p2F8o@flatron>
+ <20111205192506.GE7467@opensource.wolfsonmicro.com>
+Message-ID: <1968469.lEDYUZcgoo@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 05 December 2011 19:55:44 Daniel Vetter wrote:
-> > The only way to solve this that I can think of right now is to
-> > mandate that the mappings are all coherent (i.e. noncachable
-> > on noncoherent architectures like ARM). If you do that, you no
-> > longer need the sync_sg_for_* calls.
+On Monday 05 of December 2011 19:25:06 Mark Brown wrote:
+> On Mon, Dec 05, 2011 at 08:11:03PM +0100, Tomasz Figa wrote:
+> > On Monday 05 of December 2011 18:57:58 Mark Brown wrote:
+> > > > (min 1.15, max 1.3) for HCLK at 133 MHz and 1.05V (min 0.95,
+> > > > max 1.3) for HCLK running at 66 MHz.
+> > > 
+> > > I've certainly got documentation that contradicts this, and for
+> > > some
+> > > reason synchronous clocks seem to require a higher VDDINT supply
+> > > which baffles me rather.
+> > 
+> > I'm basing my statements on S3C6410 power design guide and source
+> > code of original kernel for Samsung Galaxy GT-i5700 released by
+> > Samsung on their open source portal.
 > 
-> Woops, totally missed the addition of these. Can somebody explain to used
-> to rather coherent x86 what we need these for and the code-flow would look
-> like in a typical example. I was kinda assuming that devices would bracket
-> their use of a buffer with the attachment_map/unmap calls and any cache
-> coherency magic that might be needed would be somewhat transparent to
-> users of the interface?
+> So, if you look at the power design guide (or at least the version I
+> have) that doesn't quite match that - for example, the recommended
+> operating conditions section quotes 133MHz as 1.2V typical for async
+> operation and 1.3V typical for sync operation.  There's also some
+> examples in the power guide showing periods of operation with HCLK at
+> 133MHz and VDDINT at 1.05V.  And driver code showing some variation from
+> the power design guide :/
 
-I'll describe how the respective functions work in the streaming mapping
-API (dma_map_*): You start out with a buffer that is owned by the CPU,
-i.e. the kernel can access it freely. When you call dma_map_sg or similar,
-a noncoherent device reading the buffer requires the cache to be flushed
-in order to see the data that was written by the CPU into the cache.
+I think that people from Samsung should be able to say something a bit more 
+precise on this. Am I right?
 
-After dma_map_sg, the device can perform both read and write accesses
-(depending on the flag to the map call), but the CPU is no longer allowed
-to read (which would allocate a cache line that may become invalid but
-remain marked as clean) or write (which would create a dirty cache line
-without writing it back) that buffer.
-
-Once the device is done, the driver calls dma_unmap_* and the buffer is
-again owned by the CPU. The device can no longer access it (in fact
-the address may be no longer be backed if there is an iommu) and the CPU
-can again read and write the buffer. On ARMv6 and higher, possibly some
-other architectures, dma_unmap_* also needs to invalidate the cache
-for the buffer, because due to speculative prefetching, there may also
-be a new clean cache line with stale data from an earlier version of
-the buffer.
-
-Since map/unmap is an expensive operation, the interface was extended
-to pass back the ownership to the CPU and back to the device while leaving
-the buffer mapped. dma_sync_sg_for_cpu invalidates the cache in the same
-way as dma_unmap_sg, so the CPU can access the buffer, and
-dma_sync_sg_for_device hands it back to the device by performing the
-same cache flush that dma_map_sg would do.
-
-You could for example do this if you want video input with a
-cacheable buffer, or in an rdma scenario with a buffer accessed
-by a remote machine.
-
-In case of software iommu (swiotlb, dmabounce), the map and sync
-functions don't do cache management but instead copy data between
-a buffer accessed by hardware and a different buffer accessed
-by the user.
-
-> The map call gets the dma_data_direction parameter, so it should be able
-> to do the right thing. And because we keep the attachement around, any
-> caching of mappings should be possible, too.
+> > > > Anyway, the behavior will probably vary from board to board,
+> > > > so I
+> > > > would rather think about extending s3c64xx-cpufreq driver to
+> > > > allow
+> > > > per board frequency/voltage configuration., which would also
+> > > > include settings optimized for your boards in their
+> > > > board-specific code.> > 
+> > > That seems quite tasteless frankly - the behaviour of the silicon
+> > > is
+> > > not board specific, and we do already have a facility in the
+> > > regulator API to compensate for voltage drops in the board if
+> > > that's an issue. Anything beyond that is policy and is in the
+> > > domain of the governors.> 
+> > Well, you are mostly right, but there is one aspect that varies
+> > between boards, configuration. Boards can have different PLL
+> > settings, run in synchronous or asynchronous mode and might have
+> > power regulators of different qualities which will vary in voltage
+> > ripple.
 > 
-> Yours, Daniel
+> The regulators we should be able to take care of through the framework;
+> it's a moderately common issue on brass board designs due to the
+> physically larger form factors.  The PLL settings we'd ideally be able
+> to change at runtime (especially the ARM one which would give us a lot
+> more flexibility) and at worst should be able to figure out what to do
+> with based on readback.
+
+OK.
+
+> > For example, in case of your boards, the regulator is nice and allow
+> > reduction of VDDint voltage to minimal value (1.15V), but in general
+> > Power Design Guide it is recommended to use the typical value
+> > (1.25V).
+> If it's a question of regulator quality the board should just be adding
+> an offset in the constraints without the SoC drivers having to worry
+> their pretty little heads about it.  Like I say it's not an unknown
+> problem.  Often it's not actually the regulator but rather the board
+> design that causes the issue, for example if you've got very long traces
+> from the regulator to the device then you may experience voltage drops
+> or other effects which impair the accuracy of the supply seen by the
+> device.
+
+Right, there is a field for regulator offset in regulation_constraints 
+struct indeed. Somehow I missed it, sorry.
+
+> > As far as I know, there are also different revisions of S3C6410,
+> > capable of running at different maximal frequencies, at least 667
+> > MHz and 800 MHz versions.
 > 
-> PS: Slightly related, because it will make the coherency nightmare worse,
-> afaict: Can we kill mmap support?
+> Yes, there are - I've got boards with both variants.  At the minute
+> we're managing to cope with them by virtue of the different PLL settings
+> constraining the frequencies we can set, if we ever get control of the
+> ARM PLL the drivers will need to get a bit smarter.
 
-The mmap support is required (and only make sense) for consistent mappings,
-not for streaming mappings. The provider must ensure that if you map
-something uncacheable into the kernel in order to provide consistency,
-any mapping into user space must also be uncacheable. A driver
-that wants to have the buffer mapped to user space as many do should
-not need to know whether it is required to do cacheable or uncacheable
-mapping because of some other driver, and it should not need to worry
-about how to set up uncached mappings in user space.
+OK.
 
-	Arnd
+> > > > This would also solve a major problem of current
+> > > > s3c64xx-cpufreq
+> > > > implementation, namely crashing boards running in synchronous
+> > > > mode, because of odd frequencies specified, like 200 MHz
+> > > > (achievable with PLL set to 800 MHz), while the requirement
+> > > > is to keep the ARM frequency a multiple of HCLK when running
+> > > > synchronously.
+> > > 
+> > > The clock code should just be adjusted to refuse to set invalid
+> > > ARM
+> > > clock ratios.
+> > 
+> > This might be some solution as well. I'm not yet sure if it solves
+> > all the problems, but I will think about it.
+> 
+> It'd at least stop the system falling over in a big fat heap which seems
+> like an improvement :)
+
+OK. :)
+
+The problem with voltages would be solved by offset given in constraints 
+and the problem of incorrect frequencies should be fixable in s3c64xx-
+cpufreq, so no more problems left. I think.
