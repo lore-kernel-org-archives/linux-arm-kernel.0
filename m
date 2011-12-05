@@ -1,36 +1,25 @@
-From: hector.oron@gmail.com (Hector Oron)
-Date: Mon,  5 Dec 2011 12:54:17 +0000
-Subject: [PATCH] ARM: mxc: cpufreq.c: include missing module.h header
-Message-ID: <1323089657-25832-1-git-send-email-hector.oron@gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 5 Dec 2011 14:07:07 +0100
+Subject: [PATCH 5/7] fb: pxa: support pinmux operation
+In-Reply-To: <4ED948D4.8030202@gmx.de>
+References: <1322262544-7854-1-git-send-email-haojian.zhuang@marvell.com>
+ <1322262544-7854-6-git-send-email-haojian.zhuang@marvell.com>
+ <CACRpkdYfEkwv_zYu7Cz8hTtaXp9W8vHxo_Dc9T5CnTjyRh_wDg@mail.gmail.com>
+ <4ED948D4.8030202@gmx.de>
+Message-ID: <CACRpkdbo-war6TY6S2JbQsYB+NgjQmhhojbNM7Ew8M_CfONRbg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-  Fixes a fail to build with following message:
+On Fri, Dec 2, 2011 at 10:53 PM, Florian Tobias Schandinat
+<FlorianSchandinat@gmx.de> wrote:
 
-     CC [M]  arch/arm/plat-mxc/cpufreq.o
-   arch/arm/plat-mxc/cpufreq.c:203:15: error: expected
-   declaration specifiers or '...' before string constant
-   arch/arm/plat-mxc/cpufreq.c:204:20: error: expected
-   declaration specifiers or '...' before string constant
-   arch/arm/plat-mxc/cpufreq.c:205:16: error: expected
-   declaration specifiers or '...' before string constant
+> You could have made my life easier by quoting the patch. Anyway, after I found
+> it in an archive, you may add
+>
+> Acked-by: Florian Tobias Schandinat <FlorianSchandinat@gmx.de>
 
-Signed-off-by: Hector Oron <hector.oron@gmail.com>
----
- arch/arm/plat-mxc/cpufreq.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+Ah. sorry, I compulsory cut down my reply quotes after being yelled at
+to stop quoting too much, in this case I didn't think long enough...
 
-diff --git a/arch/arm/plat-mxc/cpufreq.c b/arch/arm/plat-mxc/cpufreq.c
-index 74aac96..e3073be 100644
---- a/arch/arm/plat-mxc/cpufreq.c
-+++ b/arch/arm/plat-mxc/cpufreq.c
-@@ -20,6 +20,7 @@
- #include <linux/cpufreq.h>
- #include <linux/clk.h>
- #include <linux/err.h>
-+#include <linux/module.h>
- #include <linux/slab.h>
- #include <mach/hardware.h>
- #include <mach/clock.h>
--- 
-1.7.7.3
+Yours,
+Linus Walleij
