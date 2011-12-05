@@ -1,74 +1,117 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 5 Dec 2011 14:15:56 -0700 (MST)
-Subject: [PATCH v3 3/5] clk: introduce the common clock framework
-In-Reply-To: <1321926047-14211-4-git-send-email-mturquette@linaro.org>
-References: <1321926047-14211-1-git-send-email-mturquette@linaro.org>
- <1321926047-14211-4-git-send-email-mturquette@linaro.org>
-Message-ID: <alpine.DEB.2.00.1112051342430.6289@utopia.booyaka.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 5 Dec 2011 22:18:38 +0100
+Subject: [RFC PATCH 2/3] pinctrl: imx: add pinmux-imx53 support
+In-Reply-To: <CACRpkdaYz+-nZA6atxA+5kvWOO84YeSHQPNiojq_R4zkHUGz3Q@mail.gmail.com>
+References: <1322999384-7886-1-git-send-email-b29396@freescale.com>
+ <1322999384-7886-2-git-send-email-b29396@freescale.com>
+ <CACRpkdaYz+-nZA6atxA+5kvWOO84YeSHQPNiojq_R4zkHUGz3Q@mail.gmail.com>
+Message-ID: <20111205211838.GG27267@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+On Mon, Dec 05, 2011 at 05:57:42PM +0100, Linus Walleij wrote:
+> On Sun, Dec 4, 2011 at 12:49 PM, Dong Aisheng <b29396@freescale.com> wrote:
+> 
+> > +enum imx_mx53_pads {
+> > + ? ? ? MX53_GPIO_19 = 0,
+> > + ? ? ? MX53_KEY_COL0 = 1,
+> (...)
+> 
+> First I thought it looked a bit strange since you needed enums for all pads
+> but then I realized that your macros use the same enumerator name to
+> name the pad and then it looks sort of clever.
+> 
+> But maybe put in a comment about that here:
+> 
+> > +/* Pad names for the pinmux subsystem */
+> 
+> Like this:
+> 
+> /*
+>  * Pad names for the pinmux subsystem.
+>  * These pad names are constructed from the pin enumerator names
+>  * in the IMX_PINCTRL_PIN() macro.
+>  */
+> 
+> > +static const struct pinctrl_pin_desc mx53_pads[] = {
+> > + ? ? ? IMX_PINCTRL_PIN(MX53_GPIO_19),
+> > + ? ? ? IMX_PINCTRL_PIN(MX53_KEY_COL0),
+> (...)
+> 
+> > +/* mx53 pin groups and mux mode */
+> > +static const unsigned mx53_fec_pins[] = {
+> > + ? ? ? MX53_FEC_MDC,
+> > + ? ? ? MX53_FEC_MDIO,
+> > + ? ? ? MX53_FEC_REF_CLK,
+> > + ? ? ? MX53_FEC_RX_ER,
+> > + ? ? ? MX53_FEC_CRS_DV,
+> > + ? ? ? MX53_FEC_RXD1,
+> > + ? ? ? MX53_FEC_RXD0,
+> > + ? ? ? MX53_FEC_TX_EN,
+> > + ? ? ? MX53_FEC_TXD1,
+> > + ? ? ? MX53_FEC_TXD0,
+> > +};
+> 
+> I understand this.
+> 
+> > +static const unsigned mx53_fec_mux[] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+> 
+> But what is this? Just zeroes? Why?
+> Especially with a const so they really cannot be anything
+> else. The same pin (0) can only be enumerated once.
+> 
+> > +static const unsigned mx53_sd1_pins[] = {
+> > + ? ? ? MX53_SD1_CMD,
+> > + ? ? ? MX53_SD1_CLK,
+> > + ? ? ? MX53_SD1_DATA0,
+> > + ? ? ? MX53_SD1_DATA1,
+> > + ? ? ? MX53_SD1_DATA2,
+> > + ? ? ? MX53_SD1_DATA3,
+> > +
+> > +};
+> > +static const unsigned mx53_sd1_mux[] = { 0, 0, 0, 0, 0, 0 };
+> 
+> And here again.
+> 
+> > +static const unsigned mx53_sd3_pins[] = {
+> > + ? ? ? MX53_PATA_DATA8,
+> > + ? ? ? MX53_PATA_DATA9,
+> > + ? ? ? MX53_PATA_DATA10,
+> > + ? ? ? MX53_PATA_DATA11,
+> > + ? ? ? MX53_PATA_DATA0,
+> > + ? ? ? MX53_PATA_DATA1,
+> > + ? ? ? MX53_PATA_DATA2,
+> > + ? ? ? MX53_PATA_DATA3,
+> > + ? ? ? MX53_PATA_IORDY,
+> > + ? ? ? MX53_PATA_RESET_B,
+> > +
+> > +};
+> > +static const unsigned mx53_sd3_mux[] = { 4, 4, 4, 4, 4, 4, 4, 4, 2, 2 };
+> 
+> This also looks strange. Can you explain what these muxes are?
 
-a brief comment concerning clock rates:
+Freescale has named the pins after their primary function which is quite
+confusing.
 
-On Mon, 21 Nov 2011, Mike Turquette wrote:
+The above means:
 
-> +unsigned long clk_get_rate(struct clk *clk)
-
+MX53_PATA_DATA8 -> mux mode 4
+MX53_PATA_DATA9 -> mux mode 4
 ...
 
-> +long clk_round_rate(struct clk *clk, unsigned long rate)
+This brings me to the point that currently we have the pins described as
 
-...
+#define MX53_PAD_<name>__<function>
 
-> +int clk_set_rate(struct clk *clk, unsigned long rate)
+which means that you don't have to look into the datasheet to get the
+different options for a pin (and don't have a chance to get it wrong).
+I don't really want to lose this.
 
-...
-
-> +struct clk {
-...
-> +	unsigned long		rate;
-...
-> +};
-
-The types associated with clock rates in the clock interface 
-(include/linux/clk.h) are inconsistent, and we should fix this. 
-clk_round_rate() is the problematic case, returning a signed long rather 
-than an unsigned long.  So clk_round_rate() won't work correctly with any 
-rates higher than 2 GiHz.
-
-We could fix the immediate problem by changing the prototype of 
-clk_round_rate() to pass the rounded rate back to the caller via a pointer 
-in one of the arguments, and return an error code (if any) via the return 
-value:
-
-int clk_round_rate(struct clk *clk, unsigned long rate, unsigned long 
-                   *rounded_rate);
-
-But I'd propose that we instead increase the size of struct clk.rate to be 
-s64:
-
-s64 clk_round_rate(struct clk *clk, s64 desired_rate);
-int clk_set_rate(struct clk *clk, s64 rate);
-s64 clk_get_rate(struct clk *clk);
-
-struct clk {
-...
-     s64 rate;
-...
-};
-
-That way the clock framework can accommodate current clock rates, as well 
-as any conceivable future clock rate.  (Some production CPUs are already 
-running at clock rates greater than 4 GiHZ[1].  RF devices with 4 GiHz+ 
-clock rates are also common, such as 802.11a devices running in the 5.8 
-GHz band, and drivers for those may eventually wish to use the clock 
-framework.)
+Sascha
 
 
-
-- Paul
-
-1. www.cpu-world.com, "Intel Xeon X5698 - AT80614007314AA" 
-   http://www.cpu-world.com/CPUs/Xeon/Intel-Xeon%20X5698%20-%20AT80614007314AA.html
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
