@@ -1,66 +1,34 @@
-From: hs@denx.de (Heiko Schocher)
-Date: Mon, 05 Dec 2011 11:50:41 +0100
-Subject: [PATCH] arm,
- davinci: configure davinci aemif chipselects through OF
-In-Reply-To: <4EDB66C9.9050302@mvista.com>
-References: <1322991679-20947-1-git-send-email-hs@denx.de>
- <4EDB66C9.9050302@mvista.com>
-Message-ID: <4EDCA201.4080505@denx.de>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 5 Dec 2011 10:52:02 +0000
+Subject: [PATCH] backlight: add regulator support for platform_lcd driver
+In-Reply-To: <CAJuYYwTT2jbbquZM=ZwK=Gh39ss=iG0WDCc3TYjzHLEgfeC1gA@mail.gmail.com>
+References: <1323074921-29291-1-git-send-email-thomas.abraham@linaro.org>
+ <CAH9JG2XJ4TCEaN1rMRjMZNRn5Wx6jcTRC_DmyN4Qyf2zztWSsg@mail.gmail.com>
+ <CAJuYYwTT2jbbquZM=ZwK=Gh39ss=iG0WDCc3TYjzHLEgfeC1gA@mail.gmail.com>
+Message-ID: <20111205105201.GD11150@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Sergei,
+On Mon, Dec 05, 2011 at 04:06:17PM +0530, Thomas Abraham wrote:
+> On 5 December 2011 15:40, Kyungmin Park <kmpark@infradead.org> wrote:
 
-Sergei Shtylyov wrote:
-> Hello.
-> 
-> On 04-12-2011 13:41, Heiko Schocher wrote:
-> 
->> Signed-off-by: Heiko Schocher<hs@denx.de>
->> Cc: davinci-linux-open-source at linux.davincidsp.com
->> Cc: devicetree-discuss at lists.ozlabs.org
->> Cc: linux-arm-kernel at lists.infradead.org
->> Cc: grant.likely at secretlab.ca
->> Cc: Sekhar Nori<nsekhar@ti.com>
->> Cc: Kevin Hilman<khilman@ti.com>
->> Cc: Wolfgang Denk<wd@denx.de>
-> 
->> diff --git a/arch/arm/mach-davinci/aemif.c
->> b/arch/arm/mach-davinci/aemif.c
->> index 1ce70a9..12c559f 100644
->> --- a/arch/arm/mach-davinci/aemif.c
->> +++ b/arch/arm/mach-davinci/aemif.c
-> [...]
->> @@ -131,3 +138,99 @@ int davinci_aemif_setup_timing(struct
->> davinci_aemif_timing *t,
->>       return 0;
->>   }
->>   EXPORT_SYMBOL(davinci_aemif_setup_timing);
->> +
->> +#if defined(CONFIG_OF)
->> +static int dv_get_value(struct device_node *np, const char *name)
->> +{
->> +    const u32 *data;
->> +    int len;
->> +
->> +    data = of_get_property(np, name,&len);
->> +    if (data)
->> +        return be32_to_cpu(readl(data));
-> 
->    Why readl() here?! Device tree is not a peripheral device...
-> 
->> +
->> +    return -EINVAL;
->> +}
-> 
->    Isn't there already a standard helper for that, of_property_read_u32()?
+> > Recent regulator discussion. it should be failed instead fall through
+> > gracefully.
 
-Yep, fixed that.
+> Ok. But in this case, there could be boards that do not use a
+> regulator for the lcd/display interface. Is it mandatory for fail if
+> regulator is not found. Sorry, I have not read through the regulator
+> discussion.
 
-Thanks!
+The boards should supply a fixed voltage regulator representing the
+supply (or use CONFIG_REGULATOR_DUMMY to substitute in a dummy regulator
+when not needed).  Sascha Hauer had some patches to add a flag that
+could be set to enable this mode on init rather than through Kconfig but
+they needed a bit of cleanup, not sure what the status is there.
 
-bye,
-Heiko
--- 
-DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
-HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
+> The constraint 'apply_uV' cannot be expressed with a device tree. So
+> there has be a mechanism to set the required output voltage for a
+> regulator.
+
+It's not an option to not have it with device tree - if there's a single
+voltage specified apply_uV is assumed.
