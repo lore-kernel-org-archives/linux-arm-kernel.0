@@ -1,55 +1,44 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 5 Dec 2011 23:48:49 +0000
-Subject: [PATCH v3 3/5] clk: introduce the common clock framework
-In-Reply-To: <alpine.DEB.2.00.1112051342430.6289@utopia.booyaka.com>
-References: <1321926047-14211-1-git-send-email-mturquette@linaro.org>
- <1321926047-14211-4-git-send-email-mturquette@linaro.org>
- <alpine.DEB.2.00.1112051342430.6289@utopia.booyaka.com>
-Message-ID: <20111205234849.GA14547@n2100.arm.linux.org.uk>
+Date: Mon, 5 Dec 2011 23:56:09 +0000
+Subject: [PATCH 07/23] ARM: plat-omap: remove arch specific special
+ handling for ioremap
+In-Reply-To: <alpine.LFD.2.02.1112021637200.2357@xanadu.home>
+References: <1321422521-1138-1-git-send-email-nico@fluxnic.net>
+ <1321422521-1138-8-git-send-email-nico@fluxnic.net>
+ <20111202202125.GZ31337@atomide.com>
+ <alpine.LFD.2.02.1112021637200.2357@xanadu.home>
+Message-ID: <20111205235609.GI14542@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 05, 2011 at 02:15:56PM -0700, Paul Walmsley wrote:
-> The types associated with clock rates in the clock interface 
-> (include/linux/clk.h) are inconsistent, and we should fix this. 
-
-Rubbish.  They're different with good reason.  Rates are primerily
-unsigned quantities - and should be treated as such.
-
-The exception is clk_round_rate() which returns the rate, but also
-_may_ return an error.  Therefore, its return type has to be signed.
-
-> We could fix the immediate problem by changing the prototype of 
-> clk_round_rate() to pass the rounded rate back to the caller via a pointer 
-> in one of the arguments, and return an error code (if any) via the return 
-> value:
+On Fri, Dec 02, 2011 at 04:39:31PM -0500, Nicolas Pitre wrote:
+> On Fri, 2 Dec 2011, Tony Lindgren wrote:
 > 
-> int clk_round_rate(struct clk *clk, unsigned long rate, unsigned long 
->                    *rounded_rate);
-
-Yes that might have been a better solution.
-
-> But I'd propose that we instead increase the size of struct clk.rate to be 
-> s64:
+> > Hi Nico,
+> > 
+> > * Nicolas Pitre <nico@fluxnic.net> [111115 21:21]:
+> > > From: Nicolas Pitre <nicolas.pitre@linaro.org>
+> > > 
+> > > A generic version should replace this later.
+> > > 
+> > > As io.c has become nearly empty, omap_init_consistent_dma_size() is moved
+> > > into common.c so that io.c can be removed entirely.
+> > 
+> > Sorry for the delay on trying this series out. It boots fine
+> > on omap2/3/4 as Kevin already noted. However, the following
+> > fix is needed for this patch to keep things building for
+> > omap1_defconfig.
+> >  
+> > > Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+> > 
+> > With the following fix it works on what I tested. That's
+> > osk5912 n800 2430sdp n900 zoom3 and blaze. If you're still
+> > taking acks for this series:
+> > 
+> > Tested-by: Tony Lindgren <tony@atomide.com>
 > 
-> s64 clk_round_rate(struct clk *clk, s64 desired_rate);
-> int clk_set_rate(struct clk *clk, s64 rate);
-> s64 clk_get_rate(struct clk *clk);
-> 
-> struct clk {
-> ...
->      s64 rate;
-> ...
-> };
-> 
-> That way the clock framework can accommodate current clock rates, as well 
-> as any conceivable future clock rate.  (Some production CPUs are already 
-> running at clock rates greater than 4 GiHZ[1].  RF devices with 4 GiHz+ 
-> clock rates are also common, such as 802.11a devices running in the 5.8 
-> GHz band, and drivers for those may eventually wish to use the clock 
-> framework.)
+> OK, thanks for testing.  Since Russell didn't commit this to his stable 
+> branch yet I simply folded in your fix and added your tested-by tag.
 
-Yuck.  You are aware that 64-bit math on 32-bit CPUs sucks?  So burdening
-_everything_ with 64-bit rate quantities is absurd.  As for making then
-64-bit signed quantities, that's asking for horrid code from gcc for the
-majority of cases.
+So I'm about to push what I had out in the devel-stable branch... what
+am I supposed to do with this?
