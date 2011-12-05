@@ -1,45 +1,17 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 5 Dec 2011 15:21:45 -0800
-Subject: [PATCH 07/23] ARM: plat-omap: remove arch specific special
- handling for ioremap
-In-Reply-To: <alpine.LFD.2.02.1112021637200.2357@xanadu.home>
-References: <1321422521-1138-1-git-send-email-nico@fluxnic.net>
- <1321422521-1138-8-git-send-email-nico@fluxnic.net>
- <20111202202125.GZ31337@atomide.com>
- <alpine.LFD.2.02.1112021637200.2357@xanadu.home>
-Message-ID: <20111205232144.GB31337@atomide.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 5 Dec 2011 23:23:42 +0000
+Subject: [GIT PULL] Identity mapping changes for 3.3
+In-Reply-To: <20111202160833.GK5540@mudshark.cambridge.arm.com>
+References: <20111202160833.GK5540@mudshark.cambridge.arm.com>
+Message-ID: <20111205232342.GG14542@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Nicolas Pitre <nico@fluxnic.net> [111202 13:04]:
-> On Fri, 2 Dec 2011, Tony Lindgren wrote:
+On Fri, Dec 02, 2011 at 04:08:33PM +0000, Will Deacon wrote:
+> The following changes since commit 2d13ccaa8797d7e599f3792aed4b1e44b47f94a5:
 > 
-> > Hi Nico,
-> > 
-> > * Nicolas Pitre <nico@fluxnic.net> [111115 21:21]:
-> > > From: Nicolas Pitre <nicolas.pitre@linaro.org>
-> > > 
-> > > A generic version should replace this later.
-> > > 
-> > > As io.c has become nearly empty, omap_init_consistent_dma_size() is moved
-> > > into common.c so that io.c can be removed entirely.
-> > 
-> > Sorry for the delay on trying this series out. It boots fine
-> > on omap2/3/4 as Kevin already noted. However, the following
-> > fix is needed for this patch to keep things building for
-> > omap1_defconfig.
-> >  
-> > > Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
-> > 
-> > With the following fix it works on what I tested. That's
-> > osk5912 n800 2430sdp n900 zoom3 and blaze. If you're still
-> > taking acks for this series:
-> > 
-> > Tested-by: Tony Lindgren <tony@atomide.com>
-> 
-> OK, thanks for testing.  Since Russell didn't commit this to his stable 
-> branch yet I simply folded in your fix and added your tested-by tag.
+>   Merge branch 'irqchip-consolidation' of git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms into devel-stable (2011-11-21 21:56:56 +0000)
 
-OK thanks.
-
-Tony
+As this is known to be broken on OMAP, could I have this based upon
+some other commit - maybe ba8bb18a03f which I've just committed into
+devel-stable (which is the second 'fix' patch for OMAP) please.
