@@ -1,37 +1,57 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Mon, 5 Dec 2011 12:29:25 +0800
-Subject: [PATCH 2/2] gpio/tegra: Dynamically allocate IRQ base, and
- support DT
-In-Reply-To: <1323058550-13368-9-git-send-email-shawn.guo@linaro.org>
-References: <1323058550-13368-1-git-send-email-shawn.guo@linaro.org>
- <1323058550-13368-9-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20111205042924.GB2980@S2100-06.ap.freescale.net>
+From: ming.lei@canonical.com (Ming Lei)
+Date: Mon, 5 Dec 2011 12:25:24 +0800
+Subject: [RFC PATCH v1 2/7] omap4: build fdif omap device from hwmod
+In-Reply-To: <4ED8C029.7000004@ru.mvista.com>
+References: <1322817178-8931-1-git-send-email-ming.lei@canonical.com>
+ <1322817178-8931-3-git-send-email-ming.lei@canonical.com>
+ <4ED8C029.7000004@ru.mvista.com>
+Message-ID: <CACVXFVOUaodnMKV8_E7E__Zqt8c8Qt0+omgABj9cHbwyiQGoxA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sorry, this one should not be in the series.  Please ignore.
+Hi,
 
-Regards,
-Shawn
+On Fri, Dec 2, 2011 at 8:10 PM, Sergei Shtylyov <sshtylyov@ru.mvista.com> wrote:
+> Hello.
+>
+>
+> On 02-12-2011 13:12, Ming Lei wrote:
+>
+>> Signed-off-by: Ming Lei<ming.lei@canonical.com>
+>> ---
+>> ?arch/arm/mach-omap2/devices.c | ? 33 +++++++++++++++++++++++++++++++++
+>> ?1 files changed, 33 insertions(+), 0 deletions(-)
+>
+>
+>> diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
+>> index 1166bdc..a392af5 100644
+>> --- a/arch/arm/mach-omap2/devices.c
+>> +++ b/arch/arm/mach-omap2/devices.c
+>> @@ -728,6 +728,38 @@ void __init omap242x_init_mmc(struct
+>> omap_mmc_platform_data **mmc_data)
+>>
+>> ?#endif
+>>
+>> +static struct platform_device* __init omap4_init_fdif(void)
+>
+>
+> ? Shouldn't there be space before *? checkpatch.pl is silent about it?
+> ALso, I'd have placed '__init' after 'static'...
 
-On Mon, Dec 05, 2011 at 12:15:50PM +0800, Shawn Guo wrote:
-> Enhance  the driver to dynamically allocate the base IRQ number, and
-> create an IRQ domain for itself. The use of an IRQ domain ensures that
-> any device tree node interrupts properties are correctly parsed.
-> 
-> Fix the DT binding documentation to describe interrupt-related properties,
-> and the contents of "child" node interrupts property.
-> 
-> Update tegra20.dtsi to specify the required interrupt-related properties.
-> 
-> Finally, remove the definition of TEGRA_GPIO_TO_IRQ; this macro no longer
-> gives correct results since the IRQ numbers for GPIOs are dynamically
-> allocated.
-> 
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
-> ---
->  .../devicetree/bindings/gpio/gpio_nvidia.txt       |   10 ++++++
->  arch/arm/boot/dts/tegra20.dtsi                     |    2 +
->  arch/arm/mach-tegra/include/mach/gpio-tegra.h      |    2 -
->  drivers/gpio/gpio-tegra.c                          |   32 +++++++++++++++----
->  4 files changed, 37 insertions(+), 9 deletions(-)
+Yes, you are right, will do do it in next version.
+
+>
+>> +{
+>> + ? ? ? int id = -1;
+>> + ? ? ? struct platform_device *pd;
+>> + ? ? ? struct omap_hwmod *oh;
+>> + ? ? ? const char *dev_name = "fdif";
+>
+>
+> ? Why you need this variable at all?
+
+Will remove some of them.
+
+thanks,
+--
+Ming Lei
