@@ -1,39 +1,37 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Tue, 06 Dec 2011 16:23:27 +0000
-Subject: [RFC PATCH] ARM: Add generic instruction opcode manipulation
- helpers
-In-Reply-To: <20111206150855.GA5385@mudshark.cambridge.arm.com>
-References: <1322220493-3251-1-git-send-email-dave.martin@linaro.org>
- <20111206150855.GA5385@mudshark.cambridge.arm.com>
-Message-ID: <1323188607.3427.60.camel@linaro1>
+From: joerg.roedel@amd.com (Joerg Roedel)
+Date: Tue, 6 Dec 2011 17:23:46 +0100
+Subject: [PATCH v7 0/2] iommu/exynos: Add IOMMU/System MMU driver for
+ Samsung Exynos
+In-Reply-To: <20111205154715.GE25178@amd.com>
+References: <1321609650-1329-1-git-send-email-pullip.cho@samsung.com>
+ <20111205154715.GE25178@amd.com>
+Message-ID: <20111206162346.GP25178@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I've cut down the cc list...
+On Mon, Dec 05, 2011 at 04:47:15PM +0100, Joerg Roedel wrote:
 
-On Tue, 2011-12-06 at 15:08 +0000, Will Deacon wrote:
-[...]
-> Tixy - how much work do you reckon it would be to rework your kprobes
-> decoding code into a generic `here are my callbacks, please decode this
-> instruction stream for me' type thing?
->
-> All I want for hw_breakpoint is to know whether an instruction is a load or
-> a store, but even for that it looks like I'll need to duplicate a lot of
-> stuff.
+> Okay, I merged it into arm/exynos, but it is not pushed yet. Actually
+> there were conflicts while merging, which I resolved. What I failed
+> to find is a config for Exynos that actually builds for upstream Linux.
+> Probably I havn't tried hard enough to find one... Can you provide a
+> kernel config that I can use for my testing and that builds a current
+> 3.2-rc4 kernel for Exynos?
 
-The kprobes instruction decoding is pretty specialised if you look at
-it. Most of the complexity is in the data tables, (grep for "const union
-decode_item") which are processed by kprobe_decode_insn(). For
-documentation look for comments before "enum decode_type" and
-kprobe_decode_insn(). I suspect that to try and create something generic
-out of these would be major work.
+Okay, since there are new objections and since I can't even reliably
+build test the driver I unmerged it again.
+Please fix the outstanding issues and rebase it against a recent upstream
+kernel so that the result can be compiled to a kernel-image.
 
-An alternative would be to bend the data tables to your purpose by
-squeezing in and 'instruction type' parameter into the table (ldr, str,
-other) and then parsing the tables with a different function to get the
-instruction type. You may find though that there are some classes of
-instruction that the existing tables don't decode fully, because kprobes
-isn't interested in distinguishing between them.
+
+Thanks,
+
+	Joerg
+
 
 -- 
-Tixy
+AMD Operating System Research Center
+
+Advanced Micro Devices GmbH Einsteinring 24 85609 Dornach
+General Managers: Alberto Bozzo, Andrew Bowd
+Registration: Dornach, Landkr. Muenchen; Registerger. Muenchen, HRB Nr. 43632
