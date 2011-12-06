@@ -1,39 +1,33 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 6 Dec 2011 12:55:55 +0000
-Subject: [RFC PATCH v1 5/7] media: v4l2: introduce two IOCTLs for face
- detection
-In-Reply-To: <CACVXFVMB+HuQDb+Pxo0d8x46P82-c-OPxaL0c661Wztyx3NWJA@mail.gmail.com>
-References: <1322817178-8931-1-git-send-email-ming.lei@canonical.com>
- <201112051437.27538.arnd@arndb.de>
- <CACVXFVMB+HuQDb+Pxo0d8x46P82-c-OPxaL0c661Wztyx3NWJA@mail.gmail.com>
-Message-ID: <201112061255.56136.arnd@arndb.de>
+From: joerg.roedel@amd.com (Joerg Roedel)
+Date: Tue, 6 Dec 2011 13:57:39 +0100
+Subject: [PATCH v7 0/2] iommu/exynos: Add IOMMU/System MMU driver for
+ Samsung Exynos
+In-Reply-To: <CAHQjnOOCHO3eDiUft4WgS=8N5EheWas+n3MD9xxBKUoSjmNQSQ@mail.gmail.com>
+References: <1321609650-1329-1-git-send-email-pullip.cho@samsung.com>
+ <20111205154715.GE25178@amd.com>
+ <CAH9JG2VALcm-PreS7S2SZPPgEbid_6_VWJA0PHBEtY5KvaA3Og@mail.gmail.com>
+ <CAHQjnOOCHO3eDiUft4WgS=8N5EheWas+n3MD9xxBKUoSjmNQSQ@mail.gmail.com>
+Message-ID: <20111206125739.GK25178@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 06 December 2011, Ming Lei wrote:
-> diff --git a/include/linux/videodev2.h b/include/linux/videodev2.h
-> index 073eb4d..8aeaa1e 100644
-> --- a/include/linux/videodev2.h
-> +++ b/include/linux/videodev2.h
-> @@ -2214,7 +2214,12 @@ struct v4l2_fd_result {
->         __u32   buf_index;
->         __u32   face_cnt;
->         __u32   reserved[6];
-> -       struct v4l2_fd_detection *fd;
-> +
-> +       /*make 64/32 compatible*/
-> +       union {
-> +               struct v4l2_fd_detection *fd;
-> +               __u64   dummy;
-> +       };
->  };
-> 
+On Tue, Dec 06, 2011 at 09:13:18PM +0900, KyongHo Cho wrote:
+> > BTW, how do you test it at mainline kernel?
+> >
+> I merged IOMMU mainline branch to our kernel branch and tested it with
+> our FIMC, MFC, JPEG, 2D.
 
-That's not compatible, at least not on any big-endian architecture.
-If you want to have an indirect pointer, you have to cast it to the
-__u64 member in user space and back in kernel space.
+This is not sufficient. Please do it the other way around, merge your
+outstanding changes into the mainline kernel (or for iommu topics my
+next branch) and test against that. This way it is easier to catch bugs
+in mainline.
 
-Using an array added to the end of the v4l2_fd_result structure
-rather than a pointer would really make this easier IMHO.
 
-	Arnd
+	Joerg
+
+-- 
+AMD Operating System Research Center
+
+Advanced Micro Devices GmbH Einsteinring 24 85609 Dornach
+General Managers: Alberto Bozzo, Andrew Bowd
+Registration: Dornach, Landkr. Muenchen; Registerger. Muenchen, HRB Nr. 43632
