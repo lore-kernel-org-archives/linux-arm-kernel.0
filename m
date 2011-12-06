@@ -1,37 +1,102 @@
-From: joerg.roedel@amd.com (Joerg Roedel)
-Date: Tue, 6 Dec 2011 17:23:46 +0100
-Subject: [PATCH v7 0/2] iommu/exynos: Add IOMMU/System MMU driver for
- Samsung Exynos
-In-Reply-To: <20111205154715.GE25178@amd.com>
-References: <1321609650-1329-1-git-send-email-pullip.cho@samsung.com>
- <20111205154715.GE25178@amd.com>
-Message-ID: <20111206162346.GP25178@amd.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Tue, 6 Dec 2011 16:26:46 +0000
+Subject: [PATCH] ARM: pl2x0/pl310: Refactor Kconfig to be more maintainable
+In-Reply-To: <4ED531C3.8050004@gmail.com>
+References: <1322584345-19193-1-git-send-email-dave.martin@linaro.org>
+ <4ED531C3.8050004@gmail.com>
+Message-ID: <20111206162646.GE13769@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 05, 2011 at 04:47:15PM +0100, Joerg Roedel wrote:
+On Tue, Nov 29, 2011 at 01:25:55PM -0600, Rob Herring wrote:
+> On 11/29/2011 10:32 AM, Dave Martin wrote:
+> > Making CACHE_L2X0 depends on (huge list of MACH_ and ARCH_ configs)
+> > is bothersome to maintain and likely to lead to merge conflicts.
+> > 
+> > This patch moves the knowledge of which platforms have a L2x0 or
+> > PL310 cache controller to the individual machines.  To enable this,
+> > a new HAVE_L2X0_L2CC config option is introduced to allow machines
+> > to indicate that they have such a cache controller independently of
+> > each other.
+> > 
+> > Signed-off-by: Dave Martin <dave.martin@linaro.org>
+> > ---
+> >  arch/arm/Kconfig               |    8 ++++++++
+> >  arch/arm/mach-exynos/Kconfig   |    1 +
+> >  arch/arm/mach-omap2/Kconfig    |    1 +
+> >  arch/arm/mach-realview/Kconfig |    5 +++++
+> >  arch/arm/mach-vexpress/Kconfig |    1 +
+> >  arch/arm/mm/Kconfig            |   13 ++++++++-----
+> >  arch/arm/plat-mxc/Kconfig      |    1 +
+> >  7 files changed, 25 insertions(+), 5 deletions(-)
+> > 
+> > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> > index 44789ef..4068fe5 100644
+> > --- a/arch/arm/Kconfig
+> > +++ b/arch/arm/Kconfig
+> > @@ -339,6 +339,7 @@ config ARCH_HIGHBANK
+> >  	select ARCH_WANT_OPTIONAL_GPIOLIB
+> >  	select ARM_AMBA
+> >  	select ARM_GIC
+> > +	select HAVE_L2X0_L2CC
+> >  	select ARM_TIMER_SP804
+> >  	select CLKDEV_LOOKUP
+> >  	select CPU_V7
+> 
+> These entries are sorted per rmk's review, so please keep it that way.
 
-> Okay, I merged it into arm/exynos, but it is not pushed yet. Actually
-> there were conflicts while merging, which I resolved. What I failed
-> to find is a config for Exynos that actually builds for upstream Linux.
-> Probably I havn't tried hard enough to find one... Can you provide a
-> kernel config that I can use for my testing and that builds a current
-> 3.2-rc4 kernel for Exynos?
+Can you explain what order they should be in?  Alphabetical?
 
-Okay, since there are new objections and since I can't even reliably
-build test the driver I unmerged it again.
-Please fix the outstanding issues and rebase it against a recent upstream
-kernel so that the result can be compiled to a kernel-image.
+> 
+> > @@ -359,6 +360,7 @@ config ARCH_CLPS711X
+> >  config ARCH_CNS3XXX
+> >  	bool "Cavium Networks CNS3XXX family"
+> >  	select CPU_V6K
+> > +	select HAVE_L2X0_L2CC
+> >  	select GENERIC_CLOCKEVENTS
+> >  	select ARM_GIC
+> >  	select MIGHT_HAVE_PCI
+> 
+> But as you can see, that's rarely the case...
 
+Do you mean "things are not always in alphabetical order?"
 
-Thanks,
+Apologies if I'm being obtuse -- your comments are rather terse for me.
 
-	Joerg
+[...]
 
+> > +config HAVE_L2X0_L2CC
+> > +	bool
+> > +	default n
+> 
+> n is the default already.
 
--- 
-AMD Operating System Research Center
+Good point -- I'll kill that.
 
-Advanced Micro Devices GmbH Einsteinring 24 85609 Dornach
-General Managers: Alberto Bozzo, Andrew Bowd
-Registration: Dornach, Landkr. Muenchen; Registerger. Muenchen, HRB Nr. 43632
+> > +	help
+> > +	  This option should be selected by machines which have a L2x0
+> > +	  or PL310 cache controller.
+> > +
+> >  config CACHE_L2X0
+> >  	bool "Enable the L2x0 outer cache controller"
+> > -	depends on REALVIEW_EB_ARM11MP || MACH_REALVIEW_PB11MP || MACH_REALVIEW_PB1176 || \
+> > -		   REALVIEW_EB_A9MP || ARCH_IMX_V6_V7 || MACH_REALVIEW_PBX || \
+> > -		   ARCH_NOMADIK || ARCH_OMAP4 || ARCH_EXYNOS4 || ARCH_TEGRA || \
+> > -		   ARCH_U8500 || ARCH_VEXPRESS_CA9X4 || ARCH_SHMOBILE || \
+> > -		   ARCH_PRIMA2 || ARCH_ZYNQ || ARCH_CNS3XXX || ARCH_HIGHBANK
+> > +	depends on HAVE_L2X0_L2CC
+> 
+> For platforms that run in non-secure mode, this shouldn't really be a
+> user selectable option. Perhaps those should just select CACHE_L2X0
+> directly. I'm not sure which one's those are other than Highbank and OMAP4.
+
+The idea here is to make the option user-selectable on platforms where it
+makes sense (and only those platforms).
+
+So yes, I think that platforms which require this option _should_ select
+it directly, rather than it being reverse-selected from arch/arm/mm/Kconfig.
+This puts the knowledge in the logical place.  Does this apply to OMAP3?
+I think we're always running in the Normal World there too.
+
+Cheers
+---Dave
