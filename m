@@ -1,30 +1,44 @@
-From: tushar.behera@linaro.org (Tushar Behera)
-Date: Tue, 06 Dec 2011 14:43:15 +0530
-Subject: [PATCH v2 1/3] ARM: EXYNOS: Add USB OHCI device
-In-Reply-To: <001301ccb3e0$b5fec280$21fc4780$%han@samsung.com>
-References: <001101ccb3e0$7fe48270$7fad8750$%han@samsung.com>
- <001301ccb3e0$b5fec280$21fc4780$%han@samsung.com>
-Message-ID: <4EDDDCAB.1000001@linaro.org>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 6 Dec 2011 17:14:23 +0800
+Subject: Error of 'handle_local_timer' missing in plat-mxc/gic.c when
+ building 'mx5-merge' branch
+In-Reply-To: <CAMPhdO-KyXDw-aR0NGSyQ_rzp5bpAjc=s-EttWz9qS+kK2s1Rw@mail.gmail.com>
+References: <CAMPhdO8ArDykEgXn6rdttPF3d6c_MUB4Bukh85VMNCYwg9Ezjw@mail.gmail.com>
+ <CAAQ0ZWSZJthOvw0EY3Of-Sn=n85H5VJSaFEZjgqGeUduKkLeZw@mail.gmail.com>
+ <CAMPhdO-KyXDw-aR0NGSyQ_rzp5bpAjc=s-EttWz9qS+kK2s1Rw@mail.gmail.com>
+Message-ID: <CAAQ0ZWTYcZe5SWCCpBNXp8xHuji-61BSywgYq0+KGohnipLFzA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 06 December 2011 12:01 PM, Jingoo Han wrote:
-> This patch adds USB ohci device definition for Exynos SoCs.
+On 6 December 2011 17:11, Eric Miao <eric.miao@linaro.org> wrote:
+> On Tue, Dec 6, 2011 at 5:02 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
+>> On 6 December 2011 16:40, Eric Miao <eric.miao@linaro.org> wrote:
+>>> Hi Sascha,
+>>>
+>>> Just FYI,
+>>>
+>>> ?CC ? ? ?arch/arm/plat-mxc/gic.o
+>>> /home/ycmiao/linux-2.6/arch/arm/plat-mxc/gic.c: In function 'gic_handle_irq':
+>>> /home/ycmiao/linux-2.6/arch/arm/plat-mxc/gic.c:44:4: error: implicit
+>>> declaration of function 'handle_local_timer'
+>>> make[2]: *** [arch/arm/plat-mxc/gic.o] Error 1
+>>> make[1]: *** [arch/arm/plat-mxc] Error 2
+>>> make: *** [sub-make] Error 2
+>>>
+>>> Do we have a fix somewhere already?
+>>>
+>> This should be fixed by Marc's series below, which has hit the mainline.
+>>
 >
-> Signed-off-by: Jingoo Han<jg1.han@samsung.com>
-> ---
->   arch/arm/mach-exynos/Kconfig              |    5 +++
->   arch/arm/mach-exynos/Makefile             |    1 +
->   arch/arm/mach-exynos/dev-ohci.c           |   52 +++++++++++++++++++++++++++++
->   arch/arm/mach-exynos/include/mach/map.h   |    1 +
->   arch/arm/mach-exynos/include/mach/ohci.h  |   21 +++++++++++
-
-In the earlier patchset, platform_device struct for ohci was defined 
-within plat-samsung, and ohci.h was located in 
-plat-samsung/include/plat. These are still the locations where ehci 
-related definitions are located.
-
-What is the reason for movement of ohci related definitions to mach folder?
+> Awesome. I'll do a quick merge and test if that's working.
+>
+> Marc,
+>
+> What's the status of the branch?
+>
+Sorry, I was mistaken here.  Please ignore it, and let me find the
+correct patch.
 
 -- 
-Tushar Behera
+Regards,
+Shawn
