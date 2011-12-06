@@ -1,22 +1,23 @@
-From: snjw23@gmail.com (Sylwester Nawrocki)
-Date: Tue, 06 Dec 2011 23:39:47 +0100
-Subject: [RFC PATCH v1 6/7] media: video: introduce face detection driver
- module
-In-Reply-To: <4EDE90A3.7050900@gmail.com>
-References: <1322838172-11149-1-git-send-email-ming.lei@canonical.com>	<1322838172-11149-7-git-send-email-ming.lei@canonical.com>	<4EDD3DEE.6060506@gmail.com>
- <CACVXFVPrAro=3t-wpbR_cVahzcx7SCa2J=s2nyyKfQ6SG-i0VQ@mail.gmail.com>
- <4EDE90A3.7050900@gmail.com>
-Message-ID: <4EDE99B3.2010507@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 06 Dec 2011 23:49:54 +0100
+Subject: [PATCH v4 2/6] ARM: vexpress: Get rid of MMIO_P2V
+In-Reply-To: <1323186229-22054-3-git-send-email-pawel.moll@arm.com>
+References: <1323186229-22054-1-git-send-email-pawel.moll@arm.com>
+ <1323186229-22054-3-git-send-email-pawel.moll@arm.com>
+Message-ID: <5087012.8uYbFcxygW@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/06/2011 11:01 PM, Sylwester Nawrocki wrote:
-[...]
->
-> It might be much better as the v4l2 events are associated with the frame
-> sequence. And if we use controls then you get control events for free,
-> and each event carries a frame sequence number int it
-> (http://linuxtv.org/downloads/v4l-dvb-apis/vidioc-dqevent.html).
+On Tuesday 06 December 2011 15:43:45 Pawel Moll wrote:
+> This patch gets rid of the MMIO_P2V and __MMIO_P2V macros,
+> defining constant virtual base for motherboard and tile
+> peripherals instead.
+> 
+> Additionally, in preparation for the new motherboard memory
+> map, the motherboard peripherals are using base pointers
+> calculated in runtime, instead of compile-time calculated
+> values.
+> 
+> Signed-off-by: Pawel Moll <pawel.moll@arm.com>
 
-Oops, just ignore that. The frame sequence number is only available for
-V4L2_EVENT_FRAME_SYNC events.
+Reviewed-by: Arnd Bergmann <arnd@arndb.de
