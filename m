@@ -1,41 +1,25 @@
-From: tanmay.upadhyay@einfochips.com (Tanmay Upadhyay)
-Date: Tue,  6 Dec 2011 16:37:46 +0530
-Subject: [PATCH] USB: pxa168: Fix compilation error
-In-Reply-To: <no>
-References: <no>
-Message-ID: <1323169667-10671-1-git-send-email-tanmay.upadhyay@einfochips.com>
+From: alan@lxorguk.ukuu.org.uk (Alan Cox)
+Date: Tue, 6 Dec 2011 11:10:43 +0000
+Subject: [PATCH] ata: Don't use NO_IRQ in pata_of_platform driver
+In-Reply-To: <CAMuHMdXvuwXps7j2jz18aB1VueLh5Vn0m94jLvBEO-CmsG1JxQ@mail.gmail.com>
+References: <20111202192618.GC3037@localhost.localdomain>
+ <CA+55aFwekNWz+V4440f=2iu_BfOxSg0NjVogv4cZZDFbJBNoAQ@mail.gmail.com>
+ <1322867573.11728.22.camel@pasglop>
+ <20111205161157.GA27550@localhost.localdomain>
+ <alpine.LFD.2.02.1112051236350.2357@xanadu.home>
+ <20111205180253.GB29812@localhost.localdomain>
+ <alpine.LFD.2.02.1112051310150.2357@xanadu.home>
+ <20111205192605.GD29812@localhost.localdomain>
+ <alpine.LFD.2.02.1112051443190.2357@xanadu.home>
+ <20111206093709.GB2274@linaro.org>
+ <20111206104654.GN14542@n2100.arm.linux.org.uk>
+ <CAMuHMdXvuwXps7j2jz18aB1VueLh5Vn0m94jLvBEO-CmsG1JxQ@mail.gmail.com>
+Message-ID: <20111206111043.2360bf00@lxorguk.ukuu.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After commit c430131a02d677aa708f56342c1565edfdacb3c0,
-HC_LENGTH takes two arguments. This patch fixes following
-compilation error:
+> It's shown in /proc/interrupts due to a "bug" in show_interrupts().
+> The (gmail damaged) patch below fixes this bug.
 
-In file included from drivers/usb/host/ehci-hcd.c:1323:
-drivers/usb/host/ehci-pxa168.c:302:54: error: macro "HC_LENGTH" requires 2 arguments, but only 1 given
-In file included from drivers/usb/host/ehci-hcd.c:1323:
-drivers/usb/host/ehci-pxa168.c: In function 'ehci_pxa168_drv_probe':
-drivers/usb/host/ehci-pxa168.c:302: error: 'HC_LENGTH' undeclared (first use in this function)
-drivers/usb/host/ehci-pxa168.c:302: error: (Each undeclared identifier is reported only once
-drivers/usb/host/ehci-pxa168.c:302: error: for each function it appears in.)
-
-Signed-off-by: Tanmay Upadhyay <tanmay.upadhyay@einfochips.com>
----
- drivers/usb/host/ehci-pxa168.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
-
-diff --git a/drivers/usb/host/ehci-pxa168.c b/drivers/usb/host/ehci-pxa168.c
-index ac0c16e..8d0e7a2 100644
---- a/drivers/usb/host/ehci-pxa168.c
-+++ b/drivers/usb/host/ehci-pxa168.c
-@@ -299,7 +299,7 @@ static int __devinit ehci_pxa168_drv_probe(struct platform_device *pdev)
- 	ehci = hcd_to_ehci(hcd);
- 	ehci->caps = hcd->regs + 0x100;
- 	ehci->regs = hcd->regs + 0x100 +
--		HC_LENGTH(ehci_readl(ehci, &ehci->caps->hc_capbase));
-+		HC_LENGTH(ehci, ehci_readl(ehci, &ehci->caps->hc_capbase));
- 	ehci->hcs_params = ehci_readl(ehci, &ehci->caps->hcs_params);
- 	hcd->has_tt = 1;
- 	ehci->sbrn = 0x20;
--- 
-1.7.0.4
+We get API breakage then. Which is a pain of course because debug tools
+and the like which think IRQ 0 is "timer ticks" are somewhat broken.
