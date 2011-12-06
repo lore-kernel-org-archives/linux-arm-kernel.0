@@ -1,145 +1,30 @@
-From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
-Date: Tue, 6 Dec 2011 12:31:21 +0100
-Subject: [PATCH] ARM: S3C64XX: Add basic cpuidle driver
-In-Reply-To: <1323117169-9817-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-References: <1323117169-9817-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-Message-ID: <201112061231.22570.heiko@sntech.de>
+From: alan@lxorguk.ukuu.org.uk (Alan Cox)
+Date: Tue, 6 Dec 2011 11:34:58 +0000
+Subject: [PATCH] ata: Don't use NO_IRQ in pata_of_platform driver
+In-Reply-To: <20111206061321.GH9192@game.jcrosoft.org>
+References: <20111110162859.GA7088@oksana.dev.rtsoft.ru>
+ <20111202192618.GC3037@localhost.localdomain>
+ <CA+55aFwekNWz+V4440f=2iu_BfOxSg0NjVogv4cZZDFbJBNoAQ@mail.gmail.com>
+ <1322867573.11728.22.camel@pasglop>
+ <20111205161157.GA27550@localhost.localdomain>
+ <alpine.LFD.2.02.1112051236350.2357@xanadu.home>
+ <20111205180253.GB29812@localhost.localdomain>
+ <alpine.LFD.2.02.1112051310150.2357@xanadu.home>
+ <20111205184522.316598de@lxorguk.ukuu.org.uk>
+ <20111206061321.GH9192@game.jcrosoft.org>
+Message-ID: <20111206113458.1c247d79@lxorguk.ukuu.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, 5. Dezember 2011, 21:32:49 schrieb Mark Brown:
-> Add a very basic cpuidle driver for S3C64xx which merely drives the CPU
-> into IDLE mode. We could do this with pm_idle but the more modern idiom
-> is to use cpuidle and the intention is to go further and support STOP
-> and DEEP-STOP states in conjunction with the pm_domain framework.
-cool :-)
+> can we sinply introduce a macro irq_is_valid
 
-My S3C2416 playground is quite similar in its low power modes and their wakeup 
-sources and I've got a idle driver for it in a similar state sitting here.
+See the 2005, 2006 and 2008 discussion.
 
-So I'm really looking forward to seeing a possible example on how to support 
-the STOP and DEEP-STOP modes best.
+    if (!dev->irq)
 
+is the proper test.
 
-> The actual state entry code was lifted from Tomasz Figa's work on spica.
->
-> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
-Acked-by: Heiko Stuebner <heiko@sntech.de>
+The <= is just a temporary thing while ARM gets its publically visible
+house in order so it can be done without breakage.
 
-
-> ---
->  arch/arm/mach-s3c64xx/Makefile  |    1 +
->  arch/arm/mach-s3c64xx/cpuidle.c |   91
-> +++++++++++++++++++++++++++++++++++++++ 2 files changed, 92 insertions(+),
-> 0 deletions(-)
->  create mode 100644 arch/arm/mach-s3c64xx/cpuidle.c
-> 
-> diff --git a/arch/arm/mach-s3c64xx/Makefile
-> b/arch/arm/mach-s3c64xx/Makefile index e32093c..8f5574b 100644
-> --- a/arch/arm/mach-s3c64xx/Makefile
-> +++ b/arch/arm/mach-s3c64xx/Makefile
-> @@ -40,6 +40,7 @@ obj-$(CONFIG_S3C64XX_SETUP_SDHCI_GPIO) +=
-> setup-sdhci-gpio.o obj-$(CONFIG_PM)		+= pm.o
->  obj-$(CONFIG_PM)		+= sleep.o
->  obj-$(CONFIG_PM)		+= irq-pm.o
-> +obj-$(CONFIG_CPU_IDLE)		+= cpuidle.o
-> 
->  # Machine support
-> 
-> diff --git a/arch/arm/mach-s3c64xx/cpuidle.c
-> b/arch/arm/mach-s3c64xx/cpuidle.c new file mode 100644
-> index 0000000..625d2c7
-> --- /dev/null
-> +++ b/arch/arm/mach-s3c64xx/cpuidle.c
-> @@ -0,0 +1,91 @@
-> +/* linux/arch/arm/mach-s3c64xx/cpuidle.c
-> + *
-> + * Copyright (c) 2011 Wolfson Microelectronics, plc
-> + * Copyright (c) 2011 Samsung Electronics Co., Ltd.
-> + *		http://www.samsung.com
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> +*/
-> +
-> +#include <linux/kernel.h>
-> +#include <linux/init.h>
-> +#include <linux/cpuidle.h>
-> +#include <linux/io.h>
-> +#include <linux/export.h>
-> +#include <linux/time.h>
-> +
-> +#include <asm/proc-fns.h>
-> +
-> +#include <mach/map.h>
-> +
-> +#include <mach/regs-sys.h>
-> +#include <mach/regs-syscon-power.h>
-> +
-> +static int s3c64xx_enter_idle(struct cpuidle_device *dev,
-> +			      struct cpuidle_driver *drv,
-> +			      int index)
-> +{
-> +	struct timeval before, after;
-> +	unsigned long tmp;
-> +	int idle_time;
-> +
-> +	local_irq_disable();
-> +	do_gettimeofday(&before);
-> +
-> +	/* Setup PWRCFG to enter idle mode */
-> +	tmp = __raw_readl(S3C64XX_PWR_CFG);
-> +	tmp &= ~S3C64XX_PWRCFG_CFG_WFI_MASK;
-> +	tmp |= S3C64XX_PWRCFG_CFG_WFI_IDLE;
-> +	__raw_writel(tmp, S3C64XX_PWR_CFG);
-> +
-> +	cpu_do_idle();
-> +
-> +	do_gettimeofday(&after);
-> +	local_irq_enable();
-> +	idle_time = (after.tv_sec - before.tv_sec) * USEC_PER_SEC +
-> +		    (after.tv_usec - before.tv_usec);
-> +
-> +	dev->last_residency = idle_time;
-> +	return index;
-> +}
-> +
-> +static struct cpuidle_state s3c64xx_cpuidle_set[] = {
-> +	[0] = {
-> +		.enter			= s3c64xx_enter_idle,
-> +		.exit_latency		= 1,
-> +		.target_residency	= 100000,
-> +		.flags			= CPUIDLE_FLAG_TIME_VALID,
-> +		.name			= "IDLE",
-> +		.desc			= "System active, ARM gated",
-> +	},
-> +};
-> +
-> +static struct cpuidle_driver s3c64xx_cpuidle_driver = {
-> +	.name		= "s3c64xx_cpuidle",
-> +	.owner		= THIS_MODULE,
-> +	.state_count	= ARRAY_SIZE(s3c64xx_cpuidle_set),
-> +};
-> +
-> +static struct cpuidle_device s3c64xx_cpuidle_device = {
-> +	.state_count	= ARRAY_SIZE(s3c64xx_cpuidle_set),
-> +};
-> +
-> +static int __init s3c64xx_init_cpuidle(void)
-> +{
-> +	int ret;
-> +
-> +	memcpy(s3c64xx_cpuidle_driver.states, s3c64xx_cpuidle_set,
-> +	       sizeof(s3c64xx_cpuidle_set));
-> +	cpuidle_register_driver(&s3c64xx_cpuidle_driver);
-> +
-> +	ret = cpuidle_register_device(&s3c64xx_cpuidle_device);
-> +	if (ret) {
-> +		pr_err("Failed to register cpuidle device: %d\n", ret);
-> +		return ret;
-> +	}
-> +
-> +	return 0;
-> +}
-> +device_initcall(s3c64xx_init_cpuidle);
+Alan
