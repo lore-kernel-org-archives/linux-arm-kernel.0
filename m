@@ -1,46 +1,62 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Tue, 6 Dec 2011 07:13:21 +0100
-Subject: [PATCH] ata: Don't use NO_IRQ in pata_of_platform driver
-In-Reply-To: <20111205184522.316598de@lxorguk.ukuu.org.uk>
-References: <20111110162859.GA7088@oksana.dev.rtsoft.ru>
- <20111202192618.GC3037@localhost.localdomain>
- <CA+55aFwekNWz+V4440f=2iu_BfOxSg0NjVogv4cZZDFbJBNoAQ@mail.gmail.com>
- <1322867573.11728.22.camel@pasglop>
- <20111205161157.GA27550@localhost.localdomain>
- <alpine.LFD.2.02.1112051236350.2357@xanadu.home>
- <20111205180253.GB29812@localhost.localdomain>
- <alpine.LFD.2.02.1112051310150.2357@xanadu.home>
- <20111205184522.316598de@lxorguk.ukuu.org.uk>
-Message-ID: <20111206061321.GH9192@game.jcrosoft.org>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 5 Dec 2011 23:28:08 -0700 (MST)
+Subject: [PATCH v3 3/5] clk: introduce the common clock framework
+In-Reply-To: <alpine.DEB.2.00.1112051706300.6289@utopia.booyaka.com>
+References: <1321926047-14211-1-git-send-email-mturquette@linaro.org>
+ <1321926047-14211-4-git-send-email-mturquette@linaro.org>
+ <alpine.DEB.2.00.1112051342430.6289@utopia.booyaka.com>
+ <20111205234849.GA14547@n2100.arm.linux.org.uk>
+ <alpine.DEB.2.00.1112051706300.6289@utopia.booyaka.com>
+Message-ID: <alpine.DEB.2.00.1112052322120.6289@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18:45 Mon 05 Dec     , Alan Cox wrote:
-> > But as you illustrated, there is a large number of drivers that already 
-> > assume no IRQ is < 0, even if they don't use any IRQ #0 themselves.  
-> > That is a much bigger problem to fix.
-> 
-> And a much larger number assuming the reverse is true which are hiding
-> potential bugs on ARM.
-> 
-> Looking at the serial stuff the best checks appear to be looking at
-> "irq", "-1" and NO_IRQ.
-> 
-> For migration stuff that's doing broken things like
-> 
-> 	if (irq < 0)
-> 
-> can be changed to
-> 
-> 	if (irq <= 0)
-> 
-> and that can be done before NO_IRQ itself is nailed on ARM and PA-RISC.
-can we sinply introduce a macro irq_is_valid
+On Mon, 5 Dec 2011, Paul Walmsley wrote:
 
-and make it chip dependant as gpio_is_valid
-and then move away from irq 0 valid
+> For example, here's a trivial implementation for rate recalculation for a 
+> integer divider clock node (that can't be handled with a right shift):
+> 
+> s64 div(struct clk *clk, u32 div) {
+> 	if (clk->flags & CLK_PARENT_RATE_MAX_U32)
+> 		return ((u32)(clk->parent->rate & 0xffffffff)) / div;
+> 
+> 	clk->rate = clk->parent->rate;
+> 	do_div(clk->rate, div);
+> 	return clk->rate;
+> }
 
-so we do not need to brake anthing first and then easly convert them
+(removing some useless cruft from the above function, for clarity's sake)
 
-Best Regards,
-J.
+s64 div(struct clk *clk, u32 div) {
+	s64 r;
+
+	if (clk->flags & CLK_PARENT_RATE_MAX_U32)
+		return ((u32)clk->parent->rate) / div;
+
+	r = clk->parent->rate;
+	do_div(r, div);
+	return r;
+}
+
+00000000 <div>:
+   0:	e92d4010 	push	{r4, lr}
+   4:	e1a04001 	mov	r4, r1
+   8:	e5d03010 	ldrb	r3, [r0, #16]
+   c:	e3130001 	tst	r3, #1
+  10:	1a000005 	bne	2c <div+0x2c>
+
+  14:	e5903000 	ldr	r3, [r0]
+  18:	e1c300d8 	ldrd	r0, [r3, #8]
+  1c:	ebfffffe 	bl	0 <__do_div64>
+  20:	e1a00002 	mov	r0, r2
+  24:	e1a01003 	mov	r1, r3
+  28:	e8bd8010 	pop	{r4, pc}
+
+  2c:	e5900000 	ldr	r0, [r0]
+  30:	e5900008 	ldr	r0, [r0, #8]
+  34:	ebfffffe 	bl	0 <__aeabi_uidiv>
+  38:	e3a01000 	mov	r1, #0
+  3c:	e8bd8010 	pop	{r4, pc}
+
+
+- Paul
