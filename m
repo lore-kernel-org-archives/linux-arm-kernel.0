@@ -1,36 +1,26 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 6 Dec 2011 14:01:23 -0500 (EST)
-Subject: [PATCH] ARM: make head.S register assignments more convenient
-In-Reply-To: <20111206132331.GA13769@linaro.org>
-References: <alpine.LFD.2.02.1112051528200.2357@xanadu.home>
- <20111206111105.GA2270@linaro.org>
- <20111206112912.GR14542@n2100.arm.linux.org.uk>
- <20111206132331.GA13769@linaro.org>
-Message-ID: <alpine.LFD.2.02.1112061357280.2357@xanadu.home>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Tue, 6 Dec 2011 20:05:55 +0100
+Subject: [MXS MMC 1/5] Fix grammatical error in comment
+In-Reply-To: <1ebaeb7f7ed88b1d82f5fc3a01c0661f38e2a16d.1323177907.git.LW@KARO-electronics.de>
+References: <cover.1323177907.git.LW@KARO-electronics.de>
+ <1ebaeb7f7ed88b1d82f5fc3a01c0661f38e2a16d.1323177907.git.LW@KARO-electronics.de>
+Message-ID: <20111206190555.GC7835@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 6 Dec 2011, Dave Martin wrote:
-
-> On Tue, Dec 06, 2011 at 11:29:12AM +0000, Russell King - ARM Linux wrote:
-> > On Tue, Dec 06, 2011 at 11:11:05AM +0000, Dave Martin wrote:
-> > > Is it also worth changing the other proc-*.S setup rountines to be PCS
-> > > compliant too?  This would clean up the calling convention further, and
-> > > help avoid future sutprises.
-> > 
-> > They _aren't_ PCS functions in any case.  They don't have a stack
-> > available to them.  So, having them as non-PCS functions reinforces
-> > the fact that they _are_ special.
+On Tue, Dec 06, 2011 at 02:41:26PM +0100, Lothar Wa?mann wrote:
 > 
-> Fair point.
-> 
-> Maybe a brief note in the commit message explaining why only certain
-> proc-*.S files are touched would be belpful.  But it's not vital.
+> Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
 
-They are touched only because they were using registers where I moved 
-the previous r1 and r2 values to.  So I moved their usage of mainly 
-r5-r6 to the normally callee clobbered registers.  I don't think there 
-is further changes that would be as badly needed as those I did.
+Acked-by: Wolfram Sang <w.sang@pengutronix.de>
 
-
-Nicolas
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111206/8eeada94/attachment-0001.sig>
