@@ -1,36 +1,40 @@
-From: alan@lxorguk.ukuu.org.uk (Alan Cox)
-Date: Tue, 6 Dec 2011 12:11:31 +0000
-Subject: [PATCH] ata: Don't use NO_IRQ in pata_of_platform driver
-In-Reply-To: <20111206112545.GQ14542@n2100.arm.linux.org.uk>
-References: <1322867573.11728.22.camel@pasglop>
- <20111205161157.GA27550@localhost.localdomain>
- <alpine.LFD.2.02.1112051236350.2357@xanadu.home>
- <20111205180253.GB29812@localhost.localdomain>
- <alpine.LFD.2.02.1112051310150.2357@xanadu.home>
- <20111205192605.GD29812@localhost.localdomain>
- <alpine.LFD.2.02.1112051443190.2357@xanadu.home>
- <20111206093709.GB2274@linaro.org>
- <20111206104654.GN14542@n2100.arm.linux.org.uk>
- <20111206110554.53bddd14@lxorguk.ukuu.org.uk>
- <20111206112545.GQ14542@n2100.arm.linux.org.uk>
-Message-ID: <20111206121131.3446266c@lxorguk.ukuu.org.uk>
+From: pullip.cho@samsung.com (KyongHo Cho)
+Date: Tue, 6 Dec 2011 21:13:18 +0900
+Subject: [PATCH v7 0/2] iommu/exynos: Add IOMMU/System MMU driver for
+ Samsung Exynos
+In-Reply-To: <CAH9JG2VALcm-PreS7S2SZPPgEbid_6_VWJA0PHBEtY5KvaA3Og@mail.gmail.com>
+References: <1321609650-1329-1-git-send-email-pullip.cho@samsung.com>
+ <20111205154715.GE25178@amd.com>
+ <CAH9JG2VALcm-PreS7S2SZPPgEbid_6_VWJA0PHBEtY5KvaA3Og@mail.gmail.com>
+Message-ID: <CAHQjnOOCHO3eDiUft4WgS=8N5EheWas+n3MD9xxBKUoSjmNQSQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> However, I have suggested in the past that new platforms _should_ avoid
-> not just IRQ0 but IRQ0-15 (for a completely different reason to that of
-> 'IRQ0 means no IRQ'.)  But such comments just get ignored, so I just
-> don't see the point in doing anything about this.  If people experience
-> breakage, so be it.  I too will have little sympathy but not for the same
-> reason.
+On Tue, Dec 6, 2011 at 8:24 AM, Kyungmin Park <kmpark@infradead.org> wrote:
+> On 12/6/11, Joerg Roedel <joerg.roedel@amd.com> wrote:
+>> On Fri, Nov 18, 2011 at 06:47:28PM +0900, KyongHo Cho wrote:
+>>> Patch Summary:
+>>> [PATCH v7 1/2] ARM: EXYNOS: Change System MMU platform device definitions
+>>> [PATCH v7 2/2] iommu/exynos: Add iommu driver for Exynos Platforms
+>>
+>> Okay, I merged it into arm/exynos, but it is not pushed yet. Actually
+>> there were conflicts while merging, which I resolved. What I failed
+>> to find is a config for Exynos that actually builds for upstream Linux.
+>> Probably I havn't tried hard enough to find one... Can you provide a
+>> kernel config that I can use for my testing and that builds a current
+>> 3.2-rc4 kernel for Exynos?
+> and I hope to see the real example how to use it with exynos platform.
+>
+> Now I can't find the interface between exynos platform and generic exynos iommu.
+In "[PATCH v7 1/2] ARM: EXYNOS: Change System MMU platform device
+definitions" patch,
+you can find sysmmu_init().
+It stores associations between a system MMU and a peripheral device in
+platform data of platform device descriptor.
+If Exynos IOMMU driver finds the association while probing, then the
+driver can control the system MMU.
 
-The one I can think of that is capable of taking EISA/ISA cards but has
-differently IRQ plumbing arrangements is PA-RISC, and they do exactly
-this.
-
-Beyond that it probably doesn't come up except in the weird world of PCI
-legacy compatibility for legacy IDE and VGA vertical interrupt routing.
-In those cases we fix up the PCI config space so the platform in turn can
-do proper IRQ plumbing.
-
-Alan
+> BTW, how do you test it at mainline kernel?
+>
+I merged IOMMU mainline branch to our kernel branch and tested it with
+our FIMC, MFC, JPEG, 2D.
