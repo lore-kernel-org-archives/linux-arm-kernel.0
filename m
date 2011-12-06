@@ -1,30 +1,56 @@
-From: alan@lxorguk.ukuu.org.uk (Alan Cox)
-Date: Tue, 6 Dec 2011 11:34:58 +0000
-Subject: [PATCH] ata: Don't use NO_IRQ in pata_of_platform driver
-In-Reply-To: <20111206061321.GH9192@game.jcrosoft.org>
-References: <20111110162859.GA7088@oksana.dev.rtsoft.ru>
- <20111202192618.GC3037@localhost.localdomain>
- <CA+55aFwekNWz+V4440f=2iu_BfOxSg0NjVogv4cZZDFbJBNoAQ@mail.gmail.com>
- <1322867573.11728.22.camel@pasglop>
- <20111205161157.GA27550@localhost.localdomain>
- <alpine.LFD.2.02.1112051236350.2357@xanadu.home>
- <20111205180253.GB29812@localhost.localdomain>
- <alpine.LFD.2.02.1112051310150.2357@xanadu.home>
- <20111205184522.316598de@lxorguk.ukuu.org.uk>
- <20111206061321.GH9192@game.jcrosoft.org>
-Message-ID: <20111206113458.1c247d79@lxorguk.ukuu.org.uk>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 06 Dec 2011 20:35:43 +0900
+Subject: [PATCH resend3] arm: s3c24xx: Add new LCD (W35i) support for
+ Mini2440 board
+In-Reply-To: <4EDD71C5.1090905@solonet.org.ua>
+References: <4EC588A8.3030907@solonet.org.ua> <4EDD71C5.1090905@solonet.org.ua>
+Message-ID: <02f001ccb40b$303fa8a0$90bef9e0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> can we sinply introduce a macro irq_is_valid
+Denis Kuzmenko wrote:
+> 
+> Add new LCD (W35i) support for Mini2440 board
+> 
+> Signed-off-by: Denis Kuzmenko <linux@solonet.org.ua>
+> ---
+> 
+> diff --git a/arch/arm/mach-s3c2440/mach-mini2440.c
+> b/arch/arm/mach-s3c2440/mach-mini2440.c
+> index fc2dc0b..951eadd 100644
+> --- a/arch/arm/mach-s3c2440/mach-mini2440.c
+> +++ b/arch/arm/mach-s3c2440/mach-mini2440.c
+> @@ -167,6 +167,24 @@ static struct s3c2410fb_display mini2440_lcd_cfg[]
+> __initdata = {
+>  		.lcdcon5	= (S3C2410_LCDCON5_FRM565 |
+>  				   S3C2410_LCDCON5_HWSWP),
+>  	},
+> +	/* mini2440 + 3.5" TFT (LCD-W35i, LQ035Q1DG06 type) + touchscreen*/
+> +	[3] = {
+> +		_LCD_DECLARE(
+> +			/* clock */
+> +			7,
+> +			/* xres, margin_right, margin_left, hsync */
+> +			320, 68, 66, 4,
+> +			/* yres, margin_top, margin_bottom, vsync */
+> +			240, 4, 4, 9,
+> +			/* refresh rate */
+> +			60),
+> +		.lcdcon5	= (S3C2410_LCDCON5_FRM565 |
+> +				   S3C2410_LCDCON5_INVVDEN |
+> +				   S3C2410_LCDCON5_INVVFRAME |
+> +				   S3C2410_LCDCON5_INVVLINE |
+> +				   S3C2410_LCDCON5_INVVCLK |
+> +				   S3C2410_LCDCON5_HWSWP),
+> +	},
+>  };
+>   /* todo - put into gpio header */
 
-See the 2005, 2006 and 2008 discussion.
+Looks ok, will apply.
+Thanks.
 
-    if (!dev->irq)
-
-is the proper test.
-
-The <= is just a temporary thing while ARM gets its publically visible
-house in order so it can be done without breakage.
-
-Alan
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
