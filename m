@@ -1,44 +1,62 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 5 Dec 2011 23:56:09 +0000
-Subject: [PATCH 07/23] ARM: plat-omap: remove arch specific special
- handling for ioremap
-In-Reply-To: <alpine.LFD.2.02.1112021637200.2357@xanadu.home>
-References: <1321422521-1138-1-git-send-email-nico@fluxnic.net>
- <1321422521-1138-8-git-send-email-nico@fluxnic.net>
- <20111202202125.GZ31337@atomide.com>
- <alpine.LFD.2.02.1112021637200.2357@xanadu.home>
-Message-ID: <20111205235609.GI14542@n2100.arm.linux.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 5 Dec 2011 16:02:32 -0800
+Subject: [GIT PULL] ARM perf updates for 3.3
+In-Reply-To: <20111205231909.GA31337@atomide.com>
+References: <20111202170231.GP5540@mudshark.cambridge.arm.com>
+ <20111203092659.GL9581@n2100.arm.linux.org.uk>
+ <20111205211136.GF14542@n2100.arm.linux.org.uk>
+ <20111205231909.GA31337@atomide.com>
+Message-ID: <20111206000232.GC31337@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 02, 2011 at 04:39:31PM -0500, Nicolas Pitre wrote:
-> On Fri, 2 Dec 2011, Tony Lindgren wrote:
+* Tony Lindgren <tony@atomide.com> [111205 14:51]:
+> * Russell King - ARM Linux <linux@arm.linux.org.uk> [111205 12:40]:
+> > Tony,
+> > 
+> > Can you please treat this with the utmost urgency.  If I don't get a
+> > reply from you within the next two hours, then I'm committing this
+> > merge resolution whether or not it's correct for you - as I have other
+> > stuff which needs to be committed to my tree and I can't wait any
+> > longer for your reply.
 > 
-> > Hi Nico,
-> > 
-> > * Nicolas Pitre <nico@fluxnic.net> [111115 21:21]:
-> > > From: Nicolas Pitre <nicolas.pitre@linaro.org>
-> > > 
-> > > A generic version should replace this later.
-> > > 
-> > > As io.c has become nearly empty, omap_init_consistent_dma_size() is moved
-> > > into common.c so that io.c can be removed entirely.
-> > 
-> > Sorry for the delay on trying this series out. It boots fine
-> > on omap2/3/4 as Kevin already noted. However, the following
-> > fix is needed for this patch to keep things building for
-> > omap1_defconfig.
-> >  
-> > > Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
-> > 
-> > With the following fix it works on what I tested. That's
-> > osk5912 n800 2430sdp n900 zoom3 and blaze. If you're still
-> > taking acks for this series:
-> > 
-> > Tested-by: Tony Lindgren <tony@atomide.com>
-> 
-> OK, thanks for testing.  Since Russell didn't commit this to his stable 
-> branch yet I simply folded in your fix and added your tested-by tag.
+> Sorry only now saw this. Looking at it now.
 
-So I'm about to push what I had out in the devel-stable branch... what
-am I supposed to do with this?
+Here's what I would do:
+
+1. Apply Santosh' omap2plus_defconfig patches first into devel-stable at
+   commit 53fadbdd83039bb1181e4ff76123d612cdf26c37 (Merge branch
+   'irqchip-consolidation' ...). The patches in question are 7188/1 and
+   patch 7189/1.
+
+2. Pull Will's for-rmk branch on top of that
+
+3. Run git mergetool which produces the resolution you posted earlier
+
+4. Before committing apply the following build fix and run git update-index
+   arch/arm/mach-omap2/display.c. This came from the DSS fixes in -rc4.
+
+Then it all builds and boots fine. 
+
+Regards,
+
+Tony
+
+
+--- a/arch/arm/mach-omap2/display.c
++++ b/arch/arm/mach-omap2/display.c
+@@ -22,12 +22,13 @@
+ #include <linux/io.h>
+ #include <linux/clk.h>
+ #include <linux/err.h>
++#include <linux/delay.h>
+ 
+ #include <video/omapdss.h>
+ #include <plat/omap_hwmod.h>
+ #include <plat/omap_device.h>
+ #include <plat/omap-pm.h>
+-#include <plat/common.h>
++#include "common.h"
+ 
+ #include "control.h"
+ #include "display.h"
