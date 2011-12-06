@@ -1,54 +1,33 @@
-From: tixy@yxit.co.uk (Tixy)
-Date: Tue, 06 Dec 2011 20:22:47 +0000
-Subject: [RFC][PATCH] ARM: kirkwood: Remove eSATA SheevaPlug board support
-In-Reply-To: <alpine.LFD.2.02.1112061442430.2357@xanadu.home>
-References: <1322737480.9622.5.camel@phoenix>
- <1322912383.2378.79.camel@computer2>
- <alpine.LFD.2.02.1112031247230.2357@xanadu.home>
- <1323155228.2237.10.camel@computer2>
- <alpine.LFD.2.02.1112061442430.2357@xanadu.home>
-Message-ID: <1323202967.3019.12.camel@computer2>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 6 Dec 2011 20:34:16 +0000
+Subject: [GIT PULL v2] Linux support for ARM LPAE
+In-Reply-To: <20111206152955.GC31720@arm.com>
+References: <20111206152955.GC31720@arm.com>
+Message-ID: <20111206203416.GV14542@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2011-12-06 at 14:45 -0500, Nicolas Pitre wrote:
-> On Tue, 6 Dec 2011, Tixy wrote:
-> 
-> > On Sat, 2011-12-03 at 13:00 -0500, Nicolas Pitre wrote:
-> > > On Sat, 3 Dec 2011, Tixy wrote:
-> > > > [PATCH] Fix machine_is_xxx() naming for eSata SheevaPlug and QNAP TS-209
-> > > > 
-> > > > The eSata SheevaPlug and QNAP TS-209 devices were removed from
-> > > > mach-types due to naming mismatches between machine_is_xxx(), CONFIG_XXX
-> > > > and MACH_TYPE_XXX.
-> > > > 
-> > > > This patch fixes those mismatches and adds the devices back into
-> > > > mach-types.
-> > > > 
-> > > > Cc: Nicolas Pitre <nico@fluxnic.net>
-> > > > Cc: Lennert Buytenhek <kernel@wantstofly.org>
-> > > > Cc: Russell King <linux@arm.linux.org.uk>
-> > > > Signed-off-by: Jon Medhurst <tixy@yxit.co.uk>
-> > > 
-> > > Acked-by: Nicolas Pitre <nico@linaro.org>
-> > > 
-> > > Obviously, the change to mach-types should be done in the machine 
-> > > registry database as well by RMK.
-> > 
-> > Which tree should this go through? Russell's or arm-soc?
-> 
-> The arm-soc tree is probably more appropriate.  Don't include the 
-> mach-types changes though as it is preferable if they come through RMK's 
-> database updates.
+On Tue, Dec 06, 2011 at 03:29:55PM +0000, Catalin Marinas wrote:
+> I updated the series with an additional signed-off-by to your patch. The
+> code is unchanged. Could you please pull it again?
 
-It's already gone through Russell's tree.
+I will for this time only, but note - last time you said:
 
-I realised that a mach-types patch couldn't go into arm-soc as that
-doesn't have the removed machine entries, and the only other changes in
-linux-next for the sheevaplug and ts209 files were from Russell's tree
-anyway. And finally, I thought that Russel's mach-types generation
-script would want to see the fixed files in his tree, otherwise it would
-want to delete the machine entries.
+> If there are no further comments, could you please pull the ARM LPAE
+> branch below? They should be merged after Will's idmap patches (no real
+> conflict, just correctly functioning setup_mm_for_reboot).
 
--- 
-Tixy
+Now, the thing is, merging it after Will's patches won't solve that in
+any shape or form - it really does not matter what order I do the merges
+in, the fact of the matter is that there is no ordering or dependence
+between your patches and Will's, so there's no guarantee that your code
+will see a properly functioning setup_mm_for_reboot.
+
+If you actually depend on something in some other tree, you need to have
+it merged into your tree _before_ the objects which depend on it.
+
+So, what the above comment admits to me is that "what I'm asking you to
+pull is known to be broken if a git-bisect hits one of these commits,
+but I don't care."
+
+As I said, I will merge it this time around, but next time I won't.
