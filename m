@@ -1,28 +1,38 @@
 From: dave.martin@linaro.org (Dave Martin)
-Date: Tue, 6 Dec 2011 13:23:31 +0000
-Subject: [PATCH] ARM: make head.S register assignments more convenient
-In-Reply-To: <20111206112912.GR14542@n2100.arm.linux.org.uk>
-References: <alpine.LFD.2.02.1112051528200.2357@xanadu.home>
- <20111206111105.GA2270@linaro.org>
- <20111206112912.GR14542@n2100.arm.linux.org.uk>
-Message-ID: <20111206132331.GA13769@linaro.org>
+Date: Tue, 6 Dec 2011 13:25:27 +0000
+Subject: [PATCH] ata: Don't use NO_IRQ in pata_of_platform driver
+In-Reply-To: <20111206114952.GS14542@n2100.arm.linux.org.uk>
+References: <20111205161157.GA27550@localhost.localdomain>
+ <alpine.LFD.2.02.1112051236350.2357@xanadu.home>
+ <20111205180253.GB29812@localhost.localdomain>
+ <alpine.LFD.2.02.1112051310150.2357@xanadu.home>
+ <20111205192605.GD29812@localhost.localdomain>
+ <alpine.LFD.2.02.1112051443190.2357@xanadu.home>
+ <20111206093709.GB2274@linaro.org>
+ <20111206104654.GN14542@n2100.arm.linux.org.uk>
+ <20111206113735.GC2274@linaro.org>
+ <20111206114952.GS14542@n2100.arm.linux.org.uk>
+Message-ID: <20111206132527.GA13780@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 06, 2011 at 11:29:12AM +0000, Russell King - ARM Linux wrote:
-> On Tue, Dec 06, 2011 at 11:11:05AM +0000, Dave Martin wrote:
-> > Is it also worth changing the other proc-*.S setup rountines to be PCS
-> > compliant too?  This would clean up the calling convention further, and
-> > help avoid future sutprises.
+On Tue, Dec 06, 2011 at 11:49:52AM +0000, Russell King - ARM Linux wrote:
+> On Tue, Dec 06, 2011 at 11:37:35AM +0000, Dave Martin wrote:
+> > 1) All OF code and drivers should be migrating to use 0 instead of NO_IRQ
+> >    for the no-interrupt case.  Code which receives irq numbers directly
+> >    from the OF framework and refers to NO_IRQ, or expects 0 to be a valid
+> >    needs to be fixed.
+> > 
+> > 2) Where we hit a problem, board code needs to be adapted to remap HW IRQs
+> >    0-15 to different software values.  (This could be done using irq
+> >    domains, or not)
 > 
-> They _aren't_ PCS functions in any case.  They don't have a stack
-> available to them.  So, having them as non-PCS functions reinforces
-> the fact that they _are_ special.
+> No AMBA driver I'm aware of ever uses an IRQ number 0 or is passed such
+> an IRQ number.
 
-Fair point.
+OK, hopefully we can safely ignore that case, then.
 
-Maybe a brief note in the commit message explaining why only certain
-proc-*.S files are touched would be belpful.  But it's not vital.
+But other than that, you're in agreement?
 
 Cheers
 ---Dave
