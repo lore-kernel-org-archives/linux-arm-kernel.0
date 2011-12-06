@@ -1,266 +1,203 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue,  6 Dec 2011 23:04:43 +0800
-Subject: [PATCH v3] mfd: mc13xxx: add device tree probe support
-In-Reply-To: <1322731268-12158-2-git-send-email-shawn.guo@linaro.org>
-References: <1322731268-12158-2-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1323183883-32161-1-git-send-email-shawn.guo@linaro.org>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 06 Dec 2011 09:06:57 -0600
+Subject: [RFC PATCH 1/8] ARM: Add commonly used cpuidle init code
+In-Reply-To: <1323146291-10676-2-git-send-email-rob.lee@linaro.org>
+References: <1323146291-10676-1-git-send-email-rob.lee@linaro.org>
+ <1323146291-10676-2-git-send-email-rob.lee@linaro.org>
+Message-ID: <4EDE2F91.5090104@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It adds device tree probe support for mc13xxx mfd driver.
+On 12/05/2011 10:38 PM, Robert Lee wrote:
+> Add commonly used cpuidle init code to avoid unecessary duplication.
+> 
+> Signed-off-by: Robert Lee <rob.lee@linaro.org>
+> ---
+>  arch/arm/common/Makefile       |    1 +
+>  arch/arm/common/cpuidle.c      |  132 ++++++++++++++++++++++++++++++++++++++++
+>  arch/arm/include/asm/cpuidle.h |   25 ++++++++
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-Cc: Samuel Ortiz <sameo@linux.intel.com>
----
-Changes since v2:
+Why not move cpuidle drivers to drivers/idle/ ?
 
- * Add some note on how driver matches regulator device and the node
-   in binding document
+>  3 files changed, 158 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/common/cpuidle.c
+>  create mode 100644 arch/arm/include/asm/cpuidle.h
+> 
+> diff --git a/arch/arm/common/Makefile b/arch/arm/common/Makefile
+> index 6ea9b6f..0865f69 100644
+> --- a/arch/arm/common/Makefile
+> +++ b/arch/arm/common/Makefile
+> @@ -17,3 +17,4 @@ obj-$(CONFIG_ARCH_IXP2000)	+= uengine.o
+>  obj-$(CONFIG_ARCH_IXP23XX)	+= uengine.o
+>  obj-$(CONFIG_PCI_HOST_ITE8152)  += it8152.o
+>  obj-$(CONFIG_ARM_TIMER_SP804)	+= timer-sp.o
+> +obj-$(CONFIG_CPU_IDLE)		+= cpuidle.o
+> diff --git a/arch/arm/common/cpuidle.c b/arch/arm/common/cpuidle.c
+> new file mode 100644
+> index 0000000..e9a46a3
+> --- /dev/null
+> +++ b/arch/arm/common/cpuidle.c
+> @@ -0,0 +1,132 @@
+> +/*
+> + * Copyright 2011 Freescale Semiconductor, Inc.
+> + * Copyright 2011 Linaro Ltd.
+> + *
+> + * The code contained herein is licensed under the GNU General Public
+> + * License. You may obtain a copy of the GNU General Public License
+> + * Version 2 or later at the following locations:
+> + *
+> + * http://www.opensource.org/licenses/gpl-license.html
+> + * http://www.gnu.org/copyleft/gpl.html
+> + */
+> +
+> +/*
+> + * This code performs provides some commonly used cpuidle setup functionality
+> + * used by many ARM SoC platforms.  Providing this functionality here
+> + * reduces the duplication of this code for each ARM platform that uses it.
+> + */
+> +
+> +#include <linux/kernel.h>
+> +#include <linux/io.h>
+> +#include <linux/cpuidle.h>
+> +#include <linux/hrtimer.h>
+> +#include <linux/err.h>
+> +#include <asm/cpuidle.h>
+> +#include <asm/proc-fns.h>
+> +
+> +static struct cpuidle_device __percpu * arm_cpuidle_devices;
+> +
+> +static int (*mach_cpuidle)(struct cpuidle_device *dev,
+> +			       struct cpuidle_driver *drv,
+> +				int index);
+> +
+> +static int arm_enter_idle(struct cpuidle_device *dev,
+> +			       struct cpuidle_driver *drv, int index)
 
-Since it's a small change, I only resend this patch (as v3) instead
-of the whole series.  Hope it's fine.
+I think how this works is backwards. This function is only called if
+there is a NULL enter function for a state, but mach_cpuidle is global.
+Ideally, I want to call this function for every state, but call a
+different mach_cpuidle function for each state. Yes, you could select a
+specific function for each state within the mach_cpuidle function, but
+that seems silly to make the per state function global and then have to
+select a per state function again. And if many users are doing that,
+then it belongs in the common code.
 
-Regards,
-Shawn
+> +{
+> +	ktime_t time_start, time_end;
+> +
+> +	local_irq_disable();
+> +	local_fiq_disable();
+> +
+> +	time_start = ktime_get();
+> +
+> +	index = mach_cpuidle(dev, drv, index);
+> +
+> +	time_end = ktime_get();
+> +
+> +	local_fiq_enable();
+> +	local_irq_enable();
+> +
+> +	dev->last_residency =
+> +		(int)ktime_to_us(ktime_sub(time_end, time_start));
+> +
+> +	return index;
+> +}
+> +
+> +void arm_cpuidle_devices_uninit(void)
+> +{
+> +	int cpu_id;
+> +	struct cpuidle_device *dev;
+> +
+> +	for_each_possible_cpu(cpu_id) {
+> +		dev = per_cpu_ptr(arm_cpuidle_devices, cpu_id);
+> +		cpuidle_unregister_device(dev);
+> +	}
+> +
+> +	free_percpu(arm_cpuidle_devices);
+> +	return;
 
- Documentation/devicetree/bindings/mfd/mc13xxx.txt |   53 ++++++++++
- drivers/mfd/mc13xxx-core.c                        |  106 +++++++++++++++------
- 2 files changed, 128 insertions(+), 31 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/mfd/mc13xxx.txt
+Don't need return statement.
 
-diff --git a/Documentation/devicetree/bindings/mfd/mc13xxx.txt b/Documentation/devicetree/bindings/mfd/mc13xxx.txt
-new file mode 100644
-index 0000000..4ed46a61
---- /dev/null
-+++ b/Documentation/devicetree/bindings/mfd/mc13xxx.txt
-@@ -0,0 +1,53 @@
-+* Freescale MC13783/MC13892 Power Management Integrated Circuit (PMIC)
-+
-+Required properties:
-+- compatible : Should be "fsl,mc13783" or "fsl,mc13892"
-+
-+Optional properties:
-+- fsl,mc13xxx-uses-adc : Indicate the ADC is being used
-+- fsl,mc13xxx-uses-codec : Indicate the Audio Codec is being used
-+- fsl,mc13xxx-uses-rtc : Indicate the RTC is being used
-+- fsl,mc13xxx-uses-touch : Indicate the touchscreen controller is being used
-+
-+Sub-nodes:
-+- regulators : Contain the regulator nodes.  The name of regulator node
-+  is being used by mc13xxx regulator driver to find the correct relator
-+  device.
-+
-+  The bindings details of individual regulator device can be found in:
-+  Documentation/devicetree/bindings/regulator/regulator.txt
-+
-+Examples:
-+
-+ecspi at 70010000 { /* ECSPI1 */
-+	fsl,spi-num-chipselects = <2>;
-+	cs-gpios = <&gpio3 24 0>, /* GPIO4_24 */
-+		   <&gpio3 25 0>; /* GPIO4_25 */
-+	status = "okay";
-+
-+	pmic: mc13892 at 0 {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		compatible = "fsl,mc13892";
-+		spi-max-frequency = <6000000>;
-+		reg = <0>;
-+		interrupt-parent = <&gpio0>;
-+		interrupts = <8>;
-+
-+		regulators {
-+			sw1_reg: mc13892__sw1 {
-+				regulator-min-microvolt = <600000>;
-+				regulator-max-microvolt = <1375000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			sw2_reg: mc13892__sw2 {
-+				regulator-min-microvolt = <900000>;
-+				regulator-max-microvolt = <1850000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+		};
-+	};
-+};
-diff --git a/drivers/mfd/mc13xxx-core.c b/drivers/mfd/mc13xxx-core.c
-index e9619ac..51b2dcc 100644
---- a/drivers/mfd/mc13xxx-core.c
-+++ b/drivers/mfd/mc13xxx-core.c
-@@ -18,11 +18,15 @@
- #include <linux/spi/spi.h>
- #include <linux/mfd/core.h>
- #include <linux/mfd/mc13xxx.h>
-+#include <linux/of.h>
-+#include <linux/of_device.h>
-+#include <linux/of_gpio.h>
- 
- struct mc13xxx {
- 	struct spi_device *spidev;
- 	struct mutex lock;
- 	int irq;
-+	int flags;
- 
- 	irq_handler_t irqhandler[MC13XXX_NUM_IRQ];
- 	void *irqdata[MC13XXX_NUM_IRQ];
-@@ -550,10 +554,7 @@ static const char *mc13xxx_get_chipname(struct mc13xxx *mc13xxx)
- 
- int mc13xxx_get_flags(struct mc13xxx *mc13xxx)
- {
--	struct mc13xxx_platform_data *pdata =
--		dev_get_platdata(&mc13xxx->spidev->dev);
--
--	return pdata->flags;
-+	return mc13xxx->flags;
- }
- EXPORT_SYMBOL(mc13xxx_get_flags);
- 
-@@ -696,17 +697,67 @@ static int mc13xxx_add_subdevice(struct mc13xxx *mc13xxx, const char *format)
- 	return mc13xxx_add_subdevice_pdata(mc13xxx, format, NULL, 0);
- }
- 
-+#ifdef CONFIG_OF
-+static int mc13xxx_probe_flags_dt(struct mc13xxx *mc13xxx)
-+{
-+	struct device_node *np = mc13xxx->spidev->dev.of_node;
-+
-+	if (!np)
-+		return -ENODEV;
-+
-+	if (of_get_property(np, "fsl,mc13xxx-uses-adc", NULL))
-+		mc13xxx->flags |= MC13XXX_USE_ADC;
-+
-+	if (of_get_property(np, "fsl,mc13xxx-uses-codec", NULL))
-+		mc13xxx->flags |= MC13XXX_USE_CODEC;
-+
-+	if (of_get_property(np, "fsl,mc13xxx-uses-rtc", NULL))
-+		mc13xxx->flags |= MC13XXX_USE_RTC;
-+
-+	if (of_get_property(np, "fsl,mc13xxx-uses-touch", NULL))
-+		mc13xxx->flags |= MC13XXX_USE_TOUCHSCREEN;
-+
-+	return 0;
-+}
-+#else
-+static inline int mc13xxx_probe_flags_dt(struct mc13xxx *mc13xxx)
-+{
-+	return -ENODEV;
-+}
-+#endif
-+
-+static const struct spi_device_id mc13xxx_device_id[] = {
-+	{
-+		.name = "mc13783",
-+		.driver_data = MC13XXX_ID_MC13783,
-+	}, {
-+		.name = "mc13892",
-+		.driver_data = MC13XXX_ID_MC13892,
-+	}, {
-+		/* sentinel */
-+	}
-+};
-+MODULE_DEVICE_TABLE(spi, mc13xxx_device_id);
-+
-+static const struct of_device_id mc13xxx_dt_ids[] = {
-+	{ .compatible = "fsl,mc13783", .data = (void *) MC13XXX_ID_MC13783, },
-+	{ .compatible = "fsl,mc13892", .data = (void *) MC13XXX_ID_MC13892, },
-+	{ /* sentinel */ }
-+};
-+MODULE_DEVICE_TABLE(of, mc13xxx_dt_ids);
-+
- static int mc13xxx_probe(struct spi_device *spi)
- {
-+	const struct of_device_id *of_id;
-+	struct spi_driver *sdrv = to_spi_driver(spi->dev.driver);
- 	struct mc13xxx *mc13xxx;
- 	struct mc13xxx_platform_data *pdata = dev_get_platdata(&spi->dev);
- 	enum mc13xxx_id id;
- 	int ret;
- 
--	if (!pdata) {
--		dev_err(&spi->dev, "invalid platform data\n");
--		return -EINVAL;
--	}
-+	of_id = of_match_device(mc13xxx_dt_ids, &spi->dev);
-+	if (of_id)
-+		sdrv->id_table = &mc13xxx_device_id[(enum mc13xxx_id) of_id->data];
- 
- 	mc13xxx = kzalloc(sizeof(*mc13xxx), GFP_KERNEL);
- 	if (!mc13xxx)
-@@ -749,28 +800,33 @@ err_revision:
- 
- 	mc13xxx_unlock(mc13xxx);
- 
--	if (pdata->flags & MC13XXX_USE_ADC)
-+	if (mc13xxx_probe_flags_dt(mc13xxx) < 0 && pdata)
-+		mc13xxx->flags = pdata->flags;
-+
-+	if (mc13xxx->flags & MC13XXX_USE_ADC)
- 		mc13xxx_add_subdevice(mc13xxx, "%s-adc");
- 
--	if (pdata->flags & MC13XXX_USE_CODEC)
-+	if (mc13xxx->flags & MC13XXX_USE_CODEC)
- 		mc13xxx_add_subdevice(mc13xxx, "%s-codec");
- 
--	mc13xxx_add_subdevice_pdata(mc13xxx, "%s-regulator",
--		&pdata->regulators, sizeof(pdata->regulators));
--
--	if (pdata->flags & MC13XXX_USE_RTC)
-+	if (mc13xxx->flags & MC13XXX_USE_RTC)
- 		mc13xxx_add_subdevice(mc13xxx, "%s-rtc");
- 
--	if (pdata->flags & MC13XXX_USE_TOUCHSCREEN)
-+	if (mc13xxx->flags & MC13XXX_USE_TOUCHSCREEN)
- 		mc13xxx_add_subdevice(mc13xxx, "%s-ts");
- 
--	if (pdata->leds)
-+	if (pdata) {
-+		mc13xxx_add_subdevice_pdata(mc13xxx, "%s-regulator",
-+			&pdata->regulators, sizeof(pdata->regulators));
- 		mc13xxx_add_subdevice_pdata(mc13xxx, "%s-led",
- 				pdata->leds, sizeof(*pdata->leds));
--
--	if (pdata->buttons)
- 		mc13xxx_add_subdevice_pdata(mc13xxx, "%s-pwrbutton",
- 				pdata->buttons, sizeof(*pdata->buttons));
-+	} else {
-+		mc13xxx_add_subdevice(mc13xxx, "%s-regulator");
-+		mc13xxx_add_subdevice(mc13xxx, "%s-led");
-+		mc13xxx_add_subdevice(mc13xxx, "%s-pwrbutton");
-+	}
- 
- 	return 0;
- }
-@@ -788,25 +844,13 @@ static int __devexit mc13xxx_remove(struct spi_device *spi)
- 	return 0;
- }
- 
--static const struct spi_device_id mc13xxx_device_id[] = {
--	{
--		.name = "mc13783",
--		.driver_data = MC13XXX_ID_MC13783,
--	}, {
--		.name = "mc13892",
--		.driver_data = MC13XXX_ID_MC13892,
--	}, {
--		/* sentinel */
--	}
--};
--MODULE_DEVICE_TABLE(spi, mc13xxx_device_id);
--
- static struct spi_driver mc13xxx_driver = {
- 	.id_table = mc13xxx_device_id,
- 	.driver = {
- 		.name = "mc13xxx",
- 		.bus = &spi_bus_type,
- 		.owner = THIS_MODULE,
-+		.of_match_table = mc13xxx_dt_ids,
- 	},
- 	.probe = mc13xxx_probe,
- 	.remove = __devexit_p(mc13xxx_remove),
--- 
-1.7.4.1
+> +}
+> +
+> +int __init arm_cpuidle_init(struct cpuidle_driver *drv,
+> +	int (*common_enter)(struct cpuidle_device *dev,
+> +		struct cpuidle_driver *drv, int index),
+> +	void *driver_data[])
+> +{
+> +	struct cpuidle_device *dev;
+> +	int i, cpu_id;
+> +
+> +	if (drv == NULL) {
+> +		pr_err("%s: cpuidle_driver pointer NULL\n", __func__);
+> +		return -EINVAL;
+> +	}
+> +
+> +	if (drv->state_count > CPUIDLE_STATE_MAX)
+> +		pr_err("%s: state count exceeds maximum\n", __func__);
+
+return an error?
+
+You can collapse these 2 parameter checks down to:
+
+if (!drv || (drv->state_count > CPUIDLE_STATE_MAX))
+
+> +
+> +	mach_cpuidle = common_enter;
+> +
+> +	/* if state enter function not specified, use common_enter function */
+> +	for (i = 0; i < drv->state_count; i++) {
+> +		if (drv->states[i].enter == NULL) {
+> +			if (mach_cpuidle == NULL) {
+
+Usually !mach_cpuidle is preferred for NULL checks. You can move this
+check out of the loop.
+
+> +				pr_err("%s: 'enter' function pointer NULL\n",
+> +				__func__);
+> +				return -EINVAL;
+> +			} else
+> +				drv->states[i].enter = arm_enter_idle;
+> +		}
+> +	}
+> +
+> +	if (cpuidle_register_driver(drv)) {
+> +		pr_err("%s: Failed to register cpuidle driver\n", __func__);
+> +		return -ENODEV;
+> +	}
+> +
+> +	arm_cpuidle_devices = alloc_percpu(struct cpuidle_device);
+> +	if (arm_cpuidle_devices == NULL) {
+> +		cpuidle_unregister_driver(drv);
+> +		return -ENOMEM;
+> +	}
+> +
+> +	/* initialize state data for each cpuidle_device */
+> +	for_each_possible_cpu(cpu_id) {
+> +
+> +		dev = per_cpu_ptr(arm_cpuidle_devices, cpu_id);
+> +		dev->cpu = cpu_id;
+> +		dev->state_count = drv->state_count;
+> +
+> +		if (driver_data)
+> +			for (i = 0; i < dev->state_count; i++) {
+
+This would be more concise and less indentation:
+
+for (i = 0; driver_data, i < dev->state_count; i++)
+
+> +				dev->states_usage[i].driver_data =
+> +							driver_data[i];
+> +			}
+> +
+> +		if (cpuidle_register_device(dev)) {
+> +			pr_err("%s: Failed to register cpu %u\n",
+> +				__func__, cpu_id);
+> +			return -ENODEV;
+
+Leaking memory here from alloc_percpu.
+
+Also, need to unregister driver. It's usually cleaner to use goto's for
+error clean-up.
+
+Rob
