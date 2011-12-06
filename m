@@ -1,112 +1,31 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 6 Dec 2011 15:06:16 +0800
-Subject: [RFC PATCH 1/3] pinctrl: imx: add pinmux imx core driver
-In-Reply-To: <1322999384-7886-1-git-send-email-b29396@freescale.com>
-References: <1322999384-7886-1-git-send-email-b29396@freescale.com>
-Message-ID: <20111206070615.GJ2980@S2100-06.ap.freescale.net>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Tue, 06 Dec 2011 12:24:06 +0530
+Subject: [PATCH v5 1/4] regulator: helper routine to extract
+ regulator_init_data
+In-Reply-To: <20111205105733.GE11150@opensource.wolfsonmicro.com>
+References: <1321615040-13257-1-git-send-email-rnayak@ti.com>
+ <1321615040-13257-2-git-send-email-rnayak@ti.com>
+ <CAJuYYwRO+AS=WmQfNAe8L6Gi5Dm4VsCuVqk3X5Nb8uUYAdLnJQ@mail.gmail.com>
+ <20111204155433.GA16287@opensource.wolfsonmicro.com>
+ <CAJuYYwQ-9wCu-+q0S2YYeFYemq74ULdZ-EwPGLWKHA4+0VZcsA@mail.gmail.com>
+ <20111205103447.GC11150@opensource.wolfsonmicro.com>
+ <CAJuYYwSRW-=XufvHS1miO2xNANwQMZqPbt=VyPEonywnAsvVUQ@mail.gmail.com>
+ <20111205105733.GE11150@opensource.wolfsonmicro.com>
+Message-ID: <4EDDBC0E.7050806@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Dec 04, 2011 at 07:49:42PM +0800, Dong Aisheng wrote:
-> ---
-> This patch series shows the basic idea of driver design. There're still
-> some TODOes like adding more pinmux functions and gpio support.
-> The patch is here for request for comments on the driver design
-> and other might exist issues.
-> 
-> Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> Cc: Shawn Guo <shanw.guo@freescale.com>
-> ---
->  drivers/pinctrl/Kconfig           |    6 +
->  drivers/pinctrl/Makefile          |    2 +
->  drivers/pinctrl/pinmux-imx-core.c |  284 +++++++++++++++++++++++++++++++++++++
->  drivers/pinctrl/pinmux-imx-core.h |   83 +++++++++++
->  4 files changed, 375 insertions(+), 0 deletions(-)
-> 
-> diff --git a/drivers/pinctrl/Kconfig b/drivers/pinctrl/Kconfig
-> index ef56644..214d072 100644
-> --- a/drivers/pinctrl/Kconfig
-> +++ b/drivers/pinctrl/Kconfig
-> @@ -40,4 +40,10 @@ config PINMUX_U300
->  	help
->  	  Say Y here to enable the U300 pinmux driver
->  
-> +config PINMUX_IMX
-> +	bool "IMX pinmux driver"
-> +	depends on ARCH_MXC
-> +	select PINMUX
-> +	help
-> +	  Say Y here to enable the IMX pinmux driver
->  endif
-> diff --git a/drivers/pinctrl/Makefile b/drivers/pinctrl/Makefile
-> index bdc548a..764657b 100644
-> --- a/drivers/pinctrl/Makefile
-> +++ b/drivers/pinctrl/Makefile
-> @@ -4,5 +4,7 @@ ccflags-$(CONFIG_DEBUG_PINMUX)	+= -DDEBUG
->  
->  obj-$(CONFIG_PINCTRL)		+= core.o
->  obj-$(CONFIG_PINMUX)		+= pinmux.o
-> +obj-$(CONFIG_PINMUX_IMX)	+= pinmux-imx-core.o \
-> +				   pinmux-imx53.o pinmux-imx6q.o
+On Monday 05 December 2011 04:27 PM, Mark Brown wrote:
+> On Mon, Dec 05, 2011 at 04:14:40PM +0530, Thomas Abraham wrote:
+>> On 5 December 2011 16:04, Mark Brown
+>
+>>> With the regulator device tree bindings if the regulator is configured
+>>> to run a single voltage the bindings will set apply_uV unconditionally
+>>> so there's no need for a separate constraint.
+>
+>> Sorry if I have missed this, but I could not find 'apply_uV' being set
+>> as you described in the v5 of the regulator-dt patchset.
+>
+> Yes, looks like Rajendra missed that - just fixed it.
 
-You do not have pinmux-imx53.c and pinmux-imx6q.c in this patch yet.
-
->  obj-$(CONFIG_PINMUX_SIRF)	+= pinmux-sirf.o
->  obj-$(CONFIG_PINMUX_U300)	+= pinmux-u300.o
-> diff --git a/drivers/pinctrl/pinmux-imx-core.c b/drivers/pinctrl/pinmux-imx-core.c
-> new file mode 100644
-> index 0000000..1e60932
-> --- /dev/null
-> +++ b/drivers/pinctrl/pinmux-imx-core.c
-> @@ -0,0 +1,284 @@
-> +/*
-> + * Core driver for the imx pin controller
-> + *
-> + * Copyright (C) 2011 Freescale Semiconductor, Inc.
-> + * Copyright (C) 2011 Linaro Ltd.
-> + *
-> + * Author: Dong Aisheng <dong.aisheng@linaro.org>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + */
-> +
-> +#include <linux/init.h>
-> +#include <linux/module.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/io.h>
-> +#include <linux/err.h>
-> +#include <linux/pinctrl/pinctrl.h>
-> +#include <linux/pinctrl/pinmux.h>
-> +
-> +#include "pinmux-imx-core.h"
-> +
-> +#define DRIVER_NAME "pinmux-imx"
-> +
-> +/**
-> + * @dev: a pointer back to containing device
-> + * @virtbase: the offset to the controller in virtual memory
-> + */
-> +struct imx_pmx {
-> +	struct device *dev;
-> +	struct pinctrl_dev *pctl;
-> +	void __iomem *virtbase;
-> +	struct imx_pinctrl_info *info;
-> +};
-> +
-> +#define IMX_PINCTRL_REG_SIZE 4
-> +#define IMX_PINCTRL_MAX_FUNC 7
-> +
-> +extern struct imx_pinctrl_info mx53_pinctrl_info;
-> +extern struct imx_pinctrl_info mx6q_pinctrl_info;
-> +
-
-You do not have mx53_pinctrl_info and mx6q_pinctrl_info in this patch
-yet.
-
-Regards,
-Shawn
+Thanks Mark, I certainly seem to have missed it.
