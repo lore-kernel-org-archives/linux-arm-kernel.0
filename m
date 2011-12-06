@@ -1,36 +1,55 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 6 Dec 2011 21:14:46 +0000
-Subject: [PATCH] ARM: futex: fix clobbering oldval
-In-Reply-To: <1323200328.11696.32.camel@constitution.bos.jonmasters.org>
-References: <1316660015.6872.1.camel@puffmine-laptop>
- <20110922172653.GH13572@e102144-lin.cambridge.arm.com>
- <1323197914.11696.30.camel@constitution.bos.jonmasters.org>
- <20111206191109.GB5385@mudshark.cambridge.arm.com>
- <1323200328.11696.32.camel@constitution.bos.jonmasters.org>
-Message-ID: <20111206211446.GB15640@mudshark.cambridge.arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 6 Dec 2011 21:18:52 +0000
+Subject: [RFC][PATCH] ARM: kirkwood: Remove eSATA SheevaPlug board support
+In-Reply-To: <1323202967.3019.12.camel@computer2>
+References: <1322737480.9622.5.camel@phoenix>
+ <1322912383.2378.79.camel@computer2>
+ <alpine.LFD.2.02.1112031247230.2357@xanadu.home>
+ <1323155228.2237.10.camel@computer2>
+ <alpine.LFD.2.02.1112061442430.2357@xanadu.home>
+ <1323202967.3019.12.camel@computer2>
+Message-ID: <20111206211852.GX14542@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 06, 2011 at 07:38:48PM +0000, Jon Masters wrote:
-> On Tue, 2011-12-06 at 19:11 +0000, Will Deacon wrote:
-> > On Tue, Dec 06, 2011 at 06:58:34PM +0000, Jon Masters wrote:
-> > > 
-> > > Was there ever any additional followup on this topic?
-> > 
-> > Yup, check commit df77abca ("ARM: 7099/1: futex: preserve oldval in SMP
-> > __futex_atomic_op"). It should be in stable for all affected kernels too.
+On Tue, Dec 06, 2011 at 08:22:47PM +0000, Tixy wrote:
+> On Tue, 2011-12-06 at 14:45 -0500, Nicolas Pitre wrote:
+> > The arm-soc tree is probably more appropriate.  Don't include the 
+> > mach-types changes though as it is preferable if they come through RMK's 
+> > database updates.
 > 
-> Yea, Mark flagged that patch and it was included into the kernels on our
-> boards here. So far, it seems to be making some improvement, though we
-> still have stuck boards and weird signal issues sometimes. We are trying
-> to collect more data when this occurs (I gave the engineer concerned
-> some instructions around collecting data that will be of use). So I just
-> wondered if you saw any more futex issues, or if this is believe fixed.
+> It's already gone through Russell's tree.
+> 
+> I realised that a mach-types patch couldn't go into arm-soc as that
+> doesn't have the removed machine entries, and the only other changes in
+> linux-next for the sheevaplug and ts209 files were from Russell's tree
+> anyway. And finally, I thought that Russel's mach-types generation
+> script would want to see the fixed files in his tree, otherwise it would
+> want to delete the machine entries.
 
-I think this is fixed, but that doesn't mean there aren't bugs lurking
-elsewhere that I'm simply not seeing. If you do get any diagnostics or
-concrete debug information, please CC me on any posts to the list.
+Let me take you through what I did to deal with this.  You supplied me
+a patch to go on top of current stuff.  So, I selected the 'misc' branch
+to apply it, which had the recent mach-types update as the last thing.
+Then:
 
-Cheers,
+1. I applied your patch as-is and committed it.  So the tree looked like:
+	Nov. mach-types update -> your patch
+2. I shuffled your patch before the mach-types update, which caused
+   conficts which had to be fixed manually.  So this resulted in:
+	your patch -> Nov. mach-types update
+3. I resolved the entries in the machine database - by hand in SQL -
+   to fix up the entries how you want them.
+4. I did another update to mach-types.  At this point, the tree
+   looks like:
+	your patch -> Nov. mach-types update -> Dec. mach-types update
+   and, because I'd fixed the entries in the machine database, they
+   didn't get removed this time.
+5. I combined the two mach-types update into a single December time
+   mach-types update.  Finally, we have what is visible today:
+	your patch -> Dec. mach-types update
 
-Will
+What we now have is a completely bisectable change with no commit which
+fails to build for these platforms.  Of course, as a result of the
+juggling, your patch is no longer exactly what you sent on the list
+(it's changing the entry in mach-types rather than adding it back) but
+my sign-off on committing your change covers that - DCO condition (b).)
