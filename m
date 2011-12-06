@@ -1,128 +1,33 @@
-From: pullip.cho@samsung.com (KyongHo Cho)
-Date: Tue, 6 Dec 2011 21:20:31 +0900
-Subject: [PATCH v7 2/2] iommu/exynos: Add iommu driver for Exynos Platforms
-In-Reply-To: <007e01ccb40c$ed62bca0$c82835e0$%szyprowski@samsung.com>
-References: <1321609650-1329-1-git-send-email-pullip.cho@samsung.com>
- <1321609650-1329-3-git-send-email-pullip.cho@samsung.com>
- <007e01ccb40c$ed62bca0$c82835e0$%szyprowski@samsung.com>
-Message-ID: <CAHQjnOM9N8zJmiNnHfrN00jbF8Wk5WwtsBsuPsC2Xv0g_O1tdA@mail.gmail.com>
+From: LW@KARO-electronics.de (=?utf-8?q?Lothar=20Wa=C3=9Fmann?=)
+Date: Tue,  6 Dec 2011 13:27:05 +0100
+Subject: [BUGFIX] video/mxsfb: fix crash when unblanking the display
+Message-ID: <1323174425-24038-1-git-send-email-LW@KARO-electronics.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 6, 2011 at 8:48 PM, Marek Szyprowski
-<m.szyprowski@samsung.com> wrote:
-> Hello,
->
-> I'm trying to integrate your SYSMMU driver with my DMA-mapping & IOMMU
-> API integration patches. I've noticed some issues, please see my comments below.
->
-Thank you!
+The VDCTRL4 register does not provide the MXS SET/CLR/TOGGLE feature.
+The write in mxsfb_disable_controller() sets the data_cnt for the LCD
+DMA to 0 which obviously means the max. count for the LCD DMA and
+leads to overwriting arbitrary memory when the display is unblanked.
 
-> On Friday, November 18, 2011 10:48 AM KyongHo Cho wrote:
->
->> +
->> +static int exynos_sysmmu_probe(struct platform_device *pdev)
->> +{
->> + ? ? struct resource *res, *ioarea;
->> + ? ? int ret;
->> + ? ? int irq;
->> + ? ? struct device *dev;
->> + ? ? void *sfr;
->> + ? ? struct sysmmu_drvdata *data;
->> + ? ? char *emsg;
->> +
->> + ? ? dev = &pdev->dev;
->> +
->> + ? ? if (dev_get_platdata(dev) == NULL) {
->> + ? ? ? ? ? ? pr_debug("%s: No System MMU is assigned for %s.%d.\n", __func__,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? pdev->name, pdev->id);
->> + ? ? ? ? ? ? return -ENODEV;
->> + ? ? }
->> +
->> + ? ? data = kzalloc(sizeof(*data), GFP_KERNEL);
->> + ? ? if (!data) {
->> + ? ? ? ? ? ? emsg = "Not enough memory";
->> + ? ? ? ? ? ? ret = -ENOMEM;
->> + ? ? ? ? ? ? goto err_alloc;
->> + ? ? }
->> +
->> + ? ? data->owner = dev_get_platdata(dev);
->> +
->> + ? ? ret = dev_set_drvdata(dev, data);
->> + ? ? if (ret) {
->> + ? ? ? ? ? ? emsg = "Unable to set driver data.";
->> + ? ? ? ? ? ? goto err_init;
->> + ? ? }
->> +
->> + ? ? res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->> + ? ? if (!res) {
->> + ? ? ? ? ? ? emsg = "Failed probing system MMU: failed to get resource.";
->> + ? ? ? ? ? ? goto err_init;
->> + ? ? }
->> +
->> + ? ? ioarea = request_mem_region(res->start, resource_size(res),
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? dev_name(dev));
->> + ? ? if (ioarea == NULL) {
->> + ? ? ? ? ? ? emsg = "failed to request memory region.";
->> + ? ? ? ? ? ? ret = -ENOMEM;
->> + ? ? ? ? ? ? goto err_init;
->> + ? ? }
->> +
->> + ? ? sfr = ioremap(res->start, resource_size(res));
->> + ? ? if (!sfr) {
->> + ? ? ? ? ? ? emsg = "failed to call ioremap().";
->> + ? ? ? ? ? ? ret = -ENOENT;
->> + ? ? ? ? ? ? goto err_ioremap;
->> + ? ? }
->> +
->> + ? ? irq = platform_get_irq(pdev, 0);
->> + ? ? if (irq <= 0) {
->> + ? ? ? ? ? ? emsg = "failed to get irq resource.";
->> + ? ? ? ? ? ? ret = irq;
->> + ? ? ? ? ? ? goto err_irq;
->> + ? ? }
->> +
->> + ? ? ret = request_irq(irq, exynos_sysmmu_irq, 0, dev_name(dev), data);
->> + ? ? if (ret) {
->> + ? ? ? ? ? ? emsg = "failed to request irq.";
->> + ? ? ? ? ? ? goto err_irq;
->> + ? ? }
->> +
->> + ? ? data->clk = clk_get(dev, "sysmmu");
->> + ? ? if (IS_ERR(data->clk)) {
->> + ? ? ? ? ? ? emsg = "failed to get clock descriptor";
->> + ? ? ? ? ? ? ret = PTR_ERR(data->clk);
->> + ? ? ? ? ? ? goto err_clk;
->> + ? ? }
->> +
->> + ? ? data->dev = dev;
->> + ? ? data->sfrbase = sfr;
->> + ? ? __set_fault_handler(data, &default_fault_handler);
->> + ? ? rwlock_init(&data->lock);
->
-> Here is a serious problem: __set_fault_handler takes data->lock which is initialized after calling
-> this function.
->
+Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
+---
+ drivers/video/mxsfb.c |    3 ++-
+ 1 files changed, 2 insertions(+), 1 deletions(-)
 
-Yeah, you're right. Thank you. I didn't notice it.
-I will fix it.
-
->> +
->> +static unsigned long *alloc_lv2entry(unsigned long *sent, unsigned long iova,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? short *pgcounter)
->> +{
->> + ? ? if (lv1ent_fault(sent)) {
->> + ? ? ? ? ? ? unsigned long *pent;
->> +
->> + ? ? ? ? ? ? pent = kzalloc(1024, GFP_KERNEL);
->
-> I would use GFP_ATOMIC here. iommu_map() function might be called in atomic context, and
-> GFP_KERNEL here causes kernel ops/warning.
->
-
-I wanted to avoid to allocate memory from emergency pool.
-Do you think that it needs to allocate memory with GFP_ATOMIC flag?
-
-Thanks.
-
-KyongHo.
+diff --git a/drivers/video/mxsfb.c b/drivers/video/mxsfb.c
+index d837d63..03cb95a 100644
+--- a/drivers/video/mxsfb.c
++++ b/drivers/video/mxsfb.c
+@@ -366,7 +366,8 @@ static void mxsfb_disable_controller(struct fb_info *fb_info)
+ 		loop--;
+ 	}
+ 
+-	writel(VDCTRL4_SYNC_SIGNALS_ON, host->base + LCDC_VDCTRL4 + REG_CLR);
++	reg = readl(host->base + LCDC_VDCTRL4);
++	writel(reg & ~VDCTRL4_SYNC_SIGNALS_ON, host->base + LCDC_VDCTRL4);
+ 
+ 	clk_disable(host->clk);
+ 
+-- 
+1.5.6.5
