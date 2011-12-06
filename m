@@ -1,41 +1,59 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 6 Dec 2011 19:11:09 +0000
-Subject: [PATCH] ARM: futex: fix clobbering oldval
-In-Reply-To: <1323197914.11696.30.camel@constitution.bos.jonmasters.org>
-References: <1316660015.6872.1.camel@puffmine-laptop>
- <20110922172653.GH13572@e102144-lin.cambridge.arm.com>
- <1323197914.11696.30.camel@constitution.bos.jonmasters.org>
-Message-ID: <20111206191109.GB5385@mudshark.cambridge.arm.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 6 Dec 2011 14:11:42 -0500 (EST)
+Subject: [PATCH] ata: Don't use NO_IRQ in pata_of_platform driver
+In-Reply-To: <20111206093709.GB2274@linaro.org>
+References: <20111110162859.GA7088@oksana.dev.rtsoft.ru>
+ <20111202192618.GC3037@localhost.localdomain>
+ <CA+55aFwekNWz+V4440f=2iu_BfOxSg0NjVogv4cZZDFbJBNoAQ@mail.gmail.com>
+ <1322867573.11728.22.camel@pasglop>
+ <20111205161157.GA27550@localhost.localdomain>
+ <alpine.LFD.2.02.1112051236350.2357@xanadu.home>
+ <20111205180253.GB29812@localhost.localdomain>
+ <alpine.LFD.2.02.1112051310150.2357@xanadu.home>
+ <20111205192605.GD29812@localhost.localdomain>
+ <alpine.LFD.2.02.1112051443190.2357@xanadu.home>
+ <20111206093709.GB2274@linaro.org>
+Message-ID: <alpine.LFD.2.02.1112061408000.2357@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jon,
+On Tue, 6 Dec 2011, Dave Martin wrote:
 
-On Tue, Dec 06, 2011 at 06:58:34PM +0000, Jon Masters wrote:
-> On Thu, 2011-09-22 at 18:26 +0100, Will Deacon wrote:
-> > Hi,
-> > 
-> > On Thu, Sep 22, 2011 at 03:53:35AM +0100, mhban wrote:
-> > > This patch fixes clobbering oldval bug. oldval should be preserved for next
-> > > compare operation.
-> > > 
-> > > Change-Id: I2a63bc1bdb8de330eb9e1ac02d7da1f77e6e8c3c
-> > > Signed-off-by: Minho Ban <mhban@samsung.com>
-> > 
-> > It would have been nice to have been CC'd on this...
-> > 
-> > I ran LTP tests on this, so I'm surprised that this was broken (the tests
-> > passed). Well spotted anyway!
+> On Mon, Dec 05, 2011 at 02:49:01PM -0500, Nicolas Pitre wrote:
 > 
-> This appears to be the cause of our "stuck builder" problem in Fedora
-> building certain large packages, such as OpenJDK. Some of our guys are
-> still monitoring the situation in case there's a secondary issue.
+> > No need to convert everything.
+> > 
+> > First move is to make irq=0 meaning no IRQ.  That means making things 
+> > like:
+> > 
+> > 	if (irq < 0)
+> > 	if (irq >= 0)
+> > 
+> > into
+> > 
+> > 	if (irq <= 0)
+> > 	if (irq > 0)
+> > 
+> > And replace NO_IRQ with 0.
+> >
+> > That change shouldn't break anything, except those drivers which are 1) 
+> > being passed an actual IRQ #0 and 2) testing for no IRQ.  I suspect that 
+> > those conditions aren't very common together.
 > 
-> Was there ever any additional followup on this topic?
+> To clarify, you're suggesting that the meanings of all other IRQ values
+> would not change initially?
 
-Yup, check commit df77abca ("ARM: 7099/1: futex: preserve oldval in SMP
-__futex_atomic_op"). It should be in stable for all affected kernels too.
+Initially, or even ever.
 
-Cheers,
+> (i.e., we remap HW irq 0, if there is one,
+> to some other random number but have a 1:1 mapping for everything else).
 
-Will
+Exact.
+
+> That could make sense as an approach.
+
+You might notice that a true IRQ #0 passed to generic drivers is not 
+really frequent.
+
+
+Nicolas
