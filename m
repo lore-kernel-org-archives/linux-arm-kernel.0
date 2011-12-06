@@ -1,56 +1,50 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 6 Dec 2011 00:36:59 +0000
-Subject: [PATCH 07/23] ARM: plat-omap: remove arch specific special
- handling for ioremap
-In-Reply-To: <20111205235609.GI14542@n2100.arm.linux.org.uk>
-References: <1321422521-1138-1-git-send-email-nico@fluxnic.net>
- <1321422521-1138-8-git-send-email-nico@fluxnic.net>
- <20111202202125.GZ31337@atomide.com>
- <alpine.LFD.2.02.1112021637200.2357@xanadu.home>
- <20111205235609.GI14542@n2100.arm.linux.org.uk>
-Message-ID: <20111206003659.GJ14542@n2100.arm.linux.org.uk>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Mon, 5 Dec 2011 19:37:26 -0500 (EST)
+Subject: realview compulsory enables CONFIG_ARM_PATCH_PHYS_VIRT on me
+In-Reply-To: <20111205233621.GH14542@n2100.arm.linux.org.uk>
+References: <CACRpkdZ8jpz7WTP3gpfcTykQZaCjQLN9PZCAS+UJOWrzZo1bjQ@mail.gmail.com>
+ <4EDD3E5E.6050106@gmail.com> <alpine.LFD.2.02.1112051707520.2357@xanadu.home>
+ <20111205233621.GH14542@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.02.1112051934000.2357@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 05, 2011 at 11:56:09PM +0000, Russell King - ARM Linux wrote:
-> On Fri, Dec 02, 2011 at 04:39:31PM -0500, Nicolas Pitre wrote:
-> > On Fri, 2 Dec 2011, Tony Lindgren wrote:
+On Mon, 5 Dec 2011, Russell King - ARM Linux wrote:
+
+> On Mon, Dec 05, 2011 at 05:08:12PM -0500, Nicolas Pitre wrote:
+> > On Mon, 5 Dec 2011, Rob Herring wrote:
 > > 
-> > > Hi Nico,
-> > > 
-> > > * Nicolas Pitre <nico@fluxnic.net> [111115 21:21]:
-> > > > From: Nicolas Pitre <nicolas.pitre@linaro.org>
+> > > On 12/05/2011 03:22 PM, Linus Walleij wrote:
+> > > > Hi Nico,
 > > > > 
-> > > > A generic version should replace this later.
+> > > > now I'm lost, I discussed by boot problems on ARM PB1176
+> > > > with Marc and after some investigation I found this strange thing on
+> > > > the lastest rc:s since -rc1:
 > > > > 
-> > > > As io.c has become nearly empty, omap_init_consistent_dma_size() is moved
-> > > > into common.c so that io.c can be removed entirely.
+> > > > In arch/arm/Kconfig ARM_PATCH_PHYS_VIRT is forcibly
+> > > > disabled like so:
+> > > > 
+> > > > depends on !ARCH_REALVIEW || !SPARSEMEM
 > > > 
-> > > Sorry for the delay on trying this series out. It boots fine
-> > > on omap2/3/4 as Kevin already noted. However, the following
-> > > fix is needed for this patch to keep things building for
-> > > omap1_defconfig.
-> > >  
-> > > > Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
-> > > 
-> > > With the following fix it works on what I tested. That's
-> > > osk5912 n800 2430sdp n900 zoom3 and blaze. If you're still
-> > > taking acks for this series:
-> > > 
-> > > Tested-by: Tony Lindgren <tony@atomide.com>
+> > > should be !ARCH_REALVIEW && !SPARSEMEM ?
 > > 
-> > OK, thanks for testing.  Since Russell didn't commit this to his stable 
-> > branch yet I simply folded in your fix and added your tested-by tag.
+> > Indeed.
 > 
-> So I'm about to push what I had out in the devel-stable branch... what
-> am I supposed to do with this?
+> No, it's correct.  None of you are understanding the logic.
+> 
+> If you don't understand it, draw up a truth table:
+> 
+> ARCH_REALVIEW	SPARSEMEM	result
+> n		n		y
+> n		y		y
+> y		n		y
+> y		y		n
+> 
+> And this clearly shows that if we have realview _and_ sparsemem enabled,
+> then we don't want P2V patching in place.
 
-Okay, yet again I find myself having to wait hours for a reply - which
-I expect will be forthcoming sometime tomorrow afternoon my time.  If
-I wait, it means a delay of another 24 hours before I push my tree out.
+I didn't look closely at Realview.  However the usefulness of P2V 
+patching when sparsemem is used is somewhat questionable I would say. 
 
-This is not acceptable.
 
-So I'm pushing my tree out as-is - which means the stuff I pulled
-previously is now frozen.  Please submit a patch to fix whatever error
-Tony is seeing.
+Nicolas
