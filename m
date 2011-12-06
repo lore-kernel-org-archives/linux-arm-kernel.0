@@ -1,61 +1,47 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 6 Dec 2011 14:33:19 +0000
-Subject: [PATCH 1/3] PM: Provide an always on power domain governor
-In-Reply-To: <008101ccb40f$4385c0d0$ca914270$%szyprowski@samsung.com>
-References: <1322765339-29879-1-git-send-email-broonie@opensource.wolfsonmicro.com>
- <201112042156.59990.rjw@sisk.pl>
- <20111204231005.GA4255@opensource.wolfsonmicro.com>
- <201112050115.18489.rjw@sisk.pl>
- <20111205001500.GA10173@opensource.wolfsonmicro.com>
- <02d601ccb400$a19380e0$e4ba82a0$%kim@samsung.com>
- <008101ccb40f$4385c0d0$ca914270$%szyprowski@samsung.com>
-Message-ID: <20111206143319.GF17731@opensource.wolfsonmicro.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 6 Dec 2011 14:41:25 +0000
+Subject: [RFC PATCH v1 5/7] media: v4l2: introduce two IOCTLs for face
+ detection
+In-Reply-To: <CACVXFVPYUY-vpeoKJKX2XN7-0w+=seW0u3EaP=hD9m1Sy7nkTQ@mail.gmail.com>
+References: <1322817178-8931-1-git-send-email-ming.lei@canonical.com>
+ <201112061255.56136.arnd@arndb.de>
+ <CACVXFVPYUY-vpeoKJKX2XN7-0w+=seW0u3EaP=hD9m1Sy7nkTQ@mail.gmail.com>
+Message-ID: <201112061441.25822.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 06, 2011 at 01:04:53PM +0100, Marek Szyprowski wrote:
+On Tuesday 06 December 2011, Ming Lei wrote:
+> > Using an array added to the end of the v4l2_fd_result structure
+> > rather than a pointer would really make this easier IMHO.
+> 
+> I have tried to do this, but video_usercopy needs a few changes
+> to handle array args if no indirect pointer is passed to kernel.
 
-Please fix your mailer to word wrap at less than 80 columns, I've
-reflowed your text for legibility.
+Ah, I see. Or you would have to encode the array size into the
+ioctl command, which is also ugly in a different way.
 
-> What about similar patches for S5PV210/S5PC110 series and Exynos4?
+> I am not sure if media guys are happy to accept the changes, :-)
 
-I don't really have access to these systems (well, I have a Nexus S I
-can use but that doesn't boot mainline) and I don't have datasheets so
-it's hard for me to actively work on them myself.
+Maybe Mauro can comment on which solution he prefers then, given
+the choice between:
 
-> gen_pd based power domain code for Exynos4 have been rejected in favor
-> of custom platform-device based power domain drivers. It would be much
+1. adding another handler in drivers/media/video/v4l2-compat-ioctl32.c
 
-Oh, that's very surprising to me - looking at the code it appeared that
-it just predated gen_pd, I didn't see anything in there that suggested
-an active decision to avoid using it.  What was then thinking there?  Is
-this something we can fix by enhancing gen_pd?
+2. passing a pointer that is casted to __u64 in user space an back
+   in the kernel
 
-> easier to have only one type of the drivers across different Samsung
-> SoCs. This will also help to hide some differences between the series
-> from the device drivers (clock gating, power management). 
+3. extending video_usercopy in some way to make this work, preferably
+   in a generic way.
 
-When I looked at the code I'd expected the other SoCs to also transition
-over to gen_pd and then start pulling things out from there.
+4. using a variable command number like
+   #define VIDIOC_G_FD_RESULT(num)	_IOC(_IOC_READ|_IOC_WRITE,'V', 95, \
+		sizeof(struct v4l2_fd_result) + (num) * sizeof(struct v4l2_fd_detection)
 
-Looking at what you can do on s3c64xx the power domain code looked very
-small once you use the gen_pd stuff (which is very nice to use, it
-really makes the whole thing very easy) so I'm not sure how much win it
-is immediately.  How much win it is long term will depend on where
-things get implemented - a lot of the stuff I could tink of doing seemed
-like it might be more of a fit for the opp or PM QoS stuff than for the
-power domains, with the power domains staying pretty thin and just
-providing inputs but perhaps that's not a sensible approach.
+5. requiring the interface to be simplified to return only a single
+   struct v4l2_fd_detection at a time
 
-The main trick is going to be actually putting the devices into the
-power domains which is entertaining as currently every board directly
-registers platform devices so it's hard for core code to work out what
-Linux knows about.
+I agree that none of these are nice. My preferred option would be last one,
+but I don't know how performance critical the interface is or if it would
+cause any races that you want to avoid.
 
-In terms of the drivers I wasn't expecting to see much impact as the
-power domain and runtime PM APIs provide a pretty good abstraction
-already - the actual implementation of things is totally transparent to
-them.  The only device actively able to use the power domains on the
-S3C6410 is the framebuffer and the driver there just worked with the
-existing runtime PM code.
+	Arnd
