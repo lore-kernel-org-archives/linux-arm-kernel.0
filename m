@@ -1,129 +1,53 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 6 Dec 2011 11:53:00 +0100
-Subject: [RFC PATCH 2/3] pinctrl: imx: add pinmux-imx53 support
-In-Reply-To: <20111206062500.GA3649@S2100-06.ap.freescale.net>
-References: <1322999384-7886-1-git-send-email-b29396@freescale.com>
- <1322999384-7886-2-git-send-email-b29396@freescale.com>
- <CACRpkdaYz+-nZA6atxA+5kvWOO84YeSHQPNiojq_R4zkHUGz3Q@mail.gmail.com>
- <20111205211838.GG27267@pengutronix.de>
- <20111206062500.GA3649@S2100-06.ap.freescale.net>
-Message-ID: <20111206105300.GI27267@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 6 Dec 2011 10:55:03 +0000
+Subject: [PATCH] ata: Don't use NO_IRQ in pata_of_platform driver
+In-Reply-To: <20111206093000.GA2274@linaro.org>
+References: <CA+55aFwekNWz+V4440f=2iu_BfOxSg0NjVogv4cZZDFbJBNoAQ@mail.gmail.com>
+ <1322867573.11728.22.camel@pasglop>
+ <20111205161157.GA27550@localhost.localdomain>
+ <alpine.LFD.2.02.1112051236350.2357@xanadu.home>
+ <20111205180253.GB29812@localhost.localdomain>
+ <alpine.LFD.2.02.1112051310150.2357@xanadu.home> <4EDD1897.4030208@gmail.com>
+ <20111205202125.GA32592@oksana.dev.rtsoft.ru> <4EDD2DE1.1050606@gmail.com>
+ <20111206093000.GA2274@linaro.org>
+Message-ID: <20111206105503.GO14542@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 06, 2011 at 02:25:01PM +0800, Shawn Guo wrote:
-> On Mon, Dec 05, 2011 at 10:18:38PM +0100, Sascha Hauer wrote:
-> > On Mon, Dec 05, 2011 at 05:57:42PM +0100, Linus Walleij wrote:
-> > > On Sun, Dec 4, 2011 at 12:49 PM, Dong Aisheng <b29396@freescale.com> wrote:
-> > > 
-> > > > +enum imx_mx53_pads {
-> > > > + ? ? ? MX53_GPIO_19 = 0,
-> > > > + ? ? ? MX53_KEY_COL0 = 1,
-> > > (...)
-> > > 
-> > > First I thought it looked a bit strange since you needed enums for all pads
-> > > but then I realized that your macros use the same enumerator name to
-> > > name the pad and then it looks sort of clever.
-> > > 
-> > > But maybe put in a comment about that here:
-> > > 
-> > > > +/* Pad names for the pinmux subsystem */
-> > > 
-> > > Like this:
-> > > 
-> > > /*
-> > >  * Pad names for the pinmux subsystem.
-> > >  * These pad names are constructed from the pin enumerator names
-> > >  * in the IMX_PINCTRL_PIN() macro.
-> > >  */
-> > > 
-> > > > +static const struct pinctrl_pin_desc mx53_pads[] = {
-> > > > + ? ? ? IMX_PINCTRL_PIN(MX53_GPIO_19),
-> > > > + ? ? ? IMX_PINCTRL_PIN(MX53_KEY_COL0),
-> > > (...)
-> > > 
-> > > > +/* mx53 pin groups and mux mode */
-> > > > +static const unsigned mx53_fec_pins[] = {
-> > > > + ? ? ? MX53_FEC_MDC,
-> > > > + ? ? ? MX53_FEC_MDIO,
-> > > > + ? ? ? MX53_FEC_REF_CLK,
-> > > > + ? ? ? MX53_FEC_RX_ER,
-> > > > + ? ? ? MX53_FEC_CRS_DV,
-> > > > + ? ? ? MX53_FEC_RXD1,
-> > > > + ? ? ? MX53_FEC_RXD0,
-> > > > + ? ? ? MX53_FEC_TX_EN,
-> > > > + ? ? ? MX53_FEC_TXD1,
-> > > > + ? ? ? MX53_FEC_TXD0,
-> > > > +};
-> > > 
-> > > I understand this.
-> > > 
-> > > > +static const unsigned mx53_fec_mux[] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-> > > 
-> > > But what is this? Just zeroes? Why?
-> > > Especially with a const so they really cannot be anything
-> > > else. The same pin (0) can only be enumerated once.
-> > > 
-> > > > +static const unsigned mx53_sd1_pins[] = {
-> > > > + ? ? ? MX53_SD1_CMD,
-> > > > + ? ? ? MX53_SD1_CLK,
-> > > > + ? ? ? MX53_SD1_DATA0,
-> > > > + ? ? ? MX53_SD1_DATA1,
-> > > > + ? ? ? MX53_SD1_DATA2,
-> > > > + ? ? ? MX53_SD1_DATA3,
-> > > > +
-> > > > +};
-> > > > +static const unsigned mx53_sd1_mux[] = { 0, 0, 0, 0, 0, 0 };
-> > > 
-> > > And here again.
-> > > 
-> > > > +static const unsigned mx53_sd3_pins[] = {
-> > > > + ? ? ? MX53_PATA_DATA8,
-> > > > + ? ? ? MX53_PATA_DATA9,
-> > > > + ? ? ? MX53_PATA_DATA10,
-> > > > + ? ? ? MX53_PATA_DATA11,
-> > > > + ? ? ? MX53_PATA_DATA0,
-> > > > + ? ? ? MX53_PATA_DATA1,
-> > > > + ? ? ? MX53_PATA_DATA2,
-> > > > + ? ? ? MX53_PATA_DATA3,
-> > > > + ? ? ? MX53_PATA_IORDY,
-> > > > + ? ? ? MX53_PATA_RESET_B,
-> > > > +
-> > > > +};
-> > > > +static const unsigned mx53_sd3_mux[] = { 4, 4, 4, 4, 4, 4, 4, 4, 2, 2 };
-> > > 
-> > > This also looks strange. Can you explain what these muxes are?
-> > 
-> > Freescale has named the pins after their primary function which is quite
-> > confusing.
-> > 
-> > The above means:
-> > 
-> > MX53_PATA_DATA8 -> mux mode 4
-> > MX53_PATA_DATA9 -> mux mode 4
-> > ...
-> > 
-> > This brings me to the point that currently we have the pins described as
-> > 
-> > #define MX53_PAD_<name>__<function>
-> > 
-> But that's also the reason why we have so many lengthy iomux-mx*.h on
-> imx.  Taking iomux-mx53.h for example, it's a 109K header with 1219
-> LOC, but probably only 10% of the definitions will actually be used.
+On Tue, Dec 06, 2011 at 09:30:00AM +0000, Dave Martin wrote:
+> Do we expect there to be any platform drivers which are shared between
+> legacy platforms and newer DT-ised platforms?
 > 
-> > which means that you don't have to look into the datasheet to get the
-> > different options for a pin
+> Those drivers would be pain points since they would need to understand
+> both conventions.
 > 
-> Looking at the datasheet when we write code is a pretty natural thing
-> to me.
+> So far as I can see, only boards which are not DT-ised, which do not use
+> DT-ised drivers and which do not use drivers which use interrupts and
+> are either used by DT-ised boards or by arches with a non-zero NO_IRQ
+> could safely carry on using a non-zero NO_IRQ.  Tracking down exactly
+> which boards and drivers this applies to could be hard.  We could have a
+> CONFIG_NO_IRQ and make them depend on it, but we still have to find that
+> list of boards and drivers in the first place.
 
-Yes, but digging again and again for the same pinmux setting (and the
-corresponding sel_input registers) is a PITA.
+You're digging too deeply into this.
 
-Sascha
+Drivers which need to know whether an IRQ is valid need to know this if
+they wish to do something different for 'this device doesn't have an IRQ
+wired'.  These are the drivers which have problems because of the -1 vs
+0 thing.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+That is different from 'this is an invalid IRQ number', which is what
+you find out when you call request_irq().
+
+So please, stop thinking 'we need to convert drivers to check for <= 0'.
+We don't.  We just need to make sure that we're not passing a zero IRQ
+number to any driver.
+
+On platforms where IRQ0 is special like x86, request_irq() will fail
+with -EBUSY on drivers which don't care (or other kind of refusal to
+initialize), and will cause 'polling mode' with the 8250 driver.
+
+So, all that we need to do is to ensure that all the IRQ chip stuff is
+fixed up so that IRQ0 is only used for the same purpose as x86 - the
+PIC timer on systems with an ISA 8253 timer.  Everything else should
+not pass IRQ0 outside core platform code.
