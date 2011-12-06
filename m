@@ -1,38 +1,31 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 6 Dec 2011 14:07:29 +0000
-Subject: [GIT PULL] Linux support for ARM LPAE
-In-Reply-To: <20111206124109.GT14542@n2100.arm.linux.org.uk>
-References: <20111202182054.GA3250@arm.com>
- <20111206124109.GT14542@n2100.arm.linux.org.uk>
-Message-ID: <20111206140729.GA31720@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 6 Dec 2011 14:14:36 +0000
+Subject: [GIT PULL] Identity mapping changes for 3.3
+In-Reply-To: <20111206103843.GM14542@n2100.arm.linux.org.uk>
+References: <20111202160833.GK5540@mudshark.cambridge.arm.com>
+ <20111205232342.GG14542@n2100.arm.linux.org.uk>
+ <20111206101438.GB25782@mudshark.cambridge.arm.com>
+ <20111206103843.GM14542@n2100.arm.linux.org.uk>
+Message-ID: <20111206141436.GK25782@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 06, 2011 at 12:41:09PM +0000, Russell King - ARM Linux wrote:
-> On Fri, Dec 02, 2011 at 06:20:54PM +0000, Catalin Marinas wrote:
-> > If there are no further comments, could you please pull the ARM LPAE
-> > branch below? They should be merged after Will's idmap patches (no real
-> > conflict, just correctly functioning setup_mm_for_reboot).
+On Tue, Dec 06, 2011 at 10:38:43AM +0000, Russell King - ARM Linux wrote:
+> > > As this is known to be broken on OMAP, could I have this based upon
+> > > some other commit - maybe ba8bb18a03f which I've just committed into
+> > > devel-stable (which is the second 'fix' patch for OMAP) please.
+> > 
+> > I'm struggling to pull from you [1] at the moment, but I'll rebase this once I
+> > manage to get the updated devel-stable.
 > 
-> Err, your tree contains a serious error.
+> It looks like the machine is hitting the memory and disk io bandwidth
+> limits.  Unfortunately, git seems to have high demands for both of those,
+> weighing in at around 300-400MB per pack process, and seemingly wanting
+> to read all the pack files too.
 
-I would say minor error but I agree, it needs fixing. This patch wasn't
-originally part of my LPAE series as I hoped you would have merged it
-during the last cycle. Now it had to be part of the pull request as LPAE
-patches depend on it.
+Ok, I've got it now and have pushed out the new branch (kexec/idmap) based
+on the commit that you suggested above.
 
-Anyway, I'll fix this and send you another pull request. Unless you
-already merged your nopud patch in the devel-stable branch and I can
-rebase LPAE on top, just let me know which one you'd prefer (and a
-commit id if the latter).
+Cheers,
 
-Thanks.
-
--- 
-Catalin
-
-P.S. I say it's minor because it has the committer information. If you
-     would pull someone else's branch which results in a fast-forward,
-     you can't really tell whether it was a merge or cherry-pick, so the
-     rule is not entirely consistent (unless you also mandate --no-ff
-     for merges).
+Will
