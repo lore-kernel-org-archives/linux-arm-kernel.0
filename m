@@ -1,45 +1,52 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 06 Dec 2011 19:20:08 +0900
-Subject: [PATCH 1/3] PM: Provide an always on power domain governor
-In-Reply-To: <20111205001500.GA10173@opensource.wolfsonmicro.com>
-References: <1322765339-29879-1-git-send-email-broonie@opensource.wolfsonmicro.com>
- <201112042156.59990.rjw@sisk.pl>
- <20111204231005.GA4255@opensource.wolfsonmicro.com>
- <201112050115.18489.rjw@sisk.pl>
- <20111205001500.GA10173@opensource.wolfsonmicro.com>
-Message-ID: <02d601ccb400$a19380e0$e4ba82a0$%kim@samsung.com>
+From: joerg.roedel@amd.com (Joerg Roedel)
+Date: Tue, 6 Dec 2011 11:25:27 +0100
+Subject: [PATCH] iommu/msm: Fix compile error in mach-msm/devices-iommu.c
+Message-ID: <20111206102527.GI25178@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark Brown wrote:
-> 
-> On Mon, Dec 05, 2011 at 01:15:18AM +0100, Rafael J. Wysocki wrote:
-> > On Monday, December 05, 2011, Mark Brown wrote:
-> 
-> > > It might make sense for it to go via the Samsung tree - the third
-> patch
-> > > depends on it and there's some other stuff going on with the s3c64xx
-> > > power management - so let's see what Kukjin thinks is best.
-> 
-> > OTOH, it will conflict with some patches I have in the works.
-> 
-> Ah, OK - in that case I guess it's sensible if you apply it.  Ideally it
-> could be on a separate branch so it could be cross-merged with other
-> trees if there's a need later.
+Hi,
 
-Hi Mark and Rafael,
+I just added a patch to my iommu/fixes branch to fix a compile error
+with IOMMU enabled. If there is another fix for this already somewhere
+please let me know the commit-id so that I can add it to my out-of-tree
+branch. If there is no other fix yet I will push this upstream soon with
+the next round of iommu-fixes.
 
-Looks ok to me on this series and would be nice to me if Rafael could create
-topic branch in his tree and apply this series with my ack for Samsung
-stuff.
+Thanks,
 
-Rafael, please let me know the branch when you create it so that I can merge
-it into Samsung tree to avoid other conflicts.
+	Joerg
 
-Thanks.
+>From 96f176a310e447966e45112fe4511b9d9fa0caf4 Mon Sep 17 00:00:00 2001
+From: Joerg Roedel <joerg.roedel@amd.com>
+Date: Tue, 6 Dec 2011 11:17:34 +0100
+Subject: [PATCH] iommu/msm: Fix compile error in mach-msm/devices-iommu.c
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Fix compile error due to missing <linux/module.h> include.
+
+Signed-off-by: Joerg Roedel <joerg.roedel@amd.com>
+---
+ arch/arm/mach-msm/devices-iommu.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/mach-msm/devices-iommu.c b/arch/arm/mach-msm/devices-iommu.c
+index 24030d0..0fb7a17 100644
+--- a/arch/arm/mach-msm/devices-iommu.c
++++ b/arch/arm/mach-msm/devices-iommu.c
+@@ -18,6 +18,7 @@
+ #include <linux/kernel.h>
+ #include <linux/platform_device.h>
+ #include <linux/bootmem.h>
++#include <linux/module.h>
+ #include <mach/irqs.h>
+ #include <mach/iommu.h>
+ 
+-- 
+1.7.5.4
+
+-- 
+AMD Operating System Research Center
+
+Advanced Micro Devices GmbH Einsteinring 24 85609 Dornach
+General Managers: Alberto Bozzo, Andrew Bowd
+Registration: Dornach, Landkr. Muenchen; Registerger. Muenchen, HRB Nr. 43632
