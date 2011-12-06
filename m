@@ -1,79 +1,73 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Tue, 6 Dec 2011 09:37:09 +0000
-Subject: [PATCH] ata: Don't use NO_IRQ in pata_of_platform driver
-In-Reply-To: <alpine.LFD.2.02.1112051443190.2357@xanadu.home>
-References: <20111110162859.GA7088@oksana.dev.rtsoft.ru>
- <20111202192618.GC3037@localhost.localdomain>
- <CA+55aFwekNWz+V4440f=2iu_BfOxSg0NjVogv4cZZDFbJBNoAQ@mail.gmail.com>
- <1322867573.11728.22.camel@pasglop>
- <20111205161157.GA27550@localhost.localdomain>
- <alpine.LFD.2.02.1112051236350.2357@xanadu.home>
- <20111205180253.GB29812@localhost.localdomain>
- <alpine.LFD.2.02.1112051310150.2357@xanadu.home>
- <20111205192605.GD29812@localhost.localdomain>
- <alpine.LFD.2.02.1112051443190.2357@xanadu.home>
-Message-ID: <20111206093709.GB2274@linaro.org>
+From: B29396@freescale.com (Dong Aisheng-B29396)
+Date: Tue, 6 Dec 2011 09:38:20 +0000
+Subject: [RFC PATCH 1/3] pinctrl: imx: add pinmux imx core driver
+In-Reply-To: <20111206094203.GC3864@S2100-06.ap.freescale.net>
+References: <1322999384-7886-1-git-send-email-b29396@freescale.com>
+ <20111206094203.GC3864@S2100-06.ap.freescale.net>
+Message-ID: <65EE16ACC360FA4D99C96DC085B3F772346A04@039-SN1MPN1-002.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 05, 2011 at 02:49:01PM -0500, Nicolas Pitre wrote:
-
-[...]
-
-> > > > Unfortunately, NO_IRQ is often not spelled "NO_IRQ".  It looks like the assumption
-> > > > "irq < 0 === no irq" may be quite a lot more widespread than "NO_IRQ === no irq".
-> > > > Since there's no specific thing we can grep for (and simply due to volume)
-> > > > finding all such instances may be quite a bit harder.
-> > > [...]
-> > > 
-> > > ARgh.
-> > > 
-> > > My point was about current actual usage of the IRQ numbered 0 which 
-> > > probably prompted the introduction of NO_IRQ in the first place.  What I 
-> > > was saying is that the number of occurrences where IRQ #0 is currently 
-> > > used into drivers that would get confused if 0 would mean no IRQ is 
-> > > probably quite small.
-> > 
-> > Ah, I misunderstood -- that's a separate issue, but also an important one.
-> > I guess this applies to a fair number of older boards.  One way of fixing
-> > this would be to migrate those boards to use irq domains -- but those boards
-> > may be sporadically maintained.
-> >  
-> > > But as you illustrated, there is a large number of drivers that already 
-> > > assume no IRQ is < 0, even if they don't use any IRQ #0 themselves.  
-> > > That is a much bigger problem to fix.
-> > 
-> > My concern is that as soon as we start to change this in significant
-> > volume, a _lot_ of stuff is going to break.  Everywhere that an irq value
-> > is passed from one piece of code to another, there is a potential
-> > interface mismatch -- there seems to be no single place where we can
-> > apply a conversion and fix everything.
+> -----Original Message-----
+> From: Guo Shawn-R65073
+> Sent: Tuesday, December 06, 2011 5:42 PM
+> To: Dong Aisheng-B29396
+> Cc: linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> linus.walleij at stericsson.com; s.hauer at pengutronix.de;
+> kernel at pengutronix.de
+> Subject: Re: [RFC PATCH 1/3] pinctrl: imx: add pinmux imx core driver
 > 
-> No need to convert everything.
+> On Sun, Dec 04, 2011 at 07:49:42PM +0800, Dong Aisheng wrote:
+> > +static struct pinmux_ops imx_pmx_ops = {
+> > +	.list_functions = imx_pmx_list_funcs,
+> > +	.get_function_name = imx_pmx_get_func_name,
+> > +	.get_function_groups = imx_pmx_get_groups,
+> > +	.enable = imx_pmx_enable,
+> > +};
 > 
-> First move is to make irq=0 meaning no IRQ.  That means making things 
-> like:
+> The pinmux core code will check the pinmux_ops as below.  !ops->disable
+> is one of the checking, while you do not have .disable hook.
 > 
-> 	if (irq < 0)
-> 	if (irq >= 0)
-> 
-> into
-> 
-> 	if (irq <= 0)
-> 	if (irq > 0)
-> 
-> And replace NO_IRQ with 0.
->
-> That change shouldn't break anything, except those drivers which are 1) 
-> being passed an actual IRQ #0 and 2) testing for no IRQ.  I suspect that 
-> those conditions aren't very common together.
+Then I have to add a disable function.
 
-To clarify, you're suggesting that the meanings of all other IRQ values
-would not change initially?  (i.e., we remap HW irq 0, if there is one,
-to some other random number but have a 1:1 mapping for everything else).
+> int pinmux_check_ops(const struct pinmux_ops *ops) {
+>         /* Check that we implement required operations */
+>         if (!ops->list_functions ||
+>             !ops->get_function_name ||
+>             !ops->get_function_groups ||
+>             !ops->enable ||
+>             !ops->disable)
+Not sure if we must check !ops->disable here since some soc may not have
+disable function.
 
+>                 return -EINVAL;
+> 
+>         return 0;
+> }
+> 
+> [...]
+> 
+> > +static int __init imx_pmx_probe(struct platform_device *pdev) {
+> > +	struct device *dev = &pdev->dev;
+> > +	struct imx_pmx *ipmx;
+> > +	struct resource *res;
+> > +	struct imx_pinctrl_info *info;
+> > +	resource_size_t res_size;
+> > +
+> > +	info = (struct imx_pinctrl_info *)pdev->id_entry->driver_data;
+> > +	if (!info || !info->pins || !info->groups || !info->functions
+> > +		|| (info->maxpin > info->npins)) {
+> 
+> You must mean !(info->maxpin > info->npins) here?
+> 
+Yes, thanks for this finding.
 
-That could make sense as an approach.
+> Regards,
+> Shawn
+> 
+> > +		dev_err(&pdev->dev, "wrong pinctrl info\n");
+> > +		return -EINVAL;
+> > +	}
 
-Cheers
----Dave
+Regards
+Dong Aisheng
