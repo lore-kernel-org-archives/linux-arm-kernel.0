@@ -1,55 +1,32 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 6 Dec 2011 23:28:22 +0000
-Subject: [PATCH] ARM: Add Cortex A7 proc info
-In-Reply-To: <1323186497-31306-1-git-send-email-pawel.moll@arm.com>
-References: <1323186497-31306-1-git-send-email-pawel.moll@arm.com>
-Message-ID: <20111206232822.GB16212@mudshark.cambridge.arm.com>
+From: linux@solonet.org.ua (Denis Kuzmenko)
+Date: Wed, 07 Dec 2011 01:26:51 +0200
+Subject: [PATCH resend2] s3c24xx: cpufreq: Fix compilation error when
+ CONFIG_CPU_FREQ_S3C24XX_DEBUGFS selected.
+In-Reply-To: <02ef01ccb40a$9078f2e0$b16ad8a0$%kim@samsung.com>
+References: <4EDD720B.5040607@solonet.org.ua>
+ <02ef01ccb40a$9078f2e0$b16ad8a0$%kim@samsung.com>
+Message-ID: <4EDEA4BB.60807@solonet.org.ua>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pawel,
-
-On Tue, Dec 06, 2011 at 03:48:17PM +0000, Pawel Moll wrote:
-> This patch adds processor infos for ARM Ltd. Cortex A7.
-
-You could elaborate a bit here :) Maybe mention that the A7 is
-architecturally identical to A15?
-
-> Signed-off-by: Pawel Moll <pawel.moll@arm.com>
-> ---
->  arch/arm/mm/proc-v7.S |   11 +++++++++++
->  1 files changed, 11 insertions(+), 0 deletions(-)
+On 12/06/2011 01:31 PM, Kukjin Kim wrote:
+> Denis Kuzmenko wrote:
+>>
+>> Fix compilation error when CONFIG_CPU_FREQ_S3C24XX_DEBUGFS selected.
+>>
+>> Signed-off-by: Denis Kuzmenko <linux@solonet.org.ua>
+>> ---
+>>
+>> Patch is against 3.2-rc3.
+>> CONFIG_S3C2410_IOTIMING wasn't present in Kconfig but was referenced by
+>> Makefile. Because of this the file s3c2410-iotiming.c was not ever
+>> compiled
 > 
-> diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-> index 2c559ac..ea679ec 100644
-> --- a/arch/arm/mm/proc-v7.S
-> +++ b/arch/arm/mm/proc-v7.S
-> @@ -284,6 +284,7 @@ __v7_ca5mp_setup:
->  __v7_ca9mp_setup:
->  	mov	r10, #(1 << 0)			@ TLB ops broadcasting
->  	b	1f
-> +__v7_ca7mp_setup:
->  __v7_ca15mp_setup:
->  	mov	r10, #0
->  1:
-> @@ -463,6 +464,16 @@ __v7_ca5mp_proc_info:
->  	.size	__v7_ca5mp_proc_info, . - __v7_ca5mp_proc_info
->  
->  	/*
-> +	 * ARM Ltd. Cortex A7 processor.
-> +	 */
-> +	.type	__v7_ca7mp_proc_info, #object
-> +__v7_ca7mp_proc_info:
-> +	.long	0x410fc070
-> +	.long	0xff0ffff0
-> +	__v7_proc __v7_ca7mp_setup, hwcaps = HWCAP_IDIV
-> +	.size	__v7_ca7mp_proc_info, . - __v7_ca7mp_proc_info
-> +
-> +	/*
->  	 * ARM Ltd. Cortex A9 processor.
->  	 */
->  	.type   __v7_ca9mp_proc_info, #object
+> Well, there is 'S3C2410_IOTIMING' at arch/arm/plat-s3c24xx/Kconfig and it
+> had dependency of 'CONFIG_CPU_FREQ_S3C24XX'...
+> 
 
-Tested-by: Will Deacon <will.deacon@arm.com>
+Yeah, I've missed that, thank you. I'll make a new version.
 
-Will
+-- 
+Best regards, Denis Kuzmenko.
