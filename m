@@ -1,51 +1,48 @@
-From: ming.lei@canonical.com (Ming Lei)
-Date: Tue, 6 Dec 2011 21:11:08 +0800
-Subject: [RFC PATCH v1 5/7] media: v4l2: introduce two IOCTLs for face
- detection
-In-Reply-To: <201112061255.56136.arnd@arndb.de>
-References: <1322817178-8931-1-git-send-email-ming.lei@canonical.com>
- <201112051437.27538.arnd@arndb.de>
- <CACVXFVMB+HuQDb+Pxo0d8x46P82-c-OPxaL0c661Wztyx3NWJA@mail.gmail.com>
- <201112061255.56136.arnd@arndb.de>
-Message-ID: <CACVXFVPYUY-vpeoKJKX2XN7-0w+=seW0u3EaP=hD9m1Sy7nkTQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 6 Dec 2011 13:16:58 +0000
+Subject: [RFC v2 1/2] dma-buf: Introduce dma buffer sharing mechanism
+In-Reply-To: <CAF6AEGto-+oSqguuWyPunUbtE65GpNiXh21srQzrChiBQMb1Nw@mail.gmail.com>
+References: <1322816252-19955-1-git-send-email-sumit.semwal@ti.com>
+ <CAKMK7uHw3OpMAtVib=e=s_us9Tx9TebzehGg59d4-g9dUXr+pQ@mail.gmail.com>
+ <CAF6AEGto-+oSqguuWyPunUbtE65GpNiXh21srQzrChiBQMb1Nw@mail.gmail.com>
+Message-ID: <201112061316.58858.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 6, 2011 at 8:55 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Tuesday 06 December 2011, Ming Lei wrote:
->> diff --git a/include/linux/videodev2.h b/include/linux/videodev2.h
->> index 073eb4d..8aeaa1e 100644
->> --- a/include/linux/videodev2.h
->> +++ b/include/linux/videodev2.h
->> @@ -2214,7 +2214,12 @@ struct v4l2_fd_result {
->> ? ? ? ? __u32 ? buf_index;
->> ? ? ? ? __u32 ? face_cnt;
->> ? ? ? ? __u32 ? reserved[6];
->> - ? ? ? struct v4l2_fd_detection *fd;
->> +
->> + ? ? ? /*make 64/32 compatible*/
->> + ? ? ? union {
->> + ? ? ? ? ? ? ? struct v4l2_fd_detection *fd;
->> + ? ? ? ? ? ? ? __u64 ? dummy;
->> + ? ? ? };
->> ?};
->>
->
-> That's not compatible, at least not on any big-endian architecture.
-> If you want to have an indirect pointer, you have to cast it to the
-> __u64 member in user space and back in kernel space.
+On Monday 05 December 2011, Rob Clark wrote:
+> > On the topic of a coherency model for dmabuf, I think we need to look at
+> > dma_buf_attachment_map/unmap (and also the mmap variants cpu_start and
+> > cpu_finish or whatever they might get called) as barriers:
+> >
+> > So after a dma_buf_map, all previsously completed dma operations (i.e.
+> > unmap already called) and any cpu writes (i.e. cpu_finish called) will be
+> > coherent. Similar rule holds for cpu access through the userspace mmap,
+> > only writes completed before the cpu_start will show up.
+> >
+> > Similar, writes done by the device are only guaranteed to show up after
+> > the _unmap. Dito for cpu writes and cpu_finish.
+> >
+> > In short we always need two function calls to denote the start/end of the
+> > "critical section".
+> 
+> Yup, this was exactly my assumption.  But I guess it is better to spell it out.
 
-Looks like it is a bit ugly.
+I still don't understand how this is going to help you if you let
+multiple drivers enter and leave the critical section without serializing
+against one another. That doesn't sound like what I know as critical
+section.
 
->
-> Using an array added to the end of the v4l2_fd_result structure
-> rather than a pointer would really make this easier IMHO.
+Given some reasonable constraints (all devices must be in the same coherency
+domain, for instance), you can probably define it in a way that you can
+have multiple devices mapping the same buffer at the same time, and
+when no device has mapped the buffer you can have as many concurrent
+kernel and user space accesses on the same buffer as you like. But you
+must still guarantee that no software touches a noncoherent buffer while
+it is mapped into any device and vice versa.
 
-I have tried to do this, but video_usercopy needs a few changes
-to handle array args if no indirect pointer is passed to kernel.
+Why can't we just mandate that all mappings into the kernel must be
+coherent and that user space accesses must either be coherent as well
+or be done by user space that uses explicit serialization with all
+DMA accesses?
 
-I am not sure if media guys are happy to accept the changes, :-)
-
-thanks,
---
-Ming Lei
+	Arnd
