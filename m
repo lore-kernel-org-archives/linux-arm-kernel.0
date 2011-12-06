@@ -1,42 +1,79 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Tue, 06 Dec 2011 18:30:37 +0900
-Subject: [PATCH v2 1/3] ARM: EXYNOS: Add USB OHCI device
-In-Reply-To: <4EDDDCAB.1000001@linaro.org>
-References: <001101ccb3e0$7fe48270$7fad8750$%han@samsung.com>
- <001301ccb3e0$b5fec280$21fc4780$%han@samsung.com>
- <4EDDDCAB.1000001@linaro.org>
-Message-ID: <000d01ccb3f9$b6bbc790$243356b0$%han@samsung.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Tue, 6 Dec 2011 09:37:09 +0000
+Subject: [PATCH] ata: Don't use NO_IRQ in pata_of_platform driver
+In-Reply-To: <alpine.LFD.2.02.1112051443190.2357@xanadu.home>
+References: <20111110162859.GA7088@oksana.dev.rtsoft.ru>
+ <20111202192618.GC3037@localhost.localdomain>
+ <CA+55aFwekNWz+V4440f=2iu_BfOxSg0NjVogv4cZZDFbJBNoAQ@mail.gmail.com>
+ <1322867573.11728.22.camel@pasglop>
+ <20111205161157.GA27550@localhost.localdomain>
+ <alpine.LFD.2.02.1112051236350.2357@xanadu.home>
+ <20111205180253.GB29812@localhost.localdomain>
+ <alpine.LFD.2.02.1112051310150.2357@xanadu.home>
+ <20111205192605.GD29812@localhost.localdomain>
+ <alpine.LFD.2.02.1112051443190.2357@xanadu.home>
+Message-ID: <20111206093709.GB2274@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tushar Behera wrote:
-> Subject: Re: [PATCH v2 1/3] ARM: EXYNOS: Add USB OHCI device
-> 
-> On Tuesday 06 December 2011 12:01 PM, Jingoo Han wrote:
-> > This patch adds USB ohci device definition for Exynos SoCs.
-> >
-> > Signed-off-by: Jingoo Han<jg1.han@samsung.com>
-> > ---
-> >   arch/arm/mach-exynos/Kconfig              |    5 +++
-> >   arch/arm/mach-exynos/Makefile             |    1 +
-> >   arch/arm/mach-exynos/dev-ohci.c           |   52 +++++++++++++++++++++++++++++
-> >   arch/arm/mach-exynos/include/mach/map.h   |    1 +
-> >   arch/arm/mach-exynos/include/mach/ohci.h  |   21 +++++++++++
-> 
-> In the earlier patchset, platform_device struct for ohci was defined
-> within plat-samsung, and ohci.h was located in
-> plat-samsung/include/plat. These are still the locations where ehci
-> related definitions are located.
-> 
-> What is the reason for movement of ohci related definitions to mach folder?
-I changed the ohci name from ohci-s5p to ohci-exynos, because the ohci-exynos
-is used for exynos series such as Exynos4210 & Exynos4x12.
-Therefore, it should be located within mach-exynos/include/mach.
+On Mon, Dec 05, 2011 at 02:49:01PM -0500, Nicolas Pitre wrote:
 
-Also, If this patchset is accepted, I will move Samsung ehci definitions
-to mach-exynos due to the same reason.
+[...]
 
-Thanks.
+> > > > Unfortunately, NO_IRQ is often not spelled "NO_IRQ".  It looks like the assumption
+> > > > "irq < 0 === no irq" may be quite a lot more widespread than "NO_IRQ === no irq".
+> > > > Since there's no specific thing we can grep for (and simply due to volume)
+> > > > finding all such instances may be quite a bit harder.
+> > > [...]
+> > > 
+> > > ARgh.
+> > > 
+> > > My point was about current actual usage of the IRQ numbered 0 which 
+> > > probably prompted the introduction of NO_IRQ in the first place.  What I 
+> > > was saying is that the number of occurrences where IRQ #0 is currently 
+> > > used into drivers that would get confused if 0 would mean no IRQ is 
+> > > probably quite small.
+> > 
+> > Ah, I misunderstood -- that's a separate issue, but also an important one.
+> > I guess this applies to a fair number of older boards.  One way of fixing
+> > this would be to migrate those boards to use irq domains -- but those boards
+> > may be sporadically maintained.
+> >  
+> > > But as you illustrated, there is a large number of drivers that already 
+> > > assume no IRQ is < 0, even if they don't use any IRQ #0 themselves.  
+> > > That is a much bigger problem to fix.
+> > 
+> > My concern is that as soon as we start to change this in significant
+> > volume, a _lot_ of stuff is going to break.  Everywhere that an irq value
+> > is passed from one piece of code to another, there is a potential
+> > interface mismatch -- there seems to be no single place where we can
+> > apply a conversion and fix everything.
 > 
-> --
-> Tushar Behera
+> No need to convert everything.
+> 
+> First move is to make irq=0 meaning no IRQ.  That means making things 
+> like:
+> 
+> 	if (irq < 0)
+> 	if (irq >= 0)
+> 
+> into
+> 
+> 	if (irq <= 0)
+> 	if (irq > 0)
+> 
+> And replace NO_IRQ with 0.
+>
+> That change shouldn't break anything, except those drivers which are 1) 
+> being passed an actual IRQ #0 and 2) testing for no IRQ.  I suspect that 
+> those conditions aren't very common together.
+
+To clarify, you're suggesting that the meanings of all other IRQ values
+would not change initially?  (i.e., we remap HW irq 0, if there is one,
+to some other random number but have a 1:1 mapping for everything else).
+
+
+That could make sense as an approach.
+
+Cheers
+---Dave
