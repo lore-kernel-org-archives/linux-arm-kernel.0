@@ -1,26 +1,28 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 6 Dec 2011 10:13:05 +0000
-Subject: [PATCH v2 1/4] mfd: mc13xxx: add device tree probe support
-In-Reply-To: <20111206032642.GI2980@S2100-06.ap.freescale.net>
-References: <1322731268-12158-1-git-send-email-shawn.guo@linaro.org>
- <1322731268-12158-2-git-send-email-shawn.guo@linaro.org>
- <20111202153637.GY8245@opensource.wolfsonmicro.com>
- <20111205064124.GC2980@S2100-06.ap.freescale.net>
- <20111205190946.GD7467@opensource.wolfsonmicro.com>
- <20111206032642.GI2980@S2100-06.ap.freescale.net>
-Message-ID: <20111206101304.GA28840@opensource.wolfsonmicro.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 6 Dec 2011 10:14:39 +0000
+Subject: [GIT PULL] Identity mapping changes for 3.3
+In-Reply-To: <20111205232342.GG14542@n2100.arm.linux.org.uk>
+References: <20111202160833.GK5540@mudshark.cambridge.arm.com>
+ <20111205232342.GG14542@n2100.arm.linux.org.uk>
+Message-ID: <20111206101438.GB25782@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 06, 2011 at 11:26:43AM +0800, Shawn Guo wrote:
-> On Mon, Dec 05, 2011 at 07:09:47PM +0000, Mark Brown wrote:
+Hi Russell,
 
-> > That doesn't answer the question - I've still no idea how the binding is
-> > supposed to map the nodes contained within regulators onto the physical
-> > regulators.
+On Mon, Dec 05, 2011 at 11:23:42PM +0000, Russell King - ARM Linux wrote:
+> On Fri, Dec 02, 2011 at 04:08:33PM +0000, Will Deacon wrote:
+> > The following changes since commit 2d13ccaa8797d7e599f3792aed4b1e44b47f94a5:
+> > 
+> >   Merge branch 'irqchip-consolidation' of git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms into devel-stable (2011-11-21 21:56:56 +0000)
+> 
+> As this is known to be broken on OMAP, could I have this based upon
+> some other commit - maybe ba8bb18a03f which I've just committed into
+> devel-stable (which is the second 'fix' patch for OMAP) please.
 
-> And here it is.  It finds the regulator node by looking for the
-> regulator name.
+I'm struggling to pull from you [1] at the moment, but I'll rebase this once I
+manage to get the updated devel-stable.
 
-OK, this needs to be documented in the binding documentation - people
-shouldn't need to look at the code to figure this out.
+Will
+
+[1] http://ftp.arm.linux.org.uk/pub/linux/arm/kernel/git-cur/linux-2.6-arm.git
