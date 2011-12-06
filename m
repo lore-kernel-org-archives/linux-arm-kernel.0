@@ -1,42 +1,40 @@
 From: LW@KARO-electronics.de (=?utf-8?q?Lothar=20Wa=C3=9Fmann?=)
-Date: Tue,  6 Dec 2011 11:27:12 +0100
-Subject: [PATCH][NET] several cleanups and bugfixes for fec.c: don't request
- invalid IRQ
-In-Reply-To: <0b92136d69e509a6ce49b526e1834f0ec90b04a4.1323163127.git.LW@KARO-electronics.de>
+Date: Tue,  6 Dec 2011 11:27:13 +0100
+Subject: [PATCH][NET] several cleanups and bugfixes for fec.c: don't munge MAC
+ address from platform data
+In-Reply-To: <6d1e5cdcbfc48df864ec9e0939645c0e95389d2a.1323163127.git.LW@KARO-electronics.de>
 References: <cover.1323163127.git.LW@KARO-electronics.de>
  <bd4415514fa0b40ece04d56b3ac4f549e79d87d7.1323163127.git.LW@KARO-electronics.de>
  <6c28f25c5c6d2f88d0985ce361c5e16f19db27d0.1323163127.git.LW@KARO-electronics.de>
  <0b92136d69e509a6ce49b526e1834f0ec90b04a4.1323163127.git.LW@KARO-electronics.de>
-Message-ID: <6d1e5cdcbfc48df864ec9e0939645c0e95389d2a.1323163127.git.LW@KARO-electronics.de>
+ <6d1e5cdcbfc48df864ec9e0939645c0e95389d2a.1323163127.git.LW@KARO-electronics.de>
+Message-ID: <55b78c1766da5b0d0d679f5eae3fb9fc74a6ceef.1323163127.git.LW@KARO-electronics.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-prevent calling request_irq() with a known invalid IRQ number and
-preserve the return value of the platform_get_irq() function
+When the MAC address is supplied via platform_data it should be OK as
+it is and should not be modified in case of a dual FEC setup.
+Also copying the MAC from platform_data to the single 'macaddr'
+variable will overwrite the MAC for the first interface in case of a
+dual FEC setup.
 
 Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
 ---
- drivers/net/ethernet/freescale/fec.c |    8 ++++++--
- 1 files changed, 6 insertions(+), 2 deletions(-)
+ drivers/net/ethernet/freescale/fec.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
 diff --git a/drivers/net/ethernet/freescale/fec.c b/drivers/net/ethernet/freescale/fec.c
-index 7ef408f..e2b5ce6 100644
+index e2b5ce6..11534b9 100644
 --- a/drivers/net/ethernet/freescale/fec.c
 +++ b/drivers/net/ethernet/freescale/fec.c
-@@ -1575,8 +1575,12 @@ fec_probe(struct platform_device *pdev)
+@@ -818,7 +818,7 @@ static void __inline__ fec_get_mac(struct net_device *ndev)
+ 			iap = (unsigned char *)FEC_FLASHMAC;
+ #else
+ 		if (pdata)
+-			memcpy(iap, pdata->mac, ETH_ALEN);
++			iap = (unsigned char *)&pdata->mac;
+ #endif
+ 	}
  
- 	for (i = 0; i < FEC_IRQ_NUM; i++) {
- 		irq = platform_get_irq(pdev, i);
--		if (i && irq < 0)
--			break;
-+		if (irq < 0) {
-+			if (i)
-+				break;
-+			ret = irq;
-+			goto failed_irq;
-+		}
- 		ret = request_irq(irq, fec_enet_interrupt, IRQF_DISABLED, pdev->name, ndev);
- 		if (ret) {
- 			while (--i >= 0) {
 -- 
 1.5.6.5
