@@ -1,19 +1,29 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 6 Dec 2011 14:16:01 +0000
-Subject: [GIT PULL] at91 fixes for 3.2-rc4
-In-Reply-To: <4ED65F6D.4020402@atmel.com>
-References: <4ED65F6D.4020402@atmel.com>
-Message-ID: <201112061416.01718.arnd@arndb.de>
+Date: Tue, 6 Dec 2011 14:19:18 +0000
+Subject: [GIT PULL] mxs: fixes (round 2)
+In-Reply-To: <20111202055756.GN711@S2100-06.ap.freescale.net>
+References: <20111202055756.GN711@S2100-06.ap.freescale.net>
+Message-ID: <201112061419.19276.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 30 November 2011, Nicolas Ferre wrote:
-> Here are a few fixes for AT91. I have noted 3.2-rc4 in the subject but it
-> is true that it can go in another -rc revision as I have seen your recent
-> pull request to Linus...
+On Friday 02 December 2011, Shawn Guo wrote:
+> Please pull the fixes for mxs below.
 > 
-> The following changes since commit caca6a03d365883564885f2c1da3e88dcf65d139:
+> Only patch 'arm: mx23: recognise stmp378x as mx23' has the tag
+> 'Cc: stable at kernel.org', as all other 3 patches are cosmetic fixes.
+> 
+> -- 
+> Regards,
+> Shawn
+> 
+> The following changes since commit 5611cc4572e889b62a7b4c72a413536bf6a9c416:
+> 
+>   Linux 3.2-rc4 (2011-12-01 14:56:01 -0800)
+> 
+> are available in the git repository at:
+>   git://git.linaro.org/people/shawnguo/linux-2.6.git mxs/fixes
+> 
 
-Pulled into arm-soc/fixes now. Thanks!
 
-	Arnd
+Pulled, thanks!
