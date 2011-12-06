@@ -1,140 +1,43 @@
-From: dongas86@gmail.com (Dong Aisheng)
-Date: Tue, 6 Dec 2011 11:39:51 +0800
+From: B29396@freescale.com (Dong Aisheng-B29396)
+Date: Tue, 6 Dec 2011 03:42:11 +0000
 Subject: [RFC PATCH 2/3] pinctrl: imx: add pinmux-imx53 support
-In-Reply-To: <CACRpkdaYz+-nZA6atxA+5kvWOO84YeSHQPNiojq_R4zkHUGz3Q@mail.gmail.com>
+In-Reply-To: <CACRpkdZ0aNj-BsdtD2R-bEWQfMzsOMNbdh6ryVtgwET3Ry7xXA@mail.gmail.com>
 References: <1322999384-7886-1-git-send-email-b29396@freescale.com>
  <1322999384-7886-2-git-send-email-b29396@freescale.com>
- <CACRpkdaYz+-nZA6atxA+5kvWOO84YeSHQPNiojq_R4zkHUGz3Q@mail.gmail.com>
-Message-ID: <CAA+hA=Sr0rSAQ54G_L-hxEutadAi3SzWSJ59jK+wzmXw+iBs7w@mail.gmail.com>
+ <20111204161123.GS27267@pengutronix.de>
+ <CACRpkdZ0aNj-BsdtD2R-bEWQfMzsOMNbdh6ryVtgwET3Ry7xXA@mail.gmail.com>
+Message-ID: <65EE16ACC360FA4D99C96DC085B3F7723457FD@039-SN1MPN1-002.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+> -----Original Message-----
+> From: Linus Walleij [mailto:linus.walleij at linaro.org]
+> Sent: Tuesday, December 06, 2011 1:01 AM
+> To: Sascha Hauer
+> Cc: Dong Aisheng-B29396; linux-kernel at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org; linus.walleij at stericsson.com; Guo Shawn-
+> R65073; kernel at pengutronix.de
+> Subject: Re: [RFC PATCH 2/3] pinctrl: imx: add pinmux-imx53 support
+> 
+> On Sun, Dec 4, 2011 at 5:11 PM, Sascha Hauer <s.hauer@pengutronix.de>
+> wrote:
+> 
+> > I don't think that this grouping of pads to their functions makes
+> > sense. On i.MX every pad is muxed independently and not in groups.
+> > Which pins belong to which function is board specific and not SoC
+> > specific.
+> 
+> True, Dong can this be moved to the imx pinctrl platform data and passed
+> in from arch/arm/[plat|mach]-* board files instead?
+> That is probably where it belongs today.
+> 
+Yes, I will do that.
 
-First  thanks for your review.
-
-2011/12/6 Linus Walleij <linus.walleij@linaro.org>:
-> On Sun, Dec 4, 2011 at 12:49 PM, Dong Aisheng <b29396@freescale.com> wrote:
->
->> +enum imx_mx53_pads {
->> + ? ? ? MX53_GPIO_19 = 0,
->> + ? ? ? MX53_KEY_COL0 = 1,
-> (...)
->
-> First I thought it looked a bit strange since you needed enums for all pads
-> but then I realized that your macros use the same enumerator name to
-> name the pad and then it looks sort of clever.
->
-> But maybe put in a comment about that here:
->
->> +/* Pad names for the pinmux subsystem */
->
-> Like this:
->
-> /*
-> ?* Pad names for the pinmux subsystem.
-> ?* These pad names are constructed from the pin enumerator names
-> ?* in the IMX_PINCTRL_PIN() macro.
-> ?*/
->
-Indeed.
-Thanks for your info.
-
->> +static const struct pinctrl_pin_desc mx53_pads[] = {
->> + ? ? ? IMX_PINCTRL_PIN(MX53_GPIO_19),
->> + ? ? ? IMX_PINCTRL_PIN(MX53_KEY_COL0),
-> (...)
->
->> +/* mx53 pin groups and mux mode */
->> +static const unsigned mx53_fec_pins[] = {
->> + ? ? ? MX53_FEC_MDC,
->> + ? ? ? MX53_FEC_MDIO,
->> + ? ? ? MX53_FEC_REF_CLK,
->> + ? ? ? MX53_FEC_RX_ER,
->> + ? ? ? MX53_FEC_CRS_DV,
->> + ? ? ? MX53_FEC_RXD1,
->> + ? ? ? MX53_FEC_RXD0,
->> + ? ? ? MX53_FEC_TX_EN,
->> + ? ? ? MX53_FEC_TXD1,
->> + ? ? ? MX53_FEC_TXD0,
->> +};
->
-> I understand this.
->
->> +static const unsigned mx53_fec_mux[] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
->
-> But what is this? Just zeroes? Why?
-> Especially with a const so they really cannot be anything
-> else. The same pin (0) can only be enumerated once.
->
-It's the mux mode for each pins in that group for a specific
-function(here it's fec).
-I add the comments in pinmux-imx-core.h when define this group structure.
-Maybe i still need to add some comments here to avoid confusing.
-
->> +static const unsigned mx53_sd1_pins[] = {
->> + ? ? ? MX53_SD1_CMD,
->> + ? ? ? MX53_SD1_CLK,
->> + ? ? ? MX53_SD1_DATA0,
->> + ? ? ? MX53_SD1_DATA1,
->> + ? ? ? MX53_SD1_DATA2,
->> + ? ? ? MX53_SD1_DATA3,
->> +
->> +};
->> +static const unsigned mx53_sd1_mux[] = { 0, 0, 0, 0, 0, 0 };
->
-> And here again.
->
->> +static const unsigned mx53_sd3_pins[] = {
->> + ? ? ? MX53_PATA_DATA8,
->> + ? ? ? MX53_PATA_DATA9,
->> + ? ? ? MX53_PATA_DATA10,
->> + ? ? ? MX53_PATA_DATA11,
->> + ? ? ? MX53_PATA_DATA0,
->> + ? ? ? MX53_PATA_DATA1,
->> + ? ? ? MX53_PATA_DATA2,
->> + ? ? ? MX53_PATA_DATA3,
->> + ? ? ? MX53_PATA_IORDY,
->> + ? ? ? MX53_PATA_RESET_B,
->> +
->> +};
->> +static const unsigned mx53_sd3_mux[] = { 4, 4, 4, 4, 4, 4, 4, 4, 2, 2 };
->
-> This also looks strange. Can you explain what these muxes are?
->
->> +static const unsigned mx53_uart1_pins[] = {
->> + ? ? ? MX53_CSI0_DAT10,
->> + ? ? ? MX53_CSI0_DAT11,
->> +};
->> +static const unsigned mx53_uart1_mux[] = { 2, 2 };
->
-> And here again?
->
->> +static const struct imx_pin_group mx53_pin_groups[] = {
->> + ? ? ? IMX_PIN_GROUP("fecgrp", mx53_fec_pins, mx53_fec_mux),
->> + ? ? ? IMX_PIN_GROUP("sd1grp", mx53_sd1_pins, mx53_sd1_mux),
->> + ? ? ? IMX_PIN_GROUP("sd3grp", mx53_sd3_pins, mx53_sd3_mux),
->> + ? ? ? IMX_PIN_GROUP("uart1grp", mx53_uart1_pins, mx53_uart1_mux),
->> +};
->
-> So I understand the first and second argument to IMX_PIN_GROUP()
-> but not the third.
->
->> +/* mx53 funcs and groups */
->> +static const char * const fecgrps[] = { "fecgrp" };
->> +static const char * const sd1grps[] = { "sd1grp" };
->> +static const char * const sd3grps[] = { "sd3grp" };
->> +static const char * const uart1grps[] = { "uart1grp" };
->> +
->> +static const struct imx_pmx_func mx53_pmx_functions[] = {
->> + ? ? ? IMX_PMX_FUNC("fec", fecgrps),
->> + ? ? ? IMX_PMX_FUNC("sd1", sd1grps),
->> + ? ? ? IMX_PMX_FUNC("sd3", sd3grps),
->> + ? ? ? IMX_PMX_FUNC("uart1", uart1grps),
->> +};
->
-> This looks good.
->
+> I know that this data is in drivers/pinctrl for the U300 and SIRF, but
+> that is because they only have one single board variant.
+> 
+> Yours,
+> Linus Walleij
 
 Regards
 Dong Aisheng
