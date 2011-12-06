@@ -1,82 +1,97 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 6 Dec 2011 15:29:55 +0000
-Subject: [GIT PULL v2] Linux support for ARM LPAE
-Message-ID: <20111206152955.GC31720@arm.com>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Tue,  6 Dec 2011 15:43:43 +0000
+Subject: [PATCH v4 0/6] Versatile Express DT support
+Message-ID: <1323186229-22054-1-git-send-email-pawel.moll@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+Hello again,
 
-I updated the series with an additional signed-off-by to your patch. The
-code is unchanged. Could you please pull it again?
+Here goes the fourth version of the series, hopefully something that
+could be merged for 3.3 (all Revieved-by-s and Acked-by-s welcomed!)
 
-Thanks.
+Changes since v3:
 
-The following changes since commit 5611cc4572e889b62a7b4c72a413536bf6a9c416:
+* The "core tile" support has been renamed (no real code change)
+  to support for "platforms based on a processor" and the DTBs now
+  must be now compatible with "arm,vexpress-<tile-model>" and
+  "arm,vexpress-<processor>", the latter being the important bit.
+  Documentation has been updated accordingly (all language
+  suggestions more then welcome).
 
-  Linux 3.2-rc4 (2011-12-01 14:56:01 -0800)
+* Added support code for Cortex-A7 and Cortex-A15 based platforms
+  and DTS for V2P-CA15 tile with Test Chip 1.
 
-are available in the git repository at:
-  git://git.kernel.org/pub/scm/linux/kernel/git/cmarinas/linux.git for-next
+* ARCH_VEXPRESS_RS1 has been dropped and the addresses in
+  Makefile.boot are not modified, so the behaviour of the non-DT
+  code is not changed at any time. ARCH_VEXPRESS_DT now enforces
+  AUTO_ZRELADDR.
 
-Catalin Marinas (12):
-      ARM: pgtable: Fix compiler warning in ioremap.c introduced by nopud
-      ARM: LPAE: Move page table maintenance macros to pgtable-2level.h
-      ARM: LPAE: Move the FSR definitions to separate files
-      ARM: LPAE: Factor out classic-MMU specific code into proc-v7-2level.S
-      ARM: LPAE: Introduce the 3-level page table format definitions
-      ARM: LPAE: Page table maintenance for the 3-level format
-      ARM: LPAE: MMU setup for the 3-level page table format
-      ARM: LPAE: Invalidate the TLB before freeing the PMD
-      ARM: LPAE: Add fault handling support
-      ARM: LPAE: Add context switching support
-      ARM: LPAE: Add identity mapping support for the 3-level page table format
-      ARM: LPAE: Add the Kconfig entries
+* Compact Flash is now compatible with "arm,vexpress-cf" as well
+  as with "ata-generic".
 
-Russell King (1):
-      ARM: pgtable: switch to use pgtable-nopud.h
+* V2x_PERIPH macros are now (void _iomem *) pointers and the
+  V2x_PERIPH_P2V macros were dropped.
 
-Will Deacon (2):
-      ARM: LPAE: add ISBs around MMU enabling code
-      ARM: LPAE: mark memory banks with start > ULONG_MAX as highmem
+* Wrong ARCH_VEXPRESS_DT->OF selection was fixed to ->USE_OF.
 
- arch/arm/Kconfig                            |    2 +-
- arch/arm/boot/compressed/head.S             |    1 +
- arch/arm/include/asm/assembler.h            |   11 ++
- arch/arm/include/asm/page.h                 |    4 +
- arch/arm/include/asm/pgalloc.h              |   26 ++++-
- arch/arm/include/asm/pgtable-2level.h       |   41 ++++++
- arch/arm/include/asm/pgtable-3level-hwdef.h |   77 ++++++++++++
- arch/arm/include/asm/pgtable-3level-types.h |   70 +++++++++++
- arch/arm/include/asm/pgtable-3level.h       |  155 +++++++++++++++++++++++
- arch/arm/include/asm/pgtable-hwdef.h        |    4 +
- arch/arm/include/asm/pgtable.h              |   43 +------
- arch/arm/include/asm/proc-fns.h             |   21 +++
- arch/arm/include/asm/system.h               |    8 ++
- arch/arm/include/asm/tlb.h                  |   12 ++-
- arch/arm/kernel/head.S                      |   47 +++++++-
- arch/arm/kernel/hw_breakpoint.c             |    8 +-
- arch/arm/kernel/sleep.S                     |    2 +
- arch/arm/mm/Kconfig                         |   17 +++
- arch/arm/mm/alignment.c                     |    2 +-
- arch/arm/mm/context.c                       |   19 +++-
- arch/arm/mm/fault.c                         |  111 +++--------------
- arch/arm/mm/fault.h                         |   27 ++++-
- arch/arm/mm/fsr-2level.c                    |   78 ++++++++++++
- arch/arm/mm/fsr-3level.c                    |   68 ++++++++++
- arch/arm/mm/idmap.c                         |   34 +++++-
- arch/arm/mm/ioremap.c                       |   39 ++++---
- arch/arm/mm/mmu.c                           |   46 +++++++-
- arch/arm/mm/pgd.c                           |   51 +++++++-
- arch/arm/mm/proc-macros.S                   |    5 +-
- arch/arm/mm/proc-v7-2level.S                |  171 ++++++++++++++++++++++++++
- arch/arm/mm/proc-v7-3level.S                |  150 +++++++++++++++++++++++
- arch/arm/mm/proc-v7.S                       |  177 +++------------------------
- 32 files changed, 1204 insertions(+), 323 deletions(-)
- create mode 100644 arch/arm/include/asm/pgtable-3level-hwdef.h
- create mode 100644 arch/arm/include/asm/pgtable-3level-types.h
- create mode 100644 arch/arm/include/asm/pgtable-3level.h
- create mode 100644 arch/arm/mm/fsr-2level.c
- create mode 100644 arch/arm/mm/fsr-3level.c
- create mode 100644 arch/arm/mm/proc-v7-2level.S
- create mode 100644 arch/arm/mm/proc-v7-3level.S
+* PL310-related Kconfig options were aligned to Will's and Dave's
+  changes.
+
+* "make dtbs" compile all provided vexpress-*.dts files now.
+
+Tested on:
+- V2P-CA9 with ATAGs
+- V2P-CA9 with DT
+- V2P-CA5s with DT
+- V2P-CA15 with DT
+- V2F-2XV6 Cortex-A7 SMM with DT
+
+Series v2 has been also tested by Ryan Harkin and provisionally acked
+by Rob Herring.
+
+Thanks for all your help, especially to Dave and Arnd for their
+continuous support!
+
+Pawel Moll (6):
+  ARM: versatile: Add missing ENDPROC to headsmp.S
+  ARM: vexpress: Get rid of MMIO_P2V
+  ARM: vexpress: Add DT support for the motherboard
+  ARM: vexpress: Motherboard RS1 memory map support
+  ARM: vexpress: DT-based support for Cortex-A5 and Cortex-A9 based
+    tiles
+  ARM: vexpress: DT-based support for Cortex-A7 and Cortex-A15 based
+    tiles
+
+ Documentation/devicetree/bindings/arm/vexpress.txt |  118 +++++++++
+ arch/arm/boot/dts/vexpress-v2m-rs1.dtsi            |  196 +++++++++++++++
+ arch/arm/boot/dts/vexpress-v2m.dtsi                |  195 +++++++++++++++
+ arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts        |  138 +++++++++++
+ arch/arm/boot/dts/vexpress-v2p-ca5s.dts            |  131 ++++++++++
+ arch/arm/boot/dts/vexpress-v2p-ca9.dts             |  145 +++++++++++
+ arch/arm/include/asm/hardware/arm_timer.h          |    5 +
+ arch/arm/mach-realview/platsmp.c                   |    3 +-
+ arch/arm/mach-vexpress/Kconfig                     |   68 +++++-
+ arch/arm/mach-vexpress/Makefile                    |    2 +
+ arch/arm/mach-vexpress/Makefile.boot               |    6 +
+ arch/arm/mach-vexpress/core.h                      |   19 ++-
+ arch/arm/mach-vexpress/ct-ca9x4.c                  |   52 +---
+ arch/arm/mach-vexpress/dt-ca5_ca9.c                |  114 +++++++++
+ arch/arm/mach-vexpress/dt-ca7_ca15.c               |   95 +++++++
+ arch/arm/mach-vexpress/include/mach/ct-ca9x4.h     |   13 +-
+ arch/arm/mach-vexpress/include/mach/debug-macro.S  |   37 +++-
+ arch/arm/mach-vexpress/include/mach/irqs.h         |    2 +-
+ arch/arm/mach-vexpress/include/mach/motherboard.h  |   58 +++--
+ arch/arm/mach-vexpress/include/mach/uncompress.h   |   13 +-
+ arch/arm/mach-vexpress/platsmp.c                   |    7 +-
+ arch/arm/mach-vexpress/v2m.c                       |  259 ++++++++++++++++++--
+ arch/arm/plat-versatile/headsmp.S                  |    1 +
+ 23 files changed, 1557 insertions(+), 120 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/vexpress.txt
+ create mode 100644 arch/arm/boot/dts/vexpress-v2m-rs1.dtsi
+ create mode 100644 arch/arm/boot/dts/vexpress-v2m.dtsi
+ create mode 100644 arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts
+ create mode 100644 arch/arm/boot/dts/vexpress-v2p-ca5s.dts
+ create mode 100644 arch/arm/boot/dts/vexpress-v2p-ca9.dts
+ create mode 100644 arch/arm/mach-vexpress/dt-ca5_ca9.c
+ create mode 100644 arch/arm/mach-vexpress/dt-ca7_ca15.c
