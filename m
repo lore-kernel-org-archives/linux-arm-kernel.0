@@ -1,5 +1,5 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 6 Dec 2011 16:00:06 +0800
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 6 Dec 2011 09:05:44 +0100
 Subject: [RFC PATCH 2/3] pinctrl: imx: add pinmux-imx53 support
 In-Reply-To: <20189.50504.375779.311903@ipc1.ka-ro>
 References: <1322999384-7886-1-git-send-email-b29396@freescale.com>
@@ -8,13 +8,13 @@ References: <1322999384-7886-1-git-send-email-b29396@freescale.com>
  <20111205211838.GG27267@pengutronix.de>
  <20111206062500.GA3649@S2100-06.ap.freescale.net>
  <20189.50504.375779.311903@ipc1.ka-ro>
-Message-ID: <20111206080005.GA3864@S2100-06.ap.freescale.net>
+Message-ID: <20111206080544.GF4585@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
+
 On Tue, Dec 06, 2011 at 08:33:28AM +0100, Lothar Wa?mann wrote:
-> Hi,
-> 
 > Shawn Guo writes:
 > > On Mon, Dec 05, 2011 at 10:18:38PM +0100, Sascha Hauer wrote:
 > > > Freescale has named the pins after their primary function which is quite
@@ -38,24 +38,14 @@ On Tue, Dec 06, 2011 at 08:33:28AM +0100, Lothar Wa?mann wrote:
 > to use. If developers who need to use currently unused pindefs have to
 > create them on their own, there will always be a good chance in
 > getting them wrong.
+Another upside is, that adding the complete list once doesn't result in
+conflicts if two people add new definitions in the same timeframe. As
+the header are only cpp symbols that don't hurt at runtime I think
+having them complete is better than the incremental approach.
 
-If the configuration is not working, they will notice it's wrong anyway.
-
-> 
-> > > which means that you don't have to look into the datasheet to get the
-> > > different options for a pin
-> > 
-> > Looking at the datasheet when we write code is a pretty natural thing
-> > to me.
-> > 
-> The pindefs are like interrupt numbers or IO addresses for which there
-> also is a complete list of definitions in the kernel no matter whether
-> they are actually all in use.
-> 
-The interrupt list is much shorter than iomux list here, which enumerate
-every single function for every single pad.  Also, most interrupts stand
-a pretty good chance to be used, while most of the pad functions do not.
+Best regards
+Uwe
 
 -- 
-Regards,
-Shawn
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
