@@ -1,91 +1,19 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 06 Dec 2011 12:06:48 -0600
-Subject: [PATCH 2/3] arm/dts: OMAP: Remove bootargs node from board files
-In-Reply-To: <1323190149-6492-3-git-send-email-b-cousson@ti.com>
-References: <y> <1323190149-6492-3-git-send-email-b-cousson@ti.com>
-Message-ID: <4EDE59B8.1070808@gmail.com>
+From: davem@davemloft.net (David Miller)
+Date: Tue, 06 Dec 2011 13:17:10 -0500 (EST)
+Subject: [PATCH][NET] several cleanups and bugfixes for fec.c
+In-Reply-To: <cover.1323163127.git.LW@KARO-electronics.de>
+References: <cover.1323163127.git.LW@KARO-electronics.de>
+Message-ID: <20111206.131710.2181211652306186928.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Benoit,
 
-On 12/06/2011 10:49 AM, Benoit Cousson wrote:
-> Since 3.2, the CONFIG_ARM_ATAG_DTB_COMPAT config allows
-> an old bootloader to still use ATAG to provide cmdline.
-> 
-> Remove chosen/bootargs from the DTS board files.
-> 
-> Signed-off-by: Benoit Cousson <b-cousson@ti.com>
-> Cc: Grant Likely <grant.likely@secretlab.ca>
-> Cc: Rob Herring <rob.herring@calxeda.com>
+Please use a more reasonable Subject line for your patches.
 
-Acked-by: Rob Herring <rob.herring@calxeda.com>
+Saying "several cleanups and bugfixes for fec.c:" in every subject
+line of a whole series of patches isn't very helpful.
 
-Rob
+Just "fec: set con_id in clk_get() call to NULL", as one example, would be fine.
 
-> ---
->  arch/arm/boot/dts/omap3-beagle.dts |    9 ---------
->  arch/arm/boot/dts/omap4-panda.dts  |    9 ---------
->  arch/arm/boot/dts/omap4-sdp.dts    |    9 ---------
->  3 files changed, 0 insertions(+), 27 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/omap3-beagle.dts b/arch/arm/boot/dts/omap3-beagle.dts
-> index 9486be6..9f72cd4 100644
-> --- a/arch/arm/boot/dts/omap3-beagle.dts
-> +++ b/arch/arm/boot/dts/omap3-beagle.dts
-> @@ -13,15 +13,6 @@
->  	model = "TI OMAP3 BeagleBoard";
->  	compatible = "ti,omap3-beagle", "ti,omap3";
->  
-> -	/*
-> -	 * Since the initial device tree board file does not create any
-> -	 * devices (MMC, network...), the only way to boot is to provide a
-> -	 * ramdisk.
-> -	 */
-> -	chosen {
-> -		bootargs = "root=/dev/ram0 rw console=ttyO2,115200n8 initrd=0x81600000,20M ramdisk_size=20480 no_console_suspend debug earlyprintk";
-> -	};
-> -
->  	memory {
->  		device_type = "memory";
->  		reg = <0x80000000 0x20000000>; /* 512 MB */
-> diff --git a/arch/arm/boot/dts/omap4-panda.dts b/arch/arm/boot/dts/omap4-panda.dts
-> index c702657..9755ad5 100644
-> --- a/arch/arm/boot/dts/omap4-panda.dts
-> +++ b/arch/arm/boot/dts/omap4-panda.dts
-> @@ -13,15 +13,6 @@
->  	model = "TI OMAP4 PandaBoard";
->  	compatible = "ti,omap4-panda", "ti,omap4430", "ti,omap4";
->  
-> -	/*
-> -	 * Since the initial device tree board file does not create any
-> -	 * devices (MMC, network...), the only way to boot is to provide a
-> -	 * ramdisk.
-> -	 */
-> -	chosen {
-> -		bootargs = "root=/dev/ram0 rw console=ttyO2,115200n8 initrd=0x81600000,20M ramdisk_size=20480 no_console_suspend debug";
-> -	};
-> -
->  	memory {
->  		device_type = "memory";
->  		reg = <0x80000000 0x40000000>; /* 1 GB */
-> diff --git a/arch/arm/boot/dts/omap4-sdp.dts b/arch/arm/boot/dts/omap4-sdp.dts
-> index 066e28c..63c6b2b 100644
-> --- a/arch/arm/boot/dts/omap4-sdp.dts
-> +++ b/arch/arm/boot/dts/omap4-sdp.dts
-> @@ -13,15 +13,6 @@
->  	model = "TI OMAP4 SDP board";
->  	compatible = "ti,omap4-sdp", "ti,omap4430", "ti,omap4";
->  
-> -	/*
-> -	 * Since the initial device tree board file does not create any
-> -	 * devices (MMC, network...), the only way to boot is to provide a
-> -	 * ramdisk.
-> -	 */
-> -	chosen {
-> -		bootargs = "root=/dev/ram0 rw console=ttyO2,115200n8 initrd=0x81600000,20M ramdisk_size=20480 no_console_suspend debug";
-> -	};
-> -
->  	memory {
->  		device_type = "memory";
->  		reg = <0x80000000 0x40000000>; /* 1 GB */
+You will need to resubmit this entire patch series, afresh, with this fixup.
+Do not try to fix it up by replying to the individual patch postings.
