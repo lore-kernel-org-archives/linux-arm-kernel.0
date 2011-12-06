@@ -1,131 +1,145 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 06 Dec 2011 20:31:15 +0900
-Subject: [PATCH resend2] s3c24xx: cpufreq: Fix compilation error when
- CONFIG_CPU_FREQ_S3C24XX_DEBUGFS selected.
-In-Reply-To: <4EDD720B.5040607@solonet.org.ua>
-References: <4EDD720B.5040607@solonet.org.ua>
-Message-ID: <02ef01ccb40a$9078f2e0$b16ad8a0$%kim@samsung.com>
+From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
+Date: Tue, 6 Dec 2011 12:31:21 +0100
+Subject: [PATCH] ARM: S3C64XX: Add basic cpuidle driver
+In-Reply-To: <1323117169-9817-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+References: <1323117169-9817-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+Message-ID: <201112061231.22570.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Denis Kuzmenko wrote:
-> 
-> Fix compilation error when CONFIG_CPU_FREQ_S3C24XX_DEBUGFS selected.
-> 
-> Signed-off-by: Denis Kuzmenko <linux@solonet.org.ua>
+Am Montag, 5. Dezember 2011, 21:32:49 schrieb Mark Brown:
+> Add a very basic cpuidle driver for S3C64xx which merely drives the CPU
+> into IDLE mode. We could do this with pm_idle but the more modern idiom
+> is to use cpuidle and the intention is to go further and support STOP
+> and DEEP-STOP states in conjunction with the pm_domain framework.
+cool :-)
+
+My S3C2416 playground is quite similar in its low power modes and their wakeup 
+sources and I've got a idle driver for it in a similar state sitting here.
+
+So I'm really looking forward to seeing a possible example on how to support 
+the STOP and DEEP-STOP modes best.
+
+
+> The actual state entry code was lifted from Tomasz Figa's work on spica.
+>
+> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+Acked-by: Heiko Stuebner <heiko@sntech.de>
+
+
 > ---
+>  arch/arm/mach-s3c64xx/Makefile  |    1 +
+>  arch/arm/mach-s3c64xx/cpuidle.c |   91
+> +++++++++++++++++++++++++++++++++++++++ 2 files changed, 92 insertions(+),
+> 0 deletions(-)
+>  create mode 100644 arch/arm/mach-s3c64xx/cpuidle.c
 > 
-> Patch is against 3.2-rc3.
-> CONFIG_S3C2410_IOTIMING wasn't present in Kconfig but was referenced by
-> Makefile. Because of this the file s3c2410-iotiming.c was not ever
-> compiled
-
-Well, there is 'S3C2410_IOTIMING' at arch/arm/plat-s3c24xx/Kconfig and it
-had dependency of 'CONFIG_CPU_FREQ_S3C24XX'...
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
-
-> and enabling CONFIG_CPU_FREQ_S3C24XX_DEBUGFS option caused undefined
-> reference to function s3c2410_iotiming_debugfs defined in that file.
+> diff --git a/arch/arm/mach-s3c64xx/Makefile
+> b/arch/arm/mach-s3c64xx/Makefile index e32093c..8f5574b 100644
+> --- a/arch/arm/mach-s3c64xx/Makefile
+> +++ b/arch/arm/mach-s3c64xx/Makefile
+> @@ -40,6 +40,7 @@ obj-$(CONFIG_S3C64XX_SETUP_SDHCI_GPIO) +=
+> setup-sdhci-gpio.o obj-$(CONFIG_PM)		+= pm.o
+>  obj-$(CONFIG_PM)		+= sleep.o
+>  obj-$(CONFIG_PM)		+= irq-pm.o
+> +obj-$(CONFIG_CPU_IDLE)		+= cpuidle.o
 > 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 44789ef..81d7025 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -2104,9 +2104,31 @@ config CPU_FREQ_S3C24XX_DEBUG
->  	help
->  	  Enable s3c_freq_dbg for the Samsung S3C CPUfreq core
->  +config S3C2410_IOTIMING
-> +	bool "CPUfreq iotiming for Samsung S3C2410 series CPUs"
-> +	depends on ARCH_S3C2410 && CPU_FREQ && CPU_FREQ_S3C24XX &&
-> EXPERIMENTAL
-> +	help
-> +	  This enables the CPUfreq driver for the Samsung S3C24XX to change
-> +	  IO timing according to the CPU frequency.
+>  # Machine support
+> 
+> diff --git a/arch/arm/mach-s3c64xx/cpuidle.c
+> b/arch/arm/mach-s3c64xx/cpuidle.c new file mode 100644
+> index 0000000..625d2c7
+> --- /dev/null
+> +++ b/arch/arm/mach-s3c64xx/cpuidle.c
+> @@ -0,0 +1,91 @@
+> +/* linux/arch/arm/mach-s3c64xx/cpuidle.c
+> + *
+> + * Copyright (c) 2011 Wolfson Microelectronics, plc
+> + * Copyright (c) 2011 Samsung Electronics Co., Ltd.
+> + *		http://www.samsung.com
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> +*/
 > +
-> +	  For details, take a look at <file:Documentation/cpu-freq>.
+> +#include <linux/kernel.h>
+> +#include <linux/init.h>
+> +#include <linux/cpuidle.h>
+> +#include <linux/io.h>
+> +#include <linux/export.h>
+> +#include <linux/time.h>
 > +
-> +	  If in doubt, say Y.
+> +#include <asm/proc-fns.h>
 > +
-> +config S3C2412_IOTIMING
-> +	bool "CPUfreq iotiming for Samsung S3C2412 series CPUs"
-> +	depends on ARCH_S3C2412 && CPU_FREQ && CPU_FREQ_S3C24XX &&
-> EXPERIMENTAL
-> +	help
-> +	  This enables the CPUfreq driver for the Samsung S3C2412 to change
-> +	  IO timing according to the CPU frequency.
+> +#include <mach/map.h>
 > +
-> +	  For details, take a look at <file:Documentation/cpu-freq>.
+> +#include <mach/regs-sys.h>
+> +#include <mach/regs-syscon-power.h>
 > +
-> +	  If in doubt, say Y.
+> +static int s3c64xx_enter_idle(struct cpuidle_device *dev,
+> +			      struct cpuidle_driver *drv,
+> +			      int index)
+> +{
+> +	struct timeval before, after;
+> +	unsigned long tmp;
+> +	int idle_time;
 > +
->  config CPU_FREQ_S3C24XX_IODEBUG
->  	bool "Debug CPUfreq Samsung driver IO timing"
-> -	depends on CPU_FREQ_S3C24XX
-> +	depends on CPU_FREQ_S3C24XX && (S3C2410_IOTIMING ||
-> S3C2412_IOTIMING)
->  	help
->  	  Enable s3c_freq_iodbg for the Samsung S3C CPUfreq core
->  diff --git a/arch/arm/plat-samsung/include/plat/cpu-freq-core.h
-> b/arch/arm/plat-samsung/include/plat/cpu-freq-core.h
-> index dac4760..c465252 100644
-> --- a/arch/arm/plat-samsung/include/plat/cpu-freq-core.h
-> +++ b/arch/arm/plat-samsung/include/plat/cpu-freq-core.h
-> @@ -202,13 +202,23 @@ extern int s3c_plltab_register(struct
-> cpufreq_frequency_table *plls,
->  extern struct s3c_cpufreq_config *s3c_cpufreq_getconfig(void);
->  extern struct s3c_iotimings *s3c_cpufreq_getiotimings(void);
->  -extern void s3c2410_iotiming_debugfs(struct seq_file *seq,
-> -				     struct s3c_cpufreq_config *cfg,
-> -				     union s3c_iobank *iob);
-> -
-> -extern void s3c2412_iotiming_debugfs(struct seq_file *seq,
-> -				     struct s3c_cpufreq_config *cfg,
-> -				     union s3c_iobank *iob);
-> +#ifdef CONFIG_CPU_FREQ_S3C24XX_DEBUGFS
-> +	#ifdef CONFIG_S3C2410_IOTIMING
-> +	extern void s3c2410_iotiming_debugfs(struct seq_file *seq,
-> +					     struct s3c_cpufreq_config *cfg,
-> +					     union s3c_iobank *iob);
-> +	#else
-> +	#define s3c2410_iotiming_debugfs	NULL
-> +	#endif
+> +	local_irq_disable();
+> +	do_gettimeofday(&before);
 > +
-> +	#ifdef CONFIG_S3C2412_IOTIMING
-> +	extern void s3c2412_iotiming_debugfs(struct seq_file *seq,
-> +					     struct s3c_cpufreq_config *cfg,
-> +					     union s3c_iobank *iob);
-> +	#else
-> +	#define s3c2412_iotiming_debugfs	NULL
-> +	#endif
-> +#endif
->   #ifdef CONFIG_CPU_FREQ_S3C24XX_DEBUGFS
->  #define s3c_cpufreq_debugfs_call(x) x
-> @@ -241,10 +251,7 @@ extern void s3c2410_iotiming_set(struct
-> s3c_cpufreq_config *cfg,
->  #endif /* CONFIG_S3C2410_IOTIMING */
->   /* S3C2412 compatible routines */
-> -
-> -extern int s3c2412_iotiming_get(struct s3c_cpufreq_config *cfg,
-> -				struct s3c_iotimings *timings);
-> -
-> +#ifdef CONFIG_S3C2412_IOTIMING
->  extern int s3c2412_iotiming_get(struct s3c_cpufreq_config *cfg,
->  				struct s3c_iotimings *timings);
->  @@ -253,6 +260,11 @@ extern int s3c2412_iotiming_calc(struct
-> s3c_cpufreq_config *cfg,
->   extern void s3c2412_iotiming_set(struct s3c_cpufreq_config *cfg,
->  				 struct s3c_iotimings *iot);
-> +#else
-> +#define s3c2412_iotiming_calc NULL
-> +#define s3c2412_iotiming_get NULL
-> +#define s3c2412_iotiming_set NULL
-> +#endif
->   #ifdef CONFIG_CPU_FREQ_S3C24XX_DEBUG
->  #define s3c_freq_dbg(x...) printk(KERN_INFO x)
+> +	/* Setup PWRCFG to enter idle mode */
+> +	tmp = __raw_readl(S3C64XX_PWR_CFG);
+> +	tmp &= ~S3C64XX_PWRCFG_CFG_WFI_MASK;
+> +	tmp |= S3C64XX_PWRCFG_CFG_WFI_IDLE;
+> +	__raw_writel(tmp, S3C64XX_PWR_CFG);
+> +
+> +	cpu_do_idle();
+> +
+> +	do_gettimeofday(&after);
+> +	local_irq_enable();
+> +	idle_time = (after.tv_sec - before.tv_sec) * USEC_PER_SEC +
+> +		    (after.tv_usec - before.tv_usec);
+> +
+> +	dev->last_residency = idle_time;
+> +	return index;
+> +}
+> +
+> +static struct cpuidle_state s3c64xx_cpuidle_set[] = {
+> +	[0] = {
+> +		.enter			= s3c64xx_enter_idle,
+> +		.exit_latency		= 1,
+> +		.target_residency	= 100000,
+> +		.flags			= CPUIDLE_FLAG_TIME_VALID,
+> +		.name			= "IDLE",
+> +		.desc			= "System active, ARM gated",
+> +	},
+> +};
+> +
+> +static struct cpuidle_driver s3c64xx_cpuidle_driver = {
+> +	.name		= "s3c64xx_cpuidle",
+> +	.owner		= THIS_MODULE,
+> +	.state_count	= ARRAY_SIZE(s3c64xx_cpuidle_set),
+> +};
+> +
+> +static struct cpuidle_device s3c64xx_cpuidle_device = {
+> +	.state_count	= ARRAY_SIZE(s3c64xx_cpuidle_set),
+> +};
+> +
+> +static int __init s3c64xx_init_cpuidle(void)
+> +{
+> +	int ret;
+> +
+> +	memcpy(s3c64xx_cpuidle_driver.states, s3c64xx_cpuidle_set,
+> +	       sizeof(s3c64xx_cpuidle_set));
+> +	cpuidle_register_driver(&s3c64xx_cpuidle_driver);
+> +
+> +	ret = cpuidle_register_device(&s3c64xx_cpuidle_device);
+> +	if (ret) {
+> +		pr_err("Failed to register cpuidle device: %d\n", ret);
+> +		return ret;
+> +	}
+> +
+> +	return 0;
+> +}
+> +device_initcall(s3c64xx_init_cpuidle);
