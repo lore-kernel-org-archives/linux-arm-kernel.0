@@ -1,31 +1,50 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 6 Dec 2011 10:38:43 +0000
-Subject: [GIT PULL] Identity mapping changes for 3.3
-In-Reply-To: <20111206101438.GB25782@mudshark.cambridge.arm.com>
-References: <20111202160833.GK5540@mudshark.cambridge.arm.com>
- <20111205232342.GG14542@n2100.arm.linux.org.uk>
- <20111206101438.GB25782@mudshark.cambridge.arm.com>
-Message-ID: <20111206103843.GM14542@n2100.arm.linux.org.uk>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Tue, 6 Dec 2011 18:43:11 +0800
+Subject: [RFC PATCH 0/3] Use Generic USB PHY Layer at i.MX Platform
+Message-ID: <1323168194-24191-1-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 06, 2011 at 10:14:39AM +0000, Will Deacon wrote:
-> Hi Russell,
-> 
-> On Mon, Dec 05, 2011 at 11:23:42PM +0000, Russell King - ARM Linux wrote:
-> > On Fri, Dec 02, 2011 at 04:08:33PM +0000, Will Deacon wrote:
-> > > The following changes since commit 2d13ccaa8797d7e599f3792aed4b1e44b47f94a5:
-> > > 
-> > >   Merge branch 'irqchip-consolidation' of git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms into devel-stable (2011-11-21 21:56:56 +0000)
-> > 
-> > As this is known to be broken on OMAP, could I have this based upon
-> > some other commit - maybe ba8bb18a03f which I've just committed into
-> > devel-stable (which is the second 'fix' patch for OMAP) please.
-> 
-> I'm struggling to pull from you [1] at the moment, but I'll rebase this once I
-> manage to get the updated devel-stable.
+Hi balbi, others,
 
-It looks like the machine is hitting the memory and disk io bandwidth
-limits.  Unfortunately, git seems to have high demands for both of those,
-weighing in at around 300-400MB per pack process, and seemingly wanting
-to read all the pack files too.
+I have created this patchset to show how a generic USB PHY Layer to work.
+There are two USB PHYs (UTMI and ULPI) at i.MX51 BBG board, we can use
+two phys together with Heikki proposal's generic phy file at i.MX USB 
+host driver, and let both otg host(UTMI) and host 1 (ULPI)work together.
+
+With this patchset, I hope we can find how USB PHY Layer works, and what
+it can do, and improve Heikki's patch. 
+
+Split PHY from OTG can give the benefit for the situation which only needs
+to use the PHY. So, I hope we can mainline generic USB PHY driver earlier.
+
+Peter Chen (3):
+  USB: Add Generic USB PHY Layer code
+  USB: ehci-mxc: Use new phy structure code for mxc host use
+  ARM: mx51: Create two usb phy platform drivers
+
+ arch/arm/mach-mx5/Kconfig                         |    4 +
+ arch/arm/mach-mx5/board-mx51_babbage.c            |   33 ++-
+ arch/arm/plat-mxc/Makefile                        |    1 +
+ arch/arm/plat-mxc/devices/Kconfig                 |    6 +
+ arch/arm/plat-mxc/devices/Makefile                |    2 +
+ arch/arm/plat-mxc/devices/platform-fsl-phy-ulpi.c |   18 +
+ arch/arm/plat-mxc/devices/platform-fsl-phy-utmi.c |   18 +
+ arch/arm/plat-mxc/include/mach/devices-common.h   |    5 +
+ arch/arm/plat-mxc/include/mach/mxc_phy.h          |   20 ++
+ arch/arm/plat-mxc/include/mach/ulpi.h             |   11 -
+ arch/arm/plat-mxc/ulpi.c                          |  114 ++++++-
+ arch/arm/plat-mxc/utmi.c                          |  121 +++++++
+ drivers/usb/host/ehci-mxc.c                       |   28 +-
+ drivers/usb/otg/Kconfig                           |    2 +
+ drivers/usb/otg/Makefile                          |    1 +
+ drivers/usb/otg/phy.c                             |  368 +++++++++++++++++++++
+ drivers/usb/otg/ulpi.c                            |   99 +++---
+ include/linux/usb/phy.h                           |  250 ++++++++++++++
+ 18 files changed, 1020 insertions(+), 81 deletions(-)
+ create mode 100644 arch/arm/plat-mxc/devices/platform-fsl-phy-ulpi.c
+ create mode 100644 arch/arm/plat-mxc/devices/platform-fsl-phy-utmi.c
+ create mode 100644 arch/arm/plat-mxc/include/mach/mxc_phy.h
+ create mode 100644 arch/arm/plat-mxc/utmi.c
+ create mode 100644 drivers/usb/otg/phy.c
+ create mode 100644 include/linux/usb/phy.h
