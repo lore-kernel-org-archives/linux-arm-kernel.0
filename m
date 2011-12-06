@@ -1,73 +1,42 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Tue, 6 Dec 2011 09:30:00 +0000
-Subject: [PATCH] ata: Don't use NO_IRQ in pata_of_platform driver
-In-Reply-To: <4EDD2DE1.1050606@gmail.com>
-References: <20111202192618.GC3037@localhost.localdomain>
- <CA+55aFwekNWz+V4440f=2iu_BfOxSg0NjVogv4cZZDFbJBNoAQ@mail.gmail.com>
- <1322867573.11728.22.camel@pasglop>
- <20111205161157.GA27550@localhost.localdomain>
- <alpine.LFD.2.02.1112051236350.2357@xanadu.home>
- <20111205180253.GB29812@localhost.localdomain>
- <alpine.LFD.2.02.1112051310150.2357@xanadu.home>
- <4EDD1897.4030208@gmail.com>
- <20111205202125.GA32592@oksana.dev.rtsoft.ru>
- <4EDD2DE1.1050606@gmail.com>
-Message-ID: <20111206093000.GA2274@linaro.org>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Tue, 06 Dec 2011 18:30:37 +0900
+Subject: [PATCH v2 1/3] ARM: EXYNOS: Add USB OHCI device
+In-Reply-To: <4EDDDCAB.1000001@linaro.org>
+References: <001101ccb3e0$7fe48270$7fad8750$%han@samsung.com>
+ <001301ccb3e0$b5fec280$21fc4780$%han@samsung.com>
+ <4EDDDCAB.1000001@linaro.org>
+Message-ID: <000d01ccb3f9$b6bbc790$243356b0$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 05, 2011 at 02:47:29PM -0600, Rob Herring wrote:
-> On 12/05/2011 02:21 PM, Anton Vorontsov wrote:
-> > On Mon, Dec 05, 2011 at 01:16:39PM -0600, Rob Herring wrote:
-> > [...]
-> >> At least for DT enabled platforms, we could force "no irq" to be 0 in
-> >> the DT irq code. Searching the dts files, I found 2 occurrences of IRQ0.
-> > 
-> > Please note that there are HW IRQ numbers and "Virtual" IRQ numbers.
-> > dev->irq and thus the thing that we pass into request_irq() is a
-> > virtual IRQ thing, a "cookie".
-> > 
-> > While in device tree you see real HW IRQ numbers.
-> > 
-> > Legal VIRQ is always > 0, while HW IRQ could be >= 0.
-> > 
+Tushar Behera wrote:
+> Subject: Re: [PATCH v2 1/3] ARM: EXYNOS: Add USB OHCI device
 > 
-> If this was all true, then there would be no discussion.
+> On Tuesday 06 December 2011 12:01 PM, Jingoo Han wrote:
+> > This patch adds USB ohci device definition for Exynos SoCs.
+> >
+> > Signed-off-by: Jingoo Han<jg1.han@samsung.com>
+> > ---
+> >   arch/arm/mach-exynos/Kconfig              |    5 +++
+> >   arch/arm/mach-exynos/Makefile             |    1 +
+> >   arch/arm/mach-exynos/dev-ohci.c           |   52 +++++++++++++++++++++++++++++
+> >   arch/arm/mach-exynos/include/mach/map.h   |    1 +
+> >   arch/arm/mach-exynos/include/mach/ohci.h  |   21 +++++++++++
 > 
-> This is what we are working towards, but irq_chips all over the arm tree
-> do not support any translation or have base fixed at compile time. Only
-> a few have been converted. And some ARM platforms may never get
-> converted to DT.
+> In the earlier patchset, platform_device struct for ohci was defined
+> within plat-samsung, and ohci.h was located in
+> plat-samsung/include/plat. These are still the locations where ehci
+> related definitions are located.
 > 
-> >> Prima2 has timer on IRQ0, and VersatileAB has watchdog on IRQ0. Prima2
-> >> should be fine currently as it doesn't use the of_irq_* functions to get
-> >> the timer irq, but that is an issue as it skips any translation.
-> >> VersatileAB should be okay with the VIC irqdomain support.
-> > 
-> > It shouldn't be an issue to use of_irq_*() functions for these IRQs.
-> > of_irq_*() will remap HW IRQ 0 to some other VIRQ. If it does not do
-> > this currently, then it's a bug and should be fixed.
+> What is the reason for movement of ohci related definitions to mach folder?
+I changed the ohci name from ohci-s5p to ohci-exynos, because the ohci-exynos
+is used for exynos series such as Exynos4210 & Exynos4x12.
+Therefore, it should be located within mach-exynos/include/mach.
+
+Also, If this patchset is accepted, I will move Samsung ehci definitions
+to mach-exynos due to the same reason.
+
+Thanks.
 > 
-> I think that's what I'm saying. It's either a bug or incomplete DT
-> conversion for the platform. Either way, those should get fixed first.
-
-Do we expect there to be any platform drivers which are shared between
-legacy platforms and newer DT-ised platforms?
-
-Those drivers would be pain points since they would need to understand
-both conventions.
-
-So far as I can see, only boards which are not DT-ised, which do not use
-DT-ised drivers and which do not use drivers which use interrupts and
-are either used by DT-ised boards or by arches with a non-zero NO_IRQ
-could safely carry on using a non-zero NO_IRQ.  Tracking down exactly
-which boards and drivers this applies to could be hard.  We could have a
-CONFIG_NO_IRQ and make them depend on it, but we still have to find that
-list of boards and drivers in the first place.
-
-
-Otherwise, it feels like we might need a strategy for migrating pretty
-much everything if we don't want to end up in a mess.
-
-Cheers
----Dave
+> --
+> Tushar Behera
