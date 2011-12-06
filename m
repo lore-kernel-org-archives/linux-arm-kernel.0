@@ -1,49 +1,39 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Tue, 6 Dec 2011 21:47:21 +0900
-Subject: [PATCH v7 0/2] iommu/exynos: Add IOMMU/System MMU driver for
- Samsung Exynos
-In-Reply-To: <CAHQjnOOCHO3eDiUft4WgS=8N5EheWas+n3MD9xxBKUoSjmNQSQ@mail.gmail.com>
-References: <1321609650-1329-1-git-send-email-pullip.cho@samsung.com>
- <20111205154715.GE25178@amd.com>
- <CAH9JG2VALcm-PreS7S2SZPPgEbid_6_VWJA0PHBEtY5KvaA3Og@mail.gmail.com>
- <CAHQjnOOCHO3eDiUft4WgS=8N5EheWas+n3MD9xxBKUoSjmNQSQ@mail.gmail.com>
-Message-ID: <CAH9JG2UyC651ddwiDLLUCyzgyLJx-_AVwd9+ea8dQuK1j_nJ=w@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 6 Dec 2011 12:55:55 +0000
+Subject: [RFC PATCH v1 5/7] media: v4l2: introduce two IOCTLs for face
+ detection
+In-Reply-To: <CACVXFVMB+HuQDb+Pxo0d8x46P82-c-OPxaL0c661Wztyx3NWJA@mail.gmail.com>
+References: <1322817178-8931-1-git-send-email-ming.lei@canonical.com>
+ <201112051437.27538.arnd@arndb.de>
+ <CACVXFVMB+HuQDb+Pxo0d8x46P82-c-OPxaL0c661Wztyx3NWJA@mail.gmail.com>
+Message-ID: <201112061255.56136.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 6, 2011 at 9:13 PM, KyongHo Cho <pullip.cho@samsung.com> wrote:
-> On Tue, Dec 6, 2011 at 8:24 AM, Kyungmin Park <kmpark@infradead.org> wrote:
->> On 12/6/11, Joerg Roedel <joerg.roedel@amd.com> wrote:
->>> On Fri, Nov 18, 2011 at 06:47:28PM +0900, KyongHo Cho wrote:
->>>> Patch Summary:
->>>> [PATCH v7 1/2] ARM: EXYNOS: Change System MMU platform device definitions
->>>> [PATCH v7 2/2] iommu/exynos: Add iommu driver for Exynos Platforms
->>>
->>> Okay, I merged it into arm/exynos, but it is not pushed yet. Actually
->>> there were conflicts while merging, which I resolved. What I failed
->>> to find is a config for Exynos that actually builds for upstream Linux.
->>> Probably I havn't tried hard enough to find one... Can you provide a
->>> kernel config that I can use for my testing and that builds a current
->>> 3.2-rc4 kernel for Exynos?
->> and I hope to see the real example how to use it with exynos platform.
->>
->> Now I can't find the interface between exynos platform and generic exynos iommu.
-> In "[PATCH v7 1/2] ARM: EXYNOS: Change System MMU platform device
-> definitions" patch,
-> you can find sysmmu_init().
-> It stores associations between a system MMU and a peripheral device in
-> platform data of platform device descriptor.
-> If Exynos IOMMU driver finds the association while probing, then the
-> driver can control the system MMU.
-Maybe it's still call the function directly instead of using struct
-dev field as OMAP did.
-Even though generic DMA mapping IOMMU doesn't used, you can connect
-the iommu field at arch/arm/include/asm/device.h
+On Tuesday 06 December 2011, Ming Lei wrote:
+> diff --git a/include/linux/videodev2.h b/include/linux/videodev2.h
+> index 073eb4d..8aeaa1e 100644
+> --- a/include/linux/videodev2.h
+> +++ b/include/linux/videodev2.h
+> @@ -2214,7 +2214,12 @@ struct v4l2_fd_result {
+>         __u32   buf_index;
+>         __u32   face_cnt;
+>         __u32   reserved[6];
+> -       struct v4l2_fd_detection *fd;
+> +
+> +       /*make 64/32 compatible*/
+> +       union {
+> +               struct v4l2_fd_detection *fd;
+> +               __u64   dummy;
+> +       };
+>  };
+> 
 
-BR,
-Kyungmin Park
->
->> BTW, how do you test it at mainline kernel?
->>
-> I merged IOMMU mainline branch to our kernel branch and tested it with
-> our FIMC, MFC, JPEG, 2D.
+That's not compatible, at least not on any big-endian architecture.
+If you want to have an indirect pointer, you have to cast it to the
+__u64 member in user space and back in kernel space.
+
+Using an array added to the end of the v4l2_fd_result structure
+rather than a pointer would really make this easier IMHO.
+
+	Arnd
