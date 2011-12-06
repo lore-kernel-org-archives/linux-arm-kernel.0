@@ -1,32 +1,36 @@
-From: jcm@redhat.com (Jon Masters)
-Date: Tue, 06 Dec 2011 13:58:34 -0500
-Subject: [PATCH] ARM: futex: fix clobbering oldval
-In-Reply-To: <20110922172653.GH13572@e102144-lin.cambridge.arm.com>
-References: <1316660015.6872.1.camel@puffmine-laptop>
- <20110922172653.GH13572@e102144-lin.cambridge.arm.com>
-Message-ID: <1323197914.11696.30.camel@constitution.bos.jonmasters.org>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 6 Dec 2011 14:01:23 -0500 (EST)
+Subject: [PATCH] ARM: make head.S register assignments more convenient
+In-Reply-To: <20111206132331.GA13769@linaro.org>
+References: <alpine.LFD.2.02.1112051528200.2357@xanadu.home>
+ <20111206111105.GA2270@linaro.org>
+ <20111206112912.GR14542@n2100.arm.linux.org.uk>
+ <20111206132331.GA13769@linaro.org>
+Message-ID: <alpine.LFD.2.02.1112061357280.2357@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2011-09-22 at 18:26 +0100, Will Deacon wrote:
-> Hi,
-> 
-> On Thu, Sep 22, 2011 at 03:53:35AM +0100, mhban wrote:
-> > This patch fixes clobbering oldval bug. oldval should be preserved for next
-> > compare operation.
+On Tue, 6 Dec 2011, Dave Martin wrote:
+
+> On Tue, Dec 06, 2011 at 11:29:12AM +0000, Russell King - ARM Linux wrote:
+> > On Tue, Dec 06, 2011 at 11:11:05AM +0000, Dave Martin wrote:
+> > > Is it also worth changing the other proc-*.S setup rountines to be PCS
+> > > compliant too?  This would clean up the calling convention further, and
+> > > help avoid future sutprises.
 > > 
-> > Change-Id: I2a63bc1bdb8de330eb9e1ac02d7da1f77e6e8c3c
-> > Signed-off-by: Minho Ban <mhban@samsung.com>
+> > They _aren't_ PCS functions in any case.  They don't have a stack
+> > available to them.  So, having them as non-PCS functions reinforces
+> > the fact that they _are_ special.
 > 
-> It would have been nice to have been CC'd on this...
+> Fair point.
 > 
-> I ran LTP tests on this, so I'm surprised that this was broken (the tests
-> passed). Well spotted anyway!
+> Maybe a brief note in the commit message explaining why only certain
+> proc-*.S files are touched would be belpful.  But it's not vital.
 
-This appears to be the cause of our "stuck builder" problem in Fedora
-building certain large packages, such as OpenJDK. Some of our guys are
-still monitoring the situation in case there's a secondary issue.
+They are touched only because they were using registers where I moved 
+the previous r1 and r2 values to.  So I moved their usage of mainly 
+r5-r6 to the normally callee clobbered registers.  I don't think there 
+is further changes that would be as badly needed as those I did.
 
-Was there ever any additional followup on this topic?
 
-Jon.
+Nicolas
