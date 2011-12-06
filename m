@@ -1,94 +1,45 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 5 Dec 2011 18:37:17 -0700 (MST)
-Subject: [PATCH v3 3/5] clk: introduce the common clock framework
-In-Reply-To: <20111205234849.GA14547@n2100.arm.linux.org.uk>
-References: <1321926047-14211-1-git-send-email-mturquette@linaro.org>
- <1321926047-14211-4-git-send-email-mturquette@linaro.org>
- <alpine.DEB.2.00.1112051342430.6289@utopia.booyaka.com>
- <20111205234849.GA14547@n2100.arm.linux.org.uk>
-Message-ID: <alpine.DEB.2.00.1112051706300.6289@utopia.booyaka.com>
+From: linux@solonet.org.ua (Denis Kuzmenko)
+Date: Tue, 06 Dec 2011 03:37:09 +0200
+Subject: [PATCH resend3] arm: s3c24xx: Add new LCD (W35i) support for Mini2440
+ board
+In-Reply-To: <4EC588A8.3030907@solonet.org.ua>
+References: <4EC588A8.3030907@solonet.org.ua>
+Message-ID: <4EDD71C5.1090905@solonet.org.ua>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 5 Dec 2011, Russell King - ARM Linux wrote:
+Add new LCD (W35i) support for Mini2440 board
 
-> On Mon, Dec 05, 2011 at 02:15:56PM -0700, Paul Walmsley wrote:
->
-> > But I'd propose that we instead increase the size of struct clk.rate to be 
-> > s64:
-> > 
-> > s64 clk_round_rate(struct clk *clk, s64 desired_rate);
-> > int clk_set_rate(struct clk *clk, s64 rate);
-> > s64 clk_get_rate(struct clk *clk);
-> > 
-> > struct clk {
-> > ...
-> >      s64 rate;
-> > ...
-> > };
-> > 
-> > That way the clock framework can accommodate current clock rates, as well 
-> > as any conceivable future clock rate.  (Some production CPUs are already 
-> > running at clock rates greater than 4 GiHZ[1].  RF devices with 4 GiHz+ 
-> > clock rates are also common, such as 802.11a devices running in the 5.8 
-> > GHz band, and drivers for those may eventually wish to use the clock 
-> > framework.)
-> 
-> Yuck.  You are aware that 64-bit math on 32-bit CPUs sucks? So burdening 
-> _everything_ with 64-bit rate quantities is absurd.  As for making then 
-> 64-bit signed quantities, that's asking for horrid code from gcc for the 
-> majority of cases.
+Signed-off-by: Denis Kuzmenko <linux@solonet.org.ua>
+---
 
-64-bit divides would be the only real issue in the clock framework 
-context.  And those are easily avoided on clock hardware where the parent 
-rate can never exceed 32 bits.
-
-For example, here's a trivial implementation for rate recalculation for a 
-integer divider clock node (that can't be handled with a right shift):
-
-s64 div(struct clk *clk, u32 div) {
-	if (clk->flags & CLK_PARENT_RATE_MAX_U32)
-		return ((u32)(clk->parent->rate & 0xffffffff)) / div;
-
-	clk->rate = clk->parent->rate;
-	do_div(clk->rate, div);
-	return clk->rate;
-}
-
-gcc generates this for ARMv6:
-
-00000010 <div>:
-  10:	e92d4038 	push	{r3, r4, r5, lr}
-  14:	e1a05000 	mov	r5, r0         
-  18:	e5d03010 	ldrb	r3, [r0, #16]  @ clk->flags
-  1c:	e1a04001 	mov	r4, r1
-  20:	e3130001 	tst	r3, #1         @ 32-bit parent rate?
-  24:	1a000007 	bne	48 <div+0x38>  @ do 32-bit divide 
-
-/* 64-bit divide by 32-bit follows */
-
-  28:	e5903000 	ldr	r3, [r0]
-  2c:	e1c300d8 	ldrd	r0, [r3, #8]
-  30:	ebfffffe 	bl	0 <__do_div64>
-  34:	e1a00002 	mov	r0, r2
-  38:	e1a01003 	mov	r1, r3
-  3c:	e5852008 	str	r2, [r5, #8]
-  40:	e585300c 	str	r3, [r5, #12]
-  44:	e8bd8038 	pop	{r3, r4, r5, pc}
-
-/* 32-bit divide follows */
-
-  48:	e5900000 	ldr	r0, [r0]
-  4c:	e5900008 	ldr	r0, [r0, #8]
-  50:	ebfffffe 	bl	0 <__aeabi_uidiv>
-  54:	e3a01000 	mov	r1, #0
-  58:	e8bd8038 	pop	{r3, r4, r5, pc}
-
-
-Not bad at all, and this isn't even optimized.  (The conditional could be 
-avoided completely with a little work during clock init.)  What little 
-overhead there is seems quite trivial if it means that the clock framework 
-will be useful for present and future devices.
-
-
-- Paul
+diff --git a/arch/arm/mach-s3c2440/mach-mini2440.c
+b/arch/arm/mach-s3c2440/mach-mini2440.c
+index fc2dc0b..951eadd 100644
+--- a/arch/arm/mach-s3c2440/mach-mini2440.c
++++ b/arch/arm/mach-s3c2440/mach-mini2440.c
+@@ -167,6 +167,24 @@ static struct s3c2410fb_display mini2440_lcd_cfg[]
+__initdata = {
+ 		.lcdcon5	= (S3C2410_LCDCON5_FRM565 |
+ 				   S3C2410_LCDCON5_HWSWP),
+ 	},
++	/* mini2440 + 3.5" TFT (LCD-W35i, LQ035Q1DG06 type) + touchscreen*/
++	[3] = {
++		_LCD_DECLARE(
++			/* clock */
++			7,
++			/* xres, margin_right, margin_left, hsync */
++			320, 68, 66, 4,
++			/* yres, margin_top, margin_bottom, vsync */
++			240, 4, 4, 9,
++			/* refresh rate */
++			60),
++		.lcdcon5	= (S3C2410_LCDCON5_FRM565 |
++				   S3C2410_LCDCON5_INVVDEN |
++				   S3C2410_LCDCON5_INVVFRAME |
++				   S3C2410_LCDCON5_INVVLINE |
++				   S3C2410_LCDCON5_INVVCLK |
++				   S3C2410_LCDCON5_HWSWP),
++	},
+ };
+  /* todo - put into gpio header */
