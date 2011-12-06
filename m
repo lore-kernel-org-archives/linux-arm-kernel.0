@@ -1,179 +1,112 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 6 Dec 2011 14:58:26 +0800
-Subject: [RFC PATCH 2/3] pinctrl: imx: add pinmux-imx53 support
-In-Reply-To: <65EE16ACC360FA4D99C96DC085B3F7723458DA@039-SN1MPN1-002.039d.mgd.msft.net>
+Date: Tue, 6 Dec 2011 15:06:16 +0800
+Subject: [RFC PATCH 1/3] pinctrl: imx: add pinmux imx core driver
+In-Reply-To: <1322999384-7886-1-git-send-email-b29396@freescale.com>
 References: <1322999384-7886-1-git-send-email-b29396@freescale.com>
- <1322999384-7886-2-git-send-email-b29396@freescale.com>
- <CACRpkdaYz+-nZA6atxA+5kvWOO84YeSHQPNiojq_R4zkHUGz3Q@mail.gmail.com>
- <20111205211838.GG27267@pengutronix.de>
- <65EE16ACC360FA4D99C96DC085B3F7723458DA@039-SN1MPN1-002.039d.mgd.msft.net>
-Message-ID: <20111206065825.GB3649@S2100-06.ap.freescale.net>
+Message-ID: <20111206070615.GJ2980@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 06, 2011 at 01:54:35PM +0800, Dong Aisheng-B29396 wrote:
-> > -----Original Message-----
-> > From: Sascha Hauer [mailto:s.hauer at pengutronix.de]
-> > Sent: Tuesday, December 06, 2011 5:19 AM
-> > To: Linus Walleij
-> > Cc: Dong Aisheng-B29396; linux-kernel at vger.kernel.org; linux-arm-
-> > kernel at lists.infradead.org; linus.walleij at stericsson.com; Guo Shawn-
-> > R65073; kernel at pengutronix.de
-> > Subject: Re: [RFC PATCH 2/3] pinctrl: imx: add pinmux-imx53 support
-> > 
-> > On Mon, Dec 05, 2011 at 05:57:42PM +0100, Linus Walleij wrote:
-> > > On Sun, Dec 4, 2011 at 12:49 PM, Dong Aisheng <b29396@freescale.com>
-> > wrote:
-> > >
-> > > > +enum imx_mx53_pads {
-> > > > + ? ? ? MX53_GPIO_19 = 0,
-> > > > + ? ? ? MX53_KEY_COL0 = 1,
-> > > (...)
-> > >
-> > > First I thought it looked a bit strange since you needed enums for all
-> > > pads but then I realized that your macros use the same enumerator name
-> > > to name the pad and then it looks sort of clever.
-> > >
-> > > But maybe put in a comment about that here:
-> > >
-> > > > +/* Pad names for the pinmux subsystem */
-> > >
-> > > Like this:
-> > >
-> > > /*
-> > >  * Pad names for the pinmux subsystem.
-> > >  * These pad names are constructed from the pin enumerator names
-> > >  * in the IMX_PINCTRL_PIN() macro.
-> > >  */
-> > >
-> > > > +static const struct pinctrl_pin_desc mx53_pads[] = {
-> > > > + ? ? ? IMX_PINCTRL_PIN(MX53_GPIO_19),
-> > > > + ? ? ? IMX_PINCTRL_PIN(MX53_KEY_COL0),
-> > > (...)
-> > >
-> > > > +/* mx53 pin groups and mux mode */
-> > > > +static const unsigned mx53_fec_pins[] = {
-> > > > + ? ? ? MX53_FEC_MDC,
-> > > > + ? ? ? MX53_FEC_MDIO,
-> > > > + ? ? ? MX53_FEC_REF_CLK,
-> > > > + ? ? ? MX53_FEC_RX_ER,
-> > > > + ? ? ? MX53_FEC_CRS_DV,
-> > > > + ? ? ? MX53_FEC_RXD1,
-> > > > + ? ? ? MX53_FEC_RXD0,
-> > > > + ? ? ? MX53_FEC_TX_EN,
-> > > > + ? ? ? MX53_FEC_TXD1,
-> > > > + ? ? ? MX53_FEC_TXD0,
-> > > > +};
-> > >
-> > > I understand this.
-> > >
-> > > > +static const unsigned mx53_fec_mux[] = { 0, 0, 0, 0, 0, 0, 0, 0, 0,
-> > > > +0 };
-> > >
-> > > But what is this? Just zeroes? Why?
-> > > Especially with a const so they really cannot be anything else. The
-> > > same pin (0) can only be enumerated once.
-> > >
-> > > > +static const unsigned mx53_sd1_pins[] = {
-> > > > + ? ? ? MX53_SD1_CMD,
-> > > > + ? ? ? MX53_SD1_CLK,
-> > > > + ? ? ? MX53_SD1_DATA0,
-> > > > + ? ? ? MX53_SD1_DATA1,
-> > > > + ? ? ? MX53_SD1_DATA2,
-> > > > + ? ? ? MX53_SD1_DATA3,
-> > > > +
-> > > > +};
-> > > > +static const unsigned mx53_sd1_mux[] = { 0, 0, 0, 0, 0, 0 };
-> > >
-> > > And here again.
-> > >
-> > > > +static const unsigned mx53_sd3_pins[] = {
-> > > > + ? ? ? MX53_PATA_DATA8,
-> > > > + ? ? ? MX53_PATA_DATA9,
-> > > > + ? ? ? MX53_PATA_DATA10,
-> > > > + ? ? ? MX53_PATA_DATA11,
-> > > > + ? ? ? MX53_PATA_DATA0,
-> > > > + ? ? ? MX53_PATA_DATA1,
-> > > > + ? ? ? MX53_PATA_DATA2,
-> > > > + ? ? ? MX53_PATA_DATA3,
-> > > > + ? ? ? MX53_PATA_IORDY,
-> > > > + ? ? ? MX53_PATA_RESET_B,
-> > > > +
-> > > > +};
-> > > > +static const unsigned mx53_sd3_mux[] = { 4, 4, 4, 4, 4, 4, 4, 4, 2,
-> > > > +2 };
-> > >
-> > > This also looks strange. Can you explain what these muxes are?
-> > 
-> > Freescale has named the pins after their primary function which is quite
-> > confusing.
-> > 
-> > The above means:
-> > 
-> > MX53_PATA_DATA8 -> mux mode 4
-> > MX53_PATA_DATA9 -> mux mode 4
-> > ...
-> > 
-> > This brings me to the point that currently we have the pins described as
-> > 
-> > #define MX53_PAD_<name>__<function>
-> > 
-> > which means that you don't have to look into the datasheet to get the
-> > different options for a pin (and don't have a chance to get it wrong).
-> > I don't really want to lose this.
-> > 
-> Obviously current used pin defines in that way is pretty good.
-> And I also don't want to lose this.
+On Sun, Dec 04, 2011 at 07:49:42PM +0800, Dong Aisheng wrote:
+> ---
+> This patch series shows the basic idea of driver design. There're still
+> some TODOes like adding more pinmux functions and gpio support.
+> The patch is here for request for comments on the driver design
+> and other might exist issues.
 > 
-> Actually I also have tried to see if we can reuse the current iomux-v3 code.
+> Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: Sascha Hauer <s.hauer@pengutronix.de>
+> Cc: Shawn Guo <shanw.guo@freescale.com>
+> ---
+>  drivers/pinctrl/Kconfig           |    6 +
+>  drivers/pinctrl/Makefile          |    2 +
+>  drivers/pinctrl/pinmux-imx-core.c |  284 +++++++++++++++++++++++++++++++++++++
+>  drivers/pinctrl/pinmux-imx-core.h |   83 +++++++++++
+>  4 files changed, 375 insertions(+), 0 deletions(-)
 > 
-> For current pinmux driver, one approach I can see is that define mux
-> in enum for each pin like:
-> 
-> enum MX53_PAD_GPIO_19_MUX {
->         MX53_PAD_GPIO_19__KPP_COL_5,
->         MX53_PAD_GPIO_19__GPIO4_5,
->         MX53_PAD_GPIO_19__CCM_CLKO,
->         MX53_PAD_GPIO_19__SPDIF_OUT1,
->         MX53_PAD_GPIO_19__RTC_CE_RTC_EXT_TRIG2,
->         MX53_PAD_GPIO_19__ECSPI1_RDY,
->         MX53_PAD_GPIO_19__FEC_TDATA_3,
->         MX53_PAD_GPIO_19__SRC_INT_BOOT,
-> };
+> diff --git a/drivers/pinctrl/Kconfig b/drivers/pinctrl/Kconfig
+> index ef56644..214d072 100644
+> --- a/drivers/pinctrl/Kconfig
+> +++ b/drivers/pinctrl/Kconfig
+> @@ -40,4 +40,10 @@ config PINMUX_U300
+>  	help
+>  	  Say Y here to enable the U300 pinmux driver
+>  
+> +config PINMUX_IMX
+> +	bool "IMX pinmux driver"
+> +	depends on ARCH_MXC
+> +	select PINMUX
+> +	help
+> +	  Say Y here to enable the IMX pinmux driver
+>  endif
+> diff --git a/drivers/pinctrl/Makefile b/drivers/pinctrl/Makefile
+> index bdc548a..764657b 100644
+> --- a/drivers/pinctrl/Makefile
+> +++ b/drivers/pinctrl/Makefile
+> @@ -4,5 +4,7 @@ ccflags-$(CONFIG_DEBUG_PINMUX)	+= -DDEBUG
+>  
+>  obj-$(CONFIG_PINCTRL)		+= core.o
+>  obj-$(CONFIG_PINMUX)		+= pinmux.o
+> +obj-$(CONFIG_PINMUX_IMX)	+= pinmux-imx-core.o \
+> +				   pinmux-imx53.o pinmux-imx6q.o
 
-I would say, no, do not do that, because it simply does not worth.
-Most of the definitions will probably never be used.
+You do not have pinmux-imx53.c and pinmux-imx6q.c in this patch yet.
 
-IMO, we can just focus on the support for device tree case (imx6) for
-now.  With proper DT binding for pinctrl settled, all these data can
-go into DT.  For those non-DT cases, we may want to leave them as they
-are for now.
+>  obj-$(CONFIG_PINMUX_SIRF)	+= pinmux-sirf.o
+>  obj-$(CONFIG_PINMUX_U300)	+= pinmux-u300.o
+> diff --git a/drivers/pinctrl/pinmux-imx-core.c b/drivers/pinctrl/pinmux-imx-core.c
+> new file mode 100644
+> index 0000000..1e60932
+> --- /dev/null
+> +++ b/drivers/pinctrl/pinmux-imx-core.c
+> @@ -0,0 +1,284 @@
+> +/*
+> + * Core driver for the imx pin controller
+> + *
+> + * Copyright (C) 2011 Freescale Semiconductor, Inc.
+> + * Copyright (C) 2011 Linaro Ltd.
+> + *
+> + * Author: Dong Aisheng <dong.aisheng@linaro.org>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + */
+> +
+> +#include <linux/init.h>
+> +#include <linux/module.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/io.h>
+> +#include <linux/err.h>
+> +#include <linux/pinctrl/pinctrl.h>
+> +#include <linux/pinctrl/pinmux.h>
+> +
+> +#include "pinmux-imx-core.h"
+> +
+> +#define DRIVER_NAME "pinmux-imx"
+> +
+> +/**
+> + * @dev: a pointer back to containing device
+> + * @virtbase: the offset to the controller in virtual memory
+> + */
+> +struct imx_pmx {
+> +	struct device *dev;
+> +	struct pinctrl_dev *pctl;
+> +	void __iomem *virtbase;
+> +	struct imx_pinctrl_info *info;
+> +};
+> +
+> +#define IMX_PINCTRL_REG_SIZE 4
+> +#define IMX_PINCTRL_MAX_FUNC 7
+> +
+> +extern struct imx_pinctrl_info mx53_pinctrl_info;
+> +extern struct imx_pinctrl_info mx6q_pinctrl_info;
+> +
+
+You do not have mx53_pinctrl_info and mx6q_pinctrl_info in this patch
+yet.
 
 Regards,
 Shawn
-
-> Then put them in a common file for each mx53 based board to use.
-> 
-> Take uart1 as an example, it could be:
-> static const unsigned mx53_uart1_pins[] = {
->         MX53_CSI0_DAT10,
->         MX53_CSI0_DAT11,
-> };
-> 
-> static const unsigned mx53_uart1_mux[] = {
->         MX53_CSI0_DAT10__UART1_TXD_MUX,
->         MX53_CSI0_DAT11__UART1_RXD_MUX
-> };
-> 
-> static const struct imx_pin_group mx53_pin_groups[] = {
->         IMX_PIN_GROUP("uart1grp", mx53_uart1_pins, mx53_uart1_mux),
-> };
-> 
-> The benefit is that it's very clear and good maintainable.
-> The defect is it will increase the code size a lot by defining all
-> pin's mux enum and each pin's mux array in board file.
-> 
-> Do you think if it's ok or you have any better idea?
-> 
-> Regards
-> Dong Aisheng
