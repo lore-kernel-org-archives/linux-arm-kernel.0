@@ -1,5 +1,5 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Mon, 05 Dec 2011 19:33:34 -0500 (EST)
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 6 Dec 2011 00:36:59 +0000
 Subject: [PATCH 07/23] ARM: plat-omap: remove arch specific special
  handling for ioremap
 In-Reply-To: <20111205235609.GI14542@n2100.arm.linux.org.uk>
@@ -8,12 +8,11 @@ References: <1321422521-1138-1-git-send-email-nico@fluxnic.net>
  <20111202202125.GZ31337@atomide.com>
  <alpine.LFD.2.02.1112021637200.2357@xanadu.home>
  <20111205235609.GI14542@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.02.1112051927250.2357@xanadu.home>
+Message-ID: <20111206003659.GJ14542@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 5 Dec 2011, Russell King - ARM Linux wrote:
-
+On Mon, Dec 05, 2011 at 11:56:09PM +0000, Russell King - ARM Linux wrote:
 > On Fri, Dec 02, 2011 at 04:39:31PM -0500, Nicolas Pitre wrote:
 > > On Fri, 2 Dec 2011, Tony Lindgren wrote:
 > > 
@@ -46,17 +45,12 @@ On Mon, 5 Dec 2011, Russell King - ARM Linux wrote:
 > So I'm about to push what I had out in the devel-stable branch... what
 > am I supposed to do with this?
 
-Please repull to get the OMAP1 fix:
+Okay, yet again I find myself having to wait hours for a reply - which
+I expect will be forthcoming sometime tomorrow afternoon my time.  If
+I wait, it means a delay of another 24 hours before I push my tree out.
 
-	git://git.linaro.org/people/nico/linux vmalloc
+This is not acceptable.
 
-Most reports are now positive, except one: ux500.
-
-I think at this point, it could be a good thing to merge this into your 
-stable branch nevertheless, given that the changes are quite extensive 
-and people might want to build on top of this.  The ux500 will be fixed 
-with an additional patch soon once this is debugged.  If not then please 
-keep merging it for linux-next.
-
-
-Nicolas
+So I'm pushing my tree out as-is - which means the stuff I pulled
+previously is now frozen.  Please submit a patch to fix whatever error
+Tony is seeing.
