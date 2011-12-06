@@ -1,22 +1,28 @@
-From: nsekhar@ti.com (Nori, Sekhar)
-Date: Tue, 6 Dec 2011 19:09:31 +0000
-Subject: [PATCH] arm, da8xx, mmc: set second MMC controllers default queue
-In-Reply-To: <4EDCA109.2090204@denx.de>
-References: <1322991210-20486-1-git-send-email-hs@denx.de>
- <B6A220404B6BFC4BBD2AB91C54D39DF4029FE5@DBDE01.ent.ti.com>
- <4EDCA109.2090204@denx.de>
-Message-ID: <DF0F476B391FA8409C78302C7BA518B603E610@DBDE01.ent.ti.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Tue, 6 Dec 2011 20:10:38 +0100
+Subject: [MXS MMC 3/5] Add support for SSP/MMC ports 2 & 3
+In-Reply-To: <e668bb1ab5fbe406ef604a18f59292a05149ae51.1323177907.git.LW@KARO-electronics.de>
+References: <cover.1323177907.git.LW@KARO-electronics.de>
+ <e668bb1ab5fbe406ef604a18f59292a05149ae51.1323177907.git.LW@KARO-electronics.de>
+Message-ID: <20111206191038.GD7835@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 05, 2011 at 16:16:33, Heiko Schocher wrote:
+On Tue, Dec 06, 2011 at 02:41:28PM +0100, Lothar Wa?mann wrote:
+> i.MX28 has four SSP/MMC units, only two of which are currently
+> usable.
 > 
-> Thanks, but as Ido commented, this patch is no longer necessary, sorry
-> for the noise.
-> 
+> Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
 
-It doesn't look like Ido's comment reached me or the archives. Can you
-please forward it?
+Reviewed-by: Wolfram Sang <w.sang@pengutronix.de>
 
-Thanks,
-Sekhar
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111206/0b8fba37/attachment.sig>
