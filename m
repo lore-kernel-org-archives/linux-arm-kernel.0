@@ -1,15 +1,16 @@
 From: dave.martin@linaro.org (Dave Martin)
-Date: Tue, 6 Dec 2011 16:26:46 +0000
-Subject: [PATCH] ARM: pl2x0/pl310: Refactor Kconfig to be more maintainable
-In-Reply-To: <4ED531C3.8050004@gmail.com>
-References: <1322584345-19193-1-git-send-email-dave.martin@linaro.org>
- <4ED531C3.8050004@gmail.com>
-Message-ID: <20111206162646.GE13769@linaro.org>
+Date: Tue, 6 Dec 2011 16:28:00 +0000
+Subject: [PATCH v2] ARM: pl2x0/pl310: Refactor Kconfig to be more
+ maintainable
+In-Reply-To: <4ED694C7.6020502@gmail.com>
+References: <1322675975-4471-1-git-send-email-dave.martin@linaro.org>
+ <4ED694C7.6020502@gmail.com>
+Message-ID: <20111206162800.GF13769@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 29, 2011 at 01:25:55PM -0600, Rob Herring wrote:
-> On 11/29/2011 10:32 AM, Dave Martin wrote:
+On Wed, Nov 30, 2011 at 02:40:39PM -0600, Rob Herring wrote:
+> On 11/30/2011 11:59 AM, Dave Martin wrote:
 > > Making CACHE_L2X0 depends on (huge list of MACH_ and ARCH_ configs)
 > > is bothersome to maintain and likely to lead to merge conflicts.
 > > 
@@ -21,82 +22,16 @@ On Tue, Nov 29, 2011 at 01:25:55PM -0600, Rob Herring wrote:
 > > 
 > > Signed-off-by: Dave Martin <dave.martin@linaro.org>
 > > ---
-> >  arch/arm/Kconfig               |    8 ++++++++
-> >  arch/arm/mach-exynos/Kconfig   |    1 +
-> >  arch/arm/mach-omap2/Kconfig    |    1 +
-> >  arch/arm/mach-realview/Kconfig |    5 +++++
-> >  arch/arm/mach-vexpress/Kconfig |    1 +
-> >  arch/arm/mm/Kconfig            |   13 ++++++++-----
-> >  arch/arm/plat-mxc/Kconfig      |    1 +
-> >  7 files changed, 25 insertions(+), 5 deletions(-)
+> > Changes since v1:
 > > 
-> > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> > index 44789ef..4068fe5 100644
-> > --- a/arch/arm/Kconfig
-> > +++ b/arch/arm/Kconfig
-> > @@ -339,6 +339,7 @@ config ARCH_HIGHBANK
-> >  	select ARCH_WANT_OPTIONAL_GPIOLIB
-> >  	select ARM_AMBA
-> >  	select ARM_GIC
-> > +	select HAVE_L2X0_L2CC
-> >  	select ARM_TIMER_SP804
-> >  	select CLKDEV_LOOKUP
-> >  	select CPU_V7
+> > v2: Add HAVE_L2X0_L2CC instead of CACHE_L2X0 for SOC_IMX6Q.
+> >     (Thanks to Shawn Guo for suggesting this.)
+> > 
 > 
-> These entries are sorted per rmk's review, so please keep it that way.
+> Did you not see my comments on v1?
 
-Can you explain what order they should be in?  Alphabetical?
-
-> 
-> > @@ -359,6 +360,7 @@ config ARCH_CLPS711X
-> >  config ARCH_CNS3XXX
-> >  	bool "Cavium Networks CNS3XXX family"
-> >  	select CPU_V6K
-> > +	select HAVE_L2X0_L2CC
-> >  	select GENERIC_CLOCKEVENTS
-> >  	select ARM_GIC
-> >  	select MIGHT_HAVE_PCI
-> 
-> But as you can see, that's rarely the case...
-
-Do you mean "things are not always in alphabetical order?"
-
-Apologies if I'm being obtuse -- your comments are rather terse for me.
-
-[...]
-
-> > +config HAVE_L2X0_L2CC
-> > +	bool
-> > +	default n
-> 
-> n is the default already.
-
-Good point -- I'll kill that.
-
-> > +	help
-> > +	  This option should be selected by machines which have a L2x0
-> > +	  or PL310 cache controller.
-> > +
-> >  config CACHE_L2X0
-> >  	bool "Enable the L2x0 outer cache controller"
-> > -	depends on REALVIEW_EB_ARM11MP || MACH_REALVIEW_PB11MP || MACH_REALVIEW_PB1176 || \
-> > -		   REALVIEW_EB_A9MP || ARCH_IMX_V6_V7 || MACH_REALVIEW_PBX || \
-> > -		   ARCH_NOMADIK || ARCH_OMAP4 || ARCH_EXYNOS4 || ARCH_TEGRA || \
-> > -		   ARCH_U8500 || ARCH_VEXPRESS_CA9X4 || ARCH_SHMOBILE || \
-> > -		   ARCH_PRIMA2 || ARCH_ZYNQ || ARCH_CNS3XXX || ARCH_HIGHBANK
-> > +	depends on HAVE_L2X0_L2CC
-> 
-> For platforms that run in non-secure mode, this shouldn't really be a
-> user selectable option. Perhaps those should just select CACHE_L2X0
-> directly. I'm not sure which one's those are other than Highbank and OMAP4.
-
-The idea here is to make the option user-selectable on platforms where it
-makes sense (and only those platforms).
-
-So yes, I think that platforms which require this option _should_ select
-it directly, rather than it being reverse-selected from arch/arm/mm/Kconfig.
-This puts the knowledge in the logical place.  Does this apply to OMAP3?
-I think we're always running in the Normal World there too.
+See my separate reply -- it looks like I somehow missed you mail on the
+previous iteration.
 
 Cheers
 ---Dave
