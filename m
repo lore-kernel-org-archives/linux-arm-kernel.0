@@ -1,28 +1,45 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 6 Dec 2011 10:14:39 +0000
-Subject: [GIT PULL] Identity mapping changes for 3.3
-In-Reply-To: <20111205232342.GG14542@n2100.arm.linux.org.uk>
-References: <20111202160833.GK5540@mudshark.cambridge.arm.com>
- <20111205232342.GG14542@n2100.arm.linux.org.uk>
-Message-ID: <20111206101438.GB25782@mudshark.cambridge.arm.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 06 Dec 2011 19:20:08 +0900
+Subject: [PATCH 1/3] PM: Provide an always on power domain governor
+In-Reply-To: <20111205001500.GA10173@opensource.wolfsonmicro.com>
+References: <1322765339-29879-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+ <201112042156.59990.rjw@sisk.pl>
+ <20111204231005.GA4255@opensource.wolfsonmicro.com>
+ <201112050115.18489.rjw@sisk.pl>
+ <20111205001500.GA10173@opensource.wolfsonmicro.com>
+Message-ID: <02d601ccb400$a19380e0$e4ba82a0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
-
-On Mon, Dec 05, 2011 at 11:23:42PM +0000, Russell King - ARM Linux wrote:
-> On Fri, Dec 02, 2011 at 04:08:33PM +0000, Will Deacon wrote:
-> > The following changes since commit 2d13ccaa8797d7e599f3792aed4b1e44b47f94a5:
-> > 
-> >   Merge branch 'irqchip-consolidation' of git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms into devel-stable (2011-11-21 21:56:56 +0000)
+Mark Brown wrote:
 > 
-> As this is known to be broken on OMAP, could I have this based upon
-> some other commit - maybe ba8bb18a03f which I've just committed into
-> devel-stable (which is the second 'fix' patch for OMAP) please.
+> On Mon, Dec 05, 2011 at 01:15:18AM +0100, Rafael J. Wysocki wrote:
+> > On Monday, December 05, 2011, Mark Brown wrote:
+> 
+> > > It might make sense for it to go via the Samsung tree - the third
+> patch
+> > > depends on it and there's some other stuff going on with the s3c64xx
+> > > power management - so let's see what Kukjin thinks is best.
+> 
+> > OTOH, it will conflict with some patches I have in the works.
+> 
+> Ah, OK - in that case I guess it's sensible if you apply it.  Ideally it
+> could be on a separate branch so it could be cross-merged with other
+> trees if there's a need later.
 
-I'm struggling to pull from you [1] at the moment, but I'll rebase this once I
-manage to get the updated devel-stable.
+Hi Mark and Rafael,
 
-Will
+Looks ok to me on this series and would be nice to me if Rafael could create
+topic branch in his tree and apply this series with my ack for Samsung
+stuff.
 
-[1] http://ftp.arm.linux.org.uk/pub/linux/arm/kernel/git-cur/linux-2.6-arm.git
+Rafael, please let me know the branch when you create it so that I can merge
+it into Samsung tree to avoid other conflicts.
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
