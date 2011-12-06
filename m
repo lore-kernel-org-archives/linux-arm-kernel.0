@@ -1,73 +1,79 @@
-From: B29396@freescale.com (Dong Aisheng-B29396)
-Date: Tue, 6 Dec 2011 09:38:20 +0000
-Subject: [RFC PATCH 1/3] pinctrl: imx: add pinmux imx core driver
-In-Reply-To: <20111206094203.GC3864@S2100-06.ap.freescale.net>
-References: <1322999384-7886-1-git-send-email-b29396@freescale.com>
- <20111206094203.GC3864@S2100-06.ap.freescale.net>
-Message-ID: <65EE16ACC360FA4D99C96DC085B3F772346A04@039-SN1MPN1-002.039d.mgd.msft.net>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Tue, 6 Dec 2011 10:49:12 +0100 (CET)
+Subject: [PATCH 2/2] [media] V4L: atmel-isi: add
+ clk_prepare()/clk_unprepare() functions
+In-Reply-To: <1322647604-30662-2-git-send-email-josh.wu@atmel.com>
+References: <1322647604-30662-1-git-send-email-josh.wu@atmel.com>
+ <1322647604-30662-2-git-send-email-josh.wu@atmel.com>
+Message-ID: <Pine.LNX.4.64.1112061045150.10715@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Guo Shawn-R65073
-> Sent: Tuesday, December 06, 2011 5:42 PM
-> To: Dong Aisheng-B29396
-> Cc: linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> linus.walleij at stericsson.com; s.hauer at pengutronix.de;
-> kernel at pengutronix.de
-> Subject: Re: [RFC PATCH 1/3] pinctrl: imx: add pinmux imx core driver
-> 
-> On Sun, Dec 04, 2011 at 07:49:42PM +0800, Dong Aisheng wrote:
-> > +static struct pinmux_ops imx_pmx_ops = {
-> > +	.list_functions = imx_pmx_list_funcs,
-> > +	.get_function_name = imx_pmx_get_func_name,
-> > +	.get_function_groups = imx_pmx_get_groups,
-> > +	.enable = imx_pmx_enable,
-> > +};
-> 
-> The pinmux core code will check the pinmux_ops as below.  !ops->disable
-> is one of the checking, while you do not have .disable hook.
-> 
-Then I have to add a disable function.
+Hi Josh
 
-> int pinmux_check_ops(const struct pinmux_ops *ops) {
->         /* Check that we implement required operations */
->         if (!ops->list_functions ||
->             !ops->get_function_name ||
->             !ops->get_function_groups ||
->             !ops->enable ||
->             !ops->disable)
-Not sure if we must check !ops->disable here since some soc may not have
-disable function.
+Thanks for the patch, but I'll ask you to fix the same thing in it, that 
+I've fixed for you in the first patch in this series:
 
->                 return -EINVAL;
-> 
->         return 0;
-> }
-> 
-> [...]
-> 
-> > +static int __init imx_pmx_probe(struct platform_device *pdev) {
-> > +	struct device *dev = &pdev->dev;
-> > +	struct imx_pmx *ipmx;
-> > +	struct resource *res;
-> > +	struct imx_pinctrl_info *info;
-> > +	resource_size_t res_size;
-> > +
-> > +	info = (struct imx_pinctrl_info *)pdev->id_entry->driver_data;
-> > +	if (!info || !info->pins || !info->groups || !info->functions
-> > +		|| (info->maxpin > info->npins)) {
-> 
-> You must mean !(info->maxpin > info->npins) here?
-> 
-Yes, thanks for this finding.
+On Wed, 30 Nov 2011, Josh Wu wrote:
 
-> Regards,
-> Shawn
+> Signed-off-by: Josh Wu <josh.wu@atmel.com>
+> ---
+>  drivers/media/video/atmel-isi.c |   17 ++++++++++++++++-
+>  1 files changed, 16 insertions(+), 1 deletions(-)
 > 
-> > +		dev_err(&pdev->dev, "wrong pinctrl info\n");
-> > +		return -EINVAL;
-> > +	}
+> diff --git a/drivers/media/video/atmel-isi.c b/drivers/media/video/atmel-isi.c
+> index ea4eef4..5da4381 100644
+> --- a/drivers/media/video/atmel-isi.c
+> +++ b/drivers/media/video/atmel-isi.c
 
-Regards
-Dong Aisheng
+[snip]
+
+> @@ -978,10 +986,14 @@ static int __devinit atmel_isi_probe(struct platform_device *pdev)
+>  		goto err_clk_get;
+>  	}
+>  
+> +	ret = clk_prepare(isi->mck);
+> +	if (ret)
+> +		goto err_set_mck_rate;
+> +
+>  	/* Set ISI_MCK's frequency, it should be faster than pixel clock */
+>  	ret = clk_set_rate(isi->mck, pdata->mck_hz);
+>  	if (ret < 0)
+> -		goto err_set_mck_rate;
+> +		goto err_unprepare_mck;
+>  
+>  	isi->p_fb_descriptors = dma_alloc_coherent(&pdev->dev,
+>  				sizeof(struct fbd) * MAX_BUFFER_NUM,
+> @@ -1058,11 +1070,14 @@ err_alloc_ctx:
+>  			isi->p_fb_descriptors,
+>  			isi->fb_descriptors_phys);
+>  err_alloc_descriptors:
+> +err_unprepare_mck:
+> +	clk_unprepare(isi->mck);
+>  err_set_mck_rate:
+>  	clk_put(isi->mck);
+>  err_clk_get:
+>  	kfree(isi);
+>  err_alloc_isi:
+> +	clk_unprepare(pclk);
+>  	clk_put(pclk);
+>  
+>  	return ret;
+
+Please, use error label names consistently. As you can see, currently the 
+driver uses the convention
+
+	ret = do_something();
+	if (ret < 0)
+		goto err_do_something;
+
+i.e., the label is called after the operation, that has failed, not after 
+the clean up step, that the control now has to jump to. Please, update 
+your patch to also use this convention.
+
+Thanks
+Guennadi
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
