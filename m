@@ -1,111 +1,30 @@
-From: linux@solonet.org.ua (Denis Kuzmenko)
-Date: Tue, 06 Dec 2011 03:38:19 +0200
-Subject: [PATCH resend2] s3c24xx: cpufreq: Fix compilation error when
- CONFIG_CPU_FREQ_S3C24XX_DEBUGFS selected.
-Message-ID: <4EDD720B.5040607@solonet.org.ua>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Tue, 6 Dec 2011 10:10:05 +0800
+Subject: [GIT PULL] imx: fix add_irq_domain
+Message-ID: <20111206021004.GH2980@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix compilation error when CONFIG_CPU_FREQ_S3C24XX_DEBUGFS selected.
+Hi Arnd,
 
-Signed-off-by: Denis Kuzmenko <linux@solonet.org.ua>
----
+Please pull the add_irq_domain fixing below for -rc, and then I can
+base my gpio interrupt cleanup series on top of it.  Thanks.
 
-Patch is against 3.2-rc3.
-CONFIG_S3C2410_IOTIMING wasn't present in Kconfig but was referenced by
-Makefile. Because of this the file s3c2410-iotiming.c was not ever compiled
-and enabling CONFIG_CPU_FREQ_S3C24XX_DEBUGFS option caused undefined
-reference to function s3c2410_iotiming_debugfs defined in that file.
+Regards,
+Shawn
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 44789ef..81d7025 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -2104,9 +2104,31 @@ config CPU_FREQ_S3C24XX_DEBUG
- 	help
- 	  Enable s3c_freq_dbg for the Samsung S3C CPUfreq core
- +config S3C2410_IOTIMING
-+	bool "CPUfreq iotiming for Samsung S3C2410 series CPUs"
-+	depends on ARCH_S3C2410 && CPU_FREQ && CPU_FREQ_S3C24XX && EXPERIMENTAL
-+	help
-+	  This enables the CPUfreq driver for the Samsung S3C24XX to change
-+	  IO timing according to the CPU frequency.
-+
-+	  For details, take a look at <file:Documentation/cpu-freq>.
-+
-+	  If in doubt, say Y.
-+
-+config S3C2412_IOTIMING
-+	bool "CPUfreq iotiming for Samsung S3C2412 series CPUs"
-+	depends on ARCH_S3C2412 && CPU_FREQ && CPU_FREQ_S3C24XX && EXPERIMENTAL
-+	help
-+	  This enables the CPUfreq driver for the Samsung S3C2412 to change
-+	  IO timing according to the CPU frequency.
-+
-+	  For details, take a look at <file:Documentation/cpu-freq>.
-+
-+	  If in doubt, say Y.
-+
- config CPU_FREQ_S3C24XX_IODEBUG
- 	bool "Debug CPUfreq Samsung driver IO timing"
--	depends on CPU_FREQ_S3C24XX
-+	depends on CPU_FREQ_S3C24XX && (S3C2410_IOTIMING || S3C2412_IOTIMING)
- 	help
- 	  Enable s3c_freq_iodbg for the Samsung S3C CPUfreq core
- diff --git a/arch/arm/plat-samsung/include/plat/cpu-freq-core.h
-b/arch/arm/plat-samsung/include/plat/cpu-freq-core.h
-index dac4760..c465252 100644
---- a/arch/arm/plat-samsung/include/plat/cpu-freq-core.h
-+++ b/arch/arm/plat-samsung/include/plat/cpu-freq-core.h
-@@ -202,13 +202,23 @@ extern int s3c_plltab_register(struct
-cpufreq_frequency_table *plls,
- extern struct s3c_cpufreq_config *s3c_cpufreq_getconfig(void);
- extern struct s3c_iotimings *s3c_cpufreq_getiotimings(void);
- -extern void s3c2410_iotiming_debugfs(struct seq_file *seq,
--				     struct s3c_cpufreq_config *cfg,
--				     union s3c_iobank *iob);
--
--extern void s3c2412_iotiming_debugfs(struct seq_file *seq,
--				     struct s3c_cpufreq_config *cfg,
--				     union s3c_iobank *iob);
-+#ifdef CONFIG_CPU_FREQ_S3C24XX_DEBUGFS
-+	#ifdef CONFIG_S3C2410_IOTIMING
-+	extern void s3c2410_iotiming_debugfs(struct seq_file *seq,
-+					     struct s3c_cpufreq_config *cfg,
-+					     union s3c_iobank *iob);
-+	#else
-+	#define s3c2410_iotiming_debugfs	NULL
-+	#endif
-+
-+	#ifdef CONFIG_S3C2412_IOTIMING
-+	extern void s3c2412_iotiming_debugfs(struct seq_file *seq,
-+					     struct s3c_cpufreq_config *cfg,
-+					     union s3c_iobank *iob);
-+	#else
-+	#define s3c2412_iotiming_debugfs	NULL
-+	#endif
-+#endif
-  #ifdef CONFIG_CPU_FREQ_S3C24XX_DEBUGFS
- #define s3c_cpufreq_debugfs_call(x) x
-@@ -241,10 +251,7 @@ extern void s3c2410_iotiming_set(struct
-s3c_cpufreq_config *cfg,
- #endif /* CONFIG_S3C2410_IOTIMING */
-  /* S3C2412 compatible routines */
--
--extern int s3c2412_iotiming_get(struct s3c_cpufreq_config *cfg,
--				struct s3c_iotimings *timings);
--
-+#ifdef CONFIG_S3C2412_IOTIMING
- extern int s3c2412_iotiming_get(struct s3c_cpufreq_config *cfg,
- 				struct s3c_iotimings *timings);
- @@ -253,6 +260,11 @@ extern int s3c2412_iotiming_calc(struct
-s3c_cpufreq_config *cfg,
-  extern void s3c2412_iotiming_set(struct s3c_cpufreq_config *cfg,
- 				 struct s3c_iotimings *iot);
-+#else
-+#define s3c2412_iotiming_calc NULL
-+#define s3c2412_iotiming_get NULL
-+#define s3c2412_iotiming_set NULL
-+#endif
-  #ifdef CONFIG_CPU_FREQ_S3C24XX_DEBUG
- #define s3c_freq_dbg(x...) printk(KERN_INFO x)
+The following changes since commit caca6a03d365883564885f2c1da3e88dcf65d139:
+
+  Linux 3.2-rc3 (2011-11-23 20:20:28 -0800)
+
+are available in the git repository at:
+  git://git.linaro.org/people/shawnguo/linux-2.6.git imx/fix-irqdomain
+
+Shawn Guo (2):
+      arm/imx: fix return type of callback passed to of_irq_init()
+      arm/imx: fix irq_base for gpio
+
+ arch/arm/mach-imx/mach-imx6q.c |    9 +++++----
+ arch/arm/mach-mx5/imx51-dt.c   |   12 +++++++-----
+ arch/arm/mach-mx5/imx53-dt.c   |   12 +++++++-----
+ 3 files changed, 19 insertions(+), 14 deletions(-)
