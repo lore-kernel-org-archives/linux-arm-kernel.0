@@ -1,53 +1,48 @@
-From: torvalds@linux-foundation.org (Linus Torvalds)
-Date: Tue, 6 Dec 2011 11:20:49 -0800
-Subject: [PATCH] ata: Don't use NO_IRQ in pata_of_platform driver
-In-Reply-To: <20111206104654.GN14542@n2100.arm.linux.org.uk>
-References: <20111202192618.GC3037@localhost.localdomain>
- <CA+55aFwekNWz+V4440f=2iu_BfOxSg0NjVogv4cZZDFbJBNoAQ@mail.gmail.com>
- <1322867573.11728.22.camel@pasglop>
- <20111205161157.GA27550@localhost.localdomain>
- <alpine.LFD.2.02.1112051236350.2357@xanadu.home>
- <20111205180253.GB29812@localhost.localdomain>
- <alpine.LFD.2.02.1112051310150.2357@xanadu.home>
- <20111205192605.GD29812@localhost.localdomain>
- <alpine.LFD.2.02.1112051443190.2357@xanadu.home>
- <20111206093709.GB2274@linaro.org>
- <20111206104654.GN14542@n2100.arm.linux.org.uk>
-Message-ID: <CA+55aFwZBr+3_S9kU-+m8zN8iwOvn2miuuAy-zt7sUjW_+abBg@mail.gmail.com>
+From: jcm@redhat.com (Jon Masters)
+Date: Tue, 06 Dec 2011 14:38:48 -0500
+Subject: [PATCH] ARM: futex: fix clobbering oldval
+In-Reply-To: <20111206191109.GB5385@mudshark.cambridge.arm.com>
+References: <1316660015.6872.1.camel@puffmine-laptop>
+ <20110922172653.GH13572@e102144-lin.cambridge.arm.com>
+ <1323197914.11696.30.camel@constitution.bos.jonmasters.org>
+ <20111206191109.GB5385@mudshark.cambridge.arm.com>
+Message-ID: <1323200328.11696.32.camel@constitution.bos.jonmasters.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 6, 2011 at 2:46 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
->
-> But.. let's make one thing clear: Alan Cox and Linus have been going on
-> about how IRQ0 should not be used. ?Let's be crystal clear: even x86
-> uses IRQ0.
+On Tue, 2011-12-06 at 19:11 +0000, Will Deacon wrote:
+> Hi Jon,
+> 
+> On Tue, Dec 06, 2011 at 06:58:34PM +0000, Jon Masters wrote:
+> > On Thu, 2011-09-22 at 18:26 +0100, Will Deacon wrote:
+> > > Hi,
+> > > 
+> > > On Thu, Sep 22, 2011 at 03:53:35AM +0100, mhban wrote:
+> > > > This patch fixes clobbering oldval bug. oldval should be preserved for next
+> > > > compare operation.
+> > > > 
+> > > > Change-Id: I2a63bc1bdb8de330eb9e1ac02d7da1f77e6e8c3c
+> > > > Signed-off-by: Minho Ban <mhban@samsung.com>
+> > > 
+> > > It would have been nice to have been CC'd on this...
+> > > 
+> > > I ran LTP tests on this, so I'm surprised that this was broken (the tests
+> > > passed). Well spotted anyway!
+> > 
+> > This appears to be the cause of our "stuck builder" problem in Fedora
+> > building certain large packages, such as OpenJDK. Some of our guys are
+> > still monitoring the situation in case there's a secondary issue.
+> > 
+> > Was there ever any additional followup on this topic?
+> 
+> Yup, check commit df77abca ("ARM: 7099/1: futex: preserve oldval in SMP
+> __futex_atomic_op"). It should be in stable for all affected kernels too.
 
-Not for any device driver, though.
+Yea, Mark flagged that patch and it was included into the kernels on our
+boards here. So far, it seems to be making some improvement, though we
+still have stuck boards and weird signal issues sometimes. We are trying
+to collect more data when this occurs (I gave the engineer concerned
+some instructions around collecting data that will be of use). So I just
+wondered if you saw any more futex issues, or if this is believe fixed.
 
-It's used entirely internally, and it doesn't even use
-"request_irq()". It uses the magic internal "setup_irq()" and never
-*ever* exposes irq0 as anything that a driver can see.
-
-That's what matters. You can use irq0 in ARM land all you like, AS
-LONG AS IT'S SOME HIDDEN INTERNAL USE. No drivers. No *nothing* that
-ever uses that absolutely *idiotic* NO_IRQ crap.
-
-In fact, you may be *forced* to use what is "physically" irq0 - it's
-just that you should never expose it as such to drivers. And x86
-doesn't.
-
-So Russell, if you think this has anything to do with NO_IRQ, and how
-x86 isn't doing things right, you're wrong. It's just like the
-internal exception thing, or the magical "cascade interrupt", or the
-"x87 exception mapped through the PIC". They are magic hidden
-interrupts that are set up in one place (well, one place *each*), and
-are never exposed anywhere else.
-
-The problem with NO_IRQ is that stupid "we expose our mind-numbingly
-stupid interfaces across the whole kernel".
-
-x86 never did that.  ARM still does. x86 doesn't have to fix anything. ARM does.
-
-                Linus
+Jon.
