@@ -1,25 +1,27 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 6 Dec 2011 10:27:32 +0000
-Subject: [PATCH] ARM: S3C64XX: Hook up VDDINT on Cragganmore
-In-Reply-To: <CAH9JG2V8jJGeTDUZjcXa4hs67SaivocO4g-+wB=2+zv2FwsGyQ@mail.gmail.com>
-References: <1323105817-5638-1-git-send-email-broonie@opensource.wolfsonmicro.com>
- <CAH9JG2V8jJGeTDUZjcXa4hs67SaivocO4g-+wB=2+zv2FwsGyQ@mail.gmail.com>
-Message-ID: <20111206102732.GE28840@opensource.wolfsonmicro.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 6 Dec 2011 11:30:54 +0100
+Subject: realview compulsory enables CONFIG_ARM_PATCH_PHYS_VIRT on me
+In-Reply-To: <CACRpkdZ8jpz7WTP3gpfcTykQZaCjQLN9PZCAS+UJOWrzZo1bjQ@mail.gmail.com>
+References: <CACRpkdZ8jpz7WTP3gpfcTykQZaCjQLN9PZCAS+UJOWrzZo1bjQ@mail.gmail.com>
+Message-ID: <CACRpkdb8v8uXE-sLkP32YJqa7CYT2HX2Xq_F8mtXtZCYhSMH2w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 06, 2011 at 08:21:30AM +0900, Kyungmin Park wrote:
+On Mon, Dec 5, 2011 at 10:22 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
 
-> > +	REGULATOR_SUPPLY("vddint", NULL),
+> In arch/arm/Kconfig ARM_PATCH_PHYS_VIRT is forcibly
+> disabled like so:
+>
+> depends on !ARCH_REALVIEW || !SPARSEMEM
 
-> Now there's mixed usage for vddint. until s5pc110 it uses the 'vddint'
-> but after exynos it uses the 'vdd_int'. either is okay but need to use
-> the same name for consistency?
+OK so I understand from the discussion that P2V should work
+perfectly well with the RealView as long as you're not using
+sparsemem. And now something has changed in v3.2-rc1
+kernel so it gets default-selected as opposed to being
+disabled in v3.1.
 
-> How do you think?
+So my boot problem is likely due to something else...
+I'll keep looking.
 
-I don't really care either way.  I called it vddint because the existing
-s3c64xx ARM core supply is called vddarm by software so I was also going
-for consistency here :) .  If we want to ensure consistency we should
-just pick something and move to it, though I don't know if it's really
-worth the effort.
+Yours,
+Linus Walleij
