@@ -1,101 +1,68 @@
-From: rob.lee@linaro.org (Robert Lee)
-Date: Mon,  5 Dec 2011 22:38:11 -0600
-Subject: [RFC PATCH 8/8] ARM: imx: Add mx5 cpuidle implmentation
-In-Reply-To: <1323146291-10676-1-git-send-email-rob.lee@linaro.org>
-References: <1323146291-10676-1-git-send-email-rob.lee@linaro.org>
-Message-ID: <1323146291-10676-9-git-send-email-rob.lee@linaro.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 5 Dec 2011 20:46:23 -0800
+Subject: [PATCH 07/23] ARM: plat-omap: remove arch specific special
+ handling for ioremap
+In-Reply-To: <alpine.LFD.2.02.1112052246030.2357@xanadu.home>
+References: <1321422521-1138-1-git-send-email-nico@fluxnic.net>
+ <1321422521-1138-8-git-send-email-nico@fluxnic.net>
+ <20111202202125.GZ31337@atomide.com>
+ <alpine.LFD.2.02.1112021637200.2357@xanadu.home>
+ <20111205235609.GI14542@n2100.arm.linux.org.uk>
+ <20111206003659.GJ14542@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.02.1112052246030.2357@xanadu.home>
+Message-ID: <20111206044622.GD31337@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add mx5 cpuidle implmentation based upon the common ARM cpuidle
-initialization code.
+* Nicolas Pitre <nico@fluxnic.net> [111205 19:37]:
+> On Tue, 6 Dec 2011, Russell King - ARM Linux wrote:
+> > On Mon, Dec 05, 2011 at 11:56:09PM +0000, Russell King - ARM Linux wrote:
+> > > On Fri, Dec 02, 2011 at 04:39:31PM -0500, Nicolas Pitre wrote:
+> > > > OK, thanks for testing.  Since Russell didn't commit this to his stable 
+> > > > branch yet I simply folded in your fix and added your tested-by tag.
+> > > 
+> > > So I'm about to push what I had out in the devel-stable branch... what
+> > > am I supposed to do with this?
+> > 
+> > Okay, yet again I find myself having to wait hours for a reply - which
+> > I expect will be forthcoming sometime tomorrow afternoon my time.  If
+> > I wait, it means a delay of another 24 hours before I push my tree out.
+> > 
+> > This is not acceptable.
+> 
+> You asked at 11:56:09PM +0000.
+> I replied at 19:33:34 -0500.
+> That's a delay of 37 minutes 25 seconds.
+> I even received my reply back from the mailing list server at
+> 19:39:37 -0500 so hopefully you must have received it within the hour.
+> Granted, you merged my branch at 23:27:59 +0000 so I hadn't replied yet.
+> 
+> However, the commit says:
+> 
+> Merge: 742eaa6a6e 0af362f844
+> Author:     Russell King <rmk+kernel@arm.linux.org.uk>
+> AuthorDate: Mon Dec 5 23:27:54 2011 +0000
+> Commit:     Russell King <rmk+kernel@arm.linux.org.uk>
+> CommitDate: Mon Dec 5 23:27:59 2011 +0000
+> 
+>     Merge branch 'vmalloc' of git://git.linaro.org/people/nico/linux into devel-stable
+> 
+> So the commit message is written as if you pulled my branch directly 
+> instead of a local branch, however my repo was already updated by that 
+> time.  In fact it was updated 2 days ago.  Strangely enough, you still 
+> have a version prior to that last update.
+> 
+> > So I'm pushing my tree out as-is - which means the stuff I pulled
+> > previously is now frozen.
+> 
+> That's not a big problem.
+> 
+> Tony: could you please send your original patch directly to Russell with 
+> my ACK?
 
-Signed-off-by: Robert Lee <rob.lee@linaro.org>
----
- arch/arm/mach-mx5/Makefile  |    3 +-
- arch/arm/mach-mx5/cpuidle.c |   59 +++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 61 insertions(+), 1 deletions(-)
- create mode 100644 arch/arm/mach-mx5/cpuidle.c
+OK, acked with your Linaro address as with your other patches in the
+series. It's patch 7192/1.
 
-diff --git a/arch/arm/mach-mx5/Makefile b/arch/arm/mach-mx5/Makefile
-index 0fc6080..2c348b4 100644
---- a/arch/arm/mach-mx5/Makefile
-+++ b/arch/arm/mach-mx5/Makefile
-@@ -3,8 +3,9 @@
- #
- 
- # Object file lists.
--obj-y   := cpu.o mm.o clock-mx51-mx53.o ehci.o system.o
- 
-+obj-y   := cpu.o mm.o clock-mx51-mx53.o ehci.o system.o
-+obj-$(CONFIG_CPU_IDLE) += cpuidle.o
- obj-$(CONFIG_PM) += pm-imx5.o
- obj-$(CONFIG_CPU_FREQ_IMX)    += cpu_op-mx51.o
- obj-$(CONFIG_MACH_MX51_BABBAGE) += board-mx51_babbage.o
-diff --git a/arch/arm/mach-mx5/cpuidle.c b/arch/arm/mach-mx5/cpuidle.c
-new file mode 100644
-index 0000000..3584df5
---- /dev/null
-+++ b/arch/arm/mach-mx5/cpuidle.c
-@@ -0,0 +1,59 @@
-+/*
-+ * Copyright 2011 Freescale Semiconductor, Inc.
-+ * Copyright 2011 Linaro Ltd.
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/init.h>
-+#include <linux/export.h>
-+#include <asm/proc-fns.h>
-+#include <asm/cpuidle.h>
-+#include <mach/common.h>
-+
-+static struct cpuidle_driver imx5_cpuidle_driver = {
-+	.name	= "imx5_cpuidle",
-+	.owner	= THIS_MODULE,
-+	.states[0] = {
-+		.exit_latency		= 12,
-+		.flags			= CPUIDLE_FLAG_TIME_VALID,
-+		.name			= "WFI",
-+		.desc			= "idle cpu powered, unclocked.",
-+	},
-+	.states[1] = {
-+		.exit_latency		= 20,
-+		.flags			= CPUIDLE_FLAG_TIME_VALID,
-+		.name			= "WFI SRPG",
-+		.desc			= "idle cpu unpowered, unclocked.",
-+	},
-+	.state_count = 2,
-+};
-+
-+int imx5_enter_idle(struct cpuidle_device *dev,
-+			struct cpuidle_driver *drv,
-+			      int index)
-+{
-+	if (likely(index))
-+		mx5_cpu_lp_set(WAIT_UNCLOCKED_POWER_OFF);
-+	else
-+		mx5_cpu_lp_set(WAIT_UNCLOCKED);
-+	cpu_do_idle();
-+	return index;
-+}
-+
-+static int __init imx5_init_cpuidle(void)
-+{
-+	int ret;
-+
-+	ret = arm_cpuidle_init(&imx5_cpuidle_driver,
-+					imx5_enter_idle,
-+					NULL);
-+	return ret;
-+}
-+late_initcall(imx5_init_cpuidle);
--- 
-1.7.1
+Regards,
+
+Tony
