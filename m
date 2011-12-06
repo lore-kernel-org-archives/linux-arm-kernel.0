@@ -1,56 +1,85 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 06 Dec 2011 20:35:43 +0900
-Subject: [PATCH resend3] arm: s3c24xx: Add new LCD (W35i) support for
- Mini2440 board
-In-Reply-To: <4EDD71C5.1090905@solonet.org.ua>
-References: <4EC588A8.3030907@solonet.org.ua> <4EDD71C5.1090905@solonet.org.ua>
-Message-ID: <02f001ccb40b$303fa8a0$90bef9e0$%kim@samsung.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Tue, 6 Dec 2011 11:37:35 +0000
+Subject: [PATCH] ata: Don't use NO_IRQ in pata_of_platform driver
+In-Reply-To: <20111206104654.GN14542@n2100.arm.linux.org.uk>
+References: <CA+55aFwekNWz+V4440f=2iu_BfOxSg0NjVogv4cZZDFbJBNoAQ@mail.gmail.com>
+ <1322867573.11728.22.camel@pasglop>
+ <20111205161157.GA27550@localhost.localdomain>
+ <alpine.LFD.2.02.1112051236350.2357@xanadu.home>
+ <20111205180253.GB29812@localhost.localdomain>
+ <alpine.LFD.2.02.1112051310150.2357@xanadu.home>
+ <20111205192605.GD29812@localhost.localdomain>
+ <alpine.LFD.2.02.1112051443190.2357@xanadu.home>
+ <20111206093709.GB2274@linaro.org>
+ <20111206104654.GN14542@n2100.arm.linux.org.uk>
+Message-ID: <20111206113735.GC2274@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Denis Kuzmenko wrote:
+On Tue, Dec 06, 2011 at 10:46:54AM +0000, Russell King - ARM Linux wrote:
+> On Tue, Dec 06, 2011 at 09:37:09AM +0000, Dave Martin wrote:
+> > To clarify, you're suggesting that the meanings of all other IRQ values
+> > would not change initially?  (i.e., we remap HW irq 0, if there is one,
+> > to some other random number but have a 1:1 mapping for everything else).
 > 
-> Add new LCD (W35i) support for Mini2440 board
+> Even better.  Avoid the first 16 IRQ numbers altogether - so that ISA
+> drivers which have these numbers hard-encoded in them will see failures
+> if they're expecting standard ISA IRQ numbering.
 > 
-> Signed-off-by: Denis Kuzmenko <linux@solonet.org.ua>
-> ---
+> We already do that with the GIC, partly because of the hardware design.
+> We do that on Footbridge based systems, because they may or may not have
+> a real ISA IRQ controller.
 > 
-> diff --git a/arch/arm/mach-s3c2440/mach-mini2440.c
-> b/arch/arm/mach-s3c2440/mach-mini2440.c
-> index fc2dc0b..951eadd 100644
-> --- a/arch/arm/mach-s3c2440/mach-mini2440.c
-> +++ b/arch/arm/mach-s3c2440/mach-mini2440.c
-> @@ -167,6 +167,24 @@ static struct s3c2410fb_display mini2440_lcd_cfg[]
-> __initdata = {
->  		.lcdcon5	= (S3C2410_LCDCON5_FRM565 |
->  				   S3C2410_LCDCON5_HWSWP),
->  	},
-> +	/* mini2440 + 3.5" TFT (LCD-W35i, LQ035Q1DG06 type) + touchscreen*/
-> +	[3] = {
-> +		_LCD_DECLARE(
-> +			/* clock */
-> +			7,
-> +			/* xres, margin_right, margin_left, hsync */
-> +			320, 68, 66, 4,
-> +			/* yres, margin_top, margin_bottom, vsync */
-> +			240, 4, 4, 9,
-> +			/* refresh rate */
-> +			60),
-> +		.lcdcon5	= (S3C2410_LCDCON5_FRM565 |
-> +				   S3C2410_LCDCON5_INVVDEN |
-> +				   S3C2410_LCDCON5_INVVFRAME |
-> +				   S3C2410_LCDCON5_INVVLINE |
-> +				   S3C2410_LCDCON5_INVVCLK |
-> +				   S3C2410_LCDCON5_HWSWP),
-> +	},
->  };
->   /* todo - put into gpio header */
+> But.. let's make one thing clear: Alan Cox and Linus have been going on
+> about how IRQ0 should not be used.  Let's be crystal clear: even x86
+> uses IRQ0.  It happens to be the PIC timer, and that gets claimed early
+> on during the x86 boot.  So please don't tell me that x86 avoids IRQ0.
+> It doesn't.  It just happens that x86 never shows IRQ0 to anything but
+> the i8253 PIC driver.
+> 
+> So lets see how x86 squeels if we make the i8253 PIC driver reject IRQ0.
+> I bet that there'd be absolute fury at such a suggestion.
+> 
+> When x86 sorts this out, there _might_ be some more motivation to take
+> such comments seriously.  Until then it's more like a joke.
 
-Looks ok, will apply.
-Thanks.
+OK -- but the situation is breaking OF-based drivers on ARM platforms
+today.
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Based on what you've suggested, does the following policy sound
+reasonable for resolving that deadlock?
+
+
+1) All OF code and drivers should be migrating to use 0 instead of NO_IRQ
+   for the no-interrupt case.  Code which receives irq numbers directly
+   from the OF framework and refers to NO_IRQ, or expects 0 to be a valid
+   needs to be fixed.
+
+2) Where we hit a problem, board code needs to be adapted to remap HW IRQs
+   0-15 to different software values.  (This could be done using irq
+   domains, or not)
+
+
+I'm still not sure what the correct approach is for drivers which get
+irq numbers from OF indirectly -- this particularly applies to platform
+and AMBA devices.
+
+If we expect board code to start populating platform data based on 
+information from the OF code, we need to fix the board not to use linux
+irq 0 to describe a real HW interrupt, if it matters (as in (2)).
+
+AMBA devices registered via of_platform_populate() already get their
+irq numbers from OF.  So long as OF used to explicitly return NO_IRQ
+there was no problem -- but if OF is moving to return 0 instead, we have
+a potential problem for each AMBA driver which may be used by a board
+which can boot without DT... if we have any scenarios where that driver
+is given real irq 0.
+
+Maybe we can fix these breakages as they occur -- I don't really know
+the scale of the impact.
+
+
+What are your thoughts on this?
+
+Cheers
+---Dave
