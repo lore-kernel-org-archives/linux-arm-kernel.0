@@ -1,75 +1,52 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 06 Dec 2011 12:51:02 +0100
-Subject: [PATCH v7 1/2] ARM: EXYNOS: Change System MMU platform device
- definitions
-In-Reply-To: <1321609650-1329-2-git-send-email-pullip.cho@samsung.com>
-References: <1321609650-1329-1-git-send-email-pullip.cho@samsung.com>
- <1321609650-1329-2-git-send-email-pullip.cho@samsung.com>
-Message-ID: <007f01ccb40d$540a2fb0$fc1e8f10$%szyprowski@samsung.com>
+Date: Tue, 06 Dec 2011 13:04:53 +0100
+Subject: [PATCH 1/3] PM: Provide an always on power domain governor
+In-Reply-To: <02d601ccb400$a19380e0$e4ba82a0$%kim@samsung.com>
+References: <1322765339-29879-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+ <201112042156.59990.rjw@sisk.pl>
+ <20111204231005.GA4255@opensource.wolfsonmicro.com>
+ <201112050115.18489.rjw@sisk.pl>
+ <20111205001500.GA10173@opensource.wolfsonmicro.com>
+ <02d601ccb400$a19380e0$e4ba82a0$%kim@samsung.com>
+Message-ID: <008101ccb40f$4385c0d0$ca914270$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hello,
 
-On Friday, November 18, 2011 10:47 AM KyongHo Cho wrote:
+On Tuesday, December 06, 2011 11:20 AM Kukjin Kim wrote:
+ 
+> Mark Brown wrote:
+> >
+> > On Mon, Dec 05, 2011 at 01:15:18AM +0100, Rafael J. Wysocki wrote:
+> > > On Monday, December 05, 2011, Mark Brown wrote:
+> >
+> > > > It might make sense for it to go via the Samsung tree - the third
+> > patch
+> > > > depends on it and there's some other stuff going on with the s3c64xx
+> > > > power management - so let's see what Kukjin thinks is best.
+> >
+> > > OTOH, it will conflict with some patches I have in the works.
+> >
+> > Ah, OK - in that case I guess it's sensible if you apply it.  Ideally it
+> > could be on a separate branch so it could be cross-merged with other
+> > trees if there's a need later.
+> 
+> Hi Mark and Rafael,
+> 
+> Looks ok to me on this series and would be nice to me if Rafael could create
+> topic branch in his tree and apply this series with my ack for Samsung
+> stuff.
+> 
+> Rafael, please let me know the branch when you create it so that I can merge
+> it into Samsung tree to avoid other conflicts.
 
-> Handling System MMUs with an identifier is not flexible to manage
-> System MMU platform devices because of the following reasons:
-> 1. A device driver which needs to handle System MMU must know the ID.
-> 2. A System MMU may not present in some implementations of Exynos family.
-> 3. Handling System MMU with IOMMU API does not require an ID.
-> 
-> This patch is the result of removing ID of System MMUs.
-> Instead, a device driver that needs to handle its System MMU must
-> use IOMMU API while its descriptor of platform device is given.
-> 
-> This patch also includes the following enhanclements:
-> - A System MMU device becomes a child if its power domain device.
-> - clkdev
-> 
-> Signed-off-by: KyongHo Cho <pullip.cho@samsung.com>
-> ---
->  arch/arm/mach-exynos/Kconfig                      |    2 +
->  arch/arm/mach-exynos/clock-exynos4210.c           |   16 ++
->  arch/arm/mach-exynos/clock.c                      |   55 ++--
->  arch/arm/mach-exynos/dev-sysmmu.c                 |  272 +++++----------------
->  arch/arm/mach-exynos/include/mach/dev-sysmmu.h    |   61 +++++
->  arch/arm/mach-exynos/include/mach/exynos4-clock.h |    1 +
->  arch/arm/mach-exynos/include/mach/map.h           |    3 +-
->  arch/arm/mach-exynos/include/mach/regs-sysmmu.h   |   26 +-
->  arch/arm/mach-exynos/include/mach/sysmmu.h        |   46 ----
->  arch/arm/mach-exynos/mach-armlex4210.c            |    1 -
->  arch/arm/mach-exynos/mach-nuri.c                  |   40 +++
->  arch/arm/mach-exynos/mach-origen.c                |   42 ++++
->  arch/arm/mach-exynos/mach-smdk4x12.c              |    9 +
->  arch/arm/mach-exynos/mach-smdkv310.c              |   43 ++++-
->  arch/arm/mach-exynos/mach-universal_c210.c        |   42 ++++
->  arch/arm/plat-samsung/include/plat/devs.h         |    1 -
->  16 files changed, 356 insertions(+), 304 deletions(-)
->  create mode 100644 arch/arm/mach-exynos/include/mach/dev-sysmmu.h
->  delete mode 100644 arch/arm/mach-exynos/include/mach/sysmmu.h
-> 
-> diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
-> index 0afcc3b..67769fb 100644
-> --- a/arch/arm/mach-exynos/Kconfig
-> +++ b/arch/arm/mach-exynos/Kconfig
-> @@ -272,6 +272,7 @@ config MACH_NURI
->  	select EXYNOS4_SETUP_I2C5
->  	select EXYNOS4_SETUP_SDHCI
->  	select EXYNOS4_SETUP_USB_PHY
-> +	select EXYNOS4_DEV_SYSMMU
->  	select S5P_SETUP_MIPIPHY
->  	select SAMSUNG_DEV_PWM
->  	select SAMSUNG_DEV_ADC
-> @@ -301,6 +302,7 @@ config MACH_ORIGEN
->  	select EXYNOS4_SETUP_FIMD0
->  	select EXYNOS4_SETUP_SDHCI
->  	select EXYNOS4_SETUP_USB_PHY
-> +	select EXYNOS4_DEV_SYSMMU
-
-The "select EXYNOS4_DEV_SYSMMU" statement is missing for UniversalC210 and SMDK boards
-what causes compilation issues if only these boards are selected.
-
+What about similar patches for S5PV210/S5PC110 series and Exynos4? gen_pd based
+power domain code for Exynos4 have been rejected in favor of custom platform-device
+based power domain drivers. It would be much easier to have only one type of the
+drivers across different Samsung SoCs. This will also help to hide some differences
+between the series from the device drivers (clock gating, power management). 
+ 
 Best regards
 -- 
 Marek Szyprowski
