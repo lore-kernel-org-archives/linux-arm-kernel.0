@@ -1,41 +1,53 @@
-From: ajhernandez@ti.com (Hernandez, Alejandro)
-Date: Tue, 6 Dec 2011 19:15:48 +0000
-Subject: [PATCH] arm, da8xx, mmc: set second MMC controllers default queue
-In-Reply-To: <DF0F476B391FA8409C78302C7BA518B603E610@DBDE01.ent.ti.com>
-References: <1322991210-20486-1-git-send-email-hs@denx.de>
- <B6A220404B6BFC4BBD2AB91C54D39DF4029FE5@DBDE01.ent.ti.com>
- <4EDCA109.2090204@denx.de>
- <DF0F476B391FA8409C78302C7BA518B603E610@DBDE01.ent.ti.com>
-Message-ID: <C1CAF10E70742149B55CDF4C48D47685061812@DLEE09.ent.ti.com>
+From: torvalds@linux-foundation.org (Linus Torvalds)
+Date: Tue, 6 Dec 2011 11:20:49 -0800
+Subject: [PATCH] ata: Don't use NO_IRQ in pata_of_platform driver
+In-Reply-To: <20111206104654.GN14542@n2100.arm.linux.org.uk>
+References: <20111202192618.GC3037@localhost.localdomain>
+ <CA+55aFwekNWz+V4440f=2iu_BfOxSg0NjVogv4cZZDFbJBNoAQ@mail.gmail.com>
+ <1322867573.11728.22.camel@pasglop>
+ <20111205161157.GA27550@localhost.localdomain>
+ <alpine.LFD.2.02.1112051236350.2357@xanadu.home>
+ <20111205180253.GB29812@localhost.localdomain>
+ <alpine.LFD.2.02.1112051310150.2357@xanadu.home>
+ <20111205192605.GD29812@localhost.localdomain>
+ <alpine.LFD.2.02.1112051443190.2357@xanadu.home>
+ <20111206093709.GB2274@linaro.org>
+ <20111206104654.GN14542@n2100.arm.linux.org.uk>
+Message-ID: <CA+55aFwZBr+3_S9kU-+m8zN8iwOvn2miuuAy-zt7sUjW_+abBg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sekhar,
+On Tue, Dec 6, 2011 at 2:46 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+>
+> But.. let's make one thing clear: Alan Cox and Linus have been going on
+> about how IRQ0 should not be used. ?Let's be crystal clear: even x86
+> uses IRQ0.
 
-Do you still want me to try the patch?
+Not for any device driver, though.
 
-Thanks,
-Alejandro
+It's used entirely internally, and it doesn't even use
+"request_irq()". It uses the magic internal "setup_irq()" and never
+*ever* exposes irq0 as anything that a driver can see.
 
------Original Message-----
-From: davinci-linux-open-source-bounces@linux.davincidsp.com [mailto:davinci-linux-open-source-bounces at linux.davincidsp.com] On Behalf Of Nori, Sekhar
-Sent: Tuesday, December 06, 2011 2:10 PM
-To: hs at denx.de; Rajashekhara, Sudhakar
-Cc: davinci-linux-open-source at linux.davincidsp.com; Wolfgang Denk; linux-mmc at vger.kernel.org; Ido Yariv; linux-arm-kernel at lists.infradead.org
-Subject: RE: [PATCH] arm, da8xx, mmc: set second MMC controllers default queue
+That's what matters. You can use irq0 in ARM land all you like, AS
+LONG AS IT'S SOME HIDDEN INTERNAL USE. No drivers. No *nothing* that
+ever uses that absolutely *idiotic* NO_IRQ crap.
 
-On Mon, Dec 05, 2011 at 16:16:33, Heiko Schocher wrote:
-> 
-> Thanks, but as Ido commented, this patch is no longer necessary, sorry
-> for the noise.
-> 
+In fact, you may be *forced* to use what is "physically" irq0 - it's
+just that you should never expose it as such to drivers. And x86
+doesn't.
 
-It doesn't look like Ido's comment reached me or the archives. Can you
-please forward it?
+So Russell, if you think this has anything to do with NO_IRQ, and how
+x86 isn't doing things right, you're wrong. It's just like the
+internal exception thing, or the magical "cascade interrupt", or the
+"x87 exception mapped through the PIC". They are magic hidden
+interrupts that are set up in one place (well, one place *each*), and
+are never exposed anywhere else.
 
-Thanks,
-Sekhar
-_______________________________________________
-Davinci-linux-open-source mailing list
-Davinci-linux-open-source at linux.davincidsp.com
-http://linux.davincidsp.com/mailman/listinfo/davinci-linux-open-source
+The problem with NO_IRQ is that stupid "we expose our mind-numbingly
+stupid interfaces across the whole kernel".
+
+x86 never did that.  ARM still does. x86 doesn't have to fix anything. ARM does.
+
+                Linus
