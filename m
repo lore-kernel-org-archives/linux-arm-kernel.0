@@ -1,19 +1,34 @@
-From: davem@davemloft.net (David Miller)
-Date: Tue, 06 Dec 2011 13:17:10 -0500 (EST)
-Subject: [PATCH][NET] several cleanups and bugfixes for fec.c
-In-Reply-To: <cover.1323163127.git.LW@KARO-electronics.de>
-References: <cover.1323163127.git.LW@KARO-electronics.de>
-Message-ID: <20111206.131710.2181211652306186928.davem@davemloft.net>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Tue,  6 Dec 2011 11:50:26 -0700
+Subject: [PATCH] highmem: Fix ARM build break due to __kmap_atomic rename
+Message-ID: <1323197426-10815-1-git-send-email-swarren@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Git commit 37bfbb9 "highmem: kill all __kmap_atomic()" renamed
+__kmap_atomic to kmap_atomic. However, arch/arm/include/asm/highmem.h
+wasn't updated for that change. This change does so, and fixes the
+ARM build break.
 
-Please use a more reasonable Subject line for your patches.
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+This shows up in next-20111206 at least.
 
-Saying "several cleanups and bugfixes for fec.c:" in every subject
-line of a whole series of patches isn't very helpful.
+ arch/arm/include/asm/highmem.h |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-Just "fec: set con_id in clk_get() call to NULL", as one example, would be fine.
-
-You will need to resubmit this entire patch series, afresh, with this fixup.
-Do not try to fix it up by replying to the individual patch postings.
+diff --git a/arch/arm/include/asm/highmem.h b/arch/arm/include/asm/highmem.h
+index a4edd19..8c5e828 100644
+--- a/arch/arm/include/asm/highmem.h
++++ b/arch/arm/include/asm/highmem.h
+@@ -57,7 +57,7 @@ static inline void *kmap_high_get(struct page *page)
+ #ifdef CONFIG_HIGHMEM
+ extern void *kmap(struct page *page);
+ extern void kunmap(struct page *page);
+-extern void *__kmap_atomic(struct page *page);
++extern void *kmap_atomic(struct page *page);
+ extern void __kunmap_atomic(void *kvaddr);
+ extern void *kmap_atomic_pfn(unsigned long pfn);
+ extern struct page *kmap_atomic_to_page(const void *ptr);
+-- 
+1.7.0.4
