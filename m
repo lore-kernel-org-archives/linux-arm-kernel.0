@@ -1,48 +1,28 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 6 Dec 2011 13:16:58 +0000
-Subject: [RFC v2 1/2] dma-buf: Introduce dma buffer sharing mechanism
-In-Reply-To: <CAF6AEGto-+oSqguuWyPunUbtE65GpNiXh21srQzrChiBQMb1Nw@mail.gmail.com>
-References: <1322816252-19955-1-git-send-email-sumit.semwal@ti.com>
- <CAKMK7uHw3OpMAtVib=e=s_us9Tx9TebzehGg59d4-g9dUXr+pQ@mail.gmail.com>
- <CAF6AEGto-+oSqguuWyPunUbtE65GpNiXh21srQzrChiBQMb1Nw@mail.gmail.com>
-Message-ID: <201112061316.58858.arnd@arndb.de>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Tue, 6 Dec 2011 13:23:31 +0000
+Subject: [PATCH] ARM: make head.S register assignments more convenient
+In-Reply-To: <20111206112912.GR14542@n2100.arm.linux.org.uk>
+References: <alpine.LFD.2.02.1112051528200.2357@xanadu.home>
+ <20111206111105.GA2270@linaro.org>
+ <20111206112912.GR14542@n2100.arm.linux.org.uk>
+Message-ID: <20111206132331.GA13769@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 05 December 2011, Rob Clark wrote:
-> > On the topic of a coherency model for dmabuf, I think we need to look at
-> > dma_buf_attachment_map/unmap (and also the mmap variants cpu_start and
-> > cpu_finish or whatever they might get called) as barriers:
-> >
-> > So after a dma_buf_map, all previsously completed dma operations (i.e.
-> > unmap already called) and any cpu writes (i.e. cpu_finish called) will be
-> > coherent. Similar rule holds for cpu access through the userspace mmap,
-> > only writes completed before the cpu_start will show up.
-> >
-> > Similar, writes done by the device are only guaranteed to show up after
-> > the _unmap. Dito for cpu writes and cpu_finish.
-> >
-> > In short we always need two function calls to denote the start/end of the
-> > "critical section".
+On Tue, Dec 06, 2011 at 11:29:12AM +0000, Russell King - ARM Linux wrote:
+> On Tue, Dec 06, 2011 at 11:11:05AM +0000, Dave Martin wrote:
+> > Is it also worth changing the other proc-*.S setup rountines to be PCS
+> > compliant too?  This would clean up the calling convention further, and
+> > help avoid future sutprises.
 > 
-> Yup, this was exactly my assumption.  But I guess it is better to spell it out.
+> They _aren't_ PCS functions in any case.  They don't have a stack
+> available to them.  So, having them as non-PCS functions reinforces
+> the fact that they _are_ special.
 
-I still don't understand how this is going to help you if you let
-multiple drivers enter and leave the critical section without serializing
-against one another. That doesn't sound like what I know as critical
-section.
+Fair point.
 
-Given some reasonable constraints (all devices must be in the same coherency
-domain, for instance), you can probably define it in a way that you can
-have multiple devices mapping the same buffer at the same time, and
-when no device has mapped the buffer you can have as many concurrent
-kernel and user space accesses on the same buffer as you like. But you
-must still guarantee that no software touches a noncoherent buffer while
-it is mapped into any device and vice versa.
+Maybe a brief note in the commit message explaining why only certain
+proc-*.S files are touched would be belpful.  But it's not vital.
 
-Why can't we just mandate that all mappings into the kernel must be
-coherent and that user space accesses must either be coherent as well
-or be done by user space that uses explicit serialization with all
-DMA accesses?
-
-	Arnd
+Cheers
+---Dave
