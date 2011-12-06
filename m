@@ -1,27 +1,24 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 6 Dec 2011 11:30:54 +0100
-Subject: realview compulsory enables CONFIG_ARM_PATCH_PHYS_VIRT on me
-In-Reply-To: <CACRpkdZ8jpz7WTP3gpfcTykQZaCjQLN9PZCAS+UJOWrzZo1bjQ@mail.gmail.com>
-References: <CACRpkdZ8jpz7WTP3gpfcTykQZaCjQLN9PZCAS+UJOWrzZo1bjQ@mail.gmail.com>
-Message-ID: <CACRpkdb8v8uXE-sLkP32YJqa7CYT2HX2Xq_F8mtXtZCYhSMH2w@mail.gmail.com>
+From: LW@KARO-electronics.de (=?utf-8?q?Lothar=20Wa=C3=9Fmann?=)
+Date: Tue,  6 Dec 2011 11:27:08 +0100
+Subject: [PATCH][NET] several cleanups and bugfixes for fec.c
+Message-ID: <cover.1323163127.git.LW@KARO-electronics.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 5, 2011 at 10:22 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+The following set of patches provides some cleanup and bugfixes for
+drivers/net/ethernet/freescale/fec.c and makes the driver buildable as
+a module.
 
-> In arch/arm/Kconfig ARM_PATCH_PHYS_VIRT is forcibly
-> disabled like so:
->
-> depends on !ARCH_REALVIEW || !SPARSEMEM
+Lothar Wa??mann (8):
+  misc cleanups
+  set con_id in clk_get() call to NULL
+  prevent dobule restart of interface on FDX/HDX change
+  don't request invalid IRQ
+  don't munge MAC address from platform data
+  preserve MII/RMII setting in fec_stop()
+  fix the .remove code
+  make FEC driver buildable as module
 
-OK so I understand from the discussion that P2V should work
-perfectly well with the RealView as long as you're not using
-sparsemem. And now something has changed in v3.2-rc1
-kernel so it gets default-selected as opposed to being
-disabled in v3.1.
-
-So my boot problem is likely due to something else...
-I'll keep looking.
-
-Yours,
-Linus Walleij
+ drivers/net/ethernet/freescale/Kconfig |    2 +-
+ drivers/net/ethernet/freescale/fec.c   |   63 ++++++++++++++++++++++----------
+ 2 files changed, 44 insertions(+), 21 deletions(-)
