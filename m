@@ -1,55 +1,44 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 6 Dec 2011 21:18:52 +0000
-Subject: [RFC][PATCH] ARM: kirkwood: Remove eSATA SheevaPlug board support
-In-Reply-To: <1323202967.3019.12.camel@computer2>
-References: <1322737480.9622.5.camel@phoenix>
- <1322912383.2378.79.camel@computer2>
- <alpine.LFD.2.02.1112031247230.2357@xanadu.home>
- <1323155228.2237.10.camel@computer2>
- <alpine.LFD.2.02.1112061442430.2357@xanadu.home>
- <1323202967.3019.12.camel@computer2>
-Message-ID: <20111206211852.GX14542@n2100.arm.linux.org.uk>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Tue, 6 Dec 2011 22:39:56 +0100
+Subject: [PATCH 1/3] PM: Provide an always on power domain governor
+In-Reply-To: <02d601ccb400$a19380e0$e4ba82a0$%kim@samsung.com>
+References: <1322765339-29879-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+ <20111205001500.GA10173@opensource.wolfsonmicro.com>
+ <02d601ccb400$a19380e0$e4ba82a0$%kim@samsung.com>
+Message-ID: <201112062239.57001.rjw@sisk.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 06, 2011 at 08:22:47PM +0000, Tixy wrote:
-> On Tue, 2011-12-06 at 14:45 -0500, Nicolas Pitre wrote:
-> > The arm-soc tree is probably more appropriate.  Don't include the 
-> > mach-types changes though as it is preferable if they come through RMK's 
-> > database updates.
+On Tuesday, December 06, 2011, Kukjin Kim wrote:
+> Mark Brown wrote:
+> > 
+> > On Mon, Dec 05, 2011 at 01:15:18AM +0100, Rafael J. Wysocki wrote:
+> > > On Monday, December 05, 2011, Mark Brown wrote:
+> > 
+> > > > It might make sense for it to go via the Samsung tree - the third
+> > patch
+> > > > depends on it and there's some other stuff going on with the s3c64xx
+> > > > power management - so let's see what Kukjin thinks is best.
+> > 
+> > > OTOH, it will conflict with some patches I have in the works.
+> > 
+> > Ah, OK - in that case I guess it's sensible if you apply it.  Ideally it
+> > could be on a separate branch so it could be cross-merged with other
+> > trees if there's a need later.
 > 
-> It's already gone through Russell's tree.
+> Hi Mark and Rafael,
 > 
-> I realised that a mach-types patch couldn't go into arm-soc as that
-> doesn't have the removed machine entries, and the only other changes in
-> linux-next for the sheevaplug and ts209 files were from Russell's tree
-> anyway. And finally, I thought that Russel's mach-types generation
-> script would want to see the fixed files in his tree, otherwise it would
-> want to delete the machine entries.
+> Looks ok to me on this series and would be nice to me if Rafael could create
+> topic branch in his tree and apply this series with my ack for Samsung
+> stuff.
+> 
+> Rafael, please let me know the branch when you create it so that I can merge
+> it into Samsung tree to avoid other conflicts.
 
-Let me take you through what I did to deal with this.  You supplied me
-a patch to go on top of current stuff.  So, I selected the 'misc' branch
-to apply it, which had the recent mach-types update as the last thing.
-Then:
+I need an ack from Magnus or Paul on the shmobile patch. When I get one, I'll
+put patches [1/3] and [2/3] (new version) into my linux-next branch and then
+(after a few days spent in linux-next) to the pm-domains branch.  I'll let you
+know when that happens.
 
-1. I applied your patch as-is and committed it.  So the tree looked like:
-	Nov. mach-types update -> your patch
-2. I shuffled your patch before the mach-types update, which caused
-   conficts which had to be fixed manually.  So this resulted in:
-	your patch -> Nov. mach-types update
-3. I resolved the entries in the machine database - by hand in SQL -
-   to fix up the entries how you want them.
-4. I did another update to mach-types.  At this point, the tree
-   looks like:
-	your patch -> Nov. mach-types update -> Dec. mach-types update
-   and, because I'd fixed the entries in the machine database, they
-   didn't get removed this time.
-5. I combined the two mach-types update into a single December time
-   mach-types update.  Finally, we have what is visible today:
-	your patch -> Dec. mach-types update
-
-What we now have is a completely bisectable change with no commit which
-fails to build for these platforms.  Of course, as a result of the
-juggling, your patch is no longer exactly what you sent on the list
-(it's changing the entry in mach-types rather than adding it back) but
-my sign-off on committing your change covers that - DCO condition (b).)
+Thanks,
+Rafael
