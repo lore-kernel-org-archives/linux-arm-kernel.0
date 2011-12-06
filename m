@@ -1,37 +1,39 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Tue, 6 Dec 2011 16:18:15 +0000
-Subject: [GIT PULL] ARM: amba: Enable module alias autogeneration for
- AMBA drivers
-In-Reply-To: <20111206155911.GA11902@mail.gnudd.com>
-References: <20111206151541.GA13774@linaro.org>
- <1321961573-4562-1-git-send-email-dave.martin@linaro.org>
- <20111206155911.GA11902@mail.gnudd.com>
-Message-ID: <20111206161815.GD13769@linaro.org>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Tue, 06 Dec 2011 16:23:27 +0000
+Subject: [RFC PATCH] ARM: Add generic instruction opcode manipulation
+ helpers
+In-Reply-To: <20111206150855.GA5385@mudshark.cambridge.arm.com>
+References: <1322220493-3251-1-git-send-email-dave.martin@linaro.org>
+ <20111206150855.GA5385@mudshark.cambridge.arm.com>
+Message-ID: <1323188607.3427.60.camel@linaro1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 06, 2011 at 04:59:11PM +0100, Alessandro Rubini wrote:
-> > ... it looks like Alessandro's proposed change to tidy up scripts/mod/
-> > ile2alias.c may get merged soon
-> 
-> No, I don't think it will happen. Rusty disagrees, and his own
-> suggestion is in the queue. I'm waiting a while to understand
-> what is happening.
-> 
-> Anyways, I think it's better for me to wait for amba to come in, and
-> work on scripts/mod later on. After all, it's meant to ease adding new
-> buses later, not to make it more difficult for already scheduled ones.
+I've cut down the cc list...
 
-OK -- thanks for the clarification.
+On Tue, 2011-12-06 at 15:08 +0000, Will Deacon wrote:
+[...]
+> Tixy - how much work do you reckon it would be to rework your kprobes
+> decoding code into a generic `here are my callbacks, please decode this
+> instruction stream for me' type thing?
+>
+> All I want for hw_breakpoint is to know whether an instruction is a load or
+> a store, but even for that it looks like I'll need to duplicate a lot of
+> stuff.
 
+The kprobes instruction decoding is pretty specialised if you look at
+it. Most of the complexity is in the data tables, (grep for "const union
+decode_item") which are processed by kprobe_decode_insn(). For
+documentation look for comments before "enum decode_type" and
+kprobe_decode_insn(). I suspect that to try and create something generic
+out of these would be major work.
 
-Russell, it sounds like you shouldn't get a merge conflict with the
-original version of the series after all.
+An alternative would be to bend the data tables to your purpose by
+squeezing in and 'instruction type' parameter into the table (ldr, str,
+other) and then parsing the tables with a different function to get the
+instruction type. You may find though that there are some classes of
+instruction that the existing tables don't decode fully, because kprobes
+isn't interested in distinguishing between them.
 
-For reference, the original pull request is here:
-
-http://lists.infradead.org/pipermail/linux-arm-kernel/2011-November/073619.html
-
-
-Cheers
----Dave
+-- 
+Tixy
