@@ -1,19 +1,22 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 7 Dec 2011 15:00:27 -0800
-Subject: [PATCH] arm: omap: rx51: enable tsc2005 touchscreen
-In-Reply-To: <1322843353-16155-1-git-send-email-aaro.koskinen@nokia.com>
-References: <1322843353-16155-1-git-send-email-aaro.koskinen@nokia.com>
-Message-ID: <20111207230027.GO31337@atomide.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 8 Dec 2011 00:43:32 +0100
+Subject: [PATCH V2 0/1] dmaengine/amba-pl08x: Add support for s3c64xx DMAC
+In-Reply-To: <1317189007-23033-1-git-send-email-alim.akhtar@samsung.com>
+References: <1317189007-23033-1-git-send-email-alim.akhtar@samsung.com>
+Message-ID: <CACRpkdZC8LOOLkWbrPbXN_nKaw-WvueusYDyrX48Q1Pcdwv3Aw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Aaro Koskinen <aaro.koskinen@nokia.com> [111202 07:52]:
-> Enable TSC2005 touchscreen driver on the RX-51 board by providing the
-> needed platform data.
+On Wed, Sep 28, 2011 at 7:50 AM, Alim Akhtar <alim.akhtar@samsung.com> wrote:
 
-Thanks applying this into board branch with the ealier Reviewed-by
-from Sebastian Reichel.
+> This patch modifies the amba-pl08x driver for s3c64xx.
+> The DMA controller of S3C64XX is a variant of PrimeCell pl080 DMAC.
+> S3C64xx contents extra register to hold the TransferSize.
 
-Regards,
+Alim what is happening with this patch series?
 
-Tony
+I was really happy with the rate of progress we had and Viresh & I
+have given most feedback needed to complete this I think.
+
+Yours,
+Linus Walleij
