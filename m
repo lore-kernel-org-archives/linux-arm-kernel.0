@@ -1,43 +1,65 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 07 Dec 2011 15:57:07 +0900
-Subject: [PATCH] ARM: SAMSUNG: Use kmemdup rather than duplicating its
- implementation
-In-Reply-To: <1321569820.1624.268.camel@localhost.localdomain>
-References: <1321569820.1624.268.camel@localhost.localdomain>
-Message-ID: <03e001ccb4ad$6f76a490$4e63edb0$%kim@samsung.com>
+From: dirk.behme@de.bosch.com (Dirk Behme)
+Date: Wed, 7 Dec 2011 08:50:35 +0100
+Subject: [PATCH] arm/imx6q: Rename Sabreauto to Armadillo2
+Message-ID: <1323244235-17127-1-git-send-email-dirk.behme@de.bosch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thomas Meyer wrote:
-> 
-> The semantic patch that makes this change is available
-> in scripts/coccinelle/api/memdup.cocci.
-> 
-> Signed-off-by: Thomas Meyer <thomas@m3y3r.de>
-> ---
-> 
-> diff -u -p a/arch/arm/plat-s3c24xx/dma.c b/arch/arm/plat-s3c24xx/dma.c
-> --- a/arch/arm/plat-s3c24xx/dma.c 2011-11-07 19:37:20.736205210 +0100
-> +++ b/arch/arm/plat-s3c24xx/dma.c 2011-11-08 11:03:41.719762852 +0100
-> @@ -1437,11 +1437,10 @@ int __init s3c24xx_dma_init_map(struct s
->  	size_t map_sz = sizeof(*nmap) * sel->map_size;
->  	int ptr;
-> 
-> -	nmap = kmalloc(map_sz, GFP_KERNEL);
-> +	nmap = kmemdup(sel->map, map_sz, GFP_KERNEL);
->  	if (nmap == NULL)
->  		return -ENOMEM;
-> 
-> -	memcpy(nmap, sel->map, map_sz);
->  	memcpy(&dma_sel, sel, sizeof(*sel));
-> 
->  	dma_sel.map = nmap;
+The Sabreauto board was renamed to Armadillo2 recently. To avoid
+confusion, rename Sabreauto to Armadillo2/arm2.
 
-Yes, looks ok to me, will apply.
-Thanks.
+Signed-off-by: Dirk Behme <dirk.behme@de.bosch.com>
+CC: Shawn Guo <shawn.guo@linaro.org>
+---
+ Documentation/devicetree/bindings/arm/fsl.txt      |    4 ++--
+ .../dts/{imx6q-sabreauto.dts => imx6q-arm2.dts}    |    4 ++--
+ arch/arm/mach-imx/mach-imx6q.c                     |    2 +-
+ 3 files changed, 5 insertions(+), 5 deletions(-)
+ rename arch/arm/boot/dts/{imx6q-sabreauto.dts => imx6q-arm2.dts} (91%)
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+diff --git a/Documentation/devicetree/bindings/arm/fsl.txt b/Documentation/devicetree/bindings/arm/fsl.txt
+index c9848ad..1b81e99 100644
+--- a/Documentation/devicetree/bindings/arm/fsl.txt
++++ b/Documentation/devicetree/bindings/arm/fsl.txt
+@@ -21,6 +21,6 @@ i.MX53 Smart Mobile Reference Design Board
+ Required root node properties:
+     - compatible = "fsl,imx53-smd", "fsl,imx53";
+ 
+-i.MX6 Quad SABRE Automotive Board
++i.MX6 Quad Armadillo2 Board
+ Required root node properties:
+-    - compatible = "fsl,imx6q-sabreauto", "fsl,imx6q";
++    - compatible = "fsl,imx6q-arm2", "fsl,imx6q";
+diff --git a/arch/arm/boot/dts/imx6q-sabreauto.dts b/arch/arm/boot/dts/imx6q-arm2.dts
+similarity index 91%
+rename from arch/arm/boot/dts/imx6q-sabreauto.dts
+rename to arch/arm/boot/dts/imx6q-arm2.dts
+index 072974e..b078b91 100644
+--- a/arch/arm/boot/dts/imx6q-sabreauto.dts
++++ b/arch/arm/boot/dts/imx6q-arm2.dts
+@@ -14,8 +14,8 @@
+ /include/ "imx6q.dtsi"
+ 
+ / {
+-	model = "Freescale i.MX6 Quad SABRE Automotive Board";
+-	compatible = "fsl,imx6q-sabreauto", "fsl,imx6q";
++	model = "Freescale i.MX6 Quad Armadillo2 Board";
++	compatible = "fsl,imx6q-arm2", "fsl,imx6q";
+ 
+ 	chosen {
+ 		bootargs = "console=ttymxc0,115200 root=/dev/mmcblk3p3 rootwait";
+diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
+index cf9a364..ce65375 100644
+--- a/arch/arm/mach-imx/mach-imx6q.c
++++ b/arch/arm/mach-imx/mach-imx6q.c
+@@ -75,7 +75,7 @@ static struct sys_timer imx6q_timer = {
+ };
+ 
+ static const char *imx6q_dt_compat[] __initdata = {
+-	"fsl,imx6q-sabreauto",
++	"fsl,imx6q-arm2",
+ 	"fsl,imx6q-sabrelite",
+ 	NULL,
+ };
+-- 
+1.7.0.4
