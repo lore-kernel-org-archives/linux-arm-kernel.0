@@ -1,31 +1,28 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Wed,  7 Dec 2011 13:36:06 -0800
-Subject: [PATCH] fault_inject: Don't select frame pointer with ARM unwind
-Message-ID: <1323293766-31394-1-git-send-email-lauraa@codeaurora.org>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Wed, 7 Dec 2011 22:44:02 +0100
+Subject: [PATCH 3/3] ARM: S3C64XX: Implement basic power domain support
+In-Reply-To: <20111202210706.GB15268@opensource.wolfsonmicro.com>
+References: <1322765339-29879-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+ <4ED930B3.3020200@gmail.com>
+ <20111202210706.GB15268@opensource.wolfsonmicro.com>
+Message-ID: <201112072244.02299.rjw@sisk.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CONFIG_FAULT_INJECTION_STACKTRACE_FILTER selects FRAME_POINTER.
-If ARM_UNWIND is used for backtracing, the FRAME_POINTER
-should not be selected.
+On Friday, December 02, 2011, Mark Brown wrote:
+> On Fri, Dec 02, 2011 at 09:10:27PM +0100, Sylwester Nawrocki wrote:
+> 
+> > > +	/* Not all domains provide power status readback */
+> > > +	if (pd->pwr_stat) {
+> > > +		while (retry--)
+> > > +			if (__raw_readl(S3C64XX_BLK_PWR_STAT) & pd->pwr_stat)
+> > > +				break;
+> 
+> > How about adding cpu_relax() in this busy wait loop ?
+> 
+> May as well, yes - I didn't actually measure how long it tends to take
+> to do the spin but it's not going to hurt.
 
-Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
----
- lib/Kconfig.debug |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+Are you going to post an updated patch?
 
-diff --git a/lib/Kconfig.debug b/lib/Kconfig.debug
-index 6a9e368..75b5d6b 100644
---- a/lib/Kconfig.debug
-+++ b/lib/Kconfig.debug
-@@ -1079,7 +1079,7 @@ config FAULT_INJECTION_STACKTRACE_FILTER
- 	depends on FAULT_INJECTION_DEBUG_FS && STACKTRACE_SUPPORT
- 	depends on !X86_64
- 	select STACKTRACE
--	select FRAME_POINTER if !PPC && !S390 && !MICROBLAZE
-+	select FRAME_POINTER if !PPC && !S390 && !MICROBLAZE && !ARM_UNWIND
- 	help
- 	  Provide stacktrace filter for fault-injection capabilities
- 
--- 
-1.7.6
+Rafael
