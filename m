@@ -1,55 +1,61 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 7 Dec 2011 13:06:47 +0100
-Subject: [PATCH 00/14] mmc: mmci: Improved PM support, cleanup and bugfixes
-In-Reply-To: <1323106560-5218-1-git-send-email-ulf.hansson@stericsson.com>
-References: <1323106560-5218-1-git-send-email-ulf.hansson@stericsson.com>
-Message-ID: <CACRpkdZkqv+LW5nj4X9-sw+1kMWKbjQmZX_mECLx0Oq5o91JvQ@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 07 Dec 2011 21:15:34 +0900
+Subject: [PATCH] ARM: exynos4: Fix for stall in case of cpu hotplug or
+ sleep
+In-Reply-To: <CADGdYn7jfFYkuoFX9J3NtNbgLHgagWHa3q3mehJU+gY_mg5EOw@mail.gmail.com>
+References: <1321616752-1233-1-git-send-email-amit.kachhap@linaro.org>
+ <047501ccb014$edda8f60$c98fae20$%kim@samsung.com>
+ <CADGdYn7jfFYkuoFX9J3NtNbgLHgagWHa3q3mehJU+gY_mg5EOw@mail.gmail.com>
+Message-ID: <042c01ccb4d9$ebb56ba0$c32042e0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ulf,
+amit kachhap wrote:
+> 
+> On Thu, Dec 1, 2011 at 4:05 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> > Amit Daniel Kachhap wrote:
+> >>
+> >> This patch adds remove_irq in place of disable_irq which is
+> >> correct equivalent function for setup_irq used in
+> >> exynos4_mct_tick_init.
+> >>
+> >> Signed-off-by: Amit Daniel Kachhap <amit.kachhap@linaro.org>
+> >> Tested-by: Inderpal Singh <inderpal.singh@linaro.org>
+> >> ---
+> >> ?arch/arm/mach-exynos/mct.c | ? ?6 +++++-
+> >> ?1 files changed, 5 insertions(+), 1 deletions(-)
+> >>
+> >> diff --git a/arch/arm/mach-exynos/mct.c b/arch/arm/mach-exynos/mct.c
+> >> index 97343df..959f251 100644
+> >> --- a/arch/arm/mach-exynos/mct.c
+> >> +++ b/arch/arm/mach-exynos/mct.c
+> >> @@ -428,9 +428,13 @@ int __cpuinit local_timer_setup(struct
+> >> clock_event_device *evt)
+> >>
+> >> ?void local_timer_stop(struct clock_event_device *evt)
+> >> ?{
+> >> + ? ? unsigned int cpu = smp_processor_id();
+> >> ? ? ? evt->set_mode(CLOCK_EVT_MODE_UNUSED, evt);
+> >> ? ? ? if (mct_int_type == MCT_INT_SPI)
+> >> - ? ? ? ? ? ? disable_irq(evt->irq);
+> >> + ? ? ? ? ? ? if (cpu == 0)
+> >> + ? ? ? ? ? ? ? ? ? ? remove_irq(evt->irq, &mct_tick0_event_irq);
+> >> + ? ? ? ? ? ? else
+> >> + ? ? ? ? ? ? ? ? ? ? remove_irq(evt->irq, &mct_tick1_event_irq);
+> >
+> > Hmm, how about the cpu number is 2 or 3 on Quad-core?
+> > As you know, this should be used for all of EXYNOS SoCs.
+> 
+> This code change is specific for EXYNOS4210 where the MCT irq is SPI
+> type. Other exynos soc's (4412 etc) are not effected by this change.
+> I am adding the cpu stall log currently caused during cpu1 hotplug or
+> sleep/wakeup sequence. This commit fixes this.
+> 
+Yes, you're right. Will apply :)
+Thanks.
 
-On Mon, Dec 5, 2011 at 6:35 PM, Ulf Hansson <ulf.hansson@stericsson.com> wrote:
-
-> Patch 1 -> 4:
-> Minor changes for bugs and some performance optimizations.
-> Previously sent to the mailing list.
-> Patch 5 -> 7:
-> Minor changes affecting how to handle a levelshifter.
-> Previously sent to the mailing list.
-> Patch 8:
-> Bugfix for dma. Previously sent to the mailing list, ongoing discussion.
-> Patch 9 -> 14:
-> Improvement of PM support.
-
-I applied all 14 patches on top of current v3.2-rc4
-and regression-tested the whole shebang on RealView PB1176
-and U300.
-
-- Mounted /dev/mmcblk0p1
-- Copy a kernel-sized uImage file from the card to ramdisk
-- Copy the file back to the card from ramdisk
-- Unmount
-- Mount
-- Compare the two files with diff (identical)
-- Delete copy
-- Unmount
-- dd if=/dev/mmcblk0 of=/dev/null
-
-(If any of you wants any more specific tests, tell me.)
-
-Both platforms still work like a charm with these patches.
-PB1176 is as slow on MMC as it always has been but dd:ed
-the entire card without errors.
-
-I have the branch here:
-git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git mmci
-
-Ulf you can add my Tested-by: Linus Walleij <linus.walleij@linaro.org>
-for these patches.
-
-Russell if you want a pull request for a subset of the patches I can
-arrange that, just tell me.
-
-Yours,
-Linus Walleij
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
