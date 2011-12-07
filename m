@@ -1,180 +1,209 @@
-From: ming.lei@canonical.com (Ming Lei)
-Date: Wed, 7 Dec 2011 21:40:41 +0800
-Subject: [RFC PATCH v1 6/7] media: video: introduce face detection driver
- module
-In-Reply-To: <4EDE90A3.7050900@gmail.com>
-References: <1322838172-11149-1-git-send-email-ming.lei@canonical.com>
- <1322838172-11149-7-git-send-email-ming.lei@canonical.com>
- <4EDD3DEE.6060506@gmail.com>
- <CACVXFVPrAro=3t-wpbR_cVahzcx7SCa2J=s2nyyKfQ6SG-i0VQ@mail.gmail.com>
- <4EDE90A3.7050900@gmail.com>
-Message-ID: <CACVXFVN=-0OQ_Tz+HznDug4baLmLNjxVE21gv6CGFoU+hzCtPQ@mail.gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 07 Dec 2011 14:49:46 +0100
+Subject: [PATCH v3 1/2] net/macb: add DT support for Cadence macb/gem
+ driver
+In-Reply-To: <714ca7492d8d45b50eab34448c4b70933ce5701c.1323086095.git.nicolas.ferre@atmel.com>
+References: <1322847782-22650-1-git-send-email-nicolas.ferre@atmel.com>
+ <714ca7492d8d45b50eab34448c4b70933ce5701c.1323086095.git.nicolas.ferre@atmel.com>
+Message-ID: <4EDF6EFA.3070708@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Wed, Dec 7, 2011 at 6:01 AM, Sylwester Nawrocki <snjw23@gmail.com> wrote:
-> On 12/06/2011 03:07 PM, Ming Lei wrote:
->> Hi,
->>
->> Thanks for your review.
->>
->> On Tue, Dec 6, 2011 at 5:55 AM, Sylwester Nawrocki <snjw23@gmail.com> wrote:
->>> Hi Ming,
->>>
->>> (I've pruned the Cc list, leaving just the mailing lists)
->>>
->>> On 12/02/2011 04:02 PM, Ming Lei wrote:
->>>> This patch introduces one driver for face detection purpose.
->>>>
->>>> The driver is responsible for all v4l2 stuff, buffer management
->>>> and other general things, and doesn't touch face detection hardware
->>>> directly. Several interfaces are exported to low level drivers
->>>> (such as the coming omap4 FD driver)which will communicate with
->>>> face detection hw module.
->>>>
->>>> So the driver will make driving face detection hw modules more
->>>> easy.
->>>
->>>
->>> I would hold on for a moment on implementing generic face detection
->>> module which is based on the V4L2 video device interface. We need to
->>> first define an API that would be also usable at sub-device interface
->>> level (http://linuxtv.org/downloads/v4l-dvb-apis/subdev.html).
->>
->> If we can define a good/stable enough APIs between kernel and user space,
->> I think the patches can be merged first. For internal kernel APIs, we should
->> allow it to evolve as new hardware comes or new features are to be introduced.
+On 12/05/2011 12:59 PM, Nicolas Ferre :
+> From: Jean-Christophe PLAGNIOL-VILLARD<plagnioj@jcrosoft.com>
 >
-> I also don't see a problem in discussing it a bit more;)
-
-OK, fair enough, let's discuss it, :-)
-
+> Allow the device tree to provide the mac address and the phy mode.
 >
->>
->> I understand the API you mentioned here should belong to kernel internal
->> API, correct me if it is wrong.
+> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD<plagnioj@jcrosoft.com>
+> [nicolas.ferre at atmel.com: change "compatible" node property, doc and DT hwaddr]
+> Signed-off-by: Nicolas Ferre<nicolas.ferre@atmel.com>
+> [jamie at jamieiles.com: add "gem" compatibility strings and doc]
+> Acked-by: Jamie Iles<jamie@jamieiles.com>
+
+David, can I have your acknowledgment on this patch so that I can send 
+it through arm-soc git tree? This way it will reside on top of previous 
+work by Jamie that is already in arm-soc git (for-next branch).
+
+Thanks, best regards,
+
+> ---
+> v3: add "gem" compatibility strings
+> v2: modify macb_get_hwaddr_dt() parameter
 >
-> Yes, I meant the in kernel design, i.e. generic face detection kernel module
-> and an OMAP4 FDIF driver. It makes lots of sense to separate common code
-> in this way, maybe even when there would be only OMAP devices using it.
-
-Yes, that is the motivation of the generic FD module. I think we can focus on
-two use cases for the generic FD now:
-
-- one is to detect faces from user space image data
-
-- another one is to detect faces in image data generated from HW(SoC
-internal bus, resize hardware)
-
-For OMAP4 hardware, input data is always from physically continuous
-memory directly, so it is very easy to support the two cases. For the
-use case 2,
-if buffer copy is to be avoided, we can use the coming shared dma-buf[1]
-to pass the image buffer produced by other HW to FD hw directly.
-
-For other FD hardware, if it supports to detect faces in image data from
-physically continuous memory, I think the patch is OK to support it.
-
-If the FD hw doesn't support to detect faces from physically continuous
-memory, I have some questions: how does user space app to parse the
-FD result if application can't get the input image data? If user space can
-get image data, how does it connect the image data with FD result? and
-what standard v4l2 ways(v4l2_buffer?) can the app use to describe the
-image data?
-
-> I'm sure now the Samsung devices won't fit in video output node based driver
-> design. They read image data in different ways and also the FD result format
-> is totally different.
-
-I think user space will need the FD result, so it is very important to define
-API to describe the FD result format to user space. And the input about your
-FD HW result format is certainly helpful to define the API.
-
->>
->>> AFAICS OMAP4 FDIF processes only data stored in memory, thus it seems
->>> reasonable to use the videodev interface for passing data to the kernel
->>> from user space.
->>>
->>> But there might be face detection devices that accept data from other
->>> H/W modules, e.g. transferred through SoC internal data buses between
->>> image processing pipeline blocks. Thus any new interfaces need to be
->>> designed with such devices in mind.
->>>
->>> Also the face detection hardware block might now have an input DMA
->>> engine in it, the data could be fed from memory through some other
->>> subsystem (e.g. resize/colour converter). Then the driver for that
->>> subsystem would implement a video node.
->>
->> I think the direct input image or frame data to FD should be from memory
->> no matter the actual data is from external H/W modules or input DMA because
->> FD will take lot of time to detect faces in one image or frame and FD can't
->> have so much memory to cache several images or frames data.
+>   Documentation/devicetree/bindings/net/macb.txt |   24 ++++++++
+>   drivers/net/ethernet/cadence/macb.c            |   73 +++++++++++++++++++++---
+>   drivers/net/ethernet/cadence/macb.h            |    2 +
+>   3 files changed, 91 insertions(+), 8 deletions(-)
+>   create mode 100644 Documentation/devicetree/bindings/net/macb.txt
 >
-> Sorry, I cannot provide much details at the moment, but there exists hardware
-> that reads data from internal SoC buses and even if it uses some sort of
-> cache memory it doesn't necessarily have to be available for the user.
-
-Without some hardware background, it is not easy to give a generic FD module
-design.
-
-> Still the FD result is associated with an image frame for such H/W, but not
-> necessarily with a memory buffer queued by a user application.
-
-For user space application, it doesn't make sense to handle FD results
-only without image data.  Even though there are other ways of input
-image data to FD, user space still need to know the image data, so it makes
-sense to associate FD result with a memory buffer.
-
-> How long it approximately takes to process single image for OMAP4 FDIF ?
-
-See the link[2], and my test result is basically consistent with the data.
-
->>
->> If you have seen this kind of FD hardware design, please let me know.
->>
->>> I'm for leaving the buffer handling details for individual drivers
->>> and focusing on a standard interface for applications, i.e. new
->>
->> I think leaving buffer handling details in generic FD driver or
->> individual drivers
->> doesn't matter now, since it don't have effect on interfaces between kernel
->> and user space.
+> diff --git a/Documentation/devicetree/bindings/net/macb.txt b/Documentation/devicetree/bindings/net/macb.txt
+> new file mode 100644
+> index 0000000..2e24f05
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/net/macb.txt
+> @@ -0,0 +1,24 @@
+> +* Cadence MACB/GEM Ethernet controller
+> +
+> +Required properties:
+> +- compatible: Should be "cdns,[<chip>-]{macb|gem}"
+> +  Use "cdns,at91sam9260-macb" Atmel at91sam9260 and at91sam9263 SoCs.
+> +  Use "cdns,at32ap7000-macb" for other 10/100 usage or use the generic form: "cdns,macb".
+> +  Use "cnds,pc302-gem" for Picochip picoXcell pc302 and later devices based on
+> +  the Cadence GEM, or the generic form: "cdns,gem".
+> +- reg: Address and length of the register set for the device
+> +- interrupts: Should contain macb interrupt
+> +- phy-mode: String, operation mode of the PHY interface.
+> +  Supported values are: "mii", "rmii", "gmii", "rgmii".
+> +
+> +Optional properties:
+> +- local-mac-address: 6 bytes, mac address
+> +
+> +Examples:
+> +
+> +	macb0: ethernet at fffc4000 {
+> +		compatible = "cdns,at32ap7000-macb";
+> +		reg =<0xfffc4000 0x4000>;
+> +		interrupts =<21>;
+> +		phy-mode = "rmii";
+> +	};
+> diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
+> index 64d6146..baf1a0d 100644
+> --- a/drivers/net/ethernet/cadence/macb.c
+> +++ b/drivers/net/ethernet/cadence/macb.c
+> @@ -23,6 +23,8 @@
+>   #include<linux/platform_data/macb.h>
+>   #include<linux/platform_device.h>
+>   #include<linux/phy.h>
+> +#include<linux/of_device.h>
+> +#include<linux/of_net.h>
 >
-> I think you misunderstood me. I wasn't talking about core/driver module split,
-> I meant we should not be making the user interface video node centric.
+>   #include "macb.h"
 >
-> I think for Samsung devices I'll need a capture video node for passing
-
-Why is it a capture video node instead of OUTPUT v4l2 device? I think the
-device name should be decided from the view of face detection function:
-FD need input image data and produce detection result.
-
-> the result to the user. So instead of associating FD result with a buffer index
-
-See the explanation above.
-
-> we could try to use the frame sequence number (struct v4l2_buffer.sequence,
-> http://linuxtv.org/downloads/v4l-dvb-apis/buffer.html#v4l2-buffer).
+> @@ -191,7 +193,6 @@ static int macb_mii_probe(struct net_device *dev)
+>   {
+>   	struct macb *bp = netdev_priv(dev);
+>   	struct phy_device *phydev;
+> -	struct macb_platform_data *pdata;
+>   	int ret;
 >
-> It might be much better as the v4l2 events are associated with the frame
-> sequence. And if we use controls then you get control events for free,
-> and each event carries a frame sequence number int it
-> (http://linuxtv.org/downloads/v4l-dvb-apis/vidioc-dqevent.html).
+>   	phydev = phy_find_first(bp->mii_bus);
+> @@ -200,14 +201,11 @@ static int macb_mii_probe(struct net_device *dev)
+>   		return -1;
+>   	}
 >
-> --
+> -	pdata = bp->pdev->dev.platform_data;
+>   	/* TODO : add pin_irq */
 >
-> Regards,
-> Sylwester
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+>   	/* attach the mac to the phy */
+>   	ret = phy_connect_direct(dev, phydev,&macb_handle_link_change, 0,
+> -				 pdata&&  pdata->is_rmii ?
+> -				 PHY_INTERFACE_MODE_RMII :
+> -				 PHY_INTERFACE_MODE_MII);
+> +				 bp->phy_interface);
+>   	if (ret) {
+>   		netdev_err(dev, "Could not attach to PHY\n");
+>   		return ret;
+> @@ -1244,6 +1242,52 @@ static const struct net_device_ops macb_netdev_ops = {
+>   #endif
+>   };
+>
+> +#if defined(CONFIG_OF)
+> +static const struct of_device_id macb_dt_ids[] = {
+> +	{ .compatible = "cdns,at32ap7000-macb" },
+> +	{ .compatible = "cdns,at91sam9260-macb" },
+> +	{ .compatible = "cdns,macb" },
+> +	{ .compatible = "cdns,pc302-gem" },
+> +	{ .compatible = "cdns,gem" },
+> +	{ /* sentinel */ }
+> +};
+> +
+> +MODULE_DEVICE_TABLE(of, macb_dt_ids);
+> +
+> +static int __devinit macb_get_phy_mode_dt(struct platform_device *pdev)
+> +{
+> +	struct device_node *np = pdev->dev.of_node;
+> +
+> +	if (np)
+> +		return of_get_phy_mode(np);
+> +
+> +	return -ENODEV;
+> +}
+> +
+> +static int __devinit macb_get_hwaddr_dt(struct macb *bp)
+> +{
+> +	struct device_node *np = bp->pdev->dev.of_node;
+> +	if (np) {
+> +		const char *mac = of_get_mac_address(np);
+> +		if (mac) {
+> +			memcpy(bp->dev->dev_addr, mac, ETH_ALEN);
+> +			return 0;
+> +		}
+> +	}
+> +
+> +	return -ENODEV;
+> +}
+> +#else
+> +static int __devinit macb_get_phy_mode_dt(struct platform_device *pdev)
+> +{
+> +	return -ENODEV;
+> +}
+> +static int __devinit macb_get_hwaddr_dt(struct macb *bp)
+> +{
+> +	return -ENODEV;
+> +}
+> +#endif
+> +
+>   static int __init macb_probe(struct platform_device *pdev)
+>   {
+>   	struct macb_platform_data *pdata;
+> @@ -1318,10 +1362,22 @@ static int __init macb_probe(struct platform_device *pdev)
+>   	config |= macb_dbw(bp);
+>   	macb_writel(bp, NCFGR, config);
+>
+> -	macb_get_hwaddr(bp);
+> -	pdata = pdev->dev.platform_data;
+> +	err = macb_get_hwaddr_dt(bp);
+> +	if (err<  0)
+> +		macb_get_hwaddr(bp);
+> +
+> +	err = macb_get_phy_mode_dt(pdev);
+> +	if (err<  0) {
+> +		pdata = pdev->dev.platform_data;
+> +		if (pdata&&  pdata->is_rmii)
+> +			bp->phy_interface = PHY_INTERFACE_MODE_RMII;
+> +		else
+> +			bp->phy_interface = PHY_INTERFACE_MODE_MII;
+> +	} else {
+> +		bp->phy_interface = err;
+> +	}
+>
+> -	if (pdata&&  pdata->is_rmii)
+> +	if (bp->phy_interface == PHY_INTERFACE_MODE_RMII)
+>   #if defined(CONFIG_ARCH_AT91)
+>   		macb_or_gem_writel(bp, USRIO, (MACB_BIT(RMII) |
+>   					       MACB_BIT(CLKEN)));
+> @@ -1444,6 +1500,7 @@ static struct platform_driver macb_driver = {
+>   	.driver		= {
+>   		.name		= "macb",
+>   		.owner	= THIS_MODULE,
+> +		.of_match_table	= of_match_ptr(macb_dt_ids),
+>   	},
+>   };
+>
+> diff --git a/drivers/net/ethernet/cadence/macb.h b/drivers/net/ethernet/cadence/macb.h
+> index 1931078..335e288 100644
+> --- a/drivers/net/ethernet/cadence/macb.h
+> +++ b/drivers/net/ethernet/cadence/macb.h
+> @@ -532,6 +532,8 @@ struct macb {
+>   	unsigned int 		link;
+>   	unsigned int 		speed;
+>   	unsigned int 		duplex;
+> +
+> +	phy_interface_t		phy_interface;
+>   };
+>
+>   static inline bool macb_is_gem(struct macb *bp)
 
-thanks,
---
-Ming Lei
 
-[1], http://marc.info/?t=132281644700005&r=1&w=2
-[2], http://e2e.ti.com/support/embedded/linux/f/354/t/128938.aspx#462740
+-- 
+Nicolas Ferre
