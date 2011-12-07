@@ -1,29 +1,43 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Wed,  7 Dec 2011 21:47:21 +0100
-Subject: [PATCH] pinctrl: make the "Debug PINCTRL calls" entry actually do
- something
-Message-ID: <1323290841-29633-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: b-cousson@ti.com (Benoit Cousson)
+Date: Wed, 7 Dec 2011 21:50:45 +0100
+Subject: [PATCH 0/4] ARM: OMAP2+: Interrupt controllers adaptation to DT
+Message-ID: <1323291049-24964-1-git-send-email-b-cousson@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DEBUG_PINCTRL wasn't used at all and DEBUG_PINMUX doesn't exist.
+Hi Tony and Rob,
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
- drivers/pinctrl/Makefile |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+Here is the series to take advantage of the new DT interrupt init mechanism.
+Thanks to Mark's CONFIG_MULTI_IRQ_HANDLER series, OMAP4 just has to
+use the default GIC binding and does not need some OMAP specific hacks
+anymore.
+OMAP2 and 3 are using a simple interrupt controller that can thus expose
+a simpler binding.
 
-diff --git a/drivers/pinctrl/Makefile b/drivers/pinctrl/Makefile
-index bdc548a..50a2e2f 100644
---- a/drivers/pinctrl/Makefile
-+++ b/drivers/pinctrl/Makefile
-@@ -1,6 +1,6 @@
- # generic pinmux support
- 
--ccflags-$(CONFIG_DEBUG_PINMUX)	+= -DDEBUG
-+ccflags-$(CONFIG_DEBUG_PINCTRL)	+= -DDEBUG
- 
- obj-$(CONFIG_PINCTRL)		+= core.o
- obj-$(CONFIG_PINMUX)		+= pinmux.o
--- 
-1.7.7.3
+This series is based on rmk/devel-stable branch to get Mark's series +
+a couple of OMAP fixes.
+
+An extra fix is needed before for the board-generic.c file: 
+[PATCH] ARM: OMAP2+: board-generic: Add missing handle_irq
+
+The series with all the dependencies merged is available here for reference:
+git://gitorious.org/omap-pm/linux.git for_3.3/2_dt_irq
+
+Regards,
+Benoit
+
+
+Benoit Cousson (4):
+  arm/dts: OMAP4: Update DTS file with new GIC bindings
+  ARM: OMAP2/3: intc: Add DT support for TI interrupt controller
+  arm/dts: OMAP3: Add interrupt-controller bindings for INTC
+  ARM: OMAP2+: board-generic: Use of_irq_init API
+
+ .../devicetree/bindings/arm/omap/intc.txt          |   27 +++++++++++++++
+ arch/arm/boot/dts/omap3.dtsi                       |    6 ++-
+ arch/arm/boot/dts/omap4.dtsi                       |    3 +-
+ arch/arm/mach-omap2/board-generic.c                |   30 +++++++++--------
+ arch/arm/mach-omap2/common.h                       |   10 ++++++
+ arch/arm/mach-omap2/irq.c                          |   35 ++++++++++++++++++--
+ 6 files changed, 91 insertions(+), 20 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/omap/intc.txt
