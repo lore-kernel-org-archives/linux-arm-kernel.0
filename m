@@ -1,24 +1,66 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Wed, 7 Dec 2011 21:37:45 +0800
-Subject: [PATCH][NET] several cleanups and bugfixes for fec.c: preserve
- MII/RMII setting in fec_stop()
-In-Reply-To: <20191.17172.493079.722098@ipc1.ka-ro>
+From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
+Date: Wed, 7 Dec 2011 14:26:34 +0100
+Subject: [PATCH][NET] several cleanups and bugfixes for fec.c: fix the
+ .remove code
+In-Reply-To: <20111207132828.GQ5550@S2100-06.ap.freescale.net>
 References: <cover.1323163127.git.LW@KARO-electronics.de>
- <d6f4de9e4cfb393754b42815a2ef1a59c96eab83.1323163127.git.LW@KARO-electronics.de>
- <20111207094146.GG5550@S2100-06.ap.freescale.net>
- <20191.17172.493079.722098@ipc1.ka-ro>
-Message-ID: <20111207133744.GR5550@S2100-06.ap.freescale.net>
+ <04c11563fee748562d7b53d5e5b3c5cf37fef200.1323163127.git.LW@KARO-electronics.de>
+ <20111207132828.GQ5550@S2100-06.ap.freescale.net>
+Message-ID: <20191.27018.478290.890636@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 07, 2011 at 11:42:28AM +0100, Lothar Wa?mann wrote:
-> I'm using a TX28 which has the Ethernet PHY connected in RMII
-> mode. You should see the problem, if you unplug the ethernet cable on
-> a configured link. Without this patch the kernel will not detect when
-> the cable is plugged back in.
-> 
-Tested-by: Shawn Guo <shawn.guo@linaro.org>
+Hi,
 
+Shawn Guo writes:
+> On Tue, Dec 06, 2011 at 11:27:15AM +0100, Lothar Wa?mann wrote:
+> > The .remove code is broken in several ways.
+> >  - mdiobus_unregister() is called twice for the same object in case of dual FEC
+> >  - phy_disconnect() is being called when the PHY is already disconnected
+> >  - the requested IRQ(s) are not freed
+> >  - fec_stop() is being called with the inteface already stopped
+> > 
+> >  All of those lead to kernel crashes if the remove function is actually used.
+> > 
+> > Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
+> > ---
+> >  drivers/net/ethernet/freescale/fec.c |   30 +++++++++++++++++++++---------
+> >  1 files changed, 21 insertions(+), 9 deletions(-)
+> > 
+> > diff --git a/drivers/net/ethernet/freescale/fec.c b/drivers/net/ethernet/freescale/fec.c
+> > index ab0afb5..70ec7ec 100644
+> > --- a/drivers/net/ethernet/freescale/fec.c
+> > +++ b/drivers/net/ethernet/freescale/fec.c
+> > @@ -235,6 +235,7 @@ struct fec_enet_private {
+> >  
+> >  	/* Phylib and MDIO interface */
+> >  	struct	mii_bus *mii_bus;
+> > +	int	mii_cnt;
+> >  	struct	phy_device *phy_dev;
+> >  	int	mii_timeout;
+> >  	uint	phy_speed;
+> > @@ -1040,8 +1041,12 @@ static int fec_enet_mii_init(struct platform_device *pdev)
+> >  	 */
+> >  	if ((id_entry->driver_data & FEC_QUIRK_ENET_MAC) && pdev->id > 0) {
+> >  		/* fec1 uses fec0 mii_bus */
+> > -		fep->mii_bus = fec0_mii_bus;
+> > -		return 0;
+> > +		if (fep->mii_cnt && fec0_mii_bus) {
+> 
+> This seems broken.  The second fec has its own fep and fep->mii_cnt is
+> always 0 here.
+> 
+I already noticed that myself.
+
+
+Lothar Wa?mann
 -- 
-Regards,
-Shawn
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
