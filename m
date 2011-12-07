@@ -1,45 +1,41 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 7 Dec 2011 11:40:16 -0800
-Subject: [GIT PULL] More omap1 boot regression fixes for v3.2-rc4
-Message-ID: <20111207194015.GH31337@atomide.com>
+Date: Wed, 7 Dec 2011 11:44:37 -0800
+Subject: [GIT PULL] ARM perf updates for 3.3
+In-Reply-To: <4EDF8512.2030001@arm.com>
+References: <20111202170231.GP5540@mudshark.cambridge.arm.com>
+ <20111203092659.GL9581@n2100.arm.linux.org.uk>
+ <20111205211136.GF14542@n2100.arm.linux.org.uk>
+ <20111205231909.GA31337@atomide.com>
+ <20111206000232.GC31337@atomide.com>
+ <20111206165215.GE31337@atomide.com> <4EDF757B.8020200@ti.com>
+ <4EDF8512.2030001@arm.com>
+Message-ID: <20111207194436.GI31337@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd & Olof,
+* Marc Zyngier <marc.zyngier@arm.com> [111207 06:52]:
+> On 07/12/11 14:17, Cousson, Benoit wrote:
+> > 
+> > The following commit: 6b2f55d7851aa358d3a99cff344c560c4967f042,
+> > is adding the support for the CONFIG_MULTI_IRQ_HANDLER but did
+> > not update all the machine descriptors supported in the DT
+> > board-generic.c file.
+> > It thus break the DT boot on OMAP3 and OMAP4 boards.
+> > 
+> > Add the proper handle_irq callbacks for OMAP3 and OMAP4 generic
+> > machine descriptors.
+> > 
+> > Signed-off-by: Benoit Cousson <b-cousson@ti.com>
+> > Cc: Tony Lindgren <tony@atomide.com>
+> > Cc: Marc Zyngier <marc.zyngier@arm.com>
+> > ---
+> >  arch/arm/mach-omap2/board-generic.c |    4 ++++
+> >  1 files changed, 4 insertions(+), 0 deletions(-)
+> 
+> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
-Please pull omap1 fixes from:
-
-git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap fixes
-
-These are still needed to deal with breakage of moving reprogramming
-of the DPLL1 later on in commit a66cb3454f220f49f900646ebdc76cb943319eb7.
-
-That commit caused multiple issues for omap1 boards that did not have
-OMAP_CLOCKS_SET_BY_BOOTLOADER set. This series fixes issues for boards
-booting at less than 60MHz rate, at least Amstrad Delta is known to
-not work without this series.
+Thanks I'll apply this into omap dt branch.
 
 Regards,
 
 Tony
-
-
-The following changes since commit 5611cc4572e889b62a7b4c72a413536bf6a9c416:
-  Linus Torvalds (1):
-        Linux 3.2-rc4
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap fixes
-
-Janusz Krzysztofik (3):
-      ARM: OMAP1: Remove unsafe clock values from omap1_defconfig
-      ARM: OMAP1: Fix ckctl value used for dpll1 defualt rate
-      ARM: OMAP1: recalculate loops per jiffy after dpll1 reprogram
-
-Tony Lindgren (1):
-      ARM: OMAP1: Fix reprogramming of DPLL1 for systems that boot at rates below 60MHz
-
- arch/arm/configs/omap1_defconfig |    5 -----
- arch/arm/mach-omap1/clock_data.c |   12 ++++++++++--
- 2 files changed, 10 insertions(+), 7 deletions(-)
