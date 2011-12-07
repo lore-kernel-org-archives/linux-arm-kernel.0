@@ -1,42 +1,119 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Wed, 7 Dec 2011 17:14:42 +0800
-Subject: [PATCH][NET] several cleanups and bugfixes for fec.c: don't
- munge MAC address from platform data
-In-Reply-To: <20191.10281.826050.193987@ipc1.ka-ro>
-References: <cover.1323163127.git.LW@KARO-electronics.de>
- <55b78c1766da5b0d0d679f5eae3fb9fc74a6ceef.1323163127.git.LW@KARO-electronics.de>
- <20111207084953.GD5550@S2100-06.ap.freescale.net>
- <20191.10281.826050.193987@ipc1.ka-ro>
-Message-ID: <20111207091441.GF5550@S2100-06.ap.freescale.net>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 7 Dec 2011 10:07:34 +0100
+Subject: [PATCH 1/3] PWM: add pwm framework support
+In-Reply-To: <20111207085339.GA7970@avionic-0098.mockup.avionic-design.de>
+References: <201106301441.24493.arnd@arndb.de> <4E11994B.7070103@gmail.com>
+ <20110704124318.GI6069@pengutronix.de>
+ <201107041607.10265.arnd@arndb.de>
+ <20111207085339.GA7970@avionic-0098.mockup.avionic-design.de>
+Message-ID: <20111207090734.GN27267@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 07, 2011 at 09:47:37AM +0100, Lothar Wa?mann wrote:
+On Wed, Dec 07, 2011 at 09:53:39AM +0100, Thierry Reding wrote:
+> * Arnd Bergmann wrote:
+> > On Monday 04 July 2011, Sascha Hauer wrote:
+> > > On Mon, Jul 04, 2011 at 08:43:23PM +1000, Ryan Mallon wrote:
+> > >
+> > > > The fine-grained control api could be added now. pwm_config could be
+> > > > left as is for the time being (the new api could be a wrapper around it
+> > > > to start with). Polarity control and interrupt handling apis could also
+> > > > be defined without affecting the drivers which don't need to implement
+> > > > them. Multiple channels and the sleeping/non-sleeping api are the more
+> > > > difficult ones, but at least having some sort of indication about how
+> > > > these plan to be solved would be useful.
+> > > 
+> > > Again, why should we add these *now*? It only raises the chance that
+> > > there's more discussion.
+> > 
+> > My impression is that there are a lot of things that could easily be
+> > done to improve the state of PWM drivers, but I don't care about the
+> > order in which they are done. My main issue is the lack of a subsystem
+> > core driver, which both you and Bill have patches for. It's clear that
+> > other people have other issues and want to see their problems addressed
+> > first.
+> > 
+> > I also think that the pwm code is simple enough that we don't have
+> > to worry too much about the order that things are done in. Any patch
+> > that is making the code better should just get in and not have to
+> > wait for something else to be completed first.
+> > 
+> > What we do need now is a maintainer that can coordinate the patches
+> > and merge the ones that have been agreed on. Or multiple maintainers.
+> 
 > Hi,
 > 
-> Shawn Guo writes:
-> > On Tue, Dec 06, 2011 at 11:27:13AM +0100, Lothar Wa?mann wrote:
-> > > When the MAC address is supplied via platform_data it should be OK as
-> > > it is and should not be modified in case of a dual FEC setup.
-> > > Also copying the MAC from platform_data to the single 'macaddr'
-> > > variable will overwrite the MAC for the first interface in case of a
-> > > dual FEC setup.
-> > 
-> > Hmm, I do not follow that.  If 'macaddr' holds a valid mac address,
-> > the code path has no chance to be hit at all.  Otherwise, 'macaddr'
-> > is just a place holder for copying mac address from pdata, in which
-> > case the mac address will be fixed up at the end of the function for
-> > dual FEC setup.
-> > 
-> In case of dual FEC and MAC address provided by platform_data the
-> first mac address will be copied to the 'macaddr' variable with no
-> chance for the second interface to get its mac address assigned from
-> platform_data too.
+> I'm looking at adding DT support for pwm-backlight, and I think a central PWM
+> API will be required first. Looking through the archives this seems to be the
+> last activity in that direction. Perhaps we can get the efforts restarted?
 > 
-Indeed.  So again other than subject,
+> I pretty much agree with Arnd and Sascha here in that we should try to get a
+> basic framework added. Everything else can be added on top later.
 
-Acked-by: Shawn Guo <shawn.guo@linaro.org>
+I have a branch which adds a basic PWM framework. It doesn't change the
+pwm API at all, but only adds support for registering multiple PWM
+drivers. All in Kernel drivers are converted to this new framework, but
+except the i.MX driver all of them are untested. I'm quite confident
+that the drivers itself work, but there will probably be some Kconfig
+related issues which I wasn't able to sort out. The corresponding
+Maintainers should probably have a look over it. Feel free to post
+the patches if you are prepared to work on the comments you receive.
+Otherwise I'll see if I find some time maybe next week.
+
+Sascha
+
+
+You can find my latest work on this here:
+
+
+The following changes since commit c3b92c8787367a8bb53d57d9789b558f1295cc96:
+
+  Linux 3.1 (2011-10-24 09:10:05 +0200)
+
+are available in the git repository at:
+  git://git.pengutronix.de/git/imx/linux-2.6.git pwmlib
+
+Sascha Hauer (7):
+      PWM: add pwm framework support
+      ARM mxs: adjust pwm resources to what the driver expects
+      pwm: Add a i.MX23/28 pwm driver
+      ARM i.MX: Move i.MX pwm driver to pwm framework
+      ARM pxa: Move pxa pwm driver to pwm framework
+      ARM Samsung: Move s3c pwm driver to pwm framework
+      ARM vt8500: Move vt8500 pwm driver to pwm framework
+
+ Documentation/pwm.txt                              |   56 ++++
+ MAINTAINERS                                        |    6 +
+ arch/arm/mach-mxs/devices/platform-mxs-pwm.c       |   32 ++-
+ arch/arm/mach-pxa/Kconfig                          |   14 -
+ arch/arm/plat-mxc/Kconfig                          |    6 -
+ arch/arm/plat-mxc/Makefile                         |    1 -
+ arch/arm/plat-pxa/Makefile                         |    1 -
+ arch/arm/plat-samsung/Makefile                     |    4 -
+ drivers/Kconfig                                    |    2 +
+ drivers/Makefile                                   |    1 +
+ drivers/pwm/Kconfig                                |   32 ++
+ drivers/pwm/Makefile                               |    6 +
+ drivers/pwm/core.c                                 |  220 ++++++++++++++
+ arch/arm/plat-mxc/pwm.c => drivers/pwm/imx-pwm.c   |  102 ++-----
+ drivers/pwm/mxs-pwm.c                              |  312 ++++++++++++++++++++
+ arch/arm/plat-pxa/pwm.c => drivers/pwm/pxa-pwm.c   |  118 +++-----
+ .../pwm.c => drivers/pwm/samsung-pwm.c             |  108 ++-----
+ .../mach-vt8500/pwm.c => drivers/pwm/vt8500-pwm.c  |  103 ++-----
+ include/linux/pwm.h                                |   37 +++
+ 19 files changed, 832 insertions(+), 329 deletions(-)
+ create mode 100644 Documentation/pwm.txt
+ create mode 100644 drivers/pwm/Kconfig
+ create mode 100644 drivers/pwm/Makefile
+ create mode 100644 drivers/pwm/core.c
+ rename arch/arm/plat-mxc/pwm.c => drivers/pwm/imx-pwm.c (78%)
+ create mode 100644 drivers/pwm/mxs-pwm.c
+ rename arch/arm/plat-pxa/pwm.c => drivers/pwm/pxa-pwm.c (72%)
+ rename arch/arm/plat-samsung/pwm.c => drivers/pwm/samsung-pwm.c (80%)
+ rename arch/arm/mach-vt8500/pwm.c => drivers/pwm/vt8500-pwm.c (75%)
 
 -- 
-Regards,
-Shawn
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
