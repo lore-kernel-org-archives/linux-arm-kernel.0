@@ -1,57 +1,44 @@
-From: junxiao.bi@windriver.com (Bi Junxiao)
-Date: Wed, 7 Dec 2011 13:22:34 +0800
-Subject: [RFC PATCH] ARM: Add generic instruction opcode manipulation
- helpers
-In-Reply-To: <20111206152033.GB13769@linaro.org>
-References: <1322220493-3251-1-git-send-email-dave.martin@linaro.org>
- <20111206150855.GA5385@mudshark.cambridge.arm.com>
- <20111206152033.GB13769@linaro.org>
-Message-ID: <4EDEF81A.7080100@windriver.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Tue, 06 Dec 2011 23:25:47 -0500 (EST)
+Subject: [GIT PULL] Identity mapping changes for 3.3
+In-Reply-To: <20111206103843.GM14542@n2100.arm.linux.org.uk>
+References: <20111202160833.GK5540@mudshark.cambridge.arm.com>
+ <20111205232342.GG14542@n2100.arm.linux.org.uk>
+ <20111206101438.GB25782@mudshark.cambridge.arm.com>
+ <20111206103843.GM14542@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.02.1112062321070.2907@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-on 12/06/2011 11:20 PM Dave Martin wrote:
-> On Tue, Dec 06, 2011 at 03:08:55PM +0000, Will Deacon wrote:
->    
->> Hi Dave,
->>
->> On Fri, Nov 25, 2011 at 11:28:13AM +0000, Dave Martin wrote:
->>      
->>> This patch adds some endianness-agnostic helpers to convert machine
->>> instructions between canonical integer form and in-memory
->>> representation, and also provides a transparent way to read a
->>> single Thumb instruction from memory, without the need to know the
->>> size in advance or write explicit condition checks.
->>>
->>> A canonical integer form for representing instructions is also
->>> formalised here.
->>>
->>> Signed-off-by: Dave Martin<dave.martin@linaro.org>
->>> ---
->>>   arch/arm/include/asm/opcodes.h |  162 ++++++++++++++++++++++++++++++++++++++++
->>>   1 files changed, 162 insertions(+), 0 deletions(-)
->>>   create mode 100644 arch/arm/include/asm/opcodes.h
->>>        
->> It looks like I might need to implement a basic disassembler for the
->> hw_breakpoint code and I would certainly like to reuse as much code as I
->> can. This header could obviously provide the code to fetch and format the
->> instruction, but it would be nice to have some extra helpers to aid
->> decoding.
->>
->> Tixy - how much work do you reckon it would be to rework your kprobes
->> decoding code into a generic `here are my callbacks, please decode this
->> instruction stream for me' type thing?
->>
->> All I want for hw_breakpoint is to know whether an instruction is a load or
->> a store, but even for that it looks like I'll need to duplicate a lot of
->> stuff.
->>      
-> Note, I'm currently waiting on Leif to repost his opcodes.h before I
-> repost my instration-swabbing additions on top of it, since the swabbing
-> stuff seems to be strictly non-urgent.
->    
-I am also waiting for your patch to do my be8 fix.
-> Cheers
-> ---Dave
->
->    
+On Tue, 6 Dec 2011, Russell King - ARM Linux wrote:
+
+> On Tue, Dec 06, 2011 at 10:14:39AM +0000, Will Deacon wrote:
+> > Hi Russell,
+> > 
+> > On Mon, Dec 05, 2011 at 11:23:42PM +0000, Russell King - ARM Linux wrote:
+> > > On Fri, Dec 02, 2011 at 04:08:33PM +0000, Will Deacon wrote:
+> > > > The following changes since commit 2d13ccaa8797d7e599f3792aed4b1e44b47f94a5:
+> > > > 
+> > > >   Merge branch 'irqchip-consolidation' of git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms into devel-stable (2011-11-21 21:56:56 +0000)
+> > > 
+> > > As this is known to be broken on OMAP, could I have this based upon
+> > > some other commit - maybe ba8bb18a03f which I've just committed into
+> > > devel-stable (which is the second 'fix' patch for OMAP) please.
+> > 
+> > I'm struggling to pull from you [1] at the moment, but I'll rebase this once I
+> > manage to get the updated devel-stable.
+> 
+> It looks like the machine is hitting the memory and disk io bandwidth
+> limits.  Unfortunately, git seems to have high demands for both of those,
+> weighing in at around 300-400MB per pack process, and seemingly wanting
+> to read all the pack files too.
+
+Make sure the repo on that machine is nicely packed.  Running "git gc" 
+(gc as in garbage collect) once in a while is a good thing to do, 
+especially that you now have the smart HTTP protocol enabled.  That will 
+bring the memory usage way down, and serving requests will be much 
+faster too.  It is safe to put that in a cron job once a week or so, 
+even if concurrent requests are being serviced.
+
+
+Nicolas
