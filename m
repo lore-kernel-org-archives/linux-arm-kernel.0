@@ -1,83 +1,71 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Wed, 7 Dec 2011 15:08:11 +0000
-Subject: [PATCH v4 5/6] ARM: vexpress: DT-based support for Cortex-A5 and
- Cortex-A9 based tiles
-In-Reply-To: <1323186229-22054-6-git-send-email-pawel.moll@arm.com>
-References: <1323186229-22054-1-git-send-email-pawel.moll@arm.com>
- <1323186229-22054-6-git-send-email-pawel.moll@arm.com>
-Message-ID: <20111207150811.GC2910@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 7 Dec 2011 15:06:19 +0000
+Subject: subarch maintainers: please send 3.3 pull requests for arm-soc
+Message-ID: <201112071506.19230.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 06, 2011 at 03:43:48PM +0000, Pawel Moll wrote:
+Hi everyone,
 
-[...]
+Let me first say I'm very happy with the bug fixes I received for the 3.2
+cycle. I'm about to send another bunch of those upstream now, and it's
+good to see how everyone is now placing the stable tags in the patches
+where necessary. I've been a bit slow in sending them out for -rc3/rc4
+after I returned from a lot of traveling and it was very good that
+Olof could handle the fixes for -rc2 before that.
 
-> +/include/ "vexpress-v2m.dtsi"
-> diff --git a/arch/arm/mach-vexpress/Kconfig b/arch/arm/mach-vexpress/Kconfig
-> index 56a61fb..c1cd08d 100644
-> --- a/arch/arm/mach-vexpress/Kconfig
-> +++ b/arch/arm/mach-vexpress/Kconfig
-> @@ -1,13 +1,23 @@
->  menu "Versatile Express platform type"
->  	depends on ARCH_VEXPRESS
->  
-> -config ARCH_VEXPRESS_CA9X4
-> -	bool "Versatile Express Cortex-A9x4 tile"
-> -	select CPU_V7
-> -	select ARM_GIC
-> +config ARCH_VEXPRESS_CORTEX_A5_A9
-> +	bool
->  	select ARM_ERRATA_720789
->  	select ARM_ERRATA_751472
-> -	select ARM_ERRATA_753970
-> +	select ARM_GIC
-> +	select CPU_V7
-> +	select HAVE_L2X0_L2CC
-> +	select PL310_ERRATA_753970 if CACHE_PL310
-> +	help
-> +	  Provides common dependencies for Versatile Express platforms
-> +	  based on Cortex-A5 and Cortex-A9 processors. In order to
-> +	  build a working kernel, you must also enable relevant core
-> +	  tile support or Flattened Device Tree based support options.
-> +
-> +config ARCH_VEXPRESS_CA9X4
-> +	bool "Versatile Express Cortex-A9x4 tile"
-> +	select ARCH_VEXPRESS_CORTEX_A5_A9
->  
->  config ARCH_VEXPRESS_DT
->  	bool "Device Tree support for Versatile Express platforms"
-> @@ -21,4 +31,23 @@ config ARCH_VEXPRESS_DT
->  	  If your bootloader supports Flattened Device Tree based booting,
->  	  say Y here.
->  
-> +config ARCH_VEXPRESS_DT_CORTEX_A5_A9
-> +	bool "Support for tiles based on Cortex-A5 and Cortex-A9 processors"
-> +	depends on ARCH_VEXPRESS_DT
-> +	select ARCH_VEXPRESS_CORTEX_A5_A9
-> +	help
-> +	  This option enables support for systems using Cortex-A5 and Cortex-A9
-> +	  ARM core and logic (FPGA) tiles on the Versatile Express motherboard,
-> +	  for example:
-> +
-> +	  - CoreTile Express A5x2 (V2P-CA5s)
-> +	  - CoreTile Express A9x4 (V2P-CA9)
-> +	  - LogicTile Express 13MG (V2F-2XV6) with A5 SMM (Soft Macrocell Model)
-> +	  - LogicTile Express 13MG (V2F-2XV6) with A9 SMM (Soft Macrocell Model)
-> +	  - VE Cortex-A9 RTSM (Model)
-> +
-> +	  You must boot using a Flattened Device Tree in order to use these
-> +	  platforms. The traditional (ATAGs) boot method is not usable on
-> +	  these boards with this option.
-> +
+However, looking at the for-next branch in arm-soc, we have very few
+patches in total (thanks again to those of you who sumitted 3.3
+stuff already):
 
-Because of the way these options are renamed and the backwards
-dependency of CONFIG_SMP in arch/arm/Kconfig, it now seems to be
-impossible to build an SMP kernel with this series.
+~/linux-arm$ git branch
+  at91/gpio
+  at91/ioremap
+  drivers/macb-gem
+  drivers/macb-gem-cleanup
+  drivers/pxa-gpio
+  imx/move
+  msm/misc
+  msm/timer
+  mxs/saif
+  fixes
+  for-next
+~/linux-arm$ git log --oneline --no-merges fixes..for-next | wc -l
+66
 
-I will propose a patch similar to HAVE_L2X0_L2CC to see if this
-dependency can be factorised, but in the meantime, I suggest to fix
-the dependencies in arch/arm/Kconfig.
+We are close to -rc5 now, so I would hope to have the majority of the
+patches that are coming for 3.3 in there by now. I realize that there
+is a lot of stuff that everyone is still working on, but there has
+to be more than this that you are happy to go into arm-soc already.
+Don't worry too much about bugs you are still looking for. All patches
+that are reviewed, ready to go into linux-next, and don't need to
+be rebased any more should go into arm-soc already.
 
-Cheers
----Dave
+As usual, please split the pull requests into separate branches
+based on the type (bug fix, cleanup, new feature) and type of
+change (driver, board, soc, platform, ...). When you have
+interdependencies between the branches (e.g. a new feature depending
+on a cleanup), send one pull request for each branch and describe
+explictly why there is a dependency and in which order the pull
+requests should go. In the more common case that there are conflicts
+between branches (e.g. two branches doing similar but independent
+changes to the same file), base all conflicting branches on the same
+-rc release and let us resolve the conflict in arm-soc. Sascha likes
+to provide a merge changeset for reference. This is very much
+appreciated for any complex merges, but in most simple cases it's
+not necessary.
+If you have dependencies or known conflicts with branches that don't
+go into arm-soc (e.g. Russell's ARM tree or Grant's DT tree), we
+can handle that, too, by importing the dependency as a separate
+branch into arm-soc and delaying the submission of your branch
+until the other one was merged, but you need to make sure that
+the branch you import does not get rebased any more, and you must
+not just cherry-pick patches from another branch.
+
+Finally, please address any arm-soc pull requests to both Olof
+and me, as we are sharing the load for 3.3. I have handled all
+pull requests since 3.2-rc2, but I expect things to get more
+busy between now and the merge window, so we should be prepared
+to split the work.
+
+	Arnd
