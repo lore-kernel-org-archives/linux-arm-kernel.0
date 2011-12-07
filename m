@@ -1,83 +1,150 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 07 Dec 2011 16:52:44 +0900
-Subject: [PATCH v2] ARM: pl330: Fix a race condition
-In-Reply-To: <CAJe_Zhem0yTOV4L-kJ91fQN++hFzCUgjOfxSnJR25PuYNTedVQ@mail.gmail.com>
-References: <4E8C5425.80303@arm.com>
- <1317892206-3600-1-git-send-email-javi.merino@arm.com>
- <CAJuYYwTXf-XU0fdGT0+sggN-MEY3v7UHkfjNkM4+QUW464J9Ew@mail.gmail.com>
- <4EB7B79A.2020004@arm.com> <000c01ccada6$f83f5be0$e8be13a0$%kim@samsung.com>
- <4ED3B89E.7070903@arm.com> <000e01ccae48$d76a7ba0$863f72e0$%kim@samsung.com>
- <4ED4AB9A.3060807@arm.com>
- <CAJe_Zhem0yTOV4L-kJ91fQN++hFzCUgjOfxSnJR25PuYNTedVQ@mail.gmail.com>
-Message-ID: <03f001ccb4b5$3441f5c0$9cc5e140$%kim@samsung.com>
+From: pullip.cho@samsung.com (KyongHo Cho)
+Date: Wed, 7 Dec 2011 17:12:04 +0900
+Subject: [PATCH v7 2/2] iommu/exynos: Add iommu driver for Exynos Platforms
+In-Reply-To: <009c01ccb423$3d9e95c0$b8dbc140$%szyprowski@samsung.com>
+References: <1321609650-1329-1-git-send-email-pullip.cho@samsung.com>
+ <1321609650-1329-3-git-send-email-pullip.cho@samsung.com>
+ <007e01ccb40c$ed62bca0$c82835e0$%szyprowski@samsung.com>
+ <CAHQjnOM9N8zJmiNnHfrN00jbF8Wk5WwtsBsuPsC2Xv0g_O1tdA@mail.gmail.com>
+ <009c01ccb423$3d9e95c0$b8dbc140$%szyprowski@samsung.com>
+Message-ID: <CAHQjnOOpaoVAA8RWrYE5yy0eUN=rWLxZ9XEHZR8ajP_AUeOw8Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jassi Brar wrote:
-> 
-> On 29 November 2011 15:23, Javi Merino <javi.merino@arm.com> wrote:
-> >>>>>> On Samsung's Exynos4 platform, while testing audio playback with
-> >>> i2s
-> >>>>>> interface, the above change causes the playback to freeze. The
-> >>>>>> _thrd_active(thrd) call always returns '1' and hence _start(thrd)
-> >>> is
-> >>>>>> not getting called.
-> >>>>>
-> >>>>> If _thrd_active(thrd) returns '1', that means there is an active
-> >>>>> transfer still running or, if it has finished, you haven't called
-> >>>>> pl330_update() to acknowledge that. ?pl330_update() calls _start()
-> >>> as
-> >>>>> soon as it can.
-> >>>>>
-> >>>>> drivers/dma/pl330.c registers the irq handler in pl330_probe(), so
-> >>>>> when
-> >>>>> the transaction finishes, pl330_update() should clear it and call
-> >>>>> _start(). ?If there is any outstanding transaction, it should start
-> >>>>> straight away. If there isn't, it would mark the channel as free,
-> >>> so
-> >>>>> _thrd_active() should return '0'. ?If _thrd_active() is still '1',
-> >>> then
-> >>>>> something has gone wrong in the way.
-> >>>>>
-> >>>>> Does this shed some light?
-> >>>>>
-> >>>>
-> >>>> Your patch makes the memcpy operation on dmatest.c and net DMA be
-> >>> frozen too
-> >>>> as well as Samsung audio playback.
-> >>>
-> >>> Is the IRQ correctly registered in drivers/dma/pl330.c:pl330_probe()?
-> >>> Do you get interrupts when the transfer finish?
-> >> Sure. IRQ works well.
-> >
-> > Ok, so can you check if pl330_update() is correctly marking the request
-> > as free? ?Do you know if there is another request in the queue when that
-> > happens?
-> >
-> > Thomas, you said in a previous email that _thrd_active() always returned
-> > '1'. ?Was that after a request in req[0] finished?
-> > ?- If so, can you check that MARK_FREE was actually called for that
-> > ? ?request in pl330_update()?
-> > ?- If it was after a request in req[1] finished and there was a
-> > ? ?request already waiting in req[0], can you debug why _start()
-> > ? ?didn't activate it.
-> >
-> Javi, could you please check if you too get the memcpy failure with
-> dmatest ?
+2011/12/6 Marek Szyprowski <m.szyprowski@samsung.com>:
+> Hello,
+>
+> On Tuesday, December 06, 2011 1:21 PM KyongHo Cho wrote:
+>
+>> On Tue, Dec 6, 2011 at 8:48 PM, Marek Szyprowski
+>> <m.szyprowski@samsung.com> wrote:
+>> > Hello,
+>> >
+>> > I'm trying to integrate your SYSMMU driver with my DMA-mapping & IOMMU
+>> > API integration patches. I've noticed some issues, please see my comments below.
+>> >
+>> Thank you!
+>>
+>> > On Friday, November 18, 2011 10:48 AM KyongHo Cho wrote:
+>> >
+>> >> +
+>> >> +static int exynos_sysmmu_probe(struct platform_device *pdev)
+>> >> +{
+>> >> + ? ? struct resource *res, *ioarea;
+>> >> + ? ? int ret;
+>> >> + ? ? int irq;
+>> >> + ? ? struct device *dev;
+>> >> + ? ? void *sfr;
+>> >> + ? ? struct sysmmu_drvdata *data;
+>> >> + ? ? char *emsg;
+>> >> +
+>> >> + ? ? dev = &pdev->dev;
+>> >> +
+>> >> + ? ? if (dev_get_platdata(dev) == NULL) {
+>> >> + ? ? ? ? ? ? pr_debug("%s: No System MMU is assigned for %s.%d.\n", __func__,
+>> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? pdev->name, pdev->id);
+>> >> + ? ? ? ? ? ? return -ENODEV;
+>> >> + ? ? }
+>> >> +
+>> >> + ? ? data = kzalloc(sizeof(*data), GFP_KERNEL);
+>> >> + ? ? if (!data) {
+>> >> + ? ? ? ? ? ? emsg = "Not enough memory";
+>> >> + ? ? ? ? ? ? ret = -ENOMEM;
+>> >> + ? ? ? ? ? ? goto err_alloc;
+>> >> + ? ? }
+>> >> +
+>> >> + ? ? data->owner = dev_get_platdata(dev);
+>> >> +
+>> >> + ? ? ret = dev_set_drvdata(dev, data);
+>> >> + ? ? if (ret) {
+>> >> + ? ? ? ? ? ? emsg = "Unable to set driver data.";
+>> >> + ? ? ? ? ? ? goto err_init;
+>> >> + ? ? }
+>> >> +
+>> >> + ? ? res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>> >> + ? ? if (!res) {
+>> >> + ? ? ? ? ? ? emsg = "Failed probing system MMU: failed to get resource.";
+>> >> + ? ? ? ? ? ? goto err_init;
+>> >> + ? ? }
+>> >> +
+>> >> + ? ? ioarea = request_mem_region(res->start, resource_size(res),
+>> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? dev_name(dev));
+>> >> + ? ? if (ioarea == NULL) {
+>> >> + ? ? ? ? ? ? emsg = "failed to request memory region.";
+>> >> + ? ? ? ? ? ? ret = -ENOMEM;
+>> >> + ? ? ? ? ? ? goto err_init;
+>> >> + ? ? }
+>> >> +
+>> >> + ? ? sfr = ioremap(res->start, resource_size(res));
+>> >> + ? ? if (!sfr) {
+>> >> + ? ? ? ? ? ? emsg = "failed to call ioremap().";
+>> >> + ? ? ? ? ? ? ret = -ENOENT;
+>> >> + ? ? ? ? ? ? goto err_ioremap;
+>> >> + ? ? }
+>> >> +
+>> >> + ? ? irq = platform_get_irq(pdev, 0);
+>> >> + ? ? if (irq <= 0) {
+>> >> + ? ? ? ? ? ? emsg = "failed to get irq resource.";
+>> >> + ? ? ? ? ? ? ret = irq;
+>> >> + ? ? ? ? ? ? goto err_irq;
+>> >> + ? ? }
+>> >> +
+>> >> + ? ? ret = request_irq(irq, exynos_sysmmu_irq, 0, dev_name(dev), data);
+>> >> + ? ? if (ret) {
+>> >> + ? ? ? ? ? ? emsg = "failed to request irq.";
+>> >> + ? ? ? ? ? ? goto err_irq;
+>> >> + ? ? }
+>> >> +
+>> >> + ? ? data->clk = clk_get(dev, "sysmmu");
+>> >> + ? ? if (IS_ERR(data->clk)) {
+>> >> + ? ? ? ? ? ? emsg = "failed to get clock descriptor";
+>> >> + ? ? ? ? ? ? ret = PTR_ERR(data->clk);
+>> >> + ? ? ? ? ? ? goto err_clk;
+>> >> + ? ? }
+>> >> +
+>> >> + ? ? data->dev = dev;
+>> >> + ? ? data->sfrbase = sfr;
+>> >> + ? ? __set_fault_handler(data, &default_fault_handler);
+>> >> + ? ? rwlock_init(&data->lock);
+>> >
+>> > Here is a serious problem: __set_fault_handler takes data->lock which is initialized after
+>> calling
+>> > this function.
+>> >
+>>
+>> Yeah, you're right. Thank you. I didn't notice it.
+>> I will fix it.
+>>
+>> >> +
+>> >> +static unsigned long *alloc_lv2entry(unsigned long *sent, unsigned long iova,
+>> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? short *pgcounter)
+>> >> +{
+>> >> + ? ? if (lv1ent_fault(sent)) {
+>> >> + ? ? ? ? ? ? unsigned long *pent;
+>> >> +
+>> >> + ? ? ? ? ? ? pent = kzalloc(1024, GFP_KERNEL);
+>> >
+>> > I would use GFP_ATOMIC here. iommu_map() function might be called in atomic context, and
+>> > GFP_KERNEL here causes kernel ops/warning.
+>>
+>> I wanted to avoid to allocate memory from emergency pool.
+>> Do you think that it needs to allocate memory with GFP_ATOMIC flag?
+>
+> Otherwise it will very hard to get it integrated with DMA mapping framework. GFP_ATOMIC
+> memory is allocated straight from system free lists, which are refilled on the next
+> non-atomic allocation if the watermark level is low enough.
+>
+> It will be best if iommu_map() can be extended with allocation flags argument, so the
+> caller can decide if iommu driver can use GFP_ATOMIC or GFP_KERNEL depending on the context.
+>
+Understood.
+I will change GFP_KERNEL to GFP_ATOMIC in the next patch.
+I think it is not good idea to make iommu_map() allocate 2nd level page table
+from a specific physical memory pool.
 
-(Please adding me in this thread)
-
-Hi Javi,
-How was going on the test? If any update, please let us know.
-
-Vinod, I think, if the issue cannot be fixed soon, the patch should be
-reverted until clear the issue. Because according to Boojin Kim's test, it
-does not affect only Samsung stuff.
+BTW, what about using GFP_KERNEL without __GFP_WAIT?
+Then, iommu_map() will fail if there is not enough memory.
 
 Thanks.
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+KyongHo.
