@@ -1,58 +1,62 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Wed, 7 Dec 2011 16:57:03 +0800
-Subject: [PATCH][NET] several cleanups and bugfixes for fec.c: don't
- munge MAC address from platform data
-In-Reply-To: <20190.7244.156557.313315@ipc1.ka-ro>
-References: <cover.1323163127.git.LW@KARO-electronics.de>
- <55b78c1766da5b0d0d679f5eae3fb9fc74a6ceef.1323163127.git.LW@KARO-electronics.de>
- <20111206124857.GB14048@sapphire.tkos.co.il>
- <20190.7244.156557.313315@ipc1.ka-ro>
-Message-ID: <20111207085702.GE5550@S2100-06.ap.freescale.net>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 07 Dec 2011 17:44:55 +0900
+Subject: [PATCH] ARM: EXYNOS: Fix build error without CONFIG_LOCAL_TIMERS
+Message-ID: <03f201ccb4bc$7e55b820$7b012860$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 06, 2011 at 02:44:44PM +0100, Lothar Wa?mann wrote:
-> Hi,
-> 
-> Baruch Siach writes:
-> > Hi Lothar,
-> > 
-> > On Tue, Dec 06, 2011 at 11:27:13AM +0100, Lothar Wa?mann wrote:
-> > > When the MAC address is supplied via platform_data it should be OK as
-> > > it is and should not be modified in case of a dual FEC setup.
-> > > Also copying the MAC from platform_data to the single 'macaddr'
-> > > variable will overwrite the MAC for the first interface in case of a
-> > > dual FEC setup.
-> > > 
-> > > Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
-> > > ---
-> > >  drivers/net/ethernet/freescale/fec.c |    2 +-
-> > >  1 files changed, 1 insertions(+), 1 deletions(-)
-> > > 
-> > > diff --git a/drivers/net/ethernet/freescale/fec.c b/drivers/net/ethernet/freescale/fec.c
-> > > index e2b5ce6..11534b9 100644
-> > > --- a/drivers/net/ethernet/freescale/fec.c
-> > > +++ b/drivers/net/ethernet/freescale/fec.c
-> > > @@ -818,7 +818,7 @@ static void __inline__ fec_get_mac(struct net_device *ndev)
-> > >  			iap = (unsigned char *)FEC_FLASHMAC;
-> > >  #else
-> > >  		if (pdata)
-> > > -			memcpy(iap, pdata->mac, ETH_ALEN);
-> > > +			iap = (unsigned char *)&pdata->mac;
-> > 
-> > Since pdata might point to __initdata struct, you must hold a copy of its 
-> > content.
-> > 
+arch/arm/mach-exynos/mct.c: In function 'exynos4_timer_resources':
+arch/arm/mach-exynos/mct.c:450: error: 'exynos4_mct_tick_isr' undeclared (first use in this function)
+arch/arm/mach-exynos/mct.c:450: error: (Each undeclared identifier is reported only once
+arch/arm/mach-exynos/mct.c:450: error: for each function it appears in.)
+make[1]: *** [arch/arm/mach-exynos/mct.o] Error 1
 
-As iap will anyway be copied to ndev->dev_addr after that, it may still
-be fine to take this patch, for obviously for different reason.
+Reported-by: Kyungmin Park <kyungmin.park@samsung.com>
+Acked-by: Changhwan Youn <chaos.youn@samsung.com>
+Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm/mach-exynos/mct.c |    7 +++++--
+ 1 files changed, 5 insertions(+), 2 deletions(-)
 
-> No. platform_data must be present during the life time of a driver
-> using it and thus must never be __initdata!
-> 
-Then we need to fix a lot of imx/mxc platform codes, mach-mx28evk.c
-is the one for this case.
-
+diff --git a/arch/arm/mach-exynos/mct.c b/arch/arm/mach-exynos/mct.c
+index 97343df..586c819 100644
+--- a/arch/arm/mach-exynos/mct.c
++++ b/arch/arm/mach-exynos/mct.c
+@@ -44,8 +44,6 @@ struct mct_clock_event_device {
+ 	char name[10];
+ };
+ 
+-static DEFINE_PER_CPU(struct mct_clock_event_device, percpu_mct_tick);
+-
+ static void exynos4_mct_write(unsigned int value, void *addr)
+ {
+ 	void __iomem *stat_addr;
+@@ -264,6 +262,9 @@ static void exynos4_clockevent_init(void)
+ }
+ 
+ #ifdef CONFIG_LOCAL_TIMERS
++
++static DEFINE_PER_CPU(struct mct_clock_event_device, percpu_mct_tick);
++
+ /* Clock event handling */
+ static void exynos4_mct_tick_stop(struct mct_clock_event_device *mevt)
+ {
+@@ -443,6 +444,7 @@ static void __init exynos4_timer_resources(void)
+ 
+ 	clk_rate = clk_get_rate(mct_clk);
+ 
++#ifdef CONFIG_LOCAL_TIMERS
+ 	if (mct_int_type == MCT_INT_PPI) {
+ 		int err;
+ 
+@@ -452,6 +454,7 @@ static void __init exynos4_timer_resources(void)
+ 		WARN(err, "MCT: can't request IRQ %d (%d)\n",
+ 		     IRQ_MCT_LOCALTIMER, err);
+ 	}
++#endif /* CONFIG_LOCAL_TIMERS */
+ }
+ 
+ static void __init exynos4_timer_init(void)
 -- 
-Regards,
-Shawn
+1.7.1
