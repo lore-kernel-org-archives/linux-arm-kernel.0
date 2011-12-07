@@ -1,50 +1,56 @@
-From: B29396@freescale.com (Dong Aisheng-B29396)
-Date: Wed, 7 Dec 2011 09:18:36 +0000
-Subject: [RFC PATCH 3/3] pinctrl: imx: add pinmux-imx6q support
-In-Reply-To: <CACRpkdbVXkpVHqhP2SHV2fud66NYFj0mcAPyaqJoyUS-20to5Q@mail.gmail.com>
-References: <1322999384-7886-1-git-send-email-b29396@freescale.com>
- <1322999384-7886-3-git-send-email-b29396@freescale.com>
- <20111206072326.GA3712@S2100-06.ap.freescale.net>
- <65EE16ACC360FA4D99C96DC085B3F772345A0B@039-SN1MPN1-002.039d.mgd.msft.net>
- <CACRpkdbVXkpVHqhP2SHV2fud66NYFj0mcAPyaqJoyUS-20to5Q@mail.gmail.com>
-Message-ID: <65EE16ACC360FA4D99C96DC085B3F77234FC5B@039-SN1MPN1-002.039d.mgd.msft.net>
+From: axel.lin@gmail.com (Axel Lin)
+Date: Wed, 07 Dec 2011 17:21:59 +0800
+Subject: [PATCH] highmem: fix missed kmap_atomic update in
+ arch/arm/include/asm/highmem.h
+Message-ID: <1323249719.27710.2.camel@phoenix>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Linus Walleij [mailto:linus.walleij at linaro.org]
-> Sent: Wednesday, December 07, 2011 5:10 PM
-> To: Dong Aisheng-B29396; Guo Shawn-R65073
-> Cc: linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> linus.walleij at stericsson.com; s.hauer at pengutronix.de;
-> kernel at pengutronix.de
-> Subject: Re: [RFC PATCH 3/3] pinctrl: imx: add pinmux-imx6q support
-> 
-> On Tue, Dec 6, 2011 at 8:23 AM, Dong Aisheng-B29396 <B29396@freescale.com>
-> wrote:
-> >> From: Guo Shawn-R65073
-> >> As I do not see the device tree probing added in pinmux-imx-core.c, I
-> >> expect the patch has not got the chance to run on imx6, right?
-> >>
-> > Yes, I would add it if the pinctrl framework supports DT.
-> 
-> There are many levels of DT.
-> 
-> You can of course add DT-support for anything driver-specific, such as
-> init data for some registers, or anything else you would normally pass in
-> through platform data. So please just do that if imx6 already has support
-> for such things.
-> 
-> What we're discussing about right now on devicetree-discuss is where to
-> put the mapping tables etc that is currently registered by the board,
-> that has no obvious solution as there is some disagreement on how to do
-> that.
-> 
-Yes, thanks for your info.
-I'm new to device tree and may take some time to get more familiar with it.
+commit 37bfbb "highmem: kill all __kmap_atomic()" missed the update to
+arch/arm/include/asm/highmem.h.
 
-I discussed with Shawn today and now we're going to move data to dt and run
-this driver on mx6q first.
+This patch fixes below build error:
+  CC      init/main.o
+In file included from include/linux/pagemap.h:10,
+                 from include/linux/mempolicy.h:70,
+                 from init/main.c:49:
+include/linux/highmem.h: In function 'kmap_atomic_deprecated':
+include/linux/highmem.h:127: error: implicit declaration of function 'kmap_atomic'
+include/linux/highmem.h:127: warning: return makes pointer from integer without a cast
+include/linux/highmem.h: In function 'clear_highpage':
+include/linux/highmem.h:218: warning: initialization makes pointer from integer without a cast
+include/linux/highmem.h: In function 'zero_user_segments':
+include/linux/highmem.h:227: warning: initialization makes pointer from integer without a cast
+include/linux/highmem.h: In function 'copy_highpage':
+include/linux/highmem.h:279: warning: assignment makes pointer from integer without a cast
+include/linux/highmem.h:280: warning: assignment makes pointer from integer without a cast
+make[1]: *** [init/main.o] Error 1
+make: *** [init] Error 2
 
-Regards
-Dong Aisheng
+Signed-off-by: Axel Lin <axel.lin@gmail.com>
+---
+I got the build error by "make tegra_defconfig;make" on linux-next 20111207.
+Thus this patch is against linux-next tree.
+
+BTW, why commit 37bfbb "highmem: kill all __kmap_atomic()" does not have any
+Signed-off-by?
+
+Axel
+ arch/arm/include/asm/highmem.h |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/include/asm/highmem.h b/arch/arm/include/asm/highmem.h
+index a4edd19..8c5e828 100644
+--- a/arch/arm/include/asm/highmem.h
++++ b/arch/arm/include/asm/highmem.h
+@@ -57,7 +57,7 @@ static inline void *kmap_high_get(struct page *page)
+ #ifdef CONFIG_HIGHMEM
+ extern void *kmap(struct page *page);
+ extern void kunmap(struct page *page);
+-extern void *__kmap_atomic(struct page *page);
++extern void *kmap_atomic(struct page *page);
+ extern void __kunmap_atomic(void *kvaddr);
+ extern void *kmap_atomic_pfn(unsigned long pfn);
+ extern struct page *kmap_atomic_to_page(const void *ptr);
+-- 
+1.7.5.4
