@@ -1,67 +1,96 @@
-From: ben@decadent.org.uk (Ben Hutchings)
-Date: Wed, 07 Dec 2011 06:02:27 +0000
-Subject: Bug#651215: Kernel fails to boot on NSLU2
-In-Reply-To: <20111206194048.12063.82586.reportbug@vrnul03074nb.vr-netze.vrnet>
-References: <20111206194048.12063.82586.reportbug@vrnul03074nb.vr-netze.vrnet>
-Message-ID: <1323237747.18450.7.camel@deadeye>
+From: Josh.wu@atmel.com (Wu, Josh)
+Date: Wed, 7 Dec 2011 14:09:56 +0800
+Subject: [PATCH 2/2] [media] V4L: atmel-isi: add
+ clk_prepare()/clk_unprepare() functions
+In-Reply-To: <Pine.LNX.4.64.1112061045150.10715@axis700.grange>
+References: <1322647604-30662-1-git-send-email-josh.wu@atmel.com>
+ <1322647604-30662-2-git-send-email-josh.wu@atmel.com>
+ <Pine.LNX.4.64.1112061045150.10715@axis700.grange>
+Message-ID: <4C79549CB6F772498162A641D92D5328039E98C1@penmb01.corp.atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2011-12-06 at 20:40 +0100, Jochen Friedrich wrote:
-> Package: linux-image-3.1.0-1-ixp4xx
-> Severity: normal
-> 
-> While 3.0.0-6 booted OK on NSLU2 platform, 3.1.0-1 or -4 fails to do so.
-> 
-> Boot log:
-[...]
-> [    0.000000] Linux version 3.1.0-1-ixp4xx (Debian 3.1.4-1) (waldi at debian.org)
-> (gcc version 4.6.2 (Debian 4.6.2-4) ) #1 Wed Nov 30 06:35:38 UTC 2011
-> [    0.000000] CPU: XScale-IXP42x Family [690541f1] revision 1 (ARMv5TE),
-> cr=0000397f
-> [    0.000000] CPU: VIVT data cache, VIVT instruction cache
-> [    0.000000] Machine: Linksys NSLU2
-[...]
-> [    3.269860] ehci_hcd: USB 2.0 'Enhanced' Host Controller (EHCI) Driver
-> [    3.350596] PCI: enabling device 0000:00:01.2 (0140 -> 0142)
-> [    3.356553] ehci_hcd 0000:00:01.2: EHCI Host Controller
-> [    3.452053] ehci_hcd 0000:00:01.2: new USB bus registered, assigned bus
-> number 1
-> [    3.459646] ehci_hcd 0000:00:01.2: coherent DMA mask 0x3ffffff is smaller
-> than system GFP_DMA mask 0xffffffff
-> [    3.570085] ehci_hcd 0000:00:01.2: coherent DMA mask 0x3ffffff is smaller
-> than system GFP_DMA mask 0xffffffff
-> [    3.680189] ehci_hcd 0000:00:01.2: coherent DMA mask 0x3ffffff is smaller
-> than system GFP_DMA mask 0xffffffff
-> (repeated over and over)
+Hi, Guennadi
 
-I assume that this has something to do with:
+Thank you for explain the label name rules. I've sent the v2 version
+patch out. In v2 version I modified the code and make the label name
+consistent.
 
-commit 650320181a08b64d4421c65c639cf47ad8cc2cd6
-Author: Nicolas Pitre <nico@fluxnic.net>
-Date:   Mon Jul 18 15:05:10 2011 -0400
+On 12/06/2011 5:49PM, Guennadi Liakhovetski wrote:
 
-    ARM: change ARM_DMA_ZONE_SIZE into a variable
+> Hi Josh
 
-commit 7553ee777b513c3bc8f45bb9fc75fb1bbc584ba1
-Author: Nicolas Pitre <nicolas.pitre@linaro.org>
-Date:   Tue Jul 5 22:28:09 2011 -0400
+> Thanks for the patch, but I'll ask you to fix the same thing in it,
+that 
+> I've fixed for you in the first patch in this series:
 
-    ARM: mach-ixp4xx: move from ARM_DMA_ZONE_SIZE to mdesc->dma_zone_size
+> On Wed, 30 Nov 2011, Josh Wu wrote:
 
-It's clear that the DMA zone size is supposed to be 64 MB on this
-machine and I don't see why the DMA mask hasn't propagated correctly.
-Any idea, Nicholas?
+>> Signed-off-by: Josh Wu <josh.wu@atmel.com>
+>> ---
+>>  drivers/media/video/atmel-isi.c |   17 ++++++++++++++++-
+>>  1 files changed, 16 insertions(+), 1 deletions(-)
+>> 
+>> diff --git a/drivers/media/video/atmel-isi.c
+b/drivers/media/video/atmel-isi.c
+>> index ea4eef4..5da4381 100644
+>> --- a/drivers/media/video/atmel-isi.c
+>> +++ b/drivers/media/video/atmel-isi.c
 
-Ben.
+> [snip]
 
--- 
-Ben Hutchings
-Absolutum obsoletum. (If it works, it's out of date.) - Stafford Beer
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 828 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111207/44fa3d7e/attachment-0001.sig>
+>> @@ -978,10 +986,14 @@ static int __devinit atmel_isi_probe(struct
+platform_device *pdev)
+>>  		goto err_clk_get;
+>>  	}
+>>  
+>> +	ret = clk_prepare(isi->mck);
+>> +	if (ret)
+>> +		goto err_set_mck_rate;
+>> +
+>>  	/* Set ISI_MCK's frequency, it should be faster than pixel clock
+*/
+>>  	ret = clk_set_rate(isi->mck, pdata->mck_hz);
+>>  	if (ret < 0)
+>> -		goto err_set_mck_rate;
+>> +		goto err_unprepare_mck;
+>>  
+>>  	isi->p_fb_descriptors = dma_alloc_coherent(&pdev->dev,
+>>  				sizeof(struct fbd) * MAX_BUFFER_NUM,
+>> @@ -1058,11 +1070,14 @@ err_alloc_ctx:
+>>  			isi->p_fb_descriptors,
+>>  			isi->fb_descriptors_phys);
+>>  err_alloc_descriptors:
+>> +err_unprepare_mck:
+>> +	clk_unprepare(isi->mck);
+>>  err_set_mck_rate:
+>>  	clk_put(isi->mck);
+>>  err_clk_get:
+>>  	kfree(isi);
+>>  err_alloc_isi:
+>> +	clk_unprepare(pclk);
+>>  	clk_put(pclk);
+>>  
+>>  	return ret;
+
+> Please, use error label names consistently. As you can see, currently
+the 
+> driver uses the convention
+
+>	ret = do_something();
+>	if (ret < 0)
+>		goto err_do_something;
+
+> i.e., the label is called after the operation, that has failed, not
+after 
+> the clean up step, that the control now has to jump to. Please, update
+
+> your patch to also use this convention.
+
+Understand it now. Thank you.
+
+> Thanks
+> Guennadi
+
+Best Regards,
+Josh Wu
