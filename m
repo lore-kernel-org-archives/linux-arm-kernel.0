@@ -1,27 +1,42 @@
-From: alan@lxorguk.ukuu.org.uk (Alan Cox)
-Date: Fri, 9 Dec 2011 14:24:05 +0000
-Subject: [Linaro-mm-sig] [RFC v2 1/2] dma-buf: Introduce dma buffer
- sharing mechanism
-In-Reply-To: <201112091413.03736.arnd@arndb.de>
-References: <1322816252-19955-1-git-send-email-sumit.semwal@ti.com>
- <201112071340.35267.arnd@arndb.de>
- <CAKMK7uFQiiUbkU-7c3Os0d0FJNyLbqS2HLPRLy3LGnOoCXV5Pw@mail.gmail.com>
- <201112091413.03736.arnd@arndb.de>
-Message-ID: <20111209142405.6f371be6@pyramind.ukuu.org.uk>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Wed, 7 Dec 2011 14:57:14 -0500 (EST)
+Subject: [PATCH] USB: pxa168: Fix compilation error
+In-Reply-To: <1323169667-10671-1-git-send-email-tanmay.upadhyay@einfochips.com>
+Message-ID: <Pine.LNX.4.44L0.1112071456440.1647-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> I still don't think that's possible. Please explain how you expect
-> to change the semantics of the streaming mapping API to allow multiple
-> mappers without having explicit serialization points that are visible
-> to all users. For simplicity, let's assume a cache coherent system
+On Tue, 6 Dec 2011, Tanmay Upadhyay wrote:
 
-I would agree. It's not just about barriers but in many cases where you
-have multiple mappings by hardware devices the actual hardware interface
-is specific to the devices. Just take a look at the fencing in TTM and
-the graphics drivers.
+> After commit c430131a02d677aa708f56342c1565edfdacb3c0,
+> HC_LENGTH takes two arguments. This patch fixes following
+> compilation error:
+> 
+> In file included from drivers/usb/host/ehci-hcd.c:1323:
+> drivers/usb/host/ehci-pxa168.c:302:54: error: macro "HC_LENGTH" requires 2 arguments, but only 1 given
+> In file included from drivers/usb/host/ehci-hcd.c:1323:
+> drivers/usb/host/ehci-pxa168.c: In function 'ehci_pxa168_drv_probe':
+> drivers/usb/host/ehci-pxa168.c:302: error: 'HC_LENGTH' undeclared (first use in this function)
+> drivers/usb/host/ehci-pxa168.c:302: error: (Each undeclared identifier is reported only once
+> drivers/usb/host/ehci-pxa168.c:302: error: for each function it appears in.)
+> 
+> Signed-off-by: Tanmay Upadhyay <tanmay.upadhyay@einfochips.com>
+> ---
+>  drivers/usb/host/ehci-pxa168.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
+> 
+> diff --git a/drivers/usb/host/ehci-pxa168.c b/drivers/usb/host/ehci-pxa168.c
+> index ac0c16e..8d0e7a2 100644
+> --- a/drivers/usb/host/ehci-pxa168.c
+> +++ b/drivers/usb/host/ehci-pxa168.c
+> @@ -299,7 +299,7 @@ static int __devinit ehci_pxa168_drv_probe(struct platform_device *pdev)
+>  	ehci = hcd_to_ehci(hcd);
+>  	ehci->caps = hcd->regs + 0x100;
+>  	ehci->regs = hcd->regs + 0x100 +
+> -		HC_LENGTH(ehci_readl(ehci, &ehci->caps->hc_capbase));
+> +		HC_LENGTH(ehci, ehci_readl(ehci, &ehci->caps->hc_capbase));
+>  	ehci->hcs_params = ehci_readl(ehci, &ehci->caps->hcs_params);
+>  	hcd->has_tt = 1;
+>  	ehci->sbrn = 0x20;
 
-Its not something the low level API can deal with, it requires high level
-knowledge.
-
-Alan
+Acked-by: Alan Stern <stern@rowland.harvard.edu>
