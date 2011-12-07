@@ -1,26 +1,83 @@
-From: eric.miao@linaro.org (Eric Miao)
-Date: Wed,  7 Dec 2011 22:44:11 +0800
-Subject: [PATCH] ARM: imx6q: generate imx6q dtb files
-Message-ID: <1323269051-29007-1-git-send-email-eric.miao@linaro.org>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Wed, 7 Dec 2011 15:08:11 +0000
+Subject: [PATCH v4 5/6] ARM: vexpress: DT-based support for Cortex-A5 and
+ Cortex-A9 based tiles
+In-Reply-To: <1323186229-22054-6-git-send-email-pawel.moll@arm.com>
+References: <1323186229-22054-1-git-send-email-pawel.moll@arm.com>
+ <1323186229-22054-6-git-send-email-pawel.moll@arm.com>
+Message-ID: <20111207150811.GC2910@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cc: Shawn Guo <shawn.guo@linaro.org>
-Signed-off-by: Eric Miao <eric.miao@linaro.org>
----
- arch/arm/mach-imx/Makefile.boot |    3 +++
- 1 files changed, 3 insertions(+), 0 deletions(-)
+On Tue, Dec 06, 2011 at 03:43:48PM +0000, Pawel Moll wrote:
 
-diff --git a/arch/arm/mach-imx/Makefile.boot b/arch/arm/mach-imx/Makefile.boot
-index cfede57..67b76f5 100644
---- a/arch/arm/mach-imx/Makefile.boot
-+++ b/arch/arm/mach-imx/Makefile.boot
-@@ -25,3 +25,6 @@ initrd_phys-$(CONFIG_SOC_IMX35)	:= 0x80800000
- zreladdr-$(CONFIG_SOC_IMX6Q)	+= 0x10008000
- params_phys-$(CONFIG_SOC_IMX6Q)	:= 0x10000100
- initrd_phys-$(CONFIG_SOC_IMX6Q)	:= 0x10800000
-+
-+dtb-$(CONFIG_SOC_IMX6Q)	+= imx6q-sabreauto.dtb \
-+			   imx6q-sabrelite.dtb
--- 
-1.7.5.4
+[...]
+
+> +/include/ "vexpress-v2m.dtsi"
+> diff --git a/arch/arm/mach-vexpress/Kconfig b/arch/arm/mach-vexpress/Kconfig
+> index 56a61fb..c1cd08d 100644
+> --- a/arch/arm/mach-vexpress/Kconfig
+> +++ b/arch/arm/mach-vexpress/Kconfig
+> @@ -1,13 +1,23 @@
+>  menu "Versatile Express platform type"
+>  	depends on ARCH_VEXPRESS
+>  
+> -config ARCH_VEXPRESS_CA9X4
+> -	bool "Versatile Express Cortex-A9x4 tile"
+> -	select CPU_V7
+> -	select ARM_GIC
+> +config ARCH_VEXPRESS_CORTEX_A5_A9
+> +	bool
+>  	select ARM_ERRATA_720789
+>  	select ARM_ERRATA_751472
+> -	select ARM_ERRATA_753970
+> +	select ARM_GIC
+> +	select CPU_V7
+> +	select HAVE_L2X0_L2CC
+> +	select PL310_ERRATA_753970 if CACHE_PL310
+> +	help
+> +	  Provides common dependencies for Versatile Express platforms
+> +	  based on Cortex-A5 and Cortex-A9 processors. In order to
+> +	  build a working kernel, you must also enable relevant core
+> +	  tile support or Flattened Device Tree based support options.
+> +
+> +config ARCH_VEXPRESS_CA9X4
+> +	bool "Versatile Express Cortex-A9x4 tile"
+> +	select ARCH_VEXPRESS_CORTEX_A5_A9
+>  
+>  config ARCH_VEXPRESS_DT
+>  	bool "Device Tree support for Versatile Express platforms"
+> @@ -21,4 +31,23 @@ config ARCH_VEXPRESS_DT
+>  	  If your bootloader supports Flattened Device Tree based booting,
+>  	  say Y here.
+>  
+> +config ARCH_VEXPRESS_DT_CORTEX_A5_A9
+> +	bool "Support for tiles based on Cortex-A5 and Cortex-A9 processors"
+> +	depends on ARCH_VEXPRESS_DT
+> +	select ARCH_VEXPRESS_CORTEX_A5_A9
+> +	help
+> +	  This option enables support for systems using Cortex-A5 and Cortex-A9
+> +	  ARM core and logic (FPGA) tiles on the Versatile Express motherboard,
+> +	  for example:
+> +
+> +	  - CoreTile Express A5x2 (V2P-CA5s)
+> +	  - CoreTile Express A9x4 (V2P-CA9)
+> +	  - LogicTile Express 13MG (V2F-2XV6) with A5 SMM (Soft Macrocell Model)
+> +	  - LogicTile Express 13MG (V2F-2XV6) with A9 SMM (Soft Macrocell Model)
+> +	  - VE Cortex-A9 RTSM (Model)
+> +
+> +	  You must boot using a Flattened Device Tree in order to use these
+> +	  platforms. The traditional (ATAGs) boot method is not usable on
+> +	  these boards with this option.
+> +
+
+Because of the way these options are renamed and the backwards
+dependency of CONFIG_SMP in arch/arm/Kconfig, it now seems to be
+impossible to build an SMP kernel with this series.
+
+I will propose a patch similar to HAVE_L2X0_L2CC to see if this
+dependency can be factorised, but in the meantime, I suggest to fix
+the dependencies in arch/arm/Kconfig.
+
+Cheers
+---Dave
