@@ -1,63 +1,45 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Wed, 7 Dec 2011 21:43:36 +0800
-Subject: [PATCH][NET] several cleanups and bugfixes for fec.c: fix the
- .remove code
-In-Reply-To: <20191.27018.478290.890636@ipc1.ka-ro>
-References: <cover.1323163127.git.LW@KARO-electronics.de>
- <04c11563fee748562d7b53d5e5b3c5cf37fef200.1323163127.git.LW@KARO-electronics.de>
- <20111207132828.GQ5550@S2100-06.ap.freescale.net>
- <20191.27018.478290.890636@ipc1.ka-ro>
-Message-ID: <20111207134336.GS5550@S2100-06.ap.freescale.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 7 Dec 2011 13:40:35 +0000
+Subject: [RFC v2 1/2] dma-buf: Introduce dma buffer sharing mechanism
+In-Reply-To: <CAB2ybb-0mTdNXN82O1TUGVjhMZUQtQb07A3EVmmdxg3ngEc3Dw@mail.gmail.com>
+References: <1322816252-19955-1-git-send-email-sumit.semwal@ti.com>
+ <CAF6AEGto-+oSqguuWyPunUbtE65GpNiXh21srQzrChiBQMb1Nw@mail.gmail.com>
+ <CAB2ybb-0mTdNXN82O1TUGVjhMZUQtQb07A3EVmmdxg3ngEc3Dw@mail.gmail.com>
+Message-ID: <201112071340.35267.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 07, 2011 at 02:26:34PM +0100, Lothar Wa?mann wrote:
-> Hi,
+On Wednesday 07 December 2011, Semwal, Sumit wrote:
+> Thanks for the excellent discussion - it indeed is very good learning
+> for the relatively-inexperienced me :)
 > 
-> Shawn Guo writes:
-> > On Tue, Dec 06, 2011 at 11:27:15AM +0100, Lothar Wa?mann wrote:
-> > > The .remove code is broken in several ways.
-> > >  - mdiobus_unregister() is called twice for the same object in case of dual FEC
-> > >  - phy_disconnect() is being called when the PHY is already disconnected
-> > >  - the requested IRQ(s) are not freed
-> > >  - fec_stop() is being called with the inteface already stopped
-> > > 
-> > >  All of those lead to kernel crashes if the remove function is actually used.
-> > > 
-> > > Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
-> > > ---
-> > >  drivers/net/ethernet/freescale/fec.c |   30 +++++++++++++++++++++---------
-> > >  1 files changed, 21 insertions(+), 9 deletions(-)
-> > > 
-> > > diff --git a/drivers/net/ethernet/freescale/fec.c b/drivers/net/ethernet/freescale/fec.c
-> > > index ab0afb5..70ec7ec 100644
-> > > --- a/drivers/net/ethernet/freescale/fec.c
-> > > +++ b/drivers/net/ethernet/freescale/fec.c
-> > > @@ -235,6 +235,7 @@ struct fec_enet_private {
-> > >  
-> > >  	/* Phylib and MDIO interface */
-> > >  	struct	mii_bus *mii_bus;
-> > > +	int	mii_cnt;
-> > >  	struct	phy_device *phy_dev;
-> > >  	int	mii_timeout;
-> > >  	uint	phy_speed;
-> > > @@ -1040,8 +1041,12 @@ static int fec_enet_mii_init(struct platform_device *pdev)
-> > >  	 */
-> > >  	if ((id_entry->driver_data & FEC_QUIRK_ENET_MAC) && pdev->id > 0) {
-> > >  		/* fec1 uses fec0 mii_bus */
-> > > -		fep->mii_bus = fec0_mii_bus;
-> > > -		return 0;
-> > > +		if (fep->mii_cnt && fec0_mii_bus) {
-> > 
-> > This seems broken.  The second fec has its own fep and fep->mii_cnt is
-> > always 0 here.
-> > 
-> I already noticed that myself.
-> 
-With a quick fix here, the last two patches: 
+> So, for the purpose of dma-buf framework, could I summarize the
+> following and rework accordingly?:
+> 1. remove mmap() dma_buf_op [and mmap fop], and introduce cpu_start(),
+> cpu_finish() ops to bracket cpu accesses to the buffer. Also add
+> DMABUF_CPU_START / DMABUF_CPU_FINI IOCTLs?
 
-Tested-by: Shawn Guo <shawn.guo@linaro.org>
+I think we'd be better off for now without the extra ioctls and
+just document that a shared buffer must not be exported to user
+space using mmap at all, to avoid those problems. Serialization
+between GPU and CPU is on a higher level than the dma_buf framework
+IMHO.
 
--- 
-Regards,
-Shawn
+> 2. remove sg_sync* ops for now (and we'll see if we need to add them
+> later if needed)
+
+Just removing the sg_sync_* operations is not enough. We have to make
+the decision whether we want to allow
+a) only coherent mappings of the buffer into kernel memory (requiring
+an extension to the dma_map_ops on ARM to not flush caches at map/unmap
+time)
+b) not allowing any in-kernel mappings (same requirement on ARM, also
+limits the usefulness of the dma_buf if we cannot access it from the
+kernel or from user space)
+c) only allowing streaming mappings, even if those are non-coherent
+(requiring strict serialization between CPU (in-kernel) and dma users of
+the buffer)
+
+This issue has to be solved or we get random data corruption.
+
+	Arnd
