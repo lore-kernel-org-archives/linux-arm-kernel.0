@@ -1,44 +1,70 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Tue, 06 Dec 2011 23:25:47 -0500 (EST)
-Subject: [GIT PULL] Identity mapping changes for 3.3
-In-Reply-To: <20111206103843.GM14542@n2100.arm.linux.org.uk>
-References: <20111202160833.GK5540@mudshark.cambridge.arm.com>
- <20111205232342.GG14542@n2100.arm.linux.org.uk>
- <20111206101438.GB25782@mudshark.cambridge.arm.com>
- <20111206103843.GM14542@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.02.1112062321070.2907@xanadu.home>
+From: tarun.kanti@ti.com (Tarun Kanti DebBarma)
+Date: Wed, 7 Dec 2011 11:27:14 +0530
+Subject: [PATCH v2] ARM: OMAP: dmtimer: fix missing content/correction in
+ low-power mode support
+Message-ID: <1323237434-4919-1-git-send-email-tarun.kanti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 6 Dec 2011, Russell King - ARM Linux wrote:
+Since omap_dm_timer_write_reg/__omap_dm_timer_write is now modified
+to use timer->func_base OCP_CFG should not use this wrapper anymore.
+Instead use __raw_writel() directly and use timer->io_base instead
+to write to OCP_CFG.
 
-> On Tue, Dec 06, 2011 at 10:14:39AM +0000, Will Deacon wrote:
-> > Hi Russell,
-> > 
-> > On Mon, Dec 05, 2011 at 11:23:42PM +0000, Russell King - ARM Linux wrote:
-> > > On Fri, Dec 02, 2011 at 04:08:33PM +0000, Will Deacon wrote:
-> > > > The following changes since commit 2d13ccaa8797d7e599f3792aed4b1e44b47f94a5:
-> > > > 
-> > > >   Merge branch 'irqchip-consolidation' of git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms into devel-stable (2011-11-21 21:56:56 +0000)
-> > > 
-> > > As this is known to be broken on OMAP, could I have this based upon
-> > > some other commit - maybe ba8bb18a03f which I've just committed into
-> > > devel-stable (which is the second 'fix' patch for OMAP) please.
-> > 
-> > I'm struggling to pull from you [1] at the moment, but I'll rebase this once I
-> > manage to get the updated devel-stable.
-> 
-> It looks like the machine is hitting the memory and disk io bandwidth
-> limits.  Unfortunately, git seems to have high demands for both of those,
-> weighing in at around 300-400MB per pack process, and seemingly wanting
-> to read all the pack files too.
+The timer->sys_stat is valid only if timer->revision is 1. In the
+context restore function make this correction.
 
-Make sure the repo on that machine is nicely packed.  Running "git gc" 
-(gc as in garbage collect) once in a while is a good thing to do, 
-especially that you now have the smart HTTP protocol enabled.  That will 
-bring the memory usage way down, and serving requests will be much 
-faster too.  It is safe to put that in a cron job once a week or so, 
-even if concurrent requests are being serviced.
+Save the contexts and loss count when timer is stopped.
+Also, disable the clock. Else, clock usecount would become imbalanced.
 
+Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
+Tested-by: Omar Ramirez Luna <omar.ramirez@ti.com>
+---
+Simplified checks around context loss count read.
 
-Nicolas
+Baseline: git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux-2.6.git
+Branch: master
+Commit: b835c0f
+
+ arch/arm/plat-omap/dmtimer.c |   19 ++++++++++++++++---
+ 1 files changed, 16 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/plat-omap/dmtimer.c b/arch/arm/plat-omap/dmtimer.c
+index af3b92b..0b77fe8 100644
+--- a/arch/arm/plat-omap/dmtimer.c
++++ b/arch/arm/plat-omap/dmtimer.c
+@@ -80,9 +80,9 @@ static void omap_dm_timer_write_reg(struct omap_dm_timer *timer, u32 reg,
+ 
+ static void omap_timer_restore_context(struct omap_dm_timer *timer)
+ {
+-	omap_dm_timer_write_reg(timer, OMAP_TIMER_OCP_CFG_OFFSET,
+-				timer->context.tiocp_cfg);
+-	if (timer->revision > 1)
++	__raw_writel(timer->context.tiocp_cfg,
++			timer->io_base + OMAP_TIMER_OCP_CFG_OFFSET);
++	if (timer->revision == 1)
+ 		__raw_writel(timer->context.tistat, timer->sys_stat);
+ 
+ 	__raw_writel(timer->context.tisr, timer->irq_stat);
+@@ -357,6 +357,19 @@ int omap_dm_timer_stop(struct omap_dm_timer *timer)
+ 
+ 	__omap_dm_timer_stop(timer, timer->posted, rate);
+ 
++	if (timer->loses_context && timer->get_context_loss_count)
++		timer->ctx_loss_count =
++			timer->get_context_loss_count(&timer->pdev->dev);
++
++	/*
++	 * Since the register values are computed and written within
++	 * __omap_dm_timer_stop, we need to use read to retrieve the
++	 * context.
++	 */
++	timer->context.tclr =
++			omap_dm_timer_read_reg(timer, OMAP_TIMER_CTRL_REG);
++	timer->context.tisr = __raw_readl(timer->irq_stat);
++	omap_dm_timer_disable(timer);
+ 	return 0;
+ }
+ EXPORT_SYMBOL_GPL(omap_dm_timer_stop);
+-- 
+1.7.0.4
