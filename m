@@ -1,78 +1,85 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 07 Dec 2011 10:24:36 -0600
-Subject: [PATCH 2/4] arm: exynos4: add irq_domain support for wakeup
- interrupts
-In-Reply-To: <1323266392-28330-3-git-send-email-thomas.abraham@linaro.org>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Wed, 7 Dec 2011 22:19:41 +0530
+Subject: [PATCH 4/4] arm: exynos4: add device tree support for external
+ wakeup interrupt controller
+In-Reply-To: <4EDF9169.2030100@gmail.com>
 References: <1323266392-28330-1-git-send-email-thomas.abraham@linaro.org>
  <1323266392-28330-2-git-send-email-thomas.abraham@linaro.org>
  <1323266392-28330-3-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <4EDF9344.7040003@gmail.com>
+ <1323266392-28330-4-git-send-email-thomas.abraham@linaro.org>
+ <1323266392-28330-5-git-send-email-thomas.abraham@linaro.org>
+ <4EDF9169.2030100@gmail.com>
+Message-ID: <CAJuYYwSp_5Bvcz7JqP7u6xd5DQXBRroezFNCRNh=A=Vf+pAhZA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thomas,
+Hi Rob,
 
-On 12/07/2011 07:59 AM, Thomas Abraham wrote:
-> Add irq_domain support for the 32 wakeup interrupt sources.
-> 
-> Cc: Grant Likely <grant.likely@secretlab.ca>
-> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
-> ---
->  arch/arm/mach-exynos/include/mach/regs-gpio.h |    4 +-
->  arch/arm/mach-exynos/irq-eint.c               |   69 ++++++++++++++++---------
->  2 files changed, 46 insertions(+), 27 deletions(-)
-> 
+On 7 December 2011 21:46, Rob Herring <robherring2@gmail.com> wrote:
+> On 12/07/2011 07:59 AM, Thomas Abraham wrote:
+>> Add device tree support for external wakeup source interrupt controller
+>> on Exynos4.
+>>
+>> Cc: Rob Herring <rob.herring@calxeda.com>
+>> Cc: Grant Likely <grant.likely@secretlab.ca>
+>> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+>> ---
 
-[snip]
+[...]
 
-> @@ -193,22 +199,35 @@ static void exynos4_irq_eint0_15(unsigned int irq, struct irq_desc *desc)
->  
->  int __init exynos4_init_irq_eint(void)
->  {
-> -	int irq;
-> +	int irq, hwirq;
-> +	struct irq_domain *domain = &exynos4_eint_irq_domain;
-> +
-> +	domain->irq_base = irq_alloc_descs(IRQ_EINT(0), IRQ_EINT(0),
+>> diff --git a/Documentation/devicetree/bindings/arm/samsung/wakeup-eint.txt b/Documentation/devicetree/bindings/arm/samsung/wakeup-eint.txt
+>> new file mode 100644
+>> index 0000000..0ca5782
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/arm/samsung/wakeup-eint.txt
+>> @@ -0,0 +1,14 @@
+>> +* Samsung Exynos4 External Wakeup Interrupt Source Controller
+>> +
+>> +Samsung Exynos4 processor supports 32 external wakeup interrupt sources. First
+>> +16 of these interrupts are directly connected to GIC and the rest 16 of the
+>> +interrupts are grouped together to deliver a single interrupt to GIC.
+>> +
+>> +Required properties:
+>> +
+>> +- compatible: should be "samsung,exynos4210-wakeup-eint".
+>> +- interrupt-controller: Identifies the node as an interrupt controller.
+>> +- interrupt-cells: Specifies the number of cells required to specify the
+>> + ? ?interrupt source number. The value of should be <2>. The first cell
+>> + ? ?represents the wakeup interrupt source number and the second cell
+>> + ? ?should be zero (currently unused).
+>
+> interrupt-parent needs to be set to the gic?
 
-Can this be dynamic and remove any compile time knowledge of the irq base?
+Yes, I missed that. gic is set as the interrupt parent in the root
+node and all child nodes inherit it. I will add interrupt-parent as
+the required property as list gic as the parent.
 
-> +						EXYNOS4_EINT_NR, 0);
-> +	if (domain->irq_base < 0) {
-> +		pr_err("exynos4_init_irq_eint: Failed to alloc irq descs\n");
-> +		return -EBUSY;
+>
+>> diff --git a/arch/arm/mach-exynos/cpu.c b/arch/arm/mach-exynos/cpu.c
 
-You will hit this error with sparse irq unless you set nr_irq in mach
-desc to NR_IRQ_LEGACY (16).
+[...]
 
-> +	}
-> +	domain->nr_irq = EXYNOS4_EINT_NR;
-> +	domain->ops = &irq_domain_simple_ops;
-> +	irq_domain_add(domain);
->  
-> -	for (irq = 0 ; irq <= 31 ; irq++) {
-> -		irq_set_chip_and_handler(IRQ_EINT(irq), &exynos4_irq_eint,
-> +	irq_domain_for_each_irq(domain, hwirq, irq) {
-> +		irq_set_chip_and_handler(irq, &exynos4_irq_eint,
->  					 handle_level_irq);
-> -		set_irq_flags(IRQ_EINT(irq), IRQF_VALID);
-> +		set_irq_flags(irq, IRQF_VALID);
->  	}
->  
->  	irq_set_chained_handler(IRQ_EINT16_31, exynos4_irq_demux_eint16_31);
-> +	irq_set_handler_data(IRQ_EINT16_31, &domain->irq_base);
->  
-> -	for (irq = 0 ; irq <= 15 ; irq++) {
-> -		eint0_15_data[irq] = IRQ_EINT(irq);
-> +	for (hwirq = 0 ; hwirq <= 15 ; hwirq++) {
-> +		irq = irq_domain_to_irq(domain, hwirq);
-> +		eint0_15_data[irq] = irq;
->  
-> -		irq_set_handler_data(exynos4_irq_eint_to_gic_irq(irq),
-> +		irq_set_handler_data(exynos4_irq_eint_to_gic_irq(hwirq),
->  				     &eint0_15_data[irq]);
-> -		irq_set_chained_handler(exynos4_irq_eint_to_gic_irq(irq),
-> +		irq_set_chained_handler(exynos4_irq_eint_to_gic_irq(hwirq),
->  					exynos4_irq_eint0_15);
->  	}
->  
+>> +#ifdef CONFIG_OF
+>> + ? ? if (of_have_populated_dt()) {
+>> + ? ? ? ? ? ? domain->of_node = of_find_compatible_node(NULL, NULL,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? "samsung,exynos4210-wakeup-eint");
+>> + ? ? ? ? ? ? if (!domain->of_node)
+>> + ? ? ? ? ? ? ? ? ? ? pr_info("exynos4_init_irq_eint: of_node not found\n");
+>> + ? ? }
+>> +#endif
+>
+> Your function prototype is wrong for of_irq_init as it provides you the
+> node ptr.
+
+Thanks. I got this wrong. That would make the code above much simpler.
+I will fix this.
+
+>
+> Otherwise, the series looks pretty good.
+>
+> Rob
+
+Thanks for your review and comments.
+
+Regards,
+Thomas.
