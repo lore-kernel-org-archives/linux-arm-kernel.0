@@ -1,75 +1,63 @@
-From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
-Date: Wed, 07 Dec 2011 23:05:58 +0100
-Subject: Bug#651215: Kernel fails to boot on NSLU2
-In-Reply-To: <1323237747.18450.7.camel@deadeye> (Ben Hutchings's message of
- "Wed, 07 Dec 2011 06:02:27 +0000")
-References: <20111206194048.12063.82586.reportbug@vrnul03074nb.vr-netze.vrnet>
- <1323237747.18450.7.camel@deadeye>
-Message-ID: <8739cwxcjd.fsf@lebrac.rtp-net.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 7 Dec 2011 22:15:24 +0000
+Subject: [GIT PULL] Linux support for ARM LPAE
+In-Reply-To: <20111207202912.GE14542@n2100.arm.linux.org.uk>
+References: <20111202182054.GA3250@arm.com>
+ <20111206124109.GT14542@n2100.arm.linux.org.uk>
+ <20111206140729.GA31720@arm.com>
+ <20111206233058.GZ14542@n2100.arm.linux.org.uk>
+ <20111207112320.GB23720@arm.com> <20111207122544.GD23720@arm.com>
+ <20111207202912.GE14542@n2100.arm.linux.org.uk>
+Message-ID: <CAHkRjk7H+A4XKk+==hKPGdnUfaS4PePEf9-p-iO6eE=+xOmTWw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ben Hutchings <ben@decadent.org.uk> writes:
-Hi,
+On 7 December 2011 20:29, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Wed, Dec 07, 2011 at 12:25:44PM +0000, Catalin Marinas wrote:
+>> ARM: pgtable: Fix compiler warning in ioremap.c introduced by nopud
+>>
+>> From: Catalin Marinas <catalin.marinas@arm.com>
+>>
+>> With the arch/arm code conversion to pgtable-nopud.h, the section and
+>> supersection (un|re)map code triggers compiler warnings on UP systems.
+>> This is caused by pmd_offset() being given a pgd_t argument rather than
+>> a pud_t one. This patch makes the necessary conversion via pud_alloc()
+>> and pmd_alloc().
+>>
+>> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+>
+> So, do I now take this email as you saying that _your_ LPAE tree is
+> not ready for merging because you want to rework this patch, or what?
 
-> On Tue, 2011-12-06 at 20:40 +0100, Jochen Friedrich wrote:
->> Package: linux-image-3.1.0-1-ixp4xx
->> Severity: normal
->> 
->> While 3.0.0-6 booted OK on NSLU2 platform, 3.1.0-1 or -4 fails to do so.
->> 
->> Boot log:
-> [...]
->> [    0.000000] Linux version 3.1.0-1-ixp4xx (Debian 3.1.4-1) (waldi at debian.org)
->> (gcc version 4.6.2 (Debian 4.6.2-4) ) #1 Wed Nov 30 06:35:38 UTC 2011
->> [    0.000000] CPU: XScale-IXP42x Family [690541f1] revision 1 (ARMv5TE),
->> cr=0000397f
->> [    0.000000] CPU: VIVT data cache, VIVT instruction cache
->> [    0.000000] Machine: Linksys NSLU2
-> [...]
->> [    3.269860] ehci_hcd: USB 2.0 'Enhanced' Host Controller (EHCI) Driver
->> [    3.350596] PCI: enabling device 0000:00:01.2 (0140 -> 0142)
->> [    3.356553] ehci_hcd 0000:00:01.2: EHCI Host Controller
->> [    3.452053] ehci_hcd 0000:00:01.2: new USB bus registered, assigned bus
->> number 1
->> [    3.459646] ehci_hcd 0000:00:01.2: coherent DMA mask 0x3ffffff is smaller
->> than system GFP_DMA mask 0xffffffff
->> [    3.570085] ehci_hcd 0000:00:01.2: coherent DMA mask 0x3ffffff is smaller
->> than system GFP_DMA mask 0xffffffff
->> [    3.680189] ehci_hcd 0000:00:01.2: coherent DMA mask 0x3ffffff is smaller
->> than system GFP_DMA mask 0xffffffff
->> (repeated over and over)
->
-> I assume that this has something to do with:
->
-> commit 650320181a08b64d4421c65c639cf47ad8cc2cd6
-> Author: Nicolas Pitre <nico@fluxnic.net>
-> Date:   Mon Jul 18 15:05:10 2011 -0400
->
->     ARM: change ARM_DMA_ZONE_SIZE into a variable
->
-> commit 7553ee777b513c3bc8f45bb9fc75fb1bbc584ba1
-> Author: Nicolas Pitre <nicolas.pitre@linaro.org>
-> Date:   Tue Jul 5 22:28:09 2011 -0400
->
->     ARM: mach-ixp4xx: move from ARM_DMA_ZONE_SIZE to mdesc->dma_zone_size
->
-> It's clear that the DMA zone size is supposed to be 64 MB on this
-> machine and I don't see why the DMA mask hasn't propagated correctly.
-> Any idea, Nicholas?
+No, I'm not, it's you saying that your nopud patch does not have any
+fix for the warnings, even though I had fixes posted for months. The
+same fix that's in my LPAE series was sent to you to include with your
+patch but instead you kept saying (even twice in the past week) that
+those warning had no fix. From that, I understand that you really
+don't consider my patch a proper fix for the compiler warnings.
 
-I may be wrong but it seems that arm_dma_zone_size is used before being
-set. It would be interesting if someone can boot test a nslu2 kernel with
-appended patch.
+> Because you've decided to go down the path of reworking this patch,
+> I consider it dangerous for me to just pull from your tree again - I've
+> no idea what I'd get, and I've no idea whether what's there is what you
+> want me to merge.
 
+I haven't changed anything in my LPAE branch, just posted an
+alternative fix-up for the nopud patch. Please _state_ clearly whether
+you consider my original (in the LPAE series) fixup valid or not. If
+yes, I'm happy that I don't have to rework anything.
 
-Thanks,
-Arnaud
+> What I want from you - by 5pm tomorrow so I can get this stuff merged -
+> is a pull request for the LPAE stuff as it was in your v2 pull request,
+> either based on top of _either_ my devel-stable (if you can get it - as
+> the machine is having severe problems running git atm) or with Will's
+> idmap changes merged into it _before_ the LPAE changes.
+>
+> I suspect you'll have to do the latter though, because I don't think I
+> can sort out git on the server at the moment.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: nslu2_debug.patch
-Type: text/x-diff
-Size: 943 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111207/af7b9578/attachment.bin>
+Yes, that's fine with me, I already talked to Will about this earlier
+today but wanted to get your reply first.
+
+-- 
+Catalin
