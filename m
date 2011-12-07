@@ -1,65 +1,83 @@
-From: dirk.behme@de.bosch.com (Dirk Behme)
-Date: Wed, 7 Dec 2011 08:50:35 +0100
-Subject: [PATCH] arm/imx6q: Rename Sabreauto to Armadillo2
-Message-ID: <1323244235-17127-1-git-send-email-dirk.behme@de.bosch.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 07 Dec 2011 16:52:44 +0900
+Subject: [PATCH v2] ARM: pl330: Fix a race condition
+In-Reply-To: <CAJe_Zhem0yTOV4L-kJ91fQN++hFzCUgjOfxSnJR25PuYNTedVQ@mail.gmail.com>
+References: <4E8C5425.80303@arm.com>
+ <1317892206-3600-1-git-send-email-javi.merino@arm.com>
+ <CAJuYYwTXf-XU0fdGT0+sggN-MEY3v7UHkfjNkM4+QUW464J9Ew@mail.gmail.com>
+ <4EB7B79A.2020004@arm.com> <000c01ccada6$f83f5be0$e8be13a0$%kim@samsung.com>
+ <4ED3B89E.7070903@arm.com> <000e01ccae48$d76a7ba0$863f72e0$%kim@samsung.com>
+ <4ED4AB9A.3060807@arm.com>
+ <CAJe_Zhem0yTOV4L-kJ91fQN++hFzCUgjOfxSnJR25PuYNTedVQ@mail.gmail.com>
+Message-ID: <03f001ccb4b5$3441f5c0$9cc5e140$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Sabreauto board was renamed to Armadillo2 recently. To avoid
-confusion, rename Sabreauto to Armadillo2/arm2.
+Jassi Brar wrote:
+> 
+> On 29 November 2011 15:23, Javi Merino <javi.merino@arm.com> wrote:
+> >>>>>> On Samsung's Exynos4 platform, while testing audio playback with
+> >>> i2s
+> >>>>>> interface, the above change causes the playback to freeze. The
+> >>>>>> _thrd_active(thrd) call always returns '1' and hence _start(thrd)
+> >>> is
+> >>>>>> not getting called.
+> >>>>>
+> >>>>> If _thrd_active(thrd) returns '1', that means there is an active
+> >>>>> transfer still running or, if it has finished, you haven't called
+> >>>>> pl330_update() to acknowledge that. ?pl330_update() calls _start()
+> >>> as
+> >>>>> soon as it can.
+> >>>>>
+> >>>>> drivers/dma/pl330.c registers the irq handler in pl330_probe(), so
+> >>>>> when
+> >>>>> the transaction finishes, pl330_update() should clear it and call
+> >>>>> _start(). ?If there is any outstanding transaction, it should start
+> >>>>> straight away. If there isn't, it would mark the channel as free,
+> >>> so
+> >>>>> _thrd_active() should return '0'. ?If _thrd_active() is still '1',
+> >>> then
+> >>>>> something has gone wrong in the way.
+> >>>>>
+> >>>>> Does this shed some light?
+> >>>>>
+> >>>>
+> >>>> Your patch makes the memcpy operation on dmatest.c and net DMA be
+> >>> frozen too
+> >>>> as well as Samsung audio playback.
+> >>>
+> >>> Is the IRQ correctly registered in drivers/dma/pl330.c:pl330_probe()?
+> >>> Do you get interrupts when the transfer finish?
+> >> Sure. IRQ works well.
+> >
+> > Ok, so can you check if pl330_update() is correctly marking the request
+> > as free? ?Do you know if there is another request in the queue when that
+> > happens?
+> >
+> > Thomas, you said in a previous email that _thrd_active() always returned
+> > '1'. ?Was that after a request in req[0] finished?
+> > ?- If so, can you check that MARK_FREE was actually called for that
+> > ? ?request in pl330_update()?
+> > ?- If it was after a request in req[1] finished and there was a
+> > ? ?request already waiting in req[0], can you debug why _start()
+> > ? ?didn't activate it.
+> >
+> Javi, could you please check if you too get the memcpy failure with
+> dmatest ?
 
-Signed-off-by: Dirk Behme <dirk.behme@de.bosch.com>
-CC: Shawn Guo <shawn.guo@linaro.org>
----
- Documentation/devicetree/bindings/arm/fsl.txt      |    4 ++--
- .../dts/{imx6q-sabreauto.dts => imx6q-arm2.dts}    |    4 ++--
- arch/arm/mach-imx/mach-imx6q.c                     |    2 +-
- 3 files changed, 5 insertions(+), 5 deletions(-)
- rename arch/arm/boot/dts/{imx6q-sabreauto.dts => imx6q-arm2.dts} (91%)
+(Please adding me in this thread)
 
-diff --git a/Documentation/devicetree/bindings/arm/fsl.txt b/Documentation/devicetree/bindings/arm/fsl.txt
-index c9848ad..1b81e99 100644
---- a/Documentation/devicetree/bindings/arm/fsl.txt
-+++ b/Documentation/devicetree/bindings/arm/fsl.txt
-@@ -21,6 +21,6 @@ i.MX53 Smart Mobile Reference Design Board
- Required root node properties:
-     - compatible = "fsl,imx53-smd", "fsl,imx53";
- 
--i.MX6 Quad SABRE Automotive Board
-+i.MX6 Quad Armadillo2 Board
- Required root node properties:
--    - compatible = "fsl,imx6q-sabreauto", "fsl,imx6q";
-+    - compatible = "fsl,imx6q-arm2", "fsl,imx6q";
-diff --git a/arch/arm/boot/dts/imx6q-sabreauto.dts b/arch/arm/boot/dts/imx6q-arm2.dts
-similarity index 91%
-rename from arch/arm/boot/dts/imx6q-sabreauto.dts
-rename to arch/arm/boot/dts/imx6q-arm2.dts
-index 072974e..b078b91 100644
---- a/arch/arm/boot/dts/imx6q-sabreauto.dts
-+++ b/arch/arm/boot/dts/imx6q-arm2.dts
-@@ -14,8 +14,8 @@
- /include/ "imx6q.dtsi"
- 
- / {
--	model = "Freescale i.MX6 Quad SABRE Automotive Board";
--	compatible = "fsl,imx6q-sabreauto", "fsl,imx6q";
-+	model = "Freescale i.MX6 Quad Armadillo2 Board";
-+	compatible = "fsl,imx6q-arm2", "fsl,imx6q";
- 
- 	chosen {
- 		bootargs = "console=ttymxc0,115200 root=/dev/mmcblk3p3 rootwait";
-diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
-index cf9a364..ce65375 100644
---- a/arch/arm/mach-imx/mach-imx6q.c
-+++ b/arch/arm/mach-imx/mach-imx6q.c
-@@ -75,7 +75,7 @@ static struct sys_timer imx6q_timer = {
- };
- 
- static const char *imx6q_dt_compat[] __initdata = {
--	"fsl,imx6q-sabreauto",
-+	"fsl,imx6q-arm2",
- 	"fsl,imx6q-sabrelite",
- 	NULL,
- };
--- 
-1.7.0.4
+Hi Javi,
+How was going on the test? If any update, please let us know.
+
+Vinod, I think, if the issue cannot be fixed soon, the patch should be
+reverted until clear the issue. Because according to Boojin Kim's test, it
+does not affect only Samsung stuff.
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
