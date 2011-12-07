@@ -1,33 +1,31 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 7 Dec 2011 13:25:07 -0800
-Subject: [RFC PATCH 00/11] arm:omap:am33xx: Add basic voltage, power,
- clock & HWMOD data
-In-Reply-To: <1321809555-13833-1-git-send-email-hvaibhav@ti.com>
-References: <1321809555-13833-1-git-send-email-hvaibhav@ti.com>
-Message-ID: <20111207212507.GM31337@atomide.com>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Wed, 7 Dec 2011 22:28:02 +0100
+Subject: [PATCH 1/3] PM: Provide an always on power domain governor
+In-Reply-To: <20111207123459.GB18715@opensource.wolfsonmicro.com>
+References: <1322765339-29879-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+ <201112062239.57001.rjw@sisk.pl>
+ <20111207123459.GB18715@opensource.wolfsonmicro.com>
+Message-ID: <201112072228.02916.rjw@sisk.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Vaibhav Hiremath <hvaibhav@ti.com> [111120 08:44]:
+On Wednesday, December 07, 2011, Mark Brown wrote:
+> On Tue, Dec 06, 2011 at 10:39:56PM +0100, Rafael J. Wysocki wrote:
+> > On Tuesday, December 06, 2011, Kukjin Kim wrote:
 > 
->  34 files changed, 7525 insertions(+), 15 deletions(-)
+> > > Rafael, please let me know the branch when you create it so that I can merge
+> > > it into Samsung tree to avoid other conflicts.
+> 
+> > I need an ack from Magnus or Paul on the shmobile patch. When I get one, I'll
+> > put patches [1/3] and [2/3] (new version) into my linux-next branch and then
+> > (after a few days spent in linux-next) to the pm-domains branch.  I'll let you
+> > know when that happens.
+> 
+> Well, I guess you could put patch 1 and 3 in then add 2 if an ack is
+> forthcoming for that - there's no direct dependency.
 
-Clearly we can't merge this amount of static SoC specific
-hwmod/mux data after the all that's been discussed over
-this year.
+It's been acked already, I'm going to pul all three patches into
+linux-pm/linux-next later today.
 
-We just have to have a better way of doing this.
-
-For now, we already have the SoC specific init functions
-available, so I suggest taking a hard look how to dynamically
-allocate these data structures and populate them with the
-SoC specific init functions.
-
-Then later on we may be able to pass some of the data such
-as module base addresses from device tree. But I'm guessing
-that the SoC specific inits should already squeeze this down
-into something tolerable.
-
-Regards,
-
-Tony
+Thanks,
+Rafael
