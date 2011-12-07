@@ -1,58 +1,29 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed,  7 Dec 2011 23:40:16 +0100
-Subject: [PATCH 1/2] ARM: only look for TCM on ARM926 and later
-Message-ID: <1323297616-22865-1-git-send-email-linus.walleij@linaro.org>
+Date: Wed,  7 Dec 2011 23:40:24 +0100
+Subject: [PATCH 2/2] ARM: activate TCM on the Integrator
+Message-ID: <1323297624-22901-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Integrator AP/CP can have a varying set of core modules, some
-(like ARM920T) are so old that trying to read the TCM status register
-with CP15 will make them hang. So we need to make sure that we are
-running on 926 or later in order to be able to activate this for
-the Integrator. (The Integrator with CM926EJ-S has 32+32 kb of TCM
-memory.)
+Some Integrator core modules have TCM memory, so let's turn it on
+if it's there.
 
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/kernel/tcm.c |   19 ++++++++++++++++---
- 1 files changed, 16 insertions(+), 3 deletions(-)
+ arch/arm/Kconfig |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/kernel/tcm.c b/arch/arm/kernel/tcm.c
-index 30e302d..700c876 100644
---- a/arch/arm/kernel/tcm.c
-+++ b/arch/arm/kernel/tcm.c
-@@ -180,9 +180,10 @@ static int __init setup_tcm_bank(u8 type, u8 bank, u8 banks,
-  */
- void __init tcm_init(void)
- {
--	u32 tcm_status = read_cpuid_tcmstatus();
--	u8 dtcm_banks = (tcm_status >> 16) & 0x03;
--	u8 itcm_banks = (tcm_status & 0x03);
-+	u32 cpuid = read_cpuid_id();
-+	u32 tcm_status;
-+	u8 dtcm_banks;
-+	u8 itcm_banks;
- 	size_t dtcm_code_sz = &__edtcm_data - &__sdtcm_data;
- 	size_t itcm_code_sz = &__eitcm_text - &__sitcm_text;
- 	char *start;
-@@ -191,6 +192,18 @@ void __init tcm_init(void)
- 	int ret;
- 	int i;
- 
-+	/*
-+	 * Prior to ARM926 there is no TCM, and trying to read the status
-+	 * register will hang the processor.
-+	 */
-+	if (((cpuid & 0x0008f000) == 0x00000000) &&
-+	    ((cpuid >> 4) < 0x926))
-+		return;
-+
-+	tcm_status = read_cpuid_tcmstatus();
-+	dtcm_banks = (tcm_status >> 16) & 0x03;
-+	itcm_banks = (tcm_status & 0x03);
-+
- 	/* Values greater than 2 for D/ITCM banks are "reserved" */
- 	if (dtcm_banks > 2)
- 		dtcm_banks = 0;
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index e084b7e..d9a4485 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -257,6 +257,7 @@ config ARCH_INTEGRATOR
+ 	select ARCH_HAS_CPUFREQ
+ 	select CLKDEV_LOOKUP
+ 	select HAVE_MACH_CLKDEV
++	select HAVE_TCM
+ 	select ICST
+ 	select GENERIC_CLOCKEVENTS
+ 	select PLAT_VERSATILE
 -- 
 1.7.6.4
