@@ -1,31 +1,33 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 7 Dec 2011 10:11:03 +0000
-Subject: [RFC v2 1/2] dma-buf: Introduce dma buffer sharing mechanism
-In-Reply-To: <CAB2ybb8-0_HupO95UUvLN9ovVxnU+uvn4UXbwqZLSFuC9MZs0w@mail.gmail.com>
-References: <1322816252-19955-1-git-send-email-sumit.semwal@ti.com>
- <201112051718.48324.arnd@arndb.de>
- <CAB2ybb8-0_HupO95UUvLN9ovVxnU+uvn4UXbwqZLSFuC9MZs0w@mail.gmail.com>
-Message-ID: <201112071011.03525.arnd@arndb.de>
+From: Josh.wu@atmel.com (Wu, Josh)
+Date: Wed, 7 Dec 2011 18:12:52 +0800
+Subject: [PATCH 1/2] [media] V4L: atmel-isi: add code to
+ enable/disableISI_MCK clock
+In-Reply-To: <20111207084958.GA14542@n2100.arm.linux.org.uk>
+References: <1322647604-30662-1-git-send-email-josh.wu@atmel.com>
+ <20111207084958.GA14542@n2100.arm.linux.org.uk>
+Message-ID: <4C79549CB6F772498162A641D92D5328039E9C15@penmb01.corp.atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 07 December 2011, Semwal, Sumit wrote:
-> >
-> > Do you have a use case for making the interface compile-time disabled?
-> > I had assumed that any code using it would make no sense if it's not
-> > available so you don't actually need this.
->
-> Ok. Though if we keep the interface compile-time disabled, the users
-> can actually check and fail or fall-back gracefully when the API is
-> not available; If I remove it, anyways the users would need to do the
-> same compile time check whether API is available or not, right?
+Hi, Russell King
 
-If you have to do a compile-time check for the config symbol, it's better
-to do it the way you did here than in the caller.
+On Wed, Dec 07, 2011 at 4:50 PM, Russell King wrote:
 
-My guess was that no caller would actually require this, because when you
-write a part of a subsystem to interact with the dma-buf infrastructure,
-you would always disable compilation of an extire file that deals with 
-everything related to struct dma_buf, not just stub out the calls.
+> On Wed, Nov 30, 2011 at 06:06:43PM +0800, Josh Wu wrote:
+>> +	/* Get ISI_MCK, provided by programmable clock or external clock
+*/
+>> +	isi->mck = clk_get(dev, "isi_mck");
+>> +	if (IS_ERR_OR_NULL(isi->mck)) {
 
-	Arnd
+> This should be IS_ERR()
+
+So it means the clk_get() will never return NULL even when clk structure
+is NULL in clk lookup entry. Right?
+
+>> +		dev_err(dev, "Failed to get isi_mck\n");
+>> +		ret = isi->mck ? PTR_ERR(isi->mck) : -EINVAL;
+
+>		ret = PTR_ERR(isi->mck);
+
+Best Regards,
+Josh Wu
