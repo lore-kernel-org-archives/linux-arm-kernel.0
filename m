@@ -1,45 +1,180 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 7 Dec 2011 13:40:35 +0000
-Subject: [RFC v2 1/2] dma-buf: Introduce dma buffer sharing mechanism
-In-Reply-To: <CAB2ybb-0mTdNXN82O1TUGVjhMZUQtQb07A3EVmmdxg3ngEc3Dw@mail.gmail.com>
-References: <1322816252-19955-1-git-send-email-sumit.semwal@ti.com>
- <CAF6AEGto-+oSqguuWyPunUbtE65GpNiXh21srQzrChiBQMb1Nw@mail.gmail.com>
- <CAB2ybb-0mTdNXN82O1TUGVjhMZUQtQb07A3EVmmdxg3ngEc3Dw@mail.gmail.com>
-Message-ID: <201112071340.35267.arnd@arndb.de>
+From: ming.lei@canonical.com (Ming Lei)
+Date: Wed, 7 Dec 2011 21:40:41 +0800
+Subject: [RFC PATCH v1 6/7] media: video: introduce face detection driver
+ module
+In-Reply-To: <4EDE90A3.7050900@gmail.com>
+References: <1322838172-11149-1-git-send-email-ming.lei@canonical.com>
+ <1322838172-11149-7-git-send-email-ming.lei@canonical.com>
+ <4EDD3DEE.6060506@gmail.com>
+ <CACVXFVPrAro=3t-wpbR_cVahzcx7SCa2J=s2nyyKfQ6SG-i0VQ@mail.gmail.com>
+ <4EDE90A3.7050900@gmail.com>
+Message-ID: <CACVXFVN=-0OQ_Tz+HznDug4baLmLNjxVE21gv6CGFoU+hzCtPQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 07 December 2011, Semwal, Sumit wrote:
-> Thanks for the excellent discussion - it indeed is very good learning
-> for the relatively-inexperienced me :)
-> 
-> So, for the purpose of dma-buf framework, could I summarize the
-> following and rework accordingly?:
-> 1. remove mmap() dma_buf_op [and mmap fop], and introduce cpu_start(),
-> cpu_finish() ops to bracket cpu accesses to the buffer. Also add
-> DMABUF_CPU_START / DMABUF_CPU_FINI IOCTLs?
+Hi,
 
-I think we'd be better off for now without the extra ioctls and
-just document that a shared buffer must not be exported to user
-space using mmap at all, to avoid those problems. Serialization
-between GPU and CPU is on a higher level than the dma_buf framework
-IMHO.
+On Wed, Dec 7, 2011 at 6:01 AM, Sylwester Nawrocki <snjw23@gmail.com> wrote:
+> On 12/06/2011 03:07 PM, Ming Lei wrote:
+>> Hi,
+>>
+>> Thanks for your review.
+>>
+>> On Tue, Dec 6, 2011 at 5:55 AM, Sylwester Nawrocki <snjw23@gmail.com> wrote:
+>>> Hi Ming,
+>>>
+>>> (I've pruned the Cc list, leaving just the mailing lists)
+>>>
+>>> On 12/02/2011 04:02 PM, Ming Lei wrote:
+>>>> This patch introduces one driver for face detection purpose.
+>>>>
+>>>> The driver is responsible for all v4l2 stuff, buffer management
+>>>> and other general things, and doesn't touch face detection hardware
+>>>> directly. Several interfaces are exported to low level drivers
+>>>> (such as the coming omap4 FD driver)which will communicate with
+>>>> face detection hw module.
+>>>>
+>>>> So the driver will make driving face detection hw modules more
+>>>> easy.
+>>>
+>>>
+>>> I would hold on for a moment on implementing generic face detection
+>>> module which is based on the V4L2 video device interface. We need to
+>>> first define an API that would be also usable at sub-device interface
+>>> level (http://linuxtv.org/downloads/v4l-dvb-apis/subdev.html).
+>>
+>> If we can define a good/stable enough APIs between kernel and user space,
+>> I think the patches can be merged first. For internal kernel APIs, we should
+>> allow it to evolve as new hardware comes or new features are to be introduced.
+>
+> I also don't see a problem in discussing it a bit more;)
 
-> 2. remove sg_sync* ops for now (and we'll see if we need to add them
-> later if needed)
+OK, fair enough, let's discuss it, :-)
 
-Just removing the sg_sync_* operations is not enough. We have to make
-the decision whether we want to allow
-a) only coherent mappings of the buffer into kernel memory (requiring
-an extension to the dma_map_ops on ARM to not flush caches at map/unmap
-time)
-b) not allowing any in-kernel mappings (same requirement on ARM, also
-limits the usefulness of the dma_buf if we cannot access it from the
-kernel or from user space)
-c) only allowing streaming mappings, even if those are non-coherent
-(requiring strict serialization between CPU (in-kernel) and dma users of
-the buffer)
+>
+>>
+>> I understand the API you mentioned here should belong to kernel internal
+>> API, correct me if it is wrong.
+>
+> Yes, I meant the in kernel design, i.e. generic face detection kernel module
+> and an OMAP4 FDIF driver. It makes lots of sense to separate common code
+> in this way, maybe even when there would be only OMAP devices using it.
 
-This issue has to be solved or we get random data corruption.
+Yes, that is the motivation of the generic FD module. I think we can focus on
+two use cases for the generic FD now:
 
-	Arnd
+- one is to detect faces from user space image data
+
+- another one is to detect faces in image data generated from HW(SoC
+internal bus, resize hardware)
+
+For OMAP4 hardware, input data is always from physically continuous
+memory directly, so it is very easy to support the two cases. For the
+use case 2,
+if buffer copy is to be avoided, we can use the coming shared dma-buf[1]
+to pass the image buffer produced by other HW to FD hw directly.
+
+For other FD hardware, if it supports to detect faces in image data from
+physically continuous memory, I think the patch is OK to support it.
+
+If the FD hw doesn't support to detect faces from physically continuous
+memory, I have some questions: how does user space app to parse the
+FD result if application can't get the input image data? If user space can
+get image data, how does it connect the image data with FD result? and
+what standard v4l2 ways(v4l2_buffer?) can the app use to describe the
+image data?
+
+> I'm sure now the Samsung devices won't fit in video output node based driver
+> design. They read image data in different ways and also the FD result format
+> is totally different.
+
+I think user space will need the FD result, so it is very important to define
+API to describe the FD result format to user space. And the input about your
+FD HW result format is certainly helpful to define the API.
+
+>>
+>>> AFAICS OMAP4 FDIF processes only data stored in memory, thus it seems
+>>> reasonable to use the videodev interface for passing data to the kernel
+>>> from user space.
+>>>
+>>> But there might be face detection devices that accept data from other
+>>> H/W modules, e.g. transferred through SoC internal data buses between
+>>> image processing pipeline blocks. Thus any new interfaces need to be
+>>> designed with such devices in mind.
+>>>
+>>> Also the face detection hardware block might now have an input DMA
+>>> engine in it, the data could be fed from memory through some other
+>>> subsystem (e.g. resize/colour converter). Then the driver for that
+>>> subsystem would implement a video node.
+>>
+>> I think the direct input image or frame data to FD should be from memory
+>> no matter the actual data is from external H/W modules or input DMA because
+>> FD will take lot of time to detect faces in one image or frame and FD can't
+>> have so much memory to cache several images or frames data.
+>
+> Sorry, I cannot provide much details at the moment, but there exists hardware
+> that reads data from internal SoC buses and even if it uses some sort of
+> cache memory it doesn't necessarily have to be available for the user.
+
+Without some hardware background, it is not easy to give a generic FD module
+design.
+
+> Still the FD result is associated with an image frame for such H/W, but not
+> necessarily with a memory buffer queued by a user application.
+
+For user space application, it doesn't make sense to handle FD results
+only without image data.  Even though there are other ways of input
+image data to FD, user space still need to know the image data, so it makes
+sense to associate FD result with a memory buffer.
+
+> How long it approximately takes to process single image for OMAP4 FDIF ?
+
+See the link[2], and my test result is basically consistent with the data.
+
+>>
+>> If you have seen this kind of FD hardware design, please let me know.
+>>
+>>> I'm for leaving the buffer handling details for individual drivers
+>>> and focusing on a standard interface for applications, i.e. new
+>>
+>> I think leaving buffer handling details in generic FD driver or
+>> individual drivers
+>> doesn't matter now, since it don't have effect on interfaces between kernel
+>> and user space.
+>
+> I think you misunderstood me. I wasn't talking about core/driver module split,
+> I meant we should not be making the user interface video node centric.
+>
+> I think for Samsung devices I'll need a capture video node for passing
+
+Why is it a capture video node instead of OUTPUT v4l2 device? I think the
+device name should be decided from the view of face detection function:
+FD need input image data and produce detection result.
+
+> the result to the user. So instead of associating FD result with a buffer index
+
+See the explanation above.
+
+> we could try to use the frame sequence number (struct v4l2_buffer.sequence,
+> http://linuxtv.org/downloads/v4l-dvb-apis/buffer.html#v4l2-buffer).
+>
+> It might be much better as the v4l2 events are associated with the frame
+> sequence. And if we use controls then you get control events for free,
+> and each event carries a frame sequence number int it
+> (http://linuxtv.org/downloads/v4l-dvb-apis/vidioc-dqevent.html).
+>
+> --
+>
+> Regards,
+> Sylwester
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+
+thanks,
+--
+Ming Lei
+
+[1], http://marc.info/?t=132281644700005&r=1&w=2
+[2], http://e2e.ti.com/support/embedded/linux/f/354/t/128938.aspx#462740
