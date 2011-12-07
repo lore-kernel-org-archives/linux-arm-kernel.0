@@ -1,47 +1,47 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Wed, 7 Dec 2011 21:22:03 +0100
-Subject: [PATCH 4/7] spi/pl022: move device disable to workqueue thread
-In-Reply-To: <CACRpkdYSGWAB29gHhKjpyEQDAaLoTbPM6-Qz0FosL3X4TNwxdg@mail.gmail.com>
-References: <1321950301-4782-1-git-send-email-linus.walleij@stericsson.com>
- <4ECB5D2E.1000906@st.com>
- <CACRpkdYSGWAB29gHhKjpyEQDAaLoTbPM6-Qz0FosL3X4TNwxdg@mail.gmail.com>
-Message-ID: <20111207202203.GA3744@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 7 Dec 2011 20:29:12 +0000
+Subject: [GIT PULL] Linux support for ARM LPAE
+In-Reply-To: <20111207122544.GD23720@arm.com>
+References: <20111202182054.GA3250@arm.com>
+ <20111206124109.GT14542@n2100.arm.linux.org.uk>
+ <20111206140729.GA31720@arm.com>
+ <20111206233058.GZ14542@n2100.arm.linux.org.uk>
+ <20111207112320.GB23720@arm.com> <20111207122544.GD23720@arm.com>
+Message-ID: <20111207202912.GE14542@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
-
-On Tue, Nov 22, 2011 at 10:28:44AM +0100, Linus Walleij wrote:
-> On Tue, Nov 22, 2011 at 9:28 AM, Viresh Kumar <viresh.kumar@st.com> wrote:
-> > On 11/22/2011 1:55 PM, Linus WALLEIJ wrote:
-> >> ? ? ? if (list_empty(&pl022->queue) || !pl022->running) {
-> >> + ? ? ? ? ? ? if (pl022->busy) {
-> >> + ? ? ? ? ? ? ? ? ? ? pm_runtime_put(&pl022->adev->dev);
-> >> + ? ? ? ? ? ? }
-> >
-> > We used to get warnings from checkpatch, for single line code inside {}.
-> > Don't we get them anymore?
+On Wed, Dec 07, 2011 at 12:25:44PM +0000, Catalin Marinas wrote:
+> ARM: pgtable: Fix compiler warning in ioremap.c introduced by nopud
 > 
-> It's driven by heuristics, I think it only warns on the first level since
-> elsewhere you may want braces for readability.
+> From: Catalin Marinas <catalin.marinas@arm.com>
 > 
-> But I'll take it out when I add you Reviewed-by...
+> With the arch/arm code conversion to pgtable-nopud.h, the section and
+> supersection (un|re)map code triggers compiler warnings on UP systems.
+> This is caused by pmd_offset() being given a pgd_t argument rather than
+> a pud_t one. This patch makes the necessary conversion via pud_alloc()
+> and pmd_alloc().
+> 
+> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 
-Does that imply you will send out a V3 of this series somewhen and I
-don't need to add this right now to the for-grant branch I am currently
-preparing?
+So, do I now take this email as you saying that _your_ LPAE tree is
+not ready for merging because you want to rework this patch, or what?
 
-Thanks,
+Because you've decided to go down the path of reworking this patch,
+I consider it dangerous for me to just pull from your tree again - I've
+no idea what I'd get, and I've no idea whether what's there is what you
+want me to merge.
 
-   Wolfram
+So, this is causing extra delay, and there's nothing _I_ can do about
+it at my end.
 
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111207/b856cd69/attachment.sig>
+This is getting completely out of hand.
+
+What I want from you - by 5pm tomorrow so I can get this stuff merged -
+is a pull request for the LPAE stuff as it was in your v2 pull request,
+either based on top of _either_ my devel-stable (if you can get it - as
+the machine is having severe problems running git atm) or with Will's
+idmap changes merged into it _before_ the LPAE changes.
+
+I suspect you'll have to do the latter though, because I don't think I
+can sort out git on the server at the moment.
