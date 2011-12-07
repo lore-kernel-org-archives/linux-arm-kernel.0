@@ -1,108 +1,84 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Wed, 7 Dec 2011 21:50:49 +0100
-Subject: [PATCH 4/4] ARM: OMAP2+: board-generic: Use of_irq_init API
-In-Reply-To: <1323291049-24964-1-git-send-email-b-cousson@ti.com>
-References: <1323291049-24964-1-git-send-email-b-cousson@ti.com>
-Message-ID: <1323291049-24964-5-git-send-email-b-cousson@ti.com>
+From: javi.merino@arm.com (Javi Merino)
+Date: Wed, 07 Dec 2011 20:54:16 +0000
+Subject: [PATCH v2] ARM: pl330: Fix a race condition
+In-Reply-To: <4EDF3989.3060108@arm.com>
+References: <4E8C5425.80303@arm.com>
+ <1317892206-3600-1-git-send-email-javi.merino@arm.com>
+ <CAJuYYwTXf-XU0fdGT0+sggN-MEY3v7UHkfjNkM4+QUW464J9Ew@mail.gmail.com>
+ <4EB7B79A.2020004@arm.com> <000c01ccada6$f83f5be0$e8be13a0$%kim@samsung.com>
+ <4ED3B89E.7070903@arm.com> <000e01ccae48$d76a7ba0$863f72e0$%kim@samsung.com>
+ <4ED4AB9A.3060807@arm.com>
+ <CAJe_Zhem0yTOV4L-kJ91fQN++hFzCUgjOfxSnJR25PuYNTedVQ@mail.gmail.com>
+ <03f001ccb4b5$3441f5c0$9cc5e140$%kim@samsung.com> <4EDF3989.3060108@arm.com>
+Message-ID: <4EDFD278.9090101@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the of_irq_init API introduced in 3.2 to handle
-interrupt-controller with DT.
-Update the irq_match table to map the proper XXX_of_init
-functions for INTC and GIC drivers.
+On 07/12/11 10:01, Javi Merino wrote:
+> On 07/12/11 07:52, Kukjin Kim wrote:
+>> Jassi Brar wrote:
+>>>
+>>> On 29 November 2011 15:23, Javi Merino <javi.merino@arm.com> wrote:
+>>>>>>>>> On Samsung's Exynos4 platform, while testing audio playback with
+>>>>>> i2s
+>>>>>>>>> interface, the above change causes the playback to freeze. The
+>>>>>>>>> _thrd_active(thrd) call always returns '1' and hence _start(thrd)
+>>>>>> is
+>>>>>>>>> not getting called.
+>>>>>>>>
+>>>>>>>> If _thrd_active(thrd) returns '1', that means there is an active
+>>>>>>>> transfer still running or, if it has finished, you haven't called
+>>>>>>>> pl330_update() to acknowledge that.  pl330_update() calls _start()
+>>>>>> as
+>>>>>>>> soon as it can.
+>>>>>>>>
+>>>>>>>> drivers/dma/pl330.c registers the irq handler in pl330_probe(), so
+>>>>>>>> when
+>>>>>>>> the transaction finishes, pl330_update() should clear it and call
+>>>>>>>> _start().  If there is any outstanding transaction, it should start
+>>>>>>>> straight away. If there isn't, it would mark the channel as free,
+>>>>>> so
+>>>>>>>> _thrd_active() should return '0'.  If _thrd_active() is still '1',
+>>>>>> then
+>>>>>>>> something has gone wrong in the way.
+>>>>>>>>
+>>>>>>>> Does this shed some light?
+>>>>>>>>
+>>>>>>>
+>>>>>>> Your patch makes the memcpy operation on dmatest.c and net DMA be
+>>>>>> frozen too
+>>>>>>> as well as Samsung audio playback.
+>>>>>>
+>>>>>> Is the IRQ correctly registered in drivers/dma/pl330.c:pl330_probe()?
+>>>>>> Do you get interrupts when the transfer finish?
+>>>>> Sure. IRQ works well.
+>>>>
+>>>> Ok, so can you check if pl330_update() is correctly marking the request
+>>>> as free?  Do you know if there is another request in the queue when that
+>>>> happens?
+>>>>
+>>>> Thomas, you said in a previous email that _thrd_active() always returned
+>>>> '1'.  Was that after a request in req[0] finished?
+>>>>  - If so, can you check that MARK_FREE was actually called for that
+>>>>    request in pl330_update()?
+>>>>  - If it was after a request in req[1] finished and there was a
+>>>>    request already waiting in req[0], can you debug why _start()
+>>>>    didn't activate it.
+>>>>
+>>> Javi, could you please check if you too get the memcpy failure with
+>>> dmatest ?
+>>
+>> (Please adding me in this thread)
+>>
+>> Hi Javi,
+>> How was going on the test? If any update, please let us know.
+> 
+> I'm currently very busy at work, I'll run it as soon as I can.
 
-Signed-off-by: Benoit Cousson <b-cousson@ti.com>
-Cc: Tony Lindgren <tony@atomide.com>
-Cc: Rob Herring <rob.herring@calxeda.com>
----
- arch/arm/mach-omap2/board-generic.c |   30 ++++++++++++++++--------------
- 1 files changed, 16 insertions(+), 14 deletions(-)
+Ok, I think I've just reproduced it in my end with the kernel's dmatest
+module.  After the first transaction it looks like the dma test wasn't
+able to issue any more transactions.  I'll have a look at it tomorrow
+and try to answer my own questions ;)
 
-diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
-index a0e9595..16c301e 100644
---- a/arch/arm/mach-omap2/board-generic.c
-+++ b/arch/arm/mach-omap2/board-generic.c
-@@ -12,6 +12,7 @@
-  * published by the Free Software Foundation.
-  */
- #include <linux/io.h>
-+#include <linux/of_irq.h>
- #include <linux/of_platform.h>
- #include <linux/irqdomain.h>
- #include <linux/i2c/twl.h>
-@@ -24,6 +25,17 @@
- #include "common.h"
- #include "common-board-devices.h"
- 
-+static struct of_device_id irq_match[] __initdata = {
-+	{ .compatible = "ti,omap2-intc", .data = intc_of_init, },
-+	{ .compatible = "arm,cortex-a9-gic", .data = gic_of_init, },
-+	{ }
-+};
-+
-+static void __init omap_init_irq(void)
-+{
-+	of_irq_init(irq_match);
-+}
-+
- /*
-  * XXX: Still needed to boot until the i2c & twl driver is adapted to
-  * device-tree
-@@ -58,18 +70,8 @@ static struct of_device_id omap_dt_match_table[] __initdata = {
- 	{ }
- };
- 
--static struct of_device_id intc_match[] __initdata = {
--	{ .compatible = "ti,omap3-intc", },
--	{ .compatible = "arm,cortex-a9-gic", },
--	{ }
--};
--
- static void __init omap_generic_init(void)
- {
--	struct device_node *node = of_find_matching_node(NULL, intc_match);
--	if (node)
--		irq_domain_add_simple(node, 0);
--
- 	omap_serial_init();
- 	omap_sdrc_init(NULL, NULL);
- 
-@@ -103,7 +105,7 @@ DT_MACHINE_START(OMAP242X_DT, "Generic OMAP2420 (Flattened Device Tree)")
- 	.reserve	= omap_reserve,
- 	.map_io		= omap242x_map_io,
- 	.init_early	= omap2420_init_early,
--	.init_irq	= omap2_init_irq,
-+	.init_irq	= omap_init_irq,
- 	.handle_irq	= omap2_intc_handle_irq,
- 	.init_machine	= omap_generic_init,
- 	.timer		= &omap2_timer,
-@@ -122,7 +124,7 @@ DT_MACHINE_START(OMAP243X_DT, "Generic OMAP2430 (Flattened Device Tree)")
- 	.reserve	= omap_reserve,
- 	.map_io		= omap243x_map_io,
- 	.init_early	= omap2430_init_early,
--	.init_irq	= omap2_init_irq,
-+	.init_irq	= omap_init_irq,
- 	.handle_irq	= omap2_intc_handle_irq,
- 	.init_machine	= omap_generic_init,
- 	.timer		= &omap2_timer,
-@@ -141,7 +143,7 @@ DT_MACHINE_START(OMAP3_DT, "Generic OMAP3 (Flattened Device Tree)")
- 	.reserve	= omap_reserve,
- 	.map_io		= omap3_map_io,
- 	.init_early	= omap3430_init_early,
--	.init_irq	= omap3_init_irq,
-+	.init_irq	= omap_init_irq,
- 	.handle_irq	= omap3_intc_handle_irq,
- 	.init_machine	= omap3_init,
- 	.timer		= &omap3_timer,
-@@ -160,7 +162,7 @@ DT_MACHINE_START(OMAP4_DT, "Generic OMAP4 (Flattened Device Tree)")
- 	.reserve	= omap_reserve,
- 	.map_io		= omap4_map_io,
- 	.init_early	= omap4430_init_early,
--	.init_irq	= gic_init_irq,
-+	.init_irq	= omap_init_irq,
- 	.handle_irq	= gic_handle_irq,
- 	.init_machine	= omap4_init,
- 	.timer		= &omap4_timer,
--- 
-1.7.0.4
+Cheers,
+Javi
