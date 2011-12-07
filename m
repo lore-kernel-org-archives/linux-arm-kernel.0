@@ -1,81 +1,51 @@
-From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
-Date: Wed, 7 Dec 2011 11:49:09 +0100
-Subject: [PATCH][NET] several cleanups and bugfixes for fec.c: preserve
- MII/RMII setting in fec_stop()
-In-Reply-To: <20111207105816.GH5550@S2100-06.ap.freescale.net>
-References: <cover.1323163127.git.LW@KARO-electronics.de>
- <d6f4de9e4cfb393754b42815a2ef1a59c96eab83.1323163127.git.LW@KARO-electronics.de>
- <20111207094146.GG5550@S2100-06.ap.freescale.net>
- <20191.17172.493079.722098@ipc1.ka-ro>
- <20111207105816.GH5550@S2100-06.ap.freescale.net>
-Message-ID: <20191.17573.87285.411253@ipc1.ka-ro>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 7 Dec 2011 10:59:13 +0000
+Subject: [GIT PULL v2] Linux support for ARM LPAE
+In-Reply-To: <20111206231630.GY14542@n2100.arm.linux.org.uk>
+References: <20111206152955.GC31720@arm.com>
+ <20111206203416.GV14542@n2100.arm.linux.org.uk>
+ <CAHkRjk6ATr1thCL+-Cb4bOiObVmXrcoqvBiEBVzss_dATjt1VA@mail.gmail.com>
+ <20111206231630.GY14542@n2100.arm.linux.org.uk>
+Message-ID: <20111207105913.GA23720@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Shawn Guo writes:
-> On Wed, Dec 07, 2011 at 11:42:28AM +0100, Lothar Wa?mann wrote:
-> > Hi,
+On Tue, Dec 06, 2011 at 11:16:30PM +0000, Russell King - ARM Linux wrote:
+> On Tue, Dec 06, 2011 at 10:24:28PM +0000, Catalin Marinas wrote:
+> > On 6 December 2011 20:34, Russell King - ARM Linux
+> > <linux@arm.linux.org.uk> wrote:
+> > > As I said, I will merge it this time around, but next time I won't.
 > > 
-> > Shawn Guo writes:
-> > > On Tue, Dec 06, 2011 at 11:27:14AM +0100, Lothar Wa?mann wrote:
-> > > > Additionally to setting the ETHER_EN bit in FEC_ECNTRL the MII/RMII
-> > > > setting in FEC_R_CNTRL needs to be preserved to keep the MII interface
-> > > 
-> > > s/MII/RMII?  From what I see from imx28 and imx6q RM, the reset state
-> > > for this setting is MII mode.
-> > > 
-> > > > functional.
-> > > > 
-> > > > Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
-> > > > ---
-> > > >  drivers/net/ethernet/freescale/fec.c |    5 ++++-
-> > > >  1 files changed, 4 insertions(+), 1 deletions(-)
-> > > 
-> > > I assume this is fixing a problem you are seeing on imx28 only.
-> > > Do you see the problem on imx53/51?
-> > > 
-> > No. i.MX53 uses the RMII gasket which is not affected by resetting the
-> > controller. And imMX51 does not support RMII at all.
-> > 
-> > > > 
-> > > > diff --git a/drivers/net/ethernet/freescale/fec.c b/drivers/net/ethernet/freescale/fec.c
-> > > > index 11534b9..ab0afb5 100644
-> > > > --- a/drivers/net/ethernet/freescale/fec.c
-> > > > +++ b/drivers/net/ethernet/freescale/fec.c
-> > > > @@ -515,6 +515,7 @@ fec_stop(struct net_device *ndev)
-> > > >  	struct fec_enet_private *fep = netdev_priv(ndev);
-> > > >  	const struct platform_device_id *id_entry =
-> > > >  				platform_get_device_id(fep->pdev);
-> > > > +	u32 rmii_mode = readl(fep->hwp + FEC_R_CNTRL) & (1 << 8);
-> > > 
-> > > This bit is only available on ENET (imx28 and imx6q).  Do we want to
-> > > do the same thing for FEC (imx25/27/35/51/53)?
-> > > 
-> > No. AFAICT that's not necessary there.
-> > 
-> So you need to check it's actually running on ENET before accessing
-> the bit.
+> > As I also said above, there are solutions. What it is really needed is
+> > _better_ collaboration during merges and _discussing_ the best
+> > approach rather than threatening that there won't be other pulls.
 > 
-That's done in the place where the register is being written:
-|	if (id_entry->driver_data & FEC_QUIRK_ENET_MAC) {
-|		writel(2, fep->hwp + FEC_ECNTRL);
-|		writel(rmii_mode, fep->hwp + FEC_R_CNTRL);
-|	}
+> And what about the email from Philippe on me rejecting your first pull
+> request?  There is no need to try to exert commercial pressures when the
+> problems are legal and technical.
 
-We could save one register read by doing the check also for the read,
-but that would further complicate the code.
+I'm not discussing Philippe's email publicly (as it was in private).
 
+>From my perspective, the tone of your email suggested more of a good
+opportunity not to merge LPAE (and in subsequent emails doing ARM a
+great favour by only accepting it this time) rather than a more
+constructive 'fix this before merging'.
 
-Lothar Wa?mann
+Since you mentioned commercial pressures, yes, there are many, but I'm
+not sure you are aware of all of them (many companies haven't publicly
+announced their plans, though they have very aggressive targets). I am
+asked on a weekly basis when features like LPAE (or other bug-fixes -
+TLBs, ASIDs) get into mainline. I can't really answer as it does not
+depend on me and I don't have any visibility on when it would happen.
+Long delays is not a problem, it's predictability that matters. As a
+temporary (can be 1-2 years) workaround, I have to recommend them to use
+one of my development trees (e.g. linux-arm-arch).
+
+On the positive side, more and more companies rely on the mainline
+kernel and many of them don't even trust a set of patches unless it's in
+the mainline kernel. The Linux community complained in the past that
+companies forked the kernel and used old versions but now we should
+really help those that want to stay up to date with the latest mainline.
+
 -- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+Catalin
