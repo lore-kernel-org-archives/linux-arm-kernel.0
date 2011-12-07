@@ -1,77 +1,47 @@
-From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
-Date: Wed, 7 Dec 2011 09:47:38 +0100
-Subject: [PATCH][NET] several cleanups and bugfixes for fec.c: don't
- munge MAC address from platform data
-In-Reply-To: <20111207085702.GE5550@S2100-06.ap.freescale.net>
-References: <cover.1323163127.git.LW@KARO-electronics.de>
- <55b78c1766da5b0d0d679f5eae3fb9fc74a6ceef.1323163127.git.LW@KARO-electronics.de>
- <20111206124857.GB14048@sapphire.tkos.co.il>
- <20190.7244.156557.313315@ipc1.ka-ro>
- <20111207085702.GE5550@S2100-06.ap.freescale.net>
-Message-ID: <20191.10282.826634.821906@ipc1.ka-ro>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 07 Dec 2011 17:48:33 +0900
+Subject: [GIT PULL] Samsung fixes-2 for v3.2
+Message-ID: <03f401ccb4bd$00421090$00c631b0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Arnd,
 
-Shawn Guo writes:
-> On Tue, Dec 06, 2011 at 02:44:44PM +0100, Lothar Wa?mann wrote:
-> > Hi,
-> > 
-> > Baruch Siach writes:
-> > > Hi Lothar,
-> > > 
-> > > On Tue, Dec 06, 2011 at 11:27:13AM +0100, Lothar Wa?mann wrote:
-> > > > When the MAC address is supplied via platform_data it should be OK as
-> > > > it is and should not be modified in case of a dual FEC setup.
-> > > > Also copying the MAC from platform_data to the single 'macaddr'
-> > > > variable will overwrite the MAC for the first interface in case of a
-> > > > dual FEC setup.
-> > > > 
-> > > > Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
-> > > > ---
-> > > >  drivers/net/ethernet/freescale/fec.c |    2 +-
-> > > >  1 files changed, 1 insertions(+), 1 deletions(-)
-> > > > 
-> > > > diff --git a/drivers/net/ethernet/freescale/fec.c b/drivers/net/ethernet/freescale/fec.c
-> > > > index e2b5ce6..11534b9 100644
-> > > > --- a/drivers/net/ethernet/freescale/fec.c
-> > > > +++ b/drivers/net/ethernet/freescale/fec.c
-> > > > @@ -818,7 +818,7 @@ static void __inline__ fec_get_mac(struct net_device *ndev)
-> > > >  			iap = (unsigned char *)FEC_FLASHMAC;
-> > > >  #else
-> > > >  		if (pdata)
-> > > > -			memcpy(iap, pdata->mac, ETH_ALEN);
-> > > > +			iap = (unsigned char *)&pdata->mac;
-> > > 
-> > > Since pdata might point to __initdata struct, you must hold a copy of its 
-> > > content.
-> > > 
-> 
-> As iap will anyway be copied to ndev->dev_addr after that, it may still
-> be fine to take this patch, for obviously for different reason.
-> 
-> > No. platform_data must be present during the life time of a driver
-> > using it and thus must never be __initdata!
-> > 
-> Then we need to fix a lot of imx/mxc platform codes, mach-mx28evk.c
-> is the one for this case.
-> 
-Nope. The platform_data provided there is only a template that is
-copied to kmalloc'ed memory by the mxs_add...() functions.
+Please pull samsung-fixes-2 for v3.2.
+It includes small fixes for S3C64XX and update the Samsung field of MAINTAINERS.
 
-With actual platform_data in init memory no driver built as module
-would work.
+If any problems, please let me know.
 
+Thanks.
 
-Lothar Wa?mann
--- 
-___________________________________________________________
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
 
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+The following changes since commit 5611cc4572e889b62a7b4c72a413536bf6a9c416:
 
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+  Linux 3.2-rc4 (2011-12-01 14:56:01 -0800)
+
+are available in the git repository at:
+  git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git samsung-fixes-2
+
+Heiko Stuebner (1):
+      MAINTAINERS: Consolidate Samsung MAINTAINERS
+
+Kukjin Kim (1):
+      Merge branch 'next/topic-update-maintainer' into samsung-fixes-2
+
+Mark Brown (5):
+      MAINTAINERS: Add linux-samsung-soc mailing list for Samsung
+      MAINTAINERS: Extend Samsung patterns to cover SPI and ASoC drivers
+      ARM: S3C64XX: Remove extern from definition of framebuffer setup call
+      ARM: S3C64XX: Add linux/export.h to dev-spi.c
+      ARM: S3C64XX: Staticise s3c6400_sysclass
+
+ MAINTAINERS                            |   27 +++++----------------------
+ arch/arm/mach-s3c64xx/dev-spi.c        |    1 +
+ arch/arm/mach-s3c64xx/s3c6400.c        |    2 +-
+ arch/arm/mach-s3c64xx/setup-fb-24bpp.c |    2 +-
+ 4 files changed, 8 insertions(+), 24 deletions(-)
