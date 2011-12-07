@@ -1,71 +1,88 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 7 Dec 2011 15:06:19 +0000
-Subject: subarch maintainers: please send 3.3 pull requests for arm-soc
-Message-ID: <201112071506.19230.arnd@arndb.de>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 07 Dec 2011 15:24:02 +0000
+Subject: [GIT PULL] ARM perf updates for 3.3
+In-Reply-To: <4EDF757B.8020200@ti.com>
+References: <20111202170231.GP5540@mudshark.cambridge.arm.com>
+ <20111203092659.GL9581@n2100.arm.linux.org.uk>
+ <20111205211136.GF14542@n2100.arm.linux.org.uk>
+ <20111205231909.GA31337@atomide.com> <20111206000232.GC31337@atomide.com>
+ <20111206165215.GE31337@atomide.com> <4EDF757B.8020200@ti.com>
+Message-ID: <4EDF8512.2030001@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi everyone,
+On 07/12/11 14:17, Cousson, Benoit wrote:
+> + Marc
+> 
+> Hi Tony,
+> 
+> On 12/6/2011 5:52 PM, Tony Lindgren wrote:
+>> * Tony Lindgren<tony@atomide.com>  [111205 15:34]:
+>>> * Tony Lindgren<tony@atomide.com>  [111205 14:51]:
+>>>> * Russell King - ARM Linux<linux@arm.linux.org.uk>  [111205 12:40]:
+>>>>> Tony,
+>>>>>
+>>>>> Can you please treat this with the utmost urgency.  If I don't get a
+>>>>> reply from you within the next two hours, then I'm committing this
+>>>>> merge resolution whether or not it's correct for you - as I have other
+>>>>> stuff which needs to be committed to my tree and I can't wait any
+>>>>> longer for your reply.
+>>>>
+>>>> Sorry only now saw this. Looking at it now.
+>>>
+>>> Here's what I would do:
+>>>
+>>> 1. Apply Santosh' omap2plus_defconfig patches first into devel-stable at
+>>>     commit 53fadbdd83039bb1181e4ff76123d612cdf26c37 (Merge branch
+>>>     'irqchip-consolidation' ...). The patches in question are 7188/1 and
+>>>     patch 7189/1.
+>>>
+>>> 2. Pull Will's for-rmk branch on top of that
+>>>
+>>> 3. Run git mergetool which produces the resolution you posted earlier
+>>>
+>>> 4. Before committing apply the following build fix and run git update-index
+>>>     arch/arm/mach-omap2/display.c. This came from the DSS fixes in -rc4.
+>>>
+>>> Then it all builds and boots fine.
+>>
+>> Added the following fix into patch system as 7194/1. Russell, can you
+>> please apply that one into your devel-stable so we have a common
+>> base for folks to base other omap patches on?
+> 
+> Please note that we still have a regression for the OMAP3/4 DT boot on this branch.
+> The board-generic.c file was not updated for all the machine descriptors inside it
+> during irqchip-consolidation series.
+> 
+> The following patch fixes that.
+> 
+> Regards,
+> Benoit 
+> 
+> ---
+> From 0c8b4ed454ab9d5cbb267eaf236d0b14c7c6896a Mon Sep 17 00:00:00 2001
+> From: Benoit Cousson <b-cousson@ti.com>
+> Date: Wed, 7 Dec 2011 13:46:55 +0100
+> Subject: [PATCH] ARM: OMAP2+: board-generic: Add missing handle_irq callbacks
+> 
+> The following commit: 6b2f55d7851aa358d3a99cff344c560c4967f042,
+> is adding the support for the CONFIG_MULTI_IRQ_HANDLER but did
+> not update all the machine descriptors supported in the DT
+> board-generic.c file.
+> It thus break the DT boot on OMAP3 and OMAP4 boards.
+> 
+> Add the proper handle_irq callbacks for OMAP3 and OMAP4 generic
+> machine descriptors.
+> 
+> Signed-off-by: Benoit Cousson <b-cousson@ti.com>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  arch/arm/mach-omap2/board-generic.c |    4 ++++
+>  1 files changed, 4 insertions(+), 0 deletions(-)
 
-Let me first say I'm very happy with the bug fixes I received for the 3.2
-cycle. I'm about to send another bunch of those upstream now, and it's
-good to see how everyone is now placing the stable tags in the patches
-where necessary. I've been a bit slow in sending them out for -rc3/rc4
-after I returned from a lot of traveling and it was very good that
-Olof could handle the fixes for -rc2 before that.
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
-However, looking at the for-next branch in arm-soc, we have very few
-patches in total (thanks again to those of you who sumitted 3.3
-stuff already):
-
-~/linux-arm$ git branch
-  at91/gpio
-  at91/ioremap
-  drivers/macb-gem
-  drivers/macb-gem-cleanup
-  drivers/pxa-gpio
-  imx/move
-  msm/misc
-  msm/timer
-  mxs/saif
-  fixes
-  for-next
-~/linux-arm$ git log --oneline --no-merges fixes..for-next | wc -l
-66
-
-We are close to -rc5 now, so I would hope to have the majority of the
-patches that are coming for 3.3 in there by now. I realize that there
-is a lot of stuff that everyone is still working on, but there has
-to be more than this that you are happy to go into arm-soc already.
-Don't worry too much about bugs you are still looking for. All patches
-that are reviewed, ready to go into linux-next, and don't need to
-be rebased any more should go into arm-soc already.
-
-As usual, please split the pull requests into separate branches
-based on the type (bug fix, cleanup, new feature) and type of
-change (driver, board, soc, platform, ...). When you have
-interdependencies between the branches (e.g. a new feature depending
-on a cleanup), send one pull request for each branch and describe
-explictly why there is a dependency and in which order the pull
-requests should go. In the more common case that there are conflicts
-between branches (e.g. two branches doing similar but independent
-changes to the same file), base all conflicting branches on the same
--rc release and let us resolve the conflict in arm-soc. Sascha likes
-to provide a merge changeset for reference. This is very much
-appreciated for any complex merges, but in most simple cases it's
-not necessary.
-If you have dependencies or known conflicts with branches that don't
-go into arm-soc (e.g. Russell's ARM tree or Grant's DT tree), we
-can handle that, too, by importing the dependency as a separate
-branch into arm-soc and delaying the submission of your branch
-until the other one was merged, but you need to make sure that
-the branch you import does not get rebased any more, and you must
-not just cherry-pick patches from another branch.
-
-Finally, please address any arm-soc pull requests to both Olof
-and me, as we are sharing the load for 3.3. I have handled all
-pull requests since 3.2-rc2, but I expect things to get more
-busy between now and the merge window, so we should be prepared
-to split the work.
-
-	Arnd
+	M.
+-- 
+Jazz is not dead. It just smells funny...
