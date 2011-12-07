@@ -1,31 +1,31 @@
-From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Wed, 7 Dec 2011 22:28:02 +0100
-Subject: [PATCH 1/3] PM: Provide an always on power domain governor
-In-Reply-To: <20111207123459.GB18715@opensource.wolfsonmicro.com>
-References: <1322765339-29879-1-git-send-email-broonie@opensource.wolfsonmicro.com>
- <201112062239.57001.rjw@sisk.pl>
- <20111207123459.GB18715@opensource.wolfsonmicro.com>
-Message-ID: <201112072228.02916.rjw@sisk.pl>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Wed,  7 Dec 2011 13:36:06 -0800
+Subject: [PATCH] fault_inject: Don't select frame pointer with ARM unwind
+Message-ID: <1323293766-31394-1-git-send-email-lauraa@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, December 07, 2011, Mark Brown wrote:
-> On Tue, Dec 06, 2011 at 10:39:56PM +0100, Rafael J. Wysocki wrote:
-> > On Tuesday, December 06, 2011, Kukjin Kim wrote:
-> 
-> > > Rafael, please let me know the branch when you create it so that I can merge
-> > > it into Samsung tree to avoid other conflicts.
-> 
-> > I need an ack from Magnus or Paul on the shmobile patch. When I get one, I'll
-> > put patches [1/3] and [2/3] (new version) into my linux-next branch and then
-> > (after a few days spent in linux-next) to the pm-domains branch.  I'll let you
-> > know when that happens.
-> 
-> Well, I guess you could put patch 1 and 3 in then add 2 if an ack is
-> forthcoming for that - there's no direct dependency.
+CONFIG_FAULT_INJECTION_STACKTRACE_FILTER selects FRAME_POINTER.
+If ARM_UNWIND is used for backtracing, the FRAME_POINTER
+should not be selected.
 
-It's been acked already, I'm going to pul all three patches into
-linux-pm/linux-next later today.
+Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+---
+ lib/Kconfig.debug |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-Thanks,
-Rafael
+diff --git a/lib/Kconfig.debug b/lib/Kconfig.debug
+index 6a9e368..75b5d6b 100644
+--- a/lib/Kconfig.debug
++++ b/lib/Kconfig.debug
+@@ -1079,7 +1079,7 @@ config FAULT_INJECTION_STACKTRACE_FILTER
+ 	depends on FAULT_INJECTION_DEBUG_FS && STACKTRACE_SUPPORT
+ 	depends on !X86_64
+ 	select STACKTRACE
+-	select FRAME_POINTER if !PPC && !S390 && !MICROBLAZE
++	select FRAME_POINTER if !PPC && !S390 && !MICROBLAZE && !ARM_UNWIND
+ 	help
+ 	  Provide stacktrace filter for fault-injection capabilities
+ 
+-- 
+1.7.6
