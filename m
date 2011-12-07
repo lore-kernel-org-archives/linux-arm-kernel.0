@@ -1,29 +1,30 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 7 Dec 2011 22:57:18 +0000
-Subject: Bug#651215: Kernel fails to boot on NSLU2
-In-Reply-To: <8739cwxcjd.fsf@lebrac.rtp-net.org>
-References: <20111206194048.12063.82586.reportbug@vrnul03074nb.vr-netze.vrnet>
- <1323237747.18450.7.camel@deadeye> <8739cwxcjd.fsf@lebrac.rtp-net.org>
-Message-ID: <20111207225718.GI14542@n2100.arm.linux.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 7 Dec 2011 15:17:41 -0800
+Subject: [PATCH v4 1/3] ARM: OMAP: TI81XX: Prepare for addition of
+ TI814X support
+In-Reply-To: <1318210796-2357-1-git-send-email-hemantp@ti.com>
+References: <1318210796-2357-1-git-send-email-hemantp@ti.com>
+Message-ID: <20111207231741.GP31337@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 07, 2011 at 11:05:58PM +0100, Arnaud Patard wrote:
-> I may be wrong but it seems that arm_dma_zone_size is used before being
-> set. It would be interesting if someone can boot test a nslu2 kernel with
-> appended patch.
+* Hemant Pedanekar <hemantp@ti.com> [111009 18:06]:
+> This patch updates existing macros, functions used for TI816X, to enable
+> addition of other SoCs belonging to TI81XX family (e.g., TI814X).
+> 
+> The approach taken is to use TI81XX/ti81xx for code/data going to be common
+> across all TI81XX devices.
+> 
+> cpu_is_ti81xx() is introduced to handle code common across TI81XX devices.
+> 
+> In addition, ti8168_evm_map_io() is now replaced with ti81xx_map_io() and moved
+> in mach-omap2/common.c as same will be used for TI814X and is not board
+> specific.
 
-It does look like that's the case - arm_dma_zone_size is used in
-arm_bootmem_free(), which is called from bootmem_init() and in turn
-paging_init().
+Looks like this series needs a rebase after the map_io and common.h
+changes. Can you please rebase against the current omap soc branch at
+commit 24a5e092a387e4c8e93f33448da334bd3fd15192?
 
-So, arm_dma_zone_size needs to be set before paging_init() is called.
+Regards,
 
-I'd actually suggest moving it before:
-
-        if (mdesc->restart_mode)
-                reboot_setup(&mdesc->restart_mode);
-
-so that it's set real early, to avoid any future problems with this.
-The earlier these kinds of things are set, the less likely this kind
-of bug will happen.
+Tony
