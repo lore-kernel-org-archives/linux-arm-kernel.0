@@ -1,75 +1,108 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Wed, 7 Dec 2011 21:07:52 +0800
-Subject: [PATCH] arm/imx6q: Rename Sabreauto to Armadillo2
-In-Reply-To: <1323244235-17127-1-git-send-email-dirk.behme@de.bosch.com>
-References: <1323244235-17127-1-git-send-email-dirk.behme@de.bosch.com>
-Message-ID: <20111207130750.GP5550@S2100-06.ap.freescale.net>
+Date: Wed, 7 Dec 2011 21:28:29 +0800
+Subject: [PATCH][NET] several cleanups and bugfixes for fec.c: fix the
+ .remove code
+In-Reply-To: <04c11563fee748562d7b53d5e5b3c5cf37fef200.1323163127.git.LW@KARO-electronics.de>
+References: <cover.1323163127.git.LW@KARO-electronics.de>
+ <04c11563fee748562d7b53d5e5b3c5cf37fef200.1323163127.git.LW@KARO-electronics.de>
+Message-ID: <20111207132828.GQ5550@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 07, 2011 at 08:50:35AM +0100, Dirk Behme wrote:
-> The Sabreauto board was renamed to Armadillo2 recently. To avoid
-> confusion, rename Sabreauto to Armadillo2/arm2.
+On Tue, Dec 06, 2011 at 11:27:15AM +0100, Lothar Wa?mann wrote:
+> The .remove code is broken in several ways.
+>  - mdiobus_unregister() is called twice for the same object in case of dual FEC
+>  - phy_disconnect() is being called when the PHY is already disconnected
+>  - the requested IRQ(s) are not freed
+>  - fec_stop() is being called with the inteface already stopped
 > 
-> Signed-off-by: Dirk Behme <dirk.behme@de.bosch.com>
-> CC: Shawn Guo <shawn.guo@linaro.org>
+>  All of those lead to kernel crashes if the remove function is actually used.
+> 
+> Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
 > ---
->  Documentation/devicetree/bindings/arm/fsl.txt      |    4 ++--
->  .../dts/{imx6q-sabreauto.dts => imx6q-arm2.dts}    |    4 ++--
->  arch/arm/mach-imx/mach-imx6q.c                     |    2 +-
->  3 files changed, 5 insertions(+), 5 deletions(-)
->  rename arch/arm/boot/dts/{imx6q-sabreauto.dts => imx6q-arm2.dts} (91%)
+>  drivers/net/ethernet/freescale/fec.c |   30 +++++++++++++++++++++---------
+>  1 files changed, 21 insertions(+), 9 deletions(-)
 > 
-> diff --git a/Documentation/devicetree/bindings/arm/fsl.txt b/Documentation/devicetree/bindings/arm/fsl.txt
-> index c9848ad..1b81e99 100644
-> --- a/Documentation/devicetree/bindings/arm/fsl.txt
-> +++ b/Documentation/devicetree/bindings/arm/fsl.txt
-> @@ -21,6 +21,6 @@ i.MX53 Smart Mobile Reference Design Board
->  Required root node properties:
->      - compatible = "fsl,imx53-smd", "fsl,imx53";
+> diff --git a/drivers/net/ethernet/freescale/fec.c b/drivers/net/ethernet/freescale/fec.c
+> index ab0afb5..70ec7ec 100644
+> --- a/drivers/net/ethernet/freescale/fec.c
+> +++ b/drivers/net/ethernet/freescale/fec.c
+> @@ -235,6 +235,7 @@ struct fec_enet_private {
 >  
-> -i.MX6 Quad SABRE Automotive Board
-> +i.MX6 Quad Armadillo2 Board
->  Required root node properties:
-> -    - compatible = "fsl,imx6q-sabreauto", "fsl,imx6q";
-> +    - compatible = "fsl,imx6q-arm2", "fsl,imx6q";
-> diff --git a/arch/arm/boot/dts/imx6q-sabreauto.dts b/arch/arm/boot/dts/imx6q-arm2.dts
-> similarity index 91%
-> rename from arch/arm/boot/dts/imx6q-sabreauto.dts
-> rename to arch/arm/boot/dts/imx6q-arm2.dts
-> index 072974e..b078b91 100644
-> --- a/arch/arm/boot/dts/imx6q-sabreauto.dts
-> +++ b/arch/arm/boot/dts/imx6q-arm2.dts
-> @@ -14,8 +14,8 @@
->  /include/ "imx6q.dtsi"
->  
->  / {
-> -	model = "Freescale i.MX6 Quad SABRE Automotive Board";
-> -	compatible = "fsl,imx6q-sabreauto", "fsl,imx6q";
-> +	model = "Freescale i.MX6 Quad Armadillo2 Board";
-> +	compatible = "fsl,imx6q-arm2", "fsl,imx6q";
->  
->  	chosen {
->  		bootargs = "console=ttymxc0,115200 root=/dev/mmcblk3p3 rootwait";
-> diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
-> index cf9a364..ce65375 100644
-> --- a/arch/arm/mach-imx/mach-imx6q.c
-> +++ b/arch/arm/mach-imx/mach-imx6q.c
-> @@ -75,7 +75,7 @@ static struct sys_timer imx6q_timer = {
->  };
->  
->  static const char *imx6q_dt_compat[] __initdata = {
-> -	"fsl,imx6q-sabreauto",
-> +	"fsl,imx6q-arm2",
->  	"fsl,imx6q-sabrelite",
+>  	/* Phylib and MDIO interface */
+>  	struct	mii_bus *mii_bus;
+> +	int	mii_cnt;
+>  	struct	phy_device *phy_dev;
+>  	int	mii_timeout;
+>  	uint	phy_speed;
+> @@ -1040,8 +1041,12 @@ static int fec_enet_mii_init(struct platform_device *pdev)
+>  	 */
+>  	if ((id_entry->driver_data & FEC_QUIRK_ENET_MAC) && pdev->id > 0) {
+>  		/* fec1 uses fec0 mii_bus */
+> -		fep->mii_bus = fec0_mii_bus;
+> -		return 0;
+> +		if (fep->mii_cnt && fec0_mii_bus) {
 
-Mainline kernel does not have this sabrelite yet.  That said you need
-to create the patch against the mainline kernel (the latest -rc).
+This seems broken.  The second fec has its own fep and fep->mii_cnt is
+always 0 here.
 
 Regards,
 Shawn
 
->  	NULL,
->  };
+> +			fep->mii_bus = fec0_mii_bus;
+> +			fep->mii_cnt++;
+> +			return 0;
+> +		}
+> +		return -ENOENT;
+>  	}
+>  
+>  	fep->mii_timeout = 0;
+> @@ -1086,6 +1091,8 @@ static int fec_enet_mii_init(struct platform_device *pdev)
+>  	if (mdiobus_register(fep->mii_bus))
+>  		goto err_out_free_mdio_irq;
+>  
+> +	fep->mii_cnt++;
+> +
+>  	/* save fec0 mii_bus */
+>  	if (id_entry->driver_data & FEC_QUIRK_ENET_MAC)
+>  		fec0_mii_bus = fep->mii_bus;
+> @@ -1102,11 +1109,11 @@ err_out:
+>  
+>  static void fec_enet_mii_remove(struct fec_enet_private *fep)
+>  {
+> -	if (fep->phy_dev)
+> -		phy_disconnect(fep->phy_dev);
+> -	mdiobus_unregister(fep->mii_bus);
+> -	kfree(fep->mii_bus->irq);
+> -	mdiobus_free(fep->mii_bus);
+> +	if (--fep->mii_cnt == 0) {
+> +		mdiobus_unregister(fep->mii_bus);
+> +		kfree(fep->mii_bus->irq);
+> +		mdiobus_free(fep->mii_bus);
+> +	}
+>  }
+>  
+>  static int fec_enet_get_settings(struct net_device *ndev,
+> @@ -1646,13 +1653,18 @@ fec_drv_remove(struct platform_device *pdev)
+>  	struct net_device *ndev = platform_get_drvdata(pdev);
+>  	struct fec_enet_private *fep = netdev_priv(ndev);
+>  	struct resource *r;
+> +	int i;
+>  
+> -	fec_stop(ndev);
+> +	unregister_netdev(ndev);
+>  	fec_enet_mii_remove(fep);
+> +	for (i = 0; i < FEC_IRQ_NUM; i++) {
+> +		int irq = platform_get_irq(pdev, i);
+> +		if (irq > 0)
+> +			free_irq(irq, ndev);
+> +	}
+>  	clk_disable(fep->clk);
+>  	clk_put(fep->clk);
+>  	iounmap(fep->hwp);
+> -	unregister_netdev(ndev);
+>  	free_netdev(ndev);
+>  
+>  	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 > -- 
-> 1.7.0.4
+> 1.5.6.5
