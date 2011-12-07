@@ -1,86 +1,58 @@
-From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
-Date: Wed, 7 Dec 2011 11:42:28 +0100
-Subject: [PATCH][NET] several cleanups and bugfixes for fec.c: preserve
- MII/RMII setting in fec_stop()
-In-Reply-To: <20111207094146.GG5550@S2100-06.ap.freescale.net>
-References: <cover.1323163127.git.LW@KARO-electronics.de>
- <d6f4de9e4cfb393754b42815a2ef1a59c96eab83.1323163127.git.LW@KARO-electronics.de>
- <20111207094146.GG5550@S2100-06.ap.freescale.net>
-Message-ID: <20191.17172.493079.722098@ipc1.ka-ro>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Wed, 7 Dec 2011 10:42:25 +0000
+Subject: [RFC PATCH] ARM: Add generic instruction opcode manipulation
+ helpers
+In-Reply-To: <4EDEF81A.7080100@windriver.com>
+References: <1322220493-3251-1-git-send-email-dave.martin@linaro.org>
+ <20111206150855.GA5385@mudshark.cambridge.arm.com>
+ <20111206152033.GB13769@linaro.org>
+ <4EDEF81A.7080100@windriver.com>
+Message-ID: <20111207104212.GA2910@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Dec 07, 2011 at 01:22:34PM +0800, Bi Junxiao wrote:
+> on 12/06/2011 11:20 PM Dave Martin wrote:
+> >On Tue, Dec 06, 2011 at 03:08:55PM +0000, Will Deacon wrote:
+> >>Hi Dave,
+> >>
+> >>On Fri, Nov 25, 2011 at 11:28:13AM +0000, Dave Martin wrote:
+> >>>This patch adds some endianness-agnostic helpers to convert machine
+> >>>instructions between canonical integer form and in-memory
+> >>>representation, and also provides a transparent way to read a
+> >>>single Thumb instruction from memory, without the need to know the
+> >>>size in advance or write explicit condition checks.
+> >>>
+> >>>A canonical integer form for representing instructions is also
+> >>>formalised here.
+> >>>
+> >>>Signed-off-by: Dave Martin<dave.martin@linaro.org>
+> >>>---
+> >>>  arch/arm/include/asm/opcodes.h |  162 ++++++++++++++++++++++++++++++++++++++++
+> >>>  1 files changed, 162 insertions(+), 0 deletions(-)
+> >>>  create mode 100644 arch/arm/include/asm/opcodes.h
+> >>It looks like I might need to implement a basic disassembler for the
+> >>hw_breakpoint code and I would certainly like to reuse as much code as I
+> >>can. This header could obviously provide the code to fetch and format the
+> >>instruction, but it would be nice to have some extra helpers to aid
+> >>decoding.
+> >>
+> >>Tixy - how much work do you reckon it would be to rework your kprobes
+> >>decoding code into a generic `here are my callbacks, please decode this
+> >>instruction stream for me' type thing?
+> >>
+> >>All I want for hw_breakpoint is to know whether an instruction is a load or
+> >>a store, but even for that it looks like I'll need to duplicate a lot of
+> >>stuff.
+> >Note, I'm currently waiting on Leif to repost his opcodes.h before I
+> >repost my instration-swabbing additions on top of it, since the swabbing
+> >stuff seems to be strictly non-urgent.
+> I am also waiting for your patch to do my be8 fix.
 
-Shawn Guo writes:
-> On Tue, Dec 06, 2011 at 11:27:14AM +0100, Lothar Wa?mann wrote:
-> > Additionally to setting the ETHER_EN bit in FEC_ECNTRL the MII/RMII
-> > setting in FEC_R_CNTRL needs to be preserved to keep the MII interface
-> 
-> s/MII/RMII?  From what I see from imx28 and imx6q RM, the reset state
-> for this setting is MII mode.
-> 
-> > functional.
-> > 
-> > Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
-> > ---
-> >  drivers/net/ethernet/freescale/fec.c |    5 ++++-
-> >  1 files changed, 4 insertions(+), 1 deletions(-)
-> 
-> I assume this is fixing a problem you are seeing on imx28 only.
-> Do you see the problem on imx53/51?
-> 
-No. i.MX53 uses the RMII gasket which is not affected by resetting the
-controller. And imMX51 does not support RMII at all.
+OK -- in that case I will clean up and repost my patch anyway.
 
-> > 
-> > diff --git a/drivers/net/ethernet/freescale/fec.c b/drivers/net/ethernet/freescale/fec.c
-> > index 11534b9..ab0afb5 100644
-> > --- a/drivers/net/ethernet/freescale/fec.c
-> > +++ b/drivers/net/ethernet/freescale/fec.c
-> > @@ -515,6 +515,7 @@ fec_stop(struct net_device *ndev)
-> >  	struct fec_enet_private *fep = netdev_priv(ndev);
-> >  	const struct platform_device_id *id_entry =
-> >  				platform_get_device_id(fep->pdev);
-> > +	u32 rmii_mode = readl(fep->hwp + FEC_R_CNTRL) & (1 << 8);
-> 
-> This bit is only available on ENET (imx28 and imx6q).  Do we want to
-> do the same thing for FEC (imx25/27/35/51/53)?
-> 
-No. AFAICT that's not necessary there.
+The two proposed bits of functionality in that header are independent,
+so the later merge shouldn't affect what you're doing.
 
-> >  	/* We cannot expect a graceful transmit stop without link !!! */
-> >  	if (fep->link) {
-> > @@ -531,8 +532,10 @@ fec_stop(struct net_device *ndev)
-> >  	writel(FEC_DEFAULT_IMASK, fep->hwp + FEC_IMASK);
-> >  
-> >  	/* We have to keep ENET enabled to have MII interrupt stay working */
-> > -	if (id_entry->driver_data & FEC_QUIRK_ENET_MAC)
-> > +	if (id_entry->driver_data & FEC_QUIRK_ENET_MAC) {
-> >  		writel(2, fep->hwp + FEC_ECNTRL);
-> > +		writel(rmii_mode, fep->hwp + FEC_R_CNTRL);
-> > +	}
-> >  }
-> 
-> On imx6q, we have two bits, bit 6 and 8 of FEC_R_CNTRL, to select MII
-> interface among MII, RMII and RGMII modes.  I'm not sure if we will
-> run into the same problem for RGMII mode.  What's your test setup?
-> I would try to reproduce it here.
-> 
-I'm using a TX28 which has the Ethernet PHY connected in RMII
-mode. You should see the problem, if you unplug the ethernet cable on
-a configured link. Without this patch the kernel will not detect when
-the cable is plugged back in.
-
-
-Lothar Wa?mann
--- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+Cheers
+---Dave
