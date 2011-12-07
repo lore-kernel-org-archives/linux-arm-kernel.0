@@ -1,64 +1,40 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Wed, 7 Dec 2011 17:41:48 +0800
-Subject: [PATCH][NET] several cleanups and bugfixes for fec.c: preserve
- MII/RMII setting in fec_stop()
-In-Reply-To: <d6f4de9e4cfb393754b42815a2ef1a59c96eab83.1323163127.git.LW@KARO-electronics.de>
-References: <cover.1323163127.git.LW@KARO-electronics.de>
- <d6f4de9e4cfb393754b42815a2ef1a59c96eab83.1323163127.git.LW@KARO-electronics.de>
-Message-ID: <20111207094146.GG5550@S2100-06.ap.freescale.net>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 7 Dec 2011 10:35:14 +0100
+Subject: [PATCH] highmem: fix missed kmap_atomic update in
+ arch/arm/include/asm/highmem.h
+In-Reply-To: <1323249719.27710.2.camel@phoenix>
+References: <1323249719.27710.2.camel@phoenix>
+Message-ID: <20111207093514.GI4585@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 06, 2011 at 11:27:14AM +0100, Lothar Wa?mann wrote:
-> Additionally to setting the ETHER_EN bit in FEC_ECNTRL the MII/RMII
-> setting in FEC_R_CNTRL needs to be preserved to keep the MII interface
-
-s/MII/RMII?  From what I see from imx28 and imx6q RM, the reset state
-for this setting is MII mode.
-
-> functional.
+On Wed, Dec 07, 2011 at 05:21:59PM +0800, Axel Lin wrote:
+> commit 37bfbb "highmem: kill all __kmap_atomic()" missed the update to
+> arch/arm/include/asm/highmem.h.
 > 
-> Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
-> ---
->  drivers/net/ethernet/freescale/fec.c |    5 ++++-
->  1 files changed, 4 insertions(+), 1 deletions(-)
+> This patch fixes below build error:
+>   CC      init/main.o
+> In file included from include/linux/pagemap.h:10,
+>                  from include/linux/mempolicy.h:70,
+>                  from init/main.c:49:
+> include/linux/highmem.h: In function 'kmap_atomic_deprecated':
+> include/linux/highmem.h:127: error: implicit declaration of function 'kmap_atomic'
+> include/linux/highmem.h:127: warning: return makes pointer from integer without a cast
+> include/linux/highmem.h: In function 'clear_highpage':
+> include/linux/highmem.h:218: warning: initialization makes pointer from integer without a cast
+> include/linux/highmem.h: In function 'zero_user_segments':
+> include/linux/highmem.h:227: warning: initialization makes pointer from integer without a cast
+> include/linux/highmem.h: In function 'copy_highpage':
+> include/linux/highmem.h:279: warning: assignment makes pointer from integer without a cast
+> include/linux/highmem.h:280: warning: assignment makes pointer from integer without a cast
+> make[1]: *** [init/main.o] Error 1
+> make: *** [init] Error 2
+Already reported and fixed, see
 
-I assume this is fixing a problem you are seeing on imx28 only.
-Do you see the problem on imx53/51?
+	http://thread.gmane.org/gmane.linux.kernel/1225278
 
-> 
-> diff --git a/drivers/net/ethernet/freescale/fec.c b/drivers/net/ethernet/freescale/fec.c
-> index 11534b9..ab0afb5 100644
-> --- a/drivers/net/ethernet/freescale/fec.c
-> +++ b/drivers/net/ethernet/freescale/fec.c
-> @@ -515,6 +515,7 @@ fec_stop(struct net_device *ndev)
->  	struct fec_enet_private *fep = netdev_priv(ndev);
->  	const struct platform_device_id *id_entry =
->  				platform_get_device_id(fep->pdev);
-> +	u32 rmii_mode = readl(fep->hwp + FEC_R_CNTRL) & (1 << 8);
-
-This bit is only available on ENET (imx28 and imx6q).  Do we want to
-do the same thing for FEC (imx25/27/35/51/53)?
-
->  
->  	/* We cannot expect a graceful transmit stop without link !!! */
->  	if (fep->link) {
-> @@ -531,8 +532,10 @@ fec_stop(struct net_device *ndev)
->  	writel(FEC_DEFAULT_IMASK, fep->hwp + FEC_IMASK);
->  
->  	/* We have to keep ENET enabled to have MII interrupt stay working */
-> -	if (id_entry->driver_data & FEC_QUIRK_ENET_MAC)
-> +	if (id_entry->driver_data & FEC_QUIRK_ENET_MAC) {
->  		writel(2, fep->hwp + FEC_ECNTRL);
-> +		writel(rmii_mode, fep->hwp + FEC_R_CNTRL);
-> +	}
->  }
-
-On imx6q, we have two bits, bit 6 and 8 of FEC_R_CNTRL, to select MII
-interface among MII, RMII and RGMII modes.  I'm not sure if we will
-run into the same problem for RGMII mode.  What's your test setup?
-I would try to reproduce it here.
+Uwe
 
 -- 
-Regards,
-Shawn
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
