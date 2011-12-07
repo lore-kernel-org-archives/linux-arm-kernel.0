@@ -1,51 +1,46 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Wed,  7 Dec 2011 18:51:10 +0000
-Subject: [PATCH v2] ARM: Add Cortex-A7 proc info
-In-Reply-To: <20111206232822.GB16212@mudshark.cambridge.arm.com>
-References: <20111206232822.GB16212@mudshark.cambridge.arm.com>
-Message-ID: <1323283870-1705-1-git-send-email-pawel.moll@arm.com>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Wed, 7 Dec 2011 20:53:05 +0200
+Subject: [PATCH 0/7] Introducing a generic AMP framework
+In-Reply-To: <4EDE9289.8040903@codeaurora.org>
+References: <1319536106-25802-1-git-send-email-ohad@wizery.com>
+ <4ECC67B9.4050306@codeaurora.org>
+ <CAK=WgbYyrbZLmDOx8yKWwjhn2MYN8669FDRvsYZSyLj1equcTw@mail.gmail.com>
+ <20111123161012.GA31423@sirena.org.uk> <4ECD5767.90307@codeaurora.org>
+ <CAK=Wgba49eu_MGTWP_SND1=KDPp=MfuDyvxFGA_NND=ydqBmZA@mail.gmail.com>
+ <4EDE9289.8040903@codeaurora.org>
+Message-ID: <CAK=Wgbb1WwvzR8KVZT7aQJA6WOMJwp9qdS5HCUd6tJxgJmwQUg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds processor info for ARM Ltd. Cortex-A7.
+On Wed, Dec 7, 2011 at 12:09 AM, Saravana Kannan <skannan@codeaurora.org> wrote:
+> Yes, I did realize it's not used in the code. I just wanted to prevent what
+> I considered a misuse of "AMP". Thanks for accommodating my request.
 
-A7 is (nearly) architecturally identical to A15 so
-it shares the same SMP initialization code and hwcaps.
+Sure thing, and thanks for the feedback.
 
-Tested-by: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Pawel Moll <pawel.moll@arm.com>
----
- arch/arm/mm/proc-v7.S |   11 +++++++++++
- 1 files changed, 11 insertions(+), 0 deletions(-)
+Dropping the 'amp' prefix also went well with my gut feeling that
+remoteproc and rpmsg should again be made as independent top-level
+subsystems, just like they were in the first patch set submission;
+they're not really coupled, and putting them together under the 'amp'
+folder just confused people and somewhat convoluted development.
 
-diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-index 2c559ac..ea679ec 100644
---- a/arch/arm/mm/proc-v7.S
-+++ b/arch/arm/mm/proc-v7.S
-@@ -284,6 +284,7 @@ __v7_ca5mp_setup:
- __v7_ca9mp_setup:
- 	mov	r10, #(1 << 0)			@ TLB ops broadcasting
- 	b	1f
-+__v7_ca7mp_setup:
- __v7_ca15mp_setup:
- 	mov	r10, #0
- 1:
-@@ -463,6 +464,16 @@ __v7_ca5mp_proc_info:
- 	.size	__v7_ca5mp_proc_info, . - __v7_ca5mp_proc_info
- 
- 	/*
-+	 * ARM Ltd. Cortex A7 processor.
-+	 */
-+	.type	__v7_ca7mp_proc_info, #object
-+__v7_ca7mp_proc_info:
-+	.long	0x410fc070
-+	.long	0xff0ffff0
-+	__v7_proc __v7_ca7mp_setup, hwcaps = HWCAP_IDIV
-+	.size	__v7_ca7mp_proc_info, . - __v7_ca7mp_proc_info
-+
-+	/*
- 	 * ARM Ltd. Cortex A9 processor.
- 	 */
- 	.type   __v7_ca9mp_proc_info, #object
--- 
-1.7.5.4
+I suspect that once the basic functionality will be merged, the
+development of remoteproc and rpmsg will become completely orthogonal
+and it would then make sense to start queueing patches separately, so
+I've created two trees for them:
+
+git://git.kernel.org/pub/scm/linux/kernel/git/ohad/remoteproc.git
+git://git.kernel.org/pub/scm/linux/kernel/git/ohad/rpmsg.git
+
+Though at this point splitting the patches into two separate trees
+will just make it harder for people to work with the code, so both
+trees currently have the entire patch-set (and some other wip stuff).
+
+I've also created a for-next branch which I'll send to Stephen, and
+then we could start doing linear development (there's a bunch of
+patches I'll post soon, including stuff that was reported-by Stephen
+earlier) - that will hopefully make it easier for people to use this
+code, but also to review patches.
+
+Thanks,
+Ohad.
