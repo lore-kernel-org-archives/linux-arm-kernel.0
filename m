@@ -1,25 +1,25 @@
 From: davem@davemloft.net (David Miller)
-Date: Wed, 07 Dec 2011 13:27:39 -0500 (EST)
-Subject: [PATCH v3 1/2] net/macb: add DT support for Cadence macb/gem
- driver
-In-Reply-To: <714ca7492d8d45b50eab34448c4b70933ce5701c.1323086095.git.nicolas.ferre@atmel.com>
-References: <1322847782-22650-1-git-send-email-nicolas.ferre@atmel.com>
- <714ca7492d8d45b50eab34448c4b70933ce5701c.1323086095.git.nicolas.ferre@atmel.com>
-Message-ID: <20111207.132739.335219058075173468.davem@davemloft.net>
+Date: Wed, 07 Dec 2011 13:38:33 -0500 (EST)
+Subject: [PATCH] net/fec: fix the use of pdev->id
+In-Reply-To: <1323097275-7846-1-git-send-email-shawn.guo@linaro.org>
+References: <1323097275-7846-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20111207.133833.1526414845107847968.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nicolas Ferre <nicolas.ferre@atmel.com>
-Date: Mon,  5 Dec 2011 12:59:52 +0100
+From: Shawn Guo <shawn.guo@linaro.org>
+Date: Mon,  5 Dec 2011 23:01:15 +0800
 
-> From: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> The pdev->id is used in several places for different purpose.  All
+> these uses assume it's always the id of fec device which is >= 0.
+> However this is only true for non-DT case.  When DT plays, pdev->id
+> is always -1, which will break these pdev->id users.
 > 
-> Allow the device tree to provide the mac address and the phy mode.
+> Instead of fixing all these users one by one, this patch introduces
+> a new member 'dev_id' to 'struct fec_enet_private' for holding the
+> correct fec device id, and replaces all the existing uses of pdev->id
+> with this dev_id.
 > 
-> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> [nicolas.ferre at atmel.com: change "compatible" node property, doc and DT hwaddr]
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> [jamie at jamieiles.com: add "gem" compatibility strings and doc]
-> Acked-by: Jamie Iles<jamie@jamieiles.com>
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 
-Acked-by: David S. Miller <davem@davemloft.net>
+Applied.
