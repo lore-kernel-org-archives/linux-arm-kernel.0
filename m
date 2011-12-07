@@ -1,70 +1,72 @@
-From: tarun.kanti@ti.com (Tarun Kanti DebBarma)
-Date: Wed, 7 Dec 2011 11:27:14 +0530
-Subject: [PATCH v2] ARM: OMAP: dmtimer: fix missing content/correction in
- low-power mode support
-Message-ID: <1323237434-4919-1-git-send-email-tarun.kanti@ti.com>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Wed,  7 Dec 2011 14:01:53 +0800
+Subject: [PATCH v2 2/2] [media] V4L: atmel-isi: add
+ clk_prepare()/clk_unprepare() functions
+In-Reply-To: <1323237713-25734-1-git-send-email-josh.wu@atmel.com>
+References: <1323237713-25734-1-git-send-email-josh.wu@atmel.com>
+Message-ID: <1323237713-25734-2-git-send-email-josh.wu@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since omap_dm_timer_write_reg/__omap_dm_timer_write is now modified
-to use timer->func_base OCP_CFG should not use this wrapper anymore.
-Instead use __raw_writel() directly and use timer->io_base instead
-to write to OCP_CFG.
 
-The timer->sys_stat is valid only if timer->revision is 1. In the
-context restore function make this correction.
-
-Save the contexts and loss count when timer is stopped.
-Also, disable the clock. Else, clock usecount would become imbalanced.
-
-Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
-Tested-by: Omar Ramirez Luna <omar.ramirez@ti.com>
+Signed-off-by: Josh Wu <josh.wu@atmel.com>
 ---
-Simplified checks around context loss count read.
+in v2 version, made the label name to be consistent
 
-Baseline: git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux-2.6.git
-Branch: master
-Commit: b835c0f
+ drivers/media/video/atmel-isi.c |   15 +++++++++++++++
+ 1 files changed, 15 insertions(+), 0 deletions(-)
 
- arch/arm/plat-omap/dmtimer.c |   19 ++++++++++++++++---
- 1 files changed, 16 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/plat-omap/dmtimer.c b/arch/arm/plat-omap/dmtimer.c
-index af3b92b..0b77fe8 100644
---- a/arch/arm/plat-omap/dmtimer.c
-+++ b/arch/arm/plat-omap/dmtimer.c
-@@ -80,9 +80,9 @@ static void omap_dm_timer_write_reg(struct omap_dm_timer *timer, u32 reg,
+diff --git a/drivers/media/video/atmel-isi.c b/drivers/media/video/atmel-isi.c
+index ea4eef4..91ebcfb 100644
+--- a/drivers/media/video/atmel-isi.c
++++ b/drivers/media/video/atmel-isi.c
+@@ -922,7 +922,9 @@ static int __devexit atmel_isi_remove(struct platform_device *pdev)
+ 			isi->fb_descriptors_phys);
  
- static void omap_timer_restore_context(struct omap_dm_timer *timer)
- {
--	omap_dm_timer_write_reg(timer, OMAP_TIMER_OCP_CFG_OFFSET,
--				timer->context.tiocp_cfg);
--	if (timer->revision > 1)
-+	__raw_writel(timer->context.tiocp_cfg,
-+			timer->io_base + OMAP_TIMER_OCP_CFG_OFFSET);
-+	if (timer->revision == 1)
- 		__raw_writel(timer->context.tistat, timer->sys_stat);
+ 	iounmap(isi->regs);
++	clk_unprepare(isi->mck);
+ 	clk_put(isi->mck);
++	clk_unprepare(isi->pclk);
+ 	clk_put(isi->pclk);
+ 	kfree(isi);
  
- 	__raw_writel(timer->context.tisr, timer->irq_stat);
-@@ -357,6 +357,19 @@ int omap_dm_timer_stop(struct omap_dm_timer *timer)
+@@ -955,6 +957,12 @@ static int __devinit atmel_isi_probe(struct platform_device *pdev)
+ 	if (IS_ERR(pclk))
+ 		return PTR_ERR(pclk);
  
- 	__omap_dm_timer_stop(timer, timer->posted, rate);
- 
-+	if (timer->loses_context && timer->get_context_loss_count)
-+		timer->ctx_loss_count =
-+			timer->get_context_loss_count(&timer->pdev->dev);
++	ret = clk_prepare(pclk);
++	if (ret) {
++		clk_put(pclk);
++		return ret;
++	}
 +
-+	/*
-+	 * Since the register values are computed and written within
-+	 * __omap_dm_timer_stop, we need to use read to retrieve the
-+	 * context.
-+	 */
-+	timer->context.tclr =
-+			omap_dm_timer_read_reg(timer, OMAP_TIMER_CTRL_REG);
-+	timer->context.tisr = __raw_readl(timer->irq_stat);
-+	omap_dm_timer_disable(timer);
- 	return 0;
- }
- EXPORT_SYMBOL_GPL(omap_dm_timer_stop);
+ 	isi = kzalloc(sizeof(struct atmel_isi), GFP_KERNEL);
+ 	if (!isi) {
+ 		ret = -ENOMEM;
+@@ -978,6 +986,10 @@ static int __devinit atmel_isi_probe(struct platform_device *pdev)
+ 		goto err_clk_get;
+ 	}
+ 
++	ret = clk_prepare(isi->mck);
++	if (ret)
++		goto err_clk_prepare_mck;
++
+ 	/* Set ISI_MCK's frequency, it should be faster than pixel clock */
+ 	ret = clk_set_rate(isi->mck, pdata->mck_hz);
+ 	if (ret < 0)
+@@ -1059,10 +1071,13 @@ err_alloc_ctx:
+ 			isi->fb_descriptors_phys);
+ err_alloc_descriptors:
+ err_set_mck_rate:
++	clk_unprepare(isi->mck);
++err_clk_prepare_mck:
+ 	clk_put(isi->mck);
+ err_clk_get:
+ 	kfree(isi);
+ err_alloc_isi:
++	clk_unprepare(pclk);
+ 	clk_put(pclk);
+ 
+ 	return ret;
 -- 
-1.7.0.4
+1.6.3.3
