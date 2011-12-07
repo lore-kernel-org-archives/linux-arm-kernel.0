@@ -1,25 +1,51 @@
-From: davem@davemloft.net (David Miller)
-Date: Wed, 07 Dec 2011 13:38:33 -0500 (EST)
-Subject: [PATCH] net/fec: fix the use of pdev->id
-In-Reply-To: <1323097275-7846-1-git-send-email-shawn.guo@linaro.org>
-References: <1323097275-7846-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20111207.133833.1526414845107847968.davem@davemloft.net>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Wed,  7 Dec 2011 18:51:10 +0000
+Subject: [PATCH v2] ARM: Add Cortex-A7 proc info
+In-Reply-To: <20111206232822.GB16212@mudshark.cambridge.arm.com>
+References: <20111206232822.GB16212@mudshark.cambridge.arm.com>
+Message-ID: <1323283870-1705-1-git-send-email-pawel.moll@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shawn Guo <shawn.guo@linaro.org>
-Date: Mon,  5 Dec 2011 23:01:15 +0800
+This patch adds processor info for ARM Ltd. Cortex-A7.
 
-> The pdev->id is used in several places for different purpose.  All
-> these uses assume it's always the id of fec device which is >= 0.
-> However this is only true for non-DT case.  When DT plays, pdev->id
-> is always -1, which will break these pdev->id users.
-> 
-> Instead of fixing all these users one by one, this patch introduces
-> a new member 'dev_id' to 'struct fec_enet_private' for holding the
-> correct fec device id, and replaces all the existing uses of pdev->id
-> with this dev_id.
-> 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+A7 is (nearly) architecturally identical to A15 so
+it shares the same SMP initialization code and hwcaps.
 
-Applied.
+Tested-by: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+---
+ arch/arm/mm/proc-v7.S |   11 +++++++++++
+ 1 files changed, 11 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+index 2c559ac..ea679ec 100644
+--- a/arch/arm/mm/proc-v7.S
++++ b/arch/arm/mm/proc-v7.S
+@@ -284,6 +284,7 @@ __v7_ca5mp_setup:
+ __v7_ca9mp_setup:
+ 	mov	r10, #(1 << 0)			@ TLB ops broadcasting
+ 	b	1f
++__v7_ca7mp_setup:
+ __v7_ca15mp_setup:
+ 	mov	r10, #0
+ 1:
+@@ -463,6 +464,16 @@ __v7_ca5mp_proc_info:
+ 	.size	__v7_ca5mp_proc_info, . - __v7_ca5mp_proc_info
+ 
+ 	/*
++	 * ARM Ltd. Cortex A7 processor.
++	 */
++	.type	__v7_ca7mp_proc_info, #object
++__v7_ca7mp_proc_info:
++	.long	0x410fc070
++	.long	0xff0ffff0
++	__v7_proc __v7_ca7mp_setup, hwcaps = HWCAP_IDIV
++	.size	__v7_ca7mp_proc_info, . - __v7_ca7mp_proc_info
++
++	/*
+ 	 * ARM Ltd. Cortex A9 processor.
+ 	 */
+ 	.type   __v7_ca9mp_proc_info, #object
+-- 
+1.7.5.4
