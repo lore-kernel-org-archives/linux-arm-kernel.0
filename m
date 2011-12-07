@@ -1,32 +1,40 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 7 Dec 2011 23:38:45 +0100
-Subject: [PATCH 4/7] spi/pl022: move device disable to workqueue thread
-In-Reply-To: <20111207202203.GA3744@pengutronix.de>
-References: <1321950301-4782-1-git-send-email-linus.walleij@stericsson.com>
- <4ECB5D2E.1000906@st.com>
- <CACRpkdYSGWAB29gHhKjpyEQDAaLoTbPM6-Qz0FosL3X4TNwxdg@mail.gmail.com>
- <20111207202203.GA3744@pengutronix.de>
-Message-ID: <CACRpkdZS_+e04b42nEJVsTRAiV9ovdWxde1DRTR_m_JBAFMdUA@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 7 Dec 2011 22:39:52 +0000
+Subject: [PATCH 1/2] [media] V4L: atmel-isi: add code to
+ enable/disableISI_MCK clock
+In-Reply-To: <4C79549CB6F772498162A641D92D5328039E9C15@penmb01.corp.atmel.com>
+References: <1322647604-30662-1-git-send-email-josh.wu@atmel.com>
+ <20111207084958.GA14542@n2100.arm.linux.org.uk>
+ <4C79549CB6F772498162A641D92D5328039E9C15@penmb01.corp.atmel.com>
+Message-ID: <20111207223952.GH14542@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 7, 2011 at 9:22 PM, Wolfram Sang <w.sang@pengutronix.de> wrote:
+On Wed, Dec 07, 2011 at 06:12:52PM +0800, Wu, Josh wrote:
+> Hi, Russell King
+> 
+> On Wed, Dec 07, 2011 at 4:50 PM, Russell King wrote:
+> 
+> > On Wed, Nov 30, 2011 at 06:06:43PM +0800, Josh Wu wrote:
+> >> +	/* Get ISI_MCK, provided by programmable clock or external clock
+> */
+> >> +	isi->mck = clk_get(dev, "isi_mck");
+> >> +	if (IS_ERR_OR_NULL(isi->mck)) {
+> 
+> > This should be IS_ERR()
+> 
+> So it means the clk_get() will never return NULL even when clk structure
+> is NULL in clk lookup entry. Right?
 
->> But I'll take it out when I add you Reviewed-by...
->
-> Does that imply you will send out a V3 of this series somewhen and I
-> don't need to add this right now to the for-grant branch I am currently
-> preparing?
+It is not the drivers business to know whether NULL is valid or not.
 
-No I just added them to my branch and waited for Grant to get
-back online.
+clk_get() is defined to either return an error pointer, or a cookie
+which the rest of the clk API must accept.
 
-The patches and ACKs are accumulated on this branch:
+If an implementation decides that clk_get() can return NULL and deals
+with that in the rest of the API (eg, to mean 'there is no clock but
+don't fail for this') then drivers must not reject that.
 
-git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git pl022
-
-If you want to make a huge bundle to send to Grant, please pull
-this into your tree.
-
-Thanks,
-Linus Walleij
+If a driver rejects NULL then it is performing checks outside of the
+definition of the clk API, and making assumptions about the nature of
+valid cookies.
