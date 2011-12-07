@@ -1,141 +1,67 @@
-From: josh.wu@atmel.com (Josh Wu)
-Date: Wed,  7 Dec 2011 14:01:52 +0800
-Subject: [PATCH v2 1/2] [media] V4L: atmel-isi: add code to enable/disable
- ISI_MCK clock
-Message-ID: <1323237713-25734-1-git-send-email-josh.wu@atmel.com>
+From: ben@decadent.org.uk (Ben Hutchings)
+Date: Wed, 07 Dec 2011 06:02:27 +0000
+Subject: Bug#651215: Kernel fails to boot on NSLU2
+In-Reply-To: <20111206194048.12063.82586.reportbug@vrnul03074nb.vr-netze.vrnet>
+References: <20111206194048.12063.82586.reportbug@vrnul03074nb.vr-netze.vrnet>
+Message-ID: <1323237747.18450.7.camel@deadeye>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch
-- add ISI_MCK clock enable/disable code.
-- change field name in isi_platform_data structure
+On Tue, 2011-12-06 at 20:40 +0100, Jochen Friedrich wrote:
+> Package: linux-image-3.1.0-1-ixp4xx
+> Severity: normal
+> 
+> While 3.0.0-6 booted OK on NSLU2 platform, 3.1.0-1 or -4 fails to do so.
+> 
+> Boot log:
+[...]
+> [    0.000000] Linux version 3.1.0-1-ixp4xx (Debian 3.1.4-1) (waldi at debian.org)
+> (gcc version 4.6.2 (Debian 4.6.2-4) ) #1 Wed Nov 30 06:35:38 UTC 2011
+> [    0.000000] CPU: XScale-IXP42x Family [690541f1] revision 1 (ARMv5TE),
+> cr=0000397f
+> [    0.000000] CPU: VIVT data cache, VIVT instruction cache
+> [    0.000000] Machine: Linksys NSLU2
+[...]
+> [    3.269860] ehci_hcd: USB 2.0 'Enhanced' Host Controller (EHCI) Driver
+> [    3.350596] PCI: enabling device 0000:00:01.2 (0140 -> 0142)
+> [    3.356553] ehci_hcd 0000:00:01.2: EHCI Host Controller
+> [    3.452053] ehci_hcd 0000:00:01.2: new USB bus registered, assigned bus
+> number 1
+> [    3.459646] ehci_hcd 0000:00:01.2: coherent DMA mask 0x3ffffff is smaller
+> than system GFP_DMA mask 0xffffffff
+> [    3.570085] ehci_hcd 0000:00:01.2: coherent DMA mask 0x3ffffff is smaller
+> than system GFP_DMA mask 0xffffffff
+> [    3.680189] ehci_hcd 0000:00:01.2: coherent DMA mask 0x3ffffff is smaller
+> than system GFP_DMA mask 0xffffffff
+> (repeated over and over)
 
-Signed-off-by: Josh Wu <josh.wu@atmel.com>
-[g.liakhovetski at gmx.de: fix label names]
-Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
-Hi, Guennadi
+I assume that this has something to do with:
 
-this is the v2 version of the patch series. it is based on staging/for_v3.3.
-The second patch add clk_prepare()/clk_unprepare() functions, and fix the label name issues.
+commit 650320181a08b64d4421c65c639cf47ad8cc2cd6
+Author: Nicolas Pitre <nico@fluxnic.net>
+Date:   Mon Jul 18 15:05:10 2011 -0400
 
-Best Regards,
-Josh Wu
+    ARM: change ARM_DMA_ZONE_SIZE into a variable
 
- drivers/media/video/atmel-isi.c |   31 +++++++++++++++++++++++++++++--
- include/media/atmel-isi.h       |    4 +++-
- 2 files changed, 32 insertions(+), 3 deletions(-)
+commit 7553ee777b513c3bc8f45bb9fc75fb1bbc584ba1
+Author: Nicolas Pitre <nicolas.pitre@linaro.org>
+Date:   Tue Jul 5 22:28:09 2011 -0400
 
-diff --git a/drivers/media/video/atmel-isi.c b/drivers/media/video/atmel-isi.c
-index fbc904f..ea4eef4 100644
---- a/drivers/media/video/atmel-isi.c
-+++ b/drivers/media/video/atmel-isi.c
-@@ -90,7 +90,10 @@ struct atmel_isi {
- 	struct isi_dma_desc		dma_desc[MAX_BUFFER_NUM];
- 
- 	struct completion		complete;
-+	/* ISI peripherial clock */
- 	struct clk			*pclk;
-+	/* ISI_MCK, feed to camera sensor to generate pixel clock */
-+	struct clk			*mck;
- 	unsigned int			irq;
- 
- 	struct isi_platform_data	*pdata;
-@@ -766,6 +769,12 @@ static int isi_camera_add_device(struct soc_camera_device *icd)
- 	if (ret)
- 		return ret;
- 
-+	ret = clk_enable(isi->mck);
-+	if (ret) {
-+		clk_disable(isi->pclk);
-+		return ret;
-+	}
-+
- 	isi->icd = icd;
- 	dev_dbg(icd->parent, "Atmel ISI Camera driver attached to camera %d\n",
- 		 icd->devnum);
-@@ -779,6 +788,7 @@ static void isi_camera_remove_device(struct soc_camera_device *icd)
- 
- 	BUG_ON(icd != isi->icd);
- 
-+	clk_disable(isi->mck);
- 	clk_disable(isi->pclk);
- 	isi->icd = NULL;
- 
-@@ -874,7 +884,7 @@ static int isi_camera_set_bus_param(struct soc_camera_device *icd, u32 pixfmt)
- 
- 	if (isi->pdata->has_emb_sync)
- 		cfg1 |= ISI_CFG1_EMB_SYNC;
--	if (isi->pdata->isi_full_mode)
-+	if (isi->pdata->full_mode)
- 		cfg1 |= ISI_CFG1_FULL_MODE;
- 
- 	isi_writel(isi, ISI_CTRL, ISI_CTRL_DIS);
-@@ -912,6 +922,7 @@ static int __devexit atmel_isi_remove(struct platform_device *pdev)
- 			isi->fb_descriptors_phys);
- 
- 	iounmap(isi->regs);
-+	clk_put(isi->mck);
- 	clk_put(isi->pclk);
- 	kfree(isi);
- 
-@@ -930,7 +941,7 @@ static int __devinit atmel_isi_probe(struct platform_device *pdev)
- 	struct isi_platform_data *pdata;
- 
- 	pdata = dev->platform_data;
--	if (!pdata || !pdata->data_width_flags) {
-+	if (!pdata || !pdata->data_width_flags || !pdata->mck_hz) {
- 		dev_err(&pdev->dev,
- 			"No config available for Atmel ISI\n");
- 		return -EINVAL;
-@@ -959,6 +970,19 @@ static int __devinit atmel_isi_probe(struct platform_device *pdev)
- 	INIT_LIST_HEAD(&isi->video_buffer_list);
- 	INIT_LIST_HEAD(&isi->dma_desc_head);
- 
-+	/* Get ISI_MCK, provided by programmable clock or external clock */
-+	isi->mck = clk_get(dev, "isi_mck");
-+	if (IS_ERR_OR_NULL(isi->mck)) {
-+		dev_err(dev, "Failed to get isi_mck\n");
-+		ret = isi->mck ? PTR_ERR(isi->mck) : -EINVAL;
-+		goto err_clk_get;
-+	}
-+
-+	/* Set ISI_MCK's frequency, it should be faster than pixel clock */
-+	ret = clk_set_rate(isi->mck, pdata->mck_hz);
-+	if (ret < 0)
-+		goto err_set_mck_rate;
-+
- 	isi->p_fb_descriptors = dma_alloc_coherent(&pdev->dev,
- 				sizeof(struct fbd) * MAX_BUFFER_NUM,
- 				&isi->fb_descriptors_phys,
-@@ -1034,6 +1058,9 @@ err_alloc_ctx:
- 			isi->p_fb_descriptors,
- 			isi->fb_descriptors_phys);
- err_alloc_descriptors:
-+err_set_mck_rate:
-+	clk_put(isi->mck);
-+err_clk_get:
- 	kfree(isi);
- err_alloc_isi:
- 	clk_put(pclk);
-diff --git a/include/media/atmel-isi.h b/include/media/atmel-isi.h
-index 26cece5..6568230 100644
---- a/include/media/atmel-isi.h
-+++ b/include/media/atmel-isi.h
-@@ -110,10 +110,12 @@ struct isi_platform_data {
- 	u8 hsync_act_low;
- 	u8 vsync_act_low;
- 	u8 pclk_act_falling;
--	u8 isi_full_mode;
-+	u8 full_mode;
- 	u32 data_width_flags;
- 	/* Using for ISI_CFG1 */
- 	u32 frate;
-+	/* Using for ISI_MCK */
-+	u32 mck_hz;
- };
- 
- #endif /* __ATMEL_ISI_H__ */
+    ARM: mach-ixp4xx: move from ARM_DMA_ZONE_SIZE to mdesc->dma_zone_size
+
+It's clear that the DMA zone size is supposed to be 64 MB on this
+machine and I don't see why the DMA mask hasn't propagated correctly.
+Any idea, Nicholas?
+
+Ben.
+
 -- 
-1.6.3.3
+Ben Hutchings
+Absolutum obsoletum. (If it works, it's out of date.) - Stafford Beer
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 828 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111207/44fa3d7e/attachment-0001.sig>
