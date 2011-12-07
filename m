@@ -1,40 +1,58 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 7 Dec 2011 22:39:52 +0000
-Subject: [PATCH 1/2] [media] V4L: atmel-isi: add code to
- enable/disableISI_MCK clock
-In-Reply-To: <4C79549CB6F772498162A641D92D5328039E9C15@penmb01.corp.atmel.com>
-References: <1322647604-30662-1-git-send-email-josh.wu@atmel.com>
- <20111207084958.GA14542@n2100.arm.linux.org.uk>
- <4C79549CB6F772498162A641D92D5328039E9C15@penmb01.corp.atmel.com>
-Message-ID: <20111207223952.GH14542@n2100.arm.linux.org.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed,  7 Dec 2011 23:40:16 +0100
+Subject: [PATCH 1/2] ARM: only look for TCM on ARM926 and later
+Message-ID: <1323297616-22865-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 07, 2011 at 06:12:52PM +0800, Wu, Josh wrote:
-> Hi, Russell King
-> 
-> On Wed, Dec 07, 2011 at 4:50 PM, Russell King wrote:
-> 
-> > On Wed, Nov 30, 2011 at 06:06:43PM +0800, Josh Wu wrote:
-> >> +	/* Get ISI_MCK, provided by programmable clock or external clock
-> */
-> >> +	isi->mck = clk_get(dev, "isi_mck");
-> >> +	if (IS_ERR_OR_NULL(isi->mck)) {
-> 
-> > This should be IS_ERR()
-> 
-> So it means the clk_get() will never return NULL even when clk structure
-> is NULL in clk lookup entry. Right?
+The Integrator AP/CP can have a varying set of core modules, some
+(like ARM920T) are so old that trying to read the TCM status register
+with CP15 will make them hang. So we need to make sure that we are
+running on 926 or later in order to be able to activate this for
+the Integrator. (The Integrator with CM926EJ-S has 32+32 kb of TCM
+memory.)
 
-It is not the drivers business to know whether NULL is valid or not.
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/kernel/tcm.c |   19 ++++++++++++++++---
+ 1 files changed, 16 insertions(+), 3 deletions(-)
 
-clk_get() is defined to either return an error pointer, or a cookie
-which the rest of the clk API must accept.
-
-If an implementation decides that clk_get() can return NULL and deals
-with that in the rest of the API (eg, to mean 'there is no clock but
-don't fail for this') then drivers must not reject that.
-
-If a driver rejects NULL then it is performing checks outside of the
-definition of the clk API, and making assumptions about the nature of
-valid cookies.
+diff --git a/arch/arm/kernel/tcm.c b/arch/arm/kernel/tcm.c
+index 30e302d..700c876 100644
+--- a/arch/arm/kernel/tcm.c
++++ b/arch/arm/kernel/tcm.c
+@@ -180,9 +180,10 @@ static int __init setup_tcm_bank(u8 type, u8 bank, u8 banks,
+  */
+ void __init tcm_init(void)
+ {
+-	u32 tcm_status = read_cpuid_tcmstatus();
+-	u8 dtcm_banks = (tcm_status >> 16) & 0x03;
+-	u8 itcm_banks = (tcm_status & 0x03);
++	u32 cpuid = read_cpuid_id();
++	u32 tcm_status;
++	u8 dtcm_banks;
++	u8 itcm_banks;
+ 	size_t dtcm_code_sz = &__edtcm_data - &__sdtcm_data;
+ 	size_t itcm_code_sz = &__eitcm_text - &__sitcm_text;
+ 	char *start;
+@@ -191,6 +192,18 @@ void __init tcm_init(void)
+ 	int ret;
+ 	int i;
+ 
++	/*
++	 * Prior to ARM926 there is no TCM, and trying to read the status
++	 * register will hang the processor.
++	 */
++	if (((cpuid & 0x0008f000) == 0x00000000) &&
++	    ((cpuid >> 4) < 0x926))
++		return;
++
++	tcm_status = read_cpuid_tcmstatus();
++	dtcm_banks = (tcm_status >> 16) & 0x03;
++	itcm_banks = (tcm_status & 0x03);
++
+ 	/* Values greater than 2 for D/ITCM banks are "reserved" */
+ 	if (dtcm_banks > 2)
+ 		dtcm_banks = 0;
+-- 
+1.7.6.4
