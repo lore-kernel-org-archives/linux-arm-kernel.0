@@ -1,43 +1,64 @@
-From: amwang@redhat.com (Cong Wang)
-Date: Wed, 07 Dec 2011 17:26:56 +0800
-Subject: [PATCH] highmem: Fix ARM build break due to __kmap_atomic rename
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF1750B774A6@HQMAIL01.nvidia.com>
-References: <1323197426-10815-1-git-send-email-swarren@nvidia.com>
- <alpine.LFD.2.02.1112061440050.2357@xanadu.home>
- <74CDBE0F657A3D45AFBB94109FB122FF1750B774A6@HQMAIL01.nvidia.com>
-Message-ID: <4EDF3160.7070800@redhat.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Wed, 7 Dec 2011 17:41:48 +0800
+Subject: [PATCH][NET] several cleanups and bugfixes for fec.c: preserve
+ MII/RMII setting in fec_stop()
+In-Reply-To: <d6f4de9e4cfb393754b42815a2ef1a59c96eab83.1323163127.git.LW@KARO-electronics.de>
+References: <cover.1323163127.git.LW@KARO-electronics.de>
+ <d6f4de9e4cfb393754b42815a2ef1a59c96eab83.1323163127.git.LW@KARO-electronics.de>
+Message-ID: <20111207094146.GG5550@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2011?12?07? 03:52, Stephen Warren ??:
-> Nicolas Pitre wrote at Tuesday, December 06, 2011 12:42 PM:
->> On Tue, 6 Dec 2011, Stephen Warren wrote:
->>> Git commit 37bfbb9 "highmem: kill all __kmap_atomic()" renamed
->>> __kmap_atomic to kmap_atomic. However, arch/arm/include/asm/highmem.h
->>> wasn't updated for that change. This change does so, and fixes the
->>> ARM build break.
->>>
->>> Signed-off-by: Stephen Warren<swarren@nvidia.com>
->>> ---
->>> This shows up in next-20111206 at least.
->>
->> Commit 37bfbb9 doesn't show up in anything which is stable yet.  Would
->> be best to ask the original author to fix his branch.
->
-> Yes, I assumed that Cong would squash this into his/her tree that's in
-> linux-next.
->
+On Tue, Dec 06, 2011 at 11:27:14AM +0100, Lothar Wa?mann wrote:
+> Additionally to setting the ETHER_EN bit in FEC_ECNTRL the MII/RMII
+> setting in FEC_R_CNTRL needs to be preserved to keep the MII interface
 
-Thanks for your patch, Stephen!
+s/MII/RMII?  From what I see from imx28 and imx6q RM, the reset state
+for this setting is MII mode.
 
-I have squashed your patch into that commit,
+> functional.
+> 
+> Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
+> ---
+>  drivers/net/ethernet/freescale/fec.c |    5 ++++-
+>  1 files changed, 4 insertions(+), 1 deletions(-)
 
-commit 5bf31c9a5de45a6ea6628fe84c043ac38babf393
-Author: Cong Wang <amwang@redhat.com>
-Date:   Sat Nov 26 10:53:39 2011 +0800
+I assume this is fixing a problem you are seeing on imx28 only.
+Do you see the problem on imx53/51?
 
-     highmem: kill all __kmap_atomic()
-     [swarren at nvidia.com: highmem: Fix ARM build break due to __kmap_atomic rename]
+> 
+> diff --git a/drivers/net/ethernet/freescale/fec.c b/drivers/net/ethernet/freescale/fec.c
+> index 11534b9..ab0afb5 100644
+> --- a/drivers/net/ethernet/freescale/fec.c
+> +++ b/drivers/net/ethernet/freescale/fec.c
+> @@ -515,6 +515,7 @@ fec_stop(struct net_device *ndev)
+>  	struct fec_enet_private *fep = netdev_priv(ndev);
+>  	const struct platform_device_id *id_entry =
+>  				platform_get_device_id(fep->pdev);
+> +	u32 rmii_mode = readl(fep->hwp + FEC_R_CNTRL) & (1 << 8);
 
-     Signed-off-by: Stephen Warren <swarren@nvidia.com>
-     Signed-off-by: Cong Wang <amwang@redhat.com>
+This bit is only available on ENET (imx28 and imx6q).  Do we want to
+do the same thing for FEC (imx25/27/35/51/53)?
+
+>  
+>  	/* We cannot expect a graceful transmit stop without link !!! */
+>  	if (fep->link) {
+> @@ -531,8 +532,10 @@ fec_stop(struct net_device *ndev)
+>  	writel(FEC_DEFAULT_IMASK, fep->hwp + FEC_IMASK);
+>  
+>  	/* We have to keep ENET enabled to have MII interrupt stay working */
+> -	if (id_entry->driver_data & FEC_QUIRK_ENET_MAC)
+> +	if (id_entry->driver_data & FEC_QUIRK_ENET_MAC) {
+>  		writel(2, fep->hwp + FEC_ECNTRL);
+> +		writel(rmii_mode, fep->hwp + FEC_R_CNTRL);
+> +	}
+>  }
+
+On imx6q, we have two bits, bit 6 and 8 of FEC_R_CNTRL, to select MII
+interface among MII, RMII and RGMII modes.  I'm not sure if we will
+run into the same problem for RGMII mode.  What's your test setup?
+I would try to reproduce it here.
+
+-- 
+Regards,
+Shawn
