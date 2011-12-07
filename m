@@ -1,26 +1,88 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Wed, 07 Dec 2011 10:45:25 +0200
-Subject: [PATCH 1/5] ASoC: omap-dmic: Add device tree bindings
-In-Reply-To: <20111205154611.GV11150@opensource.wolfsonmicro.com>
-References: <1322819580-7424-1-git-send-email-peter.ujfalusi@ti.com>
- <1322819580-7424-2-git-send-email-peter.ujfalusi@ti.com>
- <20111203112206.GE6043@opensource.wolfsonmicro.com> <4EDCCAE0.2000009@ti.com>
- <20111205154611.GV11150@opensource.wolfsonmicro.com>
-Message-ID: <4EDF27A5.7090909@ti.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 07 Dec 2011 17:47:06 +0900
+Subject: [GIT PULL] Samsung fixes for v3.2
+In-Reply-To: <CAH9JG2XcUHUpU5OQyv4+Q9bzbqxsekF8yvUuK4Gb6EDBpQMucw@mail.gmail.com>
+References: <03e501cca837$d893e320$89bba960$%kim@samsung.com>
+ <CAH9JG2XcUHUpU5OQyv4+Q9bzbqxsekF8yvUuK4Gb6EDBpQMucw@mail.gmail.com>
+Message-ID: <03f301ccb4bc$cc8b8a10$65a29e30$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/05/2011 05:46 PM, Mark Brown wrote:
-> And what I'm saying is that my main concern is that you're publishing
-> documenting a binding which isn't intended to be the the final binding
-> and which there's no intention that anyone should use directly anyway.
+Kyungmin Park wrote:
+> 
+> Hi,
+> 
+> Don't you fix the mct compiler error if LOCAL_TIMERS are not defined?
+> 
+> arch/arm/mach-exynos/mct.c: In function 'exynos4_timer_resources':
+> arch/arm/mach-exynos/mct.c:451: error: 'exynos4_mct_tick_isr'
+> undeclared (first use in this function)
+> arch/arm/mach-exynos/mct.c:451: error: (Each undeclared identifier is
+> reported only once
+> arch/arm/mach-exynos/mct.c:451: error: for each function it appears in.)
+> make[1]: *** [arch/arm/mach-exynos/mct.o] Error 1
+> 
+Sorry for late response.
 
-I felt it is the right thing to document the current situation.
-The documentation will be updated as we can move away from the
-"ti,hwmods" tag from DT.
-I can place comment in the documentation for omap-dmic, omap-mcpdm
-stating that the use of "ti,hwmods" is required at the moment, but it is
-temporally solution.
+I fixed this and that will be sent to upstream next time.
+Thanks for pointing out.
 
--- 
-P?ter
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
+
+
+> On 11/21/11, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> > Hi Arnd,
+> >
+> > Please pull samsung-fixes for v3.2 from:
+> >
+> > git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> > samsung-fixes
+> >
+> > This includes fix of inclusion header.
+> > If any problems, please let me know.
+> >
+> > Thanks.
+> >
+> > Best regards,
+> > Kgene.
+> > --
+> > Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+> > SW Solution Development Team, Samsung Electronics Co., Ltd.
+> >
+> > The following changes since commit 1ea6b8f48918282bdca0b32a34095504ee65bab5:
+> >
+> >   Linux 3.2-rc1 (2011-11-07 16:16:02 -0800)
+> >
+> > are available in the git repository at:
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> > samsung-fixes
+> >
+> > Axel Lin (1):
+> >       ARM: SAMSUNG: include linux/types.h at gpio-cfg.h
+> >
+> > Kukjin Kim (2):
+> >       ARM: S5P: Fix export.h inclusion
+> >       ARM: SAMSUNG: inclusion export.h instead of module.h
+> >
+> > Kyungmin Park (1):
+> >       ARM: EXYNOS: Fix compiler error with THIS_MODULE
+> >
+> >  arch/arm/mach-exynos/cpuidle.c                |    2 ++
+> >  arch/arm/mach-s3c64xx/mach-crag6410-module.c  |    2 +-
+> >  arch/arm/plat-s3c24xx/cpu-freq-debugfs.c      |    2 +-
+> >  arch/arm/plat-s5p/sysmmu.c                    |    1 +
+> >  arch/arm/plat-samsung/include/plat/gpio-cfg.h |    2 ++
+> >  arch/arm/plat-samsung/pd.c                    |    2 +-
+> >  arch/arm/plat-samsung/pwm.c                   |    2 +-
+> >  7 files changed, 9 insertions(+), 4 deletions(-)
+> >
+> > --
+> > To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc"
+> > in
+> > the body of a message to majordomo at vger.kernel.org
+> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> >
