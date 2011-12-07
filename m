@@ -1,25 +1,61 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 7 Dec 2011 12:35:00 +0000
-Subject: [PATCH 1/3] PM: Provide an always on power domain governor
-In-Reply-To: <201112062239.57001.rjw@sisk.pl>
-References: <1322765339-29879-1-git-send-email-broonie@opensource.wolfsonmicro.com>
- <20111205001500.GA10173@opensource.wolfsonmicro.com>
- <02d601ccb400$a19380e0$e4ba82a0$%kim@samsung.com>
- <201112062239.57001.rjw@sisk.pl>
-Message-ID: <20111207123459.GB18715@opensource.wolfsonmicro.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 7 Dec 2011 13:50:29 +0100
+Subject: [MXS MMC 2/5] Some cleanups for the MMC driver
+In-Reply-To: <20191.21688.696997.76000@ipc1.ka-ro>
+References: <cover.1323177907.git.LW@KARO-electronics.de>
+ <d935557e044d2ebc56b4e70487b519fe722e9017.1323177907.git.LW@KARO-electronics.de>
+ <20111207120120.GK5550@S2100-06.ap.freescale.net>
+ <20191.21688.696997.76000@ipc1.ka-ro>
+Message-ID: <20111207125029.GJ4585@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 06, 2011 at 10:39:56PM +0100, Rafael J. Wysocki wrote:
-> On Tuesday, December 06, 2011, Kukjin Kim wrote:
+On Wed, Dec 07, 2011 at 12:57:44PM +0100, Lothar Wa?mann wrote:
+> Hi,
+> 
+> Shawn Guo writes:
+> > I'm fine with this cosmetic patch with the comments below addressed.
+> > 
+> > On Tue, Dec 06, 2011 at 02:41:27PM +0100, Lothar Wa?mann wrote:
+> > >  - Remove bogus parens around numerical arguments in #define's
+> > >  - When defining bit masks, use the #def for the shift count
+> > >    instead of repeating the numbers
+> > 
+> > This change brings a few 'line over 80 characters' checkpatch warnings.
+> > 
+> will fix.
+> 
+> > >  - Remove bogus whitespace in indentation
+> > >  - Remove 'break' at end of switch statement
+> > > 
+> > > Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
+> > > ---
+> > >  drivers/mmc/host/mxs-mmc.c |   57 +++++++++++++++++++++----------------------
+> > >  1 files changed, 28 insertions(+), 29 deletions(-)
+> > > 
+> > > diff --git a/drivers/mmc/host/mxs-mmc.c b/drivers/mmc/host/mxs-mmc.c
+> > [...]
+> > > @@ -277,7 +277,7 @@ static irqreturn_t mxs_mmc_irq_handler(int irq, void *dev_id)
+> > >  
+> > >  	stat = readl(host->base + HW_SSP_CTRL1);
+> > >  	writel(stat & MXS_MMC_IRQ_BITS,
+> > > -	       host->base + HW_SSP_CTRL1 + MXS_CLR_ADDR);
+> > 
+> > This is an intended indentation with 7 spaces.
+> > 
+> According to Documentation/CodingStyle spaces are never used for
+> indentation (except in documentation, Kconfig and comments).
+AFAIK "don't use spaces" only applies to the first line of a statement.
+When breaking long lines using spaces to align to the containing
+parenthesis is quite common (though I don't like it personally).
 
-> > Rafael, please let me know the branch when you create it so that I can merge
-> > it into Samsung tree to avoid other conflicts.
+The rule for follow-up lines is only: Descendants are always
+substantially shorter than the parent and are placed substantially to
+the right.
 
-> I need an ack from Magnus or Paul on the shmobile patch. When I get one, I'll
-> put patches [1/3] and [2/3] (new version) into my linux-next branch and then
-> (after a few days spent in linux-next) to the pm-domains branch.  I'll let you
-> know when that happens.
+Best regards
+Uwe
 
-Well, I guess you could put patch 1 and 3 in then add 2 if an ack is
-forthcoming for that - there's no direct dependency.
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
