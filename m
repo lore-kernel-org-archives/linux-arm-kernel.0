@@ -1,88 +1,45 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 07 Dec 2011 17:47:06 +0900
-Subject: [GIT PULL] Samsung fixes for v3.2
-In-Reply-To: <CAH9JG2XcUHUpU5OQyv4+Q9bzbqxsekF8yvUuK4Gb6EDBpQMucw@mail.gmail.com>
-References: <03e501cca837$d893e320$89bba960$%kim@samsung.com>
- <CAH9JG2XcUHUpU5OQyv4+Q9bzbqxsekF8yvUuK4Gb6EDBpQMucw@mail.gmail.com>
-Message-ID: <03f301ccb4bc$cc8b8a10$65a29e30$%kim@samsung.com>
+From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
+Date: Wed, 7 Dec 2011 09:47:37 +0100
+Subject: [PATCH][NET] several cleanups and bugfixes for fec.c: don't
+ munge MAC address from platform data
+In-Reply-To: <20111207084953.GD5550@S2100-06.ap.freescale.net>
+References: <cover.1323163127.git.LW@KARO-electronics.de>
+ <55b78c1766da5b0d0d679f5eae3fb9fc74a6ceef.1323163127.git.LW@KARO-electronics.de>
+ <20111207084953.GD5550@S2100-06.ap.freescale.net>
+Message-ID: <20191.10281.826050.193987@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kyungmin Park wrote:
-> 
-> Hi,
-> 
-> Don't you fix the mct compiler error if LOCAL_TIMERS are not defined?
-> 
-> arch/arm/mach-exynos/mct.c: In function 'exynos4_timer_resources':
-> arch/arm/mach-exynos/mct.c:451: error: 'exynos4_mct_tick_isr'
-> undeclared (first use in this function)
-> arch/arm/mach-exynos/mct.c:451: error: (Each undeclared identifier is
-> reported only once
-> arch/arm/mach-exynos/mct.c:451: error: for each function it appears in.)
-> make[1]: *** [arch/arm/mach-exynos/mct.o] Error 1
-> 
-Sorry for late response.
+Hi,
 
-I fixed this and that will be sent to upstream next time.
-Thanks for pointing out.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Shawn Guo writes:
+> On Tue, Dec 06, 2011 at 11:27:13AM +0100, Lothar Wa?mann wrote:
+> > When the MAC address is supplied via platform_data it should be OK as
+> > it is and should not be modified in case of a dual FEC setup.
+> > Also copying the MAC from platform_data to the single 'macaddr'
+> > variable will overwrite the MAC for the first interface in case of a
+> > dual FEC setup.
+> 
+> Hmm, I do not follow that.  If 'macaddr' holds a valid mac address,
+> the code path has no chance to be hit at all.  Otherwise, 'macaddr'
+> is just a place holder for copying mac address from pdata, in which
+> case the mac address will be fixed up at the end of the function for
+> dual FEC setup.
+> 
+In case of dual FEC and MAC address provided by platform_data the
+first mac address will be copied to the 'macaddr' variable with no
+chance for the second interface to get its mac address assigned from
+platform_data too.
 
 
-> On 11/21/11, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> > Hi Arnd,
-> >
-> > Please pull samsung-fixes for v3.2 from:
-> >
-> > git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> > samsung-fixes
-> >
-> > This includes fix of inclusion header.
-> > If any problems, please let me know.
-> >
-> > Thanks.
-> >
-> > Best regards,
-> > Kgene.
-> > --
-> > Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-> > SW Solution Development Team, Samsung Electronics Co., Ltd.
-> >
-> > The following changes since commit 1ea6b8f48918282bdca0b32a34095504ee65bab5:
-> >
-> >   Linux 3.2-rc1 (2011-11-07 16:16:02 -0800)
-> >
-> > are available in the git repository at:
-> >   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> > samsung-fixes
-> >
-> > Axel Lin (1):
-> >       ARM: SAMSUNG: include linux/types.h at gpio-cfg.h
-> >
-> > Kukjin Kim (2):
-> >       ARM: S5P: Fix export.h inclusion
-> >       ARM: SAMSUNG: inclusion export.h instead of module.h
-> >
-> > Kyungmin Park (1):
-> >       ARM: EXYNOS: Fix compiler error with THIS_MODULE
-> >
-> >  arch/arm/mach-exynos/cpuidle.c                |    2 ++
-> >  arch/arm/mach-s3c64xx/mach-crag6410-module.c  |    2 +-
-> >  arch/arm/plat-s3c24xx/cpu-freq-debugfs.c      |    2 +-
-> >  arch/arm/plat-s5p/sysmmu.c                    |    1 +
-> >  arch/arm/plat-samsung/include/plat/gpio-cfg.h |    2 ++
-> >  arch/arm/plat-samsung/pd.c                    |    2 +-
-> >  arch/arm/plat-samsung/pwm.c                   |    2 +-
-> >  7 files changed, 9 insertions(+), 4 deletions(-)
-> >
-> > --
-> > To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc"
-> > in
-> > the body of a message to majordomo at vger.kernel.org
-> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> >
+Lothar Wa?mann
+-- 
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
