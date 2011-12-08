@@ -1,233 +1,157 @@
-From: rob.lee@linaro.org (Rob Lee)
-Date: Thu, 8 Dec 2011 15:46:46 -0600
-Subject: [RFC PATCH 1/8] ARM: Add commonly used cpuidle init code
-In-Reply-To: <4EDE2F91.5090104@gmail.com>
-References: <1323146291-10676-1-git-send-email-rob.lee@linaro.org>
- <1323146291-10676-2-git-send-email-rob.lee@linaro.org>
- <4EDE2F91.5090104@gmail.com>
-Message-ID: <CAMXH7KFT+JP8uJwK=rzt1cjwMQMGPd-6RwPVma0ky0wSMbaz8A@mail.gmail.com>
+From: rmallon@gmail.com (Ryan Mallon)
+Date: Fri, 09 Dec 2011 09:10:30 +1100
+Subject: [PATCH 1/2] ARM: at91: make x40s use free of at91_sys_read/write
+In-Reply-To: <1323355315-9767-1-git-send-email-plagnioj@jcrosoft.com>
+References: <1323355315-9767-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <4EE135D6.6000008@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rob, thanks for your thorough review.  Comments and questions below.
+On 09/12/11 01:41, Jean-Christophe PLAGNIOL-VILLARD wrote:
 
-On 6 December 2011 09:06, Rob Herring <robherring2@gmail.com> wrote:
-> On 12/05/2011 10:38 PM, Robert Lee wrote:
->> Add commonly used cpuidle init code to avoid unecessary duplication.
->>
->> Signed-off-by: Robert Lee <rob.lee@linaro.org>
->> ---
->> ?arch/arm/common/Makefile ? ? ? | ? ?1 +
->> ?arch/arm/common/cpuidle.c ? ? ?| ?132 ++++++++++++++++++++++++++++++++++++++++
->> ?arch/arm/include/asm/cpuidle.h | ? 25 ++++++++
->
-> Why not move cpuidle drivers to drivers/idle/ ?
->
+> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+> ---
+>  arch/arm/mach-at91/at91x40_time.c         |   28 +++++++++++++++++-----------
+>  arch/arm/mach-at91/include/mach/at91x40.h |   18 +++++++++---------
+>  arch/arm/mach-at91/include/mach/system.h  |    2 +-
+>  3 files changed, 27 insertions(+), 21 deletions(-)
+> 
+> diff --git a/arch/arm/mach-at91/at91x40_time.c b/arch/arm/mach-at91/at91x40_time.c
+> index dfff289..6ca680a 100644
+> --- a/arch/arm/mach-at91/at91x40_time.c
+> +++ b/arch/arm/mach-at91/at91x40_time.c
+> @@ -28,6 +28,12 @@
+>  #include <asm/mach/time.h>
+>  #include <mach/at91_tc.h>
+>  
+> +#define at91_tc_read(field) \
+> +	__raw_readl(AT91_TC + field)
+> +
+> +#define at91_tc_write(field, value) \
+> +	__raw_writel(value, AT91_TC + field);
+> +
 
-Or to drivers/cpuidle?  I am not sure the reasoning behind a
-drivers/idle directory if everything there is a cpuidle driver
-implementation.  I originally did locate this common cpuidle code in
-drivers/idle/arm_idle.c and put the head file in arch/arm/include/asm
-but this threw a checkpatch warning so I submitted with this placement
-to start with.  If the local_fiq_enable/disable calls can be handled
-in a community friendly way for any architecture, then perhaps I can
-just move the header file code to linux/include/cpuidle.h.
 
-Do you have suggestions about making this functionality available for
-any architecture and what is the most community friendly method of
-doing this?  I suppose function declarations for
-local_fiq_enable/disable could be given.  Then, one could either
-define them here as empty functions or could have two idle functions,
-arm_enter_idle and nonarm_enter_idle and the architecture could be
-read or passed in to determine which one to set the cpuidle states'
-enter functions to.
+Can we make these functions please. They will get inlined anyway, but we
+get the added benefits of type checking. Also you have a spurious
+semicolon on the second #define.
 
->> ?3 files changed, 158 insertions(+), 0 deletions(-)
->> ?create mode 100644 arch/arm/common/cpuidle.c
->> ?create mode 100644 arch/arm/include/asm/cpuidle.h
->>
->> diff --git a/arch/arm/common/Makefile b/arch/arm/common/Makefile
->> index 6ea9b6f..0865f69 100644
->> --- a/arch/arm/common/Makefile
->> +++ b/arch/arm/common/Makefile
->> @@ -17,3 +17,4 @@ obj-$(CONFIG_ARCH_IXP2000) ?+= uengine.o
->> ?obj-$(CONFIG_ARCH_IXP23XX) ? += uengine.o
->> ?obj-$(CONFIG_PCI_HOST_ITE8152) ?+= it8152.o
->> ?obj-$(CONFIG_ARM_TIMER_SP804) ? ? ? ?+= timer-sp.o
->> +obj-$(CONFIG_CPU_IDLE) ? ? ? ? ? ? ? += cpuidle.o
->> diff --git a/arch/arm/common/cpuidle.c b/arch/arm/common/cpuidle.c
->> new file mode 100644
->> index 0000000..e9a46a3
->> --- /dev/null
->> +++ b/arch/arm/common/cpuidle.c
->> @@ -0,0 +1,132 @@
->> +/*
->> + * Copyright 2011 Freescale Semiconductor, Inc.
->> + * Copyright 2011 Linaro Ltd.
->> + *
->> + * The code contained herein is licensed under the GNU General Public
->> + * License. You may obtain a copy of the GNU General Public License
->> + * Version 2 or later at the following locations:
->> + *
->> + * http://www.opensource.org/licenses/gpl-license.html
->> + * http://www.gnu.org/copyleft/gpl.html
->> + */
->> +
->> +/*
->> + * This code performs provides some commonly used cpuidle setup functionality
->> + * used by many ARM SoC platforms. ?Providing this functionality here
->> + * reduces the duplication of this code for each ARM platform that uses it.
->> + */
->> +
->> +#include <linux/kernel.h>
->> +#include <linux/io.h>
->> +#include <linux/cpuidle.h>
->> +#include <linux/hrtimer.h>
->> +#include <linux/err.h>
->> +#include <asm/cpuidle.h>
->> +#include <asm/proc-fns.h>
->> +
->> +static struct cpuidle_device __percpu * arm_cpuidle_devices;
->> +
->> +static int (*mach_cpuidle)(struct cpuidle_device *dev,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ?struct cpuidle_driver *drv,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? int index);
->> +
->> +static int arm_enter_idle(struct cpuidle_device *dev,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ?struct cpuidle_driver *drv, int index)
->
-> I think how this works is backwards. This function is only called if
-> there is a NULL enter function for a state, but mach_cpuidle is global.
-> Ideally, I want to call this function for every state, but call a
-> different mach_cpuidle function for each state. Yes, you could select a
-> specific function for each state within the mach_cpuidle function, but
-> that seems silly to make the per state function global and then have to
-> select a per state function again. And if many users are doing that,
-> then it belongs in the common code.
->
->> +{
->> + ? ? ktime_t time_start, time_end;
->> +
->> + ? ? local_irq_disable();
->> + ? ? local_fiq_disable();
->> +
->> + ? ? time_start = ktime_get();
->> +
->> + ? ? index = mach_cpuidle(dev, drv, index);
->> +
->> + ? ? time_end = ktime_get();
->> +
->> + ? ? local_fiq_enable();
->> + ? ? local_irq_enable();
->> +
->> + ? ? dev->last_residency =
->> + ? ? ? ? ? ? (int)ktime_to_us(ktime_sub(time_end, time_start));
->> +
->> + ? ? return index;
->> +}
->> +
->> +void arm_cpuidle_devices_uninit(void)
->> +{
->> + ? ? int cpu_id;
->> + ? ? struct cpuidle_device *dev;
->> +
->> + ? ? for_each_possible_cpu(cpu_id) {
->> + ? ? ? ? ? ? dev = per_cpu_ptr(arm_cpuidle_devices, cpu_id);
->> + ? ? ? ? ? ? cpuidle_unregister_device(dev);
->> + ? ? }
->> +
->> + ? ? free_percpu(arm_cpuidle_devices);
->> + ? ? return;
->
-> Don't need return statement.
->
->> +}
->> +
->> +int __init arm_cpuidle_init(struct cpuidle_driver *drv,
->> + ? ? int (*common_enter)(struct cpuidle_device *dev,
->> + ? ? ? ? ? ? struct cpuidle_driver *drv, int index),
->> + ? ? void *driver_data[])
->> +{
->> + ? ? struct cpuidle_device *dev;
->> + ? ? int i, cpu_id;
->> +
->> + ? ? if (drv == NULL) {
->> + ? ? ? ? ? ? pr_err("%s: cpuidle_driver pointer NULL\n", __func__);
->> + ? ? ? ? ? ? return -EINVAL;
->> + ? ? }
->> +
->> + ? ? if (drv->state_count > CPUIDLE_STATE_MAX)
->> + ? ? ? ? ? ? pr_err("%s: state count exceeds maximum\n", __func__);
->
-> return an error?
->
-> You can collapse these 2 parameter checks down to:
->
-> if (!drv || (drv->state_count > CPUIDLE_STATE_MAX))
->
->> +
->> + ? ? mach_cpuidle = common_enter;
->> +
->> + ? ? /* if state enter function not specified, use common_enter function */
->> + ? ? for (i = 0; i < drv->state_count; i++) {
->> + ? ? ? ? ? ? if (drv->states[i].enter == NULL) {
->> + ? ? ? ? ? ? ? ? ? ? if (mach_cpuidle == NULL) {
->
-> Usually !mach_cpuidle is preferred for NULL checks. You can move this
-> check out of the loop.
->
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? pr_err("%s: 'enter' function pointer NULL\n",
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? __func__);
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? return -EINVAL;
->> + ? ? ? ? ? ? ? ? ? ? } else
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? drv->states[i].enter = arm_enter_idle;
->> + ? ? ? ? ? ? }
->> + ? ? }
->> +
->> + ? ? if (cpuidle_register_driver(drv)) {
->> + ? ? ? ? ? ? pr_err("%s: Failed to register cpuidle driver\n", __func__);
->> + ? ? ? ? ? ? return -ENODEV;
->> + ? ? }
->> +
->> + ? ? arm_cpuidle_devices = alloc_percpu(struct cpuidle_device);
->> + ? ? if (arm_cpuidle_devices == NULL) {
->> + ? ? ? ? ? ? cpuidle_unregister_driver(drv);
->> + ? ? ? ? ? ? return -ENOMEM;
->> + ? ? }
->> +
->> + ? ? /* initialize state data for each cpuidle_device */
->> + ? ? for_each_possible_cpu(cpu_id) {
->> +
->> + ? ? ? ? ? ? dev = per_cpu_ptr(arm_cpuidle_devices, cpu_id);
->> + ? ? ? ? ? ? dev->cpu = cpu_id;
->> + ? ? ? ? ? ? dev->state_count = drv->state_count;
->> +
->> + ? ? ? ? ? ? if (driver_data)
->> + ? ? ? ? ? ? ? ? ? ? for (i = 0; i < dev->state_count; i++) {
->
-> This would be more concise and less indentation:
->
-> for (i = 0; driver_data, i < dev->state_count; i++)
->
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? dev->states_usage[i].driver_data =
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? driver_data[i];
->> + ? ? ? ? ? ? ? ? ? ? }
->> +
->> + ? ? ? ? ? ? if (cpuidle_register_device(dev)) {
->> + ? ? ? ? ? ? ? ? ? ? pr_err("%s: Failed to register cpu %u\n",
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? __func__, cpu_id);
+>  /*
+>   *	3 counter/timer units present.
+>   */
+> @@ -37,12 +43,12 @@
+>  
+>  static unsigned long at91x40_gettimeoffset(void)
+>  {
+> -	return (at91_sys_read(AT91_TC + AT91_TC_CLK1BASE + AT91_TC_CV) * 1000000 / (AT91X40_MASTER_CLOCK / 128));
+> +	return (at91_tc_read(AT91_TC_CLK1BASE + AT91_TC_CV) * 1000000 / (AT91X40_MASTER_CLOCK / 128));
+>  }
 
-arm_cpuidle_devices_uninit();
 
->> + ? ? ? ? ? ? ? ? ? ? return -ENODEV;
->
-> Leaking memory here from alloc_percpu.
->
-> Also, need to unregister driver. It's usually cleaner to use goto's for
-> error clean-up.
->
+It is a good chance to split this line to fit in 80 characters while you
+are editing it.
 
-In this case, just adding a call  to arm_cpuidle_devices_uninit()
-seems clean right?
+>  
+>  static irqreturn_t at91x40_timer_interrupt(int irq, void *dev_id)
+>  {
+> -	at91_sys_read(AT91_TC + AT91_TC_CLK1BASE + AT91_TC_SR);
+> +	at91_tc_read(AT91_TC_CLK1BASE + AT91_TC_SR);
+>  	timer_tick();
+>  	return IRQ_HANDLED;
+>  }
+> @@ -57,20 +63,20 @@ void __init at91x40_timer_init(void)
+>  {
+>  	unsigned int v;
+>  
+> -	at91_sys_write(AT91_TC + AT91_TC_BCR, 0);
+> -	v = at91_sys_read(AT91_TC + AT91_TC_BMR);
+> +	at91_tc_write(AT91_TC_BCR, 0);
+> +	v = at91_tc_read(AT91_TC_BMR);
+>  	v = (v & ~AT91_TC_TC1XC1S) | AT91_TC_TC1XC1S_NONE;
+> -	at91_sys_write(AT91_TC + AT91_TC_BMR, v);
+> +	at91_tc_write(AT91_TC_BMR, v);
+>  
+> -	at91_sys_write(AT91_TC + AT91_TC_CLK1BASE + AT91_TC_CCR, AT91_TC_CLKDIS);
+> -	at91_sys_write(AT91_TC + AT91_TC_CLK1BASE + AT91_TC_CMR, (AT91_TC_TIMER_CLOCK4 | AT91_TC_CPCTRG));
+> -	at91_sys_write(AT91_TC + AT91_TC_CLK1BASE + AT91_TC_IDR, 0xffffffff);
+> -	at91_sys_write(AT91_TC + AT91_TC_CLK1BASE + AT91_TC_RC, (AT91X40_MASTER_CLOCK / 128) / HZ - 1);
+> -	at91_sys_write(AT91_TC + AT91_TC_CLK1BASE + AT91_TC_IER, (1<<4));
+> +	at91_tc_write(AT91_TC_CLK1BASE + AT91_TC_CCR, AT91_TC_CLKDIS);
+> +	at91_tc_write(AT91_TC_CLK1BASE + AT91_TC_CMR, (AT91_TC_TIMER_CLOCK4 | AT91_TC_CPCTRG));
+> +	at91_tc_write(AT91_TC_CLK1BASE + AT91_TC_IDR, 0xffffffff);
+> +	at91_tc_write(AT91_TC_CLK1BASE + AT91_TC_RC, (AT91X40_MASTER_CLOCK / 128) / HZ - 1);
+> +	at91_tc_write(AT91_TC_CLK1BASE + AT91_TC_IER, (1<<4));
 
-> Rob
+
+Same here, some of these lines look over 80 characters. Good chance to
+fix them.
+
+>  
+>  	setup_irq(AT91X40_ID_TC1, &at91x40_timer_irq);
+>  
+> -	at91_sys_write(AT91_TC + AT91_TC_CLK1BASE + AT91_TC_CCR, (AT91_TC_SWTRG | AT91_TC_CLKEN));
+> +	at91_tc_write(AT91_TC_CLK1BASE + AT91_TC_CCR, (AT91_TC_SWTRG | AT91_TC_CLKEN));
+
+
+and here.
+
+>  }
+>  
+>  struct sys_timer at91x40_timer = {
+> diff --git a/arch/arm/mach-at91/include/mach/at91x40.h b/arch/arm/mach-at91/include/mach/at91x40.h
+> index a57829f..9068021 100644
+> --- a/arch/arm/mach-at91/include/mach/at91x40.h
+> +++ b/arch/arm/mach-at91/include/mach/at91x40.h
+> @@ -28,18 +28,18 @@
+>  #define AT91X40_ID_IRQ2		18	/* External IRQ 2 */
+>  
+>  /*
+> - * System Peripherals (offset from AT91_BASE_SYS)
+> + * System Peripherals
+>   */
+>  #define AT91_BASE_SYS	0xffc00000
+>  
+> -#define AT91_EBI	(0xffe00000 - AT91_BASE_SYS)	/* External Bus Interface */
+> -#define AT91_SF		(0xfff00000 - AT91_BASE_SYS)	/* Special Function */
+> -#define AT91_USART1	(0xfffcc000 - AT91_BASE_SYS)	/* USART 1 */
+> -#define AT91_USART0	(0xfffd0000 - AT91_BASE_SYS)	/* USART 0 */
+> -#define AT91_TC		(0xfffe0000 - AT91_BASE_SYS)	/* Timer Counter */
+> -#define AT91_PIOA	(0xffff0000 - AT91_BASE_SYS)	/* PIO Controller A */
+> -#define AT91_PS		(0xffff4000 - AT91_BASE_SYS)	/* Power Save */
+> -#define AT91_WD		(0xffff8000 - AT91_BASE_SYS)	/* Watchdog Timer */
+> +#define AT91_EBI	0xffe00000	/* External Bus Interface */
+> +#define AT91_SF		0xfff00000	/* Special Function */
+> +#define AT91_USART1	0xfffcc000	/* USART 1 */
+> +#define AT91_USART0	0xfffd0000	/* USART 0 */
+> +#define AT91_TC		0xfffe0000	/* Timer Counter */
+> +#define AT91_PIOA	0xffff0000	/* PIO Controller A */
+> +#define AT91_PS		0xffff4000	/* Power Save */
+> +#define AT91_WD		0xffff8000	/* Watchdog Timer */
+>  
+>  /*
+>   * The AT91x40 series doesn't have a debug unit like the other AT91 parts.
+> diff --git a/arch/arm/mach-at91/include/mach/system.h b/arch/arm/mach-at91/include/mach/system.h
+> index 36af14b..a3c0fc0 100644
+> --- a/arch/arm/mach-at91/include/mach/system.h
+> +++ b/arch/arm/mach-at91/include/mach/system.h
+> @@ -33,7 +33,7 @@ static inline void arch_idle(void)
+>  	 * re-enabled by an interrupt or by a reset.
+>  	 */
+>  #ifdef AT91_PS
+> -	at91_sys_write(AT91_PS_CR, AT91_PS_CR_CPU);
+> +	__raw_writel(AT91_PS_CR_CPU, AT91_PS_CR);
+>  #else
+>  	at91_sys_write(AT91_PMC_SCDR, AT91_PMC_PCK);
+
+
+Is this one changed in another patch?
+
+>  #endif
+
+
+Other than that, looks good to me:
+
+Reviewed-by: Ryan Mallon <rmallon@gmail.com>
+
+~Ryan
