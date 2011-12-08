@@ -1,40 +1,120 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Thu, 08 Dec 2011 13:03:26 +0530
-Subject: [PATCH] video IPUv1 fixes for different display connections
-In-Reply-To: <1322747932-24943-1-git-send-email-s.hauer@pengutronix.de>
-References: <1322747932-24943-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1323329606.1641.25.camel@vkoul-udesk3>
+From: hs@denx.de (Heiko Schocher)
+Date: Thu, 08 Dec 2011 08:47:05 +0100
+Subject: [PATCH] arm,
+ davinci: configure davinci aemif chipselects through OF
+In-Reply-To: <DF0F476B391FA8409C78302C7BA518B603EFB2@DBDE01.ent.ti.com>
+References: <1322991679-20947-1-git-send-email-hs@denx.de>
+ <DF0F476B391FA8409C78302C7BA518B603EFB2@DBDE01.ent.ti.com>
+Message-ID: <4EE06B79.7070804@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2011-12-01 at 14:58 +0100, Sascha Hauer wrote:
-> Hi,
+Hello Nori,
+
+Nori, Sekhar wrote:
+> Hi Heiko,
 > 
-> The following series fixes the display connections to the IPU on
-> i.MX3 boards. The connection to the display is completely independend
-> of the internal pixel format in the framebuffer. The driver instead
-> changes the IPU <-> Display mapping dependent on the pixelformat
-> which is wrong.
-> The following patch makes 16bpp and 32bpp modes possible on both
-> RGB666 and RGB888 connected displays.
-> The burstsize setting for 32bpp was configured wrong, so 32bpp
-> modes have obviously never been tested.
+> On Sun, Dec 04, 2011 at 15:11:19, Heiko Schocher wrote:
 > 
-> Not for stable since all in kernel boards seem to work.
-Applied thanks.
+> Please provide a patch description. Nice to see device tree
+> support being added for DaVinci devices.
 
-Couldn't help but notice that :
-@@ -312,7 +312,7 @@ static void ipu_ch_param_set_size(union
-chan_param_mem *params,
-        case IPU_PIX_FMT_RGB565:
-                params->ip.bpp  = 2;
-                params->ip.pfs  = 4;
+fixed.
 
-is not really good way. Someone else who is using this driver has no way
-of knowing what these magic numbers mean and how to use them
-Perhaps you can add meaning to these numbers and some note on why they
-should be set to these values.
+>> Signed-off-by: Heiko Schocher <hs@denx.de>
+>> Cc: davinci-linux-open-source at linux.davincidsp.com
+>> Cc: devicetree-discuss at lists.ozlabs.org
+>> Cc: linux-arm-kernel at lists.infradead.org
+>> Cc: grant.likely at secretlab.ca
+>> Cc: Sekhar Nori <nsekhar@ti.com>
+>> Cc: Kevin Hilman <khilman@ti.com>
+>> Cc: Wolfgang Denk <wd@denx.de>
+>> ---
+>>  .../devicetree/bindings/arm/davinci/aemif.txt      |   85 ++++++++++++++++
+>>  arch/arm/mach-davinci/aemif.c                      |  105 +++++++++++++++++++-
+>>  arch/arm/mach-davinci/include/mach/aemif.h         |    1 +
+>>  3 files changed, 190 insertions(+), 1 deletions(-)
+>>  create mode 100644 Documentation/devicetree/bindings/arm/davinci/aemif.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/arm/davinci/aemif.txt b/Documentation/devicetree/bindings/arm/davinci/aemif.txt
+>> new file mode 100644
+>> index 0000000..c9ed551
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/arm/davinci/aemif.txt
+>> @@ -0,0 +1,85 @@
+>> +* Texas Instruments Davinci AEMIF
+>> +
+>> +This file provides information, what the device node for the
+>> +davinci aemifa interface contain.
+>            ^^^^^^
+>            aemif
 
+fixed, thanks.
 
+>> +
+>> +Required properties:
+>> +- compatible: "ti,davinci-emifa";
+
+Shouldn't this also be "ti,davinci-aemif" ?
+
+[...]
+>> diff --git a/arch/arm/mach-davinci/aemif.c b/arch/arm/mach-davinci/aemif.c
+>> index 1ce70a9..12c559f 100644
+>> --- a/arch/arm/mach-davinci/aemif.c
+>> +++ b/arch/arm/mach-davinci/aemif.c
+>> @@ -13,12 +13,14 @@
+>>  #include <linux/err.h>
+>>  #include <linux/clk.h>
+>>  #include <linux/module.h>
+>> +#include <linux/of.h>
+>> +#include <linux/of_address.h>
+>>  #include <linux/time.h>
+>>  
+>>  #include <mach/aemif.h>
+>>  
+>>  /* Timing value configuration */
+>> -
+>> +#define ASIZE(x)	(x)
+>>  #define TA(x)		((x) << 2)
+>>  #define RHOLD(x)	((x) << 4)
+>>  #define RSTROBE(x)	((x) << 7)
+>> @@ -26,7 +28,10 @@
+>>  #define WHOLD(x)	((x) << 17)
+>>  #define WSTROBE(x)	((x) << 20)
+>>  #define WSETUP(x)	((x) << 26)
+>> +#define EW(x)		((x) << 30)
+>> +#define SS(x)		((x) << 31)
+> 
+> You are adding support for additional configuration
+> parameters which should be done in a separate patch.
+
+Hmm.. they are only used in the OF case ... is this split
+really needed?
+
+[...]
+>> +static int davinci_aemif_setup_timing_of_one(struct device_node *np,
+>> +		void __iomem *base)
+>> +{
+[...]
+>> +	val = ASIZE(asize) | TA(ta) | RHOLD(rhold) | RSTROBE(rstrobe) |
+>> +		RSETUP(rsetup) | WHOLD(whold) | WSTROBE(wstrobe) |
+>> +		WSETUP(wsetup) | EW(ew) | SS(ss);
+>> +
+>> +	__raw_writel(val, base + offset);
+>> +
+>> +	return 0;
+>> +}
+> 
+> This shares a large amount of code with davinci_aemif_setup_timing().
+> Can you try writing this as a OF wrapper to the existing function?
+
+Done.
+
+Waiting to your response to my 2 questions above, after that sending
+the v2.
+
+bye,
+Heiko
 -- 
-~Vinod
+DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
+HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
