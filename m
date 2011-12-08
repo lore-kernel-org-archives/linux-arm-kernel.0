@@ -1,34 +1,28 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu, 8 Dec 2011 16:03:48 +0100
-Subject: ARM: at91: smc update
-Message-ID: <20111208150348.GD23884@game.jcrosoft.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 8 Dec 2011 16:08:33 +0100
+Subject: [PATCH] pinctrl: remove two unused global variables
+In-Reply-To: <1323296184-30227-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1323296184-30227-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <CACRpkdaSoA=0M=_a0M-weS62H=iWhhgbEw15Nz2Y7ju0+U9YJg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+2011/12/7 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
 
-	this patch series introduce new accessor to manipulate the smc
-	and be allow to abstract it of the soc rm9200 vs sam9
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 
-The following changes since commit 5c4ee7a68bc518ec79ac04f7c3259899ecff61db:
+Applied, with some rewriting. I have a hard time handling this
+kind of mails:
 
-  Merge branch 'next/cleanup' into for-next (2011-12-01 12:36:29 +0000)
+Content-Transfer-Encoding: base64
+(...)
+U2lnbmVkLW9mZi1ieTogVXdlIEtsZWluZS1Lw7ZuaWcgPHUua2xlaW5lLWtvZW5pZ0BwZW5ndXRy
+b25peC5kZT4KLS0tCiBkcml2ZXJzL3BpbmN0cmwvcGlubXV4LmMgfCAgICA0IC0tLS0KIDEgZmls
+ZXMgY2hhbmdlZCwgMCBpbnNlcnRpb25zKCspLCA0IGRlbGV0aW9ucygtKQoKZGlmZiAtLWdpdCBh
+(...)
 
-are available in the git repository at:
+git am won't accept it for some reason.
 
-  git://github.com/at91linux/linux-at91.git ..BRANCH.NOT.VERIFIED..
+Any hints?
 
-Jean-Christophe PLAGNIOL-VILLARD (3):
-      ARM: at91: add accessor to manage smc
-      pata/at91: use new introduce smc accessor
-      ide/at91: use new introduce smc accessor
-
- arch/arm/mach-at91/include/mach/at91sam9_smc.h |   29 ++++++++
- arch/arm/mach-at91/sam9_smc.c                  |   93 ++++++++++++++++++++++--
- arch/arm/mach-at91/sam9_smc.h                  |   23 ------
- drivers/ata/pata_at91.c                        |   43 ++++++------
- drivers/ide/at91_ide.c                         |   65 ++++++++++-------
- 5 files changed, 173 insertions(+), 80 deletions(-)
-
-Best Regards,
-J.
+Linus Walleij
