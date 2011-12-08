@@ -1,67 +1,64 @@
-From: dirk.behme@de.bosch.com (Dirk Behme)
-Date: Thu, 8 Dec 2011 08:22:01 +0100
-Subject: [PATCH v2] arm/imx6q: Rename Sabreauto to Armadillo2
-Message-ID: <1323328921-2226-1-git-send-email-dirk.behme@de.bosch.com>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Thu, 8 Dec 2011 15:22:39 +0800
+Subject: [GIT PULL] pxa changes for v3.3
+Message-ID: <CAN1soZz3LcnoFUmFR8go5_ga0-tT9rnxDwtVz9j-P=Ef2Lkp4w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Sabreauto board was renamed to Armadillo2 recently. To avoid
-confusion, rename Sabreauto to Armadillo2/arm2.
+Hi Arnd,
 
-Signed-off-by: Dirk Behme <dirk.behme@de.bosch.com>
-CC: Shawn Guo <shawn.guo@linaro.org>
----
-Changes in v2: Rebase against the recent mainline
+Please pull these for v3.3.
 
- Documentation/devicetree/bindings/arm/fsl.txt      |    4 ++--
- .../dts/{imx6q-sabreauto.dts => imx6q-arm2.dts}    |    4 ++--
- arch/arm/mach-imx/mach-imx6q.c                     |    2 +-
- 3 files changed, 5 insertions(+), 5 deletions(-)
- rename arch/arm/boot/dts/{imx6q-sabreauto.dts => imx6q-arm2.dts} (91%)
+The four patches in below are used to fix build issue while gpio-pxa
+is changed to platform driver.
+      pcmcia: pxa: replace IRQ_GPIO() with gpio_to_irq()
+      Input: zylonite-wm97xx - replace IRQ_GPIO() with gpio_to_irq()
+      ARM: pxa: fix build error for GPIO_bit()
+      ARM: pxa: fix the build error because of missing gpio-pxa.h
 
-diff --git a/Documentation/devicetree/bindings/arm/fsl.txt b/Documentation/devicetree/bindings/arm/fsl.txt
-index c9848ad..1b81e99 100644
---- a/Documentation/devicetree/bindings/arm/fsl.txt
-+++ b/Documentation/devicetree/bindings/arm/fsl.txt
-@@ -21,6 +21,6 @@ i.MX53 Smart Mobile Reference Design Board
- Required root node properties:
-     - compatible = "fsl,imx53-smd", "fsl,imx53";
- 
--i.MX6 Quad SABRE Automotive Board
-+i.MX6 Quad Armadillo2 Board
- Required root node properties:
--    - compatible = "fsl,imx6q-sabreauto", "fsl,imx6q";
-+    - compatible = "fsl,imx6q-arm2", "fsl,imx6q";
-diff --git a/arch/arm/boot/dts/imx6q-sabreauto.dts b/arch/arm/boot/dts/imx6q-arm2.dts
-similarity index 91%
-rename from arch/arm/boot/dts/imx6q-sabreauto.dts
-rename to arch/arm/boot/dts/imx6q-arm2.dts
-index 072974e..b078b91 100644
---- a/arch/arm/boot/dts/imx6q-sabreauto.dts
-+++ b/arch/arm/boot/dts/imx6q-arm2.dts
-@@ -14,8 +14,8 @@
- /include/ "imx6q.dtsi"
- 
- / {
--	model = "Freescale i.MX6 Quad SABRE Automotive Board";
--	compatible = "fsl,imx6q-sabreauto", "fsl,imx6q";
-+	model = "Freescale i.MX6 Quad Armadillo2 Board";
-+	compatible = "fsl,imx6q-arm2", "fsl,imx6q";
- 
- 	chosen {
- 		bootargs = "console=ttymxc0,115200 root=/dev/mmcblk3p3 rootwait";
-diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
-index 9cd860a..a62e568 100644
---- a/arch/arm/mach-imx/mach-imx6q.c
-+++ b/arch/arm/mach-imx/mach-imx6q.c
-@@ -71,7 +71,7 @@ static struct sys_timer imx6q_timer = {
- };
- 
- static const char *imx6q_dt_compat[] __initdata = {
--	"fsl,imx6q-sabreauto",
-+	"fsl,imx6q-arm2",
- 	NULL,
- };
- 
--- 
-1.7.0.4
+
+The following changes since commit 1fc27d6c81c881a67fcd1ff983f23c06cdd2a93f:
+
+  Merge branch 'fixes' into for-next (2011-12-06 14:24:24 +0000)
+
+are available in the git repository at:
+
+  git://github.com/hzhuang1/linux.git for-next
+
+Axel Lin (2):
+      pcmcia: pxa: replace IRQ_GPIO() with gpio_to_irq()
+      Input: zylonite-wm97xx - replace IRQ_GPIO() with gpio_to_irq()
+
+Haojian Zhuang (2):
+      ARM: pxa: fix build error for GPIO_bit()
+      ARM: pxa: fix the build error because of missing gpio-pxa.h
+
+Jett.Zhou (5):
+      RTC: sa1100: Clean out ost register
+      RTC: sa1100: remove redundant code of setting alarm
+      RTC: sa1100: support sa1100, pxa and mmp soc families
+      ARM: pxa: add dummy clock for sa1100-rtc
+      ARM: sa1100: clean up of the clock support
+
+ arch/arm/Kconfig                            |    2 +-
+ arch/arm/mach-pxa/corgi_pm.c                |    1 +
+ arch/arm/mach-pxa/devices.c                 |   20 ++
+ arch/arm/mach-pxa/pxa25x.c                  |    1 +
+ arch/arm/mach-pxa/pxa27x.c                  |    1 +
+ arch/arm/mach-pxa/pxa300.c                  |    1 +
+ arch/arm/mach-pxa/pxa320.c                  |    1 +
+ arch/arm/mach-pxa/pxa3xx.c                  |    1 +
+ arch/arm/mach-pxa/pxa95x.c                  |    1 +
+ arch/arm/mach-pxa/spitz_pm.c                |    1 +
+ arch/arm/mach-sa1100/clock.c                |   91 ++++++---
+ arch/arm/mach-sa1100/generic.c              |   20 ++
+ drivers/input/touchscreen/zylonite-wm97xx.c |    5 +-
+ drivers/pcmcia/pxa2xx_e740.c                |   11 +-
+ drivers/pcmcia/pxa2xx_palmld.c              |    2 +-
+ drivers/pcmcia/pxa2xx_palmtc.c              |    2 +-
+ drivers/pcmcia/pxa2xx_stargate2.c           |    6 +-
+ drivers/pcmcia/pxa2xx_trizeps4.c            |    5 +-
+ drivers/pcmcia/pxa2xx_vpac270.c             |    4 +-
+ drivers/rtc/Kconfig                         |    2 +-
+ drivers/rtc/rtc-sa1100.c                    |  300 ++++++++++++++++-----------
+ 21 files changed, 320 insertions(+), 158 deletions(-)
