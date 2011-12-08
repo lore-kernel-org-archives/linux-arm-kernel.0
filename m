@@ -1,47 +1,64 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 8 Dec 2011 16:49:23 +0000
-Subject: [GIT PULL] sa1100 fixes for 3.2
-In-Reply-To: <CAN1soZyDCb8BqjTZ3N7kJBspQQtGuBchQYRbr2qcY1J24zCfuw@mail.gmail.com>
-References: <CAN1soZyDCb8BqjTZ3N7kJBspQQtGuBchQYRbr2qcY1J24zCfuw@mail.gmail.com>
-Message-ID: <201112081649.23956.arnd@arndb.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 8 Dec 2011 09:01:14 -0800
+Subject: [PATCH 4/7] amp/omap: add a remoteproc driver
+In-Reply-To: <CAK=WgbZvH3eiouryKDenC_x0LdDcHFuumhfoeY4ueiwT5r0cxA@mail.gmail.com>
+References: <1319536106-25802-1-git-send-email-ohad@wizery.com>
+ <1319536106-25802-5-git-send-email-ohad@wizery.com>
+ <CAK=WgbZvH3eiouryKDenC_x0LdDcHFuumhfoeY4ueiwT5r0cxA@mail.gmail.com>
+Message-ID: <20111208170114.GZ31337@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 08 December 2011, Haojian Zhuang wrote:
-> The following changes since commit 56f54e7d671969da13693e5a147438f2cc50ca9b:
+* Ohad Ben-Cohen <ohad@wizery.com> [111207 23:26]:
+> Hi Tony,
 > 
->   Merge branch 'fix' of git://github.com/ycmiao/pxa-linux into fixes
-> (2011-11-23 20:30:08 +0000)
+> On Tue, Oct 25, 2011 at 11:48 AM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
+> > Add a remoteproc driver for OMAP4, so we can boot the dual-M3 "Ducati"
+> > and DSP subsystems.
+> >
+> > Use the omap_device_* API to control the hardware state, and utilize
+> > the OMAP mailbox to interrupt the remote processor when a new message
+> > is pending (the mailbox payload is used to tell it which virtqueue was
+> > the message placed in).
+> >
+> > Conversely, when an inbound mailbox message arrives, tell the remoteproc
+> > core which virtqueue is triggered.
+> >
+> > Later we will also use the mailbox payload to signal omap-specific
+> > events like remote crashes (which will be used to trigger remoteproc
+> > recovery) and power management transitions. At that point we will also
+> > extend the remoteproc core to support this.
+> >
+> > Based on (but now quite far from) work done by Fernando Guzman Lugo
+> > <fernando.lugo@ti.com> and Hari Kanigeri <h-kanigeri2@ti.com>.
+> >
+> > Designed with Brian Swetland <swetland@google.com>.
+> >
+> > Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
+> > Cc: Brian Swetland <swetland@google.com>
+> > Cc: Arnd Bergmann <arnd@arndb.de>
+> > Cc: Grant Likely <grant.likely@secretlab.ca>
+> > Cc: Tony Lindgren <tony@atomide.com>
+> > Cc: Russell King <linux@arm.linux.org.uk>
+> > Cc: Rusty Russell <rusty@rustcorp.com.au>
+> > Cc: Andrew Morton <akpm@linux-foundation.org>
+> > Cc: Greg KH <greg@kroah.com>
+> > Cc: Stephen Boyd <sboyd@codeaurora.org>
+> > ---
+> > ?arch/arm/plat-omap/include/plat/remoteproc.h | ? 56 ++++++
+> > ?drivers/amp/remoteproc/Kconfig ? ? ? ? ? ? ? | ? 21 +++
+> > ?drivers/amp/remoteproc/Makefile ? ? ? ? ? ? ?| ? ?4 +-
+> > ?drivers/amp/remoteproc/omap_remoteproc.c ? ? | ?248 ++++++++++++++++++++++++++
+> > ?drivers/amp/remoteproc/omap_remoteproc.h ? ? | ? 69 +++++++
+> > ?5 files changed, 397 insertions(+), 1 deletions(-)
+> > ?create mode 100644 arch/arm/plat-omap/include/plat/remoteproc.h
+> > ?create mode 100644 drivers/amp/remoteproc/omap_remoteproc.c
+> > ?create mode 100644 drivers/amp/remoteproc/omap_remoteproc.h
+> 
+> I'm about to add this to linux-next (minus the 'amp' wording); can I
+> please have your Acked-by for this (at least for the plat-omap change) ?
 
-Pulled, thanks! Note that generally, I'd prefer pull requests to be based
-on an -rc release instead of my own fixes branch, but it's not a big
-deal.
+The platform init code looks OK to me. Please also start considering
+how to do the DT bindings for it. For patches 4 & 5:
 
-I've also applied the two bug fixes for your pxa gpio series on top of the
-branch I already had. It took me a while to figure out that those are not
-for 3.2 but instead on the other branch. Since they are obviously required,
-I applied them directly (I've noticed the same bug before).
-
-I'm a bit confused about who I should be pulling from pxa and mmp stuff
-in general. I've taken the liberal approach so far and just pulled whatever
-gets thrown at me as long as it looks good from each of you, but the
-MAINTAINERS file currently lists:
-
-PXA2xx/PXA3xx SUPPORT
-M:      Eric Miao <eric.y.miao@gmail.com>
-M:      Russell King <linux@arm.linux.org.uk>
-PXA168 SUPPORT
-M:      Eric Miao <eric.y.miao@gmail.com>
-M:      Jason Chagas <jason.chagas@marvell.com>
-PXA910 SUPPORT
-M:      Eric Miao <eric.y.miao@gmail.com>
-MMP2 SUPPORT (aka ARMADA610)
-M:      Haojian Zhuang <haojian.zhuang@marvell.com>
-M:      Eric Miao <eric.y.miao@gmail.com>
-
-Should that be updated to include you for all of these? I certainly don't
-want to step on Eric's and Russell's toes but you seem to be doing the bulk
-of the pxa/mmp work nowadays and I would prefer to pull from someone
-who is actually listed as maintainer.
-
-	Arnd
+Acked-by: Tony Lindgren <tony@atomide.com>
