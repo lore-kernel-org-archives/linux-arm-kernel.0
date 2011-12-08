@@ -1,67 +1,63 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu,  8 Dec 2011 16:28:06 +0100
-Subject: [PATCH 1/1] at91: 9260 and 9g20 add support of join SRAM Memory
- Mapping
-Message-ID: <1323358086-18749-1-git-send-email-plagnioj@jcrosoft.com>
+Date: Thu,  8 Dec 2011 16:32:00 +0100
+Subject: [PATCH 1/2] usb: at91: fix clk_get error handling
+Message-ID: <1323358321-19918-1-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-on 9269 and 9g20 the sram are mirrored at then of the bank so we can join them
-
 Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-Cc: Patrice Vilchez <patrice.vilchez@atmel.com>
+Cc: linux-usb at vger.kernel.org
 ---
- arch/arm/mach-at91/at91sam9260.c              |   13 +++++--------
- arch/arm/mach-at91/include/mach/at91sam9260.h |    4 ++++
- 2 files changed, 9 insertions(+), 8 deletions(-)
+Hi,
 
-diff --git a/arch/arm/mach-at91/at91sam9260.c b/arch/arm/mach-at91/at91sam9260.c
-index 1836002..3ebd306 100644
---- a/arch/arm/mach-at91/at91sam9260.c
-+++ b/arch/arm/mach-at91/at91sam9260.c
-@@ -309,15 +309,12 @@ static void __init at91sam9xe_map_io(void)
+	can we apply via at91 as it's depend on patch already on arm-soc
+
+Best Regarfds,
+J.
+ drivers/usb/host/ohci-at91.c |   18 ++++++++++++++++++
+ 1 files changed, 18 insertions(+), 0 deletions(-)
+
+diff --git a/drivers/usb/host/ohci-at91.c b/drivers/usb/host/ohci-at91.c
+index 5df0b0e..dc33517 100644
+--- a/drivers/usb/host/ohci-at91.c
++++ b/drivers/usb/host/ohci-at91.c
+@@ -139,8 +139,23 @@ static int usb_hcd_at91_probe(const struct hc_driver *driver,
+ 	}
  
- static void __init at91sam9260_map_io(void)
- {
--	if (cpu_is_at91sam9xe()) {
-+	if (cpu_is_at91sam9xe())
- 		at91sam9xe_map_io();
--	} else if (cpu_is_at91sam9g20()) {
--		at91_init_sram(0, AT91SAM9G20_SRAM0_BASE, AT91SAM9G20_SRAM0_SIZE);
--		at91_init_sram(1, AT91SAM9G20_SRAM1_BASE, AT91SAM9G20_SRAM1_SIZE);
--	} else {
--		at91_init_sram(0, AT91SAM9260_SRAM0_BASE, AT91SAM9260_SRAM0_SIZE);
--		at91_init_sram(1, AT91SAM9260_SRAM1_BASE, AT91SAM9260_SRAM1_SIZE);
--	}
-+	else if (cpu_is_at91sam9g20())
-+		at91_init_sram(0, AT91SAM9G20_SRAM_BASE, AT91SAM9G20_SRAM_SIZE);
-+	else
-+		at91_init_sram(0, AT91SAM9260_SRAM_BASE, AT91SAM9260_SRAM_SIZE);
- 	at91_init_gpbr(AT91SAM9260_BASE_GPBR, 16);
- }
+ 	iclk = clk_get(&pdev->dev, "ohci_clk");
++	if (IS_ERR(iclk)) {
++		dev_err(&pdev->dev, "failed to get ohci_clk\n");
++		retval = PTR_ERR(iclk);
++		goto err3;
++	}
+ 	fclk = clk_get(&pdev->dev, "uhpck");
++	if (IS_ERR(fclk)) {
++		dev_err(&pdev->dev, "failed to get uhpck\n");
++		retval = PTR_ERR(fclk);
++		goto err4;
++	}
+ 	hclk = clk_get(&pdev->dev, "hclk");
++	if (IS_ERR(hclk)) {
++		dev_err(&pdev->dev, "failed to get hclk\n");
++		retval = PTR_ERR(hclk);
++		goto err5;
++	}
  
-diff --git a/arch/arm/mach-at91/include/mach/at91sam9260.h b/arch/arm/mach-at91/include/mach/at91sam9260.h
-index 23fdede..e3cb780 100644
---- a/arch/arm/mach-at91/include/mach/at91sam9260.h
-+++ b/arch/arm/mach-at91/include/mach/at91sam9260.h
-@@ -115,6 +115,8 @@
- #define AT91SAM9260_SRAM0_SIZE	SZ_4K		/* Internal SRAM 0 size (4Kb) */
- #define AT91SAM9260_SRAM1_BASE	0x00300000	/* Internal SRAM 1 base address */
- #define AT91SAM9260_SRAM1_SIZE	SZ_4K		/* Internal SRAM 1 size (4Kb) */
-+#define AT91SAM9260_SRAM_BASE	0x002FF000	/* Internal SRAM base address */
-+#define AT91SAM9260_SRAM_SIZE	SZ_8K		/* Internal SRAM size (8Kb) */
+ 	at91_start_hc(pdev);
+ 	ohci_hcd_init(hcd_to_ohci(hcd));
+@@ -153,9 +168,12 @@ static int usb_hcd_at91_probe(const struct hc_driver *driver,
+ 	at91_stop_hc(pdev);
  
- #define AT91SAM9260_UHP_BASE	0x00500000	/* USB Host controller */
+ 	clk_put(hclk);
++ err5:
+ 	clk_put(fclk);
++ err4:
+ 	clk_put(iclk);
  
-@@ -128,6 +130,8 @@
- #define AT91SAM9G20_SRAM0_SIZE	SZ_16K		/* Internal SRAM 0 size (16Kb) */
- #define AT91SAM9G20_SRAM1_BASE	0x00300000	/* Internal SRAM 1 base address */
- #define AT91SAM9G20_SRAM1_SIZE	SZ_16K		/* Internal SRAM 1 size (16Kb) */
-+#define AT91SAM9G20_SRAM_BASE	0x002FC000	/* Internal SRAM base address */
-+#define AT91SAM9G20_SRAM_SIZE	SZ_32K		/* Internal SRAM size (32Kb) */
++ err3:
+ 	iounmap(hcd->regs);
  
- #define AT91SAM9G20_UHP_BASE	0x00500000	/* USB Host controller */
- 
+  err2:
 -- 
 1.7.7
