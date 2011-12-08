@@ -1,182 +1,60 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Thu, 8 Dec 2011 15:14:40 -0800
-Subject: [PATCH] [RFC] pinctrl: add a driver for Energy Micro's efm32 SoCs
-In-Reply-To: <1323384057-31452-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1323384057-31452-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF1750B77BD8@HQMAIL01.nvidia.com>
+From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
+Date: Fri, 9 Dec 2011 00:13:37 +0100
+Subject: [PATCH] ARM: OMAP1: Move dpll1 rates selection from config to
+ runtime
+In-Reply-To: <1323001021-7322-1-git-send-email-jkrzyszt@tis.icnet.pl>
+References: <20111130222837.GR31337@atomide.com>
+ <1323001021-7322-1-git-send-email-jkrzyszt@tis.icnet.pl>
+Message-ID: <201112090013.37529.jkrzyszt@tis.icnet.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Uwe Kleine-K?nig wrote at Thursday, December 08, 2011 3:41 PM:
+On Sunday 04 of December 2011 at 13:17:01, Janusz Krzysztofik wrote:
+> For still better multi-OMAP1 support, expand omap1_rate_table with flags
+> for different SoC types and match them while selecting clock rates. The
+> idea is stolen from current omap24xx clock rate selection algorithm.
+> 
+> Since clkdev platform flag definitions are reused here, those had to be
+> expanded with one extra entry for OMAP1710 subtype, as this is the only
+> SoC for which we allow selection of the highest, 216 MHz rate.
+> 
+> Once done, remove no longer needed clock rate configure time options.
+> 
+> Created against linux-omap/master tip as of Thu Dec 1,
+> commit f83c2a8cbb59981722d1ab610c79adfd034a2667.
+> Tested on Amstrad Delta.
+> 
+> Signed-off-by: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
+> ---
+> Hi,
+> Here is a list of changes against the initial version, submitted as
+> patch 2a/5 v2 "ARM: OMAP1: select clock rate by CPU type" of the series
+> "ARM: OMAP1: Fix dpll1 reprogramming related issues":
+> * drop no longer needed .config options, as suggested by Tony (thanks!),
+> * follow selection conditions of those removed .config clock rate
+>   options more closely (I missed that before, ended up reinventing the
+>   wheel),
+> * add extra clkdev platform flag for OMAP1710 to be able to limit the
+>   216 MHz rate selection to this SoC subtype only,
+> * update commit summary and message.
+> 
+> I still wonder if it is sufficient to select a highest rate for a board
+> based on a SoC type only, not on the board type itself. For example, the
+> Amstrad Delta has been used to be running at 150 MHz since it was
+> introduced first, while from now on it will be running at 168 MHz.
+> I haven't noticed any visible issues so far, but who knows...
+> Any opinions?
 
-> diff --git a/drivers/pinctrl/Kconfig b/drivers/pinctrl/Kconfig
+Hi,
+I've collected one opinion, or observation, myself: one of my boards 
+doesn't work correctly at 168 MHz, but works without problems at 150 
+MHz.
 
-> +config PINMUX_EFM32
-> +	bool "EFM32 pinmux driver"
-> +	depends on ARCH_EFM32
-> +	default y
-> +	select PINMUX
+Tony,
+Is it OK for you if we limit the maximum dpll1 rate for all OMAP1510 
+based boards to 150 MHz (now 168 MHz), or do you prefer me to invent an 
+alternative solution, which would derive the (maximum) rate from the 
+board type?
 
-LinusW,
-
-Since this is the pinctrl not pinmux subsystem now, does it make sense
-to name the driver Kconfig options PINCTRL_FOO and the files pinctrl-
-foo.c? I see that the coh901 driver already does that, and I followed
-that convention in my Tegra pinctrl patches.
-
-Uwe,
-
-> diff --git a/drivers/pinctrl/pinmux-efm32.c b/drivers/pinctrl/pinmux-efm32.c
-
-> +#define DRIVER_NAME "efm32-pinctl"
-
-pinctrl (with an r) would match the subsystem name better.
-
-> +static const char *efm32_pinctl_pctl_get_group_name(struct pinctrl_dev *pctldev,
-> +		unsigned selector)
-> +{
-> +	struct efm32_pinctrl_ddata *ddata = pctldev->driver_data;
-> +	const struct efm32_pinctl_pdata *pdata = ddata->pdata;
-> +
-> +	return pdata->groups[selector]->name;
-> +}
-
-Presumably, the set of pins, groups, and functions is determined by the
-SoC HW. Platform data is usually board-specific rather than SoC specific.
-You have two choices here: You could either parse this data from device
-tree as Arnd suggested (and I think as the TI OMAP pinctrl driver will),
-or do what I've done in the Tegra pinctrl driver, and simply put each
-SoC's data into the driver and select which one to use based on the DT
-compatible flag; I didn't see the point of putting data in to the DT that
-was identical for every board using a given SoC.
-
-> +struct efm32_pmx_func {
-> +	const char *name;
-> +	const char **groups;
-> +	const unsigned ngroups;
-> +	const unsigned *mode;
-> +};
-> +
-> +static const char *efm32_us1_groups[] = {
-> +	"us1_loc0",
-> +	"us1_loc1",
-> +	"us1_loc2",
-> +};
-> +
-> +/* order: TX, RX, CS, CLK */
-> +static const unsigned efm32_us_modes[] = {
-> +	EFM32_MODE_PUSHPULL_HIGH, EFM32_MODE_INPUT,
-> +	EFM32_MODE_DISABLE, EFM32_MODE_DISABLE
-> +};
-> +
-> +#define EFM32_PMXFUNC(_name, num) {					\
-> +		.name = #_name #num,					\
-> +		.groups = efm32_ ## _name ## num ## _groups,		\
-> +		.ngroups = ARRAY_SIZE(efm32_ ## _name ## num ## _groups),\
-> +		.mode = efm32_ ## _name ## _modes,			\
-> +	}
-> +
-> +static const struct efm32_pmx_func efm32_pmx_funcs[] = {
-> +	EFM32_PMXFUNC(us, 1),
-> +};
-
-If you're getting all your information from pdata, I'm not sure why
-part of it is hard-coded into the driver...
-
-> +static int efm32_pinctrl_pmx_enable(struct pinctrl_dev *pctldev,
-> +		unsigned func_selector,
-> +		unsigned group_selector)
-> +{
-> +	struct efm32_pinctrl_ddata *ddata = pctldev->driver_data;
-> +
-> +	const struct efm32_pmx_func *func;
-> +	const char *groupname;
-> +	const struct efm32_pinctl_group *group;
-> +	unsigned i;
-> +
-> +	efm32_pinctrl_dbg(ddata, "%s(%u, %u)\n",
-> +			__func__, func_selector, group_selector);
-> +
-> +	func = &efm32_pmx_funcs[func_selector];
-> +	groupname = func->groups[group_selector];
-> +	group = efm32_pinctrl_lookup_group(pctldev, groupname);
-
-I'm not sure that's correct; group_selector is a global identifier, not
-something that can only be interpreted relative to a particular function.
-In other words, shouldn't those last 3 lines be:
-
-func = &efm32_pmx_funcs[func_selector];
-group = pdata->groups[group_selector];
-
-or something like that?
-
-> +static int __devinit efm32_pinctrl_probe(struct platform_device *pdev)
-> +{
-> +	int ret = -ENOMEM;
-> +	struct efm32_pinctrl_ddata *ddata;
-> +	const struct resource *res;
-> +
-> +       	ddata = kzalloc(sizeof(*ddata), GFP_KERNEL);
-
-I think there's an indentation error there.
-
-If you use devm_kzalloc, and also devm_ioremap below, you can avoid
-having to write some of the cleanup code at all.
-
-> +	ddata->pinctrldev = pinctrl_register(&ddata->pinctrldesc,
-> +			&pdev->dev, ddata);
-> +	if (!ddata->pinctrldev) {
-> +		ret = -EINVAL;
-> +		dev_dbg(&pdev->dev, "failed to register pinctrl device");
-> +
-> +		clk_unprepare(ddata->clk);
-> +err_clk_prepare:
-> +
-> +		clk_put(ddata->clk);
-> +err_clk_get:
-> +
-> +		iounmap(ddata->base);
-> +err_ioremap:
-> +err_get_base:
-> +err_platdata:
-> +		kfree(ddata);
-> +	} else
-> +		efm32_pinctrl_dbg(ddata, "initialized (%p, %p)\n", ddata, ddata->pinctrldev);
-> +
-> +err_ddata_kzalloc:
-> +	return ret;
-> +}
-
-That's a pretty unusual code structure. You'd usually put all the err_foo:
-labels right at the end of the function, and have even that last if()
-condition jump to an error:
-
-	ddata->pinctrldev = pinctrl_register(&ddata->pinctrldesc,
-			&pdev->dev, ddata);
-	if (!ddata->pinctrldev) {
-		ret = -EINVAL;
-		dev_dbg(&pdev->dev, "failed to register pinctrl device");
-		goto err_register;
-	} else
-		efm32_pinctrl_dbg(ddata, "initialized (%p, %p)\n", ddata, ddata->pinctrldev);
-
-	return 0;
-
-err_register:
-	clk_unprepare(ddata->clk);
-err_clk_prepare:
-	clk_put(ddata->clk);
-err_clk_get:
-	iounmap(ddata->base);
-err_ioremap:
-err_get_base:
-err_platdata:
-	kfree(ddata);
-err_ddata_kzalloc:
-	return ret;
-}
-
-... that keeps all the error if() blocks looking the same.
-
--- 
-nvpbulic
+Thanks,
+Janusz
