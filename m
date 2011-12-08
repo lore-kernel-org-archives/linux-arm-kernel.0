@@ -1,87 +1,82 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Thu, 8 Dec 2011 22:15:13 +0800
-Subject: [PATCH 2/2] gpio/tegra: Dynamically allocate IRQ base, and
- support DT
-In-Reply-To: <4ED7FA1B.1080109@atmel.com>
-References: <1322700336-26866-1-git-send-email-swarren@nvidia.com>
- <1322700336-26866-2-git-send-email-swarren@nvidia.com>
- <4ED78461.40006@gmail.com> <20111201141112.GG4556@totoro>
- <74CDBE0F657A3D45AFBB94109FB122FF174FDB01DD@HQMAIL01.nvidia.com>
- <20111201165518.GH4556@totoro>
- <74CDBE0F657A3D45AFBB94109FB122FF174FDB02BF@HQMAIL01.nvidia.com>
- <4ED7FA1B.1080109@atmel.com>
-Message-ID: <20111208141511.GE7913@S2100-06.ap.freescale.net>
+Date: Thu, 8 Dec 2011 22:32:05 +0800
+Subject: [GIT PULL] imx: gpio interrupt cleanup
+Message-ID: <20111208143204.GA8139@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+Hi Arnd and  Olof,
 
-On Thu, Dec 01, 2011 at 11:05:15PM +0100, Nicolas Ferre wrote:
-> On 12/01/2011 09:57 PM, Stephen Warren :
-> >Jamie Iles wrote at Thursday, December 01, 2011 9:55 AM:
-> >>On Thu, Dec 01, 2011 at 08:52:49AM -0800, Stephen Warren wrote:
-> >>>Jamie Iles wrote at Thursday, December 01, 2011 7:11 AM:
-> >>>>On Thu, Dec 01, 2011 at 07:42:57AM -0600, Rob Herring wrote:
-> >>>>>On 11/30/2011 06:45 PM, Stephen Warren wrote:
-> >...
-> >>>>>>+	irq_domain.irq_base = irq_alloc_descs(-1, 0, TEGRA_NR_GPIOS, 0);
-> >>>>>>+	if (irq_domain.irq_base<  0) {
-> >>>>>>+		dev_err(&pdev->dev, "Couldn't allocate IRQ numbers\n");
-> >>>>>>+		return -ENODEV;
-> >>>>>>+	}
-> >>>>>>+	irq_domain.nr_irq = TEGRA_NR_GPIOS;
-> >>>>>>+	irq_domain.ops =&irq_domain_ops;
-> >>>>>
-> >>>>>Why don't you just use irq_domain_simple_ops?
-> >>>>
-> >>>>This would need the patch I posted earlier
-> >>>>(https://lkml.org/lkml/2011/12/1/109) so they can work for the
-> >>>>!CONFIG_OF case ;-)
-> >>>
-> >>>Part of my reasoning was that simple_ops appeared to be intended for
-> >>>DT-based controllers; is it safe to use those ops for a controller that
-> >>>wasn't instantiated from DT? I know that right now, the only op in that
-> >>>structure is dt_translate, and that won't ever be called for the non-DT
-> >>>case, but is there a guarantee that more functions won't be added to
-> >>>the simple ops, and that they won't assume DT is in use, and fail if
-> >>>not?
-> >>>
-> >>>If these are safe to use in the non-DT case, then yet I could build off
-> >>>Jamie's patch, although managing the dependencies might be awkward.
-> >>
-> >>Yes, it's absolutely fine to use it just that irq_simple_ops isn't
-> >>currently exported unless you have CONFIG_OF_IRQ set so you'd get an
-> >>undefined reference for !CONFIG_OF at the moment.
-> >
-> >OK, sounds good.
-> >
-> >So, I think we have a few options:
-> >1) Merge my change as-is, and simplify it later once your patch is in.
-> >2) Put your change in a branch, and merge it into both its usual place,
-> >and the Tegra/ARM branches, so I can rebase my patch on top of it.
-> >3) Have the usual maintainer ack it (I see Rob already did, but I think
-> >Thomas is the maintainer here right?) and just put both patches into the
-> >Tegra/ARM tree. This of course means non-Tegra branches have to wait for
-> >it rather than the other way around.
-> >
-> >(1) seems simplest, but (2) is probably doable. Thomas?
-> 
-> I jump into the discussion to say that I am also interested by
-> Jamie's patch. I am following the same path as Stephen at the moment
-> with Atmel AT91... A chance I can read all your comments that are so
-> valuable for me as well :-)
-> 
-> So, for me (2) will ease things...
-> 
-I'm sending Jamie's patch as prerequisite of my gpio interrupt
-controller cleanup series to Arnd and Olof (arm-soc tree), so that
-similar series for tegra and at91 from Stephen and Nicolas can base
-on Jamie's patch too.
+Please consider to pull the series below.  I really should have
+Thomas' ack on Jamie's patch 'irqdomain: export irq_domain_simple_ops
+for !CONFIG_OF', and Grant's ack on patch 'gpio/mxc: adopt irq_domain
+in gpio driver'.  So this pull request is also asking comments for the
+path of these patches.
 
-Please let us know if you do not want this way.
+Thomas, Grant,
 
-Regards,
+Please speak up if you do not want "your" patches to go through arm-soc
+tree.  Thanks.
+
 Shawn
 
-[1] [PATCH] irqdomain: export irq_domain_simple_ops for !CONFIG_OF
-    https://lkml.org/lkml/2011/12/1/109
+The following changes since commit fec607aab5dca019cfc76768fa0b5908d47a55b1:
+
+  Merge branch 'imx/fix-irqdomain' of git://git.linaro.org/people/shawnguo/linux-2.6 into fixes (2011-12-06 14:15:02 +0000)
+
+are available in the git repository at:
+
+  git://git.linaro.org/people/shawnguo/linux-2.6.git imx/clean-gpio-irq
+
+Jamie Iles (1):
+      irqdomain: export irq_domain_simple_ops for !CONFIG_OF
+
+Shawn Guo (5):
+      arm/imx: eliminate macro IMX_GPIO_TO_IRQ()
+      arm/imx: eliminate macro IOMUX_TO_IRQ()
+      arm/imx: eliminate macro IRQ_GPIOx()
+      gpio/mxc: adopt irq_domain in gpio driver
+      arm/imx: remove macro MXC_GPIO_IRQ_START
+
+ arch/arm/mach-imx/eukrea_mbimx27-baseboard.c |    3 +-
+ arch/arm/mach-imx/mach-apf9328.c             |    6 ++-
+ arch/arm/mach-imx/mach-armadillo5x0.c        |   12 ++++--
+ arch/arm/mach-imx/mach-cpuimx27.c            |   12 ++++--
+ arch/arm/mach-imx/mach-cpuimx35.c            |    3 +-
+ arch/arm/mach-imx/mach-imx27_visstrim_m10.c  |    8 ++--
+ arch/arm/mach-imx/mach-imx6q.c               |   13 ------
+ arch/arm/mach-imx/mach-kzm_arm11_01.c        |   20 +++++++--
+ arch/arm/mach-imx/mach-mx21ads.c             |    5 +-
+ arch/arm/mach-imx/mach-mx27_3ds.c            |    3 +-
+ arch/arm/mach-imx/mach-mx27ads.c             |   12 +++---
+ arch/arm/mach-imx/mach-mx31_3ds.c            |   13 +++---
+ arch/arm/mach-imx/mach-mx31ads.c             |   14 ++++--
+ arch/arm/mach-imx/mach-mx31lilly.c           |   10 +++-
+ arch/arm/mach-imx/mach-mx31lite.c            |   10 +++-
+ arch/arm/mach-imx/mach-mx31moboard.c         |    4 +-
+ arch/arm/mach-imx/mach-mxt_td60.c            |    6 +-
+ arch/arm/mach-imx/mach-pca100.c              |    4 +-
+ arch/arm/mach-imx/mach-pcm037.c              |   18 +++++---
+ arch/arm/mach-imx/mach-pcm038.c              |    4 +-
+ arch/arm/mach-imx/mach-qong.c                |    9 ++--
+ arch/arm/mach-imx/mach-scb9328.c             |    6 ++-
+ arch/arm/mach-imx/mach-vpr200.c              |    3 +-
+ arch/arm/mach-imx/mx31lilly-db.c             |    5 +-
+ arch/arm/mach-imx/mx31lite-db.c              |    5 +-
+ arch/arm/mach-imx/pcm970-baseboard.c         |   13 +++---
+ arch/arm/mach-mx5/board-cpuimx51.c           |   12 ++++--
+ arch/arm/mach-mx5/board-cpuimx51sd.c         |    6 ++-
+ arch/arm/mach-mx5/board-mx53_ard.c           |    5 +-
+ arch/arm/mach-mx5/eukrea_mbimx51-baseboard.c |    3 +-
+ arch/arm/mach-mx5/imx51-dt.c                 |   12 -----
+ arch/arm/mach-mx5/imx53-dt.c                 |   12 -----
+ arch/arm/mach-mx5/mx51_efika.c               |    3 +-
+ arch/arm/plat-mxc/include/mach/hardware.h    |    2 -
+ arch/arm/plat-mxc/include/mach/iomux-mx3.h   |    3 -
+ arch/arm/plat-mxc/include/mach/iomux-v1.h    |   12 +++---
+ arch/arm/plat-mxc/include/mach/irqs.h        |    2 -
+ drivers/gpio/Kconfig                         |    1 +
+ drivers/gpio/gpio-mxc.c                      |   57 ++++++++++++++------------
+ include/linux/irqdomain.h                    |    3 +-
+ kernel/irq/irqdomain.c                       |   12 +++--
+ 41 files changed, 195 insertions(+), 171 deletions(-)
