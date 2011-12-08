@@ -1,145 +1,166 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Thu,  8 Dec 2011 23:36:05 +0100
-Subject: [PATCH v2] Documentation/pinctrl: various minor fixes
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF1750B77B9F@HQMAIL01.nvidia.com>
-References: <74CDBE0F657A3D45AFBB94109FB122FF1750B77B9F@HQMAIL01.nvidia.com>
-Message-ID: <1323383765-30742-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: rmallon@gmail.com (Ryan Mallon)
+Date: Fri, 09 Dec 2011 09:38:30 +1100
+Subject: [PATCH 3/3] ide/at91: use new introduce smc accessor
+In-Reply-To: <1323357784-17555-3-git-send-email-plagnioj@jcrosoft.com>
+References: <20111208150348.GD23884@game.jcrosoft.org>
+ <1323357784-17555-3-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <4EE13C66.1050804@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-- add some consts
-- don't use the group index alone to determine the value to write to
-  foo's mux register. For spi and i2c the group index is always 0.
-  Additionally using the function index makes much more sense as it
-  generates a different value for each function/group pair.
-- fix a few syntax errors
+On 09/12/11 02:23, Jean-Christophe PLAGNIOL-VILLARD wrote:
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
-changes since (implicit) v1:
- - use the same register bit for disable as is used for enable. Spotted
-   by Stephen.
+> this will allow to use the pata_at91 on a single zImage
+> 
+> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Cc: linux-ide at vger.kernel.org
 
- Documentation/pinctrl.txt |   28 ++++++++++++++--------------
- 1 files changed, 14 insertions(+), 14 deletions(-)
 
-diff --git a/Documentation/pinctrl.txt b/Documentation/pinctrl.txt
-index b04cb7d..d9bab7b 100644
---- a/Documentation/pinctrl.txt
-+++ b/Documentation/pinctrl.txt
-@@ -133,8 +133,8 @@ struct foo_group {
- 	const unsigned num_pins;
- };
- 
--static unsigned int spi0_pins[] = { 0, 8, 16, 24 };
--static unsigned int i2c0_pins[] = { 24, 25 };
-+static const unsigned int spi0_pins[] = { 0, 8, 16, 24 };
-+static const unsigned int i2c0_pins[] = { 24, 25 };
- 
- static const struct foo_group foo_groups[] = {
- 	{
-@@ -585,7 +585,7 @@ int foo_list_funcs(struct pinctrl_dev *pctldev, unsigned selector)
- 
- const char *foo_get_fname(struct pinctrl_dev *pctldev, unsigned selector)
- {
--	return myfuncs[selector].name;
-+	return foo_functions[selector].name;
- }
- 
- static int foo_get_groups(struct pinctrl_dev *pctldev, unsigned selector,
-@@ -600,7 +600,7 @@ static int foo_get_groups(struct pinctrl_dev *pctldev, unsigned selector,
- int foo_enable(struct pinctrl_dev *pctldev, unsigned selector,
- 		unsigned group)
- {
--	u8 regbit = (1 << group);
-+	u8 regbit = (1 << selector + group);
- 
- 	writeb((readb(MUX)|regbit), MUX)
- 	return 0;
-@@ -609,7 +609,7 @@ int foo_enable(struct pinctrl_dev *pctldev, unsigned selector,
- int foo_disable(struct pinctrl_dev *pctldev, unsigned selector,
- 		unsigned group)
- {
--	u8 regbit = (1 << group);
-+	u8 regbit = (1 << selector + group);
- 
- 	writeb((readb(MUX) & ~(regbit)), MUX)
- 	return 0;
-@@ -683,7 +683,7 @@ spi on the second function mapping:
- 
- #include <linux/pinctrl/machine.h>
- 
--static struct pinmux_map pmx_mapping[] = {
-+static const struct pinmux_map pmx_mapping[] = {
- 	{
- 		.ctrl_dev_name = "pinctrl.0",
- 		.function = "spi0",
-@@ -714,7 +714,7 @@ for example if they are not yet instantiated or cumbersome to obtain.
- 
- You register this pinmux mapping to the pinmux subsystem by simply:
- 
--       ret = pinmux_register_mappings(&pmx_mapping, ARRAY_SIZE(pmx_mapping));
-+       ret = pinmux_register_mappings(pmx_mapping, ARRAY_SIZE(pmx_mapping));
- 
- Since the above construct is pretty common there is a helper macro to make
- it even more compact which assumes you want to use pinctrl.0 and position
-@@ -759,42 +759,42 @@ case), we define a mapping like this:
- 
- ...
- {
--	.name "2bit"
-+	.name = "2bit"
- 	.ctrl_dev_name = "pinctrl.0",
- 	.function = "mmc0",
- 	.group = "mmc0_0_grp",
- 	.dev_name = "foo-mmc.0",
- },
- {
--	.name "4bit"
-+	.name = "4bit"
- 	.ctrl_dev_name = "pinctrl.0",
- 	.function = "mmc0",
- 	.group = "mmc0_0_grp",
- 	.dev_name = "foo-mmc.0",
- },
- {
--	.name "4bit"
-+	.name = "4bit"
- 	.ctrl_dev_name = "pinctrl.0",
- 	.function = "mmc0",
- 	.group = "mmc0_1_grp",
- 	.dev_name = "foo-mmc.0",
- },
- {
--	.name "8bit"
-+	.name = "8bit"
- 	.ctrl_dev_name = "pinctrl.0",
- 	.function = "mmc0",
- 	.group = "mmc0_0_grp",
- 	.dev_name = "foo-mmc.0",
- },
- {
--	.name "8bit"
-+	.name = "8bit"
- 	.ctrl_dev_name = "pinctrl.0",
- 	.function = "mmc0",
- 	.group = "mmc0_1_grp",
- 	.dev_name = "foo-mmc.0",
- },
- {
--	.name "8bit"
-+	.name = "8bit"
- 	.ctrl_dev_name = "pinctrl.0",
- 	.function = "mmc0",
- 	.group = "mmc0_2_grp",
-@@ -897,7 +897,7 @@ This is enabled by simply setting the .hog_on_boot field in the map to true,
- like this:
- 
- {
--	.name "POWERMAP"
-+	.name = "POWERMAP"
- 	.ctrl_dev_name = "pinctrl.0",
- 	.function = "power_func",
- 	.hog_on_boot = true,
--- 
-1.7.7.3
+Couple of minor comments below,
+
+~Ryan
+
+> ---
+> Hi,
+> 
+> 	it's depends on other patch for AT91 can we apply via at91
+> 
+> Best Regards,
+> J.
+>  drivers/ide/at91_ide.c |   65 +++++++++++++++++++++++++++--------------------
+>  1 files changed, 37 insertions(+), 28 deletions(-)
+> 
+> diff --git a/drivers/ide/at91_ide.c b/drivers/ide/at91_ide.c
+> index 41d4155..407595b 100644
+> --- a/drivers/ide/at91_ide.c
+> +++ b/drivers/ide/at91_ide.c
+> @@ -59,41 +59,50 @@
+>  #define ALT_MODE	0x00e00000
+>  #define REGS_SIZE	8
+>  
+> -#define enter_16bit(cs, mode) do {					\
+> -	mode = at91_sys_read(AT91_SMC_MODE(cs));			\
+> -	at91_sys_write(AT91_SMC_MODE(cs), mode | AT91_SMC_DBW_16);	\
+> -} while (0)
+> +static inline void enter_16bit(int cs, struct sam9_smc_config *smc)
+> +{
+> +	sam9_smc_read_mode(0, cs, smc);
+> +	smc->mode = (smc->mode & ~AT91_SMC_DBW) | AT91_SMC_DBW_16;
+> +	sam9_smc_write_mode(0, cs, smc);
+> +}
+>  
+> -#define leave_16bit(cs, mode) at91_sys_write(AT91_SMC_MODE(cs), mode);
+> +static inline void leave_16bit(int cs, struct sam9_smc_config *smc)
+> +{
+> +	smc->mode = (smc->mode & ~AT91_SMC_DBW) | AT91_SMC_DBW_8;
+> +	sam9_smc_write_mode(0, cs, smc);
+> +}
+>  
+>  static void set_smc_timings(const u8 chipselect, const u16 cycle,
+>  			    const u16 setup, const u16 pulse,
+>  			    const u16 data_float, int use_iordy)
+>  {
+> -	unsigned long mode = AT91_SMC_READMODE | AT91_SMC_WRITEMODE |
+> +	struct sam9_smc_config smc;
+> +
+> +	smc.mode = AT91_SMC_READMODE | AT91_SMC_WRITEMODE |
+>  			     AT91_SMC_BAT_SELECT;
+>  
+>  	/* disable or enable waiting for IORDY signal */
+>  	if (use_iordy)
+> -		mode |= AT91_SMC_EXNWMODE_READY;
+> +		smc.mode |= AT91_SMC_EXNWMODE_READY;
+>  
+> -	/* add data float cycles if needed */
+> -	if (data_float)
+> -		mode |= AT91_SMC_TDF_(data_float);
+> +	/* add data ofloat cycles if needed */
+
+
+Typo: ofloat -> float?
+
+> +	smc.tdf_cycles = data_float;
+>  
+> -	at91_sys_write(AT91_SMC_MODE(chipselect), mode);
+> +	/* write SMC Setup Register */
+
+
+This comment is no longer correct.
+
+> +	smc.nrd_setup = setup;
+> +	smc.nwe_setup = smc.nrd_setup;
+> +	smc.ncs_read_setup = 0;
+> +	smc.ncs_write_setup = smc.ncs_read_setup;
+> +	/* write SMC Pulse Register */
+
+
+Nor is this one.
+
+> +	smc.nrd_pulse = pulse;
+> +	smc.nwe_pulse = smc.nrd_pulse;
+> +	smc.ncs_read_pulse = cycle;
+> +	smc.ncs_write_pulse = smc.ncs_read_pulse;
+> +	/* write SMC Cycle Register */
+
+
+or this one.
+
+> +	smc.read_cycle = cycle;
+> +	smc.write_cycle = smc.read_cycle;
+>  
+> -	/* setup timings in SMC */
+> -	at91_sys_write(AT91_SMC_SETUP(chipselect), AT91_SMC_NWESETUP_(setup) |
+> -						   AT91_SMC_NCS_WRSETUP_(0) |
+> -						   AT91_SMC_NRDSETUP_(setup) |
+> -						   AT91_SMC_NCS_RDSETUP_(0));
+> -	at91_sys_write(AT91_SMC_PULSE(chipselect), AT91_SMC_NWEPULSE_(pulse) |
+> -						   AT91_SMC_NCS_WRPULSE_(cycle) |
+> -						   AT91_SMC_NRDPULSE_(pulse) |
+> -						   AT91_SMC_NCS_RDPULSE_(cycle));
+> -	at91_sys_write(AT91_SMC_CYCLE(chipselect), AT91_SMC_NWECYCLE_(cycle) |
+> -						   AT91_SMC_NRDCYCLE_(cycle));
+> +	sam9_smc_configure(0, chipselect, &smc);
+
+
+Check return value?
+
+>  }
+>  
+>  static unsigned int calc_mck_cycles(unsigned int ns, unsigned int mck_hz)
+> @@ -146,15 +155,15 @@ static void at91_ide_input_data(ide_drive_t *drive, struct ide_cmd *cmd,
+>  	ide_hwif_t *hwif = drive->hwif;
+>  	struct ide_io_ports *io_ports = &hwif->io_ports;
+>  	u8 chipselect = hwif->select_data;
+> -	unsigned long mode;
+> +	struct sam9_smc_config smc;
+>  
+>  	pdbg("cs %u buf %p len %d\n", chipselect, buf, len);
+>  
+>  	len++;
+>  
+> -	enter_16bit(chipselect, mode);
+> +	enter_16bit(chipselect, &smc);
+>  	readsw((void __iomem *)io_ports->data_addr, buf, len / 2);
+> -	leave_16bit(chipselect, mode);
+> +	leave_16bit(chipselect, &smc);
+>  }
+>  
+>  static void at91_ide_output_data(ide_drive_t *drive, struct ide_cmd *cmd,
+> @@ -163,13 +172,13 @@ static void at91_ide_output_data(ide_drive_t *drive, struct ide_cmd *cmd,
+>  	ide_hwif_t *hwif = drive->hwif;
+>  	struct ide_io_ports *io_ports = &hwif->io_ports;
+>  	u8 chipselect = hwif->select_data;
+> -	unsigned long mode;
+> +	struct sam9_smc_config smc;
+>  
+>  	pdbg("cs %u buf %p len %d\n", chipselect,  buf, len);
+>  
+> -	enter_16bit(chipselect, mode);
+> +	enter_16bit(chipselect, &smc);
+>  	writesw((void __iomem *)io_ports->data_addr, buf, len / 2);
+> -	leave_16bit(chipselect, mode);
+> +	leave_16bit(chipselect, &smc);
+>  }
+>  
+>  static void at91_ide_set_pio_mode(ide_hwif_t *hwif, ide_drive_t *drive)
