@@ -1,105 +1,87 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Thu,  8 Dec 2011 14:01:57 +0000
-Subject: [PATCH v2] ARM: Add generic instruction opcode manipulation helpers
-Message-ID: <1323352917-30653-1-git-send-email-dave.martin@linaro.org>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Thu, 8 Dec 2011 22:15:13 +0800
+Subject: [PATCH 2/2] gpio/tegra: Dynamically allocate IRQ base, and
+ support DT
+In-Reply-To: <4ED7FA1B.1080109@atmel.com>
+References: <1322700336-26866-1-git-send-email-swarren@nvidia.com>
+ <1322700336-26866-2-git-send-email-swarren@nvidia.com>
+ <4ED78461.40006@gmail.com> <20111201141112.GG4556@totoro>
+ <74CDBE0F657A3D45AFBB94109FB122FF174FDB01DD@HQMAIL01.nvidia.com>
+ <20111201165518.GH4556@totoro>
+ <74CDBE0F657A3D45AFBB94109FB122FF174FDB02BF@HQMAIL01.nvidia.com>
+ <4ED7FA1B.1080109@atmel.com>
+Message-ID: <20111208141511.GE7913@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds some endianness-agnostic helpers to convert machine
-instructions between canonical integer form and in-memory
-representation.
+Hi Thomas,
 
-A canonical integer form for representing instructions is also
-formalised here.
+On Thu, Dec 01, 2011 at 11:05:15PM +0100, Nicolas Ferre wrote:
+> On 12/01/2011 09:57 PM, Stephen Warren :
+> >Jamie Iles wrote at Thursday, December 01, 2011 9:55 AM:
+> >>On Thu, Dec 01, 2011 at 08:52:49AM -0800, Stephen Warren wrote:
+> >>>Jamie Iles wrote at Thursday, December 01, 2011 7:11 AM:
+> >>>>On Thu, Dec 01, 2011 at 07:42:57AM -0600, Rob Herring wrote:
+> >>>>>On 11/30/2011 06:45 PM, Stephen Warren wrote:
+> >...
+> >>>>>>+	irq_domain.irq_base = irq_alloc_descs(-1, 0, TEGRA_NR_GPIOS, 0);
+> >>>>>>+	if (irq_domain.irq_base<  0) {
+> >>>>>>+		dev_err(&pdev->dev, "Couldn't allocate IRQ numbers\n");
+> >>>>>>+		return -ENODEV;
+> >>>>>>+	}
+> >>>>>>+	irq_domain.nr_irq = TEGRA_NR_GPIOS;
+> >>>>>>+	irq_domain.ops =&irq_domain_ops;
+> >>>>>
+> >>>>>Why don't you just use irq_domain_simple_ops?
+> >>>>
+> >>>>This would need the patch I posted earlier
+> >>>>(https://lkml.org/lkml/2011/12/1/109) so they can work for the
+> >>>>!CONFIG_OF case ;-)
+> >>>
+> >>>Part of my reasoning was that simple_ops appeared to be intended for
+> >>>DT-based controllers; is it safe to use those ops for a controller that
+> >>>wasn't instantiated from DT? I know that right now, the only op in that
+> >>>structure is dt_translate, and that won't ever be called for the non-DT
+> >>>case, but is there a guarantee that more functions won't be added to
+> >>>the simple ops, and that they won't assume DT is in use, and fail if
+> >>>not?
+> >>>
+> >>>If these are safe to use in the non-DT case, then yet I could build off
+> >>>Jamie's patch, although managing the dependencies might be awkward.
+> >>
+> >>Yes, it's absolutely fine to use it just that irq_simple_ops isn't
+> >>currently exported unless you have CONFIG_OF_IRQ set so you'd get an
+> >>undefined reference for !CONFIG_OF at the moment.
+> >
+> >OK, sounds good.
+> >
+> >So, I think we have a few options:
+> >1) Merge my change as-is, and simplify it later once your patch is in.
+> >2) Put your change in a branch, and merge it into both its usual place,
+> >and the Tegra/ARM branches, so I can rebase my patch on top of it.
+> >3) Have the usual maintainer ack it (I see Rob already did, but I think
+> >Thomas is the maintainer here right?) and just put both patches into the
+> >Tegra/ARM tree. This of course means non-Tegra branches have to wait for
+> >it rather than the other way around.
+> >
+> >(1) seems simplest, but (2) is probably doable. Thomas?
+> 
+> I jump into the discussion to say that I am also interested by
+> Jamie's patch. I am following the same path as Stephen at the moment
+> with Atmel AT91... A chance I can read all your comments that are so
+> valuable for me as well :-)
+> 
+> So, for me (2) will ease things...
+> 
+I'm sending Jamie's patch as prerequisite of my gpio interrupt
+controller cleanup series to Arnd and Olof (arm-soc tree), so that
+similar series for tegra and at91 from Stephen and Nicolas can base
+on Jamie's patch too.
 
-Signed-off-by: Dave Martin <dave.martin@linaro.org>
-Acked-by: Nicolas Pitre <nico@linaro.org>
----
-Changes since v1:
+Please let us know if you do not want this way.
 
-v2: Remove unnecessary typedef for arm_opcode_t.
+Regards,
+Shawn
 
-    The general "everything is a word" concept works just fine here --
-    we don't need a typedef, and people will probably not use it
-    anyway.
-
- arch/arm/include/asm/opcodes.h |   68 ++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 68 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/include/asm/opcodes.h
-
-diff --git a/arch/arm/include/asm/opcodes.h b/arch/arm/include/asm/opcodes.h
-new file mode 100644
-index 0000000..564cb24
---- /dev/null
-+++ b/arch/arm/include/asm/opcodes.h
-@@ -0,0 +1,68 @@
-+/*
-+ * arch/arm/include/asm/opcodes.h
-+ *
-+ * Copyright (C) 2011 Linaro Limited
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
-+ */
-+
-+#ifndef __ARM_OPCODES_H
-+#define __ARM_OPCODES_H
-+
-+#include <linux/types.h>
-+#include <linux/swab.h>
-+
-+/*
-+ * Canonical instruction representation:
-+ *
-+ *	ARM:		0xKKLLMMNN
-+ *	Thumb 16-bit:	0x0000KKLL, where KK < 0xE8
-+ *	Thumb 32-bit:	0xKKLLMMNN, where KK >= 0xE8
-+ *
-+ * There is no way to distinguish an ARM instruction in canonical representation
-+ * from a Thumb instruction (just as these cannot be distinguished in memory).
-+ * Where this distinction is important, it needs to be tracked separately.
-+ *
-+ * Note that values in the range 0x0000E800..0xE7FFFFFF intentionally do not
-+ * represent any valid Thumb-2 instruction.  For this range,
-+ * __opcode_is_thumb32() and __opcode_is_thumb16() will both be false.
-+ */
-+
-+#ifdef CONFIG_CPU_ENDIAN_BE8
-+#define __opcode_to_mem_arm(x) swab32(x)
-+#define __opcode_to_mem_thumb16(x) swab16(x)
-+#define __opcode_to_mem_thumb32(x) swahb32(x)
-+#else
-+#define __opcode_to_mem_arm(x) (x) ((u32)(x))
-+#define __opcode_to_mem_thumb16(x) ((u16)(x))
-+#define __opcode_to_mem_thumb32(x) swahw32(x)
-+#endif
-+
-+#define __mem_to_opcode_arm(x) __opcode_to_mem_arm(x)
-+#define __mem_to_opcode_thumb16(x) __opcode_to_mem_thumb16(x)
-+#define __mem_to_opcode_thumb32(x) __opcode_to_mem_thumb32(x)
-+
-+/* Operations specific to Thumb opcodes */
-+
-+/* Instruction size checks: */
-+#define __opcode_is_thumb32(x) ((u32)(x) >= 0xE8000000UL)
-+#define __opcode_is_thumb16(x) ((u32)(x) < 0xE800UL)
-+
-+/* Operations to construct or split 32-bit Thumb instructions: */
-+#define __opcode_thumb32_first(x) ((u16)((thumb_opcode) >> 16))
-+#define __opcode_thumb32_second(x) ((u16)(thumb_opcode))
-+#define __opcode_thumb32_compose(first, second) \
-+	(((u32)(u16)(first) << 16) | (u32)(u16)(second))
-+
-+#endif /* ! __ARM_OPCODES_H */
--- 
-1.7.4.1
+[1] [PATCH] irqdomain: export irq_domain_simple_ops for !CONFIG_OF
+    https://lkml.org/lkml/2011/12/1/109
