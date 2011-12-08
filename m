@@ -1,29 +1,37 @@
-From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Thu, 8 Dec 2011 23:15:18 +0100
-Subject: [PATCH 3/3] ARM: S3C64XX: Implement basic power domain support
-In-Reply-To: <20111208010924.GC5748@opensource.wolfsonmicro.com>
-References: <1322765339-29879-1-git-send-email-broonie@opensource.wolfsonmicro.com>
- <201112072244.02299.rjw@sisk.pl>
- <20111208010924.GC5748@opensource.wolfsonmicro.com>
-Message-ID: <201112082315.18197.rjw@sisk.pl>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Thu,  8 Dec 2011 15:13:07 -0700
+Subject: [RFC 0/3] pinctrl: add a driver for NVIDIA Tegra
+Message-ID: <1323382390-14892-1-git-send-email-swarren@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, December 08, 2011, Mark Brown wrote:
-> On Wed, Dec 07, 2011 at 10:44:02PM +0100, Rafael J. Wysocki wrote:
-> > On Friday, December 02, 2011, Mark Brown wrote:
-> 
-> > > May as well, yes - I didn't actually measure how long it tends to take
-> > > to do the spin but it's not going to hurt.
-> 
-> > Are you going to post an updated patch?
-> 
-> I've resent it but my development laptop is currently not internet
-> connected so I'm not sure when it'll actually go out.
+This isn't quite ready for merging yet; there are some issues that need
+to be sorted out w.r.t. how to replace the existing Tegra pinmux driver
+first. However, I figured it'd be good to get a review of the pinctrl
+driver itself now that it should be complete.
 
-Hmm.  I can't find it in my e-mail archives.
+The first patch is the driver. The other 2 patches are hacks that I use
+to test it, just in case anyone is interested. Patch 2 would be fixed
+before actually submitting, and patch 3 dropped.
 
-Do you have any pointer to a web archive somewhere, where I can get the patch
-from?
+Stephen Warren (3):
+  pinctrl: add a driver for NVIDIA Tegra
+  arm/tegra: Select PINMUX Kconfig variables
+  New pinmux testing hacks
 
-Rafael
+ arch/arm/boot/dts/tegra20.dtsi                   |    8 +
+ arch/arm/mach-tegra/Kconfig                      |    3 +
+ arch/arm/mach-tegra/include/mach/pinconf-tegra.h |   58 +
+ arch/arm/mach-tegra/pinmux.c                     |    2 +
+ drivers/pinctrl/Kconfig                          |   15 +
+ drivers/pinctrl/Makefile                         |    3 +
+ drivers/pinctrl/pinctrl-tegra.c                  |  604 ++++
+ drivers/pinctrl/pinctrl-tegra.h                  |   83 +
+ drivers/pinctrl/pinctrl-tegra20.c                | 2731 +++++++++++++++++
+ drivers/pinctrl/pinctrl-tegra30.c                | 3387 ++++++++++++++++++++++
+ 10 files changed, 6894 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-tegra/include/mach/pinconf-tegra.h
+ create mode 100644 drivers/pinctrl/pinctrl-tegra.c
+ create mode 100644 drivers/pinctrl/pinctrl-tegra.h
+ create mode 100644 drivers/pinctrl/pinctrl-tegra20.c
+ create mode 100644 drivers/pinctrl/pinctrl-tegra30.c
