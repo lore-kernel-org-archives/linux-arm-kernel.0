@@ -1,97 +1,52 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu,  8 Dec 2011 19:03:19 +0000
-Subject: [PATCH v8 2/4] ARM: reset: implement soft_restart for jumping to a
- physical address
-In-Reply-To: <1323371001-4036-1-git-send-email-will.deacon@arm.com>
-References: <1323371001-4036-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1323371001-4036-3-git-send-email-will.deacon@arm.com>
+Date: Thu,  8 Dec 2011 19:03:17 +0000
+Subject: [PATCH v8 0/6] kexec fixes and soft restart code
+Message-ID: <1323371001-4036-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tools such as kexec and CPU hotplug require a way to reset the processor
-and branch to some code in physical space. This requires various bits of
-jiggery pokery with the caches and MMU which, when it goes wrong, tends
-to lock up the system.
+Hello,
 
-This patch fleshes out the soft_restart implementation so that it
-branches to the reset code using the identity mapping. This requires us
-to change to a temporary stack, held within the kernel image as a static
-array, to avoid conflicting with the new view of memory.
+This is version 8 of the patches originally posted here:
 
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/kernel/process.c |   50 ++++++++++++++++++++++++++++++++++++---------
- 1 files changed, 40 insertions(+), 10 deletions(-)
+v1: http://lists.infradead.org/pipermail/linux-arm-kernel/2011-June/052157.html
+v2: http://lists.infradead.org/pipermail/linux-arm-kernel/2011-June/052559.html
+v3: http://lists.infradead.org/pipermail/linux-arm-kernel/2011-June/053252.html
+v4: http://lists.infradead.org/pipermail/linux-arm-kernel/2011-August/062305.html
+v5: http://lists.infradead.org/pipermail/linux-arm-kernel/2011-November/071909.html
+v6: http://lists.infradead.org/pipermail/linux-arm-kernel/2011-November/073054.html
+v7: http://lists.infradead.org/pipermail/linux-arm-kernel/2011-November/074338.html
 
-diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
-index eeb3e16..423bb20 100644
---- a/arch/arm/kernel/process.c
-+++ b/arch/arm/kernel/process.c
-@@ -92,17 +92,23 @@ static int __init hlt_setup(char *__unused)
- __setup("nohlt", nohlt_setup);
- __setup("hlt", hlt_setup);
- 
--void soft_restart(unsigned long addr)
-+extern void call_with_stack(void (*fn)(void *), void *arg, void *sp);
-+typedef void (*phys_reset_t)(unsigned long);
-+
-+/*
-+ * A temporary stack to use for CPU reset. This is static so that we
-+ * don't clobber it with the identity mapping. When running with this
-+ * stack, any references to the current task *will not work* so you
-+ * should really do as little as possible before jumping to your reset
-+ * code.
-+ */
-+static u64 soft_restart_stack[16];
-+
-+static void __soft_restart(void *addr)
- {
--	/* Disable interrupts first */
--	local_irq_disable();
--	local_fiq_disable();
-+	phys_reset_t phys_reset;
- 
--	/*
--	 * Tell the mm system that we are going to reboot -
--	 * we may need it to insert some 1:1 mappings so that
--	 * soft boot works.
--	 */
-+	/* Take out a flat memory mapping. */
- 	setup_mm_for_reboot();
- 
- 	/* Clean and invalidate caches */
-@@ -114,7 +120,31 @@ void soft_restart(unsigned long addr)
- 	/* Push out any further dirty data, and ensure cache is empty */
- 	flush_cache_all();
- 
--	cpu_reset(addr);
-+	/* Switch to the identity mapping. */
-+	phys_reset = (phys_reset_t)(unsigned long)virt_to_phys(cpu_reset);
-+	phys_reset((unsigned long)addr);
-+
-+	/* Should never get here. */
-+	BUG();
-+}
-+
-+void soft_restart(unsigned long addr)
-+{
-+	u64 *stack = soft_restart_stack + ARRAY_SIZE(soft_restart_stack);
-+
-+	/* Disable interrupts first */
-+	local_irq_disable();
-+	local_fiq_disable();
-+
-+	/* Disable the L2 if we're the last man standing. */
-+	if (num_online_cpus() == 1)
-+		outer_disable();
-+
-+	/* Change to the new stack and continue with the reset. */
-+	call_with_stack(__soft_restart, (void *)addr, (void *)stack);
-+
-+	/* Should never get here. */
-+	BUG();
- }
- 
- void arm_machine_restart(char mode, const char *cmd)
+There are a few small changes since v7:
+
+ - Fixed a warning in the stack declaration from an implicit u64* -> u32* cast
+ - Rebased onto rmk/devel-stable, which now includes my idmap patches
+ - Merged in the outer_disable patch with the soft_restart patch as it
+   didn't warrant a separate commit.
+
+I'm pretty happy with these patches, but I appreciate there is already a lot
+queued for 3.3. Russell - would you rather I held fire on these for the time
+being (the downside being that soft reboot is broken for a bit longer)?
+
+Cheers,
+
+Will
+
+
+Will Deacon (4):
+  ARM: lib: add call_with_stack function for safely changing stack
+  ARM: reset: implement soft_restart for jumping to a physical address
+  ARM: stop: execute platform callback from cpu_stop code
+  ARM: kexec: use soft_restart for branching to the reboot buffer
+
+ arch/arm/Kconfig                |    2 +-
+ arch/arm/kernel/machine_kexec.c |   15 ++---------
+ arch/arm/kernel/process.c       |   50 +++++++++++++++++++++++++++++++-------
+ arch/arm/kernel/smp.c           |    4 +++
+ arch/arm/lib/Makefile           |    3 +-
+ arch/arm/lib/call_with_stack.S  |   44 ++++++++++++++++++++++++++++++++++
+ 6 files changed, 94 insertions(+), 24 deletions(-)
+ create mode 100644 arch/arm/lib/call_with_stack.S
+
 -- 
 1.7.4.1
