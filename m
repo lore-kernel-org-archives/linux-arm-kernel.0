@@ -1,178 +1,144 @@
-From: sakoman@gmail.com (Steve Sakoman)
-Date: Thu, 8 Dec 2011 14:33:10 -0800
-Subject: [PATCH] ARM: OMAP3: hwmod data: disable multiblock reads on
- MMC1/2 on OMAP34xx/35xx <= ES2.1
-In-Reply-To: <alpine.DEB.2.00.1110061453540.4611@utopia.booyaka.com>
-References: <alpine.DEB.2.00.1110061453540.4611@utopia.booyaka.com>
-Message-ID: <CAGDS+nnm_+9975aX9h7U7EUf6UDWiiqO8+yfG_zW1sCxhgrzQw@mail.gmail.com>
+From: rmallon@gmail.com (Ryan Mallon)
+Date: Fri, 09 Dec 2011 09:34:05 +1100
+Subject: [PATCH 2/3] pata/at91: use new introduce smc accessor
+In-Reply-To: <1323357784-17555-2-git-send-email-plagnioj@jcrosoft.com>
+References: <20111208150348.GD23884@game.jcrosoft.org>
+ <1323357784-17555-2-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <4EE13B5D.9090908@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 6, 2011 at 1:56 PM, Paul Walmsley <paul@pwsan.com> wrote:
->
-> The HSMMC1/HSMMC2 host controllers on OMAP34xx and
-> OMAP3503/3515/3525/3530 chips at ES levels prior to 3.0 can't do multiple
-> block reads[1]. ?Mark the hwmod data appropriately.
->
-> Reported by Dave Hylands <dhylands@gmail.com> and Steve Sakoman
-> <sakoman@gmail.com>.
->
-> 1. See for example Advisory 2.1.1.128 "MMC: Multiple Block Read
-> ? Operation Issue" in _OMAP3530/3525/3515/3503 Silicon Errata_
-> ? Revision F (October 2010) (SPRZ278F), available from
-> ? http://focus.ti.com/lit/er/sprz278f/sprz278f.pdf
->
-> Signed-off-by: Paul Walmsley <paul@pwsan.com>
-> Cc: Dave Hylands <dhylands@gmail.com>
-> Cc: Steve Sakoman <sakoman@gmail.com>
+On 09/12/11 02:23, Jean-Christophe PLAGNIOL-VILLARD wrote:
+
+> this will allow to use the pata_at91 on a single zImage
+> 
+> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Cc: linux-ide at vger.kernel.org
+
+
+Some comments below,
+
+~Ryan
+
 > ---
->
-> This patch has a dependency on the "MMC: disable multiblock reads on
-> controllers that don't support them" series recently posted to
-> the linux-mmc list, so the application of this patch will probably be
-> delayed until the 3.3 merge window.
+> Hi,
+> 
+> 	it's depends on other patch for AT91 can we apply via at91
+> 
+> Best Regards,
+> J.
+>  drivers/ata/pata_at91.c |   43 +++++++++++++++++++++----------------------
+>  1 files changed, 21 insertions(+), 22 deletions(-)
+> 
+> diff --git a/drivers/ata/pata_at91.c b/drivers/ata/pata_at91.c
+> index 5249e6d..c8d1154 100644
+> --- a/drivers/ata/pata_at91.c
+> +++ b/drivers/ata/pata_at91.c
+> @@ -207,11 +207,11 @@ static void set_smc_timing(struct device *dev, struct ata_device *adev,
+>  {
+>  	int ret = 0;
+>  	int use_iordy;
+> +	struct sam9_smc_config smc;
+>  	unsigned int t6z;         /* data tristate time in ns */
+>  	unsigned int cycle;       /* SMC Cycle width in MCK ticks */
+>  	unsigned int setup;       /* SMC Setup width in MCK ticks */
+>  	unsigned int pulse;       /* CFIOR and CFIOW pulse width in MCK ticks */
+> -	unsigned int cs_setup = 0;/* CS4 or CS5 setup width in MCK ticks */
+>  	unsigned int cs_pulse;    /* CS4 or CS5 pulse width in MCK ticks*/
+>  	unsigned int tdf_cycles;  /* SMC TDF MCK ticks */
+>  	unsigned long mck_hz;     /* MCK frequency in Hz */
+> @@ -244,26 +244,25 @@ static void set_smc_timing(struct device *dev, struct ata_device *adev,
+>  	}
+>  
+>  	dev_dbg(dev, "Use IORDY=%u, TDF Cycles=%u\n", use_iordy, tdf_cycles);
+> -	info->mode |= AT91_SMC_TDF_(tdf_cycles);
+>  
+>  	/* write SMC Setup Register */
+> -	at91_sys_write(AT91_SMC_SETUP(info->cs),
+> -			AT91_SMC_NWESETUP_(setup) |
+> -			AT91_SMC_NRDSETUP_(setup) |
+> -			AT91_SMC_NCS_WRSETUP_(cs_setup) |
+> -			AT91_SMC_NCS_RDSETUP_(cs_setup));
+> +	smc.nrd_setup = setup;
+> +	smc.nwe_setup = smc.nrd_setup;
+> +	smc.ncs_read_setup = 0;
+> +	smc.ncs_write_setup = smc.ncs_read_setup;
+>  	/* write SMC Pulse Register */
+> -	at91_sys_write(AT91_SMC_PULSE(info->cs),
+> -			AT91_SMC_NWEPULSE_(pulse) |
+> -			AT91_SMC_NRDPULSE_(pulse) |
+> -			AT91_SMC_NCS_WRPULSE_(cs_pulse) |
+> -			AT91_SMC_NCS_RDPULSE_(cs_pulse));
+> +	smc.nrd_pulse = pulse;
+> +	smc.nwe_pulse = smc.nrd_pulse;
+> +	smc.ncs_read_pulse =cs_pulse;
 
-Since the above patch is now in mainline
-(2bf22b39823c1d173dda31111a4eb2ce36daaf39) this patch can go in.
 
-Without it 35XXES2.1 systems have broken mmc.   Too late as a bug fix for 3.2?
+Nitpick: Whitespace around the = operator.
 
-Steve
+> +	smc.ncs_write_pulse = smc.ncs_read_pulse;
+>  	/* write SMC Cycle Register */
+> -	at91_sys_write(AT91_SMC_CYCLE(info->cs),
+> -			AT91_SMC_NWECYCLE_(cycle) |
+> -			AT91_SMC_NRDCYCLE_(cycle));
+> +	smc.read_cycle = cycle;
+> +	smc.write_cycle = smc.read_cycle;
+>  	/* write SMC Mode Register*/
+> -	at91_sys_write(AT91_SMC_MODE(info->cs), info->mode);
+> +	smc.tdf_cycles = tdf_cycles;
 
 
+The "write SMC Mode Register" comment should be removed.
 
-> ?arch/arm/mach-omap2/omap_hwmod_3xxx_data.c | ? 90 ++++++++++++++++++++++++++-
-> ?1 files changed, 86 insertions(+), 4 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-> index 53b6706..a14d150 100644
-> --- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-> @@ -3020,7 +3020,35 @@ static struct omap_mmc_dev_attr mmc1_dev_attr = {
-> ? ? ? ?.flags = OMAP_HSMMC_SUPPORTS_DUAL_VOLT,
-> ?};
->
-> -static struct omap_hwmod omap3xxx_mmc1_hwmod = {
-> +/* See 35xx errata 2.1.1.128 in SPRZ278F */
-> +static struct omap_mmc_dev_attr mmc1_pre_es3_dev_attr = {
-> + ? ? ? .flags = (OMAP_HSMMC_SUPPORTS_DUAL_VOLT |
-> + ? ? ? ? ? ? ? ? OMAP_HSMMC_BROKEN_MULTIBLOCK_READ),
-> +};
+> +	smc.mode = info->mode;
 > +
-> +static struct omap_hwmod omap3xxx_pre_es3_mmc1_hwmod = {
-> + ? ? ? .name ? ? ? ? ? = "mmc1",
-> + ? ? ? .mpu_irqs ? ? ? = omap34xx_mmc1_mpu_irqs,
-> + ? ? ? .sdma_reqs ? ? ?= omap34xx_mmc1_sdma_reqs,
-> + ? ? ? .opt_clks ? ? ? = omap34xx_mmc1_opt_clks,
-> + ? ? ? .opt_clks_cnt ? = ARRAY_SIZE(omap34xx_mmc1_opt_clks),
-> + ? ? ? .main_clk ? ? ? = "mmchs1_fck",
-> + ? ? ? .prcm ? ? ? ? ? = {
-> + ? ? ? ? ? ? ? .omap2 = {
-> + ? ? ? ? ? ? ? ? ? ? ? .module_offs = CORE_MOD,
-> + ? ? ? ? ? ? ? ? ? ? ? .prcm_reg_id = 1,
-> + ? ? ? ? ? ? ? ? ? ? ? .module_bit = OMAP3430_EN_MMC1_SHIFT,
-> + ? ? ? ? ? ? ? ? ? ? ? .idlest_reg_id = 1,
-> + ? ? ? ? ? ? ? ? ? ? ? .idlest_idle_bit = OMAP3430_ST_MMC1_SHIFT,
-> + ? ? ? ? ? ? ? },
-> + ? ? ? },
-> + ? ? ? .dev_attr ? ? ? = &mmc1_pre_es3_dev_attr,
-> + ? ? ? .slaves ? ? ? ? = omap3xxx_mmc1_slaves,
-> + ? ? ? .slaves_cnt ? ? = ARRAY_SIZE(omap3xxx_mmc1_slaves),
-> + ? ? ? .class ? ? ? ? ?= &omap34xx_mmc_class,
-> +};
-> +
-> +static struct omap_hwmod omap3xxx_es3plus_mmc1_hwmod = {
-> ? ? ? ?.name ? ? ? ? ? = "mmc1",
-> ? ? ? ?.mpu_irqs ? ? ? = omap34xx_mmc1_mpu_irqs,
-> ? ? ? ?.sdma_reqs ? ? ?= omap34xx_mmc1_sdma_reqs,
-> @@ -3063,7 +3091,34 @@ static struct omap_hwmod_ocp_if *omap3xxx_mmc2_slaves[] = {
-> ? ? ? ?&omap3xxx_l4_core__mmc2,
-> ?};
->
-> -static struct omap_hwmod omap3xxx_mmc2_hwmod = {
-> +/* See 35xx errata 2.1.1.128 in SPRZ278F */
-> +static struct omap_mmc_dev_attr mmc2_pre_es3_dev_attr = {
-> + ? ? ? .flags = OMAP_HSMMC_BROKEN_MULTIBLOCK_READ,
-> +};
-> +
-> +static struct omap_hwmod omap3xxx_pre_es3_mmc2_hwmod = {
-> + ? ? ? .name ? ? ? ? ? = "mmc2",
-> + ? ? ? .mpu_irqs ? ? ? = omap34xx_mmc2_mpu_irqs,
-> + ? ? ? .sdma_reqs ? ? ?= omap34xx_mmc2_sdma_reqs,
-> + ? ? ? .opt_clks ? ? ? = omap34xx_mmc2_opt_clks,
-> + ? ? ? .opt_clks_cnt ? = ARRAY_SIZE(omap34xx_mmc2_opt_clks),
-> + ? ? ? .main_clk ? ? ? = "mmchs2_fck",
-> + ? ? ? .prcm ? ? ? ? ? = {
-> + ? ? ? ? ? ? ? .omap2 = {
-> + ? ? ? ? ? ? ? ? ? ? ? .module_offs = CORE_MOD,
-> + ? ? ? ? ? ? ? ? ? ? ? .prcm_reg_id = 1,
-> + ? ? ? ? ? ? ? ? ? ? ? .module_bit = OMAP3430_EN_MMC2_SHIFT,
-> + ? ? ? ? ? ? ? ? ? ? ? .idlest_reg_id = 1,
-> + ? ? ? ? ? ? ? ? ? ? ? .idlest_idle_bit = OMAP3430_ST_MMC2_SHIFT,
-> + ? ? ? ? ? ? ? },
-> + ? ? ? },
-> + ? ? ? .dev_attr ? ? ? = &mmc2_pre_es3_dev_attr,
-> + ? ? ? .slaves ? ? ? ? = omap3xxx_mmc2_slaves,
-> + ? ? ? .slaves_cnt ? ? = ARRAY_SIZE(omap3xxx_mmc2_slaves),
-> + ? ? ? .class ? ? ? ? ?= &omap34xx_mmc_class,
-> +};
-> +
-> +static struct omap_hwmod omap3xxx_es3plus_mmc2_hwmod = {
-> ? ? ? ?.name ? ? ? ? ? = "mmc2",
-> ? ? ? ?.mpu_irqs ? ? ? = omap34xx_mmc2_mpu_irqs,
-> ? ? ? ?.sdma_reqs ? ? ?= omap34xx_mmc2_sdma_reqs,
-> @@ -3130,8 +3185,6 @@ static __initdata struct omap_hwmod *omap3xxx_hwmods[] = {
-> ? ? ? ?&omap3xxx_l4_core_hwmod,
-> ? ? ? ?&omap3xxx_l4_per_hwmod,
-> ? ? ? ?&omap3xxx_l4_wkup_hwmod,
-> - ? ? ? &omap3xxx_mmc1_hwmod,
-> - ? ? ? &omap3xxx_mmc2_hwmod,
-> ? ? ? ?&omap3xxx_mmc3_hwmod,
-> ? ? ? ?&omap3xxx_mpu_hwmod,
-> ? ? ? ?&omap3xxx_iva_hwmod,
-> @@ -3209,6 +3262,20 @@ static __initdata struct omap_hwmod *omap3430es2plus_hwmods[] = {
-> ? ? ? ?NULL
-> ?};
->
-> +/* <= 3430ES3-only hwmods */
-> +static __initdata struct omap_hwmod *omap3430_pre_es3_hwmods[] = {
-> + ? ? ? &omap3xxx_pre_es3_mmc1_hwmod,
-> + ? ? ? &omap3xxx_pre_es3_mmc2_hwmod,
-> + ? ? ? NULL
-> +};
-> +
-> +/* 3430ES3+-only hwmods */
-> +static __initdata struct omap_hwmod *omap3430_es3plus_hwmods[] = {
-> + ? ? ? &omap3xxx_es3plus_mmc1_hwmod,
-> + ? ? ? &omap3xxx_es3plus_mmc2_hwmod,
-> + ? ? ? NULL
-> +};
-> +
-> ?/* 34xx-only hwmods (all ES revisions) */
-> ?static __initdata struct omap_hwmod *omap34xx_hwmods[] = {
-> ? ? ? ?&omap34xx_sr1_hwmod,
-> @@ -3281,6 +3348,21 @@ int __init omap3xxx_hwmod_init(void)
-> ? ? ? ? ? ? ? ?h = omap3430es2plus_hwmods;
-> ? ? ? ?};
->
-> + ? ? ? if (h) {
-> + ? ? ? ? ? ? ? r = omap_hwmod_register(h);
-> + ? ? ? ? ? ? ? if (IS_ERR_VALUE(r))
-> + ? ? ? ? ? ? ? ? ? ? ? return r;
-> + ? ? ? }
-> +
-> + ? ? ? h = NULL;
-> + ? ? ? if (rev == OMAP3430_REV_ES1_0 || rev == OMAP3430_REV_ES2_0 ||
-> + ? ? ? ? ? rev == OMAP3430_REV_ES2_1) {
-> + ? ? ? ? ? ? ? h = omap3430_pre_es3_hwmods;
-> + ? ? ? } else if (rev == OMAP3430_REV_ES3_0 || rev == OMAP3430_REV_ES3_1 ||
-> + ? ? ? ? ? ? ? ? ?rev == OMAP3430_REV_ES3_1_2) {
-> + ? ? ? ? ? ? ? h = omap3430_es3plus_hwmods;
-> + ? ? ? };
-> +
-> ? ? ? ?if (h)
-> ? ? ? ? ? ? ? ?r = omap_hwmod_register(h);
->
-> --
-> 1.7.6.3
->
+> +	sam9_smc_configure(0, info->cs, &smc);
+
+
+This new function returns an int, should we be checking the return value
+here?
+
+>  }
+>  
+>  static void pata_at91_set_piomode(struct ata_port *ap, struct ata_device *adev)
+> @@ -288,20 +287,20 @@ static unsigned int pata_at91_data_xfer_noirq(struct ata_device *dev,
+>  	struct at91_ide_info *info = dev->link->ap->host->private_data;
+>  	unsigned int consumed;
+>  	unsigned long flags;
+> -	unsigned int mode;
+> +	struct sam9_smc_config smc;
+>  
+>  	local_irq_save(flags);
+> -	mode = at91_sys_read(AT91_SMC_MODE(info->cs));
+> +	sam9_smc_read_mode(0, info->cs, &smc);
+>  
+>  	/* set 16bit mode before writing data */
+> -	at91_sys_write(AT91_SMC_MODE(info->cs),
+> -			(mode & ~AT91_SMC_DBW) | AT91_SMC_DBW_16);
+> +	smc.mode = (smc.mode & ~AT91_SMC_DBW) | AT91_SMC_DBW_16;
+> +	sam9_smc_write_mode(0, info->cs, &smc);
+
+
+Do sam9_smc_read/write_mode really need to pass the whole smc structure?
+The only fields used are mode and tdf_cycles. It might be clearer to
+pass those directly.
+
+Also the original code here doesn't write tdf_cycles as part of the
+mode. Perhaps it would be better to have sam9_smc_write_mode to be:
+
+  int sam9_smc_write_mode(int id, int cs, unsigned mode);
+
+and in set_smc_timing above explicitly or in the tdf_cycles bits?
+
+>  
+>  	consumed = ata_sff_data_xfer(dev, buf, buflen, rw);
+>  
+>  	/* restore 8bit mode after data is written */
+> -	at91_sys_write(AT91_SMC_MODE(info->cs),
+> -			(mode & ~AT91_SMC_DBW) | AT91_SMC_DBW_8);
+> +	smc.mode = (smc.mode & ~AT91_SMC_DBW) | AT91_SMC_DBW_8;
+> +	sam9_smc_write_mode(0, info->cs, &smc);
+>  
+>  	local_irq_restore(flags);
+>  	return consumed;
