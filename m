@@ -1,128 +1,178 @@
 From: junxiao.bi@windriver.com (Junxiao Bi)
-Date: Thu, 8 Dec 2011 18:07:50 +0800
-Subject: [PATCH 4/6] ARM: SMP: fix big endian support
+Date: Thu, 8 Dec 2011 18:07:52 +0800
+Subject: [PATCH 6/6] ARM: support kernel modules in BE8 mode
 In-Reply-To: <1323338872-24716-1-git-send-email-junxiao.bi@windriver.com>
 References: <1323338872-24716-1-git-send-email-junxiao.bi@windriver.com>
-Message-ID: <1323338872-24716-5-git-send-email-junxiao.bi@windriver.com>
+Message-ID: <1323338872-24716-7-git-send-email-junxiao.bi@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Xue Ying <ying.xue@windriver.com>
+From: Stanley.Miao <stanley.miao@windriver.com>
 
-Since data from arm peripheral are little-endian and __raw_read*/__raw_write*
-don't do any endian conversion, we should use read*/write*_relaxed to replace
-them as the _relaxed version only adds endian conversion based on __raw version
-which isn't like read*/write* that adds IO barriers which will affect performance.
+In BE8 mode, data must be manipulated in big endian format while
+text must be little endian. Therefore, when relocating the text
+section of module in BE8 mode, we must convert the location offset
+of the text to big endian from the native little endian. After
+the relocation is complete, the location offset value is re-written
+as little endian.
 
-Signed-off-by: Xue Ying <ying.xue@windriver.com>
+Signed-off-by: Stanley.Miao <stanley.miao@windriver.com>
 Signed-off-by: Junxiao Bi <junxiao.bi@windriver.com>
 ---
- arch/arm/kernel/smp_scu.c |   10 +++++-----
- arch/arm/kernel/smp_twd.c |   20 ++++++++++----------
- 2 files changed, 15 insertions(+), 15 deletions(-)
+ arch/arm/Makefile        |    1 +
+ arch/arm/kernel/module.c |   63 +++++++++++++++++++++++++++------------------
+ 2 files changed, 39 insertions(+), 25 deletions(-)
 
-diff --git a/arch/arm/kernel/smp_scu.c b/arch/arm/kernel/smp_scu.c
-index 8f5dd79..0324435 100644
---- a/arch/arm/kernel/smp_scu.c
-+++ b/arch/arm/kernel/smp_scu.c
-@@ -27,7 +27,7 @@
-  */
- unsigned int __init scu_get_core_count(void __iomem *scu_base)
- {
--	unsigned int ncores = __raw_readl(scu_base + SCU_CONFIG);
-+	unsigned int ncores = readl_relaxed(scu_base + SCU_CONFIG);
- 	return (ncores & 0x03) + 1;
- }
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index dfcf3b0..c858184 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -13,6 +13,7 @@
+ LDFLAGS_vmlinux	:=-p --no-undefined -X
+ ifeq ($(CONFIG_CPU_ENDIAN_BE8),y)
+ LDFLAGS_vmlinux	+= --be8
++LDFLAGS_MODULE	+= --be8
+ endif
  
-@@ -41,19 +41,19 @@ void scu_enable(void __iomem *scu_base)
- #ifdef CONFIG_ARM_ERRATA_764369
- 	/* Cortex-A9 only */
- 	if ((read_cpuid(CPUID_ID) & 0xff0ffff0) == 0x410fc090) {
--		scu_ctrl = __raw_readl(scu_base + 0x30);
-+		scu_ctrl = readl_relaxed(scu_base + 0x30);
- 		if (!(scu_ctrl & 1))
--			__raw_writel(scu_ctrl | 0x1, scu_base + 0x30);
-+			writel_relaxed(scu_ctrl | 0x1, scu_base + 0x30);
- 	}
+ OBJCOPYFLAGS	:=-O binary -R .comment -S
+diff --git a/arch/arm/kernel/module.c b/arch/arm/kernel/module.c
+index 1e9be5d..9b32c8f 100644
+--- a/arch/arm/kernel/module.c
++++ b/arch/arm/kernel/module.c
+@@ -24,6 +24,7 @@
+ #include <asm/sections.h>
+ #include <asm/smp_plat.h>
+ #include <asm/unwind.h>
++#include <asm/opcodes.h>
+ 
+ #ifdef CONFIG_XIP_KERNEL
+ /*
+@@ -60,6 +61,7 @@ apply_relocate(Elf32_Shdr *sechdrs, const char *strtab, unsigned int symindex,
+ 		Elf32_Sym *sym;
+ 		const char *symname;
+ 		s32 offset;
++		u32 instr32;
+ #ifdef CONFIG_THUMB2_KERNEL
+ 		u32 upper, lower, sign, j1, j2;
  #endif
+@@ -95,7 +97,8 @@ apply_relocate(Elf32_Shdr *sechdrs, const char *strtab, unsigned int symindex,
+ 		case R_ARM_PC24:
+ 		case R_ARM_CALL:
+ 		case R_ARM_JUMP24:
+-			offset = (*(u32 *)loc & 0x00ffffff) << 2;
++			instr32 = __mem_to_opcode_arm(*(u32 *)loc);
++			offset = (instr32 & 0x00ffffff) << 2;
+ 			if (offset & 0x02000000)
+ 				offset -= 0x04000000;
  
--	scu_ctrl = __raw_readl(scu_base + SCU_CTRL);
-+	scu_ctrl = readl_relaxed(scu_base + SCU_CTRL);
- 	/* already enabled? */
- 	if (scu_ctrl & 1)
- 		return;
+@@ -112,8 +115,8 @@ apply_relocate(Elf32_Shdr *sechdrs, const char *strtab, unsigned int symindex,
  
- 	scu_ctrl |= 1;
--	__raw_writel(scu_ctrl, scu_base + SCU_CTRL);
-+	writel_relaxed(scu_ctrl, scu_base + SCU_CTRL);
+ 			offset >>= 2;
  
- 	/*
- 	 * Ensure that the data accessed by CPU0 before the SCU was
-diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
-index a8a6682..0864d92 100644
---- a/arch/arm/kernel/smp_twd.c
-+++ b/arch/arm/kernel/smp_twd.c
-@@ -39,7 +39,7 @@ static void twd_set_mode(enum clock_event_mode mode,
- 		/* timer load already set up */
- 		ctrl = TWD_TIMER_CONTROL_ENABLE | TWD_TIMER_CONTROL_IT_ENABLE
- 			| TWD_TIMER_CONTROL_PERIODIC;
--		__raw_writel(twd_timer_rate / HZ, twd_base + TWD_TIMER_LOAD);
-+		writel_relaxed(twd_timer_rate / HZ, twd_base + TWD_TIMER_LOAD);
- 		break;
- 	case CLOCK_EVT_MODE_ONESHOT:
- 		/* period set, and timer enabled in 'next_event' hook */
-@@ -51,18 +51,18 @@ static void twd_set_mode(enum clock_event_mode mode,
- 		ctrl = 0;
- 	}
+-			*(u32 *)loc &= 0xff000000;
+-			*(u32 *)loc |= offset & 0x00ffffff;
++			*(u32 *)loc = __opcode_to_mem_arm((instr32 & 0xff000000)
++						| (offset & 0x00ffffff));
+ 			break;
  
--	__raw_writel(ctrl, twd_base + TWD_TIMER_CONTROL);
-+	writel_relaxed(ctrl, twd_base + TWD_TIMER_CONTROL);
- }
+ 	       case R_ARM_V4BX:
+@@ -121,9 +124,9 @@ apply_relocate(Elf32_Shdr *sechdrs, const char *strtab, unsigned int symindex,
+ 			* other bits to re-code instruction as
+ 			* MOV PC,Rm.
+ 			*/
+-		       *(u32 *)loc &= 0xf000000f;
+-		       *(u32 *)loc |= 0x01a0f000;
+-		       break;
++			instr32 = __mem_to_opcode_arm(*(u32 *)loc) & 0xf000000f;
++			*(u32 *)loc = __opcode_to_mem_arm(instr32 | 0x01a0f000);
++			break;
  
- static int twd_set_next_event(unsigned long evt,
- 			struct clock_event_device *unused)
- {
--	unsigned long ctrl = __raw_readl(twd_base + TWD_TIMER_CONTROL);
-+	unsigned long ctrl = readl_relaxed(twd_base + TWD_TIMER_CONTROL);
+ 		case R_ARM_PREL31:
+ 			offset = *(u32 *)loc + sym->st_value - loc;
+@@ -132,7 +135,7 @@ apply_relocate(Elf32_Shdr *sechdrs, const char *strtab, unsigned int symindex,
  
- 	ctrl |= TWD_TIMER_CONTROL_ENABLE;
+ 		case R_ARM_MOVW_ABS_NC:
+ 		case R_ARM_MOVT_ABS:
+-			offset = *(u32 *)loc;
++			offset = __mem_to_opcode_arm(*(u32 *)loc);
+ 			offset = ((offset & 0xf0000) >> 4) | (offset & 0xfff);
+ 			offset = (offset ^ 0x8000) - 0x8000;
  
--	__raw_writel(evt, twd_base + TWD_TIMER_COUNTER);
--	__raw_writel(ctrl, twd_base + TWD_TIMER_CONTROL);
-+	writel_relaxed(evt, twd_base + TWD_TIMER_COUNTER);
-+	writel_relaxed(ctrl, twd_base + TWD_TIMER_CONTROL);
+@@ -140,16 +143,17 @@ apply_relocate(Elf32_Shdr *sechdrs, const char *strtab, unsigned int symindex,
+ 			if (ELF32_R_TYPE(rel->r_info) == R_ARM_MOVT_ABS)
+ 				offset >>= 16;
  
- 	return 0;
- }
-@@ -75,8 +75,8 @@ static int twd_set_next_event(unsigned long evt,
-  */
- int twd_timer_ack(void)
- {
--	if (__raw_readl(twd_base + TWD_TIMER_INTSTAT)) {
--		__raw_writel(1, twd_base + TWD_TIMER_INTSTAT);
-+	if (readl_relaxed(twd_base + TWD_TIMER_INTSTAT)) {
-+		writel_relaxed(1, twd_base + TWD_TIMER_INTSTAT);
- 		return 1;
- 	}
+-			*(u32 *)loc &= 0xfff0f000;
+-			*(u32 *)loc |= ((offset & 0xf000) << 4) |
+-					(offset & 0x0fff);
++			instr32 = __mem_to_opcode_arm(*(u32 *)loc) & 0xfff0f000;
++			*(u32 *)loc = __opcode_to_mem_arm(instr32 |
++					((offset & 0xf000) << 4) |
++					(offset & 0x0fff));
+ 			break;
  
-@@ -111,15 +111,15 @@ static void __cpuinit twd_calibrate_rate(void)
- 		waitjiffies += 5;
+ #ifdef CONFIG_THUMB2_KERNEL
+ 		case R_ARM_THM_CALL:
+ 		case R_ARM_THM_JUMP24:
+-			upper = *(u16 *)loc;
+-			lower = *(u16 *)(loc + 2);
++			upper = __mem_to_opcode_thumb16(*(u16 *)loc);
++			lower = __mem_to_opcode_thumb16(*(u16 *)(loc + 2));
  
- 				 /* enable, no interrupt or reload */
--		__raw_writel(0x1, twd_base + TWD_TIMER_CONTROL);
-+		writel_relaxed(0x1, twd_base + TWD_TIMER_CONTROL);
+ 			/*
+ 			 * 25 bit signed address range (Thumb-2 BL and B.W
+@@ -198,17 +202,22 @@ apply_relocate(Elf32_Shdr *sechdrs, const char *strtab, unsigned int symindex,
+ 			sign = (offset >> 24) & 1;
+ 			j1 = sign ^ (~(offset >> 23) & 1);
+ 			j2 = sign ^ (~(offset >> 22) & 1);
+-			*(u16 *)loc = (u16)((upper & 0xf800) | (sign << 10) |
+-					    ((offset >> 12) & 0x03ff));
+-			*(u16 *)(loc + 2) = (u16)((lower & 0xd000) |
+-						  (j1 << 13) | (j2 << 11) |
+-						  ((offset >> 1) & 0x07ff));
++			*(u16 *)loc = __opcode_to_mem_thumb16((u16)(
++						(upper & 0xf800) |
++						(sign << 10) |
++						((offset >> 12) & 0x03ff)
++						));
++			*(u16 *)(loc + 2) = __opcode_to_mem_thumb16((u16)(
++						(lower & 0xd000) |
++						(j1 << 13) | (j2 << 11) |
++						((offset >> 1) & 0x07ff)
++						));
+ 			break;
  
- 				 /* maximum value */
--		__raw_writel(0xFFFFFFFFU, twd_base + TWD_TIMER_COUNTER);
-+		writel_relaxed(0xFFFFFFFFU, twd_base + TWD_TIMER_COUNTER);
+ 		case R_ARM_THM_MOVW_ABS_NC:
+ 		case R_ARM_THM_MOVT_ABS:
+-			upper = *(u16 *)loc;
+-			lower = *(u16 *)(loc + 2);
++			upper = __mem_to_opcode_thumb16(*(u16 *)loc);
++			lower = __mem_to_opcode_thumb16(*(u16 *)(loc + 2));
  
- 		while (get_jiffies_64() < waitjiffies)
- 			udelay(10);
+ 			/*
+ 			 * MOVT/MOVW instructions encoding in Thumb-2:
+@@ -229,12 +238,16 @@ apply_relocate(Elf32_Shdr *sechdrs, const char *strtab, unsigned int symindex,
+ 			if (ELF32_R_TYPE(rel->r_info) == R_ARM_THM_MOVT_ABS)
+ 				offset >>= 16;
  
--		count = __raw_readl(twd_base + TWD_TIMER_COUNTER);
-+		count = readl_relaxed(twd_base + TWD_TIMER_COUNTER);
- 
- 		twd_timer_rate = (0xFFFFFFFFU - count) * (HZ / 5);
+-			*(u16 *)loc = (u16)((upper & 0xfbf0) |
+-					    ((offset & 0xf000) >> 12) |
+-					    ((offset & 0x0800) >> 1));
+-			*(u16 *)(loc + 2) = (u16)((lower & 0x8f00) |
+-						  ((offset & 0x0700) << 4) |
+-						  (offset & 0x00ff));
++			*(u16 *)loc = __opcode_to_mem_thumb16((u16)(
++					(upper & 0xfbf0) |
++					((offset & 0xf000) >> 12) |
++					((offset & 0x0800) >> 1)
++					));
++			*(u16 *)(loc + 2) = __opcode_to_mem_thumb16((u16)(
++					(lower & 0x8f00) |
++					((offset & 0x0700) << 4) |
++					(offset & 0x00ff)
++					));
+ 			break;
+ #endif
  
 -- 
 1.7.0.4
