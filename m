@@ -1,29 +1,23 @@
-From: felipe.contreras@gmail.com (Felipe Contreras)
-Date: Thu, 8 Dec 2011 02:36:31 +0200
-Subject: [PATCH] ARM: OMAP: dmtimer: fix missing content/correction in
- low-power mode support
-In-Reply-To: <1320732026-6783-1-git-send-email-tarun.kanti@ti.com>
-References: <1320732026-6783-1-git-send-email-tarun.kanti@ti.com>
-Message-ID: <CAMP44s0LGVOWrKu8nTbDWdGJFoUH8kcg_nFQwnxFWHFQDf_5_w@mail.gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 8 Dec 2011 00:40:16 +0000
+Subject: [PATCH 1/3] PM: Provide an always on power domain governor
+In-Reply-To: <201112072228.02916.rjw@sisk.pl>
+References: <1322765339-29879-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+ <201112062239.57001.rjw@sisk.pl>
+ <20111207123459.GB18715@opensource.wolfsonmicro.com>
+ <201112072228.02916.rjw@sisk.pl>
+Message-ID: <20111208004015.GA5748@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 8, 2011 at 8:00 AM, Tarun Kanti DebBarma <tarun.kanti@ti.com> wrote:
-> Since omap_dm_timer_write_reg/__omap_dm_timer_write is now modified
-> to use timer->func_base OCP_CFG should not use this wrapper anymore.
-> Instead use __raw_writel() directly and use timer->io_base instead
-> to write to OCP_CFG.
->
-> The timer->sys_stat is valid only if timer->revision is 1. In the
-> context restore function make this correction.
->
-> Save the contexts and loss count when timer is stopped.
-> Also, disable the clock. Else, clock usecount would become imbalanced.
->
-> Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
+On Wed, Dec 07, 2011 at 10:28:02PM +0100, Rafael J. Wysocki wrote:
+> On Wednesday, December 07, 2011, Mark Brown wrote:
 
-It looks like this patch is doing 3 things, so I think this patch
-should be split into 3 logical patches.
+> > Well, I guess you could put patch 1 and 3 in then add 2 if an ack is
+> > forthcoming for that - there's no direct dependency.
 
--- 
-Felipe Contreras
+> It's been acked already, I'm going to pul all three patches into
+> linux-pm/linux-next later today.
+
+Oh, OK - I didn't seem to get copied on any of the acks or at least I
+didn't see them.
