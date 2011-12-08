@@ -1,66 +1,86 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Thu, 08 Dec 2011 10:37:59 +0000
-Subject: [PATCH v4 3/6] ARM: vexpress: Add DT support for the motherboard
-In-Reply-To: <47277884.EQ6QaTZjNt@wuerfel>
-References: <1323186229-22054-1-git-send-email-pawel.moll@arm.com>
- <1323186229-22054-4-git-send-email-pawel.moll@arm.com>
- <47277884.EQ6QaTZjNt@wuerfel>
-Message-ID: <1323340679.32116.26.camel@hornet.cambridge.arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 8 Dec 2011 11:03:49 +0000
+Subject: [GIT PULL v3] Linux support for ARM LPAE
+Message-ID: <20111208110349.GA26970@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2011-12-07 at 22:49 +0000, Arnd Bergmann wrote:
-> On Tuesday 06 December 2011 15:43:46 Pawel Moll wrote:
-> > +
-> > +static struct of_dev_auxdata v2m_dt_auxdata_lookup[] __initdata = {
-> > +       OF_DEV_AUXDATA("arm,vexpress-flash", V2M_NOR0, "physmap-flash",
-> > +                       &v2m_flash_data),
-> > +       OF_DEV_AUXDATA("arm,primecell", V2M_MMCI, "mb:mmci", &v2m_mmci_data),
-> > +       {}
-> > +};
-> 
-> One more thing I noticed. While I'm not familiar with the progress on
-> device driver conversion, 
+Hi Russell,
 
-I'm aware of these two last non-DT bits and actually already started
-working on them, but this won't happen this year (I'm on holiday
-starting next Friday without any access to Internet whatsoever :-)
+The series is rebased against Will's idmap series as merged in your
+devel-stable tree (I couldn't fetch devel-stable this morning). Please
+note that the branch was changed to 'for-rmk' (previously 'for-next').
+The nopud fixup was already reordered so that it comes before your
+patch.
 
-> I think you should be using the physmap_of
-> driver instead of physmap, which will remove the need for the
-> platform data.
+There is still time until 5pm in case anything else goes wrong :).
+Thanks.
 
-There's one bit missing in the physmap_of. The "set_vpp" handle which is
-used on VE:
+The following changes since commit 4e8ee7de227e3ab9a72040b448ad728c5428a042:
 
-static struct physmap_flash_data v2m_flash_data = {
-        .width          = 4,
-        .set_vpp        = v2m_flash_set_vpp,
-};      
+  ARM: SMP: use idmap_pgd for mapping MMU enable during secondary booting (2011-12-06 14:04:15 +0000)
 
-My plan is to extend the physmap_of driver so it could operate VPP via
-gpio API and make the sysreg a gpio controller, having Flash VPP, CF &
-MMC card detects and DVI output control (that's for CLCD) as internal
-GPIO lines.
+are available in the git repository at:
+  git://git.kernel.org/pub/scm/linux/kernel/git/cmarinas/linux.git for-rmk
 
-> For mmci, it should not be hard to do change the driver so it
-> understands the device tree, too. The easiest implementation for
-> that would be to add some code into mmci_probe and allocate
-> an mmci_platform_data structure that gets filled with the required
-> attributes.
+Catalin Marinas (12):
+      ARM: pgtable: Fix compiler warning in ioremap.c introduced by nopud
+      ARM: LPAE: Move page table maintenance macros to pgtable-2level.h
+      ARM: LPAE: Move the FSR definitions to separate files
+      ARM: LPAE: Factor out classic-MMU specific code into proc-v7-2level.S
+      ARM: LPAE: Introduce the 3-level page table format definitions
+      ARM: LPAE: Page table maintenance for the 3-level format
+      ARM: LPAE: MMU setup for the 3-level page table format
+      ARM: LPAE: Invalidate the TLB before freeing the PMD
+      ARM: LPAE: Add fault handling support
+      ARM: LPAE: Add context switching support
+      ARM: LPAE: Add identity mapping support for the 3-level page table format
+      ARM: LPAE: Add the Kconfig entries
 
-I've started the implementation already, but it turned out much trickier
-that I was hoping... One thing is the "status" handle (card detect line
-"virtual gpio" I mentioned above), the second problem is the fact that
-mmci platform data can take generic caps MMC_CAP_* from
-include/linux/mmc/host.h (now even caps2 as well)... This issue was
-already briefly mentioned here:
-http://article.gmane.org/gmane.linux.kernel.samsung-soc/7639 and as
-there was no generic resolution my plan is to reuse as much properties
-from other MMC host controllers and forge the missing one (as a superset
-of ARM's and STE's cell implementations). But as I said, it's unlikely
-to happen this year...
+Russell King (1):
+      ARM: pgtable: switch to use pgtable-nopud.h
 
-Cheers!
+Will Deacon (2):
+      ARM: LPAE: add ISBs around MMU enabling code
+      ARM: LPAE: mark memory banks with start > ULONG_MAX as highmem
 
-Pawe?
+ arch/arm/Kconfig                            |    2 +-
+ arch/arm/boot/compressed/head.S             |    1 +
+ arch/arm/include/asm/assembler.h            |   11 ++
+ arch/arm/include/asm/page.h                 |    4 +
+ arch/arm/include/asm/pgalloc.h              |   26 ++++-
+ arch/arm/include/asm/pgtable-2level.h       |   41 ++++++
+ arch/arm/include/asm/pgtable-3level-hwdef.h |   77 ++++++++++++
+ arch/arm/include/asm/pgtable-3level-types.h |   70 +++++++++++
+ arch/arm/include/asm/pgtable-3level.h       |  155 +++++++++++++++++++++++
+ arch/arm/include/asm/pgtable-hwdef.h        |    4 +
+ arch/arm/include/asm/pgtable.h              |   43 +------
+ arch/arm/include/asm/proc-fns.h             |   21 +++
+ arch/arm/include/asm/system.h               |    8 ++
+ arch/arm/include/asm/tlb.h                  |   12 ++-
+ arch/arm/kernel/head.S                      |   47 +++++++-
+ arch/arm/kernel/hw_breakpoint.c             |    8 +-
+ arch/arm/kernel/sleep.S                     |    2 +
+ arch/arm/mm/Kconfig                         |   17 +++
+ arch/arm/mm/alignment.c                     |    2 +-
+ arch/arm/mm/context.c                       |   19 +++-
+ arch/arm/mm/fault.c                         |  111 +++--------------
+ arch/arm/mm/fault.h                         |   27 ++++-
+ arch/arm/mm/fsr-2level.c                    |   78 ++++++++++++
+ arch/arm/mm/fsr-3level.c                    |   68 ++++++++++
+ arch/arm/mm/idmap.c                         |   28 ++++-
+ arch/arm/mm/ioremap.c                       |   39 ++++---
+ arch/arm/mm/mmu.c                           |   46 +++++++-
+ arch/arm/mm/pgd.c                           |   51 +++++++-
+ arch/arm/mm/proc-macros.S                   |    5 +-
+ arch/arm/mm/proc-v7-2level.S                |  171 ++++++++++++++++++++++++++
+ arch/arm/mm/proc-v7-3level.S                |  150 +++++++++++++++++++++++
+ arch/arm/mm/proc-v7.S                       |  177 +++------------------------
+ 32 files changed, 1199 insertions(+), 322 deletions(-)
+ create mode 100644 arch/arm/include/asm/pgtable-3level-hwdef.h
+ create mode 100644 arch/arm/include/asm/pgtable-3level-types.h
+ create mode 100644 arch/arm/include/asm/pgtable-3level.h
+ create mode 100644 arch/arm/mm/fsr-2level.c
+ create mode 100644 arch/arm/mm/fsr-3level.c
+ create mode 100644 arch/arm/mm/proc-v7-2level.S
+ create mode 100644 arch/arm/mm/proc-v7-3level.S
