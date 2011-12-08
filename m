@@ -1,86 +1,55 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Thu, 08 Dec 2011 10:45:40 -0800
-Subject: [GIT PULL] OMAP: PM support for OMAP4 MPU sub-system
-Message-ID: <874nxaewbv.fsf@ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu,  8 Dec 2011 19:03:21 +0000
+Subject: [PATCH v8 4/4] ARM: kexec: use soft_restart for branching to the
+ reboot buffer
+In-Reply-To: <1323371001-4036-1-git-send-email-will.deacon@arm.com>
+References: <1323371001-4036-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1323371001-4036-5-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony,
+Now that there is a common way to reset the machine, let's use it
+instead of reinventing the wheel in the kexec backend.
 
-Please pull the OMAP4 MPUSS PM series below.  It is based on the
-Russell's devel-stable branch due to dependencies
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/kernel/machine_kexec.c |   15 +++------------
+ 1 files changed, 3 insertions(+), 12 deletions(-)
 
-Kevin
-
-The following changes since commit 3ee0fc5ca129cbae81c073756febcb1c552af446:
-
-  Merge branch 'kexec/idmap' of git://git.kernel.org/pub/scm/linux/kernel/git/will/linux into devel-stable (2011-12-06 20:27:54 +0000)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git for_3.3/pm/omap4-mpuss
-
-Santosh Shilimkar (24):
-      ARM: OMAP4: Use WARN_ON() instead of BUG_ON() with graceful exit
-      ARM: OMAP4: Export omap4_get_base*() rather than global address pointers
-      ARM: OMAP4: PM: Add SAR RAM support
-      ARM: OMAP4: PM: Keep static dep between MPUSS-EMIF and MPUSS-L3/L4 and DUCATI-L3
-      ARM: OMAP4: PM: Avoid omap4_pm_init() on OMAP4430 ES1.0
-      ARM: OMAP4: PM: Initialise all the clockdomains to supported states
-      ARM: OMAP: Add Secure HAL and monitor mode API infrastructure.
-      ARM: OMAP: PM: Add support to allocate the memory for secure RAM
-      ARM: OMAP4: PM: Add WakeupGen module as OMAP gic_arch_extn
-      ARM: OMAP4: PM: Add CPUX OFF mode support
-      ARM: OMAP4: Remove __INIT from omap_secondary_startup() to re-use it for hotplug.
-      ARM: OMAP4: PM: Program CPU1 to hit OFF when off-lined
-      ARM: OMAP4: PM: CPU1 wakeup workaround from Low power modes
-      ARM: OMAP4: PM: Use custom omap_do_wfi() for default idle.
-      ARM: OMAP4: suspend: Add MPUSS power domain RETENTION support
-      ARM: OMAP4: Remove un-used do_wfi() macro.
-      ARM: OMAP4: PM: Add WakeupGen and secure GIC low power support
-      ARM: OMAP4: PM: Add L2X0 cache lowpower support
-      ARM: OMAP4: PM: Add MPUSS power domain OSWR support
-      ARM: OMAP4: PM: Add power domain statistics support
-      ARM: OMAP4: Fix errata i688 with MPU interconnect barriers.
-      ARM: OMAP4: PM: Add CPUidle support
-      ARM: OMAP4: cpuidle: Switch to gptimer from twd in deeper C-states.
-      ARM: OMAP3: CPUidle: Make use of CPU PM notifiers
-
- arch/arm/mach-omap2/Kconfig                        |   21 +
- arch/arm/mach-omap2/Makefile                       |   16 +-
- arch/arm/mach-omap2/common.h                       |   64 +++-
- arch/arm/mach-omap2/cpuidle34xx.c                  |   15 +
- arch/arm/mach-omap2/cpuidle44xx.c                  |  245 ++++++++++++
- arch/arm/mach-omap2/include/mach/barriers.h        |   31 ++
- arch/arm/mach-omap2/include/mach/omap-secure.h     |   57 +++
- arch/arm/mach-omap2/include/mach/omap-wakeupgen.h  |   39 ++
- arch/arm/mach-omap2/io.c                           |    9 +
- arch/arm/mach-omap2/omap-headsmp.S                 |    5 -
- arch/arm/mach-omap2/omap-hotplug.c                 |   14 +-
- arch/arm/mach-omap2/omap-mpuss-lowpower.c          |  398 ++++++++++++++++++++
- arch/arm/mach-omap2/omap-secure.c                  |   81 ++++
- arch/arm/mach-omap2/{omap44xx-smc.S => omap-smc.S} |   23 ++
- arch/arm/mach-omap2/omap-smp.c                     |   45 +++
- arch/arm/mach-omap2/omap-wakeupgen.c               |  389 +++++++++++++++++++
- arch/arm/mach-omap2/omap4-common.c                 |   94 +++++-
- arch/arm/mach-omap2/omap4-sar-layout.h             |   50 +++
- arch/arm/mach-omap2/pm.h                           |    1 +
- arch/arm/mach-omap2/pm44xx.c                       |  153 ++++++++-
- arch/arm/mach-omap2/sleep44xx.S                    |  379 +++++++++++++++++++
- arch/arm/plat-omap/common.c                        |    3 +
- arch/arm/plat-omap/include/plat/omap-secure.h      |   13 +
- arch/arm/plat-omap/include/plat/omap44xx.h         |    1 +
- arch/arm/plat-omap/include/plat/sram.h             |    6 +-
- arch/arm/plat-omap/sram.c                          |    8 +
- 26 files changed, 2126 insertions(+), 34 deletions(-)
- create mode 100644 arch/arm/mach-omap2/cpuidle44xx.c
- create mode 100644 arch/arm/mach-omap2/include/mach/barriers.h
- create mode 100644 arch/arm/mach-omap2/include/mach/omap-secure.h
- create mode 100644 arch/arm/mach-omap2/include/mach/omap-wakeupgen.h
- create mode 100644 arch/arm/mach-omap2/omap-mpuss-lowpower.c
- create mode 100644 arch/arm/mach-omap2/omap-secure.c
- rename arch/arm/mach-omap2/{omap44xx-smc.S => omap-smc.S} (70%)
- create mode 100644 arch/arm/mach-omap2/omap-wakeupgen.c
- create mode 100644 arch/arm/mach-omap2/omap4-sar-layout.h
- create mode 100644 arch/arm/mach-omap2/sleep44xx.S
- create mode 100644 arch/arm/plat-omap/include/plat/omap-secure.h
+diff --git a/arch/arm/kernel/machine_kexec.c b/arch/arm/kernel/machine_kexec.c
+index 29620b6..764bd45 100644
+--- a/arch/arm/kernel/machine_kexec.c
++++ b/arch/arm/kernel/machine_kexec.c
+@@ -12,12 +12,11 @@
+ #include <asm/mmu_context.h>
+ #include <asm/cacheflush.h>
+ #include <asm/mach-types.h>
++#include <asm/system.h>
+ 
+ extern const unsigned char relocate_new_kernel[];
+ extern const unsigned int relocate_new_kernel_size;
+ 
+-extern void setup_mm_for_reboot(void);
+-
+ extern unsigned long kexec_start_address;
+ extern unsigned long kexec_indirection_page;
+ extern unsigned long kexec_mach_type;
+@@ -111,14 +110,6 @@ void machine_kexec(struct kimage *image)
+ 
+ 	if (kexec_reinit)
+ 		kexec_reinit();
+-	local_irq_disable();
+-	local_fiq_disable();
+-	setup_mm_for_reboot();
+-	flush_cache_all();
+-	outer_flush_all();
+-	outer_disable();
+-	cpu_proc_fin();
+-	outer_inv_all();
+-	flush_cache_all();
+-	cpu_reset(reboot_code_buffer_phys);
++
++	soft_restart(reboot_code_buffer_phys);
+ }
+-- 
+1.7.4.1
