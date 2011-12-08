@@ -1,63 +1,58 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Thu, 8 Dec 2011 13:45:47 +0000
-Subject: [PATCH-V5 0/3] Introducing TI's New SoC/board AM335XEVM
-In-Reply-To: <20111207211029.GL31337@atomide.com>
-References: <hvaibhav@ti.com>
- <1322808204-12878-1-git-send-email-hvaibhav@ti.com> <87y5up44bf.fsf@ti.com>
- <20111207211029.GL31337@atomide.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A8050F6D@DBDE01.ent.ti.com>
+From: manjunath.hadli@ti.com (Manjunath Hadli)
+Date: Thu, 8 Dec 2011 19:25:25 +0530
+Subject: [PATCH v4 2/5] ARM: davinci: dm644x: remove the macros from the
+ header to move to c file
+In-Reply-To: <1323352528-1207-1-git-send-email-manjunath.hadli@ti.com>
+References: <1323352528-1207-1-git-send-email-manjunath.hadli@ti.com>
+Message-ID: <1323352528-1207-3-git-send-email-manjunath.hadli@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+move the register base addresses and offsets used only by dm644x
+platform file from platform header dm644x.h to dm644x.c as they
+are used only in the c file.
 
-> -----Original Message-----
-> From: Tony Lindgren [mailto:tony at atomide.com]
-> Sent: Thursday, December 08, 2011 2:40 AM
-> To: Hilman, Kevin
-> Cc: Hiremath, Vaibhav; linux-omap at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org; paul at pwsan.com
-> Subject: Re: [PATCH-V5 0/3] Introducing TI's New SoC/board AM335XEVM
-> 
-> * Kevin Hilman <khilman@ti.com> [111206 15:52]:
-> > <hvaibhav@ti.com> writes:
-> >
-> > > From: Vaibhav Hiremath <hvaibhav@ti.com>
-> > >
-> > > This patch set adds support for AM335x device having
-> > > Cortex-A8 MPU.
-> > >
-> > > Official website - http://www.ti.com/product/am3359
-> > >
-> > > AM335X is treated as another OMAP3 variant, where,
-> > > along with existing cpu class OMAP34XX, new cpu class AM33XX is
-> created
-> > > and the respective type is AM335X, which is newly added device in
-> > > the family.
-> > > This means, cpu_is_omap34xx(), cpu_is_am33xx() and
-> > > cpu_is_am335x() checks return success for AM335X.
-> > >
-> > > Also, I have validated OMAP3 boot test with this patch-series on
-> > > OMAP3EVM.
-> >
-> > Tony, this series looks good to me.
-> >
-> > I've also tested it on a BeagleBone, so feel free to also add:
-> >
-> > Tested-by: Kevin Hilman <khilman@ti.com>
-> 
-> Thanks looks good to me. We still need the machine_id update to
-> apply patches 2 and 3 in this series, so applying only the first
-> patch into soc branch for now.
-> 
+Signed-off-by: Manjunath Hadli <manjunath.hadli@ti.com>
+---
+ arch/arm/mach-davinci/dm644x.c              |    7 +++++++
+ arch/arm/mach-davinci/include/mach/dm644x.h |    7 -------
+ 2 files changed, 7 insertions(+), 7 deletions(-)
 
-Tony,
-
-Should I ping Russell for this? The machine-id patch is already registered
-and present at
-
-http://www.arm.linux.org.uk/developer/machines/download.php
-
-Thanks,
-Vaibhav
-
-> Tony
+diff --git a/arch/arm/mach-davinci/dm644x.c b/arch/arm/mach-davinci/dm644x.c
+index 3470983..27d1371 100644
+--- a/arch/arm/mach-davinci/dm644x.c
++++ b/arch/arm/mach-davinci/dm644x.c
+@@ -35,6 +35,13 @@
+  */
+ #define DM644X_REF_FREQ		27000000
+ 
++#define DM644X_EMAC_BASE		0x01c80000
++#define DM644X_EMAC_MDIO_BASE		(DM644X_EMAC_BASE + 0x4000)
++#define DM644X_EMAC_CNTRL_OFFSET	0x0000
++#define DM644X_EMAC_CNTRL_MOD_OFFSET	0x1000
++#define DM644X_EMAC_CNTRL_RAM_OFFSET	0x2000
++#define DM644X_EMAC_CNTRL_RAM_SIZE	0x2000
++
+ static struct pll_data pll1_data = {
+ 	.num       = 1,
+ 	.phys_base = DAVINCI_PLL1_BASE,
+diff --git a/arch/arm/mach-davinci/include/mach/dm644x.h b/arch/arm/mach-davinci/include/mach/dm644x.h
+index 5a1b26d..724377f 100644
+--- a/arch/arm/mach-davinci/include/mach/dm644x.h
++++ b/arch/arm/mach-davinci/include/mach/dm644x.h
+@@ -27,13 +27,6 @@
+ #include <mach/asp.h>
+ #include <media/davinci/vpfe_capture.h>
+ 
+-#define DM644X_EMAC_BASE		(0x01C80000)
+-#define DM644X_EMAC_MDIO_BASE		(DM644X_EMAC_BASE + 0x4000)
+-#define DM644X_EMAC_CNTRL_OFFSET	(0x0000)
+-#define DM644X_EMAC_CNTRL_MOD_OFFSET	(0x1000)
+-#define DM644X_EMAC_CNTRL_RAM_OFFSET	(0x2000)
+-#define DM644X_EMAC_CNTRL_RAM_SIZE	(0x2000)
+-
+ #define DM644X_ASYNC_EMIF_CONTROL_BASE	0x01E00000
+ #define DM644X_ASYNC_EMIF_DATA_CE0_BASE 0x02000000
+ #define DM644X_ASYNC_EMIF_DATA_CE1_BASE 0x04000000
+-- 
+1.6.2.4
