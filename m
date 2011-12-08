@@ -1,275 +1,70 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu,  8 Dec 2011 16:35:32 +0100
-Subject: [PATCH] ARM: at91: make st soc independent
-Message-ID: <1323358532-21135-1-git-send-email-plagnioj@jcrosoft.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 8 Dec 2011 15:41:39 +0000
+Subject: [PATCH v4 3/6] ARM: vexpress: Add DT support for the motherboard
+In-Reply-To: <1323340679.32116.26.camel@hornet.cambridge.arm.com>
+References: <1323186229-22054-1-git-send-email-pawel.moll@arm.com>
+ <47277884.EQ6QaTZjNt@wuerfel>
+ <1323340679.32116.26.camel@hornet.cambridge.arm.com>
+Message-ID: <201112081541.39263.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- arch/arm/mach-at91/at91rm9200.c              |    4 +-
- arch/arm/mach-at91/at91rm9200_time.c         |   37 ++++++++++++++++----------
- arch/arm/mach-at91/generic.h                 |    1 +
- arch/arm/mach-at91/include/mach/at91_st.h    |   32 +++++++++++++++-------
- arch/arm/mach-at91/include/mach/at91rm9200.h |    2 +-
- drivers/watchdog/at91rm9200_wdt.c            |    8 +++---
- 6 files changed, 53 insertions(+), 31 deletions(-)
+On Thursday 08 December 2011, Pawel Moll wrote:
+> On Wed, 2011-12-07 at 22:49 +0000, Arnd Bergmann wrote:
+> > On Tuesday 06 December 2011 15:43:46 Pawel Moll wrote:
+> > > +
+> > > +static struct of_dev_auxdata v2m_dt_auxdata_lookup[] __initdata = {
+> > > +       OF_DEV_AUXDATA("arm,vexpress-flash", V2M_NOR0, "physmap-flash",
+> > > +                       &v2m_flash_data),
+> > > +       OF_DEV_AUXDATA("arm,primecell", V2M_MMCI, "mb:mmci", &v2m_mmci_data),
+> > > +       {}
+> > > +};
+> > 
+> > One more thing I noticed. While I'm not familiar with the progress on
+> > device driver conversion, 
+> 
+> I'm aware of these two last non-DT bits and actually already started
+> working on them, but this won't happen this year (I'm on holiday
+> starting next Friday without any access to Internet whatsoever :-)
 
-diff --git a/arch/arm/mach-at91/at91rm9200.c b/arch/arm/mach-at91/at91rm9200.c
-index 9163d7d..6b819c0 100644
---- a/arch/arm/mach-at91/at91rm9200.c
-+++ b/arch/arm/mach-at91/at91rm9200.c
-@@ -294,8 +294,8 @@ static void at91rm9200_reset(void)
- 	/*
- 	 * Perform a hardware reset with the use of the Watchdog timer.
- 	 */
--	at91_sys_write(AT91_ST_WDMR, AT91_ST_RSTEN | AT91_ST_EXTEN | 1);
--	at91_sys_write(AT91_ST_CR, AT91_ST_WDRST);
-+	at91_st_write(AT91_ST_WDMR, AT91_ST_RSTEN | AT91_ST_EXTEN | 1);
-+	at91_st_write(AT91_ST_CR, AT91_ST_WDRST);
- }
- 
- /* --------------------------------------------------------------------
-diff --git a/arch/arm/mach-at91/at91rm9200_time.c b/arch/arm/mach-at91/at91rm9200_time.c
-index a028cdf..52d4b45 100644
---- a/arch/arm/mach-at91/at91rm9200_time.c
-+++ b/arch/arm/mach-at91/at91rm9200_time.c
-@@ -43,9 +43,9 @@ static inline unsigned long read_CRTR(void)
- {
- 	unsigned long x1, x2;
- 
--	x1 = at91_sys_read(AT91_ST_CRTR);
-+	x1 = at91_st_read(AT91_ST_CRTR);
- 	do {
--		x2 = at91_sys_read(AT91_ST_CRTR);
-+		x2 = at91_st_read(AT91_ST_CRTR);
- 		if (x1 == x2)
- 			break;
- 		x1 = x2;
-@@ -58,7 +58,7 @@ static inline unsigned long read_CRTR(void)
-  */
- static irqreturn_t at91rm9200_timer_interrupt(int irq, void *dev_id)
- {
--	u32	sr = at91_sys_read(AT91_ST_SR) & irqmask;
-+	u32	sr = at91_st_read(AT91_ST_SR) & irqmask;
- 
- 	/*
- 	 * irqs should be disabled here, but as the irq is shared they are only
-@@ -110,22 +110,22 @@ static void
- clkevt32k_mode(enum clock_event_mode mode, struct clock_event_device *dev)
- {
- 	/* Disable and flush pending timer interrupts */
--	at91_sys_write(AT91_ST_IDR, AT91_ST_PITS | AT91_ST_ALMS);
--	(void) at91_sys_read(AT91_ST_SR);
-+	at91_st_write(AT91_ST_IDR, AT91_ST_PITS | AT91_ST_ALMS);
-+	(void) at91_st_read(AT91_ST_SR);
- 
- 	last_crtr = read_CRTR();
- 	switch (mode) {
- 	case CLOCK_EVT_MODE_PERIODIC:
- 		/* PIT for periodic irqs; fixed rate of 1/HZ */
- 		irqmask = AT91_ST_PITS;
--		at91_sys_write(AT91_ST_PIMR, RM9200_TIMER_LATCH);
-+		at91_st_write(AT91_ST_PIMR, RM9200_TIMER_LATCH);
- 		break;
- 	case CLOCK_EVT_MODE_ONESHOT:
- 		/* ALM for oneshot irqs, set by next_event()
- 		 * before 32 seconds have passed
- 		 */
- 		irqmask = AT91_ST_ALMS;
--		at91_sys_write(AT91_ST_RTAR, last_crtr);
-+		at91_st_write(AT91_ST_RTAR, last_crtr);
- 		break;
- 	case CLOCK_EVT_MODE_SHUTDOWN:
- 	case CLOCK_EVT_MODE_UNUSED:
-@@ -133,7 +133,7 @@ clkevt32k_mode(enum clock_event_mode mode, struct clock_event_device *dev)
- 		irqmask = 0;
- 		break;
- 	}
--	at91_sys_write(AT91_ST_IER, irqmask);
-+	at91_st_write(AT91_ST_IER, irqmask);
- }
- 
- static int
-@@ -156,12 +156,12 @@ clkevt32k_next_event(unsigned long delta, struct clock_event_device *dev)
- 	alm = read_CRTR();
- 
- 	/* Cancel any pending alarm; flush any pending IRQ */
--	at91_sys_write(AT91_ST_RTAR, alm);
--	(void) at91_sys_read(AT91_ST_SR);
-+	at91_st_write(AT91_ST_RTAR, alm);
-+	(void) at91_st_read(AT91_ST_SR);
- 
- 	/* Schedule alarm by writing RTAR. */
- 	alm += delta;
--	at91_sys_write(AT91_ST_RTAR, alm);
-+	at91_st_write(AT91_ST_RTAR, alm);
- 
- 	return status;
- }
-@@ -175,15 +175,24 @@ static struct clock_event_device clkevt = {
- 	.set_mode	= clkevt32k_mode,
- };
- 
-+void __iomem *at91_st_base;
-+
-+void __init at91rm9200_ioremap_st(u32 addr)
-+{
-+	at91_st_base = ioremap(AT91RM9200_BASE_ST, 256);
-+	if (!at91_st_base)
-+		panic("Impossible to ioremap ST\n");
-+}
-+
- /*
-  * ST (system timer) module supports both clockevents and clocksource.
-  */
- void __init at91rm9200_timer_init(void)
- {
- 	/* Disable all timer interrupts, and clear any pending ones */
--	at91_sys_write(AT91_ST_IDR,
-+	at91_st_write(AT91_ST_IDR,
- 		AT91_ST_PITS | AT91_ST_WDOVF | AT91_ST_RTTINC | AT91_ST_ALMS);
--	(void) at91_sys_read(AT91_ST_SR);
-+	(void) at91_st_read(AT91_ST_SR);
- 
- 	/* Make IRQs happen for the system timer */
- 	setup_irq(AT91_ID_SYS, &at91rm9200_timer_irq);
-@@ -192,7 +201,7 @@ void __init at91rm9200_timer_init(void)
- 	 * directly for the clocksource and all clockevents, after adjusting
- 	 * its prescaler from the 1 Hz default.
- 	 */
--	at91_sys_write(AT91_ST_RTMR, 1);
-+	at91_st_write(AT91_ST_RTMR, 1);
- 
- 	/* Setup timer clockevent, with minimum of two ticks (important!!) */
- 	clkevt.mult = div_sc(AT91_SLOW_CLOCK, NSEC_PER_SEC, clkevt.shift);
-diff --git a/arch/arm/mach-at91/generic.h b/arch/arm/mach-at91/generic.h
-index 4030958..445c00d 100644
---- a/arch/arm/mach-at91/generic.h
-+++ b/arch/arm/mach-at91/generic.h
-@@ -28,6 +28,7 @@ extern void __init at91_aic_init(unsigned int priority[]);
- 
-  /* Timer */
- struct sys_timer;
-+extern void at91rm9200_ioremap_st(u32 addr);
- extern struct sys_timer at91rm9200_timer;
- extern void at91sam926x_ioremap_pit(u32 addr);
- extern struct sys_timer at91sam926x_timer;
-diff --git a/arch/arm/mach-at91/include/mach/at91_st.h b/arch/arm/mach-at91/include/mach/at91_st.h
-index 8847173..969aac2 100644
---- a/arch/arm/mach-at91/include/mach/at91_st.h
-+++ b/arch/arm/mach-at91/include/mach/at91_st.h
-@@ -16,34 +16,46 @@
- #ifndef AT91_ST_H
- #define AT91_ST_H
- 
--#define	AT91_ST_CR		(AT91_ST + 0x00)	/* Control Register */
-+#ifndef __ASSEMBLY__
-+extern void __iomem *at91_st_base;
-+
-+#define at91_st_read(field) \
-+	__raw_readl(at91_st_base + field)
-+
-+#define at91_st_write(field, value) \
-+	__raw_writel(value, at91_st_base + field);
-+#else
-+.extern at91_st_base
-+#endif
-+
-+#define	AT91_ST_CR		0x00			/* Control Register */
- #define 	AT91_ST_WDRST		(1 << 0)		/* Watchdog Timer Restart */
- 
--#define	AT91_ST_PIMR		(AT91_ST + 0x04)	/* Period Interval Mode Register */
-+#define	AT91_ST_PIMR		0x04			/* Period Interval Mode Register */
- #define		AT91_ST_PIV		(0xffff <<  0)		/* Period Interval Value */
- 
--#define	AT91_ST_WDMR		(AT91_ST + 0x08)	/* Watchdog Mode Register */
-+#define	AT91_ST_WDMR		0x08			/* Watchdog Mode Register */
- #define		AT91_ST_WDV		(0xffff <<  0)		/* Watchdog Counter Value */
- #define		AT91_ST_RSTEN		(1	<< 16)		/* Reset Enable */
- #define		AT91_ST_EXTEN		(1	<< 17)		/* External Signal Assertion Enable */
- 
--#define	AT91_ST_RTMR		(AT91_ST + 0x0c)	/* Real-time Mode Register */
-+#define	AT91_ST_RTMR		0x0c			/* Real-time Mode Register */
- #define		AT91_ST_RTPRES		(0xffff <<  0)		/* Real-time Prescalar Value */
- 
--#define	AT91_ST_SR		(AT91_ST + 0x10)	/* Status Register */
-+#define	AT91_ST_SR		0x10			/* Status Register */
- #define		AT91_ST_PITS		(1 << 0)		/* Period Interval Timer Status */
- #define		AT91_ST_WDOVF		(1 << 1) 		/* Watchdog Overflow */
- #define		AT91_ST_RTTINC		(1 << 2) 		/* Real-time Timer Increment */
- #define		AT91_ST_ALMS		(1 << 3) 		/* Alarm Status */
- 
--#define	AT91_ST_IER		(AT91_ST + 0x14)	/* Interrupt Enable Register */
--#define	AT91_ST_IDR		(AT91_ST + 0x18)	/* Interrupt Disable Register */
--#define	AT91_ST_IMR		(AT91_ST + 0x1c)	/* Interrupt Mask Register */
-+#define	AT91_ST_IER		0x14			/* Interrupt Enable Register */
-+#define	AT91_ST_IDR		0x18			/* Interrupt Disable Register */
-+#define	AT91_ST_IMR		0x1c			/* Interrupt Mask Register */
- 
--#define	AT91_ST_RTAR		(AT91_ST + 0x20)	/* Real-time Alarm Register */
-+#define	AT91_ST_RTAR		0x20			/* Real-time Alarm Register */
- #define		AT91_ST_ALMV		(0xfffff << 0)		/* Alarm Value */
- 
--#define	AT91_ST_CRTR		(AT91_ST + 0x24)	/* Current Real-time Register */
-+#define	AT91_ST_CRTR		0x24			/* Current Real-time Register */
- #define		AT91_ST_CRTV		(0xfffff << 0)		/* Current Real-Time Value */
- 
- #endif
-diff --git a/arch/arm/mach-at91/include/mach/at91rm9200.h b/arch/arm/mach-at91/include/mach/at91rm9200.h
-index bacb511..8583009 100644
---- a/arch/arm/mach-at91/include/mach/at91rm9200.h
-+++ b/arch/arm/mach-at91/include/mach/at91rm9200.h
-@@ -80,7 +80,6 @@
-  * System Peripherals (offset from AT91_BASE_SYS)
-  */
- #define AT91_PMC	(0xfffffc00 - AT91_BASE_SYS)	/* Power Management Controller */
--#define AT91_ST		(0xfffffd00 - AT91_BASE_SYS)	/* System Timer */
- #define AT91_MC		(0xffffff00 - AT91_BASE_SYS)	/* Memory Controllers */
- 
- #define AT91RM9200_BASE_DBGU	AT91_BASE_DBGU0	/* Debug Unit */
-@@ -88,6 +87,7 @@
- #define AT91RM9200_BASE_PIOB	0xfffff600	/* PIO Controller B */
- #define AT91RM9200_BASE_PIOC	0xfffff800	/* PIO Controller C */
- #define AT91RM9200_BASE_PIOD	0xfffffa00	/* PIO Controller D */
-+#define AT91RM9200_BASE_ST	0xfffffd00	/* System Timer */
- #define AT91RM9200_BASE_RTC	0xfffffe00	/* Real-Time Clock */
- 
- #define AT91_USART0	AT91RM9200_BASE_US0
-diff --git a/drivers/watchdog/at91rm9200_wdt.c b/drivers/watchdog/at91rm9200_wdt.c
-index b3046dc..7ceefd2 100644
---- a/drivers/watchdog/at91rm9200_wdt.c
-+++ b/drivers/watchdog/at91rm9200_wdt.c
-@@ -51,7 +51,7 @@ static unsigned long at91wdt_busy;
-  */
- static inline void at91_wdt_stop(void)
- {
--	at91_sys_write(AT91_ST_WDMR, AT91_ST_EXTEN);
-+	at91_st_write(AT91_ST_WDMR, AT91_ST_EXTEN);
- }
- 
- /*
-@@ -59,9 +59,9 @@ static inline void at91_wdt_stop(void)
-  */
- static inline void at91_wdt_start(void)
- {
--	at91_sys_write(AT91_ST_WDMR, AT91_ST_EXTEN | AT91_ST_RSTEN |
-+	at91_st_write(AT91_ST_WDMR, AT91_ST_EXTEN | AT91_ST_RSTEN |
- 				(((65536 * wdt_time) >> 8) & AT91_ST_WDV));
--	at91_sys_write(AT91_ST_CR, AT91_ST_WDRST);
-+	at91_st_write(AT91_ST_CR, AT91_ST_WDRST);
- }
- 
- /*
-@@ -69,7 +69,7 @@ static inline void at91_wdt_start(void)
-  */
- static inline void at91_wdt_reload(void)
- {
--	at91_sys_write(AT91_ST_CR, AT91_ST_WDRST);
-+	at91_st_write(AT91_ST_CR, AT91_ST_WDRST);
- }
- 
- /* ......................................................................... */
--- 
-1.7.7
+Ok, fine with me. Let's make sure we get everything else ready for 3.3
+then.
+
+> > I think you should be using the physmap_of
+> > driver instead of physmap, which will remove the need for the
+> > platform data.
+> 
+> There's one bit missing in the physmap_of. The "set_vpp" handle which is
+> used on VE:
+> 
+> static struct physmap_flash_data v2m_flash_data = {
+>         .width          = 4,
+>         .set_vpp        = v2m_flash_set_vpp,
+> };      
+> 
+> My plan is to extend the physmap_of driver so it could operate VPP via
+> gpio API and make the sysreg a gpio controller, having Flash VPP, CF &
+> MMC card detects and DVI output control (that's for CLCD) as internal
+> GPIO lines.
+> 
+> > For mmci, it should not be hard to do change the driver so it
+> > understands the device tree, too. The easiest implementation for
+> > that would be to add some code into mmci_probe and allocate
+> > an mmci_platform_data structure that gets filled with the required
+> > attributes.
+> 
+> I've started the implementation already, but it turned out much trickier
+> that I was hoping... One thing is the "status" handle (card detect line
+> "virtual gpio" I mentioned above), the second problem is the fact that
+> mmci platform data can take generic caps MMC_CAP_* from
+> include/linux/mmc/host.h (now even caps2 as well)... This issue was
+> already briefly mentioned here:
+> http://article.gmane.org/gmane.linux.kernel.samsung-soc/7639 and as
+> there was no generic resolution my plan is to reuse as much properties
+> from other MMC host controllers and forge the missing one (as a superset
+> of ARM's and STE's cell implementations). But as I said, it's unlikely
+> to happen this year...
+
+I see. Thanks for the explanation.
+
+	Arnd
