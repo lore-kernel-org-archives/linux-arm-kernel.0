@@ -1,43 +1,29 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Thu, 8 Dec 2011 10:08:19 -0800
-Subject: [PATCH v6 00/10] Add support for tegra30 and cardhu
-In-Reply-To: <1323348254-29072-1-git-send-email-pdeschrijver@nvidia.com>
-References: <1323348254-29072-1-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF1750B77A8A@HQMAIL01.nvidia.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 8 Dec 2011 18:08:28 +0000
+Subject: [GIT PULL v3] Linux support for ARM LPAE
+In-Reply-To: <20111208180536.GK14542@n2100.arm.linux.org.uk>
+References: <20111208110349.GA26970@arm.com>
+ <20111208180536.GK14542@n2100.arm.linux.org.uk>
+Message-ID: <20111208180828.GE27757@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Peter De Schrijver wrote at Thursday, December 08, 2011 5:44 AM:
-> This patchset adds support for the tegra30 SoC and the cardhu development
-> board.
+On Thu, Dec 08, 2011 at 06:05:36PM +0000, Russell King - ARM Linux wrote:
+> On Thu, Dec 08, 2011 at 11:03:49AM +0000, Catalin Marinas wrote:
+> > The series is rebased against Will's idmap series as merged in your
+> > devel-stable tree (I couldn't fetch devel-stable this morning). Please
+> > note that the branch was changed to 'for-rmk' (previously 'for-next').
+> > The nopud fixup was already reordered so that it comes before your
+> > patch.
 > 
-> Patchset is on top of linux-next and
-> http://www.spinics.net/lists/linux-tegra/msg03016.html.
+> Thank you.
+> 
+> Now pulled and merged - with the expected conflict in ioremap.c between
+> your commits and 576d2f25 resolved.
+> 
+> I'll push it out shortly, so it should land in linux-next this evening.
 
-The series,
-
-Acked-by: Stephen Warren <swarren@nvidia.com>
-Tested-by: Stephen Warren <swarren@nvidia.com>
-
-Tested:
-
-Two separate branches:
-
-* next-20111208, plus the patch linked above, plus this patch series.
-* My local dev branch based on next-20111206, plus all the patches I've
-  posted recently, plus this patch series.
-
-In each branch, tested the following builds:
-
-* Non-DT build, Tegra20 only:
-  - Booted Harmony, root on SD, tested audio.
-* DT build, Tegra20 only:
-  - Booted Harmony, root on SD, tested audio only in my dev branch.
-* DT build, Tegra20 and Tegra30 support:
-  - Booted Harmony, root on SD, tested audio only in my dev branch.
-  - Booted Cardhu to the point of attempting to mount a root FS.
-* DT build, Tegra30 support only:
-  - Booted Cardhu to the point of attempting to mount a root FS
+Great! Thanks.
 
 -- 
-nvpublic
+Catalin
