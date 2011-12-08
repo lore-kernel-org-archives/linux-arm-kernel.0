@@ -1,63 +1,95 @@
 From: junxiao.bi@windriver.com (Junxiao Bi)
-Date: Thu, 8 Dec 2011 18:07:51 +0800
-Subject: [PATCH 5/6] MTD: map: fix big endian support
+Date: Thu, 8 Dec 2011 18:07:48 +0800
+Subject: [PATCH 2/6] ARM: Atomic64: fix 64bit ops in BE mode
 In-Reply-To: <1323338872-24716-1-git-send-email-junxiao.bi@windriver.com>
 References: <1323338872-24716-1-git-send-email-junxiao.bi@windriver.com>
-Message-ID: <1323338872-24716-6-git-send-email-junxiao.bi@windriver.com>
+Message-ID: <1323338872-24716-3-git-send-email-junxiao.bi@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use read*/write*_relaxed to replace __raw_read*/__raw_write*
-to make it work in both endians.
+The add/sub ops to 64 bits double word are made by adds/subs to the least
+significant 32 bits first and then adc/sbc to the most significant 32 bits.
+Using %0 and %H0 can only work in LE mode. If we change them to %Q0 and %R0,
+it will work in both endian modes since %Q0 always represents the least
+significant 32 bits and %R0 represents the most.
 
-Cc: David Woodhouse <dwmw2@infradead.org>
-Cc: linux-mtd at lists.infradead.org
+Acked-by: Nicolas Pitre <nico@linaro.org>
 Signed-off-by: Junxiao Bi <junxiao.bi@windriver.com>
 ---
- include/linux/mtd/map.h |   16 ++++++++--------
- 1 files changed, 8 insertions(+), 8 deletions(-)
+ arch/arm/include/asm/atomic.h |   26 +++++++++++++-------------
+ 1 files changed, 13 insertions(+), 13 deletions(-)
 
-diff --git a/include/linux/mtd/map.h b/include/linux/mtd/map.h
-index a9e6ba4..74b266d 100644
---- a/include/linux/mtd/map.h
-+++ b/include/linux/mtd/map.h
-@@ -393,14 +393,14 @@ static inline map_word inline_map_read(struct map_info *map, unsigned long ofs)
- 	map_word r;
+diff --git a/arch/arm/include/asm/atomic.h b/arch/arm/include/asm/atomic.h
+index 86976d0..00fcc4f 100644
+--- a/arch/arm/include/asm/atomic.h
++++ b/arch/arm/include/asm/atomic.h
+@@ -275,8 +275,8 @@ static inline void atomic64_add(u64 i, atomic64_t *v)
  
- 	if (map_bankwidth_is_1(map))
--		r.x[0] = __raw_readb(map->virt + ofs);
-+		r.x[0] = readb_relaxed(map->virt + ofs);
- 	else if (map_bankwidth_is_2(map))
--		r.x[0] = __raw_readw(map->virt + ofs);
-+		r.x[0] = readw_relaxed(map->virt + ofs);
- 	else if (map_bankwidth_is_4(map))
--		r.x[0] = __raw_readl(map->virt + ofs);
-+		r.x[0] = readl_relaxed(map->virt + ofs);
- #if BITS_PER_LONG >= 64
- 	else if (map_bankwidth_is_8(map))
--		r.x[0] = __raw_readq(map->virt + ofs);
-+		r.x[0] = readq_relaxed(map->virt + ofs);
- #endif
- 	else if (map_bankwidth_is_large(map))
- 		memcpy_fromio(r.x, map->virt+ofs, map->bankwidth);
-@@ -413,14 +413,14 @@ static inline map_word inline_map_read(struct map_info *map, unsigned long ofs)
- static inline void inline_map_write(struct map_info *map, const map_word datum, unsigned long ofs)
- {
- 	if (map_bankwidth_is_1(map))
--		__raw_writeb(datum.x[0], map->virt + ofs);
-+		writeb_relaxed(datum.x[0], map->virt + ofs);
- 	else if (map_bankwidth_is_2(map))
--		__raw_writew(datum.x[0], map->virt + ofs);
-+		writew_relaxed(datum.x[0], map->virt + ofs);
- 	else if (map_bankwidth_is_4(map))
--		__raw_writel(datum.x[0], map->virt + ofs);
-+		writel_relaxed(datum.x[0], map->virt + ofs);
- #if BITS_PER_LONG >= 64
- 	else if (map_bankwidth_is_8(map))
--		__raw_writeq(datum.x[0], map->virt + ofs);
-+		writeq_relaxed(datum.x[0], map->virt + ofs);
- #endif
- 	else if (map_bankwidth_is_large(map))
- 		memcpy_toio(map->virt+ofs, datum.x, map->bankwidth);
+ 	__asm__ __volatile__("@ atomic64_add\n"
+ "1:	ldrexd	%0, %H0, [%3]\n"
+-"	adds	%0, %0, %4\n"
+-"	adc	%H0, %H0, %H4\n"
++"	adds	%Q0, %Q0, %Q4\n"
++"	adc	%R0, %R0, %R4\n"
+ "	strexd	%1, %0, %H0, [%3]\n"
+ "	teq	%1, #0\n"
+ "	bne	1b"
+@@ -294,8 +294,8 @@ static inline u64 atomic64_add_return(u64 i, atomic64_t *v)
+ 
+ 	__asm__ __volatile__("@ atomic64_add_return\n"
+ "1:	ldrexd	%0, %H0, [%3]\n"
+-"	adds	%0, %0, %4\n"
+-"	adc	%H0, %H0, %H4\n"
++"	adds	%Q0, %Q0, %Q4\n"
++"	adc	%R0, %R0, %R4\n"
+ "	strexd	%1, %0, %H0, [%3]\n"
+ "	teq	%1, #0\n"
+ "	bne	1b"
+@@ -315,8 +315,8 @@ static inline void atomic64_sub(u64 i, atomic64_t *v)
+ 
+ 	__asm__ __volatile__("@ atomic64_sub\n"
+ "1:	ldrexd	%0, %H0, [%3]\n"
+-"	subs	%0, %0, %4\n"
+-"	sbc	%H0, %H0, %H4\n"
++"	subs	%Q0, %Q0, %Q4\n"
++"	sbc	%R0, %R0, %R4\n"
+ "	strexd	%1, %0, %H0, [%3]\n"
+ "	teq	%1, #0\n"
+ "	bne	1b"
+@@ -334,8 +334,8 @@ static inline u64 atomic64_sub_return(u64 i, atomic64_t *v)
+ 
+ 	__asm__ __volatile__("@ atomic64_sub_return\n"
+ "1:	ldrexd	%0, %H0, [%3]\n"
+-"	subs	%0, %0, %4\n"
+-"	sbc	%H0, %H0, %H4\n"
++"	subs	%Q0, %Q0, %Q4\n"
++"	sbc	%R0, %R0, %R4\n"
+ "	strexd	%1, %0, %H0, [%3]\n"
+ "	teq	%1, #0\n"
+ "	bne	1b"
+@@ -402,9 +402,9 @@ static inline u64 atomic64_dec_if_positive(atomic64_t *v)
+ 
+ 	__asm__ __volatile__("@ atomic64_dec_if_positive\n"
+ "1:	ldrexd	%0, %H0, [%3]\n"
+-"	subs	%0, %0, #1\n"
+-"	sbc	%H0, %H0, #0\n"
+-"	teq	%H0, #0\n"
++"	subs	%Q0, %Q0, #1\n"
++"	sbc	%R0, %R0, #0\n"
++"	teq	%R0, #0\n"
+ "	bmi	2f\n"
+ "	strexd	%1, %0, %H0, [%3]\n"
+ "	teq	%1, #0\n"
+@@ -433,8 +433,8 @@ static inline int atomic64_add_unless(atomic64_t *v, u64 a, u64 u)
+ "	teqeq	%H0, %H5\n"
+ "	moveq	%1, #0\n"
+ "	beq	2f\n"
+-"	adds	%0, %0, %6\n"
+-"	adc	%H0, %H0, %H6\n"
++"	adds	%Q0, %Q0, %Q6\n"
++"	adc	%R0, %R0, %R6\n"
+ "	strexd	%2, %0, %H0, [%4]\n"
+ "	teq	%2, #0\n"
+ "	bne	1b\n"
 -- 
 1.7.0.4
