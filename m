@@ -1,29 +1,67 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 8 Dec 2011 10:33:10 +0100
-Subject: [PATCH V2 2/2] ARM: mx51/53: add round_rate for esdhc clocks
-In-Reply-To: <1323307714-21290-3-git-send-email-richard.zhao@linaro.org>
-References: <1323307714-21290-1-git-send-email-richard.zhao@linaro.org>
- <1323307714-21290-3-git-send-email-richard.zhao@linaro.org>
-Message-ID: <20111208093310.GT27267@pengutronix.de>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 08 Dec 2011 10:37:45 +0100
+Subject: [PATCH v2] irqdomain: protect macro variable in domain iterators
+In-Reply-To: <20111202134458.GD2892@localhost.localdomain>
+References: <1322833997-32083-1-git-send-email-nicolas.ferre@atmel.com>
+ <1322832609-24956-1-git-send-email-nicolas.ferre@atmel.com>
+ <20111202134458.GD2892@localhost.localdomain>
+Message-ID: <4EE08569.3070009@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Richard,
+On 12/02/2011 02:44 PM, Dave Martin :
+> On Fri, Dec 02, 2011 at 02:30:09PM +0100, Nicolas Ferre wrote:
+>> Signed-off-by: Nicolas Ferre<nicolas.ferre@atmel.com>
+>
+> Looks OK to me:
+>
+> Acked-by: Dave Martin<dave.martin@linaro.org>
 
-On Thu, Dec 08, 2011 at 09:28:34AM +0800, Richard Zhao wrote:
-> Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
-> ---
->  arch/arm/mach-imx/clock-mx51-mx53.c |   42 ++++++++++++++++++++--------------
->  1 files changed, 25 insertions(+), 17 deletions(-)
-> 
+Rob,
 
-Is it worth it to queue this one given that you are working on generic
-clock support for i.MX5?
+Do you want a different implementation for this. I think it is the 
+simplest way to write this macro...
 
-Sascha
+If it is ok for you, it will be interesting to include this patch 
+quickly so that I will be able to queue my own patches on top of it.
+(Cc: stable can be a good idea also).
+
+Best regards,
+
+>> ---
+>> v2: add brackets to each macro variable.
+>>
+>>   include/linux/irqdomain.h |   10 ++++++----
+>>   1 files changed, 6 insertions(+), 4 deletions(-)
+>>
+>> diff --git a/include/linux/irqdomain.h b/include/linux/irqdomain.h
+>> index bd4272b..e535063 100644
+>> --- a/include/linux/irqdomain.h
+>> +++ b/include/linux/irqdomain.h
+>> @@ -82,12 +82,14 @@ static inline unsigned int irq_domain_to_irq(struct irq_domain *d,
+>>   }
+>>
+>>   #define irq_domain_for_each_hwirq(d, hw) \
+>> -	for (hw = d->hwirq_base; hw<  d->hwirq_base + d->nr_irq; hw++)
+>> +	for ((hw) = (d)->hwirq_base; \
+>> +	     (hw)<  (d)->hwirq_base + (d)->nr_irq; \
+>> +	     (hw)++)
+>>
+>>   #define irq_domain_for_each_irq(d, hw, irq) \
+>> -	for (hw = d->hwirq_base, irq = irq_domain_to_irq(d, hw); \
+>> -	     hw<  d->hwirq_base + d->nr_irq; \
+>> -	     hw++, irq = irq_domain_to_irq(d, hw))
+>> +	for ((hw) = (d)->hwirq_base, (irq) = irq_domain_to_irq((d), (hw)); \
+>> +	     (hw)<  (d)->hwirq_base + (d)->nr_irq; \
+>> +	     (hw)++, (irq) = irq_domain_to_irq((d), (hw)))
+>>
+>>   extern void irq_domain_add(struct irq_domain *domain);
+>>   extern void irq_domain_del(struct irq_domain *domain);
+>> --
+>> 1.7.5.4
+>>
+>
+
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Nicolas Ferre
