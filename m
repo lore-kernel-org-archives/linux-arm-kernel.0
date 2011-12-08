@@ -1,22 +1,41 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 8 Dec 2011 00:43:32 +0100
-Subject: [PATCH V2 0/1] dmaengine/amba-pl08x: Add support for s3c64xx DMAC
-In-Reply-To: <1317189007-23033-1-git-send-email-alim.akhtar@samsung.com>
-References: <1317189007-23033-1-git-send-email-alim.akhtar@samsung.com>
-Message-ID: <CACRpkdZC8LOOLkWbrPbXN_nKaw-WvueusYDyrX48Q1Pcdwv3Aw@mail.gmail.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Wed, 07 Dec 2011 19:00:59 -0500 (EST)
+Subject: [GIT PULL] Identity mapping changes for 3.3
+In-Reply-To: <20111207221610.GF14542@n2100.arm.linux.org.uk>
+References: <20111202160833.GK5540@mudshark.cambridge.arm.com>
+ <20111205232342.GG14542@n2100.arm.linux.org.uk>
+ <20111206101438.GB25782@mudshark.cambridge.arm.com>
+ <20111206103843.GM14542@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.02.1112062321070.2907@xanadu.home>
+ <20111207194826.GB14542@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.02.1112071454100.2907@xanadu.home>
+ <20111207221610.GF14542@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.02.1112071844590.2907@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 28, 2011 at 7:50 AM, Alim Akhtar <alim.akhtar@samsung.com> wrote:
+On Wed, 7 Dec 2011, Russell King - ARM Linux wrote:
 
-> This patch modifies the amba-pl08x driver for s3c64xx.
-> The DMA controller of S3C64XX is a variant of PrimeCell pl080 DMAC.
-> S3C64xx contents extra register to hold the TransferSize.
+> On Wed, Dec 07, 2011 at 03:38:31PM -0500, Nicolas Pitre wrote:
+> > Most likely, yes.  The disk throughput shouldn't be such a problem, but 
+> > the lack of RAM certainly is.  And 2g of RAM to deal with a repository 
+> > the size of the Linux kernel is making it tight.
+> 
+> So how much RAM is now required - and will be required in the future -
+> for running git?  Given that my laptop also has 2G of RAM, it seems
+> from what you're saying that's also a problem there - or will be soon.
 
-Alim what is happening with this patch series?
+Well, this depends on what operation you typically use Git for of 
+course.  Normally, checkout, commit, log, merge, etc. are operations 
+that don't need to walk the entire repository data and are less affected 
+by the repository growth than the size of the checked-out tree.
 
-I was really happy with the rate of progress we had and Viresh & I
-have given most feedback needed to complete this I think.
+The other class of operations such as fsck, repack, gc, clone, 
+push/pull/fetch are likely to see their memory footprint grow with the 
+size of the repository.
 
-Yours,
-Linus Walleij
+Fortunately the size of the Linux Git repository tends to grow slower 
+than Moore's law.
+
+
+Nicolas
