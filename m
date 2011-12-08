@@ -1,33 +1,40 @@
-From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Thu, 8 Dec 2011 23:22:07 +0100
-Subject: [PATCH 3/3] ARM: S3C64XX: Implement basic power domain support
-In-Reply-To: <201112082315.18197.rjw@sisk.pl>
-References: <1322765339-29879-1-git-send-email-broonie@opensource.wolfsonmicro.com>
- <20111208010924.GC5748@opensource.wolfsonmicro.com>
- <201112082315.18197.rjw@sisk.pl>
-Message-ID: <201112082322.07970.rjw@sisk.pl>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Thu, 8 Dec 2011 14:24:46 -0800
+Subject: [PATCH] Documentation/pinctrl: various minor fixes
+In-Reply-To: <1323382892-28298-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1323382892-28298-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF1750B77B9F@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, December 08, 2011, Rafael J. Wysocki wrote:
-> On Thursday, December 08, 2011, Mark Brown wrote:
-> > On Wed, Dec 07, 2011 at 10:44:02PM +0100, Rafael J. Wysocki wrote:
-> > > On Friday, December 02, 2011, Mark Brown wrote:
-> > 
-> > > > May as well, yes - I didn't actually measure how long it tends to take
-> > > > to do the spin but it's not going to hurt.
-> > 
-> > > Are you going to post an updated patch?
-> > 
-> > I've resent it but my development laptop is currently not internet
-> > connected so I'm not sure when it'll actually go out.
-> 
-> Hmm.  I can't find it in my e-mail archives.
-> 
-> Do you have any pointer to a web archive somewhere, where I can get the patch
-> from?
+Uwe Kleine-K?nig wrote at Thursday, December 08, 2011 3:22 PM:
+> - add some consts
+> - don't use the group index alone to determine the value to write to
+>   foo's mux register. For spi and i2c the group index is always 0.
+>   Additionally using the function index makes much more sense as it
+>   generates a different value for each function/group pair.
+> - fix a few syntax errors
 
-Ah, I've just received it.
+> @@ -600,7 +600,7 @@ static int foo_get_groups(struct pinctrl_dev *pctldev, unsigned selector,
+>  int foo_enable(struct pinctrl_dev *pctldev, unsigned selector,
+>  		unsigned group)
+>  {
+> -	u8 regbit = (1 << group);
+> +	u8 regbit = (1 << selector + group);
+> 
+>  	writeb((readb(MUX)|regbit), MUX)
+>  	return 0;
+> @@ -609,7 +609,7 @@ int foo_enable(struct pinctrl_dev *pctldev, unsigned selector,
+>  int foo_disable(struct pinctrl_dev *pctldev, unsigned selector,
+>  		unsigned group)
+>  {
+> -	u8 regbit = (1 << group);
+> +	u8 regbit = (1 << selector);
+> 
+>  	writeb((readb(MUX) & ~(regbit)), MUX)
+>  	return 0;
 
-Thanks,
-Rafael
+Shouldn't those two regbit calculations match?
+
+-- 
+nvpublic
