@@ -1,77 +1,60 @@
-From: nsekhar@ti.com (Nori, Sekhar)
-Date: Thu, 8 Dec 2011 08:19:12 +0000
-Subject: [PATCH] arm,davinci: configure davinci aemif chipselects
- through OF
-In-Reply-To: <4EE06B79.7070804@denx.de>
-References: <1322991679-20947-1-git-send-email-hs@denx.de>
- <DF0F476B391FA8409C78302C7BA518B603EFB2@DBDE01.ent.ti.com>
- <4EE06B79.7070804@denx.de>
-Message-ID: <DF0F476B391FA8409C78302C7BA518B6040A03@DBDE01.ent.ti.com>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Thu,  8 Dec 2011 11:19:03 +0300
+Subject: [RESEND PATCH v3] pxa2xx_spi: fix memory corruption
+In-Reply-To: <20111207203559.GB3744@pengutronix.de>
+References: <20111207203559.GB3744@pengutronix.de>
+Message-ID: <1323332343-2266-1-git-send-email-anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 08, 2011 at 13:17:05, Heiko Schocher wrote:
+pxa2xx_spi_probe allocates struct driver_data and null_dma_buf
+at same time via spi_alloc_master(), but then calculates
+null_dma_buf pointer incorrectly, and it causes memory corruption
+later if DMA usage is enabled.
 
-> >> diff --git a/Documentation/devicetree/bindings/arm/davinci/aemif.txt b/Documentation/devicetree/bindings/arm/davinci/aemif.txt
-> >> new file mode 100644
-> >> index 0000000..c9ed551
-> >> --- /dev/null
-> >> +++ b/Documentation/devicetree/bindings/arm/davinci/aemif.txt
-> >> @@ -0,0 +1,85 @@
-> >> +* Texas Instruments Davinci AEMIF
-> >> +
-> >> +This file provides information, what the device node for the
-> >> +davinci aemifa interface contain.
-> >            ^^^^^^
-> >            aemif
-> 
-> fixed, thanks.
-> 
-> >> +
-> >> +Required properties:
-> >> +- compatible: "ti,davinci-emifa";
-> 
-> Shouldn't this also be "ti,davinci-aemif" ?
+Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+---
+v2: - add u8 __null_dma_buf[16] to the end of driver_data structure
+    and use it as null_dma_buf after alignment.
+    - use PTR_ALIGN instead of ALIGN
+v3: - drop (u8 *) cast, use & operator instead, change array name
 
-Yes, makes sense.
+ drivers/spi/spi-pxa2xx.c |    9 +++++----
+ 1 files changed, 5 insertions(+), 4 deletions(-)
 
-> 
-> [...]
-> >> diff --git a/arch/arm/mach-davinci/aemif.c b/arch/arm/mach-davinci/aemif.c
-> >> index 1ce70a9..12c559f 100644
-> >> --- a/arch/arm/mach-davinci/aemif.c
-> >> +++ b/arch/arm/mach-davinci/aemif.c
-> >> @@ -13,12 +13,14 @@
-> >>  #include <linux/err.h>
-> >>  #include <linux/clk.h>
-> >>  #include <linux/module.h>
-> >> +#include <linux/of.h>
-> >> +#include <linux/of_address.h>
-> >>  #include <linux/time.h>
-> >>  
-> >>  #include <mach/aemif.h>
-> >>  
-> >>  /* Timing value configuration */
-> >> -
-> >> +#define ASIZE(x)	(x)
-> >>  #define TA(x)		((x) << 2)
-> >>  #define RHOLD(x)	((x) << 4)
-> >>  #define RSTROBE(x)	((x) << 7)
-> >> @@ -26,7 +28,10 @@
-> >>  #define WHOLD(x)	((x) << 17)
-> >>  #define WSTROBE(x)	((x) << 20)
-> >>  #define WSETUP(x)	((x) << 26)
-> >> +#define EW(x)		((x) << 30)
-> >> +#define SS(x)		((x) << 31)
-> > 
-> > You are adding support for additional configuration
-> > parameters which should be done in a separate patch.
-> 
-> Hmm.. they are only used in the OF case ... is this split
-> really needed?
-
-But they should also be useful in the non-OF case, no?
-Why restrict their usage to the OF case?
-
-Thanks,
-Sekhar
+diff --git a/drivers/spi/spi-pxa2xx.c b/drivers/spi/spi-pxa2xx.c
+index dc25bee..b25fe27 100644
+--- a/drivers/spi/spi-pxa2xx.c
++++ b/drivers/spi/spi-pxa2xx.c
+@@ -106,6 +106,7 @@ struct driver_data {
+ 	int rx_channel;
+ 	int tx_channel;
+ 	u32 *null_dma_buf;
++	u8 null_dma_buf_unaligned[16];
+ 
+ 	/* SSP register addresses */
+ 	void __iomem *ioaddr;
+@@ -1543,8 +1544,8 @@ static int __devinit pxa2xx_spi_probe(struct platform_device *pdev)
+ 		return -ENODEV;
+ 	}
+ 
+-	/* Allocate master with space for drv_data and null dma buffer */
+-	master = spi_alloc_master(dev, sizeof(struct driver_data) + 16);
++	/* Allocate master with space for drv_data */
++	master = spi_alloc_master(dev, sizeof(struct driver_data));
+ 	if (!master) {
+ 		dev_err(&pdev->dev, "cannot alloc spi_master\n");
+ 		pxa_ssp_free(ssp);
+@@ -1569,8 +1570,8 @@ static int __devinit pxa2xx_spi_probe(struct platform_device *pdev)
+ 	master->transfer = transfer;
+ 
+ 	drv_data->ssp_type = ssp->type;
+-	drv_data->null_dma_buf = (u32 *)ALIGN((u32)(drv_data +
+-						sizeof(struct driver_data)), 8);
++	drv_data->null_dma_buf =
++		(u32 *)PTR_ALIGN(&drv_data->null_dma_buf_unaligned, 8);
+ 
+ 	drv_data->ioaddr = ssp->mmio_base;
+ 	drv_data->ssdr_physical = ssp->phys_base + SSDR;
+-- 
+1.7.8
