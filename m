@@ -1,69 +1,117 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Thu, 8 Dec 2011 15:59:50 +0100
-Subject: [PATCH 2/4] ARM: OMAP2/3: intc: Add DT support for TI interrupt
- controller
-In-Reply-To: <4EDFD88B.8060008@gmail.com>
-References: <1323291049-24964-1-git-send-email-b-cousson@ti.com>
- <1323291049-24964-3-git-send-email-b-cousson@ti.com>
- <4EDFD88B.8060008@gmail.com>
-Message-ID: <4EE0D0E6.3060202@ti.com>
+From: rpurdie@rpsys.net (Richard Purdie)
+Date: Thu, 08 Dec 2011 15:02:50 +0000
+Subject: [PATCH] leds: kill CONFIG_LEDS_CLASS option
+In-Reply-To: <CAK5ve-LcUabPS2EGAPD7q3-_thS4XhmGyhafmRkOCUAAriaXSw@mail.gmail.com>
+References: <1314647628-21707-1-git-send-email-bryan.wu@canonical.com>
+ <alpine.LFD.2.00.1108291630020.20358@xanadu.home>
+ <1314653699.5939.299.camel@rex>
+ <CAK5ve-+J3hzVB=_b0AOJ-Q1LYewahVraMti=y=6AaQy3+iy+rg@mail.gmail.com>
+ <1314791341.5939.464.camel@rex>
+ <CAK5ve-LcUabPS2EGAPD7q3-_thS4XhmGyhafmRkOCUAAriaXSw@mail.gmail.com>
+Message-ID: <1323356570.5309.25.camel@ted>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/7/2011 10:20 PM, Rob Herring wrote:
-> On 12/07/2011 02:50 PM, Benoit Cousson wrote:
+On Thu, 2011-12-08 at 19:53 +0800, Bryan Wu wrote:
+> On Wed, Aug 31, 2011 at 7:49 PM, Richard Purdie <rpurdie@rpsys.net> wrote:
+> > On Wed, 2011-08-31 at 10:45 +0800, Bryan Wu wrote:
+> >> On Tue, Aug 30, 2011 at 5:34 AM, Richard Purdie <rpurdie@rpsys.net> wrote:
+> >> > On Mon, 2011-08-29 at 16:34 -0400, Nicolas Pitre wrote:
+> >> >> On Tue, 30 Aug 2011, Bryan Wu wrote:
+> >> >>
+> >> >> > Almost all the new leds driver and trigger driver are depends on
+> >> >> > CONFIG_LED_CLASS, so there is no such user with CONFIG_NEW_LEDS=y
+> >> >> > and CONFIG_LED_CLASS=n. Moreover, lots of API functions in led-class.c
+> >> >> > are very common and should be built-in when CONFIG_NEW_LEDS=y.
+> >> >> >
+> >> >> > Obviously, CONFIG_LEDS_CLASS is pointless. This patch kills it and
+> >> >> > also updates defconfigs which contains CONFIG_LEDS_CLASS.
+> >> >> >
+> >> >> > Signed-off-by: Bryan Wu <bryan.wu@canonical.com>
+> >> >> > ---
+> >> >
+> >> > Looking at the code I'm a little concerned to see the direction this is
+> >> > going. There was originally a reason that there were two options, it was
+> >> > related to being able to compile as much of the LED code as a module as
+> >> > possible.
+> >> >
+> >>
+> >> I quite understand the original reason for 2 options, but I failed to
+> >> see any user of CONFIG_NEW_LEDS=y and CONFIG_LEDS_CLASS=n.
+> >
+> > Right, the intent was to support CONFIG_NEW_LEDS=y and
+> > CONFIG_LEDS_CLASS=m and I believe that still should be possible.
+> >
+> >> > It looks like commit 5ada28bf76752e33dce3d807bf0dfbe6d1b943ad changed
+> >> > the tristate to a bool at which point the separate option obviously
+> >> > becomes pointless.
+> >>
+> >> Exactly, this patch added some function API which are used very widely
+> >> as default LEDS driver behavior in some drivers.
+> >
+> > Looking at that commit, its adds the code to leds-class.c and shouldn't
+> > have needed to change the tristate to a bool. I know we discussed that
+> > at the time and I think that part might have been unnecessary and just
+> > accidentally committed. It could well be we can just revert that piece
+> > of the patch.
+> >
+> 
+> Richard,
+> 
+> Sorry for bringing up this topic so late. I was occupied by other
+> stuff for a while.
+> 
+> I'm trying to make leds-class.c as a module, but found APIs exported
+> from led-class.c are widely used in kernel.
+> 
+> For example: led_classdev_register()
+> --
+> linux-2.6$ grep -r led_classdev_register .
+> ./include/linux/leds.h:extern int led_classdev_register(struct device *parent,
+> ./drivers/mmc/host/au1xmmc.c:		ret = led_classdev_register(mmc_dev(mmc), led);
 
-[...]
+If there are users of the LED API compiled in, then the config code
+should be handling this so the led class code is compiled in too.
 
->> +#ifdef CONFIG_OF
->> +int __init intc_of_init(struct device_node *node, struct device_node *parent)
->> +{
->> +	struct resource res;
->> +	u32 nr_irqs;
->> +
->> +	if (WARN_ON(!node))
->> +		return -ENODEV;
->> +
->> +	if (of_address_to_resource(node, 0,&res)) {
->> +		WARN(1, "unable to get intc registers\n");
->> +		return -EINVAL;
->> +	}
->> +
->> +	if (of_property_read_u32(node, "ti,intc-size",&nr_irqs)) {
->> +		WARN(1, "unable to get intc-size\n");
->> +		return -EINVAL;
->
-> There is no default value that makes sense?
+That shouldn't make it impossible to have the class code as a module, if
+the users are also modules.
 
-So far we have 96 or 128, so I can put 96 as a default and just keep the 
-warning without returning an error.
+> When CONFIG_NEW_LEDS=y, CONFIG_LEDS_CLASS=m and CONFIG_LEDS_TRIGGER=y,
+> I got following error for building omap2plus_defconfig
+> --
+> arch/arm/plat-omap/built-in.o: In function `newled_init':
+> /opt/git/linux-2.6/arch/arm/plat-omap/debug-leds.c:248: undefined
+> reference to `led_classdev_register'
 
->> +	}
->> +
->> +	omap_init_irq(res.start, nr_irqs);
->> +	irq_domain_add_simple(node, 0);
->
-> Have you read the NO_IRQ thread...
+So this is a dependency issues as far as I can see,
 
-Yeah, I tried, but that's a long email thread with some unclear 
-conclusion...
-The point is that the few users of that API today are using 0 as a base 
-as well, so I thought it was still valid.
+> drivers/built-in.o: In function `led_trigger_blink':
+> /opt/git/linux-2.6/drivers/leds/led-triggers.c:248: undefined
+> reference to `led_blink_set'
+> drivers/built-in.o: In function `led_trigger_set':
+> /opt/git/linux-2.6/drivers/leds/led-triggers.c:116: undefined
+> reference to `led_brightness_set'
 
-> Is 0 ever a valid interrupt for a driver? If so, you must not use 0 for
-> the base. I would pick 16 to skip over legacy ISA irqs.
+but I agree these are more problematic.
 
-I do not have any 0 interrupts right now, my concern is that I still 
-have some legacy non-DT drivers that expect the previous hwirq = irq 
-mapping.
+> The commit 5ada28bf76752e33dce3d807bf0dfbe6d1b943ad "led-class: always
+> implement blinking" added 2 API (led_blink_set and
+> `led_brightness_set'), which are used by led-trigger.c
+> 
+> For this kind of errors, I think it's quite hard to set led-class.c as
+> a module now and suggest we merge NEW_LEDS and LEDS_CLASS together.
 
-> irqdomains should always be enabled regardless of CONFIG_OF. So either
-> you can leave it as is if OF is always enabled for OMAP, or you should
-> move domain setup into omap_init_irq.
+I still don't believe this is necessary. 
 
-OK, but it looks like I cannot really modify the current INTC to DT 
-without having fully adapted the OMAP drivers to use 
-irq_of_parse_and_map. Or did I miss something?
+How about moving led_timer_function(), led_set_software_blink()
+led_blink_set() and to led-triggers.c, putting #ifdef
+CONFIG_LEDS_TRIGGERS around the appropriate pieces of leds-class.c. We'd
+then move led_brightness_set() and led_stop_software_blink() to
+led-core.c since those are the real problem.
 
-Regards,
-Benoit
+It means there is a slightly higher always loaded footprint but its
+better than giving up and making it all always loaded.
+
+Cheers,
+
+Richard
