@@ -1,58 +1,46 @@
 From: manjunath.hadli@ti.com (Manjunath Hadli)
-Date: Thu, 8 Dec 2011 19:25:25 +0530
-Subject: [PATCH v4 2/5] ARM: davinci: dm644x: remove the macros from the
- header to move to c file
+Date: Thu, 8 Dec 2011 19:25:24 +0530
+Subject: [PATCH v4 1/5] davinci: vpif: remove obsolete header file inclusion
 In-Reply-To: <1323352528-1207-1-git-send-email-manjunath.hadli@ti.com>
 References: <1323352528-1207-1-git-send-email-manjunath.hadli@ti.com>
-Message-ID: <1323352528-1207-3-git-send-email-manjunath.hadli@ti.com>
+Message-ID: <1323352528-1207-2-git-send-email-manjunath.hadli@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-move the register base addresses and offsets used only by dm644x
-platform file from platform header dm644x.h to dm644x.c as they
-are used only in the c file.
+remove inclusion of header files from vpif.h and vpif_dispaly.c
+and add appropriate header file for building.
 
 Signed-off-by: Manjunath Hadli <manjunath.hadli@ti.com>
 ---
- arch/arm/mach-davinci/dm644x.c              |    7 +++++++
- arch/arm/mach-davinci/include/mach/dm644x.h |    7 -------
- 2 files changed, 7 insertions(+), 7 deletions(-)
+ drivers/media/video/davinci/vpif.h         |    2 +-
+ drivers/media/video/davinci/vpif_display.c |    2 --
+ 2 files changed, 1 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/dm644x.c b/arch/arm/mach-davinci/dm644x.c
-index 3470983..27d1371 100644
---- a/arch/arm/mach-davinci/dm644x.c
-+++ b/arch/arm/mach-davinci/dm644x.c
-@@ -35,6 +35,13 @@
-  */
- #define DM644X_REF_FREQ		27000000
+diff --git a/drivers/media/video/davinci/vpif.h b/drivers/media/video/davinci/vpif.h
+index 25036cb..c96268a 100644
+--- a/drivers/media/video/davinci/vpif.h
++++ b/drivers/media/video/davinci/vpif.h
+@@ -19,7 +19,7 @@
+ #include <linux/io.h>
+ #include <linux/videodev2.h>
+ #include <mach/hardware.h>
+-#include <mach/dm646x.h>
++#include <linux/i2c.h>
+ #include <media/davinci/vpif_types.h>
  
-+#define DM644X_EMAC_BASE		0x01c80000
-+#define DM644X_EMAC_MDIO_BASE		(DM644X_EMAC_BASE + 0x4000)
-+#define DM644X_EMAC_CNTRL_OFFSET	0x0000
-+#define DM644X_EMAC_CNTRL_MOD_OFFSET	0x1000
-+#define DM644X_EMAC_CNTRL_RAM_OFFSET	0x2000
-+#define DM644X_EMAC_CNTRL_RAM_SIZE	0x2000
-+
- static struct pll_data pll1_data = {
- 	.num       = 1,
- 	.phys_base = DAVINCI_PLL1_BASE,
-diff --git a/arch/arm/mach-davinci/include/mach/dm644x.h b/arch/arm/mach-davinci/include/mach/dm644x.h
-index 5a1b26d..724377f 100644
---- a/arch/arm/mach-davinci/include/mach/dm644x.h
-+++ b/arch/arm/mach-davinci/include/mach/dm644x.h
-@@ -27,13 +27,6 @@
- #include <mach/asp.h>
- #include <media/davinci/vpfe_capture.h>
+ /* Maximum channel allowed */
+diff --git a/drivers/media/video/davinci/vpif_display.c b/drivers/media/video/davinci/vpif_display.c
+index 286f029..7fa34b4 100644
+--- a/drivers/media/video/davinci/vpif_display.c
++++ b/drivers/media/video/davinci/vpif_display.c
+@@ -39,8 +39,6 @@
+ #include <media/v4l2-ioctl.h>
+ #include <media/v4l2-chip-ident.h>
  
--#define DM644X_EMAC_BASE		(0x01C80000)
--#define DM644X_EMAC_MDIO_BASE		(DM644X_EMAC_BASE + 0x4000)
--#define DM644X_EMAC_CNTRL_OFFSET	(0x0000)
--#define DM644X_EMAC_CNTRL_MOD_OFFSET	(0x1000)
--#define DM644X_EMAC_CNTRL_RAM_OFFSET	(0x2000)
--#define DM644X_EMAC_CNTRL_RAM_SIZE	(0x2000)
+-#include <mach/dm646x.h>
 -
- #define DM644X_ASYNC_EMIF_CONTROL_BASE	0x01E00000
- #define DM644X_ASYNC_EMIF_DATA_CE0_BASE 0x02000000
- #define DM644X_ASYNC_EMIF_DATA_CE1_BASE 0x04000000
+ #include "vpif_display.h"
+ #include "vpif.h"
+ 
 -- 
 1.6.2.4
