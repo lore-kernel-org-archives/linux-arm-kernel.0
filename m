@@ -1,220 +1,139 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu,  8 Dec 2011 16:23:02 +0100
-Subject: [PATCH 1/3] ARM: at91: add accessor to manage smc
+Date: Thu,  8 Dec 2011 16:23:04 +0100
+Subject: [PATCH 3/3] ide/at91: use new introduce smc accessor
 In-Reply-To: <20111208150348.GD23884@game.jcrosoft.org>
 References: <20111208150348.GD23884@game.jcrosoft.org>
-Message-ID: <1323357784-17555-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <1323357784-17555-3-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-this will allow to configure the smc independtly of the register configuration
-as example on rm9200 different from sam9
+this will allow to use the pata_at91 on a single zImage
 
 Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+Cc: linux-ide at vger.kernel.org
 ---
- arch/arm/mach-at91/include/mach/at91sam9_smc.h |   29 ++++++++
- arch/arm/mach-at91/sam9_smc.c                  |   93 ++++++++++++++++++++++--
- arch/arm/mach-at91/sam9_smc.h                  |   23 ------
- 3 files changed, 115 insertions(+), 30 deletions(-)
+Hi,
 
-diff --git a/arch/arm/mach-at91/include/mach/at91sam9_smc.h b/arch/arm/mach-at91/include/mach/at91sam9_smc.h
-index eb18a70..b5eff0e 100644
---- a/arch/arm/mach-at91/include/mach/at91sam9_smc.h
-+++ b/arch/arm/mach-at91/include/mach/at91sam9_smc.h
-@@ -18,6 +18,35 @@
+	it's depends on other patch for AT91 can we apply via at91
+
+Best Regards,
+J.
+ drivers/ide/at91_ide.c |   65 +++++++++++++++++++++++++++--------------------
+ 1 files changed, 37 insertions(+), 28 deletions(-)
+
+diff --git a/drivers/ide/at91_ide.c b/drivers/ide/at91_ide.c
+index 41d4155..407595b 100644
+--- a/drivers/ide/at91_ide.c
++++ b/drivers/ide/at91_ide.c
+@@ -59,41 +59,50 @@
+ #define ALT_MODE	0x00e00000
+ #define REGS_SIZE	8
  
- #include <mach/cpu.h>
- 
-+#ifndef __ASSEMBLY__
-+struct sam9_smc_config {
-+	/* Setup register */
-+	u8 ncs_read_setup;
-+	u8 nrd_setup;
-+	u8 ncs_write_setup;
-+	u8 nwe_setup;
-+
-+	/* Pulse register */
-+	u8 ncs_read_pulse;
-+	u8 nrd_pulse;
-+	u8 ncs_write_pulse;
-+	u8 nwe_pulse;
-+
-+	/* Cycle register */
-+	u16 read_cycle;
-+	u16 write_cycle;
-+
-+	/* Mode register */
-+	u32 mode;
-+	u8 tdf_cycles:4;
-+};
-+
-+extern int sam9_smc_configure(int id, int cs, struct sam9_smc_config* config);
-+extern int sam9_smc_read(int id, int cs, struct sam9_smc_config* config);
-+extern int sam9_smc_read_mode(int id, int cs, struct sam9_smc_config* config);
-+extern int sam9_smc_write_mode(int id, int cs, struct sam9_smc_config* config);
-+#endif
-+
- #define AT91_SMC_SETUP		0x00				/* Setup Register for CS n */
- #define		AT91_SMC_NWESETUP	(0x3f << 0)			/* NWE Setup Length */
- #define			AT91_SMC_NWESETUP_(x)	((x) << 0)
-diff --git a/arch/arm/mach-at91/sam9_smc.c b/arch/arm/mach-at91/sam9_smc.c
-index 8294783..e5936dc 100644
---- a/arch/arm/mach-at91/sam9_smc.c
-+++ b/arch/arm/mach-at91/sam9_smc.c
-@@ -2,6 +2,7 @@
-  * linux/arch/arm/mach-at91/sam9_smc.c
-  *
-  * Copyright (C) 2008 Andrew Victor
-+ * Copyright (C) 2011 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-  *
-  * This program is free software; you can redistribute it and/or modify
-  * it under the terms of the GNU General Public License version 2 as
-@@ -17,13 +18,58 @@
- 
- #include "sam9_smc.h"
- 
--
- #define AT91_SMC_CS(id, n)	(smc_base_addr[id] + ((n) * 0x10))
- 
- static void __iomem *smc_base_addr[2];
- 
--static void __init sam9_smc_cs_configure(void __iomem *base, struct sam9_smc_config* config)
-+static void __init_refok sam9_smc_cs_write_mode(void __iomem *base,
-+					struct sam9_smc_config* config)
+-#define enter_16bit(cs, mode) do {					\
+-	mode = at91_sys_read(AT91_SMC_MODE(cs));			\
+-	at91_sys_write(AT91_SMC_MODE(cs), mode | AT91_SMC_DBW_16);	\
+-} while (0)
++static inline void enter_16bit(int cs, struct sam9_smc_config *smc)
 +{
-+	__raw_writel(config->mode
-+		   | AT91_SMC_TDF_(config->tdf_cycles),
-+		   base + AT91_SMC_MODE);
++	sam9_smc_read_mode(0, cs, smc);
++	smc->mode = (smc->mode & ~AT91_SMC_DBW) | AT91_SMC_DBW_16;
++	sam9_smc_write_mode(0, cs, smc);
 +}
-+
-+int __init_refok sam9_smc_write_mode(int id, int cs,
-+					struct sam9_smc_config* config)
+ 
+-#define leave_16bit(cs, mode) at91_sys_write(AT91_SMC_MODE(cs), mode);
++static inline void leave_16bit(int cs, struct sam9_smc_config *smc)
 +{
-+	if (!smc_base_addr[id])
-+		return -EINVAL;
-+
-+	sam9_smc_cs_write_mode(AT91_SMC_CS(id, cs), config);
-+
-+	return 0;
++	smc->mode = (smc->mode & ~AT91_SMC_DBW) | AT91_SMC_DBW_8;
++	sam9_smc_write_mode(0, cs, smc);
 +}
-+
-+int __init_refok sam9_smc_configure(int id, int cs,
-+					struct sam9_smc_config* config)
-+{
-+	if (!smc_base_addr[id])
-+		return -EINVAL;
-+
-+	sam9_smc_cs_configure(AT91_SMC_CS(id, cs), config);
-+
-+	return 0;
-+}
-+
-+static void __init_refok sam9_smc_cs_read_mode(void __iomem *base,
-+					struct sam9_smc_config* config)
-+{
-+	u32 val = __raw_readl(base + AT91_SMC_MODE);
-+
-+	config->mode = (val & ~AT91_SMC_NWECYCLE);
-+	config->tdf_cycles = (val & AT91_SMC_NWECYCLE) >> 16 ;
-+}
-+
-+int __init_refok sam9_smc_read_mode(int id, int cs,
-+					struct sam9_smc_config* config)
+ 
+ static void set_smc_timings(const u8 chipselect, const u16 cycle,
+ 			    const u16 setup, const u16 pulse,
+ 			    const u16 data_float, int use_iordy)
  {
-+	void __iomen *base;
+-	unsigned long mode = AT91_SMC_READMODE | AT91_SMC_WRITEMODE |
++	struct sam9_smc_config smc;
 +
-+	if (!smc_base_addr[id])
-+		return -EINVAL;
-+
-+	base = AT91_SMC_CS(id, cs);
++	smc.mode = AT91_SMC_READMODE | AT91_SMC_WRITEMODE |
+ 			     AT91_SMC_BAT_SELECT;
  
- 	/* Setup register */
- 	__raw_writel(AT91_SMC_NWESETUP_(config->nwe_setup)
-@@ -45,14 +91,47 @@ static void __init sam9_smc_cs_configure(void __iomem *base, struct sam9_smc_con
- 		   base + AT91_SMC_CYCLE);
+ 	/* disable or enable waiting for IORDY signal */
+ 	if (use_iordy)
+-		mode |= AT91_SMC_EXNWMODE_READY;
++		smc.mode |= AT91_SMC_EXNWMODE_READY;
  
- 	/* Mode register */
--	__raw_writel(config->mode
--		   | AT91_SMC_TDF_(config->tdf_cycles),
--		   base + AT91_SMC_MODE);
-+	sam9_smc_cs_write_mode(base, config);
-+
-+	return 0;
+-	/* add data float cycles if needed */
+-	if (data_float)
+-		mode |= AT91_SMC_TDF_(data_float);
++	/* add data ofloat cycles if needed */
++	smc.tdf_cycles = data_float;
+ 
+-	at91_sys_write(AT91_SMC_MODE(chipselect), mode);
++	/* write SMC Setup Register */
++	smc.nrd_setup = setup;
++	smc.nwe_setup = smc.nrd_setup;
++	smc.ncs_read_setup = 0;
++	smc.ncs_write_setup = smc.ncs_read_setup;
++	/* write SMC Pulse Register */
++	smc.nrd_pulse = pulse;
++	smc.nwe_pulse = smc.nrd_pulse;
++	smc.ncs_read_pulse = cycle;
++	smc.ncs_write_pulse = smc.ncs_read_pulse;
++	/* write SMC Cycle Register */
++	smc.read_cycle = cycle;
++	smc.write_cycle = smc.read_cycle;
+ 
+-	/* setup timings in SMC */
+-	at91_sys_write(AT91_SMC_SETUP(chipselect), AT91_SMC_NWESETUP_(setup) |
+-						   AT91_SMC_NCS_WRSETUP_(0) |
+-						   AT91_SMC_NRDSETUP_(setup) |
+-						   AT91_SMC_NCS_RDSETUP_(0));
+-	at91_sys_write(AT91_SMC_PULSE(chipselect), AT91_SMC_NWEPULSE_(pulse) |
+-						   AT91_SMC_NCS_WRPULSE_(cycle) |
+-						   AT91_SMC_NRDPULSE_(pulse) |
+-						   AT91_SMC_NCS_RDPULSE_(cycle));
+-	at91_sys_write(AT91_SMC_CYCLE(chipselect), AT91_SMC_NWECYCLE_(cycle) |
+-						   AT91_SMC_NRDCYCLE_(cycle));
++	sam9_smc_configure(0, chipselect, &smc);
  }
  
--void __init sam9_smc_configure(int id, int cs, struct sam9_smc_config* config)
-+int __init_refok sam9_smc_read(int id, int cs, struct sam9_smc_config* config)
- {
--	sam9_smc_cs_configure(AT91_SMC_CS(id, cs), config);
-+	void __iomen *base;
-+	u32 val;
-+
-+	if (!smc_base_addr[id])
-+		return -EINVAL;
-+
-+	base = AT91_SMC_CS(id, cs);
-+
-+	/* Setup register */
-+	val = __raw_readl(base + AT91_SMC_SETUP);
-+
-+	config->nwe_setup = val & AT91_SMC_NWESETUP;
-+	config->ncs_write_setup = (val & AT91_SMC_NCS_WRSETUP) >> 8;
-+	config->nrd_setup = (val & AT91_SMC_NRDSETUP) >> 16;
-+	config->ncs_read_setup = (val & AT91_SMC_NCS_RDSETUP) >> 24;
-+
-+	/* Pulse register */
-+	val = __raw_readl(base + AT91_SMC_PULSE);
-+
-+	config->nwe_setup = val & AT91_SMC_NWEPULSE;
-+	config->ncs_write_pulse = (val & AT91_SMC_NCS_WRPULSE) >> 8;
-+	config->nrd_pulse = (val & AT91_SMC_NRDPULSE) >> 16;
-+	config->ncs_read_pulse = (val & AT91_SMC_NCS_RDPULSE) >> 24;
-+
-+	/* Cycle register */
-+	val = __raw_readl(base + AT91_SMC_CYCLE);
-+
-+	config->write_cycle = val & AT91_SMC_NWECYCLE;
-+	config->read_cycle = (val & AT91_SMC_NRDCYCLE) >> 16;
-+
-+	/* Mode register */
-+	sam9_smc_cs_read_mode(base, config);
-+
-+	return 0;
+ static unsigned int calc_mck_cycles(unsigned int ns, unsigned int mck_hz)
+@@ -146,15 +155,15 @@ static void at91_ide_input_data(ide_drive_t *drive, struct ide_cmd *cmd,
+ 	ide_hwif_t *hwif = drive->hwif;
+ 	struct ide_io_ports *io_ports = &hwif->io_ports;
+ 	u8 chipselect = hwif->select_data;
+-	unsigned long mode;
++	struct sam9_smc_config smc;
+ 
+ 	pdbg("cs %u buf %p len %d\n", chipselect, buf, len);
+ 
+ 	len++;
+ 
+-	enter_16bit(chipselect, mode);
++	enter_16bit(chipselect, &smc);
+ 	readsw((void __iomem *)io_ports->data_addr, buf, len / 2);
+-	leave_16bit(chipselect, mode);
++	leave_16bit(chipselect, &smc);
  }
  
- void __init at91sam9_ioremap_smc(int id, u32 addr)
-diff --git a/arch/arm/mach-at91/sam9_smc.h b/arch/arm/mach-at91/sam9_smc.h
-index 039c5ce..3e52dcd4 100644
---- a/arch/arm/mach-at91/sam9_smc.h
-+++ b/arch/arm/mach-at91/sam9_smc.h
-@@ -8,27 +8,4 @@
-  * published by the Free Software Foundation.
-  */
+ static void at91_ide_output_data(ide_drive_t *drive, struct ide_cmd *cmd,
+@@ -163,13 +172,13 @@ static void at91_ide_output_data(ide_drive_t *drive, struct ide_cmd *cmd,
+ 	ide_hwif_t *hwif = drive->hwif;
+ 	struct ide_io_ports *io_ports = &hwif->io_ports;
+ 	u8 chipselect = hwif->select_data;
+-	unsigned long mode;
++	struct sam9_smc_config smc;
  
--struct sam9_smc_config {
--	/* Setup register */
--	u8 ncs_read_setup;
--	u8 nrd_setup;
--	u8 ncs_write_setup;
--	u8 nwe_setup;
--
--	/* Pulse register */
--	u8 ncs_read_pulse;
--	u8 nrd_pulse;
--	u8 ncs_write_pulse;
--	u8 nwe_pulse;
--
--	/* Cycle register */
--	u16 read_cycle;
--	u16 write_cycle;
--
--	/* Mode register */
--	u32 mode;
--	u8 tdf_cycles:4;
--};
--
--extern void __init sam9_smc_configure(int id, int cs, struct sam9_smc_config* config);
- extern void __init at91sam9_ioremap_smc(int id, u32 addr);
+ 	pdbg("cs %u buf %p len %d\n", chipselect,  buf, len);
+ 
+-	enter_16bit(chipselect, mode);
++	enter_16bit(chipselect, &smc);
+ 	writesw((void __iomem *)io_ports->data_addr, buf, len / 2);
+-	leave_16bit(chipselect, mode);
++	leave_16bit(chipselect, &smc);
+ }
+ 
+ static void at91_ide_set_pio_mode(ide_hwif_t *hwif, ide_drive_t *drive)
 -- 
 1.7.7
