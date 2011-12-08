@@ -1,59 +1,63 @@
 From: junxiao.bi@windriver.com (Junxiao Bi)
-Date: Thu, 8 Dec 2011 18:07:47 +0800
-Subject: [PATCH 1/6] ARM: fix be8 support for phys/virt address conversion
+Date: Thu, 8 Dec 2011 18:07:51 +0800
+Subject: [PATCH 5/6] MTD: map: fix big endian support
 In-Reply-To: <1323338872-24716-1-git-send-email-junxiao.bi@windriver.com>
 References: <1323338872-24716-1-git-send-email-junxiao.bi@windriver.com>
-Message-ID: <1323338872-24716-2-git-send-email-junxiao.bi@windriver.com>
+Message-ID: <1323338872-24716-6-git-send-email-junxiao.bi@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-phys_to_virt() and virt_to_phys() is implemented by one assembler instruction,
-add/sub an offset between the physical and virtual address. For some arm machines
-with CONFIG_ARM_PATCH_PHYS_VIRT defined, this offset is unknown at compile time,
-it is calculated dynamically at run time and then patched to the add/sub instruction.
-To support BE8 mode, firstly we need to convert the instruntion to big-endian after
-loading it from the memory, and then modify its offset field, at last convert it to
-little-endian and write it back to the memory.
+Use read*/write*_relaxed to replace __raw_read*/__raw_write*
+to make it work in both endians.
 
-Reviewed-by: Nicolas Pitre <nico@linaro.org>
+Cc: David Woodhouse <dwmw2@infradead.org>
+Cc: linux-mtd at lists.infradead.org
 Signed-off-by: Junxiao Bi <junxiao.bi@windriver.com>
 ---
- arch/arm/kernel/head.S |   12 ++++++++++++
- 1 files changed, 12 insertions(+), 0 deletions(-)
+ include/linux/mtd/map.h |   16 ++++++++--------
+ 1 files changed, 8 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
-index 54fa641..a52aec7 100644
---- a/arch/arm/kernel/head.S
-+++ b/arch/arm/kernel/head.S
-@@ -565,8 +565,14 @@ __fixup_a_pv_table:
- 	b	2f
- 1:	add     r7, r3
- 	ldrh	ip, [r7, #2]
-+#ifdef CONFIG_CPU_ENDIAN_BE8
-+	rev16	ip, ip
-+#endif
- 	and	ip, 0x8f00
- 	orr	ip, r6	@ mask in offset bits 31-24
-+#ifdef CONFIG_CPU_ENDIAN_BE8
-+	rev16	ip, ip
-+#endif
- 	strh	ip, [r7, #2]
- 2:	cmp	r4, r5
- 	ldrcc	r7, [r4], #4	@ use branch for delay slot
-@@ -575,8 +581,14 @@ __fixup_a_pv_table:
- #else
- 	b	2f
- 1:	ldr	ip, [r7, r3]
-+#ifdef CONFIG_CPU_ENDIAN_BE8
-+	rev	ip, ip
-+#endif
- 	bic	ip, ip, #0x000000ff
- 	orr	ip, ip, r6	@ mask in offset bits 31-24
-+#ifdef CONFIG_CPU_ENDIAN_BE8
-+	rev	ip, ip
-+#endif
- 	str	ip, [r7, r3]
- 2:	cmp	r4, r5
- 	ldrcc	r7, [r4], #4	@ use branch for delay slot
+diff --git a/include/linux/mtd/map.h b/include/linux/mtd/map.h
+index a9e6ba4..74b266d 100644
+--- a/include/linux/mtd/map.h
++++ b/include/linux/mtd/map.h
+@@ -393,14 +393,14 @@ static inline map_word inline_map_read(struct map_info *map, unsigned long ofs)
+ 	map_word r;
+ 
+ 	if (map_bankwidth_is_1(map))
+-		r.x[0] = __raw_readb(map->virt + ofs);
++		r.x[0] = readb_relaxed(map->virt + ofs);
+ 	else if (map_bankwidth_is_2(map))
+-		r.x[0] = __raw_readw(map->virt + ofs);
++		r.x[0] = readw_relaxed(map->virt + ofs);
+ 	else if (map_bankwidth_is_4(map))
+-		r.x[0] = __raw_readl(map->virt + ofs);
++		r.x[0] = readl_relaxed(map->virt + ofs);
+ #if BITS_PER_LONG >= 64
+ 	else if (map_bankwidth_is_8(map))
+-		r.x[0] = __raw_readq(map->virt + ofs);
++		r.x[0] = readq_relaxed(map->virt + ofs);
+ #endif
+ 	else if (map_bankwidth_is_large(map))
+ 		memcpy_fromio(r.x, map->virt+ofs, map->bankwidth);
+@@ -413,14 +413,14 @@ static inline map_word inline_map_read(struct map_info *map, unsigned long ofs)
+ static inline void inline_map_write(struct map_info *map, const map_word datum, unsigned long ofs)
+ {
+ 	if (map_bankwidth_is_1(map))
+-		__raw_writeb(datum.x[0], map->virt + ofs);
++		writeb_relaxed(datum.x[0], map->virt + ofs);
+ 	else if (map_bankwidth_is_2(map))
+-		__raw_writew(datum.x[0], map->virt + ofs);
++		writew_relaxed(datum.x[0], map->virt + ofs);
+ 	else if (map_bankwidth_is_4(map))
+-		__raw_writel(datum.x[0], map->virt + ofs);
++		writel_relaxed(datum.x[0], map->virt + ofs);
+ #if BITS_PER_LONG >= 64
+ 	else if (map_bankwidth_is_8(map))
+-		__raw_writeq(datum.x[0], map->virt + ofs);
++		writeq_relaxed(datum.x[0], map->virt + ofs);
+ #endif
+ 	else if (map_bankwidth_is_large(map))
+ 		memcpy_toio(map->virt+ofs, datum.x, map->bankwidth);
 -- 
 1.7.0.4
