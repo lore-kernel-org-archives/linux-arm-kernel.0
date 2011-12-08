@@ -1,38 +1,47 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 8 Dec 2011 09:18:54 -0800
-Subject: [PATCH-V5 0/3] Introducing TI's New SoC/board AM335XEVM
-In-Reply-To: <79CD15C6BA57404B839C016229A409A8050F6D@DBDE01.ent.ti.com>
-References: <hvaibhav@ti.com>
- <1322808204-12878-1-git-send-email-hvaibhav@ti.com>
- <87y5up44bf.fsf@ti.com> <20111207211029.GL31337@atomide.com>
- <79CD15C6BA57404B839C016229A409A8050F6D@DBDE01.ent.ti.com>
-Message-ID: <20111208171854.GB31337@atomide.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Thu,  8 Dec 2011 18:19:40 +0100
+Subject: [PATCH 0/3] watchdog: new driver for STMP3xxx/MX23/MX28
+Message-ID: <1323364783-1059-1-git-send-email-w.sang@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell,
+Introduce a new user of the watchdog framework :) This is a rewritten driver
+for STMP and imx23/28 (the old one was not compilable anymore due to the
+missing mach). Please read the patch descriptions to understand why I think a
+rewrite was necessary. The first patch adds an accessor routine to the
+RTC-driver which can hopefully go via the watchdog-tree as well. The second
+patch adds the new driver, the third removes the old one.
 
-* Hiremath, Vaibhav <hvaibhav@ti.com> [111208 05:14]:
-> > From: Tony Lindgren [mailto:tony at atomide.com]
-> > * Kevin Hilman <khilman@ti.com> [111206 15:52]:
-> > >
-> > > I've also tested it on a BeagleBone, so feel free to also add:
-> > >
-> > > Tested-by: Kevin Hilman <khilman@ti.com>
-> > 
-> > Thanks looks good to me. We still need the machine_id update to
-> > apply patches 2 and 3 in this series, so applying only the first
-> > patch into soc branch for now.
-> 
-> Tony,
-> 
-> Should I ping Russell for this? The machine-id patch is already registered
-> and present at
-> 
-> http://www.arm.linux.org.uk/developer/machines/download.php
-
-Care to push the machine_id updates into devel-stable?
+I hope this can make it for 3.3; the old driver was broken (= not compilable)
+anyhow, so there cannot be any regression. Tested on a MX28EVK.
 
 Regards,
 
-Tony
+   Wolfram
+
+Changes since V1:
+
+* don't use EXPORT_SYMBOL for the callback into the RTC anymore.
+  Now, the callback is provided via platform_data to make sure it is
+  private between RTC and watchdog.
+
+* use more helpers to reduce driver size (module_platform_driver, pm_ops)
+
+Wolfram Sang (3):
+  rtc: stmp3xxx: add wdt-accessor function
+  watchdog: add new driver for STMP3xxx and i.MX23/28
+  watchdog: remove old STMP3XXX driver
+
+ drivers/rtc/rtc-stmp3xxx.c          |   64 ++++++++
+ drivers/watchdog/Kconfig            |   13 +-
+ drivers/watchdog/Makefile           |    2 +-
+ drivers/watchdog/stmp3xxx_rtc_wdt.c |  139 ++++++++++++++++
+ drivers/watchdog/stmp3xxx_wdt.c     |  297 -----------------------------------
+ include/linux/stmp3xxx_rtc_wdt.h    |   15 ++
+ 6 files changed, 226 insertions(+), 304 deletions(-)
+ create mode 100644 drivers/watchdog/stmp3xxx_rtc_wdt.c
+ delete mode 100644 drivers/watchdog/stmp3xxx_wdt.c
+ create mode 100644 include/linux/stmp3xxx_rtc_wdt.h
+
+-- 
+1.7.7.3
