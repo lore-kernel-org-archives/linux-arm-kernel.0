@@ -1,69 +1,233 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Thu, 8 Dec 2011 22:44:08 +0100
-Subject: [Linaro-mm-sig] [RFC v2 1/2] dma-buf: Introduce dma buffer
- sharing mechanism
-In-Reply-To: <201112071340.35267.arnd@arndb.de>
-References: <1322816252-19955-1-git-send-email-sumit.semwal@ti.com>
- <CAF6AEGto-+oSqguuWyPunUbtE65GpNiXh21srQzrChiBQMb1Nw@mail.gmail.com>
- <CAB2ybb-0mTdNXN82O1TUGVjhMZUQtQb07A3EVmmdxg3ngEc3Dw@mail.gmail.com>
- <201112071340.35267.arnd@arndb.de>
-Message-ID: <CAKMK7uFQiiUbkU-7c3Os0d0FJNyLbqS2HLPRLy3LGnOoCXV5Pw@mail.gmail.com>
+From: rob.lee@linaro.org (Rob Lee)
+Date: Thu, 8 Dec 2011 15:46:46 -0600
+Subject: [RFC PATCH 1/8] ARM: Add commonly used cpuidle init code
+In-Reply-To: <4EDE2F91.5090104@gmail.com>
+References: <1323146291-10676-1-git-send-email-rob.lee@linaro.org>
+ <1323146291-10676-2-git-send-email-rob.lee@linaro.org>
+ <4EDE2F91.5090104@gmail.com>
+Message-ID: <CAMXH7KFT+JP8uJwK=rzt1cjwMQMGPd-6RwPVma0ky0wSMbaz8A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 7, 2011 at 14:40, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Wednesday 07 December 2011, Semwal, Sumit wrote:
->> Thanks for the excellent discussion - it indeed is very good learning
->> for the relatively-inexperienced me :)
+Rob, thanks for your thorough review.  Comments and questions below.
+
+On 6 December 2011 09:06, Rob Herring <robherring2@gmail.com> wrote:
+> On 12/05/2011 10:38 PM, Robert Lee wrote:
+>> Add commonly used cpuidle init code to avoid unecessary duplication.
 >>
->> So, for the purpose of dma-buf framework, could I summarize the
->> following and rework accordingly?:
->> 1. remove mmap() dma_buf_op [and mmap fop], and introduce cpu_start(),
->> cpu_finish() ops to bracket cpu accesses to the buffer. Also add
->> DMABUF_CPU_START / DMABUF_CPU_FINI IOCTLs?
+>> Signed-off-by: Robert Lee <rob.lee@linaro.org>
+>> ---
+>> ?arch/arm/common/Makefile ? ? ? | ? ?1 +
+>> ?arch/arm/common/cpuidle.c ? ? ?| ?132 ++++++++++++++++++++++++++++++++++++++++
+>> ?arch/arm/include/asm/cpuidle.h | ? 25 ++++++++
 >
-> I think we'd be better off for now without the extra ioctls and
-> just document that a shared buffer must not be exported to user
-> space using mmap at all, to avoid those problems. Serialization
-> between GPU and CPU is on a higher level than the dma_buf framework
-> IMHO.
-
-Agreed.
-
->> 2. remove sg_sync* ops for now (and we'll see if we need to add them
->> later if needed)
+> Why not move cpuidle drivers to drivers/idle/ ?
 >
-> Just removing the sg_sync_* operations is not enough. We have to make
-> the decision whether we want to allow
-> a) only coherent mappings of the buffer into kernel memory (requiring
-> an extension to the dma_map_ops on ARM to not flush caches at map/unmap
-> time)
-> b) not allowing any in-kernel mappings (same requirement on ARM, also
-> limits the usefulness of the dma_buf if we cannot access it from the
-> kernel or from user space)
-> c) only allowing streaming mappings, even if those are non-coherent
-> (requiring strict serialization between CPU (in-kernel) and dma users of
-> the buffer)
 
-I think only allowing streaming access makes the most sense:
-- I don't see much (if any need) for the kernel to access a dma_buf -
-in all current usecases it just contains pixel data and no hw-specific
-things (like sg tables, command buffers, ..). At most I see the need
-for the kernel to access the buffer for dma bounce buffers, but that
-is internal to the dma subsystem (and hence does not need to be
-exposed).
-- Userspace can still access the contents through the exporting
-subsystem (e.g. use some gem mmap support). For efficiency reason gpu
-drivers are already messing around with cache coherency in a platform
-specific way (and hence violated the dma api a bit), so we could stuff
-the mmap coherency in there, too. When we later on extend dma_buf
-support so that other drivers than the gpu can export dma_bufs, we can
-then extend the official dma api with already a few drivers with
-use-patterns around.
+Or to drivers/cpuidle?  I am not sure the reasoning behind a
+drivers/idle directory if everything there is a cpuidle driver
+implementation.  I originally did locate this common cpuidle code in
+drivers/idle/arm_idle.c and put the head file in arch/arm/include/asm
+but this threw a checkpatch warning so I submitted with this placement
+to start with.  If the local_fiq_enable/disable calls can be handled
+in a community friendly way for any architecture, then perhaps I can
+just move the header file code to linux/include/cpuidle.h.
 
-But I still think that the kernel must not be required to enforce
-correct access ordering for the reasons outlined in my other mail.
--Daniel
--- 
-Daniel Vetter
-daniel.vetter at ffwll.ch - +41 (0) 79 364 57 48 - http://blog.ffwll.ch
+Do you have suggestions about making this functionality available for
+any architecture and what is the most community friendly method of
+doing this?  I suppose function declarations for
+local_fiq_enable/disable could be given.  Then, one could either
+define them here as empty functions or could have two idle functions,
+arm_enter_idle and nonarm_enter_idle and the architecture could be
+read or passed in to determine which one to set the cpuidle states'
+enter functions to.
+
+>> ?3 files changed, 158 insertions(+), 0 deletions(-)
+>> ?create mode 100644 arch/arm/common/cpuidle.c
+>> ?create mode 100644 arch/arm/include/asm/cpuidle.h
+>>
+>> diff --git a/arch/arm/common/Makefile b/arch/arm/common/Makefile
+>> index 6ea9b6f..0865f69 100644
+>> --- a/arch/arm/common/Makefile
+>> +++ b/arch/arm/common/Makefile
+>> @@ -17,3 +17,4 @@ obj-$(CONFIG_ARCH_IXP2000) ?+= uengine.o
+>> ?obj-$(CONFIG_ARCH_IXP23XX) ? += uengine.o
+>> ?obj-$(CONFIG_PCI_HOST_ITE8152) ?+= it8152.o
+>> ?obj-$(CONFIG_ARM_TIMER_SP804) ? ? ? ?+= timer-sp.o
+>> +obj-$(CONFIG_CPU_IDLE) ? ? ? ? ? ? ? += cpuidle.o
+>> diff --git a/arch/arm/common/cpuidle.c b/arch/arm/common/cpuidle.c
+>> new file mode 100644
+>> index 0000000..e9a46a3
+>> --- /dev/null
+>> +++ b/arch/arm/common/cpuidle.c
+>> @@ -0,0 +1,132 @@
+>> +/*
+>> + * Copyright 2011 Freescale Semiconductor, Inc.
+>> + * Copyright 2011 Linaro Ltd.
+>> + *
+>> + * The code contained herein is licensed under the GNU General Public
+>> + * License. You may obtain a copy of the GNU General Public License
+>> + * Version 2 or later at the following locations:
+>> + *
+>> + * http://www.opensource.org/licenses/gpl-license.html
+>> + * http://www.gnu.org/copyleft/gpl.html
+>> + */
+>> +
+>> +/*
+>> + * This code performs provides some commonly used cpuidle setup functionality
+>> + * used by many ARM SoC platforms. ?Providing this functionality here
+>> + * reduces the duplication of this code for each ARM platform that uses it.
+>> + */
+>> +
+>> +#include <linux/kernel.h>
+>> +#include <linux/io.h>
+>> +#include <linux/cpuidle.h>
+>> +#include <linux/hrtimer.h>
+>> +#include <linux/err.h>
+>> +#include <asm/cpuidle.h>
+>> +#include <asm/proc-fns.h>
+>> +
+>> +static struct cpuidle_device __percpu * arm_cpuidle_devices;
+>> +
+>> +static int (*mach_cpuidle)(struct cpuidle_device *dev,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ?struct cpuidle_driver *drv,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? int index);
+>> +
+>> +static int arm_enter_idle(struct cpuidle_device *dev,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ?struct cpuidle_driver *drv, int index)
+>
+> I think how this works is backwards. This function is only called if
+> there is a NULL enter function for a state, but mach_cpuidle is global.
+> Ideally, I want to call this function for every state, but call a
+> different mach_cpuidle function for each state. Yes, you could select a
+> specific function for each state within the mach_cpuidle function, but
+> that seems silly to make the per state function global and then have to
+> select a per state function again. And if many users are doing that,
+> then it belongs in the common code.
+>
+>> +{
+>> + ? ? ktime_t time_start, time_end;
+>> +
+>> + ? ? local_irq_disable();
+>> + ? ? local_fiq_disable();
+>> +
+>> + ? ? time_start = ktime_get();
+>> +
+>> + ? ? index = mach_cpuidle(dev, drv, index);
+>> +
+>> + ? ? time_end = ktime_get();
+>> +
+>> + ? ? local_fiq_enable();
+>> + ? ? local_irq_enable();
+>> +
+>> + ? ? dev->last_residency =
+>> + ? ? ? ? ? ? (int)ktime_to_us(ktime_sub(time_end, time_start));
+>> +
+>> + ? ? return index;
+>> +}
+>> +
+>> +void arm_cpuidle_devices_uninit(void)
+>> +{
+>> + ? ? int cpu_id;
+>> + ? ? struct cpuidle_device *dev;
+>> +
+>> + ? ? for_each_possible_cpu(cpu_id) {
+>> + ? ? ? ? ? ? dev = per_cpu_ptr(arm_cpuidle_devices, cpu_id);
+>> + ? ? ? ? ? ? cpuidle_unregister_device(dev);
+>> + ? ? }
+>> +
+>> + ? ? free_percpu(arm_cpuidle_devices);
+>> + ? ? return;
+>
+> Don't need return statement.
+>
+>> +}
+>> +
+>> +int __init arm_cpuidle_init(struct cpuidle_driver *drv,
+>> + ? ? int (*common_enter)(struct cpuidle_device *dev,
+>> + ? ? ? ? ? ? struct cpuidle_driver *drv, int index),
+>> + ? ? void *driver_data[])
+>> +{
+>> + ? ? struct cpuidle_device *dev;
+>> + ? ? int i, cpu_id;
+>> +
+>> + ? ? if (drv == NULL) {
+>> + ? ? ? ? ? ? pr_err("%s: cpuidle_driver pointer NULL\n", __func__);
+>> + ? ? ? ? ? ? return -EINVAL;
+>> + ? ? }
+>> +
+>> + ? ? if (drv->state_count > CPUIDLE_STATE_MAX)
+>> + ? ? ? ? ? ? pr_err("%s: state count exceeds maximum\n", __func__);
+>
+> return an error?
+>
+> You can collapse these 2 parameter checks down to:
+>
+> if (!drv || (drv->state_count > CPUIDLE_STATE_MAX))
+>
+>> +
+>> + ? ? mach_cpuidle = common_enter;
+>> +
+>> + ? ? /* if state enter function not specified, use common_enter function */
+>> + ? ? for (i = 0; i < drv->state_count; i++) {
+>> + ? ? ? ? ? ? if (drv->states[i].enter == NULL) {
+>> + ? ? ? ? ? ? ? ? ? ? if (mach_cpuidle == NULL) {
+>
+> Usually !mach_cpuidle is preferred for NULL checks. You can move this
+> check out of the loop.
+>
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? pr_err("%s: 'enter' function pointer NULL\n",
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? __func__);
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? return -EINVAL;
+>> + ? ? ? ? ? ? ? ? ? ? } else
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? drv->states[i].enter = arm_enter_idle;
+>> + ? ? ? ? ? ? }
+>> + ? ? }
+>> +
+>> + ? ? if (cpuidle_register_driver(drv)) {
+>> + ? ? ? ? ? ? pr_err("%s: Failed to register cpuidle driver\n", __func__);
+>> + ? ? ? ? ? ? return -ENODEV;
+>> + ? ? }
+>> +
+>> + ? ? arm_cpuidle_devices = alloc_percpu(struct cpuidle_device);
+>> + ? ? if (arm_cpuidle_devices == NULL) {
+>> + ? ? ? ? ? ? cpuidle_unregister_driver(drv);
+>> + ? ? ? ? ? ? return -ENOMEM;
+>> + ? ? }
+>> +
+>> + ? ? /* initialize state data for each cpuidle_device */
+>> + ? ? for_each_possible_cpu(cpu_id) {
+>> +
+>> + ? ? ? ? ? ? dev = per_cpu_ptr(arm_cpuidle_devices, cpu_id);
+>> + ? ? ? ? ? ? dev->cpu = cpu_id;
+>> + ? ? ? ? ? ? dev->state_count = drv->state_count;
+>> +
+>> + ? ? ? ? ? ? if (driver_data)
+>> + ? ? ? ? ? ? ? ? ? ? for (i = 0; i < dev->state_count; i++) {
+>
+> This would be more concise and less indentation:
+>
+> for (i = 0; driver_data, i < dev->state_count; i++)
+>
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? dev->states_usage[i].driver_data =
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? driver_data[i];
+>> + ? ? ? ? ? ? ? ? ? ? }
+>> +
+>> + ? ? ? ? ? ? if (cpuidle_register_device(dev)) {
+>> + ? ? ? ? ? ? ? ? ? ? pr_err("%s: Failed to register cpu %u\n",
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? __func__, cpu_id);
+
+arm_cpuidle_devices_uninit();
+
+>> + ? ? ? ? ? ? ? ? ? ? return -ENODEV;
+>
+> Leaking memory here from alloc_percpu.
+>
+> Also, need to unregister driver. It's usually cleaner to use goto's for
+> error clean-up.
+>
+
+In this case, just adding a call  to arm_cpuidle_devices_uninit()
+seems clean right?
+
+> Rob
