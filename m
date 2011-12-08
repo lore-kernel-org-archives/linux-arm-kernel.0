@@ -1,139 +1,67 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu,  8 Dec 2011 16:23:04 +0100
-Subject: [PATCH 3/3] ide/at91: use new introduce smc accessor
-In-Reply-To: <20111208150348.GD23884@game.jcrosoft.org>
-References: <20111208150348.GD23884@game.jcrosoft.org>
-Message-ID: <1323357784-17555-3-git-send-email-plagnioj@jcrosoft.com>
+Date: Thu,  8 Dec 2011 16:28:06 +0100
+Subject: [PATCH 1/1] at91: 9260 and 9g20 add support of join SRAM Memory
+ Mapping
+Message-ID: <1323358086-18749-1-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-this will allow to use the pata_at91 on a single zImage
+on 9269 and 9g20 the sram are mirrored at then of the bank so we can join them
 
 Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-Cc: linux-ide at vger.kernel.org
+Cc: Patrice Vilchez <patrice.vilchez@atmel.com>
 ---
-Hi,
+ arch/arm/mach-at91/at91sam9260.c              |   13 +++++--------
+ arch/arm/mach-at91/include/mach/at91sam9260.h |    4 ++++
+ 2 files changed, 9 insertions(+), 8 deletions(-)
 
-	it's depends on other patch for AT91 can we apply via at91
-
-Best Regards,
-J.
- drivers/ide/at91_ide.c |   65 +++++++++++++++++++++++++++--------------------
- 1 files changed, 37 insertions(+), 28 deletions(-)
-
-diff --git a/drivers/ide/at91_ide.c b/drivers/ide/at91_ide.c
-index 41d4155..407595b 100644
---- a/drivers/ide/at91_ide.c
-+++ b/drivers/ide/at91_ide.c
-@@ -59,41 +59,50 @@
- #define ALT_MODE	0x00e00000
- #define REGS_SIZE	8
+diff --git a/arch/arm/mach-at91/at91sam9260.c b/arch/arm/mach-at91/at91sam9260.c
+index 1836002..3ebd306 100644
+--- a/arch/arm/mach-at91/at91sam9260.c
++++ b/arch/arm/mach-at91/at91sam9260.c
+@@ -309,15 +309,12 @@ static void __init at91sam9xe_map_io(void)
  
--#define enter_16bit(cs, mode) do {					\
--	mode = at91_sys_read(AT91_SMC_MODE(cs));			\
--	at91_sys_write(AT91_SMC_MODE(cs), mode | AT91_SMC_DBW_16);	\
--} while (0)
-+static inline void enter_16bit(int cs, struct sam9_smc_config *smc)
-+{
-+	sam9_smc_read_mode(0, cs, smc);
-+	smc->mode = (smc->mode & ~AT91_SMC_DBW) | AT91_SMC_DBW_16;
-+	sam9_smc_write_mode(0, cs, smc);
-+}
- 
--#define leave_16bit(cs, mode) at91_sys_write(AT91_SMC_MODE(cs), mode);
-+static inline void leave_16bit(int cs, struct sam9_smc_config *smc)
-+{
-+	smc->mode = (smc->mode & ~AT91_SMC_DBW) | AT91_SMC_DBW_8;
-+	sam9_smc_write_mode(0, cs, smc);
-+}
- 
- static void set_smc_timings(const u8 chipselect, const u16 cycle,
- 			    const u16 setup, const u16 pulse,
- 			    const u16 data_float, int use_iordy)
+ static void __init at91sam9260_map_io(void)
  {
--	unsigned long mode = AT91_SMC_READMODE | AT91_SMC_WRITEMODE |
-+	struct sam9_smc_config smc;
-+
-+	smc.mode = AT91_SMC_READMODE | AT91_SMC_WRITEMODE |
- 			     AT91_SMC_BAT_SELECT;
- 
- 	/* disable or enable waiting for IORDY signal */
- 	if (use_iordy)
--		mode |= AT91_SMC_EXNWMODE_READY;
-+		smc.mode |= AT91_SMC_EXNWMODE_READY;
- 
--	/* add data float cycles if needed */
--	if (data_float)
--		mode |= AT91_SMC_TDF_(data_float);
-+	/* add data ofloat cycles if needed */
-+	smc.tdf_cycles = data_float;
- 
--	at91_sys_write(AT91_SMC_MODE(chipselect), mode);
-+	/* write SMC Setup Register */
-+	smc.nrd_setup = setup;
-+	smc.nwe_setup = smc.nrd_setup;
-+	smc.ncs_read_setup = 0;
-+	smc.ncs_write_setup = smc.ncs_read_setup;
-+	/* write SMC Pulse Register */
-+	smc.nrd_pulse = pulse;
-+	smc.nwe_pulse = smc.nrd_pulse;
-+	smc.ncs_read_pulse = cycle;
-+	smc.ncs_write_pulse = smc.ncs_read_pulse;
-+	/* write SMC Cycle Register */
-+	smc.read_cycle = cycle;
-+	smc.write_cycle = smc.read_cycle;
- 
--	/* setup timings in SMC */
--	at91_sys_write(AT91_SMC_SETUP(chipselect), AT91_SMC_NWESETUP_(setup) |
--						   AT91_SMC_NCS_WRSETUP_(0) |
--						   AT91_SMC_NRDSETUP_(setup) |
--						   AT91_SMC_NCS_RDSETUP_(0));
--	at91_sys_write(AT91_SMC_PULSE(chipselect), AT91_SMC_NWEPULSE_(pulse) |
--						   AT91_SMC_NCS_WRPULSE_(cycle) |
--						   AT91_SMC_NRDPULSE_(pulse) |
--						   AT91_SMC_NCS_RDPULSE_(cycle));
--	at91_sys_write(AT91_SMC_CYCLE(chipselect), AT91_SMC_NWECYCLE_(cycle) |
--						   AT91_SMC_NRDCYCLE_(cycle));
-+	sam9_smc_configure(0, chipselect, &smc);
+-	if (cpu_is_at91sam9xe()) {
++	if (cpu_is_at91sam9xe())
+ 		at91sam9xe_map_io();
+-	} else if (cpu_is_at91sam9g20()) {
+-		at91_init_sram(0, AT91SAM9G20_SRAM0_BASE, AT91SAM9G20_SRAM0_SIZE);
+-		at91_init_sram(1, AT91SAM9G20_SRAM1_BASE, AT91SAM9G20_SRAM1_SIZE);
+-	} else {
+-		at91_init_sram(0, AT91SAM9260_SRAM0_BASE, AT91SAM9260_SRAM0_SIZE);
+-		at91_init_sram(1, AT91SAM9260_SRAM1_BASE, AT91SAM9260_SRAM1_SIZE);
+-	}
++	else if (cpu_is_at91sam9g20())
++		at91_init_sram(0, AT91SAM9G20_SRAM_BASE, AT91SAM9G20_SRAM_SIZE);
++	else
++		at91_init_sram(0, AT91SAM9260_SRAM_BASE, AT91SAM9260_SRAM_SIZE);
+ 	at91_init_gpbr(AT91SAM9260_BASE_GPBR, 16);
  }
  
- static unsigned int calc_mck_cycles(unsigned int ns, unsigned int mck_hz)
-@@ -146,15 +155,15 @@ static void at91_ide_input_data(ide_drive_t *drive, struct ide_cmd *cmd,
- 	ide_hwif_t *hwif = drive->hwif;
- 	struct ide_io_ports *io_ports = &hwif->io_ports;
- 	u8 chipselect = hwif->select_data;
--	unsigned long mode;
-+	struct sam9_smc_config smc;
+diff --git a/arch/arm/mach-at91/include/mach/at91sam9260.h b/arch/arm/mach-at91/include/mach/at91sam9260.h
+index 23fdede..e3cb780 100644
+--- a/arch/arm/mach-at91/include/mach/at91sam9260.h
++++ b/arch/arm/mach-at91/include/mach/at91sam9260.h
+@@ -115,6 +115,8 @@
+ #define AT91SAM9260_SRAM0_SIZE	SZ_4K		/* Internal SRAM 0 size (4Kb) */
+ #define AT91SAM9260_SRAM1_BASE	0x00300000	/* Internal SRAM 1 base address */
+ #define AT91SAM9260_SRAM1_SIZE	SZ_4K		/* Internal SRAM 1 size (4Kb) */
++#define AT91SAM9260_SRAM_BASE	0x002FF000	/* Internal SRAM base address */
++#define AT91SAM9260_SRAM_SIZE	SZ_8K		/* Internal SRAM size (8Kb) */
  
- 	pdbg("cs %u buf %p len %d\n", chipselect, buf, len);
+ #define AT91SAM9260_UHP_BASE	0x00500000	/* USB Host controller */
  
- 	len++;
+@@ -128,6 +130,8 @@
+ #define AT91SAM9G20_SRAM0_SIZE	SZ_16K		/* Internal SRAM 0 size (16Kb) */
+ #define AT91SAM9G20_SRAM1_BASE	0x00300000	/* Internal SRAM 1 base address */
+ #define AT91SAM9G20_SRAM1_SIZE	SZ_16K		/* Internal SRAM 1 size (16Kb) */
++#define AT91SAM9G20_SRAM_BASE	0x002FC000	/* Internal SRAM base address */
++#define AT91SAM9G20_SRAM_SIZE	SZ_32K		/* Internal SRAM size (32Kb) */
  
--	enter_16bit(chipselect, mode);
-+	enter_16bit(chipselect, &smc);
- 	readsw((void __iomem *)io_ports->data_addr, buf, len / 2);
--	leave_16bit(chipselect, mode);
-+	leave_16bit(chipselect, &smc);
- }
+ #define AT91SAM9G20_UHP_BASE	0x00500000	/* USB Host controller */
  
- static void at91_ide_output_data(ide_drive_t *drive, struct ide_cmd *cmd,
-@@ -163,13 +172,13 @@ static void at91_ide_output_data(ide_drive_t *drive, struct ide_cmd *cmd,
- 	ide_hwif_t *hwif = drive->hwif;
- 	struct ide_io_ports *io_ports = &hwif->io_ports;
- 	u8 chipselect = hwif->select_data;
--	unsigned long mode;
-+	struct sam9_smc_config smc;
- 
- 	pdbg("cs %u buf %p len %d\n", chipselect,  buf, len);
- 
--	enter_16bit(chipselect, mode);
-+	enter_16bit(chipselect, &smc);
- 	writesw((void __iomem *)io_ports->data_addr, buf, len / 2);
--	leave_16bit(chipselect, mode);
-+	leave_16bit(chipselect, &smc);
- }
- 
- static void at91_ide_set_pio_mode(ide_hwif_t *hwif, ide_drive_t *drive)
 -- 
 1.7.7
