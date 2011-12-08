@@ -1,28 +1,67 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Thu, 8 Dec 2011 15:16:58 +0800
-Subject: [GIT PULL] sa1100 fixes for 3.2
-Message-ID: <CAN1soZyDCb8BqjTZ3N7kJBspQQtGuBchQYRbr2qcY1J24zCfuw@mail.gmail.com>
+From: dirk.behme@de.bosch.com (Dirk Behme)
+Date: Thu, 8 Dec 2011 08:22:01 +0100
+Subject: [PATCH v2] arm/imx6q: Rename Sabreauto to Armadillo2
+Message-ID: <1323328921-2226-1-git-send-email-dirk.behme@de.bosch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+The Sabreauto board was renamed to Armadillo2 recently. To avoid
+confusion, rename Sabreauto to Armadillo2/arm2.
 
-Please pull sa1100 fixes for 3.2.
+Signed-off-by: Dirk Behme <dirk.behme@de.bosch.com>
+CC: Shawn Guo <shawn.guo@linaro.org>
+---
+Changes in v2: Rebase against the recent mainline
 
-The following changes since commit 56f54e7d671969da13693e5a147438f2cc50ca9b:
+ Documentation/devicetree/bindings/arm/fsl.txt      |    4 ++--
+ .../dts/{imx6q-sabreauto.dts => imx6q-arm2.dts}    |    4 ++--
+ arch/arm/mach-imx/mach-imx6q.c                     |    2 +-
+ 3 files changed, 5 insertions(+), 5 deletions(-)
+ rename arch/arm/boot/dts/{imx6q-sabreauto.dts => imx6q-arm2.dts} (91%)
 
-  Merge branch 'fix' of git://github.com/ycmiao/pxa-linux into fixes
-(2011-11-23 20:30:08 +0000)
-
-are available in the git repository at:
-
-  git://github.com/hzhuang1/linux.git fixes
-
-Jett.Zhou (1):
-      ARM: sa1100: fix build error
-
- arch/arm/mach-sa1100/Makefile.boot |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
-
-Thanks
-Haojian
+diff --git a/Documentation/devicetree/bindings/arm/fsl.txt b/Documentation/devicetree/bindings/arm/fsl.txt
+index c9848ad..1b81e99 100644
+--- a/Documentation/devicetree/bindings/arm/fsl.txt
++++ b/Documentation/devicetree/bindings/arm/fsl.txt
+@@ -21,6 +21,6 @@ i.MX53 Smart Mobile Reference Design Board
+ Required root node properties:
+     - compatible = "fsl,imx53-smd", "fsl,imx53";
+ 
+-i.MX6 Quad SABRE Automotive Board
++i.MX6 Quad Armadillo2 Board
+ Required root node properties:
+-    - compatible = "fsl,imx6q-sabreauto", "fsl,imx6q";
++    - compatible = "fsl,imx6q-arm2", "fsl,imx6q";
+diff --git a/arch/arm/boot/dts/imx6q-sabreauto.dts b/arch/arm/boot/dts/imx6q-arm2.dts
+similarity index 91%
+rename from arch/arm/boot/dts/imx6q-sabreauto.dts
+rename to arch/arm/boot/dts/imx6q-arm2.dts
+index 072974e..b078b91 100644
+--- a/arch/arm/boot/dts/imx6q-sabreauto.dts
++++ b/arch/arm/boot/dts/imx6q-arm2.dts
+@@ -14,8 +14,8 @@
+ /include/ "imx6q.dtsi"
+ 
+ / {
+-	model = "Freescale i.MX6 Quad SABRE Automotive Board";
+-	compatible = "fsl,imx6q-sabreauto", "fsl,imx6q";
++	model = "Freescale i.MX6 Quad Armadillo2 Board";
++	compatible = "fsl,imx6q-arm2", "fsl,imx6q";
+ 
+ 	chosen {
+ 		bootargs = "console=ttymxc0,115200 root=/dev/mmcblk3p3 rootwait";
+diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
+index 9cd860a..a62e568 100644
+--- a/arch/arm/mach-imx/mach-imx6q.c
++++ b/arch/arm/mach-imx/mach-imx6q.c
+@@ -71,7 +71,7 @@ static struct sys_timer imx6q_timer = {
+ };
+ 
+ static const char *imx6q_dt_compat[] __initdata = {
+-	"fsl,imx6q-sabreauto",
++	"fsl,imx6q-arm2",
+ 	NULL,
+ };
+ 
+-- 
+1.7.0.4
