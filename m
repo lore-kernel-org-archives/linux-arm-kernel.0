@@ -1,124 +1,53 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu,  8 Dec 2011 15:41:54 +0100
-Subject: [PATCH 1/2] ARM: at91: make x40s use free of at91_sys_read/write
-Message-ID: <1323355315-9767-1-git-send-email-plagnioj@jcrosoft.com>
+Date: Thu,  8 Dec 2011 15:41:55 +0100
+Subject: [PATCH 2/2] ARM: at91x40: refresh soc defconfig for 3.2
+In-Reply-To: <1323355315-9767-1-git-send-email-plagnioj@jcrosoft.com>
+References: <1323355315-9767-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <1323355315-9767-2-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
 ---
- arch/arm/mach-at91/at91x40_time.c         |   28 +++++++++++++++++-----------
- arch/arm/mach-at91/include/mach/at91x40.h |   18 +++++++++---------
- arch/arm/mach-at91/include/mach/system.h  |    2 +-
- 3 files changed, 27 insertions(+), 21 deletions(-)
+ arch/arm/configs/at91x40_defconfig |    6 ++----
+ 1 files changed, 2 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-at91/at91x40_time.c b/arch/arm/mach-at91/at91x40_time.c
-index dfff289..6ca680a 100644
---- a/arch/arm/mach-at91/at91x40_time.c
-+++ b/arch/arm/mach-at91/at91x40_time.c
-@@ -28,6 +28,12 @@
- #include <asm/mach/time.h>
- #include <mach/at91_tc.h>
- 
-+#define at91_tc_read(field) \
-+	__raw_readl(AT91_TC + field)
-+
-+#define at91_tc_write(field, value) \
-+	__raw_writel(value, AT91_TC + field);
-+
- /*
-  *	3 counter/timer units present.
-  */
-@@ -37,12 +43,12 @@
- 
- static unsigned long at91x40_gettimeoffset(void)
- {
--	return (at91_sys_read(AT91_TC + AT91_TC_CLK1BASE + AT91_TC_CV) * 1000000 / (AT91X40_MASTER_CLOCK / 128));
-+	return (at91_tc_read(AT91_TC_CLK1BASE + AT91_TC_CV) * 1000000 / (AT91X40_MASTER_CLOCK / 128));
- }
- 
- static irqreturn_t at91x40_timer_interrupt(int irq, void *dev_id)
- {
--	at91_sys_read(AT91_TC + AT91_TC_CLK1BASE + AT91_TC_SR);
-+	at91_tc_read(AT91_TC_CLK1BASE + AT91_TC_SR);
- 	timer_tick();
- 	return IRQ_HANDLED;
- }
-@@ -57,20 +63,20 @@ void __init at91x40_timer_init(void)
- {
- 	unsigned int v;
- 
--	at91_sys_write(AT91_TC + AT91_TC_BCR, 0);
--	v = at91_sys_read(AT91_TC + AT91_TC_BMR);
-+	at91_tc_write(AT91_TC_BCR, 0);
-+	v = at91_tc_read(AT91_TC_BMR);
- 	v = (v & ~AT91_TC_TC1XC1S) | AT91_TC_TC1XC1S_NONE;
--	at91_sys_write(AT91_TC + AT91_TC_BMR, v);
-+	at91_tc_write(AT91_TC_BMR, v);
- 
--	at91_sys_write(AT91_TC + AT91_TC_CLK1BASE + AT91_TC_CCR, AT91_TC_CLKDIS);
--	at91_sys_write(AT91_TC + AT91_TC_CLK1BASE + AT91_TC_CMR, (AT91_TC_TIMER_CLOCK4 | AT91_TC_CPCTRG));
--	at91_sys_write(AT91_TC + AT91_TC_CLK1BASE + AT91_TC_IDR, 0xffffffff);
--	at91_sys_write(AT91_TC + AT91_TC_CLK1BASE + AT91_TC_RC, (AT91X40_MASTER_CLOCK / 128) / HZ - 1);
--	at91_sys_write(AT91_TC + AT91_TC_CLK1BASE + AT91_TC_IER, (1<<4));
-+	at91_tc_write(AT91_TC_CLK1BASE + AT91_TC_CCR, AT91_TC_CLKDIS);
-+	at91_tc_write(AT91_TC_CLK1BASE + AT91_TC_CMR, (AT91_TC_TIMER_CLOCK4 | AT91_TC_CPCTRG));
-+	at91_tc_write(AT91_TC_CLK1BASE + AT91_TC_IDR, 0xffffffff);
-+	at91_tc_write(AT91_TC_CLK1BASE + AT91_TC_RC, (AT91X40_MASTER_CLOCK / 128) / HZ - 1);
-+	at91_tc_write(AT91_TC_CLK1BASE + AT91_TC_IER, (1<<4));
- 
- 	setup_irq(AT91X40_ID_TC1, &at91x40_timer_irq);
- 
--	at91_sys_write(AT91_TC + AT91_TC_CLK1BASE + AT91_TC_CCR, (AT91_TC_SWTRG | AT91_TC_CLKEN));
-+	at91_tc_write(AT91_TC_CLK1BASE + AT91_TC_CCR, (AT91_TC_SWTRG | AT91_TC_CLKEN));
- }
- 
- struct sys_timer at91x40_timer = {
-diff --git a/arch/arm/mach-at91/include/mach/at91x40.h b/arch/arm/mach-at91/include/mach/at91x40.h
-index a57829f..9068021 100644
---- a/arch/arm/mach-at91/include/mach/at91x40.h
-+++ b/arch/arm/mach-at91/include/mach/at91x40.h
-@@ -28,18 +28,18 @@
- #define AT91X40_ID_IRQ2		18	/* External IRQ 2 */
- 
- /*
-- * System Peripherals (offset from AT91_BASE_SYS)
-+ * System Peripherals
-  */
- #define AT91_BASE_SYS	0xffc00000
- 
--#define AT91_EBI	(0xffe00000 - AT91_BASE_SYS)	/* External Bus Interface */
--#define AT91_SF		(0xfff00000 - AT91_BASE_SYS)	/* Special Function */
--#define AT91_USART1	(0xfffcc000 - AT91_BASE_SYS)	/* USART 1 */
--#define AT91_USART0	(0xfffd0000 - AT91_BASE_SYS)	/* USART 0 */
--#define AT91_TC		(0xfffe0000 - AT91_BASE_SYS)	/* Timer Counter */
--#define AT91_PIOA	(0xffff0000 - AT91_BASE_SYS)	/* PIO Controller A */
--#define AT91_PS		(0xffff4000 - AT91_BASE_SYS)	/* Power Save */
--#define AT91_WD		(0xffff8000 - AT91_BASE_SYS)	/* Watchdog Timer */
-+#define AT91_EBI	0xffe00000	/* External Bus Interface */
-+#define AT91_SF		0xfff00000	/* Special Function */
-+#define AT91_USART1	0xfffcc000	/* USART 1 */
-+#define AT91_USART0	0xfffd0000	/* USART 0 */
-+#define AT91_TC		0xfffe0000	/* Timer Counter */
-+#define AT91_PIOA	0xffff0000	/* PIO Controller A */
-+#define AT91_PS		0xffff4000	/* Power Save */
-+#define AT91_WD		0xffff8000	/* Watchdog Timer */
- 
- /*
-  * The AT91x40 series doesn't have a debug unit like the other AT91 parts.
-diff --git a/arch/arm/mach-at91/include/mach/system.h b/arch/arm/mach-at91/include/mach/system.h
-index 36af14b..a3c0fc0 100644
---- a/arch/arm/mach-at91/include/mach/system.h
-+++ b/arch/arm/mach-at91/include/mach/system.h
-@@ -33,7 +33,7 @@ static inline void arch_idle(void)
- 	 * re-enabled by an interrupt or by a reset.
- 	 */
- #ifdef AT91_PS
--	at91_sys_write(AT91_PS_CR, AT91_PS_CR_CPU);
-+	__raw_writel(AT91_PS_CR_CPU, AT91_PS_CR);
- #else
- 	at91_sys_write(AT91_PMC_SCDR, AT91_PMC_PCK);
- #endif
+diff --git a/arch/arm/configs/at91x40_defconfig b/arch/arm/configs/at91x40_defconfig
+index c55e921..875275f 100644
+--- a/arch/arm/configs/at91x40_defconfig
++++ b/arch/arm/configs/at91x40_defconfig
+@@ -1,10 +1,11 @@
++CONFIG_PHYS_OFFSET=0x20000000
+ CONFIG_EXPERIMENTAL=y
+ CONFIG_LOG_BUF_SHIFT=14
+-CONFIG_EMBEDDED=y
+ # CONFIG_HOTPLUG is not set
+ # CONFIG_ELF_CORE is not set
+ # CONFIG_FUTEX is not set
+ # CONFIG_TIMERFD is not set
++CONFIG_EMBEDDED=y
+ # CONFIG_VM_EVENT_COUNTERS is not set
+ # CONFIG_COMPAT_BRK is not set
+ CONFIG_SLAB=y
+@@ -16,7 +17,6 @@ CONFIG_SLAB=y
+ CONFIG_ARCH_AT91=y
+ CONFIG_ARCH_AT91X40=y
+ CONFIG_MACH_AT91EB01=y
+-CONFIG_AT91_EARLY_USART0=y
+ CONFIG_CPU_ARM7TDMI=y
+ CONFIG_SET_MEM_PARAM=y
+ CONFIG_DRAM_BASE=0x01000000
+@@ -26,10 +26,8 @@ CONFIG_PROCESSOR_ID=0x14000040
+ CONFIG_ZBOOT_ROM_TEXT=0x0
+ CONFIG_ZBOOT_ROM_BSS=0x0
+ CONFIG_BINFMT_FLAT=y
+-# CONFIG_SUSPEND is not set
+ # CONFIG_FW_LOADER is not set
+ CONFIG_MTD=y
+-CONFIG_MTD_PARTITIONS=y
+ CONFIG_MTD_CHAR=y
+ CONFIG_MTD_BLOCK=y
+ CONFIG_MTD_RAM=y
 -- 
 1.7.7
