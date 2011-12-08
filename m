@@ -1,48 +1,45 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 7 Dec 2011 19:10:48 -0500 (EST)
-Subject: Bug#651215: Kernel fails to boot on NSLU2
-In-Reply-To: <20111207225718.GI14542@n2100.arm.linux.org.uk>
-References: <20111206194048.12063.82586.reportbug@vrnul03074nb.vr-netze.vrnet>
- <1323237747.18450.7.camel@deadeye> <8739cwxcjd.fsf@lebrac.rtp-net.org>
- <20111207225718.GI14542@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.02.1112071902360.2907@xanadu.home>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 8 Dec 2011 00:16:33 +0000
+Subject: [GIT PULL] Linux support for ARM LPAE
+In-Reply-To: <20111207202912.GE14542@n2100.arm.linux.org.uk>
+References: <20111202182054.GA3250@arm.com>
+ <20111206124109.GT14542@n2100.arm.linux.org.uk>
+ <20111206140729.GA31720@arm.com>
+ <20111206233058.GZ14542@n2100.arm.linux.org.uk>
+ <20111207112320.GB23720@arm.com> <20111207122544.GD23720@arm.com>
+ <20111207202912.GE14542@n2100.arm.linux.org.uk>
+Message-ID: <20111208001633.GJ14542@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 7 Dec 2011, Russell King - ARM Linux wrote:
+On Wed, Dec 07, 2011 at 08:29:12PM +0000, Russell King - ARM Linux wrote:
+> What I want from you - by 5pm tomorrow so I can get this stuff merged -
+> is a pull request for the LPAE stuff as it was in your v2 pull request,
+> either based on top of _either_ my devel-stable (if you can get it - as
+> the machine is having severe problems running git atm) or with Will's
+> idmap changes merged into it _before_ the LPAE changes.
 
-> On Wed, Dec 07, 2011 at 11:05:58PM +0100, Arnaud Patard wrote:
-> > I may be wrong but it seems that arm_dma_zone_size is used before being
-> > set. It would be interesting if someone can boot test a nslu2 kernel with
-> > appended patch.
-> 
-> It does look like that's the case - arm_dma_zone_size is used in
-> arm_bootmem_free(), which is called from bootmem_init() and in turn
-> paging_init().
-> 
-> So, arm_dma_zone_size needs to be set before paging_init() is called.
+For the avoidance of any doubt - and any argument - the 5pm time limit
+is there to bring this debacle to a close in a reasonable period.  It's
+purely there because I want to get this merged by end of Thursday and
+no later.
 
-Oops, indeed.
+To summarise, my objections are quite simply:
 
-> I'd actually suggest moving it before:
-> 
->         if (mdesc->restart_mode)
->                 reboot_setup(&mdesc->restart_mode);
-> 
-> so that it's set real early, to avoid any future problems with this.
-> The earlier these kinds of things are set, the less likely this kind
-> of bug will happen.
+1. Your lack of sign-off on my patch which you merged (which you've
+   addressed in pull v2.)
+2. The combined point of the merge conflict between your tree and Will's
+   idmap tree, plus the dependency your tree _does_ have on the idmap
+   changes means it _should_ include Will's idmap changes to ensure
+   bisectability - and this has the side effect of solving the merge
+   conflict which shouldn't be there.
 
-Arnaud: please resubmit your patch moving the call as suggested by 
-Russell and mark it with:
+Any other objections which you think I've made are a purely a figment
+of your imagination.
 
-Acked-by: Nicolas Pitre <nico@linaro.org>
-
-and
-
-CC: stable at kernel.org
-
-Thanks
-
-
-Nicolas
+Now, one thing I haven't checked is the ordering of the commits -
+particularly the ordering of the 'fix' patch and my patch.  Unfortunately,
+standard git pull messages don't give the order so it's not something I
+can readily check.  I commented on this issue when you posted the patch
+set.  I hope it will be correct for pull v3 (iow, the fix patch first,
+then my patch.)
