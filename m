@@ -1,36 +1,110 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 8 Dec 2011 11:19:56 -0800
-Subject: [GIT PULL] OMAP: PM support for OMAP4 MPU sub-system
-In-Reply-To: <874nxaewbv.fsf@ti.com>
-References: <874nxaewbv.fsf@ti.com>
-Message-ID: <20111208191956.GC31337@atomide.com>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Thu, 08 Dec 2011 21:25:20 +0200
+Subject: [PATCH] ARM: OMAP3: hsmmc: fix MMC 2 setup for AM35x
+In-Reply-To: <1322559468-5883-1-git-send-email-grinberg@compulab.co.il>
+References: <1322559468-5883-1-git-send-email-grinberg@compulab.co.il>
+Message-ID: <4EE10F20.5080806@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Kevin Hilman <khilman@ti.com> [111208 10:14]:
-> Tony,
-> 
-> Please pull the OMAP4 MPUSS PM series below.  It is based on the
-> Russell's devel-stable branch due to dependencies
-> 
-> Kevin
-> 
-> The following changes since commit 3ee0fc5ca129cbae81c073756febcb1c552af446:
-> 
->   Merge branch 'kexec/idmap' of git://git.kernel.org/pub/scm/linux/kernel/git/will/linux into devel-stable (2011-12-06 20:27:54 +0000)
+ping
 
-I don't think there's a dependency here to the kexec/idmap commit?
+Tony,
+I'd like this to go into 3.3, can it?
 
-Great yeah this is badly needed. One minor thing, can you please rebase
-this on one commit earlier to commit deee6d5359969a0ce4e2760cfd7b9f379bd5698a
-(ARM: 7194/1: OMAP: Fix build after a merge between v3.2-rc4 and ARM
-restart changes) as that's what we have as the base for other branches.
+On 11/29/11 11:37, Igor Grinberg wrote:
+> AM35x MMC 2 controller has internal clock loopback setting which cannot
+> be utilized without this patch and thus SDIO devices connected to this
+> controller and depend on this setting will fail to initialize.
+> 
+> Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
+> ---
+>  arch/arm/mach-omap2/hsmmc.c |   42 ++++++++++++++++++++++++++++++------------
+>  1 files changed, 30 insertions(+), 12 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/hsmmc.c b/arch/arm/mach-omap2/hsmmc.c
+> index ecde558..c80859e 100644
+> --- a/arch/arm/mach-omap2/hsmmc.c
+> +++ b/arch/arm/mach-omap2/hsmmc.c
+> @@ -171,6 +171,17 @@ static void omap4_hsmmc1_after_set_reg(struct device *dev, int slot,
+>  	}
+>  }
+>  
+> +static void hsmmc2_select_input_clk_src(struct omap_mmc_platform_data *mmc)
+> +{
+> +	u32 reg;
+> +
+> +	if (mmc->slots[0].internal_clock) {
+> +		reg = omap_ctrl_readl(control_devconf1_offset);
+> +		reg |= OMAP2_MMCSDIO2ADPCLKISEL;
+> +		omap_ctrl_writel(reg, control_devconf1_offset);
+> +	}
+> +}
+> +
+>  static void hsmmc23_before_set_reg(struct device *dev, int slot,
+>  				   int power_on, int vdd)
+>  {
+> @@ -179,16 +190,19 @@ static void hsmmc23_before_set_reg(struct device *dev, int slot,
+>  	if (mmc->slots[0].remux)
+>  		mmc->slots[0].remux(dev, slot, power_on);
+>  
+> -	if (power_on) {
+> -		/* Only MMC2 supports a CLKIN */
+> -		if (mmc->slots[0].internal_clock) {
+> -			u32 reg;
+> +	if (power_on)
+> +		hsmmc2_select_input_clk_src(mmc);
+> +}
+>  
+> -			reg = omap_ctrl_readl(control_devconf1_offset);
+> -			reg |= OMAP2_MMCSDIO2ADPCLKISEL;
+> -			omap_ctrl_writel(reg, control_devconf1_offset);
+> -		}
+> -	}
+> +static int am35x_hsmmc2_set_power(struct device *dev, int slot,
+> +				  int power_on, int vdd)
+> +{
+> +	struct omap_mmc_platform_data *mmc = dev->platform_data;
+> +
+> +	if (power_on)
+> +		hsmmc2_select_input_clk_src(mmc);
+> +
+> +	return 0;
+>  }
+>  
+>  static int nop_mmc_set_power(struct device *dev, int slot, int power_on,
+> @@ -346,9 +360,7 @@ static int __init omap_hsmmc_pdata_init(struct omap2_hsmmc_info *c,
+>  	else
+>  		mmc->slots[0].ocr_mask = c->ocr_mask;
+>  
+> -	if (cpu_is_omap3517() || cpu_is_omap3505())
+> -		mmc->slots[0].set_power = nop_mmc_set_power;
+> -	else
+> +	if (!cpu_is_omap3517() && !cpu_is_omap3505())
+>  		mmc->slots[0].features |= HSMMC_HAS_PBIAS;
+>  
+>  	if (cpu_is_omap44xx() && (omap_rev() > OMAP4430_REV_ES1_0))
+> @@ -371,6 +383,9 @@ static int __init omap_hsmmc_pdata_init(struct omap2_hsmmc_info *c,
+>  			}
+>  		}
+>  
+> +		if (cpu_is_omap3517() || cpu_is_omap3505())
+> +			mmc->slots[0].set_power = nop_mmc_set_power;
+> +
+>  		/* OMAP3630 HSMMC1 supports only 4-bit */
+>  		if (cpu_is_omap3630() &&
+>  				(c->caps & MMC_CAP_8_BIT_DATA)) {
+> @@ -380,6 +395,9 @@ static int __init omap_hsmmc_pdata_init(struct omap2_hsmmc_info *c,
+>  		}
+>  		break;
+>  	case 2:
+> +		if (cpu_is_omap3517() || cpu_is_omap3505())
+> +			mmc->slots[0].set_power = am35x_hsmmc2_set_power;
+> +
+>  		if (c->ext_clock)
+>  			c->transceiver = 1;
+>  		if (c->transceiver && (c->caps & MMC_CAP_8_BIT_DATA)) {
 
-It sounds like we'll have to base board branch to something later in
-devel-stable for the machine_id, but from generating pull requests point
-of view it's best to have the same base for other branches unless
-there are new dependencies involved.
-
+-- 
 Regards,
-
-Tony
+Igor.
