@@ -1,22 +1,13 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 8 Dec 2011 01:09:25 +0000
-Subject: [PATCH 3/3] ARM: S3C64XX: Implement basic power domain support
-In-Reply-To: <201112072244.02299.rjw@sisk.pl>
-References: <1322765339-29879-1-git-send-email-broonie@opensource.wolfsonmicro.com>
- <4ED930B3.3020200@gmail.com>
- <20111202210706.GB15268@opensource.wolfsonmicro.com>
- <201112072244.02299.rjw@sisk.pl>
-Message-ID: <20111208010924.GC5748@opensource.wolfsonmicro.com>
+From: richard.zhao@linaro.org (Richard Zhao)
+Date: Thu, 8 Dec 2011 09:28:32 +0800
+Subject: ARM: mx51/53: fix _clk_max_* misuse and add esdhc round_rate
+Message-ID: <1323307714-21290-1-git-send-email-richard.zhao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 07, 2011 at 10:44:02PM +0100, Rafael J. Wysocki wrote:
-> On Friday, December 02, 2011, Mark Brown wrote:
+Changes since v1:
+-split into two patch. one for  _clk_max_*, the other for esdhc round_rate
+-rebase onto arm-soc for-next
 
-> > May as well, yes - I didn't actually measure how long it tends to take
-> > to do the spin but it's not going to hurt.
-
-> Are you going to post an updated patch?
-
-I've resent it but my development laptop is currently not internet
-connected so I'm not sure when it'll actually go out.
+Thanks
+Richard
