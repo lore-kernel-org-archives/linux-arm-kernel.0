@@ -1,24 +1,22 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Thu, 8 Dec 2011 10:03:38 -0800
-Subject: [PATCH v6 10/10] arm/tegra: add support for tegra30 based board
- cardhu
-In-Reply-To: <1323348254-29072-11-git-send-email-pdeschrijver@nvidia.com>
-References: <1323348254-29072-1-git-send-email-pdeschrijver@nvidia.com>
- <1323348254-29072-11-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF1750B77A82@HQMAIL01.nvidia.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 8 Dec 2011 18:05:36 +0000
+Subject: [GIT PULL v3] Linux support for ARM LPAE
+In-Reply-To: <20111208110349.GA26970@arm.com>
+References: <20111208110349.GA26970@arm.com>
+Message-ID: <20111208180536.GK14542@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Peter De Schrijver wrote at Thursday, December 08, 2011 5:44 AM:
-> Add support for the tegra30 based cardhu development board. Cardhu is a tablet
-> formfactor reference design for tegra30. The patch provides a device tree for
-> the board, updates Makefile.boot to build the dtb, includes the platform in
-> Kconfig and updates board-dt.c.
+On Thu, Dec 08, 2011 at 11:03:49AM +0000, Catalin Marinas wrote:
+> The series is rebased against Will's idmap series as merged in your
+> devel-stable tree (I couldn't fetch devel-stable this morning). Please
+> note that the branch was changed to 'for-rmk' (previously 'for-next').
+> The nopud fixup was already reordered so that it comes before your
+> patch.
 
-It'd be nice to add status="disabled" to all the peripherals that aren't
-hooked up on Cardhu, in the same way as the patches I recently posted for
-all the Tegra20 boards. Still, I'm fine with doing that in a following
-patch.
+Thank you.
 
--- 
-nvpublic
+Now pulled and merged - with the expected conflict in ioremap.c between
+your commits and 576d2f25 resolved.
+
+I'll push it out shortly, so it should land in linux-next this evening.
