@@ -1,46 +1,178 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 8 Dec 2011 23:31:44 +0100
-Subject: [PATCH] Documentation/pinctrl: various minor fixes
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF1750B77B9F@HQMAIL01.nvidia.com>
-References: <1323382892-28298-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <74CDBE0F657A3D45AFBB94109FB122FF1750B77B9F@HQMAIL01.nvidia.com>
-Message-ID: <20111208223144.GQ4585@pengutronix.de>
+From: sakoman@gmail.com (Steve Sakoman)
+Date: Thu, 8 Dec 2011 14:33:10 -0800
+Subject: [PATCH] ARM: OMAP3: hwmod data: disable multiblock reads on
+ MMC1/2 on OMAP34xx/35xx <= ES2.1
+In-Reply-To: <alpine.DEB.2.00.1110061453540.4611@utopia.booyaka.com>
+References: <alpine.DEB.2.00.1110061453540.4611@utopia.booyaka.com>
+Message-ID: <CAGDS+nnm_+9975aX9h7U7EUf6UDWiiqO8+yfG_zW1sCxhgrzQw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 08, 2011 at 02:24:46PM -0800, Stephen Warren wrote:
-> Uwe Kleine-K?nig wrote at Thursday, December 08, 2011 3:22 PM:
-> > - add some consts
-> > - don't use the group index alone to determine the value to write to
-> >   foo's mux register. For spi and i2c the group index is always 0.
-> >   Additionally using the function index makes much more sense as it
-> >   generates a different value for each function/group pair.
-> > - fix a few syntax errors
-> 
-> > @@ -600,7 +600,7 @@ static int foo_get_groups(struct pinctrl_dev *pctldev, unsigned selector,
-> >  int foo_enable(struct pinctrl_dev *pctldev, unsigned selector,
-> >  		unsigned group)
-> >  {
-> > -	u8 regbit = (1 << group);
-> > +	u8 regbit = (1 << selector + group);
-> > 
-> >  	writeb((readb(MUX)|regbit), MUX)
-> >  	return 0;
-> > @@ -609,7 +609,7 @@ int foo_enable(struct pinctrl_dev *pctldev, unsigned selector,
-> >  int foo_disable(struct pinctrl_dev *pctldev, unsigned selector,
-> >  		unsigned group)
-> >  {
-> > -	u8 regbit = (1 << group);
-> > +	u8 regbit = (1 << selector);
-> > 
-> >  	writeb((readb(MUX) & ~(regbit)), MUX)
-> >  	return 0;
-> 
-> Shouldn't those two regbit calculations match?
-Yes, of course. (Well, it depends on the register model ...)
+On Thu, Oct 6, 2011 at 1:56 PM, Paul Walmsley <paul@pwsan.com> wrote:
+>
+> The HSMMC1/HSMMC2 host controllers on OMAP34xx and
+> OMAP3503/3515/3525/3530 chips at ES levels prior to 3.0 can't do multiple
+> block reads[1]. ?Mark the hwmod data appropriately.
+>
+> Reported by Dave Hylands <dhylands@gmail.com> and Steve Sakoman
+> <sakoman@gmail.com>.
+>
+> 1. See for example Advisory 2.1.1.128 "MMC: Multiple Block Read
+> ? Operation Issue" in _OMAP3530/3525/3515/3503 Silicon Errata_
+> ? Revision F (October 2010) (SPRZ278F), available from
+> ? http://focus.ti.com/lit/er/sprz278f/sprz278f.pdf
+>
+> Signed-off-by: Paul Walmsley <paul@pwsan.com>
+> Cc: Dave Hylands <dhylands@gmail.com>
+> Cc: Steve Sakoman <sakoman@gmail.com>
+> ---
+>
+> This patch has a dependency on the "MMC: disable multiblock reads on
+> controllers that don't support them" series recently posted to
+> the linux-mmc list, so the application of this patch will probably be
+> delayed until the 3.3 merge window.
 
-Uwe
+Since the above patch is now in mainline
+(2bf22b39823c1d173dda31111a4eb2ce36daaf39) this patch can go in.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Without it 35XXES2.1 systems have broken mmc.   Too late as a bug fix for 3.2?
+
+Steve
+
+
+
+> ?arch/arm/mach-omap2/omap_hwmod_3xxx_data.c | ? 90 ++++++++++++++++++++++++++-
+> ?1 files changed, 86 insertions(+), 4 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+> index 53b6706..a14d150 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+> @@ -3020,7 +3020,35 @@ static struct omap_mmc_dev_attr mmc1_dev_attr = {
+> ? ? ? ?.flags = OMAP_HSMMC_SUPPORTS_DUAL_VOLT,
+> ?};
+>
+> -static struct omap_hwmod omap3xxx_mmc1_hwmod = {
+> +/* See 35xx errata 2.1.1.128 in SPRZ278F */
+> +static struct omap_mmc_dev_attr mmc1_pre_es3_dev_attr = {
+> + ? ? ? .flags = (OMAP_HSMMC_SUPPORTS_DUAL_VOLT |
+> + ? ? ? ? ? ? ? ? OMAP_HSMMC_BROKEN_MULTIBLOCK_READ),
+> +};
+> +
+> +static struct omap_hwmod omap3xxx_pre_es3_mmc1_hwmod = {
+> + ? ? ? .name ? ? ? ? ? = "mmc1",
+> + ? ? ? .mpu_irqs ? ? ? = omap34xx_mmc1_mpu_irqs,
+> + ? ? ? .sdma_reqs ? ? ?= omap34xx_mmc1_sdma_reqs,
+> + ? ? ? .opt_clks ? ? ? = omap34xx_mmc1_opt_clks,
+> + ? ? ? .opt_clks_cnt ? = ARRAY_SIZE(omap34xx_mmc1_opt_clks),
+> + ? ? ? .main_clk ? ? ? = "mmchs1_fck",
+> + ? ? ? .prcm ? ? ? ? ? = {
+> + ? ? ? ? ? ? ? .omap2 = {
+> + ? ? ? ? ? ? ? ? ? ? ? .module_offs = CORE_MOD,
+> + ? ? ? ? ? ? ? ? ? ? ? .prcm_reg_id = 1,
+> + ? ? ? ? ? ? ? ? ? ? ? .module_bit = OMAP3430_EN_MMC1_SHIFT,
+> + ? ? ? ? ? ? ? ? ? ? ? .idlest_reg_id = 1,
+> + ? ? ? ? ? ? ? ? ? ? ? .idlest_idle_bit = OMAP3430_ST_MMC1_SHIFT,
+> + ? ? ? ? ? ? ? },
+> + ? ? ? },
+> + ? ? ? .dev_attr ? ? ? = &mmc1_pre_es3_dev_attr,
+> + ? ? ? .slaves ? ? ? ? = omap3xxx_mmc1_slaves,
+> + ? ? ? .slaves_cnt ? ? = ARRAY_SIZE(omap3xxx_mmc1_slaves),
+> + ? ? ? .class ? ? ? ? ?= &omap34xx_mmc_class,
+> +};
+> +
+> +static struct omap_hwmod omap3xxx_es3plus_mmc1_hwmod = {
+> ? ? ? ?.name ? ? ? ? ? = "mmc1",
+> ? ? ? ?.mpu_irqs ? ? ? = omap34xx_mmc1_mpu_irqs,
+> ? ? ? ?.sdma_reqs ? ? ?= omap34xx_mmc1_sdma_reqs,
+> @@ -3063,7 +3091,34 @@ static struct omap_hwmod_ocp_if *omap3xxx_mmc2_slaves[] = {
+> ? ? ? ?&omap3xxx_l4_core__mmc2,
+> ?};
+>
+> -static struct omap_hwmod omap3xxx_mmc2_hwmod = {
+> +/* See 35xx errata 2.1.1.128 in SPRZ278F */
+> +static struct omap_mmc_dev_attr mmc2_pre_es3_dev_attr = {
+> + ? ? ? .flags = OMAP_HSMMC_BROKEN_MULTIBLOCK_READ,
+> +};
+> +
+> +static struct omap_hwmod omap3xxx_pre_es3_mmc2_hwmod = {
+> + ? ? ? .name ? ? ? ? ? = "mmc2",
+> + ? ? ? .mpu_irqs ? ? ? = omap34xx_mmc2_mpu_irqs,
+> + ? ? ? .sdma_reqs ? ? ?= omap34xx_mmc2_sdma_reqs,
+> + ? ? ? .opt_clks ? ? ? = omap34xx_mmc2_opt_clks,
+> + ? ? ? .opt_clks_cnt ? = ARRAY_SIZE(omap34xx_mmc2_opt_clks),
+> + ? ? ? .main_clk ? ? ? = "mmchs2_fck",
+> + ? ? ? .prcm ? ? ? ? ? = {
+> + ? ? ? ? ? ? ? .omap2 = {
+> + ? ? ? ? ? ? ? ? ? ? ? .module_offs = CORE_MOD,
+> + ? ? ? ? ? ? ? ? ? ? ? .prcm_reg_id = 1,
+> + ? ? ? ? ? ? ? ? ? ? ? .module_bit = OMAP3430_EN_MMC2_SHIFT,
+> + ? ? ? ? ? ? ? ? ? ? ? .idlest_reg_id = 1,
+> + ? ? ? ? ? ? ? ? ? ? ? .idlest_idle_bit = OMAP3430_ST_MMC2_SHIFT,
+> + ? ? ? ? ? ? ? },
+> + ? ? ? },
+> + ? ? ? .dev_attr ? ? ? = &mmc2_pre_es3_dev_attr,
+> + ? ? ? .slaves ? ? ? ? = omap3xxx_mmc2_slaves,
+> + ? ? ? .slaves_cnt ? ? = ARRAY_SIZE(omap3xxx_mmc2_slaves),
+> + ? ? ? .class ? ? ? ? ?= &omap34xx_mmc_class,
+> +};
+> +
+> +static struct omap_hwmod omap3xxx_es3plus_mmc2_hwmod = {
+> ? ? ? ?.name ? ? ? ? ? = "mmc2",
+> ? ? ? ?.mpu_irqs ? ? ? = omap34xx_mmc2_mpu_irqs,
+> ? ? ? ?.sdma_reqs ? ? ?= omap34xx_mmc2_sdma_reqs,
+> @@ -3130,8 +3185,6 @@ static __initdata struct omap_hwmod *omap3xxx_hwmods[] = {
+> ? ? ? ?&omap3xxx_l4_core_hwmod,
+> ? ? ? ?&omap3xxx_l4_per_hwmod,
+> ? ? ? ?&omap3xxx_l4_wkup_hwmod,
+> - ? ? ? &omap3xxx_mmc1_hwmod,
+> - ? ? ? &omap3xxx_mmc2_hwmod,
+> ? ? ? ?&omap3xxx_mmc3_hwmod,
+> ? ? ? ?&omap3xxx_mpu_hwmod,
+> ? ? ? ?&omap3xxx_iva_hwmod,
+> @@ -3209,6 +3262,20 @@ static __initdata struct omap_hwmod *omap3430es2plus_hwmods[] = {
+> ? ? ? ?NULL
+> ?};
+>
+> +/* <= 3430ES3-only hwmods */
+> +static __initdata struct omap_hwmod *omap3430_pre_es3_hwmods[] = {
+> + ? ? ? &omap3xxx_pre_es3_mmc1_hwmod,
+> + ? ? ? &omap3xxx_pre_es3_mmc2_hwmod,
+> + ? ? ? NULL
+> +};
+> +
+> +/* 3430ES3+-only hwmods */
+> +static __initdata struct omap_hwmod *omap3430_es3plus_hwmods[] = {
+> + ? ? ? &omap3xxx_es3plus_mmc1_hwmod,
+> + ? ? ? &omap3xxx_es3plus_mmc2_hwmod,
+> + ? ? ? NULL
+> +};
+> +
+> ?/* 34xx-only hwmods (all ES revisions) */
+> ?static __initdata struct omap_hwmod *omap34xx_hwmods[] = {
+> ? ? ? ?&omap34xx_sr1_hwmod,
+> @@ -3281,6 +3348,21 @@ int __init omap3xxx_hwmod_init(void)
+> ? ? ? ? ? ? ? ?h = omap3430es2plus_hwmods;
+> ? ? ? ?};
+>
+> + ? ? ? if (h) {
+> + ? ? ? ? ? ? ? r = omap_hwmod_register(h);
+> + ? ? ? ? ? ? ? if (IS_ERR_VALUE(r))
+> + ? ? ? ? ? ? ? ? ? ? ? return r;
+> + ? ? ? }
+> +
+> + ? ? ? h = NULL;
+> + ? ? ? if (rev == OMAP3430_REV_ES1_0 || rev == OMAP3430_REV_ES2_0 ||
+> + ? ? ? ? ? rev == OMAP3430_REV_ES2_1) {
+> + ? ? ? ? ? ? ? h = omap3430_pre_es3_hwmods;
+> + ? ? ? } else if (rev == OMAP3430_REV_ES3_0 || rev == OMAP3430_REV_ES3_1 ||
+> + ? ? ? ? ? ? ? ? ?rev == OMAP3430_REV_ES3_1_2) {
+> + ? ? ? ? ? ? ? h = omap3430_es3plus_hwmods;
+> + ? ? ? };
+> +
+> ? ? ? ?if (h)
+> ? ? ? ? ? ? ? ?r = omap_hwmod_register(h);
+>
+> --
+> 1.7.6.3
+>
