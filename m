@@ -1,23 +1,135 @@
-From: junxiao.bi@windriver.com (Junxiao Bi)
-Date: Thu, 8 Dec 2011 18:07:46 +0800
-Subject: [V2][PATCH 0/6]ARM: fix BE8 mode support
-Message-ID: <1323338872-24716-1-git-send-email-junxiao.bi@windriver.com>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Thu,  8 Dec 2011 18:18:49 +0800
+Subject: [PATCH v3 1/2] [media] V4L: atmel-isi: add code to enable/disable
+ ISI_MCK clock
+Message-ID: <1323339530-26117-1-git-send-email-josh.wu@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patch
+- add ISI_MCK clock enable/disable code.
+- change field name in isi_platform_data structure
 
-This is V2 for this series. See V1 at
-http://comments.gmane.org/gmane.linux.ports.arm.kernel/140189
+Signed-off-by: Josh Wu <josh.wu@atmel.com>
+[g.liakhovetski at gmx.de: fix label names]
+Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+v3: using IS_ERR() to check return value of clk_get() instead of using IS_ERR_OR_NULL()
 
-Changes since V1:
-1. Drop the patch "ARM: gic: fix big endian support" since gic
-implementation has been changed and it works well in BE mode.
+ drivers/media/video/atmel-isi.c |   31 +++++++++++++++++++++++++++++--
+ include/media/atmel-isi.h       |    4 +++-
+ 2 files changed, 32 insertions(+), 3 deletions(-)
 
-2. remove "read/write_instr*" from the patch 
-"ARM: support kernel modules in BE8 mode", and use new helper 
-__opcode_to_mem_* and __mem_to_opcode_* to implement it. These 
-new helpers come from Dave Martin's patch 
-"ARM: Add generic instruction opcode manipulation helpers"
-
-3. split the big endian fix for MTD from the original patch
-"ARM: add big endian support for peripheral access" 
+diff --git a/drivers/media/video/atmel-isi.c b/drivers/media/video/atmel-isi.c
+index fbc904f..44789f0 100644
+--- a/drivers/media/video/atmel-isi.c
++++ b/drivers/media/video/atmel-isi.c
+@@ -90,7 +90,10 @@ struct atmel_isi {
+ 	struct isi_dma_desc		dma_desc[MAX_BUFFER_NUM];
+ 
+ 	struct completion		complete;
++	/* ISI peripherial clock */
+ 	struct clk			*pclk;
++	/* ISI_MCK, feed to camera sensor to generate pixel clock */
++	struct clk			*mck;
+ 	unsigned int			irq;
+ 
+ 	struct isi_platform_data	*pdata;
+@@ -766,6 +769,12 @@ static int isi_camera_add_device(struct soc_camera_device *icd)
+ 	if (ret)
+ 		return ret;
+ 
++	ret = clk_enable(isi->mck);
++	if (ret) {
++		clk_disable(isi->pclk);
++		return ret;
++	}
++
+ 	isi->icd = icd;
+ 	dev_dbg(icd->parent, "Atmel ISI Camera driver attached to camera %d\n",
+ 		 icd->devnum);
+@@ -779,6 +788,7 @@ static void isi_camera_remove_device(struct soc_camera_device *icd)
+ 
+ 	BUG_ON(icd != isi->icd);
+ 
++	clk_disable(isi->mck);
+ 	clk_disable(isi->pclk);
+ 	isi->icd = NULL;
+ 
+@@ -874,7 +884,7 @@ static int isi_camera_set_bus_param(struct soc_camera_device *icd, u32 pixfmt)
+ 
+ 	if (isi->pdata->has_emb_sync)
+ 		cfg1 |= ISI_CFG1_EMB_SYNC;
+-	if (isi->pdata->isi_full_mode)
++	if (isi->pdata->full_mode)
+ 		cfg1 |= ISI_CFG1_FULL_MODE;
+ 
+ 	isi_writel(isi, ISI_CTRL, ISI_CTRL_DIS);
+@@ -912,6 +922,7 @@ static int __devexit atmel_isi_remove(struct platform_device *pdev)
+ 			isi->fb_descriptors_phys);
+ 
+ 	iounmap(isi->regs);
++	clk_put(isi->mck);
+ 	clk_put(isi->pclk);
+ 	kfree(isi);
+ 
+@@ -930,7 +941,7 @@ static int __devinit atmel_isi_probe(struct platform_device *pdev)
+ 	struct isi_platform_data *pdata;
+ 
+ 	pdata = dev->platform_data;
+-	if (!pdata || !pdata->data_width_flags) {
++	if (!pdata || !pdata->data_width_flags || !pdata->mck_hz) {
+ 		dev_err(&pdev->dev,
+ 			"No config available for Atmel ISI\n");
+ 		return -EINVAL;
+@@ -959,6 +970,19 @@ static int __devinit atmel_isi_probe(struct platform_device *pdev)
+ 	INIT_LIST_HEAD(&isi->video_buffer_list);
+ 	INIT_LIST_HEAD(&isi->dma_desc_head);
+ 
++	/* Get ISI_MCK, provided by programmable clock or external clock */
++	isi->mck = clk_get(dev, "isi_mck");
++	if (IS_ERR(isi->mck)) {
++		dev_err(dev, "Failed to get isi_mck\n");
++		ret = PTR_ERR(isi->mck);
++		goto err_clk_get;
++	}
++
++	/* Set ISI_MCK's frequency, it should be faster than pixel clock */
++	ret = clk_set_rate(isi->mck, pdata->mck_hz);
++	if (ret < 0)
++		goto err_set_mck_rate;
++
+ 	isi->p_fb_descriptors = dma_alloc_coherent(&pdev->dev,
+ 				sizeof(struct fbd) * MAX_BUFFER_NUM,
+ 				&isi->fb_descriptors_phys,
+@@ -1034,6 +1058,9 @@ err_alloc_ctx:
+ 			isi->p_fb_descriptors,
+ 			isi->fb_descriptors_phys);
+ err_alloc_descriptors:
++err_set_mck_rate:
++	clk_put(isi->mck);
++err_clk_get:
+ 	kfree(isi);
+ err_alloc_isi:
+ 	clk_put(pclk);
+diff --git a/include/media/atmel-isi.h b/include/media/atmel-isi.h
+index 26cece5..6568230 100644
+--- a/include/media/atmel-isi.h
++++ b/include/media/atmel-isi.h
+@@ -110,10 +110,12 @@ struct isi_platform_data {
+ 	u8 hsync_act_low;
+ 	u8 vsync_act_low;
+ 	u8 pclk_act_falling;
+-	u8 isi_full_mode;
++	u8 full_mode;
+ 	u32 data_width_flags;
+ 	/* Using for ISI_CFG1 */
+ 	u32 frate;
++	/* Using for ISI_MCK */
++	u32 mck_hz;
+ };
+ 
+ #endif /* __ATMEL_ISI_H__ */
+-- 
+1.6.3.3
