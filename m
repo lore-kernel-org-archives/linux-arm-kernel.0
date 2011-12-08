@@ -1,72 +1,107 @@
-From: josh.wu@atmel.com (Josh Wu)
-Date: Thu,  8 Dec 2011 18:18:50 +0800
-Subject: [PATCH v3 2/2] [media] V4L: atmel-isi: add
- clk_prepare()/clk_unprepare() functions
-In-Reply-To: <1323339530-26117-1-git-send-email-josh.wu@atmel.com>
-References: <1323339530-26117-1-git-send-email-josh.wu@atmel.com>
-Message-ID: <1323339530-26117-2-git-send-email-josh.wu@atmel.com>
+From: nsekhar@ti.com (Nori, Sekhar)
+Date: Thu, 8 Dec 2011 10:29:14 +0000
+Subject: [PATCH] arm,davinci: configure davinci aemif chipselects
+ through OF
+In-Reply-To: <4EE07E27.8090602@denx.de>
+References: <1322991679-20947-1-git-send-email-hs@denx.de>
+ <DF0F476B391FA8409C78302C7BA518B603EFB2@DBDE01.ent.ti.com>
+ <4EE06B79.7070804@denx.de>
+ <DF0F476B391FA8409C78302C7BA518B6040A03@DBDE01.ent.ti.com>
+ <4EE07E27.8090602@denx.de>
+Message-ID: <DF0F476B391FA8409C78302C7BA518B6040CBB@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Heiko,
 
-Signed-off-by: Josh Wu <josh.wu@atmel.com>
----
-in v2 version, made the label name to be consistent
+On Thu, Dec 08, 2011 at 14:36:47, Heiko Schocher wrote:
 
- drivers/media/video/atmel-isi.c |   15 +++++++++++++++
- 1 files changed, 15 insertions(+), 0 deletions(-)
+> >>>> diff --git a/arch/arm/mach-davinci/aemif.c b/arch/arm/mach-davinci/aemif.c
+> >>>> index 1ce70a9..12c559f 100644
+> >>>> --- a/arch/arm/mach-davinci/aemif.c
+> >>>> +++ b/arch/arm/mach-davinci/aemif.c
+> >>>> @@ -13,12 +13,14 @@
+> >>>>  #include <linux/err.h>
+> >>>>  #include <linux/clk.h>
+> >>>>  #include <linux/module.h>
+> >>>> +#include <linux/of.h>
+> >>>> +#include <linux/of_address.h>
+> >>>>  #include <linux/time.h>
+> >>>>  
+> >>>>  #include <mach/aemif.h>
+> >>>>  
+> >>>>  /* Timing value configuration */
+> >>>> -
+> >>>> +#define ASIZE(x)	(x)
+> >>>>  #define TA(x)		((x) << 2)
+> >>>>  #define RHOLD(x)	((x) << 4)
+> >>>>  #define RSTROBE(x)	((x) << 7)
+> >>>> @@ -26,7 +28,10 @@
+> >>>>  #define WHOLD(x)	((x) << 17)
+> >>>>  #define WSTROBE(x)	((x) << 20)
+> >>>>  #define WSETUP(x)	((x) << 26)
+> >>>> +#define EW(x)		((x) << 30)
+> >>>> +#define SS(x)		((x) << 31)
+> >>> You are adding support for additional configuration
+> >>> parameters which should be done in a separate patch.
+> >> Hmm.. they are only used in the OF case ... is this split
+> >> really needed?
+> > 
+> > But they should also be useful in the non-OF case, no?
+> > Why restrict their usage to the OF case?
+> 
+> I thought there is no need, because nobody needed this yet ...
+> Ok, I change this too, so I have to fix this files:
 
-diff --git a/drivers/media/video/atmel-isi.c b/drivers/media/video/atmel-isi.c
-index ea4eef4..91ebcfb 100644
---- a/drivers/media/video/atmel-isi.c
-+++ b/drivers/media/video/atmel-isi.c
-@@ -922,7 +922,9 @@ static int __devexit atmel_isi_remove(struct platform_device *pdev)
- 			isi->fb_descriptors_phys);
- 
- 	iounmap(isi->regs);
-+	clk_unprepare(isi->mck);
- 	clk_put(isi->mck);
-+	clk_unprepare(isi->pclk);
- 	clk_put(isi->pclk);
- 	kfree(isi);
- 
-@@ -955,6 +957,12 @@ static int __devinit atmel_isi_probe(struct platform_device *pdev)
- 	if (IS_ERR(pclk))
- 		return PTR_ERR(pclk);
- 
-+	ret = clk_prepare(pclk);
-+	if (ret) {
-+		clk_put(pclk);
-+		return ret;
-+	}
-+
- 	isi = kzalloc(sizeof(struct atmel_isi), GFP_KERNEL);
- 	if (!isi) {
- 		ret = -ENOMEM;
-@@ -978,6 +986,10 @@ static int __devinit atmel_isi_probe(struct platform_device *pdev)
- 		goto err_clk_get;
- 	}
- 
-+	ret = clk_prepare(isi->mck);
-+	if (ret)
-+		goto err_clk_prepare_mck;
-+
- 	/* Set ISI_MCK's frequency, it should be faster than pixel clock */
- 	ret = clk_set_rate(isi->mck, pdata->mck_hz);
- 	if (ret < 0)
-@@ -1059,10 +1071,13 @@ err_alloc_ctx:
- 			isi->fb_descriptors_phys);
- err_alloc_descriptors:
- err_set_mck_rate:
-+	clk_unprepare(isi->mck);
-+err_clk_prepare_mck:
- 	clk_put(isi->mck);
- err_clk_get:
- 	kfree(isi);
- err_alloc_isi:
-+	clk_unprepare(pclk);
- 	clk_put(pclk);
- 
- 	return ret;
--- 
-1.6.3.3
+True, no one configured these so far (relied on the defaults).
+
+Also, they probably did not get added into the timing API since
+they are not really timing parameters. Its better to add a separate 
+configuration API for these.
+
+It will be better to move the driver outside of arch/arm/
+before adding new features. I don't know if there is a place
+defined yet for "memory interface" drivers, so, drivers/misc/
+may be the place.
+
+I have added Greg and Arnd for their opinion in this.
+
+Greg, Arnd,
+
+Brief background:
+
+DaVinci AEMIF is an async memory interface peripheral implemented
+in arch/arm/mach-davinci/aemif.c. It helps interface to NAND, NOR
+and other asynchronous memories. Currently it just provides an API
+for timing value configuration. The API is invoked by the MTD NAND
+driver.
+
+Specification here: http://www.ti.com/lit/ug/sprue20c/sprue20c.pdf
+
+We are looking at a place for this outside of architecture code.
+
+> 
+> $ grep -lr davinci_aemif_timing .
+> ./arch/arm/mach-davinci/board-dm644x-evm.c
+> ./arch/arm/mach-davinci/board-dm646x-evm.c
+> ./arch/arm/mach-davinci/board-da850-evm.c
+> ./arch/arm/mach-davinci/include/mach/aemif.h
+> ./arch/arm/mach-davinci/include/mach/nand.h
+> ./arch/arm/mach-davinci/board-da830-evm.c
+> ./drivers/mtd/nand/davinci_nand.c
+> 
+> I do not know the values for this boards for the new parameters.
+> How to proceed? Do you know this values? Or is it Ok, if I add in
+
+If we add a new API, there won't be a need to touch existing
+board code.
+
+> arch/arm/mach-davinci/include/mach/aemif.h
+> a "#define AEMIF_VALUE_NOT USED 0xff" and if the new value is set to
+> this I don't change this setting in the register?
+> 
+> bye,
+> Heiko
+
+Thanks,
+Sekhar
