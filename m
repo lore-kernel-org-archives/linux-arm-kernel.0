@@ -1,29 +1,31 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 8 Dec 2011 18:08:28 +0000
-Subject: [GIT PULL v3] Linux support for ARM LPAE
-In-Reply-To: <20111208180536.GK14542@n2100.arm.linux.org.uk>
-References: <20111208110349.GA26970@arm.com>
- <20111208180536.GK14542@n2100.arm.linux.org.uk>
-Message-ID: <20111208180828.GE27757@arm.com>
+From: ccross@android.com (Colin Cross)
+Date: Thu, 8 Dec 2011 10:29:43 -0800
+Subject: [PATCH v6 04/10] arm/tegra: prepare early init for multiple tegra
+ variants
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF1750B77A7E@HQMAIL01.nvidia.com>
+References: <1323348254-29072-1-git-send-email-pdeschrijver@nvidia.com>
+ <1323348254-29072-5-git-send-email-pdeschrijver@nvidia.com>
+ <74CDBE0F657A3D45AFBB94109FB122FF1750B77A7E@HQMAIL01.nvidia.com>
+Message-ID: <CAMbhsRTD1rQBY7Sn2km=XsUYsHMdqQqZSKu4agc0GB6+QE79fA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 08, 2011 at 06:05:36PM +0000, Russell King - ARM Linux wrote:
-> On Thu, Dec 08, 2011 at 11:03:49AM +0000, Catalin Marinas wrote:
-> > The series is rebased against Will's idmap series as merged in your
-> > devel-stable tree (I couldn't fetch devel-stable this morning). Please
-> > note that the branch was changed to 'for-rmk' (previously 'for-next').
-> > The nopud fixup was already reordered so that it comes before your
-> > patch.
-> 
-> Thank you.
-> 
-> Now pulled and merged - with the expected conflict in ioremap.c between
-> your commits and 576d2f25 resolved.
-> 
-> I'll push it out shortly, so it should land in linux-next this evening.
+On Thu, Dec 8, 2011 at 9:57 AM, Stephen Warren <swarren@nvidia.com> wrote:
+> Peter De Schrijver wrote at Thursday, December 08, 2011 5:44 AM:
+>> This patch splits the early init code in a common and a tegra20 specific part.
+>> L2 cache initialization is generalized and discovers the cache associativity
+>> at runtime. Also use arm_pm_restart instead of arm_arch_reset and reset the
+>> the system using the PMC reset feature rather then the CAR system reset.
+>
+> This one really should be at least 3 separate patches:
+> * s/tegra_init_early/tegra20_init_early/ in machine descriptions
+> * Switch reset mechanism from CAR to PMC
+> * tegra_init_cache modifications
+> * Not sure if all the ifdef additions go in the above, or if some should be
+> ?separate?
+>
+> Still, I think it's probably OK to go in as it is even if it isn't optimal.
 
-Great! Thanks.
-
--- 
-Catalin
+Please at least split out the reset change.  Does using the PMC reset
+instead of the CAR reset still result in a warm reset, or does it
+change to a cold reset?
