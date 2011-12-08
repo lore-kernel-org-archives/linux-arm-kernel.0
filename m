@@ -1,28 +1,24 @@
 From: swarren@nvidia.com (Stephen Warren)
-Date: Thu, 8 Dec 2011 09:57:33 -0800
-Subject: [PATCH v6 04/10] arm/tegra: prepare early init for multiple
- tegra variants
-In-Reply-To: <1323348254-29072-5-git-send-email-pdeschrijver@nvidia.com>
+Date: Thu, 8 Dec 2011 10:03:38 -0800
+Subject: [PATCH v6 10/10] arm/tegra: add support for tegra30 based board
+ cardhu
+In-Reply-To: <1323348254-29072-11-git-send-email-pdeschrijver@nvidia.com>
 References: <1323348254-29072-1-git-send-email-pdeschrijver@nvidia.com>
- <1323348254-29072-5-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF1750B77A7E@HQMAIL01.nvidia.com>
+ <1323348254-29072-11-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF1750B77A82@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Peter De Schrijver wrote at Thursday, December 08, 2011 5:44 AM:
-> This patch splits the early init code in a common and a tegra20 specific part.
-> L2 cache initialization is generalized and discovers the cache associativity
-> at runtime. Also use arm_pm_restart instead of arm_arch_reset and reset the
-> the system using the PMC reset feature rather then the CAR system reset.
+> Add support for the tegra30 based cardhu development board. Cardhu is a tablet
+> formfactor reference design for tegra30. The patch provides a device tree for
+> the board, updates Makefile.boot to build the dtb, includes the platform in
+> Kconfig and updates board-dt.c.
 
-This one really should be at least 3 separate patches:
-* s/tegra_init_early/tegra20_init_early/ in machine descriptions
-* Switch reset mechanism from CAR to PMC
-* tegra_init_cache modifications
-* Not sure if all the ifdef additions go in the above, or if some should be
-  separate?
-
-Still, I think it's probably OK to go in as it is even if it isn't optimal.
+It'd be nice to add status="disabled" to all the peripherals that aren't
+hooked up on Cardhu, in the same way as the patches I recently posted for
+all the Tegra20 boards. Still, I'm fine with doing that in a following
+patch.
 
 -- 
 nvpublic
