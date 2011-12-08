@@ -1,100 +1,36 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu,  8 Dec 2011 19:03:18 +0000
-Subject: [PATCH v8 1/4] ARM: lib: add call_with_stack function for safely
- changing stack
-In-Reply-To: <1323371001-4036-1-git-send-email-will.deacon@arm.com>
-References: <1323371001-4036-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1323371001-4036-2-git-send-email-will.deacon@arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 8 Dec 2011 11:19:56 -0800
+Subject: [GIT PULL] OMAP: PM support for OMAP4 MPU sub-system
+In-Reply-To: <874nxaewbv.fsf@ti.com>
+References: <874nxaewbv.fsf@ti.com>
+Message-ID: <20111208191956.GC31337@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When disabling the MMU, it is necessary to take out a 1:1 identity map
-of the reset code so that it can safely be executed with and without
-the MMU active. To avoid the situation where the physical address of the
-reset code aliases with the virtual address of the active stack (which
-cannot be included in the 1:1 mapping), it is desirable to change to a
-new stack at a location which is less likely to alias.
+* Kevin Hilman <khilman@ti.com> [111208 10:14]:
+> Tony,
+> 
+> Please pull the OMAP4 MPUSS PM series below.  It is based on the
+> Russell's devel-stable branch due to dependencies
+> 
+> Kevin
+> 
+> The following changes since commit 3ee0fc5ca129cbae81c073756febcb1c552af446:
+> 
+>   Merge branch 'kexec/idmap' of git://git.kernel.org/pub/scm/linux/kernel/git/will/linux into devel-stable (2011-12-06 20:27:54 +0000)
 
-This code adds a new lib function, call_with_stack:
+I don't think there's a dependency here to the kexec/idmap commit?
 
-	void call_with_stack(void (*fn)(void *), void *arg, void *sp);
+Great yeah this is badly needed. One minor thing, can you please rebase
+this on one commit earlier to commit deee6d5359969a0ce4e2760cfd7b9f379bd5698a
+(ARM: 7194/1: OMAP: Fix build after a merge between v3.2-rc4 and ARM
+restart changes) as that's what we have as the base for other branches.
 
-which changes the stack to point at the sp parameter, before invoking
-fn(arg) with the new stack selected.
+It sounds like we'll have to base board branch to something later in
+devel-stable for the machine_id, but from generating pull requests point
+of view it's best to have the same base for other branches unless
+there are new dependencies involved.
 
-Reviewed-by: Nicolas Pitre <nicolas.pitre@linaro.org>
-Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
-Signed-off-by: Dave Martin <dave.martin@linaro.org>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/lib/Makefile          |    3 +-
- arch/arm/lib/call_with_stack.S |   44 ++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 46 insertions(+), 1 deletions(-)
- create mode 100644 arch/arm/lib/call_with_stack.S
+Regards,
 
-diff --git a/arch/arm/lib/Makefile b/arch/arm/lib/Makefile
-index cf73a7f..0ade0ac 100644
---- a/arch/arm/lib/Makefile
-+++ b/arch/arm/lib/Makefile
-@@ -13,7 +13,8 @@ lib-y		:= backtrace.o changebit.o csumipv6.o csumpartial.o   \
- 		   testchangebit.o testclearbit.o testsetbit.o        \
- 		   ashldi3.o ashrdi3.o lshrdi3.o muldi3.o             \
- 		   ucmpdi2.o lib1funcs.o div64.o                      \
--		   io-readsb.o io-writesb.o io-readsl.o io-writesl.o
-+		   io-readsb.o io-writesb.o io-readsl.o io-writesl.o  \
-+		   call_with_stack.o
- 
- mmu-y	:= clear_user.o copy_page.o getuser.o putuser.o
- 
-diff --git a/arch/arm/lib/call_with_stack.S b/arch/arm/lib/call_with_stack.S
-new file mode 100644
-index 0000000..916c80f
---- /dev/null
-+++ b/arch/arm/lib/call_with_stack.S
-@@ -0,0 +1,44 @@
-+/*
-+ * arch/arm/lib/call_with_stack.S
-+ *
-+ * Copyright (C) 2011 ARM Ltd.
-+ * Written by Will Deacon <will.deacon@arm.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
-+ */
-+
-+#include <linux/linkage.h>
-+#include <asm/assembler.h>
-+
-+/*
-+ * void call_with_stack(void (*fn)(void *), void *arg, void *sp)
-+ *
-+ * Change the stack to that pointed at by sp, then invoke fn(arg) with
-+ * the new stack.
-+ */
-+ENTRY(call_with_stack)
-+	str	sp, [r2, #-4]!
-+	str	lr, [r2, #-4]!
-+
-+	mov	sp, r2
-+	mov	r2, r0
-+	mov	r0, r1
-+
-+	adr	lr, BSYM(1f)
-+	mov	pc, r2
-+
-+1:	ldr	lr, [sp]
-+	ldr	sp, [sp, #4]
-+	mov	pc, lr
-+ENDPROC(call_with_stack)
--- 
-1.7.4.1
+Tony
