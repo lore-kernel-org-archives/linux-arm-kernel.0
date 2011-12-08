@@ -1,66 +1,30 @@
-From: mturquette@ti.com (Turquette, Mike)
-Date: Thu, 8 Dec 2011 15:02:04 -0800
-Subject: [PATCH 7/8] OMAP4: clock: Add CPU local timer clock node.
-In-Reply-To: <CAMQu2gyBq61jcP1sLDEs8+zGfdAa6Pur1fSec9Wfzs48CX5zjA@mail.gmail.com>
-References: <1315459327-3285-1-git-send-email-santosh.shilimkar@ti.com>
- <1315459327-3285-8-git-send-email-santosh.shilimkar@ti.com>
- <CAKnu2Mp4QnQPwcGJCrfMqS6VcfvvvAxginjJkLG1mPLO0WJBUw@mail.gmail.com>
- <CAMQu2gyBq61jcP1sLDEs8+zGfdAa6Pur1fSec9Wfzs48CX5zjA@mail.gmail.com>
-Message-ID: <CAJOA=zP0zs=eKsQXQPt5dj8EHQFnZ50Jnm_Ho425yH-NZkgY5A@mail.gmail.com>
+From: sakoman@gmail.com (Steve Sakoman)
+Date: Thu, 8 Dec 2011 15:07:13 -0800
+Subject: [PATCH] ARM: OMAP3: hwmod data: disable multiblock reads on
+ MMC1/2 on OMAP34xx/35xx <= ES2.1
+In-Reply-To: <alpine.DEB.2.00.1112081541170.6289@utopia.booyaka.com>
+References: <alpine.DEB.2.00.1110061453540.4611@utopia.booyaka.com>
+ <CAGDS+nnm_+9975aX9h7U7EUf6UDWiiqO8+yfG_zW1sCxhgrzQw@mail.gmail.com>
+ <alpine.DEB.2.00.1112081541170.6289@utopia.booyaka.com>
+Message-ID: <CAGDS+nnASzgu4Xrvm2zqQ2H3uUtZWiKNC+Gb5saqZVLA=-7Scw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 30, 2011 at 2:15 AM, Shilimkar, Santosh
-<santosh.shilimkar@ti.com> wrote:
-> On Fri, Sep 30, 2011 at 3:00 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
->> 2011/9/8 Santosh Shilimkar <santosh.shilimkar@ti.com>:
->>
->>> Local timer clock is sourced from the CPU clock and hence changes
->>> along with CPU clock. These per CPU local timers are used as
->>> clock-events, so they need to be reconfigured on CPU frequency
->>> change as part of CPUfreq governor.
->>
->> This requires patch 6956/2 right?
->> http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=6956/2
->>
->> Can I add your Tested-by: to the patch as well?
->>
-> Sure.
+On Thu, Dec 8, 2011 at 2:51 PM, Paul Walmsley <paul@pwsan.com> wrote:
 
-Santosh,
+> Thanks for the reminder - I would have forgotten it otherwise.
+>
+>> Without it 35XXES2.1 systems have broken mmc. ?Too late as a bug fix for
+>> 3.2?
+>
+> This never worked correctly in previous Linux releases, right?
 
-I've taken in Linus' patch as well as this patch while testing clk
-notifiers (part of common clk framework code).
+I seem to recall that it worked a few releases back -- perhaps before
+multiblock reads??
 
-Linus' patch matches the clk based on dev_id, but the clkdev entry in
-your patch populated dev_id with NULL and con_id with "smp_twd" so
-things never worked correctly.  Below changed fixed it for me:
+It's been broken for a while though, so waiting for 3.3 isn't the end
+of the world.
 
-diff --git a/arch/arm/mach-omap2/clock44xx_data.c
-b/arch/arm/mach-omap2/clock44xx_data.c
-index ae8c292..0f8cf68 100644
---- a/arch/arm/mach-omap2/clock44xx_data.c
-+++ b/arch/arm/mach-omap2/clock44xx_data.c
-@@ -4114,7 +4114,7 @@ static struct omap_clk omap44xx_clks[] = {
-        CLK(NULL,       "l4_div_ck",
-&l4_div_ck_hw.clk,      CK_443X),
-        CLK(NULL,       "lp_clk_div_ck",
-&lp_clk_div_ck_hw.clk,  CK_443X),
-        CLK(NULL,       "l4_wkup_clk_mux_ck",
-&l4_wkup_clk_mux_ck_hw.clk,     CK_443X),
--       CLK(NULL,       "smp_twd",
-&mpu_periphclk_hw.clk,  CK_443X),
-+       CLK("smp_twd",  NULL,                   &mpu_periphclk_hw.clk,
- CK_443X),
-        CLK(NULL,       "ocp_abe_iclk",
-&ocp_abe_iclk_hw.clk,   CK_443X),
-        CLK(NULL,       "per_abe_24m_fclk",
-&per_abe_24m_fclk_hw.clk,       CK_443X),
-        CLK(NULL,       "per_abe_nc_fclk",
-&per_abe_nc_fclk_hw.clk,        CK_443X),
+I'll add the patch to my 3.2 builds to put some miles on it :-)
 
-A better change might be for the code in smp_twd.c to match on con_id
-but I'll let you guys sort that out.
-
-Regards,
-Mike
+Steve
