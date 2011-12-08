@@ -1,7 +1,7 @@
 From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Thu, 8 Dec 2011 14:41:01 +0200
+Date: Thu, 8 Dec 2011 14:43:43 +0200
 Subject: [PATCH v6 00/10] Add support for tegra30 and cardhu
-Message-ID: <1323348092-28732-1-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <1323348254-29072-1-git-send-email-pdeschrijver@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
