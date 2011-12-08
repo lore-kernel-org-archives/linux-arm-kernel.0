@@ -1,107 +1,66 @@
-From: nsekhar@ti.com (Nori, Sekhar)
-Date: Thu, 8 Dec 2011 10:29:14 +0000
-Subject: [PATCH] arm,davinci: configure davinci aemif chipselects
- through OF
-In-Reply-To: <4EE07E27.8090602@denx.de>
-References: <1322991679-20947-1-git-send-email-hs@denx.de>
- <DF0F476B391FA8409C78302C7BA518B603EFB2@DBDE01.ent.ti.com>
- <4EE06B79.7070804@denx.de>
- <DF0F476B391FA8409C78302C7BA518B6040A03@DBDE01.ent.ti.com>
- <4EE07E27.8090602@denx.de>
-Message-ID: <DF0F476B391FA8409C78302C7BA518B6040CBB@DBDE01.ent.ti.com>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Thu, 08 Dec 2011 10:37:59 +0000
+Subject: [PATCH v4 3/6] ARM: vexpress: Add DT support for the motherboard
+In-Reply-To: <47277884.EQ6QaTZjNt@wuerfel>
+References: <1323186229-22054-1-git-send-email-pawel.moll@arm.com>
+ <1323186229-22054-4-git-send-email-pawel.moll@arm.com>
+ <47277884.EQ6QaTZjNt@wuerfel>
+Message-ID: <1323340679.32116.26.camel@hornet.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko,
-
-On Thu, Dec 08, 2011 at 14:36:47, Heiko Schocher wrote:
-
-> >>>> diff --git a/arch/arm/mach-davinci/aemif.c b/arch/arm/mach-davinci/aemif.c
-> >>>> index 1ce70a9..12c559f 100644
-> >>>> --- a/arch/arm/mach-davinci/aemif.c
-> >>>> +++ b/arch/arm/mach-davinci/aemif.c
-> >>>> @@ -13,12 +13,14 @@
-> >>>>  #include <linux/err.h>
-> >>>>  #include <linux/clk.h>
-> >>>>  #include <linux/module.h>
-> >>>> +#include <linux/of.h>
-> >>>> +#include <linux/of_address.h>
-> >>>>  #include <linux/time.h>
-> >>>>  
-> >>>>  #include <mach/aemif.h>
-> >>>>  
-> >>>>  /* Timing value configuration */
-> >>>> -
-> >>>> +#define ASIZE(x)	(x)
-> >>>>  #define TA(x)		((x) << 2)
-> >>>>  #define RHOLD(x)	((x) << 4)
-> >>>>  #define RSTROBE(x)	((x) << 7)
-> >>>> @@ -26,7 +28,10 @@
-> >>>>  #define WHOLD(x)	((x) << 17)
-> >>>>  #define WSTROBE(x)	((x) << 20)
-> >>>>  #define WSETUP(x)	((x) << 26)
-> >>>> +#define EW(x)		((x) << 30)
-> >>>> +#define SS(x)		((x) << 31)
-> >>> You are adding support for additional configuration
-> >>> parameters which should be done in a separate patch.
-> >> Hmm.. they are only used in the OF case ... is this split
-> >> really needed?
-> > 
-> > But they should also be useful in the non-OF case, no?
-> > Why restrict their usage to the OF case?
+On Wed, 2011-12-07 at 22:49 +0000, Arnd Bergmann wrote:
+> On Tuesday 06 December 2011 15:43:46 Pawel Moll wrote:
+> > +
+> > +static struct of_dev_auxdata v2m_dt_auxdata_lookup[] __initdata = {
+> > +       OF_DEV_AUXDATA("arm,vexpress-flash", V2M_NOR0, "physmap-flash",
+> > +                       &v2m_flash_data),
+> > +       OF_DEV_AUXDATA("arm,primecell", V2M_MMCI, "mb:mmci", &v2m_mmci_data),
+> > +       {}
+> > +};
 > 
-> I thought there is no need, because nobody needed this yet ...
-> Ok, I change this too, so I have to fix this files:
+> One more thing I noticed. While I'm not familiar with the progress on
+> device driver conversion, 
 
-True, no one configured these so far (relied on the defaults).
+I'm aware of these two last non-DT bits and actually already started
+working on them, but this won't happen this year (I'm on holiday
+starting next Friday without any access to Internet whatsoever :-)
 
-Also, they probably did not get added into the timing API since
-they are not really timing parameters. Its better to add a separate 
-configuration API for these.
+> I think you should be using the physmap_of
+> driver instead of physmap, which will remove the need for the
+> platform data.
 
-It will be better to move the driver outside of arch/arm/
-before adding new features. I don't know if there is a place
-defined yet for "memory interface" drivers, so, drivers/misc/
-may be the place.
+There's one bit missing in the physmap_of. The "set_vpp" handle which is
+used on VE:
 
-I have added Greg and Arnd for their opinion in this.
+static struct physmap_flash_data v2m_flash_data = {
+        .width          = 4,
+        .set_vpp        = v2m_flash_set_vpp,
+};      
 
-Greg, Arnd,
+My plan is to extend the physmap_of driver so it could operate VPP via
+gpio API and make the sysreg a gpio controller, having Flash VPP, CF &
+MMC card detects and DVI output control (that's for CLCD) as internal
+GPIO lines.
 
-Brief background:
+> For mmci, it should not be hard to do change the driver so it
+> understands the device tree, too. The easiest implementation for
+> that would be to add some code into mmci_probe and allocate
+> an mmci_platform_data structure that gets filled with the required
+> attributes.
 
-DaVinci AEMIF is an async memory interface peripheral implemented
-in arch/arm/mach-davinci/aemif.c. It helps interface to NAND, NOR
-and other asynchronous memories. Currently it just provides an API
-for timing value configuration. The API is invoked by the MTD NAND
-driver.
+I've started the implementation already, but it turned out much trickier
+that I was hoping... One thing is the "status" handle (card detect line
+"virtual gpio" I mentioned above), the second problem is the fact that
+mmci platform data can take generic caps MMC_CAP_* from
+include/linux/mmc/host.h (now even caps2 as well)... This issue was
+already briefly mentioned here:
+http://article.gmane.org/gmane.linux.kernel.samsung-soc/7639 and as
+there was no generic resolution my plan is to reuse as much properties
+from other MMC host controllers and forge the missing one (as a superset
+of ARM's and STE's cell implementations). But as I said, it's unlikely
+to happen this year...
 
-Specification here: http://www.ti.com/lit/ug/sprue20c/sprue20c.pdf
+Cheers!
 
-We are looking at a place for this outside of architecture code.
-
-> 
-> $ grep -lr davinci_aemif_timing .
-> ./arch/arm/mach-davinci/board-dm644x-evm.c
-> ./arch/arm/mach-davinci/board-dm646x-evm.c
-> ./arch/arm/mach-davinci/board-da850-evm.c
-> ./arch/arm/mach-davinci/include/mach/aemif.h
-> ./arch/arm/mach-davinci/include/mach/nand.h
-> ./arch/arm/mach-davinci/board-da830-evm.c
-> ./drivers/mtd/nand/davinci_nand.c
-> 
-> I do not know the values for this boards for the new parameters.
-> How to proceed? Do you know this values? Or is it Ok, if I add in
-
-If we add a new API, there won't be a need to touch existing
-board code.
-
-> arch/arm/mach-davinci/include/mach/aemif.h
-> a "#define AEMIF_VALUE_NOT USED 0xff" and if the new value is set to
-> this I don't change this setting in the register?
-> 
-> bye,
-> Heiko
-
-Thanks,
-Sekhar
+Pawe?
