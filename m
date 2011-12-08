@@ -1,45 +1,23 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 8 Dec 2011 00:16:33 +0000
-Subject: [GIT PULL] Linux support for ARM LPAE
-In-Reply-To: <20111207202912.GE14542@n2100.arm.linux.org.uk>
-References: <20111202182054.GA3250@arm.com>
- <20111206124109.GT14542@n2100.arm.linux.org.uk>
- <20111206140729.GA31720@arm.com>
- <20111206233058.GZ14542@n2100.arm.linux.org.uk>
- <20111207112320.GB23720@arm.com> <20111207122544.GD23720@arm.com>
- <20111207202912.GE14542@n2100.arm.linux.org.uk>
-Message-ID: <20111208001633.GJ14542@n2100.arm.linux.org.uk>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 7 Dec 2011 16:19:41 -0800
+Subject: [PATCH 1/5] arm/dt: tegra: Remove /memreserve/ from device-tree
+ files
+In-Reply-To: <1321911851-10091-1-git-send-email-swarren@nvidia.com>
+References: <1321911851-10091-1-git-send-email-swarren@nvidia.com>
+Message-ID: <20111208001941.GG12945@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 07, 2011 at 08:29:12PM +0000, Russell King - ARM Linux wrote:
-> What I want from you - by 5pm tomorrow so I can get this stuff merged -
-> is a pull request for the LPAE stuff as it was in your v2 pull request,
-> either based on top of _either_ my devel-stable (if you can get it - as
-> the machine is having severe problems running git atm) or with Will's
-> idmap changes merged into it _before_ the LPAE changes.
+On Mon, Nov 21, 2011 at 02:44:07PM -0700, Stephen Warren wrote:
+> There are no drivers in the kernel at present which can make use of the
+> memory reserved by /memreserve/, so there is no point reserving it. Remove
+> /memreserve/ to allow the user more memory. It's also unclear whether any
+> future driver would actually require /memreserve/, or allocate memory
+> through some other mechanism.
+> 
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
 
-For the avoidance of any doubt - and any argument - the 5pm time limit
-is there to bring this debacle to a close in a reasonable period.  It's
-purely there because I want to get this merged by end of Thursday and
-no later.
+Thanks, applied to for-3.3/boards
 
-To summarise, my objections are quite simply:
 
-1. Your lack of sign-off on my patch which you merged (which you've
-   addressed in pull v2.)
-2. The combined point of the merge conflict between your tree and Will's
-   idmap tree, plus the dependency your tree _does_ have on the idmap
-   changes means it _should_ include Will's idmap changes to ensure
-   bisectability - and this has the side effect of solving the merge
-   conflict which shouldn't be there.
-
-Any other objections which you think I've made are a purely a figment
-of your imagination.
-
-Now, one thing I haven't checked is the ordering of the commits -
-particularly the ordering of the 'fix' patch and my patch.  Unfortunately,
-standard git pull messages don't give the order so it's not something I
-can readily check.  I commented on this issue when you posted the patch
-set.  I hope it will be correct for pull v3 (iow, the fix patch first,
-then my patch.)
+-Olof
