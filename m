@@ -1,27 +1,29 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Thu, 8 Dec 2011 09:54:03 +0100
-Subject: [MXS MMC 4/4] Add an appropriate MODULE_ALIAS
-In-Reply-To: <b1c45bfdbc9323b2a6c50ce213a3e895aeea2b2f.1323328267.git.LW@KARO-electronics.de>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Thu, 8 Dec 2011 17:17:02 +0800
+Subject: [MXS MMC v2 2/4] Some cleanups for the MMC driver
+In-Reply-To: <d935557e044d2ebc56b4e70487b519fe722e9017.1323328267.git.LW@KARO-electronics.de>
 References: <cover.1323328267.git.LW@KARO-electronics.de>
- <b1c45bfdbc9323b2a6c50ce213a3e895aeea2b2f.1323328267.git.LW@KARO-electronics.de>
-Message-ID: <20111208085403.GE23908@pengutronix.de>
+ <d935557e044d2ebc56b4e70487b519fe722e9017.1323328267.git.LW@KARO-electronics.de>
+Message-ID: <20111208091701.GC7913@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 08, 2011 at 09:17:47AM +0100, Lothar Wa?mann wrote:
+On Thu, Dec 08, 2011 at 09:17:45AM +0100, Lothar Wa?mann wrote:
+>  - Remove bogus parens around numerical arguments in #define's
+>  - When defining bit masks, use the #def for the shift count
+>    instead of repeating the numbers
+>  - Remove 'break' at end of switch statement
+> 
+> Changes wrt v1:
+>  - break long lines
+>  - leave indentation as is
 > 
 > Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
-> Acked-by: Shawn Guo <shawn.guo@linaro.org>
 
-Acked-by: Wolfram Sang <w.sang@pengutronix.de>
+Acked-by: Shawn Guo <shawn.guo@linaro.org>
+
+Not sure if Chris will ask you to add proper subject prefix though :)
 
 -- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111208/f2dce507/attachment.sig>
+Regards,
+Shawn
