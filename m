@@ -1,43 +1,30 @@
-From: tanmay.upadhyay@einfochips.com (Tanmay Upadhyay)
-Date: Thu,  8 Dec 2011 10:03:49 +0530
-Subject: [PATCH v2] USB: pxa168: Fix compilation error
-In-Reply-To: <4EDDFBB6.5060803@mvista.com>
-References: <4EDDFBB6.5060803@mvista.com>
-Message-ID: <1323318829-2718-1-git-send-email-tanmay.upadhyay@einfochips.com>
+From: hong.xu@atmel.com (Hong Xu)
+Date: Thu,  8 Dec 2011 12:44:21 +0800
+Subject: [PATCH] AT91: Update struct atmel_nand_data to support PMECC
+Message-ID: <1323319461-19983-1-git-send-email-hong.xu@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After commit c430131a02d677aa708f56342c1565edfdacb3c0 (Support
-controllers with big endian capability regs), HC_LENGTH takes
-two arguments. This patch fixes following compilation error:
+User will use the newly added field `correction_cap' and
+`sector_size' to pass PMECC parameters to driver.
 
-In file included from drivers/usb/host/ehci-hcd.c:1323:
-drivers/usb/host/ehci-pxa168.c:302:54: error: macro "HC_LENGTH" requires 2 arguments, but only 1 given
-In file included from drivers/usb/host/ehci-hcd.c:1323:
-drivers/usb/host/ehci-pxa168.c: In function 'ehci_pxa168_drv_probe':
-drivers/usb/host/ehci-pxa168.c:302: error: 'HC_LENGTH' undeclared (first use in this function)
-drivers/usb/host/ehci-pxa168.c:302: error: (Each undeclared identifier is reported only once
-drivers/usb/host/ehci-pxa168.c:302: error: for each function it appears in.)
-
-v2 - Added summary of the commit that caused this change
-
-Signed-off-by: Tanmay Upadhyay <tanmay.upadhyay@einfochips.com>
+Signed-off-by: Hong Xu <hong.xu@atmel.com>
 ---
- drivers/usb/host/ehci-pxa168.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ arch/arm/mach-at91/include/mach/board.h |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/usb/host/ehci-pxa168.c b/drivers/usb/host/ehci-pxa168.c
-index ac0c16e..8d0e7a2 100644
---- a/drivers/usb/host/ehci-pxa168.c
-+++ b/drivers/usb/host/ehci-pxa168.c
-@@ -299,7 +299,7 @@ static int __devinit ehci_pxa168_drv_probe(struct platform_device *pdev)
- 	ehci = hcd_to_ehci(hcd);
- 	ehci->caps = hcd->regs + 0x100;
- 	ehci->regs = hcd->regs + 0x100 +
--		HC_LENGTH(ehci_readl(ehci, &ehci->caps->hc_capbase));
-+		HC_LENGTH(ehci, ehci_readl(ehci, &ehci->caps->hc_capbase));
- 	ehci->hcs_params = ehci_readl(ehci, &ehci->caps->hcs_params);
- 	hcd->has_tt = 1;
- 	ehci->sbrn = 0x20;
+diff --git a/arch/arm/mach-at91/include/mach/board.h b/arch/arm/mach-at91/include/mach/board.h
+index eac92e9..b0035de 100644
+--- a/arch/arm/mach-at91/include/mach/board.h
++++ b/arch/arm/mach-at91/include/mach/board.h
+@@ -117,6 +117,8 @@ struct atmel_nand_data {
+ 	u8		ale;		/* address line number connected to ALE */
+ 	u8		cle;		/* address line number connected to CLE */
+ 	u8		bus_width_16;	/* buswidth is 16 bit */
++	u8		correction_cap; /* PMECC correction capability */
++	u16		sector_size;    /* Sector size for PMECC */
+ 	struct mtd_partition *parts;
+ 	unsigned int	num_parts;
+ };
 -- 
-1.7.0.4
+1.7.3.3
