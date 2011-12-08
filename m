@@ -1,67 +1,50 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 08 Dec 2011 10:37:45 +0100
-Subject: [PATCH v2] irqdomain: protect macro variable in domain iterators
-In-Reply-To: <20111202134458.GD2892@localhost.localdomain>
-References: <1322833997-32083-1-git-send-email-nicolas.ferre@atmel.com>
- <1322832609-24956-1-git-send-email-nicolas.ferre@atmel.com>
- <20111202134458.GD2892@localhost.localdomain>
-Message-ID: <4EE08569.3070009@atmel.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 8 Dec 2011 10:39:27 +0100
+Subject: [PATCH] video IPUv1 fixes for different display connections
+In-Reply-To: <1323329606.1641.25.camel@vkoul-udesk3>
+References: <1322747932-24943-1-git-send-email-s.hauer@pengutronix.de>
+ <1323329606.1641.25.camel@vkoul-udesk3>
+Message-ID: <20111208093927.GU27267@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/02/2011 02:44 PM, Dave Martin :
-> On Fri, Dec 02, 2011 at 02:30:09PM +0100, Nicolas Ferre wrote:
->> Signed-off-by: Nicolas Ferre<nicolas.ferre@atmel.com>
->
-> Looks OK to me:
->
-> Acked-by: Dave Martin<dave.martin@linaro.org>
+On Thu, Dec 08, 2011 at 01:03:26PM +0530, Vinod Koul wrote:
+> On Thu, 2011-12-01 at 14:58 +0100, Sascha Hauer wrote:
+> > Hi,
+> > 
+> > The following series fixes the display connections to the IPU on
+> > i.MX3 boards. The connection to the display is completely independend
+> > of the internal pixel format in the framebuffer. The driver instead
+> > changes the IPU <-> Display mapping dependent on the pixelformat
+> > which is wrong.
+> > The following patch makes 16bpp and 32bpp modes possible on both
+> > RGB666 and RGB888 connected displays.
+> > The burstsize setting for 32bpp was configured wrong, so 32bpp
+> > modes have obviously never been tested.
+> > 
+> > Not for stable since all in kernel boards seem to work.
+> Applied thanks.
+> 
+> Couldn't help but notice that :
+> @@ -312,7 +312,7 @@ static void ipu_ch_param_set_size(union
+> chan_param_mem *params,
+>         case IPU_PIX_FMT_RGB565:
+>                 params->ip.bpp  = 2;
+>                 params->ip.pfs  = 4;
+> 
+> is not really good way. Someone else who is using this driver has no way
+> of knowing what these magic numbers mean and how to use them
+> Perhaps you can add meaning to these numbers and some note on why they
+> should be set to these values.
 
-Rob,
+Yes, you are right. Adding defines for these really makes this better
+readable. BTW did you queue both patches or only the first one?
 
-Do you want a different implementation for this. I think it is the 
-simplest way to write this macro...
-
-If it is ok for you, it will be interesting to include this patch 
-quickly so that I will be able to queue my own patches on top of it.
-(Cc: stable can be a good idea also).
-
-Best regards,
-
->> ---
->> v2: add brackets to each macro variable.
->>
->>   include/linux/irqdomain.h |   10 ++++++----
->>   1 files changed, 6 insertions(+), 4 deletions(-)
->>
->> diff --git a/include/linux/irqdomain.h b/include/linux/irqdomain.h
->> index bd4272b..e535063 100644
->> --- a/include/linux/irqdomain.h
->> +++ b/include/linux/irqdomain.h
->> @@ -82,12 +82,14 @@ static inline unsigned int irq_domain_to_irq(struct irq_domain *d,
->>   }
->>
->>   #define irq_domain_for_each_hwirq(d, hw) \
->> -	for (hw = d->hwirq_base; hw<  d->hwirq_base + d->nr_irq; hw++)
->> +	for ((hw) = (d)->hwirq_base; \
->> +	     (hw)<  (d)->hwirq_base + (d)->nr_irq; \
->> +	     (hw)++)
->>
->>   #define irq_domain_for_each_irq(d, hw, irq) \
->> -	for (hw = d->hwirq_base, irq = irq_domain_to_irq(d, hw); \
->> -	     hw<  d->hwirq_base + d->nr_irq; \
->> -	     hw++, irq = irq_domain_to_irq(d, hw))
->> +	for ((hw) = (d)->hwirq_base, (irq) = irq_domain_to_irq((d), (hw)); \
->> +	     (hw)<  (d)->hwirq_base + (d)->nr_irq; \
->> +	     (hw)++, (irq) = irq_domain_to_irq((d), (hw)))
->>
->>   extern void irq_domain_add(struct irq_domain *domain);
->>   extern void irq_domain_del(struct irq_domain *domain);
->> --
->> 1.7.5.4
->>
->
+Sascha
 
 
 -- 
-Nicolas Ferre
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
