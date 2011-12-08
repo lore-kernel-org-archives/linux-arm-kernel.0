@@ -1,36 +1,33 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Thu, 08 Dec 2011 11:45:27 -0800
-Subject: [GIT PULL] OMAP: PM support for OMAP4 MPU sub-system
-In-Reply-To: <20111208191956.GC31337@atomide.com> (Tony Lindgren's message of
- "Thu, 8 Dec 2011 11:19:56 -0800")
-References: <874nxaewbv.fsf@ti.com> <20111208191956.GC31337@atomide.com>
-Message-ID: <87liqmkfu0.fsf@ti.com>
+From: felipe.contreras@gmail.com (Felipe Contreras)
+Date: Thu, 8 Dec 2011 22:23:58 +0200
+Subject: [PATCH] omap: rx51: initialize isp1704 properly
+In-Reply-To: <20111208144044.GA25415@xps8300>
+References: <20111207193141.GG31337@atomide.com>
+ <1323287816-2809-1-git-send-email-felipe.contreras@gmail.com>
+ <20111208144044.GA25415@xps8300>
+Message-ID: <CAMP44s2noD4TXBALOc0JkcbVroYFnp3BaSozrQYdUbsv50xuoQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony Lindgren <tony@atomide.com> writes:
-
-> * Kevin Hilman <khilman@ti.com> [111208 10:14]:
->> Tony,
->> 
->> Please pull the OMAP4 MPUSS PM series below.  It is based on the
->> Russell's devel-stable branch due to dependencies
->> 
->> Kevin
->> 
->> The following changes since commit 3ee0fc5ca129cbae81c073756febcb1c552af446:
->> 
->>   Merge branch 'kexec/idmap' of git://git.kernel.org/pub/scm/linux/kernel/git/will/linux into devel-stable (2011-12-06 20:27:54 +0000)
+On Thu, Dec 8, 2011 at 4:40 PM, Heikki Krogerus <krohei@gmail.com> wrote:
+> On Wed, Dec 07, 2011 at 09:56:56PM +0200, Felipe Contreras wrote:
+>> From: Heikki Krogerus <krohei@gmail.com>
 >
-> I don't think there's a dependency here to the kexec/idmap commit?
+> I would prefer that you change this so this is from you, like it
+> actually is. You can mention me in the commit message if you like.
 
-Nope.
+Well, you came with the fix, I just typed it down, but as you wish :)
 
-> Great yeah this is badly needed. One minor thing, can you please rebase
-> this on one commit earlier to commit deee6d5359969a0ce4e2760cfd7b9f379bd5698a
-> (ARM: 7194/1: OMAP: Fix build after a merge between v3.2-rc4 and ARM
-> restart changes) as that's what we have as the base for other branches.
+>> Without this USB networking doesn't work as the link is never detected.
+>
+> What this changes is, it leaves the transceiver powered by default
+> instead of setting it into power off mode. So not only USB networking
+> is affected by this. If isp1704_charger is not enabled with RX51, USB
+> does not work at all. Please change the comment.
 
-Done, pushed updated branch.
+I've updated the patch.
 
-Kevin
+Cheers.
+
+-- 
+Felipe Contreras
