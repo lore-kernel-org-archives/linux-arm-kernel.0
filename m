@@ -1,39 +1,40 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 08 Dec 2011 10:47:40 +0900
-Subject: [PATCH] ARM: S3C64XX: Hook up VDDINT on Cragganmore
-In-Reply-To: <20111206102732.GE28840@opensource.wolfsonmicro.com>
-References: <1323105817-5638-1-git-send-email-broonie@opensource.wolfsonmicro.com>
- <CAH9JG2V8jJGeTDUZjcXa4hs67SaivocO4g-+wB=2+zv2FwsGyQ@mail.gmail.com>
- <20111206102732.GE28840@opensource.wolfsonmicro.com>
-Message-ID: <04ca01ccb54b$5ed1e390$1c75aab0$%kim@samsung.com>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Thu, 8 Dec 2011 09:48:31 +0800
+Subject: [PATCH v2] pcmcia: pxa: replace IRQ_GPIO() with gpio_to_irq()
+In-Reply-To: <CAN1soZyMxP4qKow+XKk09KAdzdctdzz=aiYbiTqek923xirK0A@mail.gmail.com>
+References: <1323083166.6763.3.camel@phoenix>
+ <CAN1soZyMxP4qKow+XKk09KAdzdctdzz=aiYbiTqek923xirK0A@mail.gmail.com>
+Message-ID: <CAN1soZxEdz5FSkC+xBfESAdWgiCnpWcykTa48Xy4RgM4ixCUQQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark Brown wrote:
-> 
-> On Tue, Dec 06, 2011 at 08:21:30AM +0900, Kyungmin Park wrote:
-> 
-> > > +	REGULATOR_SUPPLY("vddint", NULL),
-> 
-> > Now there's mixed usage for vddint. until s5pc110 it uses the 'vddint'
-> > but after exynos it uses the 'vdd_int'. either is okay but need to use
-> > the same name for consistency?
-> 
-> > How do you think?
-> 
-> I don't really care either way.  I called it vddint because the existing
-> s3c64xx ARM core supply is called vddarm by software so I was also going
-> for consistency here :) .  If we want to ensure consistency we should
-> just pick something and move to it, though I don't know if it's really
-> worth the effort.
+On Mon, Dec 5, 2011 at 7:29 PM, Haojian Zhuang <haojian.zhuang@gmail.com> wrote:
+> On Mon, Dec 5, 2011 at 7:06 PM, Axel Lin <axel.lin@gmail.com> wrote:
+>> Since commit 6384fd "ARM: pxa: rename IRQ_GPIO to PXA_GPIO_TO_IRQ",
+>> I got buid errors due to implicit declaration of function 'IRQ_GPIO'.
+>>
+>> Use common gpio_to_irq() to replace machine dependant macro IRQ_GPIO().
+>>
+>> Cc: Marek Vasut <marek.vasut@gmail.com>
+>> Cc: Ian Molton <spyro@f2s.com>
+>> Cc: Jonathan Cameron <jic23@cam.ac.uk>
+>> Cc: Zhuang <haojian.zhuang@marvell.com>
+>> Cc: Eric Miao <eric.y.miao@gmail.com>
+>> Cc: Russell King <linux@arm.linux.org.uk>
+>> Signed-off-by: Axel Lin <axel.lin@gmail.com>
+>> ---
+>> v2:
+>> I just found pxa2xx_trizeps4.c also needs to be converted to gpio_to_irq.
+>> Thus include the fix for pxa2xx_trizeps4.c in v2.
+>>
+>> ?drivers/pcmcia/pxa2xx_e740.c ? ? ?| ? 11 +++++++----
+>> ?drivers/pcmcia/pxa2xx_palmld.c ? ?| ? ?2 +-
+>> ?drivers/pcmcia/pxa2xx_palmtc.c ? ?| ? ?2 +-
+>> ?drivers/pcmcia/pxa2xx_stargate2.c | ? ?6 ++++--
+>> ?drivers/pcmcia/pxa2xx_trizeps4.c ?| ? ?5 +++--
+>> ?drivers/pcmcia/pxa2xx_vpac270.c ? | ? ?4 ++--
+>> ?6 files changed, 18 insertions(+), 12 deletions(-)
+>>
+> Acked-by: Haojian Zhuang <haojian.zhuang@gmail.com>
 
-Yes, I think so. If required, let's move it later.
-
-Looks ok to me, will apply.
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Applied
