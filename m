@@ -1,86 +1,40 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 8 Dec 2011 11:03:49 +0000
-Subject: [GIT PULL v3] Linux support for ARM LPAE
-Message-ID: <20111208110349.GA26970@arm.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Thu, 8 Dec 2011 11:40:05 +0000
+Subject: [PATCH v4 5/6] ARM: vexpress: DT-based support for Cortex-A5 and
+ Cortex-A9 based tiles
+In-Reply-To: <1323284974.32116.12.camel@hornet.cambridge.arm.com>
+References: <1323186229-22054-1-git-send-email-pawel.moll@arm.com>
+ <1323186229-22054-6-git-send-email-pawel.moll@arm.com>
+ <20111207153338.GD2910@linaro.org>
+ <1323284974.32116.12.camel@hornet.cambridge.arm.com>
+Message-ID: <20111208114005.GA2015@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+On Wed, Dec 07, 2011 at 07:09:34PM +0000, Pawel Moll wrote:
+> On Wed, 2011-12-07 at 15:33 +0000, Dave Martin wrote:
+> > Oh, we should select HAVE_PATA_PLATFORM in here somewhere too.
+> > But that's not critical for this series.
+> 
+> It's already selected in "arch/arm/Kconfig":
+> 
+> config ARCH_VEXPRESS
+>         bool "ARM Ltd. Versatile Express family"
+>         select ARCH_WANT_OPTIONAL_GPIOLIB
+>         select ARM_AMBA
+>         select ARM_TIMER_SP804 
+>         select CLKDEV_LOOKUP
+>         select HAVE_MACH_CLKDEV
+>         select GENERIC_CLOCKEVENTS
+>         select HAVE_CLK
+>         select HAVE_PATA_PLATFORM
+>         select ICST
+>         select PLAT_VERSATILE
+>         select PLAT_VERSATILE_CLCD
+>         help
+>           This enables support for the ARM Ltd Versatile Express boards.
 
-The series is rebased against Will's idmap series as merged in your
-devel-stable tree (I couldn't fetch devel-stable this morning). Please
-note that the branch was changed to 'for-rmk' (previously 'for-next').
-The nopud fixup was already reordered so that it comes before your
-patch.
+Oh, OK.  I was looking in mach-vexpress/Kconfig instead ...
 
-There is still time until 5pm in case anything else goes wrong :).
-Thanks.
-
-The following changes since commit 4e8ee7de227e3ab9a72040b448ad728c5428a042:
-
-  ARM: SMP: use idmap_pgd for mapping MMU enable during secondary booting (2011-12-06 14:04:15 +0000)
-
-are available in the git repository at:
-  git://git.kernel.org/pub/scm/linux/kernel/git/cmarinas/linux.git for-rmk
-
-Catalin Marinas (12):
-      ARM: pgtable: Fix compiler warning in ioremap.c introduced by nopud
-      ARM: LPAE: Move page table maintenance macros to pgtable-2level.h
-      ARM: LPAE: Move the FSR definitions to separate files
-      ARM: LPAE: Factor out classic-MMU specific code into proc-v7-2level.S
-      ARM: LPAE: Introduce the 3-level page table format definitions
-      ARM: LPAE: Page table maintenance for the 3-level format
-      ARM: LPAE: MMU setup for the 3-level page table format
-      ARM: LPAE: Invalidate the TLB before freeing the PMD
-      ARM: LPAE: Add fault handling support
-      ARM: LPAE: Add context switching support
-      ARM: LPAE: Add identity mapping support for the 3-level page table format
-      ARM: LPAE: Add the Kconfig entries
-
-Russell King (1):
-      ARM: pgtable: switch to use pgtable-nopud.h
-
-Will Deacon (2):
-      ARM: LPAE: add ISBs around MMU enabling code
-      ARM: LPAE: mark memory banks with start > ULONG_MAX as highmem
-
- arch/arm/Kconfig                            |    2 +-
- arch/arm/boot/compressed/head.S             |    1 +
- arch/arm/include/asm/assembler.h            |   11 ++
- arch/arm/include/asm/page.h                 |    4 +
- arch/arm/include/asm/pgalloc.h              |   26 ++++-
- arch/arm/include/asm/pgtable-2level.h       |   41 ++++++
- arch/arm/include/asm/pgtable-3level-hwdef.h |   77 ++++++++++++
- arch/arm/include/asm/pgtable-3level-types.h |   70 +++++++++++
- arch/arm/include/asm/pgtable-3level.h       |  155 +++++++++++++++++++++++
- arch/arm/include/asm/pgtable-hwdef.h        |    4 +
- arch/arm/include/asm/pgtable.h              |   43 +------
- arch/arm/include/asm/proc-fns.h             |   21 +++
- arch/arm/include/asm/system.h               |    8 ++
- arch/arm/include/asm/tlb.h                  |   12 ++-
- arch/arm/kernel/head.S                      |   47 +++++++-
- arch/arm/kernel/hw_breakpoint.c             |    8 +-
- arch/arm/kernel/sleep.S                     |    2 +
- arch/arm/mm/Kconfig                         |   17 +++
- arch/arm/mm/alignment.c                     |    2 +-
- arch/arm/mm/context.c                       |   19 +++-
- arch/arm/mm/fault.c                         |  111 +++--------------
- arch/arm/mm/fault.h                         |   27 ++++-
- arch/arm/mm/fsr-2level.c                    |   78 ++++++++++++
- arch/arm/mm/fsr-3level.c                    |   68 ++++++++++
- arch/arm/mm/idmap.c                         |   28 ++++-
- arch/arm/mm/ioremap.c                       |   39 ++++---
- arch/arm/mm/mmu.c                           |   46 +++++++-
- arch/arm/mm/pgd.c                           |   51 +++++++-
- arch/arm/mm/proc-macros.S                   |    5 +-
- arch/arm/mm/proc-v7-2level.S                |  171 ++++++++++++++++++++++++++
- arch/arm/mm/proc-v7-3level.S                |  150 +++++++++++++++++++++++
- arch/arm/mm/proc-v7.S                       |  177 +++------------------------
- 32 files changed, 1199 insertions(+), 322 deletions(-)
- create mode 100644 arch/arm/include/asm/pgtable-3level-hwdef.h
- create mode 100644 arch/arm/include/asm/pgtable-3level-types.h
- create mode 100644 arch/arm/include/asm/pgtable-3level.h
- create mode 100644 arch/arm/mm/fsr-2level.c
- create mode 100644 arch/arm/mm/fsr-3level.c
- create mode 100644 arch/arm/mm/proc-v7-2level.S
- create mode 100644 arch/arm/mm/proc-v7-3level.S
+Cheers
+---Dave
