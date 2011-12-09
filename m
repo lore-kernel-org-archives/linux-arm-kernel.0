@@ -1,85 +1,36 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Fri, 9 Dec 2011 08:53:48 -0800
-Subject: [PATCH] [RFC] pinctrl: add a driver for Energy Micro's efm32 SoCs
-In-Reply-To: <20111209051413.GK7913@S2100-06.ap.freescale.net>
-References: <1323384057-31452-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <74CDBE0F657A3D45AFBB94109FB122FF1750B77BD8@HQMAIL01.nvidia.com>
- <20111209010147.GH7913@S2100-06.ap.freescale.net>
- <4EE18403.30604@nvidia.com>
- <20111209043220.GJ7913@S2100-06.ap.freescale.net>
- <4EE192DC.3080209@nvidia.com>
- <20111209051413.GK7913@S2100-06.ap.freescale.net>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF17518604CA@HQMAIL01.nvidia.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Fri, 9 Dec 2011 17:58:26 +0100
+Subject: [PATCH 2/4] ARM: OMAP2/3: intc: Add DT support for TI interrupt
+ controller
+In-Reply-To: <4EE2335C.7050902@gmail.com>
+References: <1323291049-24964-1-git-send-email-b-cousson@ti.com>
+ <1323291049-24964-3-git-send-email-b-cousson@ti.com>
+ <4EDFD88B.8060008@gmail.com> <4EE0D0E6.3060202@ti.com>
+ <4EE20B38.8050006@gmail.com> <4EE2209E.2040209@ti.com>
+ <4EE227A4.2030209@gmail.com> <4EE2320D.2030309@ti.com>
+ <4EE2335C.7050902@gmail.com>
+Message-ID: <4EE23E32.2060503@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Shawn Guo wrote at Thursday, December 08, 2011 10:14 PM:
-> On Thu, Dec 08, 2011 at 09:47:24PM -0700, Stephen Warren wrote:
-...
-> > I'm not familiar with imx. For my education, which of the following is true:
-> >
-> 
-> It's the case b).
-> 
-> > a)
-> >
-> > * UART TX signal can muxed onto 1 of 16 pins
-> > * UART RX signal can muxed onto 1 of 16 pins
-> >
-> > In this case, you'd just list say "UART A TX" as a legal function for
-> > each of those 16 pins. Yes, that's a lot of places, but still do-able.
-> >
-> > (16 possible positions would be a lot, but I suppose it is possible in HW)
-> >
-> > b)
-> >
-> > * UART TX signal can muxed onto 1 of 4 pins
-> > * UART RX signal can muxed onto 1 of 4 pins
-> > * So, there are 16 (4*4) combinations of these two settings
-> >
-> > In this case, you'd just list say "UART A TX" for the 4 pins, and "UART
-> > A RX" for the other 4 pins. The 16 combinations don't come into play at
-> > all; the board-specific mapping table would pick 1 single combination,
-> > and represent this as:
-> >
-> > pin X: function = UART A TX
-> > pin Y: function = UART A RX
-> 
-> We really do not expect per pin function mapping but per block function
-> mapping.  That said, the UART driver is going to tell pinctrl subsystem
-> "I'm UARTA, please set all my pins up for me".
+On 12/9/2011 5:12 PM, Rob Herring wrote:
+> On 12/09/2011 10:06 AM, Cousson, Benoit wrote:
 
-That's fine; UART A can operate that way with pinctrl used as intended.
+[...]
 
-The way the pinctrl subsystem is defined is:
+>> Mmm, I'm probably missing something here.
+>>
+>> My point is that even in the DT case I do have some devices that are
+>> initialized without DT for the moment and thus cannot get access to the
+>> interrupt-controller node and then cannot retrieve the domain information.
+>>
+>> How can I ensure the proper hwirq ->  irq translation then for such devices?
+>> Only the one created by DT will have the correct irq number.
+>
+> Okay, I missed that aspect of it. So I guess 0 base is fine for now.
 
-The SoC-specific pinctrl driver exposes the per-pin available functions.
+Cool, thanks.
+I'll repost early next week to take into account your other comments.
 
-The board-specific mapping table selects the function to use for each pin,
-based on the board's requirements.
-
-Any other way isn't fully consistent with the way pinctrl works. If we
-do see a need for just a single per-board table rather than a separate
-per-SoC table, and a per-board mapping table, we should rethink the
-pinctrl subsystem...
-
-> > Either way though, whether you put the data into tables in the driver or
-> > in the SoC .dtsi file (included by each board's .dts file), the pinctrl
-> 
-> We are not going to list that into SoC .dtsi file.
-> 
-> > driver's table really should list all possible options, and the pinctrl
-> > mapping table should select just one; that's kinda the whole point of
-> > the tables. If you try to put just the used subset into device tree, you
-> > won't be able to put it into the .dtsi file since it'll be
-> > board-specific, and you'll end up forcing board .dts authors to recreate
-> 
-> That's what we are going to do.
-> 
-> > that driver's complete configuration table every time, which seems like
-> > a lot of wasted work.
-
-I re-iterate that point...
-
--- 
-nvpublic
+Thanks,
+Benoit
