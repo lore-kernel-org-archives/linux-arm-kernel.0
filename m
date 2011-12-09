@@ -1,34 +1,40 @@
-From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
-Date: Fri, 9 Dec 2011 11:00:01 +0100
-Subject: [PATCH 5/5 v2] ARM: OMAP1: recalculate loops per jiffy after
- dpll1 reprogram
-In-Reply-To: <20111209084245.GB14547@n2100.arm.linux.org.uk>
-References: <1322364751-29980-6-git-send-email-jkrzyszt@tis.icnet.pl>
- <1322526332-14088-1-git-send-email-jkrzyszt@tis.icnet.pl>
- <20111209084245.GB14547@n2100.arm.linux.org.uk>
-Message-ID: <201112091100.01690.jkrzyszt@tis.icnet.pl>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 9 Dec 2011 11:09:26 +0100
+Subject: [GIT PULL] i.MX fixes
+Message-ID: <20111209100926.GD27267@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 09 of December 2011 at 09:42:45, Russell King - ARM Linux wrote:
-> On Tue, Nov 29, 2011 at 01:25:32AM +0100, Janusz Krzysztofik wrote:
-> > However, the result of cpufreq_scale() differs from that of
-> > (re)calibrate_delay() by ca. 6%, i.e., 70.40 vs. 74.54. Please advise if
-> > this approximation is acceptable.
-> 
-> You don't say which figure is what.
+Hi Arnd,
 
-Hi,
-Those were BogoMIPS, which you were talking about in your comment 
-(http://www.spinics.net/lists/linux-omap/msg60811.html).
-> 
-> Note that calibrate_delay() is itself inaccurate - the loops_per_jiffy
-> is the number of loops which can be executed between two timer ticks
-> _minus_ the time to process the timer interrupt itself.  So, it's
-> actually always a little less than the theoretical number of loops
-> within that time period.
+Please pull the following small fixes.
 
-I see. Then, in case of a machine always booting at, let's say, 12 and then reprogrammed to 150 MHz, we actually scale up that less then the theoretical number, with a side effect of scaling up its error as well. Perhaps in this case, when the machine is going to run at that target rate until rebooted, we should rather decide to recalibrate to keep that error proportionally small compared to the target loops per jiffy value, like it worked in my initial proposal? I think that your argument about unnecessarily wasting 10s of milliseconds has marginal importance here because we will be redoing that calibration only once, at boot time, and never later until next reboot.
+Sascha
 
-Thanks,
-Janusz
+The following changes since commit 5611cc4572e889b62a7b4c72a413536bf6a9c416:
+
+  Linux 3.2-rc4 (2011-12-01 14:56:01 -0800)
+
+are available in the git repository at:
+  git://git.pengutronix.de/git/imx/linux-2.6.git imx-fixes-for-arnd
+
+Dong Aisheng (1):
+      ARM: mx5: add __initconst for fec pdata
+
+Jason Chen (1):
+      MXC PWM: should active during DOZE/WAIT/DBG mode
+
+Richard Zhao (1):
+      ARM: imx: fix cpufreq build errors
+
+ arch/arm/mach-mx5/board-mx53_evk.c  |    2 +-
+ arch/arm/mach-mx5/board-mx53_loco.c |    2 +-
+ arch/arm/mach-mx5/board-mx53_smd.c  |    2 +-
+ arch/arm/plat-mxc/cpufreq.c         |    1 +
+ arch/arm/plat-mxc/pwm.c             |    7 ++++++-
+ 5 files changed, 10 insertions(+), 4 deletions(-)
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
