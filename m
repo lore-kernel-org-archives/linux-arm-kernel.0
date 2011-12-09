@@ -1,65 +1,62 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 9 Dec 2011 10:00:40 -0800
-Subject: [RFC 1/3] pinctrl: add a driver for NVIDIA Tegra
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF17518604D7@HQMAIL01.nvidia.com>
-References: <1323382390-14892-1-git-send-email-swarren@nvidia.com>
- <1323382390-14892-2-git-send-email-swarren@nvidia.com>
- <CACRpkdYDn0V7SeQuFiFDMxGkybvg6PGf7jxid8ECGB7Azkj3zw@mail.gmail.com>
- <74CDBE0F657A3D45AFBB94109FB122FF17518604D7@HQMAIL01.nvidia.com>
-Message-ID: <20111209180039.GR31337@atomide.com>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Fri, 09 Dec 2011 18:05:35 +0000
+Subject: [PATCH 4/4] Use generic ARM instruction set condition code
+ checks for kprobes.
+In-Reply-To: <20111209164029.GL5196@mudshark.cambridge.arm.com>
+References: <20111208173100.7572.9099.stgit@localhost6.localdomain6>
+ <20111208173212.7572.16210.stgit@localhost6.localdomain6>
+ <20111209155450.GI5196@mudshark.cambridge.arm.com> <4EE234A8.80208@arm.com>
+ <20111209164029.GL5196@mudshark.cambridge.arm.com>
+Message-ID: <1323453935.14174.22.camel@linaro1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Stephen Warren <swarren@nvidia.com> [111209 08:56]:
-> Linus Walleij wrote at Friday, December 09, 2011 7:01 AM:
+On Fri, 2011-12-09 at 16:40 +0000, Will Deacon wrote:
+> On Fri, Dec 09, 2011 at 04:17:44PM +0000, Leif Lindholm wrote:
+> > On 12/09/11 15:54, Will Deacon wrote:
+> > > On Thu, Dec 08, 2011 at 05:32:13PM +0000, Leif Lindholm wrote:
+> > >> -static unsigned long test_check_cc(int cc, unsigned long cpsr)
+> > >> +inline unsigned long test_check_cc(int cc, unsigned long cpsr)
+> > >
+> > > Not sure why you make this change, surely you can just leave it as static?
 > > 
-> > What we could worry about is the amount of hard-coded chip data
-> > which sort of correlates with the discussion with Tony on how to
-> > provide DT info for pin control drivers.
+> > As the function is now only a wrapper on arm_check_condition (with an 
+> > inline shift), it made more sense to me. This was also suggested by 
+> > Tixy, and he's since ACKed this patch.
 > 
-> My thinking here is that irrespective of whether the data in future chips
-> is the same or different to the current chips, it's better in the driver.
-> 
-> For a given SoC, the data is static; it can never ever change.
-> 
-> Hence, there's no point parsing it from device tree; we end up with exactly
-> the same data in the driver, yet have spent a bunch of time parsing it out
-> from device tree instead of just embedding it into the kernel binary.
-> 
-> If parts of Tegra X and Tegra Y are similar, it should be possible to have
-> them co-ordinate together and share the common data, and do whatever it
-> takes to create the appropriate completed view before passing it back from
-> tegraX_pinctrl_init() to the core. You could perhaps do it using /include/
-> in the .dtsi file too, but I think allowing the SoC init code to unify the
-> tables gives more flexibility; in your example below of the same data with
-> different pin names, that'd be implementable with code without too much
-> difficulty, but probably impossible with dtc since it has no macro/define
-> support at present.
-> 
-> Also, the representation of the data in a .c file will likely be far
-> smaller than in the .dtsi file, so this way saves space. Admittedly with
-> a multi-SoC binary, you end up with all the large per-SoC data in the
-> binary initially, so the space-savings aren't exactly seen, but it's
-> all init data, so does get dumped soon after boot.
-> 
-> Another point here: I don't have to maintain a DT binding for the Tegra
-> pinctrl driver this way, so if the next Tegra's pinmux HW is different,
-> all I need to do is edit the driver, not be shackled by a need to keep
-> the DT binding for it backwards-compatible. Although that said, I
-> /think/ even an obvious DT binding derived from struct
-> tegra_pinctrl_soc_data would be flexible enough for most things, perhaps
-> with the addition of allowing config param field definitions for pins
-> as well as groups.
+> Hmm, I still don't see why you should change the linkage. Make it static
+> inline if you really want the inline, but that seems weird outside of a
+> header file stub.
 
-What you're describing should be supported for sure.
+As you pointed out later, it does need to be static, to avoid potential
+linkage issues. (I always incorrectly imagine that 'inline' is a
+glorified macro.)
 
-IMHO the key issue here from pinctrl fwk point of view is: We want to
-allow multiple data sources for describing the pinmux functions.
+> > > Maybe it's best just to change all of the callers to call
+> > > arm_check_condition directly, like you have done below for the ARM case. For
+> > > the Thumb cases will it work if you make sure that you put the condition
+> > > code in the top bits?
+> > 
+> > Yes, that is functionally equivalent, and what I did in the RFC version, 
+> > but it ended up looking messy at the calling point.
+> 
+> Ok, then could you route the ARM variant through the wrapper too?
 
-The data sources supported should be any combination of static platform_data,
-DT data, loadable modules, and /lib/firmware. Then it's just a question of
-using the most suitable method for each SoC.
+The function Leif added is for checking the condition code in an ARM
+instruction, so it doesn't need a wrapper when used for this.
 
-Regards,
+The other locations in the kprobes tests get the condition nibble from
+the ITSATE or from thumb conditional branch instructions. In these cases
+the code looks cleaner if the condition is passed as a value between 0x0
+and 0xf, rather than being shift up to bit position 28 where the
+conditional ARM instructions have it encoded.
 
-Tony
+> > Any sane compiler should generate pretty identical code for these two 
+> > alternative solutions (unless it neglected to auto-inline the static 
+> > variant).
+> 
+> The problem is when somebody else decides to call test_check_cc from another
+> compilation unit, rather than go through arm_check_condition.
+
+-- 
+Tixy
