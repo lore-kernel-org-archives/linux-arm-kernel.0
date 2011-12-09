@@ -1,94 +1,32 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 8 Dec 2011 18:15:05 -0700 (MST)
-Subject: [PATCHv7 1/3] OMAP: I2C: Reset support
-In-Reply-To: <1322817674-25384-2-git-send-email-shubhrajyoti@ti.com>
-References: <1322817674-25384-1-git-send-email-shubhrajyoti@ti.com>
- <1322817674-25384-2-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <alpine.DEB.2.00.1112081812530.6289@utopia.booyaka.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 8 Dec 2011 17:51:22 -0800
+Subject: [PATCH] ARM: OMAP1: Set the omap1623 sram size to 16K
+In-Reply-To: <1322686675-26855-1-git-send-email-jkrzyszt@tis.icnet.pl>
+References: <20111128174508.GO31337@atomide.com>
+ <1322686675-26855-1-git-send-email-jkrzyszt@tis.icnet.pl>
+Message-ID: <20111209015122.GM31337@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+Now that we're always reprogramming the core clock we must make
+sure SRAM works. It seems that neither omap1621 or omap1623
+has 256K of SRAM. Set the SRAM size to safe value of 16K.
 
-some comments
+Signed-off-by: Tony Lindgren <tony@atomide.com>
 
-On Fri, 2 Dec 2011, Shubhrajyoti D wrote:
-
-> Under some error conditions the i2c driver may do a reset.
-> Adding a reset field and support in the device-specific code.
-> 
-> Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
-> ---
->  arch/arm/plat-omap/i2c.c |   18 ++++++++++++++++++
->  include/linux/i2c-omap.h |    1 +
->  2 files changed, 19 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/plat-omap/i2c.c b/arch/arm/plat-omap/i2c.c
-> index db071bc..883229c 100644
-> --- a/arch/arm/plat-omap/i2c.c
-> +++ b/arch/arm/plat-omap/i2c.c
-> @@ -74,6 +74,22 @@ static struct omap_i2c_bus_platform_data i2c_pdata[OMAP_I2C_MAX_CONTROLLERS];
->  static struct platform_device omap_i2c_devices[] = {
->  	I2C_DEV_BUILDER(1, i2c_resources[0], &i2c_pdata[0]),
->  };
-> +/**
-> + * omap2_i2c_reset - reset the omap i2c module.
-> + * @dev: struct device*
-> + */
-> +
-> +static int omap2_i2c_reset(struct device *dev)
-> +{
-> +	int r = 0;
-> +	struct platform_device *pdev = to_platform_device(dev);
-> +	struct omap_device *odev = to_omap_device(pdev);
-> +	struct omap_hwmod *oh;
-> +
-> +	oh = odev->hwmods[0];
-> +	r = omap_hwmod_reset(oh);
-> +	return r;
-> +}
-
-This function should go into arch/arm/plat-omap/omap_device.c, and it 
-should be renamed to omap_device_reset(), since it's not I2C specific.  
-Also it shouldn't assume that there's only one hwmod - it should iterate 
-over all of the hwmods in the omap_device and call omap_hwmod_reset() on 
-each.
-
->  
->  #define OMAP_I2C_CMDLINE_SETUP	(BIT(31))
->  
-> @@ -179,6 +195,8 @@ static inline int omap2_i2c_add_bus(int bus_id)
->  	 */
->  	if (cpu_is_omap34xx())
->  		pdata->set_mpu_wkup_lat = omap_pm_set_max_mpu_wakeup_lat_compat;
-> +
-> +	pdata->device_reset = omap2_i2c_reset;
-
-omap_device_reset
-
->  	pdev = omap_device_build(name, bus_id, oh, pdata,
->  			sizeof(struct omap_i2c_bus_platform_data),
->  			NULL, 0, 0);
-> diff --git a/include/linux/i2c-omap.h b/include/linux/i2c-omap.h
-> index 92a0dc7..fd38249 100644
-> --- a/include/linux/i2c-omap.h
-> +++ b/include/linux/i2c-omap.h
-> @@ -35,6 +35,7 @@ struct omap_i2c_bus_platform_data {
->  	u32		rev;
->  	u32		flags;
->  	void		(*set_mpu_wkup_lat)(struct device *dev, long set);
-> +	int		(*device_reset) (struct device *dev);
->  };
->  
->  #endif
-> -- 
-> 1.7.1
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
-
-
-- Paul
+--- a/arch/arm/plat-omap/sram.c
++++ b/arch/arm/plat-omap/sram.c
+@@ -141,11 +141,9 @@ static void __init omap_detect_sram(void)
+ 			omap_sram_size = 0x32000;	/* 200K */
+ 		else if (cpu_is_omap15xx())
+ 			omap_sram_size = 0x30000;	/* 192K */
+-		else if (cpu_is_omap1610() || cpu_is_omap1621() ||
+-		     cpu_is_omap1710())
++		else if (cpu_is_omap1610() || cpu_is_omap1611() ||
++				cpu_is_omap1621() || cpu_is_omap1710())
+ 			omap_sram_size = 0x4000;	/* 16K */
+-		else if (cpu_is_omap1611())
+-			omap_sram_size = SZ_256K;
+ 		else {
+ 			pr_err("Could not detect SRAM size\n");
+ 			omap_sram_size = 0x4000;
