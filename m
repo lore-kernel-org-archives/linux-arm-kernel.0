@@ -1,49 +1,89 @@
-From: rusty@rustcorp.com.au (Rusty Russell)
-Date: Fri, 09 Dec 2011 16:08:02 +1030
-Subject: [PATCH 0/7] Introducing a generic AMP framework
-In-Reply-To: <CAK=WgbbmZR5gPqD-0Dc2jWom9J_z+iV0+nAB-BAFedbTqXk0Mw@mail.gmail.com>
-References: <1319536106-25802-1-git-send-email-ohad@wizery.com>
- <874nywpfkd.fsf@rustcorp.com.au>
- <CAK=WgbaF=yvGXvJdENrMoi4wWxaQa3UpbtsRm3mcA3cFdDCitA@mail.gmail.com>
- <87obw31v31.fsf@rustcorp.com.au>
- <CAK=WgbYVscyeJ5Og5iPx-tjEApa2KgAR1bnZiZUUcv0HxBEtOw@mail.gmail.com>
- <CAK=WgbbmZR5gPqD-0Dc2jWom9J_z+iV0+nAB-BAFedbTqXk0Mw@mail.gmail.com>
-Message-ID: <87liqmfgp1.fsf@rustcorp.com.au>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Fri, 09 Dec 2011 14:50:27 +0400
+Subject: [PATCH v4 5/5] ARM: davinci: create new common platform header
+ for davinci
+In-Reply-To: <1323352528-1207-6-git-send-email-manjunath.hadli@ti.com>
+References: <1323352528-1207-1-git-send-email-manjunath.hadli@ti.com>
+ <1323352528-1207-6-git-send-email-manjunath.hadli@ti.com>
+Message-ID: <4EE1E7F3.3050509@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 8 Dec 2011 09:50:59 +0200, Ohad Ben-Cohen <ohad@wizery.com> wrote:
-> Hi Rusty,
-> 
-> On Wed, Nov 23, 2011 at 11:58 AM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
-> > On Wed, Nov 23, 2011 at 3:33 AM, Rusty Russell <rusty@rustcorp.com.au> wrote:
-> >> That would imply that I'd done more than glance over them, and
-> >> unfortunately I haven't :(
-> >
-> > Np, thanks for glancing :)
-> 
-> I'd still like to ask for your Ack at least for the virtio_ids.h
-> change (please see below, and for the full patch, see
-> http://www.spinics.net/lists/linux-omap/msg59537.html):
-> 
-> Anyone following our threads will know you approved it, but I'm still
-> technically required to have your explicit ack as long as the patch
-> isn't going through your tree.
-> 
-> I can always add something like:
-> 
-> Virtio_ids.h-change-acked-by: Rusty Russell <rusty@rustcorp.com.au>
-> 
-> So it doesn't imply anything else but this specific change, or I can
-> just put that hunk in a separate patch, and add then add your Acked-by
-> (so it doesn't imply anything on the rest of the patch set).
+Hello.
 
-It's usually done:
+On 08-12-2011 17:55, Manjunath Hadli wrote:
 
-Acked-by: Rusty Russell <rusty@rustcorp.com.au> (virtio_ids.h)
+> remove the code from individual platform header files for
+> dm365, dm355, dm644x and dm646x and consolidate it into a
+> single and common header file davinci.h.
 
-And I've added it to the next version of the virtio-spec, so noone else
-grabs it.
+> Signed-off-by: Manjunath Hadli<manjunath.hadli@ti.com>
+[...]
 
-Thanks!
-Rusty.
+> diff --git a/arch/arm/mach-davinci/davinci.h b/arch/arm/mach-davinci/davinci.h
+> new file mode 100644
+> index 0000000..1fafbd7
+> --- /dev/null
+> +++ b/arch/arm/mach-davinci/davinci.h
+> @@ -0,0 +1,88 @@
+[...]
+> +/* DM646x function declarations */
+> +void __init dm646x_init(void);
+> +void __init dm646x_init_mcasp0(struct snd_platform_data *pdata);
+> +void __init dm646x_init_mcasp1(struct snd_platform_data *pdata);
+> +void __init dm646x_board_setup_refclk(struct clk *clk);
+
+    I don't see from where are you moving this prototype -- it wasn't in the 
+original #include file... In fact, I'm not even seeing this function in the 
+current Linus tree...
+
+> +int __init dm646x_init_edma(struct edma_rsv_info *rsv);
+> +
+> +void dm646x_video_init(void);
+> +
+> +void dm646x_setup_vpif(struct vpif_display_config *,
+> +		       struct vpif_capture_config *);
+> +#endif /*__DAVINCI_H */
+[...]
+> diff --git a/arch/arm/mach-davinci/include/mach/dm646x.h b/arch/arm/mach-davinci/include/mach/dm646x.h
+> deleted file mode 100644
+> index eb95864..0000000
+> --- a/arch/arm/mach-davinci/include/mach/dm646x.h
+> +++ /dev/null
+> @@ -1,34 +0,0 @@
+> -/*
+> - * Chip specific defines for DM646x SoC
+> - *
+> - * Author: Kevin Hilman, Deep Root Systems, LLC
+> - *
+> - * 2007 (c) Deep Root Systems, LLC. This file is licensed under
+> - * the terms of the GNU General Public License version 2. This program
+> - * is licensed "as is" without any warranty of any kind, whether express
+> - * or implied.
+> - */
+> -#ifndef __ASM_ARCH_DM646X_H
+> -#define __ASM_ARCH_DM646X_H
+> -
+> -#include<mach/hardware.h>
+> -#include<mach/asp.h>
+> -#include<linux/i2c.h>
+> -#include<linux/videodev2.h>
+> -#include<linux/davinci_emac.h>
+> -#include<media/davinci/vpif_types.h>
+> -
+> -#define DM646X_ASYNC_EMIF_CONTROL_BASE	0x20008000
+> -#define DM646X_ASYNC_EMIF_CS2_SPACE_BASE 0x42000000
+> -
+> -void __init dm646x_init(void);
+> -void __init dm646x_init_mcasp0(struct snd_platform_data *pdata);
+> -void __init dm646x_init_mcasp1(struct snd_platform_data *pdata);
+> -int __init dm646x_init_edma(struct edma_rsv_info *rsv);
+> -
+> -void dm646x_video_init(void);
+> -
+> -void dm646x_setup_vpif(struct vpif_display_config *,
+> -		       struct vpif_capture_config *);
+> -
+> -#endif /* __ASM_ARCH_DM646X_H */
+
+WBR, Sergei
