@@ -1,109 +1,47 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Fri, 9 Dec 2011 15:02:41 +0100
-Subject: [PATCH v2 10/10] ARM: OMAP2+: board-generic: Remove i2c static init
-In-Reply-To: <1323439361-1647-1-git-send-email-b-cousson@ti.com>
-References: <1323439361-1647-1-git-send-email-b-cousson@ti.com>
-Message-ID: <1323439361-1647-11-git-send-email-b-cousson@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 9 Dec 2011 14:13:03 +0000
+Subject: [Linaro-mm-sig] [RFC v2 1/2] dma-buf: Introduce dma buffer
+ sharing mechanism
+In-Reply-To: <CAKMK7uFQiiUbkU-7c3Os0d0FJNyLbqS2HLPRLy3LGnOoCXV5Pw@mail.gmail.com>
+References: <1322816252-19955-1-git-send-email-sumit.semwal@ti.com>
+ <201112071340.35267.arnd@arndb.de>
+ <CAKMK7uFQiiUbkU-7c3Os0d0FJNyLbqS2HLPRLy3LGnOoCXV5Pw@mail.gmail.com>
+Message-ID: <201112091413.03736.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This mainly reverts the commit that was adding the i2c static init.
+On Thursday 08 December 2011, Daniel Vetter wrote:
+> > c) only allowing streaming mappings, even if those are non-coherent
+> > (requiring strict serialization between CPU (in-kernel) and dma users of
+> > the buffer)
+> 
+> I think only allowing streaming access makes the most sense:
+> - I don't see much (if any need) for the kernel to access a dma_buf -
+> in all current usecases it just contains pixel data and no hw-specific
+> things (like sg tables, command buffers, ..). At most I see the need
+> for the kernel to access the buffer for dma bounce buffers, but that
+> is internal to the dma subsystem (and hence does not need to be
+> exposed).
+> - Userspace can still access the contents through the exporting
+> subsystem (e.g. use some gem mmap support). For efficiency reason gpu
+> drivers are already messing around with cache coherency in a platform
+> specific way (and hence violated the dma api a bit), so we could stuff
+> the mmap coherency in there, too. When we later on extend dma_buf
+> support so that other drivers than the gpu can export dma_bufs, we can
+> then extend the official dma api with already a few drivers with
+> use-patterns around.
+> 
+> But I still think that the kernel must not be required to enforce
+> correct access ordering for the reasons outlined in my other mail.
 
-Since the i2c and twl nodes are now present, there is no need
-for the static initialization anymore.
+I still don't think that's possible. Please explain how you expect
+to change the semantics of the streaming mapping API to allow multiple
+mappers without having explicit serialization points that are visible
+to all users. For simplicity, let's assume a cache coherent system
+with bounce buffers where map() copies the buffer to a dma area
+and unmap() copies it back to regular kernel memory. How does a driver
+know if it can touch the buffer in memory or from DMA at any given
+point in time? Note that this problem is the same as the cache coherency
+problem but may be easier to grasp.
 
-Signed-off-by: Benoit Cousson <b-cousson@ti.com>
-Cc: Tony Lindgren <tony@atomide.com>
----
- arch/arm/mach-omap2/board-generic.c |   48 +---------------------------------
- 1 files changed, 2 insertions(+), 46 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
-index 16c301e..63a2495 100644
---- a/arch/arm/mach-omap2/board-generic.c
-+++ b/arch/arm/mach-omap2/board-generic.c
-@@ -15,7 +15,6 @@
- #include <linux/of_irq.h>
- #include <linux/of_platform.h>
- #include <linux/irqdomain.h>
--#include <linux/i2c/twl.h>
- 
- #include <mach/hardware.h>
- #include <asm/hardware/gic.h>
-@@ -36,34 +35,6 @@ static void __init omap_init_irq(void)
- 	of_irq_init(irq_match);
- }
- 
--/*
-- * XXX: Still needed to boot until the i2c & twl driver is adapted to
-- * device-tree
-- */
--#ifdef CONFIG_ARCH_OMAP4
--static struct twl4030_platform_data sdp4430_twldata = {
--	.irq_base	= TWL6030_IRQ_BASE,
--	.irq_end	= TWL6030_IRQ_END,
--};
--
--static void __init omap4_i2c_init(void)
--{
--	omap4_pmic_init("twl6030", &sdp4430_twldata);
--}
--#endif
--
--#ifdef CONFIG_ARCH_OMAP3
--static struct twl4030_platform_data beagle_twldata = {
--	.irq_base	= TWL4030_IRQ_BASE,
--	.irq_end	= TWL4030_IRQ_END,
--};
--
--static void __init omap3_i2c_init(void)
--{
--	omap3_pmic_init("twl4030", &beagle_twldata);
--}
--#endif
--
- static struct of_device_id omap_dt_match_table[] __initdata = {
- 	{ .compatible = "simple-bus", },
- 	{ .compatible = "ti,omap-infra", },
-@@ -78,21 +49,6 @@ static void __init omap_generic_init(void)
- 	of_platform_populate(NULL, omap_dt_match_table, NULL, NULL);
- }
- 
--#ifdef CONFIG_ARCH_OMAP4
--static void __init omap4_init(void)
--{
--	omap4_i2c_init();
--	omap_generic_init();
--}
--#endif
--
--#ifdef CONFIG_ARCH_OMAP3
--static void __init omap3_init(void)
--{
--	omap3_i2c_init();
--	omap_generic_init();
--}
--#endif
- 
- #ifdef CONFIG_SOC_OMAP2420
- static const char *omap242x_boards_compat[] __initdata = {
-@@ -145,7 +101,7 @@ DT_MACHINE_START(OMAP3_DT, "Generic OMAP3 (Flattened Device Tree)")
- 	.init_early	= omap3430_init_early,
- 	.init_irq	= omap_init_irq,
- 	.handle_irq	= omap3_intc_handle_irq,
--	.init_machine	= omap3_init,
-+	.init_machine	= omap_generic_init,
- 	.timer		= &omap3_timer,
- 	.dt_compat	= omap3_boards_compat,
- MACHINE_END
-@@ -164,7 +120,7 @@ DT_MACHINE_START(OMAP4_DT, "Generic OMAP4 (Flattened Device Tree)")
- 	.init_early	= omap4430_init_early,
- 	.init_irq	= omap_init_irq,
- 	.handle_irq	= gic_handle_irq,
--	.init_machine	= omap4_init,
-+	.init_machine	= omap_generic_init,
- 	.timer		= &omap4_timer,
- 	.dt_compat	= omap4_boards_compat,
- MACHINE_END
--- 
-1.7.0.4
+	Arnd
