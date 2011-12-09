@@ -1,37 +1,28 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri,  9 Dec 2011 10:42:21 -0200
-Subject: [PATCH 2/2] ARM: mach-mx27_3ds: Allow UART to be a source for wakeup.
-In-Reply-To: <1323434541-27689-1-git-send-email-festevam@gmail.com>
-References: <1323434541-27689-1-git-send-email-festevam@gmail.com>
-Message-ID: <1323434541-27689-2-git-send-email-festevam@gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Fri,  9 Dec 2011 20:55:03 +0800
+Subject: [PATCH] i2c: i2c-s3c2410: Add a cpu_relax() to busy wait for bus idle
+Message-ID: <1323435303-17040-1-git-send-email-broonie@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allow UART to be a source for wakeup.
+Be a bit more friendly.
 
-Tested by doing:
-
-echo mem > /sys/power/state
-
-and then pressing a key in the console will wakeup the sytem.
-
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
 ---
- arch/arm/mach-imx/mach-mx27_3ds.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ drivers/i2c/busses/i2c-s3c2410.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-imx/mach-mx27_3ds.c b/arch/arm/mach-imx/mach-mx27_3ds.c
-index ba232d7..ee57521 100644
---- a/arch/arm/mach-imx/mach-mx27_3ds.c
-+++ b/arch/arm/mach-imx/mach-mx27_3ds.c
-@@ -144,7 +144,7 @@ static const int mx27pdk_pins[] __initconst = {
- };
+diff --git a/drivers/i2c/busses/i2c-s3c2410.c b/drivers/i2c/busses/i2c-s3c2410.c
+index 065c316..acda56e1 100644
+--- a/drivers/i2c/busses/i2c-s3c2410.c
++++ b/drivers/i2c/busses/i2c-s3c2410.c
+@@ -535,6 +535,7 @@ static int s3c24xx_i2c_doxfer(struct s3c24xx_i2c *i2c,
  
- static const struct imxuart_platform_data uart_pdata __initconst = {
--	.flags = IMXUART_HAVE_RTSCTS,
-+	.flags = IMXUART_HAVE_RTSCTS | IMXUART_CANWAKE,
- };
+ 	/* first, try busy waiting briefly */
+ 	do {
++		cpu_relax();
+ 		iicstat = readl(i2c->regs + S3C2410_IICSTAT);
+ 	} while ((iicstat & S3C2410_IICSTAT_START) && --spins);
  
- /*
 -- 
-1.7.1
+1.7.7.3
