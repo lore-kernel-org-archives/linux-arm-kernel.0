@@ -1,45 +1,45 @@
-From: richard.zhao@linaro.org (Richard Zhao)
-Date: Fri, 9 Dec 2011 10:46:21 +0800
-Subject: [PATCH 1/1] ARM: imx: fix cpufreq build errors
-Message-ID: <1323398781-14760-1-git-send-email-richard.zhao@linaro.org>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Thu, 08 Dec 2011 20:44:03 -0700
+Subject: [PATCH] [RFC] pinctrl: add a driver for Energy Micro's efm32 SoCs
+In-Reply-To: <20111209010147.GH7913@S2100-06.ap.freescale.net>
+References: <1323384057-31452-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <74CDBE0F657A3D45AFBB94109FB122FF1750B77BD8@HQMAIL01.nvidia.com>
+ <20111209010147.GH7913@S2100-06.ap.freescale.net>
+Message-ID: <4EE18403.30604@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Richard Zhao <richard.zhao@freescale.com>
+On 12/08/2011 06:01 PM, Shawn Guo wrote:
+> On Thu, Dec 08, 2011 at 03:14:40PM -0800, Stephen Warren wrote:
+>> Presumably, the set of pins, groups, and functions is determined by the
+>> SoC HW. Platform data is usually board-specific rather than SoC specific.
+>> You have two choices here: You could either parse this data from device
+>> tree as Arnd suggested (and I think as the TI OMAP pinctrl driver will),
+>> or do what I've done in the Tegra pinctrl driver, and simply put each
+>> SoC's data into the driver and select which one to use based on the DT
+>> compatible flag; I didn't see the point of putting data in to the DT that
+>> was identical for every board using a given SoC.
+>>
+> I'm not sure about tegra, but for imx, it's very difficult to enumerate
+> all these data and list them in pinctrl driver.  Sascha gave a few
+> examples when we discussed about it in another thread.  The TX and RX
+> pin of UART has 4 options each.  SD could possibly have 1, 4, and 8
+> data lines.  Display interface could have 16, 24, 32 data lines, etc.
+> All these options are chosen by board design for given soc pinmux
+> design.  So putting this data into device tree makes sense for imx too.
 
-  CC      arch/arm/plat-mxc/cpufreq.o
-arch/arm/plat-mxc/cpufreq.c:203: error: expected declaration specifiers or '...' before string constant
-arch/arm/plat-mxc/cpufreq.c:203: warning: data definition has no type or storage class
-arch/arm/plat-mxc/cpufreq.c:203: warning: type defaults to 'int' in declaration of 'MODULE_AUTHOR'
-arch/arm/plat-mxc/cpufreq.c:203: warning: function declaration isn't a prototype
-arch/arm/plat-mxc/cpufreq.c:204: error: expected declaration specifiers or '...' before string constant
-arch/arm/plat-mxc/cpufreq.c:204: warning: data definition has no type or storage class
-arch/arm/plat-mxc/cpufreq.c:204: warning: type defaults to 'int' in declaration of 'MODULE_DESCRIPTION'
-arch/arm/plat-mxc/cpufreq.c:204: warning: function declaration isn't a prototype
-arch/arm/plat-mxc/cpufreq.c:205: error: expected declaration specifiers or '...' before string constant
-arch/arm/plat-mxc/cpufreq.c:205: warning: data definition has no type or storage class
-arch/arm/plat-mxc/cpufreq.c:205: warning: type defaults to 'int' in declaration of 'MODULE_LICENSE'
-arch/arm/plat-mxc/cpufreq.c:205: warning: function declaration isn't a prototype
-make[1]: *** [arch/arm/plat-mxc/cpufreq.o] Error 1
-make: *** [arch/arm/plat-mxc] Error 2
+The pinctrl driver should simply represent the raw options that the HW
+supports on each individual pin. This table should be readily enumerable
+(it's probably already in the SoC's datasheet), and of non-exponential
+size. In this table, considerations such as display bus width do not
+come into play; you just note that a certain 32 pins could support the
+display function.
 
-Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
-Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
----
- arch/arm/plat-mxc/cpufreq.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+The board-specific selection of which function to use for each pin/group
+(which is where the actual selection of e.g. 16/24/32-bit display bus
+comes in) is provided by the board-specific mapping table, which I agree
+makes perfect sense to put into device tree, since it's potentially
+highly variable.
 
-diff --git a/arch/arm/plat-mxc/cpufreq.c b/arch/arm/plat-mxc/cpufreq.c
-index 74aac96..adbff70 100644
---- a/arch/arm/plat-mxc/cpufreq.c
-+++ b/arch/arm/plat-mxc/cpufreq.c
-@@ -17,6 +17,7 @@
-  * the CPU clock speed on the fly.
-  */
- 
-+#include <linux/module.h>
- #include <linux/cpufreq.h>
- #include <linux/clk.h>
- #include <linux/err.h>
 -- 
-1.7.5.4
+nvpublic
