@@ -1,30 +1,94 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 8 Dec 2011 16:55:37 -0800
-Subject: [PATCH 2/3] arm/dts: OMAP: Remove bootargs node from board files
-In-Reply-To: <4EDE59B8.1070808@gmail.com>
-References: <y> <1323190149-6492-3-git-send-email-b-cousson@ti.com>
- <4EDE59B8.1070808@gmail.com>
-Message-ID: <20111209005537.GL31337@atomide.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 8 Dec 2011 18:15:05 -0700 (MST)
+Subject: [PATCHv7 1/3] OMAP: I2C: Reset support
+In-Reply-To: <1322817674-25384-2-git-send-email-shubhrajyoti@ti.com>
+References: <1322817674-25384-1-git-send-email-shubhrajyoti@ti.com>
+ <1322817674-25384-2-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <alpine.DEB.2.00.1112081812530.6289@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Rob Herring <robherring2@gmail.com> [111206 09:35]:
-> Benoit,
-> 
-> On 12/06/2011 10:49 AM, Benoit Cousson wrote:
-> > Since 3.2, the CONFIG_ARM_ATAG_DTB_COMPAT config allows
-> > an old bootloader to still use ATAG to provide cmdline.
-> > 
-> > Remove chosen/bootargs from the DTS board files.
-> > 
-> > Signed-off-by: Benoit Cousson <b-cousson@ti.com>
-> > Cc: Grant Likely <grant.likely@secretlab.ca>
-> > Cc: Rob Herring <rob.herring@calxeda.com>
-> 
-> Acked-by: Rob Herring <rob.herring@calxeda.com>
+Hi
 
-Thanks applying patches 1 & 2 into omap dt branch.
-Still wondering if we should combine patch 3 into
-some other cleanup to avoid extra churn..
+some comments
 
-Tony
+On Fri, 2 Dec 2011, Shubhrajyoti D wrote:
+
+> Under some error conditions the i2c driver may do a reset.
+> Adding a reset field and support in the device-specific code.
+> 
+> Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
+> ---
+>  arch/arm/plat-omap/i2c.c |   18 ++++++++++++++++++
+>  include/linux/i2c-omap.h |    1 +
+>  2 files changed, 19 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/plat-omap/i2c.c b/arch/arm/plat-omap/i2c.c
+> index db071bc..883229c 100644
+> --- a/arch/arm/plat-omap/i2c.c
+> +++ b/arch/arm/plat-omap/i2c.c
+> @@ -74,6 +74,22 @@ static struct omap_i2c_bus_platform_data i2c_pdata[OMAP_I2C_MAX_CONTROLLERS];
+>  static struct platform_device omap_i2c_devices[] = {
+>  	I2C_DEV_BUILDER(1, i2c_resources[0], &i2c_pdata[0]),
+>  };
+> +/**
+> + * omap2_i2c_reset - reset the omap i2c module.
+> + * @dev: struct device*
+> + */
+> +
+> +static int omap2_i2c_reset(struct device *dev)
+> +{
+> +	int r = 0;
+> +	struct platform_device *pdev = to_platform_device(dev);
+> +	struct omap_device *odev = to_omap_device(pdev);
+> +	struct omap_hwmod *oh;
+> +
+> +	oh = odev->hwmods[0];
+> +	r = omap_hwmod_reset(oh);
+> +	return r;
+> +}
+
+This function should go into arch/arm/plat-omap/omap_device.c, and it 
+should be renamed to omap_device_reset(), since it's not I2C specific.  
+Also it shouldn't assume that there's only one hwmod - it should iterate 
+over all of the hwmods in the omap_device and call omap_hwmod_reset() on 
+each.
+
+>  
+>  #define OMAP_I2C_CMDLINE_SETUP	(BIT(31))
+>  
+> @@ -179,6 +195,8 @@ static inline int omap2_i2c_add_bus(int bus_id)
+>  	 */
+>  	if (cpu_is_omap34xx())
+>  		pdata->set_mpu_wkup_lat = omap_pm_set_max_mpu_wakeup_lat_compat;
+> +
+> +	pdata->device_reset = omap2_i2c_reset;
+
+omap_device_reset
+
+>  	pdev = omap_device_build(name, bus_id, oh, pdata,
+>  			sizeof(struct omap_i2c_bus_platform_data),
+>  			NULL, 0, 0);
+> diff --git a/include/linux/i2c-omap.h b/include/linux/i2c-omap.h
+> index 92a0dc7..fd38249 100644
+> --- a/include/linux/i2c-omap.h
+> +++ b/include/linux/i2c-omap.h
+> @@ -35,6 +35,7 @@ struct omap_i2c_bus_platform_data {
+>  	u32		rev;
+>  	u32		flags;
+>  	void		(*set_mpu_wkup_lat)(struct device *dev, long set);
+> +	int		(*device_reset) (struct device *dev);
+>  };
+>  
+>  #endif
+> -- 
+> 1.7.1
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+
+
+- Paul
