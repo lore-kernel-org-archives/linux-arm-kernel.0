@@ -1,33 +1,38 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 9 Dec 2011 13:55:16 +0000
-Subject: [PATCH] [RFC] pinctrl: add a driver for Energy Micro's efm32 SoCs
-In-Reply-To: <20111209092300.GR4585@pengutronix.de>
-References: <1323384057-31452-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <4693507.K6tP4YDUh2@wuerfel> <20111209092300.GR4585@pengutronix.de>
-Message-ID: <201112091355.16720.arnd@arndb.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 9 Dec 2011 15:01:04 +0100
+Subject: [RFC 1/3] pinctrl: add a driver for NVIDIA Tegra
+In-Reply-To: <1323382390-14892-2-git-send-email-swarren@nvidia.com>
+References: <1323382390-14892-1-git-send-email-swarren@nvidia.com>
+ <1323382390-14892-2-git-send-email-swarren@nvidia.com>
+Message-ID: <CACRpkdYDn0V7SeQuFiFDMxGkybvg6PGf7jxid8ECGB7Azkj3zw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 09 December 2011, Uwe Kleine-K?nig wrote:
-> On Thu, Dec 08, 2011 at 11:55:53PM +0100, Arnd Bergmann wrote:
-> > On Thursday 08 December 2011 23:40:57 Uwe Kleine-K?nig wrote:
-> > > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> > > ---
-> > > Note that there is no support yet for efm32 in mainline, so ARCH_EFM32
-> > > isn't defined.
-> > 
-> > Since the platform is not yet part of the architecture, it will have
-> > to use device tree based probing when it gets added. I would suggest
-> > only merging drivers for it that can deal with this and do not rely
-> > on platform_data.
+On Thu, Dec 8, 2011 at 11:13 PM, Stephen Warren <swarren@nvidia.com> wrote:
+
+> This adds a driver for the Tegra pinmux, and required parameterization
+> data for Tegra20 and Tegra30.
 >
-> I feared you will say that. These machines have at most 4MiB of RAM.
-> I'll have to evaluate if dt is too heavy for them.
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
 
-What's the state of the platform code? Is this based on Catalin's
-Cortex-M3 tree? I've heard a few people express interest in getting
-various M3 based SoCs supported mainline and I think that would
-be a good idea, but I would also expect that device tree is one
-of the lesser problems here.
+This is looking good from a framework point of view (obviously,
+since you've designed the framework with me you sure know what
+you're doing).
 
-	Arnd
+What we could worry about is the amount of hard-coded chip data
+which sort of correlates with the discussion with Tony on how to
+provide DT info for pin control drivers.
+
+If say this same controller appear in Tegra 4 with no changes but
+different pin names, it makes sense to try to push this into the
+DT as soon as possible, so as to avoid the situation Tony is
+having with the OMAP muxes. If Tegra 4 will be all-new and not even
+related, it doesn't.
+
+So, just think a bit about it.
+
+It will fit way better here than any place under
+arch/arm/* in any case, so it's a great achievement!
+
+Yours,
+Linus Walleij
