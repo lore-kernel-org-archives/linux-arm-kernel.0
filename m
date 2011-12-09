@@ -1,230 +1,207 @@
-From: omar.ramirez@ti.com (Omar Ramirez Luna)
-Date: Fri,  9 Dec 2011 10:25:43 -0600
-Subject: [PATCH] ARM: remove header files included more than once
-Message-ID: <1323447943-23595-1-git-send-email-omar.ramirez@ti.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Fri, 09 Dec 2011 17:39:51 +0100
+Subject: [PATCH 1/8] ARM: dma-mapping: remove offset parameter to prepare for
+ generic dma_ops
+In-Reply-To: <1323448798-18184-1-git-send-email-m.szyprowski@samsung.com>
+References: <1323448798-18184-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1323448798-18184-2-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-checkincludes.pl complains about these:
-	linux/debugfs.h
-	linux/dma-mapping.h
-	linux/gpio.h
-	linux/sched.h
-	linux/slab.h
-	plat/common.h
-	plat/i2c.h
+This patch removes the need for offset parameter in dma bounce
+functions. This is required to let dma-mapping framework on ARM
+architecture use common, generic dma-mapping helpers.
 
-Signed-off-by: Omar Ramirez Luna <omar.ramirez@ti.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
- arch/arm/mach-bcmring/dma.c                 |    1 -
- arch/arm/mach-ks8695/leds.c                 |    1 -
- arch/arm/mach-mmp/aspenite.c                |    1 -
- arch/arm/mach-mmp/tavorevb.c                |    1 -
- arch/arm/mach-msm/board-msm7x30.c           |    1 -
- arch/arm/mach-msm/board-qsd8x50.c           |    1 -
- arch/arm/mach-omap2/board-ldp.c             |    1 -
- arch/arm/mach-omap2/io.c                    |    1 -
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c  |    1 -
- arch/arm/mach-pxa/pxa25x.c                  |    1 -
- arch/arm/mach-pxa/pxa27x.c                  |    1 -
- arch/arm/mach-pxa/saarb.c                   |    1 -
- arch/arm/mach-shmobile/board-ag5evm.c       |    1 -
- arch/arm/mach-ux500/board-mop500-u8500uib.c |    1 -
- arch/arm/plat-omap/clock.c                  |    1 -
- arch/arm/plat-samsung/dev-backlight.c       |    1 -
- 16 files changed, 0 insertions(+), 16 deletions(-)
+ arch/arm/common/dmabounce.c        |   13 +++++--
+ arch/arm/include/asm/dma-mapping.h |   67 +++++++++++++++++------------------
+ arch/arm/mm/dma-mapping.c          |    4 +-
+ 3 files changed, 45 insertions(+), 39 deletions(-)
 
-diff --git a/arch/arm/mach-bcmring/dma.c b/arch/arm/mach-bcmring/dma.c
-index f4d4d6d..b52b8de 100644
---- a/arch/arm/mach-bcmring/dma.c
-+++ b/arch/arm/mach-bcmring/dma.c
-@@ -36,7 +36,6 @@
- #include <linux/mm.h>
- #include <linux/pfn.h>
- #include <linux/atomic.h>
--#include <linux/sched.h>
- #include <mach/dma.h>
+diff --git a/arch/arm/common/dmabounce.c b/arch/arm/common/dmabounce.c
+index 595ecd2..46b4b8d 100644
+--- a/arch/arm/common/dmabounce.c
++++ b/arch/arm/common/dmabounce.c
+@@ -173,7 +173,8 @@ find_safe_buffer(struct dmabounce_device_info *device_info, dma_addr_t safe_dma_
+ 	read_lock_irqsave(&device_info->lock, flags);
  
- /* I don't quite understand why dc4 fails when this is set to 1 and DMA is enabled */
-diff --git a/arch/arm/mach-ks8695/leds.c b/arch/arm/mach-ks8695/leds.c
-index d6f6502..4bd7075 100644
---- a/arch/arm/mach-ks8695/leds.c
-+++ b/arch/arm/mach-ks8695/leds.c
-@@ -11,7 +11,6 @@
- #include <linux/kernel.h>
- #include <linux/module.h>
- #include <linux/init.h>
--#include <linux/gpio.h>
+ 	list_for_each_entry(b, &device_info->safe_buffers, node)
+-		if (b->safe_dma_addr == safe_dma_addr) {
++		if (b->safe_dma_addr <= safe_dma_addr &&
++		    b->safe_dma_addr + b->size > safe_dma_addr) {
+ 			rb = b;
+ 			break;
+ 		}
+@@ -362,9 +363,10 @@ void __dma_unmap_page(struct device *dev, dma_addr_t dma_addr, size_t size,
+ EXPORT_SYMBOL(__dma_unmap_page);
  
- #include <asm/leds.h>
- #include <mach/devices.h>
-diff --git a/arch/arm/mach-mmp/aspenite.c b/arch/arm/mach-mmp/aspenite.c
-index 7a60bbb..2b3b0c6 100644
---- a/arch/arm/mach-mmp/aspenite.c
-+++ b/arch/arm/mach-mmp/aspenite.c
-@@ -17,7 +17,6 @@
- #include <linux/mtd/partitions.h>
- #include <linux/mtd/nand.h>
- #include <linux/interrupt.h>
--#include <linux/gpio.h>
+ int dmabounce_sync_for_cpu(struct device *dev, dma_addr_t addr,
+-		unsigned long off, size_t sz, enum dma_data_direction dir)
++		size_t sz, enum dma_data_direction dir)
+ {
+ 	struct safe_buffer *buf;
++	unsigned long off;
  
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
-diff --git a/arch/arm/mach-mmp/tavorevb.c b/arch/arm/mach-mmp/tavorevb.c
-index eb5be87..143e52e 100644
---- a/arch/arm/mach-mmp/tavorevb.c
-+++ b/arch/arm/mach-mmp/tavorevb.c
-@@ -12,7 +12,6 @@
- #include <linux/kernel.h>
- #include <linux/platform_device.h>
- #include <linux/smc91x.h>
--#include <linux/gpio.h>
+ 	dev_dbg(dev, "%s(dma=%#x,off=%#lx,sz=%zx,dir=%x)\n",
+ 		__func__, addr, off, sz, dir);
+@@ -373,6 +375,8 @@ int dmabounce_sync_for_cpu(struct device *dev, dma_addr_t addr,
+ 	if (!buf)
+ 		return 1;
  
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
-diff --git a/arch/arm/mach-msm/board-msm7x30.c b/arch/arm/mach-msm/board-msm7x30.c
-index db81ed5..8a941bb 100644
---- a/arch/arm/mach-msm/board-msm7x30.c
-+++ b/arch/arm/mach-msm/board-msm7x30.c
-@@ -14,7 +14,6 @@
-  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
-  * 02110-1301, USA.
++	off = addr - buf->safe_dma_addr;
++
+ 	BUG_ON(buf->direction != dir);
+ 
+ 	dev_dbg(dev, "%s: unsafe buffer %p (dma=%#x) mapped to %p (dma=%#x)\n",
+@@ -391,9 +395,10 @@ int dmabounce_sync_for_cpu(struct device *dev, dma_addr_t addr,
+ EXPORT_SYMBOL(dmabounce_sync_for_cpu);
+ 
+ int dmabounce_sync_for_device(struct device *dev, dma_addr_t addr,
+-		unsigned long off, size_t sz, enum dma_data_direction dir)
++		size_t sz, enum dma_data_direction dir)
+ {
+ 	struct safe_buffer *buf;
++	unsigned long off;
+ 
+ 	dev_dbg(dev, "%s(dma=%#x,off=%#lx,sz=%zx,dir=%x)\n",
+ 		__func__, addr, off, sz, dir);
+@@ -402,6 +407,8 @@ int dmabounce_sync_for_device(struct device *dev, dma_addr_t addr,
+ 	if (!buf)
+ 		return 1;
+ 
++	off = addr - buf->safe_dma_addr;
++
+ 	BUG_ON(buf->direction != dir);
+ 
+ 	dev_dbg(dev, "%s: unsafe buffer %p (dma=%#x) mapped to %p (dma=%#x)\n",
+diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
+index cb3b7c9..6bc056c 100644
+--- a/arch/arm/include/asm/dma-mapping.h
++++ b/arch/arm/include/asm/dma-mapping.h
+@@ -264,19 +264,17 @@ extern void __dma_unmap_page(struct device *, dma_addr_t, size_t,
+ /*
+  * Private functions
   */
--#include <linux/gpio.h>
- #include <linux/kernel.h>
- #include <linux/irq.h>
- #include <linux/gpio.h>
-diff --git a/arch/arm/mach-msm/board-qsd8x50.c b/arch/arm/mach-msm/board-qsd8x50.c
-index 7e8909c..d82a73e 100644
---- a/arch/arm/mach-msm/board-qsd8x50.c
-+++ b/arch/arm/mach-msm/board-qsd8x50.c
-@@ -14,7 +14,6 @@
-  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
-  * 02110-1301, USA.
-  */
--#include <linux/gpio.h>
- #include <linux/kernel.h>
- #include <linux/irq.h>
- #include <linux/gpio.h>
-diff --git a/arch/arm/mach-omap2/board-ldp.c b/arch/arm/mach-omap2/board-ldp.c
-index e179da0..eed5c78 100644
---- a/arch/arm/mach-omap2/board-ldp.c
-+++ b/arch/arm/mach-omap2/board-ldp.c
-@@ -10,7 +10,6 @@
-  * it under the terms of the GNU General Public License version 2 as
-  * published by the Free Software Foundation.
-  */
--#include <linux/gpio.h>
- #include <linux/kernel.h>
- #include <linux/init.h>
- #include <linux/platform_device.h>
-diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
-index 25d20ce..cf25a60 100644
---- a/arch/arm/mach-omap2/io.c
-+++ b/arch/arm/mach-omap2/io.c
-@@ -43,7 +43,6 @@
- #include "clockdomain.h"
- #include <plat/omap_hwmod.h>
- #include <plat/multi.h>
--#include <plat/common.h>
+-int dmabounce_sync_for_cpu(struct device *, dma_addr_t, unsigned long,
+-		size_t, enum dma_data_direction);
+-int dmabounce_sync_for_device(struct device *, dma_addr_t, unsigned long,
+-		size_t, enum dma_data_direction);
++int dmabounce_sync_for_cpu(struct device *, dma_addr_t, size_t, enum dma_data_direction);
++int dmabounce_sync_for_device(struct device *, dma_addr_t, size_t, enum dma_data_direction);
+ #else
+ static inline int dmabounce_sync_for_cpu(struct device *d, dma_addr_t addr,
+-	unsigned long offset, size_t size, enum dma_data_direction dir)
++	size_t size, enum dma_data_direction dir)
+ {
+ 	return 1;
+ }
+ 
+ static inline int dmabounce_sync_for_device(struct device *d, dma_addr_t addr,
+-	unsigned long offset, size_t size, enum dma_data_direction dir)
++	size_t size, enum dma_data_direction dir)
+ {
+ 	return 1;
+ }
+@@ -399,6 +397,33 @@ static inline void dma_unmap_page(struct device *dev, dma_addr_t handle,
+ 	__dma_unmap_page(dev, handle, size, dir);
+ }
+ 
++
++static inline void dma_sync_single_for_cpu(struct device *dev,
++		dma_addr_t handle, size_t size, enum dma_data_direction dir)
++{
++	BUG_ON(!valid_dma_direction(dir));
++
++	debug_dma_sync_single_for_cpu(dev, handle, size, dir);
++
++	if (!dmabounce_sync_for_cpu(dev, handle, size, dir))
++		return;
++
++	__dma_single_dev_to_cpu(dma_to_virt(dev, handle), size, dir);
++}
++
++static inline void dma_sync_single_for_device(struct device *dev,
++		dma_addr_t handle, size_t size, enum dma_data_direction dir)
++{
++	BUG_ON(!valid_dma_direction(dir));
++
++	debug_dma_sync_single_for_device(dev, handle, size, dir);
++
++	if (!dmabounce_sync_for_device(dev, handle, size, dir))
++		return;
++
++	__dma_single_cpu_to_dev(dma_to_virt(dev, handle), size, dir);
++}
++
+ /**
+  * dma_sync_single_range_for_cpu
+  * @dev: valid struct device pointer, or NULL for ISA and EISA-like devices
+@@ -421,40 +446,14 @@ static inline void dma_sync_single_range_for_cpu(struct device *dev,
+ 		dma_addr_t handle, unsigned long offset, size_t size,
+ 		enum dma_data_direction dir)
+ {
+-	BUG_ON(!valid_dma_direction(dir));
+-
+-	debug_dma_sync_single_for_cpu(dev, handle + offset, size, dir);
+-
+-	if (!dmabounce_sync_for_cpu(dev, handle, offset, size, dir))
+-		return;
+-
+-	__dma_single_dev_to_cpu(dma_to_virt(dev, handle) + offset, size, dir);
++	dma_sync_single_for_cpu(dev, handle + offset, size, dir);
+ }
+ 
+ static inline void dma_sync_single_range_for_device(struct device *dev,
+ 		dma_addr_t handle, unsigned long offset, size_t size,
+ 		enum dma_data_direction dir)
+ {
+-	BUG_ON(!valid_dma_direction(dir));
+-
+-	debug_dma_sync_single_for_device(dev, handle + offset, size, dir);
+-
+-	if (!dmabounce_sync_for_device(dev, handle, offset, size, dir))
+-		return;
+-
+-	__dma_single_cpu_to_dev(dma_to_virt(dev, handle) + offset, size, dir);
+-}
+-
+-static inline void dma_sync_single_for_cpu(struct device *dev,
+-		dma_addr_t handle, size_t size, enum dma_data_direction dir)
+-{
+-	dma_sync_single_range_for_cpu(dev, handle, 0, size, dir);
+-}
+-
+-static inline void dma_sync_single_for_device(struct device *dev,
+-		dma_addr_t handle, size_t size, enum dma_data_direction dir)
+-{
+-	dma_sync_single_range_for_device(dev, handle, 0, size, dir);
++	dma_sync_single_for_device(dev, handle + offset, size, dir);
+ }
  
  /*
-  * The machine specific code may provide the extra mapping besides the
-diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-index daaf165..5f78e90 100644
---- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-@@ -22,7 +22,6 @@
+diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+index 1aa664a..a5ab8bf 100644
+--- a/arch/arm/mm/dma-mapping.c
++++ b/arch/arm/mm/dma-mapping.c
+@@ -654,7 +654,7 @@ void dma_sync_sg_for_cpu(struct device *dev, struct scatterlist *sg,
+ 	int i;
  
- #include <plat/omap_hwmod.h>
- #include <plat/cpu.h>
--#include <plat/i2c.h>
- #include <plat/gpio.h>
- #include <plat/dma.h>
- #include <plat/mcspi.h>
-diff --git a/arch/arm/mach-pxa/pxa25x.c b/arch/arm/mach-pxa/pxa25x.c
-index f05f948..f6ef67f 100644
---- a/arch/arm/mach-pxa/pxa25x.c
-+++ b/arch/arm/mach-pxa/pxa25x.c
-@@ -24,7 +24,6 @@
- #include <linux/suspend.h>
- #include <linux/syscore_ops.h>
- #include <linux/irq.h>
--#include <linux/gpio.h>
+ 	for_each_sg(sg, s, nents, i) {
+-		if (!dmabounce_sync_for_cpu(dev, sg_dma_address(s), 0,
++		if (!dmabounce_sync_for_cpu(dev, sg_dma_address(s),
+ 					    sg_dma_len(s), dir))
+ 			continue;
  
- #include <asm/mach/map.h>
- #include <asm/suspend.h>
-diff --git a/arch/arm/mach-pxa/pxa27x.c b/arch/arm/mach-pxa/pxa27x.c
-index bc5a98e..2dd93e9 100644
---- a/arch/arm/mach-pxa/pxa27x.c
-+++ b/arch/arm/mach-pxa/pxa27x.c
-@@ -21,7 +21,6 @@
- #include <linux/io.h>
- #include <linux/irq.h>
- #include <linux/i2c/pxa-i2c.h>
--#include <linux/gpio.h>
+@@ -680,7 +680,7 @@ void dma_sync_sg_for_device(struct device *dev, struct scatterlist *sg,
+ 	int i;
  
- #include <asm/mach/map.h>
- #include <mach/hardware.h>
-diff --git a/arch/arm/mach-pxa/saarb.c b/arch/arm/mach-pxa/saarb.c
-index 3e999e3..7991552 100644
---- a/arch/arm/mach-pxa/saarb.c
-+++ b/arch/arm/mach-pxa/saarb.c
-@@ -15,7 +15,6 @@
- #include <linux/i2c.h>
- #include <linux/i2c/pxa-i2c.h>
- #include <linux/mfd/88pm860x.h>
--#include <linux/gpio.h>
+ 	for_each_sg(sg, s, nents, i) {
+-		if (!dmabounce_sync_for_device(dev, sg_dma_address(s), 0,
++		if (!dmabounce_sync_for_device(dev, sg_dma_address(s),
+ 					sg_dma_len(s), dir))
+ 			continue;
  
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
-diff --git a/arch/arm/mach-shmobile/board-ag5evm.c b/arch/arm/mach-shmobile/board-ag5evm.c
-index b862e9f..544cde2 100644
---- a/arch/arm/mach-shmobile/board-ag5evm.c
-+++ b/arch/arm/mach-shmobile/board-ag5evm.c
-@@ -37,7 +37,6 @@
- #include <linux/mmc/sh_mobile_sdhi.h>
- #include <linux/mfd/tmio.h>
- #include <linux/sh_clk.h>
--#include <linux/dma-mapping.h>
- #include <video/sh_mobile_lcdc.h>
- #include <video/sh_mipi_dsi.h>
- #include <sound/sh_fsi.h>
-diff --git a/arch/arm/mach-ux500/board-mop500-u8500uib.c b/arch/arm/mach-ux500/board-mop500-u8500uib.c
-index feb5744..4df0a3d 100644
---- a/arch/arm/mach-ux500/board-mop500-u8500uib.c
-+++ b/arch/arm/mach-ux500/board-mop500-u8500uib.c
-@@ -4,7 +4,6 @@
-  * Board data for the U8500 UIB, also known as the New UIB
-  * License terms: GNU General Public License (GPL), version 2
-  */
--#include <linux/gpio.h>
- #include <linux/kernel.h>
- #include <linux/init.h>
- #include <linux/i2c.h>
-diff --git a/arch/arm/plat-omap/clock.c b/arch/arm/plat-omap/clock.c
-index 567e4b5..6022154 100644
---- a/arch/arm/plat-omap/clock.c
-+++ b/arch/arm/plat-omap/clock.c
-@@ -477,7 +477,6 @@ int __init clk_init(struct clk_functions * custom_clocks)
-  *	debugfs support to trace clock tree hierarchy and attributes
-  */
- 
--#include <linux/debugfs.h>
- #include <linux/seq_file.h>
- 
- static struct dentry *clk_debugfs_root;
-diff --git a/arch/arm/plat-samsung/dev-backlight.c b/arch/arm/plat-samsung/dev-backlight.c
-index e657305..a976c02 100644
---- a/arch/arm/plat-samsung/dev-backlight.c
-+++ b/arch/arm/plat-samsung/dev-backlight.c
-@@ -15,7 +15,6 @@
- #include <linux/slab.h>
- #include <linux/io.h>
- #include <linux/pwm_backlight.h>
--#include <linux/slab.h>
- 
- #include <plat/devs.h>
- #include <plat/gpio-cfg.h>
 -- 
-1.7.4.1
+1.7.1.569.g6f426
