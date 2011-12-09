@@ -1,153 +1,80 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri,  9 Dec 2011 11:12:32 -0200
-Subject: [PATCH v2 1/2] tty: serial: imx: Allow UART to be a source for wakeup
-In-Reply-To: <1323434541-27689-1-git-send-email-festevam@gmail.com>
-References: <1323434541-27689-1-git-send-email-festevam@gmail.com>
-Message-ID: <1323436352-2442-1-git-send-email-festevam@gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 09 Dec 2011 07:20:56 -0600
+Subject: [PATCH 2/4] ARM: OMAP2/3: intc: Add DT support for TI interrupt
+ controller
+In-Reply-To: <4EE0D0E6.3060202@ti.com>
+References: <1323291049-24964-1-git-send-email-b-cousson@ti.com>
+ <1323291049-24964-3-git-send-email-b-cousson@ti.com>
+ <4EDFD88B.8060008@gmail.com> <4EE0D0E6.3060202@ti.com>
+Message-ID: <4EE20B38.8050006@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allow UART to be a source for wakeup from low power mode.
+On 12/08/2011 08:59 AM, Cousson, Benoit wrote:
+> On 12/7/2011 10:20 PM, Rob Herring wrote:
+>> On 12/07/2011 02:50 PM, Benoit Cousson wrote:
+> 
+> [...]
+> 
+>>> +#ifdef CONFIG_OF
+>>> +int __init intc_of_init(struct device_node *node, struct device_node
+>>> *parent)
+>>> +{
+>>> +    struct resource res;
+>>> +    u32 nr_irqs;
+>>> +
+>>> +    if (WARN_ON(!node))
+>>> +        return -ENODEV;
+>>> +
+>>> +    if (of_address_to_resource(node, 0,&res)) {
+>>> +        WARN(1, "unable to get intc registers\n");
+>>> +        return -EINVAL;
+>>> +    }
+>>> +
+>>> +    if (of_property_read_u32(node, "ti,intc-size",&nr_irqs)) {
+>>> +        WARN(1, "unable to get intc-size\n");
+>>> +        return -EINVAL;
+>>
+>> There is no default value that makes sense?
+> 
+> So far we have 96 or 128, so I can put 96 as a default and just keep the
+> warning without returning an error.
+> 
+>>> +    }
+>>> +
+>>> +    omap_init_irq(res.start, nr_irqs);
+>>> +    irq_domain_add_simple(node, 0);
+>>
+>> Have you read the NO_IRQ thread...
+> 
+> Yeah, I tried, but that's a long email thread with some unclear
+> conclusion...
+> The point is that the few users of that API today are using 0 as a base
+> as well, so I thought it was still valid.
+> 
+>> Is 0 ever a valid interrupt for a driver? If so, you must not use 0 for
+>> the base. I would pick 16 to skip over legacy ISA irqs.
+> 
+> I do not have any 0 interrupts right now, my concern is that I still
+> have some legacy non-DT drivers that expect the previous hwirq = irq
+> mapping.
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
-Changes since v1:
-- Pass the can-wake property via DT correctly
+I guess it depends how easily you can shift all the irq defines. You
+allow specifying the base so that you can set it to 0 for non-DT and -1
+(dynamic allocation) for DT.
 
- .../bindings/tty/serial/fsl-imx-uart.txt           |    2 +
- arch/arm/plat-mxc/include/mach/imx-uart.h          |    1 +
- drivers/tty/serial/imx.c                           |   38 ++++++++++++++++++++
- 3 files changed, 41 insertions(+), 0 deletions(-)
+> 
+>> irqdomains should always be enabled regardless of CONFIG_OF. So either
+>> you can leave it as is if OF is always enabled for OMAP, or you should
+>> move domain setup into omap_init_irq.
+> 
+> OK, but it looks like I cannot really modify the current INTC to DT
+> without having fully adapted the OMAP drivers to use
+> irq_of_parse_and_map. Or did I miss something?
+> 
 
-diff --git a/Documentation/devicetree/bindings/tty/serial/fsl-imx-uart.txt b/Documentation/devicetree/bindings/tty/serial/fsl-imx-uart.txt
-index a9c0406..676cc39 100644
---- a/Documentation/devicetree/bindings/tty/serial/fsl-imx-uart.txt
-+++ b/Documentation/devicetree/bindings/tty/serial/fsl-imx-uart.txt
-@@ -8,6 +8,8 @@ Required properties:
- Optional properties:
- - fsl,uart-has-rtscts : Indicate the uart has rts and cts
- - fsl,irda-mode : Indicate the uart supports irda mode
-+- fsl,uart-can-wake : Indicate that uart can be a source for wakeup from
-+low-power mode
- 
- Example:
- 
-diff --git a/arch/arm/plat-mxc/include/mach/imx-uart.h b/arch/arm/plat-mxc/include/mach/imx-uart.h
-index 4adec9b..0ba6c6b 100644
---- a/arch/arm/plat-mxc/include/mach/imx-uart.h
-+++ b/arch/arm/plat-mxc/include/mach/imx-uart.h
-@@ -21,6 +21,7 @@
- 
- #define IMXUART_HAVE_RTSCTS (1<<0)
- #define IMXUART_IRDA        (1<<1)
-+#define IMXUART_CANWAKE     (1<<2)
- 
- struct imxuart_platform_data {
- 	int (*init)(struct platform_device *pdev);
-diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
-index 163fc90..cd66046 100644
---- a/drivers/tty/serial/imx.c
-+++ b/drivers/tty/serial/imx.c
-@@ -200,6 +200,7 @@ struct imx_port {
- 	int			txirq,rxirq,rtsirq;
- 	unsigned int		have_rtscts:1;
- 	unsigned int		use_irda:1;
-+	unsigned int		can_wake:1;
- 	unsigned int		irda_inv_rx:1;
- 	unsigned int		irda_inv_tx:1;
- 	unsigned short		trcv_delay; /* transceiver delay */
-@@ -566,6 +567,9 @@ static irqreturn_t imx_int(int irq, void *dev_id)
- 	if (sts & USR1_RTSD)
- 		imx_rtsint(irq, dev_id);
- 
-+	if (sts & USR1_AWAKE)
-+		writel(USR1_AWAKE, sport->port.membase + USR1);
-+
- 	return IRQ_HANDLED;
- }
- 
-@@ -660,6 +664,7 @@ static int imx_setup_ufcr(struct imx_port *sport, unsigned int mode)
- static int imx_startup(struct uart_port *port)
- {
- 	struct imx_port *sport = (struct imx_port *)port;
-+	struct tty_struct *tty;
- 	int retval;
- 	unsigned long flags, temp;
- 
-@@ -791,6 +796,8 @@ static int imx_startup(struct uart_port *port)
- 		if (pdata->irda_enable)
- 			pdata->irda_enable(1);
- 	}
-+	tty = sport->port.state->port.tty;
-+	device_set_wakeup_enable(tty->dev, 1);
- 
- 	return 0;
- 
-@@ -1269,6 +1276,15 @@ static struct uart_driver imx_reg = {
- static int serial_imx_suspend(struct platform_device *dev, pm_message_t state)
- {
- 	struct imx_port *sport = platform_get_drvdata(dev);
-+	unsigned int val;
-+
-+	if (device_may_wakeup(&dev->dev)) {
-+		enable_irq_wake(sport->rxirq);
-+		/* enable wakeup from i.MX UART */
-+		val = readl(sport->port.membase + UCR3);
-+		val |= UCR3_AWAKEN;
-+		writel(val, sport->port.membase + UCR3);
-+	}
- 
- 	if (sport)
- 		uart_suspend_port(&imx_reg, &sport->port);
-@@ -1279,6 +1295,17 @@ static int serial_imx_suspend(struct platform_device *dev, pm_message_t state)
- static int serial_imx_resume(struct platform_device *dev)
- {
- 	struct imx_port *sport = platform_get_drvdata(dev);
-+	unsigned int val;
-+
-+	if (device_may_wakeup(&dev->dev)) {
-+		enable_irq_wake(sport->rxirq);
-+		/* enable wakeup from i.MX UART */
-+		val = readl(sport->port.membase + UCR3);
-+		val &= ~UCR3_AWAKEN;
-+		writel(val, sport->port.membase + UCR3);
-+
-+		disable_irq_wake(sport->rxirq);
-+	}
- 
- 	if (sport)
- 		uart_resume_port(&imx_reg, &sport->port);
-@@ -1311,6 +1338,9 @@ static int serial_imx_probe_dt(struct imx_port *sport,
- 	if (of_get_property(np, "fsl,irda-mode", NULL))
- 		sport->use_irda = 1;
- 
-+	if (of_get_property(np, "fsl,uart-can-wake", NULL))
-+		sport->can_wake = 1;
-+
- 	sport->devdata = of_id->data;
- 
- 	return 0;
-@@ -1339,6 +1369,9 @@ static void serial_imx_probe_pdata(struct imx_port *sport,
- 
- 	if (pdata->flags & IMXUART_IRDA)
- 		sport->use_irda = 1;
-+
-+	if (pdata->flags & IMXUART_CANWAKE)
-+		sport->can_wake = 1;
- }
- 
- static int serial_imx_probe(struct platform_device *pdev)
-@@ -1408,6 +1441,11 @@ static int serial_imx_probe(struct platform_device *pdev)
- 		goto deinit;
- 	platform_set_drvdata(pdev, &sport->port);
- 
-+	if (sport->can_wake)
-+		device_init_wakeup(&pdev->dev, 1);
-+	else
-+		device_init_wakeup(&pdev->dev, 0);
-+
- 	return 0;
- deinit:
- 	if (pdata && pdata->exit)
--- 
-1.7.1
+No, the drivers should not need to be modified as long as they get the
+irq's from platform device resources. You just want to make sure the
+INTC has no knowledge of it's irq base so it can change.
+
+Rob
