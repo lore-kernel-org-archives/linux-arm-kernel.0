@@ -1,114 +1,23 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 9 Dec 2011 11:13:32 +0100
-Subject: [PATCH v3 1/2] MX2: Add platform definitions for eMMa-PrP device.
-In-Reply-To: <4EE0B478.8080205@redhat.com>
-References: <1322061227-6631-1-git-send-email-javier.martin@vista-silicon.com>
- <1322061227-6631-2-git-send-email-javier.martin@vista-silicon.com>
- <4EE0B478.8080205@redhat.com>
-Message-ID: <20111209101332.GE27267@pengutronix.de>
+Date: Fri, 9 Dec 2011 11:16:39 +0100
+Subject: [GIT PULL] i.MX fixes
+In-Reply-To: <20111209100926.GD27267@pengutronix.de>
+References: <20111209100926.GD27267@pengutronix.de>
+Message-ID: <20111209101639.GA27471@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 08, 2011 at 10:58:32AM -0200, Mauro Carvalho Chehab wrote:
-> On 23-11-2011 13:13, Javier Martin wrote:
-> >eMMa-PrP device included in Freescale i.MX2 chips can also
-> >be used separately to process memory buffers.
+On Fri, Dec 09, 2011 at 11:09:26AM +0100, Sascha Hauer wrote:
+> Hi Arnd,
 > 
-> This patch is just the arch glue to the driver, so it should be applied via the
-> media tree, and likely as patch 2, in order to avoid breaking git bisect.
-> 
-> Yet, I'd like to have the mach-imx maintainer's ack on this.
+> Please pull the following small fixes.
 
-Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+Added the following to it:
 
-Sascha
 
-> 
-> Regards,
-> Mauro.
-> 
-> >
-> >Changes since v2:
-> >- Define imx_add_mx2_emmaprp function which also registers device,
-> >not only alloc.
-> >- Change definition of emma_clk.
-> >- Minor fixes.
-> >
-> >Signed-off-by: Javier Martin<javier.martin@vista-silicon.com>
-> >---
-> >  arch/arm/mach-imx/clock-imx27.c                 |    2 +-
-> >  arch/arm/mach-imx/devices-imx27.h               |    2 ++
-> >  arch/arm/plat-mxc/devices/platform-mx2-camera.c |   18 ++++++++++++++++++
-> >  arch/arm/plat-mxc/include/mach/devices-common.h |    2 ++
-> >  4 files changed, 23 insertions(+), 1 deletions(-)
-> >
-> >diff --git a/arch/arm/mach-imx/clock-imx27.c b/arch/arm/mach-imx/clock-imx27.c
-> >index 88fe00a..dc2d7a5 100644
-> >--- a/arch/arm/mach-imx/clock-imx27.c
-> >+++ b/arch/arm/mach-imx/clock-imx27.c
-> >@@ -661,7 +661,7 @@ static struct clk_lookup lookups[] = {
-> >  	_REGISTER_CLOCK(NULL, "dma", dma_clk)
-> >  	_REGISTER_CLOCK(NULL, "rtic", rtic_clk)
-> >  	_REGISTER_CLOCK(NULL, "brom", brom_clk)
-> >-	_REGISTER_CLOCK(NULL, "emma", emma_clk)
-> >+	_REGISTER_CLOCK("m2m-emmaprp.0", NULL, emma_clk)
-> >  	_REGISTER_CLOCK(NULL, "slcdc", slcdc_clk)
-> >  	_REGISTER_CLOCK("imx27-fec.0", NULL, fec_clk)
-> >  	_REGISTER_CLOCK(NULL, "emi", emi_clk)
-> >diff --git a/arch/arm/mach-imx/devices-imx27.h b/arch/arm/mach-imx/devices-imx27.h
-> >index 2f727d7..28537a5 100644
-> >--- a/arch/arm/mach-imx/devices-imx27.h
-> >+++ b/arch/arm/mach-imx/devices-imx27.h
-> >@@ -50,6 +50,8 @@ extern const struct imx_imx_uart_1irq_data imx27_imx_uart_data[];
-> >  extern const struct imx_mx2_camera_data imx27_mx2_camera_data;
-> >  #define imx27_add_mx2_camera(pdata)	\
-> >  	imx_add_mx2_camera(&imx27_mx2_camera_data, pdata)
-> >+#define imx27_add_mx2_emmaprp(pdata)	\
-> >+	imx_add_mx2_emmaprp(&imx27_mx2_camera_data)
-> >
-> >  extern const struct imx_mxc_ehci_data imx27_mxc_ehci_otg_data;
-> >  #define imx27_add_mxc_ehci_otg(pdata)	\
-> >diff --git a/arch/arm/plat-mxc/devices/platform-mx2-camera.c b/arch/arm/plat-mxc/devices/platform-mx2-camera.c
-> >index b3f4828..11eace9 100644
-> >--- a/arch/arm/plat-mxc/devices/platform-mx2-camera.c
-> >+++ b/arch/arm/plat-mxc/devices/platform-mx2-camera.c
-> >@@ -62,3 +62,21 @@ struct platform_device *__init imx_add_mx2_camera(
-> >  			res, data->iobaseemmaprp ? 4 : 2,
-> >  			pdata, sizeof(*pdata), DMA_BIT_MASK(32));
-> >  }
-> >+
-> >+struct platform_device *__init imx_add_mx2_emmaprp(
-> >+		const struct imx_mx2_camera_data *data)
-> >+{
-> >+	struct resource res[] = {
-> >+		{
-> >+			.start = data->iobaseemmaprp,
-> >+			.end = data->iobaseemmaprp + data->iosizeemmaprp - 1,
-> >+			.flags = IORESOURCE_MEM,
-> >+		}, {
-> >+			.start = data->irqemmaprp,
-> >+			.end = data->irqemmaprp,
-> >+			.flags = IORESOURCE_IRQ,
-> >+		},
-> >+	};
-> >+	return imx_add_platform_device_dmamask("m2m-emmaprp", 0,
-> >+			res, 2, NULL, 0, DMA_BIT_MASK(32));
-> >+}
-> >diff --git a/arch/arm/plat-mxc/include/mach/devices-common.h b/arch/arm/plat-mxc/include/mach/devices-common.h
-> >index def9ba5..1b2258d 100644
-> >--- a/arch/arm/plat-mxc/include/mach/devices-common.h
-> >+++ b/arch/arm/plat-mxc/include/mach/devices-common.h
-> >@@ -223,6 +223,8 @@ struct imx_mx2_camera_data {
-> >  struct platform_device *__init imx_add_mx2_camera(
-> >  		const struct imx_mx2_camera_data *data,
-> >  		const struct mx2_camera_platform_data *pdata);
-> >+struct platform_device *__init imx_add_mx2_emmaprp(
-> >+		const struct imx_mx2_camera_data *data);
-> >
-> >  #include<mach/mxc_ehci.h>
-> >  struct imx_mxc_ehci_data {
-> 
-> 
+Shawn Guo (1):
+      arm/imx: fix power button on imx51 babbage board
+
 
 -- 
 Pengutronix e.K.                           |                             |
