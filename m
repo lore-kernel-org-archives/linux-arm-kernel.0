@@ -1,41 +1,32 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 8 Dec 2011 16:49:51 -0800
-Subject: [PATCH] OMAP2, 3: DSS2: Include linux/delay.h and common.h to
- fix build errors
-In-Reply-To: <1322654481.11191.1.camel@phoenix>
-References: <1322654481.11191.1.camel@phoenix>
-Message-ID: <20111209004951.GK31337@atomide.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Fri, 9 Dec 2011 09:05:36 +0800
+Subject: [PATCH v2] arm/imx6: add restart support for imx6q
+In-Reply-To: <1323066734-29994-1-git-send-email-shawn.guo@linaro.org>
+References: <1323066734-29994-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20111209010535.GI7913@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Axel Lin <axel.lin@gmail.com> [111130 03:26]:
-> Include linux/delay.h to fix below build error:
-> 
->   CC      arch/arm/mach-omap2/display.o
-> arch/arm/mach-omap2/display.c: In function 'dispc_disable_outputs':
-> arch/arm/mach-omap2/display.c:283: error: implicit declaration of function 'mdelay'
-> arch/arm/mach-omap2/display.c: In function 'omap_dss_reset':
-> arch/arm/mach-omap2/display.c:317: error: implicit declaration of function 'omap_test_timeout'
-> make[1]: *** [arch/arm/mach-omap2/display.o] Error 1
-> make: *** [arch/arm/mach-omap2] Error 2
-> 
-> Include common.h to fix below build error:
-> 
->   CC      arch/arm/mach-omap2/display.o
-> arch/arm/mach-omap2/display.c: In function 'omap_dss_reset':
-> arch/arm/mach-omap2/display.c:318: error: implicit declaration of function 'omap_test_timeout'
-> make[1]: *** [arch/arm/mach-omap2/display.o] Error 1
-> make: *** [arch/arm/mach-omap2] Error 2
-> 
-> Signed-off-by: Axel Lin <axel.lin@gmail.com>
-> ---
-> I got the build error on linux-next 20111130.
-> This patch is against linux-next 20111130.
-> Axel
+Hi Russell,
 
-Thanks we already have commit deee6d5359969a0ce4e2760cfd7b9f379bd5698a
-in Russell's devel-stable branch doing the same thing.
+I just put the patch into the tracking system as 7198/1.  Please let
+me know if any problem.
 
 Regards,
+Shawn
 
-Tony
+On Mon, Dec 05, 2011 at 02:32:14PM +0800, Shawn Guo wrote:
+> The restart support was missed from the initial imx6q submission.
+> The mxc_restart() does not work for imx6q.  Instead, this patch adds
+> the restart for imx6q.
+> 
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> ---
+> Changes since v1:
+>  * Fall into soft_restart in case that iomap for wdog_base fails
+> 
+>  arch/arm/mach-imx/clock-imx6q.c         |    2 -
+>  arch/arm/mach-imx/mach-imx6q.c          |   35 ++++++++++++++++++++++++++++++-
+>  arch/arm/mach-imx/src.c                 |   23 ++++++++++++++++++++
+>  arch/arm/plat-mxc/include/mach/common.h |    1 +
+>  4 files changed, 58 insertions(+), 3 deletions(-)
