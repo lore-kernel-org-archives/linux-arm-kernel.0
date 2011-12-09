@@ -1,85 +1,99 @@
-From: javi.merino@arm.com (Javi Merino)
-Date: Fri, 09 Dec 2011 14:52:23 +0000
-Subject: [PATCH v2] ARM: pl330: Fix a race condition
-In-Reply-To: <CABb+yY0f8xxAj+rFeZ4e61Sfk0+0bMsAiZ-H5AeY4cfCd_VE5g@mail.gmail.com>
-References: <4E8C5425.80303@arm.com>	<1317892206-3600-1-git-send-email-javi.merino@arm.com>	<CAJuYYwTXf-XU0fdGT0+sggN-MEY3v7UHkfjNkM4+QUW464J9Ew@mail.gmail.com>	<4EB7B79A.2020004@arm.com>	<000c01ccada6$f83f5be0$e8be13a0$%kim@samsung.com>	<4ED3B89E.7070903@arm.com>	<000e01ccae48$d76a7ba0$863f72e0$%kim@samsung.com>	<4ED4AB9A.3060807@arm.com>	<CAJe_Zhem0yTOV4L-kJ91fQN++hFzCUgjOfxSnJR25PuYNTedVQ@mail.gmail.com>	<03f001ccb4b5$3441f5c0$9cc5e140$%kim@samsung.com>	<4EDF3989.3060108@arm.com>	<4EDFD278.9090101@arm.com>	<4EE1F7F0.70107@arm.com>	<CAJe_Zhcj_j+r+T5N_BdS-ENds1SmJs7-Pfyf8vrFkB75BGBaYg@mail.gmail.com>	<4EE20FF1.5070702@arm.com>
- <CABb+yY0f8xxAj+rFeZ4e61Sfk0+0bMsAiZ-H5AeY4cfCd_VE5g@mail.gmail.com>
-Message-ID: <4EE220A7.5070101@arm.com>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Fri, 9 Dec 2011 16:55:27 +0200
+Subject: Adding remoteproc/rpmsg to linux-next
+Message-ID: <CAK=WgbaU6vpiBGSgogYPjQNmrF-U0wk1rSXMX83DdgQa9hw5Mw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/12/11 14:15, Jassi Brar wrote:
-> On Fri, Dec 9, 2011 at 7:11 PM, Javi Merino <javi.merino@arm.com> wrote:
->> On 09/12/11 13:04, Jassi Brar wrote:
->>> Hi Javi,
->>>
->>> On 9 December 2011 17:28, Javi Merino <javi.merino@arm.com> wrote:
->>>>
->>>>>>>> Javi, could you please check if you too get the memcpy failure with
->>>>>>>> dmatest ?
->>>>>>>
->>>>> Ok, I think I've just reproduced it in my end with the kernel's dmatest
->>>>> module.  After the first transaction it looks like the dma test wasn't
->>>>> able to issue any more transactions.
->>>>>
->>>> If you submit a transaction, it finishes and there's nothing else to run,
->>>> pl330_update() calls _start() but there is nothing to send.  This is all
->>>> right.  Then, if another transaction is submitted, pl330_submit_req() will
->>>> put it in buffer 0 again.  This time, the PC of the DMA is in the last
->>>> instruction of buffer 0 (the DMAEND of the *previous* transaction that
->>>> finished long ago) so _thrd_active() thinks that this buffer is active,
->>>>
->>> Many thanks for the in-depth analysis.
->>>
->>> Though before the PC check, the IS_FREE() should return true since
->>> pl330_update() does MARK_FREE()
->>>
->>> Could you please check if the client's callback function called
->>> successfully for the
->>> first submitted transfer ?
->>
->> Yes, it calls MARK_FREE() and indeed in pl330_update(), _thrd_active()
->> returns 0.  The problem comes when, afterwards, pl330_submit_req()
->> introduces a new request and chooses the same buffer. Then, IS_FREE()
->> returns false (obviously) but the PC of the DMA is at the end of the
->> buffer, so _thrd_active() claims that it is active so pl330_chan_ctrl()
->> doesn't start it.
->>
-> OK, I see what you mean.
-> We need to be able to differentiate between 'programmed' state
-> and 'running' state.
-> So instead of employing  _state() or another marker, we'd rather
-> alternate between buff 0 & 1 as a workaround.
-> 
-> That is, I am ok with your following fix.
-> 
-> -       idx = IS_FREE(&thrd->req[0]) ? 0 : 1;
-> +       idx = IS_FREE(&thrd->req[1 - thrd->lstenq]) ? 1 - thrd->lstenq
-> : thrd->lstenq;
+Hi Stephen,
 
-No, see my last comment in the previous email.  I think this freezes the
-DMA in the following scenario:
+Can you please add the following remoteproc tree to linux-next ?
 
-pl330_submit_req()
-pl330_chan_ctrl(PL33O_OP_START)
-... wait for the transfer to finish ...
-pl330_update()
-...
-pl330_submit_req()
-pl330_submit_req()
-pl330_chan_ctrl(PL330_OP_START)
+git://git.kernel.org/pub/scm/linux/kernel/git/ohad/remoteproc.git for-next
 
-The pl330 won't start because of the same reason, we have a request in
-buffer 0 and _thrd_active() would say that it is active.  This can
-happen if drivers/dma/pl330.c:fill_queues() introduces two requests
-before calling pl330_chan_ctrl(), which I'm not entirely sure that it
-can't happen.
+This branch includes the basic remoteproc/rpmsg functionality as
+posted in the mailing lists, with a few minor changes that were
+requested (namely, changes against virtio-spec.txt were removed and
+"amp" is no longer used).
 
-I think the best solution would be to revert
-ee3f615819404a9438b2dd01b7a39f276d2737f2 and go back to my original
-patch (in the beginning of this thread):
+The motivation for having this in linux-next is twofold:
+1. Getting prepared for a 3.3 merger (knock on wood)
+2. Starting a linear development scheme, in order to make it easier
+for people to collaborate (and to reduce the review load of
+incremental changes)
 
-http://article.gmane.org/gmane.linux.ports.arm.kernel/133110
+I suspect that once this basic functionality will be merged upstream,
+the development of remoteproc and rpmsg will become completely
+orthogonal, and it would then make sense to start queueing patches
+separately. At that point I'll send you the details for the rpmsg.git
+tree.
 
-What do you think?  Thanks,
-Javi
+Last note: the "ARM: OMAP: add remoteproc devices for OMAP4" patch is
+omitted from this branch, since it depends on CMA (which isn't merged
+yet). As soon as CMA will be added (at least to linux-next) that patch
+will be queued up too.
+
+Thanks,
+Ohad.
+
+The following changes since commit 5611cc4572e889b62a7b4c72a413536bf6a9c416:
+
+  Linux 3.2-rc4 (2011-12-01 14:56:01 -0800)
+
+are available in the git repository at:
+  git://git.kernel.org/pub/scm/linux/kernel/git/ohad/remoteproc.git for-next
+
+Ohad Ben-Cohen (6):
+      remoteproc: add framework for controlling remote processors
+      remoteproc: add debugfs entries
+      remoteproc: create rpmsg virtio device
+      remoteproc/omap: add a remoteproc driver for OMAP4
+      rpmsg: add virtio-based remote processor messaging bus
+      samples/rpmsg: add an rpmsg driver sample
+
+ Documentation/ABI/testing/sysfs-bus-rpmsg    |   75 ++
+ Documentation/remoteproc.txt                 |  324 ++++++
+ Documentation/rpmsg.txt                      |  293 ++++++
+ MAINTAINERS                                  |    7 +
+ arch/arm/plat-omap/include/plat/remoteproc.h |   57 +
+ drivers/Kconfig                              |    4 +
+ drivers/Makefile                             |    2 +
+ drivers/remoteproc/Kconfig                   |   24 +
+ drivers/remoteproc/Makefile                  |    9 +
+ drivers/remoteproc/omap_remoteproc.c         |  249 +++++
+ drivers/remoteproc/omap_remoteproc.h         |   69 ++
+ drivers/remoteproc/remoteproc_core.c         | 1410 ++++++++++++++++++++++++++
+ drivers/remoteproc/remoteproc_debugfs.c      |  179 ++++
+ drivers/remoteproc/remoteproc_internal.h     |   44 +
+ drivers/remoteproc/remoteproc_rpmsg.c        |  295 ++++++
+ drivers/rpmsg/Kconfig                        |    5 +
+ drivers/rpmsg/Makefile                       |    1 +
+ drivers/rpmsg/virtio_rpmsg_bus.c             | 1026 +++++++++++++++++++
+ include/linux/mod_devicetable.h              |    9 +
+ include/linux/remoteproc.h                   |  265 +++++
+ include/linux/rpmsg.h                        |  326 ++++++
+ include/linux/virtio_ids.h                   |    1 +
+ samples/Kconfig                              |    8 +
+ samples/Makefile                             |    2 +-
+ samples/rpmsg/Makefile                       |    1 +
+ samples/rpmsg/rpmsg_client_sample.c          |  100 ++
+ 26 files changed, 4784 insertions(+), 1 deletions(-)
+ create mode 100644 Documentation/ABI/testing/sysfs-bus-rpmsg
+ create mode 100644 Documentation/remoteproc.txt
+ create mode 100644 Documentation/rpmsg.txt
+ create mode 100644 arch/arm/plat-omap/include/plat/remoteproc.h
+ create mode 100644 drivers/remoteproc/Kconfig
+ create mode 100644 drivers/remoteproc/Makefile
+ create mode 100644 drivers/remoteproc/omap_remoteproc.c
+ create mode 100644 drivers/remoteproc/omap_remoteproc.h
+ create mode 100644 drivers/remoteproc/remoteproc_core.c
+ create mode 100644 drivers/remoteproc/remoteproc_debugfs.c
+ create mode 100644 drivers/remoteproc/remoteproc_internal.h
+ create mode 100644 drivers/remoteproc/remoteproc_rpmsg.c
+ create mode 100644 drivers/rpmsg/Kconfig
+ create mode 100644 drivers/rpmsg/Makefile
+ create mode 100644 drivers/rpmsg/virtio_rpmsg_bus.c
+ create mode 100644 include/linux/remoteproc.h
+ create mode 100644 include/linux/rpmsg.h
+ create mode 100644 samples/rpmsg/Makefile
+ create mode 100644 samples/rpmsg/rpmsg_client_sample.c
