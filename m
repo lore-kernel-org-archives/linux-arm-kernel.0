@@ -1,47 +1,38 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 9 Dec 2011 13:28:05 -0800
-Subject: [GIT PULL] omap1 changes for v3.3 merge window
-Message-ID: <20111209212804.GA31337@atomide.com>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Fri,  9 Dec 2011 22:31:30 +0100
+Subject: [PATCH] ARM: only show modules in the memory layout for MODULES=y
+Message-ID: <1323466291-9679-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi And & Olof,
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+ arch/arm/mm/init.c |    4 ++++
+ 1 files changed, 4 insertions(+), 0 deletions(-)
 
-Please pull omap1 changes from:
-
-git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap omap1
-
-These changes are necessary to always reprogram the core clock
-based on the SoC type so we can boot at the fastest supported rate.
-
-Regards,
-
-Tony
-
-
-The following changes since commit 6560ee07dc946e94f7cc2cd8e3b5a5f5ee7340c1:
-  Janusz Krzysztofik (1):
-        ARM: OMAP1: recalculate loops per jiffy after dpll1 reprogram
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap omap1
-
-Janusz Krzysztofik (3):
-      ARM: OMAP1: Move dpll1 rates selection from config to runtime
-      ARM: OMAP1: Update dpll1 default rate reprogramming method
-      ARM: OMAP1: Always reprogram dpll1 rate at boot
-
-Tony Lindgren (1):
-      ARM: OMAP1: Set the omap1623 sram size to 16K
-
- arch/arm/configs/omap1_defconfig              |    1 -
- arch/arm/mach-omap1/Kconfig                   |   64 -------------------------
- arch/arm/mach-omap1/clock.c                   |   14 ++---
- arch/arm/mach-omap1/clock.h                   |    3 +
- arch/arm/mach-omap1/clock_data.c              |   19 ++++----
- arch/arm/mach-omap1/opp.h                     |    1 +
- arch/arm/mach-omap1/opp_data.c                |   63 +++++++++++-------------
- arch/arm/plat-omap/include/plat/clkdev_omap.h |    1 +
- arch/arm/plat-omap/sram.c                     |    9 ++--
- 9 files changed, 55 insertions(+), 120 deletions(-)
+diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+index fbdd12e..80def74 100644
+--- a/arch/arm/mm/init.c
++++ b/arch/arm/mm/init.c
+@@ -666,7 +666,9 @@ void __init mem_init(void)
+ #ifdef CONFIG_HIGHMEM
+ 			"    pkmap   : 0x%08lx - 0x%08lx   (%4ld MB)\n"
+ #endif
++#ifdef CONFIG_MODULES
+ 			"    modules : 0x%08lx - 0x%08lx   (%4ld MB)\n"
++#endif
+ 			"      .text : 0x%p" " - 0x%p" "   (%4d kB)\n"
+ 			"      .init : 0x%p" " - 0x%p" "   (%4d kB)\n"
+ 			"      .data : 0x%p" " - 0x%p" "   (%4d kB)\n"
+@@ -685,7 +687,9 @@ void __init mem_init(void)
+ 			MLM(PKMAP_BASE, (PKMAP_BASE) + (LAST_PKMAP) *
+ 				(PAGE_SIZE)),
+ #endif
++#ifdef CONFIG_MODULES
+ 			MLM(MODULES_VADDR, MODULES_END),
++#endif
+ 
+ 			MLK_ROUNDUP(_text, _etext),
+ 			MLK_ROUNDUP(__init_begin, __init_end),
+-- 
+1.7.7.3
