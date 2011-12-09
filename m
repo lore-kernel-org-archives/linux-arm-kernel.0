@@ -1,103 +1,85 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Fri, 9 Dec 2011 15:52:14 +0100
-Subject: [PATCH 2/4] ARM: OMAP2/3: intc: Add DT support for TI interrupt
- controller
-In-Reply-To: <4EE20B38.8050006@gmail.com>
-References: <1323291049-24964-1-git-send-email-b-cousson@ti.com>
- <1323291049-24964-3-git-send-email-b-cousson@ti.com>
- <4EDFD88B.8060008@gmail.com> <4EE0D0E6.3060202@ti.com>
- <4EE20B38.8050006@gmail.com>
-Message-ID: <4EE2209E.2040209@ti.com>
+From: javi.merino@arm.com (Javi Merino)
+Date: Fri, 09 Dec 2011 14:52:23 +0000
+Subject: [PATCH v2] ARM: pl330: Fix a race condition
+In-Reply-To: <CABb+yY0f8xxAj+rFeZ4e61Sfk0+0bMsAiZ-H5AeY4cfCd_VE5g@mail.gmail.com>
+References: <4E8C5425.80303@arm.com>	<1317892206-3600-1-git-send-email-javi.merino@arm.com>	<CAJuYYwTXf-XU0fdGT0+sggN-MEY3v7UHkfjNkM4+QUW464J9Ew@mail.gmail.com>	<4EB7B79A.2020004@arm.com>	<000c01ccada6$f83f5be0$e8be13a0$%kim@samsung.com>	<4ED3B89E.7070903@arm.com>	<000e01ccae48$d76a7ba0$863f72e0$%kim@samsung.com>	<4ED4AB9A.3060807@arm.com>	<CAJe_Zhem0yTOV4L-kJ91fQN++hFzCUgjOfxSnJR25PuYNTedVQ@mail.gmail.com>	<03f001ccb4b5$3441f5c0$9cc5e140$%kim@samsung.com>	<4EDF3989.3060108@arm.com>	<4EDFD278.9090101@arm.com>	<4EE1F7F0.70107@arm.com>	<CAJe_Zhcj_j+r+T5N_BdS-ENds1SmJs7-Pfyf8vrFkB75BGBaYg@mail.gmail.com>	<4EE20FF1.5070702@arm.com>
+ <CABb+yY0f8xxAj+rFeZ4e61Sfk0+0bMsAiZ-H5AeY4cfCd_VE5g@mail.gmail.com>
+Message-ID: <4EE220A7.5070101@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/9/2011 2:20 PM, Rob Herring wrote:
-> On 12/08/2011 08:59 AM, Cousson, Benoit wrote:
->> On 12/7/2011 10:20 PM, Rob Herring wrote:
->>> On 12/07/2011 02:50 PM, Benoit Cousson wrote:
->>
->> [...]
->>
->>>> +#ifdef CONFIG_OF
->>>> +int __init intc_of_init(struct device_node *node, struct device_node
->>>> *parent)
->>>> +{
->>>> +    struct resource res;
->>>> +    u32 nr_irqs;
->>>> +
->>>> +    if (WARN_ON(!node))
->>>> +        return -ENODEV;
->>>> +
->>>> +    if (of_address_to_resource(node, 0,&res)) {
->>>> +        WARN(1, "unable to get intc registers\n");
->>>> +        return -EINVAL;
->>>> +    }
->>>> +
->>>> +    if (of_property_read_u32(node, "ti,intc-size",&nr_irqs)) {
->>>> +        WARN(1, "unable to get intc-size\n");
->>>> +        return -EINVAL;
+On 09/12/11 14:15, Jassi Brar wrote:
+> On Fri, Dec 9, 2011 at 7:11 PM, Javi Merino <javi.merino@arm.com> wrote:
+>> On 09/12/11 13:04, Jassi Brar wrote:
+>>> Hi Javi,
 >>>
->>> There is no default value that makes sense?
->>
->> So far we have 96 or 128, so I can put 96 as a default and just keep the
->> warning without returning an error.
->>
->>>> +    }
->>>> +
->>>> +    omap_init_irq(res.start, nr_irqs);
->>>> +    irq_domain_add_simple(node, 0);
+>>> On 9 December 2011 17:28, Javi Merino <javi.merino@arm.com> wrote:
+>>>>
+>>>>>>>> Javi, could you please check if you too get the memcpy failure with
+>>>>>>>> dmatest ?
+>>>>>>>
+>>>>> Ok, I think I've just reproduced it in my end with the kernel's dmatest
+>>>>> module.  After the first transaction it looks like the dma test wasn't
+>>>>> able to issue any more transactions.
+>>>>>
+>>>> If you submit a transaction, it finishes and there's nothing else to run,
+>>>> pl330_update() calls _start() but there is nothing to send.  This is all
+>>>> right.  Then, if another transaction is submitted, pl330_submit_req() will
+>>>> put it in buffer 0 again.  This time, the PC of the DMA is in the last
+>>>> instruction of buffer 0 (the DMAEND of the *previous* transaction that
+>>>> finished long ago) so _thrd_active() thinks that this buffer is active,
+>>>>
+>>> Many thanks for the in-depth analysis.
 >>>
->>> Have you read the NO_IRQ thread...
+>>> Though before the PC check, the IS_FREE() should return true since
+>>> pl330_update() does MARK_FREE()
+>>>
+>>> Could you please check if the client's callback function called
+>>> successfully for the
+>>> first submitted transfer ?
 >>
->> Yeah, I tried, but that's a long email thread with some unclear
->> conclusion...
->> The point is that the few users of that API today are using 0 as a base
->> as well, so I thought it was still valid.
+>> Yes, it calls MARK_FREE() and indeed in pl330_update(), _thrd_active()
+>> returns 0.  The problem comes when, afterwards, pl330_submit_req()
+>> introduces a new request and chooses the same buffer. Then, IS_FREE()
+>> returns false (obviously) but the PC of the DMA is at the end of the
+>> buffer, so _thrd_active() claims that it is active so pl330_chan_ctrl()
+>> doesn't start it.
 >>
->>> Is 0 ever a valid interrupt for a driver? If so, you must not use 0 for
->>> the base. I would pick 16 to skip over legacy ISA irqs.
->>
->> I do not have any 0 interrupts right now, my concern is that I still
->> have some legacy non-DT drivers that expect the previous hwirq = irq
->> mapping.
->
-> I guess it depends how easily you can shift all the irq defines. You
-> allow specifying the base so that you can set it to 0 for non-DT and -1
-> (dynamic allocation) for DT.
+> OK, I see what you mean.
+> We need to be able to differentiate between 'programmed' state
+> and 'running' state.
+> So instead of employing  _state() or another marker, we'd rather
+> alternate between buff 0 & 1 as a workaround.
+> 
+> That is, I am ok with your following fix.
+> 
+> -       idx = IS_FREE(&thrd->req[0]) ? 0 : 1;
+> +       idx = IS_FREE(&thrd->req[1 - thrd->lstenq]) ? 1 - thrd->lstenq
+> : thrd->lstenq;
 
-The issue, is that the IRQs are not defined anymore but hard coded in 
-the hwmod database. And the idea is that this is reflecting exactly the 
-hwirq from the spec, so I do not want to add any artificial offset for 
-the domain in the original data.
+No, see my last comment in the previous email.  I think this freezes the
+DMA in the following scenario:
 
->>> irqdomains should always be enabled regardless of CONFIG_OF. So either
->>> you can leave it as is if OF is always enabled for OMAP, or you should
->>> move domain setup into omap_init_irq.
->>
->> OK, but it looks like I cannot really modify the current INTC to DT
->> without having fully adapted the OMAP drivers to use
->> irq_of_parse_and_map. Or did I miss something?
->>
->
-> No, the drivers should not need to be modified as long as they get the
-> irq's from platform device resources. You just want to make sure the
-> INTC has no knowledge of it's irq base so it can change.
+pl330_submit_req()
+pl330_chan_ctrl(PL33O_OP_START)
+... wait for the transfer to finish ...
+pl330_update()
+...
+pl330_submit_req()
+pl330_submit_req()
+pl330_chan_ctrl(PL330_OP_START)
 
-OK, the driver will not have to change but the IRQ value will not be the 
-same in the case of DT since it will use the irq_create_of_mapping.
+The pl330 won't start because of the same reason, we have a request in
+buffer 0 and _thrd_active() would say that it is active.  This can
+happen if drivers/dma/pl330.c:fill_queues() introduces two requests
+before calling pl330_chan_ctrl(), which I'm not entirely sure that it
+can't happen.
 
-Currently, the driver IRQ resource is 7 for example for the twl, this is 
-the hwirq (= irq). If I use a domain with a base of 16, the resource 
-will still be 7 except if the resource is created from OF, then it will 
-be 23.
+I think the best solution would be to revert
+ee3f615819404a9438b2dd01b7a39f276d2737f2 and go back to my original
+patch (in the beginning of this thread):
 
-The only way I have today to maintain the legacy drivers to work without 
-hacking the OMAP resource code is to keep the base_irq at 0.
+http://article.gmane.org/gmane.linux.ports.arm.kernel/133110
 
-Since I do not have any hwirq at 0 so far, is it a big deal to keep the 
-base_irq at 0 for the moment?
-It will be easier to transition to DT that way without breaking the 
-existing drivers.
-
-Regards,
-Benoit
+What do you think?  Thanks,
+Javi
