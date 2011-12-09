@@ -1,51 +1,95 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Fri, 9 Dec 2011 12:49:49 +0530
-Subject: [PATCH 1/2] mfd: add irq domain support for max8997 interrupts
-In-Reply-To: <20111209063912.GG26952@opensource.wolfsonmicro.com>
-References: <1323361659-11835-1-git-send-email-thomas.abraham@linaro.org>
- <1323361659-11835-2-git-send-email-thomas.abraham@linaro.org>
- <20111209044109.GB26952@opensource.wolfsonmicro.com>
- <CAJuYYwRicSWO=wCmBH5RWcBLX3uhpyxS2wojUS3ZAH9tN=R1Kg@mail.gmail.com>
- <20111209060249.GD26952@opensource.wolfsonmicro.com>
- <CAJuYYwSCuu8U2rF3RGAnczXgbh4Px7hMwUhHr=xrhPZ1jEs5DA@mail.gmail.com>
- <20111209063912.GG26952@opensource.wolfsonmicro.com>
-Message-ID: <CAJuYYwQ8B_EtuReRDJ8Tp-cCOV3jd_-y-9iLy0apRZV3zU6Jdw@mail.gmail.com>
+From: shubhrajyoti@ti.com (Shubhrajyoti)
+Date: Fri, 09 Dec 2011 12:51:09 +0530
+Subject: [PATCHv7 1/3] OMAP: I2C: Reset support
+In-Reply-To: <alpine.DEB.2.00.1112081812530.6289@utopia.booyaka.com>
+References: <1322817674-25384-1-git-send-email-shubhrajyoti@ti.com>
+ <1322817674-25384-2-git-send-email-shubhrajyoti@ti.com>
+ <alpine.DEB.2.00.1112081812530.6289@utopia.booyaka.com>
+Message-ID: <4EE1B6E5.6080401@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9 December 2011 12:09, Mark Brown
-<broonie@opensource.wolfsonmicro.com> wrote:
-> On Fri, Dec 09, 2011 at 12:00:07PM +0530, Thomas Abraham wrote:
+On Friday 09 December 2011 06:45 AM, Paul Walmsley wrote:
+> Hi
 >
->> If these gpio's are connected to the host system, and host system sets
->> up gpio interrupt notification for these gpio lines, the linux irq
->> number for the gpio interrupt would belong to the irq domain of the
->> host interrupt controller (gic irq domain in case of exynos).
->> Consumers of this interrupt would use the gpio interrupt independent
->> of the max8997 irq domain. So irq_base can be maintained private to
->> the max8997 mfd driver and its sub-block drivers.
+> some comments
 >
-> How would you provide this interrupt to the device using it in a non-DT
-> systemm without passing the irq_base into the device as platform data?
+> On Fri, 2 Dec 2011, Shubhrajyoti D wrote:
+>
+>> Under some error conditions the i2c driver may do a reset.
+>> Adding a reset field and support in the device-specific code.
+>>
+>> Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
+>> ---
+>>  arch/arm/plat-omap/i2c.c |   18 ++++++++++++++++++
+>>  include/linux/i2c-omap.h |    1 +
+>>  2 files changed, 19 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/arch/arm/plat-omap/i2c.c b/arch/arm/plat-omap/i2c.c
+>> index db071bc..883229c 100644
+>> --- a/arch/arm/plat-omap/i2c.c
+>> +++ b/arch/arm/plat-omap/i2c.c
+>> @@ -74,6 +74,22 @@ static struct omap_i2c_bus_platform_data i2c_pdata[OMAP_I2C_MAX_CONTROLLERS];
+>>  static struct platform_device omap_i2c_devices[] = {
+>>  	I2C_DEV_BUILDER(1, i2c_resources[0], &i2c_pdata[0]),
+>>  };
+>> +/**
+>> + * omap2_i2c_reset - reset the omap i2c module.
+>> + * @dev: struct device*
+>> + */
+>> +
+>> +static int omap2_i2c_reset(struct device *dev)
+>> +{
+>> +	int r = 0;
+>> +	struct platform_device *pdev = to_platform_device(dev);
+>> +	struct omap_device *odev = to_omap_device(pdev);
+>> +	struct omap_hwmod *oh;
+>> +
+>> +	oh = odev->hwmods[0];
+>> +	r = omap_hwmod_reset(oh);
+>> +	return r;
+>> +}
+> This function should go into arch/arm/plat-omap/omap_device.c, and it 
+agree
+> should be renamed to omap_device_reset(), since it's not I2C specific.  
+> Also it shouldn't assume that there's only one hwmod - it should iterate 
+> over all of the hwmods in the omap_device and call omap_hwmod_reset() on 
+> each.
+Yes agree will fix in the next version.
 
-In non-DT system, the linux irq number that is used to register the
-gpio interrupt notifier would belong to the irq domain of the host
-interrupt controller (gic). For Exynos, the linux irq numbers that
-belong to the gic irq domain are statically assigned to specific
-interrupt notifiers and known to the entire system.
-
-For instance, the linux virq number for gpio interrupt for the gpio
-connected from max8997 to Exynos GPIO (hypothetical case) would be
-statically defined as GPIO_EINT_MAX8997_GPIO0. The device that
-requires to be notified of this interrupt would request_irq or
-setup_irq using this macro and hence needs no knowledge of the
-irq_base of the max8997 irq domain.
-
-If the system uses sparse irqs, or if static mapping of linux virq's
-are not possible in a system, that is a problem that this patch does
-not address. irq_domain of max8997 is self contained to provide all
-max8997 linux irq numbers required by the sub-block drivers of
-max8997.
-
-Thanks,
-Thomas.
+>>  
+>>  #define OMAP_I2C_CMDLINE_SETUP	(BIT(31))
+>>  
+>> @@ -179,6 +195,8 @@ static inline int omap2_i2c_add_bus(int bus_id)
+>>  	 */
+>>  	if (cpu_is_omap34xx())
+>>  		pdata->set_mpu_wkup_lat = omap_pm_set_max_mpu_wakeup_lat_compat;
+>> +
+>> +	pdata->device_reset = omap2_i2c_reset;
+> omap_device_reset
+>
+>>  	pdev = omap_device_build(name, bus_id, oh, pdata,
+>>  			sizeof(struct omap_i2c_bus_platform_data),
+>>  			NULL, 0, 0);
+>> diff --git a/include/linux/i2c-omap.h b/include/linux/i2c-omap.h
+>> index 92a0dc7..fd38249 100644
+>> --- a/include/linux/i2c-omap.h
+>> +++ b/include/linux/i2c-omap.h
+>> @@ -35,6 +35,7 @@ struct omap_i2c_bus_platform_data {
+>>  	u32		rev;
+>>  	u32		flags;
+>>  	void		(*set_mpu_wkup_lat)(struct device *dev, long set);
+>> +	int		(*device_reset) (struct device *dev);
+>>  };
+>>  
+>>  #endif
+>> -- 
+>> 1.7.1
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>>
+>
+> - Paul
