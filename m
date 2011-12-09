@@ -1,38 +1,61 @@
 From: leif.lindholm@arm.com (Leif Lindholm)
-Date: Fri, 9 Dec 2011 17:48:42 +0000
-Subject: [PATCH 4/4] Use generic ARM instruction set condition code checks
- for kprobes.
-In-Reply-To: <20111209164029.GL5196@mudshark.cambridge.arm.com>
+Date: Fri, 9 Dec 2011 17:50:11 +0000
+Subject: [PATCH 1/4] Add generic ARM instruction set condition code checks.
+In-Reply-To: <20111209153649.GH5196@mudshark.cambridge.arm.com>
 References: <20111208173100.7572.9099.stgit@localhost6.localdomain6>
- <20111208173212.7572.16210.stgit@localhost6.localdomain6>
- <20111209155450.GI5196@mudshark.cambridge.arm.com> <4EE234A8.80208@arm.com>
- <20111209164029.GL5196@mudshark.cambridge.arm.com>
-Message-ID: <4EE249FA.1060403@arm.com>
+ <20111208173138.7572.48841.stgit@localhost6.localdomain6>
+ <20111209153649.GH5196@mudshark.cambridge.arm.com>
+Message-ID: <4EE24A53.5090807@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/09/11 16:40, Will Deacon wrote:
- > Hmm, I still don't see why you should change the linkage. Make it
- > static inline if you really want the inline, but that seems weird
- > outside of a header file stub.
+On 12/09/11 15:36, Will Deacon wrote:
+> Hi Leif,
+>
+> This looks largely there, but I have some small comments inline.
+>
+> On Thu, Dec 08, 2011 at 05:31:43PM +0000, Leif Lindholm wrote:
+>> +#ifndef __ASSEMBLY__
+>> +extern unsigned int arm_check_condition(unsigned int opcode, unsigned int psr);
+>> +#endif
+>
+> You could use u32 for the parameters to reinforce the point that they're
+> words.
+
+Yeah, fair point. I just kept the types from the original nwfpe code.
+
+>> +unsigned int arm_check_condition(unsigned int opcode, unsigned int psr)
+>
+> I think you want asmlinkage for this function.
 
 OK
 
->>> Maybe it's best just to change all of the callers to call
->>> arm_check_condition directly, like you have done below for the ARM case. For
->>> the Thumb cases will it work if you make sure that you put the condition
->>> code in the top bits?
->>
->> Yes, that is functionally equivalent, and what I did in the RFC version,
->> but it ended up looking messy at the calling point.
+>> +{
+>> +    unsigned int cc_bits  = opcode>>  28;
+>> +    unsigned int psr_cond = psr>>  28;
+>> +
+>> +    if (cc_bits != ARM_OPCODE_CONDITION_UNCOND) {
+>> +            if ((cc_map[cc_bits]>>  (psr_cond))&  1)
+>> +                    return ARM_OPCODE_CONDTEST_PASS;
+>> +            else
+>> +                    return ARM_OPCODE_CONDTEST_FAIL;
+>> +    } else {
+>> +            return ARM_OPCODE_CONDTEST_UNCOND;
+>> +    }
+>> +}
 >
-> Ok, then could you route the ARM variant through the wrapper too?
+> Maybe have a single return here returning a ret value which you assign in
+> the conditional blocks.
 
-I would have preferred the opposite, but that would seem to require more
-invasive changes to the Thumb handling code (at least for the
-'kprobe_test_flags & TEST_FLAG_NO_ITBLOCK' case). Will do.
+OK
+
+>> +EXPORT_SYMBOL(arm_check_condition);
+>
+> EXPORT_SYMBOL_GPL?
+
+OK
 
 /
-     Leif
+        Leif
 
 -- IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium.  Thank you.
