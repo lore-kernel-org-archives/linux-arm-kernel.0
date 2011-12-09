@@ -1,84 +1,56 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Fri, 09 Dec 2011 15:06:03 +0400
-Subject: [PATCH 3/3] ide/at91: use new introduce smc accessor
-In-Reply-To: <1323357784-17555-3-git-send-email-plagnioj@jcrosoft.com>
-References: <20111208150348.GD23884@game.jcrosoft.org>
- <1323357784-17555-3-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <4EE1EB9B.4080500@mvista.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 9 Dec 2011 12:08:07 +0100
+Subject: [PATCH] [RFC] pinctrl: add a driver for Energy Micro's efm32 SoCs
+In-Reply-To: <20111209051413.GK7913@S2100-06.ap.freescale.net>
+References: <1323384057-31452-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <74CDBE0F657A3D45AFBB94109FB122FF1750B77BD8@HQMAIL01.nvidia.com>
+ <20111209010147.GH7913@S2100-06.ap.freescale.net>
+ <4EE18403.30604@nvidia.com>
+ <20111209043220.GJ7913@S2100-06.ap.freescale.net>
+ <4EE192DC.3080209@nvidia.com>
+ <20111209051413.GK7913@S2100-06.ap.freescale.net>
+Message-ID: <20111209110807.GG27267@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Fri, Dec 09, 2011 at 01:14:14PM +0800, Shawn Guo wrote:
+> On Thu, Dec 08, 2011 at 09:47:24PM -0700, Stephen Warren wrote:
+> > 
+> > pin X: function = UART A TX
+> > pin Y: function = UART A RX
+> > 
+> 
+> We really do not expect per pin function mapping but per block function
+> mapping.  That said, the UART driver is going to tell pinctrl subsystem
+> "I'm UARTA, please set all my pins up for me".
 
-On 08-12-2011 19:23, Jean-Christophe PLAGNIOL-VILLARD wrote:
+I still think it should be "I'm board Y, please set all my pins up for me"
 
-    Same comment about the subject.
+Drivers should not be bothered with pin muxing *at all*. When we add
+pinmux_request to drivers all SoCs using this driver are doomed to
+implement pinmux support regardless if they have any pinmux support in
+hardware or not.
+Where this leads we can currently see in current next branch with the
+smc91x driver where one single board has a regulator for.  Suddenly all
+other boards using this driver stopped working because they have no
+regulator provided for the driver.
+There is this CONFIG_REGULATOR_DUMMY option which will cause *all*
+regulator_request to succeed on all regulators in this binary which
+disqualifies this option for multiboard/SoC Kernels.
 
-> this will allow to use the pata_at91 on a single zImage
+A pin setup is board specific and not driver specific. There are only
+some corner cases where a driver has to do something with the pin setup
+like for example on i.MX6 where the drive strength setting has to be
+changed with different card speeds.
 
-    s/pata_at91/at91_ide/
+There is also no value in being able to say which pins are allocated
+by which driver. All we really want is being able to abstract the
+pinmux in some common way and being able to detect conflicts.
 
-> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD<plagnioj@jcrosoft.com>
-> Cc: Nicolas Ferre<nicolas.ferre@atmel.com>
-> Cc: linux-ide at vger.kernel.org
-> ---
-> Hi,
+Sascha
 
-> 	it's depends on other patch for AT91 can we apply via at91
-
-    I'm afraid David won't accept this, as the IDE tree is frozen for anything 
-but the fixes.
-
-> diff --git a/drivers/ide/at91_ide.c b/drivers/ide/at91_ide.c
-> index 41d4155..407595b 100644
-> --- a/drivers/ide/at91_ide.c
-> +++ b/drivers/ide/at91_ide.c
-> @@ -59,41 +59,50 @@
-[...]
->   static void set_smc_timings(const u8 chipselect, const u16 cycle,
->   			    const u16 setup, const u16 pulse,
->   			    const u16 data_float, int use_iordy)
->   {
-> -	unsigned long mode = AT91_SMC_READMODE | AT91_SMC_WRITEMODE |
-> +	struct sam9_smc_config smc;
-> +
-> +	smc.mode = AT91_SMC_READMODE | AT91_SMC_WRITEMODE |
->   			     AT91_SMC_BAT_SELECT;
->
->   	/* disable or enable waiting for IORDY signal */
->   	if (use_iordy)
-> -		mode |= AT91_SMC_EXNWMODE_READY;
-> +		smc.mode |= AT91_SMC_EXNWMODE_READY;
->
-> -	/* add data float cycles if needed */
-> -	if (data_float)
-> -		mode |= AT91_SMC_TDF_(data_float);
-> +	/* add data ofloat cycles if needed */
-> +	smc.tdf_cycles = data_float;
->
-> -	at91_sys_write(AT91_SMC_MODE(chipselect), mode);
-> +	/* write SMC Setup Register */
-> +	smc.nrd_setup = setup;
-> +	smc.nwe_setup = smc.nrd_setup;
-> +	smc.ncs_read_setup = 0;
-> +	smc.ncs_write_setup = smc.ncs_read_setup;
-
-	smc.nrd_setup = smc.nwe_setup = setup;
-	smc.ncs_read_setup = smc.ncs_write_setup = 0;
-
-> +	/* write SMC Pulse Register */
-> +	smc.nrd_pulse = pulse;
-> +	smc.nwe_pulse = smc.nrd_pulse;
-> +	smc.ncs_read_pulse = cycle;
-> +	smc.ncs_write_pulse = smc.ncs_read_pulse;
-
-	smc.nrd_pulse = smc.nwe_pulse = pulse;
- > +	smc.ncs_read_pulse = smc.ncs_write_pulse = cycle;
-
-> +	/* write SMC Cycle Register */
-> +	smc.read_cycle = cycle;
-> +	smc.write_cycle = smc.read_cycle;
-
-	smc.read_cycle = smc.write_cycle = cycle;
-
-WBR, Sergei
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
