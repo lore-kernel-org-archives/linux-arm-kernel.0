@@ -1,21 +1,23 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 9 Dec 2011 16:25:14 +0800
-Subject: [RFC PATCH 1/8] ARM: Add commonly used cpuidle init code
-In-Reply-To: <CAMXH7KHqmEB+adCB3OUSUUoYL85o_zqEv03tuxB9DEAo08KhoA@mail.gmail.com>
-References: <1323146291-10676-1-git-send-email-rob.lee@linaro.org>
- <1323146291-10676-2-git-send-email-rob.lee@linaro.org>
- <20111206114737.GF17194@sirena.org.uk>
- <CAMXH7KHqmEB+adCB3OUSUUoYL85o_zqEv03tuxB9DEAo08KhoA@mail.gmail.com>
-Message-ID: <20111209082512.GI26952@opensource.wolfsonmicro.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 9 Dec 2011 08:42:45 +0000
+Subject: [PATCH 5/5 v2] ARM: OMAP1: recalculate loops per jiffy after
+ dpll1 reprogram
+In-Reply-To: <1322526332-14088-1-git-send-email-jkrzyszt@tis.icnet.pl>
+References: <1322364751-29980-6-git-send-email-jkrzyszt@tis.icnet.pl>
+ <1322526332-14088-1-git-send-email-jkrzyszt@tis.icnet.pl>
+Message-ID: <20111209084245.GB14547@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 08, 2011 at 11:34:34AM -0600, Rob Lee wrote:
+On Tue, Nov 29, 2011 at 01:25:32AM +0100, Janusz Krzysztofik wrote:
+> However, the result of cpufreq_scale() differs from that of
+> (re)calibrate_delay() by ca. 6%, i.e., 70.40 vs. 74.54. Please advise if
+> this approximation is acceptable.
 
-> I agree and had considered this as well.  Can you (or anyone else)
-> suggest the best/most community friendly method of doing this?  If
-> this code is moved to drivers/idle or drivers/cpuidle, then perhaps
-> just making empty fiq enable/disable functions would be ok.
+You don't say which figure is what.
 
-Sounds like a reasonable plan, or providing an arch hook mechanism as
-well as a SoC hook mechanism and allowing them to use that.
+Note that calibrate_delay() is itself inaccurate - the loops_per_jiffy
+is the number of loops which can be executed between two timer ticks
+_minus_ the time to process the timer interrupt itself.  So, it's
+actually always a little less than the theoretical number of loops
+within that time period.
