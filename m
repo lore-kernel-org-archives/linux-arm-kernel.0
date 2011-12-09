@@ -1,88 +1,32 @@
-From: aaro.koskinen@nokia.com (Aaro Koskinen)
-Date: Fri, 9 Dec 2011 21:41:17 +0200 (EET)
-Subject: [PATCH 2/3] arm: mach-omap2: sdram-nokia: add 200 MHz memory
- timings info
-In-Reply-To: <20111209180641.GS31337@atomide.com>
-References: <1323443211-3648-1-git-send-email-aaro.koskinen@nokia.com>
- <1323443211-3648-3-git-send-email-aaro.koskinen@nokia.com>
- <20111209180641.GS31337@atomide.com>
-Message-ID: <alpine.DEB.2.00.1112092136370.7393@kernel.research.nokia.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Fri, 9 Dec 2011 14:48:48 -0500 (EST)
+Subject: [RFC PATCH 1/8] ARM: Add commonly used cpuidle init code
+In-Reply-To: <4EE212FF.1080202@gmail.com>
+References: <1323146291-10676-1-git-send-email-rob.lee@linaro.org>
+ <1323146291-10676-2-git-send-email-rob.lee@linaro.org>
+ <4EDE2F91.5090104@gmail.com>
+ <CAMXH7KFT+JP8uJwK=rzt1cjwMQMGPd-6RwPVma0ky0wSMbaz8A@mail.gmail.com>
+ <4EE212FF.1080202@gmail.com>
+Message-ID: <alpine.LFD.2.02.1112091434490.2907@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, 9 Dec 2011, Rob Herring wrote:
 
-On Fri, 9 Dec 2011, Tony Lindgren wrote:
-> * Aaro Koskinen <aaro.koskinen@nokia.com> [111209 06:33]:
->> From: Igor Dmitriev <ext-dmitriev.igor@nokia.com>
->>
->> Add memory timing info regarding the 200 MHz memory in sdram-nokia.
->>
->> Signed-off-by: Igor Dmitriev <ext-dmitriev.igor@nokia.com>
->> Signed-off-by: Eduardo Valentin <eduardo.valentin@nokia.com>
->> Signed-off-by: Aaro Koskinen <aaro.koskinen@nokia.com>
->> ---
->>  arch/arm/mach-omap2/sdram-nokia.c |   25 ++++++++++++++++++++++++-
->>  1 files changed, 24 insertions(+), 1 deletions(-)
->>
->> diff --git a/arch/arm/mach-omap2/sdram-nokia.c b/arch/arm/mach-omap2/sdram-nokia.c
->> index 14caa22..b394a0e 100644
->> --- a/arch/arm/mach-omap2/sdram-nokia.c
->> +++ b/arch/arm/mach-omap2/sdram-nokia.c
->> @@ -1,7 +1,7 @@
->>  /*
->>   * SDRC register values for Nokia boards
->>   *
->> - * Copyright (C) 2008, 2010 Nokia Corporation
->> + * Copyright (C) 2008, 2010-2011 Nokia Corporation
->>   *
->>   * Lauri Leukkunen <lauri.leukkunen@nokia.com>
->>   *
->> @@ -107,14 +107,37 @@ static const struct sdram_timings nokia_195dot2mhz_timings[] = {
->>  	},
->>  };
->>
->> +static const struct sdram_timings nokia_200mhz_timings[] = {
->> +	{
->> +		.casl = 3,
->> +		.tDAL = 30000,
->> +		.tDPL = 15000,
->> +		.tRRD = 10000,
->> +		.tRCD = 20000,
->> +		.tRP = 15000,
->> +		.tRAS = 40000,
->> +		.tRC = 55000,
->> +		.tRFC = 140000,
->> +		.tXSR = 200000,
->> +
->> +		.tREF = 7800,
->> +
->> +		.tXP = 2,
->> +		.tCKE = 4,
->> +		.tWTR = 2
->> +	},
->> +};
->> +
->>  static const struct {
->>  	long rate;
->>  	struct sdram_timings const *data;
->>  } nokia_timings[] = {
->>  	{ 83000000, nokia_166mhz_timings },
->>  	{ 97600000, nokia_97dot6mhz_timings },
->> +	{ 100000000, nokia_200mhz_timings },
->
-> Is that a typo above? Should it say nokia_100mhz_timings?
+> On 12/08/2011 03:46 PM, Rob Lee wrote:
+> > to start with.  If the local_fiq_enable/disable calls can be handled
+> > in a community friendly way for any architecture, then perhaps I can
+> > just move the header file code to linux/include/cpuidle.h.
+> 
+> Maybe we should think about whether we even need to disable fiq. You
+> probably don't use low latency interrupt and a high latency low power
+> mode together.
 
-No, it's not a typo, same data is used. (Like 83/166 already in the table)
+Agreed.  FIQs should be invisible and normally not be interfered with by 
+generic kernel code.  If some CPU specific special low power mode really 
+needs FIQs to be masked out, then that should be done by the code 
+dealing with that mode.  And that is valid only if you do make use of 
+FIQs in the first place.
 
->>  	{ 166000000, nokia_166mhz_timings },
->>  	{ 195200000, nokia_195dot2mhz_timings },
->> +	{ 200000000, nokia_200mhz_timings },
->>  };
->>  static struct omap_sdrc_params nokia_sdrc_params[ARRAY_SIZE(nokia_timings) + 1];
->
-> Regards,
->
-> Tony
 
-A.
+Nicolas
