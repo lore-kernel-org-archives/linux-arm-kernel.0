@@ -1,42 +1,120 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Wed, 7 Dec 2011 14:57:14 -0500 (EST)
-Subject: [PATCH] USB: pxa168: Fix compilation error
-In-Reply-To: <1323169667-10671-1-git-send-email-tanmay.upadhyay@einfochips.com>
-Message-ID: <Pine.LNX.4.44L0.1112071456440.1647-100000@iolanthe.rowland.org>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 09 Dec 2011 08:29:59 -0600
+Subject: [PATCH v6 10/10] arm/tegra: add support for tegra30 based board
+ cardhu
+In-Reply-To: <1323348254-29072-11-git-send-email-pdeschrijver@nvidia.com>
+References: <1323348254-29072-1-git-send-email-pdeschrijver@nvidia.com>
+ <1323348254-29072-11-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <4EE21B67.5040006@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 6 Dec 2011, Tanmay Upadhyay wrote:
-
-> After commit c430131a02d677aa708f56342c1565edfdacb3c0,
-> HC_LENGTH takes two arguments. This patch fixes following
-> compilation error:
+On 12/08/2011 06:43 AM, Peter De Schrijver wrote:
+> Add support for the tegra30 based cardhu development board. Cardhu is a tablet
+> formfactor reference design for tegra30. The patch provides a device tree for
+> the board, updates Makefile.boot to build the dtb, includes the platform in
+> Kconfig and updates board-dt.c.
 > 
-> In file included from drivers/usb/host/ehci-hcd.c:1323:
-> drivers/usb/host/ehci-pxa168.c:302:54: error: macro "HC_LENGTH" requires 2 arguments, but only 1 given
-> In file included from drivers/usb/host/ehci-hcd.c:1323:
-> drivers/usb/host/ehci-pxa168.c: In function 'ehci_pxa168_drv_probe':
-> drivers/usb/host/ehci-pxa168.c:302: error: 'HC_LENGTH' undeclared (first use in this function)
-> drivers/usb/host/ehci-pxa168.c:302: error: (Each undeclared identifier is reported only once
-> drivers/usb/host/ehci-pxa168.c:302: error: for each function it appears in.)
-> 
-> Signed-off-by: Tanmay Upadhyay <tanmay.upadhyay@einfochips.com>
+> Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
 > ---
->  drivers/usb/host/ehci-pxa168.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
+>  arch/arm/boot/dts/tegra-cardhu.dts |   36 ++++++++++++++++++++++++++++++++++++
+>  arch/arm/mach-tegra/Kconfig        |    7 +++++++
+>  arch/arm/mach-tegra/Makefile.boot  |    1 +
+>  arch/arm/mach-tegra/board-dt.c     |    1 +
+>  4 files changed, 45 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/boot/dts/tegra-cardhu.dts
 > 
-> diff --git a/drivers/usb/host/ehci-pxa168.c b/drivers/usb/host/ehci-pxa168.c
-> index ac0c16e..8d0e7a2 100644
-> --- a/drivers/usb/host/ehci-pxa168.c
-> +++ b/drivers/usb/host/ehci-pxa168.c
-> @@ -299,7 +299,7 @@ static int __devinit ehci_pxa168_drv_probe(struct platform_device *pdev)
->  	ehci = hcd_to_ehci(hcd);
->  	ehci->caps = hcd->regs + 0x100;
->  	ehci->regs = hcd->regs + 0x100 +
-> -		HC_LENGTH(ehci_readl(ehci, &ehci->caps->hc_capbase));
-> +		HC_LENGTH(ehci, ehci_readl(ehci, &ehci->caps->hc_capbase));
->  	ehci->hcs_params = ehci_readl(ehci, &ehci->caps->hcs_params);
->  	hcd->has_tt = 1;
->  	ehci->sbrn = 0x20;
+> diff --git a/arch/arm/boot/dts/tegra-cardhu.dts b/arch/arm/boot/dts/tegra-cardhu.dts
+> new file mode 100644
+> index 0000000..70c41fc
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/tegra-cardhu.dts
+> @@ -0,0 +1,36 @@
+> +/dts-v1/;
+> +
+> +/include/ "tegra30.dtsi"
+> +
+> +/ {
+> +	model = "NVIDIA Tegra30 Cardhu evaluation board";
+> +	compatible = "nvidia,cardhu", "nvidia,tegra30";
+> +
+> +	memory {
 
-Acked-by: Alan Stern <stern@rowland.harvard.edu>
+memory at 80000000
+
+> +		reg = < 0x80000000 0x40000000 >;
+> +	};
+> +
+> +	serial at 70006000 {
+> +		clock-frequency = < 408000000 >;
+> +	};
+> +
+> +	i2c at 7000c000 {
+> +		clock-frequency = <100000>;
+> +	};
+> +
+> +	i2c at 7000c400 {
+> +		clock-frequency = <100000>;
+> +	};
+> +
+> +	i2c at 7000c500 {
+> +		clock-frequency = <100000>;
+> +	};
+> +
+> +	i2c at 7000c700 {
+> +		clock-frequency = <100000>;
+> +	};
+> +
+> +	i2c at 7000d000 {
+> +		clock-frequency = <100000>;
+> +	};
+> +};
+> diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
+> index aad54ca..6bae1bb 100644
+> --- a/arch/arm/mach-tegra/Kconfig
+> +++ b/arch/arm/mach-tegra/Kconfig
+> @@ -91,6 +91,13 @@ config MACH_VENTANA
+>         help
+>           Support for the nVidia Ventana development platform
+>  
+> +config MACH_CARDHU
+> +       bool "Cardhu board"
+> +       depends on ARCH_TEGRA_3x_SOC
+> +       select MACH_TEGRA_DT
+> +       help
+> +         Support for the NVIDIA Cardhu development platform
+> +
+
+You should not be adding kconfig entries for boards. They should
+eventually go away with DT.
+
+>  choice
+>          prompt "Low-level debug console UART"
+>          default TEGRA_DEBUG_UART_NONE
+> diff --git a/arch/arm/mach-tegra/Makefile.boot b/arch/arm/mach-tegra/Makefile.boot
+> index cf51a00..7c1110f 100644
+> --- a/arch/arm/mach-tegra/Makefile.boot
+> +++ b/arch/arm/mach-tegra/Makefile.boot
+> @@ -7,3 +7,4 @@ dtb-$(CONFIG_MACH_PAZ00) += tegra-paz00.dtb
+>  dtb-$(CONFIG_MACH_SEABOARD) += tegra-seaboard.dtb
+>  dtb-$(CONFIG_MACH_TRIMSLICE) += tegra-trimslice.dtb
+>  dtb-$(CONFIG_MACH_VENTANA) += tegra-ventana.dtb
+> +dtb-$(CONFIG_MACH_CARDHU) += tegra-cardhu.dtb
+
+Likewise, this should be more like:
+dtb-$(CONFIG_MACH_TEGRA_DT) += tegra-seaboard.dtb tegra-trimslice.dtb
+tegra-ventana.dtb ...
+
+Rob
+> diff --git a/arch/arm/mach-tegra/board-dt.c b/arch/arm/mach-tegra/board-dt.c
+> index d1ed473..14ef047 100644
+> --- a/arch/arm/mach-tegra/board-dt.c
+> +++ b/arch/arm/mach-tegra/board-dt.c
+> @@ -157,6 +157,7 @@ MACHINE_END
+>  
+>  #ifdef CONFIG_ARCH_TEGRA_3x_SOC
+>  static const char *tegra30_dt_board_compat[] = {
+> +	"nvidia,cardhu",
+>  	NULL
+>  };
+>  
