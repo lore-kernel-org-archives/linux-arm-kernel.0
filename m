@@ -1,47 +1,30 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Fri, 9 Dec 2011 10:22:19 +0100
-Subject: [PATCH 1/3] rtc: stmp3xxx: add wdt-accessor function
-In-Reply-To: <20111209002722.GG7913@S2100-06.ap.freescale.net>
-References: <1323364783-1059-1-git-send-email-w.sang@pengutronix.de>
- <1323364783-1059-2-git-send-email-w.sang@pengutronix.de>
- <20111209002722.GG7913@S2100-06.ap.freescale.net>
-Message-ID: <20111209092219.GA3327@pengutronix.de>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 9 Dec 2011 10:23:00 +0100
+Subject: [PATCH] [RFC] pinctrl: add a driver for Energy Micro's efm32 SoCs
+In-Reply-To: <4693507.K6tP4YDUh2@wuerfel>
+References: <1323384057-31452-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <4693507.K6tP4YDUh2@wuerfel>
+Message-ID: <20111209092300.GR4585@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 09, 2011 at 08:27:24AM +0800, Shawn Guo wrote:
-> Hi Wolfram,
+On Thu, Dec 08, 2011 at 11:55:53PM +0100, Arnd Bergmann wrote:
+> On Thursday 08 December 2011 23:40:57 Uwe Kleine-K?nig wrote:
+> > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> > ---
+> > Note that there is no support yet for efm32 in mainline, so ARCH_EFM32
+> > isn't defined.
 > 
-> On Thu, Dec 08, 2011 at 06:19:41PM +0100, Wolfram Sang wrote:
-> > @@ -0,0 +1,15 @@
-> > +/*
-> > + * stmp3xxx_rtc_wdt.h
-> > + *
-> > + * Copyright (C) 2011 Wolfram Sang, Pengutronix e.K.
-> > + *
-> > + * This file is released under the GPLv2.
-> > + */
-> > +#ifndef __LINUX_STMP3XXX_RTC_WDT_H
-> > +#define __LINUX_STMP3XXX_RTC_WDT_H
-> > +
-> > +struct stmp3xxx_wdt_pdata {
-> > +	void (*wdt_set_timeout)(struct device *dev, u32 timeout);
-> 
-> Passing callback with platform_data will make device tree migration
-> difficult.  Is there any possibility we can save the callback here?
+> Since the platform is not yet part of the architecture, it will have
+> to use device tree based probing when it gets added. I would suggest
+> only merging drivers for it that can deal with this and do not rely
+> on platform_data.
+I feared you will say that. These machines have at most 4MiB of RAM.
+I'll have to evaluate if dt is too heavy for them.
 
-This won't affect the device tree. The platform_data is not set up per
-board. It is the RTC driver which adds the platform_data to the
-platform_device which was also created inside the RTC driver. So, device
-tree or not, simply enable the watchdog in Kconfig and all will be fine.
+Best regards
+Uwe
 
 -- 
-Pengutronix e.K.                           | Wolfram Sang                |
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
 Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111209/db3be99b/attachment.sig>
