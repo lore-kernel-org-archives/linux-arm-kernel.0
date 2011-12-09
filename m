@@ -1,42 +1,154 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Fri, 9 Dec 2011 10:55:10 +0530
-Subject: [PATCH 1/2] mfd: add irq domain support for max8997 interrupts
-In-Reply-To: <20111209044109.GB26952@opensource.wolfsonmicro.com>
-References: <1323361659-11835-1-git-send-email-thomas.abraham@linaro.org>
- <1323361659-11835-2-git-send-email-thomas.abraham@linaro.org>
- <20111209044109.GB26952@opensource.wolfsonmicro.com>
-Message-ID: <CAJuYYwRicSWO=wCmBH5RWcBLX3uhpyxS2wojUS3ZAH9tN=R1Kg@mail.gmail.com>
+From: dh09.lee@samsung.com (Donghwa Lee)
+Date: Fri, 09 Dec 2011 14:38:45 +0900
+Subject: [PATCH v3] backlight/ld9040.c: regulator control in the driver
+Message-ID: <4EE19EE5.1000608@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+This patch supports regulator power control in the driver.
+Current ld9040 driver was controlled power on/off sequence by callback function
+in the board file. But, by doing this, there's no need to register lcd power 
+on/off callback function in the board file.
 
-On 9 December 2011 10:11, Mark Brown
-<broonie@opensource.wolfsonmicro.com> wrote:
-> On Thu, Dec 08, 2011 at 09:57:38PM +0530, Thomas Abraham wrote:
->
-> You should be sending this to Samuel for review as it's a MFD patch.
+changes since v2:
+ - bind regulators as bulk data
+ - in case of failure to get regulator, free regulator bulk data
 
-Ok. I will Cc Samuel for the v2 of this patchset.
+Signed-off-by: Donghwa Lee <dh09.lee@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+Signed-off-by: Inki Dae <inki.dae@samsung.com>
+---
+ drivers/video/backlight/ld9040.c |   71
++++++++++++++++++++++++++++++++------
+ 1 files changed, 59 insertions(+), 12 deletions(-)
 
->
->> Add irq domain support for max8997 interrupts. All uses of irq_base in platform
->> data and max8997 driver private data are removed.
->
-> Removing irq_base from platform data isn't going to be helpful for
-> anyone using the driver on non-DT platforms as it's going to make it
-> impossible to find the interrupts.
+diff --git a/drivers/video/backlight/ld9040.c
+b/drivers/video/backlight/ld9040.c
+index da9a5ce..133ddff 100644
+--- a/drivers/video/backlight/ld9040.c
++++ b/drivers/video/backlight/ld9040.c
+@@ -31,6 +31,7 @@
+ #include <linux/lcd.h>
+ #include <linux/backlight.h>
+ #include <linux/module.h>
++#include <linux/regulator/consumer.h>
 
-All the consumers of the max8997 interrupts are the drivers for the
-sub-blocks of max8997. These drivers have access to 'irq_domain'
-member of 'struct max8997_dev', From irq_domain, the sub-block driver
-can get the irq_base and add one of the 'enum max8997_irq' offset when
-registering for interrupt notifications.
+ #include "ld9040_gamma.h"
 
-So irq_base from platform data and all uses of it was removed. All
-max8997 sub-block drivers should use the irq_base of the irq_domain.
+@@ -53,8 +54,51 @@ struct ld9040 {
+ 	struct lcd_device		*ld;
+ 	struct backlight_device		*bd;
+ 	struct lcd_platform_data	*lcd_pd;
++
++	struct mutex			lock;
++	bool  enabled;
++};
++
++static struct regulator_bulk_data supplies[] = {
++	{ .supply = "vdd3", },
++	{ .supply = "vci", },
+ };
 
-Thanks for your review.
++static void ld9040_regulator_enable(struct ld9040 *lcd)
++{
++	int ret = 0;
++	struct lcd_platform_data *pd = NULL;
++
++	pd = lcd->lcd_pd;
++	mutex_lock(&lcd->lock);
++	if (!lcd->enabled) {
++		ret = regulator_bulk_enable(ARRAY_SIZE(supplies), supplies);
++		if (ret)
++			goto out;
++
++		lcd->enabled = true;
++	}
++	mdelay(pd->power_on_delay);
++out:
++	mutex_unlock(&lcd->lock);
++}
++
++static void ld9040_regulator_disable(struct ld9040 *lcd)
++{
++	int ret = 0;
++
++	mutex_lock(&lcd->lock);
++	if (lcd->enabled) {
++		ret = regulator_bulk_disable(ARRAY_SIZE(supplies), supplies);
++		if (ret)
++			goto out;
++
++		lcd->enabled = false;
++	}
++out:
++	mutex_unlock(&lcd->lock);
++}
++
+ static const unsigned short seq_swreset[] = {
+ 	0x01, COMMAND_ONLY,
+ 	ENDDEF, 0x00
+@@ -532,13 +576,8 @@ static int ld9040_power_on(struct ld9040 *lcd)
+ 		return -EFAULT;
+ 	}
 
-Regards,
-Thomas.
+-	if (!pd->power_on) {
+-		dev_err(lcd->dev, "power_on is NULL.\n");
+-		return -EFAULT;
+-	} else {
+-		pd->power_on(lcd->ld, 1);
+-		mdelay(pd->power_on_delay);
+-	}
++	/* lcd power on */
++	ld9040_regulator_enable(lcd);
+
+ 	if (!pd->reset) {
+ 		dev_err(lcd->dev, "reset is NULL.\n");
+@@ -582,11 +621,8 @@ static int ld9040_power_off(struct ld9040 *lcd)
+
+ 	mdelay(pd->power_off_delay);
+
+-	if (!pd->power_on) {
+-		dev_err(lcd->dev, "power_on is NULL.\n");
+-		return -EFAULT;
+-	} else
+-		pd->power_on(lcd->ld, 0);
++	/* lcd power off */
++	ld9040_regulator_disable(lcd);
+
+ 	return 0;
+ }
+@@ -693,6 +729,14 @@ static int ld9040_probe(struct spi_device *spi)
+ 		goto out_free_lcd;
+ 	}
+
++	mutex_init(&lcd->lock);
++
++	ret = regulator_bulk_get(lcd->dev, ARRAY_SIZE(supplies), supplies);
++	if (ret) {
++		dev_err(lcd->dev, "Failed to get regulators: %d\n", ret);
++		goto out_free_lcd;
++	}
++
+ 	ld = lcd_device_register("ld9040", &spi->dev, lcd, &ld9040_lcd_ops);
+ 	if (IS_ERR(ld)) {
+ 		ret = PTR_ERR(ld);
+@@ -739,6 +783,8 @@ static int ld9040_probe(struct spi_device *spi)
+ out_unregister_lcd:
+ 	lcd_device_unregister(lcd->ld);
+ out_free_lcd:
++	regulator_bulk_free(ARRAY_SIZE(supplies), supplies);
++
+ 	kfree(lcd);
+ 	return ret;
+ }
+@@ -750,6 +796,7 @@ static int __devexit ld9040_remove(struct spi_device
+*spi)
+ 	ld9040_power(lcd, FB_BLANK_POWERDOWN);
+ 	backlight_device_unregister(lcd->bd);
+ 	lcd_device_unregister(lcd->ld);
++	regulator_bulk_free(ARRAY_SIZE(supplies), supplies);
+ 	kfree(lcd);
+
+ 	return 0;
+-- 
+1.7.4.1
