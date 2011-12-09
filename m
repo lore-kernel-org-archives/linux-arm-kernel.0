@@ -1,120 +1,103 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 09 Dec 2011 08:29:59 -0600
-Subject: [PATCH v6 10/10] arm/tegra: add support for tegra30 based board
- cardhu
-In-Reply-To: <1323348254-29072-11-git-send-email-pdeschrijver@nvidia.com>
-References: <1323348254-29072-1-git-send-email-pdeschrijver@nvidia.com>
- <1323348254-29072-11-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <4EE21B67.5040006@gmail.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Fri, 9 Dec 2011 15:52:14 +0100
+Subject: [PATCH 2/4] ARM: OMAP2/3: intc: Add DT support for TI interrupt
+ controller
+In-Reply-To: <4EE20B38.8050006@gmail.com>
+References: <1323291049-24964-1-git-send-email-b-cousson@ti.com>
+ <1323291049-24964-3-git-send-email-b-cousson@ti.com>
+ <4EDFD88B.8060008@gmail.com> <4EE0D0E6.3060202@ti.com>
+ <4EE20B38.8050006@gmail.com>
+Message-ID: <4EE2209E.2040209@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/08/2011 06:43 AM, Peter De Schrijver wrote:
-> Add support for the tegra30 based cardhu development board. Cardhu is a tablet
-> formfactor reference design for tegra30. The patch provides a device tree for
-> the board, updates Makefile.boot to build the dtb, includes the platform in
-> Kconfig and updates board-dt.c.
-> 
-> Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
-> ---
->  arch/arm/boot/dts/tegra-cardhu.dts |   36 ++++++++++++++++++++++++++++++++++++
->  arch/arm/mach-tegra/Kconfig        |    7 +++++++
->  arch/arm/mach-tegra/Makefile.boot  |    1 +
->  arch/arm/mach-tegra/board-dt.c     |    1 +
->  4 files changed, 45 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm/boot/dts/tegra-cardhu.dts
-> 
-> diff --git a/arch/arm/boot/dts/tegra-cardhu.dts b/arch/arm/boot/dts/tegra-cardhu.dts
-> new file mode 100644
-> index 0000000..70c41fc
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/tegra-cardhu.dts
-> @@ -0,0 +1,36 @@
-> +/dts-v1/;
-> +
-> +/include/ "tegra30.dtsi"
-> +
-> +/ {
-> +	model = "NVIDIA Tegra30 Cardhu evaluation board";
-> +	compatible = "nvidia,cardhu", "nvidia,tegra30";
-> +
-> +	memory {
+On 12/9/2011 2:20 PM, Rob Herring wrote:
+> On 12/08/2011 08:59 AM, Cousson, Benoit wrote:
+>> On 12/7/2011 10:20 PM, Rob Herring wrote:
+>>> On 12/07/2011 02:50 PM, Benoit Cousson wrote:
+>>
+>> [...]
+>>
+>>>> +#ifdef CONFIG_OF
+>>>> +int __init intc_of_init(struct device_node *node, struct device_node
+>>>> *parent)
+>>>> +{
+>>>> +    struct resource res;
+>>>> +    u32 nr_irqs;
+>>>> +
+>>>> +    if (WARN_ON(!node))
+>>>> +        return -ENODEV;
+>>>> +
+>>>> +    if (of_address_to_resource(node, 0,&res)) {
+>>>> +        WARN(1, "unable to get intc registers\n");
+>>>> +        return -EINVAL;
+>>>> +    }
+>>>> +
+>>>> +    if (of_property_read_u32(node, "ti,intc-size",&nr_irqs)) {
+>>>> +        WARN(1, "unable to get intc-size\n");
+>>>> +        return -EINVAL;
+>>>
+>>> There is no default value that makes sense?
+>>
+>> So far we have 96 or 128, so I can put 96 as a default and just keep the
+>> warning without returning an error.
+>>
+>>>> +    }
+>>>> +
+>>>> +    omap_init_irq(res.start, nr_irqs);
+>>>> +    irq_domain_add_simple(node, 0);
+>>>
+>>> Have you read the NO_IRQ thread...
+>>
+>> Yeah, I tried, but that's a long email thread with some unclear
+>> conclusion...
+>> The point is that the few users of that API today are using 0 as a base
+>> as well, so I thought it was still valid.
+>>
+>>> Is 0 ever a valid interrupt for a driver? If so, you must not use 0 for
+>>> the base. I would pick 16 to skip over legacy ISA irqs.
+>>
+>> I do not have any 0 interrupts right now, my concern is that I still
+>> have some legacy non-DT drivers that expect the previous hwirq = irq
+>> mapping.
+>
+> I guess it depends how easily you can shift all the irq defines. You
+> allow specifying the base so that you can set it to 0 for non-DT and -1
+> (dynamic allocation) for DT.
 
-memory at 80000000
+The issue, is that the IRQs are not defined anymore but hard coded in 
+the hwmod database. And the idea is that this is reflecting exactly the 
+hwirq from the spec, so I do not want to add any artificial offset for 
+the domain in the original data.
 
-> +		reg = < 0x80000000 0x40000000 >;
-> +	};
-> +
-> +	serial at 70006000 {
-> +		clock-frequency = < 408000000 >;
-> +	};
-> +
-> +	i2c at 7000c000 {
-> +		clock-frequency = <100000>;
-> +	};
-> +
-> +	i2c at 7000c400 {
-> +		clock-frequency = <100000>;
-> +	};
-> +
-> +	i2c at 7000c500 {
-> +		clock-frequency = <100000>;
-> +	};
-> +
-> +	i2c at 7000c700 {
-> +		clock-frequency = <100000>;
-> +	};
-> +
-> +	i2c at 7000d000 {
-> +		clock-frequency = <100000>;
-> +	};
-> +};
-> diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
-> index aad54ca..6bae1bb 100644
-> --- a/arch/arm/mach-tegra/Kconfig
-> +++ b/arch/arm/mach-tegra/Kconfig
-> @@ -91,6 +91,13 @@ config MACH_VENTANA
->         help
->           Support for the nVidia Ventana development platform
->  
-> +config MACH_CARDHU
-> +       bool "Cardhu board"
-> +       depends on ARCH_TEGRA_3x_SOC
-> +       select MACH_TEGRA_DT
-> +       help
-> +         Support for the NVIDIA Cardhu development platform
-> +
+>>> irqdomains should always be enabled regardless of CONFIG_OF. So either
+>>> you can leave it as is if OF is always enabled for OMAP, or you should
+>>> move domain setup into omap_init_irq.
+>>
+>> OK, but it looks like I cannot really modify the current INTC to DT
+>> without having fully adapted the OMAP drivers to use
+>> irq_of_parse_and_map. Or did I miss something?
+>>
+>
+> No, the drivers should not need to be modified as long as they get the
+> irq's from platform device resources. You just want to make sure the
+> INTC has no knowledge of it's irq base so it can change.
 
-You should not be adding kconfig entries for boards. They should
-eventually go away with DT.
+OK, the driver will not have to change but the IRQ value will not be the 
+same in the case of DT since it will use the irq_create_of_mapping.
 
->  choice
->          prompt "Low-level debug console UART"
->          default TEGRA_DEBUG_UART_NONE
-> diff --git a/arch/arm/mach-tegra/Makefile.boot b/arch/arm/mach-tegra/Makefile.boot
-> index cf51a00..7c1110f 100644
-> --- a/arch/arm/mach-tegra/Makefile.boot
-> +++ b/arch/arm/mach-tegra/Makefile.boot
-> @@ -7,3 +7,4 @@ dtb-$(CONFIG_MACH_PAZ00) += tegra-paz00.dtb
->  dtb-$(CONFIG_MACH_SEABOARD) += tegra-seaboard.dtb
->  dtb-$(CONFIG_MACH_TRIMSLICE) += tegra-trimslice.dtb
->  dtb-$(CONFIG_MACH_VENTANA) += tegra-ventana.dtb
-> +dtb-$(CONFIG_MACH_CARDHU) += tegra-cardhu.dtb
+Currently, the driver IRQ resource is 7 for example for the twl, this is 
+the hwirq (= irq). If I use a domain with a base of 16, the resource 
+will still be 7 except if the resource is created from OF, then it will 
+be 23.
 
-Likewise, this should be more like:
-dtb-$(CONFIG_MACH_TEGRA_DT) += tegra-seaboard.dtb tegra-trimslice.dtb
-tegra-ventana.dtb ...
+The only way I have today to maintain the legacy drivers to work without 
+hacking the OMAP resource code is to keep the base_irq at 0.
 
-Rob
-> diff --git a/arch/arm/mach-tegra/board-dt.c b/arch/arm/mach-tegra/board-dt.c
-> index d1ed473..14ef047 100644
-> --- a/arch/arm/mach-tegra/board-dt.c
-> +++ b/arch/arm/mach-tegra/board-dt.c
-> @@ -157,6 +157,7 @@ MACHINE_END
->  
->  #ifdef CONFIG_ARCH_TEGRA_3x_SOC
->  static const char *tegra30_dt_board_compat[] = {
-> +	"nvidia,cardhu",
->  	NULL
->  };
->  
+Since I do not have any hwirq at 0 so far, is it a big deal to keep the 
+base_irq at 0 for the moment?
+It will be easier to transition to DT that way without breaking the 
+existing drivers.
+
+Regards,
+Benoit
