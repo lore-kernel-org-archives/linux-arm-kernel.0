@@ -1,34 +1,21 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 9 Dec 2011 16:15:04 +0800
-Subject: [PATCH 1/2] mfd: add irq domain support for max8997 interrupts
-In-Reply-To: <CAJuYYwQ8B_EtuReRDJ8Tp-cCOV3jd_-y-9iLy0apRZV3zU6Jdw@mail.gmail.com>
-References: <1323361659-11835-1-git-send-email-thomas.abraham@linaro.org>
- <1323361659-11835-2-git-send-email-thomas.abraham@linaro.org>
- <20111209044109.GB26952@opensource.wolfsonmicro.com>
- <CAJuYYwRicSWO=wCmBH5RWcBLX3uhpyxS2wojUS3ZAH9tN=R1Kg@mail.gmail.com>
- <20111209060249.GD26952@opensource.wolfsonmicro.com>
- <CAJuYYwSCuu8U2rF3RGAnczXgbh4Px7hMwUhHr=xrhPZ1jEs5DA@mail.gmail.com>
- <20111209063912.GG26952@opensource.wolfsonmicro.com>
- <CAJuYYwQ8B_EtuReRDJ8Tp-cCOV3jd_-y-9iLy0apRZV3zU6Jdw@mail.gmail.com>
-Message-ID: <20111209081502.GH26952@opensource.wolfsonmicro.com>
+Date: Fri, 9 Dec 2011 16:25:14 +0800
+Subject: [RFC PATCH 1/8] ARM: Add commonly used cpuidle init code
+In-Reply-To: <CAMXH7KHqmEB+adCB3OUSUUoYL85o_zqEv03tuxB9DEAo08KhoA@mail.gmail.com>
+References: <1323146291-10676-1-git-send-email-rob.lee@linaro.org>
+ <1323146291-10676-2-git-send-email-rob.lee@linaro.org>
+ <20111206114737.GF17194@sirena.org.uk>
+ <CAMXH7KHqmEB+adCB3OUSUUoYL85o_zqEv03tuxB9DEAo08KhoA@mail.gmail.com>
+Message-ID: <20111209082512.GI26952@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 09, 2011 at 12:49:49PM +0530, Thomas Abraham wrote:
-> On 9 December 2011 12:09, Mark Brown
+On Thu, Dec 08, 2011 at 11:34:34AM -0600, Rob Lee wrote:
 
-> > How would you provide this interrupt to the device using it in a non-DT
-> > systemm without passing the irq_base into the device as platform data?
+> I agree and had considered this as well.  Can you (or anyone else)
+> suggest the best/most community friendly method of doing this?  If
+> this code is moved to drivers/idle or drivers/cpuidle, then perhaps
+> just making empty fiq enable/disable functions would be ok.
 
-> In non-DT system, the linux irq number that is used to register the
-> gpio interrupt notifier would belong to the irq domain of the host
-> interrupt controller (gic). For Exynos, the linux irq numbers that
-> belong to the gic irq domain are statically assigned to specific
-> interrupt notifiers and known to the entire system.
-
-This seems like it's going to be a bit of a usability issue at best as
-users will have to figure out the relevant domain and the offset we end
-up with within it, and you appear to be making assumptions about the
-system you're running on here.  The way this has been handled for other
-drivers is by using irq_alloc_descs with platform data to provide a
-default, preserving the old behaviour on non-OF systems.
+Sounds like a reasonable plan, or providing an arch hook mechanism as
+well as a SoC hook mechanism and allowing them to use that.
