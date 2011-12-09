@@ -1,30 +1,74 @@
 From: aaro.koskinen@nokia.com (Aaro Koskinen)
-Date: Fri,  9 Dec 2011 17:06:49 +0200
-Subject: [PATCH 1/3] arm: tools: mach-types: add nokia_rm696
+Date: Fri,  9 Dec 2011 17:06:51 +0200
+Subject: [PATCH 3/3] arm: omap: add minimal support for Nokia RM-696
 In-Reply-To: <1323443211-3648-1-git-send-email-aaro.koskinen@nokia.com>
 References: <1323443211-3648-1-git-send-email-aaro.koskinen@nokia.com>
-Message-ID: <1323443211-3648-2-git-send-email-aaro.koskinen@nokia.com>
+Message-ID: <1323443211-3648-4-git-send-email-aaro.koskinen@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the mach-type number for RM-696.
+Add minimal support for Nokia RM-696 board.
 
 Signed-off-by: Aaro Koskinen <aaro.koskinen@nokia.com>
 ---
- arch/arm/tools/mach-types |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+ arch/arm/mach-omap2/Kconfig                  |    3 ++-
+ arch/arm/mach-omap2/board-rm680.c            |   12 +++++++++++-
+ arch/arm/plat-omap/include/plat/uncompress.h |    1 +
+ 3 files changed, 14 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/tools/mach-types b/arch/arm/tools/mach-types
-index ccbe16f..63f20da 100644
---- a/arch/arm/tools/mach-types
-+++ b/arch/arm/tools/mach-types
-@@ -1123,6 +1123,7 @@ blissc			MACH_BLISSC		BLISSC			3491
- thales_adc		MACH_THALES_ADC		THALES_ADC		3492
- ubisys_p9d_evp		MACH_UBISYS_P9D_EVP	UBISYS_P9D_EVP		3493
- atdgp318		MACH_ATDGP318		ATDGP318		3494
-+nokia_rm696		MACH_NOKIA_RM696	NOKIA_RM696		3522
- m28evk			MACH_M28EVK		M28EVK			3613
- smdk4212		MACH_SMDK4212		SMDK4212		3638
- smdk4412		MACH_SMDK4412		SMDK4412		3765
+diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+index e1293aa..73d86dc 100644
+--- a/arch/arm/mach-omap2/Kconfig
++++ b/arch/arm/mach-omap2/Kconfig
+@@ -238,10 +238,11 @@ config MACH_NOKIA_N8X0
+ 	select MACH_NOKIA_N810_WIMAX
+ 
+ config MACH_NOKIA_RM680
+-	bool "Nokia RM-680 board"
++	bool "Nokia RM-680/696 board"
+ 	depends on ARCH_OMAP3
+ 	default y
+ 	select OMAP_PACKAGE_CBB
++	select MACH_NOKIA_RM696
+ 
+ config MACH_NOKIA_RX51
+ 	bool "Nokia RX-51 board"
+diff --git a/arch/arm/mach-omap2/board-rm680.c b/arch/arm/mach-omap2/board-rm680.c
+index 616fb39..a5bcc75 100644
+--- a/arch/arm/mach-omap2/board-rm680.c
++++ b/arch/arm/mach-omap2/board-rm680.c
+@@ -1,5 +1,5 @@
+ /*
+- * Board support file for Nokia RM-680.
++ * Board support file for Nokia RM-680/696.
+  *
+  * Copyright (C) 2010 Nokia
+  *
+@@ -152,3 +152,13 @@ MACHINE_START(NOKIA_RM680, "Nokia RM-680 board")
+ 	.init_machine	= rm680_init,
+ 	.timer		= &omap3_timer,
+ MACHINE_END
++
++MACHINE_START(NOKIA_RM696, "Nokia RM-696 board")
++	.atag_offset	= 0x100,
++	.reserve	= omap_reserve,
++	.map_io		= omap3_map_io,
++	.init_early	= omap3630_init_early,
++	.init_irq	= omap3_init_irq,
++	.init_machine	= rm680_init,
++	.timer		= &omap3_timer,
++MACHINE_END
+diff --git a/arch/arm/plat-omap/include/plat/uncompress.h b/arch/arm/plat-omap/include/plat/uncompress.h
+index 2f472e9..de3e35c 100644
+--- a/arch/arm/plat-omap/include/plat/uncompress.h
++++ b/arch/arm/plat-omap/include/plat/uncompress.h
+@@ -160,6 +160,7 @@ static inline void __arch_decomp_setup(unsigned long arch_id)
+ 		DEBUG_LL_OMAP3(3, igep0020);
+ 		DEBUG_LL_OMAP3(3, igep0030);
+ 		DEBUG_LL_OMAP3(3, nokia_rm680);
++		DEBUG_LL_OMAP3(3, nokia_rm696);
+ 		DEBUG_LL_OMAP3(3, nokia_rx51);
+ 		DEBUG_LL_OMAP3(3, omap3517evm);
+ 		DEBUG_LL_OMAP3(3, omap3_beagle);
 -- 
 1.7.2.5
