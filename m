@@ -1,41 +1,41 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri,  9 Dec 2011 16:56:08 -0600
-Subject: [PATCH] gpio: pl061: drop extra check for NULL platform_data
-Message-ID: <1323471368-7955-1-git-send-email-robherring2@gmail.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Fri, 09 Dec 2011 18:12:04 -0500 (EST)
+Subject: [PATCH] ARM: provide XIP_VIRT_ADDR for no-MMU builds
+In-Reply-To: <1323467451-12128-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1323467451-12128-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <alpine.LFD.2.02.1112091811370.2907@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rob Herring <rob.herring@calxeda.com>
+On Fri, 9 Dec 2011, Uwe Kleine-K?nig wrote:
 
-In adding DT binding support, the check for NULL platform_data got added
-back in inadvertently, so remove it.
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 
-Signed-off-by: Rob Herring <rob.herring@calxeda.com>
----
-Linus or Grant, 
+Acked-by: Nicolas Pitre <nico@linaro.org>
 
-Can you apply this fix for 3.2-rc.
-
-Thanks,
-Rob
-
- drivers/gpio/gpio-pl061.c |    4 ----
- 1 files changed, 0 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/gpio/gpio-pl061.c b/drivers/gpio/gpio-pl061.c
-index 093c90b..4102f63 100644
---- a/drivers/gpio/gpio-pl061.c
-+++ b/drivers/gpio/gpio-pl061.c
-@@ -238,10 +238,6 @@ static int pl061_probe(struct amba_device *dev, const struct amba_id *id)
- 	int ret, irq, i;
- 	static DECLARE_BITMAP(init_irq, NR_IRQS);
- 
--	pdata = dev->dev.platform_data;
--	if (pdata == NULL)
--		return -ENODEV;
--
- 	chip = kzalloc(sizeof(*chip), GFP_KERNEL);
- 	if (chip == NULL)
- 		return -ENOMEM;
--- 
-1.7.5.4
+> ---
+>  arch/arm/include/asm/memory.h |    2 ++
+>  1 files changed, 2 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
+> index a8997d7..fcb5757 100644
+> --- a/arch/arm/include/asm/memory.h
+> +++ b/arch/arm/include/asm/memory.h
+> @@ -116,6 +116,8 @@
+>  #define MODULES_END		(END_MEM)
+>  #define MODULES_VADDR		(PHYS_OFFSET)
+>  
+> +#define XIP_VIRT_ADDR(physaddr)  (physaddr)
+> +
+>  #endif /* !CONFIG_MMU */
+>  
+>  /*
+> -- 
+> 1.7.7.3
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
