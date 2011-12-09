@@ -1,39 +1,34 @@
 From: pawel.moll@arm.com (Pawel Moll)
-Date: Fri,  9 Dec 2011 19:03:52 +0000
-Subject: [PATCH v5 9/9] ARM: vexpress: Add Device Tree for V2P-CA15 core tile
- (TC1 variant)
+Date: Fri,  9 Dec 2011 19:03:51 +0000
+Subject: [PATCH v5 8/9] ARM: vexpress: Add Device Tree for V2P-CA9 core tile
 In-Reply-To: <1323457432-4800-1-git-send-email-pawel.moll@arm.com>
 References: <1323457432-4800-1-git-send-email-pawel.moll@arm.com>
-Message-ID: <1323457432-4800-10-git-send-email-pawel.moll@arm.com>
+Message-ID: <1323457432-4800-9-git-send-email-pawel.moll@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds Device Tree file for the CoreTile Express A15x2
-(V2P-CA15) with Test Chip 1.
-
-As the chip's GIC has 160 interrupt inputs, NR_IRQS is increased.
+This patch adds Device Tree file for the CoreTile Express A9x4 (V2P-CA9).
 
 Signed-off-by: Pawel Moll <pawel.moll@arm.com>
 ---
- arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts |  155 +++++++++++++++++++++++++++
- arch/arm/mach-vexpress/Makefile.boot        |    3 +-
- arch/arm/mach-vexpress/include/mach/irqs.h  |    2 +-
- 3 files changed, 158 insertions(+), 2 deletions(-)
- create mode 100644 arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts
+ arch/arm/boot/dts/vexpress-v2p-ca9.dts |  190 ++++++++++++++++++++++++++++++++
+ arch/arm/mach-vexpress/Makefile.boot   |    3 +-
+ 2 files changed, 192 insertions(+), 1 deletions(-)
+ create mode 100644 arch/arm/boot/dts/vexpress-v2p-ca9.dts
 
-diff --git a/arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts b/arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts
+diff --git a/arch/arm/boot/dts/vexpress-v2p-ca9.dts b/arch/arm/boot/dts/vexpress-v2p-ca9.dts
 new file mode 100644
-index 0000000..02cada5
+index 0000000..84542e7
 --- /dev/null
-+++ b/arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts
-@@ -0,0 +1,155 @@
++++ b/arch/arm/boot/dts/vexpress-v2p-ca9.dts
+@@ -0,0 +1,190 @@
 +/*
 + * ARM Ltd. Versatile Express
 + *
-+ * CoreTile Express A15x2 (version with Test Chip 1)
-+ * Cortex-A15 MPCore (V2P-CA15)
++ * CoreTile Express A9x4
++ * Cortex-A9 MPCore (V2P-CA9)
 + *
-+ * HBI-0237A
++ * HBI-0191B
 + */
 +
 +/dts-v1/;
@@ -41,9 +36,9 @@ index 0000000..02cada5
 +/include/ "skeleton.dtsi"
 +
 +/ {
-+	model = "V2P-CA15";
-+	arm,hbi = <0x237>;
-+	compatible = "arm,vexpress,v2p-ca15,tc1", "arm,vexpress,v2p-ca15", "arm,vexpress";
++	model = "V2P-CA9";
++	arm,hbi = <0x191>;
++	compatible = "arm,vexpress,v2p-ca9", "arm,vexpress";
 +	interrupt-parent = <&gic>;
 +
 +	aliases {
@@ -61,78 +56,113 @@ index 0000000..02cada5
 +
 +		cpu at 0 {
 +			device_type = "cpu";
-+			compatible = "arm,cortex-a15";
++			compatible = "arm,cortex-a9";
 +			reg = <0>;
++			next-level-cache = <&L2>;
 +		};
 +
 +		cpu at 1 {
 +			device_type = "cpu";
-+			compatible = "arm,cortex-a15";
++			compatible = "arm,cortex-a9";
 +			reg = <1>;
++			next-level-cache = <&L2>;
++		};
++
++		cpu at 2 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a9";
++			reg = <2>;
++			next-level-cache = <&L2>;
++		};
++
++		cpu at 3 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a9";
++			reg = <3>;
++			next-level-cache = <&L2>;
 +		};
 +	};
 +
-+	memory at 80000000 {
++	memory at 60000000 {
 +		device_type = "memory";
-+		reg = <0x80000000 0x40000000>;
++		reg = <0x60000000 0x40000000>;
 +	};
 +
-+	hdlcd at 2b000000 {
-+		compatible = "arm,hdlcd";
-+		reg = <0x2b000000 0x1000>;
-+		interrupts = <0 85 4>;
++	clcd at 10020000 {
++		compatible = "arm,pl111", "arm,primecell";
++		reg = <0x10020000 0x1000>;
++		interrupts = <0 44 4>;
 +	};
 +
-+	memory-controller at 2b0a0000 {
++	memory-controller at 100e0000 {
 +		compatible = "arm,pl341", "arm,primecell";
-+		reg = <0x2b0a0000 0x1000>;
++		reg = <0x100e0000 0x1000>;
 +	};
 +
-+	wdt at 2b060000 {
++	memory-controller at 100e1000 {
++		compatible = "arm,pl354", "arm,primecell";
++		reg = <0x100e1000 0x1000>;
++		interrupts = <0 45 4>,
++			     <0 46 4>;
++	};
++
++	timer at 100e4000 {
++		compatible = "arm,sp804", "arm,primecell";
++		reg = <0x100e4000 0x1000>;
++		interrupts = <0 48 4>,
++			     <0 49 4>;
++	};
++
++	watchdog at 100e5000 {
 +		compatible = "arm,sp805", "arm,primecell";
-+		reg = <0x2b060000 0x1000>;
-+		interrupts = <98>;
++		reg = <0x100e5000 0x1000>;
++		interrupts = <0 51 4>;
 +	};
 +
-+	gic: interrupt-controller at 2c001000 {
++	scu at 1e000000 {
++		compatible = "arm,cortex-a9-scu";
++		reg = <0x1e000000 0x58>;
++	};
++
++	timer at 1e000600 {
++		compatible = "arm,smp-twd";
++		reg = <0x1e000600 0x20>;
++		interrupts = <1 2 0xf04>,
++			     <1 3 0xf04>;
++	};
++
++	gic: interrupt-controller at 1e001000 {
 +		compatible = "arm,cortex-a9-gic";
 +		#interrupt-cells = <3>;
 +		#address-cells = <0>;
 +		interrupt-controller;
-+		reg = <0x2c001000 0x1000>,
-+		      <0x2c002000 0x100>;
++		reg = <0x1e001000 0x1000>,
++		      <0x1e000100 0x100>;
 +	};
 +
-+	memory-controller at 7ffd0000 {
-+		compatible = "arm,pl354", "arm,primecell";
-+		reg = <0x7ffd0000 0x1000>;
-+		interrupts = <0 86 4>,
-+			     <0 87 4>;
-+	};
-+
-+	dma at 7ffb0000 {
-+		compatible = "arm,pl330", "arm,primecell";
-+		reg = <0x7ffb0000 0x1000>;
-+		interrupts = <0 92 4>,
-+			     <0 88 4>,
-+			     <0 89 4>,
-+			     <0 90 4>,
-+			     <0 91 4>;
++	L2: cache-controller at 1e00a000 {
++		compatible = "arm,pl310-cache";
++		reg = <0x1e00a000 0x1000>;
++		interrupts = <0 43 4>;
++		cache-level = <2>;
++		arm,data-latency = <1 1 1>;
++		arm,tag-latency = <1 1 1>;
 +	};
 +
 +	pmu {
 +		compatible = "arm,cortex-a9-pmu";
-+		interrupts = <0 68 4>,
-+			     <0 69 4>;
++		interrupts = <0 60 4>,
++			     <0 61 4>,
++			     <0 62 4>,
++			     <0 63 4>;
 +	};
 +
 +	motherboard {
-+		ranges = <0 0 0x08000000 0x04000000>,
-+			 <1 0 0x14000000 0x04000000>,
-+			 <2 0 0x18000000 0x04000000>,
-+			 <3 0 0x1c000000 0x04000000>,
-+			 <4 0 0x0c000000 0x04000000>,
-+			 <5 0 0x10000000 0x04000000>;
++		ranges = <0 0 0x40000000 0x04000000>,
++			 <1 0 0x44000000 0x04000000>,
++			 <2 0 0x48000000 0x04000000>,
++			 <3 0 0x4c000000 0x04000000>,
++			 <7 0 0x10000000 0x00020000>;
 +
 +		interrupt-map-mask = <0 0 63>;
 +		interrupt-map = <0 0  0 &gic 0  0 4>,
@@ -181,27 +211,17 @@ index 0000000..02cada5
 +	};
 +};
 +
-+/include/ "vexpress-v2m-rs1.dtsi"
++/include/ "vexpress-v2m.dtsi"
 diff --git a/arch/arm/mach-vexpress/Makefile.boot b/arch/arm/mach-vexpress/Makefile.boot
-index 2f0ad9f..909f85e 100644
+index 5e2177e..2f0ad9f 100644
 --- a/arch/arm/mach-vexpress/Makefile.boot
 +++ b/arch/arm/mach-vexpress/Makefile.boot
-@@ -5,4 +5,5 @@ params_phys-y	:= 0x60000100
+@@ -4,4 +4,5 @@
+ params_phys-y	:= 0x60000100
  initrd_phys-y	:= 0x60800000
  
- dtb-$(CONFIG_ARCH_VEXPRESS_DT)	+= vexpress-v2p-ca5s.dtb \
--				   vexpress-v2p-ca9.dtb
-+				   vexpress-v2p-ca9.dtb \
-+				   vexpress-v2p-ca15-tc1.dtb
-diff --git a/arch/arm/mach-vexpress/include/mach/irqs.h b/arch/arm/mach-vexpress/include/mach/irqs.h
-index 7054cbf..4b10ee7 100644
---- a/arch/arm/mach-vexpress/include/mach/irqs.h
-+++ b/arch/arm/mach-vexpress/include/mach/irqs.h
-@@ -1,4 +1,4 @@
- #define IRQ_LOCALTIMER		29
- #define IRQ_LOCALWDOG		30
- 
--#define NR_IRQS	128
-+#define NR_IRQS	256
+-dtb-$(CONFIG_ARCH_VEXPRESS_DT)	+= vexpress-v2p-ca5s.dtb
++dtb-$(CONFIG_ARCH_VEXPRESS_DT)	+= vexpress-v2p-ca5s.dtb \
++				   vexpress-v2p-ca9.dtb
 -- 
 1.7.5.4
