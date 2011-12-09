@@ -1,55 +1,85 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Fri, 9 Dec 2011 22:20:48 +0530
-Subject: [PATCH v2] ARM: pl330: Fix a race condition
-In-Reply-To: <4EE220A7.5070101@arm.com>
-References: <4E8C5425.80303@arm.com>
- <1317892206-3600-1-git-send-email-javi.merino@arm.com>
- <CAJuYYwTXf-XU0fdGT0+sggN-MEY3v7UHkfjNkM4+QUW464J9Ew@mail.gmail.com>
- <4EB7B79A.2020004@arm.com>
- <000c01ccada6$f83f5be0$e8be13a0$%kim@samsung.com>
- <4ED3B89E.7070903@arm.com>
- <000e01ccae48$d76a7ba0$863f72e0$%kim@samsung.com>
- <4ED4AB9A.3060807@arm.com>
- <CAJe_Zhem0yTOV4L-kJ91fQN++hFzCUgjOfxSnJR25PuYNTedVQ@mail.gmail.com>
- <03f001ccb4b5$3441f5c0$9cc5e140$%kim@samsung.com>
- <4EDF3989.3060108@arm.com> <4EDFD278.9090101@arm.com>
- <4EE1F7F0.70107@arm.com>
- <CAJe_Zhcj_j+r+T5N_BdS-ENds1SmJs7-Pfyf8vrFkB75BGBaYg@mail.gmail.com>
- <4EE20FF1.5070702@arm.com>
- <CABb+yY0f8xxAj+rFeZ4e61Sfk0+0bMsAiZ-H5AeY4cfCd_VE5g@mail.gmail.com>
- <4EE220A7.5070101@arm.com>
-Message-ID: <CABb+yY2-1B65-UqRofj72zVuZUUk5c6pkqNGs15ZLnkrVheRDQ@mail.gmail.com>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Fri, 9 Dec 2011 08:53:48 -0800
+Subject: [PATCH] [RFC] pinctrl: add a driver for Energy Micro's efm32 SoCs
+In-Reply-To: <20111209051413.GK7913@S2100-06.ap.freescale.net>
+References: <1323384057-31452-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <74CDBE0F657A3D45AFBB94109FB122FF1750B77BD8@HQMAIL01.nvidia.com>
+ <20111209010147.GH7913@S2100-06.ap.freescale.net>
+ <4EE18403.30604@nvidia.com>
+ <20111209043220.GJ7913@S2100-06.ap.freescale.net>
+ <4EE192DC.3080209@nvidia.com>
+ <20111209051413.GK7913@S2100-06.ap.freescale.net>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF17518604CA@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 9, 2011 at 8:22 PM, Javi Merino <javi.merino@arm.com> wrote:
->
-> I think the best solution would be to revert
-> ee3f615819404a9438b2dd01b7a39f276d2737f2 and go back to my original
-> patch (in the beginning of this thread):
->
-> http://article.gmane.org/gmane.linux.ports.arm.kernel/133110
->
-> What do you think?
+Shawn Guo wrote at Thursday, December 08, 2011 10:14 PM:
+> On Thu, Dec 08, 2011 at 09:47:24PM -0700, Stephen Warren wrote:
+...
+> > I'm not familiar with imx. For my education, which of the following is true:
+> >
+> 
+> It's the case b).
+> 
+> > a)
+> >
+> > * UART TX signal can muxed onto 1 of 16 pins
+> > * UART RX signal can muxed onto 1 of 16 pins
+> >
+> > In this case, you'd just list say "UART A TX" as a legal function for
+> > each of those 16 pins. Yes, that's a lot of places, but still do-able.
+> >
+> > (16 possible positions would be a lot, but I suppose it is possible in HW)
+> >
+> > b)
+> >
+> > * UART TX signal can muxed onto 1 of 4 pins
+> > * UART RX signal can muxed onto 1 of 4 pins
+> > * So, there are 16 (4*4) combinations of these two settings
+> >
+> > In this case, you'd just list say "UART A TX" for the 4 pins, and "UART
+> > A RX" for the other 4 pins. The 16 combinations don't come into play at
+> > all; the board-specific mapping table would pick 1 single combination,
+> > and represent this as:
+> >
+> > pin X: function = UART A TX
+> > pin Y: function = UART A RX
+> 
+> We really do not expect per pin function mapping but per block function
+> mapping.  That said, the UART driver is going to tell pinctrl subsystem
+> "I'm UARTA, please set all my pins up for me".
 
-Well, we have to resort to that if we can't find something simpler.
+That's fine; UART A can operate that way with pinctrl used as intended.
 
-What do you think about ...
+The way the pinctrl subsystem is defined is:
 
-diff --git a/arch/arm/common/pl330.c b/arch/arm/common/pl330.c
-index f407a6b..3a51cdd 100644
---- a/arch/arm/common/pl330.c
-+++ b/arch/arm/common/pl330.c
-@@ -1546,7 +1546,7 @@ int pl330_chan_ctrl(void *ch_id, enum pl330_chan_op op)
+The SoC-specific pinctrl driver exposes the per-pin available functions.
 
- 		/* Start the next */
- 	case PL330_OP_START:
--		if (!_thrd_active(thrd) && !_start(thrd))
-+		if (_state(thrd) == PL330_STATE_STOPPED && !_start(thrd))
- 			ret = -EIO;
- 		break;
+The board-specific mapping table selects the function to use for each pin,
+based on the board's requirements.
 
-Thanks
--jassi
+Any other way isn't fully consistent with the way pinctrl works. If we
+do see a need for just a single per-board table rather than a separate
+per-SoC table, and a per-board mapping table, we should rethink the
+pinctrl subsystem...
 
-[Sorry I don't have any pl330 platform handy]
+> > Either way though, whether you put the data into tables in the driver or
+> > in the SoC .dtsi file (included by each board's .dts file), the pinctrl
+> 
+> We are not going to list that into SoC .dtsi file.
+> 
+> > driver's table really should list all possible options, and the pinctrl
+> > mapping table should select just one; that's kinda the whole point of
+> > the tables. If you try to put just the used subset into device tree, you
+> > won't be able to put it into the .dtsi file since it'll be
+> > board-specific, and you'll end up forcing board .dts authors to recreate
+> 
+> That's what we are going to do.
+> 
+> > that driver's complete configuration table every time, which seems like
+> > a lot of wasted work.
+
+I re-iterate that point...
+
+-- 
+nvpublic
