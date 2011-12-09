@@ -1,89 +1,102 @@
 From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Fri, 09 Dec 2011 14:50:27 +0400
-Subject: [PATCH v4 5/5] ARM: davinci: create new common platform header
- for davinci
-In-Reply-To: <1323352528-1207-6-git-send-email-manjunath.hadli@ti.com>
-References: <1323352528-1207-1-git-send-email-manjunath.hadli@ti.com>
- <1323352528-1207-6-git-send-email-manjunath.hadli@ti.com>
-Message-ID: <4EE1E7F3.3050509@mvista.com>
+Date: Fri, 09 Dec 2011 14:59:49 +0400
+Subject: [PATCH 2/3] pata/at91: use new introduce smc accessor
+In-Reply-To: <1323357784-17555-2-git-send-email-plagnioj@jcrosoft.com>
+References: <20111208150348.GD23884@game.jcrosoft.org>
+ <1323357784-17555-2-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <4EE1EA25.3010002@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hello.
 
-On 08-12-2011 17:55, Manjunath Hadli wrote:
+On 08-12-2011 19:23, Jean-Christophe PLAGNIOL-VILLARD wrote:
 
-> remove the code from individual platform header files for
-> dm365, dm355, dm644x and dm646x and consolidate it into a
-> single and common header file davinci.h.
+    Your subject doesn't parse. Maybe you meant "use newly introduced smc 
+accessor"?
 
-> Signed-off-by: Manjunath Hadli<manjunath.hadli@ti.com>
-[...]
+> this will allow to use the pata_at91 on a single zImage
 
-> diff --git a/arch/arm/mach-davinci/davinci.h b/arch/arm/mach-davinci/davinci.h
-> new file mode 100644
-> index 0000000..1fafbd7
-> --- /dev/null
-> +++ b/arch/arm/mach-davinci/davinci.h
-> @@ -0,0 +1,88 @@
-[...]
-> +/* DM646x function declarations */
-> +void __init dm646x_init(void);
-> +void __init dm646x_init_mcasp0(struct snd_platform_data *pdata);
-> +void __init dm646x_init_mcasp1(struct snd_platform_data *pdata);
-> +void __init dm646x_board_setup_refclk(struct clk *clk);
+> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD<plagnioj@jcrosoft.com>
+> Cc: Nicolas Ferre<nicolas.ferre@atmel.com>
+> Cc: linux-ide at vger.kernel.org
+> ---
+> Hi,
 
-    I don't see from where are you moving this prototype -- it wasn't in the 
-original #include file... In fact, I'm not even seeing this function in the 
-current Linus tree...
+> 	it's depends on other patch for AT91 can we apply via at91
 
-> +int __init dm646x_init_edma(struct edma_rsv_info *rsv);
-> +
-> +void dm646x_video_init(void);
-> +
-> +void dm646x_setup_vpif(struct vpif_display_config *,
-> +		       struct vpif_capture_config *);
-> +#endif /*__DAVINCI_H */
-[...]
-> diff --git a/arch/arm/mach-davinci/include/mach/dm646x.h b/arch/arm/mach-davinci/include/mach/dm646x.h
-> deleted file mode 100644
-> index eb95864..0000000
-> --- a/arch/arm/mach-davinci/include/mach/dm646x.h
-> +++ /dev/null
-> @@ -1,34 +0,0 @@
-> -/*
-> - * Chip specific defines for DM646x SoC
-> - *
-> - * Author: Kevin Hilman, Deep Root Systems, LLC
-> - *
-> - * 2007 (c) Deep Root Systems, LLC. This file is licensed under
-> - * the terms of the GNU General Public License version 2. This program
-> - * is licensed "as is" without any warranty of any kind, whether express
-> - * or implied.
-> - */
-> -#ifndef __ASM_ARCH_DM646X_H
-> -#define __ASM_ARCH_DM646X_H
-> -
-> -#include<mach/hardware.h>
-> -#include<mach/asp.h>
-> -#include<linux/i2c.h>
-> -#include<linux/videodev2.h>
-> -#include<linux/davinci_emac.h>
-> -#include<media/davinci/vpif_types.h>
-> -
-> -#define DM646X_ASYNC_EMIF_CONTROL_BASE	0x20008000
-> -#define DM646X_ASYNC_EMIF_CS2_SPACE_BASE 0x42000000
-> -
-> -void __init dm646x_init(void);
-> -void __init dm646x_init_mcasp0(struct snd_platform_data *pdata);
-> -void __init dm646x_init_mcasp1(struct snd_platform_data *pdata);
-> -int __init dm646x_init_edma(struct edma_rsv_info *rsv);
-> -
-> -void dm646x_video_init(void);
-> -
-> -void dm646x_setup_vpif(struct vpif_display_config *,
-> -		       struct vpif_capture_config *);
-> -
-> -#endif /* __ASM_ARCH_DM646X_H */
+> Best Regards,
+> J.
+>   drivers/ata/pata_at91.c |   43 +++++++++++++++++++++----------------------
+>   1 files changed, 21 insertions(+), 22 deletions(-)
+
+> diff --git a/drivers/ata/pata_at91.c b/drivers/ata/pata_at91.c
+> index 5249e6d..c8d1154 100644
+> --- a/drivers/ata/pata_at91.c
+> +++ b/drivers/ata/pata_at91.c
+> @@ -207,11 +207,11 @@ static void set_smc_timing(struct device *dev, struct ata_device *adev,
+>   {
+>   	int ret = 0;
+>   	int use_iordy;
+> +	struct sam9_smc_config smc;
+>   	unsigned int t6z;         /* data tristate time in ns */
+>   	unsigned int cycle;       /* SMC Cycle width in MCK ticks */
+>   	unsigned int setup;       /* SMC Setup width in MCK ticks */
+>   	unsigned int pulse;       /* CFIOR and CFIOW pulse width in MCK ticks */
+> -	unsigned int cs_setup = 0;/* CS4 or CS5 setup width in MCK ticks */
+>   	unsigned int cs_pulse;    /* CS4 or CS5 pulse width in MCK ticks*/
+>   	unsigned int tdf_cycles;  /* SMC TDF MCK ticks */
+>   	unsigned long mck_hz;     /* MCK frequency in Hz */
+> @@ -244,26 +244,25 @@ static void set_smc_timing(struct device *dev, struct ata_device *adev,
+>   	}
+>
+>   	dev_dbg(dev, "Use IORDY=%u, TDF Cycles=%u\n", use_iordy, tdf_cycles);
+> -	info->mode |= AT91_SMC_TDF_(tdf_cycles);
+>
+>   	/* write SMC Setup Register */
+> -	at91_sys_write(AT91_SMC_SETUP(info->cs),
+> -			AT91_SMC_NWESETUP_(setup) |
+> -			AT91_SMC_NRDSETUP_(setup) |
+> -			AT91_SMC_NCS_WRSETUP_(cs_setup) |
+> -			AT91_SMC_NCS_RDSETUP_(cs_setup));
+> +	smc.nrd_setup = setup;
+> +	smc.nwe_setup = smc.nrd_setup;
+> +	smc.ncs_read_setup = 0;
+> +	smc.ncs_write_setup = smc.ncs_read_setup;
+
+    Why not:
+
+	smc.nrd_setup = smc.nwe_setup = setup;
+	smc.ncs_read_setup = smc.ncs_write_setup = 0;
+
+>   	/* write SMC Pulse Register */
+> -	at91_sys_write(AT91_SMC_PULSE(info->cs),
+> -			AT91_SMC_NWEPULSE_(pulse) |
+> -			AT91_SMC_NRDPULSE_(pulse) |
+> -			AT91_SMC_NCS_WRPULSE_(cs_pulse) |
+> -			AT91_SMC_NCS_RDPULSE_(cs_pulse));
+> +	smc.nrd_pulse = pulse;
+> +	smc.nwe_pulse = smc.nrd_pulse;
+> +	smc.ncs_read_pulse =cs_pulse;
+
+    Add space after =, please.
+
+> +	smc.ncs_write_pulse = smc.ncs_read_pulse;
+
+    Why not:
+
+	smc.nrd_pulse = smc.nwe_pulse = pulse;
+	smc.ncs_read_pulse = smc.ncs_write_pulse = cs_pulse;
+
+>   	/* write SMC Cycle Register */
+> -	at91_sys_write(AT91_SMC_CYCLE(info->cs),
+> -			AT91_SMC_NWECYCLE_(cycle) |
+> -			AT91_SMC_NRDCYCLE_(cycle));
+> +	smc.read_cycle = cycle;
+> +	smc.write_cycle = smc.read_cycle;
+
+    Why not:
+
+	smc.read_cycle = smc.write_cycle = cycle;
 
 WBR, Sergei
