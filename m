@@ -1,177 +1,39 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 09 Dec 2011 08:22:44 -0600
-Subject: [PATCH v6 01/10] arm/tegra: initial device tree for tegra30
-In-Reply-To: <1323348254-29072-2-git-send-email-pdeschrijver@nvidia.com>
-References: <1323348254-29072-1-git-send-email-pdeschrijver@nvidia.com>
- <1323348254-29072-2-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <4EE219B4.8030707@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 9 Dec 2011 14:23:12 +0000
+Subject: [GIT PULL] pxa changes for v3.3
+In-Reply-To: <CAN1soZz3LcnoFUmFR8go5_ga0-tT9rnxDwtVz9j-P=Ef2Lkp4w@mail.gmail.com>
+References: <CAN1soZz3LcnoFUmFR8go5_ga0-tT9rnxDwtVz9j-P=Ef2Lkp4w@mail.gmail.com>
+Message-ID: <201112091423.12990.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/08/2011 06:43 AM, Peter De Schrijver wrote:
-> This patch adds the initial device tree for tegra30
+On Thursday 08 December 2011, Haojian Zhuang wrote:
+> Please pull these for v3.3.
 > 
-> Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
-
-Acked-by: Rob Herring <rob.herring@calxeda.com>
-
-> ---
->  Documentation/devicetree/bindings/arm/tegra.txt |   14 +++
->  arch/arm/boot/dts/tegra30.dtsi                  |  127 +++++++++++++++++++++++
->  2 files changed, 141 insertions(+), 0 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/arm/tegra.txt
->  create mode 100644 arch/arm/boot/dts/tegra30.dtsi
+> The four patches in below are used to fix build issue while gpio-pxa
+> is changed to platform driver.
+>       pcmcia: pxa: replace IRQ_GPIO() with gpio_to_irq()
+>       Input: zylonite-wm97xx - replace IRQ_GPIO() with gpio_to_irq()
+>       ARM: pxa: fix build error for GPIO_bit()
+>       ARM: pxa: fix the build error because of missing gpio-pxa.h
 > 
-> diff --git a/Documentation/devicetree/bindings/arm/tegra.txt b/Documentation/devicetree/bindings/arm/tegra.txt
-> new file mode 100644
-> index 0000000..6e69d2e
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/tegra.txt
-> @@ -0,0 +1,14 @@
-> +NVIDIA Tegra device tree bindings
-> +-------------------------------------------
-> +
-> +Boards with the tegra20 SoC shall have the following properties:
-> +
-> +Required root node property:
-> +
-> +compatible = "nvidia,tegra20";
-> +
-> +Boards with the tegra30 SoC shall have the following properties:
-> +
-> +Required root node property:
-> +
-> +compatible = "nvidia,tegra30";
-> diff --git a/arch/arm/boot/dts/tegra30.dtsi b/arch/arm/boot/dts/tegra30.dtsi
-> new file mode 100644
-> index 0000000..ee7db98
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/tegra30.dtsi
-> @@ -0,0 +1,127 @@
-> +/include/ "skeleton.dtsi"
-> +
-> +/ {
-> +	compatible = "nvidia,tegra30";
-> +	interrupt-parent = <&intc>;
-> +
-> +	intc: interrupt-controller at 50041000 {
-> +		compatible = "arm,cortex-a9-gic";
-> +		interrupt-controller;
-> +		#interrupt-cells = <3>;
-> +		reg = < 0x50041000 0x1000 >,
-> +		      < 0x50040100 0x0100 >;
-> +	};
-> +
-> +	i2c at 7000c000 {
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		compatible =  "nvidia,tegra30-i2c", "nvidia,tegra20-i2c";
-> +		reg = <0x7000C000 0x100>;
-> +		interrupts = < 0 38 0x04 >;
-> +	};
-> +
-> +	i2c at 7000c400 {
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		compatible = "nvidia,tegra30-i2c", "nvidia,tegra20-i2c";
-> +		reg = <0x7000C400 0x100>;
-> +		interrupts = < 0 84 0x04 >;
-> +	};
-> +
-> +	i2c at 7000c500 {
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		compatible = "nvidia,tegra30-i2c", "nvidia,tegra20-i2c";
-> +		reg = <0x7000C500 0x100>;
-> +		interrupts = < 0 92 0x04 >;
-> +	};
-> +
-> +	i2c at 7000c700 {
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		compatible = "nvidia,tegra30-i2c", "nvidia,tegra20-i2c";
-> +		reg = <0x7000c700 0x100>;
-> +		interrupts = < 0 120 0x04 >;
-> +	};
-> +
-> +	i2c at 7000d000 {
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		compatible = "nvidia,tegra30-i2c", "nvidia,tegra20-i2c";
-> +		reg = <0x7000D000 0x100>;
-> +		interrupts = < 0 53 0x04 >;
-> +	};
-> +
-> +	gpio: gpio at 6000d000 {
-> +		compatible = "nvidia,tegra30-gpio", "nvidia,tegra20-gpio";
-> +		reg = < 0x6000d000 0x1000 >;
-> +		interrupts = < 0 32 0x04 0 33 0x04 0 34 0x04 0 35 0x04 0 55 0x04 0 87 0x04 0 89 0x04 >;
-> +		#gpio-cells = <2>;
-> +		gpio-controller;
-> +	};
-> +
-> +	serial at 70006000 {
-> +		compatible = "nvidia,tegra30-uart", "nvidia,tegra20-uart";
-> +		reg = <0x70006000 0x40>;
-> +		reg-shift = <2>;
-> +		interrupts = < 0 36 0x04 >;
-> +	};
-> +
-> +	serial at 70006040 {
-> +		compatible = "nvidia,tegra30-uart", "nvidia,tegra20-uart";
-> +		reg = <0x70006040 0x40>;
-> +		reg-shift = <2>;
-> +		interrupts = < 0 37 0x04 >;
-> +	};
-> +
-> +	serial at 70006200 {
-> +		compatible = "nvidia,tegra30-uart", "nvidia,tegra20-uart";
-> +		reg = <0x70006200 0x100>;
-> +		reg-shift = <2>;
-> +		interrupts = < 0 46 0x04 >;
-> +	};
-> +
-> +	serial at 70006300 {
-> +		compatible = "nvidia,tegra30-uart", "nvidia,tegra20-uart";
-> +		reg = <0x70006300 0x100>;
-> +		reg-shift = <2>;
-> +		interrupts = < 0 90 0x04 >;
-> +	};
-> +
-> +	serial at 70006400 {
-> +		compatible = "nvidia,tegra30-uart", "nvidia,tegra20-uart";
-> +		reg = <0x70006400 0x100>;
-> +		reg-shift = <2>;
-> +		interrupts = < 0 91 0x04 >;
-> +	};
-> +
-> +	sdhci at 78000000 {
-> +		compatible = "nvidia,tegra30-sdhci", "nvidia,tegra20-sdhci";
-> +		reg = <0x78000000 0x200>;
-> +		interrupts = < 0 14 0x04 >;
-> +	};
-> +
-> +	sdhci at 78000200 {
-> +		compatible = "nvidia,tegra30-sdhci", "nvidia,tegra20-sdhci";
-> +		reg = <0x78000200 0x200>;
-> +		interrupts = < 0 15 0x04 >;
-> +	};
-> +
-> +	sdhci at 78000400 {
-> +		compatible = "nvidia,tegra30-sdhci", "nvidia,tegra20-sdhci";
-> +		reg = <0x78000400 0x200>;
-> +		interrupts = < 0 19 0x04 >;
-> +	};
-> +
-> +	sdhci at 78000600 {
-> +		compatible = "nvidia,tegra30-sdhci", "nvidia,tegra20-sdhci";
-> +		reg = <0x78000600 0x200>;
-> +		interrupts = < 0 31 0x04 >;
-> +	};
-> +
-> +	pinmux: pinmux at 70000000 {
-> +		compatible = "nvidia,tegra30-pinmux";
-> +		reg = < 0x70000868 0xd0     /* Pad control registers */
-> +			0x70003000 0x3e0 >; /* Mux registers */
-> +	};
-> +};
+> 
+> The following changes since commit 1fc27d6c81c881a67fcd1ff983f23c06cdd2a93f:
+> 
+>   Merge branch 'fixes' into for-next (2011-12-06 14:24:24 +0000)
+> 
+> are available in the git repository at:
+> 
+>   git://github.com/hzhuang1/linux.git for-next
+> 
+
+Sorry, I can't pull these. As I explained to other people before, you cannot
+base your submissions on the for-next branch because that is not kept stable.
+
+The patches in here all look ok, so just rebase these onto 3.2-rc4.
+Also, please keep the bug fixes separate from features so I can send
+the fixes early (ideally for 3.2) while I queue up the other patches
+for 3.3. See my "subarch maintainers: please send 3.3 pull requests for
+arm-soc" for the other instructions.
+
+	Arnd
