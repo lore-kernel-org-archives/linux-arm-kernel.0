@@ -1,47 +1,40 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 9 Dec 2011 16:40:29 +0000
-Subject: [PATCH 4/4] Use generic ARM instruction set condition code
- checks for kprobes.
-In-Reply-To: <4EE234A8.80208@arm.com>
-References: <20111208173100.7572.9099.stgit@localhost6.localdomain6>
- <20111208173212.7572.16210.stgit@localhost6.localdomain6>
- <20111209155450.GI5196@mudshark.cambridge.arm.com>
- <4EE234A8.80208@arm.com>
-Message-ID: <20111209164029.GL5196@mudshark.cambridge.arm.com>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Fri, 9 Dec 2011 08:49:01 -0800
+Subject: [PATCH] [RFC] pinctrl: add a driver for Energy Micro's efm32 SoCs
+In-Reply-To: <CAA+hA=Sx=tmnjsY_7EF8NciZO4PvgYOCgRNK9WsGpKmJ8X-r3g@mail.gmail.com>
+References: <1323384057-31452-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <74CDBE0F657A3D45AFBB94109FB122FF1750B77BD8@HQMAIL01.nvidia.com>
+ <20111209010147.GH7913@S2100-06.ap.freescale.net>
+ <4EE18403.30604@nvidia.com>
+ <20111209043220.GJ7913@S2100-06.ap.freescale.net>
+ <4EE192DC.3080209@nvidia.com>
+ <CAA+hA=Sx=tmnjsY_7EF8NciZO4PvgYOCgRNK9WsGpKmJ8X-r3g@mail.gmail.com>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF17518604C3@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 09, 2011 at 04:17:44PM +0000, Leif Lindholm wrote:
-> On 12/09/11 15:54, Will Deacon wrote:
-> > On Thu, Dec 08, 2011 at 05:32:13PM +0000, Leif Lindholm wrote:
-> >> -static unsigned long test_check_cc(int cc, unsigned long cpsr)
-> >> +inline unsigned long test_check_cc(int cc, unsigned long cpsr)
-> >
-> > Not sure why you make this change, surely you can just leave it as static?
+Dong Aisheng wrote at Friday, December 09, 2011 8:03 AM:
+...
+> I agree that parsing data from device tree increases much effort
+> because we can not using any help functions like microes in dts file and we have
+> to construct the structure we need in driver by parsing that data.
+> And it will increase dtsi file's size a lot when after adding all functions.
 > 
-> As the function is now only a wrapper on arm_check_condition (with an 
-> inline shift), it made more sense to me. This was also suggested by 
-> Tixy, and he's since ACKed this patch.
+> I wonder if we can define that data as a pdata in a .c file and only
+> get a pointer from dts file. That would make life much easier.
 
-Hmm, I still don't see why you should change the linkage. Make it static
-inline if you really want the inline, but that seems weird outside of a
-header file stub.
+You can't get pointers themselves directly from a .dts file, since the
+.dts file author has no idea what the memory layout (or even which OS)
+is present on the running system.
 
-> > Maybe it's best just to change all of the callers to call
-> > arm_check_condition directly, like you have done below for the ARM case. For
-> > the Thumb cases will it work if you make sure that you put the condition
-> > code in the top bits?
-> 
-> Yes, that is functionally equivalent, and what I did in the RFC version, 
-> but it ended up looking messy at the calling point.
+An alternative is to key off the compatible flag in the device tree,
+and use that to index a table that points at the various structures you
+want pointers to.
 
-Ok, then could you route the ARM variant through the wrapper too?
+struct of_device_id's .data field, and the function of_match_device()
+are for exactly that purpose; see the way the Tegra pinctrl driver that
+I posted uses them for an example of mapping compatible flag to per-
+SoC initialization function pointers.
 
-> Any sane compiler should generate pretty identical code for these two 
-> alternative solutions (unless it neglected to auto-inline the static 
-> variant).
-
-The problem is when somebody else decides to call test_check_cc from another
-compilation unit, rather than go through arm_check_condition.
-
-Will
+-- 
+nvpublic
