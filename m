@@ -1,26 +1,49 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 9 Dec 2011 11:16:39 +0100
-Subject: [GIT PULL] i.MX fixes
-In-Reply-To: <20111209100926.GD27267@pengutronix.de>
-References: <20111209100926.GD27267@pengutronix.de>
-Message-ID: <20111209101639.GA27471@pengutronix.de>
+From: rusty@rustcorp.com.au (Rusty Russell)
+Date: Fri, 09 Dec 2011 16:08:02 +1030
+Subject: [PATCH 0/7] Introducing a generic AMP framework
+In-Reply-To: <CAK=WgbbmZR5gPqD-0Dc2jWom9J_z+iV0+nAB-BAFedbTqXk0Mw@mail.gmail.com>
+References: <1319536106-25802-1-git-send-email-ohad@wizery.com>
+ <874nywpfkd.fsf@rustcorp.com.au>
+ <CAK=WgbaF=yvGXvJdENrMoi4wWxaQa3UpbtsRm3mcA3cFdDCitA@mail.gmail.com>
+ <87obw31v31.fsf@rustcorp.com.au>
+ <CAK=WgbYVscyeJ5Og5iPx-tjEApa2KgAR1bnZiZUUcv0HxBEtOw@mail.gmail.com>
+ <CAK=WgbbmZR5gPqD-0Dc2jWom9J_z+iV0+nAB-BAFedbTqXk0Mw@mail.gmail.com>
+Message-ID: <87liqmfgp1.fsf@rustcorp.com.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 09, 2011 at 11:09:26AM +0100, Sascha Hauer wrote:
-> Hi Arnd,
+On Thu, 8 Dec 2011 09:50:59 +0200, Ohad Ben-Cohen <ohad@wizery.com> wrote:
+> Hi Rusty,
 > 
-> Please pull the following small fixes.
+> On Wed, Nov 23, 2011 at 11:58 AM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
+> > On Wed, Nov 23, 2011 at 3:33 AM, Rusty Russell <rusty@rustcorp.com.au> wrote:
+> >> That would imply that I'd done more than glance over them, and
+> >> unfortunately I haven't :(
+> >
+> > Np, thanks for glancing :)
+> 
+> I'd still like to ask for your Ack at least for the virtio_ids.h
+> change (please see below, and for the full patch, see
+> http://www.spinics.net/lists/linux-omap/msg59537.html):
+> 
+> Anyone following our threads will know you approved it, but I'm still
+> technically required to have your explicit ack as long as the patch
+> isn't going through your tree.
+> 
+> I can always add something like:
+> 
+> Virtio_ids.h-change-acked-by: Rusty Russell <rusty@rustcorp.com.au>
+> 
+> So it doesn't imply anything else but this specific change, or I can
+> just put that hunk in a separate patch, and add then add your Acked-by
+> (so it doesn't imply anything on the rest of the patch set).
 
-Added the following to it:
+It's usually done:
 
+Acked-by: Rusty Russell <rusty@rustcorp.com.au> (virtio_ids.h)
 
-Shawn Guo (1):
-      arm/imx: fix power button on imx51 babbage board
+And I've added it to the next version of the virtio-spec, so noone else
+grabs it.
 
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Thanks!
+Rusty.
