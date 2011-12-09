@@ -1,40 +1,47 @@
-From: leif.lindholm@arm.com (Leif Lindholm)
-Date: Fri, 09 Dec 2011 18:26:44 +0000
-Subject: [PATCH 4/4] Use generic ARM instruction set condition code checks
- for kprobes.
-In-Reply-To: <1323453935.14174.22.camel@linaro1>
-References: <20111208173100.7572.9099.stgit@localhost6.localdomain6>	
- <20111208173212.7572.16210.stgit@localhost6.localdomain6>	
- <20111209155450.GI5196@mudshark.cambridge.arm.com> <4EE234A8.80208@arm.com>	
- <20111209164029.GL5196@mudshark.cambridge.arm.com>
- <1323453935.14174.22.camel@linaro1>
-Message-ID: <4EE252E4.3040701@arm.com>
+From: hemantp@ti.com (Pedanekar, Hemant)
+Date: Fri, 9 Dec 2011 18:29:25 +0000
+Subject: [PATCH v4 1/3] ARM: OMAP: TI81XX: Prepare for addition of
+ TI814X support
+In-Reply-To: <20111207231741.GP31337@atomide.com>
+References: <1318210796-2357-1-git-send-email-hemantp@ti.com>
+ <20111207231741.GP31337@atomide.com>
+Message-ID: <DDE393F022194E4FB9AE108B0AECD70C042A54@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/09/11 18:05, Jon Medhurst (Tixy) wrote:
->>> Yes, that is functionally equivalent, and what I did in the RFC version,
->>> but it ended up looking messy at the calling point.
->>
->> Ok, then could you route the ARM variant through the wrapper too?
->
-> The function Leif added is for checking the condition code in an ARM
-> instruction, so it doesn't need a wrapper when used for this.
+Tony Lindgren wrote on Thursday, December 08, 2011 4:48 AM:
 
-It doesn't, but...
+> * Hemant Pedanekar <hemantp@ti.com> [111009 18:06]:
+>> This patch updates existing macros, functions used for TI816X, to enable
+>> addition of other SoCs belonging to TI81XX family (e.g., TI814X).
+>> 
+>> The approach taken is to use TI81XX/ti81xx for code/data going to be
+>> common across all TI81XX devices. 
+>> 
+>> cpu_is_ti81xx() is introduced to handle code common across TI81XX devices.
+>> 
+>> In addition, ti8168_evm_map_io() is now replaced with ti81xx_map_io() and
+>> moved in mach-omap2/common.c as same will be used for TI814X and is not
+>> board specific.
+> 
+> Looks like this series needs a rebase after the map_io and common.h
+> changes. Can you please rebase against the current omap soc branch at
+> commit 24a5e092a387e4c8e93f33448da334bd3fd15192?
+> 
+> Regards,
+> 
+> Tony
 
-> The other locations in the kprobes tests get the condition nibble from
-> the ITSATE or from thumb conditional branch instructions. In these cases
-> the code looks cleaner if the condition is passed as a value between 0x0
-> and 0xf, rather than being shift up to bit position 28 where the
-> conditional ARM instructions have it encoded.
+Thanks Tony, I sent v5 in the morning but it didnlt reach the ML
+may be because I got unsubscribed for some reason.
 
-I did what Will suggested though, and it does make it a bit cleaner. It 
-also moves the ARM_OPCODE_* testing out of the test_context_cpsr code, 
-so that all three cases have the probe_should_run setting pretty much 
-identical.
+Btw, I am getting following error when trying to build from soc branch:
 
-I'll post the updated set shortly, so you can have a look.
+make[1]: *** No rule to make target `arch/arm/mach-omap2/omap-smc.o', needed by `arch/arm/mach-omap2/built-in.o'.  Stop.
 
-/
-	Leif
+Looks like the commit c95f06a0d4bc9c2546769b5d984cc2dc6665d4f5 added
+Following but not the corresponding c file(s):
+
+ +secure-common                          = omap-smc.o omap-secure.o
+
+   Hemant
