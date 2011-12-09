@@ -1,80 +1,44 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 9 Dec 2011 10:06:41 -0800
-Subject: [PATCH 2/3] arm: mach-omap2: sdram-nokia: add 200 MHz memory
- timings info
-In-Reply-To: <1323443211-3648-3-git-send-email-aaro.koskinen@nokia.com>
+Date: Fri, 9 Dec 2011 10:07:55 -0800
+Subject: [PATCH 1/3] arm: tools: mach-types: add nokia_rm696
+In-Reply-To: <1323443211-3648-2-git-send-email-aaro.koskinen@nokia.com>
 References: <1323443211-3648-1-git-send-email-aaro.koskinen@nokia.com>
- <1323443211-3648-3-git-send-email-aaro.koskinen@nokia.com>
-Message-ID: <20111209180641.GS31337@atomide.com>
+ <1323443211-3648-2-git-send-email-aaro.koskinen@nokia.com>
+Message-ID: <20111209180755.GT31337@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Russell,
+
 * Aaro Koskinen <aaro.koskinen@nokia.com> [111209 06:33]:
-> From: Igor Dmitriev <ext-dmitriev.igor@nokia.com>
-> 
-> Add memory timing info regarding the 200 MHz memory in sdram-nokia.
-> 
-> Signed-off-by: Igor Dmitriev <ext-dmitriev.igor@nokia.com>
-> Signed-off-by: Eduardo Valentin <eduardo.valentin@nokia.com>
-> Signed-off-by: Aaro Koskinen <aaro.koskinen@nokia.com>
-> ---
->  arch/arm/mach-omap2/sdram-nokia.c |   25 ++++++++++++++++++++++++-
->  1 files changed, 24 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/sdram-nokia.c b/arch/arm/mach-omap2/sdram-nokia.c
-> index 14caa22..b394a0e 100644
-> --- a/arch/arm/mach-omap2/sdram-nokia.c
-> +++ b/arch/arm/mach-omap2/sdram-nokia.c
-> @@ -1,7 +1,7 @@
->  /*
->   * SDRC register values for Nokia boards
->   *
-> - * Copyright (C) 2008, 2010 Nokia Corporation
-> + * Copyright (C) 2008, 2010-2011 Nokia Corporation
->   *
->   * Lauri Leukkunen <lauri.leukkunen@nokia.com>
->   *
-> @@ -107,14 +107,37 @@ static const struct sdram_timings nokia_195dot2mhz_timings[] = {
->  	},
->  };
->  
-> +static const struct sdram_timings nokia_200mhz_timings[] = {
-> +	{
-> +		.casl = 3,
-> +		.tDAL = 30000,
-> +		.tDPL = 15000,
-> +		.tRRD = 10000,
-> +		.tRCD = 20000,
-> +		.tRP = 15000,
-> +		.tRAS = 40000,
-> +		.tRC = 55000,
-> +		.tRFC = 140000,
-> +		.tXSR = 200000,
-> +
-> +		.tREF = 7800,
-> +
-> +		.tXP = 2,
-> +		.tCKE = 4,
-> +		.tWTR = 2
-> +	},
-> +};
-> +
->  static const struct {
->  	long rate;
->  	struct sdram_timings const *data;
->  } nokia_timings[] = {
->  	{ 83000000, nokia_166mhz_timings },
->  	{ 97600000, nokia_97dot6mhz_timings },
-> +	{ 100000000, nokia_200mhz_timings },
+> Add the mach-type number for RM-696.
 
-Is that a typo above? Should it say nokia_100mhz_timings?
+Care to ack this one or apply into your devel-stable with the
+other pending mach-types updates?
 
->  	{ 166000000, nokia_166mhz_timings },
->  	{ 195200000, nokia_195dot2mhz_timings },
-> +	{ 200000000, nokia_200mhz_timings },
->  };
->  static struct omap_sdrc_params nokia_sdrc_params[ARRAY_SIZE(nokia_timings) + 1];
+This allows board-rm680.c to support Nokia N9 with minimal changes.
 
 Regards,
 
 Tony
+ 
+> Signed-off-by: Aaro Koskinen <aaro.koskinen@nokia.com>
+> ---
+>  arch/arm/tools/mach-types |    1 +
+>  1 files changed, 1 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/tools/mach-types b/arch/arm/tools/mach-types
+> index ccbe16f..63f20da 100644
+> --- a/arch/arm/tools/mach-types
+> +++ b/arch/arm/tools/mach-types
+> @@ -1123,6 +1123,7 @@ blissc			MACH_BLISSC		BLISSC			3491
+>  thales_adc		MACH_THALES_ADC		THALES_ADC		3492
+>  ubisys_p9d_evp		MACH_UBISYS_P9D_EVP	UBISYS_P9D_EVP		3493
+>  atdgp318		MACH_ATDGP318		ATDGP318		3494
+> +nokia_rm696		MACH_NOKIA_RM696	NOKIA_RM696		3522
+>  m28evk			MACH_M28EVK		M28EVK			3613
+>  smdk4212		MACH_SMDK4212		SMDK4212		3638
+>  smdk4412		MACH_SMDK4412		SMDK4412		3765
+> -- 
+> 1.7.2.5
+> 
