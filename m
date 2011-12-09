@@ -1,5 +1,5 @@
 From: leif.lindholm@arm.com (Leif Lindholm)
-Date: Fri, 9 Dec 2011 18:26:35 +0000
+Date: Fri, 09 Dec 2011 18:26:44 +0000
 Subject: [PATCH 4/4] Use generic ARM instruction set condition code checks
  for kprobes.
 In-Reply-To: <1323453935.14174.22.camel@linaro1>
@@ -8,7 +8,7 @@ References: <20111208173100.7572.9099.stgit@localhost6.localdomain6>
  <20111209155450.GI5196@mudshark.cambridge.arm.com> <4EE234A8.80208@arm.com>	
  <20111209164029.GL5196@mudshark.cambridge.arm.com>
  <1323453935.14174.22.camel@linaro1>
-Message-ID: <4EE252DB.6060306@arm.com>
+Message-ID: <4EE252E4.3040701@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -29,14 +29,12 @@ It doesn't, but...
 > and 0xf, rather than being shift up to bit position 28 where the
 > conditional ARM instructions have it encoded.
 
-I did what Will suggested though, and it does make it a bit cleaner. It
-also moves the ARM_OPCODE_* testing out of the test_context_cpsr code,
-so that all three cases have the probe_should_run setting pretty much
+I did what Will suggested though, and it does make it a bit cleaner. It 
+also moves the ARM_OPCODE_* testing out of the test_context_cpsr code, 
+so that all three cases have the probe_should_run setting pretty much 
 identical.
 
 I'll post the updated set shortly, so you can have a look.
 
 /
-        Leif
-
--- IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium.  Thank you.
+	Leif
