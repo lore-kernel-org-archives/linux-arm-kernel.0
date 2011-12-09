@@ -1,223 +1,134 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Fri, 9 Dec 2011 07:16:06 +0100
-Subject: [PATCH] ARM: at91: make st soc independent
-In-Reply-To: <4EE13E32.7030905@gmail.com>
-References: <1323358532-21135-1-git-send-email-plagnioj@jcrosoft.com>
- <4EE13E32.7030905@gmail.com>
-Message-ID: <20111209061606.GI23884@game.jcrosoft.org>
+Date: Fri, 9 Dec 2011 07:19:25 +0100
+Subject: [PATCH 3/3] ide/at91: use new introduce smc accessor
+In-Reply-To: <4EE13C66.1050804@gmail.com>
+References: <20111208150348.GD23884@game.jcrosoft.org>
+ <1323357784-17555-3-git-send-email-plagnioj@jcrosoft.com>
+ <4EE13C66.1050804@gmail.com>
+Message-ID: <20111209061925.GJ23884@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09:46 Fri 09 Dec     , Ryan Mallon wrote:
-> On 09/12/11 02:35, Jean-Christophe PLAGNIOL-VILLARD wrote:
+On 09:38 Fri 09 Dec     , Ryan Mallon wrote:
+> On 09/12/11 02:23, Jean-Christophe PLAGNIOL-VILLARD wrote:
 > 
+> > this will allow to use the pata_at91 on a single zImage
+> > 
 > > Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 > > Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-> > ---
-> >  arch/arm/mach-at91/at91rm9200.c              |    4 +-
-> >  arch/arm/mach-at91/at91rm9200_time.c         |   37 ++++++++++++++++----------
-> >  arch/arm/mach-at91/generic.h                 |    1 +
-> >  arch/arm/mach-at91/include/mach/at91_st.h    |   32 +++++++++++++++-------
-> >  arch/arm/mach-at91/include/mach/at91rm9200.h |    2 +-
-> >  drivers/watchdog/at91rm9200_wdt.c            |    8 +++---
-> >  6 files changed, 53 insertions(+), 31 deletions(-)
+> > Cc: linux-ide at vger.kernel.org
 > 
-> Some comments below,
+> 
+> Couple of minor comments below,
 > 
 > ~Ryan
 > 
-> > diff --git a/arch/arm/mach-at91/at91rm9200.c b/arch/arm/mach-at91/at91rm9200.c
-> > index 9163d7d..6b819c0 100644
-> > --- a/arch/arm/mach-at91/at91rm9200.c
-> > +++ b/arch/arm/mach-at91/at91rm9200.c
-> > @@ -294,8 +294,8 @@ static void at91rm9200_reset(void)
-> >  	/*
-> >  	 * Perform a hardware reset with the use of the Watchdog timer.
-> >  	 */
-> > -	at91_sys_write(AT91_ST_WDMR, AT91_ST_RSTEN | AT91_ST_EXTEN | 1);
-> > -	at91_sys_write(AT91_ST_CR, AT91_ST_WDRST);
-> > +	at91_st_write(AT91_ST_WDMR, AT91_ST_RSTEN | AT91_ST_EXTEN | 1);
-> > +	at91_st_write(AT91_ST_CR, AT91_ST_WDRST);
-> >  }
+> > ---
+> > Hi,
+> > 
+> > 	it's depends on other patch for AT91 can we apply via at91
+> > 
+> > Best Regards,
+> > J.
+> >  drivers/ide/at91_ide.c |   65 +++++++++++++++++++++++++++--------------------
+> >  1 files changed, 37 insertions(+), 28 deletions(-)
+> > 
+> > diff --git a/drivers/ide/at91_ide.c b/drivers/ide/at91_ide.c
+> > index 41d4155..407595b 100644
+> > --- a/drivers/ide/at91_ide.c
+> > +++ b/drivers/ide/at91_ide.c
+> > @@ -59,41 +59,50 @@
+> >  #define ALT_MODE	0x00e00000
+> >  #define REGS_SIZE	8
 > >  
-> >  /* --------------------------------------------------------------------
-> > diff --git a/arch/arm/mach-at91/at91rm9200_time.c b/arch/arm/mach-at91/at91rm9200_time.c
-> > index a028cdf..52d4b45 100644
-> > --- a/arch/arm/mach-at91/at91rm9200_time.c
-> > +++ b/arch/arm/mach-at91/at91rm9200_time.c
-> > @@ -43,9 +43,9 @@ static inline unsigned long read_CRTR(void)
-> >  {
-> >  	unsigned long x1, x2;
-> >  
-> > -	x1 = at91_sys_read(AT91_ST_CRTR);
-> > +	x1 = at91_st_read(AT91_ST_CRTR);
-> >  	do {
-> > -		x2 = at91_sys_read(AT91_ST_CRTR);
-> > +		x2 = at91_st_read(AT91_ST_CRTR);
-> >  		if (x1 == x2)
-> >  			break;
-> >  		x1 = x2;
-> > @@ -58,7 +58,7 @@ static inline unsigned long read_CRTR(void)
-> >   */
-> >  static irqreturn_t at91rm9200_timer_interrupt(int irq, void *dev_id)
-> >  {
-> > -	u32	sr = at91_sys_read(AT91_ST_SR) & irqmask;
-> > +	u32	sr = at91_st_read(AT91_ST_SR) & irqmask;
-> >  
-> >  	/*
-> >  	 * irqs should be disabled here, but as the irq is shared they are only
-> > @@ -110,22 +110,22 @@ static void
-> >  clkevt32k_mode(enum clock_event_mode mode, struct clock_event_device *dev)
-> >  {
-> >  	/* Disable and flush pending timer interrupts */
-> > -	at91_sys_write(AT91_ST_IDR, AT91_ST_PITS | AT91_ST_ALMS);
-> > -	(void) at91_sys_read(AT91_ST_SR);
-> > +	at91_st_write(AT91_ST_IDR, AT91_ST_PITS | AT91_ST_ALMS);
-> > +	(void) at91_st_read(AT91_ST_SR);
-> 
-> 
-> Drop the void cast or check the return value.
-this is not he scope of this patch
-
-the change are by script
-> 
-> >  
-> >  	last_crtr = read_CRTR();
-> >  	switch (mode) {
-> >  	case CLOCK_EVT_MODE_PERIODIC:
-> >  		/* PIT for periodic irqs; fixed rate of 1/HZ */
-> >  		irqmask = AT91_ST_PITS;
-> > -		at91_sys_write(AT91_ST_PIMR, RM9200_TIMER_LATCH);
-> > +		at91_st_write(AT91_ST_PIMR, RM9200_TIMER_LATCH);
-> >  		break;
-> >  	case CLOCK_EVT_MODE_ONESHOT:
-> >  		/* ALM for oneshot irqs, set by next_event()
-> >  		 * before 32 seconds have passed
-> >  		 */
-> >  		irqmask = AT91_ST_ALMS;
-> > -		at91_sys_write(AT91_ST_RTAR, last_crtr);
-> > +		at91_st_write(AT91_ST_RTAR, last_crtr);
-> >  		break;
-> >  	case CLOCK_EVT_MODE_SHUTDOWN:
-> >  	case CLOCK_EVT_MODE_UNUSED:
-> > @@ -133,7 +133,7 @@ clkevt32k_mode(enum clock_event_mode mode, struct clock_event_device *dev)
-> >  		irqmask = 0;
-> >  		break;
-> >  	}
-> > -	at91_sys_write(AT91_ST_IER, irqmask);
-> > +	at91_st_write(AT91_ST_IER, irqmask);
-> >  }
-> >  
-> >  static int
-> > @@ -156,12 +156,12 @@ clkevt32k_next_event(unsigned long delta, struct clock_event_device *dev)
-> >  	alm = read_CRTR();
-> >  
-> >  	/* Cancel any pending alarm; flush any pending IRQ */
-> > -	at91_sys_write(AT91_ST_RTAR, alm);
-> > -	(void) at91_sys_read(AT91_ST_SR);
-> > +	at91_st_write(AT91_ST_RTAR, alm);
-> > +	(void) at91_st_read(AT91_ST_SR);
-> 
-> 
-> Same here, remove the void cast or check the return value.
-ditti
-> 
-> >  
-> >  	/* Schedule alarm by writing RTAR. */
-> >  	alm += delta;
-> > -	at91_sys_write(AT91_ST_RTAR, alm);
-> > +	at91_st_write(AT91_ST_RTAR, alm);
-> >  
-> >  	return status;
-> >  }
-> > @@ -175,15 +175,24 @@ static struct clock_event_device clkevt = {
-> >  	.set_mode	= clkevt32k_mode,
-> >  };
-> >  
-> > +void __iomem *at91_st_base;
-> > +
-> > +void __init at91rm9200_ioremap_st(u32 addr)
+> > -#define enter_16bit(cs, mode) do {					\
+> > -	mode = at91_sys_read(AT91_SMC_MODE(cs));			\
+> > -	at91_sys_write(AT91_SMC_MODE(cs), mode | AT91_SMC_DBW_16);	\
+> > -} while (0)
+> > +static inline void enter_16bit(int cs, struct sam9_smc_config *smc)
 > > +{
-> > +	at91_st_base = ioremap(AT91RM9200_BASE_ST, 256);
-> > +	if (!at91_st_base)
-> > +		panic("Impossible to ioremap ST\n");
+> > +	sam9_smc_read_mode(0, cs, smc);
+> > +	smc->mode = (smc->mode & ~AT91_SMC_DBW) | AT91_SMC_DBW_16;
+> > +	sam9_smc_write_mode(0, cs, smc);
 > > +}
-> 
-> 
-> I'm unsure about this. Only at91rm9200 has the ST, so is it worth
-> ioremapping it and having a global variable? At the very least could we
-> make at91_st_base static and move at91_st_read/write here.
-no we need it at different place in the kernel
-> 
-> > +
-> >  /*
-> >   * ST (system timer) module supports both clockevents and clocksource.
-> >   */
-> >  void __init at91rm9200_timer_init(void)
+> >  
+> > -#define leave_16bit(cs, mode) at91_sys_write(AT91_SMC_MODE(cs), mode);
+> > +static inline void leave_16bit(int cs, struct sam9_smc_config *smc)
+> > +{
+> > +	smc->mode = (smc->mode & ~AT91_SMC_DBW) | AT91_SMC_DBW_8;
+> > +	sam9_smc_write_mode(0, cs, smc);
+> > +}
+> >  
+> >  static void set_smc_timings(const u8 chipselect, const u16 cycle,
+> >  			    const u16 setup, const u16 pulse,
+> >  			    const u16 data_float, int use_iordy)
 > >  {
-> >  	/* Disable all timer interrupts, and clear any pending ones */
-> > -	at91_sys_write(AT91_ST_IDR,
-> > +	at91_st_write(AT91_ST_IDR,
-> >  		AT91_ST_PITS | AT91_ST_WDOVF | AT91_ST_RTTINC | AT91_ST_ALMS);
-> > -	(void) at91_sys_read(AT91_ST_SR);
-> > +	(void) at91_st_read(AT91_ST_SR);
-> 
-> 
-> Drop the cast.
-> 
-> >  
-> >  	/* Make IRQs happen for the system timer */
-> >  	setup_irq(AT91_ID_SYS, &at91rm9200_timer_irq);
-> > @@ -192,7 +201,7 @@ void __init at91rm9200_timer_init(void)
-> >  	 * directly for the clocksource and all clockevents, after adjusting
-> >  	 * its prescaler from the 1 Hz default.
-> >  	 */
-> > -	at91_sys_write(AT91_ST_RTMR, 1);
-> > +	at91_st_write(AT91_ST_RTMR, 1);
-> >  
-> >  	/* Setup timer clockevent, with minimum of two ticks (important!!) */
-> >  	clkevt.mult = div_sc(AT91_SLOW_CLOCK, NSEC_PER_SEC, clkevt.shift);
-> > diff --git a/arch/arm/mach-at91/generic.h b/arch/arm/mach-at91/generic.h
-> > index 4030958..445c00d 100644
-> > --- a/arch/arm/mach-at91/generic.h
-> > +++ b/arch/arm/mach-at91/generic.h
-> > @@ -28,6 +28,7 @@ extern void __init at91_aic_init(unsigned int priority[]);
-> >  
-> >   /* Timer */
-> >  struct sys_timer;
-> > +extern void at91rm9200_ioremap_st(u32 addr);
-> >  extern struct sys_timer at91rm9200_timer;
-> >  extern void at91sam926x_ioremap_pit(u32 addr);
-> >  extern struct sys_timer at91sam926x_timer;
-> > diff --git a/arch/arm/mach-at91/include/mach/at91_st.h b/arch/arm/mach-at91/include/mach/at91_st.h
-> > index 8847173..969aac2 100644
-> > --- a/arch/arm/mach-at91/include/mach/at91_st.h
-> > +++ b/arch/arm/mach-at91/include/mach/at91_st.h
-> > @@ -16,34 +16,46 @@
-> >  #ifndef AT91_ST_H
-> >  #define AT91_ST_H
-> >  
-> > -#define	AT91_ST_CR		(AT91_ST + 0x00)	/* Control Register */
-> > +#ifndef __ASSEMBLY__
-> > +extern void __iomem *at91_st_base;
+> > -	unsigned long mode = AT91_SMC_READMODE | AT91_SMC_WRITEMODE |
+> > +	struct sam9_smc_config smc;
 > > +
-> > +#define at91_st_read(field) \
-> > +	__raw_readl(at91_st_base + field)
-> > +
-> > +#define at91_st_write(field, value) \
-> > +	__raw_writel(value, at91_st_base + field);
+> > +	smc.mode = AT91_SMC_READMODE | AT91_SMC_WRITEMODE |
+> >  			     AT91_SMC_BAT_SELECT;
+> >  
+> >  	/* disable or enable waiting for IORDY signal */
+> >  	if (use_iordy)
+> > -		mode |= AT91_SMC_EXNWMODE_READY;
+> > +		smc.mode |= AT91_SMC_EXNWMODE_READY;
+> >  
+> > -	/* add data float cycles if needed */
+> > -	if (data_float)
+> > -		mode |= AT91_SMC_TDF_(data_float);
+> > +	/* add data ofloat cycles if needed */
 > 
 > 
-> Static inline functions are nicer for readability/type checking.
-sorry no this will improve nothing
+> Typo: ofloat -> float?
 > 
-> > +#else
-> > +.extern at91_st_base
+> > +	smc.tdf_cycles = data_float;
+> >  
+> > -	at91_sys_write(AT91_SMC_MODE(chipselect), mode);
+> > +	/* write SMC Setup Register */
 > 
 > 
-> Typo: remove the . in front of the extern. Has this been compile tested?
-certainly not it's assembly
-.extern is right
+> This comment is no longer correct.
+> 
+> > +	smc.nrd_setup = setup;
+> > +	smc.nwe_setup = smc.nrd_setup;
+> > +	smc.ncs_read_setup = 0;
+> > +	smc.ncs_write_setup = smc.ncs_read_setup;
+> > +	/* write SMC Pulse Register */
+> 
+> 
+> Nor is this one.
+> 
+> > +	smc.nrd_pulse = pulse;
+> > +	smc.nwe_pulse = smc.nrd_pulse;
+> > +	smc.ncs_read_pulse = cycle;
+> > +	smc.ncs_write_pulse = smc.ncs_read_pulse;
+> > +	/* write SMC Cycle Register */
+> 
+> 
+> or this one.
+> 
+> > +	smc.read_cycle = cycle;
+> > +	smc.write_cycle = smc.read_cycle;
+> >  
+> > -	/* setup timings in SMC */
+> > -	at91_sys_write(AT91_SMC_SETUP(chipselect), AT91_SMC_NWESETUP_(setup) |
+> > -						   AT91_SMC_NCS_WRSETUP_(0) |
+> > -						   AT91_SMC_NRDSETUP_(setup) |
+> > -						   AT91_SMC_NCS_RDSETUP_(0));
+> > -	at91_sys_write(AT91_SMC_PULSE(chipselect), AT91_SMC_NWEPULSE_(pulse) |
+> > -						   AT91_SMC_NCS_WRPULSE_(cycle) |
+> > -						   AT91_SMC_NRDPULSE_(pulse) |
+> > -						   AT91_SMC_NCS_RDPULSE_(cycle));
+> > -	at91_sys_write(AT91_SMC_CYCLE(chipselect), AT91_SMC_NWECYCLE_(cycle) |
+> > -						   AT91_SMC_NRDCYCLE_(cycle));
+> > +	sam9_smc_configure(0, chipselect, &smc);
+> 
+> 
+> Check return value?
+set_timings don't care about it
+
+so no need
 
 Best Regards,
 J.
