@@ -1,40 +1,55 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Fri, 9 Dec 2011 08:49:01 -0800
-Subject: [PATCH] [RFC] pinctrl: add a driver for Energy Micro's efm32 SoCs
-In-Reply-To: <CAA+hA=Sx=tmnjsY_7EF8NciZO4PvgYOCgRNK9WsGpKmJ8X-r3g@mail.gmail.com>
-References: <1323384057-31452-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <74CDBE0F657A3D45AFBB94109FB122FF1750B77BD8@HQMAIL01.nvidia.com>
- <20111209010147.GH7913@S2100-06.ap.freescale.net>
- <4EE18403.30604@nvidia.com>
- <20111209043220.GJ7913@S2100-06.ap.freescale.net>
- <4EE192DC.3080209@nvidia.com>
- <CAA+hA=Sx=tmnjsY_7EF8NciZO4PvgYOCgRNK9WsGpKmJ8X-r3g@mail.gmail.com>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF17518604C3@HQMAIL01.nvidia.com>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Fri, 9 Dec 2011 22:20:48 +0530
+Subject: [PATCH v2] ARM: pl330: Fix a race condition
+In-Reply-To: <4EE220A7.5070101@arm.com>
+References: <4E8C5425.80303@arm.com>
+ <1317892206-3600-1-git-send-email-javi.merino@arm.com>
+ <CAJuYYwTXf-XU0fdGT0+sggN-MEY3v7UHkfjNkM4+QUW464J9Ew@mail.gmail.com>
+ <4EB7B79A.2020004@arm.com>
+ <000c01ccada6$f83f5be0$e8be13a0$%kim@samsung.com>
+ <4ED3B89E.7070903@arm.com>
+ <000e01ccae48$d76a7ba0$863f72e0$%kim@samsung.com>
+ <4ED4AB9A.3060807@arm.com>
+ <CAJe_Zhem0yTOV4L-kJ91fQN++hFzCUgjOfxSnJR25PuYNTedVQ@mail.gmail.com>
+ <03f001ccb4b5$3441f5c0$9cc5e140$%kim@samsung.com>
+ <4EDF3989.3060108@arm.com> <4EDFD278.9090101@arm.com>
+ <4EE1F7F0.70107@arm.com>
+ <CAJe_Zhcj_j+r+T5N_BdS-ENds1SmJs7-Pfyf8vrFkB75BGBaYg@mail.gmail.com>
+ <4EE20FF1.5070702@arm.com>
+ <CABb+yY0f8xxAj+rFeZ4e61Sfk0+0bMsAiZ-H5AeY4cfCd_VE5g@mail.gmail.com>
+ <4EE220A7.5070101@arm.com>
+Message-ID: <CABb+yY2-1B65-UqRofj72zVuZUUk5c6pkqNGs15ZLnkrVheRDQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dong Aisheng wrote at Friday, December 09, 2011 8:03 AM:
-...
-> I agree that parsing data from device tree increases much effort
-> because we can not using any help functions like microes in dts file and we have
-> to construct the structure we need in driver by parsing that data.
-> And it will increase dtsi file's size a lot when after adding all functions.
-> 
-> I wonder if we can define that data as a pdata in a .c file and only
-> get a pointer from dts file. That would make life much easier.
+On Fri, Dec 9, 2011 at 8:22 PM, Javi Merino <javi.merino@arm.com> wrote:
+>
+> I think the best solution would be to revert
+> ee3f615819404a9438b2dd01b7a39f276d2737f2 and go back to my original
+> patch (in the beginning of this thread):
+>
+> http://article.gmane.org/gmane.linux.ports.arm.kernel/133110
+>
+> What do you think?
 
-You can't get pointers themselves directly from a .dts file, since the
-.dts file author has no idea what the memory layout (or even which OS)
-is present on the running system.
+Well, we have to resort to that if we can't find something simpler.
 
-An alternative is to key off the compatible flag in the device tree,
-and use that to index a table that points at the various structures you
-want pointers to.
+What do you think about ...
 
-struct of_device_id's .data field, and the function of_match_device()
-are for exactly that purpose; see the way the Tegra pinctrl driver that
-I posted uses them for an example of mapping compatible flag to per-
-SoC initialization function pointers.
+diff --git a/arch/arm/common/pl330.c b/arch/arm/common/pl330.c
+index f407a6b..3a51cdd 100644
+--- a/arch/arm/common/pl330.c
++++ b/arch/arm/common/pl330.c
+@@ -1546,7 +1546,7 @@ int pl330_chan_ctrl(void *ch_id, enum pl330_chan_op op)
 
--- 
-nvpublic
+ 		/* Start the next */
+ 	case PL330_OP_START:
+-		if (!_thrd_active(thrd) && !_start(thrd))
++		if (_state(thrd) == PL330_STATE_STOPPED && !_start(thrd))
+ 			ret = -EIO;
+ 		break;
+
+Thanks
+-jassi
+
+[Sorry I don't have any pl330 platform handy]
