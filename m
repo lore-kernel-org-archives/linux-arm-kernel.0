@@ -1,61 +1,81 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 9 Dec 2011 09:07:22 -0800
-Subject: [RFC 1/3] pinctrl: add a driver for NVIDIA Tegra
-In-Reply-To: <CACRpkdYDn0V7SeQuFiFDMxGkybvg6PGf7jxid8ECGB7Azkj3zw@mail.gmail.com>
-References: <1323382390-14892-1-git-send-email-swarren@nvidia.com>
- <1323382390-14892-2-git-send-email-swarren@nvidia.com>
- <CACRpkdYDn0V7SeQuFiFDMxGkybvg6PGf7jxid8ECGB7Azkj3zw@mail.gmail.com>
-Message-ID: <20111209170722.GO31337@atomide.com>
+Date: Fri, 9 Dec 2011 09:24:08 -0800
+Subject: [PATCH] [RFC] pinctrl: add a driver for Energy Micro's efm32 SoCs
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF17518604C3@HQMAIL01.nvidia.com>
+References: <1323384057-31452-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <74CDBE0F657A3D45AFBB94109FB122FF1750B77BD8@HQMAIL01.nvidia.com>
+ <20111209010147.GH7913@S2100-06.ap.freescale.net>
+ <4EE18403.30604@nvidia.com>
+ <20111209043220.GJ7913@S2100-06.ap.freescale.net>
+ <4EE192DC.3080209@nvidia.com>
+ <CAA+hA=Sx=tmnjsY_7EF8NciZO4PvgYOCgRNK9WsGpKmJ8X-r3g@mail.gmail.com>
+ <74CDBE0F657A3D45AFBB94109FB122FF17518604C3@HQMAIL01.nvidia.com>
+Message-ID: <20111209172407.GP31337@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Linus Walleij <linus.walleij@linaro.org> [111209 05:29]:
-> On Thu, Dec 8, 2011 at 11:13 PM, Stephen Warren <swarren@nvidia.com> wrote:
+* Stephen Warren <swarren@nvidia.com> [111209 08:17]:
+> Dong Aisheng wrote at Friday, December 09, 2011 8:03 AM:
+> ...
+> > I agree that parsing data from device tree increases much effort
+> > because we can not using any help functions like microes in dts file and we have
+> > to construct the structure we need in driver by parsing that data.
+> > And it will increase dtsi file's size a lot when after adding all functions.
+> > 
+> > I wonder if we can define that data as a pdata in a .c file and only
+> > get a pointer from dts file. That would make life much easier.
 > 
-> > This adds a driver for the Tegra pinmux, and required parameterization
-> > data for Tegra20 and Tegra30.
-> >
-> > Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> You can't get pointers themselves directly from a .dts file, since the
+> .dts file author has no idea what the memory layout (or even which OS)
+> is present on the running system.
 > 
-> This is looking good from a framework point of view (obviously,
-> since you've designed the framework with me you sure know what
-> you're doing).
+> An alternative is to key off the compatible flag in the device tree,
+> and use that to index a table that points at the various structures you
+> want pointers to.
 > 
-> What we could worry about is the amount of hard-coded chip data
-> which sort of correlates with the discussion with Tony on how to
-> provide DT info for pin control drivers.
-> 
-> If say this same controller appear in Tegra 4 with no changes but
-> different pin names, it makes sense to try to push this into the
-> DT as soon as possible, so as to avoid the situation Tony is
-> having with the OMAP muxes. If Tegra 4 will be all-new and not even
-> related, it doesn't.
-> 
-> So, just think a bit about it.
-> 
-> It will fit way better here than any place under
-> arch/arm/* in any case, so it's a great achievement!
+> struct of_device_id's .data field, and the function of_match_device()
+> are for exactly that purpose; see the way the Tegra pinctrl driver that
+> I posted uses them for an example of mapping compatible flag to per-
+> SoC initialization function pointers.
 
-Sorry I still need some more time with pinmux-simple.c, will have
-to get pending omap patches merged first. Just want to recap the
-findings so far:
+For letting a device do it's pingroup in DT, I've played with the
+following:
 
-- We can have automatically generated device to pinmux driver
-  mapping from DT, so that's nice
+	/*      mux func phandle mux func name    hw initial flags */
+	pins = <&uart3_rx_irrx>, "uart3_rx_irrx", <0xdeadbeef>,
+		<&uart3_tx_irtx>, "uart3_tx_irtx", <0xdeadbeef>;
 
-- Describing pins for each driver in DT is still open.. And
-  using mixed-property arrays in DT won't nicely as the data
-  gets unaligned easily with string properties..
+But it seems that doing mixed-property arrays gets nasty as any
+data after a string has a high likelihood of getting misaligned
+since a mixed-property array is a string array with the string
+embedded in it with the registers. That leads into nasty string
+parsing that can be extremely flakey with buggy DT data. So it
+seems that using a string there is only safe as the last element,
+which means we can't use names for multiple pins.
 
-- We currently have hard time supporting pin groups with pins
-  coming from multiple pinmux driver instances
+So I've pretty much come to the conclusion that we would have to
+use something like this instead:
 
-- Mixing pinmux data from various sources is still open; Some
-  pinmux data may need to be static, some come from DT, some
-  come from loadable modules or even /lib/firmware if the data
-  gets insanely big. Basically we may not always have a phandle
-  in DT data for the pinmux function, and should somehow allow
-  also using names there
+	/*      phandle        f hw specific initial flags */
+	pins = <&uart3_rx_irrx 0 0xdeadbeef
+		&uart3_tx_irtx 0 0xdeadbeef>;
+
+This however has a problem for cases where we may not have a phandle
+in DT for the mux function. For example, let's assume that we'll have
+tens of thousands of lines of mux data for omaps (we already have
+over 6k LOC) and just want to load that from /lib/firmware to avoid
+bloating the kernel. In that case we won't have the phandle for the
+mux function in DT.
+
+It would be _really_nice_ to use DT in the missing phandle case also
+for doing the device to mux function mapping based on a function name
+when no phandle is available.
+
+But so far I have not found a good way of doing both phandle and
+optional name type thing. Anybody got some good ideas for that?
+
+BTW, this same problem applies also to clock framwork where we may
+have multiple sources of clocks to register and map to devices.
 
 Regards,
 
