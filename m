@@ -1,38 +1,48 @@
-From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
-Date: Fri, 9 Dec 2011 03:31:17 +0100
-Subject: [PATCH v2] ARM: OMAP1: Move dpll1 rates selection from config to
- runtime
-In-Reply-To: <20111209020922.GN31337@atomide.com>
-References: <201112090013.37529.jkrzyszt@tis.icnet.pl>
- <1323395476-26548-1-git-send-email-jkrzyszt@tis.icnet.pl>
- <20111209020922.GN31337@atomide.com>
-Message-ID: <201112090331.17570.jkrzyszt@tis.icnet.pl>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri,  9 Dec 2011 10:50:55 +0800
+Subject: [PATCH] arm/imx: fix cpufreq build error
+In-Reply-To: <20111209020948.GA28216@b20223-02.ap.freescale.net>
+References: <20111209020948.GA28216@b20223-02.ap.freescale.net>
+Message-ID: <1323399055-31850-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 09 of December 2011 at 03:09:22, Tony Lindgren wrote:
-> * Janusz Krzysztofik <jkrzyszt@tis.icnet.pl> [111208 17:24]:
-> > For still better multi-OMAP1 support, expand omap1_rate_table with flags
-> > for different SoC types and match them while selecting clock rates. The
-> > idea is stolen from current omap24xx clock rate selection algorithm.
-> > 
-> > Since clkdev platform flag definitions are reused here, those had to be
-> > expanded with one extra entry for OMAP1710 subtype, as this is the only
-> > SoC for which we allow selection of the highest, 216 MHz rate.
-> > 
-> > Once done, remove no longer needed clock rate configure time options.
-> > 
-> > Created against linux-omap/master tip as of Thu Dec 1,
-> > commit f83c2a8cbb59981722d1ab610c79adfd034a2667.
-> > Tested on Amstrad Delta.
-> > 
-> > Signed-off-by: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
-> > ---
-> > v2: limit OMAP1510 rate to 150 MHz, or some boards may not work.
-> 
-> Thanks pushing them all into omap1 branch, can you please check
-> that I got all the patches? I've boot tested it here on h2/osk/770.
+This patch adds missing linux/module.h to fix the build error seen
+on imx cpuidle driver.
 
-Looks like all are there, thank you.
+  CC      arch/arm/plat-mxc/cpufreq.o
+arch/arm/plat-mxc/cpufreq.c:203: error: expected declaration specifiers or '...' before string constant
+arch/arm/plat-mxc/cpufreq.c:203: warning: data definition has no type or storage class
+arch/arm/plat-mxc/cpufreq.c:203: warning: type defaults to 'int' in declaration of 'MODULE_AUTHOR'
+arch/arm/plat-mxc/cpufreq.c:203: warning: function declaration isn't a prototype
+arch/arm/plat-mxc/cpufreq.c:204: error: expected declaration specifiers or '...' before string constant
+arch/arm/plat-mxc/cpufreq.c:204: warning: data definition has no type or storage class
+arch/arm/plat-mxc/cpufreq.c:204: warning: type defaults to 'int' in declaration of 'MODULE_DESCRIPTION'
+arch/arm/plat-mxc/cpufreq.c:204: warning: function declaration isn't a prototype
+arch/arm/plat-mxc/cpufreq.c:205: error: expected declaration specifiers or '...' before string constant
+arch/arm/plat-mxc/cpufreq.c:205: warning: data definition has no type or storage class
+arch/arm/plat-mxc/cpufreq.c:205: warning: type defaults to 'int' in declaration of 'MODULE_LICENSE'
+arch/arm/plat-mxc/cpufreq.c:205: warning: function declaration isn't a prototype
+make[1]: *** [arch/arm/plat-mxc/cpufreq.o] Error 1
+make: *** [arch/arm/plat-mxc] Error 2
 
-Janusz
+Reported-by: Richard Zhao <richard.zhao@freescale.com>
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ arch/arm/plat-mxc/cpufreq.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/plat-mxc/cpufreq.c b/arch/arm/plat-mxc/cpufreq.c
+index 74aac96..e3073be 100644
+--- a/arch/arm/plat-mxc/cpufreq.c
++++ b/arch/arm/plat-mxc/cpufreq.c
+@@ -20,6 +20,7 @@
+ #include <linux/cpufreq.h>
+ #include <linux/clk.h>
+ #include <linux/err.h>
++#include <linux/module.h>
+ #include <linux/slab.h>
+ #include <mach/hardware.h>
+ #include <mach/clock.h>
+-- 
+1.7.4.1
