@@ -1,42 +1,89 @@
-From: ccross@android.com (Colin Cross)
-Date: Fri, 9 Dec 2011 10:35:09 -0800
-Subject: [PATCH v6 04/10] arm/tegra: prepare early init for multiple tegra
- variants
-In-Reply-To: <20111209111925.GK27578@tbergstrom-lnx.Nvidia.com>
-References: <1323348254-29072-1-git-send-email-pdeschrijver@nvidia.com>
- <1323348254-29072-5-git-send-email-pdeschrijver@nvidia.com>
- <74CDBE0F657A3D45AFBB94109FB122FF1750B77A7E@HQMAIL01.nvidia.com>
- <CAMbhsRTD1rQBY7Sn2km=XsUYsHMdqQqZSKu4agc0GB6+QE79fA@mail.gmail.com>
- <20111209111925.GK27578@tbergstrom-lnx.Nvidia.com>
-Message-ID: <CAMbhsRR1HdG6QnNdrnD3y9DApnDR3RrUqFyTt5vZT0qR9n=ECg@mail.gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri,  9 Dec 2011 16:41:05 -0200
+Subject: [PATCH v4] tty: serial: imx: Allow UART to be a source for wakeup
+In-Reply-To: <1323434541-27689-1-git-send-email-festevam@gmail.com>
+References: <1323434541-27689-1-git-send-email-festevam@gmail.com>
+Message-ID: <1323456065-6240-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 9, 2011 at 3:19 AM, Peter De Schrijver
-<pdeschrijver@nvidia.com> wrote:
-> On Thu, Dec 08, 2011 at 07:29:43PM +0100, Colin Cross wrote:
->> On Thu, Dec 8, 2011 at 9:57 AM, Stephen Warren <swarren@nvidia.com> wrote:
->> > Peter De Schrijver wrote at Thursday, December 08, 2011 5:44 AM:
->> >> This patch splits the early init code in a common and a tegra20 specific part.
->> >> L2 cache initialization is generalized and discovers the cache associativity
->> >> at runtime. Also use arm_pm_restart instead of arm_arch_reset and reset the
->> >> the system using the PMC reset feature rather then the CAR system reset.
->> >
->> > This one really should be at least 3 separate patches:
->> > * s/tegra_init_early/tegra20_init_early/ in machine descriptions
->> > * Switch reset mechanism from CAR to PMC
->> > * tegra_init_cache modifications
->> > * Not sure if all the ifdef additions go in the above, or if some should be
->> > ?separate?
->> >
->> > Still, I think it's probably OK to go in as it is even if it isn't optimal.
->>
->> Please at least split out the reset change. ?Does using the PMC reset
->> instead of the CAR reset still result in a warm reset, or does it
->> change to a cold reset?
->
-> What do you consider a cold reset in the tegra world?
+Allow UART to be a source for wakeup from low power mode.
 
-Power rails turn off and on.  Some of our debugging tools rely on
-memory contents surviving across a reset, and that is generally true
-of a warm reset, but not a cold reset.
+Tested on a MX27PDK by doing:
+
+echo enabled > /sys/devices/platform/imx21-uart.0/power/wakeup
+
+echo mem > /sys/power/state
+
+and then pressing a key in the console will wakeup the sytem.
+
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+Changes since v3:
+- Remove IMXUART_CANWAKE flag. Let userspace write in /sys/ file
+in order to enable UART wakeup source.
+Changes since v2:
+- Remove incorrect enable_irq_wake from serial_imx_resume
+Changes since v1:
+- Pass the can-wake property via DT correctly
+ drivers/tty/serial/imx.c |   24 ++++++++++++++++++++++++
+ 1 files changed, 24 insertions(+), 0 deletions(-)
+
+diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
+index 163fc90..283bf21 100644
+--- a/drivers/tty/serial/imx.c
++++ b/drivers/tty/serial/imx.c
+@@ -566,6 +566,9 @@ static irqreturn_t imx_int(int irq, void *dev_id)
+ 	if (sts & USR1_RTSD)
+ 		imx_rtsint(irq, dev_id);
+ 
++	if (sts & USR1_AWAKE)
++		writel(USR1_AWAKE, sport->port.membase + USR1);
++
+ 	return IRQ_HANDLED;
+ }
+ 
+@@ -1269,6 +1272,15 @@ static struct uart_driver imx_reg = {
+ static int serial_imx_suspend(struct platform_device *dev, pm_message_t state)
+ {
+ 	struct imx_port *sport = platform_get_drvdata(dev);
++	unsigned int val;
++
++	if (device_may_wakeup(&dev->dev)) {
++		enable_irq_wake(sport->rxirq);
++		/* enable wakeup from i.MX UART */
++		val = readl(sport->port.membase + UCR3);
++		val |= UCR3_AWAKEN;
++		writel(val, sport->port.membase + UCR3);
++	}
+ 
+ 	if (sport)
+ 		uart_suspend_port(&imx_reg, &sport->port);
+@@ -1279,6 +1291,15 @@ static int serial_imx_suspend(struct platform_device *dev, pm_message_t state)
+ static int serial_imx_resume(struct platform_device *dev)
+ {
+ 	struct imx_port *sport = platform_get_drvdata(dev);
++	unsigned int val;
++
++	if (device_may_wakeup(&dev->dev)) {
++		/* disable wakeup from i.MX UART */
++		val = readl(sport->port.membase + UCR3);
++		val &= ~UCR3_AWAKEN;
++		writel(val, sport->port.membase + UCR3);
++		disable_irq_wake(sport->rxirq);
++	}
+ 
+ 	if (sport)
+ 		uart_resume_port(&imx_reg, &sport->port);
+@@ -1408,6 +1429,9 @@ static int serial_imx_probe(struct platform_device *pdev)
+ 		goto deinit;
+ 	platform_set_drvdata(pdev, &sport->port);
+ 
++	device_init_wakeup(&pdev->dev, 1);
++	device_set_wakeup_enable(&pdev->dev, 0);
++
+ 	return 0;
+ deinit:
+ 	if (pdata && pdata->exit)
+-- 
+1.7.1
