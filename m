@@ -1,113 +1,91 @@
-From: leif.lindholm@arm.com (Leif Lindholm)
-Date: Fri, 09 Dec 2011 18:55:44 +0000
-Subject: [PATCH 4/4] Use generic ARM instruction set condition code checks for
- kprobes.
-In-Reply-To: <20111209185302.19655.36481.stgit@localhost6.localdomain6>
-References: <20111209185302.19655.36481.stgit@localhost6.localdomain6>
-Message-ID: <20111209185503.19655.37484.stgit@localhost6.localdomain6>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Fri,  9 Dec 2011 19:03:43 +0000
+Subject: [PATCH v5 0/9] Versatile Express DT support
+Message-ID: <1323457432-4800-1-git-send-email-pawel.moll@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch changes the kprobes implementation to use the generic ARM
-instruction set condition code checks, rather than a dedicated
-implementation.
+Good Evening,
 
-Signed-off-by: Leif Lindholm <leif.lindholm@arm.com>
----
-Tixy's ACK removed as patch modified.
+As usually it took more time than I though, but the changes are
+quite extensive:
 
- arch/arm/kernel/kprobes-test.c |   66 ++++------------------------------------
- 1 files changed, 7 insertions(+), 59 deletions(-)
+Changes since v4:
 
-diff --git a/arch/arm/kernel/kprobes-test.c b/arch/arm/kernel/kprobes-test.c
-index e17cdd6..1862d8f 100644
---- a/arch/arm/kernel/kprobes-test.c
-+++ b/arch/arm/kernel/kprobes-test.c
-@@ -202,6 +202,8 @@
- #include <linux/slab.h>
- #include <linux/kprobes.h>
- 
-+#include <asm/opcodes.h>
-+
- #include "kprobes.h"
- #include "kprobes-test.h"
- 
-@@ -1050,65 +1052,9 @@ static int test_instance;
- 
- static unsigned long test_check_cc(int cc, unsigned long cpsr)
- {
--	unsigned long temp;
--
--	switch (cc) {
--	case 0x0: /* eq */
--		return cpsr & PSR_Z_BIT;
--
--	case 0x1: /* ne */
--		return (~cpsr) & PSR_Z_BIT;
--
--	case 0x2: /* cs */
--		return cpsr & PSR_C_BIT;
--
--	case 0x3: /* cc */
--		return (~cpsr) & PSR_C_BIT;
--
--	case 0x4: /* mi */
--		return cpsr & PSR_N_BIT;
--
--	case 0x5: /* pl */
--		return (~cpsr) & PSR_N_BIT;
--
--	case 0x6: /* vs */
--		return cpsr & PSR_V_BIT;
--
--	case 0x7: /* vc */
--		return (~cpsr) & PSR_V_BIT;
-+	int ret = arm_check_condition(cc << 28, cpsr);
- 
--	case 0x8: /* hi */
--		cpsr &= ~(cpsr >> 1); /* PSR_C_BIT &= ~PSR_Z_BIT */
--		return cpsr & PSR_C_BIT;
--
--	case 0x9: /* ls */
--		cpsr &= ~(cpsr >> 1); /* PSR_C_BIT &= ~PSR_Z_BIT */
--		return (~cpsr) & PSR_C_BIT;
--
--	case 0xa: /* ge */
--		cpsr ^= (cpsr << 3); /* PSR_N_BIT ^= PSR_V_BIT */
--		return (~cpsr) & PSR_N_BIT;
--
--	case 0xb: /* lt */
--		cpsr ^= (cpsr << 3); /* PSR_N_BIT ^= PSR_V_BIT */
--		return cpsr & PSR_N_BIT;
--
--	case 0xc: /* gt */
--		temp = cpsr ^ (cpsr << 3); /* PSR_N_BIT ^= PSR_V_BIT */
--		temp |= (cpsr << 1);	   /* PSR_N_BIT |= PSR_Z_BIT */
--		return (~temp) & PSR_N_BIT;
--
--	case 0xd: /* le */
--		temp = cpsr ^ (cpsr << 3); /* PSR_N_BIT ^= PSR_V_BIT */
--		temp |= (cpsr << 1);	   /* PSR_N_BIT |= PSR_Z_BIT */
--		return temp & PSR_N_BIT;
--
--	case 0xe: /* al */
--	case 0xf: /* unconditional */
--		return true;
--	}
--	BUG();
--	return false;
-+	return (ret != ARM_OPCODE_CONDTEST_FAIL);
- }
- 
- static int is_last_scenario;
-@@ -1128,7 +1074,9 @@ static unsigned long test_context_cpsr(int scenario)
- 
- 	if (!test_case_is_thumb) {
- 		/* Testing ARM code */
--		probe_should_run = test_check_cc(current_instruction >> 28, cpsr) != 0;
-+		int cc = current_instruction >> 28;
-+
-+		probe_should_run = test_check_cc(cc, cpsr) != 0;
- 		if (scenario == 15)
- 			is_last_scenario = true;
- 
+* Breaking news: we have a "generic" vexpress machine now!
+
+* TWD DT-based initialization was moved to platform's local timers
+  file
+
+* SCU (and generally SMP) initialization was moved to platsmp.c
+  file; when there is no memory-mapped SCU (A7/A15) the number
+  of available cores is worked in generic way from the tree
+  ("cpus" node)
+
+* ... and there was very little left in the "tile" file, so it
+  just nicely folded into v2m.c.
+
+* Main compatible value is now "arm,vexpress", so we are back in
+  the point we started :-)
+
+* The tiles' trees are now separate patches, but I may fold them
+  into one if this is preferred.
+
+Tested on:
+- V2P-CA9 with ATAGs
+- V2P-CA9 with DT
+- V2P-CA5s with DT
+- V2P-CA15 with DT
+- V2F-2XV6 Cortex-A7 SMM with DT
+
+Previous versions have been tested by Ryan Harkin and provisionally
+acked by Rob Herring and Arnd Bergmann.
+
+Thanks for all your help, especially to Dave and Arnd for their
+continuous support!
+
+
+Pawel Moll (9):
+  ARM: versatile: Add missing ENDPROC to headsmp.S
+  ARM: vexpress: Get rid of MMIO_P2V
+  ARM: vexpress: Add Device Tree support
+  ARM: vexpress: Motherboard RS1 memory map support
+  ARM: versatile: Map local timers using Device Tree when possible
+  ARM: vexpress: Use FDT data in platform SMP calls
+  ARM: vexpress: Add Device Tree for V2P-CA5s core tile
+  ARM: vexpress: Add Device Tree for V2P-CA9 core tile
+  ARM: vexpress: Add Device Tree for V2P-CA15 core tile (TC1 variant)
+
+ Documentation/devicetree/bindings/arm/vexpress.txt |  144 ++++++++++
+ arch/arm/Kconfig                                   |    2 +-
+ arch/arm/boot/dts/vexpress-v2m-rs1.dtsi            |  196 ++++++++++++++
+ arch/arm/boot/dts/vexpress-v2m.dtsi                |  195 ++++++++++++++
+ arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts        |  155 +++++++++++
+ arch/arm/boot/dts/vexpress-v2p-ca5s.dts            |  160 +++++++++++
+ arch/arm/boot/dts/vexpress-v2p-ca9.dts             |  190 +++++++++++++
+ arch/arm/include/asm/hardware/arm_timer.h          |    5 +
+ arch/arm/mach-realview/platsmp.c                   |    3 +-
+ arch/arm/mach-vexpress/Kconfig                     |   45 +++-
+ arch/arm/mach-vexpress/Makefile.boot               |    6 +
+ arch/arm/mach-vexpress/core.h                      |    9 +-
+ arch/arm/mach-vexpress/ct-ca9x4.c                  |   48 +---
+ arch/arm/mach-vexpress/include/mach/ct-ca9x4.h     |   13 +-
+ arch/arm/mach-vexpress/include/mach/debug-macro.S  |   37 +++-
+ arch/arm/mach-vexpress/include/mach/irqs.h         |    2 +-
+ arch/arm/mach-vexpress/include/mach/motherboard.h  |   58 +++--
+ arch/arm/mach-vexpress/include/mach/uncompress.h   |   13 +-
+ arch/arm/mach-vexpress/platsmp.c                   |  151 ++++++++++-
+ arch/arm/mach-vexpress/v2m.c                       |  282 ++++++++++++++++++--
+ arch/arm/mm/Kconfig                                |    2 +-
+ arch/arm/plat-versatile/headsmp.S                  |    1 +
+ arch/arm/plat-versatile/localtimer.c               |   12 +
+ 23 files changed, 1609 insertions(+), 120 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/vexpress.txt
+ create mode 100644 arch/arm/boot/dts/vexpress-v2m-rs1.dtsi
+ create mode 100644 arch/arm/boot/dts/vexpress-v2m.dtsi
+ create mode 100644 arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts
+ create mode 100644 arch/arm/boot/dts/vexpress-v2p-ca5s.dts
+ create mode 100644 arch/arm/boot/dts/vexpress-v2p-ca9.dts
+
+-- 
+1.7.5.4
