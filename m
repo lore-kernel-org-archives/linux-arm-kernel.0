@@ -1,99 +1,110 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Fri, 9 Dec 2011 16:55:27 +0200
-Subject: Adding remoteproc/rpmsg to linux-next
-Message-ID: <CAK=WgbaU6vpiBGSgogYPjQNmrF-U0wk1rSXMX83DdgQa9hw5Mw@mail.gmail.com>
+From: dongas86@gmail.com (Dong Aisheng)
+Date: Fri, 9 Dec 2011 23:03:17 +0800
+Subject: [PATCH] [RFC] pinctrl: add a driver for Energy Micro's efm32 SoCs
+In-Reply-To: <4EE192DC.3080209@nvidia.com>
+References: <1323384057-31452-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <74CDBE0F657A3D45AFBB94109FB122FF1750B77BD8@HQMAIL01.nvidia.com>
+ <20111209010147.GH7913@S2100-06.ap.freescale.net>
+ <4EE18403.30604@nvidia.com>
+ <20111209043220.GJ7913@S2100-06.ap.freescale.net>
+ <4EE192DC.3080209@nvidia.com>
+Message-ID: <CAA+hA=Sx=tmnjsY_7EF8NciZO4PvgYOCgRNK9WsGpKmJ8X-r3g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+2011/12/9 Stephen Warren <swarren@nvidia.com>:
+> On 12/08/2011 09:32 PM, Shawn Guo wrote:
+>> On Thu, Dec 08, 2011 at 08:44:03PM -0700, Stephen Warren wrote:
+>>> On 12/08/2011 06:01 PM, Shawn Guo wrote:
+>>>> On Thu, Dec 08, 2011 at 03:14:40PM -0800, Stephen Warren wrote:
+>>>>> Presumably, the set of pins, groups, and functions is determined by the
+>>>>> SoC HW. Platform data is usually board-specific rather than SoC specific.
+>>>>> You have two choices here: You could either parse this data from device
+>>>>> tree as Arnd suggested (and I think as the TI OMAP pinctrl driver will),
+>>>>> or do what I've done in the Tegra pinctrl driver, and simply put each
+>>>>> SoC's data into the driver and select which one to use based on the DT
+>>>>> compatible flag; I didn't see the point of putting data in to the DT that
+>>>>> was identical for every board using a given SoC.
+>>>>>
+>>>> I'm not sure about tegra, but for imx, it's very difficult to enumerate
+>>>> all these data and list them in pinctrl driver. ?Sascha gave a few
+>>>> examples when we discussed about it in another thread. ?The TX and RX
+>>>> pin of UART has 4 options each. ?SD could possibly have 1, 4, and 8
+>>>> data lines. ?Display interface could have 16, 24, 32 data lines, etc.
+>>>> All these options are chosen by board design for given soc pinmux
+>>>> design. ?So putting this data into device tree makes sense for imx too.
+>>>
+>>> The pinctrl driver should simply represent the raw options that the HW
+>>> supports on each individual pin. This table should be readily enumerable
+> ...
+>> The situation is there might be a few possible pin groups for each
+>> function of 16/24/32-bit display. ? Let's think about the UART case
+>> I put above, to enumerate all the groups, we will have 16 groups for
+>> one UART instance. ?And we have 5 UART ports on recent imx SoC.
+>
+> I'm not familiar with imx. For my education, which of the following is true:
+>
+> a)
+>
+> * UART TX signal can muxed onto 1 of 16 pins
+> * UART RX signal can muxed onto 1 of 16 pins
+>
+> In this case, you'd just list say "UART A TX" as a legal function for
+> each of those 16 pins. Yes, that's a lot of places, but still do-able.
+>
+Yes,  it's a way to fix the issue Sascha raised.
+But it will increase the code size heavily and using complexity.
+Passing table from pdata or devicetree has another benifit that it will make
+things simple since board knows which function uses which pin group,
+that means you do not have to define all possible pin groups for one function.
 
-Can you please add the following remoteproc tree to linux-next ?
+> (16 possible positions would be a lot, but I suppose it is possible in HW)
+>
+> b)
+>
+> * UART TX signal can muxed onto 1 of 4 pins
+> * UART RX signal can muxed onto 1 of 4 pins
+> * So, there are 16 (4*4) combinations of these two settings
+>
+> In this case, you'd just list say "UART A TX" for the 4 pins, and "UART
+> A RX" for the other 4 pins. The 16 combinations don't come into play at
+> all; the board-specific mapping table would pick 1 single combination,
+> and represent this as:
+>
+> pin X: function = UART A TX
+> pin Y: function = UART A RX
+>
+> Either way though, whether you put the data into tables in the driver or
+> in the SoC .dtsi file (included by each board's .dts file), the pinctrl
+> driver's table really should list all possible options, and the pinctrl
+> mapping table should select just one; that's kinda the whole point of
+> the tables. If you try to put just the used subset into device tree, you
+> won't be able to put it into the .dtsi file since it'll be
+> board-specific, and you'll end up forcing board .dts authors to recreate
+> that driver's complete configuration table every time, which seems like
+> a lot of wasted work. (and yes, this might bloat the .dtsi file, and
+> mean a lot of useless device tree parsing, which is why I personally
+> chose not to put the SoC tables into the device tree).
+>
+I agree that parsing data from device tree increases much effort
+because we can not using any help functions like microes in dts file and we have
+to construct the structure we need in driver by parsing that data.
+And it will increase dtsi file's size a lot when after adding all functions.
 
-git://git.kernel.org/pub/scm/linux/kernel/git/ohad/remoteproc.git for-next
+I wonder if we can define that data as a pdata in a .c file and only
+get a pointer
+from dts file. That would make life much easier.
 
-This branch includes the basic remoteproc/rpmsg functionality as
-posted in the mailing lists, with a few minor changes that were
-requested (namely, changes against virtio-spec.txt were removed and
-"amp" is no longer used).
+Anyway, we're trying the way of parsing data from devicetree now for mx6q
+pinmux driver.
+I will send out patches soon when it's done for the discussion.
 
-The motivation for having this in linux-next is twofold:
-1. Getting prepared for a 3.3 merger (knock on wood)
-2. Starting a linear development scheme, in order to make it easier
-for people to collaborate (and to reduce the review load of
-incremental changes)
-
-I suspect that once this basic functionality will be merged upstream,
-the development of remoteproc and rpmsg will become completely
-orthogonal, and it would then make sense to start queueing patches
-separately. At that point I'll send you the details for the rpmsg.git
-tree.
-
-Last note: the "ARM: OMAP: add remoteproc devices for OMAP4" patch is
-omitted from this branch, since it depends on CMA (which isn't merged
-yet). As soon as CMA will be added (at least to linux-next) that patch
-will be queued up too.
-
-Thanks,
-Ohad.
-
-The following changes since commit 5611cc4572e889b62a7b4c72a413536bf6a9c416:
-
-  Linux 3.2-rc4 (2011-12-01 14:56:01 -0800)
-
-are available in the git repository at:
-  git://git.kernel.org/pub/scm/linux/kernel/git/ohad/remoteproc.git for-next
-
-Ohad Ben-Cohen (6):
-      remoteproc: add framework for controlling remote processors
-      remoteproc: add debugfs entries
-      remoteproc: create rpmsg virtio device
-      remoteproc/omap: add a remoteproc driver for OMAP4
-      rpmsg: add virtio-based remote processor messaging bus
-      samples/rpmsg: add an rpmsg driver sample
-
- Documentation/ABI/testing/sysfs-bus-rpmsg    |   75 ++
- Documentation/remoteproc.txt                 |  324 ++++++
- Documentation/rpmsg.txt                      |  293 ++++++
- MAINTAINERS                                  |    7 +
- arch/arm/plat-omap/include/plat/remoteproc.h |   57 +
- drivers/Kconfig                              |    4 +
- drivers/Makefile                             |    2 +
- drivers/remoteproc/Kconfig                   |   24 +
- drivers/remoteproc/Makefile                  |    9 +
- drivers/remoteproc/omap_remoteproc.c         |  249 +++++
- drivers/remoteproc/omap_remoteproc.h         |   69 ++
- drivers/remoteproc/remoteproc_core.c         | 1410 ++++++++++++++++++++++++++
- drivers/remoteproc/remoteproc_debugfs.c      |  179 ++++
- drivers/remoteproc/remoteproc_internal.h     |   44 +
- drivers/remoteproc/remoteproc_rpmsg.c        |  295 ++++++
- drivers/rpmsg/Kconfig                        |    5 +
- drivers/rpmsg/Makefile                       |    1 +
- drivers/rpmsg/virtio_rpmsg_bus.c             | 1026 +++++++++++++++++++
- include/linux/mod_devicetable.h              |    9 +
- include/linux/remoteproc.h                   |  265 +++++
- include/linux/rpmsg.h                        |  326 ++++++
- include/linux/virtio_ids.h                   |    1 +
- samples/Kconfig                              |    8 +
- samples/Makefile                             |    2 +-
- samples/rpmsg/Makefile                       |    1 +
- samples/rpmsg/rpmsg_client_sample.c          |  100 ++
- 26 files changed, 4784 insertions(+), 1 deletions(-)
- create mode 100644 Documentation/ABI/testing/sysfs-bus-rpmsg
- create mode 100644 Documentation/remoteproc.txt
- create mode 100644 Documentation/rpmsg.txt
- create mode 100644 arch/arm/plat-omap/include/plat/remoteproc.h
- create mode 100644 drivers/remoteproc/Kconfig
- create mode 100644 drivers/remoteproc/Makefile
- create mode 100644 drivers/remoteproc/omap_remoteproc.c
- create mode 100644 drivers/remoteproc/omap_remoteproc.h
- create mode 100644 drivers/remoteproc/remoteproc_core.c
- create mode 100644 drivers/remoteproc/remoteproc_debugfs.c
- create mode 100644 drivers/remoteproc/remoteproc_internal.h
- create mode 100644 drivers/remoteproc/remoteproc_rpmsg.c
- create mode 100644 drivers/rpmsg/Kconfig
- create mode 100644 drivers/rpmsg/Makefile
- create mode 100644 drivers/rpmsg/virtio_rpmsg_bus.c
- create mode 100644 include/linux/remoteproc.h
- create mode 100644 include/linux/rpmsg.h
- create mode 100644 samples/rpmsg/Makefile
- create mode 100644 samples/rpmsg/rpmsg_client_sample.c
+> Thanks.
+>
+> --
+> nvpublic
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at ?http://www.tux.org/lkml/
