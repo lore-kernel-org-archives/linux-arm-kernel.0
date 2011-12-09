@@ -1,44 +1,184 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Fri, 9 Dec 2011 12:00:07 +0530
-Subject: [PATCH 1/2] mfd: add irq domain support for max8997 interrupts
-In-Reply-To: <20111209060249.GD26952@opensource.wolfsonmicro.com>
-References: <1323361659-11835-1-git-send-email-thomas.abraham@linaro.org>
- <1323361659-11835-2-git-send-email-thomas.abraham@linaro.org>
- <20111209044109.GB26952@opensource.wolfsonmicro.com>
- <CAJuYYwRicSWO=wCmBH5RWcBLX3uhpyxS2wojUS3ZAH9tN=R1Kg@mail.gmail.com>
- <20111209060249.GD26952@opensource.wolfsonmicro.com>
-Message-ID: <CAJuYYwSCuu8U2rF3RGAnczXgbh4Px7hMwUhHr=xrhPZ1jEs5DA@mail.gmail.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Fri, 9 Dec 2011 07:27:56 +0100
+Subject: [PATCH 1/3] ARM: at91: add accessor to manage smc
+In-Reply-To: <4EE13848.1030702@gmail.com>
+References: <20111208150348.GD23884@game.jcrosoft.org>
+ <1323357784-17555-1-git-send-email-plagnioj@jcrosoft.com>
+ <4EE13848.1030702@gmail.com>
+Message-ID: <20111209062756.GL23884@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9 December 2011 11:32, Mark Brown
-<broonie@opensource.wolfsonmicro.com> wrote:
-> On Fri, Dec 09, 2011 at 10:55:10AM +0530, Thomas Abraham wrote:
->> On 9 December 2011 10:11, Mark Brown
->
->> > Removing irq_base from platform data isn't going to be helpful for
->> > anyone using the driver on non-DT platforms as it's going to make it
->> > impossible to find the interrupts.
->
->> All the consumers of the max8997 interrupts are the drivers for the
->> sub-blocks of max8997. These drivers have access to 'irq_domain'
->> member of 'struct max8997_dev', From irq_domain, the sub-block driver
->> can get the irq_base and add one of the 'enum max8997_irq' offset when
->> registering for interrupt notifications.
->
-> There's no GPIOs with interrupt support (even if they're not implemented
-> yet)?
+On 09:20 Fri 09 Dec     , Ryan Mallon wrote:
+> On 09/12/11 02:23, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> 
+> > this will allow to configure the smc independtly of the register configuration
+> > as example on rm9200 different from sam9
+> > 
+> > Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> > Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+> 
+> 
+> Hi Jean,
+> 
+> Couple of comments below.
+> 
+> ~Ryan
+> 
+> > ---
+> >  arch/arm/mach-at91/include/mach/at91sam9_smc.h |   29 ++++++++
+> >  arch/arm/mach-at91/sam9_smc.c                  |   93 ++++++++++++++++++++++--
+> >  arch/arm/mach-at91/sam9_smc.h                  |   23 ------
+> >  3 files changed, 115 insertions(+), 30 deletions(-)
+> > 
+> > diff --git a/arch/arm/mach-at91/include/mach/at91sam9_smc.h b/arch/arm/mach-at91/include/mach/at91sam9_smc.h
+> > index eb18a70..b5eff0e 100644
+> > --- a/arch/arm/mach-at91/include/mach/at91sam9_smc.h
+> > +++ b/arch/arm/mach-at91/include/mach/at91sam9_smc.h
+> > @@ -18,6 +18,35 @@
+> >  
+> >  #include <mach/cpu.h>
+> >  
+> > +#ifndef __ASSEMBLY__
+> > +struct sam9_smc_config {
+> > +	/* Setup register */
+> > +	u8 ncs_read_setup;
+> > +	u8 nrd_setup;
+> > +	u8 ncs_write_setup;
+> > +	u8 nwe_setup;
+> > +
+> > +	/* Pulse register */
+> > +	u8 ncs_read_pulse;
+> > +	u8 nrd_pulse;
+> > +	u8 ncs_write_pulse;
+> > +	u8 nwe_pulse;
+> > +
+> > +	/* Cycle register */
+> > +	u16 read_cycle;
+> > +	u16 write_cycle;
+> > +
+> > +	/* Mode register */
+> > +	u32 mode;
+> > +	u8 tdf_cycles:4;
+> > +};
+> > +
+> > +extern int sam9_smc_configure(int id, int cs, struct sam9_smc_config* config);
+> > +extern int sam9_smc_read(int id, int cs, struct sam9_smc_config* config);
+> > +extern int sam9_smc_read_mode(int id, int cs, struct sam9_smc_config* config);
+> > +extern int sam9_smc_write_mode(int id, int cs, struct sam9_smc_config* config);
+> > +#endif
+> > +
+> >  #define AT91_SMC_SETUP		0x00				/* Setup Register for CS n */
+> >  #define		AT91_SMC_NWESETUP	(0x3f << 0)			/* NWE Setup Length */
+> >  #define			AT91_SMC_NWESETUP_(x)	((x) << 0)
+> > diff --git a/arch/arm/mach-at91/sam9_smc.c b/arch/arm/mach-at91/sam9_smc.c
+> > index 8294783..e5936dc 100644
+> > --- a/arch/arm/mach-at91/sam9_smc.c
+> > +++ b/arch/arm/mach-at91/sam9_smc.c
+> > @@ -2,6 +2,7 @@
+> >   * linux/arch/arm/mach-at91/sam9_smc.c
+> >   *
+> >   * Copyright (C) 2008 Andrew Victor
+> > + * Copyright (C) 2011 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> >   *
+> >   * This program is free software; you can redistribute it and/or modify
+> >   * it under the terms of the GNU General Public License version 2 as
+> > @@ -17,13 +18,58 @@
+> >  
+> >  #include "sam9_smc.h"
+> >  
+> > -
+> >  #define AT91_SMC_CS(id, n)	(smc_base_addr[id] + ((n) * 0x10))
+> >  
+> >  static void __iomem *smc_base_addr[2];
+> >  
+> > -static void __init sam9_smc_cs_configure(void __iomem *base, struct sam9_smc_config* config)
+> > +static void __init_refok sam9_smc_cs_write_mode(void __iomem *base,
+> > +					struct sam9_smc_config* config)
+> 
+> 
+> include/linux/kernel.h says that __init_refok means that this function
+> can reference __init code, without being __init itself and without
+> generating a modpost warning. It also says that such cases should be
+> documented as to why the reference is ok. Why is __init_refok being used
+> here and on the other fucntions in this file?
+because you can you this function before and after init and this need to not
+be free by the kernel after boot
+> 
+> > +{
+> > +	__raw_writel(config->mode
+> > +		   | AT91_SMC_TDF_(config->tdf_cycles),
+> > +		   base + AT91_SMC_MODE);
+> > +}
+> > +
+> > +int __init_refok sam9_smc_write_mode(int id, int cs,
+> > +					struct sam9_smc_config* config)
+> > +{
+> > +	if (!smc_base_addr[id])
+> > +		return -EINVAL;
+> > +
+> > +	sam9_smc_cs_write_mode(AT91_SMC_CS(id, cs), config);
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +int __init_refok sam9_smc_configure(int id, int cs,
+> > +					struct sam9_smc_config* config)
+> > +{
+> > +	if (!smc_base_addr[id])
+> > +		return -EINVAL;
+> > +
+> > +	sam9_smc_cs_configure(AT91_SMC_CS(id, cs), config);
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static void __init_refok sam9_smc_cs_read_mode(void __iomem *base,
+> > +					struct sam9_smc_config* config)
+> > +{
+> > +	u32 val = __raw_readl(base + AT91_SMC_MODE);
+> > +
+> > +	config->mode = (val & ~AT91_SMC_NWECYCLE);
+> > +	config->tdf_cycles = (val & AT91_SMC_NWECYCLE) >> 16 ;
+> > +}
+> > +
+> > +int __init_refok sam9_smc_read_mode(int id, int cs,
+> > +					struct sam9_smc_config* config)
+> >  {
+> > +	void __iomen *base;
+> 
+> 
+> Typo: __iomem.
+> 
+> > +
+> > +	if (!smc_base_addr[id])
+> > +		return -EINVAL;
+> > +
+> > +	base = AT91_SMC_CS(id, cs);
+> >  
+> >  	/* Setup register */
+> >  	__raw_writel(AT91_SMC_NWESETUP_(config->nwe_setup)
+> > @@ -45,14 +91,47 @@ static void __init sam9_smc_cs_configure(void __iomem *base, struct sam9_smc_con
+> >  		   base + AT91_SMC_CYCLE);
+> >  
+> >  	/* Mode register */
+> > -	__raw_writel(config->mode
+> > -		   | AT91_SMC_TDF_(config->tdf_cycles),
+> > -		   base + AT91_SMC_MODE);
+> > +	sam9_smc_cs_write_mode(base, config);
+> > +
+> > +	return 0;
+> >  }
+> >  
+> > -void __init sam9_smc_configure(int id, int cs, struct sam9_smc_config* config)
+> > +int __init_refok sam9_smc_read(int id, int cs, struct sam9_smc_config* config)
+> >  {
+> > -	sam9_smc_cs_configure(AT91_SMC_CS(id, cs), config);
+> > +	void __iomen *base;
+> 
+> 
+> Typo: __iomem. Has this been compile tested?
+yes and tested but rebased on for-next where the typo could have beed introduced
 
-Ok. There does seem to be 12 gpios supported by max8997, but not used
-on the origen board.
-
-If these gpio's are connected to the host system, and host system sets
-up gpio interrupt notification for these gpio lines, the linux irq
-number for the gpio interrupt would belong to the irq domain of the
-host interrupt controller (gic irq domain in case of exynos).
-Consumers of this interrupt would use the gpio interrupt independent
-of the max8997 irq domain. So irq_base can be maintained private to
-the max8997 mfd driver and its sub-block drivers.
-
-Thanks,
-Thomas.
+Best Regards,
+J.
