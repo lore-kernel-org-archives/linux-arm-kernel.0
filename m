@@ -1,62 +1,80 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Fri, 09 Dec 2011 18:05:35 +0000
-Subject: [PATCH 4/4] Use generic ARM instruction set condition code
- checks for kprobes.
-In-Reply-To: <20111209164029.GL5196@mudshark.cambridge.arm.com>
-References: <20111208173100.7572.9099.stgit@localhost6.localdomain6>
- <20111208173212.7572.16210.stgit@localhost6.localdomain6>
- <20111209155450.GI5196@mudshark.cambridge.arm.com> <4EE234A8.80208@arm.com>
- <20111209164029.GL5196@mudshark.cambridge.arm.com>
-Message-ID: <1323453935.14174.22.camel@linaro1>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 9 Dec 2011 10:06:41 -0800
+Subject: [PATCH 2/3] arm: mach-omap2: sdram-nokia: add 200 MHz memory
+ timings info
+In-Reply-To: <1323443211-3648-3-git-send-email-aaro.koskinen@nokia.com>
+References: <1323443211-3648-1-git-send-email-aaro.koskinen@nokia.com>
+ <1323443211-3648-3-git-send-email-aaro.koskinen@nokia.com>
+Message-ID: <20111209180641.GS31337@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2011-12-09 at 16:40 +0000, Will Deacon wrote:
-> On Fri, Dec 09, 2011 at 04:17:44PM +0000, Leif Lindholm wrote:
-> > On 12/09/11 15:54, Will Deacon wrote:
-> > > On Thu, Dec 08, 2011 at 05:32:13PM +0000, Leif Lindholm wrote:
-> > >> -static unsigned long test_check_cc(int cc, unsigned long cpsr)
-> > >> +inline unsigned long test_check_cc(int cc, unsigned long cpsr)
-> > >
-> > > Not sure why you make this change, surely you can just leave it as static?
-> > 
-> > As the function is now only a wrapper on arm_check_condition (with an 
-> > inline shift), it made more sense to me. This was also suggested by 
-> > Tixy, and he's since ACKed this patch.
+* Aaro Koskinen <aaro.koskinen@nokia.com> [111209 06:33]:
+> From: Igor Dmitriev <ext-dmitriev.igor@nokia.com>
 > 
-> Hmm, I still don't see why you should change the linkage. Make it static
-> inline if you really want the inline, but that seems weird outside of a
-> header file stub.
-
-As you pointed out later, it does need to be static, to avoid potential
-linkage issues. (I always incorrectly imagine that 'inline' is a
-glorified macro.)
-
-> > > Maybe it's best just to change all of the callers to call
-> > > arm_check_condition directly, like you have done below for the ARM case. For
-> > > the Thumb cases will it work if you make sure that you put the condition
-> > > code in the top bits?
-> > 
-> > Yes, that is functionally equivalent, and what I did in the RFC version, 
-> > but it ended up looking messy at the calling point.
+> Add memory timing info regarding the 200 MHz memory in sdram-nokia.
 > 
-> Ok, then could you route the ARM variant through the wrapper too?
-
-The function Leif added is for checking the condition code in an ARM
-instruction, so it doesn't need a wrapper when used for this.
-
-The other locations in the kprobes tests get the condition nibble from
-the ITSATE or from thumb conditional branch instructions. In these cases
-the code looks cleaner if the condition is passed as a value between 0x0
-and 0xf, rather than being shift up to bit position 28 where the
-conditional ARM instructions have it encoded.
-
-> > Any sane compiler should generate pretty identical code for these two 
-> > alternative solutions (unless it neglected to auto-inline the static 
-> > variant).
+> Signed-off-by: Igor Dmitriev <ext-dmitriev.igor@nokia.com>
+> Signed-off-by: Eduardo Valentin <eduardo.valentin@nokia.com>
+> Signed-off-by: Aaro Koskinen <aaro.koskinen@nokia.com>
+> ---
+>  arch/arm/mach-omap2/sdram-nokia.c |   25 ++++++++++++++++++++++++-
+>  1 files changed, 24 insertions(+), 1 deletions(-)
 > 
-> The problem is when somebody else decides to call test_check_cc from another
-> compilation unit, rather than go through arm_check_condition.
+> diff --git a/arch/arm/mach-omap2/sdram-nokia.c b/arch/arm/mach-omap2/sdram-nokia.c
+> index 14caa22..b394a0e 100644
+> --- a/arch/arm/mach-omap2/sdram-nokia.c
+> +++ b/arch/arm/mach-omap2/sdram-nokia.c
+> @@ -1,7 +1,7 @@
+>  /*
+>   * SDRC register values for Nokia boards
+>   *
+> - * Copyright (C) 2008, 2010 Nokia Corporation
+> + * Copyright (C) 2008, 2010-2011 Nokia Corporation
+>   *
+>   * Lauri Leukkunen <lauri.leukkunen@nokia.com>
+>   *
+> @@ -107,14 +107,37 @@ static const struct sdram_timings nokia_195dot2mhz_timings[] = {
+>  	},
+>  };
+>  
+> +static const struct sdram_timings nokia_200mhz_timings[] = {
+> +	{
+> +		.casl = 3,
+> +		.tDAL = 30000,
+> +		.tDPL = 15000,
+> +		.tRRD = 10000,
+> +		.tRCD = 20000,
+> +		.tRP = 15000,
+> +		.tRAS = 40000,
+> +		.tRC = 55000,
+> +		.tRFC = 140000,
+> +		.tXSR = 200000,
+> +
+> +		.tREF = 7800,
+> +
+> +		.tXP = 2,
+> +		.tCKE = 4,
+> +		.tWTR = 2
+> +	},
+> +};
+> +
+>  static const struct {
+>  	long rate;
+>  	struct sdram_timings const *data;
+>  } nokia_timings[] = {
+>  	{ 83000000, nokia_166mhz_timings },
+>  	{ 97600000, nokia_97dot6mhz_timings },
+> +	{ 100000000, nokia_200mhz_timings },
 
--- 
-Tixy
+Is that a typo above? Should it say nokia_100mhz_timings?
+
+>  	{ 166000000, nokia_166mhz_timings },
+>  	{ 195200000, nokia_195dot2mhz_timings },
+> +	{ 200000000, nokia_200mhz_timings },
+>  };
+>  static struct omap_sdrc_params nokia_sdrc_params[ARRAY_SIZE(nokia_timings) + 1];
+
+Regards,
+
+Tony
