@@ -1,47 +1,56 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 9 Dec 2011 14:13:03 +0000
-Subject: [Linaro-mm-sig] [RFC v2 1/2] dma-buf: Introduce dma buffer
- sharing mechanism
-In-Reply-To: <CAKMK7uFQiiUbkU-7c3Os0d0FJNyLbqS2HLPRLy3LGnOoCXV5Pw@mail.gmail.com>
-References: <1322816252-19955-1-git-send-email-sumit.semwal@ti.com>
- <201112071340.35267.arnd@arndb.de>
- <CAKMK7uFQiiUbkU-7c3Os0d0FJNyLbqS2HLPRLy3LGnOoCXV5Pw@mail.gmail.com>
-Message-ID: <201112091413.03736.arnd@arndb.de>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 9 Dec 2011 15:15:12 +0100
+Subject: [PATCH] [RFC] pinctrl: add a driver for Energy Micro's efm32 SoCs
+In-Reply-To: <201112091355.16720.arnd@arndb.de>
+References: <1323384057-31452-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <4693507.K6tP4YDUh2@wuerfel> <20111209092300.GR4585@pengutronix.de>
+ <201112091355.16720.arnd@arndb.de>
+Message-ID: <20111209141512.GU4585@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 08 December 2011, Daniel Vetter wrote:
-> > c) only allowing streaming mappings, even if those are non-coherent
-> > (requiring strict serialization between CPU (in-kernel) and dma users of
-> > the buffer)
+On Fri, Dec 09, 2011 at 01:55:16PM +0000, Arnd Bergmann wrote:
+> On Friday 09 December 2011, Uwe Kleine-K?nig wrote:
+> > On Thu, Dec 08, 2011 at 11:55:53PM +0100, Arnd Bergmann wrote:
+> > > On Thursday 08 December 2011 23:40:57 Uwe Kleine-K?nig wrote:
+> > > > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> > > > ---
+> > > > Note that there is no support yet for efm32 in mainline, so ARCH_EFM32
+> > > > isn't defined.
+> > > 
+> > > Since the platform is not yet part of the architecture, it will have
+> > > to use device tree based probing when it gets added. I would suggest
+> > > only merging drivers for it that can deal with this and do not rely
+> > > on platform_data.
+> >
+> > I feared you will say that. These machines have at most 4MiB of RAM.
+> > I'll have to evaluate if dt is too heavy for them.
 > 
-> I think only allowing streaming access makes the most sense:
-> - I don't see much (if any need) for the kernel to access a dma_buf -
-> in all current usecases it just contains pixel data and no hw-specific
-> things (like sg tables, command buffers, ..). At most I see the need
-> for the kernel to access the buffer for dma bounce buffers, but that
-> is internal to the dma subsystem (and hence does not need to be
-> exposed).
-> - Userspace can still access the contents through the exporting
-> subsystem (e.g. use some gem mmap support). For efficiency reason gpu
-> drivers are already messing around with cache coherency in a platform
-> specific way (and hence violated the dma api a bit), so we could stuff
-> the mmap coherency in there, too. When we later on extend dma_buf
-> support so that other drivers than the gpu can export dma_bufs, we can
-> then extend the official dma api with already a few drivers with
-> use-patterns around.
-> 
-> But I still think that the kernel must not be required to enforce
-> correct access ordering for the reasons outlined in my other mail.
+> What's the state of the platform code? Is this based on Catalin's
+> Cortex-M3 tree? I've heard a few people express interest in getting
+> various M3 based SoCs supported mainline and I think that would
+> be a good idea, but I would also expect that device tree is one
+> of the lesser problems here.
+Yes, I took a few patches from there and rebased them to 3.2-rc3. The
+patches I have from Catalin are:
 
-I still don't think that's possible. Please explain how you expect
-to change the semantics of the streaming mapping API to allow multiple
-mappers without having explicit serialization points that are visible
-to all users. For simplicity, let's assume a cache coherent system
-with bounce buffers where map() copies the buffer to a dma area
-and unmap() copies it back to regular kernel memory. How does a driver
-know if it can touch the buffer in memory or from DMA at any given
-point in time? Note that this problem is the same as the cache coherency
-problem but may be easier to grasp.
+131dbba Cortex-M3: Add base support for Cortex-M3
+48cc6a8 Cortex-M3: Add support for exception handling
+2aebf66 Cortex-M3: Add NVIC support
+75bf249 Cortex-M3: Allow the building of Cortex-M3 kernel port
+66dcc1e Cortex-M3: Add VFP support
+a541241 [ARM] Do not call flush_cache_user_range with mmap_sem held
+6083ea7 ARM: Handle instruction cache maintenance fault properly
 
-	Arnd
+I didn't look into these deeply yet to check how ready they are for
+mainline, but my machine boots to a prompt (which doesn't allow to start
+anything because it doesn't have enough memory to allocate the stack for
+a new program. I will soon get a machine that has 4MiB of RAM instead of
+the 1MiB I have now).
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
