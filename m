@@ -1,44 +1,42 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 9 Dec 2011 10:07:55 -0800
-Subject: [PATCH 1/3] arm: tools: mach-types: add nokia_rm696
-In-Reply-To: <1323443211-3648-2-git-send-email-aaro.koskinen@nokia.com>
-References: <1323443211-3648-1-git-send-email-aaro.koskinen@nokia.com>
- <1323443211-3648-2-git-send-email-aaro.koskinen@nokia.com>
-Message-ID: <20111209180755.GT31337@atomide.com>
+From: leif.lindholm@arm.com (Leif Lindholm)
+Date: Fri, 9 Dec 2011 18:26:35 +0000
+Subject: [PATCH 4/4] Use generic ARM instruction set condition code checks
+ for kprobes.
+In-Reply-To: <1323453935.14174.22.camel@linaro1>
+References: <20111208173100.7572.9099.stgit@localhost6.localdomain6>	
+ <20111208173212.7572.16210.stgit@localhost6.localdomain6>	
+ <20111209155450.GI5196@mudshark.cambridge.arm.com> <4EE234A8.80208@arm.com>	
+ <20111209164029.GL5196@mudshark.cambridge.arm.com>
+ <1323453935.14174.22.camel@linaro1>
+Message-ID: <4EE252DB.6060306@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell,
+On 12/09/11 18:05, Jon Medhurst (Tixy) wrote:
+>>> Yes, that is functionally equivalent, and what I did in the RFC version,
+>>> but it ended up looking messy at the calling point.
+>>
+>> Ok, then could you route the ARM variant through the wrapper too?
+>
+> The function Leif added is for checking the condition code in an ARM
+> instruction, so it doesn't need a wrapper when used for this.
 
-* Aaro Koskinen <aaro.koskinen@nokia.com> [111209 06:33]:
-> Add the mach-type number for RM-696.
+It doesn't, but...
 
-Care to ack this one or apply into your devel-stable with the
-other pending mach-types updates?
+> The other locations in the kprobes tests get the condition nibble from
+> the ITSATE or from thumb conditional branch instructions. In these cases
+> the code looks cleaner if the condition is passed as a value between 0x0
+> and 0xf, rather than being shift up to bit position 28 where the
+> conditional ARM instructions have it encoded.
 
-This allows board-rm680.c to support Nokia N9 with minimal changes.
+I did what Will suggested though, and it does make it a bit cleaner. It
+also moves the ARM_OPCODE_* testing out of the test_context_cpsr code,
+so that all three cases have the probe_should_run setting pretty much
+identical.
 
-Regards,
+I'll post the updated set shortly, so you can have a look.
 
-Tony
- 
-> Signed-off-by: Aaro Koskinen <aaro.koskinen@nokia.com>
-> ---
->  arch/arm/tools/mach-types |    1 +
->  1 files changed, 1 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/tools/mach-types b/arch/arm/tools/mach-types
-> index ccbe16f..63f20da 100644
-> --- a/arch/arm/tools/mach-types
-> +++ b/arch/arm/tools/mach-types
-> @@ -1123,6 +1123,7 @@ blissc			MACH_BLISSC		BLISSC			3491
->  thales_adc		MACH_THALES_ADC		THALES_ADC		3492
->  ubisys_p9d_evp		MACH_UBISYS_P9D_EVP	UBISYS_P9D_EVP		3493
->  atdgp318		MACH_ATDGP318		ATDGP318		3494
-> +nokia_rm696		MACH_NOKIA_RM696	NOKIA_RM696		3522
->  m28evk			MACH_M28EVK		M28EVK			3613
->  smdk4212		MACH_SMDK4212		SMDK4212		3638
->  smdk4412		MACH_SMDK4412		SMDK4412		3765
-> -- 
-> 1.7.2.5
-> 
+/
+        Leif
+
+-- IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium.  Thank you.
