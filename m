@@ -1,23 +1,56 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 9 Dec 2011 12:46:53 -0800
-Subject: [PATCH 2/3] arm: mach-omap2: sdram-nokia: add 200 MHz memory
- timings info
-In-Reply-To: <alpine.DEB.2.00.1112092136370.7393@kernel.research.nokia.com>
-References: <1323443211-3648-1-git-send-email-aaro.koskinen@nokia.com>
- <1323443211-3648-3-git-send-email-aaro.koskinen@nokia.com>
- <20111209180641.GS31337@atomide.com>
- <alpine.DEB.2.00.1112092136370.7393@kernel.research.nokia.com>
-Message-ID: <20111209204653.GU31337@atomide.com>
+Date: Fri, 9 Dec 2011 12:52:04 -0800
+Subject: [PATCH v4 1/3] ARM: OMAP: TI81XX: Prepare for addition of
+ TI814X support
+In-Reply-To: <DDE393F022194E4FB9AE108B0AECD70C042A54@DBDE01.ent.ti.com>
+References: <1318210796-2357-1-git-send-email-hemantp@ti.com>
+ <20111207231741.GP31337@atomide.com>
+ <DDE393F022194E4FB9AE108B0AECD70C042A54@DBDE01.ent.ti.com>
+Message-ID: <20111209205203.GV31337@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Aaro Koskinen <aaro.koskinen@nokia.com> [111209 11:11]:
-> On Fri, 9 Dec 2011, Tony Lindgren wrote:
-> >
-> >Is that a typo above? Should it say nokia_100mhz_timings?
+* Pedanekar, Hemant <hemantp@ti.com> [111209 09:57]:
+> Tony Lindgren wrote on Thursday, December 08, 2011 4:48 AM:
 > 
-> No, it's not a typo, same data is used. (Like 83/166 already in the table)
+> > * Hemant Pedanekar <hemantp@ti.com> [111009 18:06]:
+> >> This patch updates existing macros, functions used for TI816X, to enable
+> >> addition of other SoCs belonging to TI81XX family (e.g., TI814X).
+> >> 
+> >> The approach taken is to use TI81XX/ti81xx for code/data going to be
+> >> common across all TI81XX devices. 
+> >> 
+> >> cpu_is_ti81xx() is introduced to handle code common across TI81XX devices.
+> >> 
+> >> In addition, ti8168_evm_map_io() is now replaced with ti81xx_map_io() and
+> >> moved in mach-omap2/common.c as same will be used for TI814X and is not
+> >> board specific.
+> > 
+> > Looks like this series needs a rebase after the map_io and common.h
+> > changes. Can you please rebase against the current omap soc branch at
+> > commit 24a5e092a387e4c8e93f33448da334bd3fd15192?
+> > 
+> > Regards,
+> > 
+> > Tony
+> 
+> Thanks Tony, I sent v5 in the morning but it didnlt reach the ML
+> may be because I got unsubscribed for some reason.
 
-OK thanks, applying this into board branch.
+Yeah not seeing it :(
+ 
+> Btw, I am getting following error when trying to build from soc branch:
+> 
+> make[1]: *** No rule to make target `arch/arm/mach-omap2/omap-smc.o', needed by `arch/arm/mach-omap2/built-in.o'.  Stop.
+> 
+> Looks like the commit c95f06a0d4bc9c2546769b5d984cc2dc6665d4f5 added
+> Following but not the corresponding c file(s):
+> 
+>  +secure-common                          = omap-smc.o omap-secure.o
+
+Thanks for letting me know, that means there's a dependency to the omap4
+branch, I'll update the soc branch accordingly.
+
+Regards,
 
 Tony
