@@ -1,42 +1,217 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Fri, 9 Dec 2011 14:50:22 +0100
-Subject: [PATCH v2 01/10] ARM: OMAP2+: pm: Do not init statically the SR and
- voltage layer with DT
-In-Reply-To: <1323438631-28124-1-git-send-email-b-cousson@ti.com>
-References: <1323438631-28124-1-git-send-email-b-cousson@ti.com>
-Message-ID: <1323438631-28124-2-git-send-email-b-cousson@ti.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 09 Dec 2011 07:54:07 -0600
+Subject: [RFC PATCH 1/8] ARM: Add commonly used cpuidle init code
+In-Reply-To: <CAMXH7KFT+JP8uJwK=rzt1cjwMQMGPd-6RwPVma0ky0wSMbaz8A@mail.gmail.com>
+References: <1323146291-10676-1-git-send-email-rob.lee@linaro.org>
+ <1323146291-10676-2-git-send-email-rob.lee@linaro.org>
+ <4EDE2F91.5090104@gmail.com>
+ <CAMXH7KFT+JP8uJwK=rzt1cjwMQMGPd-6RwPVma0ky0wSMbaz8A@mail.gmail.com>
+Message-ID: <4EE212FF.1080202@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the case of DT, the PMIC and SR initialization will be done using
-a completely different mechanism.
+On 12/08/2011 03:46 PM, Rob Lee wrote:
+> Rob, thanks for your thorough review.  Comments and questions below.
+> 
+> On 6 December 2011 09:06, Rob Herring <robherring2@gmail.com> wrote:
+>> On 12/05/2011 10:38 PM, Robert Lee wrote:
+>>> Add commonly used cpuidle init code to avoid unecessary duplication.
+>>>
+>>> Signed-off-by: Robert Lee <rob.lee@linaro.org>
+>>> ---
+>>>  arch/arm/common/Makefile       |    1 +
+>>>  arch/arm/common/cpuidle.c      |  132 ++++++++++++++++++++++++++++++++++++++++
+>>>  arch/arm/include/asm/cpuidle.h |   25 ++++++++
+>>
+>> Why not move cpuidle drivers to drivers/idle/ ?
+>>
+> 
+> Or to drivers/cpuidle?  I am not sure the reasoning behind a
 
-Disable this part if a DT blob is available.
+It would make sense to me that they should be combined. I'm not sure of
+the history here.
 
-Signed-off-by: Benoit Cousson <b-cousson@ti.com>
-Cc: Kevin Hilman <khilman@ti.com>
----
- arch/arm/mach-omap2/pm.c |    8 ++++++++
- 1 files changed, 8 insertions(+), 0 deletions(-)
+> drivers/idle directory if everything there is a cpuidle driver
+> implementation.  I originally did locate this common cpuidle code in
+> drivers/idle/arm_idle.c and put the head file in arch/arm/include/asm
+> but this threw a checkpatch warning so I submitted with this placement
 
-diff --git a/arch/arm/mach-omap2/pm.c b/arch/arm/mach-omap2/pm.c
-index 1881fe9..ad4f693 100644
---- a/arch/arm/mach-omap2/pm.c
-+++ b/arch/arm/mach-omap2/pm.c
-@@ -227,6 +227,14 @@ postcore_initcall(omap2_common_pm_init);
- 
- static int __init omap2_common_pm_late_init(void)
- {
-+	/*
-+	 * In the case of DT, the PMIC and SR initialization will be done using
-+	 * a completely different mechanism.
-+	 * Disable this part if a DT blob is available.
-+	 */
-+	if (of_have_populated_dt())
-+		return 0;
-+
- 	/* Init the voltage layer */
- 	omap_pmic_late_init();
- 	omap_voltage_late_init();
--- 
-1.7.0.4
+What warning?
+
+> to start with.  If the local_fiq_enable/disable calls can be handled
+> in a community friendly way for any architecture, then perhaps I can
+> just move the header file code to linux/include/cpuidle.h.
+
+Maybe we should think about whether we even need to disable fiq. You
+probably don't use low latency interrupt and a high latency low power
+mode together.
+
+> Do you have suggestions about making this functionality available for
+> any architecture and what is the most community friendly method of
+> doing this?  I suppose function declarations for
+> local_fiq_enable/disable could be given.  Then, one could either
+> define them here as empty functions or could have two idle functions,
+> arm_enter_idle and nonarm_enter_idle and the architecture could be
+> read or passed in to determine which one to set the cpuidle states'
+> enter functions to.
+
+I'm not sure I understand the issue. You can include asm headers and
+make things depend on CONFIG_ARM so no other arch builds code with
+local_fiq_enable.
+
+The other approach would be to define arch specific cpu_idle functions
+for pre and post idle.
+
+>>> +static int (*mach_cpuidle)(struct cpuidle_device *dev,
+>>> +                            struct cpuidle_driver *drv,
+>>> +                             int index);
+>>> +
+>>> +static int arm_enter_idle(struct cpuidle_device *dev,
+>>> +                            struct cpuidle_driver *drv, int index)
+>>
+>> I think how this works is backwards. This function is only called if
+>> there is a NULL enter function for a state, but mach_cpuidle is global.
+>> Ideally, I want to call this function for every state, but call a
+>> different mach_cpuidle function for each state. Yes, you could select a
+>> specific function for each state within the mach_cpuidle function, but
+>> that seems silly to make the per state function global and then have to
+>> select a per state function again. And if many users are doing that,
+>> then it belongs in the common code.
+
+
+No comments on this!?
+
+
+>>> +{
+>>> +     ktime_t time_start, time_end;
+>>> +
+>>> +     local_irq_disable();
+>>> +     local_fiq_disable();
+>>> +
+>>> +     time_start = ktime_get();
+>>> +
+>>> +     index = mach_cpuidle(dev, drv, index);
+>>> +
+>>> +     time_end = ktime_get();
+>>> +
+>>> +     local_fiq_enable();
+>>> +     local_irq_enable();
+>>> +
+>>> +     dev->last_residency =
+>>> +             (int)ktime_to_us(ktime_sub(time_end, time_start));
+>>> +
+>>> +     return index;
+>>> +}
+>>> +
+>>> +void arm_cpuidle_devices_uninit(void)
+>>> +{
+>>> +     int cpu_id;
+>>> +     struct cpuidle_device *dev;
+>>> +
+>>> +     for_each_possible_cpu(cpu_id) {
+>>> +             dev = per_cpu_ptr(arm_cpuidle_devices, cpu_id);
+>>> +             cpuidle_unregister_device(dev);
+>>> +     }
+>>> +
+>>> +     free_percpu(arm_cpuidle_devices);
+>>> +     return;
+>>
+>> Don't need return statement.
+>>
+>>> +}
+>>> +
+>>> +int __init arm_cpuidle_init(struct cpuidle_driver *drv,
+>>> +     int (*common_enter)(struct cpuidle_device *dev,
+>>> +             struct cpuidle_driver *drv, int index),
+>>> +     void *driver_data[])
+>>> +{
+>>> +     struct cpuidle_device *dev;
+>>> +     int i, cpu_id;
+>>> +
+>>> +     if (drv == NULL) {
+>>> +             pr_err("%s: cpuidle_driver pointer NULL\n", __func__);
+>>> +             return -EINVAL;
+>>> +     }
+>>> +
+>>> +     if (drv->state_count > CPUIDLE_STATE_MAX)
+>>> +             pr_err("%s: state count exceeds maximum\n", __func__);
+>>
+>> return an error?
+>>
+>> You can collapse these 2 parameter checks down to:
+>>
+>> if (!drv || (drv->state_count > CPUIDLE_STATE_MAX))
+>>
+>>> +
+>>> +     mach_cpuidle = common_enter;
+>>> +
+>>> +     /* if state enter function not specified, use common_enter function */
+>>> +     for (i = 0; i < drv->state_count; i++) {
+>>> +             if (drv->states[i].enter == NULL) {
+>>> +                     if (mach_cpuidle == NULL) {
+>>
+>> Usually !mach_cpuidle is preferred for NULL checks. You can move this
+>> check out of the loop.
+>>
+>>> +                             pr_err("%s: 'enter' function pointer NULL\n",
+>>> +                             __func__);
+>>> +                             return -EINVAL;
+>>> +                     } else
+>>> +                             drv->states[i].enter = arm_enter_idle;
+>>> +             }
+>>> +     }
+>>> +
+>>> +     if (cpuidle_register_driver(drv)) {
+>>> +             pr_err("%s: Failed to register cpuidle driver\n", __func__);
+>>> +             return -ENODEV;
+>>> +     }
+>>> +
+>>> +     arm_cpuidle_devices = alloc_percpu(struct cpuidle_device);
+>>> +     if (arm_cpuidle_devices == NULL) {
+>>> +             cpuidle_unregister_driver(drv);
+>>> +             return -ENOMEM;
+>>> +     }
+>>> +
+>>> +     /* initialize state data for each cpuidle_device */
+>>> +     for_each_possible_cpu(cpu_id) {
+>>> +
+>>> +             dev = per_cpu_ptr(arm_cpuidle_devices, cpu_id);
+>>> +             dev->cpu = cpu_id;
+>>> +             dev->state_count = drv->state_count;
+>>> +
+>>> +             if (driver_data)
+>>> +                     for (i = 0; i < dev->state_count; i++) {
+>>
+>> This would be more concise and less indentation:
+>>
+>> for (i = 0; driver_data, i < dev->state_count; i++)
+>>
+>>> +                             dev->states_usage[i].driver_data =
+>>> +                                                     driver_data[i];
+>>> +                     }
+>>> +
+>>> +             if (cpuidle_register_device(dev)) {
+>>> +                     pr_err("%s: Failed to register cpu %u\n",
+>>> +                             __func__, cpu_id);
+> 
+> arm_cpuidle_devices_uninit();
+> 
+>>> +                     return -ENODEV;
+>>
+>> Leaking memory here from alloc_percpu.
+>>
+>> Also, need to unregister driver. It's usually cleaner to use goto's for
+>> error clean-up.
+>>
+> 
+> In this case, just adding a call  to arm_cpuidle_devices_uninit()
+> seems clean right?
+> 
+Really you should only undo what you have setup. In most cases uninit
+functions just uninit everything unconditionally. This gets a bit messy
+when you have loops that can fail.
+
+arm_cpuidle_devices_uninit is not unregistering the driver, so that
+needs fixing as well.
+
+Rob
