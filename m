@@ -1,89 +1,40 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri,  9 Dec 2011 16:41:05 -0200
-Subject: [PATCH v4] tty: serial: imx: Allow UART to be a source for wakeup
-In-Reply-To: <1323434541-27689-1-git-send-email-festevam@gmail.com>
-References: <1323434541-27689-1-git-send-email-festevam@gmail.com>
-Message-ID: <1323456065-6240-1-git-send-email-festevam@gmail.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Fri, 9 Dec 2011 19:40:47 +0100
+Subject: [PATCH 3/3] ide/at91: use new introduce smc accessor
+In-Reply-To: <4EE1EB9B.4080500@mvista.com>
+References: <20111208150348.GD23884@game.jcrosoft.org>
+ <1323357784-17555-3-git-send-email-plagnioj@jcrosoft.com>
+ <4EE1EB9B.4080500@mvista.com>
+Message-ID: <20111209184047.GQ23884@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allow UART to be a source for wakeup from low power mode.
+On 15:06 Fri 09 Dec     , Sergei Shtylyov wrote:
+> Hello.
+> 
+> On 08-12-2011 19:23, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> 
+>    Same comment about the subject.
+> 
+> >this will allow to use the pata_at91 on a single zImage
+> 
+>    s/pata_at91/at91_ide/
+> 
+> >Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD<plagnioj@jcrosoft.com>
+> >Cc: Nicolas Ferre<nicolas.ferre@atmel.com>
+> >Cc: linux-ide at vger.kernel.org
+> >---
+> >Hi,
+> 
+> >	it's depends on other patch for AT91 can we apply via at91
+> 
+>    I'm afraid David won't accept this, as the IDE tree is frozen for
+> anything but the fixes.
+basicaly it's a fix on at91 not ide. we can not compile all at91 together because of the
+at91_sys_read/write so I need to fix it on at91 this one of the place I need
+to touch.
 
-Tested on a MX27PDK by doing:
+I'll not touch it otherwise
 
-echo enabled > /sys/devices/platform/imx21-uart.0/power/wakeup
-
-echo mem > /sys/power/state
-
-and then pressing a key in the console will wakeup the sytem.
-
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
-Changes since v3:
-- Remove IMXUART_CANWAKE flag. Let userspace write in /sys/ file
-in order to enable UART wakeup source.
-Changes since v2:
-- Remove incorrect enable_irq_wake from serial_imx_resume
-Changes since v1:
-- Pass the can-wake property via DT correctly
- drivers/tty/serial/imx.c |   24 ++++++++++++++++++++++++
- 1 files changed, 24 insertions(+), 0 deletions(-)
-
-diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
-index 163fc90..283bf21 100644
---- a/drivers/tty/serial/imx.c
-+++ b/drivers/tty/serial/imx.c
-@@ -566,6 +566,9 @@ static irqreturn_t imx_int(int irq, void *dev_id)
- 	if (sts & USR1_RTSD)
- 		imx_rtsint(irq, dev_id);
- 
-+	if (sts & USR1_AWAKE)
-+		writel(USR1_AWAKE, sport->port.membase + USR1);
-+
- 	return IRQ_HANDLED;
- }
- 
-@@ -1269,6 +1272,15 @@ static struct uart_driver imx_reg = {
- static int serial_imx_suspend(struct platform_device *dev, pm_message_t state)
- {
- 	struct imx_port *sport = platform_get_drvdata(dev);
-+	unsigned int val;
-+
-+	if (device_may_wakeup(&dev->dev)) {
-+		enable_irq_wake(sport->rxirq);
-+		/* enable wakeup from i.MX UART */
-+		val = readl(sport->port.membase + UCR3);
-+		val |= UCR3_AWAKEN;
-+		writel(val, sport->port.membase + UCR3);
-+	}
- 
- 	if (sport)
- 		uart_suspend_port(&imx_reg, &sport->port);
-@@ -1279,6 +1291,15 @@ static int serial_imx_suspend(struct platform_device *dev, pm_message_t state)
- static int serial_imx_resume(struct platform_device *dev)
- {
- 	struct imx_port *sport = platform_get_drvdata(dev);
-+	unsigned int val;
-+
-+	if (device_may_wakeup(&dev->dev)) {
-+		/* disable wakeup from i.MX UART */
-+		val = readl(sport->port.membase + UCR3);
-+		val &= ~UCR3_AWAKEN;
-+		writel(val, sport->port.membase + UCR3);
-+		disable_irq_wake(sport->rxirq);
-+	}
- 
- 	if (sport)
- 		uart_resume_port(&imx_reg, &sport->port);
-@@ -1408,6 +1429,9 @@ static int serial_imx_probe(struct platform_device *pdev)
- 		goto deinit;
- 	platform_set_drvdata(pdev, &sport->port);
- 
-+	device_init_wakeup(&pdev->dev, 1);
-+	device_set_wakeup_enable(&pdev->dev, 0);
-+
- 	return 0;
- deinit:
- 	if (pdata && pdata->exit)
--- 
-1.7.1
+Best Regards,
+J.
