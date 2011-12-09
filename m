@@ -1,228 +1,152 @@
-From: rob.lee@linaro.org (Rob Lee)
-Date: Fri, 9 Dec 2011 09:55:31 -0600
-Subject: [RFC PATCH 1/8] ARM: Add commonly used cpuidle init code
-In-Reply-To: <4EE212FF.1080202@gmail.com>
-References: <1323146291-10676-1-git-send-email-rob.lee@linaro.org>
- <1323146291-10676-2-git-send-email-rob.lee@linaro.org>
- <4EDE2F91.5090104@gmail.com>
- <CAMXH7KFT+JP8uJwK=rzt1cjwMQMGPd-6RwPVma0ky0wSMbaz8A@mail.gmail.com>
- <4EE212FF.1080202@gmail.com>
-Message-ID: <CAMXH7KHSLL9zta7P3OUkgtVjBPjJFEErjxZu1SSLg6pf2BE66g@mail.gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri,  9 Dec 2011 13:55:24 -0200
+Subject: [PATCH v3 1/2] tty: serial: imx: Allow UART to be a source for wakeup
+In-Reply-To: <1323434541-27689-1-git-send-email-festevam@gmail.com>
+References: <1323434541-27689-1-git-send-email-festevam@gmail.com>
+Message-ID: <1323446124-11865-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9 December 2011 07:54, Rob Herring <robherring2@gmail.com> wrote:
-> On 12/08/2011 03:46 PM, Rob Lee wrote:
->> Rob, thanks for your thorough review. ?Comments and questions below.
->>
->> On 6 December 2011 09:06, Rob Herring <robherring2@gmail.com> wrote:
->>> On 12/05/2011 10:38 PM, Robert Lee wrote:
->>>> Add commonly used cpuidle init code to avoid unecessary duplication.
->>>>
->>>> Signed-off-by: Robert Lee <rob.lee@linaro.org>
->>>> ---
->>>> ?arch/arm/common/Makefile ? ? ? | ? ?1 +
->>>> ?arch/arm/common/cpuidle.c ? ? ?| ?132 ++++++++++++++++++++++++++++++++++++++++
->>>> ?arch/arm/include/asm/cpuidle.h | ? 25 ++++++++
->>>
->>> Why not move cpuidle drivers to drivers/idle/ ?
->>>
->>
->> Or to drivers/cpuidle? ?I am not sure the reasoning behind a
->
-> It would make sense to me that they should be combined. I'm not sure of
-> the history here.
->
->> drivers/idle directory if everything there is a cpuidle driver
->> implementation. ?I originally did locate this common cpuidle code in
->> drivers/idle/arm_idle.c and put the head file in arch/arm/include/asm
->> but this threw a checkpatch warning so I submitted with this placement
->
-> What warning?
->
+Allow UART to be a source for wakeup from low power mode.
 
-I'll move things back to drivers/idle and try it again  and send the
-specific warning later today.
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+Changes since v2:
+- Remove incorrect enable_irq_wake from serial_imx_resume
+Changes since v1:
+- Pass the can-wake property via DT correctly
+ .../bindings/tty/serial/fsl-imx-uart.txt           |    2 +
+ arch/arm/plat-mxc/include/mach/imx-uart.h          |    1 +
+ drivers/tty/serial/imx.c                           |   36 ++++++++++++++++++++
+ 3 files changed, 39 insertions(+), 0 deletions(-)
 
->> to start with. ?If the local_fiq_enable/disable calls can be handled
->> in a community friendly way for any architecture, then perhaps I can
->> just move the header file code to linux/include/cpuidle.h.
->
-> Maybe we should think about whether we even need to disable fiq. You
-> probably don't use low latency interrupt and a high latency low power
-> mode together.
->
->> Do you have suggestions about making this functionality available for
->> any architecture and what is the most community friendly method of
->> doing this? ?I suppose function declarations for
->> local_fiq_enable/disable could be given. ?Then, one could either
->> define them here as empty functions or could have two idle functions,
->> arm_enter_idle and nonarm_enter_idle and the architecture could be
->> read or passed in to determine which one to set the cpuidle states'
->> enter functions to.
->
-> I'm not sure I understand the issue. You can include asm headers and
-> make things depend on CONFIG_ARM so no other arch builds code with
-> local_fiq_enable.
->
-> The other approach would be to define arch specific cpu_idle functions
-> for pre and post idle.
->
->>>> +static int (*mach_cpuidle)(struct cpuidle_device *dev,
->>>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ?struct cpuidle_driver *drv,
->>>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? int index);
->>>> +
->>>> +static int arm_enter_idle(struct cpuidle_device *dev,
->>>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ?struct cpuidle_driver *drv, int index)
->>>
->>> I think how this works is backwards. This function is only called if
->>> there is a NULL enter function for a state, but mach_cpuidle is global.
->>> Ideally, I want to call this function for every state, but call a
->>> different mach_cpuidle function for each state. Yes, you could select a
->>> specific function for each state within the mach_cpuidle function, but
->>> that seems silly to make the per state function global and then have to
->>> select a per state function again. And if many users are doing that,
->>> then it belongs in the common code.
->
->
-> No comments on this!?
->
->
-
-I agree with your viewpoint and will fix this in v2.  The same goes
-for all of your other comments that I made no response to.  Should I
-post my proposed fix here before submitting v2?
-
->>>> +{
->>>> + ? ? ktime_t time_start, time_end;
->>>> +
->>>> + ? ? local_irq_disable();
->>>> + ? ? local_fiq_disable();
->>>> +
->>>> + ? ? time_start = ktime_get();
->>>> +
->>>> + ? ? index = mach_cpuidle(dev, drv, index);
->>>> +
->>>> + ? ? time_end = ktime_get();
->>>> +
->>>> + ? ? local_fiq_enable();
->>>> + ? ? local_irq_enable();
->>>> +
->>>> + ? ? dev->last_residency =
->>>> + ? ? ? ? ? ? (int)ktime_to_us(ktime_sub(time_end, time_start));
->>>> +
->>>> + ? ? return index;
->>>> +}
->>>> +
->>>> +void arm_cpuidle_devices_uninit(void)
->>>> +{
->>>> + ? ? int cpu_id;
->>>> + ? ? struct cpuidle_device *dev;
->>>> +
->>>> + ? ? for_each_possible_cpu(cpu_id) {
->>>> + ? ? ? ? ? ? dev = per_cpu_ptr(arm_cpuidle_devices, cpu_id);
->>>> + ? ? ? ? ? ? cpuidle_unregister_device(dev);
->>>> + ? ? }
->>>> +
->>>> + ? ? free_percpu(arm_cpuidle_devices);
->>>> + ? ? return;
->>>
->>> Don't need return statement.
->>>
->>>> +}
->>>> +
->>>> +int __init arm_cpuidle_init(struct cpuidle_driver *drv,
->>>> + ? ? int (*common_enter)(struct cpuidle_device *dev,
->>>> + ? ? ? ? ? ? struct cpuidle_driver *drv, int index),
->>>> + ? ? void *driver_data[])
->>>> +{
->>>> + ? ? struct cpuidle_device *dev;
->>>> + ? ? int i, cpu_id;
->>>> +
->>>> + ? ? if (drv == NULL) {
->>>> + ? ? ? ? ? ? pr_err("%s: cpuidle_driver pointer NULL\n", __func__);
->>>> + ? ? ? ? ? ? return -EINVAL;
->>>> + ? ? }
->>>> +
->>>> + ? ? if (drv->state_count > CPUIDLE_STATE_MAX)
->>>> + ? ? ? ? ? ? pr_err("%s: state count exceeds maximum\n", __func__);
->>>
->>> return an error?
->>>
->>> You can collapse these 2 parameter checks down to:
->>>
->>> if (!drv || (drv->state_count > CPUIDLE_STATE_MAX))
->>>
->>>> +
->>>> + ? ? mach_cpuidle = common_enter;
->>>> +
->>>> + ? ? /* if state enter function not specified, use common_enter function */
->>>> + ? ? for (i = 0; i < drv->state_count; i++) {
->>>> + ? ? ? ? ? ? if (drv->states[i].enter == NULL) {
->>>> + ? ? ? ? ? ? ? ? ? ? if (mach_cpuidle == NULL) {
->>>
->>> Usually !mach_cpuidle is preferred for NULL checks. You can move this
->>> check out of the loop.
->>>
->>>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? pr_err("%s: 'enter' function pointer NULL\n",
->>>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? __func__);
->>>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? return -EINVAL;
->>>> + ? ? ? ? ? ? ? ? ? ? } else
->>>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? drv->states[i].enter = arm_enter_idle;
->>>> + ? ? ? ? ? ? }
->>>> + ? ? }
->>>> +
->>>> + ? ? if (cpuidle_register_driver(drv)) {
->>>> + ? ? ? ? ? ? pr_err("%s: Failed to register cpuidle driver\n", __func__);
->>>> + ? ? ? ? ? ? return -ENODEV;
->>>> + ? ? }
->>>> +
->>>> + ? ? arm_cpuidle_devices = alloc_percpu(struct cpuidle_device);
->>>> + ? ? if (arm_cpuidle_devices == NULL) {
->>>> + ? ? ? ? ? ? cpuidle_unregister_driver(drv);
->>>> + ? ? ? ? ? ? return -ENOMEM;
->>>> + ? ? }
->>>> +
->>>> + ? ? /* initialize state data for each cpuidle_device */
->>>> + ? ? for_each_possible_cpu(cpu_id) {
->>>> +
->>>> + ? ? ? ? ? ? dev = per_cpu_ptr(arm_cpuidle_devices, cpu_id);
->>>> + ? ? ? ? ? ? dev->cpu = cpu_id;
->>>> + ? ? ? ? ? ? dev->state_count = drv->state_count;
->>>> +
->>>> + ? ? ? ? ? ? if (driver_data)
->>>> + ? ? ? ? ? ? ? ? ? ? for (i = 0; i < dev->state_count; i++) {
->>>
->>> This would be more concise and less indentation:
->>>
->>> for (i = 0; driver_data, i < dev->state_count; i++)
->>>
->>>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? dev->states_usage[i].driver_data =
->>>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? driver_data[i];
->>>> + ? ? ? ? ? ? ? ? ? ? }
->>>> +
->>>> + ? ? ? ? ? ? if (cpuidle_register_device(dev)) {
->>>> + ? ? ? ? ? ? ? ? ? ? pr_err("%s: Failed to register cpu %u\n",
->>>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? __func__, cpu_id);
->>
->> arm_cpuidle_devices_uninit();
->>
->>>> + ? ? ? ? ? ? ? ? ? ? return -ENODEV;
->>>
->>> Leaking memory here from alloc_percpu.
->>>
->>> Also, need to unregister driver. It's usually cleaner to use goto's for
->>> error clean-up.
->>>
->>
->> In this case, just adding a call ?to arm_cpuidle_devices_uninit()
->> seems clean right?
->>
-> Really you should only undo what you have setup. In most cases uninit
-> functions just uninit everything unconditionally. This gets a bit messy
-> when you have loops that can fail.
->
-> arm_cpuidle_devices_uninit is not unregistering the driver, so that
-> needs fixing as well.
->
-> Rob
+diff --git a/Documentation/devicetree/bindings/tty/serial/fsl-imx-uart.txt b/Documentation/devicetree/bindings/tty/serial/fsl-imx-uart.txt
+index a9c0406..676cc39 100644
+--- a/Documentation/devicetree/bindings/tty/serial/fsl-imx-uart.txt
++++ b/Documentation/devicetree/bindings/tty/serial/fsl-imx-uart.txt
+@@ -8,6 +8,8 @@ Required properties:
+ Optional properties:
+ - fsl,uart-has-rtscts : Indicate the uart has rts and cts
+ - fsl,irda-mode : Indicate the uart supports irda mode
++- fsl,uart-can-wake : Indicate that uart can be a source for wakeup from
++low-power mode
+ 
+ Example:
+ 
+diff --git a/arch/arm/plat-mxc/include/mach/imx-uart.h b/arch/arm/plat-mxc/include/mach/imx-uart.h
+index 4adec9b..0ba6c6b 100644
+--- a/arch/arm/plat-mxc/include/mach/imx-uart.h
++++ b/arch/arm/plat-mxc/include/mach/imx-uart.h
+@@ -21,6 +21,7 @@
+ 
+ #define IMXUART_HAVE_RTSCTS (1<<0)
+ #define IMXUART_IRDA        (1<<1)
++#define IMXUART_CANWAKE     (1<<2)
+ 
+ struct imxuart_platform_data {
+ 	int (*init)(struct platform_device *pdev);
+diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
+index 163fc90..f0b736e 100644
+--- a/drivers/tty/serial/imx.c
++++ b/drivers/tty/serial/imx.c
+@@ -200,6 +200,7 @@ struct imx_port {
+ 	int			txirq,rxirq,rtsirq;
+ 	unsigned int		have_rtscts:1;
+ 	unsigned int		use_irda:1;
++	unsigned int		can_wake:1;
+ 	unsigned int		irda_inv_rx:1;
+ 	unsigned int		irda_inv_tx:1;
+ 	unsigned short		trcv_delay; /* transceiver delay */
+@@ -566,6 +567,9 @@ static irqreturn_t imx_int(int irq, void *dev_id)
+ 	if (sts & USR1_RTSD)
+ 		imx_rtsint(irq, dev_id);
+ 
++	if (sts & USR1_AWAKE)
++		writel(USR1_AWAKE, sport->port.membase + USR1);
++
+ 	return IRQ_HANDLED;
+ }
+ 
+@@ -660,6 +664,7 @@ static int imx_setup_ufcr(struct imx_port *sport, unsigned int mode)
+ static int imx_startup(struct uart_port *port)
+ {
+ 	struct imx_port *sport = (struct imx_port *)port;
++	struct tty_struct *tty;
+ 	int retval;
+ 	unsigned long flags, temp;
+ 
+@@ -791,6 +796,8 @@ static int imx_startup(struct uart_port *port)
+ 		if (pdata->irda_enable)
+ 			pdata->irda_enable(1);
+ 	}
++	tty = sport->port.state->port.tty;
++	device_set_wakeup_enable(tty->dev, 1);
+ 
+ 	return 0;
+ 
+@@ -1269,6 +1276,15 @@ static struct uart_driver imx_reg = {
+ static int serial_imx_suspend(struct platform_device *dev, pm_message_t state)
+ {
+ 	struct imx_port *sport = platform_get_drvdata(dev);
++	unsigned int val;
++
++	if (device_may_wakeup(&dev->dev)) {
++		enable_irq_wake(sport->rxirq);
++		/* enable wakeup from i.MX UART */
++		val = readl(sport->port.membase + UCR3);
++		val |= UCR3_AWAKEN;
++		writel(val, sport->port.membase + UCR3);
++	}
+ 
+ 	if (sport)
+ 		uart_suspend_port(&imx_reg, &sport->port);
+@@ -1279,6 +1295,15 @@ static int serial_imx_suspend(struct platform_device *dev, pm_message_t state)
+ static int serial_imx_resume(struct platform_device *dev)
+ {
+ 	struct imx_port *sport = platform_get_drvdata(dev);
++	unsigned int val;
++
++	if (device_may_wakeup(&dev->dev)) {
++		/* disable wakeup from i.MX UART */
++		val = readl(sport->port.membase + UCR3);
++		val &= ~UCR3_AWAKEN;
++		writel(val, sport->port.membase + UCR3);
++		disable_irq_wake(sport->rxirq);
++	}
+ 
+ 	if (sport)
+ 		uart_resume_port(&imx_reg, &sport->port);
+@@ -1311,6 +1336,9 @@ static int serial_imx_probe_dt(struct imx_port *sport,
+ 	if (of_get_property(np, "fsl,irda-mode", NULL))
+ 		sport->use_irda = 1;
+ 
++	if (of_get_property(np, "fsl,uart-can-wake", NULL))
++		sport->can_wake = 1;
++
+ 	sport->devdata = of_id->data;
+ 
+ 	return 0;
+@@ -1339,6 +1367,9 @@ static void serial_imx_probe_pdata(struct imx_port *sport,
+ 
+ 	if (pdata->flags & IMXUART_IRDA)
+ 		sport->use_irda = 1;
++
++	if (pdata->flags & IMXUART_CANWAKE)
++		sport->can_wake = 1;
+ }
+ 
+ static int serial_imx_probe(struct platform_device *pdev)
+@@ -1408,6 +1439,11 @@ static int serial_imx_probe(struct platform_device *pdev)
+ 		goto deinit;
+ 	platform_set_drvdata(pdev, &sport->port);
+ 
++	if (sport->can_wake)
++		device_init_wakeup(&pdev->dev, 1);
++	else
++		device_init_wakeup(&pdev->dev, 0);
++
+ 	return 0;
+ deinit:
+ 	if (pdata && pdata->exit)
+-- 
+1.7.1
