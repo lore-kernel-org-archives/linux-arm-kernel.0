@@ -1,30 +1,45 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 9 Dec 2011 10:23:00 +0100
-Subject: [PATCH] [RFC] pinctrl: add a driver for Energy Micro's efm32 SoCs
-In-Reply-To: <4693507.K6tP4YDUh2@wuerfel>
-References: <1323384057-31452-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <4693507.K6tP4YDUh2@wuerfel>
-Message-ID: <20111209092300.GR4585@pengutronix.de>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Fri, 9 Dec 2011 10:26:31 +0100
+Subject: [PATCH] arm/imx: fix cpufreq build error
+In-Reply-To: <1323399055-31850-1-git-send-email-shawn.guo@linaro.org>
+References: <20111209020948.GA28216@b20223-02.ap.freescale.net>
+ <1323399055-31850-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20111209092631.GB3327@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 08, 2011 at 11:55:53PM +0100, Arnd Bergmann wrote:
-> On Thursday 08 December 2011 23:40:57 Uwe Kleine-K?nig wrote:
-> > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> > ---
-> > Note that there is no support yet for efm32 in mainline, so ARCH_EFM32
-> > isn't defined.
+On Fri, Dec 09, 2011 at 10:50:55AM +0800, Shawn Guo wrote:
+> This patch adds missing linux/module.h to fix the build error seen
+> on imx cpuidle driver.
 > 
-> Since the platform is not yet part of the architecture, it will have
-> to use device tree based probing when it gets added. I would suggest
-> only merging drivers for it that can deal with this and do not rely
-> on platform_data.
-I feared you will say that. These machines have at most 4MiB of RAM.
-I'll have to evaluate if dt is too heavy for them.
+>   CC      arch/arm/plat-mxc/cpufreq.o
+> arch/arm/plat-mxc/cpufreq.c:203: error: expected declaration specifiers or '...' before string constant
+> arch/arm/plat-mxc/cpufreq.c:203: warning: data definition has no type or storage class
+> arch/arm/plat-mxc/cpufreq.c:203: warning: type defaults to 'int' in declaration of 'MODULE_AUTHOR'
+> arch/arm/plat-mxc/cpufreq.c:203: warning: function declaration isn't a prototype
+> arch/arm/plat-mxc/cpufreq.c:204: error: expected declaration specifiers or '...' before string constant
+> arch/arm/plat-mxc/cpufreq.c:204: warning: data definition has no type or storage class
+> arch/arm/plat-mxc/cpufreq.c:204: warning: type defaults to 'int' in declaration of 'MODULE_DESCRIPTION'
+> arch/arm/plat-mxc/cpufreq.c:204: warning: function declaration isn't a prototype
+> arch/arm/plat-mxc/cpufreq.c:205: error: expected declaration specifiers or '...' before string constant
+> arch/arm/plat-mxc/cpufreq.c:205: warning: data definition has no type or storage class
+> arch/arm/plat-mxc/cpufreq.c:205: warning: type defaults to 'int' in declaration of 'MODULE_LICENSE'
+> arch/arm/plat-mxc/cpufreq.c:205: warning: function declaration isn't a prototype
+> make[1]: *** [arch/arm/plat-mxc/cpufreq.o] Error 1
+> make: *** [arch/arm/plat-mxc] Error 2
+> 
+> Reported-by: Richard Zhao <richard.zhao@freescale.com>
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 
-Best regards
-Uwe
+Acked-by: Wolfram Sang <w.sang@pengutronix.de>
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Pengutronix e.K.                           | Wolfram Sang                |
 Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111209/3419e3cd/attachment.sig>
