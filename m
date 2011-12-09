@@ -1,77 +1,156 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Fri, 9 Dec 2011 19:42:39 +0100
-Subject: [PATCH 2/3] pata/at91: use new introduce smc accessor
-In-Reply-To: <4EE1EA25.3010002@mvista.com>
-References: <20111208150348.GD23884@game.jcrosoft.org>
- <1323357784-17555-2-git-send-email-plagnioj@jcrosoft.com>
- <4EE1EA25.3010002@mvista.com>
-Message-ID: <20111209184239.GR23884@game.jcrosoft.org>
+Date: Fri, 9 Dec 2011 19:47:01 +0100
+Subject: [PATCH 1/2] ARM: at91: make x40s use free of at91_sys_read/write
+In-Reply-To: <4EE135D6.6000008@gmail.com>
+References: <1323355315-9767-1-git-send-email-plagnioj@jcrosoft.com>
+ <4EE135D6.6000008@gmail.com>
+Message-ID: <20111209184701.GS23884@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14:59 Fri 09 Dec     , Sergei Shtylyov wrote:
-> Hello.
+On 09:10 Fri 09 Dec     , Ryan Mallon wrote:
+> On 09/12/11 01:41, Jean-Christophe PLAGNIOL-VILLARD wrote:
 > 
-> On 08-12-2011 19:23, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> > Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+> > ---
+> >  arch/arm/mach-at91/at91x40_time.c         |   28 +++++++++++++++++-----------
+> >  arch/arm/mach-at91/include/mach/at91x40.h |   18 +++++++++---------
+> >  arch/arm/mach-at91/include/mach/system.h  |    2 +-
+> >  3 files changed, 27 insertions(+), 21 deletions(-)
+> > 
+> > diff --git a/arch/arm/mach-at91/at91x40_time.c b/arch/arm/mach-at91/at91x40_time.c
+> > index dfff289..6ca680a 100644
+> > --- a/arch/arm/mach-at91/at91x40_time.c
+> > +++ b/arch/arm/mach-at91/at91x40_time.c
+> > @@ -28,6 +28,12 @@
+> >  #include <asm/mach/time.h>
+> >  #include <mach/at91_tc.h>
+> >  
+> > +#define at91_tc_read(field) \
+> > +	__raw_readl(AT91_TC + field)
+> > +
+> > +#define at91_tc_write(field, value) \
+> > +	__raw_writel(value, AT91_TC + field);
+> > +
 > 
->    Your subject doesn't parse. Maybe you meant "use newly introduced
-> smc accessor"?
-yeap
 > 
-> >this will allow to use the pata_at91 on a single zImage
+> Can we make these functions please. They will get inlined anyway, but we
+> get the added benefits of type checking. Also you have a spurious
+> semicolon on the second #define.
 > 
-> >Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD<plagnioj@jcrosoft.com>
-> >Cc: Nicolas Ferre<nicolas.ferre@atmel.com>
-> >Cc: linux-ide at vger.kernel.org
-> >---
-> >Hi,
-> 
-> >	it's depends on other patch for AT91 can we apply via at91
-> 
-> >Best Regards,
-> >J.
-> >  drivers/ata/pata_at91.c |   43 +++++++++++++++++++++----------------------
-> >  1 files changed, 21 insertions(+), 22 deletions(-)
-> 
-> >diff --git a/drivers/ata/pata_at91.c b/drivers/ata/pata_at91.c
-> >index 5249e6d..c8d1154 100644
-> >--- a/drivers/ata/pata_at91.c
-> >+++ b/drivers/ata/pata_at91.c
-> >@@ -207,11 +207,11 @@ static void set_smc_timing(struct device *dev, struct ata_device *adev,
+> >  /*
+> >   *	3 counter/timer units present.
+> >   */
+> > @@ -37,12 +43,12 @@
+> >  
+> >  static unsigned long at91x40_gettimeoffset(void)
 > >  {
-> >  	int ret = 0;
-> >  	int use_iordy;
-> >+	struct sam9_smc_config smc;
-> >  	unsigned int t6z;         /* data tristate time in ns */
-> >  	unsigned int cycle;       /* SMC Cycle width in MCK ticks */
-> >  	unsigned int setup;       /* SMC Setup width in MCK ticks */
-> >  	unsigned int pulse;       /* CFIOR and CFIOW pulse width in MCK ticks */
-> >-	unsigned int cs_setup = 0;/* CS4 or CS5 setup width in MCK ticks */
-> >  	unsigned int cs_pulse;    /* CS4 or CS5 pulse width in MCK ticks*/
-> >  	unsigned int tdf_cycles;  /* SMC TDF MCK ticks */
-> >  	unsigned long mck_hz;     /* MCK frequency in Hz */
-> >@@ -244,26 +244,25 @@ static void set_smc_timing(struct device *dev, struct ata_device *adev,
-> >  	}
-> >
-> >  	dev_dbg(dev, "Use IORDY=%u, TDF Cycles=%u\n", use_iordy, tdf_cycles);
-> >-	info->mode |= AT91_SMC_TDF_(tdf_cycles);
-> >
-> >  	/* write SMC Setup Register */
-> >-	at91_sys_write(AT91_SMC_SETUP(info->cs),
-> >-			AT91_SMC_NWESETUP_(setup) |
-> >-			AT91_SMC_NRDSETUP_(setup) |
-> >-			AT91_SMC_NCS_WRSETUP_(cs_setup) |
-> >-			AT91_SMC_NCS_RDSETUP_(cs_setup));
-> >+	smc.nrd_setup = setup;
-> >+	smc.nwe_setup = smc.nrd_setup;
-> >+	smc.ncs_read_setup = 0;
-> >+	smc.ncs_write_setup = smc.ncs_read_setup;
+> > -	return (at91_sys_read(AT91_TC + AT91_TC_CLK1BASE + AT91_TC_CV) * 1000000 / (AT91X40_MASTER_CLOCK / 128));
+> > +	return (at91_tc_read(AT91_TC_CLK1BASE + AT91_TC_CV) * 1000000 / (AT91X40_MASTER_CLOCK / 128));
+> >  }
 > 
->    Why not:
 > 
-> 	smc.nrd_setup = smc.nwe_setup = setup;
-> 	smc.ncs_read_setup = smc.ncs_write_setup = 0;
-why not
+> It is a good chance to split this line to fit in 80 characters while you
+> are editing it.
+not the scope of the patch
+change done by script
+> 
+> >  
+> >  static irqreturn_t at91x40_timer_interrupt(int irq, void *dev_id)
+> >  {
+> > -	at91_sys_read(AT91_TC + AT91_TC_CLK1BASE + AT91_TC_SR);
+> > +	at91_tc_read(AT91_TC_CLK1BASE + AT91_TC_SR);
+> >  	timer_tick();
+> >  	return IRQ_HANDLED;
+> >  }
+> > @@ -57,20 +63,20 @@ void __init at91x40_timer_init(void)
+> >  {
+> >  	unsigned int v;
+> >  
+> > -	at91_sys_write(AT91_TC + AT91_TC_BCR, 0);
+> > -	v = at91_sys_read(AT91_TC + AT91_TC_BMR);
+> > +	at91_tc_write(AT91_TC_BCR, 0);
+> > +	v = at91_tc_read(AT91_TC_BMR);
+> >  	v = (v & ~AT91_TC_TC1XC1S) | AT91_TC_TC1XC1S_NONE;
+> > -	at91_sys_write(AT91_TC + AT91_TC_BMR, v);
+> > +	at91_tc_write(AT91_TC_BMR, v);
+> >  
+> > -	at91_sys_write(AT91_TC + AT91_TC_CLK1BASE + AT91_TC_CCR, AT91_TC_CLKDIS);
+> > -	at91_sys_write(AT91_TC + AT91_TC_CLK1BASE + AT91_TC_CMR, (AT91_TC_TIMER_CLOCK4 | AT91_TC_CPCTRG));
+> > -	at91_sys_write(AT91_TC + AT91_TC_CLK1BASE + AT91_TC_IDR, 0xffffffff);
+> > -	at91_sys_write(AT91_TC + AT91_TC_CLK1BASE + AT91_TC_RC, (AT91X40_MASTER_CLOCK / 128) / HZ - 1);
+> > -	at91_sys_write(AT91_TC + AT91_TC_CLK1BASE + AT91_TC_IER, (1<<4));
+> > +	at91_tc_write(AT91_TC_CLK1BASE + AT91_TC_CCR, AT91_TC_CLKDIS);
+> > +	at91_tc_write(AT91_TC_CLK1BASE + AT91_TC_CMR, (AT91_TC_TIMER_CLOCK4 | AT91_TC_CPCTRG));
+> > +	at91_tc_write(AT91_TC_CLK1BASE + AT91_TC_IDR, 0xffffffff);
+> > +	at91_tc_write(AT91_TC_CLK1BASE + AT91_TC_RC, (AT91X40_MASTER_CLOCK / 128) / HZ - 1);
+> > +	at91_tc_write(AT91_TC_CLK1BASE + AT91_TC_IER, (1<<4));
+> 
+> 
+> Same here, some of these lines look over 80 characters. Good chance to
+> fix them.
+> 
+> >  
+> >  	setup_irq(AT91X40_ID_TC1, &at91x40_timer_irq);
+> >  
+> > -	at91_sys_write(AT91_TC + AT91_TC_CLK1BASE + AT91_TC_CCR, (AT91_TC_SWTRG | AT91_TC_CLKEN));
+> > +	at91_tc_write(AT91_TC_CLK1BASE + AT91_TC_CCR, (AT91_TC_SWTRG | AT91_TC_CLKEN));
+> 
+> 
+> and here.
+> 
+> >  }
+> >  
+> >  struct sys_timer at91x40_timer = {
+> > diff --git a/arch/arm/mach-at91/include/mach/at91x40.h b/arch/arm/mach-at91/include/mach/at91x40.h
+> > index a57829f..9068021 100644
+> > --- a/arch/arm/mach-at91/include/mach/at91x40.h
+> > +++ b/arch/arm/mach-at91/include/mach/at91x40.h
+> > @@ -28,18 +28,18 @@
+> >  #define AT91X40_ID_IRQ2		18	/* External IRQ 2 */
+> >  
+> >  /*
+> > - * System Peripherals (offset from AT91_BASE_SYS)
+> > + * System Peripherals
+> >   */
+> >  #define AT91_BASE_SYS	0xffc00000
+> >  
+> > -#define AT91_EBI	(0xffe00000 - AT91_BASE_SYS)	/* External Bus Interface */
+> > -#define AT91_SF		(0xfff00000 - AT91_BASE_SYS)	/* Special Function */
+> > -#define AT91_USART1	(0xfffcc000 - AT91_BASE_SYS)	/* USART 1 */
+> > -#define AT91_USART0	(0xfffd0000 - AT91_BASE_SYS)	/* USART 0 */
+> > -#define AT91_TC		(0xfffe0000 - AT91_BASE_SYS)	/* Timer Counter */
+> > -#define AT91_PIOA	(0xffff0000 - AT91_BASE_SYS)	/* PIO Controller A */
+> > -#define AT91_PS		(0xffff4000 - AT91_BASE_SYS)	/* Power Save */
+> > -#define AT91_WD		(0xffff8000 - AT91_BASE_SYS)	/* Watchdog Timer */
+> > +#define AT91_EBI	0xffe00000	/* External Bus Interface */
+> > +#define AT91_SF		0xfff00000	/* Special Function */
+> > +#define AT91_USART1	0xfffcc000	/* USART 1 */
+> > +#define AT91_USART0	0xfffd0000	/* USART 0 */
+> > +#define AT91_TC		0xfffe0000	/* Timer Counter */
+> > +#define AT91_PIOA	0xffff0000	/* PIO Controller A */
+> > +#define AT91_PS		0xffff4000	/* Power Save */
+> > +#define AT91_WD		0xffff8000	/* Watchdog Timer */
+> >  
+> >  /*
+> >   * The AT91x40 series doesn't have a debug unit like the other AT91 parts.
+> > diff --git a/arch/arm/mach-at91/include/mach/system.h b/arch/arm/mach-at91/include/mach/system.h
+> > index 36af14b..a3c0fc0 100644
+> > --- a/arch/arm/mach-at91/include/mach/system.h
+> > +++ b/arch/arm/mach-at91/include/mach/system.h
+> > @@ -33,7 +33,7 @@ static inline void arch_idle(void)
+> >  	 * re-enabled by an interrupt or by a reset.
+> >  	 */
+> >  #ifdef AT91_PS
+> > -	at91_sys_write(AT91_PS_CR, AT91_PS_CR_CPU);
+> > +	__raw_writel(AT91_PS_CR_CPU, AT91_PS_CR);
+> >  #else
+> >  	at91_sys_write(AT91_PMC_SCDR, AT91_PMC_PCK);
+> 
+> 
+> Is this one changed in another patch?
+no the AT91_PS is x40 specific
 
 Best Regards,
 J.
