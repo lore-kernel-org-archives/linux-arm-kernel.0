@@ -1,30 +1,199 @@
 From: pawel.moll@arm.com (Pawel Moll)
-Date: Fri,  9 Dec 2011 19:03:47 +0000
-Subject: [PATCH v5 4/9] ARM: vexpress: Motherboard RS1 memory map support
+Date: Fri,  9 Dec 2011 19:03:46 +0000
+Subject: [PATCH v5 3/9] ARM: vexpress: Add Device Tree support
 In-Reply-To: <1323457432-4800-1-git-send-email-pawel.moll@arm.com>
 References: <1323457432-4800-1-git-send-email-pawel.moll@arm.com>
-Message-ID: <1323457432-4800-5-git-send-email-pawel.moll@arm.com>
+Message-ID: <1323457432-4800-4-git-send-email-pawel.moll@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for RS1 memory map based Versatile Express
-motherboard.
+This patch adds generic Versatile Express DT machine description,
+Device Tree description for the motherboard and documentation for
+the bindings.
 
 Signed-off-by: Pawel Moll <pawel.moll@arm.com>
 ---
- arch/arm/boot/dts/vexpress-v2m-rs1.dtsi           |  196 +++++++++++++++++++++
- arch/arm/mach-vexpress/include/mach/debug-macro.S |   37 ++++-
- arch/arm/mach-vexpress/include/mach/uncompress.h  |   13 ++-
- arch/arm/mach-vexpress/v2m.c                      |   64 +++++++-
- 4 files changed, 304 insertions(+), 6 deletions(-)
- create mode 100644 arch/arm/boot/dts/vexpress-v2m-rs1.dtsi
+ Documentation/devicetree/bindings/arm/vexpress.txt |  144 +++++++++++++++
+ arch/arm/Kconfig                                   |    2 +-
+ arch/arm/boot/dts/vexpress-v2m.dtsi                |  195 ++++++++++++++++++++
+ arch/arm/mach-vexpress/Kconfig                     |   45 +++++-
+ arch/arm/mach-vexpress/Makefile.boot               |    2 +
+ arch/arm/mach-vexpress/include/mach/motherboard.h  |    6 +
+ arch/arm/mach-vexpress/v2m.c                       |  152 +++++++++++++++-
+ arch/arm/mm/Kconfig                                |    2 +-
+ 8 files changed, 541 insertions(+), 7 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/vexpress.txt
+ create mode 100644 arch/arm/boot/dts/vexpress-v2m.dtsi
 
-diff --git a/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi b/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi
+diff --git a/Documentation/devicetree/bindings/arm/vexpress.txt b/Documentation/devicetree/bindings/arm/vexpress.txt
 new file mode 100644
-index 0000000..a7d385f
+index 0000000..87b9ee7
 --- /dev/null
-+++ b/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi
-@@ -0,0 +1,196 @@
++++ b/Documentation/devicetree/bindings/arm/vexpress.txt
+@@ -0,0 +1,144 @@
++ARM Versatile Express boards family
++-----------------------------------
++
++ARM's Versatile Express platform consists of a motherboard and one
++or more daughterboards (tiles). The motherboard provides a set of
++peripherals. Processor and RAM "live" on the tiles.
++
++The motherboard and each core tile should be described by a separate
++Device Tree source file, with the tile's description including
++the motherboard file using a /include/ directive. As the motherboard
++can be initialized in one of two different configurations ("memory
++maps"), care must be taken to include the correct one.
++
++Required properties in the root node:
++- compatible value:
++	compatible = "arm,vexpress,<model>", "arm,vexpress";
++  where <model> is the full tile model name (as used in the tile's
++    Technical Reference Manual), eg.:
++    - for Coretile Express A5x2 (V2P-CA5s):
++	compatible = "arm,vexpress,v2p-ca5s", "arm,vexpress";
++    - for Coretile Express A9x4 (V2P-CA9):
++	compatible = "arm,vexpress,v2p-ca9", "arm,vexpress";
++  If a tile comes in several variants or can be used in more then one
++  configuration, the compatible value should be:
++	compatible = "arm,vexpress,<model>,<variant>", \
++				"arm,vexpress,<model>", "arm,vexpress";
++  eg:
++    - Coretile Express A15x2 (V2P-CA15) with Tech Chip 1:
++	compatible = "arm,vexpress,v2p-ca15,tc1", \
++				"arm,vexpress,v2p-ca15", "arm,vexpress";
++    - LogicTile Express 13MG (V2F-2XV6) running Cortex-A7 (3 cores) SMM:
++	compatible = "arm,vexpress,v2f-2xv6,ca7x3", \
++				"arm,vexpress,v2f-2xv6", "arm,vexpress";
++
++Optional properties in the root node:
++- tile model name (use name from the tile's Technical Reference
++  Manual, eg. "V2P-CA5s")
++	model = "<model>";
++- tile's HBI number (unique ARM's board model ID, visible on the
++  PCB's silkscreen) in hexadecimal transcription:
++	arm,hbi = <0xhbi>
++  eg:
++  - for Coretile Express A5x2 (V2P-CA5s) HBI-0191:
++	arm,hbi = <0x191>;
++  - Coretile Express A9x4 (V2P-CA9) HBI-0225:
++	arm,hbi = <0x225>;
++
++Top-level standard "cpus" node is required. It must contain a node
++with device_type = "cpu" property for every available core, eg.:
++
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		cpu at 0 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a5";
++			reg = <0>;
++		};
++	};
++
++The motherboard description file provides a single "motherboard" node
++using 2 address cells corresponding to the Static Memory Bus used
++between the motherboard and the tile. The first cell defines the Chip
++Select (CS) line number, the second cell address offset within the CS.
++All interrupt lines between the motherboard and the tile are active
++high and are described using single cell.
++
++Optional properties of the "motherboard" node:
++- motherboard's memory map variant:
++	arm,v2m-memory-map = "<name>";
++  where name is one of:
++  - "rs1" - for RS1 map (i.a. peripherals on CS3); this map is also
++            referred to as "ARM Cortex-A Series memory map":
++	arm,v2m-memory-map = "rs1";
++  When this property is missing, the motherboard is using the original
++  memory map (also known as the "Legacy memory map", primarily used
++  with the original CoreTile Express A9x4) with peripherals on CS7.
++
++Motherboard .dtsi files provide a set of labelled peripherals that
++can be used to obtain required phandle in the tile's "aliases" node:
++- UARTs, note that the numbers correspond to the physical connectors
++  on the motherboard's back panel:
++	v2m_serial0, v2m_serial1, v2m_serial2 and v2m_serial3
++- I2C controllers:
++	v2m_i2c_dvi and v2m_i2c_pcie
++- SP804 timers:
++	v2m_timer01 and v2m_timer23
++
++Current Linux implementation requires a "arm,v2m_timer" alias
++pointing at one of the motherboard's SP804 timers, if it is to be
++used as the system timer. This alias should be defined in the
++motherboard files.
++
++The tile description must define "ranges", "interrupt-map-mask" and
++"interrupt-map" properties to translate the motherboard's address
++and interrupt space into one used by the tile's processor.
++
++Abbreviated example:
++
++/dts-v1/;
++
++/include/ "skeleton.dtsi"
++
++/ {
++	model = "V2P-CA5s";
++	arm,hbi = <0x225>;
++	compatible = "arm,vexpress-v2p-ca5s", "arm,vexpress";
++	interrupt-parent = <&gic>;
++
++	aliases {
++		serial0 = &v2m_serial0;
++	};
++
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		cpu at 0 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a5";
++			reg = <0>;
++		};
++	};
++
++	gic: interrupt-controller at 2c001000 {
++		compatible = "arm,cortex-a9-gic";
++		#interrupt-cells = <3>;
++		#address-cells = <0>;
++		interrupt-controller;
++		reg = <0x2c001000 0x1000>,
++		      <0x2c000100 0x100>;
++	};
++
++	motherboard {
++		/* CS0 is visible at 0x08000000 */
++		ranges = <0 0 0x08000000 0x04000000>;
++		interrupt-map-mask = <0 0 63>;
++		/* Active high IRQ 0 is connected to GIC's SPI0 */
++		interrupt-map = <0 0 0 &gic 0 0 4>;
++	};
++};
++
++/include/ "vexpress-v2m-rs1.dtsi"
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index e084b7e..9e71684 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1440,7 +1440,7 @@ config SMP
+ 	depends on GENERIC_CLOCKEVENTS
+ 	depends on REALVIEW_EB_ARM11MP || REALVIEW_EB_A9MP || \
+ 		 MACH_REALVIEW_PB11MP || MACH_REALVIEW_PBX || ARCH_OMAP4 || \
+-		 ARCH_EXYNOS4 || ARCH_TEGRA || ARCH_U8500 || ARCH_VEXPRESS_CA9X4 || \
++		 ARCH_EXYNOS4 || ARCH_TEGRA || ARCH_U8500 || ARCH_VEXPRESS || \
+ 		 ARCH_MSM_SCORPIONMP || ARCH_SHMOBILE || ARCH_HIGHBANK || SOC_IMX6Q
+ 	depends on MMU
+ 	select USE_GENERIC_SMP_HELPERS
+diff --git a/arch/arm/boot/dts/vexpress-v2m.dtsi b/arch/arm/boot/dts/vexpress-v2m.dtsi
+new file mode 100644
+index 0000000..7bc29e9
+--- /dev/null
++++ b/arch/arm/boot/dts/vexpress-v2m.dtsi
+@@ -0,0 +1,195 @@
 +/*
 + * ARM Ltd. Versatile Express
 + *
@@ -33,15 +202,15 @@ index 0000000..a7d385f
 + *
 + * HBI-0190D
 + *
-+ * RS1 memory map ("ARM Cortex-A Series memory map" in the board's
++ * Original memory map ("Legacy memory map" in the board's
 + * Technical Reference Manual)
 + *
 + * WARNING! The hardware described in this file is independent from the
-+ * original variant (vexpress-v2m.dtsi), but there is a strong
++ * RS1 variant (vexpress-v2m-rs1.dtsi), but there is a strong
 + * correspondence between the two configurations.
 + *
 + * TAKE CARE WHEN MAINTAINING THIS FILE TO PROPAGATE ANY RELEVANT
-+ * CHANGES TO vexpress-v2m.dtsi!
++ * CHANGES TO vexpress-v2m-rs1.dtsi!
 + */
 +
 +/ {
@@ -51,7 +220,6 @@ index 0000000..a7d385f
 +
 +	motherboard {
 +		compatible = "simple-bus";
-+		arm,v2m-memory-map = "rs1";
 +		#address-cells = <2>; /* SMB chipselect number and offset */
 +		#size-cells = <1>;
 +		#interrupt-cells = <1>;
@@ -59,19 +227,19 @@ index 0000000..a7d385f
 +		flash at 0,00000000 {
 +			compatible = "arm,vexpress-flash", "cfi-flash";
 +			reg = <0 0x00000000 0x04000000>,
-+			      <4 0x00000000 0x04000000>;
++			      <1 0x00000000 0x04000000>;
 +			bank-width = <4>;
 +		};
 +
-+		psram at 1,00000000 {
++		psram at 2,00000000 {
 +			compatible = "mtd-ram";
-+			reg = <1 0x00000000 0x02000000>;
++			reg = <2 0x00000000 0x02000000>;
 +			bank-width = <4>;
 +		};
 +
-+		ethernet at 2,02000000 {
++		ethernet at 3,02000000 {
 +			compatible = "smsc,lan9118", "smsc,lan9115";
-+			reg = <2 0x02000000 0x10000>;
++			reg = <3 0x02000000 0x10000>;
 +			interrupts = <15>;
 +			phy-mode = "mii";
 +			reg-io-width = <4>;
@@ -79,33 +247,33 @@ index 0000000..a7d385f
 +			smsc,irq-push-pull;
 +		};
 +
-+		usb at 2,03000000 {
++		usb at 3,03000000 {
 +			compatible = "nxp,usb-isp1761";
-+			reg = <2 0x03000000 0x20000>;
++			reg = <3 0x03000000 0x20000>;
 +			interrupts = <16>;
 +			port1-otg;
 +		};
 +
-+		iofpga at 3,00000000 {
++		iofpga at 7,00000000 {
 +			compatible = "arm,amba-bus", "simple-bus";
 +			#address-cells = <1>;
 +			#size-cells = <1>;
-+			ranges = <0 3 0 0x200000>;
++			ranges = <0 7 0 0x20000>;
 +
-+			sysreg at 010000 {
++			sysreg at 00000 {
 +				compatible = "arm,vexpress-sysreg";
-+				reg = <0x010000 0x1000>;
++				reg = <0x00000 0x1000>;
 +			};
 +
-+			sysctl at 020000 {
++			sysctl at 01000 {
 +				compatible = "arm,sp810", "arm,primecell";
-+				reg = <0x020000 0x1000>;
++				reg = <0x01000 0x1000>;
 +			};
 +
 +			/* PCI-E I2C bus */
-+			v2m_i2c_pcie: i2c at 030000 {
++			v2m_i2c_pcie: i2c at 02000 {
 +				compatible = "arm,versatile-i2c";
-+				reg = <0x030000 0x1000>;
++				reg = <0x02000 0x1000>;
 +
 +				#address-cells = <1>;
 +				#size-cells = <0>;
@@ -116,75 +284,75 @@ index 0000000..a7d385f
 +				};
 +			};
 +
-+			aaci at 040000 {
++			aaci at 04000 {
 +				compatible = "arm,pl041", "arm,primecell";
-+				reg = <0x040000 0x1000>;
++				reg = <0x04000 0x1000>;
 +				interrupts = <11>;
 +			};
 +
-+			mmci at 050000 {
++			mmci at 05000 {
 +				compatible = "arm,pl180", "arm,primecell";
-+				reg = <0x050000 0x1000>;
++				reg = <0x05000 0x1000>;
 +				interrupts = <9 10>;
 +			};
 +
-+			kmi at 060000 {
++			kmi at 06000 {
 +				compatible = "arm,pl050", "arm,primecell";
-+				reg = <0x060000 0x1000>;
++				reg = <0x06000 0x1000>;
 +				interrupts = <12>;
 +			};
 +
-+			kmi at 070000 {
++			kmi at 07000 {
 +				compatible = "arm,pl050", "arm,primecell";
-+				reg = <0x070000 0x1000>;
++				reg = <0x07000 0x1000>;
 +				interrupts = <13>;
 +			};
 +
-+			v2m_serial0: uart at 090000 {
++			v2m_serial0: uart at 09000 {
 +				compatible = "arm,pl011", "arm,primecell";
-+				reg = <0x090000 0x1000>;
++				reg = <0x09000 0x1000>;
 +				interrupts = <5>;
 +			};
 +
-+			v2m_serial1: uart at 0a0000 {
++			v2m_serial1: uart at 0a000 {
 +				compatible = "arm,pl011", "arm,primecell";
-+				reg = <0x0a0000 0x1000>;
++				reg = <0x0a000 0x1000>;
 +				interrupts = <6>;
 +			};
 +
-+			v2m_serial2: uart at 0b0000 {
++			v2m_serial2: uart at 0b000 {
 +				compatible = "arm,pl011", "arm,primecell";
-+				reg = <0x0b0000 0x1000>;
++				reg = <0x0b000 0x1000>;
 +				interrupts = <7>;
 +			};
 +
-+			v2m_serial3: uart at 0c0000 {
++			v2m_serial3: uart at 0c000 {
 +				compatible = "arm,pl011", "arm,primecell";
-+				reg = <0x0c0000 0x1000>;
++				reg = <0x0c000 0x1000>;
 +				interrupts = <8>;
 +			};
 +
-+			wdt at 0f0000 {
++			wdt at 0f000 {
 +				compatible = "arm,sp805", "arm,primecell";
-+				reg = <0x0f0000 0x1000>;
++				reg = <0x0f000 0x1000>;
 +				interrupts = <0>;
 +			};
 +
-+			v2m_timer01: timer at 110000 {
++			v2m_timer01: timer at 11000 {
 +				compatible = "arm,sp804", "arm,primecell";
-+				reg = <0x110000 0x1000>;
++				reg = <0x11000 0x1000>;
 +				interrupts = <2>;
 +			};
 +
-+			v2m_timer23: timer at 120000 {
++			v2m_timer23: timer at 12000 {
 +				compatible = "arm,sp804", "arm,primecell";
-+				reg = <0x120000 0x1000>;
++				reg = <0x12000 0x1000>;
 +			};
 +
 +			/* DVI I2C bus */
-+			v2m_i2c_dvi: i2c at 160000 {
++			v2m_i2c_dvi: i2c at 16000 {
 +				compatible = "arm,versatile-i2c";
-+				reg = <0x160000 0x1000>;
++				reg = <0x16000 0x1000>;
 +
 +				#address-cells = <1>;
 +				#size-cells = <0>;
@@ -200,191 +368,306 @@ index 0000000..a7d385f
 +				};
 +			};
 +
-+			rtc at 170000 {
++			rtc at 17000 {
 +				compatible = "arm,pl031", "arm,primecell";
-+				reg = <0x170000 0x1000>;
++				reg = <0x17000 0x1000>;
 +				interrupts = <4>;
 +			};
 +
-+			compact-flash at 1a0000 {
++			compact-flash at 1a000 {
 +				compatible = "arm,vexpress-cf", "ata-generic";
-+				reg = <0x1a0000 0x100
-+				       0x1a0100 0xf00>;
++				reg = <0x1a000 0x100
++				       0x1a100 0xf00>;
 +				reg-shift = <2>;
 +			};
 +
-+			clcd at 1f0000 {
++			clcd at 1f000 {
 +				compatible = "arm,pl111", "arm,primecell";
-+				reg = <0x1f0000 0x1000>;
++				reg = <0x1f000 0x1000>;
 +				interrupts = <14>;
 +			};
 +		};
 +	};
 +};
-diff --git a/arch/arm/mach-vexpress/include/mach/debug-macro.S b/arch/arm/mach-vexpress/include/mach/debug-macro.S
-index fd9e6c7..8010ff9 100644
---- a/arch/arm/mach-vexpress/include/mach/debug-macro.S
-+++ b/arch/arm/mach-vexpress/include/mach/debug-macro.S
-@@ -10,12 +10,41 @@
-  * published by the Free Software Foundation.
-  */
+diff --git a/arch/arm/mach-vexpress/Kconfig b/arch/arm/mach-vexpress/Kconfig
+index 9311484..4c1dcd0 100644
+--- a/arch/arm/mach-vexpress/Kconfig
++++ b/arch/arm/mach-vexpress/Kconfig
+@@ -1,12 +1,51 @@
+ menu "Versatile Express platform type"
+ 	depends on ARCH_VEXPRESS
  
--#define DEBUG_LL_UART_OFFSET	0x00009000
-+#define DEBUG_LL_PHYS_BASE		0x10000000
-+#define DEBUG_LL_UART_OFFSET		0x00009000
++config ARCH_VEXPRESS_CORTEX_A5_A9_ERRATA
++	bool
++	select ARM_ERRATA_720789
++	select ARM_ERRATA_751472
++	select PL310_ERRATA_753970 if CACHE_PL310
++	help
++	  Provides common dependencies for Versatile Express platforms
++	  based on Cortex-A5 and Cortex-A9 processors. In order to
++	  build a working kernel, you must also enable relevant core
++	  tile support or Flattened Device Tree based support options.
 +
-+#define DEBUG_LL_PHYS_BASE_RS1		0x1c000000
-+#define DEBUG_LL_UART_OFFSET_RS1	0x00090000
+ config ARCH_VEXPRESS_CA9X4
+ 	bool "Versatile Express Cortex-A9x4 tile"
++	select ARCH_VEXPRESS_CORTEX_A5_A9_ERRATA
++	select ARM_GIC
+ 	select CPU_V7
 +
-+#define DEBUG_LL_VIRT_BASE		0xf8000000
++config ARCH_VEXPRESS_DT
++	bool "Device Tree support for Versatile Express platforms"
++	select ARCH_VEXPRESS_CORTEX_A5_A9_ERRATA
+ 	select ARM_GIC
+-	select ARM_ERRATA_720789
+-	select ARM_ERRATA_751472
+-	select ARM_ERRATA_753970
++	select ARM_PATCH_PHYS_VIRT
++	select AUTO_ZRELADDR
++	select CPU_V7
++	select USE_OF
++	help
++	  New Versatile Express platforms require Flattened Device Tree to
++	  be passed to the kernel.
++
++	  This option enables support for systems using Cortex processor based
++	  ARM core and logic (FPGA) tiles on the Versatile Express motherboard,
++	  for example:
++
++	  - CoreTile Express A5x2 (V2P-CA5s)
++	  - CoreTile Express A9x4 (V2P-CA9)
++	  - CoreTile Express A15x2 (V2P-CA15)
++	  - LogicTile Express 13MG (V2F-2XV6) with A5, A7, A9 or A15 SMMs
++	    (Soft Macrocell Models)
++	  - Versatile Express RTSMs (Models)
++
++	  You must boot using a Flattened Device Tree in order to use these
++	  platforms. The traditional (ATAGs) boot method is not usable on
++	  these boards with this option.
++
++	  If your bootloader supports Flattened Device Tree based booting,
++	  say Y here.
  
- 		.macro	addruart,rp,rv,tmp
--		mov	\rp, #DEBUG_LL_UART_OFFSET
--		orr	\rv, \rp, #0xf8000000	@ virtual base
--		orr	\rp, \rp, #0x10000000	@ physical base
-+
-+		@ Check the MMU state
-+#if defined(CONFIG_MMU)
-+		mrc	p15, 0, \tmp, c1, c0	@ SCTRL
-+		tst	\tmp, #1		@ MMU enabled?
-+		moveq	\tmp, #DEBUG_LL_PHYS_BASE
-+		movne	\tmp, #DEBUG_LL_VIRT_BASE
-+#else
-+		mov	\tmp, #DEBUG_LL_PHYS_BASE
-+#endif
-+
-+		@ PL011 present in "original" place?
-+		orr	\tmp, \tmp, #DEBUG_LL_UART_OFFSET
-+		ldr	\tmp, [\tmp, #0xfe0]	@ PeriphID0
-+		teq	\tmp, #0x11		@ PL011
-+
-+		@ Original memory map
-+		moveq	\rp, #DEBUG_LL_UART_OFFSET
-+		orreq	\rv, \rp, #DEBUG_LL_VIRT_BASE
-+		orreq	\rp, \rp, #DEBUG_LL_PHYS_BASE
-+
-+		@ RS1 memory map
-+		movne	\rp, #DEBUG_LL_UART_OFFSET_RS1
-+		orrne	\rv, \rp, #DEBUG_LL_VIRT_BASE
-+		orrne	\rp, \rp, #DEBUG_LL_PHYS_BASE_RS1
-+
- 		.endm
- 
- #include <asm/hardware/debug-pl01x.S>
-diff --git a/arch/arm/mach-vexpress/include/mach/uncompress.h b/arch/arm/mach-vexpress/include/mach/uncompress.h
-index 7972c57..c491565 100644
---- a/arch/arm/mach-vexpress/include/mach/uncompress.h
-+++ b/arch/arm/mach-vexpress/include/mach/uncompress.h
-@@ -22,7 +22,18 @@
- #define AMBA_UART_CR(base)	(*(volatile unsigned char *)((base) + 0x30))
- #define AMBA_UART_FR(base)	(*(volatile unsigned char *)((base) + 0x18))
- 
--#define get_uart_base()	(0x10000000 + 0x00009000)
-+#define AMBA_PERIPH_ID0(base)	(*(volatile unsigned char *)((base) + 0xfe0))
-+
-+#define UART_BASE	0x10009000
-+#define UART_BASE_RS1	0x1c090000
-+
-+static unsigned long get_uart_base(void)
-+{
-+	if (AMBA_PERIPH_ID0(UART_BASE) == 0x11)
-+		return UART_BASE;
-+	else
-+		return UART_BASE_RS1;
-+}
+ endmenu
+diff --git a/arch/arm/mach-vexpress/Makefile.boot b/arch/arm/mach-vexpress/Makefile.boot
+index 8630b3d..c6dd891 100644
+--- a/arch/arm/mach-vexpress/Makefile.boot
++++ b/arch/arm/mach-vexpress/Makefile.boot
+@@ -1,3 +1,5 @@
++# Those numbers are used only by the non-DT V2P-CA9 platform
++# The DT-enabled ones require CONFIG_AUTO_ZRELADDR=y
+    zreladdr-y	+= 0x60008000
+ params_phys-y	:= 0x60000100
+ initrd_phys-y	:= 0x60800000
+diff --git a/arch/arm/mach-vexpress/include/mach/motherboard.h b/arch/arm/mach-vexpress/include/mach/motherboard.h
+index b4c498c..31a9289 100644
+--- a/arch/arm/mach-vexpress/include/mach/motherboard.h
++++ b/arch/arm/mach-vexpress/include/mach/motherboard.h
+@@ -117,6 +117,12 @@ int v2m_cfg_read(u32 devfn, u32 *data);
+ void v2m_flags_set(u32 data);
  
  /*
-  * This does not append a newline
++ * Miscellaneous
++ */
++#define SYS_MISC_MASTERSITE	(1 << 14)
++#define SYS_PROCIDx_HBI_MASK	0xfff
++
++/*
+  * Core tile IDs
+  */
+ #define V2M_CT_ID_CA9		0x0c000191
 diff --git a/arch/arm/mach-vexpress/v2m.c b/arch/arm/mach-vexpress/v2m.c
-index 2544958..c5aff7b 100644
+index 05b4f46..2544958 100644
 --- a/arch/arm/mach-vexpress/v2m.c
 +++ b/arch/arm/mach-vexpress/v2m.c
-@@ -484,9 +484,38 @@ MACHINE_END
+@@ -6,6 +6,10 @@
+ #include <linux/amba/mmci.h>
+ #include <linux/io.h>
+ #include <linux/init.h>
++#include <linux/of_address.h>
++#include <linux/of_fdt.h>
++#include <linux/of_irq.h>
++#include <linux/of_platform.h>
+ #include <linux/platform_device.h>
+ #include <linux/ata_platform.h>
+ #include <linux/smsc911x.h>
+@@ -21,6 +25,8 @@
+ #include <asm/mach/map.h>
+ #include <asm/mach/time.h>
+ #include <asm/hardware/arm_timer.h>
++#include <asm/hardware/cache-l2x0.h>
++#include <asm/hardware/gic.h>
+ #include <asm/hardware/timer-sp.h>
+ #include <asm/hardware/sp810.h>
  
- #if defined(CONFIG_ARCH_VEXPRESS_DT)
+@@ -429,8 +435,9 @@ static void __init v2m_populate_ct_desc(void)
+ 			ct_desc = ct_descs[i];
  
-+static struct map_desc v2m_rs1_io_desc[] __initdata = {
-+	{
-+		.virtual	= (unsigned long)V2M_PERIPH,
-+		.pfn		= __phys_to_pfn(0x1c000000),
-+		.length		= SZ_2M,
-+		.type		= MT_DEVICE,
+ 	if (!ct_desc)
+-		panic("vexpress: failed to populate core tile description "
+-		      "for tile ID 0x%8x\n", current_tile_id);
++		panic("vexpress: this kernel does not support core tile ID 0x%08x when booting via ATAGs.\n"
++		      "You may need a device tree blob or a different kernel to boot on this board.\n",
++		      current_tile_id);
+ }
+ 
+ static void __init v2m_map_io(void)
+@@ -474,3 +481,144 @@ MACHINE_START(VEXPRESS, "ARM-Versatile Express")
+ 	.timer		= &v2m_timer,
+ 	.init_machine	= v2m_init,
+ MACHINE_END
++
++#if defined(CONFIG_ARCH_VEXPRESS_DT)
++
++void __init v2m_dt_map_io(void)
++{
++	iotable_init(v2m_io_desc, ARRAY_SIZE(v2m_io_desc));
++}
++
++static struct clk_lookup v2m_dt_lookups[] = {
++	{	/* AMBA bus clock */
++		.con_id		= "apb_pclk",
++		.clk		= &dummy_apb_pclk,
++	}, {	/* SP804 timers */
++		.dev_id		= "sp804",
++		.con_id		= "v2m-timer0",
++		.clk		= &v2m_sp804_clk,
++	}, {	/* SP804 timers */
++		.dev_id		= "sp804",
++		.con_id		= "v2m-timer1",
++		.clk		= &v2m_sp804_clk,
++	}, {	/* PL180 MMCI */
++		.dev_id		= "mb:mmci", /* 10005000.mmci */
++		.clk		= &osc2_clk,
++	}, {	/* PL050 KMI0 */
++		.dev_id		= "10006000.kmi",
++		.clk		= &osc2_clk,
++	}, {	/* PL050 KMI1 */
++		.dev_id		= "10007000.kmi",
++		.clk		= &osc2_clk,
++	}, {	/* PL011 UART0 */
++		.dev_id		= "10009000.uart",
++		.clk		= &osc2_clk,
++	}, {	/* PL011 UART1 */
++		.dev_id		= "1000a000.uart",
++		.clk		= &osc2_clk,
++	}, {	/* PL011 UART2 */
++		.dev_id		= "1000b000.uart",
++		.clk		= &osc2_clk,
++	}, {	/* PL011 UART3 */
++		.dev_id		= "1000c000.uart",
++		.clk		= &osc2_clk,
++	}, {	/* SP805 WDT */
++		.dev_id		= "1000f000.wdt",
++		.clk		= &v2m_ref_clk,
++	}, {	/* PL111 CLCD */
++		.dev_id		= "1001f000.clcd",
++		.clk		= &osc1_clk,
 +	},
 +};
 +
-+static int __init v2m_dt_scan_memory_map(unsigned long node, const char *uname,
-+		int depth, void *data)
++void __init v2m_dt_init_early(void)
 +{
-+	const char **map = data;
++	struct device_node *node;
++	const __be32 *reg;
++	u32 dt_hbi;
 +
-+	if (strcmp(uname, "motherboard") != 0)
-+		return 0;
++	node = of_find_compatible_node(NULL, NULL, "arm,vexpress-sysreg");
++	reg = of_get_property(node, "reg", NULL);
++	if (WARN_ON(!reg))
++		return;
 +
-+	*map = of_get_flat_dt_prop(node, "arm,v2m-memory-map", NULL);
++	v2m_sysreg_base = V2M_PERIPH + be32_to_cpup(reg);
 +
-+	return 1;
++	/* Confirm board type against DT property, if available */
++	if (of_property_read_u32(allnodes, "arm,hbi", &dt_hbi) == 0) {
++		u32 misc = readl(v2m_sysreg_base + V2M_SYS_MISC);
++		u32 id = readl(v2m_sysreg_base + (misc & SYS_MISC_MASTERSITE ?
++				V2M_SYS_PROCID1 : V2M_SYS_PROCID0));
++		u32 hbi = id & SYS_PROCIDx_HBI_MASK;
++
++		if (WARN_ON(dt_hbi != hbi))
++			pr_warning("vexpress: DT HBI (%x) is not matching "
++					"hardware (%x)!\n", dt_hbi, hbi);
++	}
++
++	clkdev_add_table(v2m_dt_lookups, ARRAY_SIZE(v2m_dt_lookups));
++	versatile_sched_clock_init(v2m_sysreg_base + V2M_SYS_24MHZ, 24000000);
++
++	pm_power_off = v2m_power_off;
++	arm_pm_restart = v2m_restart;
 +}
 +
- void __init v2m_dt_map_io(void)
- {
--	iotable_init(v2m_io_desc, ARRAY_SIZE(v2m_io_desc));
-+	const char *map = NULL;
++static  struct of_device_id vexpress_irq_match[] __initdata = {
++	{ .compatible = "arm,cortex-a9-gic", .data = gic_of_init, },
++	{}
++};
 +
-+	of_scan_flat_dt(v2m_dt_scan_memory_map, &map);
++static void __init v2m_dt_init_irq(void)
++{
++	of_irq_init(vexpress_irq_match);
++}
 +
-+	if (map && strcmp(map, "rs1") == 0)
-+		iotable_init(v2m_rs1_io_desc, ARRAY_SIZE(v2m_rs1_io_desc));
-+	else
-+		iotable_init(v2m_io_desc, ARRAY_SIZE(v2m_io_desc));
- }
- 
- static struct clk_lookup v2m_dt_lookups[] = {
-@@ -529,6 +558,35 @@ static struct clk_lookup v2m_dt_lookups[] = {
- 		.dev_id		= "1001f000.clcd",
- 		.clk		= &osc1_clk,
- 	},
-+	/* RS1 memory map */
-+	{	/* PL180 MMCI */
-+		.dev_id		= "mb:mmci", /* 1c050000.mmci */
-+		.clk		= &osc2_clk,
-+	}, {	/* PL050 KMI0 */
-+		.dev_id		= "1c060000.kmi",
-+		.clk		= &osc2_clk,
-+	}, {	/* PL050 KMI1 */
-+		.dev_id		= "1c070000.kmi",
-+		.clk		= &osc2_clk,
-+	}, {	/* PL011 UART0 */
-+		.dev_id		= "1c090000.uart",
-+		.clk		= &osc2_clk,
-+	}, {	/* PL011 UART1 */
-+		.dev_id		= "1c0a0000.uart",
-+		.clk		= &osc2_clk,
-+	}, {	/* PL011 UART2 */
-+		.dev_id		= "1c0b0000.uart",
-+		.clk		= &osc2_clk,
-+	}, {	/* PL011 UART3 */
-+		.dev_id		= "1c0c0000.uart",
-+		.clk		= &osc2_clk,
-+	}, {	/* SP805 WDT */
-+		.dev_id		= "1c0f0000.wdt",
-+		.clk		= &v2m_ref_clk,
-+	}, {	/* PL111 CLCD */
-+		.dev_id		= "1c1f0000.clcd",
-+		.clk		= &osc1_clk,
-+	},
- };
- 
- void __init v2m_dt_init_early(void)
-@@ -597,6 +655,10 @@ static struct of_dev_auxdata v2m_dt_auxdata_lookup[] __initdata = {
- 	OF_DEV_AUXDATA("arm,vexpress-flash", V2M_NOR0, "physmap-flash",
- 			&v2m_flash_data),
- 	OF_DEV_AUXDATA("arm,primecell", V2M_MMCI, "mb:mmci", &v2m_mmci_data),
-+	/* RS1 memory map */
-+	OF_DEV_AUXDATA("arm,vexpress-flash", 0x08000000, "physmap-flash",
++static void __init v2m_dt_timer_init(void)
++{
++	struct device_node *node;
++	const char *path;
++	int err;
++
++	node = of_find_compatible_node(NULL, NULL, "arm,sp810");
++	v2m_sysctl_init(of_iomap(node, 0));
++
++	err = of_property_read_string(of_aliases, "arm,v2m_timer", &path);
++	if (WARN_ON(err))
++		return;
++	node = of_find_node_by_path(path);
++	v2m_sp804_init(of_iomap(node, 0), irq_of_parse_and_map(node, 0));
++}
++
++static struct sys_timer v2m_dt_timer = {
++	.init = v2m_dt_timer_init,
++};
++
++static struct of_dev_auxdata v2m_dt_auxdata_lookup[] __initdata = {
++	OF_DEV_AUXDATA("arm,vexpress-flash", V2M_NOR0, "physmap-flash",
 +			&v2m_flash_data),
-+	OF_DEV_AUXDATA("arm,primecell", 0x1c050000, "mb:mmci", &v2m_mmci_data),
- 	{}
- };
- 
++	OF_DEV_AUXDATA("arm,primecell", V2M_MMCI, "mb:mmci", &v2m_mmci_data),
++	{}
++};
++
++static void __init v2m_dt_init(void)
++{
++	l2x0_of_init(0x00400000, 0xfe0fffff);
++	of_platform_populate(NULL, of_default_bus_match_table,
++			v2m_dt_auxdata_lookup, NULL);
++}
++
++static const char *v2m_dt_match[] __initdata = {
++	"arm,vexpress",
++	NULL,
++};
++
++DT_MACHINE_START(VEXPRESS_DT, "ARM Versatile Express")
++	.map_io		= v2m_dt_map_io,
++	.init_early	= v2m_dt_init_early,
++	.init_irq	= v2m_dt_init_irq,
++	.timer		= &v2m_dt_timer,
++	.init_machine	= v2m_dt_init,
++	.dt_compat	= v2m_dt_match,
++MACHINE_END
++
++#endif
+diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+index 67f75a0..2506e58 100644
+--- a/arch/arm/mm/Kconfig
++++ b/arch/arm/mm/Kconfig
+@@ -821,7 +821,7 @@ config CACHE_L2X0
+ 	depends on REALVIEW_EB_ARM11MP || MACH_REALVIEW_PB11MP || MACH_REALVIEW_PB1176 || \
+ 		   REALVIEW_EB_A9MP || ARCH_IMX_V6_V7 || MACH_REALVIEW_PBX || \
+ 		   ARCH_NOMADIK || ARCH_OMAP4 || ARCH_EXYNOS4 || ARCH_TEGRA || \
+-		   ARCH_U8500 || ARCH_VEXPRESS_CA9X4 || ARCH_SHMOBILE || \
++		   ARCH_U8500 || ARCH_VEXPRESS || ARCH_SHMOBILE || \
+ 		   ARCH_PRIMA2 || ARCH_ZYNQ || ARCH_CNS3XXX || ARCH_HIGHBANK
+ 	default y
+ 	select OUTER_CACHE
 -- 
 1.7.5.4
