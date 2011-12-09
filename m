@@ -1,57 +1,45 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Fri, 09 Dec 2011 18:14:49 -0500 (EST)
-Subject: [PATCH] ARM: only show modules in the memory layout for MODULES=y
-In-Reply-To: <1323466291-9679-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1323466291-9679-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <alpine.LFD.2.02.1112091813130.2907@xanadu.home>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Fri, 9 Dec 2011 18:17:40 -0500 (EST)
+Subject: [PATCH] arm: standardize /proc/iomem "Kernel code" name
+In-Reply-To: <20111209211157.GA2146@outflux.net>
+References: <20111209211157.GA2146@outflux.net>
+Message-ID: <alpine.LFD.2.02.1112091815400.2907@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 9 Dec 2011, Uwe Kleine-K?nig wrote:
+On Fri, 9 Dec 2011, Kees Cook wrote:
 
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-
-If compilation breaks without this with CONFIG_MODULES=n then please say 
-so in the commit log.
-
-Otherwise:
+> All other ports use "Kernel code" to identify the Kernel text segment
+> in /proc/iomem. Change the ARM resources to do the same.
+> 
+> Signed-off-by: Kees Cook <keescook@chromium.org>
 
 Acked-by: Nicolas Pitre <nico@linaro.org>
 
+Please submit the patch here:
+http://www.arm.linux.org.uk/developer/patches/
+
 > ---
->  arch/arm/mm/init.c |    4 ++++
->  1 files changed, 4 insertions(+), 0 deletions(-)
+>  arch/arm/kernel/setup.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
 > 
-> diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-> index fbdd12e..80def74 100644
-> --- a/arch/arm/mm/init.c
-> +++ b/arch/arm/mm/init.c
-> @@ -666,7 +666,9 @@ void __init mem_init(void)
->  #ifdef CONFIG_HIGHMEM
->  			"    pkmap   : 0x%08lx - 0x%08lx   (%4ld MB)\n"
->  #endif
-> +#ifdef CONFIG_MODULES
->  			"    modules : 0x%08lx - 0x%08lx   (%4ld MB)\n"
-> +#endif
->  			"      .text : 0x%p" " - 0x%p" "   (%4d kB)\n"
->  			"      .init : 0x%p" " - 0x%p" "   (%4d kB)\n"
->  			"      .data : 0x%p" " - 0x%p" "   (%4d kB)\n"
-> @@ -685,7 +687,9 @@ void __init mem_init(void)
->  			MLM(PKMAP_BASE, (PKMAP_BASE) + (LAST_PKMAP) *
->  				(PAGE_SIZE)),
->  #endif
-> +#ifdef CONFIG_MODULES
->  			MLM(MODULES_VADDR, MODULES_END),
-> +#endif
->  
->  			MLK_ROUNDUP(_text, _etext),
->  			MLK_ROUNDUP(__init_begin, __init_end),
+> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+> index 3448a3f..a34dbf6 100644
+> --- a/arch/arm/kernel/setup.c
+> +++ b/arch/arm/kernel/setup.c
+> @@ -158,7 +158,7 @@ static struct resource mem_res[] = {
+>  		.flags = IORESOURCE_MEM
+>  	},
+>  	{
+> -		.name = "Kernel text",
+> +		.name = "Kernel code",
+>  		.start = 0,
+>  		.end = 0,
+>  		.flags = IORESOURCE_MEM
 > -- 
-> 1.7.7.3
+> 1.7.5.4
 > 
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> -- 
+> Kees Cook                                            @outflux.net
 > 
