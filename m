@@ -1,49 +1,41 @@
-From: mchehab@redhat.com (Mauro Carvalho Chehab)
-Date: Sat, 10 Dec 2011 09:13:06 -0200
-Subject: [Linaro-mm-sig] [RFC v2 1/2] dma-buf: Introduce dma buffer sharing
- mechanism
-In-Reply-To: <20111209225056.GL7969@morell.nvidia.com>
-References: <1322816252-19955-1-git-send-email-sumit.semwal@ti.com>
- <1322816252-19955-2-git-send-email-sumit.semwal@ti.com>
- <201112051718.48324.arnd@arndb.de> <20111209225056.GL7969@morell.nvidia.com>
-Message-ID: <4EE33EC2.6050508@redhat.com>
+From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
+Date: Sat, 10 Dec 2011 13:04:29 +0100
+Subject: [PATCH 5/5 v2] ARM: OMAP1: recalculate loops per jiffy after
+ dpll1 reprogram
+In-Reply-To: <20111210002503.GA6018@n2100.arm.linux.org.uk>
+References: <1322364751-29980-6-git-send-email-jkrzyszt@tis.icnet.pl>
+ <201112091100.01690.jkrzyszt@tis.icnet.pl>
+ <20111210002503.GA6018@n2100.arm.linux.org.uk>
+Message-ID: <201112101304.30135.jkrzyszt@tis.icnet.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09-12-2011 20:50, Robert Morell wrote:
-> On Mon, Dec 05, 2011 at 09:18:48AM -0800, Arnd Bergmann wrote:
->> On Friday 02 December 2011, Sumit Semwal wrote:
->>> This is the first step in defining a dma buffer sharing mechanism.
->>
-> [...]
->>
->>> +	return dmabuf;
->>> +}
->>> +EXPORT_SYMBOL(dma_buf_export);
->>
->> I agree with Konrad, this should definitely be EXPORT_SYMBOL_GPL,
->> because it's really a low-level function that I would expect
->> to get used by in-kernel subsystems providing the feature to
->> users and having back-end drivers, but it's not the kind of thing
->> we want out-of-tree drivers to mess with.
->
-> Is this really necessary?  If this is intended to be a
-> lowest-common-denominator between many drivers to allow buffer sharing,
-> it seems like it needs to be able to be usable by all drivers.
->
-> If the interface is not accessible then I fear many drivers will be
-> forced to continue to roll their own buffer sharing mechanisms (which is
-> exactly what we're trying to avoid here, needless to say).
+On Saturday 10 of December 2011 at 01:25:03, Russell King - ARM Linux wrote:
+> On Fri, Dec 09, 2011 at 11:00:01AM +0100, Janusz Krzysztofik wrote:
+> > 
+> > Those were BogoMIPS, ...
+> 
+> I realise that.  But which is which - is 70.40 from recalibrate_delay
+> or is it 74.54?  Your message is too vague to be able to interpret your
+> results because it's impossible to work out what figure refers to which
+> method.
 
-Doing a buffer sharing with something that is not GPL is not fun, as, if any
-issue rises there, it would be impossible to discover if the problem is either
-at the closed-source driver or at the open source one. At the time I was using
-the Nvidia proprietary driver, it was very common to have unexplained issues
-caused likely by bad code there at the buffer management code, causing X
-applications and extensions (like xv) to break.
+Yes, I realised what you had actually asked about after re-reading your 
+answer, which I unfortunately did after I had already replied, sorry.
 
-We should really make this EXPORT_SYMBOL_GPL(), in order to be able to latter
-debug future share buffer issues, when needed.
+> > ... Then, in case of a machine always booting at, let's say, 12 and
+> > then reprogrammed to 150 MHz, we actually scale up that less then the
+> > theoretical number, with a side effect of scaling up its error as well.
+> > Perhaps in this case, when the machine is going to run at that target
+> > rate until rebooted, we should rather decide to recalibrate to keep
+> > that error proportionally small compared to the target loops per
+> > jiffy value ...
+> 
+> It really doesn't matter - udelay() etc is not designed to be mega
+> accurate but good enough... 
 
-Regards,
-Mauro
+Great, that's the answer to my initial question: loops per jiffy 
+inaccuracy of 6% shouldn't matter.
+
+Thanks,
+Janusz
