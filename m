@@ -1,41 +1,39 @@
-From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
-Date: Sat, 10 Dec 2011 13:04:29 +0100
-Subject: [PATCH 5/5 v2] ARM: OMAP1: recalculate loops per jiffy after
- dpll1 reprogram
-In-Reply-To: <20111210002503.GA6018@n2100.arm.linux.org.uk>
-References: <1322364751-29980-6-git-send-email-jkrzyszt@tis.icnet.pl>
- <201112091100.01690.jkrzyszt@tis.icnet.pl>
- <20111210002503.GA6018@n2100.arm.linux.org.uk>
-Message-ID: <201112101304.30135.jkrzyszt@tis.icnet.pl>
+From: will.deacon@arm.com (Will Deacon)
+Date: Sat, 10 Dec 2011 13:20:42 +0000
+Subject: [PATCH 1/4] Add generic ARM instruction set condition code checks.
+In-Reply-To: <20111209185422.19655.40836.stgit@localhost6.localdomain6>
+References: <20111209185302.19655.36481.stgit@localhost6.localdomain6>
+ <20111209185422.19655.40836.stgit@localhost6.localdomain6>
+Message-ID: <20111210132042.GB8292@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 10 of December 2011 at 01:25:03, Russell King - ARM Linux wrote:
-> On Fri, Dec 09, 2011 at 11:00:01AM +0100, Janusz Krzysztofik wrote:
-> > 
-> > Those were BogoMIPS, ...
-> 
-> I realise that.  But which is which - is 70.40 from recalibrate_delay
-> or is it 74.54?  Your message is too vague to be able to interpret your
-> results because it's impossible to work out what figure refers to which
-> method.
+On Fri, Dec 09, 2011 at 06:54:29PM +0000, Leif Lindholm wrote:
+> diff --git a/arch/arm/include/asm/opcodes.h b/arch/arm/include/asm/opcodes.h
+> new file mode 100644
+> index 0000000..aea97bf
+> --- /dev/null
+> +++ b/arch/arm/include/asm/opcodes.h
+> @@ -0,0 +1,20 @@
+> +/*
+> + *  arch/arm/include/asm/opcodes.h
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#ifndef __ASM_ARM_OPCODES_H
+> +#define __ASM_ARM_OPCODES_H
+> +
+> +#ifndef __ASSEMBLY__
+> +extern unsigned int arm_check_condition(unsigned int opcode, unsigned int psr);
+> +#endif
 
-Yes, I realised what you had actually asked about after re-reading your 
-answer, which I unfortunately did after I had already replied, sorry.
+You forgot to update the prototype arguments.
 
-> > ... Then, in case of a machine always booting at, let's say, 12 and
-> > then reprogrammed to 150 MHz, we actually scale up that less then the
-> > theoretical number, with a side effect of scaling up its error as well.
-> > Perhaps in this case, when the machine is going to run at that target
-> > rate until rebooted, we should rather decide to recalibrate to keep
-> > that error proportionally small compared to the target loops per
-> > jiffy value ...
-> 
-> It really doesn't matter - udelay() etc is not designed to be mega
-> accurate but good enough... 
+With that fixed,
 
-Great, that's the answer to my initial question: loops per jiffy 
-inaccuracy of 6% shouldn't matter.
+Reviewed-by: Will Deacon <will.deacon@arm.com>
 
-Thanks,
-Janusz
+Will
