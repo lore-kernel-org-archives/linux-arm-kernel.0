@@ -1,34 +1,33 @@
-From: jean.pihet@newoldbits.com (jean.pihet at newoldbits.com)
-Date: Sat, 10 Dec 2011 10:26:55 +0100
-Subject: [PATCH] OMAP2+: hwmod: remove unused voltagedomain pointer from
- kerneldoc
-Message-ID: <1323509215-30179-1-git-send-email-j-pihet@ti.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Sat, 10 Dec 2011 10:52:53 +0100
+Subject: [PATCH] ARM: provide XIP_VIRT_ADDR for no-MMU builds
+In-Reply-To: <20111210010221.GN14542@n2100.arm.linux.org.uk>
+References: <1323467451-12128-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <20111210010221.GN14542@n2100.arm.linux.org.uk>
+Message-ID: <20111210095253.GV4585@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jean Pihet <j-pihet@ti.com>
+On Sat, Dec 10, 2011 at 01:02:21AM +0000, Russell King - ARM Linux wrote:
+> On Fri, Dec 09, 2011 at 10:50:51PM +0100, Uwe Kleine-K?nig wrote:
+> > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> 
+> Lack of changelog.  Say why this change is required.
+Something like:
 
-Commit fa17f20f (OMAP2+: hwmod: remove unused voltagedomain pointer)
-did remove the voltdm field from the struct omap_hwmod.
-Remove it from the kerneldoc as well.
+	XIP_VIRT_ADDR is needed for XIP builds and currently only
+	defined for builds with CONFIG_MMU.
 
-Signed-off-by: Jean Pihet <j-pihet@ti.com>
-Acked-by: Kevin Hilman <khilman@ti.com>
----
- arch/arm/plat-omap/include/plat/omap_hwmod.h |    1 -
- 1 files changed, 0 insertions(+), 1 deletions(-)
+	Also provide it for no-MMU builds to make it possible to build
+	an XIP kernel for MMU-less machines. As these lack an MMU it has
+	to be an identity mapping.
 
-diff --git a/arch/arm/plat-omap/include/plat/omap_hwmod.h b/arch/arm/plat-omap/include/plat/omap_hwmod.h
-index 5359663..bdc6ee4 100644
---- a/arch/arm/plat-omap/include/plat/omap_hwmod.h
-+++ b/arch/arm/plat-omap/include/plat/omap_hwmod.h
-@@ -480,7 +480,6 @@ struct omap_hwmod_class {
-  * @main_clk: main clock: OMAP clock name
-  * @_clk: pointer to the main struct clk (filled in at runtime)
-  * @opt_clks: other device clocks that drivers can request (0..*)
-- * @voltdm: pointer to voltage domain (filled in at runtime)
-  * @masters: ptr to array of OCP ifs that this hwmod can initiate on
-  * @slaves: ptr to array of OCP ifs that this hwmod can respond on
-  * @dev_attr: arbitrary device attributes that can be passed to the driver
+?
+
+Best regards
+Uwe
+
+
 -- 
-1.7.5.4
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
