@@ -1,306 +1,231 @@
-From: tarun.kanti@ti.com (DebBarma, Tarun Kanti)
-Date: Sat, 10 Dec 2011 22:21:09 +0530
-Subject: [PATCH v8 REPOST 17/24] gpio/omap: fix debounce clock handling
-In-Reply-To: <CAC83ZvLc+gOXp6wD1iXb5juSHyOXbFPCE3cucgq5=R8AYVhXbg@mail.gmail.com>
-References: <1318422697-22247-1-git-send-email-tarun.kanti@ti.com>
- <87hb2jdeof.fsf@ti.com>
- <CAC83ZvK48SQj=GTHcASQ5uFZBXffYZmxUN49qo35MFdJNZj97g@mail.gmail.com>
- <CAC83ZvLc+gOXp6wD1iXb5juSHyOXbFPCE3cucgq5=R8AYVhXbg@mail.gmail.com>
-Message-ID: <CAC83ZvJ8x1NLyH8ZjzvG92A9ZZrv94gXnNbWPPWDpnUhzdz1eg@mail.gmail.com>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Sat, 10 Dec 2011 22:47:39 +0530
+Subject: [PATCH] ARM: Exynos: Add irq domain and device tree support for
+ interrupt combiner
+Message-ID: <1323537459-1848-1-git-send-email-thomas.abraham@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 5, 2011 at 7:27 PM, DebBarma, Tarun Kanti
-<tarun.kanti@ti.com> wrote:
-> On Mon, Nov 7, 2011 at 7:19 PM, DebBarma, Tarun Kanti
-> <tarun.kanti@ti.com> wrote:
->> On Fri, Nov 4, 2011 at 10:10 PM, Kevin Hilman <khilman@ti.com> wrote:
->>> Tarun Kanti DebBarma <tarun.kanti@ti.com> writes:
->>>
->>>> Currently debounce clock state is not tracked in the system.
->>>
->>> ??
->>>
->>> bank->dbck_enable_mask ?
->> As I understand, this only tells which all GPIOs have debounce timeout enabled.
->> But, during system operation as debounce clocks are enabled and disabled I need
->> additional flag to keep track of current state (enabled/disabled).
->> This is what I meant.
->>
->>>
->>>> The bank->dbck
->>>> is enabled/disabled in suspend/idle paths irrespective of whether debounce
->>>> interval has been set or not.
->>>
->>> No. ?It's conditional based on bank->dbck_enable_mask, which is based on
->>> whether or not debounce has been enabled.
->> You are right. I need to rephrase my description.
->>
->>>
->>>> Ideally, it should be handled only for those
->>>> gpio banks where the debounce is enabled.
->>>
->>> AFAICT, it is. ?Please explain more what is actually happening in the
->>> patch, and why.
->> Yes, as I explained above, it is more about the tracking the debounce clock
->> enabled/disabled state for those GPIOs whose debounce timeouts are enabled.
->> I will modify the patch description.
->>
->>>
->>>> In _set_gpio_debounce, enable debounce clock before accessing
->>>> registers.
->>>
->>> This is a separate issue/bug and wants its own patch with descriptive
->>> changelog.
->> OK.
->>
->>>
->>>> Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
->>>> ---
->>>> During further internal testing it was found that image was crashing within
->>>> _set_gpio_debounce(). It is observed that we are trying to access registers
->>>> without enabling debounce clock. This patch incorporates the change whereby
->>>> the debounce clock is enabled before accessing registers and disabled at the
->>>> end of the function.
->>>>
->>>> ?drivers/gpio/gpio-omap.c | ? 60 ++++++++++++++++++++++++++++++++-------------
->>>> ?1 files changed, 42 insertions(+), 18 deletions(-)
->>>>
->>>> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
->>>> index fa6c9c5..85e9c2a 100644
->>>> --- a/drivers/gpio/gpio-omap.c
->>>> +++ b/drivers/gpio/gpio-omap.c
->>>> @@ -65,6 +65,7 @@ struct gpio_bank {
->>>> ? ? ? struct clk *dbck;
->>>> ? ? ? u32 mod_usage;
->>>> ? ? ? u32 dbck_enable_mask;
->>>> + ? ? bool dbck_enabled;
->>>> ? ? ? struct device *dev;
->>>> ? ? ? bool is_mpuio;
->>>> ? ? ? bool dbck_flag;
->>>> @@ -156,6 +157,22 @@ static inline void _gpio_rmw(void __iomem *base, u32 reg, u32 mask, bool set)
->>>> ? ? ? __raw_writel(l, base + reg);
->>>> ?}
->>>>
->>>> +static inline void _gpio_dbck_enable(struct gpio_bank *bank)
->>>> +{
->>>> + ? ? if (bank->dbck_enable_mask && !bank->dbck_enabled) {
->>>> + ? ? ? ? ? ? clk_enable(bank->dbck);
->>>> + ? ? ? ? ? ? bank->dbck_enabled = true;
->>>> + ? ? }
->>>> +}
->>>> +
->>>> +static inline void _gpio_dbck_disable(struct gpio_bank *bank)
->>>> +{
->>>> + ? ? if (bank->dbck_enable_mask && bank->dbck_enabled) {
->>>> + ? ? ? ? ? ? clk_disable(bank->dbck);
->>>> + ? ? ? ? ? ? bank->dbck_enabled = false;
->>>> + ? ? }
->>>> +}
->>>> +
->>>> ?/**
->>>> ? * _set_gpio_debounce - low level gpio debounce time
->>>> ? * @bank: the gpio bank we're acting upon
->>>> @@ -184,22 +201,22 @@ static void _set_gpio_debounce(struct gpio_bank *bank, unsigned gpio,
->>>>
->>>> ? ? ? l = GPIO_BIT(bank, gpio);
->>>>
->>>> + ? ? clk_enable(bank->dbck);
->>>> ? ? ? reg = bank->base + bank->regs->debounce;
->>>> ? ? ? __raw_writel(debounce, reg);
->>>>
->>>> ? ? ? reg = bank->base + bank->regs->debounce_en;
->>>> ? ? ? val = __raw_readl(reg);
->>>>
->>>> - ? ? if (debounce) {
->>>> + ? ? if (debounce)
->>>> ? ? ? ? ? ? ? val |= l;
->>>> - ? ? ? ? ? ? clk_enable(bank->dbck);
->>>> - ? ? } else {
->>>> + ? ? else
->>>> ? ? ? ? ? ? ? val &= ~l;
->>>> - ? ? ? ? ? ? clk_disable(bank->dbck);
->>>> - ? ? }
->>>> +
->>>> ? ? ? bank->dbck_enable_mask = val;
->>>>
->>>> ? ? ? __raw_writel(val, reg);
->>>> + ? ? clk_disable(bank->dbck);
->>>> ?}
->>>>
->>>> ?static inline void set_gpio_trigger(struct gpio_bank *bank, int gpio,
->>>> @@ -485,8 +502,10 @@ static int omap_gpio_request(struct gpio_chip *chip, unsigned offset)
->>>> ? ? ? ?* If this is the first gpio_request for the bank,
->>>> ? ? ? ?* enable the bank module.
->>>> ? ? ? ?*/
->>>> - ? ? if (!bank->mod_usage)
->>>> + ? ? if (!bank->mod_usage) {
->>>> + ? ? ? ? ? ? _gpio_dbck_enable(bank);
->>>> ? ? ? ? ? ? ? pm_runtime_get_sync(bank->dev);
->>>> + ? ? }
->>>>
->>>> ? ? ? spin_lock_irqsave(&bank->lock, flags);
->>>> ? ? ? /* Set trigger to none. You need to enable the desired trigger with
->>>> @@ -549,8 +568,10 @@ static void omap_gpio_free(struct gpio_chip *chip, unsigned offset)
->>>> ? ? ? ?* If this is the last gpio to be freed in the bank,
->>>> ? ? ? ?* disable the bank module.
->>>> ? ? ? ?*/
->>>> - ? ? if (!bank->mod_usage)
->>>> + ? ? if (!bank->mod_usage) {
->>>> ? ? ? ? ? ? ? pm_runtime_put_sync(bank->dev);
->>>> + ? ? ? ? ? ? _gpio_dbck_disable(bank);
->>>
->>> Why not add this to the ->runtime_suspend() callback?
->> Yes, I can move there and test.
->>
->>>
->>>> + ? ? }
->>>> ?}
->>>>
->>>> ?/*
->>>> @@ -829,8 +850,10 @@ static int gpio_debounce(struct gpio_chip *chip, unsigned offset,
->>>>
->>>> ? ? ? if (!bank->dbck) {
->>>> ? ? ? ? ? ? ? bank->dbck = clk_get(bank->dev, "dbclk");
->>>> - ? ? ? ? ? ? if (IS_ERR(bank->dbck))
->>>> + ? ? ? ? ? ? if (IS_ERR(bank->dbck)) {
->>>> ? ? ? ? ? ? ? ? ? ? ? dev_err(bank->dev, "Could not get gpio dbck\n");
->>>> + ? ? ? ? ? ? ? ? ? ? return -EINVAL;
->>>> + ? ? ? ? ? ? }
->>>> ? ? ? }
->>>>
->>>> ? ? ? spin_lock_irqsave(&bank->lock, flags);
->>>> @@ -1086,6 +1109,8 @@ static int omap_gpio_suspend(struct device *dev)
->>>> ? ? ? ? ? ? ? bank->saved_wakeup = __raw_readl(wake_status);
->>>> ? ? ? ? ? ? ? _gpio_rmw(base, bank->regs->wkup_en, bank->suspend_wakeup, 1);
->>>> ? ? ? ? ? ? ? spin_unlock_irqrestore(&bank->lock, flags);
->>>> +
->>>> + ? ? ? ? ? ? _gpio_dbck_disable(bank);
->>>
->>> If this call was in the ->runtime_suspend() callback, you wouldn't need
->>> it here.
->> Yes.
->>
->>>
->>>> ? ? ? }
->>>>
->>>> ? ? ? return 0;
->>>> @@ -1102,6 +1127,8 @@ static int omap_gpio_resume(struct device *dev)
->>>> ? ? ? ? ? ? ? if (!bank->regs->wkup_en)
->>>> ? ? ? ? ? ? ? ? ? ? ? return 0;
->>>>
->>>> + ? ? ? ? ? ? _gpio_dbck_enable(bank);
->>>
->>> Similarily, this call should be in the ->runtime_resume() callback and
->>> it wouldn't be needed here.
->> Right.
->>
->>>
->>> Using the runtime PM callbacks, all the _gpio_dbck_* calls below would
->>> not be needed.
->> Yes.
-> I removed the ?_gpio_dbck_disable/enable calls are removed from
-> *_prepare_for_idle()
-> and *_resume_after_idle(). But I am not seeing runtime callbacks being
-> called and
-> hence the ?_gpio_dbck_* calls are not getting called.
->
-> I have also tried making explicit pm_runtime_put() and pm_runtime_get_sync() in
-> *_prepare_for_idle() and *_resume_after_idle(). Still, I do not see
-> the runtime callbacks
-> getting called.
->
-> Is there anything that I could be missing?
-Sorry for the silly mistake.
-I used !off_mode check before calling pm_runtime_put_sync_suspend()
-in *_prepare_for_idle(). This resulted in use count mismatch with
-*_get_sync() call in *_resume_after_idle() which is called both for
-offmode and retention. I have removed the off_mode and made it unused.
+A common irq domain for the interrupts managed by the interrupt combiners is
+setup. All the instances of irq combiner reference the common irq domain for
+translating hardware interrupts to linux irq number.
 
+In case of device tree based boot, a interrupt specifier translator is setup
+that can translate interrupt specifiers for device nodes which use combiner
+as their interrupt parent.
 
-void omap2_gpio_prepare_for_idle(int off_mode)
-{
- 	struct gpio_bank *bank;
+Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+---
+This patch is based on the following tree.
+http://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git for-next
 
- 	list_for_each_entry(bank, &omap_gpio_list, node) {
- 		if (!bank->mod_usage || !off_mode)
- 			continue;
+ .../bindings/arm/samsung/interrupt-combiner.txt    |   18 ++++++
+ arch/arm/mach-exynos/cpu.c                         |   29 +++++++---
+ arch/arm/mach-exynos/irq-combiner.c                |   58 +++++++++++++++++---
+ 3 files changed, 87 insertions(+), 18 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/samsung/interrupt-combiner.txt
 
-		pm_runtime_put_sync_suspend(bank->dev);
+diff --git a/Documentation/devicetree/bindings/arm/samsung/interrupt-combiner.txt b/Documentation/devicetree/bindings/arm/samsung/interrupt-combiner.txt
+new file mode 100644
+index 0000000..6ca30d9
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/samsung/interrupt-combiner.txt
+@@ -0,0 +1,18 @@
++* Samsung Exynos Interrupt Combiner Controller
++
++Samsung's Exynos4 architecture includes a interrupt combiner which can combine
++interrupt sources as a group and provide a single interrupt request for the
++group. The interrupt request from each group are connected to a parent interrupt
++controller, such as GIC in case of Exynos4210.
++
++Required properties:
++- compatible: should be "samsung,exynos4210-combiner".
++- #interrupt-cells: should be <2>. The meaning of the cells are
++	* First Cell: Combiner Group Number.
++	* Second Cell: Interrupt number within the group.
++- reg: Base address and size of interrupt combiner registers.
++- interrupt-controller: Identifies the node as an interrupt controller.
++
++Optional properties:
++- interrupt-parent: pHandle of the parent interrupt controller, if not
++  inherited from the parent node.
+diff --git a/arch/arm/mach-exynos/cpu.c b/arch/arm/mach-exynos/cpu.c
+index 8e09f34..14f86ba 100644
+--- a/arch/arm/mach-exynos/cpu.c
++++ b/arch/arm/mach-exynos/cpu.c
+@@ -37,9 +37,10 @@
+ 
+ unsigned int gic_bank_offset __read_mostly;
+ 
+-extern int combiner_init(unsigned int combiner_nr, void __iomem *base,
+-			 unsigned int irq_start);
++extern int combiner_init(unsigned int combiner_nr, void __iomem *base);
+ extern void combiner_cascade_irq(unsigned int combiner_nr, unsigned int irq);
++extern int combiner_init_irq_domain(unsigned int irq_base, unsigned int nr_irq,
++					struct device_node *np);
+ 
+ /* Initial IO mappings */
+ static struct map_desc exynos_iodesc[] __initdata = {
+@@ -242,16 +243,30 @@ static void exynos4_gic_irq_fix_base(struct irq_data *d)
+ 			    (gic_bank_offset * smp_processor_id());
+ }
+ 
++void __init combiner_of_init(struct device_node *np, struct device_node *parent)
++{
++	int irq;
++
++	if (combiner_init_irq_domain(COMBINER_IRQ(0, 0), MAX_COMBINER_NR *
++					MAX_IRQ_IN_COMBINER, np))
++		BUG();
++	for (irq = 0; irq < MAX_COMBINER_NR; irq++) {
++		combiner_init(irq, (void __iomem *)S5P_VA_COMBINER(irq));
++		combiner_cascade_irq(irq, IRQ_SPI(irq));
++	}
++}
++
+ #ifdef CONFIG_OF
+ static const struct of_device_id exynos4_dt_irq_match[] = {
+ 	{ .compatible = "arm,cortex-a9-gic", .data = gic_of_init, },
++	{ .compatible = "samsung,exynos4120-combiner",
++			.data = combiner_of_init, },
+ 	{},
+ };
+ #endif
+ 
+ void __init exynos4_init_irq(void)
+ {
+-	int irq;
+ 
+ 	gic_bank_offset = soc_is_exynos4412() ? 0x4000 : 0x8000;
+ 
+@@ -266,12 +281,8 @@ void __init exynos4_init_irq(void)
+ 	gic_arch_extn.irq_unmask = exynos4_gic_irq_fix_base;
+ 	gic_arch_extn.irq_mask = exynos4_gic_irq_fix_base;
+ 
+-	for (irq = 0; irq < MAX_COMBINER_NR; irq++) {
+-
+-		combiner_init(irq, (void __iomem *)S5P_VA_COMBINER(irq),
+-				COMBINER_IRQ(irq, 0));
+-		combiner_cascade_irq(irq, IRQ_SPI(irq));
+-	}
++	if (!of_have_populated_dt())
++		combiner_of_init(NULL, NULL);
+ 
+ 	/* The parameters of s5p_init_irq() are for VIC init.
+ 	 * Theses parameters should be NULL and 0 because EXYNOS4
+diff --git a/arch/arm/mach-exynos/irq-combiner.c b/arch/arm/mach-exynos/irq-combiner.c
+index 5a2758a..84f24c9 100644
+--- a/arch/arm/mach-exynos/irq-combiner.c
++++ b/arch/arm/mach-exynos/irq-combiner.c
+@@ -13,6 +13,8 @@
+ */
+ 
+ #include <linux/io.h>
++#include <linux/export.h>
++#include <linux/irqdomain.h>
+ 
+ #include <asm/mach/irq.h>
+ 
+@@ -26,8 +28,10 @@ struct combiner_chip_data {
+ 	unsigned int irq_offset;
+ 	unsigned int irq_mask;
+ 	void __iomem *base;
++	struct irq_domain *domain;
+ };
+ 
++static struct irq_domain combiner_irq_domain;
+ static struct combiner_chip_data combiner_data[MAX_COMBINER_NR];
+ 
+ static inline void __iomem *combiner_base(struct irq_data *data)
+@@ -40,14 +44,14 @@ static inline void __iomem *combiner_base(struct irq_data *data)
+ 
+ static void combiner_mask_irq(struct irq_data *data)
+ {
+-	u32 mask = 1 << (data->irq % 32);
++	u32 mask = 1 << (data->hwirq % 32);
+ 
+ 	__raw_writel(mask, combiner_base(data) + COMBINER_ENABLE_CLEAR);
+ }
+ 
+ static void combiner_unmask_irq(struct irq_data *data)
+ {
+-	u32 mask = 1 << (data->irq % 32);
++	u32 mask = 1 << (data->hwirq % 32);
+ 
+ 	__raw_writel(mask, combiner_base(data) + COMBINER_ENABLE_SET);
+ }
+@@ -96,17 +100,18 @@ void __init combiner_cascade_irq(unsigned int combiner_nr, unsigned int irq)
+ 	irq_set_chained_handler(irq, combiner_handle_cascade_irq);
+ }
+ 
+-void __init combiner_init(unsigned int combiner_nr, void __iomem *base,
+-			  unsigned int irq_start)
++void __init combiner_init(unsigned int combiner_nr, void __iomem *base)
+ {
+-	unsigned int i;
++	unsigned int i, hwirq;
+ 
+ 	if (combiner_nr >= MAX_COMBINER_NR)
+ 		BUG();
+ 
+ 	combiner_data[combiner_nr].base = base;
+-	combiner_data[combiner_nr].irq_offset = irq_start;
++	combiner_data[combiner_nr].irq_offset =	irq_domain_to_irq(
++		&combiner_irq_domain, combiner_nr * MAX_IRQ_IN_COMBINER);
+ 	combiner_data[combiner_nr].irq_mask = 0xff << ((combiner_nr % 4) << 3);
++	combiner_data[combiner_nr].domain = &combiner_irq_domain;
+ 
+ 	/* Disable all interrupts */
+ 
+@@ -114,11 +119,46 @@ void __init combiner_init(unsigned int combiner_nr, void __iomem *base,
+ 		     base + COMBINER_ENABLE_CLEAR);
+ 
+ 	/* Setup the Linux IRQ subsystem */
+-
+-	for (i = irq_start; i < combiner_data[combiner_nr].irq_offset
+-				+ MAX_IRQ_IN_COMBINER; i++) {
++	for (hwirq = 0; hwirq < MAX_IRQ_IN_COMBINER; hwirq++) {
++		i = combiner_data[combiner_nr].irq_offset + hwirq;
+ 		irq_set_chip_and_handler(i, &combiner_chip, handle_level_irq);
+ 		irq_set_chip_data(i, &combiner_data[combiner_nr]);
+ 		set_irq_flags(i, IRQF_VALID | IRQF_PROBE);
  	}
  }
-
-void omap2_gpio_resume_after_idle(void)
- 	struct gpio_bank *bank;
-
- 	list_for_each_entry(bank, &omap_gpio_list, node) {
- 		if (!bank->mod_usage)
- 			continue;
-
-		pm_runtime_get_sync(bank->dev);
- 	}
- }
-
---
-Tarun
-
->>>
->>>> ? ? ? ? ? ? ? spin_lock_irqsave(&bank->lock, flags);
->>>> ? ? ? ? ? ? ? _gpio_rmw(base, bank->regs->wkup_en, bank->saved_wakeup, 1);
->>>> ? ? ? ? ? ? ? spin_unlock_irqrestore(&bank->lock, flags);
->>>> @@ -1120,16 +1147,14 @@ void omap2_gpio_prepare_for_idle(int off_mode)
->>>>
->>>> ? ? ? list_for_each_entry(bank, &omap_gpio_list, node) {
->>>> ? ? ? ? ? ? ? u32 l1 = 0, l2 = 0;
->>>> - ? ? ? ? ? ? int j;
->>>>
->>>> ? ? ? ? ? ? ? if (!bank->loses_context)
->>>> ? ? ? ? ? ? ? ? ? ? ? continue;
->>>>
->>>> - ? ? ? ? ? ? for (j = 0; j < hweight_long(bank->dbck_enable_mask); j++)
->>>> - ? ? ? ? ? ? ? ? ? ? clk_disable(bank->dbck);
->>>> -
->>>> - ? ? ? ? ? ? if (!off_mode)
->>>> + ? ? ? ? ? ? if (!off_mode) {
->>>> + ? ? ? ? ? ? ? ? ? ? _gpio_dbck_disable(bank);
->>>> ? ? ? ? ? ? ? ? ? ? ? continue;
->>>> + ? ? ? ? ? ? }
->>>>
->>>> ? ? ? ? ? ? ? /* If going to OFF, remove triggering for all
->>>> ? ? ? ? ? ? ? ?* non-wakeup GPIOs. ?Otherwise spurious IRQs will be
->>>> @@ -1151,15 +1176,16 @@ void omap2_gpio_prepare_for_idle(int off_mode)
->>>> ? ? ? ? ? ? ? __raw_writel(l2, bank->base + bank->regs->risingdetect);
->>>>
->>>> ?save_gpio_context:
->>>> -
->>>> ? ? ? ? ? ? ? if (bank->get_context_loss_count)
->>>> ? ? ? ? ? ? ? ? ? ? ? bank->context_loss_count =
->>>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? bank->get_context_loss_count(bank->dev);
->>>>
->>>> ? ? ? ? ? ? ? omap_gpio_save_context(bank);
->>>>
->>>> - ? ? ? ? ? ? if (!pm_runtime_suspended(bank->dev))
->>>> + ? ? ? ? ? ? if (!pm_runtime_suspended(bank->dev)) {
->>>> ? ? ? ? ? ? ? ? ? ? ? pm_runtime_put_sync(bank->dev);
->>>> + ? ? ? ? ? ? ? ? ? ? _gpio_dbck_disable(bank);
->>>> + ? ? ? ? ? ? }
->>>> ? ? ? }
->>>> ?}
->>>>
->>>> @@ -1170,13 +1196,11 @@ void omap2_gpio_resume_after_idle(void)
->>>> ? ? ? list_for_each_entry(bank, &omap_gpio_list, node) {
->>>> ? ? ? ? ? ? ? u32 context_lost_cnt_after;
->>>> ? ? ? ? ? ? ? u32 l = 0, gen, gen0, gen1;
->>>> - ? ? ? ? ? ? int j;
->>>>
->>>> ? ? ? ? ? ? ? if (!bank->loses_context)
->>>> ? ? ? ? ? ? ? ? ? ? ? continue;
->>>>
->>>> - ? ? ? ? ? ? for (j = 0; j < hweight_long(bank->dbck_enable_mask); j++)
->>>> - ? ? ? ? ? ? ? ? ? ? clk_enable(bank->dbck);
->>>> + ? ? ? ? ? ? _gpio_dbck_enable(bank);
->>>> ? ? ? ? ? ? ? if (pm_runtime_suspended(bank->dev))
->>>> ? ? ? ? ? ? ? ? ? ? ? pm_runtime_get_sync(bank->dev);
->>>
->>> Kevin
->>>
++
++static int combiner_dt_translate(struct irq_domain *d,
++		struct device_node *controller, const u32 *intspec,
++		unsigned int intsize, unsigned long *out_hwirq,
++		unsigned int *out_type)
++{
++	if (d->of_node != controller)
++		return -EINVAL;
++	if (intsize < 2)
++		return -EINVAL;
++
++	*out_hwirq = intspec[0] * MAX_IRQ_IN_COMBINER + intspec[1];
++	*out_type = 0;
++	return 0;
++}
++
++static struct irq_domain_ops combiner_irq_domain_ops = {
++	.dt_translate = combiner_dt_translate,
++};
++
++int __init combiner_init_irq_domain(unsigned int irq_base, unsigned int nr_irq,
++					struct device_node *np)
++{
++	struct irq_domain *domain = &combiner_irq_domain;
++
++	domain->irq_base = irq_alloc_descs(irq_base, irq_base, nr_irq, 0);
++	if (domain->irq_base < 0) {
++		pr_err("failed to alloc irq descs, combiner init failed\n");
++		return -EBUSY;
++	}
++	domain->nr_irq = nr_irq;
++	domain->ops = &combiner_irq_domain_ops;
++	domain->of_node = np;
++	irq_domain_add(domain);
++	return 0;
++}
+-- 
+1.6.6.rc2
