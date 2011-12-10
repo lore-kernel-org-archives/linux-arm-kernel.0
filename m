@@ -1,30 +1,45 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Sat, 10 Dec 2011 13:24:06 +0000
-Subject: [PATCH 4/4] Use generic ARM instruction set condition code
- checks for kprobes.
-In-Reply-To: <20111209185503.19655.37484.stgit@localhost6.localdomain6>
-References: <20111209185302.19655.36481.stgit@localhost6.localdomain6>
- <20111209185503.19655.37484.stgit@localhost6.localdomain6>
-Message-ID: <20111210132406.GE8292@mudshark.cambridge.arm.com>
+From: sshtylyov@ru.mvista.com (Sergei Shtylyov)
+Date: Sat, 10 Dec 2011 19:27:09 +0400
+Subject: [PATCH v5 5/9] ARM: versatile: Map local timers using Device
+ Tree when possible
+In-Reply-To: <1323457432-4800-6-git-send-email-pawel.moll@arm.com>
+References: <1323457432-4800-1-git-send-email-pawel.moll@arm.com>
+ <1323457432-4800-6-git-send-email-pawel.moll@arm.com>
+Message-ID: <4EE37A4D.8060204@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 09, 2011 at 06:55:44PM +0000, Leif Lindholm wrote:
-> This patch changes the kprobes implementation to use the generic ARM
-> instruction set condition code checks, rather than a dedicated
-> implementation.
-> 
-> Signed-off-by: Leif Lindholm <leif.lindholm@arm.com>
+Hello.
+
+On 09-12-2011 23:03, Pawel Moll wrote:
+
+> If twd_base is not set, try to map the TWD registers from
+> "arm,smp-twd" Device Tree node (compatible value as used in
+> Highbank's DT).
+
+> Signed-off-by: Pawel Moll<pawel.moll@arm.com>
 > ---
-> Tixy's ACK removed as patch modified.
-> 
->  arch/arm/kernel/kprobes-test.c |   66 ++++------------------------------------
->  1 files changed, 7 insertions(+), 59 deletions(-)
-> 
+>   arch/arm/plat-versatile/localtimer.c |   12 ++++++++++++
+>   1 files changed, 12 insertions(+), 0 deletions(-)
 
-This looks good to me. Given that Tixy's re-acked it, my reviewed-by is fairly
-worthless, but here it is anyway (take it or leave it!):
+> diff --git a/arch/arm/plat-versatile/localtimer.c b/arch/arm/plat-versatile/localtimer.c
+> index 0fb3961..e3da322 100644
+> --- a/arch/arm/plat-versatile/localtimer.c
+> +++ b/arch/arm/plat-versatile/localtimer.c
+[...]
+> @@ -21,6 +23,16 @@
+>    */
+>   int __cpuinit local_timer_setup(struct clock_event_device *evt)
+>   {
+> +#if defined(CONFIG_OF)
+> +	if (!twd_base) {
+> +		struct device_node *np = of_find_compatible_node(NULL,
+> +				NULL, "arm,smp-twd");
+> +
+> +		twd_base = of_iomap(np, 0);
+> +		if (!twd_base)
+> +			return -ENXIO;
 
-Reviewed-by: Will Deacon <will.deacon@arm.com>
+    -ENOMEM.
 
-Will
+WBR, Sergei
