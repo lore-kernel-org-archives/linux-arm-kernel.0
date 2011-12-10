@@ -1,65 +1,34 @@
-From: greg@kroah.com (Greg KH)
-Date: Fri, 9 Dec 2011 15:58:07 -0800
-Subject: [PATCH 0/3] Support Samsung S5P OHCI device and driver
-In-Reply-To: <046f01ccb011$6d111370$47333a50$%kim@samsung.com>
-References: <33510089.42761321876635907.JavaMail.weblogic@epv6ml08>
- <20111121172344.GA4483@kroah.com>
- <046f01ccb011$6d111370$47333a50$%kim@samsung.com>
-Message-ID: <20111209235807.GC6680@kroah.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sat, 10 Dec 2011 01:04:59 +0100
+Subject: [PATCH] [RFC] pinctrl: add a driver for Energy Micro's efm32 SoCs
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF1750B77BD8@HQMAIL01.nvidia.com>
+References: <1323384057-31452-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <74CDBE0F657A3D45AFBB94109FB122FF1750B77BD8@HQMAIL01.nvidia.com>
+Message-ID: <CACRpkdbOo6MhQhWJmT4Q49BjsAU94obKdvvsSQ=KreiL1y_owg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 01, 2011 at 07:10:17PM +0900, Kukjin Kim wrote:
-> Greg KH wrote:
-> > 
-> > On Mon, Nov 21, 2011 at 11:57:16AM +0000, Jingoo Han wrote:
-> > > > -----Original Message-----
-> > > > From: Greg KH [mailto:greg at kroah.com]
-> > > > Sent: Friday, November 18, 2011 4:12 AM
-> > > > To: Jingoo Han
-> > > > Cc: linux-arm-kernel at lists.infradead.org; linux-usb at vger.kernel.org;
-> > > > linux-samsung-soc at vger.kernel.org; gregkh at suse.de;
-> > > > stern at rowland.harvard.edu; kgene.kim at samsung.com;
-> > yulgon.kim at samsung.com;
-> > > > jy0922.shim at samsung.com
-> > > > Subject: Re: [PATCH 0/3] Support Samsung S5P OHCI device and driver
-> > > >
-> > > > On Tue, Nov 15, 2011 at 06:49:58AM +0000, Jingoo Han wrote:
-> > > > > Hello.
-> > > > >
-> > > > > This patch series adds USB OHCI device and initial driver for
-> > Samsung
-> > > > > S5P SoCs and is based from Linux 3.2-rc1. I have tested on SMDKV310
-> > > > board
-> > > > > using EXYNOS4.
-> > > >
-> > > > This is to be sent through some arm tree, not the usb tree, right?
-> > > Right, 1st and 2nd patch are sent throught arm tree.
-> > > However, 3rd patch is sent through the usb tree.
-> > > Thanks.
-> > > [PATCH 1/3] ARM: SAMSUNG: Add USB OHCI device
-> > > [PATCH 2/3]  ARM: EXYNOS: Add USB OHCI support to SMDKV310 board
-> > > [PATCH 3/3] USB: Add S5P OHCI diver
-> > 
-> Hi Greg,
-> 
-> Sorry for late response. I came back today from family vacation...
-> 
-> Anyway,
-> 
-> > So the third patch does not depend on the first two?  If it does, that
-> > means I will get build errors in the USB tree when I apply that patch,
-> > right?
-> > 
-> > If so, then all three should go through a single tree.
-> > 
-> Yes, right. This series would be handled in same tree so that we can avoid
-> useless conflicts.
-> 
-> I commented small thing on 3rd patch. So I think, if you're ok on his
-> updated patch, it can be sent to upstream via Samsung tree. Or your tree
-> with my ack?
+2011/12/9 Stephen Warren <swarren@nvidia.com>:
 
-The samsung tree is fine to take these, thanks.
+> Uwe Kleine-K?nig wrote at Thursday, December 08, 2011 3:41 PM:
+>> diff --git a/drivers/pinctrl/Kconfig b/drivers/pinctrl/Kconfig
+>
+>> +config PINMUX_EFM32
+>> + ? ? bool "EFM32 pinmux driver"
+>> + ? ? depends on ARCH_EFM32
+>> + ? ? default y
+>> + ? ? select PINMUX
+>
+> LinusW,
+>
+> Since this is the pinctrl not pinmux subsystem now, does it make sense
+> to name the driver Kconfig options PINCTRL_FOO and the files pinctrl-
+> foo.c? I see that the coh901 driver already does that, and I followed
+> that convention in my Tegra pinctrl patches.
 
-greg k-h
+Hm, the U300 pinmux is named pinmux-u300.c because it can only do
+pinmux. It cannot do anything else. But if it's confusing we can surely
+name everything pinctrl-*.
+
+Yours,
+Linus Walleij
