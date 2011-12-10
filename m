@@ -1,26 +1,35 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Sat, 10 Dec 2011 10:55:28 +0100
-Subject: [PATCH] ARM: only show modules in the memory layout for MODULES=y
-In-Reply-To: <alpine.LFD.2.02.1112091813130.2907@xanadu.home>
-References: <1323466291-9679-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <alpine.LFD.2.02.1112091813130.2907@xanadu.home>
-Message-ID: <20111210095528.GW4585@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 10 Dec 2011 10:11:22 +0000
+Subject: [PATCH] ARM: provide XIP_VIRT_ADDR for no-MMU builds
+In-Reply-To: <20111210095253.GV4585@pengutronix.de>
+References: <1323467451-12128-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <20111210010221.GN14542@n2100.arm.linux.org.uk>
+ <20111210095253.GV4585@pengutronix.de>
+Message-ID: <20111210101122.GO14542@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 09, 2011 at 06:14:49PM -0500, Nicolas Pitre wrote:
-> On Fri, 9 Dec 2011, Uwe Kleine-K?nig wrote:
+On Sat, Dec 10, 2011 at 10:52:53AM +0100, Uwe Kleine-K?nig wrote:
+> On Sat, Dec 10, 2011 at 01:02:21AM +0000, Russell King - ARM Linux wrote:
+> > On Fri, Dec 09, 2011 at 10:50:51PM +0100, Uwe Kleine-K?nig wrote:
+> > > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> > 
+> > Lack of changelog.  Say why this change is required.
+> Something like:
 > 
-> > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> 	XIP_VIRT_ADDR is needed for XIP builds and currently only
+> 	defined for builds with CONFIG_MMU.
 > 
-> If compilation breaks without this with CONFIG_MODULES=n then please say 
-> so in the commit log.
-It doesn't (at least for me), it just suppresses the irritating modules
-line. Will add that to the commit log for an eventual resend.
+> 	Also provide it for no-MMU builds to make it possible to build
+> 	an XIP kernel for MMU-less machines. As these lack an MMU it has
+> 	to be an identity mapping.
 
-Thanks
-Uwe
+You seem to be saying from the above that this is required also for
+non-XIP kernel builds as well as XIP kernel builds.  That sounds wrong -
+XIP_VIRT_ADDR is only required for XIP kernel builds.  Use outside of
+that would be a bug.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Please clarify.
+
+(And this illustrates why it is very important to give an explanation
+of changes.)
