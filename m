@@ -1,39 +1,47 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 10 Dec 2011 01:02:21 +0000
-Subject: [PATCH] ARM: provide XIP_VIRT_ADDR for no-MMU builds
-In-Reply-To: <1323467451-12128-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1323467451-12128-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <20111210010221.GN14542@n2100.arm.linux.org.uk>
+From: khilman@ti.com (Kevin Hilman)
+Date: Fri, 09 Dec 2011 17:32:26 -0800
+Subject: [PATCH v2 01/10] ARM: OMAP2+: pm: Do not init statically the SR
+ and voltage layer with DT
+In-Reply-To: <1323438631-28124-2-git-send-email-b-cousson@ti.com> (Benoit
+ Cousson's message of "Fri, 9 Dec 2011 14:50:22 +0100")
+References: <1323438631-28124-1-git-send-email-b-cousson@ti.com>
+ <1323438631-28124-2-git-send-email-b-cousson@ti.com>
+Message-ID: <87obvhgqj9.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 09, 2011 at 10:50:51PM +0100, Uwe Kleine-K?nig wrote:
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+Benoit Cousson <b-cousson@ti.com> writes:
 
-Lack of changelog.  Say why this change is required.
+> In the case of DT, the PMIC and SR initialization will be done using
+> a completely different mechanism.
+>
+> Disable this part if a DT blob is available.
+>
+> Signed-off-by: Benoit Cousson <b-cousson@ti.com>
+> Cc: Kevin Hilman <khilman@ti.com>
+
+Acked-by: Kevin Hilman <khilman@ti.com>
 
 > ---
->  arch/arm/include/asm/memory.h |    2 ++
->  1 files changed, 2 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
-> index a8997d7..fcb5757 100644
-> --- a/arch/arm/include/asm/memory.h
-> +++ b/arch/arm/include/asm/memory.h
-> @@ -116,6 +116,8 @@
->  #define MODULES_END		(END_MEM)
->  #define MODULES_VADDR		(PHYS_OFFSET)
+>  arch/arm/mach-omap2/pm.c |    8 ++++++++
+>  1 files changed, 8 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/pm.c b/arch/arm/mach-omap2/pm.c
+> index 1881fe9..ad4f693 100644
+> --- a/arch/arm/mach-omap2/pm.c
+> +++ b/arch/arm/mach-omap2/pm.c
+> @@ -227,6 +227,14 @@ postcore_initcall(omap2_common_pm_init);
 >  
-> +#define XIP_VIRT_ADDR(physaddr)  (physaddr)
+>  static int __init omap2_common_pm_late_init(void)
+>  {
+> +	/*
+> +	 * In the case of DT, the PMIC and SR initialization will be done using
+> +	 * a completely different mechanism.
+> +	 * Disable this part if a DT blob is available.
+> +	 */
+> +	if (of_have_populated_dt())
+> +		return 0;
 > +
->  #endif /* !CONFIG_MMU */
->  
->  /*
-> -- 
-> 1.7.7.3
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>  	/* Init the voltage layer */
+>  	omap_pmic_late_init();
+>  	omap_voltage_late_init();
