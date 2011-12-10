@@ -1,41 +1,17 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 10 Dec 2011 21:38:36 +0000
-Subject: [patch 1/1] arch/arm/kernel/setup.c: initialize
- arm_dma_zone_size earlier
-In-Reply-To: <20111208213131.407903305@rtp-net.org>
-References: <20111208213131.407903305@rtp-net.org>
-Message-ID: <20111210213836.GP14542@n2100.arm.linux.org.uk>
+Date: Sat, 10 Dec 2011 21:46:45 +0000
+Subject: [PATCH 03/62] arm: remove the second argument of k[un]map_atomic()
+In-Reply-To: <1322371662-26166-4-git-send-email-amwang@redhat.com>
+References: <1322371662-26166-1-git-send-email-amwang@redhat.com>
+ <1322371662-26166-4-git-send-email-amwang@redhat.com>
+Message-ID: <20111210214645.GQ14542@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 08, 2011 at 10:31:09PM +0100, Arnaud Patard wrote:
-> arm_dma_zone_size is used by arm_bootmem_free() which is called by
-> paging_init(). Thus it needs to be set before calling it.
+On Sun, Nov 27, 2011 at 01:26:43PM +0800, Cong Wang wrote:
 > 
-> Signed-off-by: Arnaud Patard <arnaud.patard@rtp-net.org>
-> Acked-by: Nicolas Pitre <nico@linaro.org>
-> CC: stable at kernel.org
-> Index: linux-2.6/arch/arm/kernel/setup.c
-> ===================================================================
-> --- linux-2.6.orig/arch/arm/kernel/setup.c	2011-12-08 22:17:01.000000000 +0100
-> +++ linux-2.6/arch/arm/kernel/setup.c	2011-12-08 22:17:32.000000000 +0100
-> @@ -911,6 +911,12 @@ void __init setup_arch(char **cmdline_p)
->  	machine_desc = mdesc;
->  	machine_name = mdesc->name;
->  
-> +#ifdef CONFIG_ZONE_DMA
-> +	if (mdesc->dma_zone_size) {
-> +		extern unsigned long arm_dma_zone_size;
-> +		arm_dma_zone_size = mdesc->dma_zone_size;
-> +	}
-> +#endif
->  	if (mdesc->restart_mode)
->  		reboot_setup(&mdesc->restart_mode);
+> Signed-off-by: Cong Wang <amwang@redhat.com>
 
-Just trying to apply this patch, it won't apply to mainline because it's
-based upon the bleeding edge of kernel development, rather than what's
-currently in mainline.  If we're going to fix this in current mainline
-and previous stable versions, the patch needs to be against that, not
-linux-next.
+Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
-Could you re-generate against an -rc kernel please?
+Thanks for doing this.
