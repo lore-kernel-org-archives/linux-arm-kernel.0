@@ -1,101 +1,205 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Sun, 11 Dec 2011 14:01:35 +0800
-Subject: [PATCH v4] tty: serial: imx: Allow UART to be a source for wakeup
-In-Reply-To: <1323456065-6240-1-git-send-email-festevam@gmail.com>
-References: <1323434541-27689-1-git-send-email-festevam@gmail.com>
- <1323456065-6240-1-git-send-email-festevam@gmail.com>
-Message-ID: <20111211060133.GA9470@S2100-06.ap.freescale.net>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Sun, 11 Dec 2011 11:24:57 +0530
+Subject: [PATCH 3/4] rtc-s3c: add variants for S3C2443 and S3C2416
+In-Reply-To: <201112091050.55775.heiko@sntech.de>
+References: <201112091046.26563.heiko@sntech.de>
+ <201112091050.55775.heiko@sntech.de>
+Message-ID: <CAJuYYwS=0LaucoP2m1C0CJXUscStpax897D7otCGSv7c_hEOuQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 09, 2011 at 04:41:05PM -0200, Fabio Estevam wrote:
-> Allow UART to be a source for wakeup from low power mode.
-> 
-> Tested on a MX27PDK by doing:
-> 
-> echo enabled > /sys/devices/platform/imx21-uart.0/power/wakeup
-> 
-> echo mem > /sys/power/state
-> 
-> and then pressing a key in the console will wakeup the sytem.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+On 9 December 2011 15:20, Heiko St?bner <heiko@sntech.de> wrote:
+> Especially the TICNT registers are different from the two rtc types
+> that currently exists.
+>
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 > ---
-> Changes since v3:
-> - Remove IMXUART_CANWAKE flag. Let userspace write in /sys/ file
-> in order to enable UART wakeup source.
-> Changes since v2:
-> - Remove incorrect enable_irq_wake from serial_imx_resume
-> Changes since v1:
-> - Pass the can-wake property via DT correctly
->  drivers/tty/serial/imx.c |   24 ++++++++++++++++++++++++
->  1 files changed, 24 insertions(+), 0 deletions(-)
-> 
-> diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
-> index 163fc90..283bf21 100644
-> --- a/drivers/tty/serial/imx.c
-> +++ b/drivers/tty/serial/imx.c
-> @@ -566,6 +566,9 @@ static irqreturn_t imx_int(int irq, void *dev_id)
->  	if (sts & USR1_RTSD)
->  		imx_rtsint(irq, dev_id);
->  
-> +	if (sts & USR1_AWAKE)
-> +		writel(USR1_AWAKE, sport->port.membase + USR1);
+> ?arch/arm/plat-samsung/include/plat/regs-rtc.h | ? 24 +++++++++++++
+> ?drivers/rtc/rtc-s3c.c ? ? ? ? ? ? ? ? ? ? ? ? | ? 44 ++++++++++++++++++++++--
+> ?2 files changed, 64 insertions(+), 4 deletions(-)
+>
+> diff --git a/arch/arm/plat-samsung/include/plat/regs-rtc.h b/arch/arm/plat-samsung/include/plat/regs-rtc.h
+> index d9d9bdc..fa6066a 100644
+> --- a/arch/arm/plat-samsung/include/plat/regs-rtc.h
+> +++ b/arch/arm/plat-samsung/include/plat/regs-rtc.h
+> @@ -23,14 +23,33 @@
+> ?#define S3C2410_RTCCON_CLKSEL ?(1 << 1)
+> ?#define S3C2410_RTCCON_CNTSEL ?(1 << 2)
+> ?#define S3C2410_RTCCON_CLKRST ?(1 << 3)
+> +#define S3C2443_RTCCON_TICSEL ?(1 << 4)
+> ?#define S3C64XX_RTCCON_TICEN ? (1 << 8)
+>
+> ?#define S3C64XX_RTCCON_TICMSK ?(0xF << 7)
+> ?#define S3C64XX_RTCCON_TICSHT ?(7)
+>
+> +#define S3C2416_RTCCON_TICMSK ?(0x1F << 7)
 > +
->  	return IRQ_HANDLED;
->  }
->  
-> @@ -1269,6 +1272,15 @@ static struct uart_driver imx_reg = {
->  static int serial_imx_suspend(struct platform_device *dev, pm_message_t state)
->  {
->  	struct imx_port *sport = platform_get_drvdata(dev);
-> +	unsigned int val;
+> ?#define S3C2410_TICNT ? ? ? ? ?S3C2410_RTCREG(0x44)
+> ?#define S3C2410_TICNT_ENABLE ? (1 << 7)
+>
+> +/* S3C2443: tick count is 15 bit wide
+> + * TICNT[6:0] contains upper 7 bits
+> + * TICNT1[7:0] contains lower 8 bits
+> + */
+> +#define S3C2443_TICNT_PART(x) ?((x & 0x7f00) >> 8)
+> +#define S3C2443_TICNT1 ? ? ? ? S3C2410_RTCREG(0x4C)
+> +#define S3C2443_TICNT1_PART(x) (x & 0xff)
 > +
-> +	if (device_may_wakeup(&dev->dev)) {
-> +		enable_irq_wake(sport->rxirq);
-> +		/* enable wakeup from i.MX UART */
-> +		val = readl(sport->port.membase + UCR3);
-> +		val |= UCR3_AWAKEN;
-> +		writel(val, sport->port.membase + UCR3);
-> +	}
->  
->  	if (sport)
->  		uart_suspend_port(&imx_reg, &sport->port);
-> @@ -1279,6 +1291,15 @@ static int serial_imx_suspend(struct platform_device *dev, pm_message_t state)
->  static int serial_imx_resume(struct platform_device *dev)
->  {
->  	struct imx_port *sport = platform_get_drvdata(dev);
-> +	unsigned int val;
+> +/* S3C2416: tick count is 32 bit wide
+> + * TICNT[6:0] contains bits [14:8]
+> + * TICNT1[7:0] contains lower 8 bits
+> + * TICNT2[16:0] contains upper 17 bits
+> + */
+> +#define S3C2416_TICNT2 ? ? ? ? S3C2410_RTCREG(0x48)
+> +#define S3C2416_TICNT2_PART(x) ((x & 0xffff8000) >> 15)
 > +
-> +	if (device_may_wakeup(&dev->dev)) {
-> +		/* disable wakeup from i.MX UART */
-> +		val = readl(sport->port.membase + UCR3);
-> +		val &= ~UCR3_AWAKEN;
-> +		writel(val, sport->port.membase + UCR3);
-> +		disable_irq_wake(sport->rxirq);
-> +	}
->  
->  	if (sport)
->  		uart_resume_port(&imx_reg, &sport->port);
-> @@ -1408,6 +1429,9 @@ static int serial_imx_probe(struct platform_device *pdev)
->  		goto deinit;
->  	platform_set_drvdata(pdev, &sport->port);
->  
-> +	device_init_wakeup(&pdev->dev, 1);
-> +	device_set_wakeup_enable(&pdev->dev, 0);
+> ?#define S3C2410_RTCALM ? ? ? ? S3C2410_RTCREG(0x50)
+> ?#define S3C2410_RTCALM_ALMEN ? (1 << 6)
+> ?#define S3C2410_RTCALM_YEAREN ?(1 << 5)
+> @@ -63,4 +82,9 @@
+> ?#define S3C2410_RTCMON ? ? ? ? S3C2410_RTCREG(0x84)
+> ?#define S3C2410_RTCYEAR ? ? ? ? ? ? ? ?S3C2410_RTCREG(0x88)
+>
+> +#define S3C2443_TICKCNT ? ? ? ? ? ? ? ?S3C2410_RTCREG(0x90)
 > +
-Rather than calling these two functions, simply calling 
+> +#define S3C2443_RTCLBAT ? ? ? ? ? ? ? ?S3C2410_RTCREG(0x94)
+> +#define S3C2443_RTCLBAT_CLEAR ?(1 << 0)
+> +
+> ?#endif /* __ASM_ARCH_REGS_RTC_H */
+> diff --git a/drivers/rtc/rtc-s3c.c b/drivers/rtc/rtc-s3c.c
+> index 71807a6..2a0692e 100644
+> --- a/drivers/rtc/rtc-s3c.c
+> +++ b/drivers/rtc/rtc-s3c.c
+> @@ -35,6 +35,8 @@
+>
+> ?enum s3c_cpu_type {
+> ? ? ? ?TYPE_S3C2410,
+> + ? ? ? TYPE_S3C2443,
+> + ? ? ? TYPE_S3C2416,
+> ? ? ? ?TYPE_S3C64XX,
+> ?};
+>
+> @@ -132,6 +134,7 @@ static int s3c_rtc_setfreq(struct device *dev, int freq)
+> ? ? ? ?struct platform_device *pdev = to_platform_device(dev);
+> ? ? ? ?struct rtc_device *rtc_dev = platform_get_drvdata(pdev);
+> ? ? ? ?unsigned int tmp = 0;
+> + ? ? ? int val;
+>
+> ? ? ? ?if (!is_power_of_2(freq))
+> ? ? ? ? ? ? ? ?return -EINVAL;
+> @@ -139,12 +142,23 @@ static int s3c_rtc_setfreq(struct device *dev, int freq)
+> ? ? ? ?clk_enable(rtc_clk);
+> ? ? ? ?spin_lock_irq(&s3c_rtc_pie_lock);
+>
+> - ? ? ? if (s3c_rtc_cpu_type == TYPE_S3C2410) {
+> + ? ? ? if (s3c_rtc_cpu_type != TYPE_S3C64XX) {
+> ? ? ? ? ? ? ? ?tmp = readb(s3c_rtc_base + S3C2410_TICNT);
+> ? ? ? ? ? ? ? ?tmp &= S3C2410_TICNT_ENABLE;
+> ? ? ? ?}
+>
+> - ? ? ? tmp |= (rtc_dev->max_user_freq / freq)-1;
+> + ? ? ? val = (rtc_dev->max_user_freq / freq) - 1;
+> +
+> + ? ? ? if (s3c_rtc_cpu_type == TYPE_S3C2443) {
+> + ? ? ? ? ? ? ? tmp |= S3C2443_TICNT_PART(val);
+> + ? ? ? ? ? ? ? writel(S3C2443_TICNT1_PART(val), s3c_rtc_base + S3C2443_TICNT1);
+> + ? ? ? } else if (s3c_rtc_cpu_type == TYPE_S3C2416) {
+> + ? ? ? ? ? ? ? tmp |= S3C2443_TICNT_PART(val);
+> + ? ? ? ? ? ? ? writel(S3C2443_TICNT1_PART(val), s3c_rtc_base + S3C2443_TICNT1);
+> + ? ? ? ? ? ? ? writel(S3C2416_TICNT2_PART(val), s3c_rtc_base + S3C2416_TICNT2);
+> + ? ? ? } else {
+> + ? ? ? ? ? ? ? tmp |= val;
+> + ? ? ? }
 
-	device_set_wakeup_capable(&pdev->dev, true);
+Can this be changed to:
 
-can just do what we want to do here.
+if (s3c_rtc_cpu_type == TYPE_S3C2443 || (s3c_rtc_cpu_type == TYPE_S3C2416) {
+       tmp |= S3C2443_TICNT_PART(val);
+       writel(S3C2443_TICNT1_PART(val), s3c_rtc_base + S3C2443_TICNT1);
+       if (s3c_rtc_cpu_type == TYPE_S3C2416)
+                writel(S3C2416_TICNT2_PART(val), s3c_rtc_base + S3C2416_TICNT2);
+} else {
+      tmp |= val;
+}
 
-Other than that,
+>
+> ? ? ? ?writel(tmp, s3c_rtc_base + S3C2410_TICNT);
+> ? ? ? ?spin_unlock_irq(&s3c_rtc_pie_lock);
+> @@ -371,7 +385,9 @@ static void s3c_rtc_enable(struct platform_device *pdev, int en)
+> ? ? ? ? ? ? ? ?tmp &= ~S3C2410_RTCCON_RTCEN;
+> ? ? ? ? ? ? ? ?writew(tmp, base + S3C2410_RTCCON);
+>
+> - ? ? ? ? ? ? ? if (s3c_rtc_cpu_type == TYPE_S3C2410) {
+> + ? ? ? ? ? ? ? if (s3c_rtc_cpu_type == TYPE_S3C2410 ||
+> + ? ? ? ? ? ? ? ? ? s3c_rtc_cpu_type == TYPE_S3C2443 ||
+> + ? ? ? ? ? ? ? ? ? s3c_rtc_cpu_type == TYPE_S3C2416) {
+> ? ? ? ? ? ? ? ? ? ? ? ?tmp = readb(base + S3C2410_TICNT);
+> ? ? ? ? ? ? ? ? ? ? ? ?tmp &= ~S3C2410_TICNT_ENABLE;
+> ? ? ? ? ? ? ? ? ? ? ? ?writeb(tmp, base + S3C2410_TICNT);
+> @@ -441,6 +457,7 @@ static int __devinit s3c_rtc_probe(struct platform_device *pdev)
+> ? ? ? ?const struct of_device_id *match;
+> ?#endif
+> ? ? ? ?int ret;
+> + ? ? ? int tmp;
+>
+> ? ? ? ?pr_debug("%s: probe=%p\n", __func__, pdev);
+>
+> @@ -543,11 +560,18 @@ static int __devinit s3c_rtc_probe(struct platform_device *pdev)
+> ? ? ? ? ? ? ? ?dev_warn(&pdev->dev, "warning: invalid RTC value so initializing it\n");
+> ? ? ? ?}
+>
+> - ? ? ? if (s3c_rtc_cpu_type == TYPE_S3C64XX)
+> + ? ? ? if (s3c_rtc_cpu_type != TYPE_S3C2410)
+> ? ? ? ? ? ? ? ?rtc->max_user_freq = 32768;
+> ? ? ? ?else
+> ? ? ? ? ? ? ? ?rtc->max_user_freq = 128;
+>
+> + ? ? ? if (s3c_rtc_cpu_type == TYPE_S3C2443 ||
+> + ? ? ? ? ? ?s3c_rtc_cpu_type == TYPE_S3C2416) {
+> + ? ? ? ? ? ? ? tmp = readw(s3c_rtc_base + S3C2410_RTCCON);
+> + ? ? ? ? ? ? ? tmp |= S3C2443_RTCCON_TICSEL;
+> + ? ? ? ? ? ? ? writew(tmp, s3c_rtc_base + S3C2410_RTCCON);
+> + ? ? ? }
+> +
+> ? ? ? ?platform_set_drvdata(pdev, rtc);
+>
+> ? ? ? ?s3c_rtc_setfreq(&pdev->dev, 1);
+> @@ -652,6 +676,12 @@ static const struct of_device_id s3c_rtc_dt_match[] = {
+> ? ? ? ? ? ? ? ?.compatible = "samsung,s3c2410-rtc"
+> ? ? ? ? ? ? ? ?.data = TYPE_S3C2410,
+> ? ? ? ?}, {
+> + ? ? ? ? ? ? ? .compatible = "samsung,s3c2443-rtc"
+> + ? ? ? ? ? ? ? .data = TYPE_S3C2443,
+> + ? ? ? }, {
+> + ? ? ? ? ? ? ? .compatible = "samsung,s3c2416-rtc"
+> + ? ? ? ? ? ? ? .data = TYPE_S3C2416,
+> + ? ? ? }, {
+> ? ? ? ? ? ? ? ?.compatible = "samsung,s3c6410-rtc"
+> ? ? ? ? ? ? ? ?.data = TYPE_S3C64XX,
+> ? ? ? ?},
+> @@ -667,6 +697,12 @@ static struct platform_device_id s3c_rtc_driver_ids[] = {
+> ? ? ? ? ? ? ? ?.name ? ? ? ? ? = "s3c2410-rtc",
+> ? ? ? ? ? ? ? ?.driver_data ? ?= TYPE_S3C2410,
+> ? ? ? ?}, {
+> + ? ? ? ? ? ? ? .name ? ? ? ? ? = "s3c2443-rtc",
+> + ? ? ? ? ? ? ? .driver_data ? ?= TYPE_S3C2443,
+> + ? ? ? }, {
+> + ? ? ? ? ? ? ? .name ? ? ? ? ? = "s3c2416-rtc",
+> + ? ? ? ? ? ? ? .driver_data ? ?= TYPE_S3C2416,
+> + ? ? ? }, {
+> ? ? ? ? ? ? ? ?.name ? ? ? ? ? = "s3c64xx-rtc",
+> ? ? ? ? ? ? ? ?.driver_data ? ?= TYPE_S3C64XX,
+> ? ? ? ?},
+> --
+> 1.7.5.4
 
-Acked-by: Shawn Guo <shawn.guo@linaro.org>
+Reviewed device tree related changes in this patch.
 
-(Tested on i.MX6Q ARM2 board)
-
--- 
 Regards,
-Shawn
+Thomas.
+
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
