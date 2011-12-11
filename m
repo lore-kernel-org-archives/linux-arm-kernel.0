@@ -1,115 +1,101 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Sun, 11 Dec 2011 11:17:43 +0530
-Subject: [PATCH 2/4] rtc-s3c: make room for more variants in devicetree
- block
-In-Reply-To: <201112091050.11095.heiko@sntech.de>
-References: <201112091046.26563.heiko@sntech.de>
- <201112091050.11095.heiko@sntech.de>
-Message-ID: <CAJuYYwSvk1_tvNvukn-BQ4Z3JEeD15djs9xP_=jWz4vG-xs_nw@mail.gmail.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Sun, 11 Dec 2011 14:01:35 +0800
+Subject: [PATCH v4] tty: serial: imx: Allow UART to be a source for wakeup
+In-Reply-To: <1323456065-6240-1-git-send-email-festevam@gmail.com>
+References: <1323434541-27689-1-git-send-email-festevam@gmail.com>
+ <1323456065-6240-1-git-send-email-festevam@gmail.com>
+Message-ID: <20111211060133.GA9470@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko,
-
-On 9 December 2011 15:20, Heiko St?bner <heiko@sntech.de> wrote:
-> Use the data field of of_device_id to hold the type for
-> s3c_cpu_type.
->
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+On Fri, Dec 09, 2011 at 04:41:05PM -0200, Fabio Estevam wrote:
+> Allow UART to be a source for wakeup from low power mode.
+> 
+> Tested on a MX27PDK by doing:
+> 
+> echo enabled > /sys/devices/platform/imx21-uart.0/power/wakeup
+> 
+> echo mem > /sys/power/state
+> 
+> and then pressing a key in the console will wakeup the sytem.
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 > ---
-> ?drivers/rtc/rtc-s3c.c | ? 27 +++++++++++++++++++++------
-> ?1 files changed, 21 insertions(+), 6 deletions(-)
->
-> diff --git a/drivers/rtc/rtc-s3c.c b/drivers/rtc/rtc-s3c.c
-> index 175067a..71807a6 100644
-> --- a/drivers/rtc/rtc-s3c.c
-> +++ b/drivers/rtc/rtc-s3c.c
-> @@ -428,11 +428,18 @@ static int __devexit s3c_rtc_remove(struct platform_device *dev)
-> ? ? ? ?return 0;
-> ?}
->
-
-This patch looks fine but the number of #ifdef's can be reduced in
-this patch as below.
-
-static const struct of_device_id s3c_rtc_dt_match[];
-
-static inline int s3c_rtc_get_driver_data(struct platfrom_device *pdev)
-{
-#ifdef CONFIG_OF
-         if (pdev->dev.of_node) {
-                 const struct of_device_id *match;
-                 match = of_match_node(s3c_rtc_dt_match, pdev->dev.of_node);
-                 return match->data;
-         }
-#endif
-         return platform_get_device_id(pdev)->driver_data;
-}
-
-> +#ifdef CONFIG_OF
-> +static const struct of_device_id s3c_rtc_dt_match[];
-> +#endif
+> Changes since v3:
+> - Remove IMXUART_CANWAKE flag. Let userspace write in /sys/ file
+> in order to enable UART wakeup source.
+> Changes since v2:
+> - Remove incorrect enable_irq_wake from serial_imx_resume
+> Changes since v1:
+> - Pass the can-wake property via DT correctly
+>  drivers/tty/serial/imx.c |   24 ++++++++++++++++++++++++
+>  1 files changed, 24 insertions(+), 0 deletions(-)
+> 
+> diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
+> index 163fc90..283bf21 100644
+> --- a/drivers/tty/serial/imx.c
+> +++ b/drivers/tty/serial/imx.c
+> @@ -566,6 +566,9 @@ static irqreturn_t imx_int(int irq, void *dev_id)
+>  	if (sts & USR1_RTSD)
+>  		imx_rtsint(irq, dev_id);
+>  
+> +	if (sts & USR1_AWAKE)
+> +		writel(USR1_AWAKE, sport->port.membase + USR1);
 > +
-> ?static int __devinit s3c_rtc_probe(struct platform_device *pdev)
-> ?{
-> ? ? ? ?struct rtc_device *rtc;
-> ? ? ? ?struct rtc_time rtc_tm;
-> ? ? ? ?struct resource *res;
-> +#ifdef CONFIG_OF
-> + ? ? ? const struct of_device_id *match;
-> +#endif
+>  	return IRQ_HANDLED;
+>  }
+>  
+> @@ -1269,6 +1272,15 @@ static struct uart_driver imx_reg = {
+>  static int serial_imx_suspend(struct platform_device *dev, pm_message_t state)
+>  {
+>  	struct imx_port *sport = platform_get_drvdata(dev);
+> +	unsigned int val;
+> +
+> +	if (device_may_wakeup(&dev->dev)) {
+> +		enable_irq_wake(sport->rxirq);
+> +		/* enable wakeup from i.MX UART */
+> +		val = readl(sport->port.membase + UCR3);
+> +		val |= UCR3_AWAKEN;
+> +		writel(val, sport->port.membase + UCR3);
+> +	}
+>  
+>  	if (sport)
+>  		uart_suspend_port(&imx_reg, &sport->port);
+> @@ -1279,6 +1291,15 @@ static int serial_imx_suspend(struct platform_device *dev, pm_message_t state)
+>  static int serial_imx_resume(struct platform_device *dev)
+>  {
+>  	struct imx_port *sport = platform_get_drvdata(dev);
+> +	unsigned int val;
+> +
+> +	if (device_may_wakeup(&dev->dev)) {
+> +		/* disable wakeup from i.MX UART */
+> +		val = readl(sport->port.membase + UCR3);
+> +		val &= ~UCR3_AWAKEN;
+> +		writel(val, sport->port.membase + UCR3);
+> +		disable_irq_wake(sport->rxirq);
+> +	}
+>  
+>  	if (sport)
+>  		uart_resume_port(&imx_reg, &sport->port);
+> @@ -1408,6 +1429,9 @@ static int serial_imx_probe(struct platform_device *pdev)
+>  		goto deinit;
+>  	platform_set_drvdata(pdev, &sport->port);
+>  
+> +	device_init_wakeup(&pdev->dev, 1);
+> +	device_set_wakeup_enable(&pdev->dev, 0);
+> +
+Rather than calling these two functions, simply calling 
 
-*match not required here.
+	device_set_wakeup_capable(&pdev->dev, true);
 
-> ? ? ? ?int ret;
->
-> ? ? ? ?pr_debug("%s: probe=%p\n", __func__, pdev);
-> @@ -509,12 +516,15 @@ static int __devinit s3c_rtc_probe(struct platform_device *pdev)
-> ? ? ? ?}
->
-> ?#ifdef CONFIG_OF
-> - ? ? ? if (pdev->dev.of_node)
-> - ? ? ? ? ? ? ? s3c_rtc_cpu_type = of_device_is_compatible(pdev->dev.of_node,
-> - ? ? ? ? ? ? ? ? ? ? ? "samsung,s3c6410-rtc") ? TYPE_S3C64XX : TYPE_S3C2410;
-> - ? ? ? else
-> + ? ? ? if (pdev->dev.of_node) {
-> + ? ? ? ? ? ? ? match = of_match_node(s3c_rtc_dt_match, pdev->dev.of_node);
-> + ? ? ? ? ? ? ? s3c_rtc_cpu_type = match->data;
-> + ? ? ? } else {
-> ?#endif
-> ? ? ? ? ? ? ? ?s3c_rtc_cpu_type = platform_get_device_id(pdev)->driver_data;
-> +#ifdef CONFIG_OF
-> + ? ? ? }
-> +#endif
+can just do what we want to do here.
 
-This gets replaced with
+Other than that,
 
-        s3c_rtc_cpu_type = s3c_rtc_get_driver_data(pdev);
->
-> ? ? ? ?/* Check RTC Time */
->
-> @@ -638,8 +648,13 @@ static int s3c_rtc_resume(struct platform_device *pdev)
->
-> ?#ifdef CONFIG_OF
-> ?static const struct of_device_id s3c_rtc_dt_match[] = {
-> - ? ? ? { .compatible = "samsung,s3c2410-rtc" },
-> - ? ? ? { .compatible = "samsung,s3c6410-rtc" },
-> + ? ? ? {
-> + ? ? ? ? ? ? ? .compatible = "samsung,s3c2410-rtc"
-> + ? ? ? ? ? ? ? .data = TYPE_S3C2410,
-> + ? ? ? }, {
-> + ? ? ? ? ? ? ? .compatible = "samsung,s3c6410-rtc"
-> + ? ? ? ? ? ? ? .data = TYPE_S3C64XX,
-> + ? ? ? },
-> ? ? ? ?{},
-> ?};
-> ?MODULE_DEVICE_TABLE(of, s3c_rtc_dt_match);
-> --
-> 1.7.5.4
->
+Acked-by: Shawn Guo <shawn.guo@linaro.org>
 
-Patch looks fine except the #ifdef's which can be reduced.
-Reviewed-by: Thomas Abraham <thomas.abraham@linaro.org>
+(Tested on i.MX6Q ARM2 board)
 
+-- 
 Regards,
-Thomas.
+Shawn
