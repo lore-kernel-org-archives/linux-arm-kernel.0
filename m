@@ -1,268 +1,77 @@
-From: javi.merino@arm.com (Javi Merino)
-Date: Sun, 11 Dec 2011 19:27:17 +0000
-Subject: [PATCH] ARM: PL330: Fix driver freeze
-In-Reply-To: <4EE4EB91.6020508@arm.com>
-References: <4EE4EB91.6020508@arm.com>
-Message-ID: <1323631637-9610-1-git-send-email-javi.merino@arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Sun, 11 Dec 2011 11:34:01 -0800
+Subject: [PATCH] [RFC] pinctrl: add a driver for Energy Micro's efm32 SoCs
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF175186060C@HQMAIL01.nvidia.com>
+References: <74CDBE0F657A3D45AFBB94109FB122FF1750B77BD8@HQMAIL01.nvidia.com>
+ <20111209010147.GH7913@S2100-06.ap.freescale.net>
+ <4EE18403.30604@nvidia.com>
+ <20111209043220.GJ7913@S2100-06.ap.freescale.net>
+ <4EE192DC.3080209@nvidia.com>
+ <CAA+hA=Sx=tmnjsY_7EF8NciZO4PvgYOCgRNK9WsGpKmJ8X-r3g@mail.gmail.com>
+ <74CDBE0F657A3D45AFBB94109FB122FF17518604C3@HQMAIL01.nvidia.com>
+ <20111209172407.GP31337@atomide.com>
+ <20111209175327.GQ31337@atomide.com>
+ <74CDBE0F657A3D45AFBB94109FB122FF175186060C@HQMAIL01.nvidia.com>
+Message-ID: <20111211193400.GD31337@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a req_running field to the pl330_thread to track which request (if
-any) has been submitted to the DMA.  This mechanism replaces the old
-one in which we tried to guess the same by looking at the PC of the
-DMA, which could prevent the driver from sending more requests if it
-didn't guess correctly.
+* Stephen Warren <swarren@nvidia.com> [111209 15:42]:
+> Tony Lindgren wrote at Friday, December 09, 2011 10:53 AM:
+> > * Tony Lindgren <tony@atomide.com> [111209 08:53]:
+> ...
+> > > For letting a device do it's pingroup in DT, I've played with the
+> > > following:
+> > >
+> > > 	/*      mux func phandle mux func name    hw initial flags */
+> > > 	pins = <&uart3_rx_irrx>, "uart3_rx_irrx", <0xdeadbeef>,
+> > > 		<&uart3_tx_irtx>, "uart3_tx_irtx", <0xdeadbeef>;
+> > >
+> > > But it seems that doing mixed-property arrays gets nasty as any
+> ...
+> > > So I've pretty much come to the conclusion that we would have to
+> > > use something like this instead:
+> > >
+> > > 	/*      phandle        f hw specific initial flags */
+> > > 	pins = <&uart3_rx_irrx 0 0xdeadbeef
+> > > 		&uart3_tx_irtx 0 0xdeadbeef>;
+> > >
+> > > This however has a problem for cases where we may not have a phandle
+> > > in DT for the mux function. For example, let's assume that we'll have
+> > > tens of thousands of lines of mux data for omaps (we already have
+> > > over 6k LOC) and just want to load that from /lib/firmware to avoid
+> > > bloating the kernel. In that case we won't have the phandle for the
+> > > mux function in DT.
+> ...
+> > Oh forgot to mention of course what Benoit came up which is reg-names.
+> > That of course is doable with both phandles and pin names:
+> > 
+> > So optionally either
+> > 
+> > 	pins = <&uart3_rx_irrx &uart3_tx_irtx>;
+> > or
+> > 
+> > 	pin-names = "uart3_rx_irrx",  "uart3_tx_irtx";
+> 
+> Tony,
+> 
+> It sounds like you've already started working on some DT bindings for
+> pin muxing. Are you just at the thinking stage as above, or do you have
+> any concrete code? I'd obviously be interested in looking at any early
+> bindings to see if I can port the Tegra pinctrl driver to use them.
 
-Signed-off-by: Javi Merino <javi.merino@arm.com>
-Cc: Jassi Brar <jaswinder.singh@linaro.org>
----
- arch/arm/common/pl330.c |  116 ++++++++++++++++++++---------------------------
- 1 files changed, 49 insertions(+), 67 deletions(-)
+Yeah I have some code but it still needs a bit more work.. The DT bindings
+part I have only briefly played with so far. Mostly to verify that trying
+to use the mixed-property arrays will get messy.
 
-diff --git a/arch/arm/common/pl330.c b/arch/arm/common/pl330.c
-index f407a6b..8d8df74 100644
---- a/arch/arm/common/pl330.c
-+++ b/arch/arm/common/pl330.c
-@@ -221,17 +221,6 @@
-  */
- #define MCODE_BUFF_PER_REQ	256
- 
--/*
-- * Mark a _pl330_req as free.
-- * We do it by writing DMAEND as the first instruction
-- * because no valid request is going to have DMAEND as
-- * its first instruction to execute.
-- */
--#define MARK_FREE(req)	do { \
--				_emit_END(0, (req)->mc_cpu); \
--				(req)->mc_len = 0; \
--			} while (0)
--
- /* If the _pl330_req is available to the client */
- #define IS_FREE(req)	(*((u8 *)((req)->mc_cpu)) == CMD_DMAEND)
- 
-@@ -301,8 +290,10 @@ struct pl330_thread {
- 	struct pl330_dmac *dmac;
- 	/* Only two at a time */
- 	struct _pl330_req req[2];
--	/* Index of the last submitted request */
-+	/* Index of the last enqueued request */
- 	unsigned lstenq;
-+	/* Index of the last submitted request or -1 if the DMA is stopped */
-+	int req_running;
- };
- 
- enum pl330_dmac_state {
-@@ -778,6 +769,22 @@ static inline void _execute_DBGINSN(struct pl330_thread *thrd,
- 	writel(0, regs + DBGCMD);
- }
- 
-+/*
-+ * Mark a _pl330_req as free.
-+ * We do it by writing DMAEND as the first instruction
-+ * because no valid request is going to have DMAEND as
-+ * its first instruction to execute.
-+ */
-+static void mark_free(struct pl330_thread *thrd, int idx)
-+{
-+	struct _pl330_req *req = &thrd->req[idx];
-+
-+	_emit_END(0, req->mc_cpu);
-+	req->mc_len = 0;
-+
-+	thrd->req_running = -1;
-+}
-+
- static inline u32 _state(struct pl330_thread *thrd)
- {
- 	void __iomem *regs = thrd->dmac->pinfo->base;
-@@ -836,31 +843,6 @@ static inline u32 _state(struct pl330_thread *thrd)
- 	}
- }
- 
--/* If the request 'req' of thread 'thrd' is currently active */
--static inline bool _req_active(struct pl330_thread *thrd,
--		struct _pl330_req *req)
--{
--	void __iomem *regs = thrd->dmac->pinfo->base;
--	u32 buf = req->mc_bus, pc = readl(regs + CPC(thrd->id));
--
--	if (IS_FREE(req))
--		return false;
--
--	return (pc >= buf && pc <= buf + req->mc_len) ? true : false;
--}
--
--/* Returns 0 if the thread is inactive, ID of active req + 1 otherwise */
--static inline unsigned _thrd_active(struct pl330_thread *thrd)
--{
--	if (_req_active(thrd, &thrd->req[0]))
--		return 1; /* First req active */
--
--	if (_req_active(thrd, &thrd->req[1]))
--		return 2; /* Second req active */
--
--	return 0;
--}
--
- static void _stop(struct pl330_thread *thrd)
- {
- 	void __iomem *regs = thrd->dmac->pinfo->base;
-@@ -892,17 +874,22 @@ static bool _trigger(struct pl330_thread *thrd)
- 	struct _arg_GO go;
- 	unsigned ns;
- 	u8 insn[6] = {0, 0, 0, 0, 0, 0};
-+	int idx;
- 
- 	/* Return if already ACTIVE */
- 	if (_state(thrd) != PL330_STATE_STOPPED)
- 		return true;
- 
--	if (!IS_FREE(&thrd->req[1 - thrd->lstenq]))
--		req = &thrd->req[1 - thrd->lstenq];
--	else if (!IS_FREE(&thrd->req[thrd->lstenq]))
--		req = &thrd->req[thrd->lstenq];
--	else
--		req = NULL;
-+	idx = 1 - thrd->lstenq;
-+	if (!IS_FREE(&thrd->req[idx]))
-+		req = &thrd->req[idx];
-+	else {
-+		idx = thrd->lstenq;
-+		if (!IS_FREE(&thrd->req[idx]))
-+			req = &thrd->req[idx];
-+		else
-+			req = NULL;
-+	}
- 
- 	/* Return if no request */
- 	if (!req || !req->r)
-@@ -933,6 +920,8 @@ static bool _trigger(struct pl330_thread *thrd)
- 	/* Only manager can execute GO */
- 	_execute_DBGINSN(thrd, insn, true);
- 
-+	thrd->req_running = idx;
-+
- 	return true;
- }
- 
-@@ -1382,8 +1371,8 @@ static void pl330_dotask(unsigned long data)
- 
- 			thrd->req[0].r = NULL;
- 			thrd->req[1].r = NULL;
--			MARK_FREE(&thrd->req[0]);
--			MARK_FREE(&thrd->req[1]);
-+			mark_free(thrd, 0);
-+			mark_free(thrd, 1);
- 
- 			/* Clear the reset flag */
- 			pl330->dmac_tbd.reset_chan &= ~(1 << i);
-@@ -1461,14 +1450,12 @@ int pl330_update(const struct pl330_info *pi)
- 
- 			thrd = &pl330->channels[id];
- 
--			active = _thrd_active(thrd);
--			if (!active) /* Aborted */
-+			active = thrd->req_running;
-+			if (active == -1) /* Aborted */
- 				continue;
- 
--			active -= 1;
--
- 			rqdone = &thrd->req[active];
--			MARK_FREE(rqdone);
-+			mark_free(thrd, active);
- 
- 			/* Get going again ASAP */
- 			_start(thrd);
-@@ -1509,7 +1496,7 @@ int pl330_chan_ctrl(void *ch_id, enum pl330_chan_op op)
- 	struct pl330_thread *thrd = ch_id;
- 	struct pl330_dmac *pl330;
- 	unsigned long flags;
--	int ret = 0, active;
-+	int ret = 0, active = thrd->req_running;
- 
- 	if (!thrd || thrd->free || thrd->dmac->state == DYING)
- 		return -EINVAL;
-@@ -1525,28 +1512,24 @@ int pl330_chan_ctrl(void *ch_id, enum pl330_chan_op op)
- 
- 		thrd->req[0].r = NULL;
- 		thrd->req[1].r = NULL;
--		MARK_FREE(&thrd->req[0]);
--		MARK_FREE(&thrd->req[1]);
-+		mark_free(thrd, 0);
-+		mark_free(thrd, 1);
- 		break;
- 
- 	case PL330_OP_ABORT:
--		active = _thrd_active(thrd);
--
- 		/* Make sure the channel is stopped */
- 		_stop(thrd);
- 
- 		/* ABORT is only for the active req */
--		if (!active)
-+		if (active == -1)
- 			break;
- 
--		active--;
--
- 		thrd->req[active].r = NULL;
--		MARK_FREE(&thrd->req[active]);
-+		mark_free(thrd, active);
- 
- 		/* Start the next */
- 	case PL330_OP_START:
--		if (!_thrd_active(thrd) && !_start(thrd))
-+		if ((active == -1) && !_start(thrd))
- 			ret = -EIO;
- 		break;
- 
-@@ -1587,14 +1570,13 @@ int pl330_chan_status(void *ch_id, struct pl330_chanstatus *pstatus)
- 	else
- 		pstatus->faulting = false;
- 
--	active = _thrd_active(thrd);
-+	active = thrd->req_running;
- 
--	if (!active) {
-+	if (active == -1) {
- 		/* Indicate that the thread is not running */
- 		pstatus->top_req = NULL;
- 		pstatus->wait_req = NULL;
- 	} else {
--		active--;
- 		pstatus->top_req = thrd->req[active].r;
- 		pstatus->wait_req = !IS_FREE(&thrd->req[1 - active])
- 					? thrd->req[1 - active].r : NULL;
-@@ -1659,9 +1641,9 @@ void *pl330_request_channel(const struct pl330_info *pi)
- 				thrd->free = false;
- 				thrd->lstenq = 1;
- 				thrd->req[0].r = NULL;
--				MARK_FREE(&thrd->req[0]);
-+				mark_free(thrd, 0);
- 				thrd->req[1].r = NULL;
--				MARK_FREE(&thrd->req[1]);
-+				mark_free(thrd, 1);
- 				break;
- 			}
- 		}
-@@ -1767,14 +1749,14 @@ static inline void _reset_thread(struct pl330_thread *thrd)
- 	thrd->req[0].mc_bus = pl330->mcode_bus
- 				+ (thrd->id * pi->mcbufsz);
- 	thrd->req[0].r = NULL;
--	MARK_FREE(&thrd->req[0]);
-+	mark_free(thrd, 0);
- 
- 	thrd->req[1].mc_cpu = thrd->req[0].mc_cpu
- 				+ pi->mcbufsz / 2;
- 	thrd->req[1].mc_bus = thrd->req[0].mc_bus
- 				+ pi->mcbufsz / 2;
- 	thrd->req[1].r = NULL;
--	MARK_FREE(&thrd->req[1]);
-+	mark_free(thrd, 1);
- }
- 
- static int dmac_alloc_threads(struct pl330_dmac *pl330)
--- 
-1.7.0.4
+For parsing the pins as phandles, drivers/of/gpio.c is a nice example.
+
+After still thinking more about it, I think the cleanest and most flexible
+option is using both the pins phandle array or pin-names string array,
+combined with a separate pin-flags initial value array. That way we can
+use the DT generated maps also for non-dt pinmux drivers where we don't
+have phandles around.
+
+Regards,
+
+Tony
