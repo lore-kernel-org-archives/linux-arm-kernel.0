@@ -1,86 +1,46 @@
-From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
-Date: Sun, 11 Dec 2011 21:12:08 +0100
-Subject: [PATCH 10/10] ARM: OMAP1: ams-delta: Drop custom I/O functions
-In-Reply-To: <1323634328-856-1-git-send-email-jkrzyszt@tis.icnet.pl>
-References: <1323634328-856-1-git-send-email-jkrzyszt@tis.icnet.pl>
-Message-ID: <1323634328-856-11-git-send-email-jkrzyszt@tis.icnet.pl>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Mon, 12 Dec 2011 09:27:27 +1100
+Subject: [RFC] virtio: use mandatory barriers for remote processor vdevs
+In-Reply-To: <20111211122544.GC11504@redhat.com>
+References: <1322569886-13055-1-git-send-email-ohad@wizery.com>
+ <1322867384.11728.20.camel@pasglop> <87hb1iqls3.fsf@rustcorp.com.au>
+ <20111211122544.GC11504@redhat.com>
+Message-ID: <1323642447.19891.8.camel@pasglop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Those are no longer required after all drivers which used them have been
-converted to the GPIO interface.
+On Sun, 2011-12-11 at 14:25 +0200, Michael S. Tsirkin wrote:
 
-Depends on patch 9/10 "input: serio: ams-delta: Toggle keyboard power
-over GPIO".
+> Forwarding some results by Amos, who run multiple netperf streams in
+> parallel, from an external box to the guest.  TCP_STREAM results were
+> noisy.  This could be due to buffering done by TCP, where packet size
+> varies even as message size is constant.
+> 
+> TCP_RR results were consistent. In this benchmark, after switching
+> to mandatory barriers, CPU utilization increased by up to 35% while
+> throughput went down by up to 14%. the normalized throughput/cpu
+> regressed consistently, between 7 and 35%
+> 
+> The "fix" applied was simply this:
 
-Signed-off-by: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
----
- arch/arm/mach-omap1/board-ams-delta.c             |   17 +++--------------
- arch/arm/plat-omap/include/plat/board-ams-delta.h |   10 ----------
- 2 files changed, 3 insertions(+), 24 deletions(-)
+What machine & processor was this  ?
 
-diff --git a/arch/arm/mach-omap1/board-ams-delta.c b/arch/arm/mach-omap1/board-ams-delta.c
-index 587118c..bed43b4 100644
---- a/arch/arm/mach-omap1/board-ams-delta.c
-+++ b/arch/arm/mach-omap1/board-ams-delta.c
-@@ -258,19 +258,6 @@ static struct gpio _latch_gpios[] __initconst = {
- 	},
- };
- 
--void ams_delta_latch_write(int base, int ngpio, u16 mask, u16 value)
--{
--	int bit;
--	u16 bitpos;
--
--	for (bit = 0; bit < ngpio; bit++) {
--		bitpos = 1 << bit;
--		if (mask & bitpos)
--			gpio_set_value(base + bit, (value & bitpos) != 0);
--	}
--}
--EXPORT_SYMBOL(ams_delta_latch_write);
--
- static struct resource ams_delta_nand_resources[] = {
- 	[0] = {
- 		.start	= OMAP1_MPUIO_BASE,
-@@ -441,7 +428,9 @@ static void __init ams_delta_init(void)
- 	omap_register_i2c_bus(1, 100, NULL, 0);
- 
- 	platform_add_devices(_latch_devices, ARRAY_SIZE(_latch_devices));
--	BUG_ON(gpio_request_array(_latch_gpios, ARRAY_SIZE(_latch_gpios)));
-+	/* Initialize pins not used by any drivers */
-+	gpio_request_array(_latch_gpios, ARRAY_SIZE(_latch_gpios));
-+	gpio_free_array(_latch_gpios, ARRAY_SIZE(_latch_gpios));
- 
- 	omap1_usb_init(&ams_delta_usb_config);
- 	omap1_set_camera_info(&ams_delta_camera_platform_data);
-diff --git a/arch/arm/plat-omap/include/plat/board-ams-delta.h b/arch/arm/plat-omap/include/plat/board-ams-delta.h
-index 004c827..b09b69d 100644
---- a/arch/arm/plat-omap/include/plat/board-ams-delta.h
-+++ b/arch/arm/plat-omap/include/plat/board-ams-delta.h
-@@ -28,9 +28,6 @@
- 
- #if defined (CONFIG_MACH_AMS_DELTA)
- 
--#define AMD_DELTA_LATCH2_SCARD_RSTIN	0x0400
--#define AMD_DELTA_LATCH2_SCARD_CMDVCC	0x0800
--
- #define AMS_DELTA_GPIO_PIN_KEYBRD_DATA	0
- #define AMS_DELTA_GPIO_PIN_KEYBRD_CLK	1
- #define AMS_DELTA_GPIO_PIN_MODEM_IRQ	2
-@@ -58,13 +55,6 @@
- #define AMS_DELTA_LATCH2_GPIO_BASE	AMS_DELTA_GPIO_PIN_LCD_VBLEN
- #define AMS_DELTA_LATCH2_NGPIO		16
- 
--#ifndef __ASSEMBLY__
--void ams_delta_latch_write(int base, int ngpio, u16 mask, u16 value);
--#endif
--#define ams_delta_latch2_write(mask, value) \
--	ams_delta_latch_write(AMS_DELTA_LATCH2_GPIO_BASE, \
--			AMS_DELTA_LATCH2_NGPIO, (mask), (value))
--
- #endif /* CONFIG_MACH_AMS_DELTA */
- 
- #endif /* __ASM_ARCH_OMAP_AMS_DELTA_H */
--- 
-1.7.3.4
+Cheers,
+Ben.
+
+> diff --git a/drivers/virtio/virtio_ring.c b/drivers/virtio/virtio_ring.c
+> index 3198f2e..fdccb77 100644
+> --- a/drivers/virtio/virtio_ring.c
+> +++ b/drivers/virtio/virtio_ring.c
+> @@ -23,7 +23,7 @@
+>  
+>  /* virtio guest is communicating with a virtual "device" that actually runs on
+>   * a host processor.  Memory barriers are used to control SMP effects. */
+> -#ifdef CONFIG_SMP
+> +#if 0
+>  /* Where possible, use SMP barriers which are more lightweight than mandatory
+>   * barriers, because mandatory barriers control MMIO effects on accesses
+>   * through relaxed memory I/O windows (which virtio does not use). */
+> 
+> 
+> 
