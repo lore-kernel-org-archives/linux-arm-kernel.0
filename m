@@ -1,76 +1,268 @@
-From: snjw23@gmail.com (Sylwester Nawrocki)
-Date: Sun, 11 Dec 2011 19:38:14 +0100
-Subject: [RFC PATCH v1 6/7] media: video: introduce face detection driver
- module
-In-Reply-To: <1322838172-11149-7-git-send-email-ming.lei@canonical.com>
-References: <1322838172-11149-1-git-send-email-ming.lei@canonical.com>
- <1322838172-11149-7-git-send-email-ming.lei@canonical.com>
-Message-ID: <4EE4F896.3080406@gmail.com>
+From: javi.merino@arm.com (Javi Merino)
+Date: Sun, 11 Dec 2011 19:27:17 +0000
+Subject: [PATCH] ARM: PL330: Fix driver freeze
+In-Reply-To: <4EE4EB91.6020508@arm.com>
+References: <4EE4EB91.6020508@arm.com>
+Message-ID: <1323631637-9610-1-git-send-email-javi.merino@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ming,
+Add a req_running field to the pl330_thread to track which request (if
+any) has been submitted to the DMA.  This mechanism replaces the old
+one in which we tried to guess the same by looking at the PC of the
+DMA, which could prevent the driver from sending more requests if it
+didn't guess correctly.
 
-On 12/02/2011 04:02 PM, Ming Lei wrote:
-> This patch introduces one driver for face detection purpose.
-> 
-> The driver is responsible for all v4l2 stuff, buffer management
-> and other general things, and doesn't touch face detection hardware
-> directly. Several interfaces are exported to low level drivers
-> (such as the coming omap4 FD driver)which will communicate with
-> face detection hw module.
-> 
-> So the driver will make driving face detection hw modules more
-> easy.
-> 
-> TODO:
-> 	- implement FD setting interfaces with v4l2 controls or
-> 	ext controls
-> 
-> Signed-off-by: Ming Lei <ming.lei@canonical.com>
-> ---
-...
-> +static int vidioc_g_fd_result(struct file *file, void *priv,
-> +					struct v4l2_fd_result *f)
-> +{
-> +	struct fdif_dev *dev = video_drvdata(file);
-> +	unsigned long flags;
-> +	struct v4l2_fdif_result *tmp;
-> +	struct v4l2_fdif_result *fr = NULL;
-> +	unsigned int cnt = 0;
-> +	int ret = -EINVAL;
-> +
-> +	spin_lock_irqsave(&dev->lock, flags);
-> +	list_for_each_entry(tmp, &dev->fdif_dq.complete, list)
-> +		if (tmp->index == f->buf_index) {
-> +			fr = tmp;
-> +			list_del(&tmp->list);
-> +			break;
-> +		}
-> +	spin_unlock_irqrestore(&dev->lock, flags);
-> +
-> +	if (fr) {
-> +		ret = 0;
-> +		cnt = min(f->face_cnt, fr->face_cnt);
-> +		if (cnt)
-> +			memcpy(f->fd, fr->faces,
-> +				sizeof(struct v4l2_fd_detection) * cnt);
-> +		f->face_cnt = cnt;
-> +		kfree(fr->faces);
-> +		kfree(fr);
+Signed-off-by: Javi Merino <javi.merino@arm.com>
+Cc: Jassi Brar <jaswinder.singh@linaro.org>
+---
+ arch/arm/common/pl330.c |  116 ++++++++++++++++++++---------------------------
+ 1 files changed, 49 insertions(+), 67 deletions(-)
 
-struct v4l2_fdif_result is allocated in HW driver at the time when FD result
-is read out and it is freed in generic module here. Not sure if it is a good
-practice to split memory management like this. Also IMHO it would be much
-better to pre-allocate memory for FD output data, according to maximum number
-of detected faces per frame. It could be more reliable than allocating memory
-in interrupt context per each frame.
-
-
-> +	}
-> +	return ret;
-> +}
-
---
-Regards,
-Sylwester
+diff --git a/arch/arm/common/pl330.c b/arch/arm/common/pl330.c
+index f407a6b..8d8df74 100644
+--- a/arch/arm/common/pl330.c
++++ b/arch/arm/common/pl330.c
+@@ -221,17 +221,6 @@
+  */
+ #define MCODE_BUFF_PER_REQ	256
+ 
+-/*
+- * Mark a _pl330_req as free.
+- * We do it by writing DMAEND as the first instruction
+- * because no valid request is going to have DMAEND as
+- * its first instruction to execute.
+- */
+-#define MARK_FREE(req)	do { \
+-				_emit_END(0, (req)->mc_cpu); \
+-				(req)->mc_len = 0; \
+-			} while (0)
+-
+ /* If the _pl330_req is available to the client */
+ #define IS_FREE(req)	(*((u8 *)((req)->mc_cpu)) == CMD_DMAEND)
+ 
+@@ -301,8 +290,10 @@ struct pl330_thread {
+ 	struct pl330_dmac *dmac;
+ 	/* Only two at a time */
+ 	struct _pl330_req req[2];
+-	/* Index of the last submitted request */
++	/* Index of the last enqueued request */
+ 	unsigned lstenq;
++	/* Index of the last submitted request or -1 if the DMA is stopped */
++	int req_running;
+ };
+ 
+ enum pl330_dmac_state {
+@@ -778,6 +769,22 @@ static inline void _execute_DBGINSN(struct pl330_thread *thrd,
+ 	writel(0, regs + DBGCMD);
+ }
+ 
++/*
++ * Mark a _pl330_req as free.
++ * We do it by writing DMAEND as the first instruction
++ * because no valid request is going to have DMAEND as
++ * its first instruction to execute.
++ */
++static void mark_free(struct pl330_thread *thrd, int idx)
++{
++	struct _pl330_req *req = &thrd->req[idx];
++
++	_emit_END(0, req->mc_cpu);
++	req->mc_len = 0;
++
++	thrd->req_running = -1;
++}
++
+ static inline u32 _state(struct pl330_thread *thrd)
+ {
+ 	void __iomem *regs = thrd->dmac->pinfo->base;
+@@ -836,31 +843,6 @@ static inline u32 _state(struct pl330_thread *thrd)
+ 	}
+ }
+ 
+-/* If the request 'req' of thread 'thrd' is currently active */
+-static inline bool _req_active(struct pl330_thread *thrd,
+-		struct _pl330_req *req)
+-{
+-	void __iomem *regs = thrd->dmac->pinfo->base;
+-	u32 buf = req->mc_bus, pc = readl(regs + CPC(thrd->id));
+-
+-	if (IS_FREE(req))
+-		return false;
+-
+-	return (pc >= buf && pc <= buf + req->mc_len) ? true : false;
+-}
+-
+-/* Returns 0 if the thread is inactive, ID of active req + 1 otherwise */
+-static inline unsigned _thrd_active(struct pl330_thread *thrd)
+-{
+-	if (_req_active(thrd, &thrd->req[0]))
+-		return 1; /* First req active */
+-
+-	if (_req_active(thrd, &thrd->req[1]))
+-		return 2; /* Second req active */
+-
+-	return 0;
+-}
+-
+ static void _stop(struct pl330_thread *thrd)
+ {
+ 	void __iomem *regs = thrd->dmac->pinfo->base;
+@@ -892,17 +874,22 @@ static bool _trigger(struct pl330_thread *thrd)
+ 	struct _arg_GO go;
+ 	unsigned ns;
+ 	u8 insn[6] = {0, 0, 0, 0, 0, 0};
++	int idx;
+ 
+ 	/* Return if already ACTIVE */
+ 	if (_state(thrd) != PL330_STATE_STOPPED)
+ 		return true;
+ 
+-	if (!IS_FREE(&thrd->req[1 - thrd->lstenq]))
+-		req = &thrd->req[1 - thrd->lstenq];
+-	else if (!IS_FREE(&thrd->req[thrd->lstenq]))
+-		req = &thrd->req[thrd->lstenq];
+-	else
+-		req = NULL;
++	idx = 1 - thrd->lstenq;
++	if (!IS_FREE(&thrd->req[idx]))
++		req = &thrd->req[idx];
++	else {
++		idx = thrd->lstenq;
++		if (!IS_FREE(&thrd->req[idx]))
++			req = &thrd->req[idx];
++		else
++			req = NULL;
++	}
+ 
+ 	/* Return if no request */
+ 	if (!req || !req->r)
+@@ -933,6 +920,8 @@ static bool _trigger(struct pl330_thread *thrd)
+ 	/* Only manager can execute GO */
+ 	_execute_DBGINSN(thrd, insn, true);
+ 
++	thrd->req_running = idx;
++
+ 	return true;
+ }
+ 
+@@ -1382,8 +1371,8 @@ static void pl330_dotask(unsigned long data)
+ 
+ 			thrd->req[0].r = NULL;
+ 			thrd->req[1].r = NULL;
+-			MARK_FREE(&thrd->req[0]);
+-			MARK_FREE(&thrd->req[1]);
++			mark_free(thrd, 0);
++			mark_free(thrd, 1);
+ 
+ 			/* Clear the reset flag */
+ 			pl330->dmac_tbd.reset_chan &= ~(1 << i);
+@@ -1461,14 +1450,12 @@ int pl330_update(const struct pl330_info *pi)
+ 
+ 			thrd = &pl330->channels[id];
+ 
+-			active = _thrd_active(thrd);
+-			if (!active) /* Aborted */
++			active = thrd->req_running;
++			if (active == -1) /* Aborted */
+ 				continue;
+ 
+-			active -= 1;
+-
+ 			rqdone = &thrd->req[active];
+-			MARK_FREE(rqdone);
++			mark_free(thrd, active);
+ 
+ 			/* Get going again ASAP */
+ 			_start(thrd);
+@@ -1509,7 +1496,7 @@ int pl330_chan_ctrl(void *ch_id, enum pl330_chan_op op)
+ 	struct pl330_thread *thrd = ch_id;
+ 	struct pl330_dmac *pl330;
+ 	unsigned long flags;
+-	int ret = 0, active;
++	int ret = 0, active = thrd->req_running;
+ 
+ 	if (!thrd || thrd->free || thrd->dmac->state == DYING)
+ 		return -EINVAL;
+@@ -1525,28 +1512,24 @@ int pl330_chan_ctrl(void *ch_id, enum pl330_chan_op op)
+ 
+ 		thrd->req[0].r = NULL;
+ 		thrd->req[1].r = NULL;
+-		MARK_FREE(&thrd->req[0]);
+-		MARK_FREE(&thrd->req[1]);
++		mark_free(thrd, 0);
++		mark_free(thrd, 1);
+ 		break;
+ 
+ 	case PL330_OP_ABORT:
+-		active = _thrd_active(thrd);
+-
+ 		/* Make sure the channel is stopped */
+ 		_stop(thrd);
+ 
+ 		/* ABORT is only for the active req */
+-		if (!active)
++		if (active == -1)
+ 			break;
+ 
+-		active--;
+-
+ 		thrd->req[active].r = NULL;
+-		MARK_FREE(&thrd->req[active]);
++		mark_free(thrd, active);
+ 
+ 		/* Start the next */
+ 	case PL330_OP_START:
+-		if (!_thrd_active(thrd) && !_start(thrd))
++		if ((active == -1) && !_start(thrd))
+ 			ret = -EIO;
+ 		break;
+ 
+@@ -1587,14 +1570,13 @@ int pl330_chan_status(void *ch_id, struct pl330_chanstatus *pstatus)
+ 	else
+ 		pstatus->faulting = false;
+ 
+-	active = _thrd_active(thrd);
++	active = thrd->req_running;
+ 
+-	if (!active) {
++	if (active == -1) {
+ 		/* Indicate that the thread is not running */
+ 		pstatus->top_req = NULL;
+ 		pstatus->wait_req = NULL;
+ 	} else {
+-		active--;
+ 		pstatus->top_req = thrd->req[active].r;
+ 		pstatus->wait_req = !IS_FREE(&thrd->req[1 - active])
+ 					? thrd->req[1 - active].r : NULL;
+@@ -1659,9 +1641,9 @@ void *pl330_request_channel(const struct pl330_info *pi)
+ 				thrd->free = false;
+ 				thrd->lstenq = 1;
+ 				thrd->req[0].r = NULL;
+-				MARK_FREE(&thrd->req[0]);
++				mark_free(thrd, 0);
+ 				thrd->req[1].r = NULL;
+-				MARK_FREE(&thrd->req[1]);
++				mark_free(thrd, 1);
+ 				break;
+ 			}
+ 		}
+@@ -1767,14 +1749,14 @@ static inline void _reset_thread(struct pl330_thread *thrd)
+ 	thrd->req[0].mc_bus = pl330->mcode_bus
+ 				+ (thrd->id * pi->mcbufsz);
+ 	thrd->req[0].r = NULL;
+-	MARK_FREE(&thrd->req[0]);
++	mark_free(thrd, 0);
+ 
+ 	thrd->req[1].mc_cpu = thrd->req[0].mc_cpu
+ 				+ pi->mcbufsz / 2;
+ 	thrd->req[1].mc_bus = thrd->req[0].mc_bus
+ 				+ pi->mcbufsz / 2;
+ 	thrd->req[1].r = NULL;
+-	MARK_FREE(&thrd->req[1]);
++	mark_free(thrd, 1);
+ }
+ 
+ static int dmac_alloc_threads(struct pl330_dmac *pl330)
+-- 
+1.7.0.4
