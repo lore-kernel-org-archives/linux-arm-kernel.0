@@ -1,76 +1,38 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Sun, 11 Dec 2011 11:34:01 -0800
-Subject: [PATCH] [RFC] pinctrl: add a driver for Energy Micro's efm32 SoCs
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF175186060C@HQMAIL01.nvidia.com>
-References: <74CDBE0F657A3D45AFBB94109FB122FF1750B77BD8@HQMAIL01.nvidia.com>
- <20111209010147.GH7913@S2100-06.ap.freescale.net>
- <4EE18403.30604@nvidia.com>
- <20111209043220.GJ7913@S2100-06.ap.freescale.net>
- <4EE192DC.3080209@nvidia.com>
- <CAA+hA=Sx=tmnjsY_7EF8NciZO4PvgYOCgRNK9WsGpKmJ8X-r3g@mail.gmail.com>
- <74CDBE0F657A3D45AFBB94109FB122FF17518604C3@HQMAIL01.nvidia.com>
- <20111209172407.GP31337@atomide.com>
- <20111209175327.GQ31337@atomide.com>
- <74CDBE0F657A3D45AFBB94109FB122FF175186060C@HQMAIL01.nvidia.com>
-Message-ID: <20111211193400.GD31337@atomide.com>
+Date: Sun, 11 Dec 2011 11:36:25 -0800
+Subject: [RFC 1/3] pinctrl: add a driver for NVIDIA Tegra
+In-Reply-To: <CACRpkdaco=967cKHUcj9VNKc_HyT7Mw30Z9HVdfgsUsHbps8bQ@mail.gmail.com>
+References: <1323382390-14892-1-git-send-email-swarren@nvidia.com>
+ <1323382390-14892-2-git-send-email-swarren@nvidia.com>
+ <CACRpkdYDn0V7SeQuFiFDMxGkybvg6PGf7jxid8ECGB7Azkj3zw@mail.gmail.com>
+ <20111209170722.GO31337@atomide.com>
+ <CACRpkdaco=967cKHUcj9VNKc_HyT7Mw30Z9HVdfgsUsHbps8bQ@mail.gmail.com>
+Message-ID: <20111211193625.GE31337@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Stephen Warren <swarren@nvidia.com> [111209 15:42]:
-> Tony Lindgren wrote at Friday, December 09, 2011 10:53 AM:
-> > * Tony Lindgren <tony@atomide.com> [111209 08:53]:
-> ...
-> > > For letting a device do it's pingroup in DT, I've played with the
-> > > following:
-> > >
-> > > 	/*      mux func phandle mux func name    hw initial flags */
-> > > 	pins = <&uart3_rx_irrx>, "uart3_rx_irrx", <0xdeadbeef>,
-> > > 		<&uart3_tx_irtx>, "uart3_tx_irtx", <0xdeadbeef>;
-> > >
-> > > But it seems that doing mixed-property arrays gets nasty as any
-> ...
-> > > So I've pretty much come to the conclusion that we would have to
-> > > use something like this instead:
-> > >
-> > > 	/*      phandle        f hw specific initial flags */
-> > > 	pins = <&uart3_rx_irrx 0 0xdeadbeef
-> > > 		&uart3_tx_irtx 0 0xdeadbeef>;
-> > >
-> > > This however has a problem for cases where we may not have a phandle
-> > > in DT for the mux function. For example, let's assume that we'll have
-> > > tens of thousands of lines of mux data for omaps (we already have
-> > > over 6k LOC) and just want to load that from /lib/firmware to avoid
-> > > bloating the kernel. In that case we won't have the phandle for the
-> > > mux function in DT.
-> ...
-> > Oh forgot to mention of course what Benoit came up which is reg-names.
-> > That of course is doable with both phandles and pin names:
-> > 
-> > So optionally either
-> > 
-> > 	pins = <&uart3_rx_irrx &uart3_tx_irtx>;
-> > or
-> > 
-> > 	pin-names = "uart3_rx_irrx",  "uart3_tx_irtx";
+* Linus Walleij <linus.walleij@linaro.org> [111209 15:17]:
+> On Fri, Dec 9, 2011 at 6:07 PM, Tony Lindgren <tony@atomide.com> wrote:
 > 
-> Tony,
+> > - We currently have hard time supporting pin groups with pins
+> > ?coming from multiple pinmux driver instances
 > 
-> It sounds like you've already started working on some DT bindings for
-> pin muxing. Are you just at the thinking stage as above, or do you have
-> any concrete code? I'd obviously be interested in looking at any early
-> bindings to see if I can port the Tegra pinctrl driver to use them.
+> Pin groups are per definiton per-controller inctance. That is a
+> given side effect of not having a global pin space.
+> 
+> But you can create two groups of the same name on two
+> pin controllers so that e.g. pinctrl.0 and pinctrl.1 have
+> a group named "foo", then map both to a certain device
+> in the board pinmux map.
+> 
+> You will have to request them individually however, like
+> with two hogs or two pinmux_get() calls specifying the
+> name of each map, else you will just get the first one.
+> 
+> Not that I've tried it, but that's how it's supposed to work...
 
-Yeah I have some code but it still needs a bit more work.. The DT bindings
-part I have only briefly played with so far. Mostly to verify that trying
-to use the mixed-property arrays will get messy.
-
-For parsing the pins as phandles, drivers/of/gpio.c is a nice example.
-
-After still thinking more about it, I think the cleanest and most flexible
-option is using both the pins phandle array or pin-names string array,
-combined with a separate pin-flags initial value array. That way we can
-use the DT generated maps also for non-dt pinmux drivers where we don't
-have phandles around.
+Yes a little bit of trickery is needed there, I'll look into
+it more as we already have two controller instances on omap4.
 
 Regards,
 
