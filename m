@@ -1,81 +1,52 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Sun, 11 Dec 2011 15:12:05 +0530
-Subject: [PATCH 2/2] DMA: PL330: Removes useless function
-In-Reply-To: <002a01ccb582$bbcdbba0$336932e0$%kim@samsung.com>
-References: <Acy1grs8azr8gcXzQzOmZ6e1pLhc6Q==>
- <002a01ccb582$bbcdbba0$336932e0$%kim@samsung.com>
-Message-ID: <CABb+yY2gyBXSW98EEF_t-RjCFwxLuOtaRBxTXBD_6Q5M0kR9aA@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 11 Dec 2011 10:03:25 +0000
+Subject: [PATCH] ARM: MM: Configure the number of banks
+In-Reply-To: <1323048539-9573-1-git-send-email-boojin.kim@samsung.com>
+References: <1323048539-9573-1-git-send-email-boojin.kim@samsung.com>
+Message-ID: <20111211100325.GR14542@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 8, 2011 at 1:53 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> From: Boojin Kim <boojin.kim@samsung.com>
->
-> Cc: Jassi Brar <jassisinghbrar@gmail.com>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: Vinod Koul <vinod.koul@intel.com>
+On Mon, Dec 05, 2011 at 10:28:59AM +0900, Boojin Kim wrote:
+> This patch configures NR_BANKS by machine specific configuration.
+> NR_BANKS should be increased to support bigger than 2GB memory.
+> 
 > Signed-off-by: Boojin Kim <boojin.kim@samsung.com>
-> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> ---
-> ?drivers/dma/pl330.c | ? 47 -----------------------------------------------
-> ?1 files changed, 0 insertions(+), 47 deletions(-)
->
-> diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
-> index 35f0904..b917477 100644
-> --- a/drivers/dma/pl330.c
-> +++ b/drivers/dma/pl330.c
-> @@ -1512,53 +1512,6 @@ static int pl330_chan_ctrl(void *ch_id, enum pl330_chan_op op)
-> ? ? ? ?return ret;
-> ?}
->
-> -static int pl330_chan_status(void *ch_id, struct pl330_chanstatus *pstatus)
-> -{
-> - ? ? ? struct pl330_thread *thrd = ch_id;
-> - ? ? ? struct pl330_dmac *pl330;
-> - ? ? ? struct pl330_info *pi;
-> - ? ? ? void __iomem *regs;
-> - ? ? ? int active;
-> - ? ? ? u32 val;
-> -
-> - ? ? ? if (!pstatus || !thrd || thrd->free)
-> - ? ? ? ? ? ? ? return -EINVAL;
-> -
-> - ? ? ? pl330 = thrd->dmac;
-> - ? ? ? pi = pl330->pinfo;
-> - ? ? ? regs = pi->base;
-> -
-> - ? ? ? /* The client should remove the DMAC and add again */
-> - ? ? ? if (pl330->state == DYING)
-> - ? ? ? ? ? ? ? pstatus->dmac_halted = true;
-> - ? ? ? else
-> - ? ? ? ? ? ? ? pstatus->dmac_halted = false;
-> -
-> - ? ? ? val = readl(regs + FSC);
-> - ? ? ? if (val & (1 << thrd->id))
-> - ? ? ? ? ? ? ? pstatus->faulting = true;
-> - ? ? ? else
-> - ? ? ? ? ? ? ? pstatus->faulting = false;
-> -
-> - ? ? ? active = _thrd_active(thrd);
-> -
-> - ? ? ? if (!active) {
-> - ? ? ? ? ? ? ? /* Indicate that the thread is not running */
-> - ? ? ? ? ? ? ? pstatus->top_req = NULL;
-> - ? ? ? ? ? ? ? pstatus->wait_req = NULL;
-> - ? ? ? } else {
-> - ? ? ? ? ? ? ? active--;
-> - ? ? ? ? ? ? ? pstatus->top_req = thrd->req[active].r;
-> - ? ? ? ? ? ? ? pstatus->wait_req = !IS_FREE(&thrd->req[1 - active])
-> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? thrd->req[1 - active].r : NULL;
-> - ? ? ? }
-> -
-> - ? ? ? pstatus->src_addr = readl(regs + SA(thrd->id));
-> - ? ? ? pstatus->dst_addr = readl(regs + DA(thrd->id));
-> -
-> - ? ? ? return 0;
-> -}
->
-NAK.
-Recently Samsung ASoC regressed to update DMA pointer only at period boundaries.
-I am sure other platforms would like to have low audio latencies and
-hence need this function.
+
+I'd much prefer to solve this a different way:
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 4676c19..d451945 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1126,6 +1126,11 @@ config ARM_TIMER_SP804
+ 
+ source arch/arm/mm/Kconfig
+ 
++config ARM_NR_BANKS
++	int
++	default 16 if ARCH_EP93XX
++	default 8
++
+ config IWMMXT
+ 	bool "Enable iWMMXt support"
+ 	depends on CPU_XSCALE || CPU_XSC3 || CPU_MOHAWK || CPU_PJ4
+diff --git a/arch/arm/include/asm/setup.h b/arch/arm/include/asm/setup.h
+index 915696d..23ebc0c 100644
+--- a/arch/arm/include/asm/setup.h
++++ b/arch/arm/include/asm/setup.h
+@@ -192,11 +192,7 @@ static const struct tagtable __tagtable_##fn __tag = { tag, fn }
+ /*
+  * Memory map description
+  */
+-#ifdef CONFIG_ARCH_EP93XX
+-# define NR_BANKS 16
+-#else
+-# define NR_BANKS 8
+-#endif
++#define NR_BANKS	CONFIG_ARM_NR_BANKS
+ 
+ struct membank {
+ 	phys_addr_t start;
+
+so we don't introduce new dependencies for having a mach/memory.h.
