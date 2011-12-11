@@ -1,39 +1,51 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Sun, 11 Dec 2011 11:36:25 -0800
-Subject: [RFC 1/3] pinctrl: add a driver for NVIDIA Tegra
-In-Reply-To: <CACRpkdaco=967cKHUcj9VNKc_HyT7Mw30Z9HVdfgsUsHbps8bQ@mail.gmail.com>
-References: <1323382390-14892-1-git-send-email-swarren@nvidia.com>
- <1323382390-14892-2-git-send-email-swarren@nvidia.com>
- <CACRpkdYDn0V7SeQuFiFDMxGkybvg6PGf7jxid8ECGB7Azkj3zw@mail.gmail.com>
- <20111209170722.GO31337@atomide.com>
- <CACRpkdaco=967cKHUcj9VNKc_HyT7Mw30Z9HVdfgsUsHbps8bQ@mail.gmail.com>
-Message-ID: <20111211193625.GE31337@atomide.com>
+From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
+Date: Sun, 11 Dec 2011 20:35:55 +0100
+Subject: [patch 1/1] arch/arm/kernel/setup.c: initialize arm_dma_zone_size
+ earlier
+In-Reply-To: <20111210213836.GP14542@n2100.arm.linux.org.uk> (Russell King's
+ message of "Sat, 10 Dec 2011 21:38:36 +0000")
+References: <20111208213131.407903305@rtp-net.org>
+ <20111210213836.GP14542@n2100.arm.linux.org.uk>
+Message-ID: <87d3bux5no.fsf@lebrac.rtp-net.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Linus Walleij <linus.walleij@linaro.org> [111209 15:17]:
-> On Fri, Dec 9, 2011 at 6:07 PM, Tony Lindgren <tony@atomide.com> wrote:
-> 
-> > - We currently have hard time supporting pin groups with pins
-> > ?coming from multiple pinmux driver instances
-> 
-> Pin groups are per definiton per-controller inctance. That is a
-> given side effect of not having a global pin space.
-> 
-> But you can create two groups of the same name on two
-> pin controllers so that e.g. pinctrl.0 and pinctrl.1 have
-> a group named "foo", then map both to a certain device
-> in the board pinmux map.
-> 
-> You will have to request them individually however, like
-> with two hogs or two pinmux_get() calls specifying the
-> name of each map, else you will just get the first one.
-> 
-> Not that I've tried it, but that's how it's supposed to work...
+Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
 
-Yes a little bit of trickery is needed there, I'll look into
-it more as we already have two controller instances on omap4.
+Hi,
 
-Regards,
+> On Thu, Dec 08, 2011 at 10:31:09PM +0100, Arnaud Patard wrote:
+>> arm_dma_zone_size is used by arm_bootmem_free() which is called by
+>> paging_init(). Thus it needs to be set before calling it.
+>> 
+>> Signed-off-by: Arnaud Patard <arnaud.patard@rtp-net.org>
+>> Acked-by: Nicolas Pitre <nico@linaro.org>
+>> CC: stable at kernel.org
+>> Index: linux-2.6/arch/arm/kernel/setup.c
+>> ===================================================================
+>> --- linux-2.6.orig/arch/arm/kernel/setup.c	2011-12-08 22:17:01.000000000 +0100
+>> +++ linux-2.6/arch/arm/kernel/setup.c	2011-12-08 22:17:32.000000000 +0100
+>> @@ -911,6 +911,12 @@ void __init setup_arch(char **cmdline_p)
+>>  	machine_desc = mdesc;
+>>  	machine_name = mdesc->name;
+>>  
+>> +#ifdef CONFIG_ZONE_DMA
+>> +	if (mdesc->dma_zone_size) {
+>> +		extern unsigned long arm_dma_zone_size;
+>> +		arm_dma_zone_size = mdesc->dma_zone_size;
+>> +	}
+>> +#endif
+>>  	if (mdesc->restart_mode)
+>>  		reboot_setup(&mdesc->restart_mode);
+>
+> Just trying to apply this patch, it won't apply to mainline because it's
+> based upon the bleeding edge of kernel development, rather than what's
+> currently in mainline.  If we're going to fix this in current mainline
+> and previous stable versions, the patch needs to be against that, not
+> linux-next.
+>
+> Could you re-generate against an -rc kernel please?
 
-Tony
+Ok. No problem. Done. It's the patch 7204/1 in the patch system.
+
+Arnaud
