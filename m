@@ -1,62 +1,62 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Tue, 13 Dec 2011 09:49:34 +1100
-Subject: linux-next: please update URL for arm-soc tree
-In-Reply-To: <CAOesGMgUJAH01p20Kx=DOTN1T-fxJDVHbtDFRno4cUPcnbHFMw@mail.gmail.com>
-References: <CAOesGMgUJAH01p20Kx=DOTN1T-fxJDVHbtDFRno4cUPcnbHFMw@mail.gmail.com>
-Message-ID: <20111213094934.6dae2e13597a25fbaaa0e7fd@canb.auug.org.au>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Mon, 12 Dec 2011 17:56:38 -0500 (EST)
+Subject: arm and patch phys offset
+In-Reply-To: <20111212222157.GG20178@n2100.arm.linux.org.uk>
+References: <201112112255.32534.michael@walle.cc>
+ <201112122255.40092.michael@walle.cc>
+ <20111212220247.GF20178@n2100.arm.linux.org.uk>
+ <201112122309.00075.michael@walle.cc>
+ <20111212222157.GG20178@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.02.1112121746330.2907@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
+On Mon, 12 Dec 2011, Russell King - ARM Linux wrote:
 
-On Mon, 12 Dec 2011 08:45:59 -0800 Olof Johansson <olof@lixom.net> wrote:
->
-> The arm-soc tree is back on kernel.org, so can you please update the
-> tree you pull to:
+> On Mon, Dec 12, 2011 at 11:09:00PM +0100, Michael Walle wrote:
+> > Am Montag 12 Dezember 2011, 23:02:47 schrieb Russell King - ARM Linux:
+> > > > > Are you running a Thumb-2 kernel?  Which kernel are you running?
+> > > > 
+> > > > what do you mean by which kernel?
+> > > > linus' master from yesterday, ARCH_KIRKWOOD=y
+> > > > CONFIG_THUMB2_KERNEL is not set
+> > > 
+> > > Yes, that's what I mean.
+> > > 
+> > > Right, so the problem you're describing is _impossible_ - there is no way
+> > > the fixup function can fix only some instructions and skip over others in
+> > > a properly functioning system.
+> > > 
+> > > The only options are that either the CPU is not executing the instructions
+> > > we're giving it (unlikely as - I assume - your hardware executes older
+> > > kernels fine), or for some reason your kernel is being called with caches
+> > > still enabled, violating the long-standing kernel's calling requirements.
+> > > 
+> > > So, some more questions to try to narrow this down:
+> > > 
+> > > 1. What boot loader are you using?
+> > u-boot 2011.09 with own bsp support.
+> > 
+> > > 2. What file are you taking from the kernel build in order to boot?
+> > generated uImage
 > 
-> git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git  for-next
+> Okay, so this should mean that the kernel's own decompressor has run,
+> which should turn on/off the mmu and caches, cleaning and invalidating
+> them, which will take the boot loader completely out of the picture at
+> this stage.
 > 
-> Contacts for merge conflicts are Arnd, me and the linux-arm-kernel list.
+> I think I'll leave this in the hands of Nicolas - from what I remember,
+> kirkwood is a feroceon based system, and I have little working knowledge
+> of that ARM derivative.
 
-OK, I have switched to that now.
+I just compiled vanilla v3.2-rc5 using kirkwood_defconfig and 
+successfully booted it on a SheevaPlug and a DB-88F6281-BP development 
+board.  And I do have CONFIG_ARM_PATCH_PHYS_VIRT=y.  Both platforms are 
+using u-Boot which booted the default uImage produced by the kernel 
+build system.
 
-Thanks for adding your subsystem tree as a participant of linux-next.  As
-you may know, this is not a judgment of your code.  The purpose of
-linux-next is for integration testing and to lower the impact of
-conflicts between subsystems in the next merge window. 
+So at this point I wouldn't think the issue is Kirkwood related as I 
+can't reproduce it on two different Kirkwood targets.
 
-You will need to ensure that the patches/commits in your tree/series have
-been:
-     * submitted under GPL v2 (or later) and include the Contributor's
-	Signed-off-by,
-     * posted to the relevant mailing list,
-     * reviewed by you (or another maintainer of your subsystem tree),
-     * successfully unit tested, and 
-     * destined for the current or next Linux merge window.
 
-Basically, this should be just what you would send to Linus (or ask him
-to fetch).  It is allowed to be rebased if you deem it necessary.
-
--- 
-Cheers,
-Stephen Rothwell 
-sfr at canb.auug.org.au
-
-Legal Stuff:
-By participating in linux-next, your subsystem tree contributions are
-public and will be included in the linux-next trees.  You may be sent
-e-mail messages indicating errors or other issues when the
-patches/commits from your subsystem tree are merged and tested in
-linux-next.  These messages may also be cross-posted to the linux-next
-mailing list, the linux-kernel mailing list, etc.  The linux-next tree
-project and IBM (my employer) make no warranties regarding the linux-next
-project, the testing procedures, the results, the e-mails, etc.  If you
-don't agree to these ground rules, let me know and I'll remove your tree
-from participation in linux-next.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111213/9ccc76f1/attachment.sig>
+Nicolas
