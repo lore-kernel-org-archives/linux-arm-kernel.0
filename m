@@ -1,75 +1,162 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Mon, 12 Dec 2011 13:45:48 +0530
-Subject: [PATCH 7/8] OMAP4: clock: Add CPU local timer clock node.
-In-Reply-To: <CAJOA=zP0zs=eKsQXQPt5dj8EHQFnZ50Jnm_Ho425yH-NZkgY5A@mail.gmail.com>
-References: <1315459327-3285-1-git-send-email-santosh.shilimkar@ti.com>
- <1315459327-3285-8-git-send-email-santosh.shilimkar@ti.com>
- <CAKnu2Mp4QnQPwcGJCrfMqS6VcfvvvAxginjJkLG1mPLO0WJBUw@mail.gmail.com>
- <CAMQu2gyBq61jcP1sLDEs8+zGfdAa6Pur1fSec9Wfzs48CX5zjA@mail.gmail.com>
- <CAJOA=zP0zs=eKsQXQPt5dj8EHQFnZ50Jnm_Ho425yH-NZkgY5A@mail.gmail.com>
-Message-ID: <CAMQu2gxvYNjL2rrzs=H+ougB16po6GL-31hNd_wV42kNDBYBvA@mail.gmail.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Mon, 12 Dec 2011 00:18:16 -0800
+Subject: [PATCH 09/10] input: serio: ams-delta: Toggle keyboard power
+ over GPIO
+In-Reply-To: <1323634328-856-10-git-send-email-jkrzyszt@tis.icnet.pl>
+References: <1323634328-856-1-git-send-email-jkrzyszt@tis.icnet.pl>
+ <1323634328-856-10-git-send-email-jkrzyszt@tis.icnet.pl>
+Message-ID: <20111212081816.GG4682@core.coreip.homeip.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 9, 2011 at 4:32 AM, Turquette, Mike <mturquette@ti.com> wrote:
-> On Fri, Sep 30, 2011 at 2:15 AM, Shilimkar, Santosh
-> <santosh.shilimkar@ti.com> wrote:
->> On Fri, Sep 30, 2011 at 3:00 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
->>> 2011/9/8 Santosh Shilimkar <santosh.shilimkar@ti.com>:
->>>
->>>> Local timer clock is sourced from the CPU clock and hence changes
->>>> along with CPU clock. These per CPU local timers are used as
->>>> clock-events, so they need to be reconfigured on CPU frequency
->>>> change as part of CPUfreq governor.
->>>
->>> This requires patch 6956/2 right?
->>> http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=6956/2
->>>
->>> Can I add your Tested-by: to the patch as well?
->>>
->> Sure.
->
-> Santosh,
->
-> I've taken in Linus' patch as well as this patch while testing clk
-> notifiers (part of common clk framework code).
->
-> Linus' patch matches the clk based on dev_id, but the clkdev entry in
-> your patch populated dev_id with NULL and con_id with "smp_twd" so
-> things never worked correctly. ?Below changed fixed it for me:
->
-You are right.
-When I picked up the patch while changing the
-OMAP44XX stuff to OMAP4430, looks like I miss-placed it.
+On Sun, Dec 11, 2011 at 09:12:07PM +0100, Janusz Krzysztofik wrote:
+> Don't use Amstrad Delta custom I/O functions once GPIO interface is
+> available for the underlying hardware.
+> 
+> Depends on patch 8/10 "omapfb: lcd_ams_delta: Drive control lines over
+> GPIO".
+> 
+> Signed-off-by: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
 
-> diff --git a/arch/arm/mach-omap2/clock44xx_data.c
-> b/arch/arm/mach-omap2/clock44xx_data.c
-> index ae8c292..0f8cf68 100644
-> --- a/arch/arm/mach-omap2/clock44xx_data.c
-> +++ b/arch/arm/mach-omap2/clock44xx_data.c
-> @@ -4114,7 +4114,7 @@ static struct omap_clk omap44xx_clks[] = {
-> ? ? ? ?CLK(NULL, ? ? ? "l4_div_ck",
-> &l4_div_ck_hw.clk, ? ? ?CK_443X),
-> ? ? ? ?CLK(NULL, ? ? ? "lp_clk_div_ck",
-> &lp_clk_div_ck_hw.clk, ?CK_443X),
-> ? ? ? ?CLK(NULL, ? ? ? "l4_wkup_clk_mux_ck",
-> &l4_wkup_clk_mux_ck_hw.clk, ? ? CK_443X),
-> - ? ? ? CLK(NULL, ? ? ? "smp_twd",
-> &mpu_periphclk_hw.clk, ?CK_443X),
-> + ? ? ? CLK("smp_twd", ?NULL, ? ? ? ? ? ? ? ? ? &mpu_periphclk_hw.clk,
-> ?CK_443X),
-> ? ? ? ?CLK(NULL, ? ? ? "ocp_abe_iclk",
-> &ocp_abe_iclk_hw.clk, ? CK_443X),
-> ? ? ? ?CLK(NULL, ? ? ? "per_abe_24m_fclk",
-> &per_abe_24m_fclk_hw.clk, ? ? ? CK_443X),
-> ? ? ? ?CLK(NULL, ? ? ? "per_abe_nc_fclk",
-> &per_abe_nc_fclk_hw.clk, ? ? ? ?CK_443X),
->
-> A better change might be for the code in smp_twd.c to match on con_id
-> but I'll let you guys sort that out.
+Acked-by: Dmitry Torokhov <dtor@mail.ru>
 
-I guess we can stick to what Linus and others have followed.
-Will post an updated patch. Thanks for catch.
+> ---
+>  arch/arm/mach-omap1/board-ams-delta.c             |    5 --
+>  arch/arm/plat-omap/include/plat/board-ams-delta.h |    2 -
+>  drivers/input/serio/ams_delta_serio.c             |   45 +++++++++++---------
+>  3 files changed, 25 insertions(+), 27 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap1/board-ams-delta.c b/arch/arm/mach-omap1/board-ams-delta.c
+> index b7422e3..587118c 100644
+> --- a/arch/arm/mach-omap1/board-ams-delta.c
+> +++ b/arch/arm/mach-omap1/board-ams-delta.c
+> @@ -232,11 +232,6 @@ static struct gpio _latch_gpios[] __initconst = {
+>  		.label	= "dockit2",
+>  	},
+>  	{
+> -		.gpio	= AMS_DELTA_GPIO_PIN_KEYBRD_PWR,
+> -		.flags	= GPIOF_OUT_INIT_LOW,
+> -		.label	= "keybrd_pwr",
+> -	},
+> -	{
+>  		.gpio	= AMS_DELTA_GPIO_PIN_KEYBRD_DATAOUT,
+>  		.flags	= GPIOF_OUT_INIT_LOW,
+>  		.label	= "keybrd_dataout",
+> diff --git a/arch/arm/plat-omap/include/plat/board-ams-delta.h b/arch/arm/plat-omap/include/plat/board-ams-delta.h
+> index 1d0706e..004c827 100644
+> --- a/arch/arm/plat-omap/include/plat/board-ams-delta.h
+> +++ b/arch/arm/plat-omap/include/plat/board-ams-delta.h
+> @@ -28,8 +28,6 @@
+>  
+>  #if defined (CONFIG_MACH_AMS_DELTA)
+>  
+> -#define AMD_DELTA_LATCH2_KEYBRD_PWR	0x0100
+> -#define AMD_DELTA_LATCH2_KEYBRD_DATA	0x0200
+>  #define AMD_DELTA_LATCH2_SCARD_RSTIN	0x0400
+>  #define AMD_DELTA_LATCH2_SCARD_CMDVCC	0x0800
+>  
+> diff --git a/drivers/input/serio/ams_delta_serio.c b/drivers/input/serio/ams_delta_serio.c
+> index d4d08bd..1499c7d 100644
+> --- a/drivers/input/serio/ams_delta_serio.c
+> +++ b/drivers/input/serio/ams_delta_serio.c
+> @@ -92,8 +92,7 @@ static irqreturn_t ams_delta_serio_interrupt(int irq, void *dev_id)
+>  static int ams_delta_serio_open(struct serio *serio)
+>  {
+>  	/* enable keyboard */
+> -	ams_delta_latch2_write(AMD_DELTA_LATCH2_KEYBRD_PWR,
+> -			AMD_DELTA_LATCH2_KEYBRD_PWR);
+> +	gpio_set_value(AMS_DELTA_GPIO_PIN_KEYBRD_PWR, 1);
+>  
+>  	return 0;
+>  }
+> @@ -101,9 +100,26 @@ static int ams_delta_serio_open(struct serio *serio)
+>  static void ams_delta_serio_close(struct serio *serio)
+>  {
+>  	/* disable keyboard */
+> -	ams_delta_latch2_write(AMD_DELTA_LATCH2_KEYBRD_PWR, 0);
+> +	gpio_set_value(AMS_DELTA_GPIO_PIN_KEYBRD_PWR, 0);
+>  }
+>  
+> +static struct gpio _gpios[] __initconst_or_module = {
+> +	{
+> +		.gpio	= AMS_DELTA_GPIO_PIN_KEYBRD_DATA,
+> +		.flags	= GPIOF_DIR_IN,
+> +		.label	= "serio-data",
+> +	},
+> +	{
+> +		.gpio	= AMS_DELTA_GPIO_PIN_KEYBRD_CLK,
+> +		.flags	= GPIOF_DIR_IN,
+> +		.label	= "serio-clock",
+> +	},
+> +	{
+> +		.gpio	= AMS_DELTA_GPIO_PIN_KEYBRD_PWR,
+> +		.flags	= GPIOF_OUT_INIT_LOW,
+> +		.label	= "serio-power",
+> +	},
+> +};
+>  static int __init ams_delta_serio_init(void)
+>  {
+>  	int err;
+> @@ -123,19 +139,11 @@ static int __init ams_delta_serio_init(void)
+>  	strlcpy(ams_delta_serio->phys, "GPIO/serio0",
+>  			sizeof(ams_delta_serio->phys));
+>  
+> -	err = gpio_request(AMS_DELTA_GPIO_PIN_KEYBRD_DATA, "serio-data");
+> +	err = gpio_request_array(_gpios, ARRAY_SIZE(_gpios));
+>  	if (err) {
+> -		pr_err("ams_delta_serio: Couldn't request gpio pin for data\n");
+> +		pr_err("ams_delta_serio: Couldn't request gpio pins\n");
+>  		goto serio;
+>  	}
+> -	gpio_direction_input(AMS_DELTA_GPIO_PIN_KEYBRD_DATA);
+> -
+> -	err = gpio_request(AMS_DELTA_GPIO_PIN_KEYBRD_CLK, "serio-clock");
+> -	if (err) {
+> -		pr_err("ams_delta_serio: couldn't request gpio pin for clock\n");
+> -		goto gpio_data;
+> -	}
+> -	gpio_direction_input(AMS_DELTA_GPIO_PIN_KEYBRD_CLK);
+>  
+>  	err = request_irq(gpio_to_irq(AMS_DELTA_GPIO_PIN_KEYBRD_CLK),
+>  			ams_delta_serio_interrupt, IRQ_TYPE_EDGE_RISING,
+> @@ -143,7 +151,7 @@ static int __init ams_delta_serio_init(void)
+>  	if (err < 0) {
+>  		pr_err("ams_delta_serio: couldn't request gpio interrupt %d\n",
+>  				gpio_to_irq(AMS_DELTA_GPIO_PIN_KEYBRD_CLK));
+> -		goto gpio_clk;
+> +		goto gpio;
+>  	}
+>  	/*
+>  	 * Since GPIO register handling for keyboard clock pin is performed
+> @@ -157,10 +165,8 @@ static int __init ams_delta_serio_init(void)
+>  	dev_info(&ams_delta_serio->dev, "%s\n", ams_delta_serio->name);
+>  
+>  	return 0;
+> -gpio_clk:
+> -	gpio_free(AMS_DELTA_GPIO_PIN_KEYBRD_CLK);
+> -gpio_data:
+> -	gpio_free(AMS_DELTA_GPIO_PIN_KEYBRD_DATA);
+> +gpio:
+> +	gpio_free_array(_gpios, ARRAY_SIZE(_gpios));
+>  serio:
+>  	kfree(ams_delta_serio);
+>  	return err;
+> @@ -171,7 +177,6 @@ static void __exit ams_delta_serio_exit(void)
+>  {
+>  	serio_unregister_port(ams_delta_serio);
+>  	free_irq(OMAP_GPIO_IRQ(AMS_DELTA_GPIO_PIN_KEYBRD_CLK), 0);
+> -	gpio_free(AMS_DELTA_GPIO_PIN_KEYBRD_CLK);
+> -	gpio_free(AMS_DELTA_GPIO_PIN_KEYBRD_DATA);
+> +	gpio_free_array(_gpios, ARRAY_SIZE(_gpios));
+>  }
+>  module_exit(ams_delta_serio_exit);
+> -- 
+> 1.7.3.4
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-input" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
-Regards
-Santosh
+-- 
+Dmitry
