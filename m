@@ -1,72 +1,53 @@
 From: ulf.hansson@stericsson.com (Ulf Hansson)
-Date: Mon, 12 Dec 2011 16:36:07 +0100
-Subject: [PATCH 5/5] mmc: mmci: Support any block sizes for ux500v2 variant
+Date: Mon, 12 Dec 2011 16:36:06 +0100
+Subject: [PATCH 4/5] mmc: mmci: Fix PIO read for small SDIO packets
 In-Reply-To: <1323704167-10247-1-git-send-email-ulf.hansson@stericsson.com>
 References: <1323704167-10247-1-git-send-email-ulf.hansson@stericsson.com>
-Message-ID: <1323704167-10247-6-git-send-email-ulf.hansson@stericsson.com>
+Message-ID: <1323704167-10247-5-git-send-email-ulf.hansson@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For the ux500v2 variant of the PL18x block, any block sizes are
-supported. This will make it possible to decrease data overhead
-for SDIO transfers.
+From: Stefan Nilsson XK <stefan.xk.nilsson@stericsson.com>
 
-This patch is based upon a patch from Stefan Nilsson.
+Corrects a bug in MMCI host driver which silently causes
+small reads (< 4 bytes as only used in SDIO) from PL-18X to fail.
 
+Signed-off-by: Stefan Nilsson XK <stefan.xk.nilsson@stericsson.com>
 Signed-off-by: Ulf Hansson <ulf.hansson@stericsson.com>
+Signed-off-by: Fredrik Soderstedt <fredrik.soderstedt@stericsson.com>
 ---
- drivers/mmc/host/mmci.c |    8 ++++++--
- 1 files changed, 6 insertions(+), 2 deletions(-)
+ drivers/mmc/host/mmci.c |   19 ++++++++++++++++++-
+ 1 files changed, 18 insertions(+), 1 deletions(-)
 
 diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-index 94c04c3..1c6c874 100644
+index 9ea2f13..94c04c3 100644
 --- a/drivers/mmc/host/mmci.c
 +++ b/drivers/mmc/host/mmci.c
-@@ -57,6 +57,7 @@ static unsigned int fmax = 515633;
-  * @pwrreg_powerup: power up value for MMCIPOWER register
-  * @signal_direction: input/out direction of bus signals can be indicated
-  * @pwrreg_ctrl_power: bits in MMCIPOWER register controls ext. power supply
-+ * @any_blksize: true if block any sizes are supported
-  */
- struct variant_data {
- 	unsigned int		clkreg;
-@@ -71,6 +72,7 @@ struct variant_data {
- 	u32			pwrreg_powerup;
- 	bool			signal_direction;
- 	bool			pwrreg_ctrl_power;
-+	bool			any_blksize;
- };
+@@ -876,7 +876,24 @@ static int mmci_pio_read(struct mmci_host *host, char *buffer, unsigned int rema
+ 		if (count <= 0)
+ 			break;
  
- static struct variant_data variant_arm = {
-@@ -124,6 +126,7 @@ static struct variant_data variant_ux500v2 = {
- 	.blksz_datactrl16	= true,
- 	.pwrreg_powerup		= MCI_PWR_ON,
- 	.signal_direction	= true,
-+	.any_blksize		= true,
- };
+-		readsl(base + MMCIFIFO, ptr, count >> 2);
++		/*
++		 * SDIO especially may want to send something that is
++		 * not divisible by 4 (as opposed to card sectors
++		 * etc). Therefore make sure to always read the last bytes
++		 * while only doing full 32-bit reads towards the FIFO.
++		 */
++		if (unlikely(count & 0x3)) {
++			if (count < 4) {
++				unsigned char buf[4];
++				readsl(base + MMCIFIFO, buf, 1);
++				memcpy(ptr, buf, count);
++			} else {
++				readsl(base + MMCIFIFO, ptr, count >> 2);
++				count &= ~0x3;
++			}
++		} else {
++			readsl(base + MMCIFIFO, ptr, count >> 2);
++		}
  
- /*
-@@ -132,10 +135,12 @@ static struct variant_data variant_ux500v2 = {
- static int mmci_validate_data(struct mmci_host *host,
- 			      struct mmc_data *data)
- {
-+	struct variant_data *variant = host->variant;
-+
- 	if (!data)
- 		return 0;
- 
--	if (!is_power_of_2(data->blksz)) {
-+	if (!is_power_of_2(data->blksz) && !variant->any_blksize) {
- 		dev_err(mmc_dev(host->mmc),
- 			"unsupported block size (%d bytes)\n", data->blksz);
- 		return -EINVAL;
-@@ -669,7 +674,6 @@ static void mmci_start_data(struct mmci_host *host, struct mmc_data *data)
- 	writel(host->size, base + MMCIDATALENGTH);
- 
- 	blksz_bits = ffs(data->blksz) - 1;
--	BUG_ON(1 << blksz_bits != data->blksz);
- 
- 	if (variant->blksz_datactrl16)
- 		datactrl = MCI_DPSM_ENABLE | (data->blksz << 16);
+ 		ptr += count;
+ 		remain -= count;
 -- 
 1.7.5.4
