@@ -1,35 +1,55 @@
-From: joe@perches.com (Joe Perches)
-Date: Mon, 12 Dec 2011 14:28:28 -0800
-Subject: [PATCH 4/5] MAINTAINERS: add maintainer entry for Picochip
- picoxcell
-In-Reply-To: <1323726414-3319-5-git-send-email-jamie@jamieiles.com>
-References: <1323726414-3319-1-git-send-email-jamie@jamieiles.com>
- <1323726414-3319-5-git-send-email-jamie@jamieiles.com>
-Message-ID: <1323728908.1812.5.camel@joe2Laptop>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 12 Dec 2011 14:32:34 -0800
+Subject: [GIT PULL] omap hsmmc platform code changes for v3.3 merge window
+Message-ID: <20111212223234.GH32251@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2011-12-12 at 21:46 +0000, Jamie Iles wrote:
-> Add maintainer entry for the picoxcell machine support and associated
-> drivers.
-[]
-> diff --git a/MAINTAINERS b/MAINTAINERS
-[]
-> @@ -5114,6 +5114,14 @@ L:	linux-mtd at lists.infradead.org
->  S:	Maintained
->  F:	drivers/mtd/devices/phram.c
->  
-> +PICOXCELL SUPPORT
-> +M:	Jamie Iles <jamie@jamieiles.com>
-> +L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-> +T:	git git://github.com/jamieiles/linux-2.6-ji.git
-> +S:	Supported
-> +F:	arch/arm/mach-picoxcell
-> +F:	drivers/*/picoxcell*
+Hi Arnd & Olof,
 
-This wildcard matches only 1 directory depth level.
+Please pull omap hsmmc platform code changes from:
 
-To match "drivers/char/hw_random/picoxcell-rng.c"
-you also need to have:
+git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap hsmmc
 
-F:	drivers/*/*/picoxcell*
+Ideally arch/arm/mach-omap2/hsmmc.c file will completely
+disappear with device tree, but looks like we're still
+some more patches away from that. Meanwhile, these are
+needed for various board files.
+
+Regards,
+
+Tony
+
+
+The following changes since commit 5611cc4572e889b62a7b4c72a413536bf6a9c416:
+  Linus Torvalds (1):
+        Linux 3.2-rc4
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap hsmmc
+
+Abhilash K V (1):
+      ARM: OMAP: hsmmc: Support for AM3517 MMC1 voltages
+
+Eliad Peller (3):
+      omap_hsmmc: consider MMC_PM_KEEP_POWER on suspend/resume
+      ARM: OMAP: hsmmc: add pm_caps field
+      ARM: OMAP: hsmmc: board-sdp4430: declare support for MMC_PM_KEEP_POWER
+
+Igor Grinberg (1):
+      ARM: OMAP: hsmmc: Add support for MMC 2 setup for AM35x
+
+Thomas Weber (1):
+      ARM: OMAP: hsmmc: Add support for non-OMAP pins
+
+Vaibhav Hiremath (1):
+      ARM: OMAP: hsmmc: Add support for AM3517EVM base-board MMC slot
+
+ arch/arm/mach-omap2/board-4430sdp.c   |    1 +
+ arch/arm/mach-omap2/board-am3517evm.c |   22 ++++++++++++
+ arch/arm/mach-omap2/hsmmc.c           |   59 ++++++++++++++++++++++++--------
+ arch/arm/mach-omap2/hsmmc.h           |    1 +
+ arch/arm/plat-omap/include/plat/mmc.h |    1 +
+ drivers/mmc/host/omap_hsmmc.c         |   26 +++++++++-----
+ 6 files changed, 86 insertions(+), 24 deletions(-)
