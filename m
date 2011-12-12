@@ -1,44 +1,106 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 12 Dec 2011 15:37:50 +0100
-Subject: [PATCH] [RFC] pinctrl: add a driver for Energy Micro's efm32 SoCs
-In-Reply-To: <CACRpkdYpq1phHTTLy875xSr-upiW5BmvKMPO_d-niG+-J14t9w@mail.gmail.com>
-References: <1323384057-31452-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <74CDBE0F657A3D45AFBB94109FB122FF1750B77BD8@HQMAIL01.nvidia.com>
- <20111209010147.GH7913@S2100-06.ap.freescale.net>
- <4EE18403.30604@nvidia.com>
- <20111209043220.GJ7913@S2100-06.ap.freescale.net>
- <4EE192DC.3080209@nvidia.com>
- <20111209051413.GK7913@S2100-06.ap.freescale.net>
- <20111209110807.GG27267@pengutronix.de>
- <CACRpkdYpq1phHTTLy875xSr-upiW5BmvKMPO_d-niG+-J14t9w@mail.gmail.com>
-Message-ID: <20111212143750.GA27267@pengutronix.de>
+From: b-cousson@ti.com (Benoit Cousson)
+Date: Mon, 12 Dec 2011 15:39:47 +0100
+Subject: [PATCH] ARM: OMAP2+: Fix: Don't wait for the idle status if
+ modulemode is not supported
+Message-ID: <1323700787-5934-1-git-send-email-b-cousson@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Dec 10, 2011 at 01:18:43AM +0100, Linus Walleij wrote:
-> On Fri, Dec 9, 2011 at 12:08 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> 
-> > I still think it should be "I'm board Y, please set all my pins up for me"
-> 
-> This is basically what the current pinmux hog concept does.
-> 
-> > Drivers should not be bothered with pin muxing *at all*.
-> 
-> Not if they are simple. Like - set them up once and for all and
-> then forget about it.
-> 
-> It gets problematic when we get to sleep states and the system
-> need to reconfigure all pins on say idle or deep sleep.
+If the module does not have any modulemode, the _disable_module function
+will do nothing. There is then no point waiting for a idle status change.
 
-If you need to reconfigure your pins in deep sleep and you control
-the pins in the driver this seems to suggest that your device won't
-suspend properly if the driver is not loaded?
+It will remove the following warnings.
 
-Sascha
+[    0.331848] omap_hwmod: dmm: _wait_target_disable failed
+[    0.339935] omap_hwmod: emif_fw: _wait_target_disable failed
+[    0.348358] omap_hwmod: l3_main_1: _wait_target_disable failed
+[    0.356964] omap_hwmod: l3_main_2: _wait_target_disable failed
+[    0.365600] omap_hwmod: l4_abe: _wait_target_disable failed
+[    0.373931] omap_hwmod: l4_cfg: _wait_target_disable failed
+[    0.382263] omap_hwmod: l4_per: _wait_target_disable failed
+[    0.391113] omap_hwmod: l4_wkup: _wait_target_disable failed
+[    0.399536] omap_hwmod: dma_system: _wait_target_disable failed
+[    0.408325] omap_hwmod: dss_core: _wait_target_disable failed
+[    0.416839] omap_hwmod: dss_dispc: _wait_target_disable failed
+[    0.425445] omap_hwmod: dss_dsi1: _wait_target_disable failed
+[    0.433990] omap_hwmod: dss_dsi2: _wait_target_disable failed
+[    0.442504] omap_hwmod: dss_hdmi: _wait_target_disable failed
+[    0.451019] omap_hwmod: dss_rfbi: _wait_target_disable failed
+[    0.459564] omap_hwmod: dss_venc: _wait_target_disable failed
+[    0.489471] omap_hwmod: mailbox: _wait_target_disable failed
+[    0.505920] omap_hwmod: spinlock: _wait_target_disable failed
 
+Note: For such module, the state is managed automatically by HW according
+to clock domain transition. It is then not possible to wait for idle even
+later in the _idle function since the status will change at clock domain
+boundary.
 
+Signed-off-by: Benoit Cousson <b-cousson@ti.com>
+Cc: Paul Walmsley <paul@pwsan.com>
+Cc: Rajendra Nayak <rnayak@ti.com>
+---
+ arch/arm/mach-omap2/omap_hwmod.c |   29 ++++++++++++++++++++---------
+ 1 files changed, 20 insertions(+), 9 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+index 207a2ff..dc9acac 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.c
++++ b/arch/arm/mach-omap2/omap_hwmod.c
+@@ -710,16 +710,16 @@ static void _enable_module(struct omap_hwmod *oh)
+  * @oh: struct omap_hwmod *
+  *
+  * Disable the PRCM module mode related to the hwmod @oh.
+- * No return value.
++ * Return EINVAL if the modulemode is not supported and 0 in case of success.
+  */
+-static void _disable_module(struct omap_hwmod *oh)
++int _disable_module(struct omap_hwmod *oh)
+ {
+ 	/* The module mode does not exist prior OMAP4 */
+ 	if (cpu_is_omap24xx() || cpu_is_omap34xx())
+-		return;
++		return -EINVAL;
+ 
+ 	if (!oh->clkdm || !oh->prcm.omap4.modulemode)
+-		return;
++		return -EINVAL;
+ 
+ 	pr_debug("omap_hwmod: %s: _disable_module\n", oh->name);
+ 
+@@ -727,6 +727,8 @@ static void _disable_module(struct omap_hwmod *oh)
+ 				    oh->clkdm->cm_inst,
+ 				    oh->clkdm->clkdm_offs,
+ 				    oh->prcm.omap4.clkctrl_offs);
++
++	return 0;
+ }
+ 
+ /**
+@@ -1537,11 +1539,20 @@ static int _idle(struct omap_hwmod *oh)
+ 	if (oh->class->sysc)
+ 		_idle_sysc(oh);
+ 	_del_initiator_dep(oh, mpu_oh);
+-	_disable_module(oh);
+-	ret = _wait_target_disable(oh);
+-	if (ret)
+-		pr_warn("omap_hwmod: %s: _wait_target_disable failed\n",
+-			oh->name);
++	ret = _disable_module(oh);
++
++	/*
++	 * If the module does not have any modulemode, the previous
++	 * function will do nothing. There is then no point waiting
++	 * for a idle status change.
++	 */
++	if (!ret) {
++		ret = _wait_target_disable(oh);
++		if (ret)
++			pr_warn("omap_hwmod: %s: _wait_target_disable failed\n",
++				oh->name);
++	}
++
+ 	/*
+ 	 * The module must be in idle mode before disabling any parents
+ 	 * clocks. Otherwise, the parent clock might be disabled before
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.7.0.4
