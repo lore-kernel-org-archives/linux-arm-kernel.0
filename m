@@ -1,89 +1,84 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Mon, 12 Dec 2011 17:54:58 +0800
-Subject: [PATCH] irq: convert generic-chip to use irq_domain
-In-Reply-To: <4EE56C66.5000909@gmail.com>
-References: <1323470689-6200-1-git-send-email-robherring2@gmail.com>
- <20111211160025.GA9572@S2100-06.ap.freescale.net>
- <4EE554BA.9040408@gmail.com> <4EE56C66.5000909@gmail.com>
-Message-ID: <20111212095457.GI9572@S2100-06.ap.freescale.net>
+From: ming.lei@canonical.com (Ming Lei)
+Date: Mon, 12 Dec 2011 17:49:34 +0800
+Subject: [RFC PATCH v1 6/7] media: video: introduce face detection driver
+ module
+In-Reply-To: <4EE4EBCF.8000202@gmail.com>
+References: <1322838172-11149-1-git-send-email-ming.lei@canonical.com>
+ <1322838172-11149-7-git-send-email-ming.lei@canonical.com>
+ <4EDD3DEE.6060506@gmail.com>
+ <CACVXFVPrAro=3t-wpbR_cVahzcx7SCa2J=s2nyyKfQ6SG-i0VQ@mail.gmail.com>
+ <4EDE90A3.7050900@gmail.com>
+ <CACVXFVN=-0OQ_Tz+HznDug4baLmLNjxVE21gv6CGFoU+hzCtPQ@mail.gmail.com>
+ <4EE14787.8090509@gmail.com>
+ <CACVXFVNV3TLNvPMU4oj6X+Yj5wqhNvcU_ZpyCd1wMm8B2azT4w@mail.gmail.com>
+ <4EE4EBCF.8000202@gmail.com>
+Message-ID: <CACVXFVNjawdPEYHoXNxc3U2-H8f4VVF_+2HDruNGQwg16M8njA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Dec 11, 2011 at 08:52:22PM -0600, Rob Herring wrote:
-> Actually, there's a much simpler fix:
-> 
-> diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
-> index 200ce83..3832ac6 100644
-> --- a/kernel/irq/irqdomain.c
-> +++ b/kernel/irq/irqdomain.c
-> @@ -135,6 +135,9 @@ int irq_domain_simple_dt_translate(struct irq_domain *d,
->                 return -EINVAL;
->         if (intsize < 1)
->                 return -EINVAL;
-> +       if ((intspec[0] < d->hwirq_base) ||
-> +           (intspec[0] >= d->hwirq_base + d->nr_irq))
-> +               return -EINVAL;
-> 
->         *out_hwirq = intspec[0];
->         *out_type = IRQ_TYPE_NONE;
-> 
-Thanks, Rob.  It works for me with some additional changes to your
-patch.
+Hi,
 
-8<-------------------------
+On Mon, Dec 12, 2011 at 1:43 AM, Sylwester Nawrocki <snjw23@gmail.com>
 
-diff --git a/kernel/irq/generic-chip.c b/kernel/irq/generic-chip.c
-index 48eeb29..3ac7de4 100644
---- a/kernel/irq/generic-chip.c
-+++ b/kernel/irq/generic-chip.c
-@@ -252,14 +252,16 @@ void irq_setup_generic_chip(struct irq_chip_generic *gc, u32 msk,
-                gc->mask_cache = irq_reg_readl(gc->reg_base + ct->regs.mask);
+>> For OMAP4 FD, it is not needed to include FD into MC framework since a
+>> intermediate buffer is always required. If your HW doesn't belong to this
+>> case, what is the output of your HW FD in the link? Also sounds FD results
+>> may not be needed at all for use space application in the case.
+>
+> The result data is similar to OMAP4 one, plus a few other attributes.
+> User buffers may be filled by other than FD device driver.
 
-        gc->domain->nr_irq = fls(msk);
--       irq = irq_alloc_descs(gc->domain->irq_base, 1, gc->domain->nr_irq,
--                             numa_node_id());
--       if (irq > 0)
--               gc->domain->irq_base = irq;
-+       if ((int) gc->domain->irq_base < 0) {
-+               irq = irq_alloc_descs(gc->domain->irq_base, 1,
-+                                     gc->domain->nr_irq, numa_node_id());
-+               if (irq > 0)
-+                       gc->domain->irq_base = irq;
-+       }
+OK.
 
-        irq_domain_add(gc->domain);
 
--       for (i = 0; msk; msk >>= 1, i++) {
-+       for (i = gc->domain->hwirq_base; msk; msk >>= 1, i++) {
-                if (!(msk & 0x01))
-                        continue;
+>> Could you provide some practical use cases about these?
+>
+> As above, and any device with a camera that controls something and makes
+> decision according to presence of human face in his view.
 
-diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
-index 200ce83..7947252 100644
---- a/kernel/irq/irqdomain.c
-+++ b/kernel/irq/irqdomain.c
-@@ -39,7 +39,7 @@ void irq_domain_add(struct irq_domain *domain)
-                        return;
-                }
-                d->domain = domain;
--               d->hwirq = hwirq;
-+               d->hwirq = hwirq - d->domain->hwirq_base;
-        }
+Sounds a reasonable case, :-)
 
-        mutex_lock(&irq_domain_mutex);
-@@ -136,6 +136,10 @@ int irq_domain_simple_dt_translate(struct irq_domain *d,
-        if (intsize < 1)
-                return -EINVAL;
 
-+       if ((intspec[0] < d->hwirq_base) ||
-+           (intspec[0] >= d->hwirq_base + d->nr_irq))
-+               return -EINVAL;
-+
-        *out_hwirq = intspec[0];
-        *out_type = IRQ_TYPE_NONE;
-        if (intsize > 1)
+>> If FD result is associated with a frame, how can user space get the frame seq
+>> if no v4l2 buffer is involved? Without a frame sequence, it is a bit
+>> difficult to retrieve FD results from user space.
+>
+> If you pass image data in memory buffers from user space, yes, it could be
+> impossible.
 
-------------------------->8
+It is easy to get the frame sequence from v4l2_buffer for the case too, :-)
 
-Regards,
-Shawn
+>
+> Not really, still v4l2_buffer may be used by other (sub)driver within same video
+> processing pipeline.
+
+OK.
+
+A related question: how can we make one application to support the two kinds of
+devices(input from user space data as OMAP4, input from SoC bus as Samsung)
+at the same time? Maybe some capability info is to be exported to user space?
+or other suggestions?
+
+And will your Samsung FD HW support to detect faces from memory? or just only
+detect from SoC bus?
+
+
+> It will be included in the FD result... or in a dedicated v4l2 event data structure.
+> More important, at the end of the day, we'll be getting buffers with image data
+> at some stage of a video pipeline, which would contain same frame identifier
+> (I think we can ignore v4l2_buffer.field for FD purpose).
+
+OK, I will associate FD result with frame identifier, and not invent a
+dedicated v4l2 event for query frame seq now until a specific requirement
+for it is proposed.
+
+I will convert/integrate recent discussions into patches of v2 for further
+review, and sub device support will be provided. But before starting to do it,
+I am still not clear how to integrate FD into MC framework. I understand FD
+sub device is only a media entity, so how can FD sub device find the media
+device(struct media_device)?  or just needn't to care about it now?
+
+
+thanks,
+--
+Ming Lei
