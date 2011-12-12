@@ -1,90 +1,196 @@
 From: richard.zhao@linaro.org (Richard Zhao)
-Date: Mon, 12 Dec 2011 11:42:26 +0800
-Subject: [PATCH 1/7] arm/imx6: add imx6q sabrelite board support
+Date: Mon, 12 Dec 2011 11:42:27 +0800
+Subject: [PATCH 2/7] arm/imx: cpufreq: add multi-core support
 In-Reply-To: <1323661352-10291-1-git-send-email-richard.zhao@linaro.org>
 References: <1323661352-10291-1-git-send-email-richard.zhao@linaro.org>
-Message-ID: <1323661352-10291-2-git-send-email-richard.zhao@linaro.org>
+Message-ID: <1323661352-10291-3-git-send-email-richard.zhao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
 ---
- arch/arm/boot/dts/imx6q-sabrelite.dts |   54 +++++++++++++++++++++++++++++++++
- arch/arm/mach-imx/mach-imx6q.c        |    1 +
- 2 files changed, 55 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/boot/dts/imx6q-sabrelite.dts
+ arch/arm/plat-mxc/cpufreq.c |   99 ++++++++++++++++++++++++++++--------------
+ 1 files changed, 66 insertions(+), 33 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6q-sabrelite.dts b/arch/arm/boot/dts/imx6q-sabrelite.dts
-new file mode 100644
-index 0000000..d54363f
---- /dev/null
-+++ b/arch/arm/boot/dts/imx6q-sabrelite.dts
-@@ -0,0 +1,54 @@
-+/*
-+ * Copyright 2011 Freescale Semiconductor, Inc.
-+ * Copyright 2011 Linaro Ltd.
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+
-+/dts-v1/;
-+/include/ "imx6q.dtsi"
-+
-+/ {
-+	model = "Freescale i.MX6 Quad SABRE Lite Board";
-+	compatible = "fsl,imx6q-sabrelite", "fsl,imx6q";
-+
-+	chosen {
-+		bootargs = "console=ttymxc1,115200";
-+	};
-+
-+	memory {
-+		reg = <0x10000000 0x40000000>;
-+	};
-+
-+	soc {
-+		aips-bus at 02100000 { /* AIPS2 */
-+			enet at 02188000 {
-+				phy-mode = "rgmii";
-+				local-mac-address = [01 04 9F 01 1B 61];
-+				phy-reset-gpios = <&gpio2 23 0>; /* gpio3 23 */
-+				status = "okay";
-+			};
-+
-+			usdhc at 02198000 { /* uSDHC3 */
-+				cd-gpios = <&gpio6 0 0>; /* GPIO7_0 */
-+				wp-gpios = <&gpio6 1 0>; /* GPIO7_1 */
-+				status = "okay";
-+			};
-+
-+			usdhc at 0219c000 { /* uSDHC4 */
-+				cd-gpios = <&gpio1 6 0>; /* GPIO2_6 */
-+				wp-gpios = <&gpio1 7 0>; /* GPIO2_7 */
-+				status = "okay";
-+			};
-+
-+			uart1: uart at 021e8000 { /* UART2 */
-+				status = "okay";
-+			};
-+		};
-+	};
-+};
-diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
-index 8deb012..d24d6c4 100644
---- a/arch/arm/mach-imx/mach-imx6q.c
-+++ b/arch/arm/mach-imx/mach-imx6q.c
-@@ -73,6 +73,7 @@ static struct sys_timer imx6q_timer = {
+diff --git a/arch/arm/plat-mxc/cpufreq.c b/arch/arm/plat-mxc/cpufreq.c
+index 74aac96..122b21a 100644
+--- a/arch/arm/plat-mxc/cpufreq.c
++++ b/arch/arm/plat-mxc/cpufreq.c
+@@ -21,6 +21,7 @@
+ #include <linux/clk.h>
+ #include <linux/err.h>
+ #include <linux/slab.h>
++#include <asm/cpu.h>
+ #include <mach/hardware.h>
+ #include <mach/clock.h>
  
- static const char *imx6q_dt_compat[] __initdata = {
- 	"fsl,imx6q-sabreauto",
-+	"fsl,imx6q-sabrelite",
- 	NULL,
- };
+@@ -33,6 +34,7 @@ static int cpu_freq_khz_min;
+ static int cpu_freq_khz_max;
+ 
+ static struct clk *cpu_clk;
++static DEFINE_MUTEX(cpu_lock);
+ static struct cpufreq_frequency_table *imx_freq_table;
+ 
+ static int cpu_op_nr;
+@@ -58,17 +60,11 @@ static int set_cpu_freq(int freq)
+ 
+ static int mxc_verify_speed(struct cpufreq_policy *policy)
+ {
+-	if (policy->cpu != 0)
+-		return -EINVAL;
+-
+ 	return cpufreq_frequency_table_verify(policy, imx_freq_table);
+ }
+ 
+ static unsigned int mxc_get_speed(unsigned int cpu)
+ {
+-	if (cpu)
+-		return 0;
+-
+ 	return clk_get_rate(cpu_clk) / 1000;
+ }
+ 
+@@ -76,23 +72,49 @@ static int mxc_set_target(struct cpufreq_policy *policy,
+ 			  unsigned int target_freq, unsigned int relation)
+ {
+ 	struct cpufreq_freqs freqs;
+-	int freq_Hz;
++	int freq_Hz, cpu;
+ 	int ret = 0;
+ 	unsigned int index;
+ 
++	mutex_lock(&cpu_lock);
++
+ 	cpufreq_frequency_table_target(policy, imx_freq_table,
+ 			target_freq, relation, &index);
+ 	freq_Hz = imx_freq_table[index].frequency * 1000;
+ 
+ 	freqs.old = clk_get_rate(cpu_clk) / 1000;
+-	freqs.new = freq_Hz / 1000;
+-	freqs.cpu = 0;
++	freqs.new = clk_round_rate(cpu_clk, freq_Hz);
++	freqs.new = (freqs.new ? freqs.new : freq_Hz) / 1000;
+ 	freqs.flags = 0;
+-	cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
++
++	if (freqs.old == freqs.new) {
++		mutex_unlock(&cpu_lock);
++		return 0;
++	}
++
++	for_each_possible_cpu(cpu) {
++		freqs.cpu = cpu;
++		cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
++	}
+ 
+ 	ret = set_cpu_freq(freq_Hz);
+ 
+-	cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
++#ifdef CONFIG_SMP
++	/* loops_per_jiffy is not updated by the cpufreq core for SMP systems.
++	 * So update it for all CPUs.
++	 */
++	for_each_possible_cpu(cpu)
++		per_cpu(cpu_data, cpu).loops_per_jiffy =
++		cpufreq_scale(per_cpu(cpu_data, cpu).loops_per_jiffy,
++					freqs.old, freqs.new);
++#endif
++
++	for_each_possible_cpu(cpu) {
++		freqs.cpu = cpu;
++		cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
++	}
++
++	mutex_unlock(&cpu_lock);
+ 
+ 	return ret;
+ }
+@@ -104,7 +126,7 @@ static int __init mxc_cpufreq_init(struct cpufreq_policy *policy)
+ 
+ 	printk(KERN_INFO "i.MXC CPU frequency driver\n");
+ 
+-	if (policy->cpu != 0)
++	if (policy->cpu >= num_possible_cpus())
+ 		return -EINVAL;
+ 
+ 	if (!get_cpu_op)
+@@ -116,37 +138,45 @@ static int __init mxc_cpufreq_init(struct cpufreq_policy *policy)
+ 		return PTR_ERR(cpu_clk);
+ 	}
+ 
+-	cpu_op_tbl = get_cpu_op(&cpu_op_nr);
++	mutex_lock(&cpu_lock);
++	if (!imx_freq_table) {
++		cpu_op_tbl = get_cpu_op(&cpu_op_nr);
+ 
+-	cpu_freq_khz_min = cpu_op_tbl[0].cpu_rate / 1000;
+-	cpu_freq_khz_max = cpu_op_tbl[0].cpu_rate / 1000;
++		cpu_freq_khz_min = cpu_op_tbl[0].cpu_rate / 1000;
++		cpu_freq_khz_max = cpu_op_tbl[0].cpu_rate / 1000;
+ 
+-	imx_freq_table = kmalloc(
+-		sizeof(struct cpufreq_frequency_table) * (cpu_op_nr + 1),
+-			GFP_KERNEL);
+-	if (!imx_freq_table) {
+-		ret = -ENOMEM;
+-		goto err1;
+-	}
++		imx_freq_table = kmalloc(sizeof(struct cpufreq_frequency_table)
++					* (cpu_op_nr + 1), GFP_KERNEL);
++		if (!imx_freq_table) {
++			ret = -ENOMEM;
++			mutex_unlock(&cpu_lock);
++			goto err1;
++		}
+ 
+-	for (i = 0; i < cpu_op_nr; i++) {
+-		imx_freq_table[i].index = i;
+-		imx_freq_table[i].frequency = cpu_op_tbl[i].cpu_rate / 1000;
++		for (i = 0; i < cpu_op_nr; i++) {
++			imx_freq_table[i].index = i;
++			imx_freq_table[i].frequency =
++					cpu_op_tbl[i].cpu_rate / 1000;
+ 
+-		if ((cpu_op_tbl[i].cpu_rate / 1000) < cpu_freq_khz_min)
+-			cpu_freq_khz_min = cpu_op_tbl[i].cpu_rate / 1000;
++			if ((cpu_op_tbl[i].cpu_rate / 1000) < cpu_freq_khz_min)
++				cpu_freq_khz_min =
++					cpu_op_tbl[i].cpu_rate / 1000;
+ 
+-		if ((cpu_op_tbl[i].cpu_rate / 1000) > cpu_freq_khz_max)
+-			cpu_freq_khz_max = cpu_op_tbl[i].cpu_rate / 1000;
+-	}
++			if ((cpu_op_tbl[i].cpu_rate / 1000) > cpu_freq_khz_max)
++				cpu_freq_khz_max =
++					cpu_op_tbl[i].cpu_rate / 1000;
++		}
+ 
+-	imx_freq_table[i].index = i;
+-	imx_freq_table[i].frequency = CPUFREQ_TABLE_END;
++		imx_freq_table[i].index = i;
++		imx_freq_table[i].frequency = CPUFREQ_TABLE_END;
++	}
++	mutex_unlock(&cpu_lock);
+ 
+ 	policy->cur = clk_get_rate(cpu_clk) / 1000;
+ 	policy->min = policy->cpuinfo.min_freq = cpu_freq_khz_min;
+ 	policy->max = policy->cpuinfo.max_freq = cpu_freq_khz_max;
+-
++	policy->shared_type = CPUFREQ_SHARED_TYPE_ANY;
++	cpumask_setall(policy->cpus);
+ 	/* Manual states, that PLL stabilizes in two CLK32 periods */
+ 	policy->cpuinfo.transition_latency = 2 * NANOSECOND / CLK32_FREQ;
+ 
+@@ -173,7 +203,10 @@ static int mxc_cpufreq_exit(struct cpufreq_policy *policy)
+ 
+ 	set_cpu_freq(cpu_freq_khz_max * 1000);
+ 	clk_put(cpu_clk);
++	mutex_lock(&cpu_lock);
+ 	kfree(imx_freq_table);
++	imx_freq_table = NULL;
++	mutex_unlock(&cpu_lock);
+ 	return 0;
+ }
  
 -- 
 1.7.5.4
