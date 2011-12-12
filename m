@@ -1,23 +1,43 @@
-From: sameo@linux.intel.com (Samuel Ortiz)
-Date: Mon, 12 Dec 2011 12:53:49 +0100
-Subject: [V3 0/2] mfd 88pm860x bugfix and regmap
-In-Reply-To: <1320997107-3233-1-git-send-email-jtzhou@marvell.com>
-References: <1320997107-3233-1-git-send-email-jtzhou@marvell.com>
-Message-ID: <20111212115349.GD13952@sortiz-mobl>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Mon, 12 Dec 2011 13:57:07 +0200
+Subject: [PATCH] ARM: OMAP: mcbsp: Fix possible memory corruption
+In-Reply-To: <4EE5E3F4.6060701@bitmer.com>
+References: <1323678976-4119-1-git-send-email-jarkko.nikula@bitmer.com>
+ <1323679106-4191-1-git-send-email-jarkko.nikula@bitmer.com>
+ <4EE5D639.8080608@compulab.co.il> <4EE5E3F4.6060701@bitmer.com>
+Message-ID: <4EE5EC13.40901@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jett,
+On 12/12/11 13:22, Jarkko Nikula wrote:
+> Hi
+> 
+> On 12/12/2011 12:23 PM, Igor Grinberg wrote:
+>> On 12/12/11 10:38, Jarkko Nikula wrote:
+>>> Commits 09d28d ("ARM: OMAP: mcbsp: Start generalize omap2_mcbsp_set_clks_src")
+>>> and 7bc0c4 ("ARM: OMAP: mcbsp: Start generalize signal muxing functions")
+>>> incorrectly set two struct omap_mcbsp_platform_data fields after
+>>> omap_device_build_ss and kfree calls.
+>>>
+>>> Fix this by moving these pdata assignments before those calls.
+>>>
+>>> Signed-off-by: Jarkko Nikula <jarkko.nikula@bitmer.com>
+>>> Reported-by: neilb at suse.de
+>> Perhaps, should be:
+>> Reported-by: NeilBrown <neilb@suse.de>
+>> and
+>> Cc: <stable@vger.kernel.org>	[3.1]
+>> as for below.
+>>> ---
+>>> For 3.2, 3.1 is ok.
+>>> ---
+> No need to cc stable since the issue is not in stable kernels.
 
-On Fri, Nov 11, 2011 at 03:38:25PM +0800, Jett.Zhou wrote:
-> Seperate it into two patches, one is for bugfix on the 88pm860x 
-> i2c interface test bank , the other is for converting 88pm860x 
-> i2c interface of normal bank to use regmap API
-Nevermind my previous email, I applied both patches now.
+Ah, so I've misunderstood what was that about...
+So it has been introduced in 3.2-rc cycle.
+Ok. Then now it is the perfect time to fix this ;)
 
-Cheers,
-Samuel.
 
 -- 
-Intel Open Source Technology Centre
-http://oss.intel.com/
+Regards,
+Igor.
