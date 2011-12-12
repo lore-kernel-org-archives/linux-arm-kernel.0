@@ -1,74 +1,36 @@
-From: mturquette@ti.com (Turquette, Mike)
-Date: Mon, 12 Dec 2011 13:06:35 -0800
-Subject: [PATCH v3 4/5] clk: basic gateable and fixed-rate clks
-In-Reply-To: <20111212194757.GB12131@lunn.ch>
-References: <20111212194757.GB12131@lunn.ch>
-Message-ID: <CAJOA=zP1CAsCqJERvXC6tTh_gs_boGYnO3MUC5=Vgiiw=0Vs_w@mail.gmail.com>
+From: michael@walle.cc (Michael Walle)
+Date: Mon, 12 Dec 2011 22:12:35 +0100
+Subject: arm and patch phys offset
+In-Reply-To: <alpine.LFD.2.02.1112111935590.2907@xanadu.home>
+References: <201112112255.32534.michael@walle.cc>
+ <alpine.LFD.2.02.1112111935590.2907@xanadu.home>
+Message-ID: <201112122212.35506.michael@walle.cc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 12, 2011 at 11:47 AM, Andrew Lunn <andrew@lunn.ch> wrote:
-> Hi Mike
->
-> +int clk_register_gate(struct device *dev, const char *name, unsigned long flags,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct clk *fixed_parent, void __iomem *reg, u8 bit_idx,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?int set_to_enable)
-> +
->
-> How do you suggest handling gated clocks which are already running
-> when calling the register function?
->
-> On my kirkwood bases system, the bootloader has already turned on a
-> number of clocks. It does not seem right to start messing with
-> clk->enable_count and clk->prepare_count. Could clk_register_gate()
-> have one more parameter, a bool indicating running?
+Am Montag 12 Dezember 2011, 01:53:42 schrieb Nicolas Pitre:
+> On Sun, 11 Dec 2011, Michael Walle wrote:
+> > I have a marvell kirkwood based LS-CHLv2 board and running the latest
+> > HEAD of linus tree (with my dts patched for the kirkwood port, but
+> > hopefully this should be unrelated to this problem).
+> 
+> Did you try without those patches to be sure?
+clean linux tree with old fashioned setup code now (the one i sent long time 
+ago to this mailinglist ;).
 
-I don't like this approach.  If the bool for a particular clk is
-statically defined then it could be wrong (bootloader/kernel
-mismatch).
+> > The weird thing is that this output changes if i insert or move some
+> > debug prints. I even accomplished to make the board boot completely
+> > sometimes.
+> 
+> You must have some memory corrupting bug somewhere.  Please try calling
+> this code first thing in start_kernel() for comparison.
 
-I've been thinking of adding a clk->ops->init callback in clk_init,
-which is defined for a platform to use however the author sees fit.
-There have been a few cases where it would be nice to "init" a clk
-only once, when it is registered.  That code could also handle
-detecting if a clk is enabled or not.
+calling the dump function right at the beginning of start_kernel() won't 
+change anything, expect the addresses.
 
-On the other hand we already have a .get_parent callback which is only
-good for figuring out which parent a mux clk is using... maybe a
-.is_enabled or .get_enabled would be a good idea which also served the
-purpose of dynamically determining whether a clk is disabled or
-running.
+If it would be some memory corruption, shouldn't the table or the p2v/v2p 
+stubs be corrupt? But the non-patched entries always points to correct v2p/p2v 
+calls and in every case there is the unpatched add/sub instruction. 
 
-In general though I think we should try to keep the solution in the
-core code, not by having platform code pass in a bool.
-
-> The kirkwood mach code keeps a bitmap of which platform_data init
-> functions are called from the board file. In a late_initcall function
-> it then enables and disables clocks as needed. What i was thinking is
-> i can ask the hardware what clocks are already running before i
-> register them and register them as running/not running. Then let the
-> driver probe functions use the API to enable clocks which are really
-> needed. In a late_initcall function, i would then call clk_disable(),
-> clk_unprepare() on clocks which the boot loader started, thus turning
-> them off if no driver has claimed them.
-
-The problem here is that you're solving the "disabled unused clks"
-issue in platform code.  I've started to lay out a little groundwork
-for that with a flag in struct clk:
-http://git.linaro.org/gitweb?p=people/mturquette/linux.git;a=blob;f=include/linux/clk.h;h=3b0eb3f1caf1d6346b62c785b74a648587bfcc7f;hb=586c6e8922a889a2893ba4467bb3d13b471656a9#l35
-
-The idea behind CLK_IGNORE_UNUSED flag on line 35 is that the common
-clk framework can walk the tree (probably as part of a late_initcall,
-as you suggested) and disable any clks that aren't already enabled and
-don't have this flag set.  This involves zero platform-specific code,
-but I haven't gotten around to introducing the feature yet as I'm
-really trying to minimize footprint for the core code (and I'm not
-doing a good job of that since it keeps growing).
-
-Regards,
-Mike
-
-> Is this how you envisage it working?
->
-> Thanks
-> ? ? ? ?Andrew
+-- 
+Michael
