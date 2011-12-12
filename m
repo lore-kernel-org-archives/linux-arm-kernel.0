@@ -1,71 +1,68 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Mon, 12 Dec 2011 16:53:23 +0000
-Subject: [PATCH v3 1/2] ARM: pl2x0/pl310: Refactor Kconfig to be more
- maintainable
-In-Reply-To: <20111212160437.GC20178@n2100.arm.linux.org.uk>
-References: <1323690426-6267-1-git-send-email-dave.martin@linaro.org>
- <1323690426-6267-2-git-send-email-dave.martin@linaro.org>
- <20111212140836.GY14542@n2100.arm.linux.org.uk>
- <20111212145738.GA2296@linaro.org>
- <20111212160437.GC20178@n2100.arm.linux.org.uk>
-Message-ID: <20111212165323.GF2296@linaro.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 12 Dec 2011 17:05:29 +0000
+Subject: [PATCH v4] ARM: sched_clock: allow sched_clock to be selected
+ at runtime
+In-Reply-To: <4EE57BC3.4080306@gmail.com>
+References: <1323444833-10587-1-git-send-email-marc.zyngier@arm.com>
+ <4EE57BC3.4080306@gmail.com>
+Message-ID: <4EE63459.1030105@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 12, 2011 at 04:04:37PM +0000, Russell King - ARM Linux wrote:
-> On Mon, Dec 12, 2011 at 03:01:58PM +0000, Dave Martin wrote:
-> > On Mon, Dec 12, 2011 at 02:08:37PM +0000, Russell King - ARM Linux wrote:
-> > > On Mon, Dec 12, 2011 at 11:47:05AM +0000, Dave Martin wrote:
-> > > > diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
-> > > > index 724ec0f..c4c9acf 100644
-> > > > --- a/arch/arm/mach-exynos/Kconfig
-> > > > +++ b/arch/arm/mach-exynos/Kconfig
-> > > > @@ -17,6 +17,7 @@ choice
-> > > >  
-> > > >  config ARCH_EXYNOS4
-> > > >  	bool "SAMSUNG EXYNOS4"
-> > > > +	select CACHE_L2X0
-> > > 
-> > > Doesn't this need to select HAVE_L2X0_L2CC as well?
-> > 
-> > Probably not -- due to a moment of madness, it looks like I somehow
-> > mistranslated "highbank" as "exynos4".
+On 12/12/11 03:57, Rob Herring wrote:
+> On 12/09/2011 09:33 AM, Marc Zyngier wrote:
+>> sched_clock() is yet another blocker on the road to the single
+>> image. This patch implements an idea by Russell King:
+>>
+>> http://www.spinics.net/lists/linux-omap/msg49561.html
+>>
+>> Instead of asking the platform to implement both sched_clock()
+>> itself and the rollover callback, simply register a read()
+>> function, and let the ARM code care about sched_clock() itself,
+>> the conversion to ns and the rollover. sched_clock() uses
+>> this read() function as an indirection to the platform code.
+>> If the platform doesn't provide a read(), the code falls back
+>> to the jiffy counter (just like the default sched_clock).
+>>
+>> This allow some simplifications and possibly some footprint gain
+>> when multiple platforms are compiled in. Among the drawbacks,
+>> the removal of the *_fixed_sched_clock optimization which could
+>> negatively impact some platforms (sa1100, tegra, versatile
+>> and omap).
+>>
+>> Tested on 11MPCore, OMAP4 and Tegra.
+>>
+>> Cc: Imre Kaloz <kaloz@openwrt.org>
+>> Cc: Krzysztof Halasa <khc@pm.waw.pl>
+>> Cc: Tony Lindgren <tony@atomide.com>
+>> Cc: Eric Miao <eric.y.miao@gmail.com>
+>> Cc: Colin Cross <ccross@android.com>
+>> Cc: Erik Gilling <konkers@android.com>
+>> Cc: Olof Johansson <olof@lixom.net>
+>> Cc: Linus Walleij <linus.walleij@stericsson.com>
+>> Cc: Sascha Hauer <kernel@pengutronix.de>
+>> Cc: Alessandro Rubini <rubini@unipv.it>
+>> Cc: STEricsson <STEricsson_nomadik_linux@list.st.com>
+>> Cc: Lennert Buytenhek <kernel@wantstofly.org>
+>> Cc: Nicolas Pitre <nico@fluxnic.net>
+>> Cc: Ben Dooks <ben-linux@fluff.org>
+>> Cc: Kukjin Kim <kgene.kim@samsung.com>
+>> Cc: Jamie Iles <jamie@jamieiles.com>
+>> Tested-by: Jamie Iles <jamie@jamieiles.com>
+>> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>> I'm reposting this patch with the hope that it (or Russell's
+>> alternative patch http://patchwork.ozlabs.org/patch/115961/)
+>> will get merged in 3.3. It doesn't look intrusive enough to be
+>> left on the side of the road for yet another cycle...
+>>
 > 
-> Well, you have CACHE_L2X0 depending on HAVE_L2X0_L2CC.  Selecting
-> CACHE_L2X0 without HAVE_L2X0_L2CC being selected will make Kconfig
-> produce a message about unmet dependencies.
-> 
-> The other solution to this is:
-> 
-> config CACHE_L2X0
-> 	bool "Enable the L2x0 outer cache controller" if HAVE_L2X0_L2CC
-> 
-> and I think that's more in keeping with what Rob mentioned in his
-> message - it makes this a non-user selectable option unless
-> HAVE_L2X0_L2CC is enabled.
-> 
-> However, in this case it would be more sensible to name the option
-> 'MIGHT_HAVE_CACHE_L2X0'.  (btw, please name the option after the
-> option it relates to.)
+> Please! I've been holding off on (re)doing and submitting sched_clock
+> support for highbank until this goes in.
 
-We still want CACHE_L2X0 to default to y even in the
-MIGHT_HAVE_CACHE_L2X0 case, since it is not usually desirable to turn it
-off except for debugging purposes.
+Queued as patch 7205/1.
 
-Would the correct thing be:
-
-config CACHE_L2X0
-	bool "Enable the L2x0 outer cache controller" if MIGHT_HAVE_CACHE_L2X0
-	default MIGHT_HAVE_CACHE_L2X0
-
-That way, select CACHE_L2X0=y, MIGHT_HAVE_CACHE_L2X0=y and both=y will
-all produce sensible results, if I understand correctly how this works.
-
-...or is there a better way?
-
-
-In the meantime, I will separate the pure refactoring from the other
-changes.
-
-Cheers
----Dave
+	M.
+-- 
+Jazz is not dead. It just smells funny...
