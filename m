@@ -1,59 +1,72 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Mon, 12 Dec 2011 10:33:01 +1100
-Subject: Adding remoteproc/rpmsg to linux-next
-In-Reply-To: <CAK=WgbaU6vpiBGSgogYPjQNmrF-U0wk1rSXMX83DdgQa9hw5Mw@mail.gmail.com>
-References: <CAK=WgbaU6vpiBGSgogYPjQNmrF-U0wk1rSXMX83DdgQa9hw5Mw@mail.gmail.com>
-Message-ID: <20111212103301.5ff6a582dca82394ace40e8d@canb.auug.org.au>
+From: olof@lixom.net (Olof Johansson)
+Date: Sun, 11 Dec 2011 16:17:03 -0800
+Subject: [PATCH v6 04/10] arm/tegra: prepare early init for multiple
+ tegra variants
+In-Reply-To: <1323348254-29072-5-git-send-email-pdeschrijver@nvidia.com>
+References: <1323348254-29072-1-git-send-email-pdeschrijver@nvidia.com>
+ <1323348254-29072-5-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <20111212001703.GA26598@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ohad,
-
-On Fri, 9 Dec 2011 16:55:27 +0200 Ohad Ben-Cohen <ohad@wizery.com> wrote:
->
-> Can you please add the following remoteproc tree to linux-next ?
+On Thu, Dec 08, 2011 at 02:43:47PM +0200, Peter De Schrijver wrote:
+> This patch splits the early init code in a common and a tegra20 specific part.
+> L2 cache initialization is generalized and discovers the cache associativity
+> at runtime. Also use arm_pm_restart instead of arm_arch_reset and reset the
+> the system using the PMC reset feature rather then the CAR system reset.
 > 
-> git://git.kernel.org/pub/scm/linux/kernel/git/ohad/remoteproc.git for-next
+> Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
+> ---
+>  arch/arm/mach-tegra/board-dt.c        |   10 +++++---
+>  arch/arm/mach-tegra/board-harmony.c   |    2 +-
+>  arch/arm/mach-tegra/board-paz00.c     |    2 +-
+>  arch/arm/mach-tegra/board-seaboard.c  |    6 ++--
+>  arch/arm/mach-tegra/board-trimslice.c |    2 +-
+>  arch/arm/mach-tegra/board.h           |    2 +-
+>  arch/arm/mach-tegra/clock.c           |    5 ----
+>  arch/arm/mach-tegra/common.c          |   34 ++++++++++++++++++++------------
+>  8 files changed, 34 insertions(+), 29 deletions(-)
+> 
+> diff --git a/arch/arm/mach-tegra/board-dt.c b/arch/arm/mach-tegra/board-dt.c
+> index 6a460a2..ef9843c 100644
+> --- a/arch/arm/mach-tegra/board-dt.c
+> +++ b/arch/arm/mach-tegra/board-dt.c
+> @@ -133,7 +133,8 @@ static void __init tegra_dt_init(void)
+>  		"Unknown platform! Pinmuxing not initialized\n");
+>  }
+>  
+> -static const char * tegra_dt_board_compat[] = {
+> +#ifdef CONFIG_ARCH_TEGRA_2x_SOC
+> +static const char *tegra20_dt_board_compat[] = {
+>  	"compulab,trimslice",
+>  	"nvidia,harmony",
+>  	"compal,paz00",
+> @@ -142,13 +143,14 @@ static const char * tegra_dt_board_compat[] = {
+>  	NULL
+>  };
+>  
+> -DT_MACHINE_START(TEGRA_DT, "nVidia Tegra (Flattened Device Tree)")
+> +DT_MACHINE_START(TEGRA_DT, "nVidia Tegra20 (Flattened Device Tree)")
+>  	.map_io		= tegra_map_common_io,
+> -	.init_early	= tegra_init_early,
+> +	.init_early	= tegra20_init_early,
+>  	.init_irq	= tegra_dt_init_irq,
+>  	.handle_irq	= gic_handle_irq,
+>  	.timer		= &tegra_timer,
+>  	.init_machine	= tegra_dt_init,
+>  	.restart	= tegra_assert_system_reset,
+> -	.dt_compat	= tegra_dt_board_compat,
+> +	.dt_compat	= tegra20_dt_board_compat,
+>  MACHINE_END
+> +#endif
 
-I have added that from today.
+As previously mentioned by Stephen, please split up in separate
+patches.
 
-Thanks for adding your subsystem tree as a participant of linux-next.  As
-you may know, this is not a judgment of your code.  The purpose of
-linux-next is for integration testing and to lower the impact of
-conflicts between subsystems in the next merge window. 
+But also, I would prefer to see one board-dt for tegra20 and one for
+tegra30 (board-dt-t20 and board-dt-t30, or whatnot). They wouldn't be
+sharing much code anyway, I would rather see a limited amount of code
+duplication than excessive ifdefs in one file.
 
-You will need to ensure that the patches/commits in your tree/series have
-been:
-     * submitted under GPL v2 (or later) and include the Contributor's
-	Signed-off-by,
-     * posted to the relevant mailing list,
-     * reviewed by you (or another maintainer of your subsystem tree),
-     * successfully unit tested, and 
-     * destined for the current or next Linux merge window.
 
-Basically, this should be just what you would send to Linus (or ask him
-to fetch).  It is allowed to be rebased if you deem it necessary.
-
--- 
-Cheers,
-Stephen Rothwell 
-sfr at canb.auug.org.au
-
-Legal Stuff:
-By participating in linux-next, your subsystem tree contributions are
-public and will be included in the linux-next trees.  You may be sent
-e-mail messages indicating errors or other issues when the
-patches/commits from your subsystem tree are merged and tested in
-linux-next.  These messages may also be cross-posted to the linux-next
-mailing list, the linux-kernel mailing list, etc.  The linux-next tree
-project and IBM (my employer) make no warranties regarding the linux-next
-project, the testing procedures, the results, the e-mails, etc.  If you
-don't agree to these ground rules, let me know and I'll remove your tree
-from participation in linux-next.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111212/4151c18b/attachment.sig>
+-Olof
