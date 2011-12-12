@@ -1,35 +1,27 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 12 Dec 2011 11:44:45 -0800
-Subject: [PATCH] omap: rx51: initialize isp1704 properly
-In-Reply-To: <CAMP44s2noD4TXBALOc0JkcbVroYFnp3BaSozrQYdUbsv50xuoQ@mail.gmail.com>
-References: <20111207193141.GG31337@atomide.com>
- <1323287816-2809-1-git-send-email-felipe.contreras@gmail.com>
- <20111208144044.GA25415@xps8300>
- <CAMP44s2noD4TXBALOc0JkcbVroYFnp3BaSozrQYdUbsv50xuoQ@mail.gmail.com>
-Message-ID: <20111212194445.GG32251@atomide.com>
+From: omar.ramirez@ti.com (Ramirez Luna, Omar)
+Date: Mon, 12 Dec 2011 14:25:53 -0600
+Subject: [PATCH] ARM: remove header files included more than once
+In-Reply-To: <CAN1soZyaDO1dFTuG-5AgNGEHua6pi_W7VQ24yxyV1+dadK-vdQ@mail.gmail.com>
+References: <1323447943-23595-1-git-send-email-omar.ramirez@ti.com>
+ <CAN1soZyaDO1dFTuG-5AgNGEHua6pi_W7VQ24yxyV1+dadK-vdQ@mail.gmail.com>
+Message-ID: <CAB-zwWg=7x2qLq52JC8LRzEu7HuzCHgqFZCB4ZBuVxAs_O0VWg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Felipe Contreras <felipe.contreras@gmail.com> [111208 11:52]:
-> On Thu, Dec 8, 2011 at 4:40 PM, Heikki Krogerus <krohei@gmail.com> wrote:
-> > On Wed, Dec 07, 2011 at 09:56:56PM +0200, Felipe Contreras wrote:
-> >> From: Heikki Krogerus <krohei@gmail.com>
-> >
-> > I would prefer that you change this so this is from you, like it
-> > actually is. You can mention me in the commit message if you like.
-> 
-> Well, you came with the fix, I just typed it down, but as you wish :)
-> 
-> >> Without this USB networking doesn't work as the link is never detected.
-> >
-> > What this changes is, it leaves the transceiver powered by default
-> > instead of setting it into power off mode. So not only USB networking
-> > is affected by this. If isp1704_charger is not enabled with RX51, USB
-> > does not work at all. Please change the comment.
-> 
-> I've updated the patch.
+Hi Haojian,
 
-Sorry what's the deal with this one? Is this the one to use or is there
-some other patch?
+On Sun, Dec 11, 2011 at 7:10 PM, Haojian Zhuang
+<haojian.zhuang@gmail.com> wrote:
+...
+> Hi Omar,
+>
+> Thanks for your patch. Could you help to split your patches into small
+> pieces? Since different people are handling for different files. For
+> example, I can help to handle files in arch-pxa. But I can't handle
+> other files.
 
-Tony
+No problem, I'll split the patch to be included by independent trees.
+
+Thanks,
+
+Omar
