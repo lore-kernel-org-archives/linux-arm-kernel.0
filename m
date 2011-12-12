@@ -1,78 +1,69 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Mon, 12 Dec 2011 21:32:10 +0530
-Subject: [RESEND][PATCH] ARM: Exynos: Add irq domain and device tree
- support for interrupt combiner
-In-Reply-To: <4EE5781E.2060702@gmail.com>
-References: <1323586114-24486-1-git-send-email-thomas.abraham@linaro.org>
- <4EE5781E.2060702@gmail.com>
-Message-ID: <CAJuYYwS=d92ra9-R0W0Q8nwv1aPfe192FcOb-5QM9ZnQAO_T3g@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 12 Dec 2011 16:04:37 +0000
+Subject: [PATCH v3 1/2] ARM: pl2x0/pl310: Refactor Kconfig to be more
+ maintainable
+In-Reply-To: <20111212145738.GA2296@linaro.org>
+References: <1323690426-6267-1-git-send-email-dave.martin@linaro.org>
+ <1323690426-6267-2-git-send-email-dave.martin@linaro.org>
+ <20111212140836.GY14542@n2100.arm.linux.org.uk>
+ <20111212145738.GA2296@linaro.org>
+Message-ID: <20111212160437.GC20178@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+On Mon, Dec 12, 2011 at 03:01:58PM +0000, Dave Martin wrote:
+> On Mon, Dec 12, 2011 at 02:08:37PM +0000, Russell King - ARM Linux wrote:
+> > On Mon, Dec 12, 2011 at 11:47:05AM +0000, Dave Martin wrote:
+> > > diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
+> > > index 724ec0f..c4c9acf 100644
+> > > --- a/arch/arm/mach-exynos/Kconfig
+> > > +++ b/arch/arm/mach-exynos/Kconfig
+> > > @@ -17,6 +17,7 @@ choice
+> > >  
+> > >  config ARCH_EXYNOS4
+> > >  	bool "SAMSUNG EXYNOS4"
+> > > +	select CACHE_L2X0
+> > 
+> > Doesn't this need to select HAVE_L2X0_L2CC as well?
+> 
+> Probably not -- due to a moment of madness, it looks like I somehow
+> mistranslated "highbank" as "exynos4".
 
-On 12 December 2011 09:12, Rob Herring <robherring2@gmail.com> wrote:
->> +Example:
->> +
->> + ? ? combiner:interrupt-controller at 10440000 {
->> + ? ? ? ? ? ? compatible = "samsung,exynos4120-combiner";
->> + ? ? ? ? ? ? #interrupt-cells = <2>;
->> + ? ? ? ? ? ? interrupt-controoler;
->
-> s/controoler/controller/
+Well, you have CACHE_L2X0 depending on HAVE_L2X0_L2CC.  Selecting
+CACHE_L2X0 without HAVE_L2X0_L2CC being selected will make Kconfig
+produce a message about unmet dependencies.
 
-Ok. I will fix this.
+The other solution to this is:
 
->
->> + ? ? ? ? ? ? reg = <0x10440000 0x1000>;
->> + ? ? };
->
-> [snip]
->
->> +
->> +int __init combiner_init_irq_domain(unsigned int irq_base, unsigned int nr_irq,
->
-> Make irq_base signed.
+config CACHE_L2X0
+	bool "Enable the L2x0 outer cache controller" if HAVE_L2X0_L2CC
+
+and I think that's more in keeping with what Rob mentioned in his
+message - it makes this a non-user selectable option unless
+HAVE_L2X0_L2CC is enabled.
+
+However, in this case it would be more sensible to name the option
+'MIGHT_HAVE_CACHE_L2X0'.  (btw, please name the option after the
+option it relates to.)
+
+> > > diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+> > > index 5f7f9c2..4234937 100644
+> > > --- a/arch/arm/mach-imx/Kconfig
+> > > +++ b/arch/arm/mach-imx/Kconfig
+> > > @@ -609,12 +609,12 @@ comment "i.MX6 family:"
+> > >  config SOC_IMX6Q
+> > >  	bool "i.MX6 Quad support"
+> > >  	select ARM_GIC
+> > > -	select CACHE_L2X0
+> > >  	select CPU_V7
+> > >  	select HAVE_ARM_SCU
+> > >  	select HAVE_IMX_GPC
+> > >  	select HAVE_IMX_MMDC
+> > >  	select HAVE_IMX_SRC
+> > > +	select HAVE_L2X0_L2CC
+> > 
+> > Do you know enough about this to make L2 cache support optional on this SoC?
+> 
+> No.  But Shawn Guo suggested that this correct [2]
 
 Ok.
-
->
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct device_node *np)
->> +{
->> + ? ? struct irq_domain *domain = &combiner_irq_domain;
->> +
->> + ? ? domain->irq_base = irq_alloc_descs(irq_base, irq_base, nr_irq, 0);
->
-> This should be irq_alloc_descs(irq_base, 1,
->
-> So that dynamic allocation can work when irq_base is -1.
-
-Ok. I will modify this.
-
->
->> + ? ? if (domain->irq_base < 0) {
->> + ? ? ? ? ? ? pr_err("failed to alloc irq descs, combiner init failed\n");
->> + ? ? ? ? ? ? return -EBUSY;
->
-> On failure, just warn and do:
->
-> domain->irq_base = irq_base
->
-> instead of returning unless all platforms using this are completely
-> converted over to support dynamic Linux virq mapping.
-
-Ok.
-
->
-> Also you should update your platforms' to set mdesc.nr_irq to
-> NR_IRQS_LEGACY. And test with SPARSE_IRQ turned on.
-
-Ok. I will test with NR_IRQS_LEGACY. Hope nothing breaks!
-
-Thank you Rob for you review and comments on this patch.
-
-Regards,
-Thomas.
-
->
-> Rob
