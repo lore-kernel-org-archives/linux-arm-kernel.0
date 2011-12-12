@@ -1,255 +1,244 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 12 Dec 2011 23:15:56 +0800
-Subject: [PATCH v3 1/3] mfd: mc13xxx: add device tree probe support
+Date: Mon, 12 Dec 2011 23:15:57 +0800
+Subject: [PATCH v3 2/3] regulator: mc13892: add device tree probe support
 In-Reply-To: <1323702958-4831-1-git-send-email-shawn.guo@linaro.org>
 References: <1323702958-4831-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1323702958-4831-2-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1323702958-4831-3-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It adds device tree probe support for mc13xxx mfd driver.
+It adds device tree probe support for mc13892-regulator driver.
 
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-Cc: Samuel Ortiz <sameo@linux.intel.com>
+Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
+Cc: Liam Girdwood <lrg@ti.com>
 ---
- Documentation/devicetree/bindings/mfd/mc13xxx.txt |   53 ++++++++++
- drivers/mfd/mc13xxx-core.c                        |  106 +++++++++++++++------
- 2 files changed, 128 insertions(+), 31 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/mfd/mc13xxx.txt
+ drivers/regulator/mc13892-regulator.c      |   43 +++++++++++++++-----
+ drivers/regulator/mc13xxx-regulator-core.c |   57 ++++++++++++++++++++++++++++
+ drivers/regulator/mc13xxx.h                |   20 ++++++++++
+ include/linux/mfd/mc13xxx.h                |    1 +
+ 4 files changed, 110 insertions(+), 11 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/mfd/mc13xxx.txt b/Documentation/devicetree/bindings/mfd/mc13xxx.txt
-new file mode 100644
-index 0000000..4ed46a61
---- /dev/null
-+++ b/Documentation/devicetree/bindings/mfd/mc13xxx.txt
-@@ -0,0 +1,53 @@
-+* Freescale MC13783/MC13892 Power Management Integrated Circuit (PMIC)
-+
-+Required properties:
-+- compatible : Should be "fsl,mc13783" or "fsl,mc13892"
-+
-+Optional properties:
-+- fsl,mc13xxx-uses-adc : Indicate the ADC is being used
-+- fsl,mc13xxx-uses-codec : Indicate the Audio Codec is being used
-+- fsl,mc13xxx-uses-rtc : Indicate the RTC is being used
-+- fsl,mc13xxx-uses-touch : Indicate the touchscreen controller is being used
-+
-+Sub-nodes:
-+- regulators : Contain the regulator nodes.  The name of regulator node
-+  is being used by mc13xxx regulator driver to find the correct relator
-+  device.
-+
-+  The bindings details of individual regulator device can be found in:
-+  Documentation/devicetree/bindings/regulator/regulator.txt
-+
-+Examples:
-+
-+ecspi at 70010000 { /* ECSPI1 */
-+	fsl,spi-num-chipselects = <2>;
-+	cs-gpios = <&gpio3 24 0>, /* GPIO4_24 */
-+		   <&gpio3 25 0>; /* GPIO4_25 */
-+	status = "okay";
-+
-+	pmic: mc13892 at 0 {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		compatible = "fsl,mc13892";
-+		spi-max-frequency = <6000000>;
-+		reg = <0>;
-+		interrupt-parent = <&gpio0>;
-+		interrupts = <8>;
-+
-+		regulators {
-+			sw1_reg: mc13892__sw1 {
-+				regulator-min-microvolt = <600000>;
-+				regulator-max-microvolt = <1375000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			sw2_reg: mc13892__sw2 {
-+				regulator-min-microvolt = <900000>;
-+				regulator-max-microvolt = <1850000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+		};
-+	};
-+};
-diff --git a/drivers/mfd/mc13xxx-core.c b/drivers/mfd/mc13xxx-core.c
-index e9619ac..51b2dcc 100644
---- a/drivers/mfd/mc13xxx-core.c
-+++ b/drivers/mfd/mc13xxx-core.c
-@@ -18,11 +18,15 @@
- #include <linux/spi/spi.h>
- #include <linux/mfd/core.h>
- #include <linux/mfd/mc13xxx.h>
-+#include <linux/of.h>
-+#include <linux/of_device.h>
-+#include <linux/of_gpio.h>
+diff --git a/drivers/regulator/mc13892-regulator.c b/drivers/regulator/mc13892-regulator.c
+index 2824804..46bfa4a 100644
+--- a/drivers/regulator/mc13892-regulator.c
++++ b/drivers/regulator/mc13892-regulator.c
+@@ -527,18 +527,27 @@ static int __devinit mc13892_regulator_probe(struct platform_device *pdev)
+ 	struct mc13xxx *mc13892 = dev_get_drvdata(pdev->dev.parent);
+ 	struct mc13xxx_regulator_platform_data *pdata =
+ 		dev_get_platdata(&pdev->dev);
+-	struct mc13xxx_regulator_init_data *init_data;
++	struct mc13xxx_regulator_init_data *mc13xxx_data;
+ 	int i, ret;
++	int num_regulators = 0;
+ 	u32 val;
  
- struct mc13xxx {
- 	struct spi_device *spidev;
- 	struct mutex lock;
- 	int irq;
-+	int flags;
++	num_regulators = mc13xxx_get_num_regulators_dt(pdev);
++	if (num_regulators <= 0 && pdata)
++		num_regulators = pdata->num_regulators;
++	if (num_regulators <= 0)
++		return -EINVAL;
++
+ 	priv = kzalloc(sizeof(*priv) +
+-		pdata->num_regulators * sizeof(priv->regulators[0]),
++		num_regulators * sizeof(priv->regulators[0]),
+ 		GFP_KERNEL);
+ 	if (!priv)
+ 		return -ENOMEM;
  
- 	irq_handler_t irqhandler[MC13XXX_NUM_IRQ];
- 	void *irqdata[MC13XXX_NUM_IRQ];
-@@ -550,10 +554,7 @@ static const char *mc13xxx_get_chipname(struct mc13xxx *mc13xxx)
++	priv->num_regulators = num_regulators;
+ 	priv->mc13xxx_regulators = mc13892_regulators;
+ 	priv->mc13xxx = mc13892;
++	platform_set_drvdata(pdev, priv);
  
- int mc13xxx_get_flags(struct mc13xxx *mc13xxx)
- {
--	struct mc13xxx_platform_data *pdata =
--		dev_get_platdata(&mc13xxx->spidev->dev);
+ 	mc13xxx_lock(mc13892);
+ 	ret = mc13xxx_reg_read(mc13892, MC13892_REVISION, &val);
+@@ -569,11 +578,27 @@ static int __devinit mc13892_regulator_probe(struct platform_device *pdev)
+ 		= mc13892_vcam_set_mode;
+ 	mc13892_regulators[MC13892_VCAM].desc.ops->get_mode
+ 		= mc13892_vcam_get_mode;
+-	for (i = 0; i < pdata->num_regulators; i++) {
+-		init_data = &pdata->regulators[i];
++
++	mc13xxx_data = mc13xxx_parse_regulators_dt(pdev, mc13892_regulators,
++					ARRAY_SIZE(mc13892_regulators));
++	for (i = 0; i < num_regulators; i++) {
++		struct regulator_init_data *init_data;
++		struct regulator_desc *desc;
++		struct device_node *node = NULL;
++		int id;
++
++		if (mc13xxx_data) {
++			id = mc13xxx_data[i].id;
++			init_data = mc13xxx_data[i].init_data;
++			node = mc13xxx_data[i].node;
++		} else {
++			id = pdata->regulators[i].id;
++			init_data = pdata->regulators[i].init_data;
++		}
++		desc = &mc13892_regulators[id].desc;
++
+ 		priv->regulators[i] = regulator_register(
+-			&mc13892_regulators[init_data->id].desc,
+-			&pdev->dev, init_data->init_data, priv, NULL);
++			desc, &pdev->dev, init_data, priv, node);
+ 
+ 		if (IS_ERR(priv->regulators[i])) {
+ 			dev_err(&pdev->dev, "failed to register regulator %s\n",
+@@ -583,8 +608,6 @@ static int __devinit mc13892_regulator_probe(struct platform_device *pdev)
+ 		}
+ 	}
+ 
+-	platform_set_drvdata(pdev, priv);
 -
--	return pdata->flags;
-+	return mc13xxx->flags;
- }
- EXPORT_SYMBOL(mc13xxx_get_flags);
+ 	return 0;
+ err:
+ 	while (--i >= 0)
+@@ -600,13 +623,11 @@ err_free:
+ static int __devexit mc13892_regulator_remove(struct platform_device *pdev)
+ {
+ 	struct mc13xxx_regulator_priv *priv = platform_get_drvdata(pdev);
+-	struct mc13xxx_regulator_platform_data *pdata =
+-		dev_get_platdata(&pdev->dev);
+ 	int i;
  
-@@ -696,17 +697,67 @@ static int mc13xxx_add_subdevice(struct mc13xxx *mc13xxx, const char *format)
- 	return mc13xxx_add_subdevice_pdata(mc13xxx, format, NULL, 0);
+ 	platform_set_drvdata(pdev, NULL);
+ 
+-	for (i = 0; i < pdata->num_regulators; i++)
++	for (i = 0; i < priv->num_regulators; i++)
+ 		regulator_unregister(priv->regulators[i]);
+ 
+ 	kfree(priv);
+diff --git a/drivers/regulator/mc13xxx-regulator-core.c b/drivers/regulator/mc13xxx-regulator-core.c
+index 6532853..80ecafe 100644
+--- a/drivers/regulator/mc13xxx-regulator-core.c
++++ b/drivers/regulator/mc13xxx-regulator-core.c
+@@ -18,12 +18,14 @@
+ #include <linux/mfd/mc13xxx.h>
+ #include <linux/regulator/machine.h>
+ #include <linux/regulator/driver.h>
++#include <linux/regulator/of_regulator.h>
+ #include <linux/platform_device.h>
+ #include <linux/kernel.h>
+ #include <linux/slab.h>
+ #include <linux/init.h>
+ #include <linux/err.h>
+ #include <linux/module.h>
++#include <linux/of.h>
+ #include "mc13xxx.h"
+ 
+ static int mc13xxx_regulator_enable(struct regulator_dev *rdev)
+@@ -236,6 +238,61 @@ int mc13xxx_sw_regulator_is_enabled(struct regulator_dev *rdev)
  }
+ EXPORT_SYMBOL_GPL(mc13xxx_sw_regulator_is_enabled);
  
 +#ifdef CONFIG_OF
-+static int mc13xxx_probe_flags_dt(struct mc13xxx *mc13xxx)
++int __devinit mc13xxx_get_num_regulators_dt(struct platform_device *pdev)
 +{
-+	struct device_node *np = mc13xxx->spidev->dev.of_node;
++	struct device_node *parent, *child;
++	int num = 0;
 +
-+	if (!np)
++	of_node_get(pdev->dev.parent->of_node);
++	parent = of_find_node_by_name(pdev->dev.parent->of_node, "regulators");
++	if (!parent)
 +		return -ENODEV;
 +
-+	if (of_get_property(np, "fsl,mc13xxx-uses-adc", NULL))
-+		mc13xxx->flags |= MC13XXX_USE_ADC;
++	for_each_child_of_node(parent, child)
++		num++;
 +
-+	if (of_get_property(np, "fsl,mc13xxx-uses-codec", NULL))
-+		mc13xxx->flags |= MC13XXX_USE_CODEC;
-+
-+	if (of_get_property(np, "fsl,mc13xxx-uses-rtc", NULL))
-+		mc13xxx->flags |= MC13XXX_USE_RTC;
-+
-+	if (of_get_property(np, "fsl,mc13xxx-uses-touch", NULL))
-+		mc13xxx->flags |= MC13XXX_USE_TOUCHSCREEN;
-+
-+	return 0;
++	return num;
 +}
-+#else
-+static inline int mc13xxx_probe_flags_dt(struct mc13xxx *mc13xxx)
++
++struct mc13xxx_regulator_init_data * __devinit mc13xxx_parse_regulators_dt(
++	struct platform_device *pdev, struct mc13xxx_regulator *regulators,
++	int num_regulators)
 +{
-+	return -ENODEV;
++	struct mc13xxx_regulator_priv *priv = platform_get_drvdata(pdev);
++	struct mc13xxx_regulator_init_data *data, *p;
++	struct device_node *parent, *child;
++	int i;
++
++	of_node_get(pdev->dev.parent->of_node);
++	parent = of_find_node_by_name(pdev->dev.parent->of_node, "regulators");
++	if (!parent)
++		return NULL;
++
++	data = devm_kzalloc(&pdev->dev, sizeof(*data) * priv->num_regulators,
++			    GFP_KERNEL);
++	if (!data)
++		return NULL;
++	p = data;
++
++	for_each_child_of_node(parent, child) {
++		for (i = 0; i < num_regulators; i++) {
++			if (!of_node_cmp(child->name,
++					 regulators[i].desc.name)) {
++				p->id = i;
++				p->init_data = of_get_regulator_init_data(
++							&pdev->dev, child);
++				p->node = child;
++				p++;
++				break;
++			}
++		}
++	}
++
++	return data;
 +}
 +#endif
 +
-+static const struct spi_device_id mc13xxx_device_id[] = {
-+	{
-+		.name = "mc13783",
-+		.driver_data = MC13XXX_ID_MC13783,
-+	}, {
-+		.name = "mc13892",
-+		.driver_data = MC13XXX_ID_MC13892,
-+	}, {
-+		/* sentinel */
-+	}
-+};
-+MODULE_DEVICE_TABLE(spi, mc13xxx_device_id);
-+
-+static const struct of_device_id mc13xxx_dt_ids[] = {
-+	{ .compatible = "fsl,mc13783", .data = (void *) MC13XXX_ID_MC13783, },
-+	{ .compatible = "fsl,mc13892", .data = (void *) MC13XXX_ID_MC13892, },
-+	{ /* sentinel */ }
-+};
-+MODULE_DEVICE_TABLE(of, mc13xxx_dt_ids);
-+
- static int mc13xxx_probe(struct spi_device *spi)
- {
-+	const struct of_device_id *of_id;
-+	struct spi_driver *sdrv = to_spi_driver(spi->dev.driver);
+ MODULE_LICENSE("GPL v2");
+ MODULE_AUTHOR("Yong Shen <yong.shen@linaro.org>");
+ MODULE_DESCRIPTION("Regulator Driver for Freescale MC13xxx PMIC");
+diff --git a/drivers/regulator/mc13xxx.h b/drivers/regulator/mc13xxx.h
+index 2775826..419aee5 100644
+--- a/drivers/regulator/mc13xxx.h
++++ b/drivers/regulator/mc13xxx.h
+@@ -29,6 +29,7 @@ struct mc13xxx_regulator_priv {
  	struct mc13xxx *mc13xxx;
- 	struct mc13xxx_platform_data *pdata = dev_get_platdata(&spi->dev);
- 	enum mc13xxx_id id;
- 	int ret;
+ 	u32 powermisc_pwgt_state;
+ 	struct mc13xxx_regulator *mc13xxx_regulators;
++	int num_regulators;
+ 	struct regulator_dev *regulators[];
+ };
  
--	if (!pdata) {
--		dev_err(&spi->dev, "invalid platform data\n");
--		return -EINVAL;
--	}
-+	of_id = of_match_device(mc13xxx_dt_ids, &spi->dev);
-+	if (of_id)
-+		sdrv->id_table = &mc13xxx_device_id[(enum mc13xxx_id) of_id->data];
+@@ -42,6 +43,25 @@ extern int mc13xxx_fixed_regulator_set_voltage(struct regulator_dev *rdev,
+ 		int min_uV, int max_uV, unsigned *selector);
+ extern int mc13xxx_fixed_regulator_get_voltage(struct regulator_dev *rdev);
  
- 	mc13xxx = kzalloc(sizeof(*mc13xxx), GFP_KERNEL);
- 	if (!mc13xxx)
-@@ -749,28 +800,33 @@ err_revision:
- 
- 	mc13xxx_unlock(mc13xxx);
- 
--	if (pdata->flags & MC13XXX_USE_ADC)
-+	if (mc13xxx_probe_flags_dt(mc13xxx) < 0 && pdata)
-+		mc13xxx->flags = pdata->flags;
++#ifdef CONFIG_OF
++extern int mc13xxx_get_num_regulators_dt(struct platform_device *pdev);
++extern struct mc13xxx_regulator_init_data *mc13xxx_parse_regulators_dt(
++	struct platform_device *pdev, struct mc13xxx_regulator *regulators,
++	int num_regulators);
++#else
++static inline int mc13xxx_get_num_regulators_dt(struct platform_device *pdev)
++{
++	return -ENODEV;
++}
 +
-+	if (mc13xxx->flags & MC13XXX_USE_ADC)
- 		mc13xxx_add_subdevice(mc13xxx, "%s-adc");
++static inline struct mc13xxx_regulator_init_data *mc13xxx_parse_regulators_dt(
++	struct platform_device *pdev, struct mc13xxx_regulator *regulators,
++	int num_regulators)
++{
++	return NULL;
++}
++#endif
++
+ extern struct regulator_ops mc13xxx_regulator_ops;
+ extern struct regulator_ops mc13xxx_fixed_regulator_ops;
  
--	if (pdata->flags & MC13XXX_USE_CODEC)
-+	if (mc13xxx->flags & MC13XXX_USE_CODEC)
- 		mc13xxx_add_subdevice(mc13xxx, "%s-codec");
+diff --git a/include/linux/mfd/mc13xxx.h b/include/linux/mfd/mc13xxx.h
+index 3816c2f..a98e2a3 100644
+--- a/include/linux/mfd/mc13xxx.h
++++ b/include/linux/mfd/mc13xxx.h
+@@ -69,6 +69,7 @@ struct regulator_init_data;
+ struct mc13xxx_regulator_init_data {
+ 	int id;
+ 	struct regulator_init_data *init_data;
++	struct device_node *node;
+ };
  
--	mc13xxx_add_subdevice_pdata(mc13xxx, "%s-regulator",
--		&pdata->regulators, sizeof(pdata->regulators));
--
--	if (pdata->flags & MC13XXX_USE_RTC)
-+	if (mc13xxx->flags & MC13XXX_USE_RTC)
- 		mc13xxx_add_subdevice(mc13xxx, "%s-rtc");
- 
--	if (pdata->flags & MC13XXX_USE_TOUCHSCREEN)
-+	if (mc13xxx->flags & MC13XXX_USE_TOUCHSCREEN)
- 		mc13xxx_add_subdevice(mc13xxx, "%s-ts");
- 
--	if (pdata->leds)
-+	if (pdata) {
-+		mc13xxx_add_subdevice_pdata(mc13xxx, "%s-regulator",
-+			&pdata->regulators, sizeof(pdata->regulators));
- 		mc13xxx_add_subdevice_pdata(mc13xxx, "%s-led",
- 				pdata->leds, sizeof(*pdata->leds));
--
--	if (pdata->buttons)
- 		mc13xxx_add_subdevice_pdata(mc13xxx, "%s-pwrbutton",
- 				pdata->buttons, sizeof(*pdata->buttons));
-+	} else {
-+		mc13xxx_add_subdevice(mc13xxx, "%s-regulator");
-+		mc13xxx_add_subdevice(mc13xxx, "%s-led");
-+		mc13xxx_add_subdevice(mc13xxx, "%s-pwrbutton");
-+	}
- 
- 	return 0;
- }
-@@ -788,25 +844,13 @@ static int __devexit mc13xxx_remove(struct spi_device *spi)
- 	return 0;
- }
- 
--static const struct spi_device_id mc13xxx_device_id[] = {
--	{
--		.name = "mc13783",
--		.driver_data = MC13XXX_ID_MC13783,
--	}, {
--		.name = "mc13892",
--		.driver_data = MC13XXX_ID_MC13892,
--	}, {
--		/* sentinel */
--	}
--};
--MODULE_DEVICE_TABLE(spi, mc13xxx_device_id);
--
- static struct spi_driver mc13xxx_driver = {
- 	.id_table = mc13xxx_device_id,
- 	.driver = {
- 		.name = "mc13xxx",
- 		.bus = &spi_bus_type,
- 		.owner = THIS_MODULE,
-+		.of_match_table = mc13xxx_dt_ids,
- 	},
- 	.probe = mc13xxx_probe,
- 	.remove = __devexit_p(mc13xxx_remove),
+ struct mc13xxx_regulator_platform_data {
 -- 
 1.7.4.1
