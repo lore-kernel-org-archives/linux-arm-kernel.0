@@ -1,53 +1,25 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 12 Dec 2011 14:08:37 +0000
-Subject: [PATCH v3 1/2] ARM: pl2x0/pl310: Refactor Kconfig to be more
- maintainable
-In-Reply-To: <1323690426-6267-2-git-send-email-dave.martin@linaro.org>
+Date: Mon, 12 Dec 2011 14:10:01 +0000
+Subject: [PATCH v3 2/2] ARM: SMP: Refactor Kconfig to be more maintainable
+In-Reply-To: <1323690426-6267-3-git-send-email-dave.martin@linaro.org>
 References: <1323690426-6267-1-git-send-email-dave.martin@linaro.org>
- <1323690426-6267-2-git-send-email-dave.martin@linaro.org>
-Message-ID: <20111212140836.GY14542@n2100.arm.linux.org.uk>
+ <1323690426-6267-3-git-send-email-dave.martin@linaro.org>
+Message-ID: <20111212141001.GZ14542@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 12, 2011 at 11:47:05AM +0000, Dave Martin wrote:
-> diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
-> index 724ec0f..c4c9acf 100644
-> --- a/arch/arm/mach-exynos/Kconfig
-> +++ b/arch/arm/mach-exynos/Kconfig
-> @@ -17,6 +17,7 @@ choice
->  
->  config ARCH_EXYNOS4
->  	bool "SAMSUNG EXYNOS4"
-> +	select CACHE_L2X0
-
-Doesn't this need to select HAVE_L2X0_L2CC as well?
-
+On Mon, Dec 12, 2011 at 11:47:06AM +0000, Dave Martin wrote:
 > diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-> index 5f7f9c2..4234937 100644
+> index 4234937..4aa7f7e 100644
 > --- a/arch/arm/mach-imx/Kconfig
 > +++ b/arch/arm/mach-imx/Kconfig
-> @@ -609,12 +609,12 @@ comment "i.MX6 family:"
->  config SOC_IMX6Q
->  	bool "i.MX6 Quad support"
+> @@ -611,6 +611,7 @@ config SOC_IMX6Q
 >  	select ARM_GIC
-> -	select CACHE_L2X0
 >  	select CPU_V7
 >  	select HAVE_ARM_SCU
+> +	select HAVE_SMP
 >  	select HAVE_IMX_GPC
 >  	select HAVE_IMX_MMDC
 >  	select HAVE_IMX_SRC
-> +	select HAVE_L2X0_L2CC
 
-Do you know enough about this to make L2 cache support optional on this SoC?
-
-> diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-> index 5034147..0358159 100644
-> --- a/arch/arm/mach-omap2/Kconfig
-> +++ b/arch/arm/mach-omap2/Kconfig
-> @@ -44,6 +44,7 @@ config ARCH_OMAP4
->  	select CPU_V7
->  	select ARM_GIC
->  	select LOCAL_TIMERS if SMP
-> +	select CACHE_L2X0
-
-HAVE_L2X0_L2CC ?
+NAK.  I'll let you work out why.  It has something to do with ABCDEFGH...
