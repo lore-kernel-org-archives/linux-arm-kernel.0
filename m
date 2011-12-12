@@ -1,49 +1,61 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Mon, 12 Dec 2011 18:18:38 +0800
-Subject: [PATCH 1/7] arm/imx6: add imx6q sabrelite board support
-In-Reply-To: <20111212101224.GQ27267@pengutronix.de>
-References: <1323661352-10291-1-git-send-email-richard.zhao@linaro.org>
- <1323661352-10291-2-git-send-email-richard.zhao@linaro.org>
- <20111212054053.GD9572@S2100-06.ap.freescale.net>
- <20111212101224.GQ27267@pengutronix.de>
-Message-ID: <20111212101837.GA16835@b20223-02.ap.freescale.net>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Mon, 12 Dec 2011 12:23:53 +0200
+Subject: [PATCH] ARM: OMAP: mcbsp: Fix possible memory corruption
+In-Reply-To: <1323679106-4191-1-git-send-email-jarkko.nikula@bitmer.com>
+References: <1323678976-4119-1-git-send-email-jarkko.nikula@bitmer.com>
+ <1323679106-4191-1-git-send-email-jarkko.nikula@bitmer.com>
+Message-ID: <4EE5D639.8080608@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 12, 2011 at 11:12:24AM +0100, Sascha Hauer wrote:
-> On Mon, Dec 12, 2011 at 01:40:54PM +0800, Shawn Guo wrote:
-> > 
-> > > +	memory {
-> > > +		reg = <0x10000000 0x40000000>;
-> > > +	};
-> > > +
-> > > +	soc {
-> > > +		aips-bus at 02100000 { /* AIPS2 */
-> > > +			enet at 02188000 {
-> > > +				phy-mode = "rgmii";
-> > > +				local-mac-address = [01 04 9F 01 1B 61];
-> > 
-> > Do we still have no way to figure the mac address from hardware setup
-> > (fuse or something) on sabrelite board?
+On 12/12/11 10:38, Jarkko Nikula wrote:
+> Commits 09d28d ("ARM: OMAP: mcbsp: Start generalize omap2_mcbsp_set_clks_src")
+> and 7bc0c4 ("ARM: OMAP: mcbsp: Start generalize signal muxing functions")
+> incorrectly set two struct omap_mcbsp_platform_data fields after
+> omap_device_build_ss and kfree calls.
 > 
-> Even if not, adding hardcoded MAC addresses to the kernel is a no go.
-> This includes devicetree blobs.
-If Shawn agree, I can remove it. I don't feel it usefaull on daily develop work.
-Let user use fec.macaddr. 
+> Fix this by moving these pdata assignments before those calls.
+> 
+> Signed-off-by: Jarkko Nikula <jarkko.nikula@bitmer.com>
+> Reported-by: neilb at suse.de
 
-Thanks
-Richard
+Perhaps, should be:
+Reported-by: NeilBrown <neilb@suse.de>
+and
+Cc: <stable@vger.kernel.org>	[3.1]
+as for below.
+
+> ---
+> For 3.2, 3.1 is ok.
+> ---
+>  arch/arm/mach-omap2/mcbsp.c |    6 +++---
+>  1 files changed, 3 insertions(+), 3 deletions(-)
 > 
-> Sascha
-> 
-> -- 
-> Pengutronix e.K.                           |                             |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+> diff --git a/arch/arm/mach-omap2/mcbsp.c b/arch/arm/mach-omap2/mcbsp.c
+> index 292eee3..28fcb27 100644
+> --- a/arch/arm/mach-omap2/mcbsp.c
+> +++ b/arch/arm/mach-omap2/mcbsp.c
+> @@ -145,6 +145,9 @@ static int omap_init_mcbsp(struct omap_hwmod *oh, void *unused)
+>  		pdata->reg_size = 4;
+>  		pdata->has_ccr = true;
+>  	}
+> +	pdata->set_clk_src = omap2_mcbsp_set_clk_src;
+> +	if (id == 1)
+> +		pdata->mux_signal = omap2_mcbsp1_mux_rx_clk;
+>  
+>  	if (oh->class->rev == MCBSP_CONFIG_TYPE3) {
+>  		if (id == 2)
+> @@ -174,9 +177,6 @@ static int omap_init_mcbsp(struct omap_hwmod *oh, void *unused)
+>  					name, oh->name);
+>  		return PTR_ERR(pdev);
+>  	}
+> -	pdata->set_clk_src = omap2_mcbsp_set_clk_src;
+> -	if (id == 1)
+> -		pdata->mux_signal = omap2_mcbsp1_mux_rx_clk;
+>  	omap_mcbsp_count++;
+>  	return 0;
+>  }
+
+-- 
+Regards,
+Igor.
