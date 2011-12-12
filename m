@@ -1,14 +1,30 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Mon, 12 Dec 2011 12:47:34 +0800
-Subject: [PATCH 3/7] ARM: imx: fix cpufreq build errors
-In-Reply-To: <1323661352-10291-4-git-send-email-richard.zhao@linaro.org>
-References: <1323661352-10291-1-git-send-email-richard.zhao@linaro.org>
- <1323661352-10291-4-git-send-email-richard.zhao@linaro.org>
-Message-ID: <20111212044733.GA16350@b20223-02.ap.freescale.net>
+From: noodles@earth.li (Jonathan McDowell)
+Date: Sun, 11 Dec 2011 21:00:22 -0800
+Subject: [PATCH 00/10] ARM: OMAP1: ams-delta: replace custom I/O with GPIO
+In-Reply-To: <1323634328-856-1-git-send-email-jkrzyszt@tis.icnet.pl>
+References: <1323634328-856-1-git-send-email-jkrzyszt@tis.icnet.pl>
+Message-ID: <20111212050022.GI16333@earth.li>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-please ignore this one if it's already been merged.
+On Sun, Dec 11, 2011 at 09:11:58PM +0100, Janusz Krzysztofik wrote:
+> The Amstrad Delta board has two extra output ports used for driving
+> input lines of different on-board devices. Those ports are now
+> controlled with custom functions, provided by the board arch code and
+> used by several device drivers.
+> 
+> The idea behind the series is to replace those custom I/O functions
+> with gpiolib API. This way, existing drivers can be made less platform
+> dependent, and some of them perhaps even superseded with generic GPIO
+> based drivers after the board platform device descriptions are
+> converted. Moreover, should a new driver for the on-board Smart Card
+> controller ever be created, it could be designed as a generic GPIO
+> based driver, not a custom one.
 
-Thanks
-Richard 
+Nice work; moving ams-delta over to gpiolib has been on my todo list for
+a while (albeit quite low down).
+
+J.
+
+-- 
+I just Fedexed my soul to hell. I'm *real* clever.
