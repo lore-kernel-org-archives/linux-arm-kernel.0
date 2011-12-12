@@ -1,223 +1,51 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Mon, 12 Dec 2011 13:10:38 +0200
-Subject: [PATCH] ARM: OMAP3LOGIC: Adding DSS support
-In-Reply-To: <1323345948-14533-1-git-send-email-alexg@meprolight.com>
-References: <1323345948-14533-1-git-send-email-alexg@meprolight.com>
-Message-ID: <1323688238.3852.18.camel@deskari>
+From: b.a.stenning@gmail.com (Bruce Stenning)
+Date: Mon, 12 Dec 2011 11:18:45 +0000
+Subject: Bad page state BUG triggered by init process (kernel 3.1.2)
+Message-ID: <CAN_pD_CfXh=savgYk21vo8+5E8ScfSgVsu7m4VjBLVwdPop+SA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello,
 
-On Thu, 2011-12-08 at 14:05 +0200, Alex wrote:
-> This patch adds DSS2 support to the LogicPD OMAP 35x Torpedo boardfile. LCD and
-> TV-out are supported.
-> 
-> Signed-off-by: Alex Gershgorin <alexg@meprolight.com>
-> ---
->  arch/arm/mach-omap2/board-omap3logic.c |  151 ++++++++++++++++++++++++++++++++
->  1 files changed, 151 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/board-omap3logic.c b/arch/arm/mach-omap2/board-omap3logic.c
-> index 7c0f193..86175fa 100644
-> --- a/arch/arm/mach-omap2/board-omap3logic.c
-> +++ b/arch/arm/mach-omap2/board-omap3logic.c
-> @@ -7,6 +7,9 @@
->   * Copyright (C) 2010 Logic Product Development, Inc.
->   * Peter Barada <peter.barada@logicpd.com>
->   *
-> + * Copyright (C) 2011 Meprolight, Ltd.
-> + * Alex Gershgorin <alexg@meprolight.com>
-> + *
->   * Modified from Beagle, EVM, and RX51
->   *
->   * This program is free software; you can redistribute it and/or modify
-> @@ -44,6 +47,10 @@
->  #include <plat/gpmc-smsc911x.h>
->  #include <plat/gpmc.h>
->  #include <plat/sdrc.h>
-> +#include <plat/vram.h>
-> +
-> +#include <video/omapdss.h>
-> +#include <video/omap-panel-generic-dpi.h>
->  
->  #define OMAP3LOGIC_SMSC911X_CS			1
->  
-> @@ -58,6 +65,14 @@ static struct regulator_consumer_supply omap3logic_vmmc1_supply[] = {
->  	REGULATOR_SUPPLY("vmmc", "omap_hsmmc.0"),
->  };
->  
-> +static struct regulator_consumer_supply omap3logic_vdds_supplies[] = {
-> +	REGULATOR_SUPPLY("vdds_sdi", "omapdss"),
-> +	REGULATOR_SUPPLY("vdds_dsi", "omapdss"),
-> +};
-> +
-> +static struct regulator_consumer_supply omap3logic_vdac_supply =
-> +	REGULATOR_SUPPLY("vdda_dac", "omapdss_venc");
-> +
->  /* VMMC1 for MMC1 pins CMD, CLK, DAT0..DAT3 (20 mA, plus card == max 220 mA) */
->  static struct regulator_init_data omap3logic_vmmc1 = {
->  	.constraints = {
-> @@ -74,6 +89,34 @@ static struct regulator_init_data omap3logic_vmmc1 = {
->  	.consumer_supplies      = omap3logic_vmmc1_supply,
->  };
->  
-> +static struct regulator_init_data omap3logic_vpll2 = {
-> +	.constraints = {
-> +		.name			= "VDDS_DSI",
-> +		.min_uV			= 1800000,
-> +		.max_uV			= 1800000,
-> +		.apply_uV		= true,
-> +		.always_on		= true,
-> +		.valid_modes_mask	= REGULATOR_MODE_NORMAL
-> +					| REGULATOR_MODE_STANDBY,
-> +		.valid_ops_mask		= REGULATOR_CHANGE_MODE,
-> +	},
-> +	.num_consumer_supplies  = ARRAY_SIZE(omap3logic_vdds_supplies),
-> +	.consumer_supplies      = omap3logic_vdds_supplies,
-> +};
-> +
-> +static struct regulator_init_data omap3logic_vdac = {
-> +	.constraints = {
-> +		.min_uV			= 1800000,
-> +		.max_uV			= 1800000,
-> +		.valid_modes_mask	= REGULATOR_MODE_NORMAL
-> +					| REGULATOR_MODE_STANDBY,
-> +		.valid_ops_mask		= REGULATOR_CHANGE_MODE
-> +					| REGULATOR_CHANGE_STATUS,
-> +	},
-> +	.num_consumer_supplies	= 1,
-> +	.consumer_supplies	= &omap3logic_vdac_supply,
-> +};
-> +
->  static struct twl4030_gpio_platform_data omap3logic_gpio_data = {
->  	.gpio_base	= OMAP_MAX_GPIO_LINES,
->  	.irq_base	= TWL4030_GPIO_IRQ_BASE,
-> @@ -91,6 +134,8 @@ static struct twl4030_platform_data omap3logic_twldata = {
->  	/* platform_data for children goes here */
->  	.gpio		= &omap3logic_gpio_data,
->  	.vmmc1		= &omap3logic_vmmc1,
-> +	.vpll2		= &omap3logic_vpll2,
-> +	.vdac		= &omap3logic_vdac,
->  };
+I have a bad page state BUG triggered during the running of 'init' on our ARM
+board (iop13xx) running busybox.  I have manually added the symbols associated
+with the kernel addresses in the stack trace:
 
-The regulators are already set up in twl-common.c, so there shouldn't be
-need for the code above.
+Freeing init memory: 124K
+Setting up root file system indirection
+BUG: Bad page state in process busybox  pfn:00000
+page:c0291000 count:0 mapcount:0 mapping:  (null) index:0x0
+page flags: 0x200(arch_1)
+Function entered at [<c0016b84>] from [<c0058024>] -- unwind_backtrace
+Function entered at [<c0058024>] from [<c005846c>] -- bad_page
+Function entered at [<c005846c>] from [<c0058b14>] -- get_page_from_freelist
+Function entered at [<c0058b14>] from [<c005b434>] -- __alloc_pages_nodemask
+Function entered at [<c005b434>] from [<c005b7f0>] -- __do_page_cache_readahead
+Function entered at [<c005b7f0>] from [<c0054df4>] -- ra_submit
+Function entered at [<c0054df4>] from [<c0068440>] -- filemap_fault
+Function entered at [<c0068440>] from [<c006aea0>] -- __do_fault
+Function entered at [<c006aea0>] from [<c006b398>] -- handle_pte_fault
+Function entered at [<c006b398>] from [<c0017b14>] -- handle_mm_fault
+Function entered at [<c0017b14>] from [<c0008370>] -- do_page_fault
+Function entered at [<c0008370>] from [<c0011834>] -- do_PrefetchAbort
+Exception stack(0xdf993fb0 to 0xdf993ff8)
+3fa0:                                     00008ed4 00000005 bebe8e84 00008074
+3fc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+3fe0: 00066810 bebe8e78 00000000 00060858 00000010 ffffffff
+Disabling lock debugging due to kernel taint
+(.) (..) (bin) (cmd) /cmd -> /jffs/cmd
+(dev) (etc) /etc -> /jffs/etc
 
->  
->  static int __init omap3logic_i2c_init(void)
-> @@ -182,6 +227,110 @@ static inline void __init board_smsc911x_init(void)
->  	gpmc_smsc911x_init(&board_smsc911x_data);
->  }
->  
-> +#if defined(CONFIG_FB_OMAP2) || defined(CONFIG_FB_OMAP2_MODULE)
-> +
-> +#define OMAP3_TORPEDO_LCD_BACKLIGHT_GPIO	154
-> +#define OMAP3_TORPEDO_LCD_ENABLE_GPIO		155
-> +#define OMAP3_TORPEDO_LCD_PWM_GPIO		56
+This is with the 3.1.2 Linux kernel.  It does not happen with the 2.6.39.4
+kernel.  This seems to be the only time this BUG_ON triggers.
 
-The PWM gpio doesn't seem to be used. Is it needed for something?
+It looks somewhat similar to the problem fixed in the following commit:
 
-> +static struct gpio omap3logic_dss_gpios[] __initdata = {
-> +	{OMAP3_TORPEDO_LCD_BACKLIGHT_GPIO, GPIOF_OUT_INIT_LOW, "lcd_bl_pwr"},
-> +	{OMAP3_TORPEDO_LCD_PWM_GPIO, GPIOF_OUT_INIT_LOW, "lcd bl enable"},
-> +	{OMAP3_TORPEDO_LCD_ENABLE_GPIO, GPIOF_OUT_INIT_LOW, "lcd enable"},
-> +};
-> +
-> +static int omap3logic_enable_lcd(struct omap_dss_device *dssdev)
-> +{
-> +	gpio_set_value_cansleep(OMAP3_TORPEDO_LCD_ENABLE_GPIO, 1);
-> +	msleep(20);
-> +	gpio_set_value_cansleep(OMAP3_TORPEDO_LCD_BACKLIGHT_GPIO, 1);
-> +
-> +	return 0;
-> +}
-> +
-> +static void omap3logic_disable_lcd(struct omap_dss_device *dssdev)
-> +{
-> +	gpio_set_value_cansleep(OMAP3_TORPEDO_LCD_ENABLE_GPIO, 0);
-> +	msleep(20);
-> +	gpio_set_value_cansleep(OMAP3_TORPEDO_LCD_BACKLIGHT_GPIO, 0);
-> +}
+http://git.kernel.org/?p=linux/kernel/git/torvalds/linux.git;a=commitdiff;h=b962a286e500c6259af8ba133361f8528eed9172
 
-Is there a particular reason for msleep(20) in the enable and disable
-function?
+Has anyone else seen this, and is there a fix to address it?
 
-> +
-> +static struct panel_generic_dpi_data lcd_panel = {
-> +	.name			= "sharp_lq",
-> +	.platform_enable	= omap3logic_enable_lcd,
-> +	.platform_disable	= omap3logic_disable_lcd,
-> +};
-> +
-> +static struct omap_dss_device omap3logic_lcd_device = {
-> +	.name			= "lcd",
-> +	.driver_name		= "generic_dpi_panel",
-> +	.type			= OMAP_DISPLAY_TYPE_DPI,
-> +	.data			= &lcd_panel,
-> +	.phy.dpi.data_lines	= 16,
-> +};
-> +
-> +static struct omap_dss_device omap3logic_tv_device = {
-> +	.name			= "tv",
-> +	.driver_name		= "venc",
-> +	.type			= OMAP_DISPLAY_TYPE_VENC,
-> +	.phy.venc.type		= OMAP_DSS_VENC_TYPE_SVIDEO,
-> +};
-> +
-> +static struct omap_dss_device *omap3logic_dss_devices[] = {
-> +	&omap3logic_lcd_device,
-> +	&omap3logic_tv_device,
-> +};
-> +
-> +static struct omap_dss_board_info omap3logic_dss_data = {
-> +	.num_devices		= ARRAY_SIZE(omap3logic_dss_devices),
-> +	.devices		= omap3logic_dss_devices,
-> +	.default_device		= &omap3logic_lcd_device,
-> +};
-> +
-> +static void __init omap3logic_display_init(void)
-> +{
-> +	int r;
-> +
-> +	r = gpio_request_array(omap3logic_dss_gpios,
-> +			       ARRAY_SIZE(omap3logic_dss_gpios));
-> +	if (r) {
-> +		printk(KERN_ERR "failed to get lcd_panel_* gpios\n");
-> +		return;
-> +	}
-> +
-> +	gpio_export(OMAP3_TORPEDO_LCD_BACKLIGHT_GPIO, 0);
-> +	gpio_export(OMAP3_TORPEDO_LCD_ENABLE_GPIO, 0);
-> +	gpio_export(OMAP3_TORPEDO_LCD_PWM_GPIO, 0);
-> +
-> +	r = omap_display_init(&omap3logic_dss_data);
-> +	if (r) {
-> +		pr_err("OMAP3LOGIC: failed to register DSS device\n");
-> +		gpio_free_array(omap3logic_dss_gpios,
-> +				ARRAY_SIZE(omap3logic_dss_gpios));
-> +	}
-> +}
-> +
-> +static void __init omap3logic_video_mem_init(void)
-> +{
-> +	/*
-> +	 * GFX 480x272x32bpp
-> +	 * VID1/2 480x272x32bpp double buffered
-> +	 */
-> +	omap_vram_set_sdram_vram(PAGE_ALIGN(480 * 272 * 4) +
-> +			2 * PAGE_ALIGN(480 * 272 * 4 * 2), 0);
-> +}
+Kind Regards,
 
-You should normally let the bootloader or the user define the vram size
-via boot parameters, not in the board file like this.
-
- Tomi
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111212/7402e7b0/attachment.sig>
+Bruce Stenning,
+b <dot> a <dot> stenning <at> gmail <dot> com
