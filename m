@@ -1,76 +1,41 @@
 From: jamie@jamieiles.com (Jamie Iles)
-Date: Mon, 12 Dec 2011 23:03:10 +0000
-Subject: [PATCH 2/5] ARM: picoxcell: don't reserve irq_descs
-In-Reply-To: <4EE682AA.2020700@gmail.com>
+Date: Mon, 12 Dec 2011 23:05:27 +0000
+Subject: [PATCH 4/5] MAINTAINERS: add maintainer entry for Picochip
+ picoxcell
+In-Reply-To: <1323728908.1812.5.camel@joe2Laptop>
 References: <1323726414-3319-1-git-send-email-jamie@jamieiles.com>
- <1323726414-3319-3-git-send-email-jamie@jamieiles.com>
- <4EE682AA.2020700@gmail.com>
-Message-ID: <20111212230310.GA2616@gallagher>
+ <1323726414-3319-5-git-send-email-jamie@jamieiles.com>
+ <1323728908.1812.5.camel@joe2Laptop>
+Message-ID: <20111212230527.GB2616@gallagher>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
-
-On Mon, Dec 12, 2011 at 04:39:38PM -0600, Rob Herring wrote:
-> On 12/12/2011 03:46 PM, Jamie Iles wrote:
-> > All irq_desc's are now dynamically allocated so we don't need to
-> > statically reserve them.
-> > 
-> > Signed-off-by: Jamie Iles <jamie@jamieiles.com>
-> > ---
-> >  arch/arm/mach-picoxcell/common.c            |    1 -
-> >  arch/arm/mach-picoxcell/include/mach/irqs.h |    9 ++-------
-> >  2 files changed, 2 insertions(+), 8 deletions(-)
-> > 
-> > diff --git a/arch/arm/mach-picoxcell/common.c b/arch/arm/mach-picoxcell/common.c
-> > index ad871bd..7d91165 100644
-> > --- a/arch/arm/mach-picoxcell/common.c
-> > +++ b/arch/arm/mach-picoxcell/common.c
-> > @@ -45,7 +45,6 @@ static void __init picoxcell_init_irq(void)
+On Mon, Dec 12, 2011 at 02:28:28PM -0800, Joe Perches wrote:
+> On Mon, 2011-12-12 at 21:46 +0000, Jamie Iles wrote:
+> > Add maintainer entry for the picoxcell machine support and associated
+> > drivers.
+> []
+> > diff --git a/MAINTAINERS b/MAINTAINERS
+> []
+> > @@ -5114,6 +5114,14 @@ L:	linux-mtd at lists.infradead.org
+> >  S:	Maintained
+> >  F:	drivers/mtd/devices/phram.c
 > >  
-> >  DT_MACHINE_START(PICOXCELL, "Picochip picoXcell")
-> >  	.map_io		= picoxcell_map_io,
-> > -	.nr_irqs	= ARCH_NR_IRQS,
+> > +PICOXCELL SUPPORT
+> > +M:	Jamie Iles <jamie@jamieiles.com>
+> > +L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+> > +T:	git git://github.com/jamieiles/linux-2.6-ji.git
+> > +S:	Supported
+> > +F:	arch/arm/mach-picoxcell
+> > +F:	drivers/*/picoxcell*
 > 
-> You should probably should set this to NR_IRQS_LEGACY (16) to skip irq 0
-> and ISA irqs.
-
-OK, that seems reasonable.  This platform won't ever have ISA support 
-but I guess it's still worth it?
-
-> >  	.init_irq	= picoxcell_init_irq,
-> >  	.handle_irq	= vic_handle_irq,
-> >  	.timer		= &picoxcell_timer,
-> > diff --git a/arch/arm/mach-picoxcell/include/mach/irqs.h b/arch/arm/mach-picoxcell/include/mach/irqs.h
-> > index 4d13ed9..59eac1e 100644
-> > --- a/arch/arm/mach-picoxcell/include/mach/irqs.h
-> > +++ b/arch/arm/mach-picoxcell/include/mach/irqs.h
-> > @@ -1,8 +1,6 @@
-> >  /*
-> >   * Copyright (c) 2011 Picochip Ltd., Jamie Iles
-> >   *
-> > - * This file contains the hardware definitions of the picoXcell SoC devices.
-> > - *
-> >   * This program is free software; you can redistribute it and/or modify
-> >   * it under the terms of the GNU General Public License as published by
-> >   * the Free Software Foundation; either version 2 of the License, or
-> > @@ -16,10 +14,7 @@
-> >  #ifndef __MACH_IRQS_H
-> >  #define __MACH_IRQS_H
-> >  
-> > -#define ARCH_NR_IRQS			64
-> > -#define NR_IRQS				(128 + ARCH_NR_IRQS)
-> > -
-> > -#define IRQ_VIC0_BASE			0
-> > -#define IRQ_VIC1_BASE			32
-> > +/* We dynamically allocate our irq_desc's. */
-> > +#define NR_IRQS				0
+> This wildcard matches only 1 directory depth level.
 > 
-> Are you selecting SPARSE_IRQ?
+> To match "drivers/char/hw_random/picoxcell-rng.c"
+> you also need to have:
+> 
+> F:	drivers/*/*/picoxcell*
 
-Not in the patch, but I did have it enabled locally.  I'll respin this 
-patch to select SPARSE_IRQ for picoxcell.
-
-Thanks,
+Thanks Joe, I'll update accordingly.
 
 Jamie
