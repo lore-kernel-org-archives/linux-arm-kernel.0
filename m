@@ -1,53 +1,36 @@
-From: richard.zhao@linaro.org (Richard Zhao)
-Date: Mon, 12 Dec 2011 18:09:18 +0800
-Subject: [PATCH 1/1] net/fec: add KSZ9021RN phy fixup
-Message-ID: <1323684558-16796-1-git-send-email-richard.zhao@linaro.org>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 12 Dec 2011 11:12:24 +0100
+Subject: [PATCH 1/7] arm/imx6: add imx6q sabrelite board support
+In-Reply-To: <20111212054053.GD9572@S2100-06.ap.freescale.net>
+References: <1323661352-10291-1-git-send-email-richard.zhao@linaro.org>
+ <1323661352-10291-2-git-send-email-richard.zhao@linaro.org>
+ <20111212054053.GD9572@S2100-06.ap.freescale.net>
+Message-ID: <20111212101224.GQ27267@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For imx6q sabrelite board, set phy RGMII pad skew.
+On Mon, Dec 12, 2011 at 01:40:54PM +0800, Shawn Guo wrote:
+> 
+> > +	memory {
+> > +		reg = <0x10000000 0x40000000>;
+> > +	};
+> > +
+> > +	soc {
+> > +		aips-bus at 02100000 { /* AIPS2 */
+> > +			enet at 02188000 {
+> > +				phy-mode = "rgmii";
+> > +				local-mac-address = [01 04 9F 01 1B 61];
+> 
+> Do we still have no way to figure the mac address from hardware setup
+> (fuse or something) on sabrelite board?
 
-Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
----
- drivers/net/ethernet/freescale/fec.c |   19 +++++++++++++++++++
- 1 files changed, 19 insertions(+), 0 deletions(-)
+Even if not, adding hardcoded MAC addresses to the kernel is a no go.
+This includes devicetree blobs.
 
-diff --git a/drivers/net/ethernet/freescale/fec.c b/drivers/net/ethernet/freescale/fec.c
-index 112af9b..d3b4463 100644
---- a/drivers/net/ethernet/freescale/fec.c
-+++ b/drivers/net/ethernet/freescale/fec.c
-@@ -1513,6 +1513,21 @@ static inline void fec_reset_phy(struct platform_device *pdev)
- }
- #endif /* CONFIG_OF */
- 
-+/* For imx6q sabrelite board: set KSZ9021RN RGMII pad skew */
-+static int ksz9021rn_phy_fixup(struct phy_device *phydev)
-+{
-+	/* min rx data delay */
-+	phy_write(phydev, 0x0b, 0x8105);
-+	phy_write(phydev, 0x0c, 0x0000);
-+
-+	/* max rx/tx clock delay, min rx/tx control delay */
-+	phy_write(phydev, 0x0b, 0x8104);
-+	phy_write(phydev, 0x0c, 0xf0f0);
-+	phy_write(phydev, 0x0b, 0x104);
-+
-+	return 0;
-+}
-+
- static int __devinit
- fec_probe(struct platform_device *pdev)
- {
-@@ -1597,6 +1612,10 @@ fec_probe(struct platform_device *pdev)
- 	if (ret)
- 		goto failed_init;
- 
-+	/* register the PHY board fixup (for Micrel KSZ9021RN) */
-+	phy_register_fixup_for_uid(0x00221611, 0xfffffff0,
-+					 ksz9021rn_phy_fixup);
-+
- 	ret = fec_enet_mii_init(pdev);
- 	if (ret)
- 		goto failed_mii_init;
+Sascha
+
 -- 
-1.7.5.4
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
