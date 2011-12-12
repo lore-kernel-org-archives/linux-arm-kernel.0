@@ -1,34 +1,47 @@
-From: lost.distance@yahoo.com (Paul Parsons)
-Date: Mon, 12 Dec 2011 22:21:05 +0000 (GMT)
-Subject: [PATCH] pxa/hx4700: Fix PXA_GPIO_IRQ_BASE/IRQ_NUM values
-Message-ID: <1323728465.801.YahooMailClassic@web29018.mail.ird.yahoo.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 12 Dec 2011 22:21:57 +0000
+Subject: arm and patch phys offset
+In-Reply-To: <201112122309.00075.michael@walle.cc>
+References: <201112112255.32534.michael@walle.cc>
+ <201112122255.40092.michael@walle.cc>
+ <20111212220247.GF20178@n2100.arm.linux.org.uk>
+ <201112122309.00075.michael@walle.cc>
+Message-ID: <20111212222157.GG20178@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-linux-2.6.32 changed the values of PXA_GPIO_IRQ_BASE and PXA_GPIO_IRQ_NUM from
-64/128 to 96/192. This has broken the hx4700 platform, for example its PCMCIA/CF
-driver. The 9 EGPIO GPIOs have become numbered 256..264, and consequently fail
-the gpio_is_valid() test in gpiolib.c (which limits GPIOs to the range 0..255).
-This patch reverts the values of PXA_GPIO_IRQ_BASE and PXA_GPIO_IRQ_NUM to their
-previous linux-2.6.31 values for the hx4700 platform only.
+On Mon, Dec 12, 2011 at 11:09:00PM +0100, Michael Walle wrote:
+> Am Montag 12 Dezember 2011, 23:02:47 schrieb Russell King - ARM Linux:
+> > > > Are you running a Thumb-2 kernel?  Which kernel are you running?
+> > > 
+> > > what do you mean by which kernel?
+> > > linus' master from yesterday, ARCH_KIRKWOOD=y
+> > > CONFIG_THUMB2_KERNEL is not set
+> > 
+> > Yes, that's what I mean.
+> > 
+> > Right, so the problem you're describing is _impossible_ - there is no way
+> > the fixup function can fix only some instructions and skip over others in
+> > a properly functioning system.
+> > 
+> > The only options are that either the CPU is not executing the instructions
+> > we're giving it (unlikely as - I assume - your hardware executes older
+> > kernels fine), or for some reason your kernel is being called with caches
+> > still enabled, violating the long-standing kernel's calling requirements.
+> > 
+> > So, some more questions to try to narrow this down:
+> > 
+> > 1. What boot loader are you using?
+> u-boot 2011.09 with own bsp support.
+> 
+> > 2. What file are you taking from the kernel build in order to boot?
+> generated uImage
 
-Signed-off-by: Paul Parsons <lost.distance@yahoo.com>
----
+Okay, so this should mean that the kernel's own decompressor has run,
+which should turn on/off the mmu and caches, cleaning and invalidating
+them, which will take the boot loader completely out of the picture at
+this stage.
 
-diff -uprN clean-3.2-rc5/arch/arm/mach-pxa/include/mach/irqs.h linux-3.2-rc5/arch/arm/mach-pxa/include/mach/irqs.h
---- clean-3.2-rc5/arch/arm/mach-pxa/include/mach/irqs.h	2011-12-09 23:09:32.000000000 +0000
-+++ linux-3.2-rc5/arch/arm/mach-pxa/include/mach/irqs.h	2011-12-12 15:21:09.770483920 +0000
-@@ -87,8 +87,13 @@
- #define IRQ_PXA955_MMC3	PXA_IRQ(75)	/* MMC3 Controller (PXA955) */
- #define IRQ_U2P		PXA_IRQ(93)	/* USB PHY D+/D- Lines (PXA935) */
- 
-+#ifdef CONFIG_MACH_H4700
-+#define PXA_GPIO_IRQ_BASE	PXA_IRQ(64)
-+#define PXA_GPIO_IRQ_NUM	(128)
-+#else
- #define PXA_GPIO_IRQ_BASE	PXA_IRQ(96)
- #define PXA_GPIO_IRQ_NUM	(192)
-+#endif
- 
- #define GPIO_2_x_TO_IRQ(x)	(PXA_GPIO_IRQ_BASE + (x))
- #define IRQ_GPIO(x)	(((x) < 2) ? (IRQ_GPIO0 + (x)) : GPIO_2_x_TO_IRQ(x))
+I think I'll leave this in the hands of Nicolas - from what I remember,
+kirkwood is a feroceon based system, and I have little working knowledge
+of that ARM derivative.
