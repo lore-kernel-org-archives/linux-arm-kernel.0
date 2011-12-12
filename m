@@ -1,58 +1,63 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 12 Dec 2011 22:02:47 +0000
+From: michael@walle.cc (Michael Walle)
+Date: Mon, 12 Dec 2011 23:06:09 +0100
 Subject: arm and patch phys offset
-In-Reply-To: <201112122255.40092.michael@walle.cc>
+In-Reply-To: <alpine.LFD.2.02.1112121627030.2907@xanadu.home>
 References: <201112112255.32534.michael@walle.cc>
  <201112122212.35506.michael@walle.cc>
- <20111212213450.GD20178@n2100.arm.linux.org.uk>
- <201112122255.40092.michael@walle.cc>
-Message-ID: <20111212220247.GF20178@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.02.1112121627030.2907@xanadu.home>
+Message-ID: <201112122306.09585.michael@walle.cc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 12, 2011 at 10:55:40PM +0100, Michael Walle wrote:
-> Am Montag 12 Dezember 2011, 22:34:50 schrieb Russell King - ARM Linux:
-> > Why do you say that, and what you do mean by "expect the addresses" ?
-> > Presumably you're saying the addresses will be different.  Why do you
-> > think that?
-> > Are you saying that you find that the address of these 'unconverted'
-> > instructions change each time you run your debug function?
-> i see different output from the debug function everytime i change the source 
-> code and recompile the kernel. restarting the same binary results in the same 
-> unconverted instructions.
+Am Montag 12 Dezember 2011, 22:38:07 schrieb Nicolas Pitre:
+> > But the non-patched entries always points to correct v2p/p2v
+> > calls and in every case there is the unpatched add/sub instruction.
 > 
-> > > If it would be some memory corruption, shouldn't the table or the p2v/v2p
-> > > stubs be corrupt? But the non-patched entries always points to correct
-> > > v2p/p2v calls and in every case there is the unpatched add/sub
-> > > instruction.
-> > 
-> > Have you tried dumping out the entire instruction as well as the
-> > address of the unconverted instruction?
-> yes, the addresses make sense as i can see the unpatched instruction at that 
-> address in the disassembly and the instruction at these addresses are always:
+> Then, might it be possible that the cache is not properly turned off
+> prior entering the kernel?
+i'll have a look at that
+
+> What bootloader do you use?
+U-Boot 2011.09 + patches for bsp support
+
+> You could try instrumenting the patching code, although it is a bit
+> tricky because of the non-standard register life rules in that file.
+> But something like this should tell you if the expected amount of fixups
+> were applied:
 > 
-> add/sub rX, rY, #81000000
-> 
-> > Are you running a Thumb-2 kernel?  Which kernel are you running?
-> what do you mean by which kernel?
-> linus' master from yesterday, ARCH_KIRKWOOD=y
-> CONFIG_THUMB2_KERNEL is not set
+> diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
+> index 08c82fd844..7f43d1fe01 100644
+> --- a/arch/arm/kernel/head.S
+> +++ b/arch/arm/kernel/head.S
+> @@ -530,14 +530,23 @@ __fixup_a_pv_table:
+>  	bcc	1b
+>  	bx	lr
+>  #else
+> +	mov	r0, #0
+>  	b	2f
+>  1:	ldr	ip, [r7, r3]
+>  	bic	ip, ip, #0x000000ff
+>  	orr	ip, ip, r6	@ mask in offset bits 31-24
+>  	str	ip, [r7, r3]
+> +	add	r0, r0, #1
+>  2:	cmp	r4, r5
+>  	ldrcc	r7, [r4], #4	@ use branch for delay slot
+>  	bcc	1b
+> +
+> +	mov	r6, r2
+> +	mov	r7, r3
+> +	bl	printhex8	@ display number of fixups done in r0
+> +	mov	r2, r6
+> +	mov	r3, r7
+> +
+>  	mov	pc, lr
+>  #endif
+>  ENDPROC(__fixup_a_pv_table)
 
-Yes, that's what I mean.
+Thanks, although the kernel hangs now after it printed the number, i can see 
+it patched the correct number of stubs.
 
-Right, so the problem you're describing is _impossible_ - there is no way
-the fixup function can fix only some instructions and skip over others in
-a properly functioning system.
+I'll have a look at the bootloader now.
 
-The only options are that either the CPU is not executing the instructions
-we're giving it (unlikely as - I assume - your hardware executes older
-kernels fine), or for some reason your kernel is being called with caches
-still enabled, violating the long-standing kernel's calling requirements.
-
-So, some more questions to try to narrow this down:
-
-1. What boot loader are you using?
-
-2. What file are you taking from the kernel build in order to boot?
-
-3. How are you transfering the kernel file to your target system?
+-- 
+Michael
