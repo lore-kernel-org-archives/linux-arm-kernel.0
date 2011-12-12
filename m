@@ -1,47 +1,89 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Mon, 12 Dec 2011 17:49:20 +0800
+Date: Mon, 12 Dec 2011 17:54:58 +0800
 Subject: [PATCH] irq: convert generic-chip to use irq_domain
-In-Reply-To: <4EE554BA.9040408@gmail.com>
+In-Reply-To: <4EE56C66.5000909@gmail.com>
 References: <1323470689-6200-1-git-send-email-robherring2@gmail.com>
  <20111211160025.GA9572@S2100-06.ap.freescale.net>
- <4EE554BA.9040408@gmail.com>
-Message-ID: <20111212094919.GH9572@S2100-06.ap.freescale.net>
+ <4EE554BA.9040408@gmail.com> <4EE56C66.5000909@gmail.com>
+Message-ID: <20111212095457.GI9572@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Dec 11, 2011 at 07:11:22PM -0600, Rob Herring wrote:
-> Shawn,
+On Sun, Dec 11, 2011 at 08:52:22PM -0600, Rob Herring wrote:
+> Actually, there's a much simpler fix:
 > 
-> On 12/11/2011 10:00 AM, Shawn Guo wrote:
-> > Hi Rob,
-> > 
-> > I installed the patch and played it a little bit, and I some feedback
-> > below.
+> diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
+> index 200ce83..3832ac6 100644
+> --- a/kernel/irq/irqdomain.c
+> +++ b/kernel/irq/irqdomain.c
+> @@ -135,6 +135,9 @@ int irq_domain_simple_dt_translate(struct irq_domain *d,
+>                 return -EINVAL;
+>         if (intsize < 1)
+>                 return -EINVAL;
+> +       if ((intspec[0] < d->hwirq_base) ||
+> +           (intspec[0] >= d->hwirq_base + d->nr_irq))
+> +               return -EINVAL;
 > 
-> Thanks!
+>         *out_hwirq = intspec[0];
+>         *out_type = IRQ_TYPE_NONE;
 > 
-> > * It breaks some existing irq_chip_generic users like imx5, which
-> >   is currently numbering irq from 0.  For such users, irq_alloc_descs()
-> >   will fail because it's asked to search irq #0 starting from irq #1.
-> >   Yes, I know numbering irq from 0 is a bad idea and really needs to
-> >   get fixed.  But is it your intention to break such users and force
-> >   them get fixed with this patch?
-> 
-> I was trying not to break things and allow the existing irq base.
-> 
-> My problem is irq 0-15 are unallocated, 16-159 are the GIC. So when I
-> try to allocate 8 irqdescs for gpio, I don't really want irq_alloc_descs
-> to pick 0-15. Ideally we would just globally reserve 0-15 on ARM, but
-> this will cause problems. So starting at 1 was at least slightly better
-> than 0.
-> 
-> I think I'll just skip irq_alloc_descs call when the irq_base is >= 0.
-> 
-Yes, looks good.  But both parameter irq_base of irq_alloc_generic_chip
-and member irq_base of 'struct irq_domain' are unsigned int, which
-might be a little problem for irq_chip_generic users to pass -1 for
-asking irq_chip_generic to allocate Linux irq numbers for it.
+Thanks, Rob.  It works for me with some additional changes to your
+patch.
 
--- 
+8<-------------------------
+
+diff --git a/kernel/irq/generic-chip.c b/kernel/irq/generic-chip.c
+index 48eeb29..3ac7de4 100644
+--- a/kernel/irq/generic-chip.c
++++ b/kernel/irq/generic-chip.c
+@@ -252,14 +252,16 @@ void irq_setup_generic_chip(struct irq_chip_generic *gc, u32 msk,
+                gc->mask_cache = irq_reg_readl(gc->reg_base + ct->regs.mask);
+
+        gc->domain->nr_irq = fls(msk);
+-       irq = irq_alloc_descs(gc->domain->irq_base, 1, gc->domain->nr_irq,
+-                             numa_node_id());
+-       if (irq > 0)
+-               gc->domain->irq_base = irq;
++       if ((int) gc->domain->irq_base < 0) {
++               irq = irq_alloc_descs(gc->domain->irq_base, 1,
++                                     gc->domain->nr_irq, numa_node_id());
++               if (irq > 0)
++                       gc->domain->irq_base = irq;
++       }
+
+        irq_domain_add(gc->domain);
+
+-       for (i = 0; msk; msk >>= 1, i++) {
++       for (i = gc->domain->hwirq_base; msk; msk >>= 1, i++) {
+                if (!(msk & 0x01))
+                        continue;
+
+diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
+index 200ce83..7947252 100644
+--- a/kernel/irq/irqdomain.c
++++ b/kernel/irq/irqdomain.c
+@@ -39,7 +39,7 @@ void irq_domain_add(struct irq_domain *domain)
+                        return;
+                }
+                d->domain = domain;
+-               d->hwirq = hwirq;
++               d->hwirq = hwirq - d->domain->hwirq_base;
+        }
+
+        mutex_lock(&irq_domain_mutex);
+@@ -136,6 +136,10 @@ int irq_domain_simple_dt_translate(struct irq_domain *d,
+        if (intsize < 1)
+                return -EINVAL;
+
++       if ((intspec[0] < d->hwirq_base) ||
++           (intspec[0] >= d->hwirq_base + d->nr_irq))
++               return -EINVAL;
++
+        *out_hwirq = intspec[0];
+        *out_type = IRQ_TYPE_NONE;
+        if (intsize > 1)
+
+------------------------->8
+
 Regards,
 Shawn
