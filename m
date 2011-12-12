@@ -1,41 +1,100 @@
-From: michael@walle.cc (Michael Walle)
-Date: Mon, 12 Dec 2011 22:55:40 +0100
-Subject: arm and patch phys offset
-In-Reply-To: <20111212213450.GD20178@n2100.arm.linux.org.uk>
-References: <201112112255.32534.michael@walle.cc>
- <201112122212.35506.michael@walle.cc>
- <20111212213450.GD20178@n2100.arm.linux.org.uk>
-Message-ID: <201112122255.40092.michael@walle.cc>
+From: snjw23@gmail.com (Sylwester Nawrocki)
+Date: Mon, 12 Dec 2011 22:57:35 +0100
+Subject: [RFC PATCH v1 6/7] media: video: introduce face detection driver
+ module
+In-Reply-To: <CACVXFVNjawdPEYHoXNxc3U2-H8f4VVF_+2HDruNGQwg16M8njA@mail.gmail.com>
+References: <1322838172-11149-1-git-send-email-ming.lei@canonical.com>	<1322838172-11149-7-git-send-email-ming.lei@canonical.com>	<4EDD3DEE.6060506@gmail.com>	<CACVXFVPrAro=3t-wpbR_cVahzcx7SCa2J=s2nyyKfQ6SG-i0VQ@mail.gmail.com>	<4EDE90A3.7050900@gmail.com>	<CACVXFVN=-0OQ_Tz+HznDug4baLmLNjxVE21gv6CGFoU+hzCtPQ@mail.gmail.com>	<4EE14787.8090509@gmail.com>	<CACVXFVNV3TLNvPMU4oj6X+Yj5wqhNvcU_ZpyCd1wMm8B2azT4w@mail.gmail.com>	<4EE4EBCF.8000202@gmail.com>
+ <CACVXFVNjawdPEYHoXNxc3U2-H8f4VVF_+2HDruNGQwg16M8njA@mail.gmail.com>
+Message-ID: <4EE678CF.1020300@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag 12 Dezember 2011, 22:34:50 schrieb Russell King - ARM Linux:
-> Why do you say that, and what you do mean by "expect the addresses" ?
-> Presumably you're saying the addresses will be different.  Why do you
-> think that?
-> Are you saying that you find that the address of these 'unconverted'
-> instructions change each time you run your debug function?
-i see different output from the debug function everytime i change the source 
-code and recompile the kernel. restarting the same binary results in the same 
-unconverted instructions.
+Hi,
 
-> > If it would be some memory corruption, shouldn't the table or the p2v/v2p
-> > stubs be corrupt? But the non-patched entries always points to correct
-> > v2p/p2v calls and in every case there is the unpatched add/sub
-> > instruction.
+On 12/12/2011 10:49 AM, Ming Lei wrote:
+>>> If FD result is associated with a frame, how can user space get the frame
+>>> seq if no v4l2 buffer is involved? Without a frame sequence, it is a bit
+>>> difficult to retrieve FD results from user space.
+>>
+>> If you pass image data in memory buffers from user space, yes, it could be
+>> impossible.
 > 
-> Have you tried dumping out the entire instruction as well as the
-> address of the unconverted instruction?
-yes, the addresses make sense as i can see the unpatched instruction at that 
-address in the disassembly and the instruction at these addresses are always:
+> It is easy to get the frame sequence from v4l2_buffer for the case too, :-)
 
-add/sub rX, rY, #81000000
+Oops, have mixed something up ;)
 
-> Are you running a Thumb-2 kernel?  Which kernel are you running?
-what do you mean by which kernel?
-linus' master from yesterday, ARCH_KIRKWOOD=y
-CONFIG_THUMB2_KERNEL is not set
+>> Not really, still v4l2_buffer may be used by other (sub)driver within same
+>> video processing pipeline.
+> 
+> OK.
+> 
+> A related question: how can we make one application to support the two kinds 
+> of devices(input from user space data as OMAP4, input from SoC bus as Samsung)
+> at the same time? Maybe some capability info is to be exported to user space?
+> or other suggestions?
 
+Good question. To let applications know that a video device is not just
+an ordinary video output device I suppose we'll need a new object
+detection/recognition capability flag.
+V4L2_CAPS_OBJECT_DETECTION, V4L2_CAP_OBJECT_RECOGNITION or something similar.
+
+It's probably safe to assume the SoC will support either input method at time,
+not both simultaneously. Then it could be, for example, modelled with a video
+node and a subdev:
+
+
+	     user image data                   video capture
+             for FD                            stream
+             +-------------+                  +-------------+
+             | /dev/video0 |                  | /dev/video0 |
+             |   OUTPUT    |                  |  CAPTURE    |
+             +------+------+                  +------+------+
+                    |                                |
+                    v                                ^
+..------+        +--+--+----------+-----+            |
+image   | link0  | pad | face     | pad |            |
+sensor  +-->-----+  0  | detector |  1  |            |
+sub-dev +-->-+   |     | sub-dev  |     |            |
+..------+    |   +-----+----------+-----+            |
+             |                                       |
+             |   +--+--+------------+-----+          |
+             |   | pad | image      | pad |          |
+             +---+  0  | processing |  1  +----------+
+          link1  |     | sub-dev    |     |
+                 +-----+------------+-----+
+
+User space can control state of link0. If the link is active (streaming) then
+access to /dev/video0 would be blocked by the driver, e.g. with EBUSY errno.
+This means that only one data source can be attached to an input pad (pad0).
+These are intrinsic properties of Media Controller/v4l2 subdev API.
+
+
+> And will your Samsung FD HW support to detect faces from memory? or just only
+> detect from SoC bus?
+
+I think we should be prepared for both configurations, as on a diagram above.
+
+[...]
+> OK, I will associate FD result with frame identifier, and not invent a
+> dedicated v4l2 event for query frame seq now until a specific requirement
+> for it is proposed.
+> 
+> I will convert/integrate recent discussions into patches of v2 for further
+
+Sure, sounds like a good idea.
+
+> review, and sub device support will be provided. But before starting to do it,
+> I am still not clear how to integrate FD into MC framework. I understand FD
+> sub device is only a media entity, so how can FD sub device find the media
+> device(struct media_device)?  or just needn't to care about it now?
+
+The media device driver will register all entities that belong to it and will
+create relevant links between entities' pads, which then can be activated by
+applications. How the entities are registered is another topic, that we don't
+need to be concerned about at the moment. If you're curious see
+drivers/media/video/omap3isp or driver/media/video/s5p-fimc for example media
+device drivers.
 
 -- 
-Michael
+Regards,
+Sylwester
