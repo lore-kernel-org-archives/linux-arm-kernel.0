@@ -1,7 +1,9 @@
 From: jarkko.nikula@bitmer.com (Jarkko Nikula)
-Date: Mon, 12 Dec 2011 10:36:16 +0200
+Date: Mon, 12 Dec 2011 10:38:26 +0200
 Subject: [PATCH] ARM: OMAP: mcbsp: Fix possible memory corruption
-Message-ID: <1323678976-4119-1-git-send-email-jarkko.nikula@bitmer.com>
+In-Reply-To: <1323678976-4119-1-git-send-email-jarkko.nikula@bitmer.com>
+References: <1323678976-4119-1-git-send-email-jarkko.nikula@bitmer.com>
+Message-ID: <1323679106-4191-1-git-send-email-jarkko.nikula@bitmer.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
