@@ -1,69 +1,86 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 12 Dec 2011 16:04:37 +0000
-Subject: [PATCH v3 1/2] ARM: pl2x0/pl310: Refactor Kconfig to be more
- maintainable
-In-Reply-To: <20111212145738.GA2296@linaro.org>
-References: <1323690426-6267-1-git-send-email-dave.martin@linaro.org>
- <1323690426-6267-2-git-send-email-dave.martin@linaro.org>
- <20111212140836.GY14542@n2100.arm.linux.org.uk>
- <20111212145738.GA2296@linaro.org>
-Message-ID: <20111212160437.GC20178@n2100.arm.linux.org.uk>
+From: jean.pihet@newoldbits.com (jean.pihet at newoldbits.com)
+Date: Mon, 12 Dec 2011 17:18:15 +0100
+Subject: [PATCH v5 0/6] PM QoS: implement the OMAP low level constraints
+ management code
+Message-ID: <1323706701-6627-1-git-send-email-j-pihet@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 12, 2011 at 03:01:58PM +0000, Dave Martin wrote:
-> On Mon, Dec 12, 2011 at 02:08:37PM +0000, Russell King - ARM Linux wrote:
-> > On Mon, Dec 12, 2011 at 11:47:05AM +0000, Dave Martin wrote:
-> > > diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
-> > > index 724ec0f..c4c9acf 100644
-> > > --- a/arch/arm/mach-exynos/Kconfig
-> > > +++ b/arch/arm/mach-exynos/Kconfig
-> > > @@ -17,6 +17,7 @@ choice
-> > >  
-> > >  config ARCH_EXYNOS4
-> > >  	bool "SAMSUNG EXYNOS4"
-> > > +	select CACHE_L2X0
-> > 
-> > Doesn't this need to select HAVE_L2X0_L2CC as well?
-> 
-> Probably not -- due to a moment of madness, it looks like I somehow
-> mistranslated "highbank" as "exynos4".
+From: Jean Pihet <j-pihet@ti.com>
 
-Well, you have CACHE_L2X0 depending on HAVE_L2X0_L2CC.  Selecting
-CACHE_L2X0 without HAVE_L2X0_L2CC being selected will make Kconfig
-produce a message about unmet dependencies.
+. Implement the devices wake-up latency constraints using the global
+  device PM QoS notification handler which applies the constraints to the
+  underlying layer
+. Implement the low level code which controls the power domains next power
+  states, through the hwmod and pwrdm layers
+. Add cpuidle and power domains wake-up latency figures for OMAP3, cf. 
+  comments in the code and [1] for the details on where the numbers
+  are magically coming from
+. Implement the relation between the cpuidle and per-device PM QoS frameworks
+  in the OMAP3 specific idle callbacks.
+  The chosen C-state shall satisfy the following conditions:
+   . the 'valid' field is enabled,
+   . it satisfies the enable_off_mode flag,
+   . the next state for MPU and CORE power domains is not lower than the
+     state programmed by the per-device PM QoS.
 
-The other solution to this is:
 
-config CACHE_L2X0
-	bool "Enable the L2x0 outer cache controller" if HAVE_L2X0_L2CC
+ToDo:
+1. validate the constraints framework on OMAP4 HW (done on OMAP3)
+2. Re-visit the OMAP power domains states initialization procedure. Currently
+   the power states that have been changed from the constraints API which were
+   applied before the initialization of the power domains are lost
+3. Further clean-up the OMAP PM layer, use the generic frameworks instead (OPP,
+   PM QoS...)
 
-and I think that's more in keeping with what Rob mentioned in his
-message - it makes this a non-user selectable option unless
-HAVE_L2X0_L2CC is enabled.
 
-However, in this case it would be more sensible to name the option
-'MIGHT_HAVE_CACHE_L2X0'.  (btw, please name the option after the
-option it relates to.)
+Based on the pm-qos branch of the linux-omap git tree (3.2.0-rc4), cf. [2].
 
-> > > diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-> > > index 5f7f9c2..4234937 100644
-> > > --- a/arch/arm/mach-imx/Kconfig
-> > > +++ b/arch/arm/mach-imx/Kconfig
-> > > @@ -609,12 +609,12 @@ comment "i.MX6 family:"
-> > >  config SOC_IMX6Q
-> > >  	bool "i.MX6 Quad support"
-> > >  	select ARM_GIC
-> > > -	select CACHE_L2X0
-> > >  	select CPU_V7
-> > >  	select HAVE_ARM_SCU
-> > >  	select HAVE_IMX_GPC
-> > >  	select HAVE_IMX_MMDC
-> > >  	select HAVE_IMX_SRC
-> > > +	select HAVE_L2X0_L2CC
-> > 
-> > Do you know enough about this to make L2 cache support optional on this SoC?
-> 
-> No.  But Shawn Guo suggested that this correct [2]
+Tested on OMAP3 Beagleboard (ES2.x) with constraints on MPU, CORE, PER in
+RETention and OFF modes.
 
-Ok.
+[1] http://www.omappedia.org/wiki/Power_Management_Device_Latencies_Measurement
+[2] git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap.git
+
+
+v5:
+. rebased on latest linux-omap [2]
+. rework after Kevin's comments on the MLs
+
+v4:
+. split up the patches which remove the omap_pm_ code from the patch set.
+  Those patches are to be submitted later, on top of this patch set.
+. latency numbers: provide the measurements setup and conditions in the code
+  comments, added the link to the details on wiki [1].
+. improved kerneldoc
+. split big functions into smaller ones, in order to improve the readability
+
+v3: reworked the error return path and improved the kerneldoc
+
+v2: reworked the OMAP specific cpuidle code to demote the initial C-state to
+     a valid C-state which fulfills the per-device constraints
+
+v1: initial version
+
+
+Jean Pihet (6):
+  OMAP2+: powerdomain: control power domains next state
+  OMAP2+: omap_hwmod: manage the wake-up latency constraints
+  OMAP: PM: register to the per-device PM QoS framework
+  OMAP3: cpuidle: next C-state decision depends on the PM QoS MPU and
+    CORE constraints
+  OMAP3: update cpuidle latency and threshold figures
+  OMAP3: powerdomain data: add wake-up latency figures
+
+ arch/arm/mach-omap2/cpuidle34xx.c            |  107 +++++++-----
+ arch/arm/mach-omap2/omap_hwmod.c             |   27 +++-
+ arch/arm/mach-omap2/pm.c                     |   71 ++++++++-
+ arch/arm/mach-omap2/pm.h                     |   17 ++-
+ arch/arm/mach-omap2/powerdomain.c            |  245 ++++++++++++++++++++++++++
+ arch/arm/mach-omap2/powerdomain.h            |   36 ++++-
+ arch/arm/mach-omap2/powerdomains3xxx_data.c  |   83 +++++++++
+ arch/arm/plat-omap/include/plat/omap_hwmod.h |    2 +
+ 8 files changed, 539 insertions(+), 49 deletions(-)
+
+-- 
+1.7.5.4
