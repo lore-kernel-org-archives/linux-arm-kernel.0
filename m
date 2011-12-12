@@ -1,27 +1,58 @@
 From: jamie@jamieiles.com (Jamie Iles)
-Date: Mon, 12 Dec 2011 21:46:50 +0000
-Subject: [PATCH 1/5] ARM: picoxcell: remove mach/memory.h
+Date: Mon, 12 Dec 2011 21:46:51 +0000
+Subject: [PATCH 2/5] ARM: picoxcell: don't reserve irq_descs
 In-Reply-To: <1323726414-3319-1-git-send-email-jamie@jamieiles.com>
 References: <1323726414-3319-1-git-send-email-jamie@jamieiles.com>
-Message-ID: <1323726414-3319-2-git-send-email-jamie@jamieiles.com>
+Message-ID: <1323726414-3319-3-git-send-email-jamie@jamieiles.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-mach/memory.h is no longer required for simple platforms so remove it
-for picoxcell.
+All irq_desc's are now dynamically allocated so we don't need to
+statically reserve them.
 
 Signed-off-by: Jamie Iles <jamie@jamieiles.com>
 ---
- arch/arm/mach-picoxcell/include/mach/memory.h |    1 -
- 1 files changed, 0 insertions(+), 1 deletions(-)
- delete mode 100644 arch/arm/mach-picoxcell/include/mach/memory.h
+ arch/arm/mach-picoxcell/common.c            |    1 -
+ arch/arm/mach-picoxcell/include/mach/irqs.h |    9 ++-------
+ 2 files changed, 2 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/mach-picoxcell/include/mach/memory.h b/arch/arm/mach-picoxcell/include/mach/memory.h
-deleted file mode 100644
-index 40a8c17..0000000
---- a/arch/arm/mach-picoxcell/include/mach/memory.h
-+++ /dev/null
-@@ -1 +0,0 @@
--/* empty */
+diff --git a/arch/arm/mach-picoxcell/common.c b/arch/arm/mach-picoxcell/common.c
+index ad871bd..7d91165 100644
+--- a/arch/arm/mach-picoxcell/common.c
++++ b/arch/arm/mach-picoxcell/common.c
+@@ -45,7 +45,6 @@ static void __init picoxcell_init_irq(void)
+ 
+ DT_MACHINE_START(PICOXCELL, "Picochip picoXcell")
+ 	.map_io		= picoxcell_map_io,
+-	.nr_irqs	= ARCH_NR_IRQS,
+ 	.init_irq	= picoxcell_init_irq,
+ 	.handle_irq	= vic_handle_irq,
+ 	.timer		= &picoxcell_timer,
+diff --git a/arch/arm/mach-picoxcell/include/mach/irqs.h b/arch/arm/mach-picoxcell/include/mach/irqs.h
+index 4d13ed9..59eac1e 100644
+--- a/arch/arm/mach-picoxcell/include/mach/irqs.h
++++ b/arch/arm/mach-picoxcell/include/mach/irqs.h
+@@ -1,8 +1,6 @@
+ /*
+  * Copyright (c) 2011 Picochip Ltd., Jamie Iles
+  *
+- * This file contains the hardware definitions of the picoXcell SoC devices.
+- *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License as published by
+  * the Free Software Foundation; either version 2 of the License, or
+@@ -16,10 +14,7 @@
+ #ifndef __MACH_IRQS_H
+ #define __MACH_IRQS_H
+ 
+-#define ARCH_NR_IRQS			64
+-#define NR_IRQS				(128 + ARCH_NR_IRQS)
+-
+-#define IRQ_VIC0_BASE			0
+-#define IRQ_VIC1_BASE			32
++/* We dynamically allocate our irq_desc's. */
++#define NR_IRQS				0
+ 
+ #endif /* __MACH_IRQS_H */
 -- 
 1.7.5.4
