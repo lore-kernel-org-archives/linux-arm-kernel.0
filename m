@@ -1,41 +1,54 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Mon, 12 Dec 2011 22:15:06 +0800
-Subject: [PATCH 6/7] arm/imx6q: add cpufreq support
-In-Reply-To: <20111212141031.GA14542@n2100.arm.linux.org.uk>
-References: <1323661352-10291-1-git-send-email-richard.zhao@linaro.org>
- <1323661352-10291-7-git-send-email-richard.zhao@linaro.org>
- <20111212141031.GA14542@n2100.arm.linux.org.uk>
-Message-ID: <20111212141505.GF16835@b20223-02.ap.freescale.net>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 12 Dec 2011 15:17:27 +0100
+Subject: [PATCH] ARM: imx_v4_v5_defconfig: Select SMSC911X driver by
+ default.
+In-Reply-To: <1323696242-5902-1-git-send-email-fabio.estevam@freescale.com>
+References: <1323696242-5902-1-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <20111212141727.GX27267@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 12, 2011 at 02:10:31PM +0000, Russell King - ARM Linux wrote:
-> On Mon, Dec 12, 2011 at 11:42:31AM +0800, Richard Zhao wrote:
-> > Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
-> > ---
-> >  arch/arm/mach-imx/Kconfig        |    1 +
-> >  arch/arm/mach-imx/Makefile       |    2 +-
-> >  arch/arm/mach-imx/cpu_op-imx6q.c |   78 ++++++++++++++++++++++++++++++++++++++
-> >  3 files changed, 80 insertions(+), 1 deletions(-)
-> >  create mode 100644 arch/arm/mach-imx/cpu_op-imx6q.c
-> > 
-> > diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-> > index fbd414b..7d813a3 100644
-> > --- a/arch/arm/mach-imx/Kconfig
-> > +++ b/arch/arm/mach-imx/Kconfig
-> > @@ -837,6 +837,7 @@ config SOC_IMX6Q
-> >  	select ARM_GIC
-> >  	select CACHE_L2X0
-> >  	select CPU_V7
-> > +	select ARCH_HAS_CPUFREQ
-> 
-> ABCDEFGH...etc...
-Right. Thanks for your comments.
+Hi Fabio, Arnd,
 
-Richard
+On Mon, Dec 12, 2011 at 11:24:02AM -0200, Fabio Estevam wrote:
+> Select SMSC911X driver by default.  
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+
+The patch is ok.
+
+Arnd,
+
+On which base should I apply this patch? It needs the i.MX5 -> imx
+merge which shows up in your for-next branch, but all other i.MX
+topic branches in your tree seem to be empty.
+
+Sascha
+
+> ---
+>  arch/arm/configs/imx_v4_v5_defconfig |    1 +
+>  1 files changed, 1 insertions(+), 0 deletions(-)
 > 
+> diff --git a/arch/arm/configs/imx_v4_v5_defconfig b/arch/arm/configs/imx_v4_v5_defconfig
+> index 11a4192..a51e282 100644
+> --- a/arch/arm/configs/imx_v4_v5_defconfig
+> +++ b/arch/arm/configs/imx_v4_v5_defconfig
+> @@ -50,6 +50,7 @@ CONFIG_INET=y
+>  CONFIG_IP_MULTICAST=y
+>  CONFIG_IP_PNP=y
+>  CONFIG_IP_PNP_DHCP=y
+> +CONFIG_SMSC911X=y
+>  # CONFIG_INET_XFRM_MODE_TRANSPORT is not set
+>  # CONFIG_INET_XFRM_MODE_TUNNEL is not set
+>  # CONFIG_INET_XFRM_MODE_BEET is not set
+> -- 
+> 1.7.1
+> 
+> 
+> 
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
