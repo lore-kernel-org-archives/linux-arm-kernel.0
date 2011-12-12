@@ -1,66 +1,35 @@
-From: mel@csn.ul.ie (Mel Gorman)
-Date: Mon, 12 Dec 2011 15:40:15 +0000
-Subject: [PATCH 04/11] mm: compaction: export some of the functions
-In-Reply-To: <op.v6dseqji3l0zgt@mpn-glaptop>
-References: <1321634598-16859-1-git-send-email-m.szyprowski@samsung.com>
- <1321634598-16859-5-git-send-email-m.szyprowski@samsung.com>
- <20111212142906.GE3277@csn.ul.ie> <op.v6dseqji3l0zgt@mpn-glaptop>
-Message-ID: <20111212154015.GI3277@csn.ul.ie>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Mon, 12 Dec 2011 21:16:27 +0530
+Subject: [PATCH 0/2] ARM: Exynos: Adapt to generic power domain
+Message-ID: <1323704789-23923-1-git-send-email-thomas.abraham@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 12, 2011 at 03:41:04PM +0100, Michal Nazarewicz wrote:
-> On Mon, 12 Dec 2011 15:29:07 +0100, Mel Gorman <mel@csn.ul.ie> wrote:
-> 
-> >On Fri, Nov 18, 2011 at 05:43:11PM +0100, Marek Szyprowski wrote:
-> >>From: Michal Nazarewicz <mina86@mina86.com>
-> >>
-> >>This commit exports some of the functions from compaction.c file
-> >>outside of it adding their declaration into internal.h header
-> >>file so that other mm related code can use them.
-> >>
-> >>This forced compaction.c to always be compiled (as opposed to being
-> >>compiled only if CONFIG_COMPACTION is defined) but as to avoid
-> >>introducing code that user did not ask for, part of the compaction.c
-> >>is now wrapped in on #ifdef.
-> >>
-> >>Signed-off-by: Michal Nazarewicz <mina86@mina86.com>
-> >>Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> >>---
-> >> mm/Makefile     |    3 +-
-> >> mm/compaction.c |  112 +++++++++++++++++++++++--------------------------------
-> >> mm/internal.h   |   35 +++++++++++++++++
-> >> 3 files changed, 83 insertions(+), 67 deletions(-)
-> >>
-> >>diff --git a/mm/Makefile b/mm/Makefile
-> >>index 50ec00e..24ed801 100644
-> >>--- a/mm/Makefile
-> >>+++ b/mm/Makefile
-> >>@@ -13,7 +13,7 @@ obj-y			:= filemap.o mempool.o oom_kill.o fadvise.o \
-> >> 			   readahead.o swap.o truncate.o vmscan.o shmem.o \
-> >> 			   prio_tree.o util.o mmzone.o vmstat.o backing-dev.o \
-> >> 			   page_isolation.o mm_init.o mmu_context.o percpu.o \
-> >>-			   $(mmu-y)
-> >>+			   $(mmu-y) compaction.o
-> >
-> >That should be
-> >
-> >compaction.o $(mmu-y)
-> >
-> >for consistency.
-> >
-> >Overall, this patch implies that CMA is always compiled in.
-> 
-> Not really.  But yes, it produces some bloat when neither CMA nor
-> compaction are compiled.  I assume that linker will be able to deal
-> with that (since the functions are not EXPORT_SYMBOL'ed).
-> 
+The power domains available on Exynos4 are made controllable using the generic
+power domain infrastructure. The existing power domain code is not removed by
+this patchset. Support for both DT and non-DT Exynos platforms is added.
 
-The bloat exists either way. I don't believe the linker strips it out so
-overall it would make more sense to depend on compaction to keep the
-vmstat counters for debugging reasons if nothing else. It's not
-something I feel very strongly about though.
+The first patch adds device tree support for generic power domain. A device
+node is added to the generic power domain strucure that represents a power
+domain node in the device tree. Other device nodes in the device tree can
+include a property with a phandle of the power domain node which will enable
+that device to be associated with a power domain.
 
--- 
-Mel Gorman
-SUSE Labs
+The second patch registers available power domains to generic power domain
+framework with support for both dt and non-dt platforms.
+
+The patchset is based on the following tree
+http://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git for-next
+
+with all patches merged from
+http://git.kernel.org/pub/scm/linux/kernel/git/rafael/linux-pm.git linux-next
+
+Thomas Abraham (2):
+  PM / Domains: Add OF support
+  ARM: Exynos: Hook up power domains to generic power domain infrastructure
+
+ arch/arm/mach-exynos/Kconfig |    1 +
+ arch/arm/mach-exynos/pm.c    |  179 ++++++++++++++++++++++++++++++++++++++++++
+ drivers/base/power/domain.c  |   14 +++-
+ include/linux/pm_domain.h    |   13 +++-
+ 4 files changed, 204 insertions(+), 3 deletions(-)
