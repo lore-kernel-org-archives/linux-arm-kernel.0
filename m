@@ -1,59 +1,36 @@
-From: sshtylyov@ru.mvista.com (Sergei Shtylyov)
-Date: Mon, 12 Dec 2011 15:18:26 +0400
-Subject: [PATCH v5 5/9] ARM: versatile: Map local timers using Device
- Tree when possible
-In-Reply-To: <1323687811.2391.3.camel@hornet.cambridge.arm.com>
-References: <1323457432-4800-1-git-send-email-pawel.moll@arm.com>
- <1323457432-4800-6-git-send-email-pawel.moll@arm.com>
- <4EE37A4D.8060204@ru.mvista.com>
- <1323687811.2391.3.camel@hornet.cambridge.arm.com>
-Message-ID: <4EE5E302.8070301@ru.mvista.com>
+From: jarkko.nikula@bitmer.com (Jarkko Nikula)
+Date: Mon, 12 Dec 2011 13:22:28 +0200
+Subject: [PATCH] ARM: OMAP: mcbsp: Fix possible memory corruption
+In-Reply-To: <4EE5D639.8080608@compulab.co.il>
+References: <1323678976-4119-1-git-send-email-jarkko.nikula@bitmer.com>
+ <1323679106-4191-1-git-send-email-jarkko.nikula@bitmer.com>
+ <4EE5D639.8080608@compulab.co.il>
+Message-ID: <4EE5E3F4.6060701@bitmer.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Hi
 
-On 12-12-2011 15:03, Pawel Moll wrote:
+On 12/12/2011 12:23 PM, Igor Grinberg wrote:
+> On 12/12/11 10:38, Jarkko Nikula wrote:
+>> Commits 09d28d ("ARM: OMAP: mcbsp: Start generalize omap2_mcbsp_set_clks_src")
+>> and 7bc0c4 ("ARM: OMAP: mcbsp: Start generalize signal muxing functions")
+>> incorrectly set two struct omap_mcbsp_platform_data fields after
+>> omap_device_build_ss and kfree calls.
+>>
+>> Fix this by moving these pdata assignments before those calls.
+>>
+>> Signed-off-by: Jarkko Nikula <jarkko.nikula@bitmer.com>
+>> Reported-by: neilb at suse.de
+> Perhaps, should be:
+> Reported-by: NeilBrown <neilb@suse.de>
+> and
+> Cc: <stable@vger.kernel.org>	[3.1]
+> as for below.
+>> ---
+>> For 3.2, 3.1 is ok.
+>> ---
+No need to cc stable since the issue is not in stable kernels.
 
->>>    int __cpuinit local_timer_setup(struct clock_event_device *evt)
->>>    {
->>> +#if defined(CONFIG_OF)
->>> +	if (!twd_base) {
->>> +		struct device_node *np = of_find_compatible_node(NULL,
->>> +				NULL, "arm,smp-twd");
->>> +
->>> +		twd_base = of_iomap(np, 0);
->>> +		if (!twd_base)
->>> +			return -ENXIO;
-
->>      -ENOMEM.
-
-> Hm. What I did simply mimics this ("arch/arm/include/asm/localtimer.h"):
-
-> #ifdef CONFIG_LOCAL_TIMERS
-> [...]
-> #else
-
-> static inline int local_timer_setup(struct clock_event_device *evt)
-> {
->          return -ENXIO;
-> }
-
-> Now, I had a look at "include/asm-generic/errno-base.h":
-
-> #define ENXIO            6      /* No such device or address */
-> [...]
-> #define ENOMEM          12      /* Out of memory */
-
-> and to be honest, ENXIO makes more sense to me, but I really have no
-> strong feelings either way... Do you?
-
-    I think if of_iomap() fails, it's because the system is out of memory, so 
--ENOMEM seems more proper error in this case. Although... it's not the only 
-case when of_iomap() fails.
-
-> Thanks for your time!
-
-> Pawe?
-
-WBR, Sergei
+-- 
+Jarkko
