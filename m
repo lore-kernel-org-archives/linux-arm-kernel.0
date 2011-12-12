@@ -1,37 +1,119 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Mon, 12 Dec 2011 20:15:25 +0200
-Subject: [PATCHv11 0/8] OMAP3+: PRCM chain handler
-Message-ID: <1323713733-13115-1-git-send-email-t-kristo@ti.com>
+Date: Mon, 12 Dec 2011 20:15:26 +0200
+Subject: [PATCHv11 1/8] ARM: OMAP2+: hwmod: Add API to enable IO ring wakeup.
+In-Reply-To: <1323713733-13115-1-git-send-email-t-kristo@ti.com>
+References: <1323713733-13115-1-git-send-email-t-kristo@ti.com>
+Message-ID: <1323713733-13115-2-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: R, Govindraj <govindraj.raja@ti.com>
 
-PRCM chain handler is adding a support to the omap3+ kernel that
-allows different drivers to use PRCM interrupt events for their
-own purposes, typically this means IO wakeups. This work was
-attempted to integrate as its own driver at some point of
-the evolution of this set, however this was now postponed as
-the lacking support is basically blocking a few drivers.
+Add API to enable IO pad wakeup capability based on mux dynamic pad and
+wake_up enable flag available from hwmod_mux initialization.
 
-This is the version 11 of this set, now posted to linux-arm-kernel also
-as cc. Contains just a couple of minor changes compared to previous
-version proposed by Kevin Hilman.
+Use the wakeup_enable flag and enable wakeup capability
+for the given pads. Wakeup capability will be enabled/disabled
+during hwmod idle transition based on whether wakeup_flag is
+set or cleared.
 
-Also, patch 8 is new (posted as a separate patch to l-o list earlier),
-for supporting different irqs for different pads on the same hwmod.
-This is needed at least by USB driver.
+Map the enable/disable pad wakeup API's to hwmod_wakeup_enable/disable.
 
-This version tested on omap3 beagle board, dynamic idle + suspend,
-with and without off-mode. I have pushed two branches on a public
-git tree:
+Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
+---
+ arch/arm/mach-omap2/omap_hwmod.c |   59 ++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 59 insertions(+), 0 deletions(-)
 
-git://gitorious.org/~kristo/omap-pm/omap-pm-work.git
-
-branch: chain-prcm-v11
-branch2: chain-prcm-v11-debug
-
-Debug branch contains a few debugging related patches I've used
-for testing purposes.
-
--Tero
+diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+index 6b3088d..8d37d83 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.c
++++ b/arch/arm/mach-omap2/omap_hwmod.c
+@@ -2059,6 +2059,34 @@ static int __init omap_hwmod_setup_all(void)
+ core_initcall(omap_hwmod_setup_all);
+ 
+ /**
++ * omap_hwmod_set_ioring_wakeup - enable io pad wakeup flag.
++ * @oh: struct omap_hwmod *
++ * @set: bool value indicating to set or clear wakeup status.
++ *
++ * Set or Clear wakeup flag for the io_pad.
++ */
++static int omap_hwmod_set_ioring_wakeup(struct omap_hwmod *oh, bool set_wake)
++{
++	struct omap_device_pad *pad;
++	int ret = -EINVAL, j;
++
++	if (oh->mux && oh->mux->enabled) {
++		for (j = 0; j < oh->mux->nr_pads_dynamic; j++) {
++			pad = oh->mux->pads_dynamic[j];
++			if (pad->flags & OMAP_DEVICE_PAD_WAKEUP) {
++				if (set_wake)
++					pad->idle |= OMAP_WAKEUP_EN;
++				else
++					pad->idle &= ~OMAP_WAKEUP_EN;
++				ret = 0;
++			}
++		}
++	}
++
++	return ret;
++}
++
++/**
+  * omap_hwmod_enable - enable an omap_hwmod
+  * @oh: struct omap_hwmod *
+  *
+@@ -2390,6 +2418,35 @@ int omap_hwmod_del_initiator_dep(struct omap_hwmod *oh,
+ {
+ 	return _del_initiator_dep(oh, init_oh);
+ }
++/**
++ * omap_hwmod_enable_ioring_wakeup - Set wakeup flag for iopad.
++ * @oh: struct omap_hwmod *
++ *
++ * Traverse through dynamic pads, if pad is enabled then
++ * set wakeup enable bit flag for the mux pin. Wakeup pad bit
++ * will be set during hwmod idle transistion.
++ * Return error if pads are not enabled or not available.
++ */
++int omap_hwmod_enable_ioring_wakeup(struct omap_hwmod *oh)
++{
++	/* Enable pad wake-up capability */
++	return omap_hwmod_set_ioring_wakeup(oh, true);
++}
++
++/**
++ * omap_hwmod_disable_ioring_wakeup - Clear wakeup flag for iopad.
++ * @oh: struct omap_hwmod *
++ *
++ * Traverse through dynamic pads, if pad is enabled then
++ * clear wakeup enable bit flag for the mux pin. Wakeup pad bit
++ * will be set during hwmod idle transistion.
++ * Return error if pads are not enabled or not available.
++ */
++int omap_hwmod_disable_ioring_wakeup(struct omap_hwmod *oh)
++{
++	/* Disable pad wakeup capability */
++	return omap_hwmod_set_ioring_wakeup(oh, false);
++}
+ 
+ /**
+  * omap_hwmod_enable_wakeup - allow device to wake up the system
+@@ -2416,6 +2473,7 @@ int omap_hwmod_enable_wakeup(struct omap_hwmod *oh)
+ 	v = oh->_sysc_cache;
+ 	_enable_wakeup(oh, &v);
+ 	_write_sysconfig(v, oh);
++	omap_hwmod_enable_ioring_wakeup(oh);
+ 	spin_unlock_irqrestore(&oh->_lock, flags);
+ 
+ 	return 0;
+@@ -2446,6 +2504,7 @@ int omap_hwmod_disable_wakeup(struct omap_hwmod *oh)
+ 	v = oh->_sysc_cache;
+ 	_disable_wakeup(oh, &v);
+ 	_write_sysconfig(v, oh);
++	omap_hwmod_disable_ioring_wakeup(oh);
+ 	spin_unlock_irqrestore(&oh->_lock, flags);
+ 
+ 	return 0;
+-- 
+1.7.4.1
