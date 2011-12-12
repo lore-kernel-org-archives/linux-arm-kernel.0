@@ -1,38 +1,29 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Mon, 12 Dec 2011 09:20:43 +0800
-Subject: [PATCH v3] mfd: mc13xxx: add device tree probe support
-In-Reply-To: <1323183883-32161-1-git-send-email-shawn.guo@linaro.org>
-References: <1322731268-12158-2-git-send-email-shawn.guo@linaro.org>
- <1323183883-32161-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20111212012043.GB9572@S2100-06.ap.freescale.net>
+Date: Mon, 12 Dec 2011 09:21:25 +0800
+Subject: [PATCH v2 3/4] regulator: mc13892: add device tree probe support
+In-Reply-To: <1322731268-12158-4-git-send-email-shawn.guo@linaro.org>
+References: <1322731268-12158-1-git-send-email-shawn.guo@linaro.org>
+ <1322731268-12158-4-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20111212012124.GC9572@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Samuel,
+Hi Mark,
 
 Ping?
 
 Regards,
 Shawn
 
-On Tue, Dec 06, 2011 at 11:04:43PM +0800, Shawn Guo wrote:
-> It adds device tree probe support for mc13xxx mfd driver.
+On Thu, Dec 01, 2011 at 05:21:07PM +0800, Shawn Guo wrote:
+> It adds device tree probe support for mc13892-regulator driver.
 > 
 > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Samuel Ortiz <sameo@linux.intel.com>
+> Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> Cc: Liam Girdwood <lrg@ti.com>
 > ---
-> Changes since v2:
-> 
->  * Add some note on how driver matches regulator device and the node
->    in binding document
-> 
-> Since it's a small change, I only resend this patch (as v3) instead
-> of the whole series.  Hope it's fine.
-> 
-> Regards,
-> Shawn
-> 
->  Documentation/devicetree/bindings/mfd/mc13xxx.txt |   53 ++++++++++
->  drivers/mfd/mc13xxx-core.c                        |  106 +++++++++++++++------
->  2 files changed, 128 insertions(+), 31 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/mfd/mc13xxx.txt
+>  drivers/regulator/mc13892-regulator.c      |   43 +++++++++++++++-----
+>  drivers/regulator/mc13xxx-regulator-core.c |   57 ++++++++++++++++++++++++++++
+>  drivers/regulator/mc13xxx.h                |   20 ++++++++++
+>  include/linux/mfd/mc13xxx.h                |    1 +
+>  4 files changed, 110 insertions(+), 11 deletions(-)
