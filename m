@@ -1,51 +1,37 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Mon, 12 Dec 2011 18:07:09 +0800
-Subject: [GIT PULL] imx: gpio interrupt cleanup
-In-Reply-To: <20111208143204.GA8139@S2100-06.ap.freescale.net>
-References: <20111208143204.GA8139@S2100-06.ap.freescale.net>
-Message-ID: <20111212100707.GJ9572@S2100-06.ap.freescale.net>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Mon, 12 Dec 2011 10:56:22 +0100
+Subject: [PATCH 0/4] SMP TWD localtimer patches, broken apart
+Message-ID: <1323683782-23792-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof,
+From: Linus Walleij <linus.walleij@linaro.org>
 
-Please hold this request.  I'm trying to make this series cope with
-the Rob's series adding irqdomain support for irq_chip_generic, since
-both imx tzic and gpio interrupt controllers are irq_chip_generic users.
+In order to avoid stalling all of the code in Colin Cross' classic
+patch, I have taken the liberty to break it in four pieces, so we
+can (hopefully) proceed with atleast some pieces of the patch.
 
-Regards,
-Shawn
+I think patch 1 would be uncontroversial at least.
 
-On Thu, Dec 08, 2011 at 10:32:05PM +0800, Shawn Guo wrote:
-> Hi Arnd and  Olof,
-> 
-> Please consider to pull the series below.  I really should have
-> Thomas' ack on Jamie's patch 'irqdomain: export irq_domain_simple_ops
-> for !CONFIG_OF', and Grant's ack on patch 'gpio/mxc: adopt irq_domain
-> in gpio driver'.  So this pull request is also asking comments for the
-> path of these patches.
-> 
-> Thomas, Grant,
-> 
-> Please speak up if you do not want "your" patches to go through arm-soc
-> tree.  Thanks.
-> 
-> Shawn
-> 
-> The following changes since commit fec607aab5dca019cfc76768fa0b5908d47a55b1:
-> 
->   Merge branch 'imx/fix-irqdomain' of git://git.linaro.org/people/shawnguo/linux-2.6 into fixes (2011-12-06 14:15:02 +0000)
-> 
-> are available in the git repository at:
-> 
->   git://git.linaro.org/people/shawnguo/linux-2.6.git imx/clean-gpio-irq
-> 
-> Jamie Iles (1):
->       irqdomain: export irq_domain_simple_ops for !CONFIG_OF
-> 
-> Shawn Guo (5):
->       arm/imx: eliminate macro IMX_GPIO_TO_IRQ()
->       arm/imx: eliminate macro IOMUX_TO_IRQ()
->       arm/imx: eliminate macro IRQ_GPIOx()
->       gpio/mxc: adopt irq_domain in gpio driver
->       arm/imx: remove macro MXC_GPIO_IRQ_START
+I think ST-Ericsson, TI and nVidia are all using this patch or some
+variant of it in their recently shipped products, so if there is
+something seriously wrong about it, we'd better find out.
+
+Since the end result after all four patches are applied, is 100%
+identical to the original patch, I have kept the Acked-by:s from
+the big patch on each individual patch.
+
+I will replace the single patch in the patch tracker with these four
+patches soon-ish.
+
+Linus Walleij (4):
+  ARM: smp_twd: modernize clock event registration
+  ARM: smp_twd: create a percpu reference to the clockevent
+  ARM: smp_twd: get the rate from a clock
+  ARM: smp_twd: reconfigure clockevents after cpufreq change
+
+ arch/arm/kernel/smp_twd.c |   89 ++++++++++++++++++++++++++++++++++++++++++---
+ 1 files changed, 83 insertions(+), 6 deletions(-)
+
+-- 
+1.7.3.2
