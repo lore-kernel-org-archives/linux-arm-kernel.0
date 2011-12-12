@@ -1,111 +1,258 @@
 From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Mon, 12 Dec 2011 21:16:28 +0530
-Subject: [PATCH 1/2] PM / Domains: Add OF support
-In-Reply-To: <1323704789-23923-1-git-send-email-thomas.abraham@linaro.org>
+Date: Mon, 12 Dec 2011 21:16:29 +0530
+Subject: [PATCH 2/2] ARM: Exynos: Hook up power domains to generic power domain
+ infrastructure
+In-Reply-To: <1323704789-23923-2-git-send-email-thomas.abraham@linaro.org>
 References: <1323704789-23923-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <1323704789-23923-2-git-send-email-thomas.abraham@linaro.org>
+ <1323704789-23923-2-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <1323704789-23923-3-git-send-email-thomas.abraham@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A device node pointer is added to generic pm domain structure to associate
-the domain with a node in the device tree. The platform code parses the
-device tree to find available nodes representing the generic power domain,
-instantiates the available domains and initializes them by calling
-pm_genpd_init().
+The generic power domain infrastructure is used to control the power domains
+available on Exynos4. For non-dt platforms, the power domains are statically
+instantiated. For dt platforms, the power domain nodes found in the device
+tree are instantiated.
 
-Nodes representing the devices include a phandle of the power domain to
-which it belongs. As these devices get instantiated, the driver code
-checkes for availability of a power domain phandle, converts the phandle
-to a device node and uses the new pm_genpd_of_add_device() api to
-associate the device with a power domain.
-
-pm_genpd_of_add_device() runs through its list of registered power domains
-and matches the OF node of the domain with the one specified as the
-parameter. If a match is found, the device is associated with the matched
-domain.
-
-Cc: Rafael J. Wysocki <rjw@sisk.pl>
+Cc: Kukjin Kim <kgene.kim@samsung.com>
 Cc: Rob Herring <rob.herring@calxeda.com>
 Cc: Grant Likely <grant.likely@secretlab.ca>
 Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
 ---
- drivers/base/power/domain.c |   14 +++++++++++++-
- include/linux/pm_domain.h   |   13 +++++++++++--
- 2 files changed, 24 insertions(+), 3 deletions(-)
+This patch is mainly derived from Mark Brown's work on generic power domain
+support for s3c64xx platforms. The existing exynos4 power domain implementation
+is not removed in this patch. The devices are not yet registered with the power
+domains for non-dt platforms.
 
-diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
-index 92e6a90..e895dc9 100644
---- a/drivers/base/power/domain.c
-+++ b/drivers/base/power/domain.c
-@@ -1118,14 +1118,26 @@ static void pm_genpd_complete(struct device *dev)
-  * @td: Set of PM QoS timing parameters to attach to the device.
-  */
- int __pm_genpd_add_device(struct generic_pm_domain *genpd, struct device *dev,
--			  struct gpd_timing_data *td)
-+			  struct gpd_timing_data *td, struct device_node *node)
- {
- 	struct generic_pm_domain_data *gpd_data;
-+	struct generic_pm_domain *gpd = NULL;
- 	struct pm_domain_data *pdd;
- 	int ret = 0;
- 
- 	dev_dbg(dev, "%s()\n", __func__);
- 
-+	mutex_lock(&gpd_list_lock);
-+	if (node) {
-+		list_for_each_entry(gpd, &gpd_list, gpd_list_node) {
-+			if (gpd->of_node == node) {
-+				genpd = gpd;
-+				break;
-+			}
-+		}
-+	}
-+	mutex_unlock(&gpd_list_lock);
-+
- 	if (IS_ERR_OR_NULL(genpd) || IS_ERR_OR_NULL(dev))
- 		return -EINVAL;
- 
-diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
-index a03a0ad..2ce7cc4 100644
---- a/include/linux/pm_domain.h
-+++ b/include/linux/pm_domain.h
-@@ -11,6 +11,7 @@
- 
- #include <linux/device.h>
+ arch/arm/mach-exynos/Kconfig |    1 +
+ arch/arm/mach-exynos/pm.c    |  179 ++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 180 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
+index 0afcc3b..c1f77c7 100644
+--- a/arch/arm/mach-exynos/Kconfig
++++ b/arch/arm/mach-exynos/Kconfig
+@@ -29,6 +29,7 @@ config CPU_EXYNOS4210
+ 	default y
+ 	depends on ARCH_EXYNOS4
+ 	select SAMSUNG_DMADEV
++	select PM_GENERIC_DOMAINS
+ 	select ARM_CPU_SUSPEND if PM
+ 	select S5P_PM if PM
+ 	select S5P_SLEEP if PM
+diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
+index 4093fea..a471ea6 100644
+--- a/arch/arm/mach-exynos/pm.c
++++ b/arch/arm/mach-exynos/pm.c
+@@ -20,6 +20,10 @@
+ #include <linux/io.h>
  #include <linux/err.h>
-+#include <linux/of.h>
+ #include <linux/clk.h>
++#include <linux/slab.h>
++#include <linux/pm_domain.h>
++#include <linux/delay.h>
++#include <linux/of_address.h>
  
- enum gpd_status {
- 	GPD_STATE_ACTIVE = 0,	/* PM domain is active */
-@@ -70,6 +71,7 @@ struct generic_pm_domain {
- 	s64 break_even_ns;	/* Power break even for the entire domain. */
- 	s64 max_off_time_ns;	/* Maximum allowed "suspended" time. */
- 	ktime_t power_off_time;
-+	struct device_node *of_node; /* Node in device tree */
+ #include <asm/cacheflush.h>
+ #include <asm/hardware/cache-l2x0.h>
+@@ -37,6 +41,13 @@
+ #include <mach/pm-core.h>
+ #include <mach/pmu.h>
+ 
++struct exynos4_pm_domain {
++	void __iomem *base;
++	char const *name;
++	bool is_off;
++	struct generic_pm_domain pd;
++};
++
+ static struct sleep_save exynos4_set_clksrc[] = {
+ 	{ .reg = S5P_CLKSRC_MASK_TOP			, .val = 0x00000001, },
+ 	{ .reg = S5P_CLKSRC_MASK_CAM			, .val = 0x11111111, },
+@@ -285,12 +296,172 @@ static struct sysdev_driver exynos4_pm_driver = {
+ 	.add		= exynos4_pm_add,
  };
  
- static inline struct generic_pm_domain *pd_to_genpd(struct dev_pm_domain *pd)
-@@ -115,12 +117,19 @@ extern struct dev_power_governor simple_qos_governor;
- extern struct generic_pm_domain *dev_to_genpd(struct device *dev);
- extern int __pm_genpd_add_device(struct generic_pm_domain *genpd,
- 				 struct device *dev,
--				 struct gpd_timing_data *td);
-+				 struct gpd_timing_data *td,
-+				 struct device_node *gpd_node);
- 
- static inline int pm_genpd_add_device(struct generic_pm_domain *genpd,
- 				      struct device *dev)
- {
--	return __pm_genpd_add_device(genpd, dev, NULL);
-+	return __pm_genpd_add_device(genpd, dev, NULL, NULL);
++static int exynos4_pd_power_on(struct generic_pm_domain *domain)
++{
++	struct exynos4_pm_domain *pd;
++	void __iomem *base;
++	u32 timeout;
++
++	pd = container_of(domain, struct exynos4_pm_domain, pd);
++	base = pd->base;
++
++	__raw_writel(S5P_INT_LOCAL_PWR_EN, base);
++
++	/* Wait max 1ms */
++	timeout = 10;
++	while ((__raw_readl(base + 0x4) & S5P_INT_LOCAL_PWR_EN)
++					!= S5P_INT_LOCAL_PWR_EN) {
++		if (!timeout) {
++			pr_err("Power domain %s enable failed\n", domain->name);
++			return -ETIMEDOUT;
++		}
++		timeout--;
++		udelay(100);
++	}
++	return 0;
 +}
 +
-+static inline int pm_genpd_of_add_device(struct device_node *gpd_node,
-+					 struct device *dev)
++static int exynos4_pd_power_off(struct generic_pm_domain *domain)
 +{
-+	return __pm_genpd_add_device(NULL, dev, NULL, gpd_node);
- }
++	struct exynos4_pm_domain *pd;
++	void __iomem *base;
++	u32 timeout;
++
++	pd = container_of(domain, struct exynos4_pm_domain, pd);
++	base = pd->base;
++
++	__raw_writel(0, base);
++
++	/* Wait max 1ms */
++	timeout = 10;
++	while (__raw_readl(base + 0x4) & S5P_INT_LOCAL_PWR_EN) {
++		if (!timeout) {
++			pr_err("Power domain %s disable failed\n", domain->name);
++			return -ETIMEDOUT;
++		}
++		timeout--;
++		udelay(100);
++	}
++	return 0;
++}
++
++static struct exynos4_pm_domain exynos4_pd_mfc = {
++	.base = (void __iomem *)S5P_PMU_MFC_CONF,
++	.name = "pd-mfc",
++	.pd = {
++		.power_off = exynos4_pd_power_off,
++		.power_on = exynos4_pd_power_on,
++	},
++};
++
++static struct exynos4_pm_domain exynos4_pd_g3d = {
++	.base = (void __iomem *)S5P_PMU_G3D_CONF,
++	.name = "pd-g3d",
++	.pd = {
++		.power_off = exynos4_pd_power_off,
++		.power_on = exynos4_pd_power_on,
++	},
++};
++
++static struct exynos4_pm_domain exynos4_pd_lcd0 = {
++	.base = (void __iomem *)S5P_PMU_LCD0_CONF,
++	.name = "pd-lcd0",
++	.pd = {
++		.power_off = exynos4_pd_power_off,
++		.power_on = exynos4_pd_power_on,
++	},
++};
++
++static struct exynos4_pm_domain exynos4_pd_lcd1 = {
++	.base = (void __iomem *)S5P_PMU_LCD1_CONF,
++	.name = "pd-lcd1",
++	.pd = {
++		.power_off = exynos4_pd_power_off,
++		.power_on = exynos4_pd_power_on,
++	},
++};
++
++static struct exynos4_pm_domain exynos4_pd_tv = {
++	.base = (void __iomem *)S5P_PMU_TV_CONF,
++	.name = "pd-tv",
++	.pd = {
++		.power_off = exynos4_pd_power_off,
++		.power_on = exynos4_pd_power_on,
++	},
++};
++
++static struct exynos4_pm_domain exynos4_pd_cam = {
++	.base = (void __iomem *)S5P_PMU_CAM_CONF,
++	.name = "pd-cam",
++	.pd = {
++		.power_off = exynos4_pd_power_off,
++		.power_on = exynos4_pd_power_on,
++	},
++};
++
++static struct exynos4_pm_domain exynos4_pd_gps = {
++	.base = (void __iomem *)S5P_PMU_GPS_CONF,
++	.name = "pd-gps",
++	.pd = {
++		.power_off = exynos4_pd_power_off,
++		.power_on = exynos4_pd_power_on,
++	},
++};
++
++static struct exynos4_pm_domain *exynos4_pm_domains[] = {
++	&exynos4_pd_mfc,
++	&exynos4_pd_g3d,
++	&exynos4_pd_lcd0,
++	&exynos4_pd_lcd1,
++	&exynos4_pd_tv,
++	&exynos4_pd_cam,
++	&exynos4_pd_gps,
++};
++
++static __init void exynos4_pm_init_power_domain(void)
++{
++	int idx;
++	struct device_node *np;
++
++#ifdef CONFIG_OF
++	if (!of_have_populated_dt())
++		goto no_dt;
++
++	for_each_compatible_node(np, NULL, "samsung,exynos4210-pd") {
++		struct exynos4_pm_domain *pd;
++
++		pd = kzalloc(sizeof(*pd), GFP_KERNEL);
++		if (!pd) {
++			pr_err("exynos4_pm_init_power_domain: memalloc "
++					"failed\n");
++			return;
++		}
++
++		if (of_get_property(np, "samsung,exynos4210-pd-off", NULL))
++			pd->is_off = true;
++		pd->name = np->name;
++		pd->base = of_iomap(np, 0);
++		pd->pd.power_off = exynos4_pd_power_off;
++		pd->pd.power_on = exynos4_pd_power_on;
++		pd->pd.of_node = np;
++		pm_genpd_init(&pd->pd, NULL, false);
++	}
++	return;
++#endif /* CONFIG_OF */
++
++no_dt:
++	for (idx = 0; idx < ARRAY_SIZE(exynos4_pm_domains); idx++)
++		pm_genpd_init(&exynos4_pm_domains[idx]->pd, NULL,
++				exynos4_pm_domains[idx]->is_off);
++}
++
+ static __init int exynos4_pm_drvinit(void)
+ {
+ 	struct clk *pll_base;
+ 	unsigned int tmp;
  
- extern int pm_genpd_remove_device(struct generic_pm_domain *genpd,
+ 	s3c_pm_init();
++	exynos4_pm_init_power_domain();
+ 
+ 	/* All wakeup disable */
+ 
+@@ -406,3 +577,11 @@ static __init int exynos4_pm_syscore_init(void)
+ 	return 0;
+ }
+ arch_initcall(exynos4_pm_syscore_init);
++
++
++static __init int exynos4_pm_late_initcall(void)
++{
++	pm_genpd_poweroff_unused();
++	return 0;
++}
++late_initcall(exynos4_pm_late_initcall);
 -- 
 1.6.6.rc2
