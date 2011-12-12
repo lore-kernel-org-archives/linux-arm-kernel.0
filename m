@@ -1,48 +1,44 @@
-From: mina86@mina86.com (Michal Nazarewicz)
-Date: Mon, 12 Dec 2011 15:35:03 +0100
-Subject: [PATCH 03/11] mm: mmzone: introduce zone_pfn_same_memmap()
-In-Reply-To: <20111212141953.GD3277@csn.ul.ie>
-References: <1321634598-16859-1-git-send-email-m.szyprowski@samsung.com>
- <1321634598-16859-4-git-send-email-m.szyprowski@samsung.com>
- <20111212141953.GD3277@csn.ul.ie>
-Message-ID: <op.v6dr4pj43l0zgt@mpn-glaptop>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 12 Dec 2011 15:37:50 +0100
+Subject: [PATCH] [RFC] pinctrl: add a driver for Energy Micro's efm32 SoCs
+In-Reply-To: <CACRpkdYpq1phHTTLy875xSr-upiW5BmvKMPO_d-niG+-J14t9w@mail.gmail.com>
+References: <1323384057-31452-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <74CDBE0F657A3D45AFBB94109FB122FF1750B77BD8@HQMAIL01.nvidia.com>
+ <20111209010147.GH7913@S2100-06.ap.freescale.net>
+ <4EE18403.30604@nvidia.com>
+ <20111209043220.GJ7913@S2100-06.ap.freescale.net>
+ <4EE192DC.3080209@nvidia.com>
+ <20111209051413.GK7913@S2100-06.ap.freescale.net>
+ <20111209110807.GG27267@pengutronix.de>
+ <CACRpkdYpq1phHTTLy875xSr-upiW5BmvKMPO_d-niG+-J14t9w@mail.gmail.com>
+Message-ID: <20111212143750.GA27267@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On Fri, Nov 18, 2011 at 05:43:10PM +0100, Marek Szyprowski wrote:
->> From: Michal Nazarewicz <mina86@mina86.com>
->> diff --git a/mm/compaction.c b/mm/compaction.c
->> index 6afae0e..09c9702 100644
->> --- a/mm/compaction.c
->> +++ b/mm/compaction.c
->> @@ -111,7 +111,10 @@ skip:
->>
->>  next:
->>  		pfn += isolated;
->> -		page += isolated;
->> +		if (zone_pfn_same_memmap(pfn - isolated, pfn))
->> +			page += isolated;
->> +		else
->> +			page = pfn_to_page(pfn);
->>  	}
+On Sat, Dec 10, 2011 at 01:18:43AM +0100, Linus Walleij wrote:
+> On Fri, Dec 9, 2011 at 12:08 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> 
+> > I still think it should be "I'm board Y, please set all my pins up for me"
+> 
+> This is basically what the current pinmux hog concept does.
+> 
+> > Drivers should not be bothered with pin muxing *at all*.
+> 
+> Not if they are simple. Like - set them up once and for all and
+> then forget about it.
+> 
+> It gets problematic when we get to sleep states and the system
+> need to reconfigure all pins on say idle or deep sleep.
 
-On Mon, 12 Dec 2011 15:19:53 +0100, Mel Gorman <mel@csn.ul.ie> wrote:
-> Is this necessary?
->
-> We are isolating pages, the largest of which is a MAX_ORDER_NR_PAGES
-> page.  [...]
+If you need to reconfigure your pins in deep sleep and you control
+the pins in the driver this seems to suggest that your device won't
+suspend properly if the driver is not loaded?
 
-This is not true for CMA.
+Sascha
 
-> That said, everywhere else managed to avoid checks like this by always
-> scanning in units of pageblocks. Maybe this should be structured
-> the same way to guarantee pfn_valid is called at least per pageblock
-> (even though only once per MAX_ORDER_NR_PAGES is necessary).
-
-I'll look into that.
 
 -- 
-Best regards,                                         _     _
-.o. | Liege of Serenely Enlightened Majesty of      o' \,=./ `o
-..o | Computer Science,  Micha? ?mina86? Nazarewicz    (o o)
-ooo +----<email/xmpp: mpn@google.com>--------------ooO--(_)--Ooo--
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
