@@ -1,37 +1,66 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 12 Dec 2011 15:37:27 +0000
-Subject: [PATCH] ARM: imx_v4_v5_defconfig: Select SMSC911X driver by
- default.
-In-Reply-To: <20111212141727.GX27267@pengutronix.de>
-References: <1323696242-5902-1-git-send-email-fabio.estevam@freescale.com>
- <20111212141727.GX27267@pengutronix.de>
-Message-ID: <201112121537.27170.arnd@arndb.de>
+From: mel@csn.ul.ie (Mel Gorman)
+Date: Mon, 12 Dec 2011 15:40:15 +0000
+Subject: [PATCH 04/11] mm: compaction: export some of the functions
+In-Reply-To: <op.v6dseqji3l0zgt@mpn-glaptop>
+References: <1321634598-16859-1-git-send-email-m.szyprowski@samsung.com>
+ <1321634598-16859-5-git-send-email-m.szyprowski@samsung.com>
+ <20111212142906.GE3277@csn.ul.ie> <op.v6dseqji3l0zgt@mpn-glaptop>
+Message-ID: <20111212154015.GI3277@csn.ul.ie>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 12 December 2011, Sascha Hauer wrote:
-> On Mon, Dec 12, 2011 at 11:24:02AM -0200, Fabio Estevam wrote:
-> > Select SMSC911X driver by default.  
-> > 
-> > Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+On Mon, Dec 12, 2011 at 03:41:04PM +0100, Michal Nazarewicz wrote:
+> On Mon, 12 Dec 2011 15:29:07 +0100, Mel Gorman <mel@csn.ul.ie> wrote:
 > 
-> The patch is ok.
+> >On Fri, Nov 18, 2011 at 05:43:11PM +0100, Marek Szyprowski wrote:
+> >>From: Michal Nazarewicz <mina86@mina86.com>
+> >>
+> >>This commit exports some of the functions from compaction.c file
+> >>outside of it adding their declaration into internal.h header
+> >>file so that other mm related code can use them.
+> >>
+> >>This forced compaction.c to always be compiled (as opposed to being
+> >>compiled only if CONFIG_COMPACTION is defined) but as to avoid
+> >>introducing code that user did not ask for, part of the compaction.c
+> >>is now wrapped in on #ifdef.
+> >>
+> >>Signed-off-by: Michal Nazarewicz <mina86@mina86.com>
+> >>Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> >>---
+> >> mm/Makefile     |    3 +-
+> >> mm/compaction.c |  112 +++++++++++++++++++++++--------------------------------
+> >> mm/internal.h   |   35 +++++++++++++++++
+> >> 3 files changed, 83 insertions(+), 67 deletions(-)
+> >>
+> >>diff --git a/mm/Makefile b/mm/Makefile
+> >>index 50ec00e..24ed801 100644
+> >>--- a/mm/Makefile
+> >>+++ b/mm/Makefile
+> >>@@ -13,7 +13,7 @@ obj-y			:= filemap.o mempool.o oom_kill.o fadvise.o \
+> >> 			   readahead.o swap.o truncate.o vmscan.o shmem.o \
+> >> 			   prio_tree.o util.o mmzone.o vmstat.o backing-dev.o \
+> >> 			   page_isolation.o mm_init.o mmu_context.o percpu.o \
+> >>-			   $(mmu-y)
+> >>+			   $(mmu-y) compaction.o
+> >
+> >That should be
+> >
+> >compaction.o $(mmu-y)
+> >
+> >for consistency.
+> >
+> >Overall, this patch implies that CMA is always compiled in.
 > 
-> Arnd,
-> 
-> On which base should I apply this patch? It needs the i.MX5 -> imx
-> merge which shows up in your for-next branch, but all other i.MX
-> topic branches in your tree seem to be empty.
+> Not really.  But yes, it produces some bloat when neither CMA nor
+> compaction are compiled.  I assume that linker will be able to deal
+> with that (since the functions are not EXPORT_SYMBOL'ed).
 > 
 
-Which tree are you looking at? I guess I should have announced when
-the tree moved back to kernel.org, where there is only one branch
-for imx right now.
+The bloat exists either way. I don't believe the linker strips it out so
+overall it would make more sense to depend on compaction to keep the
+vmstat counters for debugging reasons if nothing else. It's not
+something I feel very strongly about though.
 
-Since I expect we will have to rebase the imx/move branch to get it
-merged at the end of the 3.3 merge window, I can also fold the
-new patch into "ARM i.MX: Update defconfig". If you prefer not
-to rebase that branch, better apply it on top and send me an
-updated pull request for imx/move or let me apply the patch on top.
-
-	Arnd
+-- 
+Mel Gorman
+SUSE Labs
