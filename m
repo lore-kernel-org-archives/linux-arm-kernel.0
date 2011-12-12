@@ -1,119 +1,126 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Mon, 12 Dec 2011 20:15:27 +0200
-Subject: [PATCHv11 2/8] ARM: OMAP2+: hwmod: Add API to check IO PAD wakeup
- status
+Date: Mon, 12 Dec 2011 20:15:29 +0200
+Subject: [PATCHv11 4/8] ARM: OMAP: prcm: add suspend prepare / finish support
 In-Reply-To: <1323713733-13115-1-git-send-email-t-kristo@ti.com>
 References: <1323713733-13115-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1323713733-13115-3-git-send-email-t-kristo@ti.com>
+Message-ID: <1323713733-13115-5-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: R, Govindraj <govindraj.raja@ti.com>
+PRCM chain handler needs to disable forwarding of interrupts during
+suspend, because runtime PM is disabled and most of the drivers
+are potentially not able to handle interrupts coming at this time.
 
-Add API to determine IO-PAD wakeup event status for a given
-hwmod dynamic_mux pad.
+This patch masks all the PRCM interrupt events if a PRCM interrupt
+occurs during suspend, but does not ack them. Once suspend finish
+is called, all the masked events will be re-enabled, which causes
+immediate PRCM interrupt and handles the postponed event.
 
-Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
+The suspend prepare and complete  callbacks will be called from
+pm34xx.c / pm44xx.c files in the following patches.
+
+The functions defined in this patch should eventually be moved to
+suspend->prepare and suspend->finish driver hooks, once the PRCM
+chain handler will be made as its own driver.
+
+Signed-off-by: Tero Kristo <t-kristo@ti.com>
+Cc: Kevin Hilman <khilman@ti.com>
+Cc: Paul Walmsley <paul@pwsan.com>
 ---
- arch/arm/mach-omap2/mux.c                    |   30 ++++++++++++++++++++++++++
- arch/arm/mach-omap2/mux.h                    |   13 +++++++++++
- arch/arm/mach-omap2/omap_hwmod.c             |    7 ++++++
- arch/arm/plat-omap/include/plat/omap_hwmod.h |    1 +
- 4 files changed, 51 insertions(+), 0 deletions(-)
+ arch/arm/mach-omap2/prcm-common.h |    4 +++
+ arch/arm/mach-omap2/prcm.c        |   46 ++++++++++++++++++++++++++++++++++++-
+ 2 files changed, 49 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/mux.c b/arch/arm/mach-omap2/mux.c
-index 655e948..5f15ab8 100644
---- a/arch/arm/mach-omap2/mux.c
-+++ b/arch/arm/mach-omap2/mux.c
-@@ -351,6 +351,36 @@ err1:
- 	return NULL;
+diff --git a/arch/arm/mach-omap2/prcm-common.h b/arch/arm/mach-omap2/prcm-common.h
+index 3c54e3c..6cb0daf 100644
+--- a/arch/arm/mach-omap2/prcm-common.h
++++ b/arch/arm/mach-omap2/prcm-common.h
+@@ -425,6 +425,8 @@ struct omap_prcm_irq_setup {
+ 	u32 *priority_mask;
+ 	int base_irq;
+ 	int irq;
++	bool suspended;
++	bool suspend_save_flag;
+ };
+ 
+ #define OMAP_PRCM_IRQ(_name, _offset, _priority) {	\
+@@ -437,6 +439,8 @@ extern void omap_prcm_irq_cleanup(void);
+ extern int omap_prcm_register_chain_handler(
+ 	struct omap_prcm_irq_setup *irq_setup);
+ extern int omap_prcm_event_to_irq(const char *event);
++extern void omap_prcm_irq_prepare(void);
++extern void omap_prcm_irq_complete(void);
+ # endif
+ 
+ #endif
+diff --git a/arch/arm/mach-omap2/prcm.c b/arch/arm/mach-omap2/prcm.c
+index 948247f..e7c8f3f 100644
+--- a/arch/arm/mach-omap2/prcm.c
++++ b/arch/arm/mach-omap2/prcm.c
+@@ -221,12 +221,28 @@ static void omap_prcm_irq_handler(unsigned int irq, struct irq_desc *desc)
+ 	struct irq_chip *chip = irq_desc_get_chip(desc);
+ 	unsigned int virtirq;
+ 	int nr_irqs = prcm_irq_setup->nr_regs * 32;
++	int i;
++
++	/*
++	 * If we are suspended, mask all interrupts from PRCM level,
++	 * this does not ack them, and they will be pending until
++	 * we re-enable the interrupts, at which point the
++	 * omap_prcm_irq_handler will be executed again
++	 */
++	if (prcm_irq_setup->suspended) {
++		for (i = 0; i < prcm_irq_setup->nr_regs; i++) {
++			prcm_irq_setup->saved_mask[i] =
++				prcm_irq_read_reg(prcm_irq_setup->mask + i * 4);
++			prcm_irq_write_reg(0, prcm_irq_setup->mask + i * 4);
++		}
++		prcm_irq_setup->suspend_save_flag = true;
++	}
+ 
+ 	/*
+ 	 * Loop until all pending irqs are handled, since
+ 	 * generic_handle_irq() can cause new irqs to come
+ 	 */
+-	while (1) {
++	while (!prcm_irq_setup->suspended) {
+ 		omap_prm_pending_events(pending);
+ 
+ 		/* No bit set, then all IRQs are handled */
+@@ -307,6 +323,34 @@ void omap_prcm_irq_cleanup(void)
+ 	prcm_irq_setup->base_irq = 0;
  }
  
-+/**
-+ * omap_hwmod_mux_get_wake_status - omap hwmod check pad wakeup
-+ * @hmux:		Pads for a hwmod
-+ *
-+ * Gets the wakeup status of given pad from omap-hwmod.
-+ * Returns true if wakeup event is set for pad else false
-+ * if wakeup is not occured or pads are not avialable.
-+ */
-+bool omap_hwmod_mux_get_wake_status(struct omap_hwmod_mux_info *hmux)
++void omap_prcm_irq_prepare(void)
++{
++	prcm_irq_setup->suspended = true;
++}
++
++void omap_prcm_irq_complete(void)
 +{
 +	int i;
-+	unsigned int val;
-+	u8 ret = false;
 +
-+	for (i = 0; i < hmux->nr_pads; i++) {
-+		struct omap_device_pad *pad = &hmux->pads[i];
++	prcm_irq_setup->suspended = false;
 +
-+		if (pad->flags & OMAP_DEVICE_PAD_WAKEUP) {
-+			val = omap_mux_read(pad->partition,
-+					pad->mux->reg_offset);
-+			if (val & OMAP_WAKEUP_EVENT) {
-+				ret = true;
-+				break;
-+			}
-+		}
-+	}
++	/* If we have not saved the masks, do not attempt to restore */
++	if (!prcm_irq_setup->suspend_save_flag)
++		return;
 +
-+	return ret;
++	prcm_irq_setup->suspend_save_flag = false;
++
++	/*
++	 * Re-enable all masked PRCM irq sources, this
++	 * causes the PRCM interrupt to fire immediately
++	 * if the events were masked previously in the chain
++	 * handler
++	 */
++	for (i = 0; i < prcm_irq_setup->nr_regs; i++)
++		prcm_irq_write_reg(prcm_irq_setup->saved_mask[i],
++			prcm_irq_setup->mask + i * 4);
 +}
 +
- /* Assumes the calling function takes care of locking */
- void omap_hwmod_mux(struct omap_hwmod_mux_info *hmux, u8 state)
- {
-diff --git a/arch/arm/mach-omap2/mux.h b/arch/arm/mach-omap2/mux.h
-index 2132308..8b2150a 100644
---- a/arch/arm/mach-omap2/mux.h
-+++ b/arch/arm/mach-omap2/mux.h
-@@ -225,8 +225,21 @@ omap_hwmod_mux_init(struct omap_device_pad *bpads, int nr_pads);
-  */
- void omap_hwmod_mux(struct omap_hwmod_mux_info *hmux, u8 state);
- 
-+/**
-+ * omap_hwmod_mux_get_wake_status - omap hwmod check pad wakeup
-+ * @hmux:		Pads for a hwmod
-+ *
-+ * Called only from omap_hwmod.c, do not use.
-+ */
-+bool omap_hwmod_mux_get_wake_status(struct omap_hwmod_mux_info *hmux);
- #else
- 
-+static inline bool
-+omap_hwmod_mux_get_wake_status(struct omap_hwmod_mux_info *hmux)
-+{
-+	return 0;
-+}
-+
- static inline int omap_mux_init_gpio(int gpio, int val)
- {
- 	return 0;
-diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index 8d37d83..d7f4623 100644
---- a/arch/arm/mach-omap2/omap_hwmod.c
-+++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -2721,3 +2721,10 @@ int omap_hwmod_no_setup_reset(struct omap_hwmod *oh)
- 
- 	return 0;
- }
-+
-+int omap_hwmod_pad_get_wakeup_status(struct omap_hwmod *oh)
-+{
-+	if (oh && oh->mux)
-+		return omap_hwmod_mux_get_wake_status(oh->mux);
-+	return -EINVAL;
-+}
-diff --git a/arch/arm/plat-omap/include/plat/omap_hwmod.h b/arch/arm/plat-omap/include/plat/omap_hwmod.h
-index 8b372ed..1b81dfb 100644
---- a/arch/arm/plat-omap/include/plat/omap_hwmod.h
-+++ b/arch/arm/plat-omap/include/plat/omap_hwmod.h
-@@ -604,6 +604,7 @@ int omap_hwmod_get_context_loss_count(struct omap_hwmod *oh);
- 
- int omap_hwmod_no_setup_reset(struct omap_hwmod *oh);
- 
-+int omap_hwmod_pad_get_wakeup_status(struct omap_hwmod *oh);
  /*
-  * Chip variant-specific hwmod init routines - XXX should be converted
-  * to use initcalls once the initial boot ordering is straightened out
+  * Initializes the prcm chain handler based on provided parameters
+  */
 -- 
 1.7.4.1
