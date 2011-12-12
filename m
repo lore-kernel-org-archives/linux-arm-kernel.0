@@ -1,153 +1,123 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 12 Dec 2011 13:44:36 +0100
-Subject: [PATCH 6/7] arm/imx6q: add cpufreq support
-In-Reply-To: <1323661352-10291-7-git-send-email-richard.zhao@linaro.org>
-References: <1323661352-10291-1-git-send-email-richard.zhao@linaro.org>
- <1323661352-10291-7-git-send-email-richard.zhao@linaro.org>
-Message-ID: <20111212124436.GT27267@pengutronix.de>
+From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
+Date: Mon, 12 Dec 2011 13:51:13 +0100
+Subject: [PATCH 2/4] rtc-s3c: make room for more variants in devicetree
+ block
+In-Reply-To: <CAJuYYwSvk1_tvNvukn-BQ4Z3JEeD15djs9xP_=jWz4vG-xs_nw@mail.gmail.com>
+References: <201112091046.26563.heiko@sntech.de>
+ <201112091050.11095.heiko@sntech.de>
+ <CAJuYYwSvk1_tvNvukn-BQ4Z3JEeD15djs9xP_=jWz4vG-xs_nw@mail.gmail.com>
+Message-ID: <201112121351.14362.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 12, 2011 at 11:42:31AM +0800, Richard Zhao wrote:
-> Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
-> ---
->  arch/arm/mach-imx/Kconfig        |    1 +
->  arch/arm/mach-imx/Makefile       |    2 +-
->  arch/arm/mach-imx/cpu_op-imx6q.c |   78 ++++++++++++++++++++++++++++++++++++++
->  3 files changed, 80 insertions(+), 1 deletions(-)
->  create mode 100644 arch/arm/mach-imx/cpu_op-imx6q.c
+Hi Thomas,
+
+thanks for your review and you are of course right with both your suggestions. 
+I will submit a v2 series shortly, implementing these suggestions.
+
+Heiko
+
+Am Sonntag, 11. Dezember 2011, 06:47:43 schrieb Thomas Abraham:
+> Hi Heiko,
 > 
-> diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-> index fbd414b..7d813a3 100644
-> --- a/arch/arm/mach-imx/Kconfig
-> +++ b/arch/arm/mach-imx/Kconfig
-> @@ -837,6 +837,7 @@ config SOC_IMX6Q
->  	select ARM_GIC
->  	select CACHE_L2X0
->  	select CPU_V7
-> +	select ARCH_HAS_CPUFREQ
->  	select HAVE_ARM_SCU
->  	select HAVE_IMX_GPC
->  	select HAVE_IMX_MMDC
-> diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
-> index 9cf630a..2dfe4a7 100644
-> --- a/arch/arm/mach-imx/Makefile
-> +++ b/arch/arm/mach-imx/Makefile
-> @@ -72,7 +72,7 @@ AFLAGS_head-v7.o :=-Wa,-march=armv7-a
->  obj-$(CONFIG_SMP) += platsmp.o
->  obj-$(CONFIG_HOTPLUG_CPU) += hotplug.o
->  obj-$(CONFIG_LOCAL_TIMERS) += localtimer.o
-> -obj-$(CONFIG_SOC_IMX6Q) += clock-imx6q.o mach-imx6q.o pm-imx6q.o
-> +obj-$(CONFIG_SOC_IMX6Q) += clock-imx6q.o mach-imx6q.o pm-imx6q.o cpu_op-imx6q.o
->  
->  # i.MX5 based machines
->  obj-$(CONFIG_MACH_MX51_BABBAGE) += mach-mx51_babbage.o
-> diff --git a/arch/arm/mach-imx/cpu_op-imx6q.c b/arch/arm/mach-imx/cpu_op-imx6q.c
-> new file mode 100644
-> index 0000000..8807b96
-> --- /dev/null
-> +++ b/arch/arm/mach-imx/cpu_op-imx6q.c
-> @@ -0,0 +1,78 @@
-> +/*
-> + * Copyright (C) 2010-2011 Freescale Semiconductor, Inc. All Rights Reserved.
-> + */
-> +
-> +/*
-> + * The code contained herein is licensed under the GNU General Public
-> + * License. You may obtain a copy of the GNU General Public License
-> + * Version 2 or later at the following locations:
-> + *
-> + * http://www.opensource.org/licenses/gpl-license.html
-> + * http://www.gnu.org/copyleft/gpl.html
-> + */
-> +
-> +#include <linux/types.h>
-> +#include <linux/kernel.h>
-> +#include <linux/string.h>
-> +#include <mach/hardware.h>
-> +
-> +static u32 arm_max_freq;
-> +static int num_cpu_op;
-
-Unused variable.
-
-> +
-> +/* working point(wp): 0 - 1GHzMHz; 1 - 800MHz, 3 - 400MHz, 4  - 160MHz */
-
-s/GHzMHz/GHz/
-
-> +static struct cpu_op mx6q_cpu_op_1G[] = {
-> +	{
-> +	 .cpu_rate = 996000000,
-> +	 .cpu_voltage = 1225000,},
-> +	{
-
-Strange indention.
-
-
-
-> +	 .cpu_rate = 792000000,
-> +	 .cpu_voltage = 1100000,},
-> +	{
-> +	  .cpu_rate = 396000000,
-> +	  .cpu_voltage = 950000,},
-> +	{
-> +	 .cpu_rate = 198000000,
-> +	 .cpu_voltage = 850000,},
-> +};
-> +
-> +static struct cpu_op mx6q_cpu_op[] = {
-> +	{
-> +	 .cpu_rate = 792000000,
-> +	 .cpu_voltage = 1100000,},
-> +	{
-> +	  .cpu_rate = 396000000,
-> +	  .cpu_voltage = 950000,},
-> +	{
-> +	 .cpu_rate = 198000000,
-> +	 .cpu_voltage = 850000,},
-> +};
-> +
-> +struct cpu_op *mx6q_get_cpu_op(int *op)
-> +{
-> +	if (arm_max_freq == 1000) {
-> +		*op =  num_cpu_op = ARRAY_SIZE(mx6q_cpu_op_1G);
-> +		return mx6q_cpu_op_1G;
-> +	} else {
-> +		*op =  num_cpu_op = ARRAY_SIZE(mx6q_cpu_op);
-> +		return mx6q_cpu_op;
-> +	}
-
-Why not just return &mx6q_cpu_op[1] instead of creating a second array?
-
-> +}
-> +
-> +static int __init mx6q_cpu_op_init(void)
-> +{
-> +	get_cpu_op = mx6q_get_cpu_op;
-> +	return 0;
-> +}
-> +
-> +core_initcall(mx6q_cpu_op_init);
-> +
-> +static int __init set_arm_max_freq(char *p)
-> +{
-> +	if (strncmp(p, "1000", 4) == 0)
-> +		arm_max_freq = 1000;
-> +	else if (strncmp(p, "800", 3) == 0)
-> +		arm_max_freq = 800;
-> +	return 0;
-> +}
-> +
-> +early_param("arm_freq", set_arm_max_freq);
-
-Do we need this? I suppose this should be passed by the device tree if
-necessary.
-
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> On 9 December 2011 15:20, Heiko St?bner <heiko@sntech.de> wrote:
+> > Use the data field of of_device_id to hold the type for
+> > s3c_cpu_type.
+> > 
+> > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> > ---
+> >  drivers/rtc/rtc-s3c.c |   27 +++++++++++++++++++++------
+> >  1 files changed, 21 insertions(+), 6 deletions(-)
+> > 
+> > diff --git a/drivers/rtc/rtc-s3c.c b/drivers/rtc/rtc-s3c.c
+> > index 175067a..71807a6 100644
+> > --- a/drivers/rtc/rtc-s3c.c
+> > +++ b/drivers/rtc/rtc-s3c.c
+> > @@ -428,11 +428,18 @@ static int __devexit s3c_rtc_remove(struct
+> > platform_device *dev) return 0;
+> >  }
+> 
+> This patch looks fine but the number of #ifdef's can be reduced in
+> this patch as below.
+> 
+> static const struct of_device_id s3c_rtc_dt_match[];
+> 
+> static inline int s3c_rtc_get_driver_data(struct platfrom_device *pdev)
+> {
+> #ifdef CONFIG_OF
+>          if (pdev->dev.of_node) {
+>                  const struct of_device_id *match;
+>                  match = of_match_node(s3c_rtc_dt_match,
+> pdev->dev.of_node); return match->data;
+>          }
+> #endif
+>          return platform_get_device_id(pdev)->driver_data;
+> }
+> 
+> > +#ifdef CONFIG_OF
+> > +static const struct of_device_id s3c_rtc_dt_match[];
+> > +#endif
+> > +
+> >  static int __devinit s3c_rtc_probe(struct platform_device *pdev)
+> >  {
+> >        struct rtc_device *rtc;
+> >        struct rtc_time rtc_tm;
+> >        struct resource *res;
+> > +#ifdef CONFIG_OF
+> > +       const struct of_device_id *match;
+> > +#endif
+> 
+> *match not required here.
+> 
+> >        int ret;
+> > 
+> >        pr_debug("%s: probe=%p\n", __func__, pdev);
+> > @@ -509,12 +516,15 @@ static int __devinit s3c_rtc_probe(struct
+> > platform_device *pdev) }
+> > 
+> >  #ifdef CONFIG_OF
+> > -       if (pdev->dev.of_node)
+> > -               s3c_rtc_cpu_type =
+> > of_device_is_compatible(pdev->dev.of_node, -                      
+> > "samsung,s3c6410-rtc") ? TYPE_S3C64XX : TYPE_S3C2410; -       else
+> > +       if (pdev->dev.of_node) {
+> > +               match = of_match_node(s3c_rtc_dt_match,
+> > pdev->dev.of_node); +               s3c_rtc_cpu_type = match->data;
+> > +       } else {
+> >  #endif
+> >                s3c_rtc_cpu_type =
+> > platform_get_device_id(pdev)->driver_data; +#ifdef CONFIG_OF
+> > +       }
+> > +#endif
+> 
+> This gets replaced with
+> 
+>         s3c_rtc_cpu_type = s3c_rtc_get_driver_data(pdev);
+> 
+> >        /* Check RTC Time */
+> > 
+> > @@ -638,8 +648,13 @@ static int s3c_rtc_resume(struct platform_device
+> > *pdev)
+> > 
+> >  #ifdef CONFIG_OF
+> >  static const struct of_device_id s3c_rtc_dt_match[] = {
+> > -       { .compatible = "samsung,s3c2410-rtc" },
+> > -       { .compatible = "samsung,s3c6410-rtc" },
+> > +       {
+> > +               .compatible = "samsung,s3c2410-rtc"
+> > +               .data = TYPE_S3C2410,
+> > +       }, {
+> > +               .compatible = "samsung,s3c6410-rtc"
+> > +               .data = TYPE_S3C64XX,
+> > +       },
+> >        {},
+> >  };
+> >  MODULE_DEVICE_TABLE(of, s3c_rtc_dt_match);
+> > --
+> > 1.7.5.4
+> 
+> Patch looks fine except the #ifdef's which can be reduced.
+> Reviewed-by: Thomas Abraham <thomas.abraham@linaro.org>
+> 
+> Regards,
+> Thomas.
