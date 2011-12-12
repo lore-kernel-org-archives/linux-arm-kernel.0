@@ -1,50 +1,37 @@
-From: mel@csn.ul.ie (Mel Gorman)
-Date: Mon, 12 Dec 2011 14:42:29 +0000
-Subject: [PATCH 01/11] mm: page_alloc: handle MIGRATE_ISOLATE in
- free_pcppages_bulk()
-In-Reply-To: <op.v6drko0p3l0zgt@mpn-glaptop>
-References: <1321634598-16859-1-git-send-email-m.szyprowski@samsung.com>
- <1321634598-16859-2-git-send-email-m.szyprowski@samsung.com>
- <20111212134235.GB3277@csn.ul.ie> <op.v6drko0p3l0zgt@mpn-glaptop>
-Message-ID: <20111212144229.GH3277@csn.ul.ie>
+From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
+Date: Mon, 12 Dec 2011 15:43:41 +0100
+Subject: [PATCH v2 0/4] Implement RTC support for S3C2443/S3C2416/S3C2450
+Message-ID: <201112121543.42299.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 12, 2011 at 03:23:02PM +0100, Michal Nazarewicz wrote:
-> >On Fri, Nov 18, 2011 at 05:43:08PM +0100, Marek Szyprowski wrote:
-> >>From: Michal Nazarewicz <mina86@mina86.com>
-> >>diff --git a/mm/page_alloc.c b/mm/page_alloc.c
-> >>index 9dd443d..58d1a2e 100644
-> >>--- a/mm/page_alloc.c
-> >>+++ b/mm/page_alloc.c
-> >>@@ -628,6 +628,18 @@ static void free_pcppages_bulk(struct zone *zone, int count,
-> >> 			page = list_entry(list->prev, struct page, lru);
-> >> 			/* must delete as __free_one_page list manipulates */
-> >> 			list_del(&page->lru);
-> >>+
-> >>+			/*
-> >>+			 * When page is isolated in set_migratetype_isolate()
-> >>+			 * function it's page_private is not changed since the
-> >>+			 * function has no way of knowing if it can touch it.
-> >>+			 * This means that when a page is on PCP list, it's
-> >>+			 * page_private no longer matches the desired migrate
-> >>+			 * type.
-> >>+			 */
-> >>+			if (get_pageblock_migratetype(page) == MIGRATE_ISOLATE)
-> >>+				set_page_private(page, MIGRATE_ISOLATE);
-> >>+
-> 
-> On Mon, 12 Dec 2011 14:42:35 +0100, Mel Gorman <mel@csn.ul.ie> wrote:
-> >How much of a problem is this in practice?
-> 
-> IIRC, this lead to allocation being made from area marked as isolated
-> or some such.
-> 
+Similar to the ADC the RTC of S3C2443 and S3C2416/2450 has some slight
+variances when compared to the existing types.
 
-And I believe that nothing prevents that from happening. I was just
-wondering how common it was in practice. Draining the per-cpu lists
-should work as a substitute either way.
+This series adds support for those SoCs.
+
+As with the ADC patches, these changes where tested on S3C2416 hardware.
+The S3C2443 quirks are a subset of those and are done according to the
+datasheet, but not tested on real hardware (as I do not own a S3C2443 device).
+
+changes since v1:
+address comments from Thomas Abraham, reducing number of ifdefs and
+duplicate code
+
+
+Heiko Stuebner (4):
+  ARM: SAMSUNG: cleanup of rtc register definitions
+  rtc-s3c: make room for more variants in devicetree block
+  rtc-s3c: add variants for S3C2443 and S3C2416
+  ARM: S3C2443/S3C2416: add s3c_rtc_setname and rename rtc devices
+
+ arch/arm/mach-s3c2416/s3c2416.c               |    2 +
+ arch/arm/mach-s3c2443/s3c2443.c               |    2 +
+ arch/arm/plat-samsung/include/plat/regs-rtc.h |   92 +++++++++++++++---------
+ arch/arm/plat-samsung/include/plat/rtc-core.h |   27 +++++++
+ drivers/rtc/rtc-s3c.c                         |   74 ++++++++++++++++----
+ 5 files changed, 149 insertions(+), 48 deletions(-)
+ create mode 100644 arch/arm/plat-samsung/include/plat/rtc-core.h
 
 -- 
-Mel Gorman
-SUSE Labs
+1.7.5.4
