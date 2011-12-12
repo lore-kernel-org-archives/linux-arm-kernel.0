@@ -1,233 +1,99 @@
-From: alexg@meprolight.com (Alex Gershgorin)
-Date: Mon, 12 Dec 2011 16:20:26 +0200
-Subject: [PATCH] ARM: OMAP3LOGIC: Adding DSS support
-In-Reply-To: <1323688238.3852.18.camel@deskari>
-References: <1323345948-14533-1-git-send-email-alexg@meprolight.com>,
- <1323688238.3852.18.camel@deskari>
-Message-ID: <4875438356E7CA4A8F2145FCD3E61C0B2C89899251@MEP-EXCH.meprolight.com>
+From: mel@csn.ul.ie (Mel Gorman)
+Date: Mon, 12 Dec 2011 14:19:53 +0000
+Subject: [PATCH 03/11] mm: mmzone: introduce zone_pfn_same_memmap()
+In-Reply-To: <1321634598-16859-4-git-send-email-m.szyprowski@samsung.com>
+References: <1321634598-16859-1-git-send-email-m.szyprowski@samsung.com>
+ <1321634598-16859-4-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <20111212141953.GD3277@csn.ul.ie>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Nov 18, 2011 at 05:43:10PM +0100, Marek Szyprowski wrote:
+> From: Michal Nazarewicz <mina86@mina86.com>
+> 
+> This commit introduces zone_pfn_same_memmap() function which checkes
 
-________________________________________
-From: Tomi Valkeinen [tomi.valkeinen at ti.com]
-Sent: Monday, December 12, 2011 1:10 PM
-To: Alex Gershgorin
-Cc: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org; tim.nordell at logicpd.com; baruch at tkos.co.il
-Subject: Re: [PATCH] ARM: OMAP3LOGIC: Adding DSS support
+s/checkes/checks/
 
-Hi,
+> whether two PFNs within the same zone have struct pages within the
+> same memmap. 
 
-On Thu, 2011-12-08 at 14:05 +0200, Alex wrote:
-> This patch adds DSS2 support to the LogicPD OMAP 35x Torpedo boardfile. LCD and
-> TV-out are supported.
->
-> Signed-off-by: Alex Gershgorin <alexg@meprolight.com>
+s/memmap/same sparsemem section/
+
+> This check is needed because in general pointer
+> arithmetic on struct pages may lead to invalid pointers.
+> 
+> On memory models that are not affected, zone_pfn_same_memmap() is
+> defined as always returning true so the call should be optimised
+> at compile time.
+> 
+> Signed-off-by: Michal Nazarewicz <mina86@mina86.com>
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 > ---
->  arch/arm/mach-omap2/board-omap3logic.c |  151 ++++++++++++++++++++++++++++++++
->  1 files changed, 151 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/board-omap3logic.c b/arch/arm/mach-omap2/board-omap3logic.c
-> index 7c0f193..86175fa 100644
-> --- a/arch/arm/mach-omap2/board-omap3logic.c
-> +++ b/arch/arm/mach-omap2/board-omap3logic.c
-> @@ -7,6 +7,9 @@
->   * Copyright (C) 2010 Logic Product Development, Inc.
->   * Peter Barada <peter.barada@logicpd.com>
->   *
-> + * Copyright (C) 2011 Meprolight, Ltd.
-> + * Alex Gershgorin <alexg@meprolight.com>
-> + *
->   * Modified from Beagle, EVM, and RX51
->   *
->   * This program is free software; you can redistribute it and/or modify
-> @@ -44,6 +47,10 @@
->  #include <plat/gpmc-smsc911x.h>
->  #include <plat/gpmc.h>
->  #include <plat/sdrc.h>
-> +#include <plat/vram.h>
-> +
-> +#include <video/omapdss.h>
-> +#include <video/omap-panel-generic-dpi.h>
->
->  #define OMAP3LOGIC_SMSC911X_CS                       1
->
-> @@ -58,6 +65,14 @@ static struct regulator_consumer_supply omap3logic_vmmc1_supply[] = {
->       REGULATOR_SUPPLY("vmmc", "omap_hsmmc.0"),
->  };
->
-> +static struct regulator_consumer_supply omap3logic_vdds_supplies[] = {
-> +     REGULATOR_SUPPLY("vdds_sdi", "omapdss"),
-> +     REGULATOR_SUPPLY("vdds_dsi", "omapdss"),
-> +};
-> +
-> +static struct regulator_consumer_supply omap3logic_vdac_supply =
-> +     REGULATOR_SUPPLY("vdda_dac", "omapdss_venc");
-> +
->  /* VMMC1 for MMC1 pins CMD, CLK, DAT0..DAT3 (20 mA, plus card == max 220 mA) */
->  static struct regulator_init_data omap3logic_vmmc1 = {
->       .constraints = {
-> @@ -74,6 +89,34 @@ static struct regulator_init_data omap3logic_vmmc1 = {
->       .consumer_supplies      = omap3logic_vmmc1_supply,
->  };
->
-> +static struct regulator_init_data omap3logic_vpll2 = {
-> +     .constraints = {
-> +             .name                   = "VDDS_DSI",
-> +             .min_uV                 = 1800000,
-> +             .max_uV                 = 1800000,
-> +             .apply_uV               = true,
-> +             .always_on              = true,
-> +             .valid_modes_mask       = REGULATOR_MODE_NORMAL
-> +                                     | REGULATOR_MODE_STANDBY,
-> +             .valid_ops_mask         = REGULATOR_CHANGE_MODE,
-> +     },
-> +     .num_consumer_supplies  = ARRAY_SIZE(omap3logic_vdds_supplies),
-> +     .consumer_supplies      = omap3logic_vdds_supplies,
-> +};
-> +
-> +static struct regulator_init_data omap3logic_vdac = {
-> +     .constraints = {
-> +             .min_uV                 = 1800000,
-> +             .max_uV                 = 1800000,
-> +             .valid_modes_mask       = REGULATOR_MODE_NORMAL
-> +                                     | REGULATOR_MODE_STANDBY,
-> +             .valid_ops_mask         = REGULATOR_CHANGE_MODE
-> +                                     | REGULATOR_CHANGE_STATUS,
-> +     },
-> +     .num_consumer_supplies  = 1,
-> +     .consumer_supplies      = &omap3logic_vdac_supply,
-> +};
-> +
->  static struct twl4030_gpio_platform_data omap3logic_gpio_data = {
->       .gpio_base      = OMAP_MAX_GPIO_LINES,
->       .irq_base       = TWL4030_GPIO_IRQ_BASE,
-> @@ -91,6 +134,8 @@ static struct twl4030_platform_data omap3logic_twldata = {
->       /* platform_data for children goes here */
->       .gpio           = &omap3logic_gpio_data,
->       .vmmc1          = &omap3logic_vmmc1,
-> +     .vpll2          = &omap3logic_vpll2,
-> +     .vdac           = &omap3logic_vdac,
->  };
-
->The regulators are already set up in twl-common.c, so there shouldn't be
->need for the code above.
-
-I will correct it .
-
->
->  static int __init omap3logic_i2c_init(void)
-> @@ -182,6 +227,110 @@ static inline void __init board_smsc911x_init(void)
->       gpmc_smsc911x_init(&board_smsc911x_data);
+>  include/linux/mmzone.h |   16 ++++++++++++++++
+>  mm/compaction.c        |    5 ++++-
+>  2 files changed, 20 insertions(+), 1 deletions(-)
+> 
+> diff --git a/include/linux/mmzone.h b/include/linux/mmzone.h
+> index 188cb2f..84e07d0 100644
+> --- a/include/linux/mmzone.h
+> +++ b/include/linux/mmzone.h
+> @@ -1166,6 +1166,22 @@ static inline int memmap_valid_within(unsigned long pfn,
 >  }
->
-> +#if defined(CONFIG_FB_OMAP2) || defined(CONFIG_FB_OMAP2_MODULE)
-> +
-> +#define OMAP3_TORPEDO_LCD_BACKLIGHT_GPIO     154
-> +#define OMAP3_TORPEDO_LCD_ENABLE_GPIO                155
-> +#define OMAP3_TORPEDO_LCD_PWM_GPIO           56
+>  #endif /* CONFIG_ARCH_HAS_HOLES_MEMORYMODEL */
+>  
+> +#if defined(CONFIG_SPARSEMEM) && !defined(CONFIG_SPARSEMEM_VMEMMAP)
+> +/*
+> + * Both PFNs must be from the same zone!  If this function returns
 
->The PWM gpio doesn't seem to be used. Is it needed for something?
+from the same sparsemem section, not the same zone. 
 
-Excuse  me for  my neglect, I shall have it set to default in the function omap3logic_display_init.
-
-> +static struct gpio omap3logic_dss_gpios[] __initdata = {
-> +     {OMAP3_TORPEDO_LCD_BACKLIGHT_GPIO, GPIOF_OUT_INIT_LOW, "lcd_bl_pwr"},
-> +     {OMAP3_TORPEDO_LCD_PWM_GPIO, GPIOF_OUT_INIT_LOW, "lcd bl enable"},
-> +     {OMAP3_TORPEDO_LCD_ENABLE_GPIO, GPIOF_OUT_INIT_LOW, "lcd enable"},
-> +};
-> +
-> +static int omap3logic_enable_lcd(struct omap_dss_device *dssdev)
+> + * true, pfn_to_page(pfn1) + (pfn2 - pfn1) == pfn_to_page(pfn2).
+> + */
+> +static inline bool zone_pfn_same_memmap(unsigned long pfn1, unsigned long pfn2)
 > +{
-> +     gpio_set_value_cansleep(OMAP3_TORPEDO_LCD_ENABLE_GPIO, 1);
-> +     msleep(20);
-> +     gpio_set_value_cansleep(OMAP3_TORPEDO_LCD_BACKLIGHT_GPIO, 1);
-> +
-> +     return 0;
+> +	return pfn_to_section_nr(pfn1) == pfn_to_section_nr(pfn2);
 > +}
 > +
-> +static void omap3logic_disable_lcd(struct omap_dss_device *dssdev)
-> +{
-> +     gpio_set_value_cansleep(OMAP3_TORPEDO_LCD_ENABLE_GPIO, 0);
-> +     msleep(20);
-> +     gpio_set_value_cansleep(OMAP3_TORPEDO_LCD_BACKLIGHT_GPIO, 0);
-> +}
+> +#else
+> +
+> +#define zone_pfn_same_memmap(pfn1, pfn2) (true)
+> +
+> +#endif
+> +
+>  #endif /* !__GENERATING_BOUNDS.H */
+>  #endif /* !__ASSEMBLY__ */
+>  #endif /* _LINUX_MMZONE_H */
+> diff --git a/mm/compaction.c b/mm/compaction.c
+> index 6afae0e..09c9702 100644
+> --- a/mm/compaction.c
+> +++ b/mm/compaction.c
+> @@ -111,7 +111,10 @@ skip:
+>  
+>  next:
+>  		pfn += isolated;
+> -		page += isolated;
+> +		if (zone_pfn_same_memmap(pfn - isolated, pfn))
+> +			page += isolated;
+> +		else
+> +			page = pfn_to_page(pfn);
+>  	}
 
->Is there a particular reason for msleep(20) in the enable and disable
->function?
+Is this necessary?
 
-No particular reason, it works now without delay.
+We are isolating pages, the largest of which is a MAX_ORDER_NR_PAGES
+page. Sections are never smaller than MAX_ORDER_NR_PAGES so the end
+of the free range of pages should never be in another section. That
+should mean that the PFN walk will always consider the first
+PFN of every section and you can implement a simplier check than
+zone_pfn_same_memmap based on pfn & PAGE_SECTION_MASK and contain it
+within mm/compaction.c
 
-> +
-> +static struct panel_generic_dpi_data lcd_panel = {
-> +     .name                   = "sharp_lq",
-> +     .platform_enable        = omap3logic_enable_lcd,
-> +     .platform_disable       = omap3logic_disable_lcd,
-> +};
-> +
-> +static struct omap_dss_device omap3logic_lcd_device = {
-> +     .name                   = "lcd",
-> +     .driver_name            = "generic_dpi_panel",
-> +     .type                   = OMAP_DISPLAY_TYPE_DPI,
-> +     .data                   = &lcd_panel,
-> +     .phy.dpi.data_lines     = 16,
-> +};
-> +
-> +static struct omap_dss_device omap3logic_tv_device = {
-> +     .name                   = "tv",
-> +     .driver_name            = "venc",
-> +     .type                   = OMAP_DISPLAY_TYPE_VENC,
-> +     .phy.venc.type          = OMAP_DSS_VENC_TYPE_SVIDEO,
-> +};
-> +
-> +static struct omap_dss_device *omap3logic_dss_devices[] = {
-> +     &omap3logic_lcd_device,
-> +     &omap3logic_tv_device,
-> +};
-> +
-> +static struct omap_dss_board_info omap3logic_dss_data = {
-> +     .num_devices            = ARRAY_SIZE(omap3logic_dss_devices),
-> +     .devices                = omap3logic_dss_devices,
-> +     .default_device         = &omap3logic_lcd_device,
-> +};
-> +
-> +static void __init omap3logic_display_init(void)
-> +{
-> +     int r;
-> +
-> +     r = gpio_request_array(omap3logic_dss_gpios,
-> +                            ARRAY_SIZE(omap3logic_dss_gpios));
-> +     if (r) {
-> +             printk(KERN_ERR "failed to get lcd_panel_* gpios\n");
-> +             return;
-> +     }
-> +
-> +     gpio_export(OMAP3_TORPEDO_LCD_BACKLIGHT_GPIO, 0);
-> +     gpio_export(OMAP3_TORPEDO_LCD_ENABLE_GPIO, 0);
-> +     gpio_export(OMAP3_TORPEDO_LCD_PWM_GPIO, 0);
-> +
-> +     r = omap_display_init(&omap3logic_dss_data);
-> +     if (r) {
-> +             pr_err("OMAP3LOGIC: failed to register DSS device\n");
-> +             gpio_free_array(omap3logic_dss_gpios,
-> +                             ARRAY_SIZE(omap3logic_dss_gpios));
-> +     }
-> +}
-> +
-> +static void __init omap3logic_video_mem_init(void)
-> +{
-> +     /*
-> +      * GFX 480x272x32bpp
-> +      * VID1/2 480x272x32bpp double buffered
-> +      */
-> +     omap_vram_set_sdram_vram(PAGE_ALIGN(480 * 272 * 4) +
-> +                     2 * PAGE_ALIGN(480 * 272 * 4 * 2), 0);
-> +}
+That said, everywhere else managed to avoid checks like this by always
+scanning in units of pageblocks. Maybe this should be structured
+the same way to guarantee pfn_valid is called at least per pageblock
+(even though only once per MAX_ORDER_NR_PAGES is necessary).
 
->You should normally let the bootloader or the user define the vram size
->via boot parameters, not in the board file like this.
-
-I will send the corrected patch.
-
-Thanks,
-Alex Gershgorin
+-- 
+Mel Gorman
+SUSE Labs
