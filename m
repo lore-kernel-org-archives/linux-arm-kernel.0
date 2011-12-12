@@ -1,41 +1,58 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 12 Dec 2011 15:28:21 +0100
-Subject: [PATCH 6/7] arm/imx6q: add cpufreq support
-In-Reply-To: <20111212134643.GC16835@b20223-02.ap.freescale.net>
-References: <1323661352-10291-1-git-send-email-richard.zhao@linaro.org>
- <1323661352-10291-7-git-send-email-richard.zhao@linaro.org>
- <20111212124436.GT27267@pengutronix.de>
- <20111212134643.GC16835@b20223-02.ap.freescale.net>
-Message-ID: <20111212142821.GZ27267@pengutronix.de>
+From: mel@csn.ul.ie (Mel Gorman)
+Date: Mon, 12 Dec 2011 14:29:07 +0000
+Subject: [PATCH 04/11] mm: compaction: export some of the functions
+In-Reply-To: <1321634598-16859-5-git-send-email-m.szyprowski@samsung.com>
+References: <1321634598-16859-1-git-send-email-m.szyprowski@samsung.com>
+ <1321634598-16859-5-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <20111212142906.GE3277@csn.ul.ie>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 12, 2011 at 09:46:43PM +0800, Richard Zhao wrote:
-> > > +{
-> > > +	if (strncmp(p, "1000", 4) == 0)
-> > > +		arm_max_freq = 1000;
-> > > +	else if (strncmp(p, "800", 3) == 0)
-> > > +		arm_max_freq = 800;
-> > > +	return 0;
-> > > +}
-> > > +
-> > > +early_param("arm_freq", set_arm_max_freq);
-> > 
-> > Do we need this? I suppose this should be passed by the device tree if
-> > necessary.
-> Yes, we do. Some boards don't support 1G. Would you let it be a temp solution? Or I'll
-> only support 1G boards.
-> For long time, maybe we put all operating points to dts or opp. Which one will
-> you prefer?  It needs much other work to do.
+On Fri, Nov 18, 2011 at 05:43:11PM +0100, Marek Szyprowski wrote:
+> From: Michal Nazarewicz <mina86@mina86.com>
+> 
+> This commit exports some of the functions from compaction.c file
+> outside of it adding their declaration into internal.h header
+> file so that other mm related code can use them.
+> 
+> This forced compaction.c to always be compiled (as opposed to being
+> compiled only if CONFIG_COMPACTION is defined) but as to avoid
+> introducing code that user did not ask for, part of the compaction.c
+> is now wrapped in on #ifdef.
+> 
+> Signed-off-by: Michal Nazarewicz <mina86@mina86.com>
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> ---
+>  mm/Makefile     |    3 +-
+>  mm/compaction.c |  112 +++++++++++++++++++++++--------------------------------
+>  mm/internal.h   |   35 +++++++++++++++++
+>  3 files changed, 83 insertions(+), 67 deletions(-)
+> 
+> diff --git a/mm/Makefile b/mm/Makefile
+> index 50ec00e..24ed801 100644
+> --- a/mm/Makefile
+> +++ b/mm/Makefile
+> @@ -13,7 +13,7 @@ obj-y			:= filemap.o mempool.o oom_kill.o fadvise.o \
+>  			   readahead.o swap.o truncate.o vmscan.o shmem.o \
+>  			   prio_tree.o util.o mmzone.o vmstat.o backing-dev.o \
+>  			   page_isolation.o mm_init.o mmu_context.o percpu.o \
+> -			   $(mmu-y)
+> +			   $(mmu-y) compaction.o
 
-I see several boards already having a clock-frequency property in their
-cpu node, so you could use this as maximum frequency.
+That should be
 
-Sascha
+compaction.o $(mmu-y)
 
+for consistency.
+
+Overall, this patch implies that CMA is always compiled in. Why
+not just make CMA depend on COMPACTION to keep things simplier? For
+example, if you enable CMA and do not enable COMPACTION, you lose
+things like the vmstat counters that can aid debugging. In fact, as
+parts of compaction.c are using defines like COMPACTBLOCKS, I'm not
+even sure compaction.c can compile without CONFIG_COMPACTION because
+of the vmstat stuff.
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Mel Gorman
+SUSE Labs
