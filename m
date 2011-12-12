@@ -1,99 +1,53 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Mon, 12 Dec 2011 10:57:50 +0100
-Subject: [PATCH 4/4] ARM: smp_twd: reconfigure clockevents after cpufreq change
-Message-ID: <1323683870-23937-1-git-send-email-linus.walleij@stericsson.com>
+From: richard.zhao@linaro.org (Richard Zhao)
+Date: Mon, 12 Dec 2011 18:09:18 +0800
+Subject: [PATCH 1/1] net/fec: add KSZ9021RN phy fixup
+Message-ID: <1323684558-16796-1-git-send-email-richard.zhao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linus Walleij <linus.walleij@linaro.org>
+For imx6q sabrelite board, set phy RGMII pad skew.
 
-This break-out from Colin Cross' cpufreq-aware TWD patch
-will handle the case when our localtimer's clock changes with
-the cpu clock. A cpufreq transtion notifier will be registered
-only if the platform has supplied a specified clock to the TWD.
-
-After a cpufreq transition, update the clockevent's frequency
-by fetching the new clock rate from the clock framework and
-reprogram the next clock event.
-
-The necessary changes in the clockevents framework was done by
-Thomas Gleixner in kernel v3.0.
-
-Signed-off-by: Colin Cross <ccross@android.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Acked-by: Thomas Gleixner <tglx@linutronix.de>
-Acked-by: Rob Herring <rob.herring@calxeda.com>
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-[Broke out, ifdef:ed CPUfreq stuff for non-cpufreq configs]
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
 ---
- arch/arm/kernel/smp_twd.c |   47 +++++++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 47 insertions(+), 0 deletions(-)
+ drivers/net/ethernet/freescale/fec.c |   19 +++++++++++++++++++
+ 1 files changed, 19 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
-index a13e1c0..92dbd80 100644
---- a/arch/arm/kernel/smp_twd.c
-+++ b/arch/arm/kernel/smp_twd.c
-@@ -11,6 +11,7 @@
- #include <linux/init.h>
- #include <linux/kernel.h>
- #include <linux/clk.h>
-+#include <linux/cpufreq.h>
- #include <linux/delay.h>
- #include <linux/device.h>
- #include <linux/err.h>
-@@ -94,6 +95,52 @@ void twd_timer_stop(struct clock_event_device *clk)
- 	disable_percpu_irq(clk->irq);
+diff --git a/drivers/net/ethernet/freescale/fec.c b/drivers/net/ethernet/freescale/fec.c
+index 112af9b..d3b4463 100644
+--- a/drivers/net/ethernet/freescale/fec.c
++++ b/drivers/net/ethernet/freescale/fec.c
+@@ -1513,6 +1513,21 @@ static inline void fec_reset_phy(struct platform_device *pdev)
  }
+ #endif /* CONFIG_OF */
  
-+#ifdef CONFIG_CPU_FREQ
-+
-+/*
-+ * Updates clockevent frequency when the cpu frequency changes.
-+ * Called on the cpu that is changing frequency with interrupts disabled.
-+ */
-+static void twd_update_frequency(void *data)
++/* For imx6q sabrelite board: set KSZ9021RN RGMII pad skew */
++static int ksz9021rn_phy_fixup(struct phy_device *phydev)
 +{
-+	twd_timer_rate = clk_get_rate(twd_clk);
++	/* min rx data delay */
++	phy_write(phydev, 0x0b, 0x8105);
++	phy_write(phydev, 0x0c, 0x0000);
 +
-+	clockevents_update_freq(__get_cpu_var(twd_ce), twd_timer_rate);
-+}
-+
-+static int twd_cpufreq_transition(struct notifier_block *nb,
-+	unsigned long state, void *data)
-+{
-+	struct cpufreq_freqs *freqs = data;
-+
-+	/*
-+	 * The twd clock events must be reprogrammed to account for the new
-+	 * frequency.  The timer is local to a cpu, so cross-call to the
-+	 * changing cpu.
-+	 */
-+	if (state == CPUFREQ_POSTCHANGE || state == CPUFREQ_RESUMECHANGE)
-+		smp_call_function_single(freqs->cpu, twd_update_frequency,
-+			NULL, 1);
-+
-+	return NOTIFY_OK;
-+}
-+
-+static struct notifier_block twd_cpufreq_nb = {
-+	.notifier_call = twd_cpufreq_transition,
-+};
-+
-+static int twd_cpufreq_init(void)
-+{
-+	if (!IS_ERR_OR_NULL(twd_clk))
-+		return cpufreq_register_notifier(&twd_cpufreq_nb,
-+			CPUFREQ_TRANSITION_NOTIFIER);
++	/* max rx/tx clock delay, min rx/tx control delay */
++	phy_write(phydev, 0x0b, 0x8104);
++	phy_write(phydev, 0x0c, 0xf0f0);
++	phy_write(phydev, 0x0b, 0x104);
 +
 +	return 0;
 +}
-+core_initcall(twd_cpufreq_init);
 +
-+#endif
-+
- static void __cpuinit twd_calibrate_rate(void)
+ static int __devinit
+ fec_probe(struct platform_device *pdev)
  {
- 	unsigned long count;
+@@ -1597,6 +1612,10 @@ fec_probe(struct platform_device *pdev)
+ 	if (ret)
+ 		goto failed_init;
+ 
++	/* register the PHY board fixup (for Micrel KSZ9021RN) */
++	phy_register_fixup_for_uid(0x00221611, 0xfffffff0,
++					 ksz9021rn_phy_fixup);
++
+ 	ret = fec_enet_mii_init(pdev);
+ 	if (ret)
+ 		goto failed_mii_init;
 -- 
-1.7.3.2
+1.7.5.4
