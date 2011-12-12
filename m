@@ -1,20 +1,31 @@
-From: boojin.kim@samsung.com (Boojin Kim)
-Date: Mon, 12 Dec 2011 10:36:33 +0900
-Subject: [PATCH 1/2] DMA: PL330: Merge PL330 driver into drivers/dma/
-In-Reply-To: <CABb+yY1Ei_88d9N9bzkt-N7OkjorJS+ub0KeOtYMMurnskyjPg@mail.gmail.com>
-References: <Acy1grpTOtJOVEocTR+nE20sY4VTDQ==@samsung.com>
- <002901ccb582$ba7e0a20$2f7a1e60$%kim@samsung.com>
- <CABb+yY1Ei_88d9N9bzkt-N7OkjorJS+ub0KeOtYMMurnskyjPg@mail.gmail.com>
-Message-ID: <005e01ccb86e$7ae1bf30$70a53d90$%kim@samsung.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Sun, 11 Dec 2011 17:51:33 -0800
+Subject: [AT91 PULL] gpio cleanup pull request for 3.3
+In-Reply-To: <20111129020213.GI15008@game.jcrosoft.org>
+References: <20111123171935.GC15531@game.jcrosoft.org>
+ <201111281858.54217.arnd@arndb.de>
+ <20111129020213.GI15008@game.jcrosoft.org>
+Message-ID: <CAOesGMhqw-Gf=H3J04twGq5+b+8MOhSJ-cYyt9Dai6BRS-PaVQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jassi Brar [mailto:jassisinghbrar at gmail.com] wrote:
+Jean-Christophe,
+
+The branch that was pulled by Arnd is not the same patches that were
+posted for review (at least not the same as v3 of the series).
+
+In the series you posted for review, the code was correct. In your
+branch it breaks with:
+
+arch/arm/mach-at91/board-stamp9g20.c:126: error: expected '}' before ';' token
+
+I.e. a trivial ; vs , error, but it's the only one in the whole file
+(it's done on two consecutive lines). It can be found by building
+stamp9g20_defconfig or pcontrol_g20_defconfig.
+
+Please use more care in the future to avoid this. In particular, it is
+troubling that the code in your branch does not match the series you
+posted without any kind of notice about it.
 
 
-> >
-> Please try to maintain general order of functions and
-> definitions/declarations
-> in the code.
-
-Thanks for your review. I will re-summit with our comment.
+-Olof
