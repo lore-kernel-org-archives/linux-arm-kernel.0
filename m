@@ -1,277 +1,107 @@
-From: rusty@rustcorp.com.au (Rusty Russell)
-Date: Mon, 12 Dec 2011 15:42:09 +1030
-Subject: [RFC] virtio: use mandatory barriers for remote processor vdevs
-In-Reply-To: <4EE56FCD.9030609@redhat.com>
-References: <1322569886-13055-1-git-send-email-ohad@wizery.com>
- <1322867384.11728.20.camel@pasglop> <87hb1iqls3.fsf@rustcorp.com.au>
- <20111211122544.GC11504@redhat.com> <1323642447.19891.8.camel@pasglop>
- <4EE56FCD.9030609@redhat.com>
-Message-ID: <87wra2tlue.fsf@rustcorp.com.au>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Mon, 12 Dec 2011 13:40:54 +0800
+Subject: [PATCH 1/7] arm/imx6: add imx6q sabrelite board support
+In-Reply-To: <1323661352-10291-2-git-send-email-richard.zhao@linaro.org>
+References: <1323661352-10291-1-git-send-email-richard.zhao@linaro.org>
+ <1323661352-10291-2-git-send-email-richard.zhao@linaro.org>
+Message-ID: <20111212054053.GD9572@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 12 Dec 2011 11:06:53 +0800, Amos Kong <akong@redhat.com> wrote:
-> On 12/12/11 06:27, Benjamin Herrenschmidt wrote:
-> > On Sun, 2011-12-11 at 14:25 +0200, Michael S. Tsirkin wrote:
-> >
-> >> Forwarding some results by Amos, who run multiple netperf streams in
-> >> parallel, from an external box to the guest.  TCP_STREAM results were
-> >> noisy.  This could be due to buffering done by TCP, where packet size
-> >> varies even as message size is constant.
-> >>
-> >> TCP_RR results were consistent. In this benchmark, after switching
-> >> to mandatory barriers, CPU utilization increased by up to 35% while
-> >> throughput went down by up to 14%. the normalized throughput/cpu
-> >> regressed consistently, between 7 and 35%
-> >>
-> >> The "fix" applied was simply this:
-> >
-> > What machine&  processor was this  ?
+On Mon, Dec 12, 2011 at 11:42:26AM +0800, Richard Zhao wrote:
+> Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
+> ---
+>  arch/arm/boot/dts/imx6q-sabrelite.dts |   54 +++++++++++++++++++++++++++++++++
+>  arch/arm/mach-imx/mach-imx6q.c        |    1 +
+>  2 files changed, 55 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/boot/dts/imx6q-sabrelite.dts
 > 
-> pined guest memory to numa node 1
+> diff --git a/arch/arm/boot/dts/imx6q-sabrelite.dts b/arch/arm/boot/dts/imx6q-sabrelite.dts
+> new file mode 100644
+> index 0000000..d54363f
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/imx6q-sabrelite.dts
+> @@ -0,0 +1,54 @@
+> +/*
+> + * Copyright 2011 Freescale Semiconductor, Inc.
+> + * Copyright 2011 Linaro Ltd.
+> + *
+> + * The code contained herein is licensed under the GNU General Public
+> + * License. You may obtain a copy of the GNU General Public License
+> + * Version 2 or later at the following locations:
+> + *
+> + * http://www.opensource.org/licenses/gpl-license.html
+> + * http://www.gnu.org/copyleft/gpl.html
+> + */
+> +
+> +/dts-v1/;
+> +/include/ "imx6q.dtsi"
+> +
+> +/ {
+> +	model = "Freescale i.MX6 Quad SABRE Lite Board";
+> +	compatible = "fsl,imx6q-sabrelite", "fsl,imx6q";
+> +
+> +	chosen {
+> +		bootargs = "console=ttymxc1,115200";
+> +	};
+> +
+Maybe we can start dropping this, since kernel is now able to get
+bootargs from atags even in case that bootloader can not pass dtb
+and the dtb is appended to kernel image.
 
-Please try this patch.  How much does the branch cost us?
+> +	memory {
+> +		reg = <0x10000000 0x40000000>;
+> +	};
+> +
+> +	soc {
+> +		aips-bus at 02100000 { /* AIPS2 */
+> +			enet at 02188000 {
+> +				phy-mode = "rgmii";
+> +				local-mac-address = [01 04 9F 01 1B 61];
 
-(Compiles, untested).
+Do we still have no way to figure the mac address from hardware setup
+(fuse or something) on sabrelite board?
 
-Thanks,
-Rusty.
+> +				phy-reset-gpios = <&gpio2 23 0>; /* gpio3 23 */
 
-From: Rusty Russell <rusty@rustcorp.com.au>
-Subject: virtio: harsher barriers for virtio-mmio.
+Nit: If you want to comment it, please comment it in the consistent way,
+which is '/* GPIO3_23 */'.
 
-We were cheating with our barriers; using the smp ones rather than the
-real device ones.  That was fine, until virtio-mmio came along, which
-could be talking to a real device (a non-SMP CPU).
+Regards,
+Shawn
 
-Unfortunately, just putting back the real barriers (reverting
-d57ed95d) causes a performance regression on virtio-pci.  In
-particular, Amos reports netbench's TCP_RR over virtio_net CPU
-utilization increased up to 35% while throughput went down by up to
-14%.
-
-By comparison, this branch costs us???
-
-Reference: https://lkml.org/lkml/2011/12/11/22
-
-Signed-off-by: Rusty Russell <rusty@rustcorp.com.au>
----
- drivers/lguest/lguest_device.c |   10 ++++++----
- drivers/s390/kvm/kvm_virtio.c  |    2 +-
- drivers/virtio/virtio_mmio.c   |    7 ++++---
- drivers/virtio/virtio_pci.c    |    4 ++--
- drivers/virtio/virtio_ring.c   |   34 +++++++++++++++++++++-------------
- include/linux/virtio_ring.h    |    1 +
- tools/virtio/linux/virtio.h    |    1 +
- tools/virtio/virtio_test.c     |    3 ++-
- 8 files changed, 38 insertions(+), 24 deletions(-)
-
-diff --git a/drivers/lguest/lguest_device.c b/drivers/lguest/lguest_device.c
---- a/drivers/lguest/lguest_device.c
-+++ b/drivers/lguest/lguest_device.c
-@@ -291,11 +291,13 @@ static struct virtqueue *lg_find_vq(stru
- 	}
- 
- 	/*
--	 * OK, tell virtio_ring.c to set up a virtqueue now we know its size
--	 * and we've got a pointer to its pages.
-+	 * OK, tell virtio_ring.c to set up a virtqueue now we know its size
-+	 * and we've got a pointer to its pages.  Note that we set weak_barriers
-+	 * to 'true': the host just a(nother) SMP CPU, so we only need inter-cpu
-+	 * barriers.
- 	 */
--	vq = vring_new_virtqueue(lvq->config.num, LGUEST_VRING_ALIGN,
--				 vdev, lvq->pages, lg_notify, callback, name);
-+	vq = vring_new_virtqueue(lvq->config.num, LGUEST_VRING_ALIGN, vdev,
-+				 true, lvq->pages, lg_notify, callback, name);
- 	if (!vq) {
- 		err = -ENOMEM;
- 		goto unmap;
-diff --git a/drivers/s390/kvm/kvm_virtio.c b/drivers/s390/kvm/kvm_virtio.c
---- a/drivers/s390/kvm/kvm_virtio.c
-+++ b/drivers/s390/kvm/kvm_virtio.c
-@@ -198,7 +198,7 @@ static struct virtqueue *kvm_find_vq(str
- 		goto out;
- 
- 	vq = vring_new_virtqueue(config->num, KVM_S390_VIRTIO_RING_ALIGN,
--				 vdev, (void *) config->address,
-+				 vdev, true, (void *) config->address,
- 				 kvm_notify, callback, name);
- 	if (!vq) {
- 		err = -ENOMEM;
-diff --git a/drivers/virtio/virtio_mmio.c b/drivers/virtio/virtio_mmio.c
---- a/drivers/virtio/virtio_mmio.c
-+++ b/drivers/virtio/virtio_mmio.c
-@@ -309,9 +309,10 @@ static struct virtqueue *vm_setup_vq(str
- 	writel(virt_to_phys(info->queue) >> PAGE_SHIFT,
- 			vm_dev->base + VIRTIO_MMIO_QUEUE_PFN);
- 
--	/* Create the vring */
--	vq = vring_new_virtqueue(info->num, VIRTIO_MMIO_VRING_ALIGN,
--				 vdev, info->queue, vm_notify, callback, name);
-+	/* Create the vring: no weak barriers, the other side is could
-+	 * be an independent "device". */
-+	vq = vring_new_virtqueue(info->num, VIRTIO_MMIO_VRING_ALIGN, vdev,
-+				 false, info->queue, vm_notify, callback, name);
- 	if (!vq) {
- 		err = -ENOMEM;
- 		goto error_new_virtqueue;
-diff --git a/drivers/virtio/virtio_pci.c b/drivers/virtio/virtio_pci.c
---- a/drivers/virtio/virtio_pci.c
-+++ b/drivers/virtio/virtio_pci.c
-@@ -414,8 +414,8 @@ static struct virtqueue *setup_vq(struct
- 		  vp_dev->ioaddr + VIRTIO_PCI_QUEUE_PFN);
- 
- 	/* create the vring */
--	vq = vring_new_virtqueue(info->num, VIRTIO_PCI_VRING_ALIGN,
--				 vdev, info->queue, vp_notify, callback, name);
-+	vq = vring_new_virtqueue(info->num, VIRTIO_PCI_VRING_ALIGN, vdev,
-+				 true, info->queue, vp_notify, callback, name);
- 	if (!vq) {
- 		err = -ENOMEM;
- 		goto out_activate_queue;
-diff --git a/drivers/virtio/virtio_ring.c b/drivers/virtio/virtio_ring.c
---- a/drivers/virtio/virtio_ring.c
-+++ b/drivers/virtio/virtio_ring.c
-@@ -28,17 +28,20 @@
- #ifdef CONFIG_SMP
- /* Where possible, use SMP barriers which are more lightweight than mandatory
-  * barriers, because mandatory barriers control MMIO effects on accesses
-- * through relaxed memory I/O windows (which virtio does not use). */
--#define virtio_mb() smp_mb()
--#define virtio_rmb() smp_rmb()
--#define virtio_wmb() smp_wmb()
-+ * through relaxed memory I/O windows (which virtio-pci does not use). */
-+#define virtio_mb(vq) \
-+	do { if ((vq)->weak_barriers) smp_mb(); else mb(); } while(0)
-+#define virtio_rmb(vq) \
-+	do { if ((vq)->weak_barriers) smp_rmb(); else rmb(); } while(0)
-+#define virtio_wmb(vq) \
-+	do { if ((vq)->weak_barriers) smp_rmb(); else rmb(); } while(0)
- #else
- /* We must force memory ordering even if guest is UP since host could be
-  * running on another CPU, but SMP barriers are defined to barrier() in that
-  * configuration. So fall back to mandatory barriers instead. */
--#define virtio_mb() mb()
--#define virtio_rmb() rmb()
--#define virtio_wmb() wmb()
-+#define virtio_mb(vq) mb()
-+#define virtio_rmb(vq) rmb()
-+#define virtio_wmb(vq) wmb()
- #endif
- 
- #ifdef DEBUG
-@@ -77,6 +80,9 @@ struct vring_virtqueue
- 	/* Actual memory layout for this queue */
- 	struct vring vring;
- 
-+	/* Can we use weak barriers? */
-+	bool weak_barriers;
-+
- 	/* Other side has made a mess, don't try any more. */
- 	bool broken;
- 
-@@ -245,14 +251,14 @@ void virtqueue_kick(struct virtqueue *_v
- 	START_USE(vq);
- 	/* Descriptors and available array need to be set before we expose the
- 	 * new available array entries. */
--	virtio_wmb();
-+	virtio_wmb(vq);
- 
- 	old = vq->vring.avail->idx;
- 	new = vq->vring.avail->idx = old + vq->num_added;
- 	vq->num_added = 0;
- 
- 	/* Need to update avail index before checking if we should notify */
--	virtio_mb();
-+	virtio_mb(vq);
- 
- 	if (vq->event ?
- 	    vring_need_event(vring_avail_event(&vq->vring), new, old) :
-@@ -314,7 +320,7 @@ void *virtqueue_get_buf(struct virtqueue
- 	}
- 
- 	/* Only get used array entries after they have been exposed by host. */
--	virtio_rmb();
-+	virtio_rmb(vq);
- 
- 	i = vq->vring.used->ring[vq->last_used_idx%vq->vring.num].id;
- 	*len = vq->vring.used->ring[vq->last_used_idx%vq->vring.num].len;
-@@ -337,7 +343,7 @@ void *virtqueue_get_buf(struct virtqueue
- 	 * the read in the next get_buf call. */
- 	if (!(vq->vring.avail->flags & VRING_AVAIL_F_NO_INTERRUPT)) {
- 		vring_used_event(&vq->vring) = vq->last_used_idx;
--		virtio_mb();
-+		virtio_mb(vq);
- 	}
- 
- 	END_USE(vq);
-@@ -366,7 +372,7 @@ bool virtqueue_enable_cb(struct virtqueu
- 	 * entry. Always do both to keep code simple. */
- 	vq->vring.avail->flags &= ~VRING_AVAIL_F_NO_INTERRUPT;
- 	vring_used_event(&vq->vring) = vq->last_used_idx;
--	virtio_mb();
-+	virtio_mb(vq);
- 	if (unlikely(more_used(vq))) {
- 		END_USE(vq);
- 		return false;
-@@ -393,7 +399,7 @@ bool virtqueue_enable_cb_delayed(struct 
- 	/* TODO: tune this threshold */
- 	bufs = (u16)(vq->vring.avail->idx - vq->last_used_idx) * 3 / 4;
- 	vring_used_event(&vq->vring) = vq->last_used_idx + bufs;
--	virtio_mb();
-+	virtio_mb(vq);
- 	if (unlikely((u16)(vq->vring.used->idx - vq->last_used_idx) > bufs)) {
- 		END_USE(vq);
- 		return false;
-@@ -453,6 +459,7 @@ EXPORT_SYMBOL_GPL(vring_interrupt);
- struct virtqueue *vring_new_virtqueue(unsigned int num,
- 				      unsigned int vring_align,
- 				      struct virtio_device *vdev,
-+				      bool weak_barriers,
- 				      void *pages,
- 				      void (*notify)(struct virtqueue *),
- 				      void (*callback)(struct virtqueue *),
-@@ -476,6 +483,7 @@ struct virtqueue *vring_new_virtqueue(un
- 	vq->vq.vdev = vdev;
- 	vq->vq.name = name;
- 	vq->notify = notify;
-+	vq->weak_barriers = weak_barriers;
- 	vq->broken = false;
- 	vq->last_used_idx = 0;
- 	vq->num_added = 0;
-diff --git a/include/linux/virtio_ring.h b/include/linux/virtio_ring.h
---- a/include/linux/virtio_ring.h
-+++ b/include/linux/virtio_ring.h
-@@ -168,6 +168,7 @@ struct virtqueue;
- struct virtqueue *vring_new_virtqueue(unsigned int num,
- 				      unsigned int vring_align,
- 				      struct virtio_device *vdev,
-+				      bool weak_barriers,
- 				      void *pages,
- 				      void (*notify)(struct virtqueue *vq),
- 				      void (*callback)(struct virtqueue *vq),
-diff --git a/tools/virtio/linux/virtio.h b/tools/virtio/linux/virtio.h
---- a/tools/virtio/linux/virtio.h
-+++ b/tools/virtio/linux/virtio.h
-@@ -214,6 +214,7 @@ void *virtqueue_detach_unused_buf(struct
- struct virtqueue *vring_new_virtqueue(unsigned int num,
- 				      unsigned int vring_align,
- 				      struct virtio_device *vdev,
-+				      bool weak_barriers,
- 				      void *pages,
- 				      void (*notify)(struct virtqueue *vq),
- 				      void (*callback)(struct virtqueue *vq),
-diff --git a/tools/virtio/virtio_test.c b/tools/virtio/virtio_test.c
---- a/tools/virtio/virtio_test.c
-+++ b/tools/virtio/virtio_test.c
-@@ -92,7 +92,8 @@ static void vq_info_add(struct vdev_info
- 	assert(r >= 0);
- 	memset(info->ring, 0, vring_size(num, 4096));
- 	vring_init(&info->vring, num, info->ring, 4096);
--	info->vq = vring_new_virtqueue(info->vring.num, 4096, &dev->vdev, info->ring,
-+	info->vq = vring_new_virtqueue(info->vring.num, 4096, &dev->vdev,
-+				       true, info->ring,
- 				       vq_notify, vq_callback, "test");
- 	assert(info->vq);
- 	info->vq->priv = info;
+> +				status = "okay";
+> +			};
+> +
+> +			usdhc at 02198000 { /* uSDHC3 */
+> +				cd-gpios = <&gpio6 0 0>; /* GPIO7_0 */
+> +				wp-gpios = <&gpio6 1 0>; /* GPIO7_1 */
+> +				status = "okay";
+> +			};
+> +
+> +			usdhc at 0219c000 { /* uSDHC4 */
+> +				cd-gpios = <&gpio1 6 0>; /* GPIO2_6 */
+> +				wp-gpios = <&gpio1 7 0>; /* GPIO2_7 */
+> +				status = "okay";
+> +			};
+> +
+> +			uart1: uart at 021e8000 { /* UART2 */
+> +				status = "okay";
+> +			};
+> +		};
+> +	};
+> +};
+> diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
+> index 8deb012..d24d6c4 100644
+> --- a/arch/arm/mach-imx/mach-imx6q.c
+> +++ b/arch/arm/mach-imx/mach-imx6q.c
+> @@ -73,6 +73,7 @@ static struct sys_timer imx6q_timer = {
+>  
+>  static const char *imx6q_dt_compat[] __initdata = {
+>  	"fsl,imx6q-sabreauto",
+> +	"fsl,imx6q-sabrelite",
+>  	NULL,
+>  };
+>  
+> -- 
+> 1.7.5.4
