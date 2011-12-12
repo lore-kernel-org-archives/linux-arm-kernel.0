@@ -1,75 +1,61 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 12 Dec 2011 07:41:17 -0600
-Subject: [PATCH 1/7] arm/imx6: add imx6q sabrelite board support
-In-Reply-To: <20111212054053.GD9572@S2100-06.ap.freescale.net>
-References: <1323661352-10291-1-git-send-email-richard.zhao@linaro.org>
- <1323661352-10291-2-git-send-email-richard.zhao@linaro.org>
- <20111212054053.GD9572@S2100-06.ap.freescale.net>
-Message-ID: <4EE6047D.9080209@gmail.com>
+From: mel@csn.ul.ie (Mel Gorman)
+Date: Mon, 12 Dec 2011 13:42:35 +0000
+Subject: [PATCH 01/11] mm: page_alloc: handle MIGRATE_ISOLATE in
+ free_pcppages_bulk()
+In-Reply-To: <1321634598-16859-2-git-send-email-m.szyprowski@samsung.com>
+References: <1321634598-16859-1-git-send-email-m.szyprowski@samsung.com>
+ <1321634598-16859-2-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <20111212134235.GB3277@csn.ul.ie>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/11/2011 11:40 PM, Shawn Guo wrote:
-> On Mon, Dec 12, 2011 at 11:42:26AM +0800, Richard Zhao wrote:
->> Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
->> ---
->>  arch/arm/boot/dts/imx6q-sabrelite.dts |   54 +++++++++++++++++++++++++++++++++
->>  arch/arm/mach-imx/mach-imx6q.c        |    1 +
->>  2 files changed, 55 insertions(+), 0 deletions(-)
->>  create mode 100644 arch/arm/boot/dts/imx6q-sabrelite.dts
->>
->> diff --git a/arch/arm/boot/dts/imx6q-sabrelite.dts b/arch/arm/boot/dts/imx6q-sabrelite.dts
->> new file mode 100644
->> index 0000000..d54363f
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/imx6q-sabrelite.dts
->> @@ -0,0 +1,54 @@
->> +/*
->> + * Copyright 2011 Freescale Semiconductor, Inc.
->> + * Copyright 2011 Linaro Ltd.
->> + *
->> + * The code contained herein is licensed under the GNU General Public
->> + * License. You may obtain a copy of the GNU General Public License
->> + * Version 2 or later at the following locations:
->> + *
->> + * http://www.opensource.org/licenses/gpl-license.html
->> + * http://www.gnu.org/copyleft/gpl.html
->> + */
->> +
->> +/dts-v1/;
->> +/include/ "imx6q.dtsi"
->> +
->> +/ {
->> +	model = "Freescale i.MX6 Quad SABRE Lite Board";
->> +	compatible = "fsl,imx6q-sabrelite", "fsl,imx6q";
->> +
->> +	chosen {
->> +		bootargs = "console=ttymxc1,115200";
->> +	};
->> +
-> Maybe we can start dropping this, since kernel is now able to get
-> bootargs from atags even in case that bootloader can not pass dtb
-> and the dtb is appended to kernel image.
+On Fri, Nov 18, 2011 at 05:43:08PM +0100, Marek Szyprowski wrote:
+> From: Michal Nazarewicz <mina86@mina86.com>
 > 
->> +	memory {
->> +		reg = <0x10000000 0x40000000>;
->> +	};
->> +
->> +	soc {
->> +		aips-bus at 02100000 { /* AIPS2 */
->> +			enet at 02188000 {
->> +				phy-mode = "rgmii";
->> +				local-mac-address = [01 04 9F 01 1B 61];
+> If page is on PCP list while pageblock it belongs to gets isolated,
+> the page's private still holds the old migrate type.  This means
+> that free_pcppages_bulk() will put the page on a freelist of the
+> old migrate type instead of MIGRATE_ISOLATE.
 > 
-> Do we still have no way to figure the mac address from hardware setup
-> (fuse or something) on sabrelite board?
+> This commit changes that by explicitly checking whether page's
+> pageblock's migrate type is MIGRATE_ISOLATE and if it is, overwrites
+> page's private data.
 > 
->> +				phy-reset-gpios = <&gpio2 23 0>; /* gpio3 23 */
+> Signed-off-by: Michal Nazarewicz <mina86@mina86.com>
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> ---
+>  mm/page_alloc.c |   12 ++++++++++++
+>  1 files changed, 12 insertions(+), 0 deletions(-)
 > 
-> Nit: If you want to comment it, please comment it in the consistent way,
-> which is '/* GPIO3_23 */'.
+> diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+> index 9dd443d..58d1a2e 100644
+> --- a/mm/page_alloc.c
+> +++ b/mm/page_alloc.c
+> @@ -628,6 +628,18 @@ static void free_pcppages_bulk(struct zone *zone, int count,
+>  			page = list_entry(list->prev, struct page, lru);
+>  			/* must delete as __free_one_page list manipulates */
+>  			list_del(&page->lru);
+> +
+> +			/*
+> +			 * When page is isolated in set_migratetype_isolate()
+> +			 * function it's page_private is not changed since the
+> +			 * function has no way of knowing if it can touch it.
+> +			 * This means that when a page is on PCP list, it's
+> +			 * page_private no longer matches the desired migrate
+> +			 * type.
+> +			 */
+> +			if (get_pageblock_migratetype(page) == MIGRATE_ISOLATE)
+> +				set_page_private(page, MIGRATE_ISOLATE);
+> +
 
-Better yet, why don't you name the phandles starting at 1 so the comment
-isn't needed at all.
+How much of a problem is this in practice? It's adding overhead to the
+free path for what should be a very rare case which is undesirable. I
+know we are already calling get_pageblock_migrate() when freeing
+pages but it should be unnecessary to call it again. I'd go as far
+to say that it would be preferable to drain the per-CPU lists after
+you set pageblocks MIGRATE_ISOLATE. The IPIs also have overhead but it
+will be incurred for the rare rather than the common case.
 
-Rob
+-- 
+Mel Gorman
+SUSE Labs
