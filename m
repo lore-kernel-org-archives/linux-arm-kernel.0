@@ -1,55 +1,27 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 12 Dec 2011 14:32:34 -0800
-Subject: [GIT PULL] omap hsmmc platform code changes for v3.3 merge window
-Message-ID: <20111212223234.GH32251@atomide.com>
+From: davidb@codeaurora.org (David Brown)
+Date: Mon, 12 Dec 2011 14:36:05 -0800
+Subject: [PATCH v2] spi: QUP based bus driver for Qualcomm MSM chipsets
+In-Reply-To: <4EE68003.1090802@codeaurora.org>
+References: <y> <1321307907-31508-1-git-send-email-harinij@codeaurora.org>
+ <20111207223757.GE3744@pengutronix.de>
+ <4EE68003.1090802@codeaurora.org>
+Message-ID: <20111212223604.GA21861@huya.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd & Olof,
+On Mon, Dec 12, 2011 at 03:28:19PM -0700, Harini Jayaraman wrote:
 
-Please pull omap hsmmc platform code changes from:
+> Thanks Wolfram for taking time to review this patch. I appreciate
+> your comments and will incorporate them in to the next version of
+> the patch.
+> ... 806 lines of excessive context ...
 
-git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap hsmmc
+Please trim your replies to only include the parts you are replying
+to.
 
-Ideally arch/arm/mach-omap2/hsmmc.c file will completely
-disappear with device tree, but looks like we're still
-some more patches away from that. Meanwhile, these are
-needed for various board files.
+Thanks,
+David
 
-Regards,
-
-Tony
-
-
-The following changes since commit 5611cc4572e889b62a7b4c72a413536bf6a9c416:
-  Linus Torvalds (1):
-        Linux 3.2-rc4
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap hsmmc
-
-Abhilash K V (1):
-      ARM: OMAP: hsmmc: Support for AM3517 MMC1 voltages
-
-Eliad Peller (3):
-      omap_hsmmc: consider MMC_PM_KEEP_POWER on suspend/resume
-      ARM: OMAP: hsmmc: add pm_caps field
-      ARM: OMAP: hsmmc: board-sdp4430: declare support for MMC_PM_KEEP_POWER
-
-Igor Grinberg (1):
-      ARM: OMAP: hsmmc: Add support for MMC 2 setup for AM35x
-
-Thomas Weber (1):
-      ARM: OMAP: hsmmc: Add support for non-OMAP pins
-
-Vaibhav Hiremath (1):
-      ARM: OMAP: hsmmc: Add support for AM3517EVM base-board MMC slot
-
- arch/arm/mach-omap2/board-4430sdp.c   |    1 +
- arch/arm/mach-omap2/board-am3517evm.c |   22 ++++++++++++
- arch/arm/mach-omap2/hsmmc.c           |   59 ++++++++++++++++++++++++--------
- arch/arm/mach-omap2/hsmmc.h           |    1 +
- arch/arm/plat-omap/include/plat/mmc.h |    1 +
- drivers/mmc/host/omap_hsmmc.c         |   26 +++++++++-----
- 6 files changed, 86 insertions(+), 24 deletions(-)
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
