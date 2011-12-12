@@ -1,58 +1,93 @@
-From: mel@csn.ul.ie (Mel Gorman)
-Date: Mon, 12 Dec 2011 14:29:07 +0000
-Subject: [PATCH 04/11] mm: compaction: export some of the functions
-In-Reply-To: <1321634598-16859-5-git-send-email-m.szyprowski@samsung.com>
-References: <1321634598-16859-1-git-send-email-m.szyprowski@samsung.com>
- <1321634598-16859-5-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <20111212142906.GE3277@csn.ul.ie>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Mon, 12 Dec 2011 22:44:47 +0800
+Subject: [PATCH 1/7] arm/imx6: add imx6q sabrelite board support
+In-Reply-To: <20111212134949.GD16835@b20223-02.ap.freescale.net>
+References: <1323661352-10291-1-git-send-email-richard.zhao@linaro.org>
+ <1323661352-10291-2-git-send-email-richard.zhao@linaro.org>
+ <20111212054053.GD9572@S2100-06.ap.freescale.net>
+ <4EE6047D.9080209@gmail.com>
+ <20111212134949.GD16835@b20223-02.ap.freescale.net>
+Message-ID: <20111212144445.GA10437@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 18, 2011 at 05:43:11PM +0100, Marek Szyprowski wrote:
-> From: Michal Nazarewicz <mina86@mina86.com>
+On Mon, Dec 12, 2011 at 09:49:54PM +0800, Richard Zhao wrote:
+> On Mon, Dec 12, 2011 at 07:41:17AM -0600, Rob Herring wrote:
+> > On 12/11/2011 11:40 PM, Shawn Guo wrote:
+> > > On Mon, Dec 12, 2011 at 11:42:26AM +0800, Richard Zhao wrote:
+> > >> Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
+> > >> ---
+> > >>  arch/arm/boot/dts/imx6q-sabrelite.dts |   54 +++++++++++++++++++++++++++++++++
+> > >>  arch/arm/mach-imx/mach-imx6q.c        |    1 +
+> > >>  2 files changed, 55 insertions(+), 0 deletions(-)
+> > >>  create mode 100644 arch/arm/boot/dts/imx6q-sabrelite.dts
+> > >>
+> > >> diff --git a/arch/arm/boot/dts/imx6q-sabrelite.dts b/arch/arm/boot/dts/imx6q-sabrelite.dts
+> > >> new file mode 100644
+> > >> index 0000000..d54363f
+> > >> --- /dev/null
+> > >> +++ b/arch/arm/boot/dts/imx6q-sabrelite.dts
+> > >> @@ -0,0 +1,54 @@
+> > >> +/*
+> > >> + * Copyright 2011 Freescale Semiconductor, Inc.
+> > >> + * Copyright 2011 Linaro Ltd.
+> > >> + *
+> > >> + * The code contained herein is licensed under the GNU General Public
+> > >> + * License. You may obtain a copy of the GNU General Public License
+> > >> + * Version 2 or later at the following locations:
+> > >> + *
+> > >> + * http://www.opensource.org/licenses/gpl-license.html
+> > >> + * http://www.gnu.org/copyleft/gpl.html
+> > >> + */
+> > >> +
+> > >> +/dts-v1/;
+> > >> +/include/ "imx6q.dtsi"
+> > >> +
+> > >> +/ {
+> > >> +	model = "Freescale i.MX6 Quad SABRE Lite Board";
+> > >> +	compatible = "fsl,imx6q-sabrelite", "fsl,imx6q";
+> > >> +
+> > >> +	chosen {
+> > >> +		bootargs = "console=ttymxc1,115200";
+> > >> +	};
+> > >> +
+> > > Maybe we can start dropping this, since kernel is now able to get
+> > > bootargs from atags even in case that bootloader can not pass dtb
+> > > and the dtb is appended to kernel image.
+> > > 
+> > >> +	memory {
+> > >> +		reg = <0x10000000 0x40000000>;
+> > >> +	};
+> > >> +
+> > >> +	soc {
+> > >> +		aips-bus at 02100000 { /* AIPS2 */
+> > >> +			enet at 02188000 {
+> > >> +				phy-mode = "rgmii";
+> > >> +				local-mac-address = [01 04 9F 01 1B 61];
+> > > 
+> > > Do we still have no way to figure the mac address from hardware setup
+> > > (fuse or something) on sabrelite board?
+> > > 
+> > >> +				phy-reset-gpios = <&gpio2 23 0>; /* gpio3 23 */
+> > > 
+> > > Nit: If you want to comment it, please comment it in the consistent way,
+> > > which is '/* GPIO3_23 */'.
+> > 
+> > Better yet, why don't you name the phandles starting at 1 so the comment
+> > isn't needed at all.
+> Good idea, but it needs another patch, because it effects all imx6 boards.
+> Shawn, what do you think?
 > 
-> This commit exports some of the functions from compaction.c file
-> outside of it adding their declaration into internal.h header
-> file so that other mm related code can use them.
-> 
-> This forced compaction.c to always be compiled (as opposed to being
-> compiled only if CONFIG_COMPACTION is defined) but as to avoid
-> introducing code that user did not ask for, part of the compaction.c
-> is now wrapped in on #ifdef.
-> 
-> Signed-off-by: Michal Nazarewicz <mina86@mina86.com>
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> ---
->  mm/Makefile     |    3 +-
->  mm/compaction.c |  112 +++++++++++++++++++++++--------------------------------
->  mm/internal.h   |   35 +++++++++++++++++
->  3 files changed, 83 insertions(+), 67 deletions(-)
-> 
-> diff --git a/mm/Makefile b/mm/Makefile
-> index 50ec00e..24ed801 100644
-> --- a/mm/Makefile
-> +++ b/mm/Makefile
-> @@ -13,7 +13,7 @@ obj-y			:= filemap.o mempool.o oom_kill.o fadvise.o \
->  			   readahead.o swap.o truncate.o vmscan.o shmem.o \
->  			   prio_tree.o util.o mmzone.o vmstat.o backing-dev.o \
->  			   page_isolation.o mm_init.o mmu_context.o percpu.o \
-> -			   $(mmu-y)
-> +			   $(mmu-y) compaction.o
+When I was firstly working out the dts for imx51, I followed what most
+dts files do, numbering phandle and label name from 0, while imx
+reference manual happens to indexing hardware block from 1.  This
+mismatch have been existing in kernel for long time, since kernel is
+numbering platform device from 0 too.
 
-That should be
-
-compaction.o $(mmu-y)
-
-for consistency.
-
-Overall, this patch implies that CMA is always compiled in. Why
-not just make CMA depend on COMPACTION to keep things simplier? For
-example, if you enable CMA and do not enable COMPACTION, you lose
-things like the vmstat counters that can aid debugging. In fact, as
-parts of compaction.c are using defines like COMPACTBLOCKS, I'm not
-even sure compaction.c can compile without CONFIG_COMPACTION because
-of the vmstat stuff.
+I'm not really sure if there is a convention on this.  But since Rob
+(as device tree maintainer) says it can be numbered from 1, I'm fine
+to accept a patch fixing this up for all imx dts files.
 
 -- 
-Mel Gorman
-SUSE Labs
+Regards,
+Shawn
