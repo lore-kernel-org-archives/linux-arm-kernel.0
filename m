@@ -1,79 +1,39 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Mon, 12 Dec 2011 15:01:58 +0000
-Subject: [PATCH v3 1/2] ARM: pl2x0/pl310: Refactor Kconfig to be more
- maintainable
-In-Reply-To: <20111212140836.GY14542@n2100.arm.linux.org.uk>
-References: <1323690426-6267-1-git-send-email-dave.martin@linaro.org>
- <1323690426-6267-2-git-send-email-dave.martin@linaro.org>
- <20111212140836.GY14542@n2100.arm.linux.org.uk>
-Message-ID: <20111212145738.GA2296@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 12 Dec 2011 15:03:34 +0000
+Subject: [PATCH v4 0/5] ARM: davinci: re-arrange definitions to have a
+ common davinci header
+In-Reply-To: <DF0F476B391FA8409C78302C7BA518B6043FD6@DBDE01.ent.ti.com>
+References: <1323352528-1207-1-git-send-email-manjunath.hadli@ti.com>
+ <DF0F476B391FA8409C78302C7BA518B6043FD6@DBDE01.ent.ti.com>
+Message-ID: <20111212150334.GA20178@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 12, 2011 at 02:08:37PM +0000, Russell King - ARM Linux wrote:
-> On Mon, Dec 12, 2011 at 11:47:05AM +0000, Dave Martin wrote:
-> > diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
-> > index 724ec0f..c4c9acf 100644
-> > --- a/arch/arm/mach-exynos/Kconfig
-> > +++ b/arch/arm/mach-exynos/Kconfig
-> > @@ -17,6 +17,7 @@ choice
-> >  
-> >  config ARCH_EXYNOS4
-> >  	bool "SAMSUNG EXYNOS4"
-> > +	select CACHE_L2X0
+On Mon, Dec 12, 2011 at 11:25:11AM +0000, Nori, Sekhar wrote:
+> Hi Manju,
 > 
-> Doesn't this need to select HAVE_L2X0_L2CC as well?
-
-Probably not -- due to a moment of madness, it looks like I somehow
-mistranslated "highbank" as "exynos4".
-
-For highbank, Rob Herring thinks that direct selection of CACHE_L2X0 is
-needed [1].
-
-I will re-roll the patch to fix this.
-
-
-This may apply to other platforms too; but if they are not already
-selecting CACHE_L2X0 directly, this series will make the situation no
-worse.
-
-> > diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-> > index 5f7f9c2..4234937 100644
-> > --- a/arch/arm/mach-imx/Kconfig
-> > +++ b/arch/arm/mach-imx/Kconfig
-> > @@ -609,12 +609,12 @@ comment "i.MX6 family:"
-> >  config SOC_IMX6Q
-> >  	bool "i.MX6 Quad support"
-> >  	select ARM_GIC
-> > -	select CACHE_L2X0
-> >  	select CPU_V7
-> >  	select HAVE_ARM_SCU
-> >  	select HAVE_IMX_GPC
-> >  	select HAVE_IMX_MMDC
-> >  	select HAVE_IMX_SRC
-> > +	select HAVE_L2X0_L2CC
+> On Thu, Dec 08, 2011 at 19:25:23, Hadli, Manjunath wrote:
+> > Re-arrange definitions and remove unnecessary code so that we can
+> > have a common header for all davinci platforms. This will enable
+> > us to share defines and enable common routines to be used without
+> > polluting hardware.h.
+> >  This patch set forms the base for a later set of patches for having
+> > a common system module base address (DAVINCI_SYSTEM_MODULE_BASE).
 > 
-> Do you know enough about this to make L2 cache support optional on this SoC?
-
-No.  But Shawn Guo suggested that this correct [2]
- 
-> > diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-> > index 5034147..0358159 100644
-> > --- a/arch/arm/mach-omap2/Kconfig
-> > +++ b/arch/arm/mach-omap2/Kconfig
-> > @@ -44,6 +44,7 @@ config ARCH_OMAP4
-> >  	select CPU_V7
-> >  	select ARM_GIC
-> >  	select LOCAL_TIMERS if SMP
-> > +	select CACHE_L2X0
+> Its easy to dismiss this series as causing "needless churn" by
+> moving around definitions from header to C files and consolidating
+> definitions from multiple header files to one.
 > 
-> HAVE_L2X0_L2CC ?
+> You need to do a better job of "selling" this series. The best way
+> to do that would be to include future patches which benefit from
+> this series into this series itself. This way, its clear to judge
+> the relative benefit of the "churn". You gave some examples, but
+> showing code helps.
+> 
+> Also, one of the biggest gains from this series is reducing the
+> pollution in include/mach as asked by Russell in his "pet peaves"
+> mail. That should find reference in the cover letter and in the
+> commit text of patch 5/5.
 
-Rob Herring thinks not [1]
-
-Cheers
----Dave
-
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2011-November/074495.html
-[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2011-November/074602.html
+Indeed, and I hope it takes into account (at some point) the restart
+changes.
